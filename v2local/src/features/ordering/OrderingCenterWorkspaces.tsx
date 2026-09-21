@@ -98,22 +98,71 @@ export function ComboWorkspace({products,onAdd}:{products:readonly WorkspaceProd
 }
 
 
-export function HoldCartWorkspace({lines,totalMinor,onHold}:{lines:readonly WorkspaceCartLine[];totalMinor:number;onHold:(kind:'dining'|'waiting',partySize:number,note:string)=>void}){
-  const [kind,setKind]=useState<'dining'|'waiting'>('waiting');
+export interface HoldPlacementTable{
+  readonly id:string;
+  readonly label:string;
+  readonly occupied:boolean;
+  readonly codeLabel?:string;
+}
+
+export function HoldCartWorkspace({
+  lines,totalMinor,tables,onHoldWaiting,onHoldQueue,onHoldTable
+}:{
+  lines:readonly WorkspaceCartLine[];
+  totalMinor:number;
+  tables:readonly HoldPlacementTable[];
+  onHoldWaiting:(partySize:number,note:string)=>void;
+  onHoldQueue:(partySize:number,note:string)=>void;
+  onHoldTable:(tableId:string,partySize:number,note:string)=>void;
+}){
+  const [mode,setMode]=useState<'cart'|'dining'>('cart');
   const [partySize,setPartySize]=useState(2);
   const [note,setNote]=useState('');
+
   return <div className="hold-cart-workspace">
-    <header><div><h2>暫存／候位</h2><p>暫存唔會建立正式訂單；只保存購物車，等客人確認或者安排堂食。</p></div><strong>{money(totalMinor)}</strong></header>
+    <header>
+      <div><h2>暫存工作台</h2><p>同一頁完成：暫存待客，或者掛入堂食／輪候。</p></div>
+      <strong>{money(totalMinor)}</strong>
+    </header>
+
     <section className="hold-kind-grid">
-      <button className={kind==='dining'?'active':''} onClick={()=>setKind('dining')}><b>掛入堂食／輪候</b><span>進入堂食九宮格流程，之後安排座位。</span></button>
-      <button className={kind==='waiting'?'active':''} onClick={()=>setKind('waiting')}><b>暫存待客</b><span>客人話等一等，先離開點單流程，之後再處理。</span></button>
+      <button className="waiting" onClick={()=>onHoldWaiting(partySize,note)}>
+        <b>暫存待客</b>
+        <span>客人未確認；保存呢張 Cart，之後由「取回訂單」直接攞返。</span>
+      </button>
+      <button className={mode==='dining'?'active dining':'dining'} onClick={()=>setMode('dining')}>
+        <b>掛入堂食</b>
+        <span>唔跳頁；下面「購物車內容」即場轉成加入輪候＋1–9 號枱。</span>
+      </button>
     </section>
-    <section className="hold-cart-summary"><header><b>購物車內容</b><span>{lines.reduce((sum,line)=>sum+line.qty,0)} 件</span></header>{lines.map(line=><article key={line.id}><span>{line.qty}×</span><b>{line.name}</b><strong>{money(line.qty*line.unitMinor)}</strong></article>)}</section>
-    <div className="hold-cart-form">
-      <label><span>人數</span><div><button onClick={()=>setPartySize(Math.max(1,partySize-1))}>−</button><b>{partySize}</b><button onClick={()=>setPartySize(partySize+1)}>＋</button></div></label>
-      <label><span>備註</span><input value={note} onChange={event=>setNote(event.target.value)} placeholder="例如：客人 10 分鐘後返"/></label>
-    </div>
-    <footer><button onClick={()=>onHold(kind,partySize,note)}>確認暫存</button></footer>
+
+    {mode==='cart'?<section className="hold-cart-summary">
+      <header><b>購物車內容</b><span>{lines.reduce((sum,line)=>sum+line.qty,0)} 件</span></header>
+      {lines.map(line=><article key={line.id}>
+        <span>{line.qty}×</span>
+        <div><b>{line.name}</b>{line.detail?<small>{line.detail}</small>:null}</div>
+        <strong>{money(line.qty*line.unitMinor)}</strong>
+      </article>)}
+    </section>:<section className="hold-inline-dining">
+      <aside className="hold-inline-left">
+        <div className="hold-party">
+          <span>人數</span>
+          <div><button onClick={()=>setPartySize(Math.max(1,partySize-1))}>−</button><b>{partySize}</b><button onClick={()=>setPartySize(partySize+1)}>＋</button></div>
+        </div>
+        <button className="hold-queue-button" onClick={()=>onHoldQueue(partySize,note)}>
+          <b>加入輪候</b>
+          <span>直接放入堂食輪候，唔使再跳堂食頁揀第二次。</span>
+        </button>
+        <label className="hold-note"><span>備註</span><input value={note} onChange={event=>setNote(event.target.value)} placeholder="例如：等 10 分鐘"/></label>
+        <button className="hold-back-cart" onClick={()=>setMode('cart')}>返回購物車內容</button>
+      </aside>
+      <div className="hold-nine-grid">
+        {tables.map(table=><button key={table.id} className={table.occupied?'occupied':'available'} disabled={table.occupied} onClick={()=>onHoldTable(table.id,partySize,note)}>
+          <b>{table.label}</b>
+          <span>{table.occupied?(table.codeLabel??'使用中'):'空枱'}</span>
+        </button>)}
+      </div>
+    </section>}
   </div>;
 }
 
