@@ -63,7 +63,7 @@ const fieldLabels = {
 };
 const channelIcon={"現場":"channel-onsite.webp","電話／WhatsApp":"channel-phone-whatsapp.webp","磨飯 App":"channel-morefun-app.webp",Keeta:"channel-keeta.webp",Foodpanda:"channel-foodpanda.webp"};
 const paymentIcon={現金:"payment-cash.webp",Alipay:"payment-alipay.webp", "WeChat Pay":"payment-wechat-pay.webp",FPS:"payment-fps.webp",PayMe:"payment-payme.webp","組合付款":"payment-combined.webp"};
-const labelled=(value,map)=>`<img class="option-icon" src="../../assets/checkout-icons/${map[value]}" alt="" aria-hidden="true"><span>${value}</span>`;
+const labelled=(value)=>`<span>${value}</span>`;
 function fieldRows(policy) {
   return policy.fields.length
     ? `<section class="channel-fields"><h3>渠道資料</h3>${policy.fields.map((field) => `<label><span>${fieldLabels[field]}</span>${field === "note" ? `<textarea data-field="${field}" placeholder="可留空">${escapeHtml(channelData[field] || "")}</textarea>` : `<input data-field="${field}" value="${escapeHtml(channelData[field] || "")}" placeholder="可留空">`}</label>`).join("")}</section>`
