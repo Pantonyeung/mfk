@@ -218,7 +218,7 @@ async function dispatchOrderOutputs(order:StoredOrder):Promise<PrintDispatchSumm
           try{
             const result=job.renderMode==='tsc-bitmap'&&job.labelSpec
               ?await printBytesLan({...printerInput(job.binding),bytes:await renderTscRasterLabel(job.labelSpec)})
-              :await printTextLan({...printerInput(job.binding),text:job.payload});
+              :await printTextLan({...printerInput(job.binding),text:job.payload,cutAfter:job.cutAfter,kickDrawer:job.kickDrawer});
             const code=result.code||(result.ok?'SENT':'PRINT_FAILED');
             results.push({jobId:job.id,role:job.role,ok:result.ok,code});
             if(!result.ok)groupCode=code;

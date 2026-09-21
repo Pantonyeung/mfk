@@ -4,7 +4,7 @@ import {ProductionViewport} from './app/ProductionViewport.tsx';
 import {OrderingWorkspace} from './features/ordering/OrderingWorkspace.tsx';
 import type {OrderingWorkspaceActions,OrderingWorkspaceViewModel,ServiceMode} from './features/ordering/ordering-workspace-model.ts';
 import {CheckoutWorkspace} from './features/checkout/CheckoutWorkspace.tsx';
-import type {CheckoutWorkspaceActions,CheckoutWorkspaceViewModel} from './features/checkout/checkout-workspace-model.ts';
+import type {CheckoutChannelId,CheckoutTenderId,CheckoutWorkspaceActions,CheckoutWorkspaceViewModel} from './features/checkout/checkout-workspace-model.ts';
 import {RuntimeOrdersWorkspace} from './presentation/RuntimeOrdersWorkspace.tsx';
 import {RuntimeDiningWorkspace} from './presentation/RuntimeDiningWorkspace.tsx';
 import {RuntimeSoldoutWorkspace} from './presentation/RuntimeSoldoutWorkspace.tsx';
@@ -79,61 +79,116 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
 function CheckoutPage({cart,setCart}:{cart:CartLine[];setCart:(v:CartLine[])=>void}){
   const navigate=useNavigate();
   const due=cart.reduce((sum,line)=>sum+line.unitMinor*line.qty,0);
+  const [channel,setChannel]=useState<CheckoutChannelId>('walk-in');
+  const [method,setMethod]=useState<CheckoutTenderId>('CASH');
   const [cash,setCash]=useState('');
+  const [customerPhone,setCustomerPhone]=useState('');
+  const [pickupCode,setPickupCode]=useState('');
+  const [platformOrderNo,setPlatformOrderNo]=useState('');
+  const [split,setSplit]=useState<Record<'CASH'|'ALIPAY'|'WECHAT'|'FPS'|'PAYME',string>>({CASH:'',ALIPAY:'',WECHAT:'',FPS:'',PAYME:''});
   const [state,setState]=useState<'selected'|'processing'|'success'|'failure'>('selected');
   const [completion,setCompletion]=useState<CheckoutWorkspaceViewModel['completionReview']>();
   const [printStatus,setPrintStatus]=useState<string|undefined>();
-  const received=Math.round((Number(cash)||0)*100);
-  const change=Math.max(0,received-due);
+
+  const methodLabels:Record<CheckoutTenderId,string>={
+    CASH:'現金',ALIPAY:'Alipay',WECHAT:'WeChat Pay',FPS:'轉數快',PAYME:'PayMe',COMBO:'組合付款'
+  };
+  const channelLabels:Record<CheckoutChannelId,string>={
+    'walk-in':'現場','whatsapp':'WhatsApp／電話','own-platform':'自家平台','tiktok':'TikTok','foodpanda':'Foodpanda'
+  };
+  const parseMoney=(value:string)=>Math.max(0,Math.round((Number(value)||0)*100));
+  const cashMinor=parseMoney(cash);
+  const comboMinor=(Object.values(split) as string[]).reduce((sum,value)=>sum+parseMoney(value),0);
+  const received=method==='CASH'?cashMinor:method==='COMBO'?comboMinor:due;
+  const change=method==='CASH'?Math.max(0,received-due):0;
+  const comboExact=method!=='COMBO'||comboMinor===due;
+  const cashReady=method!=='CASH'||received>=due;
+  const confirmEnabled=cart.length>0&&comboExact&&cashReady;
+  const validationMessage=method==='CASH'&&cash&&received<due?'收款金額不足':
+    method==='COMBO'&&comboMinor!==due?'組合付款合計 '+money(comboMinor)+'，必須等於 '+money(due):undefined;
+
+  const sourceParts=[channelLabels[channel]];
+  if(channel==='whatsapp'&&customerPhone.trim())sourceParts.push(customerPhone.trim());
+  if(channel!=='walk-in'&&channel!=='whatsapp'){
+    if(pickupCode.trim())sourceParts.push('取餐碼 '+pickupCode.trim());
+    if(platformOrderNo.trim())sourceParts.push('單號 '+platformOrderNo.trim());
+  }
+  const sourceLabel=sourceParts.join(' · ');
+  const comboEntries=(Object.entries(split) as [keyof typeof split,string][]).filter(([,value])=>parseMoney(value)>0);
+  const paymentLabel=method==='COMBO'
+    ?'COMBO '+comboEntries.map(([id,value])=>id+' '+money(parseMoney(value))).join(' + ')
+    :method;
+  const tenderDisplay=method==='COMBO'
+    ?comboEntries.map(([id,value])=>methodLabels[id]+' '+money(parseMoney(value))).join(' + ')
+    :methodLabels[method];
+
   const view:CheckoutWorkspaceViewModel={
     order:{
       orderId:'P'+String(localRuntime.orders().length+1).padStart(3,'0'),
       lines:cart.map(x=>({id:x.id,name:x.name,quantity:x.qty,lineTotalLabel:money(x.unitMinor*x.qty)})),
       subtotalLabel:money(due),packagingLabel:'$0.00',discountLabel:'$0.00',totalLabel:money(due),
     },
-    channels:[{id:'walk-in',label:'現場',selected:true}],
-    methods:[{id:'CASH',label:'現金',enabled:true,selected:true}],
+    channels:[
+      {id:'walk-in',label:'現場',selected:channel==='walk-in'},
+      {id:'whatsapp',label:'WhatsApp／電話',selected:channel==='whatsapp'},
+      {id:'own-platform',label:'自家平台',selected:channel==='own-platform'},
+      {id:'tiktok',label:'TikTok',selected:channel==='tiktok'},
+      {id:'foodpanda',label:'Foodpanda',selected:channel==='foodpanda'},
+    ],
+    methods:(['CASH','ALIPAY','WECHAT','FPS','PAYME','COMBO'] as CheckoutTenderId[]).map(id=>({id,label:methodLabels[id],enabled:true,selected:method===id})),
+    selectedMethodLabel:methodLabels[method],
     amount:{dueLabel:money(due),receivedLabel:money(received),changeLabel:money(change)},
-    cashInput:cash,exactCashEnabled:true,confirmEnabled:cart.length>0&&received>=due,
+    cashInput:cash,
+    cashEntryVisible:method==='CASH',
+    exactCashEnabled:method==='CASH',
+    confirmEnabled,
     paymentState:state,
-    validationMessage:received<due&&cash?'收款金額不足':undefined,
+    channelFields:{
+      showCustomerPhone:channel==='whatsapp',customerPhone,
+      showPlatformFields:channel==='own-platform'||channel==='tiktok'||channel==='foodpanda',
+      pickupCode,platformOrderNo,
+    },
+    comboMode:method==='COMBO',
+    splitTenders:(['CASH','ALIPAY','WECHAT','FPS','PAYME'] as const).map(id=>({id,label:methodLabels[id],amount:split[id]})),
+    validationMessage,
     statusMessage:printStatus,
     completionReview:completion,
   };
+
   const confirm=()=>{
-    if(received<due||!cart.length)return;
+    if(!confirmEnabled)return;
     setState('processing');
     try{
       const order=localRuntime.createOrder({
         items:cart.map(x=>({id:x.productId,name:x.name,qty:x.qty,unitMinor:x.unitMinor})),
-        totalMinor:due,paymentLabel:'CASH'
+        totalMinor:due,paymentLabel,sourceLabel
       });
-      setCompletion({displayOrderCode:order.display,tenderLabel:'CASH',dueLabel:money(due),receivedLabel:money(received),changeLabel:money(change),statusLabel:'COMPLETED'});
+      setCompletion({displayOrderCode:order.display,tenderLabel:tenderDisplay,dueLabel:money(due),receivedLabel:money(received),changeLabel:money(change),statusLabel:'COMPLETED'});
       setState('success');
       setPrintStatus('訂單已完成 · 正在送打印…');
       void localRuntime.printOrderOutputs(order.id).then(summary=>{
-        if(summary.planned===0){
-          setPrintStatus('訂單已完成 · 未有已綁定打印 Route');
-          return;
-        }
-        if(summary.failed===0){
-          setPrintStatus(`訂單已完成 · 已送出 ${summary.sent}/${summary.planned} 個打印工作`);
-          return;
-        }
+        if(summary.planned===0){setPrintStatus('訂單已完成 · 未有已綁定打印 Route');return;}
+        if(summary.failed===0){setPrintStatus('訂單已完成 · 已送出 '+summary.sent+'/'+summary.planned+' 個打印工作');return;}
         const failures=summary.results.filter(row=>!row.ok).map(row=>row.role+':'+row.code).join('；');
-        setPrintStatus(`訂單已完成 · 打印部分失敗 ${summary.sent}/${summary.planned} · ${failures}`);
-      }).catch(error=>{
-        setPrintStatus('訂單已完成 · 打印失敗 '+(error instanceof Error?error.message:String(error)));
-      });
+        setPrintStatus('訂單已完成 · 打印部分失敗 '+summary.sent+'/'+summary.planned+' · '+failures);
+      }).catch(error=>setPrintStatus('訂單已完成 · 打印失敗 '+(error instanceof Error?error.message:String(error))));
     }catch{setState('failure')}
   };
+
   const actions:CheckoutWorkspaceActions={
-    onBack:()=>navigate('/'),onSelectChannel:()=>{},onSelectMethod:()=>{},
+    onBack:()=>navigate('/'),
+    onSelectChannel:setChannel,
+    onSelectMethod:setMethod,
+    onChangeCustomerPhone:setCustomerPhone,
+    onChangePickupCode:setPickupCode,
+    onChangePlatformOrderNo:setPlatformOrderNo,
+    onChangeSplitAmount:(id,value)=>setSplit(current=>({...current,[id]:value})),
     onCashKey:key=>{
       if(key==='⌫')setCash(v=>v.slice(0,-1));
       else if(key==='00')setCash(v=>(v||'')+'00');
       else setCash(v=>(v||'')+key);
     },
+    onQuickCash:amount=>setCash(v=>(((Number(v)||0)+amount).toFixed(2))),
     onExactCash:()=>setCash((due/100).toFixed(2)),
     onConfirm:confirm,onRetry:confirm,
     onDone:()=>{setCart([]);navigate('/')},

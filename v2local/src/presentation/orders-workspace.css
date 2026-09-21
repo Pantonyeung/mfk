@@ -50,7 +50,7 @@
 .orders-pool-row>header>div{display:flex;align-items:center;gap:10px}
 .orders-pool-row>header strong{font-size:20px;font-weight:950}
 .orders-pool-row>header span{padding:4px 8px;border-radius:999px;background:#ececf2;color:#615d66;font-size:14px;font-weight:900}
-.orders-pool-cards{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(250px,290px);gap:10px;overflow-x:auto;padding-bottom:4px;overscroll-behavior-inline:contain}
+.orders-pool-cards{display:grid;grid-template-columns:1fr;gap:10px;overflow:visible;padding-bottom:4px}
 .orders-pool-cards>button{min-height:112px;display:grid;grid-template-columns:1fr auto;gap:8px;text-align:left;padding:16px;border:1px solid #ddd9e4;border-radius:11px;background:#fff;cursor:pointer;touch-action:manipulation}
 .orders-pool-cards>button.selected{border:2px solid #725bd0;background:#f4f1ff}
 .orders-pool-cards strong{font-size:22px;line-height:1.15;font-weight:950}
