@@ -326,36 +326,67 @@ function DayClosePanel({revision,onSaved}:{revision:number;onSaved:()=>void}){
   void revision;
   const report=buildLocalReport(localRuntime.orders());
   const [opening,setOpening]=useState('0');
+  const [mode,setMode]=useState<'total'|'denom'>('denom');
   const [counted,setCounted]=useState('');
+  const [counts,setCounts]=useState<Record<string,number>>({});
   const [note,setNote]=useState('');
   const [message,setMessage]=useState('');
   const closes=readLocalDayCloses();
   const latest=[...closes].filter(x=>x.businessDate===report.businessDate).sort((a,b)=>b.version-a.version)[0];
+  const denominations=[1,2,5,10,20,100,500] as const;
+  const denomTotal=denominations.reduce((sum,value)=>sum+value*Math.max(0,Math.floor(Number(counts[String(value)])||0)),0);
+  const countedMinor=mode==='denom'?Math.round(denomTotal*100):Math.round(Number(counted||0)*100);
   const expected=Math.round(Number(opening||0)*100)+report.cashSalesMinor;
-  const countedMinor=Math.round(Number(counted||0)*100);
-  const difference=(counted?countedMinor:0)-expected;
+  const difference=countedMinor-expected;
+  const hasCount=mode==='denom'?Object.values(counts).some(value=>Number(value)>0):Boolean(counted);
+
   const close=()=>{
-    if(!counted){setMessage('請先輸入實點現金。');return;}
+    if(!hasCount){setMessage('請先輸入實點現金。');return;}
     const row=createLocalDayClose({
-      orders:localRuntime.orders(),openingCashMinor:Math.round(Number(opening||0)*100),
-      countedCashMinor:countedMinor,existing:closes,note,
+      orders:localRuntime.orders(),
+      openingCashMinor:Math.round(Number(opening||0)*100),
+      countedCashMinor:countedMinor,
+      existing:closes,
+      note:note+(mode==='denom'?'｜面額點算 '+denominations.map(value=>'$'+value+'×'+(counts[String(value)]??0)).join('、'):''),
     });
     writeLocalDayCloses([...closes,row]);
     setMessage('日結已保存：V'+row.version+' · 差額 '+money(row.cashDifferenceMinor));
     onSaved();
   };
-  return <section className="more-panel">
+
+  return <section className="more-panel dayclose-panel">
     <header className="more-section-heading"><div><span>LOCAL DAY CLOSE</span><h2>收銀與日結</h2></div><strong>{latest?'已日結 V'+latest.version:'今日未日結'}</strong></header>
     <div className="more-kpis">
       <article><span>今日現金銷售</span><b>{money(report.cashSalesMinor)}</b></article>
       <article><span>預計櫃桶</span><b>{money(expected)}</b></article>
-      <article><span>目前差額</span><b>{counted?money(difference):'—'}</b></article>
+      <article><span>實點現金</span><b>{money(countedMinor)}</b></article>
+      <article><span>目前差額</span><b>{hasCount?money(difference):'—'}</b></article>
     </div>
+
+    <div className="dayclose-mode-switch">
+      <button type="button" className={mode==='denom'?'active':''} onClick={()=>setMode('denom')}>按面額點算</button>
+      <button type="button" className={mode==='total'?'active':''} onClick={()=>setMode('total')}>直接輸入總額</button>
+    </div>
+
     <div className="fusion-form-grid">
       <label className="more-field"><span>開更現金</span><input inputMode="decimal" value={opening} onChange={e=>setOpening(e.target.value)}/></label>
-      <label className="more-field"><span>實點現金</span><input inputMode="decimal" value={counted} onChange={e=>setCounted(e.target.value)}/></label>
+      {mode==='total'?<label className="more-field"><span>實點現金</span><input inputMode="decimal" value={counted} onChange={e=>setCounted(e.target.value)}/></label>:null}
       <label className="more-field fusion-wide"><span>備註</span><input value={note} onChange={e=>setNote(e.target.value)} placeholder="例如：現金差異原因"/></label>
     </div>
+
+    {mode==='denom'?<section className="cash-denomination-table">
+      <header><span>面額</span><span>數量</span><span>小計</span></header>
+      {denominations.map(value=>{
+        const qty=Math.max(0,Math.floor(Number(counts[String(value)])||0));
+        return <div key={value}>
+          <b>{'$'+value}</b>
+          <div><button type="button" onClick={()=>setCounts(current=>({...current,[String(value)]:Math.max(0,qty-1)}))}>−</button><input inputMode="numeric" value={qty||''} placeholder="0" onChange={e=>setCounts(current=>({...current,[String(value)]:Math.max(0,Math.floor(Number(e.target.value)||0))}))}/><button type="button" onClick={()=>setCounts(current=>({...current,[String(value)]:qty+1}))}>＋</button></div>
+          <strong>{money(value*qty*100)}</strong>
+        </div>;
+      })}
+      <footer><span>面額合計</span><strong>{money(countedMinor)}</strong></footer>
+    </section>:null}
+
     <div className="more-tab-row"><button type="button" className="more-primary" onClick={close}>確認本機日結</button></div>
     {message?<p role="status" className="fusion-status">{message}</p>:null}
     {latest?<section className="fusion-list"><header><b>最近日結</b><span>{latest.id}</span></header><article><span>實點 {money(latest.countedCashMinor)}</span><b>預計 {money(latest.expectedCashMinor)}</b><strong>差額 {money(latest.cashDifferenceMinor)}</strong></article></section>:null}
@@ -404,18 +435,16 @@ export function LocalMoreWorkspace(){
   const [revision,setRevision]=useState(0);
   useEffect(()=>localRuntime.subscribe(()=>setRevision(value=>value+1)),[]);
   const bump=()=>setRevision(value=>value+1);
-  return <main className="more-workspace runtime-more-workspace" aria-label="MFK SMT Fusion 本地營運中心">
-    <aside className="more-workspace-menu">
-      <header><span>MFK · SMT FUSION</span><h1>營運中心</h1></header>
-      <button type="button" onClick={()=>navigate('/')}><b>返回點單</b><small>MoreFun V2 Ordering</small></button>
-      <button type="button" className={section==='overview'?'active':''} onClick={()=>setSection('overview')}><b>更多總覽</b><small>Local Operations Overview</small></button>
-      <button type="button" className={section==='printing'?'active':''} onClick={()=>setSection('printing')}><b>打印與設備</b><small>External Printer Registry</small></button>
-      <button type="button" className={section==='diagnostics'?'active':''} onClick={()=>setSection('diagnostics')}><b>診斷中心</b><small>Local Runtime Diagnostics</small></button>
-      <button type="button" className={section==='dayclose'?'active':''} onClick={()=>setSection('dayclose')}><b>收銀與日結</b><small>Local Day Close</small></button>
-      <button type="button" className={section==='reports'?'active':''} onClick={()=>setSection('reports')}><b>報表與分析</b><small>Local Report</small></button>
-      <button type="button" className={section==='backup'?'active':''} onClick={()=>setSection('backup')}><b>備份與恢復</b><small>Local Backup</small></button>
-      <button type="button" onClick={()=>navigate('/orders')}><b>本機訂單</b><small>Local Orders</small></button>
-    </aside>
+  const titleMap:Record<Section,string>={
+    overview:'更多功能總覽',printing:'打印與設備',diagnostics:'顯示與操作／診斷',
+    dayclose:'收銀與日結',reports:'報表與分析',backup:'備份與恢復'
+  };
+  return <main className="more-workspace more-card-workspace" aria-label="MFK SMT 本地營運中心">
+    <header className="more-card-topbar">
+      <button type="button" onClick={()=>section==='overview'?navigate('/'):setSection('overview')}>{section==='overview'?'← 返回點單':'← 更多功能'}</button>
+      <div><small>SMT LOCAL OPERATIONS</small><b>{titleMap[section]}</b></div>
+      <span>LOCAL-FIRST</span>
+    </header>
     <section className="more-workspace-content">
       {section==='overview'?<OverviewPanel onOpen={setSection}/>:null}
       {section==='printing'?<PrinterPanel/>:null}
