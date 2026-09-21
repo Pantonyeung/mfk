@@ -19,8 +19,8 @@ function readSources(dir){
 const source=readSources(srcRoot).join('\n');
 
 test('owner capability registry is complete and stable',()=>{
-  assert.equal(registry.length,94);
-  assert.equal(new Set(registry.map(item=>item.CAP_ID)).size,94);
+  assert.equal(registry.length,110);
+  assert.equal(new Set(registry.map(item=>item.CAP_ID)).size,110);
   for(const item of registry){
     for(const key of ['CAP_ID','GROUP','LABEL','SURFACE','KIND','STATUS','OWNER'])assert.ok(item[key],item.CAP_ID+' missing '+key);
     assert.ok(['READ_SHAPE','COMMAND_SHAPE'].includes(item.KIND));
@@ -29,7 +29,7 @@ test('owner capability registry is complete and stable',()=>{
 
 test('all owner command shapes are explicitly NOT_WIRED',()=>{
   const commands=registry.filter(item=>item.KIND==='COMMAND_SHAPE');
-  assert.ok(commands.length>=1);
+  assert.equal(commands.length,18);
   assert.deepEqual([...new Set(commands.map(item=>item.STATUS))],['NOT_WIRED']);
 });
 
@@ -41,7 +41,11 @@ test('required owner migration surfaces are registered',()=>{
     'CHANNEL_PAUSE','SELLABILITY_LIST','PRODUCT_SOLD_OUT','STAFF_PRESENCE','STAFF_ROLE_PERMISSION',
     'DEVICE_HEALTH','PRINTER_HEALTH','REPORTS_HOME','NOTIFICATION_CENTRE','COMMAND_CONFIRM',
     'ADMIN_DEEP_LINK','RECOVERY_OFFLINE','RECOVERY_STALE','RECOVERY_UNKNOWN','RECOVERY_PARTIAL',
-    'RECOVERY_FAILURE','RECOVERY_RETRY','ACTIVITY_FEED'
+    'RECOVERY_FAILURE','RECOVERY_RETRY','ACTIVITY_FEED',
+    'CUSTOMER_OVERVIEW','CUSTOMER_NEW_RETURNING','CUSTOMER_CONSENT_SUMMARY','CUSTOMER_EXPERIENCE_SUMMARY',
+    'CAMPAIGN_OVERVIEW','CAMPAIGN_ATTRIBUTION_SUMMARY','PLATFORM_PROMOTION_FACTS',
+    'SETTLEMENT_SUMMARY','SETTLEMENT_FINALITY','RECONCILIATION_ATTENTION',
+    'CASH_OVERVIEW','CASH_VARIANCE','CLOSEOUT_SUMMARY','INVENTORY_LITE_SUMMARY','INVENTORY_ATTENTION','ACTIVITY_APPROVAL_READBACK'
   ])assert.ok(ids.has(id),id);
 });
 
@@ -69,7 +73,7 @@ test('owner clean port contains zero live network or cross-port authority calls'
 });
 
 test('owner UI declares migration boundary and recovery semantics',()=>{
-  for(const marker of ['PORT_MIGRATION_ONLY','Command = NOT_WIRED','今日','待處理','訂單','更多','OFFLINE','STALE','UNKNOWN','PARTIAL','FAILURE','RETRY'])assert.match(source,new RegExp(marker));
+  for(const marker of ['CAPABILITY_UPGRADE_ONLY','Command = NOT_WIRED','今日','待處理','訂單','更多','Customer / CRM Lite','Campaign / Marketing','Platform Settlement','Cash / Closeout','Inventory Lite','OFFLINE','STALE','UNKNOWN','PARTIAL','FAILURE','RETRY'])assert.match(source,new RegExp(marker));
 });
 
 test('owner shell exposes no second POS or Admin authoring flow',()=>{
