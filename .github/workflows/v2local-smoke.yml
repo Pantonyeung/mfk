@@ -41,7 +41,9 @@ jobs:
           grep -F "print.lan.endpoint.apply" v2local/src/runtime/native-print.ts
           grep -F "print.lan.endpoint.test" v2local/src/runtime/native-print.ts
           grep -F "print.lan.dispatch" v2local/src/runtime/native-print.ts
-          grep -F "RECEIPT_PRINTER_NOT_BOUND" v2local/src/runtime/local-runtime.ts
+          grep -F "buildOrderPrintPlan" v2local/src/runtime/local-runtime.ts
+          grep -F "localRuntime.printOrderOutputs(order.id)" v2local/src/App.tsx
+          grep -F "runtime.printOrderOutputs" v2local/src/presentation/RuntimeOrdersWorkspace.tsx
       - name: Static bundle proof
         shell: bash
         run: |
