@@ -79,7 +79,7 @@ export function App(){
     if(cart.length===0){setNotice('購物籃未有項目。');return;}
     if(digits.length<8){setNotice('請輸入至少 8 位電話，作 Checkout Form shape 驗證。');return;}
     setSubmissionState('PENDING');
-    setNotice('Safe Submit Presentation：PENDING_INTENT。結果 certainty 只可以係 PENDING / UNKNOWN，未有 authoritative readback 前唔會假裝 Order Created。');
+    setNotice('Safe Submit Presentation：PENDING_INTENT。未送店舖、未建立正式 Order、唔會派正式 Display Number。結果 certainty 只可以係 PENDING / UNKNOWN，未有 authoritative readback 前唔會假裝 Order Created。');
   };
 
   const rebuildLocalCart=(summary:string)=>{
@@ -200,7 +200,7 @@ function CheckoutView({cart,name,setName,phone,setPhone,submissionState,setSubmi
   const hasAttention=cart.some(line=>Boolean(line.attention));
   return <section className="page checkout-page">
     <button className="back-link" onClick={onBack}>← 返回購物籃</button>
-    <header className="page-title"><span>Checkout Preview / Final Review</span><h1>確認自取資料</h1><p>Checkout 只收斂 Intent；Price / Availability / Promo / Fulfillment context 要喺真正 Commit 前重新驗證。</p></header>
+    <header className="page-title"><span>Checkout Form Shape / Preview / Final Review</span><h1>確認自取資料</h1><p>Checkout 只收斂 Intent；Price / Availability / Promo / Fulfillment context 要喺真正 Commit 前重新驗證。</p></header>
     <section className="checkout-form">
       <label><span>姓名（選填）</span><input value={name} onChange={event=>setName(event.target.value)} placeholder="例如 Panton"/></label>
       <label><span>電話</span><input type="tel" inputMode="tel" value={phone} onChange={event=>setPhone(event.target.value)} placeholder="例如 9123 4567"/></label>
