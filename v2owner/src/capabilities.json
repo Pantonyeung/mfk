@@ -844,5 +844,149 @@
     "KIND": "READ_SHAPE",
     "STATUS": "MIGRATED_SHAPE",
     "OWNER": "Future shared operational projections"
+  },
+  {
+    "CAP_ID": "CUSTOMER_OVERVIEW",
+    "GROUP": "CUSTOMER",
+    "LABEL": "Customer / CRM Lite Overview",
+    "SURFACE": "更多／客戶",
+    "KIND": "READ_SHAPE",
+    "STATUS": "MIGRATED_SHAPE",
+    "OWNER": "Future Customer / CRM read projection"
+  },
+  {
+    "CAP_ID": "CUSTOMER_NEW_RETURNING",
+    "GROUP": "CUSTOMER",
+    "LABEL": "New / Returning Customer Summary",
+    "SURFACE": "更多／客戶",
+    "KIND": "READ_SHAPE",
+    "STATUS": "MIGRATED_SHAPE",
+    "OWNER": "Future Customer / CRM read projection"
+  },
+  {
+    "CAP_ID": "CUSTOMER_CONSENT_SUMMARY",
+    "GROUP": "CUSTOMER",
+    "LABEL": "Consent Summary",
+    "SURFACE": "更多／客戶",
+    "KIND": "READ_SHAPE",
+    "STATUS": "MIGRATED_SHAPE",
+    "OWNER": "Future Customer / Consent projection"
+  },
+  {
+    "CAP_ID": "CUSTOMER_EXPERIENCE_SUMMARY",
+    "GROUP": "CUSTOMER",
+    "LABEL": "Review / Complaint Summary",
+    "SURFACE": "更多／客戶",
+    "KIND": "READ_SHAPE",
+    "STATUS": "MIGRATED_SHAPE",
+    "OWNER": "Future Customer Experience projection"
+  },
+  {
+    "CAP_ID": "CAMPAIGN_OVERVIEW",
+    "GROUP": "MARKETING",
+    "LABEL": "Campaign Performance Overview",
+    "SURFACE": "更多／推廣",
+    "KIND": "READ_SHAPE",
+    "STATUS": "MIGRATED_SHAPE",
+    "OWNER": "Future Marketing reporting projection"
+  },
+  {
+    "CAP_ID": "CAMPAIGN_ATTRIBUTION_SUMMARY",
+    "GROUP": "MARKETING",
+    "LABEL": "Attributed Orders / Sales Summary",
+    "SURFACE": "更多／推廣",
+    "KIND": "READ_SHAPE",
+    "STATUS": "MIGRATED_SHAPE",
+    "OWNER": "Future Marketing reporting projection"
+  },
+  {
+    "CAP_ID": "PLATFORM_PROMOTION_FACTS",
+    "GROUP": "MARKETING",
+    "LABEL": "Platform Promotion / Funding Facts",
+    "SURFACE": "更多／推廣",
+    "KIND": "READ_SHAPE",
+    "STATUS": "MIGRATED_SHAPE",
+    "OWNER": "Future provider reporting projection"
+  },
+  {
+    "CAP_ID": "SETTLEMENT_SUMMARY",
+    "GROUP": "PLATFORM_FINANCE",
+    "LABEL": "Platform Settlement Summary",
+    "SURFACE": "更多／平台結算",
+    "KIND": "READ_SHAPE",
+    "STATUS": "MIGRATED_SHAPE",
+    "OWNER": "Future settlement / reconciliation projection"
+  },
+  {
+    "CAP_ID": "SETTLEMENT_FINALITY",
+    "GROUP": "PLATFORM_FINANCE",
+    "LABEL": "Settlement Freshness / Finality",
+    "SURFACE": "更多／平台結算",
+    "KIND": "READ_SHAPE",
+    "STATUS": "MIGRATED_SHAPE",
+    "OWNER": "Future settlement / reconciliation projection"
+  },
+  {
+    "CAP_ID": "RECONCILIATION_ATTENTION",
+    "GROUP": "PLATFORM_FINANCE",
+    "LABEL": "Reconciliation Difference Attention",
+    "SURFACE": "更多／平台結算",
+    "KIND": "READ_SHAPE",
+    "STATUS": "MIGRATED_SHAPE",
+    "OWNER": "Future settlement / reconciliation projection"
+  },
+  {
+    "CAP_ID": "CASH_OVERVIEW",
+    "GROUP": "CASH",
+    "LABEL": "Cash / Drawer Overview",
+    "SURFACE": "更多／現金",
+    "KIND": "READ_SHAPE",
+    "STATUS": "MIGRATED_SHAPE",
+    "OWNER": "Future cash / closeout projection"
+  },
+  {
+    "CAP_ID": "CASH_VARIANCE",
+    "GROUP": "CASH",
+    "LABEL": "Expected / Actual / Over-Short Summary",
+    "SURFACE": "更多／現金",
+    "KIND": "READ_SHAPE",
+    "STATUS": "MIGRATED_SHAPE",
+    "OWNER": "Future cash / reconciliation projection"
+  },
+  {
+    "CAP_ID": "CLOSEOUT_SUMMARY",
+    "GROUP": "CASH",
+    "LABEL": "Closeout / Handover Summary",
+    "SURFACE": "更多／現金",
+    "KIND": "READ_SHAPE",
+    "STATUS": "MIGRATED_SHAPE",
+    "OWNER": "Future closeout projection"
+  },
+  {
+    "CAP_ID": "INVENTORY_LITE_SUMMARY",
+    "GROUP": "INVENTORY",
+    "LABEL": "Inventory Lite Summary",
+    "SURFACE": "更多／庫存",
+    "KIND": "READ_SHAPE",
+    "STATUS": "MIGRATED_SHAPE",
+    "OWNER": "Future Inventory Lite projection"
+  },
+  {
+    "CAP_ID": "INVENTORY_ATTENTION",
+    "GROUP": "INVENTORY",
+    "LABEL": "Low Stock / Count / Waste Attention",
+    "SURFACE": "更多／庫存",
+    "KIND": "READ_SHAPE",
+    "STATUS": "MIGRATED_SHAPE",
+    "OWNER": "Future Inventory Lite projection"
+  },
+  {
+    "CAP_ID": "ACTIVITY_APPROVAL_READBACK",
+    "GROUP": "OPERATIONS",
+    "LABEL": "Requester / Approver / Readback Activity Detail",
+    "SURFACE": "更多／活動紀錄",
+    "KIND": "READ_SHAPE",
+    "STATUS": "MIGRATED_SHAPE",
+    "OWNER": "Future Audit / Activity projection"
   }
 ]
