@@ -1,3 +1,30 @@
+# CURRENT GLOBAL CONTROL OVERLAY｜2026-09-22
+
+> This section overrides any older sequencing/runtime assumptions later in this handoff.
+
+Current system: MFK only.
+Current navigation: `docs/navigation/MFK_航海圖_V1.4_Round005_2026-09-22.txt` once published.
+Cloud governance: `docs/governance/MFK_CLOUD_RUNTIME_BUDGET_AND_LEGACY_RETIREMENT_LOCK_R1_2026-09-22.md`.
+
+Permanent rules:
+- exactly six roles only: SMT / Admin / SMM / Customer / Keeta / Owner
+- one decision authority per business fact/action
+- Cloud / Business Day / Reporting / Audit / Inventory / Reconciliation never block local SMT transaction
+- MFK cloud = EVENT-DRIVEN FIRST
+- operating window = 10:00–20:30 Asia/Hong_Kong
+- 20:30–10:00 = LOW_TRAFFIC_MODE
+- no global one-minute heavy cron
+- no 5-second liveness watchdog
+- one cloud invocation = one purpose + bounded batch + bounded CPU
+- every cutover must explicitly retire old cron/alarm/webhook/route/binding/credential before BANK
+- old Morefun-v2 Keeta runtime is RETIRED; never reconnect MFK to it
+- live connection count remains 0 until Owner opens one exact seam
+- connection order remains Admin first, then Keeta, one seam → immediate test → BANK → STOP
+
+Legacy Cloudflare incident lesson:
+current MFK was clean, but old Morefun-v2 background runtime remained deployed and continued consuming CPU. This must never recur.
+
+---
 # MFK SMT｜無縫接手文件｜2026-09-21 13:58 HKT
 
 ## 0. 接手一句話
