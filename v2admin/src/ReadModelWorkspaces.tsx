@@ -49,6 +49,18 @@ export function OpenOrdersWorkspace(){
   </section>;
 }
 
+
+export function OrdersHistoryWorkspace(){
+  const [query,setQuery]=useState('');
+  const [from,setFrom]=useState('');
+  const [to,setTo]=useState('');
+  return <section className="admin-editor-page">
+    <ReadHeader title="訂單歷史" description="只讀正式 MFK Order history。Admin 唔建立第二份訂單資料。"/>
+    <div className="admin-filterbar"><input value={query} onChange={event=>setQuery(event.target.value)} placeholder="Order / Pickup / External reference"/><label><span>由</span><input type="date" value={from} onChange={event=>setFrom(event.target.value)}/></label><label><span>至</span><input type="date" value={to} onChange={event=>setTo(event.target.value)}/></label><button disabled>搜尋未接駁</button></div>
+    <section className="admin-read-table"><header><span>Order</span><span>來源</span><span>金額</span><span>狀態</span><span>完成時間</span></header><div className="admin-read-empty">ORDER_HISTORY_READ_MODEL_NOT_WIRED</div></section>
+  </section>;
+}
+
 export function ExceptionsWorkspace(){
   const [query,setQuery]=useState('');
   const [kind,setKind]=useState('PAYMENT');
