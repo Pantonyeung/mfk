@@ -97,18 +97,20 @@ function concatNativeBytes(parts:readonly Uint8Array[]){
 }
 export const ESC_POS_DRAWER_PULSE=new Uint8Array([0x1b,0x70,0x00,0x19,0xfa]);
 export const ESC_POS_FULL_CUT=new Uint8Array([0x0a,0x0a,0x1d,0x56,0x00]);
-export function decorateEscPosTicket(bytes:Uint8Array,{kickDrawer=false,cutAfter=false}:{kickDrawer?:boolean;cutAfter?:boolean}={}){
+export const ESC_POS_BEEP=new Uint8Array([0x1b,0x42,0x03,0x02]);
+export function decorateEscPosTicket(bytes:Uint8Array,{kickDrawer=false,cutAfter=false,beepAfter=false}:{kickDrawer?:boolean;cutAfter?:boolean;beepAfter?:boolean}={}){
   return concatNativeBytes([
     ...(kickDrawer?[ESC_POS_DRAWER_PULSE]:[]),
     bytes,
     ...(cutAfter?[ESC_POS_FULL_CUT]:[]),
+    ...(beepAfter?[ESC_POS_BEEP]:[]),
   ]);
 }
-export async function printTextLan(input:LanPrinterInput&{text:string;cutAfter?:boolean;kickDrawer?:boolean}){
+export async function printTextLan(input:LanPrinterInput&{text:string;cutAfter?:boolean;kickDrawer?:boolean;beepAfter?:boolean}){
   const encoding=input.encoding??'gb18030';
   const body=input.capability==='label-58mm'
     ?encodePrinterText(input.text,encoding)
     :encodeEscPosText(input.text,encoding);
-  const bytes=input.capability==='label-58mm'?body:decorateEscPosTicket(body,{kickDrawer:input.kickDrawer,cutAfter:input.cutAfter});
+  const bytes=input.capability==='label-58mm'?body:decorateEscPosTicket(body,{kickDrawer:input.kickDrawer,cutAfter:input.cutAfter,beepAfter:input.beepAfter});
   return printBytesLan({...input,bytes});
 }
