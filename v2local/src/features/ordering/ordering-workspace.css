@@ -13,7 +13,7 @@
 .ordering-pending-card{border-left:4px solid #f15a24}.ordering-active-card{border-left:4px solid #4d8fe8}
 .ordering-pending-primary,.ordering-pending-meta,.ordering-active-card>div{display:flex;align-items:center;justify-content:space-between;gap:7px}.ordering-pending-card b,.ordering-active-card b{font-size:17px}.ordering-pending-card strong,.ordering-active-card span{font-size:13px}.ordering-pending-meta,.ordering-active-card small{margin-top:4px;color:#6d6e75;font-size:12px}.ordering-empty{margin:8px 2px;color:#8a8a90;font-size:14px}
 
-.ordering-catalog{grid-area:catalog;min-width:0;min-height:0;display:grid;grid-template-rows:auto minmax(0,1fr);gap:10px}
+.ordering-catalog{grid-area:catalog;min-width:0;min-height:0;display:grid;grid-template-rows:auto auto minmax(0,1fr);gap:10px}
 .ordering-categories{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px}
 .ordering-categories button{min-height:54px;border:1px solid #dddfe5;border-radius:10px;background:#fff;color:#443d39;font-size:18px;font-weight:900;cursor:pointer}
 .ordering-categories button.active{border-color:#6a4f42;background:linear-gradient(180deg,#5c4036,#4a342e);color:#fff}
@@ -167,3 +167,6 @@
   .ordering-line-identity{width:46px}
   .ordering-line-copy b{font-size:27px}
 }
+
+.ordering-menu-local-status{min-height:32px;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:4px 10px;border:1px solid #cfe2d8;border-radius:8px;background:#f3faf6;color:#286145}
+.ordering-menu-local-status b{font-size:12px;font-weight:950;letter-spacing:.03em}.ordering-menu-local-status span{font-size:11px;color:#6b7770}
