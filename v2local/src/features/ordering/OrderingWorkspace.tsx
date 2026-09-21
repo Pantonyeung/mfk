@@ -103,13 +103,6 @@ export function OrderingWorkspace({view,actions,centerPanel}:{view:OrderingWorks
         <header className="ordering-center-panel-head"><div><small>點單工作台</small><strong>{centerPanel.title}</strong></div><button type="button" onClick={centerPanel.onClose}>×</button></header>
         <div className="ordering-center-panel-body">{centerPanel.body}</div>
       </section>:<>
-        <div className={"ordering-menu-readback "+view.menuStatusTone}>
-          <span><b>Menu</b>{view.menuStatusLabel}</span>
-          <div className="ordering-menu-readback-actions">
-            <button type="button" onClick={actions.onOpenAdminMenuPreview}>預覽 Admin Menu</button>
-            <button type="button" disabled={view.menuRefreshBusy} onClick={actions.onRefreshMenu}>{view.menuRefreshBusy?'刷新中…':'刷新'}</button>
-          </div>
-        </div>
         <nav className="ordering-categories" aria-label="商品分類">
           {view.categories.map(category=><button type="button" key={category.id} aria-pressed={view.selectedCategoryId===category.id} className={view.selectedCategoryId===category.id?'active':''} onClick={()=>actions.onSelectCategory(category.id)}>{category.label}</button>)}
         </nav>
