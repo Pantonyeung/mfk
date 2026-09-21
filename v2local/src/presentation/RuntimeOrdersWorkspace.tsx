@@ -126,6 +126,12 @@ export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePor
   const toggleJob=(jobId:string)=>setSelectedJobs(current=>{
     const next=new Set(current);if(next.has(jobId))next.delete(jobId);else next.add(jobId);return next;
   });
+  const ticketReprintOptions=reprintOptions.filter(option=>option.role!=='產品標籤'&&option.role!=='袋標籤');
+  const labelReprintGroups=[...reprintOptions.filter(option=>option.role==='產品標籤'||option.role==='袋標籤').reduce((map,option)=>{
+    const key=option.bindingId;
+    const current=map.get(key)??{bindingId:key,printerName:option.printerName,physicalKey:option.physicalKey,options:[] as SmtReprintOption[]};
+    current.options.push(option);map.set(key,current);return map;
+  },new Map<string,{bindingId:string;printerName:string;physicalKey:string;options:SmtReprintOption[]}>()).values()];
 
   return <main className="order-manager">
     <header className="order-manager-top">
@@ -206,9 +212,13 @@ export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePor
         </div>:null}
 
         {modal==='reprint'?<div className="order-reprint-body">
-          <p>選擇需要重新打印嘅內容。重印永遠唔會開錢箱。</p>
-          <div className="order-reprint-options">{reprintOptions.map(option=><label key={option.jobId}><input type="checkbox" checked={selectedJobs.has(option.jobId)} onChange={()=>toggleJob(option.jobId)}/><span><b>{option.label}</b><small>{option.detail??option.role}</small></span></label>)}</div>
-          <div className="order-reprint-tools"><button onClick={()=>setSelectedJobs(new Set(reprintOptions.map(option=>option.jobId)))}>全部選擇</button><button onClick={()=>setSelectedJobs(new Set(reprintOptions.filter(option=>option.role==='產品標籤'||option.role==='袋標籤').map(option=>option.jobId)))}>只選 Label</button><button onClick={()=>setSelectedJobs(new Set())}>清除</button></div>
+          <p>選擇需要重新打印嘅內容。Label 會按實體打印機分組；同一部機有多張 Label 時可以展開逐張揀。重印永遠唔會開錢箱。</p>
+          {ticketReprintOptions.length?<section className="order-reprint-ticket-group"><header><b>80mm 單據</b><span>{ticketReprintOptions.length}</span></header><div className="order-reprint-options">{ticketReprintOptions.map(option=><label key={option.jobId}><input type="checkbox" checked={selectedJobs.has(option.jobId)} onChange={()=>toggleJob(option.jobId)}/><span><b>{option.label}</b><small>{option.printerName}</small></span></label>)}</div></section>:null}
+          <div className="order-reprint-printers">{labelReprintGroups.map(group=><details key={group.bindingId} className="order-reprint-printer-group" open={group.options.length===1}>
+            <summary><span><b>{group.printerName}</b><small>{group.physicalKey||'未綁定'} · {group.options.length} 張 Label</small></span><button type="button" onClick={event=>{event.preventDefault();setSelectedJobs(current=>{const next=new Set(current);const allSelected=group.options.every(option=>next.has(option.jobId));for(const option of group.options){if(allSelected)next.delete(option.jobId);else next.add(option.jobId);}return next;});}}>呢部全選</button></summary>
+            <div className="order-reprint-options">{group.options.map(option=><label key={option.jobId}><input type="checkbox" checked={selectedJobs.has(option.jobId)} onChange={()=>toggleJob(option.jobId)}/><span><b>{option.label}</b><small>{option.detail??option.role}</small></span></label>)}</div>
+          </details>)}</div>
+          <div className="order-reprint-tools"><button onClick={()=>setSelectedJobs(new Set(reprintOptions.map(option=>option.jobId)))}>全部選擇</button><button onClick={()=>setSelectedJobs(new Set())}>清除</button></div>
           <footer><button onClick={()=>setModal(null)}>取消</button><button className="primary" disabled={!selectedJobs.size||reprintBusy} onClick={()=>void runReprint()}>{reprintBusy?'打印中…':'開始打印'}</button></footer>
         </div>:null}
       </section>
