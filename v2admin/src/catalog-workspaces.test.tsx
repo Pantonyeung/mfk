@@ -4,6 +4,7 @@ import {describe,expect,it} from 'vitest';
 import {AdminDraftProvider,validateAdminDraft,type AdminSessionDraft} from './admin-draft.tsx';
 import {ProductsWorkspace} from './CatalogWorkspaces.tsx';
 import {MfkAdminApp} from './App.tsx';
+import {ADMIN_CAPABILITIES} from './admin-capabilities.ts';
 
 describe('MFK Admin catalog migration slice',()=>{
   it('renders a real Product editor while keeping Publish disconnected',()=>{
@@ -48,6 +49,18 @@ describe('MFK Admin catalog migration slice',()=>{
     expect(print).toContain('打印中心');
     expect(print).toContain('新增 Logical Printer');
     expect(print).toContain('NOT_WIRED');
+  });
+
+
+  it('has a concrete workspace for every current NOT_WIRED Admin capability',()=>{
+    for(const capability of ADMIN_CAPABILITIES.filter(item=>item.status==='NOT_WIRED')){
+      const html=renderToStaticMarkup(
+        <MemoryRouter initialEntries={[capability.path]}>
+          <MfkAdminApp/>
+        </MemoryRouter>,
+      );
+      expect(html,capability.id).not.toContain('Current MFK State');
+    }
   });
 
   it('validates required category/product/modifier/combo structure without pricing execution',()=>{
