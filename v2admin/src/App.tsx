@@ -4,6 +4,7 @@ import {ADMIN_CAPABILITIES,findAdminCapability} from './admin-capabilities.ts';
 import {MFK_ADMIN_AUTHORITY} from './admin-authority.ts';
 import {AdminDraftProvider} from './admin-draft.tsx';
 import {CategoriesWorkspace,CombosWorkspace,MenuDisplayWorkspace,ModifiersWorkspace,PricingWorkspace,ProductsWorkspace} from './CatalogWorkspaces.tsx';
+import {AvailabilityWorkspace,BusinessDayWorkspace,ChannelsWorkspace,PrintCenterWorkspace,PrintTemplatesWorkspace,StaffWorkspace,StoreSettingsWorkspace} from './PolicyWorkspaces.tsx';
 
 const statusTitle={
   NOT_WIRED:'等待 MFK Domain Adapter',
@@ -51,6 +52,17 @@ function capabilityElement(id:string){
   if(id==='pricing')return <PricingWorkspace/>;
   if(id==='combo')return <CombosWorkspace/>;
   if(id==='menu-sort')return <MenuDisplayWorkspace/>;
+  if(id==='availability')return <AvailabilityWorkspace/>;
+  if(id==='business-day')return <BusinessDayWorkspace/>;
+  if(id==='print-center')return <PrintCenterWorkspace/>;
+  if(id==='print-templates')return <PrintTemplatesWorkspace/>;
+  if(id==='store-settings')return <StoreSettingsWorkspace/>;
+  if(id==='staff')return <StaffWorkspace/>;
+  if(id==='channel-overview')return <ChannelsWorkspace mode="overview"/>;
+  if(id==='product-mapping')return <ChannelsWorkspace mode="mapping"/>;
+  if(id==='accept-policy')return <ChannelsWorkspace mode="accept"/>;
+  if(id==='sync-policy')return <ChannelsWorkspace mode="sync"/>;
+  if(id==='net-estimate')return <ChannelsWorkspace mode="estimate"/>;
   return <CapabilityPage/>;
 }
 
