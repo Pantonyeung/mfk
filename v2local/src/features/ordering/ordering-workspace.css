@@ -21,7 +21,8 @@
 .ordering-product-card{min-width:0;position:relative;border:1px solid #d8dbe1;border-radius:10px;background:#fff;box-shadow:0 3px 9px rgba(0,0,0,.035);overflow:hidden}
 .ordering-product-body{width:100%;height:100%;padding:12px 56px 12px 16px;border:0;background:#fff;display:flex;align-items:center;text-align:left}
 .ordering-product-copy{min-width:0;display:grid;align-content:center;gap:6px}.ordering-product-copy small{width:max-content;padding:3px 6px;border-radius:5px;background:#ff5a72;color:#fff;font-size:11px;font-weight:900}
-.ordering-product-name{display:block;inline-size:6em;max-inline-size:6em;font-size:25px;line-height:1.12;font-weight:950;color:#20242c;white-space:normal;word-break:break-all;overflow-wrap:anywhere}
+.ordering-product-name{display:grid;gap:1px;font-size:25px;line-height:1.12;font-weight:950;color:#20242c}
+.ordering-product-name-line{display:block;white-space:nowrap}
 .ordering-product-price{font-size:25px;line-height:1;font-weight:950;color:#c54736}
 .ordering-product-more{position:absolute;right:8px;top:50%;transform:translateY(-50%);width:44px;height:56px;border:0;border-radius:8px;background:transparent;font-size:34px;line-height:1;color:#6f8594;font-weight:900}
 .ordering-product-more:active{background:#eef1f4}
