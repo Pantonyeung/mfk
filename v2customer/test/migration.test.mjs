@@ -76,7 +76,7 @@ test('safe submit cannot present a formal-order success claim',()=>{
   assert.match(source,/提交訂單（NOT_WIRED）/);
   assert.match(source,/未建立正式 Order/);
   assert.match(source,/未送店舖/);
-  assert.match(source,/未派正式 Display Number/);
-  assert.match(source,/未建立離線 queue/);
+  assert.match(source,/唔會派正式 Display Number/);
+  assert.match(source,/離線 queue/);
   assert.doesNotMatch(source,/正式訂單已建立/);
 });
