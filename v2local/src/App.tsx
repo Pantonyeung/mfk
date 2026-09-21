@@ -13,7 +13,7 @@ import {localRuntime,type DiningTender} from './runtime/local-runtime.ts';
 import {readAdminPublishedMenu,readCachedAdminMenu,type AdminMenuReadback} from './runtime/admin-menu-read.ts';
 import {ComboWorkspace,HoldCartWorkspace,HoldListWorkspace,OrganizeWorkspace,ProductConfigWorkspace,type OrderingPanelState,type WorkspaceHoldDraft,type WorkspaceProduct} from './features/ordering/OrderingCenterWorkspaces.tsx';
 
-type Product={id:string;category:string;name:string;priceMinor:number;priceReady:boolean};
+type Product={id:string;category:string;name:string;priceMinor:number;priceReady:boolean;imageRef?:string};
 type CartLine={id:string;productId:string;name:string;qty:number;unitMinor:number;serviceMode:ServiceMode;detail?:string};
 
 const FROZEN_PRODUCTS:readonly Product[]=[
@@ -36,7 +36,19 @@ const PRODUCT_ART_COLORS:Record<string,[string,string]>={
   '飲品':['#d7a66a','#7b4c3a'],
 };
 
+function adminProductImageUrl(imageRef?:string){
+  const ref=String(imageRef||'').trim();
+  if(!ref)return '';
+  if(ref.startsWith('https://'))return ref;
+  const base='https://morefun-v2-admin.pantonyeung.workers.dev';
+  if(ref.startsWith('/media/products/'))return base+ref;
+  if(ref.startsWith('media:products/'))return base+'/media/products/'+ref.slice('media:products/'.length);
+  return '';
+}
+
 function productArtwork(product:Product){
+  const adminImage=adminProductImageUrl(product.imageRef);
+  if(adminImage)return adminImage;
   const [light,dark]=PRODUCT_ART_COLORS[product.category]??['#e4d6c3','#6a5747'];
   const safeName=product.name.slice(0,4).replace(/[&<>"]/g,'');
   const svg='<svg xmlns="http://www.w3.org/2000/svg" width="320" height="200" viewBox="0 0 320 200">'
@@ -97,6 +109,7 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
         name:remote.name,
         priceMinor:local?.priceMinor??0,
         priceReady:Boolean(local),
+        ...(remote.imageRef?{imageRef:remote.imageRef}:{}),
       };
     });
   },[menuState.readback]);
