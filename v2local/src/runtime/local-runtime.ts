@@ -19,14 +19,24 @@ export interface StoredOrder{
   id:string;display:string;createdAt:string;totalMinor:number;paymentLabel:string;fulfillmentLabel:'待處理'|'進行中'|'可取餐'|'已完成'|'已取消';sourceLabel:string;
   items:readonly {id:string;name:string;qty:number;unitMinor:number}[];
 }
-interface Persisted{orders:StoredOrder[];availability:Record<string,SmtAvailabilityStatus>}
+export interface LocalHoldDraft{
+  readonly id:string;
+  readonly codeLabel:string;
+  readonly kind:'dining'|'waiting';
+  readonly createdAt:string;
+  readonly partySize:number;
+  readonly note:string;
+  readonly totalMinor:number;
+  readonly items:readonly {id:string;name:string;qty:number;unitMinor:number}[];
+}
+interface Persisted{orders:StoredOrder[];availability:Record<string,SmtAvailabilityStatus>;holds:LocalHoldDraft[]}
 const KEY='mfk.v2local.runtime.v1';
 const PRINTER_BINDING_KEY='mfk.v2local.printers.v5';
 const LEGACY_PRINTER_BINDING_KEYS=['mfk.v2local.printers.v4','mfk.v2local.printers.v3','mfk.v2local.printers.v2'] as const;
 const RICEBALL_PRODUCT_IDS=Object.freeze(['riceball','tuna','pork']);
 const TAKEAWAY_PRODUCT_IDS=Object.freeze(['bento','curry','wedges','milkTea','lemonTea']);
 const listeners=new Set<()=>void>();
-const defaults:Persisted={orders:[],availability:{}};
+const defaults:Persisted={orders:[],availability:{},holds:[]};
 const clone=<T,>(value:T):T=>JSON.parse(JSON.stringify(value)) as T;
 function read():Persisted{
   try{
@@ -38,14 +48,14 @@ function read():Persisted{
       const legacyLocal=source.startsWith('現場')||source.startsWith('電話／WhatsApp')||source.startsWith('WhatsApp／電話');
       return {...order,fulfillmentLabel:order?.fulfillmentLabel==='待處理'&&paid&&legacyLocal?'進行中':order?.fulfillmentLabel};
     }) as StoredOrder[];
-    return {orders,availability:value.availability||{}};
+    return {orders,availability:value.availability||{},holds:Array.isArray(value.holds)?value.holds:[]};
   }catch{return clone(defaults)}
 }
 let data=read();
 function save(){localStorage.setItem(KEY,JSON.stringify(data));listeners.forEach(fn=>fn())}
 const money=(minor:number)=>'$'+(minor/100).toFixed(2);
 
-export interface SmtReprintOption{readonly jobId:string;readonly role:string;readonly label:string;readonly detail?:string}
+export interface SmtReprintOption{readonly jobId:string;readonly role:string;readonly label:string;readonly detail?:string;readonly bindingId:string;readonly printerName:string;readonly physicalKey:string}
 export interface CleanSmtCoreRuntimePort{
   subscribe(listener:()=>void):()=>void;
   readOrders?(selectedOrderId?:string):Promise<SmtOrdersProjection>;
@@ -59,6 +69,8 @@ export interface CleanSmtCoreRuntimePort{
   readDining?(selectedSessionId?:string):Promise<SmtDiningProjection>;
   readAvailability?():Promise<SmtAvailabilityProjection>;
   setAvailability?(nodeId:string,status:SmtAvailabilityStatus,expectedRevision:number):Promise<SmtAvailabilityProjection>;
+  createDiningWait?(input:{partySize:number;note?:string}):Promise<LocalHoldDraft>;
+  removeDiningWait?(id:string):Promise<void>;
 }
 export interface PrintDispatchResult{readonly jobId:string;readonly role:string;readonly ok:boolean;readonly code:string}
 export interface PrintDispatchSummary{
@@ -103,6 +115,9 @@ export interface MfkLocalRuntime extends CleanSmtCoreRuntimePort{
   reprintOrderJobs(orderId:string,jobIds:readonly string[]):Promise<PrintDispatchSummary>;
   updateOrderItems(orderId:string,items:readonly {id:string;name:string;qty:number;unitMinor:number}[]):Promise<{readonly orderId:string;readonly totalMinor:number}>;
   cancelOrder(orderId:string):Promise<{readonly orderId:string;readonly status:'CANCELLED'}>;
+  createHold(input:{kind:'dining'|'waiting';items:readonly {id:string;name:string;qty:number;unitMinor:number}[];totalMinor:number;partySize?:number;note?:string}):LocalHoldDraft;
+  holds():readonly LocalHoldDraft[];
+  removeHold(id:string):void;
   clear():void;
 }
 
@@ -312,6 +327,22 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
     data={...data,orders:[order,...data.orders]};save();return order;
   },
   orders(){return data.orders},
+  createHold(input){
+    const n=data.holds.length+1;
+    const draft:LocalHoldDraft={
+      id:'HOLD-'+Date.now().toString(36),
+      codeLabel:'H'+String(n).padStart(3,'0'),
+      kind:input.kind,
+      createdAt:new Date().toISOString(),
+      partySize:Math.max(1,Math.floor(Number(input.partySize)||1)),
+      note:String(input.note||''),
+      totalMinor:Math.max(0,Math.floor(Number(input.totalMinor)||0)),
+      items:input.items.map(item=>({...item})),
+    };
+    data={...data,holds:[draft,...data.holds]};save();return draft;
+  },
+  holds(){return data.holds},
+  removeHold(id){data={...data,holds:data.holds.filter(item=>item.id!==id)};save()},
   clear(){data=clone(defaults);save()},
   async readOrders(selectedOrderId){
     const items=data.orders.map(order=>({
@@ -357,6 +388,9 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
       role:job.role,
       label:job.renderMode==='tsc-bitmap'&&job.labelSpec?job.role+' · '+job.labelSpec.primaryText:job.role,
       detail:job.labelSpec?.pieceLabel,
+      bindingId:job.binding.id,
+      printerName:job.binding.name,
+      physicalKey:job.binding.host.trim()+':'+job.binding.port,
     }));
   },
   async reprintOrderJobs(orderId,jobIds){
@@ -399,14 +433,36 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
   },
   async readDining(){
     return {
-      businessDate:new Date().toISOString().slice(0,10),revision:1,queue:[],
-      tables:[
-        {id:'A1',areaLabel:'A區',label:'A1',state:'available'},
-        {id:'A2',areaLabel:'A區',label:'A2',state:'available'},
-        {id:'A3',areaLabel:'A區',label:'A3',state:'available'},
-        {id:'B1',areaLabel:'B區',label:'B1',state:'available'},
-      ]
+      businessDate:new Date().toISOString().slice(0,10),revision:1,
+      queue:data.holds.map(hold=>({
+        id:hold.id,
+        codeLabel:hold.codeLabel,
+        partySize:hold.partySize,
+        statusLabel:hold.kind==='dining'?'待安排座位':'暫存待客',
+      })),
+      tables:Array.from({length:9},(_,index)=>({
+        id:'T'+String(index+1).padStart(2,'0'),
+        areaLabel:'堂食',
+        label:String(index+1),
+        state:'available' as const,
+      }))
     };
+  },
+  async createDiningWait(input){
+    const draft:LocalHoldDraft={
+      id:'HOLD-'+Date.now().toString(36),
+      codeLabel:'W'+String(data.holds.length+1).padStart(3,'0'),
+      kind:'dining',
+      createdAt:new Date().toISOString(),
+      partySize:Math.max(1,Math.floor(Number(input.partySize)||1)),
+      note:String(input.note||''),
+      totalMinor:0,
+      items:[],
+    };
+    data={...data,holds:[draft,...data.holds]};save();return draft;
+  },
+  async removeDiningWait(id){
+    data={...data,holds:data.holds.filter(item=>item.id!==id)};save();
   },
   async readAvailability(){
     return {revision:1,nodes:Object.entries(productNames).map(([nodeId,label])=>({nodeId,label,status:data.availability[nodeId]||'available',sourceLabel:'LOCAL'})),canChange:true};
