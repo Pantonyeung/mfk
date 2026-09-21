@@ -85,4 +85,4 @@ export function dissolveRiceballSet(cart,comboLineId,options={}){
 export const ORDER_AUTO_COMPLETE_MS=30*60*1000;
 export function acceptPendingOrder(order,acceptedAt=Date.now()){return {...order,status:'running',acceptedAt,autoCompleteAt:acceptedAt+ORDER_AUTO_COMPLETE_MS};}
 export function completeExpiredOrders(orders,now=Date.now()){return orders.map(order=>order.status==='running'&&Number(order.autoCompleteAt)<=now?{...order,status:'completed',completedAt:now}:order);}
-export function createWhatsAppLink(phone,message){const normalized=String(phone||'').replace(/\D/g,'');return 'https://wa.me/'+normalized+'?text='+encodeURIComponent(String(message||''));}
+export function createWhatsAppLink(){return '#local-only';}
