@@ -314,6 +314,12 @@ function CheckoutPage({cart,setCart}:{cart:CartLine[];setCart:(v:CartLine[])=>vo
 export function MfkV2LocalApp(){
   const [cart,setCartState]=useState<CartLine[]>([]);
   const [serviceMode,setServiceMode]=useState<ServiceMode>('takeaway');
+  const [navRevision,setNavRevision]=useState(0);
+  useEffect(()=>localRuntime.subscribe(()=>setNavRevision(value=>value+1)),[]);
+  const activeOrderCount=useMemo(()=>{
+    void navRevision;
+    return localRuntime.orders().filter(order=>order.fulfillmentLabel==='待處理'||order.fulfillmentLabel==='進行中'||order.fulfillmentLabel==='可取餐').length;
+  },[navRevision]);
   const setCart=(next:CartLine[])=>setCartState(next);
   const runtime=useMemo(()=>localRuntime,[]);
 
@@ -322,7 +328,9 @@ export function MfkV2LocalApp(){
       <div className="clean-brand" aria-label="磨飯">磨</div>
       <nav aria-label="MFK 主導航">
         {nav.map(item=><NavLink key={item.to} to={item.to} end={'end' in item?item.end:false} className={({isActive})=>isActive?'active':''}>
-          <span className="clean-rail-icon">{item.icon}</span><span className="clean-rail-label">{item.label}</span>
+          <span className="clean-rail-icon">{item.icon}</span>
+          <span className="clean-rail-label">{item.label}</span>
+          {item.to==='/orders'&&activeOrderCount>0?<span className="clean-rail-badge" aria-label={'進行中訂單 '+activeOrderCount}>{activeOrderCount>99?'99+':activeOrderCount}</span>:null}
         </NavLink>)}
       </nav>
       <div className="clean-runtime-state">LOCAL<br/>OFFLINE</div>
