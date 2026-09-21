@@ -1,1 +1,42 @@
-# MFK Owner Clean Migration｜Source Handoff\n\nWORK_ID: MFK-OWNER-CLEAN-MIGRATION-R1\nSTATUS: MFK_OWNER_PORT_MIGRATED_NOT_WIRED\nMODE: PORT_MIGRATION_ONLY\n\n## CURRENT\nIndependent Owner shell and required migration surfaces are present under v2owner only.\n\n## CAPABILITY_COUNT\n94\n\n## WHAT_MOVED\n- Today / Readiness home\n- Sales / Orders / AOV / comparison cards\n- Exception / Action Queue\n- Order list + detail + status/readback/tender/fulfillment/side-effect/timeline\n- Channel health + pause/resume/snooze command shape\n- Sold-out / restore command shape\n- Staff presence / clock / schedule / break / hours / role-permission shape\n- Device / printer health + job certainty + impact\n- Fixed reports + trend/drill-down\n- Alerts / notifications\n- Bounded action confirmation / reason / approval / pending / result / failure / unknown\n- Admin deep-link UX only\n- Recovery states\n- Manager Log / Checklist / Activity\n- Owner Capability Registry\n\n## WHAT_REMAINS_NOT_WIRED\nEvery COMMAND_SHAPE. No network, adapter, provider, SMT, Admin authoring, Store Kernel, Order, Pricing, Payment, Print, Drawer, D1 or Cloud connection was opened.\n\n## TEST_EXECUTION\nHANDOFF_TO_MAIN_CHAT\n\nWorker did not run npm test, production build, clean landing, or final BANK.\n
+# MFK Owner Clean Migration｜Source Handoff
+
+WORK_ID: MFK-OWNER-CLEAN-MIGRATION-R1
+STATUS: MFK_OWNER_PORT_MIGRATED_NOT_WIRED
+MODE: PORT_MIGRATION_ONLY
+
+## CURRENT
+Independent Owner shell and required migration surfaces are present under v2owner only.
+
+## CAPABILITY_COUNT
+94
+
+## COMMAND_SHAPE_COUNT
+18
+
+## WHAT_MOVED
+- Today / Readiness home
+- Sales / Orders / AOV / comparison cards
+- Exception / Action Queue
+- Order list + detail + status / readback / tender / fulfillment / side-effect / timeline
+- Channel health + pause / resume / snooze command shape
+- Sold-out / restore command shape
+- Staff presence / clock / schedule / break / hours / role-permission shape
+- Device / printer health + job certainty + impact
+- Fixed reports + trend / drill-down
+- Alerts / notifications
+- Bounded action confirmation / reason / approval / pending / result / failure / unknown
+- Admin deep-link UX only
+- Recovery states
+- Manager Log / Checklist / Activity
+- Owner Capability Registry
+
+## WHAT_REMAINS_NOT_WIRED
+Every COMMAND_SHAPE. No network, adapter, provider, SMT, Admin authoring, Store Kernel, Order, Pricing, Payment, Print, Drawer, D1 or Cloud connection was opened.
+
+## AUTHORITY_SCAN
+Expected static source scan: zero live-network / cross-port / transaction-authority call hits.
+
+## TEST_EXECUTION
+HANDOFF_TO_MAIN_CHAT
+
+Worker did not run npm test, production build, clean landing, or final BANK.

@@ -814,8 +814,8 @@
     "GROUP": "OPERATIONS",
     "LABEL": "Manager Log Presentation",
     "SURFACE": "更多",
-    "KIND": "READ_SHAPE",
-    "STATUS": "MIGRATED_SHAPE",
+    "KIND": "COMMAND_SHAPE",
+    "STATUS": "NOT_WIRED",
     "OWNER": "Future shared operational projections"
   },
   {
@@ -823,8 +823,8 @@
     "GROUP": "OPERATIONS",
     "LABEL": "Opening / Mid-day / Closing Checklist",
     "SURFACE": "更多",
-    "KIND": "READ_SHAPE",
-    "STATUS": "MIGRATED_SHAPE",
+    "KIND": "COMMAND_SHAPE",
+    "STATUS": "NOT_WIRED",
     "OWNER": "Future shared operational projections"
   },
   {
