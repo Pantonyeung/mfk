@@ -45,7 +45,7 @@ const defaults:PrinterBinding[]=[
   {id:'bag-label-1',routeKey:'logical.bag-label',name:'袋標籤打印機',model:'LAN LABEL PRINTER',role:'袋標籤',host:'',port:9100,capability:'label-58mm',encoding:'big5'},
 ];
 
-type Section='printing'|'diagnostics'|'dayclose'|'reports'|'backup';
+type Section='overview'|'printing'|'diagnostics'|'dayclose'|'reports'|'backup';
 
 function normalizeStoredRow(old:Record<string,unknown>,fallback?:PrinterBinding,legacy=false):PrinterBinding{
   const capability=(old.capability==='label-58mm'||fallback?.capability==='label-58mm')?'label-58mm':'receipt-80mm/kitchen';
@@ -136,6 +136,31 @@ function productLabelPurpose(binding:PrinterBinding){
   if(binding.id==='product-label-1')return '飯糰專用';
   if(binding.id==='product-label-2')return '外賣專用';
   return '自訂 Route · 待 Admin 指派商品';
+}
+
+function OverviewPanel({onOpen}:{onOpen:(section:Section)=>void}){
+  const report=buildLocalReport(localRuntime.orders());
+  const printers=loadPrinters();
+  const online=printers.filter(printer=>printer.host.trim()).length;
+  const lastPrint=readLastPrintDiagnostic();
+  const cards=[
+    {id:'dayclose' as const,no:'01',icon:'▣',title:'收銀與日結',desc:'現金點算、開工底箱、日結確認與本機紀錄'},
+    {id:'reports' as const,no:'02',icon:'↗',title:'報表與分析',desc:'營業額、訂單、商品排行與本機報表'},
+    {id:'printing' as const,no:'03',icon:'▤',title:'打印與設備',desc:'打印機設定、路由、測試與標籤綁定'},
+    {id:'backup' as const,no:'04',icon:'☁',title:'備份與恢復',desc:'本機備份、校驗、恢復與資料安全'},
+    {id:'diagnostics' as const,no:'05',icon:'⚙',title:'顯示與操作／診斷',desc:'Printer Trace、Route、錯誤碼與本機健康狀態'},
+  ];
+  return <section className="more-overview">
+    <header><div><span>SMT LOCAL OPERATIONS</span><h2>更多功能總覽</h2><p>本地營運控制面板；之後可以再接 Admin 發布設定。</p></div><strong>{new Date().toLocaleString('zh-HK')}</strong></header>
+    <div className="more-overview-cards">{cards.map(card=><button key={card.id} type="button" onClick={()=>onOpen(card.id)}>
+      <span>{card.no}</span><i>{card.icon}</i><b>{card.title}</b><small>{card.desc}</small><em>進入</em>
+    </button>)}</div>
+    <div className="more-overview-grid">
+      <article><header><b>今日營運</b><span>LOCAL</span></header><div><p><span>完成訂單</span><strong>{report.completedOrders}</strong></p><p><span>淨銷售</span><strong>{money(report.netSalesMinor)}</strong></p><p><span>平均客單</span><strong>{money(report.averageOrderMinor)}</strong></p></div></article>
+      <article><header><b>打印設備</b><span>{online}/{printers.length} 已綁定</span></header><div><p><span>最近打印</span><strong>{lastPrint?lastPrint.elapsedMs+' ms':'—'}</strong></p><p><span>成功／計劃</span><strong>{lastPrint?lastPrint.sent+'/'+lastPrint.planned:'—'}</strong></p><p><span>狀態</span><strong>{lastPrint?(lastPrint.failed?'需檢查':'正常'):'待首張'}</strong></p></div></article>
+      <article><header><b>系統資訊</b><span>MFK Local</span></header><div><p><span>Runtime</span><strong>LOCAL-FIRST</strong></p><p><span>Native Bridge</span><strong>{window.moreFunNative?'已連接':'未連接'}</strong></p><p><span>資料權威</span><strong>本機交易</strong></p></div></article>
+    </div>
+  </section>;
 }
 
 function PrinterPanel(){
@@ -375,7 +400,7 @@ function BackupPanel({onRestore}:{onRestore:()=>void}){
 
 export function LocalMoreWorkspace(){
   const navigate=useNavigate();
-  const [section,setSection]=useState<Section>('printing');
+  const [section,setSection]=useState<Section>('overview');
   const [revision,setRevision]=useState(0);
   useEffect(()=>localRuntime.subscribe(()=>setRevision(value=>value+1)),[]);
   const bump=()=>setRevision(value=>value+1);
@@ -383,6 +408,7 @@ export function LocalMoreWorkspace(){
     <aside className="more-workspace-menu">
       <header><span>MFK · SMT FUSION</span><h1>營運中心</h1></header>
       <button type="button" onClick={()=>navigate('/')}><b>返回點單</b><small>MoreFun V2 Ordering</small></button>
+      <button type="button" className={section==='overview'?'active':''} onClick={()=>setSection('overview')}><b>更多總覽</b><small>Local Operations Overview</small></button>
       <button type="button" className={section==='printing'?'active':''} onClick={()=>setSection('printing')}><b>打印與設備</b><small>External Printer Registry</small></button>
       <button type="button" className={section==='diagnostics'?'active':''} onClick={()=>setSection('diagnostics')}><b>診斷中心</b><small>Local Runtime Diagnostics</small></button>
       <button type="button" className={section==='dayclose'?'active':''} onClick={()=>setSection('dayclose')}><b>收銀與日結</b><small>Local Day Close</small></button>
@@ -391,6 +417,7 @@ export function LocalMoreWorkspace(){
       <button type="button" onClick={()=>navigate('/orders')}><b>本機訂單</b><small>Local Orders</small></button>
     </aside>
     <section className="more-workspace-content">
+      {section==='overview'?<OverviewPanel onOpen={setSection}/>:null}
       {section==='printing'?<PrinterPanel/>:null}
       {section==='diagnostics'?<DiagnosticsPanel/>:null}
       {section==='dayclose'?<DayClosePanel revision={revision} onSaved={bump}/>:null}
