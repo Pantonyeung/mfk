@@ -1,13 +1,24 @@
 <!doctype html>
 <html lang="zh-HK">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>磨飯 MFK POS</title>
-  <link rel="stylesheet" href="./styles.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,minimum-scale=0.25,maximum-scale=5,user-scalable=yes,viewport-fit=cover">
+  <title>磨飯 SMT T2S 1280×800</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="stylesheet" href="app-shell.css?v=smt-adaptive-transition-v1">
 </head>
 <body>
-  <div id="app"></div>
-  <script type="module" src="./app.js"></script>
+  <main id="viewport">
+    <section id="stage">
+      <iframe id="page" class="page-frame is-active" title="磨飯 SMT"></iframe>
+      <iframe id="page-next" class="page-frame" title="磨飯 SMT 預載頁" aria-hidden="true"></iframe>
+    </section>
+    <aside id="device-hud" aria-live="polite">
+      <strong>T2S 原比例預覽 1280×800</strong>
+      <span id="device-hud-detail">正在量度畫面…</span>
+      <span>iPhone 可直屏或橫屏查看；使用 Safari 雙指放大、縮小及移動畫面檢查細節。</span>
+    </aside>
+  </main>
+  <script type="module" src="app-loader.js?v=smt-adaptive-transition-v1"></script>
 </body>
 </html>
