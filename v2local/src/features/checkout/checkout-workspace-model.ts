@@ -1,4 +1,4 @@
-export type CheckoutChannelId='walk-in'|'whatsapp'|'own-platform'|'tiktok'|'foodpanda';
+export type CheckoutChannelId='walk-in'|'whatsapp'|'morefun-app'|'keeta'|'foodpanda';
 export type CheckoutTenderId='CASH'|'ALIPAY'|'WECHAT'|'FPS'|'PAYME'|'COMBO';
 export type CheckoutPaymentState='selected'|'processing'|'success'|'failure';
 
