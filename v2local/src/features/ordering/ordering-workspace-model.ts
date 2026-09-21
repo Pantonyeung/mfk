@@ -47,7 +47,7 @@ export interface OrderingCartViewModel {
 }
 
 export interface OrderingWorkItemViewModel {
-  readonly id:'riceball-pool'|'required'|'combo'|'holds'|'soldout';
+  readonly id:'riceball-pool'|'required'|'combo';
   readonly label:string;
   readonly count:number;
 }
