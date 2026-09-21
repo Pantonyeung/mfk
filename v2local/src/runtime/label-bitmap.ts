@@ -56,7 +56,7 @@ export function buildTscBitmapPayload(input:{
     +'CLS\r\n'
     +'BITMAP 0,0,'+bytesPerRow+','+input.heightDots+',0,'
   );
-  const suffix=encoder.encode('\r\nPRINT 1,1\r\n');
+  const suffix=encoder.encode('\r\nPRINT 1,1\r\nSOUND 3,40\r\n');
   return concatBytes([prefix,input.bitmap,suffix]);
 }
 
