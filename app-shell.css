@@ -1,0 +1,101 @@
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+html,
+body {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #050505;
+  overscroll-behavior: none;
+}
+#viewport {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background: #050505;
+}
+#stage {
+  position: absolute;
+  width: 1280px;
+  height: 800px;
+  min-width: 0;
+  min-height: 0;
+  background: #f8f6f2;
+  overflow: hidden;
+  transform-origin: top left;
+  outline: 3px solid #ffbf00;
+  box-shadow: 0 0 0 1px rgba(255,255,255,.32),0 18px 60px rgba(0,0,0,.5);
+}
+html[data-preview-mode="native"] #stage {
+  outline: 0;
+  box-shadow: none;
+}
+.page-frame {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  border: 0;
+  display: block;
+  background: #f8f6f2;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  z-index: 1;
+}
+.page-frame.is-active {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  z-index: 2;
+}
+.page-frame.is-loading {
+  visibility: visible;
+  opacity: 0;
+  z-index: 1;
+}
+#device-hud {
+  position: fixed;
+  left: max(10px, env(safe-area-inset-left));
+  top: max(10px, env(safe-area-inset-top));
+  z-index: 9000;
+  max-width: min(620px, calc(100vw - 20px));
+  padding: 8px 11px;
+  border: 1px solid rgba(255,255,255,.3);
+  border-radius: 9px;
+  background: rgba(0,0,0,.78);
+  color: #fff;
+  font: 12px/1.35 -apple-system,BlinkMacSystemFont,"PingFang HK",sans-serif;
+  pointer-events: none;
+  backdrop-filter: blur(8px);
+}
+#device-hud strong {
+  display: block;
+  color: #ffd45c;
+  font-size: 13px;
+}
+#device-hud span {
+  display: block;
+  margin-top: 2px;
+  color: #e4e4e4;
+}
+#device-hud[hidden] {
+  display: none;
+}
+@media (max-width: 600px) {
+  #device-hud {
+    max-width: calc(100vw - 16px);
+    left: max(8px, env(safe-area-inset-left));
+    top: max(8px, env(safe-area-inset-top));
+    padding: 7px 9px;
+    font-size: 11px;
+  }
+  #device-hud strong {
+    font-size: 12px;
+  }
+}
