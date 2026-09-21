@@ -40,9 +40,10 @@ describe('MFK checkout print fanout',()=>{
     expect(plan[1]?.payload).toContain('製作單');
     expect(plan[2]?.payload).toContain('打包單');
     expect(plan[3]?.payload).toContain('原味飯團');
-    expect(plan[3]?.payload).toContain('"TST24.BF2"');
-    expect(plan[3]?.payload).not.toContain('TEXT 20,55,"3"');
-    expect(plan[6]?.payload).toContain('P001');
+    expect(plan[3]?.renderMode).toBe('tsc-bitmap');
+    expect(plan[3]?.labelSpec).toMatchObject({orderCode:'P001',primaryText:'原味飯團',pieceLabel:'1/3'});
+    expect(plan[6]?.renderMode).toBe('tsc-bitmap');
+    expect(plan[6]?.labelSpec?.orderCode).toBe('P001');
   });
 
   it('prints only routes that are actually bound',()=>{
