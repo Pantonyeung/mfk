@@ -35,7 +35,7 @@ function CapabilityPage(){
       <p>目前頁面只整理 MFK Admin 自己嘅操作面同責任邊界。未有 Domain Adapter 嘅功能一律維持 NOT_WIRED，唔會假裝已經執行成功。</p>
     </section>
 
-    <section className="mfk-admin-donor-check">
+    <section className="mfk-admin-state-card">
       <header><h2>Current MFK State</h2><span>{capability.status}</span></header>
       <p>呢項能力已經有 MFK 路徑同 Truth Owner。下一階段先由獨立工作將佢接到對應 MFK Domain，唔會喺 Admin 裏面重造第二套 engine。</p>
     </section>
