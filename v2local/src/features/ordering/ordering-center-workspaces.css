@@ -39,3 +39,31 @@
 .hold-nine-grid button.occupied{background:#f0f2f4;color:#9297a0}
 .hold-nine-grid b{font-size:30px}.hold-nine-grid span{font-size:12px;font-weight:850}
 @media(max-width:1350px){.hold-inline-dining{grid-template-columns:155px minmax(0,1fr)}.hold-kind-grid button{min-height:92px}}
+
+/* R9 hold placement density */
+.hold-inline-dining{
+  grid-template-columns:minmax(230px,270px) minmax(0,560px);
+  justify-content:start;
+  align-items:stretch;
+  gap:14px
+}
+.hold-inline-left{gap:8px}
+.hold-queue-button{padding:14px}
+.hold-queue-button b{font-size:19px}
+.hold-nine-grid{
+  width:100%;
+  max-width:560px;
+  gap:7px;
+  justify-self:start
+}
+.hold-nine-grid button{
+  border-radius:10px;
+  padding:5px
+}
+.hold-nine-grid b{font-size:25px}
+.hold-nine-grid span{font-size:11px}
+@media(max-width:1350px){
+  .hold-inline-dining{grid-template-columns:minmax(210px,240px) minmax(0,500px);gap:10px}
+  .hold-nine-grid{max-width:500px;gap:6px}
+  .hold-nine-grid b{font-size:22px}
+}
