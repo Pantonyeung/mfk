@@ -40,13 +40,15 @@ https://github.com/Pantonyeung/mfk
 Active implementation：
 `v2local/**`
 
-Current main：
+Current executable product code baseline：
 `7660f49cfcd97c0679697af07f5bc194f7807c03`
 
-Current main latest commit：
+呢個 SHA 係目前最後一個會影響 Runtime 行為嘅 product commit：
 `fix: invert TSC raster label polarity`
 
-Current main smoke：
+之後如 repo HEAD 只多咗 HANDOFF / docs commit，唔代表 executable product code 改變。
+
+Product smoke：
 GitHub Actions run `35566403875`
 Result：SUCCESS
 
