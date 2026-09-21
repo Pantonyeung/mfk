@@ -8,7 +8,21 @@ import {
 } from './local-admin-menu.ts';
 
 describe('local Admin menu authority',()=>{
-  beforeEach(()=>localStorage.removeItem(LOCAL_ADMIN_MENU_STORAGE_KEY));
+  beforeEach(()=>{
+    const values=new Map<string,string>();
+    Object.defineProperty(globalThis,'localStorage',{
+      configurable:true,
+      value:{
+        getItem:(key:string)=>values.get(key)??null,
+        setItem:(key:string,value:string)=>{values.set(key,String(value));},
+        removeItem:(key:string)=>{values.delete(key);},
+        clear:()=>values.clear(),
+        key:(index:number)=>[...values.keys()][index]??null,
+        get length(){return values.size;},
+      },
+    });
+    localStorage.removeItem(LOCAL_ADMIN_MENU_STORAGE_KEY);
+  });
 
   it('boots with deterministic local seed',()=>{
     const menu=readLocalAdminMenu();
