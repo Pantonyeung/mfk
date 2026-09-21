@@ -19,6 +19,36 @@ type Draft={
   products:LocalAdminMenuProduct[];
 };
 
+type PublishReceipt={
+  revision:number;
+  publishedAt:string;
+};
+
+export function AdminMenuPublishReceipt({receipt}:{receipt:PublishReceipt}){
+  const publishedTime=new Date(receipt.publishedAt).toLocaleTimeString('zh-HK',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  return <div
+    className="local-admin-publish-success"
+    role="status"
+    aria-live="polite"
+    style={{
+      display:'grid',
+      gridTemplateColumns:'auto auto 1fr',
+      alignItems:'center',
+      gap:12,
+      padding:'14px 16px',
+      border:'2px solid #78c69a',
+      borderRadius:12,
+      background:'#eaf8ef',
+      color:'#145c38',
+      boxShadow:'0 6px 18px rgba(20,92,56,.12)',
+    }}
+  >
+    <strong style={{fontSize:20}}>✓ 已發布到 POS</strong>
+    <b style={{fontSize:18}}>Active Menu R{receipt.revision}</b>
+    <span style={{justifySelf:'end',fontSize:13,fontWeight:850}}>發布時間 {publishedTime}</span>
+  </div>;
+}
+
 function copyDraft():Draft{
   const draft=readLocalAdminMenuDraft();
   return {
@@ -39,6 +69,7 @@ export function LocalAdminMenuWorkspace(){
   const [draft,setDraft]=useState<Draft>(copyDraft);
   const [message,setMessage]=useState('Menu Admin 已獨立。修改先保存草稿，發布後 POS 先會轉版本。');
   const [dirty,setDirty]=useState(false);
+  const [publishReceipt,setPublishReceipt]=useState<PublishReceipt|null>(null);
 
   useEffect(()=>{
     const stopActive=subscribeLocalAdminMenu(()=>{
@@ -63,10 +94,17 @@ export function LocalAdminMenuWorkspace(){
     [draft.products],
   );
   const validation=useMemo(()=>inspectLocalAdminMenuDraft(draft),[draft]);
+  const activeSnapshot=useMemo(()=>{void activeRevision;return readLocalAdminMenu();},[activeRevision]);
+  const hasUnpublishedChanges=useMemo(
+    ()=>JSON.stringify(draft.categories)!==JSON.stringify(activeSnapshot.categories)
+      ||JSON.stringify(draft.products)!==JSON.stringify(activeSnapshot.products),
+    [draft,activeSnapshot],
+  );
 
   const patchCategory=(id:string,patch:Partial<LocalAdminMenuCategory>)=>{
     setDraft(current=>({...current,categories:current.categories.map(row=>row.id===id?{...row,...patch}:row)}));
     setDirty(true);
+    setPublishReceipt(null);
   };
   const moveCategory=(id:string,delta:-1|1)=>{
     setDraft(current=>{
@@ -78,6 +116,7 @@ export function LocalAdminMenuWorkspace(){
       return {...current,categories:normalizePositions(rows)};
     });
     setDirty(true);
+    setPublishReceipt(null);
   };
   const addCategory=()=>{
     const used=new Set(draft.categories.map(row=>row.id));
@@ -88,6 +127,7 @@ export function LocalAdminMenuWorkspace(){
       categories:[...current.categories,{id:'cat-new-'+suffix,name:'新分類',position:(current.categories.length+1)*10}],
     }));
     setDirty(true);
+    setPublishReceipt(null);
   };
   const removeCategory=(id:string)=>{
     if(draft.products.some(row=>row.categoryId===id)){
@@ -96,10 +136,12 @@ export function LocalAdminMenuWorkspace(){
     }
     setDraft(current=>({...current,categories:current.categories.filter(row=>row.id!==id)}));
     setDirty(true);
+    setPublishReceipt(null);
   };
   const patchProduct=(id:string,patch:Partial<LocalAdminMenuProduct>)=>{
     setDraft(current=>({...current,products:current.products.map(row=>row.id===id?{...row,...patch}:row)}));
     setDirty(true);
+    setPublishReceipt(null);
   };
   const addProduct=()=>{
     const used=new Set(draft.products.map(row=>row.id));
@@ -118,10 +160,12 @@ export function LocalAdminMenuWorkspace(){
       }],
     }));
     setDirty(true);
+    setPublishReceipt(null);
   };
   const removeProduct=(id:string)=>{
     setDraft(current=>({...current,products:current.products.filter(row=>row.id!==id)}));
     setDirty(true);
+    setPublishReceipt(null);
   };
 
   const saveDraft=()=>{
@@ -142,6 +186,10 @@ export function LocalAdminMenuWorkspace(){
 
   const publish=()=>{
     try{
+      if(!hasUnpublishedChanges){
+        setMessage('目前冇未發布修改；POS 已經使用 Active Menu R'+activeRevision+'。');
+        return;
+      }
       let targetDraftRevision=draftRevision;
       if(dirty){
         const saved=saveLocalAdminMenuDraft(draft,draftRevision);
@@ -156,6 +204,7 @@ export function LocalAdminMenuWorkspace(){
       setBasePublishedRevision(nextDraft.basePublishedRevision);
       setDraft(copyDraft());
       setDirty(false);
+      setPublishReceipt({revision:published.revision,publishedAt:published.publishedAt});
       setMessage('Menu R'+published.revision+' 已發布；POS 已切換到呢個 Active Menu。');
     }catch(error){
       const code=error instanceof Error?error.message:'ADMIN_MENU_PUBLISH_FAILED';
@@ -170,6 +219,7 @@ export function LocalAdminMenuWorkspace(){
     setBasePublishedRevision(saved.basePublishedRevision);
     setActiveRevision(readLocalAdminMenu().revision);
     setDirty(false);
+    setPublishReceipt(null);
     setMessage('已重新載入草稿 D'+saved.draftRevision+'。');
   };
   const discard=()=>{
@@ -179,6 +229,7 @@ export function LocalAdminMenuWorkspace(){
       setDraftRevision(next.draftRevision);
       setBasePublishedRevision(next.basePublishedRevision);
       setDirty(false);
+      setPublishReceipt(null);
       setMessage('已放棄草稿；重新跟 Active Menu R'+activeRevision+'。');
     }catch(error){setMessage(error instanceof Error?error.message:'ADMIN_MENU_DRAFT_DISCARD_FAILED');}
   };
@@ -189,6 +240,7 @@ export function LocalAdminMenuWorkspace(){
       setDraftRevision(next.draftRevision);
       setBasePublishedRevision(next.basePublishedRevision);
       setDirty(false);
+      setPublishReceipt(null);
       setMessage('初始 Menu 已放入草稿 D'+next.draftRevision+'；未發布，POS 未變。');
     }catch(error){setMessage(error instanceof Error?error.message:'ADMIN_MENU_RESET_FAILED');}
   };
@@ -208,9 +260,11 @@ export function LocalAdminMenuWorkspace(){
 
     <div className={validation.ok?'local-admin-menu-validation valid':'local-admin-menu-validation invalid'}>
       <b>{validation.ok?'結構合法':'結構未通過'}</b>
-      <span>{validation.ok?'可以保存／發布。':validation.errors.join(' · ')}</span>
-      <em>{dirty?'有未保存修改':'草稿已保存'}</em>
+      <span>{validation.ok?(hasUnpublishedChanges?'可以保存／發布。':'已同 Active Menu 同步。'):validation.errors.join(' · ')}</span>
+      <em>{dirty?'有未保存修改':hasUnpublishedChanges?'草稿已保存 · 待發布':'Active 已同步'}</em>
     </div>
+
+    {publishReceipt?<AdminMenuPublishReceipt receipt={publishReceipt}/>:null}
 
     <div className="local-admin-menu-grid">
       <section className="local-admin-categories">
@@ -252,7 +306,7 @@ export function LocalAdminMenuWorkspace(){
         <button type="button" onClick={discard}>放棄草稿</button>
         <button type="button" onClick={resetSeed}>初始 Menu → 草稿</button>
         <button type="button" disabled={!dirty||!validation.ok} onClick={saveDraft}>保存草稿</button>
-        <button className="primary" type="button" disabled={!validation.ok} onClick={publish}>發布到 POS</button>
+        <button className="primary" type="button" disabled={!validation.ok||!hasUnpublishedChanges} onClick={publish}>{hasUnpublishedChanges?'發布到 POS':'已同步 Active'}</button>
       </div>
     </footer>
   </section>;
