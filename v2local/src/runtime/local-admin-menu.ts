@@ -175,5 +175,5 @@ export function resetLocalAdminMenu(expectedRevision:number):LocalAdminMenuSnaps
 
 export function subscribeLocalAdminMenu(listener:()=>void){
   listeners.add(listener);
-  return()=>listeners.delete(listener);
+  return()=>{listeners.delete(listener);};
 }
