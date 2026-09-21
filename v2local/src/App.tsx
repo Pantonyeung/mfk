@@ -94,7 +94,7 @@ function CheckoutPage({cart,setCart}:{cart:CartLine[];setCart:(v:CartLine[])=>vo
     CASH:'現金',ALIPAY:'Alipay',WECHAT:'WeChat Pay',FPS:'轉數快',PAYME:'PayMe',COMBO:'組合付款'
   };
   const channelLabels:Record<CheckoutChannelId,string>={
-    'walk-in':'現場','whatsapp':'WhatsApp／電話','own-platform':'自家平台','tiktok':'TikTok','foodpanda':'Foodpanda'
+    'walk-in':'現場','whatsapp':'電話／WhatsApp','morefun-app':'磨飯 App','keeta':'Keeta','foodpanda':'Foodpanda'
   };
   const parseMoney=(value:string)=>Math.max(0,Math.round((Number(value)||0)*100));
   const cashMinor=parseMoney(cash);
@@ -130,9 +130,9 @@ function CheckoutPage({cart,setCart}:{cart:CartLine[];setCart:(v:CartLine[])=>vo
     },
     channels:[
       {id:'walk-in',label:'現場',selected:channel==='walk-in'},
-      {id:'whatsapp',label:'WhatsApp／電話',selected:channel==='whatsapp'},
-      {id:'own-platform',label:'自家平台',selected:channel==='own-platform'},
-      {id:'tiktok',label:'TikTok',selected:channel==='tiktok'},
+      {id:'whatsapp',label:'電話／WhatsApp',selected:channel==='whatsapp'},
+      {id:'morefun-app',label:'磨飯 App',selected:channel==='morefun-app'},
+      {id:'keeta',label:'Keeta',selected:channel==='keeta'},
       {id:'foodpanda',label:'Foodpanda',selected:channel==='foodpanda'},
     ],
     methods:(['CASH','ALIPAY','WECHAT','FPS','PAYME','COMBO'] as CheckoutTenderId[]).map(id=>({id,label:methodLabels[id],enabled:true,selected:method===id})),
@@ -145,7 +145,7 @@ function CheckoutPage({cart,setCart}:{cart:CartLine[];setCart:(v:CartLine[])=>vo
     paymentState:state,
     channelFields:{
       showCustomerPhone:channel==='whatsapp',customerPhone,
-      showPlatformFields:channel==='own-platform'||channel==='tiktok'||channel==='foodpanda',
+      showPlatformFields:channel==='morefun-app'||channel==='keeta'||channel==='foodpanda',
       pickupCode,platformOrderNo,
     },
     comboMode:method==='COMBO',
