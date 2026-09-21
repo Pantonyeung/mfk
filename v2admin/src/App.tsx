@@ -5,6 +5,7 @@ import {MFK_ADMIN_AUTHORITY} from './admin-authority.ts';
 import {AdminDraftProvider} from './admin-draft.tsx';
 import {CategoriesWorkspace,CombosWorkspace,MenuDisplayWorkspace,ModifiersWorkspace,PricingWorkspace,ProductsWorkspace} from './CatalogWorkspaces.tsx';
 import {AvailabilityWorkspace,BusinessDayWorkspace,ChannelsWorkspace,PrintCenterWorkspace,PrintTemplatesWorkspace,StaffWorkspace,StoreSettingsWorkspace} from './PolicyWorkspaces.tsx';
+import {AuditWorkspace,CapacityWorkspace,ExceptionsWorkspace,OpenOrdersWorkspace,OperationsReportWorkspace,OverviewWorkspace,SalesReportWorkspace} from './ReadModelWorkspaces.tsx';
 
 const statusTitle={
   NOT_WIRED:'等待 MFK Domain Adapter',
@@ -52,12 +53,19 @@ function capabilityElement(id:string){
   if(id==='pricing')return <PricingWorkspace/>;
   if(id==='combo')return <CombosWorkspace/>;
   if(id==='menu-sort')return <MenuDisplayWorkspace/>;
+  if(id==='overview')return <OverviewWorkspace/>;
+  if(id==='open-orders')return <OpenOrdersWorkspace/>;
   if(id==='availability')return <AvailabilityWorkspace/>;
+  if(id==='capacity')return <CapacityWorkspace/>;
   if(id==='business-day')return <BusinessDayWorkspace/>;
+  if(id==='exceptions')return <ExceptionsWorkspace/>;
   if(id==='print-center')return <PrintCenterWorkspace/>;
   if(id==='print-templates')return <PrintTemplatesWorkspace/>;
   if(id==='store-settings')return <StoreSettingsWorkspace/>;
   if(id==='staff')return <StaffWorkspace/>;
+  if(id==='sales-report')return <SalesReportWorkspace/>;
+  if(id==='operations-report')return <OperationsReportWorkspace/>;
+  if(id==='audit')return <AuditWorkspace/>;
   if(id==='channel-overview')return <ChannelsWorkspace mode="overview"/>;
   if(id==='product-mapping')return <ChannelsWorkspace mode="mapping"/>;
   if(id==='accept-policy')return <ChannelsWorkspace mode="accept"/>;
