@@ -1,4 +1,5 @@
-import {printTextLan} from './native-print.ts';
+import {printBytesLan,printTextLan} from './native-print.ts';
+import {renderTscRasterLabel} from './label-bitmap.ts';
 import {buildOrderPrintPlan,type PrintBinding} from './print-routing.ts';
 
 export interface SmtOperationalMetric{readonly id:string;readonly label:string;readonly value:string;readonly detail?:string}
@@ -101,7 +102,7 @@ async function dispatchOrderOutputs(order:StoredOrder):Promise<PrintDispatchSumm
     let ok=false;
     let code='PRINT_FAILED';
     try{
-      const result=await printTextLan({
+      const printer={
         endpointId:binding.id,
         host:binding.host.trim(),
         port:Number(binding.port)||9100,
@@ -109,8 +110,10 @@ async function dispatchOrderOutputs(order:StoredOrder):Promise<PrintDispatchSumm
         model:binding.model,
         capability:binding.capability,
         encoding:binding.encoding,
-        text:job.payload,
-      });
+      };
+      const result=job.renderMode==='tsc-bitmap'&&job.labelSpec
+        ?await printBytesLan({...printer,bytes:await renderTscRasterLabel(job.labelSpec)})
+        :await printTextLan({...printer,text:job.payload});
       ok=result.ok;
       code=result.code|| (result.ok?'SENT':'PRINT_FAILED');
     }catch(error){
