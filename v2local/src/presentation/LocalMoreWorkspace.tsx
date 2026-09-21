@@ -3,7 +3,6 @@ import {useNavigate} from 'react-router';
 import {applyLanPrinter,printBytesLan,printTextLan,testLanPrinter,type NativeResult} from '../runtime/native-print.ts';
 import {LABEL_TSC_PROFILE,renderTscRasterLabel} from '../runtime/label-bitmap.ts';
 import {localRuntime,readLastPrintDiagnostic} from '../runtime/local-runtime.ts';
-import {readAdminPricingReadback,type AdminPricingReadback} from '../runtime/admin-link-readback.ts';
 import {
   applyMfkStorageSnapshot,
   buildLocalReport,
@@ -266,9 +265,6 @@ function PrinterPanel(){
 function DiagnosticsPanel(){
   const printers=loadPrinters();
   const lastPrint=readLastPrintDiagnostic();
-  const [adminState,setAdminState]=useState<'loading'|'ready'|'error'>('loading');
-  const [adminReadback,setAdminReadback]=useState<AdminPricingReadback|null>(null);
-  const [adminError,setAdminError]=useState('');
   const groups=new Map<string,PrinterBinding[]>();
   for(const printer of printers){
     const host=printer.host.trim();
@@ -278,19 +274,6 @@ function DiagnosticsPanel(){
     groups.set(key,list);
   }
   const unbound=printers.filter(printer=>!printer.host.trim());
-
-  const refreshAdmin=async()=>{
-    setAdminState('loading');setAdminError('');
-    try{
-      const value=await readAdminPricingReadback();
-      setAdminReadback(value);setAdminState('ready');
-    }catch(error){
-      setAdminState('error');
-      setAdminError(error instanceof Error?error.message:'ADMIN_PRICING_READBACK_FAILED');
-    }
-  };
-  useEffect(()=>{void refreshAdmin();},[]);
-
   return <section className="more-panel">
     <header className="more-section-heading"><div><span>LOCAL DIAGNOSTICS</span><h2>診斷中心</h2></div><strong>{window.moreFunNative?'Carrier Bridge 已連接':'Native Bridge 未連接'}</strong></header>
     <div className="more-kpis">
@@ -299,21 +282,6 @@ function DiagnosticsPanel(){
       <article><span>實體設備</span><b>{[...groups.keys()].filter(key=>!key.startsWith('UNBOUND:')).length}</b></article>
       <article><span>最近打印</span><b>{lastPrint?lastPrint.elapsedMs+' ms':'—'}</b></article>
     </div>
-
-    <section className="fusion-list admin-link-readback">
-      <header>
-        <b>Admin 發布連線｜第一批只讀</b>
-        <span>{adminState==='loading'?'讀取中':adminState==='ready'?'READBACK PASS':'READBACK FAIL'}</span>
-      </header>
-      {adminState==='ready'&&adminReadback?<>
-        <article><span>Store</span><b>{adminReadback.storeId}</b><strong>{adminReadback.currency}</strong></article>
-        <article><span>Pricing Revision</span><b>{adminReadback.revision}</b><strong>{adminReadback.productCount} Products</strong></article>
-        <article><span>Revision Token</span><b>{adminReadback.revisionToken??'—'}</b><strong>{new Date(adminReadback.generatedAt).toLocaleString('zh-HK')}</strong></article>
-        <article><span>Product IDs</span><b>{adminReadback.productIds.slice(0,8).join(', ')||'—'}</b><strong>{adminReadback.productIds.length>8?'+'+(adminReadback.productIds.length-8):'全部顯示'}</strong></article>
-      </>:adminState==='error'?<p className="fusion-note">Admin readback 失敗：{adminError}</p>:<p className="fusion-note">正在讀取 Cloudflare 已發布 Pricing projection…</p>}
-      <div className="more-tab-row"><button type="button" onClick={()=>void refreshAdmin()} disabled={adminState==='loading'}>{adminState==='loading'?'讀取中…':'重新讀取 Admin'}</button></div>
-    </section>
-
     <section className="fusion-list">
       <header><b>打印 Route</b><span>LOCAL STORAGE · v5</span></header>
       {printers.map(printer=><article key={printer.id}>
@@ -330,7 +298,7 @@ function DiagnosticsPanel(){
         <strong>{route.ok?'PASS':'FAIL'} · {route.planned} jobs · {route.elapsedMs} ms · {route.code}</strong>
       </article>)}
     </section>:<p className="fusion-note">未有最近打印 Trace。下一張單打印後，會記錄每部實體 Printer 嘅 jobs、耗時同錯誤碼。</p>}
-    <p className="fusion-note">第一批 Admin integration 只做 Cloudflare 已發布 Pricing readback，暫時唔改 Menu、Cart、Checkout、Modifier、Combo、Print Rule 或 Order Mapping。實機確認 readback 後先開下一批。</p>
+    <p className="fusion-note">同一實體 IP / Port 嘅 Label Route 會合併成一次 LAN socket dispatch；不同實體 Printer 會並行送出。飯糰同外賣仍保留獨立 logical route。診斷中心只顯示本機真實 binding，唔會假裝 Cloud 同步狀態。</p>
   </section>;
 }
 
