@@ -39,7 +39,7 @@
 .ordering-line-qty{display:grid;grid-template-columns:26px 28px 26px;align-items:center;justify-content:end}.ordering-line-qty button{height:28px;border:1px solid #d8dae0;border-radius:7px;background:#fff;font-size:18px}.ordering-line-qty strong{text-align:center;font-size:16px}
 .ordering-line-total{grid-column:3;text-align:right;font-size:17px}.ordering-cart-empty{display:grid;place-items:center;height:100%;color:#888;font-weight:850}
 .ordering-cart-facts{display:grid;gap:5px;padding:10px 0;border-top:1px solid #ececf0}.ordering-cart-facts span{display:flex;justify-content:space-between}.ordering-cart-facts small,.ordering-cart-facts b{font-size:15px}.ordering-cart-total{display:flex;justify-content:space-between;align-items:end;padding:6px 0 12px}.ordering-cart-total span{font-size:20px;font-weight:950}.ordering-cart-total strong{font-size:34px;color:#2877d5}
-.ordering-cart-secondary-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:9px}.ordering-cart-secondary-actions button{min-height:48px;border:0;border-radius:10px;background:#f1f2f4;font-size:17px;font-weight:900}.ordering-cart-secondary-actions button.destructive{background:#fff0f2;color:#d43a52}
+.ordering-cart-secondary-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:9px}.ordering-cart-secondary-actions.single{grid-template-columns:1fr}.ordering-cart-secondary-actions button{min-height:48px;border:0;border-radius:10px;background:#f1f2f4;font-size:17px;font-weight:900}.ordering-cart-secondary-actions button.destructive{background:#fff0f2;color:#d43a52}
 .ordering-checkout{min-height:64px;border:0;border-radius:12px;background:linear-gradient(180deg,#4da2ff,#2d7fe3);color:#fff;font-size:22px;font-weight:950}.ordering-checkout:disabled{opacity:.45}
 
 .ordering-workbar{grid-area:work;min-width:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}
@@ -59,3 +59,22 @@
 .ordering-pending-card,.ordering-active-card{cursor:pointer}
 .ordering-pending-card:active,.ordering-active-card:active{transform:translateY(1px)}
 
+
+.ordering-cart.hold-active{grid-template-rows:auto minmax(0,1fr)}
+.ordering-cart.hold-active>.ordering-cart-head{border-bottom:1px solid #ececf0}
+.ordering-hold-placement{min-height:0;display:grid;grid-template-rows:auto minmax(0,1fr);gap:10px;padding-top:10px}
+.ordering-hold-placement>header{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.ordering-hold-placement>header>div{display:grid;gap:2px}.ordering-hold-placement>header small{font-size:12px;color:#777}.ordering-hold-placement>header strong{font-size:20px}
+.ordering-hold-placement>header button{min-height:38px;padding:0 12px;border:1px solid #d9dce2;border-radius:8px;background:#fff;font-weight:850}
+.ordering-hold-placement-body{min-height:0;display:grid;grid-template-columns:135px minmax(0,1fr);gap:10px}
+.ordering-hold-left{min-height:0;display:grid;grid-template-rows:1.35fr .8fr;gap:10px}
+.ordering-hold-left button{min-height:0;padding:14px;display:grid;align-content:center;gap:7px;text-align:left;border:1px solid #d9dce2;border-radius:12px;background:#fff}
+.ordering-hold-left button.queue{border:2px solid #078b7f;background:#eefaf8;color:#066b64}
+.ordering-hold-left button.waiting{background:#f7f8fa}
+.ordering-hold-left b{font-size:18px}.ordering-hold-left span{font-size:12px;line-height:1.4;color:#69707d}
+.ordering-hold-tables{min-height:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));grid-template-rows:repeat(3,minmax(0,1fr));gap:8px}
+.ordering-hold-tables button{min-height:0;display:grid;place-items:center;align-content:center;gap:4px;border:1px solid #d9dce2;border-radius:11px;background:#fff}
+.ordering-hold-tables button.available{border:2px solid #4b7bec;background:#f3f7ff;color:#2458b4}
+.ordering-hold-tables button.occupied{background:#f0f2f4;color:#8a8f98}
+.ordering-hold-tables b{font-size:24px}.ordering-hold-tables span{font-size:11px;font-weight:800}
+@media(max-width:1400px){.ordering-hold-placement-body{grid-template-columns:115px minmax(0,1fr)}.ordering-hold-left b{font-size:16px}}
