@@ -191,14 +191,7 @@ function paymentModal(o) {
   const policy = getChannelPolicy(editSource);
   return `<label>渠道</label><div class="option-grid">${sources.map((x) => `<button data-action="edit-source" data-value="${x}" class="${x === editSource ? "active" : ""}">${x}</button>`).join("")}</div>${policy.requiresPaymentMethod ? `<label>付款方式</label><div class="option-grid">${policy.paymentMethods.map((x) => `<button data-action="edit-payment" data-value="${x}" class="${x === editPayment ? "active" : ""}">${x}</button>`).join("")}</div>` : '<p class="notice">此渠道不預先選付款方式，會按正式狀態進入待核實或平台已付。</p>'}<footer><button data-action="close-modal">返回</button><button class="primary" data-action="save-payment">儲存更改</button></footer>`;
 }
-function whatsappLink(o) {
-  const phone = String(o.phone || o.channelData?.phone || "").replace(
-    /\D/g,
-    "",
-  );
-  const message = `你好，呢度係磨飯。訂單 ${orderDisplayNumber(o)} 嘅付款資料需要你協助核對，麻煩回覆付款截圖或相關資料，謝謝。`;
-  return `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
-}
+function whatsappLink(){ return '#local-only'; }
 function paymentProof(o) {
   const proof = o.paymentProof || o.proof;
   return proof
