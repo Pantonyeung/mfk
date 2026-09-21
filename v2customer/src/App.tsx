@@ -4,15 +4,18 @@ import {activeOrderFixture,categories,historyFixtures,products,storeFixture,type
 
 type View='home'|'menu'|'cart'|'checkout'|'orders'|'more';
 type NetworkMode='ONLINE'|'OFFLINE'|'FAILURE'|'STALE';
-type OrderStage='ACCEPTANCE'|'PREPARING'|'READY'|'PICKUP'|'COMPLETED';
-type CartLine={id:number;productId:string;name:string;config:string[];priceLabel:string};
+type OrderStage='ACCEPTANCE'|'REJECTED'|'PREPARING'|'DELAYED'|'READY'|'PICKUP'|'COMPLETED';
+type SubmissionState='IDLE'|'PENDING'|'UNKNOWN';
+type CartLine={id:number;productId:string;name:string;config:string[];priceLabel:string;quantity:number;attention?:string};
 
 const commandCapabilities=capabilities.filter(item=>item.kind==='COMMAND_SHAPE');
 
 const stageMeta:Record<OrderStage,{label:string;title:string;detail:string}>={
-  ACCEPTANCE:{label:'等待店舖接單',title:'已收到訂單（展示狀態）',detail:'等待店舖確認。此畫面只係 migration fixture，唔代表本次提交建立咗正式 Order。'},
-  PREPARING:{label:'製作中',title:'店舖已接單（展示狀態）',detail:'Preparing · 展示 promised ready time，同內部製作細節分開。'},
-  READY:{label:'可取餐',title:'可以取餐（展示狀態）',detail:'Ready 只係取餐準備完成嘅呈現 shape，唔等於已交收。'},
+  ACCEPTANCE:{label:'等待店舖接單',title:'已收到訂單（展示狀態）',detail:'等待店舖確認。Created / Received 唔等於 Accepted。'},
+  REJECTED:{label:'未能接單',title:'店舖未能承諾（展示狀態）',detail:'Rejected 必須有結構化原因同修復入口；唔會永久停留 Pending。'},
+  PREPARING:{label:'製作中',title:'店舖已接單（展示狀態）',detail:'Accepted → Preparing。只展示客戶需要嘅階段，同內部製作細節分開。'},
+  DELAYED:{label:'稍有延誤',title:'製作時間已更新（展示狀態）',detail:'Delay 只更新 ETA；仍然係 Preparing，唔會假裝 Ready。'},
+  READY:{label:'可取餐',title:'可以取餐（展示狀態）',detail:'Ready 只代表真正可取；唔等於 Arrived / Verified / Handed Over / Completed。'},
   PICKUP:{label:'取餐核對',title:'到店取餐（展示狀態）',detail:'顯示短取餐碼／電話尾碼 shape；真正核對 authority 今輪未接線。'},
   COMPLETED:{label:'已完成',title:'取餐完成（展示狀態）',detail:'Completed 只係 fixture projection，唔由 Customer Port 自行寫正式交易狀態。'},
 };
@@ -22,19 +25,27 @@ export function App(){
   const [network,setNetwork]=useState<NetworkMode>('ONLINE');
   const [channelUnavailable,setChannelUnavailable]=useState(false);
   const [category,setCategory]=useState<string>('人氣');
+  const [searchQuery,setSearchQuery]=useState('');
   const [selected,setSelected]=useState<Product|null>(null);
-  const [selections,setSelections]=useState<Record<string,string>>({});
+  const [selections,setSelections]=useState<Record<string,string[]>>({});
   const [cart,setCart]=useState<CartLine[]>([]);
   const [notice,setNotice]=useState<string|null>(null);
   const [phone,setPhone]=useState('');
   const [name,setName]=useState('');
-  const [pendingIntent,setPendingIntent]=useState(false);
+  const [submissionState,setSubmissionState]=useState<SubmissionState>('IDLE');
   const [orderStage,setOrderStage]=useState<OrderStage>('ACCEPTANCE');
   const [orderSegment,setOrderSegment]=useState<'current'|'history'>('current');
   const [registryOpen,setRegistryOpen]=useState(false);
   const [nextLineId,setNextLineId]=useState(1);
 
-  const visibleProducts=useMemo(()=>products.filter(product=>category==='人氣'?(product.badge==='人氣'||product.id==='c-p2'):product.category===category),[category]);
+  const visibleProducts=useMemo(()=>{
+    const query=searchQuery.trim().toLowerCase();
+    return products.filter(product=>{
+      const categoryMatch=category==='人氣'?(product.badge==='人氣'||product.id==='c-p2'):product.category===category;
+      const searchMatch=!query||[product.name,product.description,product.category,product.badge??''].some(value=>value.toLowerCase().includes(query));
+      return categoryMatch&&searchMatch;
+    });
+  },[category,searchQuery]);
 
   const showNotWired=(label:string)=>{
     setNotice(`${label}：NOT_WIRED｜MIGRATION_ONLY。今輪唔會建立正式 Order、派 Display Number、執行付款、寫入 Store Kernel、送出訊息或連接 SMT。`);
@@ -48,10 +59,15 @@ export function App(){
   const addLocalCartLine=()=>{
     if(!selected)return;
     const groups=[...(selected.choiceGroups??[]),...(selected.comboGroups??[])];
-    const missing=groups.filter(group=>group.required).find(group=>!selections[group.label]);
-    if(missing){setNotice(`請先完成必選：${missing.label}`);return;}
-    const config=Object.entries(selections).map(([key,value])=>`${key}：${value}`);
-    setCart(current=>[...current,{id:nextLineId,productId:selected.id,name:selected.name,config,priceLabel:selected.priceLabel}]);
+    for(const group of groups){
+      const values=selections[group.label]??[];
+      const min=group.min??(group.required?1:0);
+      const max=group.max??1;
+      if(values.length<min){setNotice(`請完成 ${group.label}：最少揀 ${min} 項。`);return;}
+      if(values.length>max){setNotice(`${group.label}：最多揀 ${max} 項。`);return;}
+    }
+    const config=Object.entries(selections).filter(([,values])=>values.length).map(([key,values])=>`${key}：${values.join('、')}`);
+    setCart(current=>[...current,{id:nextLineId,productId:selected.id,name:selected.name,config,priceLabel:selected.priceLabel,quantity:1}]);
     setNextLineId(value=>value+1);
     setSelected(null);
     setSelections({});
@@ -62,12 +78,12 @@ export function App(){
     const digits=phone.replace(/\D/g,'');
     if(cart.length===0){setNotice('購物籃未有項目。');return;}
     if(digits.length<8){setNotice('請輸入至少 8 位電話，作 Checkout Form shape 驗證。');return;}
-    setPendingIntent(true);
-    setNotice('Safe Submit Presentation：已進入 PENDING_INTENT 展示。NOT_WIRED；未送店舖、未建立正式 Order。');
+    setSubmissionState('PENDING');
+    setNotice('Safe Submit Presentation：PENDING_INTENT。結果 certainty 只可以係 PENDING / UNKNOWN，未有 authoritative readback 前唔會假裝 Order Created。');
   };
 
   const rebuildLocalCart=(summary:string)=>{
-    setCart([{id:nextLineId,productId:'history-fixture',name:'再次下單預覽',config:[summary,'Historical intent copy / current revalidation 尚未接線'],priceLabel:'等待正式 Quote'}]);
+    setCart([{id:nextLineId,productId:'history-fixture',name:'再次下單預覽',config:[summary,'Historical intent copy'],priceLabel:'等待 Current Quote',quantity:1,attention:'NEEDS_REVALIDATION：Price / Availability / Config 必須按 current state 重驗；只修有問題嗰項。'}]);
     setNextLineId(value=>value+1);
     setView('cart');
     setNotice('Reorder Shape：只重建本機 Cart 預覽。正式 Reorder Command 仍然 NOT_WIRED。');
@@ -88,10 +104,10 @@ export function App(){
     {network!=='ONLINE'?<RecoveryBanner mode={network} onRetry={()=>showNotWired('重試／重新確認')}/>:null}
 
     <section className="viewport">
-      {view==='home'?<HomeView unavailable={channelUnavailable} onBrowse={()=>setView('menu')} onOrders={()=>{setOrderSegment('current');setView('orders')}} onFallback={()=>showNotWired('WhatsApp 備用入口')}/>:null}
-      {view==='menu'?<MenuView category={category} setCategory={setCategory} products={visibleProducts} onProduct={openProduct} cartCount={cart.length} onCart={()=>setView('cart')}/>:null}
-      {view==='cart'?<CartView cart={cart} onRemove={id=>setCart(current=>current.filter(line=>line.id!==id))} onMenu={()=>setView('menu')} onCheckout={()=>setView('checkout')}/>:null}
-      {view==='checkout'?<CheckoutView cart={cart} name={name} setName={setName} phone={phone} setPhone={setPhone} pending={pendingIntent} onSubmit={submitPresentation} onBack={()=>setView('cart')} onAction={showNotWired}/>:null}
+      {view==='home'?<HomeView unavailable={channelUnavailable} onBrowse={()=>setView('menu')} onOrders={()=>{setOrderSegment('current');setView('orders')}} onHistory={()=>{setOrderSegment('history');setView('orders')}} onFallback={()=>showNotWired('WhatsApp 備用入口')}/>:null}
+      {view==='menu'?<MenuView category={category} setCategory={setCategory} query={searchQuery} setQuery={setSearchQuery} products={visibleProducts} onProduct={openProduct} cartCount={cart.reduce((sum,line)=>sum+line.quantity,0)} onCart={()=>setView('cart')}/>:null}
+      {view==='cart'?<CartView cart={cart} onRemove={id=>setCart(current=>current.filter(line=>line.id!==id))} onQuantity={(id,quantity)=>setCart(current=>current.map(line=>line.id===id?{...line,quantity:Math.max(1,quantity)}:line))} onMenu={()=>setView('menu')} onCheckout={()=>setView('checkout')}/>:null}
+      {view==='checkout'?<CheckoutView cart={cart} name={name} setName={setName} phone={phone} setPhone={setPhone} submissionState={submissionState} setSubmissionState={setSubmissionState} onSubmit={submitPresentation} onBack={()=>setView('cart')} onAction={showNotWired}/>:null}
       {view==='orders'?<OrdersView segment={orderSegment} setSegment={setOrderSegment} stage={orderStage} setStage={setOrderStage} onReorder={rebuildLocalCart} onAction={showNotWired}/>:null}
       {view==='more'?<MoreView network={network} setNetwork={setNetwork} unavailable={channelUnavailable} setUnavailable={setChannelUnavailable} registryOpen={registryOpen} setRegistryOpen={setRegistryOpen} onAction={showNotWired}/>:null}
     </section>
@@ -99,12 +115,12 @@ export function App(){
     {view!=='checkout'?<nav className="bottom-nav" aria-label="主要導覽">
       <Nav active={view==='home'} icon="⌂" label="首頁" onClick={()=>setView('home')}/>
       <Nav active={view==='menu'} icon="▦" label="菜單" onClick={()=>setView('menu')}/>
-      <Nav active={view==='cart'} icon="□" label="購物籃" badge={cart.length?String(cart.length):undefined} onClick={()=>setView('cart')}/>
+      <Nav active={view==='cart'} icon="□" label="購物籃" badge={cart.length?String(cart.reduce((sum,line)=>sum+line.quantity,0)):undefined} onClick={()=>setView('cart')}/>
       <Nav active={view==='orders'} icon="◎" label="訂單" onClick={()=>setView('orders')}/>
       <Nav active={view==='more'} icon="•••" label="更多" onClick={()=>setView('more')}/>
     </nav>:null}
 
-    {selected?<ProductSheet product={selected} values={selections} setValue={(group,value)=>setSelections(current=>({...current,[group]:value}))} onClose={()=>setSelected(null)} onAdd={addLocalCartLine}/>:null}
+    {selected?<ProductSheet product={selected} values={selections} setValue={(group,value,max)=>setSelections(current=>{const selectedValues=current[group]??[];const exists=selectedValues.includes(value);const next=exists?selectedValues.filter(item=>item!==value):max===1?[value]:selectedValues.length<max?[...selectedValues,value]:selectedValues;return {...current,[group]:next};})} onClose={()=>setSelected(null)} onAdd={addLocalCartLine}/>:null}
   </main>;
 }
 
