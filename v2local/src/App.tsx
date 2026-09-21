@@ -82,6 +82,7 @@ function CheckoutPage({cart,setCart}:{cart:CartLine[];setCart:(v:CartLine[])=>vo
   const [cash,setCash]=useState('');
   const [state,setState]=useState<'selected'|'processing'|'success'|'failure'>('selected');
   const [completion,setCompletion]=useState<CheckoutWorkspaceViewModel['completionReview']>();
+  const [printStatus,setPrintStatus]=useState<string|undefined>();
   const received=Math.round((Number(cash)||0)*100);
   const change=Math.max(0,received-due);
   const view:CheckoutWorkspaceViewModel={
@@ -96,6 +97,7 @@ function CheckoutPage({cart,setCart}:{cart:CartLine[];setCart:(v:CartLine[])=>vo
     cashInput:cash,exactCashEnabled:true,confirmEnabled:cart.length>0&&received>=due,
     paymentState:state,
     validationMessage:received<due&&cash?'收款金額不足':undefined,
+    statusMessage:printStatus,
     completionReview:completion,
   };
   const confirm=()=>{
@@ -108,6 +110,21 @@ function CheckoutPage({cart,setCart}:{cart:CartLine[];setCart:(v:CartLine[])=>vo
       });
       setCompletion({displayOrderCode:order.display,tenderLabel:'CASH',dueLabel:money(due),receivedLabel:money(received),changeLabel:money(change),statusLabel:'COMPLETED'});
       setState('success');
+      setPrintStatus('訂單已完成 · 正在送打印…');
+      void localRuntime.printOrderOutputs(order.id).then(summary=>{
+        if(summary.planned===0){
+          setPrintStatus('訂單已完成 · 未有已綁定打印 Route');
+          return;
+        }
+        if(summary.failed===0){
+          setPrintStatus(`訂單已完成 · 已送出 ${summary.sent}/${summary.planned} 個打印工作`);
+          return;
+        }
+        const failures=summary.results.filter(row=>!row.ok).map(row=>row.role+':'+row.code).join('；');
+        setPrintStatus(`訂單已完成 · 打印部分失敗 ${summary.sent}/${summary.planned} · ${failures}`);
+      }).catch(error=>{
+        setPrintStatus('訂單已完成 · 打印失敗 '+(error instanceof Error?error.message:String(error)));
+      });
     }catch{setState('failure')}
   };
   const actions:CheckoutWorkspaceActions={
