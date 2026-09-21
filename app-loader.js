@@ -4,9 +4,9 @@ const secondaryFrame=document.getElementById('page-next');
 const hud=document.getElementById('device-hud');
 const hudDetail=document.getElementById('device-hud-detail');
 const routes={order:'pages/order/index.html',checkout:'pages/checkout/index.html',orders:'pages/orders/index.html',dine:'pages/dine/index.html',soldout:'pages/soldout/index.html',more:'pages/more/index.html'};
-const BUILD='smt-t2s-1280x800-rebuild.40';
-const TARGET_WIDTH=1280;
-const TARGET_HEIGHT=800;
+const BUILD='mfk-fullhd-local-print-v1';
+const TARGET_WIDTH=1920;
+const TARGET_HEIGHT=1080;
 let activeFrame=primaryFrame;
 let loadingFrame=secondaryFrame;
 let current='';
@@ -48,10 +48,10 @@ body[data-page="order"] .toast{position:fixed!important;left:300px!important;bot
 
 function viewportSize(){const viewport=window.visualViewport;return{width:Math.round(viewport?.width||window.innerWidth),height:Math.round(viewport?.height||window.innerHeight)};}
 function isExactTarget(size){return size.width===TARGET_WIDTH&&size.height===TARGET_HEIGHT;}
-function applyT2SViewport(){const size=viewportSize();const orientation=size.width>=size.height?'橫屏':'直屏';document.documentElement.dataset.orientation=orientation==='橫屏'?'landscape':'portrait';const exact=isExactTarget(size);const scale=exact?1:Math.min(size.width/TARGET_WIDTH,size.height/TARGET_HEIGHT);const renderedWidth=Math.round(TARGET_WIDTH*scale),renderedHeight=Math.round(TARGET_HEIGHT*scale);stage.style.width=TARGET_WIDTH+'px';stage.style.height=TARGET_HEIGHT+'px';stage.style.left=Math.max(0,Math.round((size.width-renderedWidth)/2))+'px';stage.style.top=Math.max(0,Math.round((size.height-renderedHeight)/2))+'px';stage.style.transform=scale===1?'none':'scale('+scale+')';stage.dataset.profile=exact?'sunmi-t2s-native':'sunmi-t2s-simulator';stage.dataset.viewportWidth=String(size.width);stage.dataset.viewportHeight=String(size.height);stage.dataset.scale=scale.toFixed(4);stage.dataset.fitted='1';document.documentElement.dataset.previewMode=exact?'native':'simulator';if(hud&&hudDetail){hud.hidden=exact;hudDetail.textContent='裝置 '+size.width+'×'+size.height+'（'+orientation+'）｜完整框縮放 '+Math.round(scale*100)+'%｜黃色框內固定為 1280×800｜版本 '+BUILD;}}
+function applyT2SViewport(){const size=viewportSize();const orientation=size.width>=size.height?'橫屏':'直屏';document.documentElement.dataset.orientation=orientation==='橫屏'?'landscape':'portrait';const exact=isExactTarget(size);const scale=Math.min(size.width/TARGET_WIDTH,size.height/TARGET_HEIGHT);const renderedWidth=Math.round(TARGET_WIDTH*scale),renderedHeight=Math.round(TARGET_HEIGHT*scale);stage.style.width=TARGET_WIDTH+'px';stage.style.height=TARGET_HEIGHT+'px';stage.style.left=Math.max(0,Math.round((size.width-renderedWidth)/2))+'px';stage.style.top=Math.max(0,Math.round((size.height-renderedHeight)/2))+'px';stage.style.transform=scale===1?'none':'scale('+scale+')';stage.dataset.profile='mfk-fullhd-1920x1080';stage.dataset.viewportWidth=String(size.width);stage.dataset.viewportHeight=String(size.height);stage.dataset.scale=scale.toFixed(4);stage.dataset.fitted='1';document.documentElement.dataset.previewMode=exact?'native':'scaled';if(hud){hud.hidden=true;}}
 function route(){const key=(location.hash.replace(/^#\/?/,'')||'order').split('?')[0];return routes[key]?key:'order';}
 function showLoaderError(message,target=activeFrame){if(current&&target===loadingFrame){console.error('PAGE_TRANSITION_FAILED',message);pending='';target.classList.remove('is-loading');target.src='about:blank';return;}target.srcdoc='<!doctype html><html lang="zh-HK"><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><style>body{margin:0;display:grid;place-items:center;height:100vh;font-family:-apple-system,BlinkMacSystemFont,"PingFang HK",sans-serif;background:#fff8f3;color:#382b24}.card{max-width:520px;padding:28px;border:1px solid #ead9ce;border-radius:16px;background:#fff;text-align:center}.card strong{display:block;font-size:24px;color:#e84b12;margin-bottom:10px}.card button{min-height:48px;margin-top:12px;padding:0 20px;border:0;border-radius:10px;background:#ef5b23;color:#fff;font-weight:800}</style><body><section class="card"><strong>頁面未能載入</strong><p>'+String(message||'請重新整理後再試')+'</p><button onclick="location.reload()">重新載入</button></section></body></html>';}
-function injectPageFixes(target=activeFrame){try{const doc=target.contentDocument;if(!doc?.head||!doc.body)return;const page=doc.body.dataset.page||'';let css='';if(page==='checkout')css=checkoutFixCss;else if(page==='order')css=orderFixCss;else if(page==='more')css='body[data-page="more"] .app{width:1280px!important;height:800px!important;min-width:1280px!important;min-height:800px!important;overflow:hidden!important}';if(!css)return;let style=doc.getElementById('smt-loader-t2s-fixes');if(!style){style=doc.createElement('style');style.id='smt-loader-t2s-fixes';doc.head.appendChild(style);}style.textContent=css;}catch(error){console.warn('T2S_FIX_INJECT_FAILED',error);}}
+function injectPageFixes(target=activeFrame){try{const doc=target.contentDocument;if(!doc?.head||!doc.body)return;const page=doc.body.dataset.page||'';const fullHd='html,body,#app,.app{width:1920px!important;min-width:1920px!important;max-width:1920px!important;height:1080px!important;min-height:1080px!important;max-height:1080px!important;overflow:hidden!important}';let css=fullHd;if(page==='checkout')css+=checkoutFixCss.replaceAll('1280px','1920px').replaceAll('744px','1008px').replaceAll('350px','525px');else if(page==='order')css+=orderFixCss;let style=doc.getElementById('mfk-fullhd-fixes');if(!style){style=doc.createElement('style');style.id='mfk-fullhd-fixes';doc.head.appendChild(style);}style.textContent=css;}catch(error){console.warn('MFK_FULLHD_FIX_INJECT_FAILED',error);}}
 function pageUrl(key,mode='normal'){const base=routes[key]+'?build='+encodeURIComponent(BUILD);return mode==='normal'?base:base+'&'+mode+'='+Date.now();}
 function armWatchdog(frame,key,seq){clearTimeout(watchdogTimer);watchdogTimer=setTimeout(()=>{if(seq!==loadSeq||childReady||key!==pending)return;frame.src=pageUrl(key,'retry');},1600);}
 function swapFrames(key){injectPageFixes(loadingFrame);const old=activeFrame;old.classList.remove('is-active');old.setAttribute('aria-hidden','true');old.tabIndex=-1;loadingFrame.classList.remove('is-loading');loadingFrame.classList.add('is-active');loadingFrame.setAttribute('aria-hidden','false');loadingFrame.removeAttribute('tabindex');activeFrame=loadingFrame;loadingFrame=old;current=key;pending='';childReady=true;clearTimeout(watchdogTimer);stage.dataset.route=current;delete stage.dataset.pendingRoute;requestAnimationFrame(()=>{if(loadingFrame!==activeFrame){loadingFrame.classList.remove('is-loading');loadingFrame.src='about:blank';}});}
@@ -59,4 +59,33 @@ function load({force=false}={}){const key=route();if(!force&&(key===current||key
 [primaryFrame,secondaryFrame].forEach(frame=>{frame.addEventListener('error',()=>showLoaderError('子頁載入失敗，資料仍保存在本機。',frame));frame.addEventListener('load',()=>{applyT2SViewport();setTimeout(()=>injectPageFixes(frame),0);setTimeout(()=>injectPageFixes(frame),80);setTimeout(()=>injectPageFixes(frame),240);});});
 addEventListener('hashchange',()=>load());addEventListener('pageshow',()=>{applyT2SViewport();if(!childReady&&!pending)load();});addEventListener('resize',applyT2SViewport,{passive:true});addEventListener('orientationchange',()=>setTimeout(applyT2SViewport,120),{passive:true});
 addEventListener('message',event=>{const fromActive=event.source===activeFrame.contentWindow,fromLoading=event.source===loadingFrame.contentWindow;if(!fromActive&&!fromLoading)return;if(event.data?.type==='morefun:page-ready'){if(fromLoading&&pending){const key=pending;swapFrames(key);return;}if(fromActive){childReady=true;injectPageFixes(activeFrame);clearTimeout(watchdogTimer);}return;}if(!fromActive)return;if(event.data?.type==='morefun:navigate'){const next=String(event.data.route||'order');if(location.hash==='#/'+next){if(next!==current)load();}else location.hash='#/'+next;}if(event.data?.type==='morefun:exit-fullscreen'&&document.fullscreenElement)document.exitFullscreen?.();if(event.data?.type==='morefun:set-ui-scale')activeFrame.contentWindow?.postMessage({type:'morefun:ui-scale-disabled',reason:'T2S 使用固定 1280×800 測試框；請使用瀏覽器雙指縮放檢查細節。'},'*');if(event.data?.type==='morefun:reload-current-page'){pending=current;loadingFrame.classList.add('is-loading');loadingFrame.src=pageUrl(current,'reload');armWatchdog(loadingFrame,current,++loadSeq);}});
+
+function relayNativeMessage(data){
+  for(const frame of [activeFrame,loadingFrame]){
+    try{if(frame?.contentWindow)frame.contentWindow.postMessage({type:'morefun:native-response',data},APP_ORIGIN);}catch(_error){}
+  }
+}
+const APP_ORIGIN='https://appassets.androidplatform.net';
+function onNativeBridgeMessage(event){
+  const data=event?.data;
+  if(typeof data==='string')relayNativeMessage(data);
+}
+try{window.moreFunNative?.addEventListener?.('message',onNativeBridgeMessage);}catch(_error){}
+window.addEventListener('message',event=>{
+  if(event.source===activeFrame?.contentWindow||event.source===loadingFrame?.contentWindow){
+    if(event.data?.type==='morefun:native-request'){
+      const request=event.data.request;
+      if(!request||typeof request!=='object')return;
+      if(!window.moreFunNative?.postMessage){
+        event.source?.postMessage?.({type:'morefun:native-response',data:JSON.stringify({type:'carrier.error',status:'failed',requestId:request.requestId||'',failureCode:'NATIVE_BRIDGE_UNAVAILABLE'})},APP_ORIGIN);
+        return;
+      }
+      try{window.moreFunNative.postMessage(JSON.stringify(request));}
+      catch(_error){event.source?.postMessage?.({type:'morefun:native-response',data:JSON.stringify({type:'carrier.error',status:'failed',requestId:request.requestId||'',failureCode:'NATIVE_BRIDGE_POST_FAILED'})},APP_ORIGIN);}
+    }
+    return;
+  }
+  if(typeof event.data==='string')relayNativeMessage(event.data);
+});
+
 applyT2SViewport();load();
