@@ -128,7 +128,7 @@ export async function renderTscRasterLabel(spec:RasterLabelSpec):Promise<Uint8Ar
     const b=image.data[offset+2]??255;
     const alpha=image.data[offset+3]??255;
     const luminance=(r*299+g*587+b*114)/1000;
-    mono[pixel]=alpha>20&&luminance<180?1:0;
+    mono[pixel]=alpha>20&&luminance<180?0:1;
   }
   const bitmap=packMonochromeBitmap(mono,widthDots,heightDots);
   return buildTscBitmapPayload({bitmap,widthDots,heightDots});
