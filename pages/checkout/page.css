@@ -1,0 +1,294 @@
+.statusbar {
+  height: 58px;
+  min-height: 58px;
+  box-shadow: 0 1px 0 var(--line);
+}
+.statusbar .brand { font-size: 20px; }
+.status-item {
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--muted);
+}
+.checkout {
+  flex: 1;
+  min-height: 0;
+  height: 742px;
+  display: grid;
+  grid-template-columns: 360px minmax(0, 1fr);
+  gap: 10px;
+  padding: 10px 12px;
+  overflow: hidden;
+}
+.checkout-cart {
+  display: flex;
+  flex-direction: column;
+  padding: 12px;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+.checkout-cart > header {
+  height: 40px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.checkout-cart h2 { margin: 0; font-size: 18px; }
+.cart-lines {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.checkout-cart article {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+}
+.checkout-cart article span:nth-child(2) {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.checkout-cart article strong {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.checkout-cart article small { color: var(--muted); }
+.detail-actions {
+  flex: none;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  padding-top: 10px;
+}
+.detail-actions button {
+  min-height: 46px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+  font-weight: 900;
+}
+.detail-actions button span,
+.detail-actions button small { display: block; }
+.detail-actions button small {
+  margin-top: 2px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.detail-actions button.active {
+  border-color: var(--orange);
+  background: var(--orange-soft);
+}
+.checkout-main {
+  padding: 10px;
+  display: grid;
+  grid-template-rows: auto auto auto minmax(0, 1fr) 54px;
+  gap: 7px;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+.checkout-context {
+  min-height: 72px;
+  display: grid;
+  place-content: center;
+  gap: 5px;
+  border: 1px dashed var(--line);
+  border-radius: 10px;
+  background: #fffaf6;
+  text-align: center;
+  color: var(--muted);
+}
+.checkout-context strong { font-size: 20px; color: var(--text); }
+.checkout-action-zone { margin-top: auto; display: grid; gap: 8px; flex: 0 0 auto; }
+.checkout-action-zone .confirm { width: 100%; }
+.row {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+}
+.row.five,
+.row.channels { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.row.six,
+.row.payments { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+.row button,
+.quick button {
+  min-height: 42px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #fff;
+  font-size: 12px;
+  font-weight: 850;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-width: 0;
+}
+.row button.active,
+.quick button:active {
+  background: var(--orange-soft);
+  border-color: var(--orange);
+}
+.option-icon {
+  display: block;
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+}
+.summary {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 7px;
+}
+.summary > span,
+.summary .received-summary {
+  min-height: 52px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 6px 8px;
+  display: grid;
+  gap: 2px;
+  background: #fff;
+  color: inherit;
+  text-align: left;
+  font-size: 12px;
+}
+.summary b { font-size: 18px; }
+.summary .received-summary.active {
+  border: 2px solid var(--orange);
+  background: #fff8f1;
+  box-shadow: 0 0 0 3px rgba(226, 101, 47, .14);
+}
+.cash-area {
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr);
+  gap: 10px;
+  min-height: 0;
+  overflow: hidden;
+}
+.cash-entry {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  min-height: 0;
+}
+.received-display {
+  min-height: 52px;
+  border: 2px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+  font-size: 22px;
+  font-weight: 950;
+}
+.received-display.active { border-color: var(--orange); }
+.quick {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 7px;
+}
+.cash-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  min-height: 0;
+  flex: 1;
+  overflow: hidden;
+}
+.keypad-wrap {
+  display: grid;
+  grid-template-rows: 34px minmax(0, 1fr);
+  gap: 7px;
+  min-height: 0;
+  flex: 1;
+  overflow: hidden;
+}
+.keypad-wrap .quick-amounts {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 7px;
+}
+.quick-amounts button {
+  min-height: 34px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  font-size: 12px;
+  font-weight: 850;
+}
+.keypad {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-rows: repeat(4, minmax(64px, 1fr));
+  gap: 7px;
+  min-height: 0;
+}
+.keypad button {
+  min-height: 64px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff8f3;
+  font-size: 26px;
+  color: #2283ff;
+  font-weight: 950;
+}
+.keypad .clear-key {
+  grid-row: auto;
+  background: #fff;
+  color: #8b3320;
+}
+.cash-controls.is-locked .keypad button,
+.cash-controls.is-locked .quick-amounts button { opacity: 0.34; }
+.confirm {
+  height: 50px;
+  flex: none;
+  border: 0;
+  border-radius: 10px;
+  background: var(--orange);
+  color: #fff;
+  font-size: 17px;
+  font-weight: 950;
+}
+.confirm:disabled { background: #c8beb8; }
+.zero-warning {
+  margin: 0;
+  padding: 7px 10px;
+  border-radius: 8px;
+  background: #fff0ed;
+  color: #a63228;
+  font-weight: 850;
+  text-align: center;
+}
+.modal-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  background: rgba(32, 22, 17, 0.42);
+  display: grid;
+  place-items: center;
+}
+.discount-card {
+  width: min(620px, calc(100vw - 80px));
+  max-height: calc(100vh - 80px);
+  overflow: auto;
+  padding: 16px;
+  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.22);
+}
+.discount-card > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.discount-card h2 { margin: 2px 0 12px; }
+.discount-card > header button {
+  border: 0;
+  background: transparent;
+  font-size: 24px;
+}
