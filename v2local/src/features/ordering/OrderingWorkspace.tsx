@@ -21,7 +21,7 @@ function QueueStrip({title,kind,orders,onOpen}:{title:string;kind:'pending'|'act
       {orders.length?orders.map(order=><button type="button" key={order.id} className="ordering-active-card" onClick={()=>onOpen('active',order.id)}>
         <div><b>#{order.orderId}</b><span>{order.sourceLabel}</span></div>
         <div><strong>{order.waitLabel}</strong><small>{order.itemCount} 件</small></div>
-      </button>):<p className="ordering-empty">暫無 Kita 訂單</p>}
+      </button>):<p className="ordering-empty">暫無 Keeta 訂單</p>}
     </div>
   </section>;
 }
@@ -95,7 +95,7 @@ export function OrderingWorkspace({view,actions,centerPanel}:{view:OrderingWorks
   return <div className={`ordering-workspace${centerPanel?' panel-open':''}`}>
     <header className="ordering-flow-strip">
       <QueueStrip title="待處理" kind="pending" orders={view.pendingOrders} onOpen={actions.onOpenQueueOrder}/>
-      <QueueStrip title="Kita" kind="active" orders={view.activeOrders} onOpen={actions.onOpenQueueOrder}/>
+      <QueueStrip title="Keeta" kind="active" orders={view.activeOrders} onOpen={actions.onOpenQueueOrder}/>
     </header>
 
     <main className={`ordering-catalog${centerPanel?' ordering-catalog--panel':''}`} aria-label={centerPanel?centerPanel.title:'商品'}>
@@ -121,16 +121,31 @@ export function OrderingWorkspace({view,actions,centerPanel}:{view:OrderingWorks
           <ServiceToggle value={view.cart.serviceMode} onChange={actions.onChangeServiceMode}/>
         </div>
       </header>
-      <div className={`ordering-cart-lines ${view.cart.viewMode}`}>
-        {view.cart.lines.length?(view.cart.viewMode==='original'
-          ?view.cart.lines.map((line,index)=><CartLineRow key={line.id} line={line} index={index} highlighted={view.highlightedCartLineId===line.id} actions={actions} availability={availability}/>)
-          :<OrganizedCart lines={view.cart.lines} highlightedLineId={view.highlightedCartLineId} actions={actions} availability={availability}/>
-        ):<div className="ordering-cart-empty">購物車未有商品</div>}
-      </div>
-      <div className="ordering-cart-facts"><span><small>小計</small><b>{view.cart.subtotalLabel}</b></span><span><small>包裝</small><b>{view.cart.packagingLabel}</b></span><span><small>折扣</small><b>{view.cart.discountLabel}</b></span></div>
-      <div className="ordering-cart-total"><span>總計</span><strong>{view.cart.totalLabel}</strong></div>
-      {availability.holdCart||availability.cancelCart?<div className="ordering-cart-secondary-actions">{availability.holdCart?<button type="button" onClick={actions.onHoldCart}>{view.cart.lines.length?'暫存':'取回訂單'}</button>:null}{availability.cancelCart?<button type="button" className="destructive" onClick={actions.onCancelCart}>取消單</button>:null}</div>:null}
-      <button type="button" className="ordering-checkout" aria-label="結帳" disabled={!view.cart.checkoutEnabled} onClick={actions.onCheckout}>結帳　{view.cart.totalLabel}</button>
+      {view.holdPlacement?.active?<div className="ordering-hold-placement">
+        <header><div><small>暫存／堂食</small><strong>直接安排</strong></div><button type="button" onClick={actions.onCancelHoldPlacement}>返回購物車</button></header>
+        <div className="ordering-hold-placement-body">
+          <section className="ordering-hold-left">
+            <button type="button" className="queue" onClick={actions.onHoldQueue}><b>加入輪候</b><span>直接放入堂食輪候，之後先安排枱號。</span></button>
+            <button type="button" className="waiting" onClick={actions.onHoldWaiting}><b>暫存待客</b><span>客人話等一等，之後由「取回訂單」攞返。</span></button>
+          </section>
+          <section className="ordering-hold-tables" aria-label="堂食枱號">
+            {view.holdPlacement.tables.map(table=><button type="button" key={table.id} disabled={table.occupied} className={table.occupied?'occupied':'available'} onClick={()=>actions.onHoldTable(table.id)}>
+              <b>{table.label}</b><span>{table.occupied?(table.codeLabel??'使用中'):'空枱'}</span>
+            </button>)}
+          </section>
+        </div>
+      </div>:<>
+        <div className={`ordering-cart-lines ${view.cart.viewMode}`}>
+          {view.cart.lines.length?(view.cart.viewMode==='original'
+            ?view.cart.lines.map((line,index)=><CartLineRow key={line.id} line={line} index={index} highlighted={view.highlightedCartLineId===line.id} actions={actions} availability={availability}/>)
+            :<OrganizedCart lines={view.cart.lines} highlightedLineId={view.highlightedCartLineId} actions={actions} availability={availability}/>
+          ):<div className="ordering-cart-empty">購物車未有商品</div>}
+        </div>
+        <div className="ordering-cart-facts"><span><small>小計</small><b>{view.cart.subtotalLabel}</b></span><span><small>包裝</small><b>{view.cart.packagingLabel}</b></span><span><small>折扣</small><b>{view.cart.discountLabel}</b></span></div>
+        <div className="ordering-cart-total"><span>總計</span><strong>{view.cart.totalLabel}</strong></div>
+        {availability.holdCart||availability.cancelCart?<div className={`ordering-cart-secondary-actions${!availability.cancelCart?' single':''}`}>{availability.holdCart?<button type="button" onClick={actions.onHoldCart}>{view.cart.lines.length?'暫存':'取回訂單'}</button>:null}{availability.cancelCart?<button type="button" className="destructive" onClick={actions.onCancelCart}>取消單</button>:null}</div>:null}
+        <button type="button" className="ordering-checkout" aria-label="結帳" disabled={!view.cart.checkoutEnabled} onClick={actions.onCheckout}>結帳　{view.cart.totalLabel}</button>
+      </>}
     </aside>
 
     <footer className="ordering-workbar">{view.workItems.map(item=><button type="button" key={item.id} onClick={()=>actions.onOpenWorkItem(item.id)}><span>{item.label}</span>{item.count>0?<b>{item.count}</b>:null}</button>)}</footer>
