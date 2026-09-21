@@ -1,0 +1,92 @@
+export interface NativeResult{ok:boolean;code:string|null;message?:Record<string,unknown>}
+
+interface NativeBridge{
+  postMessage(message:string):void;
+  addEventListener?(type:'message',listener:(event:{data:unknown})=>void):void;
+  removeEventListener?(type:'message',listener:(event:{data:unknown})=>void):void;
+}
+declare global{interface Window{moreFunNative?:NativeBridge}}
+
+function parse(data:unknown):Record<string,unknown>|null{
+  if(typeof data!=='string'||!data.trim())return null;
+  try{
+    const value=JSON.parse(data);
+    return value&&typeof value==='object'&&!Array.isArray(value)?value as Record<string,unknown>:null;
+  }catch{return null;}
+}
+function requestId(prefix='mfk-v2-print'){return prefix+'-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,7)}
+function toBase64(text:string){
+  const bytes=new TextEncoder().encode(text);
+  let binary='';
+  for(const byte of bytes)binary+=String.fromCharCode(byte);
+  return btoa(binary);
+}
+
+export async function sendNative(type:string,expected:readonly string[],extra:Record<string,unknown>={},timeoutMs=7000):Promise<NativeResult>{
+  const bridge=window.moreFunNative;
+  if(!bridge)return{ok:false,code:'NATIVE_PRINT_BRIDGE_UNAVAILABLE'};
+  const id=requestId();
+  return await new Promise(resolve=>{
+    let settled=false;
+    let timer:number|undefined;
+    const finish=(result:NativeResult)=>{
+      if(settled)return;
+      settled=true;
+      if(timer!==undefined)window.clearTimeout(timer);
+      window.removeEventListener('message',onWindow);
+      bridge.removeEventListener?.('message',onBridge);
+      resolve(result);
+    };
+    const accept=(raw:unknown)=>{
+      const message=parse(raw);
+      if(!message||message.requestId!==id)return;
+      const kind=typeof message.type==='string'?message.type:'';
+      if(kind==='carrier.error'||message.status==='failed'){
+        finish({ok:false,code:String(message.failureCode||message.errorCode||'NATIVE_PRINT_FAILED'),message});
+        return;
+      }
+      if(!expected.includes(kind))return;
+      if(message.outcome==='REJECTED_BEFORE_SEND'||message.outcome==='NOT_PRINTED'){
+        finish({ok:false,code:String(message.failureCode||'NATIVE_PRINT_REJECTED'),message});return;
+      }
+      if(message.outcome==='OUTCOME_UNKNOWN'){
+        finish({ok:false,code:String(message.uncertaintyCode||'NATIVE_PRINT_OUTCOME_UNKNOWN'),message});return;
+      }
+      finish({ok:true,code:typeof message.outcome==='string'?message.outcome:null,message});
+    };
+    const onWindow=(event:MessageEvent)=>accept(event.data);
+    const onBridge=(event:{data:unknown})=>accept(event.data);
+    window.addEventListener('message',onWindow);
+    bridge.addEventListener?.('message',onBridge);
+    timer=window.setTimeout(()=>finish({ok:false,code:'NATIVE_PRINT_TIMEOUT'}),timeoutMs);
+    try{bridge.postMessage(JSON.stringify({type,requestId:id,...extra}));}
+    catch{finish({ok:false,code:'NATIVE_PRINT_BRIDGE_POST_FAILED'});}
+  });
+}
+
+export async function applyLanPrinter(input:{endpointId:string;host:string;port:number;displayName:string;model:string;capability:'receipt-80mm/kitchen'|'label-58mm'}){
+  return sendNative('print.lan.endpoint.apply',['print.lan.endpoint.apply.result'],input);
+}
+export async function testLanPrinter(input:{endpointId:string;host:string;port:number;displayName:string;model:string;capability:'receipt-80mm/kitchen'|'label-58mm'}){
+  const applied=await applyLanPrinter(input);
+  if(!applied.ok)return applied;
+  return sendNative('print.lan.endpoint.test',['print.lan.endpoint.test.completed'],{endpointId:input.endpointId},8000);
+}
+export async function testInternalPrinter(){
+  return sendNative('print.sunmi.test',['print.sunmi.test.result'],{},5000);
+}
+export async function printTextInternal(text:string){
+  return sendNative('print.sunmi.dispatch',['print.sunmi.dispatch.completed'],{
+    dispatchAttemptId:requestId('mfk-v2-sunmi'),
+    payloadBase64:toBase64('\x1b\x40'+text+'\n\n\n')
+  },10000);
+}
+export async function printTextLan(input:{endpointId:string;host:string;port:number;displayName:string;model:string;capability:'receipt-80mm/kitchen'|'label-58mm';text:string}){
+  const applied=await applyLanPrinter(input);
+  if(!applied.ok)return applied;
+  return sendNative('print.lan.dispatch',['print.lan.dispatch.completed'],{
+    endpointId:input.endpointId,
+    dispatchAttemptId:requestId('mfk-v2-lan'),
+    payloadBase64:toBase64(input.text)
+  },10000);
+}
