@@ -1,37 +1,43 @@
 # MFK
 
-公開嘅磨飯 POS 實作 repo。
+MFK 係目前唯一 current system。
 
-Active implementation 只有：
+## Current products
 
-`v2local/`
+- `v2local/` — SMT frontline execution
+- `v2admin/` — Admin control plane
+- `v2smm/` — SMM（migration lane；未完成前唔視為 current product）
 
-呢一版直接以 MoreFun V2 SMT 嘅 1920×1080 UI 做基礎，重新接成本地 POS。
+## Authority
 
-目前：
+Owner 決定規則。
 
-- MoreFun V2 1920×1080 production viewport
-- 點餐
-- Cart
-- 現金結帳
-- 本機 Order persistence
-- 訂單
-- 堂食畫面
-- 售罄
-- 打印與設備
-- Carrier 1.0.6 Native Print Bridge
-- Sunmi 內置打印機測試
-- LAN printer apply / connect test / test print
+Admin：
+Draft → Validate → Publish → Active Revision。
 
-Active runtime 禁止：
+SMT：
+按已發布規則執行正式店舖交易。
 
-- D1
-- Cloud
-- WebSocket
-- Firebase
-- 外部訂單入口
-- 遠端身份／登入依賴
+## Current Admin state
 
-舊 static POS 已由 active repo 移除。
+`v2admin/` 已獨立隔離：
+- 37 capability registry
+- MFK-only routes / truth owners
+- live domain wiring = NOT_WIRED
+- live mutation = OFF
+- SMT transaction execution = NO
 
-原始研究入口：`REPORT.md`
+跨 Port adapter 會喺 Admin 本身收整完成後逐項接入。
+
+## Current SMT state
+
+`v2local/` 係 current frontline execution surface。
+禁止因 Admin/SMM migration 重做 SMT authority。
+
+## Current control
+
+GitHub issue：
+`Pantonyeung/mfk#22`
+
+Navigation：
+`docs/navigation/MFK_航海圖_V1.0_Round001_2026-09-21.txt`
