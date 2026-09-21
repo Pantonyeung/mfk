@@ -1,0 +1,51 @@
+import {renderToStaticMarkup} from 'react-dom/server';
+import {MemoryRouter} from 'react-router';
+import {describe,expect,it} from 'vitest';
+import {AdminDraftProvider,validateAdminDraft,type AdminSessionDraft} from './admin-draft.tsx';
+import {ProductsWorkspace} from './CatalogWorkspaces.tsx';
+import {MfkAdminApp} from './App.tsx';
+
+describe('MFK Admin catalog migration slice',()=>{
+  it('renders a real Product editor while keeping Publish disconnected',()=>{
+    const html=renderToStaticMarkup(
+      <AdminDraftProvider>
+        <ProductsWorkspace/>
+      </AdminDraftProvider>,
+    );
+    expect(html).toContain('商品資料');
+    expect(html).toContain('新增商品');
+    expect(html).toContain('Publish 未接駁');
+    expect(html).toContain('SESSION DRAFT · NOT_WIRED');
+  });
+
+  it('routes Product to the real editor instead of the generic capability placeholder',()=>{
+    const html=renderToStaticMarkup(
+      <MemoryRouter initialEntries={['/admin/catalog/products']}>
+        <MfkAdminApp/>
+      </MemoryRouter>,
+    );
+    expect(html).toContain('商品資料');
+    expect(html).toContain('新增商品');
+    expect(html).not.toContain('Live Mutation');
+  });
+
+  it('validates required category/product/modifier/combo structure without pricing execution',()=>{
+    const invalid:AdminSessionDraft={
+      categories:[{id:'category-001',name:'',position:10,active:true}],
+      products:[{id:'product-001',name:'',categoryId:'missing',active:true,basePrice:'abc',takeawayAdjustment:'0.00',modifierGroupIds:[]}],
+      modifierGroups:[{
+        id:'modifier-001',name:'',required:true,selection:'SINGLE',min:0,max:1,active:true,
+        options:[{id:'option-001',name:'',priceAdjustment:'bad',active:true,defaultSelected:false}],
+      }],
+      combos:[{
+        id:'combo-001',name:'',active:true,basePrice:'bad',takeawayAdjustment:'0.00',
+        sections:[{id:'section-001',name:'',required:true,min:2,max:1}],
+      }],
+    };
+    const errors=validateAdminDraft(invalid);
+    expect(errors.some(error=>error.includes('未填名稱'))).toBe(true);
+    expect(errors.some(error=>error.includes('未選有效分類'))).toBe(true);
+    expect(errors.some(error=>error.includes('基本價格式錯誤'))).toBe(true);
+    expect(errors.some(error=>error.includes('Min / Max 無效'))).toBe(true);
+  });
+});
