@@ -1,5 +1,5 @@
 import {describe,expect,it} from 'vitest';
-import {buildOrderPrintPlan,type PrintBinding,type PrintableOrder} from './print-routing.ts';
+import {buildOrderPrintPlan,groupTscBitmapJobsByBinding,type PrintBinding,type PrintableOrder} from './print-routing.ts';
 
 const order:PrintableOrder={
   id:'MFK-1',
@@ -54,6 +54,19 @@ describe('MFK checkout print fanout',()=>{
 
     expect(plan[6]?.renderMode).toBe('tsc-bitmap');
     expect(plan[6]?.labelSpec?.orderCode).toBe('P001');
+  });
+
+  it('batches eleven labels for one logical printer into one native dispatch batch',()=>{
+    const eleven:PrintableOrder={...order,items:[{id:'riceball',name:'原味飯團',qty:11,unitMinor:2100}]};
+    const plan=buildOrderPrintPlan(eleven,[binding('產品標籤','product-label-riceball',['riceball'])]);
+    expect(plan).toHaveLength(11);
+    expect(plan.map(job=>job.labelSpec?.pieceLabel)).toEqual([
+      '1/11','2/11','3/11','4/11','5/11','6/11','7/11','8/11','9/11','10/11','11/11'
+    ]);
+    const batches=groupTscBitmapJobsByBinding(plan);
+    expect(batches).toHaveLength(1);
+    expect(batches[0]?.binding.id).toBe('product-label-riceball');
+    expect(batches[0]?.jobs).toHaveLength(11);
   });
 
   it('keeps a newly added custom product-label route silent until products are assigned',()=>{
