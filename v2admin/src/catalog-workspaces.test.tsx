@@ -52,8 +52,8 @@ describe('MFK Admin catalog migration slice',()=>{
   });
 
 
-  it('has a concrete workspace for every current NOT_WIRED Admin capability',()=>{
-    for(const capability of ADMIN_CAPABILITIES.filter(item=>item.status==='NOT_WIRED')){
+  it('has a concrete workspace for every migrated Admin capability',()=>{
+    for(const capability of ADMIN_CAPABILITIES){
       const html=renderToStaticMarkup(
         <MemoryRouter initialEntries={[capability.path]}>
           <MfkAdminApp/>
