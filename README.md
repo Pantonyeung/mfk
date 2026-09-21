@@ -1,23 +1,37 @@
-# MFK｜磨飯 POS 重新實作
+# MFK
 
-呢個 repository 由零開始做一個真正可以本地運行嘅餐飲 POS。
+公開嘅磨飯 POS 實作 repo。
 
-## 目前第一版
+Active implementation 只有：
 
-- 純前端、本地運行
-- 無 D1
-- 無 Cloud
-- 無 WebSocket
-- 無登入／認證依賴
-- 商品 → Cart → 現金結帳 → 本地 Order History
-- Order 以 localStorage 保存，重新整理頁面仍然存在
+`v2local/`
 
-## 公開原始 Report
+呢一版直接以 MoreFun V2 SMT 嘅 1920×1080 UI 做基礎，重新接成本地 POS。
 
-見 [REPORT.md](./REPORT.md)。
+目前：
 
-## 直接預覽
+- MoreFun V2 1920×1080 production viewport
+- 點餐
+- Cart
+- 現金結帳
+- 本機 Order persistence
+- 訂單
+- 堂食畫面
+- 售罄
+- 打印與設備
+- Carrier 1.0.6 Native Print Bridge
+- Sunmi 內置打印機測試
+- LAN printer apply / connect test / test print
 
-打開 `index.html` 即可。
+Active runtime 禁止：
 
-呢個 repo 目前刻意保持簡單：先證明本地功能可以運行，再逐個加 Printer、SQLite/Room、Android bridge、外部連線。
+- D1
+- Cloud
+- WebSocket
+- Firebase
+- 外部訂單入口
+- 遠端身份／登入依賴
+
+舊 static POS 已由 active repo 移除。
+
+原始研究入口：`REPORT.md`
