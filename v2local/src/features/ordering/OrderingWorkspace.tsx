@@ -26,10 +26,20 @@ function QueueStrip({title,kind,orders,onOpen}:{title:string;kind:'pending'|'act
   </section>;
 }
 
+export function splitProductName(name:string,maxChars=6){
+  const chars=Array.from(name);
+  const lines:string[]=[];
+  for(let index=0;index<chars.length;index+=maxChars)lines.push(chars.slice(index,index+maxChars).join(''));
+  return lines.length?lines:[''];
+}
+
 export function ProductCardText({name,priceLabel,badge}:{name:string;priceLabel:string;badge?:string}){
+  const nameLines=splitProductName(name,6);
   return <span className="ordering-product-copy">
     {badge?<small>{badge}</small>:null}
-    <b className="ordering-product-name" data-active-menu-product-name={name}>{name}</b>
+    <b className="ordering-product-name" data-active-menu-product-name={name}>
+      {nameLines.map((line,index)=><span className="ordering-product-name-line" key={index}>{line}</span>)}
+    </b>
     <strong className="ordering-product-price">{priceLabel}</strong>
   </span>;
 }
