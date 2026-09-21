@@ -1,0 +1,44 @@
+name: V2 Local POS Smoke
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'v2local/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install
+        working-directory: v2local
+        run: npm install --ignore-scripts --no-audit --no-fund
+      - name: Build
+        working-directory: v2local
+        run: npm run build
+      - name: Local-only source proof
+        shell: bash
+        run: |
+          set -euo pipefail
+          ! grep -RInE '\b(fetch|XMLHttpRequest|WebSocket|EventSource)\s*\(' v2local/src
+          ! grep -RInE 'https?://' v2local/src
+          grep -F 'SMT_GOLDEN_WIDTH=1920' v2local/src/app/production-viewport-layout.ts
+          grep -F 'SMT_GOLDEN_HEIGHT=1080' v2local/src/app/production-viewport-layout.ts
+          grep -F "print.sunmi.test" v2local/src/runtime/native-print.ts
+          grep -F "print.lan.endpoint.test" v2local/src/runtime/native-print.ts
+          grep -F "print.lan.dispatch" v2local/src/runtime/native-print.ts
+      - name: Static bundle proof
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s v2local/dist/index.html
+          test -d v2local/dist/assets
