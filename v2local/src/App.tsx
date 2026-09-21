@@ -10,7 +10,7 @@ import {RuntimeDiningWorkspace} from './presentation/RuntimeDiningWorkspace.tsx'
 import {RuntimeSoldoutWorkspace} from './presentation/RuntimeSoldoutWorkspace.tsx';
 import {LocalMoreWorkspace} from './presentation/LocalMoreWorkspace.tsx';
 import {localRuntime} from './runtime/local-runtime.ts';
-import {ComboWorkspace,HoldCartWorkspace,OrganizeWorkspace,ProductConfigWorkspace,type OrderingPanelState,type WorkspaceProduct} from './features/ordering/OrderingCenterWorkspaces.tsx';
+import {ComboWorkspace,HoldCartWorkspace,HoldListWorkspace,OrganizeWorkspace,ProductConfigWorkspace,type OrderingPanelState,type WorkspaceHoldDraft,type WorkspaceProduct} from './features/ordering/OrderingCenterWorkspaces.tsx';
 
 type Product={id:string;category:string;name:string;priceMinor:number};
 type CartLine={id:string;productId:string;name:string;qty:number;unitMinor:number;serviceMode:ServiceMode;detail?:string};
@@ -74,6 +74,7 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
   ];
   const visible=products.filter(p=>category==='all'||p.category===category);
   const runtimeOrders=useMemo(()=>{void runtimeRevision;return localRuntime.orders();},[runtimeRevision]);
+  const heldCarts=useMemo(()=>{void runtimeRevision;return localRuntime.holds();},[runtimeRevision]);
   const queueItem=(order:(typeof runtimeOrders)[number])=>({
     id:order.id,
     orderId:order.display,
@@ -104,6 +105,7 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
       {id:'riceball-pool',label:'飯團待組區',count:0},
       {id:'required',label:'必選區',count:0},
       {id:'combo',label:'紫米套餐區',count:0},
+      {id:'holds',label:'暫存單',count:heldCarts.length},
       {id:'soldout',label:'售罄管理',count:0},
     ],
     recentlyAddedProductId:recent,highlightedCartLineId:highlight,cartPulseNonce:pulse,
@@ -132,7 +134,7 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
     setCart([...cart,line]);setHighlight(line.id);setPulse(value=>value+1);setPanel(null);
   };
   const workspaceProducts:WorkspaceProduct[]=products.map(product=>({...product,priceLabel:money(product.priceMinor),imageUrl:productArtwork(product)}));
-  const panelTitle=panel?.type==='product'?'商品選項':panel?.type==='organize'?'整理工作台':panel?.type==='combo'?'紫米套餐區':panel?.type==='hold'?'暫存／候位':'';
+  const panelTitle=panel?.type==='product'?'商品選項':panel?.type==='organize'?'整理工作台':panel?.type==='combo'?'紫米套餐區':panel?.type==='hold'?'暫存／候位':panel?.type==='holds'?'暫存單':'';
   const panelBody=panel?.type==='product'
     ?(()=>{const product=workspaceProducts.find(item=>item.id===panel.productId);return product?<ProductConfigWorkspace product={product} onAdd={(detail,delta,qty)=>addConfigured(product.id,detail,delta,qty)}/>:null})()
     :panel?.type==='organize'
@@ -149,15 +151,36 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
             setCart([]);setPanel(null);
             if(kind==='dining')navigate('/dining');
           }}/>
-          :null;
+          :panel?.type==='holds'
+            ?<HoldListWorkspace holds={heldCarts as readonly WorkspaceHoldDraft[]} onRestore={hold=>{
+              const restored:CartLine[]=hold.items.map((item,index)=>{
+                const parts=item.name.split('｜');
+                const name=parts.shift()||item.name;
+                const detail=parts.length?parts.join('｜'):undefined;
+                return {
+                  id:'line-'+hold.id+'-'+index+'-'+Date.now().toString(36),
+                  productId:item.id,
+                  name,
+                  qty:item.qty,
+                  unitMinor:item.unitMinor,
+                  serviceMode:hold.kind==='dining'?'dine-in':'takeaway',
+                  detail,
+                };
+              });
+              setCart(restored);
+              setServiceMode(hold.kind==='dining'?'dine-in':'takeaway');
+              localRuntime.removeHold(hold.id);
+              setPanel(null);
+            }} onRemove={id=>localRuntime.removeHold(id)}/>
+            :null;
 
   const actions:OrderingWorkspaceActions={
     onSelectCategory:setCategory,onAddProduct:add,onConfigureProduct:id=>setPanel({type:'product',productId:id}),
     onChangeServiceMode:setServiceMode,onChangeCartView:mode=>{setViewMode(mode);if(mode==='organized')setPanel({type:'organize'});},
     onChangeLineServiceMode:(lineId,mode)=>setCart(cart.map(item=>item.id===lineId?{...item,serviceMode:mode}:item)),
     onAdjustLineQuantity:(lineId,delta)=>setCart(cart.map(item=>item.id===lineId?{...item,qty:item.qty+delta}:item).filter(item=>item.qty>0)),
-    onEditCartLine:lineId=>{const line=cart.find(item=>item.id===lineId);if(line)setPanel({type:'product',productId:line.productId});},onHoldCart:()=>setPanel({type:'hold'}),onCancelCart:()=>setCart([]),
-    onOpenWorkItem:id=>{if(id==='soldout')navigate('/soldout');else if(id==='combo')setPanel({type:'combo'});else setPanel({type:'organize'});},
+    onEditCartLine:lineId=>{const line=cart.find(item=>item.id===lineId);if(line)setPanel({type:'product',productId:line.productId});},onHoldCart:()=>setPanel(cart.length?{type:'hold'}:{type:'holds'}),onCancelCart:()=>setCart([]),
+    onOpenWorkItem:id=>{if(id==='soldout')navigate('/soldout');else if(id==='combo')setPanel({type:'combo'});else if(id==='holds')setPanel({type:'holds'});else setPanel({type:'organize'});},
     onOpenQueueOrder:(_kind,id)=>navigate('/orders?orderId='+encodeURIComponent(id)),
     onCheckout:()=>navigate('/checkout'),
   };
