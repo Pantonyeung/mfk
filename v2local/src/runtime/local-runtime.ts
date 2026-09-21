@@ -16,7 +16,7 @@ export interface SmtAvailabilityNodeViewModel{readonly nodeId:string;readonly la
 export interface SmtAvailabilityProjection{readonly revision:number;readonly nodes:readonly SmtAvailabilityNodeViewModel[];readonly canChange:boolean}
 
 export interface StoredOrder{
-  id:string;display:string;createdAt:string;totalMinor:number;paymentLabel:string;fulfillmentLabel:'待處理'|'可取餐'|'已完成';sourceLabel:string;
+  id:string;display:string;createdAt:string;totalMinor:number;paymentLabel:string;fulfillmentLabel:'待處理'|'進行中'|'可取餐'|'已完成';sourceLabel:string;
   items:readonly {id:string;name:string;qty:number;unitMinor:number}[];
 }
 interface Persisted{orders:StoredOrder[];availability:Record<string,SmtAvailabilityStatus>}
@@ -31,19 +31,29 @@ const clone=<T,>(value:T):T=>JSON.parse(JSON.stringify(value)) as T;
 function read():Persisted{
   try{
     const value=JSON.parse(localStorage.getItem(KEY)||'null');
-    return value&&typeof value==='object'?{orders:Array.isArray(value.orders)?value.orders:[],availability:value.availability||{}}:clone(defaults);
+    if(!value||typeof value!=='object')return clone(defaults);
+    const orders=(Array.isArray(value.orders)?value.orders:[]).map((order:any)=>{
+      const source=String(order?.sourceLabel||'');
+      const paid=Boolean(String(order?.paymentLabel||'').trim());
+      const legacyLocal=source.startsWith('現場')||source.startsWith('電話／WhatsApp')||source.startsWith('WhatsApp／電話');
+      return {...order,fulfillmentLabel:order?.fulfillmentLabel==='待處理'&&paid&&legacyLocal?'進行中':order?.fulfillmentLabel};
+    }) as StoredOrder[];
+    return {orders,availability:value.availability||{}};
   }catch{return clone(defaults)}
 }
 let data=read();
 function save(){localStorage.setItem(KEY,JSON.stringify(data));listeners.forEach(fn=>fn())}
 const money=(minor:number)=>'$'+(minor/100).toFixed(2);
 
+export interface SmtReprintOption{readonly jobId:string;readonly role:string;readonly label:string;readonly detail?:string}
 export interface CleanSmtCoreRuntimePort{
   subscribe(listener:()=>void):()=>void;
   readOrders?(selectedOrderId?:string):Promise<SmtOrdersProjection>;
   markOrderReady?(orderId:string):Promise<{readonly orderId:string;readonly canonicalRevision:number;readonly status:'READY'}>;
   printOrderReceipt?(orderId:string):Promise<{readonly printJobId:string;readonly state:string}>;
   printOrderOutputs?(orderId:string):Promise<PrintDispatchSummary>;
+  readOrderReprintOptions?(orderId:string):Promise<readonly SmtReprintOption[]>;
+  reprintOrderJobs?(orderId:string,jobIds:readonly string[]):Promise<PrintDispatchSummary>;
   readDining?(selectedSessionId?:string):Promise<SmtDiningProjection>;
   readAvailability?():Promise<SmtAvailabilityProjection>;
   setAvailability?(nodeId:string,status:SmtAvailabilityStatus,expectedRevision:number):Promise<SmtAvailabilityProjection>;
@@ -87,6 +97,8 @@ export interface MfkLocalRuntime extends CleanSmtCoreRuntimePort{
   createOrder(input:{items:readonly {id:string;name:string;qty:number;unitMinor:number}[];totalMinor:number;paymentLabel:string;sourceLabel?:string}):StoredOrder;
   orders():readonly StoredOrder[];
   printOrderOutputs(orderId:string):Promise<PrintDispatchSummary>;
+  readOrderReprintOptions(orderId:string):Promise<readonly SmtReprintOption[]>;
+  reprintOrderJobs(orderId:string,jobIds:readonly string[]):Promise<PrintDispatchSummary>;
   clear():void;
 }
 
@@ -191,9 +203,11 @@ function physicalKey(binding:PrintBinding){
   return binding.host.trim().toLowerCase()+':'+(Number(binding.port)||9100);
 }
 
-async function dispatchOrderOutputs(order:StoredOrder):Promise<PrintDispatchSummary>{
+async function dispatchOrderOutputs(order:StoredOrder,requestedJobIds?:ReadonlySet<string>,reprint=false):Promise<PrintDispatchSummary>{
   const started=performance.now();
-  const plan=buildOrderPrintPlan(order,readPrinterBindings());
+  let plan=[...buildOrderPrintPlan(order,readPrinterBindings())];
+  if(requestedJobIds)plan=plan.filter(job=>requestedJobIds.has(job.id));
+  if(reprint)plan=plan.map(job=>({...job,kickDrawer:false}));
   const groups=new Map<string,PlannedPrintJob[]>();
   for(const job of plan){
     const key=physicalKey(job.binding);
@@ -218,7 +232,7 @@ async function dispatchOrderOutputs(order:StoredOrder):Promise<PrintDispatchSumm
           try{
             const result=job.renderMode==='tsc-bitmap'&&job.labelSpec
               ?await printBytesLan({...printerInput(job.binding),bytes:await renderTscRasterLabel(job.labelSpec)})
-              :await printTextLan({...printerInput(job.binding),text:job.payload,cutAfter:job.cutAfter,kickDrawer:job.kickDrawer});
+              :await printTextLan({...printerInput(job.binding),text:job.payload,cutAfter:job.cutAfter,kickDrawer:job.kickDrawer,beepAfter:job.beepAfter});
             const code=result.code||(result.ok?'SENT':'PRINT_FAILED');
             results.push({jobId:job.id,role:job.role,ok:result.ok,code});
             if(!result.ok)groupCode=code;
@@ -287,7 +301,7 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
       createdAt:new Date().toISOString(),
       totalMinor:input.totalMinor,
       paymentLabel:input.paymentLabel,
-      fulfillmentLabel:'待處理',
+      fulfillmentLabel:'進行中',
       sourceLabel:input.sourceLabel||'現場',
       items:input.items.map(item=>({...item})),
     };
@@ -330,6 +344,22 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
     const order=data.orders.find(x=>x.id===orderId);
     if(!order)throw new Error('ORDER_NOT_FOUND');
     return dispatchOrderOutputs(order);
+  },
+  async readOrderReprintOptions(orderId){
+    const order=data.orders.find(x=>x.id===orderId);
+    if(!order)throw new Error('ORDER_NOT_FOUND');
+    return buildOrderPrintPlan(order,readPrinterBindings()).map(job=>Object.freeze({
+      jobId:job.id,
+      role:job.role,
+      label:job.renderMode==='tsc-bitmap'&&job.labelSpec?job.role+' · '+job.labelSpec.primaryText:job.role,
+      detail:job.labelSpec?.pieceLabel,
+    }));
+  },
+  async reprintOrderJobs(orderId,jobIds){
+    const order=data.orders.find(x=>x.id===orderId);
+    if(!order)throw new Error('ORDER_NOT_FOUND');
+    if(!jobIds.length)throw new Error('REPRINT_SELECTION_REQUIRED');
+    return dispatchOrderOutputs(order,new Set(jobIds),true);
   },
   async printOrderReceipt(orderId){
     const order=data.orders.find(x=>x.id===orderId);
