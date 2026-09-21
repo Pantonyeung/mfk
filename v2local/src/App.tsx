@@ -180,7 +180,7 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
   };
 
   const addCombo=(productId:string,detail:string,unitMinor:number)=>{
-    const product=products.find(item=>item.id===productId);if(!product)return;
+    const product=products.find(item=>item.id===productId);if(!product||!product.priceReady)return;
     const line:CartLine={id:'line-'+Date.now().toString(36),productId:product.id,name:product.name,qty:1,unitMinor,serviceMode,detail};
     setCart([...cart,line]);setHighlight(line.id);setPulse(value=>value+1);setPanel(null);
   };
