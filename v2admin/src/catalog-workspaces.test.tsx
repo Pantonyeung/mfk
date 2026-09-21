@@ -63,6 +63,19 @@ describe('MFK Admin catalog migration slice',()=>{
     }
   });
 
+  it('keeps migration-only governance surfaces disconnected',()=>{
+    for(const path of ['/admin/publish','/admin/print/rules','/admin/channels/settlement','/admin/store/quick-reasons']){
+      const html=renderToStaticMarkup(
+        <MemoryRouter initialEntries={[path]}>
+          <MfkAdminApp/>
+        </MemoryRouter>,
+      );
+      expect(html).toContain('NOT_WIRED');
+      expect(html).toContain('未接駁');
+      expect(html).not.toContain('Live Mutation');
+    }
+  });
+
   it('validates required category/product/modifier/combo structure without pricing execution',()=>{
     const invalid:AdminSessionDraft={
       categories:[{id:'category-001',name:'',position:10,active:true}],
