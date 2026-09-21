@@ -1,3 +1,4 @@
+import {validateMfkAdminMenuIndexRevision,type MfkAdminMenuIndexRevision} from '../../../contracts/admin-menu-index-v1.ts';
 export const LOCAL_ADMIN_MENU_ACTIVE_KEY='mfk.local-admin.menu.active.v2';
 export const LOCAL_ADMIN_MENU_DRAFT_KEY='mfk.local-admin.menu.draft.v2';
 export const LOCAL_ADMIN_MENU_HISTORY_KEY='mfk.local-admin.menu.history.v2';
@@ -331,4 +332,84 @@ export function subscribeLocalAdminMenu(listener:()=>void){
 export function subscribeLocalAdminMenuDraft(listener:()=>void){
   draftListeners.add(listener);
   return()=>{draftListeners.delete(listener);};
+}
+
+
+export interface AdminMenuIndexApplyResult{
+  readonly disposition:'APPLIED'|'IDEMPOTENT';
+  readonly revision:number;
+  readonly fingerprint:string;
+}
+
+export function applyAdminMenuIndexRevision(input:unknown):AdminMenuIndexApplyResult{
+  const revision=validateMfkAdminMenuIndexRevision(input);
+  const current=readLocalAdminMenu();
+
+  if(revision.revision===current.revision){
+    const currentFingerprint=localMenuSnapshotFingerprint(current);
+    if(currentFingerprint!==revision.fingerprint)throw new Error('ADMIN_MENU_INDEX_REVISION_CONFLICT');
+    return Object.freeze({disposition:'IDEMPOTENT',revision:current.revision,fingerprint:revision.fingerprint});
+  }
+
+  if(revision.baseRevision!==current.revision)throw new Error('ADMIN_MENU_INDEX_BASE_REVISION_CONFLICT');
+  if(revision.revision!==current.revision+1)throw new Error('ADMIN_MENU_INDEX_STALE_OR_GAP');
+
+  const next=validateLocalAdminMenuSnapshot({
+    schemaVersion:2,
+    revision:revision.revision,
+    publishedAt:revision.publishedAt,
+    categories:revision.categories.map(row=>({
+      id:row.id,
+      name:row.label,
+      position:row.position,
+    })),
+    products:revision.products.map(row=>({
+      id:row.id,
+      name:row.label,
+      categoryId:row.categoryId,
+      position:row.position,
+      active:true,
+    })),
+  });
+
+  persistActive(next);
+  appendHistory(next);
+  const currentDraft=readLocalAdminMenuDraft();
+  const rebased=draftFromActive(next,currentDraft.draftRevision+1);
+  persistDraft(rebased);
+  emitActive();
+  emitDraft();
+  return Object.freeze({disposition:'APPLIED',revision:next.revision,fingerprint:revision.fingerprint});
+}
+
+function localMenuSnapshotFingerprint(snapshot:LocalAdminMenuSnapshot):string{
+  const projected:MfkAdminMenuIndexRevision={
+    schema:'MFK_ADMIN_MENU_INDEX_V1',
+    revision:snapshot.revision,
+    baseRevision:snapshot.revision-1,
+    publishedAt:snapshot.publishedAt,
+    categories:snapshot.categories.map(row=>({id:row.id,label:row.name,position:row.position})),
+    products:snapshot.products.filter(row=>row.active).map(row=>({
+      id:row.id,label:row.name,categoryId:row.categoryId,position:row.position,enabled:true,
+    })),
+    fingerprint:'',
+  };
+  const validated=validateMfkAdminMenuIndexRevision({...projected,fingerprint:revisionFingerprint(projected)});
+  return validated.fingerprint;
+}
+
+function revisionFingerprint(value:Omit<MfkAdminMenuIndexRevision,'fingerprint'>|MfkAdminMenuIndexRevision):string{
+  const payload={
+    schema:value.schema,
+    revision:value.revision,
+    baseRevision:value.baseRevision,
+    publishedAt:value.publishedAt,
+    categories:value.categories,
+    products:value.products,
+  };
+  // Keep this helper intentionally local and deterministic; shared validator remains the authority.
+  let hash=0x811c9dc5;
+  const text=JSON.stringify(payload);
+  for(let i=0;i<text.length;i++){hash^=text.charCodeAt(i);hash=Math.imul(hash,0x01000193)>>>0;}
+  return 'fnv1a32:'+hash.toString(16).padStart(8,'0');
 }
