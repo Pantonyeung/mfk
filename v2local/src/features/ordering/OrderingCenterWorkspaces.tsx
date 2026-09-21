@@ -22,6 +22,7 @@ export type OrderingPanelState=
   |{readonly type:'organize'}
   |{readonly type:'combo'}
   |{readonly type:'hold'}
+  |{readonly type:'holds'}
   |null;
 
 const money=(minor:number)=>'$'+(Math.max(0,minor)/100).toFixed(2);
@@ -113,5 +114,33 @@ export function HoldCartWorkspace({lines,totalMinor,onHold}:{lines:readonly Work
       <label><span>備註</span><input value={note} onChange={event=>setNote(event.target.value)} placeholder="例如：客人 10 分鐘後返"/></label>
     </div>
     <footer><button onClick={()=>onHold(kind,partySize,note)}>確認暫存</button></footer>
+  </div>;
+}
+
+
+export interface WorkspaceHoldDraft{
+  readonly id:string;
+  readonly codeLabel:string;
+  readonly kind:'dining'|'waiting';
+  readonly createdAt:string;
+  readonly partySize:number;
+  readonly note:string;
+  readonly totalMinor:number;
+  readonly assignedTable?:string;
+  readonly items:readonly {id:string;name:string;qty:number;unitMinor:number}[];
+}
+
+export function HoldListWorkspace({holds,onRestore,onRemove}:{holds:readonly WorkspaceHoldDraft[];onRestore:(hold:WorkspaceHoldDraft)=>void;onRemove:(id:string)=>void}){
+  return <div className="hold-list-workspace">
+    <header><div><h2>暫存單</h2><p>未完成付款／未正式提交嘅 Cart 全部喺呢度取回。</p></div><strong>{holds.length} 張</strong></header>
+    <div className="hold-list">
+      {holds.length?holds.map(hold=><article key={hold.id}>
+        <div className="hold-list-head"><div><b>{hold.codeLabel}</b><span>{hold.kind==='dining'?'堂食／輪候':'暫存待客'}</span></div><strong>{money(hold.totalMinor)}</strong></div>
+        <div className="hold-list-meta"><span>{new Date(hold.createdAt).toLocaleTimeString('zh-HK',{hour:'2-digit',minute:'2-digit'})}</span><span>{hold.partySize} 位</span>{hold.assignedTable?<span>枱 {hold.assignedTable.replace('T','')}</span>:null}</div>
+        <div className="hold-list-items">{hold.items.map((item,index)=><p key={hold.id+'-'+index}><span>{item.qty}×</span><b>{item.name}</b><strong>{money(item.qty*item.unitMinor)}</strong></p>)}</div>
+        {hold.note?<small>備註：{hold.note}</small>:null}
+        <footer><button type="button" className="danger" onClick={()=>onRemove(hold.id)}>刪除暫存</button><button type="button" className="primary" onClick={()=>onRestore(hold)}>取回購物車</button></footer>
+      </article>):<div className="hold-list-empty">而家未有暫存單。</div>}
+    </div>
   </div>;
 }
