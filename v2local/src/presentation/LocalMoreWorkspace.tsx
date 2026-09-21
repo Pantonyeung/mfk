@@ -2,7 +2,7 @@ import {useEffect,useMemo,useState} from 'react';
 import {useNavigate} from 'react-router';
 import {applyLanPrinter,printBytesLan,printTextLan,testLanPrinter,type NativeResult} from '../runtime/native-print.ts';
 import {LABEL_TSC_PROFILE,renderTscRasterLabel} from '../runtime/label-bitmap.ts';
-import {localRuntime} from '../runtime/local-runtime.ts';
+import {localRuntime,readLastPrintDiagnostic} from '../runtime/local-runtime.ts';
 import {
   applyMfkStorageSnapshot,
   buildLocalReport,
@@ -239,6 +239,7 @@ function PrinterPanel(){
 
 function DiagnosticsPanel(){
   const printers=loadPrinters();
+  const lastPrint=readLastPrintDiagnostic();
   const groups=new Map<string,PrinterBinding[]>();
   for(const printer of printers){
     const host=printer.host.trim();
@@ -254,6 +255,7 @@ function DiagnosticsPanel(){
       <article><span>Printer Routes</span><b>{printers.length}</b></article>
       <article><span>未綁定</span><b>{unbound.length}</b></article>
       <article><span>實體設備</span><b>{[...groups.keys()].filter(key=>!key.startsWith('UNBOUND:')).length}</b></article>
+      <article><span>最近打印</span><b>{lastPrint?lastPrint.elapsedMs+' ms':'—'}</b></article>
     </div>
     <section className="fusion-list">
       <header><b>打印 Route</b><span>LOCAL STORAGE · v5</span></header>
@@ -263,7 +265,15 @@ function DiagnosticsPanel(){
         <strong>{printer.role==='產品標籤'?(printer.productIds?.length??0)+' 個商品':'—'}</strong>
       </article>)}
     </section>
-    <p className="fusion-note">同一實體 IP / Port 嘅 Label Route 會合併成一次 LAN socket dispatch；飯糰同外賣仍保留獨立 logical route。診斷中心只顯示本機真實 binding，唔會假裝 Cloud 同步狀態。</p>
+    {lastPrint?<section className="fusion-list">
+      <header><b>最近一次打印 Trace · {lastPrint.display}</b><span>{lastPrint.sent}/{lastPrint.planned} · {lastPrint.elapsedMs} ms</span></header>
+      {lastPrint.physical.map(route=><article key={route.physicalKey}>
+        <span>{route.roles.join(' + ')}<small> · {route.bindingIds.join(', ')}</small></span>
+        <b>{route.physicalKey}</b>
+        <strong>{route.ok?'PASS':'FAIL'} · {route.planned} jobs · {route.elapsedMs} ms · {route.code}</strong>
+      </article>)}
+    </section>:<p className="fusion-note">未有最近打印 Trace。下一張單打印後，會記錄每部實體 Printer 嘅 jobs、耗時同錯誤碼。</p>}
+    <p className="fusion-note">同一實體 IP / Port 嘅 Label Route 會合併成一次 LAN socket dispatch；不同實體 Printer 會並行送出。飯糰同外賣仍保留獨立 logical route。診斷中心只顯示本機真實 binding，唔會假裝 Cloud 同步狀態。</p>
   </section>;
 }
 
