@@ -13,8 +13,8 @@ const source=fs.readdirSync(srcRoot)
   .join('\n');
 
 test('customer capability registry is complete and stable',()=>{
-  assert.equal(registry.length,44);
-  assert.equal(new Set(registry.map(item=>item.id)).size,44);
+  assert.equal(registry.length,58);
+  assert.equal(new Set(registry.map(item=>item.id)).size,58);
   for(const item of registry){
     assert.ok(item.id);
     assert.ok(item.group);
@@ -39,7 +39,10 @@ test('required customer migration capabilities exist',()=>{
     'CART_VIEW','CHECKOUT_FORM','PHONE_INPUT','PICKUP_CODE_PRESENTATION','SAFE_SUBMIT_PRESENTATION','PENDING_INTENT_PRESENTATION',
     'STORE_ACCEPTANCE_PRESENTATION','PREPARING_PRESENTATION','READY_PRESENTATION','PICKUP_PRESENTATION','COMPLETED_PRESENTATION',
     'ORDER_STATUS','ORDER_DETAIL','HISTORY','REORDER_SHAPE','OWN_CHANNEL_UNAVAILABLE','FALLBACK_PRESENTATION',
-    'OFFLINE_PRESENTATION','FAILURE_PRESENTATION','RETRY_PRESENTATION','UNKNOWN_PRESENTATION','STALE_PRESENTATION','CAPABILITY_REGISTRY'
+    'OFFLINE_PRESENTATION','FAILURE_PRESENTATION','RETRY_PRESENTATION','UNKNOWN_PRESENTATION','STALE_PRESENTATION','CAPABILITY_REGISTRY',
+    'BASIC_SEARCH','ZERO_RESULT_RECOVERY','MULTI_SELECT_CONFIG','CONFIG_MIN_MAX_VALIDATION','CART_QUANTITY_EDIT','CART_LINE_ATTENTION',
+    'CHECKOUT_REPAIR','QUOTE_FRESHNESS_PRESENTATION','SUBMISSION_CERTAINTY_PRESENTATION','REJECTED_PRESENTATION','DELAYED_PRESENTATION',
+    'PICKUP_VERIFICATION_PRESENTATION','REORDER_REVALIDATION_PRESENTATION','BUY_AGAIN_ENTRY'
   ])assert.ok(ids.has(id),id);
 });
 
@@ -68,7 +71,9 @@ test('customer workflow surfaces remain visible without live authority',()=>{
     '首頁','菜單','Product Detail','Product Config','Modifier / Option Selection Shape','Combo Selection Shape',
     '購物籃','Checkout Form Shape','電話','Pickup Code Presentation','Safe Submit Presentation','PENDING_INTENT',
     '等待店舖接單','製作中','可取餐','取餐','已完成','Order Status','Order Detail','歷史','再次下單',
-    '自家渠道暫時不可用','WhatsApp','離線','Failure','Retry Presentation','UNKNOWN','STALE','Capability Registry'
+    '自家渠道暫時不可用','WhatsApp','離線','Failure','Retry Presentation','UNKNOWN','STALE','Capability Registry',
+    '搜尋','搵唔到符合條件','最少','最多','Cart Intent','局部修復','Checkout Form Shape / Preview / Final Review','Result Certainty',
+    '未能接單','稍有延誤','Ready ≠ Arrived ≠ Verified ≠ Handed Over ≠ Completed','NEEDS_REVALIDATION','再來一單'
   ])assert.match(source,new RegExp(marker));
 });
 
