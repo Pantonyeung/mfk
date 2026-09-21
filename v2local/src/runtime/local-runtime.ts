@@ -19,7 +19,8 @@ export interface StoredOrder{
 }
 interface Persisted{orders:StoredOrder[];availability:Record<string,SmtAvailabilityStatus>}
 const KEY='mfk.v2local.runtime.v1';
-const PRINTER_BINDING_KEY='mfk.v2local.printers.v2';
+const PRINTER_BINDING_KEY='mfk.v2local.printers.v3';
+const LEGACY_PRINTER_BINDING_KEY='mfk.v2local.printers.v2';
 const listeners=new Set<()=>void>();
 const defaults:Persisted={orders:[],availability:{}};
 const clone=<T,>(value:T):T=>JSON.parse(JSON.stringify(value)) as T;
@@ -60,22 +61,35 @@ export interface MfkLocalRuntime extends CleanSmtCoreRuntimePort{
 
 function readPrinterBindings():PrintBinding[]{
   try{
-    const value=JSON.parse(localStorage.getItem(PRINTER_BINDING_KEY)||'[]');
+    const currentRaw=localStorage.getItem(PRINTER_BINDING_KEY);
+    const legacyRaw=localStorage.getItem(LEGACY_PRINTER_BINDING_KEY);
+    const usingLegacy=!currentRaw&&Boolean(legacyRaw);
+    const value=JSON.parse(currentRaw||legacyRaw||'[]');
     if(!Array.isArray(value))return [];
-    return value
+    const rows=value
       .filter(row=>row&&typeof row==='object')
-      .map(row=>({
-        id:String(row.id||''),
-        routeKey:String(row.routeKey||''),
-        name:String(row.name||'LAN PRINTER'),
-        model:String(row.model||'LAN PRINTER'),
-        role:String(row.role||'') as PrintBinding['role'],
-        host:String(row.host||''),
-        port:Number(row.port)||9100,
-        capability:(row.capability==='label-58mm'?'label-58mm':'receipt-80mm/kitchen') as PrintBinding['capability'],
-        encoding:(row.encoding==='big5'||row.encoding==='utf-8'?'big5'===row.encoding?'big5':'utf-8':'gb18030') as PrintBinding['encoding'],
-      }))
+      .map(row=>{
+        const capability=(row.capability==='label-58mm'?'label-58mm':'receipt-80mm/kitchen') as PrintBinding['capability'];
+        const encoding=(
+          capability==='label-58mm'
+            ? (row.encoding==='utf-8'?'utf-8':usingLegacy?'big5':row.encoding==='big5'?'big5':'big5')
+            : (row.encoding==='big5'||row.encoding==='utf-8'?row.encoding:'gb18030')
+        ) as PrintBinding['encoding'];
+        return {
+          id:String(row.id||''),
+          routeKey:String(row.routeKey||''),
+          name:String(row.name||'LAN PRINTER'),
+          model:String(row.model||'LAN PRINTER'),
+          role:String(row.role||'') as PrintBinding['role'],
+          host:String(row.host||''),
+          port:Number(row.port)||9100,
+          capability,
+          encoding,
+        };
+      })
       .filter(row=>row.id&&['顧客小票','製作單','打包單','產品標籤','袋標籤'].includes(row.role));
+    if(usingLegacy)localStorage.setItem(PRINTER_BINDING_KEY,JSON.stringify(rows));
+    return rows;
   }catch{return []}
 }
 
