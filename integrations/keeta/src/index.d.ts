@@ -31,6 +31,53 @@ export interface KeetaWebhookEnvelope {
   };
 }
 
+export interface KeetaMenuCategory {
+  readonly openItemCode: string;
+  readonly name: string;
+  readonly [key: string]: unknown;
+}
+
+export interface KeetaMenuSku {
+  readonly openItemCode: string;
+  readonly [key: string]: unknown;
+}
+
+export interface KeetaMenuSpu {
+  readonly openItemCode: string;
+  readonly name?: string;
+  readonly shopCategoryOpenItemCodeList?: readonly string[];
+  readonly skuList: readonly KeetaMenuSku[];
+  readonly [key: string]: unknown;
+}
+
+export interface KeetaMenuOption {
+  readonly openItemCode: string;
+  readonly [key: string]: unknown;
+}
+
+export interface KeetaChoiceGroup {
+  readonly openItemCode: string;
+  readonly name?: string;
+  readonly minNumber?: number;
+  readonly maxNumber?: number;
+  readonly repeatable?: 0 | 1;
+  readonly choiceGroupSkuList: readonly KeetaMenuOption[];
+  readonly [key: string]: unknown;
+}
+
+export interface KeetaFullMenuSnapshot {
+  readonly shopCategoryList: readonly KeetaMenuCategory[];
+  readonly choiceGroupList: readonly KeetaChoiceGroup[];
+  readonly spuList: readonly KeetaMenuSpu[];
+  readonly spuSequenceCodeMap?: Readonly<Record<string, readonly string[]>> | null;
+}
+
+export interface KeetaProviderRequestShape {
+  readonly providerOperation: string;
+  readonly params?: Readonly<Record<string, unknown>>;
+  readonly executionGate: 'NOT_WIRED';
+}
+
 export interface KeetaBusinessHour {
   readonly startTime: number;
   readonly endTime: number;
@@ -68,7 +115,7 @@ export function missingSecretFailure(ref?: CredentialRef): Readonly<Record<strin
 export function normalizeKeetaProviderResponse(rawBody: string): Readonly<Record<string, unknown>>;
 export function unknownKeetaProviderResult(reason?: string): Readonly<Record<string, unknown>>;
 
-export function validateKeetaFullMenuSnapshot(payload: Readonly<Record<string, unknown>>): Readonly<{ok: boolean; issues: readonly string[]}>;
+export function validateKeetaFullMenuSnapshot(payload: KeetaFullMenuSnapshot | Readonly<Record<string, unknown>>): Readonly<{ok: boolean; issues: readonly string[]}>;
 export function buildKeetaFullMenuSyncShape(input: Readonly<Record<string, unknown>>): Readonly<Record<string, unknown>>;
 export function parseKeetaMenuCompletion(envelope: KeetaWebhookEnvelope): Readonly<Record<string, unknown>>;
 export function parseKeetaPictureTaskCompletion(envelope: KeetaWebhookEnvelope): Readonly<Record<string, unknown>>;
