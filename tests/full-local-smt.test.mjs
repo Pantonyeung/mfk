@@ -30,7 +30,7 @@ test('full SMT shell is present',async()=>{
     'pages/dine/index.html','pages/dine/page.js',
     'pages/soldout/index.html','pages/soldout/page.js',
     'pages/more/index.html','pages/more/page.js','pages/more/print-domain.js',
-    'shared/store.js','shared/runtime.js','shared/shell.js','shared/page-bridge.js'
+    'shared/store.js','shared/runtime.js','shared/shell.js','shared/page-bridge.js','shared/native-print.js'
   ];
   for(const path of required)assert.equal(await exists(join(root,path)),true,path);
 });
@@ -61,7 +61,7 @@ test('active SMT runtime has no remote network client',async()=>{
     'pages/dine/page.js','pages/dine/dine-domain.js',
     'pages/soldout/page.js',
     'pages/more/page.js','pages/more/more-domain.js','pages/more/print-domain.js',
-    'shared/runtime.js','shared/store.js','shared/operations.js','shared/order-identity.js','shared/page-bridge.js','shared/shell.js'
+    'shared/runtime.js','shared/store.js','shared/operations.js','shared/order-identity.js','shared/page-bridge.js','shared/shell.js','shared/native-print.js'
   ];
   for(const path of firstParty){
     const source=await read(path);
@@ -91,4 +91,21 @@ test('local printer configuration exists before native printing is connected',as
   }
   assert.match(print,/morefun\.print\.v1/);
   assert.match(print,/waiting_bridge/);
+});
+
+test('shell targets 1920x1080 and printer UI uses native carrier commands',async()=>{
+  const loader=await read('app-loader.js');
+  const more=await read('pages/more/page.js');
+  const nativePrint=await read('shared/native-print.js');
+  assert.match(loader,/TARGET_WIDTH=1920/);
+  assert.match(loader,/TARGET_HEIGHT=1080/);
+  assert.match(loader,/morefun:native-request/);
+  assert.match(more,/applyPrinterBinding/);
+  assert.match(more,/testPrinterConnection/);
+  assert.match(more,/sendPrinterTestPage/);
+  assert.match(nativePrint,/print\.lan\.endpoint\.apply/);
+  assert.match(nativePrint,/print\.lan\.endpoint\.test/);
+  assert.match(nativePrint,/print\.sunmi\.test/);
+  assert.match(nativePrint,/print\.lan\.dispatch/);
+  assert.match(nativePrint,/print\.sunmi\.dispatch/);
 });
