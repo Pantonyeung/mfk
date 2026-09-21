@@ -1,9 +1,10 @@
-import {useMemo,useState} from 'react';
+import {useEffect,useMemo,useState} from 'react';
 import {useAdminDraft} from './admin-draft.tsx';
 
 function WorkspaceHeader({title,description,onAdd,addLabel}:{title:string;description:string;onAdd?:()=>void;addLabel?:string}){
-  const {dirty,validationErrors,validate,reset}=useAdminDraft();
+  const {draft,dirty,validationErrors,validate,reset}=useAdminDraft();
   const [validated,setValidated]=useState(false);
+  useEffect(()=>setValidated(false),[draft]);
   const runValidate=()=>{validate();setValidated(true);};
   return <header className="admin-editor-head">
     <div><small>SESSION DRAFT · NOT_WIRED</small><h1>{title}</h1><p>{description}</p></div>
