@@ -4,7 +4,7 @@ import './ordering-workspace.css';
 
 function QueueStrip({title,kind,orders,onOpen}:{title:string;kind:'pending'|'active';orders:OrderingWorkspaceViewModel['pendingOrders'];onOpen:(kind:'pending'|'active',id:string)=>void}){
   if(kind==='pending'){
-    const visible=orders.slice(0,2);
+    const visible=orders;
     return <section className="ordering-queue-group ordering-queue-group--pending" aria-label={title}>
       <header><strong>{title}</strong><div className="ordering-pending-head-actions"><span>{orders.length}</span>{orders.length>2&&orders[0]?<button type="button" onClick={()=>onOpen('pending',orders[0].id)}>更多</button>:null}</div></header>
       <div className="ordering-pending-list">
@@ -92,7 +92,7 @@ function OrganizedCart({lines,highlightedLineId,actions,availability}:{lines:rea
 
 export function OrderingWorkspace({view,actions,centerPanel}:{view:OrderingWorkspaceViewModel;actions:OrderingWorkspaceActions;centerPanel?:{readonly title:string;readonly body:ReactNode;readonly onClose:()=>void}|null}){
   const availability=view.actionAvailability??{lineServiceMode:true,lineEdit:true,lineQuantity:true,holdCart:true,cancelCart:true};
-  return <div className="ordering-workspace">
+  return <div className={`ordering-workspace${centerPanel?' panel-open':''}`}>
     <header className="ordering-flow-strip">
       <QueueStrip title="待處理" kind="pending" orders={view.pendingOrders} onOpen={actions.onOpenQueueOrder}/>
       <QueueStrip title="進行中" kind="active" orders={view.activeOrders} onOpen={actions.onOpenQueueOrder}/>

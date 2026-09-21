@@ -47,3 +47,14 @@
 .ordering-center-panel{height:100%;min-height:0;display:grid;grid-template-rows:auto minmax(0,1fr);border:1px solid #dddfe5;border-radius:16px;background:#fff}.ordering-center-panel-head{display:flex;justify-content:space-between;padding:14px;border-bottom:1px solid #eee}.ordering-center-panel-head div{display:grid}.ordering-center-panel-head button{width:44px;height:44px;border:0;border-radius:10px;background:#f1f2f4}.ordering-center-panel-body{min-height:0;overflow:auto;padding:14px}
 
 @media(max-width:1400px){.ordering-workspace{grid-template-columns:minmax(0,1fr) 420px}.ordering-product-grid{grid-template-columns:repeat(4,minmax(0,1fr))}.ordering-categories{grid-template-columns:repeat(4,minmax(0,1fr))}}
+
+.ordering-workspace.panel-open{grid-template-areas:"queue cart" "catalog cart" "catalog cart"}
+.ordering-catalog--panel{grid-template-rows:minmax(0,1fr)}
+.ordering-workspace.panel-open .ordering-workbar{display:none}
+.ordering-center-panel{height:100%;min-height:0}
+.ordering-center-panel-head{padding:10px 14px}
+.ordering-center-panel-head small{font-size:13px;color:#7b7c82}
+.ordering-center-panel-head strong{font-size:22px}
+.ordering-center-panel-body{padding:0}
+.ordering-pending-card,.ordering-active-card{cursor:pointer}
+.ordering-pending-card:active,.ordering-active-card:active{transform:translateY(1px)}

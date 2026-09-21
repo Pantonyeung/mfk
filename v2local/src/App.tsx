@@ -10,9 +10,10 @@ import {RuntimeDiningWorkspace} from './presentation/RuntimeDiningWorkspace.tsx'
 import {RuntimeSoldoutWorkspace} from './presentation/RuntimeSoldoutWorkspace.tsx';
 import {LocalMoreWorkspace} from './presentation/LocalMoreWorkspace.tsx';
 import {localRuntime} from './runtime/local-runtime.ts';
+import {ComboWorkspace,OrganizeWorkspace,ProductConfigWorkspace,type OrderingPanelState,type WorkspaceProduct} from './features/ordering/OrderingCenterWorkspaces.tsx';
 
 type Product={id:string;category:string;name:string;priceMinor:number};
-type CartLine={id:string;productId:string;name:string;qty:number;unitMinor:number;serviceMode:ServiceMode};
+type CartLine={id:string;productId:string;name:string;qty:number;unitMinor:number;serviceMode:ServiceMode;detail?:string};
 
 const products:readonly Product[]=[
   {id:'riceball',category:'飯團',name:'原味飯團',priceMinor:4100},
@@ -65,7 +66,12 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
   const [pulse,setPulse]=useState(0);
   const [recent,setRecent]=useState<string|undefined>();
   const [highlight,setHighlight]=useState<string|undefined>();
-  const categories=[{id:'all',label:'全部'},...[...new Set(products.map(p=>p.category))].map(x=>({id:x,label:x}))];
+  const [panel,setPanel]=useState<OrderingPanelState>(null);
+  const categories=[
+    {id:'all',label:'熱門'},{id:'飯團',label:'飯團'},{id:'套餐',label:'套餐'},{id:'便當',label:'便當'},
+    {id:'小食',label:'小食'},{id:'飲品',label:'飲品'},{id:'素食',label:'素食'},{id:'湯品',label:'湯品'},
+    {id:'配料',label:'配料'},{id:'更多',label:'更多'},
+  ];
   const visible=products.filter(p=>category==='all'||p.category===category);
   const runtimeOrders=useMemo(()=>{void runtimeRevision;return localRuntime.orders();},[runtimeRevision]);
   const queueItem=(order:(typeof runtimeOrders)[number])=>({
@@ -84,13 +90,13 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
     pendingOrders,activeOrders,categories,selectedCategoryId:category,
     products:visible.map(product=>({
       id:product.id,name:product.name,priceLabel:money(product.priceMinor),
-      enabled:true,requiresOptions:false,imageUrl:productArtwork(product),
+      enabled:true,requiresOptions:['飯團','便當'].includes(product.category),imageUrl:productArtwork(product),
     })),
     cart:{
       orderId:nextDisplay,serviceMode,viewMode,
       lines:cart.map(line=>({
         id:line.id,name:line.name,quantity:line.qty,lineTotalLabel:money(line.unitMinor*line.qty),
-        serviceMode:line.serviceMode,groupId:'local',groupLabel:'本機',
+        serviceMode:line.serviceMode,groupId:'local',groupLabel:'本機',detail:line.detail,
       })),
       subtotalLabel:money(total),packagingLabel:'$0.00',discountLabel:'$0.00',totalLabel:money(total),checkoutEnabled:cart.length>0,
     },
@@ -115,18 +121,37 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
     setPulse(value=>value+1);
     window.setTimeout(()=>{setRecent(undefined);setHighlight(undefined)},700);
   };
+  const addConfigured=(productId:string,detail:string,deltaMinor:number,qty:number)=>{
+    const product=products.find(item=>item.id===productId);if(!product)return;
+    const line:CartLine={id:'line-'+Date.now().toString(36),productId:product.id,name:product.name,qty,unitMinor:product.priceMinor+deltaMinor,serviceMode,detail};
+    setCart([...cart,line]);setRecent(product.id);setHighlight(line.id);setPulse(value=>value+1);setPanel(null);
+  };
+  const addCombo=(productId:string,detail:string,unitMinor:number)=>{
+    const product=products.find(item=>item.id===productId);if(!product)return;
+    const line:CartLine={id:'line-'+Date.now().toString(36),productId:product.id,name:product.name,qty:1,unitMinor,serviceMode,detail};
+    setCart([...cart,line]);setHighlight(line.id);setPulse(value=>value+1);setPanel(null);
+  };
+  const workspaceProducts:WorkspaceProduct[]=products.map(product=>({...product,priceLabel:money(product.priceMinor),imageUrl:productArtwork(product)}));
+  const panelTitle=panel?.type==='product'?'商品選項':panel?.type==='organize'?'整理工作台':panel?.type==='combo'?'紫米套餐區':'';
+  const panelBody=panel?.type==='product'
+    ?(()=>{const product=workspaceProducts.find(item=>item.id===panel.productId);return product?<ProductConfigWorkspace product={product} onAdd={(detail,delta,qty)=>addConfigured(product.id,detail,delta,qty)}/>:null})()
+    :panel?.type==='organize'
+      ?<OrganizeWorkspace lines={cart} onDone={()=>setPanel(null)}/>
+      :panel?.type==='combo'
+        ?<ComboWorkspace products={workspaceProducts} onAdd={addCombo}/>
+        :null;
 
   const actions:OrderingWorkspaceActions={
-    onSelectCategory:setCategory,onAddProduct:add,onConfigureProduct:add,
-    onChangeServiceMode:setServiceMode,onChangeCartView:setViewMode,
+    onSelectCategory:setCategory,onAddProduct:add,onConfigureProduct:id=>setPanel({type:'product',productId:id}),
+    onChangeServiceMode:setServiceMode,onChangeCartView:mode=>{setViewMode(mode);if(mode==='organized')setPanel({type:'organize'});},
     onChangeLineServiceMode:(lineId,mode)=>setCart(cart.map(item=>item.id===lineId?{...item,serviceMode:mode}:item)),
     onAdjustLineQuantity:(lineId,delta)=>setCart(cart.map(item=>item.id===lineId?{...item,qty:item.qty+delta}:item).filter(item=>item.qty>0)),
-    onEditCartLine:()=>{},onHoldCart:()=>{},onCancelCart:()=>setCart([]),
-    onOpenWorkItem:id=>{if(id==='soldout')navigate('/soldout')},
+    onEditCartLine:lineId=>{const line=cart.find(item=>item.id===lineId);if(line)setPanel({type:'product',productId:line.productId});},onHoldCart:()=>{},onCancelCart:()=>setCart([]),
+    onOpenWorkItem:id=>{if(id==='soldout')navigate('/soldout');else if(id==='combo')setPanel({type:'combo'});else setPanel({type:'organize'});},
     onOpenQueueOrder:(_kind,id)=>navigate('/orders?orderId='+encodeURIComponent(id)),
     onCheckout:()=>navigate('/checkout'),
   };
-  return <OrderingWorkspace view={view} actions={actions}/>;
+  return <OrderingWorkspace view={view} actions={actions} centerPanel={panel&&panelBody?{title:panelTitle,body:panelBody,onClose:()=>setPanel(null)}:null}/>;
 }
 
 function CheckoutPage({cart,setCart}:{cart:CartLine[];setCart:(v:CartLine[])=>void}){
@@ -179,7 +204,7 @@ function CheckoutPage({cart,setCart}:{cart:CartLine[];setCart:(v:CartLine[])=>vo
   const view:CheckoutWorkspaceViewModel={
     order:{
       orderId:'P'+String(localRuntime.orders().length+1).padStart(3,'0'),
-      lines:cart.map(line=>({id:line.id,name:line.name,quantity:line.qty,lineTotalLabel:money(line.unitMinor*line.qty)})),
+      lines:cart.map(line=>({id:line.id,name:line.name,detail:line.detail,quantity:line.qty,lineTotalLabel:money(line.unitMinor*line.qty)})),
       subtotalLabel:money(due),packagingLabel:'$0.00',discountLabel:'$0.00',totalLabel:money(due),
     },
     channels:[
@@ -211,7 +236,7 @@ function CheckoutPage({cart,setCart}:{cart:CartLine[];setCart:(v:CartLine[])=>vo
     setState('processing');
     try{
       const order=localRuntime.createOrder({
-        items:cart.map(line=>({id:line.productId,name:line.name,qty:line.qty,unitMinor:line.unitMinor})),
+        items:cart.map(line=>({id:line.productId,name:line.detail?line.name+'｜'+line.detail:line.name,qty:line.qty,unitMinor:line.unitMinor})),
         totalMinor:due,paymentLabel,sourceLabel,
       });
       setCompletion({
