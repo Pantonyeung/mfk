@@ -2,6 +2,8 @@ import {Navigate,Route,Routes,useLocation} from 'react-router';
 import {AdminShell} from './AdminShell.tsx';
 import {ADMIN_CAPABILITIES,findAdminCapability} from './admin-capabilities.ts';
 import {MFK_ADMIN_AUTHORITY} from './admin-authority.ts';
+import {AdminDraftProvider} from './admin-draft.tsx';
+import {CategoriesWorkspace,CombosWorkspace,MenuDisplayWorkspace,ModifiersWorkspace,PricingWorkspace,ProductsWorkspace} from './CatalogWorkspaces.tsx';
 
 const statusTitle={
   NOT_WIRED:'等待 MFK Domain Adapter',
@@ -42,10 +44,20 @@ function CapabilityPage(){
   </section>;
 }
 
+function capabilityElement(id:string){
+  if(id==='products')return <ProductsWorkspace/>;
+  if(id==='categories')return <CategoriesWorkspace/>;
+  if(id==='modifiers')return <ModifiersWorkspace/>;
+  if(id==='pricing')return <PricingWorkspace/>;
+  if(id==='combo')return <CombosWorkspace/>;
+  if(id==='menu-sort')return <MenuDisplayWorkspace/>;
+  return <CapabilityPage/>;
+}
+
 export function MfkAdminApp(){
-  return <AdminShell><Routes>
-    {ADMIN_CAPABILITIES.map(item=><Route key={item.id} path={item.path} element={<CapabilityPage/>}/>)}
+  return <AdminDraftProvider><AdminShell><Routes>
+    {ADMIN_CAPABILITIES.map(item=><Route key={item.id} path={item.path} element={capabilityElement(item.id)}/>)}
     <Route path="/" element={<Navigate to="/admin/overview" replace/>}/>
     <Route path="*" element={<Navigate to="/admin/overview" replace/>}/>
-  </Routes></AdminShell>;
+  </Routes></AdminShell></AdminDraftProvider>;
 }
