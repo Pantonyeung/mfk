@@ -8,7 +8,7 @@ export interface SmtOrderDetailLineViewModel{readonly id:string;readonly name:st
 export interface SmtOrderDetailViewModel extends SmtOrderListItemViewModel{readonly attention:readonly string[];readonly metrics:readonly SmtOperationalMetric[];readonly lines:readonly SmtOrderDetailLineViewModel[]}
 export interface SmtOrdersProjection{readonly items:readonly SmtOrderListItemViewModel[];readonly detailsByOrderId?:Readonly<Record<string,SmtOrderDetailViewModel>>;readonly selectedOrderId?:string;readonly selectedOrder?:SmtOrderDetailViewModel}
 export interface SmtDiningQueueItemViewModel{readonly id:string;readonly codeLabel:string;readonly partySize:number;readonly statusLabel:string}
-export interface SmtDiningTableViewModel{readonly id:string;readonly areaLabel:string;readonly label:string;readonly state:'available'|'occupied'|'attention';readonly partySize?:number;readonly outstandingLabel?:string}
+export interface SmtDiningTableViewModel{readonly id:string;readonly areaLabel:string;readonly label:string;readonly state:'available'|'occupied'|'attention'|'settled';readonly partySize?:number;readonly outstandingLabel?:string;readonly holdId?:string;readonly startedAt?:string;readonly itemCount?:number;readonly itemSummary?:string;readonly totalMinor?:number;readonly paidMinor?:number;readonly remainingMinor?:number}
 export interface SmtDiningSessionViewModel{readonly sessionId:string;readonly tableLabels:readonly string[];readonly statusLabel:string;readonly metrics:readonly SmtOperationalMetric[]}
 export interface SmtDiningProjection{readonly businessDate:string;readonly revision:number;readonly queue:readonly SmtDiningQueueItemViewModel[];readonly tables:readonly SmtDiningTableViewModel[];readonly selectedSession?:SmtDiningSessionViewModel}
 export type SmtAvailabilityStatus='available'|'soldout'|'paused';
@@ -19,6 +19,36 @@ export interface StoredOrder{
   id:string;display:string;createdAt:string;totalMinor:number;paymentLabel:string;fulfillmentLabel:'待處理'|'進行中'|'可取餐'|'已完成'|'已取消';sourceLabel:string;
   items:readonly {id:string;name:string;qty:number;unitMinor:number}[];
 }
+export type DiningTender='CASH'|'ALIPAY'|'WECHAT'|'FPS'|'PAYME';
+export interface LocalDiningPayment{
+  readonly id:string;
+  readonly createdAt:string;
+  readonly tender:DiningTender;
+  readonly amountMinor:number;
+  readonly selections:readonly {lineIndex:number;qty:number;amountMinor:number}[];
+}
+export interface LocalDiningLineViewModel{
+  readonly lineIndex:number;
+  readonly id:string;
+  readonly name:string;
+  readonly qty:number;
+  readonly paidQty:number;
+  readonly remainingQty:number;
+  readonly unitMinor:number;
+}
+export interface LocalDiningHoldDetail{
+  readonly holdId:string;
+  readonly codeLabel:string;
+  readonly assignedTable?:string;
+  readonly createdAt:string;
+  readonly partySize:number;
+  readonly note:string;
+  readonly totalMinor:number;
+  readonly paidMinor:number;
+  readonly remainingMinor:number;
+  readonly lines:readonly LocalDiningLineViewModel[];
+  readonly payments:readonly LocalDiningPayment[];
+}
 export interface LocalHoldDraft{
   readonly id:string;
   readonly codeLabel:string;
@@ -28,6 +58,7 @@ export interface LocalHoldDraft{
   readonly note:string;
   readonly totalMinor:number;
   readonly assignedTable?:string;
+  readonly payments?:readonly LocalDiningPayment[];
   readonly items:readonly {id:string;name:string;qty:number;unitMinor:number}[];
 }
 interface Persisted{orders:StoredOrder[];availability:Record<string,SmtAvailabilityStatus>;holds:LocalHoldDraft[]}
@@ -73,6 +104,10 @@ export interface CleanSmtCoreRuntimePort{
   createDiningWait?(input:{partySize:number;note?:string}):Promise<LocalHoldDraft>;
   removeDiningWait?(id:string):Promise<void>;
   assignDiningTable?(holdId:string,tableId:string):Promise<void>;
+  unassignDiningTable?(holdId:string):Promise<void>;
+  readDiningHold?(holdId:string):Promise<LocalDiningHoldDetail>;
+  settleDiningHold?(holdId:string,selections:readonly {lineIndex:number;qty:number}[],tender:DiningTender):Promise<LocalDiningHoldDetail>;
+  clearDiningHold?(holdId:string):Promise<void>;
 }
 export interface PrintDispatchResult{readonly jobId:string;readonly role:string;readonly ok:boolean;readonly code:string}
 export interface PrintDispatchSummary{
@@ -120,6 +155,10 @@ export interface MfkLocalRuntime extends CleanSmtCoreRuntimePort{
   createHold(input:{kind:'dining'|'waiting';items:readonly {id:string;name:string;qty:number;unitMinor:number}[];totalMinor:number;partySize?:number;note?:string}):LocalHoldDraft;
   holds():readonly LocalHoldDraft[];
   removeHold(id:string):void;
+  readDiningHold(holdId:string):Promise<LocalDiningHoldDetail>;
+  settleDiningHold(holdId:string,selections:readonly {lineIndex:number;qty:number}[],tender:DiningTender):Promise<LocalDiningHoldDetail>;
+  unassignDiningTable(holdId:string):Promise<void>;
+  clearDiningHold(holdId:string):Promise<void>;
   clear():void;
 }
 
@@ -312,6 +351,42 @@ const productNames:Record<string,string>={
   curry:'咖喱便當',wedges:'香脆薯角',milkTea:'台式奶茶',lemonTea:'手打檸檬茶'
 };
 
+function diningDetail(hold:LocalHoldDraft):LocalDiningHoldDetail{
+  const payments=Array.isArray(hold.payments)?hold.payments:[];
+  const paidByLine=new Map<number,number>();
+  for(const payment of payments){
+    for(const selection of payment.selections){
+      paidByLine.set(selection.lineIndex,(paidByLine.get(selection.lineIndex)??0)+selection.qty);
+    }
+  }
+  const lines=hold.items.map((item,lineIndex)=>{
+    const paidQty=Math.min(item.qty,paidByLine.get(lineIndex)??0);
+    return {
+      lineIndex,
+      id:item.id,
+      name:item.name,
+      qty:item.qty,
+      paidQty,
+      remainingQty:Math.max(0,item.qty-paidQty),
+      unitMinor:item.unitMinor,
+    };
+  });
+  const paidMinor=payments.reduce((sum,payment)=>sum+payment.amountMinor,0);
+  return {
+    holdId:hold.id,
+    codeLabel:hold.codeLabel,
+    assignedTable:hold.assignedTable,
+    createdAt:hold.createdAt,
+    partySize:hold.partySize,
+    note:hold.note,
+    totalMinor:hold.totalMinor,
+    paidMinor,
+    remainingMinor:Math.max(0,hold.totalMinor-paidMinor),
+    lines,
+    payments,
+  };
+}
+
 export const localRuntime:MfkLocalRuntime=Object.freeze({
   subscribe(listener){listeners.add(listener);return()=>listeners.delete(listener)},
   createOrder(input){
@@ -339,6 +414,7 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
       partySize:Math.max(1,Math.floor(Number(input.partySize)||1)),
       note:String(input.note||''),
       totalMinor:Math.max(0,Math.floor(Number(input.totalMinor)||0)),
+      payments:[],
       items:input.items.map(item=>({...item})),
     };
     data={...data,holds:[draft,...data.holds]};save();return draft;
@@ -440,18 +516,28 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
         id:hold.id,
         codeLabel:hold.codeLabel,
         partySize:hold.partySize,
-        statusLabel:hold.kind==='dining'?'待安排座位':'暫存待客',
+        statusLabel:'待安排座位',
       })),
       tables:Array.from({length:9},(_,index)=>{
         const id='T'+String(index+1).padStart(2,'0');
         const seated=data.holds.find(hold=>hold.kind==='dining'&&hold.assignedTable===id);
+        if(!seated)return {id,areaLabel:'堂食',label:String(index+1),state:'available' as const};
+        const detail=diningDetail(seated);
+        const first=detail.lines.filter(line=>line.qty>0).slice(0,2).map(line=>line.name.split('｜')[0]).join('、');
         return {
           id,
           areaLabel:'堂食',
           label:String(index+1),
-          state:seated?'occupied' as const:'available' as const,
-          partySize:seated?.partySize,
-          outstandingLabel:seated?.codeLabel,
+          state:detail.remainingMinor===0?'settled' as const:'occupied' as const,
+          partySize:seated.partySize,
+          outstandingLabel:seated.codeLabel,
+          holdId:seated.id,
+          startedAt:seated.createdAt,
+          itemCount:seated.items.reduce((sum,item)=>sum+item.qty,0),
+          itemSummary:first,
+          totalMinor:seated.totalMinor,
+          paidMinor:detail.paidMinor,
+          remainingMinor:detail.remainingMinor,
         };
       })
     };
@@ -465,6 +551,7 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
       partySize:Math.max(1,Math.floor(Number(input.partySize)||1)),
       note:String(input.note||''),
       totalMinor:0,
+      payments:[],
       items:[],
     };
     data={...data,holds:[draft,...data.holds]};save();return draft;
@@ -476,6 +563,58 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
     const found=data.holds.find(item=>item.id===holdId);
     if(!found)throw new Error('HOLD_NOT_FOUND');
     data={...data,holds:data.holds.map(item=>item.id===holdId?{...item,assignedTable:tableId}:item)};save();
+  },
+  async unassignDiningTable(holdId){
+    const found=data.holds.find(item=>item.id===holdId);
+    if(!found)throw new Error('HOLD_NOT_FOUND');
+    data={...data,holds:data.holds.map(item=>{
+      if(item.id!==holdId)return item;
+      const {assignedTable:_assignedTable,...rest}=item;
+      return rest as LocalHoldDraft;
+    })};save();
+  },
+  async readDiningHold(holdId){
+    const hold=data.holds.find(item=>item.id===holdId);
+    if(!hold)throw new Error('HOLD_NOT_FOUND');
+    return diningDetail(hold);
+  },
+  async settleDiningHold(holdId,selections,tender){
+    const hold=data.holds.find(item=>item.id===holdId);
+    if(!hold)throw new Error('HOLD_NOT_FOUND');
+    if(!hold.assignedTable)throw new Error('DINING_TABLE_NOT_ASSIGNED');
+    const detail=diningDetail(hold);
+    const normalized=selections.map(selection=>({
+      lineIndex:Math.floor(Number(selection.lineIndex)),
+      qty:Math.max(0,Math.floor(Number(selection.qty)||0)),
+    })).filter(selection=>selection.qty>0);
+    if(!normalized.length)throw new Error('DINING_PAYMENT_SELECTION_REQUIRED');
+    let amountMinor=0;
+    const paymentSelections:{lineIndex:number;qty:number;amountMinor:number}[]=[];
+    for(const selection of normalized){
+      const line=detail.lines.find(item=>item.lineIndex===selection.lineIndex);
+      if(!line)throw new Error('DINING_LINE_NOT_FOUND');
+      if(selection.qty>line.remainingQty)throw new Error('DINING_QTY_EXCEEDS_REMAINING');
+      const lineAmount=line.unitMinor*selection.qty;
+      amountMinor+=lineAmount;
+      paymentSelections.push({lineIndex:selection.lineIndex,qty:selection.qty,amountMinor:lineAmount});
+    }
+    const payment:LocalDiningPayment={
+      id:'DP-'+Date.now().toString(36),
+      createdAt:new Date().toISOString(),
+      tender,
+      amountMinor,
+      selections:paymentSelections,
+    };
+    data={...data,holds:data.holds.map(item=>item.id===holdId?{...item,payments:[...(item.payments??[]),payment]}:item)};save();
+    const updated=data.holds.find(item=>item.id===holdId)!;
+    return diningDetail(updated);
+  },
+  async clearDiningHold(holdId){
+    const hold=data.holds.find(item=>item.id===holdId);
+    if(!hold)throw new Error('HOLD_NOT_FOUND');
+    const detail=diningDetail(hold);
+    if(detail.remainingMinor>0)throw new Error('DINING_BALANCE_REMAINING');
+    data={...data,holds:data.holds.filter(item=>item.id!==holdId)};save();
   },
   async readAvailability(){
     return {revision:1,nodes:Object.entries(productNames).map(([nodeId,label])=>({nodeId,label,status:data.availability[nodeId]||'available',sourceLabel:'LOCAL'})),canChange:true};
