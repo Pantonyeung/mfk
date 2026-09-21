@@ -123,6 +123,12 @@ test('after-sale evidence is separate from financial authority and decisions are
       afterSaleOrderId: 99,
       isAppeal: 0,
       money: 500,
+      currency: 'HKD',
+      applyOpType: 10,
+      applyReason: 'provider refund request',
+      handleOpType: 20,
+      handleReason: 'provider handling',
+      opTime: 1770000000123,
     }),
   });
   const evidence = parseKeetaAfterSaleEvidence(envelope);
