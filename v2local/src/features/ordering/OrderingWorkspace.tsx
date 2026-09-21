@@ -110,7 +110,7 @@ export function OrderingWorkspace({view,actions,centerPanel}:{view:OrderingWorks
       </>}
     </main>
 
-    <aside key={view.cartPulseNonce} className={`ordering-cart${view.cartPulseNonce>0?' cart-updated':''}`} aria-label="購物車">
+    <aside key={view.cartPulseNonce} className={`ordering-cart${view.cartPulseNonce>0?' cart-updated':''}${view.holdPlacement?.active?' hold-active':''}`} aria-label="購物車">
       <header className="ordering-cart-head">
         <div className="ordering-cart-order-id"><small>ORDER</small><strong>#{view.cart.orderId}</strong></div>
         <div className="ordering-cart-head-actions">
