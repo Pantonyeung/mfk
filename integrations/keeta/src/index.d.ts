@@ -141,3 +141,23 @@ export function hhmmToSeconds(value: string): number;
 export function validateKeetaBusinessHours(hours: KeetaBusinessHourOfTheWeek): true;
 export function buildKeetaStoreHoursShape(input: Readonly<Record<string, unknown>>): Readonly<Record<string, unknown>>;
 export function buildKeetaStoreOperationalShape(input: Readonly<Record<string, unknown>>): Readonly<Record<string, unknown>>;
+
+export interface KeetaRuntimePlan {
+  readonly trigger: 'WEBHOOK'|'CANONICAL_EVENT'|'OPERATOR_ACTION'|'SAFETY_SWEEP';
+  readonly purpose: string;
+  readonly maxBatch: number;
+  readonly onePurposeOnly: true;
+  readonly backgroundDiscoveryPoll?: boolean;
+  readonly usesSleepDelay?: boolean;
+  readonly ownsCanonicalTruth?: boolean;
+  readonly trafficMode?: 'BUSINESS_HOURS'|'LOW_TRAFFIC_MODE';
+  readonly intervalMinutes?: number;
+  readonly expectedCpuMs: number;
+  readonly providerCpuLimitMs: number;
+  readonly stopCondition: string;
+  readonly backoff: string;
+}
+
+export const KEETA_RUNTIME_POLICY: Readonly<Record<string, unknown>>;
+export function estimateScheduledInvocationsPerDay(intervalMinutes: number, activeMinutes?: number): number;
+export function assertKeetaRuntimePlan(plan: KeetaRuntimePlan): true;
