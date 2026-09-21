@@ -6,6 +6,9 @@ import {
   KEETA_CAPABILITY_REGISTRY,
   KEETA_CERTIFICATION_REGISTRY,
   KEETA_EXTERNAL_EVIDENCE,
+  KEETA_RUNTIME_POLICY,
+  assertKeetaRuntimePlan,
+  estimateScheduledInvocationsPerDay,
   assertKeetaReplayCompatible,
   buildKeetaAfterSaleDecisionShape,
   buildKeetaFullMenuSyncShape,
@@ -155,9 +158,76 @@ test('webhook dedup identity conflicts fail closed', () => {
 });
 
 test('registry has no acceptance claims and preserves known external blockers', () => {
-  assert.equal(KEETA_CAPABILITY_COUNT, 21);
+  assert.equal(KEETA_CAPABILITY_COUNT, 23);
   assert.equal(new Set(KEETA_CAPABILITY_REGISTRY.map((x) => x.CAP_ID)).size, KEETA_CAPABILITY_COUNT);
   const serialized = JSON.stringify(KEETA_CERTIFICATION_REGISTRY);
   assert.doesNotMatch(serialized, /SIT_PASS|UAT_PASS|KEETA_ACCEPTED/);
   assert.ok(KEETA_EXTERNAL_EVIDENCE.some((x) => x.evidenceId === 'KEETA_LIVE_WEBHOOK_SIGNING_SEMANTICS_MISMATCH'));
+});
+
+
+test('runtime policy forbids legacy high-frequency orchestration patterns', () => {
+  assert.equal(KEETA_RUNTIME_POLICY.mode, 'EVENT_DRIVEN_FIRST');
+  assert.equal(KEETA_RUNTIME_POLICY.providerRole, 'THIN_EDGE_ADAPTER_ONLY');
+  assert.equal(KEETA_RUNTIME_POLICY.businessHours.timeZone, 'Asia/Hong_Kong');
+  assert.equal(KEETA_RUNTIME_POLICY.businessHours.startLocal, '10:00');
+  assert.equal(KEETA_RUNTIME_POLICY.businessHours.endLocal, '20:30');
+  assert.equal(KEETA_RUNTIME_POLICY.offHoursMode, 'LOW_TRAFFIC_MODE');
+
+  assert.equal(estimateScheduledInvocationsPerDay(1), 1440);
+  assert.equal(estimateScheduledInvocationsPerDay(30, 810), 27);
+
+  assert.throws(() => assertKeetaRuntimePlan({
+    trigger: 'SAFETY_SWEEP',
+    purpose: 'liveness poll',
+    maxBatch: 1,
+    onePurposeOnly: true,
+    trafficMode: 'LOW_TRAFFIC_MODE',
+    intervalMinutes: 1,
+    expectedCpuMs: 1,
+    providerCpuLimitMs: 10,
+    stopCondition: 'one check',
+    backoff: 'none',
+  }), /KEETA_SAFETY_SWEEP_TOO_FREQUENT/);
+
+  assert.throws(() => assertKeetaRuntimePlan({
+    trigger: 'SAFETY_SWEEP',
+    purpose: 'multi-domain drain',
+    maxBatch: 50,
+    onePurposeOnly: false,
+    trafficMode: 'BUSINESS_HOURS',
+    intervalMinutes: 5,
+    expectedCpuMs: 2,
+    providerCpuLimitMs: 10,
+    stopCondition: 'bounded',
+    backoff: 'exponential',
+  }), /KEETA_RUNTIME_ONE_PURPOSE_REQUIRED/);
+
+  assert.throws(() => assertKeetaRuntimePlan({
+    trigger: 'WEBHOOK',
+    purpose: 'provider ingress',
+    maxBatch: 1,
+    onePurposeOnly: true,
+    backgroundDiscoveryPoll: true,
+    expectedCpuMs: 2,
+    providerCpuLimitMs: 10,
+    stopCondition: 'one webhook',
+    backoff: 'provider-safe',
+  }), /KEETA_BACKGROUND_DISCOVERY_POLL_FORBIDDEN/);
+});
+
+test('runtime policy accepts a thin event-driven provider edge plan', () => {
+  assert.equal(assertKeetaRuntimePlan({
+    trigger: 'WEBHOOK',
+    purpose: 'verify normalize dedup and handoff one provider event',
+    maxBatch: 1,
+    onePurposeOnly: true,
+    backgroundDiscoveryPoll: false,
+    usesSleepDelay: false,
+    ownsCanonicalTruth: false,
+    expectedCpuMs: 2,
+    providerCpuLimitMs: 10,
+    stopCondition: 'one provider event processed or fail closed',
+    backoff: 'no blind retry; canonical readback before retry',
+  }), true);
 });
