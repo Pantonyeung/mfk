@@ -123,7 +123,7 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
     onAdjustLineQuantity:(lineId,delta)=>setCart(cart.map(item=>item.id===lineId?{...item,qty:item.qty+delta}:item).filter(item=>item.qty>0)),
     onEditCartLine:()=>{},onHoldCart:()=>{},onCancelCart:()=>setCart([]),
     onOpenWorkItem:id=>{if(id==='soldout')navigate('/soldout')},
-    onOpenQueueOrder:()=>{},
+    onOpenQueueOrder:(_kind,id)=>navigate('/orders?orderId='+encodeURIComponent(id)),
     onCheckout:()=>navigate('/checkout'),
   };
   return <OrderingWorkspace view={view} actions={actions}/>;
@@ -147,7 +147,7 @@ function CheckoutPage({cart,setCart}:{cart:CartLine[];setCart:(v:CartLine[])=>vo
     CASH:'現金付款',ALIPAY:'AlipayHK',WECHAT:'WeChat Pay HK',FPS:'FPS／轉數快',PAYME:'PayMe',COMBO:'組合付款'
   };
   const channelLabels:Record<CheckoutChannelId,string>={
-    'walk-in':'現場外賣','whatsapp':'電話／WhatsApp','morefun-app':'磨飯 App','keeta':'Keeta','foodpanda':'Foodpanda'
+    'walk-in':'現場','whatsapp':'電話／WhatsApp','morefun-app':'磨飯 App','keeta':'Keeta','foodpanda':'Foodpanda'
   };
 
   const parseMoney=(value:string)=>Math.max(0,Math.round((Number(value)||0)*100));
@@ -183,7 +183,7 @@ function CheckoutPage({cart,setCart}:{cart:CartLine[];setCart:(v:CartLine[])=>vo
       subtotalLabel:money(due),packagingLabel:'$0.00',discountLabel:'$0.00',totalLabel:money(due),
     },
     channels:[
-      {id:'walk-in',label:'現場外賣',selected:channel==='walk-in'},
+      {id:'walk-in',label:'現場',selected:channel==='walk-in'},
       {id:'whatsapp',label:'電話／WhatsApp',selected:channel==='whatsapp'},
       {id:'morefun-app',label:'磨飯 App',selected:channel==='morefun-app'},
       {id:'foodpanda',label:'Foodpanda',selected:channel==='foodpanda'},
