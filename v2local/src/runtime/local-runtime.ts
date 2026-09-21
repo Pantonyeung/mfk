@@ -1,4 +1,4 @@
-import {printTextInternal} from './native-print.ts';
+import {printTextLan} from './native-print.ts';
 
 export interface SmtOperationalMetric{readonly id:string;readonly label:string;readonly value:string;readonly detail?:string}
 export interface SmtOrderListItemViewModel{readonly orderId:string;readonly orderIdLabel:string;readonly itemCount:number;readonly totalLabel:string;readonly paymentLabel:string;readonly fulfillmentLabel:string;readonly sourceLabel?:string;readonly localSequenceLabel?:string}
@@ -18,6 +18,7 @@ export interface StoredOrder{
 }
 interface Persisted{orders:StoredOrder[];availability:Record<string,SmtAvailabilityStatus>}
 const KEY='mfk.v2local.runtime.v1';
+const PRINTER_BINDING_KEY='mfk.v2local.printers.v2';
 const listeners=new Set<()=>void>();
 const defaults:Persisted={orders:[],availability:{}};
 const clone=<T,>(value:T):T=>JSON.parse(JSON.stringify(value)) as T;
@@ -96,7 +97,19 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
   async printOrderReceipt(orderId){
     const order=data.orders.find(x=>x.id===orderId);if(!order)throw new Error('ORDER_NOT_FOUND');
     const lines=['磨飯 MFK',order.display,'------------------------------',...order.items.map(x=>x.name+' x'+x.qty),'------------------------------','TOTAL '+money(order.totalMinor),order.paymentLabel];
-    const result=await printTextInternal(lines.join('\n'));
+    let bindings:readonly {id:string;role:string;host:string;port:number;name:string;model:string;capability:'receipt-80mm/kitchen'|'label-58mm'}[]=[];
+    try{const value=JSON.parse(localStorage.getItem(PRINTER_BINDING_KEY)||'[]');if(Array.isArray(value))bindings=value;}catch{}
+    const printer=bindings.find(x=>x.role==='顧客小票'&&String(x.host||'').trim());
+    if(!printer)throw new Error('RECEIPT_PRINTER_NOT_BOUND');
+    const result=await printTextLan({
+      endpointId:printer.id,
+      host:String(printer.host).trim(),
+      port:Number(printer.port)||9100,
+      displayName:printer.name||'顧客小票打印機',
+      model:printer.model||'LAN PRINTER',
+      capability:'receipt-80mm/kitchen',
+      text:'\x1b\x40'+lines.join('\n')+'\n\n\n'
+    });
     if(!result.ok)throw new Error(result.code||'PRINT_FAILED');
     return {printJobId:'local-'+order.id,state:result.code==='ACKNOWLEDGED'?'COMPLETED':'SENT'};
   },
