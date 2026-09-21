@@ -1,0 +1,662 @@
+MFK 航海圖 V1.2｜Round003｜2026-09-21
+主題：SIX-ROLE CLEAN LANDING COMPLETE / CONNECTION NOT STARTED
+狀態：CURRENT / CONTROLLING
+CURRENT_MAIN：5612ae8da62d34ba7f3de9dd60e6ae47dac25925
+
+==================================================
+0. OWNER ABSOLUTE RULE
+==================================================
+
+MFK 對外只保留六個角色：
+
+1. SMT
+2. Admin
+3. SMM
+4. Customer
+5. Keeta
+6. Owner
+
+NO SEVENTH PRODUCT.
+
+禁止再建立：
+
+- 第二 Order Engine
+- 第二 Pricing Engine
+- 第二 Payment Engine
+- 第二 Print Engine
+- 第二 Store Kernel
+- Shared-domain App
+- Orchestration App
+- 任何會取得獨立 business authority 嘅額外產品
+
+Internal Adapter / Contract / Projection 只係 seam。
+唔係 Product。
+唔取得獨立主權。
+
+==================================================
+1. CURRENT PHASE
+==================================================
+
+SIX-ROLE MIGRATION：
+COMPLETE
+
+CLEAN LANDING：
+COMPLETE
+
+LIVE CONNECTION：
+NOT STARTED
+
+CURRENT GLOBAL STATE：
+
+MIGRATED
+TEST_GREEN
+LANDED_CLEAN
+NOT_WIRED
+
+直到 Owner 明確開第一條 connection seam 前：
+
+NO LIVE WIRING
+
+==================================================
+2. SIX ROLE CURRENT REALITY
+==================================================
+
+--------------------------------------------------
+SMT
+--------------------------------------------------
+
+ROLE：
+LOCAL POS / FRONTLINE EXECUTION / LOCAL TRANSACTION AUTHORITY
+
+CURRENT：
+EXISTS IN MFK
+NO REMIGRATION
+
+RESPONSIBILITY：
+
+- Local ordering
+- Cart / Checkout
+- Payment execution
+- Formal Order
+- Fulfillment
+- Local Print / Hardware
+- Local transaction truth
+- Offline local execution
+
+RULE：
+
+SMT 必須可以本地完成交易。
+Cloud / Reporting / Audit / Business Day / Owner / Provider failure
+唔可以阻止本地 Order / Checkout / Payment / Local Commit。
+
+--------------------------------------------------
+ADMIN
+--------------------------------------------------
+
+ROLE：
+CONFIGURE / AUTHOR / PUBLISH
+
+ISSUE：
+#23 CLOSED / BANKED
+
+STATUS：
+MFK_ADMIN_PORT_MIGRATED_NOT_WIRED
+TEST_GREEN
+LANDED_CLEAN
+
+SOURCE TEST：
+35608146758 SUCCESS
+
+LANDING TEST：
+35608606577 SUCCESS
+
+RESPONSIBILITY：
+
+- Menu config
+- Product
+- Category
+- Modifier / Option
+- Combo
+- Pricing config
+- Store config
+- Print logical rules
+- Channel policy
+- Staff / permission config
+- Reporting/read-model surfaces
+
+ABSOLUTE RULE：
+
+Admin 唔係每張交易嘅第二 approver。
+
+Target future behavior：
+
+Admin Publish
+→ Active Config Revision
+→ SMT receive / local store
+→ SMT execute locally
+
+交易時唔返 Admin 問准。
+
+--------------------------------------------------
+SMM
+--------------------------------------------------
+
+ROLE：
+TRUSTED STAFF ASSISTIVE ORDER SOURCE
+
+ISSUE：
+#24 CLOSED / BANKED
+
+STATUS：
+MFK_SMM_PORT_MIGRATED_NOT_WIRED
+TEST_GREEN
+LANDED_CLEAN
+
+SOURCE TEST：
+35608421978 SUCCESS
+
+LANDING TEST：
+35608789364 SUCCESS
+
+RULE：
+
+SMM 唔擁有 Formal Order。
+SMM 唔擁有 Pricing。
+SMM 唔擁有 Store Kernel。
+
+Future direction：
+
+SMM
+→ ONE canonical Order Intake direction
+→ SMT
+
+--------------------------------------------------
+CUSTOMER
+--------------------------------------------------
+
+ROLE：
+CUSTOMER DIRECT ORDER SOURCE
+
+ISSUE：
+#25 CLOSED / BANKED
+
+STATUS：
+MFK_CUSTOMER_PORT_MIGRATED_NOT_WIRED
+TEST_GREEN
+LANDED_CLEAN
+
+SOURCE：
+a08146b0b47ad902baca6a7654906a29c2eb56bd
+
+SOURCE TEST：
+35610918547 SUCCESS
+
+LANDING：
+f1b95024756c00e8223b79b41b129c09822202e1
+
+LANDING TEST：
+35611041188 SUCCESS
+
+RULE：
+
+Customer 唔擁有 Formal Order。
+Customer 唔擁有 Pricing。
+Customer 唔擁有 Payment execution。
+
+Future direction：
+
+Customer
+→ ONE canonical Order Intake direction
+→ SMT
+
+--------------------------------------------------
+KEETA
+--------------------------------------------------
+
+ROLE：
+THIRD_PARTY_PROVIDER_ORDER_SOURCE + PROVIDER_TRANSLATION
+
+ISSUE：
+#27 CLOSED / BANKED
+
+STATUS：
+MFK_KEETA_API_MIGRATED_NOT_WIRED
+TEST_GREEN
+LANDED_CLEAN
+
+SOURCE：
+0c63b8dbb9fbb79a8e0c1c530e3d8b38e288c4d7
+
+SOURCE TEST：
+35614714034 SUCCESS
+13 / 13 PASS
+
+LANDING：
+5612ae8da62d34ba7f3de9dd60e6ae47dac25925
+
+LANDING TEST：
+35614821994 SUCCESS
+
+CURRENT：
+
+Provider contract / translation / evidence only.
+
+ABSENT：
+
+- Live API
+- Provider activation
+- Cloudflare runtime
+- D1 runtime
+- Runtime secret binding
+- SMT/Admin wiring
+- SIT / UAT acceptance claim
+
+PRESERVED EXTERNAL BLOCKERS：
+
+KEETA_LIVE_WEBHOOK_SIGNING_SEMANTICS_MISMATCH
+
+Generic PREPARING API：
+NO OFFICIAL EVIDENCE
+
+/order/prepare：
+READY ONLY
+
+RULE：
+
+Keeta payload / provider ID
+唔係 MFK canonical truth。
+
+Future direction：
+
+Keeta Provider Adapter
+→ ONE canonical Order Intake direction
+→ SMT
+
+Provider-specific auth / signature / translation / evidence
+只留 edge。
+
+--------------------------------------------------
+OWNER
+--------------------------------------------------
+
+ROLE：
+OBSERVE / REVIEW / BOUNDED CONTROL
+
+ISSUE：
+#26 CLOSED / BANKED
+
+STATUS：
+MFK_OWNER_PORT_MIGRATED_NOT_WIRED
+TEST_GREEN
+LANDED_CLEAN
+
+SOURCE：
+5efed35dc8eb65116f2469fe3a824d8c8d80199e
+
+SOURCE TEST：
+35614020264 SUCCESS
+
+LANDING：
+f816c320f6036e07773503c1eb618db4c1be524a
+
+LANDING TEST：
+35614159500 SUCCESS
+
+CAPABILITIES：
+94
+
+COMMAND_SHAPE：
+18 / 18 NOT_WIRED
+
+RULE：
+
+Owner 唔係第二 POS。
+Owner 唔係第二 Admin。
+Owner 唔係 transaction engine。
+
+==================================================
+3. SIMPLE AUTHORITY LOCK
+==================================================
+
+每一件 business fact / action：
+
+ONE DECISION AUTHORITY ONLY
+
+其他 surface 只可以：
+
+- Record
+- Configure
+- Project
+- Request
+- Display
+- Translate
+
+禁止：
+
+同一件事由多個 gatekeeper 重複判斷。
+
+禁止：
+
+Order submit
+→ Business Day gate
+→ Reporting gate
+→ Audit gate
+→ Owner gate
+→ Provider gate
+→ 先可以 Commit
+
+呢類 synchronous veto chain。
+
+==================================================
+4. NON-BLOCKING DEFAULT
+==================================================
+
+以下全部預設 NON-BLOCKING：
+
+- Business Day
+- Reporting
+- Audit
+- Diagnostics
+- Projection
+- Owner observation
+- Admin read model
+- Optional operational metadata
+- Cloud export
+- Provider status
+
+明確鎖：
+
+BUSINESS_DAY
+=
+RECORD / CLASSIFICATION / REPORTING SEMANTICS ONLY
+
+BUSINESS_DAY MUST NEVER BLOCK：
+
+- Order
+- Checkout
+- Payment
+- Local Commit
+
+只有真正 transaction authority
+先可以 enforce 該 transaction step 必須嘅最小 invariant。
+
+==================================================
+5. ORDER SOURCE MODEL
+==================================================
+
+三個外部/輔助落單入口：
+
+SMM
+Customer
+Keeta
+
+屬於同一族：
+
+ORDER_SOURCE
+
+但身份唔同：
+
+SMM
+= TRUSTED_STAFF
+
+Customer
+= CUSTOMER_DIRECT
+
+Keeta
+= THIRD_PARTY_PROVIDER
+
+共同方向：
+
+SMM ───────┐
+Customer ──┼──→ ONE CANONICAL ORDER INTAKE → SMT
+Keeta ─────┘
+
+禁止三套：
+
+- Order Engine
+- Pricing Engine
+- Formal Order writer
+
+Source-specific 差異只留：
+
+- Identity
+- Auth
+- Trust
+- Transport
+- Provider translation
+- Provider evidence
+
+==================================================
+6. ADMIN → SMT FUTURE CONNECTION MODEL
+==================================================
+
+最短路徑：
+
+Admin Draft
+→ Validate
+→ Publish
+→ Active Config Revision
+→ SMT receive
+→ SMT Local LKG
+→ Readback
+
+Admin 唔直接控制每張交易。
+
+SMT 收到有效 Revision 後：
+
+LOCAL EXECUTION
+
+Future Menu / Product / Modifier / Combo / Pricing config
+由同一 Revision source 供應。
+
+SMM / Customer / Keeta
+之後只讀相同 canonical projection / translation。
+
+==================================================
+7. OWNER-LOCKED CONNECTION PRIORITY
+==================================================
+
+第一優先：
+
+ADMIN CONNECTION FIRST
+
+規則：
+
+CONNECT ONE SEAM
+→ TEST SAME SEAM IMMEDIATELY
+→ GREEN / RED
+→ BANK
+→ STOP
+→ OWNER DECIDES NEXT
+
+第二優先：
+
+KEETA CONNECTION
+
+同樣：
+
+CONNECT ONE KEETA SEAM
+→ TEST SAME SEAM IMMEDIATELY
+→ GREEN / RED
+→ BANK
+
+Keeta internal connection 完成後：
+
+OWNER 自行安排 Keeta External Acceptance。
+
+Keeta 對外驗收唔屬 Main Chat acceptance authority。
+
+External acceptance 期間：
+
+MFK INTERNAL WORK CONTINUES
+
+唔停工。
+
+Keeta 之後其餘 connection 次序：
+
+OWNER DIRECTS EXACT NEXT SEAM
+
+禁止自行推斷 SMM / Customer / Owner 邊個先。
+
+==================================================
+8. CONNECTION FAILURE ISOLATION
+==================================================
+
+任何外部故障只可以影響自己條 seam。
+
+例：
+
+Keeta signature fail
+→ Keeta message fail closed
+
+但：
+
+SMT local Order
+= MUST CONTINUE
+
+Reporting fail
+→ Reporting unavailable
+
+但：
+
+SMT local Order
+= MUST CONTINUE
+
+Owner unavailable
+→ Owner view unavailable
+
+但：
+
+SMT local Order
+= MUST CONTINUE
+
+Admin unavailable after valid revision already local
+→ SMT uses Local LKG
+
+但：
+
+SMT local Order
+= MUST CONTINUE
+
+==================================================
+9. OLD MOREFUN V2 TREATMENT
+==================================================
+
+舊 Morefun V2：
+REFERENCE / ORACLE ONLY
+
+唔係 current authority。
+
+舊 44 packages：
+
+NOT AUTOMATIC MIGRATION TARGETS
+
+禁止整包復活。
+
+只可以用作：
+
+- Capability oracle
+- Contract oracle
+- Acceptance oracle
+- Pure-function donor after review
+
+如 current MFK 真係有 gap：
+
+fresh-read current MFK
+→ define exact missing seam
+→ implement smallest MFK-native piece
+→ test
+→ bank
+
+禁止因舊 package 存在就搬。
+
+==================================================
+10. SIX-ROLE CURRENT BANK
+==================================================
+
+SMT：
+CURRENT / NO REMIGRATION
+
+Admin：
+CLEAN LANDED / TEST GREEN / NOT_WIRED
+
+SMM：
+CLEAN LANDED / TEST GREEN / NOT_WIRED
+
+Customer：
+CLEAN LANDED / TEST GREEN / NOT_WIRED
+
+Owner：
+CLEAN LANDED / TEST GREEN / NOT_WIRED
+
+Keeta：
+CONTRACT CLEAN LANDED / TEST GREEN / NOT_WIRED
+
+GLOBAL：
+
+SIX ROLE SET COMPLETE
+
+LIVE CONNECTION COUNT：
+0
+
+==================================================
+11. CONTROLLING RECORDS
+==================================================
+
+CONTROL：
+Pantonyeung/mfk #22
+
+SIMPLE / SINGLE AUTHORITY / NON-BLOCKING：
+comment 5762381805
+
+OWNER CLEAN LANDING：
+comment 5762401952
+
+KEETA CLEAN LANDING：
+comment 5762492869
+
+Admin：
+#23 CLOSED
+
+SMM：
+#24 CLOSED
+
+Customer：
+#25 CLOSED
+
+Owner：
+#26 CLOSED
+
+Keeta：
+#27 CLOSED
+
+==================================================
+12. NEXT OWNER DECISION
+==================================================
+
+Current migration work：
+
+COMPLETE
+
+Next executable action：
+
+WAIT OWNER TO OPEN FIRST ADMIN CONNECTION SEAM
+
+未收到 exact seam 指令前：
+
+NO CONNECTION
+
+==================================================
+13. MILESTONE
+==================================================
+
+MFK_SIX_ROLE_SET_CLEAN_LANDED_NOT_WIRED
+
+MFK_SIMPLE_SINGLE_AUTHORITY_NONBLOCKING_LOCKED
+
+NEXT：
+ADMIN_CONNECTION_FIRST
+
+==================================================
+END ROUND003
+==================================================
