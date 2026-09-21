@@ -1,6 +1,6 @@
 import {printBytesLan,printTextLan} from './native-print.ts';
 import {renderTscRasterLabel} from './label-bitmap.ts';
-import {buildOrderPrintPlan,type PrintBinding} from './print-routing.ts';
+import {buildOrderPrintPlan,groupTscBitmapJobsByBinding,type PrintBinding,type PlannedPrintJob} from './print-routing.ts';
 
 export interface SmtOperationalMetric{readonly id:string;readonly label:string;readonly value:string;readonly detail?:string}
 export interface SmtOrderListItemViewModel{readonly orderId:string;readonly orderIdLabel:string;readonly itemCount:number;readonly totalLabel:string;readonly paymentLabel:string;readonly fulfillmentLabel:string;readonly sourceLabel?:string;readonly localSequenceLabel?:string}
@@ -114,33 +114,68 @@ function readPrinterBindings():PrintBinding[]{
   }catch{return []}
 }
 
+function concatPrintBytes(parts:readonly Uint8Array[]):Uint8Array{
+  const total=parts.reduce((sum,part)=>sum+part.length,0);
+  const output=new Uint8Array(total);
+  let offset=0;
+  for(const part of parts){output.set(part,offset);offset+=part.length;}
+  return output;
+}
+
+function printerInput(binding:PrintBinding){
+  return {
+    endpointId:binding.id,
+    host:binding.host.trim(),
+    port:Number(binding.port)||9100,
+    displayName:binding.name,
+    model:binding.model,
+    capability:binding.capability,
+    encoding:binding.encoding,
+  };
+}
+
+function pushDispatchResults(results:PrintDispatchResult[],jobs:readonly PlannedPrintJob[],ok:boolean,code:string){
+  for(const job of jobs)results.push({jobId:job.id,role:job.role,ok,code});
+}
+
 async function dispatchOrderOutputs(order:StoredOrder):Promise<PrintDispatchSummary>{
   const plan=buildOrderPrintPlan(order,readPrinterBindings());
   const results:PrintDispatchResult[]=[];
+  const labelBatches=groupTscBitmapJobsByBinding(plan);
+  const labelJobs=new Set(labelBatches.flatMap(batch=>batch.jobs.map(job=>job.id)));
+
   for(const job of plan){
-    const binding=job.binding;
+    if(labelJobs.has(job.id))continue;
     let ok=false;
     let code='PRINT_FAILED';
     try{
-      const printer={
-        endpointId:binding.id,
-        host:binding.host.trim(),
-        port:Number(binding.port)||9100,
-        displayName:binding.name,
-        model:binding.model,
-        capability:binding.capability,
-        encoding:binding.encoding,
-      };
-      const result=job.renderMode==='tsc-bitmap'&&job.labelSpec
-        ?await printBytesLan({...printer,bytes:await renderTscRasterLabel(job.labelSpec)})
-        :await printTextLan({...printer,text:job.payload});
+      const result=await printTextLan({...printerInput(job.binding),text:job.payload});
       ok=result.ok;
-      code=result.code|| (result.ok?'SENT':'PRINT_FAILED');
+      code=result.code||(result.ok?'SENT':'PRINT_FAILED');
     }catch(error){
       code=error instanceof Error?error.message:'PRINT_FAILED';
     }
     results.push({jobId:job.id,role:job.role,ok,code});
   }
+
+  for(const batch of labelBatches){
+    let ok=false;
+    let code='PRINT_FAILED';
+    try{
+      const payloads:Uint8Array[]=[];
+      for(const job of batch.jobs){
+        if(!job.labelSpec)throw new Error('LABEL_SPEC_MISSING');
+        payloads.push(await renderTscRasterLabel(job.labelSpec));
+      }
+      const result=await printBytesLan({...printerInput(batch.binding),bytes:concatPrintBytes(payloads)});
+      ok=result.ok;
+      code=result.code||(result.ok?'SENT':'PRINT_FAILED');
+    }catch(error){
+      code=error instanceof Error?error.message:'PRINT_FAILED';
+    }
+    pushDispatchResults(results,batch.jobs,ok,code);
+  }
+
   const sent=results.filter(result=>result.ok).length;
   return Object.freeze({
     orderId:order.id,
