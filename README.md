@@ -1,37 +1,56 @@
 # MFK
 
-公開嘅磨飯 POS 實作 repo。
+磨飯新架構實作 repo。
 
-Active implementation 只有：
+Active products：
 
-`v2local/`
+- `v2local/` — SMT 本地執行面
+- `v2admin/` — MFK Admin 獨立控制面
 
-呢一版直接以 MoreFun V2 SMT 嘅 1920×1080 UI 做基礎，重新接成本地 POS。
+## SMT｜v2local
+
+以 MoreFun V2 SMT 嘅 1920×1080 UI 做基礎，重新接成本地 POS。
 
 目前：
-
-- MoreFun V2 1920×1080 production viewport
 - 點餐
 - Cart
 - 現金結帳
 - 本機 Order persistence
 - 訂單
-- 堂食畫面
+- 堂食
 - 售罄
 - 打印與設備
 - Carrier 1.0.6 Native Print Bridge
-- Sunmi 內置打印機測試
-- LAN printer apply / connect test / test print
+- LAN / Sunmi print execution
 
-Active runtime 禁止：
+SMT 原則：
+- 只執行已發布規則
+- local-first
+- Order / Checkout / Payment / Print / Fulfillment execution 留喺 store execution authority
+- 不成為 Product / Modifier / Combo authoring authority
 
-- D1
-- Cloud
-- WebSocket
-- Firebase
-- 外部訂單入口
-- 遠端身份／登入依賴
+## Admin｜v2admin
 
-舊 static POS 已由 active repo 移除。
+由舊 Morefun V2 `apps/admin-web` 乾淨抽出完整 Admin capability tree。
+
+Donor 只提供：
+- UI / Workflow / IA
+- route / page / capability inventory
+
+舊 authority 不繼承：
+- legacy DB canonical truth：OFF
+- legacy API authority：OFF
+- legacy mutation writers：OFF
+
+MFK 重新定義：
+Owner Decision
+→ Admin Draft
+→ Validate
+→ Publish
+→ Active Config Revision
+→ SMT Local LKG
+→ SMT 執行
+
+Admin 現時已保留完整 37 項 capability inventory；每項都有 MFK truth owner 同接駁狀態，之後逐 domain 由 `NEEDS_ADAPTER` 收斂到 current MFK authority。
 
 原始研究入口：`REPORT.md`
