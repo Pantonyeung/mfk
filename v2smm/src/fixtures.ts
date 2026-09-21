@@ -18,6 +18,8 @@ export const products:Product[]=[
   {id:'p4',category:'小食',name:'鹽酥雞',price:'$24',tone:'鹽'},
   {id:'p5',category:'飲品',name:'台式奶茶',price:'$12',tone:'茶'},
   {id:'p6',category:'套餐',name:'限定午餐',price:'暫停供應',tone:'限',unavailable:true,comboGroups:[{label:'主食',required:true,options:['便當','飯團']},{label:'飲品',options:['奶茶','冷泡茶']}]},
+  {id:'p7',category:'飯團',name:'雞肉飯團',price:'$43 起',tone:'雞',modifierGroups:[{label:'飯底',required:true,options:['原味紫米','少飯','半飯']},{label:'口味',options:['正常','少辣','走醬']}]},
+  {id:'p8',category:'飲品',name:'冷泡茶',price:'$10',tone:'冷'},
 ];
 
 export const workTickets=[
