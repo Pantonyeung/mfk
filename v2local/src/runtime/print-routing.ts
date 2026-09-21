@@ -12,6 +12,7 @@ export interface PrintBinding{
   readonly port:number;
   readonly capability:'receipt-80mm/kitchen'|'label-58mm';
   readonly encoding:'gb18030'|'big5'|'utf-8';
+  readonly productIds?:readonly string[];
 }
 
 export interface PrintableOrder{
@@ -69,6 +70,12 @@ function packing(order:PrintableOrder){
     +'\n\n\n';
 }
 
+function routedProductItems(order:PrintableOrder,binding:PrintBinding){
+  if(binding.productIds===undefined)return order.items;
+  const allowed=new Set(binding.productIds.map(String));
+  return order.items.filter(item=>allowed.has(String(item.id)));
+}
+
 export function buildOrderPrintPlan(order:PrintableOrder,bindings:readonly PrintBinding[]):readonly PlannedPrintJob[]{
   const active=bindings.filter(binding=>String(binding.host||'').trim()&&Number(binding.port)>0);
   const jobs:PlannedPrintJob[]=[];
@@ -94,7 +101,7 @@ export function buildOrderPrintPlan(order:PrintableOrder,bindings:readonly Print
         pieceLabel:'1/1',
       };
       jobs.push({
-        id:order.id+':bag-label',
+        id:order.id+':'+binding.id+':bag-label',
         role:binding.role,
         binding,
         payload:'LABEL '+labelSpec.orderCode+' '+labelSpec.primaryText,
@@ -104,9 +111,11 @@ export function buildOrderPrintPlan(order:PrintableOrder,bindings:readonly Print
       continue;
     }
     if(binding.role==='產品標籤'){
-      const total=order.items.reduce((sum,item)=>sum+Math.max(0,Number(item.qty)||0),0);
+      const routeItems=routedProductItems(order,binding);
+      const total=routeItems.reduce((sum,item)=>sum+Math.max(0,Number(item.qty)||0),0);
+      if(total<1)continue;
       let labelIndex=0;
-      for(const item of order.items){
+      for(const item of routeItems){
         const qty=Math.max(0,Math.floor(Number(item.qty)||0));
         for(let i=0;i<qty;i++){
           labelIndex+=1;
@@ -116,7 +125,7 @@ export function buildOrderPrintPlan(order:PrintableOrder,bindings:readonly Print
             pieceLabel:labelIndex+'/'+total,
           };
           jobs.push({
-            id:order.id+':product-label:'+item.id+':'+(i+1),
+            id:order.id+':'+binding.id+':product-label:'+item.id+':'+(i+1),
             role:binding.role,
             binding,
             payload:'LABEL '+labelSpec.orderCode+' '+labelSpec.primaryText+' '+labelSpec.pieceLabel,

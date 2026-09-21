@@ -27,53 +27,81 @@ export type PrinterBinding={
   port:number;
   capability:'receipt-80mm/kitchen'|'label-58mm';
   encoding:'gb18030'|'big5'|'utf-8';
+  productIds?:string[];
 };
 
-export const PRINTER_BINDING_KEY='mfk.v2local.printers.v3';
-const LEGACY_PRINTER_BINDING_KEY='mfk.v2local.printers.v2';
+export const PRINTER_BINDING_KEY='mfk.v2local.printers.v4';
+const LEGACY_PRINTER_BINDING_KEYS=['mfk.v2local.printers.v3','mfk.v2local.printers.v2'] as const;
+const RICEBALL_PRODUCT_IDS=['riceball','tuna','pork'];
+const TAKEAWAY_PRODUCT_IDS=['bento','curry','wedges','milkTea','lemonTea'];
+const FIXED_PRODUCT_LABEL_IDS=new Set(['product-label-1','product-label-2']);
 
 const defaults:PrinterBinding[]=[
   {id:'receipt-1',routeKey:'logical.receipt',name:'顧客小票打印機',model:'LAN PRINTER',role:'顧客小票',host:'',port:9100,capability:'receipt-80mm/kitchen',encoding:'gb18030'},
   {id:'production-1',routeKey:'logical.production',name:'製作單打印機',model:'LAN PRINTER',role:'製作單',host:'',port:9100,capability:'receipt-80mm/kitchen',encoding:'gb18030'},
   {id:'packing-1',routeKey:'logical.packing',name:'打包單打印機',model:'LAN PRINTER',role:'打包單',host:'',port:9100,capability:'receipt-80mm/kitchen',encoding:'gb18030'},
-  {id:'product-label-1',routeKey:'logical.product-label',name:'產品標籤打印機',model:'LAN LABEL PRINTER',role:'產品標籤',host:'',port:9100,capability:'label-58mm',encoding:'big5'},
+  {id:'product-label-1',routeKey:'logical.product-label.riceball',name:'飯糰標籤機',model:'LAN LABEL PRINTER',role:'產品標籤',host:'',port:9100,capability:'label-58mm',encoding:'big5',productIds:[...RICEBALL_PRODUCT_IDS]},
+  {id:'product-label-2',routeKey:'logical.product-label.takeaway',name:'外賣標籤機',model:'LAN LABEL PRINTER',role:'產品標籤',host:'',port:9100,capability:'label-58mm',encoding:'big5',productIds:[...TAKEAWAY_PRODUCT_IDS]},
   {id:'bag-label-1',routeKey:'logical.bag-label',name:'袋標籤打印機',model:'LAN LABEL PRINTER',role:'袋標籤',host:'',port:9100,capability:'label-58mm',encoding:'big5'},
 ];
 
 type Section='printing'|'dayclose'|'reports'|'backup';
 
-function migrateStored(value:unknown,{legacy=false}:{legacy?:boolean}={}):PrinterBinding[]{
-  if(!Array.isArray(value))return defaults.map(x=>({...x}));
-  const stored=value.filter(x=>x&&typeof x==='object') as Record<string,unknown>[];
-  return defaults.map(fallback=>{
-    const old=stored.find(x=>String(x.id||'')===fallback.id)
-      ??stored.find(x=>String(x.role||'')===fallback.role);
-    if(!old)return {...fallback};
-    return {
-      ...fallback,
-      name:typeof old.name==='string'&&old.name.trim()?old.name:fallback.name,
-      model:typeof old.model==='string'&&old.model.trim()&&!String(old.model).includes('SUNMI')?String(old.model):fallback.model,
-      host:typeof old.host==='string'?old.host:'',
-      port:Number.isSafeInteger(Number(old.port))&&Number(old.port)>0?Number(old.port):9100,
-      encoding:
-        fallback.capability==='label-58mm'
-          ? (old.encoding==='utf-8'?'utf-8':legacy?'big5':old.encoding==='big5'?'big5':'big5')
-          : (old.encoding==='big5'||old.encoding==='utf-8'?old.encoding:'gb18030'),
-    };
-  });
+function normalizeStoredRow(old:Record<string,unknown>,fallback?:PrinterBinding,legacy=false):PrinterBinding{
+  const capability=(old.capability==='label-58mm'||fallback?.capability==='label-58mm')?'label-58mm':'receipt-80mm/kitchen';
+  const role=(typeof old.role==='string'?old.role:fallback?.role) as PrinterBinding['role'];
+  const id=String(old.id||fallback?.id||'');
+  const routeKey=String(old.routeKey||fallback?.routeKey||'');
+  const defaultProductIds=fallback?.productIds??[];
+  const productIds=role==='產品標籤'
+    ? (Array.isArray(old.productIds)?old.productIds.map(String):[...defaultProductIds])
+    : undefined;
+  return {
+    id,
+    routeKey,
+    name:typeof old.name==='string'&&old.name.trim()?old.name:String(fallback?.name||'LAN PRINTER'),
+    model:typeof old.model==='string'&&old.model.trim()&&!String(old.model).includes('SUNMI')?String(old.model):String(fallback?.model||'LAN PRINTER'),
+    role,
+    host:typeof old.host==='string'?old.host:String(fallback?.host||''),
+    port:Number.isSafeInteger(Number(old.port))&&Number(old.port)>0?Number(old.port):Number(fallback?.port||9100),
+    capability,
+    encoding:capability==='label-58mm'
+      ? (old.encoding==='utf-8'?'utf-8':legacy?'big5':old.encoding==='big5'?'big5':'big5')
+      : (old.encoding==='big5'||old.encoding==='utf-8'?old.encoding:'gb18030'),
+    ...(productIds===undefined?{}:{productIds}),
+  };
 }
+
+function migrateStored(value:unknown,{legacy=false}:{legacy?:boolean}={}):PrinterBinding[]{
+  if(!Array.isArray(value))return defaults.map(x=>({...x,productIds:x.productIds?[...x.productIds]:undefined}));
+  const stored=value.filter(x=>x&&typeof x==='object') as Record<string,unknown>[];
+  const fixed=defaults.map(fallback=>{
+    let old=stored.find(x=>String(x.id||'')===fallback.id);
+    if(!old&&fallback.id==='product-label-1')old=stored.find(x=>String(x.role||'')==='產品標籤');
+    if(!old&&!fallback.id.startsWith('product-label-'))old=stored.find(x=>String(x.role||'')===fallback.role);
+    return old?normalizeStoredRow(old,fallback,legacy):{...fallback,productIds:fallback.productIds?[...fallback.productIds]:undefined};
+  });
+  const fixedIds=new Set(fixed.map(row=>row.id));
+  const extras=stored
+    .filter(row=>String(row.role||'')==='產品標籤'&&!fixedIds.has(String(row.id||'')))
+    .map(row=>normalizeStoredRow(row,undefined,legacy))
+    .filter(row=>row.id&&row.routeKey);
+  return [...fixed,...extras];
+}
+
 function loadPrinters():PrinterBinding[]{
   try{
     const current=JSON.parse(localStorage.getItem(PRINTER_BINDING_KEY)||'null');
     if(current)return migrateStored(current);
-    const legacy=JSON.parse(localStorage.getItem(LEGACY_PRINTER_BINDING_KEY)||'null');
-    if(legacy){
-      const migrated=migrateStored(legacy,{legacy:true});
+    for(const key of LEGACY_PRINTER_BINDING_KEYS){
+      const raw=localStorage.getItem(key);
+      if(!raw)continue;
+      const migrated=migrateStored(JSON.parse(raw),{legacy:true});
       localStorage.setItem(PRINTER_BINDING_KEY,JSON.stringify(migrated));
       return migrated;
     }
-    return defaults.map(x=>({...x}));
-  }catch{return defaults.map(x=>({...x}))}
+    return defaults.map(x=>({...x,productIds:x.productIds?[...x.productIds]:undefined}));
+  }catch{return defaults.map(x=>({...x,productIds:x.productIds?[...x.productIds]:undefined}))}
 }
 function savePrinters(rows:PrinterBinding[]){localStorage.setItem(PRINTER_BINDING_KEY,JSON.stringify(rows))}
 function resultLabel(result:NativeResult|null){return !result?'未測試':result.ok?(result.code||'PASS'):(result.code||'FAIL')}
@@ -100,6 +128,12 @@ function csv(report:ReturnType<typeof buildLocalReport>){
   return '\ufeff'+rows.map(row=>row.map(cell=>'"'+String(cell??'').replace(/"/g,'""')+'"').join(',')).join('\r\n');
 }
 
+function productLabelPurpose(binding:PrinterBinding){
+  if(binding.id==='product-label-1')return '飯糰專用';
+  if(binding.id==='product-label-2')return '外賣專用';
+  return '自訂 Route · 待 Admin 指派商品';
+}
+
 function PrinterPanel(){
   const [printers,setPrinters]=useState<PrinterBinding[]>(loadPrinters);
   const [selected,setSelected]=useState('receipt-1');
@@ -111,6 +145,32 @@ function PrinterPanel(){
     const next=printers.map(p=>p.id===current.id?{...p,...patch}:p);
     setPrinters(next);
     savePrinters(next);
+  };
+  const addProductLabel=()=>{
+    const suffix=Date.now().toString(36);
+    const row:PrinterBinding={
+      id:'product-label-custom-'+suffix,
+      routeKey:'logical.product-label.custom.'+suffix,
+      name:'新增產品標籤機',
+      model:'LAN LABEL PRINTER',
+      role:'產品標籤',
+      host:'',
+      port:9100,
+      capability:'label-58mm',
+      encoding:'big5',
+      productIds:[],
+    };
+    const next=[...printers,row];
+    setPrinters(next);
+    savePrinters(next);
+    setSelected(row.id);
+  };
+  const removeProductLabel=()=>{
+    if(current.role!=='產品標籤'||FIXED_PRODUCT_LABEL_IDS.has(current.id))return;
+    const next=printers.filter(row=>row.id!==current.id);
+    setPrinters(next);
+    savePrinters(next);
+    setSelected('product-label-1');
   };
   const input=()=>({
     endpointId:current.id,host:current.host.trim(),port:Number(current.port),
@@ -130,8 +190,8 @@ function PrinterPanel(){
         if(current.capability==='label-58mm'){
           const bytes=await renderTscRasterLabel({
             orderCode:'MFK TEST',
-            primaryText:current.role,
-            secondaryText:'50×40 · TSC',
+            primaryText:current.name,
+            secondaryText:current.role==='產品標籤'?productLabelPurpose(current):'50×40 · TSC',
             pieceLabel:'1/1',
           });
           result=await printBytesLan({...printer,bytes});
@@ -147,8 +207,11 @@ function PrinterPanel(){
 
   return <section className="more-panel">
     <header className="more-section-heading"><div><span>PHYSICAL PRINT ROUTING</span><h2>打印與設備</h2></div><strong>{window.moreFunNative?'Carrier Bridge 已連接':'Native Bridge 未連接'}</strong></header>
-    <p className="fusion-note">每個邏輯用途由你綁定一部外置實體 Printer。系統唔預設 T2S 內置打印機。</p>
-    <div className="more-tab-row">{printers.map(p=><button key={p.id} type="button" className={p.id===current.id?'active':''} onClick={()=>setSelected(p.id)}>{p.role}</button>)}</div>
+    <p className="fusion-note">每個邏輯用途獨立綁定外置實體 Printer。產品 Label 可以有多條 Route；飯糰同外賣先分開，之後由 Admin 發布商品 → Label Route 設定。</p>
+    <div className="more-tab-row">
+      {printers.map(p=><button key={p.id} type="button" className={p.id===current.id?'active':''} onClick={()=>setSelected(p.id)}>{p.role==='產品標籤'?p.name:p.role}</button>)}
+      <button type="button" onClick={addProductLabel}>＋ 新增產品 Label</button>
+    </div>
     <div className="more-kpis">
       <article><span>Route</span><b>{current.routeKey}</b></article>
       <article><span>實體打印機</span><b>{current.host?current.host+':'+current.port:'未綁定'}</b></article>
@@ -158,11 +221,13 @@ function PrinterPanel(){
     <label className="more-field"><span>Printer IP / Host</span><input inputMode="decimal" placeholder="例如 192.168.1.201" value={current.host} onChange={e=>update({host:e.target.value})}/></label>
     <label className="more-field"><span>Port</span><input inputMode="numeric" value={String(current.port)} onChange={e=>update({port:Number(e.target.value)||0})}/></label>
     <label className="more-field"><span>中文編碼</span><select value={current.encoding} onChange={e=>update({encoding:e.target.value as PrinterBinding['encoding']})}><option value="gb18030">GB18030</option><option value="big5">Big5（標籤預設）</option><option value="utf-8">UTF-8</option></select></label>
+    {current.role==='產品標籤'?<div className="fusion-note"><b>本地用途</b>：{productLabelPurpose(current)}。目前只做 SMT 本地實體綁定；自訂 Route 預設唔自動出產品 Label，避免未有 Admin 商品映射前重覆打印。</div>:null}
     {current.capability==='label-58mm'?<div className="fusion-note"><b>Label Profile</b>：{LABEL_TSC_PROFILE.protocol} · {LABEL_TSC_PROFILE.widthMm}×{LABEL_TSC_PROFILE.heightMm} mm · 上偏移 {LABEL_TSC_PROFILE.topOffset} · 左偏移 {LABEL_TSC_PROFILE.leftOffset} · 行間隔 {LABEL_TSC_PROFILE.lineGap} · 中文以 Bitmap 出紙</div>:null}
     <div className="more-tab-row">
       <button type="button" disabled={Boolean(busy)} onClick={()=>void run('test')}>{busy==='test'?'測試中…':'① 測試連線'}</button>
       <button type="button" className="more-primary" disabled={Boolean(busy)} onClick={()=>void run('print')}>{busy==='print'?'出紙中…':'② 測試出紙'}</button>
       <button type="button" disabled={Boolean(busy)} onClick={()=>void run('save')}>{busy==='save'?'保存中…':'③ 保存綁定'}</button>
+      {current.role==='產品標籤'&&!FIXED_PRODUCT_LABEL_IDS.has(current.id)?<button type="button" disabled={Boolean(busy)} onClick={removeProductLabel}>刪除此自訂 Label</button>:null}
     </div>
     {status[current.id]?<p role="status"><b>{status[current.id]?.ok?'PASS':'FAIL'}：</b>{resultLabel(status[current.id]??null)}</p>:null}
   </section>;
