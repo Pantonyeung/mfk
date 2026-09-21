@@ -5,10 +5,21 @@ const positive = (value, code) => {
   if (!Number.isSafeInteger(value) || value <= 0) throw new Error(code);
   return value;
 };
+const integer = (value, code) => {
+  if (!Number.isSafeInteger(value)) throw new Error(code);
+  return value;
+};
 const nonEmpty = (value, code) => {
   if (typeof value !== 'string' || value.trim().length === 0) throw new Error(code);
   return value.trim();
 };
+const operatorType = (value, code) => {
+  const parsed = integer(value, code);
+  if (![0, 10, 20, 30].includes(parsed)) throw new Error(code);
+  return parsed;
+};
+const optionalInteger = (value, code) => value === undefined || value === null ? undefined : integer(value, code);
+const optionalText = (value, code) => value === undefined || value === null ? undefined : nonEmpty(value, code);
 
 function request(providerOperation, params, extra = {}) {
   return Object.freeze({
@@ -66,7 +77,10 @@ export function buildKeetaOrderCancelShape(input) {
     ...identity(input),
     cancelCode,
     ...(input.cancelReason ? { cancelReason: input.cancelReason } : {}),
-  }, { action: input.action === 'REJECT' ? 'REJECT' : 'CANCEL', translationBoundary: 'EXPLICIT_PROVIDER_CODE_ONLY' });
+  }, {
+    action: input.action === 'REJECT' ? 'REJECT' : 'CANCEL',
+    translationBoundary: 'EXPLICIT_PROVIDER_CODE_ONLY',
+  });
 }
 
 export function buildKeetaOrderReadyShape(input) {
@@ -91,14 +105,42 @@ export function parseKeetaAfterSaleEvidence(envelope) {
     providerOrderId: String(positive(raw.orderViewId, 'KEETA_REFUND_ORDER_VIEW_ID_INVALID')),
     providerShopId: envelope.providerShopId,
     providerMessageId: envelope.messageId,
-    providerRefundStatus: Number.isSafeInteger(raw.status) ? raw.status : (() => { throw new Error('KEETA_REFUND_STATUS_INVALID'); })(),
+    providerRefundStatus: integer(raw.status, 'KEETA_REFUND_STATUS_INVALID'),
     afterSaleOrderId: String(positive(raw.afterSaleOrderId, 'KEETA_REFUND_AFTER_SALE_ID_INVALID')),
     refundAmountMinor: positive(raw.money, 'KEETA_REFUND_AMOUNT_INVALID'),
     isAppeal: raw.isAppeal === 0 || raw.isAppeal === 1 ? raw.isAppeal : (() => { throw new Error('KEETA_REFUND_APPEAL_INVALID'); })(),
     raw: Object.freeze({ ...raw }),
     authorityBoundary: 'PROVIDER_EVIDENCE_NOT_FINANCIAL_REFUND_AUTHORITY',
   };
-  return Object.freeze(base);
+
+  if (envelope.eventId === 1005) {
+    return Object.freeze({
+      ...base,
+      currency: nonEmpty(raw.currency, 'KEETA_REFUND_CURRENCY_INVALID'),
+      applyOperatorType: operatorType(raw.applyOpType, 'KEETA_REFUND_APPLY_OPERATOR_INVALID'),
+      applyReason: nonEmpty(raw.applyReason, 'KEETA_REFUND_APPLY_REASON_INVALID'),
+      handleOperatorType: operatorType(raw.handleOpType, 'KEETA_REFUND_HANDLE_OPERATOR_INVALID'),
+      handleReason: nonEmpty(raw.handleReason, 'KEETA_REFUND_HANDLE_REASON_INVALID'),
+      operationTimeMilliseconds: positive(raw.opTime, 'KEETA_REFUND_OP_TIME_INVALID'),
+    });
+  }
+
+  const currency = optionalText(raw.currency, 'KEETA_PARTIAL_REFUND_CURRENCY_INVALID');
+  const applyOpType = optionalInteger(raw.applyOpType, 'KEETA_PARTIAL_REFUND_APPLY_OPERATOR_INVALID');
+  const applyReason = optionalText(raw.applyReason, 'KEETA_PARTIAL_REFUND_APPLY_REASON_INVALID');
+  const handleOpType = optionalInteger(raw.handleOpType, 'KEETA_PARTIAL_REFUND_HANDLE_OPERATOR_INVALID');
+  const handleReason = optionalText(raw.handleReason, 'KEETA_PARTIAL_REFUND_HANDLE_REASON_INVALID');
+  const opTime = optionalInteger(raw.opTime, 'KEETA_PARTIAL_REFUND_OP_TIME_INVALID');
+
+  return Object.freeze({
+    ...base,
+    ...(currency === undefined ? {} : { currency }),
+    ...(applyOpType === undefined ? {} : { applyOperatorType: applyOpType }),
+    ...(applyReason === undefined ? {} : { applyReason }),
+    ...(handleOpType === undefined ? {} : { handleOperatorType: handleOpType }),
+    ...(handleReason === undefined ? {} : { handleReason }),
+    ...(opTime === undefined ? {} : { operationTimeMilliseconds: opTime }),
+  });
 }
 
 export function presentKeetaAfterSaleStatus(evidence) {
