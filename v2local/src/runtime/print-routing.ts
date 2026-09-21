@@ -34,6 +34,25 @@ export interface PlannedPrintJob{
   readonly labelSpec?:RasterLabelSpec;
 }
 
+export interface TscBitmapJobBatch{
+  readonly binding:PrintBinding;
+  readonly jobs:readonly PlannedPrintJob[];
+}
+
+export function groupTscBitmapJobsByBinding(plan:readonly PlannedPrintJob[]):readonly TscBitmapJobBatch[]{
+  const groups=new Map<string,{binding:PrintBinding;jobs:PlannedPrintJob[]}>();
+  for(const job of plan){
+    if(job.renderMode!=='tsc-bitmap'||!job.labelSpec)continue;
+    const existing=groups.get(job.binding.id);
+    if(existing)existing.jobs.push(job);
+    else groups.set(job.binding.id,{binding:job.binding,jobs:[job]});
+  }
+  return Object.freeze([...groups.values()].map(group=>Object.freeze({
+    binding:group.binding,
+    jobs:Object.freeze([...group.jobs]),
+  })));
+}
+
 const money=(minor:number)=>'$'+(Math.max(0,Number(minor)||0)/100).toFixed(2);
 const clean=(value:string)=>String(value??'').replace(/[\r\n]+/g,' ').trim();
 
