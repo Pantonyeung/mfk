@@ -29,6 +29,27 @@ describe('MFK Admin catalog migration slice',()=>{
     expect(html).not.toContain('Live Mutation');
   });
 
+
+  it('routes business-day and logical print configuration to real policy workspaces',()=>{
+    const businessDay=renderToStaticMarkup(
+      <MemoryRouter initialEntries={['/admin/business-day']}>
+        <MfkAdminApp/>
+      </MemoryRouter>,
+    );
+    expect(businessDay).toContain('營業日／交更');
+    expect(businessDay).toContain('每日分界時間');
+    expect(businessDay).toContain('Publish 未接駁');
+
+    const print=renderToStaticMarkup(
+      <MemoryRouter initialEntries={['/admin/print']}>
+        <MfkAdminApp/>
+      </MemoryRouter>,
+    );
+    expect(print).toContain('打印中心');
+    expect(print).toContain('新增 Logical Printer');
+    expect(print).toContain('NOT_WIRED');
+  });
+
   it('validates required category/product/modifier/combo structure without pricing execution',()=>{
     const invalid:AdminSessionDraft={
       categories:[{id:'category-001',name:'',position:10,active:true}],
