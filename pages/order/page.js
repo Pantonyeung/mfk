@@ -29,11 +29,8 @@ function supplyStatus(product){return supplyOverrides[product.id]?.status||(prod
 function supplyLabel(status){return status==='soldout'?'今日售罄':status==='paused'?'暫停供應':'供應中';}
 function sortPausedLast(items){return items.map((item,index)=>({item,index})).sort((a,b)=>Number(supplyStatus(a.item)==='paused')-Number(supplyStatus(b.item)==='paused')||a.index-b.index).map(row=>row.item);}
 let confirmState=null;
-let newOrderNotice={id:'A516',source:'磨飯 App',items:3,amount:104,visible:true};
-const demoPendingOrders={
-  online:[{id:'A512',source:'磨飯 App',contact:'陳小姐',phone:'85291234567',items:5,amount:168,wait:'2 分鐘',paymentStatus:'已付款，待核對',paymentMethod:'FPS',proof:'../../assets/products/f4.webp',lines:[['蜜糖雞絲＋鹽酥雞',2,90],['台式奶茶',2,32],['香脆雞翼',1,18]]},{id:'W331',source:'網頁',contact:'梁先生',phone:'85262345678',items:3,amount:62,wait:'1 分鐘',paymentStatus:'已付款，待核對',paymentMethod:'PayMe',proof:'../../assets/products/f1.webp',lines:[['原味紫米飯團',1,41],['味噌湯',1,12],['可樂',1,9]]}],
-  queue:[{id:'T1824',source:'電話',contact:'電話尾號 1824',phone:'85261231824',items:2,amount:96,wait:'4 分鐘',paymentStatus:'等候客人付款證明',paymentMethod:'待確認',proof:'',lines:[['自選便當',2,96]]},{id:'T6631',source:'WhatsApp',contact:'WhatsApp 尾號 6631',phone:'85261236631',items:1,amount:59,wait:'6 分鐘',paymentStatus:'等候客人付款證明',paymentMethod:'FPS',proof:'',lines:[['紫米飯團 A 餐',1,59]]}]
-};
+let newOrderNotice={id:'',source:'',items:0,amount:0,visible:false};
+const demoPendingOrders={online:[],queue:[]};
 
 const saved=readJSON(ORDER_STORAGE_KEY,null);
 const savedSettings=readJSON(SETTINGS_STORAGE_KEY,{});
@@ -638,11 +635,11 @@ async function bootstrapLiveMenu(){
     if(!categories.includes(state.category))state.category='全部';
     const existing=state.settings.quickDrinks.order||[];
     state.settings.quickDrinks.order=[...existing.filter(id=>drinkMap.has(id)),...drinks.map(item=>item.id).filter(id=>!existing.includes(id))];
-    state.health.catalog={ok:catalog.source!=='fallback',label:'餐牌',detail:catalog.source==='firebase'?'已連接 Firebase 餐牌來源':catalog.source==='cache'?'離線模式：使用上次餐牌':'Firebase 未連接：使用內置後備餐牌'};
-    state.health.sync={...state.health.sync,detail:catalog.source==='firebase'?'餐牌同步正常':'餐牌等待重新連線'};
+    state.health.catalog={ok:true,label:'餐牌',detail:'LOCAL ONLY · 本機餐牌'};
+    state.health.sync={ok:true,label:'本機',detail:'無網絡依賴'};
     return state;
   });
-  showToast(catalog.source==='firebase'?'餐牌已同步':catalog.source==='cache'?'網絡未連接，已載入上次餐牌':'Firebase 未連接，現正使用後備餐牌');
+  showToast('本機餐牌已載入');
 }
 bootstrapLiveMenu().catch(error=>{console.error('MENU_BOOTSTRAP_FAILED',error);showToast('餐牌連接失敗，已保留本機點單');});
 setTimeout(()=>{if(newOrderNotice?.visible){newOrderNotice.visible=false;render();}},3000);
