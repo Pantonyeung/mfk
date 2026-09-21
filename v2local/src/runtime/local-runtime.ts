@@ -16,7 +16,7 @@ export interface SmtAvailabilityNodeViewModel{readonly nodeId:string;readonly la
 export interface SmtAvailabilityProjection{readonly revision:number;readonly nodes:readonly SmtAvailabilityNodeViewModel[];readonly canChange:boolean}
 
 export interface StoredOrder{
-  id:string;display:string;createdAt:string;totalMinor:number;paymentLabel:string;fulfillmentLabel:'待處理'|'進行中'|'可取餐'|'已完成';sourceLabel:string;
+  id:string;display:string;createdAt:string;totalMinor:number;paymentLabel:string;fulfillmentLabel:'待處理'|'進行中'|'可取餐'|'已完成'|'已取消';sourceLabel:string;
   items:readonly {id:string;name:string;qty:number;unitMinor:number}[];
 }
 interface Persisted{orders:StoredOrder[];availability:Record<string,SmtAvailabilityStatus>}
@@ -54,6 +54,8 @@ export interface CleanSmtCoreRuntimePort{
   printOrderOutputs?(orderId:string):Promise<PrintDispatchSummary>;
   readOrderReprintOptions?(orderId:string):Promise<readonly SmtReprintOption[]>;
   reprintOrderJobs?(orderId:string,jobIds:readonly string[]):Promise<PrintDispatchSummary>;
+  updateOrderItems?(orderId:string,items:readonly {id:string;name:string;qty:number;unitMinor:number}[]):Promise<{readonly orderId:string;readonly totalMinor:number}>;
+  cancelOrder?(orderId:string):Promise<{readonly orderId:string;readonly status:'CANCELLED'}>;
   readDining?(selectedSessionId?:string):Promise<SmtDiningProjection>;
   readAvailability?():Promise<SmtAvailabilityProjection>;
   setAvailability?(nodeId:string,status:SmtAvailabilityStatus,expectedRevision:number):Promise<SmtAvailabilityProjection>;
@@ -99,6 +101,8 @@ export interface MfkLocalRuntime extends CleanSmtCoreRuntimePort{
   printOrderOutputs(orderId:string):Promise<PrintDispatchSummary>;
   readOrderReprintOptions(orderId:string):Promise<readonly SmtReprintOption[]>;
   reprintOrderJobs(orderId:string,jobIds:readonly string[]):Promise<PrintDispatchSummary>;
+  updateOrderItems(orderId:string,items:readonly {id:string;name:string;qty:number;unitMinor:number}[]):Promise<{readonly orderId:string;readonly totalMinor:number}>;
+  cancelOrder(orderId:string):Promise<{readonly orderId:string;readonly status:'CANCELLED'}>;
   clear():void;
 }
 
@@ -360,6 +364,27 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
     if(!order)throw new Error('ORDER_NOT_FOUND');
     if(!jobIds.length)throw new Error('REPRINT_SELECTION_REQUIRED');
     return dispatchOrderOutputs(order,new Set(jobIds),true);
+  },
+  async updateOrderItems(orderId,items){
+    const order=data.orders.find(x=>x.id===orderId);
+    if(!order)throw new Error('ORDER_NOT_FOUND');
+    if(order.fulfillmentLabel==='已取消'||order.fulfillmentLabel==='已完成')throw new Error('ORDER_NOT_EDITABLE');
+    const normalized=items
+      .map(item=>({...item,qty:Math.max(0,Math.floor(Number(item.qty)||0)),unitMinor:Math.max(0,Math.floor(Number(item.unitMinor)||0))}))
+      .filter(item=>item.qty>0);
+    if(!normalized.length)throw new Error('ORDER_ITEMS_REQUIRED');
+    const totalMinor=normalized.reduce((sum,item)=>sum+item.qty*item.unitMinor,0);
+    data={...data,orders:data.orders.map(current=>current.id===orderId?{...current,items:normalized,totalMinor}:current)};
+    save();
+    return {orderId,totalMinor};
+  },
+  async cancelOrder(orderId){
+    const order=data.orders.find(x=>x.id===orderId);
+    if(!order)throw new Error('ORDER_NOT_FOUND');
+    if(order.fulfillmentLabel==='已完成')throw new Error('COMPLETED_ORDER_CANNOT_CANCEL');
+    data={...data,orders:data.orders.map(current=>current.id===orderId?{...current,fulfillmentLabel:'已取消'}:current)};
+    save();
+    return {orderId,status:'CANCELLED'};
   },
   async printOrderReceipt(orderId){
     const order=data.orders.find(x=>x.id===orderId);
