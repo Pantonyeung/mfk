@@ -33,9 +33,11 @@ jobs:
           ! grep -RInE 'https?://' v2local/src
           grep -F 'SMT_GOLDEN_WIDTH=1920' v2local/src/app/production-viewport-layout.ts
           grep -F 'SMT_GOLDEN_HEIGHT=1080' v2local/src/app/production-viewport-layout.ts
-          grep -F "print.sunmi.test" v2local/src/runtime/native-print.ts
+          ! grep -RInF "print.sunmi." v2local/src
+          grep -F "print.lan.endpoint.apply" v2local/src/runtime/native-print.ts
           grep -F "print.lan.endpoint.test" v2local/src/runtime/native-print.ts
           grep -F "print.lan.dispatch" v2local/src/runtime/native-print.ts
+          grep -F "RECEIPT_PRINTER_NOT_BOUND" v2local/src/runtime/local-runtime.ts
       - name: Static bundle proof
         shell: bash
         run: |
