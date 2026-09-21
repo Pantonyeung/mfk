@@ -89,6 +89,42 @@ const EMPTY:AdminSessionDraft=Object.freeze({
 const AdminDraftContext=createContext<AdminDraftContextValue|null>(null);
 const nextId=(prefix:string,count:number)=>prefix+'-'+String(count+1).padStart(3,'0');
 
+export function validateAdminDraft(draft:AdminSessionDraft){
+  const errors:string[]=[];
+  const categoryIds=new Set(draft.categories.map(row=>row.id));
+  const categoryNames=new Set<string>();
+  for(const category of draft.categories){
+    const name=category.name.trim();
+    if(!name)errors.push('分類 '+category.id+' 未填名稱');
+    if(name&&categoryNames.has(name))errors.push('分類名稱重複：'+name);
+    categoryNames.add(name);
+  }
+  for(const product of draft.products){
+    if(!product.name.trim())errors.push('商品 '+product.id+' 未填名稱');
+    if(!product.categoryId||!categoryIds.has(product.categoryId))errors.push('商品 '+(product.name||product.id)+' 未選有效分類');
+    if(product.basePrice.trim()&&Number.isNaN(Number(product.basePrice)))errors.push('商品 '+(product.name||product.id)+' 基本價格式錯誤');
+    if(product.takeawayAdjustment.trim()&&Number.isNaN(Number(product.takeawayAdjustment)))errors.push('商品 '+(product.name||product.id)+' 外賣調整格式錯誤');
+  }
+  for(const group of draft.modifierGroups){
+    if(!group.name.trim())errors.push('選項組 '+group.id+' 未填名稱');
+    if(group.min<0||group.max<group.min)errors.push('選項組 '+(group.name||group.id)+' Min / Max 無效');
+    if(group.required&&group.min<1)errors.push('必選組 '+(group.name||group.id)+' Min 必須至少 1');
+    for(const option of group.options){
+      if(!option.name.trim())errors.push('選項 '+option.id+' 未填名稱');
+      if(option.priceAdjustment.trim()&&Number.isNaN(Number(option.priceAdjustment)))errors.push('選項 '+(option.name||option.id)+' 價格調整格式錯誤');
+    }
+  }
+  for(const combo of draft.combos){
+    if(!combo.name.trim())errors.push('套餐 '+combo.id+' 未填名稱');
+    if(combo.basePrice.trim()&&Number.isNaN(Number(combo.basePrice)))errors.push('套餐 '+(combo.name||combo.id)+' 基本價格式錯誤');
+    for(const section of combo.sections){
+      if(!section.name.trim())errors.push('套餐區段 '+section.id+' 未填名稱');
+      if(section.min<0||section.max<section.min)errors.push('套餐區段 '+(section.name||section.id)+' Min / Max 無效');
+    }
+  }
+  return errors;
+}
+
 export function AdminDraftProvider({children}:{children:ReactNode}){
   const [draft,setDraft]=useState<AdminSessionDraft>(EMPTY);
   const [dirty,setDirty]=useState(false);
@@ -229,38 +265,7 @@ export function AdminDraftProvider({children}:{children:ReactNode}){
   }));
 
   const validate=()=>{
-    const errors:string[]=[];
-    const categoryIds=new Set(draft.categories.map(row=>row.id));
-    const categoryNames=new Set<string>();
-    for(const category of draft.categories){
-      const name=category.name.trim();
-      if(!name)errors.push('分類 '+category.id+' 未填名稱');
-      if(name&&categoryNames.has(name))errors.push('分類名稱重複：'+name);
-      categoryNames.add(name);
-    }
-    for(const product of draft.products){
-      if(!product.name.trim())errors.push('商品 '+product.id+' 未填名稱');
-      if(!product.categoryId||!categoryIds.has(product.categoryId))errors.push('商品 '+(product.name||product.id)+' 未選有效分類');
-      if(product.basePrice.trim()&&Number.isNaN(Number(product.basePrice)))errors.push('商品 '+(product.name||product.id)+' 基本價格式錯誤');
-      if(product.takeawayAdjustment.trim()&&Number.isNaN(Number(product.takeawayAdjustment)))errors.push('商品 '+(product.name||product.id)+' 外賣調整格式錯誤');
-    }
-    for(const group of draft.modifierGroups){
-      if(!group.name.trim())errors.push('選項組 '+group.id+' 未填名稱');
-      if(group.min<0||group.max<group.min)errors.push('選項組 '+(group.name||group.id)+' Min / Max 無效');
-      if(group.required&&group.min<1)errors.push('必選組 '+(group.name||group.id)+' Min 必須至少 1');
-      for(const option of group.options){
-        if(!option.name.trim())errors.push('選項 '+option.id+' 未填名稱');
-        if(option.priceAdjustment.trim()&&Number.isNaN(Number(option.priceAdjustment)))errors.push('選項 '+(option.name||option.id)+' 價格調整格式錯誤');
-      }
-    }
-    for(const combo of draft.combos){
-      if(!combo.name.trim())errors.push('套餐 '+combo.id+' 未填名稱');
-      if(combo.basePrice.trim()&&Number.isNaN(Number(combo.basePrice)))errors.push('套餐 '+(combo.name||combo.id)+' 基本價格式錯誤');
-      for(const section of combo.sections){
-        if(!section.name.trim())errors.push('套餐區段 '+section.id+' 未填名稱');
-        if(section.min<0||section.max<section.min)errors.push('套餐區段 '+(section.name||section.id)+' Min / Max 無效');
-      }
-    }
+    const errors=validateAdminDraft(draft);
     setValidationErrors(errors);
     return errors;
   };
