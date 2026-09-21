@@ -1,6 +1,6 @@
 import {describe,expect,it} from 'vitest';
 import {encodePrinterText} from './printer-encoding.ts';
-import {decorateEscPosTicket,ESC_POS_DRAWER_PULSE,ESC_POS_FULL_CUT} from './native-print.ts';
+import {decorateEscPosTicket,ESC_POS_DRAWER_PULSE,ESC_POS_FULL_CUT,ESC_POS_BEEP} from './native-print.ts';
 
 function hex(bytes:Uint8Array){return Array.from(bytes).map(v=>v.toString(16).padStart(2,'0')).join('')}
 
@@ -16,8 +16,9 @@ describe('printer encoding',()=>{
   });
   it('adds cash drawer pulse before a cash receipt and full cut after the ticket',()=>{
     const body=new Uint8Array([0x41,0x42]);
-    const bytes=decorateEscPosTicket(body,{kickDrawer:true,cutAfter:true});
+    const bytes=decorateEscPosTicket(body,{kickDrawer:true,cutAfter:true,beepAfter:true});
     expect(Array.from(bytes.slice(0,ESC_POS_DRAWER_PULSE.length))).toEqual(Array.from(ESC_POS_DRAWER_PULSE));
-    expect(Array.from(bytes.slice(-ESC_POS_FULL_CUT.length))).toEqual(Array.from(ESC_POS_FULL_CUT));
+    expect(Array.from(bytes.slice(-(ESC_POS_FULL_CUT.length+ESC_POS_BEEP.length),-ESC_POS_BEEP.length))).toEqual(Array.from(ESC_POS_FULL_CUT));
+    expect(Array.from(bytes.slice(-ESC_POS_BEEP.length))).toEqual(Array.from(ESC_POS_BEEP));
   });
 });
