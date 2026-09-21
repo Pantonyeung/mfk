@@ -20,12 +20,14 @@ export function App(){
   const [moreTool,setMoreTool]=useState<'sellability'|'business'|'reporting'|'printing'|'diagnostics'|'capabilities'|null>(null);
   const [orderSegment,setOrderSegment]=useState<'active'|'history'>('active');
   const [query,setQuery]=useState('');
+  const [sourceFilter,setSourceFilter]=useState('全部');
 
   const visibleProducts=products.filter(p=>category==='人氣'?p.category==='人氣'||p.id==='p2':p.category===category);
   const visibleOrders=orderRows.filter(row=>{
     const segmentOk=orderSegment==='active'?row.status!=='已完成':row.status==='已完成';
     const queryOk=!query||[row.code,row.source,row.status].join(' ').toLowerCase().includes(query.toLowerCase());
-    return segmentOk&&queryOk;
+    const sourceOk=sourceFilter==='全部'||row.source===sourceFilter;
+    return segmentOk&&queryOk&&sourceOk;
   });
 
   const showNotWired=(label:string)=>{
@@ -73,7 +75,7 @@ export function App(){
     <section className="stage">
       {view==='order'?<OrderView category={category} setCategory={setCategory} visibleProducts={visibleProducts} chooseProduct={chooseProduct} cart={cart} openCart={()=>setCartOpen(true)}/>:null}
       {view==='work'?<WorkView onAction={showNotWired}/>:null}
-      {view==='orders'?<OrdersView segment={orderSegment} setSegment={setOrderSegment} query={query} setQuery={setQuery} rows={visibleOrders} onAction={showNotWired}/>:null}
+      {view==='orders'?<OrdersView segment={orderSegment} setSegment={setOrderSegment} query={query} setQuery={setQuery} sourceFilter={sourceFilter} setSourceFilter={setSourceFilter} rows={visibleOrders} onAction={showNotWired}/>:null}
       {view==='dine'?<DineView onAction={showNotWired}/>:null}
       {view==='more'?<MoreView tool={moreTool} setTool={setMoreTool} onAction={showNotWired}/>:null}
     </section>
@@ -107,11 +109,12 @@ function WorkView({onAction}:{onAction:(s:string)=>void}){
   </section>;
 }
 
-function OrdersView({segment,setSegment,query,setQuery,rows,onAction}:{segment:'active'|'history';setSegment:(v:'active'|'history')=>void;query:string;setQuery:(v:string)=>void;rows:typeof orderRows;onAction:(s:string)=>void}){
+function OrdersView({segment,setSegment,query,setQuery,sourceFilter,setSourceFilter,rows,onAction}:{segment:'active'|'history';setSegment:(v:'active'|'history')=>void;query:string;setQuery:(v:string)=>void;sourceFilter:string;setSourceFilter:(v:string)=>void;rows:typeof orderRows;onAction:(s:string)=>void}){
   return <section className="page">
     <header className="hero"><div><span>訂單</span><h1>Result / Readback</h1><small>UI projection only；UNKNOWN 會保留，不會當 FAILED。</small></div><div className="hero-count"><b>{rows.length}</b><small>張</small></div></header>
     <div className="segmented"><button className={segment==='active'?'active':''} onClick={()=>setSegment('active')}>進行中</button><button className={segment==='history'?'active':''} onClick={()=>setSegment('history')}>歷史</button></div>
     <label className="search"><span>搜尋</span><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="訂單號／來源／狀態"/></label>
+    <div className="source-filter" aria-label="訂單來源">{['全部','Keeta','現場','自家客戶端','電話'].map(source=><button key={source} className={sourceFilter===source?'active':''} onClick={()=>setSourceFilter(source)}>{source}</button>)}</div>
     <div className="cards">{rows.map(row=><article className="order-card" key={row.code}><div className="order-head"><div><small>{row.time} · {row.source}</small><h2>#{row.code}</h2></div><span className={`status ${row.readback==='UNKNOWN'?'unknown':row.readback==='PARTIAL'?'warning':'positive'}`}>{row.readback}</span></div><div className="order-meta"><span>{row.status}</span><b>{row.amount}</b><span>{row.items}</span></div>{row.note?<p>備註：{row.note}</p>:null}<div className="order-actions"><button onClick={()=>onAction('完成／交收')}>完成</button><button className="danger" onClick={()=>onAction('取消訂單')}>取消</button><button onClick={()=>onAction('重新 Readback')}>重新確認</button></div></article>)}</div>
   </section>;
 }
