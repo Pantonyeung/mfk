@@ -31,6 +31,7 @@ const c=(id:string,label:string,path:string,status:CapabilityStatus,owner:MfkAdm
 export const ADMIN_CAPABILITY_GROUPS:readonly AdminCapabilityGroup[]=[
   {id:'overview',label:'首頁',capabilities:[
     c('overview','營運總覽','/admin/overview','NOT_WIRED','REPORTING','顯示 MFK 營運摘要、Readiness 同需要處理嘅事項。'),
+    c('publish-center','發布中心','/admin/publish','NOT_WIRED','ADMIN_CONFIG','集中顯示 Draft、Validate、Pending Changes、Publish 同 Active Revision readback。'),
   ]},
   {id:'operations',label:'營運',capabilities:[
     c('open-orders','進行中訂單','/admin/orders/open','NOT_WIRED','STORE_READ_MODEL','只讀正式 Order / Fulfillment 狀態。'),
@@ -57,6 +58,7 @@ export const ADMIN_CAPABILITY_GROUPS:readonly AdminCapabilityGroup[]=[
   {id:'print',label:'打印',capabilities:[
     c('print-center','打印中心','/admin/print','NOT_WIRED','PRINT_LOGICAL','管理 Logical Printer、Capability 同 routing policy。'),
     c('print-templates','打印模板中心','/admin/print/templates','NOT_WIRED','PRINT_LOGICAL','管理票據模板同輸出規則；實體裝置執行留喺 SMT。'),
+    c('print-rules','商品／堂食打印規則','/admin/print/rules','NOT_WIRED','PRINT_LOGICAL','管理 Product output flags、堂食打印旗標同 logical route policy。'),
   ]},
   {id:'channels',label:'平台',capabilities:[
     c('channel-overview','平台管理','/admin/channels','NOT_WIRED','CHANNEL','管理平台狀態、政策同配置入口。'),
@@ -66,6 +68,7 @@ export const ADMIN_CAPABILITY_GROUPS:readonly AdminCapabilityGroup[]=[
     c('mapping-failure','匹配失敗明細','/admin/channels/mapping-failure','NOT_WIRED','CHANNEL','顯示 mapping exceptions 同待處理項。'),
     c('accept-policy','接單／自動接單','/admin/channels/accept-policy','NOT_WIRED','CHANNEL','管理 intake policy。'),
     c('sync-policy','售罄／供應同步','/admin/channels/sync-policy','NOT_WIRED','CHANNEL','管理渠道供應同步政策。'),
+    c('settlement','Settlement／對帳','/admin/channels/settlement','NOT_WIRED','CHANNEL','顯示 provider supplied settlement facts 同 reconciliation 差異；唔自行改寫 provider truth。'),
   ]},
   {id:'members',label:'會員',capabilities:[
     c('members','Customer 360','/admin/members/customer360','DEFERRED','REPORTING','保留 Customer 360 管理入口。'),
@@ -79,6 +82,7 @@ export const ADMIN_CAPABILITY_GROUPS:readonly AdminCapabilityGroup[]=[
   ]},
   {id:'store',label:'門店',capabilities:[
     c('store-settings','門店設定','/admin/store/settings','NOT_WIRED','ADMIN_CONFIG','管理 Owner 決定嘅 Store config。'),
+    c('quick-reasons','快捷原因','/admin/store/quick-reasons','NOT_WIRED','ADMIN_CONFIG','管理 Tender Correction、Reprint 等可重用快捷原因；原因保持 optional / non-blocking。'),
     c('staff','員工／權限','/admin/staff','NOT_WIRED','AUTH','管理員工、角色、scope 同後台授權設定。'),
     c('announcement','公告／通知','/admin/store/announcements','DEFERRED','ADMIN_CONFIG','保留公告／通知配置。'),
   ]},
