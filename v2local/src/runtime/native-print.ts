@@ -64,24 +64,24 @@ export async function sendNative(type:string,expected:readonly string[],extra:Re
   });
 }
 
-export async function applyLanPrinter(input:{endpointId:string;host:string;port:number;displayName:string;model:string;capability:'receipt-80mm/kitchen'|'label-58mm'}){
+export interface LanPrinterInput{
+  endpointId:string;
+  host:string;
+  port:number;
+  displayName:string;
+  model:string;
+  capability:'receipt-80mm/kitchen'|'label-58mm';
+}
+
+export async function applyLanPrinter(input:LanPrinterInput){
   return sendNative('print.lan.endpoint.apply',['print.lan.endpoint.apply.result'],input);
 }
-export async function testLanPrinter(input:{endpointId:string;host:string;port:number;displayName:string;model:string;capability:'receipt-80mm/kitchen'|'label-58mm'}){
+export async function testLanPrinter(input:LanPrinterInput){
   const applied=await applyLanPrinter(input);
   if(!applied.ok)return applied;
   return sendNative('print.lan.endpoint.test',['print.lan.endpoint.test.completed'],{endpointId:input.endpointId},8000);
 }
-export async function testInternalPrinter(){
-  return sendNative('print.sunmi.test',['print.sunmi.test.result'],{},5000);
-}
-export async function printTextInternal(text:string){
-  return sendNative('print.sunmi.dispatch',['print.sunmi.dispatch.completed'],{
-    dispatchAttemptId:requestId('mfk-v2-sunmi'),
-    payloadBase64:toBase64('\x1b\x40'+text+'\n\n\n')
-  },10000);
-}
-export async function printTextLan(input:{endpointId:string;host:string;port:number;displayName:string;model:string;capability:'receipt-80mm/kitchen'|'label-58mm';text:string}){
+export async function printTextLan(input:LanPrinterInput&{text:string}){
   const applied=await applyLanPrinter(input);
   if(!applied.ok)return applied;
   return sendNative('print.lan.dispatch',['print.lan.dispatch.completed'],{
