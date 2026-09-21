@@ -99,25 +99,45 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
   };
   useEffect(()=>{void refreshAdminMenu();},[]);
 
+  const adminCategoryNameById=useMemo(()=>{
+    const map=new Map<string,string>();
+    for(const item of menuState.readback?.categories??[])map.set(item.categoryId,item.name);
+    return map;
+  },[menuState.readback]);
+
   const menuProducts:readonly Product[]=useMemo(()=>{
     if(!menuState.readback)return FROZEN_PRODUCTS;
     return menuState.readback.products.map(remote=>{
-      const local=FROZEN_PRODUCTS.find(item=>item.id===remote.id)||FROZEN_PRODUCTS.find(item=>item.name===remote.name);
+      const local=FROZEN_PRODUCTS.find(item=>item.id===remote.productId)||FROZEN_PRODUCTS.find(item=>item.name===remote.name);
+      const primaryCategoryId=remote.categoryMemberships[0]?.categoryId;
+      const category=(primaryCategoryId&&adminCategoryNameById.get(primaryCategoryId))||local?.category||'其他';
       return {
-        id:local?.id??('admin:'+remote.id),
-        category:remote.category||local?.category||'其他',
+        id:local?.id??('admin:'+remote.productId),
+        category,
         name:remote.name,
         priceMinor:local?.priceMinor??0,
         priceReady:Boolean(local),
         ...(remote.imageRef?{imageRef:remote.imageRef}:{}),
       };
     });
-  },[menuState.readback]);
+  },[menuState.readback,adminCategoryNameById]);
 
-  const categories=[
-    {id:'all',label:'熱門'},
-    ...[...new Set(menuProducts.map(product=>product.category).filter(Boolean))].map(label=>({id:label,label})),
-  ];
+  const categories=useMemo(()=>{
+    if(!menuState.readback){
+      return [
+        {id:'all',label:'熱門'},
+        ...[...new Set(FROZEN_PRODUCTS.map(product=>product.category))].map(label=>({id:label,label})),
+      ];
+    }
+    const used=new Set(menuProducts.map(product=>product.category));
+    const ordered=menuState.readback.categories
+      .slice()
+      .sort((a,b)=>a.position-b.position||a.categoryId.localeCompare(b.categoryId))
+      .map(item=>item.name)
+      .filter(name=>used.has(name));
+    const remaining=[...used].filter(name=>!ordered.includes(name)).sort();
+    return [{id:'all',label:'熱門'},...[...ordered,...remaining].map(label=>({id:label,label}))];
+  },[menuState.readback,menuProducts]);
   const visible=menuProducts.filter(product=>category==='all'||product.category===category);
 
   const runtimeOrders=useMemo(()=>{void runtimeRevision;return localRuntime.orders();},[runtimeRevision]);
@@ -156,7 +176,7 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
       ...(!product.priceReady?{badge:'Admin 新商品'}:{}),
     })),
     menuStatusLabel:menuState.readback
-      ?(menuState.tone==='canonical'?'LIVE':'CACHE')+' · '+menuState.readback.catalogVersion+' · '+menuState.readback.products.length+' 件'
+      ?(menuState.tone==='canonical'?'LIVE':'CACHE')+' · '+menuState.readback.catalogRevision+' · '+menuState.readback.products.length+' 件'
       :'本地 Frozen R12 · Admin Menu 未連',
     menuStatusTone:menuState.tone,
     menuRefreshBusy,
