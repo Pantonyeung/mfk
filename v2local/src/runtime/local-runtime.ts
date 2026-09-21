@@ -1,4 +1,5 @@
 import {printTextLan} from './native-print.ts';
+import {buildOrderPrintPlan,type PrintBinding} from './print-routing.ts';
 
 export interface SmtOperationalMetric{readonly id:string;readonly label:string;readonly value:string;readonly detail?:string}
 export interface SmtOrderListItemViewModel{readonly orderId:string;readonly orderIdLabel:string;readonly itemCount:number;readonly totalLabel:string;readonly paymentLabel:string;readonly fulfillmentLabel:string;readonly sourceLabel?:string;readonly localSequenceLabel?:string}
@@ -37,14 +38,78 @@ export interface CleanSmtCoreRuntimePort{
   readOrders?(selectedOrderId?:string):Promise<SmtOrdersProjection>;
   markOrderReady?(orderId:string):Promise<{readonly orderId:string;readonly canonicalRevision:number;readonly status:'READY'}>;
   printOrderReceipt?(orderId:string):Promise<{readonly printJobId:string;readonly state:string}>;
+  printOrderOutputs?(orderId:string):Promise<PrintDispatchSummary>;
   readDining?(selectedSessionId?:string):Promise<SmtDiningProjection>;
   readAvailability?():Promise<SmtAvailabilityProjection>;
   setAvailability?(nodeId:string,status:SmtAvailabilityStatus,expectedRevision:number):Promise<SmtAvailabilityProjection>;
 }
+export interface PrintDispatchResult{readonly jobId:string;readonly role:string;readonly ok:boolean;readonly code:string}
+export interface PrintDispatchSummary{
+  readonly orderId:string;
+  readonly planned:number;
+  readonly sent:number;
+  readonly failed:number;
+  readonly results:readonly PrintDispatchResult[];
+}
 export interface MfkLocalRuntime extends CleanSmtCoreRuntimePort{
   createOrder(input:{items:readonly {id:string;name:string;qty:number;unitMinor:number}[];totalMinor:number;paymentLabel:string;sourceLabel?:string}):StoredOrder;
   orders():readonly StoredOrder[];
+  printOrderOutputs(orderId:string):Promise<PrintDispatchSummary>;
   clear():void;
+}
+
+function readPrinterBindings():PrintBinding[]{
+  try{
+    const value=JSON.parse(localStorage.getItem(PRINTER_BINDING_KEY)||'[]');
+    if(!Array.isArray(value))return [];
+    return value
+      .filter(row=>row&&typeof row==='object')
+      .map(row=>({
+        id:String(row.id||''),
+        routeKey:String(row.routeKey||''),
+        name:String(row.name||'LAN PRINTER'),
+        model:String(row.model||'LAN PRINTER'),
+        role:String(row.role||'') as PrintBinding['role'],
+        host:String(row.host||''),
+        port:Number(row.port)||9100,
+        capability:(row.capability==='label-58mm'?'label-58mm':'receipt-80mm/kitchen') as PrintBinding['capability'],
+      }))
+      .filter(row=>row.id&&['顧客小票','製作單','打包單','產品標籤','袋標籤'].includes(row.role));
+  }catch{return []}
+}
+
+async function dispatchOrderOutputs(order:StoredOrder):Promise<PrintDispatchSummary>{
+  const plan=buildOrderPrintPlan(order,readPrinterBindings());
+  const results:PrintDispatchResult[]=[];
+  for(const job of plan){
+    const binding=job.binding;
+    let ok=false;
+    let code='PRINT_FAILED';
+    try{
+      const result=await printTextLan({
+        endpointId:binding.id,
+        host:binding.host.trim(),
+        port:Number(binding.port)||9100,
+        displayName:binding.name,
+        model:binding.model,
+        capability:binding.capability,
+        text:job.payload,
+      });
+      ok=result.ok;
+      code=result.code|| (result.ok?'SENT':'PRINT_FAILED');
+    }catch(error){
+      code=error instanceof Error?error.message:'PRINT_FAILED';
+    }
+    results.push({jobId:job.id,role:job.role,ok,code});
+  }
+  const sent=results.filter(result=>result.ok).length;
+  return Object.freeze({
+    orderId:order.id,
+    planned:plan.length,
+    sent,
+    failed:plan.length-sent,
+    results:Object.freeze(results.map(result=>Object.freeze(result))),
+  });
 }
 
 const productNames:Record<string,string>={
@@ -94,24 +159,21 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
     data={...data,orders:data.orders.map(x=>x.id===orderId?{...x,fulfillmentLabel:'可取餐'}:x)};save();
     return {orderId,canonicalRevision:Date.now(),status:'READY'};
   },
+  async printOrderOutputs(orderId){
+    const order=data.orders.find(x=>x.id===orderId);
+    if(!order)throw new Error('ORDER_NOT_FOUND');
+    return dispatchOrderOutputs(order);
+  },
   async printOrderReceipt(orderId){
-    const order=data.orders.find(x=>x.id===orderId);if(!order)throw new Error('ORDER_NOT_FOUND');
-    const lines=['磨飯 MFK',order.display,'------------------------------',...order.items.map(x=>x.name+' x'+x.qty),'------------------------------','TOTAL '+money(order.totalMinor),order.paymentLabel];
-    let bindings:readonly {id:string;role:string;host:string;port:number;name:string;model:string;capability:'receipt-80mm/kitchen'|'label-58mm'}[]=[];
-    try{const value=JSON.parse(localStorage.getItem(PRINTER_BINDING_KEY)||'[]');if(Array.isArray(value))bindings=value;}catch{}
-    const printer=bindings.find(x=>x.role==='顧客小票'&&String(x.host||'').trim());
-    if(!printer)throw new Error('RECEIPT_PRINTER_NOT_BOUND');
-    const result=await printTextLan({
-      endpointId:printer.id,
-      host:String(printer.host).trim(),
-      port:Number(printer.port)||9100,
-      displayName:printer.name||'顧客小票打印機',
-      model:printer.model||'LAN PRINTER',
-      capability:'receipt-80mm/kitchen',
-      text:'\x1b\x40'+lines.join('\n')+'\n\n\n'
-    });
-    if(!result.ok)throw new Error(result.code||'PRINT_FAILED');
-    return {printJobId:'local-'+order.id,state:result.code==='ACKNOWLEDGED'?'COMPLETED':'SENT'};
+    const order=data.orders.find(x=>x.id===orderId);
+    if(!order)throw new Error('ORDER_NOT_FOUND');
+    const summary=await dispatchOrderOutputs(order);
+    if(summary.planned===0)throw new Error('NO_PRINTER_ROUTE_BOUND');
+    if(summary.failed>0){
+      const codes=summary.results.filter(result=>!result.ok).map(result=>result.role+':'+result.code).join(',');
+      throw new Error('PRINT_FANOUT_FAILED:'+codes);
+    }
+    return {printJobId:'fanout-'+order.id,state:'SENT'};
   },
   async readDining(){
     return {
