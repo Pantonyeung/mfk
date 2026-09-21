@@ -27,6 +27,7 @@ export interface LocalHoldDraft{
   readonly partySize:number;
   readonly note:string;
   readonly totalMinor:number;
+  readonly assignedTable?:string;
   readonly items:readonly {id:string;name:string;qty:number;unitMinor:number}[];
 }
 interface Persisted{orders:StoredOrder[];availability:Record<string,SmtAvailabilityStatus>;holds:LocalHoldDraft[]}
@@ -71,6 +72,7 @@ export interface CleanSmtCoreRuntimePort{
   setAvailability?(nodeId:string,status:SmtAvailabilityStatus,expectedRevision:number):Promise<SmtAvailabilityProjection>;
   createDiningWait?(input:{partySize:number;note?:string}):Promise<LocalHoldDraft>;
   removeDiningWait?(id:string):Promise<void>;
+  assignDiningTable?(holdId:string,tableId:string):Promise<void>;
 }
 export interface PrintDispatchResult{readonly jobId:string;readonly role:string;readonly ok:boolean;readonly code:string}
 export interface PrintDispatchSummary{
@@ -434,18 +436,24 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
   async readDining(){
     return {
       businessDate:new Date().toISOString().slice(0,10),revision:1,
-      queue:data.holds.map(hold=>({
+      queue:data.holds.filter(hold=>!hold.assignedTable).map(hold=>({
         id:hold.id,
         codeLabel:hold.codeLabel,
         partySize:hold.partySize,
         statusLabel:hold.kind==='dining'?'待安排座位':'暫存待客',
       })),
-      tables:Array.from({length:9},(_,index)=>({
-        id:'T'+String(index+1).padStart(2,'0'),
-        areaLabel:'堂食',
-        label:String(index+1),
-        state:'available' as const,
-      }))
+      tables:Array.from({length:9},(_,index)=>{
+        const id='T'+String(index+1).padStart(2,'0');
+        const seated=data.holds.find(hold=>hold.assignedTable===id);
+        return {
+          id,
+          areaLabel:'堂食',
+          label:String(index+1),
+          state:seated?'occupied' as const:'available' as const,
+          partySize:seated?.partySize,
+          outstandingLabel:seated?.codeLabel,
+        };
+      })
     };
   },
   async createDiningWait(input){
@@ -463,6 +471,11 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
   },
   async removeDiningWait(id){
     data={...data,holds:data.holds.filter(item=>item.id!==id)};save();
+  },
+  async assignDiningTable(holdId,tableId){
+    const found=data.holds.find(item=>item.id===holdId);
+    if(!found)throw new Error('HOLD_NOT_FOUND');
+    data={...data,holds:data.holds.map(item=>item.id===holdId?{...item,assignedTable:tableId}:item)};save();
   },
   async readAvailability(){
     return {revision:1,nodes:Object.entries(productNames).map(([nodeId,label])=>({nodeId,label,status:data.availability[nodeId]||'available',sourceLabel:'LOCAL'})),canChange:true};
