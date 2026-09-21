@@ -1,8 +1,11 @@
 import {useCallback,useEffect,useMemo,useState} from 'react';
+import {useSearchParams} from 'react-router';
 import type {CleanSmtCoreRuntimePort,SmtOrdersProjection,SmtReprintOption} from '../runtime/local-runtime.ts';
 import './orders-workspace.css';
 
 export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePort}){
+  const [params]=useSearchParams();
+  const initialOrderId=params.get('orderId')??undefined;
   const [snapshot,setSnapshot]=useState<SmtOrdersProjection|null>(null);
   const [loading,setLoading]=useState(false);
   const [error,setError]=useState<string|null>(null);
@@ -24,7 +27,7 @@ export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePor
     finally{if(!silent)setLoading(false);}
   },[runtime]);
 
-  useEffect(()=>{void load();},[load]);
+  useEffect(()=>{void load(initialOrderId);},[load,initialOrderId]);
   useEffect(()=>runtime.subscribe(()=>void load(snapshot?.selectedOrderId,true)),[runtime,load,snapshot?.selectedOrderId]);
 
   const selected=snapshot?.selectedOrder;
