@@ -1,22 +1,31 @@
 import {useCallback,useEffect,useMemo,useState} from 'react';
+import {useNavigate} from 'react-router';
 import type {
   CleanSmtCoreRuntimePort,
-  DiningTender,
   LocalDiningHoldDetail,
   SmtDiningProjection
 } from '../runtime/local-runtime.ts';
 import './dining-operations-workspace.css';
 
-const tenderLabels:Record<DiningTender,string>={
+const tenderLabels:Record<string,string>={
   CASH:'現金',
   ALIPAY:'Alipay',
   WECHAT:'WeChat Pay',
   FPS:'轉數快',
   PAYME:'PayMe',
+  COMBO:'組合付款',
 };
 const money=(minor:number)=>'$'+(minor/100).toFixed(2);
 
-export function RuntimeDiningWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePort}){
+export interface DiningCheckoutRequest{
+  readonly holdId:string;
+  readonly codeLabel:string;
+  readonly tableLabel:string;
+  readonly selections:readonly {lineIndex:number;qty:number}[];
+  readonly lines:readonly {lineIndex:number;id:string;name:string;qty:number;unitMinor:number}[];
+}
+export function RuntimeDiningWorkspace({runtime,onCheckout}:{runtime:CleanSmtCoreRuntimePort;onCheckout:(request:DiningCheckoutRequest)=>void}){
+  const navigate=useNavigate();
   const [view,setView]=useState<SmtDiningProjection|null>(null);
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState<string|null>(null);
@@ -27,7 +36,6 @@ export function RuntimeDiningWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePor
   const [selectedHoldId,setSelectedHoldId]=useState<string|null>(null);
   const [detail,setDetail]=useState<LocalDiningHoldDetail|null>(null);
   const [selection,setSelection]=useState<Record<number,number>>({});
-  const [tender,setTender]=useState<DiningTender>('CASH');
   const [message,setMessage]=useState('');
   const [now,setNow]=useState(Date.now());
 
@@ -136,17 +144,30 @@ export function RuntimeDiningWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePor
     setSelection(next);
   };
 
-  const settle=async()=>{
-    if(!detail||!runtime.settleDiningHold||selectedUnits<=0)return;
-    try{
-      const selections=Object.entries(selection)
-        .map(([lineIndex,qty])=>({lineIndex:Number(lineIndex),qty:Number(qty)}))
-        .filter(item=>item.qty>0);
-      const next=await runtime.settleDiningHold(detail.holdId,selections,tender);
-      setDetail(next);setSelection({});
-      setMessage('已記錄 '+tenderLabels[tender]+' '+money(selectedAmount)+'。');
-      await load();
-    }catch(cause){setMessage(cause instanceof Error?cause.message:'分項結帳失敗');}
+  const goCheckout=()=>{
+    if(!detail||selectedUnits<=0)return;
+    const selections=Object.entries(selection)
+      .map(([lineIndex,qty])=>({lineIndex:Number(lineIndex),qty:Number(qty)}))
+      .filter(item=>item.qty>0);
+    const lines=selections.map(selected=>{
+      const line=detail.lines.find(item=>item.lineIndex===selected.lineIndex);
+      if(!line)throw new Error('DINING_LINE_NOT_FOUND');
+      return {
+        lineIndex:line.lineIndex,
+        id:line.id,
+        name:line.name,
+        qty:selected.qty,
+        unitMinor:line.unitMinor,
+      };
+    });
+    onCheckout({
+      holdId:detail.holdId,
+      codeLabel:detail.codeLabel,
+      tableLabel:detail.assignedTable?detail.assignedTable.replace('T',''):'',
+      selections,
+      lines,
+    });
+    navigate('/checkout');
   };
 
   const tableElapsed=(startedAt?:string)=>{
@@ -223,10 +244,9 @@ export function RuntimeDiningWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePor
           </article>)}
         </section>
 
-        <section className="dining-payment-panel">
-          <header><b>本次付款</b><strong>{money(selectedAmount)}</strong></header>
-          <div className="dining-tenders">{(Object.keys(tenderLabels) as DiningTender[]).map(id=><button key={id} className={tender===id?'active':''} onClick={()=>setTender(id)}>{tenderLabels[id]}</button>)}</div>
-          <button className="dining-settle-button" disabled={selectedUnits<=0||detail.remainingMinor<=0} onClick={()=>void settle()}>確認分項結帳 · {selectedUnits} 件</button>
+        <section className="dining-payment-panel checkout-authority">
+          <header><div><b>本次結帳選擇</b><small>付款只可以喺 Checkout 介面完成</small></div><strong>{money(selectedAmount)}</strong></header>
+          <button className="dining-settle-button" disabled={selectedUnits<=0||detail.remainingMinor<=0} onClick={goCheckout}>前往 Checkout · {selectedUnits} 件</button>
         </section>
 
         <section className="dining-balance">
@@ -237,7 +257,7 @@ export function RuntimeDiningWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePor
 
         <section className="dining-payment-history">
           <header><b>付款紀錄</b><span>{detail.payments.length}</span></header>
-          {detail.payments.length?detail.payments.map(payment=><div key={payment.id}><span>{tenderLabels[payment.tender]}</span><b>{money(payment.amountMinor)}</b><small>{new Date(payment.createdAt).toLocaleTimeString('zh-HK',{hour:'2-digit',minute:'2-digit'})}</small></div>):<p>未有付款紀錄。</p>}
+          {detail.payments.length?detail.payments.map(payment=><div key={payment.id}><span>{tenderLabels[payment.tender]??payment.tender}</span><b>{money(payment.amountMinor)}</b><small>{new Date(payment.createdAt).toLocaleTimeString('zh-HK',{hour:'2-digit',minute:'2-digit'})}</small></div>):<p>未有付款紀錄。</p>}
         </section>
 
         <footer className="dining-detail-actions">
