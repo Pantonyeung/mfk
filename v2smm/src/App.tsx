@@ -1,10 +1,11 @@
 import {useMemo,useState} from 'react';
 import capabilities from './capabilities.json';
-import {categories,dineSessions,orderRows,products,workTickets,type Product} from './fixtures';
+import {categories,channelHealthFixtures,dineSessions,exceptionFixtures,orderRows,products,workTickets,type Product} from './fixtures';
 
 type View='order'|'work'|'orders'|'dine'|'more';
 type Mode='ONLINE'|'OFFLINE'|'DEGRADED';
-type CartLine={id:number;name:string;config:string};
+type SubmissionState='IDLE'|'PENDING'|'UNKNOWN';
+type CartLine={id:number;name:string;config:string;quantity:number;attention?:string};
 
 const commandCapabilities=capabilities.filter(item=>item.kind==='COMMAND_SHAPE');
 
@@ -13,16 +14,24 @@ export function App(){
   const [mode,setMode]=useState<Mode>('ONLINE');
   const [category,setCategory]=useState<string>('人氣');
   const [selected,setSelected]=useState<Product|null>(null);
-  const [selectedOptions,setSelectedOptions]=useState<Record<string,string>>({});
+  const [searchQuery,setSearchQuery]=useState('');
+  const [selectedOptions,setSelectedOptions]=useState<Record<string,string[]>>({});
   const [cart,setCart]=useState<CartLine[]>([]);
   const [cartOpen,setCartOpen]=useState(false);
+  const [submissionState,setSubmissionState]=useState<SubmissionState>('IDLE');
+  const [submissionId]=useState(()=>`SMM-${Date.now().toString(36).toUpperCase()}`);
   const [notice,setNotice]=useState<string|null>(null);
-  const [moreTool,setMoreTool]=useState<'sellability'|'business'|'reporting'|'printing'|'diagnostics'|'capabilities'|null>(null);
+  const [moreTool,setMoreTool]=useState<'sellability'|'business'|'reporting'|'printing'|'diagnostics'|'channels'|'capabilities'|null>(null);
   const [orderSegment,setOrderSegment]=useState<'active'|'history'>('active');
   const [query,setQuery]=useState('');
   const [sourceFilter,setSourceFilter]=useState('全部');
 
-  const visibleProducts=products.filter(p=>category==='人氣'?p.category==='人氣'||p.id==='p2':p.category===category);
+  const visibleProducts=products.filter(p=>{
+    const categoryOk=category==='人氣'?p.category==='人氣'||p.id==='p2':p.category===category;
+    const q=searchQuery.trim().toLowerCase();
+    const searchOk=!q||[p.name,p.category,p.price].join(' ').toLowerCase().includes(q);
+    return categoryOk&&searchOk;
+  });
   const visibleOrders=orderRows.filter(row=>{
     const segmentOk=orderSegment==='active'?row.status!=='已完成':row.status==='已完成';
     const queryOk=!query||[row.code,row.source,row.status].join(' ').toLowerCase().includes(query.toLowerCase());
@@ -41,11 +50,16 @@ export function App(){
 
   const addPreviewLine=()=>{
     if(!selected)return;
-    const required=[...(selected.modifierGroups??[]),...(selected.comboGroups??[])].filter(g=>g.required);
-    const missing=required.find(group=>!selectedOptions[group.label]);
-    if(missing){setNotice(`請先完成必選：${missing.label}`);return;}
-    const config=Object.entries(selectedOptions).map(([k,v])=>`${k}：${v}`).join(' · ')||'無額外設定';
-    setCart(current=>[...current,{id:Date.now(),name:selected.name,config}]);
+    const groups=[...(selected.modifierGroups??[]),...(selected.comboGroups??[])];
+    for(const group of groups){
+      const values=selectedOptions[group.label]??[];
+      const min=group.min??(group.required?1:0);
+      const max=group.max??1;
+      if(values.length<min){setNotice(`請完成 ${group.label}：最少揀 ${min} 項。`);return;}
+      if(values.length>max){setNotice(`${group.label}：最多揀 ${max} 項。`);return;}
+    }
+    const config=Object.entries(selectedOptions).filter(([,values])=>values.length).map(([k,values])=>`${k}：${values.join('、')}`).join(' · ')||'無額外設定';
+    setCart(current=>[...current,{id:Date.now(),name:selected.name,config,quantity:1}]);
     setSelected(null);
     setSelectedOptions({});
     setNotice('已加入本機 Cart 預覽。未計價、未建立正式訂單。');
@@ -73,7 +87,7 @@ export function App(){
     </section>:null}
 
     <section className="stage">
-      {view==='order'?<OrderView category={category} setCategory={setCategory} visibleProducts={visibleProducts} chooseProduct={chooseProduct} cart={cart} openCart={()=>setCartOpen(true)}/>:null}
+      {view==='order'?<OrderView category={category} setCategory={setCategory} query={searchQuery} setQuery={setSearchQuery} visibleProducts={visibleProducts} chooseProduct={chooseProduct} cart={cart} openCart={()=>setCartOpen(true)}/>:null}
       {view==='work'?<WorkView onAction={showNotWired}/>:null}
       {view==='orders'?<OrdersView segment={orderSegment} setSegment={setOrderSegment} query={query} setQuery={setQuery} sourceFilter={sourceFilter} setSourceFilter={setSourceFilter} rows={visibleOrders} onAction={showNotWired}/>:null}
       {view==='dine'?<DineView onAction={showNotWired}/>:null}
@@ -88,8 +102,8 @@ export function App(){
       <NavButton active={view==='more'} label="更多" glyph="•••" onClick={()=>setView('more')}/>
     </nav>
 
-    {selected?<ProductSheet product={selected} values={selectedOptions} setValue={(group,value)=>setSelectedOptions(current=>({...current,[group]:value}))} onClose={()=>setSelected(null)} onAdd={addPreviewLine}/>:null}
-    {cartOpen?<CartSheet cart={cart} onClose={()=>setCartOpen(false)} onRemove={id=>setCart(current=>current.filter(line=>line.id!==id))} onAction={showNotWired}/>:null}
+    {selected?<ProductSheet product={selected} values={selectedOptions} setValue={(group,value,max)=>setSelectedOptions(current=>{const values=current[group]??[];const exists=values.includes(value);const next=exists?values.filter(item=>item!==value):max===1?[value]:values.length<max?[...values,value]:values;return {...current,[group]:next};})} onClose={()=>setSelected(null)} onAdd={addPreviewLine}/>:null}
+    {cartOpen?<CartSheet cart={cart} submissionId={submissionId} submissionState={submissionState} setSubmissionState={setSubmissionState} onClose={()=>setCartOpen(false)} onRemove={id=>setCart(current=>current.filter(line=>line.id!==id))} onQuantity={(id,quantity)=>setCart(current=>current.map(line=>line.id===id?{...line,quantity:Math.max(1,quantity)}:line))} onAction={showNotWired}/>:null}
   </main>;
 }
 
