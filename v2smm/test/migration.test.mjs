@@ -18,6 +18,7 @@ test('capability registry is complete and stable',()=>{
     assert.ok(item.label);
     assert.ok(item.surface);
     assert.ok(item.owner);
+    if(item.kind==='COMMAND_SHAPE')assert.equal(item.status,'NOT_WIRED');
   }
 });
 
@@ -51,6 +52,10 @@ const forbidden=[
 
 test('SMM clean port has zero live authority or network mutation',()=>{
   for(const pattern of forbidden)assert.equal(pattern.test(source),false,String(pattern));
+});
+
+test('donor workflow surfaces remain visible without authority',()=>{
+  for(const marker of ['點單','待處理','訂單','堂食','更多','商品供應','營業日','營運報表','列印管理','診斷中心','訂單來源'])assert.match(source,new RegExp(marker));
 });
 
 test('UI declares migration boundary',()=>{
