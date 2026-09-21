@@ -26,29 +26,12 @@ function QueueStrip({title,kind,orders,onOpen}:{title:string;kind:'pending'|'act
   </section>;
 }
 
-export function ActiveMenuProductName({name}:{name:string}){
-  return <span
-    className="ordering-product-live-name"
-    data-active-menu-product-name={name}
-    style={{
-      display:'block',
-      position:'absolute',
-      zIndex:2,
-      left:10,
-      top:8,
-      maxWidth:'calc(100% - 20px)',
-      padding:'3px 6px',
-      borderRadius:6,
-      background:'rgba(54,37,29,.72)',
-      color:'#fff',
-      fontSize:16,
-      fontWeight:950,
-      lineHeight:1.2,
-      whiteSpace:'normal',
-      overflowWrap:'anywhere',
-      textShadow:'0 1px 2px rgba(0,0,0,.35)',
-    }}
-  >{name}</span>;
+export function ProductCardText({name,priceLabel,badge}:{name:string;priceLabel:string;badge?:string}){
+  return <span className="ordering-product-copy">
+    {badge?<small>{badge}</small>:null}
+    <b className="ordering-product-name" data-active-menu-product-name={name}>{name}</b>
+    <strong className="ordering-product-price">{priceLabel}</strong>
+  </span>;
 }
 
 function ProductCard({product,actions,recentlyAdded}:{product:OrderingProductViewModel;actions:OrderingWorkspaceActions;recentlyAdded:boolean}){
@@ -57,12 +40,23 @@ function ProductCard({product,actions,recentlyAdded}:{product:OrderingProductVie
     if(product.requiresOptions)actions.onConfigureProduct(product.id);
     else actions.onAddProduct(product.id);
   };
-  return <article className={`ordering-product-card ${product.imageUrl?'has-media':'text-only'}${product.enabled?'':' disabled'}${recentlyAdded?' recently-added':''}`}>
-    <button type="button" className="ordering-product-body" aria-label={`商品 ${product.name}`} disabled={!product.enabled} onClick={onBody}>
-      {product.imageUrl?<span className="ordering-product-media" aria-hidden="true"><ActiveMenuProductName name={product.name}/><img src={product.imageUrl} alt="" loading="lazy" decoding="async" onError={event=>event.currentTarget.remove()}/></span>:null}
-      <span className="ordering-product-copy">{product.badge?<small>{product.badge}</small>:null}<b>{product.name}</b><strong>{product.priceLabel}</strong></span>
+  return <article className={`ordering-product-card text-only${product.enabled?'':' disabled'}${recentlyAdded?' recently-added':''}`}>
+    <button
+      type="button"
+      className="ordering-product-body"
+      aria-label={`商品 ${product.name}`}
+      disabled={!product.enabled}
+      onClick={onBody}
+    >
+      <ProductCardText name={product.name} priceLabel={product.priceLabel} badge={product.badge}/>
     </button>
-    <button type="button" className="ordering-product-more" aria-label={`更多設定 ${product.name}`} disabled={!product.enabled} onClick={()=>actions.onConfigureProduct(product.id)}>⋮</button>
+    <button
+      type="button"
+      className="ordering-product-more"
+      aria-label={`開啟選項 ${product.name}`}
+      disabled={!product.enabled}
+      onClick={()=>actions.onConfigureProduct(product.id)}
+    >⋮</button>
   </article>;
 }
 
