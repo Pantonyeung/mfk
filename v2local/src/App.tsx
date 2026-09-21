@@ -82,8 +82,13 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
     waitLabel:new Date(order.createdAt).toLocaleTimeString('zh-HK',{hour:'2-digit',minute:'2-digit'}),
     itemCount:order.items.reduce((sum,item)=>sum+item.qty,0),
   });
-  const pendingOrders=runtimeOrders.filter(order=>order.fulfillmentLabel==='待處理').slice(0,6).map(queueItem);
-  const activeOrders=runtimeOrders.filter(order=>order.fulfillmentLabel==='進行中'||order.fulfillmentLabel==='可取餐').slice(0,8).map(queueItem);
+  const isKitaOrder=(order:(typeof runtimeOrders)[number])=>/^Kita\b/i.test(String(order.sourceLabel||''));
+  const pendingOrders=runtimeOrders
+    .filter(order=>order.fulfillmentLabel==='待處理'&&!isKitaOrder(order))
+    .slice(0,6).map(queueItem);
+  const activeOrders=runtimeOrders
+    .filter(order=>isKitaOrder(order)&&!['已完成','已取消'].includes(order.fulfillmentLabel))
+    .slice(0,8).map(queueItem);
   const total=cart.reduce((sum,line)=>sum+line.unitMinor*line.qty,0);
   const nextDisplay='P'+String(localRuntime.orders().length+1).padStart(3,'0');
 
@@ -105,9 +110,14 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
       {id:'riceball-pool',label:'飯團待組區',count:0},
       {id:'required',label:'必選區',count:0},
       {id:'combo',label:'紫米套餐區',count:0},
-      {id:'holds',label:'暫存單',count:heldCarts.length},
-      {id:'soldout',label:'售罄管理',count:0},
     ],
+    actionAvailability:{
+      lineServiceMode:true,
+      lineEdit:true,
+      lineQuantity:true,
+      holdCart:cart.length>0||heldCarts.length>0,
+      cancelCart:cart.length>0,
+    },
     recentlyAddedProductId:recent,highlightedCartLineId:highlight,cartPulseNonce:pulse,
   };
 
@@ -180,7 +190,7 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
     onChangeLineServiceMode:(lineId,mode)=>setCart(cart.map(item=>item.id===lineId?{...item,serviceMode:mode}:item)),
     onAdjustLineQuantity:(lineId,delta)=>setCart(cart.map(item=>item.id===lineId?{...item,qty:item.qty+delta}:item).filter(item=>item.qty>0)),
     onEditCartLine:lineId=>{const line=cart.find(item=>item.id===lineId);if(line)setPanel({type:'product',productId:line.productId});},onHoldCart:()=>setPanel(cart.length?{type:'hold'}:{type:'holds'}),onCancelCart:()=>setCart([]),
-    onOpenWorkItem:id=>{if(id==='soldout')navigate('/soldout');else if(id==='combo')setPanel({type:'combo'});else if(id==='holds')setPanel({type:'holds'});else setPanel({type:'organize'});},
+    onOpenWorkItem:id=>{if(id==='combo')setPanel({type:'combo'});else setPanel({type:'organize'});},
     onOpenQueueOrder:(_kind,id)=>navigate('/orders?orderId='+encodeURIComponent(id)),
     onCheckout:()=>navigate('/checkout'),
   };
