@@ -28,19 +28,20 @@ export type PrinterBinding={
   encoding:'gb18030'|'big5'|'utf-8';
 };
 
-export const PRINTER_BINDING_KEY='mfk.v2local.printers.v2';
+export const PRINTER_BINDING_KEY='mfk.v2local.printers.v3';
+const LEGACY_PRINTER_BINDING_KEY='mfk.v2local.printers.v2';
 
 const defaults:PrinterBinding[]=[
   {id:'receipt-1',routeKey:'logical.receipt',name:'顧客小票打印機',model:'LAN PRINTER',role:'顧客小票',host:'',port:9100,capability:'receipt-80mm/kitchen',encoding:'gb18030'},
   {id:'production-1',routeKey:'logical.production',name:'製作單打印機',model:'LAN PRINTER',role:'製作單',host:'',port:9100,capability:'receipt-80mm/kitchen',encoding:'gb18030'},
   {id:'packing-1',routeKey:'logical.packing',name:'打包單打印機',model:'LAN PRINTER',role:'打包單',host:'',port:9100,capability:'receipt-80mm/kitchen',encoding:'gb18030'},
-  {id:'product-label-1',routeKey:'logical.product-label',name:'產品標籤打印機',model:'LAN LABEL PRINTER',role:'產品標籤',host:'',port:9100,capability:'label-58mm',encoding:'gb18030'},
-  {id:'bag-label-1',routeKey:'logical.bag-label',name:'袋標籤打印機',model:'LAN LABEL PRINTER',role:'袋標籤',host:'',port:9100,capability:'label-58mm',encoding:'gb18030'},
+  {id:'product-label-1',routeKey:'logical.product-label',name:'產品標籤打印機',model:'LAN LABEL PRINTER',role:'產品標籤',host:'',port:9100,capability:'label-58mm',encoding:'big5'},
+  {id:'bag-label-1',routeKey:'logical.bag-label',name:'袋標籤打印機',model:'LAN LABEL PRINTER',role:'袋標籤',host:'',port:9100,capability:'label-58mm',encoding:'big5'},
 ];
 
 type Section='printing'|'dayclose'|'reports'|'backup';
 
-function migrateStored(value:unknown):PrinterBinding[]{
+function migrateStored(value:unknown,{legacy=false}:{legacy?:boolean}={}):PrinterBinding[]{
   if(!Array.isArray(value))return defaults.map(x=>({...x}));
   const stored=value.filter(x=>x&&typeof x==='object') as Record<string,unknown>[];
   return defaults.map(fallback=>{
@@ -53,7 +54,10 @@ function migrateStored(value:unknown):PrinterBinding[]{
       model:typeof old.model==='string'&&old.model.trim()&&!String(old.model).includes('SUNMI')?String(old.model):fallback.model,
       host:typeof old.host==='string'?old.host:'',
       port:Number.isSafeInteger(Number(old.port))&&Number(old.port)>0?Number(old.port):9100,
-      encoding:old.encoding==='big5'||old.encoding==='utf-8' ? old.encoding : 'gb18030',
+      encoding:
+        fallback.capability==='label-58mm'
+          ? (old.encoding==='utf-8'?'utf-8':legacy?'big5':old.encoding==='big5'?'big5':'big5')
+          : (old.encoding==='big5'||old.encoding==='utf-8'?old.encoding:'gb18030'),
     };
   });
 }
@@ -61,6 +65,12 @@ function loadPrinters():PrinterBinding[]{
   try{
     const current=JSON.parse(localStorage.getItem(PRINTER_BINDING_KEY)||'null');
     if(current)return migrateStored(current);
+    const legacy=JSON.parse(localStorage.getItem(LEGACY_PRINTER_BINDING_KEY)||'null');
+    if(legacy){
+      const migrated=migrateStored(legacy,{legacy:true});
+      localStorage.setItem(PRINTER_BINDING_KEY,JSON.stringify(migrated));
+      return migrated;
+    }
     return defaults.map(x=>({...x}));
   }catch{return defaults.map(x=>({...x}))}
 }
@@ -116,8 +126,9 @@ function PrinterPanel(){
       else if(kind==='save')result=await applyLanPrinter(printer);
       else if(kind==='test')result=await testLanPrinter(printer);
       else{
+        const labelFont=current.encoding==='big5'?'TST24.BF2':current.encoding==='gb18030'?'TSS24.BF2':'3';
         const payload=current.capability==='label-58mm'
-          ?'SIZE 40 mm,30 mm\r\nGAP 2 mm,0 mm\r\nCLS\r\nTEXT 20,20,"3",0,1,1,"MFK FUSION TEST"\r\nTEXT 20,55,"3",0,1,1,"'+current.role+'"\r\nPRINT 1\r\n'
+          ?'SIZE 40 mm,30 mm\r\nGAP 2 mm,0 mm\r\nDENSITY 8\r\nCLS\r\nTEXT 20,20,"3",0,1,1,"MFK TEST"\r\nTEXT 20,55,"'+labelFont+'",0,1,1,"'+current.role+'"\r\nPRINT 1,1\r\n'
           :'\x1b\x40MFK FUSION '+current.role+' TEST\n'+current.name+'\n'+new Date().toISOString()+'\n\n\n';
         result=await printTextLan({...printer,text:payload});
       }
@@ -138,7 +149,7 @@ function PrinterPanel(){
     <label className="more-field"><span>打印機名稱</span><input value={current.name} onChange={e=>update({name:e.target.value})}/></label>
     <label className="more-field"><span>Printer IP / Host</span><input inputMode="decimal" placeholder="例如 192.168.1.201" value={current.host} onChange={e=>update({host:e.target.value})}/></label>
     <label className="more-field"><span>Port</span><input inputMode="numeric" value={String(current.port)} onChange={e=>update({port:Number(e.target.value)||0})}/></label>
-    <label className="more-field"><span>中文編碼</span><select value={current.encoding} onChange={e=>update({encoding:e.target.value as PrinterBinding['encoding']})}><option value="gb18030">GB18030（預設）</option><option value="big5">Big5</option><option value="utf-8">UTF-8</option></select></label>
+    <label className="more-field"><span>中文編碼</span><select value={current.encoding} onChange={e=>update({encoding:e.target.value as PrinterBinding['encoding']})}><option value="gb18030">GB18030</option><option value="big5">Big5（標籤預設）</option><option value="utf-8">UTF-8</option></select></label>
     <div className="more-tab-row">
       <button type="button" disabled={Boolean(busy)} onClick={()=>void run('test')}>{busy==='test'?'測試中…':'① 測試連線'}</button>
       <button type="button" className="more-primary" disabled={Boolean(busy)} onClick={()=>void run('print')}>{busy==='print'?'出紙中…':'② 測試出紙'}</button>
