@@ -12,7 +12,23 @@ import {
   type LocalAdminMenuCategory,
   type LocalAdminMenuProduct,
 } from '../runtime/local-admin-menu.ts';
+import {receiveAdminMenuA2Transfer} from '../runtime/admin-menu-transfer.ts';
+import type {MfkAdminMenuReadbackReceipt} from '../../../contracts/admin-menu-transfer-v1.ts';
 import './local-admin-menu-workspace.css';
+
+function downloadSmtJson(filename:string,value:unknown){
+  const blob=new Blob([JSON.stringify(value,null,2)],{type:'application/json'});
+  const url=URL.createObjectURL(blob);
+  const anchor=document.createElement('a');
+  anchor.href=url;
+  anchor.download=filename;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
+
+async function readSmtJsonFile(file:File){
+  return JSON.parse(await file.text()) as unknown;
+}
 
 type Draft={
   categories:LocalAdminMenuCategory[];
@@ -39,6 +55,7 @@ export function LocalAdminMenuWorkspace(){
   const [draft,setDraft]=useState<Draft>(copyDraft);
   const [message,setMessage]=useState('Menu Admin 已獨立。修改先保存草稿，發布後 POS 先會轉版本。');
   const [dirty,setDirty]=useState(false);
+  const [a2Receipt,setA2Receipt]=useState<MfkAdminMenuReadbackReceipt|null>(null);
 
   useEffect(()=>{
     const stopActive=subscribeLocalAdminMenu(()=>{
@@ -182,6 +199,29 @@ export function LocalAdminMenuWorkspace(){
       setMessage('已放棄草稿；重新跟 Active Menu R'+activeRevision+'。');
     }catch(error){setMessage(error instanceof Error?error.message:'ADMIN_MENU_DRAFT_DISCARD_FAILED');}
   };
+  const importA2Bundle=async(file:File)=>{
+    try{
+      const receipt=receiveAdminMenuA2Transfer(await readSmtJsonFile(file));
+      setA2Receipt(receipt);
+      setActiveRevision(readLocalAdminMenu().revision);
+      const saved=readLocalAdminMenuDraft();
+      setDraftRevision(saved.draftRevision);
+      setBasePublishedRevision(saved.basePublishedRevision);
+      setDraft(copyDraft());
+      setDirty(false);
+      setMessage(receipt.state==='MATCH'
+        ?'A2 TARGET_OBSERVED = MATCH：已 Apply R'+receipt.observedRevision+'。下載 Readback Receipt 返 Admin 比對。'
+        :'A2 TARGET_OBSERVED = MISMATCH：'+(receipt.failureCode??'APPLY_REJECTED'));
+    }catch(error){
+      setMessage(error instanceof Error?error.message:'ADMIN_A2_TRANSFER_INVALID');
+    }
+  };
+
+  const downloadA2Receipt=()=>{
+    if(!a2Receipt)return;
+    downloadSmtJson('mfk-smt-admin-readback-'+a2Receipt.transportId.replace(/[:]/g,'_')+'.json',a2Receipt);
+  };
+
   const resetSeed=()=>{
     try{
       const next=resetLocalAdminMenuToSeed(draftRevision);
@@ -205,6 +245,24 @@ export function LocalAdminMenuWorkspace(){
         <div><span>DRAFT</span><b>D{draftRevision}</b><small>base R{basePublishedRevision}</small></div>
       </div>
     </header>
+
+    <section className="local-admin-a2-transfer">
+      <header><div><small>A2 CONTROLLED TRANSFER</small><h3>Admin Publish Bundle → SMT LKG</h3></div><span>NO CLOUD / NO POLLING</span></header>
+      <div className="local-admin-a2-controls">
+        <label className="fusion-file-button">匯入 Admin A2 Bundle<input type="file" accept=".json,application/json" onChange={event=>{const file=event.target.files?.[0];if(file)void importA2Bundle(file);}}/></label>
+        <button type="button" disabled={!a2Receipt} onClick={downloadA2Receipt}>下載 SMT Readback Receipt</button>
+      </div>
+      {a2Receipt?<div className={'local-admin-a2-proof '+a2Receipt.state.toLowerCase()}>
+        <p><span>Transport ID</span><code>{a2Receipt.transportId}</code></p>
+        <p><span>Expected</span><b>R{a2Receipt.expectedRevision} · {a2Receipt.expectedFingerprint}</b></p>
+        <p><span>Observed</span><b>R{a2Receipt.observedRevision} · {a2Receipt.observedFingerprint}</b></p>
+        <p><span>Disposition</span><b>{a2Receipt.deliveryDisposition}</b></p>
+        <p><span>State</span><strong>{a2Receipt.state}</strong></p>
+        <p><span>Evidence</span><code>{a2Receipt.evidenceRef}</code></p>
+        {a2Receipt.failureCode?<p><span>Failure</span><code>{a2Receipt.failureCode}</code></p>:null}
+      </div>:<div className="local-admin-a2-empty">TARGET_READBACK_NOT_OBSERVED</div>}
+      <small>Hard rule：Admin bundle 存在 ≠ SMT 已 Apply。只有 SMT Readback Receipt 對返同一 revision + fingerprint 先可以叫 MATCH。</small>
+    </section>
 
     <div className={validation.ok?'local-admin-menu-validation valid':'local-admin-menu-validation invalid'}>
       <b>{validation.ok?'結構合法':'結構未通過'}</b>
