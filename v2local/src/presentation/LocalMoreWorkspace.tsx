@@ -327,18 +327,34 @@ function DayClosePanel({revision,onSaved}:{revision:number;onSaved:()=>void}){
   const report=buildLocalReport(localRuntime.orders());
   const [opening,setOpening]=useState('0');
   const [mode,setMode]=useState<'total'|'denom'>('denom');
+  const [denomEntryMode,setDenomEntryMode]=useState<'count'|'amount'>('amount');
   const [counted,setCounted]=useState('');
   const [counts,setCounts]=useState<Record<string,number>>({});
+  const [amounts,setAmounts]=useState<Record<string,string>>({});
   const [note,setNote]=useState('');
   const [message,setMessage]=useState('');
   const closes=readLocalDayCloses();
   const latest=[...closes].filter(x=>x.businessDate===report.businessDate).sort((a,b)=>b.version-a.version)[0];
   const denominations=[1,2,5,10,20,100,500] as const;
-  const denomTotal=denominations.reduce((sum,value)=>sum+value*Math.max(0,Math.floor(Number(counts[String(value)])||0)),0);
+
+  const qtyFor=(value:number)=>Math.max(0,Math.floor(Number(counts[String(value)])||0));
+  const denomTotal=denominations.reduce((sum,value)=>sum+value*qtyFor(value),0);
   const countedMinor=mode==='denom'?Math.round(denomTotal*100):Math.round(Number(counted||0)*100);
   const expected=Math.round(Number(opening||0)*100)+report.cashSalesMinor;
   const difference=countedMinor-expected;
-  const hasCount=mode==='denom'?Object.values(counts).some(value=>Number(value)>0):Boolean(counted);
+  const hasCount=mode==='denom'?denominations.some(value=>qtyFor(value)>0):Boolean(counted);
+
+  const setQty=(value:number,qty:number)=>{
+    const normalized=Math.max(0,Math.floor(Number(qty)||0));
+    setCounts(current=>({...current,[String(value)]:normalized}));
+    setAmounts(current=>({...current,[String(value)]:String(normalized*value)}));
+  };
+
+  const setAmount=(value:number,raw:string)=>{
+    const numeric=Math.max(0,Math.floor(Number(raw)||0));
+    setAmounts(current=>({...current,[String(value)]:raw}));
+    setCounts(current=>({...current,[String(value)]:Math.floor(numeric/value)}));
+  };
 
   const close=()=>{
     if(!hasCount){setMessage('請先輸入實點現金。');return;}
@@ -347,7 +363,7 @@ function DayClosePanel({revision,onSaved}:{revision:number;onSaved:()=>void}){
       openingCashMinor:Math.round(Number(opening||0)*100),
       countedCashMinor:countedMinor,
       existing:closes,
-      note:note+(mode==='denom'?'｜面額點算 '+denominations.map(value=>'$'+value+'×'+(counts[String(value)]??0)).join('、'):''),
+      note:note+(mode==='denom'?'｜面額點算 '+denominations.map(value=>'$'+value+'×'+qtyFor(value)).join('、'):''),
     });
     writeLocalDayCloses([...closes,row]);
     setMessage('日結已保存：V'+row.version+' · 差額 '+money(row.cashDifferenceMinor));
@@ -356,6 +372,7 @@ function DayClosePanel({revision,onSaved}:{revision:number;onSaved:()=>void}){
 
   return <section className="more-panel dayclose-panel">
     <header className="more-section-heading"><div><span>LOCAL DAY CLOSE</span><h2>收銀與日結</h2></div><strong>{latest?'已日結 V'+latest.version:'今日未日結'}</strong></header>
+
     <div className="more-kpis">
       <article><span>今日現金銷售</span><b>{money(report.cashSalesMinor)}</b></article>
       <article><span>預計櫃桶</span><b>{money(expected)}</b></article>
@@ -368,26 +385,45 @@ function DayClosePanel({revision,onSaved}:{revision:number;onSaved:()=>void}){
       <button type="button" className={mode==='total'?'active':''} onClick={()=>setMode('total')}>直接輸入總額</button>
     </div>
 
-    <div className="fusion-form-grid">
+    <div className="fusion-form-grid dayclose-base-fields">
       <label className="more-field"><span>開更現金</span><input inputMode="decimal" value={opening} onChange={e=>setOpening(e.target.value)}/></label>
       {mode==='total'?<label className="more-field"><span>實點現金</span><input inputMode="decimal" value={counted} onChange={e=>setCounted(e.target.value)}/></label>:null}
       <label className="more-field fusion-wide"><span>備註</span><input value={note} onChange={e=>setNote(e.target.value)} placeholder="例如：現金差異原因"/></label>
     </div>
 
-    {mode==='denom'?<section className="cash-denomination-table">
-      <header><span>面額</span><span>數量</span><span>小計</span></header>
-      {denominations.map(value=>{
-        const qty=Math.max(0,Math.floor(Number(counts[String(value)])||0));
-        return <div key={value}>
-          <b>{'$'+value}</b>
-          <div><button type="button" onClick={()=>setCounts(current=>({...current,[String(value)]:Math.max(0,qty-1)}))}>−</button><input inputMode="numeric" value={qty||''} placeholder="0" onChange={e=>setCounts(current=>({...current,[String(value)]:Math.max(0,Math.floor(Number(e.target.value)||0))}))}/><button type="button" onClick={()=>setCounts(current=>({...current,[String(value)]:qty+1}))}>＋</button></div>
-          <strong>{money(value*qty*100)}</strong>
-        </div>;
-      })}
-      <footer><span>面額合計</span><strong>{money(countedMinor)}</strong></footer>
+    {mode==='denom'?<section className="cash-denomination-shell">
+      <header className="cash-denomination-toolbar">
+        <div><b>面額點算</b><span>可以輸入張／個數，亦可以直接輸入該面額總金額。</span></div>
+        <div className="cash-entry-toggle">
+          <button type="button" className={denomEntryMode==='count'?'active':''} onClick={()=>setDenomEntryMode('count')}>輸入張／個數</button>
+          <button type="button" className={denomEntryMode==='amount'?'active':''} onClick={()=>setDenomEntryMode('amount')}>輸入面額總金額</button>
+        </div>
+      </header>
+      <section className="cash-denomination-table">
+        <header><span>面額</span><span>{denomEntryMode==='count'?'張／個數':'該面額總金額'}</span><span>換算</span><span>小計</span></header>
+        {denominations.map(value=>{
+          const qty=qtyFor(value);
+          const rawAmount=amounts[String(value)]??String(qty*value||'');
+          const typedAmount=Math.max(0,Math.floor(Number(rawAmount)||0));
+          const remainder=typedAmount%value;
+          return <div key={value}>
+            <b>{'$'+value}</b>
+            {denomEntryMode==='count'
+              ?<div className="cash-count-control"><button type="button" onClick={()=>setQty(value,qty-1)}>−</button><input inputMode="numeric" value={qty||''} placeholder="0" onChange={e=>setQty(value,Number(e.target.value))}/><button type="button" onClick={()=>setQty(value,qty+1)}>＋</button></div>
+              :<div className="cash-amount-control"><span>$</span><input inputMode="numeric" value={rawAmount} placeholder="0" onChange={e=>setAmount(value,e.target.value)}/></div>}
+            <span className={remainder&&denomEntryMode==='amount'?'cash-convert invalid':'cash-convert'}>{qty} {value<10?'個':'張'}{remainder&&denomEntryMode==='amount'?' · 非 $'+value+' 倍數':''}</span>
+            <strong>{money(value*qty*100)}</strong>
+          </div>;
+        })}
+        <footer><span>面額合計</span><strong>{money(countedMinor)}</strong></footer>
+      </section>
     </section>:null}
 
-    <div className="more-tab-row"><button type="button" className="more-primary" onClick={close}>確認本機日結</button></div>
+    <footer className="dayclose-sticky-footer">
+      <div>{hasCount?<><span>實點 {money(countedMinor)}</span><span>差額 {money(difference)}</span></>:<span>未輸入點算資料</span>}</div>
+      <button type="button" className="more-primary" onClick={close}>確認本機日結</button>
+    </footer>
+
     {message?<p role="status" className="fusion-status">{message}</p>:null}
     {latest?<section className="fusion-list"><header><b>最近日結</b><span>{latest.id}</span></header><article><span>實點 {money(latest.countedCashMinor)}</span><b>預計 {money(latest.expectedCashMinor)}</b><strong>差額 {money(latest.cashDifferenceMinor)}</strong></article></section>:null}
   </section>;
