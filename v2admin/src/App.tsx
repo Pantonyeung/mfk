@@ -68,6 +68,7 @@ function capabilityElement(id:string){
   if(id==='audit')return <AuditWorkspace/>;
   if(id==='channel-overview')return <ChannelsWorkspace mode="overview"/>;
   if(id==='product-mapping')return <ChannelsWorkspace mode="mapping"/>;
+  if(id==='mapping-failure')return <ChannelsWorkspace mode="failures"/>;
   if(id==='accept-policy')return <ChannelsWorkspace mode="accept"/>;
   if(id==='sync-policy')return <ChannelsWorkspace mode="sync"/>;
   if(id==='net-estimate')return <ChannelsWorkspace mode="estimate"/>;
