@@ -21,6 +21,7 @@ export type OrderingPanelState=
   |{readonly type:'product';readonly productId:string}
   |{readonly type:'organize'}
   |{readonly type:'combo'}
+  |{readonly type:'hold'}
   |null;
 
 const money=(minor:number)=>'$'+(Math.max(0,minor)/100).toFixed(2);
@@ -92,5 +93,25 @@ export function ComboWorkspace({products,onAdd}:{products:readonly WorkspaceProd
     <section className="combo-section duo"><div><header><b>2　選擇小食</b></header><div className="combo-option-grid">{['香脆薯角','QQ 紫米餅','炸雞塊','台灣一口腸','黃金薯餅','涼拌西蘭花'].map(v=><button key={v} className={side===v?'active':''} onClick={()=>setSide(v)}>{v}</button>)}</div></div><div><header><b>3　選擇飲品</b></header><div className="combo-option-grid">{['台式奶茶','凍檸茶','熱玄米茶','手打檸檬茶','不用飲品'].map(v=><button key={v} className={drink===v?'active':''} onClick={()=>setDrink(v)}>{v}</button>)}</div></div></section>
     <section className="combo-summary"><div><span>已選</span><b>{selected?.name??'未選'} · {side} · {drink}</b></div><strong>{money(tierPrice)}</strong></section>
     <footer className="combo-footer"><button disabled={!selected} onClick={()=>selected&&onAdd(selected.id,detail,tierPrice)}>加入購物車　{money(tierPrice)}</button></footer>
+  </div>;
+}
+
+
+export function HoldCartWorkspace({lines,totalMinor,onHold}:{lines:readonly WorkspaceCartLine[];totalMinor:number;onHold:(kind:'dining'|'waiting',partySize:number,note:string)=>void}){
+  const [kind,setKind]=useState<'dining'|'waiting'>('waiting');
+  const [partySize,setPartySize]=useState(2);
+  const [note,setNote]=useState('');
+  return <div className="hold-cart-workspace">
+    <header><div><h2>暫存／候位</h2><p>暫存唔會建立正式訂單；只保存購物車，等客人確認或者安排堂食。</p></div><strong>{money(totalMinor)}</strong></header>
+    <section className="hold-kind-grid">
+      <button className={kind==='dining'?'active':''} onClick={()=>setKind('dining')}><b>掛入堂食／輪候</b><span>進入堂食九宮格流程，之後安排座位。</span></button>
+      <button className={kind==='waiting'?'active':''} onClick={()=>setKind('waiting')}><b>暫存待客</b><span>客人話等一等，先離開點單流程，之後再處理。</span></button>
+    </section>
+    <section className="hold-cart-summary"><header><b>購物車內容</b><span>{lines.reduce((sum,line)=>sum+line.qty,0)} 件</span></header>{lines.map(line=><article key={line.id}><span>{line.qty}×</span><b>{line.name}</b><strong>{money(line.qty*line.unitMinor)}</strong></article>)}</section>
+    <div className="hold-cart-form">
+      <label><span>人數</span><div><button onClick={()=>setPartySize(Math.max(1,partySize-1))}>−</button><b>{partySize}</b><button onClick={()=>setPartySize(partySize+1)}>＋</button></div></label>
+      <label><span>備註</span><input value={note} onChange={event=>setNote(event.target.value)} placeholder="例如：客人 10 分鐘後返"/></label>
+    </div>
+    <footer><button onClick={()=>onHold(kind,partySize,note)}>確認暫存</button></footer>
   </div>;
 }
