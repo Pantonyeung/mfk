@@ -1,0 +1,14 @@
+.purple-actions{display:flex;align-items:center;gap:9px;padding:10px 16px}
+.purple-actions button,.batch-entry,.selection-tools button,.card-mode button{min-height:40px;border:1px solid var(--line);border-radius:9px;background:#fff;font-weight:900;padding:0 13px}
+.purple-actions button:first-child{background:#6f4b83;color:#fff;border-color:#6f4b83}.purple-actions button:nth-child(2){color:#6f4b83;border-color:#9a7cab}.purple-actions span{color:var(--muted)}
+.soldout-category{color:#b53f35}.catalog-caption{align-items:center;gap:10px}.card-mode,.selection-tools{display:flex;align-items:center;gap:6px}.card-mode .active{background:var(--orange);color:#fff;border-color:var(--orange)}.selection-tools{margin-left:auto}.selection-tools b{font-size:13px}
+.supply-product.small{display:block;padding:0}
+.supply-product.text{display:block;padding:0}
+.supply-product.small .card-open{grid-template-columns:72px minmax(0,1fr) auto}
+.supply-product.text .card-open{grid-template-columns:minmax(0,1fr) auto}
+.supply-product.soldout{border:2px solid #f47b35;background:#fff4ea}.supply-product.soldout .card-open,.supply-product.soldout .product-info{background:#fff4ea}
+.supply-product.paused{border:2px solid #c83c36;background:#fff0ef}.supply-product.paused .card-open,.supply-product.paused .product-info{background:#fff0ef}
+.supply-product.soldout:hover{border-color:#df6420;box-shadow:0 7px 20px #f47b3526}.supply-product.paused:hover{border-color:#a92f2a;box-shadow:0 7px 20px #c83c3626}
+.supply-state.soldout{background:#f47b35;color:#fff}.supply-state.paused{background:#c83c36;color:#fff}
+.selection-mark{position:absolute;right:10px;top:10px;display:grid;place-items:center;width:32px;height:32px;border-radius:50%;background:#fff;border:2px solid var(--orange);color:var(--orange);font-size:20px;font-weight:950;box-shadow:0 2px 9px #0002}.supply-product.selected .selection-mark{background:var(--orange);color:#fff}
+.detail-actions{display:grid;grid-template-columns:repeat(4,1fr);gap:9px}.detail-actions button:first-child{background:#f47b35;color:#fff;border-color:#f47b35}.detail-actions button:nth-child(2){background:#c83c36;color:#fff;border-color:#c83c36}.detail-actions button:nth-child(3){color:var(--green);border-color:#9ac4ae}.supply-state.available{background:#e9f5ee;color:var(--green)}
