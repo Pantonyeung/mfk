@@ -19,7 +19,7 @@ export interface StoredOrder{
   id:string;display:string;createdAt:string;totalMinor:number;paymentLabel:string;fulfillmentLabel:'待處理'|'進行中'|'可取餐'|'已完成'|'已取消';sourceLabel:string;
   items:readonly {id:string;name:string;qty:number;unitMinor:number}[];
 }
-export type DiningTender='CASH'|'ALIPAY'|'WECHAT'|'FPS'|'PAYME';
+export type DiningTender='CASH'|'ALIPAY'|'WECHAT'|'FPS'|'PAYME'|'COMBO';
 export interface LocalDiningPayment{
   readonly id:string;
   readonly createdAt:string;
