@@ -13,3 +13,29 @@
 .hold-list-workspace{height:100%;min-height:0;display:flex;flex-direction:column;gap:14px;padding:18px;box-sizing:border-box;background:#fff}
 .hold-list-workspace>header{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;padding-bottom:12px;border-bottom:1px solid #e6e7eb}.hold-list-workspace h2{margin:0;font-size:28px}.hold-list-workspace p{margin:4px 0 0;color:#717782}.hold-list-workspace>header strong{font-size:24px;color:#5b38ef}
 .hold-list{min-height:0;flex:1;overflow-y:auto;display:grid;align-content:start;gap:10px}.hold-list>article{padding:14px;border:1px solid #dfe2e8;border-radius:12px;background:#fff}.hold-list-head{display:flex;justify-content:space-between;gap:12px;align-items:center}.hold-list-head>div{display:flex;align-items:center;gap:8px}.hold-list-head b{font-size:20px}.hold-list-head span{padding:4px 8px;border-radius:999px;background:#eef1f5;font-size:12px;font-weight:900}.hold-list-head>strong{font-size:20px}.hold-list-meta{display:flex;gap:12px;margin-top:7px;color:#737985;font-size:13px}.hold-list-items{display:grid;gap:5px;margin-top:10px;padding:10px;border-radius:9px;background:#f7f8fa}.hold-list-items p{display:grid;grid-template-columns:36px minmax(0,1fr) auto;gap:8px;margin:0}.hold-list-items p span{color:#777}.hold-list-items p b{font-size:15px}.hold-list-items p strong{font-size:14px}.hold-list>article>small{display:block;margin-top:8px;color:#6f7581}.hold-list>article>footer{display:grid;grid-template-columns:1fr 1.4fr;gap:8px;margin-top:12px}.hold-list>article>footer button{min-height:46px;border:1px solid #d9dce2;border-radius:9px;background:#fff;font-weight:900}.hold-list>article>footer .primary{background:#5b38ef;border-color:#5b38ef;color:#fff}.hold-list>article>footer .danger{color:#b8322d;border-color:#f0b7b2;background:#fff7f6}.hold-list-empty{display:grid;place-items:center;min-height:240px;color:#7a7f89;font-weight:850}
+
+/* R8 hold workspace: same-page lower-content transform */
+.hold-cart-workspace{height:100%;min-height:0;display:flex;flex-direction:column;gap:12px;padding:18px;box-sizing:border-box;background:#fff}
+.hold-cart-workspace>header{flex:0 0 auto}
+.hold-kind-grid{flex:0 0 auto;display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.hold-kind-grid button{min-height:102px}
+.hold-kind-grid button.waiting{border-color:#d9dce2;background:#fff}
+.hold-kind-grid button.dining{border-color:#c9d9f7;background:#f7faff}
+.hold-kind-grid button.dining.active{border:2px solid #4b7bec;background:#eef4ff;color:#2557ad}
+.hold-cart-summary{min-height:0;flex:1 1 auto;overflow-y:auto}
+.hold-cart-summary article>div{display:grid;gap:3px}.hold-cart-summary article small{font-size:12px;color:#737985}
+.hold-inline-dining{min-height:0;flex:1 1 auto;display:grid;grid-template-columns:180px minmax(0,1fr);gap:12px}
+.hold-inline-left{min-height:0;display:grid;grid-template-rows:auto minmax(0,1fr) auto auto;gap:9px}
+.hold-party{display:grid;gap:6px}.hold-party>span,.hold-note>span{font-size:13px;font-weight:900}
+.hold-party>div{display:grid;grid-template-columns:42px 1fr 42px;border:1px solid #d9dce2;border-radius:9px;overflow:hidden}
+.hold-party button,.hold-party b{height:42px;border:0;background:#fff;display:grid;place-items:center}
+.hold-queue-button{min-height:0;padding:16px;display:grid;align-content:center;gap:8px;text-align:left;border:2px solid #078b7f;border-radius:12px;background:#eefaf8;color:#066b64}
+.hold-queue-button b{font-size:20px}.hold-queue-button span{font-size:12px;line-height:1.45;color:#5e6a72}
+.hold-note{display:grid;gap:5px}.hold-note input{height:42px;padding:0 10px;border:1px solid #d9dce2;border-radius:8px}
+.hold-back-cart{height:42px;border:1px solid #d9dce2;border-radius:8px;background:#fff;font-weight:850}
+.hold-nine-grid{min-height:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));grid-template-rows:repeat(3,minmax(0,1fr));gap:10px}
+.hold-nine-grid button{min-height:0;display:grid;place-items:center;align-content:center;gap:5px;border:1px solid #d9dce2;border-radius:13px;background:#fff}
+.hold-nine-grid button.available{border:2px solid #4b7bec;background:#f5f8ff;color:#2557ad}
+.hold-nine-grid button.occupied{background:#f0f2f4;color:#9297a0}
+.hold-nine-grid b{font-size:30px}.hold-nine-grid span{font-size:12px;font-weight:850}
+@media(max-width:1350px){.hold-inline-dining{grid-template-columns:155px minmax(0,1fr)}.hold-kind-grid button{min-height:92px}}
