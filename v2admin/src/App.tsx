@@ -6,6 +6,7 @@ import {AdminDraftProvider} from './admin-draft.tsx';
 import {CategoriesWorkspace,CombosWorkspace,MenuDisplayWorkspace,ModifiersWorkspace,PricingWorkspace,ProductsWorkspace} from './CatalogWorkspaces.tsx';
 import {AvailabilityWorkspace,BusinessDayWorkspace,ChannelsWorkspace,PrintCenterWorkspace,PrintTemplatesWorkspace,StaffWorkspace,StoreSettingsWorkspace} from './PolicyWorkspaces.tsx';
 import {AuditWorkspace,CapacityWorkspace,ExceptionsWorkspace,OpenOrdersWorkspace,OperationsReportWorkspace,OrdersHistoryWorkspace,OverviewWorkspace,SalesReportWorkspace} from './ReadModelWorkspaces.tsx';
+import {PrintRulesWorkspace,PublishCenterWorkspace,QuickReasonsWorkspace,SettlementWorkspace} from './GovernanceWorkspaces.tsx';
 
 const statusTitle={
   NOT_WIRED:'等待 MFK Domain Adapter',
@@ -54,6 +55,7 @@ function capabilityElement(id:string){
   if(id==='combo')return <CombosWorkspace/>;
   if(id==='menu-sort')return <MenuDisplayWorkspace/>;
   if(id==='overview')return <OverviewWorkspace/>;
+  if(id==='publish-center')return <PublishCenterWorkspace/>;
   if(id==='open-orders')return <OpenOrdersWorkspace/>;
   if(id==='availability')return <AvailabilityWorkspace/>;
   if(id==='capacity')return <CapacityWorkspace/>;
@@ -62,7 +64,9 @@ function capabilityElement(id:string){
   if(id==='exceptions')return <ExceptionsWorkspace/>;
   if(id==='print-center')return <PrintCenterWorkspace/>;
   if(id==='print-templates')return <PrintTemplatesWorkspace/>;
+  if(id==='print-rules')return <PrintRulesWorkspace/>;
   if(id==='store-settings')return <StoreSettingsWorkspace/>;
+  if(id==='quick-reasons')return <QuickReasonsWorkspace/>;
   if(id==='staff')return <StaffWorkspace/>;
   if(id==='sales-report')return <SalesReportWorkspace/>;
   if(id==='operations-report')return <OperationsReportWorkspace/>;
@@ -73,6 +77,7 @@ function capabilityElement(id:string){
   if(id==='accept-policy')return <ChannelsWorkspace mode="accept"/>;
   if(id==='sync-policy')return <ChannelsWorkspace mode="sync"/>;
   if(id==='net-estimate')return <ChannelsWorkspace mode="estimate"/>;
+  if(id==='settlement')return <SettlementWorkspace/>;
   return <CapabilityPage/>;
 }
 
