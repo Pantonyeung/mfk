@@ -5,7 +5,7 @@ import {MFK_ADMIN_AUTHORITY} from './admin-authority.ts';
 import {AdminDraftProvider} from './admin-draft.tsx';
 import {CategoriesWorkspace,CombosWorkspace,MenuDisplayWorkspace,ModifiersWorkspace,PricingWorkspace,ProductsWorkspace} from './CatalogWorkspaces.tsx';
 import {AvailabilityWorkspace,BusinessDayWorkspace,ChannelsWorkspace,PrintCenterWorkspace,PrintTemplatesWorkspace,StaffWorkspace,StoreSettingsWorkspace} from './PolicyWorkspaces.tsx';
-import {AuditWorkspace,CapacityWorkspace,ExceptionsWorkspace,OpenOrdersWorkspace,OperationsReportWorkspace,OverviewWorkspace,SalesReportWorkspace} from './ReadModelWorkspaces.tsx';
+import {AuditWorkspace,CapacityWorkspace,ExceptionsWorkspace,OpenOrdersWorkspace,OperationsReportWorkspace,OrdersHistoryWorkspace,OverviewWorkspace,SalesReportWorkspace} from './ReadModelWorkspaces.tsx';
 
 const statusTitle={
   NOT_WIRED:'等待 MFK Domain Adapter',
@@ -58,6 +58,7 @@ function capabilityElement(id:string){
   if(id==='availability')return <AvailabilityWorkspace/>;
   if(id==='capacity')return <CapacityWorkspace/>;
   if(id==='business-day')return <BusinessDayWorkspace/>;
+  if(id==='orders-history')return <OrdersHistoryWorkspace/>;
   if(id==='exceptions')return <ExceptionsWorkspace/>;
   if(id==='print-center')return <PrintCenterWorkspace/>;
   if(id==='print-templates')return <PrintTemplatesWorkspace/>;
