@@ -1,5 +1,5 @@
 import {describe,expect,it} from 'vitest';
-import {buildOrderPrintPlan,groupTscBitmapJobsByBinding,type PrintBinding,type PrintableOrder} from './print-routing.ts';
+import {buildOrderPrintPlan,groupTscBitmapJobsByPhysicalPrinter,type PrintBinding,type PrintableOrder} from './print-routing.ts';
 
 const order:PrintableOrder={
   id:'MFK-1',
@@ -47,9 +47,9 @@ describe('MFK checkout print fanout',()=>{
     expect(productJobs.map(job=>job.binding.id)).toEqual([
       'product-label-riceball','product-label-riceball','product-label-takeaway',
     ]);
-    expect(productJobs[0]?.labelSpec).toMatchObject({orderCode:'P001',primaryText:'原味飯團',pieceLabel:'1/2'});
-    expect(productJobs[1]?.labelSpec).toMatchObject({orderCode:'P001',primaryText:'原味飯團',pieceLabel:'2/2'});
-    expect(productJobs[2]?.labelSpec).toMatchObject({orderCode:'P001',primaryText:'台式奶茶',pieceLabel:'1/1'});
+    expect(productJobs[0]?.labelSpec).toMatchObject({orderCode:'P001',primaryText:'原味飯團',pieceLabel:'1/3'});
+    expect(productJobs[1]?.labelSpec).toMatchObject({orderCode:'P001',primaryText:'原味飯團',pieceLabel:'2/3'});
+    expect(productJobs[2]?.labelSpec).toMatchObject({orderCode:'P001',primaryText:'台式奶茶',pieceLabel:'3/3'});
     expect(productJobs.every(job=>job.renderMode==='tsc-bitmap')).toBe(true);
 
     expect(plan[6]?.renderMode).toBe('tsc-bitmap');
@@ -63,10 +63,22 @@ describe('MFK checkout print fanout',()=>{
     expect(plan.map(job=>job.labelSpec?.pieceLabel)).toEqual([
       '1/11','2/11','3/11','4/11','5/11','6/11','7/11','8/11','9/11','10/11','11/11'
     ]);
-    const batches=groupTscBitmapJobsByBinding(plan);
+    const batches=groupTscBitmapJobsByPhysicalPrinter(plan);
     expect(batches).toHaveLength(1);
     expect(batches[0]?.binding.id).toBe('product-label-riceball');
     expect(batches[0]?.jobs).toHaveLength(11);
+  });
+
+  it('merges product and bag label jobs that share the same physical printer into one socket batch',()=>{
+    const sharedHost='192.168.1.77';
+    const rice={...binding('產品標籤','rice',['riceball']),host:sharedHost};
+    const takeaway={...binding('產品標籤','takeaway',['tea']),host:sharedHost};
+    const bag={...binding('袋標籤','bag'),host:sharedHost};
+    const plan=buildOrderPrintPlan(order,[rice,takeaway,bag]);
+    const batches=groupTscBitmapJobsByPhysicalPrinter(plan);
+    expect(batches).toHaveLength(1);
+    expect(batches[0]?.jobs).toHaveLength(4);
+    expect(batches[0]?.jobs.map(job=>job.labelSpec?.pieceLabel)).toEqual(['1/3','2/3','3/3','1/1']);
   });
 
   it('keeps a newly added custom product-label route silent until products are assigned',()=>{

@@ -39,13 +39,16 @@ export interface TscBitmapJobBatch{
   readonly jobs:readonly PlannedPrintJob[];
 }
 
-export function groupTscBitmapJobsByBinding(plan:readonly PlannedPrintJob[]):readonly TscBitmapJobBatch[]{
+export function groupTscBitmapJobsByPhysicalPrinter(plan:readonly PlannedPrintJob[]):readonly TscBitmapJobBatch[]{
   const groups=new Map<string,{binding:PrintBinding;jobs:PlannedPrintJob[]}>();
   for(const job of plan){
     if(job.renderMode!=='tsc-bitmap'||!job.labelSpec)continue;
-    const existing=groups.get(job.binding.id);
+    const host=String(job.binding.host||'').trim().toLowerCase();
+    const port=Number(job.binding.port)||9100;
+    const key=host+':'+port;
+    const existing=groups.get(key);
     if(existing)existing.jobs.push(job);
-    else groups.set(job.binding.id,{binding:job.binding,jobs:[job]});
+    else groups.set(key,{binding:job.binding,jobs:[job]});
   }
   return Object.freeze([...groups.values()].map(group=>Object.freeze({
     binding:group.binding,
@@ -89,14 +92,32 @@ function packing(order:PrintableOrder){
     +'\n\n\n';
 }
 
-function routedProductItems(order:PrintableOrder,binding:PrintBinding){
-  if(binding.productIds===undefined)return order.items;
-  const allowed=new Set(binding.productIds.map(String));
-  return order.items.filter(item=>allowed.has(String(item.id)));
+function productMatchesBinding(productId:string,binding:PrintBinding){
+  if(binding.productIds===undefined)return true;
+  return binding.productIds.map(String).includes(String(productId));
+}
+
+function buildGlobalProductLabelUnits(order:PrintableOrder,bindings:readonly PrintBinding[]){
+  const labelBindings=bindings.filter(binding=>binding.role==='產品標籤');
+  const allProducts=labelBindings.some(binding=>binding.productIds===undefined);
+  const configured=new Set(labelBindings.flatMap(binding=>binding.productIds??[]).map(String));
+  const units:{item:PrintableOrder['items'][number];unit:number;pieceIndex:number}[]=[];
+  let pieceIndex=0;
+  for(const item of order.items){
+    if(!allProducts&&!configured.has(String(item.id)))continue;
+    const qty=Math.max(0,Math.floor(Number(item.qty)||0));
+    for(let unit=1;unit<=qty;unit++){
+      pieceIndex+=1;
+      units.push({item,unit,pieceIndex});
+    }
+  }
+  return units;
 }
 
 export function buildOrderPrintPlan(order:PrintableOrder,bindings:readonly PrintBinding[]):readonly PlannedPrintJob[]{
   const active=bindings.filter(binding=>String(binding.host||'').trim()&&Number(binding.port)>0);
+  const productLabelUnits=buildGlobalProductLabelUnits(order,active);
+  const globalProductLabelTotal=productLabelUnits.length;
   const jobs:PlannedPrintJob[]=[];
   for(const binding of active){
     if(binding.role==='顧客小票'){
@@ -130,28 +151,22 @@ export function buildOrderPrintPlan(order:PrintableOrder,bindings:readonly Print
       continue;
     }
     if(binding.role==='產品標籤'){
-      const routeItems=routedProductItems(order,binding);
-      const total=routeItems.reduce((sum,item)=>sum+Math.max(0,Number(item.qty)||0),0);
-      if(total<1)continue;
-      let labelIndex=0;
-      for(const item of routeItems){
-        const qty=Math.max(0,Math.floor(Number(item.qty)||0));
-        for(let i=0;i<qty;i++){
-          labelIndex+=1;
-          const labelSpec:RasterLabelSpec={
-            orderCode:clean(order.display),
-            primaryText:clean(item.name),
-            pieceLabel:labelIndex+'/'+total,
-          };
-          jobs.push({
-            id:order.id+':'+binding.id+':product-label:'+item.id+':'+(i+1),
-            role:binding.role,
-            binding,
-            payload:'LABEL '+labelSpec.orderCode+' '+labelSpec.primaryText+' '+labelSpec.pieceLabel,
-            renderMode:'tsc-bitmap',
-            labelSpec,
-          });
-        }
+      const routeUnits=productLabelUnits.filter(unit=>productMatchesBinding(String(unit.item.id),binding));
+      if(routeUnits.length<1)continue;
+      for(const unit of routeUnits){
+        const labelSpec:RasterLabelSpec={
+          orderCode:clean(order.display),
+          primaryText:clean(unit.item.name),
+          pieceLabel:unit.pieceIndex+'/'+globalProductLabelTotal,
+        };
+        jobs.push({
+          id:order.id+':'+binding.id+':product-label:'+unit.item.id+':'+unit.unit,
+          role:binding.role,
+          binding,
+          payload:'LABEL '+labelSpec.orderCode+' '+labelSpec.primaryText+' '+labelSpec.pieceLabel,
+          renderMode:'tsc-bitmap',
+          labelSpec,
+        });
       }
     }
   }

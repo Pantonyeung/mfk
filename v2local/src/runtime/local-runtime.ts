@@ -1,6 +1,6 @@
 import {printBytesLan,printTextLan} from './native-print.ts';
 import {renderTscRasterLabel} from './label-bitmap.ts';
-import {buildOrderPrintPlan,groupTscBitmapJobsByBinding,type PrintBinding,type PlannedPrintJob} from './print-routing.ts';
+import {buildOrderPrintPlan,groupTscBitmapJobsByPhysicalPrinter,type PrintBinding,type PlannedPrintJob} from './print-routing.ts';
 
 export interface SmtOperationalMetric{readonly id:string;readonly label:string;readonly value:string;readonly detail?:string}
 export interface SmtOrderListItemViewModel{readonly orderId:string;readonly orderIdLabel:string;readonly itemCount:number;readonly totalLabel:string;readonly paymentLabel:string;readonly fulfillmentLabel:string;readonly sourceLabel?:string;readonly localSequenceLabel?:string}
@@ -20,8 +20,8 @@ export interface StoredOrder{
 }
 interface Persisted{orders:StoredOrder[];availability:Record<string,SmtAvailabilityStatus>}
 const KEY='mfk.v2local.runtime.v1';
-const PRINTER_BINDING_KEY='mfk.v2local.printers.v4';
-const LEGACY_PRINTER_BINDING_KEYS=['mfk.v2local.printers.v3','mfk.v2local.printers.v2'] as const;
+const PRINTER_BINDING_KEY='mfk.v2local.printers.v5';
+const LEGACY_PRINTER_BINDING_KEYS=['mfk.v2local.printers.v4','mfk.v2local.printers.v3','mfk.v2local.printers.v2'] as const;
 const RICEBALL_PRODUCT_IDS=Object.freeze(['riceball','tuna','pork']);
 const TAKEAWAY_PRODUCT_IDS=Object.freeze(['bento','curry','wedges','milkTea','lemonTea']);
 const listeners=new Set<()=>void>();
@@ -81,7 +81,7 @@ function readPrinterBindings():PrintBinding[]{
     }
     const value=JSON.parse(raw||'[]');
     if(!Array.isArray(value))return [];
-    const rows=value
+    let rows=value
       .filter(row=>row&&typeof row==='object')
       .map(row=>{
         const capability=(row.capability==='label-58mm'?'label-58mm':'receipt-80mm/kitchen') as PrintBinding['capability'];
@@ -110,6 +110,27 @@ function readPrinterBindings():PrintBinding[]{
         };
       })
       .filter(row=>row.id&&['顧客小票','製作單','打包單','產品標籤','袋標籤'].includes(row.role));
+
+    const takeawayIndex=rows.findIndex(row=>row.id==='product-label-2');
+    const takeaway=takeawayIndex>=0?rows[takeawayIndex]:undefined;
+    const bag=rows.find(row=>row.role==='袋標籤'&&String(row.host||'').trim());
+    if((!takeaway||!String(takeaway.host||'').trim())&&bag){
+      const derived:PrintBinding={
+        id:'product-label-2',
+        routeKey:'logical.product-label.takeaway',
+        name:'外賣標籤機',
+        model:bag.model,
+        role:'產品標籤',
+        host:bag.host,
+        port:bag.port,
+        capability:'label-58mm',
+        encoding:bag.encoding,
+        productIds:[...TAKEAWAY_PRODUCT_IDS],
+      };
+      if(takeawayIndex>=0)rows=rows.map((row,index)=>index===takeawayIndex?derived:row);
+      else rows=[...rows,derived];
+    }
+    if(usingLegacy)localStorage.setItem(PRINTER_BINDING_KEY,JSON.stringify(rows));
     return rows;
   }catch{return []}
 }
@@ -141,7 +162,7 @@ function pushDispatchResults(results:PrintDispatchResult[],jobs:readonly Planned
 async function dispatchOrderOutputs(order:StoredOrder):Promise<PrintDispatchSummary>{
   const plan=buildOrderPrintPlan(order,readPrinterBindings());
   const results:PrintDispatchResult[]=[];
-  const labelBatches=groupTscBitmapJobsByBinding(plan);
+  const labelBatches=groupTscBitmapJobsByPhysicalPrinter(plan);
   const labelJobs=new Set(labelBatches.flatMap(batch=>batch.jobs.map(job=>job.id)));
 
   for(const job of plan){

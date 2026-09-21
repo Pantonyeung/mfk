@@ -30,8 +30,8 @@ export type PrinterBinding={
   productIds?:string[];
 };
 
-export const PRINTER_BINDING_KEY='mfk.v2local.printers.v4';
-const LEGACY_PRINTER_BINDING_KEYS=['mfk.v2local.printers.v3','mfk.v2local.printers.v2'] as const;
+export const PRINTER_BINDING_KEY='mfk.v2local.printers.v5';
+const LEGACY_PRINTER_BINDING_KEYS=['mfk.v2local.printers.v4','mfk.v2local.printers.v3','mfk.v2local.printers.v2'] as const;
 const RICEBALL_PRODUCT_IDS=['riceball','tuna','pork'];
 const TAKEAWAY_PRODUCT_IDS=['bento','curry','wedges','milkTea','lemonTea'];
 const FIXED_PRODUCT_LABEL_IDS=new Set(['product-label-1','product-label-2']);
@@ -45,7 +45,7 @@ const defaults:PrinterBinding[]=[
   {id:'bag-label-1',routeKey:'logical.bag-label',name:'袋標籤打印機',model:'LAN LABEL PRINTER',role:'袋標籤',host:'',port:9100,capability:'label-58mm',encoding:'big5'},
 ];
 
-type Section='printing'|'dayclose'|'reports'|'backup';
+type Section='printing'|'diagnostics'|'dayclose'|'reports'|'backup';
 
 function normalizeStoredRow(old:Record<string,unknown>,fallback?:PrinterBinding,legacy=false):PrinterBinding{
   const capability=(old.capability==='label-58mm'||fallback?.capability==='label-58mm')?'label-58mm':'receipt-80mm/kitchen';
@@ -77,6 +77,10 @@ function migrateStored(value:unknown,{legacy=false}:{legacy?:boolean}={}):Printe
   const stored=value.filter(x=>x&&typeof x==='object') as Record<string,unknown>[];
   const fixed=defaults.map(fallback=>{
     let old=stored.find(x=>String(x.id||'')===fallback.id);
+    if(fallback.id==='product-label-2'&&(!old||!String(old.host||'').trim())){
+      const bag=stored.find(x=>String(x.role||'')==='袋標籤'&&String(x.host||'').trim());
+      if(bag)old={...bag,id:fallback.id,routeKey:fallback.routeKey,name:fallback.name,role:fallback.role,productIds:fallback.productIds};
+    }
     if(!old&&fallback.id==='product-label-1')old=stored.find(x=>String(x.role||'')==='產品標籤');
     if(!old&&!fallback.id.startsWith('product-label-'))old=stored.find(x=>String(x.role||'')===fallback.role);
     return old?normalizeStoredRow(old,fallback,legacy):{...fallback,productIds:fallback.productIds?[...fallback.productIds]:undefined};
@@ -233,6 +237,36 @@ function PrinterPanel(){
   </section>;
 }
 
+function DiagnosticsPanel(){
+  const printers=loadPrinters();
+  const groups=new Map<string,PrinterBinding[]>();
+  for(const printer of printers){
+    const host=printer.host.trim();
+    const key=host?host+':'+printer.port:'UNBOUND:'+printer.id;
+    const list=groups.get(key)??[];
+    list.push(printer);
+    groups.set(key,list);
+  }
+  const unbound=printers.filter(printer=>!printer.host.trim());
+  return <section className="more-panel">
+    <header className="more-section-heading"><div><span>LOCAL DIAGNOSTICS</span><h2>診斷中心</h2></div><strong>{window.moreFunNative?'Carrier Bridge 已連接':'Native Bridge 未連接'}</strong></header>
+    <div className="more-kpis">
+      <article><span>Printer Routes</span><b>{printers.length}</b></article>
+      <article><span>未綁定</span><b>{unbound.length}</b></article>
+      <article><span>實體設備</span><b>{[...groups.keys()].filter(key=>!key.startsWith('UNBOUND:')).length}</b></article>
+    </div>
+    <section className="fusion-list">
+      <header><b>打印 Route</b><span>LOCAL STORAGE · v5</span></header>
+      {printers.map(printer=><article key={printer.id}>
+        <span>{printer.name}<small> · {printer.routeKey}</small></span>
+        <b>{printer.host.trim()?printer.host+':'+printer.port:'未綁定'}</b>
+        <strong>{printer.role==='產品標籤'?(printer.productIds?.length??0)+' 個商品':'—'}</strong>
+      </article>)}
+    </section>
+    <p className="fusion-note">同一實體 IP / Port 嘅 Label Route 會合併成一次 LAN socket dispatch；飯糰同外賣仍保留獨立 logical route。診斷中心只顯示本機真實 binding，唔會假裝 Cloud 同步狀態。</p>
+  </section>;
+}
+
 function ReportsPanel({revision}:{revision:number}){
   void revision;
   const report=buildLocalReport(localRuntime.orders());
@@ -340,6 +374,7 @@ export function LocalMoreWorkspace(){
       <header><span>MFK · SMT FUSION</span><h1>營運中心</h1></header>
       <button type="button" onClick={()=>navigate('/')}><b>返回點單</b><small>MoreFun V2 Ordering</small></button>
       <button type="button" className={section==='printing'?'active':''} onClick={()=>setSection('printing')}><b>打印與設備</b><small>External Printer Registry</small></button>
+      <button type="button" className={section==='diagnostics'?'active':''} onClick={()=>setSection('diagnostics')}><b>診斷中心</b><small>Local Runtime Diagnostics</small></button>
       <button type="button" className={section==='dayclose'?'active':''} onClick={()=>setSection('dayclose')}><b>收銀與日結</b><small>Local Day Close</small></button>
       <button type="button" className={section==='reports'?'active':''} onClick={()=>setSection('reports')}><b>報表與分析</b><small>Local Report</small></button>
       <button type="button" className={section==='backup'?'active':''} onClick={()=>setSection('backup')}><b>備份與恢復</b><small>Local Backup</small></button>
@@ -347,6 +382,7 @@ export function LocalMoreWorkspace(){
     </aside>
     <section className="more-workspace-content">
       {section==='printing'?<PrinterPanel/>:null}
+      {section==='diagnostics'?<DiagnosticsPanel/>:null}
       {section==='dayclose'?<DayClosePanel revision={revision} onSaved={bump}/>:null}
       {section==='reports'?<ReportsPanel revision={revision}/>:null}
       {section==='backup'?<BackupPanel onRestore={()=>window.location.reload()}/>:null}
