@@ -19,15 +19,15 @@ body {
 }
 #stage {
   position: absolute;
-  width: 1280px;
-  height: 800px;
+  width: 1920px;
+  height: 1080px;
   min-width: 0;
   min-height: 0;
   background: #f8f6f2;
   overflow: hidden;
   transform-origin: top left;
-  outline: 3px solid #ffbf00;
-  box-shadow: 0 0 0 1px rgba(255,255,255,.32),0 18px 60px rgba(0,0,0,.5);
+  outline: 0;
+  box-shadow: none;
 }
 html[data-preview-mode="native"] #stage {
   outline: 0;
