@@ -1,0 +1,288 @@
+import {useMemo,useState} from 'react';
+import capabilities from './capabilities.json';
+import {activeOrderFixture,categories,historyFixtures,products,storeFixture,type Product} from './fixtures';
+
+type View='home'|'menu'|'cart'|'checkout'|'orders'|'more';
+type NetworkMode='ONLINE'|'OFFLINE'|'FAILURE'|'STALE';
+type OrderStage='ACCEPTANCE'|'PREPARING'|'READY'|'PICKUP'|'COMPLETED';
+type CartLine={id:number;productId:string;name:string;config:string[];priceLabel:string};
+
+const commandCapabilities=capabilities.filter(item=>item.kind==='COMMAND_SHAPE');
+
+const stageMeta:Record<OrderStage,{label:string;title:string;detail:string}>={
+  ACCEPTANCE:{label:'等待店舖接單',title:'已收到訂單（展示狀態）',detail:'等待店舖確認。此畫面只係 migration fixture，唔代表本次提交建立咗正式 Order。'},
+  PREPARING:{label:'製作中',title:'店舖已接單（展示狀態）',detail:'Preparing · 展示 promised ready time，同內部製作細節分開。'},
+  READY:{label:'可取餐',title:'可以取餐（展示狀態）',detail:'Ready 只係取餐準備完成嘅呈現 shape，唔等於已交收。'},
+  PICKUP:{label:'取餐核對',title:'到店取餐（展示狀態）',detail:'顯示短取餐碼／電話尾碼 shape；真正核對 authority 今輪未接線。'},
+  COMPLETED:{label:'已完成',title:'取餐完成（展示狀態）',detail:'Completed 只係 fixture projection，唔由 Customer Port 自行寫正式交易狀態。'},
+};
+
+export function App(){
+  const [view,setView]=useState<View>('home');
+  const [network,setNetwork]=useState<NetworkMode>('ONLINE');
+  const [channelUnavailable,setChannelUnavailable]=useState(false);
+  const [category,setCategory]=useState<string>('人氣');
+  const [selected,setSelected]=useState<Product|null>(null);
+  const [selections,setSelections]=useState<Record<string,string>>({});
+  const [cart,setCart]=useState<CartLine[]>([]);
+  const [notice,setNotice]=useState<string|null>(null);
+  const [phone,setPhone]=useState('');
+  const [name,setName]=useState('');
+  const [pendingIntent,setPendingIntent]=useState(false);
+  const [orderStage,setOrderStage]=useState<OrderStage>('ACCEPTANCE');
+  const [orderSegment,setOrderSegment]=useState<'current'|'history'>('current');
+  const [registryOpen,setRegistryOpen]=useState(false);
+  const [nextLineId,setNextLineId]=useState(1);
+
+  const visibleProducts=useMemo(()=>products.filter(product=>category==='人氣'?(product.badge==='人氣'||product.id==='c-p2'):product.category===category),[category]);
+
+  const showNotWired=(label:string)=>{
+    setNotice(`${label}：NOT_WIRED｜MIGRATION_ONLY。今輪唔會建立正式 Order、派 Display Number、執行付款、寫入 Store Kernel、送出訊息或連接 SMT。`);
+  };
+
+  const openProduct=(product:Product)=>{
+    setSelected(product);
+    setSelections({});
+  };
+
+  const addLocalCartLine=()=>{
+    if(!selected)return;
+    const groups=[...(selected.choiceGroups??[]),...(selected.comboGroups??[])];
+    const missing=groups.filter(group=>group.required).find(group=>!selections[group.label]);
+    if(missing){setNotice(`請先完成必選：${missing.label}`);return;}
+    const config=Object.entries(selections).map(([key,value])=>`${key}：${value}`);
+    setCart(current=>[...current,{id:nextLineId,productId:selected.id,name:selected.name,config,priceLabel:selected.priceLabel}]);
+    setNextLineId(value=>value+1);
+    setSelected(null);
+    setSelections({});
+    setNotice('已加入 session-only Cart。只係 migration fixture，未計正式價錢、未建立正式 Order。');
+  };
+
+  const submitPresentation=()=>{
+    const digits=phone.replace(/\D/g,'');
+    if(cart.length===0){setNotice('購物籃未有項目。');return;}
+    if(digits.length<8){setNotice('請輸入至少 8 位電話，作 Checkout Form shape 驗證。');return;}
+    setPendingIntent(true);
+    setNotice('Safe Submit Presentation：已進入 PENDING_INTENT 展示。NOT_WIRED；未送店舖、未建立正式 Order。');
+  };
+
+  const rebuildLocalCart=(summary:string)=>{
+    setCart([{id:nextLineId,productId:'history-fixture',name:'再次下單預覽',config:[summary,'Historical intent copy / current revalidation 尚未接線'],priceLabel:'等待正式 Quote'}]);
+    setNextLineId(value=>value+1);
+    setView('cart');
+    setNotice('Reorder Shape：只重建本機 Cart 預覽。正式 Reorder Command 仍然 NOT_WIRED。');
+  };
+
+  return <main className="customer-shell" data-network={network.toLowerCase()}>
+    <header className="topbar">
+      <button className="brand" onClick={()=>setView('home')} aria-label="返回首頁"><b>磨</b><span><strong>磨飯</strong><small>Customer Migration</small></span></button>
+      <button className="network-chip" onClick={()=>setView('more')}><i/>{network==='ONLINE'?'展示：Online':network==='OFFLINE'?'展示：Offline':network==='FAILURE'?'展示：Failure':'展示：Stale'}</button>
+    </header>
+
+    <section className="migration-strip" role="status">
+      <strong>MIGRATION_ONLY</strong><span>UI / Page / Form / Workflow Shape</span><em>所有正式 Command：NOT_WIRED</em>
+    </section>
+
+    {notice?<div className="notice" role="status"><span>{notice}</span><button onClick={()=>setNotice(null)}>收起</button></div>:null}
+
+    {network!=='ONLINE'?<RecoveryBanner mode={network} onRetry={()=>showNotWired('重試／重新確認')}/>:null}
+
+    <section className="viewport">
+      {view==='home'?<HomeView unavailable={channelUnavailable} onBrowse={()=>setView('menu')} onOrders={()=>{setOrderSegment('current');setView('orders')}} onFallback={()=>showNotWired('WhatsApp 備用入口')}/>:null}
+      {view==='menu'?<MenuView category={category} setCategory={setCategory} products={visibleProducts} onProduct={openProduct} cartCount={cart.length} onCart={()=>setView('cart')}/>:null}
+      {view==='cart'?<CartView cart={cart} onRemove={id=>setCart(current=>current.filter(line=>line.id!==id))} onMenu={()=>setView('menu')} onCheckout={()=>setView('checkout')}/>:null}
+      {view==='checkout'?<CheckoutView cart={cart} name={name} setName={setName} phone={phone} setPhone={setPhone} pending={pendingIntent} onSubmit={submitPresentation} onBack={()=>setView('cart')} onAction={showNotWired}/>:null}
+      {view==='orders'?<OrdersView segment={orderSegment} setSegment={setOrderSegment} stage={orderStage} setStage={setOrderStage} onReorder={rebuildLocalCart} onAction={showNotWired}/>:null}
+      {view==='more'?<MoreView network={network} setNetwork={setNetwork} unavailable={channelUnavailable} setUnavailable={setChannelUnavailable} registryOpen={registryOpen} setRegistryOpen={setRegistryOpen} onAction={showNotWired}/>:null}
+    </section>
+
+    {view!=='checkout'?<nav className="bottom-nav" aria-label="主要導覽">
+      <Nav active={view==='home'} icon="⌂" label="首頁" onClick={()=>setView('home')}/>
+      <Nav active={view==='menu'} icon="▦" label="菜單" onClick={()=>setView('menu')}/>
+      <Nav active={view==='cart'} icon="□" label="購物籃" badge={cart.length?String(cart.length):undefined} onClick={()=>setView('cart')}/>
+      <Nav active={view==='orders'} icon="◎" label="訂單" onClick={()=>setView('orders')}/>
+      <Nav active={view==='more'} icon="•••" label="更多" onClick={()=>setView('more')}/>
+    </nav>:null}
+
+    {selected?<ProductSheet product={selected} values={selections} setValue={(group,value)=>setSelections(current=>({...current,[group]:value}))} onClose={()=>setSelected(null)} onAdd={addLocalCartLine}/>:null}
+  </main>;
+}
+
+function RecoveryBanner({mode,onRetry}:{mode:NetworkMode;onRetry:()=>void}){
+  const copy={
+    OFFLINE:['離線展示','不會建立離線 queue，不會背景重送；畫面只展示最近 fixture。'],
+    FAILURE:['提交／讀取失敗展示','Failure Presentation 只提供安全下一步；Retry 目前 NOT_WIRED。'],
+    STALE:['資料可能過期','STALE Presentation 必須指出資料唔新鮮，唔會扮成 live truth。'],
+    ONLINE:['',''],
+  }[mode];
+  return <section className={`recovery-banner ${mode.toLowerCase()}`}><div><strong>{copy[0]}</strong><span>{copy[1]}</span></div><button onClick={onRetry}>重試（NOT_WIRED）</button></section>;
+}
+
+function HomeView({unavailable,onBrowse,onOrders,onFallback}:{unavailable:boolean;onBrowse:()=>void;onOrders:()=>void;onFallback:()=>void}){
+  return <section className="page home-page">
+    <div className="store-card">
+      <span className="eyebrow">自取 · migration fixture</span>
+      <h1>{storeFixture.name}</h1>
+      <p>{storeFixture.status} · {storeFixture.eta}</p>
+      <small>{storeFixture.notice}</small>
+    </div>
+
+    {unavailable?<section className="unavailable-card">
+      <b>自家渠道暫時不可用（展示狀態）</b>
+      <p>Own-channel unavailable。唔會離線排隊，唔會延遲自動送出。</p>
+      <button onClick={onFallback}>WhatsApp 備用入口（NOT_WIRED）</button>
+      <small>Fallback 只係 presentation shape；按下去唔會自動發任何訂單。</small>
+    </section>:<section className="hero-card">
+      <span>最快由想食開始</span>
+      <h2>紫米能量餐，揀好就取。</h2>
+      <p>Category Browse → Product Config → Cart → Checkout。</p>
+      <button className="primary" onClick={onBrowse}>開始睇菜單</button>
+    </section>}
+
+    <button className="current-order-card" onClick={onOrders}>
+      <div><span>進行中訂單 · fixture</span><strong>{activeOrderFixture.orderRef}</strong><small>展示狀態：等待店舖接單</small></div>
+      <em>查看訂單狀態</em>
+    </button>
+
+    <section className="quick-grid">
+      <button onClick={onBrowse}><b>人氣</b><span>快速睇熱門</span></button>
+      <button onClick={onOrders}><b>取餐碼</b><span>{activeOrderFixture.pickupCode} · 示意</span></button>
+      <button onClick={onOrders}><b>歷史</b><span>再次下單 Shape</span></button>
+    </section>
+  </section>;
+}
+
+function MenuView({category,setCategory,products,onProduct,cartCount,onCart}:{category:string;setCategory:(value:string)=>void;products:Product[];onProduct:(product:Product)=>void;cartCount:number;onCart:()=>void}){
+  return <section className="page menu-page">
+    <header className="page-title"><span>Menu / Category Browse</span><h1>今日想食咩？</h1><p>商品、價錢、售罄全部係 migration fixture。</p></header>
+    <div className="category-rail">{categories.map(item=><button key={item} className={category===item?'active':''} onClick={()=>setCategory(item)}>{item}</button>)}</div>
+    <div className="product-list">{products.map(product=><button key={product.id} className={`product-card ${product.unavailable?'unavailable':''}`} disabled={product.unavailable} onClick={()=>onProduct(product)}>
+      <span className="product-visual">{product.name.slice(0,1)}</span>
+      <div><small>{product.badge??product.category}</small><strong>{product.name}</strong><p>{product.description}</p><em>{product.unavailable?'暫停供應 · 不可選':product.priceLabel}</em></div>
+    </button>)}</div>
+    {cartCount?<button className="floating-cart" onClick={onCart}><b>{cartCount}</b><span>查看購物籃</span><em>Quote 尚未接線</em></button>:null}
+  </section>;
+}
+
+function CartView({cart,onRemove,onMenu,onCheckout}:{cart:CartLine[];onRemove:(id:number)=>void;onMenu:()=>void;onCheckout:()=>void}){
+  return <section className="page cart-page">
+    <header className="page-title"><span>Cart</span><h1>購物籃</h1><p>Session-only state；離開 App 不保證保存。</p></header>
+    {!cart.length?<section className="empty-card"><strong>購物籃未有嘢</strong><p>先去菜單揀商品。</p><button className="primary" onClick={onMenu}>去菜單</button></section>:<>
+      <div className="cart-lines">{cart.map(line=><article key={line.id}><div><strong>{line.name}</strong><small>{line.config.length?line.config.join(' · '):'無額外設定'}</small><em>{line.priceLabel}</em></div><button onClick={()=>onRemove(line.id)}>移除</button></article>)}</div>
+      <section className="quote-card"><span>Current Quote Presentation</span><strong>等待正式 Pricing Readback</strong><p>今輪無 pricing engine；不自行計算總額。</p></section>
+      <button className="primary wide" onClick={onCheckout}>前往結帳</button>
+    </>}
+  </section>;
+}
+
+function CheckoutView({cart,name,setName,phone,setPhone,pending,onSubmit,onBack,onAction}:{cart:CartLine[];name:string;setName:(v:string)=>void;phone:string;setPhone:(v:string)=>void;pending:boolean;onSubmit:()=>void;onBack:()=>void;onAction:(label:string)=>void}){
+  return <section className="page checkout-page">
+    <button className="back-link" onClick={onBack}>← 返回購物籃</button>
+    <header className="page-title"><span>Checkout Form Shape</span><h1>確認自取資料</h1><p>表單只留 session memory；無 live submit。</p></header>
+    <section className="checkout-form">
+      <label><span>姓名（選填）</span><input value={name} onChange={event=>setName(event.target.value)} placeholder="例如 Panton"/></label>
+      <label><span>電話</span><input type="tel" inputMode="tel" value={phone} onChange={event=>setPhone(event.target.value)} placeholder="例如 9123 4567"/></label>
+      <label><span>取餐時間</span><select defaultValue="asap"><option value="asap">盡快（展示）</option><option value="later">稍後時間（展示）</option></select></label>
+    </section>
+
+    <section className="checkout-review"><div><span>商品</span><strong>{cart.length} 項</strong></div><div><span>正式總額</span><strong>等待 Quote</strong></div><div><span>付款</span><strong>未接線</strong></div></section>
+
+    <section className="safe-submit">
+      <span>Safe Submit Presentation</span>
+      <strong>提交一次，不可以假裝成功</strong>
+      <p>按下後只會展示 Pending Intent。唔會建立正式 Order、唔會派正式 Display Number、唔會執行付款。</p>
+      <button className="primary wide" disabled={!cart.length} onClick={onSubmit}>提交訂單（NOT_WIRED）</button>
+    </section>
+
+    {pending?<section className="pending-card" role="status">
+      <b>PENDING_INTENT · NOT_WIRED</b>
+      <h2>正在確認（展示）</h2>
+      <p>未建立正式 Order。今輪禁止背景自動重送；UNKNOWN 時只可等將來 authoritative readback seam。</p>
+      <div><span>取餐碼 Presentation Shape</span><strong>4821（示意，不是正式派號）</strong></div>
+      <button onClick={()=>onAction('重新確認原提交')}>重新確認（NOT_WIRED）</button>
+    </section>:null}
+  </section>;
+}
+
+function OrdersView({segment,setSegment,stage,setStage,onReorder,onAction}:{segment:'current'|'history';setSegment:(v:'current'|'history')=>void;stage:OrderStage;setStage:(v:OrderStage)=>void;onReorder:(summary:string)=>void;onAction:(label:string)=>void}){
+  return <section className="page orders-page">
+    <header className="page-title"><span>Order Status / History</span><h1>我的訂單</h1><p>所有訂單資料係 fixture；只展示 Customer workflow shape。</p></header>
+    <div className="segmented"><button className={segment==='current'?'active':''} onClick={()=>setSegment('current')}>進行中</button><button className={segment==='history'?'active':''} onClick={()=>setSegment('history')}>歷史</button></div>
+    {segment==='current'?<CurrentOrder stage={stage} setStage={setStage} onAction={onAction}/>:<HistoryView onReorder={onReorder}/>}
+  </section>;
+}
+
+function CurrentOrder({stage,setStage,onAction}:{stage:OrderStage;setStage:(v:OrderStage)=>void;onAction:(label:string)=>void}){
+  const meta=stageMeta[stage];
+  const stages=Object.keys(stageMeta) as OrderStage[];
+  return <>
+    <section className="fixture-warning">Migration fixture · 呢啲狀態唔代表 Checkout 產生咗正式訂單。</section>
+    <article className="order-status-card">
+      <div className="order-id"><span>{activeOrderFixture.orderRef}</span><b>{meta.label}</b></div>
+      <h2>{meta.title}</h2><p>{meta.detail}</p>
+      <div className="timeline">{stages.map(item=><button key={item} className={item===stage?'active':''} onClick={()=>setStage(item)}><i/>{stageMeta[item].label}</button>)}</div>
+      <small>上面按鈕只轉換本機展示狀態，唔會寫任何正式 Fulfillment truth。</small>
+    </article>
+
+    <article className="pickup-card">
+      <span>Pickup Code Presentation</span><strong>{activeOrderFixture.pickupCode}</strong><small>電話：{activeOrderFixture.phoneMasked} · 全部係 fixture</small>
+      {stage==='PICKUP'?<button onClick={()=>onAction('取餐核對／交收')}>確認取餐（NOT_WIRED）</button>:null}
+    </article>
+
+    <article className="order-detail-card">
+      <header><div><span>Order Detail</span><strong>訂單詳情</strong></div><em>{activeOrderFixture.amountLabel}</em></header>
+      <ul>{activeOrderFixture.items.map(item=><li key={item}>{item}</li>)}</ul>
+      <div className="detail-row"><span>預計可取</span><b>{activeOrderFixture.promised}</b></div>
+      <div className="detail-row"><span>資料 freshness</span><b>DEMO / fixture</b></div>
+    </article>
+  </>;
+}
+
+function HistoryView({onReorder}:{onReorder:(summary:string)=>void}){
+  return <div className="history-list">{historyFixtures.map(order=><article key={order.id}><div><small>{order.date}</small><strong>{order.code}</strong><p>{order.summary}</p><em>{order.amountLabel}</em></div><button onClick={()=>onReorder(order.summary)}>再次下單預覽</button></article>)}</div>;
+}
+
+function MoreView({network,setNetwork,unavailable,setUnavailable,registryOpen,setRegistryOpen,onAction}:{network:NetworkMode;setNetwork:(v:NetworkMode)=>void;unavailable:boolean;setUnavailable:(v:boolean)=>void;registryOpen:boolean;setRegistryOpen:(v:boolean)=>void;onAction:(label:string)=>void}){
+  return <section className="page more-page">
+    <header className="page-title"><span>Migration Controls</span><h1>狀態與能力帳</h1><p>以下開關只切換本機 presentation fixture。</p></header>
+    <section className="demo-panel">
+      <h2>Failure / Offline / UNKNOWN / STALE</h2>
+      <div className="mode-grid">{(['ONLINE','OFFLINE','FAILURE','STALE'] as NetworkMode[]).map(mode=><button key={mode} className={network===mode?'active':''} onClick={()=>setNetwork(mode)}>{mode}</button>)}</div>
+      <button className="secondary wide" onClick={()=>onAction('Retry Presentation')}>Retry Presentation（NOT_WIRED）</button>
+      <p>無 offline queue、無 background replay、無 delayed auto-submit。</p>
+    </section>
+
+    <section className="demo-panel">
+      <h2>Own-channel unavailable</h2>
+      <p>用嚟驗 Home fallback Presentation；唔會改任何真實渠道。</p>
+      <button className="secondary wide" onClick={()=>setUnavailable(!unavailable)}>{unavailable?'展示：恢復可用':'展示：渠道不可用'}</button>
+    </section>
+
+    <section className="cap-summary">
+      <div><span>Customer capabilities</span><strong>{capabilities.length}</strong></div>
+      <div><span>COMMAND_SHAPE</span><strong>{commandCapabilities.length}</strong></div>
+      <div><span>Command status</span><strong>NOT_WIRED</strong></div>
+    </section>
+    <button className="primary wide" onClick={()=>setRegistryOpen(!registryOpen)}>{registryOpen?'收起 Capability Registry':'查看 Capability Registry'}</button>
+    {registryOpen?<CapabilityRegistry/>:null}
+  </section>;
+}
+
+function CapabilityRegistry(){
+  const groups=[...new Set(capabilities.map(item=>item.group))];
+  return <section className="registry">{groups.map(group=><div key={group}><h3>{group}</h3>{capabilities.filter(item=>item.group===group).map(item=><article key={item.id}><div><strong>{item.label}</strong><small>{item.id}</small></div><div><span>{item.kind}</span><em className={item.status==='NOT_WIRED'?'red':''}>{item.status}</em></div></article>)}</div>)}</section>;
+}
+
+function ProductSheet({product,values,setValue,onClose,onAdd}:{product:Product;values:Record<string,string>;setValue:(group:string,value:string)=>void;onClose:()=>void;onAdd:()=>void}){
+  const groups=[...(product.choiceGroups??[]),...(product.comboGroups??[])];
+  return <div className="overlay"><section className="sheet" role="dialog" aria-modal="true">
+    <div className="sheet-grabber"/>
+    <header><div><span>Product Detail / Product Config</span><h2>{product.name}</h2><p>{product.description}</p><small>{product.priceLabel}</small></div><button onClick={onClose}>✕</button></header>
+    {groups.length?groups.map(group=><section className="choice-group" key={group.label}><div><strong>{group.label}</strong>{group.required?<em>必選</em>:<span>可選</span>}</div><div className="choice-grid">{group.options.map(option=><button key={option} className={values[group.label]===option?'active':''} onClick={()=>setValue(group.label,option)}>{option}</button>)}</div><small>{product.comboGroups?.includes(group)?'Combo Selection Shape':'Modifier / Option Selection Shape'} · 只係 local fixture</small></section>):<p className="plain-note">呢件商品冇額外設定。</p>}
+    <div className="sheet-actions"><button onClick={onClose}>返回</button><button className="primary" onClick={onAdd}>加入購物籃預覽</button></div>
+  </section></div>;
+}
+
+function Nav({active,icon,label,badge,onClick}:{active:boolean;icon:string;label:string;badge?:string;onClick:()=>void}){
+  return <button className={active?'active':''} onClick={onClick}><span>{icon}</span><small>{label}</small>{badge?<b>{badge}</b>:null}</button>;
+}

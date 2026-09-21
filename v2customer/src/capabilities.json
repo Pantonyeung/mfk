@@ -1,0 +1,52 @@
+[
+  {"id":"CUSTOMER_SHELL","group":"SHELL","label":"獨立 Customer Shell","surface":"全局","kind":"READ_SHAPE","status":"MIGRATED_SHAPE","owner":"MFK Customer Surface"},
+  {"id":"STORE_CONTEXT_PRESENTATION","group":"SHELL","label":"門店 Context Presentation","surface":"首頁","kind":"READ_SHAPE","status":"MIGRATED_SHAPE","owner":"Future Store projection"},
+  {"id":"MIGRATION_BOUNDARY","group":"SHELL","label":"MIGRATION_ONLY / NOT_WIRED 邊界","surface":"全局","kind":"READ_SHAPE","status":"MIGRATED_SHAPE","owner":"MFK Customer Surface"},
+  {"id":"CONNECTIVITY_PRESENTATION","group":"SHELL","label":"連線狀態 Presentation","surface":"全局","kind":"READ_SHAPE","status":"MIGRATED_SHAPE","owner":"Future runtime health projection"},
+  {"id":"OWN_CHANNEL_AVAILABILITY","group":"SHELL","label":"自家渠道可用狀態","surface":"首頁","kind":"READ_SHAPE","status":"MIGRATED_SHAPE","owner":"Future channel projection"},
+
+  {"id":"HOME","group":"DISCOVERY","label":"首頁","surface":"首頁","kind":"READ_SHAPE","status":"MIGRATED_SHAPE","owner":"MFK Customer Surface"},
+  {"id":"CATEGORY_BROWSE","group":"DISCOVERY","label":"Category Browse","surface":"菜單","kind":"READ_SHAPE","status":"MIGRATED_SHAPE","owner":"Future Menu projection"},
+  {"id":"MENU_BROWSE","group":"DISCOVERY","label":"Menu Browse","surface":"菜單","kind":"READ_SHAPE","status":"MIGRATED_SHAPE","owner":"Future Menu projection"},
+  {"id":"PRODUCT_DETAIL","group":"DISCOVERY","label":"Product Detail","surface":"商品詳情","kind":"READ_SHAPE","status":"MIGRATED_SHAPE","owner":"Future Menu projection"},
+  {"id":"PRODUCT_CONFIG","group":"DISCOVERY","label":"Product Config","surface":"商品設定","kind":"READ_SHAPE","status":"MIGRATED_SHAPE","owner":"Future Product rules projection"},
+  {"id":"MODIFIER_SELECT","group":"DISCOVERY","label":"Modifier Selection Shape","surface":"商品設定","kind":"READ_SHAPE","status":"MIGRATED_SHAPE","owner":"Future Product rules projection"},
+  {"id":"OPTION_SELECT","group":"DISCOVERY","label":"Option Selection Shape","surface":"商品設定","kind":"READ_SHAPE","status":"MIGRATED_SHAPE","owner":"Future Product rules projection"},
+  {"id":"COMBO_SELECT","group":"DISCOVERY","label":"Combo Selection Shape","surface":"商品設定","kind":"READ_SHAPE","status":"MIGRATED_SHAPE","owner":"Future Combo rules projection"},
+  {"id":"SELLABILITY_PRESENTATION","group":"DISCOVERY","label":"售罄 / 不可選 Presentation","surface":"菜單","kind":"READ_SHAPE","status":"MIGRATED_SHAPE","owner":"Future Sellability projection"},
+
+  {"id":"CART_VIEW","group":"CHECKOUT","label":"Cart","surface":"購物籃","kind":"READ_SHAPE","status":"MIGRATED_SHAPE","owner":"Session-only migration state"},
+  {"id":"CART_EDIT_SHAPE","group":"CHECKOUT","label":"Cart Edit Shape","surface":"購物籃","kind":"READ_SHAPE","status":"MIGRATED_SHAPE","owner":"Session-only migration state"},
+  {"id":"CHECKOUT_FORM","group":"CHECKOUT","label":"Checkout Form Shape","surface":"結帳","kind":"READ_SHAPE","status":"MIGRATED_SHAPE","owner":"MFK Customer Surface"},
+  {"id":"PHONE_INPUT","group":"CHECKOUT","label":"Phone Input","surface":"結帳","kind":"READ_SHAPE","status":"MIGRATED_SHAPE","owner":"Session-only migration state"},
+  {"id":"PICKUP_CODE_PRESENTATION","group":"CHECKOUT","label":"Pickup Code Presentation Shape","surface":"結帳 / 訂單","kind":"READ_SHAPE","status":"MIGRATED_SHAPE","owner":"Future canonical order projection"},
+  {"id":"CURRENT_QUOTE_PRESENTATION","group":"CHECKOUT","label":"Current Quote Presentation","surface":"購物籃 / 結帳","kind":"READ_SHAPE","status":"MIGRATED_SHAPE","owner":"Future Pricing readback"},
+  {"id":"SAFE_SUBMIT_PRESENTATION","group":"CHECKOUT","label":"Safe Submit Presentation","surface":"結帳","kind":"READ_SHAPE","status":"MIGRATED_SHAPE","owner":"MFK Customer Surface"},
+  {"id":"SUBMIT_ORDER_COMMAND","group":"CHECKOUT","label":"Submit Order Command","surface":"結帳","kind":"COMMAND_SHAPE","status":"NOT_WIRED","owner":"Future Customer→SMT admission adapter"},
+  {"id":"PENDING_INTENT_PRESENTATION","group":"CHECKOUT","label":"Pending Intent Presentation","surface":"結帳","kind":"READ_SHAPE","status":"MIGRATED_SHAPE","owner":"Future Customer submission readback"},
+
+  {"id":"STORE_ACCEPTANCE_PRESENTATION","group":"FULFILLMENT","label":"Store Acceptance Presentation","surface":"訂單","kind":"READ_SHAPE","status":"MIGRATED_SHAPE","owner":"Future Order/Fulfillment projection"},
+  {"id":"PREPARING_PRESENTATION","group":"FULFILLMENT","label":"Preparing Presentation","surface":"訂單","kind":"READ_SHAPE","status":"MIGRATED_SHAPE","owner":"Future Fulfillment projection"},
+  {"id":"READY_PRESENTATION","group":"FULFILLMENT","label":"Ready Presentation","surface":"訂單","kind":"READ_SHAPE","status":"MIGRATED_SHAPE","owner":"Future Fulfillment projection"},
+  {"id":"PICKUP_PRESENTATION","group":"FULFILLMENT","label":"Pickup Presentation","surface":"訂單","kind":"READ_SHAPE","status":"MIGRATED_SHAPE","owner":"Future Fulfillment projection"},
+  {"id":"COMPLETED_PRESENTATION","group":"FULFILLMENT","label":"Completed Presentation","surface":"訂單","kind":"READ_SHAPE","status":"MIGRATED_SHAPE","owner":"Future Fulfillment projection"},
+  {"id":"ORDER_STATUS","group":"FULFILLMENT","label":"Order Status","surface":"訂單","kind":"READ_SHAPE","status":"MIGRATED_SHAPE","owner":"Future Order projection"},
+  {"id":"ORDER_DETAIL","group":"FULFILLMENT","label":"Order Detail","surface":"訂單詳情","kind":"READ_SHAPE","status":"MIGRATED_SHAPE","owner":"Future Order projection"},
+  {"id":"PICKUP_CONFIRM_COMMAND","group":"FULFILLMENT","label":"Pickup / Handover Command","surface":"訂單","kind":"COMMAND_SHAPE","status":"NOT_WIRED","owner":"Future Fulfillment authority"},
+
+  {"id":"HISTORY","group":"HISTORY","label":"History","surface":"歷史","kind":"READ_SHAPE","status":"MIGRATED_SHAPE","owner":"Future Order history projection"},
+  {"id":"REORDER_SHAPE","group":"HISTORY","label":"Reorder Shape","surface":"歷史","kind":"READ_SHAPE","status":"MIGRATED_SHAPE","owner":"MFK Customer Surface"},
+  {"id":"REORDER_COMMAND","group":"HISTORY","label":"Formal Reorder Command","surface":"歷史","kind":"COMMAND_SHAPE","status":"NOT_WIRED","owner":"Future Customer→SMT admission adapter"},
+
+  {"id":"OWN_CHANNEL_UNAVAILABLE","group":"FALLBACK","label":"Own-channel Unavailable State","surface":"首頁","kind":"READ_SHAPE","status":"MIGRATED_SHAPE","owner":"Future Channel projection"},
+  {"id":"FALLBACK_PRESENTATION","group":"FALLBACK","label":"Fallback Presentation","surface":"首頁","kind":"READ_SHAPE","status":"MIGRATED_SHAPE","owner":"MFK Customer Surface"},
+  {"id":"WHATSAPP_FORWARD_COMMAND","group":"FALLBACK","label":"WhatsApp Fallback Command Shape","surface":"首頁","kind":"COMMAND_SHAPE","status":"NOT_WIRED","owner":"Future explicit user handoff"},
+
+  {"id":"OFFLINE_PRESENTATION","group":"RECOVERY","label":"Offline Presentation","surface":"全局","kind":"READ_SHAPE","status":"MIGRATED_SHAPE","owner":"MFK Customer Surface"},
+  {"id":"FAILURE_PRESENTATION","group":"RECOVERY","label":"Failure Presentation","surface":"全局","kind":"READ_SHAPE","status":"MIGRATED_SHAPE","owner":"MFK Customer Surface"},
+  {"id":"RETRY_PRESENTATION","group":"RECOVERY","label":"Retry Presentation","surface":"全局","kind":"COMMAND_SHAPE","status":"NOT_WIRED","owner":"Future domain-specific safe retry"},
+  {"id":"UNKNOWN_PRESENTATION","group":"RECOVERY","label":"UNKNOWN Presentation","surface":"全局","kind":"READ_SHAPE","status":"MIGRATED_SHAPE","owner":"MFK Customer Surface"},
+  {"id":"STALE_PRESENTATION","group":"RECOVERY","label":"STALE Presentation","surface":"全局","kind":"READ_SHAPE","status":"MIGRATED_SHAPE","owner":"MFK Customer Surface"},
+  {"id":"NO_BACKGROUND_RESUBMIT","group":"RECOVERY","label":"Zero Background Auto-resubmit Boundary","surface":"全局","kind":"READ_SHAPE","status":"MIGRATED_SHAPE","owner":"MFK Customer Surface"},
+  {"id":"CAPABILITY_REGISTRY","group":"GOVERNANCE","label":"Customer Capability Registry","surface":"更多","kind":"READ_SHAPE","status":"MIGRATED_SHAPE","owner":"MFK Customer Surface"}
+]
