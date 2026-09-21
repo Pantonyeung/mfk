@@ -1,0 +1,271 @@
+MFK 航海圖 V1.0｜Round001｜2026-09-21
+主題：MFK ONLY CURRENT REALITY
+狀態：CURRENT / CONTROLLING
+
+==================================================
+0. 絕對規則
+==================================================
+
+MFK 就係而家唯一 current system。
+
+所有：
+- 現況
+- 主權
+- 搬遷
+- 開發
+- 驗收
+- Worker sequencing
+
+一律只可以根據 current MFK source / runtime / current control decision 判斷。
+
+歷史文件／報告只可以喺任務明確需要時作：
+- capability reference
+- UI / workflow reference
+- acceptance oracle
+
+禁止用歷史資料：
+- 推斷 current state
+- 推斷 current authority
+- 推斷 current next step
+- 直接複製舊 execution lane
+- 覆蓋 current MFK reality
+
+==================================================
+1. 開工順序
+==================================================
+
+每次開工：
+
+1. fresh-read current MFK source
+2. fresh-read MFK current control board
+3. 判斷 current reality
+4. 只有明確需要參考時先讀歷史資料
+5. 任何衝突，以 current MFK reality 為準
+
+==================================================
+2. CURRENT MFK PORT TRUTH
+==================================================
+
+SMT
+STATUS：CURRENT / MIGRATED / DO NOT MIGRATE AGAIN
+
+Current product：
+v2local/**
+
+角色：
+Frontline Execution
+
+負責：
+Product / Modifier / Combo execution
+Cart / Quote
+Checkout
+Payment
+Store Commit
+Order
+Display
+Fulfillment
+Print execution
+Offline / local-first
+
+禁止：
+再次搬遷 SMT
+建立第二 SMT
+建立第二交易主權
+
+--------------------------------------------------
+
+ADMIN
+STATUS：MIGRATION ACTIVE / NOT COMPLETE
+
+Current product：
+v2admin/**
+
+Current branch：
+work/MFK/V2-ADMIN-CLEAN-DONOR-EXTRACTION-R1
+
+Current candidate：
+abf8f0e0024ef32bb0242e9653309751942509c1
+
+已完成：
+- independent Admin shell
+- capability inventory
+- legacy writer / API / DB authority disabled
+
+未完成：
+- 完整 page / form / editor / workflow extraction
+- live MFK domain wiring
+
+角色：
+Control Plane / Rule Publication
+
+Owner decides
+→ Admin Draft
+→ Validate
+→ Publish
+→ Active Revision
+→ SMT Execute
+
+--------------------------------------------------
+
+SMM
+STATUS：NEXT PORT MIGRATION
+
+目標：
+Frontline Assistive Terminal
+
+目前：
+未開始 current MFK migration。
+
+只准先做：
+clean port extraction / capability completeness
+
+未准：
+live submit / live LAN wiring / formal Order authority
+
+--------------------------------------------------
+
+CUSTOMER
+STATUS：NOT MIGRATED
+
+安排：
+Wave 2
+
+--------------------------------------------------
+
+OWNER
+STATUS：NOT MIGRATED
+
+安排：
+Wave 2
+
+==================================================
+3. SHARED DOMAINS
+==================================================
+
+以下係 shared domain / infrastructure，
+唔係要另外搬一個產品 Port：
+
+- External Provider
+- Sync / Projection
+- Physical Store Edge
+- Print / LAN / Device
+- Outbox / ACK / Readback
+
+處理時機：
+各產品 Port capability 有帳之後，
+由 Master Capability Matrix 決定接駁。
+
+==================================================
+4. WORKER POLICY
+==================================================
+
+同時間最多 2 個 Worker。
+
+禁止第 3 個 Worker。
+
+CURRENT WAVE 1：
+
+Worker A：
+ADMIN migration completion
+
+Worker B：
+SMM migration
+
+兩個都完成／BANKED 先開下一輪。
+
+WAVE 2：
+
+Worker A：
+CUSTOMER
+
+Worker B：
+OWNER
+
+==================================================
+5. CURRENT AUTHORITY MODEL
+==================================================
+
+OWNER：
+決定規則。
+
+ADMIN：
+將 Owner 決定變成正式、可驗證、可版本化、可發布嘅規則。
+
+SMT：
+按 Active Rules 執行。
+
+Hard Boundary：
+
+Admin 唔執行正式交易。
+SMT 唔制定 Owner policy。
+任何例外／override 必須有明確 authority + audit。
+
+==================================================
+6. MIGRATION RULE
+==================================================
+
+對每個未搬 Port：
+
+CURRENT REQUIREMENT
+→ CLEAN PORT EXTRACTION
+→ COMPLETE CAPABILITY REGISTRY
+→ NO LIVE AUTHORITY
+→ BANK
+
+全部 Port 有帳之後先：
+
+MASTER CAPABILITY MATRIX
+→ MFK AUTHORITY MAP
+→ DOMAIN ADAPTER
+→ LIVE WIRING
+→ ACCEPTANCE
+
+==================================================
+7. DO NOT DO
+==================================================
+
+禁止：
+
+1. 用歷史航海圖直接派工
+2. 見到歷史 Report 就照做
+3. 再搬 SMT
+4. 開超過 2 個 Worker
+5. Port 未抽完整就 live wiring
+6. 邊搬邊重寫 Core
+7. 將歷史 system language 當 current MFK language
+8. 將歷史 authority 當 MFK authority
+
+==================================================
+8. CURRENT CONTROL
+==================================================
+
+GitHub：
+Pantonyeung/mfk #22
+
+Title：
+CONTROL｜MFK Current Reality｜MFK-only Authority / Migration Board
+
+呢個 Issue 係 current MFK control board。
+
+==================================================
+9. NEXT
+==================================================
+
+只做：
+
+A. Admin migration completion
+B. SMM migration
+
+未完成前：
+NO THIRD WORKER
+NO LIVE WIRING
+
+==================================================
+10. MILESTONE
+==================================================
+
+MFK_ONLY_CURRENT_REALITY_LOCKED
+
+==================================================
+END ROUND001
+==================================================
