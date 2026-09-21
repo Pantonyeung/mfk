@@ -9,6 +9,7 @@ export interface PrintBinding{
   readonly host:string;
   readonly port:number;
   readonly capability:'receipt-80mm/kitchen'|'label-58mm';
+  readonly encoding:'gb18030'|'big5'|'utf-8';
 }
 
 export interface PrintableOrder{
