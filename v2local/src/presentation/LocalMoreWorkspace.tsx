@@ -1,6 +1,7 @@
 import {useEffect,useMemo,useState} from 'react';
 import {useNavigate} from 'react-router';
-import {applyLanPrinter,printTextLan,testLanPrinter,type NativeResult} from '../runtime/native-print.ts';
+import {applyLanPrinter,printBytesLan,printTextLan,testLanPrinter,type NativeResult} from '../runtime/native-print.ts';
+import {LABEL_TSC_PROFILE,renderTscRasterLabel} from '../runtime/label-bitmap.ts';
 import {localRuntime} from '../runtime/local-runtime.ts';
 import {
   applyMfkStorageSnapshot,
@@ -126,11 +127,18 @@ function PrinterPanel(){
       else if(kind==='save')result=await applyLanPrinter(printer);
       else if(kind==='test')result=await testLanPrinter(printer);
       else{
-        const labelFont=current.encoding==='big5'?'TST24.BF2':current.encoding==='gb18030'?'TSS24.BF2':'3';
-        const payload=current.capability==='label-58mm'
-          ?'SIZE 40 mm,30 mm\r\nGAP 2 mm,0 mm\r\nDENSITY 8\r\nCLS\r\nTEXT 20,20,"3",0,1,1,"MFK TEST"\r\nTEXT 20,55,"'+labelFont+'",0,1,1,"'+current.role+'"\r\nPRINT 1,1\r\n'
-          :'\x1b\x40MFK FUSION '+current.role+' TEST\n'+current.name+'\n'+new Date().toISOString()+'\n\n\n';
-        result=await printTextLan({...printer,text:payload});
+        if(current.capability==='label-58mm'){
+          const bytes=await renderTscRasterLabel({
+            orderCode:'MFK TEST',
+            primaryText:current.role,
+            secondaryText:'50×40 · TSC',
+            pieceLabel:'1/1',
+          });
+          result=await printBytesLan({...printer,bytes});
+        }else{
+          const payload='\x1b\x40MFK FUSION '+current.role+' TEST\n'+current.name+'\n'+new Date().toISOString()+'\n\n\n';
+          result=await printTextLan({...printer,text:payload});
+        }
       }
     }catch(error){result={ok:false,code:error instanceof Error?error.message:'PRINT_ACTION_FAILED'}}
     setStatus(s=>({...s,[current.id]:result}));
@@ -150,6 +158,7 @@ function PrinterPanel(){
     <label className="more-field"><span>Printer IP / Host</span><input inputMode="decimal" placeholder="例如 192.168.1.201" value={current.host} onChange={e=>update({host:e.target.value})}/></label>
     <label className="more-field"><span>Port</span><input inputMode="numeric" value={String(current.port)} onChange={e=>update({port:Number(e.target.value)||0})}/></label>
     <label className="more-field"><span>中文編碼</span><select value={current.encoding} onChange={e=>update({encoding:e.target.value as PrinterBinding['encoding']})}><option value="gb18030">GB18030</option><option value="big5">Big5（標籤預設）</option><option value="utf-8">UTF-8</option></select></label>
+    {current.capability==='label-58mm'?<div className="fusion-note"><b>Label Profile</b>：{LABEL_TSC_PROFILE.protocol} · {LABEL_TSC_PROFILE.widthMm}×{LABEL_TSC_PROFILE.heightMm} mm · 上偏移 {LABEL_TSC_PROFILE.topOffset} · 左偏移 {LABEL_TSC_PROFILE.leftOffset} · 行間隔 {LABEL_TSC_PROFILE.lineGap} · 中文以 Bitmap 出紙</div>:null}
     <div className="more-tab-row">
       <button type="button" disabled={Boolean(busy)} onClick={()=>void run('test')}>{busy==='test'?'測試中…':'① 測試連線'}</button>
       <button type="button" className="more-primary" disabled={Boolean(busy)} onClick={()=>void run('print')}>{busy==='print'?'出紙中…':'② 測試出紙'}</button>
