@@ -7,3 +7,4 @@ export * from './orders.js';
 export * from './store.js';
 export * from './certification.js';
 export * from './capabilities.js';
+export * from './runtime-policy.js';
