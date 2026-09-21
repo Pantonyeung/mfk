@@ -1,4 +1,5 @@
 import {useState} from 'react';
+import {Link} from 'react-router';
 
 function ReadHeader({title,description}:{title:string;description:string}){
   return <header className="admin-editor-head">
@@ -8,8 +9,14 @@ function ReadHeader({title,description}:{title:string;description:string}){
 }
 
 export function OverviewWorkspace(){
+  const readiness=[
+    ['Menu / Config','UNKNOWN','/admin/publish'],
+    ['Channel','UNKNOWN','/admin/channels'],
+    ['Device / Printer','UNKNOWN','/admin/devices'],
+    ['Business Day Record','UNKNOWN','/admin/business-day'],
+  ] as const;
   return <section className="admin-editor-page">
-    <ReadHeader title="營運總覽" description="Admin 首頁只聚合 MFK read models、Readiness 同 Pending Changes；唔持有交易 mutation。"/>
+    <ReadHeader title="今日" description="唯一每日入口：Readiness、核心 KPI、Pending Changes 同 Action Queue。只聚合狀態；任何修復 deep-link 去責任頁，首頁唔持有 mutation。"/>
     <div className="admin-kpi-grid">
       {[
         ['今日銷售','—','REPORTING_NOT_WIRED'],
@@ -19,13 +26,18 @@ export function OverviewWorkspace(){
       ].map(([label,value,state])=><article key={label}><span>{label}</span><strong>{value}</strong><small>{state}</small></article>)}
     </div>
     <div className="admin-overview-columns">
-      <section className="admin-read-card"><header><h2>Readiness</h2><span>NOT_WIRED</span></header><div className="admin-read-empty">未接 MFK readiness read model。</div></section>
-      <section className="admin-read-card"><header><h2>Pending Changes</h2><span>NOT_WIRED</span></header><div className="admin-read-empty">未接 Admin published / draft revision readback。</div></section>
-      <section className="admin-read-card"><header><h2>Action Queue</h2><span>NOT_WIRED</span></header><div className="admin-read-empty">未接 canonical exception/action projection。</div></section>
+      <section className="admin-read-card">
+        <header><h2>Readiness</h2><span>NOT_WIRED</span></header>
+        <div className="admin-editor-list">
+          {readiness.map(([label,state,path])=><article className="admin-policy-row" key={label}><span>{label}</span><b>{state}</b><Link to={path}>前往責任頁</Link></article>)}
+        </div>
+        <small>Readiness 只係狀態聚合；Degraded / Unknown 唔會自動變成 transaction blocker。</small>
+      </section>
+      <section className="admin-read-card"><header><h2>Pending Changes</h2><span>NOT_WIRED</span></header><div className="admin-read-empty">未接 Admin published / draft revision readback。</div><Link to="/admin/publish">開啟 Pending Changes</Link></section>
+      <section className="admin-read-card"><header><h2>Action Queue</h2><span>NOT_WIRED</span></header><div className="admin-read-empty">未接 canonical exception/action projection。</div><Link to="/admin/action-queue">開啟 Action Queue</Link></section>
     </div>
   </section>;
 }
-
 export function CapacityWorkspace(){
   const [dailyLimit,setDailyLimit]=useState('');
   const [warningAt,setWarningAt]=useState('80');

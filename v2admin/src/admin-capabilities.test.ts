@@ -5,10 +5,10 @@ import {MFK_ADMIN_AUTHORITY} from './admin-authority.ts';
 describe('MFK Admin isolated control plane',()=>{
   it('keeps the complete capability registry visible',()=>{
     expect(ADMIN_CAPABILITY_GROUPS.map(group=>group.id)).toEqual([
-      'overview','operations','products','orders','print','channels','members','reports','store','system',
+      'today','orders','menu','connections','people','reports','store','members','system',
     ]);
-    expect(ADMIN_CAPABILITIES).toHaveLength(41);
-    for(const required of ['products','categories','modifiers','pricing','combo','publish-center','print-center','print-rules','settlement','quick-reasons','staff','audit']){
+    expect(ADMIN_CAPABILITIES).toHaveLength(52);
+    for(const required of ['products','categories','modifiers','pricing','combo','publish-center','action-queue','device-health','ota','print-center','print-rules','settlement','quick-reasons','staff','access-session','product-report','channel-report','refund-report','export-governance','diagnostics','integrations-governance','audit']){
       expect(ADMIN_CAPABILITIES.some(item=>item.id===required)).toBe(true);
     }
   });

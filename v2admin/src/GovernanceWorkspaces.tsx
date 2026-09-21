@@ -12,6 +12,7 @@ function MigrationHeader({title,description}:{title:string;description:string}){
 export function PublishCenterWorkspace(){
   const {draft,dirty,validationErrors,validate}=useAdminDraft();
   const [lastValidationAt,setLastValidationAt]=useState<string>();
+  const [impactPreviewed,setImpactPreviewed]=useState(false);
   const counts=useMemo(()=>({
     categories:draft.categories.length,
     products:draft.products.length,
@@ -21,9 +22,11 @@ export function PublishCenterWorkspace(){
   const runValidation=()=>{
     validate();
     setLastValidationAt(new Date().toISOString());
+    setImpactPreviewed(false);
   };
+  const canPreview=Boolean(lastValidationAt)&&validationErrors.length===0;
   return <section className="admin-editor-page">
-    <MigrationHeader title="發布中心" description="只整理 Draft → Validate → Publish → Active Revision 嘅操作面。今階段唔會連接任何 SMT / Domain Adapter。"/>
+    <MigrationHeader title="Pending Changes／發布" description="Draft → Validate → Impact → Publish → target readback → rollback 嘅完整治理 shape。今輪全部停喺 NOT_WIRED，唔會生成 Active Revision。"/>
     <div className="admin-kpi-grid">
       <article><span>Categories</span><strong>{counts.categories}</strong><small>SESSION DRAFT</small></article>
       <article><span>Products</span><strong>{counts.products}</strong><small>SESSION DRAFT</small></article>
@@ -32,29 +35,41 @@ export function PublishCenterWorkspace(){
     </div>
     <div className="admin-policy-grid two">
       <article className="admin-policy-card">
-        <h2>Draft</h2>
+        <h2>1. Draft</h2>
         <p>{dirty?'有未發布變更':'目前冇變更'}</p>
         <span className="admin-not-wired-chip">SESSION ONLY</span>
       </article>
       <article className="admin-policy-card">
-        <h2>Validate</h2>
+        <h2>2. Validate</h2>
         <button type="button" onClick={runValidation}>執行 Validate</button>
         <small>{lastValidationAt?'最後驗證：'+lastValidationAt:'未驗證'}</small>
         {validationErrors.length?<ul>{validationErrors.map((error,index)=><li key={index}>{error}</li>)}</ul>:null}
       </article>
       <article className="admin-policy-card">
-        <h2>Publish</h2>
-        <button type="button" disabled>Publish 未接駁</button>
-        <small>Owner 未開 Connection Phase，唔會生成 Active Revision。</small>
+        <h2>3. Impact Preview</h2>
+        <p>預覽受影響 Product / Channel / Presentation target，同 base revision conflict 風險。</p>
+        <button type="button" disabled={!canPreview} onClick={()=>setImpactPreviewed(true)}>產生 Impact Preview</button>
+        <small>{impactPreviewed?'IMPACT_PREVIEW_LOCAL_ONLY':'先完成 Validate'}</small>
       </article>
       <article className="admin-policy-card">
-        <h2>Active Revision Readback</h2>
-        <div className="admin-read-empty">ACTIVE_CONFIG_READBACK_NOT_WIRED</div>
+        <h2>4. Publish</h2>
+        <label><span>Expected Base Revision</span><input disabled placeholder="ACTIVE_REVISION_NOT_WIRED"/></label>
+        <button type="button" disabled>Publish 未接駁</button>
+        <small>唔會向任何 runtime / provider 發送。</small>
+      </article>
+      <article className="admin-policy-card">
+        <h2>5. Target Readback</h2>
+        <div className="admin-read-empty">MATCH / PARTIAL / MISMATCH / UNKNOWN · NOT_WIRED</div>
+        <small>每個 target 必須有 observed revision / evidence；冇 proof 唔可以顯示成功。</small>
+      </article>
+      <article className="admin-policy-card">
+        <h2>6. Rollback</h2>
+        <button type="button" disabled>Rollback as New Revision 未接駁</button>
+        <small>Rollback 只會建立新 revision，唔 edit history。</small>
       </article>
     </div>
   </section>;
 }
-
 export function PrintRulesWorkspace(){
   const {draft}=useAdminDraft();
   const [rows,setRows]=useState<Record<string,{receipt:boolean;production:boolean;packing:boolean;label:boolean;dineIn:boolean}>>({});
