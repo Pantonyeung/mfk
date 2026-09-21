@@ -22,6 +22,10 @@ jobs:
       - name: Install
         working-directory: v2local
         run: npm install --legacy-peer-deps --ignore-scripts --no-audit --no-fund
+      - name: Unit tests
+        working-directory: v2local
+        run: npm run test
+
       - name: Build
         working-directory: v2local
         run: npm run build
