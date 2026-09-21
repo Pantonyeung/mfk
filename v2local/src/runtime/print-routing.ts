@@ -1,3 +1,5 @@
+import type {RasterLabelSpec} from './label-bitmap.ts';
+
 export type PrintRole='顧客小票'|'製作單'|'打包單'|'產品標籤'|'袋標籤';
 
 export interface PrintBinding{
@@ -27,6 +29,8 @@ export interface PlannedPrintJob{
   readonly role:PrintRole;
   readonly binding:PrintBinding;
   readonly payload:string;
+  readonly renderMode?:'text'|'tsc-bitmap';
+  readonly labelSpec?:RasterLabelSpec;
 }
 
 const money=(minor:number)=>'$'+(Math.max(0,Number(minor)||0)/100).toFixed(2);
@@ -65,39 +69,6 @@ function packing(order:PrintableOrder){
     +'\n\n\n';
 }
 
-function tsplChineseFont(encoding:PrintBinding['encoding']){
-  if(encoding==='big5')return 'TST24.BF2';
-  if(encoding==='gb18030')return 'TSS24.BF2';
-  return '3';
-}
-
-function label(order:PrintableOrder,item:{id:string;name:string;qty:number;unitMinor:number},index:number,total:number,encoding:PrintBinding['encoding']){
-  const orderCode=clean(order.display).replace(/"/g,'');
-  const product=clean(item.name).replace(/"/g,'');
-  const font=tsplChineseFont(encoding);
-  return 'SIZE 40 mm,30 mm\r\n'
-    +'GAP 2 mm,0 mm\r\n'
-    +'DENSITY 8\r\n'
-    +'CLS\r\n'
-    +'TEXT 20,20,"3",0,1,1,"'+orderCode+'"\r\n'
-    +'TEXT 20,55,"'+font+'",0,1,1,"'+product+'"\r\n'
-    +'TEXT 20,90,"2",0,1,1,"'+index+'/'+total+'"\r\n'
-    +'PRINT 1,1\r\n';
-}
-
-function bagLabel(order:PrintableOrder,encoding:PrintBinding['encoding']){
-  const orderCode=clean(order.display).replace(/"/g,'');
-  const total=order.items.reduce((sum,item)=>sum+Math.max(0,Number(item.qty)||0),0);
-  const font=tsplChineseFont(encoding);
-  return 'SIZE 40 mm,30 mm\r\n'
-    +'GAP 2 mm,0 mm\r\n'
-    +'DENSITY 8\r\n'
-    +'CLS\r\n'
-    +'TEXT 20,20,"3",0,1,1,"'+orderCode+'"\r\n'
-    +'TEXT 20,55,"'+font+'",0,1,1,"袋 '+total+' 件"\r\n'
-    +'PRINT 1,1\r\n';
-}
-
 export function buildOrderPrintPlan(order:PrintableOrder,bindings:readonly PrintBinding[]):readonly PlannedPrintJob[]{
   const active=bindings.filter(binding=>String(binding.host||'').trim()&&Number(binding.port)>0);
   const jobs:PlannedPrintJob[]=[];
@@ -125,11 +96,18 @@ export function buildOrderPrintPlan(order:PrintableOrder,bindings:readonly Print
         const qty=Math.max(0,Math.floor(Number(item.qty)||0));
         for(let i=0;i<qty;i++){
           labelIndex+=1;
+          const labelSpec:RasterLabelSpec={
+            orderCode:clean(order.display),
+            primaryText:clean(item.name),
+            pieceLabel:labelIndex+'/'+total,
+          };
           jobs.push({
             id:order.id+':product-label:'+item.id+':'+(i+1),
             role:binding.role,
             binding,
-            payload:label(order,item,labelIndex,total,binding.encoding),
+            payload:'LABEL '+labelSpec.orderCode+' '+labelSpec.primaryText+' '+labelSpec.pieceLabel,
+            renderMode:'tsc-bitmap',
+            labelSpec,
           });
         }
       }
