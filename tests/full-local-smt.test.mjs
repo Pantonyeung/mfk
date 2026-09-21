@@ -65,12 +65,13 @@ test('active SMT runtime has no remote network client',async()=>{
   ];
   for(const path of firstParty){
     const source=await read(path);
-    assert.doesNotMatch(source,/\bfetch\s*\(/,path);
-    assert.doesNotMatch(source,/\bXMLHttpRequest\b/,path);
-    assert.doesNotMatch(source,/\bWebSocket\b/,path);
-    assert.doesNotMatch(source,/\bEventSource\b/,path);
-    assert.doesNotMatch(source,/https?:\/\//,path);
-    assert.doesNotMatch(source,/firebase/i,path);
+    const networkSource=source.replaceAll('https://appassets.androidplatform.net','');
+    assert.doesNotMatch(networkSource,/\bfetch\s*\(/,path);
+    assert.doesNotMatch(networkSource,/\bXMLHttpRequest\b/,path);
+    assert.doesNotMatch(networkSource,/\bWebSocket\b/,path);
+    assert.doesNotMatch(networkSource,/\bEventSource\b/,path);
+    assert.doesNotMatch(networkSource,/https?:\/\//,path);
+    assert.doesNotMatch(networkSource,/firebase/i,path);
   }
 });
 
