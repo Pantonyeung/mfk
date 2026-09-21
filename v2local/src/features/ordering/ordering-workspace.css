@@ -78,3 +78,10 @@
 .ordering-hold-tables button.occupied{background:#f0f2f4;color:#8a8f98}
 .ordering-hold-tables b{font-size:24px}.ordering-hold-tables span{font-size:11px;font-weight:800}
 @media(max-width:1400px){.ordering-hold-placement-body{grid-template-columns:115px minmax(0,1fr)}.ordering-hold-left b{font-size:16px}}
+
+/* R8: main cart never becomes dining grid */
+.ordering-cart-secondary-actions.single{grid-template-columns:1fr}
+.ordering-cart-secondary-actions.single>button{width:100%}
+/* legacy inline-hold selectors intentionally disabled */
+.ordering-cart.hold-active{grid-template-rows:auto minmax(0,1fr) auto auto auto auto}
+.ordering-hold-placement{display:none!important}
