@@ -5,6 +5,7 @@
 Current system: MFK only.
 Current navigation: `docs/navigation/MFK_航海圖_V1.4_Round005_2026-09-22.txt` once published.
 Cloud governance: `docs/governance/MFK_CLOUD_RUNTIME_BUDGET_AND_LEGACY_RETIREMENT_LOCK_R1_2026-09-22.md`.
+Keeta runtime guard: `integrations/keeta/RUNTIME_SIMPLICITY_GUARD_R1.md`.
 
 Permanent rules:
 - exactly six roles only: SMT / Admin / SMM / Customer / Keeta / Owner
