@@ -133,7 +133,7 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
     pendingOrders,activeOrders,categories,selectedCategoryId:category,
     products:visible.map(product=>({
       id:product.id,name:product.name,priceLabel:product.priceReady?money(product.priceMinor):'未接價格',
-      enabled:product.priceReady,requiresOptions:product.priceReady&&['飯團','便當'].includes(product.category),imageUrl:productArtwork(product),
+      enabled:product.priceReady,requiresOptions:product.priceReady&&['飯團','便當'].includes(product.category),
       ...(!product.priceReady?{badge:'Menu only'}:{}),
     })),
     menuRevisionLabel:'LOCAL ADMIN MENU · R'+adminMenu.revision,
