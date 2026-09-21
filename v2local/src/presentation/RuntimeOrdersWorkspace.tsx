@@ -51,13 +51,24 @@ export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePor
   },[selected,runtime,readyBusy,load]);
 
   const printSelected=useCallback(async()=>{
-    if(!selected||!runtime.printOrderReceipt||printBusy)return;
+    if(!selected||(!runtime.printOrderOutputs&&!runtime.printOrderReceipt)||printBusy)return;
     setPrintBusy(true);setPrintStatus(null);
     try{
-      const result=await runtime.printOrderReceipt(selected.orderId);
-      setPrintStatus(result.state==='COMPLETED'?'打印完成':`打印狀態：${result.state}`);
-    }catch{
-      setPrintStatus('打印未完成，請檢查打印機連線後再試');
+      if(runtime.printOrderOutputs){
+        const result=await runtime.printOrderOutputs(selected.orderId);
+        if(result.planned===0)setPrintStatus('未有任何已綁定打印 Route');
+        else if(result.failed===0)setPrintStatus(`已送出 ${result.sent}/${result.planned} 個打印工作`);
+        else{
+          const failures=result.results.filter(row=>!row.ok).map(row=>row.role+':'+row.code).join('；');
+          setPrintStatus(`打印部分失敗：${result.sent}/${result.planned}；${failures}`);
+        }
+      }else{
+        const result=await runtime.printOrderReceipt!(selected.orderId);
+        setPrintStatus(result.state==='COMPLETED'?'打印完成':`打印狀態：${result.state}`);
+      }
+    }catch(cause){
+      const code=cause instanceof Error?cause.message:String(cause??'PRINT_FAILED');
+      setPrintStatus('打印失敗：'+code);
     }finally{setPrintBusy(false);}
   },[selected,runtime,printBusy]);
 
@@ -73,7 +84,7 @@ export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePor
           <div className="orders-status-strip"><span>付款</span><b>{selected.paymentLabel}</b><small>{selected.fulfillmentLabel}</small></div>
           <section className="orders-payment-summary">{selected.metrics.slice(0,3).map(metric=><p key={metric.id}><span>{metric.label}</span><b>{metric.value}</b></p>)}</section>
           {selected.attention.map(item=><p className="orders-notice" key={item}>{item}</p>)}
-          <div className="orders-main-actions"><button type="button" disabled={!runtime.markOrderReady||readyBusy||selected.fulfillmentLabel==='可取餐'||selected.fulfillmentLabel==='已完成'} onClick={()=>void markSelectedReady()}>{readyBusy?'處理中…':selected.fulfillmentLabel==='可取餐'?'已可取餐':'標記可取餐'}</button><button type="button" disabled={!runtime.printOrderReceipt||printBusy} onClick={()=>void printSelected()}>{printBusy?'打印中…':'打印'}</button></div>
+          <div className="orders-main-actions"><button type="button" disabled={!runtime.markOrderReady||readyBusy||selected.fulfillmentLabel==='可取餐'||selected.fulfillmentLabel==='已完成'} onClick={()=>void markSelectedReady()}>{readyBusy?'處理中…':selected.fulfillmentLabel==='可取餐'?'已可取餐':'標記可取餐'}</button><button type="button" disabled={(!runtime.printOrderOutputs&&!runtime.printOrderReceipt)||printBusy} onClick={()=>void printSelected()}>{printBusy?'打印中…':'打印全部已設定'}</button></div>
           {readyStatus?<p className={readyStatus.tone==='error'?'orders-notice':'orders-sync-state'} role={readyStatus.tone==='error'?'alert':'status'}>{readyStatus.text}</p>:null}
           {printStatus?<p className="orders-sync-state" role="status">{printStatus}</p>:null}
         </>:null}
