@@ -109,17 +109,17 @@ export function StaffWorkspace(){
   </section>;
 }
 
-export function ChannelsWorkspace({mode}:{mode:'overview'|'mapping'|'accept'|'sync'|'estimate'}){
+export function ChannelsWorkspace({mode}:{mode:'overview'|'mapping'|'failures'|'accept'|'sync'|'estimate'}){
   const [enabled,setEnabled]=useState(false);
   const [autoAccept,setAutoAccept]=useState(false);
   const [syncSellability,setSyncSellability]=useState(false);
   const [commission,setCommission]=useState('');
-  const title=mode==='overview'?'平台管理':mode==='mapping'?'商品映射管理':mode==='accept'?'接單／自動接單':mode==='sync'?'售罄／供應同步':'實收估算設定';
+  const title=mode==='overview'?'平台管理':mode==='mapping'?'商品映射管理':mode==='failures'?'匹配失敗明細':mode==='accept'?'接單／自動接單':mode==='sync'?'售罄／供應同步':'實收估算設定';
   return <section className="admin-editor-page">
     <PolicyHeader title={title} description="平台相關配置只係 Admin policy 草稿；未接 Channel Adapter 前唔會向任何 Provider 發 command。"/>
     <div className="admin-policy-grid two">
       <article className="admin-policy-card"><h2>Channel Policy</h2><label className="admin-toggle"><input type="checkbox" checked={enabled} onChange={event=>setEnabled(event.target.checked)}/><span>啟用 Channel config</span></label><label className="admin-toggle"><input type="checkbox" checked={autoAccept} onChange={event=>setAutoAccept(event.target.checked)}/><span>正常單自動 admission policy</span></label><label className="admin-toggle"><input type="checkbox" checked={syncSellability} onChange={event=>setSyncSellability(event.target.checked)}/><span>同步 Sellability policy</span></label></article>
-      <article className="admin-policy-card"><h2>Estimate / Mapping</h2><label><span>Commission estimate %</span><input inputMode="decimal" value={commission} onChange={event=>setCommission(event.target.value)} placeholder="例如 30"/></label><label><span>Provider Product Mapping</span><input disabled placeholder="待 Channel / Product Adapter"/></label><span className="admin-not-wired-chip">NO PROVIDER COMMAND</span></article>
+      <article className="admin-policy-card"><h2>{mode==='failures'?'Mapping Exceptions':'Estimate / Mapping'}</h2>{mode==='failures'?<div className="admin-read-empty">CHANNEL_MAPPING_FAILURE_READ_MODEL_NOT_WIRED</div>:<><label><span>Commission estimate %</span><input inputMode="decimal" value={commission} onChange={event=>setCommission(event.target.value)} placeholder="例如 30"/></label><label><span>Provider Product Mapping</span><input disabled placeholder="待 Channel / Product Adapter"/></label></>}<span className="admin-not-wired-chip">NO PROVIDER COMMAND</span></article>
     </div>
   </section>;
 }
