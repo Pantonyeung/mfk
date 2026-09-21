@@ -6,10 +6,10 @@ import type {OrderingWorkspaceActions,OrderingWorkspaceViewModel,ServiceMode} fr
 import {CheckoutWorkspace} from './features/checkout/CheckoutWorkspace.tsx';
 import type {CheckoutChannelId,CheckoutTenderId,CheckoutWorkspaceActions,CheckoutWorkspaceViewModel} from './features/checkout/checkout-workspace-model.ts';
 import {RuntimeOrdersWorkspace} from './presentation/RuntimeOrdersWorkspace.tsx';
-import {RuntimeDiningWorkspace} from './presentation/RuntimeDiningWorkspace.tsx';
+import {RuntimeDiningWorkspace,type DiningCheckoutRequest} from './presentation/RuntimeDiningWorkspace.tsx';
 import {RuntimeSoldoutWorkspace} from './presentation/RuntimeSoldoutWorkspace.tsx';
 import {LocalMoreWorkspace} from './presentation/LocalMoreWorkspace.tsx';
-import {localRuntime} from './runtime/local-runtime.ts';
+import {localRuntime,type DiningTender} from './runtime/local-runtime.ts';
 import {ComboWorkspace,HoldCartWorkspace,HoldListWorkspace,OrganizeWorkspace,ProductConfigWorkspace,type OrderingPanelState,type WorkspaceHoldDraft,type WorkspaceProduct} from './features/ordering/OrderingCenterWorkspaces.tsx';
 
 type Product={id:string;category:string;name:string;priceMinor:number};
@@ -223,7 +223,7 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
     onSelectCategory:setCategory,
     onAddProduct:add,
     onConfigureProduct:id=>setPanel({type:'product',productId:id}),
-    onChangeServiceMode:setServiceMode,
+    onChangeServiceMode:mode=>{setServiceMode(mode);setCart(cart.map(item=>({...item,serviceMode:mode})));},
     onChangeCartView:mode=>{setViewMode(mode);if(mode==='organized')setPanel({type:'organize'});},
     onChangeLineServiceMode:(lineId,mode)=>setCart(cart.map(item=>item.id===lineId?{...item,serviceMode:mode}:item)),
     onAdjustLineQuantity:(lineId,delta)=>setCart(cart.map(item=>item.id===lineId?{...item,qty:item.qty+delta}:item).filter(item=>item.qty>0)),
@@ -238,7 +238,7 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
   return <OrderingWorkspace view={view} actions={actions} centerPanel={panel&&panelBody?{title:panelTitle,body:panelBody,onClose:()=>setPanel(null)}:null}/>;
 }
 
-function CheckoutPage({cart,setCart}:{cart:CartLine[];setCart:(v:CartLine[])=>void}){
+function CheckoutPage({cart,setCart,diningCheckout,onDiningCheckoutDone}:{cart:CartLine[];setCart:(v:CartLine[])=>void;diningCheckout:DiningCheckoutRequest|null;onDiningCheckoutDone:()=>void}){
   const navigate=useNavigate();
   const due=cart.reduce((sum,line)=>sum+line.unitMinor*line.qty,0);
   const [channel,setChannel]=useState<CheckoutChannelId>('walk-in');
@@ -287,7 +287,7 @@ function CheckoutPage({cart,setCart}:{cart:CartLine[];setCart:(v:CartLine[])=>vo
 
   const view:CheckoutWorkspaceViewModel={
     order:{
-      orderId:'P'+String(localRuntime.orders().length+1).padStart(3,'0'),
+      orderId:diningCheckout?.codeLabel??('P'+String(localRuntime.orders().length+1).padStart(3,'0')),
       lines:cart.map(line=>({id:line.id,name:line.name,detail:line.detail,quantity:line.qty,lineTotalLabel:money(line.unitMinor*line.qty)})),
       subtotalLabel:money(due),packagingLabel:'$0.00',discountLabel:'$0.00',totalLabel:money(due),
     },
@@ -315,10 +315,30 @@ function CheckoutPage({cart,setCart}:{cart:CartLine[];setCart:(v:CartLine[])=>vo
     validationMessage,statusMessage:printStatus,completionReview:completion,
   };
 
-  const confirm=()=>{
+  const confirm=async()=>{
     if(!confirmEnabled)return;
     setState('processing');
     try{
+      if(diningCheckout){
+        const tenderCode:DiningTender=method==='COMBO'?'COMBO':method;
+        const updated=await localRuntime.settleDiningHold(
+          diningCheckout.holdId,
+          diningCheckout.selections,
+          tenderCode
+        );
+        setCompletion({
+          displayOrderCode:diningCheckout.codeLabel,
+          tenderLabel:tenderDisplay,
+          dueLabel:money(due),
+          receivedLabel:money(received),
+          changeLabel:money(change),
+          statusLabel:updated.remainingMinor===0?'堂食已全數結帳':'堂食分項結帳完成',
+        });
+        setState('success');
+        setPrintStatus('堂食 '+diningCheckout.tableLabel+' 號枱 · 已記錄 '+tenderDisplay+' · 未結 '+money(updated.remainingMinor));
+        return;
+      }
+
       const order=localRuntime.createOrder({
         items:cart.map(line=>({id:line.productId,name:line.detail?line.name+'｜'+line.detail:line.name,qty:line.qty,unitMinor:line.unitMinor})),
         totalMinor:due,paymentLabel,sourceLabel,
@@ -341,7 +361,7 @@ function CheckoutPage({cart,setCart}:{cart:CartLine[];setCart:(v:CartLine[])=>vo
   };
 
   const actions:CheckoutWorkspaceActions={
-    onBack:()=>navigate('/'),
+    onBack:()=>navigate(diningCheckout?'/dining':'/'),
     onSelectChannel:setChannel,
     onSelectMethod:setMethod,
     onChangeCustomerPhone:setCustomerPhone,
@@ -356,7 +376,7 @@ function CheckoutPage({cart,setCart}:{cart:CartLine[];setCart:(v:CartLine[])=>vo
     onQuickCash:amount=>setCash(value=>((Number(value)||0)+amount).toFixed(2)),
     onExactCash:()=>setCash((due/100).toFixed(2)),
     onConfirm:confirm,onRetry:confirm,
-    onDone:()=>{setCart([]);navigate('/')},
+    onDone:()=>{setCart([]);if(diningCheckout){onDiningCheckoutDone();navigate('/dining');}else navigate('/')},
   };
 
   return <CheckoutWorkspace view={view} actions={actions}/>;
@@ -365,6 +385,7 @@ function CheckoutPage({cart,setCart}:{cart:CartLine[];setCart:(v:CartLine[])=>vo
 export function MfkV2LocalApp(){
   const [cart,setCartState]=useState<CartLine[]>([]);
   const [serviceMode,setServiceMode]=useState<ServiceMode>('takeaway');
+  const [diningCheckout,setDiningCheckout]=useState<DiningCheckoutRequest|null>(null);
   const [navRevision,setNavRevision]=useState(0);
   useEffect(()=>localRuntime.subscribe(()=>setNavRevision(value=>value+1)),[]);
   const activeOrderCount=useMemo(()=>{
@@ -373,6 +394,26 @@ export function MfkV2LocalApp(){
   },[navRevision]);
   const setCart=(next:CartLine[])=>setCartState(next);
   const runtime=useMemo(()=>localRuntime,[]);
+
+  const prepareDiningCheckout=(request:DiningCheckoutRequest)=>{
+    const next:CartLine[]=request.lines.map((line,index)=>{
+      const parts=line.name.split('｜');
+      const name=parts.shift()||line.name;
+      const detail=parts.length?parts.join('｜'):undefined;
+      return {
+        id:'dining-checkout-'+request.holdId+'-'+line.lineIndex+'-'+index,
+        productId:line.id,
+        name,
+        qty:line.qty,
+        unitMinor:line.unitMinor,
+        serviceMode:'dine-in',
+        detail,
+      };
+    });
+    setDiningCheckout(request);
+    setServiceMode('dine-in');
+    setCartState(next);
+  };
 
   return <ProductionViewport><div className="clean-app">
     <aside className="clean-rail">
@@ -389,9 +430,9 @@ export function MfkV2LocalApp(){
     <section className="clean-route-stage">
       <Routes>
         <Route index element={<OrderingPage cart={cart} setCart={setCart} serviceMode={serviceMode} setServiceMode={setServiceMode}/>}/>
-        <Route path="checkout" element={<CheckoutPage cart={cart} setCart={setCart}/>}/>
+        <Route path="checkout" element={<CheckoutPage cart={cart} setCart={setCart} diningCheckout={diningCheckout} onDiningCheckoutDone={()=>setDiningCheckout(null)}/>}/>
         <Route path="orders" element={<RuntimeOrdersWorkspace runtime={runtime}/>}/>
-        <Route path="dining" element={<RuntimeDiningWorkspace runtime={runtime}/>}/>
+        <Route path="dining" element={<RuntimeDiningWorkspace runtime={runtime} onCheckout={prepareDiningCheckout}/>}/>
         <Route path="soldout" element={<RuntimeSoldoutWorkspace runtime={runtime}/>}/>
         <Route path="more" element={<LocalMoreWorkspace/>}/>
         <Route path="*" element={<Navigate to="/" replace/>}/>
