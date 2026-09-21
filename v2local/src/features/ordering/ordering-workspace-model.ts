@@ -60,16 +60,6 @@ export interface OrderingActionAvailability {
   readonly cancelCart:boolean;
 }
 
-export interface OrderingHoldTableViewModel{
-  readonly id:string;
-  readonly label:string;
-  readonly occupied:boolean;
-  readonly codeLabel?:string;
-}
-export interface OrderingHoldPlacementViewModel{
-  readonly active:boolean;
-  readonly tables:readonly OrderingHoldTableViewModel[];
-}
 export interface OrderingWorkspaceViewModel {
   readonly pendingOrders:readonly QueueOrderViewModel[];
   readonly activeOrders:readonly QueueOrderViewModel[];
@@ -81,7 +71,6 @@ export interface OrderingWorkspaceViewModel {
   readonly recentlyAddedProductId?:string;
   readonly highlightedCartLineId?:string;
   readonly cartPulseNonce:number;
-  readonly holdPlacement?:OrderingHoldPlacementViewModel;
   readonly actionAvailability?:OrderingActionAvailability;
 }
 
@@ -95,10 +84,6 @@ export interface OrderingWorkspaceActions {
   readonly onAdjustLineQuantity:(lineId:string,delta:-1|1)=>void;
   readonly onEditCartLine:(lineId:string)=>void;
   readonly onHoldCart:()=>void;
-  readonly onHoldQueue:()=>void;
-  readonly onHoldWaiting:()=>void;
-  readonly onHoldTable:(tableId:string)=>void;
-  readonly onCancelHoldPlacement:()=>void;
   readonly onCancelCart:()=>void;
   readonly onOpenWorkItem:(workItemId:OrderingWorkItemViewModel['id'])=>void;
   readonly onOpenQueueOrder:(kind:'pending'|'active',id:string)=>void;
