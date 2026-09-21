@@ -361,7 +361,7 @@ function CheckoutPage({cart,setCart,diningCheckout,onDiningCheckoutDone}:{cart:C
   };
 
   const actions:CheckoutWorkspaceActions={
-    onBack:()=>navigate(diningCheckout?'/dining':'/'),
+    onBack:()=>{if(diningCheckout){setCart([]);onDiningCheckoutDone();navigate('/dining');}else navigate('/')},
     onSelectChannel:setChannel,
     onSelectMethod:setMethod,
     onChangeCustomerPhone:setCustomerPhone,
