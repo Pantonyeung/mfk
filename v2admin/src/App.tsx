@@ -7,6 +7,7 @@ import {CategoriesWorkspace,CombosWorkspace,MenuDisplayWorkspace,ModifiersWorksp
 import {AvailabilityWorkspace,BusinessDayWorkspace,ChannelsWorkspace,PrintCenterWorkspace,PrintTemplatesWorkspace,StaffWorkspace,StoreSettingsWorkspace} from './PolicyWorkspaces.tsx';
 import {AuditWorkspace,CapacityWorkspace,ExceptionsWorkspace,OpenOrdersWorkspace,OperationsReportWorkspace,OrdersHistoryWorkspace,OverviewWorkspace,SalesReportWorkspace} from './ReadModelWorkspaces.tsx';
 import {PrintRulesWorkspace,PublishCenterWorkspace,QuickReasonsWorkspace,SettlementWorkspace} from './GovernanceWorkspaces.tsx';
+import {AdvancedWorkspace,AnnouncementsWorkspace,CouponsWorkspace,Customer360Workspace,InventoryWorkspace,LoyaltyWorkspace,PresentationWorkspace,RfmWorkspace,StoreBindingWorkspace} from './DeferredWorkspaces.tsx';
 
 const statusTitle={
   NOT_WIRED:'等待 MFK Domain Adapter',
@@ -54,11 +55,15 @@ function capabilityElement(id:string){
   if(id==='pricing')return <PricingWorkspace/>;
   if(id==='combo')return <CombosWorkspace/>;
   if(id==='menu-sort')return <MenuDisplayWorkspace/>;
+  if(id==='customer-presentation')return <PresentationWorkspace surface="CUSTOMER"/>;
+  if(id==='owner-presentation')return <PresentationWorkspace surface="OWNER"/>;
+  if(id==='frontline-presentation')return <PresentationWorkspace surface="FRONTLINE"/>;
   if(id==='overview')return <OverviewWorkspace/>;
   if(id==='publish-center')return <PublishCenterWorkspace/>;
   if(id==='open-orders')return <OpenOrdersWorkspace/>;
   if(id==='availability')return <AvailabilityWorkspace/>;
   if(id==='capacity')return <CapacityWorkspace/>;
+  if(id==='inventory')return <InventoryWorkspace/>;
   if(id==='business-day')return <BusinessDayWorkspace/>;
   if(id==='orders-history')return <OrdersHistoryWorkspace/>;
   if(id==='exceptions')return <ExceptionsWorkspace/>;
@@ -67,17 +72,24 @@ function capabilityElement(id:string){
   if(id==='print-rules')return <PrintRulesWorkspace/>;
   if(id==='store-settings')return <StoreSettingsWorkspace/>;
   if(id==='quick-reasons')return <QuickReasonsWorkspace/>;
+  if(id==='announcement')return <AnnouncementsWorkspace/>;
   if(id==='staff')return <StaffWorkspace/>;
   if(id==='sales-report')return <SalesReportWorkspace/>;
   if(id==='operations-report')return <OperationsReportWorkspace/>;
+  if(id==='rfm-report')return <RfmWorkspace/>;
   if(id==='audit')return <AuditWorkspace/>;
+  if(id==='advanced')return <AdvancedWorkspace/>;
   if(id==='channel-overview')return <ChannelsWorkspace mode="overview"/>;
   if(id==='product-mapping')return <ChannelsWorkspace mode="mapping"/>;
   if(id==='mapping-failure')return <ChannelsWorkspace mode="failures"/>;
   if(id==='accept-policy')return <ChannelsWorkspace mode="accept"/>;
   if(id==='sync-policy')return <ChannelsWorkspace mode="sync"/>;
   if(id==='net-estimate')return <ChannelsWorkspace mode="estimate"/>;
+  if(id==='store-binding')return <StoreBindingWorkspace/>;
   if(id==='settlement')return <SettlementWorkspace/>;
+  if(id==='members')return <Customer360Workspace/>;
+  if(id==='loyalty')return <LoyaltyWorkspace/>;
+  if(id==='coupons')return <CouponsWorkspace/>;
   return <CapabilityPage/>;
 }
 
