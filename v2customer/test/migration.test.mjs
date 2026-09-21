@@ -72,7 +72,7 @@ test('customer workflow surfaces remain visible without live authority',()=>{
     '購物籃','Checkout Form Shape','電話','Pickup Code Presentation','Safe Submit Presentation','PENDING_INTENT',
     '等待店舖接單','製作中','可取餐','取餐','已完成','Order Status','Order Detail','歷史','再次下單',
     '自家渠道暫時不可用','WhatsApp','離線','Failure','Retry Presentation','UNKNOWN','STALE','Capability Registry',
-    '搜尋','搵唔到符合條件','最少','最多','Cart Intent','局部修復','Checkout Preview / Final Review','Result Certainty',
+    '搜尋','搵唔到符合條件','最少','最多','Cart Intent','局部修復','Checkout Form Shape / Preview / Final Review','Result Certainty',
     '未能接單','稍有延誤','Ready ≠ Arrived ≠ Verified ≠ Handed Over ≠ Completed','NEEDS_REVALIDATION','再來一單'
   ])assert.match(source,new RegExp(marker));
 });
