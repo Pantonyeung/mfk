@@ -66,6 +66,9 @@ export interface OrderingWorkspaceViewModel {
   readonly categories:readonly OrderingCategoryViewModel[];
   readonly selectedCategoryId:string;
   readonly products:readonly OrderingProductViewModel[];
+  readonly menuStatusLabel:string;
+  readonly menuStatusTone:'canonical'|'cached'|'fallback';
+  readonly menuRefreshBusy:boolean;
   readonly cart:OrderingCartViewModel;
   readonly workItems:readonly OrderingWorkItemViewModel[];
   readonly recentlyAddedProductId?:string;
@@ -76,6 +79,7 @@ export interface OrderingWorkspaceViewModel {
 
 export interface OrderingWorkspaceActions {
   readonly onSelectCategory:(categoryId:string)=>void;
+  readonly onRefreshMenu:()=>void;
   readonly onAddProduct:(productId:string)=>void;
   readonly onConfigureProduct:(productId:string)=>void;
   readonly onChangeServiceMode:(mode:ServiceMode)=>void;
