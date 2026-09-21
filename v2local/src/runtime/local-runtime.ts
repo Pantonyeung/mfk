@@ -20,11 +20,12 @@ interface Persisted{orders:StoredOrder[];availability:Record<string,SmtAvailabil
 const KEY='mfk.v2local.runtime.v1';
 const listeners=new Set<()=>void>();
 const defaults:Persisted={orders:[],availability:{}};
+const clone=<T,>(value:T):T=>JSON.parse(JSON.stringify(value)) as T;
 function read():Persisted{
   try{
     const value=JSON.parse(localStorage.getItem(KEY)||'null');
-    return value&&typeof value==='object'?{orders:Array.isArray(value.orders)?value.orders:[],availability:value.availability||{}}:structuredClone(defaults);
-  }catch{return structuredClone(defaults)}
+    return value&&typeof value==='object'?{orders:Array.isArray(value.orders)?value.orders:[],availability:value.availability||{}}:clone(defaults);
+  }catch{return clone(defaults)}
 }
 let data=read();
 function save(){localStorage.setItem(KEY,JSON.stringify(data));listeners.forEach(fn=>fn())}
@@ -67,7 +68,7 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
     data={...data,orders:[order,...data.orders]};save();return order;
   },
   orders(){return data.orders},
-  clear(){data=structuredClone(defaults);save()},
+  clear(){data=clone(defaults);save()},
   async readOrders(selectedOrderId){
     const items=data.orders.map(order=>({
       orderId:order.id,orderIdLabel:'#'+order.display,itemCount:order.items.reduce((s,x)=>s+x.qty,0),
@@ -114,6 +115,7 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
     return {revision:1,nodes:Object.entries(productNames).map(([nodeId,label])=>({nodeId,label,status:data.availability[nodeId]||'available',sourceLabel:'LOCAL'})),canChange:true};
   },
   async setAvailability(nodeId,status){
-    data={...data,availability:{...data.availability,[nodeId]:status}};save();return this.readAvailability!();
+    data={...data,availability:{...data.availability,[nodeId]:status}};save();
+    return {revision:1,nodes:Object.entries(productNames).map(([id,label])=>({nodeId:id,label,status:data.availability[id]||'available',sourceLabel:'LOCAL'})),canChange:true};
   }
 });
