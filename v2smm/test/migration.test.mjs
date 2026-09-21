@@ -10,8 +10,8 @@ const registry=JSON.parse(fs.readFileSync(path.join(root,'capabilities.json'),'u
 const source=fs.readdirSync(root).filter(name=>/\.(ts|tsx|js|jsx)$/.test(name)).map(name=>fs.readFileSync(path.join(root,name),'utf8')).join('\n');
 
 test('capability registry is complete and stable',()=>{
-  assert.equal(registry.length,42);
-  assert.equal(new Set(registry.map(item=>item.id)).size,42);
+  assert.equal(registry.length,54);
+  assert.equal(new Set(registry.map(item=>item.id)).size,54);
   for(const item of registry){
     assert.ok(item.id);
     assert.ok(item.group);
@@ -33,7 +33,10 @@ test('required migration capabilities exist',()=>{
   for(const id of [
     'MENU_BROWSE','PRODUCT_SELECT','MODIFIER_SELECT','COMBO_CONFIG','CART_PREVIEW','QUOTE_PREVIEW',
     'PENDING_INTENT','ORDER_RESULT_READBACK','SELLABILITY_PROJECTION','STAFF_CONTEXT','OFFLINE_PRESENTATION',
-    'FAILURE_PRESENTATION','RETRY_PRESENTATION','UNKNOWN_PRESENTATION'
+    'FAILURE_PRESENTATION','RETRY_PRESENTATION','UNKNOWN_PRESENTATION',
+    'BASIC_SEARCH','ZERO_RESULT_RECOVERY','MULTI_SELECT_CONFIG','CONFIG_MIN_MAX_VALIDATION','CART_QUANTITY_EDIT','CART_LINE_ATTENTION',
+    'SUBMISSION_IDENTITY_PRESENTATION','SUBMISSION_CERTAINTY_PRESENTATION','SOURCE_PROVENANCE_PRESENTATION','DELAYED_ORDER_PRESENTATION',
+    'CHANNEL_HEALTH_VIEW','EXCEPTION_QUEUE_VIEW'
   ])assert.ok(ids.has(id),id);
 });
 
@@ -55,11 +58,11 @@ test('SMM clean port has zero live authority or network mutation',()=>{
 });
 
 test('donor workflow surfaces remain visible without authority',()=>{
-  for(const marker of ['點單','待處理','訂單','堂食','更多','商品供應','營業日','營運報表','列印管理','診斷中心','訂單來源'])assert.match(source,new RegExp(marker));
+  for(const marker of ['點單','待處理','訂單','堂食','更多','商品供應','營業日','營運報表','列印管理','診斷中心','搜尋 Menu','零結果','最少','最多','Stable Submission Identity','UNKNOWN ≠ FAILED','Exception / Pending Action Queue','Channel Health','稍有延誤','TRUSTED_STAFF'])assert.match(source,new RegExp(marker));
 });
 
 test('UI declares migration boundary',()=>{
   assert.match(source,/所有 Command：NOT_WIRED/);
-  assert.match(source,/未建立正式訂單/);
+  assert.match(source,/無 formal order authority/);
   assert.match(source,/等待 SMT Quote/);
 });
