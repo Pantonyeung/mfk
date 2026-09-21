@@ -25,3 +25,22 @@
   .dining-operations-workspace{grid-template-columns:250px minmax(0,1fr) 360px;gap:9px;padding:9px}
   .dining-table{padding:7px}.dining-table-top strong{font-size:25px}.dining-tenders{grid-template-columns:repeat(3,1fr)}
 }
+
+/* R11 checkout remains sole payment authority */
+.dining-payment-panel.checkout-authority{background:#f8f7ff;border-color:#d9d2ff}
+.dining-payment-panel.checkout-authority>header>div{display:grid;gap:3px}
+.dining-payment-panel.checkout-authority>header small{font-size:11px;color:#706b88}
+.dining-payment-panel.checkout-authority .dining-settle-button{
+  min-height:48px;
+  margin-top:0;
+  background:#5b38ef;
+  font-size:16px
+}
+/* Keep queue entry permanently visible and independent from the 3x3 floor */
+.dining-operations-workspace{grid-template-columns:280px minmax(0,1fr) 400px}
+.dining-wait-column{z-index:2}
+.dining-floor-board{min-width:0}
+.dining-nine-grid{min-width:0}
+@media(max-width:1350px){
+  .dining-operations-workspace{grid-template-columns:240px minmax(0,1fr) 340px}
+}
