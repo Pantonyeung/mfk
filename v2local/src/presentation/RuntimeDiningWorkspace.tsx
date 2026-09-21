@@ -262,7 +262,7 @@ export function RuntimeDiningWorkspace({runtime,onCheckout}:{runtime:CleanSmtCor
 
         <footer className="dining-detail-actions">
           <button type="button" className="unassign" disabled={detail.remainingMinor===0} onClick={()=>void unassign()}>取消掛枱／退回輪候</button>
-          <button type="button" className="clear" disabled={detail.remainingMinor>0} onClick={()=>void clearTable()}>完成結帳／清枱</button>
+          <button type="button" className="clear" disabled={detail.remainingMinor>0} onClick={()=>void clearTable()}>清枱</button>
         </footer>
       </>:<div className="dining-detail-empty">
         <b>枱號詳情</b>
