@@ -36,11 +36,11 @@ function boot(map=new Map()){
 }
 
 test('production JS is syntax-valid local-only code with no network client',()=>{
-  assert.doesNotMatch(source,/\\bfetch\\s*\\(/);
+  assert.doesNotMatch(source,/\bfetch\s*\(/);
   assert.doesNotMatch(source,/XMLHttpRequest/);
-  assert.doesNotMatch(source,/\\bWebSocket\\b/);
-  assert.doesNotMatch(source,/\\bEventSource\\b/);
-  assert.doesNotMatch(source,/https?:\\/\\//);
+  assert.doesNotMatch(source,/\bWebSocket\b/);
+  assert.doesNotMatch(source,/\bEventSource\b/);
+  assert.doesNotMatch(source,/https?:\/\//);
 });
 
 test('local POS can create a CASH order and persist it without network',()=>{
