@@ -65,27 +65,37 @@ function packing(order:PrintableOrder){
     +'\n\n\n';
 }
 
-function label(order:PrintableOrder,item:{id:string;name:string;qty:number;unitMinor:number},index:number,total:number){
-  const orderCode=clean(order.display).replace(/"/g,'');
-  const product=clean(item.name).replace(/"/g,'');
-  return 'SIZE 40 mm,30 mm\r\n'
-    +'GAP 2 mm,0 mm\r\n'
-    +'CLS\r\n'
-    +'TEXT 20,20,"3",0,1,1,"'+orderCode+'"\r\n'
-    +'TEXT 20,55,"3",0,1,1,"'+product+'"\r\n'
-    +'TEXT 20,90,"2",0,1,1,"'+index+'/'+total+'"\r\n'
-    +'PRINT 1\r\n';
+function tsplChineseFont(encoding:PrintBinding['encoding']){
+  if(encoding==='big5')return 'TST24.BF2';
+  if(encoding==='gb18030')return 'TSS24.BF2';
+  return '3';
 }
 
-function bagLabel(order:PrintableOrder){
+function label(order:PrintableOrder,item:{id:string;name:string;qty:number;unitMinor:number},index:number,total:number,encoding:PrintBinding['encoding']){
   const orderCode=clean(order.display).replace(/"/g,'');
-  const total=order.items.reduce((sum,item)=>sum+Math.max(0,Number(item.qty)||0),0);
+  const product=clean(item.name).replace(/"/g,'');
+  const font=tsplChineseFont(encoding);
   return 'SIZE 40 mm,30 mm\r\n'
     +'GAP 2 mm,0 mm\r\n'
+    +'DENSITY 8\r\n'
     +'CLS\r\n'
     +'TEXT 20,20,"3",0,1,1,"'+orderCode+'"\r\n'
-    +'TEXT 20,55,"3",0,1,1,"BAG '+total+' ITEMS"\r\n'
-    +'PRINT 1\r\n';
+    +'TEXT 20,55,"'+font+'",0,1,1,"'+product+'"\r\n'
+    +'TEXT 20,90,"2",0,1,1,"'+index+'/'+total+'"\r\n'
+    +'PRINT 1,1\r\n';
+}
+
+function bagLabel(order:PrintableOrder,encoding:PrintBinding['encoding']){
+  const orderCode=clean(order.display).replace(/"/g,'');
+  const total=order.items.reduce((sum,item)=>sum+Math.max(0,Number(item.qty)||0),0);
+  const font=tsplChineseFont(encoding);
+  return 'SIZE 40 mm,30 mm\r\n'
+    +'GAP 2 mm,0 mm\r\n'
+    +'DENSITY 8\r\n'
+    +'CLS\r\n'
+    +'TEXT 20,20,"3",0,1,1,"'+orderCode+'"\r\n'
+    +'TEXT 20,55,"'+font+'",0,1,1,"袋 '+total+' 件"\r\n'
+    +'PRINT 1,1\r\n';
 }
 
 export function buildOrderPrintPlan(order:PrintableOrder,bindings:readonly PrintBinding[]):readonly PlannedPrintJob[]{
@@ -119,7 +129,7 @@ export function buildOrderPrintPlan(order:PrintableOrder,bindings:readonly Print
             id:order.id+':product-label:'+item.id+':'+(i+1),
             role:binding.role,
             binding,
-            payload:label(order,item,labelIndex,total),
+            payload:label(order,item,labelIndex,total,binding.encoding),
           });
         }
       }
