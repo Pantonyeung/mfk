@@ -1,4 +1,7 @@
-export const LOCAL_ADMIN_MENU_STORAGE_KEY='mfk.local-admin.menu.v1';
+export const LOCAL_ADMIN_MENU_ACTIVE_KEY='mfk.local-admin.menu.active.v2';
+export const LOCAL_ADMIN_MENU_DRAFT_KEY='mfk.local-admin.menu.draft.v2';
+export const LOCAL_ADMIN_MENU_HISTORY_KEY='mfk.local-admin.menu.history.v2';
+const LEGACY_KEY='mfk.local-admin.menu.v1';
 
 export interface LocalAdminMenuCategory{
   readonly id:string;
@@ -13,11 +16,23 @@ export interface LocalAdminMenuProduct{
   readonly active:boolean;
 }
 export interface LocalAdminMenuSnapshot{
-  readonly schemaVersion:1;
+  readonly schemaVersion:2;
   readonly revision:number;
+  readonly publishedAt:string;
+  readonly categories:readonly LocalAdminMenuCategory[];
+  readonly products:readonly LocalAdminMenuProduct[];
+}
+export interface LocalAdminMenuDraft{
+  readonly schemaVersion:2;
+  readonly draftRevision:number;
+  readonly basePublishedRevision:number;
   readonly updatedAt:string;
   readonly categories:readonly LocalAdminMenuCategory[];
   readonly products:readonly LocalAdminMenuProduct[];
+}
+export interface LocalAdminMenuValidation{
+  readonly ok:boolean;
+  readonly errors:readonly string[];
 }
 
 const DEFAULT_CATEGORIES:readonly LocalAdminMenuCategory[]=[
@@ -42,23 +57,39 @@ const DEFAULT_PRODUCTS:readonly LocalAdminMenuProduct[]=[
   {id:'lemonTea',name:'手打檸檬茶',categoryId:'cat-drink',position:20,active:true},
 ];
 
-const listeners=new Set<()=>void>();
+const activeListeners=new Set<()=>void>();
+const draftListeners=new Set<()=>void>();
 
 function now(){return new Date().toISOString()}
-function cloneSnapshot(snapshot:LocalAdminMenuSnapshot):LocalAdminMenuSnapshot{
-  return Object.freeze({
-    ...snapshot,
-    categories:Object.freeze(snapshot.categories.map(row=>Object.freeze({...row}))),
-    products:Object.freeze(snapshot.products.map(row=>Object.freeze({...row}))),
-  });
+function freezeCategories(rows:readonly LocalAdminMenuCategory[]){
+  return Object.freeze(rows.map(row=>Object.freeze({...row})));
 }
-function seed(revision=1):LocalAdminMenuSnapshot{
-  return cloneSnapshot({
-    schemaVersion:1,
+function freezeProducts(rows:readonly LocalAdminMenuProduct[]){
+  return Object.freeze(rows.map(row=>Object.freeze({...row})));
+}
+function cloneActive(snapshot:LocalAdminMenuSnapshot):LocalAdminMenuSnapshot{
+  return Object.freeze({...snapshot,categories:freezeCategories(snapshot.categories),products:freezeProducts(snapshot.products)});
+}
+function cloneDraft(snapshot:LocalAdminMenuDraft):LocalAdminMenuDraft{
+  return Object.freeze({...snapshot,categories:freezeCategories(snapshot.categories),products:freezeProducts(snapshot.products)});
+}
+function seedActive(revision=1):LocalAdminMenuSnapshot{
+  return cloneActive({
+    schemaVersion:2,
     revision,
-    updatedAt:now(),
+    publishedAt:now(),
     categories:DEFAULT_CATEGORIES,
     products:DEFAULT_PRODUCTS,
+  });
+}
+function draftFromActive(active:LocalAdminMenuSnapshot,draftRevision=1):LocalAdminMenuDraft{
+  return cloneDraft({
+    schemaVersion:2,
+    draftRevision,
+    basePublishedRevision:active.revision,
+    updatedAt:now(),
+    categories:active.categories,
+    products:active.products,
   });
 }
 function text(value:unknown,code:string,max=80):string{
@@ -78,18 +109,13 @@ function position(value:unknown,code:string):number{
   return number;
 }
 
-export function validateLocalAdminMenu(input:unknown):LocalAdminMenuSnapshot{
-  if(!input||typeof input!=='object'||Array.isArray(input))throw new Error('ADMIN_MENU_INVALID');
-  const row=input as Record<string,unknown>;
-  if(row.schemaVersion!==1)throw new Error('ADMIN_MENU_SCHEMA_UNSUPPORTED');
-  const revision=Number(row.revision);
-  if(!Number.isSafeInteger(revision)||revision<1)throw new Error('ADMIN_MENU_REVISION_INVALID');
-  if(typeof row.updatedAt!=='string'||!Number.isFinite(Date.parse(row.updatedAt)))throw new Error('ADMIN_MENU_UPDATED_AT_INVALID');
-  if(!Array.isArray(row.categories)||row.categories.length===0)throw new Error('ADMIN_MENU_CATEGORIES_REQUIRED');
-  if(!Array.isArray(row.products)||row.products.length===0)throw new Error('ADMIN_MENU_PRODUCTS_REQUIRED');
+function validateCollections(categoriesRaw:unknown,productsRaw:unknown){
+  if(!Array.isArray(categoriesRaw)||categoriesRaw.length===0)throw new Error('ADMIN_MENU_CATEGORIES_REQUIRED');
+  if(!Array.isArray(productsRaw)||productsRaw.length===0)throw new Error('ADMIN_MENU_PRODUCTS_REQUIRED');
 
   const categoryIds=new Set<string>();
-  const categories=row.categories.map((value,index)=>{
+  const categoryNames=new Set<string>();
+  const categories=categoriesRaw.map((value,index)=>{
     if(!value||typeof value!=='object'||Array.isArray(value))throw new Error('ADMIN_MENU_CATEGORY_INVALID_'+index);
     const item=value as Record<string,unknown>;
     const category=Object.freeze({
@@ -98,12 +124,14 @@ export function validateLocalAdminMenu(input:unknown):LocalAdminMenuSnapshot{
       position:position(item.position,'ADMIN_MENU_CATEGORY_POSITION_INVALID_'+index),
     });
     if(categoryIds.has(category.id))throw new Error('ADMIN_MENU_CATEGORY_DUPLICATE_'+category.id);
+    if(categoryNames.has(category.name))throw new Error('ADMIN_MENU_CATEGORY_NAME_DUPLICATE_'+category.name);
     categoryIds.add(category.id);
+    categoryNames.add(category.name);
     return category;
   });
 
   const productIds=new Set<string>();
-  const products=row.products.map((value,index)=>{
+  const products=productsRaw.map((value,index)=>{
     if(!value||typeof value!=='object'||Array.isArray(value))throw new Error('ADMIN_MENU_PRODUCT_INVALID_'+index);
     const item=value as Record<string,unknown>;
     const productId=id(item.id,'ADMIN_MENU_PRODUCT_ID_INVALID_'+index);
@@ -122,58 +150,185 @@ export function validateLocalAdminMenu(input:unknown):LocalAdminMenuSnapshot{
     return product;
   });
 
-  return cloneSnapshot({
-    schemaVersion:1,
-    revision,
-    updatedAt:row.updatedAt,
-    categories,
-    products,
-  });
+  if(products.filter(row=>row.active).length===0)throw new Error('ADMIN_MENU_ACTIVE_PRODUCT_REQUIRED');
+  return {categories,products};
 }
 
-function persist(snapshot:LocalAdminMenuSnapshot){
-  localStorage.setItem(LOCAL_ADMIN_MENU_STORAGE_KEY,JSON.stringify(snapshot));
+export function validateLocalAdminMenuSnapshot(input:unknown):LocalAdminMenuSnapshot{
+  if(!input||typeof input!=='object'||Array.isArray(input))throw new Error('ADMIN_MENU_INVALID');
+  const row=input as Record<string,unknown>;
+  if(row.schemaVersion!==2)throw new Error('ADMIN_MENU_SCHEMA_UNSUPPORTED');
+  const revision=Number(row.revision);
+  if(!Number.isSafeInteger(revision)||revision<1)throw new Error('ADMIN_MENU_REVISION_INVALID');
+  if(typeof row.publishedAt!=='string'||!Number.isFinite(Date.parse(row.publishedAt)))throw new Error('ADMIN_MENU_PUBLISHED_AT_INVALID');
+  const {categories,products}=validateCollections(row.categories,row.products);
+  return cloneActive({schemaVersion:2,revision,publishedAt:row.publishedAt,categories,products});
 }
-function emit(){for(const listener of listeners)listener()}
+
+export function validateLocalAdminMenuDraft(input:unknown):LocalAdminMenuDraft{
+  if(!input||typeof input!=='object'||Array.isArray(input))throw new Error('ADMIN_MENU_DRAFT_INVALID');
+  const row=input as Record<string,unknown>;
+  if(row.schemaVersion!==2)throw new Error('ADMIN_MENU_DRAFT_SCHEMA_UNSUPPORTED');
+  const draftRevision=Number(row.draftRevision);
+  const basePublishedRevision=Number(row.basePublishedRevision);
+  if(!Number.isSafeInteger(draftRevision)||draftRevision<1)throw new Error('ADMIN_MENU_DRAFT_REVISION_INVALID');
+  if(!Number.isSafeInteger(basePublishedRevision)||basePublishedRevision<1)throw new Error('ADMIN_MENU_DRAFT_BASE_REVISION_INVALID');
+  if(typeof row.updatedAt!=='string'||!Number.isFinite(Date.parse(row.updatedAt)))throw new Error('ADMIN_MENU_DRAFT_UPDATED_AT_INVALID');
+  const {categories,products}=validateCollections(row.categories,row.products);
+  return cloneDraft({schemaVersion:2,draftRevision,basePublishedRevision,updatedAt:row.updatedAt,categories,products});
+}
+
+export function inspectLocalAdminMenuDraft(input:Pick<LocalAdminMenuDraft,'categories'|'products'>):LocalAdminMenuValidation{
+  try{
+    validateCollections(input.categories,input.products);
+    return Object.freeze({ok:true,errors:Object.freeze([])});
+  }catch(error){
+    return Object.freeze({
+      ok:false,
+      errors:Object.freeze([error instanceof Error?error.message:'ADMIN_MENU_INVALID']),
+    });
+  }
+}
+
+function persistActive(snapshot:LocalAdminMenuSnapshot){localStorage.setItem(LOCAL_ADMIN_MENU_ACTIVE_KEY,JSON.stringify(snapshot))}
+function persistDraft(snapshot:LocalAdminMenuDraft){localStorage.setItem(LOCAL_ADMIN_MENU_DRAFT_KEY,JSON.stringify(snapshot))}
+function readHistory():LocalAdminMenuSnapshot[]{
+  try{
+    const raw=JSON.parse(localStorage.getItem(LOCAL_ADMIN_MENU_HISTORY_KEY)||'[]');
+    if(!Array.isArray(raw))return[];
+    return raw.map(validateLocalAdminMenuSnapshot);
+  }catch{return[]}
+}
+function appendHistory(snapshot:LocalAdminMenuSnapshot){
+  const history=[snapshot,...readHistory().filter(row=>row.revision!==snapshot.revision)].slice(0,20);
+  localStorage.setItem(LOCAL_ADMIN_MENU_HISTORY_KEY,JSON.stringify(history));
+}
+function emitActive(){for(const listener of activeListeners)listener()}
+function emitDraft(){for(const listener of draftListeners)listener()}
+
+function migrateLegacy():LocalAdminMenuSnapshot|null{
+  try{
+    const raw=localStorage.getItem(LEGACY_KEY);
+    if(!raw)return null;
+    const legacy=JSON.parse(raw) as Record<string,unknown>;
+    if(!Array.isArray(legacy.categories)||!Array.isArray(legacy.products))return null;
+    const {categories,products}=validateCollections(legacy.categories,legacy.products);
+    const revision=Number.isSafeInteger(legacy.revision)&&Number(legacy.revision)>=1?Number(legacy.revision):1;
+    return cloneActive({
+      schemaVersion:2,
+      revision,
+      publishedAt:typeof legacy.updatedAt==='string'&&Number.isFinite(Date.parse(legacy.updatedAt))?legacy.updatedAt:now(),
+      categories,
+      products,
+    });
+  }catch{return null}
+}
 
 export function readLocalAdminMenu():LocalAdminMenuSnapshot{
   try{
-    const raw=localStorage.getItem(LOCAL_ADMIN_MENU_STORAGE_KEY);
-    if(raw)return validateLocalAdminMenu(JSON.parse(raw));
+    const raw=localStorage.getItem(LOCAL_ADMIN_MENU_ACTIVE_KEY);
+    if(raw)return validateLocalAdminMenuSnapshot(JSON.parse(raw));
   }catch{}
-  const initial=seed();
-  try{persist(initial)}catch{}
+  const initial=migrateLegacy()??seedActive();
+  try{
+    persistActive(initial);
+    appendHistory(initial);
+  }catch{}
   return initial;
 }
 
-export function saveLocalAdminMenu(
-  draft:Pick<LocalAdminMenuSnapshot,'categories'|'products'>,
-  expectedRevision:number,
-):LocalAdminMenuSnapshot{
-  const current=readLocalAdminMenu();
-  if(current.revision!==expectedRevision)throw new Error('ADMIN_MENU_REVISION_CONFLICT');
-  const next=validateLocalAdminMenu({
-    schemaVersion:1,
-    revision:current.revision+1,
+export function readLocalAdminMenuDraft():LocalAdminMenuDraft{
+  const active=readLocalAdminMenu();
+  try{
+    const raw=localStorage.getItem(LOCAL_ADMIN_MENU_DRAFT_KEY);
+    if(raw){
+      const draft=validateLocalAdminMenuDraft(JSON.parse(raw));
+      if(draft.basePublishedRevision===active.revision)return draft;
+    }
+  }catch{}
+  const draft=draftFromActive(active);
+  try{persistDraft(draft)}catch{}
+  return draft;
+}
+
+export function saveLocalAdminMenuDraft(
+  input:Pick<LocalAdminMenuDraft,'categories'|'products'>,
+  expectedDraftRevision:number,
+):LocalAdminMenuDraft{
+  const current=readLocalAdminMenuDraft();
+  if(current.draftRevision!==expectedDraftRevision)throw new Error('ADMIN_MENU_DRAFT_REVISION_CONFLICT');
+  const next=validateLocalAdminMenuDraft({
+    schemaVersion:2,
+    draftRevision:current.draftRevision+1,
+    basePublishedRevision:current.basePublishedRevision,
     updatedAt:now(),
-    categories:draft.categories,
-    products:draft.products,
+    categories:input.categories,
+    products:input.products,
   });
-  persist(next);
-  emit();
+  persistDraft(next);
+  emitDraft();
   return next;
 }
 
-export function resetLocalAdminMenu(expectedRevision:number):LocalAdminMenuSnapshot{
-  const current=readLocalAdminMenu();
-  if(current.revision!==expectedRevision)throw new Error('ADMIN_MENU_REVISION_CONFLICT');
-  const next=seed(current.revision+1);
-  persist(next);
-  emit();
+export function publishLocalAdminMenu(
+  expectedDraftRevision:number,
+  expectedPublishedRevision:number,
+):LocalAdminMenuSnapshot{
+  const active=readLocalAdminMenu();
+  const draft=readLocalAdminMenuDraft();
+  if(active.revision!==expectedPublishedRevision)throw new Error('ADMIN_MENU_PUBLISHED_REVISION_CONFLICT');
+  if(draft.draftRevision!==expectedDraftRevision)throw new Error('ADMIN_MENU_DRAFT_REVISION_CONFLICT');
+  if(draft.basePublishedRevision!==active.revision)throw new Error('ADMIN_MENU_DRAFT_BASE_STALE');
+
+  const next=validateLocalAdminMenuSnapshot({
+    schemaVersion:2,
+    revision:active.revision+1,
+    publishedAt:now(),
+    categories:draft.categories,
+    products:draft.products,
+  });
+  persistActive(next);
+  appendHistory(next);
+  const rebased=draftFromActive(next,draft.draftRevision+1);
+  persistDraft(rebased);
+  emitActive();
+  emitDraft();
+  return next;
+}
+
+export function discardLocalAdminMenuDraft(expectedDraftRevision:number):LocalAdminMenuDraft{
+  const current=readLocalAdminMenuDraft();
+  if(current.draftRevision!==expectedDraftRevision)throw new Error('ADMIN_MENU_DRAFT_REVISION_CONFLICT');
+  const next=draftFromActive(readLocalAdminMenu(),current.draftRevision+1);
+  persistDraft(next);
+  emitDraft();
+  return next;
+}
+
+export function resetLocalAdminMenuToSeed(
+  expectedDraftRevision:number,
+):LocalAdminMenuDraft{
+  const current=readLocalAdminMenuDraft();
+  if(current.draftRevision!==expectedDraftRevision)throw new Error('ADMIN_MENU_DRAFT_REVISION_CONFLICT');
+  const active=readLocalAdminMenu();
+  const next=validateLocalAdminMenuDraft({
+    schemaVersion:2,
+    draftRevision:current.draftRevision+1,
+    basePublishedRevision:active.revision,
+    updatedAt:now(),
+    categories:DEFAULT_CATEGORIES,
+    products:DEFAULT_PRODUCTS,
+  });
+  persistDraft(next);
+  emitDraft();
   return next;
 }
 
 export function subscribeLocalAdminMenu(listener:()=>void){
-  listeners.add(listener);
-  return()=>{listeners.delete(listener);};
+  activeListeners.add(listener);
+  return()=>{activeListeners.delete(listener);};
+}
+export function subscribeLocalAdminMenuDraft(listener:()=>void){
+  draftListeners.add(listener);
+  return()=>{draftListeners.delete(listener);};
 }
