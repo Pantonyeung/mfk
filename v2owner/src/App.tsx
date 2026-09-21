@@ -2,13 +2,13 @@ import {useMemo,useState} from 'react';
 import type {ReactNode} from 'react';
 import capabilitiesJson from './capabilities.json';
 import {
-  actionItems,activity,adminLinks,channels,devices,notifications,orders,readiness,recoveryStates,reports,sellability,staff,today,
+  actionItems,activity,adminLinks,auditActivityDetails,campaignFixtures,cashOverview,channels,customerOverview,devices,inventoryLiteFixtures,notifications,orders,platformFinanceFixtures,readiness,recoveryStates,reports,sellability,staff,today,
   type ActionItem,type ChannelRow,type OwnerOrder,type SellabilityRow
 } from './fixtures';
 
 type View='today'|'queue'|'orders'|'more';
 type ReadState='FRESH'|'STALE'|'OFFLINE'|'UNKNOWN'|'PARTIAL'|'FAILURE';
-type Tool='reports'|'sellability'|'channels'|'staff'|'devices'|'notifications'|'manager'|'activity'|'admin'|'capabilities'|'recovery';
+type Tool='reports'|'sellability'|'channels'|'staff'|'devices'|'customers'|'marketing'|'settlement'|'cash'|'inventory'|'notifications'|'manager'|'activity'|'admin'|'capabilities'|'recovery';
 type Capability={CAP_ID:string;GROUP:string;LABEL:string;SURFACE:string;KIND:'READ_SHAPE'|'COMMAND_SHAPE';STATUS:'MIGRATED_SHAPE'|'NOT_WIRED';OWNER:string};
 type Confirmation={label:string;target:string;impact:string;approval:string};
 
@@ -53,7 +53,7 @@ export function App(){
     </header>
 
     <section className="authority-strip" role="status">
-      <b>PORT_MIGRATION_ONLY</b><span>Observation · Alerting · Review · Bounded Decision</span><em>Command = NOT_WIRED</em>
+      <b>CAPABILITY_UPGRADE_ONLY</b><span>Watch · Alert · Review · Bounded Act</span><em>Command = NOT_WIRED</em>
     </section>
 
     {notice?<div className="notice" role="status"><span>{notice}</span><button onClick={()=>setNotice(null)}>收起</button></div>:null}
@@ -185,6 +185,11 @@ function MorePage({onOpenTool}:{onOpenTool:(tool:Tool)=>void}){
     {id:'channels',title:'渠道',detail:'Health / Pause / Snooze',state:'NOT_WIRED'},
     {id:'staff',title:'員工',detail:'Who’s working / role summary',state:'READ'},
     {id:'devices',title:'設備／Printer',detail:'Health / job certainty',state:'READ'},
+    {id:'customers',title:'客戶',detail:'CRM Lite / New / Returning / Consent',state:'READ'},
+    {id:'marketing',title:'推廣',detail:'Campaign / Attribution / Funding facts',state:'READ'},
+    {id:'settlement',title:'平台結算',detail:'Sales / Fees / Payout / Finality',state:'READ'},
+    {id:'cash',title:'現金',detail:'Tender / Variance / Closeout summary',state:'READ'},
+    {id:'inventory',title:'庫存',detail:'Inventory Lite / Attention only',state:'READ'},
     {id:'notifications',title:'Alerts / Notifications',detail:'Immediate / Digest / Inbox',state:'READ'},
     {id:'manager',title:'Manager Log / Checklist',detail:'營運交接 shape',state:'LOCAL'},
     {id:'activity',title:'Activity',detail:'Human-readable audit projection',state:'READ'},
@@ -203,6 +208,7 @@ function MorePage({onOpenTool}:{onOpenTool:(tool:Tool)=>void}){
 function ToolDrawer({tool,close,onCommand,onNotWired}:{tool:Tool;close:()=>void;onCommand:(label:string,target:string,impact:string,approval?:string)=>void;onNotWired:(label:string)=>void}){
   const titles:Record<Tool,string>={
     reports:'固定報表',sellability:'商品／售罄',channels:'渠道健康',staff:'Staff Presence',devices:'Device / Printer Health',
+    customers:'Customer / CRM Lite',marketing:'Campaign / Marketing',settlement:'Platform Settlement',cash:'Cash / Closeout',inventory:'Inventory Lite',
     notifications:'Alerts / Notifications',manager:'Manager Log / Checklist',activity:'Activity Feed',admin:'Admin Deep-link',
     capabilities:'Owner Capability Registry',recovery:'Recovery States'
   };
@@ -213,6 +219,11 @@ function ToolDrawer({tool,close,onCommand,onNotWired}:{tool:Tool;close:()=>void;
     {tool==='channels'?<ChannelsTool onCommand={onCommand}/>:null}
     {tool==='staff'?<StaffTool/>:null}
     {tool==='devices'?<DevicesTool/>:null}
+    {tool==='customers'?<CustomerTool/>:null}
+    {tool==='marketing'?<MarketingTool/>:null}
+    {tool==='settlement'?<SettlementTool/>:null}
+    {tool==='cash'?<CashTool/>:null}
+    {tool==='inventory'?<InventoryTool/>:null}
     {tool==='notifications'?<NotificationsTool/>:null}
     {tool==='manager'?<ManagerTool onNotWired={onNotWired}/>:null}
     {tool==='activity'?<ActivityTool/>:null}
@@ -257,6 +268,58 @@ function DevicesTool(){
   return <><p className="callout">Owner 只睇 health / impact / binding / job certainty。無 physical print / reroute command。</p><div className="list-stack">{devices.map(device=><article className="device-row" key={device.id}><div className="device-head"><div><strong>{device.name}</strong><span>{device.kind}</span></div><b className={'health '+healthClass(device.health)}>{device.health}</b></div><div className="device-facts"><span>Last seen：{device.lastSeen}</span><span>{device.binding}</span><span>Jobs：{device.jobs}</span><span>Affected：{device.affected}</span></div></article>)}</div></>;
 }
 
+function CustomerTool(){
+  return <>
+    <p className="callout">CRM Lite 只做 Customer / Order linkage 同營運 insight。Phone ≠ customerId；Loyalty ≠ Consent；平台履約資料 ≠ Marketing permission。</p>
+    <div className="metric-grid">
+      <Detail label="New" value={customerOverview.newCustomers}/>
+      <Detail label="Returning" value={customerOverview.returningCustomers}/>
+      <Detail label="Returning %" value={customerOverview.returningRate}/>
+      <Detail label="Average Spend" value={customerOverview.averageSpend}/>
+    </div>
+    <section className="detail-section"><h3>Consent / Experience</h3><div><p>{customerOverview.consentSummary}</p><p>{customerOverview.experience}</p><small>Freshness：{customerOverview.lastUpdated} · fixture only</small></div></section>
+    <div className="boundary-box">READ ONLY｜無 Customer merge、Loyalty ledger、Marketing mutation、PII export。</div>
+  </>;
+}
+
+function MarketingTool(){
+  return <>
+    <p className="callout">Campaign Performance 係 attribution read model，唔係 transaction Sales truth；Platform Promotion 只保存 provider facts / funding。</p>
+    <div className="list-stack">{campaignFixtures.map(item=><article className="list-row" key={item.id}><div><strong>{item.name}</strong><small>{item.channel} · {item.status} · {item.freshness}</small></div><div><span>{item.attributedOrders} orders</span><b>{item.attributedSales}</b><small>{item.funding} · merchant cost {item.merchantCost}</small></div></article>)}</div>
+    <div className="boundary-box">Attributed Sales ≠ Canonical Sales｜Marketing 唔建立第二 Pricing Engine。</div>
+  </>;
+}
+
+function SettlementTool(){
+  return <>
+    <p className="callout">Platform Sales ≠ Store Net Sales ≠ Platform Payout。Settlement 可以遲到／不完整；永遠唔阻新 Order。</p>
+    <div className="list-stack">{platformFinanceFixtures.map(item=><article className="channel-row" key={item.provider}><div className="channel-head"><strong>{item.provider}</strong><span className={'health '+(item.finality==='ESTIMATED'?'warn':'unknown')}>{item.finality}</span></div><div className="channel-facts"><span>Order Sales：{item.orderSales}</span><span>Fees：{item.fees}</span><span>Merchant Amount：{item.merchantAmount}</span><span>Freshness：{item.freshness}</span><span>Difference：{item.differences}</span></div></article>)}</div>
+    <div className="boundary-box">READ ONLY｜無 auto reconciliation、accounting journal、provider mutation。</div>
+  </>;
+}
+
+function CashTool(){
+  return <>
+    <p className="callout">Business Day / Cash / Closeout 只係 accountability / reconciliation read model。Cash Tender ≠ Physical Drawer Cash。</p>
+    <div className="metric-grid">
+      <Detail label="Effective Cash Tender" value={cashOverview.effectiveCashTender}/>
+      <Detail label="Cash Movement Net" value={cashOverview.cashMovementNet}/>
+      <Detail label="Open Drawer" value={cashOverview.openDrawerCount}/>
+      <Detail label="Pending Closeout" value={cashOverview.pendingCloseout}/>
+    </div>
+    <section className="detail-section"><h3>Closeout</h3><div><p>Variance：{cashOverview.variance}</p><p>Last closeout：{cashOverview.lastCloseout}</p><p>Responsible：{cashOverview.responsibleStaff}</p></div></section>
+    <div className="boundary-box">RECORD / ATTENTION ONLY｜Zero remote drawer open / close｜Never transaction blocker。</div>
+  </>;
+}
+
+function InventoryTool(){
+  return <>
+    <p className="callout">Inventory Lite = record / analysis / attention。Inventory quantity 永遠唔係 Sellability / transaction blocker authority。</p>
+    <div className="list-stack">{inventoryLiteFixtures.map(item=><article className="list-row" key={item.id}><div><strong>{item.name}</strong><small>Last count：{item.lastCount} · Par：{item.par}</small></div><div><b>{item.projected}</b><span>{item.state}</span><small>{item.note}</small></div></article>)}</div>
+    <div className="boundary-box">READ ONLY｜Low stock / negative quantity = attention, not automatic sold-out。</div>
+  </>;
+}
+
 function NotificationsTool(){
   return <><div className="segmented three"><button className="active">全部</button><button>即時</button><button>摘要</button></div><div className="list-stack">{notifications.map(item=><article className="notification-row" key={item.id}><div><span className={'cadence cadence-'+cadenceClass(item.cadence)}>{item.cadence}</span><small>{item.time}</small></div><strong>{item.title}</strong><p>{item.detail}</p><em>{item.state}</em></article>)}</div></>;
 }
@@ -270,7 +333,11 @@ function ManagerTool({onNotWired}:{onNotWired:(label:string)=>void}){
 }
 
 function ActivityTool(){
-  return <div className="timeline">{activity.map((item,index)=><article key={index}><i/><div><span>{item.time} · {item.actor}</span><strong>{item.action}</strong><small>{item.target} · {item.result}</small></div></article>)}</div>;
+  return <>
+    <p className="callout">Activity 只係 human-readable Audit projection。Requester / Approver / Result / Readback 分開；唔取代 domain truth。</p>
+    <div className="timeline">{auditActivityDetails.map((item,index)=><article key={index}><i/><div><span>{item.time} · requester：{item.initiatedBy}</span><strong>{item.action}</strong><small>{item.target} · approver：{item.authorizedBy} · result：{item.result} · readback：{item.readback}</small></div></article>)}</div>
+    <div className="boundary-box">Audit / Activity = READ MODEL ONLY｜無 second audit writer / store。</div>
+  </>;
 }
 
 function AdminTool({onNotWired}:{onNotWired:(label:string)=>void}){

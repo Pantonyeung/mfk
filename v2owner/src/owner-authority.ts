@@ -2,7 +2,7 @@ export const MFK_OWNER_AUTHORITY=Object.freeze({
   product:'MFK_OWNER',
   role:'OBSERVATION_ALERTING_REVIEW_BOUNDED_DECISION',
   currentSystem:'MFK',
-  mode:'PORT_MIGRATION_ONLY',
+  mode:'CAPABILITY_UPGRADE_ONLY',
   domainWiring:'NOT_WIRED',
   liveNetworkReadEnabled:false,
   liveNetworkWriteEnabled:false,

@@ -120,3 +120,46 @@ export const recoveryStates=[
   {state:'FAILURE',meaning:'已證實未完成。',action:'只提供 domain-safe recovery presentation。'},
   {state:'RETRY',meaning:'Retry 是否安全由 authority / idempotency 決定。',action:'今輪按鈕只係 NOT_WIRED。'},
 ];
+
+
+export const customerOverview={
+  newCustomers:'18',
+  returningCustomers:'42',
+  returningRate:'70%',
+  averageSpend:'$68',
+  lastUpdated:'21:42',
+  consentSummary:'SMS consent：12 已授權 · 其他保持 UNKNOWN',
+  experience:'4.6 / 5 · 2 個 unresolved complaint fixture',
+} as const;
+
+export const campaignFixtures=[
+  {id:'cmp-01',name:'晚市套餐推廣',status:'ACTIVE',channel:'自家渠道',attributedOrders:'14',attributedSales:'$910',merchantCost:'$86',funding:'MERCHANT_FUNDED',freshness:'截至 21:40'},
+  {id:'cmp-02',name:'Keeta 平台優惠',status:'PROVIDER_FACT',channel:'Keeta',attributedOrders:'9',attributedSales:'$602',merchantCost:'UNKNOWN',funding:'PROVIDER_FACT_ONLY',freshness:'截至 21:38'},
+] as const;
+
+export const platformFinanceFixtures=[
+  {provider:'Keeta',orderSales:'$1,520',fees:'$228',merchantAmount:'$1,292',finality:'ESTIMATED',freshness:'截至 21:35',differences:'1 項待覆核'},
+  {provider:'自家渠道',orderSales:'$2,104',fees:'—',merchantAmount:'—',finality:'NOT_APPLICABLE',freshness:'截至 21:42',differences:'0'},
+] as const;
+
+export const cashOverview={
+  effectiveCashTender:'$2,402',
+  cashMovementNet:'-$120',
+  openDrawerCount:'1',
+  pendingCloseout:'1',
+  variance:'UNKNOWN / NOT_WIRED',
+  lastCloseout:'昨日 22:11',
+  responsibleStaff:'前線收銀 · fixture',
+} as const;
+
+export const inventoryLiteFixtures=[
+  {id:'inv-1',name:'紫米',projected:'8.2 kg',par:'6 kg',state:'OK',lastCount:'昨日 22:05',note:'Projected quantity only'},
+  {id:'inv-2',name:'鹽酥雞原料',projected:'1.4 kg',par:'2 kg',state:'ATTENTION',lastCount:'昨日 22:07',note:'Below par = reminder only'},
+  {id:'inv-3',name:'飲品杯',projected:'-12',par:'80',state:'RECOUNT',lastCount:'2 日前',note:'Negative quantity ≠ transaction blocker'},
+] as const;
+
+export const auditActivityDetails=[
+  {time:'21:41',initiatedBy:'系統',authorizedBy:'—',action:'建立 Action Item',target:'Keeta',result:'UNKNOWN',readback:'PROOF_PENDING'},
+  {time:'21:37',initiatedBy:'前線',authorizedBy:'前線權限',action:'履約狀態更新',target:'#023',result:'可取餐',readback:'CONFIRMED'},
+  {time:'20:52',initiatedBy:'系統',authorizedBy:'—',action:'裝置健康恢復',target:'收據機',result:'RECOVERED',readback:'DEVICE_ONLY'},
+] as const;
