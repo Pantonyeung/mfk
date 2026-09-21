@@ -10,20 +10,21 @@ import {RuntimeDiningWorkspace,type DiningCheckoutRequest} from './presentation/
 import {RuntimeSoldoutWorkspace} from './presentation/RuntimeSoldoutWorkspace.tsx';
 import {LocalMoreWorkspace} from './presentation/LocalMoreWorkspace.tsx';
 import {localRuntime,type DiningTender} from './runtime/local-runtime.ts';
+import {readAdminPublishedMenu,readCachedAdminMenu,type AdminMenuReadback} from './runtime/admin-menu-read.ts';
 import {ComboWorkspace,HoldCartWorkspace,HoldListWorkspace,OrganizeWorkspace,ProductConfigWorkspace,type OrderingPanelState,type WorkspaceHoldDraft,type WorkspaceProduct} from './features/ordering/OrderingCenterWorkspaces.tsx';
 
-type Product={id:string;category:string;name:string;priceMinor:number};
+type Product={id:string;category:string;name:string;priceMinor:number;priceReady:boolean};
 type CartLine={id:string;productId:string;name:string;qty:number;unitMinor:number;serviceMode:ServiceMode;detail?:string};
 
-const products:readonly Product[]=[
-  {id:'riceball',category:'飯團',name:'原味飯團',priceMinor:4100},
-  {id:'tuna',category:'飯團',name:'紫菜吞拿魚飯團',priceMinor:4300},
-  {id:'pork',category:'飯團',name:'泡菜豬肉飯團',priceMinor:4500},
-  {id:'bento',category:'便當',name:'肉燥便當',priceMinor:4800},
-  {id:'curry',category:'便當',name:'咖喱便當',priceMinor:5000},
-  {id:'wedges',category:'小食',name:'香脆薯角',priceMinor:1800},
-  {id:'milkTea',category:'飲品',name:'台式奶茶',priceMinor:1600},
-  {id:'lemonTea',category:'飲品',name:'手打檸檬茶',priceMinor:2000},
+const FROZEN_PRODUCTS:readonly Product[]=[
+  {id:'riceball',category:'飯團',name:'原味飯團',priceMinor:4100,priceReady:true},
+  {id:'tuna',category:'飯團',name:'紫菜吞拿魚飯團',priceMinor:4300,priceReady:true},
+  {id:'pork',category:'飯團',name:'泡菜豬肉飯團',priceMinor:4500,priceReady:true},
+  {id:'bento',category:'便當',name:'肉燥便當',priceMinor:4800,priceReady:true},
+  {id:'curry',category:'便當',name:'咖喱便當',priceMinor:5000,priceReady:true},
+  {id:'wedges',category:'小食',name:'香脆薯角',priceMinor:1800,priceReady:true},
+  {id:'milkTea',category:'飲品',name:'台式奶茶',priceMinor:1600,priceReady:true},
+  {id:'lemonTea',category:'飲品',name:'手打檸檬茶',priceMinor:2000,priceReady:true},
 ];
 
 const money=(minor:number)=>'$'+(minor/100).toFixed(2);
@@ -67,13 +68,45 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
   const [recent,setRecent]=useState<string|undefined>();
   const [highlight,setHighlight]=useState<string|undefined>();
   const [panel,setPanel]=useState<OrderingPanelState>(null);
+  const [menuState,setMenuState]=useState<{readback:AdminMenuReadback|null;tone:'canonical'|'cached'|'fallback'}>(()=>{
+    const cached=readCachedAdminMenu();
+    return cached?{readback:cached,tone:'cached'}:{readback:null,tone:'fallback'};
+  });
+  const [menuRefreshBusy,setMenuRefreshBusy]=useState(false);
+  const refreshAdminMenu=async()=>{
+    if(menuRefreshBusy)return;
+    setMenuRefreshBusy(true);
+    try{
+      const readback=await readAdminPublishedMenu();
+      setMenuState({readback,tone:'canonical'});
+    }catch{
+      setMenuState(current=>current.readback?{readback:current.readback,tone:'cached'}:{readback:null,tone:'fallback'});
+    }finally{
+      setMenuRefreshBusy(false);
+    }
+  };
+  useEffect(()=>{void refreshAdminMenu();},[]);
+
+  const menuProducts:readonly Product[]=useMemo(()=>{
+    if(!menuState.readback)return FROZEN_PRODUCTS;
+    return menuState.readback.products.map(remote=>{
+      const local=FROZEN_PRODUCTS.find(item=>item.id===remote.id)||FROZEN_PRODUCTS.find(item=>item.name===remote.name);
+      return {
+        id:local?.id??('admin:'+remote.id),
+        category:remote.category||local?.category||'其他',
+        name:remote.name,
+        priceMinor:local?.priceMinor??0,
+        priceReady:Boolean(local),
+      };
+    });
+  },[menuState.readback]);
 
   const categories=[
-    {id:'all',label:'熱門'},{id:'飯團',label:'飯團'},{id:'套餐',label:'套餐'},{id:'便當',label:'便當'},
-    {id:'小食',label:'小食'},{id:'飲品',label:'飲品'},{id:'素食',label:'素食'},{id:'湯品',label:'湯品'},
-    {id:'配料',label:'配料'},{id:'更多',label:'更多'},
+    {id:'all',label:'熱門'},
+    ...[...new Set(menuProducts.map(product=>product.category).filter(Boolean))].map(label=>({id:label,label})),
   ];
-  const visible=products.filter(product=>category==='all'||product.category===category);
+  const visible=menuProducts.filter(product=>category==='all'||product.category===category);
+
   const runtimeOrders=useMemo(()=>{void runtimeRevision;return localRuntime.orders();},[runtimeRevision]);
   const heldCarts=useMemo(()=>{void runtimeRevision;return localRuntime.holds();},[runtimeRevision]);
   const queueItem=(order:(typeof runtimeOrders)[number])=>({
@@ -93,7 +126,7 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
   const total=cart.reduce((sum,line)=>sum+line.unitMinor*line.qty,0);
   const nextDisplay='P'+String(localRuntime.orders().length+1).padStart(3,'0');
 
-  const workspaceProducts:WorkspaceProduct[]=products.map(product=>({
+  const workspaceProducts:WorkspaceProduct[]=menuProducts.filter(product=>product.priceReady).map(product=>({
     ...product,priceLabel:money(product.priceMinor),imageUrl:productArtwork(product)
   }));
   const holdTables=Array.from({length:9},(_,index)=>{
@@ -105,9 +138,15 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
   const view:OrderingWorkspaceViewModel={
     pendingOrders,activeOrders,categories,selectedCategoryId:category,
     products:visible.map(product=>({
-      id:product.id,name:product.name,priceLabel:money(product.priceMinor),
-      enabled:true,requiresOptions:['飯團','便當'].includes(product.category),imageUrl:productArtwork(product),
+      id:product.id,name:product.name,priceLabel:product.priceReady?money(product.priceMinor):'待接價格',
+      enabled:product.priceReady,requiresOptions:product.priceReady&&['飯團','便當'].includes(product.category),imageUrl:productArtwork(product),
+      ...(!product.priceReady?{badge:'Admin 新商品'}:{}),
     })),
+    menuStatusLabel:menuState.readback
+      ?(menuState.tone==='canonical'?'LIVE':'CACHE')+' · '+menuState.readback.catalogVersion+' · '+menuState.readback.products.length+' 件'
+      :'本地 Frozen R12 · Admin Menu 未連',
+    menuStatusTone:menuState.tone,
+    menuRefreshBusy,
     cart:{
       orderId:nextDisplay,serviceMode,viewMode,
       lines:cart.map(line=>({
@@ -132,7 +171,7 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
   };
 
   const add=(id:string)=>{
-    const product=products.find(item=>item.id===id);if(!product)return;
+    const product=menuProducts.find(item=>item.id===id);if(!product||!product.priceReady)return;
     const existing=cart.find(item=>item.productId===id&&item.serviceMode===serviceMode);
     const next=existing
       ?cart.map(item=>item.id===existing.id?{...item,qty:item.qty+1}:item)
@@ -145,13 +184,13 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
   };
 
   const addConfigured=(productId:string,detail:string,deltaMinor:number,qty:number)=>{
-    const product=products.find(item=>item.id===productId);if(!product)return;
+    const product=menuProducts.find(item=>item.id===productId);if(!product||!product.priceReady)return;
     const line:CartLine={id:'line-'+Date.now().toString(36),productId:product.id,name:product.name,qty,unitMinor:product.priceMinor+deltaMinor,serviceMode,detail};
     setCart([...cart,line]);setRecent(product.id);setHighlight(line.id);setPulse(value=>value+1);setPanel(null);
   };
 
   const addCombo=(productId:string,detail:string,unitMinor:number)=>{
-    const product=products.find(item=>item.id===productId);if(!product)return;
+    const product=menuProducts.find(item=>item.id===productId);if(!product||!product.priceReady)return;
     const line:CartLine={id:'line-'+Date.now().toString(36),productId:product.id,name:product.name,qty:1,unitMinor,serviceMode,detail};
     setCart([...cart,line]);setHighlight(line.id);setPulse(value=>value+1);setPanel(null);
   };
@@ -221,6 +260,7 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
 
   const actions:OrderingWorkspaceActions={
     onSelectCategory:setCategory,
+    onRefreshMenu:()=>{void refreshAdminMenu();},
     onAddProduct:add,
     onConfigureProduct:id=>setPanel({type:'product',productId:id}),
     onChangeServiceMode:mode=>{setServiceMode(mode);setCart(cart.map(item=>({...item,serviceMode:mode})));},
