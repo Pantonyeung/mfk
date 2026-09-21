@@ -73,6 +73,7 @@ function readPrinterBindings():PrintBinding[]{
         host:String(row.host||''),
         port:Number(row.port)||9100,
         capability:(row.capability==='label-58mm'?'label-58mm':'receipt-80mm/kitchen') as PrintBinding['capability'],
+        encoding:(row.encoding==='big5'||row.encoding==='utf-8'?'big5'===row.encoding?'big5':'utf-8':'gb18030') as PrintBinding['encoding'],
       }))
       .filter(row=>row.id&&['顧客小票','製作單','打包單','產品標籤','袋標籤'].includes(row.role));
   }catch{return []}
@@ -93,6 +94,7 @@ async function dispatchOrderOutputs(order:StoredOrder):Promise<PrintDispatchSumm
         displayName:binding.name,
         model:binding.model,
         capability:binding.capability,
+        encoding:binding.encoding,
         text:job.payload,
       });
       ok=result.ok;
