@@ -85,3 +85,12 @@
 /* legacy inline-hold selectors intentionally disabled */
 .ordering-cart.hold-active{grid-template-rows:auto minmax(0,1fr) auto auto auto auto}
 .ordering-hold-placement{display:none!important}
+
+/* R11 service mode authority */
+.ordering-service-toggle button{min-height:44px;padding:0 16px;font-size:20px;font-weight:950}
+.ordering-cart-line{grid-template-columns:112px minmax(0,1fr) 86px}
+.ordering-line-identity{gap:8px}
+.ordering-line-sequence{width:34px;height:34px;font-size:17px}
+.ordering-line-mode{width:64px;height:38px;border-radius:10px;font-size:18px;font-weight:950}
+.ordering-line-mode.takeaway{background:#e7f1ff;color:#2466aa}
+.ordering-line-mode.dine-in{background:#fff1df;color:#a55a00}
