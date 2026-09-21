@@ -3,13 +3,13 @@
   display:grid;grid-template-columns:minmax(0,1fr) 470px;grid-template-rows:108px minmax(0,1fr) 82px;
   grid-template-areas:"queue cart" "catalog cart" "work cart";gap:12px;background:#f4f5f7;color:#222
 }
-.ordering-flow-strip{grid-area:queue;min-width:0;display:grid;grid-template-columns:340px minmax(0,1fr);gap:10px}
+.ordering-flow-strip{grid-area:queue;min-width:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
 .ordering-queue-group{min-width:0;min-height:0;padding:10px;border:1px solid #dedfe4;border-radius:16px;background:#fff;box-shadow:0 5px 18px rgba(25,25,30,.05)}
 .ordering-queue-group>header{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
 .ordering-queue-group>header strong{font-size:18px;font-weight:950;color:#3a332e}.ordering-queue-group>header span{min-width:30px;height:30px;padding:0 7px;display:grid;place-items:center;border-radius:999px;background:#f15a24;color:#fff;font-size:14px;font-weight:950}
 .ordering-pending-head-actions{display:flex;align-items:center;gap:7px}.ordering-pending-head-actions button{height:30px;padding:0 9px;border:1px solid #dedfe4;border-radius:8px;background:#fff;font-size:13px;font-weight:850}
 .ordering-pending-list,.ordering-active-list{display:flex;gap:8px;overflow-x:auto;overscroll-behavior-inline:contain;padding-bottom:2px}
-.ordering-pending-card,.ordering-active-card{flex:0 0 150px;min-height:55px;padding:8px 10px;border:1px solid #dfe1e6;border-radius:10px;background:#fafafa;text-align:left}
+.ordering-pending-card,.ordering-active-card{flex:0 0 180px;min-height:55px;padding:8px 10px;border:1px solid #dfe1e6;border-radius:10px;background:#fafafa;text-align:left}
 .ordering-pending-card{border-left:4px solid #f15a24}.ordering-active-card{border-left:4px solid #4d8fe8}
 .ordering-pending-primary,.ordering-pending-meta,.ordering-active-card>div{display:flex;align-items:center;justify-content:space-between;gap:7px}.ordering-pending-card b,.ordering-active-card b{font-size:17px}.ordering-pending-card strong,.ordering-active-card span{font-size:13px}.ordering-pending-meta,.ordering-active-card small{margin-top:4px;color:#6d6e75;font-size:12px}.ordering-empty{margin:8px 2px;color:#8a8a90;font-size:14px}
 
