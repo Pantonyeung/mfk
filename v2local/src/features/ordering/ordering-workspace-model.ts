@@ -80,6 +80,7 @@ export interface OrderingWorkspaceViewModel {
 export interface OrderingWorkspaceActions {
   readonly onSelectCategory:(categoryId:string)=>void;
   readonly onRefreshMenu:()=>void;
+  readonly onOpenAdminMenuPreview:()=>void;
   readonly onAddProduct:(productId:string)=>void;
   readonly onConfigureProduct:(productId:string)=>void;
   readonly onChangeServiceMode:(mode:ServiceMode)=>void;
