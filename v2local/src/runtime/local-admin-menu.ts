@@ -1,4 +1,4 @@
-import {validateMfkAdminMenuIndexRevision,type MfkAdminMenuIndexRevision} from '../../../contracts/admin-menu-index-v1.ts';
+import {fingerprintMfkAdminMenuIndexRevision,validateMfkAdminMenuIndexRevision,type MfkAdminMenuIndexRevision} from '../../../contracts/admin-menu-index-v1.ts';
 export const LOCAL_ADMIN_MENU_ACTIVE_KEY='mfk.local-admin.menu.active.v2';
 export const LOCAL_ADMIN_MENU_DRAFT_KEY='mfk.local-admin.menu.draft.v2';
 export const LOCAL_ADMIN_MENU_HISTORY_KEY='mfk.local-admin.menu.history.v2';
@@ -394,22 +394,7 @@ function localMenuSnapshotFingerprint(snapshot:LocalAdminMenuSnapshot):string{
     })),
     fingerprint:'',
   };
-  const validated=validateMfkAdminMenuIndexRevision({...projected,fingerprint:revisionFingerprint(projected)});
+  const {fingerprint:_,...base}=projected;
+  const validated=validateMfkAdminMenuIndexRevision({...base,fingerprint:fingerprintMfkAdminMenuIndexRevision(base)});
   return validated.fingerprint;
-}
-
-function revisionFingerprint(value:Omit<MfkAdminMenuIndexRevision,'fingerprint'>|MfkAdminMenuIndexRevision):string{
-  const payload={
-    schema:value.schema,
-    revision:value.revision,
-    baseRevision:value.baseRevision,
-    publishedAt:value.publishedAt,
-    categories:value.categories,
-    products:value.products,
-  };
-  // Keep this helper intentionally local and deterministic; shared validator remains the authority.
-  let hash=0x811c9dc5;
-  const text=JSON.stringify(payload);
-  for(let i=0;i<text.length;i++){hash^=text.charCodeAt(i);hash=Math.imul(hash,0x01000193)>>>0;}
-  return 'fnv1a32:'+hash.toString(16).padStart(8,'0');
 }
