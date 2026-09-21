@@ -86,7 +86,21 @@ export function buildOrderPrintPlan(order:PrintableOrder,bindings:readonly Print
       continue;
     }
     if(binding.role==='袋標籤'){
-      jobs.push({id:order.id+':bag-label',role:binding.role,binding,payload:bagLabel(order)});
+      const total=order.items.reduce((sum,item)=>sum+Math.max(0,Number(item.qty)||0),0);
+      const labelSpec:RasterLabelSpec={
+        orderCode:clean(order.display),
+        primaryText:'袋標籤',
+        secondaryText:'共 '+total+' 件',
+        pieceLabel:'1/1',
+      };
+      jobs.push({
+        id:order.id+':bag-label',
+        role:binding.role,
+        binding,
+        payload:'LABEL '+labelSpec.orderCode+' '+labelSpec.primaryText,
+        renderMode:'tsc-bitmap',
+        labelSpec,
+      });
       continue;
     }
     if(binding.role==='產品標籤'){
