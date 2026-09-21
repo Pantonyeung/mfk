@@ -21,7 +21,7 @@ function QueueStrip({title,kind,orders,onOpen}:{title:string;kind:'pending'|'act
       {orders.length?orders.map(order=><button type="button" key={order.id} className="ordering-active-card" onClick={()=>onOpen('active',order.id)}>
         <div><b>#{order.orderId}</b><span>{order.sourceLabel}</span></div>
         <div><strong>{order.waitLabel}</strong><small>{order.itemCount} 件</small></div>
-      </button>):<p className="ordering-empty">暫無進行中訂單</p>}
+      </button>):<p className="ordering-empty">暫無 Kita 訂單</p>}
     </div>
   </section>;
 }
@@ -95,7 +95,7 @@ export function OrderingWorkspace({view,actions,centerPanel}:{view:OrderingWorks
   return <div className={`ordering-workspace${centerPanel?' panel-open':''}`}>
     <header className="ordering-flow-strip">
       <QueueStrip title="待處理" kind="pending" orders={view.pendingOrders} onOpen={actions.onOpenQueueOrder}/>
-      <QueueStrip title="進行中" kind="active" orders={view.activeOrders} onOpen={actions.onOpenQueueOrder}/>
+      <QueueStrip title="Kita" kind="active" orders={view.activeOrders} onOpen={actions.onOpenQueueOrder}/>
     </header>
 
     <main className={`ordering-catalog${centerPanel?' ordering-catalog--panel':''}`} aria-label={centerPanel?centerPanel.title:'商品'}>
