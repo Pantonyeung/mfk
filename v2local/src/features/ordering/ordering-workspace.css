@@ -173,3 +173,5 @@
 .ordering-menu-readback.canonical{border-color:#a9ddc2;background:#f1fbf6;color:#176b43}.ordering-menu-readback.cached{border-color:#e7d6a6;background:#fff9e8;color:#805d14}.ordering-menu-readback.fallback{border-color:#e1c3bd;background:#fff5f2;color:#8d4436}
 .ordering-menu-readback button{min-height:30px;padding:0 9px;border:1px solid currentColor;border-radius:7px;background:#fff;font-size:12px;font-weight:900}.ordering-menu-readback button:disabled{opacity:.55}
 .ordering-catalog--panel{grid-template-rows:minmax(0,1fr)}
+
+.ordering-menu-readback-actions{display:flex;align-items:center;gap:7px}
