@@ -7,8 +7,8 @@ describe('MFK Admin isolated control plane',()=>{
     expect(ADMIN_CAPABILITY_GROUPS.map(group=>group.id)).toEqual([
       'overview','operations','products','orders','print','channels','members','reports','store','system',
     ]);
-    expect(ADMIN_CAPABILITIES).toHaveLength(37);
-    for(const required of ['products','categories','modifiers','pricing','combo','print-center','staff','audit']){
+    expect(ADMIN_CAPABILITIES).toHaveLength(41);
+    for(const required of ['products','categories','modifiers','pricing','combo','publish-center','print-center','print-rules','settlement','quick-reasons','staff','audit']){
       expect(ADMIN_CAPABILITIES.some(item=>item.id===required)).toBe(true);
     }
   });
