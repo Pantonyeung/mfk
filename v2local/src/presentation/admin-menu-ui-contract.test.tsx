@@ -1,13 +1,15 @@
 import {renderToStaticMarkup} from 'react-dom/server';
 import {describe,expect,it} from 'vitest';
-import {ActiveMenuProductName} from '../features/ordering/OrderingWorkspace.tsx';
+import {ProductCardText} from '../features/ordering/OrderingWorkspace.tsx';
 import {AdminMenuPublishReceipt} from './LocalAdminMenuWorkspace.tsx';
 
 describe('Admin Menu physical acceptance UI contracts',()=>{
-  it('shows the complete Active Menu product name on the POS tile',()=>{
-    const html=renderToStaticMarkup(<ActiveMenuProductName name="原味飯團ttttt"/>);
-    expect(html).toContain('data-active-menu-product-name="原味飯團ttttt"');
-    expect(html).toContain('>原味飯團ttttt</span>');
+  it('renders the POS product card as full text with name and price',()=>{
+    const html=renderToStaticMarkup(<ProductCardText name="古早味紫米飯糰" priceLabel="$41.00"/>);
+    expect(html).toContain('data-active-menu-product-name="古早味紫米飯糰"');
+    expect(html).toContain('>古早味紫米飯糰</b>');
+    expect(html).toContain('>$41.00</strong>');
+    expect(html).not.toContain('<img');
   });
 
   it('shows an unmistakable publish success receipt with Active revision',()=>{
