@@ -93,18 +93,44 @@ export function StoreSettingsWorkspace(){
   </section>;
 }
 
-interface StaffDraft{readonly id:string;readonly name:string;readonly role:string;readonly adminLogin:boolean;readonly active:boolean}
+interface StaffDraft{
+  readonly id:string;
+  readonly name:string;
+  readonly role:string;
+  readonly pin:string;
+  readonly scope:string;
+  readonly adminLogin:boolean;
+  readonly active:boolean;
+  readonly permissions:readonly string[];
+}
 export function StaffWorkspace(){
   const [staff,setStaff]=useState<readonly StaffDraft[]>([]);
-  const add=()=>setStaff(rows=>[...rows,{id:'staff-'+String(rows.length+1).padStart(3,'0'),name:'',role:'STAFF',adminLogin:false,active:true}]);
+  const add=()=>setStaff(rows=>[...rows,{
+    id:'staff-'+String(rows.length+1).padStart(3,'0'),
+    name:'',role:'STAFF',pin:'',scope:'STORE',adminLogin:false,active:true,permissions:['ORDER_REVIEW'],
+  }]);
   const patch=(id:string,change:Partial<StaffDraft>)=>setStaff(rows=>rows.map(row=>row.id===id?{...row,...change}:row));
+  const togglePermission=(row:StaffDraft,permission:string,checked:boolean)=>patch(row.id,{
+    permissions:checked?[...new Set([...row.permissions,permission])]:row.permissions.filter(item=>item!==permission),
+  });
   return <section className="admin-editor-page">
-    <header className="admin-editor-head"><div><small>AUTH CONFIG · NOT_WIRED</small><h1>員工／權限</h1><p>只整理 Staff / Role / Admin access config。真正授權判斷必須由 MFK Auth authority 執行。</p></div><div className="admin-editor-actions"><button className="secondary" onClick={add}>新增員工</button><button className="publish" disabled>Publish 未接駁</button></div></header>
-    {staff.length===0?<div className="admin-empty-state"><b>未有 Staff Draft</b><p>新增員工後設定角色同 Admin login eligibility。</p><button onClick={add}>新增員工</button></div>:<div className="admin-editor-list">{staff.map(row=><article className="admin-policy-row staff-row" key={row.id}>
-      <input value={row.name} onChange={event=>patch(row.id,{name:event.target.value})} placeholder="員工名稱"/>
-      <select value={row.role} onChange={event=>patch(row.id,{role:event.target.value})}><option value="STAFF">Staff</option><option value="MANAGER">Manager</option><option value="OWNER">Owner</option><option value="VIEWER">Viewer</option></select>
+    <header className="admin-editor-head">
+      <div><small>AUTH CONFIG · NOT_WIRED</small><h1>員工／權限</h1><p>Staff / Role / PIN / Scope / permission config shape。真正授權判斷只可以由唯一 Auth authority 執行。</p></div>
+      <div className="admin-editor-actions"><button className="secondary" onClick={add}>新增員工</button><button className="publish" disabled>Publish 未接駁</button></div>
+    </header>
+    {staff.length===0?<div className="admin-empty-state"><b>未有 Staff Draft</b><p>新增員工後設定 Role、PIN、Scope 同 Admin login eligibility。</p><button onClick={add}>新增員工</button></div>:<div className="admin-editor-list">{staff.map(row=><article className="admin-policy-card" key={row.id}>
+      <h2>{row.name||row.id}</h2>
+      <label><span>員工名稱</span><input value={row.name} onChange={event=>patch(row.id,{name:event.target.value})} placeholder="員工名稱"/></label>
+      <label><span>Role</span><select value={row.role} onChange={event=>patch(row.id,{role:event.target.value})}><option value="STAFF">Staff</option><option value="MANAGER">Manager</option><option value="OWNER">Owner</option><option value="VIEWER">Viewer</option></select></label>
+      <label><span>PIN Draft</span><input inputMode="numeric" value={row.pin} onChange={event=>patch(row.id,{pin:event.target.value.replace(/\D/g,'').slice(0,8)})} placeholder="4–8 digits"/></label>
+      <label><span>Scope</span><select value={row.scope} onChange={event=>patch(row.id,{scope:event.target.value})}><option value="STORE">Store</option><option value="MULTI_STORE">Multi-store</option><option value="REPORT_ONLY">Report only</option></select></label>
+      <div>
+        <b>Permission Draft</b>
+        {['ORDER_REVIEW','ADMIN_CONFIG','REPORT_VIEW'].map(permission=><label className="admin-toggle" key={permission}><input type="checkbox" checked={row.permissions.includes(permission)} onChange={event=>togglePermission(row,permission,event.target.checked)}/><span>{permission}</span></label>)}
+      </div>
       <label className="admin-toggle"><input type="checkbox" checked={row.adminLogin} onChange={event=>patch(row.id,{adminLogin:event.target.checked})}/><span>Admin Login</span></label>
       <label className="admin-toggle"><input type="checkbox" checked={row.active} onChange={event=>patch(row.id,{active:event.target.checked})}/><span>{row.active?'啟用':'停用'}</span></label>
+      <span className="admin-not-wired-chip">SESSION DRAFT / NO AUTHZ EFFECT</span>
     </article>)}</div>}
   </section>;
 }
