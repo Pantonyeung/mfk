@@ -4,7 +4,8 @@ import {buildOrderPrintPlan,groupTscBitmapJobsByPhysicalPrinter,type PrintBindin
 
 export interface SmtOperationalMetric{readonly id:string;readonly label:string;readonly value:string;readonly detail?:string}
 export interface SmtOrderListItemViewModel{readonly orderId:string;readonly orderIdLabel:string;readonly itemCount:number;readonly totalLabel:string;readonly paymentLabel:string;readonly fulfillmentLabel:string;readonly sourceLabel?:string;readonly localSequenceLabel?:string}
-export interface SmtOrderDetailViewModel extends SmtOrderListItemViewModel{readonly attention:readonly string[];readonly metrics:readonly SmtOperationalMetric[]}
+export interface SmtOrderDetailLineViewModel{readonly id:string;readonly name:string;readonly quantity:number;readonly unitLabel:string;readonly lineTotalLabel:string}
+export interface SmtOrderDetailViewModel extends SmtOrderListItemViewModel{readonly attention:readonly string[];readonly metrics:readonly SmtOperationalMetric[];readonly lines:readonly SmtOrderDetailLineViewModel[]}
 export interface SmtOrdersProjection{readonly items:readonly SmtOrderListItemViewModel[];readonly detailsByOrderId?:Readonly<Record<string,SmtOrderDetailViewModel>>;readonly selectedOrderId?:string;readonly selectedOrder?:SmtOrderDetailViewModel}
 export interface SmtDiningQueueItemViewModel{readonly id:string;readonly codeLabel:string;readonly partySize:number;readonly statusLabel:string}
 export interface SmtDiningTableViewModel{readonly id:string;readonly areaLabel:string;readonly label:string;readonly state:'available'|'occupied'|'attention';readonly partySize?:number;readonly outstandingLabel?:string}
@@ -54,6 +55,33 @@ export interface PrintDispatchSummary{
   readonly sent:number;
   readonly failed:number;
   readonly results:readonly PrintDispatchResult[];
+}
+
+export interface PrintPhysicalDiagnostic{
+  readonly physicalKey:string;
+  readonly bindingIds:readonly string[];
+  readonly roles:readonly string[];
+  readonly planned:number;
+  readonly ok:boolean;
+  readonly code:string;
+  readonly elapsedMs:number;
+}
+export interface PrintDispatchDiagnostic{
+  readonly orderId:string;
+  readonly display:string;
+  readonly createdAt:string;
+  readonly elapsedMs:number;
+  readonly planned:number;
+  readonly sent:number;
+  readonly failed:number;
+  readonly physical:readonly PrintPhysicalDiagnostic[];
+}
+const PRINT_DIAGNOSTIC_KEY='mfk.v2local.print-diagnostic.v1';
+export function readLastPrintDiagnostic():PrintDispatchDiagnostic|null{
+  try{
+    const value=JSON.parse(localStorage.getItem(PRINT_DIAGNOSTIC_KEY)||'null');
+    return value&&typeof value==='object'?value as PrintDispatchDiagnostic:null;
+  }catch{return null}
 }
 export interface MfkLocalRuntime extends CleanSmtCoreRuntimePort{
   createOrder(input:{items:readonly {id:string;name:string;qty:number;unitMinor:number}[];totalMinor:number;paymentLabel:string;sourceLabel?:string}):StoredOrder;
@@ -159,52 +187,89 @@ function pushDispatchResults(results:PrintDispatchResult[],jobs:readonly Planned
   for(const job of jobs)results.push({jobId:job.id,role:job.role,ok,code});
 }
 
+function physicalKey(binding:PrintBinding){
+  return binding.host.trim().toLowerCase()+':'+(Number(binding.port)||9100);
+}
+
 async function dispatchOrderOutputs(order:StoredOrder):Promise<PrintDispatchSummary>{
+  const started=performance.now();
   const plan=buildOrderPrintPlan(order,readPrinterBindings());
-  const results:PrintDispatchResult[]=[];
-  const labelBatches=groupTscBitmapJobsByPhysicalPrinter(plan);
-  const labelJobs=new Set(labelBatches.flatMap(batch=>batch.jobs.map(job=>job.id)));
-
+  const groups=new Map<string,PlannedPrintJob[]>();
   for(const job of plan){
-    if(labelJobs.has(job.id))continue;
-    let ok=false;
-    let code='PRINT_FAILED';
-    try{
-      const result=await printTextLan({...printerInput(job.binding),text:job.payload});
-      ok=result.ok;
-      code=result.code||(result.ok?'SENT':'PRINT_FAILED');
-    }catch(error){
-      code=error instanceof Error?error.message:'PRINT_FAILED';
-    }
-    results.push({jobId:job.id,role:job.role,ok,code});
+    const key=physicalKey(job.binding);
+    const existing=groups.get(key);
+    if(existing)existing.push(job);
+    else groups.set(key,[job]);
   }
 
-  for(const batch of labelBatches){
-    let ok=false;
-    let code='PRINT_FAILED';
+  const groupResults=await Promise.all([...groups.entries()].map(async([key,jobs])=>{
+    const groupStarted=performance.now();
+    const results:PrintDispatchResult[]=[];
+    let groupCode='SENT';
     try{
-      const payloads:Uint8Array[]=[];
-      for(const job of batch.jobs){
-        if(!job.labelSpec)throw new Error('LABEL_SPEC_MISSING');
-        payloads.push(await renderTscRasterLabel(job.labelSpec));
+      const bitmapOnly=jobs.every(job=>job.renderMode==='tsc-bitmap'&&job.labelSpec);
+      if(bitmapOnly){
+        const payloads=await Promise.all(jobs.map(job=>renderTscRasterLabel(job.labelSpec!)));
+        const result=await printBytesLan({...printerInput(jobs[0]!.binding),bytes:concatPrintBytes(payloads)});
+        groupCode=result.code||(result.ok?'SENT':'PRINT_FAILED');
+        pushDispatchResults(results,jobs,result.ok,groupCode);
+      }else{
+        for(const job of jobs){
+          try{
+            const result=job.renderMode==='tsc-bitmap'&&job.labelSpec
+              ?await printBytesLan({...printerInput(job.binding),bytes:await renderTscRasterLabel(job.labelSpec)})
+              :await printTextLan({...printerInput(job.binding),text:job.payload});
+            const code=result.code||(result.ok?'SENT':'PRINT_FAILED');
+            results.push({jobId:job.id,role:job.role,ok:result.ok,code});
+            if(!result.ok)groupCode=code;
+          }catch(error){
+            const code=error instanceof Error?error.message:'PRINT_FAILED';
+            results.push({jobId:job.id,role:job.role,ok:false,code});
+            groupCode=code;
+          }
+        }
       }
-      const result=await printBytesLan({...printerInput(batch.binding),bytes:concatPrintBytes(payloads)});
-      ok=result.ok;
-      code=result.code||(result.ok?'SENT':'PRINT_FAILED');
     }catch(error){
-      code=error instanceof Error?error.message:'PRINT_FAILED';
+      groupCode=error instanceof Error?error.message:'PRINT_FAILED';
+      const unresolved=jobs.filter(job=>!results.some(row=>row.jobId===job.id));
+      pushDispatchResults(results,unresolved,false,groupCode);
     }
-    pushDispatchResults(results,batch.jobs,ok,code);
-  }
+    return {
+      results,
+      diagnostic:{
+        physicalKey:key,
+        bindingIds:Object.freeze([...new Set(jobs.map(job=>job.binding.id))]),
+        roles:Object.freeze([...new Set(jobs.map(job=>job.role))]),
+        planned:jobs.length,
+        ok:results.every(row=>row.ok),
+        code:groupCode,
+        elapsedMs:Math.round(performance.now()-groupStarted),
+      } satisfies PrintPhysicalDiagnostic,
+    };
+  }));
 
+  const results=groupResults.flatMap(group=>group.results);
   const sent=results.filter(result=>result.ok).length;
-  return Object.freeze({
+  const summary=Object.freeze({
     orderId:order.id,
     planned:plan.length,
     sent,
     failed:plan.length-sent,
     results:Object.freeze(results.map(result=>Object.freeze(result))),
   });
+  const diagnostic:PrintDispatchDiagnostic={
+    orderId:order.id,
+    display:order.display,
+    createdAt:new Date().toISOString(),
+    elapsedMs:Math.round(performance.now()-started),
+    planned:summary.planned,
+    sent:summary.sent,
+    failed:summary.failed,
+    physical:Object.freeze(groupResults.map(group=>Object.freeze(group.diagnostic))),
+  };
+  localStorage.setItem(PRINT_DIAGNOSTIC_KEY,JSON.stringify(diagnostic));
+  listeners.forEach(fn=>fn());
+  return summary;
 }
 
 const productNames:Record<string,string>={
@@ -245,7 +310,14 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
         {id:'time',label:'時間',value:new Date(order.createdAt).toLocaleTimeString('zh-HK')},
         {id:'items',label:'件數',value:String(order.items.reduce((s,x)=>s+x.qty,0))},
         {id:'total',label:'總額',value:money(order.totalMinor)}
-      ]
+      ],
+      lines:order.items.map(item=>({
+        id:item.id,
+        name:item.name,
+        quantity:item.qty,
+        unitLabel:money(item.unitMinor),
+        lineTotalLabel:money(item.unitMinor*item.qty),
+      }))
     };
     return {items,detailsByOrderId:details,selectedOrderId:selectedId,selectedOrder:selectedId?details[selectedId]:undefined};
   },
