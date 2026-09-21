@@ -436,7 +436,7 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
   async readDining(){
     return {
       businessDate:new Date().toISOString().slice(0,10),revision:1,
-      queue:data.holds.filter(hold=>!hold.assignedTable).map(hold=>({
+      queue:data.holds.filter(hold=>hold.kind==='dining'&&!hold.assignedTable).map(hold=>({
         id:hold.id,
         codeLabel:hold.codeLabel,
         partySize:hold.partySize,
@@ -444,7 +444,7 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
       })),
       tables:Array.from({length:9},(_,index)=>{
         const id='T'+String(index+1).padStart(2,'0');
-        const seated=data.holds.find(hold=>hold.assignedTable===id);
+        const seated=data.holds.find(hold=>hold.kind==='dining'&&hold.assignedTable===id);
         return {
           id,
           areaLabel:'堂食',
