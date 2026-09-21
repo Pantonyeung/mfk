@@ -45,7 +45,6 @@ export function CheckoutWorkspace({view,actions}:{view:CheckoutWorkspaceViewMode
 
       <div className="checkout-payment-grid">
         <section className="checkout-method-panel" aria-label="付款方式">
-          <div className="checkout-section-title"><small>付款方式</small><h1>收款</h1></div>
           <div className="checkout-method-grid">
             {view.methods.map(method=><button type="button" key={method.id} disabled={!method.enabled||processing||success} aria-pressed={method.selected} className={method.selected?'active':''} onClick={()=>actions.onSelectMethod(method.id)}>{method.label}</button>)}
           </div>
