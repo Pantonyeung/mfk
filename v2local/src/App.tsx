@@ -10,7 +10,7 @@ import {RuntimeDiningWorkspace} from './presentation/RuntimeDiningWorkspace.tsx'
 import {RuntimeSoldoutWorkspace} from './presentation/RuntimeSoldoutWorkspace.tsx';
 import {LocalMoreWorkspace} from './presentation/LocalMoreWorkspace.tsx';
 import {localRuntime} from './runtime/local-runtime.ts';
-import {ComboWorkspace,OrganizeWorkspace,ProductConfigWorkspace,type OrderingPanelState,type WorkspaceProduct} from './features/ordering/OrderingCenterWorkspaces.tsx';
+import {ComboWorkspace,HoldCartWorkspace,OrganizeWorkspace,ProductConfigWorkspace,type OrderingPanelState,type WorkspaceProduct} from './features/ordering/OrderingCenterWorkspaces.tsx';
 
 type Product={id:string;category:string;name:string;priceMinor:number};
 type CartLine={id:string;productId:string;name:string;qty:number;unitMinor:number;serviceMode:ServiceMode;detail?:string};
@@ -132,21 +132,31 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
     setCart([...cart,line]);setHighlight(line.id);setPulse(value=>value+1);setPanel(null);
   };
   const workspaceProducts:WorkspaceProduct[]=products.map(product=>({...product,priceLabel:money(product.priceMinor),imageUrl:productArtwork(product)}));
-  const panelTitle=panel?.type==='product'?'商品選項':panel?.type==='organize'?'整理工作台':panel?.type==='combo'?'紫米套餐區':'';
+  const panelTitle=panel?.type==='product'?'商品選項':panel?.type==='organize'?'整理工作台':panel?.type==='combo'?'紫米套餐區':panel?.type==='hold'?'暫存／候位':'';
   const panelBody=panel?.type==='product'
     ?(()=>{const product=workspaceProducts.find(item=>item.id===panel.productId);return product?<ProductConfigWorkspace product={product} onAdd={(detail,delta,qty)=>addConfigured(product.id,detail,delta,qty)}/>:null})()
     :panel?.type==='organize'
       ?<OrganizeWorkspace lines={cart} onDone={()=>setPanel(null)}/>
       :panel?.type==='combo'
         ?<ComboWorkspace products={workspaceProducts} onAdd={addCombo}/>
-        :null;
+        :panel?.type==='hold'
+          ?<HoldCartWorkspace lines={cart} totalMinor={total} onHold={(kind,partySize,note)=>{
+            localRuntime.createHold({
+              kind,
+              items:cart.map(line=>({id:line.productId,name:line.detail?line.name+'｜'+line.detail:line.name,qty:line.qty,unitMinor:line.unitMinor})),
+              totalMinor:total,partySize,note
+            });
+            setCart([]);setPanel(null);
+            if(kind==='dining')navigate('/dining');
+          }}/>
+          :null;
 
   const actions:OrderingWorkspaceActions={
     onSelectCategory:setCategory,onAddProduct:add,onConfigureProduct:id=>setPanel({type:'product',productId:id}),
     onChangeServiceMode:setServiceMode,onChangeCartView:mode=>{setViewMode(mode);if(mode==='organized')setPanel({type:'organize'});},
     onChangeLineServiceMode:(lineId,mode)=>setCart(cart.map(item=>item.id===lineId?{...item,serviceMode:mode}:item)),
     onAdjustLineQuantity:(lineId,delta)=>setCart(cart.map(item=>item.id===lineId?{...item,qty:item.qty+delta}:item).filter(item=>item.qty>0)),
-    onEditCartLine:lineId=>{const line=cart.find(item=>item.id===lineId);if(line)setPanel({type:'product',productId:line.productId});},onHoldCart:()=>{},onCancelCart:()=>setCart([]),
+    onEditCartLine:lineId=>{const line=cart.find(item=>item.id===lineId);if(line)setPanel({type:'product',productId:line.productId});},onHoldCart:()=>setPanel({type:'hold'}),onCancelCart:()=>setCart([]),
     onOpenWorkItem:id=>{if(id==='soldout')navigate('/soldout');else if(id==='combo')setPanel({type:'combo'});else setPanel({type:'organize'});},
     onOpenQueueOrder:(_kind,id)=>navigate('/orders?orderId='+encodeURIComponent(id)),
     onCheckout:()=>navigate('/checkout'),
