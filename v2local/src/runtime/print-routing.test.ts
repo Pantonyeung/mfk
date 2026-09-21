@@ -16,7 +16,7 @@ const order:PrintableOrder={
 
 const binding=(role:PrintBinding['role'],id:string):PrintBinding=>({
   id,role,routeKey:'logical.'+id,name:role+' printer',model:'LAN',host:'192.168.1.50',port:9100,
-  capability:role.includes('標籤')?'label-58mm':'receipt-80mm/kitchen',
+  capability:role.includes('標籤')?'label-58mm':'receipt-80mm/kitchen',encoding:'gb18030',
 });
 
 describe('MFK checkout print fanout',()=>{
