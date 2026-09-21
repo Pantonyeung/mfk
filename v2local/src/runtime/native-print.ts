@@ -1,3 +1,5 @@
+import {encodeEscPosText,encodePrinterText,toBase64Bytes,type PrinterEncoding} from './printer-encoding.ts';
+
 export interface NativeResult{ok:boolean;code:string|null;message?:Record<string,unknown>}
 
 interface NativeBridge{
@@ -15,12 +17,6 @@ function parse(data:unknown):Record<string,unknown>|null{
   }catch{return null;}
 }
 function requestId(prefix='mfk-v2-print'){return prefix+'-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,7)}
-function toBase64(text:string){
-  const bytes=new TextEncoder().encode(text);
-  let binary='';
-  for(const byte of bytes)binary+=String.fromCharCode(byte);
-  return btoa(binary);
-}
 
 export async function sendNative(type:string,expected:readonly string[],extra:Record<string,unknown>={},timeoutMs=7000):Promise<NativeResult>{
   const bridge=window.moreFunNative;
@@ -71,6 +67,7 @@ export interface LanPrinterInput{
   displayName:string;
   model:string;
   capability:'receipt-80mm/kitchen'|'label-58mm';
+  encoding?:PrinterEncoding;
 }
 
 export async function applyLanPrinter(input:LanPrinterInput){
@@ -81,12 +78,20 @@ export async function testLanPrinter(input:LanPrinterInput){
   if(!applied.ok)return applied;
   return sendNative('print.lan.endpoint.test',['print.lan.endpoint.test.completed'],{endpointId:input.endpointId},8000);
 }
-export async function printTextLan(input:LanPrinterInput&{text:string}){
+export async function printBytesLan(input:LanPrinterInput&{bytes:Uint8Array}){
   const applied=await applyLanPrinter(input);
   if(!applied.ok)return applied;
   return sendNative('print.lan.dispatch',['print.lan.dispatch.completed'],{
     endpointId:input.endpointId,
     dispatchAttemptId:requestId('mfk-v2-lan'),
-    payloadBase64:toBase64(input.text)
+    payloadBase64:toBase64Bytes(input.bytes)
   },10000);
+}
+
+export async function printTextLan(input:LanPrinterInput&{text:string}){
+  const encoding=input.encoding??'gb18030';
+  const bytes=input.capability==='label-58mm'
+    ?encodePrinterText(input.text,encoding)
+    :encodeEscPosText(input.text,encoding);
+  return printBytesLan({...input,bytes});
 }
