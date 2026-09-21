@@ -34,6 +34,7 @@ export interface PlannedPrintJob{
   readonly labelSpec?:RasterLabelSpec;
   readonly cutAfter?:boolean;
   readonly kickDrawer?:boolean;
+  readonly beepAfter?:boolean;
 }
 
 export interface TscBitmapJobBatch{
@@ -123,15 +124,15 @@ export function buildOrderPrintPlan(order:PrintableOrder,bindings:readonly Print
   const jobs:PlannedPrintJob[]=[];
   for(const binding of active){
     if(binding.role==='顧客小票'){
-      jobs.push({id:order.id+':receipt',role:binding.role,binding,payload:receipt(order),cutAfter:true,kickDrawer:/\bCASH\b/i.test(order.paymentLabel)});
+      jobs.push({id:order.id+':receipt',role:binding.role,binding,payload:receipt(order),cutAfter:true,kickDrawer:/\bCASH\b/i.test(order.paymentLabel),beepAfter:true});
       continue;
     }
     if(binding.role==='製作單'){
-      jobs.push({id:order.id+':production',role:binding.role,binding,payload:production(order),cutAfter:true});
+      jobs.push({id:order.id+':production',role:binding.role,binding,payload:production(order),cutAfter:true,beepAfter:true});
       continue;
     }
     if(binding.role==='打包單'){
-      jobs.push({id:order.id+':packing',role:binding.role,binding,payload:packing(order),cutAfter:true});
+      jobs.push({id:order.id+':packing',role:binding.role,binding,payload:packing(order),cutAfter:true,beepAfter:true});
       continue;
     }
     if(binding.role==='袋標籤'){
