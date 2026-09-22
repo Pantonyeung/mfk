@@ -309,7 +309,8 @@ function DiagnosticsPanel(){
 
 function ReportsPanel({revision}:{revision:number}){
   void revision;
-  const report=buildLocalReport(localRuntime.orders());
+  const cutoff=readBusinessCutoff();
+  const report=buildLocalReport(localRuntime.orders(),{businessStartHour:cutoff.hour,businessStartMinute:cutoff.minute});
   return <section className="more-panel">
     <header className="more-section-heading"><div><span>LOCAL REPORT</span><h2>今日營運</h2></div><strong>{report.businessDate}</strong></header>
     <div className="more-kpis fusion-kpis">
