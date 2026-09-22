@@ -1,6 +1,7 @@
 import {useMemo,useState} from 'react';
 import {useAdminDraft} from './admin-draft.tsx';
-import {appendAdminAudit,usePersistentAdminState} from './admin-local-store.ts';
+import {appendAdminAudit,readActiveAdminRelease,usePersistentAdminState,writeAdminStored} from './admin-local-store.ts';
+import {saveAdminConfig} from './admin-config-save.ts';
 
 function PolicyHeader({title,description,badge='已自動保存設定'}:{title:string;description:string;badge?:string}){
   return <header className="admin-editor-head">
@@ -170,13 +171,26 @@ interface StaffDraft{
 }
 const PERMISSIONS=[['ORDER_REVIEW','查看訂單'],['ORDER_CORRECTION','更正訂單／付款'],['ADMIN_CONFIG','修改後台設定'],['PUBLISH_CONFIG','建立設定版本'],['REPORT_VIEW','查看報表'],['REPORT_EXPORT','匯出報表'],['STAFF_MANAGE','管理員工']] as const;
 export function StaffWorkspace(){
+  const {draft,markClean}=useAdminDraft();
   const [staff,setStaff]=usePersistentAdminState<StaffDraft[]>('staff.v1',[]);
+  const [saveMessage,setSaveMessage]=useState('');
+  const [saveErrors,setSaveErrors]=useState<readonly string[]>([]);
   const add=()=>setStaff(rows=>{const row:StaffDraft={id:'staff-'+Date.now().toString(36),name:'',role:'STAFF',pin:'',scope:'STORE',adminLogin:false,active:true,permissions:['ORDER_REVIEW']};appendAdminAudit({action:'新增員工',target:row.id});return [...rows,row];});
   const patch=(id:string,change:Partial<StaffDraft>)=>setStaff(rows=>rows.map(row=>{if(row.id!==id)return row;const after={...row,...change};appendAdminAudit({action:'修改員工／權限',target:id,before:{...row,pin:row.pin?'***':''},after:{...after,pin:after.pin?'***':''}});return after;}));
   const remove=(id:string)=>setStaff(rows=>{appendAdminAudit({action:'停用並移除員工草稿',target:id});return rows.filter(row=>row.id!==id);});
   const togglePermission=(row:StaffDraft,permission:string,checked:boolean)=>patch(row.id,{permissions:checked?[...new Set([...row.permissions,permission])]:row.permissions.filter(item=>item!==permission)});
+  const saveStaff=()=>{
+    writeAdminStored('staff.v1',staff);
+    const result=saveAdminConfig(draft);
+    if(!result.ok){setSaveErrors(result.errors);setSaveMessage('未能保存；請先修正人員資料。');return;}
+    markClean();
+    setSaveErrors([]);
+    setSaveMessage('已保存並啟用 R'+result.release.version+'；SMT 會自動收到新員工登入設定。');
+  };
+  const activeRelease=readActiveAdminRelease();
   return <section className="admin-editor-page">
-    <header className="admin-editor-head"><div><small>人員／角色／權限</small><h1>員工／權限</h1><p>管理員工、角色、PIN、權限範圍同後台登入資格。畫面隱藏唔代表有權限；正式權限仍然由系統統一判斷。</p></div><div className="admin-editor-actions"><button className="secondary" onClick={add}>新增員工</button></div></header>
+    <header className="admin-editor-head"><div><small>{activeRelease?'目前 R'+activeRelease.version:'未有保存版本'} · 人員／角色／權限</small><h1>員工／權限</h1><p>管理員工、角色、PIN、權限範圍同後台登入資格。PIN 只會轉成驗證器送到 SMT，唔會將明文 PIN 發布出去。</p>{saveMessage?<span>{saveMessage}</span>:null}</div><div className="admin-editor-actions"><button className="secondary" onClick={add}>新增員工</button><button className="primary" onClick={saveStaff}>保存人員設定</button></div></header>
+    {saveErrors.length?<div className="admin-validation is-error" role="alert"><b>有 {saveErrors.length} 項需要處理</b><ul>{saveErrors.map((error,index)=><li key={index}>{error}</li>)}</ul></div>:null}
     {staff.length===0?<div className="admin-empty-state"><b>未有員工資料</b><p>新增員工後設定角色、PIN、權限範圍同權限。</p><button onClick={add}>新增員工</button></div>:<div className="admin-editor-grid">{staff.map(row=><article className="admin-policy-card" key={row.id}>
       <header><h2>{row.name||'未命名員工'}</h2><small>{row.id}</small></header>
       <label><span>員工名稱</span><input value={row.name} onChange={event=>patch(row.id,{name:event.target.value})}/></label>

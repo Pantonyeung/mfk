@@ -15,11 +15,30 @@ export interface AdminSaveFailure{
 
 export type AdminSaveResult=AdminSaveSuccess|AdminSaveFailure;
 
+function validateStaffConfig(){
+  const rows=readAdminStored<Array<{id?:string;name?:string;pin?:string;active?:boolean;permissions?:unknown}>>('staff.v1',[]);
+  const errors:string[]=[];
+  const ids=new Set<string>();
+  for(const row of rows){
+    const id=String(row.id??'').trim();
+    const name=String(row.name??'').trim();
+    const pin=String(row.pin??'').replace(/\D/g,'');
+    if(!id)errors.push('員工缺少 Staff ID');
+    else if(ids.has(id))errors.push('員工 Staff ID 重複：'+id);
+    else ids.add(id);
+    if(!name)errors.push('員工 '+(id||'未命名')+' 未填名稱');
+    if(row.active!==false&&(pin.length<4||pin.length>8))errors.push('員工 '+(name||id||'未命名')+' PIN 必須為 4–8 位數字');
+    if(!Array.isArray(row.permissions))errors.push('員工 '+(name||id||'未命名')+' 權限資料格式錯誤');
+  }
+  return errors;
+}
+
 export function validateAdminConfig(catalog:AdminSessionDraft,optionCenter?:OptionSetCenterState){
   const optionState=optionCenter??readOptionSetCenterState(catalog);
   return Object.freeze([
     ...validateAdminDraft(catalog),
     ...validateOptionSetCenter(optionState),
+    ...validateStaffConfig(),
   ]);
 }
 
