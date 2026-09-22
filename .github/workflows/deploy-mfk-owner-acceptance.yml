@@ -1,6 +1,9 @@
 name: deploy-mfk-owner-acceptance
 
 on:
+  pull_request:
+    branches:
+      - acceptance/MFK/OWNER-PRODUCT-R1-CLOUDFLARE
   push:
     branches:
       - acceptance/MFK/OWNER-PRODUCT-R1-CLOUDFLARE
