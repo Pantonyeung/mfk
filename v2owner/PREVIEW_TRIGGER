@@ -1,2 +1,3 @@
 OWNER_ACCEPTANCE_PREVIEW
 alias=owner-acceptance
+rerun=verify-after-preview-enable
