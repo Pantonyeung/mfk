@@ -1,4 +1,5 @@
 import {createContext,useContext,useMemo,useState,type ReactNode} from 'react';
+import {LEGACY_MF01_ADMIN_DRAFT} from './admin-menu-seed-mf01-v2.ts';
 
 export type ModifierSelection='SINGLE'|'MULTI';
 
@@ -16,6 +17,8 @@ export interface ProductDraft{
   readonly basePrice:string;
   readonly takeawayAdjustment:string;
   readonly modifierGroupIds:readonly string[];
+  readonly legacyBarcode?:string;
+  readonly legacySourcePosition?:number;
 }
 export interface ModifierOptionDraft{
   readonly id:string;
@@ -79,12 +82,7 @@ interface AdminDraftContextValue{
   readonly reset:()=>void;
 }
 
-const EMPTY:AdminSessionDraft=Object.freeze({
-  categories:[],
-  products:[],
-  modifierGroups:[],
-  combos:[],
-});
+const INITIAL:AdminSessionDraft=LEGACY_MF01_ADMIN_DRAFT;
 
 const AdminDraftContext=createContext<AdminDraftContextValue|null>(null);
 const nextId=(prefix:string,count:number)=>prefix+'-'+String(count+1).padStart(3,'0');
@@ -101,7 +99,8 @@ export function validateAdminDraft(draft:AdminSessionDraft){
   }
   for(const product of draft.products){
     if(!product.name.trim())errors.push('商品 '+product.id+' 未填名稱');
-    if(!product.categoryId||!categoryIds.has(product.categoryId))errors.push('商品 '+(product.name||product.id)+' 未選有效分類');
+    if(product.active&&(!product.categoryId||!categoryIds.has(product.categoryId)))errors.push('商品 '+(product.name||product.id)+' 未選有效分類');
+    if(!product.active&&product.categoryId&&!categoryIds.has(product.categoryId))errors.push('停用商品 '+(product.name||product.id)+' 分類無效');
     if(product.basePrice.trim()&&Number.isNaN(Number(product.basePrice)))errors.push('商品 '+(product.name||product.id)+' 基本價格式錯誤');
     if(product.takeawayAdjustment.trim()&&Number.isNaN(Number(product.takeawayAdjustment)))errors.push('商品 '+(product.name||product.id)+' 外賣調整格式錯誤');
   }
@@ -126,7 +125,7 @@ export function validateAdminDraft(draft:AdminSessionDraft){
 }
 
 export function AdminDraftProvider({children}:{children:ReactNode}){
-  const [draft,setDraft]=useState<AdminSessionDraft>(EMPTY);
+  const [draft,setDraft]=useState<AdminSessionDraft>(INITIAL);
   const [dirty,setDirty]=useState(false);
   const [validationErrors,setValidationErrors]=useState<readonly string[]>([]);
 
@@ -154,8 +153,9 @@ export function AdminDraftProvider({children}:{children:ReactNode}){
       categoryId:current.categories[0]?.id??'',
       active:true,
       basePrice:'',
-      takeawayAdjustment:'0.00',
+      takeawayAdjustment:'',
       modifierGroupIds:[],
+      legacySourcePosition:current.products.length,
     }],
   }));
 
@@ -271,7 +271,7 @@ export function AdminDraftProvider({children}:{children:ReactNode}){
   };
 
   const reset=()=>{
-    setDraft(EMPTY);
+    setDraft(INITIAL);
     setDirty(false);
     setValidationErrors([]);
   };
