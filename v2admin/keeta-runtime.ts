@@ -445,7 +445,8 @@ export class KeetaRuntimeStore{
         const envelope=validateWebhookBody(body);
         if(envelope.appId!==config.appId)throw new Error('KEETA_WEBHOOK_APP_ID_MISMATCH');
         if(envelope.shopId!==config.providerShopId)throw new Error('KEETA_PROVIDER_SHOP_BINDING_MISMATCH');
-        await verifyWebhookSignature(request.url,body,config.appSecret);
+        const externalWebhookUrl=request.headers.get('x-mfk-keeta-external-url')||request.url;
+        await verifyWebhookSignature(externalWebhookUrl,body,config.appSecret);
 
         const fingerprint=await sha256Hex(stable({
           eventId:envelope.eventId,
