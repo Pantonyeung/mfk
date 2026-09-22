@@ -3,6 +3,7 @@ export * from './signature.js';
 export * from './response.js';
 export * from './menu.js';
 export * from './webhook.js';
+export * from './webhook-config.js';
 export * from './orders.js';
 export * from './store.js';
 export * from './auth.js';
