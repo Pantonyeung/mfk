@@ -69,7 +69,7 @@ export function CapacityWorkspace(){
   </section>;
 }
 
-interface OrderReadRow{orderId:string;source:string;amountMinor:number;status:string;createdAt:string;completedAt?:string;pickupCode?:string;externalRef?:string}
+interface OrderReadRow{orderId:string;source:string;amountMinor:number;status:string;createdAt:string;completedAt?:string;pickupCode?:string;externalRef?:string;staffName?:string}
 function useProjectionRevision(){
   const [revision,setRevision]=useState(0);
   useEffect(()=>subscribeAdminProjection(()=>setRevision(value=>value+1)),[]);
@@ -85,6 +85,7 @@ function useOrderRows(){
     status:row.fulfillmentLabel,
     createdAt:row.createdAt,
     completedAt:row.fulfillmentLabel==='已完成'||row.fulfillmentLabel==='已取消'?row.updatedAt:undefined,
+    staffName:row.staffName,
   }));
   return [rows] as const;
 }
@@ -98,7 +99,7 @@ export function OpenOrdersWorkspace(){
     <ReadHeader title="進行中訂單" description="只讀 SMT Cloud Projection。Order authority 仍然係門店本機；Admin 只顯示已回傳資料。"/>
     <div className="admin-callout compact">Projection：{projectionStatus.updatedAt?new Date(projectionStatus.updatedAt).toLocaleString('zh-HK'):'未同步'}{projectionStatus.error?' · '+projectionStatus.error:''} <button type="button" onClick={()=>void refreshAdminProjection()}>更新</button></div>
     <div className="admin-filterbar"><input value={query} onChange={event=>setQuery(event.target.value)} placeholder="訂單／取餐／平台參考編號"/><select value={status} onChange={event=>setStatus(event.target.value)}><option value="ALL">全部狀態</option><option value="PENDING">待處理</option><option value="PRODUCTION">進行中</option><option value="READY">可取餐</option></select><span>{filtered.length} 張</span></div>
-    {filtered.length===0?<div className="admin-read-empty">目前未有正式訂單資料。介面同查詢條件已完成，未有正式訂單資料前唔會製造假訂單。</div>:<section className="admin-read-table"><header><span>訂單</span><span>來源</span><span>金額</span><span>狀態</span><span>時間</span></header>{filtered.map(row=><article key={row.orderId}><span>{row.orderId}</span><span>{row.source}</span><span>{money(row.amountMinor)}</span><span>{row.status}</span><span>{new Date(row.createdAt).toLocaleString('zh-HK')}</span></article>)}</section>}
+    {filtered.length===0?<div className="admin-read-empty">目前未有正式訂單資料。介面同查詢條件已完成，未有正式訂單資料前唔會製造假訂單。</div>:<section className="admin-read-table"><header><span>訂單</span><span>來源</span><span>金額</span><span>狀態</span><span>時間</span></header>{filtered.map(row=><article key={row.orderId}><span>{row.orderId}{row.staffName?<small> · {row.staffName}</small>:null}</span><span>{row.source}</span><span>{money(row.amountMinor)}</span><span>{row.status}</span><span>{new Date(row.createdAt).toLocaleString('zh-HK')}</span></article>)}</section>}
   </section>;
 }
 
@@ -137,7 +138,7 @@ interface SalesMetricRow{
 export function SalesReportWorkspace(){
   const revision=useProjectionRevision();
   void revision;
-  const rows=readAdminProjectedDays() as SalesMetricRow[];
+  const rows:readonly SalesMetricRow[]=readAdminProjectedDays();
   const [from,setFrom]=useState('');
   const [to,setTo]=useState('');
   const filtered=rows.filter(row=>(!from||row.date>=from)&&(!to||row.date<=to));
