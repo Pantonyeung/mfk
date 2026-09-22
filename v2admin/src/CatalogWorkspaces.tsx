@@ -1,9 +1,9 @@
-import {useEffect,useMemo,useState} from 'react';
+import {useEffect,useMemo,useRef,useState} from 'react';
 import {useAdminDraft} from './admin-draft.tsx';
-import {appendAdminAudit,readActiveAdminRelease,readAdminStored} from './admin-local-store.ts';
+import {appendAdminAudit,readActiveAdminRelease,readAdminReleases,readAdminStored} from './admin-local-store.ts';
 import {saveAdminConfig} from './admin-config-save.ts';
 import {normalizeProductMedia,normalizeProductPrintRule,PRODUCT_MEDIA_BACKEND_CONTRACT,useProductMediaConfig,useProductPrintRules,type ProductMediaConfig,type ProductPrintRule} from './admin-product-operational-config.ts';
-import {projectOptionSetsForProduct,useOptionSetCenter,type OptionSetCenterController,type OptionSetCenterState} from './admin-option-set-center.ts';
+import {projectOptionSetsForProduct,useOptionSetCenter,type OptionSetCenterController,type OptionSetCenterState,type ProductOptionSetLink} from './admin-option-set-center.ts';
 
 function WorkspaceHeader({
   title,description,onAdd,addLabel,optionCenterState,optionDirty=false,onOptionSaved,
@@ -58,6 +58,25 @@ function EmptyState({title,description,action,onAction}:{title:string;descriptio
 
 function Toggle({checked,onChange,label}:{checked:boolean;onChange:(next:boolean)=>void;label:string}){
   return <label className="admin-toggle"><input type="checkbox" checked={checked} onChange={event=>onChange(event.target.checked)}/><span>{label}</span></label>;
+}
+
+
+function TriStateCheckbox({checked,partial,onChange,label}:{checked:boolean;partial:boolean;onChange:(next:boolean)=>void;label:string}){
+  const ref=useRef<HTMLInputElement>(null);
+  useEffect(()=>{if(ref.current)ref.current.indeterminate=partial;},[partial]);
+  return <label className="admin-bulk-check">
+    <input ref={ref} type="checkbox" checked={checked} aria-checked={partial?'mixed':checked} onChange={event=>onChange(event.target.checked)}/>
+    <span>{label}</span>
+  </label>;
+}
+
+function readActiveProductOptionLinks():readonly ProductOptionSetLink[]{
+  const active=readActiveAdminRelease();
+  if(!active)return [];
+  const release=readAdminReleases().find(row=>row.version===active.version);
+  if(!release||!release.snapshot||typeof release.snapshot!=='object')return [];
+  const snapshot=release.snapshot as {optionCenter?:{productLinks?:readonly ProductOptionSetLink[]}};
+  return snapshot.optionCenter?.productLinks??[];
 }
 
 export function CategoriesWorkspace(){
@@ -371,26 +390,34 @@ export function ModifiersWorkspace(){
   const {draft}=useAdminDraft();
   const optionCenter=useOptionSetCenter(draft);
   const [query,setQuery]=useState('');
+  const [mappingQueryBySet,setMappingQueryBySet]=useState<Record<string,string>>({});
+  const [activeProductLinks,setActiveProductLinks]=useState<readonly ProductOptionSetLink[]>(()=>readActiveProductOptionLinks());
   const token=query.trim().toLowerCase();
   const rows=optionCenter.sets.filter(set=>!token||(set.name+' '+set.id+' '+set.options.map(option=>option.name+' '+option.code).join(' ')).toLowerCase().includes(token));
+  const activeProducts=draft.products.filter(product=>product.active);
+
+  const handleOptionSaved=()=>{
+    optionCenter.markClean();
+    setActiveProductLinks(readActiveProductOptionLinks());
+  };
 
   return <section className="admin-editor-page">
     <WorkspaceHeader
       title="選項中心"
-      description="一個選項組就係一個完整可重用單位，例如「飯量」入面有多飯／少飯／走飯，「青瓜」入面有多青瓜／少青瓜／走青瓜。商品只會加入整個選項組。"
+      description="一個選項組就係一個完整可重用單位。除咗逐件商品加入，亦可以用「批量映射」一次套用全分類、分類內部分商品，或者跨分類自選商品。"
       onAdd={optionCenter.addSet}
       addLabel="新增選項組"
       optionCenterState={optionCenter.state}
       optionDirty={optionCenter.dirty}
-      onOptionSaved={optionCenter.markClean}
+      onOptionSaved={handleOptionSaved}
     />
 
-    <div className="admin-callout compact">操作方式：先新增選項組，再撳入去管理組內選項。例如「青瓜」→ 多青瓜／少青瓜／走青瓜；之後先喺商品詳細資料用「加入選項」連結呢個組。</div>
+    <div className="admin-callout compact">操作方式：先建立選項組同子選項，再用「批量映射」揀商品。勾選整個分類只會套用到保存當刻已存在嘅商品；日後新加入分類嘅商品唔會偷偷自動繼承。</div>
 
     <div className="admin-kpi-grid">
       <article><span>選項組</span><strong>{optionCenter.sets.length}</strong><small>可重用單位</small></article>
       <article><span>子選項</span><strong>{optionCenter.sets.reduce((sum,set)=>sum+set.options.length,0)}</strong><small>組內管理</small></article>
-      <article><span>商品連結</span><strong>{optionCenter.productLinks.length}</strong><small>Product → 選項組</small></article>
+      <article><span>商品連結</span><strong>{optionCenter.productLinks.length}</strong><small>商品 × 選項組</small></article>
       <article><span>資料問題</span><strong>{optionCenter.errors.length}</strong><small>{optionCenter.errors.length?'需要處理':'目前有效'}</small></article>
     </div>
 
@@ -404,7 +431,24 @@ export function ModifiersWorkspace(){
     {rows.length===0?<div className="admin-read-empty">未有選項組。撳「新增選項組」，例如先建立「飯量」或者「青瓜」；建立後展開組別，再撳「新增子選項」。</div>:<div className="admin-option-set-list">
       {rows.map(set=>{
         const requirement=set.required?'REQUIRED':set.forceShow?'OPTIONAL_FORCE_SHOW':'OPTIONAL';
-        const linkedProducts=optionCenter.productLinks.filter(link=>link.setId===set.id).length;
+        const currentLinkedIds=new Set(optionCenter.productLinks.filter(link=>link.setId===set.id).map(link=>link.productId));
+        const savedLinkedIds=new Set(activeProductLinks.filter(link=>link.setId===set.id).map(link=>link.productId));
+        const linkedProducts=currentLinkedIds.size;
+        const newlyAdded=[...currentLinkedIds].filter(id=>!savedLinkedIds.has(id)).length;
+        const pendingRemoved=[...savedLinkedIds].filter(id=>!currentLinkedIds.has(id)).length;
+        const allProductIds=activeProducts.map(product=>product.id);
+        const allChecked=allProductIds.length>0&&allProductIds.every(id=>currentLinkedIds.has(id));
+        const allPartial=!allChecked&&allProductIds.some(id=>currentLinkedIds.has(id));
+        const mappingToken=(mappingQueryBySet[set.id]??'').trim().toLowerCase();
+        const categoryRows=draft.categories.map(category=>{
+          const products=activeProducts.filter(product=>product.categoryId===category.id);
+          const visibleProducts=products.filter(product=>!mappingToken||[product.name,product.productCode,product.legacyBarcode].filter(Boolean).join(' ').toLowerCase().includes(mappingToken));
+          return {category,products,visibleProducts};
+        }).filter(row=>row.products.length>0&&(!mappingToken||row.visibleProducts.length>0));
+        const knownCategoryIds=new Set(draft.categories.map(category=>category.id));
+        const orphanProducts=activeProducts.filter(product=>!knownCategoryIds.has(product.categoryId))
+          .filter(product=>!mappingToken||[product.name,product.productCode,product.legacyBarcode].filter(Boolean).join(' ').toLowerCase().includes(mappingToken));
+
         return <details className="admin-option-group-card" key={set.id}>
           <summary>
             <span><b>{set.name||'未命名選項組'}</b><small>{set.id} · {set.options.length} 個子選項 · {linkedProducts} 件商品使用</small></span>
@@ -434,6 +478,62 @@ export function ModifiersWorkspace(){
                 </article>)}
               </div>}
             </section>
+
+            <details className="admin-option-bulk-map">
+              <summary><span><b>批量映射商品</b><small>全選／整個分類／分類內自選／跨分類自選</small></span><span>{linkedProducts} 件已選</span></summary>
+              <div className="admin-option-bulk-body">
+                <div className="admin-option-bulk-stats">
+                  <article><span>已選商品</span><strong>{linkedProducts}</strong></article>
+                  <article><span>原本已有</span><strong>{[...currentLinkedIds].filter(id=>savedLinkedIds.has(id)).length}</strong></article>
+                  <article><span>今次新增</span><strong>{newlyAdded}</strong></article>
+                  <article><span>今次移除</span><strong>{pendingRemoved}</strong></article>
+                </div>
+
+                <div className="admin-option-bulk-toolbar">
+                  <TriStateCheckbox
+                    checked={allChecked}
+                    partial={allPartial}
+                    onChange={next=>optionCenter.setProductSetLinksBulk(allProductIds,set.id,next)}
+                    label={'全部商品（'+activeProducts.length+' 件啟用商品）'}
+                  />
+                  <input
+                    value={mappingQueryBySet[set.id]??''}
+                    onChange={event=>setMappingQueryBySet(current=>({...current,[set.id]:event.target.value}))}
+                    placeholder="搜尋商品名稱／商品編號／條碼"
+                  />
+                </div>
+
+                <div className="admin-callout compact">勾選分類會套用該分類目前全部啟用商品，不受搜尋結果限制。已存在嘅商品連結會保留原本默認選項；重覆勾選唔會建立第二條連結。</div>
+
+                {activeProducts.length===0?<div className="admin-read-empty">目前冇啟用商品可以映射。</div>:<div className="admin-option-category-map">
+                  {categoryRows.map(({category,products,visibleProducts})=>{
+                    const ids=products.map(product=>product.id);
+                    const checked=ids.length>0&&ids.every(id=>currentLinkedIds.has(id));
+                    const partial=!checked&&ids.some(id=>currentLinkedIds.has(id));
+                    return <section key={category.id}>
+                      <header>
+                        <TriStateCheckbox checked={checked} partial={partial} onChange={next=>optionCenter.setProductSetLinksBulk(ids,set.id,next)} label={category.name||category.id}/>
+                        <small>{products.filter(product=>currentLinkedIds.has(product.id)).length}/{products.length} 已映射</small>
+                      </header>
+                      <div className="admin-option-product-map-grid">
+                        {visibleProducts.map(product=><label key={product.id}>
+                          <input type="checkbox" checked={currentLinkedIds.has(product.id)} onChange={event=>optionCenter.setProductSetLinksBulk([product.id],set.id,event.target.checked)}/>
+                          <span><b>{product.name||product.id}</b><small>{product.productCode??product.id}</small></span>
+                        </label>)}
+                      </div>
+                    </section>;
+                  })}
+                  {orphanProducts.length?<section>
+                    <header><b>未分類／分類資料異常</b><small>{orphanProducts.length} 件</small></header>
+                    <div className="admin-option-product-map-grid">{orphanProducts.map(product=><label key={product.id}>
+                      <input type="checkbox" checked={currentLinkedIds.has(product.id)} onChange={event=>optionCenter.setProductSetLinksBulk([product.id],set.id,event.target.checked)}/>
+                      <span><b>{product.name||product.id}</b><small>{product.productCode??product.id}</small></span>
+                    </label>)}</div>
+                  </section>:null}
+                  {mappingToken&&categoryRows.length===0&&orphanProducts.length===0?<div className="admin-read-empty">搵唔到符合搜尋條件嘅商品。</div>:null}
+                </div>}
+              </div>
+            </details>
 
             <div className="admin-editor-actions">
               <Toggle checked={set.active} onChange={active=>optionCenter.updateSet(set.id,{active})} label={set.active?'啟用選項組':'停用選項組'}/>
