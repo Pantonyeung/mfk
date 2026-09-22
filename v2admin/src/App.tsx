@@ -44,7 +44,7 @@ function CapabilityPage(){
 
     <section className="mfk-admin-state-card">
       <header><h2>目前狀態</h2><span>{capability.status}</span></header>
-      <p>呢項能力已經有 MFK 路徑同 負責範圍。下一階段先由獨立工作將佢接到對應 MFK Domain，唔會喺 Admin 裏面重造第二套 engine。</p>
+      <p>呢項功能已經有固定位置同負責範圍；未啟用之前，只會提供清楚嘅操作提示。</p>
     </section>
   </section>;
 }
