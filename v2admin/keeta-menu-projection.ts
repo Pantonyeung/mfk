@@ -24,7 +24,8 @@ const decimal=(value:unknown,code:string)=>{
   if(!raw||!Number.isFinite(amount))throw new Error(code);
   return amount.toFixed(2);
 };
-const safeCode=(prefix:string,value:string)=>prefix+':'+value.replace(/[^A-Za-z0-9._:-]/g,'_');
+export const keetaSafeCode=(prefix:string,value:string)=>prefix+':'+value.replace(/[^A-Za-z0-9._:-]/g,'_');
+export const keetaSpuOpenItemCode=(productCodeOrId:string)=>keetaSafeCode('SPU',productCodeOrId);
 
 function effectiveTakeawayPrice(product:Record<string,unknown>){
   const base=Number(product.basePrice);
@@ -60,7 +61,7 @@ export function buildKeetaMenuProjection(adminSnapshot:unknown):KeetaMenuProject
     if(name)categoryNames.add(name);
     if(id){
       categoryById.set(id,category);
-      categoryCodes.set(id,safeCode('CAT',id));
+      categoryCodes.set(id,keetaSafeCode('CAT',id));
     }
   }
 
@@ -115,7 +116,7 @@ export function buildKeetaMenuProjection(adminSnapshot:unknown):KeetaMenuProject
       if(!optionId)issues.push('KEETA_MENU_OPTION_CODE_REQUIRED:'+setId);
       const price=decimal(option.priceAdjustment??'0','KEETA_MENU_OPTION_PRICE_INVALID:'+setId+':'+optionId);
       return Object.freeze({
-        openItemCode:safeCode('OPT',setId+':'+optionId),
+        openItemCode:keetaSafeCode('OPT',setId+':'+optionId),
         name:text(option.name)||optionId,
         sourceLanguageType:'zh-HK',
         price,
@@ -126,7 +127,7 @@ export function buildKeetaMenuProjection(adminSnapshot:unknown):KeetaMenuProject
       });
     });
     return Object.freeze({
-      openItemCode:safeCode('GRP',setId),
+      openItemCode:keetaSafeCode('GRP',setId),
       name:text(set.name)||setId,
       sourceLanguageType:'zh-HK',
       minNumber:Math.max(0,Number(set.min)||0),
@@ -144,12 +145,12 @@ export function buildKeetaMenuProjection(adminSnapshot:unknown):KeetaMenuProject
     const categoryId=text(product.categoryId);
     const categoryCode=categoryCodes.get(categoryId);
     const linkedSets=linksByProduct.get(id)??array(product.modifierGroupIds).map(value=>String(value));
-    const groupCodes=linkedSets.filter(setId=>setById.has(setId)).map(setId=>safeCode('GRP',setId));
+    const groupCodes=linkedSets.filter(setId=>setById.has(setId)).map(setId=>keetaSafeCode('GRP',setId));
     const price=effectiveTakeawayPrice(product);
     const description=text(product.description);
     const imageRef=text(product.imageRef);
     return Object.freeze({
-      openItemCode:safeCode('SPU',productCode),
+      openItemCode:keetaSpuOpenItemCode(productCode),
       name:text(product.name)||productCode,
       sourceLanguageType:'zh-HK',
       status:1,
@@ -178,7 +179,7 @@ export function buildKeetaMenuProjection(adminSnapshot:unknown):KeetaMenuProject
     if(!code)continue;
     spuSequenceCodeMap[code]=Object.freeze(activeProducts
       .filter(product=>text(product.categoryId)===categoryId)
-      .map(product=>safeCode('SPU',text(product.productCode)||text(product.id))));
+      .map(product=>keetaSpuOpenItemCode(text(product.productCode)||text(product.id))));
   }
 
   if(issues.length)throw new Error([...new Set(issues)].join(','));
