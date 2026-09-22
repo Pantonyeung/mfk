@@ -3,8 +3,9 @@
 Status: CURRENT / CONTROLLING
 Protocol: #39
 Control: #22
-Updated: 2026-09-22
+Updated: 2026-09-22 10:44 Asia/Hong_Kong
 System: MFK ONLY
+Takeover checkpoint: 2026-09-22 10:44 Asia/Hong_Kong｜fresh-read complete｜no material state change
 
 > Every Commander MUST fresh-read this file before acting.
 > Every Commander MUST update this file again before returning work / ending the conversation / hitting context limits.
