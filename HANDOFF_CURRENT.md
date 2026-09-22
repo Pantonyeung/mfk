@@ -1,7 +1,7 @@
 # MFK CURRENT HANDOFF｜2026-09-22
 
 Current navigation:
-docs/navigation/MFK_航海圖_V1.21_Round022_2026-09-22.txt
+docs/navigation/MFK_航海圖_V1.22_Round023_2026-09-22.txt
 
 Control:
 #22
@@ -10,7 +10,10 @@ Parent:
 #45 Admin Product Completion
 
 Current exact issue:
-#62 Admin Product Detail R2
+#68 Admin Option Center R1
+
+Parent Product detail:
+#62
 
 State:
 MFK_ADMIN_PRODUCT_DETAIL_R2_DEPLOYED_OWNER_REVIEW_PENDING
@@ -82,14 +85,34 @@ Missing:
 Do not reuse old Morefun-v2 DB/R2.
 Do not fake upload success.
 
+## OPTION MODEL CORRECTION
+
+Owner rejected Product-owned Option editing.
+
+Correct:
+Option Center = canonical Option Master
+→ Option Group references Options
+→ Product links to Groups / Options
+→ Product-specific default lives on link policy
+
+Option Master:
+ID / Name / Price / Active
+
+Group:
+selection rules only
+
+Product detail:
+show links
+link/unlink
+set default for this Product
+read Option ID/Name/Price from Option Center
+
+No duplicated Option records.
+No copied Option price.
+
 ## EXACT NEXT
 
-Owner reviews one expanded live Product.
-
-If UI/schema accepted:
-#62 UI/schema bank.
-
-Then #66 is the exact next technical seam before Product image management can be GREEN.
+Implement #68 before any media backend or connection work.
 
 ## HOLD
 
