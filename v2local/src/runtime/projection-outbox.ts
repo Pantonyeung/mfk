@@ -1,6 +1,5 @@
 import {createSmtProjectionEvent,type SmtProjectionEvent} from '../../../contracts/smt-projection-v1.ts';
-import {readSmtDeviceId} from './admin-config-sync.ts';
-import {readAdminSnapshotSection} from './admin-config-sync.ts';
+import {readSmtDeviceId,readAdminSnapshotSection,subscribeSmtAdminConfig} from './admin-config-sync.ts';
 import {resolveBusinessWindow,type LocalCashOpening,type LocalDayClose} from './local-operations.ts';
 
 export const SMT_PROJECTION_OUTBOX_KEY='mfk.v2local.projection-outbox.v1';
@@ -16,6 +15,8 @@ export interface ProjectionOrderInput{
   readonly paymentLabel:string;
   readonly fulfillmentLabel:string;
   readonly sourceLabel:string;
+  readonly staffId?:string;
+  readonly staffName?:string;
   readonly items:readonly {readonly id:string;readonly name:string;readonly qty:number;readonly unitMinor:number}[];
 }
 
@@ -89,6 +90,8 @@ export function queueOrderProjection(order:ProjectionOrderInput){
       paymentLabel:String(order.paymentLabel||''),
       fulfillmentLabel:String(order.fulfillmentLabel||''),
       sourceLabel:String(order.sourceLabel||''),
+      ...(order.staffId?{staffId:String(order.staffId)}:{}),
+      ...(order.staffName?{staffName:String(order.staffName)}:{}),
       items:Object.freeze(order.items.map(item=>Object.freeze({
         id:String(item.id),
         name:String(item.name),
@@ -160,5 +163,6 @@ export function installProjectionOutboxAutoFlush(){
   const flush=()=>void flushProjectionOutbox();
   window.addEventListener('online',flush);
   window.addEventListener('focus',flush);
+  subscribeSmtAdminConfig(flush);
   window.setTimeout(flush,0);
 }
