@@ -11,9 +11,22 @@ import {RuntimeSoldoutWorkspace} from './presentation/RuntimeSoldoutWorkspace.ts
 import {LocalMoreWorkspace} from './presentation/LocalMoreWorkspace.tsx';
 import {localRuntime,type DiningTender} from './runtime/local-runtime.ts';
 import {readLocalAdminMenu,subscribeLocalAdminMenu} from './runtime/local-admin-menu.ts';
+import {readSmtAdminConfigLkg,readSmtAdminSyncStatus,subscribeSmtAdminConfig} from './runtime/admin-config-sync.ts';
+import {projectSyncedCombos,projectSyncedOrderingCatalog,type SyncedOptionSet} from './runtime/admin-config-projection.ts';
+import {RuntimeReadyActivation} from './runtime/RuntimeReadyActivation.tsx';
 import {ComboWorkspace,HoldCartWorkspace,HoldListWorkspace,OrganizeWorkspace,ProductConfigWorkspace,type OrderingPanelState,type WorkspaceHoldDraft,type WorkspaceProduct} from './features/ordering/OrderingCenterWorkspaces.tsx';
 
-type Product={id:string;category:string;name:string;priceMinor:number;priceReady:boolean};
+type Product={
+  id:string;
+  categoryId:string;
+  category:string;
+  name:string;
+  priceMinor:number;
+  priceReady:boolean;
+  sellable:boolean;
+  imageUrl?:string;
+  optionSets:readonly SyncedOptionSet[];
+};
 type CartLine={id:string;productId:string;name:string;qty:number;unitMinor:number;serviceMode:ServiceMode;detail?:string};
 
 const BASE_PRODUCTS:readonly Product[]=[
@@ -69,37 +82,66 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
   const [highlight,setHighlight]=useState<string|undefined>();
   const [panel,setPanel]=useState<OrderingPanelState>(null);
   const [adminMenuRevision,setAdminMenuRevision]=useState(0);
+  const [adminConfigRevision,setAdminConfigRevision]=useState(0);
   useEffect(()=>subscribeLocalAdminMenu(()=>setAdminMenuRevision(value=>value+1)),[]);
+  useEffect(()=>subscribeSmtAdminConfig(()=>setAdminConfigRevision(value=>value+1)),[]);
   const adminMenu=useMemo(()=>{void adminMenuRevision;return readLocalAdminMenu();},[adminMenuRevision]);
+  const adminConfig=useMemo(()=>{void adminConfigRevision;return readSmtAdminConfigLkg();},[adminConfigRevision]);
+  const syncStatus=useMemo(()=>{void adminConfigRevision;return readSmtAdminSyncStatus();},[adminConfigRevision]);
+  const syncedCatalog=useMemo(
+    ()=>adminConfig?projectSyncedOrderingCatalog(serviceMode,adminConfig):null,
+    [adminConfig,serviceMode],
+  );
+  const comboData=useMemo(
+    ()=>adminConfig?projectSyncedCombos(adminConfig):{combos:[] as const,pools:[] as const},
+    [adminConfig],
+  );
 
-  const categoryById=useMemo(()=>new Map(adminMenu.categories.map(row=>[row.id,row] as const)),[adminMenu]);
-  const products:readonly Product[]=useMemo(()=>adminMenu.products
-    .filter(row=>row.active)
-    .slice()
-    .sort((a,b)=>{
-      const ac=categoryById.get(a.categoryId)?.position??9999;
-      const bc=categoryById.get(b.categoryId)?.position??9999;
-      return ac-bc||a.position-b.position||a.id.localeCompare(b.id);
-    })
-    .map(row=>{
-      const base=BASE_PRODUCTS.find(item=>item.id===row.id);
-      return {
+  const fallbackCategoryById=useMemo(()=>new Map(adminMenu.categories.map(row=>[row.id,row] as const)),[adminMenu]);
+  const products:readonly Product[]=useMemo(()=>{
+    if(syncedCatalog){
+      return syncedCatalog.products.map(row=>({
         id:row.id,
-        category:categoryById.get(row.categoryId)?.name??'其他',
+        categoryId:row.categoryId,
+        category:row.category,
         name:row.name,
-        priceMinor:base?.priceMinor??0,
-        priceReady:Boolean(base),
-      };
-    }),[adminMenu,categoryById]);
+        priceMinor:row.priceMinor,
+        priceReady:row.priceReady,
+        sellable:row.sellable,
+        imageUrl:row.imageUrl,
+        optionSets:row.optionSets,
+      }));
+    }
+    return adminMenu.products
+      .filter(row=>row.active)
+      .slice()
+      .sort((a,b)=>{
+        const ac=fallbackCategoryById.get(a.categoryId)?.position??9999;
+        const bc=fallbackCategoryById.get(b.categoryId)?.position??9999;
+        return ac-bc||a.position-b.position||a.id.localeCompare(b.id);
+      })
+      .map(row=>{
+        const base=BASE_PRODUCTS.find(item=>item.id===row.id);
+        return {
+          id:row.id,
+          categoryId:row.categoryId,
+          category:fallbackCategoryById.get(row.categoryId)?.name??'其他',
+          name:row.name,
+          priceMinor:base?.priceMinor??0,
+          priceReady:Boolean(base),
+          sellable:true,
+          optionSets:[],
+        };
+      });
+  },[syncedCatalog,adminMenu,fallbackCategoryById]);
+
   const categories=[
     {id:'all',label:'熱門'},
-    ...adminMenu.categories.slice().sort((a,b)=>a.position-b.position||a.id.localeCompare(b.id)).map(row=>({id:row.id,label:row.name})),
+    ...(syncedCatalog
+      ?syncedCatalog.categories.map(row=>({id:row.id,label:row.label}))
+      :adminMenu.categories.slice().sort((a,b)=>a.position-b.position||a.id.localeCompare(b.id)).map(row=>({id:row.id,label:row.name}))),
   ];
-  const visible=products.filter(product=>{
-    if(category==='all')return true;
-    const categoryName=categoryById.get(category)?.name;
-    return categoryName===product.category;
-  });
+  const visible=products.filter(product=>category==='all'||product.categoryId===category);
   const runtimeOrders=useMemo(()=>{void runtimeRevision;return localRuntime.orders();},[runtimeRevision]);
   const heldCarts=useMemo(()=>{void runtimeRevision;return localRuntime.holds();},[runtimeRevision]);
   const queueItem=(order:(typeof runtimeOrders)[number])=>({
@@ -119,9 +161,14 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
   const total=cart.reduce((sum,line)=>sum+line.unitMinor*line.qty,0);
   const nextDisplay='P'+String(localRuntime.orders().length+1).padStart(3,'0');
 
-  const workspaceProducts:WorkspaceProduct[]=products.filter(product=>product.priceReady).map(product=>({
-    id:product.id,category:product.category,name:product.name,priceMinor:product.priceMinor,
-    priceLabel:money(product.priceMinor),imageUrl:productArtwork(product)
+  const workspaceProducts:WorkspaceProduct[]=products.filter(product=>product.priceReady&&product.sellable).map(product=>({
+    id:product.id,
+    category:product.category,
+    name:product.name,
+    priceMinor:product.priceMinor,
+    priceLabel:money(product.priceMinor),
+    imageUrl:product.imageUrl??productArtwork(product),
+    optionSets:product.optionSets,
   }));
   const holdTables=Array.from({length:9},(_,index)=>{
     const id='T'+String(index+1).padStart(2,'0');
@@ -132,11 +179,17 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
   const view:OrderingWorkspaceViewModel={
     pendingOrders,activeOrders,categories,selectedCategoryId:category,
     products:visible.map(product=>({
-      id:product.id,name:product.name,priceLabel:product.priceReady?money(product.priceMinor):'未接價格',
-      enabled:product.priceReady,requiresOptions:product.priceReady&&['飯團','便當'].includes(product.category),imageUrl:productArtwork(product),
-      ...(!product.priceReady?{badge:'Menu only'}:{}),
+      id:product.id,
+      name:product.name,
+      priceLabel:product.priceReady?money(product.priceMinor):'未接價格',
+      enabled:product.priceReady&&product.sellable,
+      requiresOptions:product.priceReady&&product.sellable&&product.optionSets.length>0,
+      imageUrl:product.imageUrl??productArtwork(product),
+      ...(!product.priceReady?{badge:'未接價格'}:!product.sellable?{badge:'停售'}:{}),
     })),
-    menuRevisionLabel:'LOCAL ADMIN MENU · R'+adminMenu.revision,
+    menuRevisionLabel:adminConfig
+      ?'ADMIN AUTO · R'+adminConfig.revision+' · '+(syncStatus.state==='SYNCED'?'已同步':syncStatus.state==='LOCAL_LKG'?'LKG':'同步中')
+      :'LOCAL FALLBACK · R'+adminMenu.revision,
     cart:{
       orderId:nextDisplay,serviceMode,viewMode,
       lines:cart.map(line=>({
@@ -148,7 +201,7 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
     workItems:[
       {id:'riceball-pool',label:'飯團待組區',count:0},
       {id:'required',label:'必選區',count:0},
-      {id:'combo',label:'紫米套餐區',count:0},
+      {id:'combo',label:'紫米套餐區',count:comboData.combos.length},
     ],
     actionAvailability:{
       lineServiceMode:true,
@@ -161,7 +214,7 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
   };
 
   const add=(id:string)=>{
-    const product=products.find(item=>item.id===id);if(!product||!product.priceReady)return;
+    const product=products.find(item=>item.id===id);if(!product||!product.priceReady||!product.sellable)return;
     const existing=cart.find(item=>item.productId===id&&item.serviceMode===serviceMode);
     const next=existing
       ?cart.map(item=>item.id===existing.id?{...item,qty:item.qty+1}:item)
@@ -174,14 +227,13 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
   };
 
   const addConfigured=(productId:string,detail:string,deltaMinor:number,qty:number)=>{
-    const product=products.find(item=>item.id===productId);if(!product||!product.priceReady)return;
+    const product=products.find(item=>item.id===productId);if(!product||!product.priceReady||!product.sellable)return;
     const line:CartLine={id:'line-'+Date.now().toString(36),productId:product.id,name:product.name,qty,unitMinor:product.priceMinor+deltaMinor,serviceMode,detail};
     setCart([...cart,line]);setRecent(product.id);setHighlight(line.id);setPulse(value=>value+1);setPanel(null);
   };
 
-  const addCombo=(productId:string,detail:string,unitMinor:number)=>{
-    const product=products.find(item=>item.id===productId);if(!product||!product.priceReady)return;
-    const line:CartLine={id:'line-'+Date.now().toString(36),productId:product.id,name:product.name,qty:1,unitMinor,serviceMode,detail};
+  const addCombo=(comboId:string,comboName:string,detail:string,unitMinor:number)=>{
+    const line:CartLine={id:'line-'+Date.now().toString(36),productId:comboId,name:comboName,qty:1,unitMinor,serviceMode,detail};
     setCart([...cart,line]);setHighlight(line.id);setPulse(value=>value+1);setPanel(null);
   };
 
@@ -204,7 +256,7 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
     :panel?.type==='organize'
       ?<OrganizeWorkspace lines={cart} onDone={()=>setPanel(null)}/>
       :panel?.type==='combo'
-        ?<ComboWorkspace products={workspaceProducts} onAdd={addCombo}/>
+        ?<ComboWorkspace products={workspaceProducts} combos={comboData.combos} pools={comboData.pools} onAdd={addCombo}/>
         :panel?.type==='hold'
           ?<HoldCartWorkspace
             lines={cart}
@@ -256,7 +308,12 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
     onChangeCartView:mode=>{setViewMode(mode);if(mode==='organized')setPanel({type:'organize'});},
     onChangeLineServiceMode:(lineId,mode)=>setCart(cart.map(item=>item.id===lineId?{...item,serviceMode:mode}:item)),
     onAdjustLineQuantity:(lineId,delta)=>setCart(cart.map(item=>item.id===lineId?{...item,qty:item.qty+delta}:item).filter(item=>item.qty>0)),
-    onEditCartLine:lineId=>{const line=cart.find(item=>item.id===lineId);if(line)setPanel({type:'product',productId:line.productId});},
+    onEditCartLine:lineId=>{
+      const line=cart.find(item=>item.id===lineId);
+      if(!line)return;
+      if(comboData.combos.some(combo=>combo.id===line.productId))setPanel({type:'combo'});
+      else setPanel({type:'product',productId:line.productId});
+    },
     onHoldCart:()=>cart.length?setPanel({type:'hold'}):setPanel({type:'holds'}),
     onCancelCart:()=>setCart([]),
     onOpenWorkItem:id=>{if(id==='combo')setPanel({type:'combo'});else setPanel({type:'organize'});},
@@ -444,7 +501,7 @@ export function MfkV2LocalApp(){
     setCartState(next);
   };
 
-  return <ProductionViewport><div className="clean-app">
+  return <><RuntimeReadyActivation/><ProductionViewport><div className="clean-app">
     <aside className="clean-rail">
       <div className="clean-brand" aria-label="磨飯">磨</div>
       <nav aria-label="MFK 主導航">
@@ -467,5 +524,5 @@ export function MfkV2LocalApp(){
         <Route path="*" element={<Navigate to="/" replace/>}/>
       </Routes>
     </section>
-  </div></ProductionViewport>;
+  </div></ProductionViewport></>;
 }

@@ -1,0 +1,6 @@
+MFK_ADMIN_HOSTING_H1
+provider_reconnect_trigger=2026-09-22T08:51:00+08:00
+base_main=fb4e37f08794bbc8ab74bacf57662291b586c8a5
+target_worker=morefun-v2-admin
+mode=STATIC_HOSTING_ONLY
+ota=UNTOUCHED

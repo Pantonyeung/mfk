@@ -1,0 +1,669 @@
+MFK 無縫接手文件｜Admin Connection｜2026-09-22
+版本：R1
+狀態：CURRENT / CONTROLLING
+CONTROL_BASE_MAIN_BEFORE_HANDOFF_COMMITS：e325a05bb8e349a24d5a6a92a8c0b111f7c12c67
+CONTROL：Pantonyeung/mfk #22
+CURRENT_NAVIGATION：docs/navigation/MFK_航海圖_V1.7_Round008_2026-09-22.txt
+
+==================================================
+0. 一句話接手
+==================================================
+
+MFK 係唯一 current system。
+
+六個角色只有：
+
+SMT
+Admin
+SMM
+Customer
+Keeta
+Owner
+
+Admin connection phase 已開。
+
+目前完成：
+
+A1：
+Admin Menu Index semantic contract
+→ SMT Local LKG
+GREEN / BANKED
+
+A2：
+Admin controlled Publish Bundle
+→ SMT Apply
+→ SMT Readback Receipt
+→ Admin Human Compare
+IMPLEMENTATION GREEN / BANKED
+
+但：
+
+A2 REAL CROSS-DEVICE OWNER WALKTHROUGH
+仍然 PENDING。
+
+A3 automatic network transport
+未獲批准。
+
+==================================================
+1. OWNER PERMANENT RULE
+==================================================
+
+每條 seam：
+
+CONNECT ONE PIECE
+→ TEST SAME PIECE IMMEDIATELY
+→ BANK
+→ STOP
+→ OWNER DECIDES NEXT
+
+唔准：
+
+- 一次接多條
+- 未測就接下一條
+- transport 200 當成功
+- UI 顯示成功就當 canonical success
+- UNKNOWN 當 FAILED
+- timeout 後新建另一個 revision
+- Cloud / Reporting / Business Day 做交易 blocker
+
+==================================================
+2. CURRENT ADMIN AUTHORITY
+==================================================
+
+Admin：
+
+CONFIGURE / AUTHOR / PUBLISH
+
+Admin 唔係：
+
+- Order Engine
+- Pricing execution engine
+- Payment engine
+- Store Kernel
+- Print execution engine
+- 每張交易 approver
+
+Target：
+
+Admin Publish Revision
+→ SMT Local LKG
+→ SMT local execution
+
+交易時：
+
+唔返 Admin 問准。
+
+==================================================
+3. A1｜已完成
+==================================================
+
+WORK：
+MFK-ADMIN-CONNECT-A1-MENU-INDEX-R1
+
+ISSUE：
+#34 CLOSED / BANKED
+
+Exact Seam：
+
+Admin Validated Menu Index Revision
+→ SMT Local Menu LKG Apply / Readback Contract
+
+Scope：
+
+Category：
+- id
+- label
+- order
+
+Product：
+- id
+- label
+- category
+- order
+- active
+
+Revision：
+- baseRevision
+- revision
+- fingerprint
+- replay identity
+
+Contract：
+
+contracts/admin-menu-index-v1.ts
+
+Admin Adapter：
+
+v2admin/src/admin-menu-link.ts
+
+SMT Apply：
+
+v2local/src/runtime/local-admin-menu.ts
+applyAdminMenuIndexRevision(...)
+
+Source：
+
+c2e544d12b797966f20fc8e9a51ec1be169aceab
+
+Source Test：
+
+35668228894
+Admin PASS
+SMT PASS
+Build PASS
+
+Landing：
+
+986820f5e4c1f3b45f4c4ed76284ccd3782a122c
+
+Landing Test：
+
+35668324383
+PASS
+
+Contract：
+
+N → N+1 valid apply
+same exact revision replay → IDEMPOTENT
+stale / conflict → REJECT
+tampered fingerprint → REJECT
+
+STATUS：
+
+MFK_ADMIN_MENU_INDEX_A1_SEMANTIC_LINK_GREEN
+
+==================================================
+4. A2｜已完成 implementation
+==================================================
+
+WORK：
+MFK-ADMIN-CONNECT-A2-CONTROLLED-TRANSFER-R1
+
+ISSUE：
+#35 CLOSED / BANKED IMPLEMENTATION
+
+Exact Seam：
+
+Admin Publish Bundle
+→ Human-controlled File Transfer
+→ SMT Local LKG Apply
+→ SMT Readback Receipt
+→ Admin Compare
+
+Transport：
+
+HUMAN_CONTROLLED_FILE
+
+Network：
+
+ABSENT
+
+Cloud：
+
+ABSENT
+
+Polling：
+
+ABSENT
+
+Shared Contract：
+
+contracts/admin-menu-transfer-v1.ts
+
+Admin：
+
+v2admin/src/admin-menu-transfer.ts
+v2admin/src/GovernanceWorkspaces.tsx
+
+SMT：
+
+v2local/src/runtime/admin-menu-transfer.ts
+v2local/src/runtime/local-admin-menu.ts
+v2local/src/presentation/LocalAdminMenuWorkspace.tsx
+
+Source Candidate：
+
+b291c895cf9ccedfc06690235fe5597bf4e2c7fa
+
+Source Test：
+
+35670165934
+Admin Test / Build PASS
+SMT Test / Build PASS
+
+Clean Landing：
+
+4609142b9e13cd825af795bf4b90e722a26a7026
+
+Landing Test：
+
+35670256629
+Admin Test / Build PASS
+SMT Test / Build PASS
+
+STATUS：
+
+MFK_ADMIN_A2_CONTROLLED_TRANSFER_IMPLEMENTATION_GREEN
+
+==================================================
+5. HUMAN READBACK CONTRACT
+==================================================
+
+任何 future connection
+唔准只靠 CI。
+
+必須有 5 層證據：
+
+1. SOURCE_INTENT
+2. TRANSPORT_IDENTITY
+3. TARGET_OBSERVED
+4. COMPARE_RESULT
+5. HUMAN_VISIBLE_READBACK
+
+Required fields：
+
+seamId
+sourcePort
+targetPort
+transportId
+expectedRevision
+expectedFingerprint
+observedRevision
+observedFingerprint
+deliveryDisposition
+state
+observedAt
+evidenceRef
+
+States：
+
+MATCH
+MISMATCH
+UNKNOWN
+
+Hard Rule：
+
+NO TARGET READBACK
+=
+NOT GREEN
+
+TRANSPORT CREATED
+!=
+TARGET APPLIED
+
+UNKNOWN
+!=
+FAILED
+
+==================================================
+6. OWNER REAL A2 TEST｜下一步
+==================================================
+
+目前唔需要寫新 code。
+
+先做一個真實 cross-device walkthrough。
+
+----------------------------------------
+ADMIN
+----------------------------------------
+
+1. 打開 Admin
+
+2. 去：
+Pending Changes／發布
+
+3. 準備一個極細 Menu change。
+
+建議：
+只改一個 Product name，
+例如：
+
+原味飯團
+→
+原味飯團 TEST
+
+唔好同時改 Price / Modifier / Combo。
+
+4. Validate
+
+5. Confirm A2 Impact
+
+6. 睇 SMT current Active Revision。
+
+SMT：
+More
+→ Admin · Menu
+
+例如：
+ACTIVE R1
+
+7. Admin 填：
+Expected SMT Base Revision = 1
+
+8. Admin：
+建立並下載 A2 Publish Bundle
+
+9. Admin 畫面必須見到：
+
+Transport ID
+Expected Revision
+Expected Fingerprint
+
+例：
+
+Expected Revision = R2
+
+----------------------------------------
+SMT
+----------------------------------------
+
+10. 將同一 JSON bundle 傳到 SMT 裝置。
+
+11. SMT：
+
+More
+→ Admin · Menu
+
+12. Import Admin A2 Bundle
+
+13. SMT 必須顯示：
+
+Observed Revision
+Observed Fingerprint
+Disposition
+State
+Evidence
+
+成功應該係：
+
+Disposition = APPLIED
+State = MATCH
+
+14. SMT menu Active Revision
+應該由：
+
+R1
+→
+R2
+
+15. SMT 點餐 Menu
+應該見到啱啱 Product name change。
+
+16. SMT：
+Download Readback Receipt
+
+----------------------------------------
+ADMIN
+----------------------------------------
+
+17. 將 SMT Readback Receipt 傳返 Admin。
+
+18. Admin：
+Import SMT Readback Receipt
+
+19. Admin 必須顯示：
+
+Expected Revision = Observed Revision
+
+Expected Fingerprint = Observed Fingerprint
+
+Compare Result = MATCH
+
+只有呢一步成功：
+
+A2 OWNER ACCEPTED
+
+==================================================
+7. A2 RED / STOP CONDITIONS
+==================================================
+
+如果：
+
+Admin expected R2
+SMT observed R1
+
+= MISMATCH
+
+唔准新建 R3。
+
+先查同一 transportId。
+
+如果：
+
+Revision 相同
+Fingerprint 唔同
+
+= RED / MISMATCH
+
+唔准 Force Success。
+
+如果：
+
+file / transfer outcome 唔清楚
+
+= UNKNOWN
+
+唔准當 FAILED 再發新 revision。
+
+如果：
+
+SMT already ahead
+
+= BASE REVISION CONFLICT
+
+Admin 要先讀 Target current revision。
+
+==================================================
+8. A3｜未開
+==================================================
+
+A3 暫定：
+
+AUTOMATIC EVENT-DRIVEN DELIVERY
+
+可能路徑：
+
+Admin Publish Event
+→ minimal transport
+→ SMT receives SAME A2 Bundle Contract
+→ Apply
+→ SAME Readback Receipt
+→ Admin Compare
+
+關鍵：
+
+A3 唔可以發明第二套 protocol。
+
+必須 reuse：
+
+contracts/admin-menu-transfer-v1.ts
+
+A3 只有 Owner 明確批准先可以開始。
+
+Before Owner approval：
+
+NO Cloudflare
+NO HTTP
+NO polling
+NO D1
+NO KV
+NO Durable Object
+NO background worker
+
+==================================================
+9. ADMIN 後續 SEAMS｜仍未開
+==================================================
+
+A1：
+Menu Index semantic
+DONE
+
+A2：
+Controlled Transport + Human Readback
+IMPLEMENTATION DONE
+OWNER WALKTHROUGH PENDING
+
+Future：
+
+A3：
+Automatic delivery
+NOT AUTHORIZED
+
+Pricing：
+NOT WIRED
+
+Modifier：
+NOT WIRED
+
+Combo：
+NOT WIRED
+
+Availability：
+NOT WIRED
+
+Print Rules：
+NOT WIRED
+
+Staff / RBAC：
+NOT WIRED
+
+==================================================
+10. CLOUD PERMANENT RULE
+==================================================
+
+MFK Cloud：
+
+EVENT-DRIVEN FIRST
+
+Business Hours：
+
+10:00–20:30
+Asia/Hong_Kong
+
+Off Hours：
+
+20:30–10:00
+LOW_TRAFFIC_MODE
+
+禁止：
+
+1-minute global cron
+5-second watchdog
+multi-domain scheduled drain
+background polling only to discover no work
+
+One invocation：
+
+ONE PURPOSE
+BOUNDED BATCH
+BOUNDED CPU
+EXPLICIT STOP CONDITION
+
+Cloud 永遠唔可以阻：
+
+SMT Order
+Checkout
+Payment
+Local Commit
+
+==================================================
+11. KEETA CURRENT
+==================================================
+
+Current MFK Keeta：
+
+THIN EDGE ADAPTER ONLY
+EVENT_DRIVEN_FIRST
+NOT_WIRED
+
+Capability：
+
+23
+
+Old Morefun-v2 Keeta：
+
+RETIRED
+
+禁止 reconnect。
+
+Legacy Cloudflare retirement：
+
+#32 OPEN
+Provider-side operator confirmation pending。
+
+Owner 已確認：
+
+morefun-v2-keeta-sit recurring Cron
+= OFF
+
+==================================================
+12. CURRENT NAVIGATION
+==================================================
+
+CURRENT：
+
+docs/navigation/MFK_航海圖_V1.7_Round008_2026-09-22.txt
+
+Admin A1：
+
+GREEN / BANKED
+
+Admin A2：
+
+IMPLEMENTATION GREEN / BANKED
+REAL OWNER WALKTHROUGH PENDING
+
+Automatic Network Connection Count：
+
+0
+
+==================================================
+13. NEXT
+==================================================
+
+NEXT TRUE ACTION：
+
+OWNER RUNS ONE REAL A2 CROSS-DEVICE TEST
+
+If MATCH：
+
+BANK：
+MFK_ADMIN_A2_OWNER_CROSS_DEVICE_GREEN
+
+STOP。
+
+Owner 再決定：
+
+A3 automatic transport
+或者下一個 Admin seam。
+
+如果未 MATCH：
+
+只修 A2 observed exact break。
+
+唔准跳去：
+
+Keeta
+Pricing
+Modifier
+Combo
+SMM
+Customer
+Owner remote
+
+==================================================
+14. RESUME COMMAND
+==================================================
+
+新 Chat / Worker 接手時第一句：
+
+「接手 MFK Admin Connection。
+fresh-read #22、#35、最新航海圖 V1.7 Round008、HANDOFF_CURRENT.md。
+A1 已 BANK。
+A2 implementation GREEN，Owner real cross-device walkthrough pending。
+禁止開 A3。
+只接受 Owner 真實 A2 結果，MATCH 就 BANK，RED 就只修 exact break。」
+
+==================================================
+END HANDOFF
+==================================================

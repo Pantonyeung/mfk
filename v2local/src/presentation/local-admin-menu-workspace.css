@@ -25,3 +25,10 @@
 .local-admin-product-list article{grid-template-columns:minmax(0,1.5fr) minmax(150px,.8fr) 90px 90px auto}
 .local-admin-product-list article>.danger{height:38px;padding:0 9px;border:1px solid #efc0bc;border-radius:8px;background:#fff7f6;color:#b8322d;font-weight:850}
 @media(max-width:1350px){.local-admin-menu-version-pair{min-width:260px}.local-admin-product-list article{grid-template-columns:minmax(0,1.2fr) 140px 80px 80px auto}}
+
+
+.local-admin-a2-transfer{margin:12px 0;padding:14px;border:1px solid #ccbda9;border-radius:16px;background:#fffaf4}
+.local-admin-a2-transfer>header{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}.local-admin-a2-transfer h3{margin:3px 0 0}.local-admin-a2-transfer>header>span{font-size:10px;font-weight:800;color:#7b6a5a}
+.local-admin-a2-controls{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}.local-admin-a2-controls button,.local-admin-a2-controls .fusion-file-button{border:1px solid #cbb79d;background:#fff;border-radius:10px;padding:9px 12px;font-weight:800}
+.local-admin-a2-proof{display:grid;gap:6px;padding:10px;border-radius:12px;background:#f5eee5}.local-admin-a2-proof p{display:grid;grid-template-columns:120px 1fr;gap:8px;margin:0;font-size:11px}.local-admin-a2-proof code,.local-admin-a2-proof b{overflow-wrap:anywhere}.local-admin-a2-proof strong{font-size:16px}.local-admin-a2-proof.match{outline:1px solid #9bc7a4}.local-admin-a2-proof.mismatch{outline:1px solid #d9a1a1}
+.local-admin-a2-empty{padding:12px;border-radius:10px;background:#f2ece5;color:#857668;font-weight:800;font-size:11px}

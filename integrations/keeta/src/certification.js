@@ -7,6 +7,13 @@ export const KEETA_EXTERNAL_EVIDENCE = Object.freeze([
     resolved: false,
   }),
   Object.freeze({
+    evidenceId: 'KEETA_SIT_1101_NO_DELIVERY',
+    status: 'BLOCKED_EXTERNAL',
+    observed: 'PROVIDER_ACCEPTED_BUSINESS_HOURS_UPDATE_BUT_ZERO_1101_CALLBACK_REQUESTS_OBSERVED_DURING_CONTROLLED_SIT',
+    policy: 'PRESERVE_AS_PROVIDER_CLARIFICATION_REQUIRED_DO_NOT_FAKE_WEBHOOK_SUCCESS',
+    resolved: false,
+  }),
+  Object.freeze({
     evidenceId: 'KEETA_PREPARING_OPERATION_NOT_DOCUMENTED',
     status: 'BLOCKED_EXTERNAL',
     observed: '/order/prepare means fully prepared READY, not generic PREPARING',
@@ -26,6 +33,7 @@ export const KEETA_CERTIFICATION_REGISTRY = Object.freeze([
   { caseId: 'SIT-FULFILLMENT-READY', capability: 'FULFILLMENT_SHAPE', status: 'NOT_WIRED' },
   { caseId: 'SIT-SELLABILITY', capability: 'SELLABILITY_SHAPE', status: 'READY_FOR_FUTURE_TEST' },
   { caseId: 'SIT-STORE-HOURS', capability: 'STORE_HOURS_SHAPE', status: 'READY_FOR_FUTURE_TEST' },
+  { caseId: 'SIT-STORE-HOURS-WEBHOOK-1101', capability: 'STORE_CHANGE_WEBHOOK', status: 'BLOCKED_EXTERNAL' },
   { caseId: 'SIT-STORE-REST-OPEN', capability: 'STORE_OPERATIONAL_SHAPE', status: 'NOT_WIRED' },
   { caseId: 'SIT-AFTERSALE-EVIDENCE', capability: 'AFTERSALE_EVIDENCE', status: 'READY_FOR_FUTURE_TEST' },
   { caseId: 'SIT-AFTERSALE-DECISION', capability: 'AFTERSALE_DECISION_SHAPE', status: 'NOT_WIRED', blocker: 'BLOCKED_CANONICAL_AUTHORITY' },
