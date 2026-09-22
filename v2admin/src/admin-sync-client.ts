@@ -1,5 +1,5 @@
 import {createMfkAdminConfigEnvelope,type MfkAdminConfigEnvelope,type MfkAdminConfigAck} from '../../contracts/admin-config-sync-v1.ts';
-import {readAdminStored,writeAdminStored,type AdminRelease} from './admin-local-store.ts';
+import {readAdminReleases,readAdminStored,writeAdminStored,type AdminRelease} from './admin-local-store.ts';
 
 const OUTBOX_KEY='sync-outbox.v1';
 const STATUS_KEY='sync-status.v1';
@@ -108,7 +108,16 @@ export function installAdminSyncAutoFlush(){
   if(installed||typeof window==='undefined')return;
   installed=true;
   const flush=()=>{void flushAdminSyncOutbox();};
+  const queueLatest=()=>{
+    const latest=readAdminReleases()[0];
+    if(!latest)return;
+    const status=readAdminSyncStatus();
+    const pending=readOutbox().some(row=>row.revision===latest.version);
+    if(status.revision===latest.version&&status.state==='PUBLISHED'&&!pending)return;
+    queueAdminReleaseSync(latest);
+  };
   window.addEventListener('online',flush);
   window.addEventListener('focus',flush);
-  window.setTimeout(flush,0);
+  window.addEventListener('mfk-admin-release',queueLatest);
+  window.setTimeout(()=>{queueLatest();flush();},0);
 }
