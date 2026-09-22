@@ -1,0 +1,183 @@
+MFK 航海圖 V1.15｜Round016｜2026-09-22
+主題：SMT OTA OWNER HOLD / ADMIN A2 CONNECTION RESUME
+狀態：CURRENT / CONTROLLING
+CONTROL：Pantonyeung/mfk #22
+COMMANDER ENTRY：COMMANDER_CURRENT.md
+
+==================================================
+0. OWNER PRIORITY
+==================================================
+
+SMT OTA:
+HOLD
+
+Admin Connection:
+RESUME NOW
+
+==================================================
+1. ADMIN HOSTING
+==================================================
+
+Canonical:
+https://admin.morefunos.com
+
+Owner browser:
+REACHABLE
+
+H2 #37:
+GREEN / BANKED
+
+H3 #38:
+GREEN / BANKED
+
+Deploy run:
+35677844235 SUCCESS
+
+Deploy source:
+d30e8dcc789806a42ea93c3670beb60270a1ee28
+
+A2 landing:
+4609142b9e13cd825af795bf4b90e722a26a7026
+
+d30 is linearly ahead of A2 landing.
+
+Deployed Publish Center contains:
+ADMIN CONNECTION A2 · HUMAN CONTROLLED
+
+d30 → current main:
+ZERO v2admin product diffs
+
+Therefore:
+LIVE ADMIN A2 UI = CURRENT
+
+==================================================
+2. A1
+==================================================
+
+#34
+BANKED
+
+MFK_ADMIN_MENU_INDEX_A1_SEMANTIC_LINK_GREEN
+
+==================================================
+3. A2
+==================================================
+
+#35
+IMPLEMENTATION GREEN / BANKED
+
+Admin Publish Bundle
+→ Human file transfer
+→ SMT apply
+→ SMT receipt
+→ Admin compare
+
+Source run:
+35670165934 SUCCESS
+
+Landing run:
+35670256629 SUCCESS
+
+Still pending:
+
+OWNER REAL CROSS-DEVICE WALKTHROUGH
+
+==================================================
+4. FIRST BREAK
+==================================================
+
+A2 OWNER PHYSICAL ACCEPTANCE NOT DONE
+
+Required evidence:
+
+SOURCE_INTENT
+TRANSPORT_IDENTITY
+TARGET_OBSERVED
+COMPARE_RESULT
+HUMAN_VISIBLE_READBACK
+
+NO TARGET READBACK
+=
+NOT GREEN
+
+==================================================
+5. EXACT NEXT
+==================================================
+
+ADMIN:
+
+open:
+/admin/publish
+
+Confirm:
+ADMIN CONNECTION A2 · HUMAN CONTROLLED
+
+Confirm controls:
+Validate
+Impact Preview
+Expected SMT Base Revision
+Build/Download A2 Bundle
+Import SMT Readback
+Human Compare
+
+Then SMT read-only:
+
+More
+→ Admin · Menu
+
+Capture:
+ACTIVE REVISION
+
+Do NOT create final bundle before exact base is known.
+
+Then one tiny Product-name change only.
+
+Run:
+Validate
+→ Impact
+→ Bundle
+→ SMT Apply
+→ Readback Receipt
+→ Admin Import
+→ MATCH
+
+==================================================
+6. A3
+==================================================
+
+NOT AUTHORIZED
+
+No HTTP.
+No polling.
+No D1/KV/DO.
+No background worker.
+
+==================================================
+7. SMT OTA HOLD
+==================================================
+
+#40 remains open.
+
+Ready candidate:
+runtime-candidate-mfk-d133043dfe7d
+
+Do not continue physical OTA acceptance until Owner resumes.
+
+==================================================
+8. NON-BLOCKING DEBT
+==================================================
+
+v2admin/BUILD_ID:
+stale legacy worker label remains.
+
+v2admin/README:
+superseded H1 wording remains.
+
+Actual wrangler target:
+mfk-admin
+
+Not current blocker.
+
+==================================================
+END ROUND016
+==================================================

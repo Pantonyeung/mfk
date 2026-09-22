@@ -15,18 +15,30 @@ function sourceFiles(dir:string):string[]{
 }
 
 describe('MFK Admin migration firewall',()=>{
-  it('contains no live network transport in migrated Admin source',()=>{
+  it('allows network only through the explicit Admin sync/projection transports',()=>{
     const forbidden=[
-      /\bfetch\s*\(/,
-      /\bnew\s+WebSocket\s*\(/,
       /\bXMLHttpRequest\b/,
       /\baxios\s*\./,
       /https?:\/\//,
     ];
     for(const path of sourceFiles(root)){
       const source=readFileSync(path,'utf8');
+      const isSyncClient=path.endsWith('admin-sync-client.ts');
+      const isProjectionClient=path.endsWith('admin-projection-client.ts');
+      const isNetworkClient=isSyncClient||isProjectionClient;
+      if(!isNetworkClient)expect(/\bfetch\s*\(/.test(source),path+' used fetch outside approved network seam').toBe(false);
+      if(!isProjectionClient)expect(/\bnew\s+WebSocket\s*\(/.test(source),path+' used WebSocket outside projection doorbell seam').toBe(false);
       for(const pattern of forbidden){
         expect(pattern.test(source),path+' matched '+String(pattern)).toBe(false);
+      }
+      if(isSyncClient){
+        expect(source).toContain('/api/admin-sync/publish');
+        expect(source).toContain('/api/admin-sync/acks');
+      }
+      if(isProjectionClient){
+        expect(source).toContain('/api/projection/orders');
+        expect(source).toContain('/api/projection/reports');
+        expect(source).toContain('/api/admin-sync/events');
       }
     }
   });

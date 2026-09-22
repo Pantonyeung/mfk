@@ -1,49 +1,488 @@
 [
-  {"id":"SMM_SHELL","group":"SHELL","label":"獨立 SMM Shell","surface":"全局","kind":"READ_SHAPE","status":"MIGRATED_SHAPE","owner":"MFK Surface"},
-  {"id":"STAFF_CONTEXT","group":"SHELL","label":"前線員工 Context","surface":"頂欄","kind":"READ_SHAPE","status":"MIGRATED_SHAPE","owner":"Future shared identity projection"},
-  {"id":"NETWORK_STATE_PRESENTATION","group":"SHELL","label":"連線／離線狀態","surface":"頂欄","kind":"READ_SHAPE","status":"MIGRATED_SHAPE","owner":"Future runtime health projection"},
-  {"id":"NOT_WIRED_FEEDBACK","group":"SHELL","label":"NOT_WIRED 明確回饋","surface":"全局","kind":"READ_SHAPE","status":"MIGRATED_SHAPE","owner":"MFK Surface"},
-
-  {"id":"MENU_BROWSE","group":"ORDER_ENTRY","label":"Menu 瀏覽","surface":"點單","kind":"READ_SHAPE","status":"MIGRATED_SHAPE","owner":"Future SMT menu projection"},
-  {"id":"CATEGORY_NAV","group":"ORDER_ENTRY","label":"分類導航","surface":"點單","kind":"READ_SHAPE","status":"MIGRATED_SHAPE","owner":"Future SMT menu projection"},
-  {"id":"PRODUCT_SELECT","group":"ORDER_ENTRY","label":"Product 選擇","surface":"點單","kind":"READ_SHAPE","status":"MIGRATED_SHAPE","owner":"Future SMT menu projection"},
-  {"id":"VARIATION_SELECT","group":"ORDER_ENTRY","label":"Variation 選擇","surface":"商品編輯","kind":"READ_SHAPE","status":"MIGRATED_SHAPE","owner":"Future SMT product rules"},
-  {"id":"MODIFIER_SELECT","group":"ORDER_ENTRY","label":"Modifier 選擇","surface":"商品編輯","kind":"READ_SHAPE","status":"MIGRATED_SHAPE","owner":"Future SMT product rules"},
-  {"id":"COMBO_CONFIG","group":"ORDER_ENTRY","label":"Combo Child 配置","surface":"商品編輯","kind":"READ_SHAPE","status":"MIGRATED_SHAPE","owner":"Future SMT combo rules"},
-  {"id":"SELLABILITY_PROJECTION","group":"ORDER_ENTRY","label":"可售狀態投影","surface":"點單","kind":"READ_SHAPE","status":"MIGRATED_SHAPE","owner":"Future SMT sellability projection"},
-  {"id":"CART_PREVIEW","group":"ORDER_ENTRY","label":"Cart 預覽","surface":"點單","kind":"READ_SHAPE","status":"MIGRATED_SHAPE","owner":"Local UI preview only"},
-  {"id":"QUOTE_PREVIEW","group":"ORDER_ENTRY","label":"Quote 預覽","surface":"Cart","kind":"READ_SHAPE","status":"MIGRATED_SHAPE","owner":"Future SMT pricing readback"},
-  {"id":"CHECKOUT_DRAFT","group":"ORDER_ENTRY","label":"Checkout Draft","surface":"Cart","kind":"READ_SHAPE","status":"MIGRATED_SHAPE","owner":"Local UI preview only"},
-  {"id":"PENDING_INTENT","group":"ORDER_ENTRY","label":"Pending Intent UX","surface":"Cart","kind":"READ_SHAPE","status":"MIGRATED_SHAPE","owner":"Future SMT admission handoff"},
-  {"id":"FORMAL_ORDER_COMMAND","group":"ORDER_ENTRY","label":"正式落單 Command","surface":"Cart","kind":"COMMAND_SHAPE","status":"NOT_WIRED","owner":"SMT formal order authority"},
-
-  {"id":"ORDER_LIST","group":"ORDERS","label":"訂單列表","surface":"訂單","kind":"READ_SHAPE","status":"MIGRATED_SHAPE","owner":"Future SMT order projection"},
-  {"id":"ORDER_SEARCH_FILTER","group":"ORDERS","label":"搜尋／來源篩選","surface":"訂單","kind":"READ_SHAPE","status":"MIGRATED_SHAPE","owner":"MFK Surface"},
-  {"id":"ORDER_RESULT_READBACK","group":"ORDERS","label":"Order Result / Readback","surface":"訂單","kind":"READ_SHAPE","status":"MIGRATED_SHAPE","owner":"Future SMT canonical readback"},
-  {"id":"ORDER_DETAIL","group":"ORDERS","label":"訂單 Detail","surface":"訂單","kind":"READ_SHAPE","status":"MIGRATED_SHAPE","owner":"Future SMT order projection"},
-  {"id":"FULFILLMENT_COMMAND","group":"ORDERS","label":"完成／交收 Command","surface":"訂單","kind":"COMMAND_SHAPE","status":"NOT_WIRED","owner":"SMT fulfillment authority"},
-  {"id":"CANCEL_COMMAND","group":"ORDERS","label":"取消 Command","surface":"訂單","kind":"COMMAND_SHAPE","status":"NOT_WIRED","owner":"SMT order authority"},
-  {"id":"REFUND_REQUEST_VIEW","group":"ORDERS","label":"退款要求視圖","surface":"訂單","kind":"READ_SHAPE","status":"MIGRATED_SHAPE","owner":"Future provider/order projection"},
-
-  {"id":"ACTIVE_WORK_QUEUE","group":"OPERATIONS","label":"前線製作佇列","surface":"待處理","kind":"READ_SHAPE","status":"MIGRATED_SHAPE","owner":"Future SMT production projection"},
-  {"id":"PACKING_STATE","group":"OPERATIONS","label":"打包狀態","surface":"待處理","kind":"READ_SHAPE","status":"MIGRATED_SHAPE","owner":"Future SMT production projection"},
-  {"id":"ETA_STATE","group":"OPERATIONS","label":"ETA／延誤狀態","surface":"待處理","kind":"READ_SHAPE","status":"MIGRATED_SHAPE","owner":"Future SMT operational projection"},
-  {"id":"ROUTING_STATE","group":"OPERATIONS","label":"工位／Routing 狀態","surface":"待處理","kind":"READ_SHAPE","status":"MIGRATED_SHAPE","owner":"Future SMT production projection"},
-  {"id":"SELLABILITY_CONTROL_COMMAND","group":"OPERATIONS","label":"售罄／暫停／恢復 Command","surface":"更多","kind":"COMMAND_SHAPE","status":"NOT_WIRED","owner":"Future canonical sellability command"},
-  {"id":"BUSINESS_DAY_VIEW","group":"OPERATIONS","label":"Business Day 視圖","surface":"更多","kind":"READ_SHAPE","status":"MIGRATED_SHAPE","owner":"Future SMT operational projection"},
-  {"id":"CAPACITY_VIEW","group":"OPERATIONS","label":"產能視圖","surface":"更多","kind":"READ_SHAPE","status":"MIGRATED_SHAPE","owner":"Future operational projection"},
-  {"id":"REPORTING_VIEW","group":"OPERATIONS","label":"營運報表視圖","surface":"更多","kind":"READ_SHAPE","status":"MIGRATED_SHAPE","owner":"Future reporting projection"},
-  {"id":"PRINT_MANAGEMENT_VIEW","group":"OPERATIONS","label":"列印管理視圖","surface":"更多","kind":"READ_SHAPE","status":"MIGRATED_SHAPE","owner":"Future print projection"},
-  {"id":"PRINT_COMMAND","group":"OPERATIONS","label":"列印／重印 Command","surface":"更多","kind":"COMMAND_SHAPE","status":"NOT_WIRED","owner":"SMT print authority"},
-  {"id":"DIAGNOSTICS_VIEW","group":"OPERATIONS","label":"診斷視圖","surface":"更多","kind":"READ_SHAPE","status":"MIGRATED_SHAPE","owner":"Future shared diagnostics projection"},
-
-  {"id":"DINE_IN_VIEW","group":"DINE_IN","label":"堂食 Session 視圖","surface":"堂食","kind":"READ_SHAPE","status":"MIGRATED_SHAPE","owner":"Future SMT dine-in projection"},
-  {"id":"DINE_IN_COMMAND","group":"DINE_IN","label":"開枱／改人數／關枱 Command","surface":"堂食","kind":"COMMAND_SHAPE","status":"NOT_WIRED","owner":"SMT dine-in authority"},
-
-  {"id":"OFFLINE_PRESENTATION","group":"RECOVERY","label":"Offline Presentation","surface":"全局","kind":"READ_SHAPE","status":"MIGRATED_SHAPE","owner":"MFK Surface"},
-  {"id":"FAILURE_PRESENTATION","group":"RECOVERY","label":"Failure Presentation","surface":"全局","kind":"READ_SHAPE","status":"MIGRATED_SHAPE","owner":"MFK Surface"},
-  {"id":"RETRY_PRESENTATION","group":"RECOVERY","label":"Retry Presentation","surface":"全局","kind":"COMMAND_SHAPE","status":"NOT_WIRED","owner":"Future domain-specific safe retry"},
-  {"id":"UNKNOWN_PRESENTATION","group":"RECOVERY","label":"UNKNOWN Presentation","surface":"全局","kind":"READ_SHAPE","status":"MIGRATED_SHAPE","owner":"MFK Surface"},
-  {"id":"PARTIAL_PRESENTATION","group":"RECOVERY","label":"PARTIAL Presentation","surface":"全局","kind":"READ_SHAPE","status":"MIGRATED_SHAPE","owner":"MFK Surface"},
-  {"id":"STALE_PRESENTATION","group":"RECOVERY","label":"Stale / Readback Presentation","surface":"全局","kind":"READ_SHAPE","status":"MIGRATED_SHAPE","owner":"MFK Surface"}
+  {
+    "id": "SMM_SHELL",
+    "group": "SHELL",
+    "label": "獨立 SMM Shell",
+    "surface": "全局",
+    "kind": "READ_SHAPE",
+    "status": "PRODUCT_READY_NOT_CONNECTED",
+    "owner": "MFK Surface"
+  },
+  {
+    "id": "STAFF_CONTEXT",
+    "group": "SHELL",
+    "label": "前線員工 Context",
+    "surface": "頂欄",
+    "kind": "READ_SHAPE",
+    "status": "PRODUCT_READY_NOT_CONNECTED",
+    "owner": "Future shared identity projection"
+  },
+  {
+    "id": "NETWORK_STATE_PRESENTATION",
+    "group": "SHELL",
+    "label": "連線／離線狀態",
+    "surface": "頂欄",
+    "kind": "READ_SHAPE",
+    "status": "PRODUCT_READY_NOT_CONNECTED",
+    "owner": "Future runtime health projection"
+  },
+  {
+    "id": "NOT_WIRED_FEEDBACK",
+    "group": "SHELL",
+    "label": "未連接狀態回饋",
+    "surface": "全局",
+    "kind": "READ_SHAPE",
+    "status": "PRODUCT_READY_NOT_CONNECTED",
+    "owner": "MFK SMM Product Surface"
+  },
+  {
+    "id": "MENU_BROWSE",
+    "group": "ORDER_ENTRY",
+    "label": "Menu 瀏覽",
+    "surface": "點單",
+    "kind": "READ_SHAPE",
+    "status": "PRODUCT_READY_NOT_CONNECTED",
+    "owner": "Future SMT menu projection"
+  },
+  {
+    "id": "CATEGORY_NAV",
+    "group": "ORDER_ENTRY",
+    "label": "分類導航",
+    "surface": "點單",
+    "kind": "READ_SHAPE",
+    "status": "PRODUCT_READY_NOT_CONNECTED",
+    "owner": "Future SMT menu projection"
+  },
+  {
+    "id": "PRODUCT_SELECT",
+    "group": "ORDER_ENTRY",
+    "label": "Product 選擇",
+    "surface": "點單",
+    "kind": "READ_SHAPE",
+    "status": "PRODUCT_READY_NOT_CONNECTED",
+    "owner": "Future SMT menu projection"
+  },
+  {
+    "id": "VARIATION_SELECT",
+    "group": "ORDER_ENTRY",
+    "label": "Variation 選擇",
+    "surface": "商品編輯",
+    "kind": "READ_SHAPE",
+    "status": "PRODUCT_READY_NOT_CONNECTED",
+    "owner": "Future SMT product rules"
+  },
+  {
+    "id": "MODIFIER_SELECT",
+    "group": "ORDER_ENTRY",
+    "label": "Modifier 選擇",
+    "surface": "商品編輯",
+    "kind": "READ_SHAPE",
+    "status": "PRODUCT_READY_NOT_CONNECTED",
+    "owner": "Future SMT product rules"
+  },
+  {
+    "id": "COMBO_CONFIG",
+    "group": "ORDER_ENTRY",
+    "label": "Combo Child 配置",
+    "surface": "商品編輯",
+    "kind": "READ_SHAPE",
+    "status": "PRODUCT_READY_NOT_CONNECTED",
+    "owner": "Future SMT combo rules"
+  },
+  {
+    "id": "SELLABILITY_PROJECTION",
+    "group": "ORDER_ENTRY",
+    "label": "可售狀態投影",
+    "surface": "點單",
+    "kind": "READ_SHAPE",
+    "status": "PRODUCT_READY_NOT_CONNECTED",
+    "owner": "Future SMT sellability projection"
+  },
+  {
+    "id": "CART_PREVIEW",
+    "group": "ORDER_ENTRY",
+    "label": "Cart 預覽",
+    "surface": "點單",
+    "kind": "READ_SHAPE",
+    "status": "PRODUCT_READY_NOT_CONNECTED",
+    "owner": "MFK SMM local non-authoritative workspace"
+  },
+  {
+    "id": "QUOTE_PREVIEW",
+    "group": "ORDER_ENTRY",
+    "label": "Quote 預覽",
+    "surface": "Cart",
+    "kind": "READ_SHAPE",
+    "status": "PRODUCT_READY_NOT_CONNECTED",
+    "owner": "Future SMT pricing readback"
+  },
+  {
+    "id": "CHECKOUT_DRAFT",
+    "group": "ORDER_ENTRY",
+    "label": "Checkout Draft",
+    "surface": "Cart",
+    "kind": "READ_SHAPE",
+    "status": "PRODUCT_READY_NOT_CONNECTED",
+    "owner": "MFK SMM local non-authoritative workspace"
+  },
+  {
+    "id": "PENDING_INTENT",
+    "group": "ORDER_ENTRY",
+    "label": "Pending Intent UX",
+    "surface": "Cart",
+    "kind": "READ_SHAPE",
+    "status": "PRODUCT_READY_NOT_CONNECTED",
+    "owner": "Future SMT admission handoff"
+  },
+  {
+    "id": "FORMAL_ORDER_COMMAND",
+    "group": "ORDER_ENTRY",
+    "label": "正式落單 Command",
+    "surface": "Cart",
+    "kind": "COMMAND_SHAPE",
+    "status": "NOT_WIRED",
+    "owner": "SMT formal order authority"
+  },
+  {
+    "id": "ORDER_LIST",
+    "group": "ORDERS",
+    "label": "訂單列表",
+    "surface": "訂單",
+    "kind": "READ_SHAPE",
+    "status": "PRODUCT_READY_NOT_CONNECTED",
+    "owner": "Future SMT order projection"
+  },
+  {
+    "id": "ORDER_SEARCH_FILTER",
+    "group": "ORDERS",
+    "label": "搜尋／來源篩選",
+    "surface": "訂單",
+    "kind": "READ_SHAPE",
+    "status": "PRODUCT_READY_NOT_CONNECTED",
+    "owner": "MFK Surface"
+  },
+  {
+    "id": "ORDER_RESULT_READBACK",
+    "group": "ORDERS",
+    "label": "Order Result / Readback",
+    "surface": "訂單",
+    "kind": "READ_SHAPE",
+    "status": "PRODUCT_READY_NOT_CONNECTED",
+    "owner": "Future SMT canonical readback"
+  },
+  {
+    "id": "ORDER_DETAIL",
+    "group": "ORDERS",
+    "label": "訂單 Detail",
+    "surface": "訂單",
+    "kind": "READ_SHAPE",
+    "status": "PRODUCT_READY_NOT_CONNECTED",
+    "owner": "Future SMT order projection"
+  },
+  {
+    "id": "FULFILLMENT_COMMAND",
+    "group": "ORDERS",
+    "label": "完成／交收 Command",
+    "surface": "訂單",
+    "kind": "COMMAND_SHAPE",
+    "status": "NOT_WIRED",
+    "owner": "SMT fulfillment authority"
+  },
+  {
+    "id": "CANCEL_COMMAND",
+    "group": "ORDERS",
+    "label": "取消 Command",
+    "surface": "訂單",
+    "kind": "COMMAND_SHAPE",
+    "status": "NOT_WIRED",
+    "owner": "SMT order authority"
+  },
+  {
+    "id": "REFUND_REQUEST_VIEW",
+    "group": "ORDERS",
+    "label": "退款要求視圖",
+    "surface": "訂單",
+    "kind": "READ_SHAPE",
+    "status": "PRODUCT_READY_NOT_CONNECTED",
+    "owner": "Future provider/order projection"
+  },
+  {
+    "id": "ACTIVE_WORK_QUEUE",
+    "group": "OPERATIONS",
+    "label": "前線製作佇列",
+    "surface": "待處理",
+    "kind": "READ_SHAPE",
+    "status": "PRODUCT_READY_NOT_CONNECTED",
+    "owner": "Future SMT production projection"
+  },
+  {
+    "id": "PACKING_STATE",
+    "group": "OPERATIONS",
+    "label": "打包狀態",
+    "surface": "待處理",
+    "kind": "READ_SHAPE",
+    "status": "PRODUCT_READY_NOT_CONNECTED",
+    "owner": "Future SMT production projection"
+  },
+  {
+    "id": "ETA_STATE",
+    "group": "OPERATIONS",
+    "label": "ETA／延誤狀態",
+    "surface": "待處理",
+    "kind": "READ_SHAPE",
+    "status": "PRODUCT_READY_NOT_CONNECTED",
+    "owner": "Future SMT operational projection"
+  },
+  {
+    "id": "ROUTING_STATE",
+    "group": "OPERATIONS",
+    "label": "工位／Routing 狀態",
+    "surface": "待處理",
+    "kind": "READ_SHAPE",
+    "status": "PRODUCT_READY_NOT_CONNECTED",
+    "owner": "Future SMT production projection"
+  },
+  {
+    "id": "SELLABILITY_CONTROL_COMMAND",
+    "group": "OPERATIONS",
+    "label": "售罄／暫停／恢復 Command",
+    "surface": "更多",
+    "kind": "COMMAND_SHAPE",
+    "status": "NOT_WIRED",
+    "owner": "Future canonical sellability command"
+  },
+  {
+    "id": "BUSINESS_DAY_VIEW",
+    "group": "OPERATIONS",
+    "label": "Business Day 視圖",
+    "surface": "更多",
+    "kind": "READ_SHAPE",
+    "status": "PRODUCT_READY_NOT_CONNECTED",
+    "owner": "Future SMT operational projection"
+  },
+  {
+    "id": "CAPACITY_VIEW",
+    "group": "OPERATIONS",
+    "label": "產能視圖",
+    "surface": "更多",
+    "kind": "READ_SHAPE",
+    "status": "PRODUCT_READY_NOT_CONNECTED",
+    "owner": "Future operational projection"
+  },
+  {
+    "id": "REPORTING_VIEW",
+    "group": "OPERATIONS",
+    "label": "營運報表視圖",
+    "surface": "更多",
+    "kind": "READ_SHAPE",
+    "status": "PRODUCT_READY_NOT_CONNECTED",
+    "owner": "Future reporting projection"
+  },
+  {
+    "id": "PRINT_MANAGEMENT_VIEW",
+    "group": "OPERATIONS",
+    "label": "列印管理視圖",
+    "surface": "更多",
+    "kind": "READ_SHAPE",
+    "status": "PRODUCT_READY_NOT_CONNECTED",
+    "owner": "Future print projection"
+  },
+  {
+    "id": "PRINT_COMMAND",
+    "group": "OPERATIONS",
+    "label": "列印／重印 Command",
+    "surface": "更多",
+    "kind": "COMMAND_SHAPE",
+    "status": "NOT_WIRED",
+    "owner": "SMT print authority"
+  },
+  {
+    "id": "DIAGNOSTICS_VIEW",
+    "group": "OPERATIONS",
+    "label": "診斷視圖",
+    "surface": "更多",
+    "kind": "READ_SHAPE",
+    "status": "PRODUCT_READY_NOT_CONNECTED",
+    "owner": "Future shared diagnostics projection"
+  },
+  {
+    "id": "DINE_IN_VIEW",
+    "group": "DINE_IN",
+    "label": "堂食 Session 視圖",
+    "surface": "堂食",
+    "kind": "READ_SHAPE",
+    "status": "PRODUCT_READY_NOT_CONNECTED",
+    "owner": "Future SMT dine-in projection"
+  },
+  {
+    "id": "DINE_IN_COMMAND",
+    "group": "DINE_IN",
+    "label": "開枱／改人數／關枱 Command",
+    "surface": "堂食",
+    "kind": "COMMAND_SHAPE",
+    "status": "NOT_WIRED",
+    "owner": "SMT dine-in authority"
+  },
+  {
+    "id": "OFFLINE_PRESENTATION",
+    "group": "RECOVERY",
+    "label": "Offline Presentation",
+    "surface": "全局",
+    "kind": "READ_SHAPE",
+    "status": "PRODUCT_READY_NOT_CONNECTED",
+    "owner": "MFK Surface"
+  },
+  {
+    "id": "FAILURE_PRESENTATION",
+    "group": "RECOVERY",
+    "label": "Failure Presentation",
+    "surface": "全局",
+    "kind": "READ_SHAPE",
+    "status": "PRODUCT_READY_NOT_CONNECTED",
+    "owner": "MFK Surface"
+  },
+  {
+    "id": "RETRY_PRESENTATION",
+    "group": "RECOVERY",
+    "label": "Retry Presentation",
+    "surface": "全局",
+    "kind": "COMMAND_SHAPE",
+    "status": "NOT_WIRED",
+    "owner": "Future domain-specific safe retry"
+  },
+  {
+    "id": "UNKNOWN_PRESENTATION",
+    "group": "RECOVERY",
+    "label": "UNKNOWN Presentation",
+    "surface": "全局",
+    "kind": "READ_SHAPE",
+    "status": "PRODUCT_READY_NOT_CONNECTED",
+    "owner": "MFK Surface"
+  },
+  {
+    "id": "PARTIAL_PRESENTATION",
+    "group": "RECOVERY",
+    "label": "PARTIAL Presentation",
+    "surface": "全局",
+    "kind": "READ_SHAPE",
+    "status": "PRODUCT_READY_NOT_CONNECTED",
+    "owner": "MFK Surface"
+  },
+  {
+    "id": "STALE_PRESENTATION",
+    "group": "RECOVERY",
+    "label": "Stale / Readback Presentation",
+    "surface": "全局",
+    "kind": "READ_SHAPE",
+    "status": "PRODUCT_READY_NOT_CONNECTED",
+    "owner": "MFK Surface"
+  },
+  {
+    "id": "BASIC_SEARCH",
+    "group": "ORDER_ENTRY",
+    "label": "基本 Menu 搜尋",
+    "surface": "點單",
+    "kind": "READ_SHAPE",
+    "status": "PRODUCT_READY_NOT_CONNECTED",
+    "owner": "MFK SMM Surface"
+  },
+  {
+    "id": "ZERO_RESULT_RECOVERY",
+    "group": "ORDER_ENTRY",
+    "label": "零結果回退",
+    "surface": "點單",
+    "kind": "READ_SHAPE",
+    "status": "PRODUCT_READY_NOT_CONNECTED",
+    "owner": "MFK SMM Surface"
+  },
+  {
+    "id": "MULTI_SELECT_CONFIG",
+    "group": "ORDER_ENTRY",
+    "label": "多選客製 Shape",
+    "surface": "商品編輯",
+    "kind": "READ_SHAPE",
+    "status": "PRODUCT_READY_NOT_CONNECTED",
+    "owner": "MFK SMM local non-authoritative workspace"
+  },
+  {
+    "id": "CONFIG_MIN_MAX_VALIDATION",
+    "group": "ORDER_ENTRY",
+    "label": "客製 Min/Max/Required 驗證",
+    "surface": "商品編輯",
+    "kind": "READ_SHAPE",
+    "status": "PRODUCT_READY_NOT_CONNECTED",
+    "owner": "MFK SMM local non-authoritative workspace"
+  },
+  {
+    "id": "CART_QUANTITY_EDIT",
+    "group": "ORDER_ENTRY",
+    "label": "Cart Quantity Edit",
+    "surface": "Cart",
+    "kind": "READ_SHAPE",
+    "status": "PRODUCT_READY_NOT_CONNECTED",
+    "owner": "MFK SMM local non-authoritative workspace"
+  },
+  {
+    "id": "CART_LINE_ATTENTION",
+    "group": "ORDER_ENTRY",
+    "label": "Cart Line Attention / Partial Repair",
+    "surface": "Cart",
+    "kind": "READ_SHAPE",
+    "status": "PRODUCT_READY_NOT_CONNECTED",
+    "owner": "MFK SMM Surface"
+  },
+  {
+    "id": "SUBMISSION_IDENTITY_PRESENTATION",
+    "group": "ORDER_ENTRY",
+    "label": "Stable Submission Identity Presentation",
+    "surface": "Cart",
+    "kind": "READ_SHAPE",
+    "status": "PRODUCT_READY_NOT_CONNECTED",
+    "owner": "Future SMT admission handoff"
+  },
+  {
+    "id": "SUBMISSION_CERTAINTY_PRESENTATION",
+    "group": "ORDER_ENTRY",
+    "label": "Submission Result Certainty / UNKNOWN",
+    "surface": "Cart",
+    "kind": "READ_SHAPE",
+    "status": "PRODUCT_READY_NOT_CONNECTED",
+    "owner": "Future SMT admission handoff"
+  },
+  {
+    "id": "SOURCE_PROVENANCE_PRESENTATION",
+    "group": "ORDERS",
+    "label": "SMM Source / Staff Provenance",
+    "surface": "訂單",
+    "kind": "READ_SHAPE",
+    "status": "PRODUCT_READY_NOT_CONNECTED",
+    "owner": "Future SMT order projection"
+  },
+  {
+    "id": "DELAYED_ORDER_PRESENTATION",
+    "group": "OPERATIONS",
+    "label": "Delayed Order / Updated ETA",
+    "surface": "待處理",
+    "kind": "READ_SHAPE",
+    "status": "PRODUCT_READY_NOT_CONNECTED",
+    "owner": "Future SMT operational projection"
+  },
+  {
+    "id": "CHANNEL_HEALTH_VIEW",
+    "group": "OPERATIONS",
+    "label": "Channel Health Read-only",
+    "surface": "更多",
+    "kind": "READ_SHAPE",
+    "status": "PRODUCT_READY_NOT_CONNECTED",
+    "owner": "Future channel health projection"
+  },
+  {
+    "id": "EXCEPTION_QUEUE_VIEW",
+    "group": "OPERATIONS",
+    "label": "Exception / Pending Action Queue",
+    "surface": "待處理 / 更多",
+    "kind": "READ_SHAPE",
+    "status": "PRODUCT_READY_NOT_CONNECTED",
+    "owner": "Future incident projection"
+  }
 ]

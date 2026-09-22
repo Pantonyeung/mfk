@@ -1,0 +1,147 @@
+MFK 航海圖 V1.21｜Round022｜2026-09-22
+主題：ADMIN PRODUCT DETAIL R2 DEPLOYED / MEDIA BACKEND FIRST BREAK
+狀態：CURRENT / CONTROLLING
+CONTROL：#22
+PARENT：#45
+ACTIVE：#62
+NEXT RED：#66
+
+==================================================
+0. PRODUCT DETAIL
+==================================================
+
+Product summary list:
+COMPACT
+20 / PAGE
+
+Expanded detail:
+基本資料
+價格
+選項／加料
+打印
+圖片／媒體
+進階／危險操作
+
+==================================================
+1. OPTIONS
+==================================================
+
+Required:
+Option Name
+Option ID
+Option Price
+
+Group:
+Required
+Optional Force Show
+Optional
+Single
+Multi
+Min
+Max
+Allow Quantities
+
+Price:
+positive / zero / negative
+
+==================================================
+2. PRINT
+==================================================
+
+Receipt
+Production
+Packing
+Label
+Dine-in
+Takeaway
+
+Label ON:
+select one or more Logical Label destinations
+
+Physical IP / USB:
+SMT later
+
+==================================================
+3. MEDIA
+==================================================
+
+Canonical imageRef:
+PRESENT
+
+Keeta independent override:
+PRESENT
+
+R2 object status:
+PRESENT
+
+D1 media ref status:
+PRESENT
+
+Fake upload success:
+FORBIDDEN
+
+Real MFK R2:
+NOT YET WIRED
+
+Real MFK D1 media metadata:
+NOT YET WIRED
+
+Authenticated Admin media mutation:
+NOT YET PROVEN
+
+FIRST BREAK:
+#66
+
+==================================================
+4. PROOF
+==================================================
+
+Verified source:
+a038e96f29a15fc296aa00ba5719dc9c8f543478
+
+Run:
+35691896826 SUCCESS
+
+Job:
+106630464142
+
+Live deploy:
+35692031072 SUCCESS
+
+Canonical:
+https://admin.morefunos.com
+
+==================================================
+5. EXACT NEXT
+==================================================
+
+Owner live review:
+Admin → 菜單 → 商品資料
+→ 編輯 one Product
+
+If accepted:
+BANK #62 UI/schema
+
+Then:
+#66
+Auth
+→ NEW MFK R2
+→ NEW MFK D1
+→ real media upload/readback
+
+==================================================
+6. HOLD
+==================================================
+
+#44 Admin→SMT:
+HOLD
+
+#40 SMT OTA:
+HOLD
+
+Keeta live:
+NOT AUTHORIZED
+
+==================================================
+END ROUND022
+==================================================

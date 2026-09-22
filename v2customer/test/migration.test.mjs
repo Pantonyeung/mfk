@@ -7,76 +7,97 @@ import {fileURLToPath} from 'node:url';
 const testDir=path.dirname(fileURLToPath(import.meta.url));
 const srcRoot=path.resolve(testDir,'../src');
 const registry=JSON.parse(fs.readFileSync(path.join(srcRoot,'capabilities.json'),'utf8'));
-const source=fs.readdirSync(srcRoot)
-  .filter(name=>/\.(ts|tsx|js|jsx)$/.test(name))
-  .map(name=>fs.readFileSync(path.join(srcRoot,name),'utf8'))
-  .join('\n');
+const sourceFiles=fs.readdirSync(srcRoot).filter(name=>/\.(ts|tsx|js|jsx)$/.test(name));
+const source=sourceFiles.map(name=>fs.readFileSync(path.join(srcRoot,name),'utf8')).join('\n');
 
-test('customer capability registry is complete and stable',()=>{
-  assert.equal(registry.length,44);
-  assert.equal(new Set(registry.map(item=>item.id)).size,44);
-  for(const item of registry){
-    assert.ok(item.id);
-    assert.ok(item.group);
-    assert.ok(item.label);
-    assert.ok(item.surface);
-    assert.ok(item.owner);
-    assert.ok(['READ_SHAPE','COMMAND_SHAPE'].includes(item.kind));
-    if(item.kind==='COMMAND_SHAPE')assert.equal(item.status,'NOT_WIRED');
-  }
-});
-
-test('all customer command shapes remain NOT_WIRED',()=>{
+test('customer capability registry remains complete with commands disconnected',()=>{
+  assert.equal(registry.length,58);
+  assert.equal(new Set(registry.map(item=>item.id)).size,58);
   const commands=registry.filter(item=>item.kind==='COMMAND_SHAPE');
+  const reads=registry.filter(item=>item.kind!=='COMMAND_SHAPE');
   assert.ok(commands.length>=1);
   assert.deepEqual([...new Set(commands.map(item=>item.status))],['NOT_WIRED']);
+  assert.deepEqual([...new Set(reads.map(item=>item.status))],['PRODUCT_READY_NOT_CONNECTED']);
 });
 
-test('required customer migration capabilities exist',()=>{
-  const ids=new Set(registry.map(item=>item.id));
-  for(const id of [
-    'HOME','MENU_BROWSE','CATEGORY_BROWSE','PRODUCT_DETAIL','PRODUCT_CONFIG','MODIFIER_SELECT','OPTION_SELECT','COMBO_SELECT',
-    'CART_VIEW','CHECKOUT_FORM','PHONE_INPUT','PICKUP_CODE_PRESENTATION','SAFE_SUBMIT_PRESENTATION','PENDING_INTENT_PRESENTATION',
-    'STORE_ACCEPTANCE_PRESENTATION','PREPARING_PRESENTATION','READY_PRESENTATION','PICKUP_PRESENTATION','COMPLETED_PRESENTATION',
-    'ORDER_STATUS','ORDER_DETAIL','HISTORY','REORDER_SHAPE','OWN_CHANNEL_UNAVAILABLE','FALLBACK_PRESENTATION',
-    'OFFLINE_PRESENTATION','FAILURE_PRESENTATION','RETRY_PRESENTATION','UNKNOWN_PRESENTATION','STALE_PRESENTATION','CAPABILITY_REGISTRY'
-  ])assert.ok(ids.has(id),id);
-});
-
-const forbidden=[
-  /\bfetch\s*\(/,
-  /\bWebSocket\b/,
-  /\bXMLHttpRequest\b/,
-  /\baxios\b/,
-  /https?:\/\//,
-  /from\s+['"][^'"]*v2local/,
-  /from\s+['"][^'"]*v2smt/,
-  /createFormalOrder/,
-  /allocateDisplayNumber/,
-  /storeKernel\s*\./i,
-  /\blocalStorage\b/,
-  /\bindexedDB\b/,
-  /new\s+Worker\s*\(/
-];
-
-test('customer clean port has zero live authority or network path',()=>{
+test('customer production source has zero live network or canonical writer',()=>{
+  const forbidden=[
+    /\bfetch\s*\(/,
+    /\bWebSocket\b/,
+    /\bXMLHttpRequest\b/,
+    /\baxios\b/,
+    /from\s+['"][^'"]*v2local/,
+    /from\s+['"][^'"]*v2smt/,
+    /createFormalOrder/,
+    /allocateDisplayNumber/,
+    /storeKernel\s*\./i,
+    /\bD1Database\b/,
+    /\bindexedDB\b/,
+    /new\s+Worker\s*\(/,
+    /\bsetInterval\s*\(/,
+    /\bsetTimeout\s*\(/
+  ];
   for(const pattern of forbidden)assert.equal(pattern.test(source),false,String(pattern));
 });
 
-test('customer workflow surfaces remain visible without live authority',()=>{
-  for(const marker of [
-    '首頁','菜單','Product Detail','Product Config','Modifier / Option Selection Shape','Combo Selection Shape',
-    '購物籃','Checkout Form Shape','電話','Pickup Code Presentation','Safe Submit Presentation','PENDING_INTENT',
-    '等待店舖接單','製作中','可取餐','取餐','已完成','Order Status','Order Detail','歷史','再次下單',
-    '自家渠道暫時不可用','WhatsApp','離線','Failure','Retry Presentation','UNKNOWN','STALE','Capability Registry'
+test('local persistence is durable but explicitly non-authoritative',()=>{
+  const persistence=fs.readFileSync(path.join(srcRoot,'persistence.ts'),'utf8');
+  assert.match(persistence,/LOCAL_NON_AUTHORITATIVE/);
+  assert.match(persistence,/localStorage/);
+  assert.match(persistence,/customer-order:/);
+  assert.doesNotMatch(persistence,/Formal Order|Store Kernel|Pricing engine/i);
+});
+
+test('production customer app has no fixture/migration/demo truth',()=>{
+  const app=fs.readFileSync(path.join(srcRoot,'App.tsx'),'utf8');
+  assert.doesNotMatch(app,/\.\/fixtures/);
+  assert.doesNotMatch(app,/MIGRATION_ONLY|Customer Migration|Capability Registry|fixture projection|展示：Online/);
+  assert.match(app,/店舖服務尚未連接/);
+  assert.match(app,/唔會用假資料代替/);
+  assert.match(app,/未建立正式訂單/);
+});
+
+test('complete customer routes and lifecycle states are present',()=>{
+  for(const marker of[
+    '自家落單','菜單','購物籃','最後確認','訂單進度','落單狀態',
+    '搜尋商品','商品詳情','最少','最多','安全提交','Submission ID',
+    '等待店舖接單','未能接單','已接單','製作中','稍有延誤','可取餐',
+    '取餐核對','已交收','已完成','再次下單','自家渠道暫時不可用',
+    '重新確認提交結果'
   ])assert.match(source,new RegExp(marker));
 });
 
-test('safe submit cannot present a formal-order success claim',()=>{
-  assert.match(source,/提交訂單（NOT_WIRED）/);
-  assert.match(source,/未建立正式 Order/);
-  assert.match(source,/未送店舖/);
-  assert.match(source,/唔會派正式 Display Number/);
-  assert.match(source,/離線 queue/);
-  assert.doesNotMatch(source,/正式訂單已建立/);
+test('typed customer runtime port is injection-only',()=>{
+  const runtime=fs.readFileSync(path.join(srcRoot,'runtime.ts'),'utf8');
+  const types=fs.readFileSync(path.join(srcRoot,'product-types.ts'),'utf8');
+  assert.match(runtime,/__MFK_CUSTOMER_PRODUCT_PORT__/);
+  assert.match(types,/MFK_CUSTOMER_PORT_V1/);
+  assert.match(types,/readSnapshot\(\)/);
+  assert.match(types,/quoteCart\?/);
+  assert.match(types,/submitOrder\?/);
+  assert.match(types,/readSubmission\?/);
+  assert.match(types,/buildReorderCart\?/);
+  assert.doesNotMatch(runtime,/fetch|WebSocket|XMLHttpRequest/);
+});
+
+test('UNKNOWN preserves same submission identity and requires readback first',()=>{
+  const app=fs.readFileSync(path.join(srcRoot,'App.tsx'),'utf8');
+  const persistence=fs.readFileSync(path.join(srcRoot,'persistence.ts'),'utf8');
+  assert.match(app,/readSubmission/);
+  assert.match(app,/唔會自動重送/);
+  assert.match(app,/未有重新提交/);
+  assert.match(app,/submissionId/);
+  assert.match(persistence,/idempotencyKey/);
+});
+
+test('quote and order creation cannot be implemented locally',()=>{
+  const app=fs.readFileSync(path.join(srcRoot,'App.tsx'),'utf8');
+  assert.match(app,/port\?\.quoteCart/);
+  assert.match(app,/port\?\.submitOrder/);
+  assert.doesNotMatch(app,/finalUnitPriceMinor\s*[*+\-\/]/);
+  assert.doesNotMatch(app,/正式訂單已建立/);
+});
+
+test('production fixture file has been removed',()=>{
+  assert.equal(fs.existsSync(path.join(srcRoot,'fixtures.ts')),false);
 });

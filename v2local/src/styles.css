@@ -442,3 +442,248 @@
   box-shadow:0 2px 7px rgba(180,20,15,.28);font-variant-numeric:tabular-nums
 }
 .clean-rail nav a.active .clean-rail-badge{border-color:#fff0ea}
+
+
+/* Staff Auth R1 */
+.smt-access-field select{
+  width:100%;
+  height:76px;
+  padding:0 24px;
+  border:2px solid #d0d5dd;
+  border-radius:20px;
+  background:#fff;
+  color:#101828;
+  font-size:22px;
+  font-weight:750;
+  outline:none;
+}
+.smt-access-field select:focus{
+  border-color:#ff7a1a;
+  box-shadow:0 0 0 5px rgba(255,122,26,.12);
+}
+.clean-staff-session{
+  width:100%;
+  display:grid;
+  gap:2px;
+  padding:9px 5px;
+  border:1px solid #d8dde5;
+  border-radius:12px;
+  background:#fff;
+  color:#344054;
+  cursor:pointer;
+}
+.clean-staff-session b{font-size:11px;line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.clean-staff-session span{font-size:9px;color:#667085}
+.clean-staff-session:hover{background:#f8fafc}
+.clean-staff-session:focus-visible{outline:3px solid #2c63d7;outline-offset:2px}
+
+
+/* Daily access overlays — keep SMT visible underneath, but inert */
+.smt-gated-underlay{
+  min-height:100%;
+  filter:saturate(.88) brightness(.93);
+  pointer-events:none;
+  user-select:none;
+}
+.smt-blocking-overlay{
+  position:fixed;
+  inset:0;
+  z-index:9999;
+  display:grid;
+  place-items:center;
+  padding:28px;
+  background:rgba(15,23,42,.34);
+  backdrop-filter:blur(4px);
+}
+.smt-access-card--compact{
+  width:min(620px,calc(100vw - 56px));
+  min-height:0;
+  margin:0;
+  padding:38px 42px 34px;
+  border-radius:28px;
+  box-shadow:0 28px 80px rgba(15,23,42,.24);
+}
+.smt-access-card--compact h2{margin:10px 0 10px;font-size:34px}
+.smt-access-card--compact .smt-access-lead{margin-bottom:24px;font-size:17px}
+.smt-access-card--compact .smt-access-field input,
+.smt-access-card--compact .smt-access-field select{height:62px;font-size:19px}
+.smt-access-card--compact .smt-access-primary{min-height:64px;margin-top:22px;font-size:20px}
+
+/* Daily cash opening */
+.smt-opening-card{
+  width:min(720px,calc(100vw - 56px));
+  max-height:calc(100vh - 56px);
+  overflow:auto;
+  display:grid;
+  gap:22px;
+  padding:34px 38px;
+  border:1px solid #e4e7ec;
+  border-radius:28px;
+  background:#fff;
+  box-shadow:0 28px 80px rgba(15,23,42,.24);
+  color:#101828;
+}
+.smt-opening-card>header{
+  display:flex;
+  justify-content:space-between;
+  gap:20px;
+  align-items:flex-start;
+}
+.smt-opening-card>header h2{margin:7px 0 8px;font-size:32px;letter-spacing:-.02em}
+.smt-opening-card>header p{margin:0;max-width:540px;color:#667085;font-size:16px;line-height:1.5}
+.smt-opening-card>header>strong{
+  padding:9px 12px;
+  border-radius:12px;
+  background:#f2f4f7;
+  font-size:14px;
+  white-space:nowrap;
+}
+.smt-opening-provenance{
+  padding:18px;
+  display:grid;
+  gap:12px;
+  border:1px solid #e4e7ec;
+  border-radius:18px;
+  background:#f8fafc;
+}
+.smt-opening-provenance>span{font-size:13px;font-weight:900;color:#475467}
+.smt-opening-provenance>div{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.smt-opening-provenance article{
+  display:grid;
+  gap:3px;
+  padding:13px;
+  border-radius:14px;
+  background:#fff;
+  border:1px solid #eaecf0;
+}
+.smt-opening-provenance article.retained{
+  border-color:#abefc6;
+  background:#ecfdf3;
+}
+.smt-opening-provenance small{color:#667085;font-size:12px}
+.smt-opening-provenance b{font-size:20px}
+.smt-opening-provenance p{margin:0;color:#475467;font-size:14px;line-height:1.5}
+.smt-opening-provenance.is-empty{background:#fff8e8;border-color:#f1d49a}
+.smt-money-input{
+  display:grid;
+  grid-template-columns:44px 1fr;
+  align-items:center;
+  border:2px solid #d0d5dd;
+  border-radius:18px;
+  overflow:hidden;
+  background:#fff;
+}
+.smt-money-input:focus-within{border-color:#ff7a1a;box-shadow:0 0 0 5px rgba(255,122,26,.12)}
+.smt-money-input>b{
+  height:58px;
+  display:grid;
+  place-items:center;
+  background:#f2f4f7;
+  font-size:20px;
+}
+.smt-money-input input{
+  height:58px!important;
+  border:0!important;
+  border-radius:0!important;
+  box-shadow:none!important;
+}
+.smt-opening-change{
+  margin:-10px 0 0;
+  color:#b54708;
+  font-size:14px;
+  font-weight:800;
+}
+.cash-retain-summary{
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:10px;
+}
+.cash-retain-summary article{
+  display:grid;
+  gap:5px;
+  padding:14px;
+  border:1px solid #e4e7ec;
+  border-radius:14px;
+  background:#fff;
+}
+.cash-retain-summary article.retained{background:#ecfdf3;border-color:#abefc6}
+.cash-retain-summary span{font-size:13px;color:#667085}
+.cash-retain-summary b{font-size:22px}
+@media(max-width:800px){
+  .smt-blocking-overlay{padding:16px}
+  .smt-access-card--compact,.smt-opening-card{width:min(100%,680px);padding:28px 24px}
+  .smt-opening-provenance>div,.cash-retain-summary{grid-template-columns:1fr}
+  .smt-opening-card>header{display:grid}
+}
+
+
+/* Day Close exactly-once completion */
+.dayclose-complete-card{
+  display:grid;
+  grid-template-columns:64px 1fr;
+  gap:18px;
+  align-items:center;
+  padding:22px;
+  border:1px solid #abefc6;
+  border-radius:18px;
+  background:#ecfdf3;
+}
+.dayclose-complete-icon{
+  width:56px;
+  height:56px;
+  display:grid;
+  place-items:center;
+  border-radius:50%;
+  background:#12b76a;
+  color:#fff;
+  font-size:30px;
+  font-weight:900;
+}
+.dayclose-complete-card span{font-size:12px;color:#027a48;font-weight:850}
+.dayclose-complete-card h3{margin:4px 0 6px;font-size:24px;color:#05603a}
+.dayclose-complete-card p{margin:0;color:#475467;line-height:1.55}
+.dayclose-success-overlay{
+  position:fixed;
+  inset:0;
+  z-index:10020;
+  display:grid;
+  place-items:center;
+  padding:24px;
+  background:rgba(15,23,42,.42);
+  backdrop-filter:blur(5px);
+}
+.dayclose-success-dialog{
+  width:min(620px,calc(100vw - 48px));
+  display:grid;
+  gap:14px;
+  padding:30px;
+  border-radius:24px;
+  background:#fff;
+  box-shadow:0 30px 90px rgba(15,23,42,.28);
+  text-align:center;
+}
+.dayclose-success-dialog>.dayclose-complete-icon{margin:0 auto}
+.dayclose-success-dialog>span{font-size:11px;font-weight:900;letter-spacing:.12em;color:#027a48}
+.dayclose-success-dialog h3{margin:0;font-size:30px}
+.dayclose-success-dialog>p{margin:0;color:#667085;line-height:1.55}
+.dayclose-success-grid{
+  display:grid;
+  grid-template-columns:repeat(4,1fr);
+  gap:8px;
+  margin:4px 0 8px;
+}
+.dayclose-success-grid article{
+  display:grid;
+  gap:4px;
+  padding:12px 8px;
+  border:1px solid #e4e7ec;
+  border-radius:12px;
+  background:#f9fafb;
+}
+.dayclose-success-grid span{font-size:11px;color:#667085}
+.dayclose-success-grid b{font-size:17px}
+@media(max-width:720px){
+  .dayclose-success-grid{grid-template-columns:repeat(2,1fr)}
+  .dayclose-complete-card{grid-template-columns:1fr;text-align:center}
+  .dayclose-complete-card .dayclose-complete-icon{margin:0 auto}
+}

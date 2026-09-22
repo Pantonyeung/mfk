@@ -5,7 +5,7 @@
     "LABEL": "獨立 Owner App Shell",
     "SURFACE": "全局",
     "KIND": "READ_SHAPE",
-    "STATUS": "MIGRATED_SHAPE",
+    "STATUS": "PRODUCT_READY_NOT_CONNECTED",
     "OWNER": "MFK Owner Surface"
   },
   {
@@ -14,7 +14,7 @@
     "LABEL": "門店 Context",
     "SURFACE": "頂欄",
     "KIND": "READ_SHAPE",
-    "STATUS": "MIGRATED_SHAPE",
+    "STATUS": "PRODUCT_READY_NOT_CONNECTED",
     "OWNER": "MFK Owner Surface"
   },
   {
@@ -23,7 +23,7 @@
     "LABEL": "Business Day Context",
     "SURFACE": "頂欄",
     "KIND": "READ_SHAPE",
-    "STATUS": "MIGRATED_SHAPE",
+    "STATUS": "PRODUCT_READY_NOT_CONNECTED",
     "OWNER": "MFK Owner Surface"
   },
   {
@@ -32,7 +32,7 @@
     "LABEL": "資料 Freshness",
     "SURFACE": "全局",
     "KIND": "READ_SHAPE",
-    "STATUS": "MIGRATED_SHAPE",
+    "STATUS": "PRODUCT_READY_NOT_CONNECTED",
     "OWNER": "MFK Owner Surface"
   },
   {
@@ -41,7 +41,7 @@
     "LABEL": "Migration / NOT_WIRED 邊界",
     "SURFACE": "全局",
     "KIND": "READ_SHAPE",
-    "STATUS": "MIGRATED_SHAPE",
+    "STATUS": "PRODUCT_READY_NOT_CONNECTED",
     "OWNER": "MFK Owner Surface"
   },
   {
@@ -50,7 +50,7 @@
     "LABEL": "今日／待處理／訂單／更多導航",
     "SURFACE": "底部導航",
     "KIND": "READ_SHAPE",
-    "STATUS": "MIGRATED_SHAPE",
+    "STATUS": "PRODUCT_READY_NOT_CONNECTED",
     "OWNER": "MFK Owner Surface"
   },
   {
@@ -59,7 +59,7 @@
     "LABEL": "Today / Readiness Home",
     "SURFACE": "今日",
     "KIND": "READ_SHAPE",
-    "STATUS": "MIGRATED_SHAPE",
+    "STATUS": "PRODUCT_READY_NOT_CONNECTED",
     "OWNER": "Future Reporting / Health projections"
   },
   {
@@ -68,7 +68,7 @@
     "LABEL": "有效營業額",
     "SURFACE": "今日 KPI",
     "KIND": "READ_SHAPE",
-    "STATUS": "MIGRATED_SHAPE",
+    "STATUS": "PRODUCT_READY_NOT_CONNECTED",
     "OWNER": "Future Reporting / Health projections"
   },
   {
@@ -77,7 +77,7 @@
     "LABEL": "訂單量",
     "SURFACE": "今日 KPI",
     "KIND": "READ_SHAPE",
-    "STATUS": "MIGRATED_SHAPE",
+    "STATUS": "PRODUCT_READY_NOT_CONNECTED",
     "OWNER": "Future Reporting / Health projections"
   },
   {
@@ -86,7 +86,7 @@
     "LABEL": "平均訂單金額",
     "SURFACE": "今日 KPI",
     "KIND": "READ_SHAPE",
-    "STATUS": "MIGRATED_SHAPE",
+    "STATUS": "PRODUCT_READY_NOT_CONNECTED",
     "OWNER": "Future Reporting / Health projections"
   },
   {
@@ -95,7 +95,7 @@
     "LABEL": "基本同期比較",
     "SURFACE": "今日 KPI",
     "KIND": "READ_SHAPE",
-    "STATUS": "MIGRATED_SHAPE",
+    "STATUS": "PRODUCT_READY_NOT_CONNECTED",
     "OWNER": "Future Reporting / Health projections"
   },
   {
@@ -104,7 +104,7 @@
     "LABEL": "營運 Readiness 摘要",
     "SURFACE": "今日",
     "KIND": "READ_SHAPE",
-    "STATUS": "MIGRATED_SHAPE",
+    "STATUS": "PRODUCT_READY_NOT_CONNECTED",
     "OWNER": "Future Reporting / Health projections"
   },
   {
@@ -113,7 +113,7 @@
     "LABEL": "待處理摘要",
     "SURFACE": "今日",
     "KIND": "READ_SHAPE",
-    "STATUS": "MIGRATED_SHAPE",
+    "STATUS": "PRODUCT_READY_NOT_CONNECTED",
     "OWNER": "Future Reporting / Health projections"
   },
   {
@@ -122,7 +122,7 @@
     "LABEL": "商品／時段 Insight 摘要",
     "SURFACE": "今日",
     "KIND": "READ_SHAPE",
-    "STATUS": "MIGRATED_SHAPE",
+    "STATUS": "PRODUCT_READY_NOT_CONNECTED",
     "OWNER": "Future Reporting / Health projections"
   },
   {
@@ -131,7 +131,7 @@
     "LABEL": "Exception / Action Queue",
     "SURFACE": "待處理",
     "KIND": "READ_SHAPE",
-    "STATUS": "MIGRATED_SHAPE",
+    "STATUS": "PRODUCT_READY_NOT_CONNECTED",
     "OWNER": "Future shared Action / Incident projection"
   },
   {
@@ -140,7 +140,7 @@
     "LABEL": "Incident Dedupe / Correlation shape",
     "SURFACE": "待處理",
     "KIND": "READ_SHAPE",
-    "STATUS": "MIGRATED_SHAPE",
+    "STATUS": "PRODUCT_READY_NOT_CONNECTED",
     "OWNER": "Future shared Action / Incident projection"
   },
   {
@@ -149,7 +149,7 @@
     "LABEL": "Impact / Urgency 顯示",
     "SURFACE": "待處理",
     "KIND": "READ_SHAPE",
-    "STATUS": "MIGRATED_SHAPE",
+    "STATUS": "PRODUCT_READY_NOT_CONNECTED",
     "OWNER": "Future shared Action / Incident projection"
   },
   {
@@ -158,7 +158,7 @@
     "LABEL": "Owner Domain 顯示",
     "SURFACE": "待處理",
     "KIND": "READ_SHAPE",
-    "STATUS": "MIGRATED_SHAPE",
+    "STATUS": "PRODUCT_READY_NOT_CONNECTED",
     "OWNER": "Future shared Action / Incident projection"
   },
   {
@@ -167,7 +167,7 @@
     "LABEL": "Action Item Drill-down",
     "SURFACE": "待處理",
     "KIND": "READ_SHAPE",
-    "STATUS": "MIGRATED_SHAPE",
+    "STATUS": "PRODUCT_READY_NOT_CONNECTED",
     "OWNER": "Future shared Action / Incident projection"
   },
   {
@@ -194,7 +194,7 @@
     "LABEL": "Order Oversight List",
     "SURFACE": "訂單",
     "KIND": "READ_SHAPE",
-    "STATUS": "MIGRATED_SHAPE",
+    "STATUS": "PRODUCT_READY_NOT_CONNECTED",
     "OWNER": "Future Order / Payment / Fulfillment projections"
   },
   {
@@ -203,7 +203,7 @@
     "LABEL": "來源／狀態 Filter",
     "SURFACE": "訂單",
     "KIND": "READ_SHAPE",
-    "STATUS": "MIGRATED_SHAPE",
+    "STATUS": "PRODUCT_READY_NOT_CONNECTED",
     "OWNER": "Future Order / Payment / Fulfillment projections"
   },
   {
@@ -212,7 +212,7 @@
     "LABEL": "訂單 Search",
     "SURFACE": "訂單",
     "KIND": "READ_SHAPE",
-    "STATUS": "MIGRATED_SHAPE",
+    "STATUS": "PRODUCT_READY_NOT_CONNECTED",
     "OWNER": "Future Order / Payment / Fulfillment projections"
   },
   {
@@ -221,16 +221,16 @@
     "LABEL": "Order Detail Drill-down",
     "SURFACE": "訂單詳情",
     "KIND": "READ_SHAPE",
-    "STATUS": "MIGRATED_SHAPE",
+    "STATUS": "PRODUCT_READY_NOT_CONNECTED",
     "OWNER": "Future Order / Payment / Fulfillment projections"
   },
   {
     "CAP_ID": "ORDER_STATUS_READBACK",
     "GROUP": "ORDERS",
-    "LABEL": "Status / Readback Presentation",
+    "LABEL": "Status / Readback 視圖",
     "SURFACE": "訂單詳情",
     "KIND": "READ_SHAPE",
-    "STATUS": "MIGRATED_SHAPE",
+    "STATUS": "PRODUCT_READY_NOT_CONNECTED",
     "OWNER": "Future Order / Payment / Fulfillment projections"
   },
   {
@@ -239,7 +239,7 @@
     "LABEL": "Payment / Tender Summary",
     "SURFACE": "訂單詳情",
     "KIND": "READ_SHAPE",
-    "STATUS": "MIGRATED_SHAPE",
+    "STATUS": "PRODUCT_READY_NOT_CONNECTED",
     "OWNER": "Future Order / Payment / Fulfillment projections"
   },
   {
@@ -248,7 +248,7 @@
     "LABEL": "Print / Side-effect Summary",
     "SURFACE": "訂單詳情",
     "KIND": "READ_SHAPE",
-    "STATUS": "MIGRATED_SHAPE",
+    "STATUS": "PRODUCT_READY_NOT_CONNECTED",
     "OWNER": "Future Order / Payment / Fulfillment projections"
   },
   {
@@ -257,7 +257,7 @@
     "LABEL": "Order Timeline / Audit",
     "SURFACE": "訂單詳情",
     "KIND": "READ_SHAPE",
-    "STATUS": "MIGRATED_SHAPE",
+    "STATUS": "PRODUCT_READY_NOT_CONNECTED",
     "OWNER": "Future Order / Payment / Fulfillment projections"
   },
   {
@@ -266,7 +266,7 @@
     "LABEL": "Channel Health Overview",
     "SURFACE": "渠道",
     "KIND": "READ_SHAPE",
-    "STATUS": "MIGRATED_SHAPE",
+    "STATUS": "PRODUCT_READY_NOT_CONNECTED",
     "OWNER": "Future Channel projection / authority adapter"
   },
   {
@@ -275,7 +275,7 @@
     "LABEL": "Desired / Observed State",
     "SURFACE": "渠道",
     "KIND": "READ_SHAPE",
-    "STATUS": "MIGRATED_SHAPE",
+    "STATUS": "PRODUCT_READY_NOT_CONNECTED",
     "OWNER": "Future Channel projection / authority adapter"
   },
   {
@@ -284,7 +284,7 @@
     "LABEL": "Channel Freshness",
     "SURFACE": "渠道",
     "KIND": "READ_SHAPE",
-    "STATUS": "MIGRATED_SHAPE",
+    "STATUS": "PRODUCT_READY_NOT_CONNECTED",
     "OWNER": "Future Channel projection / authority adapter"
   },
   {
@@ -293,7 +293,7 @@
     "LABEL": "Degraded / Stale / Unknown presentation",
     "SURFACE": "渠道",
     "KIND": "READ_SHAPE",
-    "STATUS": "MIGRATED_SHAPE",
+    "STATUS": "PRODUCT_READY_NOT_CONNECTED",
     "OWNER": "Future Channel projection / authority adapter"
   },
   {
@@ -329,7 +329,7 @@
     "LABEL": "Sold-out / Availability Overview",
     "SURFACE": "商品／售罄",
     "KIND": "READ_SHAPE",
-    "STATUS": "MIGRATED_SHAPE",
+    "STATUS": "PRODUCT_READY_NOT_CONNECTED",
     "OWNER": "Future Sellability authority adapter"
   },
   {
@@ -374,7 +374,7 @@
     "LABEL": "Who's Working",
     "SURFACE": "員工",
     "KIND": "READ_SHAPE",
-    "STATUS": "MIGRATED_SHAPE",
+    "STATUS": "PRODUCT_READY_NOT_CONNECTED",
     "OWNER": "Future Identity / Staff projection"
   },
   {
@@ -383,7 +383,7 @@
     "LABEL": "Clocked-in / out Status",
     "SURFACE": "員工",
     "KIND": "READ_SHAPE",
-    "STATUS": "MIGRATED_SHAPE",
+    "STATUS": "PRODUCT_READY_NOT_CONNECTED",
     "OWNER": "Future Identity / Staff projection"
   },
   {
@@ -392,7 +392,7 @@
     "LABEL": "Scheduled / Actual distinction",
     "SURFACE": "員工",
     "KIND": "READ_SHAPE",
-    "STATUS": "MIGRATED_SHAPE",
+    "STATUS": "PRODUCT_READY_NOT_CONNECTED",
     "OWNER": "Future Identity / Staff projection"
   },
   {
@@ -401,7 +401,7 @@
     "LABEL": "Break Status",
     "SURFACE": "員工",
     "KIND": "READ_SHAPE",
-    "STATUS": "MIGRATED_SHAPE",
+    "STATUS": "PRODUCT_READY_NOT_CONNECTED",
     "OWNER": "Future Identity / Staff projection"
   },
   {
@@ -410,7 +410,7 @@
     "LABEL": "Worked Hours",
     "SURFACE": "員工",
     "KIND": "READ_SHAPE",
-    "STATUS": "MIGRATED_SHAPE",
+    "STATUS": "PRODUCT_READY_NOT_CONNECTED",
     "OWNER": "Future Identity / Staff projection"
   },
   {
@@ -419,7 +419,7 @@
     "LABEL": "Role / Permission Summary",
     "SURFACE": "員工",
     "KIND": "READ_SHAPE",
-    "STATUS": "MIGRATED_SHAPE",
+    "STATUS": "PRODUCT_READY_NOT_CONNECTED",
     "OWNER": "Future Identity / Staff projection"
   },
   {
@@ -428,7 +428,7 @@
     "LABEL": "Device Health",
     "SURFACE": "設備",
     "KIND": "READ_SHAPE",
-    "STATUS": "MIGRATED_SHAPE",
+    "STATUS": "PRODUCT_READY_NOT_CONNECTED",
     "OWNER": "Future Device / Print projections"
   },
   {
@@ -437,7 +437,7 @@
     "LABEL": "Printer Health",
     "SURFACE": "設備",
     "KIND": "READ_SHAPE",
-    "STATUS": "MIGRATED_SHAPE",
+    "STATUS": "PRODUCT_READY_NOT_CONNECTED",
     "OWNER": "Future Device / Print projections"
   },
   {
@@ -446,16 +446,16 @@
     "LABEL": "Device Last Seen",
     "SURFACE": "設備",
     "KIND": "READ_SHAPE",
-    "STATUS": "MIGRATED_SHAPE",
+    "STATUS": "PRODUCT_READY_NOT_CONNECTED",
     "OWNER": "Future Device / Print projections"
   },
   {
     "CAP_ID": "PHYSICAL_BINDING_READ",
     "GROUP": "DEVICE_PRINT",
-    "LABEL": "Logical / Physical Binding Presentation",
+    "LABEL": "Logical / Physical Binding 視圖",
     "SURFACE": "設備",
     "KIND": "READ_SHAPE",
-    "STATUS": "MIGRATED_SHAPE",
+    "STATUS": "PRODUCT_READY_NOT_CONNECTED",
     "OWNER": "Future Device / Print projections"
   },
   {
@@ -464,7 +464,7 @@
     "LABEL": "Pending / Failed / Unknown Print Jobs",
     "SURFACE": "設備",
     "KIND": "READ_SHAPE",
-    "STATUS": "MIGRATED_SHAPE",
+    "STATUS": "PRODUCT_READY_NOT_CONNECTED",
     "OWNER": "Future Device / Print projections"
   },
   {
@@ -473,7 +473,7 @@
     "LABEL": "Affected Order Count",
     "SURFACE": "設備",
     "KIND": "READ_SHAPE",
-    "STATUS": "MIGRATED_SHAPE",
+    "STATUS": "PRODUCT_READY_NOT_CONNECTED",
     "OWNER": "Future Device / Print projections"
   },
   {
@@ -482,7 +482,7 @@
     "LABEL": "Device / Printer Exception Drill-down",
     "SURFACE": "設備",
     "KIND": "READ_SHAPE",
-    "STATUS": "MIGRATED_SHAPE",
+    "STATUS": "PRODUCT_READY_NOT_CONNECTED",
     "OWNER": "Future Device / Print projections"
   },
   {
@@ -491,7 +491,7 @@
     "LABEL": "Fixed Reports Home",
     "SURFACE": "報表",
     "KIND": "READ_SHAPE",
-    "STATUS": "MIGRATED_SHAPE",
+    "STATUS": "PRODUCT_READY_NOT_CONNECTED",
     "OWNER": "Future Reporting projection"
   },
   {
@@ -500,7 +500,7 @@
     "LABEL": "Basic Trend / Comparison",
     "SURFACE": "報表",
     "KIND": "READ_SHAPE",
-    "STATUS": "MIGRATED_SHAPE",
+    "STATUS": "PRODUCT_READY_NOT_CONNECTED",
     "OWNER": "Future Reporting projection"
   },
   {
@@ -509,7 +509,7 @@
     "LABEL": "Report Drill-down",
     "SURFACE": "報表",
     "KIND": "READ_SHAPE",
-    "STATUS": "MIGRATED_SHAPE",
+    "STATUS": "PRODUCT_READY_NOT_CONNECTED",
     "OWNER": "Future Reporting projection"
   },
   {
@@ -518,7 +518,7 @@
     "LABEL": "今日營業報表",
     "SURFACE": "報表",
     "KIND": "READ_SHAPE",
-    "STATUS": "MIGRATED_SHAPE",
+    "STATUS": "PRODUCT_READY_NOT_CONNECTED",
     "OWNER": "Future Reporting projection"
   },
   {
@@ -527,7 +527,7 @@
     "LABEL": "時段報表",
     "SURFACE": "報表",
     "KIND": "READ_SHAPE",
-    "STATUS": "MIGRATED_SHAPE",
+    "STATUS": "PRODUCT_READY_NOT_CONNECTED",
     "OWNER": "Future Reporting projection"
   },
   {
@@ -536,7 +536,7 @@
     "LABEL": "商品報表",
     "SURFACE": "報表",
     "KIND": "READ_SHAPE",
-    "STATUS": "MIGRATED_SHAPE",
+    "STATUS": "PRODUCT_READY_NOT_CONNECTED",
     "OWNER": "Future Reporting projection"
   },
   {
@@ -545,7 +545,7 @@
     "LABEL": "渠道報表",
     "SURFACE": "報表",
     "KIND": "READ_SHAPE",
-    "STATUS": "MIGRATED_SHAPE",
+    "STATUS": "PRODUCT_READY_NOT_CONNECTED",
     "OWNER": "Future Reporting projection"
   },
   {
@@ -554,7 +554,7 @@
     "LABEL": "Tender 報表",
     "SURFACE": "報表",
     "KIND": "READ_SHAPE",
-    "STATUS": "MIGRATED_SHAPE",
+    "STATUS": "PRODUCT_READY_NOT_CONNECTED",
     "OWNER": "Future Reporting projection"
   },
   {
@@ -563,7 +563,7 @@
     "LABEL": "Adjustments 報表",
     "SURFACE": "報表",
     "KIND": "READ_SHAPE",
-    "STATUS": "MIGRATED_SHAPE",
+    "STATUS": "PRODUCT_READY_NOT_CONNECTED",
     "OWNER": "Future Reporting projection"
   },
   {
@@ -572,7 +572,7 @@
     "LABEL": "Staff / Labor 報表",
     "SURFACE": "報表",
     "KIND": "READ_SHAPE",
-    "STATUS": "MIGRATED_SHAPE",
+    "STATUS": "PRODUCT_READY_NOT_CONNECTED",
     "OWNER": "Future Reporting projection"
   },
   {
@@ -581,7 +581,7 @@
     "LABEL": "Operational Health 報表",
     "SURFACE": "報表",
     "KIND": "READ_SHAPE",
-    "STATUS": "MIGRATED_SHAPE",
+    "STATUS": "PRODUCT_READY_NOT_CONNECTED",
     "OWNER": "Future Reporting projection"
   },
   {
@@ -590,7 +590,7 @@
     "LABEL": "Alerts / Notifications Centre",
     "SURFACE": "通知",
     "KIND": "READ_SHAPE",
-    "STATUS": "MIGRATED_SHAPE",
+    "STATUS": "PRODUCT_READY_NOT_CONNECTED",
     "OWNER": "Future Notification / Alert projections"
   },
   {
@@ -599,7 +599,7 @@
     "LABEL": "Immediate Alert presentation",
     "SURFACE": "通知",
     "KIND": "READ_SHAPE",
-    "STATUS": "MIGRATED_SHAPE",
+    "STATUS": "PRODUCT_READY_NOT_CONNECTED",
     "OWNER": "Future Notification / Alert projections"
   },
   {
@@ -608,7 +608,7 @@
     "LABEL": "Digest presentation",
     "SURFACE": "通知",
     "KIND": "READ_SHAPE",
-    "STATUS": "MIGRATED_SHAPE",
+    "STATUS": "PRODUCT_READY_NOT_CONNECTED",
     "OWNER": "Future Notification / Alert projections"
   },
   {
@@ -617,7 +617,7 @@
     "LABEL": "Inbox-only presentation",
     "SURFACE": "通知",
     "KIND": "READ_SHAPE",
-    "STATUS": "MIGRATED_SHAPE",
+    "STATUS": "PRODUCT_READY_NOT_CONNECTED",
     "OWNER": "Future Notification / Alert projections"
   },
   {
@@ -626,7 +626,7 @@
     "LABEL": "Notification read / history shape",
     "SURFACE": "通知",
     "KIND": "READ_SHAPE",
-    "STATUS": "MIGRATED_SHAPE",
+    "STATUS": "PRODUCT_READY_NOT_CONNECTED",
     "OWNER": "Future Notification / Alert projections"
   },
   {
@@ -635,7 +635,7 @@
     "LABEL": "Bounded Action Confirmation UX",
     "SURFACE": "確認",
     "KIND": "READ_SHAPE",
-    "STATUS": "MIGRATED_SHAPE",
+    "STATUS": "PRODUCT_READY_NOT_CONNECTED",
     "OWNER": "Future canonical domain adapters"
   },
   {
@@ -644,52 +644,52 @@
     "LABEL": "Reason Capture",
     "SURFACE": "確認",
     "KIND": "READ_SHAPE",
-    "STATUS": "MIGRATED_SHAPE",
+    "STATUS": "PRODUCT_READY_NOT_CONNECTED",
     "OWNER": "Future canonical domain adapters"
   },
   {
     "CAP_ID": "COMMAND_APPROVAL",
     "GROUP": "BOUNDED_ACTION",
-    "LABEL": "Approval Presentation",
+    "LABEL": "Approval 視圖",
     "SURFACE": "確認",
     "KIND": "READ_SHAPE",
-    "STATUS": "MIGRATED_SHAPE",
+    "STATUS": "PRODUCT_READY_NOT_CONNECTED",
     "OWNER": "Future canonical domain adapters"
   },
   {
     "CAP_ID": "COMMAND_PENDING",
     "GROUP": "BOUNDED_ACTION",
-    "LABEL": "Pending State Presentation",
+    "LABEL": "Pending State 視圖",
     "SURFACE": "確認",
     "KIND": "READ_SHAPE",
-    "STATUS": "MIGRATED_SHAPE",
+    "STATUS": "PRODUCT_READY_NOT_CONNECTED",
     "OWNER": "Future canonical domain adapters"
   },
   {
     "CAP_ID": "COMMAND_RESULT",
     "GROUP": "BOUNDED_ACTION",
-    "LABEL": "Result State Presentation",
+    "LABEL": "Result State 視圖",
     "SURFACE": "確認",
     "KIND": "READ_SHAPE",
-    "STATUS": "MIGRATED_SHAPE",
+    "STATUS": "PRODUCT_READY_NOT_CONNECTED",
     "OWNER": "Future canonical domain adapters"
   },
   {
     "CAP_ID": "COMMAND_FAILURE",
     "GROUP": "BOUNDED_ACTION",
-    "LABEL": "Failure State Presentation",
+    "LABEL": "Failure State 視圖",
     "SURFACE": "確認",
     "KIND": "READ_SHAPE",
-    "STATUS": "MIGRATED_SHAPE",
+    "STATUS": "PRODUCT_READY_NOT_CONNECTED",
     "OWNER": "Future canonical domain adapters"
   },
   {
     "CAP_ID": "COMMAND_UNKNOWN",
     "GROUP": "BOUNDED_ACTION",
-    "LABEL": "UNKNOWN State Presentation",
+    "LABEL": "UNKNOWN State 視圖",
     "SURFACE": "確認",
     "KIND": "READ_SHAPE",
-    "STATUS": "MIGRATED_SHAPE",
+    "STATUS": "PRODUCT_READY_NOT_CONNECTED",
     "OWNER": "Future canonical domain adapters"
   },
   {
@@ -749,55 +749,55 @@
   {
     "CAP_ID": "RECOVERY_OFFLINE",
     "GROUP": "RECOVERY",
-    "LABEL": "OFFLINE Presentation",
+    "LABEL": "OFFLINE 視圖",
     "SURFACE": "復原",
     "KIND": "READ_SHAPE",
-    "STATUS": "MIGRATED_SHAPE",
+    "STATUS": "PRODUCT_READY_NOT_CONNECTED",
     "OWNER": "MFK Owner Surface"
   },
   {
     "CAP_ID": "RECOVERY_STALE",
     "GROUP": "RECOVERY",
-    "LABEL": "STALE Presentation",
+    "LABEL": "STALE 視圖",
     "SURFACE": "復原",
     "KIND": "READ_SHAPE",
-    "STATUS": "MIGRATED_SHAPE",
+    "STATUS": "PRODUCT_READY_NOT_CONNECTED",
     "OWNER": "MFK Owner Surface"
   },
   {
     "CAP_ID": "RECOVERY_UNKNOWN",
     "GROUP": "RECOVERY",
-    "LABEL": "UNKNOWN Presentation",
+    "LABEL": "UNKNOWN 視圖",
     "SURFACE": "復原",
     "KIND": "READ_SHAPE",
-    "STATUS": "MIGRATED_SHAPE",
+    "STATUS": "PRODUCT_READY_NOT_CONNECTED",
     "OWNER": "MFK Owner Surface"
   },
   {
     "CAP_ID": "RECOVERY_PARTIAL",
     "GROUP": "RECOVERY",
-    "LABEL": "PARTIAL Presentation",
+    "LABEL": "PARTIAL 視圖",
     "SURFACE": "復原",
     "KIND": "READ_SHAPE",
-    "STATUS": "MIGRATED_SHAPE",
+    "STATUS": "PRODUCT_READY_NOT_CONNECTED",
     "OWNER": "MFK Owner Surface"
   },
   {
     "CAP_ID": "RECOVERY_FAILURE",
     "GROUP": "RECOVERY",
-    "LABEL": "FAILURE Presentation",
+    "LABEL": "FAILURE 視圖",
     "SURFACE": "復原",
     "KIND": "READ_SHAPE",
-    "STATUS": "MIGRATED_SHAPE",
+    "STATUS": "PRODUCT_READY_NOT_CONNECTED",
     "OWNER": "MFK Owner Surface"
   },
   {
     "CAP_ID": "RECOVERY_RETRY",
     "GROUP": "RECOVERY",
-    "LABEL": "RETRY Presentation",
+    "LABEL": "RETRY 視圖",
     "SURFACE": "復原",
     "KIND": "READ_SHAPE",
-    "STATUS": "MIGRATED_SHAPE",
+    "STATUS": "PRODUCT_READY_NOT_CONNECTED",
     "OWNER": "MFK Owner Surface"
   },
   {
@@ -812,7 +812,7 @@
   {
     "CAP_ID": "MANAGER_LOG",
     "GROUP": "OPERATIONS",
-    "LABEL": "Manager Log Presentation",
+    "LABEL": "Manager Log 視圖",
     "SURFACE": "更多",
     "KIND": "COMMAND_SHAPE",
     "STATUS": "NOT_WIRED",
@@ -833,7 +833,7 @@
     "LABEL": "Shift / Handoff Summary",
     "SURFACE": "更多",
     "KIND": "READ_SHAPE",
-    "STATUS": "MIGRATED_SHAPE",
+    "STATUS": "PRODUCT_READY_NOT_CONNECTED",
     "OWNER": "Future shared operational projections"
   },
   {
@@ -842,7 +842,151 @@
     "LABEL": "Human-readable Activity Feed",
     "SURFACE": "更多",
     "KIND": "READ_SHAPE",
-    "STATUS": "MIGRATED_SHAPE",
+    "STATUS": "PRODUCT_READY_NOT_CONNECTED",
     "OWNER": "Future shared operational projections"
+  },
+  {
+    "CAP_ID": "CUSTOMER_OVERVIEW",
+    "GROUP": "CUSTOMER",
+    "LABEL": "Customer / CRM Lite Overview",
+    "SURFACE": "更多／客戶",
+    "KIND": "READ_SHAPE",
+    "STATUS": "PRODUCT_READY_NOT_CONNECTED",
+    "OWNER": "Future Customer / CRM read projection"
+  },
+  {
+    "CAP_ID": "CUSTOMER_NEW_RETURNING",
+    "GROUP": "CUSTOMER",
+    "LABEL": "New / Returning Customer Summary",
+    "SURFACE": "更多／客戶",
+    "KIND": "READ_SHAPE",
+    "STATUS": "PRODUCT_READY_NOT_CONNECTED",
+    "OWNER": "Future Customer / CRM read projection"
+  },
+  {
+    "CAP_ID": "CUSTOMER_CONSENT_SUMMARY",
+    "GROUP": "CUSTOMER",
+    "LABEL": "Consent Summary",
+    "SURFACE": "更多／客戶",
+    "KIND": "READ_SHAPE",
+    "STATUS": "PRODUCT_READY_NOT_CONNECTED",
+    "OWNER": "Future Customer / Consent projection"
+  },
+  {
+    "CAP_ID": "CUSTOMER_EXPERIENCE_SUMMARY",
+    "GROUP": "CUSTOMER",
+    "LABEL": "Review / Complaint Summary",
+    "SURFACE": "更多／客戶",
+    "KIND": "READ_SHAPE",
+    "STATUS": "PRODUCT_READY_NOT_CONNECTED",
+    "OWNER": "Future Customer Experience projection"
+  },
+  {
+    "CAP_ID": "CAMPAIGN_OVERVIEW",
+    "GROUP": "MARKETING",
+    "LABEL": "Campaign Performance Overview",
+    "SURFACE": "更多／推廣",
+    "KIND": "READ_SHAPE",
+    "STATUS": "PRODUCT_READY_NOT_CONNECTED",
+    "OWNER": "Future Marketing reporting projection"
+  },
+  {
+    "CAP_ID": "CAMPAIGN_ATTRIBUTION_SUMMARY",
+    "GROUP": "MARKETING",
+    "LABEL": "Attributed Orders / Sales Summary",
+    "SURFACE": "更多／推廣",
+    "KIND": "READ_SHAPE",
+    "STATUS": "PRODUCT_READY_NOT_CONNECTED",
+    "OWNER": "Future Marketing reporting projection"
+  },
+  {
+    "CAP_ID": "PLATFORM_PROMOTION_FACTS",
+    "GROUP": "MARKETING",
+    "LABEL": "Platform Promotion / Funding Facts",
+    "SURFACE": "更多／推廣",
+    "KIND": "READ_SHAPE",
+    "STATUS": "PRODUCT_READY_NOT_CONNECTED",
+    "OWNER": "Future provider reporting projection"
+  },
+  {
+    "CAP_ID": "SETTLEMENT_SUMMARY",
+    "GROUP": "PLATFORM_FINANCE",
+    "LABEL": "Platform Settlement Summary",
+    "SURFACE": "更多／平台結算",
+    "KIND": "READ_SHAPE",
+    "STATUS": "PRODUCT_READY_NOT_CONNECTED",
+    "OWNER": "Future settlement / reconciliation projection"
+  },
+  {
+    "CAP_ID": "SETTLEMENT_FINALITY",
+    "GROUP": "PLATFORM_FINANCE",
+    "LABEL": "Settlement Freshness / Finality",
+    "SURFACE": "更多／平台結算",
+    "KIND": "READ_SHAPE",
+    "STATUS": "PRODUCT_READY_NOT_CONNECTED",
+    "OWNER": "Future settlement / reconciliation projection"
+  },
+  {
+    "CAP_ID": "RECONCILIATION_ATTENTION",
+    "GROUP": "PLATFORM_FINANCE",
+    "LABEL": "Reconciliation Difference Attention",
+    "SURFACE": "更多／平台結算",
+    "KIND": "READ_SHAPE",
+    "STATUS": "PRODUCT_READY_NOT_CONNECTED",
+    "OWNER": "Future settlement / reconciliation projection"
+  },
+  {
+    "CAP_ID": "CASH_OVERVIEW",
+    "GROUP": "CASH",
+    "LABEL": "Cash / Drawer Overview",
+    "SURFACE": "更多／現金",
+    "KIND": "READ_SHAPE",
+    "STATUS": "PRODUCT_READY_NOT_CONNECTED",
+    "OWNER": "Future cash / closeout projection"
+  },
+  {
+    "CAP_ID": "CASH_VARIANCE",
+    "GROUP": "CASH",
+    "LABEL": "Expected / Actual / Over-Short Summary",
+    "SURFACE": "更多／現金",
+    "KIND": "READ_SHAPE",
+    "STATUS": "PRODUCT_READY_NOT_CONNECTED",
+    "OWNER": "Future cash / reconciliation projection"
+  },
+  {
+    "CAP_ID": "CLOSEOUT_SUMMARY",
+    "GROUP": "CASH",
+    "LABEL": "Closeout / Handover Summary",
+    "SURFACE": "更多／現金",
+    "KIND": "READ_SHAPE",
+    "STATUS": "PRODUCT_READY_NOT_CONNECTED",
+    "OWNER": "Future closeout projection"
+  },
+  {
+    "CAP_ID": "INVENTORY_LITE_SUMMARY",
+    "GROUP": "INVENTORY",
+    "LABEL": "Inventory Lite Summary",
+    "SURFACE": "更多／庫存",
+    "KIND": "READ_SHAPE",
+    "STATUS": "PRODUCT_READY_NOT_CONNECTED",
+    "OWNER": "Future Inventory Lite projection"
+  },
+  {
+    "CAP_ID": "INVENTORY_ATTENTION",
+    "GROUP": "INVENTORY",
+    "LABEL": "Low Stock / Count / Waste Attention",
+    "SURFACE": "更多／庫存",
+    "KIND": "READ_SHAPE",
+    "STATUS": "PRODUCT_READY_NOT_CONNECTED",
+    "OWNER": "Future Inventory Lite projection"
+  },
+  {
+    "CAP_ID": "ACTIVITY_APPROVAL_READBACK",
+    "GROUP": "OPERATIONS",
+    "LABEL": "Requester / Approver / Readback Activity Detail",
+    "SURFACE": "更多／活動紀錄",
+    "KIND": "READ_SHAPE",
+    "STATUS": "PRODUCT_READY_NOT_CONNECTED",
+    "OWNER": "Future Audit / Activity projection"
   }
 ]

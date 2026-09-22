@@ -1,0 +1,36 @@
+{
+  "$schema": "https://raw.githubusercontent.com/cloudflare/workers-sdk/main/packages/wrangler/config-schema.json",
+  "name": "mfk-admin",
+  "main": "./worker.ts",
+  "compatibility_date": "2026-09-22",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "preview_urls": true,
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application"
+  },
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "ADMIN_SYNC",
+        "class_name": "AdminSyncStore"
+      },
+      {
+        "name": "KEETA_EDGE",
+        "class_name": "KeetaEdgeStore"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "admin-sync-v1",
+      "new_sqlite_classes": ["AdminSyncStore"]
+    },
+    {
+      "tag": "keeta-edge-k0-v1",
+      "new_sqlite_classes": ["KeetaEdgeStore"]
+    }
+  ]
+}
