@@ -261,30 +261,7 @@ describe('MFK Admin complete catalog product',()=>{
       '自選紫米套餐','選擇飯糰','選擇小食','選擇飲品',
       'Set A · 茹素輕盈','Set B · 充滿元氣','Set C · 活力滿分','Set D · 店主推薦',
       '滋味升級 · +$3','夯爆美味 · +$5','暢飲升級 · +$6','夯爆升級 · +$8','夯爆升級 · +$10',
-      '價格帶','可選商品','商品額外差價 HK
-    const invalid:AdminSessionDraft={
-      categories:[{id:'category-001',name:'',position:10,active:true}],
-      products:[{id:'product-001',productCode:'P001',name:'',categoryId:'missing',active:true,basePrice:'abc',takeawayAdjustment:'0.00',modifierGroupIds:['missing-group']}],
-      modifierGroups:[{
-        id:'modifier-001',name:'',required:true,forceShow:true,selection:'SINGLE',min:0,max:2,allowQuantities:false,active:true,
-        options:[{id:'option-001',name:'',code:'',priceAdjustment:'',active:true,defaultSelected:false}],
-      }],
-      combos:[{
-        id:'combo-001',name:'',active:true,basePrice:'bad',takeawayAdjustment:'0.00',
-        sections:[{id:'section-001',name:'',required:true,min:2,max:1,childProductIds:['missing-product'],priceAdjustment:'bad'}],
-      }],
-    };
-    const errors=validateAdminDraft(invalid);
-    expect(errors.some(error=>error.includes('未填名稱'))).toBe(true);
-    expect(errors.some(error=>error.includes('未選有效分類'))).toBe(true);
-    expect(errors.some(error=>error.includes('基本價格式錯誤'))).toBe(true);
-    expect(errors.some(error=>error.includes('最多選擇不可大過 1'))).toBe(true);
-    expect(errors.some(error=>error.includes('未填選項 ID'))).toBe(true);
-    expect(errors.some(error=>error.includes('未填價格'))).toBe(true);
-    expect(errors.some(error=>error.includes('不存在商品'))).toBe(true);
-  });
-});
-,'商品本身嘅選項組會原樣繼承',
+      '價格帶','可選商品','商品額外差價 HK$','商品本身嘅選項組會原樣繼承',
     ])expect(html).toContain(marker);
     expect(html).toContain('古早味紫米飯糰');
     expect(html).toContain('古早鹽酥雞');
@@ -313,7 +290,7 @@ describe('MFK Admin complete catalog product',()=>{
       }],
       combos:[{
         id:'combo-001',name:'',active:true,basePrice:'bad',takeawayAdjustment:'0.00',
-        sections:[{id:'section-001',name:'',required:true,min:2,max:1,childProductIds:['missing-product'],priceAdjustment:'bad'}],
+        sections:[{id:'section-001',name:'',required:true,min:2,max:1,childProductIds:['missing-product'],priceAdjustment:'bad'} as never],
       }],
     };
     const errors=validateAdminDraft(invalid);
