@@ -1,90 +1,74 @@
 # MFK CURRENT HANDOFF｜2026-09-22
 
 Current navigation:
-docs/navigation/MFK_航海圖_V1.19_Round020_2026-09-22.txt
+docs/navigation/MFK_航海圖_V1.20_Round021_2026-09-22.txt
 
 Control:
 #22
 
-## CURRENT P0
+## CURRENT
 
+Parent Admin completion:
 #45
-MFK-ADMIN-PRODUCT-COMPLETION-R1
+
+Current exact review fix:
+#50
 
 State:
-MFK_ADMIN_PRODUCT_COMPLETE_DEPLOYED_OWNER_REVIEW_PENDING
+MFK_ADMIN_PRODUCT_LIST_UX_DEPLOYED_OWNER_REVIEW_PENDING
 
-## SOURCE / TEST
+## PRODUCT LIST UX
 
-Branch:
-work/MFK/ADMIN-PRODUCT-COMPLETION-R1
+Owner rejected the 203 fully-expanded Product editor layout.
 
-Verified source:
-c03a7a547e8ec6d1485d48053ae0a80e033c2d99
+New live behavior:
+- 20 products max per page
+- compact summary list by default
+- search
+- category filter
+- active/inactive filter
+- filtered count
+- pagination
+- missing-price warning visible
+- one product detail expands only after pressing 編輯
+- mobile compact layout
 
-Verification:
-35688504352 SUCCESS
+No product data fields were removed.
 
-## CLEAN LANDING
+## PROOF
 
-Main product landing:
-d22b9bf1bfc059f1d0227cb758027b71c87af111
+Source verification:
+35689711947 SUCCESS
 
-Deploy trigger:
-13987b48181f7423eed01144eae76ebdbfb9dd4a
+Main landing:
+43f373a23198942837e537623e578584bbe52ff8
+0ade0b1ede925abfdb310db1031e78cd7c7a2139
+41bcdcd06c6b0f5bbc196baad96b3101f5be2f8c
 
-Live deploy:
-35688802387 SUCCESS
+Deploy:
+35689795493 SUCCESS
 
 Canonical:
 https://admin.morefunos.com
 
-## ADMIN PRODUCT
-
-52 Admin capabilities have concrete routes.
-
-Key Admin-owned config surfaces are persistent across browser refresh and retain local Admin audit/release history.
-
-Completed product surfaces include:
-- Today / Readiness / Action Queue
-- Orders/read surfaces without fake data
-- Product / Category / Modifier / Option / Pricing / Combo / ordering
-- complete Product detail
-- Print Registry / templates / per-product output rules
-- Store / weekly hours / reminder rules / Business Day
-- Cash close records
-- Quick Reasons
-- Staff / RBAC / PIN / Scope
-- Channels / store binding / product mapping
-- settlement surface
-- fixed report shapes
-- audit / diagnostics / export / integrations / effective settings
-- Inventory Lite / CRM / Loyalty / Coupons / Announcements / Presentation / RFM
-
-No manual A2 transport is present as the normal Admin publish workflow.
-
 ## EXACT NEXT
 
-Owner walkthrough of live Admin product only.
+Owner refreshes:
+/admin/catalog/products
 
-No connection work yet.
+Confirm:
+- compact page
+- <=20 product summaries
+- one detail expands on demand
+- filters usable
+- pagination usable
+- mobile clean
 
-Acceptance:
-Owner confirms formal routes are real product surfaces, editable config persists across refresh, and no demo/engineering workflow remains.
-
-Only then BANK:
-MFK_ADMIN_PRODUCT_COMPLETE_GREEN
+Only then bank #50 and continue #45 walkthrough.
 
 ## HOLD
 
-#44 Admin→SMT automatic connection:
-HOLD
-
-#40 SMT OTA:
-HOLD
-
-Keeta live:
-NOT AUTHORIZED
-
-SMM / Customer / Owner live seams:
-NOT AUTHORIZED
+#44 Admin→SMT HOLD
+#40 SMT OTA HOLD
+Keeta live NOT AUTHORIZED
+SMM / Customer / Owner live NOT AUTHORIZED
