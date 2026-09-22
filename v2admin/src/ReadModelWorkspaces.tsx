@@ -2,6 +2,13 @@ import {useEffect,useMemo,useState} from 'react';
 import {Link} from 'react-router';
 import {useAdminDraft,validateAdminDraft} from './admin-draft.tsx';
 import {readActiveAdminRelease,readAdminAudit,readAdminReleases,readAdminStored,usePersistentAdminState} from './admin-local-store.ts';
+import {
+  readAdminProjectedDays,
+  readAdminProjectedOrders,
+  readAdminProjectionStatus,
+  refreshAdminProjection,
+  subscribeAdminProjection,
+} from './admin-projection-client.ts';
 
 function ReadHeader({title,description,badge='只讀資料'}:{title:string;description:string;badge?:string}){
   return <header className="admin-editor-head"><div><small>{badge}</small><h1>{title}</h1><p>{description}</p></div></header>;
@@ -63,16 +70,33 @@ export function CapacityWorkspace(){
 }
 
 interface OrderReadRow{orderId:string;source:string;amountMinor:number;status:string;createdAt:string;completedAt?:string;pickupCode?:string;externalRef?:string}
+function useProjectionRevision(){
+  const [revision,setRevision]=useState(0);
+  useEffect(()=>subscribeAdminProjection(()=>setRevision(value=>value+1)),[]);
+  return revision;
+}
 function useOrderRows(){
-  return usePersistentAdminState<OrderReadRow[]>('orders-read.v1',[]);
+  const revision=useProjectionRevision();
+  void revision;
+  const rows:OrderReadRow[]=readAdminProjectedOrders().map(row=>({
+    orderId:row.orderId,
+    source:row.sourceLabel,
+    amountMinor:row.totalMinor,
+    status:row.fulfillmentLabel,
+    createdAt:row.createdAt,
+    completedAt:row.fulfillmentLabel==='已完成'||row.fulfillmentLabel==='已取消'?row.updatedAt:undefined,
+  }));
+  return [rows] as const;
 }
 export function OpenOrdersWorkspace(){
   const [rows]=useOrderRows();
   const [query,setQuery]=useState('');
   const [status,setStatus]=useState('ALL');
   const filtered=rows.filter(row=>!row.completedAt&&(status==='ALL'||row.status===status)&&(!query||[row.orderId,row.pickupCode,row.externalRef].filter(Boolean).join(' ').toLowerCase().includes(query.toLowerCase())));
+  const projectionStatus=readAdminProjectionStatus();
   return <section className="admin-editor-page">
-    <ReadHeader title="進行中訂單" description="只讀正式訂單資料。後台唔建立第二份訂單資料，亦唔喺呢個頁面直接改交易。"/>
+    <ReadHeader title="進行中訂單" description="只讀 SMT Cloud Projection。Order authority 仍然係門店本機；Admin 只顯示已回傳資料。"/>
+    <div className="admin-callout compact">Projection：{projectionStatus.updatedAt?new Date(projectionStatus.updatedAt).toLocaleString('zh-HK'):'未同步'}{projectionStatus.error?' · '+projectionStatus.error:''} <button type="button" onClick={()=>void refreshAdminProjection()}>更新</button></div>
     <div className="admin-filterbar"><input value={query} onChange={event=>setQuery(event.target.value)} placeholder="訂單／取餐／平台參考編號"/><select value={status} onChange={event=>setStatus(event.target.value)}><option value="ALL">全部狀態</option><option value="PENDING">待處理</option><option value="PRODUCTION">進行中</option><option value="READY">可取餐</option></select><span>{filtered.length} 張</span></div>
     {filtered.length===0?<div className="admin-read-empty">目前未有正式訂單資料。介面同查詢條件已完成，未有正式訂單資料前唔會製造假訂單。</div>:<section className="admin-read-table"><header><span>訂單</span><span>來源</span><span>金額</span><span>狀態</span><span>時間</span></header>{filtered.map(row=><article key={row.orderId}><span>{row.orderId}</span><span>{row.source}</span><span>{money(row.amountMinor)}</span><span>{row.status}</span><span>{new Date(row.createdAt).toLocaleString('zh-HK')}</span></article>)}</section>}
   </section>;
@@ -84,8 +108,10 @@ export function OrdersHistoryWorkspace(){
   const [from,setFrom]=useState('');
   const [to,setTo]=useState('');
   const filtered=rows.filter(row=>row.completedAt&&(!query||[row.orderId,row.pickupCode,row.externalRef].filter(Boolean).join(' ').toLowerCase().includes(query.toLowerCase()))&&(!from||row.completedAt!.slice(0,10)>=from)&&(!to||row.completedAt!.slice(0,10)<=to));
+  const projectionStatus=readAdminProjectionStatus();
   return <section className="admin-editor-page">
-    <ReadHeader title="訂單歷史" description="查詢正式 Order history；Admin 唔複製另一份交易資料。"/>
+    <ReadHeader title="訂單歷史" description="查詢 SMT Cloud Projection；重試同離線補送按同一 Order identity 去重。"/>
+    <div className="admin-callout compact">Projection：{projectionStatus.updatedAt?new Date(projectionStatus.updatedAt).toLocaleString('zh-HK'):'未同步'}{projectionStatus.error?' · '+projectionStatus.error:''}</div>
     <div className="admin-filterbar"><input value={query} onChange={event=>setQuery(event.target.value)} placeholder="訂單／取餐／平台參考編號"/><label><span>由</span><input type="date" value={from} onChange={event=>setFrom(event.target.value)}/></label><label><span>至</span><input type="date" value={to} onChange={event=>setTo(event.target.value)}/></label><span>{filtered.length} 張</span></div>
     {filtered.length===0?<div className="admin-read-empty">目前未有正式訂單歷史資料。</div>:<section className="admin-read-table"><header><span>訂單</span><span>來源</span><span>金額</span><span>狀態</span><span>完成時間</span></header>{filtered.map(row=><article key={row.orderId}><span>{row.orderId}</span><span>{row.source}</span><span>{money(row.amountMinor)}</span><span>{row.status}</span><span>{row.completedAt?new Date(row.completedAt).toLocaleString('zh-HK'):'—'}</span></article>)}</section>}
   </section>;
@@ -104,18 +130,42 @@ export function ExceptionsWorkspace(){
   </section>;
 }
 
-interface SalesMetricRow{date:string;grossMinor:number;adjustmentMinor:number;netMinor:number;orders:number}
+interface SalesMetricRow{
+  date:string;grossMinor:number;adjustmentMinor:number;netMinor:number;orders:number;cashSalesMinor:number;
+  openingCash:Record<string,unknown>|null;dayClose:Record<string,unknown>|null;
+}
 export function SalesReportWorkspace(){
-  const [rows]=usePersistentAdminState<SalesMetricRow[]>('report-sales.v1',[]);
+  const revision=useProjectionRevision();
+  void revision;
+  const rows=readAdminProjectedDays() as SalesMetricRow[];
   const [from,setFrom]=useState('');
   const [to,setTo]=useState('');
   const filtered=rows.filter(row=>(!from||row.date>=from)&&(!to||row.date<=to));
-  const total=(key:'grossMinor'|'adjustmentMinor'|'netMinor'|'orders')=>filtered.reduce((sum,row)=>sum+row[key],0);
+  const total=(key:'grossMinor'|'adjustmentMinor'|'netMinor'|'orders'|'cashSalesMinor')=>filtered.reduce((sum,row)=>sum+Number(row[key]||0),0);
+  const latest=filtered[0];
+  const close=latest?.dayClose??null;
+  const opening=latest?.openingCash??null;
+  const projectionStatus=readAdminProjectionStatus();
   return <section className="admin-editor-page">
-    <ReadHeader title="銷售報表" description="固定可信銷售報表；顯示資料版本、完整度同更新狀態，後台唔會自行重算交易結果。"/>
+    <ReadHeader title="銷售報表" description="由 SMT durable Outbox 回傳嘅 Cloud Projection。Admin 只讀 projection，唔成為 Order / Cash authority。"/>
+    <div className="admin-callout compact">Projection：{projectionStatus.updatedAt?new Date(projectionStatus.updatedAt).toLocaleString('zh-HK'):'未同步'}{projectionStatus.error?' · '+projectionStatus.error:''} <button type="button" onClick={()=>void refreshAdminProjection()}>更新</button></div>
     <div className="admin-filterbar"><label><span>由</span><input type="date" value={from} onChange={event=>setFrom(event.target.value)}/></label><label><span>至</span><input type="date" value={to} onChange={event=>setTo(event.target.value)}/></label><span>{filtered.length} 日</span></div>
-    <div className="admin-kpi-grid"><article><span>總額</span><strong>{money(total('grossMinor'))}</strong><small>正式資料</small></article><article><span>調整</span><strong>{money(total('adjustmentMinor'))}</strong><small>退款／更正</small></article><article><span>淨額</span><strong>{money(total('netMinor'))}</strong><small>正式資料</small></article><article><span>訂單</span><strong>{total('orders')}</strong><small>完成訂單</small></article></div>
-    {filtered.length===0?<div className="admin-read-empty">目前未有正式銷售資料。報表結構同篩選已完成，唔會用示範數字冒充正式報表。</div>:<section className="admin-read-table"><header><span>日期</span><span>總額</span><span>調整</span><span>淨額</span><span>訂單</span></header>{filtered.map(row=><article key={row.date}><span>{row.date}</span><span>{money(row.grossMinor)}</span><span>{money(row.adjustmentMinor)}</span><span>{money(row.netMinor)}</span><span>{row.orders}</span></article>)}</section>}
+    <div className="admin-kpi-grid">
+      <article><span>總額</span><strong>{money(total('grossMinor'))}</strong><small>非取消 Order projection</small></article>
+      <article><span>淨額</span><strong>{money(total('netMinor'))}</strong><small>目前 projection</small></article>
+      <article><span>現金銷售</span><strong>{money(total('cashSalesMinor'))}</strong><small>Combo 只計 CASH 部分</small></article>
+      <article><span>訂單</span><strong>{total('orders')}</strong><small>projected orders</small></article>
+    </div>
+    {latest?<section className="admin-read-card">
+      <header><h2>{latest.date} 現金交接</h2><span>{close?'已日結':'未日結'}</span></header>
+      <div className="admin-kpi-grid">
+        <article><span>開更現金</span><strong>{opening?money(Number(opening.amountMinor||0)):'—'}</strong><small>{opening?String(opening.staffName||opening.staffId||'已確認'):'未回傳'}</small></article>
+        <article><span>實點現金</span><strong>{close?money(Number(close.countedCashMinor||0)):'—'}</strong><small>DAY_CLOSE_RECORDED</small></article>
+        <article><span>取走現金</span><strong>{close&&close.cashRemovedMinor!==undefined?money(Number(close.cashRemovedMinor||0)):'—'}</strong><small>明確輸入</small></article>
+        <article><span>留櫃現金</span><strong>{close&&close.retainedCashMinor!==undefined?money(Number(close.retainedCashMinor||0)):'—'}</strong><small>下一 Business Day 建議</small></article>
+      </div>
+    </section>:null}
+    {filtered.length===0?<div className="admin-read-empty">目前未有 SMT projection。門店離線時會保留 Outbox，恢復網絡後自動補送。</div>:<section className="admin-read-table"><header><span>日期</span><span>總額</span><span>現金</span><span>淨額</span><span>訂單</span></header>{filtered.map(row=><article key={row.date}><span>{row.date}</span><span>{money(row.grossMinor)}</span><span>{money(row.cashSalesMinor)}</span><span>{money(row.netMinor)}</span><span>{row.orders}</span></article>)}</section>}
   </section>;
 }
 
