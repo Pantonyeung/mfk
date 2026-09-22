@@ -65,3 +65,19 @@
 .admin-file-control{display:grid;gap:6px}.admin-file-control input{font-size:11px}
 .admin-a2-result{margin-top:14px}.admin-a2-result strong{display:block;font-size:24px;margin:4px 0 8px}
 .admin-a2-result.match{border-color:#9fc7a7}.admin-a2-result.mismatch{border-color:#d8a3a3}.admin-a2-result.unknown{border-color:#d6c58d}
+
+
+/* Admin product-completion operator states */
+.mfk-admin-section small[data-status="READY"]{color:#1f6b45;background:#e8f5ed}
+.mfk-admin-section small[data-status="READ_ONLY"]{color:#375b7a;background:#eaf2f8}
+.mfk-admin-section small[data-status="P1"]{color:#76561d;background:#fff3da}
+.mfk-admin-section small[data-status="GOVERNANCE"]{color:#6748b8;background:#f0ebff}
+.admin-read-table>article,.admin-read-table>div.admin-policy-row{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;align-items:center;padding:11px 13px;border-top:1px solid #eceef2;font-size:11px}
+.admin-read-table>article code{overflow-wrap:anywhere}
+.admin-card-editor textarea,.admin-editor-page>label textarea{width:100%;padding:10px;border:1px solid #d5dae2;border-radius:9px;background:#fff;resize:vertical}
+.admin-policy-card p{margin:0;line-height:1.55}
+.admin-policy-card .admin-sub-editor{margin-top:4px}
+.admin-editor-actions button:not(:disabled),.admin-policy-card button:not(:disabled){cursor:pointer}
+@media(max-width:760px){
+  .admin-read-table>article,.admin-read-table>div.admin-policy-row{min-width:620px}
+}
