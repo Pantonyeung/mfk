@@ -756,6 +756,93 @@ export class KeetaRuntimeStore{
       }
     }
 
+    if(url.pathname==='/smt/orders/command'&&request.method==='POST'){
+      let providerOrderId='';
+      let canonicalOrderId='';
+      let action='';
+      try{
+        const body=record(await request.json(),'KEETA_PROVIDER_COMMAND_INPUT_INVALID');
+        providerOrderId=nonEmpty(String(body.providerOrderId??''),'KEETA_PROVIDER_ORDER_ID_REQUIRED');
+        canonicalOrderId=nonEmpty(body.canonicalOrderId,'KEETA_CANONICAL_ORDER_ID_REQUIRED');
+        action=nonEmpty(body.action,'KEETA_PROVIDER_COMMAND_ACTION_REQUIRED');
+        if(action!=='CONFIRM'&&action!=='READY')throw new Error('KEETA_PROVIDER_COMMAND_UNSUPPORTED');
+
+        const intent=await this.state.storage.get('order:intent:'+providerOrderId);
+        if(!intent||intent.state!=='COMMITTED')throw new Error('KEETA_PROVIDER_COMMAND_REQUIRES_COMMITTED_ORDER');
+        if(intent.canonicalOrderId!==canonicalOrderId)throw new Error('KEETA_PROVIDER_COMMAND_CANONICAL_ORDER_MISMATCH');
+
+        const commandKey='order:command:'+providerOrderId+':'+action;
+        const existing=await this.state.storage.get(commandKey);
+        if(existing?.state==='SUCCESS'){
+          return json({state:'IDEMPOTENT',command:existing});
+        }
+        if(existing?.state==='UNKNOWN'){
+          return json({state:'UNKNOWN',code:'KEETA_PROVIDER_COMMAND_UNKNOWN_READBACK_REQUIRED',command:existing},409);
+        }
+
+        const config=requireRuntimeConfig(this.env);
+        const token=await this.usableToken();
+        const requestedAt=new Date().toISOString();
+        try{
+          const receipt=await sendKeetaOrderCommand(config,token,action,providerOrderId);
+          const row=Object.freeze({
+            state:'SUCCESS',
+            provider:'KEETA',
+            providerOrderId,
+            canonicalOrderId,
+            action,
+            requestedAt,
+            completedAt:new Date().toISOString(),
+            receipt,
+          });
+          await this.state.storage.put(commandKey,row);
+          return json({state:'SUCCESS',command:row});
+        }catch(error){
+          const rejected=Boolean(error&&typeof error==='object'&&error.providerRejected===true);
+          const unknown=Boolean(error&&typeof error==='object'&&error.unknown===true);
+          const row=Object.freeze({
+            state:rejected?'REJECTED':unknown?'UNKNOWN':'FAILED',
+            provider:'KEETA',
+            providerOrderId,
+            canonicalOrderId,
+            action,
+            requestedAt,
+            updatedAt:new Date().toISOString(),
+            code:error instanceof Error?error.message:'KEETA_PROVIDER_COMMAND_FAILED',
+          });
+          await this.state.storage.put(commandKey,row);
+          return json({state:row.state,code:row.code,command:row},409);
+        }
+      }catch(error){
+        return json({code:error instanceof Error?error.message:'KEETA_PROVIDER_COMMAND_INVALID'},409);
+      }
+    }
+
+    if(url.pathname==='/smt/orders/readback'&&request.method==='POST'){
+      try{
+        const body=record(await request.json(),'KEETA_ORDER_READBACK_INPUT_INVALID');
+        const providerOrderId=nonEmpty(String(body.providerOrderId??''),'KEETA_PROVIDER_ORDER_ID_REQUIRED');
+        const canonicalOrderId=nonEmpty(body.canonicalOrderId,'KEETA_CANONICAL_ORDER_ID_REQUIRED');
+        const intent=await this.state.storage.get('order:intent:'+providerOrderId);
+        if(!intent||intent.state!=='COMMITTED')throw new Error('KEETA_ORDER_READBACK_REQUIRES_COMMITTED_ORDER');
+        if(intent.canonicalOrderId!==canonicalOrderId)throw new Error('KEETA_ORDER_READBACK_CANONICAL_ORDER_MISMATCH');
+        const config=requireRuntimeConfig(this.env);
+        const token=await this.usableToken();
+        const receipt=await readKeetaProviderOrder(config,token,providerOrderId);
+        const row=Object.freeze({
+          provider:'KEETA',
+          providerOrderId,
+          canonicalOrderId,
+          observedAt:new Date().toISOString(),
+          receipt,
+        });
+        await this.state.storage.put('order:readback:'+providerOrderId,row);
+        return json({state:'OBSERVED',readback:row});
+      }catch(error){
+        return json({state:'FAILED',code:error instanceof Error?error.message:'KEETA_ORDER_READBACK_FAILED'},409);
+      }
+    }
+
     if(url.pathname==='/webhook'&&request.method==='POST'){
       const config=requireRuntimeConfig(this.env);
       let body;
