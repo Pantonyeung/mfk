@@ -12,25 +12,31 @@ function UpgradeHeader({title,description,kicker='功能尚未啟用'}:{title:st
 const StateChip=({children}:{children:string})=><span className="admin-not-wired-chip">{children}</span>;
 
 export function ActionQueueWorkspace(){
+  const {draft,dirty}=useAdminDraft();
   const [domain,setDomain]=useState('ALL');
-  const [state,setState]=useState('OPEN');
-  const sample=useMemo(()=>[
-    {id:'AQ-DEMO-001',kind:'發布資料不一致',owner:'後台設定',state:'未確認',route:'/admin/publish'},
-    {id:'AQ-DEMO-002',kind:'平台商品對應',owner:'Channel',state:'部分完成',route:'/admin/channels/mapping-failure'},
-    {id:'AQ-DEMO-003',kind:'打印機狀態',owner:'裝置／打印',state:'資料過期',route:'/admin/devices'},
-  ],[]);
+  const errors=validateAdminDraft(draft);
+  const releases=readAdminReleases();
+  const mappings=readAdminStored<Array<{providerItemId:string;status:string}>>('channel-mapping.keeta.v1',[]);
+  const printers=readAdminStored<Array<{id:string;name:string;active:boolean}>>('logical-printers.v1',[]);
+  const devices=readAdminStored<Array<{id:string;state:string;lastSeenAt?:string}>>('devices-read.v1',[]);
+  const queue=useMemo(()=>{
+    const rows:{id:string;kind:string;owner:string;state:string;route:string}[]=[];
+    if(errors.length)rows.push({id:'AQ-CATALOG',kind:'菜單資料有 '+errors.length+' 項問題',owner:'菜單',state:'待處理',route:'/admin/catalog/products'});
+    if(dirty)rows.push({id:'AQ-PUBLISH',kind:'有未建立設定版本嘅變更',owner:'菜單',state:'待處理',route:'/admin/publish'});
+    if(!releases.length)rows.push({id:'AQ-RELEASE',kind:'未有正式設定版本',owner:'菜單',state:'待處理',route:'/admin/publish'});
+    const pendingMappings=mappings.filter(row=>row.status==='PENDING').length;
+    if(pendingMappings)rows.push({id:'AQ-MAPPING',kind:pendingMappings+' 個平台商品待對應',owner:'平台',state:'待處理',route:'/admin/channels/mapping-failure'});
+    if(!printers.length)rows.push({id:'AQ-PRINT',kind:'未建立 Logical Printer',owner:'打印',state:'待處理',route:'/admin/print'});
+    const stale=devices.filter(row=>row.state==='STALE'||row.state==='UNKNOWN').length;
+    if(stale)rows.push({id:'AQ-DEVICE',kind:stale+' 部裝置狀態未確認',owner:'裝置',state:'未確認',route:'/admin/devices'});
+    return rows;
+  },[errors.length,dirty,releases.length,mappings,printers.length,devices]);
+  const filtered=queue.filter(row=>domain==='ALL'||row.owner===domain);
   return <section className="admin-editor-page">
-    <UpgradeHeader title="待處理事項" description="集中顯示需要處理嘅事項，並帶你去相應頁面；呢度唔會直接改動正式資料。"/>
-    <div className="admin-filterbar">
-      <select value={domain} onChange={event=>setDomain(event.target.value)}><option value="ALL">全部範圍</option><option value="CONFIG">設定</option><option value="CHANNEL">平台</option><option value="DEVICE">裝置／打印</option><option value="ORDER">訂單</option></select>
-      <select value={state} onChange={event=>setState(event.target.value)}><option value="OPEN">待處理</option><option value="未確認">未確認</option><option value="部分完成">部分完成</option><option value="資料過期">資料過期</option></select>
-      <button type="button" disabled>重新整理尚未開放</button>
-    </div>
-    <section className="admin-read-table">
-      <header><span>事項</span><span>負責範圍</span><span>狀態</span><span>前往頁面</span><span>操作權限</span></header>
-      {sample.map(row=><div className="admin-policy-row" key={row.id}><span>{row.kind}<small>{row.id}</small></span><span>{row.owner}</span><span>{row.state}</span><a href={row.route}>前往責任頁</a><StateChip>只作引導</StateChip></div>)}
-    </section>
-    <section className="admin-rule-card"><h2>處理原則</h2><p>未收到正式回傳之前，一律保持「未確認」、「部分完成」或「資料過期」；唔可以喺呢度自行標記完成。</p></section>
+    <UpgradeHeader title="待處理事項" description="由真實 Admin 狀態聚合需要處理嘅事項，再帶去責任頁；呢度唔直接改正式資料。" kicker="真實 Admin 狀態"/>
+    <div className="admin-filterbar"><select value={domain} onChange={event=>setDomain(event.target.value)}><option value="ALL">全部範圍</option>{['菜單','平台','打印','裝置'].map(item=><option key={item} value={item}>{item}</option>)}</select><span>{filtered.length} 項</span></div>
+    {filtered.length===0?<div className="admin-read-empty">目前冇 Admin 端待處理事項。</div>:<section className="admin-read-table"><header><span>事項</span><span>負責範圍</span><span>狀態</span><span>前往頁面</span><span>操作</span></header>{filtered.map(row=><article key={row.id}><span>{row.kind}</span><span>{row.owner}</span><span>{row.state}</span><a href={row.route}>前往責任頁</a><StateChip>只作分流</StateChip></article>)}</section>}
+    <section className="admin-rule-card"><h2>處理原則</h2><p>未有證據唔可以標記已解決；Unknown 唔等於 Failed；真正修復由責任頁完成。</p></section>
   </section>;
 }
 
