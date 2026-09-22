@@ -146,9 +146,11 @@ describe('Keeta live edge runtime',()=>{
     const callback=await runtime.fetch(new Request('https://internal/oauth/callback?state=opaque-state',{method:'GET'}));
     expect(callback.status).toBe(302);
     const statusResponse=await runtime.fetch(new Request('https://internal/admin/status',{method:'POST'}));
-    const body=await statusResponse.json() as {oauth:{lastCallbackResult:string;lastCallbackError:string}};
+    const body=await statusResponse.json() as {oauth:{lastCallbackResult:string;lastCallbackError:string;lastCallbackMethod:string;lastCallbackParamNames:string[]}};
     expect(body.oauth.lastCallbackResult).toBe('FAILED');
     expect(body.oauth.lastCallbackError).toBe('KEETA_OAUTH_CODE_REQUIRED');
+    expect(body.oauth.lastCallbackMethod).toBe('GET');
+    expect(body.oauth.lastCallbackParamNames).toEqual(['state']);
     const diagnostic=JSON.stringify(storage.get('oauth:callback-status'));
     expect(diagnostic).not.toContain('opaque-state');
   });

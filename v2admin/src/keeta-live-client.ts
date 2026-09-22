@@ -15,6 +15,8 @@ export interface KeetaLiveStatus{
     readonly lastCallbackAt:string|null;
     readonly lastCallbackResult:'CONNECTED'|'FAILED'|null;
     readonly lastCallbackError:string|null;
+    readonly lastCallbackMethod:'GET'|'POST'|null;
+    readonly lastCallbackParamNames:readonly string[];
   };
   readonly webhook:{
     readonly callbackUrl:string;
