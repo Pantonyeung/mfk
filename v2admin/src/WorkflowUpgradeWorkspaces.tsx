@@ -146,11 +146,15 @@ export function ExportGovernanceWorkspace(){
   </section>;
 }
 
+interface DiagnosticFinding{id:string;domain:string;state:'HEALTHY'|'DEGRADED'|'UNKNOWN';updatedAt:string;pendingCount:number;lastError?:string;recovery?:string;evidenceRef?:string}
 export function DiagnosticsWorkspace(){
+  const [findings]=usePersistentAdminState<DiagnosticFinding[]>('diagnostics-read.v1',[]);
+  const unknown=findings.filter(row=>row.state==='UNKNOWN').length;
+  const degraded=findings.filter(row=>row.state==='DEGRADED').length;
   return <section className="admin-editor-page">
-    <UpgradeHeader title="系統狀態" description="顯示系統異常、相關記錄同修復證據。未確認原因之前會保持「未確認」，呢度唔會直接改動正式資料。"/>
-    <div className="admin-kpi-grid"><article><span>健康狀態</span><strong>—</strong><small>未確認</small></article><article><span>第一個異常</span><strong>—</strong><small>尚未啟用</small></article><article><span>修復證據</span><strong>—</strong><small>尚未啟用</small></article><article><span>記錄編號</span><strong>—</strong><small>尚未啟用</small></article></div>
-    <section className="admin-read-table"><header><span>發現</span><span>範圍</span><span>狀態</span><span>記錄</span><span>操作</span></header><div className="admin-read-empty">系統狀態資料尚未啟用</div></section>
+    <UpgradeHeader title="系統狀態" description="Diagnostics 回答 component / route、current state、freshness、pending count、last error、safe recovery 同 readback。冇證據唔會硬判 root cause。" kicker="診斷證據"/>
+    <div className="admin-kpi-grid"><article><span>健康</span><strong>{findings.filter(row=>row.state==='HEALTHY').length}</strong><small>已確認</small></article><article><span>需注意</span><strong>{degraded}</strong><small>DEGRADED</small></article><article><span>未確認</span><strong>{unknown}</strong><small>UNKNOWN</small></article><article><span>總項目</span><strong>{findings.length}</strong><small>Diagnostics</small></article></div>
+    {findings.length===0?<div className="admin-read-empty">目前未有 Diagnostics readback；唔會用假綠燈代替健康證據。</div>:<section className="admin-read-table"><header><span>範圍</span><span>狀態</span><span>Pending</span><span>最後錯誤</span><span>證據</span></header>{findings.map(row=><article key={row.id}><span>{row.domain}</span><span>{row.state}</span><span>{row.pendingCount}</span><span>{row.lastError||'—'}</span><span>{row.evidenceRef||'—'}</span></article>)}</section>}
   </section>;
 }
 
