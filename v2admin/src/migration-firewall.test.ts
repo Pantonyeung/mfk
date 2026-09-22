@@ -25,7 +25,8 @@ describe('MFK Admin migration firewall',()=>{
       const source=readFileSync(path,'utf8');
       const isSyncClient=path.endsWith('admin-sync-client.ts');
       const isProjectionClient=path.endsWith('admin-projection-client.ts');
-      const isNetworkClient=isSyncClient||isProjectionClient;
+      const isKeetaClient=path.endsWith('keeta-live-client.ts');
+      const isNetworkClient=isSyncClient||isProjectionClient||isKeetaClient;
       if(!isNetworkClient)expect(/\bfetch\s*\(/.test(source),path+' used fetch outside approved network seam').toBe(false);
       if(!isProjectionClient)expect(/\bnew\s+WebSocket\s*\(/.test(source),path+' used WebSocket outside projection doorbell seam').toBe(false);
       for(const pattern of forbidden){
@@ -39,6 +40,11 @@ describe('MFK Admin migration firewall',()=>{
         expect(source).toContain('/api/projection/orders');
         expect(source).toContain('/api/projection/reports');
         expect(source).toContain('/api/admin-sync/events');
+      }
+      if(isKeetaClient){
+        expect(source).toContain('/api/keeta/admin/status');
+        expect(source).toContain('/api/keeta/admin/oauth/begin');
+        expect(source).toContain('/api/keeta/admin/token/readiness');
       }
     }
   });

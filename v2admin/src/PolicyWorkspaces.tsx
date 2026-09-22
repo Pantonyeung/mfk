@@ -1,7 +1,8 @@
-import {useMemo,useState} from 'react';
+import {useEffect,useMemo,useState} from 'react';
 import {useAdminDraft} from './admin-draft.tsx';
 import {appendAdminAudit,readActiveAdminRelease,usePersistentAdminState,writeAdminStored} from './admin-local-store.ts';
 import {saveAdminConfig} from './admin-config-save.ts';
+import {beginKeetaOAuth,checkKeetaTokenReadiness,readKeetaLiveStatus,type KeetaLiveStatus} from './keeta-live-client.ts';
 
 function PolicyHeader({title,description,badge='本機設定自動保存'}:{title:string;description:string;badge?:string}){
   return <header className="admin-editor-head">
@@ -212,6 +213,32 @@ interface ChannelConfig{enabled:boolean;autoAccept:boolean;syncSellability:boole
 interface MappingRow{providerItemId:string;productId:string;optionGroupId?:string;status:'MAPPED'|'PENDING'|'IGNORED'}
 export function ChannelsWorkspace({mode}:{mode:'overview'|'mapping'|'failures'|'accept'|'sync'|'estimate'}){
   const {draft}=useAdminDraft();
+  const [liveStatus,setLiveStatus]=useState<KeetaLiveStatus|null>(null);
+  const [liveError,setLiveError]=useState('');
+  const [liveBusy,setLiveBusy]=useState(false);
+  const refreshLive=async()=>{
+    try{setLiveStatus(await readKeetaLiveStatus());setLiveError('');}
+    catch(error){setLiveError(error instanceof Error?error.message:'KEETA_STATUS_FAILED');}
+  };
+  useEffect(()=>{if(mode==='overview')void refreshLive();},[mode]);
+  const authorize=async()=>{
+    setLiveBusy(true);setLiveError('');
+    try{
+      const url=await beginKeetaOAuth();
+      window.location.assign(url);
+    }catch(error){
+      setLiveError(error instanceof Error?error.message:'KEETA_OAUTH_BEGIN_FAILED');
+      setLiveBusy(false);
+    }
+  };
+  const checkToken=async()=>{
+    setLiveBusy(true);setLiveError('');
+    try{
+      const result=await checkKeetaTokenReadiness();
+      if(!result.ok)setLiveError(result.code||'KEETA_TOKEN_UNAVAILABLE');
+      await refreshLive();
+    }finally{setLiveBusy(false);}
+  };
   const [config,setConfig]=usePersistentAdminState<ChannelConfig>('channel-policy.keeta.v1',{enabled:false,autoAccept:false,syncSellability:false,commissionPct:'',displayName:'Keeta',lateCutoffMinutes:15});
   const [mappings,setMappings]=usePersistentAdminState<MappingRow[]>('channel-mapping.keeta.v1',[]);
   const [providerItemId,setProviderItemId]=useState('');
@@ -221,7 +248,29 @@ export function ChannelsWorkspace({mode}:{mode:'overview'|'mapping'|'failures'|'
   const failures=mappings.filter(row=>row.status==='PENDING');
   const title=mode==='overview'?'平台管理':mode==='mapping'?'商品映射管理':mode==='failures'?'匹配失敗明細':mode==='accept'?'接單／自動接單':mode==='sync'?'售罄／供應同步':'實收估算設定';
   return <section className="admin-editor-page">
-    <PolicyHeader title={title} description="管理平台顯示名稱、接單、供應同步、佣金估算同商品對應。未有正式平台回傳之前，唔會顯示已套用。"/>
+    <PolicyHeader title={title} description="管理平台顯示名稱、接單、供應同步、佣金估算同商品對應。Live connection 狀態同 Provider business authority 分開顯示，唔會因為連線成功就自動啟動接單。"/>
+    {mode==='overview'?<section className="admin-policy-card">
+      <header><div><small>KEETA LIVE CONNECTION</small><h2>Keeta 香港連線</h2></div><span className={liveStatus?.oauth.state==='CONNECTED'?'admin-status-good':'admin-not-wired-chip'}>{liveStatus?.oauth.state??'讀取中'}</span></header>
+      {liveStatus?<div className="admin-readback-proof">
+        <p><span>Canonical Store</span><b>{liveStatus.canonicalStoreId}</b></p>
+        <p><span>Provider Shop</span><b>{liveStatus.providerShopId??'未設定'}</b></p>
+        <p><span>OAuth</span><b>{liveStatus.oauth.state}</b></p>
+        <p><span>Token 到期</span><b>{liveStatus.oauth.expiresAt?new Date(liveStatus.oauth.expiresAt).toLocaleString('zh-HK'):'—'}</b></p>
+        <p><span>Webhook</span><b>{liveStatus.webhook.callbackUrl}</b></p>
+        <p><span>Webhook Accepted</span><b>{liveStatus.webhook.acceptedCount}</b></p>
+        <p><span>最近 Event</span><b>{liveStatus.webhook.lastEventId??'—'} / {liveStatus.webhook.lastMessageId??'—'}</b></p>
+        <p><span>最近驗簽失敗</span><b>{liveStatus.webhook.lastSignatureFailureAt?new Date(liveStatus.webhook.lastSignatureFailureAt).toLocaleString('zh-HK'):'—'}</b></p>
+      </div>:<div className="admin-read-empty">正在讀取 Keeta live runtime 狀態。</div>}
+      {liveStatus?.missingConfig.length?<div className="admin-validation is-error"><b>Runtime 尚欠設定</b><ul>{liveStatus.missingConfig.map(item=><li key={item}>{item}</li>)}</ul></div>:null}
+      {liveStatus?<div className="admin-callout compact">Known external blocker：{liveStatus.knownExternalBlocker}。驗簽會 fail-closed，唔會為咗接通而放鬆。</div>:null}
+      {liveError?<div className="admin-validation is-error" role="alert">{liveError}</div>:null}
+      <div className="admin-editor-actions">
+        <button type="button" className="secondary" disabled={liveBusy} onClick={()=>void refreshLive()}>更新狀態</button>
+        <button type="button" className="secondary" disabled={liveBusy||liveStatus?.oauth.state!=='CONNECTED'} onClick={()=>void checkToken()}>檢查 Token</button>
+        <button type="button" className="primary" disabled={liveBusy||!liveStatus?.readyForAuthorization} onClick={()=>void authorize()}>{liveStatus?.oauth.state==='CONNECTED'?'重新授權 Keeta':'開始 Keeta 授權'}</button>
+      </div>
+      <small>目前 R1 只打通 OAuth、Token、Store Binding 同 Signed Webhook ingress。未自動建立 Formal Order，亦未啟動 Provider confirm / menu sync / refund command。</small>
+    </section>:null}
     <div className="admin-policy-grid two">
       <article className="admin-policy-card"><h2>Keeta 平台設定</h2><label><span>顯示名稱</span><input value={config.displayName} onChange={event=>patch({displayName:event.target.value})}/></label><Toggle checked={config.enabled} onChange={enabled=>patch({enabled})} label="啟用平台設定"/><Toggle checked={config.autoAccept} onChange={autoAccept=>patch({autoAccept})} label="正常單自動接單"/><Toggle checked={config.syncSellability} onChange={syncSellability=>patch({syncSellability})} label="同步售罄／供應"/><label><span>遲到訂單界線（分鐘）</span><input type="number" min={0} value={config.lateCutoffMinutes} onChange={event=>patch({lateCutoffMinutes:Number(event.target.value)||0})}/></label><label><span>佣金估算 %</span><input inputMode="decimal" value={config.commissionPct} onChange={event=>patch({commissionPct:event.target.value})}/></label></article>
       <article className="admin-policy-card"><h2>{mode==='failures'?'未完成對應':'商品對應'}</h2>
