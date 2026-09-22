@@ -3,7 +3,7 @@
 Status: CURRENT / CONTROLLING
 Protocol: #39
 Control: #22
-Updated: 2026-09-22 10:03 Asia/Hong_Kong
+Updated: 2026-09-22
 System: MFK ONLY
 
 > Every Commander MUST fresh-read this file before acting.
@@ -15,213 +15,174 @@ System: MFK ONLY
 2. Pantonyeung/mfk #22 latest controlling comment
 3. Current navigation listed below
 4. `HANDOFF_CURRENT.md`
-5. Exact active work issue(s)
-
-Do not use an older report, handoff, navigation map, or Morefun-v2 document as current authority.
+5. Active issue(s)
 
 ## 1. Current navigation
 
-`docs/navigation/MFK_航海圖_V1.11_Round012_2026-09-22.txt`
+`docs/navigation/MFK_航海圖_V1.12_Round013_2026-09-22.txt`
 
-Current navigation must be advanced whenever controlling state changes materially.
+## 2. Current priority override
 
-## 2. Current global reality
+Owner priority is now:
 
-MFK is the only current system.
+`SMT OTA PERSISTENCE P0 BEFORE ADMIN A2 WALKTHROUGH`
 
-Exactly six external product roles:
+Active issue:
+`#40 P0｜SMT OTA Persistence｜runtime.ready Promotion Missing After MFK Migration`
 
-1. SMT
-2. Admin
-3. SMM
-4. Customer
-5. Keeta
-6. Owner
+Admin A1/A2 implementation remain BANKED.
+Admin A2 real walkthrough is PAUSED, not cancelled.
+A3 automatic Admin→SMT network transport remains NOT AUTHORIZED.
 
-No seventh product.
+## 3. Physical failure
 
-One decision authority per business fact/action.
+Carrier:
+`1.0.6 (106)`
 
-## 3. Permanent execution rule
+Observed:
+- OTA can download / activate
+- new Runtime runs immediately
+- app process restart falls back to old Runtime
+- full power-cycle falls back to old Runtime
 
-`CONNECT ONE PIECE → TEST SAME PIECE IMMEDIATELY → BANK → STOP → OWNER DECIDES NEXT`
+## 4. Root cause
 
-Never infer permission to open the next seam.
+Failing OTA:
+`runtime-candidate-mfk-814043c809bb`
 
-## 4. Current Admin state
+Source:
+`814043c809bbc236df1383c320bad906bcd3f1cd`
 
-A1:
-`MFK_ADMIN_MENU_INDEX_A1_SEMANTIC_LINK_GREEN`
-BANKED.
+That source did not contain the Carrier promotion acknowledgement:
+`runtime.ready`.
 
-A2 implementation:
-`MFK_ADMIN_A2_CONTROLLED_TRANSFER_IMPLEMENTATION_GREEN`
-BANKED.
+Carrier 1.0.6 activation is intentionally two-phase:
+candidate boots provisionally and is not persisted as Current until exact `runtime.ready` with bridgeVersion 1 + exact releaseId arrives.
 
-A2 real separate-device Owner walkthrough:
-PENDING.
+Without it, the next process start deliberately rejects the unconfirmed candidate and falls back.
 
-A3 automatic Admin→SMT network transport:
-NOT AUTHORIZED.
+## 5. Source repair
 
-## 5. Admin hosting / domain
+WORK_ID:
+`MFK-SMT-OTA-PERSISTENCE-RUNTIME-READY-R1`
 
-Dedicated MFK Cloudflare account:
+Issue:
+`#40`
+
+Source candidate:
+`c7397b77430e145d0b0f8bb6ba34115754263f6f`
+
+Source run:
+`35679373673` SUCCESS
+
+Clean landing:
+`2fd6e10cc7c8bf73db854559243dc6c0c4fbe34f`
+
+Landing run:
+`35679476262` SUCCESS
+
+Files:
+- `v2local/src/runtime/runtime-carrier-boundary.ts`
+- `v2local/src/runtime/RuntimeReadyActivation.tsx`
+- `v2local/src/runtime/runtime-carrier-boundary.test.ts`
+- `v2local/src/App.tsx`
+
+State:
+`MFK_SMT_OTA_PERSISTENCE_RUNTIME_READY_SOURCE_GREEN`
+
+## 6. Published fixed candidate
+
+Existing OTA compatibility publisher:
+`Pantonyeung/morefunos-v1-builder`
+
+Publish run:
+`35679889303` SUCCESS
+
+Release:
+`runtime-candidate-mfk-2fd6e10cc7c8`
+
+Bundle:
+`MoreFunOS-SMT-runtime-candidate-mfk-2fd6e10cc7c8.mfos`
+
+Public manifest + bundle hash readback:
 GREEN.
 
-Worker:
-`mfk-admin`
+This temporary compatibility publisher does not become MFK authority.
 
-Canonical MFK Internet root:
-`morefunos.com`
+## 7. Exact NEXT
 
-Canonical Admin:
-`https://admin.morefunos.com`
+Owner performs ONE real device acceptance:
 
-Owner browser proof confirms current MFK Admin is live at the canonical domain.
-
-Hosting milestones:
-
-- `MFK_ADMIN_WORKER_DEPLOY_GREEN`
-- `MFK_ADMIN_CANONICAL_APP_READBACK_GREEN`
-- `MFK_ADMIN_HOSTING_H2_LIVE_GREEN`
-- `MFK_ADMIN_CANONICAL_DOMAIN_H3_GREEN`
-
-`workers.dev` is bootstrap/temporary validation only.
-
-## 5A. Admin canonical browser proof
-
-Owner browser screenshot confirms `https://admin.morefunos.com/admin/publish` is serving the current MFK Admin UI.
-
-Visible proof:
-- `MFK Admin 控制面`
-- `Pending Changes / 發布`
-- `ADMIN CONNECTION A2 · HUMAN CONTROLLED`
-
-Therefore H2/H3 are BANKED and closed.
-
-## 6. Current exact NEXT
-
-Run one real A2 cross-device Owner walkthrough:
-
-Admin:
-`Pending Changes / 發布`
-→ make one tiny Menu Index change
-→ Validate
-→ confirm A2 impact
-→ enter exact SMT base revision
-→ export A2 Publish Bundle
-
-SMT:
-→ import same bundle
-→ apply Local LKG
-→ prove observed revision/fingerprint
-→ state MATCH
-→ export SMT Readback Receipt
-
-Admin:
-→ import same receipt
-→ expected revision = observed revision
-→ expected fingerprint = observed fingerprint
-→ Compare = MATCH
+1. Recovery → 檢查 Runtime OTA
+2. confirm offered release = `runtime-candidate-mfk-2fd6e10cc7c8`
+3. download / install / activate
+4. after MFK UI loads, return Recovery
+5. prove:
+   - Current = `runtime-candidate-mfk-2fd6e10cc7c8`
+   - Candidate = —
+   - Activation Requested = false
+   - Previous = prior Current
+6. close/reopen app
+7. prove same Current remains
+8. full power off/on
+9. prove same Current remains
 
 Only then BANK:
+`MFK_SMT_OTA_PERSISTENCE_RUNTIME_READY_GREEN`
 
-`MFK_ADMIN_A2_OWNER_CROSS_DEVICE_GREEN`
+## 8. Failure classifier
 
-## 7. DO NOT
+- candidate not offered → OTA MANIFEST / ENDPOINT
+- download fails → DELIVERY / SIGNATURE
+- candidate launches but Current stays old → runtime.ready PROMOTION
+- new Current then app restart reverts → PERSISTED ACTIVATION STATE
+- app restart survives but power-cycle reverts → COLD BOOT / DURABILITY
 
-Until Owner explicitly authorizes:
+Fix only the first observed break.
 
-- NO A3 automatic Admin→SMT network transport
-- NO Cloud polling
-- NO D1/KV/DO transport
-- NO Pricing seam
-- NO Modifier seam
-- NO Combo seam
+## 9. DO NOT
+
+Until #40 real-device proof is GREEN:
+
+- NO Admin A2 continuation
+- NO A3 automatic Admin→SMT network
+- NO OTA infrastructure migration
+- NO Pricing / Modifier / Combo seam
 - NO SMM→SMT
 - NO Customer→SMT
 - NO Owner remote command
 - NO Keeta live wiring
-- NO OTA migration/cutover
 
-## 8. Cloud permanent rule
+## 10. Permanent system rules
+
+MFK only.
+Exactly six roles.
+One business authority per fact/action.
+
+`CONNECT ONE PIECE → TEST SAME PIECE → BANK → STOP → OWNER DECIDES NEXT`
+
+`NO TARGET READBACK = NOT GREEN`
 
 MFK Cloud = EVENT-DRIVEN FIRST.
 
-Business hours:
-`10:00–20:30 Asia/Hong_Kong`
+Cloud failure never blocks SMT local Order / Checkout / Payment / Commit.
 
-Off hours:
-`LOW_TRAFFIC_MODE`
+## 11. Admin / domain state
 
-Forbidden:
+Admin hosting is BANKED and GREEN:
 
-- global 1-minute heavy cron
-- 5-second liveness watchdog
-- multi-domain scheduled drain
-- background polling just to discover no work
+`https://admin.morefunos.com`
 
-Cloud failure must never block SMT local:
+H2 #37 CLOSED.
+H3 #38 CLOSED.
 
-- Order
-- Checkout
-- Payment
-- Local Commit
+## 12. Mandatory return
 
-## 9. Keeta current state
-
-MFK Keeta:
-THIN EDGE ADAPTER ONLY.
-NOT_WIRED.
-
-Old Morefun-v2 Keeta:
-RETIRED.
-Never reconnect MFK to it.
-
-## 10. OTA current state
-
-OTA remains untouched on the legacy endpoint/account until a separate Owner-authorized OTA migration seam is opened.
-
-Do not combine OTA migration with Admin/Keeta work.
-
-## 11. Canonical evidence/control surfaces
-
-- #22 = append-only controlling coordination log
-- #39 = Commander seamless handoff protocol
-- `COMMANDER_CURRENT.md` = mandatory stable current entry point
-- `HANDOFF_CURRENT.md` = detailed current handoff
-- current navigation = state/control index
-
-## 12. Mandatory Commander return protocol
-
-Before every return / completion / context handoff:
-
-1. Fresh-read current main + #22.
-2. Update `COMMANDER_CURRENT.md` to exact observed reality.
-3. Remove stale NEXT text.
-4. Record exact:
-   - WORK_ID
-   - issue
-   - branch
-   - commit / landing commit
-   - test run
-   - provider/manual evidence
-   - GREEN/RED/UNKNOWN
-5. State exactly ONE current NEXT.
-6. State all NOT_AUTHORIZED / DO_NOT items.
-7. Post the same return summary to #22.
-8. If a current navigation state materially changed, publish a new navigation round.
-9. Never include passwords, API token values, secrets, or private credentials.
-
-No Commander work is considered fully returned until this handoff is updated.
-
-## 13. New-chat resume command
-
-Use the reusable prompt in:
-
-`docs/commander/COMMANDER_BOOTSTRAP_PROMPT.txt`
-
-Template source:
-
-`docs/commander/COMMANDER_HANDOFF_TEMPLATE.md`
+Before any Commander returns work:
+- fresh-read main + #22
+- update this file
+- post same return to #22
+- advance navigation if state changed
+- leave one exact NEXT
+- include explicit NOT_AUTHORIZED
+- include no secrets
