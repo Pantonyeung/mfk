@@ -305,4 +305,71 @@ describe('Keeta live edge runtime',()=>{
     expect(status.oauth.expiresAt).toBeTruthy();
   });
 
+
+  it('refreshes an expired provider-portal token without OAuth reauthorization',async()=>{
+    const key=Buffer.alloc(32,10).toString('base64');
+    const storage=new Map<string,unknown>();
+    const state={storage:{
+      get:async(key:string)=>storage.get(key),
+      put:async(key:string,value:unknown)=>{storage.set(key,value);},
+      delete:async(key:string)=>{storage.delete(key);},
+    }};
+    const env={
+      KEETA_APP_ID:'3419700273',
+      KEETA_APP_SECRET:'test-secret',
+      KEETA_TOKEN_ENCRYPTION_KEY:key,
+      KEETA_PROVIDER_SHOP_ID:'721578302',
+      KEETA_OAUTH_REDIRECT_URI:'https://admin.morefunos.com/api/keeta/oauth/callback',
+    };
+    const {KeetaRuntimeStore}=await import('../keeta-runtime.ts');
+    const runtime=new KeetaRuntimeStore(state as never,env as never);
+    const refreshedIssuedAt=Date.now();
+    const providerFetch=vi.fn(async()=>new Response(JSON.stringify({
+      accessToken:'refreshed-access-token',
+      tokenType:'bearer',
+      expiresIn:7776000,
+      refreshToken:'refreshed-refresh-token',
+      scope:'all',
+      issuedAtTime:refreshedIssuedAt,
+    }),{status:200,headers:{'content-type':'application/json'}}));
+    vi.stubGlobal('fetch',providerFetch);
+    try{
+      const expiredIssuedAt=Date.now()-(7776000+3600)*1000;
+      const response=await runtime.fetch(new Request('https://internal/admin/token/import-test',{
+        method:'POST',
+        headers:{'content-type':'application/json'},
+        body:JSON.stringify({
+          accessToken:'expired-access-token',
+          tokenType:'bearer',
+          expiresIn:7776000,
+          refreshToken:'still-usable-refresh-token',
+          scope:'all',
+          issuedAtTime:expiredIssuedAt,
+        }),
+      }));
+      expect(response.status).toBe(200);
+      const body=await response.json() as {state:string;source:string;expiresAt:string};
+      expect(body.state).toBe('CONNECTED');
+      expect(body.source).toBe('TEST_PROVIDER_PORTAL_REFRESH');
+      expect(providerFetch).toHaveBeenCalledTimes(1);
+      const requestBody=JSON.parse(String(providerFetch.mock.calls[0]?.[1]?.body??'{}')) as Record<string,unknown>;
+      expect(requestBody.grantType).toBe('refresh_token');
+      expect(requestBody.refreshToken).toBe('still-usable-refresh-token');
+
+      const serialized=JSON.stringify([...storage.entries()]);
+      expect(serialized).not.toContain('expired-access-token');
+      expect(serialized).not.toContain('still-usable-refresh-token');
+      expect(serialized).not.toContain('refreshed-access-token');
+      expect(serialized).not.toContain('refreshed-refresh-token');
+
+      const statusResponse=await runtime.fetch(new Request('https://internal/admin/status',{method:'POST'}));
+      const status=await statusResponse.json() as {oauth:{state:string;tokenSource:string;expiresAt:string}};
+      expect(status.oauth.state).toBe('CONNECTED');
+      expect(status.oauth.tokenSource).toBe('TEST_PROVIDER_PORTAL_REFRESH');
+      expect(status.oauth.expiresAt).toBeTruthy();
+    }finally{
+      vi.unstubAllGlobals();
+    }
+  });
+
 });

@@ -490,21 +490,30 @@ export class KeetaRuntimeStore{
       try{
         const config=requireRuntimeConfig(this.env);
         const body=record(await request.json(),'KEETA_TEST_TOKEN_IMPORT_INVALID');
-        const token=parseTokenMaterial(body);
-        const assessment=tokenAssessment(token);
-        if(assessment.disposition==='EXPIRED')throw new Error('KEETA_TEST_TOKEN_IMPORT_EXPIRED');
-        if(token.issuedAtTime>Date.now()+10*60*1000)throw new Error('KEETA_TEST_TOKEN_IMPORT_ISSUED_AT_INVALID');
-        await this.saveToken(token);
+        const importedToken=parseTokenMaterial(body);
+        if(importedToken.issuedAtTime>Date.now()+10*60*1000)throw new Error('KEETA_TEST_TOKEN_IMPORT_ISSUED_AT_INVALID');
+
+        let token=importedToken;
+        let assessment=tokenAssessment(token);
+        let tokenSource='TEST_PROVIDER_PORTAL_IMPORT';
+        if(assessment.disposition==='EXPIRED'){
+          token=await refreshToken(config,importedToken.refreshToken);
+          assessment=await this.saveToken(token);
+          tokenSource='TEST_PROVIDER_PORTAL_REFRESH';
+        }else{
+          assessment=await this.saveToken(token);
+        }
+
         const importedAt=new Date().toISOString();
         await this.state.storage.put('connection',{
           canonicalStoreId:'MF01',
           providerShopId:config.providerShopId,
           authorizedAt:importedAt,
-          tokenSource:'TEST_PROVIDER_PORTAL_IMPORT',
+          tokenSource,
         });
         return json({
           state:'CONNECTED',
-          source:'TEST_PROVIDER_PORTAL_IMPORT',
+          source:tokenSource,
           expiresAt:new Date(assessment.expiresAtMs).toISOString(),
         });
       }catch(error){
