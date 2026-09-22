@@ -1,35 +1,51 @@
-# MFK v2owner｜Owner Clean Migration R1
+# MFK v2owner｜Product Completeness R1
 
-WORK_ID: MFK-OWNER-CLEAN-MIGRATION-R1
+WORK_ID: `MFK-OWNER-PRODUCT-COMPLETION-R1`
 
-Role: OBSERVATION / ALERTING / REVIEW / BOUNDED DECISION
+Role: `WATCH + ALERT + REVIEW + BOUNDED ACT`
 
-This port contains Owner UI / workflow / capability shape only.
+Current state:
+`PRODUCT_COMPLETE_NOT_CONNECTED`
 
-Current boundary:
-- independent v2owner app;
-- 94-item capability registry;
-- Today / Readiness + Sales / Orders / AOV + comparison;
-- Action Queue, Order Oversight and Order Detail drill-down;
-- Channel Health + Sold-out / Pause command presentation;
-- Staff Presence / Role / Permission presentation;
-- Device / Printer Health and job-certainty presentation;
-- fixed Reports, Alerts / Notifications, Manager Log / Checklist and Activity;
-- bounded action Confirmation / Reason / Approval / Pending / Result / Failure / UNKNOWN presentation;
-- Admin deep-link presentation only;
-- OFFLINE / STALE / UNKNOWN / PARTIAL / FAILURE / RETRY recovery states;
-- every COMMAND_SHAPE capability is NOT_WIRED.
+Product responsibility now implemented:
+- Today / readiness / freshness / attention
+- Effective Sales / Order Count / AOV / comparison
+- Action Queue / certainty / owner domain / target
+- Orders current/history/search/filter/drill-down/timeline
+- Channel Health / desired-vs-observed / freshness
+- Sellability bounded-action UX
+- Staff presence / role / permission summary
+- Device / Printer health / affected scope / job certainty
+- Trusted fixed reports
+- Customer / CRM Lite
+- Campaign / attribution / platform funding facts
+- Settlement / finality / reconciliation attention
+- Cash expected/actual/variance/closeout
+- Inventory Lite attention
+- Notifications
+- Activity/Audit with requester/approver/result/readback
+- Manager Log / Checklist / Handoff local non-authoritative workspace
+- Admin navigation presentation only
+- Offline / Stale / Unknown / Partial / Failure states
+- full loading / empty / error / NOT_CONNECTED states
+- browser-refresh persistence for local notes/checklist/preferences only
 
-Hard boundary:
-- no live network read / write;
-- no live remote mutation;
-- no Formal Order / Checkout / Payment / Pricing execution;
-- no Store Kernel / Display Number / physical Printer / Drawer action;
-- no D1 / Cloud / Provider authority;
-- no SMT mutation;
-- no Admin config authoring;
-- no browser persistence.
+Connection boundary:
+- runtime is injected only through `window.__MFK_OWNER_PRODUCT_PORT__`
+- missing runtime never produces fake KPI/order/health/settlement truth
+- localStorage is `LOCAL_NON_AUTHORITATIVE` and stores only local Owner notes/checklist/preferences
 
-All data shown in this migration port is static fixture or local session-only presentation. It is not current MFK business truth.
+Hard authority rules:
+- no live cross-port adapter
+- no direct fetch/WebSocket/XHR/API
+- no Formal Order writer
+- no Pricing / Payment / Store Kernel
+- no Print execution / cash drawer action
+- no provider settlement mutation
+- no destructive device recovery
+- no offline remote mutation
+- no D1 / second business DB
+- no background polling
+- all remote command capabilities remain `NOT_WIRED`
 
-TEST_EXECUTION: HANDOFF_TO_MAIN_CHAT
+The old fixture/capability-upgrade shell has been removed from production source.
