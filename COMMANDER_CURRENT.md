@@ -3,7 +3,7 @@
 Status: CURRENT / CONTROLLING
 Protocol: #39
 Control: #22
-Updated: 2026-09-22 11:18 Asia/Hong_Kong
+Updated: 2026-09-22 11:24 Asia/Hong_Kong
 System: MFK ONLY
 
 > Every Commander MUST fresh-read this file before acting.
@@ -64,6 +64,29 @@ Important source proof:
 
 Interpretation:
 `LIVE ADMIN UI IS NOT STALE RELATIVE TO CURRENT v2admin SOURCE`
+
+## 3A. Owner screenshot evidence｜Admin product page
+
+Owner screenshot confirms live:
+- `admin.morefunos.com`
+- MFK Admin shell
+- 菜單 → 商品資料
+- `OWNER → ADMIN → SMT`
+- `MFK Admin 控制面`
+- `Domain adapters 尚未接駁`
+- `SESSION DRAFT · NOT_WIRED`
+- Product-page `Publish 未接駁` disabled as designed
+
+This is NOT the A2 Publish Center.
+It confirms the live Admin product/catalog page only.
+
+Exact next remains:
+`https://admin.morefunos.com/admin/publish`
+
+Expected header:
+`ADMIN CONNECTION A2 · HUMAN CONTROLLED`
+
+Do not create a final A2 bundle before reading exact SMT Active Revision.
 
 ## 4. Admin connection progress
 
