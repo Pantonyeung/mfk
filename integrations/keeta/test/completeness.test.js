@@ -23,6 +23,7 @@ import {
   normalizeKeetaOrderLifecycleEventEvidence,
   normalizeKeetaDeliveryStatusEvidence,
   normalizeKeetaOrderPlacementEvidence,
+  normalizeKeetaStandardProviderOrderFacts,
   parseKeetaTokenMaterial,
   parseKeetaWebhookEnvelope,
   resolveKeetaAcceptancePolicy,
@@ -144,7 +145,7 @@ test('acceptance mode is explicit MFK policy input and never live by default', (
 });
 
 test('completeness ledger keeps live runtime and canonical writers excluded', () => {
-  assert.equal(KEETA_CAPABILITY_COUNT, 41);
+  assert.equal(KEETA_CAPABILITY_COUNT, 43);
   assert.equal(KEETA_COMPLETENESS_SCOPE.state, 'PROVIDER_COMPLETE_NOT_WIRED');
   const exclusions = JSON.stringify(KEETA_DONOR_EXCLUSIONS);
   assert.match(exclusions, /LEGACY_D1_CANONICAL_ACCEPTANCE/);
@@ -271,4 +272,63 @@ test('remaining donor provider request surfaces are present but inert', () => {
 
   assert.equal(buildKeetaStoreDetailsShape({ providerShopId: 2 }).executionGate, 'NOT_WIRED');
   assert.equal(buildKeetaStoreHoursGetShape({ providerShopId: 2 }).executionGate, 'NOT_WIRED');
+});
+
+
+test('standard provider order payload normalizes products options money and mapping seeds without owning Order truth', () => {
+  const facts = normalizeKeetaStandardProviderOrderFacts({
+    orderInfo: {
+      baseOrder: { orderViewIdStr: 'KEETA-O-1', currency: 'HKD' },
+      merchantOrder: { orderViewIdStr: 'KEETA-O-1', seqNoStr: 'K-0001' },
+      products: [{
+        id: 101,
+        skuId: 201,
+        spuId: 301,
+        skuOpenItemCode: 'SKU-1',
+        spuOpenItemCode: 'SPU-1',
+        name: '紫米飯',
+        count: 2,
+        currency: 'HKD',
+        priceWithGroup: {
+          originUnitPrice: 5000,
+          unitPrice: 5200,
+          originAmount: 10000,
+          amount: 10400,
+        },
+        groups: [{
+          groupName: '加料',
+          groupOpenItemCode: 'GRP-1',
+          shopProductGroupSkuList: [{
+            groupSkuOpenItemCode: 'OPT-1',
+            spuName: '加蛋',
+            count: 1,
+            unitPrice: 200,
+            currency: 'HKD',
+          }],
+        }],
+      }],
+      orderPromotionDtlList: [{ reduceFee: 400 }],
+      feeDtls: [
+        { code: 'productPrice', currency: 'HKD', price: 10400 },
+        { code: 'payTotal', currency: 'HKD', price: 10000 },
+      ],
+      feeDtl: {
+        merchantFee: {
+          basicCommission: 1000,
+          activityFee: 200,
+          earnings: 8800,
+        },
+      },
+    },
+    providerCapturedAt: '2026-09-22T12:00:00+08:00',
+    providerEvidenceRef: 'KEETA-EVIDENCE-1',
+  });
+  assert.equal(facts.providerOrderId, 'KEETA-O-1');
+  assert.equal(facts.providerEffectiveProductTotalMinor, 10000);
+  assert.equal(facts.lines[0].providerUnitAdjustmentMinor, 200);
+  assert.equal(facts.lines[0].productAliasRequest.resolutionAuthority, 'MFK_MAPPING_AUTHORITY_REQUIRED');
+  assert.equal(facts.lines[0].selectedOptions[0].providerOptionCode, 'OPT-1');
+  assert.equal(facts.providerCommercialSnapshot.settlementAuthority, 'PROVIDER_ESTIMATE');
+  assert.equal(facts.formalOrderAuthority, 'ABSENT');
+  assert.equal(facts.executionGate, 'NOT_WIRED');
 });
