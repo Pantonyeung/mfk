@@ -142,7 +142,7 @@ export function ProductOperationalDetail({productId,optionCenter}:{productId:str
     <details className="admin-product-section">
       <summary><span><b>選項</b><small>{boundGroups.length} 個已連結選項組 · 默認按商品設定</small></span><span>›</span></summary>
       <div className="admin-product-section-body">
-        <div className="admin-callout compact">選項名稱、選項 ID 同價錢只喺「選項中心」維護一次；商品詳細資料只負責連結、套用同設定此商品嘅默認。</div>
+        <div className="admin-callout compact">選項名稱、選項 ID 同價錢只喺「選項中心」維護一次；商品詳細資料只負責連結、套用同設定此商品嘅默認。 <a href="/admin/catalog/modifiers">前往選項中心</a></div>
         <div className="admin-product-link-list">
           {optionCenter.groups.length===0?<div className="admin-read-empty">選項中心未有選項組。請先建立選項同選項組。</div>:optionCenter.groups.map(group=>{
             const link=optionCenter.getLink(product.id,group.id);
