@@ -358,3 +358,50 @@
   .admin-option-bulk-toolbar{grid-template-columns:1fr}
   .admin-option-product-map-grid{grid-template-columns:1fr}
 }
+
+
+/* Combo R2 — editable poster-seeded steps / bands / canonical product choices */
+.admin-combo-list{display:grid;gap:14px}
+.admin-combo-card{display:grid;gap:14px;padding:15px;border:1px solid #dddfe6;border-radius:14px;background:#fff}
+.admin-combo-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.admin-combo-head>div:first-child{display:grid;gap:3px}
+.admin-combo-head h2{margin:0;font-size:18px}
+.admin-combo-head small{font-size:9px;color:#7d8490}
+.admin-combo-head span{font-size:10px;color:#6f7681}
+.admin-combo-steps{gap:10px}
+.admin-combo-step{display:grid;gap:12px;padding:12px;border:1px solid #e1e4ea;border-radius:12px;background:#fafbfc}
+.admin-combo-step>header{display:flex;justify-content:space-between;gap:12px;align-items:center}
+.admin-combo-step-title{display:flex;align-items:center;gap:10px}
+.admin-combo-step-title>div{display:grid;gap:2px}
+.admin-combo-step-title small{font-size:9px;color:#7c8490}
+.admin-combo-step-number{display:grid;place-items:center;width:38px;height:38px;border-radius:10px;background:#6c55d8;color:#fff;font-size:15px;font-weight:900}
+.admin-combo-band-editor,.admin-combo-choice-editor{display:grid;gap:9px;padding:11px;border:1px solid #e4e0f7;border-radius:11px;background:#fff}
+.admin-combo-band-editor>header,.admin-combo-choice-editor>header{display:flex;justify-content:space-between;gap:10px;align-items:center}
+.admin-combo-band-editor>header>div,.admin-combo-choice-editor>header>div{display:grid;gap:2px}
+.admin-combo-band-editor header small,.admin-combo-choice-editor header small{font-size:9px;color:#7d8490}
+.admin-combo-band-editor header button,.admin-combo-choice-editor header button{min-height:34px;padding:0 10px;border:1px solid #cbc2f4;border-radius:8px;background:#f5f2ff;color:#6048c5;font-weight:850}
+.admin-combo-band-list{display:grid;border:1px solid #e6e8ec;border-radius:10px;overflow:hidden}
+.admin-combo-band-list>article{display:grid;grid-template-columns:78px minmax(180px,1.4fr) 150px 120px 72px;gap:8px;align-items:center;padding:9px 10px;border-top:1px solid #eceef2}
+.admin-combo-band-list>article:first-child{border-top:0}
+.admin-combo-band-list input,.admin-combo-band-list select{min-height:36px;padding:0 8px;border:1px solid #d5dae2;border-radius:8px;background:#fff}
+.admin-combo-band-list label{display:grid;gap:3px}
+.admin-combo-band-list label>span{font-size:9px;color:#7d8490}
+.admin-combo-choice-list{display:grid;border:1px solid #e6e8ec;border-radius:10px;overflow:hidden}
+.admin-combo-choice-list>article{display:grid;grid-template-columns:78px minmax(220px,1.5fr) minmax(180px,1fr) 150px minmax(180px,1.1fr) 105px 72px;gap:8px;align-items:center;padding:9px 10px;border-top:1px solid #eceef2}
+.admin-combo-choice-list>article:first-child{border-top:0}
+.admin-combo-choice-list label{display:grid;gap:3px}
+.admin-combo-choice-list label>span{font-size:9px;color:#7d8490}
+.admin-combo-choice-list select,.admin-combo-choice-list input{min-height:36px;padding:0 8px;border:1px solid #d5dae2;border-radius:8px;background:#fff}
+.admin-combo-choice-inherit{display:grid;gap:2px}
+.admin-combo-choice-inherit b{font-size:10px}
+.admin-combo-choice-inherit small{font-size:8px;line-height:1.4;color:#6d6296}
+@media(max-width:1100px){
+  .admin-combo-band-list,.admin-combo-choice-list{overflow-x:auto}
+  .admin-combo-band-list>article{min-width:720px}
+  .admin-combo-choice-list>article{min-width:1150px}
+}
+@media(max-width:760px){
+  .admin-combo-head,.admin-combo-step>header,.admin-combo-band-editor>header,.admin-combo-choice-editor>header{display:grid}
+  .admin-combo-card{padding:11px}
+  .admin-combo-step{padding:10px}
+}
