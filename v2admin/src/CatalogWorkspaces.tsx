@@ -434,7 +434,7 @@ export function ModifiersWorkspace(){
   const {draft,addModifierGroup,updateModifierGroup,removeModifierGroup,addModifierOption,updateModifierOption,removeModifierOption}=useAdminDraft();
   return <section className="admin-editor-page">
     <WorkspaceHeader title="選項／加料" description="每個選項必須有名稱、選項 ID 同價格；選項組管理要求方式、單／多選、最少／最多同數量設定。" onAdd={addModifierGroup} addLabel="新增選項組"/>
-    <div className="admin-callout compact">選項名稱／ID／價格全部必填；選項組另外設定必選／可選提示、單選／多選、最少／最多同重覆數量。</div>
+    <div className="admin-callout compact">選項名稱／ID／價格全部必填；選項組支援必選、可選但必須顯示一次、純可選、單選／多選、最少／最多同重覆數量。</div>
     <div className="admin-kpi-grid">
       <article><span>選項組</span><strong>{draft.modifierGroups.length}</strong><small>草稿</small></article>
       <article><span>選項</span><strong>{draft.modifierGroups.reduce((sum,row)=>sum+row.options.length,0)}</strong><small>全部選項</small></article>
