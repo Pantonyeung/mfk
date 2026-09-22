@@ -261,6 +261,16 @@ describe('MFK Admin complete catalog product',()=>{
     expect(drinkPools.map(pool=>pool.name)).toEqual(['共用飲品 Pool']);
   });
 
+  it('keeps every Combo R4 PRODUCT choice on a canonical catalog Product ID',()=>{
+    const productIds=new Set(LEGACY_MF01_ADMIN_DRAFT.products.map(product=>product.id));
+    const invalid=COMBO_R4_POOLS.flatMap(pool=>pool.groups).flatMap(group=>group.choices)
+      .filter(choice=>(choice.choiceType??'PRODUCT')==='PRODUCT')
+      .filter(choice=>!choice.productId||!productIds.has(choice.productId))
+      .map(choice=>({id:choice.id,productId:choice.productId}));
+    expect(invalid).toEqual([]);
+    expect(COMBO_R4_POOLS.flatMap(pool=>pool.groups).flatMap(group=>group.choices).some(choice=>choice.productId==='b2888781-1a6d-529e-931b-aadd4ca74194')).toBe(true);
+  });
+
   it('puts each Snack product inside its exact price child-pool',()=>{
     const snackPool=COMBO_R4_POOLS.find(pool=>pool.id==='combo-snack-pool-shared')!;
     const group=snackPool.groups[0]!;

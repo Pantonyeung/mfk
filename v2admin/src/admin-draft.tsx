@@ -180,7 +180,7 @@ interface AdminDraftContextValue{
 
 const STORE_KEY='catalog-draft.v2';
 const DIRTY_KEY='catalog-dirty.v1';
-const COMBO_R4_SEED_KEY='combo-r4-nested-pool-seed-installed.v1';
+const COMBO_R4_SEED_KEY='combo-r4-nested-pool-seed-installed.v2';
 
 function normalizeComboSection(section:ComboSectionDraft,index:number):ComboSectionDraft{
   const legacyProductIds=section.childProductIds??[];

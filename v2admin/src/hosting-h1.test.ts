@@ -15,6 +15,14 @@ describe('MFK Admin Cloudflare H2 + config sync runtime',()=>{
     expect(source).toContain('"class_name": "AdminSyncStore"');
   });
 
+  it('allows SMT appassets to fetch/ACK config while Publish remains Admin-origin-only',()=>{
+    const worker=readFileSync(new URL('../worker.ts',import.meta.url),'utf8');
+    expect(worker).toContain("const SMT_ORIGIN='https://appassets.androidplatform.net'");
+    expect(worker).toContain('CORS_ORIGINS=new Set([ADMIN_ORIGIN,SMT_ORIGIN])');
+    expect(worker).toContain("if(origin!==ADMIN_ORIGIN)return false");
+    expect(worker).toContain("if(site&&site!=='same-origin')return false");
+  });
+
   it('does not inherit legacy/provider/transaction runtime bindings or background triggers',()=>{
     for(const forbidden of [
       '"d1_databases"',

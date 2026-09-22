@@ -2,13 +2,15 @@ import {validateMfkAdminConfigAck,validateMfkAdminConfigEnvelope} from '../contr
 
 const JSON_HEADERS={'content-type':'application/json; charset=utf-8','cache-control':'no-store'};
 const ADMIN_ORIGIN='https://admin.morefunos.com';
+const SMT_ORIGIN='https://appassets.androidplatform.net';
+const CORS_ORIGINS=new Set([ADMIN_ORIGIN,SMT_ORIGIN]);
 
 function json(value,status=200,extra={}){
   return new Response(JSON.stringify(value),{status,headers:{...JSON_HEADERS,...extra}});
 }
 function cors(request){
   const origin=request.headers.get('origin')||'';
-  return origin===ADMIN_ORIGIN?{
+  return CORS_ORIGINS.has(origin)?{
     'access-control-allow-origin':origin,
     'access-control-allow-methods':'GET,POST,OPTIONS',
     'access-control-allow-headers':'content-type,x-mfk-admin-publish-key',
