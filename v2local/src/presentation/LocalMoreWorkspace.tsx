@@ -379,6 +379,9 @@ function DayClosePanel({revision,onSaved}:{revision:number;onSaved:()=>void}){
     if(!hasCount){setMessage('請先輸入實點現金。');return;}
     if(!hasRemoval){setMessage('請輸入今次取走現金；如果唔取走請填 0。');return;}
     if(cashRemovedMinor>countedMinor){setMessage('取走現金唔可以大過實點現金。');return;}
+    const denominationNote=mode==='denom'
+      ?'｜面額點算 '+denominations.map(value=>String.fromCharCode(36)+value+'×'+qtyFor(value)).join('、')
+      :'';
     const result=commitLocalDayCloseOnce({
       orders:localRuntime.orders(),
       businessStartHour:cutoff.hour,
@@ -386,7 +389,13 @@ function DayClosePanel({revision,onSaved}:{revision:number;onSaved:()=>void}){
       openingCashMinor,
       countedCashMinor:countedMinor,
       cashRemovedMinor,
-      note:note+(mode==='denom'?'｜面額點算 '+denominations.map(value=>'
+      note:note+denominationNote,
+    });
+    queueDayCloseProjection(result.row);
+    setCompletion(result.row);
+    setMessage(result.created?'日結完成。':'今日已經完成日結；冇建立重複版本。');
+    onSaved();
+  };
 
   if(latest)return <section className="more-panel dayclose-panel">
     <header className="more-section-heading"><div><span>LOCAL DAY CLOSE</span><h2>收銀與日結</h2></div><strong>今日已完成</strong></header>
