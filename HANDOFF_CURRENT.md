@@ -1,133 +1,78 @@
 # MFK CURRENT HANDOFF｜2026-09-22
 
-Current system: **MFK only**.
-
-Mandatory Commander entry:
+Mandatory entry:
 `COMMANDER_CURRENT.md`
 
-Commander protocol:
-`docs/commander/README.md`
-
-Commander template:
-`docs/commander/COMMANDER_HANDOFF_TEMPLATE.md`
-
-Bootstrap prompt:
-`docs/commander/COMMANDER_BOOTSTRAP_PROMPT.txt`
-
 Current navigation:
-`docs/navigation/MFK_航海圖_V1.11_Round012_2026-09-22.txt`
+`docs/navigation/MFK_航海圖_V1.12_Round013_2026-09-22.txt`
 
 Control:
-Pantonyeung/mfk #22
+#22
 
-Commander governance:
+Commander protocol:
 #39
 
-## Current Admin
+## CURRENT PRIORITY
 
-A1:
-`MFK_ADMIN_MENU_INDEX_A1_SEMANTIC_LINK_GREEN`
-BANKED.
+SMT OTA persistence P0 has Owner priority over Admin A2 real walkthrough.
 
-A2 implementation:
-`MFK_ADMIN_A2_CONTROLLED_TRANSFER_IMPLEMENTATION_GREEN`
-BANKED.
+Active issue:
+#40
 
-A2 real cross-device Owner walkthrough:
-**PENDING**
+## ROOT CAUSE
 
-A3 automatic Admin→SMT transport:
-**NOT AUTHORIZED**
+The failing candidate `runtime-candidate-mfk-814043c809bb` came from MFK commit `814043c809bbc236df1383c320bad906bcd3f1cd`, which did not contain the native Carrier `runtime.ready` promotion acknowledgement.
 
-## Admin Hosting / Canonical Domain
+Carrier 1.0.6 intentionally treats a candidate boot as provisional until exact `runtime.ready` is received. If the process restarts before confirmation, it falls back to the persisted old Current.
 
-Dedicated MFK Cloudflare account:
-**GREEN**
+## FIX
 
-Worker:
-`mfk-admin`
+Current MFK clean landing:
+`2fd6e10cc7c8bf73db854559243dc6c0c4fbe34f`
 
-Canonical root:
-`morefunos.com`
+Landing run:
+`35679476262` SUCCESS
 
-Canonical Admin:
-`https://admin.morefunos.com`
+Fixed runtime source now emits exact `runtime.ready` after app mount.
 
-GitHub Actions → Wrangler deploy:
-**GREEN**
+## PUBLISHED CANDIDATE
 
-Run:
-`35677844235`
+Release:
+`runtime-candidate-mfk-2fd6e10cc7c8`
 
-Owner browser proof:
-**GREEN**
+Publisher run:
+`35679889303` SUCCESS
 
-Visible current UI:
-- MFK Admin 控制面
-- Pending Changes / 發布
-- ADMIN CONNECTION A2 · HUMAN CONTROLLED
+Public manifest / bundle hash:
+GREEN
 
-Milestones:
-- `MFK_ADMIN_WORKER_DEPLOY_GREEN`
-- `MFK_ADMIN_CANONICAL_APP_READBACK_GREEN`
-- `MFK_ADMIN_HOSTING_H2_LIVE_GREEN`
-- `MFK_ADMIN_CANONICAL_DOMAIN_H3_GREEN`
+## NEXT
 
-H2 #37:
-CLOSED / BANKED
+Real device acceptance only:
 
-H3 #38:
-CLOSED / BANKED
-
-## Immediate next action
-
-Run exactly one real A2 cross-device walkthrough:
-
-Admin Bundle
-→ SMT import/apply
-→ SMT Readback Receipt
-→ Admin import/compare
-→ MATCH
+1. install/activate `runtime-candidate-mfk-2fd6e10cc7c8`
+2. Recovery must show new Current + Candidate cleared
+3. close/reopen app → same Current
+4. full power off/on → same Current
+5. Previous remains rollback target
 
 Only then BANK:
-`MFK_ADMIN_A2_OWNER_CROSS_DEVICE_GREEN`
+`MFK_SMT_OTA_PERSISTENCE_RUNTIME_READY_GREEN`
 
-Hard rule:
-`NO TARGET READBACK = NOT GREEN`
+## PAUSED
+
+Admin A2 real cross-device walkthrough is paused until #40 is physically GREEN.
+
+A3 remains NOT AUTHORIZED.
+
+## ADMIN HOSTING
+
+Canonical Admin is already live and BANKED:
+`https://admin.morefunos.com`
 
 ## DO NOT
 
-Until Owner explicitly authorizes:
-
-- no A3 automatic Admin→SMT transport
-- no Pricing / Modifier / Combo seam
-- no SMM→SMT
-- no Customer→SMT
-- no Owner remote command
-- no Keeta live wiring
-- no OTA migration/cutover
-
-## Cloud rule
-
-MFK Cloud = EVENT-DRIVEN FIRST.
-
-Business hours:
-`10:00–20:30 Asia/Hong_Kong`
-
-Off hours:
-`LOW_TRAFFIC_MODE`
-
-No 1-minute heavy cron.
-No 5-second watchdog.
-Cloud never blocks SMT local transaction.
-
-## Mandatory return
-
-Before every Commander returns work / ends conversation / reaches context limit:
-
-1. update `COMMANDER_CURRENT.md`
-2. post same return summary to #22
-3. advance navigation if material current state changed
-4. leave one exact NEXT
-5. leave explicit NOT_AUTHORIZED
-6. include no secrets
+No OTA infra migration.
+No Keeta live wiring.
+No SMM/Customer/Owner live seams.
+No next Admin seam until P0 proof.
