@@ -50,17 +50,28 @@ MFK_ADMIN_MF01_LEGACY_MENU_REENTERED_DEPLOYED_GREEN
 
 ## EXACT NEXT
 
-Owner refresh Admin.
+Owner confirmed legacy MF01 menu is visible.
+#42 is BANKED / CLOSED.
 
-Verify:
-商品分類 = 14
-商品資料 = 203
+Run A2 manual controlled transfer:
 
-No SMT publish yet.
+1. SMT → More → Admin · Menu → read exact ACTIVE revision.
+2. Admin「待發布變更」→ set 門店目前版本 to that exact revision.
+3. 檢查內容 → 確認影響範圍 → 建立並下載發布檔案.
+4. Transfer SAME file to SMT and import.
+5. SMT downloads readback file.
+6. Import readback to Admin.
+7. Require 核對結果 = 一致.
 
-After visual confirmation:
-bank #41 / #42 as applicable,
-then read SMT Active Revision,
-then resume A2 single-change acceptance.
+Scope:
+A2 sends Menu Index only:
+14 categories + 188 active products.
+It does not send prices/modifiers/combos.
+
+15 inactive donor products remain Admin-only until a future explicit rule.
+
+After A2 MATCH:
+BANK and STOP.
+Pricing is a separate future seam.
 
 A3 NOT AUTHORIZED.
