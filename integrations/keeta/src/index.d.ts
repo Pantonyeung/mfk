@@ -119,6 +119,7 @@ export const KEETA_STANDARD_OAUTH_MODE: string;
 export const KEETA_STANDARD_OAUTH_AUTHORIZE_URL: string;
 export const KEETA_TOKEN_URL: string;
 export const KEETA_ACCEPTANCE_MODES: readonly string[];
+export const KEETA_CONFIGURABLE_WEBHOOK_EVENTS: readonly number[];
 export const KEETA_DONOR_EXCLUSIONS: readonly Readonly<Record<string, string>>[];
 export const KEETA_COMPLETENESS_SCOPE: Readonly<Record<string, unknown>>;
 
@@ -155,6 +156,9 @@ export function buildKeetaOrderGetShape(input: Readonly<Record<string, unknown>>
 export function buildKeetaOrderConfirmShape(input: Readonly<Record<string, unknown>>): Readonly<Record<string, unknown>>;
 export function buildKeetaOrderCancelShape(input: Readonly<Record<string, unknown>>): Readonly<Record<string, unknown>>;
 export function buildKeetaOrderReadyShape(input: Readonly<Record<string, unknown>>): Readonly<Record<string, unknown>>;
+export function buildKeetaOrderCollectShape(input: Readonly<Record<string, unknown>>): Readonly<Record<string, unknown>>;
+export function buildKeetaPartialRefundPreviewShape(input: Readonly<Record<string, unknown>>): Readonly<Record<string, unknown>>;
+export function buildKeetaPartialRefundApplyShape(input: Readonly<Record<string, unknown>>): Readonly<Record<string, unknown>>;
 export function parseKeetaAfterSaleEvidence(envelope: KeetaWebhookEnvelope): Readonly<Record<string, unknown>>;
 export function presentKeetaAfterSaleStatus(evidence: Readonly<Record<string, unknown>>): Readonly<Record<string, unknown>>;
 export function buildKeetaAfterSaleDecisionShape(input: Readonly<Record<string, unknown>>): Readonly<Record<string, unknown>>;
@@ -165,6 +169,9 @@ export function hhmmToSeconds(value: string): number;
 export function validateKeetaBusinessHours(hours: KeetaBusinessHourOfTheWeek): true;
 export function buildKeetaStoreHoursShape(input: Readonly<Record<string, unknown>>): Readonly<Record<string, unknown>>;
 export function buildKeetaStoreOperationalShape(input: Readonly<Record<string, unknown>>): Readonly<Record<string, unknown>>;
+export function buildKeetaStoreDetailsShape(input: Readonly<Record<string, unknown>>): Readonly<Record<string, unknown>>;
+export function buildKeetaStoreHoursGetShape(input: Readonly<Record<string, unknown>>): Readonly<Record<string, unknown>>;
+export function buildKeetaWebhookConfigurationShape(input: Readonly<Record<string, unknown>>): Readonly<Record<string, unknown>>;
 
 export function buildKeetaOAuthAuthorizationShape(input: Readonly<Record<string, unknown>>): Readonly<Record<string, unknown>>;
 export function validateKeetaOAuthCallbackShape(input: Readonly<Record<string, unknown>>): Readonly<Record<string, unknown>>;
