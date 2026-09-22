@@ -5,6 +5,7 @@ import {MfkAdminApp} from './App.tsx';
 import {installAdminSyncAutoFlush} from './admin-sync-client.ts';
 import {installAdminProjectionLiveRead} from './admin-projection-client.ts';
 import './styles.css';
+import './admin-control-plane.css';
 
 installAdminSyncAutoFlush();
 installAdminProjectionLiveRead();
