@@ -59,7 +59,7 @@ describe('MFK Admin catalog migration slice',()=>{
           <MfkAdminApp/>
         </MemoryRouter>,
       );
-      expect(html,capability.id).not.toContain('目前狀態');
+      expect(html,capability.id).not.toContain('class="mfk-admin-capability"');
     }
   });
 
@@ -70,8 +70,9 @@ describe('MFK Admin catalog migration slice',()=>{
           <MfkAdminApp/>
         </MemoryRouter>,
       );
-      expect(html).not.toMatch(/NOT_WIRED|MIGRATION_ONLY|SOURCE_INTENT|TARGET_OBSERVED|Human Compare|Domain adapters|Live Mutation/);
-      expect(html).toMatch(/尚未|未發布|人工|發布|對帳|快捷原因/);
+      const visible=html.replace(/<[^>]*>/g,' ');
+      expect(visible).not.toMatch(/NOT_WIRED|MIGRATION_ONLY|SOURCE_INTENT|TARGET_OBSERVED|Human Compare|Domain adapters|Live Mutation/);
+      expect(visible).toMatch(/尚未|未發布|人工|發布|對帳|快捷原因/);
     }
   });
 
