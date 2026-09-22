@@ -1,0 +1,140 @@
+MFK 航海圖 V1.13｜Round014｜2026-09-22
+主題：OWNER 814 BASELINE LOCK / PERSISTENCE FIX MUST NOT DRIFT PRODUCT
+狀態：CURRENT / CONTROLLING
+CONTROL：Pantonyeung/mfk #22
+COMMANDER ENTRY：COMMANDER_CURRENT.md
+ACTIVE ISSUE：#40
+
+==================================================
+0. OWNER TARGET CORRECTION
+==================================================
+
+Owner clarified that the desired SMT runtime/product baseline is:
+
+runtime-candidate-mfk-814043c809bb
+
+Source:
+
+814043c809bbc236df1383c320bad906bcd3f1cd
+
+This is the version to preserve.
+
+Current device stable runtime:
+
+runtime-candidate-55fea91e128a
+
+is physically persistent across reboot,
+but is NOT the desired product baseline.
+
+==================================================
+1. PREVIOUS ASSUMPTION INVALIDATED
+==================================================
+
+Previous repair candidate:
+
+runtime-candidate-mfk-2fd6e10cc7c8
+
+was treated as if it represented the desired baseline plus runtime.ready.
+
+GitHub compare proves otherwise:
+
+814043... → 2fd6e10...
+
+status: diverged
+ahead_by: 63
+behind_by: 10
+merge_base:
+3725ead94a2bf31469f054c955d1b46503e15481
+
+Therefore 2fd6 cannot be accepted as a no-drift repair of 814.
+
+==================================================
+2. CURRENT P0
+==================================================
+
+P0:
+
+814 OWNER BASELINE
++
+MINIMAL runtime.ready PERSISTENCE FIX
++
+ZERO PRODUCT DRIFT
+
+The repaired candidate must use a NEW release identity.
+
+Never reuse releaseId 814043c809bb with changed bytes.
+
+Acceptance is behavioral/source baseline preservation,
+not literal reuse of the old release ID.
+
+==================================================
+3. EXACT BASE / ALLOWLIST
+==================================================
+
+WORK_ID:
+MFK-SMT-OTA-814-BASELINE-PERSISTENCE-R2
+
+Issue:
+#40
+
+Exact base:
+814043c809bbc236df1383c320bad906bcd3f1cd
+
+Allowed delta only:
+- runtime Carrier boundary parser/signal
+- RuntimeReadyActivation
+- deterministic runtime.ready tests
+- minimal App mount after React commit
+
+No unrelated SMT UI/product/workflow/config changes.
+
+==================================================
+4. ACCEPTANCE
+==================================================
+
+Before publish:
+
+1. exact base verified
+2. allowlist-only diff
+3. runtime.ready contract GREEN
+4. build GREEN
+5. product/behavior equivalence to 814 confirmed except persistence seam
+
+Then publish NEW release ID.
+
+Real device:
+
+6. Owner confirms desired 814 UI/behavior
+7. Current promotes to new repaired release
+8. Candidate clears
+9. Activation Requested false
+10. app restart preserves Current
+11. full power off/on preserves Current
+12. Previous remains rollback target
+
+Only then BANK:
+
+MFK_SMT_OTA_814_BASELINE_PERSISTENCE_GREEN
+
+==================================================
+5. HOLD
+==================================================
+
+Admin A2:
+PAUSED
+
+A3:
+NOT AUTHORIZED
+
+OTA infra migration:
+NOT AUTHORIZED
+
+Keeta live:
+NOT AUTHORIZED
+
+SMM / Customer / Owner live seams:
+NOT AUTHORIZED
+
+==================================================
+END ROUND014
+==================================================

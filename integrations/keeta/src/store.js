@@ -90,3 +90,26 @@ export function buildKeetaStoreOperationalShape({ providerShopId, action }) {
     invariant: 'KEETA_REST_OPEN_IS_NOT_MFK_STORE_ACTIVE_INACTIVE_LIFECYCLE',
   });
 }
+
+
+export function buildKeetaStoreDetailsShape({ providerShopId }) {
+  if (!Number.isSafeInteger(providerShopId) || providerShopId <= 0) throw new Error('KEETA_PROVIDER_SHOP_ID_INVALID');
+  return Object.freeze({
+    providerOperation: PROVIDER_OPERATIONS.storeDetails,
+    params: Object.freeze({ shopId: providerShopId }),
+    action: 'STORE_DETAILS_READBACK',
+    authorityBoundary: 'PROVIDER_READBACK_ONLY',
+    executionGate: EXECUTION_GATE.NOT_WIRED,
+  });
+}
+
+export function buildKeetaStoreHoursGetShape({ providerShopId }) {
+  if (!Number.isSafeInteger(providerShopId) || providerShopId <= 0) throw new Error('KEETA_PROVIDER_SHOP_ID_INVALID');
+  return Object.freeze({
+    providerOperation: PROVIDER_OPERATIONS.storeHoursGet,
+    params: Object.freeze({ shopId: providerShopId }),
+    action: 'STORE_HOURS_READBACK',
+    authorityBoundary: 'PROVIDER_READBACK_ONLY',
+    executionGate: EXECUTION_GATE.NOT_WIRED,
+  });
+}

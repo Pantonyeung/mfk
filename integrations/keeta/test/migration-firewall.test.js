@@ -16,7 +16,7 @@ async function collect(dir) {
   return out;
 }
 
-test('migration firewall: production source has zero live runtime/network authority', async () => {
+test('runtime firewall: live network authority is isolated to the bounded K0 runtime helper', async () => {
   const patterns = [
     /\bfetch\s*\(/,
     /\bWebSocket\b/,
@@ -36,8 +36,15 @@ test('migration firewall: production source has zero live runtime/network author
 
   for (const file of await collect(srcRoot)) {
     const source = await readFile(file, 'utf8');
+    const isLiveRuntime=file.endsWith('live-runtime.js');
     for (const pattern of patterns) {
-      assert.doesNotMatch(source, pattern, `${file} violates migration firewall with ${pattern}`);
+      if(isLiveRuntime&&String(pattern)==='/\\bfetch\\s*\\(/')continue;
+      assert.doesNotMatch(source, pattern, `${file} violates runtime firewall with ${pattern}`);
+    }
+    if(isLiveRuntime){
+      assert.match(source,/https:\/\/open\.mykeeta\.com\/api\/open\/base\/oauth\/token/);
+      assert.doesNotMatch(source,/v2(?:local|admin|smm|customer|owner)/);
+      assert.doesNotMatch(source,/setInterval|setTimeout|DurableObject|D1Database|scheduled/);
     }
   }
 });
@@ -46,5 +53,12 @@ test('migration firewall: no product-port import is allowed', async () => {
   for (const file of await collect(srcRoot)) {
     const source = await readFile(file, 'utf8');
     assert.doesNotMatch(source, /(?:\.\.\/)+v2(?:local|admin|smm|customer|owner)\b/);
+  }
+});
+
+test('runtime firewall: K0 live helper never owns canonical MFK truth', async () => {
+  const source = await readFile(join(srcRoot,'live-runtime.js'),'utf8');
+  for (const forbidden of ['createOrder','StoreKernel','PaymentAuthority','FormalOrder','D1Database','canonical writer']) {
+    assert.doesNotMatch(source,new RegExp(forbidden,'i'));
   }
 });

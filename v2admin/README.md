@@ -1,128 +1,89 @@
 # MFK Admin
 
-`v2admin/` 係 MFK 獨立 Admin Control Plane。
+`v2admin/` 係 MFK Admin Control Plane。
 
 ## Current phase
 
-`PORT_MIGRATION_ONLY`
+`ADMIN_PRODUCT + ADMIN→SMT_AUTO_SYNC`
 
-呢個產品目前只完成 Admin 自己嘅 Surface / Workflow 搬遷，所有跨 Port Connection 都保持關閉。
+Owner 已明確開啟 Admin→SMT 連線。
 
-## Current migration coverage
+正式操作：
 
-Capability registry：41
+`Edit → Save → Validate → Active Revision → Auto Canonical Publish → SMT Auto Fetch → Local LKG → ACK/Readback`
 
-全部 41 項都有：
-- MFK route
-- MFK truth owner
-- concrete workspace / editor / read-model surface
-- explicit migration status
-- no live connection
+冇第二個 Publish。
+冇 Menu 手動發布。
+冇 SMT 匯入／安裝／確認。
 
-主要已搬 Surface：
+## Current sync scope
 
-- Overview / Readiness / Pending Changes
-- Publish Center
-- Product / Category
-- Modifier / Option
-- Pricing Config
-- Combo
-- Menu Display / Sort
+每個成功 Admin Save 會發布完整 active snapshot，包括：
+
+- Category / Product / Price
+- Option Set / child Option / Product defaults
+- Combo / Pool
 - Availability / Capacity
 - Business Day
-- Orders / History / Exceptions
 - Logical Printer / Print Templates / Product Print Rules
-- Channel Policy / Mapping / Mapping Failure / Intake / Sync / Settlement
-- Customer 360 / Loyalty / Coupon
-- Sales / Operations / RFM
-- Store Settings / Timers
+- Product Media references
+- Store Settings
 - Quick Reasons
-- Staff / Roles
-- Announcements
-- Audit
-- Advanced
-- Customer / Owner / Frontline presentation config
+- Staff / permission configuration
+- Channel policy / mappings
+- Presentation
+- Inventory Lite
+- Loyalty / Coupons / Announcements
 
-## Migration firewall
+SMT 將完整 snapshot 保存成一個 atomic Local LKG。
+核心點餐 projection 直接使用 Admin 商品、價格、售罄、Option Set 同 Combo。
 
-今階段：
-
-- Live mutation: OFF
-- Live read: OFF
-- Network transport: OFF
-- Domain Adapter: OFF
-- SMT connection: OFF
-- Store Kernel write: OFF
-- D1 / Cloud: OFF
-- Provider command: OFF
-
-所有未接功能必須顯示：
-`NOT_WIRED` / `MIGRATION_ONLY`
-
-## Authority
+## Authority boundary
 
 Owner 決定規則。
+Admin 係唯一設定 Control Plane。
+SMT 只執行已接收設定。
 
-Admin 將規則變成：
+仍然禁止 Admin 成為：
+- Store Kernel writer
+- Order / Payment authority
+- physical printer binding authority
+- provider live command authority
 
-Draft
-→ Validate
-→ Publish
-→ Active Revision
+SMT 離線：
+- 繼續使用 Local LKG
+- Order / Checkout / Payment / Local Commit 唔受阻
+- 網絡恢復後自動追最新 Admin revision
 
-SMT 執行已發布規則。
+Realtime 只係 doorbell。
+正式資料永遠重新 GET canonical active snapshot。
 
-但 Publish / Active Revision connection 目前仍然未開。
-
-## Connection phase
-
-只有 Owner 明確開 seam 後先可以接。
-
-固定節奏：
-
-`CONNECT ONE → TEST SAME PIECE → BANK → WAIT OWNER`
-
-
-## Cloudflare H1 hosting
-
-Current MFK Admin may reuse the existing Cloudflare Worker resource named `morefun-v2-admin`.
-
-This is **resource-shell reuse only**. The old Morefun-v2 runtime is not reused.
-
-Cloudflare reconnect settings:
-
-- Repository: `Pantonyeung/mfk`
-- Production branch: `main`
-- Root directory: `v2admin`
-- Build command: `npm run build`
-- Deploy command: `npx wrangler deploy`
-- Non-production branch builds: OFF by default
-
-`v2admin/wrangler.jsonc` intentionally contains only static SPA assets. It must not gain D1, R2, Durable Objects, service bindings, cron triggers or SMT/Keeta API runtime as part of H1.
-
-The separate OTA Worker `morefunos-v2-smt-ota` and its R2 bucket are outside H1 and must remain untouched.
-
-
-## Cloudflare H2 — dedicated MFK account
-
-H2 supersedes the legacy-account hosting path.
+## Cloudflare H2
 
 Target Worker:
 `mfk-admin`
 
-Deployment source:
-`Pantonyeung/mfk`
+同一 Worker 同時提供：
+- Admin SPA assets
+- `/api/admin-sync/*` canonical config transport
 
-Project root:
-`v2admin`
+Canonical config state 使用 dedicated Durable Object binding：
+`ADMIN_SYNC`
 
-Deployment transport:
-GitHub Actions + Wrangler.
+呢個 runtime 只負責 Admin configuration distribution / ACK。
+唔會承擔交易真相或 Store Kernel。
 
-The first empty `mfk-admin` Worker should be created once in the dedicated MFK Cloudflare account. After that, the CI token should be scoped to that Worker with Editor access. This avoids granting CI product-level Admin solely to bootstrap the first Worker.
-
-Required GitHub repository secrets:
+Required GitHub repository secrets remain:
 - `CLOUDFLARE_ACCOUNT_ID`
 - `CLOUDFLARE_API_TOKEN`
 
-H2 remains static hosting only. It must not introduce D1, R2, Durable Objects, Cron triggers, service bindings, provider runtime or SMT automatic network transport.
+## Security
+
+Publish mutation：
+- same-origin only
+- first legitimate Admin browser automatically enrols a random 256-bit publisher key
+- Durable Object stores only SHA-256 key hash
+- subsequent publish requires same publisher key
+- cross-origin mutation fails closed
+
+SMT read / doorbell / ACK 係 configuration distribution seam，唔係 transaction command seam。

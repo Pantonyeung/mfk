@@ -1,67 +1,78 @@
 # MFK CURRENT HANDOFF｜2026-09-22
 
-Current system: **MFK only**.
-
-Current main at handoff generation: `e325a05bb8e349a24d5a6a92a8c0b111f7c12c67`
-
 Current navigation:
-`docs/navigation/MFK_航海圖_V1.7_Round008_2026-09-22.txt`
+docs/navigation/MFK_航海圖_V1.24_Round025_2026-09-22.txt
 
-Detailed seamless handoff:
-`docs/handoff/MFK_Admin_Connection_Seamless_Handoff_R1_2026-09-22.txt`
+Control:
+#22
 
-Cloud / retirement lock:
-`docs/governance/MFK_CLOUD_RUNTIME_BUDGET_AND_LEGACY_RETIREMENT_LOCK_R1_2026-09-22.md`
+Parent:
+#45 Admin Product Completion
 
-Keeta runtime guard:
-`integrations/keeta/RUNTIME_SIMPLICITY_GUARD_R1.md`
+Current:
+#76 Admin Option Set Center R2
 
-## Current Admin Connection
+Superseded:
+#68 CLOSED / NOT_PLANNED
 
-A1:
-`MFK_ADMIN_MENU_INDEX_A1_SEMANTIC_LINK_GREEN`
+State:
+MFK_ADMIN_OPTION_SET_CENTER_R2_DEPLOYED_OWNER_REVIEW_PENDING
 
-A2:
-`MFK_ADMIN_A2_CONTROLLED_TRANSFER_IMPLEMENTATION_GREEN`
+## CORRECT OPTION MODEL
 
-A2 real separate-device Owner walkthrough:
-**PENDING**
+選項中心 = reusable Option Set / 選項組.
 
-A3 automatic network transport:
-**NOT AUTHORIZED**
+Examples:
+飯量 → 多飯 / 少飯 / 走飯
+青瓜 → 多青瓜 / 少青瓜 / 走青瓜
 
-## Immediate next action
+Set owns child Options.
 
-Run exactly one real A2 cross-device walkthrough:
+No flat global Option Master in primary operator UI.
 
-Admin Publish Bundle
-→ SMT Import / Apply
-→ SMT Readback Receipt
-→ Admin Import Receipt
-→ MATCH
+## PRODUCT
 
-Hard rule:
+Product Detail:
+- 加入選項
+- choose existing Set
+- link / unlink whole Set
+- read child ID / Name / Price
+- set Product-specific default child
 
-`NO TARGET READBACK = NOT GREEN`
+Default:
+Product × Set × Child Option
 
-Do not start another connection seam until Owner has accepted that result.
+## PROOF
 
-## Permanent connection rule
+Verification:
+35694910787 SUCCESS
 
-`CONNECT ONE → TEST SAME PIECE → BANK → STOP → OWNER DECIDES NEXT`
+Deploy:
+35695027863 SUCCESS
 
-## Cloud rule
+Canonical:
+https://admin.morefunos.com
 
-MFK Cloud = EVENT-DRIVEN FIRST.
+## EXACT NEXT
 
-Business hours: `10:00–20:30 Asia/Hong_Kong`
+Owner review:
+菜單 → 選項中心
+→ 新增選項組
+→ 展開
+→ 新增子選項
 
-Off hours: `LOW_TRAFFIC_MODE`
+Then:
+商品資料 → 編輯 → 選項
+→ 加入選項
+→ set Product-specific default
 
-No one-minute global cron. No five-second watchdog. Cloud never blocks local SMT transaction.
+If GREEN:
+bank #76
+continue #62.
 
-## Legacy
+## HOLD
 
-Old Morefun-v2 Keeta runtime is RETIRED and must never be reconnected to MFK.
-
-Legacy provider-side Cloudflare retirement remains tracked in #32.
+#44 HOLD
+#40 HOLD
+#66 NOT NEXT until #76 accepted
+Keeta live NOT AUTHORIZED

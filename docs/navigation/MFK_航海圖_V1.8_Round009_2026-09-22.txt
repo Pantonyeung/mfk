@@ -1,0 +1,2107 @@
+MFK 航海圖 V1.8｜Round009｜2026-09-22
+主題：ADMIN A1+A2 BANKED / DEDICATED MFK CLOUDFLARE BOOTSTRAPPED / CANONICAL DOMAIN LOCKED
+狀態：CURRENT / CONTROLLING
+CONTROL_BASE_MAIN：667c653247db69d3b4f127c1d801ed164dcb1bd2
+CONTROL：Pantonyeung/mfk #22
+
+==================================================
+0. OWNER ABSOLUTE RULE
+==================================================
+
+MFK 對外只保留六個角色：
+
+1. SMT
+2. Admin
+3. SMM
+4. Customer
+5. Keeta
+6. Owner
+
+NO SEVENTH PRODUCT.
+
+禁止建立：
+
+- 第二 Order Engine
+- 第二 Pricing Engine
+- 第二 Payment Engine
+- 第二 Print Engine
+- 第二 Store Kernel
+- 第二 Auth Engine
+- 第二 Sync Engine
+- Shared-domain App
+- Orchestration App
+- 任何會取得獨立 business authority 嘅額外產品
+
+Internal Adapter / Contract / Projection：
+只係 seam。
+唔係 Product。
+唔取得獨立主權。
+
+==================================================
+1. CURRENT PHASE
+==================================================
+
+SIX-ROLE MIGRATION：
+COMPLETE
+
+SIX-ROLE CLEAN LANDING：
+COMPLETE
+
+CAPABILITY UPGRADE WAVE：
+COMPLETE FOR
+- Admin
+- Customer
+- SMM
+- Owner
+
+KEETA PROVIDER CONTRACT MIGRATION：
+COMPLETE
+
+KEETA RUNTIME SIMPLICITY HARDENING：
+COMPLETE / TEST_GREEN / NOT_WIRED
+
+ADMIN CONNECTION PHASE：
+OPEN
+
+CONTROLLED CROSS-PORT TRANSPORT：
+A2 IMPLEMENTED / TEST_GREEN
+
+AUTOMATIC NETWORK TRANSPORT：
+NOT STARTED
+
+AUTOMATIC NETWORK CONNECTION COUNT：
+0
+
+CURRENT GLOBAL STATE：
+
+MIGRATED
+CAPABILITY_UPGRADED
+CLOUD_RUNTIME_BUDGET_LOCKED
+LEGACY_KEETA_RETIRED
+TEST_GREEN
+LANDED_CLEAN
+NOT_WIRED
+
+直到 Owner 明確開第一條 exact connection seam 前：
+
+NO LIVE WIRING
+
+==================================================
+2. SIX ROLE CURRENT REALITY
+==================================================
+
+--------------------------------------------------
+SMT
+--------------------------------------------------
+
+ROLE：
+LOCAL POS / FRONTLINE EXECUTION / LOCAL TRANSACTION AUTHORITY
+
+CURRENT：
+EXISTS IN MFK
+NO REMIGRATION
+NO SECOND POS CORE
+
+RESPONSIBILITY：
+
+- Local ordering
+- Cart / Checkout
+- Payment execution
+- Formal Order
+- Fulfillment
+- Local Print / Hardware
+- Local transaction truth
+- Offline local execution
+
+ABSOLUTE RULE：
+
+SMT 必須可以本地完成交易。
+
+以下任何失敗都唔可以阻：
+
+- Order
+- Checkout
+- Payment
+- Local Commit
+
+NON-BLOCKING：
+
+- Business Day
+- Reporting
+- Audit
+- Diagnostics
+- Owner
+- Cloud
+- Provider
+- Projection
+
+--------------------------------------------------
+ADMIN
+--------------------------------------------------
+
+ROLE：
+CONFIGURE / AUTHOR / PUBLISH
+
+PORT MIGRATION：
+#23 CLOSED / BANKED
+
+CAPABILITY UPGRADE：
+#28 CLOSED / BANKED
+
+CURRENT STATUS：
+MFK_ADMIN_WORKFLOW_CAPABILITY_UPGRADED_NOT_WIRED
+TEST_GREEN
+LANDED_CLEAN
+
+CAPABILITY REGISTRY：
+52
+
+UPGRADE R1 SOURCE：
+e18ac89d528b76f0c7861824b324bcb7e4763e09
+
+SOURCE TEST：
+35617604968 SUCCESS
+
+UPGRADE LANDING：
+d95e4172486d4f7437aa4222052bd1786f113ebf
+
+LANDING TEST：
+35617782625 SUCCESS
+
+CURRENT CAPABILITY SHAPE：
+
+- Today / Readiness
+- Unified Action Queue
+- Product / Category / Modifier / Combo
+- Pricing config
+- Pending Changes / Publish
+- Validate / Impact Preview
+- Expected Base Revision
+- Target Readback
+- Rollback shape
+- Channel config / mapping
+- Device management
+- OTA governance
+- Logical Printer / routing config
+- Staff / PIN / Role / Scope / Permission config
+- Admin Session / Trusted Device / Revoke presentation
+- Business Day record
+- Cash / Close record workflow
+- Fixed Reports
+- Export Governance
+- Diagnostics
+- Integrations Governance
+- Effective Settings / source / override / floor
+
+ABSOLUTE RULE：
+
+Admin 係 rules/config author。
+唔係每張交易第二 approver。
+
+Future shortest connection：
+
+Admin Draft
+→ Validate
+→ Publish
+→ Active Config Revision
+→ SMT receive
+→ SMT Local LKG
+→ Readback
+
+交易時唔返 Admin 問准。
+
+BUSINESS DAY / CASH：
+
+RECORD / ATTENTION / REPORTING ONLY
+
+NEVER：
+
+- Order blocker
+- Checkout blocker
+- Payment blocker
+- Local Commit blocker
+
+--------------------------------------------------
+SMM
+--------------------------------------------------
+
+ROLE：
+TRUSTED STAFF ASSISTIVE ORDER SOURCE
+
+PORT MIGRATION：
+#24 CLOSED / BANKED
+
+CAPABILITY UPGRADE：
+#30 CLOSED / BANKED
+
+CURRENT STATUS：
+MFK_SMM_ASSISTIVE_CAPABILITY_UPGRADED_NOT_WIRED
+TEST_GREEN
+LANDED_CLEAN
+
+CAPABILITY REGISTRY：
+54
+
+COMMAND_SHAPE：
+7 / 7 NOT_WIRED
+
+UPGRADE SOURCE：
+c5202ff8f97a632a0f8bd6f668da47afc862b7f5
+
+SOURCE TEST：
+35623294180 SUCCESS
+
+UPGRADE LANDING：
+e30d052c35878fa2fd2b2df0f2ca146f18ae0ab8
+
+LANDING TEST：
+35623381834 SUCCESS
+
+CURRENT CAPABILITY SHAPE：
+
+- Menu browse
+- Basic search
+- Zero-result recovery
+- Product select
+- Modifier / Combo config
+- Multi-select
+- Min / Max / Required validation
+- Cart preview
+- Quantity edit
+- Line-level repair
+- Quote preview shape
+- Stable Submission Identity presentation
+- PENDING / UNKNOWN result certainty
+- same-intent retry/readback shape
+- Order oversight
+- Delayed Order / Updated ETA
+- Channel Health read-only
+- Exception / Pending Action Queue read-only
+- Source / Staff provenance
+- Business Day non-blocking presentation
+
+RULE：
+
+SMM 唔擁有：
+
+- Formal Order
+- Pricing
+- Payment
+- Store Kernel
+
+Future direction：
+
+SMM
+→ ONE CANONICAL ORDER INTAKE
+→ SMT
+
+--------------------------------------------------
+CUSTOMER
+--------------------------------------------------
+
+ROLE：
+CUSTOMER DIRECT ORDER SOURCE
+
+PORT MIGRATION：
+#25 CLOSED / BANKED
+
+CAPABILITY UPGRADE：
+#29 CLOSED / BANKED
+
+CURRENT STATUS：
+MFK_CUSTOMER_ESSENTIAL_CAPABILITY_UPGRADED_NOT_WIRED
+TEST_GREEN
+LANDED_CLEAN
+
+CAPABILITY REGISTRY：
+58
+
+COMMAND_SHAPE：
+5 / 5 NOT_WIRED
+
+UPGRADE SOURCE：
+23a624d8c226d18b8a8e9f101e2f42ac2a53addf
+
+SOURCE TEST：
+35621446285 SUCCESS
+
+UPGRADE LANDING：
+9a926465bb6a767b2bf1b9f59d25d85bb38e135f
+
+LANDING TEST：
+35621555835 SUCCESS
+
+CURRENT CAPABILITY SHAPE：
+
+- Home
+- Buy Again entry
+- Menu / Category
+- Basic Search
+- Zero-result recovery
+- Product Detail / Config
+- Modifier / Option / Combo
+- Multi-select
+- Min / Max / Required validation
+- Cart
+- Quantity editing
+- Line-level Attention / Partial Repair
+- Checkout Final Review
+- Quote freshness presentation
+- Material revalidation presentation
+- Phone input
+- Safe Submit / Pending Intent
+- Submission certainty
+- UNKNOWN state
+- Store Acceptance
+- Rejected
+- Preparing
+- Delayed / Updated ETA
+- Ready
+- Pickup verification
+- Handover separation
+- Completed
+- History / Reorder
+- Current revalidation
+- Offline / Failure / Retry / UNKNOWN / STALE
+
+RULE：
+
+Customer 唔擁有：
+
+- Formal Order
+- Pricing
+- Payment execution
+- Display Number allocation
+
+Future direction：
+
+Customer
+→ ONE CANONICAL ORDER INTAKE
+→ SMT
+
+--------------------------------------------------
+KEETA
+--------------------------------------------------
+
+ROLE：
+THIRD_PARTY_PROVIDER_ORDER_SOURCE + PROVIDER TRANSLATION
+
+ISSUE：
+#27 CLOSED / BANKED
+
+CURRENT STATUS：
+MFK_KEETA_API_MIGRATED_NOT_WIRED
+TEST_GREEN
+LANDED_CLEAN
+
+CAPABILITY REGISTRY：
+23
+
+SOURCE：
+0c63b8dbb9fbb79a8e0c1c530e3d8b38e288c4d7
+
+SOURCE TEST：
+35614714034 SUCCESS
+13 / 13 PASS
+
+LANDING：
+5612ae8da62d34ba7f3de9dd60e6ae47dac25925
+
+LANDING TEST：
+35614821994 SUCCESS
+
+CURRENT CAPABILITY SHAPE：
+
+- Provider Identity
+- Signature contract
+- Response normalization
+- Menu full snapshot shape
+- Menu readback / async task shape
+- Order Intake evidence normalization
+- Provider Store / Order alias
+- Merchant decision request builders
+- READY fulfillment request shape
+- Sellability / Store Hours / Rest-Open translation
+- After-sale 1005 / 1007 evidence
+- Webhook dedup / replay
+- Runtime secret contract
+- SIT / UAT registry
+
+CURRENT：
+PROVIDER CONTRACT / TRANSLATION / EVIDENCE ONLY
+
+ABSENT：
+
+- Live API
+- Live Webhook
+- Runtime Secret Binding
+- Provider Activation
+- Cloudflare runtime
+- D1 runtime
+- Admin wiring
+- SMT wiring
+- SMM wiring
+- Customer wiring
+- Owner wiring
+- Formal Order creation
+- MFK Availability binding
+- Store config binding
+
+PRESERVED EXTERNAL BLOCKERS：
+
+KEETA_LIVE_WEBHOOK_SIGNING_SEMANTICS_MISMATCH
+
+GENERIC PREPARING：
+NO OFFICIAL EVIDENCE
+
+/order/prepare：
+READY ONLY
+
+RULE：
+
+Keeta payload / provider IDs
+唔係 MFK canonical truth。
+
+Future direction：
+
+Keeta Provider Adapter
+→ ONE CANONICAL ORDER INTAKE
+→ SMT
+
+Provider-specific：
+
+- Auth
+- Signature
+- Translation
+- Evidence
+
+只留 edge。
+
+--------------------------------------------------
+OWNER
+--------------------------------------------------
+
+ROLE：
+WATCH / ALERT / REVIEW / BOUNDED ACT
+
+PORT MIGRATION：
+#26 CLOSED / BANKED
+
+CAPABILITY UPGRADE：
+#31 CLOSED / BANKED
+
+CURRENT STATUS：
+MFK_OWNER_COMMAND_CENTER_CAPABILITY_UPGRADED_NOT_WIRED
+TEST_GREEN
+LANDED_CLEAN
+
+CAPABILITY REGISTRY：
+110
+
+COMMAND_SHAPE：
+18 / 18 NOT_WIRED
+
+UPGRADE SOURCE：
+10e9080ace32551923f96662e95e73fb5a0f1511
+
+SOURCE TEST：
+35624283927 SUCCESS
+
+UPGRADE LANDING：
+989c3df584ab8e08b9f7786b1abe43265be4835d
+
+LANDING TEST：
+35624376866 SUCCESS
+
+CURRENT CAPABILITY SHAPE：
+
+- Today / KPI / Comparison / Freshness
+- Readiness
+- Action Queue
+- Order Oversight / Drill-down / Timeline
+- Channel Health
+- Sold-out / Restore UX
+- Staff presence / Role summary
+- Device / Printer Health
+- 8 Fixed Reports
+- Notifications
+- Manager Log / Checklist / Handoff
+- Recovery states
+- Customer / CRM Lite summary
+- New / Returning / Consent / Experience summary
+- Campaign / Attribution / Funding facts
+- Platform Settlement / Finality / Reconciliation Attention
+- Cash / Drawer / Over-short / Closeout summary
+- Inventory Lite Attention
+- Human-readable Activity / Audit
+- requester / approver / result / readback detail
+
+ABSOLUTE RULE：
+
+Owner 唔係：
+
+- 第二 POS
+- 第二 Admin
+- 第二 Order Engine
+- 第二 Pricing Engine
+- 第二 Payment Engine
+- 第二 Print Engine
+- 第二 Auth Engine
+- 第二 Sync Engine
+- BI Builder
+- ERP
+- Project Management App
+- Engineering Console
+
+所有 command shape：
+NOT_WIRED
+
+==================================================
+3. SIMPLE AUTHORITY LOCK
+==================================================
+
+每一件 business fact / action：
+
+ONE DECISION AUTHORITY ONLY
+
+其他 surface 只可以：
+
+- Record
+- Configure
+- Project
+- Request
+- Display
+- Translate
+
+禁止同一件事由多個 gatekeeper 重複判斷。
+
+禁止：
+
+Order submit
+→ Business Day gate
+→ Reporting gate
+→ Audit gate
+→ Owner gate
+→ Provider gate
+→ Commit
+
+呢類 synchronous veto chain。
+
+==================================================
+4. NON-BLOCKING DEFAULT
+==================================================
+
+以下全部預設 NON-BLOCKING：
+
+- Business Day
+- Reporting
+- Audit
+- Diagnostics
+- Projection
+- Owner observation
+- Admin read model
+- Cash closeout record
+- Inventory
+- Settlement / Reconciliation
+- Optional operational metadata
+- Cloud export
+- Provider status
+
+BUSINESS_DAY
+=
+RECORD / CLASSIFICATION / REPORTING SEMANTICS ONLY
+
+BUSINESS_DAY MUST NEVER BLOCK：
+
+- Order
+- Checkout
+- Payment
+- Local Commit
+
+INVENTORY：
+
+RECORD / ANALYSIS / ATTENTION
+
+INVENTORY MUST NEVER BECOME AUTOMATIC TRANSACTION BLOCKER.
+
+SETTLEMENT / RECONCILIATION：
+
+POST-TRANSACTION FINANCE / REVIEW
+
+MUST NEVER BLOCK NEW ORDER.
+
+==================================================
+5. ORDER SOURCE MODEL
+==================================================
+
+三個落單入口：
+
+SMM
+Customer
+Keeta
+
+同屬：
+
+ORDER_SOURCE
+
+身份：
+
+SMM
+= TRUSTED_STAFF
+
+Customer
+= CUSTOMER_DIRECT
+
+Keeta
+= THIRD_PARTY_PROVIDER
+
+共同方向：
+
+SMM ───────┐
+Customer ──┼──→ ONE CANONICAL ORDER INTAKE → SMT
+Keeta ─────┘
+
+禁止三套：
+
+- Order Engine
+- Pricing Engine
+- Formal Order Writer
+
+Source-specific 差異只留 edge：
+
+- Identity
+- Auth
+- Trust
+- Transport
+- Provider Translation
+- Provider Evidence
+
+==================================================
+6. CONFIG / READ / ORDER / READBACK MODEL
+==================================================
+
+CONFIG：
+
+Admin
+→ Publish Config Revision
+→ SMT Local LKG
+→ SMT Execute
+
+READ PROJECTION：
+
+Canonical facts
+→ Admin / SMM / Customer / Owner / Keeta adapter projection
+
+ORDER INTAKE：
+
+SMM / Customer / Keeta
+→ ONE canonical intake direction
+→ SMT
+
+ORDER READBACK：
+
+SMT / Store truth
+→ source-specific readback
+→ Owner / Admin projection
+
+PROVIDER：
+
+MFK canonical facts
+↔ Keeta Provider Adapter
+
+Adapter 只做：
+
+- translation
+- security
+- provider evidence
+
+唔做第二 transaction authority。
+
+==================================================
+7. CONNECTION STANDARD
+==================================================
+
+每條 connection seam：
+
+ONE OWNER
+ONE INPUT
+ONE OUTPUT
+ONE TEST
+
+規則：
+
+CONNECT ONE SEAM
+→ TEST SAME SEAM IMMEDIATELY
+→ GREEN / RED
+→ BANK
+→ STOP
+→ OWNER DECIDES NEXT
+
+禁止：
+
+- 一次接多條
+- 接完唔測
+- 未 BANK 就接下一條
+- 自行推斷下一條 permission
+
+==================================================
+8. OWNER-LOCKED CONNECTION PRIORITY
+==================================================
+
+第一優先：
+
+ADMIN CONNECTION FIRST
+
+第二優先：
+
+KEETA CONNECTION
+
+流程：
+
+ADMIN EXACT SEAM
+→ CONNECT
+→ TEST
+→ BANK
+→ STOP
+
+Owner 批准下一條後：
+
+KEETA EXACT SEAM
+→ CONNECT
+→ TEST
+→ BANK
+→ Owner 安排 External Keeta Acceptance
+
+KEETA EXTERNAL ACCEPTANCE：
+
+OWNER MANAGED
+
+唔屬 Main Chat acceptance authority。
+
+External acceptance 期間：
+
+MFK INTERNAL WORK CONTINUES
+
+Keeta 後面 SMM / Customer / Owner connection 次序：
+
+OWNER DIRECTS EXACT NEXT SEAM
+
+禁止自行推斷。
+
+==================================================
+9. FAILURE ISOLATION
+==================================================
+
+Keeta signature fail
+→ 只 block 該 provider message
+
+SMT local order：
+MUST CONTINUE
+
+Reporting fail
+→ Reporting unavailable
+
+SMT local order：
+MUST CONTINUE
+
+Inventory mismatch
+→ Attention / Recount
+
+SMT local order：
+MUST CONTINUE
+
+Settlement mismatch
+→ Reconciliation Attention
+
+SMT local order：
+MUST CONTINUE
+
+Owner unavailable
+→ Owner view unavailable
+
+SMT local order：
+MUST CONTINUE
+
+Admin unavailable after valid revision local：
+→ SMT uses Local LKG
+
+SMT local order：
+MUST CONTINUE
+
+==================================================
+10. OLD MOREFUN V2 TREATMENT
+==================================================
+
+舊 Morefun V2：
+REFERENCE / ORACLE ONLY
+
+唔係 current authority。
+
+舊 Apps / Packages：
+NOT AUTOMATIC MIGRATION TARGETS
+
+禁止整包復活。
+
+只可以用作：
+
+- Capability Oracle
+- Contract Oracle
+- Acceptance Oracle
+- Pure-function donor after review
+
+Current MFK 有 gap 時：
+
+fresh-read current MFK
+→ define exact missing seam
+→ implement smallest MFK-native piece
+→ test
+→ bank
+
+禁止因舊 package 存在就搬。
+
+==================================================
+11. CURRENT UPGRADE BANK
+==================================================
+
+SMT：
+CURRENT
+NO REMIGRATION
+
+Admin：
+52 capabilities
+CAPABILITY UPGRADED
+TEST GREEN
+CLEAN LANDED
+NOT_WIRED
+
+SMM：
+54 capabilities
+7 / 7 COMMAND NOT_WIRED
+CAPABILITY UPGRADED
+TEST GREEN
+CLEAN LANDED
+
+Customer：
+58 capabilities
+5 / 5 COMMAND NOT_WIRED
+CAPABILITY UPGRADED
+TEST GREEN
+CLEAN LANDED
+
+Keeta：
+21 provider-contract capabilities
+TEST GREEN
+CLEAN LANDED
+NOT_WIRED
+
+Owner：
+110 capabilities
+18 / 18 COMMAND NOT_WIRED
+CAPABILITY UPGRADED
+TEST GREEN
+CLEAN LANDED
+
+GLOBAL：
+
+SIX ROLE SET COMPLETE
+CAPABILITY UPGRADE WAVE COMPLETE
+LIVE CONNECTION COUNT = 0
+
+==================================================
+12. CONTROLLING RECORDS
+==================================================
+
+CONTROL：
+Pantonyeung/mfk #22
+
+SIMPLE / SINGLE AUTHORITY / NON-BLOCKING：
+5762381805
+
+OWNER CLEAN LANDING：
+5762401952
+
+KEETA CLEAN LANDING：
+5762492869
+
+NAVIGATION V1.2 ROUND003：
+5762667054
+
+ADMIN UPGRADE R1：
+5762884244
+#28 CLOSED
+
+CUSTOMER UPGRADE R1：
+5763354914
+#29 CLOSED
+
+SMM UPGRADE R1：
+5763594565
+#30 CLOSED
+
+OWNER UPGRADE R1：
+5763731496
+#31 CLOSED
+
+PORT BANKS：
+
+Admin #23 CLOSED
+SMM #24 CLOSED
+Customer #25 CLOSED
+Owner #26 CLOSED
+Keeta #27 CLOSED
+
+==================================================
+13. CURRENT HOLD
+==================================================
+
+Current overnight capability-upgrade work：
+
+COMPLETE FOR
+- Admin
+- Customer
+- SMM
+- Owner
+
+No live seam opened.
+
+Before exact Owner instruction：
+
+NO CONNECTION
+
+NO ADMIN LIVE PUBLISH ADAPTER
+NO KEETA LIVE API
+NO SMM→SMT
+NO CUSTOMER→SMT
+NO OWNER REMOTE COMMAND
+NO PROVIDER ACTIVATION
+NO CLOUD/D1 CONNECTION
+
+==================================================
+14. NEXT EXECUTABLE ACTION
+==================================================
+
+WAIT OWNER TO OPEN FIRST ADMIN CONNECTION SEAM
+
+Once opened：
+
+DEFINE EXACT ADMIN SEAM
+→ CONNECT ONE PIECE
+→ TEST IMMEDIATELY
+→ BANK
+→ STOP
+
+After Owner approval：
+
+DEFINE EXACT KEETA SEAM
+→ CONNECT ONE PIECE
+→ TEST IMMEDIATELY
+→ BANK
+→ STOP
+
+==================================================
+15. MILESTONES
+==================================================
+
+MFK_SIX_ROLE_SET_CLEAN_LANDED_NOT_WIRED
+
+MFK_SIMPLE_SINGLE_AUTHORITY_NONBLOCKING_LOCKED
+
+MFK_ADMIN_CAPABILITY_UPGRADE_R1_CLEAN_LANDED_NOT_WIRED
+
+MFK_CUSTOMER_ESSENTIAL_UPGRADE_R1_CLEAN_LANDED_NOT_WIRED
+
+MFK_SMM_ASSISTIVE_UPGRADE_R1_CLEAN_LANDED_NOT_WIRED
+
+MFK_OWNER_COMMAND_CENTER_UPGRADE_R1_CLEAN_LANDED_NOT_WIRED
+
+CURRENT：
+
+MFK_CAPABILITY_UPGRADE_WAVE_COMPLETE_NOT_WIRED
+
+NEXT：
+
+ADMIN_CONNECTION_FIRST
+
+==================================================
+16. CLOUD RUNTIME BUDGET / LEGACY RETIREMENT LOCK
+==================================================
+
+INCIDENT：
+2026-09-22 Cloudflare CPU alert exposed a retirement gap.
+
+CAUSE CLASS：
+Current MFK was already the current system,
+but old Morefun-v2 Cloudflare background runtime was still alive.
+
+Legacy patterns found：
+
+- morefun-v2-admin every-minute Cron
+- one scheduled invocation bundled Business Day + Print + Capacity + Fulfillment
+- PricingRealtimeHub 5-second watchdog alarm
+- morefun-v2-keeta-sit every-minute Cron
+- legacy D1 / recovery scans continuing independently of real business demand
+
+PERMANENT MFK RULE：
+
+MFK CLOUD = EVENT-DRIVEN FIRST
+
+Preferred triggers：
+
+- Admin Publish
+- Customer Submit
+- SMM Submit
+- Keeta Webhook
+- Store Kernel / Outbox Event
+- Fulfillment Event
+- Explicit Operator Action
+
+FORBIDDEN：
+
+- global 1-minute heavy Cron
+- 5-second liveness watchdog
+- one Cron handling multiple unrelated domains
+- 24/7 polling just to discover no work
+- cloud background work becoming SMT transaction precondition
+
+BUSINESS HOURS：
+
+Asia/Hong_Kong
+10:00–20:30
+
+During business hours：
+
+- event-driven first
+- scheduled safety sweep only where event proof is impossible
+- one invocation = one purpose
+- bounded batch
+- bounded CPU
+- explicit stop condition
+
+LOW_TRAFFIC_MODE：
+
+20:30–10:00
+
+Outside business hours：
+
+- non-urgent maintenance disabled or 30–60 minute cadence
+- reporting / reconciliation / housekeeping = low cadence
+- no frequent liveness polling
+- urgent provider webhook only if that exact provider seam has been activated
+- SMT local transaction remains independent
+
+CLOUD INVOCATION CONTRACT：
+
+Every future cloud seam must declare：
+
+PURPOSE
+TRIGGER
+OWNER
+INPUT
+OUTPUT
+MAX_BATCH
+EXPECTED_CPU_PER_INVOCATION
+EXPECTED_INVOCATIONS_PER_DAY
+BUSINESS_HOURS_POLICY
+OFF_HOURS_POLICY
+BACKOFF
+STOP_CONDITION
+FAILURE_ISOLATION
+LIMIT / COST ALARM
+
+Long work：
+
+BOUNDED BATCH
+→ CHECKPOINT
+→ CONTINUATION
+
+NEVER：
+
+while backlog exists
+→ run until empty
+
+==================================================
+17. CUTOVER RETIREMENT CHECKLIST
+==================================================
+
+A system is NOT retired just because a new repo becomes current.
+
+Every future cutover must prove：
+
+NEW SYSTEM ACTIVE
+→ OLD WRITERS OFF
+→ OLD CRON OFF
+→ OLD ALARMS / WATCHDOG OFF
+→ OLD QUEUE / DRAIN OFF
+→ OLD WEBHOOK INGRESS OFF OR QUARANTINED
+→ OLD WORKERS.DEV / CUSTOM ROUTES OFF
+→ OLD SERVICE BINDINGS OFF
+→ OLD PROVIDER CREDENTIALS REMOVED
+→ OLD DB / DURABLE BINDINGS DETACHED IF NO LONGER NEEDED
+→ LIVE METRICS CONFIRM QUIET
+→ BANK
+
+NO RETIREMENT EVIDENCE
+=
+NO BANK
+
+==================================================
+18. OLD MOREFUN-V2 KEETA RETIREMENT
+==================================================
+
+OLD MOREFUN-V2 KEETA：
+RETIRED
+
+MUST NOT BE USED AS：
+
+- MFK Keeta authority
+- callback runtime
+- OAuth runtime
+- D1 runtime
+- provider command path
+- SIT/UAT acceptance environment
+- live service binding target
+
+MFK Keeta future：
+
+current integrations/keeta/**
+→ rewrite / bind in MFK
+→ Owner opens exact seam
+→ connect one piece
+→ immediate test
+→ BANK
+→ Owner handles external Keeta acceptance
+
+NEVER RECONNECT MFK
+TO OLD MOREFUN-V2 KEETA RUNTIME.
+
+SOURCE-SIDE RETIREMENT APPLIED：
+
+Morefun-v2 admin:
+- cron explicitly set to empty on next deploy
+- scheduled runtime no-op
+- legacy 5-second realtime alarm disabled/self-deletes
+- old Keeta service binding removed
+
+Morefun-v2 Keeta:
+- workers.dev config disabled on next deploy
+- cron explicitly empty
+- runtime tombstoned with RETIRED response
+- old D1/service bindings removed
+
+Morefun-v2 Keeta channel gateway:
+- runtime tombstoned
+- old D1 binding removed
+
+IMPORTANT：
+
+SOURCE CHANGE ≠ LIVE CLOUDFLARE SHUTDOWN
+
+Cloudflare Dashboard provider-side retirement
+must still be confirmed manually.
+
+==================================================
+19. CLOUDFLARE OPERATOR CHECKLIST｜CURRENT MANUAL ACTION REQUIRED
+==================================================
+
+A. morefun-v2-admin
+
+Cloudflare：
+Workers & Pages
+→ morefun-v2-admin
+
+1. Triggers / Trigger Events
+   Delete every Cron Trigger
+   especially:
+   * * * * *
+
+2. Settings / Bindings
+   Confirm KEETA_CHANNEL_GATEWAY service binding is removed.
+
+3. Metrics
+   Confirm scheduled CPU errors fall to zero after live change.
+
+Admin public HTTP route may remain only if Owner intentionally keeps it temporarily.
+Background scheduler must remain OFF.
+
+B. morefun-v2-keeta-sit
+
+Cloudflare：
+Workers & Pages
+→ morefun-v2-keeta-sit
+
+1. Triggers
+   Delete every Cron Trigger.
+
+2. Domains / Domains & Routes
+   Disable workers.dev.
+   Remove any Custom Domain / Route if present.
+
+3. Settings / Bindings
+   Remove:
+   KEETA_INGRESS_DB
+   KEETA_CANONICAL_ORDER_SERVICE
+
+4. Variables and Secrets
+   Remove old provider secrets / credentials:
+   KEETA_APP_SECRET
+   KEETA_TOKEN_ENCRYPTION_KEY
+   KEETA_OAUTH_REDIRECT_URI
+   and any old Keeta access / signing credential.
+
+   KEETA_APP_ID / KEETA_PROVIDER_SHOP_ID may also be removed from retired runtime config.
+
+5. Verify no live webhook route remains.
+
+C. morefun-v2-keeta-channel-gateway
+
+Cloudflare：
+Workers & Pages
+→ morefun-v2-keeta-channel-gateway
+
+1. Domains / Routes
+   Confirm no public route.
+
+2. Settings / Bindings
+   Remove KEETA_INGRESS_DB.
+
+3. Confirm no Worker service binding still targets this gateway.
+
+D. After retirement
+
+Observe 30–60 minutes：
+
+- scheduled executions should stop
+- CPU-limit errors should stop
+- old Keeta ingress should receive zero legitimate traffic
+- no new old-runtime D1 write should appear
+
+Only then：
+
+LEGACY_CLOUDFLARE_RUNTIME_RETIRED = BANK
+
+==================================================
+20. DURABLE CONTROL SURFACES
+==================================================
+
+This rule is intentionally recorded in multiple current MFK surfaces
+so future workers do not lose it：
+
+1. Pantonyeung/mfk #22
+2. docs/navigation/MFK_航海圖_V1.4_Round005_2026-09-22.txt
+3. docs/governance/MFK_CLOUD_RUNTIME_BUDGET_AND_LEGACY_RETIREMENT_LOCK_R1_2026-09-22.md
+4. HANDOFF_CURRENT.md current control overlay
+5. README.md current control links
+
+Any future Worker must fresh-read
+CURRENT NAVIGATION + CLOUD GOVERNANCE
+before Cloud / Provider / Background Runtime work.
+
+==================================================
+21. MILESTONE ADDITIONS
+==================================================
+
+MFK_CLOUD_RUNTIME_BUDGET_LOCKED
+
+MFK_CLOUD_RUNTIME_BUDGET_AND_LEGACY_RETIREMENT_LOCKED
+
+OLD_MOREFUN_V2_KEETA_RETIRED_SOURCE_SIDE
+
+PROVIDER_SIDE_LEGACY_RETIREMENT_PENDING_OPERATOR_CONFIRMATION
+
+NEXT REMAINS：
+
+ADMIN_CONNECTION_FIRST
+
+LIVE CONNECTION COUNT：
+
+0
+
+==================================================
+22. KEETA RUNTIME SIMPLICITY GUARD
+==================================================
+
+LEGACY DESIGN REVIEW：
+OVERDESIGNED = YES
+
+Legacy worker mixed：
+
+- Webhook ingress / verification
+- D1 receipt / dedup
+- Merchant decision
+- Canonical acceptance bridge
+- Product / Option alias resolution
+- Provider command send
+- OAuth token storage / encryption / refresh
+- Scheduled stale-receipt recovery
+- Store binding
+- Auto-accept config
+- Commercial readback
+- Separate channel gateway
+- Service binding back into legacy Admin
+
+Legacy pressure pattern：
+
+- Keeta every-minute Cron
+  = 1,440 scheduled wakeups/day before real traffic
+- Admin every-minute Cron existed separately
+- background scans discovered work
+- one provider action could fan out across multiple runtimes
+- Cloudflare non-production Git builds were enabled
+- deployment path included remote D1 migration work
+
+MFK TARGET：
+
+THIN EDGE ADAPTER ONLY
+EVENT_DRIVEN_FIRST
+
+Inbound：
+
+Keeta Webhook
+→ Verify
+→ Normalize
+→ Dedup / Replay Identity
+→ ONE Canonical Intake Handoff
+→ ACK
+
+Outbound：
+
+Canonical MFK Decision / Event
+→ Build ONE Keeta Request
+→ Send
+→ Normalize Provider Result
+→ Minimal Delivery Evidence / Readback
+
+PERMANENT FORBIDDEN：
+
+- 1-minute global Cron
+- <5-minute liveness polling
+- 5-second watchdog / alarm
+- multi-domain scheduled drain
+- background DB scan merely to discover event-driven work
+- sleep / setTimeout business-delay loop
+- OAuth refresh polling Cron
+- provider DB as parallel business truth
+- provider Worker as general orchestration engine
+- second Order / Pricing / Fulfillment / Refund truth
+- reconnect old Morefun-v2 Keeta runtime
+
+BUSINESS HOURS：
+
+10:00–20:30 Asia/Hong_Kong
+
+OFF HOURS：
+
+20:30–10:00
+LOW_TRAFFIC_MODE
+
+If non-urgent scheduled safety work is unavoidable：
+
+>= 30 minutes off-hours
+
+CURRENT GUARD FILES：
+
+integrations/keeta/src/runtime-policy.js
+integrations/keeta/RUNTIME_SIMPLICITY_GUARD_R1.md
+
+MIGRATION FIREWALL ALSO FORBIDS：
+
+fetch
+WebSocket
+XMLHttpRequest
+setInterval
+setTimeout
+setAlarm
+scheduled handler
+WorkerEntrypoint
+DurableObject
+D1 / live runtime wiring
+
+KEETA CAPABILITIES：
+
+23
+
+LIVE KEETA WIRING：
+
+0
+
+MILESTONE：
+
+MFK_KEETA_RUNTIME_SIMPLICITY_GUARD_LOCKED_NOT_WIRED
+
+==================================================
+23. ADMIN CONNECTION A1｜BANKED
+==================================================
+
+OWNER AUTHORIZATION：
+
+ADMIN CONNECTION WORK
+= OPEN
+
+A1 EXACT SEAM：
+
+Admin Validated Menu Index Revision
+→ SMT Local Menu LKG Apply / Readback Contract
+
+SCOPE：
+
+Category：
+- identity
+- label
+- order
+
+Product：
+- identity
+- label
+- category
+- order
+- active
+
+Revision：
+- expected base revision
+- monotonic N → N+1
+- fingerprint
+- replay identity
+
+SMT LKG：
+- apply valid N+1
+- persist local active menu
+- rebase local draft
+- exact replay = IDEMPOTENT
+- stale/conflict = REJECT
+- tampered fingerprint = REJECT
+
+CONTRACT：
+
+contracts/admin-menu-index-v1.ts
+
+ADMIN ADAPTER：
+
+v2admin/src/admin-menu-link.ts
+
+SMT APPLY：
+
+v2local/src/runtime/local-admin-menu.ts
+applyAdminMenuIndexRevision(...)
+
+SOURCE CANDIDATE：
+
+c2e544d12b797966f20fc8e9a51ec1be169aceab
+
+SOURCE TEST：
+
+35668228894
+ADMIN PASS
+SMT PASS
+BUILD PASS
+
+CLEAN LANDING：
+
+986820f5e4c1f3b45f4c4ed76284ccd3782a122c
+
+LANDING TEST：
+
+35668324383
+ADMIN PASS
+SMT PASS
+BUILD PASS
+
+STATUS：
+
+MFK_ADMIN_MENU_INDEX_A1_SEMANTIC_LINK_GREEN
+
+==================================================
+24. ADMIN A1｜EXPLICITLY NOT CONNECTED
+==================================================
+
+A1 DID NOT OPEN：
+
+- HTTP transport
+- Cloud transport
+- Live Admin Publish button
+- Remote persistence
+- Pricing
+- Modifier
+- Combo
+- Availability
+- Print rules
+- Staff / RBAC
+- Keeta
+- SMM
+- Customer
+- Owner command
+
+Therefore：
+
+SEMANTIC CROSS-PORT SEAM
+= GREEN
+
+LIVE EXTERNAL TRANSPORT
+= NOT_WIRED
+
+LIVE EXTERNAL CONNECTION COUNT
+= 0
+
+==================================================
+25. CURRENT STOP / NEXT OWNER DECISION
+==================================================
+
+Owner sequencing rule remains controlling：
+
+CONNECT ONE PIECE
+→ TEST SAME PIECE
+→ BANK
+→ STOP
+→ OWNER DECIDES NEXT
+
+A1：
+
+GREEN
+BANKED
+STOPPED
+
+NEXT POSSIBLE A2：
+
+ADMIN PUBLISH TRANSPORT
+
+Possible purpose：
+
+Admin published Menu Index Revision
+→ minimal event-driven transport
+→ SMT receives exact revision
+→ SMT Local LKG apply
+→ readback proof
+
+BUT：
+
+A2 IS NOT AUTHORIZED YET.
+
+No Cloud Worker / D1 / KV / HTTP transport may be opened
+until Owner explicitly authorizes exact A2 seam.
+
+Cloud runtime rules remain：
+
+EVENT-DRIVEN FIRST
+NO 1-MINUTE CRON
+NO 5-SECOND WATCHDOG
+ONE INVOCATION = ONE PURPOSE
+BOUNDED CPU / BATCH
+
+==================================================
+26. CURRENT MILESTONES
+==================================================
+
+MFK_ADMIN_CONNECTION_PHASE_OPEN
+
+MFK_ADMIN_MENU_INDEX_A1_SEMANTIC_LINK_GREEN
+
+MFK_KEETA_RUNTIME_SIMPLICITY_GUARD_LOCKED_NOT_WIRED
+
+MFK_CLOUD_RUNTIME_BUDGET_AND_LEGACY_RETIREMENT_LOCKED
+
+CURRENT：
+
+A1 BANKED
+A2 WAIT OWNER
+
+LIVE EXTERNAL CONNECTION COUNT：
+
+0
+
+==================================================
+27. ADMIN CONNECTION A2｜BANKED IMPLEMENTATION
+==================================================
+
+A2 EXACT SEAM：
+
+Admin Publish Bundle
+→ Human-controlled Transfer
+→ SMT Validate / Apply Local LKG
+→ SMT Readback Receipt
+→ Admin Compare
+
+TRANSPORT MODE：
+
+HUMAN_CONTROLLED_FILE
+
+NETWORK：
+
+ABSENT
+
+POLLING：
+
+ABSENT
+
+CLOUD：
+
+ABSENT
+
+FIVE PROOFS：
+
+1. SOURCE_INTENT
+2. TRANSPORT_IDENTITY
+3. TARGET_OBSERVED
+4. COMPARE_RESULT
+5. HUMAN_VISIBLE_READBACK
+
+ADMIN HUMAN CONTROL：
+
+Admin Publish Center now shows：
+
+- seamId
+- transportId
+- Expected Revision
+- Expected Fingerprint
+- Target Observed Revision
+- Target Observed Fingerprint
+- Disposition
+- Evidence Ref
+- MATCH / MISMATCH / UNKNOWN
+
+SMT HUMAN CONTROL：
+
+SMT
+→ More
+→ Admin · Menu
+
+now supports：
+
+- Import Admin A2 Bundle
+- Validate transport identity
+- Apply exact revision
+- Display observed revision / fingerprint
+- Display APPLIED / IDEMPOTENT / REJECTED
+- Display MATCH / MISMATCH
+- Download SMT Readback Receipt
+
+SHARED CONTRACT：
+
+contracts/admin-menu-transfer-v1.ts
+
+ADMIN：
+
+v2admin/src/admin-menu-transfer.ts
+v2admin/src/GovernanceWorkspaces.tsx
+
+SMT：
+
+v2local/src/runtime/admin-menu-transfer.ts
+v2local/src/runtime/local-admin-menu.ts
+v2local/src/presentation/LocalAdminMenuWorkspace.tsx
+
+SOURCE GREEN：
+
+b291c895cf9ccedfc06690235fe5597bf4e2c7fa
+Run 35670165934 SUCCESS
+
+CLEAN LANDING：
+
+4609142b9e13cd825af795bf4b90e722a26a7026
+
+LANDING GREEN：
+
+Run 35670256629 SUCCESS
+
+STATUS：
+
+MFK_ADMIN_A2_CONTROLLED_TRANSFER_IMPLEMENTATION_GREEN
+
+==================================================
+28. A2 REAL OWNER WALKTHROUGH｜PENDING
+==================================================
+
+IMPORTANT：
+
+Executable implementation is GREEN.
+
+Real separate-device Owner walkthrough
+has NOT yet been claimed.
+
+OWNER ACCEPTANCE STEPS：
+
+ADMIN：
+
+1. Open Pending Changes / Publish
+2. Prepare Category / Product Menu Index change
+3. Validate
+4. Confirm A2 Impact
+5. Enter exact SMT current Base Revision
+6. Download A2 Publish Bundle
+7. Confirm Admin screen shows：
+   Expected Revision
+   Expected Fingerprint
+   Transport ID
+
+SMT：
+
+8. Open More
+9. Open Admin · Menu
+10. Import same A2 Bundle
+11. Confirm：
+    Observed Revision
+    Observed Fingerprint
+    State = MATCH
+12. Download SMT Readback Receipt
+
+ADMIN：
+
+13. Import SMT Readback Receipt
+14. Confirm：
+    Expected Revision = Observed Revision
+    Expected Fingerprint = Observed Fingerprint
+    Compare = MATCH
+
+ONLY THEN：
+
+A2 OWNER ACCEPTED
+
+HARD RULE：
+
+NO TARGET READBACK
+=
+NOT GREEN
+
+TRANSPORT FILE CREATED
+!=
+TARGET APPLIED
+
+UNKNOWN
+!=
+FAILED
+
+==================================================
+29. CURRENT STOP / A3 GATE
+==================================================
+
+A1：
+BANKED
+
+A2：
+IMPLEMENTATION GREEN
+OWNER REAL WALKTHROUGH PENDING
+
+A3：
+
+AUTOMATIC NETWORK DELIVERY
+NOT AUTHORIZED
+
+Do NOT open：
+
+- Cloudflare transport
+- HTTP transport
+- polling
+- D1/KV/DO
+- background worker
+
+until Owner completes A2 real walkthrough
+and explicitly authorizes A3.
+
+If A3 is later authorized：
+
+same A2 envelope / receipt identity must be reused.
+
+Do NOT invent a second connection protocol.
+
+Future automatic path：
+
+Admin Publish Event
+→ Minimal Event-driven Delivery
+→ SMT receives SAME A2 Bundle Contract
+→ Apply
+→ SAME Readback Receipt
+→ Admin Compare
+
+==================================================
+30. CURRENT MILESTONE
+==================================================
+
+MFK_ADMIN_MENU_INDEX_A1_SEMANTIC_LINK_GREEN
+
+MFK_ADMIN_A2_CONTROLLED_TRANSFER_IMPLEMENTATION_GREEN
+
+MFK_CONNECTION_HUMAN_READBACK_REQUIRED
+
+CURRENT：
+
+A2 OWNER WALKTHROUGH PENDING
+
+NEXT：
+
+OWNER RUNS ONE REAL A2 CROSS-DEVICE TEST
+
+AUTOMATIC NETWORK CONNECTION COUNT：
+
+0
+
+==================================================
+31. DEDICATED MFK CLOUDFLARE ACCOUNT
+==================================================
+
+OWNER DECISION：
+
+MFK uses a dedicated Cloudflare account.
+
+Purpose：
+
+- isolate MFK from legacy Morefun-v2 infrastructure
+- avoid inherited Worker / D1 / R2 / DO / Cron / provider runtime
+- keep future MFK deployment authority clean
+
+PROVIDER EVIDENCE：
+
+Fresh account started with：
+
+Projects = 0
+Requests = 0
+CPU = 0 ms
+Observability = 0
+Workers Build Minutes = 0
+
+Bootstrap Worker created：
+
+mfk-admin
+
+Bootstrap URL：
+
+mfk-admin.yeungyi88.workers.dev
+
+CURRENT WORKER STATE：
+
+Hello World shell only
+manual bootstrap deployment
+
+MFK source deployment target：
+
+mfk-admin
+
+Deployment path：
+
+GitHub Actions
+→ Wrangler
+→ dedicated MFK Cloudflare account
+
+Cloudflare Workers Builds：
+
+NOT REQUIRED FOR MFK DEPLOYMENT PATH
+
+H2 SOURCE：
+
+da36b4ebefb4431bf995044174dc085d48edba80
+
+H2 TEST：
+
+35675521169 SUCCESS
+
+==================================================
+32. MFK CANONICAL DOMAIN ROOT｜OWNER LOCK
+==================================================
+
+CANONICAL INTERNET ROOT：
+
+morefunos.com
+
+This is the permanent namespace for
+all future MFK Internet-facing system web surfaces.
+
+RULE：
+
+workers.dev
+=
+BOOTSTRAP / TEMPORARY VALIDATION ONLY
+
+workers.dev MUST NOT become：
+
+- canonical system URL
+- published bookmark
+- QR target
+- provider callback target
+- permanent documentation URL
+
+APEX：
+
+morefunos.com
+
+is reserved as：
+
+MFK ROOT NAMESPACE
+/ FUTURE FRONT DOOR
+
+Do NOT consume apex for Admin.
+
+==================================================
+33. ADMIN CANONICAL DOMAIN
+==================================================
+
+CANONICAL ADMIN URL：
+
+https://admin.morefunos.com
+
+Deep-link example：
+
+https://admin.morefunos.com/admin/publish
+
+Provider mapping：
+
+mfk-admin Worker
+→ Custom Domain
+→ admin.morefunos.com
+
+Dashboard：
+
+Workers & Pages
+→ mfk-admin
+→ Domains
+→ Add
+→ Custom Domain
+→ admin.morefunos.com
+
+Cloudflare creates：
+
+- DNS record
+- TLS certificate
+
+automatically for Worker Custom Domain.
+
+ACCEPTANCE：
+
+1. admin.morefunos.com resolves
+2. /admin/publish loads current MFK Admin
+3. no D1
+4. no R2
+5. no Durable Object
+6. no Cron
+7. no service binding
+
+STATUS：
+
+CANONICAL DOMAIN ROOT
+= LOCKED
+
+ADMIN CUSTOM DOMAIN
+= PROVIDER MAPPING PENDING
+
+==================================================
+34. FUTURE DOMAIN RULE
+==================================================
+
+Future MFK web surfaces：
+
+MUST use explicit subdomains
+under：
+
+morefunos.com
+
+Exact future hostnames：
+
+OWNER DECISION REQUIRED
+
+Do NOT automatically create or infer：
+
+- Owner hostname
+- SMM hostname
+- Customer hostname
+- Provider/API hostname
+
+until exact connection/deployment seam opens.
+
+SMT：
+
+LOCAL-FIRST
+
+SMT does NOT require a public Internet hostname
+for local transaction execution.
+
+KEETA：
+
+Provider callback hostname
+must remain NOT_WIRED
+until exact Keeta connection seam opens.
+
+OTA：
+
+Current OTA endpoint remains unchanged.
+
+DO NOT migrate OTA
+just because canonical MFK domain is locked.
+
+OTA requires its own：
+
+CONNECT
+→ TEST
+→ BANK
+→ CUTOVER
+
+==================================================
+35. ADMIN DOMAIN SECURITY
+==================================================
+
+After real MFK Admin is deployed
+and admin.morefunos.com is GREEN：
+
+enable Cloudflare Access
+for Admin operational use.
+
+Do NOT treat public workers.dev bootstrap
+as final Admin security posture.
+
+==================================================
+36. CURRENT NEXT
+==================================================
+
+Current Worker：
+
+mfk-admin
+BOOTSTRAP SHELL EXISTS
+
+Canonical domain：
+
+morefunos.com
+LOCKED
+
+Immediate provider step：
+
+ADD CUSTOM DOMAIN：
+
+admin.morefunos.com
+
+Then：
+
+configure MFK CI credentials
+→ deploy real MFK Admin
+→ open /admin/publish
+→ prove canonical URL
+
+A2 Owner cross-device walkthrough
+remains pending after Admin real hosting is available.
+
+A3 automatic Admin→SMT network transport：
+
+NOT AUTHORIZED
+
+==================================================
+37. MILESTONE ADDITIONS
+==================================================
+
+MFK_DEDICATED_CLOUDFLARE_ACCOUNT_BOOTSTRAPPED
+
+MFK_ADMIN_WORKER_SHELL_CREATED
+
+MFK_CANONICAL_DOMAIN_ROOT_LOCKED
+
+MFK_ADMIN_CANONICAL_DOMAIN_ASSIGNED
+
+CURRENT：
+
+morefunos.com = CANONICAL ROOT
+
+admin.morefunos.com = CANONICAL ADMIN TARGET
+
+workers.dev = BOOTSTRAP ONLY
+
+==================================================
+END ROUND009
+==================================================
+==================================================
+==================================================
+==================================================
+==================================================
+==================================================
