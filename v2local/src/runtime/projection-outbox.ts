@@ -17,6 +17,7 @@ export interface ProjectionOrderInput{
   readonly sourceLabel:string;
   readonly staffId?:string;
   readonly staffName?:string;
+  readonly cancellationReason?:string;
   readonly items:readonly {readonly id:string;readonly name:string;readonly qty:number;readonly unitMinor:number}[];
 }
 
@@ -92,6 +93,7 @@ export function queueOrderProjection(order:ProjectionOrderInput){
       sourceLabel:String(order.sourceLabel||''),
       ...(order.staffId?{staffId:String(order.staffId)}:{}),
       ...(order.staffName?{staffName:String(order.staffName)}:{}),
+      ...(order.cancellationReason?{cancellationReason:String(order.cancellationReason)}:{}),
       items:Object.freeze(order.items.map(item=>Object.freeze({
         id:String(item.id),
         name:String(item.name),
