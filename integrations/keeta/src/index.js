@@ -15,3 +15,4 @@ export * from './completeness.js';
 export * from './certification.js';
 export * from './capabilities.js';
 export * from './runtime-policy.js';
+export * from './live-runtime.js';
