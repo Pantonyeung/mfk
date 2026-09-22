@@ -65,6 +65,14 @@ export class AdminSyncStore{
     const acks=await this.state.storage.get('acks')||{};
     return events.every(event=>Boolean(acks[event.deviceId]));
   }
+  async authorizeSmtDevice(request){
+    if(request.headers.get('origin')!==SMT_ORIGIN)return false;
+    const url=new URL(request.url);
+    const deviceId=(url.searchParams.get('deviceId')||'').trim();
+    if(!deviceId)return false;
+    const acks=await this.state.storage.get('acks')||{};
+    return Boolean(acks[deviceId]);
+  }
 
   async projectionOrders(){
     const rows=await this.state.storage.list({prefix:'projection:order:'});
@@ -124,6 +132,27 @@ export class AdminSyncStore{
     if(url.pathname==='/authorize-admin'){
       if(!await this.authorizeAdminRead(request))return json({code:'ADMIN_READ_UNAUTHORIZED'},401);
       return json({ok:true});
+    }
+    if(url.pathname==='/authorize-smt-device'){
+      if(!await this.authorizeSmtDevice(request))return json({code:'SMT_DEVICE_UNAUTHORIZED'},401);
+      return json({ok:true});
+    }
+    if(url.pathname==='/provider-doorbell'&&request.method==='POST'){
+      let body;
+      try{body=await request.json();}catch{return json({code:'PROVIDER_DOORBELL_INVALID'},400);}
+      if(body?.type!=='KEETA_ORDER_AVAILABLE')return json({code:'PROVIDER_DOORBELL_TYPE_INVALID'},400);
+      const message=JSON.stringify({
+        type:'KEETA_ORDER_AVAILABLE',
+        storeId:'MF01',
+        provider:'KEETA',
+        providerOrderId:String(body.providerOrderId||''),
+        providerMessageId:String(body.providerMessageId||''),
+        receivedAt:new Date().toISOString(),
+      });
+      for(const socket of this.state.getWebSockets()){
+        try{socket.send(message);}catch{}
+      }
+      return json({state:'DOORBELL_SENT'});
     }
     if(url.pathname==='/active'){
       const active=await this.state.storage.get('active');
@@ -265,6 +294,29 @@ export default {
       const keetaId=env.KEETA_RUNTIME.idFromName(storeId);
       const keeta=env.KEETA_RUNTIME.get(keetaId);
 
+      if(url.pathname.startsWith('/api/keeta/smt/')){
+        const adminId=env.ADMIN_SYNC.idFromName(storeId);
+        const admin=env.ADMIN_SYNC.get(adminId);
+        const authorizeUrl=new URL(request.url);
+        authorizeUrl.pathname='/authorize-smt-device';
+        const authResponse=await admin.fetch(new Request(authorizeUrl.toString(),{
+          method:'GET',
+          headers:new Headers(request.headers),
+        }));
+        if(!authResponse.ok)return json({code:'KEETA_SMT_UNAUTHORIZED'},401,cors(request));
+        const target=new URL(request.url);
+        target.pathname='/smt/'+url.pathname.slice('/api/keeta/smt/'.length);
+        const init={method:request.method,headers:new Headers(request.headers)};
+        if(request.method!=='GET'&&request.method!=='HEAD'){
+          const body=await request.arrayBuffer();
+          if(body.byteLength)init.body=body;
+        }
+        const response=await keeta.fetch(new Request(target.toString(),init));
+        const headers=new Headers(response.headers);
+        for(const [key,value] of Object.entries(cors(request)))headers.set(key,value);
+        return new Response(response.body,{status:response.status,statusText:response.statusText,headers});
+      }
+
       if(url.pathname.startsWith('/api/keeta/admin/')){
         const adminId=env.ADMIN_SYNC.idFromName(storeId);
         const admin=env.ADMIN_SYNC.get(adminId);
@@ -300,6 +352,9 @@ export default {
         return new Response(response.body,{status:response.status,statusText:response.statusText,headers});
       }
 
+      const providerEnvelope=url.pathname==='/api/keeta/webhook'&&request.method==='POST'
+        ?await request.clone().json().catch(()=>null)
+        :null;
       const target=new URL(request.url);
       target.pathname=url.pathname==='/api/keeta/webhook'
         ?'/webhook'
@@ -318,9 +373,33 @@ export default {
         if(body.byteLength)init.body=body;
       }
       const response=await keeta.fetch(new Request(target.toString(),init));
+      if(response.ok&&providerEnvelope?.eventId===1001){
+        try{
+          const message=typeof providerEnvelope.message==='string'?JSON.parse(providerEnvelope.message):null;
+          const orderInfo=message?.orderInfo??message;
+          const baseOrder=orderInfo?.baseOrder;
+          const providerOrderId=String(baseOrder?.orderViewIdStr??baseOrder?.orderViewId??'').trim();
+          if(providerOrderId){
+            const adminId=env.ADMIN_SYNC.idFromName(storeId);
+            const admin=env.ADMIN_SYNC.get(adminId);
+            await admin.fetch(new Request('https://internal/provider-doorbell',{
+              method:'POST',
+              headers:{'content-type':'application/json'},
+              body:JSON.stringify({
+                type:'KEETA_ORDER_AVAILABLE',
+                providerOrderId,
+                providerMessageId:String(providerEnvelope.messageId||''),
+              }),
+            }));
+          }
+        }catch{}
+      }
       const headers=new Headers(response.headers);
       for(const [key,value] of Object.entries(cors(request)))headers.set(key,value);
       return new Response(response.body,{status:response.status,statusText:response.statusText,headers});
+    }
+    if(url.pathname==='/api/admin-sync/provider-doorbell'||url.pathname==='/api/admin-sync/authorize-smt-device'){
+      return json({code:'NOT_FOUND'},404,cors(request));
     }
     if(url.pathname.startsWith('/api/admin-sync/')||url.pathname.startsWith('/api/projection/')){
       if(request.method==='OPTIONS')return new Response(null,{status:204,headers:cors(request)});

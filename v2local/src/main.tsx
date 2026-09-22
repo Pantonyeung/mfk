@@ -4,6 +4,7 @@ import {HashRouter} from 'react-router';
 import {MfkV2LocalApp} from './App.tsx';
 import {installSmtAdminAutoSync} from './runtime/admin-config-sync.ts';
 import {installStaffSessionInvalidation} from './runtime/staff-auth.ts';
+import {installKeetaOrderIntake} from './runtime/keeta-order-intake.ts';
 import {localRuntime} from './runtime/local-runtime.ts';
 import {readLocalCashOpenings,readLocalDayCloses} from './runtime/local-operations.ts';
 import {
@@ -17,6 +18,7 @@ import './styles.css';
 installSmtAdminAutoSync();
 installStaffSessionInvalidation();
 installProjectionOutboxAutoFlush();
+installKeetaOrderIntake();
 
 for(const order of localRuntime.orders())queueOrderProjection(order);
 for(const opening of readLocalCashOpenings())queueCashOpeningProjection(opening);

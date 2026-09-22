@@ -21,6 +21,7 @@ export interface SmtAvailabilityProjection{readonly revision:number;readonly nod
 export interface StoredOrder{
   id:string;display:string;createdAt:string;updatedAt?:string;totalMinor:number;paymentLabel:string;fulfillmentLabel:'待處理'|'進行中'|'可取餐'|'已完成'|'已取消';sourceLabel:string;
   staffId?:string;staffName?:string;cancellationReason?:string;
+  providerRef?:string;providerMessageId?:string;
   items:readonly {id:string;name:string;qty:number;unitMinor:number;serviceMode?:'takeaway'|'dine-in'}[];
 }
 export type DiningTender='CASH'|'ALIPAY'|'WECHAT'|'FPS'|'PAYME'|'COMBO';
@@ -159,7 +160,15 @@ export function readLastPrintDiagnostic():PrintDispatchDiagnostic|null{
   }catch{return null}
 }
 export interface MfkLocalRuntime extends CleanSmtCoreRuntimePort{
-  createOrder(input:{items:readonly {id:string;name:string;qty:number;unitMinor:number;serviceMode?:'takeaway'|'dine-in'}[];totalMinor:number;paymentLabel:string;sourceLabel?:string}):StoredOrder;
+  createOrder(input:{
+    items:readonly {id:string;name:string;qty:number;unitMinor:number;serviceMode?:'takeaway'|'dine-in'}[];
+    totalMinor:number;
+    paymentLabel:string;
+    sourceLabel?:string;
+    providerRef?:string;
+    providerMessageId?:string;
+    initialFulfillmentLabel?:StoredOrder['fulfillmentLabel'];
+  }):StoredOrder;
   orders():readonly StoredOrder[];
   printOrderOutputs(orderId:string):Promise<PrintDispatchSummary>;
   readOrderReprintOptions(orderId:string):Promise<readonly SmtReprintOption[]>;
@@ -405,6 +414,11 @@ function diningDetail(hold:LocalHoldDraft):LocalDiningHoldDetail{
 export const localRuntime:MfkLocalRuntime=Object.freeze({
   subscribe(listener){listeners.add(listener);return()=>listeners.delete(listener)},
   createOrder(input){
+    const providerRef=String(input.providerRef||'').trim();
+    if(providerRef){
+      const existing=data.orders.find(order=>order.providerRef===providerRef);
+      if(existing)return existing;
+    }
     const n=data.orders.length+1;
     const createdAt=new Date().toISOString();
     const session=readActiveStaffSession();
@@ -415,8 +429,10 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
       updatedAt:createdAt,
       totalMinor:input.totalMinor,
       paymentLabel:input.paymentLabel,
-      fulfillmentLabel:'進行中',
+      fulfillmentLabel:input.initialFulfillmentLabel??'進行中',
       sourceLabel:input.sourceLabel||'現場',
+      ...(providerRef?{providerRef}:{}),
+      ...(input.providerMessageId?{providerMessageId:String(input.providerMessageId)}:{}),
       ...(session?{staffId:session.staffId,staffName:session.displayName}:{}),
       items:input.items.map(item=>({...item})),
     };

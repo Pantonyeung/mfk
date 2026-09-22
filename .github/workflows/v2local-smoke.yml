@@ -29,14 +29,17 @@ jobs:
       - name: Build
         working-directory: v2local
         run: npm run build
-      - name: Local-only source proof
+      - name: Local authority and bounded cloud seam proof
         shell: bash
         run: |
           set -euo pipefail
-          ! grep -RInE '\b(fetch|XMLHttpRequest|WebSocket|EventSource)\s*\(' v2local/src
-          ! grep -RInE 'https?://' v2local/src
           grep -F 'SMT_GOLDEN_WIDTH=1920' v2local/src/app/production-viewport-layout.ts
           grep -F 'SMT_GOLDEN_HEIGHT=1080' v2local/src/app/production-viewport-layout.ts
+          grep -F "id:'MFK-'" v2local/src/runtime/local-runtime.ts
+          grep -F "providerRef===providerRef" v2local/src/runtime/local-runtime.ts
+          grep -F "localRuntime.createOrder(orderInput)" v2local/src/runtime/keeta-order-intake.ts
+          grep -F "KEETA_ORDER_AVAILABLE" v2local/src/runtime/keeta-order-intake.ts
+          grep -F "subscribeSmtCloudDoorbell" v2local/src/runtime/admin-config-sync.ts
           ! grep -RInF "print.sunmi." v2local/src
           grep -F "print.lan.endpoint.apply" v2local/src/runtime/native-print.ts
           grep -F "print.lan.endpoint.test" v2local/src/runtime/native-print.ts

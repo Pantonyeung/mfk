@@ -20,6 +20,8 @@ export interface SmtAdminConfigApplyResult{
 }
 
 const listeners=new Set<()=>void>();
+export interface SmtCloudDoorbell{readonly type:string;readonly [key:string]:unknown}
+const cloudDoorbellListeners=new Set<(event:SmtCloudDoorbell)=>void>();
 
 function emit(){for(const listener of listeners)listener();}
 function now(){return new Date().toISOString();}
@@ -67,6 +69,10 @@ function setStatus(status:SmtAdminSyncStatus){
 export function subscribeSmtAdminConfig(listener:()=>void){
   listeners.add(listener);
   return()=>{listeners.delete(listener);};
+}
+export function subscribeSmtCloudDoorbell(listener:(event:SmtCloudDoorbell)=>void){
+  cloudDoorbellListeners.add(listener);
+  return()=>{cloudDoorbellListeners.delete(listener);};
 }
 
 export function applyAdminConfigEnvelope(input:unknown):SmtAdminConfigApplyResult{
@@ -162,12 +168,15 @@ function connectDoorbell(){
     });
     socket.addEventListener('message',event=>{
       try{
-        const row=JSON.parse(String(event.data)) as {type?:string;revision?:number;fingerprint?:string};
-        if(row.type!=='ADMIN_CONFIG_AVAILABLE')return;
-        const current=readSmtAdminConfigLkg();
-        if(!current||Number(row.revision)>current.revision||String(row.fingerprint)!==current.fingerprint){
-          void fetchAndApplyAdminConfig();
+        const row=JSON.parse(String(event.data)) as SmtCloudDoorbell&{revision?:number;fingerprint?:string};
+        if(row.type==='ADMIN_CONFIG_AVAILABLE'){
+          const current=readSmtAdminConfigLkg();
+          if(!current||Number(row.revision)>current.revision||String(row.fingerprint)!==current.fingerprint){
+            void fetchAndApplyAdminConfig();
+          }
+          return;
         }
+        for(const listener of cloudDoorbellListeners)listener(row);
       }catch{}
     });
     socket.addEventListener('close',()=>{socket=null;scheduleReconnect();});
