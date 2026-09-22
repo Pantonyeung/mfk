@@ -333,11 +333,22 @@ export default {
           return json({code:'KEETA_ADMIN_AUTH_RUNTIME_FAILED'},500,cors(request));
         }
         if(!authResponse.ok)return json({code:'KEETA_ADMIN_UNAUTHORIZED'},401,cors(request));
+        const adminSubpath=url.pathname.slice('/api/keeta/admin/'.length);
         const target=new URL(request.url);
-        target.pathname='/admin/'+url.pathname.slice('/api/keeta/admin/'.length);
+        target.pathname='/admin/'+adminSubpath;
         target.search=url.search;
         const init={method:request.method,headers:new Headers(request.headers)};
-        if(request.method!=='GET'&&request.method!=='HEAD'){
+        if((adminSubpath==='menu/preview'||adminSubpath==='menu/sync')&&request.method==='POST'){
+          const activeResponse=await admin.fetch(new Request('https://internal/active',{method:'GET'}));
+          if(!activeResponse.ok)return json({code:'KEETA_MENU_ADMIN_CONFIG_NOT_PUBLISHED'},409,cors(request));
+          const active=await activeResponse.json();
+          init.headers.set('content-type','application/json');
+          init.body=JSON.stringify({
+            revision:active.revision,
+            adminFingerprint:active.fingerprint,
+            snapshot:active.snapshot,
+          });
+        }else if(request.method!=='GET'&&request.method!=='HEAD'){
           const body=await request.arrayBuffer();
           if(body.byteLength)init.body=body;
         }
