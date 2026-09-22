@@ -1,7 +1,7 @@
 # MFK CURRENT HANDOFF｜2026-09-22
 
 Current navigation:
-docs/navigation/MFK_航海圖_V1.16_Round017_2026-09-22.txt
+docs/navigation/MFK_航海圖_V1.17_Round018_2026-09-22.txt
 
 Control:
 #22
@@ -14,56 +14,53 @@ HOLD
 Admin:
 ACTIVE
 
-## ADMIN OPERATOR CHINESE UI
+## CHINESE OPERATOR UI
 
-Issue:
 #41
+deployed GREEN
+visual owner readback pending
 
-Owner requirement:
-operator-facing Admin must be Traditional-Chinese, human operational UI, not engineering-console copy.
+## LEGACY MENU RE-ENTRY
 
-Implementation/test:
-35683885708 SUCCESS
+#42
 
-Main landing:
-4f332baa67900d33f72cd43a0dc457177c3cca80
+Owner-selected donor:
+Pantonyeung/Morefun-v2
+menu-combined-2026-09-05-v1
 
-Live deploy:
-35684038608 SUCCESS
+Imported to MFK Admin:
+- 14 categories
+- 203 products
+- 188 active/direct-visible
+- 15 inactive donor-hidden
+- 188 direct prices
+- exact product names and IDs
+- legacy barcodes retained internally
 
-Deploy job:
-test SUCCESS
-build SUCCESS
-mfk-admin deploy SUCCESS
+No canonical modifier/combo bindings existed in the selected donor snapshot; none were invented.
 
-Browser visual readback:
-PENDING
+Verification:
+35684903667 SUCCESS
 
-## ADMIN CONNECTION
+Live Admin deploy:
+35684991125 SUCCESS
 
-A1:
-BANKED
-
-A2 implementation:
-BANKED / GREEN
-
-A2 owner cross-device:
-PENDING
-
-New exact first break:
-ADMIN_A2_SOURCE_BASELINE_NOT_HYDRATED
-
-Current Admin draft starts empty.
-Do not publish an A2 full Menu Index bundle from 0 Categories / 0 Products over a non-empty SMT baseline.
+State:
+MFK_ADMIN_MF01_LEGACY_MENU_REENTERED_DEPLOYED_GREEN
 
 ## EXACT NEXT
 
-Owner refreshes live Admin and confirms Chinese operator wording.
+Owner refresh Admin.
 
-Then open one baseline-hydration seam before A2 mutation:
-SMT current menu baseline
-→ Admin source draft hydrate/readback
-→ verify no product loss
-→ then one tiny product-name A2 test.
+Verify:
+商品分類 = 14
+商品資料 = 203
 
-A3 remains NOT AUTHORIZED.
+No SMT publish yet.
+
+After visual confirmation:
+bank #41 / #42 as applicable,
+then read SMT Active Revision,
+then resume A2 single-change acceptance.
+
+A3 NOT AUTHORIZED.
