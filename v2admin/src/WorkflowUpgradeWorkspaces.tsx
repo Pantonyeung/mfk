@@ -55,14 +55,17 @@ export function DeviceHealthWorkspace(){
   </section>;
 }
 
+interface OtaApproval{id:string;version:string;sha256:string;channel:'stable'|'candidate';approved:boolean;note:string}
 export function OtaWorkspace(){
+  const [rows,setRows]=usePersistentAdminState<OtaApproval[]>('ota-approvals.v1',[]);
+  const [runtime]=usePersistentAdminState<Array<{deviceId:string;version:string;observedAt:string;state:string}>>('ota-runtime-read.v1',[]);
+  const add=()=>setRows(current=>[...current,{id:'ota-'+Date.now().toString(36),version:'',sha256:'',channel:'candidate',approved:false,note:''}]);
+  const patch=(id:string,change:Partial<OtaApproval>)=>setRows(current=>current.map(row=>row.id===id?{...row,...change}:row));
   return <section className="admin-editor-page">
-    <UpgradeHeader title="版本更新" description="管理已批准版本、安裝狀態同還原記錄；目前唔會直接執行安裝。"/>
+    <header className="admin-editor-head"><div><small>版本治理</small><h1>版本更新</h1><p>Admin 管 approved artifact、渠道同批准狀態；Observed Runtime 只讀裝置回傳，填咗版本號唔等於已安裝。</p></div><div className="admin-editor-actions"><button onClick={add}>新增版本候選</button></div></header>
     <div className="admin-policy-grid two">
-      <article className="admin-policy-card"><h2>已批准版本</h2><label><span>版本</span><input placeholder="例如 1.0.7"/></label><label><span>版本驗證碼</span><input placeholder="版本驗證碼"/></label><StateChip>只保存草稿</StateChip></article>
-      <article className="admin-policy-card"><h2>安裝</h2><button disabled>安裝尚未開放</button><small>相關安裝功能尚未啟用。</small></article>
-      <article className="admin-policy-card"><h2>裝置目前版本</h2><div className="admin-read-empty">版本回傳尚未啟用</div></article>
-      <article className="admin-policy-card"><h2>還原</h2><button disabled>還原尚未開放</button><small>只會喺版本不一致或安裝失敗後提供還原。</small></article>
+      <article className="admin-policy-card"><h2>版本候選</h2>{rows.length===0?<div className="admin-read-empty">未有版本候選。</div>:rows.map(row=><div className="admin-sub-editor" key={row.id}><label><span>版本</span><input value={row.version} onChange={event=>patch(row.id,{version:event.target.value})}/></label><label><span>SHA-256</span><input value={row.sha256} onChange={event=>patch(row.id,{sha256:event.target.value})}/></label><label><span>渠道</span><select value={row.channel} onChange={event=>patch(row.id,{channel:event.target.value as OtaApproval['channel']})}><option value="candidate">候選</option><option value="stable">穩定</option></select></label><label className="admin-toggle"><input type="checkbox" checked={row.approved} onChange={event=>patch(row.id,{approved:event.target.checked})}/><span>批准版本</span></label><textarea value={row.note} onChange={event=>patch(row.id,{note:event.target.value})} placeholder="版本備註"/></div>)}</article>
+      <article className="admin-policy-card"><h2>裝置目前版本</h2>{runtime.length===0?<div className="admin-read-empty">目前未有 Runtime readback。</div>:runtime.map(row=><p key={row.deviceId}>{row.deviceId} · {row.version} · {row.state} · {new Date(row.observedAt).toLocaleString('zh-HK')}</p>)}</article>
     </div>
   </section>;
 }
