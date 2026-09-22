@@ -39,7 +39,7 @@ export function App(){
   const [search,setSearch]=useState('');
   const [orderSearch,setOrderSearch]=useState('');
   const [orderSegment,setOrderSegment]=useState<OrderSegment>('active');
-  const [moreTool,setMoreTool]=useState<'channels'|'business'|'printing'|'diagnostics'|'sellability'|'pending'|null>(null);
+  const [moreTool,setMoreTool]=useState<'channels'|'business'|'printing'|'diagnostics'|'sellability'|'pending'|'capacity'|'reporting'|'refunds'|null>(null);
   const [dineTable,setDineTable]=useState('');
   const [dineCovers,setDineCovers]=useState(2);
 
@@ -405,8 +405,8 @@ function DineView({connection,sessions,table,covers,setTable,setCovers,onCreate}
 
 function MoreView({connection,tool,setTool,snapshot,pendingIntents,onReadback,onDiscard,onSellability}:{
   connection:SmmConnectionState;
-  tool:'channels'|'business'|'printing'|'diagnostics'|'sellability'|'pending'|null;
-  setTool:(v:'channels'|'business'|'printing'|'diagnostics'|'sellability'|'pending'|null)=>void;
+  tool:'channels'|'business'|'printing'|'diagnostics'|'sellability'|'pending'|'capacity'|'reporting'|'refunds'|null;
+  setTool:(v:'channels'|'business'|'printing'|'diagnostics'|'sellability'|'pending'|'capacity'|'reporting'|'refunds'|null)=>void;
   snapshot:SmmReadModelSnapshot|null;
   pendingIntents:readonly SmmPendingIntent[];
   onReadback:(intent:SmmPendingIntent)=>void;
@@ -420,6 +420,9 @@ function MoreView({connection,tool,setTool,snapshot,pendingIntents,onReadback,on
       <Tool title="平台狀態" detail="平台連線同資料新鮮度" state={snapshot?.channels.length?String(snapshot.channels.length):'未連接'} onClick={()=>setTool('channels')}/>
       <Tool title="商品供應" detail="售罄／恢復操作入口" state={connection==='READY'?'可用':'未連接'} onClick={()=>setTool('sellability')}/>
       <Tool title="營業日" detail="只作記錄同報表分類" state={snapshot?.businessDay?.businessDate??'未連接'} onClick={()=>setTool('business')}/>
+      <Tool title="產能" detail="只讀門店產能狀態" state={snapshot?.capacity?.state??'未連接'} onClick={()=>setTool('capacity')}/>
+      <Tool title="營運報表" detail="當日訂單／營業額／平均單" state={snapshot?.reporting?.freshness??'未連接'} onClick={()=>setTool('reporting')}/>
+      <Tool title="退款要求" detail="只讀退款／售後跟進" state={snapshot?.refundRequests.length?String(snapshot.refundRequests.length):'未連接'} onClick={()=>setTool('refunds')}/>
       <Tool title="列印狀態" detail="只讀設備健康" state={snapshot?.printHealth.length?String(snapshot.printHealth.length):'未連接'} onClick={()=>setTool('printing')}/>
       <Tool title="診斷" detail="連線、資料版本、本機草稿" state={connectionLabelShort(connection)} onClick={()=>setTool('diagnostics')}/>
     </div>
@@ -427,6 +430,9 @@ function MoreView({connection,tool,setTool,snapshot,pendingIntents,onReadback,on
       {tool==='pending'?<PendingIntents intents={pendingIntents} onReadback={onReadback} onDiscard={onDiscard}/>:
        tool==='channels'?<ChannelList connection={connection} channels={snapshot?.channels??[]}/>:
        tool==='business'?<BusinessDay projection={snapshot?.businessDay}/>:
+       tool==='capacity'?<Capacity projection={snapshot?.capacity}/>:
+       tool==='reporting'?<Reporting projection={snapshot?.reporting}/>:
+       tool==='refunds'?<RefundRequests connection={connection} rows={snapshot?.refundRequests??[]}/>:
        tool==='printing'?<PrintHealth connection={connection} rows={snapshot?.printHealth??[]}/>:
        tool==='sellability'?<Sellability connection={connection} products={snapshot?.menu?.products??[]} onChange={onSellability}/>:
        <Diagnostics connection={connection} snapshot={snapshot} pendingCount={pendingIntents.length}/>}
@@ -447,6 +453,21 @@ function ChannelList({connection,channels}:{connection:SmmConnectionState;channe
 function BusinessDay({projection}:{projection:SmmReadModelSnapshot['businessDay']}){
   if(!projection)return <EmptyState title="營業日資料尚未連接" detail="營業日只作記錄同報表分類，永遠唔會阻止落單、付款或者本機提交。"/>;
   return <><div className="metric-grid"><Metric label="營業日" value={projection.businessDate}/><Metric label="狀態" value={projection.state}/><Metric label="讀取時間" value={new Date(projection.observedAt).toLocaleString('zh-HK')}/></div><p className="callout">營業日只作記錄及分類，唔係交易開關。</p></>;
+}
+
+function Capacity({projection}:{projection:SmmReadModelSnapshot['capacity']}){
+  if(!projection)return <EmptyState title="產能資料尚未連接" detail="連接後會顯示正式產能狀態；SMM 唔會自行判斷門店忙閒。"/>;
+  return <><div className="metric-grid"><Metric label="狀態" value={projection.state}/><Metric label="門店提示" value={projection.label}/></div><p className="callout">{projection.detail}</p><small>讀取：{new Date(projection.observedAt).toLocaleString('zh-HK')}</small></>;
+}
+
+function Reporting({projection}:{projection:SmmReadModelSnapshot['reporting']}){
+  if(!projection)return <EmptyState title="營運報表尚未連接" detail="未連接時唔會顯示假營業額、假訂單數或者假平均單。"/>;
+  return <><div className="metric-grid"><Metric label="營業日" value={projection.businessDate}/><Metric label="訂單" value={String(projection.orderCount)}/><Metric label="營業額" value={projection.salesLabel}/><Metric label="平均單" value={projection.averageOrderLabel}/></div><p className="callout">資料狀態：{projection.freshness} · {new Date(projection.observedAt).toLocaleString('zh-HK')}</p></>;
+}
+
+function RefundRequests({connection,rows}:{connection:SmmConnectionState;rows:NonNullable<SmmReadModelSnapshot['refundRequests']>}){
+  if(!rows.length)return <EmptyState title={connection==='NOT_CONNECTED'?'退款要求尚未連接':'暫時冇退款要求'} detail="SMM 只顯示退款／售後跟進資料，唔持有退款或付款主權。"/>;
+  return <>{rows.map(row=><div className="list-row" key={row.refundId}><div><strong>{row.displayCode} · {row.source}</strong><small>{row.reason}{row.amountLabel?` · ${row.amountLabel}`:''}</small></div><span className={`status ${row.state==='UNKNOWN'?'unknown':row.state==='RESOLVED'?'positive':'warning'}`}>{row.state}</span></div>)}</>;
 }
 
 function PrintHealth({connection,rows}:{connection:SmmConnectionState;rows:NonNullable<SmmReadModelSnapshot['printHealth']>}){
@@ -509,4 +530,4 @@ function NavButton({active,label,glyph,badge,onClick}:{active:boolean;label:stri
 
 function labelWorkState(state:string){return state==='NORMAL'?'正常':state==='DELAYED'?'延誤':state==='ACTION_REQUIRED'?'需處理':'未知'}
 function connectionLabelShort(state:SmmConnectionState){return state==='READY'?'已連接':state==='LOADING'?'同步中':state==='ERROR'?'錯誤':state==='STALE'?'資料稍舊':state==='PARTIAL'?'部分資料':state==='UNKNOWN'?'未知':'未連接'}
-function moreTitle(tool:string){return tool==='pending'?'待提交草稿':tool==='channels'?'平台狀態':tool==='business'?'營業日':tool==='printing'?'列印狀態':tool==='sellability'?'商品供應':'診斷'}
+function moreTitle(tool:string){return tool==='pending'?'待提交草稿':tool==='channels'?'平台狀態':tool==='business'?'營業日':tool==='capacity'?'產能':tool==='reporting'?'營運報表':tool==='refunds'?'退款要求':tool==='printing'?'列印狀態':tool==='sellability'?'商品供應':'診斷'}
