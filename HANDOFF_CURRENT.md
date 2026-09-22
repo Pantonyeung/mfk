@@ -2,92 +2,44 @@
 
 Current system: **MFK only**.
 
-Current main at handoff generation: `e325a05bb8e349a24d5a6a92a8c0b111f7c12c67`
+Mandatory Commander entry:
+`COMMANDER_CURRENT.md`
+
+Commander protocol:
+`docs/commander/README.md`
+
+Commander template:
+`docs/commander/COMMANDER_HANDOFF_TEMPLATE.md`
+
+Bootstrap prompt:
+`docs/commander/COMMANDER_BOOTSTRAP_PROMPT.txt`
 
 Current navigation:
-`docs/navigation/MFK_航海圖_V1.10_Round011_2026-09-22.txt`
+`docs/navigation/MFK_航海圖_V1.11_Round012_2026-09-22.txt`
 
-Detailed seamless handoff:
-`docs/handoff/MFK_Admin_Connection_Seamless_Handoff_R1_2026-09-22.txt`
+Control:
+Pantonyeung/mfk #22
 
-Cloud / retirement lock:
-`docs/governance/MFK_CLOUD_RUNTIME_BUDGET_AND_LEGACY_RETIREMENT_LOCK_R1_2026-09-22.md`
+Commander governance:
+#39
 
-Keeta runtime guard:
-`integrations/keeta/RUNTIME_SIMPLICITY_GUARD_R1.md`
-
-## Current Admin Connection
+## Current Admin
 
 A1:
 `MFK_ADMIN_MENU_INDEX_A1_SEMANTIC_LINK_GREEN`
+BANKED.
 
-A2:
+A2 implementation:
 `MFK_ADMIN_A2_CONTROLLED_TRANSFER_IMPLEMENTATION_GREEN`
+BANKED.
 
-A2 real separate-device Owner walkthrough:
+A2 real cross-device Owner walkthrough:
 **PENDING**
 
-A3 automatic network transport:
+A3 automatic Admin→SMT transport:
 **NOT AUTHORIZED**
 
-## Immediate next action
-
-Run exactly one real A2 cross-device walkthrough:
-
-Admin Publish Bundle
-→ SMT Import / Apply
-→ SMT Readback Receipt
-→ Admin Import Receipt
-→ MATCH
-
-Hard rule:
-
-`NO TARGET READBACK = NOT GREEN`
-
-Do not start another connection seam until Owner has accepted that result.
-
-## Permanent connection rule
-
-`CONNECT ONE → TEST SAME PIECE → BANK → STOP → OWNER DECIDES NEXT`
-
-## Cloud rule
-
-MFK Cloud = EVENT-DRIVEN FIRST.
-
-Business hours: `10:00–20:30 Asia/Hong_Kong`
-
-Off hours: `LOW_TRAFFIC_MODE`
-
-No one-minute global cron. No five-second watchdog. Cloud never blocks local SMT transaction.
-
-## Legacy
-
-Old Morefun-v2 Keeta runtime is RETIRED and must never be reconnected to MFK.
-
-Legacy provider-side Cloudflare retirement remains tracked in #32.
-
-
-## Canonical Domain
-
-Canonical MFK Internet root:
-`morefunos.com`
-
-Canonical Admin:
-`https://admin.morefunos.com`
-
-`workers.dev` is bootstrap/temporary validation only and is not a canonical system URL.
-
-Domain governance:
-`docs/governance/MFK_CANONICAL_DOMAIN_GOVERNANCE_R1_2026-09-22.md`
-
-Current provider state:
-- dedicated MFK Cloudflare account exists
-- `mfk-admin` bootstrap Worker exists
-- Admin Custom Domain mapping is pending
-- OTA remains untouched
-
-
-## Admin Hosting Provider State
+## Admin Hosting / Canonical Domain
 
 Dedicated MFK Cloudflare account:
 **GREEN**
@@ -95,44 +47,87 @@ Dedicated MFK Cloudflare account:
 Worker:
 `mfk-admin`
 
-Canonical Admin domain:
+Canonical root:
+`morefunos.com`
+
+Canonical Admin:
 `https://admin.morefunos.com`
 
-Custom Domain routing / DNS / TLS:
+GitHub Actions → Wrangler deploy:
 **GREEN**
 
-Current live content:
-**BOOTSTRAP HELLO WORLD ONLY**
-
-Real MFK Admin app deployment:
-**PENDING**
-
-Next exact step:
-configure GitHub CI credentials, run `deploy-mfk-admin`, then prove:
-`https://admin.morefunos.com/admin/publish`
-
-Do not call Admin hosting live GREEN until the real MFK Admin page replaces Hello World.
-
-
-## MFK Admin live deployment
-
-GitHub Actions → Wrangler deployment:
-**GREEN**
-
-Workflow run:
+Run:
 `35677844235`
 
-Cloudflare Worker:
-`mfk-admin`
+Owner browser proof:
+**GREEN**
 
-Current Version ID:
-`d03884d6-9206-4df9-8cc8-3264a626b486`
+Visible current UI:
+- MFK Admin 控制面
+- Pending Changes / 發布
+- ADMIN CONNECTION A2 · HUMAN CONTROLLED
 
-Canonical app readback:
-**PENDING OWNER BROWSER PROOF**
+Milestones:
+- `MFK_ADMIN_WORKER_DEPLOY_GREEN`
+- `MFK_ADMIN_CANONICAL_APP_READBACK_GREEN`
+- `MFK_ADMIN_HOSTING_H2_LIVE_GREEN`
+- `MFK_ADMIN_CANONICAL_DOMAIN_H3_GREEN`
 
-Next exact action:
-open `https://admin.morefunos.com/admin/publish` and confirm current MFK Admin replaces Hello World.
+H2 #37:
+CLOSED / BANKED
 
-A3 remains NOT AUTHORIZED.
-OTA remains UNTOUCHED.
+H3 #38:
+CLOSED / BANKED
+
+## Immediate next action
+
+Run exactly one real A2 cross-device walkthrough:
+
+Admin Bundle
+→ SMT import/apply
+→ SMT Readback Receipt
+→ Admin import/compare
+→ MATCH
+
+Only then BANK:
+`MFK_ADMIN_A2_OWNER_CROSS_DEVICE_GREEN`
+
+Hard rule:
+`NO TARGET READBACK = NOT GREEN`
+
+## DO NOT
+
+Until Owner explicitly authorizes:
+
+- no A3 automatic Admin→SMT transport
+- no Pricing / Modifier / Combo seam
+- no SMM→SMT
+- no Customer→SMT
+- no Owner remote command
+- no Keeta live wiring
+- no OTA migration/cutover
+
+## Cloud rule
+
+MFK Cloud = EVENT-DRIVEN FIRST.
+
+Business hours:
+`10:00–20:30 Asia/Hong_Kong`
+
+Off hours:
+`LOW_TRAFFIC_MODE`
+
+No 1-minute heavy cron.
+No 5-second watchdog.
+Cloud never blocks SMT local transaction.
+
+## Mandatory return
+
+Before every Commander returns work / ends conversation / reaches context limit:
+
+1. update `COMMANDER_CURRENT.md`
+2. post same return summary to #22
+3. advance navigation if material current state changed
+4. leave one exact NEXT
+5. leave explicit NOT_AUTHORIZED
+6. include no secrets
