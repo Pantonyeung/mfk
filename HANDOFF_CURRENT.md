@@ -5,7 +5,7 @@ Current system: **MFK only**.
 Current main at handoff generation: `e325a05bb8e349a24d5a6a92a8c0b111f7c12c67`
 
 Current navigation:
-`docs/navigation/MFK_航海圖_V1.9_Round010_2026-09-22.txt`
+`docs/navigation/MFK_航海圖_V1.10_Round011_2026-09-22.txt`
 
 Detailed seamless handoff:
 `docs/handoff/MFK_Admin_Connection_Seamless_Handoff_R1_2026-09-22.txt`
@@ -112,3 +112,27 @@ configure GitHub CI credentials, run `deploy-mfk-admin`, then prove:
 `https://admin.morefunos.com/admin/publish`
 
 Do not call Admin hosting live GREEN until the real MFK Admin page replaces Hello World.
+
+
+## MFK Admin live deployment
+
+GitHub Actions → Wrangler deployment:
+**GREEN**
+
+Workflow run:
+`35677844235`
+
+Cloudflare Worker:
+`mfk-admin`
+
+Current Version ID:
+`d03884d6-9206-4df9-8cc8-3264a626b486`
+
+Canonical app readback:
+**PENDING OWNER BROWSER PROOF**
+
+Next exact action:
+open `https://admin.morefunos.com/admin/publish` and confirm current MFK Admin replaces Hello World.
+
+A3 remains NOT AUTHORIZED.
+OTA remains UNTOUCHED.
