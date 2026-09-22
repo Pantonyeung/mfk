@@ -3,9 +3,10 @@ import {NavLink,useLocation} from 'react-router';
 import {ADMIN_CAPABILITY_GROUPS,findAdminCapability} from './admin-capabilities.ts';
 
 const statusLabel={
-  NOT_WIRED:'未啟用',
-  DEFERRED:'稍後開放',
-  RETIRED:'已停用',
+  READY:'可設定',
+  READ_ONLY:'只讀資料',
+  P1:'保留功能',
+  GOVERNANCE:'治理',
 } as const;
 
 export function AdminShell({children}:{children:ReactNode}){
@@ -23,7 +24,7 @@ export function AdminShell({children}:{children:ReactNode}){
           className={group.id===activeGroup.id?'active':''}
         ><span>{group.label}</span><small>{group.capabilities.length}</small></NavLink>)}
       </nav>
-      <div className="mfk-admin-authority"><b>設定與發布</b><span>以已發布設定為準</span></div>
+      <div className="mfk-admin-authority"><b>營運控制台</b><span>設定、記錄、報表、治理</span></div>
     </aside>
 
     <aside className="mfk-admin-section">
@@ -39,8 +40,8 @@ export function AdminShell({children}:{children:ReactNode}){
 
     <main className="mfk-admin-main">
       <header className="mfk-admin-topbar">
-        <div><small>設定 → 發布 → 門店生效</small><strong>{active?.label??'管理後台'}</strong></div>
-        <div className="mfk-admin-topstate"><b>營運管理</b><span>部分功能尚未啟用</span></div>
+        <div><small>磨飯營運管理</small><strong>{active?.label??'管理後台'}</strong></div>
+        <div className="mfk-admin-topstate"><b>Admin 控制台</b><span>草稿會自動保存；正式資料狀態會清楚標示</span></div>
       </header>
       <div className="mfk-admin-workspace">{children}</div>
     </main>
