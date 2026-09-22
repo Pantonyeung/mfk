@@ -77,7 +77,8 @@ test('UNKNOWN flow preserves identity and reads back before any resend',()=>{
   assert.match(app,/唔會自動重送/);
   assert.match(app,/未有重新提交/);
   assert.match(app,/submissionId/);
-  assert.match(app,/idempotencyKey/);
+  const persistence=fs.readFileSync(path.join(root,'persistence.ts'),'utf8');
+  assert.match(persistence,/idempotencyKey/);
 });
 
 test('Business Day remains record-only and non-blocking',()=>{
