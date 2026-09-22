@@ -1,0 +1,5 @@
+MFK_SMM_ACCEPTANCE_DEPLOY_REQUEST
+target=mfk-smm-acceptance
+source_branch=acceptance/MFK/SMM-PRODUCT-R1-CLOUDFLARE
+purpose=owner_visual_acceptance
+live_connection=off
