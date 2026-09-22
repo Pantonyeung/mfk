@@ -1,7 +1,7 @@
 MFK_ADMIN_DEPLOY_REQUEST
 target=mfk-admin
 canonical_url=https://admin.morefunos.com
-source_main=00a18deb8f12bd23709c921aab7ef0140bf518e6
+source_main=144414f4345034e491dae4cabf966e4298519e07
 requested_by=owner
-reason=operator_chinese_ui_r1
+reason=legacy_mf01_menu_reentry
 ota=untouched
