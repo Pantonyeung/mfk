@@ -43,7 +43,7 @@ export const ADMIN_CAPABILITY_GROUPS:readonly AdminCapabilityGroup[]=[
   {id:'menu',label:'菜單',capabilities:[
     c('products','商品資料','/admin/catalog/products','READY','ADMIN_CONFIG','建立及維護商品規則。'),
     c('categories','商品分類','/admin/catalog/categories','READY','ADMIN_CONFIG','建立、排序及管理商品分類。'),
-    c('modifiers','選項中心','/admin/catalog/modifiers','READY','ADMIN_CONFIG','建立唯一 Option Master、選項組，同商品連結／默認設定。'),
+    c('modifiers','選項中心','/admin/catalog/modifiers','READY','ADMIN_CONFIG','建立可重用選項組及組內子選項，再連結商品同設定商品默認。'),
     c('pricing','價格管理','/admin/catalog/pricing','READY','ADMIN_CONFIG','管理價格設定；後台唔直接執行正式交易計價。'),
     c('combo','套餐','/admin/catalog/combos','READY','ADMIN_CONFIG','定義套餐、區段、可選商品關係及選擇規則。'),
     c('menu-sort','Menu／顯示排序','/admin/catalog/menu-display','READY','ADMIN_CONFIG','管理菜單顯示次序同可見性規則。'),
