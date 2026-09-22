@@ -150,7 +150,7 @@ function OverviewPanel({onOpen}:{onOpen:(section:Section)=>void}){
     {id:'printing' as const,no:'03',icon:'▤',title:'打印與設備',desc:'打印機設定、路由、測試與標籤綁定'},
     {id:'backup' as const,no:'04',icon:'☁',title:'備份與恢復',desc:'本機備份、校驗、恢復與資料安全'},
     {id:'diagnostics' as const,no:'05',icon:'⚙',title:'顯示與操作／診斷',desc:'Printer Trace、Route、錯誤碼與本機健康狀態'},
-    {id:'admin-menu' as const,no:'06',icon:'≡',title:'Admin · Menu',desc:'本機 Menu 分類、商品名稱、排序與啟用狀態'},
+    {id:'admin-menu' as const,no:'06',icon:'↻',title:'Admin 同步',desc:'只讀查看 Admin 最新版本、同步狀態同本機 LKG'},
   ];
   return <section className="more-overview">
     <header><div><span>SMT LOCAL OPERATIONS</span><h2>更多功能總覽</h2><p>本地營運控制面板；之後可以再接 Admin 發布設定。</p></div><strong>{new Date().toLocaleString('zh-HK')}</strong></header>
@@ -476,7 +476,7 @@ export function LocalMoreWorkspace(){
   const titleMap:Record<Section,string>={
     overview:'更多功能總覽',printing:'打印與設備',diagnostics:'顯示與操作／診斷',
     dayclose:'收銀與日結',reports:'報表與分析',backup:'備份與恢復',
-    'admin-menu':'Admin · Menu'
+    'admin-menu':'Admin 同步狀態'
   };
   return <main className="more-workspace more-card-workspace" aria-label="MFK SMT 本地營運中心">
     <header className="more-card-topbar">

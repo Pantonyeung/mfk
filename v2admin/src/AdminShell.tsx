@@ -1,6 +1,7 @@
-import type {ReactNode} from 'react';
+import {useEffect,useState,type ReactNode} from 'react';
 import {NavLink,useLocation} from 'react-router';
 import {ADMIN_CAPABILITY_GROUPS,findAdminCapability} from './admin-capabilities.ts';
+import {readAdminSyncAcks,readAdminSyncStatus} from './admin-sync-client.ts';
 
 const statusLabel={
   READY:'可設定',
@@ -8,6 +9,38 @@ const statusLabel={
   P1:'保留功能',
   GOVERNANCE:'治理',
 } as const;
+
+
+function AdminSyncTopState(){
+  const [version,setVersion]=useState(0);
+  const [ack,setAck]=useState<{revision:number;deviceId:string;appliedAt:string}|null>(null);
+  useEffect(()=>{
+    let active=true;
+    const refresh=()=>{
+      setVersion(value=>value+1);
+      void readAdminSyncAcks().then(rows=>{
+        if(!active)return;
+        const latest=rows[0];
+        setAck(latest?{revision:latest.revision,deviceId:latest.deviceId,appliedAt:latest.appliedAt}:null);
+      });
+    };
+    window.addEventListener('mfk-admin-sync',refresh);
+    window.addEventListener('focus',refresh);
+    refresh();
+    return()=>{active=false;window.removeEventListener('mfk-admin-sync',refresh);window.removeEventListener('focus',refresh);};
+  },[]);
+  void version;
+  const status=readAdminSyncStatus();
+  const stateLabel=status.state==='PUBLISHED'?'已送到雲端'
+    :status.state==='PUBLISHING'?'同步中'
+    :status.state==='QUEUED'?'等待同步'
+    :status.state==='ERROR'?'同步失敗'
+    :'未有同步';
+  const ackLabel=ack
+    ?'SMT 已套用 R'+ack.revision
+    :'等待 SMT 回讀';
+  return <div className="mfk-admin-topstate"><b>Admin → SMT 自動同步</b><span>{status.revision?'R'+status.revision+' · ':''}{stateLabel} · {ackLabel}</span></div>;
+}
 
 export function AdminShell({children}:{children:ReactNode}){
   const location=useLocation();
@@ -41,7 +74,7 @@ export function AdminShell({children}:{children:ReactNode}){
     <main className="mfk-admin-main">
       <header className="mfk-admin-topbar">
         <div><small>磨飯營運管理</small><strong>{active?.label??'管理後台'}</strong></div>
-        <div className="mfk-admin-topstate"><b>Admin 控制台</b><span>修改後撳保存；成功即建立新版本並成為目前版本</span></div>
+        <AdminSyncTopState/>
       </header>
       <div className="mfk-admin-workspace">{children}</div>
     </main>

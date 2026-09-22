@@ -15,9 +15,8 @@ function sourceFiles(dir:string):string[]{
 }
 
 describe('MFK Admin migration firewall',()=>{
-  it('contains no live network transport in migrated Admin source',()=>{
+  it('allows network only through the explicit Admin config sync transport',()=>{
     const forbidden=[
-      /\bfetch\s*\(/,
       /\bnew\s+WebSocket\s*\(/,
       /\bXMLHttpRequest\b/,
       /\baxios\s*\./,
@@ -25,8 +24,14 @@ describe('MFK Admin migration firewall',()=>{
     ];
     for(const path of sourceFiles(root)){
       const source=readFileSync(path,'utf8');
+      const isSyncClient=path.endsWith('admin-sync-client.ts');
+      if(!isSyncClient)expect(/\bfetch\s*\(/.test(source),path+' used fetch outside sync seam').toBe(false);
       for(const pattern of forbidden){
         expect(pattern.test(source),path+' matched '+String(pattern)).toBe(false);
+      }
+      if(isSyncClient){
+        expect(source).toContain('/api/admin-sync/publish');
+        expect(source).toContain('/api/admin-sync/acks');
       }
     }
   });
