@@ -71,7 +71,7 @@ export function PublishCenterWorkspace(){
     setReleases(readAdminReleases());
     setImpactPreviewed(false);
     setReason('');
-    setMessage('已建立 '+row.label+'；內容驗證碼 '+row.fingerprint+'。設定版本已保存，但未宣稱任何門店已收到。');
+    setMessage('已建立 '+row.label+'；內容驗證碼 '+row.fingerprint+'。設定版本已保存。');
   };
   const restore=(release:AdminRelease)=>{
     restoreSnapshot(release,replaceDraft);
@@ -93,7 +93,7 @@ export function PublishCenterWorkspace(){
       <article className="admin-policy-card"><h2>1. 檢查內容</h2><button type="button" onClick={runValidation}>檢查完整性</button><small>{lastValidationAt?'最後檢查：'+new Date(lastValidationAt).toLocaleString('zh-HK'):'未檢查'}</small>{validationErrors.length?<ul>{validationErrors.map((error,index)=><li key={index}>{error}</li>)}</ul>:null}</article>
       <article className="admin-policy-card"><h2>2. 確認影響範圍</h2><p>今次設定版本包含菜單、價格設定、選項、套餐、供應、打印規則、門店政策、人員權限草稿同其他已完成 Admin 設定。</p><button type="button" disabled={!canPreview} onClick={()=>setImpactPreviewed(true)}>確認影響範圍</button><small>{impactPreviewed?'已確認':'先完成內容檢查'}</small></article>
       <article className="admin-policy-card"><h2>3. 版本備註</h2><label><span>原因／變更說明（建議填寫）</span><textarea rows={4} value={reason} onChange={event=>setReason(event.target.value)} placeholder="例如：秋季菜單更新／調整外賣附加費"/></label></article>
-      <article className="admin-policy-card"><h2>4. 建立正式設定版本</h2><button type="button" disabled={!impactPreviewed||validationErrors.length>0} onClick={createRelease}>建立新設定版本</button><p>{message}</p><small>建立版本 ≠ 門店已套用。目標派送同 target readback 會喺 Admin 本身完成後先開下一階段。</small></article>
+      <article className="admin-policy-card"><h2>4. 建立正式設定版本</h2><button type="button" disabled={!impactPreviewed||validationErrors.length>0} onClick={createRelease}>建立新設定版本</button><p>{message}</p><small>建立設定版本只代表後台已保存一份不可變版本；未有正式生效證據之前，介面唔會顯示已生效。</small></article>
     </div>
     <section className="admin-rule-card">
       <h2>版本歷史</h2>
@@ -166,7 +166,7 @@ export function SettlementWorkspace(){
   const sum=(key:'grossMinor'|'commissionMinor'|'refundMinor'|'adjustmentMinor')=>filtered.reduce((total,row)=>total+row[key],0);
   const money=(minor:number)=>'HK$'+(minor/100).toFixed(2);
   return <section className="admin-editor-page">
-    <Header title="平台對帳" description="顯示 Provider supplied facts、佣金、退款、調整同差異。Admin 唔自行生成或改寫 settlement truth。"/>
+    <Header title="平台對帳" description="顯示平台提供嘅正式對帳資料、佣金、退款、調整同差異；後台唔會自行改寫結算資料。"/>
     <div className="admin-filterbar">
       <select value={provider} onChange={event=>setProvider(event.target.value)}><option value="ALL">全部平台</option><option value="KEETA">Keeta</option><option value="FOODPANDA">Foodpanda</option></select>
       <label><span>由</span><input type="date" value={from} onChange={event=>setFrom(event.target.value)}/></label>
@@ -174,7 +174,7 @@ export function SettlementWorkspace(){
     </div>
     <div className="admin-kpi-grid">
       <article><span>平台總額</span><strong>{money(sum('grossMinor'))}</strong><small>{filtered.length} 筆</small></article>
-      <article><span>平台佣金</span><strong>{money(sum('commissionMinor'))}</strong><small>Provider facts</small></article>
+      <article><span>平台佣金</span><strong>{money(sum('commissionMinor'))}</strong><small>平台正式資料</small></article>
       <article><span>退款／調整</span><strong>{money(sum('refundMinor')+sum('adjustmentMinor'))}</strong><small>只讀事實</small></article>
       <article><span>差異項目</span><strong>{filtered.filter(row=>row.status==='MISMATCH').length}</strong><small>需要 reconciliation</small></article>
     </div>
@@ -189,9 +189,9 @@ export function MigrationCoverageWorkspace(){
     <Header title="功能準備進度" description="只用作內部產品盤點，唔係營運員工每日工作入口。"/>
     <div className="admin-kpi-grid">
       <article><span>已建立功能面</span><strong>{ready}</strong><small>等待資料／連接唔等於冇 UI</small></article>
-      <article><span>P1 保留</span><strong>{deferred}</strong><small>保留能力</small></article>
+      <article><span>保留功能</span><strong>{deferred}</strong><small>保留能力</small></article>
       <article><span>功能總數</span><strong>{ADMIN_CAPABILITIES.length}</strong><small>能力清單</small></article>
-      <article><span>假成功</span><strong>0</strong><small>未有 readback 就唔顯示成功</small></article>
+      <article><span>假成功</span><strong>0</strong><small>未有正式回傳就唔顯示成功</small></article>
     </div>
   </section>;
 }
