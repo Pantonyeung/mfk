@@ -207,7 +207,13 @@ export class AdminSyncStore{
         }else if(event.type==='DAY_CLOSE_RECORDED'){
           const key='projection:day-close:'+event.entityId;
           const current=await this.state.storage.get(key);
-          if(!current)await this.state.storage.put(key,{eventId:event.eventId,occurredAt:event.occurredAt,payload:event.payload});
+          const incomingVersion=Number(event.payload?.version)||0;
+          const currentVersion=Number(current?.payload?.version)||0;
+          const incomingAt=Date.parse(event.occurredAt);
+          const currentAt=current?Date.parse(String(current.occurredAt||'')):Number.NEGATIVE_INFINITY;
+          if(!current||incomingVersion>currentVersion||incomingVersion===currentVersion&&incomingAt>=currentAt){
+            await this.state.storage.put(key,{eventId:event.eventId,occurredAt:event.occurredAt,payload:event.payload});
+          }
         }
         await this.state.storage.put(eventKey,{type:event.type,entityId:event.entityId,occurredAt:event.occurredAt});
         accepted.push(event.eventId);
