@@ -24,7 +24,7 @@ export function AvailabilityWorkspace(){
   const [query,setQuery]=useState('');
   const rows=useMemo(()=>draft.products.filter(product=>product.name.toLowerCase().includes(query.trim().toLowerCase())),[draft.products,query]);
   return <section className="admin-editor-page">
-    <PolicyHeader title="售罄／供應" description="管理商品可售狀態、停售原因同恢復設定。呢度係正式 Admin 設定草稿；日後由唯一 Sellability authority 執行。"/>
+    <PolicyHeader title="售罄／供應" description="管理商品可售狀態、停售原因同恢復設定。呢度係正式後台設定草稿；正式可售狀態由系統統一執行。"/>
     <div className="admin-filterbar"><input value={query} onChange={event=>setQuery(event.target.value)} placeholder="搜尋商品"/><span>{rows.length} 件商品</span></div>
     <div className="admin-editor-list">{rows.map(product=>{
       const current=state[product.id]??{sellable:true,reason:'',updatedAt:''};
@@ -79,12 +79,12 @@ export function PrintCenterWorkspace(){
   ]);
   const add=()=>setPrinters(rows=>{
     const row:LogicalPrinterDraft={id:'logical-'+Date.now().toString(36),name:'新打印用途',type:'RECEIPT',model:'80mm 熱敏',widthMm:80,active:true,capabilities:['RECEIPT']};
-    appendAdminAudit({action:'新增 Logical Printer',target:row.id,after:row});return [...rows,row];
+    appendAdminAudit({action:'新增 打印用途',target:row.id,after:row});return [...rows,row];
   });
-  const patch=(id:string,change:Partial<LogicalPrinterDraft>)=>setPrinters(rows=>rows.map(row=>{if(row.id!==id)return row;const after={...row,...change};appendAdminAudit({action:'修改 Logical Printer',target:id,before:row,after});return after;}));
-  const remove=(id:string)=>setPrinters(rows=>{appendAdminAudit({action:'刪除 Logical Printer',target:id});return rows.filter(row=>row.id!==id);});
+  const patch=(id:string,change:Partial<LogicalPrinterDraft>)=>setPrinters(rows=>rows.map(row=>{if(row.id!==id)return row;const after={...row,...change};appendAdminAudit({action:'修改 打印用途',target:id,before:row,after});return after;}));
+  const remove=(id:string)=>setPrinters(rows=>{appendAdminAudit({action:'刪除 打印用途',target:id});return rows.filter(row=>row.id!==id);});
   return <section className="admin-editor-page">
-    <header className="admin-editor-head"><div><small>唯一 Logical Printer Registry</small><h1>打印中心</h1><p>Admin 定義唯一打印用途、規格同能力。實際 IP／USB／實體設備日後只由 SMT 配對，唔會喺兩邊建立第二套名稱。</p></div><div className="admin-editor-actions"><button className="secondary" onClick={add}>新增打印用途</button></div></header>
+    <header className="admin-editor-head"><div><small>唯一打印用途清單</small><h1>打印中心</h1><p>Admin 定義唯一打印用途、規格同能力。實際 IP／USB／實體設備日後只由 SMT 配對，唔會喺兩邊建立第二套名稱。</p></div><div className="admin-editor-actions"><button className="secondary" onClick={add}>新增打印用途</button></div></header>
     <div className="admin-editor-list">{printers.map(row=><article className="admin-policy-card" key={row.id}>
       <header><h2>{row.name}</h2><small>{row.id}</small></header>
       <label><span>名稱</span><input value={row.name} onChange={event=>patch(row.id,{name:event.target.value})}/></label>
@@ -176,8 +176,8 @@ export function StaffWorkspace(){
   const remove=(id:string)=>setStaff(rows=>{appendAdminAudit({action:'停用並移除員工草稿',target:id});return rows.filter(row=>row.id!==id);});
   const togglePermission=(row:StaffDraft,permission:string,checked:boolean)=>patch(row.id,{permissions:checked?[...new Set([...row.permissions,permission])]:row.permissions.filter(item=>item!==permission)});
   return <section className="admin-editor-page">
-    <header className="admin-editor-head"><div><small>人員／角色／權限</small><h1>員工／權限</h1><p>管理員工、角色、PIN、權限範圍同後台登入資格。Frontend 隱藏唔代表安全；正式接入時仍必須由唯一 Authz authority 判斷。</p></div><div className="admin-editor-actions"><button className="secondary" onClick={add}>新增員工</button></div></header>
-    {staff.length===0?<div className="admin-empty-state"><b>未有員工資料</b><p>新增員工後設定角色、PIN、Scope 同權限。</p><button onClick={add}>新增員工</button></div>:<div className="admin-editor-grid">{staff.map(row=><article className="admin-policy-card" key={row.id}>
+    <header className="admin-editor-head"><div><small>人員／角色／權限</small><h1>員工／權限</h1><p>管理員工、角色、PIN、權限範圍同後台登入資格。畫面隱藏唔代表有權限；正式權限仍然由系統統一判斷。</p></div><div className="admin-editor-actions"><button className="secondary" onClick={add}>新增員工</button></div></header>
+    {staff.length===0?<div className="admin-empty-state"><b>未有員工資料</b><p>新增員工後設定角色、PIN、權限範圍同權限。</p><button onClick={add}>新增員工</button></div>:<div className="admin-editor-grid">{staff.map(row=><article className="admin-policy-card" key={row.id}>
       <header><h2>{row.name||'未命名員工'}</h2><small>{row.id}</small></header>
       <label><span>員工名稱</span><input value={row.name} onChange={event=>patch(row.id,{name:event.target.value})}/></label>
       <label><span>角色</span><select value={row.role} onChange={event=>patch(row.id,{role:event.target.value as StaffDraft['role']})}><option value="STAFF">員工</option><option value="MANAGER">經理</option><option value="OWNER">老闆</option><option value="VIEWER">只讀人員</option></select></label>
@@ -204,9 +204,9 @@ export function ChannelsWorkspace({mode}:{mode:'overview'|'mapping'|'failures'|'
   const failures=mappings.filter(row=>row.status==='PENDING');
   const title=mode==='overview'?'平台管理':mode==='mapping'?'商品映射管理':mode==='failures'?'匹配失敗明細':mode==='accept'?'接單／自動接單':mode==='sync'?'售罄／供應同步':'實收估算設定';
   return <section className="admin-editor-page">
-    <PolicyHeader title={title} description="管理平台顯示名、接單、供應同步、佣金估算同商品映射。現階段只完成 Admin 設定責任，唔向 Provider 發 command。"/>
+    <PolicyHeader title={title} description="管理平台顯示名稱、接單、供應同步、佣金估算同商品對應。未有正式平台回傳之前，唔會顯示已套用。"/>
     <div className="admin-policy-grid two">
-      <article className="admin-policy-card"><h2>Keeta 平台設定</h2><label><span>顯示名稱</span><input value={config.displayName} onChange={event=>patch({displayName:event.target.value})}/></label><Toggle checked={config.enabled} onChange={enabled=>patch({enabled})} label="啟用平台設定"/><Toggle checked={config.autoAccept} onChange={autoAccept=>patch({autoAccept})} label="正常單自動接單"/><Toggle checked={config.syncSellability} onChange={syncSellability=>patch({syncSellability})} label="同步售罄／供應"/><label><span>Late Arrival Cutoff（分鐘）</span><input type="number" min={0} value={config.lateCutoffMinutes} onChange={event=>patch({lateCutoffMinutes:Number(event.target.value)||0})}/></label><label><span>佣金估算 %</span><input inputMode="decimal" value={config.commissionPct} onChange={event=>patch({commissionPct:event.target.value})}/></label></article>
+      <article className="admin-policy-card"><h2>Keeta 平台設定</h2><label><span>顯示名稱</span><input value={config.displayName} onChange={event=>patch({displayName:event.target.value})}/></label><Toggle checked={config.enabled} onChange={enabled=>patch({enabled})} label="啟用平台設定"/><Toggle checked={config.autoAccept} onChange={autoAccept=>patch({autoAccept})} label="正常單自動接單"/><Toggle checked={config.syncSellability} onChange={syncSellability=>patch({syncSellability})} label="同步售罄／供應"/><label><span>遲到訂單界線（分鐘）</span><input type="number" min={0} value={config.lateCutoffMinutes} onChange={event=>patch({lateCutoffMinutes:Number(event.target.value)||0})}/></label><label><span>佣金估算 %</span><input inputMode="decimal" value={config.commissionPct} onChange={event=>patch({commissionPct:event.target.value})}/></label></article>
       <article className="admin-policy-card"><h2>{mode==='failures'?'未完成對應':'商品對應'}</h2>
         {mode==='failures'
           ?(failures.length?<div>{failures.map(row=><p key={row.providerItemId}>{row.providerItemId} · 待處理</p>)}</div>:<div className="admin-read-empty">目前冇待處理映射。</div>)
