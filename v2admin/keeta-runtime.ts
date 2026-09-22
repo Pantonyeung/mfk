@@ -376,6 +376,8 @@ export class KeetaRuntimeStore{
         lastCallbackAt:callbackStatus.lastCallbackAt??null,
         lastCallbackResult:callbackStatus.lastCallbackResult??null,
         lastCallbackError:callbackStatus.lastCallbackError??null,
+        lastCallbackMethod:callbackStatus.lastCallbackMethod??null,
+        lastCallbackParamNames:Array.isArray(callbackStatus.lastCallbackParamNames)?callbackStatus.lastCallbackParamNames:[],
       },
       webhook:{
         callbackUrl:'https://admin.morefunos.com/api/keeta/webhook',
@@ -417,11 +419,19 @@ export class KeetaRuntimeStore{
 
     if(url.pathname==='/oauth/callback'&&request.method==='GET'){
       const callbackAt=new Date().toISOString();
+      const callbackParamNames=[...new Set([...url.searchParams.keys()])].sort();
       try{
         const config=requireRuntimeConfig(this.env);
         const stateValue=url.searchParams.get('state')||'';
         const code=nonEmpty(url.searchParams.get('code')||'','KEETA_OAUTH_CODE_REQUIRED');
         await completeAuthorizationCode(config,this,stateValue,code,callbackAt,{allowMissingState:false});
+        await this.state.storage.put('oauth:callback-status',{
+          lastCallbackAt:callbackAt,
+          lastCallbackResult:'CONNECTED',
+          lastCallbackError:null,
+          lastCallbackMethod:'GET',
+          lastCallbackParamNames:callbackParamNames,
+        });
         return Response.redirect('https://admin.morefunos.com/admin/channels?keeta=connected',302);
       }catch(error){
         const errorCode=error instanceof Error?error.message:'KEETA_OAUTH_CALLBACK_FAILED';
@@ -429,6 +439,8 @@ export class KeetaRuntimeStore{
           lastCallbackAt:callbackAt,
           lastCallbackResult:'FAILED',
           lastCallbackError:errorCode,
+          lastCallbackMethod:'GET',
+          lastCallbackParamNames:callbackParamNames,
         });
         const code=encodeURIComponent(errorCode);
         return Response.redirect('https://admin.morefunos.com/admin/channels?keeta_error='+code,302);
@@ -437,9 +449,11 @@ export class KeetaRuntimeStore{
 
     if(url.pathname==='/oauth/callback'&&request.method==='POST'){
       const callbackAt=new Date().toISOString();
+      let callbackParamNames=[];
       try{
         const config=requireRuntimeConfig(this.env);
         const body=record(await request.json(),'KEETA_OAUTH_CODE_NOTIFICATION_INVALID');
+        callbackParamNames=Object.keys(body).sort();
         const appId=positiveInt(body.appId,'KEETA_OAUTH_APP_ID_INVALID');
         if(appId!==config.appId)throw new Error('KEETA_OAUTH_APP_ID_MISMATCH');
         const code=nonEmpty(body.code,'KEETA_OAUTH_CODE_REQUIRED');
@@ -449,6 +463,13 @@ export class KeetaRuntimeStore{
         const externalCallbackUrl=request.headers.get('x-mfk-keeta-external-url')||request.url;
         await verifyWebhookSignature(externalCallbackUrl,body,config.appSecret);
         await completeAuthorizationCode(config,this,stateValue,code,callbackAt,{allowMissingState:true});
+        await this.state.storage.put('oauth:callback-status',{
+          lastCallbackAt:callbackAt,
+          lastCallbackResult:'CONNECTED',
+          lastCallbackError:null,
+          lastCallbackMethod:'POST',
+          lastCallbackParamNames:callbackParamNames,
+        });
         return json({code:0,message:'Success'});
       }catch(error){
         const errorCode=error instanceof Error?error.message:'KEETA_OAUTH_CALLBACK_FAILED';
@@ -456,6 +477,8 @@ export class KeetaRuntimeStore{
           lastCallbackAt:callbackAt,
           lastCallbackResult:'FAILED',
           lastCallbackError:errorCode,
+          lastCallbackMethod:'POST',
+          lastCallbackParamNames:callbackParamNames,
         });
         return json({code:errorCode},401);
       }
