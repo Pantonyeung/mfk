@@ -2,6 +2,7 @@ import {describe,expect,it} from 'vitest';
 import {
   buildLocalReport,
   createLocalDayClose,
+  commitLocalDayCloseOnce,
   createLocalCashOpening,
   suggestOpeningCashFromPreviousClose,
   createLocalBackup,
@@ -46,6 +47,36 @@ describe('MFK local operations fusion',()=>{
     expect(close.expectedCashMinor).toBe(110600);
     expect(close.cashDifferenceMinor).toBe(-100);
     expect(close.note).toBe('first close');
+  });
+
+  it('commits normal Day Close exactly once per Business Date',()=>{
+    const values=new Map<string,string>();
+    const storage={
+      getItem:(key:string)=>values.get(key)??null,
+      setItem:(key:string,value:string)=>{values.set(key,value);},
+    };
+    const now=new Date('2026-09-21T12:00:00.000Z').getTime();
+    const first=commitLocalDayCloseOnce({
+      orders:[],
+      now,
+      openingCashMinor:100000,
+      countedCashMinor:500000,
+      cashRemovedMinor:400000,
+    },storage);
+    const repeated=commitLocalDayCloseOnce({
+      orders:[],
+      now,
+      openingCashMinor:100000,
+      countedCashMinor:999999,
+      cashRemovedMinor:0,
+    },storage);
+    expect(first.created).toBe(true);
+    expect(first.row.version).toBe(1);
+    expect(first.row.countedCashMinor).toBe(500000);
+    expect(repeated.created).toBe(false);
+    expect(repeated.row.id).toBe(first.row.id);
+    expect(repeated.row.countedCashMinor).toBe(500000);
+    expect(JSON.parse(values.get('mfk.v2local.day-closes.v1')||'[]')).toHaveLength(1);
   });
 
   it('records cash taken out and derives retained float for next business day',()=>{
