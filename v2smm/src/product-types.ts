@@ -136,6 +136,33 @@ export interface SmmDineSession {
   readonly openedAt:string;
 }
 
+export interface SmmRefundRequest {
+  readonly refundId:string;
+  readonly orderId:string;
+  readonly displayCode:string;
+  readonly source:string;
+  readonly amountLabel?:string;
+  readonly reason:string;
+  readonly state:'PENDING'|'REVIEWING'|'RESOLVED'|'UNKNOWN';
+  readonly observedAt:string;
+}
+
+export interface SmmCapacityProjection {
+  readonly state:'NORMAL'|'BUSY'|'PAUSED'|'UNKNOWN';
+  readonly label:string;
+  readonly detail:string;
+  readonly observedAt:string;
+}
+
+export interface SmmReportingProjection {
+  readonly businessDate:string;
+  readonly orderCount:number;
+  readonly salesLabel:string;
+  readonly averageOrderLabel:string;
+  readonly freshness:'CURRENT'|'STALE'|'UNKNOWN';
+  readonly observedAt:string;
+}
+
 export interface SmmPrintHealth {
   readonly logicalPrinterId:string;
   readonly label:string;
@@ -166,6 +193,9 @@ export interface SmmReadModelSnapshot {
   readonly channels:readonly SmmChannelHealth[];
   readonly dineSessions:readonly SmmDineSession[];
   readonly printHealth:readonly SmmPrintHealth[];
+  readonly refundRequests:readonly SmmRefundRequest[];
+  readonly capacity?:SmmCapacityProjection;
+  readonly reporting?:SmmReportingProjection;
   readonly staff?:SmmStaffContext;
   readonly businessDay?:SmmBusinessDayProjection;
   readonly observedAt:string;
