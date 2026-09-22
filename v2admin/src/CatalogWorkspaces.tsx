@@ -2,7 +2,7 @@ import {useEffect,useMemo,useState} from 'react';
 import {useAdminDraft} from './admin-draft.tsx';
 import {appendAdminAudit,readAdminStored} from './admin-local-store.ts';
 import {normalizeProductMedia,normalizeProductPrintRule,PRODUCT_MEDIA_BACKEND_CONTRACT,useProductMediaConfig,useProductPrintRules,type ProductMediaConfig,type ProductPrintRule} from './admin-product-operational-config.ts';
-import {useOptionSetCenter,type OptionSetCenterController} from './admin-option-set-center.ts';
+import {projectOptionSetsForProduct,useOptionSetCenter,type OptionSetCenterController} from './admin-option-set-center.ts';
 
 function WorkspaceHeader({title,description,onAdd,addLabel}:{title:string;description:string;onAdd?:()=>void;addLabel?:string}){
   const {draft,dirty,validationErrors,validate,reset}=useAdminDraft();
@@ -494,12 +494,27 @@ export function CombosWorkspace(){
 
 export function MenuDisplayWorkspace(){
   const {draft,moveCategory,moveProduct}=useAdminDraft();
+  const optionCenter=useOptionSetCenter(draft);
   const categoryName=useMemo(()=>new Map(draft.categories.map(category=>[category.id,category.name||category.id])),[draft.categories]);
   return <section className="admin-editor-page">
-    <WorkspaceHeader title="菜單／顯示排序" description="正式管理分類同商品顯示次序；停用資料保留身份，但唔會進入 Active Menu。"/>
+    <WorkspaceHeader title="菜單／顯示排序" description="正式管理分類、商品顯示次序同商品已加入嘅選項組；選項資料直接讀取「選項中心」唯一資料來源。"/>
     <div className="admin-sort-columns">
       <section><header><b>分類次序</b><span>{draft.categories.length}</span></header>{draft.categories.map((category,index)=><article key={category.id}><span><b>{index+1}. {category.name||category.id}</b><small>{category.active?'啟用':'停用'}</small></span><div><button disabled={index===0} onClick={()=>moveCategory(category.id,-1)}>↑</button><button disabled={index===draft.categories.length-1} onClick={()=>moveCategory(category.id,1)}>↓</button></div></article>)}</section>
-      <section><header><b>商品次序</b><span>{draft.products.length}</span></header>{draft.products.map((product,index)=><article key={product.id}><span><b>{index+1}. {product.name||product.id}</b><small>{categoryName.get(product.categoryId)??'未分類'} · {product.active?'啟用':'停用'}</small></span><div><button disabled={index===0} onClick={()=>moveProduct(product.id,-1)}>↑</button><button disabled={index===draft.products.length-1} onClick={()=>moveProduct(product.id,1)}>↓</button></div></article>)}</section>
+      <section><header><b>商品次序／選項</b><span>{draft.products.length}</span></header>{draft.products.map((product,index)=>{
+        const optionSets=projectOptionSetsForProduct(optionCenter.state,product.id);
+        return <article key={product.id} className="admin-menu-product-projection">
+          <span>
+            <b>{index+1}. {product.name||product.id}</b>
+            <small>{categoryName.get(product.categoryId)??'未分類'} · {product.active?'啟用':'停用'} · {optionSets.length} 個選項組</small>
+            {optionSets.length?<div className="admin-menu-option-projection">{optionSets.map(set=><div key={set.id}>
+              <strong>{set.name}</strong>
+              <small>{set.required?'必選':set.forceShow?'可選但必須顯示':'可選'} · {set.selection==='SINGLE'?'單選':'多選'} · 最少 {set.min}／最多 {set.max}</small>
+              <div>{set.options.map(option=><span key={option.id}><code>{option.code}</code> {option.name} {Number(option.priceAdjustment)>=0?'+':''}{Number(option.priceAdjustment).toFixed(2)}{option.defaultSelected?' · 默認':''}</span>)}</div>
+            </div>)}</div>:null}
+          </span>
+          <div><button disabled={index===0} onClick={()=>moveProduct(product.id,-1)}>↑</button><button disabled={index===draft.products.length-1} onClick={()=>moveProduct(product.id,1)}>↓</button></div>
+        </article>;
+      })}</section>
     </div>
   </section>;
 }
