@@ -63,7 +63,7 @@ export function ProductsWorkspace(){
   const filtered=useMemo(()=>{
     const needle=query.trim().toLowerCase();
     return draft.products.filter(row=>{
-      const text=[row.name,row.productCode,row.legacyBarcode,row.sku,row.shortName].filter(Boolean).join(' ').toLowerCase();
+      const text=[row.name,row.productCode,row.legacy條碼,row.sku,row.shortName].filter(Boolean).join(' ').toLowerCase();
       return (!needle||text.includes(needle))
         &&(status==='ALL'||(status==='ACTIVE'?row.active:!row.active))
         &&(category==='ALL'||row.categoryId===category);
@@ -71,7 +71,7 @@ export function ProductsWorkspace(){
   },[draft.products,query,status,category]);
 
   return <section className="admin-editor-page">
-    <WorkspaceHeader title="商品資料" description="商品係正式營運資料：名稱、Product Code、分類、價格、外賣規則、選項組、SKU、描述同顯示資料都喺呢度管理。" onAdd={addProduct} addLabel="新增商品"/>
+    <WorkspaceHeader title="商品資料" description="商品係正式營運資料：名稱、商品編號、分類、價格、外賣規則、選項組、庫存編號、描述同顯示資料都喺呢度管理。" onAdd={addProduct} addLabel="新增商品"/>
     <div className="admin-kpi-grid">
       <article><span>商品總數</span><strong>{draft.products.length}</strong><small>包含停用資料</small></article>
       <article><span>已啟用</span><strong>{draft.products.filter(row=>row.active).length}</strong><small>目前菜單候選</small></article>
@@ -79,7 +79,7 @@ export function ProductsWorkspace(){
       <article><span>未填價格</span><strong>{draft.products.filter(row=>row.active&&!row.basePrice.trim()).length}</strong><small>發布前必須處理</small></article>
     </div>
     <div className="admin-filterbar">
-      <input value={query} onChange={event=>setQuery(event.target.value)} placeholder="搜尋商品名稱／Product Code／Barcode／SKU"/>
+      <input value={query} onChange={event=>setQuery(event.target.value)} placeholder="搜尋商品名稱／商品編號／條碼／庫存編號"/>
       <select value={category} onChange={event=>setCategory(event.target.value)}><option value="ALL">全部分類</option>{draft.categories.map(row=><option key={row.id} value={row.id}>{row.name}</option>)}</select>
       <select value={status} onChange={event=>setStatus(event.target.value as typeof status)}><option value="ALL">全部狀態</option><option value="ACTIVE">已啟用</option><option value="INACTIVE">已停用</option></select>
       <span>{filtered.length} / {draft.products.length}</span>
@@ -88,21 +88,21 @@ export function ProductsWorkspace(){
     {filtered.length===0
       ?<div className="admin-read-empty">搵唔到符合條件嘅商品。</div>
       :<div className="admin-editor-grid">{filtered.map(row=><article className="admin-card-editor" key={row.id}>
-        <header><div><small>{row.productCode||row.id}{row.legacyBarcode?' · '+row.legacyBarcode:''}</small><b>{row.name||'未命名商品'}</b></div><div className="admin-editor-actions"><Toggle checked={row.active} onChange={active=>updateProduct(row.id,{active})} label={row.active?'啟用':'停用'}/><button type="button" onClick={()=>removeProduct(row.id)}>刪除</button></div></header>
+        <header><div><small>{row.productCode||row.id}{row.legacy條碼?' · '+row.legacy條碼:''}</small><b>{row.name||'未命名商品'}</b></div><div className="admin-editor-actions"><Toggle checked={row.active} onChange={active=>updateProduct(row.id,{active})} label={row.active?'啟用':'停用'}/><button type="button" onClick={()=>removeProduct(row.id)}>刪除</button></div></header>
         <div className="admin-form-grid two">
           <label><span>商品名稱 *</span><input value={row.name} onChange={event=>updateProduct(row.id,{name:event.target.value})}/></label>
-          <label><span>Product Code *</span><input value={row.productCode??''} onChange={event=>updateProduct(row.id,{productCode:event.target.value})}/></label>
+          <label><span>商品編號 *</span><input value={row.productCode??''} onChange={event=>updateProduct(row.id,{productCode:event.target.value})}/></label>
           <label><span>簡稱</span><input value={row.shortName??''} onChange={event=>updateProduct(row.id,{shortName:event.target.value})}/></label>
-          <label><span>SKU</span><input value={row.sku??''} onChange={event=>updateProduct(row.id,{sku:event.target.value})}/></label>
+          <label><span>庫存編號</span><input value={row.sku??''} onChange={event=>updateProduct(row.id,{sku:event.target.value})}/></label>
           <label><span>分類 *</span><select value={row.categoryId} onChange={event=>updateProduct(row.id,{categoryId:event.target.value})}><option value="">未選分類</option>{draft.categories.map(category=><option key={category.id} value={category.id}>{category.name||category.id}</option>)}</select></label>
           <label><span>基本價 HK$ *</span><input inputMode="decimal" value={row.basePrice} onChange={event=>updateProduct(row.id,{basePrice:event.target.value})} placeholder="0.00"/></label>
-          <label><span>Barcode</span><input value={row.legacyBarcode??''} onChange={event=>updateProduct(row.id,{legacyBarcode:event.target.value})}/></label>
+          <label><span>條碼</span><input value={row.legacy條碼??''} onChange={event=>updateProduct(row.id,{legacy條碼:event.target.value})}/></label>
           <label><span>圖片參考</span><input value={row.imageRef??''} onChange={event=>updateProduct(row.id,{imageRef:event.target.value})} placeholder="圖片 URL / Asset ID"/></label>
         </div>
         <label><span>商品描述</span><textarea rows={3} value={row.description??''} onChange={event=>updateProduct(row.id,{description:event.target.value})} placeholder="顧客／員工可讀描述"/></label>
         <label><span>標籤（逗號分隔）</span><input value={(row.tags??[]).join(', ')} onChange={event=>updateProduct(row.id,{tags:event.target.value.split(',').map(value=>value.trim()).filter(Boolean)})}/></label>
         <section className="admin-sub-editor">
-          <header><b>外賣價格規則</b><small>唯一 Pricing authority 會消費呢個設定</small></header>
+          <header><b>外賣價格規則</b><small>正式計價規則會使用呢個設定</small></header>
           <Toggle checked={Boolean(row.takeawaySurchargeEnabled)} onChange={takeawaySurchargeEnabled=>updateProduct(row.id,{takeawaySurchargeEnabled})} label={row.takeawaySurchargeEnabled?'此商品外賣 +$1：開':'此商品外賣 +$1：關'}/>
           <label><span>其他外賣調整 HK$（選填）</span><input inputMode="decimal" value={row.takeawayAdjustment} onChange={event=>updateProduct(row.id,{takeawayAdjustment:event.target.value})} placeholder="例如 -1.00 / 2.00"/></label>
         </section>
