@@ -9,7 +9,7 @@ import {MfkAdminApp} from './App.tsx';
 import {ADMIN_CAPABILITIES} from './admin-capabilities.ts';
 import {applyProductSetLinksBulk,migrateLegacyDraftToOptionSetCenter,projectOptionSetsForProduct,useOptionSetCenter,validateOptionSetCenter,type OptionSetCenterState} from './admin-option-set-center.ts';
 import {validateAdminConfig} from './admin-config-save.ts';
-import {POSTER_COMBO_SEED} from './admin-combo-seed-poster-20260530.ts';
+import {COMBO_R3_COMBOS,COMBO_R3_POOLS,applyComboR3PoolSeed} from './admin-combo-pool-seed-r3.ts';
 
 
 function ProductDetailHarness({productId}:{productId:string}){
@@ -240,36 +240,75 @@ describe('MFK Admin complete catalog product',()=>{
     expect(projectOptionSetsForProduct(state,'product-a').map(set=>set.name)).toEqual(['飯量']);
   });
 
-  it('seeds the Owner poster as one editable three-step Combo template',()=>{
-    const combo=POSTER_COMBO_SEED;
-    expect(combo.name).toBe('自選紫米套餐');
-    expect(combo.basePrice).toBe('41.00');
-    expect(combo.sections.map(section=>section.name)).toEqual(['選擇飯糰','選擇小食','選擇飲品']);
-    expect(combo.sections[0]?.bands.map(band=>band.priceAdjustment)).toEqual(['0.00','2.00','4.00','6.00']);
-    expect(combo.sections[1]?.bands.map(band=>band.priceAdjustment)).toEqual(['0.00','3.00','5.00']);
-    expect(combo.sections[2]?.bands.map(band=>band.priceAdjustment)).toEqual(['0.00','3.00','6.00','8.00','10.00']);
+  it('models A/B/C/D as four main-course pools and one shared snack/drink add-on pool',()=>{
+    expect(COMBO_R3_COMBOS.map(combo=>combo.name)).toEqual([
+      '自選飯糰 A 餐','自選飯糰 B 餐','自選飯糰 C 餐','自選飯糰 D 餐',
+    ]);
+    expect(COMBO_R3_COMBOS.map(combo=>combo.basePrice)).toEqual(['41.00','43.00','45.00','47.00']);
+    expect(COMBO_R3_COMBOS.map(combo=>combo.mainPoolId)).toEqual([
+      'combo-rice-pool-a','combo-rice-pool-b','combo-rice-pool-c','combo-rice-pool-d',
+    ]);
+    for(const combo of COMBO_R3_COMBOS)expect(combo.addonPoolIds).toEqual(['combo-addon-pool-shared']);
 
-    const productIds=new Set(LEGACY_MF01_ADMIN_DRAFT.products.map(product=>product.id));
-    for(const section of combo.sections){
-      for(const choice of section.choices)expect(productIds.has(choice.productId),choice.id).toBe(true);
-    }
+    const mainPools=COMBO_R3_POOLS.filter(pool=>pool.kind==='MAIN_COURSE');
+    const addonPools=COMBO_R3_POOLS.filter(pool=>pool.kind==='ADDON');
+    expect(mainPools.map(pool=>pool.name)).toEqual(['飯糰 Pool A','飯糰 Pool B','飯糰 Pool C','飯糰 Pool D']);
+    expect(addonPools).toHaveLength(1);
+    expect(addonPools[0]?.groups.map(group=>group.name)).toEqual(['選擇小食','選擇飲品']);
   });
 
-  it('renders editable Combo R2 bands, canonical product choices and inherited Option-set contract',()=>{
+  it('locks snack and drink upgrade tiers without inventing the no-drink discount',()=>{
+    const addon=COMBO_R3_POOLS.find(pool=>pool.id==='combo-addon-pool-shared')!;
+    const snack=addon.groups.find(group=>group.id==='combo-addon-snack')!;
+    const drink=addon.groups.find(group=>group.id==='combo-addon-drink')!;
+    expect(snack.bands.map(band=>band.priceAdjustment)).toEqual(['0.00','3.00','5.00']);
+    expect(drink.bands.map(band=>band.name)).toEqual([
+      '唔飲嘢 · 減價',
+      '熱飲 · $0',
+      '熱檸茶／熱檸水轉凍 · +$3',
+      '特飲 · +$6',
+      '特飲 · +$8',
+      '特飲 · +$10',
+    ]);
+    const noDrink=drink.bands[0]!;
+    expect(noDrink.priceAdjustment).toBe('');
+    expect(noDrink.priceStatus).toBe('OWNER_VALUE_REQUIRED');
+    expect(drink.choices.find(choice=>choice.choiceType==='NONE')?.label).toBe('唔飲嘢');
+  });
+
+  it('migrates the wrong single poster Combo into the R3 pool model exactly once',()=>{
+    const legacy=LEGACY_MF01_ADMIN_DRAFT as unknown as AdminSessionDraft;
+    const withWrongCombo={
+      ...legacy,
+      combos:[{
+        id:'combo-poster-purple-rice-20260530',name:'自選紫米套餐',active:true,basePrice:'41.00',takeawayAdjustment:'0.00',sections:[],
+      }],
+    } as AdminSessionDraft;
+    const migrated=applyComboR3PoolSeed(withWrongCombo);
+    expect(migrated.combos.some(combo=>combo.id==='combo-poster-purple-rice-20260530')).toBe(false);
+    expect(migrated.combos.filter(combo=>combo.id.startsWith('combo-rice-set-'))).toHaveLength(4);
+    expect(migrated.comboPools?.filter(pool=>pool.id.startsWith('combo-rice-pool-'))).toHaveLength(4);
+    expect(migrated.comboPools?.filter(pool=>pool.id==='combo-addon-pool-shared')).toHaveLength(1);
+    const replay=applyComboR3PoolSeed(migrated);
+    expect(replay.combos.filter(combo=>combo.id==='combo-rice-set-a')).toHaveLength(1);
+    expect(replay.comboPools?.filter(pool=>pool.id==='combo-addon-pool-shared')).toHaveLength(1);
+  });
+
+  it('renders the R3 pool model and pending no-drink price explicitly',()=>{
     const html=renderToStaticMarkup(<MemoryRouter initialEntries={['/admin/catalog/combos']}><MfkAdminApp/></MemoryRouter>);
     for(const marker of [
-      '自選紫米套餐','選擇飯糰','選擇小食','選擇飲品',
-      'Set A · 茹素輕盈','Set B · 充滿元氣','Set C · 活力滿分','Set D · 店主推薦',
-      '滋味升級 · +$3','夯爆美味 · +$5','暢飲升級 · +$6','夯爆升級 · +$8','夯爆升級 · +$10',
-      '價格帶','可選商品','商品額外差價 HK$','商品本身嘅選項組會原樣繼承',
+      '自選飯糰 A 餐','自選飯糰 B 餐','自選飯糰 C 餐','自選飯糰 D 餐',
+      '飯糰 Pool A','飯糰 Pool B','飯糰 Pool C','飯糰 Pool D',
+      '共用小食／飲品 Pool','免費小食','升級 +$3','升級 +$5',
+      '唔飲嘢 · 減價','熱飲 · $0','熱檸茶／熱檸水轉凍 · +$3',
+      '特飲 · +$6','特飲 · +$8','特飲 · +$10',
+      '待 Owner 設定','非商品選擇',
     ])expect(html).toContain(marker);
-    expect(html).toContain('古早味紫米飯糰');
-    expect(html).toContain('古早鹽酥雞');
-    expect(html).toContain('台式奶茶');
   });
 
-  it('resolves Combo choice Product options through the same canonical ProductOptionSetLink truth',()=>{
-    const productId=POSTER_COMBO_SEED.sections[0]!.choices[0]!.productId;
+  it('resolves a Combo pool Product through the same canonical ProductOptionSetLink truth',()=>{
+    const ricePool=COMBO_R3_POOLS.find(pool=>pool.id==='combo-rice-pool-a')!;
+    const productId=ricePool.groups[0]!.choices[0]!.productId!;
     const state:OptionSetCenterState={
       sets:[{
         id:'rice-adjust',name:'飯量',required:false,forceShow:true,selection:'SINGLE',min:0,max:1,allowQuantities:false,active:true,
