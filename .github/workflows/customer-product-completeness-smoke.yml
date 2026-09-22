@@ -1,0 +1,27 @@
+name: customer-product-completeness-smoke
+
+on:
+  pull_request:
+    branches:
+      - work/MFK/CUSTOMER-PRODUCT-COMPLETION-R1
+  workflow_dispatch:
+
+jobs:
+  customer:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: v2customer
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install
+        run: npm install
+      - name: Test
+        run: npm test
+      - name: Build
+        run: npm run build
