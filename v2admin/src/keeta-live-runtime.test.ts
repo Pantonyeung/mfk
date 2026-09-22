@@ -1,4 +1,4 @@
-import {describe,expect,it} from 'vitest';
+import {describe,expect,it,vi} from 'vitest';
 import {
   assessKeetaRuntimeReadiness,
   buildKeetaRuntimeSignaturePreimage,
@@ -192,6 +192,64 @@ describe('Keeta live edge runtime',()=>{
     }));
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({code:0,message:'Success',data:{}});
+  });
+
+
+  it('accepts signed event-1 authorization code callback and persists an encrypted token',async()=>{
+    const key=Buffer.alloc(32,6).toString('base64');
+    const storage=new Map<string,unknown>();
+    const state={storage:{
+      get:async(key:string)=>storage.get(key),
+      put:async(key:string,value:unknown)=>{storage.set(key,value);},
+      delete:async(key:string)=>{storage.delete(key);},
+    }};
+    const env={
+      KEETA_APP_ID:'3419700273',
+      KEETA_APP_SECRET:'test-secret',
+      KEETA_TOKEN_ENCRYPTION_KEY:key,
+      KEETA_PROVIDER_SHOP_ID:'721578302',
+      KEETA_OAUTH_REDIRECT_URI:'https://admin.morefunos.com/api/keeta/oauth/callback',
+    };
+    const {KeetaRuntimeStore}=await import('../keeta-runtime.ts');
+    const runtime=new KeetaRuntimeStore(state as never,env as never);
+    const issuedAtTime=Date.now();
+    const providerFetch=vi.fn(async()=>new Response(JSON.stringify({
+      accessToken:'access-token',
+      tokenType:'bearer',
+      expiresIn:7776000,
+      refreshToken:'refresh-token',
+      scope:'all',
+      issuedAtTime,
+    }),{status:200,headers:{'content-type':'application/json'}}));
+    vi.stubGlobal('fetch',providerFetch);
+    try{
+      const externalUrl='https://admin.morefunos.com/api/keeta/oauth/callback';
+      const body=await signKeetaRuntimeParams(externalUrl,{
+        code:'authorization-code',
+        state:'',
+        appId:3419700273,
+        timestamp:Date.now(),
+      },'test-secret');
+      const response=await runtime.fetch(new Request('https://admin.morefunos.com/oauth/callback',{
+        method:'POST',
+        headers:{
+          'content-type':'application/json',
+          'x-mfk-keeta-external-url':externalUrl,
+        },
+        body:JSON.stringify(body),
+      }));
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({code:0,message:'Success'});
+      const tokenRow=storage.get('oauth:token') as {ciphertext?:string;iv?:string}|undefined;
+      expect(tokenRow?.ciphertext).toBeTruthy();
+      expect(tokenRow?.iv).toBeTruthy();
+      const status=await runtime.fetch(new Request('https://internal/admin/status',{method:'POST'}));
+      const statusBody=await status.json() as {oauth:{state:string;lastCallbackResult:string}};
+      expect(statusBody.oauth.state).toBe('CONNECTED');
+      expect(statusBody.oauth.lastCallbackResult).toBe('CONNECTED');
+    }finally{
+      vi.unstubAllGlobals();
+    }
   });
 
 });
