@@ -12,7 +12,7 @@ const render=(path:string)=>renderToStaticMarkup(
 describe('MFK Admin complete operational workflows',()=>{
   it('makes Today a useful operating entry and routes real action items',()=>{
     const today=render('/admin/overview');
-    expect(today).toContain('Admin 每日入口');
+    expect(today).toContain('每日營運入口');
     expect(today).toContain('營運準備');
     expect(today).toContain('待發布變更');
     expect(today).toContain('最近操作');
@@ -25,7 +25,7 @@ describe('MFK Admin complete operational workflows',()=>{
 
   it('builds immutable Admin configuration releases without pretending delivery',()=>{
     const html=render('/admin/publish');
-    for(const marker of ['設定版本管理','檢查內容','確認影響範圍','建立正式設定版本','版本歷史','建立版本 ≠ 門店已套用']){
+    for(const marker of ['設定版本管理','檢查內容','確認影響範圍','建立正式設定版本','版本歷史','未有正式生效證據之前']){
       expect(html).toContain(marker);
     }
     expect(html).not.toContain('建立並下載發布檔案');
@@ -34,7 +34,7 @@ describe('MFK Admin complete operational workflows',()=>{
 
   it('provides device, OTA and access governance with desired-vs-observed separation',()=>{
     const devices=render('/admin/devices');
-    expect(devices).toContain('Desired vs Observed');
+    expect(devices).toContain('預期設定／實際狀態');
     expect(devices).toContain('預期設定');
     expect(devices).toContain('裝置目前狀態');
 
@@ -44,7 +44,7 @@ describe('MFK Admin complete operational workflows',()=>{
     expect(ota).toContain('SHA-256');
 
     const access=render('/admin/access');
-    expect(access).toContain('登入／Session／Scope');
+    expect(access).toContain('登入／權限範圍');
     expect(access).toContain('PIN 最少位數');
     expect(access).toContain('可信裝置');
   });
@@ -65,16 +65,16 @@ describe('MFK Admin complete operational workflows',()=>{
     const exp=render('/admin/reports/export');
     expect(exp).toContain('匯出治理');
     expect(exp).toContain('敏感匯出需要 Owner 批准');
-    expect(exp).toContain('未有正式 read model 嘅報表唔會輸出假資料');
+    expect(exp).toContain('未有正式報表資料就唔會輸出假資料');
   });
 
   it('provides diagnostics, integrations and effective settings without fake health',()=>{
     const diagnostics=render('/admin/system/diagnostics');
-    expect(diagnostics).toContain('冇證據唔會硬判 root cause');
+    expect(diagnostics).toContain('冇證據唔會硬判根因');
     expect(diagnostics).toContain('唔會用假綠燈代替健康證據');
     const integrations=render('/admin/system/integrations');
-    expect(integrations).toContain('Credential Reference');
-    expect(integrations).toContain('Replay Window');
+    expect(integrations).toContain('憑證引用名稱');
+    expect(integrations).toContain('防重放時限');
     const settings=render('/admin/system/advanced');
     expect(settings).toContain('目前生效值');
     expect(settings).toContain('安全底線');
