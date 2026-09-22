@@ -306,7 +306,18 @@ export default {
         :url.pathname==='/api/keeta/oauth/callback'
           ?'/oauth/callback'
           :'/not-found';
-      const response=await keeta.fetch(new Request(target.toString(),request));
+      const forwardedHeaders=new Headers(request.headers);
+      if(url.pathname==='/api/keeta/webhook'){
+        forwardedHeaders.set('x-mfk-keeta-external-url',request.url);
+      }else{
+        forwardedHeaders.delete('x-mfk-keeta-external-url');
+      }
+      const init={method:request.method,headers:forwardedHeaders};
+      if(request.method!=='GET'&&request.method!=='HEAD'){
+        const body=await request.arrayBuffer();
+        if(body.byteLength)init.body=body;
+      }
+      const response=await keeta.fetch(new Request(target.toString(),init));
       const headers=new Headers(response.headers);
       for(const [key,value] of Object.entries(cors(request)))headers.set(key,value);
       return new Response(response.body,{status:response.status,statusText:response.statusText,headers});
