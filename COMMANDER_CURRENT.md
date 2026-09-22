@@ -3,224 +3,176 @@
 Status: CURRENT / CONTROLLING
 Protocol: #39
 Control: #22
-Updated: 2026-09-22 12:06 Asia/Hong_Kong
+Updated: 2026-09-22 12:14 Asia/Hong_Kong
 System: MFK ONLY
 
 ## 0. Mandatory read order
 1. COMMANDER_CURRENT.md
 2. #22 latest control
-3. docs/navigation/MFK_航海圖_V1.17_Round018_2026-09-22.txt
+3. docs/navigation/MFK_航海圖_V1.18_Round019_2026-09-22.txt
 4. HANDOFF_CURRENT.md
-5. active issues
+5. active issue(s)
 
 ## 1. Owner priority
 
 SMT OTA physical acceptance:
 HOLD
 
+Admin automatic publish:
+P0 ACTIVE
+
+Active issue:
+#44
+
+## 2. Owner architecture lock
+
+Admin is the ONLY control plane.
+
+SMT MUST NOT contain Admin mutation controls.
+
+SMT operator MUST NOT:
+- edit menu
+- save Admin draft
+- publish menu
+- import Admin file
+- choose install/apply
+- acknowledge Admin publish manually
+
+SMT may expose read-only status only:
+- active menu revision
+- last sync status/time
+- pending catch-up state
+- failure state for support
+
+## 3. Manual A2 design is superseded
+
+Historical #35 manual controlled transfer was an acceptance harness only.
+
+It MUST NOT be used as production transport.
+
+Manual flow now prohibited:
+Admin download JSON
+→ human file move
+→ SMT import
+→ human receipt move
+→ Admin import
+
+Current manually-created R20 file:
+DO NOT APPLY
+
+#35 remains useful only for:
+- revision/fingerprint contract
+- fail-closed validation semantics
+- atomic apply semantics
+- target readback shape
+
+## 4. Correct production flow
+
+Admin Draft
+→ Validate
+→ authenticated Publish
+→ canonical published Menu revision commit
+→ event-driven realtime doorbell
+→ SMT detects newer revision
+→ SMT automatic canonical fetch
+→ validate revision + fingerprint
+→ atomic Local LKG apply
+→ POS switches automatically
+→ automatic ACK/readback
+→ Admin shows applied store revision
+
+Realtime is notification only.
+Canonical Menu snapshot is authoritative.
+
+## 5. Offline rule
+
+If cloud/realtime unavailable:
+- SMT keeps current Local LKG
+- Order / Checkout / Payment / Local Commit continue
+- no transaction blocking
+- no forced logout/install prompt
+
+When connectivity returns:
+- SMT automatically reads current canonical revision
+- catches up to latest valid revision
+- applies without operator choice
+- sends readback automatically
+
+## 6. Event/runtime rule
+
+MFK cloud runtime:
+EVENT-DRIVEN FIRST
+
+No high-frequency polling.
+No 5-second watchdog.
+No global cron for Menu delivery.
+
+Allowed safety reconciliation:
+bounded reconnect/focus/startup revision check.
+
+## 7. SMT UI correction required
+
+Current:
+LocalAdminMenuWorkspace exposes mutation/admin controls.
+
+Target:
+remove Admin control surface from SMT.
+
+Replace with read-only Menu Sync Status if needed.
+
+No "Admin · Menu" control page in production SMT navigation.
+
+## 8. Security gate
+
+Admin Publish mutation must be authenticated and fail-closed.
+
+No public unauthenticated publish endpoint.
+
+Store/tenant identity must be explicit.
+
+Revision transition must remain monotonic and validated.
+
+## 9. Existing current state
+
 Admin:
-ACTIVE
-
-## 2. Admin operator Chinese UI
-
-Issue #41.
-
-Source verification:
-35683885708 SUCCESS
-
-Live deploy:
-35684038608 SUCCESS
-
-State:
-MFK_ADMIN_OPERATOR_CHINESE_UI_DEPLOYED_GREEN
-
-Owner browser visual confirmation:
-PENDING
-
-## 3. Owner-selected legacy Admin Menu re-entry
-
-Issue:
-#42
-
-Owner explicitly authorized retired Morefun-v2 Admin menu as donor for this exact work.
-
-Selected donor:
-Pantonyeung/Morefun-v2
-snapshot:
-menu-combined-2026-09-05-v1
-
-Exact source:
-- data/menu/menu-combined-2026-09-05-v1-products.tsv
-- data/menu/menu-combined-2026-09-05-v1-direct-price.tsv
-- scripts/menu/build-mf01-combined-menu-import.mjs
-
-Donor-supported facts copied:
-- raw rows = 207
-- donor canonical after its own removal list = 203 products
-- direct-visible / active = 188
-- hidden retained inactive = 15
-- categories = 14
-- direct prices = 188
-- exact donor product names
-- exact donor product IDs
-- legacy barcode retained internally
-- donor source ordering retained
-
-No unsupported data was invented.
-
-Important:
-The selected donor snapshot itself contains no canonical modifier/combo bindings.
-Those remain absent rather than being fabricated.
-
-## 4. MFK Admin implementation
-
-Seed:
-v2admin/src/admin-menu-seed-mf01-v2.ts
-
-Test:
-v2admin/src/admin-menu-seed-mf01-v2.test.ts
-
-Admin draft:
-now hydrates from the imported MF01 menu instead of 0 Categories / 0 Products.
-
-Inactive donor products:
-may remain uncategorized without blocking validation.
-
-A2 projection:
-active categories/products only;
-188 donor-visible products are eligible for Menu Index projection.
-
-Branch verification:
-35684903667 SUCCESS
-- test GREEN
-- build GREEN
-
-Clean landing:
-main
-
-Deploy trigger:
-eb4f06233b8e9ae6400caeae5880a5eacb086922
-
-Live deploy:
-35684991125 SUCCESS
-- test GREEN
-- build GREEN
-- Deploy mfk-admin GREEN
-
-Milestone:
-MFK_ADMIN_MF01_LEGACY_MENU_REENTERED_DEPLOYED_GREEN
-
-Owner browser visual readback:
-GREEN
-
-## 5. Exact NEXT
-
-Owner has confirmed the imported menu is visible in live Admin.
-
-#42:
-BANKED / CLOSED
-
-Next is ONE A2 manual controlled transfer, but exact SMT base revision MUST be read first.
-
-Step 1:
-SMT → More → Admin · Menu
-read:
-ACTIVE R?
-
-Step 2:
-Admin → 待發布變更
-set「門店目前版本」= exact SMT Active Revision
-
-Step 3:
-檢查內容
-→ 確認影響範圍
-→ 建立並下載發布檔案
-
-Step 4:
-transfer SAME file to SMT
-→ 匯入 Admin A2 Bundle
-→ require apply/readback
-
-Step 5:
-download SMT readback file
-→ import to Admin
-→ 核對結果 = 一致
-
-A2 exact scope:
-- 14 active categories
-- 188 active/direct-visible products
-- product/category identity
-- labels
-- ordering
-- active projection
-
-A2 DOES NOT include:
-- price
-- modifier
-- combo
-- availability
-- print rules
-
-15 inactive donor products remain retained in Admin but are not projected.
-
-After MATCH:
-BANK A2 owner cross-device acceptance and STOP.
-
-Next separate seam after Owner decision:
-Pricing.
-
-## 5A. Current A2 physical evidence
-
-Owner screenshots now prove:
+legacy MF01 Menu re-entry GREEN
+14 categories
+203 products
+188 active
+15 inactive
 
 SMT:
-- ACTIVE = R19
-- DRAFT = D26
-- draft base = R19
+current Active R19
 
-Admin:
-- target = R20
-- publish id = `ADMIN-MENU:R20:fnv1a32:08ff69b3`
-- fingerprint = `fnv1a32:08ff69b3`
-- publish file created/downloaded
-- no store readback yet
+Admin manually-created target R20:
+not production-applied
 
-This is expected pre-transfer state.
+## 10. Exact NEXT
 
-SMT remaining R19 is NOT failure until the exact JSON file is imported on SMT.
+Implement #44 in one bounded seam:
 
-Exact transfer:
-Admin downloaded JSON
-→ human-controlled local/physical file move
-→ SMT A2 import
-→ expected Active R20 / MATCH
-→ SMT readback download
-→ file move back to Admin
-→ Admin import
-→ 核對結果 = 一致
+1. publish/readback contract for canonical Menu revision
+2. event-driven Admin Publish signal
+3. SMT automatic fetch/apply
+4. automatic SMT ACK/readback
+5. remove SMT Admin mutation controls
+6. keep read-only revision status
+7. tests/build
+8. deploy
+9. Owner real-device proof:
+   Admin Publish only
+   → zero SMT touch
+   → SMT auto R19→R20
+   → Admin sees applied R20
 
-Important:
-Do NOT use SMT local `發布到 POS` button for A2.
-The A2 bundle import itself applies the validated revision.
+Only then BANK:
+MFK_ADMIN_SMT_AUTO_PUBLISH_GREEN
 
-STOP if SMT import does not produce R20 / MATCH.
-
-## 6. A3
-
-NOT AUTHORIZED.
-
-## 7. SMT OTA
-
-#40 remains HOLD.
-
-Ready candidate:
-runtime-candidate-mfk-d133043dfe7d
-
-## 8. DO NOT
-
-- no SMT mutation from this menu import yet
-- no A2 final bundle before SMT Active Revision is read
-- no A3
-- no SMT OTA acceptance while HOLD
-- no unsupported modifier/combo reconstruction from legacy guesses
+## 11. DO NOT
+- no manual JSON transport
+- no SMT Admin mutation UI
+- no operator install choice
+- no high-frequency polling/cron
+- no unauthenticated publish
+- no SMT OTA work while HOLD
 - no Keeta live
