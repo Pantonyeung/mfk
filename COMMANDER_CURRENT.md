@@ -3,13 +3,13 @@
 Status: CURRENT / CONTROLLING
 Protocol: #39
 Control: #22
-Updated: 2026-09-22 13:58 Asia/Hong_Kong
+Updated: 2026-09-22 14:10 Asia/Hong_Kong
 System: MFK ONLY
 
 ## 0. Mandatory read order
 1. COMMANDER_CURRENT.md
 2. #22 latest controlling comment
-3. docs/navigation/MFK_航海圖_V1.22_Round023_2026-09-22.txt
+3. docs/navigation/MFK_航海圖_V1.23_Round024_2026-09-22.txt
 4. HANDOFF_CURRENT.md
 5. active issue(s)
 
@@ -18,17 +18,17 @@ System: MFK ONLY
 Parent Admin completion:
 #45
 
-Current Product-detail correction:
-#62
-
-Current architecture correction:
+Current exact issue:
 #68 Admin Option Center R1
 
-Known next RED:
-#66 MFK-native Product Media R2 + D1 + Auth
+Parent Product detail:
+#62
+
+Known later RED:
+#66 Product Media R2 + D1 + Auth
 
 State:
-`MFK_ADMIN_PRODUCT_DETAIL_R2_DEPLOYED_OWNER_REVIEW_PENDING`
+`MFK_ADMIN_OPTION_CENTER_DEPLOYED_OWNER_REVIEW_PENDING`
 
 #44 Admin→SMT:
 HOLD
@@ -41,218 +41,155 @@ NOT AUTHORIZED
 
 ## 2. Owner Option architecture lock
 
-The previous Product-detail Option editing model is superseded.
-
-Correct normalized model:
+Correct normalized model is now implemented.
 
 ### Option Center = canonical Option Master
 
-Each Option is created once:
+Each Option exists once:
+- internal identity
 - Option ID
 - Name
 - Price adjustment
-- Active/inactive
-
-Example:
-多飯 / 小飯 / 走飯
+- Active / inactive
 
 No Product-specific duplicate Option record.
 
-### Option Group = selection policy
+### Option Group
 
-Option Group references existing Option IDs.
+Group references existing Option identities.
 
 Group owns:
 - Group ID / Name
-- included Option IDs
-- order
+- Option membership
 - Required / Optional / Optional-force-show
 - Single / Multi
 - Min / Max
 - Allow quantities
+- Active
 
-### Product link
+Group does NOT copy Option name / price.
 
-Product detail does NOT author Option Master data.
+### Product Link
 
 Product detail:
-- shows linked Option Groups / Options
-- links/unlinks existing groups/options
+- links / unlinks existing Option Groups
+- may include / exclude existing Options in that linked group for this Product
 - reads Option ID / Name / Price from Option Center
-- deep-links to Option Center for master editing
+- does NOT edit Option Master data
+- links to Option Center for master edits
 
-### Default
+### Product-specific Default
 
-Default selection is Product-specific link state.
+Default belongs to:
+`Product × Option Group × Option`
 
-It does NOT live on the global Option Master.
+NOT global Option Master.
 
-Same Option can be default for Product A but not Product B.
+Same canonical Option can be default for Product A and not Product B.
 
-Example:
-Option Center:
-多飯 +$2 / 小飯 $0 / 走飯 -$1
+Single-select Group:
+max one Product default.
 
-Group:
-飯量
+## 3. Legacy conversion
 
-Product A:
-飯量 linked, 小飯 default
+Existing embedded modifier data is normalized on first Option Center use:
+- dedupe by Option code where possible
+- preserve group membership
+- preserve Product link
+- legacy default becomes Product-specific link default
 
-Product B:
-飯量 linked, 多飯 default
+No intentional silent data loss.
 
-No duplicated identity.
-No copied Option price.
+## 4. Release / pricing governance
 
-## 3. UX
+Immutable Admin release now includes:
+- Option Master
+- Option Groups
+- Product Option Links
 
-Product list remains summary-first:
-- 20 products per page
-- search / category / active filters
-- one Product expands on demand
+Publish validation now checks Option Center.
 
-Expanded Product is bounded into collapsible sections:
-1. 基本資料
-2. 價格
-3. 選項／加料
-4. 打印
-5. 圖片／媒體
-6. 進階／危險操作
+Pricing page:
+- Product price remains Product config
+- Option price reads/writes Option Master
+- no copied per-Product Option price
+- no second Pricing engine
 
-No return to 200+ fully-expanded cards.
-
-## 4. Source / verification
+## 5. Verification / deploy
 
 WORK_ID:
-`MFK-ADMIN-PRODUCT-DETAIL-COMPLETENESS-R2`
+`MFK-ADMIN-OPTION-CENTER-R1`
 
 Branch:
-`work/MFK/ADMIN-PRODUCT-DETAIL-COMPLETENESS-R2`
+`work/MFK/ADMIN-OPTION-CENTER-R1`
 
-Final verification source:
-`a038e96f29a15fc296aa00ba5719dc9c8f543478`
-
-Verification run:
-`35691896826`
-
-Job:
-`106630464142`
-
-Result:
+Source verification:
+`35693400570`
 SUCCESS
 - npm test SUCCESS
 - npm run build SUCCESS
-- migration firewall GREEN
 
-Final branch workflow removed after verification.
+Clean landing:
+- admin-option-center `44162e315991a20d0f0f42c69232cc3c04edc914`
+- CatalogWorkspaces `433ba66774b0b68cd91e069e69e941e11ce6c00c`
+- GovernanceWorkspaces `d781f634874b5ce40845b998aee8d3bbe43230e2`
+- admin-capabilities `ebee5b5944bdf3fd2a7b44469ecd4bfa6b96a214`
+- tests `a526cc7111de5f35652303cf2e28c2b12ddf5c86`
+- styles `1893195cd96eee22c93820db9d46a10e3986645d`
 
-Product source clean-landed to main.
-Branch/main Product-detail source blobs match.
-
-Deploy trigger:
-`fc434fbe7d68987edfe4cc8da301892255f3cd17`
+Main / deploy trigger:
+`e6adc98030fc2ab2a81a2860b9a78cfe68a56105`
 
 Live deploy:
-`35692031072`
+`35693511574`
 SUCCESS
-- npm test SUCCESS
-- npm run build SUCCESS
+- test SUCCESS
+- build SUCCESS
 - Deploy mfk-admin SUCCESS
 
 Canonical:
 `https://admin.morefunos.com`
 
-## 5. Pricing status
+## 6. Exact NEXT
 
-Admin pricing responsibility is now explicit for both:
-- Product prices
-- Option prices
+ONE action only:
 
-Option price may be:
-- positive
-- zero
-- negative
+Owner reviews live Admin:
 
-Option Name / Option ID / Price are validated as required.
+1. 菜單 → 選項中心
+2. create / inspect Option Master
+3. create / inspect Option Group
+4. 商品資料 → one Product → 編輯 → 選項
 
-This is configuration only.
-Formal Quote authority remains the one existing Pricing authority.
+Acceptance:
+- Option created once
+- Group references existing Option
+- Product only links existing Group / Option
+- Product detail cannot edit canonical Option Name / ID / Price
+- Product can set its own default
+- another Product can set a different default for the same Option Group
 
-## 6. Print status
+If GREEN:
+BANK #68 and continue remaining #62 Admin Product-detail review.
 
-Per-Product Print configuration now includes:
-- Receipt
-- Production
-- Packing
-- Label
-- Dine-in
-- Takeaway
+If RED:
+STOP on exact Option Center UX/model break.
 
-Label ON:
-one or more Logical Label destinations may be selected.
+## 7. Known later RED
 
-Admin owns Logical Printer identity/config.
-Physical IP / USB remains SMT responsibility later.
+#66 Product Media backend remains NOT GREEN:
+- Admin auth mutation boundary absent
+- MFK-native R2 not proven
+- MFK-native D1 media metadata not proven
 
-## 7. Product Media status
+Do NOT start #66 until #68 Owner review is GREEN.
 
-Product Media UI / data contract is now present:
-- canonical imageRef
-- public/media reference
-- R2 object-key field/readback state
-- D1 media reference field/readback state
-- independent Keeta image override
-- storage/readback state
-- max 8MB media contract
-- browser never receives R2 credentials
+## 8. HOLD / DO NOT
 
-Historical design oracle confirmed:
-authenticated Admin Worker
-→ R2 binary object
-→ mediaRef
-→ canonical Product imageRef
-→ consumer projections.
-
-IMPORTANT CURRENT FIRST BREAK:
-
-Current MFK `mfk-admin` deployment is still static-assets-only and has no proven MFK-native authenticated mutation boundary, MFK R2 binding, or MFK D1 media binding.
-
-Therefore:
-
-`PRODUCT MEDIA REAL UPLOAD / R2 / D1 = NOT GREEN`
-
-The UI explicitly fails closed and does NOT fake upload success.
-
-Active backend issue:
-#66
-
-Do not reuse old Morefun-v2 D1 or R2 as current authority.
-
-## 8. Exact NEXT
-
-Implement #68 first.
-
-Required correction:
-1. create dedicated Option Center
-2. separate Option Master from Option Group
-3. convert Product ↔ Option relation into link data
-4. move defaultSelected to Product-link policy
-5. Product detail becomes read-through/linking UI, not another Option editor
-6. retain one Pricing authority
-
-#66 Product Media remains known RED but is NOT the next knife until Option Center model is corrected.
-
-## 9. HOLD
-
-#44 Admin→SMT automatic publish:
-HOLD
-
-#40 SMT OTA:
-HOLD
-
-Keeta live provider activation:
-NOT AUTHORIZED
-
-Manual A2 file shuttle:
-SUPERSEDED / NOT PRODUCTION
+- no Admin→SMT connection
+- no SMT OTA work
+- no Keeta live
+- no old Morefun-v2 D1/R2 authority reuse
+- no duplicate Option records per Product
+- no Product-owned Option price
+- no global defaultSelected on Option Master
