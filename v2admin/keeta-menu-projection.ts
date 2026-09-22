@@ -41,12 +41,12 @@ export function buildKeetaMenuProjection(adminSnapshot:unknown):KeetaMenuProject
   if(!root)throw new Error('KEETA_MENU_ADMIN_SNAPSHOT_REQUIRED');
   const catalog=record(root.catalog);
   if(!catalog)throw new Error('KEETA_MENU_CATALOG_REQUIRED');
-  const optionCenter=record(root.optionCenter)??{};
+  const optionCenter=record(root.optionCenter);
 
   const categories=array(catalog.categories).map(record).filter(Boolean) as Record<string,unknown>[];
   const products=array(catalog.products).map(record).filter(Boolean) as Record<string,unknown>[];
-  const sets=array(optionCenter.sets).map(record).filter(Boolean) as Record<string,unknown>[];
-  const links=array(optionCenter.productLinks).map(record).filter(Boolean) as Record<string,unknown>[];
+  const sets=array(optionCenter?.sets).map(record).filter(Boolean) as Record<string,unknown>[];
+  const links=array(optionCenter?.productLinks).map(record).filter(Boolean) as Record<string,unknown>[];
 
   const issues:string[]=[];
   const categoryById=new Map<string,Record<string,unknown>>();
