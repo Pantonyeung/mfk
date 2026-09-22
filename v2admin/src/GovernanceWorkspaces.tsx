@@ -3,14 +3,14 @@ import {ADMIN_CAPABILITIES} from './admin-capabilities.ts';
 import {useAdminDraft,type AdminSessionDraft} from './admin-draft.tsx';
 import {appendAdminAudit,createAdminRelease,readAdminReleases,readAdminStored,restoreAdminReleaseAsDraft,usePersistentAdminState,writeAdminStored,type AdminRelease} from './admin-local-store.ts';
 import {normalizeProductPrintRule,useProductPrintRules,type ProductPrintRule} from './admin-product-operational-config.ts';
-import {OPTION_CENTER_STORAGE_KEYS,readOptionCenterState,validateOptionCenter} from './admin-option-center.ts';
+import {OPTION_SET_CENTER_STORAGE_KEYS,readOptionSetCenterState,validateOptionSetCenter} from './admin-option-set-center.ts';
 
 function Header({title,description,badge='已自動保存'}:{title:string;description:string;badge?:string}){
   return <header className="admin-editor-head"><div><small>{badge}</small><h1>{title}</h1><p>{description}</p></div></header>;
 }
 
 function collectAdminSnapshot(catalog:AdminSessionDraft){
-  const optionCenter=readOptionCenterState(catalog);
+  const optionCenter=readOptionSetCenterState(catalog);
   return {
     catalog,
     optionCenter,
@@ -38,10 +38,9 @@ function restoreSnapshot(release:AdminRelease,replaceDraft:(draft:AdminSessionDr
   const snapshot=restoreAdminReleaseAsDraft<Record<string,unknown>>(release);
   if(snapshot.catalog)replaceDraft(snapshot.catalog as AdminSessionDraft,'由設定版本 R'+release.version+' 建立新草稿');
   if(snapshot.optionCenter&&typeof snapshot.optionCenter==='object'&&!Array.isArray(snapshot.optionCenter)){
-    const optionCenter=snapshot.optionCenter as {options?:unknown;groups?:unknown;productLinks?:unknown};
-    if(optionCenter.options!==undefined)writeAdminStored(OPTION_CENTER_STORAGE_KEYS.options,optionCenter.options);
-    if(optionCenter.groups!==undefined)writeAdminStored(OPTION_CENTER_STORAGE_KEYS.groups,optionCenter.groups);
-    if(optionCenter.productLinks!==undefined)writeAdminStored(OPTION_CENTER_STORAGE_KEYS.productLinks,optionCenter.productLinks);
+    const optionCenter=snapshot.optionCenter as {sets?:unknown;productLinks?:unknown};
+    if(optionCenter.sets!==undefined)writeAdminStored(OPTION_SET_CENTER_STORAGE_KEYS.sets,optionCenter.sets);
+    if(optionCenter.productLinks!==undefined)writeAdminStored(OPTION_SET_CENTER_STORAGE_KEYS.productLinks,optionCenter.productLinks);
   }
   const map:Record<string,string>={
     availability:'availability.v1',businessDay:'business-day.v1',logicalPrinters:'logical-printers.v1',
@@ -61,18 +60,18 @@ export function PublishCenterWorkspace(){
   const [reason,setReason]=useState('');
   const [releases,setReleases]=useState(()=>readAdminReleases());
   const [message,setMessage]=useState('先檢查內容，再確認影響範圍；通過後建立不可變設定版本。門店派送屬下一階段，呢度唔會假裝已送達。');
-  const optionCenter=readOptionCenterState(draft);
+  const optionCenter=readOptionSetCenterState(draft);
   const counts=useMemo(()=>({
     categories:draft.categories.length,
     products:draft.products.length,
-    modifiers:optionCenter.groups.length,
-    options:optionCenter.options.length,
+    modifiers:optionCenter.sets.length,
+    options:optionCenter.sets.reduce((sum,set)=>sum+set.options.length,0),
     combos:draft.combos.length,
-  }),[draft,optionCenter.groups.length,optionCenter.options.length]);
+  }),[draft,optionCenter.sets.length,optionCenter.sets.reduce((sum,set)=>sum+set.options.length,0)]);
 
   const runValidation=()=>{
     const errors=validate();
-    const optionErrors=validateOptionCenter(readOptionCenterState(draft));
+    const optionErrors=validateOptionSetCenter(readOptionSetCenterState(draft));
     setOptionValidationErrors(optionErrors);
     setLastValidationAt(new Date().toISOString());
     setImpactPreviewed(false);
@@ -81,7 +80,7 @@ export function PublishCenterWorkspace(){
   const canPreview=Boolean(lastValidationAt)&&validationErrors.length===0&&optionValidationErrors.length===0;
   const createRelease=()=>{
     const errors=validate();
-    const optionErrors=validateOptionCenter(readOptionCenterState(draft));
+    const optionErrors=validateOptionSetCenter(readOptionSetCenterState(draft));
     setOptionValidationErrors(optionErrors);
     if(errors.length||optionErrors.length){setMessage('仍有資料問題，未建立版本。');return;}
     const row=createAdminRelease(collectAdminSnapshot(draft),reason);
@@ -104,7 +103,7 @@ export function PublishCenterWorkspace(){
     <div className="admin-kpi-grid">
       <article><span>分類</span><strong>{counts.categories}</strong><small>{dirty?'有變更':'已保存'}</small></article>
       <article><span>商品</span><strong>{counts.products}</strong><small>完整商品資料</small></article>
-      <article><span>選項 / 組</span><strong>{counts.options} / {counts.modifiers}</strong><small>Option Center</small></article>
+      <article><span>選項 / 組</span><strong>{counts.options} / {counts.modifiers}</strong><small>選項組 / 子選項</small></article>
       <article><span>套餐</span><strong>{counts.combos}</strong><small>保留 child 關係</small></article>
     </div>
     <div className="admin-policy-grid two">
