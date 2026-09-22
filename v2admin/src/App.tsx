@@ -6,7 +6,7 @@ import {AdminDraftProvider} from './admin-draft.tsx';
 import {CategoriesWorkspace,CombosWorkspace,MenuDisplayWorkspace,ModifiersWorkspace,PricingWorkspace,ProductsWorkspace} from './CatalogWorkspaces.tsx';
 import {AvailabilityWorkspace,BusinessDayWorkspace,ChannelsWorkspace,PrintCenterWorkspace,PrintTemplatesWorkspace,StaffWorkspace,StoreSettingsWorkspace} from './PolicyWorkspaces.tsx';
 import {AuditWorkspace,CapacityWorkspace,ExceptionsWorkspace,OpenOrdersWorkspace,OperationsReportWorkspace,OrdersHistoryWorkspace,OverviewWorkspace,SalesReportWorkspace} from './ReadModelWorkspaces.tsx';
-import {PrintRulesWorkspace,發布CenterWorkspace,QuickReasonsWorkspace,SettlementWorkspace} from './GovernanceWorkspaces.tsx';
+import {PrintRulesWorkspace,PublishCenterWorkspace,QuickReasonsWorkspace,SettlementWorkspace} from './GovernanceWorkspaces.tsx';
 import {AnnouncementsWorkspace,CouponsWorkspace,Customer360Workspace,InventoryWorkspace,LoyaltyWorkspace,PresentationWorkspace,RfmWorkspace,StoreBindingWorkspace} from './DeferredWorkspaces.tsx';
 import {ActionQueueWorkspace,AccessSessionWorkspace,CashCloseRecordWorkspace,ChannelReportWorkspace,DeviceHealthWorkspace,DiagnosticsWorkspace,EffectiveSettingsWorkspace,ExportGovernanceWorkspace,IntegrationsGovernanceWorkspace,OtaWorkspace,ProductReportWorkspace,RefundReportWorkspace} from './WorkflowUpgradeWorkspaces.tsx';
 
@@ -61,7 +61,7 @@ function capabilityElement(id:string){
   if(id==='frontline-presentation')return <PresentationWorkspace surface="FRONTLINE"/>;
   if(id==='overview')return <OverviewWorkspace/>;
   if(id==='action-queue')return <ActionQueueWorkspace/>;
-  if(id==='publish-center')return <發布CenterWorkspace/>;
+  if(id==='publish-center')return <PublishCenterWorkspace/>;
   if(id==='open-orders')return <OpenOrdersWorkspace/>;
   if(id==='availability')return <AvailabilityWorkspace/>;
   if(id==='capacity')return <CapacityWorkspace/>;
