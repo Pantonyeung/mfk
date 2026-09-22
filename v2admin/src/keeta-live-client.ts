@@ -32,6 +32,7 @@ function headers(){
 
 export async function readKeetaLiveStatus():Promise<KeetaLiveStatus>{
   const response=await fetch('/api/keeta/admin/status?storeId=MF01',{
+    method:'POST',
     credentials:'same-origin',
     cache:'no-store',
     headers:headers(),
