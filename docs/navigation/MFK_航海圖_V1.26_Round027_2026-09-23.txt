@@ -1,0 +1,421 @@
+MFK 航海圖 V1.26｜Round027｜2026-09-23
+主題：OWNER SUPREMACY / ADMIN GUIDED UI PRODUCTION GREEN / KEETA K1 LANDED / K3 ACTIVE
+狀態：CURRENT / CONTROLLING
+CONTROL_BASE_MAIN：757eaf9dbdc6c74ba8fff9e963757c0fd11a9b36
+CONTROL：Pantonyeung/mfk #22
+
+==================================================
+0. OWNER ABSOLUTE AUTHORITY
+==================================================
+
+Owner 明確決定 = 本項目最高決定。
+
+Commander / AI：
+- 可以提醒風險
+- 可以解釋後果
+- 可以提供替代方案
+- 對超出已授權範圍嘅新重大風險，可以問 Owner 是否接受
+
+Commander / AI 不可以自行：
+- 撤銷 / 輪換 credential
+- unbind / rebind provider authorization
+- 建新 provider account
+- 強制 reauthorization
+- 關閉 live integration
+- 停止 Owner 已授權 program
+- 以 AI 偏好取代 Owner 決定
+
+風險流程：
+RISK FOUND
+→ REPORT TO OWNER
+→ OWNER ACCEPTS / REJECTS / MODIFIES
+→ EXECUTE OWNER DECISION
+
+==================================================
+1. CURRENT SYSTEM AUTHORITY
+==================================================
+
+MFK = 唯一 current system。
+
+六個角色：
+1. SMT
+2. Admin
+3. SMM
+4. Customer
+5. Keeta
+6. Owner
+
+禁止第二：
+Order / Pricing / Payment / Print / Store Kernel / Auth / Sync authority。
+
+SMT：
+LOCAL FORMAL ORDER / TRANSACTION AUTHORITY
+
+Admin：
+CONFIG / AUTHOR / PUBLISH / READBACK
+
+Keeta：
+THIRD_PARTY_PROVIDER EDGE
+Auth / Translation / Provider Evidence / Provider Commands / Readback
+
+Provider ID 永遠只係 alias / reference。
+唔係 canonical primary identity。
+
+==================================================
+2. ADMIN GUIDED UI｜OWNER ACCEPTED / PRODUCTION GREEN
+==================================================
+
+Owner accepted source：
+PR #110 preview
+UI commit：
+f0cc704877ce89f88327605673a312db1d48c5a7
+
+Stale preview branch was NOT merged directly.
+
+Current-main integration：
+PR #143 MERGED
+
+Product commit：
+af0003259f2bec684b2906c1bd584daa2d63b8c9
+
+Deploy trigger：
+757eaf9dbdc6c74ba8fff9e963757c0fd11a9b36
+
+Deploy run：
+35796454476 SUCCESS
+
+Verification：
+13 / 13 test files PASS
+71 / 71 tests PASS
+Production build PASS
+
+Worker：
+6f2f770a-862e-4ed3-ab30-506d77357330
+
+Canonical：
+https://admin.morefunos.com
+
+OWNER-ACCEPTED UX：
+
+Combo：
+套餐資料
+→ 飯糰
+→ 小食
+→ 飲品
+→ 檢查
+
+Option Set：
+選項組
+→ 規則
+→ 子選項
+→ 商品映射
+→ 檢查
+
+Product：
+filter-first
+→ one product
+→ one data scope
+
+Colour semantics：
+Blue = current
+Green = complete
+Amber = waiting / attention
+Red = error / destructive
+
+RULE：
+Continue = UI progression only
+NOT Save
+NOT Publish
+NOT Sync success
+NOT Readback success
+
+No page-level「打開工作區」gate。
+No default-open details。
+
+Responsive：
+Desktop / Tablet / Mobile retained.
+
+Current Keeta controls retained inside accepted UI：
+- CONNECTED readback
+- token source / expiry
+- callback diagnostics
+- webhook proof
+- existing test-token import
+- current live runtime controls
+
+Frozen runtime/business contracts untouched：
+- admin-authority
+- admin-projection-client
+- admin-sync-client
+- worker
+- wrangler
+- package
+- Keeta runtime
+- current K1 order intake runtime
+
+MILESTONE：
+ADMIN_GUIDED_UI_OWNER_ACCEPTED_PRODUCTION_GREEN
+
+==================================================
+3. KEETA LIVE CONNECTION BANK
+==================================================
+
+Canonical Store：
+MF01
+
+Provider Shop：
+721578302
+
+OAuth：
+CONNECTED
+
+Token source：
+TEST_PROVIDER_PORTAL_IMPORT
+
+Token expiry：
+2026-12-22 06:12:11 HKT
+
+Signed webhook：
+GREEN
+
+Real accepted provider webhook proof exists.
+
+Failure isolation：
+Keeta failure MUST NOT block SMT local trading.
+
+MILESTONE：
+KEETA_LIVE_CONNECTION_GREEN
+
+==================================================
+4. OWNER-AUTHORIZED KEETA FULL LIVE PROGRAM
+==================================================
+
+Owner directive：
+Order、Menu、Provider functionality 全面接入。
+
+PROGRAM：
+MFK_KEETA_FULL_LIVE_INTEGRATION_R1
+
+No per-seam re-approval required inside this authorized scope。
+
+Only genuinely new money / legal / destructive semantic outside the authorized scope：
+RETURN TO OWNER.
+
+==================================================
+5. K1 ORDER INGRESS｜SOURCE / TEST LANDED
+==================================================
+
+Issue：
+#140 OPEN
+
+Implementation：
+9f1eca97a1e2671f9ef7bd02a766890b1f002585
+
+Admin deploy trigger：
+8a36709e6061b58fb6030018ce2358206e350379
+
+Admin deploy：
+35796315764 SUCCESS
+
+SMT smoke rerun：
+35796407931 SUCCESS
+
+Current K1 shape：
+
+1001 signed webhook
+→ pending SMT intent
+→ provider evidence / providerRef
+→ existing cloud doorbell
+→ SMT authenticated intake
+→ local mapping
+→ SMT local createOrder authority
+→ providerRef idempotency
+→ canonical ACK
+
+Hard invariants：
+- Cloud does NOT create Formal Order
+- SMT assigns canonical order identity
+- providerRef duplicate safe
+- no duplicate display number
+- no duplicate canonical order
+- no second Order Engine
+- mapping failure does not invent product identity
+
+CURRENT CLASSIFICATION：
+K1 SOURCE / TEST GREEN
+
+NOT YET CLAIMED：
+REAL KEETA 1001 END-TO-END EXTERNAL ORDER ACCEPTANCE
+
+Next K1 acceptance：
+place one Keeta test order
+→ observe 1001
+→ SMT receives once
+→ canonical Order once
+→ providerRef link
+→ same message retry no duplicate
+→ readback
+
+==================================================
+6. K3 MENU LIVE SYNC｜ACTIVE
+==================================================
+
+Issue：
+#141 OPEN
+
+Current bank：
+integrations/keeta menu contract exists
+full snapshot validator exists
+1201 / 1202 parsers exist
+
+Current first break：
+current MFK canonical catalog has not yet been live-translated and sent as a complete Keeta full snapshot.
+
+Target：
+MFK canonical catalog
+→ deterministic OpenItemCode mapping
+→ complete full snapshot
+→ validation
+→ preview / diff
+→ provider send
+→ taskId
+→ 1202 completion
+→ 1201 picture completion
+→ Admin readback
+
+Critical provider invariant：
+FULL SNAPSHOT
+
+OMITTED EXISTING OPEN ITEM CODE
+MAY DELETE PROVIDER ENTITY.
+
+This is correctness gating only.
+It is NOT an AI permission veto.
+
+MFK catalog remains canonical.
+Keeta menu is provider projection only.
+
+==================================================
+7. NEXT PROGRAM WAVES
+==================================================
+
+After K1 / K3 BANK：
+
+K2 MERCHANT DECISION
+SMT canonical decision
+→ confirm / reject
+→ provider readback
+→ retry-safe
+
+K4 SELLABILITY / STORE OPS
+MFK availability/config
+→ provider availability / hours / REST / OPEN
+→ readback
+
+K5 FULFILLMENT
+Canonical READY
+→ /order/prepare
+→ readback
+
+/order/prepare = READY ONLY
+NOT generic PREPARING.
+
+K6 LIFECYCLE
+1002 / 1003 / 1004 / 1006 / 1008
+→ linked canonical order evidence
+
+K7 AFTER-SALE
+1005 / 1007
+→ canonical refund decision
+→ provider approve/reject/partial flow
+→ audit/readback
+
+K8 COMMERCIAL / SETTLEMENT
+provider commercial facts
+→ reconciliation projection
+→ never block local trading
+
+==================================================
+8. EXECUTION STANDARD
+==================================================
+
+Maximum active workers：
+2
+
+Every seam：
+FRESH READ
+→ EXACT INPUT
+→ EXACT OUTPUT
+→ TEST
+→ GREEN / RED
+→ BANK
+→ CONTINUE
+
+No fake GREEN.
+No provider payload becomes canonical truth.
+No silent duplicate authority.
+No blind retry after UNKNOWN.
+
+==================================================
+9. CONTROLLING RECORDS
+==================================================
+
+#22
+MFK current control
+
+#27
+Keeta contract migration BANKED
+
+#33
+Keeta runtime simplicity BANKED
+
+#46
+Keeta provider completeness BANKED
+
+#116
+Keeta live edge BANKED
+
+#120
+Keeta live connection GREEN
+
+#140
+K1 Order Ingress ACTIVE / SOURCE-TEST GREEN
+
+#141
+K3 Menu Live Sync ACTIVE
+
+#143
+Admin Owner-accepted Guided UI MERGED
+
+#110
+Accepted preview source / SUPERSEDED BY #143 / CLOSED
+
+==================================================
+10. CURRENT / NEXT
+==================================================
+
+CURRENT：
+
+ADMIN_GUIDED_UI_OWNER_ACCEPTED_PRODUCTION_GREEN
+
+KEETA_LIVE_CONNECTION_GREEN
+
+K1_ORDER_INGRESS_SOURCE_TEST_GREEN
+REAL_EXTERNAL_1001_ACCEPTANCE_PENDING
+
+K3_MENU_LIVE_SYNC_ACTIVE
+
+NEXT：
+
+1. K3 menu implementation
+2. K1 real Keeta test-order acceptance
+3. bank K1 / K3
+4. continue K2 / K4 / K5 / K6 / K7 / K8 automatically within Owner-authorized scope
+
+SUCCESS TARGET：
+
+KEETA_FULL_PROVIDER_INTEGRATION_GREEN
+
+==================================================
+END ROUND027
+==================================================
