@@ -1,2 +1,3 @@
 SMM_ACCEPTANCE_PREVIEW
 alias=smm-acceptance
+rerun=verify-after-preview-enable
