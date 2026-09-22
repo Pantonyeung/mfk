@@ -3,6 +3,7 @@ import {renderTscRasterLabel} from './label-bitmap.ts';
 import {buildOrderPrintPlan,groupTscBitmapJobsByPhysicalPrinter,type PrintBinding,type PlannedPrintJob} from './print-routing.ts';
 import {queueOrderProjection} from './projection-outbox.ts';
 import {readActiveStaffSession} from './staff-auth.ts';
+import {readSmtPrintConfig} from './admin-operational-config.ts';
 
 export interface SmtOperationalMetric{readonly id:string;readonly label:string;readonly value:string;readonly detail?:string}
 export interface SmtOrderListItemViewModel{readonly orderId:string;readonly orderIdLabel:string;readonly itemCount:number;readonly totalLabel:string;readonly paymentLabel:string;readonly fulfillmentLabel:string;readonly sourceLabel?:string;readonly localSequenceLabel?:string}
@@ -20,7 +21,7 @@ export interface SmtAvailabilityProjection{readonly revision:number;readonly nod
 export interface StoredOrder{
   id:string;display:string;createdAt:string;updatedAt?:string;totalMinor:number;paymentLabel:string;fulfillmentLabel:'待處理'|'進行中'|'可取餐'|'已完成'|'已取消';sourceLabel:string;
   staffId?:string;staffName?:string;cancellationReason?:string;
-  items:readonly {id:string;name:string;qty:number;unitMinor:number}[];
+  items:readonly {id:string;name:string;qty:number;unitMinor:number;serviceMode?:'takeaway'|'dine-in'}[];
 }
 export type DiningTender='CASH'|'ALIPAY'|'WECHAT'|'FPS'|'PAYME'|'COMBO';
 export interface LocalDiningPayment{
@@ -158,7 +159,7 @@ export function readLastPrintDiagnostic():PrintDispatchDiagnostic|null{
   }catch{return null}
 }
 export interface MfkLocalRuntime extends CleanSmtCoreRuntimePort{
-  createOrder(input:{items:readonly {id:string;name:string;qty:number;unitMinor:number}[];totalMinor:number;paymentLabel:string;sourceLabel?:string}):StoredOrder;
+  createOrder(input:{items:readonly {id:string;name:string;qty:number;unitMinor:number;serviceMode?:'takeaway'|'dine-in'}[];totalMinor:number;paymentLabel:string;sourceLabel?:string}):StoredOrder;
   orders():readonly StoredOrder[];
   printOrderOutputs(orderId:string):Promise<PrintDispatchSummary>;
   readOrderReprintOptions(orderId:string):Promise<readonly SmtReprintOption[]>;
@@ -219,6 +220,7 @@ function readPrinterBindings():PrintBinding[]{
           port:Number(row.port)||9100,
           capability,
           encoding,
+          logicalPrinterId:typeof row.logicalPrinterId==='string'?row.logicalPrinterId:undefined,
           ...(productIds===undefined?{}:{productIds}),
         };
       })
@@ -278,7 +280,7 @@ function physicalKey(binding:PrintBinding){
 
 async function dispatchOrderOutputs(order:StoredOrder,requestedJobIds?:ReadonlySet<string>,reprint=false):Promise<PrintDispatchSummary>{
   const started=performance.now();
-  let plan=[...buildOrderPrintPlan(order,readPrinterBindings())];
+  let plan=[...buildOrderPrintPlan(order,readPrinterBindings(),readSmtPrintConfig())];
   if(requestedJobIds)plan=plan.filter(job=>requestedJobIds.has(job.id));
   if(reprint)plan=plan.map(job=>({...job,kickDrawer:false}));
   const groups=new Map<string,PlannedPrintJob[]>();
@@ -484,7 +486,7 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
   async readOrderReprintOptions(orderId){
     const order=data.orders.find(x=>x.id===orderId);
     if(!order)throw new Error('ORDER_NOT_FOUND');
-    return buildOrderPrintPlan(order,readPrinterBindings()).map(job=>Object.freeze({
+    return buildOrderPrintPlan(order,readPrinterBindings(),readSmtPrintConfig()).map(job=>Object.freeze({
       jobId:job.id,
       role:job.role,
       label:job.renderMode==='tsc-bitmap'&&job.labelSpec?job.role+' · '+job.labelSpec.primaryText:job.role,
