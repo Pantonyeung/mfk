@@ -277,7 +277,8 @@ export function validateAdminDraft(draft:AdminSessionDraft){
     if(combo.productId&&!productIds.has(combo.productId))errors.push('套餐 '+label+' 主商品不存在');
     if(combo.basePrice.trim()&&(Number.isNaN(Number(combo.basePrice))||Number(combo.basePrice)<0))errors.push('套餐 '+label+' 基本價格式錯誤');
     if(combo.takeawayAdjustment.trim()&&Number.isNaN(Number(combo.takeawayAdjustment)))errors.push('套餐 '+label+' 外賣調整格式錯誤');
-    for(const section of combo.sections){
+    for(const [sectionIndex,sectionRaw] of combo.sections.entries()){
+      const section=normalizeComboSection(sectionRaw,sectionIndex);
       if(!section.name.trim())errors.push('套餐區段 '+section.id+' 未填名稱');
       if(section.min<0||section.max<section.min)errors.push('套餐區段 '+(section.name||section.id)+' 最少／最多選擇無效');
       if(section.required&&section.min<1)errors.push('套餐區段 '+(section.name||section.id)+' 必選時最少選擇必須至少 1');
