@@ -1,7 +1,7 @@
 import {createContext,useContext,useMemo,useState,type ReactNode} from 'react';
 import {LEGACY_MF01_ADMIN_DRAFT} from './admin-menu-seed-mf01-v2.ts';
 import {appendAdminAudit,readAdminStored,writeAdminStored} from './admin-local-store.ts';
-import {addPosterComboSeed} from './admin-combo-seed-poster-20260530.ts';
+import {applyComboR3PoolSeed} from './admin-combo-pool-seed-r3.ts';
 
 export type ModifierSelection='SINGLE'|'MULTI';
 
@@ -49,18 +49,25 @@ export interface ModifierGroupDraft{
   readonly active:boolean;
   readonly options:readonly ModifierOptionDraft[];
 }
+export type ComboPriceStatus='READY'|'OWNER_VALUE_REQUIRED';
+export type ComboChoiceType='PRODUCT'|'NONE';
+
 export interface ComboBandDraft{
   readonly id:string;
   readonly name:string;
   readonly priceAdjustment:string;
+  readonly priceStatus?:ComboPriceStatus;
   readonly active:boolean;
   readonly position:number;
 }
 export interface ComboChoiceDraft{
   readonly id:string;
-  readonly productId:string;
+  readonly choiceType?:ComboChoiceType;
+  readonly productId?:string;
+  readonly label?:string;
   readonly bandId:string;
   readonly priceAdjustment:string;
+  readonly priceStatus?:ComboPriceStatus;
   readonly active:boolean;
   readonly position:number;
 }
@@ -76,6 +83,25 @@ export interface ComboSectionDraft{
   readonly childProductIds?:readonly string[];
   readonly priceAdjustment?:string;
 }
+
+export interface ComboPoolGroupDraft{
+  readonly id:string;
+  readonly name:string;
+  readonly required:boolean;
+  readonly min:number;
+  readonly max:number;
+  readonly position:number;
+  readonly bands:readonly ComboBandDraft[];
+  readonly choices:readonly ComboChoiceDraft[];
+}
+export interface ComboPoolDraft{
+  readonly id:string;
+  readonly name:string;
+  readonly kind:'MAIN_COURSE'|'ADDON';
+  readonly active:boolean;
+  readonly position:number;
+  readonly groups:readonly ComboPoolGroupDraft[];
+}
 export interface ComboDraft{
   readonly id:string;
   readonly name:string;
@@ -84,6 +110,8 @@ export interface ComboDraft{
   readonly takeawayAdjustment:string;
   readonly takeawaySurchargeEnabled?:boolean;
   readonly productId?:string;
+  readonly mainPoolId?:string;
+  readonly addonPoolIds?:readonly string[];
   readonly sections:readonly ComboSectionDraft[];
 }
 
@@ -92,6 +120,7 @@ export interface AdminSessionDraft{
   readonly products:readonly ProductDraft[];
   readonly modifierGroups:readonly ModifierGroupDraft[];
   readonly combos:readonly ComboDraft[];
+  readonly comboPools?:readonly ComboPoolDraft[];
 }
 
 interface AdminDraftContextValue{
@@ -125,6 +154,21 @@ interface AdminDraftContextValue{
   readonly updateComboChoice:(comboId:string,sectionId:string,choiceId:string,patch:Partial<ComboChoiceDraft>)=>void;
   readonly removeComboChoice:(comboId:string,sectionId:string,choiceId:string)=>void;
   readonly moveComboChoice:(comboId:string,sectionId:string,choiceId:string,direction:-1|1)=>void;
+  readonly addComboPool:(kind:'MAIN_COURSE'|'ADDON')=>void;
+  readonly updateComboPool:(poolId:string,patch:Partial<ComboPoolDraft>)=>void;
+  readonly removeComboPool:(poolId:string)=>void;
+  readonly addComboPoolGroup:(poolId:string)=>void;
+  readonly updateComboPoolGroup:(poolId:string,groupId:string,patch:Partial<ComboPoolGroupDraft>)=>void;
+  readonly removeComboPoolGroup:(poolId:string,groupId:string)=>void;
+  readonly moveComboPoolGroup:(poolId:string,groupId:string,direction:-1|1)=>void;
+  readonly addComboPoolBand:(poolId:string,groupId:string)=>void;
+  readonly updateComboPoolBand:(poolId:string,groupId:string,bandId:string,patch:Partial<ComboBandDraft>)=>void;
+  readonly removeComboPoolBand:(poolId:string,groupId:string,bandId:string)=>void;
+  readonly moveComboPoolBand:(poolId:string,groupId:string,bandId:string,direction:-1|1)=>void;
+  readonly addComboPoolChoice:(poolId:string,groupId:string)=>void;
+  readonly updateComboPoolChoice:(poolId:string,groupId:string,choiceId:string,patch:Partial<ComboChoiceDraft>)=>void;
+  readonly removeComboPoolChoice:(poolId:string,groupId:string,choiceId:string)=>void;
+  readonly moveComboPoolChoice:(poolId:string,groupId:string,choiceId:string,direction:-1|1)=>void;
   readonly moveCategory:(id:string,direction:-1|1)=>void;
   readonly moveProduct:(id:string,direction:-1|1)=>void;
   readonly validate:()=>readonly string[];
@@ -135,7 +179,7 @@ interface AdminDraftContextValue{
 
 const STORE_KEY='catalog-draft.v2';
 const DIRTY_KEY='catalog-dirty.v1';
-const COMBO_R2_SEED_KEY='combo-r2-poster-seed-installed.v1';
+const COMBO_R3_SEED_KEY='combo-r3-pool-seed-installed.v1';
 
 function normalizeComboSection(section:ComboSectionDraft,index:number):ComboSectionDraft{
   const legacyProductIds=section.childProductIds??[];
@@ -149,7 +193,8 @@ function normalizeComboSection(section:ComboSectionDraft,index:number):ComboSect
     position:10,
   }]:[])).map((band,bandIndex)=>({
     ...band,
-    priceAdjustment:band.priceAdjustment?.trim()||'0.00',
+    priceAdjustment:band.priceStatus==='OWNER_VALUE_REQUIRED'?(band.priceAdjustment??'').trim():(band.priceAdjustment?.trim()||'0.00'),
+    priceStatus:band.priceStatus??'READY',
     active:band.active!==false,
     position:Number.isFinite(band.position)?band.position:(bandIndex+1)*10,
   })).sort((a,b)=>a.position-b.position);
@@ -159,16 +204,23 @@ function normalizeComboSection(section:ComboSectionDraft,index:number):ComboSect
     ?section.choices
     :legacyProductIds.map((productId,choiceIndex)=>({
       id:section.id+'-choice-'+String(choiceIndex+1).padStart(3,'0'),
+      choiceType:'PRODUCT' as const,
       productId,
+      label:'',
       bandId:bands[0]?.id??legacyBandId,
       priceAdjustment:'0.00',
+      priceStatus:'READY' as const,
       active:true,
       position:(choiceIndex+1)*10,
     }))
   ).map((choice,choiceIndex)=>({
     ...choice,
+    choiceType:choice.choiceType??'PRODUCT',
+    productId:choice.choiceType==='NONE'?undefined:choice.productId,
+    label:choice.label??'',
     bandId:knownBandIds.has(choice.bandId)?choice.bandId:(bands[0]?.id??''),
-    priceAdjustment:choice.priceAdjustment?.trim()||'0.00',
+    priceAdjustment:choice.priceStatus==='OWNER_VALUE_REQUIRED'?(choice.priceAdjustment??'').trim():(choice.priceAdjustment?.trim()||'0.00'),
+    priceStatus:choice.priceStatus??'READY',
     active:choice.active!==false,
     position:Number.isFinite(choice.position)?choice.position:(choiceIndex+1)*10,
   })).sort((a,b)=>a.position-b.position);
@@ -178,8 +230,43 @@ function normalizeComboSection(section:ComboSectionDraft,index:number):ComboSect
     position:Number.isFinite(section.position)?section.position:(index+1)*10,
     bands,
     choices,
-    childProductIds:choices.map(choice=>choice.productId),
+    childProductIds:choices.filter(choice=>(choice.choiceType??'PRODUCT')==='PRODUCT'&&choice.productId).map(choice=>choice.productId!),
     priceAdjustment:section.priceAdjustment??'0.00',
+  };
+}
+
+function normalizeComboPoolGroup(group:ComboPoolGroupDraft,index:number):ComboPoolGroupDraft{
+  const bandIds=new Set((group.bands??[]).map(band=>band.id));
+  return {
+    ...group,
+    position:Number.isFinite(group.position)?group.position:(index+1)*10,
+    bands:(group.bands??[]).map((band,bandIndex)=>({
+      ...band,
+      priceAdjustment:band.priceStatus==='OWNER_VALUE_REQUIRED'?(band.priceAdjustment??'').trim():(band.priceAdjustment?.trim()||'0.00'),
+      priceStatus:band.priceStatus??'READY',
+      active:band.active!==false,
+      position:Number.isFinite(band.position)?band.position:(bandIndex+1)*10,
+    })).sort((a,b)=>a.position-b.position),
+    choices:(group.choices??[]).map((choice,choiceIndex)=>({
+      ...choice,
+      choiceType:choice.choiceType??'PRODUCT',
+      productId:choice.choiceType==='NONE'?undefined:choice.productId,
+      label:choice.label??'',
+      bandId:bandIds.has(choice.bandId)?choice.bandId:((group.bands??[])[0]?.id??''),
+      priceAdjustment:choice.priceStatus==='OWNER_VALUE_REQUIRED'?(choice.priceAdjustment??'').trim():(choice.priceAdjustment?.trim()||'0.00'),
+      priceStatus:choice.priceStatus??'READY',
+      active:choice.active!==false,
+      position:Number.isFinite(choice.position)?choice.position:(choiceIndex+1)*10,
+    })).sort((a,b)=>a.position-b.position),
+  };
+}
+
+function normalizeComboPool(pool:ComboPoolDraft,index:number):ComboPoolDraft{
+  return {
+    ...pool,
+    active:pool.active!==false,
+    position:Number.isFinite(pool.position)?pool.position:(index+1)*10,
+    groups:(pool.groups??[]).map((group,groupIndex)=>normalizeComboPoolGroup(group,groupIndex)).sort((a,b)=>a.position-b.position),
   };
 }
 
@@ -212,13 +299,15 @@ function normalizeDraft(input:AdminSessionDraft):AdminSessionDraft{
     combos:input.combos.map(combo=>({
       ...combo,
       takeawaySurchargeEnabled:combo.takeawaySurchargeEnabled??false,
-      sections:combo.sections.map((section,index)=>normalizeComboSection(section,index)).sort((a,b)=>a.position-b.position),
+      addonPoolIds:combo.addonPoolIds??[],
+      sections:(combo.sections??[]).map((section,index)=>normalizeComboSection(section,index)).sort((a,b)=>a.position-b.position),
     })),
+    comboPools:(input.comboPools??[]).map((pool,index)=>normalizeComboPool(pool,index)).sort((a,b)=>a.position-b.position),
   };
 }
 
 const INITIAL:AdminSessionDraft=normalizeDraft(LEGACY_MF01_ADMIN_DRAFT as unknown as AdminSessionDraft);
-const RESET_BASELINE:AdminSessionDraft=normalizeDraft(addPosterComboSeed(INITIAL));
+const RESET_BASELINE:AdminSessionDraft=normalizeDraft(applyComboR3PoolSeed(INITIAL));
 
 const AdminDraftContext=createContext<AdminDraftContextValue|null>(null);
 const nextId=(prefix:string,count:number)=>prefix+'-'+String(count+1).padStart(3,'0');
@@ -271,12 +360,57 @@ export function validateAdminDraft(draft:AdminSessionDraft){
     }
   }
 
+  const comboPools=draft.comboPools??[];
+  const poolIds=new Set<string>();
+  for(const pool of comboPools){
+    if(poolIds.has(pool.id))errors.push('套餐 Pool ID 重複：'+pool.id);
+    poolIds.add(pool.id);
+    if(!pool.name.trim())errors.push('套餐 Pool '+pool.id+' 未填名稱');
+    for(const group of pool.groups){
+      if(!group.name.trim())errors.push('套餐 Pool '+(pool.name||pool.id)+' 有分組未填名稱');
+      if(group.min<0||group.max<group.min)errors.push('套餐 Pool 分組 '+(group.name||group.id)+' 最少／最多選擇無效');
+      if(group.required&&group.min<1)errors.push('套餐 Pool 分組 '+(group.name||group.id)+' 必選時最少選擇必須至少 1');
+      const bandIds=new Set<string>();
+      for(const band of group.bands){
+        if(!band.name.trim())errors.push('套餐 Pool 分組 '+(group.name||group.id)+' 有價格帶未填名稱');
+        if(bandIds.has(band.id))errors.push('套餐 Pool 分組 '+(group.name||group.id)+' 價格帶 ID 重複：'+band.id);
+        bandIds.add(band.id);
+        if((band.priceStatus??'READY')==='READY'&&(!band.priceAdjustment.trim()||Number.isNaN(Number(band.priceAdjustment))))errors.push('套餐 Pool 價格帶 '+(band.name||band.id)+' 差價格式錯誤');
+      }
+      const choiceIds=new Set<string>();
+      const productChoices=new Set<string>();
+      for(const choice of group.choices){
+        if(choiceIds.has(choice.id))errors.push('套餐 Pool 分組 '+(group.name||group.id)+' Choice ID 重複：'+choice.id);
+        choiceIds.add(choice.id);
+        if(!bandIds.has(choice.bandId))errors.push('套餐 Pool Choice '+choice.id+' 引用不存在價格帶 '+choice.bandId);
+        if((choice.priceStatus??'READY')==='READY'&&(!choice.priceAdjustment.trim()||Number.isNaN(Number(choice.priceAdjustment))))errors.push('套餐 Pool Choice '+choice.id+' 額外差價格式錯誤');
+        if((choice.choiceType??'PRODUCT')==='PRODUCT'){
+          if(!choice.productId||!productIds.has(choice.productId))errors.push('套餐 Pool 分組 '+(group.name||group.id)+' 包含不存在商品 '+(choice.productId??''));
+          if(choice.productId&&productChoices.has(choice.productId))errors.push('套餐 Pool 分組 '+(group.name||group.id)+' 重複引用商品 '+choice.productId);
+          if(choice.productId)productChoices.add(choice.productId);
+        }else if(!choice.label?.trim()){
+          errors.push('套餐 Pool 虛擬選擇 '+choice.id+' 未填名稱');
+        }
+      }
+    }
+  }
+
   for(const combo of draft.combos){
     const label=combo.name||combo.id;
     if(!combo.name.trim())errors.push('套餐 '+combo.id+' 未填名稱');
     if(combo.productId&&!productIds.has(combo.productId))errors.push('套餐 '+label+' 主商品不存在');
     if(combo.basePrice.trim()&&(Number.isNaN(Number(combo.basePrice))||Number(combo.basePrice)<0))errors.push('套餐 '+label+' 基本價格式錯誤');
     if(combo.takeawayAdjustment.trim()&&Number.isNaN(Number(combo.takeawayAdjustment)))errors.push('套餐 '+label+' 外賣調整格式錯誤');
+    if(combo.mainPoolId){
+      const pool=comboPools.find(row=>row.id===combo.mainPoolId);
+      if(!pool)errors.push('套餐 '+label+' 主食 Pool 不存在：'+combo.mainPoolId);
+      else if(pool.kind!=='MAIN_COURSE')errors.push('套餐 '+label+' 主食 Pool 類型錯誤');
+    }
+    for(const addonPoolId of combo.addonPoolIds??[]){
+      const pool=comboPools.find(row=>row.id===addonPoolId);
+      if(!pool)errors.push('套餐 '+label+' 加配 Pool 不存在：'+addonPoolId);
+      else if(pool.kind!=='ADDON')errors.push('套餐 '+label+' 加配 Pool 類型錯誤');
+    }
     for(const [sectionIndex,sectionRaw] of combo.sections.entries()){
       const section=normalizeComboSection(sectionRaw,sectionIndex);
       if(!section.name.trim())errors.push('套餐區段 '+section.id+' 未填名稱');
@@ -288,7 +422,7 @@ export function validateAdminDraft(draft:AdminSessionDraft){
         if(!band.name.trim())errors.push('套餐區段 '+(section.name||section.id)+' 有價格帶未填名稱');
         if(bandIds.has(band.id))errors.push('套餐區段 '+(section.name||section.id)+' 價格帶 ID 重複：'+band.id);
         bandIds.add(band.id);
-        if(!band.priceAdjustment.trim()||Number.isNaN(Number(band.priceAdjustment)))errors.push('套餐價格帶 '+(band.name||band.id)+' 差價格式錯誤');
+        if((band.priceStatus??'READY')==='READY'&&(!band.priceAdjustment.trim()||Number.isNaN(Number(band.priceAdjustment))))errors.push('套餐價格帶 '+(band.name||band.id)+' 差價格式錯誤');
       }
 
       const choiceIds=new Set<string>();
@@ -296,11 +430,13 @@ export function validateAdminDraft(draft:AdminSessionDraft){
       for(const choice of section.choices){
         if(choiceIds.has(choice.id))errors.push('套餐區段 '+(section.name||section.id)+' Choice ID 重複：'+choice.id);
         choiceIds.add(choice.id);
-        if(!productIds.has(choice.productId))errors.push('套餐區段 '+(section.name||section.id)+' 包含不存在商品 '+choice.productId);
-        if(choiceProducts.has(choice.productId))errors.push('套餐區段 '+(section.name||section.id)+' 重複引用商品 '+choice.productId);
-        choiceProducts.add(choice.productId);
+        if((choice.choiceType??'PRODUCT')==='PRODUCT'){
+          if(!choice.productId||!productIds.has(choice.productId))errors.push('套餐區段 '+(section.name||section.id)+' 包含不存在商品 '+(choice.productId??''));
+          if(choice.productId&&choiceProducts.has(choice.productId))errors.push('套餐區段 '+(section.name||section.id)+' 重複引用商品 '+choice.productId);
+          if(choice.productId)choiceProducts.add(choice.productId);
+        }
         if(!bandIds.has(choice.bandId))errors.push('套餐 Choice '+choice.id+' 引用不存在價格帶 '+choice.bandId);
-        if(!choice.priceAdjustment.trim()||Number.isNaN(Number(choice.priceAdjustment)))errors.push('套餐 Choice '+choice.id+' 額外差價格式錯誤');
+        if((choice.priceStatus??'READY')==='READY'&&(!choice.priceAdjustment.trim()||Number.isNaN(Number(choice.priceAdjustment))))errors.push('套餐 Choice '+choice.id+' 額外差價格式錯誤');
       }
     }
   }
@@ -310,10 +446,10 @@ export function validateAdminDraft(draft:AdminSessionDraft){
 export function AdminDraftProvider({children}:{children:ReactNode}){
   const [draft,setDraft]=useState<AdminSessionDraft>(()=>{
     const stored=normalizeDraft(readAdminStored<AdminSessionDraft>(STORE_KEY,INITIAL));
-    if(readAdminStored<boolean>(COMBO_R2_SEED_KEY,false))return stored;
-    const migrated=normalizeDraft(addPosterComboSeed(stored));
+    if(readAdminStored<boolean>(COMBO_R3_SEED_KEY,false))return stored;
+    const migrated=normalizeDraft(applyComboR3PoolSeed(stored));
     writeAdminStored(STORE_KEY,migrated);
-    writeAdminStored(COMBO_R2_SEED_KEY,true);
+    writeAdminStored(COMBO_R3_SEED_KEY,true);
     return migrated;
   });
   const [dirty,setDirty]=useState(()=>readAdminStored<boolean>(DIRTY_KEY,false));
@@ -430,7 +566,7 @@ export function AdminDraftProvider({children}:{children:ReactNode}){
     ...current,
     combos:[...current.combos,{
       id:nextId('combo',current.combos.length),name:'新套餐',active:true,basePrice:'',takeawayAdjustment:'0.00',
-      takeawaySurchargeEnabled:false,productId:undefined,sections:[],
+      takeawaySurchargeEnabled:false,productId:undefined,mainPoolId:undefined,addonPoolIds:[],sections:[],
     }],
   }));
 
@@ -566,6 +702,124 @@ export function AdminDraftProvider({children}:{children:ReactNode}){
     }:combo),
   }));
 
+
+  const addComboPool=(kind:'MAIN_COURSE'|'ADDON')=>mutate('新增套餐 Pool','套餐',current=>({
+    ...current,
+    comboPools:[...(current.comboPools??[]),{
+      id:nextId(kind==='MAIN_COURSE'?'combo-main-pool':'combo-addon-pool',(current.comboPools??[]).length),
+      name:kind==='MAIN_COURSE'?'新主食 Pool':'新加配 Pool',
+      kind,active:true,position:((current.comboPools??[]).length+1)*10,groups:[],
+    }],
+  }));
+
+  const updateComboPool=(poolId:string,patch:Partial<ComboPoolDraft>)=>mutate('修改套餐 Pool',poolId,current=>({
+    ...current,comboPools:(current.comboPools??[]).map(pool=>pool.id===poolId?{...pool,...patch}:pool),
+  }));
+
+  const removeComboPool=(poolId:string)=>mutate('刪除套餐 Pool',poolId,current=>{
+    const used=current.combos.some(combo=>combo.mainPoolId===poolId||(combo.addonPoolIds??[]).includes(poolId));
+    if(used)return current;
+    return {...current,comboPools:(current.comboPools??[]).filter(pool=>pool.id!==poolId)};
+  });
+
+  const addComboPoolGroup=(poolId:string)=>mutate('新增套餐 Pool 分組',poolId,current=>({
+    ...current,comboPools:(current.comboPools??[]).map(pool=>pool.id===poolId?{
+      ...pool,groups:[...pool.groups,{
+        id:nextId(pool.id+'-group',pool.groups.length),name:'新分組',required:true,min:1,max:1,position:(pool.groups.length+1)*10,bands:[],choices:[],
+      }],
+    }:pool),
+  }));
+
+  const updateComboPoolGroup=(poolId:string,groupId:string,patch:Partial<ComboPoolGroupDraft>)=>mutate('修改套餐 Pool 分組',groupId,current=>({
+    ...current,comboPools:(current.comboPools??[]).map(pool=>pool.id===poolId?{
+      ...pool,groups:pool.groups.map(group=>group.id===groupId?{...group,...patch}:group),
+    }:pool),
+  }));
+
+  const removeComboPoolGroup=(poolId:string,groupId:string)=>mutate('刪除套餐 Pool 分組',groupId,current=>({
+    ...current,comboPools:(current.comboPools??[]).map(pool=>pool.id===poolId?{
+      ...pool,groups:pool.groups.filter(group=>group.id!==groupId),
+    }:pool),
+  }));
+
+  const moveComboPoolGroup=(poolId:string,groupId:string,direction:-1|1)=>mutate('調整套餐 Pool 分組次序',groupId,current=>({
+    ...current,comboPools:(current.comboPools??[]).map(pool=>pool.id===poolId?{
+      ...pool,groups:move(pool.groups,groupId,direction).map((group,index)=>({...group,position:(index+1)*10})),
+    }:pool),
+  }));
+
+  const addComboPoolBand=(poolId:string,groupId:string)=>mutate('新增套餐 Pool 價格帶',groupId,current=>({
+    ...current,comboPools:(current.comboPools??[]).map(pool=>pool.id===poolId?{
+      ...pool,groups:pool.groups.map(group=>{
+        if(group.id!==groupId)return group;
+        const id=nextId(group.id+'-band',group.bands.length);
+        return {...group,bands:[...group.bands,{id,name:'新價格帶',priceAdjustment:'0.00',priceStatus:'READY',active:true,position:(group.bands.length+1)*10}]};
+      }),
+    }:pool),
+  }));
+
+  const updateComboPoolBand=(poolId:string,groupId:string,bandId:string,patch:Partial<ComboBandDraft>)=>mutate('修改套餐 Pool 價格帶',bandId,current=>({
+    ...current,comboPools:(current.comboPools??[]).map(pool=>pool.id===poolId?{
+      ...pool,groups:pool.groups.map(group=>group.id===groupId?{
+        ...group,bands:group.bands.map(band=>band.id===bandId?{...band,...patch}:band),
+      }:group),
+    }:pool),
+  }));
+
+  const removeComboPoolBand=(poolId:string,groupId:string,bandId:string)=>mutate('刪除套餐 Pool 價格帶',bandId,current=>({
+    ...current,comboPools:(current.comboPools??[]).map(pool=>pool.id===poolId?{
+      ...pool,groups:pool.groups.map(group=>group.id===groupId?{
+        ...group,bands:group.bands.filter(band=>band.id!==bandId),choices:group.choices.filter(choice=>choice.bandId!==bandId),
+      }:group),
+    }:pool),
+  }));
+
+  const moveComboPoolBand=(poolId:string,groupId:string,bandId:string,direction:-1|1)=>mutate('調整套餐 Pool 價格帶次序',bandId,current=>({
+    ...current,comboPools:(current.comboPools??[]).map(pool=>pool.id===poolId?{
+      ...pool,groups:pool.groups.map(group=>group.id===groupId?{
+        ...group,bands:move(group.bands,bandId,direction).map((band,index)=>({...band,position:(index+1)*10})),
+      }:group),
+    }:pool),
+  }));
+
+  const addComboPoolChoice=(poolId:string,groupId:string)=>mutate('新增套餐 Pool 商品',groupId,current=>({
+    ...current,comboPools:(current.comboPools??[]).map(pool=>pool.id===poolId?{
+      ...pool,groups:pool.groups.map(group=>{
+        if(group.id!==groupId||!group.bands[0])return group;
+        const firstProduct=current.products.find(product=>product.active&&!group.choices.some(choice=>(choice.choiceType??'PRODUCT')==='PRODUCT'&&choice.productId===product.id));
+        if(!firstProduct)return group;
+        const id=nextId(group.id+'-choice',group.choices.length);
+        return {...group,choices:[...group.choices,{
+          id,choiceType:'PRODUCT',productId:firstProduct.id,label:'',bandId:group.bands[0].id,priceAdjustment:'0.00',priceStatus:'READY',active:true,position:(group.choices.length+1)*10,
+        }]};
+      }),
+    }:pool),
+  }));
+
+  const updateComboPoolChoice=(poolId:string,groupId:string,choiceId:string,patch:Partial<ComboChoiceDraft>)=>mutate('修改套餐 Pool 商品',choiceId,current=>({
+    ...current,comboPools:(current.comboPools??[]).map(pool=>pool.id===poolId?{
+      ...pool,groups:pool.groups.map(group=>group.id===groupId?{
+        ...group,choices:group.choices.map(choice=>choice.id===choiceId?{...choice,...patch}:choice),
+      }:group),
+    }:pool),
+  }));
+
+  const removeComboPoolChoice=(poolId:string,groupId:string,choiceId:string)=>mutate('刪除套餐 Pool 商品',choiceId,current=>({
+    ...current,comboPools:(current.comboPools??[]).map(pool=>pool.id===poolId?{
+      ...pool,groups:pool.groups.map(group=>group.id===groupId?{
+        ...group,choices:group.choices.filter(choice=>choice.id!==choiceId),
+      }:group),
+    }:pool),
+  }));
+
+  const moveComboPoolChoice=(poolId:string,groupId:string,choiceId:string,direction:-1|1)=>mutate('調整套餐 Pool 商品次序',choiceId,current=>({
+    ...current,comboPools:(current.comboPools??[]).map(pool=>pool.id===poolId?{
+      ...pool,groups:pool.groups.map(group=>group.id===groupId?{
+        ...group,choices:move(group.choices,choiceId,direction).map((choice,index)=>({...choice,position:(index+1)*10})),
+      }:group),
+    }:pool),
+  }));
+
   const move=<T extends {readonly id:string}>(rows:readonly T[],id:string,direction:-1|1)=>{
     const index=rows.findIndex(row=>row.id===id);
     const target=index+direction;
@@ -602,7 +856,7 @@ export function AdminDraftProvider({children}:{children:ReactNode}){
 
   const reset=()=>{
     persist(RESET_BASELINE,true);
-    writeAdminStored(COMBO_R2_SEED_KEY,true);
+    writeAdminStored(COMBO_R3_SEED_KEY,true);
     appendAdminAudit({action:'還原目前 Admin 基準',target:'菜單'});
   };
 
@@ -614,6 +868,10 @@ export function AdminDraftProvider({children}:{children:ReactNode}){
     addCombo,updateCombo,removeCombo,addComboSection,updateComboSection,removeComboSection,moveComboSection,
     addComboBand,updateComboBand,removeComboBand,moveComboBand,
     addComboChoice,updateComboChoice,removeComboChoice,moveComboChoice,
+    addComboPool,updateComboPool,removeComboPool,
+    addComboPoolGroup,updateComboPoolGroup,removeComboPoolGroup,moveComboPoolGroup,
+    addComboPoolBand,updateComboPoolBand,removeComboPoolBand,moveComboPoolBand,
+    addComboPoolChoice,updateComboPoolChoice,removeComboPoolChoice,moveComboPoolChoice,
     moveCategory,moveProduct,validate,markClean,replaceDraft,reset,
   }),[draft,dirty,validationErrors]);
 
