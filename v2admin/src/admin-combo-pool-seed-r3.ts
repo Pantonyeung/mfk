@@ -60,7 +60,7 @@ export const COMBO_R3_POOLS:readonly ComboPoolDraft[]=Object.freeze([
     '8a68132d-9c60-532a-970f-4c16a7b94414',
     '28b754d6-2b6e-51fc-92bc-e2a1049cb654',
     '33ec73cb-cdd2-5810-959b-af1af51c9846',
-    'b2888781-1a6d-529e-931b-aadd4ca1ca5f',
+    'b2888781-1a6d-529e-931b-aadd4ca74194',
     '94c2a6b0-eb94-5139-a715-912c9e874ba0',
   ]),
   ricePool('combo-rice-pool-d','飯糰 Pool D',[
