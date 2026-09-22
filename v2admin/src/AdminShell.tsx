@@ -41,7 +41,7 @@ export function AdminShell({children}:{children:ReactNode}){
     <main className="mfk-admin-main">
       <header className="mfk-admin-topbar">
         <div><small>磨飯營運管理</small><strong>{active?.label??'管理後台'}</strong></div>
-        <div className="mfk-admin-topstate"><b>Admin 控制台</b><span>草稿會自動保存；正式資料狀態會清楚標示</span></div>
+        <div className="mfk-admin-topstate"><b>Admin 控制台</b><span>修改後撳保存；成功即建立新版本並成為目前版本</span></div>
       </header>
       <div className="mfk-admin-workspace">{children}</div>
     </main>
