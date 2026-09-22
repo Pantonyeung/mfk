@@ -67,6 +67,9 @@ export interface OrderingWorkspaceViewModel {
   readonly selectedCategoryId:string;
   readonly products:readonly OrderingProductViewModel[];
   readonly menuRevisionLabel?:string;
+  readonly operationalNotice?:string;
+  readonly showCategories?:boolean;
+  readonly serviceModes?:Readonly<{takeaway:boolean;dineIn:boolean}>;
   readonly cart:OrderingCartViewModel;
   readonly workItems:readonly OrderingWorkItemViewModel[];
   readonly recentlyAddedProductId?:string;

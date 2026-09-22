@@ -18,6 +18,8 @@ import {
 } from '../runtime/local-operations.ts';
 import {readBusinessCutoff,readCurrentCashOpeningState} from '../runtime/cash-opening.ts';
 import {queueDayCloseProjection} from '../runtime/projection-outbox.ts';
+import {readSmtPrintConfig} from '../runtime/admin-operational-config.ts';
+import {subscribeSmtAdminConfig} from '../runtime/admin-config-sync.ts';
 import './more-workspace.css';
 
 export type PrinterBinding={
@@ -30,6 +32,7 @@ export type PrinterBinding={
   port:number;
   capability:'receipt-80mm/kitchen'|'label-58mm';
   encoding:'gb18030'|'big5'|'utf-8';
+  logicalPrinterId?:string;
   productIds?:string[];
 };
 
@@ -40,11 +43,11 @@ const TAKEAWAY_PRODUCT_IDS=['bento','curry','wedges','milkTea','lemonTea'];
 const FIXED_PRODUCT_LABEL_IDS=new Set(['product-label-1','product-label-2']);
 
 const defaults:PrinterBinding[]=[
-  {id:'receipt-1',routeKey:'logical.receipt',name:'顧客小票打印機',model:'LAN PRINTER',role:'顧客小票',host:'',port:9100,capability:'receipt-80mm/kitchen',encoding:'gb18030'},
-  {id:'production-1',routeKey:'logical.production',name:'製作單打印機',model:'LAN PRINTER',role:'製作單',host:'',port:9100,capability:'receipt-80mm/kitchen',encoding:'gb18030'},
-  {id:'packing-1',routeKey:'logical.packing',name:'打包單打印機',model:'LAN PRINTER',role:'打包單',host:'',port:9100,capability:'receipt-80mm/kitchen',encoding:'gb18030'},
-  {id:'product-label-1',routeKey:'logical.product-label.riceball',name:'飯糰標籤機',model:'LAN LABEL PRINTER',role:'產品標籤',host:'',port:9100,capability:'label-58mm',encoding:'big5',productIds:[...RICEBALL_PRODUCT_IDS]},
-  {id:'product-label-2',routeKey:'logical.product-label.takeaway',name:'外賣標籤機',model:'LAN LABEL PRINTER',role:'產品標籤',host:'',port:9100,capability:'label-58mm',encoding:'big5',productIds:[...TAKEAWAY_PRODUCT_IDS]},
+  {id:'receipt-1',routeKey:'logical.receipt',logicalPrinterId:'logical-receipt',name:'顧客小票打印機',model:'LAN PRINTER',role:'顧客小票',host:'',port:9100,capability:'receipt-80mm/kitchen',encoding:'gb18030'},
+  {id:'production-1',routeKey:'logical.production',logicalPrinterId:'logical-production',name:'製作單打印機',model:'LAN PRINTER',role:'製作單',host:'',port:9100,capability:'receipt-80mm/kitchen',encoding:'gb18030'},
+  {id:'packing-1',routeKey:'logical.packing',logicalPrinterId:'logical-packing',name:'打包單打印機',model:'LAN PRINTER',role:'打包單',host:'',port:9100,capability:'receipt-80mm/kitchen',encoding:'gb18030'},
+  {id:'product-label-1',routeKey:'logical.product-label.riceball',logicalPrinterId:'logical-riceball-label',name:'飯糰標籤機',model:'LAN LABEL PRINTER',role:'產品標籤',host:'',port:9100,capability:'label-58mm',encoding:'big5',productIds:[...RICEBALL_PRODUCT_IDS]},
+  {id:'product-label-2',routeKey:'logical.product-label.takeaway',logicalPrinterId:'logical-takeaway-label',name:'外賣標籤機',model:'LAN LABEL PRINTER',role:'產品標籤',host:'',port:9100,capability:'label-58mm',encoding:'big5',productIds:[...TAKEAWAY_PRODUCT_IDS]},
   {id:'bag-label-1',routeKey:'logical.bag-label',name:'袋標籤打印機',model:'LAN LABEL PRINTER',role:'袋標籤',host:'',port:9100,capability:'label-58mm',encoding:'big5'},
 ];
 
@@ -71,6 +74,7 @@ function normalizeStoredRow(old:Record<string,unknown>,fallback?:PrinterBinding,
     encoding:capability==='label-58mm'
       ? (old.encoding==='utf-8'?'utf-8':legacy?'big5':old.encoding==='big5'?'big5':'big5')
       : (old.encoding==='big5'||old.encoding==='utf-8'?old.encoding:'gb18030'),
+    logicalPrinterId:typeof old.logicalPrinterId==='string'&&old.logicalPrinterId.trim()?old.logicalPrinterId:String(fallback?.logicalPrinterId||'')||undefined,
     ...(productIds===undefined?{}:{productIds}),
   };
 }
@@ -170,10 +174,17 @@ function OverviewPanel({onOpen}:{onOpen:(section:Section)=>void}){
 
 function PrinterPanel(){
   const [printers,setPrinters]=useState<PrinterBinding[]>(loadPrinters);
+  const [configRevision,setConfigRevision]=useState(0);
+  useEffect(()=>subscribeSmtAdminConfig(()=>setConfigRevision(value=>value+1)),[]);
+  void configRevision;
+  const printConfig=readSmtPrintConfig();
   const [selected,setSelected]=useState('receipt-1');
   const [status,setStatus]=useState<Record<string,NativeResult|null>>({});
   const [busy,setBusy]=useState<string|null>(null);
   const current=useMemo(()=>printers.find(x=>x.id===selected)??printers[0],[printers,selected]);
+  const logicalType=current?.role==='顧客小票'?'RECEIPT':current?.role==='製作單'?'PRODUCTION':current?.role==='打包單'?'PACKING':current?.role==='產品標籤'?'LABEL':undefined;
+  const logicalOptions=logicalType?printConfig.logicalPrinters.filter(row=>row.type===logicalType):[];
+
 
   const update=(patch:Partial<PrinterBinding>)=>{
     const next=printers.map(p=>p.id===current.id?{...p,...patch}:p);
@@ -192,6 +203,7 @@ function PrinterPanel(){
       port:9100,
       capability:'label-58mm',
       encoding:'big5',
+      logicalPrinterId:undefined,
       productIds:[],
     };
     const next=[...printers,row];
@@ -241,7 +253,7 @@ function PrinterPanel(){
 
   return <section className="more-panel">
     <header className="more-section-heading"><div><span>PHYSICAL PRINT ROUTING</span><h2>打印與設備</h2></div><strong>{window.moreFunNative?'Carrier Bridge 已連接':'Native Bridge 未連接'}</strong></header>
-    <p className="fusion-note">每個邏輯用途獨立綁定外置實體 Printer。產品 Label 可以有多條 Route；飯糰同外賣先分開，之後由 Admin 發布商品 → Label Route 設定。</p>
+    <p className="fusion-note">Admin 定義 Logical Printer 同商品打印規則；SMT 只負責將 Logical Printer 配對到實體 IP／Port。Admin 關閉用途或商品規則後，SMT print plan 會自動停止相應 job。</p>
     <div className="more-tab-row">
       {printers.map(p=><button key={p.id} type="button" className={p.id===current.id?'active':''} onClick={()=>setSelected(p.id)}>{p.role==='產品標籤'?p.name:p.role}</button>)}
       <button type="button" onClick={addProductLabel}>＋ 新增產品 Label</button>
@@ -252,6 +264,7 @@ function PrinterPanel(){
       <article><span>結果</span><b>{resultLabel(status[current.id]??null)}</b></article>
     </div>
     <label className="more-field"><span>打印機名稱</span><input value={current.name} onChange={e=>update({name:e.target.value})}/></label>
+    {logicalType?<label className="more-field"><span>Admin Logical Printer</span><select value={current.logicalPrinterId??''} onChange={e=>update({logicalPrinterId:e.target.value||undefined})}><option value="">未配對</option>{logicalOptions.map(row=><option key={row.id} value={row.id}>{row.name} · {row.active?'啟用':'停用'}</option>)}</select></label>:null}
     <label className="more-field"><span>Printer IP / Host</span><input inputMode="decimal" placeholder="例如 192.168.1.201" value={current.host} onChange={e=>update({host:e.target.value})}/></label>
     <label className="more-field"><span>Port</span><input inputMode="numeric" value={String(current.port)} onChange={e=>update({port:Number(e.target.value)||0})}/></label>
     <label className="more-field"><span>中文編碼</span><select value={current.encoding} onChange={e=>update({encoding:e.target.value as PrinterBinding['encoding']})}><option value="gb18030">GB18030</option><option value="big5">Big5（標籤預設）</option><option value="utf-8">UTF-8</option></select></label>

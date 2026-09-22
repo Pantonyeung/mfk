@@ -13,6 +13,9 @@ import {localRuntime,type DiningTender} from './runtime/local-runtime.ts';
 import {readLocalAdminMenu,subscribeLocalAdminMenu} from './runtime/local-admin-menu.ts';
 import {readSmtAdminConfigLkg,readSmtAdminSyncStatus,subscribeSmtAdminConfig} from './runtime/admin-config-sync.ts';
 import {projectSyncedCombos,projectSyncedOrderingCatalog,type SyncedOptionSet} from './runtime/admin-config-projection.ts';
+import {capacityNoticeForCount,readSmtFrontlinePresentation,readSmtStoreSettings} from './runtime/admin-operational-config.ts';
+import {readBusinessCutoff} from './runtime/cash-opening.ts';
+import {resolveBusinessWindow} from './runtime/local-operations.ts';
 import {RuntimeReadyActivation} from './runtime/RuntimeReadyActivation.tsx';
 import {StaffAuthGate,StaffSessionBadge} from './presentation/StaffAuthGate.tsx';
 import {CashOpeningGate} from './presentation/CashOpeningGate.tsx';
@@ -99,6 +102,13 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
     [adminConfig],
   );
 
+  const storeSettings=useMemo(()=>{void adminConfigRevision;return readSmtStoreSettings();},[adminConfigRevision]);
+  const frontlinePresentation=useMemo(()=>{void adminConfigRevision;return readSmtFrontlinePresentation();},[adminConfigRevision]);
+  useEffect(()=>{
+    if(serviceMode==='takeaway'&&!storeSettings.takeawayEnabled&&storeSettings.dineInEnabled)setServiceMode('dine-in');
+    if(serviceMode==='dine-in'&&!storeSettings.dineInEnabled&&storeSettings.takeawayEnabled)setServiceMode('takeaway');
+  },[serviceMode,storeSettings.takeawayEnabled,storeSettings.dineInEnabled,setServiceMode]);
+
   const fallbackCategoryById=useMemo(()=>new Map(adminMenu.categories.map(row=>[row.id,row] as const)),[adminMenu]);
   const products:readonly Product[]=useMemo(()=>{
     if(syncedCatalog){
@@ -143,9 +153,27 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
       ?syncedCatalog.categories.map(row=>({id:row.id,label:row.label}))
       :adminMenu.categories.slice().sort((a,b)=>a.position-b.position||a.id.localeCompare(b.id)).map(row=>({id:row.id,label:row.name}))),
   ];
-  const visible=products.filter(product=>category==='all'||product.categoryId===category);
+  const visible=products
+    .filter(product=>category==='all'||product.categoryId===category)
+    .slice()
+    .sort((a,b)=>{
+      if(category!=='all')return 0;
+      const quick=new Map(frontlinePresentation.quickProductIds.map((id,index)=>[id,index] as const));
+      const ai=quick.get(a.id),bi=quick.get(b.id);
+      if(ai===undefined&&bi===undefined)return 0;
+      if(ai===undefined)return 1;
+      if(bi===undefined)return -1;
+      return ai-bi;
+    });
   const runtimeOrders=useMemo(()=>{void runtimeRevision;return localRuntime.orders();},[runtimeRevision]);
   const heldCarts=useMemo(()=>{void runtimeRevision;return localRuntime.holds();},[runtimeRevision]);
+  const businessCutoff=readBusinessCutoff();
+  const businessWindow=resolveBusinessWindow(Date.now(),businessCutoff.hour,businessCutoff.minute);
+  const businessOrderCount=runtimeOrders.filter(order=>{
+    const at=Date.parse(order.createdAt);
+    return Number.isFinite(at)&&at>=businessWindow.start&&at<businessWindow.end&&order.fulfillmentLabel!=='已取消';
+  }).length;
+  const capacityNotice=capacityNoticeForCount(businessOrderCount);
   const queueItem=(order:(typeof runtimeOrders)[number])=>({
     id:order.id,
     orderId:order.display,
@@ -184,21 +212,26 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
       id:product.id,
       name:product.name,
       priceLabel:product.priceReady?money(product.priceMinor):'未接價格',
-      enabled:product.priceReady&&product.sellable,
+      enabled:product.priceReady&&product.sellable&&((serviceMode==='takeaway'&&storeSettings.takeawayEnabled)||(serviceMode==='dine-in'&&storeSettings.dineInEnabled)),
       requiresOptions:product.priceReady&&product.sellable&&product.optionSets.length>0,
-      imageUrl:product.imageUrl??productArtwork(product),
+      imageUrl:frontlinePresentation.showImages?(product.imageUrl??productArtwork(product)):undefined,
       ...(!product.priceReady?{badge:'未接價格'}:!product.sellable?{badge:'停售'}:{}),
     })),
     menuRevisionLabel:adminConfig
-      ?'ADMIN AUTO · R'+adminConfig.revision+' · '+(syncStatus.state==='SYNCED'?'已同步':syncStatus.state==='LOCAL_LKG'?'LKG':'同步中')
+      ?storeSettings.storeName+' · ADMIN R'+adminConfig.revision+' · '+(syncStatus.state==='SYNCED'?'已同步':syncStatus.state==='LOCAL_LKG'?'LKG':'同步中')
       :'LOCAL FALLBACK · R'+adminMenu.revision,
+    operationalNotice:capacityNotice
+      ?'今日 '+capacityNotice.currentCount+'/'+capacityNotice.dailyLimit+' 單 · 已到 '+capacityNotice.warningAt+'% 提醒門檻'+(capacityNotice.hardStopConfigured?' · Admin 有 hard-stop 設定但目前只提示':'')
+      :undefined,
+    showCategories:frontlinePresentation.showCategories,
+    serviceModes:{takeaway:storeSettings.takeawayEnabled,dineIn:storeSettings.dineInEnabled},
     cart:{
       orderId:nextDisplay,serviceMode,viewMode,
       lines:cart.map(line=>({
         id:line.id,name:line.name,quantity:line.qty,lineTotalLabel:money(line.unitMinor*line.qty),
         serviceMode:line.serviceMode,groupId:'local',groupLabel:'本機',detail:line.detail,
       })),
-      subtotalLabel:money(total),packagingLabel:'$0.00',discountLabel:'$0.00',totalLabel:money(total),checkoutEnabled:cart.length>0,
+      subtotalLabel:money(total),packagingLabel:'$0.00',discountLabel:'$0.00',totalLabel:money(total),checkoutEnabled:cart.length>0&&((serviceMode==='takeaway'&&storeSettings.takeawayEnabled)||(serviceMode==='dine-in'&&storeSettings.dineInEnabled)),
     },
     workItems:[
       {id:'riceball-pool',label:'飯團待組區',count:0},
@@ -306,9 +339,17 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
     onSelectCategory:setCategory,
     onAddProduct:add,
     onConfigureProduct:id=>setPanel({type:'product',productId:id}),
-    onChangeServiceMode:mode=>{setServiceMode(mode);setCart(cart.map(item=>({...item,serviceMode:mode})));},
+    onChangeServiceMode:mode=>{
+      if(mode==='takeaway'&&!storeSettings.takeawayEnabled)return;
+      if(mode==='dine-in'&&!storeSettings.dineInEnabled)return;
+      setServiceMode(mode);setCart(cart.map(item=>({...item,serviceMode:mode})));
+    },
     onChangeCartView:mode=>{setViewMode(mode);if(mode==='organized')setPanel({type:'organize'});},
-    onChangeLineServiceMode:(lineId,mode)=>setCart(cart.map(item=>item.id===lineId?{...item,serviceMode:mode}:item)),
+    onChangeLineServiceMode:(lineId,mode)=>{
+      if(mode==='takeaway'&&!storeSettings.takeawayEnabled)return;
+      if(mode==='dine-in'&&!storeSettings.dineInEnabled)return;
+      setCart(cart.map(item=>item.id===lineId?{...item,serviceMode:mode}:item));
+    },
     onAdjustLineQuantity:(lineId,delta)=>setCart(cart.map(item=>item.id===lineId?{...item,qty:item.qty+delta}:item).filter(item=>item.qty>0)),
     onEditCartLine:lineId=>{
       const line=cart.find(item=>item.id===lineId);
@@ -428,7 +469,7 @@ function CheckoutPage({cart,setCart,diningCheckout,onDiningCheckoutDone}:{cart:C
       }
 
       const order=localRuntime.createOrder({
-        items:cart.map(line=>({id:line.productId,name:line.detail?line.name+'｜'+line.detail:line.name,qty:line.qty,unitMinor:line.unitMinor})),
+        items:cart.map(line=>({id:line.productId,name:line.detail?line.name+'｜'+line.detail:line.name,qty:line.qty,unitMinor:line.unitMinor,serviceMode:line.serviceMode})),
         totalMinor:due,paymentLabel,sourceLabel,
       });
       setCompletion({

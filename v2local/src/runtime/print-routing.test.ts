@@ -14,9 +14,10 @@ const order:PrintableOrder={
   ],
 };
 
-const binding=(role:PrintBinding['role'],id:string,productIds?:readonly string[]):PrintBinding=>({
+const binding=(role:PrintBinding['role'],id:string,productIds?:readonly string[],logicalPrinterId?:string):PrintBinding=>({
   id,role,routeKey:'logical.'+id,name:role+' printer',model:'LAN',host:'192.168.1.50',port:9100,
   capability:role.includes('標籤')?'label-58mm':'receipt-80mm/kitchen',encoding:role.includes('標籤')?'big5':'gb18030',
+  ...(logicalPrinterId?{logicalPrinterId}:{}),
   ...(productIds===undefined?{}:{productIds}),
 });
 
@@ -84,6 +85,48 @@ describe('MFK checkout print fanout',()=>{
   it('keeps a newly added custom product-label route silent until products are assigned',()=>{
     const plan=buildOrderPrintPlan(order,[binding('產品標籤','product-label-custom',[])]);
     expect(plan).toHaveLength(0);
+  });
+
+  it('respects Admin logical-printer active state and product print rules',()=>{
+    const config={
+      logicalPrinters:[
+        {id:'logical-receipt',type:'RECEIPT' as const,active:false},
+        {id:'logical-production',type:'PRODUCTION' as const,active:true},
+        {id:'logical-label-a',type:'LABEL' as const,active:true},
+      ],
+      productRules:{
+        riceball:{receipt:true,production:true,packing:false,label:true,dineIn:true,takeaway:true,labelPrinterIds:['logical-label-a']},
+        tea:{receipt:true,production:false,packing:false,label:false,dineIn:true,takeaway:true,labelPrinterIds:[]},
+      },
+    };
+    const plan=buildOrderPrintPlan(order,[
+      binding('顧客小票','receipt',undefined,'logical-receipt'),
+      binding('製作單','production',undefined,'logical-production'),
+      binding('產品標籤','label-a',undefined,'logical-label-a'),
+    ],config);
+    expect(plan.some(job=>job.role==='顧客小票')).toBe(false);
+    expect(plan.filter(job=>job.role==='製作單')).toHaveLength(1);
+    expect(plan.filter(job=>job.role==='產品標籤')).toHaveLength(2);
+    expect(plan.find(job=>job.role==='製作單')?.payload).toContain('原味飯團');
+    expect(plan.find(job=>job.role==='製作單')?.payload).not.toContain('台式奶茶');
+  });
+
+  it('applies Admin dine-in/takeaway print flags per item',()=>{
+    const mixed:PrintableOrder={...order,items:[
+      {id:'riceball',name:'原味飯團',qty:1,unitMinor:2100,serviceMode:'dine-in'},
+      {id:'tea',name:'台式奶茶',qty:1,unitMinor:1700,serviceMode:'takeaway'},
+    ]};
+    const config={
+      logicalPrinters:[{id:'logical-production',type:'PRODUCTION' as const,active:true}],
+      productRules:{
+        riceball:{receipt:true,production:true,packing:true,label:false,dineIn:false,takeaway:true,labelPrinterIds:[]},
+        tea:{receipt:true,production:true,packing:true,label:false,dineIn:true,takeaway:true,labelPrinterIds:[]},
+      },
+    };
+    const plan=buildOrderPrintPlan(mixed,[binding('製作單','production',undefined,'logical-production')],config);
+    expect(plan).toHaveLength(1);
+    expect(plan[0]?.payload).not.toContain('原味飯團');
+    expect(plan[0]?.payload).toContain('台式奶茶');
   });
 
   it('prints only routes that are actually bound',()=>{
