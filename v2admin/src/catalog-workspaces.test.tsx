@@ -2,7 +2,9 @@ import {renderToStaticMarkup} from 'react-dom/server';
 import {MemoryRouter} from 'react-router';
 import {describe,expect,it} from 'vitest';
 import {AdminDraftProvider,validateAdminDraft,type AdminSessionDraft} from './admin-draft.tsx';
-import {ProductsWorkspace} from './CatalogWorkspaces.tsx';
+import {ProductOperationalDetail,ProductsWorkspace} from './CatalogWorkspaces.tsx';
+import {LEGACY_MF01_ADMIN_DRAFT} from './admin-menu-seed-mf01-v2.ts';
+import {PRODUCT_MEDIA_BACKEND_CONTRACT,normalizeProductPrintRule} from './admin-product-operational-config.ts';
 import {MfkAdminApp} from './App.tsx';
 import {ADMIN_CAPABILITIES} from './admin-capabilities.ts';
 
@@ -16,6 +18,30 @@ describe('MFK Admin complete catalog product',()=>{
     expect((html.match(/class="admin-product-row /g)??[]).length).toBe(20);
     expect(html).not.toContain('商品詳細資料');
     expect(html).not.toContain('商品描述</span>');
+  });
+
+
+  it('shows complete bounded Product operational sections on demand',()=>{
+    const productId=LEGACY_MF01_ADMIN_DRAFT.products[0]!.id;
+    const html=renderToStaticMarkup(<AdminDraftProvider><ProductOperationalDetail productId={productId}/></AdminDraftProvider>);
+    for(const marker of [
+      '基本資料','價格','選項／選項組','每個選項必須有：名稱、選項 ID、價錢',
+      '打印','廚房製作單','打包單','堂食打印','外賣打印',
+      '圖片／媒體','Canonical 圖片連結','Keeta 獨立圖片連結','R2 Object Key','D1 Media Ref',
+    ])expect(html).toContain(marker);
+    expect(html).toContain('MFK_R2_PRODUCT_MEDIA');
+    expect(html).toContain('MFK_D1_PRODUCT_MEDIA');
+  });
+
+  it('keeps Product print defaults complete and media backend fail-closed until real wiring',()=>{
+    const rule=normalizeProductPrintRule(undefined);
+    expect(rule.receipt).toBe(true);
+    expect(rule.production).toBe(true);
+    expect(rule.packing).toBe(true);
+    expect(rule.dineIn).toBe(true);
+    expect(rule.takeaway).toBe(true);
+    expect(PRODUCT_MEDIA_BACKEND_CONTRACT.currentExecution).toBe('NOT_WIRED');
+    expect(PRODUCT_MEDIA_BACKEND_CONTRACT.browserDirectR2Credentials).toBe(false);
   });
 
   it('routes core catalog responsibilities to concrete editors',()=>{
@@ -68,8 +94,8 @@ describe('MFK Admin complete catalog product',()=>{
       categories:[{id:'category-001',name:'',position:10,active:true}],
       products:[{id:'product-001',productCode:'P001',name:'',categoryId:'missing',active:true,basePrice:'abc',takeawayAdjustment:'0.00',modifierGroupIds:['missing-group']}],
       modifierGroups:[{
-        id:'modifier-001',name:'',required:true,selection:'SINGLE',min:0,max:2,active:true,
-        options:[{id:'option-001',name:'',priceAdjustment:'bad',active:true,defaultSelected:false}],
+        id:'modifier-001',name:'',required:true,forceShow:true,selection:'SINGLE',min:0,max:2,allowQuantities:false,active:true,
+        options:[{id:'option-001',name:'',code:'',priceAdjustment:'',active:true,defaultSelected:false}],
       }],
       combos:[{
         id:'combo-001',name:'',active:true,basePrice:'bad',takeawayAdjustment:'0.00',
@@ -81,7 +107,8 @@ describe('MFK Admin complete catalog product',()=>{
     expect(errors.some(error=>error.includes('未選有效分類'))).toBe(true);
     expect(errors.some(error=>error.includes('基本價格式錯誤'))).toBe(true);
     expect(errors.some(error=>error.includes('最多選擇不可大過 1'))).toBe(true);
-    expect(errors.some(error=>error.includes('價格調整格式錯誤'))).toBe(true);
+    expect(errors.some(error=>error.includes('未填選項 ID'))).toBe(true);
+    expect(errors.some(error=>error.includes('未填價格'))).toBe(true);
     expect(errors.some(error=>error.includes('不存在商品'))).toBe(true);
   });
 });
