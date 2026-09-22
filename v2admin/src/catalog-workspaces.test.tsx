@@ -9,7 +9,8 @@ import {MfkAdminApp} from './App.tsx';
 import {ADMIN_CAPABILITIES} from './admin-capabilities.ts';
 import {applyProductSetLinksBulk,migrateLegacyDraftToOptionSetCenter,projectOptionSetsForProduct,useOptionSetCenter,validateOptionSetCenter,type OptionSetCenterState} from './admin-option-set-center.ts';
 import {validateAdminConfig} from './admin-config-save.ts';
-import {COMBO_R3_COMBOS,COMBO_R3_POOLS,applyComboR3PoolSeed} from './admin-combo-pool-seed-r3.ts';
+import {COMBO_R3_COMBOS,COMBO_R3_POOLS} from './admin-combo-pool-seed-r3.ts';
+import {COMBO_R4_COMBOS,COMBO_R4_POOLS,applyComboR4NestedPoolSeed} from './admin-combo-pool-seed-r4.ts';
 
 
 function ProductDetailHarness({productId}:{productId:string}){
@@ -240,74 +241,111 @@ describe('MFK Admin complete catalog product',()=>{
     expect(projectOptionSetsForProduct(state,'product-a').map(set=>set.name)).toEqual(['飯量']);
   });
 
-  it('models A/B/C/D as four main-course pools and one shared snack/drink add-on pool',()=>{
-    expect(COMBO_R3_COMBOS.map(combo=>combo.name)).toEqual([
+  it('models A/B/C/D as four main pools plus separate shared Snack and Drink big pools',()=>{
+    expect(COMBO_R4_COMBOS.map(combo=>combo.name)).toEqual([
       '自選飯糰 A 餐','自選飯糰 B 餐','自選飯糰 C 餐','自選飯糰 D 餐',
     ]);
-    expect(COMBO_R3_COMBOS.map(combo=>combo.basePrice)).toEqual(['41.00','43.00','45.00','47.00']);
-    expect(COMBO_R3_COMBOS.map(combo=>combo.mainPoolId)).toEqual([
+    expect(COMBO_R4_COMBOS.map(combo=>combo.basePrice)).toEqual(['41.00','43.00','45.00','47.00']);
+    expect(COMBO_R4_COMBOS.map(combo=>combo.mainPoolId)).toEqual([
       'combo-rice-pool-a','combo-rice-pool-b','combo-rice-pool-c','combo-rice-pool-d',
     ]);
-    for(const combo of COMBO_R3_COMBOS)expect(combo.addonPoolIds).toEqual(['combo-addon-pool-shared']);
+    for(const combo of COMBO_R4_COMBOS){
+      expect(combo.addonPoolIds).toEqual(['combo-snack-pool-shared','combo-drink-pool-shared']);
+    }
 
-    const mainPools=COMBO_R3_POOLS.filter(pool=>pool.kind==='MAIN_COURSE');
-    const addonPools=COMBO_R3_POOLS.filter(pool=>pool.kind==='ADDON');
+    const mainPools=COMBO_R4_POOLS.filter(pool=>pool.kind==='MAIN_COURSE');
+    const snackPools=COMBO_R4_POOLS.filter(pool=>pool.addonKind==='SNACK');
+    const drinkPools=COMBO_R4_POOLS.filter(pool=>pool.addonKind==='DRINK');
     expect(mainPools.map(pool=>pool.name)).toEqual(['飯糰 Pool A','飯糰 Pool B','飯糰 Pool C','飯糰 Pool D']);
-    expect(addonPools).toHaveLength(1);
-    expect(addonPools[0]?.groups.map(group=>group.name)).toEqual(['選擇小食','選擇飲品']);
+    expect(snackPools.map(pool=>pool.name)).toEqual(['共用小食 Pool']);
+    expect(drinkPools.map(pool=>pool.name)).toEqual(['共用飲品 Pool']);
   });
 
-  it('locks snack and drink upgrade tiers without inventing the no-drink discount',()=>{
-    const addon=COMBO_R3_POOLS.find(pool=>pool.id==='combo-addon-pool-shared')!;
-    const snack=addon.groups.find(group=>group.id==='combo-addon-snack')!;
-    const drink=addon.groups.find(group=>group.id==='combo-addon-drink')!;
-    expect(snack.bands.map(band=>band.priceAdjustment)).toEqual(['0.00','3.00','5.00']);
-    expect(drink.bands.map(band=>band.name)).toEqual([
-      '唔飲嘢 · 減價',
-      '熱飲 · $0',
-      '熱檸茶／熱檸水轉凍 · +$3',
-      '特飲 · +$6',
-      '特飲 · +$8',
-      '特飲 · +$10',
+  it('puts each Snack product inside its exact price child-pool',()=>{
+    const snackPool=COMBO_R4_POOLS.find(pool=>pool.id==='combo-snack-pool-shared')!;
+    const group=snackPool.groups[0]!;
+    expect(group.bands.map(band=>[band.name,band.priceAdjustment])).toEqual([
+      ['免費小食 Pool','0.00'],
+      ['+$3 小食 Pool','3.00'],
+      ['+$5 小食 Pool','5.00'],
     ]);
-    const noDrink=drink.bands[0]!;
-    expect(noDrink.priceAdjustment).toBe('');
-    expect(noDrink.priceStatus).toBe('OWNER_VALUE_REQUIRED');
-    expect(drink.choices.find(choice=>choice.choiceType==='NONE')?.label).toBe('唔飲嘢');
+    const freeIds=new Set(group.choices.filter(choice=>choice.bandId==='snack-free').map(choice=>choice.productId));
+    const plus3Ids=new Set(group.choices.filter(choice=>choice.bandId==='snack-plus-3').map(choice=>choice.productId));
+    const plus5Ids=new Set(group.choices.filter(choice=>choice.bandId==='snack-plus-5').map(choice=>choice.productId));
+    expect(freeIds.has('3a007232-991f-5da7-bbb2-71331c320a5a')).toBe(true);
+    expect(plus3Ids.has('bb5da156-0b50-5201-9686-4b5919706543')).toBe(true);
+    expect(plus5Ids.has('01c3ed11-3656-5786-a46b-2d90ce1413d5')).toBe(true);
+    expect([...freeIds].some(id=>plus3Ids.has(id)||plus5Ids.has(id))).toBe(false);
   });
 
-  it('migrates the wrong single poster Combo into the R3 pool model exactly once',()=>{
+  it('locks Drink child-pools and exact Owner pricing',()=>{
+    const drinkPool=COMBO_R4_POOLS.find(pool=>pool.id==='combo-drink-pool-shared')!;
+    const group=drinkPool.groups[0]!;
+    expect(group.bands.map(band=>[band.name,band.priceAdjustment])).toEqual([
+      ['唔飲嘢 Pool','-1.00'],
+      ['熱檸茶／熱檸水免費 Pool','0.00'],
+      ['凍檸茶／凍檸水 +$3 Pool','3.00'],
+      ['特飲 +$6 Pool','6.00'],
+      ['特飲 +$8 Pool','8.00'],
+      ['特飲 +$10 Pool','10.00'],
+    ]);
+
+    const noDrink=group.choices.filter(choice=>choice.bandId==='drink-no-drink');
+    expect(noDrink).toHaveLength(1);
+    expect(noDrink[0]?.choiceType).toBe('NONE');
+    expect(noDrink[0]?.label).toBe('唔飲嘢');
+
+    expect(group.choices.filter(choice=>choice.bandId==='drink-hot-free').map(choice=>choice.label)).toEqual(['熱檸茶','熱檸水']);
+    expect(group.choices.filter(choice=>choice.bandId==='drink-cold-plus-3').map(choice=>choice.label)).toEqual(['凍檸茶','凍檸水']);
+
+    expect(group.choices.filter(choice=>choice.bandId==='drink-special-plus-6').map(choice=>choice.productId)).toEqual([
+      'ad3fe24f-2617-52d3-8416-031269e5f122',
+      '02d54674-feb5-571d-b8ac-2668bd2fc1d5',
+      '28bc7c84-0e43-5e32-a5c1-ea78b25a0abc',
+      'bf2334d9-5ffb-5d7d-b454-279cc640a23d',
+    ]);
+    expect(group.choices.filter(choice=>choice.bandId==='drink-special-plus-8').map(choice=>choice.productId)).toEqual([
+      'dcf1a976-ec1d-5d24-bc64-ab9d0a15fa02',
+    ]);
+    const handMade=group.choices.find(choice=>choice.bandId==='drink-special-plus-10');
+    expect(handMade?.choiceType).toBe('LABEL');
+    expect(handMade?.label).toBe('手打檸檬茶');
+  });
+
+  it('migrates R3 shared add-on Pool into separate Snack and Drink pools exactly once',()=>{
     const legacy=LEGACY_MF01_ADMIN_DRAFT as unknown as AdminSessionDraft;
-    const withWrongCombo={
+    const r3={
       ...legacy,
-      combos:[{
-        id:'combo-poster-purple-rice-20260530',name:'自選紫米套餐',active:true,basePrice:'41.00',takeawayAdjustment:'0.00',sections:[],
-      }],
+      combos:[...COMBO_R3_COMBOS],
+      comboPools:[...COMBO_R3_POOLS],
     } as AdminSessionDraft;
-    const migrated=applyComboR3PoolSeed(withWrongCombo);
-    expect(migrated.combos.some(combo=>combo.id==='combo-poster-purple-rice-20260530')).toBe(false);
-    expect(migrated.combos.filter(combo=>combo.id.startsWith('combo-rice-set-'))).toHaveLength(4);
-    expect(migrated.comboPools?.filter(pool=>pool.id.startsWith('combo-rice-pool-'))).toHaveLength(4);
-    expect(migrated.comboPools?.filter(pool=>pool.id==='combo-addon-pool-shared')).toHaveLength(1);
-    const replay=applyComboR3PoolSeed(migrated);
-    expect(replay.combos.filter(combo=>combo.id==='combo-rice-set-a')).toHaveLength(1);
-    expect(replay.comboPools?.filter(pool=>pool.id==='combo-addon-pool-shared')).toHaveLength(1);
+    const migrated=applyComboR4NestedPoolSeed(r3);
+    expect(migrated.comboPools?.some(pool=>pool.id==='combo-addon-pool-shared')).toBe(false);
+    expect(migrated.comboPools?.filter(pool=>pool.id==='combo-snack-pool-shared')).toHaveLength(1);
+    expect(migrated.comboPools?.filter(pool=>pool.id==='combo-drink-pool-shared')).toHaveLength(1);
+    for(const combo of migrated.combos.filter(combo=>combo.id.startsWith('combo-rice-set-'))){
+      expect(combo.addonPoolIds).toEqual(['combo-snack-pool-shared','combo-drink-pool-shared']);
+    }
+    const replay=applyComboR4NestedPoolSeed(migrated);
+    expect(replay.comboPools?.filter(pool=>pool.id==='combo-snack-pool-shared')).toHaveLength(1);
+    expect(replay.comboPools?.filter(pool=>pool.id==='combo-drink-pool-shared')).toHaveLength(1);
   });
 
-  it('renders the R3 pool model and pending no-drink price explicitly',()=>{
+  it('renders products inside child-pool cards instead of one flat add-on list',()=>{
     const html=renderToStaticMarkup(<MemoryRouter initialEntries={['/admin/catalog/combos']}><MfkAdminApp/></MemoryRouter>);
     for(const marker of [
-      '自選飯糰 A 餐','自選飯糰 B 餐','自選飯糰 C 餐','自選飯糰 D 餐',
-      '飯糰 Pool A','飯糰 Pool B','飯糰 Pool C','飯糰 Pool D',
-      '共用小食／飲品 Pool','免費小食','升級 +$3','升級 +$5',
-      '唔飲嘢 · 減價','熱飲 · $0','熱檸茶／熱檸水轉凍 · +$3',
-      '特飲 · +$6','特飲 · +$8','特飲 · +$10',
-      '待 Owner 設定','非商品選擇',
+      '共用小食 Pool','共用飲品 Pool',
+      '免費小食 Pool','+$3 小食 Pool','+$5 小食 Pool',
+      '唔飲嘢 Pool','熱檸茶／熱檸水免費 Pool','凍檸茶／凍檸水 +$3 Pool',
+      '特飲 +$6 Pool','特飲 +$8 Pool','特飲 +$10 Pool',
+      '熱檸茶','熱檸水','凍檸茶','凍檸水','手打檸檬茶',
+      '每個子 Pool 自己有價錢同成員',
     ])expect(html).toContain(marker);
+    expect(html).not.toContain('待 Owner 設定');
   });
 
   it('resolves a Combo pool Product through the same canonical ProductOptionSetLink truth',()=>{
-    const ricePool=COMBO_R3_POOLS.find(pool=>pool.id==='combo-rice-pool-a')!;
+    const ricePool=COMBO_R4_POOLS.find(pool=>pool.id==='combo-rice-pool-a')!;
     const productId=ricePool.groups[0]!.choices[0]!.productId!;
     const state:OptionSetCenterState={
       sets:[{

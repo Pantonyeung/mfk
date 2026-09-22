@@ -433,3 +433,31 @@
   .admin-combo-r3-overview{grid-template-columns:1fr}
   .admin-combo-pool-card>summary,.admin-combo-pool-groups>header,.admin-combo-pool-group>header{align-items:flex-start}
 }
+
+
+/* Combo R4 — nested price sub-pools own their exact members */
+.admin-combo-subpool-list{display:grid;gap:10px}
+.admin-combo-subpool-list>header{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.admin-combo-subpool-list>header>div{display:grid;gap:2px}
+.admin-combo-subpool-list>header small{font-size:9px;color:#7b8390}
+.admin-combo-subpool-card{display:grid;gap:10px;padding:11px;border:1px solid #dcd8f2;border-radius:11px;background:#fff}
+.admin-combo-subpool-card>header{display:grid;grid-template-columns:minmax(240px,1.3fr) 150px auto;gap:10px;align-items:end}
+.admin-combo-subpool-title{display:grid;grid-template-columns:auto minmax(180px,1fr);gap:8px;align-items:center}
+.admin-combo-subpool-title>input,.admin-combo-subpool-card>header>label input{min-height:38px;padding:0 9px;border:1px solid #d5dae2;border-radius:8px;background:#fff}
+.admin-combo-subpool-card>header>label{display:grid;gap:3px}
+.admin-combo-subpool-card>header>label>span{font-size:9px;color:#7b8390}
+.admin-combo-subpool-members{display:grid;border:1px solid #e7e9ee;border-radius:9px;overflow:hidden;background:#fafbfc}
+.admin-combo-subpool-members>article{display:grid;grid-template-columns:78px 145px minmax(220px,1.4fr) minmax(170px,1fr) minmax(190px,1.1fr) 105px 70px;gap:8px;align-items:center;padding:9px 10px;border-top:1px solid #eceef2}
+.admin-combo-subpool-members>article:first-child{border-top:0}
+.admin-combo-subpool-members label{display:grid;gap:3px}
+.admin-combo-subpool-members label>span{font-size:9px;color:#7b8390}
+.admin-combo-subpool-members select,.admin-combo-subpool-members input{min-height:36px;padding:0 8px;border:1px solid #d5dae2;border-radius:8px;background:#fff}
+@media(max-width:1180px){
+  .admin-combo-subpool-card>header{grid-template-columns:1fr}
+  .admin-combo-subpool-members{overflow-x:auto}
+  .admin-combo-subpool-members>article{min-width:1120px}
+}
+@media(max-width:760px){
+  .admin-combo-subpool-list>header{display:grid}
+  .admin-combo-subpool-title{grid-template-columns:1fr}
+}
