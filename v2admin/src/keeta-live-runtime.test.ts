@@ -398,4 +398,69 @@ describe('Keeta live edge runtime',()=>{
     expect(body.knownExternalBlocker).toBeNull();
   });
 
+
+  it('queues one 1001 provider order intent for SMT and ACKs the same canonical order idempotently',async()=>{
+    const key=Buffer.alloc(32,12).toString('base64');
+    const storage=new Map<string,unknown>();
+    const state={storage:{
+      get:async(key:string)=>storage.get(key),
+      put:async(key:string,value:unknown)=>{storage.set(key,value);},
+      delete:async(key:string)=>{storage.delete(key);},
+      list:async({prefix}:{prefix:string})=>new Map([...storage.entries()].filter(([key])=>key.startsWith(prefix))),
+    }};
+    const env={
+      KEETA_APP_ID:'3419700273',
+      KEETA_APP_SECRET:'test-secret',
+      KEETA_TOKEN_ENCRYPTION_KEY:key,
+      KEETA_PROVIDER_SHOP_ID:'721578302',
+      KEETA_OAUTH_REDIRECT_URI:'https://admin.morefunos.com/api/keeta/oauth/callback',
+    };
+    const {KeetaRuntimeStore}=await import('../keeta-runtime.ts');
+    const runtime=new KeetaRuntimeStore(state as never,env as never);
+    const url='https://admin.morefunos.com/api/keeta/webhook';
+    const message=JSON.stringify({orderInfo:{baseOrder:{orderViewIdStr:'998'}}});
+    const signed=await signKeetaRuntimeParams(url,{
+      eventId:1001,
+      appId:3419700273,
+      messageId:'msg-order-998',
+      shopId:721578302,
+      message,
+      timestamp:1790115000,
+    },'test-secret');
+    const webhook=await runtime.fetch(new Request('https://internal/webhook',{
+      method:'POST',
+      headers:{'content-type':'application/json','x-mfk-keeta-external-url':url},
+      body:JSON.stringify(signed),
+    }));
+    expect(webhook.status).toBe(200);
+
+    const pending=await runtime.fetch(new Request('https://internal/smt/orders/pending',{method:'GET'}));
+    const batch=await pending.json() as {orders:Array<{providerOrderId:string;providerMessageId:string;state:string}>};
+    expect(batch.orders).toHaveLength(1);
+    expect(batch.orders[0]).toMatchObject({providerOrderId:'998',providerMessageId:'msg-order-998',state:'PENDING_SMT'});
+
+    const ackBody={
+      schema:'MFK_KEETA_ORDER_ACK_V1',
+      storeId:'MF01',
+      provider:'KEETA',
+      providerOrderId:'998',
+      providerMessageId:'msg-order-998',
+      canonicalOrderId:'MFK-local-1',
+      canonicalDisplay:'P001',
+      committedAt:'2026-09-23T00:05:00.000Z',
+    };
+    const ack=await runtime.fetch(new Request('https://internal/smt/orders/ack',{
+      method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(ackBody),
+    }));
+    expect(ack.status).toBe(200);
+    const retry=await runtime.fetch(new Request('https://internal/smt/orders/ack',{
+      method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(ackBody),
+    }));
+    expect(retry.status).toBe(200);
+    expect((await retry.json() as {state:string}).state).toBe('IDEMPOTENT');
+
+    const after=await runtime.fetch(new Request('https://internal/smt/orders/pending',{method:'GET'}));
+    expect((await after.json() as {orders:unknown[]}).orders).toHaveLength(0);
+  });
+
 });
