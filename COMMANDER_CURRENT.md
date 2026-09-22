@@ -3,7 +3,7 @@
 Status: CURRENT / CONTROLLING
 Protocol: #39
 Control: #22
-Updated: 2026-09-22
+Updated: 2026-09-22 10:03 Asia/Hong_Kong
 System: MFK ONLY
 
 > Every Commander MUST fresh-read this file before acting.
@@ -21,7 +21,7 @@ Do not use an older report, handoff, navigation map, or Morefun-v2 document as c
 
 ## 1. Current navigation
 
-`docs/navigation/MFK_航海圖_V1.10_Round011_2026-09-22.txt`
+`docs/navigation/MFK_航海圖_V1.11_Round012_2026-09-22.txt`
 
 Current navigation must be advanced whenever controlling state changes materially.
 
@@ -88,6 +88,17 @@ Hosting milestones:
 - `MFK_ADMIN_CANONICAL_DOMAIN_H3_GREEN`
 
 `workers.dev` is bootstrap/temporary validation only.
+
+## 5A. Admin canonical browser proof
+
+Owner browser screenshot confirms `https://admin.morefunos.com/admin/publish` is serving the current MFK Admin UI.
+
+Visible proof:
+- `MFK Admin 控制面`
+- `Pending Changes / 發布`
+- `ADMIN CONNECTION A2 · HUMAN CONTROLLED`
+
+Therefore H2/H3 are BANKED and closed.
 
 ## 6. Current exact NEXT
 
