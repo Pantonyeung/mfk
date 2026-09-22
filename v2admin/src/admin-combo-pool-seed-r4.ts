@@ -17,8 +17,8 @@ function correctedRicePools():readonly ComboPoolDraft[]{
         bands:Object.freeze(group.bands.map(band=>Object.freeze({...band}))),
         choices:Object.freeze(group.choices.map(choice=>Object.freeze({
           ...choice,
-          productId:choice.productId==='b2888781-1a6d-529e-931b-aadd4ca1ca5f'
-            ?'b2888781-1a6d-529e-931b-aadd4ca1ca5f'
+          productId:choice.productId==='b2888781-1a6d-529e-931b-aadd4ca74194'
+            ?'b2888781-1a6d-529e-931b-aadd4ca74194'
             :choice.productId,
         }))),
       }))),

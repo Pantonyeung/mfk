@@ -92,7 +92,7 @@ export function LocalAdminMenuWorkspace(){
           ['商品媒體','productMedia'],
           ['門店設定','storeSettings'],
           ['快捷原因','quickReasons'],
-          ['員工／權限設定','staff'],
+          ['員工／權限設定','staffAuth'],
           ['平台政策','channelPolicy'],
           ['平台映射','channelMapping'],
           ['容量','capacity'],
