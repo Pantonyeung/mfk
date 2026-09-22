@@ -60,7 +60,7 @@ test('complete operator routes and failure states are present',()=>{
   for(const marker of[
     '快速點餐','前線工作','訂單記錄','桌面管理','店務工具',
     '搜尋商品','商品設定','購物草稿','待提交草稿','平台狀態',
-    '商品供應','營業日','列印狀態','診斷','正在同步餐單',
+    '商品供應','營業日','產能','營運報表','退款要求','列印狀態','診斷','正在同步餐單',
     '同步失敗','重新確認結果'
   ])assert.match(source,new RegExp(marker));
 });
@@ -109,4 +109,12 @@ test('quote and mutation operations can only cross the typed injected port',()=>
   assert.match(app,/port\?\.quoteCart/);
   assert.match(app,/port\?\.submitOrder/);
   assert.doesNotMatch(app,/finalUnitPriceMinor\s*[*+\-\/]/);
+});
+
+
+test('previously banked SMM read surfaces are not dropped by product completion',()=>{
+  const types=fs.readFileSync(path.join(root,'product-types.ts'),'utf8');
+  const app=fs.readFileSync(path.join(root,'App.tsx'),'utf8');
+  for(const marker of['refundRequests','capacity','reporting','printHealth','channels','dineSessions'])assert.match(types,new RegExp(marker));
+  for(const marker of['退款要求','產能資料尚未連接','營運報表尚未連接','列印狀態尚未連接'])assert.match(app,new RegExp(marker));
 });
