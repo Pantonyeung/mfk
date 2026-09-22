@@ -41,7 +41,7 @@ describe('MFK Admin complete operational workflows',()=>{
     const ota=render('/admin/ota');
     expect(ota).toContain('版本候選');
     expect(ota).toContain('裝置目前版本');
-    expect(ota).toContain('SHA-256');
+    expect(ota).toContain('新增版本候選');
 
     const access=render('/admin/access');
     expect(access).toContain('登入／權限範圍');
@@ -54,7 +54,7 @@ describe('MFK Admin complete operational workflows',()=>{
     expect(day).toContain('永遠唔會阻止新交易');
     expect(day).toContain('日結後修改權限');
     const cash=render('/admin/cash-close');
-    expect(cash).toContain('永遠唔會阻止落單、結帳、付款或本機保存');
+    expect(cash).toContain('永遠唔阻止落單、結帳、付款或本機保存');
     expect(cash).toContain('封存記錄');
   });
 
