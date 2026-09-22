@@ -282,3 +282,5 @@ export const OPTION_CENTER_STORAGE_KEYS=Object.freeze({
   groups:GROUP_KEY,
   productLinks:LINK_KEY,
 });
+
+export type OptionCenterController=ReturnType<typeof useOptionCenter>;
