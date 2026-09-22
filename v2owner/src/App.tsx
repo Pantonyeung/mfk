@@ -1,387 +1,227 @@
-import {useMemo,useState} from 'react';
+import {useEffect,useMemo,useState} from 'react';
 import type {ReactNode} from 'react';
-import capabilitiesJson from './capabilities.json';
-import {
-  actionItems,activity,adminLinks,auditActivityDetails,campaignFixtures,cashOverview,channels,customerOverview,devices,inventoryLiteFixtures,notifications,orders,platformFinanceFixtures,readiness,recoveryStates,reports,sellability,staff,today,
-  type ActionItem,type ChannelRow,type OwnerOrder,type SellabilityRow
-} from './fixtures';
+import {readOwnerLocalWorkspace,writeOwnerLocalWorkspace,type OwnerChecklistItem} from './persistence';
+import {resolveOwnerRuntimePort} from './runtime';
+import type {
+  OwnerActionItem,
+  OwnerConnectionState,
+  OwnerOrderProjection,
+  OwnerReadModelSnapshot,
+  OwnerRuntimePort,
+} from './product-types';
 
 type View='today'|'queue'|'orders'|'more';
-type ReadState='FRESH'|'STALE'|'OFFLINE'|'UNKNOWN'|'PARTIAL'|'FAILURE';
-type Tool='reports'|'sellability'|'channels'|'staff'|'devices'|'customers'|'marketing'|'settlement'|'cash'|'inventory'|'notifications'|'manager'|'activity'|'admin'|'capabilities'|'recovery';
-type Capability={CAP_ID:string;GROUP:string;LABEL:string;SURFACE:string;KIND:'READ_SHAPE'|'COMMAND_SHAPE';STATUS:'MIGRATED_SHAPE'|'NOT_WIRED';OWNER:string};
-type Confirmation={label:string;target:string;impact:string;approval:string};
-
-const capabilities=capabilitiesJson as Capability[];
-const commandCount=capabilities.filter(item=>item.KIND==='COMMAND_SHAPE').length;
-const stateOrder:ReadState[]=['FRESH','STALE','OFFLINE','UNKNOWN','PARTIAL','FAILURE'];
+type Tool='reports'|'sellability'|'channels'|'staff'|'devices'|'customers'|'marketing'|'settlement'|'cash'|'inventory'|'notifications'|'manager'|'activity'|'admin'|'recovery';
+type Confirmation={label:string;target:string;impact:string};
 
 export function App(){
-  const [view,setView]=useState<View>('today');
-  const [readState,setReadState]=useState<ReadState>('FRESH');
+  const local=useMemo(()=>readOwnerLocalWorkspace(),[]);
+  const [view,setView]=useState<View>(local.activeView);
+  const [managerNote,setManagerNote]=useState(local.managerNote);
+  const [handoffNote,setHandoffNote]=useState(local.handoffNote);
+  const [checklist,setChecklist]=useState<readonly OwnerChecklistItem[]>(local.checklist);
+  const [port]=useState<OwnerRuntimePort|null>(()=>resolveOwnerRuntimePort());
+  const [connection,setConnection]=useState<OwnerConnectionState>(port?'LOADING':'NOT_CONNECTED');
+  const [snapshot,setSnapshot]=useState<OwnerReadModelSnapshot|null>(null);
   const [notice,setNotice]=useState<string|null>(null);
+  const [error,setError]=useState<string|null>(null);
   const [tool,setTool]=useState<Tool|null>(null);
-  const [selectedOrder,setSelectedOrder]=useState<OwnerOrder|null>(null);
+  const [selectedOrder,setSelectedOrder]=useState<OwnerOrderProjection|null>(null);
   const [confirmation,setConfirmation]=useState<Confirmation|null>(null);
   const [query,setQuery]=useState('');
   const [source,setSource]=useState('全部');
   const [segment,setSegment]=useState<'current'|'completed'>('current');
 
-  const visibleOrders=useMemo(()=>orders.filter(order=>{
-    const segmentOk=segment==='current'?order.status!=='已取餐':order.status==='已取餐';
+  const persistLocal=(next?:Partial<{view:View;managerNote:string;handoffNote:string;checklist:readonly OwnerChecklistItem[]}>)=>{
+    writeOwnerLocalWorkspace({
+      activeView:next?.view??view,
+      managerNote:next?.managerNote??managerNote,
+      handoffNote:next?.handoffNote??handoffNote,
+      checklist:next?.checklist??checklist,
+    });
+  };
+
+  const changeView=(next:View)=>{setView(next);persistLocal({view:next})};
+
+  const refresh=async()=>{
+    if(!port){setConnection('NOT_CONNECTED');setSnapshot(null);return}
+    setConnection('LOADING');setError(null);
+    try{
+      const next=await port.readSnapshot();
+      setSnapshot(next);
+      setConnection(next.store?.freshness==='STALE'?'STALE':next.store?.freshness==='PARTIAL'?'PARTIAL':next.store?.freshness==='UNKNOWN'?'UNKNOWN':'READY');
+    }catch(reason){
+      setConnection('ERROR');
+      setError(reason instanceof Error?reason.message:'暫時未能同步營運資料');
+    }
+  };
+
+  useEffect(()=>{void refresh()},[]);
+
+  const visibleOrders=(snapshot?.orders??[]).filter(order=>{
+    const done=order.lifecycle==='COMPLETED'||order.lifecycle==='CANCELLED';
+    const segmentOk=segment==='completed'?done:!done;
     const sourceOk=source==='全部'||order.source===source;
-    const queryOk=!query||[order.code,order.source,order.status,order.externalRef].join(' ').toLowerCase().includes(query.toLowerCase());
+    const q=query.trim().toLowerCase();
+    const queryOk=!q||[order.displayCode,order.source,order.lifecycle,order.externalRef??'',order.itemSummary].join(' ').toLowerCase().includes(q);
     return segmentOk&&sourceOk&&queryOk;
-  }),[segment,source,query]);
+  });
 
-  const showNotWired=(label:string)=>{
-    setNotice(label+'：NOT_WIRED｜今輪只保留 Command UX，未送出任何 live command。');
-  };
-  const requestCommand=(label:string,target:string,impact:string,approval='Owner / Manager approval presentation')=>{
-    setConfirmation({label,target,impact,approval});
-  };
-  const cycleReadState=()=>{
-    const index=stateOrder.indexOf(readState);
-    setReadState(stateOrder[(index+1)%stateOrder.length]);
+  const requestBounded=(label:string,target:string,impact:string)=>setConfirmation({label,target,impact});
+
+  const executeBounded=async(value:Confirmation)=>{
+    setConfirmation(null);
+    if(!port?.requestBoundedAction){setNotice('遠端操作服務尚未連接；冇改變任何正式狀態。');return}
+    try{
+      const result=await port.requestBoundedAction({actionType:value.label,target:value.target,reason:value.impact,operationId:crypto.randomUUID()});
+      setNotice(result.message);
+      if(result.state==='CONFIRMED')void refresh();
+    }catch{
+      setNotice('操作結果未明；請先重新確認讀回，唔好重複操作。');
+    }
   };
 
-  return <main className={'app-shell state-'+readState.toLowerCase()}>
+  const connectionLabel=connection==='READY'?'資料已同步':connection==='LOADING'?'同步中':connection==='STALE'?'資料稍舊':connection==='PARTIAL'?'部分資料':connection==='UNKNOWN'?'狀態未明':connection==='ERROR'?'同步失敗':'未連接';
+  const sources=['全部',...Array.from(new Set((snapshot?.orders??[]).map(order=>order.source)))];
+
+  return <main className="app-shell">
     <header className="topbar">
       <div className="brand-mark">磨</div>
-      <div className="brand-copy"><strong>MFK Owner</strong><span>{today.store} · Mobile Command Surface</span></div>
-      <button className="state-pill" onClick={cycleReadState} aria-label="切換 migration 展示狀態"><i/>{readState}</button>
+      <div className="brand-copy"><strong>老闆中心</strong><span>{snapshot?.store?.storeName??'未連接門店'} · {snapshot?.store?.businessDate??'營業日未有資料'}</span></div>
+      <button className="state-pill" onClick={()=>void refresh()} aria-label="重新同步"><i/>{connectionLabel}</button>
     </header>
 
-    <section className="authority-strip" role="status">
-      <b>CAPABILITY_UPGRADE_ONLY</b><span>Watch · Alert · Review · Bounded Act</span><em>Command = NOT_WIRED</em>
-    </section>
-
     {notice?<div className="notice" role="status"><span>{notice}</span><button onClick={()=>setNotice(null)}>收起</button></div>:null}
-    {readState!=='FRESH'?<RecoveryBanner state={readState} onAction={()=>showNotWired('重新確認')}/>:null}
+    {error?<RecoveryBanner title="營運資料同步失敗" detail={error} onRetry={()=>void refresh()}/>:null}
+    {connection==='NOT_CONNECTED'?<RecoveryBanner title="老闆資料服務尚未連接" detail="正式營業額、訂單、渠道、結算、設備同人員狀態會保持空白，唔會用假資料代替。" onRetry={()=>void refresh()}/>:null}
+    {connection==='STALE'||connection==='PARTIAL'||connection==='UNKNOWN'?<RecoveryBanner title={connectionLabel} detail="畫面會保留資料新鮮度／確定性；未知唔會當失敗，部分資料亦唔會當完整。" onRetry={()=>void refresh()}/>:null}
 
     <section className="stage">
-      {view==='today'?<TodayPage state={readState} onOpenQueue={()=>setView('queue')} onOpenTool={setTool}/>:null}
-      {view==='queue'?<QueuePage onCommand={requestCommand}/>:null}
-      {view==='orders'?<OrdersPage rows={visibleOrders} segment={segment} setSegment={setSegment} query={query} setQuery={setQuery} source={source} setSource={setSource} onOpen={setSelectedOrder}/>:null}
-      {view==='more'?<MorePage onOpenTool={setTool}/>:null}
+      {view==='today'?<TodayPage connection={connection} snapshot={snapshot} onQueue={()=>changeView('queue')} onTool={setTool}/>:null}
+      {view==='queue'?<QueuePage connection={connection} items={snapshot?.actions??[]} onCommand={requestBounded}/>:null}
+      {view==='orders'?<OrdersPage connection={connection} rows={visibleOrders} segment={segment} setSegment={setSegment} query={query} setQuery={setQuery} source={source} setSource={setSource} sources={sources} onOpen={setSelectedOrder}/>:null}
+      {view==='more'?<MorePage snapshot={snapshot} connection={connection} onTool={setTool}/>:null}
     </section>
 
-    <nav className="bottom-nav" aria-label="Owner 主要功能">
-      <NavButton active={view==='today'} label="今日" glyph="◆" onClick={()=>setView('today')}/>
-      <NavButton active={view==='queue'} label="待處理" glyph="!" badge={String(actionItems.length)} onClick={()=>setView('queue')}/>
-      <NavButton active={view==='orders'} label="訂單" glyph="▤" onClick={()=>setView('orders')}/>
-      <NavButton active={view==='more'} label="更多" glyph="•••" onClick={()=>setView('more')}/>
+    <nav className="bottom-nav" aria-label="主要功能">
+      <Nav active={view==='today'} label="今日" glyph="◆" onClick={()=>changeView('today')}/>
+      <Nav active={view==='queue'} label="待處理" glyph="!" badge={snapshot?.actions.length?String(snapshot.actions.length):undefined} onClick={()=>changeView('queue')}/>
+      <Nav active={view==='orders'} label="訂單" glyph="▤" onClick={()=>changeView('orders')}/>
+      <Nav active={view==='more'} label="更多" glyph="•••" onClick={()=>changeView('more')}/>
     </nav>
 
-    {tool?<ToolDrawer tool={tool} close={()=>setTool(null)} onCommand={requestCommand} onNotWired={showNotWired}/>:null}
-    {selectedOrder?<OrderDrawer order={selectedOrder} close={()=>setSelectedOrder(null)}/>:null}
-    {confirmation?<ConfirmationSheet value={confirmation} close={()=>setConfirmation(null)} onConfirm={()=>{showNotWired(confirmation.label);setConfirmation(null)}}/>:null}
+    {tool?<ToolDrawer
+      tool={tool}
+      snapshot={snapshot}
+      connection={connection}
+      managerNote={managerNote}
+      handoffNote={handoffNote}
+      checklist={checklist}
+      setManagerNote={value=>{setManagerNote(value);persistLocal({managerNote:value})}}
+      setHandoffNote={value=>{setHandoffNote(value);persistLocal({handoffNote:value})}}
+      setChecklist={value=>{setChecklist(value);persistLocal({checklist:value})}}
+      onCommand={requestBounded}
+      onAdmin={async()=>{
+        if(!port?.requestAdminDeepLink){setNotice('Admin 導航服務尚未連接。');return}
+        try{setNotice((await port.requestAdminDeepLink()).message)}catch{setNotice('暫時未能開啟 Admin。')}
+      }}
+      onClose={()=>setTool(null)}
+    />:null}
+    {selectedOrder?<OrderDrawer order={selectedOrder} onClose={()=>setSelectedOrder(null)}/>:null}
+    {confirmation?<ConfirmationSheet value={confirmation} onClose={()=>setConfirmation(null)} onConfirm={()=>void executeBounded(confirmation)}/>:null}
   </main>;
 }
 
-function RecoveryBanner({state,onAction}:{state:ReadState;onAction:()=>void}){
-  const copy:Record<ReadState,string>={
-    FRESH:'資料展示正常',
-    STALE:'資料可能延遲；所有 Card 必須以「截至」理解。',
-    OFFLINE:'Owner App 離線只顯示 last-known / fixture shape；不可假裝遠端操作成功。',
-    UNKNOWN:'未能確認結果；禁止 blind retry。',
-    PARTIAL:'部分 domain 有結果，部分仍未證明。',
-    FAILURE:'已知失敗只可進安全 recovery presentation。',
-  };
-  return <section className="recovery-banner"><div><strong>{state}</strong><span>{copy[state]}</span></div><button onClick={onAction}>重新確認</button></section>;
-}
-
-function TodayPage({state,onOpenQueue,onOpenTool}:{state:ReadState;onOpenQueue:()=>void;onOpenTool:(tool:Tool)=>void}){
+function TodayPage({connection,snapshot,onQueue,onTool}:{connection:OwnerConnectionState;snapshot:OwnerReadModelSnapshot|null;onQueue:()=>void;onTool:(tool:Tool)=>void}){
+  const today=snapshot?.today;
+  const store=snapshot?.store;
   return <section className="page">
-    <header className="page-head">
-      <div><span>今日 · Business Day {today.businessDay}</span><h1>而家間舖點？</h1><small>資料狀態：{state} · fixture 截至 {today.observedAt}</small></div>
-      <b className="mode-tag">READ SHAPE</b>
-    </header>
-
-    <section className="kpi-grid" aria-label="今日核心 KPI">
-      <Kpi label="有效營業額" value={today.sales} compare={today.compare+' '+today.compareLabel}/>
-      <Kpi label="訂單" value={today.orders} compare="正式單摘要 shape"/>
-      <Kpi label="平均訂單" value={today.aov} compare="有效營業額 / 有效單量 shape"/>
-    </section>
-
-    <section className="card attention-card">
-      <div className="section-head"><div><span className="eyebrow danger">優先 0</span><h2>需要你處理</h2></div><b className="count-badge">{today.attention}</b></div>
-      <p>只放真正需要人介入的 Action Item；正常單唔搶 Owner attention。</p>
-      <button className="primary wide" onClick={onOpenQueue}>查看待處理</button>
-    </section>
-
-    <section className="card">
-      <div className="section-head"><div><span className="eyebrow">Readiness</span><h2>營運健康</h2></div><button className="link-btn" onClick={()=>onOpenTool('recovery')}>Recovery</button></div>
-      <div className="readiness-grid">{readiness.map(item=><article key={item.label}><span>{item.label}</span><strong className={'tone-'+item.tone}>{item.value}</strong></article>)}</div>
-      <div className="fresh-row"><span>Store：{today.store}</span><span>資料截至 {today.observedAt}</span></div>
-    </section>
-
-    <section className="card compact-card">
-      <div className="section-head"><div><span className="eyebrow orange">現場</span><h2>Staff Now</h2></div><button className="link-btn" onClick={()=>onOpenTool('staff')}>查看</button></div>
-      <div className="split-summary"><div><strong>{today.staffNow}</strong><span>目前在場</span></div><div><strong>1</strong><span>休息中</span></div><div><strong>0</strong><span>打卡異常</span></div></div>
-    </section>
-
-    <section className="card insight-card">
-      <div className="section-head"><div><span className="eyebrow purple">解釋層</span><h2>今日趨勢</h2></div><button className="link-btn" onClick={()=>onOpenTool('reports')}>報表</button></div>
-      <div className="bar-chart">{[28,35,44,52,71,64,82,76,66,58].map((height,index)=><i key={index} style={{height:height+'%'}}/>)}</div>
-      <div className="fresh-row"><span>19:00–20:00 較高</span><span>商品 #1：紫米飯餐</span></div>
-    </section>
+    <header className="page-head"><div><span>今日</span><h1>而家間舖點？</h1><small>{store?'資料截至 '+new Date(store.observedAt).toLocaleString('zh-HK'):'未有正式讀回'}</small></div></header>
+    {!today?<Empty title={connection==='NOT_CONNECTED'?'今日數據尚未連接':'暫時未有今日數據'} detail="正式營業額、訂單同平均單未有讀回之前唔會顯示假 KPI。"/>:
+      <section className="kpi-grid"><Kpi label="有效營業額" value={today.salesLabel} compare={today.comparisonLabel}/><Kpi label="訂單" value={String(today.orderCount)} compare="正式單摘要"/><Kpi label="平均訂單" value={today.averageOrderLabel} compare="有效營業額 / 有效單量"/></section>}
+    <section className="card attention-card"><div className="section-head"><div><span className="eyebrow danger">需要處理</span><h2>Action Queue</h2></div><b className="count-badge">{today?.attentionCount??0}</b></div><p>只放真正需要人介入嘅事項；未知狀態會保持未知。</p><button className="primary wide" onClick={onQueue}>查看待處理</button></section>
+    <section className="card"><div className="section-head"><div><span className="eyebrow">營運健康</span><h2>Readiness</h2></div><button className="link-btn" onClick={()=>onTool('recovery')}>資料狀態</button></div>{snapshot?.readiness.length?<div className="readiness-grid">{snapshot.readiness.map(item=><article key={item.id}><span>{item.label}</span><strong>{item.value}</strong></article>)}</div>:<p>未有健康讀回。</p>}</section>
+    <section className="card compact-card"><div className="section-head"><div><span className="eyebrow orange">現場</span><h2>目前人手</h2></div><button className="link-btn" onClick={()=>onTool('staff')}>查看</button></div><div className="split-summary"><div><strong>{today?.staffNow??'—'}</strong><span>目前在場</span></div><div><strong>{snapshot?.staff.filter(item=>item.presence.includes('休息')).length??0}</strong><span>休息中</span></div><div><strong>{snapshot?.staff.filter(item=>item.presence.includes('異常')).length??0}</strong><span>需留意</span></div></div></section>
+    <section className="card"><div className="section-head"><div><span className="eyebrow purple">報表</span><h2>可信摘要</h2></div><button className="link-btn" onClick={()=>onTool('reports')}>全部報表</button></div>{snapshot?.reports.slice(0,3).map(item=><div className="detail-row" key={item.reportId}><span>{item.name}</span><strong>{item.value}</strong></div>)}</section>
   </section>;
 }
 
-function QueuePage({onCommand}:{onCommand:(label:string,target:string,impact:string,approval?:string)=>void}){
-  return <section className="page">
-    <header className="page-head"><div><span>Exception / Action Queue</span><h1>待處理</h1><small>Projection / orchestration only · 不擁有 mutation</small></div><b className="hero-number">{actionItems.length}</b></header>
-    <div className="cards">{actionItems.map(item=><ActionCard key={item.id} item={item} onCommand={onCommand}/>)}</div>
-    <section className="card rule-card"><strong>Resolved ≠ Dismissed</strong><p>今輪只展示 dedupe、severity、owner domain、certainty、confirmation shape。無 live resolution。</p></section>
+function QueuePage({connection,items,onCommand}:{connection:OwnerConnectionState;items:readonly OwnerActionItem[];onCommand:(label:string,target:string,impact:string)=>void}){
+  return <section className="page"><header className="page-head"><div><span>待處理</span><h1>需要你留意</h1><small>Resolved 同 Dismissed 係兩回事；冇讀回唔會當完成。</small></div><b className="hero-number">{items.length}</b></header>
+    {!items.length?<Empty title={connection==='NOT_CONNECTED'?'待處理服務尚未連接':'暫時冇待處理事項'} detail="真正需要人介入嘅事項先會出現喺呢度。"/>:<div className="cards">{items.map(item=><ActionCard key={item.actionId} item={item} onCommand={onCommand}/>)}</div>}
   </section>;
 }
 
-function ActionCard({item,onCommand}:{item:ActionItem;onCommand:(label:string,target:string,impact:string,approval?:string)=>void}){
-  return <article className={'action-card severity-'+(item.severity==='緊急'?'urgent':item.severity==='注意'?'attention':'info')}>
-    <div className="action-top"><span>{item.domain} · {item.elapsed}</span><b>{item.severity}</b></div>
-    <h2>{item.title}</h2><p>{item.detail}</p>
-    <div className="fact-row"><span>Target：{item.target}</span><em className={'certainty '+item.certainty.toLowerCase()}>{item.certainty}</em></div>
-    <div className="action-buttons">
-      <button onClick={()=>onCommand('Acknowledge Alert',item.target,'只係處理確認 shape，不代表 underlying problem resolved。')}>確認已閱</button>
-      <button className="primary" onClick={()=>onCommand(item.action,item.target,'Bounded decision presentation only；唔會改 Order / Payment / Print / Provider truth。')}>{item.action}</button>
-    </div>
-  </article>;
+function ActionCard({item,onCommand}:{item:OwnerActionItem;onCommand:(label:string,target:string,impact:string)=>void}){
+  return <article className={'action-card severity-'+(item.severity==='URGENT'?'urgent':item.severity==='ATTENTION'?'attention':'info')}><div className="action-top"><span>{item.domain} · {new Date(item.observedAt).toLocaleTimeString('zh-HK')}</span><b>{item.severity==='URGENT'?'緊急':item.severity==='ATTENTION'?'注意':'資訊'}</b></div><h2>{item.title}</h2><p>{item.detail}</p><div className="fact-row"><span>目標：{item.target}</span><em className={'certainty '+item.certainty.toLowerCase()}>{item.certainty}</em></div>{item.actionLabel?<div className="action-buttons"><button className="primary" onClick={()=>onCommand(item.actionLabel!,item.target,'只提交有限度操作意圖；正式狀態必須等目標系統讀回。')}>{item.actionLabel}</button></div>:null}</article>;
 }
 
-function OrdersPage({rows,segment,setSegment,query,setQuery,source,setSource,onOpen}:{rows:OwnerOrder[];segment:'current'|'completed';setSegment:(v:'current'|'completed')=>void;query:string;setQuery:(v:string)=>void;source:string;setSource:(v:string)=>void;onOpen:(order:OwnerOrder)=>void}){
-  return <section className="page">
-    <header className="page-head"><div><span>Order Oversight</span><h1>訂單</h1><small>Read-only projection · 一張 Card 唔代表一個 global status</small></div><b className="hero-number">{rows.length}</b></header>
-    <div className="segmented"><button className={segment==='current'?'active':''} onClick={()=>setSegment('current')}>進行中</button><button className={segment==='completed'?'active':''} onClick={()=>setSegment('completed')}>已完成</button></div>
-    <label className="search"><span>搜尋</span><input value={query} onChange={event=>setQuery(event.target.value)} placeholder="單號／來源／狀態／外部編號"/></label>
-    <div className="chip-row">{['全部','Keeta','現場','自家客戶端','電話'].map(item=><button key={item} className={source===item?'active':''} onClick={()=>setSource(item)}>{item}</button>)}</div>
-    <div className="cards">{rows.map(order=><button className="order-card" key={order.code} onClick={()=>onOpen(order)}>
-      <div className="order-card-top"><div><small>{order.time} · {order.source}</small><h2>#{order.code}</h2></div><span className={'certainty '+order.readback.toLowerCase()}>{order.readback}</span></div>
-      <div className="order-card-main"><strong>{order.status}</strong><b>{order.amount}</b></div>
-      <div className="order-card-meta"><span>{order.fulfillment}</span><span>{order.tender}</span><span>{order.externalRef!=='—'?'外部 '+order.externalRef:'門店單'}</span></div>
-      <em>查看 Drill-down →</em>
-    </button>)}</div>
+function OrdersPage({connection,rows,segment,setSegment,query,setQuery,source,setSource,sources,onOpen}:{connection:OwnerConnectionState;rows:readonly OwnerOrderProjection[];segment:'current'|'completed';setSegment:(v:'current'|'completed')=>void;query:string;setQuery:(v:string)=>void;source:string;setSource:(v:string)=>void;sources:readonly string[];onOpen:(order:OwnerOrderProjection)=>void}){
+  return <section className="page"><header className="page-head"><div><span>訂單監察</span><h1>訂單</h1><small>只讀正式投影；未知結果唔會當完成。</small></div><b className="hero-number">{rows.length}</b></header><div className="segmented"><button className={segment==='current'?'active':''} onClick={()=>setSegment('current')}>進行中</button><button className={segment==='completed'?'active':''} onClick={()=>setSegment('completed')}>已完成</button></div><label className="search"><span>搜尋</span><input value={query} onChange={event=>setQuery(event.target.value)} placeholder="單號／來源／狀態／外部編號"/></label><div className="chip-row">{sources.map(item=><button key={item} className={source===item?'active':''} onClick={()=>setSource(item)}>{item}</button>)}</div>
+    {!rows.length?<Empty title={connection==='NOT_CONNECTED'?'訂單資料尚未連接':'暫時冇符合條件嘅訂單'} detail="可以切換分類或者修改搜尋。"/>:<div className="cards">{rows.map(order=><button className="order-card" key={order.orderId} onClick={()=>onOpen(order)}><div className="order-card-top"><div><small>{new Date(order.observedAt).toLocaleTimeString('zh-HK')} · {order.source}</small><h2>{order.displayCode}</h2></div><span className={'certainty '+order.readback.toLowerCase()}>{order.readback}</span></div><div className="order-card-main"><strong>{order.lifecycle}</strong><b>{order.amountLabel??'—'}</b></div><div className="order-card-meta"><span>{order.fulfillmentLabel??'未有交收資料'}</span><span>{order.tenderLabel??'未有付款摘要'}</span><span>{order.externalRef?'外部 '+order.externalRef:'門店單'}</span></div><em>查看詳情 →</em></button>)}</div>}
   </section>;
 }
 
-function OrderDrawer({order,close}:{order:OwnerOrder;close:()=>void}){
-  return <div className="overlay"><section className="drawer order-drawer" role="dialog" aria-modal="true">
-    <DrawerHead title={'Order #'+order.code} subtitle={order.source+' · '+order.time} close={close}/>
-    <div className="detail-grid"><Detail label="狀態" value={order.status}/><Detail label="Readback" value={order.readback}/><Detail label="有效金額" value={order.amount}/><Detail label="Tender" value={order.tender}/></div>
-    <DetailSection title="Order Identity"><p>Display #{order.code} · External {order.externalRef}</p></DetailSection>
-    <DetailSection title="Items">{order.items.map(item=><p key={item}>{item}</p>)}</DetailSection>
-    <DetailSection title="Fulfillment"><p>{order.fulfillment}</p></DetailSection>
-    <DetailSection title="Side-effects">{order.prints.map(item=><p key={item}>{item}</p>)}</DetailSection>
-    <DetailSection title="Linked Exceptions">{order.exceptions.length?order.exceptions.map(item=><p key={item}>{item}</p>):<p>無已知 exception</p>}</DetailSection>
-    <DetailSection title="Timeline">{order.timeline.map(item=><p key={item}>{item}</p>)}</DetailSection>
-    <div className="boundary-box">READ_SHAPE ONLY｜本頁冇 Checkout、Payment、Formal Order、Print、Drawer 或 Store Kernel command。</div>
-  </section></div>;
-}
-
-function MorePage({onOpenTool}:{onOpenTool:(tool:Tool)=>void}){
+function MorePage({snapshot,connection,onTool}:{snapshot:OwnerReadModelSnapshot|null;connection:OwnerConnectionState;onTool:(tool:Tool)=>void}){
   const tools:{id:Tool;title:string;detail:string;state:string}[]=[
-    {id:'reports',title:'報表',detail:'固定 8 張可信報表 shape',state:'READ'},
-    {id:'sellability',title:'商品／售罄',detail:'Sold-out / Restore UX',state:'NOT_WIRED'},
-    {id:'channels',title:'渠道',detail:'Health / Pause / Snooze',state:'NOT_WIRED'},
-    {id:'staff',title:'員工',detail:'Who’s working / role summary',state:'READ'},
-    {id:'devices',title:'設備／Printer',detail:'Health / job certainty',state:'READ'},
-    {id:'customers',title:'客戶',detail:'CRM Lite / New / Returning / Consent',state:'READ'},
-    {id:'marketing',title:'推廣',detail:'Campaign / Attribution / Funding facts',state:'READ'},
-    {id:'settlement',title:'平台結算',detail:'Sales / Fees / Payout / Finality',state:'READ'},
-    {id:'cash',title:'現金',detail:'Tender / Variance / Closeout summary',state:'READ'},
-    {id:'inventory',title:'庫存',detail:'Inventory Lite / Attention only',state:'READ'},
-    {id:'notifications',title:'Alerts / Notifications',detail:'Immediate / Digest / Inbox',state:'READ'},
-    {id:'manager',title:'Manager Log / Checklist',detail:'營運交接 shape',state:'LOCAL'},
-    {id:'activity',title:'Activity',detail:'Human-readable audit projection',state:'READ'},
-    {id:'admin',title:'前往 Admin',detail:'正式設定只 deep-link UX',state:'NOT_WIRED'},
-    {id:'recovery',title:'Recovery States',detail:'Offline / Stale / Unknown / Partial',state:'READ'},
-    {id:'capabilities',title:'Capability Registry',detail:capabilities.length+' 項 · '+commandCount+' commands',state:String(capabilities.length)},
+    {id:'reports',title:'報表',detail:'固定可信摘要',state:String(snapshot?.reports.length??0)},
+    {id:'sellability',title:'商品供應',detail:'售罄／恢復有限操作',state:connection==='READY'?'可查詢':'未連接'},
+    {id:'channels',title:'渠道',detail:'Desired / Observed / Freshness',state:String(snapshot?.channels.length??0)},
+    {id:'staff',title:'員工',detail:'在場／角色／權限摘要',state:String(snapshot?.staff.length??0)},
+    {id:'devices',title:'設備／打印',detail:'健康／影響範圍／Job certainty',state:String(snapshot?.devices.length??0)},
+    {id:'customers',title:'客戶',detail:'CRM Lite／新客／回頭客／同意',state:snapshot?.customers?'已讀取':'未連接'},
+    {id:'marketing',title:'推廣',detail:'Campaign／Attribution／Funding',state:String(snapshot?.campaigns.length??0)},
+    {id:'settlement',title:'平台結算',detail:'銷售／費用／撥款／差異',state:String(snapshot?.settlements.length??0)},
+    {id:'cash',title:'現金',detail:'Expected / Actual / Over-short',state:snapshot?.cash?'已讀取':'未連接'},
+    {id:'inventory',title:'庫存',detail:'低庫存／盤點／耗損提示',state:String(snapshot?.inventory.length??0)},
+    {id:'notifications',title:'通知',detail:'即時／摘要／收件箱',state:String(snapshot?.notifications.length??0)},
+    {id:'manager',title:'經理日誌',detail:'本機筆記／Checklist／交接草稿',state:'本機'},
+    {id:'activity',title:'活動紀錄',detail:'Requester / Approver / Result / Readback',state:String(snapshot?.activity.length??0)},
+    {id:'admin',title:'前往 Admin',detail:'設定留喺 Admin',state:'導航'},
+    {id:'recovery',title:'資料狀態',detail:'Offline / Stale / Unknown / Partial',state:connection},
   ];
-  return <section className="page">
-    <header className="page-head"><div><span>更多</span><h1>營運工具</h1><small>Structural config 留 Admin；physical / transaction execution 留 SMT。</small></div><b className="mode-tag">MIGRATED</b></header>
-    <div className="tool-grid">{tools.map(item=><button key={item.id} className="tool-card" onClick={()=>onOpenTool(item.id)}>
-      <span>◆</span><strong>{item.title}</strong><small>{item.detail}</small><em>{item.state}</em>
-    </button>)}</div>
-  </section>;
+  return <section className="page"><header className="page-head"><div><span>更多</span><h1>營運工具</h1><small>設定留 Admin；交易、付款、打印同實體設備執行留喺責任端。</small></div></header><div className="tool-grid">{tools.map(item=><button key={item.id} className="tool-card" onClick={()=>onTool(item.id)}><span>◆</span><strong>{item.title}</strong><small>{item.detail}</small><em>{item.state}</em></button>)}</div></section>;
 }
 
-function ToolDrawer({tool,close,onCommand,onNotWired}:{tool:Tool;close:()=>void;onCommand:(label:string,target:string,impact:string,approval?:string)=>void;onNotWired:(label:string)=>void}){
-  const titles:Record<Tool,string>={
-    reports:'固定報表',sellability:'商品／售罄',channels:'渠道健康',staff:'Staff Presence',devices:'Device / Printer Health',
-    customers:'Customer / CRM Lite',marketing:'Campaign / Marketing',settlement:'Platform Settlement',cash:'Cash / Closeout',inventory:'Inventory Lite',
-    notifications:'Alerts / Notifications',manager:'Manager Log / Checklist',activity:'Activity Feed',admin:'Admin Deep-link',
-    capabilities:'Owner Capability Registry',recovery:'Recovery States'
-  };
-  return <div className="overlay"><section className="drawer" role="dialog" aria-modal="true">
-    <DrawerHead title={titles[tool]} subtitle="MFK Owner migration surface" close={close}/>
-    {tool==='reports'?<ReportsTool/>:null}
-    {tool==='sellability'?<SellabilityTool onCommand={onCommand}/>:null}
-    {tool==='channels'?<ChannelsTool onCommand={onCommand}/>:null}
-    {tool==='staff'?<StaffTool/>:null}
-    {tool==='devices'?<DevicesTool/>:null}
-    {tool==='customers'?<CustomerTool/>:null}
-    {tool==='marketing'?<MarketingTool/>:null}
-    {tool==='settlement'?<SettlementTool/>:null}
-    {tool==='cash'?<CashTool/>:null}
-    {tool==='inventory'?<InventoryTool/>:null}
-    {tool==='notifications'?<NotificationsTool/>:null}
-    {tool==='manager'?<ManagerTool onNotWired={onNotWired}/>:null}
-    {tool==='activity'?<ActivityTool/>:null}
-    {tool==='admin'?<AdminTool onNotWired={onNotWired}/>:null}
-    {tool==='capabilities'?<CapabilityTool/>:null}
-    {tool==='recovery'?<RecoveryTool onNotWired={onNotWired}/>:null}
+function ToolDrawer({tool,snapshot,connection,managerNote,handoffNote,checklist,setManagerNote,setHandoffNote,setChecklist,onCommand,onAdmin,onClose}:{tool:Tool;snapshot:OwnerReadModelSnapshot|null;connection:OwnerConnectionState;managerNote:string;handoffNote:string;checklist:readonly OwnerChecklistItem[];setManagerNote:(v:string)=>void;setHandoffNote:(v:string)=>void;setChecklist:(v:readonly OwnerChecklistItem[])=>void;onCommand:(label:string,target:string,impact:string)=>void;onAdmin:()=>void;onClose:()=>void}){
+  const title=tool==='reports'?'報表':tool==='sellability'?'商品供應':tool==='channels'?'渠道健康':tool==='staff'?'員工':tool==='devices'?'設備／打印':tool==='customers'?'客戶':tool==='marketing'?'推廣':tool==='settlement'?'平台結算':tool==='cash'?'現金':tool==='inventory'?'庫存':tool==='notifications'?'通知':tool==='manager'?'經理日誌':tool==='activity'?'活動紀錄':tool==='admin'?'Admin':tool==='recovery'?'資料狀態':'工具';
+  return <div className="overlay"><section className="drawer" role="dialog" aria-modal="true"><DrawerHead title={title} subtitle="老闆中心" close={onClose}/>
+    {tool==='reports'?<ListOrEmpty rows={snapshot?.reports??[]} render={item=><div className="list-row" key={item.reportId}><div><strong>{item.name}</strong><small>{item.compare??item.freshness}</small></div><b>{item.value}</b></div>} empty="報表尚未連接"/>:null}
+    {tool==='channels'?<ListOrEmpty rows={snapshot?.channels??[]} render={item=><div className="list-row" key={item.channelId}><div><strong>{item.name}</strong><small>Desired：{item.desired} · Observed：{item.observed} · {item.freshness}</small></div><span className="status">{item.health}</span></div>} empty="渠道資料尚未連接"/>:null}
+    {tool==='sellability'?<ListOrEmpty rows={snapshot?.sellability??[]} render={item=><div className="list-row" key={item.targetId}><div><strong>{item.name}</strong><small>{item.grain} · {item.scope} · {item.state}</small></div><button onClick={()=>onCommand(item.state==='AVAILABLE'?'標記售罄':'恢復供應',item.targetId,'有限度供應狀態操作；必須等正式讀回。')}>{item.state==='AVAILABLE'?'售罄':'恢復'}</button></div>} empty="商品供應資料尚未連接"/>:null}
+    {tool==='staff'?<ListOrEmpty rows={snapshot?.staff??[]} render={item=><div className="list-row" key={item.staffId}><div><strong>{item.name}</strong><small>{item.role} · {item.permissions}</small></div><span>{item.presence}</span></div>} empty="員工資料尚未連接"/>:null}
+    {tool==='devices'?<ListOrEmpty rows={snapshot?.devices??[]} render={item=><div className="list-row" key={item.deviceId}><div><strong>{item.name}</strong><small>{item.kind} · {item.affected??'未有影響摘要'} · {item.jobs??'未有 Job 摘要'}</small></div><span>{item.health}</span></div>} empty="設備資料尚未連接"/>:null}
+    {tool==='customers'?snapshot?.customers?<div className="metric-grid"><Metric label="客戶" value={snapshot.customers.totalLabel}/><Metric label="新客" value={snapshot.customers.newLabel}/><Metric label="回頭客" value={snapshot.customers.returningLabel}/><Metric label="同意狀態" value={snapshot.customers.consentLabel}/></div>:<Empty title="客戶摘要尚未連接" detail="唔會用假 CRM 數字代替。"/>:null}
+    {tool==='marketing'?<ListOrEmpty rows={snapshot?.campaigns??[]} render={item=><div className="list-row" key={item.campaignId}><div><strong>{item.name}</strong><small>Attributed Orders：{item.attributedOrdersLabel} · {item.fundingLabel??'Funding 未提供'}</small></div><b>{item.attributedSalesLabel}</b></div>} empty="推廣資料尚未連接"/>:null}
+    {tool==='settlement'?<ListOrEmpty rows={snapshot?.settlements??[]} render={(item,index)=><div className="list-row" key={item.channel+'-'+index}><div><strong>{item.channel}</strong><small>銷售 {item.salesLabel} · 費用 {item.feesLabel} · {item.finality}</small></div><b>{item.payoutLabel}</b></div>} empty="結算資料尚未連接"/>:null}
+    {tool==='cash'?snapshot?.cash?<div className="metric-grid"><Metric label="應有" value={snapshot.cash.expectedLabel}/><Metric label="實有" value={snapshot.cash.actualLabel}/><Metric label="差異" value={snapshot.cash.varianceLabel}/><Metric label="交更" value={snapshot.cash.closeoutState}/></div>:<Empty title="現金摘要尚未連接" detail="Owner App 唔會開錢箱或者改付款結果。"/>:null}
+    {tool==='inventory'?<ListOrEmpty rows={snapshot?.inventory??[]} render={item=><div className="list-row" key={item.itemId}><div><strong>{item.name}</strong><small>{item.detail}</small></div><span>{item.state}</span></div>} empty="庫存提示尚未連接"/>:null}
+    {tool==='notifications'?<ListOrEmpty rows={snapshot?.notifications??[]} render={item=><div className="list-row" key={item.notificationId}><div><strong>{item.title}</strong><small>{item.detail}</small></div><span>{item.cadence}</span></div>} empty="暫時冇通知"/>:null}
+    {tool==='activity'?<ListOrEmpty rows={snapshot?.activity??[]} render={item=><div className="activity-card" key={item.activityId}><strong>{item.title}</strong><p>{item.actor} · {new Date(item.observedAt).toLocaleString('zh-HK')}</p><small>Requester：{item.requester??'—'} · Approver：{item.approver??'—'} · Result：{item.result} · Readback：{item.readback??'—'}</small></div>} empty="活動紀錄尚未連接"/>:null}
+    {tool==='manager'?<ManagerWorkspace managerNote={managerNote} handoffNote={handoffNote} checklist={checklist} setManagerNote={setManagerNote} setHandoffNote={setHandoffNote} setChecklist={setChecklist}/>:null}
+    {tool==='admin'?<><p className="callout">正式設定、權限、產品、價格、渠道同規則由 Admin 負責；Owner 只提供導航入口。</p><button className="primary wide" onClick={onAdmin}>前往 Admin</button></>:null}
+    {tool==='recovery'?<><div className="diag-line"><span>連線</span><b>{connection}</b><small>{snapshot?.observedAt?new Date(snapshot.observedAt).toLocaleString('zh-HK'):'未有讀回'}</small></div><p className="callout">OFFLINE / STALE / UNKNOWN / PARTIAL 都係資料狀態；未知唔等於失敗，冇目標讀回唔算成功。</p></>:null}
   </section></div>;
 }
 
-function ReportsTool(){
-  const [selected,setSelected]=useState(reports[0]);
-  return <><div className="report-picker">{reports.map(report=><button key={report.id} className={selected.id===report.id?'active':''} onClick={()=>setSelected(report)}>{report.name}</button>)}</div>
-    <section className="report-hero"><span>{selected.name}</span><strong>{selected.value}</strong><em>{selected.compare}</em><small>{selected.freshness}</small></section>
-    <div className="large-bars">{selected.bars.map((value,index)=><i key={index} style={{height:Math.max(8,value)+'%'}}/>)}</div>
-    <div className="boundary-box">Fixed report / trend / drill-down presentation only。Report 唔會直接修改 business state。</div>
-  </>;
+function ManagerWorkspace({managerNote,handoffNote,checklist,setManagerNote,setHandoffNote,setChecklist}:{managerNote:string;handoffNote:string;checklist:readonly OwnerChecklistItem[];setManagerNote:(v:string)=>void;setHandoffNote:(v:string)=>void;setChecklist:(v:readonly OwnerChecklistItem[])=>void}){
+  return <section className="manager-workspace"><p className="callout">以下只係本機私人草稿，唔係共享營運真相、唔會改 Admin/SMT 狀態。</p><label>經理筆記<textarea value={managerNote} onChange={e=>setManagerNote(e.target.value)} placeholder="記低要跟進嘅事項"/></label><div>{checklist.map(item=><label className="check-row" key={item.id}><input type="checkbox" checked={item.done} onChange={e=>setChecklist(checklist.map(row=>row.id===item.id?{...row,done:e.target.checked}:row))}/><span>{item.label}</span></label>)}</div><label>交接草稿<textarea value={handoffNote} onChange={e=>setHandoffNote(e.target.value)} placeholder="交畀下一更嘅本機備忘"/></label></section>;
 }
 
-function SellabilityTool({onCommand}:{onCommand:(label:string,target:string,impact:string,approval?:string)=>void}){
-  return <><p className="callout">Product / Option / Modifier / Combo Child quick-control presentation。Inventory 唔會喺呢度變 transaction authority。</p>
-    <div className="list-stack">{sellability.map(row=><SellabilityRowView key={row.id} row={row} onCommand={onCommand}/>)}</div>
-  </>;
-}
-function SellabilityRowView({row,onCommand}:{row:SellabilityRow;onCommand:(label:string,target:string,impact:string,approval?:string)=>void}){
-  return <article className="list-row"><div><strong>{row.name}</strong><small>{row.grain} · {row.scope}</small></div><div className="row-actions"><span>{row.state}</span><button onClick={()=>onCommand(row.action,row.name,'只會展示 Sellability bounded command flow；今輪 zero live mutation。')}>{row.action}</button></div></article>;
+function OrderDrawer({order,onClose}:{order:OwnerOrderProjection;onClose:()=>void}){
+  return <div className="overlay"><section className="drawer order-drawer" role="dialog" aria-modal="true"><DrawerHead title={'訂單 '+order.displayCode} subtitle={order.source+' · '+new Date(order.observedAt).toLocaleString('zh-HK')} close={onClose}/><div className="detail-grid"><Detail label="狀態" value={order.lifecycle}/><Detail label="Readback" value={order.readback}/><Detail label="有效金額" value={order.amountLabel??'—'}/><Detail label="付款摘要" value={order.tenderLabel??'—'}/></div><DetailSection title="商品"><p>{order.itemSummary}</p></DetailSection><DetailSection title="Fulfillment"><p>{order.fulfillmentLabel??'未有資料'}</p></DetailSection><DetailSection title="列印／副作用">{order.prints.length?order.prints.map(item=><p key={item}>{item}</p>):<p>未有資料</p>}</DetailSection><DetailSection title="Exceptions">{order.exceptions.length?order.exceptions.map(item=><p key={item}>{item}</p>):<p>冇已知 exception</p>}</DetailSection><DetailSection title="Timeline">{order.timeline.length?order.timeline.map(item=><p key={item}>{item}</p>):<p>未有 timeline</p>}</DetailSection><div className="boundary-box">只讀監察｜本頁唔會建立、付款、退款、打印、開錢箱或者改正式訂單。</div></section></div>;
 }
 
-function ChannelsTool({onCommand}:{onCommand:(label:string,target:string,impact:string,approval?:string)=>void}){
-  return <><p className="callout">Health ≠ Availability。Desired / Observed / Freshness 分開顯示。</p>
-    <div className="list-stack">{channels.map(row=><ChannelView key={row.id} row={row} onCommand={onCommand}/>)}</div>
-  </>;
-}
-function ChannelView({row,onCommand}:{row:ChannelRow;onCommand:(label:string,target:string,impact:string,approval?:string)=>void}){
-  return <article className="channel-row"><div className="channel-head"><strong>{row.name}</strong><span className={'health '+healthClass(row.health)}>{row.health}</span></div><div className="channel-facts"><span>Desired：{row.desired}</span><span>Observed：{row.observed}</span><span>Freshness：{row.freshness}</span></div><button disabled={row.action==='查看'} onClick={()=>onCommand(row.action,row.name,'Pause / Resume / Snooze 只影響新 intake presentation；不影響已成立 Order。')}>{row.action}</button></article>;
+function ConfirmationSheet({value,onClose,onConfirm}:{value:Confirmation;onClose:()=>void;onConfirm:()=>void}){
+  return <div className="overlay"><section className="sheet" role="dialog" aria-modal="true"><DrawerHead title={value.label} subtitle={value.target} close={onClose}/><p className="callout">{value.impact}</p><div className="sheet-actions"><button onClick={onClose}>取消</button><button className="primary" onClick={onConfirm}>提交操作意圖</button></div></section></div>;
 }
 
-function StaffTool(){
-  return <div className="list-stack">{staff.map(member=><article className="staff-row" key={member.id}><div className="staff-head"><div><strong>{member.name}</strong><span>{member.role}</span></div><b>{member.clock}</b></div><div className="staff-facts"><span>排班：{member.schedule}</span><span>實際：{member.actual}</span><span>休息：{member.breakState}</span><span>工時：{member.hours}</span></div><small>Permission shape：{member.permissions}</small></article>)}</div>;
-}
-
-function DevicesTool(){
-  return <><p className="callout">Owner 只睇 health / impact / binding / job certainty。無 physical print / reroute command。</p><div className="list-stack">{devices.map(device=><article className="device-row" key={device.id}><div className="device-head"><div><strong>{device.name}</strong><span>{device.kind}</span></div><b className={'health '+healthClass(device.health)}>{device.health}</b></div><div className="device-facts"><span>Last seen：{device.lastSeen}</span><span>{device.binding}</span><span>Jobs：{device.jobs}</span><span>Affected：{device.affected}</span></div></article>)}</div></>;
-}
-
-function CustomerTool(){
-  return <>
-    <p className="callout">CRM Lite 只做 Customer / Order linkage 同營運 insight。Phone ≠ customerId；Loyalty ≠ Consent；平台履約資料 ≠ Marketing permission。</p>
-    <div className="metric-grid">
-      <Detail label="New" value={customerOverview.newCustomers}/>
-      <Detail label="Returning" value={customerOverview.returningCustomers}/>
-      <Detail label="Returning %" value={customerOverview.returningRate}/>
-      <Detail label="Average Spend" value={customerOverview.averageSpend}/>
-    </div>
-    <section className="detail-section"><h3>Consent / Experience</h3><div><p>{customerOverview.consentSummary}</p><p>{customerOverview.experience}</p><small>Freshness：{customerOverview.lastUpdated} · fixture only</small></div></section>
-    <div className="boundary-box">READ ONLY｜無 Customer merge、Loyalty ledger、Marketing mutation、PII export。</div>
-  </>;
-}
-
-function MarketingTool(){
-  return <>
-    <p className="callout">Campaign Performance 係 attribution read model，唔係 transaction Sales truth；Platform Promotion 只保存 provider facts / funding。</p>
-    <div className="list-stack">{campaignFixtures.map(item=><article className="list-row" key={item.id}><div><strong>{item.name}</strong><small>{item.channel} · {item.status} · {item.freshness}</small></div><div><span>{item.attributedOrders} orders</span><b>{item.attributedSales}</b><small>{item.funding} · merchant cost {item.merchantCost}</small></div></article>)}</div>
-    <div className="boundary-box">Attributed Sales ≠ Canonical Sales｜Marketing 唔建立第二 Pricing Engine。</div>
-  </>;
-}
-
-function SettlementTool(){
-  return <>
-    <p className="callout">Platform Sales ≠ Store Net Sales ≠ Platform Payout。Settlement 可以遲到／不完整；永遠唔阻新 Order。</p>
-    <div className="list-stack">{platformFinanceFixtures.map(item=><article className="channel-row" key={item.provider}><div className="channel-head"><strong>{item.provider}</strong><span className={'health '+(item.finality==='ESTIMATED'?'warn':'unknown')}>{item.finality}</span></div><div className="channel-facts"><span>Order Sales：{item.orderSales}</span><span>Fees：{item.fees}</span><span>Merchant Amount：{item.merchantAmount}</span><span>Freshness：{item.freshness}</span><span>Difference：{item.differences}</span></div></article>)}</div>
-    <div className="boundary-box">READ ONLY｜無 auto reconciliation、accounting journal、provider mutation。</div>
-  </>;
-}
-
-function CashTool(){
-  return <>
-    <p className="callout">Business Day / Cash / Closeout 只係 accountability / reconciliation read model。Cash Tender ≠ Physical Drawer Cash。</p>
-    <div className="metric-grid">
-      <Detail label="Effective Cash Tender" value={cashOverview.effectiveCashTender}/>
-      <Detail label="Cash Movement Net" value={cashOverview.cashMovementNet}/>
-      <Detail label="Open Drawer" value={cashOverview.openDrawerCount}/>
-      <Detail label="Pending Closeout" value={cashOverview.pendingCloseout}/>
-    </div>
-    <section className="detail-section"><h3>Closeout</h3><div><p>Variance：{cashOverview.variance}</p><p>Last closeout：{cashOverview.lastCloseout}</p><p>Responsible：{cashOverview.responsibleStaff}</p></div></section>
-    <div className="boundary-box">RECORD / ATTENTION ONLY｜Zero remote drawer open / close｜Never transaction blocker。</div>
-  </>;
-}
-
-function InventoryTool(){
-  return <>
-    <p className="callout">Inventory Lite = record / analysis / attention。Inventory quantity 永遠唔係 Sellability / transaction blocker authority。</p>
-    <div className="list-stack">{inventoryLiteFixtures.map(item=><article className="list-row" key={item.id}><div><strong>{item.name}</strong><small>Last count：{item.lastCount} · Par：{item.par}</small></div><div><b>{item.projected}</b><span>{item.state}</span><small>{item.note}</small></div></article>)}</div>
-    <div className="boundary-box">READ ONLY｜Low stock / negative quantity = attention, not automatic sold-out。</div>
-  </>;
-}
-
-function NotificationsTool(){
-  return <><div className="segmented three"><button className="active">全部</button><button>即時</button><button>摘要</button></div><div className="list-stack">{notifications.map(item=><article className="notification-row" key={item.id}><div><span className={'cadence cadence-'+cadenceClass(item.cadence)}>{item.cadence}</span><small>{item.time}</small></div><strong>{item.title}</strong><p>{item.detail}</p><em>{item.state}</em></article>)}</div></>;
-}
-
-function ManagerTool({onNotWired}:{onNotWired:(label:string)=>void}){
-  const [checked,setChecked]=useState<Record<string,boolean>>({open:true,mid:false,close:false});
-  return <><section className="manager-note"><span>Manager Log</span><strong>21:20｜晚市人流正常</strong><p>Keeta 有間歇性讀數延遲；前線繼續本地營運。</p><button onClick={()=>onNotWired('新增 Manager Log')}>新增記錄</button></section>
-    <section className="checklist"><h3>今日 Checklist</h3>{[['open','開舖 readiness'],['mid','中段補貨／設備巡查'],['close','收舖交接']].map(([id,label])=><label key={id}><input type="checkbox" checked={Boolean(checked[id])} onChange={()=>setChecked(current=>({...current,[id]:!current[id]}))}/><span>{label}</span><small>Session-only preview</small></label>)}</section>
-    <div className="boundary-box">Checklist tick 只存在目前 session，唔寫入任何 DB。</div>
-  </>;
-}
-
-function ActivityTool(){
-  return <>
-    <p className="callout">Activity 只係 human-readable Audit projection。Requester / Approver / Result / Readback 分開；唔取代 domain truth。</p>
-    <div className="timeline">{auditActivityDetails.map((item,index)=><article key={index}><i/><div><span>{item.time} · requester：{item.initiatedBy}</span><strong>{item.action}</strong><small>{item.target} · approver：{item.authorizedBy} · result：{item.result} · readback：{item.readback}</small></div></article>)}</div>
-    <div className="boundary-box">Audit / Activity = READ MODEL ONLY｜無 second audit writer / store。</div>
-  </>;
-}
-
-function AdminTool({onNotWired}:{onNotWired:(label:string)=>void}){
-  return <><p className="callout">Owner 唔 author 正式設定。所有 structural work 只保留「前往 Admin」UX shape。</p><div className="list-stack">{adminLinks.map(link=><article className="admin-link" key={link.id}><div><strong>{link.label}</strong><small>{link.detail}</small></div><button onClick={()=>onNotWired('前往 Admin：'+link.label)}>前往 Admin</button></article>)}</div></>;
-}
-
-function CapabilityTool(){
-  const groups=[...new Set(capabilities.map(item=>item.GROUP))];
-  return <><div className="registry-summary"><div><strong>{capabilities.length}</strong><span>Capabilities</span></div><div><strong>{commandCount}</strong><span>Command Shapes</span></div><div><strong>0</strong><span>Live Wiring</span></div></div><div className="registry">{groups.map(group=><section key={group}><h3>{group}</h3>{capabilities.filter(item=>item.GROUP===group).map(item=><article key={item.CAP_ID}><div><strong>{item.LABEL}</strong><small>{item.CAP_ID}</small></div><div><span>{item.KIND}</span><em className={item.STATUS==='NOT_WIRED'?'red':''}>{item.STATUS}</em><small>{item.OWNER}</small></div></article>)}</section>)}</div></>;
-}
-
-function RecoveryTool({onNotWired}:{onNotWired:(label:string)=>void}){
-  return <><div className="list-stack">{recoveryStates.map(item=><article className="recovery-state" key={item.state}><strong>{item.state}</strong><p>{item.meaning}</p><small>{item.action}</small>{item.state==='RETRY'?<button onClick={()=>onNotWired('Retry')}>Retry presentation</button>:null}</article>)}</div></>;
-}
-
-function ConfirmationSheet({value,close,onConfirm}:{value:Confirmation;close:()=>void;onConfirm:()=>void}){
-  const [reason,setReason]=useState('營運處理');
-  const [preview,setPreview]=useState<'確認'|'PENDING'|'RESULT'|'FAILURE'|'UNKNOWN'>('確認');
-  return <div className="overlay top"><section className="sheet confirm-sheet" role="dialog" aria-modal="true">
-    <div className="sheet-grabber"/><header><div><span>Bounded Action Confirmation</span><h2>{value.label}</h2><small>{value.target}</small></div><button onClick={close}>×</button></header>
-    <section className="impact-box"><span>影響預覽</span><p>{value.impact}</p></section>
-    <label className="field">原因<select value={reason} onChange={event=>setReason(event.target.value)}><option>營運處理</option><option>現場要求</option><option>異常覆核</option><option>其他</option></select></label>
-    <section className="approval-box"><span>Approval Presentation</span><strong>{value.approval}</strong><small>今輪無 Auth / Approval command。</small></section>
-    <section className="command-preview"><span>狀態 Shape</span><div>{['確認','PENDING','RESULT','FAILURE','UNKNOWN'].map(item=><button key={item} className={preview===item?'active':''} onClick={()=>setPreview(item as typeof preview)}>{item}</button>)}</div><p>{commandPreviewCopy(preview)}</p></section>
-    <div className="boundary-box">STATUS = NOT_WIRED｜按「確認」只會顯示 migration feedback；唔會發 command。</div>
-    <div className="sheet-actions"><button onClick={close}>取消</button><button className="primary" onClick={onConfirm}>確認（NOT_WIRED）</button></div>
-  </section></div>;
-}
-
-function commandPreviewCopy(state:'確認'|'PENDING'|'RESULT'|'FAILURE'|'UNKNOWN'){
-  const copy={
-    '確認':'等待使用者確認／reason／approval。',
-    'PENDING':'命令已建立但未有終局的 UI 位置；今輪不會真的建立 operation。',
-    'RESULT':'Canonical readback / result 的 UI 位置。',
-    'FAILURE':'已知失敗的 UI 位置；不可偽裝成功。',
-    'UNKNOWN':'未能證明結果；禁止 blind retry。',
-  };
-  return copy[state];
-}
-
-function Kpi({label,value,compare}:{label:string;value:string;compare:string}){return <article className="kpi"><span>{label}</span><strong>{value}</strong><small>{compare}</small><em>截至 {today.observedAt}</em></article>}
-function Detail({label,value}:{label:string;value:string}){return <article className="detail"><span>{label}</span><strong>{value}</strong></article>}
-function DetailSection({title,children}:{title:string;children:ReactNode}){return <section className="detail-section"><h3>{title}</h3><div>{children}</div></section>}
-function DrawerHead({title,subtitle,close}:{title:string;subtitle:string;close:()=>void}){return <header className="drawer-head"><div><span>{subtitle}</span><h2>{title}</h2></div><button onClick={close}>×</button></header>}
-function NavButton({active,label,glyph,badge,onClick}:{active:boolean;label:string;glyph:string;badge?:string;onClick:()=>void}){return <button className={active?'active':''} onClick={onClick}><span>{glyph}</span><small>{label}</small>{badge?<b>{badge}</b>:null}</button>}
-function cadenceClass(value:'即時'|'摘要'|'收件箱'){return value==='即時'?'immediate':value==='摘要'?'digest':'inbox'}
-function healthClass(value:string){return value==='正常'?'good':value==='降級'?'warn':value==='離線'?'bad':'unknown'}
+function RecoveryBanner({title,detail,onRetry}:{title:string;detail:string;onRetry:()=>void}){return <section className="recovery-banner"><div><strong>{title}</strong><span>{detail}</span></div><button onClick={onRetry}>重新確認</button></section>}
+function Empty({title,detail}:{title:string;detail:string}){return <section className="card empty-state"><h2>{title}</h2><p>{detail}</p></section>}
+function Kpi({label,value,compare}:{label:string;value:string;compare:string}){return <article className="kpi"><span>{label}</span><strong>{value}</strong><small>{compare}</small></article>}
+function Nav({active,label,glyph,badge,onClick}:{active:boolean;label:string;glyph:string;badge?:string;onClick:()=>void}){return <button className={active?'active':''} onClick={onClick}><b>{glyph}</b><span>{label}</span>{badge?<em>{badge}</em>:null}</button>}
+function DrawerHead({title,subtitle,close}:{title:string;subtitle:string;close:()=>void}){return <header className="drawer-head"><div><small>{subtitle}</small><h2>{title}</h2></div><button onClick={close}>✕</button></header>}
+function Detail({label,value}:{label:string;value:string}){return <div><span>{label}</span><strong>{value}</strong></div>}
+function DetailSection({title,children}:{title:string;children:ReactNode}){return <section className="detail-section"><h3>{title}</h3>{children}</section>}
+function Metric({label,value}:{label:string;value:string}){return <div><small>{label}</small><strong>{value}</strong></div>}
+function ListOrEmpty<T>({rows,render,empty}:{rows:readonly T[];render:(item:T,index:number)=>ReactNode;empty:string}){return rows.length?<>{rows.map(render)}</>:<Empty title={empty} detail="未有正式讀回之前唔會顯示假資料。"/>}
