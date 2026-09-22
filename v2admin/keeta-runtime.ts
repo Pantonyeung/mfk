@@ -1,3 +1,4 @@
+import {MFK_KEETA_ORDER_INTENT_SCHEMA,validateMfkKeetaOrderAck} from '../contracts/keeta-order-intake-v1.ts';
 const KEETA_AUTHORIZE_URL='https://merchant.mykeeta.com/m/web/openapi/authorize';
 const KEETA_TOKEN_URL='https://open.mykeeta.com/api/open/base/oauth/token';
 const TOKEN_REFRESH_WINDOW_MS=5*24*60*60*1000;
@@ -41,6 +42,23 @@ function positiveInt(value,code){
   const parsed=Number(value);
   if(!Number.isSafeInteger(parsed)||parsed<=0)throw new Error(code);
   return parsed;
+}
+
+function keetaOrderPlacementIdentity(message){
+  let root;
+  try{root=JSON.parse(nonEmpty(message,'KEETA_ORDER_MESSAGE_REQUIRED'));}
+  catch{throw new Error('KEETA_ORDER_MESSAGE_INVALID_JSON');}
+  const messageRow=record(root,'KEETA_ORDER_MESSAGE_INVALID');
+  const orderInfo=messageRow.orderInfo&&typeof messageRow.orderInfo==='object'&&!Array.isArray(messageRow.orderInfo)
+    ?messageRow.orderInfo
+    :messageRow;
+  const baseOrder=orderInfo.baseOrder&&typeof orderInfo.baseOrder==='object'&&!Array.isArray(orderInfo.baseOrder)
+    ?orderInfo.baseOrder
+    :null;
+  if(!baseOrder)throw new Error('KEETA_ORDER_BASE_ORDER_REQUIRED');
+  const raw=baseOrder.orderViewIdStr??baseOrder.orderViewId;
+  const providerOrderId=nonEmpty(String(raw??''),'KEETA_PROVIDER_ORDER_ID_REQUIRED');
+  return Object.freeze({providerOrderId,rawMessage:JSON.stringify(messageRow)});
 }
 function bytesToHex(bytes){
   return [...bytes].map(value=>value.toString(16).padStart(2,'0')).join('');
@@ -530,6 +548,45 @@ export class KeetaRuntimeStore{
       }
     }
 
+
+    if(url.pathname==='/smt/orders/pending'&&request.method==='GET'){
+      const rows=await this.state.storage.list({prefix:'order:intent:'});
+      const intents=[...rows.values()]
+        .filter(row=>row&&row.state==='PENDING_SMT')
+        .sort((a,b)=>String(a.receivedAt).localeCompare(String(b.receivedAt)))
+        .slice(0,20);
+      return json({schema:'MFK_KEETA_ORDER_PENDING_BATCH_V1',storeId:'MF01',orders:intents});
+    }
+
+    if(url.pathname==='/smt/orders/ack'&&request.method==='POST'){
+      try{
+        const ack=validateMfkKeetaOrderAck(await request.json());
+        const key='order:intent:'+ack.providerOrderId;
+        const current=await this.state.storage.get(key);
+        if(!current)return json({code:'KEETA_ORDER_INTENT_NOT_FOUND'},404);
+        if(current.providerMessageId!==ack.providerMessageId){
+          return json({code:'KEETA_ORDER_ACK_MESSAGE_ID_MISMATCH'},409);
+        }
+        if(current.state==='COMMITTED'){
+          if(current.canonicalOrderId!==ack.canonicalOrderId||current.canonicalDisplay!==ack.canonicalDisplay){
+            return json({code:'KEETA_ORDER_ACK_CANONICAL_CONFLICT'},409);
+          }
+          return json({state:'IDEMPOTENT',order:current});
+        }
+        const committed=Object.freeze({
+          ...current,
+          state:'COMMITTED',
+          canonicalOrderId:ack.canonicalOrderId,
+          canonicalDisplay:ack.canonicalDisplay,
+          committedAt:ack.committedAt,
+        });
+        await this.state.storage.put(key,committed);
+        return json({state:'ACKED',order:committed});
+      }catch(error){
+        return json({code:error instanceof Error?error.message:'KEETA_ORDER_ACK_INVALID'},400);
+      }
+    }
+
     if(url.pathname==='/webhook'&&request.method==='POST'){
       const config=requireRuntimeConfig(this.env);
       let body;
@@ -587,6 +644,26 @@ export class KeetaRuntimeStore{
           fingerprint,
           authorityBoundary:'PROVIDER_EVIDENCE_ONLY_NO_MFK_MUTATION',
         });
+        if(envelope.eventId===1001){
+          const placement=keetaOrderPlacementIdentity(envelope.message);
+          const intentKey='order:intent:'+placement.providerOrderId;
+          const existingIntent=await this.state.storage.get(intentKey);
+          if(!existingIntent){
+            await this.state.storage.put(intentKey,Object.freeze({
+              schema:MFK_KEETA_ORDER_INTENT_SCHEMA,
+              storeId:'MF01',
+              provider:'KEETA',
+              providerShopId:envelope.shopId,
+              providerOrderId:placement.providerOrderId,
+              providerMessageId:envelope.messageId,
+              providerPushedAt:new Date(envelope.timestamp*1000).toISOString(),
+              receivedAt:acceptedAt,
+              fingerprint,
+              rawMessage:placement.rawMessage,
+              state:'PENDING_SMT',
+            }));
+          }
+        }
         await this.state.storage.put('webhook:status',{
           ...status,
           acceptedCount:(Number(status.acceptedCount)||0)+1,
