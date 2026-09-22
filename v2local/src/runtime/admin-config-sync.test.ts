@@ -113,7 +113,7 @@ describe('SMT full Admin config LKG',()=>{
     const applied=applyAdminConfigEnvelope(row);
     expect(applied.disposition).toBe('APPLIED');
     expect(readSmtAdminConfigLkg()?.revision).toBe(2);
-    expect(readSmtAdminConfigLkg()?.snapshot.storeSettings).toEqual({storeCode:'MF01'});
+    expect(readSmtAdminConfigLkg()?.snapshot.storeSettings).toMatchObject({storeCode:'MF01',storeName:'磨飯測試店'});
     expect(readSmtAdminSyncStatus().state).toBe('SYNCED');
   });
 
