@@ -254,4 +254,55 @@ describe('Keeta live edge runtime',()=>{
     }
   });
 
+
+  it('imports a SIT token through admin-only runtime path and stores only encrypted material',async()=>{
+    const key=Buffer.alloc(32,8).toString('base64');
+    const storage=new Map<string,unknown>();
+    const state={storage:{
+      get:async(key:string)=>storage.get(key),
+      put:async(key:string,value:unknown)=>{storage.set(key,value);},
+      delete:async(key:string)=>{storage.delete(key);},
+    }};
+    const env={
+      KEETA_APP_ID:'3419700273',
+      KEETA_APP_SECRET:'test-secret',
+      KEETA_TOKEN_ENCRYPTION_KEY:key,
+      KEETA_PROVIDER_SHOP_ID:'721578302',
+      KEETA_OAUTH_REDIRECT_URI:'https://admin.morefunos.com/api/keeta/oauth/callback',
+    };
+    const {KeetaRuntimeStore}=await import('../keeta-runtime.ts');
+    const runtime=new KeetaRuntimeStore(state as never,env as never);
+    const issuedAtTime=Date.now()-1000;
+    const response=await runtime.fetch(new Request('https://internal/admin/token/import-test',{
+      method:'POST',
+      headers:{'content-type':'application/json'},
+      body:JSON.stringify({
+        accessToken:'test-access-token',
+        tokenType:'bearer',
+        expiresIn:7776000,
+        refreshToken:'test-refresh-token',
+        scope:'all',
+        issuedAtTime,
+      }),
+    }));
+    expect(response.status).toBe(200);
+    const body=await response.json() as {state:string;source:string;expiresAt:string};
+    expect(body.state).toBe('CONNECTED');
+    expect(body.source).toBe('TEST_PROVIDER_PORTAL_IMPORT');
+    expect(body.expiresAt).toBeTruthy();
+
+    const stored=storage.get('oauth:token') as {ciphertext?:string;iv?:string;expiresAtMs?:number}|undefined;
+    expect(stored?.ciphertext).toBeTruthy();
+    expect(stored?.iv).toBeTruthy();
+    const serialized=JSON.stringify([...storage.entries()]);
+    expect(serialized).not.toContain('test-access-token');
+    expect(serialized).not.toContain('test-refresh-token');
+
+    const statusResponse=await runtime.fetch(new Request('https://internal/admin/status',{method:'POST'}));
+    const status=await statusResponse.json() as {oauth:{state:string;tokenSource:string;expiresAt:string}};
+    expect(status.oauth.state).toBe('CONNECTED');
+    expect(status.oauth.tokenSource).toBe('TEST_PROVIDER_PORTAL_IMPORT');
+    expect(status.oauth.expiresAt).toBeTruthy();
+  });
+
 });

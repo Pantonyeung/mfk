@@ -355,6 +355,7 @@ export class KeetaRuntimeStore{
   async status(){
     const readiness=assessKeetaRuntimeReadiness(this.env);
     const tokenRow=await this.state.storage.get('oauth:token');
+    const connection=await this.state.storage.get('connection')||{};
     const callbackStatus=await this.state.storage.get('oauth:callback-status')||{};
     const journal=await this.state.storage.get('webhook:status')||{};
     let tokenState='NOT_CONNECTED';
@@ -378,6 +379,7 @@ export class KeetaRuntimeStore{
         lastCallbackError:callbackStatus.lastCallbackError??null,
         lastCallbackMethod:callbackStatus.lastCallbackMethod??null,
         lastCallbackParamNames:Array.isArray(callbackStatus.lastCallbackParamNames)?callbackStatus.lastCallbackParamNames:[],
+        tokenSource:tokenRow?(connection.tokenSource??'OAUTH_CALLBACK'):null,
       },
       webhook:{
         callbackUrl:'https://admin.morefunos.com/api/keeta/webhook',
@@ -481,6 +483,32 @@ export class KeetaRuntimeStore{
           lastCallbackParamNames:callbackParamNames,
         });
         return json({code:errorCode},401);
+      }
+    }
+
+    if(url.pathname==='/admin/token/import-test'&&request.method==='POST'){
+      try{
+        const config=requireRuntimeConfig(this.env);
+        const body=record(await request.json(),'KEETA_TEST_TOKEN_IMPORT_INVALID');
+        const token=parseTokenMaterial(body);
+        const assessment=tokenAssessment(token);
+        if(assessment.disposition==='EXPIRED')throw new Error('KEETA_TEST_TOKEN_IMPORT_EXPIRED');
+        if(token.issuedAtTime>Date.now()+10*60*1000)throw new Error('KEETA_TEST_TOKEN_IMPORT_ISSUED_AT_INVALID');
+        await this.saveToken(token);
+        const importedAt=new Date().toISOString();
+        await this.state.storage.put('connection',{
+          canonicalStoreId:'MF01',
+          providerShopId:config.providerShopId,
+          authorizedAt:importedAt,
+          tokenSource:'TEST_PROVIDER_PORTAL_IMPORT',
+        });
+        return json({
+          state:'CONNECTED',
+          source:'TEST_PROVIDER_PORTAL_IMPORT',
+          expiresAt:new Date(assessment.expiresAtMs).toISOString(),
+        });
+      }catch(error){
+        return json({code:error instanceof Error?error.message:'KEETA_TEST_TOKEN_IMPORT_FAILED'},409);
       }
     }
 
