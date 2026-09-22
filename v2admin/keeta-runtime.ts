@@ -1,4 +1,5 @@
 import {buildKeetaMenuProjection} from './keeta-menu-projection.ts';
+import {buildKeetaSellabilityProjection,buildKeetaWeeklyHoursProjection,chunkKeetaSpuStatus} from './keeta-store-projection.ts';
 import {MFK_KEETA_ORDER_INTENT_SCHEMA,validateMfkKeetaOrderAck} from '../contracts/keeta-order-intake-v1.ts';
 const KEETA_AUTHORIZE_URL='https://merchant.mykeeta.com/m/web/openapi/authorize';
 const KEETA_TOKEN_URL='https://open.mykeeta.com/api/open/base/oauth/token';
@@ -6,6 +7,12 @@ const KEETA_MENU_SYNC_URL='https://open.mykeeta.com/api/open/product/menu/sync';
 const KEETA_ORDER_CONFIRM_URL='https://open.mykeeta.com/api/open/order/confirm';
 const KEETA_ORDER_READY_URL='https://open.mykeeta.com/api/open/order/prepare';
 const KEETA_ORDER_GET_URL='https://open.mykeeta.com/api/open/order/get';
+const KEETA_SPU_STATUS_URL='https://open.mykeeta.com/api/open/product/spustatus/batchupdatebycode';
+const KEETA_STORE_HOURS_GET_URL='https://open.mykeeta.com/api/open/scm/shop/business/hour/effective/get';
+const KEETA_STORE_HOURS_UPDATE_URL='https://open.mykeeta.com/api/open/scm/shop/business/hour/effective/update';
+const KEETA_STORE_DETAILS_URL='https://open.mykeeta.com/api/open/scm/shop/base/get';
+const KEETA_STORE_REST_URL='https://open.mykeeta.com/api/open/scm/shop/status/rest';
+const KEETA_STORE_OPEN_URL='https://open.mykeeta.com/api/open/scm/shop/status/open';
 const TOKEN_REFRESH_WINDOW_MS=5*24*60*60*1000;
 const TOKEN_REFRESH_MIN_INTERVAL_MS=60_000;
 const OAUTH_STATE_TTL_MS=10*60*1000;
@@ -339,6 +346,53 @@ async function readKeetaProviderOrder(config,token,providerOrderId){
   return Object.freeze({code,message:String(row.message||'Success'),data:row.data??null});
 }
 
+
+async function keetaProviderJson(config,token,url,params){
+  const raw=await sendSignedProviderRequest({
+    url,
+    params:{
+      accessToken:token.accessToken,
+      appId:config.appId,
+      ...params,
+      timestamp:Math.floor(Date.now()/1000),
+    },
+    appSecret:config.appSecret,
+  });
+  let row;
+  try{row=record(JSON.parse(raw),'KEETA_PROVIDER_RESPONSE_INVALID');}
+  catch(error){throw new Error(error instanceof Error?error.message:'KEETA_PROVIDER_RESPONSE_INVALID_JSON');}
+  const code=Number(row.code);
+  if(!Number.isSafeInteger(code))throw new Error('KEETA_PROVIDER_RESPONSE_CODE_INVALID');
+  if(code!==0)throw new Error('KEETA_PROVIDER_'+code+':'+String(row.message||''));
+  return Object.freeze({code,message:String(row.message||'Success'),data:row.data??null,errorList:Array.isArray(row.errorList)?row.errorList:[]});
+}
+
+async function syncKeetaSellability(config,token,snapshot){
+  const projection=buildKeetaSellabilityProjection(snapshot);
+  if(!projection.enabled)throw new Error('KEETA_SELLABILITY_SYNC_DISABLED_BY_PUBLISHED_CONFIG');
+  const results=[];
+  for(const [status,codes] of [[1,projection.available],[0,projection.unavailable]]){
+    for(const batch of chunkKeetaSpuStatus(codes)){
+      if(batch.length===0)continue;
+      const receipt=await keetaProviderJson(config,token,KEETA_SPU_STATUS_URL,{
+        shopId:config.providerShopId,
+        spuOpenItemCodeList:batch,
+        status,
+        needLinkage:0,
+      });
+      results.push(Object.freeze({status,count:batch.length,receipt}));
+    }
+  }
+  return Object.freeze({projection,results:Object.freeze(results)});
+}
+
+async function readKeetaStore(config,token){
+  const [details,hours]=await Promise.all([
+    keetaProviderJson(config,token,KEETA_STORE_DETAILS_URL,{shopId:config.providerShopId}),
+    keetaProviderJson(config,token,KEETA_STORE_HOURS_GET_URL,{shopId:config.providerShopId}),
+  ]);
+  return Object.freeze({observedAt:new Date().toISOString(),details,hours});
+}
 async function exchangeAuthorizationCode(config,code){
   const raw=await sendSignedProviderRequest({
     url:KEETA_TOKEN_URL,
