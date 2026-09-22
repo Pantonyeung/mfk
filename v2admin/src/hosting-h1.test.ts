@@ -4,7 +4,7 @@ import {describe,expect,it} from 'vitest';
 describe('MFK Admin Cloudflare H2 + config sync runtime',()=>{
   const source=readFileSync(new URL('../wrangler.jsonc',import.meta.url),'utf8');
 
-  it('targets mfk-admin, serves SPA assets, and exposes only the dedicated Admin sync Durable Object',()=>{
+  it('targets mfk-admin, serves SPA assets, and exposes dedicated Admin + Keeta runtime Durable Objects',()=>{
     expect(source).toContain('"name": "mfk-admin"');
     expect(source).toContain('"main": "./worker.ts"');
     expect(source).toContain('"directory": "./dist"');
@@ -13,6 +13,9 @@ describe('MFK Admin Cloudflare H2 + config sync runtime',()=>{
     expect(source).toContain('"durable_objects"');
     expect(source).toContain('"name": "ADMIN_SYNC"');
     expect(source).toContain('"class_name": "AdminSyncStore"');
+    expect(source).toContain('"name": "KEETA_RUNTIME"');
+    expect(source).toContain('"class_name": "KeetaRuntimeStore"');
+    expect(source).toContain('"tag": "keeta-runtime-v1"');
   });
 
   it('allows SMT appassets to fetch/ACK config while Publish remains Admin-origin-only',()=>{
@@ -35,6 +38,21 @@ describe('MFK Admin Cloudflare H2 + config sync runtime',()=>{
       "authorizeAdminRead",
     ])expect(worker).toContain(marker);
     expect(worker).toContain("acks[event.deviceId]");
+  });
+
+  it('routes Keeta live edge through the dedicated runtime and keeps Admin controls authenticated',()=>{
+    const worker=readFileSync(new URL('../worker.ts',import.meta.url),'utf8');
+    const keeta=readFileSync(new URL('../keeta-runtime.ts',import.meta.url),'utf8');
+    for(const marker of [
+      "/api/keeta/admin/",
+      "/api/keeta/webhook",
+      "/api/keeta/oauth/callback",
+      "KEETA_RUNTIME",
+      "/authorize-admin",
+    ])expect(worker).toContain(marker);
+    expect(keeta).toContain("KEETA_LIVE_WEBHOOK_SIGNING_SEMANTICS_MISMATCH");
+    expect(keeta).toContain("automaticOrderMutation:false");
+    expect(keeta).toContain("providerCommandActivation:false");
   });
 
   it('does not inherit legacy/provider/transaction runtime bindings or background triggers',()=>{
