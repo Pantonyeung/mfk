@@ -589,13 +589,39 @@ export function PricingWorkspace(){
 }
 
 export function CombosWorkspace(){
-  const {draft,addCombo,updateCombo,removeCombo,addComboSection,updateComboSection,removeComboSection}=useAdminDraft();
+  const {
+    draft,addCombo,updateCombo,removeCombo,
+    addComboSection,updateComboSection,removeComboSection,moveComboSection,
+    addComboBand,updateComboBand,removeComboBand,moveComboBand,
+    addComboChoice,updateComboChoice,removeComboChoice,moveComboChoice,
+  }=useAdminDraft();
+  const optionCenter=useOptionSetCenter(draft);
+  const productById=useMemo(()=>new Map(draft.products.map(product=>[product.id,product])),[draft.products]);
+
   return <section className="admin-editor-page">
-    <WorkspaceHeader title="套餐" description="套餐保留自己身份同 child 關係。每個區段可以指定必選／可選、數量規則、可選商品同差價。" onAdd={addCombo} addLabel="新增套餐"/>
+    <WorkspaceHeader
+      title="套餐"
+      description="套餐係可編輯模板：先定步驟，再定價格帶，再引用正式商品。Combo 唔複製商品；商品本身嘅選項組會原樣繼承。"
+      onAdd={addCombo}
+      addLabel="新增套餐"
+      optionCenterState={optionCenter.state}
+      optionDirty={optionCenter.dirty}
+      onOptionSaved={optionCenter.markClean}
+    />
+
+    <div className="admin-callout compact">目前已按你提供嘅「自選紫米套餐」海報建立第一個可編輯模板：飯糰 → 小食 → 飲品。海報只係初始資料，之後全部都可以改。</div>
+
     {draft.combos.length===0
-      ?<EmptyState title="未有套餐" description="建立套餐後加入區段，例如飯糰、小食、飲品，再指定可選商品。" action="新增套餐" onAction={addCombo}/>
-      :<div className="admin-editor-grid">{draft.combos.map(combo=><article className="admin-card-editor" key={combo.id}>
-        <header><div><small>{combo.id}</small><b>{combo.name||'未命名套餐'}</b></div><div className="admin-editor-actions"><Toggle checked={combo.active} onChange={active=>updateCombo(combo.id,{active})} label={combo.active?'啟用':'停用'}/><button type="button" onClick={()=>removeCombo(combo.id)}>刪除套餐</button></div></header>
+      ?<EmptyState title="未有套餐" description="建立套餐後加入步驟，例如飯糰、小食、飲品，再為每步建立價格帶同商品選擇。" action="新增套餐" onAction={addCombo}/>
+      :<div className="admin-combo-list">{draft.combos.map(combo=><article className="admin-combo-card" key={combo.id}>
+        <header className="admin-combo-head">
+          <div><small>{combo.id}</small><h2>{combo.name||'未命名套餐'}</h2><span>{combo.sections.length} 個步驟 · 基本價 HK$${Number(combo.basePrice||0).toFixed(2)}</span></div>
+          <div className="admin-editor-actions">
+            <Toggle checked={combo.active} onChange={active=>updateCombo(combo.id,{active})} label={combo.active?'啟用':'停用'}/>
+            <button type="button" onClick={()=>removeCombo(combo.id)}>刪除套餐</button>
+          </div>
+        </header>
+
         <div className="admin-form-grid three">
           <label><span>套餐名稱</span><input value={combo.name} onChange={event=>updateCombo(combo.id,{name:event.target.value})}/></label>
           <label><span>對應主商品（選填）</span><select value={combo.productId??''} onChange={event=>updateCombo(combo.id,{productId:event.target.value||undefined})}><option value="">未指定</option>{draft.products.map(product=><option key={product.id} value={product.id}>{product.name}</option>)}</select></label>
@@ -603,22 +629,69 @@ export function CombosWorkspace(){
           <Toggle checked={Boolean(combo.takeawaySurchargeEnabled)} onChange={takeawaySurchargeEnabled=>updateCombo(combo.id,{takeawaySurchargeEnabled})} label={combo.takeawaySurchargeEnabled?'整個套餐外賣 +$1':'套餐外賣 +$1 關'}/>
           <label><span>其他外賣調整 HK$</span><input inputMode="decimal" value={combo.takeawayAdjustment} onChange={event=>updateCombo(combo.id,{takeawayAdjustment:event.target.value})}/></label>
         </div>
-        <section className="admin-sub-editor">
-          <header><b>套餐區段</b><button type="button" onClick={()=>addComboSection(combo.id)}>＋ 新增區段</button></header>
-          {combo.sections.length===0?<p>未有區段。</p>:combo.sections.map(section=><article className="admin-card-editor" key={section.id}>
-            <header><b>{section.name||section.id}</b><button type="button" onClick={()=>removeComboSection(combo.id,section.id)}>刪除區段</button></header>
-            <div className="admin-form-grid three">
-              <label><span>區段名稱</span><input value={section.name} onChange={event=>updateComboSection(combo.id,section.id,{name:event.target.value})}/></label>
+
+        <section className="admin-sub-editor admin-combo-steps">
+          <header><b>套餐步驟</b><button type="button" onClick={()=>addComboSection(combo.id)}>＋ 新增步驟</button></header>
+          {combo.sections.length===0?<p>未有步驟。</p>:combo.sections.map((section,sectionIndex)=><article className="admin-combo-step" key={section.id}>
+            <header>
+              <div className="admin-combo-step-title">
+                <span className="admin-combo-step-number">{String(sectionIndex+1).padStart(2,'0')}</span>
+                <div><b>{section.name||section.id}</b><small>{section.choices.length} 個商品 · {section.bands.length} 個價格帶</small></div>
+              </div>
+              <div className="admin-editor-actions">
+                <button type="button" disabled={sectionIndex===0} onClick={()=>moveComboSection(combo.id,section.id,-1)}>↑</button>
+                <button type="button" disabled={sectionIndex===combo.sections.length-1} onClick={()=>moveComboSection(combo.id,section.id,1)}>↓</button>
+                <button type="button" onClick={()=>removeComboSection(combo.id,section.id)}>刪除步驟</button>
+              </div>
+            </header>
+
+            <div className="admin-form-grid four">
+              <label><span>步驟名稱</span><input value={section.name} onChange={event=>updateComboSection(combo.id,section.id,{name:event.target.value})}/></label>
               <label><span>最少選擇</span><input type="number" min={0} value={section.min} onChange={event=>updateComboSection(combo.id,section.id,{min:Number(event.target.value)||0})}/></label>
               <label><span>最多選擇</span><input type="number" min={0} value={section.max} onChange={event=>updateComboSection(combo.id,section.id,{max:Number(event.target.value)||0})}/></label>
               <Toggle checked={section.required} onChange={required=>updateComboSection(combo.id,section.id,{required,min:required?Math.max(1,section.min):0})} label={section.required?'必選':'可選'}/>
-              <label><span>區段差價 HK$</span><input inputMode="decimal" value={section.priceAdjustment??'0.00'} onChange={event=>updateComboSection(combo.id,section.id,{priceAdjustment:event.target.value})}/></label>
             </div>
-            <div className="admin-check-grid">{draft.products.filter(product=>product.active).map(product=><label key={product.id}><input type="checkbox" checked={(section.childProductIds??[]).includes(product.id)} onChange={event=>{
-              const current=section.childProductIds??[];
-              const next=event.target.checked?[...current,product.id]:current.filter(id=>id!==product.id);
-              updateComboSection(combo.id,section.id,{childProductIds:next});
-            }}/><span>{product.name}</span></label>)}</div>
+
+            <section className="admin-combo-band-editor">
+              <header><div><b>價格帶</b><small>例如 Set A / +$3 / +$5；差價係相對套餐基本價。</small></div><button type="button" onClick={()=>addComboBand(combo.id,section.id)}>＋ 新增價格帶</button></header>
+              {section.bands.length===0?<div className="admin-read-empty">未有價格帶；先建立至少一個價格帶先可以加入商品。</div>:<div className="admin-combo-band-list">
+                {section.bands.map((band,bandIndex)=><article key={band.id}>
+                  <div className="admin-option-order-buttons">
+                    <button type="button" disabled={bandIndex===0} onClick={()=>moveComboBand(combo.id,section.id,band.id,-1)}>↑</button>
+                    <button type="button" disabled={bandIndex===section.bands.length-1} onClick={()=>moveComboBand(combo.id,section.id,band.id,1)}>↓</button>
+                  </div>
+                  <input value={band.name} onChange={event=>updateComboBand(combo.id,section.id,band.id,{name:event.target.value})} aria-label="價格帶名稱"/>
+                  <label><span>差價 HK$</span><input inputMode="decimal" value={band.priceAdjustment} onChange={event=>updateComboBand(combo.id,section.id,band.id,{priceAdjustment:event.target.value})}/></label>
+                  <Toggle checked={band.active} onChange={active=>updateComboBand(combo.id,section.id,band.id,{active})} label={band.active?'啟用':'停用'}/>
+                  <button type="button" disabled={section.choices.some(choice=>choice.bandId===band.id)} title={section.choices.some(choice=>choice.bandId===band.id)?'先移走呢個價格帶入面嘅商品':''} onClick={()=>removeComboBand(combo.id,section.id,band.id)}>刪除</button>
+                </article>)}
+              </div>}
+            </section>
+
+            <section className="admin-combo-choice-editor">
+              <header><div><b>可選商品</b><small>引用正式 Product；商品本身選項組唔會被複製。</small></div><button type="button" disabled={section.bands.length===0} onClick={()=>addComboChoice(combo.id,section.id)}>＋ 新增商品</button></header>
+              {section.choices.length===0?<div className="admin-read-empty">未有商品選擇。</div>:<div className="admin-combo-choice-list">
+                {section.choices.map((choice,choiceIndex)=>{
+                  const product=productById.get(choice.productId);
+                  const inherited=projectOptionSetsForProduct(optionCenter.state,choice.productId);
+                  return <article key={choice.id}>
+                    <div className="admin-option-order-buttons">
+                      <button type="button" disabled={choiceIndex===0} onClick={()=>moveComboChoice(combo.id,section.id,choice.id,-1)}>↑</button>
+                      <button type="button" disabled={choiceIndex===section.choices.length-1} onClick={()=>moveComboChoice(combo.id,section.id,choice.id,1)}>↓</button>
+                    </div>
+                    <label><span>商品</span><select value={choice.productId} onChange={event=>updateComboChoice(combo.id,section.id,choice.id,{productId:event.target.value})}>{draft.products.filter(row=>row.active||row.id===choice.productId).map(row=><option key={row.id} value={row.id}>{row.name} · {row.productCode??row.id}</option>)}</select></label>
+                    <label><span>價格帶</span><select value={choice.bandId} onChange={event=>updateComboChoice(combo.id,section.id,choice.id,{bandId:event.target.value})}>{section.bands.map(band=><option key={band.id} value={band.id}>{band.name} · {Number(band.priceAdjustment)>=0?'+':''}{Number(band.priceAdjustment).toFixed(2)}</option>)}</select></label>
+                    <label><span>商品額外差價 HK$</span><input inputMode="decimal" value={choice.priceAdjustment} onChange={event=>updateComboChoice(combo.id,section.id,choice.id,{priceAdjustment:event.target.value})}/></label>
+                    <div className="admin-combo-choice-inherit">
+                      <b>{product?.name??choice.productId}</b>
+                      <small>{inherited.length?('繼承 '+inherited.length+' 個商品選項組：'+inherited.map(set=>set.name).join('、')):'此商品目前冇已加入選項組'}</small>
+                    </div>
+                    <Toggle checked={choice.active} onChange={active=>updateComboChoice(combo.id,section.id,choice.id,{active})} label={choice.active?'啟用':'停用'}/>
+                    <button type="button" onClick={()=>removeComboChoice(combo.id,section.id,choice.id)}>刪除</button>
+                  </article>;
+                })}
+              </div>}
+            </section>
           </article>)}
         </section>
       </article>)}</div>}
