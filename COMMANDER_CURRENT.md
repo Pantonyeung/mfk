@@ -3,216 +3,138 @@
 Status: CURRENT / CONTROLLING
 Protocol: #39
 Control: #22
-Updated: 2026-09-22 11:24 Asia/Hong_Kong
+Updated: 2026-09-22 11:42 Asia/Hong_Kong
 System: MFK ONLY
 
-> Every Commander MUST fresh-read this file before acting.
-> Every Commander MUST update this file again before returning work / ending the conversation / hitting context limits.
-
 ## 0. Mandatory read order
+1. COMMANDER_CURRENT.md
+2. #22 latest control
+3. docs/navigation/MFK_航海圖_V1.16_Round017_2026-09-22.txt
+4. HANDOFF_CURRENT.md
+5. active issue(s)
 
-1. `COMMANDER_CURRENT.md`
-2. Pantonyeung/mfk #22 latest controlling comment
-3. Current navigation listed below
-4. `HANDOFF_CURRENT.md`
-5. Active issue(s)
+## 1. Owner priority
 
-## 1. Current navigation
+SMT OTA physical acceptance:
+HOLD
 
-`docs/navigation/MFK_航海圖_V1.15_Round016_2026-09-22.txt`
+Admin connection:
+ACTIVE
 
-## 2. Owner priority override
+## 2. Admin operator Chinese UI
 
-Owner explicitly moved the active priority:
+Owner hard requirement:
+Admin is an operator product, not an engineering console.
 
-`SMT OTA PHYSICAL ACCEPTANCE = HOLD`
+Operator-visible UI must:
+- use Traditional Chinese first
+- hide engineering/protocol/internal architecture wording
+- use human operational wording
+- keep internal IDs/contracts/status enums inside code/tests/evidence unless explicitly needed for support
 
-`ADMIN CONNECTION = RESUME NOW`
+Issue:
+#41
 
-SMT OTA #40 remains open and preserved at:
+Implementation branch:
+work/MFK/ADMIN-OPERATOR-CHINESE-UX-R1
 
-`MFK_SMT_OTA_814_BASELINE_PERSISTENCE_CANDIDATE_PUBLISHED`
-
-Published candidate already ready:
-`runtime-candidate-mfk-d133043dfe7d`
-
-No further SMT OTA work until Owner resumes it.
-
-## 3. Admin current live reality
-
-Canonical Admin:
-`https://admin.morefunos.com`
-
-Owner confirms the Admin app is reachable.
-
-Hosting/domain:
-- H2 #37 = GREEN / BANKED
-- H3 #38 = GREEN / BANKED
-
-Only live Admin deploy run:
-`35677844235`
+Source verification:
+run 35683885708
 SUCCESS
 
-Deploy source:
-`d30e8dcc789806a42ea93c3670beb60270a1ee28`
+Clean landing main:
+4f332baa67900d33f72cd43a0dc457177c3cca80
 
-Important source proof:
-- A2 clean landing `4609142b9e13cd825af795bf4b90e722a26a7026`
-- deploy source `d30e8d...` is 16 commits ahead of A2 landing
-- deployed `GovernanceWorkspaces.tsx` contains the full A2 Publish Center UI
-- compare `d30e8d...` → current main shows ZERO `v2admin/**` product diffs
+Live deploy:
+run 35684038608
+SUCCESS
 
-Interpretation:
-`LIVE ADMIN UI IS NOT STALE RELATIVE TO CURRENT v2admin SOURCE`
+Deploy job proof:
+- npm test SUCCESS
+- npm run build SUCCESS
+- Deploy mfk-admin SUCCESS
 
-## 3A. Owner screenshot evidence｜Admin product page
+Milestone:
+MFK_ADMIN_OPERATOR_CHINESE_UI_DEPLOYED_GREEN
 
-Owner screenshot confirms live:
-- `admin.morefunos.com`
-- MFK Admin shell
-- 菜單 → 商品資料
-- `OWNER → ADMIN → SMT`
-- `MFK Admin 控制面`
-- `Domain adapters 尚未接駁`
-- `SESSION DRAFT · NOT_WIRED`
-- Product-page `Publish 未接駁` disabled as designed
+Owner browser refresh / visual readback:
+PENDING
 
-This is NOT the A2 Publish Center.
-It confirms the live Admin product/catalog page only.
+## 3. What changed in operator UI
 
-Exact next remains:
-`https://admin.morefunos.com/admin/publish`
+Removed/replaced operator-visible engineering wording including:
+- NOT_WIRED / MIGRATION_ONLY
+- SESSION DRAFT
+- ADMIN CONNECTION A2 / HUMAN CONTROLLED
+- SOURCE_INTENT / TARGET_OBSERVED
+- Transport Bundle / Readback Receipt
+- OWNER → ADMIN → SMT
+- Domain adapters
+- Validate / Impact Preview / Expected SMT Base
+- Human Compare / Governance Boundary
+- multiple raw internal status/read-model labels
 
-Expected header:
-`ADMIN CONNECTION A2 · HUMAN CONTROLLED`
+Published flow now uses operator wording such as:
+- 待發布變更
+- 檢查內容
+- 確認影響範圍
+- 門店目前版本
+- 建立並下載發布檔案
+- 匯入門店回傳檔案
+- 核對結果
 
-Do not create a final A2 bundle before reading exact SMT Active Revision.
+UI guard tests were added to prevent engineering protocol copy from leaking back onto key operator routes.
 
-## 4. Admin connection progress
+## 4. Admin connection state
 
-A1:
-`#34 BANKED`
+A1 #34:
+BANKED / GREEN
 
-State:
-`MFK_ADMIN_MENU_INDEX_A1_SEMANTIC_LINK_GREEN`
+A2 #35:
+IMPLEMENTATION GREEN / BANKED
 
-Proven:
-Admin Menu Index Revision
-→ SMT Local Menu LKG contract
+Owner real cross-device acceptance:
+PENDING
 
-A2:
-`#35 IMPLEMENTATION BANKED`
+Important newly confirmed FIRST BREAK before safe A2 publish:
+ADMIN_A2_SOURCE_BASELINE_NOT_HYDRATED
 
-State:
-`MFK_ADMIN_A2_CONTROLLED_TRANSFER_IMPLEMENTATION_GREEN`
+Evidence:
+live Admin session draft currently starts with 0 Categories / 0 Products.
+A2 builds a full Menu Index revision from Admin draft.
+Therefore a new Admin draft cannot safely publish over an existing SMT Menu baseline until the current SMT menu baseline is hydrated/imported into Admin or an equivalent safe baseline-loading seam exists.
 
-Implemented:
-Admin Publish Bundle
-→ human-controlled file transfer
-→ SMT Local LKG apply
-→ SMT Readback Receipt
-→ Admin compare
+Do NOT ask Owner to create a final A2 bundle from an empty Admin draft.
 
-Source / build:
-- source `b291c895cf9ccedfc06690235fe5597bf4e2c7fa`
-- source run `35670165934` SUCCESS
-- landing `4609142b9e13cd825af795bf4b90e722a26a7026`
-- landing run `35670256629` SUCCESS
+## 5. Exact NEXT
 
-## 5. FIRST BREAK / missing work
+1. Owner refreshes admin.morefunos.com and visually confirms operator Chinese wording is live.
+2. If Chinese UI readback is GREEN, bank #41.
+3. Then solve ONE exact Admin A2 baseline-hydration seam:
+   SMT current Active Menu baseline
+   → safe Admin source draft hydration/readback
+   → no product loss
+4. Only after source baseline is present, resume one tiny A2 cross-device change.
 
-The missing work is NOT a missing A2 implementation.
+## 6. A3
 
-The exact incomplete item is:
+NOT AUTHORIZED.
 
-`A2 OWNER REAL CROSS-DEVICE WALKTHROUGH = PENDING`
+No automatic Admin→SMT HTTP/polling/cloud transport yet.
 
-Five required proofs still not physically banked:
-1. SOURCE_INTENT
-2. TRANSPORT_IDENTITY
-3. TARGET_OBSERVED
-4. COMPARE_RESULT
-5. HUMAN_VISIBLE_READBACK
+## 7. SMT OTA
 
-Until exact target readback returns MATCH:
+#40 remains HOLD.
 
-`A2 OWNER ACCEPTED = NO`
+Ready candidate remains:
+runtime-candidate-mfk-d133043dfe7d
 
-## 6. Non-blocking admin debt discovered
+Do not advance until Owner resumes.
 
-These are real stale metadata/doc debt but NOT the current first break:
-
-1. `v2admin/BUILD_ID` still says legacy target `morefun-v2-admin`.
-2. `v2admin/README.md` still contains superseded H1 wording before the H2 section.
-
-Actual deployment authority is correct:
-`v2admin/wrangler.jsonc → name = mfk-admin`
-
-Do not fix these before A2 acceptance unless they block evidence.
-
-## 7. Exact NEXT
-
-Resume A2 acceptance from the live Admin app.
-
-Admin first:
-1. open `/admin/publish`
-2. confirm header = `ADMIN CONNECTION A2 · HUMAN CONTROLLED`
-3. confirm the page exposes:
-   - Validate
-   - Impact Preview
-   - Expected SMT Base Revision
-   - Build / Download A2 Publish Bundle
-   - Import SMT Readback Receipt
-   - Human Compare Result
-
-Do NOT create a final bundle until the exact SMT Active Revision is observed.
-
-Then read-only target check:
-SMT → More → Admin · Menu
-
-Record:
-`ACTIVE REVISION = ?`
-
-Only after that exact base is known:
-- make ONE tiny Product-name change
-- Validate
-- Confirm A2 Impact
-- build ONE bundle
-- apply SAME bundle on SMT
-- download SAME readback receipt
-- import receipt to Admin
-- require `MATCH`
-
-If any step fails:
-STOP at first break.
-
-## 8. A3 remains closed
-
-Automatic network transport:
-
-`NOT AUTHORIZED`
-
-No:
-- HTTP
-- polling
-- D1/KV/DO
-- background worker
-- new protocol
-
-Future A3 must reuse the exact A2 bundle/readback contract.
-
-## 9. DO NOT
-
-- NO SMT OTA acceptance while Owner HOLD is active
-- NO A3 automatic Admin→SMT transport
-- NO Pricing/Modifier/Combo connection yet
-- NO Keeta live wiring
-- NO SMM/Customer/Owner live seams
-- NO unrelated Admin cleanup before A2 first break
-
-## 10. Current milestone
-
-`MFK_ADMIN_A2_LIVE_UI_DEPLOYED_OWNER_CROSS_DEVICE_PENDING`
-
-Exact NEXT:
-`ADMIN /admin/publish READ-ONLY CONFIRM → SMT ACTIVE REVISION READ-ONLY CONFIRM`
+## 8. DO NOT
+- no A2 publish from empty Admin draft
+- no A3
+- no SMT OTA acceptance while HOLD
+- no Pricing/Modifier/Combo live connection yet
+- no Keeta live
+- no SMM/Customer/Owner live seams
