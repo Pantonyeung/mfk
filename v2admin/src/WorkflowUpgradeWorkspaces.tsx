@@ -106,20 +106,23 @@ export function AccessSessionWorkspace(){
   </section>;
 }
 
-function FixedReport({title,metrics}:{title:string;metrics:readonly string[]}){
+interface FixedMetricSnapshot{metricVersion:string;completeness:'COMPLETE'|'PARTIAL'|'UNAVAILABLE';freshness:'FRESH'|'STALE'|'UNKNOWN';updatedAt?:string;metrics:Record<string,number|string>}
+function FixedReport({title,metrics,storeKey}:{title:string;metrics:readonly string[];storeKey:string}){
   const [from,setFrom]=useState('');
   const [to,setTo]=useState('');
+  const [rows]=usePersistentAdminState<FixedMetricSnapshot[]>(storeKey,[]);
+  const latest=rows[0];
   return <section className="admin-editor-page">
-    <UpgradeHeader title={title} description="固定可信報表只讀取正式資料，後台唔會自行重算交易結果。"/>
-    <div className="admin-filterbar"><label><span>由</span><input type="date" value={from} onChange={e=>setFrom(e.target.value)}/></label><label><span>至</span><input type="date" value={to} onChange={e=>setTo(e.target.value)}/></label><button disabled>讀取未接駁</button></div>
-    <div className="admin-kpi-grid">{metrics.map(metric=><article key={metric}><span>{metric}</span><strong>—</strong><small>尚未啟用</small></article>)}</div>
-    <section className="admin-rule-card"><h2>資料狀態</h2><p>資料版本：—　完整度：未提供　更新狀態：未確認</p><StateChip>只供查看</StateChip></section>
+    <UpgradeHeader title={title} description="固定可信報表；Admin 只讀正式 projection，唔自行重算 transaction truth。" kicker="固定可信報表"/>
+    <div className="admin-filterbar"><label><span>由</span><input type="date" value={from} onChange={event=>setFrom(event.target.value)}/></label><label><span>至</span><input type="date" value={to} onChange={event=>setTo(event.target.value)}/></label></div>
+    <div className="admin-kpi-grid">{metrics.map(metric=><article key={metric}><span>{metric}</span><strong>{latest?.metrics[metric]??'—'}</strong><small>{latest?latest.freshness:'未有資料'}</small></article>)}</div>
+    <section className="admin-rule-card"><h2>資料狀態</h2><p>版本：{latest?.metricVersion??'—'}　完整度：{latest?.completeness??'UNAVAILABLE'}　更新狀態：{latest?.freshness??'UNKNOWN'}　最後更新：{latest?.updatedAt?new Date(latest.updatedAt).toLocaleString('zh-HK'):'—'}</p></section>
   </section>;
 }
 
-export const ProductReportWorkspace=()=> <FixedReport title="商品報表" metrics={['Units','Sales','銷售佔比 %','最高銷量商品']}/>;
-export const ChannelReportWorkspace=()=> <FixedReport title="渠道報表" metrics={['Orders','Gross','平台資料','Exceptions']}/>;
-export const RefundReportWorkspace=()=> <FixedReport title="退款報表" metrics={['申請','已批准','已拒絕','未確認']}/>;
+export const ProductReportWorkspace=()=> <FixedReport title="商品報表" metrics={['銷售件數','銷售額','銷售佔比 %','最高銷量商品']} storeKey="report-products.v1"/>;
+export const ChannelReportWorkspace=()=> <FixedReport title="渠道報表" metrics={['訂單','總額','平台資料','異常']} storeKey="report-channels.v1"/>;
+export const RefundReportWorkspace=()=> <FixedReport title="退款報表" metrics={['申請','已批准','已拒絕','未確認']} storeKey="report-refunds.v1"/>;
 
 export function ExportGovernanceWorkspace(){
   const [scope,setScope]=useState('REPORT_CURRENT_FILTER');
