@@ -5,7 +5,7 @@
     "label": "獨立 Customer Shell",
     "surface": "全局",
     "kind": "READ_SHAPE",
-    "status": "MIGRATED_SHAPE",
+    "status": "PRODUCT_READY_NOT_CONNECTED",
     "owner": "MFK Customer Surface"
   },
   {
@@ -14,16 +14,16 @@
     "label": "門店 Context Presentation",
     "surface": "首頁",
     "kind": "READ_SHAPE",
-    "status": "MIGRATED_SHAPE",
+    "status": "PRODUCT_READY_NOT_CONNECTED",
     "owner": "Future Store projection"
   },
   {
     "id": "MIGRATION_BOUNDARY",
     "group": "SHELL",
-    "label": "MIGRATION_ONLY / NOT_WIRED 邊界",
+    "label": "Customer 連接邊界",
     "surface": "全局",
     "kind": "READ_SHAPE",
-    "status": "MIGRATED_SHAPE",
+    "status": "PRODUCT_READY_NOT_CONNECTED",
     "owner": "MFK Customer Surface"
   },
   {
@@ -32,7 +32,7 @@
     "label": "連線狀態 Presentation",
     "surface": "全局",
     "kind": "READ_SHAPE",
-    "status": "MIGRATED_SHAPE",
+    "status": "PRODUCT_READY_NOT_CONNECTED",
     "owner": "Future runtime health projection"
   },
   {
@@ -41,7 +41,7 @@
     "label": "自家渠道可用狀態",
     "surface": "首頁",
     "kind": "READ_SHAPE",
-    "status": "MIGRATED_SHAPE",
+    "status": "PRODUCT_READY_NOT_CONNECTED",
     "owner": "Future channel projection"
   },
   {
@@ -50,7 +50,7 @@
     "label": "首頁",
     "surface": "首頁",
     "kind": "READ_SHAPE",
-    "status": "MIGRATED_SHAPE",
+    "status": "PRODUCT_READY_NOT_CONNECTED",
     "owner": "MFK Customer Surface"
   },
   {
@@ -59,7 +59,7 @@
     "label": "Category Browse",
     "surface": "菜單",
     "kind": "READ_SHAPE",
-    "status": "MIGRATED_SHAPE",
+    "status": "PRODUCT_READY_NOT_CONNECTED",
     "owner": "Future Menu projection"
   },
   {
@@ -68,7 +68,7 @@
     "label": "Menu Browse",
     "surface": "菜單",
     "kind": "READ_SHAPE",
-    "status": "MIGRATED_SHAPE",
+    "status": "PRODUCT_READY_NOT_CONNECTED",
     "owner": "Future Menu projection"
   },
   {
@@ -77,7 +77,7 @@
     "label": "Product Detail",
     "surface": "商品詳情",
     "kind": "READ_SHAPE",
-    "status": "MIGRATED_SHAPE",
+    "status": "PRODUCT_READY_NOT_CONNECTED",
     "owner": "Future Menu projection"
   },
   {
@@ -86,7 +86,7 @@
     "label": "Product Config",
     "surface": "商品設定",
     "kind": "READ_SHAPE",
-    "status": "MIGRATED_SHAPE",
+    "status": "PRODUCT_READY_NOT_CONNECTED",
     "owner": "Future Product rules projection"
   },
   {
@@ -95,7 +95,7 @@
     "label": "Modifier Selection Shape",
     "surface": "商品設定",
     "kind": "READ_SHAPE",
-    "status": "MIGRATED_SHAPE",
+    "status": "PRODUCT_READY_NOT_CONNECTED",
     "owner": "Future Product rules projection"
   },
   {
@@ -104,7 +104,7 @@
     "label": "Option Selection Shape",
     "surface": "商品設定",
     "kind": "READ_SHAPE",
-    "status": "MIGRATED_SHAPE",
+    "status": "PRODUCT_READY_NOT_CONNECTED",
     "owner": "Future Product rules projection"
   },
   {
@@ -113,7 +113,7 @@
     "label": "Combo Selection Shape",
     "surface": "商品設定",
     "kind": "READ_SHAPE",
-    "status": "MIGRATED_SHAPE",
+    "status": "PRODUCT_READY_NOT_CONNECTED",
     "owner": "Future Combo rules projection"
   },
   {
@@ -122,7 +122,7 @@
     "label": "售罄 / 不可選 Presentation",
     "surface": "菜單",
     "kind": "READ_SHAPE",
-    "status": "MIGRATED_SHAPE",
+    "status": "PRODUCT_READY_NOT_CONNECTED",
     "owner": "Future Sellability projection"
   },
   {
@@ -131,8 +131,8 @@
     "label": "Cart",
     "surface": "購物籃",
     "kind": "READ_SHAPE",
-    "status": "MIGRATED_SHAPE",
-    "owner": "Session-only migration state"
+    "status": "PRODUCT_READY_NOT_CONNECTED",
+    "owner": "MFK Customer local non-authoritative workspace"
   },
   {
     "id": "CART_EDIT_SHAPE",
@@ -140,8 +140,8 @@
     "label": "Cart Edit Shape",
     "surface": "購物籃",
     "kind": "READ_SHAPE",
-    "status": "MIGRATED_SHAPE",
-    "owner": "Session-only migration state"
+    "status": "PRODUCT_READY_NOT_CONNECTED",
+    "owner": "MFK Customer local non-authoritative workspace"
   },
   {
     "id": "CHECKOUT_FORM",
@@ -149,7 +149,7 @@
     "label": "Checkout Form Shape",
     "surface": "結帳",
     "kind": "READ_SHAPE",
-    "status": "MIGRATED_SHAPE",
+    "status": "PRODUCT_READY_NOT_CONNECTED",
     "owner": "MFK Customer Surface"
   },
   {
@@ -158,8 +158,8 @@
     "label": "Phone Input",
     "surface": "結帳",
     "kind": "READ_SHAPE",
-    "status": "MIGRATED_SHAPE",
-    "owner": "Session-only migration state"
+    "status": "PRODUCT_READY_NOT_CONNECTED",
+    "owner": "MFK Customer local non-authoritative workspace"
   },
   {
     "id": "PICKUP_CODE_PRESENTATION",
@@ -167,7 +167,7 @@
     "label": "Pickup Code Presentation Shape",
     "surface": "結帳 / 訂單",
     "kind": "READ_SHAPE",
-    "status": "MIGRATED_SHAPE",
+    "status": "PRODUCT_READY_NOT_CONNECTED",
     "owner": "Future canonical order projection"
   },
   {
@@ -176,7 +176,7 @@
     "label": "Current Quote Presentation",
     "surface": "購物籃 / 結帳",
     "kind": "READ_SHAPE",
-    "status": "MIGRATED_SHAPE",
+    "status": "PRODUCT_READY_NOT_CONNECTED",
     "owner": "Future Pricing readback"
   },
   {
@@ -185,7 +185,7 @@
     "label": "Safe Submit Presentation",
     "surface": "結帳",
     "kind": "READ_SHAPE",
-    "status": "MIGRATED_SHAPE",
+    "status": "PRODUCT_READY_NOT_CONNECTED",
     "owner": "MFK Customer Surface"
   },
   {
@@ -203,7 +203,7 @@
     "label": "Pending Intent Presentation",
     "surface": "結帳",
     "kind": "READ_SHAPE",
-    "status": "MIGRATED_SHAPE",
+    "status": "PRODUCT_READY_NOT_CONNECTED",
     "owner": "Future Customer submission readback"
   },
   {
@@ -212,7 +212,7 @@
     "label": "Store Acceptance Presentation",
     "surface": "訂單",
     "kind": "READ_SHAPE",
-    "status": "MIGRATED_SHAPE",
+    "status": "PRODUCT_READY_NOT_CONNECTED",
     "owner": "Future Order/Fulfillment projection"
   },
   {
@@ -221,7 +221,7 @@
     "label": "Preparing Presentation",
     "surface": "訂單",
     "kind": "READ_SHAPE",
-    "status": "MIGRATED_SHAPE",
+    "status": "PRODUCT_READY_NOT_CONNECTED",
     "owner": "Future Fulfillment projection"
   },
   {
@@ -230,7 +230,7 @@
     "label": "Ready Presentation",
     "surface": "訂單",
     "kind": "READ_SHAPE",
-    "status": "MIGRATED_SHAPE",
+    "status": "PRODUCT_READY_NOT_CONNECTED",
     "owner": "Future Fulfillment projection"
   },
   {
@@ -239,7 +239,7 @@
     "label": "Pickup Presentation",
     "surface": "訂單",
     "kind": "READ_SHAPE",
-    "status": "MIGRATED_SHAPE",
+    "status": "PRODUCT_READY_NOT_CONNECTED",
     "owner": "Future Fulfillment projection"
   },
   {
@@ -248,7 +248,7 @@
     "label": "Completed Presentation",
     "surface": "訂單",
     "kind": "READ_SHAPE",
-    "status": "MIGRATED_SHAPE",
+    "status": "PRODUCT_READY_NOT_CONNECTED",
     "owner": "Future Fulfillment projection"
   },
   {
@@ -257,7 +257,7 @@
     "label": "Order Status",
     "surface": "訂單",
     "kind": "READ_SHAPE",
-    "status": "MIGRATED_SHAPE",
+    "status": "PRODUCT_READY_NOT_CONNECTED",
     "owner": "Future Order projection"
   },
   {
@@ -266,7 +266,7 @@
     "label": "Order Detail",
     "surface": "訂單詳情",
     "kind": "READ_SHAPE",
-    "status": "MIGRATED_SHAPE",
+    "status": "PRODUCT_READY_NOT_CONNECTED",
     "owner": "Future Order projection"
   },
   {
@@ -284,7 +284,7 @@
     "label": "History",
     "surface": "歷史",
     "kind": "READ_SHAPE",
-    "status": "MIGRATED_SHAPE",
+    "status": "PRODUCT_READY_NOT_CONNECTED",
     "owner": "Future Order history projection"
   },
   {
@@ -293,7 +293,7 @@
     "label": "Reorder Shape",
     "surface": "歷史",
     "kind": "READ_SHAPE",
-    "status": "MIGRATED_SHAPE",
+    "status": "PRODUCT_READY_NOT_CONNECTED",
     "owner": "MFK Customer Surface"
   },
   {
@@ -311,7 +311,7 @@
     "label": "Own-channel Unavailable State",
     "surface": "首頁",
     "kind": "READ_SHAPE",
-    "status": "MIGRATED_SHAPE",
+    "status": "PRODUCT_READY_NOT_CONNECTED",
     "owner": "Future Channel projection"
   },
   {
@@ -320,7 +320,7 @@
     "label": "Fallback Presentation",
     "surface": "首頁",
     "kind": "READ_SHAPE",
-    "status": "MIGRATED_SHAPE",
+    "status": "PRODUCT_READY_NOT_CONNECTED",
     "owner": "MFK Customer Surface"
   },
   {
@@ -338,7 +338,7 @@
     "label": "Offline Presentation",
     "surface": "全局",
     "kind": "READ_SHAPE",
-    "status": "MIGRATED_SHAPE",
+    "status": "PRODUCT_READY_NOT_CONNECTED",
     "owner": "MFK Customer Surface"
   },
   {
@@ -347,7 +347,7 @@
     "label": "Failure Presentation",
     "surface": "全局",
     "kind": "READ_SHAPE",
-    "status": "MIGRATED_SHAPE",
+    "status": "PRODUCT_READY_NOT_CONNECTED",
     "owner": "MFK Customer Surface"
   },
   {
@@ -365,7 +365,7 @@
     "label": "UNKNOWN Presentation",
     "surface": "全局",
     "kind": "READ_SHAPE",
-    "status": "MIGRATED_SHAPE",
+    "status": "PRODUCT_READY_NOT_CONNECTED",
     "owner": "MFK Customer Surface"
   },
   {
@@ -374,7 +374,7 @@
     "label": "STALE Presentation",
     "surface": "全局",
     "kind": "READ_SHAPE",
-    "status": "MIGRATED_SHAPE",
+    "status": "PRODUCT_READY_NOT_CONNECTED",
     "owner": "MFK Customer Surface"
   },
   {
@@ -383,7 +383,7 @@
     "label": "Zero Background Auto-resubmit Boundary",
     "surface": "全局",
     "kind": "READ_SHAPE",
-    "status": "MIGRATED_SHAPE",
+    "status": "PRODUCT_READY_NOT_CONNECTED",
     "owner": "MFK Customer Surface"
   },
   {
@@ -392,7 +392,7 @@
     "label": "Customer Capability Registry",
     "surface": "更多",
     "kind": "READ_SHAPE",
-    "status": "MIGRATED_SHAPE",
+    "status": "PRODUCT_READY_NOT_CONNECTED",
     "owner": "MFK Customer Surface"
   },
   {
@@ -401,7 +401,7 @@
     "label": "基本搜尋",
     "surface": "菜單",
     "kind": "READ_SHAPE",
-    "status": "MIGRATED_SHAPE",
+    "status": "PRODUCT_READY_NOT_CONNECTED",
     "owner": "MFK Customer Surface"
   },
   {
@@ -410,7 +410,7 @@
     "label": "搜尋零結果回退",
     "surface": "菜單",
     "kind": "READ_SHAPE",
-    "status": "MIGRATED_SHAPE",
+    "status": "PRODUCT_READY_NOT_CONNECTED",
     "owner": "MFK Customer Surface"
   },
   {
@@ -419,8 +419,8 @@
     "label": "多選客製 Shape",
     "surface": "商品設定",
     "kind": "READ_SHAPE",
-    "status": "MIGRATED_SHAPE",
-    "owner": "Session-only migration state"
+    "status": "PRODUCT_READY_NOT_CONNECTED",
+    "owner": "MFK Customer local non-authoritative workspace"
   },
   {
     "id": "CONFIG_MIN_MAX_VALIDATION",
@@ -428,8 +428,8 @@
     "label": "客製 Min/Max/Required 驗證",
     "surface": "商品設定",
     "kind": "READ_SHAPE",
-    "status": "MIGRATED_SHAPE",
-    "owner": "Session-only migration state"
+    "status": "PRODUCT_READY_NOT_CONNECTED",
+    "owner": "MFK Customer local non-authoritative workspace"
   },
   {
     "id": "CART_QUANTITY_EDIT",
@@ -437,8 +437,8 @@
     "label": "Cart Quantity Edit Shape",
     "surface": "購物籃",
     "kind": "READ_SHAPE",
-    "status": "MIGRATED_SHAPE",
-    "owner": "Session-only migration state"
+    "status": "PRODUCT_READY_NOT_CONNECTED",
+    "owner": "MFK Customer local non-authoritative workspace"
   },
   {
     "id": "CART_LINE_ATTENTION",
@@ -446,7 +446,7 @@
     "label": "Cart Line Attention / Partial Repair",
     "surface": "購物籃",
     "kind": "READ_SHAPE",
-    "status": "MIGRATED_SHAPE",
+    "status": "PRODUCT_READY_NOT_CONNECTED",
     "owner": "MFK Customer Surface"
   },
   {
@@ -455,7 +455,7 @@
     "label": "Checkout 原位修復 Shape",
     "surface": "結帳",
     "kind": "READ_SHAPE",
-    "status": "MIGRATED_SHAPE",
+    "status": "PRODUCT_READY_NOT_CONNECTED",
     "owner": "MFK Customer Surface"
   },
   {
@@ -464,7 +464,7 @@
     "label": "Quote Freshness / Material Change Presentation",
     "surface": "結帳",
     "kind": "READ_SHAPE",
-    "status": "MIGRATED_SHAPE",
+    "status": "PRODUCT_READY_NOT_CONNECTED",
     "owner": "Future Pricing readback"
   },
   {
@@ -473,7 +473,7 @@
     "label": "Submission Result Certainty Presentation",
     "surface": "結帳",
     "kind": "READ_SHAPE",
-    "status": "MIGRATED_SHAPE",
+    "status": "PRODUCT_READY_NOT_CONNECTED",
     "owner": "Future Customer submission readback"
   },
   {
@@ -482,7 +482,7 @@
     "label": "Rejected Presentation",
     "surface": "訂單",
     "kind": "READ_SHAPE",
-    "status": "MIGRATED_SHAPE",
+    "status": "PRODUCT_READY_NOT_CONNECTED",
     "owner": "Future Order/Fulfillment projection"
   },
   {
@@ -491,7 +491,7 @@
     "label": "Delayed / Updated ETA Presentation",
     "surface": "訂單",
     "kind": "READ_SHAPE",
-    "status": "MIGRATED_SHAPE",
+    "status": "PRODUCT_READY_NOT_CONNECTED",
     "owner": "Future Fulfillment projection"
   },
   {
@@ -500,7 +500,7 @@
     "label": "Pickup Verification / Handover Separation",
     "surface": "訂單",
     "kind": "READ_SHAPE",
-    "status": "MIGRATED_SHAPE",
+    "status": "PRODUCT_READY_NOT_CONNECTED",
     "owner": "Future Fulfillment projection"
   },
   {
@@ -509,7 +509,7 @@
     "label": "Reorder Current Revalidation / Partial Repair",
     "surface": "歷史 / Cart",
     "kind": "READ_SHAPE",
-    "status": "MIGRATED_SHAPE",
+    "status": "PRODUCT_READY_NOT_CONNECTED",
     "owner": "MFK Customer Surface"
   },
   {
@@ -518,7 +518,7 @@
     "label": "Buy Again 快捷入口",
     "surface": "首頁 / 歷史",
     "kind": "READ_SHAPE",
-    "status": "MIGRATED_SHAPE",
+    "status": "PRODUCT_READY_NOT_CONNECTED",
     "owner": "MFK Customer Surface"
   }
 ]
