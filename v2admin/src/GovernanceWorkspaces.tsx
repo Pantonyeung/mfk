@@ -149,6 +149,16 @@ export function PublishCenterWorkspace(){
       <p>{message}</p>
       <small>Hard rule：NO READBACK PROOF = NOT GREEN。Transport bundle 建立成功亦唔代表 SMT 已 Apply。</small>
     </section>
+
+    <section className="admin-rule-card">
+      <h2>8. Governance Boundary</h2>
+      <p>完整治理詞彙保留：MATCH / PARTIAL / MISMATCH / UNKNOWN。A2 exact Menu Index compare 只會產生 MATCH / MISMATCH / UNKNOWN；PARTIAL 留畀未來多-target readback。</p>
+      <div className="admin-editor-actions">
+        <button type="button" disabled>Rollback as New Revision</button>
+        <button type="button" disabled>Automatic Publish 未接駁</button>
+      </div>
+      <small>Rollback 同自動網絡 Publish 都唔喺 A2；今次只係 human-controlled bundle + exact target receipt。</small>
+    </section>
   </section>;
 }
 
