@@ -101,3 +101,28 @@ Cloudflare reconnect settings:
 `v2admin/wrangler.jsonc` intentionally contains only static SPA assets. It must not gain D1, R2, Durable Objects, service bindings, cron triggers or SMT/Keeta API runtime as part of H1.
 
 The separate OTA Worker `morefunos-v2-smt-ota` and its R2 bucket are outside H1 and must remain untouched.
+
+
+## Cloudflare H2 — dedicated MFK account
+
+H2 supersedes the legacy-account hosting path.
+
+Target Worker:
+`mfk-admin`
+
+Deployment source:
+`Pantonyeung/mfk`
+
+Project root:
+`v2admin`
+
+Deployment transport:
+GitHub Actions + Wrangler.
+
+The first empty `mfk-admin` Worker should be created once in the dedicated MFK Cloudflare account. After that, the CI token should be scoped to that Worker with Editor access. This avoids granting CI product-level Admin solely to bootstrap the first Worker.
+
+Required GitHub repository secrets:
+- `CLOUDFLARE_ACCOUNT_ID`
+- `CLOUDFLARE_API_TOKEN`
+
+H2 remains static hosting only. It must not introduce D1, R2, Durable Objects, Cron triggers, service bindings, provider runtime or SMT automatic network transport.
