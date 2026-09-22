@@ -2,7 +2,7 @@ import {useEffect,useMemo,useState} from 'react';
 import {useAdminDraft} from './admin-draft.tsx';
 import {appendAdminAudit,readAdminStored} from './admin-local-store.ts';
 import {normalizeProductMedia,normalizeProductPrintRule,PRODUCT_MEDIA_BACKEND_CONTRACT,useProductMediaConfig,useProductPrintRules,type ProductMediaConfig,type ProductPrintRule} from './admin-product-operational-config.ts';
-import {useOptionCenter,type OptionCenterController} from './admin-option-center.ts';
+import {useOptionSetCenter,type OptionSetCenterController} from './admin-option-set-center.ts';
 
 function WorkspaceHeader({title,description,onAdd,addLabel}:{title:string;description:string;onAdd?:()=>void;addLabel?:string}){
   const {draft,dirty,validationErrors,validate,reset}=useAdminDraft();
@@ -59,7 +59,7 @@ export function CategoriesWorkspace(){
 }
 
 
-export function ProductOperationalDetail({productId,optionCenter}:{productId:string;optionCenter:OptionCenterController}){
+export function ProductOperationalDetail({productId,optionCenter}:{productId:string;optionCenter:OptionSetCenterController}){
   const {draft,updateProduct,removeProduct}=useAdminDraft();
   const [printRules,setPrintRules]=useProductPrintRules();
   const [mediaByProduct,setMediaByProduct]=useProductMediaConfig();
@@ -67,7 +67,7 @@ export function ProductOperationalDetail({productId,optionCenter}:{productId:str
   if(!product)return null;
 
   const productLinks=optionCenter.productLinks.filter(link=>link.productId===product.id);
-  const boundGroups=optionCenter.groups.filter(group=>productLinks.some(link=>link.groupId===group.id));
+  const boundGroups=optionCenter.sets.filter(set=>productLinks.some(link=>link.setId===set.id));
   const printers=readAdminStored<Array<{id:string;name:string;type:string;active:boolean}>>('logical-printers.v1',[]);
   const labelPrinters=printers.filter(row=>row.type==='LABEL'&&row.active);
   const printRule=normalizeProductPrintRule(printRules[product.id]);
@@ -140,34 +140,57 @@ export function ProductOperationalDetail({productId,optionCenter}:{productId:str
     </details>
 
     <details className="admin-product-section">
-      <summary><span><b>選項</b><small>{boundGroups.length} 個已連結選項組 · 默認按商品設定</small></span><span>›</span></summary>
+      <summary><span><b>選項</b><small>{boundGroups.length} 個已加入選項組 · 默認按商品設定</small></span><span>›</span></summary>
       <div className="admin-product-section-body">
-        <div className="admin-callout compact">選項名稱、選項 ID 同價錢只喺「選項中心」維護一次；商品詳細資料只負責連結、套用同設定此商品嘅默認。 <a href="/admin/catalog/modifiers">前往選項中心</a></div>
+        <div className="admin-callout compact">先喺「選項中心」建立完整選項組，例如「青瓜 → 多青瓜／少青瓜／走青瓜」。商品詳細資料只負責「加入選項」、移除，同設定呢件商品嘅默認子選項。</div>
+
+        <section className="admin-sub-editor">
+          <header><b>加入選項</b><small>揀一個已建立嘅選項組</small></header>
+          <div className="admin-product-option-add-grid">
+            {optionCenter.sets.filter(set=>set.active&&!optionCenter.getProductLink(product.id,set.id)).length===0
+              ?<div className="admin-read-empty">冇其他可加入選項組。<a href="/admin/catalog/modifiers">前往選項中心</a></div>
+              :optionCenter.sets.filter(set=>set.active&&!optionCenter.getProductLink(product.id,set.id)).map(set=><article key={set.id}>
+                <span><b>{set.name}</b><small>{set.options.length} 個子選項 · {set.selection==='SINGLE'?'單選':'多選'}</small></span>
+                <button type="button" onClick={()=>optionCenter.setProductSetLinked(product.id,set.id,true)}>加入</button>
+              </article>)}
+          </div>
+        </section>
+
         <div className="admin-product-link-list">
-          {optionCenter.groups.length===0?<div className="admin-read-empty">選項中心未有選項組。請先建立選項同選項組。</div>:optionCenter.groups.map(group=>{
-            const link=optionCenter.getLink(product.id,group.id);
-            const linked=Boolean(link);
-            const requirement=group.required?'必選':group.forceShow?'可選但必須顯示':'一般可選';
-            const optionRows=group.optionIds.map(optionId=>optionCenter.options.find(option=>option.id===optionId)).filter((option):option is NonNullable<typeof option>=>Boolean(option));
-            return <section className={'admin-product-link-card '+(linked?'is-linked':'')} key={group.id}>
+          {boundGroups.length===0?<div className="admin-read-empty">呢件商品未有加入任何選項組。</div>:boundGroups.map(set=>{
+            const link=optionCenter.getProductLink(product.id,set.id);
+            const requirement=set.required?'必選':set.forceShow?'可選但必須顯示':'一般可選';
+            return <section className="admin-product-link-card is-linked" key={set.id}>
               <header>
-                <label><input type="checkbox" checked={linked} onChange={event=>optionCenter.setProductGroupLinked(product.id,group.id,event.target.checked)}/><span><b>{group.name}</b><small>{requirement} · {group.selection==='SINGLE'?'單選':'多選'} · {group.min}–{group.max}</small></span></label>
-                <a href="/admin/catalog/modifiers">前往選項中心</a>
+                <span><b>{set.name}</b><small>{requirement} · {set.selection==='SINGLE'?'單選':'多選'} · {set.options.length} 個子選項</small></span>
+                <div className="admin-product-link-actions">
+                  <a href="/admin/catalog/modifiers">編輯選項組</a>
+                  <button type="button" onClick={()=>optionCenter.setProductSetLinked(product.id,set.id,false)}>移除</button>
+                </div>
               </header>
-              {linked?<div className="admin-product-linked-options">
-                <div className="admin-product-linked-options-head"><span>套用</span><span>選項 ID</span><span>名稱</span><span>價錢</span><span>此商品默認</span></div>
-                {optionRows.map(option=>{
-                  const included=link?.optionIds.includes(option.id)??false;
+              <div className="admin-product-linked-options">
+                <div className="admin-product-linked-options-head"><span>選項 ID</span><span>名稱</span><span>價錢</span><span>狀態</span><span>此商品默認</span></div>
+                {set.options.map(option=>{
                   const isDefault=link?.defaultOptionIds.includes(option.id)??false;
                   return <article key={option.id}>
-                    <input aria-label={'套用 '+option.name} type="checkbox" checked={included} onChange={event=>optionCenter.setProductOptionLinked(product.id,group.id,option.id,event.target.checked)}/>
                     <code>{option.code}</code>
                     <b>{option.name}</b>
                     <span>{Number(option.priceAdjustment)>=0?'+':''}{Number(option.priceAdjustment).toFixed(2)}</span>
-                    <label><input type="checkbox" checked={isDefault} disabled={!included} onChange={event=>optionCenter.setProductDefault(product.id,group.id,option.id,event.target.checked)}/><span>默認</span></label>
+                    <span>{option.active?'啟用':'停用'}</span>
+                    <label>
+                      <input
+                        type={set.selection==='SINGLE'?'radio':'checkbox'}
+                        name={'product-default-'+product.id+'-'+set.id}
+                        checked={isDefault}
+                        disabled={!option.active}
+                        onChange={event=>optionCenter.setProductDefault(product.id,set.id,option.id,event.target.checked)}
+                      />
+                      <span>默認</span>
+                    </label>
                   </article>;
                 })}
-              </div>:null}
+              </div>
+              {link?.defaultOptionIds.length?<button type="button" className="admin-inline-add" onClick={()=>link.defaultOptionIds.forEach(optionId=>optionCenter.setProductDefault(product.id,set.id,optionId,false))}>清除默認</button>:null}
             </section>;
           })}
         </div>
@@ -221,7 +244,7 @@ export function ProductOperationalDetail({productId,optionCenter}:{productId:str
 
 export function ProductsWorkspace(){
   const {draft,addProduct,updateProduct,removeProduct}=useAdminDraft();
-  const optionCenter=useOptionCenter(draft);
+  const optionCenter=useOptionSetCenter(draft);
   const [query,setQuery]=useState('');
   const [status,setStatus]=useState<'ALL'|'ACTIVE'|'INACTIVE'>('ALL');
   const [category,setCategory]=useState('ALL');
@@ -318,75 +341,70 @@ export function ProductsWorkspace(){
 
 export function ModifiersWorkspace(){
   const {draft}=useAdminDraft();
-  const optionCenter=useOptionCenter(draft);
-  const [tab,setTab]=useState<'OPTION'|'GROUP'>('OPTION');
+  const optionCenter=useOptionSetCenter(draft);
   const [query,setQuery]=useState('');
   const token=query.trim().toLowerCase();
-
-  const optionRows=optionCenter.options.filter(option=>!token||(option.name+' '+option.code).toLowerCase().includes(token));
-  const groupRows=optionCenter.groups.filter(group=>!token||(group.name+' '+group.id).toLowerCase().includes(token));
+  const rows=optionCenter.sets.filter(set=>!token||(set.name+' '+set.id+' '+set.options.map(option=>option.name+' '+option.code).join(' ')).toLowerCase().includes(token));
 
   return <section className="admin-editor-page">
     <header className="admin-editor-head">
-      <div><small>唯一選項資料來源</small><h1>選項中心</h1><p>選項只建立一次，再由選項組引用，最後連結到商品。Product Detail 唔會再複製另一份選項資料。</p></div>
-      <div className="admin-editor-actions">
-        {tab==='OPTION'?<button type="button" className="primary" onClick={optionCenter.addOption}>新增選項</button>:<button type="button" className="primary" onClick={optionCenter.addGroup}>新增選項組</button>}
-      </div>
+      <div><small>選項組中心</small><h1>選項中心</h1><p>一個選項組就係一個完整可重用單位，例如「飯量」入面有多飯／少飯／走飯，「青瓜」入面有多青瓜／少青瓜／走青瓜。商品只會加入整個選項組。</p></div>
+      <div className="admin-editor-actions"><button type="button" className="primary" onClick={optionCenter.addSet}>新增選項組</button></div>
     </header>
 
+    <div className="admin-callout compact">操作方式：先新增選項組，再撳入去管理組內選項。例如「青瓜」→ 多青瓜／少青瓜／走青瓜；之後先喺商品詳細資料用「加入選項」連結呢個組。</div>
+
     <div className="admin-kpi-grid">
-      <article><span>選項 Master</span><strong>{optionCenter.options.length}</strong><small>每個身份只存在一次</small></article>
-      <article><span>選項組</span><strong>{optionCenter.groups.length}</strong><small>只引用既有選項</small></article>
-      <article><span>商品連結</span><strong>{optionCenter.productLinks.length}</strong><small>Product ↔ Group</small></article>
+      <article><span>選項組</span><strong>{optionCenter.sets.length}</strong><small>可重用單位</small></article>
+      <article><span>子選項</span><strong>{optionCenter.sets.reduce((sum,set)=>sum+set.options.length,0)}</strong><small>組內管理</small></article>
+      <article><span>商品連結</span><strong>{optionCenter.productLinks.length}</strong><small>Product → 選項組</small></article>
       <article><span>資料問題</span><strong>{optionCenter.errors.length}</strong><small>{optionCenter.errors.length?'需要處理':'目前有效'}</small></article>
     </div>
 
     {optionCenter.errors.length?<div className="admin-validation is-error"><b>選項中心有 {optionCenter.errors.length} 項需要處理</b><ul>{optionCenter.errors.slice(0,12).map((error,index)=><li key={index}>{error}</li>)}</ul></div>:null}
 
     <div className="admin-filterbar">
-      <input value={query} onChange={event=>setQuery(event.target.value)} placeholder={tab==='OPTION'?'搜尋選項名稱／ID':'搜尋選項組名稱／ID'}/>
-      <button type="button" onClick={()=>setTab('OPTION')} disabled={tab==='OPTION'}>選項</button>
-      <button type="button" onClick={()=>setTab('GROUP')} disabled={tab==='GROUP'}>選項組</button>
-      <span>{tab==='OPTION'?optionRows.length:groupRows.length} 項</span>
+      <input value={query} onChange={event=>setQuery(event.target.value)} placeholder="搜尋選項組／子選項名稱／ID"/>
+      <span>{rows.length} 個選項組</span>
     </div>
 
-    {tab==='OPTION'?<div className="admin-option-master-list">
-      <div className="admin-option-master-head"><span>選項 ID *</span><span>名稱 *</span><span>價錢調整 HK$ *</span><span>狀態</span><span>使用中</span><span></span></div>
-      {optionRows.length===0?<div className="admin-read-empty">未有選項。例：多飯、小飯、走飯。</div>:optionRows.map(option=>{
-        const usedBy=optionCenter.groups.filter(group=>group.optionIds.includes(option.id)).length;
-        return <article key={option.id}>
-          <input value={option.code} onChange={event=>optionCenter.updateOption(option.id,{code:event.target.value})} aria-label="選項 ID"/>
-          <input value={option.name} onChange={event=>optionCenter.updateOption(option.id,{name:event.target.value})} aria-label="選項名稱"/>
-          <input inputMode="decimal" value={option.priceAdjustment} onChange={event=>optionCenter.updateOption(option.id,{priceAdjustment:event.target.value})} aria-label="選項價格"/>
-          <Toggle checked={option.active} onChange={active=>optionCenter.updateOption(option.id,{active})} label={option.active?'啟用':'停用'}/>
-          <span>{usedBy} 個選項組</span>
-          <button type="button" disabled={usedBy>0} title={usedBy>0?'先由選項組移除先可以刪除':''} onClick={()=>optionCenter.removeOption(option.id)}>刪除</button>
-        </article>;
-      })}
-    </div>:<div className="admin-option-group-list">
-      {groupRows.length===0?<div className="admin-read-empty">未有選項組。先建立 Option Master，再建立例如「飯量」選項組。</div>:groupRows.map(group=>{
-        const requirement=group.required?'REQUIRED':group.forceShow?'OPTIONAL_FORCE_SHOW':'OPTIONAL';
-        const linkedProducts=optionCenter.productLinks.filter(link=>link.groupId===group.id).length;
-        return <details className="admin-option-group-card" key={group.id}>
-          <summary><span><b>{group.name}</b><small>{group.id} · {group.optionIds.length} 個選項 · {linkedProducts} 件商品</small></span><span>{requirement==='REQUIRED'?'必選':requirement==='OPTIONAL_FORCE_SHOW'?'可選但必須顯示':'一般可選'}</span></summary>
+    {rows.length===0?<div className="admin-read-empty">未有選項組。撳「新增選項組」，例如先建立「飯量」或者「青瓜」；建立後展開組別，再撳「新增子選項」。</div>:<div className="admin-option-set-list">
+      {rows.map(set=>{
+        const requirement=set.required?'REQUIRED':set.forceShow?'OPTIONAL_FORCE_SHOW':'OPTIONAL';
+        const linkedProducts=optionCenter.productLinks.filter(link=>link.setId===set.id).length;
+        return <details className="admin-option-group-card" key={set.id}>
+          <summary>
+            <span><b>{set.name||'未命名選項組'}</b><small>{set.id} · {set.options.length} 個子選項 · {linkedProducts} 件商品使用</small></span>
+            <span>{requirement==='REQUIRED'?'必選':requirement==='OPTIONAL_FORCE_SHOW'?'可選但必須顯示':'一般可選'}</span>
+          </summary>
           <div className="admin-option-group-body">
             <div className="admin-form-grid three">
-              <label><span>選項組名稱 *</span><input value={group.name} onChange={event=>optionCenter.updateGroup(group.id,{name:event.target.value})}/></label>
-              <label><span>要求方式</span><select value={requirement} onChange={event=>{const mode=event.target.value;optionCenter.updateGroup(group.id,{required:mode==='REQUIRED',forceShow:mode!=='OPTIONAL',min:mode==='REQUIRED'?Math.max(1,group.min):0})}}><option value="REQUIRED">必選</option><option value="OPTIONAL_FORCE_SHOW">可選，但必須顯示一次</option><option value="OPTIONAL">一般可選</option></select></label>
-              <label><span>選擇方式</span><select value={group.selection} onChange={event=>optionCenter.updateGroup(group.id,{selection:event.target.value as 'SINGLE'|'MULTI'})}><option value="SINGLE">單選</option><option value="MULTI">多選</option></select></label>
-              <label><span>最少選擇</span><input type="number" min={0} value={group.min} onChange={event=>optionCenter.updateGroup(group.id,{min:Number(event.target.value)||0})}/></label>
-              <label><span>最多選擇</span><input type="number" min={0} value={group.max} onChange={event=>optionCenter.updateGroup(group.id,{max:Number(event.target.value)||0})}/></label>
-              <Toggle checked={group.allowQuantities} onChange={allowQuantities=>optionCenter.updateGroup(group.id,{allowQuantities})} label="同一選項可重覆數量"/>
+              <label><span>選項組名稱 *</span><input value={set.name} onChange={event=>optionCenter.updateSet(set.id,{name:event.target.value})} placeholder="例如：飯量／青瓜"/></label>
+              <label><span>要求方式</span><select value={requirement} onChange={event=>{const mode=event.target.value;optionCenter.updateSet(set.id,{required:mode==='REQUIRED',forceShow:mode!=='OPTIONAL',min:mode==='REQUIRED'?Math.max(1,set.min):0})}}><option value="REQUIRED">必選</option><option value="OPTIONAL_FORCE_SHOW">可選，但必須顯示一次</option><option value="OPTIONAL">一般可選</option></select></label>
+              <label><span>選擇方式</span><select value={set.selection} onChange={event=>optionCenter.updateSet(set.id,{selection:event.target.value as 'SINGLE'|'MULTI'})}><option value="SINGLE">單選</option><option value="MULTI">多選</option></select></label>
+              <label><span>最少選擇</span><input type="number" min={0} value={set.min} onChange={event=>optionCenter.updateSet(set.id,{min:Number(event.target.value)||0})}/></label>
+              <label><span>最多選擇</span><input type="number" min={0} value={set.max} onChange={event=>optionCenter.updateSet(set.id,{max:Number(event.target.value)||0})}/></label>
+              <Toggle checked={set.allowQuantities} onChange={allowQuantities=>optionCenter.updateSet(set.id,{allowQuantities})} label="同一子選項可重覆數量"/>
             </div>
 
             <section className="admin-sub-editor">
-              <header><b>組內選項</b><small>只引用 Option Master，唔複製名稱／價錢</small></header>
-              {optionCenter.options.length===0?<p>未有 Option Master。</p>:<div className="admin-option-membership-grid">{optionCenter.options.map(option=><label key={option.id}><input type="checkbox" checked={group.optionIds.includes(option.id)} onChange={event=>optionCenter.setGroupOption(group.id,option.id,event.target.checked)}/><span><b>{option.name}</b><small>{option.code} · {Number(option.priceAdjustment)>=0?'+':''}{Number(option.priceAdjustment).toFixed(2)}</small></span></label>)}</div>}
+              <header><b>組內選項</b><button type="button" onClick={()=>optionCenter.addChild(set.id)}>＋ 新增子選項</button></header>
+              {set.options.length===0?<p>未有子選項。例：「青瓜」可以加入多青瓜／少青瓜／走青瓜。</p>:<div className="admin-option-child-table">
+                <header><span>次序</span><span>選項 ID *</span><span>名稱 *</span><span>價錢調整 HK$ *</span><span>狀態</span><span></span></header>
+                {set.options.map((option,index)=><article key={option.id}>
+                  <div className="admin-option-order-buttons"><button type="button" disabled={index===0} onClick={()=>optionCenter.moveChild(set.id,option.id,-1)}>↑</button><button type="button" disabled={index===set.options.length-1} onClick={()=>optionCenter.moveChild(set.id,option.id,1)}>↓</button></div>
+                  <input value={option.code} onChange={event=>optionCenter.updateChild(set.id,option.id,{code:event.target.value})} aria-label="選項 ID"/>
+                  <input value={option.name} onChange={event=>optionCenter.updateChild(set.id,option.id,{name:event.target.value})} aria-label="選項名稱"/>
+                  <input inputMode="decimal" value={option.priceAdjustment} onChange={event=>optionCenter.updateChild(set.id,option.id,{priceAdjustment:event.target.value})} aria-label="選項價錢"/>
+                  <Toggle checked={option.active} onChange={active=>optionCenter.updateChild(set.id,option.id,{active})} label={option.active?'啟用':'停用'}/>
+                  <button type="button" onClick={()=>optionCenter.removeChild(set.id,option.id)}>刪除</button>
+                </article>)}
+              </div>}
             </section>
 
             <div className="admin-editor-actions">
-              <Toggle checked={group.active} onChange={active=>optionCenter.updateGroup(group.id,{active})} label={group.active?'啟用':'停用'}/>
-              <button type="button" disabled={linkedProducts>0} title={linkedProducts>0?'仍有商品連結呢個組':''} onClick={()=>optionCenter.removeGroup(group.id)}>刪除選項組</button>
+              <Toggle checked={set.active} onChange={active=>optionCenter.updateSet(set.id,{active})} label={set.active?'啟用選項組':'停用選項組'}/>
+              <button type="button" disabled={linkedProducts>0} title={linkedProducts>0?'仍有商品使用呢個選項組':''} onClick={()=>optionCenter.removeSet(set.id)}>刪除選項組</button>
             </div>
           </div>
         </details>;
@@ -397,25 +415,25 @@ export function ModifiersWorkspace(){
 
 export function PricingWorkspace(){
   const {draft,updateProduct}=useAdminDraft();
-  const optionCenter=useOptionCenter(draft);
+  const optionCenter=useOptionSetCenter(draft);
   const [query,setQuery]=useState('');
   const [tab,setTab]=useState<'PRODUCT'|'OPTION'>('PRODUCT');
   const token=query.trim().toLowerCase();
   const productRows=useMemo(()=>draft.products.filter(product=>!token||[product.name,product.productCode].filter(Boolean).join(' ').toLowerCase().includes(token)),[draft.products,token]);
-  const optionRows=optionCenter.options.filter(option=>!token||(option.name+' '+option.code).toLowerCase().includes(token));
+  const optionRows=optionCenter.sets.flatMap(set=>set.options.map(option=>({set,option}))).filter(({set,option})=>!token||(set.name+' '+option.name+' '+option.code).toLowerCase().includes(token));
   const productConfigured=draft.products.filter(product=>product.basePrice.trim()!=='').length;
-  const optionConfigured=optionCenter.options.filter(option=>option.priceAdjustment.trim()!=='').length;
+  const optionConfigured=optionRows.filter(({option})=>option.priceAdjustment.trim()!=='').length;
 
   return <section className="admin-editor-page">
-    <WorkspaceHeader title="價格管理" description="商品價同 Option Master 價錢集中管理；同一選項只得一份價錢設定，所有 Product Link 讀同一份。正式 Quote 仍由唯一 Pricing authority 計算。"/>
+    <WorkspaceHeader title="價格管理" description="商品價同選項組內子選項價集中管理。子選項價屬於嗰個選項組，例如「多青瓜 +$1」；商品 Link 唔會複製一份價格。正式 Quote 仍由唯一 Pricing authority 計算。"/>
     <div className="admin-kpi-grid">
       <article><span>商品價格</span><strong>{productConfigured}/{draft.products.length}</strong><small>基本價必填</small></article>
-      <article><span>選項價格</span><strong>{optionConfigured}/{optionCenter.options.length}</strong><small>Option Master</small></article>
+      <article><span>子選項價格</span><strong>{optionConfigured}/{optionRows.length}</strong><small>組內 Option</small></article>
       <article><span>外賣 +$1</span><strong>{draft.products.filter(product=>product.takeawaySurchargeEnabled).length}</strong><small>Product flag</small></article>
-      <article><span>負數選項價</span><strong>{optionCenter.options.filter(option=>Number(option.priceAdjustment)<0).length}</strong><small>支援減價</small></article>
+      <article><span>負數選項價</span><strong>{optionRows.filter(({option})=>Number(option.priceAdjustment)<0).length}</strong><small>支援減價</small></article>
     </div>
     <div className="admin-filterbar">
-      <input value={query} onChange={event=>setQuery(event.target.value)} placeholder={tab==='PRODUCT'?'搜尋商品':'搜尋選項名稱／ID'}/>
+      <input value={query} onChange={event=>setQuery(event.target.value)} placeholder={tab==='PRODUCT'?'搜尋商品':'搜尋選項組／子選項／ID'}/>
       <button type="button" onClick={()=>setTab('PRODUCT')} disabled={tab==='PRODUCT'}>商品價格</button>
       <button type="button" onClick={()=>setTab('OPTION')} disabled={tab==='OPTION'}>選項價格</button>
     </div>
@@ -428,10 +446,10 @@ export function PricingWorkspace(){
         <input inputMode="decimal" value={product.takeawayAdjustment} onChange={event=>updateProduct(product.id,{takeawayAdjustment:event.target.value})} placeholder="0.00"/>
       </article>)}
     </div>:<div className="admin-pricing-table admin-option-pricing-table">
-      <header><span>選項</span><span>選項 ID</span><span>使用組數</span><span>價錢 HK$</span></header>
-      {optionRows.map(option=><article key={option.id}>
-        <b>{option.name}</b><code>{option.code}</code><span>{optionCenter.groups.filter(group=>group.optionIds.includes(option.id)).length}</span>
-        <input inputMode="decimal" value={option.priceAdjustment} onChange={event=>optionCenter.updateOption(option.id,{priceAdjustment:event.target.value})} placeholder="0.00 / -1.00"/>
+      <header><span>選項組</span><span>子選項</span><span>選項 ID</span><span>價錢 HK$</span></header>
+      {optionRows.map(({set,option})=><article key={set.id+':'+option.id}>
+        <span>{set.name}</span><b>{option.name}</b><code>{option.code}</code>
+        <input inputMode="decimal" value={option.priceAdjustment} onChange={event=>optionCenter.updateChild(set.id,option.id,{priceAdjustment:event.target.value})} placeholder="0.00 / -1.00"/>
       </article>)}
     </div>}
   </section>;
