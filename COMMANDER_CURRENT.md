@@ -3,9 +3,8 @@
 Status: CURRENT / CONTROLLING
 Protocol: #39
 Control: #22
-Updated: 2026-09-22 11:04 Asia/Hong_Kong
+Updated: 2026-09-22 11:18 Asia/Hong_Kong
 System: MFK ONLY
-Takeover checkpoint: 2026-09-22 10:44 Asia/Hong_Kong｜fresh-read complete｜no material state change
 
 > Every Commander MUST fresh-read this file before acting.
 > Every Commander MUST update this file again before returning work / ending the conversation / hitting context limits.
@@ -20,251 +19,177 @@ Takeover checkpoint: 2026-09-22 10:44 Asia/Hong_Kong｜fresh-read complete｜no 
 
 ## 1. Current navigation
 
-`docs/navigation/MFK_航海圖_V1.14_Round015_2026-09-22.txt`
+`docs/navigation/MFK_航海圖_V1.15_Round016_2026-09-22.txt`
 
-## 2. Current priority override
+## 2. Owner priority override
 
-Owner priority is now:
+Owner explicitly moved the active priority:
 
-`SMT OTA PERSISTENCE P0 BEFORE ADMIN A2 WALKTHROUGH`
+`SMT OTA PHYSICAL ACCEPTANCE = HOLD`
 
-Active issue:
-`#40 P0｜SMT OTA Persistence｜runtime.ready Promotion Missing After MFK Migration`
+`ADMIN CONNECTION = RESUME NOW`
 
-Admin A1/A2 implementation remain BANKED.
-Admin A2 real walkthrough is PAUSED, not cancelled.
-A3 automatic Admin→SMT network transport remains NOT AUTHORIZED.
+SMT OTA #40 remains open and preserved at:
 
-## 3. Owner target correction｜material state change
-
-Owner clarified the intended SMT runtime baseline:
-
-`runtime-candidate-mfk-814043c809bb`
-
-Source:
-`814043c809bbc236df1383c320bad906bcd3f1cd`
-
-This is the product/runtime version the Owner wants to preserve.
-
-Current real-device stable runtime:
-
-`runtime-candidate-55fea91e128a`
-
-Physical evidence:
-- Current = `runtime-candidate-55fea91e128a`
-- Candidate = `—`
-- Activation Requested = `false`
-- Cold Boot = `BOOT_COMPLETED`
-- reboot persistence = GREEN
-
-Interpretation:
-`55fea...` proves Carrier persistence/durability behavior can work.
-It is NOT the Owner-selected runtime baseline.
-
-## 4. Previous Commander assumption corrected
-
-The previous repair candidate:
-
-`runtime-candidate-mfk-2fd6e10cc7c8`
-
-MUST NOT be treated as "814 + runtime.ready only".
-
-GitHub compare proves:
-
-base:
-`814043c809bbc236df1383c320bad906bcd3f1cd`
-
-head:
-`2fd6e10cc7c8bf73db854559243dc6c0c4fbe34f`
-
-status:
-`diverged`
-
-ahead_by:
-`63`
-
-behind_by:
-`10`
-
-merge_base:
-`3725ead94a2bf31469f054c955d1b46503e15481`
-
-Therefore the prior published `2fd6...` candidate is a different lineage containing unrelated changes.
-It is not the locked product baseline.
-
-## 5. Correct problem statement
-
-The P0 is now:
-
-`OWNER_BASELINE_814 + PERSISTENCE_FIX WITHOUT PRODUCT DRIFT`
-
-We must preserve the exact Owner-approved SMT product/runtime behavior from source `814043...`,
-and add only the minimum Carrier promotion acknowledgement needed for persistence.
-
-Do NOT reuse the same release ID after changing bytes/source.
-A repaired build must have a NEW release ID.
-
-The acceptance invariant is:
-
-`814 PRODUCT BASELINE SEMANTICS + runtime.ready PERSISTENCE FIX`
-
-not:
-
-`releaseId must literally remain 814043c809bb`.
-
-## 6. Exact implementation seam
-
-WORK_ID:
-`MFK-SMT-OTA-814-BASELINE-PERSISTENCE-R2`
-
-Issue:
-`#40`
-
-Exact base:
-`814043c809bbc236df1383c320bad906bcd3f1cd`
-
-Allowed functional delta only:
-- add runtime Carrier boundary parser / signal primitive
-- add RuntimeReadyActivation mount
-- add deterministic tests for exact releaseId + bridgeVersion 1
-- minimal App mount change after React commit
-
-No product/UI/workflow/config behavior change is authorized.
-
-No Admin A2/A3 work in this seam.
-
-## 6A. Isolated 814-baseline candidate published
-
-Source branch:
-`work/MFK/SMT-OTA-814-BASELINE-PERSISTENCE-R2`
-
-Exact Owner baseline:
-`814043c809bbc236df1383c320bad906bcd3f1cd`
-
-Clean isolated source candidate:
-`d133043dfe7d84e3f4be11ee49e9102c64f518d1`
-
-Compare against exact 814 baseline:
-- status = `ahead`
-- behind = `0`
-- changed product files = exactly 4
-- `v2local/src/App.tsx` = only 3 additions / 2 deletions for mount wiring
-- `RuntimeReadyActivation.tsx` = added
-- `runtime-carrier-boundary.ts` = added
-- `runtime-carrier-boundary.test.ts` = added
-- zero other product/runtime file drift
-
-Source verification run:
-`35681551414`
-SUCCESS
-
-Builder / publisher:
-`Pantonyeung/morefunos-v1-builder`
-
-Publish request commit:
-`c776e070b7938476e05b82633376ea6311eb4f41`
-
-Publish run:
-`35681723140`
-SUCCESS
-
-Published release:
-`runtime-candidate-mfk-d133043dfe7d`
-
-Bundle:
-`MoreFunOS-SMT-runtime-candidate-mfk-d133043dfe7d.mfos`
-
-Archive SHA-256:
-`89898b8420b2038cbde0863de21513b9c765c7e2635d2ca244a4a7f7eb1e7111`
-
-Public readback:
-GREEN
-
-Carrier contract:
-- minCarrierVersionCode = 106
-- bridgeVersion = 1
-
-State:
 `MFK_SMT_OTA_814_BASELINE_PERSISTENCE_CANDIDATE_PUBLISHED`
 
-Important:
-This is an isolated OTA source line from exact 814.
-It is NOT a merge of old baseline back into current MFK main.
-Do not merge/rebase this branch into current main as a product landing.
+Published candidate already ready:
+`runtime-candidate-mfk-d133043dfe7d`
+
+No further SMT OTA work until Owner resumes it.
+
+## 3. Admin current live reality
+
+Canonical Admin:
+`https://admin.morefunos.com`
+
+Owner confirms the Admin app is reachable.
+
+Hosting/domain:
+- H2 #37 = GREEN / BANKED
+- H3 #38 = GREEN / BANKED
+
+Only live Admin deploy run:
+`35677844235`
+SUCCESS
+
+Deploy source:
+`d30e8dcc789806a42ea93c3670beb60270a1ee28`
+
+Important source proof:
+- A2 clean landing `4609142b9e13cd825af795bf4b90e722a26a7026`
+- deploy source `d30e8d...` is 16 commits ahead of A2 landing
+- deployed `GovernanceWorkspaces.tsx` contains the full A2 Publish Center UI
+- compare `d30e8d...` → current main shows ZERO `v2admin/**` product diffs
+
+Interpretation:
+`LIVE ADMIN UI IS NOT STALE RELATIVE TO CURRENT v2admin SOURCE`
+
+## 4. Admin connection progress
+
+A1:
+`#34 BANKED`
+
+State:
+`MFK_ADMIN_MENU_INDEX_A1_SEMANTIC_LINK_GREEN`
+
+Proven:
+Admin Menu Index Revision
+→ SMT Local Menu LKG contract
+
+A2:
+`#35 IMPLEMENTATION BANKED`
+
+State:
+`MFK_ADMIN_A2_CONTROLLED_TRANSFER_IMPLEMENTATION_GREEN`
+
+Implemented:
+Admin Publish Bundle
+→ human-controlled file transfer
+→ SMT Local LKG apply
+→ SMT Readback Receipt
+→ Admin compare
+
+Source / build:
+- source `b291c895cf9ccedfc06690235fe5597bf4e2c7fa`
+- source run `35670165934` SUCCESS
+- landing `4609142b9e13cd825af795bf4b90e722a26a7026`
+- landing run `35670256629` SUCCESS
+
+## 5. FIRST BREAK / missing work
+
+The missing work is NOT a missing A2 implementation.
+
+The exact incomplete item is:
+
+`A2 OWNER REAL CROSS-DEVICE WALKTHROUGH = PENDING`
+
+Five required proofs still not physically banked:
+1. SOURCE_INTENT
+2. TRANSPORT_IDENTITY
+3. TARGET_OBSERVED
+4. COMPARE_RESULT
+5. HUMAN_VISIBLE_READBACK
+
+Until exact target readback returns MATCH:
+
+`A2 OWNER ACCEPTED = NO`
+
+## 6. Non-blocking admin debt discovered
+
+These are real stale metadata/doc debt but NOT the current first break:
+
+1. `v2admin/BUILD_ID` still says legacy target `morefun-v2-admin`.
+2. `v2admin/README.md` still contains superseded H1 wording before the H2 section.
+
+Actual deployment authority is correct:
+`v2admin/wrangler.jsonc → name = mfk-admin`
+
+Do not fix these before A2 acceptance unless they block evidence.
 
 ## 7. Exact NEXT
 
-Owner performs ONE real-device acceptance:
+Resume A2 acceptance from the live Admin app.
 
-1. Recovery → `檢查 Runtime OTA`
-2. freshly offered release MUST be:
-   `runtime-candidate-mfk-d133043dfe7d`
-3. download / install / activate
-4. first confirm the visible SMT product/UI/behavior matches the Owner-selected 814 baseline
-5. return Recovery and prove:
-   - Current = `runtime-candidate-mfk-d133043dfe7d`
-   - Candidate = `—`
-   - Activation Requested = `false`
-   - Previous = prior Current
-6. fully close/reopen SMT app
-7. prove same Current remains
-8. full device power off/on
-9. prove same Current remains
-10. Previous remains rollback target
+Admin first:
+1. open `/admin/publish`
+2. confirm header = `ADMIN CONNECTION A2 · HUMAN CONTROLLED`
+3. confirm the page exposes:
+   - Validate
+   - Impact Preview
+   - Expected SMT Base Revision
+   - Build / Download A2 Publish Bundle
+   - Import SMT Readback Receipt
+   - Human Compare Result
 
-STOP immediately if:
-- offered release is not `runtime-candidate-mfk-d133043dfe7d`
-- product/UI behavior does not match intended 814 baseline
-- Current does not promote
-- restart or power-cycle reverts
+Do NOT create a final bundle until the exact SMT Active Revision is observed.
 
-Only then BANK:
+Then read-only target check:
+SMT → More → Admin · Menu
 
-`MFK_SMT_OTA_814_BASELINE_PERSISTENCE_GREEN`
+Record:
+`ACTIVE REVISION = ?`
+
+Only after that exact base is known:
+- make ONE tiny Product-name change
+- Validate
+- Confirm A2 Impact
+- build ONE bundle
+- apply SAME bundle on SMT
+- download SAME readback receipt
+- import receipt to Admin
+- require `MATCH`
+
+If any step fails:
+STOP at first break.
+
+## 8. A3 remains closed
+
+Automatic network transport:
+
+`NOT AUTHORIZED`
+
+No:
+- HTTP
+- polling
+- D1/KV/DO
+- background worker
+- new protocol
+
+Future A3 must reuse the exact A2 bundle/readback contract.
 
 ## 9. DO NOT
 
-Until #40 real-device proof is GREEN:
-
-- NO Admin A2 continuation
-- NO A3 automatic Admin→SMT network
-- NO OTA infrastructure migration
-- NO Pricing / Modifier / Combo seam
-- NO SMM→SMT
-- NO Customer→SMT
-- NO Owner remote command
+- NO SMT OTA acceptance while Owner HOLD is active
+- NO A3 automatic Admin→SMT transport
+- NO Pricing/Modifier/Combo connection yet
 - NO Keeta live wiring
+- NO SMM/Customer/Owner live seams
+- NO unrelated Admin cleanup before A2 first break
 
-## 10. Permanent system rules
+## 10. Current milestone
 
-MFK only.
-Exactly six roles.
-One business authority per fact/action.
+`MFK_ADMIN_A2_LIVE_UI_DEPLOYED_OWNER_CROSS_DEVICE_PENDING`
 
-`CONNECT ONE PIECE → TEST SAME PIECE → BANK → STOP → OWNER DECIDES NEXT`
-
-`NO TARGET READBACK = NOT GREEN`
-
-MFK Cloud = EVENT-DRIVEN FIRST.
-
-Cloud failure never blocks SMT local Order / Checkout / Payment / Commit.
-
-## 11. Admin / domain state
-
-Admin hosting is BANKED and GREEN:
-
-`https://admin.morefunos.com`
-
-H2 #37 CLOSED.
-H3 #38 CLOSED.
-
-## 12. Mandatory return
-
-Before any Commander returns work:
-- fresh-read main + #22
-- update this file
-- post same return to #22
-- advance navigation if state changed
-- leave one exact NEXT
-- include explicit NOT_AUTHORIZED
-- include no secrets
+Exact NEXT:
+`ADMIN /admin/publish READ-ONLY CONFIRM → SMT ACTIVE REVISION READ-ONLY CONFIRM`
