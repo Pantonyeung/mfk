@@ -20,7 +20,14 @@ installProjectionOutboxAutoFlush();
 
 for(const order of localRuntime.orders())queueOrderProjection(order);
 for(const opening of readLocalCashOpenings())queueCashOpeningProjection(opening);
-for(const close of readLocalDayCloses())queueDayCloseProjection(close);
+const latestCloseByDate=new Map<string,ReturnType<typeof readLocalDayCloses>[number]>();
+for(const close of readLocalDayCloses()){
+  const current=latestCloseByDate.get(close.businessDate);
+  if(!current||close.version>current.version||close.version===current.version&&close.createdAt>current.createdAt){
+    latestCloseByDate.set(close.businessDate,close);
+  }
+}
+for(const close of latestCloseByDate.values())queueDayCloseProjection(close);
 
 const root=document.getElementById('root');
 if(!root)throw new Error('MFK_ROOT_MISSING');
