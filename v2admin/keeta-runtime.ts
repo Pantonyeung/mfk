@@ -224,6 +224,32 @@ async function exchangeAuthorizationCode(config,code){
   return parseTokenMaterial(raw);
 }
 
+async function completeAuthorizationCode(config,store,stateValue,code,callbackAt,{allowMissingState=false}={}){
+  if(stateValue){
+    const key='oauth:state:'+stateValue;
+    const saved=await store.state.storage.get(key);
+    if(!saved||saved.consumed===true||Date.now()-Number(saved.createdAt)>OAUTH_STATE_TTL_MS){
+      throw new Error('KEETA_OAUTH_STATE_INVALID_OR_REUSED');
+    }
+    await store.state.storage.put(key,{...saved,consumed:true,consumedAt:Date.now()});
+  }else if(!allowMissingState){
+    throw new Error('KEETA_OAUTH_STATE_REQUIRED');
+  }
+  const token=await exchangeAuthorizationCode(config,code);
+  await store.saveToken(token);
+  await store.state.storage.put('connection',{
+    canonicalStoreId:'MF01',
+    providerShopId:config.providerShopId,
+    authorizedAt:callbackAt,
+  });
+  await store.state.storage.put('oauth:callback-status',{
+    lastCallbackAt:callbackAt,
+    lastCallbackResult:'CONNECTED',
+    lastCallbackError:null,
+  });
+  return token;
+}
+
 async function refreshToken(config,refreshToken){
   let lastError;
   for(let attempt=1;attempt<=3;attempt+=1){
@@ -393,26 +419,9 @@ export class KeetaRuntimeStore{
       const callbackAt=new Date().toISOString();
       try{
         const config=requireRuntimeConfig(this.env);
-        const stateValue=nonEmpty(url.searchParams.get('state')||'','KEETA_OAUTH_STATE_REQUIRED');
+        const stateValue=url.searchParams.get('state')||'';
         const code=nonEmpty(url.searchParams.get('code')||'','KEETA_OAUTH_CODE_REQUIRED');
-        const key='oauth:state:'+stateValue;
-        const saved=await this.state.storage.get(key);
-        if(!saved||saved.consumed===true||Date.now()-Number(saved.createdAt)>OAUTH_STATE_TTL_MS){
-          throw new Error('KEETA_OAUTH_STATE_INVALID_OR_REUSED');
-        }
-        await this.state.storage.put(key,{...saved,consumed:true,consumedAt:Date.now()});
-        const token=await exchangeAuthorizationCode(config,code);
-        await this.saveToken(token);
-        await this.state.storage.put('connection',{
-          canonicalStoreId:'MF01',
-          providerShopId:config.providerShopId,
-          authorizedAt:callbackAt,
-        });
-        await this.state.storage.put('oauth:callback-status',{
-          lastCallbackAt:callbackAt,
-          lastCallbackResult:'CONNECTED',
-          lastCallbackError:null,
-        });
+        await completeAuthorizationCode(config,this,stateValue,code,callbackAt,{allowMissingState:false});
         return Response.redirect('https://admin.morefunos.com/admin/channels?keeta=connected',302);
       }catch(error){
         const errorCode=error instanceof Error?error.message:'KEETA_OAUTH_CALLBACK_FAILED';
@@ -423,6 +432,32 @@ export class KeetaRuntimeStore{
         });
         const code=encodeURIComponent(errorCode);
         return Response.redirect('https://admin.morefunos.com/admin/channels?keeta_error='+code,302);
+      }
+    }
+
+    if(url.pathname==='/oauth/callback'&&request.method==='POST'){
+      const callbackAt=new Date().toISOString();
+      try{
+        const config=requireRuntimeConfig(this.env);
+        const body=record(await request.json(),'KEETA_OAUTH_CODE_NOTIFICATION_INVALID');
+        const appId=positiveInt(body.appId,'KEETA_OAUTH_APP_ID_INVALID');
+        if(appId!==config.appId)throw new Error('KEETA_OAUTH_APP_ID_MISMATCH');
+        const code=nonEmpty(body.code,'KEETA_OAUTH_CODE_REQUIRED');
+        const stateValue=typeof body.state==='string'?body.state.trim():'';
+        const timestamp=positiveInt(body.timestamp,'KEETA_OAUTH_TIMESTAMP_INVALID');
+        if(Math.abs(Date.now()-timestamp)>10*60*1000)throw new Error('KEETA_OAUTH_CODE_NOTIFICATION_STALE');
+        const externalCallbackUrl=request.headers.get('x-mfk-keeta-external-url')||request.url;
+        await verifyWebhookSignature(externalCallbackUrl,body,config.appSecret);
+        await completeAuthorizationCode(config,this,stateValue,code,callbackAt,{allowMissingState:true});
+        return json({code:0,message:'Success'});
+      }catch(error){
+        const errorCode=error instanceof Error?error.message:'KEETA_OAUTH_CALLBACK_FAILED';
+        await this.state.storage.put('oauth:callback-status',{
+          lastCallbackAt:callbackAt,
+          lastCallbackResult:'FAILED',
+          lastCallbackError:errorCode,
+        });
+        return json({code:errorCode},401);
       }
     }
 
