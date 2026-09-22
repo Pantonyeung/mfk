@@ -287,3 +287,37 @@
   .admin-option-group-card>summary{align-items:flex-start}
   .admin-product-link-card>header{align-items:flex-start}
 }
+
+
+/* Option Set Center R2 — group-first hierarchy */
+.admin-option-set-list{display:grid;gap:10px}
+.admin-option-child-table{display:grid;border:1px solid #e1e4ea;border-radius:10px;background:#fff;overflow:hidden}
+.admin-option-child-table>header,.admin-option-child-table>article{display:grid;grid-template-columns:82px 150px minmax(180px,1fr) 150px 110px 72px;gap:8px;align-items:center;padding:9px 10px}
+.admin-option-child-table>header{background:#f5f6f8;color:#737c89;font-size:9px;font-weight:850}
+.admin-option-child-table>article{border-top:1px solid #eceef2}
+.admin-option-child-table input{min-height:36px;padding:0 8px;border:1px solid #d5dae2;border-radius:8px;background:#fff}
+.admin-option-child-table button{min-height:34px;border:1px solid #d8dce3;border-radius:8px;background:#fff}
+.admin-option-order-buttons{display:flex;gap:4px}
+.admin-option-order-buttons button{width:34px;padding:0}
+.admin-product-option-add-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.admin-product-option-add-grid>article{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px;border:1px solid #e1e4ea;border-radius:10px;background:#fff}
+.admin-product-option-add-grid>article>span{display:grid;gap:2px}
+.admin-product-option-add-grid b{font-size:11px}
+.admin-product-option-add-grid small{font-size:9px;color:#7b8390}
+.admin-product-option-add-grid button{min-height:34px;padding:0 11px;border:1px solid #cbc2f4;border-radius:8px;background:#f5f2ff;color:#6048c5;font-weight:850}
+.admin-product-link-card>header>span{display:grid;gap:2px}
+.admin-product-link-actions{display:flex;align-items:center;gap:8px}
+.admin-product-link-actions a{font-size:10px;font-weight:850;color:#654bc9;text-decoration:none}
+.admin-product-link-actions button{min-height:32px;padding:0 9px;border:1px solid #e0c3c8;border-radius:8px;background:#fff;color:#8a2d36}
+.admin-product-linked-options-head,.admin-product-linked-options>article{grid-template-columns:130px minmax(150px,1fr) 90px 90px 120px}
+.admin-product-link-card .admin-inline-add{margin:8px 10px 10px}
+
+@media(max-width:1000px){
+  .admin-option-child-table{overflow-x:auto}
+  .admin-option-child-table>header,.admin-option-child-table>article{min-width:760px}
+  .admin-product-option-add-grid{grid-template-columns:1fr}
+  .admin-product-linked-options-head,.admin-product-linked-options>article{min-width:620px}
+}
+@media(max-width:760px){
+  .admin-product-link-actions{align-items:flex-start}
+}
