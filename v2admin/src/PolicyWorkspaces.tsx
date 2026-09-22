@@ -7,12 +7,25 @@ import {
   checkKeetaTokenReadiness,
   importKeetaTestToken,
   previewKeetaMenu,
+  previewKeetaSellability,
+  previewKeetaStoreHours,
   readKeetaLiveStatus,
   readKeetaMenuStatus,
+  readKeetaSellabilityStatus,
+  readKeetaStore,
+  readKeetaStoreStatus,
+  restKeetaStore,
+  openKeetaStore,
   syncKeetaMenu,
+  syncKeetaSellability,
+  syncKeetaStoreHours,
   type KeetaLiveStatus,
   type KeetaMenuPreview,
   type KeetaMenuStatus,
+  type KeetaSellabilityPreview,
+  type KeetaSellabilityStatus,
+  type KeetaStorePreview,
+  type KeetaStoreStatus,
 } from './keeta-live-client.ts';
 
 function PolicyHeader({title,description,badge='本機設定自動保存'}:{title:string;description:string;badge?:string}){
@@ -231,6 +244,11 @@ export function ChannelsWorkspace({mode}:{mode:'overview'|'mapping'|'failures'|'
   const [menuPreview,setMenuPreview]=useState<KeetaMenuPreview|null>(null);
   const [menuStatus,setMenuStatus]=useState<KeetaMenuStatus|null>(null);
   const [menuBusy,setMenuBusy]=useState(false);
+  const [sellabilityPreview,setSellabilityPreview]=useState<KeetaSellabilityPreview|null>(null);
+  const [sellabilityStatus,setSellabilityStatus]=useState<KeetaSellabilityStatus|null>(null);
+  const [storePreview,setStorePreview]=useState<KeetaStorePreview|null>(null);
+  const [storeStatus,setStoreStatus]=useState<KeetaStoreStatus|null>(null);
+  const [providerOpsBusy,setProviderOpsBusy]=useState(false);
   const refreshLive=async()=>{
     try{setLiveStatus(await readKeetaLiveStatus());setLiveError('');}
     catch(error){setLiveError(error instanceof Error?error.message:'KEETA_STATUS_FAILED');}
@@ -239,10 +257,18 @@ export function ChannelsWorkspace({mode}:{mode:'overview'|'mapping'|'failures'|'
     try{setMenuStatus(await readKeetaMenuStatus());}
     catch(error){setLiveError(error instanceof Error?error.message:'KEETA_MENU_STATUS_FAILED');}
   };
+  const refreshProviderOps=async()=>{
+    try{
+      const [sellability,store]=await Promise.all([readKeetaSellabilityStatus(),readKeetaStoreStatus()]);
+      setSellabilityStatus(sellability);
+      setStoreStatus(store);
+    }catch(error){setLiveError(error instanceof Error?error.message:'KEETA_PROVIDER_OPS_STATUS_FAILED');}
+  };
   useEffect(()=>{
     if(mode==='overview'||mode==='sync'){
       void refreshLive();
       void refreshMenu();
+      void refreshProviderOps();
     }
   },[mode]);
   const authorize=async()=>{
@@ -294,6 +320,45 @@ export function ChannelsWorkspace({mode}:{mode:'overview'|'mapping'|'failures'|'
     }catch(error){
       setLiveError(error instanceof Error?error.message:'KEETA_MENU_SYNC_FAILED');
     }finally{setMenuBusy(false);}
+  };
+  const previewSellability=async()=>{
+    setProviderOpsBusy(true);setLiveError('');
+    try{setSellabilityPreview(await previewKeetaSellability());await refreshProviderOps();}
+    catch(error){setSellabilityPreview(null);setLiveError(error instanceof Error?error.message:'KEETA_SELLABILITY_PREVIEW_FAILED');}
+    finally{setProviderOpsBusy(false);}
+  };
+  const submitSellability=async()=>{
+    setProviderOpsBusy(true);setLiveError('');
+    try{setSellabilityPreview(await previewKeetaSellability());setSellabilityStatus(await syncKeetaSellability());}
+    catch(error){setLiveError(error instanceof Error?error.message:'KEETA_SELLABILITY_SYNC_FAILED');}
+    finally{setProviderOpsBusy(false);}
+  };
+  const previewStore=async()=>{
+    setProviderOpsBusy(true);setLiveError('');
+    try{setStorePreview(await previewKeetaStoreHours());}
+    catch(error){setStorePreview(null);setLiveError(error instanceof Error?error.message:'KEETA_STORE_PREVIEW_FAILED');}
+    finally{setProviderOpsBusy(false);}
+  };
+  const submitStoreHours=async()=>{
+    setProviderOpsBusy(true);setLiveError('');
+    try{setStorePreview(await previewKeetaStoreHours());setStoreStatus(await syncKeetaStoreHours());}
+    catch(error){setLiveError(error instanceof Error?error.message:'KEETA_STORE_HOURS_SYNC_FAILED');}
+    finally{setProviderOpsBusy(false);}
+  };
+  const runStoreOperation=async(action:'REST'|'OPEN')=>{
+    setProviderOpsBusy(true);setLiveError('');
+    try{
+      setStoreStatus(action==='REST'?await restKeetaStore():await openKeetaStore());
+      await readKeetaStore();
+      await refreshProviderOps();
+    }catch(error){setLiveError(error instanceof Error?error.message:'KEETA_STORE_OPERATION_FAILED');}
+    finally{setProviderOpsBusy(false);}
+  };
+  const refreshStoreReadback=async()=>{
+    setProviderOpsBusy(true);setLiveError('');
+    try{await readKeetaStore();await refreshProviderOps();}
+    catch(error){setLiveError(error instanceof Error?error.message:'KEETA_STORE_READBACK_FAILED');}
+    finally{setProviderOpsBusy(false);}
   };
   const [config,setConfig]=usePersistentAdminState<ChannelConfig>('channel-policy.keeta.v1',{enabled:false,autoAccept:false,syncSellability:false,commissionPct:'',displayName:'Keeta',lateCutoffMinutes:15});
   const [mappings,setMappings]=usePersistentAdminState<MappingRow[]>('channel-mapping.keeta.v1',[]);
@@ -380,6 +445,37 @@ export function ChannelsWorkspace({mode}:{mode:'overview'|'mapping'|'failures'|'
         <button type="button" className="secondary" disabled={menuBusy} onClick={()=>void previewMenu()}>預檢完整菜單</button>
         <button type="button" className="primary" disabled={menuBusy||liveStatus?.oauth.state!=='CONNECTED'} onClick={()=>void submitMenu()}>同步完整菜單到 Keeta</button>
         <button type="button" className="secondary" disabled={menuBusy} onClick={()=>void refreshMenu()}>更新同步狀態</button>
+      </div>
+    </section>:null}
+    {mode==='sync'?<section className="admin-policy-card">
+      <header><div><small>KEETA SELLABILITY</small><h2>Keeta 售罄／供應同步</h2></div><span className={sellabilityStatus?.state==='COMPLETED'?'admin-status-good':'admin-not-wired-chip'}>{sellabilityStatus?.state??'未同步'}</span></header>
+      <p>來源固定為已發布 MFK Availability + Catalog。SPU OpenItemCode 同完整菜單使用同一套 deterministic identity。</p>
+      {sellabilityPreview?<div className="admin-readback-proof">
+        <p><span>Admin Revision</span><b>R{sellabilityPreview.revision}</b></p>
+        <p><span>同步設定</span><b>{sellabilityPreview.state}</b></p>
+        <p><span>商品總數</span><b>{sellabilityPreview.total}</b></p>
+        <p><span>可售</span><b>{sellabilityPreview.available}</b></p>
+        <p><span>停售</span><b>{sellabilityPreview.unavailable}</b></p>
+      </div>:null}
+      <div className="admin-callout compact">目前只同步有 canonical product availability 嘅 SPU；Option 獨立售罄要等 MFK 有獨立 option availability truth，唔會由 provider 反推。</div>
+      <div className="admin-editor-actions">
+        <button type="button" className="secondary" disabled={providerOpsBusy} onClick={()=>void previewSellability()}>預檢供應狀態</button>
+        <button type="button" className="primary" disabled={providerOpsBusy||liveStatus?.oauth.state!=='CONNECTED'||!config.syncSellability} onClick={()=>void submitSellability()}>同步售罄到 Keeta</button>
+      </div>
+    </section>:null}
+    {mode==='sync'?<section className="admin-policy-card">
+      <header><div><small>KEETA STORE OPS</small><h2>Keeta 營業時間／開關店</h2></div><span className={storeStatus?.state==='AVAILABLE'?'admin-status-good':'admin-not-wired-chip'}>{storeStatus?.state??'未讀取'}</span></header>
+      <p>七日營業時間由已發布 Admin 門店設定投影；REST／OPEN 係 Keeta provider 營運動作，唔會改寫 MFK Store identity。</p>
+      {storePreview?<div className="admin-readback-proof">
+        <p><span>Admin Revision</span><b>R{storePreview.revision}</b></p>
+        <p><span>星期資料</span><b>{Object.keys(storePreview.businessHourOfTheWeek).length} / 7</b></p>
+      </div>:null}
+      <div className="admin-editor-actions">
+        <button type="button" className="secondary" disabled={providerOpsBusy} onClick={()=>void previewStore()}>預檢營業時間</button>
+        <button type="button" className="primary" disabled={providerOpsBusy||liveStatus?.oauth.state!=='CONNECTED'} onClick={()=>void submitStoreHours()}>同步營業時間</button>
+        <button type="button" className="secondary" disabled={providerOpsBusy||liveStatus?.oauth.state!=='CONNECTED'} onClick={()=>void runStoreOperation('REST')}>Keeta 暫停接單</button>
+        <button type="button" className="secondary" disabled={providerOpsBusy||liveStatus?.oauth.state!=='CONNECTED'} onClick={()=>void runStoreOperation('OPEN')}>Keeta 恢復接單</button>
+        <button type="button" className="secondary" disabled={providerOpsBusy} onClick={()=>void refreshStoreReadback()}>更新 Provider Readback</button>
       </div>
     </section>:null}
     <div className="admin-policy-grid two">

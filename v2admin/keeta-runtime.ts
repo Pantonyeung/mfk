@@ -1,4 +1,5 @@
 import {buildKeetaMenuProjection} from './keeta-menu-projection.ts';
+import {buildKeetaSellabilityProjection,buildKeetaWeeklyHoursProjection,chunkKeetaSpuStatus} from './keeta-store-projection.ts';
 import {MFK_KEETA_ORDER_INTENT_SCHEMA,validateMfkKeetaOrderAck} from '../contracts/keeta-order-intake-v1.ts';
 const KEETA_AUTHORIZE_URL='https://merchant.mykeeta.com/m/web/openapi/authorize';
 const KEETA_TOKEN_URL='https://open.mykeeta.com/api/open/base/oauth/token';
@@ -6,6 +7,12 @@ const KEETA_MENU_SYNC_URL='https://open.mykeeta.com/api/open/product/menu/sync';
 const KEETA_ORDER_CONFIRM_URL='https://open.mykeeta.com/api/open/order/confirm';
 const KEETA_ORDER_READY_URL='https://open.mykeeta.com/api/open/order/prepare';
 const KEETA_ORDER_GET_URL='https://open.mykeeta.com/api/open/order/get';
+const KEETA_SPU_STATUS_URL='https://open.mykeeta.com/api/open/product/spustatus/batchupdatebycode';
+const KEETA_STORE_HOURS_GET_URL='https://open.mykeeta.com/api/open/scm/shop/business/hour/effective/get';
+const KEETA_STORE_HOURS_UPDATE_URL='https://open.mykeeta.com/api/open/scm/shop/business/hour/effective/update';
+const KEETA_STORE_DETAILS_URL='https://open.mykeeta.com/api/open/scm/shop/base/get';
+const KEETA_STORE_REST_URL='https://open.mykeeta.com/api/open/scm/shop/status/rest';
+const KEETA_STORE_OPEN_URL='https://open.mykeeta.com/api/open/scm/shop/status/open';
 const TOKEN_REFRESH_WINDOW_MS=5*24*60*60*1000;
 const TOKEN_REFRESH_MIN_INTERVAL_MS=60_000;
 const OAUTH_STATE_TTL_MS=10*60*1000;
@@ -339,6 +346,53 @@ async function readKeetaProviderOrder(config,token,providerOrderId){
   return Object.freeze({code,message:String(row.message||'Success'),data:row.data??null});
 }
 
+
+async function keetaProviderJson(config,token,url,params){
+  const raw=await sendSignedProviderRequest({
+    url,
+    params:{
+      accessToken:token.accessToken,
+      appId:config.appId,
+      ...params,
+      timestamp:Math.floor(Date.now()/1000),
+    },
+    appSecret:config.appSecret,
+  });
+  let row;
+  try{row=record(JSON.parse(raw),'KEETA_PROVIDER_RESPONSE_INVALID');}
+  catch(error){throw new Error(error instanceof Error?error.message:'KEETA_PROVIDER_RESPONSE_INVALID_JSON');}
+  const code=Number(row.code);
+  if(!Number.isSafeInteger(code))throw new Error('KEETA_PROVIDER_RESPONSE_CODE_INVALID');
+  if(code!==0)throw new Error('KEETA_PROVIDER_'+code+':'+String(row.message||''));
+  return Object.freeze({code,message:String(row.message||'Success'),data:row.data??null,errorList:Array.isArray(row.errorList)?row.errorList:[]});
+}
+
+async function syncKeetaSellability(config,token,snapshot){
+  const projection=buildKeetaSellabilityProjection(snapshot);
+  if(!projection.enabled)throw new Error('KEETA_SELLABILITY_SYNC_DISABLED_BY_PUBLISHED_CONFIG');
+  const results=[];
+  for(const [status,codes] of [[1,projection.available],[0,projection.unavailable]]){
+    for(const batch of chunkKeetaSpuStatus(codes)){
+      if(batch.length===0)continue;
+      const receipt=await keetaProviderJson(config,token,KEETA_SPU_STATUS_URL,{
+        shopId:config.providerShopId,
+        spuOpenItemCodeList:batch,
+        status,
+        needLinkage:0,
+      });
+      results.push(Object.freeze({status,count:batch.length,receipt}));
+    }
+  }
+  return Object.freeze({projection,results:Object.freeze(results)});
+}
+
+async function readKeetaStore(config,token){
+  const [details,hours]=await Promise.all([
+    keetaProviderJson(config,token,KEETA_STORE_DETAILS_URL,{shopId:config.providerShopId}),
+    keetaProviderJson(config,token,KEETA_STORE_HOURS_GET_URL,{shopId:config.providerShopId}),
+  ]);
+  return Object.freeze({observedAt:new Date().toISOString(),details,hours});
+}
 async function exchangeAuthorizationCode(config,code){
   const raw=await sendSignedProviderRequest({
     url:KEETA_TOKEN_URL,
@@ -717,6 +771,137 @@ export class KeetaRuntimeStore{
       return latest?json(latest):json({state:'NEVER_SYNCED',provider:'KEETA',canonicalStoreId:'MF01'});
     }
 
+
+    if(url.pathname==='/admin/sellability/preview'&&request.method==='POST'){
+      try{
+        const body=record(await request.json(),'KEETA_SELLABILITY_PREVIEW_INPUT_INVALID');
+        const revision=positiveInt(body.revision,'KEETA_SELLABILITY_ADMIN_REVISION_INVALID');
+        const adminFingerprint=nonEmpty(body.adminFingerprint,'KEETA_SELLABILITY_ADMIN_FINGERPRINT_REQUIRED');
+        const projection=buildKeetaSellabilityProjection(body.snapshot);
+        return json({
+          state:projection.enabled?'READY':'DISABLED',
+          revision,adminFingerprint,
+          total:projection.total,
+          available:projection.available.length,
+          unavailable:projection.unavailable.length,
+        });
+      }catch(error){
+        return json({state:'BLOCKED',code:error instanceof Error?error.message:'KEETA_SELLABILITY_PREVIEW_FAILED'},409);
+      }
+    }
+
+    if(url.pathname==='/admin/sellability/sync'&&request.method==='POST'){
+      try{
+        const body=record(await request.json(),'KEETA_SELLABILITY_SYNC_INPUT_INVALID');
+        const revision=positiveInt(body.revision,'KEETA_SELLABILITY_ADMIN_REVISION_INVALID');
+        const adminFingerprint=nonEmpty(body.adminFingerprint,'KEETA_SELLABILITY_ADMIN_FINGERPRINT_REQUIRED');
+        const config=requireRuntimeConfig(this.env);
+        const token=await this.usableToken();
+        const result=await syncKeetaSellability(config,token,body.snapshot);
+        const row=Object.freeze({
+          state:'COMPLETED',provider:'KEETA',canonicalStoreId:'MF01',
+          providerShopId:config.providerShopId,adminRevision:revision,adminFingerprint,
+          total:result.projection.total,available:result.projection.available.length,
+          unavailable:result.projection.unavailable.length,
+          batches:result.results,completedAt:new Date().toISOString(),
+        });
+        await this.state.storage.put('sellability:sync:latest',row);
+        return json(row);
+      }catch(error){
+        const row=Object.freeze({state:'FAILED',code:error instanceof Error?error.message:'KEETA_SELLABILITY_SYNC_FAILED',updatedAt:new Date().toISOString()});
+        await this.state.storage.put('sellability:sync:latest',row);
+        return json(row,409);
+      }
+    }
+
+    if(url.pathname==='/admin/sellability/status'&&(request.method==='GET'||request.method==='POST')){
+      const row=await this.state.storage.get('sellability:sync:latest');
+      return row?json(row):json({state:'NEVER_SYNCED',provider:'KEETA'});
+    }
+
+    if(url.pathname==='/admin/store/preview'&&request.method==='POST'){
+      try{
+        const body=record(await request.json(),'KEETA_STORE_PREVIEW_INPUT_INVALID');
+        const revision=positiveInt(body.revision,'KEETA_STORE_ADMIN_REVISION_INVALID');
+        const adminFingerprint=nonEmpty(body.adminFingerprint,'KEETA_STORE_ADMIN_FINGERPRINT_REQUIRED');
+        const businessHourOfTheWeek=buildKeetaWeeklyHoursProjection(body.snapshot);
+        return json({state:'READY',revision,adminFingerprint,businessHourOfTheWeek});
+      }catch(error){
+        return json({state:'BLOCKED',code:error instanceof Error?error.message:'KEETA_STORE_PREVIEW_FAILED'},409);
+      }
+    }
+
+    if(url.pathname==='/admin/store/hours/sync'&&request.method==='POST'){
+      try{
+        const body=record(await request.json(),'KEETA_STORE_HOURS_SYNC_INPUT_INVALID');
+        const revision=positiveInt(body.revision,'KEETA_STORE_ADMIN_REVISION_INVALID');
+        const adminFingerprint=nonEmpty(body.adminFingerprint,'KEETA_STORE_ADMIN_FINGERPRINT_REQUIRED');
+        const businessHourOfTheWeek=buildKeetaWeeklyHoursProjection(body.snapshot);
+        const config=requireRuntimeConfig(this.env);
+        const token=await this.usableToken();
+        const receipt=await keetaProviderJson(config,token,KEETA_STORE_HOURS_UPDATE_URL,{
+          shopId:config.providerShopId,businessHourOfTheWeek,
+        });
+        const readback=await readKeetaStore(config,token);
+        const row=Object.freeze({
+          state:'COMPLETED',provider:'KEETA',adminRevision:revision,adminFingerprint,
+          completedAt:new Date().toISOString(),receipt,readback,
+        });
+        await this.state.storage.put('store:sync:latest',row);
+        return json(row);
+      }catch(error){
+        const row=Object.freeze({state:'FAILED',code:error instanceof Error?error.message:'KEETA_STORE_HOURS_SYNC_FAILED',updatedAt:new Date().toISOString()});
+        await this.state.storage.put('store:sync:latest',row);
+        return json(row,409);
+      }
+    }
+
+    if(url.pathname==='/admin/store/readback'&&request.method==='POST'){
+      try{
+        const config=requireRuntimeConfig(this.env);
+        const token=await this.usableToken();
+        const readback=await readKeetaStore(config,token);
+        await this.state.storage.put('store:readback:latest',readback);
+        return json({state:'OBSERVED',readback});
+      }catch(error){
+        return json({state:'FAILED',code:error instanceof Error?error.message:'KEETA_STORE_READBACK_FAILED'},409);
+      }
+    }
+
+    if((url.pathname==='/admin/store/status/rest'||url.pathname==='/admin/store/status/open')&&request.method==='POST'){
+      try{
+        const action=url.pathname.endsWith('/rest')?'REST':'OPEN';
+        const desiredStatus=action==='REST'?4:3;
+        const config=requireRuntimeConfig(this.env);
+        const token=await this.usableToken();
+        const before=await readKeetaStore(config,token);
+        const currentStatus=Number(before.details?.data?.status);
+        if(currentStatus===desiredStatus){
+          const row=Object.freeze({state:'IDEMPOTENT',action,observedAt:new Date().toISOString(),readback:before});
+          await this.state.storage.put('store:operation:latest',row);
+          return json(row);
+        }
+        const endpoint=action==='REST'?KEETA_STORE_REST_URL:KEETA_STORE_OPEN_URL;
+        const receipt=await keetaProviderJson(config,token,endpoint,{shopId:config.providerShopId});
+        const after=await readKeetaStore(config,token);
+        const row=Object.freeze({state:'COMPLETED',action,completedAt:new Date().toISOString(),receipt,readback:after});
+        await this.state.storage.put('store:operation:latest',row);
+        return json(row);
+      }catch(error){
+        const row=Object.freeze({state:'FAILED',code:error instanceof Error?error.message:'KEETA_STORE_OPERATION_FAILED',updatedAt:new Date().toISOString()});
+        await this.state.storage.put('store:operation:latest',row);
+        return json(row,409);
+      }
+    }
+
+    if(url.pathname==='/admin/store/status'&&(request.method==='GET'||request.method==='POST')){
+      const [sync,operation,readback]=await Promise.all([
+        this.state.storage.get('store:sync:latest'),
+        this.state.storage.get('store:operation:latest'),
+        this.state.storage.get('store:readback:latest'),
+      ]);
+      return json({state:'AVAILABLE',sync:sync??null,operation:operation??null,readback:readback??null});
+    }
 
     if(url.pathname==='/smt/orders/pending'&&request.method==='GET'){
       const rows=await this.state.storage.list({prefix:'order:intent:'});

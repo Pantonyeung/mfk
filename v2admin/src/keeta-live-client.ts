@@ -146,3 +146,61 @@ export function syncKeetaMenu():Promise<KeetaMenuStatus>{
 export function readKeetaMenuStatus():Promise<KeetaMenuStatus>{
   return keetaAdminPost<KeetaMenuStatus>('menu/status');
 }
+
+
+export interface KeetaSellabilityPreview{
+  readonly state:'READY'|'DISABLED';
+  readonly revision:number;
+  readonly adminFingerprint:string;
+  readonly total:number;
+  readonly available:number;
+  readonly unavailable:number;
+}
+export interface KeetaSellabilityStatus{
+  readonly state:'NEVER_SYNCED'|'COMPLETED'|'FAILED';
+  readonly total?:number;
+  readonly available?:number;
+  readonly unavailable?:number;
+  readonly completedAt?:string;
+  readonly code?:string;
+}
+export interface KeetaStorePreview{
+  readonly state:'READY';
+  readonly revision:number;
+  readonly adminFingerprint:string;
+  readonly businessHourOfTheWeek:Readonly<Record<string,readonly {readonly startTime:number;readonly endTime:number}[]>>;
+}
+export interface KeetaStoreStatus{
+  readonly state:string;
+  readonly sync?:unknown;
+  readonly operation?:unknown;
+  readonly readback?:unknown;
+  readonly code?:string;
+}
+export function previewKeetaSellability():Promise<KeetaSellabilityPreview>{
+  return keetaAdminPost<KeetaSellabilityPreview>('sellability/preview');
+}
+export function syncKeetaSellability():Promise<KeetaSellabilityStatus>{
+  return keetaAdminPost<KeetaSellabilityStatus>('sellability/sync');
+}
+export function readKeetaSellabilityStatus():Promise<KeetaSellabilityStatus>{
+  return keetaAdminPost<KeetaSellabilityStatus>('sellability/status');
+}
+export function previewKeetaStoreHours():Promise<KeetaStorePreview>{
+  return keetaAdminPost<KeetaStorePreview>('store/preview');
+}
+export function syncKeetaStoreHours():Promise<KeetaStoreStatus>{
+  return keetaAdminPost<KeetaStoreStatus>('store/hours/sync');
+}
+export function readKeetaStore():Promise<KeetaStoreStatus>{
+  return keetaAdminPost<KeetaStoreStatus>('store/readback');
+}
+export function restKeetaStore():Promise<KeetaStoreStatus>{
+  return keetaAdminPost<KeetaStoreStatus>('store/status/rest');
+}
+export function openKeetaStore():Promise<KeetaStoreStatus>{
+  return keetaAdminPost<KeetaStoreStatus>('store/status/open');
+}
+export function readKeetaStoreStatus():Promise<KeetaStoreStatus>{
+  return keetaAdminPost<KeetaStoreStatus>('store/status');
+}
