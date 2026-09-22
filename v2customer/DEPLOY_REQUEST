@@ -1,0 +1,5 @@
+MFK_CUSTOMER_ACCEPTANCE_DEPLOY_REQUEST
+target=mfk-customer-acceptance
+source_branch=acceptance/MFK/CUSTOMER-PRODUCT-R1-CLOUDFLARE
+purpose=owner_visual_acceptance
+live_connection=off
