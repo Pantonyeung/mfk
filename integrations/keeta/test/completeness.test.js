@@ -144,12 +144,16 @@ test('acceptance mode is explicit MFK policy input and never live by default', (
   assert.throws(() => resolveKeetaAcceptancePolicy({}), /KEETA_ACCEPTANCE_MODE_REQUIRED/);
 });
 
-test('completeness ledger keeps live runtime and canonical writers excluded', () => {
-  assert.equal(KEETA_CAPABILITY_COUNT, 43);
-  assert.equal(KEETA_COMPLETENESS_SCOPE.state, 'PROVIDER_COMPLETE_NOT_WIRED');
+test('completeness ledger allows only the bounded K0 live edge and keeps canonical writers excluded', () => {
+  assert.equal(KEETA_CAPABILITY_COUNT, 46);
+  assert.equal(KEETA_COMPLETENESS_SCOPE.state, 'PROVIDER_COMPLETE_K0_LIVE_EDGE');
+  assert.ok(KEETA_COMPLETENESS_SCOPE.includes.includes('K0_OAUTH_RUNTIME'));
+  assert.ok(KEETA_COMPLETENESS_SCOPE.includes.includes('K0_SIGNED_WEBHOOK_CAPTURE'));
+  assert.ok(KEETA_COMPLETENESS_SCOPE.excludes.includes('FORMAL_ORDER_WRITER'));
+  assert.ok(KEETA_COMPLETENESS_SCOPE.excludes.includes('MERCHANT_DECISION_SEND'));
   const exclusions = JSON.stringify(KEETA_DONOR_EXCLUSIONS);
   assert.match(exclusions, /LEGACY_D1_CANONICAL_ACCEPTANCE/);
-  assert.match(exclusions, /LIVE_RUNTIME_WIRING_FORBIDDEN_DURING_COMPLETENESS/);
+  assert.match(exclusions, /LEGACY_LIVE_RUNTIME_NOT_REUSED_NEW_K0_EDGE_ONLY/);
 });
 
 
