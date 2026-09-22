@@ -84,7 +84,7 @@ function normalizeChild(option:Partial<OptionChildDraft>,fallbackId:string,posit
 function normalizeSet(set:Partial<OptionSetDraft>,fallbackId:string):OptionSetDraft{
   const options=(set.options??[]).map((option,index)=>normalizeChild(option,option.id||fallbackId+'-option-'+(index+1),(index+1)*10));
   options.sort((a,b)=>a.position-b.position||a.code.localeCompare(b.code));
-  const selection:set is OptionSetDraft?OptionSetSelection:OptionSetSelection=(set.selection==='MULTI'?'MULTI':'SINGLE');
+  const selection:OptionSetSelection=set.selection==='MULTI'?'MULTI':'SINGLE';
   const max=selection==='SINGLE'?1:Math.max(0,Number(set.max??1));
   const required=Boolean(set.required);
   const min=required?Math.max(1,Number(set.min??1)):Math.max(0,Number(set.min??0));
