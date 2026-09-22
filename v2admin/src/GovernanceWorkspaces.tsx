@@ -162,7 +162,7 @@ export function PublishCenterWorkspace(){
       <p>系統會核對今次發布同門店回傳資料，並顯示「一致」、「不一致」或者「未確認」。只有「一致」先可以完成今次發布。</p>
       <div className="admin-editor-actions">
         <button type="button" disabled>建立新版還原</button>
-        <button type="button" disabled>Automatic 尚未可發布</button>
+        <button type="button" disabled>自動發布尚未開放</button>
       </div>
       <small>還原同自動發布都唔喺今次流程；今次只處理人工發布同門店回傳核對。</small>
     </section>
@@ -175,7 +175,7 @@ export function PrintRulesWorkspace(){
   const current=(id:string)=>rows[id]??{receipt:true,production:true,packing:true,label:false,dineIn:true};
   const patch=(id:string,change:Partial<ReturnType<typeof current>>)=>setRows(value=>({...value,[id]:{...current(id),...change}}));
   return <section className="admin-editor-page">
-    <MigrationHeader title="商品／堂食打印規則" description="只搬 Admin 規則設定面；實體 Print Admission、Queue、IP/USB、Native execution 全部唔喺呢度。"/>
+    <MigrationHeader title="商品／堂食打印規則" description="呢度只設定商品同堂食嘅打印規則；實際打印會由門店裝置處理。"/>
     {draft.products.length===0?<div className="admin-empty-state"><b>未有商品草稿</b><p>建立商品後先可以設定打印項目。</p></div>:<div className="admin-editor-list">
       {draft.products.map(product=>{
         const row=current(product.id);
@@ -225,10 +225,10 @@ export function SettlementWorkspace(){
       <button disabled>讀取未接駁</button>
     </div>
     <div className="admin-kpi-grid">
-      <article><span>平台總額</span><strong>—</strong><small>NOT_WIRED</small></article>
-      <article><span>平台佣金</span><strong>—</strong><small>NOT_WIRED</small></article>
-      <article><span>退款／調整</span><strong>—</strong><small>NOT_WIRED</small></article>
-      <article><span>差異</span><strong>—</strong><small>NOT_WIRED</small></article>
+      <article><span>平台總額</span><strong>—</strong><small>尚未啟用</small></article>
+      <article><span>平台佣金</span><strong>—</strong><small>尚未啟用</small></article>
+      <article><span>退款／調整</span><strong>—</strong><small>尚未啟用</small></article>
+      <article><span>差異</span><strong>—</strong><small>尚未啟用</small></article>
     </div>
     <section className="admin-read-table"><header><span>期間</span><span>平台</span><span>參考編號</span><span>差額</span><span>狀態</span></header><div className="admin-read-empty">對帳資料尚未啟用</div></section>
   </section>;
@@ -240,7 +240,7 @@ export function MigrationCoverageWorkspace(){
   return <section className="admin-editor-page">
     <MigrationHeader title="功能準備進度" description="只用嚟查看功能準備進度；唔代表相關功能已經啟用。"/>
     <div className="admin-kpi-grid">
-      <article><span>準備中功能</span><strong>{wired}</strong><small>NOT_WIRED</small></article>
+      <article><span>準備中功能</span><strong>{wired}</strong><small>尚未啟用</small></article>
       <article><span>稍後開放功能</span><strong>{deferred}</strong><small>稍後開放</small></article>
       <article><span>功能總數</span><strong>{ADMIN_CAPABILITIES.length}</strong><small>功能清單</small></article>
       <article><span>已啟用連接</span><strong>0</strong><small>尚未開放</small></article>
