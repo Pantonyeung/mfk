@@ -192,21 +192,31 @@ This is an isolated OTA source line from exact 814.
 It is NOT a merge of old baseline back into current MFK main.
 Do not merge/rebase this branch into current main as a product landing.
 
+## 7. Exact NEXT
 
+Owner performs ONE real-device acceptance:
 
-Prepare ONE isolated candidate from the exact `814043...` baseline with only the runtime.ready persistence delta.
+1. Recovery → `檢查 Runtime OTA`
+2. freshly offered release MUST be:
+   `runtime-candidate-mfk-d133043dfe7d`
+3. download / install / activate
+4. first confirm the visible SMT product/UI/behavior matches the Owner-selected 814 baseline
+5. return Recovery and prove:
+   - Current = `runtime-candidate-mfk-d133043dfe7d`
+   - Candidate = `—`
+   - Activation Requested = `false`
+   - Previous = prior Current
+6. fully close/reopen SMT app
+7. prove same Current remains
+8. full device power off/on
+9. prove same Current remains
+10. Previous remains rollback target
 
-Acceptance before device publish:
-1. exact base identity = `814043...`
-2. product/runtime files outside persistence allowlist unchanged
-3. runtime.ready test GREEN
-4. build GREEN
-5. semantic diff proves no unrelated SMT product drift
-6. publish new OTA release ID
-7. Owner visually/functionally confirms it is the intended 814 baseline
-8. Recovery proves Current promotion
-9. app restart preserves same Current
-10. full power cycle preserves same Current
+STOP immediately if:
+- offered release is not `runtime-candidate-mfk-d133043dfe7d`
+- product/UI behavior does not match intended 814 baseline
+- Current does not promote
+- restart or power-cycle reverts
 
 Only then BANK:
 
