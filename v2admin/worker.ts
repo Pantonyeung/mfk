@@ -338,9 +338,14 @@ export default {
         target.pathname='/admin/'+adminSubpath;
         target.search=url.search;
         const init={method:request.method,headers:new Headers(request.headers)};
-        if((adminSubpath==='menu/preview'||adminSubpath==='menu/sync')&&request.method==='POST'){
+        const activeConfigSubpaths=new Set([
+          'menu/preview','menu/sync',
+          'sellability/preview','sellability/sync',
+          'store/preview','store/hours/sync',
+        ]);
+        if(activeConfigSubpaths.has(adminSubpath)&&request.method==='POST'){
           const activeResponse=await admin.fetch(new Request('https://internal/active',{method:'GET'}));
-          if(!activeResponse.ok)return json({code:'KEETA_MENU_ADMIN_CONFIG_NOT_PUBLISHED'},409,cors(request));
+          if(!activeResponse.ok)return json({code:'KEETA_ADMIN_CONFIG_NOT_PUBLISHED'},409,cors(request));
           const active=await activeResponse.json();
           init.headers.set('content-type','application/json');
           init.body=JSON.stringify({
