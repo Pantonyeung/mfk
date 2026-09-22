@@ -307,7 +307,7 @@ export default {
           ?'/oauth/callback'
           :'/not-found';
       const forwardedHeaders=new Headers(request.headers);
-      if(url.pathname==='/api/keeta/webhook'){
+      if(url.pathname==='/api/keeta/webhook'||url.pathname==='/api/keeta/oauth/callback'){
         forwardedHeaders.set('x-mfk-keeta-external-url',request.url);
       }else{
         forwardedHeaders.delete('x-mfk-keeta-external-url');
