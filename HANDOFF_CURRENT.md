@@ -5,7 +5,7 @@ Current system: **MFK only**.
 Current main at handoff generation: `e325a05bb8e349a24d5a6a92a8c0b111f7c12c67`
 
 Current navigation:
-`docs/navigation/MFK_航海圖_V1.8_Round009_2026-09-22.txt`
+`docs/navigation/MFK_航海圖_V1.9_Round010_2026-09-22.txt`
 
 Detailed seamless handoff:
 `docs/handoff/MFK_Admin_Connection_Seamless_Handoff_R1_2026-09-22.txt`
@@ -85,3 +85,30 @@ Current provider state:
 - `mfk-admin` bootstrap Worker exists
 - Admin Custom Domain mapping is pending
 - OTA remains untouched
+
+
+## Admin Hosting Provider State
+
+Dedicated MFK Cloudflare account:
+**GREEN**
+
+Worker:
+`mfk-admin`
+
+Canonical Admin domain:
+`https://admin.morefunos.com`
+
+Custom Domain routing / DNS / TLS:
+**GREEN**
+
+Current live content:
+**BOOTSTRAP HELLO WORLD ONLY**
+
+Real MFK Admin app deployment:
+**PENDING**
+
+Next exact step:
+configure GitHub CI credentials, run `deploy-mfk-admin`, then prove:
+`https://admin.morefunos.com/admin/publish`
+
+Do not call Admin hosting live GREEN until the real MFK Admin page replaces Hello World.
