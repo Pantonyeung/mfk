@@ -153,4 +153,45 @@ describe('Keeta live edge runtime',()=>{
     expect(diagnostic).not.toContain('opaque-state');
   });
 
+
+  it('verifies a forwarded webhook against the external configured URL, not the internal DO path',async()=>{
+    const key=Buffer.alloc(32,5).toString('base64');
+    const storage=new Map<string,unknown>();
+    const state={storage:{
+      get:async(key:string)=>storage.get(key),
+      put:async(key:string,value:unknown)=>{storage.set(key,value);},
+      delete:async(key:string)=>{storage.delete(key);},
+    }};
+    const env={
+      KEETA_APP_ID:'3419700273',
+      KEETA_APP_SECRET:'test-secret',
+      KEETA_TOKEN_ENCRYPTION_KEY:key,
+      KEETA_PROVIDER_SHOP_ID:'721578302',
+      KEETA_OAUTH_REDIRECT_URI:'https://admin.morefunos.com/api/keeta/oauth/callback',
+    };
+    const {KeetaRuntimeStore}=await import('../keeta-runtime.ts');
+    const runtime=new KeetaRuntimeStore(state as never,env as never);
+    const externalUrl='https://admin.morefunos.com/api/keeta/webhook';
+    const internalUrl='https://admin.morefunos.com/webhook';
+    const params={
+      eventId:1301,
+      appId:3419700273,
+      messageId:'auth-msg-external-url',
+      shopId:721578302,
+      message:JSON.stringify({authId:'1294288',opType:1,shopId:721578302}),
+      timestamp:1790092903,
+    };
+    const signed=await signKeetaRuntimeParams(externalUrl,params,'test-secret');
+    const response=await runtime.fetch(new Request(internalUrl,{
+      method:'POST',
+      headers:{
+        'content-type':'application/json',
+        'x-mfk-keeta-external-url':externalUrl,
+      },
+      body:JSON.stringify(signed),
+    }));
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({code:0,message:'Success',data:{}});
+  });
+
 });
