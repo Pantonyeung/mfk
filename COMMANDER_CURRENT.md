@@ -110,12 +110,33 @@ GREEN.
 
 This temporary compatibility publisher does not become MFK authority.
 
+## 6A. Owner real-device evidence｜current screen
+
+Owner screenshot now proves the Carrier itself has a persisted cold-boot-stable Current, but it is NOT the fixed #40 acceptance release.
+
+Observed on device:
+- Carrier = `1.0.6 (106)`
+- Boot Runtime = `runtime-candidate-55fea91e128a`
+- Current = `runtime-candidate-55fea91e128a`
+- Candidate = `—`
+- Previous = `runtime-candidate-842870976ec1`
+- Activation Requested = `false`
+- Cold Boot event = `BOOT_COMPLETED`
+- visible OTA metadata block still shows releaseId = `runtime-candidate-mfk-814043c809bb`
+- visible fixed target `runtime-candidate-mfk-2fd6e10cc7c8` is NOT yet read back on this device
+
+Interpretation:
+- `runtime-candidate-55fea91e128a` persistence across reboot is GREEN for that installed release.
+- This does NOT close #40 because the repaired candidate `runtime-candidate-mfk-2fd6e10cc7c8` is not Current.
+- The metadata block may be stale until `檢查 Runtime OTA` is pressed.
+- Do NOT classify OTA MANIFEST / ENDPOINT as confirmed until a fresh OTA check still fails to offer `2fd6e10cc7c8`.
+
 ## 7. Exact NEXT
 
 Owner performs ONE real device acceptance:
 
-1. Recovery → 檢查 Runtime OTA
-2. confirm offered release = `runtime-candidate-mfk-2fd6e10cc7c8`
+1. Recovery → press `檢查 Runtime OTA` once to force a fresh metadata fetch
+2. confirm freshly offered release = `runtime-candidate-mfk-2fd6e10cc7c8`
 3. download / install / activate
 4. after MFK UI loads, return Recovery
 5. prove:
@@ -133,7 +154,7 @@ Only then BANK:
 
 ## 8. Failure classifier
 
-- candidate not offered → OTA MANIFEST / ENDPOINT
+- after a fresh OTA check, target candidate not offered → OTA MANIFEST / ENDPOINT
 - download fails → DELIVERY / SIGNATURE
 - candidate launches but Current stays old → runtime.ready PROMOTION
 - new Current then app restart reverts → PERSISTED ACTIVATION STATE
