@@ -3,138 +3,158 @@
 Status: CURRENT / CONTROLLING
 Protocol: #39
 Control: #22
-Updated: 2026-09-22 11:42 Asia/Hong_Kong
+Updated: 2026-09-22 11:58 Asia/Hong_Kong
 System: MFK ONLY
 
 ## 0. Mandatory read order
 1. COMMANDER_CURRENT.md
 2. #22 latest control
-3. docs/navigation/MFK_航海圖_V1.16_Round017_2026-09-22.txt
+3. docs/navigation/MFK_航海圖_V1.17_Round018_2026-09-22.txt
 4. HANDOFF_CURRENT.md
-5. active issue(s)
+5. active issues
 
 ## 1. Owner priority
 
 SMT OTA physical acceptance:
 HOLD
 
-Admin connection:
+Admin:
 ACTIVE
 
 ## 2. Admin operator Chinese UI
 
-Owner hard requirement:
-Admin is an operator product, not an engineering console.
-
-Operator-visible UI must:
-- use Traditional Chinese first
-- hide engineering/protocol/internal architecture wording
-- use human operational wording
-- keep internal IDs/contracts/status enums inside code/tests/evidence unless explicitly needed for support
-
-Issue:
-#41
-
-Implementation branch:
-work/MFK/ADMIN-OPERATOR-CHINESE-UX-R1
+Issue #41.
 
 Source verification:
-run 35683885708
-SUCCESS
-
-Clean landing main:
-4f332baa67900d33f72cd43a0dc457177c3cca80
+35683885708 SUCCESS
 
 Live deploy:
-run 35684038608
-SUCCESS
+35684038608 SUCCESS
 
-Deploy job proof:
-- npm test SUCCESS
-- npm run build SUCCESS
-- Deploy mfk-admin SUCCESS
-
-Milestone:
+State:
 MFK_ADMIN_OPERATOR_CHINESE_UI_DEPLOYED_GREEN
 
-Owner browser refresh / visual readback:
+Owner browser visual confirmation:
 PENDING
 
-## 3. What changed in operator UI
+## 3. Owner-selected legacy Admin Menu re-entry
 
-Removed/replaced operator-visible engineering wording including:
-- NOT_WIRED / MIGRATION_ONLY
-- SESSION DRAFT
-- ADMIN CONNECTION A2 / HUMAN CONTROLLED
-- SOURCE_INTENT / TARGET_OBSERVED
-- Transport Bundle / Readback Receipt
-- OWNER → ADMIN → SMT
-- Domain adapters
-- Validate / Impact Preview / Expected SMT Base
-- Human Compare / Governance Boundary
-- multiple raw internal status/read-model labels
+Issue:
+#42
 
-Published flow now uses operator wording such as:
-- 待發布變更
-- 檢查內容
-- 確認影響範圍
-- 門店目前版本
-- 建立並下載發布檔案
-- 匯入門店回傳檔案
-- 核對結果
+Owner explicitly authorized retired Morefun-v2 Admin menu as donor for this exact work.
 
-UI guard tests were added to prevent engineering protocol copy from leaking back onto key operator routes.
+Selected donor:
+Pantonyeung/Morefun-v2
+snapshot:
+menu-combined-2026-09-05-v1
 
-## 4. Admin connection state
+Exact source:
+- data/menu/menu-combined-2026-09-05-v1-products.tsv
+- data/menu/menu-combined-2026-09-05-v1-direct-price.tsv
+- scripts/menu/build-mf01-combined-menu-import.mjs
 
-A1 #34:
-BANKED / GREEN
+Donor-supported facts copied:
+- raw rows = 207
+- donor canonical after its own removal list = 203 products
+- direct-visible / active = 188
+- hidden retained inactive = 15
+- categories = 14
+- direct prices = 188
+- exact donor product names
+- exact donor product IDs
+- legacy barcode retained internally
+- donor source ordering retained
 
-A2 #35:
-IMPLEMENTATION GREEN / BANKED
+No unsupported data was invented.
 
-Owner real cross-device acceptance:
+Important:
+The selected donor snapshot itself contains no canonical modifier/combo bindings.
+Those remain absent rather than being fabricated.
+
+## 4. MFK Admin implementation
+
+Seed:
+v2admin/src/admin-menu-seed-mf01-v2.ts
+
+Test:
+v2admin/src/admin-menu-seed-mf01-v2.test.ts
+
+Admin draft:
+now hydrates from the imported MF01 menu instead of 0 Categories / 0 Products.
+
+Inactive donor products:
+may remain uncategorized without blocking validation.
+
+A2 projection:
+active categories/products only;
+188 donor-visible products are eligible for Menu Index projection.
+
+Branch verification:
+35684903667 SUCCESS
+- test GREEN
+- build GREEN
+
+Clean landing:
+main
+
+Deploy trigger:
+eb4f06233b8e9ae6400caeae5880a5eacb086922
+
+Live deploy:
+35684991125 SUCCESS
+- test GREEN
+- build GREEN
+- Deploy mfk-admin GREEN
+
+Milestone:
+MFK_ADMIN_MF01_LEGACY_MENU_REENTERED_DEPLOYED_GREEN
+
+Owner browser visual readback:
 PENDING
-
-Important newly confirmed FIRST BREAK before safe A2 publish:
-ADMIN_A2_SOURCE_BASELINE_NOT_HYDRATED
-
-Evidence:
-live Admin session draft currently starts with 0 Categories / 0 Products.
-A2 builds a full Menu Index revision from Admin draft.
-Therefore a new Admin draft cannot safely publish over an existing SMT Menu baseline until the current SMT menu baseline is hydrated/imported into Admin or an equivalent safe baseline-loading seam exists.
-
-Do NOT ask Owner to create a final A2 bundle from an empty Admin draft.
 
 ## 5. Exact NEXT
 
-1. Owner refreshes admin.morefunos.com and visually confirms operator Chinese wording is live.
-2. If Chinese UI readback is GREEN, bank #41.
-3. Then solve ONE exact Admin A2 baseline-hydration seam:
-   SMT current Active Menu baseline
-   → safe Admin source draft hydration/readback
-   → no product loss
-4. Only after source baseline is present, resume one tiny A2 cross-device change.
+Owner refreshes:
+https://admin.morefunos.com
+
+First verify:
+菜單 → 商品分類
+should show 14 categories.
+
+Then:
+菜單 → 商品資料
+should show 203 products.
+
+Expected:
+- 188 active
+- 15 inactive retained
+- direct prices present on the 188 donor-visible products
+
+Do NOT publish to SMT yet.
+
+After Owner visual readback:
+1. bank #41 Chinese UI if confirmed
+2. bank #42 menu re-entry if counts/content confirmed
+3. read SMT exact Active Revision
+4. only then resume one A2 cross-device change
 
 ## 6. A3
 
 NOT AUTHORIZED.
 
-No automatic Admin→SMT HTTP/polling/cloud transport yet.
-
 ## 7. SMT OTA
 
 #40 remains HOLD.
 
-Ready candidate remains:
+Ready candidate:
 runtime-candidate-mfk-d133043dfe7d
 
-Do not advance until Owner resumes.
-
 ## 8. DO NOT
-- no A2 publish from empty Admin draft
+
+- no SMT mutation from this menu import yet
+- no A2 final bundle before SMT Active Revision is read
 - no A3
 - no SMT OTA acceptance while HOLD
-- no Pricing/Modifier/Combo live connection yet
+- no unsupported modifier/combo reconstruction from legacy guesses
 - no Keeta live
-- no SMM/Customer/Owner live seams
