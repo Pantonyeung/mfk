@@ -141,7 +141,8 @@ function productLabelPurpose(binding:PrinterBinding){
 }
 
 function OverviewPanel({onOpen}:{onOpen:(section:Section)=>void}){
-  const report=buildLocalReport(localRuntime.orders());
+  const cutoff=readBusinessCutoff();
+  const report=buildLocalReport(localRuntime.orders(),{businessStartHour:cutoff.hour,businessStartMinute:cutoff.minute});
   const printers=loadPrinters();
   const online=printers.filter(printer=>printer.host.trim()).length;
   const lastPrint=readLastPrintDiagnostic();
