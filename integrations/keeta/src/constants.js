@@ -3,7 +3,7 @@ export const KEETA_PROVIDER = Object.freeze({
   market: 'HONG_KONG',
   role: 'THIRD_PARTY_PROVIDER_INTEGRATION',
   currentAuthority: 'MFK',
-  integrationState: 'MIGRATED_NOT_WIRED',
+  integrationState: 'K0_LIVE_EDGE_AUTH_WEBHOOK_ONLY',
 });
 
 export const EXECUTION_GATE = Object.freeze({
