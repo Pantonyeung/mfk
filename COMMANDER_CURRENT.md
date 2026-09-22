@@ -3,7 +3,7 @@
 Status: CURRENT / CONTROLLING
 Protocol: #39
 Control: #22
-Updated: 2026-09-22 12:00 Asia/Hong_Kong
+Updated: 2026-09-22 12:06 Asia/Hong_Kong
 System: MFK ONLY
 
 ## 0. Mandatory read order
@@ -168,6 +168,42 @@ BANK A2 owner cross-device acceptance and STOP.
 
 Next separate seam after Owner decision:
 Pricing.
+
+## 5A. Current A2 physical evidence
+
+Owner screenshots now prove:
+
+SMT:
+- ACTIVE = R19
+- DRAFT = D26
+- draft base = R19
+
+Admin:
+- target = R20
+- publish id = `ADMIN-MENU:R20:fnv1a32:08ff69b3`
+- fingerprint = `fnv1a32:08ff69b3`
+- publish file created/downloaded
+- no store readback yet
+
+This is expected pre-transfer state.
+
+SMT remaining R19 is NOT failure until the exact JSON file is imported on SMT.
+
+Exact transfer:
+Admin downloaded JSON
+→ human-controlled local/physical file move
+→ SMT A2 import
+→ expected Active R20 / MATCH
+→ SMT readback download
+→ file move back to Admin
+→ Admin import
+→ 核對結果 = 一致
+
+Important:
+Do NOT use SMT local `發布到 POS` button for A2.
+The A2 bundle import itself applies the validated revision.
+
+STOP if SMT import does not produce R20 / MATCH.
 
 ## 6. A3
 
