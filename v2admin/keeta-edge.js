@@ -54,9 +54,13 @@ function callbackUrl(env){
   return parsed.toString();
 }
 function adminRequest(request){
+  const requestOrigin=new URL(request.url).origin;
   const origin=request.headers.get('origin')||'';
   const site=request.headers.get('sec-fetch-site')||'';
-  return origin===ADMIN_ORIGIN&&(!site||site==='same-origin');
+  if(requestOrigin!==ADMIN_ORIGIN)return false;
+  if(origin&&origin!==ADMIN_ORIGIN)return false;
+  if(site&&site!=='same-origin')return false;
+  return true;
 }
 function b64(bytes){
   let binary='';
