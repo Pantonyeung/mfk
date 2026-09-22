@@ -4,7 +4,7 @@ Mandatory entry:
 `COMMANDER_CURRENT.md`
 
 Current navigation:
-`docs/navigation/MFK_航海圖_V1.13_Round014_2026-09-22.txt`
+`docs/navigation/MFK_航海圖_V1.14_Round015_2026-09-22.txt`
 
 Control:
 #22
@@ -14,61 +14,75 @@ Commander protocol:
 
 ## CURRENT PRIORITY
 
-SMT OTA baseline-lock persistence P0 remains above Admin A2.
+SMT OTA 814-baseline persistence P0 remains above Admin A2.
 
 Active issue:
 #40
 
 ## OWNER TARGET
 
-Owner explicitly locks the desired SMT runtime/product baseline to:
-
+Desired SMT product/runtime baseline:
 `runtime-candidate-mfk-814043c809bb`
 
-Source:
+Exact source baseline:
 `814043c809bbc236df1383c320bad906bcd3f1cd`
 
-Current stable physical runtime:
-`runtime-candidate-55fea91e128a`
+Current installed physical runtime `55fea...` only proved reboot persistence; it is not the desired product baseline.
 
-This current runtime survives reboot and proves Carrier persistence can work, but it is not the desired product baseline.
+## ISOLATED REPAIR SOURCE
 
-## CORRECTION
+Branch:
+`work/MFK/SMT-OTA-814-BASELINE-PERSISTENCE-R2`
 
-Previous candidate:
-`runtime-candidate-mfk-2fd6e10cc7c8`
+Candidate source:
+`d133043dfe7d84e3f4be11ee49e9102c64f518d1`
 
-must not be treated as a minimal repair of 814.
+Exact compare to 814:
+- behind = 0
+- changed product/runtime files = 4 only
+- App diff only mounts RuntimeReadyActivation
+- zero unrelated product drift
 
-GitHub compare:
-- status = diverged
-- ahead = 63
-- behind = 10
-- merge base = `3725ead94a2bf31469f054c955d1b46503e15481`
+Source verification:
+`35681551414` SUCCESS
 
-So the correct target is:
+## PUBLISHED OTA
 
-`814 BASELINE + MINIMAL runtime.ready FIX`
+Release:
+`runtime-candidate-mfk-d133043dfe7d`
 
-with zero unrelated product drift.
+Bundle:
+`MoreFunOS-SMT-runtime-candidate-mfk-d133043dfe7d.mfos`
 
-The repaired artifact must use a new release ID. Reusing 814 release identity with changed bytes is forbidden.
+SHA-256:
+`89898b8420b2038cbde0863de21513b9c765c7e2635d2ca244a4a7f7eb1e7111`
+
+Builder run:
+`35681723140` SUCCESS
+
+Public manifest + bundle hash + Carrier 106 + Bridge 1:
+GREEN
 
 ## EXACT NEXT
 
-Prepare one isolated candidate from exact base `814043...` with only the runtime.ready persistence seam.
+Owner real-device acceptance only:
 
-Before publish:
-- verify exact base
-- verify allowlist-only SMT delta
-- tests/build GREEN
-- prove semantic/product equivalence to 814 except persistence seam
+1. Recovery → 檢查 Runtime OTA
+2. offered release must be `runtime-candidate-mfk-d133043dfe7d`
+3. install / activate
+4. verify UI/function matches intended 814 baseline
+5. Recovery: Current = d133..., Candidate cleared, Activation Requested false
+6. close/reopen app → same Current
+7. full power off/on → same Current
+8. Previous remains rollback target
 
-Then publish and perform real-device:
-- visual/function baseline match
-- Current promotion
-- app restart persistence
-- full power-cycle persistence
+Only then BANK:
+`MFK_SMT_OTA_814_BASELINE_PERSISTENCE_GREEN`
+
+## IMPORTANT
+
+Do NOT merge/rebase the isolated 814 source branch into current MFK main.
+It exists only to produce the no-drift repaired OTA candidate.
 
 ## PAUSED / NOT AUTHORIZED
 
