@@ -9,6 +9,7 @@ import {MfkAdminApp} from './App.tsx';
 import {ADMIN_CAPABILITIES} from './admin-capabilities.ts';
 import {applyProductSetLinksBulk,migrateLegacyDraftToOptionSetCenter,projectOptionSetsForProduct,useOptionSetCenter,validateOptionSetCenter,type OptionSetCenterState} from './admin-option-set-center.ts';
 import {validateAdminConfig} from './admin-config-save.ts';
+import {POSTER_COMBO_SEED} from './admin-combo-seed-poster-20260530.ts';
 
 
 function ProductDetailHarness({productId}:{productId:string}){
@@ -239,6 +240,46 @@ describe('MFK Admin complete catalog product',()=>{
     expect(projectOptionSetsForProduct(state,'product-a').map(set=>set.name)).toEqual(['飯量']);
   });
 
+  it('seeds the Owner poster as one editable three-step Combo template',()=>{
+    const combo=POSTER_COMBO_SEED;
+    expect(combo.name).toBe('自選紫米套餐');
+    expect(combo.basePrice).toBe('41.00');
+    expect(combo.sections.map(section=>section.name)).toEqual(['選擇飯糰','選擇小食','選擇飲品']);
+    expect(combo.sections[0]?.bands.map(band=>band.priceAdjustment)).toEqual(['0.00','2.00','4.00','6.00']);
+    expect(combo.sections[1]?.bands.map(band=>band.priceAdjustment)).toEqual(['0.00','3.00','5.00']);
+    expect(combo.sections[2]?.bands.map(band=>band.priceAdjustment)).toEqual(['0.00','3.00','6.00','8.00','10.00']);
+
+    const productIds=new Set(LEGACY_MF01_ADMIN_DRAFT.products.map(product=>product.id));
+    for(const section of combo.sections){
+      for(const choice of section.choices)expect(productIds.has(choice.productId),choice.id).toBe(true);
+    }
+  });
+
+  it('renders editable Combo R2 bands, canonical product choices and inherited Option-set contract',()=>{
+    const html=renderToStaticMarkup(<MemoryRouter initialEntries={['/admin/catalog/combos']}><MfkAdminApp/></MemoryRouter>);
+    for(const marker of [
+      '自選紫米套餐','選擇飯糰','選擇小食','選擇飲品',
+      'Set A · 茹素輕盈','Set B · 充滿元氣','Set C · 活力滿分','Set D · 店主推薦',
+      '滋味升級 · +$3','夯爆美味 · +$5','暢飲升級 · +$6','夯爆升級 · +$8','夯爆升級 · +$10',
+      '價格帶','可選商品','商品額外差價 HK$','商品本身嘅選項組會原樣繼承',
+    ])expect(html).toContain(marker);
+    expect(html).toContain('古早味紫米飯糰');
+    expect(html).toContain('古早鹽酥雞');
+    expect(html).toContain('台式奶茶');
+  });
+
+  it('resolves Combo choice Product options through the same canonical ProductOptionSetLink truth',()=>{
+    const productId=POSTER_COMBO_SEED.sections[0]!.choices[0]!.productId;
+    const state:OptionSetCenterState={
+      sets:[{
+        id:'rice-adjust',name:'飯量',required:false,forceShow:true,selection:'SINGLE',min:0,max:1,allowQuantities:false,active:true,
+        options:[{id:'more-rice',code:'RICE_MORE',name:'多飯',priceAdjustment:'2.00',active:true,position:10}],
+      }],
+      productLinks:[{productId,setId:'rice-adjust',defaultOptionIds:[]}],
+    };
+    expect(projectOptionSetsForProduct(state,productId).map(set=>set.name)).toEqual(['飯量']);
+  });
+
   it('validates category product pricing modifier and combo relationships',()=>{
     const invalid:AdminSessionDraft={
       categories:[{id:'category-001',name:'',position:10,active:true}],
@@ -249,7 +290,7 @@ describe('MFK Admin complete catalog product',()=>{
       }],
       combos:[{
         id:'combo-001',name:'',active:true,basePrice:'bad',takeawayAdjustment:'0.00',
-        sections:[{id:'section-001',name:'',required:true,min:2,max:1,childProductIds:['missing-product'],priceAdjustment:'bad'}],
+        sections:[{id:'section-001',name:'',required:true,min:2,max:1,childProductIds:['missing-product'],priceAdjustment:'bad'} as never],
       }],
     };
     const errors=validateAdminDraft(invalid);
