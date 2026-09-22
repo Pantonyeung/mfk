@@ -1,12 +1,20 @@
 import {renderToStaticMarkup} from 'react-dom/server';
 import {MemoryRouter} from 'react-router';
 import {describe,expect,it} from 'vitest';
-import {AdminDraftProvider,validateAdminDraft,type AdminSessionDraft} from './admin-draft.tsx';
+import {AdminDraftProvider,useAdminDraft,validateAdminDraft,type AdminSessionDraft} from './admin-draft.tsx';
 import {ProductOperationalDetail,ProductsWorkspace} from './CatalogWorkspaces.tsx';
 import {LEGACY_MF01_ADMIN_DRAFT} from './admin-menu-seed-mf01-v2.ts';
 import {PRODUCT_MEDIA_BACKEND_CONTRACT,normalizeProductPrintRule} from './admin-product-operational-config.ts';
 import {MfkAdminApp} from './App.tsx';
 import {ADMIN_CAPABILITIES} from './admin-capabilities.ts';
+import {migrateLegacyOptionCenter,useOptionCenter,validateOptionCenter,type OptionCenterState} from './admin-option-center.ts';
+
+
+function ProductDetailHarness({productId}:{productId:string}){
+  const {draft}=useAdminDraft();
+  const optionCenter=useOptionCenter(draft);
+  return <ProductOperationalDetail productId={productId} optionCenter={optionCenter}/>;
+}
 
 describe('MFK Admin complete catalog product',()=>{
   it('renders a bounded compact Product list by default',()=>{
@@ -23,9 +31,9 @@ describe('MFK Admin complete catalog product',()=>{
 
   it('shows complete bounded Product operational sections on demand',()=>{
     const productId=LEGACY_MF01_ADMIN_DRAFT.products[0]!.id;
-    const html=renderToStaticMarkup(<AdminDraftProvider><ProductOperationalDetail productId={productId}/></AdminDraftProvider>);
+    const html=renderToStaticMarkup(<AdminDraftProvider><ProductDetailHarness productId={productId}/></AdminDraftProvider>);
     for(const marker of [
-      '基本資料','價格','選項／選項組','每個選項必須有：名稱、選項 ID、價錢',
+      '基本資料','價格','選項','選項名稱、選項 ID 同價錢只喺「選項中心」維護一次',
       '打印','廚房製作單','打包單','堂食打印','外賣打印',
       '圖片／媒體','Canonical 圖片連結','Keeta 獨立圖片連結','R2 Object Key','D1 Media Ref',
     ])expect(html).toContain(marker);
@@ -48,7 +56,7 @@ describe('MFK Admin complete catalog product',()=>{
     const pathsAndMarkers=[
       ['/admin/catalog/products','商品資料'],
       ['/admin/catalog/categories','商品分類'],
-      ['/admin/catalog/modifiers','選項／加料'],
+      ['/admin/catalog/modifiers','選項中心'],
       ['/admin/catalog/pricing','價格管理'],
       ['/admin/catalog/combos','套餐'],
       ['/admin/catalog/menu-display','菜單／顯示排序'],
@@ -90,19 +98,64 @@ describe('MFK Admin complete catalog product',()=>{
   });
 
 
-  it('locks complete Option and pricing responsibilities',()=>{
-    const modifiers=renderToStaticMarkup(<MemoryRouter initialEntries={['/admin/catalog/modifiers']}><MfkAdminApp/></MemoryRouter>);
-    expect(modifiers).toContain('每個選項必須有名稱、選項 ID 同價格');
-    expect(modifiers).toContain('新增選項組');
+  it('locks Option Center as master and Product detail as link/default UI',()=>{
+    const center=renderToStaticMarkup(<MemoryRouter initialEntries={['/admin/catalog/modifiers']}><MfkAdminApp/></MemoryRouter>);
+    for(const marker of ['選項中心','唯一選項資料來源','新增選項','選項 Master','商品連結'])expect(center).toContain(marker);
+    expect(center).toContain('Product Detail 唔會再複製另一份選項資料');
 
     const detailProductId=LEGACY_MF01_ADMIN_DRAFT.products[0]!.id;
-    const detail=renderToStaticMarkup(<AdminDraftProvider><ProductOperationalDetail productId={detailProductId}/></AdminDraftProvider>);
-    expect(detail).toContain('每個選項必須有：名稱、選項 ID、價錢');
+    const detail=renderToStaticMarkup(<AdminDraftProvider><ProductDetailHarness productId={detailProductId}/></AdminDraftProvider>);
+    expect(detail).toContain('只負責連結、套用同設定此商品嘅默認');
+    expect(detail).toContain('前往選項中心');
+    expect(detail).not.toContain('選項價錢</span><input');
 
     const pricing=renderToStaticMarkup(<MemoryRouter initialEntries={['/admin/catalog/pricing']}><MfkAdminApp/></MemoryRouter>);
     expect(pricing).toContain('商品價格');
     expect(pricing).toContain('選項價格');
-    expect(pricing).toContain('負數選項價');
+    expect(pricing).toContain('Option Master');
+  });
+
+  it('normalizes legacy embedded Options into one master and per-Product defaults',()=>{
+    const legacy:AdminSessionDraft={
+      categories:[],
+      products:[
+        {id:'product-a',name:'A',categoryId:'',active:false,basePrice:'',takeawayAdjustment:'',modifierGroupIds:['rice']},
+        {id:'product-b',name:'B',categoryId:'',active:false,basePrice:'',takeawayAdjustment:'',modifierGroupIds:['rice']},
+      ],
+      modifierGroups:[{
+        id:'rice',name:'飯量',required:true,forceShow:true,selection:'SINGLE',min:1,max:1,allowQuantities:false,active:true,
+        options:[
+          {id:'more',name:'多飯',code:'RICE_MORE',priceAdjustment:'2.00',active:true,defaultSelected:false},
+          {id:'small',name:'小飯',code:'RICE_SMALL',priceAdjustment:'0.00',active:true,defaultSelected:true},
+          {id:'none',name:'走飯',code:'RICE_NONE',priceAdjustment:'-1.00',active:true,defaultSelected:false},
+        ],
+      }],
+      combos:[],
+    };
+    const normalized=migrateLegacyOptionCenter(legacy);
+    expect(normalized.options).toHaveLength(3);
+    expect(normalized.groups[0]?.optionIds).toEqual(['more','small','none']);
+    expect(normalized.productLinks).toHaveLength(2);
+    expect(normalized.productLinks[0]?.defaultOptionIds).toEqual(['small']);
+    expect('defaultSelected' in normalized.options[0]!).toBe(false);
+  });
+
+  it('supports different defaults for the same canonical Option group per Product',()=>{
+    const state:OptionCenterState={
+      options:[
+        {id:'more',code:'RICE_MORE',name:'多飯',priceAdjustment:'2.00',active:true},
+        {id:'small',code:'RICE_SMALL',name:'小飯',priceAdjustment:'0.00',active:true},
+        {id:'none',code:'RICE_NONE',name:'走飯',priceAdjustment:'-1.00',active:true},
+      ],
+      groups:[{id:'rice',name:'飯量',optionIds:['more','small','none'],required:true,forceShow:true,selection:'SINGLE',min:1,max:1,allowQuantities:false,active:true}],
+      productLinks:[
+        {productId:'product-a',groupId:'rice',optionIds:['more','small','none'],defaultOptionIds:['small']},
+        {productId:'product-b',groupId:'rice',optionIds:['more','small','none'],defaultOptionIds:['more']},
+      ],
+    };
+    expect(validateOptionCenter(state)).toEqual([]);
+    expect(state.productLinks[0]?.defaultOptionIds).toEqual(['small']);
+    expect(state.productLinks[1]?.defaultOptionIds).toEqual(['more']);
   });
 
   it('validates category product pricing modifier and combo relationships',()=>{
