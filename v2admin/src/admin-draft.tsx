@@ -164,7 +164,7 @@ export function validateAdminDraft(draft:AdminSessionDraft){
 
   for(const product of draft.products){
     const label=product.name||product.id;
-    const code=(product.productCode??'').trim();
+    const code=(product.productCode?.trim()||product.legacyBarcode?.trim()||product.id).trim();
     if(!product.name.trim())errors.push('商品 '+product.id+' 未填名稱');
     if(!code)errors.push('商品 '+label+' 未填 Product Code');
     if(code&&productCodes.has(code))errors.push('Product Code 重複：'+code);
