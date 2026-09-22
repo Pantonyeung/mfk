@@ -4,6 +4,7 @@ import {appendAdminAudit,readActiveAdminRelease,readAdminReleases,readAdminStore
 import {saveAdminConfig} from './admin-config-save.ts';
 import {normalizeProductMedia,normalizeProductPrintRule,PRODUCT_MEDIA_BACKEND_CONTRACT,useProductMediaConfig,useProductPrintRules,type ProductMediaConfig,type ProductPrintRule} from './admin-product-operational-config.ts';
 import {projectOptionSetsForProduct,useOptionSetCenter,type OptionSetCenterController,type OptionSetCenterState,type ProductOptionSetLink} from './admin-option-set-center.ts';
+import {AdminPagination,AdminSearchField} from './AdminUiPrimitives.tsx';
 
 function WorkspaceHeader({
   title,description,onAdd,addLabel,optionCenterState,optionDirty=false,onOptionSaved,
@@ -16,8 +17,13 @@ function WorkspaceHeader({
   const [saveErrors,setSaveErrors]=useState<readonly string[]>([]);
   const [active,setActive]=useState(()=>readActiveAdminRelease());
   const [saveMessage,setSaveMessage]=useState('');
+  const validationRef=useRef<HTMLDivElement>(null);
   useEffect(()=>{setValidated(false);setSaveErrors([]);setSaveMessage('');},[draft]);
   const runValidate=()=>{validate();setValidated(true);};
+  const runReset=()=>{
+    if(typeof window!=='undefined'&&!window.confirm('確定還原原始 MF01 菜單？目前未保存修改會被取代。'))return;
+    reset();
+  };
   const runSave=()=>{
     const result=saveAdminConfig(draft,optionCenterState);
     if(!result.ok){
@@ -25,6 +31,7 @@ function WorkspaceHeader({
       setSaveErrors(result.errors);
       setValidated(true);
       setSaveMessage('未能保存；請先修正以下資料。');
+      window.setTimeout(()=>validationRef.current?.focus(),0);
       return;
     }
     markClean();
@@ -40,11 +47,11 @@ function WorkspaceHeader({
     <div><small>{unsaved?'未保存變更':active?'已保存 · R'+active.version:'未有保存版本'}</small><h1>{title}</h1><p>{description}</p>{saveMessage?<span>{saveMessage}</span>:null}</div>
     <div className="admin-editor-actions">
       {onAdd?<button type="button" className="secondary" onClick={onAdd}>{addLabel??'新增'}</button>:null}
-      <button type="button" className="secondary" onClick={reset}>還原原始 MF01 菜單</button>
+      <button type="button" className="secondary" onClick={runReset}>還原原始 MF01 菜單</button>
       <button type="button" className="secondary" onClick={runValidate}>檢查完整性</button>
       <button type="button" className="primary" onClick={runSave}>保存</button>
     </div>
-    {validated?<div className={'admin-validation '+(errors.length?'is-error':'is-ok')} role="status">
+    {validated?<div ref={validationRef} tabIndex={-1} className={'admin-validation '+(errors.length?'is-error':'is-ok')} role={errors.length?'alert':'status'}>
       {errors.length
         ?<><b>有 {errors.length} 項需要處理</b><ul>{errors.map((error,index)=><li key={index}>{error}</li>)}</ul></>
         :<><b>資料完整性檢查通過</b><span>撳「保存」會建立一個新版本並即時成為目前版本。</span></>}
@@ -56,8 +63,8 @@ function EmptyState({title,description,action,onAction}:{title:string;descriptio
   return <section className="admin-empty-state"><b>{title}</b><p>{description}</p><button type="button" onClick={onAction}>{action}</button></section>;
 }
 
-function Toggle({checked,onChange,label}:{checked:boolean;onChange:(next:boolean)=>void;label:string}){
-  return <label className="admin-toggle"><input type="checkbox" checked={checked} onChange={event=>onChange(event.target.checked)}/><span>{label}</span></label>;
+function Toggle({checked,onChange,label,accessibleLabel}:{checked:boolean;onChange:(next:boolean)=>void;label:string;accessibleLabel?:string}){
+  return <label className="admin-toggle"><input type="checkbox" checked={checked} aria-label={accessibleLabel} onChange={event=>onChange(event.target.checked)}/><span>{label}</span></label>;
 }
 
 
@@ -353,9 +360,9 @@ export function ProductsWorkspace(){
     </div>
     <div className="admin-product-toolbar">
       <div className="admin-filterbar">
-        <input value={query} onChange={event=>setQuery(event.target.value)} placeholder="搜尋商品名稱／商品編號／條碼／庫存編號"/>
-        <select value={category} onChange={event=>setCategory(event.target.value)}><option value="ALL">全部分類</option>{draft.categories.map(row=><option key={row.id} value={row.id}>{row.name}</option>)}</select>
-        <select value={status} onChange={event=>setStatus(event.target.value as typeof status)}><option value="ALL">全部狀態</option><option value="ACTIVE">已啟用</option><option value="INACTIVE">已停用</option></select>
+        <AdminSearchField label="搜尋商品" value={query} onChange={setQuery} placeholder="搜尋商品名稱／商品編號／條碼／庫存編號"/>
+        <label><span>分類</span><select value={category} onChange={event=>setCategory(event.target.value)}><option value="ALL">全部分類</option>{draft.categories.map(row=><option key={row.id} value={row.id}>{row.name}</option>)}</select></label>
+        <label><span>狀態</span><select value={status} onChange={event=>setStatus(event.target.value as typeof status)}><option value="ALL">全部狀態</option><option value="ACTIVE">已啟用</option><option value="INACTIVE">已停用</option></select></label>
         <span>找到 {filtered.length} 件</span>
       </div>
       <div className="admin-product-page-status"><span>第 {safePage} / {pageCount} 頁</span><small>每頁最多 {PAGE_SIZE} 件</small></div>
@@ -424,7 +431,7 @@ export function ModifiersWorkspace(){
     {optionCenter.errors.length?<div className="admin-validation is-error"><b>選項中心有 {optionCenter.errors.length} 項需要處理</b><ul>{optionCenter.errors.slice(0,12).map((error,index)=><li key={index}>{error}</li>)}</ul></div>:null}
 
     <div className="admin-filterbar">
-      <input value={query} onChange={event=>setQuery(event.target.value)} placeholder="搜尋選項組／子選項名稱／ID"/>
+      <AdminSearchField label="搜尋選項組" value={query} onChange={setQuery} placeholder="搜尋選項組／子選項名稱／ID"/>
       <span>{rows.length} 個選項組</span>
     </div>
 
@@ -470,9 +477,9 @@ export function ModifiersWorkspace(){
                 <header><span>次序</span><span>選項 ID *</span><span>名稱 *</span><span>價錢調整 HK$ *</span><span>狀態</span><span></span></header>
                 {set.options.map((option,index)=><article key={option.id}>
                   <div className="admin-option-order-buttons"><button type="button" disabled={index===0} onClick={()=>optionCenter.moveChild(set.id,option.id,-1)}>↑</button><button type="button" disabled={index===set.options.length-1} onClick={()=>optionCenter.moveChild(set.id,option.id,1)}>↓</button></div>
-                  <input value={option.code} onChange={event=>optionCenter.updateChild(set.id,option.id,{code:event.target.value})} aria-label="選項 ID"/>
-                  <input value={option.name} onChange={event=>optionCenter.updateChild(set.id,option.id,{name:event.target.value})} aria-label="選項名稱"/>
-                  <input inputMode="decimal" value={option.priceAdjustment} onChange={event=>optionCenter.updateChild(set.id,option.id,{priceAdjustment:event.target.value})} aria-label="選項價錢"/>
+                  <label className="admin-table-field"><span>選項 ID</span><input value={option.code} onChange={event=>optionCenter.updateChild(set.id,option.id,{code:event.target.value})}/></label>
+                  <label className="admin-table-field"><span>選項名稱</span><input value={option.name} onChange={event=>optionCenter.updateChild(set.id,option.id,{name:event.target.value})}/></label>
+                  <label className="admin-table-field"><span>價錢調整 HK$</span><input inputMode="decimal" value={option.priceAdjustment} onChange={event=>optionCenter.updateChild(set.id,option.id,{priceAdjustment:event.target.value})}/></label>
                   <Toggle checked={option.active} onChange={active=>optionCenter.updateChild(set.id,option.id,{active})} label={option.active?'啟用':'停用'}/>
                   <button type="button" onClick={()=>optionCenter.removeChild(set.id,option.id)}>刪除</button>
                 </article>)}
@@ -551,39 +558,53 @@ export function PricingWorkspace(){
   const optionCenter=useOptionSetCenter(draft);
   const [query,setQuery]=useState('');
   const [tab,setTab]=useState<'PRODUCT'|'OPTION'>('PRODUCT');
+  const [page,setPage]=useState(1);
+  const PAGE_SIZE=25;
   const token=query.trim().toLowerCase();
   const productRows=useMemo(()=>draft.products.filter(product=>!token||[product.name,product.productCode].filter(Boolean).join(' ').toLowerCase().includes(token)),[draft.products,token]);
-  const optionRows=optionCenter.sets.flatMap(set=>set.options.map(option=>({set,option}))).filter(({set,option})=>!token||(set.name+' '+option.name+' '+option.code).toLowerCase().includes(token));
+  const allOptionRows=optionCenter.sets.flatMap(set=>set.options.map(option=>({set,option})));
+  const optionRows=allOptionRows.filter(({set,option})=>!token||(set.name+' '+option.name+' '+option.code).toLowerCase().includes(token));
   const productConfigured=draft.products.filter(product=>product.basePrice.trim()!=='').length;
-  const optionConfigured=optionRows.filter(({option})=>option.priceAdjustment.trim()!=='').length;
+  const optionConfigured=allOptionRows.filter(({option})=>option.priceAdjustment.trim()!=='').length;
+  const activeRows=tab==='PRODUCT'?productRows:optionRows;
+  const pageCount=Math.max(1,Math.ceil(activeRows.length/PAGE_SIZE));
+  const safePage=Math.min(page,pageCount);
+  const visibleProductRows=productRows.slice((safePage-1)*PAGE_SIZE,safePage*PAGE_SIZE);
+  const visibleOptionRows=optionRows.slice((safePage-1)*PAGE_SIZE,safePage*PAGE_SIZE);
+
+  useEffect(()=>setPage(1),[query,tab]);
+  useEffect(()=>{if(page>pageCount)setPage(pageCount);},[page,pageCount]);
 
   return <section className="admin-editor-page">
     <WorkspaceHeader title="價格管理" description="商品價同選項組內子選項價集中管理。子選項價屬於嗰個選項組，例如「多青瓜 +$1」；商品 Link 唔會複製一份價格。正式 Quote 仍由唯一 Pricing authority 計算。" optionCenterState={optionCenter.state} optionDirty={optionCenter.dirty} onOptionSaved={optionCenter.markClean}/>
     <div className="admin-kpi-grid">
       <article><span>商品價格</span><strong>{productConfigured}/{draft.products.length}</strong><small>基本價必填</small></article>
-      <article><span>子選項價格</span><strong>{optionConfigured}/{optionRows.length}</strong><small>組內 Option</small></article>
+      <article><span>子選項價格</span><strong>{optionConfigured}/{allOptionRows.length}</strong><small>組內 Option</small></article>
       <article><span>外賣 +$1</span><strong>{draft.products.filter(product=>product.takeawaySurchargeEnabled).length}</strong><small>Product flag</small></article>
       <article><span>負數選項價</span><strong>{optionRows.filter(({option})=>Number(option.priceAdjustment)<0).length}</strong><small>支援減價</small></article>
     </div>
     <div className="admin-filterbar">
-      <input value={query} onChange={event=>setQuery(event.target.value)} placeholder={tab==='PRODUCT'?'搜尋商品':'搜尋選項組／子選項／ID'}/>
+      <AdminSearchField label={tab==='PRODUCT'?'搜尋商品價格':'搜尋選項價格'} value={query} onChange={setQuery} placeholder={tab==='PRODUCT'?'搜尋商品':'搜尋選項組／子選項／ID'}/>
       <button type="button" onClick={()=>setTab('PRODUCT')} disabled={tab==='PRODUCT'}>商品價格</button>
       <button type="button" onClick={()=>setTab('OPTION')} disabled={tab==='OPTION'}>選項價格</button>
+      <span>{activeRows.length} 項</span>
     </div>
     {tab==='PRODUCT'?<div className="admin-pricing-table">
       <header><span>商品</span><span>基本價</span><span>外賣 +$1</span><span>其他調整</span></header>
-      {productRows.map(product=><article key={product.id}>
+      {visibleProductRows.map(product=><article key={product.id}>
         <b>{product.name||product.id}<small> · {product.productCode}</small></b>
-        <input inputMode="decimal" value={product.basePrice} onChange={event=>updateProduct(product.id,{basePrice:event.target.value})} placeholder="0.00"/>
-        <Toggle checked={Boolean(product.takeawaySurchargeEnabled)} onChange={takeawaySurchargeEnabled=>updateProduct(product.id,{takeawaySurchargeEnabled})} label={product.takeawaySurchargeEnabled?'+$1 開':'關'}/>
-        <input inputMode="decimal" value={product.takeawayAdjustment} onChange={event=>updateProduct(product.id,{takeawayAdjustment:event.target.value})} placeholder="0.00"/>
+        <label className="admin-table-field"><span>基本價 HK$</span><input inputMode="decimal" value={product.basePrice} onChange={event=>updateProduct(product.id,{basePrice:event.target.value})} placeholder="0.00"/></label>
+        <Toggle checked={Boolean(product.takeawaySurchargeEnabled)} onChange={takeawaySurchargeEnabled=>updateProduct(product.id,{takeawaySurchargeEnabled})} label={product.takeawaySurchargeEnabled?'+$1 開':'關'} accessibleLabel={(product.name||product.id)+' 外賣加一元'}/>
+        <label className="admin-table-field"><span>其他調整 HK$</span><input inputMode="decimal" value={product.takeawayAdjustment} onChange={event=>updateProduct(product.id,{takeawayAdjustment:event.target.value})} placeholder="0.00"/></label>
       </article>)}
+      <AdminPagination page={safePage} pageCount={pageCount} total={productRows.length} pageSize={PAGE_SIZE} noun="件商品" onPageChange={setPage}/>
     </div>:<div className="admin-pricing-table admin-option-pricing-table">
       <header><span>選項組</span><span>子選項</span><span>選項 ID</span><span>價錢 HK$</span></header>
-      {optionRows.map(({set,option})=><article key={set.id+':'+option.id}>
+      {visibleOptionRows.map(({set,option})=><article key={set.id+':'+option.id}>
         <span>{set.name}</span><b>{option.name}</b><code>{option.code}</code>
-        <input inputMode="decimal" value={option.priceAdjustment} onChange={event=>optionCenter.updateChild(set.id,option.id,{priceAdjustment:event.target.value})} placeholder="0.00 / -1.00"/>
+        <label className="admin-table-field"><span>{set.name}／{option.name} 價錢 HK$</span><input inputMode="decimal" value={option.priceAdjustment} onChange={event=>optionCenter.updateChild(set.id,option.id,{priceAdjustment:event.target.value})} placeholder="0.00 / -1.00"/></label>
       </article>)}
+      <AdminPagination page={safePage} pageCount={pageCount} total={optionRows.length} pageSize={PAGE_SIZE} noun="個選項" onPageChange={setPage}/>
     </div>}
   </section>;
 }

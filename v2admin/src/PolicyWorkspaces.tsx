@@ -3,7 +3,7 @@ import {useAdminDraft} from './admin-draft.tsx';
 import {appendAdminAudit,readActiveAdminRelease,usePersistentAdminState,writeAdminStored} from './admin-local-store.ts';
 import {saveAdminConfig} from './admin-config-save.ts';
 
-function PolicyHeader({title,description,badge='已自動保存設定'}:{title:string;description:string;badge?:string}){
+function PolicyHeader({title,description,badge='本機設定自動保存'}:{title:string;description:string;badge?:string}){
   return <header className="admin-editor-head">
     <div><small>{badge}</small><h1>{title}</h1><p>{description}</p></div>
   </header>;
@@ -111,7 +111,7 @@ export function PrintTemplatesWorkspace(){
   return <section className="admin-editor-page">
     <PolicyHeader title="打印模板中心" description="管理收據、製作單、打包單同 Label 嘅正式輸出內容。製作單回答要整乜／點整；打包單回答全單齊唔齊。"/>
     <div className="admin-policy-grid two">
-      {([['receipt','收據'],['production','製作單'],['packing','打包單'],['label','標籤']] as const).map(([key,title])=><article className="admin-policy-card" key={key}><h2>{title}</h2><textarea value={templates[key]} onChange={event=>patch({[key]:event.target.value})} rows={8}/></article>)}
+      {([['receipt','收據'],['production','製作單'],['packing','打包單'],['label','標籤']] as const).map(([key,title])=><article className="admin-policy-card" key={key}><h2>{title}</h2><label><span>{title}模板內容</span><textarea value={templates[key]} onChange={event=>patch({[key]:event.target.value})} rows={8}/></label></article>)}
       <article className="admin-policy-card"><h2>輸出語義</h2><Toggle checked={templates.showComboRelationship} onChange={showComboRelationship=>patch({showComboRelationship})} label="保留套餐與 child 關係"/><Toggle checked={templates.separateFoodDrinkCount} onChange={separateFoodDrinkCount=>patch({separateFoodDrinkCount})} label="食品／飲品總件數分開"/></article>
     </div>
   </section>;
@@ -177,7 +177,10 @@ export function StaffWorkspace(){
   const [saveErrors,setSaveErrors]=useState<readonly string[]>([]);
   const add=()=>setStaff(rows=>{const row:StaffDraft={id:'staff-'+Date.now().toString(36),name:'',role:'STAFF',pin:'',scope:'STORE',adminLogin:false,active:true,permissions:['ORDER_REVIEW']};appendAdminAudit({action:'新增員工',target:row.id});return [...rows,row];});
   const patch=(id:string,change:Partial<StaffDraft>)=>setStaff(rows=>rows.map(row=>{if(row.id!==id)return row;const after={...row,...change};appendAdminAudit({action:'修改員工／權限',target:id,before:{...row,pin:row.pin?'***':''},after:{...after,pin:after.pin?'***':''}});return after;}));
-  const remove=(id:string)=>setStaff(rows=>{appendAdminAudit({action:'停用並移除員工草稿',target:id});return rows.filter(row=>row.id!==id);});
+  const remove=(row:StaffDraft)=>{
+    if(typeof window!=='undefined'&&!window.confirm('確定移除「'+(row.name||row.id)+'」嘅員工草稿？一般停用請使用狀態開關。'))return;
+    setStaff(rows=>{appendAdminAudit({action:'停用並移除員工草稿',target:row.id});return rows.filter(item=>item.id!==row.id);});
+  };
   const togglePermission=(row:StaffDraft,permission:string,checked:boolean)=>patch(row.id,{permissions:checked?[...new Set([...row.permissions,permission])]:row.permissions.filter(item=>item!==permission)});
   const saveStaff=()=>{
     writeAdminStored('staff.v1',staff);
@@ -185,7 +188,7 @@ export function StaffWorkspace(){
     if(!result.ok){setSaveErrors(result.errors);setSaveMessage('未能保存；請先修正人員資料。');return;}
     markClean();
     setSaveErrors([]);
-    setSaveMessage('已保存並啟用 R'+result.release.version+'；SMT 會自動收到新員工登入設定。');
+    setSaveMessage('已保存並啟用 R'+result.release.version+'；已排入 Admin → SMT 自動同步。');
   };
   const activeRelease=readActiveAdminRelease();
   return <section className="admin-editor-page">
@@ -195,12 +198,12 @@ export function StaffWorkspace(){
       <header><h2>{row.name||'未命名員工'}</h2><small>{row.id}</small></header>
       <label><span>員工名稱</span><input value={row.name} onChange={event=>patch(row.id,{name:event.target.value})}/></label>
       <label><span>角色</span><select value={row.role} onChange={event=>patch(row.id,{role:event.target.value as StaffDraft['role']})}><option value="STAFF">員工</option><option value="MANAGER">經理</option><option value="OWNER">老闆</option><option value="VIEWER">只讀人員</option></select></label>
-      <label><span>PIN（4–8 位）</span><input type="password" inputMode="numeric" value={row.pin} onChange={event=>patch(row.id,{pin:event.target.value.replace(/\D/g,'').slice(0,8)})}/></label>
+      <label><span>PIN（4–8 位）</span><input type="password" inputMode="numeric" autoComplete="new-password" value={row.pin} onChange={event=>patch(row.id,{pin:event.target.value.replace(/\D/g,'').slice(0,8)})}/></label>
       <label><span>權限範圍</span><select value={row.scope} onChange={event=>patch(row.id,{scope:event.target.value as StaffDraft['scope']})}><option value="STORE">單店</option><option value="MULTI_STORE">多店</option><option value="REPORT_ONLY">只看報表</option></select></label>
       <div className="admin-check-grid">{PERMISSIONS.map(([id,label])=><label key={id}><input type="checkbox" checked={row.permissions.includes(id)} onChange={event=>togglePermission(row,id,event.target.checked)}/><span>{label}</span></label>)}</div>
       <Toggle checked={row.adminLogin} onChange={adminLogin=>patch(row.id,{adminLogin})} label="允許後台登入"/>
       <Toggle checked={row.active} onChange={active=>patch(row.id,{active})} label={row.active?'啟用':'停用'}/>
-      <button type="button" onClick={()=>remove(row.id)}>移除</button>
+      <button type="button" onClick={()=>remove(row)}>移除</button>
     </article>)}</div>}
   </section>;
 }
