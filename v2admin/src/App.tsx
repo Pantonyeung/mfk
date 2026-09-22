@@ -1,7 +1,6 @@
-import {Navigate,Route,Routes,useLocation} from 'react-router';
+import {Navigate,Route,Routes} from 'react-router';
 import {AdminShell} from './AdminShell.tsx';
-import {ADMIN_CAPABILITIES,findAdminCapability} from './admin-capabilities.ts';
-import {MFK_ADMIN_AUTHORITY} from './admin-authority.ts';
+import {ADMIN_CAPABILITIES} from './admin-capabilities.ts';
 import {AdminDraftProvider} from './admin-draft.tsx';
 import {CategoriesWorkspace,CombosWorkspace,MenuDisplayWorkspace,ModifiersWorkspace,PricingWorkspace,ProductsWorkspace} from './CatalogWorkspaces.tsx';
 import {AvailabilityWorkspace,BusinessDayWorkspace,ChannelsWorkspace,PrintCenterWorkspace,PrintTemplatesWorkspace,StaffWorkspace,StoreSettingsWorkspace} from './PolicyWorkspaces.tsx';
@@ -9,45 +8,6 @@ import {AuditWorkspace,CapacityWorkspace,ExceptionsWorkspace,OpenOrdersWorkspace
 import {PrintRulesWorkspace,PublishCenterWorkspace,QuickReasonsWorkspace,SettlementWorkspace} from './GovernanceWorkspaces.tsx';
 import {AnnouncementsWorkspace,CouponsWorkspace,Customer360Workspace,InventoryWorkspace,LoyaltyWorkspace,PresentationWorkspace,RfmWorkspace,StoreBindingWorkspace} from './DeferredWorkspaces.tsx';
 import {ActionQueueWorkspace,AccessSessionWorkspace,CashCloseRecordWorkspace,ChannelReportWorkspace,DeviceHealthWorkspace,DiagnosticsWorkspace,EffectiveSettingsWorkspace,ExportGovernanceWorkspace,IntegrationsGovernanceWorkspace,OtaWorkspace,ProductReportWorkspace,RefundReportWorkspace} from './WorkflowUpgradeWorkspaces.tsx';
-
-const statusTitle={
-  NOT_WIRED:'尚未啟用',
-  DEFERRED:'能力保留，暫不啟用',
-  RETIRED:'能力已退役',
-} as const;
-
-function CapabilityPage(){
-  const location=useLocation();
-  const capability=findAdminCapability(location.pathname);
-  if(!capability)return <Navigate to="/admin/overview" replace/>;
-
-  return <section className="mfk-admin-capability">
-    <header>
-      <div><small>管理後台</small><h1>{capability.label}</h1><p>{capability.purpose}</p></div>
-      <span className={'status '+capability.status.toLowerCase()}>{statusTitle[capability.status]}</span>
-    </header>
-
-    <div className="mfk-admin-facts">
-      <article><span>功能位置</span><b>{capability.path}</b></article>
-      <article><span>負責範圍</span><b>{capability.owner}</b></article>
-      <article><span>連接狀態</span><b>{capability.status}</b></article>
-      <article><span>即時變更</span><b>{MFK_ADMIN_AUTHORITY.liveMutationEnabled?'ON':'OFF'}</b></article>
-    </div>
-
-    <section className="mfk-admin-rule-card">
-      <h2>主權流程</h2>
-      <div className="authority-flow">
-        <span>規則決定</span><i>→</i><span>編輯草稿</span><i>→</i><span>檢查內容</span><i>→</i><span>發布</span><i>→</i><span>已生效版本</span><i>→</i><span>門店使用</span>
-      </div>
-      <p>呢個頁面只顯示目前可以操作嘅設定。未啟用嘅功能會清楚標示，唔會誤導為已生效。</p>
-    </section>
-
-    <section className="mfk-admin-state-card">
-      <header><h2>目前狀態</h2><span>{capability.status}</span></header>
-      <p>呢項功能已經有固定位置同負責範圍；未啟用之前，只會提供清楚嘅操作提示。</p>
-    </section>
-  </section>;
-}
 
 function capabilityElement(id:string){
   if(id==='products')return <ProductsWorkspace/>;
