@@ -3,13 +3,13 @@
 Status: CURRENT / CONTROLLING
 Protocol: #39
 Control: #22
-Updated: 2026-09-22 13:49 Asia/Hong_Kong
+Updated: 2026-09-22 13:58 Asia/Hong_Kong
 System: MFK ONLY
 
 ## 0. Mandatory read order
 1. COMMANDER_CURRENT.md
 2. #22 latest controlling comment
-3. docs/navigation/MFK_航海圖_V1.21_Round022_2026-09-22.txt
+3. docs/navigation/MFK_航海圖_V1.22_Round023_2026-09-22.txt
 4. HANDOFF_CURRENT.md
 5. active issue(s)
 
@@ -20,6 +20,9 @@ Parent Admin completion:
 
 Current Product-detail correction:
 #62
+
+Current architecture correction:
+#68 Admin Option Center R1
 
 Known next RED:
 #66 MFK-native Product Media R2 + D1 + Auth
@@ -36,33 +39,71 @@ HOLD
 Keeta live:
 NOT AUTHORIZED
 
-## 2. Owner Product-detail lock
+## 2. Owner Option architecture lock
 
-Every formal Product must expose the complete operating information, not only name/category/price.
+The previous Product-detail Option editing model is superseded.
 
-Required Product responsibilities now represented:
-- Product name / Product Code / SKU / barcode / category / description / tags
-- base price
-- takeaway +$1
-- other positive/negative takeaway adjustment
-- Option Group bindings and settings
-- every Option: Name + Option ID + Price
-- required / optional / optional-force-show
-- single / multi
-- min / max
-- quantity allowance
-- option default / active
-- Receipt print
-- Kitchen Production print
-- Packing print
-- Label print
-- Label logical destination(s)
-- Dine-in print
-- Takeaway print
-- canonical Product imageRef
-- R2 object / D1 media reference status
-- Customer/SMM/SMT canonical image responsibility
-- independent Keeta image override
+Correct normalized model:
+
+### Option Center = canonical Option Master
+
+Each Option is created once:
+- Option ID
+- Name
+- Price adjustment
+- Active/inactive
+
+Example:
+多飯 / 小飯 / 走飯
+
+No Product-specific duplicate Option record.
+
+### Option Group = selection policy
+
+Option Group references existing Option IDs.
+
+Group owns:
+- Group ID / Name
+- included Option IDs
+- order
+- Required / Optional / Optional-force-show
+- Single / Multi
+- Min / Max
+- Allow quantities
+
+### Product link
+
+Product detail does NOT author Option Master data.
+
+Product detail:
+- shows linked Option Groups / Options
+- links/unlinks existing groups/options
+- reads Option ID / Name / Price from Option Center
+- deep-links to Option Center for master editing
+
+### Default
+
+Default selection is Product-specific link state.
+
+It does NOT live on the global Option Master.
+
+Same Option can be default for Product A but not Product B.
+
+Example:
+Option Center:
+多飯 +$2 / 小飯 $0 / 走飯 -$1
+
+Group:
+飯量
+
+Product A:
+飯量 linked, 小飯 default
+
+Product B:
+飯量 linked, 多飯 default
+
+No duplicated identity.
+No copied Option price.
 
 ## 3. UX
 
@@ -190,33 +231,17 @@ Do not reuse old Morefun-v2 D1 or R2 as current authority.
 
 ## 8. Exact NEXT
 
-Owner first reviews live Product detail only:
+Implement #68 first.
 
-`https://admin.morefunos.com/admin/catalog/products`
+Required correction:
+1. create dedicated Option Center
+2. separate Option Master from Option Group
+3. convert Product ↔ Option relation into link data
+4. move defaultSelected to Product-link policy
+5. Product detail becomes read-through/linking UI, not another Option editor
+6. retain one Pricing authority
 
-Open one Product → 編輯.
-
-Verify:
-- bounded sections are clean
-- Option Name / ID / Price rules are correct
-- Option Group settings are correct
-- print flags include Receipt / Production / Packing / Label / Dine-in / Takeaway
-- Label destinations are visible when Label is enabled
-- Product / Option pricing presentation is correct
-- Image section clearly separates canonical image from Keeta override
-- media status clearly says MFK R2/D1 is not yet connected
-
-If Product-detail UI is accepted:
-BANK #62 UI/schema portion.
-
-Then exact next technical seam is #66:
-authenticated Admin mutation boundary
-→ new MFK-native R2
-→ new MFK-native D1 media metadata
-→ real upload/readback
-→ real-device proof.
-
-Only after #66 GREEN can Product image management be called complete.
+#66 Product Media remains known RED but is NOT the next knife until Option Center model is corrected.
 
 ## 9. HOLD
 
