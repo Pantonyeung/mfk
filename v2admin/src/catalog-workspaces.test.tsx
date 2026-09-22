@@ -7,12 +7,15 @@ import {MfkAdminApp} from './App.tsx';
 import {ADMIN_CAPABILITIES} from './admin-capabilities.ts';
 
 describe('MFK Admin complete catalog product',()=>{
-  it('renders complete Product detail instead of a demo card',()=>{
+  it('renders a bounded compact Product list by default',()=>{
     const html=renderToStaticMarkup(<AdminDraftProvider><ProductsWorkspace/></AdminDraftProvider>);
-    for(const marker of ['商品資料','新增商品','商品名稱','商品編號','基本價 HK$','條碼','圖片參考','商品描述','外賣價格規則','此商品外賣 +$1','選項組綁定']) expect(html).toContain(marker);
+    for(const marker of ['商品資料','新增商品','搜尋商品名稱','找到 203 件','每頁最多 20 件','第 1 / 11 頁','編輯']) expect(html).toContain(marker);
     expect(html).toContain('203');
     expect(html).toContain('188');
     expect(html).toContain('已自動保存草稿');
+    expect((html.match(/class="admin-product-row /g)??[]).length).toBe(20);
+    expect(html).not.toContain('商品詳細資料');
+    expect(html).not.toContain('商品描述</span>');
   });
 
   it('routes core catalog responsibilities to concrete editors',()=>{
