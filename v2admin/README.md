@@ -81,3 +81,23 @@ SMT 執行已發布規則。
 固定節奏：
 
 `CONNECT ONE → TEST SAME PIECE → BANK → WAIT OWNER`
+
+
+## Cloudflare H1 hosting
+
+Current MFK Admin may reuse the existing Cloudflare Worker resource named `morefun-v2-admin`.
+
+This is **resource-shell reuse only**. The old Morefun-v2 runtime is not reused.
+
+Cloudflare reconnect settings:
+
+- Repository: `Pantonyeung/mfk`
+- Production branch: `main`
+- Root directory: `v2admin`
+- Build command: `npm run build`
+- Deploy command: `npx wrangler deploy`
+- Non-production branch builds: OFF by default
+
+`v2admin/wrangler.jsonc` intentionally contains only static SPA assets. It must not gain D1, R2, Durable Objects, service bindings, cron triggers or SMT/Keeta API runtime as part of H1.
+
+The separate OTA Worker `morefunos-v2-smt-ota` and its R2 bucket are outside H1 and must remain untouched.
