@@ -126,7 +126,7 @@ export function createLocalDayClose(input:{
   readonly businessStartHour?:number;
   readonly openingCashMinor:number;
   readonly countedCashMinor:number;
-  readonly retainedCashMinor?:number;
+  readonly cashRemovedMinor?:number;
   readonly existing:readonly LocalDayClose[];
   readonly note?:string;
 }):LocalDayClose{
@@ -138,8 +138,9 @@ export function createLocalDayClose(input:{
   const openingCashMinor=Math.max(0,Math.round(input.openingCashMinor));
   const countedCashMinor=Math.max(0,Math.round(input.countedCashMinor));
   const expectedCashMinor=openingCashMinor+report.cashSalesMinor;
-  const retainedCashMinor=input.retainedCashMinor===undefined?undefined:Math.max(0,Math.round(input.retainedCashMinor));
-  if(retainedCashMinor!==undefined&&retainedCashMinor>countedCashMinor)throw new Error('RETAINED_CASH_EXCEEDS_COUNTED');
+  const cashRemovedMinor=input.cashRemovedMinor===undefined?undefined:Math.max(0,Math.round(input.cashRemovedMinor));
+  if(cashRemovedMinor!==undefined&&cashRemovedMinor>countedCashMinor)throw new Error('CASH_REMOVED_EXCEEDS_COUNTED');
+  const retainedCashMinor=cashRemovedMinor===undefined?undefined:countedCashMinor-cashRemovedMinor;
   return Object.freeze({
     id:`DAYCLOSE-${report.businessDate}-V${version}`,
     businessDate:report.businessDate,
@@ -150,9 +151,9 @@ export function createLocalDayClose(input:{
     expectedCashMinor,
     countedCashMinor,
     cashDifferenceMinor:countedCashMinor-expectedCashMinor,
-    ...(retainedCashMinor===undefined?{}:{
+    ...(cashRemovedMinor===undefined||retainedCashMinor===undefined?{}:{
+      cashRemovedMinor,
       retainedCashMinor,
-      cashRemovedMinor:Math.max(0,countedCashMinor-retainedCashMinor),
     }),
     note:String(input.note??'').trim(),
   });
@@ -243,13 +244,21 @@ export function suggestOpeningCashFromPreviousClose(
     amountMinor:previous.retainedCashMinor,
     sourceCloseId:previous.id,
     sourceCloseBusinessDate:previous.businessDate,
+    previousCountedCashMinor:previous.countedCashMinor,
+    previousCashRemovedMinor:previous.cashRemovedMinor??Math.max(0,previous.countedCashMinor-previous.retainedCashMinor),
   });
 }
 
 export function createLocalCashOpening(input:{
   readonly businessDate:string;
   readonly amountMinor:number;
-  readonly suggestion?:{readonly amountMinor:number;readonly sourceCloseId:string;readonly sourceCloseBusinessDate:string}|null;
+  readonly suggestion?:{
+    readonly amountMinor:number;
+    readonly sourceCloseId:string;
+    readonly sourceCloseBusinessDate:string;
+    readonly previousCountedCashMinor:number;
+    readonly previousCashRemovedMinor:number;
+  }|null;
   readonly now?:number;
   readonly staffId?:string;
   readonly staffName?:string;
