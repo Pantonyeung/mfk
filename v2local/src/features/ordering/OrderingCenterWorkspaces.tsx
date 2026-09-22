@@ -27,7 +27,7 @@ export type OrderingPanelState=
   |{readonly type:'holds'}
   |null;
 
-const money=(minor:number)=>(minor<0?'-\\u0024':'\\u0024')+(Math.abs(minor)/100).toFixed(2);
+const money=(minor:number)=>(minor<0?'-':'')+String.fromCharCode(36)+(Math.abs(minor)/100).toFixed(2);
 
 export function ProductConfigWorkspace({product,onAdd}:{product:WorkspaceProduct;onAdd:(detail:string,deltaMinor:number,qty:number)=>void}){
   const [qty,setQty]=useState(1);
