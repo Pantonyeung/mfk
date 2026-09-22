@@ -39,7 +39,7 @@ export function AdminShell({children}:{children:ReactNode}){
 
     <main className="mfk-admin-main">
       <header className="mfk-admin-topbar">
-        <div><small>設定 → 發布 → 門店生效</small><strong>{active?.label??'MFK Admin'}</strong></div>
+        <div><small>設定 → 發布 → 門店生效</small><strong>{active?.label??'管理後台'}</strong></div>
         <div className="mfk-admin-topstate"><b>營運管理</b><span>部分功能尚未啟用</span></div>
       </header>
       <div className="mfk-admin-workspace">{children}</div>
