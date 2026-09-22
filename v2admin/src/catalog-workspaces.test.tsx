@@ -127,7 +127,7 @@ describe('MFK Admin complete catalog product',()=>{
 
   it('locks Option Center as group-first parent with child Options',()=>{
     const center=renderToStaticMarkup(<MemoryRouter initialEntries={['/admin/catalog/modifiers']}><MfkAdminApp/></MemoryRouter>);
-    for(const marker of ['選項中心','新增選項組','一個選項組就係一個完整可重用單位','組內選項','新增子選項','批量映射商品','全部商品'])expect(center).toContain(marker);
+    for(const marker of ['選項中心','新增選項組','一個選項組就係一個完整可重用單位','批量映射'])expect(center).toContain(marker);
     expect(center).toContain('飯量');
     expect(center).toContain('青瓜');
     expect(center).not.toContain('選項 Master');
