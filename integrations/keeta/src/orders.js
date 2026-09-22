@@ -192,3 +192,59 @@ export function buildKeetaAfterSaleDecisionShape(input) {
     executionGate: EXECUTION_GATE.NOT_WIRED,
   });
 }
+
+
+const refundProducts = (products, required) => {
+  const list = products ?? [];
+  if (!Array.isArray(list)) throw new Error('KEETA_PARTIAL_REFUND_PRODUCTS_INVALID');
+  if (required && list.length === 0) throw new Error('KEETA_PARTIAL_REFUND_PRODUCTS_REQUIRED');
+  return Object.freeze(list.map((product) => {
+    if (!isRecord(product)) throw new Error('KEETA_PARTIAL_REFUND_PRODUCT_INVALID');
+    return Object.freeze({
+      orderProductId: positive(product.orderProductId, 'KEETA_ORDER_PRODUCT_ID_INVALID'),
+      refundCount: positive(product.refundCount, 'KEETA_REFUND_COUNT_INVALID'),
+    });
+  }));
+};
+
+export function buildKeetaOrderCollectShape(input) {
+  return Object.freeze({
+    ...request(PROVIDER_OPERATIONS.orderCollect, identity(input), {
+      action: 'COLLECT',
+      providerSemantic: 'PROVIDER_COLLECT_OPERATION',
+    }),
+    authorityGate: EXECUTION_GATE.BLOCKED_CANONICAL_AUTHORITY,
+  });
+}
+
+export function buildKeetaPartialRefundPreviewShape(input) {
+  return request(PROVIDER_OPERATIONS.partialRefundPreview, {
+    ...identity(input),
+    products: refundProducts(input.products, false),
+  }, {
+    action: 'PARTIAL_REFUND_PREVIEW',
+    authorityBoundary: 'PROVIDER_PREVIEW_ONLY_NO_MFK_FINANCIAL_MUTATION',
+  });
+}
+
+export function buildKeetaPartialRefundApplyShape(input) {
+  const products = refundProducts(input.products, true);
+  if (![200000, 200001, 200002, 200003, 200004].includes(input.partRefundType)) {
+    throw new Error('KEETA_PARTIAL_REFUND_TYPE_INVALID');
+  }
+  if (input.partRefundType === 200000 && (!input.partRefundReason || input.partRefundReason.trim().length === 0)) {
+    throw new Error('KEETA_PARTIAL_REFUND_REASON_REQUIRED');
+  }
+  return Object.freeze({
+    providerOperation: PROVIDER_OPERATIONS.partialRefundApply,
+    params: Object.freeze({
+      ...identity(input),
+      products,
+      partRefundType: input.partRefundType,
+      ...(input.partRefundReason ? { partRefundReason: input.partRefundReason } : {}),
+    }),
+    action: 'PARTIAL_REFUND_APPLY',
+    authorityGate: EXECUTION_GATE.BLOCKED_CANONICAL_AUTHORITY,
+    executionGate: EXECUTION_GATE.NOT_WIRED,
+  });
+}
