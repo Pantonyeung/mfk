@@ -27,8 +27,31 @@ jobs:
       - run: npm install --no-audit --no-fund --legacy-peer-deps --package-lock=false
       - run: npm test
       - run: npm run build
+      - name: Prepare mfk-admin runtime secrets
+        shell: bash
+        env:
+          KEETA_APP_SECRET: ${{ secrets.KEETA_APP_SECRET }}
+          KEETA_TOKEN_ENCRYPTION_KEY: ${{ secrets.KEETA_TOKEN_ENCRYPTION_KEY }}
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          const required = ['KEETA_APP_SECRET', 'KEETA_TOKEN_ENCRYPTION_KEY'];
+          for (const name of required) {
+            if (!process.env[name]) {
+              console.error('Missing GitHub Actions secret: ' + name);
+              process.exit(1);
+            }
+          }
+          fs.writeFileSync('.wrangler-secrets.json', JSON.stringify({
+            KEETA_APP_SECRET: process.env.KEETA_APP_SECRET,
+            KEETA_TOKEN_ENCRYPTION_KEY: process.env.KEETA_TOKEN_ENCRYPTION_KEY,
+          }));
+          NODE
       - name: Deploy mfk-admin
-        run: npx --yes wrangler@latest deploy
+        run: npx --yes wrangler@latest deploy --secrets-file .wrangler-secrets.json
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      - name: Remove temporary secret file
+        if: always()
+        run: rm -f .wrangler-secrets.json

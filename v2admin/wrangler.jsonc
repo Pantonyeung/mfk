@@ -5,6 +5,17 @@
   "compatibility_date": "2026-09-22",
   "workers_dev": true,
   "preview_urls": true,
+  "vars": {
+    "KEETA_APP_ID": "3419700273",
+    "KEETA_PROVIDER_SHOP_ID": "721578302",
+    "KEETA_OAUTH_REDIRECT_URI": "https://admin.morefunos.com/api/keeta/oauth/callback"
+  },
+  "secrets": {
+    "required": [
+      "KEETA_APP_SECRET",
+      "KEETA_TOKEN_ENCRYPTION_KEY"
+    ]
+  },
   "assets": {
     "directory": "./dist",
     "binding": "ASSETS",
