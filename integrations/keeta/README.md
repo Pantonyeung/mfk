@@ -1,21 +1,46 @@
-# MFK Keeta Integration Contract
+# MFK Keeta Integration
 
-Status: `MIGRATED_NOT_WIRED`
+Current state: `K0_LIVE_EDGE_AUTH_WEBHOOK_ONLY`
 
-This package contains only inert provider-contract, translation, evidence, security-contract and certification shapes for Keeta Hong Kong.
+The provider contract migration from #27 remains the basis. #115 explicitly opens a bounded live K0 connection.
 
-Hard boundary:
-- no live HTTP/network client
-- no provider activation
-- no Cloudflare Worker or D1 runtime
-- no callback URL
-- no credential/token/secret value
-- no SMT/Admin/SMM/Customer/Owner wiring
-- no Store Kernel, Formal Order, Pricing, Payment or Fulfillment authority
-- every outbound provider command shape is `NOT_WIRED`
+K0 live scope:
+- Admin-origin OAuth start/callback
+- signed token exchange / refresh
+- encrypted token-at-rest in the dedicated Keeta edge Durable Object
+- Admin Store → Keeta shop alias binding
+- provider Store Details readback probe
+- exact-signature webhook verification
+- messageId dedupe / conflict fail-closed
+- verified provider evidence capture only
 
-Historical Morefun-v2 material is used only as a contract/capability/SIT-UAT oracle. MFK remains the current authority.
+K0 does NOT:
+- create Formal Orders
+- send merchant confirm/cancel/ready
+- send menu sync
+- approve/reject refunds
+- mutate MFK Pricing / Payment / Fulfillment truth
+- activate store rest/open
+- weaken signature verification
 
-The menu sync builder is intentionally full-snapshot only. Omitted existing OpenItemCodes can represent provider deletion, therefore this package never submits menu payloads.
+Provider IDs remain aliases/evidence only. MFK remains canonical authority.
 
-Known external evidence remains unresolved: `KEETA_LIVE_WEBHOOK_SIGNING_SEMANTICS_MISMATCH`. Signature verification semantics must not be weakened.
+Known external blocker remains active:
+`KEETA_LIVE_WEBHOOK_SIGNING_SEMANTICS_MISMATCH`
+
+A live callback that fails signature verification is rejected. There is no permissive fallback.
+
+Required runtime secrets are external to source:
+- `KEETA_APP_ID`
+- `KEETA_APP_SECRET`
+- `KEETA_TOKEN_ENCRYPTION_KEY`
+
+Optional runtime overrides:
+- `KEETA_OAUTH_REDIRECT_URI`
+- `KEETA_WEBHOOK_CALLBACK_URL`
+
+Default canonical callback endpoints:
+- OAuth: `https://admin.morefunos.com/api/keeta/oauth/callback`
+- Webhook: `https://admin.morefunos.com/api/keeta/webhook`
+
+K1 only starts after K0 provider readback and at least one real signed webhook are proven.
