@@ -17,7 +17,7 @@ export interface KeetaLiveStatus{
     readonly lastCallbackError:string|null;
     readonly lastCallbackMethod:'GET'|'POST'|null;
     readonly lastCallbackParamNames:readonly string[];
-    readonly tokenSource:'OAUTH_CALLBACK'|'TEST_PROVIDER_PORTAL_IMPORT'|null;
+    readonly tokenSource:'OAUTH_CALLBACK'|'TEST_PROVIDER_PORTAL_IMPORT'|'TEST_PROVIDER_PORTAL_REFRESH'|null;
   };
   readonly webhook:{
     readonly callbackUrl:string;
