@@ -5,7 +5,7 @@ import {MFK_ADMIN_AUTHORITY} from './admin-authority.ts';
 describe('MFK Admin product responsibility',()=>{
   it('keeps the complete capability registry visible',()=>{
     expect(ADMIN_CAPABILITY_GROUPS.map(group=>group.id)).toEqual([
-      'today','orders','menu','connections','people','reports','store','members','system',
+      'today','orders','menu','operations','channels','people','reports','settings',
     ]);
     expect(ADMIN_CAPABILITIES).toHaveLength(52);
     for(const required of [
