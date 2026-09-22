@@ -363,7 +363,7 @@ export class KeetaRuntimeStore{
   async fetch(request){
     const url=new URL(request.url);
 
-    if(url.pathname==='/admin/status'&&request.method==='GET'){
+    if(url.pathname==='/admin/status'&&(request.method==='GET'||request.method==='POST')){
       return json(await this.status());
     }
 
