@@ -139,3 +139,69 @@ export function capacityNoticeForCount(currentCount:number){
     note:config.note,
   });
 }
+
+
+export interface SmtLogicalPrinterConfig{
+  readonly id:string;
+  readonly name:string;
+  readonly type:'RECEIPT'|'PRODUCTION'|'PACKING'|'LABEL';
+  readonly active:boolean;
+}
+export interface SmtProductPrintRule{
+  readonly receipt:boolean;
+  readonly production:boolean;
+  readonly packing:boolean;
+  readonly label:boolean;
+  readonly dineIn:boolean;
+  readonly takeaway:boolean;
+  readonly labelPrinterIds:readonly string[];
+}
+export interface SmtPrintConfig{
+  readonly logicalPrinters:readonly SmtLogicalPrinterConfig[];
+  readonly productRules:Readonly<Record<string,SmtProductPrintRule>>;
+  readonly templateSpec:Readonly<Record<string,unknown>>;
+}
+
+const DEFAULT_PRINT_RULE:SmtProductPrintRule=Object.freeze({
+  receipt:true,production:true,packing:true,label:false,dineIn:true,takeaway:true,labelPrinterIds:Object.freeze([]),
+});
+
+export function readSmtPrintConfig():SmtPrintConfig{
+  const rawPrinters=readAdminSnapshotSection<unknown[]>('logicalPrinters');
+  const logicalPrinters=Array.isArray(rawPrinters)?rawPrinters.flatMap(raw=>{
+    const row=record(raw);
+    const type=String(row.type);
+    const id=text(row.id);
+    if(!id||!['RECEIPT','PRODUCTION','PACKING','LABEL'].includes(type))return [];
+    return [Object.freeze({
+      id,
+      name:text(row.name,id),
+      type:type as SmtLogicalPrinterConfig['type'],
+      active:row.active!==false,
+    })];
+  }):[];
+
+  const rawRules=record(readAdminSnapshotSection('printRules'));
+  const productRules:Record<string,SmtProductPrintRule>={};
+  for(const [productId,raw] of Object.entries(rawRules)){
+    const row=record(raw);
+    productRules[productId]=Object.freeze({
+      receipt:row.receipt===undefined?DEFAULT_PRINT_RULE.receipt:bool(row.receipt,true),
+      production:row.production===undefined?DEFAULT_PRINT_RULE.production:bool(row.production,true),
+      packing:row.packing===undefined?DEFAULT_PRINT_RULE.packing:bool(row.packing,true),
+      label:row.label===undefined?DEFAULT_PRINT_RULE.label:bool(row.label,false),
+      dineIn:row.dineIn===undefined?DEFAULT_PRINT_RULE.dineIn:bool(row.dineIn,true),
+      takeaway:row.takeaway===undefined?DEFAULT_PRINT_RULE.takeaway:bool(row.takeaway,true),
+      labelPrinterIds:Object.freeze(strings(row.labelPrinterIds)),
+    });
+  }
+  return Object.freeze({
+    logicalPrinters:Object.freeze(logicalPrinters),
+    productRules:Object.freeze(productRules),
+    templateSpec:Object.freeze(record(readAdminSnapshotSection('printTemplates'))),
+  });
+}
+
+export function printRuleForProduct(productId:string,config=readSmtPrintConfig()){
+  return config.productRules[productId]??DEFAULT_PRINT_RULE;
+}
