@@ -92,16 +92,16 @@ export function CashCloseRecordWorkspace(){
   </section>;
 }
 
+interface AccessPolicy{sessionHours:number;trustedDeviceRequired:boolean;revokeOnRoleChange:boolean;pinMinLength:number}
 export function AccessSessionWorkspace(){
-  const [scope,setScope]=useState('STORE');
-  const [pin,setPin]=useState('');
+  const [policy,setPolicy]=usePersistentAdminState<AccessPolicy>('access-policy.v1',{sessionHours:12,trustedDeviceRequired:false,revokeOnRoleChange:true,pinMinLength:4});
+  const [sessions]=usePersistentAdminState<Array<{id:string;staffId:string;device:string;scope:string;lastSeenAt:string;state:string}>>('sessions-read.v1',[]);
+  const patch=(change:Partial<AccessPolicy>)=>setPolicy(current=>{const after={...current,...change};appendAdminAudit({action:'修改登入／Session 規則',target:'Access Policy',before:current,after});return after;});
   return <section className="admin-editor-page">
-    <UpgradeHeader title="登入／權限範圍" description="管理後台登入、登入碼、權限範圍、登入狀態同可信裝置；正式權限由系統統一處理。"/>
+    <UpgradeHeader title="登入／Session／Scope" description="管理登入 session policy、PIN 最低要求、可信裝置政策同角色變更後處理；正式 Authz 判斷由唯一權限 authority 執行。" kicker="權限治理"/>
     <div className="admin-policy-grid two">
-      <article className="admin-policy-card"><h2>登入碼草稿</h2><label><span>登入碼</span><input inputMode="numeric" value={pin} onChange={e=>setPin(e.target.value.replace(/\D/g,'').slice(0,8))} placeholder="4–8 digits"/></label><StateChip>未保存</StateChip></article>
-      <article className="admin-policy-card"><h2>權限範圍</h2><label><span>範圍</span><select value={scope} onChange={e=>setScope(e.target.value)}><option value="STORE">單店</option><option value="MULTI_STORE">多店</option><option value="REPORT_ONLY">只看報表</option></select></label><div className="admin-read-empty">權限資料尚未啟用</div></article>
-      <article className="admin-policy-card"><h2>後台登入狀態</h2><div className="admin-read-empty">登入狀態尚未啟用</div><button disabled>登出其他登入尚未開放</button></article>
-      <article className="admin-policy-card"><h2>可信裝置</h2><div className="admin-read-empty">可信裝置資料尚未啟用</div><button disabled>移除裝置尚未開放</button></article>
+      <article className="admin-policy-card"><h2>登入政策</h2><label><span>Session 小時</span><input type="number" min={1} max={168} value={policy.sessionHours} onChange={event=>patch({sessionHours:Number(event.target.value)||12})}/></label><label><span>PIN 最少位數</span><input type="number" min={4} max={8} value={policy.pinMinLength} onChange={event=>patch({pinMinLength:Number(event.target.value)||4})}/></label><label className="admin-toggle"><input type="checkbox" checked={policy.trustedDeviceRequired} onChange={event=>patch({trustedDeviceRequired:event.target.checked})}/><span>Admin Login 要求可信裝置</span></label><label className="admin-toggle"><input type="checkbox" checked={policy.revokeOnRoleChange} onChange={event=>patch({revokeOnRoleChange:event.target.checked})}/><span>角色改動後撤銷舊 Session</span></label></article>
+      <article className="admin-policy-card"><h2>目前 Session</h2>{sessions.length===0?<div className="admin-read-empty">未有 Session readback。</div>:sessions.map(row=><p key={row.id}>{row.staffId} · {row.device} · {row.scope} · {row.state} · {new Date(row.lastSeenAt).toLocaleString('zh-HK')}</p>)}</article>
     </div>
   </section>;
 }
