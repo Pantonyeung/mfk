@@ -95,13 +95,13 @@ export function AnnouncementsWorkspace(){
 export function AdvancedWorkspace(){
   const [rawMaterials,setRawMaterials]=useState(false);
   const [diagnostics,setDiagnostics]=useState(false);
-  const [developer,set技術支援]=useState(false);
+  const [developer,setDeveloper]=useState(false);
   return <section className="admin-editor-page">
     <MigrationHeader title="進階設定" description="低頻或高風險功能目前只提供入口；未正式批准前唔會啟用任何連接。"/>
     <div className="admin-policy-grid">
       <article className="admin-policy-card"><h2>原材料</h2><label className="admin-toggle"><input type="checkbox" checked={rawMaterials} onChange={event=>setRawMaterials(event.target.checked)}/><span>顯示原材料進階功能</span></label><span className="admin-not-wired-chip">稍後開放</span></article>
       <article className="admin-policy-card"><h2>系統狀態</h2><label className="admin-toggle"><input type="checkbox" checked={diagnostics} onChange={event=>setDiagnostics(event.target.checked)}/><span>顯示診斷工具</span></label><span className="admin-not-wired-chip">稍後開放</span></article>
-      <article className="admin-policy-card"><h2>技術支援</h2><label className="admin-toggle"><input type="checkbox" checked={developer} onChange={event=>set技術支援(event.target.checked)}/><span>顯示開發工具</span></label><span className="admin-not-wired-chip">稍後開放</span></article>
+      <article className="admin-policy-card"><h2>技術支援</h2><label className="admin-toggle"><input type="checkbox" checked={developer} onChange={event=>setDeveloper(event.target.checked)}/><span>顯示開發工具</span></label><span className="admin-not-wired-chip">稍後開放</span></article>
     </div>
   </section>;
 }
