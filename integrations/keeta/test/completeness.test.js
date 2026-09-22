@@ -15,6 +15,8 @@ import {
   keetaProviderOrderRef,
   normalizeKeetaObservedSystemCancellationEvidence,
   normalizeKeetaOrderLifecycleEventEvidence,
+  normalizeKeetaDeliveryStatusEvidence,
+  normalizeKeetaOrderPlacementEvidence,
   parseKeetaTokenMaterial,
   parseKeetaWebhookEnvelope,
   resolveKeetaAcceptancePolicy,
@@ -141,4 +143,91 @@ test('completeness ledger keeps live runtime and canonical writers excluded', ()
   const exclusions = JSON.stringify(KEETA_DONOR_EXCLUSIONS);
   assert.match(exclusions, /LEGACY_D1_CANONICAL_ACCEPTANCE/);
   assert.match(exclusions, /LIVE_RUNTIME_WIRING_FORBIDDEN_DURING_COMPLETENESS/);
+});
+
+
+test('real Standard root baseOrder placement shape is accepted as provider evidence only', () => {
+  const envelope = parseKeetaWebhookEnvelope({
+    sig: 'b'.repeat(64),
+    eventId: 1001,
+    appId: 1,
+    messageId: 'ROOT-1001',
+    shopId: 721578302,
+    timestamp: 1788501711,
+    message: JSON.stringify({
+      tagCodes: [112005, 106100, 103002],
+      baseOrder: { orderViewId: 5123443030093253 },
+    }),
+  });
+  const evidence = normalizeKeetaOrderPlacementEvidence(envelope);
+  assert.equal(evidence.providerOrderId, '5123443030093253');
+  assert.equal(evidence.formalOrderAuthority, 'ABSENT');
+  assert.equal(evidence.executionGate, 'NOT_WIRED');
+});
+
+test('acceptance completion and cancellation provider events validate documented facts', () => {
+  const base = {
+    sig: 'c'.repeat(64),
+    appId: 1,
+    shopId: 466663,
+    timestamp: 1751448108,
+  };
+  const accepted = normalizeKeetaOrderLifecycleEventEvidence(parseKeetaWebhookEnvelope({
+    ...base,
+    eventId: 1002,
+    messageId: 'E-1002',
+    message: JSON.stringify({ orderViewId: 1, shopId: 466663, status: 30, opTime: 1751448108144 }),
+  }));
+  assert.equal(accepted.orderStatus, 30);
+
+  const completed = normalizeKeetaOrderLifecycleEventEvidence(parseKeetaWebhookEnvelope({
+    ...base,
+    eventId: 1003,
+    messageId: 'E-1003',
+    message: JSON.stringify({ orderViewId: 1, shopId: 466663, status: 40, opTime: 1751448108144 }),
+  }));
+  assert.equal(completed.orderStatus, 40);
+
+  const canceled = normalizeKeetaOrderLifecycleEventEvidence(parseKeetaWebhookEnvelope({
+    ...base,
+    eventId: 1004,
+    messageId: 'E-1004',
+    message: JSON.stringify({ orderViewId: 1, shopId: 466663, status: 50, opTime: 1751448108144, opType: 10 }),
+  }));
+  assert.equal(canceled.orderStatus, 50);
+  assert.equal(canceled.executionGate, 'NOT_WIRED');
+});
+
+test('delivery status accepts only documented logistics statuses and requires opTime', () => {
+  for (const logisticsStatus of [0, 10, 20, 25, 30, 50, 99]) {
+    const result = normalizeKeetaDeliveryStatusEvidence(parseKeetaWebhookEnvelope({
+      sig: 'd'.repeat(64),
+      eventId: 1006,
+      appId: 1,
+      messageId: `E-1006-${logisticsStatus}`,
+      shopId: 466663,
+      timestamp: 1751448108,
+      message: JSON.stringify({
+        orderViewId: 756823555555859,
+        shopId: 466663,
+        logisticsStatus,
+        opTime: 1751448108144,
+      }),
+    }));
+    assert.equal(result.logisticsStatus, logisticsStatus);
+  }
+  assert.throws(() => normalizeKeetaDeliveryStatusEvidence(parseKeetaWebhookEnvelope({
+    sig: 'e'.repeat(64),
+    eventId: 1006,
+    appId: 1,
+    messageId: 'E-1006-BAD',
+    shopId: 466663,
+    timestamp: 1751448108,
+    message: JSON.stringify({
+      orderViewId: 756823555555859,
+      shopId: 466663,
+      logisticsStatus: 999,
+      opTime: 1751448108144,
+    }),
+  })), /KEETA_DELIVERY_LOGISTICS_STATUS_INVALID/);
 });
