@@ -15,8 +15,8 @@ describe('MFK Admin catalog migration slice',()=>{
     );
     expect(html).toContain('商品資料');
     expect(html).toContain('新增商品');
-    expect(html).toContain('Publish 未接駁');
-    expect(html).toContain('SESSION DRAFT · NOT_WIRED');
+    expect(html).toContain('尚未可發布');
+    expect(html).toContain('未發布草稿');
   });
 
   it('routes Product to the real editor instead of the generic capability placeholder',()=>{
@@ -39,7 +39,7 @@ describe('MFK Admin catalog migration slice',()=>{
     );
     expect(businessDay).toContain('營業日／交更');
     expect(businessDay).toContain('每日分界時間');
-    expect(businessDay).toContain('Publish 未接駁');
+    expect(businessDay).toContain('尚未可發布');
 
     const print=renderToStaticMarkup(
       <MemoryRouter initialEntries={['/admin/print']}>
@@ -47,8 +47,8 @@ describe('MFK Admin catalog migration slice',()=>{
       </MemoryRouter>,
     );
     expect(print).toContain('打印中心');
-    expect(print).toContain('新增 Logical Printer');
-    expect(print).toContain('NOT_WIRED');
+    expect(print).toContain('新增打印用途');
+    expect(print).toContain('尚未啟用');
   });
 
 
@@ -59,7 +59,7 @@ describe('MFK Admin catalog migration slice',()=>{
           <MfkAdminApp/>
         </MemoryRouter>,
       );
-      expect(html,capability.id).not.toContain('Current MFK State');
+      expect(html,capability.id).not.toContain('目前狀態');
     }
   });
 
@@ -70,9 +70,8 @@ describe('MFK Admin catalog migration slice',()=>{
           <MfkAdminApp/>
         </MemoryRouter>,
       );
-      expect(html).toContain('NOT_WIRED');
-      expect(html).toContain('未接駁');
-      expect(html).not.toContain('Live Mutation');
+      expect(html).not.toMatch(/NOT_WIRED|MIGRATION_ONLY|SOURCE_INTENT|TARGET_OBSERVED|Human Compare|Domain adapters|Live Mutation/);
+      expect(html).toMatch(/尚未|未發布|人工|發布|對帳|快捷原因/);
     }
   });
 
