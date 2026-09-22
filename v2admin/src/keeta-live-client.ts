@@ -17,6 +17,7 @@ export interface KeetaLiveStatus{
     readonly lastCallbackError:string|null;
     readonly lastCallbackMethod:'GET'|'POST'|null;
     readonly lastCallbackParamNames:readonly string[];
+    readonly tokenSource:'OAUTH_CALLBACK'|'TEST_PROVIDER_PORTAL_IMPORT'|null;
   };
   readonly webhook:{
     readonly callbackUrl:string;
@@ -69,4 +70,20 @@ export async function checkKeetaTokenReadiness(){
   });
   const body=await response.json().catch(()=>({})) as {state?:string;code?:string};
   return Object.freeze({ok:response.ok,state:body.state??'UNKNOWN',code:body.code});
+}
+
+
+export async function importKeetaTestToken(raw:string){
+  let token:unknown;
+  try{token=JSON.parse(raw);}
+  catch{throw new Error('KEETA_TEST_TOKEN_JSON_INVALID');}
+  const response=await fetch('/api/keeta/admin/token/import-test?storeId=MF01',{
+    method:'POST',
+    credentials:'same-origin',
+    headers:{'content-type':'application/json',...headers()},
+    body:JSON.stringify(token),
+  });
+  const body=await response.json().catch(()=>({})) as {state?:string;source?:string;expiresAt?:string;code?:string};
+  if(!response.ok)throw new Error(body.code||'KEETA_TEST_TOKEN_IMPORT_HTTP_'+response.status);
+  return body;
 }
