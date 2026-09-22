@@ -39,6 +39,10 @@ function snapshot(){
   if(!envelope)throw new Error('KEETA_ORDER_ADMIN_CONFIG_REQUIRED');
   return envelope.snapshot as Record<string,unknown>;
 }
+function autoAcceptEnabled(){
+  const policy=snapshot().channelPolicy;
+  return Boolean(policy&&typeof policy==='object'&&!Array.isArray(policy)&&(policy as {autoAccept?:unknown}).autoAccept===true);
+}
 function rows(value:unknown):Record<string,unknown>[]{
   return Array.isArray(value)?value.filter(row=>row&&typeof row==='object'&&!Array.isArray(row)) as Record<string,unknown>[]:[];
 }
@@ -193,6 +197,9 @@ export async function reconcileKeetaOrderIntake(){
         const orderInput=translateKeetaIntentToLocalOrder(intent);
         const order=localRuntime.createOrder(orderInput);
         await ack(intent,order);
+        if(autoAcceptEnabled()&&order.fulfillmentLabel==='待處理'){
+          await localRuntime.acceptOrder(order.id);
+        }
         clearAttention(intent.providerOrderId);
       }catch(error){
         const providerOrderId=intent?.providerOrderId??'UNKNOWN';
