@@ -405,3 +405,31 @@
   .admin-combo-card{padding:11px}
   .admin-combo-step{padding:10px}
 }
+
+
+/* Combo R3 — reusable main-course pools + shared add-on pool */
+.admin-combo-r3-overview{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.admin-combo-r3-overview article{display:grid;gap:4px;padding:12px;border:1px solid #e0e3e9;border-radius:11px;background:#fff}
+.admin-combo-r3-overview span,.admin-combo-r3-overview small{font-size:9px;color:#767f8b}
+.admin-combo-r3-overview strong{font-size:20px}
+.admin-combo-pool-list{display:grid;gap:10px}
+.admin-combo-pool-card{border:1px solid #dcdfea;border-radius:13px;background:#fff;overflow:hidden}
+.admin-combo-pool-card>summary{list-style:none;display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 14px;cursor:pointer;background:#f8f7ff}
+.admin-combo-pool-card>summary::-webkit-details-marker{display:none}
+.admin-combo-pool-card>summary>span:first-child{display:grid;gap:3px}
+.admin-combo-pool-card>summary b{font-size:13px}
+.admin-combo-pool-card>summary small,.admin-combo-pool-card>summary>span:last-child{font-size:9px;color:#7267a3}
+.admin-combo-pool-body{display:grid;gap:12px;padding:13px}
+.admin-combo-pool-groups{display:grid;gap:10px}
+.admin-combo-pool-groups>header,.admin-combo-pool-group>header{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.admin-combo-pool-group{display:grid;gap:11px;padding:11px;border:1px solid #e4e6ec;border-radius:11px;background:#fafbfc}
+.admin-combo-price-pending,.admin-combo-price-ready{font-size:9px;font-weight:850}
+.admin-combo-price-pending{color:#9b5a00}
+.admin-combo-price-ready{color:#3d7651}
+@media(max-width:900px){
+  .admin-combo-r3-overview{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:760px){
+  .admin-combo-r3-overview{grid-template-columns:1fr}
+  .admin-combo-pool-card>summary,.admin-combo-pool-groups>header,.admin-combo-pool-group>header{align-items:flex-start}
+}
