@@ -89,7 +89,7 @@ function read():Persisted{
 let data=read();
 function save(){localStorage.setItem(KEY,JSON.stringify(data));listeners.forEach(fn=>fn())}
 function projectOrder(order:StoredOrder){queueOrderProjection(order)}
-const money=(minor:number)=>'
+const money=(minor:number)=>String.fromCharCode(36)+(minor/100).toFixed(2);
 
 export interface SmtReprintOption{readonly jobId:string;readonly role:string;readonly label:string;readonly detail?:string;readonly bindingId:string;readonly printerName:string;readonly physicalKey:string}
 export interface CleanSmtCoreRuntimePort{
