@@ -59,7 +59,11 @@ export function collectAdminSnapshot(catalog:AdminSessionDraft,optionCenter?:Opt
     channelPolicy:readAdminStored('channel-policy.keeta.v1',{}),
     channelMapping:readAdminStored('channel-mapping.keeta.v1',[]),
     capacity:readAdminStored('capacity.v1',{}),
-    presentation:readAdminStored('presentation.v1',{}),
+    presentation:Object.freeze({
+      customer:readAdminStored('presentation.customer.v1',{}),
+      owner:readAdminStored('presentation.owner.v1',{}),
+      frontline:readAdminStored('presentation.frontline.v1',{}),
+    }),
     inventory:readAdminStored('inventory-lite.v1',[]),
     loyalty:readAdminStored('loyalty.v1',{}),
     coupons:readAdminStored('coupons.v1',[]),
