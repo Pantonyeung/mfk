@@ -27,10 +27,8 @@ jobs:
       - run: npm run build
       - name: Upload Owner acceptance version to mfk-admin preview
         run: npx --yes wrangler@latest versions upload --name mfk-admin --preview-alias owner-acceptance
-      - name: Verify acceptance preview
-        run: curl --retry 5 --retry-delay 2 --fail --silent --show-error --head https://owner-acceptance-mfk-admin.yeungyi88.workers.dev
-      - name: Cloudflare credentials marker
-        run: echo "preview verified"
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      - name: Verify acceptance preview
+        run: curl --retry 5 --retry-delay 2 --fail --silent --show-error --head https://owner-acceptance-mfk-admin.yeungyi88.workers.dev
