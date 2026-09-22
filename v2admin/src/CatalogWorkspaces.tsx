@@ -352,6 +352,8 @@ export function ModifiersWorkspace(){
       <div className="admin-editor-actions"><button type="button" className="primary" onClick={optionCenter.addSet}>新增選項組</button></div>
     </header>
 
+    <div className="admin-callout compact">操作方式：先新增選項組，再撳入去管理組內選項。例如「青瓜」→ 多青瓜／少青瓜／走青瓜；之後先喺商品詳細資料用「加入選項」連結呢個組。</div>
+
     <div className="admin-kpi-grid">
       <article><span>選項組</span><strong>{optionCenter.sets.length}</strong><small>可重用單位</small></article>
       <article><span>子選項</span><strong>{optionCenter.sets.reduce((sum,set)=>sum+set.options.length,0)}</strong><small>組內管理</small></article>
