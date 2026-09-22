@@ -1,0 +1,141 @@
+MFK 航海圖 V1.18｜Round019｜2026-09-22
+主題：ADMIN ONLY CONTROL PLANE / ZERO-TOUCH SMT MENU AUTO PUBLISH
+狀態：CURRENT / CONTROLLING
+CONTROL：#22
+ACTIVE ISSUE：#44
+
+==================================================
+0. OWNER HARD LOCK
+==================================================
+
+Admin:
+ONLY CONTROL PLANE
+
+SMT:
+EXECUTION CLIENT + LOCAL LKG
+
+SMT Admin mutation controls:
+FORBIDDEN
+
+==================================================
+1. SUPERSEDED DESIGN
+==================================================
+
+Manual A2 file shuttle:
+SUPERSEDED / NOT PRODUCTION
+
+Admin download
+→ human move
+→ SMT import
+→ receipt move
+→ Admin import
+
+DO NOT USE.
+
+#35 remains contract/evidence donor only.
+
+==================================================
+2. CORRECT FLOW
+==================================================
+
+Admin Draft
+→ Validate
+→ Authenticated Publish
+→ Canonical Menu Revision Commit
+→ Realtime Doorbell
+→ SMT Auto Canonical Fetch
+→ Revision/Fingerprint Validate
+→ Atomic Local LKG Apply
+→ Automatic POS Switch
+→ Automatic ACK/Readback
+→ Admin Applied Revision
+
+ZERO SMT OPERATOR ACTION
+
+==================================================
+3. SMT UI
+==================================================
+
+REMOVE:
+Admin · Menu control page
+Menu editor
+Publish control
+Import file
+Install/apply decision
+
+ALLOW READ-ONLY:
+Active Menu Revision
+Last Sync
+Catch-up State
+Failure Status
+
+==================================================
+4. OFFLINE
+==================================================
+
+Cloud unavailable:
+keep Local LKG
+
+Order / Checkout / Payment / Commit:
+continue
+
+Reconnect:
+automatic revision reconcile
+automatic catch-up
+automatic readback
+
+==================================================
+5. RUNTIME
+==================================================
+
+EVENT-DRIVEN FIRST
+
+NO high-frequency polling
+NO 5-second watchdog
+NO heavy cron
+
+Bounded startup/reconnect/focus reconciliation:
+allowed
+
+==================================================
+6. ACCEPTANCE
+==================================================
+
+Admin:
+Publish once
+
+SMT:
+zero touch
+
+Expected:
+R19 → R20 automatically
+
+Admin:
+automatic target readback = R20
+
+Restart:
+same R20
+
+Offline:
+LKG survives
+
+Reconnect:
+auto catch-up
+
+Only then BANK:
+
+MFK_ADMIN_SMT_AUTO_PUBLISH_GREEN
+
+==================================================
+7. HOLD
+==================================================
+
+SMT OTA #40:
+HOLD
+
+Keeta live:
+NOT AUTHORIZED
+
+==================================================
+END ROUND019
+==================================================
