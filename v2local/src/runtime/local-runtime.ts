@@ -2,6 +2,7 @@ import {printBytesLan,printTextLan} from './native-print.ts';
 import {renderTscRasterLabel} from './label-bitmap.ts';
 import {buildOrderPrintPlan,groupTscBitmapJobsByPhysicalPrinter,type PrintBinding,type PlannedPrintJob} from './print-routing.ts';
 import {queueOrderProjection} from './projection-outbox.ts';
+import {readActiveStaffSession} from './staff-auth.ts';
 
 export interface SmtOperationalMetric{readonly id:string;readonly label:string;readonly value:string;readonly detail?:string}
 export interface SmtOrderListItemViewModel{readonly orderId:string;readonly orderIdLabel:string;readonly itemCount:number;readonly totalLabel:string;readonly paymentLabel:string;readonly fulfillmentLabel:string;readonly sourceLabel?:string;readonly localSequenceLabel?:string}
@@ -18,6 +19,7 @@ export interface SmtAvailabilityProjection{readonly revision:number;readonly nod
 
 export interface StoredOrder{
   id:string;display:string;createdAt:string;updatedAt?:string;totalMinor:number;paymentLabel:string;fulfillmentLabel:'待處理'|'進行中'|'可取餐'|'已完成'|'已取消';sourceLabel:string;
+  staffId?:string;staffName?:string;
   items:readonly {id:string;name:string;qty:number;unitMinor:number}[];
 }
 export type DiningTender='CASH'|'ALIPAY'|'WECHAT'|'FPS'|'PAYME'|'COMBO';
@@ -394,6 +396,7 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
   createOrder(input){
     const n=data.orders.length+1;
     const createdAt=new Date().toISOString();
+    const session=readActiveStaffSession();
     const order:StoredOrder={
       id:'MFK-'+Date.now().toString(36),
       display:'P'+String(n).padStart(3,'0'),
@@ -403,6 +406,7 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
       paymentLabel:input.paymentLabel,
       fulfillmentLabel:'進行中',
       sourceLabel:input.sourceLabel||'現場',
+      ...(session?{staffId:session.staffId,staffName:session.displayName}:{}),
       items:input.items.map(item=>({...item})),
     };
     data={...data,orders:[order,...data.orders]};
