@@ -58,6 +58,7 @@ export function collectAdminSnapshot(catalog:AdminSessionDraft,optionCenter?:Opt
     staff:readAdminStored('staff.v1',[]),
     channelPolicy:readAdminStored('channel-policy.keeta.v1',{}),
     channelMapping:readAdminStored('channel-mapping.keeta.v1',[]),
+    storeBindings:readAdminStored('store-bindings.v1',[]),
     capacity:readAdminStored('capacity.v1',{}),
     presentation:Object.freeze({
       customer:readAdminStored('presentation.customer.v1',{}),
