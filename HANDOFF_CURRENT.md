@@ -1,77 +1,65 @@
 # MFK CURRENT HANDOFF｜2026-09-22
 
 Current navigation:
-docs/navigation/MFK_航海圖_V1.17_Round018_2026-09-22.txt
+docs/navigation/MFK_航海圖_V1.18_Round019_2026-09-22.txt
 
 Control:
 #22
 
-## CURRENT
+## CURRENT P0
 
-SMT OTA:
-HOLD
+#44
+Admin → SMT automatic publish
 
-Admin:
-ACTIVE
+## OWNER LOCK
 
-## CHINESE OPERATOR UI
+Admin = only control plane.
 
-#41
-deployed GREEN
-visual owner readback pending
+SMT = execution client + Local LKG.
 
-## LEGACY MENU RE-ENTRY
+SMT must NOT contain:
+- Menu editor
+- Admin draft
+- Publish button
+- file import
+- install/apply choice
+- manual Admin acceptance
 
-#42
+SMT may only show read-only menu sync/revision status.
 
-Owner-selected donor:
-Pantonyeung/Morefun-v2
-menu-combined-2026-09-05-v1
+## MANUAL A2
 
-Imported to MFK Admin:
-- 14 categories
-- 203 products
-- 188 active/direct-visible
-- 15 inactive donor-hidden
-- 188 direct prices
-- exact product names and IDs
-- legacy barcodes retained internally
+#35 manual file transfer is SUPERSEDED as production design.
 
-No canonical modifier/combo bindings existed in the selected donor snapshot; none were invented.
+Keep only:
+revision/fingerprint/apply/readback contract semantics.
 
-Verification:
-35684903667 SUCCESS
+DO NOT apply the manually-created R20 JSON.
 
-Live Admin deploy:
-35684991125 SUCCESS
+## TARGET FLOW
 
-State:
-MFK_ADMIN_MF01_LEGACY_MENU_REENTERED_DEPLOYED_GREEN
+Admin Publish
+→ authenticated canonical revision commit
+→ realtime doorbell
+→ SMT automatic canonical fetch
+→ validate
+→ atomic LKG apply
+→ automatic ACK/readback
+→ Admin shows applied revision
+
+Offline:
+use current Local LKG
+→ transactions continue
+→ reconnect auto catch-up
 
 ## EXACT NEXT
 
-Owner confirmed legacy MF01 menu is visible.
-#42 is BANKED / CLOSED.
+Implement #44 bounded seam.
 
-Run A2 manual controlled transfer:
+Owner acceptance:
+press Publish in Admin only.
+No action on SMT.
+SMT must change revision automatically.
+Admin must receive applied revision readback.
 
-1. SMT → More → Admin · Menu → read exact ACTIVE revision.
-2. Admin「待發布變更」→ set 門店目前版本 to that exact revision.
-3. 檢查內容 → 確認影響範圍 → 建立並下載發布檔案.
-4. Transfer SAME file to SMT and import.
-5. SMT downloads readback file.
-6. Import readback to Admin.
-7. Require 核對結果 = 一致.
-
-Scope:
-A2 sends Menu Index only:
-14 categories + 188 active products.
-It does not send prices/modifiers/combos.
-
-15 inactive donor products remain Admin-only until a future explicit rule.
-
-After A2 MATCH:
-BANK and STOP.
-Pricing is a separate future seam.
-
-A3 NOT AUTHORIZED.
+SMT OTA #40 remains HOLD.
