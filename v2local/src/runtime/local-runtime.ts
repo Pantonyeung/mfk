@@ -1,6 +1,8 @@
 import {printBytesLan,printTextLan} from './native-print.ts';
 import {renderTscRasterLabel} from './label-bitmap.ts';
 import {buildOrderPrintPlan,groupTscBitmapJobsByPhysicalPrinter,type PrintBinding,type PlannedPrintJob} from './print-routing.ts';
+import {queueOrderProjection} from './projection-outbox.ts';
+import {readActiveStaffSession} from './staff-auth.ts';
 
 export interface SmtOperationalMetric{readonly id:string;readonly label:string;readonly value:string;readonly detail?:string}
 export interface SmtOrderListItemViewModel{readonly orderId:string;readonly orderIdLabel:string;readonly itemCount:number;readonly totalLabel:string;readonly paymentLabel:string;readonly fulfillmentLabel:string;readonly sourceLabel?:string;readonly localSequenceLabel?:string}
@@ -16,7 +18,8 @@ export interface SmtAvailabilityNodeViewModel{readonly nodeId:string;readonly la
 export interface SmtAvailabilityProjection{readonly revision:number;readonly nodes:readonly SmtAvailabilityNodeViewModel[];readonly canChange:boolean}
 
 export interface StoredOrder{
-  id:string;display:string;createdAt:string;totalMinor:number;paymentLabel:string;fulfillmentLabel:'待處理'|'進行中'|'可取餐'|'已完成'|'已取消';sourceLabel:string;
+  id:string;display:string;createdAt:string;updatedAt?:string;totalMinor:number;paymentLabel:string;fulfillmentLabel:'待處理'|'進行中'|'可取餐'|'已完成'|'已取消';sourceLabel:string;
+  staffId?:string;staffName?:string;
   items:readonly {id:string;name:string;qty:number;unitMinor:number}[];
 }
 export type DiningTender='CASH'|'ALIPAY'|'WECHAT'|'FPS'|'PAYME'|'COMBO';
@@ -85,7 +88,8 @@ function read():Persisted{
 }
 let data=read();
 function save(){localStorage.setItem(KEY,JSON.stringify(data));listeners.forEach(fn=>fn())}
-const money=(minor:number)=>'$'+(minor/100).toFixed(2);
+function projectOrder(order:StoredOrder){queueOrderProjection(order)}
+const money=(minor:number)=>String.fromCharCode(36)+(minor/100).toFixed(2);
 
 export interface SmtReprintOption{readonly jobId:string;readonly role:string;readonly label:string;readonly detail?:string;readonly bindingId:string;readonly printerName:string;readonly physicalKey:string}
 export interface CleanSmtCoreRuntimePort{
@@ -391,17 +395,24 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
   subscribe(listener){listeners.add(listener);return()=>listeners.delete(listener)},
   createOrder(input){
     const n=data.orders.length+1;
+    const createdAt=new Date().toISOString();
+    const session=readActiveStaffSession();
     const order:StoredOrder={
       id:'MFK-'+Date.now().toString(36),
       display:'P'+String(n).padStart(3,'0'),
-      createdAt:new Date().toISOString(),
+      createdAt,
+      updatedAt:createdAt,
       totalMinor:input.totalMinor,
       paymentLabel:input.paymentLabel,
       fulfillmentLabel:'進行中',
       sourceLabel:input.sourceLabel||'現場',
+      ...(session?{staffId:session.staffId,staffName:session.displayName}:{}),
       items:input.items.map(item=>({...item})),
     };
-    data={...data,orders:[order,...data.orders]};save();return order;
+    data={...data,orders:[order,...data.orders]};
+    save();
+    projectOrder(order);
+    return order;
   },
   orders(){return data.orders},
   createHold(input){
@@ -450,7 +461,10 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
   },
   async markOrderReady(orderId){
     const found=data.orders.find(x=>x.id===orderId);if(!found)throw new Error('ORDER_NOT_FOUND');
-    data={...data,orders:data.orders.map(x=>x.id===orderId?{...x,fulfillmentLabel:'可取餐'}:x)};save();
+    const updatedAt=new Date().toISOString();
+    data={...data,orders:data.orders.map(x=>x.id===orderId?{...x,fulfillmentLabel:'可取餐',updatedAt}:x)};
+    save();
+    projectOrder(data.orders.find(x=>x.id===orderId)!);
     return {orderId,canonicalRevision:Date.now(),status:'READY'};
   },
   async printOrderOutputs(orderId){
@@ -486,16 +500,20 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
       .filter(item=>item.qty>0);
     if(!normalized.length)throw new Error('ORDER_ITEMS_REQUIRED');
     const totalMinor=normalized.reduce((sum,item)=>sum+item.qty*item.unitMinor,0);
-    data={...data,orders:data.orders.map(current=>current.id===orderId?{...current,items:normalized,totalMinor}:current)};
+    const updatedAt=new Date().toISOString();
+    data={...data,orders:data.orders.map(current=>current.id===orderId?{...current,items:normalized,totalMinor,updatedAt}:current)};
     save();
+    projectOrder(data.orders.find(current=>current.id===orderId)!);
     return {orderId,totalMinor};
   },
   async cancelOrder(orderId){
     const order=data.orders.find(x=>x.id===orderId);
     if(!order)throw new Error('ORDER_NOT_FOUND');
     if(order.fulfillmentLabel==='已完成')throw new Error('COMPLETED_ORDER_CANNOT_CANCEL');
-    data={...data,orders:data.orders.map(current=>current.id===orderId?{...current,fulfillmentLabel:'已取消'}:current)};
+    const updatedAt=new Date().toISOString();
+    data={...data,orders:data.orders.map(current=>current.id===orderId?{...current,fulfillmentLabel:'已取消',updatedAt}:current)};
     save();
+    projectOrder(data.orders.find(current=>current.id===orderId)!);
     return {orderId,status:'CANCELLED'};
   },
   async printOrderReceipt(orderId){

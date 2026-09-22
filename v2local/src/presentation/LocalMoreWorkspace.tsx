@@ -8,15 +8,16 @@ import {
   applyMfkStorageSnapshot,
   buildLocalReport,
   createLocalBackup,
-  createLocalDayClose,
+  commitLocalDayCloseOnce,
   readLocalDayCloses,
   restoreLocalBackup,
   snapshotMfkStorage,
   validateLocalBackup,
-  writeLocalDayCloses,
   type LocalBackup,
+  type LocalDayClose,
 } from '../runtime/local-operations.ts';
 import {readBusinessCutoff,readCurrentCashOpeningState} from '../runtime/cash-opening.ts';
+import {queueDayCloseProjection} from '../runtime/projection-outbox.ts';
 import './more-workspace.css';
 
 export type PrinterBinding={
@@ -308,7 +309,8 @@ function DiagnosticsPanel(){
 
 function ReportsPanel({revision}:{revision:number}){
   void revision;
-  const report=buildLocalReport(localRuntime.orders());
+  const cutoff=readBusinessCutoff();
+  const report=buildLocalReport(localRuntime.orders(),{businessStartHour:cutoff.hour,businessStartMinute:cutoff.minute});
   return <section className="more-panel">
     <header className="more-section-heading"><div><span>LOCAL REPORT</span><h2>今日營運</h2></div><strong>{report.businessDate}</strong></header>
     <div className="more-kpis fusion-kpis">
@@ -343,8 +345,9 @@ function DayClosePanel({revision,onSaved}:{revision:number;onSaved:()=>void}){
   const [cashRemoved,setCashRemoved]=useState('');
   const [note,setNote]=useState('');
   const [message,setMessage]=useState('');
+  const [completion,setCompletion]=useState<LocalDayClose|null>(null);
   const closes=readLocalDayCloses();
-  const latest=[...closes].filter(x=>x.businessDate===report.businessDate).sort((a,b)=>b.version-a.version)[0];
+  const latest=[...closes].filter(x=>x.businessDate===report.businessDate).sort((a,b)=>b.version-a.version||b.createdAt-a.createdAt)[0];
   const denominations=[1,2,5,10,20,50,100,500,1000] as const;
 
   const qtyFor=(value:number)=>Math.max(0,Math.floor(Number(counts[String(value)])||0));
@@ -371,32 +374,52 @@ function DayClosePanel({revision,onSaved}:{revision:number;onSaved:()=>void}){
   };
 
   const close=()=>{
+    if(latest){setCompletion(latest);setMessage('今日已經完成日結；正常日結唔會再建立新版本。');return;}
     if(!openingRecord){setMessage('今日未確認開更現金；請重新進入 SMT 完成開更現金確認。');return;}
     if(!hasCount){setMessage('請先輸入實點現金。');return;}
     if(!hasRemoval){setMessage('請輸入今次取走現金；如果唔取走請填 0。');return;}
     if(cashRemovedMinor>countedMinor){setMessage('取走現金唔可以大過實點現金。');return;}
-    const row=createLocalDayClose({
+    const denominationNote=mode==='denom'
+      ?'｜面額點算 '+denominations.map(value=>String.fromCharCode(36)+value+'×'+qtyFor(value)).join('、')
+      :'';
+    const result=commitLocalDayCloseOnce({
       orders:localRuntime.orders(),
       businessStartHour:cutoff.hour,
       businessStartMinute:cutoff.minute,
       openingCashMinor,
       countedCashMinor:countedMinor,
       cashRemovedMinor,
-      existing:closes,
-      note:note+(mode==='denom'?'｜面額點算 '+denominations.map(value=>'$'+value+'×'+qtyFor(value)).join('、'):''),
+      note:note+denominationNote,
     });
-    writeLocalDayCloses([...closes,row]);
-    setMessage(
-      '日結已保存：V'+row.version+
-      ' · 實點 '+money(row.countedCashMinor)+
-      ' · 取走 '+money(row.cashRemovedMinor??0)+
-      ' · 留櫃 '+money(row.retainedCashMinor??0)
-    );
+    queueDayCloseProjection(result.row);
+    setCompletion(result.row);
+    setMessage(result.created?'日結完成。':'今日已經完成日結；冇建立重複版本。');
     onSaved();
   };
 
+  if(latest)return <section className="more-panel dayclose-panel">
+    <header className="more-section-heading"><div><span>LOCAL DAY CLOSE</span><h2>收銀與日結</h2></div><strong>今日已完成</strong></header>
+    <section className="dayclose-complete-card">
+      <div className="dayclose-complete-icon">✓</div>
+      <div>
+        <span>{latest.businessDate}</span>
+        <h3>今日日結已鎖定</h3>
+        <p>正常日結每個 Business Date 只可以完成一次。重覆入頁或者再撳按鈕都唔會再建立新版本。</p>
+      </div>
+    </section>
+    <div className="more-kpis">
+      <article><span>開更現金</span><b>{money(latest.openingCashMinor)}</b></article>
+      <article><span>現金銷售</span><b>{money(latest.cashSalesMinor)}</b></article>
+      <article><span>實點現金</span><b>{money(latest.countedCashMinor)}</b></article>
+      <article><span>取走現金</span><b>{latest.cashRemovedMinor===undefined?'未記錄':money(latest.cashRemovedMinor)}</b></article>
+      <article><span>留櫃現金</span><b>{latest.retainedCashMinor===undefined?'未記錄':money(latest.retainedCashMinor)}</b></article>
+      <article><span>差額</span><b>{money(latest.cashDifferenceMinor)}</b></article>
+    </div>
+    <div className="fusion-note">記錄 ID：{latest.id}。如日後需要更正，會走獨立日結更正權限流程，唔會再用正常日結按鈕新增版本。</div>
+  </section>;
+
   return <section className="more-panel dayclose-panel">
-    <header className="more-section-heading"><div><span>LOCAL DAY CLOSE</span><h2>收銀與日結</h2></div><strong>{latest?'已日結 V'+latest.version:'今日未日結'}</strong></header>
+    <header className="more-section-heading"><div><span>LOCAL DAY CLOSE</span><h2>收銀與日結</h2></div><strong>今日未日結</strong></header>
 
     <div className="more-kpis">
       <article><span>今日開更現金</span><b>{money(openingCashMinor)}</b></article>
@@ -435,11 +458,11 @@ function DayClosePanel({revision,onSaved}:{revision:number;onSaved:()=>void}){
           const typedAmount=Math.max(0,Math.floor(Number(rawAmount)||0));
           const remainder=typedAmount%value;
           return <div key={value}>
-            <b>{'$'+value}</b>
+            <b>{String.fromCharCode(36)+value}</b>
             {denomEntryMode==='count'
               ?<div className="cash-count-control"><button type="button" onClick={()=>setQty(value,qty-1)}>−</button><input inputMode="numeric" value={qty||''} placeholder="0" onChange={e=>setQty(value,Number(e.target.value))}/><button type="button" onClick={()=>setQty(value,qty+1)}>＋</button></div>
-              :<div className="cash-amount-control"><span>$</span><input inputMode="numeric" value={rawAmount} placeholder="0" onChange={e=>setAmount(value,e.target.value)}/></div>}
-            <span className={remainder&&denomEntryMode==='amount'?'cash-convert invalid':'cash-convert'}>{qty} {value<10?'個':'張'}{remainder&&denomEntryMode==='amount'?' · 非 $'+value+' 倍數':''}</span>
+              :<div className="cash-amount-control"><span>{String.fromCharCode(36)}</span><input inputMode="numeric" value={rawAmount} placeholder="0" onChange={e=>setAmount(value,e.target.value)}/></div>}
+            <span className={remainder&&denomEntryMode==='amount'?'cash-convert invalid':'cash-convert'}>{qty} {value<10?'個':'張'}{remainder&&denomEntryMode==='amount'?' · 金額唔係面額倍數':''}</span>
             <strong>{money(value*qty*100)}</strong>
           </div>;
         })}
@@ -459,11 +482,21 @@ function DayClosePanel({revision,onSaved}:{revision:number;onSaved:()=>void}){
     </footer>
 
     {message?<p role="status" className="fusion-status">{message}</p>:null}
-    {latest?<section className="fusion-list"><header><b>最近日結</b><span>{latest.id}</span></header><article>
-      <span>實點 {money(latest.countedCashMinor)}</span>
-      <b>取走 {latest.cashRemovedMinor===undefined?'未記錄':money(latest.cashRemovedMinor)}</b>
-      <strong>留櫃 {latest.retainedCashMinor===undefined?'未記錄':money(latest.retainedCashMinor)}</strong>
-    </article></section>:null}
+    {completion?<div className="dayclose-success-overlay">
+      <section className="dayclose-success-dialog" role="dialog" aria-modal="true" aria-labelledby="dayclose-success-title">
+        <div className="dayclose-complete-icon">✓</div>
+        <span>DAY CLOSE COMPLETED</span>
+        <h3 id="dayclose-success-title">日結成功</h3>
+        <p>{completion.businessDate} 已完成日結，而且今日唔會再建立第二個正常日結版本。</p>
+        <div className="dayclose-success-grid">
+          <article><span>實點</span><b>{money(completion.countedCashMinor)}</b></article>
+          <article><span>取走</span><b>{completion.cashRemovedMinor===undefined?'未記錄':money(completion.cashRemovedMinor)}</b></article>
+          <article><span>留櫃</span><b>{completion.retainedCashMinor===undefined?'未記錄':money(completion.retainedCashMinor)}</b></article>
+          <article><span>差額</span><b>{money(completion.cashDifferenceMinor)}</b></article>
+        </div>
+        <button type="button" className="more-primary" onClick={()=>setCompletion(null)}>完成</button>
+      </section>
+    </div>:null}
   </section>;
 }
 

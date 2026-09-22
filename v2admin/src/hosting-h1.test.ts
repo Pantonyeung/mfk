@@ -23,6 +23,20 @@ describe('MFK Admin Cloudflare H2 + config sync runtime',()=>{
     expect(worker).toContain("if(site&&site!=='same-origin')return false");
   });
 
+  it('exposes projection-only SMT event ingress and Admin read endpoints on the same store-scoped Durable Object',()=>{
+    const worker=readFileSync(new URL('../worker.ts',import.meta.url),'utf8');
+    for(const marker of [
+      "/api/projection/",
+      "/projection/events",
+      "/projection/orders",
+      "/projection/reports",
+      "SMT_PROJECTION_AVAILABLE",
+      "authorizeProjectionWrite",
+      "authorizeAdminRead",
+    ])expect(worker).toContain(marker);
+    expect(worker).toContain("acks[event.deviceId]");
+  });
+
   it('does not inherit legacy/provider/transaction runtime bindings or background triggers',()=>{
     for(const forbidden of [
       '"d1_databases"',
