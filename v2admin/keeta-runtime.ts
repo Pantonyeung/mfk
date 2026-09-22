@@ -72,6 +72,15 @@ function keetaOrderPlacementIdentity(message){
   const providerOrderId=nonEmpty(String(raw??''),'KEETA_PROVIDER_ORDER_ID_REQUIRED');
   return Object.freeze({providerOrderId,rawMessage:JSON.stringify(messageRow)});
 }
+function keetaOrderLifecycleIdentity(message){
+  let root;
+  try{root=JSON.parse(nonEmpty(message,'KEETA_ORDER_EVENT_MESSAGE_REQUIRED'));}
+  catch{throw new Error('KEETA_ORDER_EVENT_MESSAGE_INVALID_JSON');}
+  const row=record(root,'KEETA_ORDER_EVENT_MESSAGE_INVALID');
+  const raw=row.orderViewIdStr??row.orderViewId;
+  const providerOrderId=nonEmpty(String(raw??''),'KEETA_ORDER_EVENT_PROVIDER_ORDER_ID_REQUIRED');
+  return Object.freeze({providerOrderId,rawMessage:JSON.stringify(row)});
+}
 function bytesToHex(bytes){
   return [...bytes].map(value=>value.toString(16).padStart(2,'0')).join('');
 }
@@ -941,6 +950,40 @@ export class KeetaRuntimeStore{
       }
     }
 
+    if(url.pathname==='/smt/orders/events/pending'&&request.method==='GET'){
+      const rows=await this.state.storage.list({prefix:'order:event:'});
+      const events=[...rows.values()]
+        .filter(row=>row&&row.state==='PENDING_SMT')
+        .sort((a,b)=>String(a.receivedAt).localeCompare(String(b.receivedAt)))
+        .slice(0,50);
+      return json({schema:'MFK_KEETA_ORDER_EVENT_BATCH_V1',storeId:'MF01',events});
+    }
+
+    if(url.pathname==='/smt/orders/events/ack'&&request.method==='POST'){
+      try{
+        const body=record(await request.json(),'KEETA_ORDER_EVENT_ACK_INVALID');
+        const providerMessageId=nonEmpty(body.providerMessageId,'KEETA_ORDER_EVENT_MESSAGE_ID_REQUIRED');
+        const providerOrderId=nonEmpty(String(body.providerOrderId??''),'KEETA_ORDER_EVENT_PROVIDER_ORDER_ID_REQUIRED');
+        const canonicalOrderId=nonEmpty(body.canonicalOrderId,'KEETA_CANONICAL_ORDER_ID_REQUIRED');
+        const eventKey='order:event:'+providerMessageId;
+        const event=await this.state.storage.get(eventKey);
+        if(!event)return json({code:'KEETA_ORDER_EVENT_NOT_FOUND'},404);
+        if(event.providerOrderId!==providerOrderId)return json({code:'KEETA_ORDER_EVENT_PROVIDER_ID_MISMATCH'},409);
+        const intent=await this.state.storage.get('order:intent:'+providerOrderId);
+        if(!intent||intent.state!=='COMMITTED')return json({code:'KEETA_ORDER_EVENT_ORDER_NOT_COMMITTED'},409);
+        if(intent.canonicalOrderId!==canonicalOrderId)return json({code:'KEETA_ORDER_EVENT_CANONICAL_MISMATCH'},409);
+        if(event.state==='LINKED'){
+          if(event.canonicalOrderId!==canonicalOrderId)return json({code:'KEETA_ORDER_EVENT_ACK_CONFLICT'},409);
+          return json({state:'IDEMPOTENT',event});
+        }
+        const linked=Object.freeze({...event,state:'LINKED',canonicalOrderId,linkedAt:new Date().toISOString()});
+        await this.state.storage.put(eventKey,linked);
+        return json({state:'ACKED',event:linked});
+      }catch(error){
+        return json({code:error instanceof Error?error.message:'KEETA_ORDER_EVENT_ACK_FAILED'},400);
+      }
+    }
+
     if(url.pathname==='/smt/orders/command'&&request.method==='POST'){
       let providerOrderId='';
       let canonicalOrderId='';
@@ -1101,6 +1144,28 @@ export class KeetaRuntimeStore{
               receivedAt:acceptedAt,
               fingerprint,
               rawMessage:placement.rawMessage,
+              state:'PENDING_SMT',
+            }));
+          }
+        }
+        if([1002,1003,1004,1006,1008].includes(envelope.eventId)){
+          const lifecycle=keetaOrderLifecycleIdentity(envelope.message);
+          const eventKey='order:event:'+envelope.messageId;
+          const existingEvent=await this.state.storage.get(eventKey);
+          if(!existingEvent){
+            await this.state.storage.put(eventKey,Object.freeze({
+              schema:'MFK_KEETA_ORDER_EVENT_V1',
+              storeId:'MF01',
+              provider:'KEETA',
+              providerShopId:envelope.shopId,
+              providerOrderId:lifecycle.providerOrderId,
+              providerMessageId:envelope.messageId,
+              eventId:envelope.eventId,
+              eventName:envelope.eventName,
+              providerPushedAt:new Date(envelope.timestamp*1000).toISOString(),
+              receivedAt:acceptedAt,
+              fingerprint,
+              rawMessage:lifecycle.rawMessage,
               state:'PENDING_SMT',
             }));
           }
