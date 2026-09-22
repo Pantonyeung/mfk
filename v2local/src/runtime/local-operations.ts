@@ -287,6 +287,41 @@ export function createLocalCashOpening(input:{
   });
 }
 
+export interface LocalDayCloseCommitResult{
+  readonly row:LocalDayClose;
+  readonly created:boolean;
+}
+
+export function commitLocalDayCloseOnce(input:{
+  readonly orders:readonly LocalReportOrder[];
+  readonly now?:number;
+  readonly businessStartHour?:number;
+  readonly businessStartMinute?:number;
+  readonly openingCashMinor:number;
+  readonly countedCashMinor:number;
+  readonly cashRemovedMinor?:number;
+  readonly note?:string;
+},storage:Pick<Storage,'getItem'|'setItem'>=localStorage):LocalDayCloseCommitResult{
+  const now=input.now??Date.now();
+  const report=buildLocalReport(input.orders,{
+    now,
+    businessStartHour:input.businessStartHour??5,
+    businessStartMinute:input.businessStartMinute??0,
+  });
+  const existing=readLocalDayCloses(storage);
+  const prior=[...existing]
+    .filter(row=>row.businessDate===report.businessDate)
+    .sort((a,b)=>b.version-a.version||b.createdAt-a.createdAt)[0];
+  if(prior)return Object.freeze({row:prior,created:false});
+  const row=createLocalDayClose({
+    ...input,
+    now,
+    existing,
+  });
+  writeLocalDayCloses([...existing,row],storage);
+  return Object.freeze({row,created:true});
+}
+
 export function readLocalDayCloses(storage:Pick<Storage,'getItem'>=localStorage):LocalDayClose[]{
   try{
     const value=JSON.parse(storage.getItem(LOCAL_DAY_CLOSE_KEY)||'[]');
