@@ -1,0 +1,122 @@
+MFK 航海圖 V1.23｜Round024｜2026-09-22
+主題：ADMIN OPTION CENTER DEPLOYED / OWNER REVIEW
+狀態：CURRENT / CONTROLLING
+CONTROL：#22
+PARENT：#45
+ACTIVE：#68
+PRODUCT DETAIL：#62
+LATER RED：#66
+
+==================================================
+0. OPTION MASTER
+==================================================
+
+Option Center:
+CANONICAL MASTER
+
+Fields:
+Option ID
+Name
+Price
+Active
+
+Rule:
+ONE OPTION = ONE IDENTITY
+
+NO per-Product duplicate Option.
+
+==================================================
+1. OPTION GROUP
+==================================================
+
+References:
+existing Option identities
+
+Owns:
+Group ID / Name
+membership
+Required / Optional / Force-show
+Single / Multi
+Min / Max
+Quantities
+Active
+
+NO copied Option name / price.
+
+==================================================
+2. PRODUCT LINK
+==================================================
+
+Product:
+link / unlink Group
+include / exclude existing Options
+read Option ID / Name / Price
+set Product-specific default
+
+Product:
+NOT Option Master editor
+
+==================================================
+3. DEFAULT
+==================================================
+
+Default belongs to:
+
+Product × Group × Option
+
+Same Option:
+can be default on Product A
+and non-default on Product B
+
+==================================================
+4. PROOF
+==================================================
+
+Verification:
+35693400570 SUCCESS
+
+Deploy:
+35693511574 SUCCESS
+
+Canonical:
+https://admin.morefunos.com
+
+State:
+MFK_ADMIN_OPTION_CENTER_DEPLOYED_OWNER_REVIEW_PENDING
+
+==================================================
+5. EXACT NEXT
+==================================================
+
+Owner review:
+
+Admin
+→ 菜單
+→ 選項中心
+
+Then:
+商品資料
+→ 編輯
+→ 選項
+
+Accept only if normalized model is visible and usable.
+
+GREEN:
+BANK #68
+resume remaining #62 review
+
+RED:
+STOP on first exact break
+
+==================================================
+6. HOLD
+==================================================
+
+#44 Admin→SMT HOLD
+#40 SMT OTA HOLD
+#66 media backend NOT NEXT
+Keeta live NOT AUTHORIZED
+
+==================================================
+END ROUND024
+==================================================
