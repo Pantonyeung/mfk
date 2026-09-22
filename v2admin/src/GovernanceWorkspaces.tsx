@@ -47,14 +47,14 @@ export function PublishCenterWorkspace(){
 
   return <section className="admin-editor-page">
     <header className="admin-editor-head">
-      <div><small>{active?'目前版本 R'+active.version:'未有保存版本'}</small><h1>設定版本歷史</h1><p>「保存」就係正式版本邊界。呢度冇第二個發佈步驟；歷史版本只讀，還原會建立另一個新版本。</p></div>
+      <div><small>{active?'目前版本 R'+active.version:'未有保存版本'}</small><h1>設定版本歷史</h1><p>「保存」就係正式版本邊界。呢度冇額外確認步驟；歷史版本只讀，還原會建立另一個新版本。</p></div>
     </header>
 
     <div className="admin-kpi-grid">
       <article><span>目前版本</span><strong>{active?'R'+active.version:'—'}</strong><small>{active?new Date(active.createdAt).toLocaleString('zh-HK'):'未建立'}</small></article>
       <article><span>版本總數</span><strong>{releases.length}</strong><small>不可變歷史</small></article>
       <article><span>目前驗證碼</span><strong>{active?active.fingerprint.replace('fnv1a32:',''):'—'}</strong><small>保存後 readback</small></article>
-      <article><span>第二個發佈步驟</span><strong>0</strong><small>保存即目前版本</small></article>
+      <article><span>額外確認步驟</span><strong>0</strong><small>保存即目前版本</small></article>
     </div>
 
     <div className="admin-callout compact">{message}</div>
