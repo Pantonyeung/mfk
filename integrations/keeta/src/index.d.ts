@@ -162,6 +162,7 @@ export function buildKeetaPartialRefundApplyShape(input: Readonly<Record<string,
 export function parseKeetaAfterSaleEvidence(envelope: KeetaWebhookEnvelope): Readonly<Record<string, unknown>>;
 export function presentKeetaAfterSaleStatus(evidence: Readonly<Record<string, unknown>>): Readonly<Record<string, unknown>>;
 export function buildKeetaAfterSaleDecisionShape(input: Readonly<Record<string, unknown>>): Readonly<Record<string, unknown>>;
+export function normalizeKeetaStandardProviderOrderFacts(input: Readonly<Record<string, unknown>>): Readonly<Record<string, unknown>>;
 
 export function createKeetaStoreAliasBinding(input: Readonly<Record<string, unknown>>): Readonly<Record<string, unknown>>;
 export function toKeetaSellabilityShape(input: Readonly<Record<string, unknown>>): Readonly<Record<string, unknown>>;
