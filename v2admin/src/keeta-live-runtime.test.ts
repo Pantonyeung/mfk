@@ -33,8 +33,8 @@ describe('Keeta live edge runtime',()=>{
       'KEETA_APP_SECRET',
       'KEETA_TOKEN_ENCRYPTION_KEY',
       'KEETA_PROVIDER_SHOP_ID',
-      'KEETA_OAUTH_REDIRECT_URI',
     ]);
+    expect(empty.config.redirectUri).toBe('https://admin.morefunos.com/api/keeta/oauth/callback');
 
     const key=Buffer.alloc(32,7).toString('base64');
     const ready=assessKeetaRuntimeReadiness({
