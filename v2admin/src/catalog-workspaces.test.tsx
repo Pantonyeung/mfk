@@ -9,7 +9,7 @@ import {ADMIN_CAPABILITIES} from './admin-capabilities.ts';
 describe('MFK Admin complete catalog product',()=>{
   it('renders complete Product detail instead of a demo card',()=>{
     const html=renderToStaticMarkup(<AdminDraftProvider><ProductsWorkspace/></AdminDraftProvider>);
-    for(const marker of ['商品資料','新增商品','商品名稱','商品編號','基本價 HK$','Barcode','圖片參考','商品描述','外賣價格規則','此商品外賣 +$1','選項組綁定']) expect(html).toContain(marker);
+    for(const marker of ['商品資料','新增商品','商品名稱','商品編號','基本價 HK$','條碼','圖片參考','商品描述','外賣價格規則','此商品外賣 +$1','選項組綁定']) expect(html).toContain(marker);
     expect(html).toContain('203');
     expect(html).toContain('188');
     expect(html).toContain('已自動保存草稿');
