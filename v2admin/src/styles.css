@@ -209,3 +209,15 @@
   .admin-product-section-body{padding:12px}
   .admin-product-option-group>header{display:grid}
 }
+
+
+.admin-option-pricing-table{display:grid;border:1px solid #e0e3e9;border-radius:12px;background:#fff;overflow:hidden}
+.admin-option-pricing-table>header,.admin-option-pricing-table>article{display:grid;grid-template-columns:minmax(160px,1fr) minmax(180px,1.2fr) 150px 160px;gap:10px;align-items:center;padding:10px 12px}
+.admin-option-pricing-table>header{background:#f5f6f8;color:#737c89;font-size:10px;font-weight:850}
+.admin-option-pricing-table>article{border-top:1px solid #eceef2;font-size:11px}
+.admin-option-pricing-table input{min-height:38px;padding:0 9px;border:1px solid #d5dae2;border-radius:8px;background:#fff}
+.admin-option-pricing-table code{overflow-wrap:anywhere}
+@media(max-width:760px){
+  .admin-option-pricing-table{overflow-x:auto}
+  .admin-option-pricing-table>header,.admin-option-pricing-table>article{min-width:650px}
+}
