@@ -1,43 +1,61 @@
-import {useState} from 'react';
+import {useMemo,useState} from 'react';
 import {useAdminDraft} from './admin-draft.tsx';
+import {appendAdminAudit,usePersistentAdminState} from './admin-local-store.ts';
 
-function PolicyHeader({title,description}:{title:string;description:string}){
+function PolicyHeader({title,description,badge='已自動保存設定'}:{title:string;description:string;badge?:string}){
   return <header className="admin-editor-head">
-    <div><small>未發布設定</small><h1>{title}</h1><p>{description}</p></div>
-    <div className="admin-editor-actions">
-      <button type="button" className="primary" disabled title="部分功能尚未啟用">尚未可發布</button>
-    </div>
+    <div><small>{badge}</small><h1>{title}</h1><p>{description}</p></div>
   </header>;
 }
+const Toggle=({checked,onChange,label}:{checked:boolean;onChange:(next:boolean)=>void;label:string})=><label className="admin-toggle"><input type="checkbox" checked={checked} onChange={event=>onChange(event.target.checked)}/><span>{label}</span></label>;
 
+export interface AvailabilityRule{readonly sellable:boolean;readonly reason:string;readonly updatedAt:string}
 export function AvailabilityWorkspace(){
   const {draft}=useAdminDraft();
-  const [state,setState]=useState<Record<string,{sellable:boolean;reason:string}>>({});
+  const [state,setState]=usePersistentAdminState<Record<string,AvailabilityRule>>('availability.v1',{});
+  const patch=(id:string,change:Partial<AvailabilityRule>)=>{
+    setState(current=>{
+      const before=current[id]??{sellable:true,reason:'',updatedAt:''};
+      const after={...before,...change,updatedAt:new Date().toISOString()};
+      appendAdminAudit({action:'修改商品供應狀態設定',target:id,before,after});
+      return {...current,[id]:after};
+    });
+  };
+  const [query,setQuery]=useState('');
+  const rows=useMemo(()=>draft.products.filter(product=>product.name.toLowerCase().includes(query.trim().toLowerCase())),[draft.products,query]);
   return <section className="admin-editor-page">
-    <PolicyHeader title="售罄／供應" description="呢度只管理供應設定草稿。相關功能未啟用前，所有改動只會留喺目前草稿。"/>
-    {draft.products.length===0?<div className="admin-empty-state"><b>未有商品草稿</b><p>商品資料建立後，呢度會列出可售政策控制。</p></div>:<div className="admin-editor-list">
-      {draft.products.map(product=>{
-        const current=state[product.id]??{sellable:true,reason:''};
-        return <article className="admin-policy-row" key={product.id}>
-          <div><b>{product.name||product.id}</b><small>{product.id}</small></div>
-          <label className="admin-toggle"><input type="checkbox" checked={current.sellable} onChange={event=>setState(value=>({...value,[product.id]:{...current,sellable:event.target.checked}}))}/><span>{current.sellable?'可售':'停售'}</span></label>
-          <input value={current.reason} onChange={event=>setState(value=>({...value,[product.id]:{...current,reason:event.target.value}}))} placeholder="原因／備註（非必填）"/>
-          <span className="admin-not-wired-chip">尚未啟用</span>
-        </article>;
-      })}
-    </div>}
+    <PolicyHeader title="售罄／供應" description="管理商品可售狀態、停售原因同恢復設定。呢度係正式 Admin 設定草稿；日後由唯一 Sellability authority 執行。"/>
+    <div className="admin-filterbar"><input value={query} onChange={event=>setQuery(event.target.value)} placeholder="搜尋商品"/><span>{rows.length} 件商品</span></div>
+    <div className="admin-editor-list">{rows.map(product=>{
+      const current=state[product.id]??{sellable:true,reason:'',updatedAt:''};
+      return <article className="admin-policy-row" key={product.id}>
+        <div><b>{product.name}</b><small>{product.productCode??product.id}</small></div>
+        <Toggle checked={current.sellable} onChange={sellable=>patch(product.id,{sellable})} label={current.sellable?'可售':'停售'}/>
+        <input value={current.reason} onChange={event=>patch(product.id,{reason:event.target.value})} placeholder="原因／備註（非必填）"/>
+        <small>{current.updatedAt?new Date(current.updatedAt).toLocaleString('zh-HK'):'未修改'}</small>
+      </article>;
+    })}</div>
   </section>;
 }
 
+interface BusinessDayConfig{
+  cutoff:string;
+  postCloseCorrectionRoles:string[];
+  cashTolerance:string;
+  requireCloseApproval:boolean;
+}
 export function BusinessDayWorkspace(){
-  const [cutoff,setCutoff]=useState('05:00');
-  const [recordOnly,setRecordOnly]=useState(true);
-  const [allowPostCloseCorrection,setAllowPostCloseCorrection]=useState(false);
+  const [config,setConfig]=usePersistentAdminState<BusinessDayConfig>('business-day.v1',{
+    cutoff:'05:00',postCloseCorrectionRoles:['OWNER','MANAGER'],cashTolerance:'0.00',requireCloseApproval:true,
+  });
+  const patch=(change:Partial<BusinessDayConfig>)=>setConfig(current=>{const after={...current,...change};appendAdminAudit({action:'修改營業日設定',target:'營業日／交更',before:current,after});return after;});
+  const toggleRole=(role:string,checked:boolean)=>patch({postCloseCorrectionRoles:checked?[...new Set([...config.postCloseCorrectionRoles,role])]:config.postCloseCorrectionRoles.filter(item=>item!==role)});
   return <section className="admin-editor-page">
-    <PolicyHeader title="營業日／交更" description="設定營業日規則。呢啲設定只用作記錄同報表，唔會阻止交易。"/>
+    <PolicyHeader title="營業日／交更" description="營業日只負責記錄、報表分類同收舖歷史，永遠唔會阻止新交易。"/>
     <div className="admin-policy-grid">
-      <article className="admin-policy-card"><h2>營業日分界</h2><label><span>每日分界時間</span><input type="time" value={cutoff} onChange={event=>setCutoff(event.target.value)}/></label><small>只用作記錄、報表分類同收舖記錄。</small></article>
-      <article className="admin-policy-card"><h2>交易行為</h2><label className="admin-toggle"><input type="checkbox" checked={recordOnly} onChange={event=>setRecordOnly(event.target.checked)}/><span>只作記錄；永不阻交易</span></label><label className="admin-toggle"><input type="checkbox" checked={allowPostCloseCorrection} onChange={event=>setAllowPostCloseCorrection(event.target.checked)}/><span>允許授權人員日結後修正</span></label></article>
+      <article className="admin-policy-card"><h2>營業日分界</h2><label><span>每日分界時間</span><input type="time" value={config.cutoff} onChange={event=>patch({cutoff:event.target.value})}/></label><small>例如 05:00 代表凌晨五點先轉新營業日。</small></article>
+      <article className="admin-policy-card"><h2>日結後修改權限</h2>{['STAFF','MANAGER','OWNER'].map(role=><Toggle key={role} checked={config.postCloseCorrectionRoles.includes(role)} onChange={checked=>toggleRole(role,checked)} label={role==='STAFF'?'員工':role==='MANAGER'?'經理':'老闆'}/>)}</article>
+      <article className="admin-policy-card"><h2>收舖差額</h2><label><span>現金容許差額 HK$</span><input inputMode="decimal" value={config.cashTolerance} onChange={event=>patch({cashTolerance:event.target.value})}/></label><Toggle checked={config.requireCloseApproval} onChange={requireCloseApproval=>patch({requireCloseApproval})} label="超出差額需要授權"/><span className="admin-not-wired-chip">永不阻交易</span></article>
     </div>
   </section>;
 }
@@ -46,106 +64,128 @@ interface LogicalPrinterDraft{
   readonly id:string;
   readonly name:string;
   readonly type:'RECEIPT'|'PRODUCTION'|'PACKING'|'LABEL';
+  readonly model:string;
+  readonly widthMm:number;
   readonly active:boolean;
+  readonly capabilities:readonly string[];
 }
-
 export function PrintCenterWorkspace(){
-  const [printers,setPrinters]=useState<readonly LogicalPrinterDraft[]>([]);
-  const add=()=>setPrinters(rows=>[...rows,{id:'printer-'+String(rows.length+1).padStart(3,'0'),name:'',type:'RECEIPT',active:true}]);
-  const patch=(id:string,change:Partial<LogicalPrinterDraft>)=>setPrinters(rows=>rows.map(row=>row.id===id?{...row,...change}:row));
+  const [printers,setPrinters]=usePersistentAdminState<LogicalPrinterDraft[]>('logical-printers.v1',[
+    {id:'logical-receipt',name:'收據機',type:'RECEIPT',model:'80mm 熱敏',widthMm:80,active:true,capabilities:['RECEIPT']},
+    {id:'logical-production',name:'廚房製作單機',type:'PRODUCTION',model:'80mm 熱敏',widthMm:80,active:true,capabilities:['PRODUCTION']},
+    {id:'logical-packing',name:'打包單機',type:'PACKING',model:'80mm 熱敏',widthMm:80,active:true,capabilities:['PACKING']},
+    {id:'logical-riceball-label',name:'飯糰 Label',type:'LABEL',model:'50×40 Label',widthMm:50,active:true,capabilities:['LABEL']},
+    {id:'logical-takeaway-label',name:'外賣 Label',type:'LABEL',model:'50×40 Label',widthMm:50,active:true,capabilities:['LABEL']},
+  ]);
+  const add=()=>setPrinters(rows=>{
+    const row:LogicalPrinterDraft={id:'logical-'+Date.now().toString(36),name:'新打印用途',type:'RECEIPT',model:'80mm 熱敏',widthMm:80,active:true,capabilities:['RECEIPT']};
+    appendAdminAudit({action:'新增 Logical Printer',target:row.id,after:row});return [...rows,row];
+  });
+  const patch=(id:string,change:Partial<LogicalPrinterDraft>)=>setPrinters(rows=>rows.map(row=>{if(row.id!==id)return row;const after={...row,...change};appendAdminAudit({action:'修改 Logical Printer',target:id,before:row,after});return after;}));
+  const remove=(id:string)=>setPrinters(rows=>{appendAdminAudit({action:'刪除 Logical Printer',target:id});return rows.filter(row=>row.id!==id);});
   return <section className="admin-editor-page">
-    <header className="admin-editor-head"><div><small>打印設定尚未啟用</small><h1>打印中心</h1><p>呢度只設定打印用途同分流規則；實際連接方式同打印由門店裝置處理。</p></div><div className="admin-editor-actions"><button className="secondary" onClick={add}>新增打印用途</button><button className="publish" disabled>尚未可發布</button></div></header>
-    {printers.length===0?<div className="admin-empty-state"><b>未有打印用途</b><p>先建立打印用途，之後再由門店綁定實體打印機。</p><button onClick={add}>新增打印用途</button></div>:<div className="admin-editor-list">{printers.map(row=><article className="admin-policy-row printer-row" key={row.id}>
-      <div><b>{row.name||'未命名打印機'}</b><small>{row.id}</small></div>
-      <input value={row.name} onChange={event=>patch(row.id,{name:event.target.value})} placeholder="例如：廚房製作單機"/>
-      <select value={row.type} onChange={event=>patch(row.id,{type:event.target.value as LogicalPrinterDraft['type']})}><option value="RECEIPT">收據</option><option value="PRODUCTION">製作單</option><option value="PACKING">包裝單</option><option value="LABEL">標籤</option></select>
-      <label className="admin-toggle"><input type="checkbox" checked={row.active} onChange={event=>patch(row.id,{active:event.target.checked})}/><span>{row.active?'啟用':'停用'}</span></label>
-    </article>)}</div>}
+    <header className="admin-editor-head"><div><small>唯一 Logical Printer Registry</small><h1>打印中心</h1><p>Admin 定義唯一打印用途、規格同能力。實際 IP／USB／實體設備日後只由 SMT 配對，唔會喺兩邊建立第二套名稱。</p></div><div className="admin-editor-actions"><button className="secondary" onClick={add}>新增打印用途</button></div></header>
+    <div className="admin-editor-list">{printers.map(row=><article className="admin-policy-card" key={row.id}>
+      <header><h2>{row.name}</h2><small>{row.id}</small></header>
+      <label><span>名稱</span><input value={row.name} onChange={event=>patch(row.id,{name:event.target.value})}/></label>
+      <label><span>票種</span><select value={row.type} onChange={event=>{const type=event.target.value as LogicalPrinterDraft['type'];patch(row.id,{type,capabilities:[type]})}}><option value="RECEIPT">收據</option><option value="PRODUCTION">製作單</option><option value="PACKING">包裝單</option><option value="LABEL">標籤</option></select></label>
+      <label><span>打印規格</span><input value={row.model} onChange={event=>patch(row.id,{model:event.target.value})}/></label>
+      <label><span>紙寬／標籤寬 mm</span><input type="number" min={20} max={120} value={row.widthMm} onChange={event=>patch(row.id,{widthMm:Number(event.target.value)||80})}/></label>
+      <Toggle checked={row.active} onChange={active=>patch(row.id,{active})} label={row.active?'啟用':'停用'}/>
+      <button type="button" onClick={()=>remove(row.id)}>刪除</button>
+    </article>)}</div>
   </section>;
 }
 
+interface PrintTemplateSet{receipt:string;production:string;packing:string;label:string;showComboRelationship:boolean;separateFoodDrinkCount:boolean}
 export function PrintTemplatesWorkspace(){
-  const [receipt,setReceipt]=useState('顯示店名、訂單、商品、總額、付款方式');
-  const [production,setProduction]=useState('顯示商品、選項、備註');
-  const [packing,setPacking]=useState('顯示全單商品、件數、訂單編號');
-  const [label,setLabel]=useState('顯示商品、選項、訂單／取餐參考');
+  const [templates,setTemplates]=usePersistentAdminState<PrintTemplateSet>('print-templates.v1',{
+    receipt:'店名\n訂單編號\n商品明細\n總額\n付款方式',
+    production:'訂單編號\n要整乜／點整\n選項／備註',
+    packing:'訂單編號\n全單商品／件數\n包裝核對',
+    label:'商品名稱\n選項\n訂單／取餐參考\n件數',
+    showComboRelationship:true,separateFoodDrinkCount:true,
+  });
+  const patch=(change:Partial<PrintTemplateSet>)=>setTemplates(current=>{const after={...current,...change};appendAdminAudit({action:'修改打印模板',target:'打印模板中心'});return after;});
   return <section className="admin-editor-page">
-    <PolicyHeader title="打印模板中心" description="只設定打印內容；實際打印會由門店裝置處理。"/>
+    <PolicyHeader title="打印模板中心" description="管理收據、製作單、打包單同 Label 嘅正式輸出內容。製作單回答要整乜／點整；打包單回答全單齊唔齊。"/>
     <div className="admin-policy-grid two">
-      {[['收據',receipt,setReceipt],['製作單',production,setProduction],['包裝單',packing,setPacking],['標籤',label,setLabel]].map(([title,value,setter])=><article className="admin-policy-card" key={title as string}><h2>{title as string}</h2><textarea value={value as string} onChange={event=>(setter as (value:string)=>void)(event.target.value)} rows={5}/><span className="admin-not-wired-chip">模板設定尚未啟用</span></article>)}
+      {([['receipt','收據'],['production','製作單'],['packing','打包單'],['label','標籤']] as const).map(([key,title])=><article className="admin-policy-card" key={key}><h2>{title}</h2><textarea value={templates[key]} onChange={event=>patch({[key]:event.target.value})} rows={8}/></article>)}
+      <article className="admin-policy-card"><h2>輸出語義</h2><Toggle checked={templates.showComboRelationship} onChange={showComboRelationship=>patch({showComboRelationship})} label="保留套餐與 child 關係"/><Toggle checked={templates.separateFoodDrinkCount} onChange={separateFoodDrinkCount=>patch({separateFoodDrinkCount})} label="食品／飲品總件數分開"/></article>
     </div>
   </section>;
 }
 
+interface StoreSettings{
+  storeName:string;storeCode:string;currency:string;timezone:string;
+  lateArrivalMinutes:number;fulfillmentMinutes:number;archiveHours:number;
+  reminderAfterMinutes:number;reminderIntervalMinutes:number;repeatReminder:boolean;timeoutPriority:'NORMAL'|'HIGH'|'URGENT';
+}
 export function StoreSettingsWorkspace(){
-  const [storeName,setStoreName]=useState('');
-  const [currency,setCurrency]=useState('HKD');
-  const [timezone,setTimezone]=useState('Asia/Hong_Kong');
-  const [lateArrivalMinutes,setLateArrivalMinutes]=useState('15');
-  const [fulfillmentMinutes,setFulfillmentMinutes]=useState('20');
-  const [archiveHours,setArchiveHours]=useState('24');
+  const [config,setConfig]=usePersistentAdminState<StoreSettings>('store-settings.v1',{
+    storeName:'磨飯',storeCode:'MF01',currency:'HKD',timezone:'Asia/Hong_Kong',
+    lateArrivalMinutes:15,fulfillmentMinutes:20,archiveHours:24,
+    reminderAfterMinutes:5,reminderIntervalMinutes:5,repeatReminder:true,timeoutPriority:'HIGH',
+  });
+  const patch=(change:Partial<StoreSettings>)=>setConfig(current=>{const after={...current,...change};appendAdminAudit({action:'修改門店設定',target:current.storeCode,before:current,after});return after;});
   return <section className="admin-editor-page">
-    <PolicyHeader title="門店設定" description="集中整理門店設定。相關功能未啟用前只係未發布草稿。"/>
+    <PolicyHeader title="門店設定" description="管理門店身份、時區、營運計時同 Pending Order 提醒規則。Timeout 只改提示優先級，唔會自動接單或拒單。"/>
     <div className="admin-policy-grid two">
-      <article className="admin-policy-card"><h2>基本資料</h2><label><span>門店顯示名稱</span><input value={storeName} onChange={event=>setStoreName(event.target.value)} placeholder="門店名稱"/></label><label><span>貨幣</span><select value={currency} onChange={event=>setCurrency(event.target.value)}><option value="HKD">HKD</option></select></label><label><span>時區</span><input value={timezone} onChange={event=>setTimezone(event.target.value)}/></label></article>
-      <article className="admin-policy-card"><h2>營運時間規則</h2><label><span>遲到界線（分鐘）</span><input inputMode="numeric" value={lateArrivalMinutes} onChange={event=>setLateArrivalMinutes(event.target.value)}/></label><label><span>出餐計時（分鐘）</span><input inputMode="numeric" value={fulfillmentMinutes} onChange={event=>setFulfillmentMinutes(event.target.value)}/></label><label><span>封存時間（小時）</span><input inputMode="numeric" value={archiveHours} onChange={event=>setArchiveHours(event.target.value)}/></label></article>
+      <article className="admin-policy-card"><h2>基本資料</h2><label><span>門店顯示名稱</span><input value={config.storeName} onChange={event=>patch({storeName:event.target.value})}/></label><label><span>門店代碼</span><input value={config.storeCode} onChange={event=>patch({storeCode:event.target.value})}/></label><label><span>貨幣</span><select value={config.currency} onChange={event=>patch({currency:event.target.value})}><option value="HKD">HKD</option></select></label><label><span>時區</span><input value={config.timezone} onChange={event=>patch({timezone:event.target.value})}/></label></article>
+      <article className="admin-policy-card"><h2>營運計時</h2><label><span>遲到界線（分鐘）</span><input type="number" min={0} value={config.lateArrivalMinutes} onChange={event=>patch({lateArrivalMinutes:Number(event.target.value)||0})}/></label><label><span>出餐計時（分鐘）</span><input type="number" min={0} value={config.fulfillmentMinutes} onChange={event=>patch({fulfillmentMinutes:Number(event.target.value)||0})}/></label><label><span>封存時間（小時）</span><input type="number" min={1} value={config.archiveHours} onChange={event=>patch({archiveHours:Number(event.target.value)||1})}/></label></article>
+      <article className="admin-policy-card"><h2>Pending Order 提醒</h2><label><span>幾多分鐘後提醒</span><input type="number" min={0} value={config.reminderAfterMinutes} onChange={event=>patch({reminderAfterMinutes:Number(event.target.value)||0})}/></label><label><span>提醒間隔（分鐘）</span><input type="number" min={1} value={config.reminderIntervalMinutes} onChange={event=>patch({reminderIntervalMinutes:Number(event.target.value)||1})}/></label><Toggle checked={config.repeatReminder} onChange={repeatReminder=>patch({repeatReminder})} label="重複提醒"/><label><span>Timeout 提示優先級</span><select value={config.timeoutPriority} onChange={event=>patch({timeoutPriority:event.target.value as StoreSettings['timeoutPriority']})}><option value="NORMAL">一般</option><option value="HIGH">高</option><option value="URGENT">緊急</option></select></label><small>Timeout 唔會自動接受／拒絕訂單。</small></article>
     </div>
   </section>;
 }
 
 interface StaffDraft{
-  readonly id:string;
-  readonly name:string;
-  readonly role:string;
-  readonly pin:string;
-  readonly scope:string;
-  readonly adminLogin:boolean;
-  readonly active:boolean;
-  readonly permissions:readonly string[];
+  readonly id:string;readonly name:string;readonly role:'STAFF'|'MANAGER'|'OWNER'|'VIEWER';readonly pin:string;
+  readonly scope:'STORE'|'MULTI_STORE'|'REPORT_ONLY';readonly adminLogin:boolean;readonly active:boolean;readonly permissions:readonly string[];
 }
+const PERMISSIONS=[['ORDER_REVIEW','查看訂單'],['ORDER_CORRECTION','更正訂單／付款'],['ADMIN_CONFIG','修改後台設定'],['PUBLISH_CONFIG','建立設定版本'],['REPORT_VIEW','查看報表'],['REPORT_EXPORT','匯出報表'],['STAFF_MANAGE','管理員工']] as const;
 export function StaffWorkspace(){
-  const [staff,setStaff]=useState<readonly StaffDraft[]>([]);
-  const add=()=>setStaff(rows=>[...rows,{
-    id:'staff-'+String(rows.length+1).padStart(3,'0'),
-    name:'',role:'STAFF',pin:'',scope:'STORE',adminLogin:false,active:true,permissions:['ORDER_REVIEW'],
-  }]);
-  const patch=(id:string,change:Partial<StaffDraft>)=>setStaff(rows=>rows.map(row=>row.id===id?{...row,...change}:row));
-  const togglePermission=(row:StaffDraft,permission:string,checked:boolean)=>patch(row.id,{
-    permissions:checked?[...new Set([...row.permissions,permission])]:row.permissions.filter(item=>item!==permission),
-  });
+  const [staff,setStaff]=usePersistentAdminState<StaffDraft[]>('staff.v1',[]);
+  const add=()=>setStaff(rows=>{const row:StaffDraft={id:'staff-'+Date.now().toString(36),name:'',role:'STAFF',pin:'',scope:'STORE',adminLogin:false,active:true,permissions:['ORDER_REVIEW']};appendAdminAudit({action:'新增員工',target:row.id});return [...rows,row];});
+  const patch=(id:string,change:Partial<StaffDraft>)=>setStaff(rows=>rows.map(row=>{if(row.id!==id)return row;const after={...row,...change};appendAdminAudit({action:'修改員工／權限',target:id,before:{...row,pin:row.pin?'***':''},after:{...after,pin:after.pin?'***':''}});return after;}));
+  const remove=(id:string)=>setStaff(rows=>{appendAdminAudit({action:'停用並移除員工草稿',target:id});return rows.filter(row=>row.id!==id);});
+  const togglePermission=(row:StaffDraft,permission:string,checked:boolean)=>patch(row.id,{permissions:checked?[...new Set([...row.permissions,permission])]:row.permissions.filter(item=>item!==permission)});
   return <section className="admin-editor-page">
-    <header className="admin-editor-head">
-      <div><small>人員權限尚未啟用</small><h1>員工／權限</h1><p>設定員工、角色、登入碼、權限範圍。正式權限判斷會由系統統一處理。</p></div>
-      <div className="admin-editor-actions"><button className="secondary" onClick={add}>新增員工</button><button className="publish" disabled>尚未可發布</button></div>
-    </header>
-    {staff.length===0?<div className="admin-empty-state"><b>未有員工草稿</b><p>新增員工後設定角色、登入碼、權限範圍同後台登入資格。</p><button onClick={add}>新增員工</button></div>:<div className="admin-editor-list">{staff.map(row=><article className="admin-policy-card" key={row.id}>
-      <h2>{row.name||row.id}</h2>
-      <label><span>員工名稱</span><input value={row.name} onChange={event=>patch(row.id,{name:event.target.value})} placeholder="員工名稱"/></label>
-      <label><span>角色</span><select value={row.role} onChange={event=>patch(row.id,{role:event.target.value})}><option value="STAFF">員工</option><option value="MANAGER">經理</option><option value="OWNER">老闆</option><option value="VIEWER">只讀人員</option></select></label>
-      <label><span>登入碼草稿</span><input inputMode="numeric" value={row.pin} onChange={event=>patch(row.id,{pin:event.target.value.replace(/\D/g,'').slice(0,8)})} placeholder="4–8 digits"/></label>
-      <label><span>權限範圍</span><select value={row.scope} onChange={event=>patch(row.id,{scope:event.target.value})}><option value="STORE">單店</option><option value="MULTI_STORE">多店</option><option value="REPORT_ONLY">只看報表</option></select></label>
-      <div>
-        <b>權限草稿</b>
-        {['ORDER_REVIEW','ADMIN_CONFIG','REPORT_VIEW'].map(permission=><label className="admin-toggle" key={permission}><input type="checkbox" checked={row.permissions.includes(permission)} onChange={event=>togglePermission(row,permission,event.target.checked)}/><span>{permission}</span></label>)}
-      </div>
-      <label className="admin-toggle"><input type="checkbox" checked={row.adminLogin} onChange={event=>patch(row.id,{adminLogin:event.target.checked})}/><span>後台登入</span></label>
-      <label className="admin-toggle"><input type="checkbox" checked={row.active} onChange={event=>patch(row.id,{active:event.target.checked})}/><span>{row.active?'啟用':'停用'}</span></label>
-      <span className="admin-not-wired-chip">未發布草稿</span>
+    <header className="admin-editor-head"><div><small>人員／角色／權限</small><h1>員工／權限</h1><p>管理員工、角色、PIN、權限範圍同後台登入資格。Frontend 隱藏唔代表安全；正式接入時仍必須由唯一 Authz authority 判斷。</p></div><div className="admin-editor-actions"><button className="secondary" onClick={add}>新增員工</button></div></header>
+    {staff.length===0?<div className="admin-empty-state"><b>未有員工資料</b><p>新增員工後設定角色、PIN、Scope 同權限。</p><button onClick={add}>新增員工</button></div>:<div className="admin-editor-grid">{staff.map(row=><article className="admin-policy-card" key={row.id}>
+      <header><h2>{row.name||'未命名員工'}</h2><small>{row.id}</small></header>
+      <label><span>員工名稱</span><input value={row.name} onChange={event=>patch(row.id,{name:event.target.value})}/></label>
+      <label><span>角色</span><select value={row.role} onChange={event=>patch(row.id,{role:event.target.value as StaffDraft['role']})}><option value="STAFF">員工</option><option value="MANAGER">經理</option><option value="OWNER">老闆</option><option value="VIEWER">只讀人員</option></select></label>
+      <label><span>PIN（4–8 位）</span><input type="password" inputMode="numeric" value={row.pin} onChange={event=>patch(row.id,{pin:event.target.value.replace(/\D/g,'').slice(0,8)})}/></label>
+      <label><span>權限範圍</span><select value={row.scope} onChange={event=>patch(row.id,{scope:event.target.value as StaffDraft['scope']})}><option value="STORE">單店</option><option value="MULTI_STORE">多店</option><option value="REPORT_ONLY">只看報表</option></select></label>
+      <div className="admin-check-grid">{PERMISSIONS.map(([id,label])=><label key={id}><input type="checkbox" checked={row.permissions.includes(id)} onChange={event=>togglePermission(row,id,event.target.checked)}/><span>{label}</span></label>)}</div>
+      <Toggle checked={row.adminLogin} onChange={adminLogin=>patch(row.id,{adminLogin})} label="允許後台登入"/>
+      <Toggle checked={row.active} onChange={active=>patch(row.id,{active})} label={row.active?'啟用':'停用'}/>
+      <button type="button" onClick={()=>remove(row.id)}>移除</button>
     </article>)}</div>}
   </section>;
 }
 
+interface ChannelConfig{enabled:boolean;autoAccept:boolean;syncSellability:boolean;commissionPct:string;displayName:string;lateCutoffMinutes:number}
+interface MappingRow{providerItemId:string;productId:string;optionGroupId?:string;status:'MAPPED'|'PENDING'|'IGNORED'}
 export function ChannelsWorkspace({mode}:{mode:'overview'|'mapping'|'failures'|'accept'|'sync'|'estimate'}){
-  const [enabled,setEnabled]=useState(false);
-  const [autoAccept,setAutoAccept]=useState(false);
-  const [syncSellability,setSyncSellability]=useState(false);
-  const [commission,setCommission]=useState('');
+  const {draft}=useAdminDraft();
+  const [config,setConfig]=usePersistentAdminState<ChannelConfig>('channel-policy.keeta.v1',{enabled:false,autoAccept:false,syncSellability:false,commissionPct:'',displayName:'Keeta',lateCutoffMinutes:15});
+  const [mappings,setMappings]=usePersistentAdminState<MappingRow[]>('channel-mapping.keeta.v1',[]);
+  const [providerItemId,setProviderItemId]=useState('');
+  const [productId,setProductId]=useState('');
+  const patch=(change:Partial<ChannelConfig>)=>setConfig(current=>{const after={...current,...change};appendAdminAudit({action:'修改平台設定',target:'Keeta',before:current,after});return after;});
+  const addMapping=()=>{if(!providerItemId.trim()||!productId)return;setMappings(rows=>{const row:MappingRow={providerItemId:providerItemId.trim(),productId,status:'MAPPED'};appendAdminAudit({action:'新增平台商品對應',target:row.providerItemId,after:row});return [...rows.filter(item=>item.providerItemId!==row.providerItemId),row];});setProviderItemId('');setProductId('');};
+  const failures=mappings.filter(row=>row.status==='PENDING');
   const title=mode==='overview'?'平台管理':mode==='mapping'?'商品映射管理':mode==='failures'?'匹配失敗明細':mode==='accept'?'接單／自動接單':mode==='sync'?'售罄／供應同步':'實收估算設定';
   return <section className="admin-editor-page">
-    <PolicyHeader title={title} description="平台設定目前只係草稿；相關連接未啟用前，唔會向任何平台發送操作。"/>
+    <PolicyHeader title={title} description="管理平台顯示名、接單、供應同步、佣金估算同商品映射。現階段只完成 Admin 設定責任，唔向 Provider 發 command。"/>
     <div className="admin-policy-grid two">
-      <article className="admin-policy-card"><h2>平台設定</h2><label className="admin-toggle"><input type="checkbox" checked={enabled} onChange={event=>setEnabled(event.target.checked)}/><span>啟用平台設定</span></label><label className="admin-toggle"><input type="checkbox" checked={autoAccept} onChange={event=>setAutoAccept(event.target.checked)}/><span>一般訂單自動接單規則</span></label><label className="admin-toggle"><input type="checkbox" checked={syncSellability} onChange={event=>setSyncSellability(event.target.checked)}/><span>同步供應狀態規則</span></label></article>
-      <article className="admin-policy-card"><h2>{mode==='failures'?'對應失敗':'估算／商品對應'}</h2>{mode==='failures'?<div className="admin-read-empty">商品對應失敗資料尚未啟用</div>:<><label><span>佣金估算 %</span><input inputMode="decimal" value={commission} onChange={event=>setCommission(event.target.value)} placeholder="例如 30"/></label><label><span>平台商品對應</span><input disabled placeholder="等待相關功能啟用"/></label></>}<span className="admin-not-wired-chip">唔會向平台發送操作</span></article>
+      <article className="admin-policy-card"><h2>Keeta 平台設定</h2><label><span>顯示名稱</span><input value={config.displayName} onChange={event=>patch({displayName:event.target.value})}/></label><Toggle checked={config.enabled} onChange={enabled=>patch({enabled})} label="啟用平台設定"/><Toggle checked={config.autoAccept} onChange={autoAccept=>patch({autoAccept})} label="正常單自動接單"/><Toggle checked={config.syncSellability} onChange={syncSellability=>patch({syncSellability})} label="同步售罄／供應"/><label><span>Late Arrival Cutoff（分鐘）</span><input type="number" min={0} value={config.lateCutoffMinutes} onChange={event=>patch({lateCutoffMinutes:Number(event.target.value)||0})}/></label><label><span>佣金估算 %</span><input inputMode="decimal" value={config.commissionPct} onChange={event=>patch({commissionPct:event.target.value})}/></label></article>
+      <article className="admin-policy-card"><h2>{mode==='failures'?'未完成對應':'商品對應'}</h2>
+        {mode==='failures'
+          ?(failures.length?<div>{failures.map(row=><p key={row.providerItemId}>{row.providerItemId} · 待處理</p>)}</div>:<div className="admin-read-empty">目前冇待處理映射。</div>)
+          :<><label><span>平台商品 ID</span><input value={providerItemId} onChange={event=>setProviderItemId(event.target.value)}/></label><label><span>磨飯商品</span><select value={productId} onChange={event=>setProductId(event.target.value)}><option value="">請選擇</option>{draft.products.map(product=><option key={product.id} value={product.id}>{product.name}</option>)}</select></label><button type="button" onClick={addMapping}>保存對應</button><div className="admin-readback-proof">{mappings.slice(0,20).map(row=><p key={row.providerItemId}><span>{row.providerItemId}</span><b>{draft.products.find(product=>product.id===row.productId)?.name??row.productId}</b></p>)}</div></>}
+      </article>
     </div>
   </section>;
 }
