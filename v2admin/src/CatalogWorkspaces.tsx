@@ -58,7 +58,7 @@ export function CategoriesWorkspace(){
 }
 
 
-function ProductOperationalDetail({productId}:{productId:string}){
+export function ProductOperationalDetail({productId}:{productId:string}){
   const {draft,updateProduct,removeProduct,updateModifierGroup,addModifierOption,updateModifierOption,removeModifierOption}=useAdminDraft();
   const [printRules,setPrintRules]=useProductPrintRules();
   const [mediaByProduct,setMediaByProduct]=useProductMediaConfig();
@@ -140,6 +140,7 @@ function ProductOperationalDetail({productId}:{productId:string}){
     <details className="admin-product-section">
       <summary><span><b>選項／選項組</b><small>{boundGroups.length} 組 · 名稱／ID／價錢必填</small></span><span>›</span></summary>
       <div className="admin-product-section-body">
+        <div className="admin-callout compact">每個選項必須有：名稱、選項 ID、價錢。選項組另外管理必選／提示、單選／多選、最少／最多同重覆數量。</div>
         <div className="admin-check-grid">{draft.modifierGroups.map(group=><label key={group.id}><input type="checkbox" checked={product.modifierGroupIds.includes(group.id)} onChange={event=>{
           const next=event.target.checked?[...product.modifierGroupIds,group.id]:product.modifierGroupIds.filter(id=>id!==group.id);
           updateProduct(product.id,{modifierGroupIds:next});
@@ -346,7 +347,8 @@ export function ModifiersWorkspace(){
         <div className="admin-form-grid three">
           <label><span>組別名稱</span><input value={group.name} onChange={event=>updateModifierGroup(group.id,{name:event.target.value})}/></label>
           <label><span>選擇方式</span><select value={group.selection} onChange={event=>{const selection=event.target.value as 'SINGLE'|'MULTI';updateModifierGroup(group.id,{selection,max:selection==='SINGLE'?1:Math.max(1,group.max)})}}><option value="SINGLE">單選</option><option value="MULTI">多選</option></select></label>
-          <Toggle checked={group.required} onChange={required=>updateModifierGroup(group.id,{required,min:required?Math.max(1,group.min):0})} label={group.required?'必選':'可選'}/>
+          <label><span>顯示／必選規則</span><select value={group.required?'REQUIRED':group.forceShow?'OPTIONAL_FORCE_SHOW':'OPTIONAL'} onChange={event=>{const mode=event.target.value;updateModifierGroup(group.id,{required:mode==='REQUIRED',forceShow:mode!=='OPTIONAL',min:mode==='REQUIRED'?Math.max(1,group.min):0})}}><option value="REQUIRED">必選</option><option value="OPTIONAL_FORCE_SHOW">可唔揀，但一定顯示</option><option value="OPTIONAL">一般可選</option></select></label>
+          <Toggle checked={group.allowQuantities} onChange={allowQuantities=>updateModifierGroup(group.id,{allowQuantities})} label="同一選項可重覆數量"/>
           <label><span>最少選擇</span><input type="number" min={0} value={group.min} onChange={event=>updateModifierGroup(group.id,{min:Number(event.target.value)||0})}/></label>
           <label><span>最多選擇</span><input type="number" min={0} max={group.selection==='SINGLE'?1:99} value={group.max} onChange={event=>updateModifierGroup(group.id,{max:Number(event.target.value)||0})}/></label>
         </div>
@@ -354,8 +356,8 @@ export function ModifiersWorkspace(){
           <header><b>選項</b><button type="button" onClick={()=>addModifierOption(group.id)}>＋ 新增選項</button></header>
           {group.options.length===0?<p>未有選項。</p>:<div className="admin-option-list">{group.options.map(option=><article key={option.id}>
             <label><span>名稱</span><input value={option.name} onChange={event=>updateModifierOption(group.id,option.id,{name:event.target.value})}/></label>
-            <label><span>價格調整 HK$</span><input inputMode="decimal" value={option.priceAdjustment} onChange={event=>updateModifierOption(group.id,option.id,{priceAdjustment:event.target.value})} placeholder="可正可負"/></label>
-            <label><span>選項 Code</span><input value={option.code??''} onChange={event=>updateModifierOption(group.id,option.id,{code:event.target.value})}/></label>
+            <label><span>價錢調整 HK$ *</span><input inputMode="decimal" value={option.priceAdjustment} onChange={event=>updateModifierOption(group.id,option.id,{priceAdjustment:event.target.value})} placeholder="可正可負"/></label>
+            <label><span>選項 ID *</span><input value={option.code??''} onChange={event=>updateModifierOption(group.id,option.id,{code:event.target.value})}/></label>
             <Toggle checked={option.defaultSelected} onChange={defaultSelected=>updateModifierOption(group.id,option.id,{defaultSelected})} label="預設"/>
             <Toggle checked={option.active} onChange={active=>updateModifierOption(group.id,option.id,{active})} label={option.active?'啟用':'停用'}/>
             <button type="button" onClick={()=>removeModifierOption(group.id,option.id)}>刪除</button>
@@ -366,20 +368,36 @@ export function ModifiersWorkspace(){
 }
 
 export function PricingWorkspace(){
-  const {draft,updateProduct}=useAdminDraft();
+  const {draft,updateProduct,updateModifierOption}=useAdminDraft();
   const configured=draft.products.filter(product=>product.basePrice.trim()!=='');
+  const options=draft.modifierGroups.flatMap(group=>group.options.map(option=>({group,option})));
   return <section className="admin-editor-page">
-    <WorkspaceHeader title="價格管理" description="集中管理 Product 基本價、外賣 +$1 flag 同其他價格調整。呢度係設定面，唔建立第二套計價引擎。"/>
-    <div className="admin-pricing-table">
-      <header><span>商品</span><span>基本價</span><span>外賣 +$1</span><span>其他調整</span></header>
-      {draft.products.map(product=><article key={product.id}>
-        <b>{product.name||product.id}<small> · {product.productCode}</small></b>
-        <input inputMode="decimal" value={product.basePrice} onChange={event=>updateProduct(product.id,{basePrice:event.target.value})} placeholder="0.00"/>
-        <Toggle checked={Boolean(product.takeawaySurchargeEnabled)} onChange={takeawaySurchargeEnabled=>updateProduct(product.id,{takeawaySurchargeEnabled})} label={product.takeawaySurchargeEnabled?'+$1 開':'關'}/>
-        <input inputMode="decimal" value={product.takeawayAdjustment} onChange={event=>updateProduct(product.id,{takeawayAdjustment:event.target.value})} placeholder="0.00"/>
-      </article>)}
-      <footer>已填基本價：{configured.length} / {draft.products.length} · 選項價格調整請到「選項／加料」管理。</footer>
-    </div>
+    <WorkspaceHeader title="價格管理" description="集中管理商品基本價、外賣 +$1、其他正負調整，同選項價錢。所有設定仍由唯一 Pricing authority 消費。"/>
+    <section className="admin-rule-card">
+      <h2>商品價格</h2>
+      <div className="admin-pricing-table">
+        <header><span>商品</span><span>基本價</span><span>外賣 +$1</span><span>其他調整</span></header>
+        {draft.products.map(product=><article key={product.id}>
+          <b>{product.name||product.id}<small> · {product.productCode}</small></b>
+          <input inputMode="decimal" value={product.basePrice} onChange={event=>updateProduct(product.id,{basePrice:event.target.value})} placeholder="0.00"/>
+          <Toggle checked={Boolean(product.takeawaySurchargeEnabled)} onChange={takeawaySurchargeEnabled=>updateProduct(product.id,{takeawaySurchargeEnabled})} label={product.takeawaySurchargeEnabled?'+$1 開':'關'}/>
+          <input inputMode="decimal" value={product.takeawayAdjustment} onChange={event=>updateProduct(product.id,{takeawayAdjustment:event.target.value})} placeholder="可正可負"/>
+        </article>)}
+        <footer>已填基本價：{configured.length} / {draft.products.length}</footer>
+      </div>
+    </section>
+    <section className="admin-rule-card">
+      <h2>選項價格</h2>
+      {options.length===0?<div className="admin-read-empty">未有選項；先去「選項／加料」建立。</div>:<div className="admin-option-pricing-table">
+        <header><span>選項組</span><span>選項名稱 *</span><span>選項 ID *</span><span>價錢調整 HK$ *</span></header>
+        {options.map(({group,option})=><article key={group.id+':'+option.id}>
+          <span>{group.name}</span>
+          <b>{option.name}</b>
+          <code>{option.code}</code>
+          <input inputMode="decimal" value={option.priceAdjustment} onChange={event=>updateModifierOption(group.id,option.id,{priceAdjustment:event.target.value})}/>
+        </article>)}
+      </div>}
+    </section>
   </section>;
 }
 
