@@ -8,6 +8,7 @@ import {PRODUCT_MEDIA_BACKEND_CONTRACT,normalizeProductPrintRule} from './admin-
 import {MfkAdminApp} from './App.tsx';
 import {ADMIN_CAPABILITIES} from './admin-capabilities.ts';
 import {migrateLegacyDraftToOptionSetCenter,projectOptionSetsForProduct,useOptionSetCenter,validateOptionSetCenter,type OptionSetCenterState} from './admin-option-set-center.ts';
+import {validateAdminConfig} from './admin-config-save.ts';
 
 
 function ProductDetailHarness({productId}:{productId:string}){
@@ -22,7 +23,7 @@ describe('MFK Admin complete catalog product',()=>{
     for(const marker of ['商品資料','新增商品','搜尋商品名稱','找到 203 件','每頁最多 20 件','第 1 / 11 頁','編輯']) expect(html).toContain(marker);
     expect(html).toContain('203');
     expect(html).toContain('188');
-    expect(html).toContain('已自動保存草稿');
+    expect(html).toContain('保存');
     expect((html.match(/class="admin-product-row /g)??[]).length).toBe(20);
     expect(html).not.toContain('商品詳細資料');
     expect(html).not.toContain('商品描述</span>');
@@ -87,6 +88,32 @@ describe('MFK Admin complete catalog product',()=>{
       const html=renderToStaticMarkup(<MemoryRouter initialEntries={[capability.path]}><MfkAdminApp/></MemoryRouter>);
       expect(html,capability.id).not.toContain('class="mfk-admin-capability"');
     }
+  });
+
+  it('uses Save as the one catalog version boundary and retires publish workflow copy',()=>{
+    const products=renderToStaticMarkup(<MemoryRouter initialEntries={['/admin/catalog/products']}><MfkAdminApp/></MemoryRouter>);
+    expect(products).toContain('保存');
+    expect(products).not.toContain('已自動保存草稿');
+    expect(products).not.toContain('有待發布變更');
+
+    const history=renderToStaticMarkup(<MemoryRouter initialEntries={['/admin/publish']}><MfkAdminApp/></MemoryRouter>);
+    expect(history).toContain('設定版本歷史');
+    expect(history).toContain('保存');
+    expect(history).not.toContain('待發布變更');
+    expect(history).not.toContain('確認影響範圍');
+    expect(history).not.toContain('建立新設定版本');
+    expect(history).not.toContain('建立新草稿');
+  });
+
+  it('validates catalog and Option Set together before Save',()=>{
+    const catalog=LEGACY_MF01_ADMIN_DRAFT as unknown as AdminSessionDraft;
+    const optionCenter=migrateLegacyDraftToOptionSetCenter(catalog);
+    expect(validateAdminConfig(catalog,optionCenter)).toEqual([]);
+    const broken:OptionSetCenterState={
+      sets:[{id:'bad',name:'',required:true,forceShow:true,selection:'SINGLE',min:0,max:1,allowQuantities:false,active:true,options:[]}],
+      productLinks:[],
+    };
+    expect(validateAdminConfig(catalog,broken).length).toBeGreaterThan(0);
   });
 
   it('keeps primary operator routes free of superseded manual transport copy',()=>{

@@ -1,25 +1,53 @@
 import {useEffect,useMemo,useState} from 'react';
 import {useAdminDraft} from './admin-draft.tsx';
-import {appendAdminAudit,readAdminStored} from './admin-local-store.ts';
+import {appendAdminAudit,readActiveAdminRelease,readAdminStored} from './admin-local-store.ts';
+import {saveAdminConfig} from './admin-config-save.ts';
 import {normalizeProductMedia,normalizeProductPrintRule,PRODUCT_MEDIA_BACKEND_CONTRACT,useProductMediaConfig,useProductPrintRules,type ProductMediaConfig,type ProductPrintRule} from './admin-product-operational-config.ts';
-import {projectOptionSetsForProduct,useOptionSetCenter,type OptionSetCenterController} from './admin-option-set-center.ts';
+import {projectOptionSetsForProduct,useOptionSetCenter,type OptionSetCenterController,type OptionSetCenterState} from './admin-option-set-center.ts';
 
-function WorkspaceHeader({title,description,onAdd,addLabel}:{title:string;description:string;onAdd?:()=>void;addLabel?:string}){
-  const {draft,dirty,validationErrors,validate,reset}=useAdminDraft();
+function WorkspaceHeader({
+  title,description,onAdd,addLabel,optionCenterState,optionDirty=false,onOptionSaved,
+}:{
+  title:string;description:string;onAdd?:()=>void;addLabel?:string;
+  optionCenterState?:OptionSetCenterState;optionDirty?:boolean;onOptionSaved?:()=>void;
+}){
+  const {draft,dirty,validationErrors,validate,reset,markClean}=useAdminDraft();
   const [validated,setValidated]=useState(false);
-  useEffect(()=>setValidated(false),[draft]);
+  const [saveErrors,setSaveErrors]=useState<readonly string[]>([]);
+  const [active,setActive]=useState(()=>readActiveAdminRelease());
+  const [saveMessage,setSaveMessage]=useState('');
+  useEffect(()=>{setValidated(false);setSaveErrors([]);setSaveMessage('');},[draft]);
   const runValidate=()=>{validate();setValidated(true);};
+  const runSave=()=>{
+    const result=saveAdminConfig(draft,optionCenterState);
+    if(!result.ok){
+      validate();
+      setSaveErrors(result.errors);
+      setValidated(true);
+      setSaveMessage('未能保存；請先修正以下資料。');
+      return;
+    }
+    markClean();
+    onOptionSaved?.();
+    setActive({version:result.release.version,createdAt:result.release.createdAt,fingerprint:result.release.fingerprint});
+    setSaveErrors([]);
+    setValidated(false);
+    setSaveMessage('已保存 · R'+result.release.version);
+  };
+  const unsaved=dirty||optionDirty;
+  const errors=saveErrors.length?saveErrors:validationErrors;
   return <header className="admin-editor-head">
-    <div><small>{dirty?'已自動保存草稿 · 有待發布變更':'已自動保存草稿'}</small><h1>{title}</h1><p>{description}</p></div>
+    <div><small>{unsaved?'未保存變更':active?'已保存 · R'+active.version:'未有保存版本'}</small><h1>{title}</h1><p>{description}</p>{saveMessage?<span>{saveMessage}</span>:null}</div>
     <div className="admin-editor-actions">
       {onAdd?<button type="button" className="secondary" onClick={onAdd}>{addLabel??'新增'}</button>:null}
       <button type="button" className="secondary" onClick={reset}>還原原始 MF01 菜單</button>
-      <button type="button" className="primary" onClick={runValidate}>檢查完整性</button>
+      <button type="button" className="secondary" onClick={runValidate}>檢查完整性</button>
+      <button type="button" className="primary" onClick={runSave}>保存</button>
     </div>
-    {validated?<div className={'admin-validation '+(validationErrors.length?'is-error':'is-ok')} role="status">
-      {validationErrors.length
-        ?<><b>有 {validationErrors.length} 項需要處理</b><ul>{validationErrors.map((error,index)=><li key={index}>{error}</li>)}</ul></>
-        :<><b>菜單資料完整性檢查通過</b><span>分類、商品、價格、選項同套餐關係目前有效。</span></>}
+    {validated?<div className={'admin-validation '+(errors.length?'is-error':'is-ok')} role="status">
+      {errors.length
+        ?<><b>有 {errors.length} 項需要處理</b><ul>{errors.map((error,index)=><li key={index}>{error}</li>)}</ul></>
+        :<><b>資料完整性檢查通過</b><span>撳「保存」會建立一個新版本並即時成為目前版本。</span></>}
     </div>:null}
   </header>;
 }
@@ -35,10 +63,10 @@ function Toggle({checked,onChange,label}:{checked:boolean;onChange:(next:boolean
 export function CategoriesWorkspace(){
   const {draft,addCategory,updateCategory,removeCategory,moveCategory}=useAdminDraft();
   return <section className="admin-editor-page">
-    <WorkspaceHeader title="商品分類" description="建立分類、顯示次序同啟用狀態。分類係正式菜單結構，改動會自動保存成草稿。" onAdd={addCategory} addLabel="新增分類"/>
+    <WorkspaceHeader title="商品分類" description="建立分類、顯示次序同啟用狀態。完成修改後撳「保存」，成功即建立新版本並生效。" onAdd={addCategory} addLabel="新增分類"/>
     <div className="admin-kpi-grid">
-      <article><span>分類總數</span><strong>{draft.categories.length}</strong><small>草稿</small></article>
-      <article><span>已啟用</span><strong>{draft.categories.filter(row=>row.active).length}</strong><small>會進入發布版本</small></article>
+      <article><span>分類總數</span><strong>{draft.categories.length}</strong><small>目前編輯內容</small></article>
+      <article><span>已啟用</span><strong>{draft.categories.filter(row=>row.active).length}</strong><small>保存後進入新版本</small></article>
       <article><span>停用</span><strong>{draft.categories.filter(row=>!row.active).length}</strong><small>保留資料</small></article>
       <article><span>未分類啟用商品</span><strong>{draft.products.filter(row=>row.active&&!draft.categories.some(category=>category.id===row.categoryId)).length}</strong><small>必須處理</small></article>
     </div>
@@ -297,7 +325,7 @@ export function ProductsWorkspace(){
   };
 
   return <section className="admin-editor-page">
-    <WorkspaceHeader title="商品資料" description="預設只顯示營運摘要；要改某件商品先展開。基本資料、價格、選項、打印同圖片設定集中喺同一個 detail。" onAdd={addProduct} addLabel="新增商品"/>
+    <WorkspaceHeader title="商品資料" description="預設只顯示營運摘要；要改某件商品先展開。基本資料、價格、選項、打印同圖片設定集中喺同一個 detail。" onAdd={addProduct} addLabel="新增商品" optionCenterState={optionCenter.state} optionDirty={optionCenter.dirty} onOptionSaved={optionCenter.markClean}/>
     <div className="admin-kpi-grid">
       <article><span>商品總數</span><strong>{draft.products.length}</strong><small>包含停用資料</small></article>
       <article><span>已啟用</span><strong>{draft.products.filter(row=>row.active).length}</strong><small>目前菜單候選</small></article>
@@ -347,10 +375,15 @@ export function ModifiersWorkspace(){
   const rows=optionCenter.sets.filter(set=>!token||(set.name+' '+set.id+' '+set.options.map(option=>option.name+' '+option.code).join(' ')).toLowerCase().includes(token));
 
   return <section className="admin-editor-page">
-    <header className="admin-editor-head">
-      <div><small>選項組中心</small><h1>選項中心</h1><p>一個選項組就係一個完整可重用單位，例如「飯量」入面有多飯／少飯／走飯，「青瓜」入面有多青瓜／少青瓜／走青瓜。商品只會加入整個選項組。</p></div>
-      <div className="admin-editor-actions"><button type="button" className="primary" onClick={optionCenter.addSet}>新增選項組</button></div>
-    </header>
+    <WorkspaceHeader
+      title="選項中心"
+      description="一個選項組就係一個完整可重用單位，例如「飯量」入面有多飯／少飯／走飯，「青瓜」入面有多青瓜／少青瓜／走青瓜。商品只會加入整個選項組。"
+      onAdd={optionCenter.addSet}
+      addLabel="新增選項組"
+      optionCenterState={optionCenter.state}
+      optionDirty={optionCenter.dirty}
+      onOptionSaved={optionCenter.markClean}
+    />
 
     <div className="admin-callout compact">操作方式：先新增選項組，再撳入去管理組內選項。例如「青瓜」→ 多青瓜／少青瓜／走青瓜；之後先喺商品詳細資料用「加入選項」連結呢個組。</div>
 
@@ -425,7 +458,7 @@ export function PricingWorkspace(){
   const optionConfigured=optionRows.filter(({option})=>option.priceAdjustment.trim()!=='').length;
 
   return <section className="admin-editor-page">
-    <WorkspaceHeader title="價格管理" description="商品價同選項組內子選項價集中管理。子選項價屬於嗰個選項組，例如「多青瓜 +$1」；商品 Link 唔會複製一份價格。正式 Quote 仍由唯一 Pricing authority 計算。"/>
+    <WorkspaceHeader title="價格管理" description="商品價同選項組內子選項價集中管理。子選項價屬於嗰個選項組，例如「多青瓜 +$1」；商品 Link 唔會複製一份價格。正式 Quote 仍由唯一 Pricing authority 計算。" optionCenterState={optionCenter.state} optionDirty={optionCenter.dirty} onOptionSaved={optionCenter.markClean}/>
     <div className="admin-kpi-grid">
       <article><span>商品價格</span><strong>{productConfigured}/{draft.products.length}</strong><small>基本價必填</small></article>
       <article><span>子選項價格</span><strong>{optionConfigured}/{optionRows.length}</strong><small>組內 Option</small></article>
@@ -497,7 +530,7 @@ export function MenuDisplayWorkspace(){
   const optionCenter=useOptionSetCenter(draft);
   const categoryName=useMemo(()=>new Map(draft.categories.map(category=>[category.id,category.name||category.id])),[draft.categories]);
   return <section className="admin-editor-page">
-    <WorkspaceHeader title="菜單／顯示排序" description="正式管理分類、商品顯示次序同商品已加入嘅選項組；選項資料直接讀取「選項中心」唯一資料來源。"/>
+    <WorkspaceHeader title="菜單／顯示排序" description="正式管理分類、商品顯示次序同商品已加入嘅選項組；選項資料直接讀取「選項中心」唯一資料來源。" optionCenterState={optionCenter.state} optionDirty={optionCenter.dirty} onOptionSaved={optionCenter.markClean}/>
     <div className="admin-sort-columns">
       <section><header><b>分類次序</b><span>{draft.categories.length}</span></header>{draft.categories.map((category,index)=><article key={category.id}><span><b>{index+1}. {category.name||category.id}</b><small>{category.active?'啟用':'停用'}</small></span><div><button disabled={index===0} onClick={()=>moveCategory(category.id,-1)}>↑</button><button disabled={index===draft.categories.length-1} onClick={()=>moveCategory(category.id,1)}>↓</button></div></article>)}</section>
       <section><header><b>商品次序／選項</b><span>{draft.products.length}</span></header>{draft.products.map((product,index)=>{

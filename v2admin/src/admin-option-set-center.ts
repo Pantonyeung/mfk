@@ -108,6 +108,7 @@ interface LegacyFlatLink{
 
 const SET_KEY='option-set-center.sets.v2';
 const LINK_KEY='option-set-center.product-links.v2';
+const DIRTY_KEY='option-set-center.dirty.v1';
 
 function unique(values:readonly string[]){
   return [...new Set(values.filter(Boolean))];
@@ -286,8 +287,10 @@ export function useOptionSetCenter(draft:AdminSessionDraft){
   const fallback=useMemo(()=>fromFlatV1(draft),[]);
   const [sets,setSets]=usePersistentAdminState<OptionSetDraft[]>(SET_KEY,[...fallback.sets]);
   const [productLinks,setProductLinks]=usePersistentAdminState<ProductOptionSetLink[]>(LINK_KEY,[...fallback.productLinks]);
+  const [dirty,setDirty]=usePersistentAdminState<boolean>(DIRTY_KEY,false);
 
   const addSet=()=>{
+    setDirty(true);
     setSets(current=>{
       const id=nextId('option-set',current.map(row=>row.id));
       const row:OptionSetDraft={id,name:'新選項組',required:false,forceShow:false,selection:'SINGLE',min:0,max:1,allowQuantities:false,active:true,options:[]};
@@ -297,6 +300,7 @@ export function useOptionSetCenter(draft:AdminSessionDraft){
   };
 
   const updateSet=(id:string,patch:Partial<OptionSetDraft>)=>{
+    setDirty(true);
     setSets(current=>current.map(row=>{
       if(row.id!==id)return row;
       const after=normalizeSet({...row,...patch},id);
@@ -307,12 +311,14 @@ export function useOptionSetCenter(draft:AdminSessionDraft){
 
   const removeSet=(id:string)=>{
     if(productLinks.some(link=>link.setId===id))return false;
+    setDirty(true);
     setSets(current=>current.filter(row=>row.id!==id));
     appendAdminAudit({action:'刪除選項組',target:id});
     return true;
   };
 
   const addChild=(setId:string)=>{
+    setDirty(true);
     setSets(current=>current.map(set=>{
       if(set.id!==setId)return set;
       const id=nextId(set.id+'-option',set.options.map(option=>option.id));
@@ -324,6 +330,7 @@ export function useOptionSetCenter(draft:AdminSessionDraft){
   };
 
   const updateChild=(setId:string,optionId:string,patch:Partial<OptionChildDraft>)=>{
+    setDirty(true);
     setSets(current=>current.map(set=>{
       if(set.id!==setId)return set;
       const options=set.options.map(option=>option.id===optionId?{...option,...patch}:option);
@@ -332,6 +339,7 @@ export function useOptionSetCenter(draft:AdminSessionDraft){
   };
 
   const removeChild=(setId:string,optionId:string)=>{
+    setDirty(true);
     setSets(current=>current.map(set=>{
       if(set.id!==setId)return set;
       return normalizeSet({...set,options:set.options.filter(option=>option.id!==optionId)},set.id);
@@ -341,6 +349,7 @@ export function useOptionSetCenter(draft:AdminSessionDraft){
   };
 
   const moveChild=(setId:string,optionId:string,direction:-1|1)=>{
+    setDirty(true);
     setSets(current=>current.map(set=>{
       if(set.id!==setId)return set;
       const rows=[...set.options].sort((a,b)=>a.position-b.position);
@@ -356,6 +365,7 @@ export function useOptionSetCenter(draft:AdminSessionDraft){
   const getProductLink=(productId:string,setId:string)=>productLinks.find(link=>link.productId===productId&&link.setId===setId);
 
   const setProductSetLinked=(productId:string,setId:string,linked:boolean)=>{
+    setDirty(true);
     setProductLinks(current=>{
       const exists=current.some(link=>link.productId===productId&&link.setId===setId);
       if(linked&&exists)return current;
@@ -367,6 +377,7 @@ export function useOptionSetCenter(draft:AdminSessionDraft){
   };
 
   const setProductDefault=(productId:string,setId:string,optionId:string,selected:boolean)=>{
+    setDirty(true);
     const set=sets.find(row=>row.id===setId);
     if(!set)return;
     setProductLinks(current=>current.map(link=>{
@@ -378,12 +389,13 @@ export function useOptionSetCenter(draft:AdminSessionDraft){
     }));
   };
 
+  const markClean=()=>setDirty(false);
   const state:OptionSetCenterState={sets,productLinks};
   return {
-    state,sets,productLinks,errors:validateOptionSetCenter(state),
+    state,sets,productLinks,dirty,errors:validateOptionSetCenter(state),
     addSet,updateSet,removeSet,
     addChild,updateChild,removeChild,moveChild,
-    getProductLink,setProductSetLinked,setProductDefault,
+    getProductLink,setProductSetLinked,setProductDefault,markClean,
   };
 }
 
@@ -392,4 +404,5 @@ export type OptionSetCenterController=ReturnType<typeof useOptionSetCenter>;
 export const OPTION_SET_CENTER_STORAGE_KEYS=Object.freeze({
   sets:SET_KEY,
   productLinks:LINK_KEY,
+  dirty:DIRTY_KEY,
 });

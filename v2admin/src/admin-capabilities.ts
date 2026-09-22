@@ -31,7 +31,7 @@ const c=(id:string,label:string,path:string,status:CapabilityStatus,owner:MfkAdm
 
 export const ADMIN_CAPABILITY_GROUPS:readonly AdminCapabilityGroup[]=[
   {id:'today',label:'今日',capabilities:[
-    c('overview','營運總覽','/admin/overview','READY','REPORTING','每日入口：營運準備、核心數字、待發布變更同異常摘要；只顯示狀態。'),
+    c('overview','營運總覽','/admin/overview','READY','REPORTING','每日入口：營運準備、目前設定版本、未保存變更同異常摘要；只顯示狀態。'),
     c('action-queue','待處理／異常','/admin/action-queue','READY','GOVERNANCE','集中需要處理嘅事項同資料狀態，並帶你去相應責任頁；唔會直接改動正式資料。'),
   ]},
   {id:'orders',label:'訂單',capabilities:[
@@ -47,7 +47,7 @@ export const ADMIN_CAPABILITY_GROUPS:readonly AdminCapabilityGroup[]=[
     c('pricing','價格管理','/admin/catalog/pricing','READY','ADMIN_CONFIG','管理價格設定；後台唔直接執行正式交易計價。'),
     c('combo','套餐','/admin/catalog/combos','READY','ADMIN_CONFIG','定義套餐、區段、可選商品關係及選擇規則。'),
     c('menu-sort','Menu／顯示排序','/admin/catalog/menu-display','READY','ADMIN_CONFIG','管理菜單顯示次序同可見性規則。'),
-    c('publish-center','Pending Changes／版本','/admin/publish','READY','ADMIN_CONFIG','草稿 → 檢查內容 → 確認影響 → 建立不可變設定版本 → 由歷史版本建立新草稿。'),
+    c('publish-center','設定版本歷史','/admin/publish','READY','ADMIN_CONFIG','保存 → 驗證 → 建立不可變新版本 → 即時成為目前版本；歷史版本只讀，可還原成另一個新版本。'),
     c('customer-presentation','客戶端首頁','/admin/presentation/customer-home','P1','PRESENTATION','管理客戶端首頁顯示設定。'),
     c('owner-presentation','Owner 今日首頁','/admin/presentation/owner-home','P1','PRESENTATION','管理老闆首頁顯示設定。'),
     c('frontline-presentation','前線點單版面','/admin/presentation/frontline-ordering','P1','PRESENTATION','管理前線點單版面顯示設定；唔會改動交易規則。'),
