@@ -14,6 +14,7 @@ import {readLocalAdminMenu,subscribeLocalAdminMenu} from './runtime/local-admin-
 import {readSmtAdminConfigLkg,readSmtAdminSyncStatus,subscribeSmtAdminConfig} from './runtime/admin-config-sync.ts';
 import {projectSyncedCombos,projectSyncedOrderingCatalog,type SyncedOptionSet} from './runtime/admin-config-projection.ts';
 import {RuntimeReadyActivation} from './runtime/RuntimeReadyActivation.tsx';
+import {StaffAuthGate,StaffSessionBadge} from './presentation/StaffAuthGate.tsx';
 import {ComboWorkspace,HoldCartWorkspace,HoldListWorkspace,OrganizeWorkspace,ProductConfigWorkspace,type OrderingPanelState,type WorkspaceHoldDraft,type WorkspaceProduct} from './features/ordering/OrderingCenterWorkspaces.tsx';
 
 type Product={
@@ -468,7 +469,7 @@ function CheckoutPage({cart,setCart,diningCheckout,onDiningCheckoutDone}:{cart:C
   return <CheckoutWorkspace view={view} actions={actions}/>;
 }
 
-export function MfkV2LocalApp(){
+function OperationalApp(){
   const [cart,setCartState]=useState<CartLine[]>([]);
   const [serviceMode,setServiceMode]=useState<ServiceMode>('takeaway');
   const [diningCheckout,setDiningCheckout]=useState<DiningCheckoutRequest|null>(null);
@@ -511,6 +512,7 @@ export function MfkV2LocalApp(){
           {item.to==='/orders'&&activeOrderCount>0?<span className="clean-rail-badge" aria-label={'進行中訂單 '+activeOrderCount}>{activeOrderCount>99?'99+':activeOrderCount}</span>:null}
         </NavLink>)}
       </nav>
+      <StaffSessionBadge/>
       <div className="clean-runtime-state">LOCAL<br/>OFFLINE</div>
     </aside>
     <section className="clean-route-stage">
@@ -525,4 +527,9 @@ export function MfkV2LocalApp(){
       </Routes>
     </section>
   </div></ProductionViewport></>;
+}
+
+
+export function MfkV2LocalApp(){
+  return <StaffAuthGate><OperationalApp/></StaffAuthGate>;
 }
