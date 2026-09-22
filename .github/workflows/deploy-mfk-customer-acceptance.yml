@@ -1,6 +1,9 @@
 name: deploy-mfk-customer-acceptance
 
 on:
+  pull_request:
+    branches:
+      - acceptance/MFK/CUSTOMER-PRODUCT-R1-CLOUDFLARE
   push:
     branches:
       - acceptance/MFK/CUSTOMER-PRODUCT-R1-CLOUDFLARE
