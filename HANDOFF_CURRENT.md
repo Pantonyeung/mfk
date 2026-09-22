@@ -1,65 +1,90 @@
 # MFK CURRENT HANDOFF｜2026-09-22
 
 Current navigation:
-docs/navigation/MFK_航海圖_V1.18_Round019_2026-09-22.txt
+docs/navigation/MFK_航海圖_V1.19_Round020_2026-09-22.txt
 
 Control:
 #22
 
 ## CURRENT P0
 
-#44
-Admin → SMT automatic publish
+#45
+MFK-ADMIN-PRODUCT-COMPLETION-R1
 
-## OWNER LOCK
+State:
+MFK_ADMIN_PRODUCT_COMPLETE_DEPLOYED_OWNER_REVIEW_PENDING
 
-Admin = only control plane.
+## SOURCE / TEST
 
-SMT = execution client + Local LKG.
+Branch:
+work/MFK/ADMIN-PRODUCT-COMPLETION-R1
 
-SMT must NOT contain:
-- Menu editor
-- Admin draft
-- Publish button
-- file import
-- install/apply choice
-- manual Admin acceptance
+Verified source:
+c03a7a547e8ec6d1485d48053ae0a80e033c2d99
 
-SMT may only show read-only menu sync/revision status.
+Verification:
+35688504352 SUCCESS
 
-## MANUAL A2
+## CLEAN LANDING
 
-#35 manual file transfer is SUPERSEDED as production design.
+Main product landing:
+d22b9bf1bfc059f1d0227cb758027b71c87af111
 
-Keep only:
-revision/fingerprint/apply/readback contract semantics.
+Deploy trigger:
+13987b48181f7423eed01144eae76ebdbfb9dd4a
 
-DO NOT apply the manually-created R20 JSON.
+Live deploy:
+35688802387 SUCCESS
 
-## TARGET FLOW
+Canonical:
+https://admin.morefunos.com
 
-Admin Publish
-→ authenticated canonical revision commit
-→ realtime doorbell
-→ SMT automatic canonical fetch
-→ validate
-→ atomic LKG apply
-→ automatic ACK/readback
-→ Admin shows applied revision
+## ADMIN PRODUCT
 
-Offline:
-use current Local LKG
-→ transactions continue
-→ reconnect auto catch-up
+52 Admin capabilities have concrete routes.
+
+Key Admin-owned config surfaces are persistent across browser refresh and retain local Admin audit/release history.
+
+Completed product surfaces include:
+- Today / Readiness / Action Queue
+- Orders/read surfaces without fake data
+- Product / Category / Modifier / Option / Pricing / Combo / ordering
+- complete Product detail
+- Print Registry / templates / per-product output rules
+- Store / weekly hours / reminder rules / Business Day
+- Cash close records
+- Quick Reasons
+- Staff / RBAC / PIN / Scope
+- Channels / store binding / product mapping
+- settlement surface
+- fixed report shapes
+- audit / diagnostics / export / integrations / effective settings
+- Inventory Lite / CRM / Loyalty / Coupons / Announcements / Presentation / RFM
+
+No manual A2 transport is present as the normal Admin publish workflow.
 
 ## EXACT NEXT
 
-Implement #44 bounded seam.
+Owner walkthrough of live Admin product only.
 
-Owner acceptance:
-press Publish in Admin only.
-No action on SMT.
-SMT must change revision automatically.
-Admin must receive applied revision readback.
+No connection work yet.
 
-SMT OTA #40 remains HOLD.
+Acceptance:
+Owner confirms formal routes are real product surfaces, editable config persists across refresh, and no demo/engineering workflow remains.
+
+Only then BANK:
+MFK_ADMIN_PRODUCT_COMPLETE_GREEN
+
+## HOLD
+
+#44 Admin→SMT automatic connection:
+HOLD
+
+#40 SMT OTA:
+HOLD
+
+Keeta live:
+NOT AUTHORIZED
+
+SMM / Customer / Owner live seams:
+NOT AUTHORIZED
