@@ -8,15 +8,16 @@ import {
   applyMfkStorageSnapshot,
   buildLocalReport,
   createLocalBackup,
-  createLocalDayClose,
+  commitLocalDayCloseOnce,
   readLocalDayCloses,
   restoreLocalBackup,
   snapshotMfkStorage,
   validateLocalBackup,
-  writeLocalDayCloses,
   type LocalBackup,
+  type LocalDayClose,
 } from '../runtime/local-operations.ts';
 import {readBusinessCutoff,readCurrentCashOpeningState} from '../runtime/cash-opening.ts';
+import {queueDayCloseProjection} from '../runtime/projection-outbox.ts';
 import './more-workspace.css';
 
 export type PrinterBinding={
@@ -308,7 +309,8 @@ function DiagnosticsPanel(){
 
 function ReportsPanel({revision}:{revision:number}){
   void revision;
-  const report=buildLocalReport(localRuntime.orders());
+  const cutoff=readBusinessCutoff();
+  const report=buildLocalReport(localRuntime.orders(),{businessStartHour:cutoff.hour,businessStartMinute:cutoff.minute});
   return <section className="more-panel">
     <header className="more-section-heading"><div><span>LOCAL REPORT</span><h2>今日營運</h2></div><strong>{report.businessDate}</strong></header>
     <div className="more-kpis fusion-kpis">
@@ -343,6 +345,7 @@ function DayClosePanel({revision,onSaved}:{revision:number;onSaved:()=>void}){
   const [cashRemoved,setCashRemoved]=useState('');
   const [note,setNote]=useState('');
   const [message,setMessage]=useState('');
+  const [completion,setCompletion]=useState<LocalDayClose|null>(null);
   const closes=readLocalDayCloses();
   const latest=[...closes].filter(x=>x.businessDate===report.businessDate).sort((a,b)=>b.version-a.version)[0];
   const denominations=[1,2,5,10,20,50,100,500,1000] as const;
@@ -371,27 +374,197 @@ function DayClosePanel({revision,onSaved}:{revision:number;onSaved:()=>void}){
   };
 
   const close=()=>{
+    if(latest){setCompletion(latest);setMessage('今日已經完成日結；正常日結唔會再建立新版本。');return;}
     if(!openingRecord){setMessage('今日未確認開更現金；請重新進入 SMT 完成開更現金確認。');return;}
     if(!hasCount){setMessage('請先輸入實點現金。');return;}
     if(!hasRemoval){setMessage('請輸入今次取走現金；如果唔取走請填 0。');return;}
     if(cashRemovedMinor>countedMinor){setMessage('取走現金唔可以大過實點現金。');return;}
-    const row=createLocalDayClose({
+    const result=commitLocalDayCloseOnce({
       orders:localRuntime.orders(),
       businessStartHour:cutoff.hour,
       businessStartMinute:cutoff.minute,
       openingCashMinor,
       countedCashMinor:countedMinor,
       cashRemovedMinor,
-      existing:closes,
-      note:note+(mode==='denom'?'｜面額點算 '+denominations.map(value=>'$'+value+'×'+qtyFor(value)).join('、'):''),
+      note:note+(mode==='denom'?'｜面額點算 '+denominations.map(value=>'
+
+  if(latest)return <section className="more-panel dayclose-panel">
+    <header className="more-section-heading"><div><span>LOCAL DAY CLOSE</span><h2>收銀與日結</h2></div><strong>今日已完成</strong></header>
+    <section className="dayclose-complete-card">
+      <div className="dayclose-complete-icon">✓</div>
+      <div>
+        <span>{latest.businessDate}</span>
+        <h3>今日日結已鎖定</h3>
+        <p>正常日結每個 Business Date 只可以完成一次。重覆入頁或者再撳按鈕都唔會再建立 V2 / V3 / V6。</p>
+      </div>
+    </section>
+    <div className="more-kpis">
+      <article><span>開更現金</span><b>{money(latest.openingCashMinor)}</b></article>
+      <article><span>現金銷售</span><b>{money(latest.cashSalesMinor)}</b></article>
+      <article><span>實點現金</span><b>{money(latest.countedCashMinor)}</b></article>
+      <article><span>取走現金</span><b>{latest.cashRemovedMinor===undefined?'未記錄':money(latest.cashRemovedMinor)}</b></article>
+      <article><span>留櫃現金</span><b>{latest.retainedCashMinor===undefined?'未記錄':money(latest.retainedCashMinor)}</b></article>
+      <article><span>差額</span><b>{money(latest.cashDifferenceMinor)}</b></article>
+    </div>
+    <div className="fusion-note">記錄 ID：{latest.id}。如日後需要更正，會走獨立「日結更正」權限流程，唔會再用正常日結按鈕新增版本。</div>
+  </section>;
+
+  return <section className="more-panel dayclose-panel">
+    <header className="more-section-heading"><div><span>LOCAL DAY CLOSE</span><h2>收銀與日結</h2></div><strong>{latest?'已日結 V'+latest.version:'今日未日結'}</strong></header>
+
+    <div className="more-kpis">
+      <article><span>今日開更現金</span><b>{money(openingCashMinor)}</b></article>
+      <article><span>今日現金銷售</span><b>{money(report.cashSalesMinor)}</b></article>
+      <article><span>預計櫃桶</span><b>{money(expected)}</b></article>
+      <article><span>實點現金</span><b>{money(countedMinor)}</b></article>
+      <article><span>目前差額</span><b>{hasCount?money(difference):'—'}</b></article>
+    </div>
+
+    <div className="dayclose-mode-switch">
+      <button type="button" className={mode==='denom'?'active':''} onClick={()=>setMode('denom')}>按面額點算</button>
+      <button type="button" className={mode==='total'?'active':''} onClick={()=>setMode('total')}>直接輸入總額</button>
+    </div>
+
+    <div className="fusion-form-grid dayclose-base-fields">
+      <label className="more-field"><span>開更現金</span><input value={(openingCashMinor/100).toFixed(2)} readOnly/></label>
+      {mode==='total'?<label className="more-field"><span>實點現金</span><input inputMode="decimal" value={counted} onChange={e=>setCounted(e.target.value.replace(/[^0-9.]/g,''))}/></label>:null}
+      <label className="more-field"><span>今次取走現金</span><input inputMode="decimal" value={cashRemoved} onChange={e=>setCashRemoved(e.target.value.replace(/[^0-9.]/g,''))} placeholder="例如 4000"/></label>
+      <label className="more-field"><span>計算後留櫃現金</span><input value={removalValid?(retainedCashMinor/100).toFixed(2):''} readOnly placeholder="實點 − 取走"/></label>
+      <label className="more-field fusion-wide"><span>備註</span><input value={note} onChange={e=>setNote(e.target.value)} placeholder="例如：現金差異原因／額外補回散紙"/></label>
+    </div>
+
+    {mode==='denom'?<section className="cash-denomination-shell">
+      <header className="cash-denomination-toolbar">
+        <div><b>面額點算</b><span>先點清實際櫃桶現金，再輸入今次攞走幾多；系統會自動計留櫃現金。</span></div>
+        <div className="cash-entry-toggle">
+          <button type="button" className={denomEntryMode==='count'?'active':''} onClick={()=>setDenomEntryMode('count')}>輸入張／個數</button>
+          <button type="button" className={denomEntryMode==='amount'?'active':''} onClick={()=>setDenomEntryMode('amount')}>輸入面額總金額</button>
+        </div>
+      </header>
+      <section className="cash-denomination-table">
+        <header><span>面額</span><span>{denomEntryMode==='count'?'張／個數':'該面額總金額'}</span><span>換算</span><span>小計</span></header>
+        {denominations.map(value=>{
+          const qty=qtyFor(value);
+          const rawAmount=amounts[String(value)]??String(qty*value||'');
+          const typedAmount=Math.max(0,Math.floor(Number(rawAmount)||0));
+          const remainder=typedAmount%value;
+          return <div key={value}>
+            <b>{'$'+value}</b>
+            {denomEntryMode==='count'
+              ?<div className="cash-count-control"><button type="button" onClick={()=>setQty(value,qty-1)}>−</button><input inputMode="numeric" value={qty||''} placeholder="0" onChange={e=>setQty(value,Number(e.target.value))}/><button type="button" onClick={()=>setQty(value,qty+1)}>＋</button></div>
+              :<div className="cash-amount-control"><span>$</span><input inputMode="numeric" value={rawAmount} placeholder="0" onChange={e=>setAmount(value,e.target.value)}/></div>}
+            <span className={remainder&&denomEntryMode==='amount'?'cash-convert invalid':'cash-convert'}>{qty} {value<10?'個':'張'}{remainder&&denomEntryMode==='amount'?' · 非 $'+value+' 倍數':''}</span>
+            <strong>{money(value*qty*100)}</strong>
+          </div>;
+        })}
+        <footer><span>面額合計</span><strong>{money(countedMinor)}</strong></footer>
+      </section>
+    </section>:null}
+
+    <section className="cash-retain-summary">
+      <article><span>實點現金</span><b>{hasCount?money(countedMinor):'—'}</b></article>
+      <article><span>取走現金</span><b>{hasRemoval?money(cashRemovedMinor):'—'}</b></article>
+      <article className="retained"><span>留櫃至下個 Business Day</span><b>{removalValid?money(retainedCashMinor):'—'}</b></article>
+    </section>
+
+    <footer className="dayclose-sticky-footer">
+      <div>{hasCount?<><span>差額 {money(difference)}</span>{removalValid?<span>留櫃 {money(retainedCashMinor)}</span>:<span>未確認取走現金</span>}</>:<span>未輸入點算資料</span>}</div>
+      <button type="button" className="more-primary" onClick={close}>確認本機日結</button>
+    </footer>
+
+    {message?<p role="status" className="fusion-status">{message}</p>:null}
+    {completion?<div className="dayclose-success-overlay">
+      <section className="dayclose-success-dialog" role="dialog" aria-modal="true" aria-labelledby="dayclose-success-title">
+        <div className="dayclose-complete-icon">✓</div>
+        <span>DAY CLOSE COMPLETED</span>
+        <h3 id="dayclose-success-title">日結成功</h3>
+        <p>{completion.businessDate} 已完成日結，而且今日唔會再建立第二個正常日結版本。</p>
+        <div className="dayclose-success-grid">
+          <article><span>實點</span><b>{money(completion.countedCashMinor)}</b></article>
+          <article><span>取走</span><b>{completion.cashRemovedMinor===undefined?'未記錄':money(completion.cashRemovedMinor)}</b></article>
+          <article><span>留櫃</span><b>{completion.retainedCashMinor===undefined?'未記錄':money(completion.retainedCashMinor)}</b></article>
+          <article><span>差額</span><b>{money(completion.cashDifferenceMinor)}</b></article>
+        </div>
+        <button type="button" className="more-primary" onClick={()=>setCompletion(null)}>完成</button>
+      </section>
+    </div>:null}
+    {latest?<section className="fusion-list"><header><b>最近日結</b><span>{latest.id}</span></header><article>
+      <span>實點 {money(latest.countedCashMinor)}</span>
+      <b>取走 {latest.cashRemovedMinor===undefined?'未記錄':money(latest.cashRemovedMinor)}</b>
+      <strong>留櫃 {latest.retainedCashMinor===undefined?'未記錄':money(latest.retainedCashMinor)}</strong>
+    </article></section>:null}
+  </section>;
+}
+
+function BackupPanel({onRestore}:{onRestore:()=>void}){
+  const [message,setMessage]=useState('');
+  const [candidate,setCandidate]=useState<LocalBackup|null>(null);
+  const create=()=>{
+    const backup=createLocalBackup(snapshotMfkStorage());
+    download('mfk-local-backup-'+backup.createdAt+'.json',JSON.stringify(backup,null,2));
+    setMessage('本機備份已建立並下載。');
+  };
+  const choose=async(file:File)=>{
+    try{
+      const parsed=JSON.parse(await file.text()) as LocalBackup;
+      const valid=validateLocalBackup(parsed);
+      if(!valid.ok){setCandidate(null);setMessage('備份無效：'+valid.errors.join(' / '));return;}
+      setCandidate(parsed);setMessage('備份校驗通過，可以恢復。');
+    }catch{setCandidate(null);setMessage('備份檔案無法讀取。')}
+  };
+  const restore=()=>{
+    if(!candidate)return;
+    const current=snapshotMfkStorage();
+    const next=restoreLocalBackup(current,candidate);
+    applyMfkStorageSnapshot(next);
+    setMessage('恢復完成，已重新載入本機資料。');
+    onRestore();
+  };
+  return <section className="more-panel">
+    <header className="more-section-heading"><div><span>LOCAL BACKUP</span><h2>備份與恢復</h2></div><strong>只處理 MFK 本機資料</strong></header>
+    <p className="fusion-note">備份唔經 Cloud。檔案只包含 <code>mfk.*</code> 本機資料，其他 App 資料唔會被寫入。</p>
+    <div className="more-tab-row">
+      <button type="button" onClick={create}>建立／下載備份</button>
+      <label className="fusion-file-button">選擇備份<input type="file" accept=".json,application/json" onChange={e=>{const file=e.target.files?.[0];if(file)void choose(file)}}/></label>
+      <button type="button" className="more-primary" disabled={!candidate} onClick={restore}>恢復已驗證備份</button>
+    </div>
+    {message?<p role="status" className="fusion-status">{message}</p>:null}
+  </section>;
+}
+
+export function LocalMoreWorkspace(){
+  const navigate=useNavigate();
+  const [section,setSection]=useState<Section>('overview');
+  const [revision,setRevision]=useState(0);
+  useEffect(()=>localRuntime.subscribe(()=>setRevision(value=>value+1)),[]);
+  const bump=()=>setRevision(value=>value+1);
+  const titleMap:Record<Section,string>={
+    overview:'更多功能總覽',printing:'打印與設備',diagnostics:'顯示與操作／診斷',
+    dayclose:'收銀與日結',reports:'報表與分析',backup:'備份與恢復',
+    'admin-menu':'Admin 同步狀態'
+  };
+  return <main className="more-workspace more-card-workspace" aria-label="MFK SMT 本地營運中心">
+    <header className="more-card-topbar">
+      <button type="button" onClick={()=>section==='overview'?navigate('/'):setSection('overview')}>{section==='overview'?'← 返回點單':'← 更多功能'}</button>
+      <div><small>SMT LOCAL OPERATIONS</small><b>{titleMap[section]}</b></div>
+      <span>LOCAL-FIRST</span>
+    </header>
+    <section className="more-workspace-content">
+      {section==='overview'?<OverviewPanel onOpen={setSection}/>:null}
+      {section==='printing'?<PrinterPanel/>:null}
+      {section==='diagnostics'?<DiagnosticsPanel/>:null}
+      {section==='dayclose'?<DayClosePanel revision={revision} onSaved={bump}/>:null}
+      {section==='reports'?<ReportsPanel revision={revision}/>:null}
+      {section==='backup'?<BackupPanel onRestore={()=>window.location.reload()}/>:null}
+      {section==='admin-menu'?<LocalAdminMenuWorkspace/>:null}
+    </section>
+  </main>;
+}
++value+'×'+qtyFor(value)).join('、'):''),
     });
-    writeLocalDayCloses([...closes,row]);
-    setMessage(
-      '日結已保存：V'+row.version+
-      ' · 實點 '+money(row.countedCashMinor)+
-      ' · 取走 '+money(row.cashRemovedMinor??0)+
-      ' · 留櫃 '+money(row.retainedCashMinor??0)
-    );
+    queueDayCloseProjection(result.row);
+    setCompletion(result.row);
+    setMessage(result.created?'日結完成。':'今日已經完成日結；冇建立重複版本。');
     onSaved();
   };
 
