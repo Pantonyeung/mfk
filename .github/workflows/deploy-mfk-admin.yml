@@ -2,6 +2,11 @@ name: deploy-mfk-admin
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - 'v2admin/DEPLOY_REQUEST'
 
 jobs:
   deploy:
