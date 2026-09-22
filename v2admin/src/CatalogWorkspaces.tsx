@@ -16,7 +16,7 @@ function WorkspaceHeader({
   const [saveErrors,setSaveErrors]=useState<readonly string[]>([]);
   const [active,setActive]=useState(()=>readActiveAdminRelease());
   const [saveMessage,setSaveMessage]=useState('');
-  useEffect(()=>{setValidated(false);setSaveErrors([]);setSaveMessage('');},[draft,optionCenterState]);
+  useEffect(()=>{setValidated(false);setSaveErrors([]);setSaveMessage('');},[draft]);
   const runValidate=()=>{validate();setValidated(true);};
   const runSave=()=>{
     const result=saveAdminConfig(draft,optionCenterState);
