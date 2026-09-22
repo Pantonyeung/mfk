@@ -1,3 +1,4 @@
+export {KeetaEdgeStore} from './keeta-edge.js';
 import {validateMfkAdminConfigAck,validateMfkAdminConfigEnvelope} from '../contracts/admin-config-sync-v1.ts';
 import {validateSmtProjectionBatch} from '../contracts/smt-projection-v1.ts';
 
@@ -252,6 +253,18 @@ export class AdminSyncStore{
 export default {
   async fetch(request,env){
     const url=new URL(request.url);
+    if(url.pathname.startsWith('/api/keeta/')){
+      if(request.method==='OPTIONS')return new Response(null,{status:204,headers:cors(request)});
+      const id=env.KEETA_EDGE.idFromName('GLOBAL');
+      const stub=env.KEETA_EDGE.get(id);
+      const target=new URL(request.url);
+      target.pathname=url.pathname.replace('/api/keeta','')||'/status';
+      const response=await stub.fetch(new Request(target.toString(),request));
+      const headers=new Headers(response.headers);
+      for(const [key,value] of Object.entries(cors(request)))headers.set(key,value);
+      return new Response(response.body,{status:response.status,statusText:response.statusText,headers});
+    }
+
     if(url.pathname.startsWith('/api/admin-sync/')||url.pathname.startsWith('/api/projection/')){
       if(request.method==='OPTIONS')return new Response(null,{status:204,headers:cors(request)});
       const storeId=storeIdFrom(url);
