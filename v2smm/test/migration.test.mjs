@@ -16,6 +16,8 @@ test('capability registry stays unique and command authority remains disconnecte
   const commands=registry.filter(item=>item.kind==='COMMAND_SHAPE');
   assert.ok(commands.length>=1);
   assert.deepEqual([...new Set(commands.map(item=>item.status))],['NOT_WIRED']);
+  const reads=registry.filter(item=>item.kind!=='COMMAND_SHAPE');
+  assert.deepEqual([...new Set(reads.map(item=>item.status))],['PRODUCT_READY_NOT_CONNECTED']);
 });
 
 test('SMM product shell has no live network or canonical writer',()=>{
@@ -29,7 +31,9 @@ test('SMM product shell has no live network or canonical writer',()=>{
     /allocateDisplayNumber/,
     /storeKernel\s*\./,
     /\bD1Database\b/,
-    /new\s+Worker\s*\(/
+    /new\s+Worker\s*\(/,
+    /\bsetInterval\s*\(/,
+    /\bsetTimeout\s*\(/
   ];
   for(const pattern of forbidden)assert.equal(pattern.test(source),false,String(pattern));
 });
@@ -86,4 +90,23 @@ test('Business Day remains record-only and non-blocking',()=>{
   const app=fs.readFileSync(path.join(root,'App.tsx'),'utf8');
   assert.match(types,/recordOnly:true/);
   assert.match(app,/永遠唔會阻止落單、付款或者本機提交/);
+});
+
+
+test('production source contains no static fixture module or fake product truth',()=>{
+  assert.equal(fs.existsSync(path.join(root,'fixtures.ts')),false);
+  const app=fs.readFileSync(path.join(root,'App.tsx'),'utf8');
+  assert.doesNotMatch(app,/\$6,420|Keeta provider readback|紫米飯團 ×2|DEMO/);
+});
+
+test('quote and mutation operations can only cross the typed injected port',()=>{
+  const types=fs.readFileSync(path.join(root,'product-types.ts'),'utf8');
+  assert.match(types,/quoteCart\?/);
+  assert.match(types,/submitOrder\?/);
+  assert.match(types,/setSellability\?/);
+  assert.match(types,/createDineSession\?/);
+  const app=fs.readFileSync(path.join(root,'App.tsx'),'utf8');
+  assert.match(app,/port\?\.quoteCart/);
+  assert.match(app,/port\?\.submitOrder/);
+  assert.doesNotMatch(app,/finalUnitPriceMinor\s*[*+\-\/]/);
 });
