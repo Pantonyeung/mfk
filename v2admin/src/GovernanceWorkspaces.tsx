@@ -1,6 +1,22 @@
 import {useMemo,useState} from 'react';
 import {ADMIN_CAPABILITIES} from './admin-capabilities.ts';
 import {useAdminDraft} from './admin-draft.tsx';
+import {buildAdminA2TransferFromDraft,inspectAdminA2Readback} from './admin-menu-transfer.ts';
+import type {MfkAdminMenuReadbackReceipt,MfkAdminMenuTransferBundle} from '../../contracts/admin-menu-transfer-v1.ts';
+
+function downloadAdminJson(filename:string,value:unknown){
+  const blob=new Blob([JSON.stringify(value,null,2)],{type:'application/json'});
+  const url=URL.createObjectURL(blob);
+  const anchor=document.createElement('a');
+  anchor.href=url;
+  anchor.download=filename;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
+
+async function readAdminJsonFile(file:File){
+  return JSON.parse(await file.text()) as unknown;
+}
 
 function MigrationHeader({title,description}:{title:string;description:string}){
   return <header className="admin-editor-head">
@@ -13,63 +29,139 @@ export function PublishCenterWorkspace(){
   const {draft,dirty,validationErrors,validate}=useAdminDraft();
   const [lastValidationAt,setLastValidationAt]=useState<string>();
   const [impactPreviewed,setImpactPreviewed]=useState(false);
+  const [baseRevision,setBaseRevision]=useState(1);
+  const [bundle,setBundle]=useState<MfkAdminMenuTransferBundle|null>(null);
+  const [readback,setReadback]=useState<MfkAdminMenuReadbackReceipt|null>(null);
+  const [compareState,setCompareState]=useState<'MATCH'|'MISMATCH'|'UNKNOWN'|'NOT_OBSERVED'>('NOT_OBSERVED');
+  const [message,setMessage]=useState('A2 係 human-controlled transport：先匯出 Publish Bundle，再由 SMT 匯入並回傳 Readback Receipt。');
   const counts=useMemo(()=>({
     categories:draft.categories.length,
     products:draft.products.length,
     modifiers:draft.modifierGroups.length,
     combos:draft.combos.length,
   }),[draft]);
+
   const runValidation=()=>{
-    validate();
+    const errors=validate();
     setLastValidationAt(new Date().toISOString());
     setImpactPreviewed(false);
+    setBundle(null);
+    setReadback(null);
+    setCompareState('NOT_OBSERVED');
+    setMessage(errors.length?'Validate 未通過；A2 bundle 未建立。':'Validate 通過。先做 Impact Preview，再建立 A2 Publish Bundle。');
   };
   const canPreview=Boolean(lastValidationAt)&&validationErrors.length===0;
+  const createBundle=()=>{
+    try{
+      const next=buildAdminA2TransferFromDraft(draft,baseRevision);
+      setBundle(next);
+      setReadback(null);
+      setCompareState('NOT_OBSERVED');
+      setMessage('SOURCE_INTENT 已建立：R'+next.revision.revision+' / '+next.revision.fingerprint+'。下載 bundle 後交畀 SMT。');
+      downloadAdminJson('mfk-admin-menu-'+next.transportId.replace(/[:]/g,'_')+'.json',next);
+    }catch(error){
+      setMessage(error instanceof Error?error.message:'ADMIN_A2_BUNDLE_BUILD_FAILED');
+    }
+  };
+  const importReadback=async(file:File)=>{
+    try{
+      if(!bundle){setMessage('請先建立同一個 A2 Publish Bundle，再匯入 SMT Readback。');return;}
+      const result=inspectAdminA2Readback(bundle,await readAdminJsonFile(file));
+      setReadback(result.receipt);
+      setCompareState(result.state);
+      setMessage(result.state==='MATCH'
+        ?'TARGET_OBSERVED = MATCH。Admin expected 同 SMT observed 完全一致。'
+        :result.state==='MISMATCH'
+          ?'TARGET_OBSERVED = MISMATCH。唔准當 Publish 成功。'
+          :'TARGET_OBSERVED = UNKNOWN。唔准新建另一個 revision；只可查返同一 identity。');
+    }catch(error){
+      setCompareState('UNKNOWN');
+      setMessage(error instanceof Error?error.message:'ADMIN_A2_READBACK_INVALID');
+    }
+  };
+
   return <section className="admin-editor-page">
-    <MigrationHeader title="Pending Changes／發布" description="Draft → Validate → Impact → Publish → target readback → rollback 嘅完整治理 shape。今輪全部停喺 NOT_WIRED，唔會生成 Active Revision。"/>
+    <header className="admin-editor-head">
+      <div><small>ADMIN CONNECTION A2 · HUMAN CONTROLLED</small><h1>Pending Changes／發布</h1><p>Draft → Validate → Impact → Export Bundle → SMT Apply → Readback Receipt → Compare。冇 Target Readback 就唔算 GREEN。</p></div>
+      <div className="admin-editor-actions"><span className="admin-not-wired-chip">NO CLOUD / NO HTTP / NO POLLING</span></div>
+    </header>
+
     <div className="admin-kpi-grid">
       <article><span>Categories</span><strong>{counts.categories}</strong><small>SESSION DRAFT</small></article>
       <article><span>Products</span><strong>{counts.products}</strong><small>SESSION DRAFT</small></article>
-      <article><span>Modifier Groups</span><strong>{counts.modifiers}</strong><small>SESSION DRAFT</small></article>
-      <article><span>Combos</span><strong>{counts.combos}</strong><small>SESSION DRAFT</small></article>
+      <article><span>Modifier Groups</span><strong>{counts.modifiers}</strong><small>NOT IN A2</small></article>
+      <article><span>Combos</span><strong>{counts.combos}</strong><small>NOT IN A2</small></article>
     </div>
+
     <div className="admin-policy-grid two">
       <article className="admin-policy-card">
-        <h2>1. Draft</h2>
+        <h2>1. Source Draft</h2>
         <p>{dirty?'有未發布變更':'目前冇變更'}</p>
-        <span className="admin-not-wired-chip">SESSION ONLY</span>
+        <span className="admin-not-wired-chip">ADMIN SOURCE</span>
       </article>
+
       <article className="admin-policy-card">
         <h2>2. Validate</h2>
         <button type="button" onClick={runValidation}>執行 Validate</button>
         <small>{lastValidationAt?'最後驗證：'+lastValidationAt:'未驗證'}</small>
         {validationErrors.length?<ul>{validationErrors.map((error,index)=><li key={index}>{error}</li>)}</ul>:null}
       </article>
+
       <article className="admin-policy-card">
         <h2>3. Impact Preview</h2>
-        <p>預覽受影響 Product / Channel / Presentation target，同 base revision conflict 風險。</p>
-        <button type="button" disabled={!canPreview} onClick={()=>setImpactPreviewed(true)}>產生 Impact Preview</button>
-        <small>{impactPreviewed?'IMPACT_PREVIEW_LOCAL_ONLY':'先完成 Validate'}</small>
+        <p>A2 只影響 Category / Product Menu Index。Pricing / Modifier / Combo / Availability 全部唔喺今次。</p>
+        <button type="button" disabled={!canPreview} onClick={()=>setImpactPreviewed(true)}>確認 A2 Impact</button>
+        <small>{impactPreviewed?'A2_MENU_INDEX_ONLY':'先完成 Validate'}</small>
       </article>
+
       <article className="admin-policy-card">
-        <h2>4. Publish</h2>
-        <label><span>Expected Base Revision</span><input disabled placeholder="ACTIVE_REVISION_NOT_WIRED"/></label>
-        <button type="button" disabled>Publish 未接駁</button>
-        <small>唔會向任何 runtime / provider 發送。</small>
+        <h2>4. Expected SMT Base</h2>
+        <label><span>Expected Base Revision</span><input type="number" min={1} value={baseRevision} onChange={event=>setBaseRevision(Math.max(1,Number(event.target.value)||1))}/></label>
+        <small>例如 SMT 而家係 R1，就只可以建立 R2。Target base 唔吻合會由 SMT fail closed。</small>
       </article>
+
       <article className="admin-policy-card">
-        <h2>5. Target Readback</h2>
-        <div className="admin-read-empty">MATCH / PARTIAL / MISMATCH / UNKNOWN · NOT_WIRED</div>
-        <small>每個 target 必須有 observed revision / evidence；冇 proof 唔可以顯示成功。</small>
+        <h2>5. SOURCE_INTENT / Transport Bundle</h2>
+        <button type="button" disabled={!impactPreviewed||validationErrors.length>0} onClick={createBundle}>建立並下載 A2 Publish Bundle</button>
+        {bundle?<div className="admin-readback-proof">
+          <p><span>Seam</span><b>{bundle.seamId}</b></p>
+          <p><span>Transport ID</span><b>{bundle.transportId}</b></p>
+          <p><span>Expected Revision</span><b>R{bundle.revision.revision}</b></p>
+          <p><span>Expected Fingerprint</span><code>{bundle.revision.fingerprint}</code></p>
+        </div>:<div className="admin-read-empty">SOURCE_INTENT_NOT_CREATED</div>}
       </article>
+
       <article className="admin-policy-card">
-        <h2>6. Rollback</h2>
-        <button type="button" disabled>Rollback as New Revision 未接駁</button>
-        <small>Rollback 只會建立新 revision，唔 edit history。</small>
+        <h2>6. TARGET_OBSERVED / Readback</h2>
+        <label className="admin-file-control"><span>匯入 SMT Readback Receipt</span><input type="file" accept=".json,application/json" disabled={!bundle} onChange={event=>{const file=event.target.files?.[0];if(file)void importReadback(file);}}/></label>
+        {readback?<div className="admin-readback-proof">
+          <p><span>Observed Revision</span><b>R{readback.observedRevision}</b></p>
+          <p><span>Observed Fingerprint</span><code>{readback.observedFingerprint}</code></p>
+          <p><span>Disposition</span><b>{readback.deliveryDisposition}</b></p>
+          <p><span>Evidence</span><code>{readback.evidenceRef}</code></p>
+        </div>:<div className="admin-read-empty">TARGET_READBACK_NOT_OBSERVED</div>}
       </article>
     </div>
+
+    <section className={'admin-rule-card admin-a2-result '+compareState.toLowerCase()}>
+      <h2>7. Human Compare Result</h2>
+      <strong>{compareState}</strong>
+      <p>{message}</p>
+      <small>Hard rule：NO READBACK PROOF = NOT GREEN。Transport bundle 建立成功亦唔代表 SMT 已 Apply。</small>
+    </section>
+
+    <section className="admin-rule-card">
+      <h2>8. Governance Boundary</h2>
+      <p>完整治理詞彙保留：MATCH / PARTIAL / MISMATCH / UNKNOWN。A2 exact Menu Index compare 只會產生 MATCH / MISMATCH / UNKNOWN；PARTIAL 留畀未來多-target readback。</p>
+      <div className="admin-editor-actions">
+        <button type="button" disabled>Rollback as New Revision</button>
+        <button type="button" disabled>Automatic Publish 未接駁</button>
+      </div>
+      <small>Rollback 同自動網絡 Publish 都唔喺 A2；今次只係 human-controlled bundle + exact target receipt。</small>
+    </section>
   </section>;
 }
+
 export function PrintRulesWorkspace(){
   const {draft}=useAdminDraft();
   const [rows,setRows]=useState<Record<string,{receipt:boolean;production:boolean;packing:boolean;label:boolean;dineIn:boolean}>>({});

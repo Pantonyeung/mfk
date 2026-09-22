@@ -398,3 +398,19 @@ function localMenuSnapshotFingerprint(snapshot:LocalAdminMenuSnapshot):string{
   const validated=validateMfkAdminMenuIndexRevision({...base,fingerprint:fingerprintMfkAdminMenuIndexRevision(base)});
   return validated.fingerprint;
 }
+
+
+export interface LocalAdminMenuReadback{
+  readonly revision:number;
+  readonly fingerprint:string;
+  readonly publishedAt:string;
+}
+
+export function readLocalAdminMenuReadback():LocalAdminMenuReadback{
+  const current=readLocalAdminMenu();
+  return Object.freeze({
+    revision:current.revision,
+    fingerprint:localMenuSnapshotFingerprint(current),
+    publishedAt:current.publishedAt,
+  });
+}
