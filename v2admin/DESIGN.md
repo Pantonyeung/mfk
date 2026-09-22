@@ -9,12 +9,16 @@ an Apple product.
 
 - Admin is a control plane. It should feel calm even when the underlying system
   is complex.
-- The first view answers only: where am I, what is this for, and what do I open
-  next?
-- Every route starts collapsed. Opening a route is an explicit act; navigating
-  to another route collapses the previous workspace again.
-- Nested editors and advanced settings also start collapsed. A user opens only
-  the product, pool, section, or configuration they are working on.
+- The first view answers: where am I, what can I do here, and what is the one
+  next action?
+- Route purpose and the current working surface stay visible. We never hide the
+  whole page behind an extra "open workspace" action.
+- Dependent future content stays absent until the current step is complete.
+  Completed steps collapse into truthful summaries and remain available for
+  correction.
+- Large collections use selection before editing. Product search on mobile is
+  filter-first; Option Sets, Combos, and Pools open one selected object at a
+  time.
 - Unknown, offline, stale, failed, queued, and readback-waiting states remain
   explicit. Visual calm must never manufacture success.
 
@@ -41,26 +45,31 @@ an Apple product.
 - Use broad whitespace and grouping instead of borders around every element.
 - Shadows are quiet and local. Translucency is reserved for persistent chrome,
   never stacked across multiple content layers.
-- Orange identifies MFK. Blue identifies an interactive system action. Do not
-  use multiple decorative accent colours.
+- Orange identifies MFK. Blue identifies the current step and interactive
+  system action. Green identifies a completed/reviewable step, amber identifies
+  attention or waiting, and red identifies errors or destructive actions.
+  Every colour is paired with text, icon, or status wording; colour is never the
+  only signal.
 
 ## Information hierarchy
 
 1. Persistent chrome: MFK, primary areas, conservative sync state.
 2. Compact route picker: one current secondary destination, not a row of every
    possible tab.
-3. Focus card: page title, one-sentence purpose, and one Open action.
-4. Revealed workspace: primary action toolbar, then operational content.
-5. Nested disclosure: detailed editors and advanced settings closed by default.
+3. Visible workspace: page title, one-sentence purpose, and current task.
+4. Guided progress: completed summary, current instruction, future step label.
+5. Current editor: only the fields required for this step.
 
 The old card and table placement is not a constraint. Composition follows the
 user task, reading order, and action frequency.
 
 ## Interaction
 
-- Route changes remount the focus card in its collapsed state.
-- Native `details` / `summary` semantics provide keyboard and assistive-
-  technology support without creating a parallel interaction model.
+- Route changes remount the focused task state.
+- `Continue` changes presentation state only. It never saves, publishes,
+  creates a revision, claims sync, or fabricates a successful readback.
+- Existing validation determines whether a required step can continue. Optional
+  contract fields may be explicitly skipped and remain visibly unset.
 - Press feedback starts immediately with a small, critically damped scale
   response. No bounce is used for ordinary menus or form controls.
 - Open and close use the same spatial origin and remain interruptible.
@@ -72,9 +81,10 @@ user task, reading order, and action frequency.
 - Desktop: quiet 220px sidebar, translucent top chrome, centered focus surface.
 - Tablet: compact 76px area rail with shortened labels; content remains a real
   two-column composition where useful.
-- Mobile: no desktop sidebar. Use a compact top bar, route picker, single focus
-  surface, and a five-target translucent bottom bar. Data tables become
-  labelled records after the workspace is opened.
+- Mobile: no desktop sidebar. Use a compact top bar, route picker, one current
+  editor, and a five-target translucent bottom bar. Product results appear only
+  after an explicit filter action. Step actions stay reachable at the bottom of
+  the current panel.
 - Touch targets are at least 44px; primary mobile navigation is at least 50px.
 
 ## Accessibility

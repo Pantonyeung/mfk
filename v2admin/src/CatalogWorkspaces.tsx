@@ -4,7 +4,7 @@ import {appendAdminAudit,readActiveAdminRelease,readAdminReleases,readAdminStore
 import {saveAdminConfig} from './admin-config-save.ts';
 import {normalizeProductMedia,normalizeProductPrintRule,PRODUCT_MEDIA_BACKEND_CONTRACT,useProductMediaConfig,useProductPrintRules,type ProductMediaConfig,type ProductPrintRule} from './admin-product-operational-config.ts';
 import {projectOptionSetsForProduct,useOptionSetCenter,type OptionSetCenterController,type OptionSetCenterState,type ProductOptionSetLink} from './admin-option-set-center.ts';
-import {AdminPagination,AdminSearchField} from './AdminUiPrimitives.tsx';
+import {AdminGuidedPanel,AdminGuidedProgress,AdminPagination,AdminSearchField,AdminStepActions,type AdminGuidedStep} from './AdminUiPrimitives.tsx';
 
 function WorkspaceHeader({
   title,description,onAdd,addLabel,optionCenterState,optionDirty=false,onOptionSaved,
@@ -117,6 +117,7 @@ export function ProductOperationalDetail({productId,optionCenter}:{productId:str
   const {draft,updateProduct,removeProduct}=useAdminDraft();
   const [printRules,setPrintRules]=useProductPrintRules();
   const [mediaByProduct,setMediaByProduct]=useProductMediaConfig();
+  const [activeTask,setActiveTask]=useState<'basic'|'price'|'options'|'print'|'media'|'advanced'|null>(null);
   const product=draft.products.find(row=>row.id===productId);
   if(!product)return null;
 
@@ -163,8 +164,19 @@ export function ProductOperationalDetail({productId,optionCenter}:{productId:str
       <Toggle checked={product.active} onChange={active=>updateProduct(product.id,{active})} label={product.active?'啟用':'停用'}/>
     </div>
 
-    <details className="admin-product-section">
-      <summary><span><b>基本資料</b><small>名稱、編號、分類、條碼、描述</small></span><span>›</span></summary>
+    {activeTask===null?<AdminGuidedPanel eyebrow="揀一項工作" title="你而家想修改邊部分？" instruction="一次只打開一個編輯範圍；完成後會返回呢個摘要，其他資料唔會阻住你。">
+      <div className="admin-task-picker">
+        <button type="button" onClick={()=>setActiveTask('basic')}><b>基本資料</b><small>{product.productCode||'未有商品編號'} · {draft.categories.find(row=>row.id===product.categoryId)?.name||'未分類'}</small></button>
+        <button type="button" onClick={()=>setActiveTask('price')}><b>價格</b><small>{product.basePrice.trim()?'HK$'+Number(product.basePrice).toFixed(2):'未填價格，需要處理'}</small></button>
+        <button type="button" onClick={()=>setActiveTask('options')}><b>選項</b><small>{boundGroups.length} 個已加入選項組</small></button>
+        <button type="button" onClick={()=>setActiveTask('print')}><b>打印</b><small>{printRule.label?'包括 Label':'未啟用 Label'}</small></button>
+        <button type="button" onClick={()=>setActiveTask('media')}><b>圖片／媒體</b><small>{media.canonicalImageRef?'已設定主圖':'未設定主圖'}</small></button>
+        <button type="button" onClick={()=>setActiveTask('advanced')}><b>進階／刪除</b><small>低頻及破壞性操作</small></button>
+      </div>
+    </AdminGuidedPanel>:null}
+
+    {activeTask==='basic'?<section className="admin-product-section is-guided">
+      <header><span><b>基本資料</b><small>名稱、編號、分類、條碼、描述</small></span></header>
       <div className="admin-product-section-body">
         <div className="admin-form-grid two">
           <label><span>商品名稱 *</span><input value={product.name} onChange={event=>updateProduct(product.id,{name:event.target.value})}/></label>
@@ -179,10 +191,10 @@ export function ProductOperationalDetail({productId,optionCenter}:{productId:str
           <label><span>標籤（逗號分隔）</span><input value={(product.tags??[]).join(', ')} onChange={event=>updateProduct(product.id,{tags:event.target.value.split(',').map(value=>value.trim()).filter(Boolean)})}/></label>
         </div>
       </div>
-    </details>
+    </section>:null}
 
-    <details className="admin-product-section">
-      <summary><span><b>價格</b><small>商品價、外賣 +$1、其他正負調整</small></span><span>›</span></summary>
+    {activeTask==='price'?<section className="admin-product-section is-guided">
+      <header><span><b>價格</b><small>商品價、外賣 +$1、其他正負調整</small></span></header>
       <div className="admin-product-section-body">
         <div className="admin-form-grid two">
           <label><span>基本價 HK$ *</span><input inputMode="decimal" value={product.basePrice} onChange={event=>updateProduct(product.id,{basePrice:event.target.value})} placeholder="0.00"/></label>
@@ -191,10 +203,10 @@ export function ProductOperationalDetail({productId,optionCenter}:{productId:str
         <Toggle checked={Boolean(product.takeawaySurchargeEnabled)} onChange={takeawaySurchargeEnabled=>updateProduct(product.id,{takeawaySurchargeEnabled})} label={product.takeawaySurchargeEnabled?'此商品外賣 +$1：開':'此商品外賣 +$1：關'}/>
         <div className="admin-callout compact">商品價同選項價只係設定；正式交易仍由唯一 Pricing authority 計算。</div>
       </div>
-    </details>
+    </section>:null}
 
-    <details className="admin-product-section">
-      <summary><span><b>選項</b><small>{boundGroups.length} 個已加入選項組 · 默認按商品設定</small></span><span>›</span></summary>
+    {activeTask==='options'?<section className="admin-product-section is-guided">
+      <header><span><b>選項</b><small>{boundGroups.length} 個已加入選項組 · 默認按商品設定</small></span></header>
       <div className="admin-product-section-body">
         <div className="admin-callout compact">先喺「選項中心」建立完整選項組，例如「青瓜 → 多青瓜／少青瓜／走青瓜」。商品詳細資料只負責「加入選項」、移除，同設定呢件商品嘅默認子選項。</div>
 
@@ -249,10 +261,10 @@ export function ProductOperationalDetail({productId,optionCenter}:{productId:str
           })}
         </div>
       </div>
-    </details>
+    </section>:null}
 
-    <details className="admin-product-section">
-      <summary><span><b>打印</b><small>收據／製作單／打包單／Label／堂食／外賣</small></span><span>›</span></summary>
+    {activeTask==='print'?<section className="admin-product-section is-guided">
+      <header><span><b>打印</b><small>收據／製作單／打包單／Label／堂食／外賣</small></span></header>
       <div className="admin-product-section-body">
         <div className="admin-check-grid">
           {([['receipt','收據'],['production','廚房製作單'],['packing','打包單'],['label','Label'],['dineIn','堂食打印'],['takeaway','外賣打印']] as const).map(([key,label])=><label key={key}><input type="checkbox" checked={printRule[key]} onChange={event=>patchPrint({[key]:event.target.checked})}/><span>{label}</span></label>)}
@@ -260,10 +272,10 @@ export function ProductOperationalDetail({productId,optionCenter}:{productId:str
         {printRule.label?<section className="admin-sub-editor"><header><b>Label 去邊部打印機</b><small>{printRule.labelPrinterIds.length} 個目的地</small></header>{labelPrinters.length===0?<p>未有可用 Label Logical Printer；請先到「打印中心」建立。</p>:<div className="admin-check-grid">{labelPrinters.map(printer=><label key={printer.id}><input type="checkbox" checked={printRule.labelPrinterIds.includes(printer.id)} onChange={event=>patchPrint({labelPrinterIds:event.target.checked?[...printRule.labelPrinterIds,printer.id]:printRule.labelPrinterIds.filter(id=>id!==printer.id)})}/><span>{printer.name}</span></label>)}</div>}</section>:null}
         <div className="admin-callout compact">Admin 只設定 Logical Printer；實體 IP／USB 配對仍然由 SMT 現場負責。</div>
       </div>
-    </details>
+    </section>:null}
 
-    <details className="admin-product-section">
-      <summary><span><b>圖片／媒體</b><small>Canonical 主圖、R2/D1 狀態、Keeta 獨立圖片</small></span><span>›</span></summary>
+    {activeTask==='media'?<section className="admin-product-section is-guided">
+      <header><span><b>圖片／媒體</b><small>Canonical 主圖、R2/D1 狀態、Keeta 獨立圖片</small></span></header>
       <div className="admin-product-section-body">
         <div className="admin-media-layout">
           <div className="admin-media-preview">{media.publicUrl?<img src={media.publicUrl} alt={product.name}/>:<div><b>未設定商品圖片</b><span>Customer／SMM／SMT 日後會讀 canonical imageRef。</span></div>}</div>
@@ -282,17 +294,18 @@ export function ProductOperationalDetail({productId,optionCenter}:{productId:str
         <div className="admin-callout compact">而家 MFK Admin 未有安全圖片上載 Worker；所以唔會假裝 R2／D1 已經寫入。正式圖片後端要使用 MFK 自己嘅 R2 blob + D1 metadata，瀏覽器唔會直接持有 R2 credential。</div>
         <small>Backend contract：{PRODUCT_MEDIA_BACKEND_CONTRACT.binaryStore} / {PRODUCT_MEDIA_BACKEND_CONTRACT.metadataProjection} / {PRODUCT_MEDIA_BACKEND_CONTRACT.publicPath}</small>
       </div>
-    </details>
+    </section>:null}
 
-    <details className="admin-product-section">
-      <summary><span><b>進階／刪除</b><small>低頻資料同破壞性操作</small></span><span>›</span></summary>
+    {activeTask==='advanced'?<section className="admin-product-section is-guided">
+      <header><span><b>進階／刪除</b><small>低頻資料同破壞性操作</small></span></header>
       <div className="admin-product-section-body">
         <div className="admin-product-danger-zone">
           <span>一般停售請使用「停用」；刪除只應用於確定唔需要保留身份嘅商品。</span>
           <button type="button" onClick={()=>{if(typeof window==='undefined'||window.confirm('確定刪除「'+product.name+'」？刪除前一般應優先使用停用。'))removeProduct(product.id)}}>刪除商品</button>
         </div>
       </div>
-    </details>
+    </section>:null}
+    {activeTask?<AdminStepActions onNext={()=>setActiveTask(null)} nextLabel="完成，返回商品摘要"/>:null}
   </div>;
 }
 
@@ -304,6 +317,7 @@ export function ProductsWorkspace(){
   const [category,setCategory]=useState('ALL');
   const [page,setPage]=useState(1);
   const [expandedId,setExpandedId]=useState<string|null>(null);
+  const [filtersApplied,setFiltersApplied]=useState(false);
   const [printRules,setPrintRules]=useProductPrintRules();
   const [mediaRows,setMediaRows]=useProductMediaConfig();
   const logicalPrinters=readAdminStored<Array<{id:string;name:string;type:string;active:boolean}>>('logical-printers.v1',[]);
@@ -325,7 +339,7 @@ export function ProductsWorkspace(){
   const safePage=Math.min(page,pageCount);
   const pageRows=filtered.slice((safePage-1)*PAGE_SIZE,safePage*PAGE_SIZE);
 
-  useEffect(()=>{setPage(1);setExpandedId(null);},[query,status,category]);
+  useEffect(()=>{setPage(1);setExpandedId(null);setFiltersApplied(false);},[query,status,category]);
   useEffect(()=>{if(page>pageCount)setPage(pageCount);},[page,pageCount]);
 
   const toggleExpanded=(id:string)=>setExpandedId(current=>current===id?null:id);
@@ -358,17 +372,20 @@ export function ProductsWorkspace(){
       <article><span>已停用</span><strong>{draft.products.filter(row=>!row.active).length}</strong><small>保留歷史身份</small></article>
       <article><span>未填價格</span><strong>{draft.products.filter(row=>row.active&&!row.basePrice.trim()).length}</strong><small>建立版本前必須處理</small></article>
     </div>
-    <div className="admin-product-toolbar">
+    <div className="admin-product-toolbar" data-mobile-collapsed={filtersApplied?'true':'false'}>
       <div className="admin-filterbar">
         <AdminSearchField label="搜尋商品" value={query} onChange={setQuery} placeholder="搜尋商品名稱／商品編號／條碼／庫存編號"/>
         <label><span>分類</span><select value={category} onChange={event=>setCategory(event.target.value)}><option value="ALL">全部分類</option>{draft.categories.map(row=><option key={row.id} value={row.id}>{row.name}</option>)}</select></label>
         <label><span>狀態</span><select value={status} onChange={event=>setStatus(event.target.value as typeof status)}><option value="ALL">全部狀態</option><option value="ACTIVE">已啟用</option><option value="INACTIVE">已停用</option></select></label>
         <span>找到 {filtered.length} 件</span>
+        <button type="button" className="admin-mobile-filter-action" onClick={()=>setFiltersApplied(true)}>顯示 {filtered.length} 件商品</button>
       </div>
       <div className="admin-product-page-status"><span>第 {safePage} / {pageCount} 頁</span><small>每頁最多 {PAGE_SIZE} 件</small></div>
     </div>
 
-    {filtered.length===0?<div className="admin-read-empty">搵唔到符合條件嘅商品。</div>:<div className="admin-product-list">
+    {filtersApplied?<div className="admin-product-filter-summary"><span><b>已套用篩選</b> · {filtered.length} 件商品</span><button type="button" onClick={()=>setFiltersApplied(false)}>修改篩選</button></div>:null}
+
+    {filtered.length===0?<div className="admin-read-empty admin-product-results" data-mobile-ready={filtersApplied?'true':'false'}>搵唔到符合條件嘅商品。</div>:<div className={'admin-product-list admin-product-results '+(expandedId?'has-focused-product':'')} data-mobile-ready={filtersApplied?'true':'false'}>
       <header className="admin-product-list-head"><span>商品</span><span>分類</span><span>售價</span><span>狀態</span><span></span></header>
       {pageRows.map(row=>{
         const expanded=expandedId===row.id;
@@ -376,7 +393,7 @@ export function ProductsWorkspace(){
         const boundGroups=optionCenter.productLinks.filter(link=>link.productId===row.id);
         const print=currentPrint(row.id);
         const media=currentMedia(row.id,row.imageRef);
-        return <article className={'admin-product-row '+(expanded?'is-open':'')} key={row.id}>
+        return <article className={'admin-product-row '+(expanded?'is-open':expandedId?'is-background':'')} key={row.id}>
           <div className="admin-product-summary">
             <div className="admin-product-identity"><b>{row.name||'未命名商品'}</b><small>{row.productCode||row.id}{row.legacyBarcode?' · '+row.legacyBarcode:''}</small></div>
             <span className="admin-product-category">{categoryName.get(row.categoryId)??'未分類'}</span>
@@ -393,10 +410,19 @@ export function ProductsWorkspace(){
   </section>;
 }
 
+const OPTION_GUIDED_STEPS:readonly AdminGuidedStep[]=[
+  {id:'setup',label:'基本規則',summary:'先確認名稱、必選方式同選擇上限'},
+  {id:'options',label:'子選項',summary:'加入顧客或員工實際會揀嘅項目'},
+  {id:'mapping',label:'套用商品',summary:'選擇呢組選項會出現喺邊啲商品'},
+  {id:'review',label:'檢查',summary:'核對狀態，再使用頁頂保存'},
+];
+
 export function ModifiersWorkspace(){
   const {draft}=useAdminDraft();
   const optionCenter=useOptionSetCenter(draft);
   const [query,setQuery]=useState('');
+  const [selectedSetId,setSelectedSetId]=useState<string|null>(null);
+  const [activeStep,setActiveStep]=useState<'setup'|'options'|'mapping'|'review'>('setup');
   const [mappingQueryBySet,setMappingQueryBySet]=useState<Record<string,string>>({});
   const [activeProductLinks,setActiveProductLinks]=useState<readonly ProductOptionSetLink[]>(()=>readActiveProductOptionLinks());
   const token=query.trim().toLowerCase();
@@ -435,8 +461,15 @@ export function ModifiersWorkspace(){
       <span>{rows.length} 個選項組</span>
     </div>
 
-    {rows.length===0?<div className="admin-read-empty">未有選項組。撳「新增選項組」，例如先建立「飯量」或者「青瓜」；建立後展開組別，再撳「新增子選項」。</div>:<div className="admin-option-set-list">
-      {rows.map(set=>{
+    {rows.length===0?<div className="admin-read-empty">未有選項組。撳「新增選項組」，例如先建立「飯量」或者「青瓜」。</div>:selectedSetId===null?<AdminGuidedPanel eyebrow="步驟 1" title="先揀一個選項組" instruction="揀定工作對象後，系統先會顯示規則設定；子選項同商品映射會喺完成前一步後先出現。">
+      <div className="admin-selection-list">{rows.map(set=>{
+        const linkedProducts=optionCenter.productLinks.filter(link=>link.setId===set.id).length;
+        return <button type="button" className="admin-selection-card" key={set.id} onClick={()=>{setSelectedSetId(set.id);setActiveStep('setup')}}>
+          <span><b>{set.name||'未命名選項組'}</b><small>{set.options.length} 個子選項 · {linkedProducts} 件商品使用</small></span><span>開始設定 →</span>
+        </button>;
+      })}</div>
+    </AdminGuidedPanel>:<div className="admin-option-set-list admin-guided-workflow">
+      {optionCenter.sets.filter(set=>set.id===selectedSetId).map(set=>{
         const requirement=set.required?'REQUIRED':set.forceShow?'OPTIONAL_FORCE_SHOW':'OPTIONAL';
         const currentLinkedIds=new Set(optionCenter.productLinks.filter(link=>link.setId===set.id).map(link=>link.productId));
         const savedLinkedIds=new Set(activeProductLinks.filter(link=>link.setId===set.id).map(link=>link.productId));
@@ -456,12 +489,17 @@ export function ModifiersWorkspace(){
         const orphanProducts=activeProducts.filter(product=>!knownCategoryIds.has(product.categoryId))
           .filter(product=>!mappingToken||[product.name,product.productCode,product.legacyBarcode].filter(Boolean).join(' ').toLowerCase().includes(mappingToken));
 
-        return <details className="admin-option-group-card" key={set.id}>
-          <summary>
+        const setupBlocker=!set.name.trim()?'請先填寫選項組名稱。':set.max<set.min?'最多選擇唔可以少過最少選擇。':set.required&&set.min<1?'必選組最少要揀 1 項。':set.selection==='SINGLE'&&set.max>1?'單選組最多只可以揀 1 項。':'';
+        const optionBlocker=set.options.some(option=>!option.code.trim()||!option.name.trim()||option.priceAdjustment.trim()===''||!Number.isFinite(Number(option.priceAdjustment)))?'請完成每個子選項嘅 ID、名稱同有效價錢。':'';
+        return <article className="admin-option-group-card is-guided" key={set.id}>
+          <header className="admin-guided-object-head">
+            <button type="button" onClick={()=>setSelectedSetId(null)}>← 轉另一個選項組</button>
             <span><b>{set.name||'未命名選項組'}</b><small>{set.id} · {set.options.length} 個子選項 · {linkedProducts} 件商品使用</small></span>
             <span>{requirement==='REQUIRED'?'必選':requirement==='OPTIONAL_FORCE_SHOW'?'可選但必須顯示':'一般可選'}</span>
-          </summary>
+          </header>
+          <AdminGuidedProgress steps={OPTION_GUIDED_STEPS} currentStep={activeStep} onStepChange={stepId=>setActiveStep(stepId as typeof activeStep)} label="選項組設定進度"/>
           <div className="admin-option-group-body">
+            {activeStep==='setup'?<AdminGuidedPanel eyebrow="目前步驟 · 1 / 4" title="設定選項組規則" instruction="先決定呢組選項點樣出現同可以揀幾多項；完成前唔會顯示子選項。">
             <div className="admin-form-grid three">
               <label><span>選項組名稱 *</span><input value={set.name} onChange={event=>optionCenter.updateSet(set.id,{name:event.target.value})} placeholder="例如：飯量／青瓜"/></label>
               <label><span>要求方式</span><select value={requirement} onChange={event=>{const mode=event.target.value;optionCenter.updateSet(set.id,{required:mode==='REQUIRED',forceShow:mode!=='OPTIONAL',min:mode==='REQUIRED'?Math.max(1,set.min):0})}}><option value="REQUIRED">必選</option><option value="OPTIONAL_FORCE_SHOW">可選，但必須顯示一次</option><option value="OPTIONAL">一般可選</option></select></label>
@@ -470,7 +508,10 @@ export function ModifiersWorkspace(){
               <label><span>最多選擇</span><input type="number" min={0} value={set.max} onChange={event=>optionCenter.updateSet(set.id,{max:Number(event.target.value)||0})}/></label>
               <Toggle checked={set.allowQuantities} onChange={allowQuantities=>optionCenter.updateSet(set.id,{allowQuantities})} label="同一子選項可重覆數量"/>
             </div>
+            <AdminStepActions onNext={()=>setActiveStep('options')} disabledReason={setupBlocker||undefined}/>
+            </AdminGuidedPanel>:null}
 
+            {activeStep==='options'?<AdminGuidedPanel eyebrow="目前步驟 · 2 / 4" title="加入子選項" instruction="只處理顧客或員工實際會揀嘅選項；完成後先進入商品映射。">
             <section className="admin-sub-editor">
               <header><b>組內選項</b><button type="button" onClick={()=>optionCenter.addChild(set.id)}>＋ 新增子選項</button></header>
               {set.options.length===0?<p>未有子選項。例：「青瓜」可以加入多青瓜／少青瓜／走青瓜。</p>:<div className="admin-option-child-table">
@@ -485,9 +526,11 @@ export function ModifiersWorkspace(){
                 </article>)}
               </div>}
             </section>
+            <AdminStepActions onBack={()=>setActiveStep('setup')} onNext={()=>setActiveStep('mapping')} disabledReason={optionBlocker||undefined}/>
+            </AdminGuidedPanel>:null}
 
-            <details className="admin-option-bulk-map">
-              <summary><span><b>批量映射商品</b><small>全選／整個分類／分類內自選／跨分類自選</small></span><span>{linkedProducts} 件已選</span></summary>
+            {activeStep==='mapping'?<AdminGuidedPanel eyebrow="目前步驟 · 3 / 4" title="套用到商品" instruction="揀呢組選項會出現喺邊啲商品；未揀任何商品都係如實保留為 0 件，唔會假裝完成連線。">
+            <section className="admin-option-bulk-map is-guided">
               <div className="admin-option-bulk-body">
                 <div className="admin-option-bulk-stats">
                   <article><span>已選商品</span><strong>{linkedProducts}</strong></article>
@@ -540,14 +583,24 @@ export function ModifiersWorkspace(){
                   {mappingToken&&categoryRows.length===0&&orphanProducts.length===0?<div className="admin-read-empty">搵唔到符合搜尋條件嘅商品。</div>:null}
                 </div>}
               </div>
-            </details>
+            </section>
+            <AdminStepActions onBack={()=>setActiveStep('options')} onNext={()=>setActiveStep('review')} nextLabel="檢查設定"/>
+            </AdminGuidedPanel>:null}
 
+            {activeStep==='review'?<AdminGuidedPanel eyebrow="目前步驟 · 4 / 4" title="檢查選項組" instruction="以下係目前草稿摘要。呢一步唔代表已保存；要建立正式 revision，請使用頁頂「保存設定」。" tone={optionCenter.errors.length?'warning':'success'}>
+            <div className="admin-guided-review-grid">
+              <article><span>規則</span><b>{requirement==='REQUIRED'?'必選':requirement==='OPTIONAL_FORCE_SHOW'?'可選但必須顯示':'一般可選'} · {set.selection==='SINGLE'?'單選':'多選'}</b><small>最少 {set.min}／最多 {set.max}</small></article>
+              <article><span>子選項</span><b>{set.options.length} 項</b><small>{optionBlocker||'目前欄位格式完整'}</small></article>
+              <article><span>商品映射</span><b>{linkedProducts} 件</b><small>保存時寫入現有 canonical links</small></article>
+            </div>
             <div className="admin-editor-actions">
               <Toggle checked={set.active} onChange={active=>optionCenter.updateSet(set.id,{active})} label={set.active?'啟用選項組':'停用選項組'}/>
-              <button type="button" disabled={linkedProducts>0} title={linkedProducts>0?'仍有商品使用呢個選項組':''} onClick={()=>optionCenter.removeSet(set.id)}>刪除選項組</button>
+              <button type="button" disabled={linkedProducts>0} title={linkedProducts>0?'仍有商品使用呢個選項組':''} onClick={()=>{optionCenter.removeSet(set.id);setSelectedSetId(null)}}>刪除選項組</button>
             </div>
+            <AdminStepActions onBack={()=>setActiveStep('mapping')} onNext={()=>setSelectedSetId(null)} nextLabel="完成，返回選項組列表" disabledReason={(setupBlocker||optionBlocker)||undefined}/>
+            </AdminGuidedPanel>:null}
           </div>
-        </details>;
+        </article>;
       })}
     </div>}
   </section>;
@@ -609,6 +662,14 @@ export function PricingWorkspace(){
   </section>;
 }
 
+const COMBO_GUIDED_STEPS:readonly AdminGuidedStep[]=[
+  {id:'basics',label:'套餐資料',summary:'先確認名稱、基本價同狀態'},
+  {id:'main',label:'飯糰',summary:'選擇飯糰主食 Pool'},
+  {id:'snack',label:'小食',summary:'選擇共用小食 Pool'},
+  {id:'drink',label:'飲品',summary:'選擇共用飲品 Pool'},
+  {id:'review',label:'檢查',summary:'核對組合，再使用頁頂保存'},
+];
+
 export function CombosWorkspace(){
   const {
     draft,addCombo,updateCombo,removeCombo,
@@ -618,6 +679,10 @@ export function CombosWorkspace(){
     addComboPoolChoice,updateComboPoolChoice,removeComboPoolChoice,moveComboPoolChoice,
   }=useAdminDraft();
   const optionCenter=useOptionSetCenter(draft);
+  const [focusArea,setFocusArea]=useState<'combo'|'pool'|null>(null);
+  const [selectedComboId,setSelectedComboId]=useState<string|null>(null);
+  const [selectedPoolId,setSelectedPoolId]=useState<string|null>(null);
+  const [comboStep,setComboStep]=useState<'basics'|'main'|'snack'|'drink'|'review'>('basics');
   const pools=draft.comboPools??[];
   const mainPools=pools.filter(pool=>pool.kind==='MAIN_COURSE');
   const snackPools=pools.filter(pool=>pool.kind==='ADDON'&&pool.addonKind==='SNACK');
@@ -645,9 +710,19 @@ export function CombosWorkspace(){
       <article><span>套餐</span><strong>{draft.combos.length}</strong><small>引用 Pool，唔複製商品</small></article>
     </section>
 
-    <section className="admin-sub-editor">
-      <header><div><b>套餐商品</b><small>A/B/C/D 各自指定一個飯糰 Pool，再共用小食 Pool 同飲品 Pool。</small></div><button type="button" onClick={addCombo}>＋ 新增套餐</button></header>
-      {draft.combos.length===0?<div className="admin-read-empty">未有套餐。</div>:<div className="admin-combo-list">{draft.combos.map(combo=>{
+    {focusArea===null?<AdminGuidedPanel eyebrow="先揀工作" title="今次想處理邊一部分？" instruction="套餐組合與 Pool 內容分開處理，避免一次出現兩套設定。">
+      <div className="admin-task-picker">
+        <button type="button" onClick={()=>setFocusArea('combo')}><b>設定套餐組合</b><small>按次序設定套餐資料、飯糰、小食同飲品</small></button>
+        <button type="button" onClick={()=>setFocusArea('pool')}><b>管理 Reusable Pools</b><small>編輯飯糰、小食或飲品 Pool 入面嘅分組同成員</small></button>
+      </div>
+    </AdminGuidedPanel>:null}
+
+    {focusArea==='combo'?<section className="admin-sub-editor admin-guided-workflow">
+      <header><div><button type="button" onClick={()=>{setFocusArea(null);setSelectedComboId(null)}}>← 返回工作選擇</button><b>套餐商品</b><small>一次設定一個套餐；完成飯糰先會進入小食，再進入飲品。</small></div><button type="button" onClick={addCombo}>＋ 新增套餐</button></header>
+      {draft.combos.length===0?<div className="admin-read-empty">未有套餐。</div>:selectedComboId===null?<AdminGuidedPanel eyebrow="步驟 1" title="先揀一個套餐" instruction="揀定套餐後先會顯示第一步資料，其他 Pool 設定唔會同時展開。"><div className="admin-selection-list">{draft.combos.map(combo=>{
+        const mainPool=combo.mainPoolId?poolById.get(combo.mainPoolId):undefined;
+        return <button type="button" className="admin-selection-card" key={combo.id} onClick={()=>{setSelectedComboId(combo.id);setComboStep('basics')}}><span><b>{combo.name||'未命名套餐'}</b><small>HK${Number(combo.basePrice||0).toFixed(2)} · {mainPool?.name??'未設定飯糰 Pool'}</small></span><span>開始設定 →</span></button>;
+      })}</div></AdminGuidedPanel>:<div className="admin-combo-list">{draft.combos.filter(combo=>combo.id===selectedComboId).map(combo=>{
         const mainPool=combo.mainPoolId?poolById.get(combo.mainPoolId):undefined;
         const snackPoolId=(combo.addonPoolIds??[]).find(id=>poolById.get(id)?.addonKind==='SNACK')??'';
         const drinkPoolId=(combo.addonPoolIds??[]).find(id=>poolById.get(id)?.addonKind==='DRINK')??'';
@@ -655,32 +730,32 @@ export function CombosWorkspace(){
           const addonKind=poolById.get(id)?.addonKind;
           return addonKind!=='SNACK'&&addonKind!=='DRINK';
         });
-        return <article className="admin-combo-card" key={combo.id}>
+        const basicsBlocker=!combo.name.trim()?'請先填寫套餐名稱。':combo.basePrice.trim()!==''&&(!Number.isFinite(Number(combo.basePrice))||Number(combo.basePrice)<0)?'基本價必須係 0 或以上嘅有效數字。':'';
+        return <article className="admin-combo-card is-guided" key={combo.id}>
           <header className="admin-combo-head">
-            <div><small>{combo.id}</small><h2>{combo.name||'未命名套餐'}</h2><span>{'基本價 HK$'+Number(combo.basePrice||0).toFixed(2)+' · 主食：'+(mainPool?.name??'未設定')+' · 小食：'+(poolById.get(snackPoolId)?.name??'未設定')+' · 飲品：'+(poolById.get(drinkPoolId)?.name??'未設定')}</span></div>
-            <div className="admin-editor-actions"><Toggle checked={combo.active} onChange={active=>updateCombo(combo.id,{active})} label={combo.active?'啟用':'停用'}/><button type="button" onClick={()=>removeCombo(combo.id)}>刪除套餐</button></div>
+            <div><button type="button" onClick={()=>setSelectedComboId(null)}>← 轉另一個套餐</button><small>{combo.id}</small><h2>{combo.name||'未命名套餐'}</h2><span>{'主食：'+(mainPool?.name??'未設定')+' · 小食：'+(poolById.get(snackPoolId)?.name??'未設定')+' · 飲品：'+(poolById.get(drinkPoolId)?.name??'未設定')}</span></div>
           </header>
-          <div className="admin-form-grid four">
-            <label><span>套餐名稱</span><input value={combo.name} onChange={event=>updateCombo(combo.id,{name:event.target.value})}/></label>
-            <label><span>基本價 HK$</span><input inputMode="decimal" value={combo.basePrice} onChange={event=>updateCombo(combo.id,{basePrice:event.target.value})}/></label>
-            <label><span>飯糰主食 Pool</span><select value={combo.mainPoolId??''} onChange={event=>updateCombo(combo.id,{mainPoolId:event.target.value||undefined})}><option value="">未設定</option>{mainPools.map(pool=><option key={pool.id} value={pool.id}>{pool.name}</option>)}</select></label>
-            <label><span>共用小食 Pool</span><select value={snackPoolId} onChange={event=>updateCombo(combo.id,{addonPoolIds:Array.from(new Set([...otherAddonIds,...(event.target.value?[event.target.value]:[]),...(drinkPoolId?[drinkPoolId]:[])]))})}><option value="">未設定</option>{snackPools.map(pool=><option key={pool.id} value={pool.id}>{pool.name}</option>)}</select></label>
-            <label><span>共用飲品 Pool</span><select value={drinkPoolId} onChange={event=>updateCombo(combo.id,{addonPoolIds:Array.from(new Set([...otherAddonIds,...(snackPoolId?[snackPoolId]:[]),...(event.target.value?[event.target.value]:[])]))})}><option value="">未設定</option>{drinkPools.map(pool=><option key={pool.id} value={pool.id}>{pool.name}</option>)}</select></label>
-          </div>
+          <AdminGuidedProgress steps={COMBO_GUIDED_STEPS} currentStep={comboStep} onStepChange={stepId=>setComboStep(stepId as typeof comboStep)} label="套餐設定進度"/>
+          {comboStep==='basics'?<AdminGuidedPanel eyebrow="目前步驟 · 1 / 5" title="先確認套餐資料" instruction="名稱係現有必填資料；完成後先進入飯糰 Pool。"><div className="admin-form-grid two"><label><span>套餐名稱 *</span><input value={combo.name} onChange={event=>updateCombo(combo.id,{name:event.target.value})}/></label><label><span>基本價 HK$</span><input inputMode="decimal" value={combo.basePrice} onChange={event=>updateCombo(combo.id,{basePrice:event.target.value})}/></label><Toggle checked={combo.active} onChange={active=>updateCombo(combo.id,{active})} label={combo.active?'啟用':'停用'}/></div><AdminStepActions onNext={()=>setComboStep('main')} disabledReason={basicsBlocker||undefined}/></AdminGuidedPanel>:null}
+          {comboStep==='main'?<AdminGuidedPanel eyebrow="目前步驟 · 2 / 5" title="選擇飯糰主食 Pool" instruction="只顯示飯糰設定。現有 contract 允許未設定，所以你可以如實略過，唔會假裝已選。"><label className="admin-guided-choice-field"><span>飯糰主食 Pool</span><select value={combo.mainPoolId??''} onChange={event=>updateCombo(combo.id,{mainPoolId:event.target.value||undefined})}><option value="">暫時未設定</option>{mainPools.map(pool=><option key={pool.id} value={pool.id}>{pool.name}</option>)}</select></label><AdminStepActions onBack={()=>setComboStep('basics')} onNext={()=>setComboStep('snack')} nextLabel={combo.mainPoolId?'完成飯糰，設定小食':'略過飯糰，設定小食'}/></AdminGuidedPanel>:null}
+          {comboStep==='snack'?<AdminGuidedPanel eyebrow="目前步驟 · 3 / 5" title="選擇共用小食 Pool" instruction="飯糰資料已收成摘要；而家只處理小食。未設定可以如實略過。"><label className="admin-guided-choice-field"><span>共用小食 Pool</span><select value={snackPoolId} onChange={event=>updateCombo(combo.id,{addonPoolIds:Array.from(new Set([...otherAddonIds,...(event.target.value?[event.target.value]:[]),...(drinkPoolId?[drinkPoolId]:[])]))})}><option value="">暫時未設定</option>{snackPools.map(pool=><option key={pool.id} value={pool.id}>{pool.name}</option>)}</select></label><AdminStepActions onBack={()=>setComboStep('main')} onNext={()=>setComboStep('drink')} nextLabel={snackPoolId?'完成小食，設定飲品':'略過小食，設定飲品'}/></AdminGuidedPanel>:null}
+          {comboStep==='drink'?<AdminGuidedPanel eyebrow="目前步驟 · 4 / 5" title="選擇共用飲品 Pool" instruction="之前步驟只保留摘要；而家只處理飲品。"><label className="admin-guided-choice-field"><span>共用飲品 Pool</span><select value={drinkPoolId} onChange={event=>updateCombo(combo.id,{addonPoolIds:Array.from(new Set([...otherAddonIds,...(snackPoolId?[snackPoolId]:[]),...(event.target.value?[event.target.value]:[])]))})}><option value="">暫時未設定</option>{drinkPools.map(pool=><option key={pool.id} value={pool.id}>{pool.name}</option>)}</select></label><AdminStepActions onBack={()=>setComboStep('snack')} onNext={()=>setComboStep('review')} nextLabel="檢查套餐"/></AdminGuidedPanel>:null}
+          {comboStep==='review'?<AdminGuidedPanel eyebrow="目前步驟 · 5 / 5" title="檢查套餐組合" instruction="以下係目前草稿，唔代表已保存或 SMT 已套用；正式狀態仍以頁頂保存及 readback 為準。" tone="success"><div className="admin-guided-review-grid"><article><span>基本資料</span><b>{combo.name}</b><small>HK${Number(combo.basePrice||0).toFixed(2)} · {combo.active?'啟用':'停用'}</small></article><article><span>飯糰</span><b>{mainPool?.name??'未設定'}</b></article><article><span>小食</span><b>{poolById.get(snackPoolId)?.name??'未設定'}</b></article><article><span>飲品</span><b>{poolById.get(drinkPoolId)?.name??'未設定'}</b></article></div><div className="admin-editor-actions"><button type="button" onClick={()=>{removeCombo(combo.id);setSelectedComboId(null)}}>刪除套餐</button></div><AdminStepActions onBack={()=>setComboStep('drink')} onNext={()=>setSelectedComboId(null)} nextLabel="完成，返回套餐列表" disabledReason={basicsBlocker||undefined}/></AdminGuidedPanel>:null}
         </article>;
       })}</div>}
-    </section>
+    </section>:null}
 
-    <section className="admin-sub-editor">
-      <header><div><b>Reusable Pools</b><small>每個子 Pool 自己擁有商品／選擇清單；價錢同成員唔再分開平鋪。</small></div><div className="admin-editor-actions"><button type="button" onClick={()=>addComboPool('MAIN_COURSE')}>＋ 飯糰 Pool</button><button type="button" onClick={()=>addComboPool('ADDON','SNACK')}>＋ 小食 Pool</button><button type="button" onClick={()=>addComboPool('ADDON','DRINK')}>＋ 飲品 Pool</button></div></header>
-      {pools.length===0?<div className="admin-read-empty">未有 Pool。</div>:<div className="admin-combo-pool-list">{pools.map(pool=>{
+    {focusArea==='pool'?<section className="admin-sub-editor admin-guided-workflow">
+      <header><div><button type="button" onClick={()=>{setFocusArea(null);setSelectedPoolId(null)}}>← 返回工作選擇</button><b>Reusable Pools</b><small>先揀 Pool；畫面只會保留一個 Pool 編輯器。</small></div><div className="admin-editor-actions"><button type="button" onClick={()=>addComboPool('MAIN_COURSE')}>＋ 飯糰 Pool</button><button type="button" onClick={()=>addComboPool('ADDON','SNACK')}>＋ 小食 Pool</button><button type="button" onClick={()=>addComboPool('ADDON','DRINK')}>＋ 飲品 Pool</button></div></header>
+      {pools.length===0?<div className="admin-read-empty">未有 Pool。</div>:selectedPoolId===null?<AdminGuidedPanel eyebrow="揀選 Pool" title="今次要修改邊個 Pool？" instruction="只會打開你揀嘅 Pool；其他 Pool 保留成摘要。"><div className="admin-selection-list">{pools.map(pool=>{const usedBy=draft.combos.filter(combo=>combo.mainPoolId===pool.id||(combo.addonPoolIds??[]).includes(pool.id));return <button type="button" className="admin-selection-card" key={pool.id} onClick={()=>setSelectedPoolId(pool.id)}><span><b>{pool.name}</b><small>{pool.groups.length} 個分組 · {usedBy.length} 個套餐使用</small></span><span>編輯 →</span></button>})}</div></AdminGuidedPanel>:<div className="admin-combo-pool-list">{pools.filter(pool=>pool.id===selectedPoolId).map(pool=>{
         const usedBy=draft.combos.filter(combo=>combo.mainPoolId===pool.id||(combo.addonPoolIds??[]).includes(pool.id));
         const poolTypeLabel=pool.kind==='MAIN_COURSE'?'飯糰主食 Pool':pool.addonKind==='DRINK'?'飲品 Pool':'小食 Pool';
-        return <details className="admin-combo-pool-card" key={pool.id}>
-          <summary>
+        return <article className="admin-combo-pool-card is-guided" key={pool.id}>
+          <header className="admin-guided-object-head">
+            <button type="button" onClick={()=>setSelectedPoolId(null)}>← 轉另一個 Pool</button>
             <span><b>{pool.name}</b><small>{poolTypeLabel} · {pool.groups.length} 個大分組 · {usedBy.length} 個套餐使用</small></span>
             <span>{pool.active?'啟用':'停用'}</span>
-          </summary>
+          </header>
           <div className="admin-combo-pool-body">
             <div className="admin-form-grid three">
               <label><span>Pool 名稱</span><input value={pool.name} onChange={event=>updateComboPool(pool.id,{name:event.target.value})}/></label>
@@ -746,11 +821,11 @@ export function CombosWorkspace(){
               </article>)}
             </section>
 
-            <div className="admin-editor-actions"><button type="button" disabled={usedBy.length>0} title={usedBy.length?'仍有套餐引用呢個 Pool':''} onClick={()=>removeComboPool(pool.id)}>刪除 Pool</button></div>
+            <div className="admin-editor-actions"><button type="button" disabled={usedBy.length>0} title={usedBy.length?'仍有套餐引用呢個 Pool':''} onClick={()=>{removeComboPool(pool.id);setSelectedPoolId(null)}}>刪除 Pool</button></div>
           </div>
-        </details>;
+        </article>;
       })}</div>}
-    </section>
+    </section>:null}
   </section>;
 }
 

@@ -19,11 +19,12 @@ describe('Admin UI recomposition',()=>{
     expect(html).toContain('/admin/publish');
   });
 
-  it('keeps each page and nested product editors collapsed until requested',()=>{
+  it('keeps the route workspace visible and progressively reveals nested product editors',()=>{
     const page=render('/admin/catalog/products');
     expect(page).toContain('class="mfk-admin-focus-workspace"');
-    expect(page).not.toContain('class="mfk-admin-focus-workspace" open=""');
-    expect(page).not.toContain('class="admin-product-section" open=""');
+    expect(page).toContain('class="mfk-admin-focus-header"');
+    expect(page).not.toContain('<details class="mfk-admin-focus-workspace"');
+    expect(page).not.toContain('商品詳細資料');
   });
 
   it('bounds the initial pricing editor and names every visible price field',()=>{

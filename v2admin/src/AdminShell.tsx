@@ -132,17 +132,16 @@ export function AdminShell({children}:{children:ReactNode}){
       </section>
 
       <div className="mfk-admin-workspace">
-        <details className="mfk-admin-focus-workspace" key={location.pathname}>
-          <summary>
+        <section className="mfk-admin-focus-workspace" key={location.pathname} aria-labelledby="mfk-admin-workspace-title">
+          <header className="mfk-admin-focus-header">
             <div className="mfk-admin-focus-copy">
               <span>{activeGroup.label}</span>
-              <h1>{active?.label??'管理後台'}</h1>
-              <p>{active?.purpose??'按需要打開工作區。'}</p>
+              <h1 id="mfk-admin-workspace-title">{active?.label??'管理後台'}</h1>
+              <p>{active?.purpose??'完成目前任務後，系統會清楚提示下一步。'}</p>
             </div>
-            <span className="mfk-admin-focus-action" aria-hidden="true"><span className="when-closed">打開</span><span className="when-open">收起</span><i>⌄</i></span>
-          </summary>
+          </header>
           <div className="mfk-admin-focus-body">{children}</div>
-        </details>
+        </section>
       </div>
     </main>
 
