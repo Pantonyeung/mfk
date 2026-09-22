@@ -1,0 +1,128 @@
+MFK 航海圖 V1.20｜Round021｜2026-09-22
+主題：ADMIN PRODUCT LIST UX REWORK DEPLOYED / OWNER REVIEW
+狀態：CURRENT / CONTROLLING
+CONTROL：#22
+PARENT：#45
+ACTIVE UX ISSUE：#50
+
+==================================================
+0. OWNER UX STANDARD
+==================================================
+
+正式操作頁：
+
+DEFAULT = CLEAN / SUMMARY FIRST
+
+需要時：
+EXPAND DETAIL
+
+禁止：
+200+ FULL EDITOR CARDS
+無限長操作頁
+非必要資料預設全開
+
+==================================================
+1. PRODUCT PAGE REWORK
+==================================================
+
+商品資料：
+
+Default:
+compact summary list
+
+Page size:
+20
+
+Filters:
+name / code / barcode / SKU
+category
+active / inactive
+
+Summary:
+name
+code / barcode
+category
+price
+status
+modifier count
+
+Detail:
+press 編輯
+→ one product expands
+
+Detailed fields remain complete.
+
+Mobile:
+compact responsive layout.
+
+==================================================
+2. PROOF
+==================================================
+
+Source verification:
+35689711947 SUCCESS
+
+Test:
+GREEN
+
+Build:
+GREEN
+
+Clean landing:
+43f373a23198942837e537623e578584bbe52ff8
+0ade0b1ede925abfdb310db1031e78cd7c7a2139
+41bcdcd06c6b0f5bbc196baad96b3101f5be2f8c
+
+Deploy:
+35689795493 SUCCESS
+
+Canonical:
+https://admin.morefunos.com/admin/catalog/products
+
+==================================================
+3. STATE
+==================================================
+
+MFK_ADMIN_PRODUCT_LIST_UX_DEPLOYED_OWNER_REVIEW_PENDING
+
+==================================================
+4. EXACT NEXT
+==================================================
+
+Owner refresh Product page.
+
+Accept only if:
+
+default compact
+<=20 summaries
+filter/search usable
+one detail expands on demand
+pagination works
+mobile clean
+
+If GREEN:
+BANK #50
+continue #45 walkthrough
+
+If RED:
+STOP on exact first break
+
+==================================================
+5. HOLD
+==================================================
+
+#44 Admin→SMT:
+HOLD
+
+#40 SMT OTA:
+HOLD
+
+Keeta live:
+NOT AUTHORIZED
+
+SMM / Customer / Owner live:
+NOT AUTHORIZED
+
+==================================================
+END ROUND021
+==================================================
