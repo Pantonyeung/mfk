@@ -59,6 +59,17 @@ export interface AdminRelease{
   readonly reason?:string;
 }
 const RELEASE_KEY='releases.v1';
+const ACTIVE_RELEASE_KEY='active-release.v1';
+
+export interface ActiveAdminReleaseRef{
+  readonly version:number;
+  readonly createdAt:string;
+  readonly fingerprint:string;
+}
+
+export function readActiveAdminRelease(){
+  return readAdminStored<ActiveAdminReleaseRef|null>(ACTIVE_RELEASE_KEY,null);
+}
 
 function fnv1a(value:string){
   let hash=0x811c9dc5;
@@ -88,12 +99,13 @@ export function createAdminRelease(snapshot:unknown,reason?:string){
     ...(reason?.trim()?{reason:reason.trim()}:{}),
   });
   writeAdminStored(RELEASE_KEY,[row,...rows].slice(0,200));
-  appendAdminAudit({action:'建立設定版本',target:'Admin 設定 R'+version,after:{version,fingerprint},reason});
+  writeAdminStored<ActiveAdminReleaseRef>(ACTIVE_RELEASE_KEY,{version,createdAt,fingerprint});
+  appendAdminAudit({action:'保存並啟用設定版本',target:'Admin 設定 R'+version,after:{version,fingerprint},reason});
   if(typeof window!=='undefined')window.dispatchEvent(new CustomEvent('mfk-admin-release'));
   return row;
 }
 
 export function restoreAdminReleaseAsDraft<T>(release:AdminRelease):T{
-  appendAdminAudit({action:'由歷史版本建立新草稿',target:'Admin 設定 R'+release.version,before:{version:release.version,fingerprint:release.fingerprint}});
+  appendAdminAudit({action:'讀取歷史版本作還原',target:'Admin 設定 R'+release.version,before:{version:release.version,fingerprint:release.fingerprint}});
   return structuredClone(release.snapshot) as T;
 }
