@@ -2,6 +2,8 @@ import {useCallback,useEffect,useMemo,useState} from 'react';
 import {useSearchParams} from 'react-router';
 import type {CleanSmtCoreRuntimePort,SmtOrdersProjection,SmtReprintOption} from '../runtime/local-runtime.ts';
 import {hasStaffPermission} from '../runtime/staff-auth.ts';
+import {readSmtQuickReasons,readSmtStoreSettings} from '../runtime/admin-operational-config.ts';
+import {subscribeSmtAdminConfig} from '../runtime/admin-config-sync.ts';
 import './orders-workspace.css';
 
 type PaymentFilter='全部'|'現金'|'Alipay'|'WeChat Pay'|'FPS / PayMe';
@@ -25,6 +27,12 @@ function paymentMatches(label:string,filter:PaymentFilter){
 export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePort}){
   const canReview=hasStaffPermission('ORDER_REVIEW');
   const canCorrect=hasStaffPermission('ORDER_CORRECTION');
+  const [configRevision,setConfigRevision]=useState(0);
+  useEffect(()=>subscribeSmtAdminConfig(()=>setConfigRevision(value=>value+1)),[]);
+  void configRevision;
+  const storeSettings=readSmtStoreSettings();
+  const cancelReasons=readSmtQuickReasons('CANCEL');
+  const reprintReasons=readSmtQuickReasons('REPRINT');
   const [params]=useSearchParams();
   const initialOrderId=params.get('orderId')??undefined;
   const [snapshot,setSnapshot]=useState<SmtOrdersProjection|null>(null);
@@ -39,6 +47,8 @@ export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePor
   const [selectedJobs,setSelectedJobs]=useState<Set<string>>(new Set());
   const [reprintBusy,setReprintBusy]=useState(false);
   const [editLines,setEditLines]=useState<{id:string;name:string;qty:number;unitMinor:number}[]>([]);
+  const [cancelReason,setCancelReason]=useState('');
+  const [reprintReason,setReprintReason]=useState('');
 
   const load=useCallback(async(selectedOrderId?:string,silent=false)=>{
     if(!runtime.readOrders){setError('ORDERS_PROVIDER_UNAVAILABLE');return;}
@@ -76,7 +86,7 @@ export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePor
   },[allItems,history]);
 
   useEffect(()=>{
-    setModal(null);setMessage(null);setReprintOptions([]);setSelectedJobs(new Set());
+    setModal(null);setMessage(null);setReprintOptions([]);setSelectedJobs(new Set());setCancelReason('');setReprintReason('');
     if(selected)setEditLines(selected.lines.map(line=>({
       id:line.id,name:line.name,qty:line.quantity,
       unitMinor:Math.round(Number(line.unitLabel.replace(/[^0-9.]/g,''))*100)
@@ -103,7 +113,7 @@ export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePor
     if(!selected||!runtime.reprintOrderJobs||!selectedJobs.size||reprintBusy)return;
     setReprintBusy(true);setMessage(null);
     try{
-      const result=await runtime.reprintOrderJobs(selected.orderId,[...selectedJobs]);
+      const result=await runtime.reprintOrderJobs(selected.orderId,[...selectedJobs],reprintReason.trim()||undefined);
       setMessage(result.failed===0?'重印已送出 '+result.sent+'/'+result.planned:'重印部分失敗 '+result.sent+'/'+result.planned);
       setModal(null);
     }catch(cause){setMessage(cause instanceof Error?cause.message:'REPRINT_FAILED');}
@@ -123,7 +133,7 @@ export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePor
     if(!canCorrect){setMessage('你冇訂單更正權限。');return;}
     if(!selected||!runtime.cancelOrder)return;
     try{
-      await runtime.cancelOrder(selected.orderId);
+      await runtime.cancelOrder(selected.orderId,cancelReason.trim()||undefined);
       await load(undefined,true);setMessage('訂單已取消；冇自動退款、重印或開錢箱。');setModal(null);
     }catch(cause){setMessage(cause instanceof Error?cause.message:'ORDER_CANCEL_FAILED');}
   };
@@ -172,7 +182,7 @@ export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePor
       </div>
       <div className="order-board-head">
         <span>{history?'歷史訂單':'進行中訂單'}　{filtered.length}</span>
-        <div><label>自動完成時間</label><b>30 分鐘</b><button>⚙ 現場設定</button></div>
+        <div><label>Admin 出餐計時</label><b>{storeSettings.fulfillmentMinutes} 分鐘</b><button disabled title="由 Admin 門店設定提供">Admin</button></div>
       </div>
 
       <div className="order-channel-grid">
@@ -215,6 +225,8 @@ export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePor
         {modal==='cancel'?<div className="order-cancel-body">
           <p>確定取消 {selected.orderIdLabel}？</p>
           <div className="order-cancel-warning">呢個本地動作只改訂單狀態；唔會自動退款、重印、開錢箱或通知外部平台。</div>
+          <label><span>原因（可選）</span><select value={cancelReason} onChange={event=>setCancelReason(event.target.value)}><option value="">唔填原因</option>{cancelReasons.map(reason=><option key={reason.id} value={reason.label}>{reason.label}</option>)}</select></label>
+          <label><span>自填原因（可選）</span><input value={cancelReason} onChange={event=>setCancelReason(event.target.value)} placeholder="Admin 快捷原因以外可自填"/></label>
           <footer><button onClick={()=>setModal(null)}>返回</button><button className="danger" onClick={()=>void cancelSelected()}>確認取消</button></footer>
         </div>:null}
 
@@ -226,6 +238,7 @@ export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePor
             <div className="order-reprint-options">{group.options.map(option=><label key={option.jobId}><input type="checkbox" checked={selectedJobs.has(option.jobId)} onChange={()=>toggleJob(option.jobId)}/><span><b>{option.label}</b><small>{option.detail??option.role}</small></span></label>)}</div>
           </details>)}</div>
           <div className="order-reprint-tools"><button onClick={()=>setSelectedJobs(new Set(reprintOptions.map(option=>option.jobId)))}>全部選擇</button><button onClick={()=>setSelectedJobs(new Set())}>清除</button></div>
+          <label><span>重印原因（可選）</span><select value={reprintReason} onChange={event=>setReprintReason(event.target.value)}><option value="">唔填原因</option>{reprintReasons.map(reason=><option key={reason.id} value={reason.label}>{reason.label}</option>)}</select></label>
           <footer><button onClick={()=>setModal(null)}>取消</button><button className="primary" disabled={!selectedJobs.size||reprintBusy} onClick={()=>void runReprint()}>{reprintBusy?'打印中…':'開始打印'}</button></footer>
         </div>:null}
       </section>

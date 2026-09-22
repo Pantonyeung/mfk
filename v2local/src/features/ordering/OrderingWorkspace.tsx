@@ -41,10 +41,10 @@ function ProductCard({product,actions,recentlyAdded}:{product:OrderingProductVie
   </article>;
 }
 
-function ServiceToggle({value,onChange}:{value:ServiceMode;onChange:(mode:ServiceMode)=>void}){
+function ServiceToggle({value,onChange,availability}:{value:ServiceMode;onChange:(mode:ServiceMode)=>void;availability:Readonly<{takeaway:boolean;dineIn:boolean}>}){
   return <div className="ordering-service-toggle" role="group" aria-label="全單用餐方式">
-    <button type="button" className={value==='takeaway'?'active':''} aria-pressed={value==='takeaway'} onClick={()=>onChange('takeaway')}>外賣</button>
-    <button type="button" className={value==='dine-in'?'active':''} aria-pressed={value==='dine-in'} onClick={()=>onChange('dine-in')}>堂食</button>
+    <button type="button" disabled={!availability.takeaway} className={value==='takeaway'?'active':''} aria-pressed={value==='takeaway'} onClick={()=>onChange('takeaway')}>外賣</button>
+    <button type="button" disabled={!availability.dineIn} className={value==='dine-in'?'active':''} aria-pressed={value==='dine-in'} onClick={()=>onChange('dine-in')}>堂食</button>
   </div>;
 }
 
@@ -92,6 +92,7 @@ function OrganizedCart({lines,highlightedLineId,actions,availability}:{lines:rea
 
 export function OrderingWorkspace({view,actions,centerPanel}:{view:OrderingWorkspaceViewModel;actions:OrderingWorkspaceActions;centerPanel?:{readonly title:string;readonly body:ReactNode;readonly onClose:()=>void}|null}){
   const availability=view.actionAvailability??{lineServiceMode:true,lineEdit:true,lineQuantity:true,holdCart:true,cancelCart:true};
+  const serviceModes=view.serviceModes??{takeaway:true,dineIn:true};
   return <div className={`ordering-workspace${centerPanel?' panel-open':''}`}>
     <header className="ordering-flow-strip">
       <QueueStrip title="待處理" kind="pending" orders={view.pendingOrders} onOpen={actions.onOpenQueueOrder}/>
@@ -104,9 +105,10 @@ export function OrderingWorkspace({view,actions,centerPanel}:{view:OrderingWorks
         <div className="ordering-center-panel-body">{centerPanel.body}</div>
       </section>:<>
         {view.menuRevisionLabel?<div className="ordering-menu-local-status"><b>{view.menuRevisionLabel}</b><span>本機 Admin → POS</span></div>:null}
-        <nav className="ordering-categories" aria-label="商品分類">
+        {view.operationalNotice?<div className="ordering-menu-local-status warning"><b>{view.operationalNotice}</b><span>Admin 營運提示</span></div>:null}
+        {view.showCategories===false?null:<nav className="ordering-categories" aria-label="商品分類">
           {view.categories.map(category=><button type="button" key={category.id} aria-pressed={view.selectedCategoryId===category.id} className={view.selectedCategoryId===category.id?'active':''} onClick={()=>actions.onSelectCategory(category.id)}>{category.label}</button>)}
-        </nav>
+        </nav>}
         <section className="ordering-product-grid">{view.products.map(product=><ProductCard key={product.id} product={product} actions={actions} recentlyAdded={view.recentlyAddedProductId===product.id}/>)}</section>
       </>}
     </main>
@@ -119,7 +121,7 @@ export function OrderingWorkspace({view,actions,centerPanel}:{view:OrderingWorks
             <button type="button" className={view.cart.viewMode==='original'?'active':''} aria-pressed={view.cart.viewMode==='original'} onClick={()=>actions.onChangeCartView('original')}>原單</button>
             <button type="button" className={view.cart.viewMode==='organized'?'active':''} aria-pressed={view.cart.viewMode==='organized'} onClick={()=>actions.onChangeCartView('organized')}>整理</button>
           </div>
-          <ServiceToggle value={view.cart.serviceMode} onChange={actions.onChangeServiceMode}/>
+          <ServiceToggle value={view.cart.serviceMode} onChange={actions.onChangeServiceMode} availability={serviceModes}/>
         </div>
       </header>
       <div className={`ordering-cart-lines ${view.cart.viewMode}`}>
