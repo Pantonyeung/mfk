@@ -3,7 +3,7 @@
 Status: CURRENT / CONTROLLING
 Protocol: #39
 Control: #22
-Updated: 2026-09-22 11:58 Asia/Hong_Kong
+Updated: 2026-09-22 12:00 Asia/Hong_Kong
 System: MFK ONLY
 
 ## 0. Mandatory read order
@@ -111,33 +111,63 @@ Milestone:
 MFK_ADMIN_MF01_LEGACY_MENU_REENTERED_DEPLOYED_GREEN
 
 Owner browser visual readback:
-PENDING
+GREEN
 
 ## 5. Exact NEXT
 
-Owner refreshes:
-https://admin.morefunos.com
+Owner has confirmed the imported menu is visible in live Admin.
 
-First verify:
-菜單 → 商品分類
-should show 14 categories.
+#42:
+BANKED / CLOSED
 
-Then:
-菜單 → 商品資料
-should show 203 products.
+Next is ONE A2 manual controlled transfer, but exact SMT base revision MUST be read first.
 
-Expected:
-- 188 active
-- 15 inactive retained
-- direct prices present on the 188 donor-visible products
+Step 1:
+SMT → More → Admin · Menu
+read:
+ACTIVE R?
 
-Do NOT publish to SMT yet.
+Step 2:
+Admin → 待發布變更
+set「門店目前版本」= exact SMT Active Revision
 
-After Owner visual readback:
-1. bank #41 Chinese UI if confirmed
-2. bank #42 menu re-entry if counts/content confirmed
-3. read SMT exact Active Revision
-4. only then resume one A2 cross-device change
+Step 3:
+檢查內容
+→ 確認影響範圍
+→ 建立並下載發布檔案
+
+Step 4:
+transfer SAME file to SMT
+→ 匯入 Admin A2 Bundle
+→ require apply/readback
+
+Step 5:
+download SMT readback file
+→ import to Admin
+→ 核對結果 = 一致
+
+A2 exact scope:
+- 14 active categories
+- 188 active/direct-visible products
+- product/category identity
+- labels
+- ordering
+- active projection
+
+A2 DOES NOT include:
+- price
+- modifier
+- combo
+- availability
+- print rules
+
+15 inactive donor products remain retained in Admin but are not projected.
+
+After MATCH:
+BANK A2 owner cross-device acceptance and STOP.
+
+Next separate seam after Owner decision:
+Pricing.
 
 ## 6. A3
 
