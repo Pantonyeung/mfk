@@ -1,4 +1,4 @@
 ADMIN_UI_REFRESH_R1_PREVIEW
 candidate=aa3c398ecea9caed28fffaeff4d88a1081ab4fd9
-mode=static-ui-acceptance
+mode=exact-candidate-test-then-static-preview
 production_traffic=unchanged
