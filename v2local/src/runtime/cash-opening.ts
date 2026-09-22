@@ -1,5 +1,6 @@
 import {readAdminSnapshotSection} from './admin-config-sync.ts';
 import {readActiveStaffSession,staffAuthRequired} from './staff-auth.ts';
+import {queueCashOpeningProjection} from './projection-outbox.ts';
 import {
   createLocalCashOpening,
   latestCashOpeningForBusinessDate,
@@ -77,6 +78,7 @@ export function confirmCashOpening(input:{
   });
   const rows=readLocalCashOpenings();
   writeLocalCashOpenings([row,...rows.filter(item=>item.businessDate!==row.businessDate)]);
+  queueCashOpeningProjection(row);
   emit();
   return row;
 }
