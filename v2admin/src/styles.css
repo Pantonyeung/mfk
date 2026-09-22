@@ -157,60 +157,6 @@
 }
 
 
-/* Product detail R2: bounded operational sections */
-.admin-product-section{border:1px solid #e2e4ea;border-radius:13px;background:#fff;overflow:hidden}
-.admin-product-section>summary{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:13px 14px;cursor:pointer;list-style:none}
-.admin-product-section>summary::-webkit-details-marker{display:none}
-.admin-product-section>summary>span:first-child{display:grid;gap:2px}
-.admin-product-section>summary b{font-size:14px}
-.admin-product-section>summary small{font-size:10px;color:#7a8290}
-.admin-product-section>summary>span:last-child{font-size:20px;color:#8b93a0;transition:transform .15s ease}
-.admin-product-section[open]>summary>span:last-child{transform:rotate(90deg)}
-.admin-product-section[open]>summary{background:#faf9ff;border-bottom:1px solid #e7e2fb}
-.admin-product-section-body{display:grid;gap:13px;padding:14px}
-
-.admin-product-option-group{display:grid;gap:12px;padding:13px;border:1px solid #e3e5eb;border-radius:12px;background:#fafbfc}
-.admin-product-option-group>header{display:flex;align-items:center;justify-content:space-between;gap:12px}
-.admin-product-option-group>header>div{display:grid;gap:2px}
-.admin-product-option-group>header b{font-size:13px}
-.admin-product-option-group>header small{font-size:9px;color:#7c8490}
-.admin-product-option-table{display:grid;border:1px solid #e0e3e9;border-radius:10px;overflow:hidden;background:#fff}
-.admin-product-option-table>header,.admin-product-option-table>article{display:grid;grid-template-columns:minmax(150px,1.3fr) minmax(120px,1fr) 140px 70px 70px 48px;gap:8px;align-items:center;padding:8px 9px}
-.admin-product-option-table>header{background:#f3f4f7;color:#717986;font-size:9px;font-weight:850}
-.admin-product-option-table>article{border-top:1px solid #eceef2}
-.admin-product-option-table input[type="text"],.admin-product-option-table input:not([type]){min-height:36px}
-.admin-product-option-table input[type="checkbox"]{width:17px;height:17px;justify-self:center}
-.admin-product-option-table button{height:34px;border:1px solid #d8dce3;border-radius:8px;background:#fff}
-.admin-inline-add{width:max-content;min-height:36px;padding:0 10px;border:1px solid #d7dbe2;border-radius:9px;background:#fff;font-weight:850}
-.admin-shared-warning{font-size:9px;color:#8c6720}
-
-.admin-media-layout{display:grid;grid-template-columns:220px minmax(0,1fr);gap:14px}
-.admin-media-preview{min-height:170px;display:grid;place-items:center;border:1px dashed #cfd5de;border-radius:12px;background:#fafbfc;overflow:hidden}
-.admin-media-preview img{display:block;width:100%;height:100%;max-height:220px;object-fit:contain;background:#fff}
-.admin-media-preview>div{display:grid;gap:4px;padding:16px;text-align:center}
-.admin-media-preview b{font-size:13px}
-.admin-media-preview span{font-size:10px;color:#7b8390}
-.admin-media-fields{display:grid;gap:9px}
-.admin-media-status-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
-.admin-media-status-grid article{display:grid;gap:5px;padding:10px;border:1px solid #e2e5ea;border-radius:10px;background:#fafbfc;min-width:0}
-.admin-media-status-grid span{font-size:9px;color:#7b8390}
-.admin-media-status-grid b,.admin-media-status-grid code{font-size:10px;overflow-wrap:anywhere}
-
-@media(max-width:1000px){
-  .admin-product-option-table{overflow-x:auto}
-  .admin-product-option-table>header,.admin-product-option-table>article{min-width:720px}
-  .admin-media-status-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
-}
-@media(max-width:760px){
-  .admin-media-layout{grid-template-columns:1fr}
-  .admin-media-preview{min-height:150px}
-  .admin-media-status-grid{grid-template-columns:1fr}
-  .admin-product-section>summary{padding:12px}
-  .admin-product-section-body{padding:12px}
-  .admin-product-option-group>header{display:grid}
-}
-
-
 .admin-option-pricing-table{display:grid;border:1px solid #e0e3e9;border-radius:12px;background:#fff;overflow:hidden}
 .admin-option-pricing-table>header,.admin-option-pricing-table>article{display:grid;grid-template-columns:minmax(160px,1fr) minmax(180px,1.2fr) 150px 160px;gap:10px;align-items:center;padding:10px 12px}
 .admin-option-pricing-table>header{background:#f5f6f8;color:#737c89;font-size:10px;font-weight:850}
