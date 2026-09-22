@@ -4,6 +4,7 @@ import {readAdminSnapshotSection} from './admin-config-sync.ts';
 import {resolveBusinessWindow,type LocalCashOpening,type LocalDayClose} from './local-operations.ts';
 
 export const SMT_PROJECTION_OUTBOX_KEY='mfk.v2local.projection-outbox.v1';
+export const SMT_PROJECTION_ACKED_KEY='mfk.v2local.projection-acked.v1';
 export const SMT_PROJECTION_ENDPOINT='https://admin.morefunos.com';
 
 export interface ProjectionOrderInput{
@@ -37,6 +38,16 @@ function writeRows(rows:readonly OutboxRow[]){
   localStorage.setItem(SMT_PROJECTION_OUTBOX_KEY,JSON.stringify(rows));
   emit();
 }
+function readAcked(){
+  try{
+    const value=JSON.parse(localStorage.getItem(SMT_PROJECTION_ACKED_KEY)||'[]');
+    return new Set(Array.isArray(value)?value.map(String):[]);
+  }catch{return new Set<string>()}
+}
+function writeAcked(ids:Iterable<string>){
+  const unique=[...new Set(ids)];
+  localStorage.setItem(SMT_PROJECTION_ACKED_KEY,JSON.stringify(unique.slice(-5000)));
+}
 function cutoff(){
   const config=readAdminSnapshotSection<{cutoff?:string}>('businessDay');
   const value=String(config?.cutoff??'05:00');
@@ -49,6 +60,7 @@ function businessDateFor(iso:string){
   return resolveBusinessWindow(Number.isFinite(at)?at:Date.now(),c.hour,c.minute).businessDate;
 }
 function enqueue(event:SmtProjectionEvent){
+  if(readAcked().has(event.eventId))return event;
   const current=readRows();
   if(current.some(row=>row.event.eventId===event.eventId))return event;
   const next=[...current,{event,queuedAt:new Date().toISOString(),attempts:0}];
@@ -125,6 +137,9 @@ export async function flushProjectionOutbox(){
     const body=await response.json().catch(()=>({})) as {accepted?:string[];code?:string};
     if(!response.ok)throw new Error(body.code||'PROJECTION_HTTP_'+response.status);
     const accepted=new Set(Array.isArray(body.accepted)?body.accepted:[]);
+    const acked=readAcked();
+    for(const id of accepted)acked.add(id);
+    writeAcked(acked);
     writeRows(readRows().filter(row=>!accepted.has(row.event.eventId)));
   }catch(error){
     const failedIds=new Set(batch.map(row=>row.event.eventId));
