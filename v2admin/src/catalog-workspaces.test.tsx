@@ -92,7 +92,7 @@ describe('MFK Admin complete catalog product',()=>{
 
   it('locks complete Option and pricing responsibilities',()=>{
     const modifiers=renderToStaticMarkup(<MemoryRouter initialEntries={['/admin/catalog/modifiers']}><MfkAdminApp/></MemoryRouter>);
-    for(const marker of ['名稱／ID／價格全部必填','選項 ID *','價格 HK$ *','可選，但必須顯示一次','允許同一選項多份']) expect(modifiers).toContain(marker);
+    for(const marker of ['名稱／ID／價格全部必填','可選但必須顯示一次','單選／多選','重覆數量']) expect(modifiers).toContain(marker);
 
     const pricing=renderToStaticMarkup(<MemoryRouter initialEntries={['/admin/catalog/pricing']}><MfkAdminApp/></MemoryRouter>);
     expect(pricing).toContain('商品價格');
