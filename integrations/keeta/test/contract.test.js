@@ -158,7 +158,7 @@ test('webhook dedup identity conflicts fail closed', () => {
 });
 
 test('registry has no acceptance claims and preserves known external blockers', () => {
-  assert.equal(KEETA_CAPABILITY_COUNT, 43);
+  assert.equal(KEETA_CAPABILITY_COUNT, 46);
   assert.equal(new Set(KEETA_CAPABILITY_REGISTRY.map((x) => x.CAP_ID)).size, KEETA_CAPABILITY_COUNT);
   const serialized = JSON.stringify(KEETA_CERTIFICATION_REGISTRY);
   assert.doesNotMatch(serialized, /SIT_PASS|UAT_PASS|KEETA_ACCEPTED/);
