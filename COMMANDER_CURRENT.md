@@ -3,7 +3,7 @@
 Status: CURRENT / CONTROLLING
 Protocol: #39
 Control: #22
-Updated: 2026-09-22 10:52 Asia/Hong_Kong
+Updated: 2026-09-22 11:04 Asia/Hong_Kong
 System: MFK ONLY
 Takeover checkpoint: 2026-09-22 10:44 Asia/Hong_Kong｜fresh-read complete｜no material state change
 
@@ -20,7 +20,7 @@ Takeover checkpoint: 2026-09-22 10:44 Asia/Hong_Kong｜fresh-read complete｜no 
 
 ## 1. Current navigation
 
-`docs/navigation/MFK_航海圖_V1.13_Round014_2026-09-22.txt`
+`docs/navigation/MFK_航海圖_V1.14_Round015_2026-09-22.txt`
 
 ## 2. Current priority override
 
@@ -133,7 +133,66 @@ No product/UI/workflow/config behavior change is authorized.
 
 No Admin A2/A3 work in this seam.
 
-## 7. Exact NEXT
+## 6A. Isolated 814-baseline candidate published
+
+Source branch:
+`work/MFK/SMT-OTA-814-BASELINE-PERSISTENCE-R2`
+
+Exact Owner baseline:
+`814043c809bbc236df1383c320bad906bcd3f1cd`
+
+Clean isolated source candidate:
+`d133043dfe7d84e3f4be11ee49e9102c64f518d1`
+
+Compare against exact 814 baseline:
+- status = `ahead`
+- behind = `0`
+- changed product files = exactly 4
+- `v2local/src/App.tsx` = only 3 additions / 2 deletions for mount wiring
+- `RuntimeReadyActivation.tsx` = added
+- `runtime-carrier-boundary.ts` = added
+- `runtime-carrier-boundary.test.ts` = added
+- zero other product/runtime file drift
+
+Source verification run:
+`35681551414`
+SUCCESS
+
+Builder / publisher:
+`Pantonyeung/morefunos-v1-builder`
+
+Publish request commit:
+`c776e070b7938476e05b82633376ea6311eb4f41`
+
+Publish run:
+`35681723140`
+SUCCESS
+
+Published release:
+`runtime-candidate-mfk-d133043dfe7d`
+
+Bundle:
+`MoreFunOS-SMT-runtime-candidate-mfk-d133043dfe7d.mfos`
+
+Archive SHA-256:
+`89898b8420b2038cbde0863de21513b9c765c7e2635d2ca244a4a7f7eb1e7111`
+
+Public readback:
+GREEN
+
+Carrier contract:
+- minCarrierVersionCode = 106
+- bridgeVersion = 1
+
+State:
+`MFK_SMT_OTA_814_BASELINE_PERSISTENCE_CANDIDATE_PUBLISHED`
+
+Important:
+This is an isolated OTA source line from exact 814.
+It is NOT a merge of old baseline back into current MFK main.
+Do not merge/rebase this branch into current main as a product landing.
+
+
 
 Prepare ONE isolated candidate from the exact `814043...` baseline with only the runtime.ready persistence delta.
 
