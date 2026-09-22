@@ -1,5 +1,7 @@
 import {useEffect,useMemo,useState} from 'react';
 import {useAdminDraft} from './admin-draft.tsx';
+import {appendAdminAudit,readAdminStored} from './admin-local-store.ts';
+import {normalizeProductMedia,normalizeProductPrintRule,PRODUCT_MEDIA_BACKEND_CONTRACT,useProductMediaConfig,useProductPrintRules,type ProductMediaConfig,type ProductPrintRule} from './admin-product-operational-config.ts';
 
 function WorkspaceHeader({title,description,onAdd,addLabel}:{title:string;description:string;onAdd?:()=>void;addLabel?:string}){
   const {draft,dirty,validationErrors,validate,reset}=useAdminDraft();
@@ -55,8 +57,177 @@ export function CategoriesWorkspace(){
   </section>;
 }
 
+
+function ProductOperationalDetail({productId}:{productId:string}){
+  const {draft,updateProduct,updateModifierGroup,addModifierOption,updateModifierOption,removeModifierOption}=useAdminDraft();
+  const [printRules,setPrintRules]=useProductPrintRules();
+  const [mediaByProduct,setMediaByProduct]=useProductMediaConfig();
+  const product=draft.products.find(row=>row.id===productId);
+  if(!product)return null;
+
+  const boundGroups=draft.modifierGroups.filter(group=>product.modifierGroupIds.includes(group.id));
+  const printers=readAdminStored<Array<{id:string;name:string;type:string;active:boolean}>>('logical-printers.v1',[]);
+  const labelPrinters=printers.filter(row=>row.type==='LABEL'&&row.active);
+  const printRule=normalizeProductPrintRule(printRules[product.id]);
+  const media=normalizeProductMedia(mediaByProduct[product.id],product.imageRef??'');
+
+  const patchPrint=(change:Partial<ProductPrintRule>)=>{
+    setPrintRules(current=>{
+      const before=normalizeProductPrintRule(current[product.id]);
+      const after=normalizeProductPrintRule({...before,...change});
+      appendAdminAudit({action:'修改商品打印規則',target:product.id,before,after});
+      return {...current,[product.id]:after};
+    });
+  };
+
+  const patchMedia=(change:Partial<ProductMediaConfig>)=>{
+    setMediaByProduct(current=>{
+      const before=normalizeProductMedia(current[product.id],product.imageRef??'');
+      const after=normalizeProductMedia({...before,...change},product.imageRef??'');
+      appendAdminAudit({action:'修改商品圖片設定',target:product.id,before,after});
+      return {...current,[product.id]:after};
+    });
+  };
+
+  const setCanonicalImage=(value:string)=>{
+    updateProduct(product.id,{imageRef:value});
+    patchMedia({
+      canonicalImageRef:value,
+      publicUrl:value,
+      storageState:value.trim()?'REFERENCE_ONLY':'UNSET',
+      lastVerifiedAt:'',
+      r2ObjectKey:'',
+      d1MediaRef:'',
+    });
+  };
+
+  return <div className="admin-product-detail">
+    <div className="admin-product-detail-head">
+      <div><small>商品詳細資料</small><h2>{product.name||'未命名商品'}</h2></div>
+      <Toggle checked={product.active} onChange={active=>updateProduct(product.id,{active})} label={product.active?'啟用':'停用'}/>
+    </div>
+
+    <details className="admin-product-section" open>
+      <summary><span><b>基本資料</b><small>名稱、編號、分類、條碼、描述</small></span><span>›</span></summary>
+      <div className="admin-product-section-body">
+        <div className="admin-form-grid two">
+          <label><span>商品名稱 *</span><input value={product.name} onChange={event=>updateProduct(product.id,{name:event.target.value})}/></label>
+          <label><span>商品編號 *</span><input value={product.productCode??''} onChange={event=>updateProduct(product.id,{productCode:event.target.value})}/></label>
+          <label><span>簡稱</span><input value={product.shortName??''} onChange={event=>updateProduct(product.id,{shortName:event.target.value})}/></label>
+          <label><span>庫存編號</span><input value={product.sku??''} onChange={event=>updateProduct(product.id,{sku:event.target.value})}/></label>
+          <label><span>分類 *</span><select value={product.categoryId} onChange={event=>updateProduct(product.id,{categoryId:event.target.value})}><option value="">未選分類</option>{draft.categories.map(item=><option key={item.id} value={item.id}>{item.name||item.id}</option>)}</select></label>
+          <label><span>條碼</span><input value={product.legacyBarcode??''} onChange={event=>updateProduct(product.id,{legacyBarcode:event.target.value})}/></label>
+        </div>
+        <div className="admin-product-detail-secondary">
+          <label><span>商品描述</span><textarea rows={3} value={product.description??''} onChange={event=>updateProduct(product.id,{description:event.target.value})} placeholder="顧客／員工可讀描述"/></label>
+          <label><span>標籤（逗號分隔）</span><input value={(product.tags??[]).join(', ')} onChange={event=>updateProduct(product.id,{tags:event.target.value.split(',').map(value=>value.trim()).filter(Boolean)})}/></label>
+        </div>
+      </div>
+    </details>
+
+    <details className="admin-product-section">
+      <summary><span><b>價格</b><small>商品價、外賣 +$1、其他正負調整</small></span><span>›</span></summary>
+      <div className="admin-product-section-body">
+        <div className="admin-form-grid two">
+          <label><span>基本價 HK$ *</span><input inputMode="decimal" value={product.basePrice} onChange={event=>updateProduct(product.id,{basePrice:event.target.value})} placeholder="0.00"/></label>
+          <label><span>其他外賣調整 HK$</span><input inputMode="decimal" value={product.takeawayAdjustment} onChange={event=>updateProduct(product.id,{takeawayAdjustment:event.target.value})} placeholder="可正可負，例如 -1.00 / 2.00"/></label>
+        </div>
+        <Toggle checked={Boolean(product.takeawaySurchargeEnabled)} onChange={takeawaySurchargeEnabled=>updateProduct(product.id,{takeawaySurchargeEnabled})} label={product.takeawaySurchargeEnabled?'此商品外賣 +$1：開':'此商品外賣 +$1：關'}/>
+        <div className="admin-callout compact">商品價同選項價只係設定；正式交易仍由唯一 Pricing authority 計算。</div>
+      </div>
+    </details>
+
+    <details className="admin-product-section">
+      <summary><span><b>選項／選項組</b><small>{boundGroups.length} 組 · 名稱／ID／價錢必填</small></span><span>›</span></summary>
+      <div className="admin-product-section-body">
+        <div className="admin-check-grid">{draft.modifierGroups.map(group=><label key={group.id}><input type="checkbox" checked={product.modifierGroupIds.includes(group.id)} onChange={event=>{
+          const next=event.target.checked?[...product.modifierGroupIds,group.id]:product.modifierGroupIds.filter(id=>id!==group.id);
+          updateProduct(product.id,{modifierGroupIds:next});
+        }}/><span>{group.name||group.id}</span></label>)}</div>
+        {boundGroups.length===0?<div className="admin-read-empty">呢件商品未綁定選項組。</div>:boundGroups.map(group=>{
+          const promptMode=group.required?'REQUIRED':group.forceShow?'OPTIONAL_FORCE_SHOW':'OPTIONAL';
+          return <section className="admin-product-option-group" key={group.id}>
+            <header><div><b>{group.name||'未命名選項組'}</b><small>組 ID：{group.id}</small></div><Toggle checked={group.active} onChange={active=>updateModifierGroup(group.id,{active})} label={group.active?'啟用':'停用'}/></header>
+            <div className="admin-form-grid three">
+              <label><span>選項組名稱 *</span><input value={group.name} onChange={event=>updateModifierGroup(group.id,{name:event.target.value})}/></label>
+              <label><span>顯示／必選規則</span><select value={promptMode} onChange={event=>{
+                const mode=event.target.value;
+                updateModifierGroup(group.id,{
+                  required:mode==='REQUIRED',
+                  forceShow:mode!=='OPTIONAL',
+                  min:mode==='REQUIRED'?Math.max(1,group.min):0,
+                });
+              }}><option value="REQUIRED">必選</option><option value="OPTIONAL_FORCE_SHOW">可唔揀，但一定顯示</option><option value="OPTIONAL">一般可選</option></select></label>
+              <label><span>選擇方式</span><select value={group.selection} onChange={event=>{const selection=event.target.value as 'SINGLE'|'MULTI';updateModifierGroup(group.id,{selection,max:selection==='SINGLE'?1:Math.max(1,group.max),allowQuantities:selection==='SINGLE'?false:group.allowQuantities})}}><option value="SINGLE">單選</option><option value="MULTI">多選</option></select></label>
+              <label><span>最少選擇</span><input type="number" min={0} value={group.min} onChange={event=>updateModifierGroup(group.id,{min:Number(event.target.value)||0})}/></label>
+              <label><span>最多選擇</span><input type="number" min={0} max={group.selection==='SINGLE'?1:99} value={group.max} onChange={event=>updateModifierGroup(group.id,{max:Number(event.target.value)||0})}/></label>
+              <Toggle checked={group.allowQuantities} onChange={allowQuantities=>updateModifierGroup(group.id,{allowQuantities})} label="同一選項可重覆數量"/>
+            </div>
+            <div className="admin-product-option-table">
+              <header><span>選項名稱 *</span><span>選項 ID *</span><span>價錢調整 HK$ *</span><span>預設</span><span>狀態</span><span></span></header>
+              {group.options.map(option=><article key={option.id}>
+                <input aria-label="選項名稱" value={option.name} onChange={event=>updateModifierOption(group.id,option.id,{name:event.target.value})}/>
+                <input aria-label="選項 ID" value={option.code} onChange={event=>updateModifierOption(group.id,option.id,{code:event.target.value})}/>
+                <input aria-label="選項價錢" inputMode="decimal" value={option.priceAdjustment} onChange={event=>updateModifierOption(group.id,option.id,{priceAdjustment:event.target.value})}/>
+                <input aria-label="預設選項" type="checkbox" checked={option.defaultSelected} onChange={event=>updateModifierOption(group.id,option.id,{defaultSelected:event.target.checked})}/>
+                <input aria-label="選項啟用" type="checkbox" checked={option.active} onChange={event=>updateModifierOption(group.id,option.id,{active:event.target.checked})}/>
+                <button type="button" onClick={()=>removeModifierOption(group.id,option.id)}>刪</button>
+              </article>)}
+            </div>
+            <button type="button" className="admin-inline-add" onClick={()=>addModifierOption(group.id)}>＋ 新增選項</button>
+            <small className="admin-shared-warning">修改呢個選項組會影響所有綁定同一組別嘅商品。</small>
+          </section>;
+        })}
+      </div>
+    </details>
+
+    <details className="admin-product-section">
+      <summary><span><b>打印</b><small>收據／製作單／打包單／Label／堂食／外賣</small></span><span>›</span></summary>
+      <div className="admin-product-section-body">
+        <div className="admin-check-grid">
+          {([['receipt','收據'],['production','廚房製作單'],['packing','打包單'],['label','Label'],['dineIn','堂食打印'],['takeaway','外賣打印']] as const).map(([key,label])=><label key={key}><input type="checkbox" checked={printRule[key]} onChange={event=>patchPrint({[key]:event.target.checked})}/><span>{label}</span></label>)}
+        </div>
+        {printRule.label?<section className="admin-sub-editor"><header><b>Label 去邊部打印機</b><small>{printRule.labelPrinterIds.length} 個目的地</small></header>{labelPrinters.length===0?<p>未有可用 Label Logical Printer；請先到「打印中心」建立。</p>:<div className="admin-check-grid">{labelPrinters.map(printer=><label key={printer.id}><input type="checkbox" checked={printRule.labelPrinterIds.includes(printer.id)} onChange={event=>patchPrint({labelPrinterIds:event.target.checked?[...printRule.labelPrinterIds,printer.id]:printRule.labelPrinterIds.filter(id=>id!==printer.id)})}/><span>{printer.name}</span></label>)}</div>}</section>:null}
+        <div className="admin-callout compact">Admin 只設定 Logical Printer；實體 IP／USB 配對仍然由 SMT 現場負責。</div>
+      </div>
+    </details>
+
+    <details className="admin-product-section">
+      <summary><span><b>圖片／媒體</b><small>Canonical 主圖、R2/D1 狀態、Keeta 獨立圖片</small></span><span>›</span></summary>
+      <div className="admin-product-section-body">
+        <div className="admin-media-layout">
+          <div className="admin-media-preview">{media.publicUrl?<img src={media.publicUrl} alt={product.name}/>:<div><b>未設定商品圖片</b><span>Customer／SMM／SMT 日後會讀 canonical imageRef。</span></div>}</div>
+          <div className="admin-media-fields">
+            <label><span>Canonical 圖片連結</span><input value={media.canonicalImageRef} onChange={event=>setCanonicalImage(event.target.value)} placeholder="https://... 或 /media/products/..."/></label>
+            <label><span>公開圖片 URL</span><input value={media.publicUrl} onChange={event=>patchMedia({publicUrl:event.target.value})} placeholder="Customer／前線預設讀取"/></label>
+            <label><span>Keeta 獨立圖片連結</span><input value={media.keetaImageUrl} onChange={event=>patchMedia({keetaImageUrl:event.target.value})} placeholder="可指向 Keeta／平台圖片庫"/></label>
+          </div>
+        </div>
+        <div className="admin-media-status-grid">
+          <article><span>R2 Object Key</span><code>{media.r2ObjectKey||'未有'}</code></article>
+          <article><span>D1 Media Ref</span><code>{media.d1MediaRef||'未有'}</code></article>
+          <article><span>儲存狀態</span><b>{media.storageState==='R2_D1_VERIFIED'?'R2 + D1 已驗證':media.storageState==='REFERENCE_ONLY'?'只有圖片引用':media.storageState==='R2_D1_PENDING'?'等待 R2/D1 驗證':'未設定'}</b></article>
+          <article><span>最後驗證</span><b>{media.lastVerifiedAt?new Date(media.lastVerifiedAt).toLocaleString('zh-HK'):'未有 readback'}</b></article>
+        </div>
+        <div className="admin-callout compact">而家 MFK Admin 未有安全圖片上載 Worker；所以唔會假裝 R2／D1 已經寫入。正式圖片後端要使用 MFK 自己嘅 R2 blob + D1 metadata，瀏覽器唔會直接持有 R2 credential。</div>
+        <small>Backend contract：{PRODUCT_MEDIA_BACKEND_CONTRACT.binaryStore} / {PRODUCT_MEDIA_BACKEND_CONTRACT.metadataProjection} / {PRODUCT_MEDIA_BACKEND_CONTRACT.publicPath}</small>
+      </div>
+    </details>
+
+    <details className="admin-product-section">
+      <summary><span><b>進階／刪除</b><small>低頻資料同破壞性操作</small></span><span>›</span></summary>
+      <div className="admin-product-section-body">
+        <div className="admin-product-danger-zone">
+          <span>一般停售請使用「停用」；刪除只應用於確定唔需要保留身份嘅商品。</span>
+          <button type="button" onClick={()=>{if(typeof window==='undefined'||window.confirm('確定刪除「'+product.name+'」？')){updateProduct(product.id,{active:false});}}}>停用商品</button>
+        </div>
+      </div>
+    </details>
+  </div>;
+}
+
 export function ProductsWorkspace(){
-  const {draft,addProduct,updateProduct,removeProduct}=useAdminDraft();
+  const {draft,addProduct,updateProduct,removeProduct,updateModifierGroup,addModifierOption,updateModifierOption,removeModifierOption}=useAdminDraft();
   const [query,setQuery]=useState('');
   const [status,setStatus]=useState<'ALL'|'ACTIVE'|'INACTIVE'>('ALL');
   const [category,setCategory]=useState('ALL');
@@ -68,7 +239,7 @@ export function ProductsWorkspace(){
   const filtered=useMemo(()=>{
     const needle=query.trim().toLowerCase();
     return draft.products.filter(row=>{
-      const text=[row.name,row.productCode,row.legacy條碼,row.sku,row.shortName].filter(Boolean).join(' ').toLowerCase();
+      const text=[row.name,row.productCode,row.legacyBarcode,row.sku,row.shortName].filter(Boolean).join(' ').toLowerCase();
       return (!needle||text.includes(needle))
         &&(status==='ALL'||(status==='ACTIVE'?row.active:!row.active))
         &&(category==='ALL'||row.categoryId===category);
@@ -131,7 +302,7 @@ export function ProductsWorkspace(){
             <div className="admin-product-summary">
               <div className="admin-product-identity">
                 <b>{row.name||'未命名商品'}</b>
-                <small>{row.productCode||row.id}{row.legacy條碼?' · '+row.legacy條碼:''}</small>
+                <small>{row.productCode||row.id}{row.legacyBarcode?' · '+row.legacyBarcode:''}</small>
               </div>
               <span className="admin-product-category">{categoryName.get(row.categoryId)??'未分類'}</span>
               <span className={'admin-product-price '+(needsPrice?'is-warning':'')}>{row.basePrice.trim()?'HK$'+Number(row.basePrice).toFixed(2):'未填價格'}</span>
@@ -155,7 +326,7 @@ export function ProductsWorkspace(){
                 <label><span>庫存編號</span><input value={row.sku??''} onChange={event=>updateProduct(row.id,{sku:event.target.value})}/></label>
                 <label><span>分類 *</span><select value={row.categoryId} onChange={event=>updateProduct(row.id,{categoryId:event.target.value})}><option value="">未選分類</option>{draft.categories.map(item=><option key={item.id} value={item.id}>{item.name||item.id}</option>)}</select></label>
                 <label><span>基本價 HK$ *</span><input inputMode="decimal" value={row.basePrice} onChange={event=>updateProduct(row.id,{basePrice:event.target.value})} placeholder="0.00"/></label>
-                <label><span>條碼</span><input value={row.legacy條碼??''} onChange={event=>updateProduct(row.id,{legacy條碼:event.target.value})}/></label>
+                <label><span>條碼</span><input value={row.legacyBarcode??''} onChange={event=>updateProduct(row.id,{legacyBarcode:event.target.value})}/></label>
                 <label><span>圖片參考</span><input value={row.imageRef??''} onChange={event=>updateProduct(row.id,{imageRef:event.target.value})} placeholder="圖片 URL / Asset ID"/></label>
               </div>
 
