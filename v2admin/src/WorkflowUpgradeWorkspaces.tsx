@@ -1,6 +1,8 @@
 import {useMemo,useState} from 'react';
+import {Link} from 'react-router';
 import {useAdminDraft,validateAdminDraft} from './admin-draft.tsx';
 import {appendAdminAudit,readAdminAudit,readAdminReleases,readAdminStored,usePersistentAdminState} from './admin-local-store.ts';
+import {AdminResponsiveDataView} from './AdminResponsiveDataView.tsx';
 
 function UpgradeHeader({title,description,kicker='功能尚未啟用'}:{title:string;description:string;kicker?:string}){
   return <header className="admin-editor-head">
@@ -34,8 +36,21 @@ export function ActionQueueWorkspace(){
   const filtered=queue.filter(row=>domain==='ALL'||row.owner===domain);
   return <section className="admin-editor-page">
     <UpgradeHeader title="待處理事項" description="由真實 Admin 狀態聚合需要處理嘅事項，再帶去責任頁；呢度唔直接改正式資料。" kicker="真實 Admin 狀態"/>
-    <div className="admin-filterbar"><select value={domain} onChange={event=>setDomain(event.target.value)}><option value="ALL">全部範圍</option>{['菜單','平台','打印','裝置'].map(item=><option key={item} value={item}>{item}</option>)}</select><span>{filtered.length} 項</span></div>
-    {filtered.length===0?<div className="admin-read-empty">目前冇 Admin 端待處理事項。</div>:<section className="admin-read-table"><header><span>事項</span><span>負責範圍</span><span>狀態</span><span>前往頁面</span><span>操作</span></header>{filtered.map(row=><article key={row.id}><span>{row.kind}</span><span>{row.owner}</span><span>{row.state==='HEALTHY'?'正常':row.state==='DEGRADED'?'需注意':'未確認'}</span><a href={row.route}>前往責任頁</a><StateChip>只作分流</StateChip></article>)}</section>}
+    <div className="admin-filterbar"><label><span>範圍</span><select value={domain} onChange={event=>setDomain(event.target.value)}><option value="ALL">全部範圍</option>{['菜單','平台','打印','裝置'].map(item=><option key={item} value={item}>{item}</option>)}</select></label><span>{filtered.length} 項</span></div>
+    <AdminResponsiveDataView
+      label="待處理事項"
+      rows={filtered}
+      rowKey={row=>row.id}
+      emptyTitle="目前無待處理事項"
+      emptyDescription="呢個狀態只代表現有 Admin evidence 無待辦，唔等於所有 runtime 都已驗證。"
+      columns={[
+        {key:'item',label:'事項',render:row=>row.kind},
+        {key:'owner',label:'負責範圍',render:row=>row.owner},
+        {key:'state',label:'狀態',render:row=>row.state==='HEALTHY'?'正常':row.state==='DEGRADED'?'需注意':row.state},
+        {key:'route',label:'前往頁面',render:row=><Link to={row.route}>前往責任頁</Link>},
+        {key:'action',label:'操作',render:()=> <StateChip>只作分流</StateChip>},
+      ]}
+    />
     <section className="admin-rule-card"><h2>處理原則</h2><p>未有證據唔可以標記已解決；未確認唔等於失敗；真正修復由責任頁完成。</p></section>
   </section>;
 }
@@ -64,7 +79,7 @@ export function OtaWorkspace(){
   return <section className="admin-editor-page">
     <header className="admin-editor-head"><div><small>版本治理</small><h1>版本更新</h1><p>Admin 管 approved artifact、渠道同批准狀態；Observed Runtime 只讀裝置回傳，填咗版本號唔等於已安裝。</p></div><div className="admin-editor-actions"><button onClick={add}>新增版本候選</button></div></header>
     <div className="admin-policy-grid two">
-      <article className="admin-policy-card"><h2>版本候選</h2>{rows.length===0?<div className="admin-read-empty">未有版本候選。</div>:rows.map(row=><div className="admin-sub-editor" key={row.id}><label><span>版本</span><input value={row.version} onChange={event=>patch(row.id,{version:event.target.value})}/></label><label><span>SHA-256</span><input value={row.sha256} onChange={event=>patch(row.id,{sha256:event.target.value})}/></label><label><span>渠道</span><select value={row.channel} onChange={event=>patch(row.id,{channel:event.target.value as OtaApproval['channel']})}><option value="candidate">候選</option><option value="stable">穩定</option></select></label><label className="admin-toggle"><input type="checkbox" checked={row.approved} onChange={event=>patch(row.id,{approved:event.target.checked})}/><span>批准版本</span></label><textarea value={row.note} onChange={event=>patch(row.id,{note:event.target.value})} placeholder="版本備註"/></div>)}</article>
+      <article className="admin-policy-card"><h2>版本候選</h2>{rows.length===0?<div className="admin-read-empty">未有版本候選。</div>:rows.map(row=><div className="admin-sub-editor" key={row.id}><label><span>版本</span><input value={row.version} onChange={event=>patch(row.id,{version:event.target.value})}/></label><label><span>SHA-256</span><input value={row.sha256} onChange={event=>patch(row.id,{sha256:event.target.value})}/></label><label><span>渠道</span><select value={row.channel} onChange={event=>patch(row.id,{channel:event.target.value as OtaApproval['channel']})}><option value="candidate">候選</option><option value="stable">穩定</option></select></label><label className="admin-toggle"><input type="checkbox" checked={row.approved} onChange={event=>patch(row.id,{approved:event.target.checked})}/><span>批准版本</span></label><label><span>版本備註</span><textarea value={row.note} onChange={event=>patch(row.id,{note:event.target.value})} placeholder="版本備註"/></label></div>)}</article>
       <article className="admin-policy-card"><h2>裝置目前版本</h2>{runtime.length===0?<div className="admin-read-empty">目前未有裝置版本回傳。</div>:runtime.map(row=><p key={row.deviceId}>{row.deviceId} · {row.version} · {row.state} · {new Date(row.observedAt).toLocaleString('zh-HK')}</p>)}</article>
     </div>
   </section>;
@@ -154,7 +169,20 @@ export function DiagnosticsWorkspace(){
   return <section className="admin-editor-page">
     <UpgradeHeader title="系統狀態" description="系統狀態顯示功能範圍、目前狀態、資料新鮮度、待處理數量、最後錯誤、安全修復方法同回傳證據。冇證據唔會硬判根因。" kicker="診斷證據"/>
     <div className="admin-kpi-grid"><article><span>健康</span><strong>{findings.filter(row=>row.state==='HEALTHY').length}</strong><small>已確認</small></article><article><span>需注意</span><strong>{degraded}</strong><small>需要跟進</small></article><article><span>未確認</span><strong>{unknown}</strong><small>等待資料</small></article><article><span>總項目</span><strong>{findings.length}</strong><small>系統狀態</small></article></div>
-    {findings.length===0?<div className="admin-read-empty">目前未有系統狀態回傳；唔會用假綠燈代替健康證據。</div>:<section className="admin-read-table"><header><span>範圍</span><span>狀態</span><span>待處理</span><span>最後錯誤</span><span>證據</span></header>{findings.map(row=><article key={row.id}><span>{row.domain}</span><span>{row.state}</span><span>{row.pendingCount}</span><span>{row.lastError||'—'}</span><span>{row.evidenceRef||'—'}</span></article>)}</section>}
+    <AdminResponsiveDataView
+      label="系統狀態"
+      rows={findings}
+      rowKey={row=>row.id}
+      emptyTitle="未有系統狀態回傳"
+      emptyDescription="未有正式回傳，所以唔會用假綠燈代替健康證據。"
+      columns={[
+        {key:'domain',label:'範圍',render:(row:DiagnosticFinding)=>row.domain},
+        {key:'state',label:'狀態',render:(row:DiagnosticFinding)=>row.state},
+        {key:'pending',label:'待處理',numeric:true,render:(row:DiagnosticFinding)=>row.pendingCount},
+        {key:'error',label:'最後錯誤',render:(row:DiagnosticFinding)=>row.lastError||'—'},
+        {key:'evidence',label:'證據',render:(row:DiagnosticFinding)=>row.evidenceRef||'—'},
+      ]}
+    />
   </section>;
 }
 
@@ -189,6 +217,18 @@ export function EffectiveSettingsWorkspace(){
   const patch=(id:string,override:string)=>setRows(current=>current.map(row=>row.id===id?{...row,override}:row));
   return <section className="admin-editor-page">
     <UpgradeHeader title="進階設定" description="顯示目前生效值、來源、可選覆寫同安全底線；唔建立一個可以跨功能範圍任意覆寫嘅巨型設定頁。" kicker="生效設定"/>
-    <section className="admin-read-table"><header><span>設定項目</span><span>目前生效值</span><span>來源</span><span>安全底線</span><span>覆寫草稿</span></header>{rows.map(row=><article key={row.id}><span>{row.label}</span><span>{row.override||row.baseValue}</span><span>{row.source}</span><span>{row.securityFloor}</span><input value={row.override} onChange={event=>patch(row.id,event.target.value)} placeholder="可選覆寫"/></article>)}</section>
+    <AdminResponsiveDataView
+      label="進階生效設定"
+      rows={rows}
+      rowKey={row=>row.id}
+      emptyDescription="未有生效設定。"
+      columns={[
+        {key:'setting',label:'設定項目',render:(row:EffectiveSettingRow)=>row.label},
+        {key:'effective',label:'目前生效值',render:(row:EffectiveSettingRow)=>row.override||row.baseValue},
+        {key:'source',label:'來源',render:(row:EffectiveSettingRow)=>row.source},
+        {key:'floor',label:'安全底線',render:(row:EffectiveSettingRow)=>row.securityFloor},
+        {key:'override',label:'覆寫草稿',render:(row:EffectiveSettingRow)=><label className="admin-inline-field"><span className="admin-visually-hidden">{row.label}覆寫草稿</span><input value={row.override} onChange={event=>patch(row.id,event.target.value)} placeholder="可選覆寫"/></label>},
+      ]}
+    />
   </section>;
 }
