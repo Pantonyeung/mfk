@@ -34,15 +34,17 @@ export interface ModifierOptionDraft{
   readonly priceAdjustment:string;
   readonly active:boolean;
   readonly defaultSelected:boolean;
-  readonly code?:string;
+  readonly code:string;
 }
 export interface ModifierGroupDraft{
   readonly id:string;
   readonly name:string;
   readonly required:boolean;
+  readonly forceShow:boolean;
   readonly selection:ModifierSelection;
   readonly min:number;
   readonly max:number;
+  readonly allowQuantities:boolean;
   readonly active:boolean;
   readonly options:readonly ModifierOptionDraft[];
 }
@@ -128,7 +130,9 @@ function normalizeDraft(input:AdminSessionDraft):AdminSessionDraft{
     })),
     modifierGroups:input.modifierGroups.map(group=>({
       ...group,
-      options:group.options.map(option=>({...option,code:option.code??''})),
+      forceShow:group.forceShow??group.required,
+      allowQuantities:group.allowQuantities??false,
+      options:group.options.map(option=>({...option,code:option.code?.trim()||option.id,priceAdjustment:option.priceAdjustment?.trim()||'0.00'})),
     })),
     combos:input.combos.map(combo=>({
       ...combo,
@@ -184,9 +188,14 @@ export function validateAdminDraft(draft:AdminSessionDraft){
     if(group.min<0||group.max<group.min)errors.push('選項組 '+(group.name||group.id)+' 最少／最多選擇無效');
     if(group.required&&group.min<1)errors.push('必選組 '+(group.name||group.id)+' 最少選擇必須至少 1');
     if(group.selection==='SINGLE'&&group.max>1)errors.push('單選組 '+(group.name||group.id)+' 最多選擇不可大過 1');
+    const optionCodes=new Set<string>();
     for(const option of group.options){
       if(!option.name.trim())errors.push('選項 '+option.id+' 未填名稱');
-      if(option.priceAdjustment.trim()&&Number.isNaN(Number(option.priceAdjustment)))errors.push('選項 '+(option.name||option.id)+' 價格調整格式錯誤');
+      if(!option.code.trim())errors.push('選項 '+(option.name||option.id)+' 未填選項 ID');
+      if(option.code.trim()&&optionCodes.has(option.code.trim()))errors.push('選項組 '+(group.name||group.id)+' 選項 ID 重複：'+option.code.trim());
+      if(option.code.trim())optionCodes.add(option.code.trim());
+      if(!option.priceAdjustment.trim())errors.push('選項 '+(option.name||option.id)+' 未填價格');
+      else if(Number.isNaN(Number(option.priceAdjustment)))errors.push('選項 '+(option.name||option.id)+' 價格調整格式錯誤');
     }
   }
 
@@ -280,7 +289,7 @@ export function AdminDraftProvider({children}:{children:ReactNode}){
     ...current,
     modifierGroups:[...current.modifierGroups,{
       id:nextId('modifier',current.modifierGroups.length),
-      name:'新選項組',required:false,selection:'SINGLE',min:0,max:1,active:true,options:[],
+      name:'新選項組',required:false,forceShow:false,selection:'SINGLE',min:0,max:1,allowQuantities:false,active:true,options:[],
     }],
   }));
 
@@ -298,7 +307,12 @@ export function AdminDraftProvider({children}:{children:ReactNode}){
     modifierGroups:current.modifierGroups.map(group=>group.id===groupId?{
       ...group,
       options:[...group.options,{
-        id:nextId(group.id+'-option',group.options.length),name:'新選項',code:'',priceAdjustment:'0.00',active:true,defaultSelected:false,
+        id:nextId(group.id+'-option',group.options.length),
+        name:'新選項',
+        code:'OPT-'+String(group.options.length+1).padStart(3,'0'),
+        priceAdjustment:'0.00',
+        active:true,
+        defaultSelected:false,
       }],
     }:group),
   }));
