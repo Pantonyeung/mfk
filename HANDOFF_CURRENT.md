@@ -5,7 +5,7 @@ Current system: **MFK only**.
 Current main at handoff generation: `e325a05bb8e349a24d5a6a92a8c0b111f7c12c67`
 
 Current navigation:
-`docs/navigation/MFK_航海圖_V1.7_Round008_2026-09-22.txt`
+`docs/navigation/MFK_航海圖_V1.8_Round009_2026-09-22.txt`
 
 Detailed seamless handoff:
 `docs/handoff/MFK_Admin_Connection_Seamless_Handoff_R1_2026-09-22.txt`
@@ -65,3 +65,23 @@ No one-minute global cron. No five-second watchdog. Cloud never blocks local SMT
 Old Morefun-v2 Keeta runtime is RETIRED and must never be reconnected to MFK.
 
 Legacy provider-side Cloudflare retirement remains tracked in #32.
+
+
+## Canonical Domain
+
+Canonical MFK Internet root:
+`morefunos.com`
+
+Canonical Admin:
+`https://admin.morefunos.com`
+
+`workers.dev` is bootstrap/temporary validation only and is not a canonical system URL.
+
+Domain governance:
+`docs/governance/MFK_CANONICAL_DOMAIN_GOVERNANCE_R1_2026-09-22.md`
+
+Current provider state:
+- dedicated MFK Cloudflare account exists
+- `mfk-admin` bootstrap Worker exists
+- Admin Custom Domain mapping is pending
+- OTA remains untouched
