@@ -244,6 +244,11 @@ export function ChannelsWorkspace({mode}:{mode:'overview'|'mapping'|'failures'|'
   const [menuPreview,setMenuPreview]=useState<KeetaMenuPreview|null>(null);
   const [menuStatus,setMenuStatus]=useState<KeetaMenuStatus|null>(null);
   const [menuBusy,setMenuBusy]=useState(false);
+  const [sellabilityPreview,setSellabilityPreview]=useState<KeetaSellabilityPreview|null>(null);
+  const [sellabilityStatus,setSellabilityStatus]=useState<KeetaSellabilityStatus|null>(null);
+  const [storePreview,setStorePreview]=useState<KeetaStorePreview|null>(null);
+  const [storeStatus,setStoreStatus]=useState<KeetaStoreStatus|null>(null);
+  const [providerOpsBusy,setProviderOpsBusy]=useState(false);
   const refreshLive=async()=>{
     try{setLiveStatus(await readKeetaLiveStatus());setLiveError('');}
     catch(error){setLiveError(error instanceof Error?error.message:'KEETA_STATUS_FAILED');}
@@ -252,10 +257,18 @@ export function ChannelsWorkspace({mode}:{mode:'overview'|'mapping'|'failures'|'
     try{setMenuStatus(await readKeetaMenuStatus());}
     catch(error){setLiveError(error instanceof Error?error.message:'KEETA_MENU_STATUS_FAILED');}
   };
+  const refreshProviderOps=async()=>{
+    try{
+      const [sellability,store]=await Promise.all([readKeetaSellabilityStatus(),readKeetaStoreStatus()]);
+      setSellabilityStatus(sellability);
+      setStoreStatus(store);
+    }catch(error){setLiveError(error instanceof Error?error.message:'KEETA_PROVIDER_OPS_STATUS_FAILED');}
+  };
   useEffect(()=>{
     if(mode==='overview'||mode==='sync'){
       void refreshLive();
       void refreshMenu();
+      void refreshProviderOps();
     }
   },[mode]);
   const authorize=async()=>{
@@ -307,6 +320,45 @@ export function ChannelsWorkspace({mode}:{mode:'overview'|'mapping'|'failures'|'
     }catch(error){
       setLiveError(error instanceof Error?error.message:'KEETA_MENU_SYNC_FAILED');
     }finally{setMenuBusy(false);}
+  };
+  const previewSellability=async()=>{
+    setProviderOpsBusy(true);setLiveError('');
+    try{setSellabilityPreview(await previewKeetaSellability());await refreshProviderOps();}
+    catch(error){setSellabilityPreview(null);setLiveError(error instanceof Error?error.message:'KEETA_SELLABILITY_PREVIEW_FAILED');}
+    finally{setProviderOpsBusy(false);}
+  };
+  const submitSellability=async()=>{
+    setProviderOpsBusy(true);setLiveError('');
+    try{setSellabilityPreview(await previewKeetaSellability());setSellabilityStatus(await syncKeetaSellability());}
+    catch(error){setLiveError(error instanceof Error?error.message:'KEETA_SELLABILITY_SYNC_FAILED');}
+    finally{setProviderOpsBusy(false);}
+  };
+  const previewStore=async()=>{
+    setProviderOpsBusy(true);setLiveError('');
+    try{setStorePreview(await previewKeetaStoreHours());}
+    catch(error){setStorePreview(null);setLiveError(error instanceof Error?error.message:'KEETA_STORE_PREVIEW_FAILED');}
+    finally{setProviderOpsBusy(false);}
+  };
+  const submitStoreHours=async()=>{
+    setProviderOpsBusy(true);setLiveError('');
+    try{setStorePreview(await previewKeetaStoreHours());setStoreStatus(await syncKeetaStoreHours());}
+    catch(error){setLiveError(error instanceof Error?error.message:'KEETA_STORE_HOURS_SYNC_FAILED');}
+    finally{setProviderOpsBusy(false);}
+  };
+  const runStoreOperation=async(action:'REST'|'OPEN')=>{
+    setProviderOpsBusy(true);setLiveError('');
+    try{
+      setStoreStatus(action==='REST'?await restKeetaStore():await openKeetaStore());
+      await readKeetaStore();
+      await refreshProviderOps();
+    }catch(error){setLiveError(error instanceof Error?error.message:'KEETA_STORE_OPERATION_FAILED');}
+    finally{setProviderOpsBusy(false);}
+  };
+  const refreshStoreReadback=async()=>{
+    setProviderOpsBusy(true);setLiveError('');
+    try{await readKeetaStore();await refreshProviderOps();}
+    catch(error){setLiveError(error instanceof Error?error.message:'KEETA_STORE_READBACK_FAILED');}
+    finally{setProviderOpsBusy(false);}
   };
   const [config,setConfig]=usePersistentAdminState<ChannelConfig>('channel-policy.keeta.v1',{enabled:false,autoAccept:false,syncSellability:false,commissionPct:'',displayName:'Keeta',lateCutoffMinutes:15});
   const [mappings,setMappings]=usePersistentAdminState<MappingRow[]>('channel-mapping.keeta.v1',[]);
