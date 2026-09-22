@@ -7,12 +7,12 @@ import {LEGACY_MF01_ADMIN_DRAFT} from './admin-menu-seed-mf01-v2.ts';
 import {PRODUCT_MEDIA_BACKEND_CONTRACT,normalizeProductPrintRule} from './admin-product-operational-config.ts';
 import {MfkAdminApp} from './App.tsx';
 import {ADMIN_CAPABILITIES} from './admin-capabilities.ts';
-import {migrateLegacyOptionCenter,useOptionCenter,validateOptionCenter,type OptionCenterState} from './admin-option-center.ts';
+import {migrateLegacyDraftToOptionSetCenter,useOptionSetCenter,validateOptionSetCenter,type OptionSetCenterState} from './admin-option-set-center.ts';
 
 
 function ProductDetailHarness({productId}:{productId:string}){
   const {draft}=useAdminDraft();
-  const optionCenter=useOptionCenter(draft);
+  const optionCenter=useOptionSetCenter(draft);
   return <ProductOperationalDetail productId={productId} optionCenter={optionCenter}/>;
 }
 
@@ -33,7 +33,7 @@ describe('MFK Admin complete catalog product',()=>{
     const productId=LEGACY_MF01_ADMIN_DRAFT.products[0]!.id;
     const html=renderToStaticMarkup(<AdminDraftProvider><ProductDetailHarness productId={productId}/></AdminDraftProvider>);
     for(const marker of [
-      '基本資料','價格','選項','選項名稱、選項 ID 同價錢只喺「選項中心」維護一次',
+      '基本資料','價格','選項','先喺「選項中心」建立完整選項組',
       '打印','廚房製作單','打包單','堂食打印','外賣打印',
       '圖片／媒體','Canonical 圖片連結','Keeta 獨立圖片連結','R2 Object Key','D1 Media Ref',
     ])expect(html).toContain(marker);
@@ -98,24 +98,21 @@ describe('MFK Admin complete catalog product',()=>{
   });
 
 
-  it('locks Option Center as master and Product detail as link/default UI',()=>{
+  it('locks Option Center as group-first parent with child Options',()=>{
     const center=renderToStaticMarkup(<MemoryRouter initialEntries={['/admin/catalog/modifiers']}><MfkAdminApp/></MemoryRouter>);
-    for(const marker of ['選項中心','唯一選項資料來源','新增選項','選項 Master','商品連結'])expect(center).toContain(marker);
-    expect(center).toContain('Product Detail 唔會再複製另一份選項資料');
+    for(const marker of ['選項中心','新增選項組','一個選項組就係一個完整可重用單位','組內選項','新增子選項'])expect(center).toContain(marker);
+    expect(center).toContain('飯量');
+    expect(center).toContain('青瓜');
+    expect(center).not.toContain('選項 Master');
 
     const detailProductId=LEGACY_MF01_ADMIN_DRAFT.products[0]!.id;
     const detail=renderToStaticMarkup(<AdminDraftProvider><ProductDetailHarness productId={detailProductId}/></AdminDraftProvider>);
-    expect(detail).toContain('只負責連結、套用同設定此商品嘅默認');
-    expect(detail).toContain('前往選項中心');
-    expect(detail).not.toContain('選項價錢</span><input');
-
-    const pricing=renderToStaticMarkup(<MemoryRouter initialEntries={['/admin/catalog/pricing']}><MfkAdminApp/></MemoryRouter>);
-    expect(pricing).toContain('商品價格');
-    expect(pricing).toContain('選項價格');
-    expect(pricing).toContain('Option Master');
+    expect(detail).toContain('加入選項');
+    expect(detail).toContain('先喺「選項中心」建立完整選項組');
+    expect(detail).not.toContain('修改選項組名稱');
   });
 
-  it('normalizes legacy embedded Options into one master and per-Product defaults',()=>{
+  it('migrates legacy embedded Group with child Options without flattening',()=>{
     const legacy:AdminSessionDraft={
       categories:[],
       products:[
@@ -132,30 +129,32 @@ describe('MFK Admin complete catalog product',()=>{
       }],
       combos:[],
     };
-    const normalized=migrateLegacyOptionCenter(legacy);
-    expect(normalized.options).toHaveLength(3);
-    expect(normalized.groups[0]?.optionIds).toEqual(['more','small','none']);
+    const normalized=migrateLegacyDraftToOptionSetCenter(legacy);
+    expect(normalized.sets).toHaveLength(1);
+    expect(normalized.sets[0]?.name).toBe('飯量');
+    expect(normalized.sets[0]?.options.map(option=>option.name)).toEqual(['多飯','小飯','走飯']);
     expect(normalized.productLinks).toHaveLength(2);
     expect(normalized.productLinks[0]?.defaultOptionIds).toEqual(['small']);
-    expect('defaultSelected' in normalized.options[0]!).toBe(false);
   });
 
-  it('supports different defaults for the same canonical Option group per Product',()=>{
-    const state:OptionCenterState={
-      options:[
-        {id:'more',code:'RICE_MORE',name:'多飯',priceAdjustment:'2.00',active:true},
-        {id:'small',code:'RICE_SMALL',name:'小飯',priceAdjustment:'0.00',active:true},
-        {id:'none',code:'RICE_NONE',name:'走飯',priceAdjustment:'-1.00',active:true},
-      ],
-      groups:[{id:'rice',name:'飯量',optionIds:['more','small','none'],required:true,forceShow:true,selection:'SINGLE',min:1,max:1,allowQuantities:false,active:true}],
+  it('supports Product-specific default for same linked Option Set',()=>{
+    const state:OptionSetCenterState={
+      sets:[{
+        id:'cucumber',name:'青瓜',required:false,forceShow:true,selection:'SINGLE',min:0,max:1,allowQuantities:false,active:true,
+        options:[
+          {id:'more-cucumber',code:'CUC_MORE',name:'多青瓜',priceAdjustment:'1.00',active:true,position:10},
+          {id:'less-cucumber',code:'CUC_LESS',name:'少青瓜',priceAdjustment:'0.00',active:true,position:20},
+          {id:'no-cucumber',code:'CUC_NONE',name:'走青瓜',priceAdjustment:'0.00',active:true,position:30},
+        ],
+      }],
       productLinks:[
-        {productId:'product-a',groupId:'rice',optionIds:['more','small','none'],defaultOptionIds:['small']},
-        {productId:'product-b',groupId:'rice',optionIds:['more','small','none'],defaultOptionIds:['more']},
+        {productId:'product-a',setId:'cucumber',defaultOptionIds:['less-cucumber']},
+        {productId:'product-b',setId:'cucumber',defaultOptionIds:['more-cucumber']},
       ],
     };
-    expect(validateOptionCenter(state)).toEqual([]);
-    expect(state.productLinks[0]?.defaultOptionIds).toEqual(['small']);
-    expect(state.productLinks[1]?.defaultOptionIds).toEqual(['more']);
+    expect(validateOptionSetCenter(state)).toEqual([]);
+    expect(state.productLinks[0]?.defaultOptionIds).toEqual(['less-cucumber']);
+    expect(state.productLinks[1]?.defaultOptionIds).toEqual(['more-cucumber']);
   });
 
   it('validates category product pricing modifier and combo relationships',()=>{
