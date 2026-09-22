@@ -6,12 +6,12 @@ import {AdminDraftProvider} from './admin-draft.tsx';
 import {CategoriesWorkspace,CombosWorkspace,MenuDisplayWorkspace,ModifiersWorkspace,PricingWorkspace,ProductsWorkspace} from './CatalogWorkspaces.tsx';
 import {AvailabilityWorkspace,BusinessDayWorkspace,ChannelsWorkspace,PrintCenterWorkspace,PrintTemplatesWorkspace,StaffWorkspace,StoreSettingsWorkspace} from './PolicyWorkspaces.tsx';
 import {AuditWorkspace,CapacityWorkspace,ExceptionsWorkspace,OpenOrdersWorkspace,OperationsReportWorkspace,OrdersHistoryWorkspace,OverviewWorkspace,SalesReportWorkspace} from './ReadModelWorkspaces.tsx';
-import {PrintRulesWorkspace,PublishCenterWorkspace,QuickReasonsWorkspace,SettlementWorkspace} from './GovernanceWorkspaces.tsx';
+import {PrintRulesWorkspace,發布CenterWorkspace,QuickReasonsWorkspace,SettlementWorkspace} from './GovernanceWorkspaces.tsx';
 import {AnnouncementsWorkspace,CouponsWorkspace,Customer360Workspace,InventoryWorkspace,LoyaltyWorkspace,PresentationWorkspace,RfmWorkspace,StoreBindingWorkspace} from './DeferredWorkspaces.tsx';
 import {ActionQueueWorkspace,AccessSessionWorkspace,CashCloseRecordWorkspace,ChannelReportWorkspace,DeviceHealthWorkspace,DiagnosticsWorkspace,EffectiveSettingsWorkspace,ExportGovernanceWorkspace,IntegrationsGovernanceWorkspace,OtaWorkspace,ProductReportWorkspace,RefundReportWorkspace} from './WorkflowUpgradeWorkspaces.tsx';
 
 const statusTitle={
-  NOT_WIRED:'等待 MFK Domain Adapter',
+  NOT_WIRED:'尚未啟用',
   DEFERRED:'能力保留，暫不啟用',
   RETIRED:'能力已退役',
 } as const;
@@ -23,28 +23,28 @@ function CapabilityPage(){
 
   return <section className="mfk-admin-capability">
     <header>
-      <div><small>MFK ADMIN</small><h1>{capability.label}</h1><p>{capability.purpose}</p></div>
+      <div><small>管理後台</small><h1>{capability.label}</h1><p>{capability.purpose}</p></div>
       <span className={'status '+capability.status.toLowerCase()}>{statusTitle[capability.status]}</span>
     </header>
 
     <div className="mfk-admin-facts">
-      <article><span>MFK Route</span><b>{capability.path}</b></article>
-      <article><span>Truth Owner</span><b>{capability.owner}</b></article>
-      <article><span>Wiring</span><b>{capability.status}</b></article>
-      <article><span>Live Mutation</span><b>{MFK_ADMIN_AUTHORITY.liveMutationEnabled?'ON':'OFF'}</b></article>
+      <article><span>功能位置</span><b>{capability.path}</b></article>
+      <article><span>負責範圍</span><b>{capability.owner}</b></article>
+      <article><span>連接狀態</span><b>{capability.status}</b></article>
+      <article><span>即時變更</span><b>{MFK_ADMIN_AUTHORITY.liveMutationEnabled?'ON':'OFF'}</b></article>
     </div>
 
     <section className="mfk-admin-rule-card">
       <h2>主權流程</h2>
       <div className="authority-flow">
-        <span>Owner Decision</span><i>→</i><span>Admin Draft</span><i>→</i><span>Validate</span><i>→</i><span>Publish</span><i>→</i><span>Active Revision</span><i>→</i><span>SMT Execute</span>
+        <span>規則決定</span><i>→</i><span>編輯草稿</span><i>→</i><span>檢查內容</span><i>→</i><span>發布</span><i>→</i><span>已生效版本</span><i>→</i><span>門店使用</span>
       </div>
-      <p>目前頁面只整理 MFK Admin 自己嘅操作面同責任邊界。未有 Domain Adapter 嘅功能一律維持 NOT_WIRED，唔會假裝已經執行成功。</p>
+      <p>呢個頁面只顯示目前可以操作嘅設定。未啟用嘅功能會清楚標示，唔會誤導為已生效。</p>
     </section>
 
     <section className="mfk-admin-state-card">
-      <header><h2>Current MFK State</h2><span>{capability.status}</span></header>
-      <p>呢項能力已經有 MFK 路徑同 Truth Owner。下一階段先由獨立工作將佢接到對應 MFK Domain，唔會喺 Admin 裏面重造第二套 engine。</p>
+      <header><h2>目前狀態</h2><span>{capability.status}</span></header>
+      <p>呢項能力已經有 MFK 路徑同 負責範圍。下一階段先由獨立工作將佢接到對應 MFK Domain，唔會喺 Admin 裏面重造第二套 engine。</p>
     </section>
   </section>;
 }
@@ -61,7 +61,7 @@ function capabilityElement(id:string){
   if(id==='frontline-presentation')return <PresentationWorkspace surface="FRONTLINE"/>;
   if(id==='overview')return <OverviewWorkspace/>;
   if(id==='action-queue')return <ActionQueueWorkspace/>;
-  if(id==='publish-center')return <PublishCenterWorkspace/>;
+  if(id==='publish-center')return <發布CenterWorkspace/>;
   if(id==='open-orders')return <OpenOrdersWorkspace/>;
   if(id==='availability')return <AvailabilityWorkspace/>;
   if(id==='capacity')return <CapacityWorkspace/>;
