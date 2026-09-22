@@ -7,77 +7,95 @@ import {fileURLToPath} from 'node:url';
 const testDir=path.dirname(fileURLToPath(import.meta.url));
 const srcRoot=path.resolve(testDir,'../src');
 const registry=JSON.parse(fs.readFileSync(path.join(srcRoot,'capabilities.json'),'utf8'));
+const source=fs.readdirSync(srcRoot)
+  .filter(name=>/\.(ts|tsx|js|jsx)$/.test(name))
+  .map(name=>fs.readFileSync(path.join(srcRoot,name),'utf8'))
+  .join('\n');
 
-function readSources(dir){
-  return fs.readdirSync(dir,{withFileTypes:true}).flatMap(entry=>{
-    const target=path.join(dir,entry.name);
-    if(entry.isDirectory())return readSources(target);
-    if(!/\.(ts|tsx|js|jsx)$/.test(entry.name))return [];
-    return [fs.readFileSync(target,'utf8')];
-  });
-}
-const source=readSources(srcRoot).join('\n');
-
-test('owner capability registry is complete and stable',()=>{
+test('owner capability registry remains complete with commands disconnected',()=>{
   assert.equal(registry.length,110);
   assert.equal(new Set(registry.map(item=>item.CAP_ID)).size,110);
-  for(const item of registry){
-    for(const key of ['CAP_ID','GROUP','LABEL','SURFACE','KIND','STATUS','OWNER'])assert.ok(item[key],item.CAP_ID+' missing '+key);
-    assert.ok(['READ_SHAPE','COMMAND_SHAPE'].includes(item.KIND));
-  }
-});
-
-test('all owner command shapes are explicitly NOT_WIRED',()=>{
   const commands=registry.filter(item=>item.KIND==='COMMAND_SHAPE');
+  const reads=registry.filter(item=>item.KIND!=='COMMAND_SHAPE');
   assert.equal(commands.length,18);
   assert.deepEqual([...new Set(commands.map(item=>item.STATUS))],['NOT_WIRED']);
+  assert.deepEqual([...new Set(reads.map(item=>item.STATUS))],['PRODUCT_READY_NOT_CONNECTED']);
 });
 
-test('required owner migration surfaces are registered',()=>{
-  const ids=new Set(registry.map(item=>item.CAP_ID));
-  for(const id of [
-    'TODAY_HOME','EFFECTIVE_SALES','ORDER_COUNT','AVERAGE_ORDER_VALUE','BASIC_COMPARISON',
-    'ACTION_QUEUE','ORDER_LIST','ORDER_DETAIL','ORDER_STATUS_READBACK','CHANNEL_HEALTH',
-    'CHANNEL_PAUSE','SELLABILITY_LIST','PRODUCT_SOLD_OUT','STAFF_PRESENCE','STAFF_ROLE_PERMISSION',
-    'DEVICE_HEALTH','PRINTER_HEALTH','REPORTS_HOME','NOTIFICATION_CENTRE','COMMAND_CONFIRM',
-    'ADMIN_DEEP_LINK','RECOVERY_OFFLINE','RECOVERY_STALE','RECOVERY_UNKNOWN','RECOVERY_PARTIAL',
-    'RECOVERY_FAILURE','RECOVERY_RETRY','ACTIVITY_FEED',
-    'CUSTOMER_OVERVIEW','CUSTOMER_NEW_RETURNING','CUSTOMER_CONSENT_SUMMARY','CUSTOMER_EXPERIENCE_SUMMARY',
-    'CAMPAIGN_OVERVIEW','CAMPAIGN_ATTRIBUTION_SUMMARY','PLATFORM_PROMOTION_FACTS',
-    'SETTLEMENT_SUMMARY','SETTLEMENT_FINALITY','RECONCILIATION_ATTENTION',
-    'CASH_OVERVIEW','CASH_VARIANCE','CLOSEOUT_SUMMARY','INVENTORY_LITE_SUMMARY','INVENTORY_ATTENTION','ACTIVITY_APPROVAL_READBACK'
-  ])assert.ok(ids.has(id),id);
-});
-
-test('owner clean port contains zero live network or cross-port authority calls',()=>{
+test('owner production source has zero live network or transaction authority',()=>{
   const forbidden=[
     /\bfetch\s*\(/,
     /\bWebSocket\b/,
     /\bXMLHttpRequest\b/,
     /\baxios\b/,
-    /\blocalStorage\b/,
-    /\bindexedDB\b/,
     /\/api\//,
-    /window\.location/,
-    /v2local\//,
-    /v2admin\//,
-    /v2smm\//,
-    /v2customer\//,
     /createFormalOrder/,
     /allocateDisplayNumber/,
     /storeKernel\s*\./i,
     /physicalPrinter\s*\./i,
-    /cashDrawer\s*\./i
+    /cashDrawer\s*\./i,
+    /\bD1Database\b/,
+    /\bindexedDB\b/,
+    /new\s+Worker\s*\(/,
+    /\bsetInterval\s*\(/,
+    /\bsetTimeout\s*\(/
   ];
   for(const pattern of forbidden)assert.equal(pattern.test(source),false,String(pattern));
 });
 
-test('owner UI declares migration boundary and recovery semantics',()=>{
-  for(const marker of ['CAPABILITY_UPGRADE_ONLY','Command = NOT_WIRED','今日','待處理','訂單','更多','Customer / CRM Lite','Campaign / Marketing','Platform Settlement','Cash / Closeout','Inventory Lite','OFFLINE','STALE','UNKNOWN','PARTIAL','FAILURE','RETRY'])assert.match(source,new RegExp(marker));
+test('local Owner workspace is durable and explicitly non-authoritative',()=>{
+  const persistence=fs.readFileSync(path.join(srcRoot,'persistence.ts'),'utf8');
+  assert.match(persistence,/LOCAL_NON_AUTHORITATIVE/);
+  assert.match(persistence,/localStorage/);
+  assert.match(persistence,/managerNote/);
+  assert.match(persistence,/handoffNote/);
+  assert.match(persistence,/checklist/);
+  assert.doesNotMatch(persistence,/Formal Order|Store Kernel|Pricing engine|Payment/);
 });
 
-test('owner shell exposes no second POS or Admin authoring flow',()=>{
-  assert.match(source,/READ_SHAPE ONLY/);
-  assert.match(source,/Structural config 留 Admin/);
-  assert.match(source,/physical \/ transaction execution 留 SMT/);
+test('production Owner app has no fixture or migration operator truth',()=>{
+  const app=fs.readFileSync(path.join(srcRoot,'App.tsx'),'utf8');
+  assert.doesNotMatch(app,/\.\/fixtures/);
+  assert.doesNotMatch(app,/CAPABILITY_UPGRADE_ONLY|Migration|fixture 截至|MFK Owner|Capability Registry/);
+  assert.match(app,/老闆資料服務尚未連接/);
+  assert.match(app,/唔會用假資料代替/);
+});
+
+test('complete Owner product surfaces remain present',()=>{
+  for(const marker of[
+    '而家間舖點','Action Queue','訂單監察','渠道健康','商品供應','員工','設備／打印',
+    '報表','客戶','推廣','平台結算','現金','庫存','通知','經理日誌','活動紀錄','Admin',
+    'Requester','Approver','Readback','OFFLINE','STALE','UNKNOWN','PARTIAL'
+  ])assert.match(source,new RegExp(marker));
+});
+
+test('typed Owner runtime port is injection-only',()=>{
+  const runtime=fs.readFileSync(path.join(srcRoot,'runtime.ts'),'utf8');
+  const types=fs.readFileSync(path.join(srcRoot,'product-types.ts'),'utf8');
+  assert.match(runtime,/__MFK_OWNER_PRODUCT_PORT__/);
+  assert.match(types,/MFK_OWNER_PORT_V1/);
+  assert.match(types,/readSnapshot\(\)/);
+  assert.match(types,/requestBoundedAction\?/);
+  assert.match(types,/requestAdminDeepLink\?/);
+  assert.doesNotMatch(runtime,/fetch|WebSocket|XMLHttpRequest/);
+});
+
+test('bounded actions require runtime and target readback semantics',()=>{
+  const app=fs.readFileSync(path.join(srcRoot,'App.tsx'),'utf8');
+  assert.match(app,/requestBoundedAction/);
+  assert.match(app,/冇改變任何正式狀態/);
+  assert.match(app,/結果未明/);
+  assert.match(app,/正式狀態必須等目標系統讀回/);
+});
+
+test('manager log and checklist are local-only product workflows',()=>{
+  const app=fs.readFileSync(path.join(srcRoot,'App.tsx'),'utf8');
+  assert.match(app,/本機私人草稿/);
+  assert.match(app,/唔係共享營運真相/);
+  assert.match(app,/經理筆記/);
+  assert.match(app,/交接草稿/);
+});
+
+test('production fixture file has been removed',()=>{
+  assert.equal(fs.existsSync(path.join(srcRoot,'fixtures.ts')),false);
 });
