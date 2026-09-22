@@ -277,7 +277,7 @@ export function ChannelsWorkspace({mode}:{mode:'overview'|'mapping'|'failures'|'
         <p><span>最近驗簽失敗</span><b>{liveStatus.webhook.lastSignatureFailureAt?new Date(liveStatus.webhook.lastSignatureFailureAt).toLocaleString('zh-HK'):'—'}</b></p>
       </div>:<div className="admin-read-empty">正在讀取 Keeta live runtime 狀態。</div>}
       {liveStatus?.missingConfig.length?<div className="admin-validation is-error"><b>Runtime 尚欠設定</b><ul>{liveStatus.missingConfig.map(item=><li key={item}>{item}</li>)}</ul></div>:null}
-      {liveStatus?<div className="admin-callout compact">Known external blocker：{liveStatus.knownExternalBlocker}。驗簽會 fail-closed，唔會為咗接通而放鬆。</div>:null}
+      {liveStatus?.knownExternalBlocker?<div className="admin-callout compact">Known external blocker：{liveStatus.knownExternalBlocker}。驗簽會 fail-closed，唔會為咗接通而放鬆。</div>:null}
       {liveError?<div className="admin-validation is-error" role="alert">{liveError}</div>:null}
       <div className="admin-editor-actions">
         <button type="button" className="secondary" disabled={liveBusy} onClick={()=>void refreshLive()}>更新狀態</button>
