@@ -391,7 +391,7 @@ export class KeetaRuntimeStore{
         duplicateCount:Number(journal.duplicateCount)||0,
         conflictCount:Number(journal.conflictCount)||0,
       },
-      knownExternalBlocker:'KEETA_LIVE_WEBHOOK_SIGNING_SEMANTICS_MISMATCH',
+      knownExternalBlocker:(Number(journal.acceptedCount)||0)>0?null:'KEETA_LIVE_WEBHOOK_SIGNING_SEMANTICS_MISMATCH',
       automaticOrderMutation:false,
       providerCommandActivation:false,
     });

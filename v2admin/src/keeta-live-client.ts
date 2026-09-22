@@ -29,7 +29,7 @@ export interface KeetaLiveStatus{
     readonly duplicateCount:number;
     readonly conflictCount:number;
   };
-  readonly knownExternalBlocker:string;
+  readonly knownExternalBlocker:string|null;
   readonly automaticOrderMutation:false;
   readonly providerCommandActivation:false;
 }
