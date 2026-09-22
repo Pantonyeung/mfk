@@ -2,7 +2,7 @@ export const KEETA_DONOR_EXCLUSIONS = Object.freeze([
   Object.freeze({
     donor: 'LEGACY_PROVIDER_EDGE_RUNTIME',
     disposition: 'NOT_MIGRATED',
-    reason: 'LIVE_RUNTIME_WIRING_FORBIDDEN_DURING_COMPLETENESS',
+    reason: 'LEGACY_LIVE_RUNTIME_NOT_REUSED_NEW_K0_EDGE_ONLY',
   }),
   Object.freeze({
     donor: 'LEGACY_D1_CANONICAL_ACCEPTANCE',
@@ -32,7 +32,7 @@ export const KEETA_DONOR_EXCLUSIONS = Object.freeze([
 ]);
 
 export const KEETA_COMPLETENESS_SCOPE = Object.freeze({
-  state: 'PROVIDER_COMPLETE_NOT_WIRED',
+  state: 'PROVIDER_COMPLETE_K0_LIVE_EDGE',
   provider: 'KEETA',
   market: 'HONG_KONG',
   includes: Object.freeze([
@@ -54,14 +54,18 @@ export const KEETA_COMPLETENESS_SCOPE = Object.freeze({
     'MAPPING_REQUEST_CONTRACT',
     'ACCEPTANCE_POLICY_CONTRACT',
     'CERTIFICATION_REGISTRY',
+    'K0_OAUTH_RUNTIME',
+    'K0_ENCRYPTED_TOKEN_STORAGE',
+    'K0_SIGNED_WEBHOOK_CAPTURE',
+    'K0_STORE_DETAILS_READBACK',
   ]),
   excludes: Object.freeze([
-    'LIVE_NETWORK',
-    'LIVE_SECRET_BINDING',
-    'PROVIDER_ACTIVATION',
     'FORMAL_ORDER_WRITER',
     'MFK_DOMAIN_MUTATION',
-    'PORT_WIRING',
-    'PERSISTENCE_RUNTIME',
+    'MENU_SYNC_SEND',
+    'MERCHANT_DECISION_SEND',
+    'AFTERSALE_DECISION_SEND',
+    'STORE_REST_OPEN_MUTATION',
+    'PERMISSIVE_SIGNATURE_FALLBACK',
   ]),
 });
