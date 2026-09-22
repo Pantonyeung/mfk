@@ -1,46 +1,22 @@
 import {useMemo,useState} from 'react';
 import {ADMIN_CAPABILITIES} from './admin-capabilities.ts';
 import {useAdminDraft,type AdminSessionDraft} from './admin-draft.tsx';
-import {appendAdminAudit,createAdminRelease,readAdminReleases,readAdminStored,restoreAdminReleaseAsDraft,usePersistentAdminState,writeAdminStored,type AdminRelease} from './admin-local-store.ts';
+import {appendAdminAudit,createAdminRelease,readActiveAdminRelease,readAdminReleases,readAdminStored,restoreAdminReleaseAsDraft,usePersistentAdminState,writeAdminStored,type AdminRelease} from './admin-local-store.ts';
 import {normalizeProductPrintRule,useProductPrintRules,type ProductPrintRule} from './admin-product-operational-config.ts';
-import {OPTION_SET_CENTER_STORAGE_KEYS,readOptionSetCenterState,validateOptionSetCenter} from './admin-option-set-center.ts';
+import {OPTION_SET_CENTER_STORAGE_KEYS} from './admin-option-set-center.ts';
 
 function Header({title,description,badge='已自動保存'}:{title:string;description:string;badge?:string}){
   return <header className="admin-editor-head"><div><small>{badge}</small><h1>{title}</h1><p>{description}</p></div></header>;
 }
 
-function collectAdminSnapshot(catalog:AdminSessionDraft){
-  const optionCenter=readOptionSetCenterState(catalog);
-  return {
-    catalog,
-    optionCenter,
-    availability:readAdminStored('availability.v1',{}),
-    businessDay:readAdminStored('business-day.v1',{}),
-    logicalPrinters:readAdminStored('logical-printers.v1',[]),
-    printTemplates:readAdminStored('print-templates.v1',{}),
-    printRules:readAdminStored('print-rules.v1',{}),
-    productMedia:readAdminStored('product-media.v1',{}),
-    storeSettings:readAdminStored('store-settings.v1',{}),
-    quickReasons:readAdminStored('quick-reasons.v1',[]),
-    staff:readAdminStored('staff.v1',[]),
-    channelPolicy:readAdminStored('channel-policy.keeta.v1',{}),
-    channelMapping:readAdminStored('channel-mapping.keeta.v1',[]),
-    capacity:readAdminStored('capacity.v1',{}),
-    presentation:readAdminStored('presentation.v1',{}),
-    inventory:readAdminStored('inventory-lite.v1',[]),
-    loyalty:readAdminStored('loyalty.v1',{}),
-    coupons:readAdminStored('coupons.v1',[]),
-    announcements:readAdminStored('announcements.v1',[]),
-  };
-}
-
 function restoreSnapshot(release:AdminRelease,replaceDraft:(draft:AdminSessionDraft,reason:string)=>void){
   const snapshot=restoreAdminReleaseAsDraft<Record<string,unknown>>(release);
-  if(snapshot.catalog)replaceDraft(snapshot.catalog as AdminSessionDraft,'由設定版本 R'+release.version+' 建立新草稿');
+  if(snapshot.catalog)replaceDraft(snapshot.catalog as AdminSessionDraft,'由設定版本 R'+release.version+' 還原內容');
   if(snapshot.optionCenter&&typeof snapshot.optionCenter==='object'&&!Array.isArray(snapshot.optionCenter)){
     const optionCenter=snapshot.optionCenter as {sets?:unknown;productLinks?:unknown};
     if(optionCenter.sets!==undefined)writeAdminStored(OPTION_SET_CENTER_STORAGE_KEYS.sets,optionCenter.sets);
     if(optionCenter.productLinks!==undefined)writeAdminStored(OPTION_SET_CENTER_STORAGE_KEYS.productLinks,optionCenter.productLinks);
+    writeAdminStored(OPTION_SET_CENTER_STORAGE_KEYS.dirty,false);
   }
   const map:Record<string,string>={
     availability:'availability.v1',businessDay:'business-day.v1',logicalPrinters:'logical-printers.v1',
@@ -53,72 +29,43 @@ function restoreSnapshot(release:AdminRelease,replaceDraft:(draft:AdminSessionDr
 }
 
 export function PublishCenterWorkspace(){
-  const {draft,dirty,validationErrors,validate,markClean,replaceDraft}=useAdminDraft();
-  const [optionValidationErrors,setOptionValidationErrors]=useState<readonly string[]>([]);
-  const [lastValidationAt,setLastValidationAt]=useState<string>();
-  const [impactPreviewed,setImpactPreviewed]=useState(false);
-  const [reason,setReason]=useState('');
+  const {markClean,replaceDraft}=useAdminDraft();
   const [releases,setReleases]=useState(()=>readAdminReleases());
-  const [message,setMessage]=useState('先檢查內容，再確認影響範圍；通過後建立不可變設定版本。門店派送屬下一階段，呢度唔會假裝已送達。');
-  const optionCenter=readOptionSetCenterState(draft);
-  const counts=useMemo(()=>({
-    categories:draft.categories.length,
-    products:draft.products.length,
-    modifiers:optionCenter.sets.length,
-    options:optionCenter.sets.reduce((sum,set)=>sum+set.options.length,0),
-    combos:draft.combos.length,
-  }),[draft,optionCenter.sets.length,optionCenter.sets.reduce((sum,set)=>sum+set.options.length,0)]);
+  const [active,setActive]=useState(()=>readActiveAdminRelease());
+  const [message,setMessage]=useState('每次喺菜單／商品／選項／套餐撳「保存」，就會建立一個不可變新版本並即時成為目前版本。呢度只保留版本歷史同還原。');
 
-  const runValidation=()=>{
-    const errors=validate();
-    const optionErrors=validateOptionSetCenter(readOptionSetCenterState(draft));
-    setOptionValidationErrors(optionErrors);
-    setLastValidationAt(new Date().toISOString());
-    setImpactPreviewed(false);
-    setMessage(errors.length||optionErrors.length?'內容檢查未通過；先修正問題。':'內容檢查通過，可以確認影響範圍。');
-  };
-  const canPreview=Boolean(lastValidationAt)&&validationErrors.length===0&&optionValidationErrors.length===0;
-  const createRelease=()=>{
-    const errors=validate();
-    const optionErrors=validateOptionSetCenter(readOptionSetCenterState(draft));
-    setOptionValidationErrors(optionErrors);
-    if(errors.length||optionErrors.length){setMessage('仍有資料問題，未建立版本。');return;}
-    const row=createAdminRelease(collectAdminSnapshot(draft),reason);
-    markClean();
-    setReleases(readAdminReleases());
-    setImpactPreviewed(false);
-    setReason('');
-    setMessage('已建立 '+row.label+'；內容驗證碼 '+row.fingerprint+'。設定版本已保存。');
-  };
   const restore=(release:AdminRelease)=>{
     restoreSnapshot(release,replaceDraft);
-    setMessage('已由 R'+release.version+' 建立新草稿；歷史版本本身冇被修改。');
+    const row=createAdminRelease(release.snapshot,'還原自 R'+release.version);
+    markClean();
+    writeAdminStored(OPTION_SET_CENTER_STORAGE_KEYS.dirty,false);
+    setReleases(readAdminReleases());
+    setActive({version:row.version,createdAt:row.createdAt,fingerprint:row.fingerprint});
+    setMessage('已由 R'+release.version+' 還原並保存成 R'+row.version+'；舊版本冇被修改。');
     window.setTimeout(()=>window.location.reload(),50);
   };
 
   return <section className="admin-editor-page">
     <header className="admin-editor-head">
-      <div><small>設定版本管理</small><h1>待發布變更</h1><p>Draft → 檢查內容 → 確認影響 → 建立新設定版本。任何 rollback 都係建立新草稿／新版本，唔會改寫歷史。</p></div>
+      <div><small>{active?'目前版本 R'+active.version:'未有保存版本'}</small><h1>設定版本歷史</h1><p>「保存」就係正式版本邊界。呢度冇第二個發佈步驟；歷史版本只讀，還原會建立另一個新版本。</p></div>
     </header>
+
     <div className="admin-kpi-grid">
-      <article><span>分類</span><strong>{counts.categories}</strong><small>{dirty?'有變更':'已保存'}</small></article>
-      <article><span>商品</span><strong>{counts.products}</strong><small>完整商品資料</small></article>
-      <article><span>選項 / 組</span><strong>{counts.options} / {counts.modifiers}</strong><small>選項組 / 子選項</small></article>
-      <article><span>套餐</span><strong>{counts.combos}</strong><small>保留 child 關係</small></article>
+      <article><span>目前版本</span><strong>{active?'R'+active.version:'—'}</strong><small>{active?new Date(active.createdAt).toLocaleString('zh-HK'):'未建立'}</small></article>
+      <article><span>版本總數</span><strong>{releases.length}</strong><small>不可變歷史</small></article>
+      <article><span>目前驗證碼</span><strong>{active?active.fingerprint.replace('fnv1a32:',''):'—'}</strong><small>保存後 readback</small></article>
+      <article><span>第二個發佈步驟</span><strong>0</strong><small>保存即目前版本</small></article>
     </div>
-    <div className="admin-policy-grid two">
-      <article className="admin-policy-card"><h2>1. 檢查內容</h2><button type="button" onClick={runValidation}>檢查完整性</button><small>{lastValidationAt?'最後檢查：'+new Date(lastValidationAt).toLocaleString('zh-HK'):'未檢查'}</small>{validationErrors.length||optionValidationErrors.length?<ul>{[...validationErrors,...optionValidationErrors].map((error,index)=><li key={index}>{error}</li>)}</ul>:null}</article>
-      <article className="admin-policy-card"><h2>2. 確認影響範圍</h2><p>今次設定版本包含菜單、價格設定、選項、套餐、供應、打印規則、門店政策、人員權限草稿同其他已完成 Admin 設定。</p><button type="button" disabled={!canPreview} onClick={()=>setImpactPreviewed(true)}>確認影響範圍</button><small>{impactPreviewed?'已確認':'先完成內容檢查'}</small></article>
-      <article className="admin-policy-card"><h2>3. 版本備註</h2><label><span>原因／變更說明（建議填寫）</span><textarea rows={4} value={reason} onChange={event=>setReason(event.target.value)} placeholder="例如：秋季菜單更新／調整外賣附加費"/></label></article>
-      <article className="admin-policy-card"><h2>4. 建立正式設定版本</h2><button type="button" disabled={!impactPreviewed||validationErrors.length>0} onClick={createRelease}>建立新設定版本</button><p>{message}</p><small>建立設定版本只代表後台已保存一份不可變版本；未有正式生效證據之前，介面唔會顯示已生效。</small></article>
-    </div>
+
+    <div className="admin-callout compact">{message}</div>
+
     <section className="admin-rule-card">
       <h2>版本歷史</h2>
-      {releases.length===0?<div className="admin-read-empty">未有正式設定版本。</div>:<div className="admin-editor-list">{releases.map(release=><article className="admin-policy-row" key={release.version}>
-        <div><b>R{release.version}</b><small>{new Date(release.createdAt).toLocaleString('zh-HK')}</small></div>
+      {releases.length===0?<div className="admin-read-empty">未有保存版本。去菜單／商品／選項／套餐修改後直接撳「保存」。</div>:<div className="admin-editor-list">{releases.map(release=><article className="admin-policy-row" key={release.version}>
+        <div><b>R{release.version}{active?.version===release.version?' · 目前':''}</b><small>{new Date(release.createdAt).toLocaleString('zh-HK')}</small></div>
         <code>{release.fingerprint}</code>
-        <span>{release.reason||'未填備註'}</span>
-        <button type="button" onClick={()=>restore(release)}>由此版本建立新草稿</button>
+        <span>{release.reason||'一般保存'}</span>
+        <button type="button" disabled={active?.version===release.version} onClick={()=>restore(release)}>還原為新版本</button>
       </article>)}</div>}
     </section>
   </section>;
