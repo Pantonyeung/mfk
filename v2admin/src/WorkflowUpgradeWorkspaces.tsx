@@ -28,7 +28,7 @@ export function ActionQueueWorkspace(){
       <header><span>事項</span><span>負責範圍</span><span>狀態</span><span>前往頁面</span><span>操作權限</span></header>
       {sample.map(row=><div className="admin-policy-row" key={row.id}><span>{row.kind}<small>{row.id}</small></span><span>{row.owner}</span><span>{row.state}</span><a href={row.route}>前往責任頁</a><StateChip>只作引導</StateChip></div>)}
     </section>
-    <section className="admin-rule-card"><h2>處理原則</h2><p>未有 canonical readback proof，一律保持 未確認 / 部分完成 / 資料過期；唔可以喺 Queue 入面扮 Resolved。</p></section>
+    <section className="admin-rule-card"><h2>處理原則</h2><p>未收到正式回傳之前，一律保持「未確認」、「部分完成」或「資料過期」；唔可以喺呢度自行標記完成。</p></section>
   </section>;
 }
 
@@ -67,7 +67,7 @@ export function CashCloseRecordWorkspace(){
       <article className="admin-policy-card"><h2>開舖記錄</h2><label><span>開舖現金</span><input inputMode="decimal" value={opening} onChange={e=>setOpening(e.target.value)} placeholder="0.00"/></label><StateChip>只作記錄</StateChip></article>
       <article className="admin-policy-card"><h2>收舖預覽</h2><div className="admin-read-empty">預期現金資料尚未啟用</div><small>任何差異或待處理事項只會提示，唔會阻止交易。</small></article>
       <article className="admin-policy-card"><h2>點算／交更草稿</h2><label><span>點算現金</span><input inputMode="decimal" value={counted} onChange={e=>setCounted(e.target.value)} placeholder="0.00"/></label><label><span>備註</span><textarea value={note} onChange={e=>setNote(e.target.value)} placeholder="交更備註"/></label><StateChip>只保存今次草稿</StateChip></article>
-      <article className="admin-policy-card"><h2>收舖記錄</h2><button disabled>Save 收舖記錄 未接駁</button><small>唔會停止門店交易。</small></article>
+      <article className="admin-policy-card"><h2>收舖記錄</h2><button disabled>保存收舖記錄尚未開放</button><small>唔會停止門店交易。</small></article>
     </div>
   </section>;
 }
@@ -99,7 +99,7 @@ function FixedReport({title,metrics}:{title:string;metrics:readonly string[]}){
 
 export const ProductReportWorkspace=()=> <FixedReport title="商品報表" metrics={['Units','Sales','銷售佔比 %','最高銷量商品']}/>;
 export const ChannelReportWorkspace=()=> <FixedReport title="渠道報表" metrics={['Orders','Gross','平台資料','Exceptions']}/>;
-export const RefundReportWorkspace=()=> <FixedReport title="退款報表" metrics={['Requests','Approved','Rejected','Unknown']}/>;
+export const RefundReportWorkspace=()=> <FixedReport title="退款報表" metrics={['申請','已批准','已拒絕','未確認']}/>;
 
 export function ExportGovernanceWorkspace(){
   const [scope,setScope]=useState('REPORT_CURRENT_FILTER');
@@ -108,16 +108,16 @@ export function ExportGovernanceWorkspace(){
     <UpgradeHeader title="匯出治理" description="匯出功能會受權限、資料範圍同私隱規則限制；目前匯出服務尚未啟用。"/>
     <div className="admin-policy-grid two">
       <article className="admin-policy-card"><h2>匯出範圍</h2><label><span>範圍</span><select value={scope} onChange={e=>setScope(e.target.value)}><option value="REPORT_CURRENT_FILTER">目前報表篩選</option><option value="STORE_DAY">門店／日期</option><option value="AUDIT_RANGE">操作記錄範圍</option></select></label><label className="admin-toggle"><input type="checkbox" checked={includePii} onChange={e=>setIncludePii(e.target.checked)}/><span>包含個人資料欄位</span></label></article>
-      <article className="admin-policy-card"><h2>記錄</h2><div className="admin-read-empty">EXPORT_PERMISSION / HASH / AUDIT_尚未啟用</div><button disabled>匯出尚未開放</button></article>
+      <article className="admin-policy-card"><h2>記錄</h2><div className="admin-read-empty">匯出權限同記錄尚未啟用</div><button disabled>匯出尚未開放</button></article>
     </div>
   </section>;
 }
 
 export function DiagnosticsWorkspace(){
   return <section className="admin-editor-page">
-    <UpgradeHeader title="Diagnostics" description="Finding / incident / trace / evidence / recovery proof。未證明 root cause 就保持 未確認；Diagnostics 唔取得 domain mutation authority。"/>
+    <UpgradeHeader title="系統狀態" description="顯示系統異常、相關記錄同修復證據。未確認原因之前會保持「未確認」，呢度唔會直接改動正式資料。"/>
     <div className="admin-kpi-grid"><article><span>健康狀態</span><strong>—</strong><small>未確認</small></article><article><span>第一個異常</span><strong>—</strong><small>尚未啟用</small></article><article><span>修復證據</span><strong>—</strong><small>尚未啟用</small></article><article><span>記錄編號</span><strong>—</strong><small>尚未啟用</small></article></div>
-    <section className="admin-read-table"><header><span>發現</span><span>範圍</span><span>狀態</span><span>記錄</span><span>操作</span></header><div className="admin-read-empty">DIAGNOSTICS_READ_MODEL_尚未啟用</div></section>
+    <section className="admin-read-table"><header><span>發現</span><span>範圍</span><span>狀態</span><span>記錄</span><span>操作</span></header><div className="admin-read-empty">系統狀態資料尚未啟用</div></section>
   </section>;
 }
 
@@ -125,10 +125,10 @@ export function IntegrationsGovernanceWorkspace(){
   return <section className="admin-editor-page">
     <UpgradeHeader title="外部連接" description="只顯示外部連接所需設定同狀態；目前唔會連接任何平台。"/>
     <div className="admin-policy-grid two">
-      <article className="admin-policy-card"><h2>連接憑證狀態</h2><div className="admin-read-empty">CREDENTIAL_REFERENCE_尚未啟用</div><small>唔會喺畫面顯示或保存秘密資料。</small></article>
-      <article className="admin-policy-card"><h2>接收安全設定</h2><div className="admin-read-empty">WEBHOOK_SIGNATURE_REPLAY_尚未啟用</div></article>
-      <article className="admin-policy-card"><h2>資料格式</h2><div className="admin-read-empty">PROVIDER_SCHEMA_READBACK_尚未啟用</div></article>
-      <article className="admin-policy-card"><h2>傳送狀態</h2><div className="admin-read-empty">DELIVERY_READBACK_尚未啟用</div></article>
+      <article className="admin-policy-card"><h2>連接憑證狀態</h2><div className="admin-read-empty">連接憑證資料尚未啟用</div><small>唔會喺畫面顯示或保存秘密資料。</small></article>
+      <article className="admin-policy-card"><h2>接收安全設定</h2><div className="admin-read-empty">接收安全資料尚未啟用</div></article>
+      <article className="admin-policy-card"><h2>資料格式</h2><div className="admin-read-empty">平台資料格式尚未啟用</div></article>
+      <article className="admin-policy-card"><h2>傳送狀態</h2><div className="admin-read-empty">傳送狀態尚未啟用</div></article>
     </div>
   </section>;
 }
