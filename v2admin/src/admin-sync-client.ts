@@ -1,4 +1,5 @@
 import {createMfkAdminConfigEnvelope,type MfkAdminConfigEnvelope,type MfkAdminConfigAck} from '../../contracts/admin-config-sync-v1.ts';
+import {projectStaffForRuntime} from '../../contracts/staff-auth-v1.ts';
 import {readAdminReleases,readAdminStored,writeAdminStored,type AdminRelease} from './admin-local-store.ts';
 
 const OUTBOX_KEY='sync-outbox.v1';
@@ -45,14 +46,24 @@ function publisherKey(){
   return key;
 }
 
-export function queueAdminReleaseSync(release:AdminRelease,storeId='MF01'){
+async function runtimeSnapshot(release:AdminRelease){
   if(!release.snapshot||typeof release.snapshot!=='object'||Array.isArray(release.snapshot))throw new Error('ADMIN_SYNC_RELEASE_SNAPSHOT_INVALID');
+  const snapshot=release.snapshot as Readonly<Record<string,unknown>>;
+  return Object.freeze({
+    ...snapshot,
+    staffAuth:await projectStaffForRuntime(snapshot.staff),
+    // Never transmit raw staff PIN material to SMT/cloud projection.
+    staff:undefined,
+  });
+}
+
+export async function queueAdminReleaseSync(release:AdminRelease,storeId='MF01'){
   const envelope=createMfkAdminConfigEnvelope({
     storeId,
     revision:release.version,
     publishedAt:release.createdAt,
     adminFingerprint:release.fingerprint,
-    snapshot:release.snapshot as Readonly<Record<string,unknown>>,
+    snapshot:await runtimeSnapshot(release),
   });
   const rows=readOutbox().filter(row=>row.revision!==envelope.revision);
   writeOutbox([...rows,envelope].sort((a,b)=>a.revision-b.revision));
@@ -114,7 +125,7 @@ export function installAdminSyncAutoFlush(){
     const status=readAdminSyncStatus();
     const pending=readOutbox().some(row=>row.revision===latest.version);
     if(status.revision===latest.version&&status.state==='PUBLISHED'&&!pending)return;
-    queueAdminReleaseSync(latest);
+    void queueAdminReleaseSync(latest);
   };
   window.addEventListener('online',flush);
   window.addEventListener('focus',flush);
