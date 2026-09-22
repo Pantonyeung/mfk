@@ -124,14 +124,24 @@ export const ProductReportWorkspace=()=> <FixedReport title="商品報表" metri
 export const ChannelReportWorkspace=()=> <FixedReport title="渠道報表" metrics={['訂單','總額','平台資料','異常']} storeKey="report-channels.v1"/>;
 export const RefundReportWorkspace=()=> <FixedReport title="退款報表" metrics={['申請','已批准','已拒絕','未確認']} storeKey="report-refunds.v1"/>;
 
+interface ExportPolicy{scope:'REPORT_CURRENT_FILTER'|'STORE_DAY'|'AUDIT_RANGE';includePii:boolean;requireOwnerApproval:boolean;retentionDays:number}
 export function ExportGovernanceWorkspace(){
-  const [scope,setScope]=useState('REPORT_CURRENT_FILTER');
-  const [includePii,setIncludePii]=useState(false);
+  const [policy,setPolicy]=usePersistentAdminState<ExportPolicy>('export-policy.v1',{scope:'REPORT_CURRENT_FILTER',includePii:false,requireOwnerApproval:true,retentionDays:30});
+  const audit=readAdminAudit();
+  const patch=(change:Partial<ExportPolicy>)=>setPolicy(current=>{const after={...current,...change};appendAdminAudit({action:'修改匯出治理設定',target:'Export Policy',before:current,after});return after;});
+  const exportAudit=()=>{
+    const data=JSON.stringify(audit,null,2);
+    const blob=new Blob([data],{type:'application/json'});
+    const url=URL.createObjectURL(blob);
+    const anchor=document.createElement('a');
+    anchor.href=url;anchor.download='mfk-admin-audit-'+new Date().toISOString().slice(0,10)+'.json';anchor.click();URL.revokeObjectURL(url);
+    appendAdminAudit({action:'匯出操作記錄',target:'Audit',after:{rows:audit.length}});
+  };
   return <section className="admin-editor-page">
-    <UpgradeHeader title="匯出治理" description="匯出功能會受權限、資料範圍同私隱規則限制；目前匯出服務尚未啟用。"/>
+    <UpgradeHeader title="匯出治理" description="管理匯出範圍、PII、審批同保留日數；每次匯出都要留 audit evidence。" kicker="匯出政策"/>
     <div className="admin-policy-grid two">
-      <article className="admin-policy-card"><h2>匯出範圍</h2><label><span>範圍</span><select value={scope} onChange={e=>setScope(e.target.value)}><option value="REPORT_CURRENT_FILTER">目前報表篩選</option><option value="STORE_DAY">門店／日期</option><option value="AUDIT_RANGE">操作記錄範圍</option></select></label><label className="admin-toggle"><input type="checkbox" checked={includePii} onChange={e=>setIncludePii(e.target.checked)}/><span>包含個人資料欄位</span></label></article>
-      <article className="admin-policy-card"><h2>記錄</h2><div className="admin-read-empty">匯出權限同記錄尚未啟用</div><button disabled>匯出尚未開放</button></article>
+      <article className="admin-policy-card"><h2>匯出規則</h2><label><span>預設範圍</span><select value={policy.scope} onChange={event=>patch({scope:event.target.value as ExportPolicy['scope']})}><option value="REPORT_CURRENT_FILTER">目前報表篩選</option><option value="STORE_DAY">門店／日期</option><option value="AUDIT_RANGE">操作記錄範圍</option></select></label><label className="admin-toggle"><input type="checkbox" checked={policy.includePii} onChange={event=>patch({includePii:event.target.checked})}/><span>允許 PII 欄位</span></label><label className="admin-toggle"><input type="checkbox" checked={policy.requireOwnerApproval} onChange={event=>patch({requireOwnerApproval:event.target.checked})}/><span>敏感匯出需要 Owner 批准</span></label><label><span>匯出檔保留日數</span><input type="number" min={1} value={policy.retentionDays} onChange={event=>patch({retentionDays:Number(event.target.value)||30})}/></label></article>
+      <article className="admin-policy-card"><h2>目前可匯出資料</h2><p>Admin 操作記錄：{audit.length} 筆</p><button type="button" onClick={exportAudit}>匯出操作記錄 JSON</button><small>未有正式 read model 嘅報表唔會輸出假資料。</small></article>
     </div>
   </section>;
 }
