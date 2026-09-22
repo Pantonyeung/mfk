@@ -2,7 +2,7 @@ import {useEffect,useMemo,useState} from 'react';
 import {useAdminDraft} from './admin-draft.tsx';
 import {appendAdminAudit,readActiveAdminRelease,usePersistentAdminState,writeAdminStored} from './admin-local-store.ts';
 import {saveAdminConfig} from './admin-config-save.ts';
-import {beginKeetaOAuth,checkKeetaTokenReadiness,readKeetaLiveStatus,type KeetaLiveStatus} from './keeta-live-client.ts';
+import {beginKeetaOAuth,checkKeetaTokenReadiness,importKeetaTestToken,readKeetaLiveStatus,type KeetaLiveStatus} from './keeta-live-client.ts';
 
 function PolicyHeader({title,description,badge='已自動保存設定'}:{title:string;description:string;badge?:string}){
   return <header className="admin-editor-head">
@@ -213,6 +213,7 @@ export function ChannelsWorkspace({mode}:{mode:'overview'|'mapping'|'failures'|'
   const [liveStatus,setLiveStatus]=useState<KeetaLiveStatus|null>(null);
   const [liveError,setLiveError]=useState('');
   const [liveBusy,setLiveBusy]=useState(false);
+  const [testTokenJson,setTestTokenJson]=useState('');
   const refreshLive=async()=>{
     try{setLiveStatus(await readKeetaLiveStatus());setLiveError('');}
     catch(error){setLiveError(error instanceof Error?error.message:'KEETA_STATUS_FAILED');}
@@ -236,6 +237,17 @@ export function ChannelsWorkspace({mode}:{mode:'overview'|'mapping'|'failures'|'
       await refreshLive();
     }finally{setLiveBusy(false);}
   };
+  const importTestToken=async()=>{
+    if(!testTokenJson.trim())return;
+    setLiveBusy(true);setLiveError('');
+    try{
+      await importKeetaTestToken(testTokenJson);
+      setTestTokenJson('');
+      await refreshLive();
+    }catch(error){
+      setLiveError(error instanceof Error?error.message:'KEETA_TEST_TOKEN_IMPORT_FAILED');
+    }finally{setLiveBusy(false);}
+  };
   const [config,setConfig]=usePersistentAdminState<ChannelConfig>('channel-policy.keeta.v1',{enabled:false,autoAccept:false,syncSellability:false,commissionPct:'',displayName:'Keeta',lateCutoffMinutes:15});
   const [mappings,setMappings]=usePersistentAdminState<MappingRow[]>('channel-mapping.keeta.v1',[]);
   const [providerItemId,setProviderItemId]=useState('');
@@ -253,6 +265,7 @@ export function ChannelsWorkspace({mode}:{mode:'overview'|'mapping'|'failures'|'
         <p><span>Provider Shop</span><b>{liveStatus.providerShopId??'未設定'}</b></p>
         <p><span>OAuth</span><b>{liveStatus.oauth.state}</b></p>
         <p><span>Token 到期</span><b>{liveStatus.oauth.expiresAt?new Date(liveStatus.oauth.expiresAt).toLocaleString('zh-HK'):'—'}</b></p>
+        <p><span>Token 來源</span><b>{liveStatus.oauth.tokenSource??'—'}</b></p>
         <p><span>最近 OAuth callback</span><b>{liveStatus.oauth.lastCallbackAt?new Date(liveStatus.oauth.lastCallbackAt).toLocaleString('zh-HK'):'—'}</b></p>
         <p><span>Callback 結果</span><b>{liveStatus.oauth.lastCallbackResult??'—'}</b></p>
         <p><span>Callback 錯誤</span><b>{liveStatus.oauth.lastCallbackError??'—'}</b></p>
