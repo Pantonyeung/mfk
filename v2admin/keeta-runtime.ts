@@ -1,6 +1,8 @@
+import {buildKeetaMenuProjection} from './keeta-menu-projection.ts';
 import {MFK_KEETA_ORDER_INTENT_SCHEMA,validateMfkKeetaOrderAck} from '../contracts/keeta-order-intake-v1.ts';
 const KEETA_AUTHORIZE_URL='https://merchant.mykeeta.com/m/web/openapi/authorize';
 const KEETA_TOKEN_URL='https://open.mykeeta.com/api/open/base/oauth/token';
+const KEETA_MENU_SYNC_URL='https://open.mykeeta.com/api/open/product/menu/sync';
 const TOKEN_REFRESH_WINDOW_MS=5*24*60*60*1000;
 const TOKEN_REFRESH_MIN_INTERVAL_MS=60_000;
 const OAUTH_STATE_TTL_MS=10*60*1000;
@@ -226,6 +228,51 @@ async function sendSignedProviderRequest({url,params,appSecret}){
   });
   if(response.status!==200)throw new Error('KEETA_HTTP_STATUS_'+response.status);
   return response.text();
+}
+
+async function submitKeetaMenuSync(config,token,payload){
+  const raw=await sendSignedProviderRequest({
+    url:KEETA_MENU_SYNC_URL,
+    params:{
+      accessToken:token.accessToken,
+      appId:config.appId,
+      choiceGroupList:payload.choiceGroupList,
+      shopCategoryList:payload.shopCategoryList,
+      shopId:config.providerShopId,
+      spuList:payload.spuList,
+      spuSequenceCodeMap:payload.spuSequenceCodeMap,
+      timestamp:Math.floor(Date.now()/1000),
+    },
+    appSecret:config.appSecret,
+  });
+  let body;
+  try{body=JSON.parse(raw);}catch{throw new Error('KEETA_MENU_SYNC_RESPONSE_INVALID_JSON');}
+  const row=record(body,'KEETA_MENU_SYNC_RESPONSE_INVALID');
+  const code=Number(row.code);
+  if(!Number.isSafeInteger(code))throw new Error('KEETA_MENU_SYNC_RESPONSE_CODE_INVALID');
+  if(code!==0)throw new Error('KEETA_MENU_SYNC_PROVIDER_'+code+':'+String(row.message||''));
+  return positiveInt(row.data,'KEETA_MENU_SYNC_TASK_ID_INVALID');
+}
+
+function parseKeetaMenuCompletionMessage(message,eventId,providerShopId){
+  let row;
+  try{row=record(JSON.parse(message),'KEETA_MENU_COMPLETION_INVALID');}
+  catch(error){throw new Error(error instanceof Error?error.message:'KEETA_MENU_COMPLETION_INVALID_JSON');}
+  if(positiveInt(row.shopId,'KEETA_MENU_COMPLETION_SHOP_ID_INVALID')!==providerShopId){
+    throw new Error('KEETA_MENU_COMPLETION_SHOP_ID_MISMATCH');
+  }
+  const errorsRaw=eventId===1202?row.errorSpuDTOList:row.errorList;
+  const errors=Array.isArray(errorsRaw)?errorsRaw.map(item=>record(item,'KEETA_MENU_COMPLETION_ERROR_INVALID')):[];
+  return Object.freeze({
+    taskId:positiveInt(row.taskId,'KEETA_MENU_COMPLETION_TASK_ID_INVALID'),
+    mainTaskId:row.mainTaskId==null?null:positiveInt(row.mainTaskId,'KEETA_MENU_COMPLETION_MAIN_TASK_ID_INVALID'),
+    pictureTaskId:row.pictureTaskId==null?null:positiveInt(row.pictureTaskId,'KEETA_MENU_COMPLETION_PICTURE_TASK_ID_INVALID'),
+    errors:Object.freeze(errors.map(item=>Object.freeze({
+      openItemCode:typeof item.openItemCode==='string'?item.openItemCode:null,
+      code:Number.isFinite(Number(item.code))?Number(item.code):null,
+      message:typeof item.message==='string'?item.message:null,
+    }))),
+  });
 }
 
 async function exchangeAuthorizationCode(config,code){
@@ -549,6 +596,64 @@ export class KeetaRuntimeStore{
     }
 
 
+    if(url.pathname==='/admin/menu/preview'&&request.method==='POST'){
+      try{
+        const body=record(await request.json(),'KEETA_MENU_PREVIEW_INPUT_INVALID');
+        const revision=positiveInt(body.revision,'KEETA_MENU_ADMIN_REVISION_INVALID');
+        const adminFingerprint=nonEmpty(body.adminFingerprint,'KEETA_MENU_ADMIN_FINGERPRINT_REQUIRED');
+        const projection=buildKeetaMenuProjection(body.snapshot);
+        const snapshotFingerprint=await sha256Hex(stable(projection.payload));
+        return json({
+          state:'READY',
+          revision,
+          adminFingerprint,
+          snapshotFingerprint,
+          summary:projection.summary,
+          destructiveOmissionSemantics:'FULL_SNAPSHOT_OMISSIONS_DELETE_PROVIDER_ENTITIES',
+        });
+      }catch(error){
+        return json({state:'BLOCKED',code:error instanceof Error?error.message:'KEETA_MENU_PREVIEW_FAILED'},409);
+      }
+    }
+
+    if(url.pathname==='/admin/menu/sync'&&request.method==='POST'){
+      try{
+        const body=record(await request.json(),'KEETA_MENU_SYNC_INPUT_INVALID');
+        const revision=positiveInt(body.revision,'KEETA_MENU_ADMIN_REVISION_INVALID');
+        const adminFingerprint=nonEmpty(body.adminFingerprint,'KEETA_MENU_ADMIN_FINGERPRINT_REQUIRED');
+        const projection=buildKeetaMenuProjection(body.snapshot);
+        const snapshotFingerprint=await sha256Hex(stable(projection.payload));
+        const token=await this.usableToken();
+        const taskId=await submitKeetaMenuSync(requireRuntimeConfig(this.env),token,projection.payload);
+        const submittedAt=new Date().toISOString();
+        const row=Object.freeze({
+          state:'SUBMITTED',
+          provider:'KEETA',
+          canonicalStoreId:'MF01',
+          providerShopId:Number(this.env.KEETA_PROVIDER_SHOP_ID),
+          taskId,
+          adminRevision:revision,
+          adminFingerprint,
+          snapshotFingerprint,
+          summary:projection.summary,
+          submittedAt,
+          completion:null,
+          pictureCompletion:null,
+        });
+        await this.state.storage.put('menu:sync:task:'+taskId,row);
+        await this.state.storage.put('menu:sync:latest',row);
+        return json(row);
+      }catch(error){
+        return json({state:'FAILED',code:error instanceof Error?error.message:'KEETA_MENU_SYNC_FAILED'},409);
+      }
+    }
+
+    if(url.pathname==='/admin/menu/status'&&(request.method==='GET'||request.method==='POST')){
+      const latest=await this.state.storage.get('menu:sync:latest');
+      return latest?json(latest):json({state:'NEVER_SYNCED',provider:'KEETA',canonicalStoreId:'MF01'});
+    }
+
+
     if(url.pathname==='/smt/orders/pending'&&request.method==='GET'){
       const rows=await this.state.storage.list({prefix:'order:intent:'});
       const intents=[...rows.values()]
@@ -671,6 +776,43 @@ export class KeetaRuntimeStore{
           lastEventId:envelope.eventId,
           lastMessageId:envelope.messageId,
         });
+
+        if(envelope.eventId===1202||envelope.eventId===1201){
+          const completion=parseKeetaMenuCompletionMessage(envelope.message,envelope.eventId,config.providerShopId);
+          const menuTaskId=envelope.eventId===1202?completion.taskId:completion.mainTaskId;
+          if(menuTaskId){
+            const taskKey='menu:sync:task:'+menuTaskId;
+            const current=await this.state.storage.get(taskKey);
+            if(current){
+              const updated=Object.freeze({
+                ...current,
+                ...(envelope.eventId===1202?{
+                  state:completion.errors.length?'PARTIAL':'COMPLETED',
+                  completion:Object.freeze({
+                    messageId:envelope.messageId,
+                    completedAt:acceptedAt,
+                    taskId:completion.taskId,
+                    pictureTaskId:completion.pictureTaskId,
+                    errors:completion.errors,
+                  }),
+                }:{
+                  pictureCompletion:Object.freeze({
+                    messageId:envelope.messageId,
+                    completedAt:acceptedAt,
+                    taskId:completion.taskId,
+                    mainTaskId:completion.mainTaskId,
+                    errors:completion.errors,
+                  }),
+                }),
+              });
+              await this.state.storage.put(taskKey,updated);
+              const latest=await this.state.storage.get('menu:sync:latest');
+              if(latest&&Number(latest.taskId)===Number(menuTaskId)){
+                await this.state.storage.put('menu:sync:latest',updated);
+              }
+            }
+          }
+        }
         return json({code:0,message:'Success',data:{}});
       }catch(error){
         const code=error instanceof Error?error.message:'KEETA_WEBHOOK_REJECTED';

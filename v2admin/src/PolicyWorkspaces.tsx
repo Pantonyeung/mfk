@@ -2,7 +2,18 @@ import {useEffect,useMemo,useState} from 'react';
 import {useAdminDraft} from './admin-draft.tsx';
 import {appendAdminAudit,readActiveAdminRelease,usePersistentAdminState,writeAdminStored} from './admin-local-store.ts';
 import {saveAdminConfig} from './admin-config-save.ts';
-import {beginKeetaOAuth,checkKeetaTokenReadiness,importKeetaTestToken,readKeetaLiveStatus,type KeetaLiveStatus} from './keeta-live-client.ts';
+import {
+  beginKeetaOAuth,
+  checkKeetaTokenReadiness,
+  importKeetaTestToken,
+  previewKeetaMenu,
+  readKeetaLiveStatus,
+  readKeetaMenuStatus,
+  syncKeetaMenu,
+  type KeetaLiveStatus,
+  type KeetaMenuPreview,
+  type KeetaMenuStatus,
+} from './keeta-live-client.ts';
 
 function PolicyHeader({title,description,badge='本機設定自動保存'}:{title:string;description:string;badge?:string}){
   return <header className="admin-editor-head">
@@ -217,11 +228,23 @@ export function ChannelsWorkspace({mode}:{mode:'overview'|'mapping'|'failures'|'
   const [liveError,setLiveError]=useState('');
   const [liveBusy,setLiveBusy]=useState(false);
   const [testTokenJson,setTestTokenJson]=useState('');
+  const [menuPreview,setMenuPreview]=useState<KeetaMenuPreview|null>(null);
+  const [menuStatus,setMenuStatus]=useState<KeetaMenuStatus|null>(null);
+  const [menuBusy,setMenuBusy]=useState(false);
   const refreshLive=async()=>{
     try{setLiveStatus(await readKeetaLiveStatus());setLiveError('');}
     catch(error){setLiveError(error instanceof Error?error.message:'KEETA_STATUS_FAILED');}
   };
-  useEffect(()=>{if(mode==='overview')void refreshLive();},[mode]);
+  const refreshMenu=async()=>{
+    try{setMenuStatus(await readKeetaMenuStatus());}
+    catch(error){setLiveError(error instanceof Error?error.message:'KEETA_MENU_STATUS_FAILED');}
+  };
+  useEffect(()=>{
+    if(mode==='overview'||mode==='sync'){
+      void refreshLive();
+      void refreshMenu();
+    }
+  },[mode]);
   const authorize=async()=>{
     setLiveBusy(true);setLiveError('');
     try{
@@ -250,6 +273,27 @@ export function ChannelsWorkspace({mode}:{mode:'overview'|'mapping'|'failures'|'
     }catch(error){
       setLiveError(error instanceof Error?error.message:'KEETA_TEST_TOKEN_IMPORT_FAILED');
     }finally{setLiveBusy(false);}
+  };
+  const previewMenu=async()=>{
+    setMenuBusy(true);setLiveError('');
+    try{
+      const preview=await previewKeetaMenu();
+      setMenuPreview(preview);
+      await refreshMenu();
+    }catch(error){
+      setMenuPreview(null);
+      setLiveError(error instanceof Error?error.message:'KEETA_MENU_PREVIEW_FAILED');
+    }finally{setMenuBusy(false);}
+  };
+  const submitMenu=async()=>{
+    setMenuBusy(true);setLiveError('');
+    try{
+      const preview=await previewKeetaMenu();
+      setMenuPreview(preview);
+      setMenuStatus(await syncKeetaMenu());
+    }catch(error){
+      setLiveError(error instanceof Error?error.message:'KEETA_MENU_SYNC_FAILED');
+    }finally{setMenuBusy(false);}
   };
   const [config,setConfig]=usePersistentAdminState<ChannelConfig>('channel-policy.keeta.v1',{enabled:false,autoAccept:false,syncSellability:false,commissionPct:'',displayName:'Keeta',lateCutoffMinutes:15});
   const [mappings,setMappings]=usePersistentAdminState<MappingRow[]>('channel-mapping.keeta.v1',[]);
@@ -306,7 +350,37 @@ export function ChannelsWorkspace({mode}:{mode:'overview'|'mapping'|'failures'|'
         </div>
         <small>Token 只會送到 MFK runtime，以現有 encryption key 加密保存；成功後輸入欄會即時清空。呢個輸入唔會寫入 Admin draft、localStorage 或操作記錄。</small>
       </details>
-      <small>目前 R1 只打通 OAuth、Token、Store Binding 同 Signed Webhook ingress。未自動建立 Formal Order，亦未啟動 Provider confirm / menu sync / refund command。</small>
+      <small>目前連線層已接通；Provider business commands 會按 Owner 已授權嘅 Keeta Full Integration program 逐 seam 接入。</small>
+    </section>:null}
+    {(mode==='overview'||mode==='sync')?<section className="admin-policy-card">
+      <header>
+        <div><small>KEETA FULL MENU SNAPSHOT</small><h2>Keeta 菜單同步</h2></div>
+        <span className={menuStatus?.state==='COMPLETED'?'admin-status-good':'admin-not-wired-chip'}>{menuStatus?.state??'讀取中'}</span>
+      </header>
+      <p>來源固定為已發布 Admin 設定版本；同步係 full snapshot。預檢會先確認分類、商品、Option Set、OpenItemCode 同完整排序，再提交 Keeta 非同步 task。</p>
+      {menuPreview?<div className="admin-readback-proof">
+        <p><span>Admin Revision</span><b>R{menuPreview.revision}</b></p>
+        <p><span>分類</span><b>{menuPreview.summary.categories}</b></p>
+        <p><span>商品</span><b>{menuPreview.summary.spus}</b></p>
+        <p><span>SKU</span><b>{menuPreview.summary.skus}</b></p>
+        <p><span>Option Groups</span><b>{menuPreview.summary.choiceGroups}</b></p>
+        <p><span>Options</span><b>{menuPreview.summary.options}</b></p>
+        <p><span>Snapshot</span><b>{menuPreview.snapshotFingerprint.slice(0,18)}…</b></p>
+      </div>:null}
+      {menuStatus&&menuStatus.state!=='NEVER_SYNCED'?<div className="admin-readback-proof">
+        <p><span>狀態</span><b>{menuStatus.state}</b></p>
+        <p><span>Task ID</span><b>{menuStatus.taskId??'—'}</b></p>
+        <p><span>提交時間</span><b>{menuStatus.submittedAt?new Date(menuStatus.submittedAt).toLocaleString('zh-HK'):'—'}</b></p>
+        <p><span>1202 Completion</span><b>{menuStatus.completion?new Date(menuStatus.completion.completedAt).toLocaleString('zh-HK'):'—'}</b></p>
+        <p><span>1201 Picture Completion</span><b>{menuStatus.pictureCompletion?new Date(menuStatus.pictureCompletion.completedAt).toLocaleString('zh-HK'):'—'}</b></p>
+        <p><span>Errors</span><b>{menuStatus.completion?.errors.length??0}</b></p>
+      </div>:null}
+      <div className="admin-callout compact">Full snapshot 規則：未包含嘅既有 provider OpenItemCode 可能被 Keeta 刪除。呢度用完整已發布 MFK catalog 建 snapshot，唔會由 UI 手工砌半份 payload。</div>
+      <div className="admin-editor-actions">
+        <button type="button" className="secondary" disabled={menuBusy} onClick={()=>void previewMenu()}>預檢完整菜單</button>
+        <button type="button" className="primary" disabled={menuBusy||liveStatus?.oauth.state!=='CONNECTED'} onClick={()=>void submitMenu()}>同步完整菜單到 Keeta</button>
+        <button type="button" className="secondary" disabled={menuBusy} onClick={()=>void refreshMenu()}>更新同步狀態</button>
+      </div>
     </section>:null}
     <div className="admin-policy-grid two">
       <article className="admin-policy-card"><h2>Keeta 平台設定</h2><label><span>顯示名稱</span><input value={config.displayName} onChange={event=>patch({displayName:event.target.value})}/></label><Toggle checked={config.enabled} onChange={enabled=>patch({enabled})} label="啟用平台設定"/><Toggle checked={config.autoAccept} onChange={autoAccept=>patch({autoAccept})} label="正常單自動接單"/><Toggle checked={config.syncSellability} onChange={syncSellability=>patch({syncSellability})} label="同步售罄／供應"/><label><span>遲到訂單界線（分鐘）</span><input type="number" min={0} value={config.lateCutoffMinutes} onChange={event=>patch({lateCutoffMinutes:Number(event.target.value)||0})}/></label><label><span>佣金估算 %</span><input inputMode="decimal" value={config.commissionPct} onChange={event=>patch({commissionPct:event.target.value})}/></label></article>

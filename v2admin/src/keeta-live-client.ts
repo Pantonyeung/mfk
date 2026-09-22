@@ -87,3 +87,62 @@ export async function importKeetaTestToken(raw:string){
   if(!response.ok)throw new Error(body.code||'KEETA_TEST_TOKEN_IMPORT_HTTP_'+response.status);
   return body;
 }
+
+
+export interface KeetaMenuSummary{
+  readonly categories:number;
+  readonly choiceGroups:number;
+  readonly options:number;
+  readonly spus:number;
+  readonly skus:number;
+}
+export interface KeetaMenuPreview{
+  readonly state:'READY';
+  readonly revision:number;
+  readonly adminFingerprint:string;
+  readonly snapshotFingerprint:string;
+  readonly summary:KeetaMenuSummary;
+  readonly destructiveOmissionSemantics:string;
+}
+export interface KeetaMenuStatus{
+  readonly state:'NEVER_SYNCED'|'SUBMITTED'|'COMPLETED'|'PARTIAL'|'FAILED';
+  readonly taskId?:number;
+  readonly adminRevision?:number;
+  readonly snapshotFingerprint?:string;
+  readonly summary?:KeetaMenuSummary;
+  readonly submittedAt?:string;
+  readonly completion?:{
+    readonly messageId:string;
+    readonly completedAt:string;
+    readonly taskId:number;
+    readonly pictureTaskId:number|null;
+    readonly errors:readonly {readonly openItemCode:string|null;readonly code:number|null;readonly message:string|null}[];
+  }|null;
+  readonly pictureCompletion?:{
+    readonly messageId:string;
+    readonly completedAt:string;
+    readonly taskId:number;
+    readonly mainTaskId:number|null;
+    readonly errors:readonly {readonly openItemCode:string|null;readonly code:number|null;readonly message:string|null}[];
+  }|null;
+}
+async function keetaAdminPost<T>(path:string):Promise<T>{
+  const response=await fetch('/api/keeta/admin/'+path+'?storeId=MF01',{
+    method:'POST',
+    credentials:'same-origin',
+    cache:'no-store',
+    headers:{'content-type':'application/json',...headers()},
+  });
+  const body=await response.json().catch(()=>({})) as T&{code?:string};
+  if(!response.ok)throw new Error(body.code||'KEETA_ADMIN_HTTP_'+response.status);
+  return body;
+}
+export function previewKeetaMenu():Promise<KeetaMenuPreview>{
+  return keetaAdminPost<KeetaMenuPreview>('menu/preview');
+}
+export function syncKeetaMenu():Promise<KeetaMenuStatus>{
+  return keetaAdminPost<KeetaMenuStatus>('menu/sync');
+}
+export function readKeetaMenuStatus():Promise<KeetaMenuStatus>{
+  return keetaAdminPost<KeetaMenuStatus>('menu/status');
+}

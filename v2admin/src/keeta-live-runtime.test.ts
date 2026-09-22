@@ -463,4 +463,103 @@ describe('Keeta live edge runtime',()=>{
     expect((await after.json() as {orders:unknown[]}).orders).toHaveLength(0);
   });
 
+
+  it('submits a canonical full-menu task and banks 1202 completion readback',async()=>{
+    const key=Buffer.alloc(32,13).toString('base64');
+    const storage=new Map<string,unknown>();
+    const state={storage:{
+      get:async(key:string)=>storage.get(key),
+      put:async(key:string,value:unknown)=>{storage.set(key,value);},
+      delete:async(key:string)=>{storage.delete(key);},
+      list:async({prefix}:{prefix:string})=>new Map([...storage.entries()].filter(([key])=>key.startsWith(prefix))),
+    }};
+    const env={
+      KEETA_APP_ID:'3419700273',
+      KEETA_APP_SECRET:'test-secret',
+      KEETA_TOKEN_ENCRYPTION_KEY:key,
+      KEETA_PROVIDER_SHOP_ID:'721578302',
+      KEETA_OAUTH_REDIRECT_URI:'https://admin.morefunos.com/api/keeta/oauth/callback',
+    };
+    const {KeetaRuntimeStore}=await import('../keeta-runtime.ts');
+    const runtime=new KeetaRuntimeStore(state as never,env as never);
+
+    const imported=await runtime.fetch(new Request('https://internal/admin/token/import-test',{
+      method:'POST',
+      headers:{'content-type':'application/json'},
+      body:JSON.stringify({
+        accessToken:'menu-access',
+        tokenType:'bearer',
+        expiresIn:7776000,
+        refreshToken:'menu-refresh',
+        scope:'all',
+        issuedAtTime:Date.now(),
+      }),
+    }));
+    expect(imported.status).toBe(200);
+
+    const providerFetch=vi.fn(async()=>new Response(JSON.stringify({
+      code:0,message:'Success',data:897354,
+    }),{status:200,headers:{'content-type':'application/json'}}));
+    vi.stubGlobal('fetch',providerFetch);
+    try{
+      const snapshot={
+        catalog:{
+          categories:[{id:'cat',name:'主食',position:10,active:true}],
+          products:[{
+            id:'p1',productCode:'SKU-P1',name:'商品一',categoryId:'cat',active:true,
+            basePrice:'42.00',takeawayAdjustment:'0.00',takeawaySurchargeEnabled:false,modifierGroupIds:[],
+          }],
+        },
+        optionCenter:{sets:[],productLinks:[]},
+      };
+      const sync=await runtime.fetch(new Request('https://internal/admin/menu/sync',{
+        method:'POST',
+        headers:{'content-type':'application/json'},
+        body:JSON.stringify({revision:7,adminFingerprint:'fnv1a32:menu7',snapshot}),
+      }));
+      expect(sync.status).toBe(200);
+      const submitted=await sync.json() as {state:string;taskId:number;summary:{spus:number}};
+      expect(submitted).toMatchObject({state:'SUBMITTED',taskId:897354});
+      expect(submitted.summary.spus).toBe(1);
+
+      const providerCall=providerFetch.mock.calls[0];
+      expect(String(providerCall?.[0])).toBe('https://open.mykeeta.com/api/open/product/menu/sync');
+      const sent=JSON.parse(String(providerCall?.[1]?.body??'{}')) as Record<string,unknown>;
+      expect(sent.shopId).toBe(721578302);
+      expect(sent.accessToken).toBe('menu-access');
+      expect(Array.isArray(sent.spuList)).toBe(true);
+
+      const externalUrl='https://admin.morefunos.com/api/keeta/webhook';
+      const completionMessage=JSON.stringify({
+        shopId:721578302,
+        taskId:897354,
+        pictureTaskId:266675845,
+        errorSpuDTOList:[],
+      });
+      const signed=await signKeetaRuntimeParams(externalUrl,{
+        eventId:1202,
+        appId:3419700273,
+        messageId:'menu-complete-897354',
+        shopId:721578302,
+        message:completionMessage,
+        timestamp:Math.floor(Date.now()/1000),
+      },'test-secret');
+      const webhook=await runtime.fetch(new Request('https://internal/webhook',{
+        method:'POST',
+        headers:{'content-type':'application/json','x-mfk-keeta-external-url':externalUrl},
+        body:JSON.stringify(signed),
+      }));
+      expect(webhook.status).toBe(200);
+
+      const status=await runtime.fetch(new Request('https://internal/admin/menu/status',{method:'POST'}));
+      const readback=await status.json() as {state:string;taskId:number;completion:{pictureTaskId:number;errors:unknown[]}};
+      expect(readback.state).toBe('COMPLETED');
+      expect(readback.taskId).toBe(897354);
+      expect(readback.completion.pictureTaskId).toBe(266675845);
+      expect(readback.completion.errors).toEqual([]);
+    }finally{
+      vi.unstubAllGlobals();
+    }
+  });
+
 });
