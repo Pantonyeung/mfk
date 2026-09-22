@@ -1,5 +1,5 @@
 import {useMemo} from 'react';
-import {appendAdminAudit,usePersistentAdminState} from './admin-local-store.ts';
+import {appendAdminAudit,readAdminStored,usePersistentAdminState} from './admin-local-store.ts';
 import type {AdminSessionDraft,ModifierGroupDraft} from './admin-draft.tsx';
 
 export interface OptionMasterDraft{
@@ -158,6 +158,15 @@ function nextIdentity(prefix:string,existing:readonly string[]){
   let index=1;
   while(existing.includes(prefix+'-'+String(index).padStart(3,'0')))index++;
   return prefix+'-'+String(index).padStart(3,'0');
+}
+
+export function readOptionCenterState(draft:AdminSessionDraft):OptionCenterState{
+  const migrated=migrateLegacyOptionCenter(draft);
+  return Object.freeze({
+    options:Object.freeze(readAdminStored<OptionMasterDraft[]>(OPTION_KEY,[...migrated.options])),
+    groups:Object.freeze(readAdminStored<OptionGroupDraft[]>(GROUP_KEY,[...migrated.groups])),
+    productLinks:Object.freeze(readAdminStored<ProductOptionLinkDraft[]>(LINK_KEY,[...migrated.productLinks])),
+  });
 }
 
 export function useOptionCenter(draft:AdminSessionDraft){
