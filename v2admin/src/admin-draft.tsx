@@ -1,7 +1,7 @@
 import {createContext,useContext,useMemo,useState,type ReactNode} from 'react';
 import {LEGACY_MF01_ADMIN_DRAFT} from './admin-menu-seed-mf01-v2.ts';
 import {appendAdminAudit,readAdminStored,writeAdminStored} from './admin-local-store.ts';
-import {applyComboR3PoolSeed} from './admin-combo-pool-seed-r3.ts';
+import {applyComboR4NestedPoolSeed} from './admin-combo-pool-seed-r4.ts';
 
 export type ModifierSelection='SINGLE'|'MULTI';
 
@@ -50,7 +50,7 @@ export interface ModifierGroupDraft{
   readonly options:readonly ModifierOptionDraft[];
 }
 export type ComboPriceStatus='READY'|'OWNER_VALUE_REQUIRED';
-export type ComboChoiceType='PRODUCT'|'NONE';
+export type ComboChoiceType='PRODUCT'|'NONE'|'LABEL';
 
 export interface ComboBandDraft{
   readonly id:string;
@@ -98,6 +98,7 @@ export interface ComboPoolDraft{
   readonly id:string;
   readonly name:string;
   readonly kind:'MAIN_COURSE'|'ADDON';
+  readonly addonKind?:'SNACK'|'DRINK';
   readonly active:boolean;
   readonly position:number;
   readonly groups:readonly ComboPoolGroupDraft[];
@@ -154,7 +155,7 @@ interface AdminDraftContextValue{
   readonly updateComboChoice:(comboId:string,sectionId:string,choiceId:string,patch:Partial<ComboChoiceDraft>)=>void;
   readonly removeComboChoice:(comboId:string,sectionId:string,choiceId:string)=>void;
   readonly moveComboChoice:(comboId:string,sectionId:string,choiceId:string,direction:-1|1)=>void;
-  readonly addComboPool:(kind:'MAIN_COURSE'|'ADDON')=>void;
+  readonly addComboPool:(kind:'MAIN_COURSE'|'ADDON',addonKind?:'SNACK'|'DRINK')=>void;
   readonly updateComboPool:(poolId:string,patch:Partial<ComboPoolDraft>)=>void;
   readonly removeComboPool:(poolId:string)=>void;
   readonly addComboPoolGroup:(poolId:string)=>void;
@@ -165,7 +166,7 @@ interface AdminDraftContextValue{
   readonly updateComboPoolBand:(poolId:string,groupId:string,bandId:string,patch:Partial<ComboBandDraft>)=>void;
   readonly removeComboPoolBand:(poolId:string,groupId:string,bandId:string)=>void;
   readonly moveComboPoolBand:(poolId:string,groupId:string,bandId:string,direction:-1|1)=>void;
-  readonly addComboPoolChoice:(poolId:string,groupId:string)=>void;
+  readonly addComboPoolChoice:(poolId:string,groupId:string,bandId?:string)=>void;
   readonly updateComboPoolChoice:(poolId:string,groupId:string,choiceId:string,patch:Partial<ComboChoiceDraft>)=>void;
   readonly removeComboPoolChoice:(poolId:string,groupId:string,choiceId:string)=>void;
   readonly moveComboPoolChoice:(poolId:string,groupId:string,choiceId:string,direction:-1|1)=>void;
@@ -179,7 +180,7 @@ interface AdminDraftContextValue{
 
 const STORE_KEY='catalog-draft.v2';
 const DIRTY_KEY='catalog-dirty.v1';
-const COMBO_R3_SEED_KEY='combo-r3-pool-seed-installed.v1';
+const COMBO_R4_SEED_KEY='combo-r4-nested-pool-seed-installed.v1';
 
 function normalizeComboSection(section:ComboSectionDraft,index:number):ComboSectionDraft{
   const legacyProductIds=section.childProductIds??[];
@@ -216,7 +217,7 @@ function normalizeComboSection(section:ComboSectionDraft,index:number):ComboSect
   ).map((choice,choiceIndex)=>({
     ...choice,
     choiceType:choice.choiceType??'PRODUCT',
-    productId:choice.choiceType==='NONE'?undefined:choice.productId,
+    productId:(choice.choiceType??'PRODUCT')==='PRODUCT'?choice.productId:undefined,
     label:choice.label??'',
     bandId:knownBandIds.has(choice.bandId)?choice.bandId:(bands[0]?.id??''),
     priceAdjustment:choice.priceStatus==='OWNER_VALUE_REQUIRED'?(choice.priceAdjustment??'').trim():(choice.priceAdjustment?.trim()||'0.00'),
@@ -250,7 +251,7 @@ function normalizeComboPoolGroup(group:ComboPoolGroupDraft,index:number):ComboPo
     choices:(group.choices??[]).map((choice,choiceIndex)=>({
       ...choice,
       choiceType:choice.choiceType??'PRODUCT',
-      productId:choice.choiceType==='NONE'?undefined:choice.productId,
+      productId:(choice.choiceType??'PRODUCT')==='PRODUCT'?choice.productId:undefined,
       label:choice.label??'',
       bandId:bandIds.has(choice.bandId)?choice.bandId:((group.bands??[])[0]?.id??''),
       priceAdjustment:choice.priceStatus==='OWNER_VALUE_REQUIRED'?(choice.priceAdjustment??'').trim():(choice.priceAdjustment?.trim()||'0.00'),
@@ -307,7 +308,7 @@ function normalizeDraft(input:AdminSessionDraft):AdminSessionDraft{
 }
 
 const INITIAL:AdminSessionDraft=normalizeDraft(LEGACY_MF01_ADMIN_DRAFT as unknown as AdminSessionDraft);
-const RESET_BASELINE:AdminSessionDraft=normalizeDraft(applyComboR3PoolSeed(INITIAL));
+const RESET_BASELINE:AdminSessionDraft=normalizeDraft(applyComboR4NestedPoolSeed(INITIAL));
 
 const AdminDraftContext=createContext<AdminDraftContextValue|null>(null);
 const nextId=(prefix:string,count:number)=>prefix+'-'+String(count+1).padStart(3,'0');
@@ -446,10 +447,10 @@ export function validateAdminDraft(draft:AdminSessionDraft){
 export function AdminDraftProvider({children}:{children:ReactNode}){
   const [draft,setDraft]=useState<AdminSessionDraft>(()=>{
     const stored=normalizeDraft(readAdminStored<AdminSessionDraft>(STORE_KEY,INITIAL));
-    if(readAdminStored<boolean>(COMBO_R3_SEED_KEY,false))return stored;
-    const migrated=normalizeDraft(applyComboR3PoolSeed(stored));
+    if(readAdminStored<boolean>(COMBO_R4_SEED_KEY,false))return stored;
+    const migrated=normalizeDraft(applyComboR4NestedPoolSeed(stored));
     writeAdminStored(STORE_KEY,migrated);
-    writeAdminStored(COMBO_R3_SEED_KEY,true);
+    writeAdminStored(COMBO_R4_SEED_KEY,true);
     return migrated;
   });
   const [dirty,setDirty]=useState(()=>readAdminStored<boolean>(DIRTY_KEY,false));
@@ -703,12 +704,12 @@ export function AdminDraftProvider({children}:{children:ReactNode}){
   }));
 
 
-  const addComboPool=(kind:'MAIN_COURSE'|'ADDON')=>mutate('新增套餐 Pool','套餐',current=>({
+  const addComboPool=(kind:'MAIN_COURSE'|'ADDON',addonKind?:'SNACK'|'DRINK')=>mutate('新增套餐 Pool','套餐',current=>({
     ...current,
     comboPools:[...(current.comboPools??[]),{
       id:nextId(kind==='MAIN_COURSE'?'combo-main-pool':'combo-addon-pool',(current.comboPools??[]).length),
-      name:kind==='MAIN_COURSE'?'新主食 Pool':'新加配 Pool',
-      kind,active:true,position:((current.comboPools??[]).length+1)*10,groups:[],
+      name:kind==='MAIN_COURSE'?'新主食 Pool':addonKind==='DRINK'?'新飲品 Pool':'新小食 Pool',
+      kind,addonKind:kind==='ADDON'?(addonKind??'SNACK'):undefined,active:true,position:((current.comboPools??[]).length+1)*10,groups:[],
     }],
   }));
 
@@ -782,15 +783,16 @@ export function AdminDraftProvider({children}:{children:ReactNode}){
     }:pool),
   }));
 
-  const addComboPoolChoice=(poolId:string,groupId:string)=>mutate('新增套餐 Pool 商品',groupId,current=>({
+  const addComboPoolChoice=(poolId:string,groupId:string,bandId?:string)=>mutate('新增套餐 Pool 商品',groupId,current=>({
     ...current,comboPools:(current.comboPools??[]).map(pool=>pool.id===poolId?{
       ...pool,groups:pool.groups.map(group=>{
         if(group.id!==groupId||!group.bands[0])return group;
+        const targetBand=group.bands.find(band=>band.id===bandId)??group.bands[0];
         const firstProduct=current.products.find(product=>product.active&&!group.choices.some(choice=>(choice.choiceType??'PRODUCT')==='PRODUCT'&&choice.productId===product.id));
-        if(!firstProduct)return group;
+        if(!firstProduct||!targetBand)return group;
         const id=nextId(group.id+'-choice',group.choices.length);
         return {...group,choices:[...group.choices,{
-          id,choiceType:'PRODUCT',productId:firstProduct.id,label:'',bandId:group.bands[0].id,priceAdjustment:'0.00',priceStatus:'READY',active:true,position:(group.choices.length+1)*10,
+          id,choiceType:'PRODUCT',productId:firstProduct.id,label:'',bandId:targetBand.id,priceAdjustment:'0.00',priceStatus:'READY',active:true,position:(group.choices.length+1)*10,
         }]};
       }),
     }:pool),
@@ -856,7 +858,7 @@ export function AdminDraftProvider({children}:{children:ReactNode}){
 
   const reset=()=>{
     persist(RESET_BASELINE,true);
-    writeAdminStored(COMBO_R3_SEED_KEY,true);
+    writeAdminStored(COMBO_R4_SEED_KEY,true);
     appendAdminAudit({action:'還原目前 Admin 基準',target:'菜單'});
   };
 
