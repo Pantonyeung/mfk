@@ -1,3 +1,20 @@
+## Commander Mandatory Entry
+
+Every Commander, new chat, takeover, context rollover and work return MUST start from:
+
+`COMMANDER_CURRENT.md`
+
+Template:
+`docs/commander/COMMANDER_HANDOFF_TEMPLATE.md`
+
+Bootstrap prompt:
+`docs/commander/COMMANDER_BOOTSTRAP_PROMPT.txt`
+
+Protocol:
+`docs/commander/README.md`
+
+Before any Commander returns work or ends a conversation, `COMMANDER_CURRENT.md` must be refreshed and the same return summary must be posted to #22.
+
 # MFK
 
 公開嘅磨飯 POS 實作 repo。
