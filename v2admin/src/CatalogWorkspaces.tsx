@@ -368,7 +368,7 @@ export function ModifiersWorkspace(){
       <span>{rows.length} 個選項組</span>
     </div>
 
-    {rows.length===0?<div className="admin-read-empty">未有選項組。撳「新增選項組」，例如先建立「飯量」或者「青瓜」。</div>:<div className="admin-option-set-list">
+    {rows.length===0?<div className="admin-read-empty">未有選項組。撳「新增選項組」，例如先建立「飯量」或者「青瓜」；建立後展開組別，再撳「新增子選項」。</div>:<div className="admin-option-set-list">
       {rows.map(set=>{
         const requirement=set.required?'REQUIRED':set.forceShow?'OPTIONAL_FORCE_SHOW':'OPTIONAL';
         const linkedProducts=optionCenter.productLinks.filter(link=>link.setId===set.id).length;
