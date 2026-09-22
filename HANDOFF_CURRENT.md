@@ -4,7 +4,7 @@ Mandatory entry:
 `COMMANDER_CURRENT.md`
 
 Current navigation:
-`docs/navigation/MFK_航海圖_V1.14_Round015_2026-09-22.txt`
+`docs/navigation/MFK_航海圖_V1.15_Round016_2026-09-22.txt`
 
 Control:
 #22
@@ -12,82 +12,80 @@ Control:
 Commander protocol:
 #39
 
-## CURRENT PRIORITY
+## PRIORITY
 
-SMT OTA 814-baseline persistence P0 remains above Admin A2.
+Owner HOLD:
+SMT OTA physical acceptance.
 
-Active issue:
-#40
+Owner RESUME:
+Admin connection.
 
-## OWNER TARGET
+## SMT OTA HOLD
 
-Desired SMT product/runtime baseline:
-`runtime-candidate-mfk-814043c809bb`
+#40 remains open.
 
-Exact source baseline:
-`814043c809bbc236df1383c320bad906bcd3f1cd`
-
-Current installed physical runtime `55fea...` only proved reboot persistence; it is not the desired product baseline.
-
-## ISOLATED REPAIR SOURCE
-
-Branch:
-`work/MFK/SMT-OTA-814-BASELINE-PERSISTENCE-R2`
-
-Candidate source:
-`d133043dfe7d84e3f4be11ee49e9102c64f518d1`
-
-Exact compare to 814:
-- behind = 0
-- changed product/runtime files = 4 only
-- App diff only mounts RuntimeReadyActivation
-- zero unrelated product drift
-
-Source verification:
-`35681551414` SUCCESS
-
-## PUBLISHED OTA
-
-Release:
+Published no-drift 814-baseline persistence candidate:
 `runtime-candidate-mfk-d133043dfe7d`
 
-Bundle:
-`MoreFunOS-SMT-runtime-candidate-mfk-d133043dfe7d.mfos`
+Do not continue physical OTA acceptance until Owner resumes.
 
-SHA-256:
-`89898b8420b2038cbde0863de21513b9c765c7e2635d2ca244a4a7f7eb1e7111`
+## ADMIN LIVE
 
-Builder run:
-`35681723140` SUCCESS
+Canonical Admin:
+`https://admin.morefunos.com`
 
-Public manifest + bundle hash + Carrier 106 + Bridge 1:
-GREEN
+Hosting/domain:
+GREEN / BANKED.
+
+Live deployment:
+`35677844235` SUCCESS
+
+Deploy source:
+`d30e8dcc789806a42ea93c3670beb60270a1ee28`
+
+A2 source was already in that deployment.
+No later `v2admin/**` product diffs exist on current main.
+
+Therefore live Admin is current for the A2 surface.
+
+## ADMIN CONNECTION STATE
+
+A1 #34:
+BANKED / GREEN
+
+A2 #35:
+IMPLEMENTATION GREEN / BANKED
+
+Missing:
+`OWNER REAL CROSS-DEVICE WALKTHROUGH`
+
+A3:
+NOT AUTHORIZED
 
 ## EXACT NEXT
 
-Owner real-device acceptance only:
+Live Admin:
+`/admin/publish`
 
-1. Recovery → 檢查 Runtime OTA
-2. offered release must be `runtime-candidate-mfk-d133043dfe7d`
-3. install / activate
-4. verify UI/function matches intended 814 baseline
-5. Recovery: Current = d133..., Candidate cleared, Activation Requested false
-6. close/reopen app → same Current
-7. full power off/on → same Current
-8. Previous remains rollback target
+Read-only confirm A2 controls exist.
 
-Only then BANK:
-`MFK_SMT_OTA_814_BASELINE_PERSISTENCE_GREEN`
+Then SMT:
+More → Admin · Menu
 
-## IMPORTANT
+Read-only capture:
+`ACTIVE REVISION`
 
-Do NOT merge/rebase the isolated 814 source branch into current MFK main.
-It exists only to produce the no-drift repaired OTA candidate.
+Do not build a final A2 bundle until exact SMT base revision is known.
 
-## PAUSED / NOT AUTHORIZED
+Then run one tiny Product-name change through:
+Validate → Impact → Bundle → SMT Apply → Readback → Admin Compare = MATCH.
 
-Admin A2 remains PAUSED.
-A3 remains NOT AUTHORIZED.
-No OTA infrastructure migration.
-No Keeta live wiring.
-No SMM/Customer/Owner live seams.
+## NON-BLOCKING DEBT
+
+`v2admin/BUILD_ID` still references old `morefun-v2-admin`.
+README retains superseded H1 wording.
+
+Actual wrangler target is correct:
+`mfk-admin`.
+
+Do not prioritize this over A2 acceptance.
