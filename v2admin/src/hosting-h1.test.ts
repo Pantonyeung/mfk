@@ -1,11 +1,11 @@
 import {readFileSync} from 'node:fs';
 import {describe,expect,it} from 'vitest';
 
-describe('MFK Admin Cloudflare H1 hosting config',()=>{
+describe('MFK Admin Cloudflare H2 hosting config',()=>{
   const source=readFileSync(new URL('../wrangler.jsonc',import.meta.url),'utf8');
 
   it('targets the existing Cloudflare Worker and serves only SPA assets',()=>{
-    expect(source).toContain('"name": "morefun-v2-admin"');
+    expect(source).toContain('"name": "mfk-admin"');
     expect(source).toContain('"directory": "./dist"');
     expect(source).toContain('"not_found_handling": "single-page-application"');
   });
