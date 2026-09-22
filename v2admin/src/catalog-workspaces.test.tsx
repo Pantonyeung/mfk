@@ -7,7 +7,7 @@ import {LEGACY_MF01_ADMIN_DRAFT} from './admin-menu-seed-mf01-v2.ts';
 import {PRODUCT_MEDIA_BACKEND_CONTRACT,normalizeProductPrintRule} from './admin-product-operational-config.ts';
 import {MfkAdminApp} from './App.tsx';
 import {ADMIN_CAPABILITIES} from './admin-capabilities.ts';
-import {migrateLegacyDraftToOptionSetCenter,useOptionSetCenter,validateOptionSetCenter,type OptionSetCenterState} from './admin-option-set-center.ts';
+import {migrateLegacyDraftToOptionSetCenter,projectOptionSetsForProduct,useOptionSetCenter,validateOptionSetCenter,type OptionSetCenterState} from './admin-option-set-center.ts';
 
 
 function ProductDetailHarness({productId}:{productId:string}){
@@ -155,6 +155,40 @@ describe('MFK Admin complete catalog product',()=>{
     expect(validateOptionSetCenter(state)).toEqual([]);
     expect(state.productLinks[0]?.defaultOptionIds).toEqual(['less-cucumber']);
     expect(state.productLinks[1]?.defaultOptionIds).toEqual(['more-cucumber']);
+  });
+
+  it('projects only R2-linked Option Sets into Product menu truth',()=>{
+    const state:OptionSetCenterState={
+      sets:[{
+        id:'cucumber',name:'青瓜',required:false,forceShow:true,selection:'SINGLE',min:0,max:1,allowQuantities:false,active:true,
+        options:[
+          {id:'more',code:'CUC_MORE',name:'多青瓜',priceAdjustment:'1.00',active:true,position:20},
+          {id:'less',code:'CUC_LESS',name:'少青瓜',priceAdjustment:'0.00',active:true,position:10},
+          {id:'none',code:'CUC_NONE',name:'走青瓜',priceAdjustment:'0.00',active:false,position:30},
+        ],
+      }],
+      productLinks:[{productId:'product-a',setId:'cucumber',defaultOptionIds:['less']}],
+    };
+    expect(projectOptionSetsForProduct(state,'product-b')).toEqual([]);
+    const projected=projectOptionSetsForProduct(state,'product-a');
+    expect(projected).toHaveLength(1);
+    expect(projected[0]?.name).toBe('青瓜');
+    expect(projected[0]?.options.map(option=>option.name)).toEqual(['少青瓜','多青瓜']);
+    expect(projected[0]?.options[0]?.defaultSelected).toBe(true);
+    expect(projected[0]?.options[0]?.priceAdjustment).toBe('0.00');
+  });
+
+  it('R2 ProductOptionSetLink wins even when legacy modifierGroupIds is empty',()=>{
+    const state:OptionSetCenterState={
+      sets:[{
+        id:'rice',name:'飯量',required:true,forceShow:true,selection:'SINGLE',min:1,max:1,allowQuantities:false,active:true,
+        options:[{id:'more',code:'RICE_MORE',name:'多飯',priceAdjustment:'2.00',active:true,position:10}],
+      }],
+      productLinks:[{productId:'product-a',setId:'rice',defaultOptionIds:[]}],
+    };
+    const legacyProduct={modifierGroupIds:[] as string[]};
+    expect(legacyProduct.modifierGroupIds).toEqual([]);
+    expect(projectOptionSetsForProduct(state,'product-a').map(set=>set.name)).toEqual(['飯量']);
   });
 
   it('validates category product pricing modifier and combo relationships',()=>{

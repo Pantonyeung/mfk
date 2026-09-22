@@ -37,6 +37,49 @@ export interface OptionSetCenterState{
   readonly productLinks:readonly ProductOptionSetLink[];
 }
 
+export interface MenuProjectedOption{
+  readonly id:string;
+  readonly code:string;
+  readonly name:string;
+  readonly priceAdjustment:string;
+  readonly active:boolean;
+  readonly position:number;
+  readonly defaultSelected:boolean;
+}
+
+export interface MenuProjectedOptionSet{
+  readonly id:string;
+  readonly name:string;
+  readonly required:boolean;
+  readonly forceShow:boolean;
+  readonly selection:OptionSetSelection;
+  readonly min:number;
+  readonly max:number;
+  readonly allowQuantities:boolean;
+  readonly active:boolean;
+  readonly options:readonly MenuProjectedOption[];
+}
+
+export function projectOptionSetsForProduct(state:OptionSetCenterState,productId:string):readonly MenuProjectedOptionSet[]{
+  const links=state.productLinks.filter(link=>link.productId===productId);
+  const linkBySetId=new Map(links.map(link=>[link.setId,link]));
+  return Object.freeze(
+    state.sets
+      .filter(set=>set.active&&linkBySetId.has(set.id))
+      .map(set=>{
+        const link=linkBySetId.get(set.id)!;
+        const defaults=new Set(link.defaultOptionIds);
+        const options=set.options
+          .filter(option=>option.active)
+          .slice()
+          .sort((a,b)=>a.position-b.position||a.code.localeCompare(b.code))
+          .map(option=>Object.freeze({...option,defaultSelected:defaults.has(option.id)}));
+        return Object.freeze({...set,options:Object.freeze(options)});
+      }),
+  );
+}
+
+
 interface LegacyFlatOption{
   readonly id:string;
   readonly code:string;
