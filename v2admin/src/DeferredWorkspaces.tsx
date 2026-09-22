@@ -1,5 +1,7 @@
 import {useMemo,useState} from 'react';
 import {appendAdminAudit,usePersistentAdminState} from './admin-local-store.ts';
+import {AdminResponsiveDataView} from './AdminResponsiveDataView.tsx';
+import {AdminSearchField} from './AdminUiPrimitives.tsx';
 
 function Header({title,description,badge='保留功能'}:{title:string;description:string;badge?:string}){
   return <header className="admin-editor-head"><div><small>{badge}</small><h1>{title}</h1><p>{description}</p></div></header>;
@@ -49,8 +51,21 @@ export function InventoryWorkspace(){
       <article className="admin-policy-card"><h2>新增統計項目</h2><label><span>名稱</span><input value={newName} onChange={event=>setNewName(event.target.value)} placeholder="例如 紫米"/></label><label><span>基本單位</span><input value={newUnit} onChange={event=>setNewUnit(event.target.value)} placeholder="g / 件 / 包"/></label><label><span>商品 Ref（可選）</span><input value={newCatalogRef} onChange={event=>setNewCatalogRef(event.target.value)}/></label><label><span>低庫存提示值（可選）</span><input inputMode="decimal" value={newThreshold} onChange={event=>setNewThreshold(event.target.value)}/></label><button onClick={create}>新增項目</button></article>
       <article className="admin-policy-card"><h2>記錄數量變動</h2><label><span>項目</span><select value={selectedId} onChange={event=>setSelectedId(event.target.value)}><option value="">請選擇</option>{items.filter(item=>item.active).map(item=><option key={item.id} value={item.id}>{item.displayName}</option>)}</select></label><label><span>動作</span><select value={action} onChange={event=>setAction(event.target.value as InventoryMovement['action'])}><option value="RECEIPT">收貨</option><option value="ADJUST">加減調整</option><option value="WASTE">損耗</option><option value="STOCKTAKE">實盤</option><option value="OPENING">期初數量</option></select></label><label><span>數量</span><input inputMode="decimal" value={quantity} onChange={event=>setQuantity(event.target.value)} placeholder={action==='ADJUST'?'可輸入 -2 或 3':'例如 5'}/></label><label><span>原因／備註（可選）</span><input value={reason} onChange={event=>setReason(event.target.value)}/></label><button onClick={record}>記錄變動</button></article>
     </div>
-    <div className="admin-filterbar"><input value={search} onChange={event=>setSearch(event.target.value)} placeholder="搜尋原料／品項"/><span>{filtered.length} 項</span></div>
-    {filtered.length===0?<div className="admin-read-empty">未有庫存統計項目。</div>:<section className="admin-read-table"><header><span>品項</span><span>目前數量</span><span>單位</span><span>提示值</span><span>版本</span></header>{filtered.map(row=><article key={row.id}><span>{row.displayName}</span><span>{row.quantity}</span><span>{row.baseUnit}</span><span>{row.lowStockThreshold||'—'}</span><span>R{row.revision}</span></article>)}</section>}
+    <div className="admin-filterbar"><AdminSearchField label="搜尋庫存統計項目" value={search} onChange={setSearch} placeholder="搜尋原料／品項"/><span>{filtered.length} 項</span></div>
+    <AdminResponsiveDataView
+      label="庫存統計項目"
+      rows={filtered}
+      rowKey={row=>row.id}
+      emptyTitle="未有庫存統計項目"
+      emptyDescription="新增原料或品項後，數量同提示值會顯示喺呢度。"
+      columns={[
+        {key:'item',label:'品項',render:(row:InventoryItem)=>row.displayName},
+        {key:'quantity',label:'目前數量',numeric:true,render:(row:InventoryItem)=>row.quantity},
+        {key:'unit',label:'單位',render:(row:InventoryItem)=>row.baseUnit},
+        {key:'threshold',label:'提示值',numeric:true,render:(row:InventoryItem)=>row.lowStockThreshold||'—'},
+        {key:'revision',label:'版本',render:(row:InventoryItem)=>'R'+row.revision},
+      ]}
+    />
   </section>;
 }
 
@@ -94,7 +109,7 @@ export function Customer360Workspace(){
   const found=rows.find(row=>[row.phone,row.id,row.displayName].filter(Boolean).join(' ').toLowerCase().includes(query.trim().toLowerCase()));
   return <section className="admin-editor-page">
     <Header title="顧客資料" description="用電話／顧客編號查看正式顧客資料、消費摘要、會員積分同客戶標籤。電話唔等於顧客身份，會員資格亦唔等於聯絡同意。" badge="顧客資料"/>
-    <div className="admin-filterbar"><input value={query} onChange={event=>setQuery(event.target.value)} placeholder="電話／顧客編號／名稱"/><span>{rows.length} 位顧客資料</span></div>
+    <div className="admin-filterbar"><AdminSearchField label="搜尋顧客資料" value={query} onChange={setQuery} placeholder="電話／顧客編號／名稱"/><span>{rows.length} 位顧客資料</span></div>
     {!query?<div className="admin-read-empty">輸入電話或顧客編號開始查詢。</div>:!found?<div className="admin-read-empty">目前正式 顧客資料 入面搵唔到呢位顧客。</div>:<div className="admin-policy-grid two"><section className="admin-read-card"><header><h2>{found.displayName||found.phone}</h2><span>{found.relationshipStatus||'未分類'}</span></header><p>顧客編號：{found.id}</p><p>電話：{found.phone}</p><p>標籤：{found.tags?.join('、')||'—'}</p></section><section className="admin-read-card"><header><h2>消費／會員</h2><span>{new Date(found.updatedAt).toLocaleString('zh-HK')}</span></header><p>訂單：{found.orders}</p><p>累計消費：{'HK$'+(found.spendMinor/100).toFixed(2)}</p><p>積分：{found.points??'—'}</p></section></div>}
   </section>;
 }
