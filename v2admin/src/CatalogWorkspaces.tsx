@@ -399,7 +399,7 @@ export function ProductsWorkspace(){
                 <div className="admin-product-media-grid">
                   <div className="admin-product-image-preview">{media.canonicalImageRef&&/^https?:\/\//i.test(media.canonicalImageRef)?<img src={media.canonicalImageRef} alt={row.name}/>:<div><b>未有可預覽主圖</b><small>Canonical imageRef 會供 Customer／SMM／SMT 投影使用。</small></div>}</div>
                   <div className="admin-product-media-fields">
-                    <label><span>Canonical 主圖 URL / imageRef</span><input value={media.canonicalImageRef} onChange={event=>patchMedia(row.id,row.imageRef,{canonicalImageRef:event.target.value,publicUrl:event.target.value,storageState:event.target.value.trim()?'REFERENCE_ONLY':'UNSET'})} placeholder="https://... 或 /media/products/..."/></label>
+                    <label><span>Canonical 主圖 URL / imageRef</span><input value={media.canonicalImageRef} onChange={event=>patchMedia(row.id,row.imageRef,{canonicalImageRef:event.target.value,publicUrl:event.target.value,storageState:event.target.value.trim()?'REFERENCE_ONLY':'UNSET'})} placeholder="圖片 URL 或 /media/products/..."/></label>
                     <label><span>Keeta 圖片 URL（獨立覆寫）</span><input value={media.keetaImageUrl} onChange={event=>patchMedia(row.id,row.imageRef,{keetaImageUrl:event.target.value})} placeholder="留空 = 日後使用 Canonical 主圖"/></label>
                   </div>
                 </div>
@@ -434,6 +434,7 @@ export function ModifiersWorkspace(){
   const {draft,addModifierGroup,updateModifierGroup,removeModifierGroup,addModifierOption,updateModifierOption,removeModifierOption}=useAdminDraft();
   return <section className="admin-editor-page">
     <WorkspaceHeader title="選項／加料" description="每個選項必須有名稱、選項 ID 同價格；選項組管理要求方式、單／多選、最少／最多同數量設定。" onAdd={addModifierGroup} addLabel="新增選項組"/>
+    <div className="admin-callout compact">選項名稱／ID／價格全部必填；選項組另外設定必選／可選提示、單選／多選、最少／最多同重覆數量。</div>
     <div className="admin-kpi-grid">
       <article><span>選項組</span><strong>{draft.modifierGroups.length}</strong><small>草稿</small></article>
       <article><span>選項</span><strong>{draft.modifierGroups.reduce((sum,row)=>sum+row.options.length,0)}</strong><small>全部選項</small></article>
