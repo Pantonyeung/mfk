@@ -9,7 +9,13 @@ export interface KeetaLiveStatus{
   readonly providerShopId:number|null;
   readonly readyForAuthorization:boolean;
   readonly missingConfig:readonly string[];
-  readonly oauth:{readonly state:'NOT_CONNECTED'|'CONNECTED'|'EXPIRED';readonly expiresAt:string|null};
+  readonly oauth:{
+    readonly state:'NOT_CONNECTED'|'CONNECTED'|'EXPIRED';
+    readonly expiresAt:string|null;
+    readonly lastCallbackAt:string|null;
+    readonly lastCallbackResult:'CONNECTED'|'FAILED'|null;
+    readonly lastCallbackError:string|null;
+  };
   readonly webhook:{
     readonly callbackUrl:string;
     readonly lastAcceptedAt:string|null;

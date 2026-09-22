@@ -17,6 +17,9 @@ const KEETA_WEBHOOK_EVENTS=Object.freeze({
   1102:'STORE_STATUS_CHANGE',
   1201:'PICTURE_BIND_TASK_COMPLETION',
   1202:'MENU_SYNC_TASK_COMPLETION',
+  1301:'STORE_AUTHORIZATION_ADDED',
+  1302:'STORE_AUTHORIZATION_REMOVED',
+  1303:'BRAND_AUTHORIZATION_REVOKED',
 });
 
 const JSON_HEADERS={'content-type':'application/json; charset=utf-8','cache-control':'no-store'};
@@ -326,6 +329,7 @@ export class KeetaRuntimeStore{
   async status(){
     const readiness=assessKeetaRuntimeReadiness(this.env);
     const tokenRow=await this.state.storage.get('oauth:token');
+    const callbackStatus=await this.state.storage.get('oauth:callback-status')||{};
     const journal=await this.state.storage.get('webhook:status')||{};
     let tokenState='NOT_CONNECTED';
     let expiresAt=null;
@@ -343,6 +347,9 @@ export class KeetaRuntimeStore{
       oauth:{
         state:tokenState,
         expiresAt:expiresAt?new Date(expiresAt).toISOString():null,
+        lastCallbackAt:callbackStatus.lastCallbackAt??null,
+        lastCallbackResult:callbackStatus.lastCallbackResult??null,
+        lastCallbackError:callbackStatus.lastCallbackError??null,
       },
       webhook:{
         callbackUrl:'https://admin.morefunos.com/api/keeta/webhook',
@@ -383,6 +390,7 @@ export class KeetaRuntimeStore{
     }
 
     if(url.pathname==='/oauth/callback'&&request.method==='GET'){
+      const callbackAt=new Date().toISOString();
       try{
         const config=requireRuntimeConfig(this.env);
         const stateValue=nonEmpty(url.searchParams.get('state')||'','KEETA_OAUTH_STATE_REQUIRED');
@@ -398,11 +406,22 @@ export class KeetaRuntimeStore{
         await this.state.storage.put('connection',{
           canonicalStoreId:'MF01',
           providerShopId:config.providerShopId,
-          authorizedAt:new Date().toISOString(),
+          authorizedAt:callbackAt,
+        });
+        await this.state.storage.put('oauth:callback-status',{
+          lastCallbackAt:callbackAt,
+          lastCallbackResult:'CONNECTED',
+          lastCallbackError:null,
         });
         return Response.redirect('https://admin.morefunos.com/admin/channels?keeta=connected',302);
       }catch(error){
-        const code=encodeURIComponent(error instanceof Error?error.message:'KEETA_OAUTH_CALLBACK_FAILED');
+        const errorCode=error instanceof Error?error.message:'KEETA_OAUTH_CALLBACK_FAILED';
+        await this.state.storage.put('oauth:callback-status',{
+          lastCallbackAt:callbackAt,
+          lastCallbackResult:'FAILED',
+          lastCallbackError:errorCode,
+        });
+        const code=encodeURIComponent(errorCode);
         return Response.redirect('https://admin.morefunos.com/admin/channels?keeta_error='+code,302);
       }
     }

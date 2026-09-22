@@ -86,4 +86,71 @@ describe('Keeta live edge runtime',()=>{
     expect(body.oauth.state).toBe('NOT_CONNECTED');
   });
 
+
+  it('accepts Keeta store authorization event 1301 under the current signed-envelope contract',async()=>{
+    const key=Buffer.alloc(32,3).toString('base64');
+    const storage=new Map<string,unknown>();
+    const state={storage:{
+      get:async(key:string)=>storage.get(key),
+      put:async(key:string,value:unknown)=>{storage.set(key,value);},
+      delete:async(key:string)=>{storage.delete(key);},
+    }};
+    const env={
+      KEETA_APP_ID:'3419700273',
+      KEETA_APP_SECRET:'test-secret',
+      KEETA_TOKEN_ENCRYPTION_KEY:key,
+      KEETA_PROVIDER_SHOP_ID:'721578302',
+      KEETA_OAUTH_REDIRECT_URI:'https://admin.morefunos.com/api/keeta/oauth/callback',
+    };
+    const {KeetaRuntimeStore}=await import('../keeta-runtime.ts');
+    const runtime=new KeetaRuntimeStore(state as never,env as never);
+    const url='https://internal/webhook';
+    const params={
+      eventId:1301,
+      appId:3419700273,
+      messageId:'auth-msg-1',
+      shopId:721578302,
+      message:JSON.stringify({authId:'1294288',opType:1,shopId:721578302}),
+      timestamp:1790092903,
+    };
+    const signed=await signKeetaRuntimeParams(url,params,'test-secret');
+    const response=await runtime.fetch(new Request(url,{
+      method:'POST',
+      headers:{'content-type':'application/json'},
+      body:JSON.stringify(signed),
+    }));
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({code:0,message:'Success',data:{}});
+    const journal=storage.get('webhook:event:auth-msg-1') as {eventId:number;eventName:string}|undefined;
+    expect(journal?.eventId).toBe(1301);
+    expect(journal?.eventName).toBe('STORE_AUTHORIZATION_ADDED');
+  });
+
+  it('records sanitized OAuth callback failure diagnostics without storing code or state',async()=>{
+    const key=Buffer.alloc(32,4).toString('base64');
+    const storage=new Map<string,unknown>();
+    const state={storage:{
+      get:async(key:string)=>storage.get(key),
+      put:async(key:string,value:unknown)=>{storage.set(key,value);},
+      delete:async(key:string)=>{storage.delete(key);},
+    }};
+    const env={
+      KEETA_APP_ID:'3419700273',
+      KEETA_APP_SECRET:'test-secret',
+      KEETA_TOKEN_ENCRYPTION_KEY:key,
+      KEETA_PROVIDER_SHOP_ID:'721578302',
+      KEETA_OAUTH_REDIRECT_URI:'https://admin.morefunos.com/api/keeta/oauth/callback',
+    };
+    const {KeetaRuntimeStore}=await import('../keeta-runtime.ts');
+    const runtime=new KeetaRuntimeStore(state as never,env as never);
+    const callback=await runtime.fetch(new Request('https://internal/oauth/callback?state=opaque-state',{method:'GET'}));
+    expect(callback.status).toBe(302);
+    const statusResponse=await runtime.fetch(new Request('https://internal/admin/status',{method:'POST'}));
+    const body=await statusResponse.json() as {oauth:{lastCallbackResult:string;lastCallbackError:string}};
+    expect(body.oauth.lastCallbackResult).toBe('FAILED');
+    expect(body.oauth.lastCallbackError).toBe('KEETA_OAUTH_CODE_REQUIRED');
+    const diagnostic=JSON.stringify(storage.get('oauth:callback-status'));
+    expect(diagnostic).not.toContain('opaque-state');
+  });
+
 });

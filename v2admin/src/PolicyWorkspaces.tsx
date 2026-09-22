@@ -253,6 +253,9 @@ export function ChannelsWorkspace({mode}:{mode:'overview'|'mapping'|'failures'|'
         <p><span>Provider Shop</span><b>{liveStatus.providerShopId??'未設定'}</b></p>
         <p><span>OAuth</span><b>{liveStatus.oauth.state}</b></p>
         <p><span>Token 到期</span><b>{liveStatus.oauth.expiresAt?new Date(liveStatus.oauth.expiresAt).toLocaleString('zh-HK'):'—'}</b></p>
+        <p><span>最近 OAuth callback</span><b>{liveStatus.oauth.lastCallbackAt?new Date(liveStatus.oauth.lastCallbackAt).toLocaleString('zh-HK'):'—'}</b></p>
+        <p><span>Callback 結果</span><b>{liveStatus.oauth.lastCallbackResult??'—'}</b></p>
+        <p><span>Callback 錯誤</span><b>{liveStatus.oauth.lastCallbackError??'—'}</b></p>
         <p><span>Webhook</span><b>{liveStatus.webhook.callbackUrl}</b></p>
         <p><span>Webhook Accepted</span><b>{liveStatus.webhook.acceptedCount}</b></p>
         <p><span>最近 Event</span><b>{liveStatus.webhook.lastEventId??'—'} / {liveStatus.webhook.lastMessageId??'—'}</b></p>
