@@ -1,0 +1,25 @@
+name: keeta-provider-completeness-smoke
+
+on:
+  push:
+    branches:
+      - test/MFK/KEETA-PROVIDER-COMPLETION-R1-SMOKE
+  workflow_dispatch:
+
+jobs:
+  keeta:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: integrations/keeta
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Test
+        run: npm test
+      - name: Build
+        run: npm run build
