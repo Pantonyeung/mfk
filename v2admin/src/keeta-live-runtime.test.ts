@@ -372,4 +372,30 @@ describe('Keeta live edge runtime',()=>{
     }
   });
 
+
+  it('clears the generic signing blocker after a live signed webhook has been accepted',async()=>{
+    const key=Buffer.alloc(32,11).toString('base64');
+    const storage=new Map<string,unknown>([
+      ['webhook:status',{acceptedCount:1,lastAcceptedAt:new Date().toISOString(),lastEventId:1301,lastMessageId:'live-proof'}],
+    ]);
+    const state={storage:{
+      get:async(key:string)=>storage.get(key),
+      put:async(key:string,value:unknown)=>{storage.set(key,value);},
+      delete:async(key:string)=>{storage.delete(key);},
+    }};
+    const env={
+      KEETA_APP_ID:'3419700273',
+      KEETA_APP_SECRET:'test-secret',
+      KEETA_TOKEN_ENCRYPTION_KEY:key,
+      KEETA_PROVIDER_SHOP_ID:'721578302',
+      KEETA_OAUTH_REDIRECT_URI:'https://admin.morefunos.com/api/keeta/oauth/callback',
+    };
+    const {KeetaRuntimeStore}=await import('../keeta-runtime.ts');
+    const runtime=new KeetaRuntimeStore(state as never,env as never);
+    const response=await runtime.fetch(new Request('https://internal/admin/status',{method:'POST'}));
+    const body=await response.json() as {knownExternalBlocker:string|null;webhook:{acceptedCount:number}};
+    expect(body.webhook.acceptedCount).toBe(1);
+    expect(body.knownExternalBlocker).toBeNull();
+  });
+
 });
