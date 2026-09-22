@@ -677,4 +677,103 @@ describe('Keeta live edge runtime',()=>{
     }finally{vi.unstubAllGlobals();}
   });
 
+
+  it('syncs published product sellability in bounded Keeta SPU batches without reverse authority',async()=>{
+    const key=Buffer.alloc(32,16).toString('base64');
+    const storage=new Map<string,unknown>();
+    const state={storage:{
+      get:async(key:string)=>storage.get(key),
+      put:async(key:string,value:unknown)=>{storage.set(key,value);},
+      delete:async(key:string)=>{storage.delete(key);},
+      list:async({prefix}:{prefix:string})=>new Map([...storage.entries()].filter(([key])=>key.startsWith(prefix))),
+    }};
+    const env={
+      KEETA_APP_ID:'3419700273',KEETA_APP_SECRET:'test-secret',
+      KEETA_TOKEN_ENCRYPTION_KEY:key,KEETA_PROVIDER_SHOP_ID:'721578302',
+      KEETA_OAUTH_REDIRECT_URI:'https://admin.morefunos.com/api/keeta/oauth/callback',
+    };
+    const {KeetaRuntimeStore}=await import('../keeta-runtime.ts');
+    const runtime=new KeetaRuntimeStore(state as never,env as never);
+    await runtime.fetch(new Request('https://internal/admin/token/import-test',{
+      method:'POST',headers:{'content-type':'application/json'},
+      body:JSON.stringify({accessToken:'access',tokenType:'bearer',expiresIn:7776000,refreshToken:'refresh',scope:'all',issuedAtTime:Date.now()}),
+    }));
+    const providerFetch=vi.fn(async()=>new Response(JSON.stringify({code:0,message:'Success',data:['ok'],errorList:[]}),{
+      status:200,headers:{'content-type':'application/json'},
+    }));
+    vi.stubGlobal('fetch',providerFetch);
+    try{
+      const response=await runtime.fetch(new Request('https://internal/admin/sellability/sync',{
+        method:'POST',headers:{'content-type':'application/json'},
+        body:JSON.stringify({
+          revision:9,adminFingerprint:'fp-9',
+          snapshot:{
+            channelPolicy:{syncSellability:true},
+            availability:{p1:{sellable:true},p2:{sellable:false}},
+            catalog:{products:[
+              {id:'p1',productCode:'RB-A',active:true},
+              {id:'p2',productCode:'BX 2',active:true},
+            ]},
+          },
+        }),
+      }));
+      expect(response.status).toBe(200);
+      const body=await response.json() as {state:string;available:number;unavailable:number};
+      expect(body).toMatchObject({state:'COMPLETED',available:1,unavailable:1});
+      expect(providerFetch).toHaveBeenCalledTimes(2);
+      const payloads=providerFetch.mock.calls.map(call=>JSON.parse(String(call[1]?.body??'{}')) as Record<string,unknown>);
+      expect(payloads.map(row=>row.status).sort()).toEqual([0,1]);
+      expect(payloads.every(row=>row.needLinkage===0)).toBe(true);
+    }finally{vi.unstubAllGlobals();}
+  });
+
+  it('updates weekly hours then reads back store state, and avoids duplicate REST when already suspended',async()=>{
+    const key=Buffer.alloc(32,17).toString('base64');
+    const storage=new Map<string,unknown>();
+    const state={storage:{
+      get:async(key:string)=>storage.get(key),
+      put:async(key:string,value:unknown)=>{storage.set(key,value);},
+      delete:async(key:string)=>{storage.delete(key);},
+      list:async({prefix}:{prefix:string})=>new Map([...storage.entries()].filter(([key])=>key.startsWith(prefix))),
+    }};
+    const env={
+      KEETA_APP_ID:'3419700273',KEETA_APP_SECRET:'test-secret',
+      KEETA_TOKEN_ENCRYPTION_KEY:key,KEETA_PROVIDER_SHOP_ID:'721578302',
+      KEETA_OAUTH_REDIRECT_URI:'https://admin.morefunos.com/api/keeta/oauth/callback',
+    };
+    const {KeetaRuntimeStore}=await import('../keeta-runtime.ts');
+    const runtime=new KeetaRuntimeStore(state as never,env as never);
+    await runtime.fetch(new Request('https://internal/admin/token/import-test',{
+      method:'POST',headers:{'content-type':'application/json'},
+      body:JSON.stringify({accessToken:'access',tokenType:'bearer',expiresIn:7776000,refreshToken:'refresh',scope:'all',issuedAtTime:Date.now()}),
+    }));
+    const providerFetch=vi.fn(async(input:string|URL|Request)=>{
+      const url=String(input);
+      if(url.includes('/scm/shop/base/get'))return new Response(JSON.stringify({code:0,message:'Success',data:{shopId:721578302,status:4}}),{status:200});
+      if(url.includes('/business/hour/effective/get'))return new Response(JSON.stringify({code:0,message:'Success',data:{mon:[{startTime:39600,endTime:72000}]}}),{status:200});
+      return new Response(JSON.stringify({code:0,message:'Success'}),{status:200});
+    });
+    vi.stubGlobal('fetch',providerFetch);
+    try{
+      const weeklyHours=Object.fromEntries(['MON','TUE','WED','THU','FRI','SAT','SUN'].map(day=>[
+        day,{closed:day==='SAT',opensAt:'11:00',closesAt:'20:00'},
+      ]));
+      const synced=await runtime.fetch(new Request('https://internal/admin/store/hours/sync',{
+        method:'POST',headers:{'content-type':'application/json'},
+        body:JSON.stringify({revision:10,adminFingerprint:'fp-10',snapshot:{storeSettings:{weeklyHours}}}),
+      }));
+      expect(synced.status).toBe(200);
+      const urls=providerFetch.mock.calls.map(call=>String(call[0]));
+      expect(urls.some(url=>url.includes('/business/hour/effective/update'))).toBe(true);
+      expect(urls.some(url=>url.includes('/scm/shop/base/get'))).toBe(true);
+      expect(urls.some(url=>url.includes('/business/hour/effective/get'))).toBe(true);
+
+      providerFetch.mockClear();
+      const rest=await runtime.fetch(new Request('https://internal/admin/store/status/rest',{method:'POST'}));
+      expect(rest.status).toBe(200);
+      expect((await rest.json() as {state:string}).state).toBe('IDEMPOTENT');
+      expect(providerFetch.mock.calls.map(call=>String(call[0])).some(url=>url.includes('/status/rest'))).toBe(false);
+    }finally{vi.unstubAllGlobals();}
+  });
+
 });
