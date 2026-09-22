@@ -1,91 +1,69 @@
 # MFK CURRENT HANDOFF｜2026-09-22
 
-Mandatory entry:
-`COMMANDER_CURRENT.md`
-
 Current navigation:
-`docs/navigation/MFK_航海圖_V1.15_Round016_2026-09-22.txt`
+docs/navigation/MFK_航海圖_V1.16_Round017_2026-09-22.txt
 
 Control:
 #22
 
-Commander protocol:
-#39
+## CURRENT
 
-## PRIORITY
+SMT OTA:
+HOLD
 
-Owner HOLD:
-SMT OTA physical acceptance.
+Admin:
+ACTIVE
 
-Owner RESUME:
-Admin connection.
+## ADMIN OPERATOR CHINESE UI
 
-## SMT OTA HOLD
+Issue:
+#41
 
-#40 remains open.
+Owner requirement:
+operator-facing Admin must be Traditional-Chinese, human operational UI, not engineering-console copy.
 
-Published no-drift 814-baseline persistence candidate:
-`runtime-candidate-mfk-d133043dfe7d`
+Implementation/test:
+35683885708 SUCCESS
 
-Do not continue physical OTA acceptance until Owner resumes.
+Main landing:
+4f332baa67900d33f72cd43a0dc457177c3cca80
 
-## ADMIN LIVE
+Live deploy:
+35684038608 SUCCESS
 
-Canonical Admin:
-`https://admin.morefunos.com`
+Deploy job:
+test SUCCESS
+build SUCCESS
+mfk-admin deploy SUCCESS
 
-Hosting/domain:
-GREEN / BANKED.
+Browser visual readback:
+PENDING
 
-Live deployment:
-`35677844235` SUCCESS
+## ADMIN CONNECTION
 
-Deploy source:
-`d30e8dcc789806a42ea93c3670beb60270a1ee28`
+A1:
+BANKED
 
-A2 source was already in that deployment.
-No later `v2admin/**` product diffs exist on current main.
-
-Therefore live Admin is current for the A2 surface.
-
-## ADMIN CONNECTION STATE
-
-A1 #34:
+A2 implementation:
 BANKED / GREEN
 
-A2 #35:
-IMPLEMENTATION GREEN / BANKED
+A2 owner cross-device:
+PENDING
 
-Missing:
-`OWNER REAL CROSS-DEVICE WALKTHROUGH`
+New exact first break:
+ADMIN_A2_SOURCE_BASELINE_NOT_HYDRATED
 
-A3:
-NOT AUTHORIZED
+Current Admin draft starts empty.
+Do not publish an A2 full Menu Index bundle from 0 Categories / 0 Products over a non-empty SMT baseline.
 
 ## EXACT NEXT
 
-Live Admin:
-`/admin/publish`
+Owner refreshes live Admin and confirms Chinese operator wording.
 
-Read-only confirm A2 controls exist.
+Then open one baseline-hydration seam before A2 mutation:
+SMT current menu baseline
+→ Admin source draft hydrate/readback
+→ verify no product loss
+→ then one tiny product-name A2 test.
 
-Then SMT:
-More → Admin · Menu
-
-Read-only capture:
-`ACTIVE REVISION`
-
-Do not build a final A2 bundle until exact SMT base revision is known.
-
-Then run one tiny Product-name change through:
-Validate → Impact → Bundle → SMT Apply → Readback → Admin Compare = MATCH.
-
-## NON-BLOCKING DEBT
-
-`v2admin/BUILD_ID` still references old `morefun-v2-admin`.
-README retains superseded H1 wording.
-
-Actual wrangler target is correct:
-`mfk-admin`.
-
-Do not prioritize this over A2 acceptance.
+A3 remains NOT AUTHORIZED.
