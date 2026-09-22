@@ -615,7 +615,7 @@ export function CombosWorkspace(){
       ?<EmptyState title="未有套餐" description="建立套餐後加入步驟，例如飯糰、小食、飲品，再為每步建立價格帶同商品選擇。" action="新增套餐" onAction={addCombo}/>
       :<div className="admin-combo-list">{draft.combos.map(combo=><article className="admin-combo-card" key={combo.id}>
         <header className="admin-combo-head">
-          <div><small>{combo.id}</small><h2>{combo.name||'未命名套餐'}</h2><span>{combo.sections.length} 個步驟 · 基本價 HK$${Number(combo.basePrice||0).toFixed(2)}</span></div>
+          <div><small>{combo.id}</small><h2>{combo.name||'未命名套餐'}</h2><span>{combo.sections.length} 個步驟 · 基本價 HK${Number(combo.basePrice||0).toFixed(2)}</span></div>
           <div className="admin-editor-actions">
             <Toggle checked={combo.active} onChange={active=>updateCombo(combo.id,{active})} label={combo.active?'啟用':'停用'}/>
             <button type="button" onClick={()=>removeCombo(combo.id)}>刪除套餐</button>
