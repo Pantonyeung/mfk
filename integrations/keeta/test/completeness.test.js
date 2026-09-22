@@ -12,6 +12,12 @@ import {
   buildKeetaOrderGetShape,
   buildKeetaProductAliasRequest,
   buildKeetaRefreshTokenShape,
+  buildKeetaWebhookConfigurationShape,
+  buildKeetaOrderCollectShape,
+  buildKeetaPartialRefundPreviewShape,
+  buildKeetaPartialRefundApplyShape,
+  buildKeetaStoreDetailsShape,
+  buildKeetaStoreHoursGetShape,
   keetaProviderOrderRef,
   normalizeKeetaObservedSystemCancellationEvidence,
   normalizeKeetaOrderLifecycleEventEvidence,
@@ -138,7 +144,7 @@ test('acceptance mode is explicit MFK policy input and never live by default', (
 });
 
 test('completeness ledger keeps live runtime and canonical writers excluded', () => {
-  assert.equal(KEETA_CAPABILITY_COUNT, 35);
+  assert.equal(KEETA_CAPABILITY_COUNT, 41);
   assert.equal(KEETA_COMPLETENESS_SCOPE.state, 'PROVIDER_COMPLETE_NOT_WIRED');
   const exclusions = JSON.stringify(KEETA_DONOR_EXCLUSIONS);
   assert.match(exclusions, /LEGACY_D1_CANONICAL_ACCEPTANCE/);
@@ -230,4 +236,39 @@ test('delivery status accepts only documented logistics statuses and requires op
       opTime: 1751448108144,
     }),
   })), /KEETA_DELIVERY_LOGISTICS_STATUS_INVALID/);
+});
+
+
+test('remaining donor provider request surfaces are present but inert', () => {
+  const webhook = buildKeetaWebhookConfigurationShape({
+    appId: 1,
+    timestamp: 1780000000,
+    eventId: 1102,
+    callbackUrl: 'https://example.invalid/webhooks/keeta',
+    isTest: 1,
+  });
+  assert.equal(webhook.executionGate, 'NOT_WIRED');
+
+  const collect = buildKeetaOrderCollectShape({ orderViewId: 1, providerShopId: 2 });
+  assert.equal(collect.executionGate, 'NOT_WIRED');
+  assert.equal(collect.authorityGate, 'BLOCKED_CANONICAL_AUTHORITY');
+
+  const preview = buildKeetaPartialRefundPreviewShape({
+    orderViewId: 1,
+    providerShopId: 2,
+    products: [{ orderProductId: 9, refundCount: 1 }],
+  });
+  assert.equal(preview.executionGate, 'NOT_WIRED');
+
+  const apply = buildKeetaPartialRefundApplyShape({
+    orderViewId: 1,
+    providerShopId: 2,
+    products: [{ orderProductId: 9, refundCount: 1 }],
+    partRefundType: 200001,
+  });
+  assert.equal(apply.authorityGate, 'BLOCKED_CANONICAL_AUTHORITY');
+  assert.equal(apply.executionGate, 'NOT_WIRED');
+
+  assert.equal(buildKeetaStoreDetailsShape({ providerShopId: 2 }).executionGate, 'NOT_WIRED');
+  assert.equal(buildKeetaStoreHoursGetShape({ providerShopId: 2 }).executionGate, 'NOT_WIRED');
 });
