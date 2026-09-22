@@ -284,6 +284,25 @@ export function ChannelsWorkspace({mode}:{mode:'overview'|'mapping'|'failures'|'
         <button type="button" className="secondary" disabled={liveBusy||liveStatus?.oauth.state!=='CONNECTED'} onClick={()=>void checkToken()}>檢查 Token</button>
         <button type="button" className="primary" disabled={liveBusy||!liveStatus?.readyForAuthorization} onClick={()=>void authorize()}>{liveStatus?.oauth.state==='CONNECTED'?'重新授權 Keeta':'開始 Keeta 授權'}</button>
       </div>
+      <details className="admin-rule-card">
+        <summary><b>已有 Keeta 測試 Token</b></summary>
+        <p>位置：Keeta Developers → 應用程式管理 → 磨飯v2 → 授權管理 → 門店數量 → 查看 Token。</p>
+        <label>
+          <span>Token JSON</span>
+          <textarea
+            rows={6}
+            value={testTokenJson}
+            onChange={event=>setTestTokenJson(event.target.value)}
+            placeholder='貼上「查看 Token」顯示嘅完整 JSON'
+            autoComplete="off"
+            spellCheck={false}
+          />
+        </label>
+        <div className="admin-editor-actions">
+          <button type="button" className="primary" disabled={liveBusy||!testTokenJson.trim()} onClick={()=>void importTestToken()}>匯入現有測試 Token</button>
+        </div>
+        <small>Token 只會送到 MFK runtime，以現有 encryption key 加密保存；成功後輸入欄會即時清空。呢個輸入唔會寫入 Admin draft、localStorage 或操作記錄。</small>
+      </details>
       <small>目前 R1 只打通 OAuth、Token、Store Binding 同 Signed Webhook ingress。未自動建立 Formal Order，亦未啟動 Provider confirm / menu sync / refund command。</small>
     </section>:null}
     <div className="admin-policy-grid two">
