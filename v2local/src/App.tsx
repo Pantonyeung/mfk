@@ -469,7 +469,7 @@ function CheckoutPage({cart,setCart,diningCheckout,onDiningCheckoutDone}:{cart:C
       }
 
       const order=localRuntime.createOrder({
-        items:cart.map(line=>({id:line.productId,name:line.detail?line.name+'｜'+line.detail:line.name,qty:line.qty,unitMinor:line.unitMinor})),
+        items:cart.map(line=>({id:line.productId,name:line.detail?line.name+'｜'+line.detail:line.name,qty:line.qty,unitMinor:line.unitMinor,serviceMode:line.serviceMode})),
         totalMinor:due,paymentLabel,sourceLabel,
       });
       setCompletion({
