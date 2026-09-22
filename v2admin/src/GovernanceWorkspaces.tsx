@@ -4,6 +4,7 @@ import {useAdminDraft,type AdminSessionDraft} from './admin-draft.tsx';
 import {appendAdminAudit,createAdminRelease,readActiveAdminRelease,readAdminReleases,readAdminStored,restoreAdminReleaseAsDraft,usePersistentAdminState,writeAdminStored,type AdminRelease} from './admin-local-store.ts';
 import {normalizeProductPrintRule,useProductPrintRules,type ProductPrintRule} from './admin-product-operational-config.ts';
 import {OPTION_SET_CENTER_STORAGE_KEYS} from './admin-option-set-center.ts';
+import {AdminResponsiveDataView} from './AdminResponsiveDataView.tsx';
 
 function Header({title,description,badge='已自動保存'}:{title:string;description:string;badge?:string}){
   return <header className="admin-editor-head"><div><small>{badge}</small><h1>{title}</h1><p>{description}</p></div></header>;
@@ -110,8 +111,8 @@ export function QuickReasonsWorkspace(){
   return <section className="admin-editor-page">
     <header className="admin-editor-head"><div><small>可選／不阻交易</small><h1>快捷原因</h1><p>提供更改付款方式、重印、取消、退款等常用原因。原因永遠係 OPTIONAL，員工可以自填或不填。</p></div><div className="admin-editor-actions"><button type="button" className="secondary" onClick={add}>新增原因</button></div></header>
     <div className="admin-editor-list">{reasons.map(reason=><article className="admin-policy-row quick-reason-row" key={reason.id}>
-      <select value={reason.scope} onChange={event=>patch(reason.id,{scope:event.target.value as QuickReasonDraft['scope']})}><option value="TENDER_CORRECTION">更改付款方式</option><option value="REPRINT">重印</option><option value="CANCEL">取消</option><option value="REFUND">退款</option></select>
-      <input value={reason.label} onChange={event=>patch(reason.id,{label:event.target.value})} placeholder="原因文字"/>
+      <select aria-label={`快捷原因範圍 ${reason.id}`} value={reason.scope} onChange={event=>patch(reason.id,{scope:event.target.value as QuickReasonDraft['scope']})}><option value="TENDER_CORRECTION">更改付款方式</option><option value="REPRINT">重印</option><option value="CANCEL">取消</option><option value="REFUND">退款</option></select>
+      <input aria-label={`快捷原因文字 ${reason.id}`} value={reason.label} onChange={event=>patch(reason.id,{label:event.target.value})} placeholder="原因文字"/>
       <label className="admin-toggle"><input type="checkbox" checked={reason.active} onChange={event=>patch(reason.id,{active:event.target.checked})}/><span>{reason.active?'啟用':'停用'}</span></label>
       <button type="button" onClick={()=>remove(reason.id)}>刪除</button>
     </article>)}</div>
@@ -132,7 +133,7 @@ export function SettlementWorkspace(){
   return <section className="admin-editor-page">
     <Header title="平台對帳" description="顯示平台提供嘅正式對帳資料、佣金、退款、調整同差異；後台唔會自行改寫結算資料。"/>
     <div className="admin-filterbar">
-      <select value={provider} onChange={event=>setProvider(event.target.value)}><option value="ALL">全部平台</option><option value="KEETA">Keeta</option><option value="FOODPANDA">Foodpanda</option></select>
+      <label><span>平台</span><select value={provider} onChange={event=>setProvider(event.target.value)}><option value="ALL">全部平台</option><option value="KEETA">Keeta</option><option value="FOODPANDA">Foodpanda</option></select></label>
       <label><span>由</span><input type="date" value={from} onChange={event=>setFrom(event.target.value)}/></label>
       <label><span>至</span><input type="date" value={to} onChange={event=>setTo(event.target.value)}/></label>
     </div>
@@ -142,7 +143,20 @@ export function SettlementWorkspace(){
       <article><span>退款／調整</span><strong>{money(sum('refundMinor')+sum('adjustmentMinor'))}</strong><small>只讀事實</small></article>
       <article><span>差異項目</span><strong>{filtered.filter(row=>row.status==='MISMATCH').length}</strong><small>需要 reconciliation</small></article>
     </div>
-    {filtered.length===0?<div className="admin-read-empty">目前未有正式平台對帳資料。介面、篩選同計算責任已完成；未接資料來源前唔會製造假數據。</div>:<section className="admin-read-table"><header><span>期間</span><span>平台</span><span>參考編號</span><span>總額</span><span>狀態</span></header>{filtered.map(row=><article key={row.id}><span>{row.period}</span><span>{row.provider}</span><span>{row.reference}</span><span>{money(row.grossMinor)}</span><span>{row.status==='MATCH'?'一致':row.status==='MISMATCH'?'有差異':'待核對'}</span></article>)}</section>}
+    <AdminResponsiveDataView
+      label="平台對帳"
+      rows={filtered}
+      rowKey={row=>row.id}
+      emptyTitle="未有平台對帳資料"
+      emptyDescription="目前未有正式平台對帳資料；未接資料來源前唔會製造假數據。"
+      columns={[
+        {key:'period',label:'期間',render:(row:SettlementFact)=>row.period},
+        {key:'provider',label:'平台',render:(row:SettlementFact)=>row.provider},
+        {key:'reference',label:'參考編號',render:(row:SettlementFact)=>row.reference},
+        {key:'gross',label:'總額',numeric:true,render:(row:SettlementFact)=>money(row.grossMinor)},
+        {key:'status',label:'狀態',render:(row:SettlementFact)=>row.status==='MATCH'?'一致':row.status==='MISMATCH'?'有差異':'待核對'},
+      ]}
+    />
   </section>;
 }
 
