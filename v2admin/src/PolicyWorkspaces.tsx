@@ -54,7 +54,7 @@ export function PrintCenterWorkspace(){
   const add=()=>setPrinters(rows=>[...rows,{id:'printer-'+String(rows.length+1).padStart(3,'0'),name:'',type:'RECEIPT',active:true}]);
   const patch=(id:string,change:Partial<LogicalPrinterDraft>)=>setPrinters(rows=>rows.map(row=>row.id===id?{...row,...change}:row));
   return <section className="admin-editor-page">
-    <header className="admin-editor-head"><div><small>LOGICAL PRINT CONFIG · 尚未啟用</small><h1>打印中心</h1><p>呢度只設定打印用途同分流規則；實際連接方式同打印由門店裝置處理。</p></div><div className="admin-editor-actions"><button className="secondary" onClick={add}>新增打印用途</button><button className="publish" disabled>尚未可發布</button></div></header>
+    <header className="admin-editor-head"><div><small>打印設定尚未啟用</small><h1>打印中心</h1><p>呢度只設定打印用途同分流規則；實際連接方式同打印由門店裝置處理。</p></div><div className="admin-editor-actions"><button className="secondary" onClick={add}>新增打印用途</button><button className="publish" disabled>尚未可發布</button></div></header>
     {printers.length===0?<div className="admin-empty-state"><b>未有打印用途</b><p>先建立打印用途，之後再由門店綁定實體打印機。</p><button onClick={add}>新增打印用途</button></div>:<div className="admin-editor-list">{printers.map(row=><article className="admin-policy-row printer-row" key={row.id}>
       <div><b>{row.name||'未命名打印機'}</b><small>{row.id}</small></div>
       <input value={row.name} onChange={event=>patch(row.id,{name:event.target.value})} placeholder="例如：廚房製作單機"/>
@@ -72,7 +72,7 @@ export function PrintTemplatesWorkspace(){
   return <section className="admin-editor-page">
     <PolicyHeader title="打印模板中心" description="只設定打印內容；實際打印會由門店裝置處理。"/>
     <div className="admin-policy-grid two">
-      {[['Receipt',receipt,setReceipt],['Production',production,setProduction],['Packing',packing,setPacking],['Label',label,setLabel]].map(([title,value,setter])=><article className="admin-policy-card" key={title as string}><h2>{title as string}</h2><textarea value={value as string} onChange={event=>(setter as (value:string)=>void)(event.target.value)} rows={5}/><span className="admin-not-wired-chip">TEMPLATE CONFIG · 尚未啟用</span></article>)}
+      {[['收據',receipt,setReceipt],['製作單',production,setProduction],['包裝單',packing,setPacking],['標籤',label,setLabel]].map(([title,value,setter])=><article className="admin-policy-card" key={title as string}><h2>{title as string}</h2><textarea value={value as string} onChange={event=>(setter as (value:string)=>void)(event.target.value)} rows={5}/><span className="admin-not-wired-chip">模板設定尚未啟用</span></article>)}
     </div>
   </section>;
 }
@@ -115,7 +115,7 @@ export function StaffWorkspace(){
   });
   return <section className="admin-editor-page">
     <header className="admin-editor-head">
-      <div><small>AUTH CONFIG · 尚未啟用</small><h1>員工／權限</h1><p>設定員工、角色、登入碼、權限範圍。正式權限判斷會由系統統一處理。</p></div>
+      <div><small>人員權限尚未啟用</small><h1>員工／權限</h1><p>設定員工、角色、登入碼、權限範圍。正式權限判斷會由系統統一處理。</p></div>
       <div className="admin-editor-actions"><button className="secondary" onClick={add}>新增員工</button><button className="publish" disabled>尚未可發布</button></div>
     </header>
     {staff.length===0?<div className="admin-empty-state"><b>未有員工草稿</b><p>新增員工後設定角色、登入碼、權限範圍同後台登入資格。</p><button onClick={add}>新增員工</button></div>:<div className="admin-editor-list">{staff.map(row=><article className="admin-policy-card" key={row.id}>
@@ -145,7 +145,7 @@ export function ChannelsWorkspace({mode}:{mode:'overview'|'mapping'|'failures'|'
     <PolicyHeader title={title} description="平台設定目前只係草稿；相關連接未啟用前，唔會向任何平台發送操作。"/>
     <div className="admin-policy-grid two">
       <article className="admin-policy-card"><h2>平台設定</h2><label className="admin-toggle"><input type="checkbox" checked={enabled} onChange={event=>setEnabled(event.target.checked)}/><span>啟用平台設定</span></label><label className="admin-toggle"><input type="checkbox" checked={autoAccept} onChange={event=>setAutoAccept(event.target.checked)}/><span>一般訂單自動接單規則</span></label><label className="admin-toggle"><input type="checkbox" checked={syncSellability} onChange={event=>setSyncSellability(event.target.checked)}/><span>同步供應狀態規則</span></label></article>
-      <article className="admin-policy-card"><h2>{mode==='failures'?'對應失敗':'估算／商品對應'}</h2>{mode==='failures'?<div className="admin-read-empty">CHANNEL_MAPPING_FAILURE_READ_MODEL_尚未啟用</div>:<><label><span>佣金估算 %</span><input inputMode="decimal" value={commission} onChange={event=>setCommission(event.target.value)} placeholder="例如 30"/></label><label><span>平台商品對應</span><input disabled placeholder="等待相關功能啟用"/></label></>}<span className="admin-not-wired-chip">唔會向平台發送操作</span></article>
+      <article className="admin-policy-card"><h2>{mode==='failures'?'對應失敗':'估算／商品對應'}</h2>{mode==='failures'?<div className="admin-read-empty">商品對應失敗資料尚未啟用</div>:<><label><span>佣金估算 %</span><input inputMode="decimal" value={commission} onChange={event=>setCommission(event.target.value)} placeholder="例如 30"/></label><label><span>平台商品對應</span><input disabled placeholder="等待相關功能啟用"/></label></>}<span className="admin-not-wired-chip">唔會向平台發送操作</span></article>
     </div>
   </section>;
 }
