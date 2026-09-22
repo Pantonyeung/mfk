@@ -13,6 +13,8 @@ export interface AdminProjectedOrder{
   readonly paymentLabel:string;
   readonly fulfillmentLabel:string;
   readonly sourceLabel:string;
+  readonly staffId?:string;
+  readonly staffName?:string;
   readonly items:readonly {readonly id:string;readonly name:string;readonly qty:number;readonly unitMinor:number}[];
 }
 
