@@ -226,3 +226,64 @@
   .admin-media-status-grid{grid-template-columns:1fr 1fr}
   .admin-option-list-complete>article{grid-template-columns:1fr}
 }
+
+
+/* Option Center R1 */
+.admin-option-master-list{display:grid;border:1px solid #e0e3e9;border-radius:14px;background:#fff;overflow:hidden}
+.admin-option-master-head,.admin-option-master-list>article{display:grid;grid-template-columns:150px minmax(180px,1.2fr) 150px 120px 110px 72px;gap:10px;align-items:center;padding:10px 12px}
+.admin-option-master-head{background:#f5f6f8;color:#737c89;font-size:10px;font-weight:850}
+.admin-option-master-list>article{border-top:1px solid #eceef2}
+.admin-option-master-list input{min-height:38px;padding:0 9px;border:1px solid #d5dae2;border-radius:8px;background:#fff}
+.admin-option-master-list>article>span{font-size:10px;color:#737c89}
+.admin-option-master-list button{min-height:34px;border:1px solid #d8dce3;border-radius:8px;background:#fff;font-weight:800}
+.admin-option-master-list button:disabled{opacity:.45}
+
+.admin-option-group-list{display:grid;gap:10px}
+.admin-option-group-card{border:1px solid #e0e3e9;border-radius:14px;background:#fff;overflow:hidden}
+.admin-option-group-card>summary{list-style:none;display:flex;justify-content:space-between;gap:12px;align-items:center;padding:12px 14px;cursor:pointer}
+.admin-option-group-card>summary::-webkit-details-marker{display:none}
+.admin-option-group-card>summary>span:first-child{display:grid;gap:3px}
+.admin-option-group-card>summary b{font-size:14px}
+.admin-option-group-card>summary small{font-size:9px;color:#7b8390}
+.admin-option-group-card>summary>span:last-child{font-size:10px;font-weight:850;color:#7657e8}
+.admin-option-group-card[open]>summary{background:#faf9ff;border-bottom:1px solid #e7e2fb}
+.admin-option-group-body{display:grid;gap:12px;padding:14px}
+
+.admin-option-membership-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.admin-option-membership-grid label{display:flex;align-items:center;gap:8px;padding:9px;border:1px solid #e1e4ea;border-radius:9px;background:#fff}
+.admin-option-membership-grid label>span{display:grid;gap:2px}
+.admin-option-membership-grid b{font-size:11px}
+.admin-option-membership-grid small{font-size:9px;color:#7b8390}
+.admin-option-membership-grid input{width:17px;height:17px}
+
+.admin-product-link-list{display:grid;gap:9px}
+.admin-product-link-card{border:1px solid #e1e4ea;border-radius:11px;background:#fff;overflow:hidden}
+.admin-product-link-card>header{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 11px}
+.admin-product-link-card.is-linked>header{background:#f6f4ff;border-bottom:1px solid #e6e0fb}
+.admin-product-link-card>header>label{display:flex!important;align-items:center;gap:8px}
+.admin-product-link-card>header>label>span{display:grid;gap:2px}
+.admin-product-link-card>header b{font-size:12px}
+.admin-product-link-card>header small{font-size:9px;color:#7b8390}
+.admin-product-link-card>header>a{font-size:10px;font-weight:850;color:#654bc9;text-decoration:none}
+
+.admin-product-linked-options{display:grid}
+.admin-product-linked-options-head,.admin-product-linked-options>article{display:grid;grid-template-columns:54px 130px minmax(150px,1fr) 90px 110px;gap:8px;align-items:center;padding:8px 10px}
+.admin-product-linked-options-head{background:#fafbfc;color:#737c89;font-size:9px;font-weight:850}
+.admin-product-linked-options>article{border-top:1px solid #eceef2;font-size:10px}
+.admin-product-linked-options>article>input{width:17px;height:17px}
+.admin-product-linked-options code{font-size:9px;overflow-wrap:anywhere}
+.admin-product-linked-options>article>label{display:flex!important;align-items:center;gap:6px}
+.admin-product-linked-options>article>label input{width:17px!important;height:17px!important;min-height:auto!important}
+
+@media(max-width:1000px){
+  .admin-option-master-list{overflow-x:auto}
+  .admin-option-master-head,.admin-option-master-list>article{min-width:780px}
+  .admin-option-membership-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .admin-product-linked-options{overflow-x:auto}
+  .admin-product-linked-options-head,.admin-product-linked-options>article{min-width:620px}
+}
+@media(max-width:760px){
+  .admin-option-membership-grid{grid-template-columns:1fr}
+  .admin-option-group-card>summary{align-items:flex-start}
+  .admin-product-link-card>header{align-items:flex-start}
+}
