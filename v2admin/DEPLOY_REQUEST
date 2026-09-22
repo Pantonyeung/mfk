@@ -4,4 +4,5 @@ canonical_url=https://admin.morefunos.com
 source_main=1f9d3d089f7de14436f281982c78808ebbe6a909
 requested_by=owner
 reason=keeta_encryption_key_preflight_r1
+retry=2
 ota=unchanged
