@@ -1,7 +1,8 @@
-import {useMemo,useState} from 'react';
+import {useEffect,useMemo,useState} from 'react';
 import {useAdminDraft} from './admin-draft.tsx';
 import {appendAdminAudit,readActiveAdminRelease,usePersistentAdminState,writeAdminStored} from './admin-local-store.ts';
 import {saveAdminConfig} from './admin-config-save.ts';
+import {beginKeetaOAuth,probeKeetaProvider,readKeetaLiveStatus,type KeetaLiveStatus} from './keeta-live-client.ts';
 
 function PolicyHeader({title,description,badge='已自動保存設定'}:{title:string;description:string;badge?:string}){
   return <header className="admin-editor-head">
@@ -207,7 +208,88 @@ export function StaffWorkspace(){
 
 interface ChannelConfig{enabled:boolean;autoAccept:boolean;syncSellability:boolean;commissionPct:string;displayName:string;lateCutoffMinutes:number}
 interface MappingRow{providerItemId:string;productId:string;optionGroupId?:string;status:'MAPPED'|'PENDING'|'IGNORED'}
+const KEETA_STATE_LABEL:Record<string,string>={
+  NOT_CONFIGURED:'未設定 Runtime Credentials',
+  STORE_BINDING_REQUIRED:'未有正式 Keeta 門店對應',
+  AUTH_REQUIRED:'等待 Keeta 授權',
+  CONNECTED_UNVERIFIED:'已授權 · 等待 Provider Readback',
+  CONNECTED_VERIFIED:'Provider Readback 已驗證',
+};
 export function ChannelsWorkspace({mode}:{mode:'overview'|'mapping'|'failures'|'accept'|'sync'|'estimate'}){
+  const {draft,markClean}=useAdminDraft();
+  const [config,setConfig]=usePersistentAdminState<ChannelConfig>('channel-policy.keeta.v1',{enabled:false,autoAccept:false,syncSellability:false,commissionPct:'',displayName:'Keeta',lateCutoffMinutes:15});
+  const [mappings,setMappings]=usePersistentAdminState<MappingRow[]>('channel-mapping.keeta.v1',[]);
+  const [providerItemId,setProviderItemId]=useState('');
+  const [productId,setProductId]=useState('');
+  const [connection,setConnection]=useState<KeetaLiveStatus|null>(null);
+  const [connectionMessage,setConnectionMessage]=useState('');
+  const [busy,setBusy]=useState('');
+  const patch=(change:Partial<ChannelConfig>)=>setConfig(current=>{const after={...current,...change};appendAdminAudit({action:'修改平台設定',target:'Keeta',before:current,after});return after;});
+  const addMapping=()=>{if(!providerItemId.trim()||!productId)return;setMappings(rows=>{const row:MappingRow={providerItemId:providerItemId.trim(),productId,status:'MAPPED'};appendAdminAudit({action:'新增平台商品對應',target:row.providerItemId,after:row});return [...rows.filter(item=>item.providerItemId!==row.providerItemId),row];});setProviderItemId('');setProductId('');};
+  const refreshConnection=()=>{
+    void readKeetaLiveStatus().then(setConnection).catch(error=>setConnectionMessage(error instanceof Error?error.message:'KEETA_STATUS_FAILED'));
+  };
+  useEffect(refreshConnection,[]);
+  const saveKeeta=()=>{
+    writeAdminStored('channel-policy.keeta.v1',config);
+    writeAdminStored('channel-mapping.keeta.v1',mappings);
+    const result=saveAdminConfig(draft,undefined,'保存 Keeta 平台設定');
+    if(!result.ok){setConnectionMessage('未能保存：'+result.errors.join('；'));return;}
+    markClean();
+    setConnectionMessage('已保存並啟用 R'+result.release.version+'；Cloud 同步後即可做 Keeta 授權／Readback。');
+  };
+  const connect=async()=>{
+    setBusy('oauth');setConnectionMessage('');
+    try{
+      const authorizationUrl=await beginKeetaOAuth();
+      window.location.assign(authorizationUrl);
+    }catch(error){
+      setConnectionMessage(error instanceof Error?error.message:'KEETA_OAUTH_START_FAILED');
+      setBusy('');
+    }
+  };
+  const probe=async()=>{
+    setBusy('probe');setConnectionMessage('');
+    try{
+      await probeKeetaProvider();
+      setConnectionMessage('Keeta Store Readback 已成功。');
+      refreshConnection();
+    }catch(error){
+      setConnectionMessage(error instanceof Error?error.message:'KEETA_PROVIDER_PROBE_FAILED');
+    }finally{setBusy('');}
+  };
+  const failures=mappings.filter(row=>row.status==='PENDING');
+  const title=mode==='overview'?'平台管理':mode==='mapping'?'商品映射管理':mode==='failures'?'匹配失敗明細':mode==='accept'?'接單／自動接單':mode==='sync'?'售罄／供應同步':'實收估算設定';
+  return <section className="admin-editor-page">
+    <PolicyHeader title={title} description="Admin 係 Keeta 設定 Control Plane。K0 只開 OAuth、門店 alias、Provider Readback 同已驗簽 Webhook evidence；Order/Menu 正式執行仍然 HOLD。"/>
+    <section className="admin-read-card">
+      <header><div><small>KEETA LIVE K0</small><h2>Keeta 連線狀態</h2></div><strong>{connection?KEETA_STATE_LABEL[connection.state]??connection.state:'讀取中'}</strong></header>
+      <div className="admin-kpi-grid">
+        <article><span>Admin Enabled</span><strong>{connection?.adminEnabled?'YES':'NO'}</strong><small>只係設定旗標</small></article>
+        <article><span>Provider Shop</span><strong>{connection?.providerShopId??'—'}</strong><small>Alias only</small></article>
+        <article><span>OAuth Token</span><strong>{connection?.tokenState??'—'}</strong><small>{connection?.tokenExpiresAt?new Date(connection.tokenExpiresAt).toLocaleString('zh-HK'):'未連接'}</small></article>
+        <article><span>Webhook</span><strong>{connection?.lastWebhook?.verified?'VERIFIED':'—'}</strong><small>{connection?.lastWebhook?connection.lastWebhook.eventName:'未收到已驗簽 callback'}</small></article>
+      </div>
+      {connection?.lastWebhookError?<div className="admin-callout compact">Webhook fail-closed：{connection.lastWebhookError.code}</div>:null}
+      <div className="admin-editor-actions">
+        <button type="button" onClick={saveKeeta}>保存 Keeta 設定</button>
+        <button type="button" disabled={busy==='oauth'||connection?.state==='NOT_CONFIGURED'||connection?.state==='STORE_BINDING_REQUIRED'} onClick={()=>void connect()}>{busy==='oauth'?'開啟中…':'連接 Keeta OAuth'}</button>
+        <button type="button" disabled={busy==='probe'||!connection||!['CONNECTED_UNVERIFIED','CONNECTED_VERIFIED'].includes(connection.state)} onClick={()=>void probe()}>{busy==='probe'?'驗證中…':'Provider Store Readback'}</button>
+        <button type="button" className="secondary" onClick={refreshConnection}>更新狀態</button>
+      </div>
+      <small>已保留 blocker：{connection?.knownExternalBlocker??'KEETA_LIVE_WEBHOOK_SIGNING_SEMANTICS_MISMATCH'}。簽名唔吻合會直接拒絕，唔會降級放行。</small>
+      {connectionMessage?<p role="status">{connectionMessage}</p>:null}
+    </section>
+    <div className="admin-policy-grid two">
+      <article className="admin-policy-card"><h2>Keeta 平台設定</h2><label><span>顯示名稱</span><input value={config.displayName} onChange={event=>patch({displayName:event.target.value})}/></label><Toggle checked={config.enabled} onChange={enabled=>patch({enabled})} label="啟用平台設定"/><Toggle checked={config.autoAccept} onChange={autoAccept=>patch({autoAccept})} label="正常單自動接單（K0 未執行）"/><Toggle checked={config.syncSellability} onChange={syncSellability=>patch({syncSellability})} label="同步售罄／供應（K0 未執行）"/><label><span>遲到訂單界線（分鐘）</span><input type="number" min={0} value={config.lateCutoffMinutes} onChange={event=>patch({lateCutoffMinutes:Number(event.target.value)||0})}/></label><label><span>佣金估算 %</span><input inputMode="decimal" value={config.commissionPct} onChange={event=>patch({commissionPct:event.target.value})}/></label></article>
+      <article className="admin-policy-card"><h2>{mode==='failures'?'未完成對應':'商品對應'}</h2>
+        {mode==='failures'
+          ?(failures.length?<div>{failures.map(row=><p key={row.providerItemId}>{row.providerItemId} · 待處理</p>)}</div>:<div className="admin-read-empty">目前冇待處理映射。</div>)
+          :<><label><span>平台商品 ID</span><input value={providerItemId} onChange={event=>setProviderItemId(event.target.value)}/></label><label><span>磨飯商品</span><select value={productId} onChange={event=>setProductId(event.target.value)}><option value="">請選擇</option>{draft.products.map(product=><option key={product.id} value={product.id}>{product.name}</option>)}</select></label><button type="button" onClick={addMapping}>保存對應</button><div className="admin-readback-proof">{mappings.slice(0,20).map(row=><p key={row.providerItemId}><span>{row.providerItemId}</span><b>{draft.products.find(product=>product.id===row.productId)?.name??row.productId}</b></p>)}</div></>}
+      </article>
+    </div>
+  </section>;
+}:{mode:'overview'|'mapping'|'failures'|'accept'|'sync'|'estimate'}){
   const {draft}=useAdminDraft();
   const [config,setConfig]=usePersistentAdminState<ChannelConfig>('channel-policy.keeta.v1',{enabled:false,autoAccept:false,syncSellability:false,commissionPct:'',displayName:'Keeta',lateCutoffMinutes:15});
   const [mappings,setMappings]=usePersistentAdminState<MappingRow[]>('channel-mapping.keeta.v1',[]);
