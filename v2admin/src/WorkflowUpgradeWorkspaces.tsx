@@ -158,15 +158,23 @@ export function DiagnosticsWorkspace(){
   </section>;
 }
 
+interface IntegrationGovernance{provider:string;credentialRef:string;scope:string;webhookPath:string;signaturePolicy:string;schemaVersion:string;replayWindowMinutes:number;active:boolean}
 export function IntegrationsGovernanceWorkspace(){
+  const [rows,setRows]=usePersistentAdminState<IntegrationGovernance[]>('integrations-governance.v1',[]);
+  const add=()=>setRows(current=>[...current,{provider:'',credentialRef:'',scope:'',webhookPath:'',signaturePolicy:'',schemaVersion:'',replayWindowMinutes:5,active:false}]);
+  const patch=(index:number,change:Partial<IntegrationGovernance>)=>setRows(current=>current.map((row,i)=>i===index?{...row,...change}:row));
   return <section className="admin-editor-page">
-    <UpgradeHeader title="外部連接" description="只顯示外部連接所需設定同狀態；目前唔會連接任何平台。"/>
-    <div className="admin-policy-grid two">
-      <article className="admin-policy-card"><h2>連接憑證狀態</h2><div className="admin-read-empty">連接憑證資料尚未啟用</div><small>唔會喺畫面顯示或保存秘密資料。</small></article>
-      <article className="admin-policy-card"><h2>接收安全設定</h2><div className="admin-read-empty">接收安全資料尚未啟用</div></article>
-      <article className="admin-policy-card"><h2>資料格式</h2><div className="admin-read-empty">平台資料格式尚未啟用</div></article>
-      <article className="admin-policy-card"><h2>傳送狀態</h2><div className="admin-read-empty">傳送狀態尚未啟用</div></article>
-    </div>
+    <header className="admin-editor-head"><div><small>治理設定</small><h1>外部連接</h1><p>管理 credential reference、scope、webhook、signature、schema 同 replay window。永遠唔保存 secret value。</p></div><div className="admin-editor-actions"><button onClick={add}>新增連接設定</button></div></header>
+    {rows.length===0?<div className="admin-read-empty">未有外部連接治理設定。</div>:<div className="admin-editor-grid">{rows.map((row,index)=><article className="admin-policy-card" key={index}>
+      <label><span>Provider</span><input value={row.provider} onChange={event=>patch(index,{provider:event.target.value})}/></label>
+      <label><span>Credential Reference</span><input value={row.credentialRef} onChange={event=>patch(index,{credentialRef:event.target.value})} placeholder="只填引用名稱，唔填 secret"/></label>
+      <label><span>Scope</span><input value={row.scope} onChange={event=>patch(index,{scope:event.target.value})}/></label>
+      <label><span>Webhook Path</span><input value={row.webhookPath} onChange={event=>patch(index,{webhookPath:event.target.value})}/></label>
+      <label><span>Signature Policy</span><input value={row.signaturePolicy} onChange={event=>patch(index,{signaturePolicy:event.target.value})}/></label>
+      <label><span>Schema Version</span><input value={row.schemaVersion} onChange={event=>patch(index,{schemaVersion:event.target.value})}/></label>
+      <label><span>Replay Window（分鐘）</span><input type="number" min={1} value={row.replayWindowMinutes} onChange={event=>patch(index,{replayWindowMinutes:Number(event.target.value)||5})}/></label>
+      <label className="admin-toggle"><input type="checkbox" checked={row.active} onChange={event=>patch(index,{active:event.target.checked})}/><span>{row.active?'啟用設定':'停用設定'}</span></label>
+    </article>)}</div>}
   </section>;
 }
 
