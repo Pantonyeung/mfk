@@ -3,6 +3,9 @@ import {MFK_KEETA_ORDER_INTENT_SCHEMA,validateMfkKeetaOrderAck} from '../contrac
 const KEETA_AUTHORIZE_URL='https://merchant.mykeeta.com/m/web/openapi/authorize';
 const KEETA_TOKEN_URL='https://open.mykeeta.com/api/open/base/oauth/token';
 const KEETA_MENU_SYNC_URL='https://open.mykeeta.com/api/open/product/menu/sync';
+const KEETA_ORDER_CONFIRM_URL='https://open.mykeeta.com/api/open/order/confirm';
+const KEETA_ORDER_READY_URL='https://open.mykeeta.com/api/open/order/prepare';
+const KEETA_ORDER_GET_URL='https://open.mykeeta.com/api/open/order/get';
 const TOKEN_REFRESH_WINDOW_MS=5*24*60*60*1000;
 const TOKEN_REFRESH_MIN_INTERVAL_MS=60_000;
 const OAUTH_STATE_TTL_MS=10*60*1000;
@@ -273,6 +276,67 @@ function parseKeetaMenuCompletionMessage(message,eventId,providerShopId){
       message:typeof item.message==='string'?item.message:null,
     }))),
   });
+}
+
+function providerOrderIdentity(providerOrderId){
+  return positiveInt(providerOrderId,'KEETA_PROVIDER_ORDER_ID_INVALID');
+}
+
+async function sendKeetaOrderCommand(config,token,action,providerOrderId){
+  const endpoint=action==='CONFIRM'?KEETA_ORDER_CONFIRM_URL:action==='READY'?KEETA_ORDER_READY_URL:null;
+  if(!endpoint)throw new Error('KEETA_PROVIDER_COMMAND_UNSUPPORTED');
+  const signed=await signKeetaRuntimeParams(endpoint,{
+    accessToken:token.accessToken,
+    appId:config.appId,
+    orderViewId:providerOrderIdentity(providerOrderId),
+    shopId:config.providerShopId,
+    timestamp:Math.floor(Date.now()/1000),
+  },config.appSecret);
+  let response;
+  try{
+    response=await fetch(endpoint,{
+      method:'POST',
+      headers:{'content-type':'application/json; charset=utf-8'},
+      body:JSON.stringify(signed),
+    });
+  }catch(error){
+    throw Object.assign(new Error('KEETA_PROVIDER_COMMAND_TRANSPORT_UNKNOWN'),{cause:error,unknown:true});
+  }
+  if(response.status!==200){
+    throw Object.assign(new Error('KEETA_PROVIDER_COMMAND_HTTP_UNKNOWN_'+response.status),{unknown:true});
+  }
+  let row;
+  try{row=record(JSON.parse(await response.text()),'KEETA_PROVIDER_COMMAND_RESPONSE_INVALID');}
+  catch(error){throw Object.assign(new Error(error instanceof Error?error.message:'KEETA_PROVIDER_COMMAND_RESPONSE_INVALID'),{unknown:true});}
+  const code=Number(row.code);
+  if(!Number.isSafeInteger(code))throw Object.assign(new Error('KEETA_PROVIDER_COMMAND_CODE_INVALID'),{unknown:true});
+  if(code!==0){
+    const error=new Error('KEETA_PROVIDER_COMMAND_REJECTED_'+code+':'+String(row.message||''));
+    Object.assign(error,{providerRejected:true,providerCode:code});
+    throw error;
+  }
+  return Object.freeze({code,message:String(row.message||'Success'),data:row.data??null});
+}
+
+async function readKeetaProviderOrder(config,token,providerOrderId){
+  const raw=await sendSignedProviderRequest({
+    url:KEETA_ORDER_GET_URL,
+    params:{
+      accessToken:token.accessToken,
+      appId:config.appId,
+      orderViewId:providerOrderIdentity(providerOrderId),
+      shopId:config.providerShopId,
+      timestamp:Math.floor(Date.now()/1000),
+    },
+    appSecret:config.appSecret,
+  });
+  let row;
+  try{row=record(JSON.parse(raw),'KEETA_ORDER_GET_RESPONSE_INVALID');}
+  catch(error){throw new Error(error instanceof Error?error.message:'KEETA_ORDER_GET_RESPONSE_INVALID_JSON');}
+  const code=Number(row.code);
+  if(!Number.isSafeInteger(code))throw new Error('KEETA_ORDER_GET_RESPONSE_CODE_INVALID');
+  if(code!==0)throw new Error('KEETA_ORDER_GET_PROVIDER_'+code+':'+String(row.message||''));
+  return Object.freeze({code,message:String(row.message||'Success'),data:row.data??null});
 }
 
 async function exchangeAuthorizationCode(config,code){
