@@ -32,16 +32,15 @@ describe('MFK Admin complete catalog product',()=>{
   });
 
 
-  it('shows complete bounded Product operational sections on demand',()=>{
+  it('starts Product editing with one human-readable task choice and keeps future fields hidden',()=>{
     const productId=LEGACY_MF01_ADMIN_DRAFT.products[0]!.id;
     const html=renderToStaticMarkup(<AdminDraftProvider><ProductDetailHarness productId={productId}/></AdminDraftProvider>);
     for(const marker of [
-      '基本資料','價格','選項','先喺「選項中心」建立完整選項組',
-      '打印','廚房製作單','打包單','堂食打印','外賣打印',
-      '圖片／媒體','Canonical 圖片連結','Keeta 獨立圖片連結','R2 Object Key','D1 Media Ref',
+      '你而家想修改邊部分？','基本資料','價格','選項','打印','圖片／媒體','進階／刪除',
     ])expect(html).toContain(marker);
-    expect(html).toContain('MFK_R2_PRODUCT_MEDIA');
-    expect(html).toContain('MFK_D1_PRODUCT_MEDIA');
+    expect(html).not.toContain('商品描述</span>');
+    expect(html).not.toContain('Canonical 圖片連結');
+    expect(html).not.toContain('廚房製作單');
   });
 
   it('keeps Product print defaults complete and media backend fail-closed until real wiring',()=>{
@@ -136,8 +135,8 @@ describe('MFK Admin complete catalog product',()=>{
 
     const detailProductId=LEGACY_MF01_ADMIN_DRAFT.products[0]!.id;
     const detail=renderToStaticMarkup(<AdminDraftProvider><ProductDetailHarness productId={detailProductId}/></AdminDraftProvider>);
-    expect(detail).toContain('加入選項');
-    expect(detail).toContain('先喺「選項中心」建立完整選項組');
+    expect(detail).toContain('0 個已加入選項組');
+    expect(detail).not.toContain('先喺「選項中心」建立完整選項組');
     expect(detail).not.toContain('修改選項組名稱');
   });
 
@@ -341,16 +340,13 @@ describe('MFK Admin complete catalog product',()=>{
     expect(replay.comboPools?.filter(pool=>pool.id==='combo-drink-pool-shared')).toHaveLength(1);
   });
 
-  it('renders products inside child-pool cards instead of one flat add-on list',()=>{
+  it('starts Combo work with an explicit task choice instead of dumping every Pool',()=>{
     const html=renderToStaticMarkup(<MemoryRouter initialEntries={['/admin/catalog/combos']}><MfkAdminApp/></MemoryRouter>);
     for(const marker of [
-      '共用小食 Pool','共用飲品 Pool',
-      '免費小食 Pool','+$3 小食 Pool','+$5 小食 Pool',
-      '唔飲嘢 Pool','熱檸茶／熱檸水免費 Pool','凍檸茶／凍檸水 +$3 Pool',
-      '特飲 +$6 Pool','特飲 +$8 Pool','特飲 +$10 Pool',
-      '熱檸茶','熱檸水','凍檸茶','凍檸水','手打檸檬茶',
-      '每個子 Pool 自己有價錢同成員',
+      '今次想處理邊一部分？','設定套餐組合','管理 Reusable Pools','按次序設定套餐資料、飯糰、小食同飲品',
     ])expect(html).toContain(marker);
+    expect(html).not.toContain('免費小食 Pool');
+    expect(html).not.toContain('手打檸檬茶');
     expect(html).not.toContain('待 Owner 設定');
   });
 
