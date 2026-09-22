@@ -40,15 +40,17 @@ export function ActionQueueWorkspace(){
   </section>;
 }
 
+interface DesiredDeviceProfile{id:string;name:string;profile:'STORE_FRONTLINE'|'MANAGER_MOBILE'|'BACKOFFICE';trusted:boolean;expectedVersion:string}
 export function DeviceHealthWorkspace(){
-  const [profile,setProfile]=useState('門店前線');
+  const [profiles,setProfiles]=usePersistentAdminState<DesiredDeviceProfile[]>('device-profiles.v1',[]);
+  const [observed]=usePersistentAdminState<Array<{id:string;name:string;profile:string;trusted:boolean;version:string;state:string;lastSeenAt:string}>>('devices-read.v1',[]);
+  const add=()=>setProfiles(rows=>{const row:DesiredDeviceProfile={id:'device-'+Date.now().toString(36),name:'新裝置',profile:'STORE_FRONTLINE',trusted:true,expectedVersion:''};appendAdminAudit({action:'新增裝置預期設定',target:row.id});return [...rows,row];});
+  const patch=(id:string,change:Partial<DesiredDeviceProfile>)=>setProfiles(rows=>rows.map(row=>row.id===id?{...row,...change}:row));
   return <section className="admin-editor-page">
-    <UpgradeHeader title="裝置管理" description="顯示裝置設定、信任狀態、版本同設定差異；目前只提供管理介面。"/>
+    <header className="admin-editor-head"><div><small>Desired vs Observed</small><h1>裝置管理</h1><p>管理預期 Profile、信任同版本；裝置目前狀態只讀實際 readback，唔會用草稿假扮已完成。</p></div><div className="admin-editor-actions"><button onClick={add}>新增裝置設定</button></div></header>
     <div className="admin-policy-grid two">
-      <article className="admin-policy-card"><h2>預期設定</h2><label><span>裝置類型</span><select value={profile} onChange={e=>setProfile(e.target.value)}><option>門店前線</option><option>管理人員流動裝置</option><option>後台工作站</option></select></label><StateChip>未發布草稿</StateChip></article>
-      <article className="admin-policy-card"><h2>裝置目前狀態</h2><div className="admin-read-empty">裝置狀態尚未啟用</div></article>
-      <article className="admin-policy-card"><h2>設定差異</h2><p>比較預期同實際版本、裝置類型同信任狀態。</p><StateChip>需要裝置回傳</StateChip></article>
-      <article className="admin-policy-card"><h2>信任／移除</h2><button disabled>移除裝置尚未開放</button><small>正式移除會由權限系統處理。</small></article>
+      <article className="admin-policy-card"><h2>預期設定</h2>{profiles.length===0?<div className="admin-read-empty">未有裝置預期設定。</div>:profiles.map(row=><div key={row.id} className="admin-sub-editor"><label><span>名稱</span><input value={row.name} onChange={event=>patch(row.id,{name:event.target.value})}/></label><label><span>類型</span><select value={row.profile} onChange={event=>patch(row.id,{profile:event.target.value as DesiredDeviceProfile['profile']})}><option value="STORE_FRONTLINE">門店前線</option><option value="MANAGER_MOBILE">管理人員流動裝置</option><option value="BACKOFFICE">後台工作站</option></select></label><label><span>預期版本</span><input value={row.expectedVersion} onChange={event=>patch(row.id,{expectedVersion:event.target.value})}/></label><label className="admin-toggle"><input type="checkbox" checked={row.trusted} onChange={event=>patch(row.id,{trusted:event.target.checked})}/><span>可信裝置</span></label></div>)}</article>
+      <article className="admin-policy-card"><h2>裝置目前狀態</h2>{observed.length===0?<div className="admin-read-empty">目前未有裝置 readback；唔會顯示假 Online。</div>:observed.map(row=><p key={row.id}><b>{row.name}</b> · {row.version} · {row.state} · {new Date(row.lastSeenAt).toLocaleString('zh-HK')}</p>)}</article>
     </div>
   </section>;
 }
