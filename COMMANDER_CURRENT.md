@@ -3,13 +3,13 @@
 Status: CURRENT / CONTROLLING
 Protocol: #39
 Control: #22
-Updated: 2026-09-22 14:10 Asia/Hong_Kong
+Updated: 2026-09-22 14:17 Asia/Hong_Kong
 System: MFK ONLY
 
 ## 0. Mandatory read order
 1. COMMANDER_CURRENT.md
 2. #22 latest controlling comment
-3. docs/navigation/MFK_航海圖_V1.23_Round024_2026-09-22.txt
+3. docs/navigation/MFK_航海圖_V1.24_Round025_2026-09-22.txt
 4. HANDOFF_CURRENT.md
 5. active issue(s)
 
@@ -19,7 +19,10 @@ Parent Admin completion:
 #45
 
 Current exact issue:
-#68 Admin Option Center R1
+#76 Admin Option Set Center R2
+
+Superseded:
+#68 CLOSED / NOT_PLANNED
 
 Parent Product detail:
 #62
@@ -28,7 +31,7 @@ Known later RED:
 #66 Product Media R2 + D1 + Auth
 
 State:
-`MFK_ADMIN_OPTION_CENTER_DEPLOYED_OWNER_REVIEW_PENDING`
+`MFK_ADMIN_OPTION_SET_CENTER_R2_DEPLOYED_OWNER_REVIEW_PENDING`
 
 #44 Admin→SMT:
 HOLD
@@ -41,107 +44,129 @@ NOT AUTHORIZED
 
 ## 2. Owner Option architecture lock
 
-Correct normalized model is now implemented.
+The reusable operator unit is an Option Set / 選項組.
 
-### Option Center = canonical Option Master
+Examples:
 
-Each Option exists once:
-- internal identity
-- Option ID
-- Name
-- Price adjustment
-- Active / inactive
+飯量
+- 多飯
+- 少飯
+- 走飯
 
-No Product-specific duplicate Option record.
+青瓜
+- 多青瓜
+- 少青瓜
+- 走青瓜
 
-### Option Group
+No flat global Option Master as the primary operator model.
 
-Group references existing Option identities.
+## 3. Option Set responsibility
 
-Group owns:
-- Group ID / Name
-- Option membership
+Each Option Set owns:
+- Set ID
+- Set Name
 - Required / Optional / Optional-force-show
 - Single / Multi
 - Min / Max
 - Allow quantities
 - Active
+- ordered child Options
 
-Group does NOT copy Option name / price.
+Each child Option owns:
+- Option ID
+- Name
+- Price adjustment
+- Active
+- Order
 
-### Product Link
+## 4. Product link responsibility
 
-Product detail:
-- links / unlinks existing Option Groups
-- may include / exclude existing Options in that linked group for this Product
-- reads Option ID / Name / Price from Option Center
-- does NOT edit Option Master data
-- links to Option Center for master edits
+Product links whole Option Sets.
 
-### Product-specific Default
+Product detail now provides:
+- explicit `加入選項`
+- list of available existing Option Sets
+- add whole Set
+- remove linked Set
+- read child Option ID / Name / Price
+- Product-specific default child selection
+- clear default
+- deep-link to Option Center for editing master Set
 
 Default belongs to:
-`Product × Option Group × Option`
+`Product × Option Set × Child Option`
 
-NOT global Option Master.
+No global default on child Option.
 
-Same canonical Option can be default for Product A and not Product B.
+## 5. SMT semantic target
 
-Single-select Group:
-max one Product default.
+Future connection semantics only:
 
-## 3. Legacy conversion
+Product linked to 青瓜
+→ SMT taps 青瓜
+→ child choices:
+  多青瓜
+  少青瓜
+  走青瓜
 
-Existing embedded modifier data is normalized on first Option Center use:
-- dedupe by Option code where possible
-- preserve group membership
-- preserve Product link
-- legacy default becomes Product-specific link default
+This work does NOT open SMT connection.
+
+## 6. Migration safety
+
+R2 migration preserves current data where possible:
+- #68 groups → Option Sets
+- referenced flat Options → child Options
+- orphan flat Options → disabled `待整理選項` Set
+- Product links preserved
+- Product-specific defaults preserved
+- legacy embedded modifier groups also migrate
 
 No intentional silent data loss.
 
-## 4. Release / pricing governance
-
-Immutable Admin release now includes:
-- Option Master
-- Option Groups
-- Product Option Links
-
-Publish validation now checks Option Center.
+## 7. Pricing / release governance
 
 Pricing page:
-- Product price remains Product config
-- Option price reads/writes Option Master
-- no copied per-Product Option price
-- no second Pricing engine
+- Product price stays Product config
+- child Option price belongs to its Option Set child row
+- Product link never copies Option price
+- one Pricing authority remains
 
-## 5. Verification / deploy
+Immutable Admin release now includes:
+- Option Set Center state
+- Product Option Set links
+
+Publish validation checks hierarchical Option Set data.
+
+## 8. Verification / deploy
 
 WORK_ID:
-`MFK-ADMIN-OPTION-CENTER-R1`
+`MFK-ADMIN-OPTION-SET-CENTER-R2`
+
+Issue:
+#76
 
 Branch:
-`work/MFK/ADMIN-OPTION-CENTER-R1`
+`work/MFK/ADMIN-OPTION-SET-CENTER-R2`
 
-Source verification:
-`35693400570`
+Verification:
+`35694910787`
 SUCCESS
 - npm test SUCCESS
 - npm run build SUCCESS
 
 Clean landing:
-- admin-option-center `44162e315991a20d0f0f42c69232cc3c04edc914`
-- CatalogWorkspaces `433ba66774b0b68cd91e069e69e941e11ce6c00c`
-- GovernanceWorkspaces `d781f634874b5ce40845b998aee8d3bbe43230e2`
-- admin-capabilities `ebee5b5944bdf3fd2a7b44469ecd4bfa6b96a214`
-- tests `a526cc7111de5f35652303cf2e28c2b12ddf5c86`
-- styles `1893195cd96eee22c93820db9d46a10e3986645d`
+- model `c87591a7af668fee3938fed8bba3710ebcac5d86`
+- UI `cad72d29e568dc5f18c3618d7dc35315207dcb03`
+- release governance `1efdf4b50f27ebb39ed48936dfbe8623797b4fdf`
+- capability copy `4e0ebd298dc8909eaf49b9362ef171bb80894785`
+- tests `acd18532edd8539163034b4627663447f47d703d`
+- styles `2389780fecfe6160e99f256f90369c2a6c3c2986`
 
-Main / deploy trigger:
-`e6adc98030fc2ab2a81a2860b9a78cfe68a56105`
+Deploy trigger:
+`18b52d38daebcd8ef88c4b8c5b9974ba5d80d587`
 
 Live deploy:
-`35693511574`
+`35695027863`
 SUCCESS
 - test SUCCESS
 - build SUCCESS
@@ -150,46 +175,43 @@ SUCCESS
 Canonical:
 `https://admin.morefunos.com`
 
-## 6. Exact NEXT
+## 9. Exact NEXT
 
 ONE action only:
 
-Owner reviews live Admin:
+Owner refreshes live Admin.
 
-1. 菜單 → 選項中心
-2. create / inspect Option Master
-3. create / inspect Option Group
-4. 商品資料 → one Product → 編輯 → 選項
+First:
+菜單 → 選項中心
 
-Acceptance:
-- Option created once
-- Group references existing Option
-- Product only links existing Group / Option
-- Product detail cannot edit canonical Option Name / ID / Price
-- Product can set its own default
-- another Product can set a different default for the same Option Group
+Verify:
+1. default view is a list of Option Sets, not flat Options
+2. `新增選項組` is visible
+3. open a Set
+4. `新增子選項` is visible
+5. child rows have ID / Name / Price / Active / Order
+
+Then:
+商品資料 → one Product → 編輯 → 選項
+
+Verify:
+1. `加入選項` is visible
+2. existing Option Sets can be added
+3. linked Set shows its child choices
+4. Product can select its own default child
+5. Product cannot edit the Set child master fields here
 
 If GREEN:
-BANK #68 and continue remaining #62 Admin Product-detail review.
+BANK #76 and continue #62 review.
 
 If RED:
-STOP on exact Option Center UX/model break.
+STOP on exact first break.
 
-## 7. Known later RED
-
-#66 Product Media backend remains NOT GREEN:
-- Admin auth mutation boundary absent
-- MFK-native R2 not proven
-- MFK-native D1 media metadata not proven
-
-Do NOT start #66 until #68 Owner review is GREEN.
-
-## 8. HOLD / DO NOT
+## 10. HOLD / DO NOT
 
 - no Admin→SMT connection
 - no SMT OTA work
 - no Keeta live
-- no old Morefun-v2 D1/R2 authority reuse
-- no duplicate Option records per Product
-- no Product-owned Option price
-- no global defaultSelected on Option Master
+- #66 media backend NOT NEXT until #76 accepted
+- no flat global Option Master UI
+- no Product-side child Option editing
