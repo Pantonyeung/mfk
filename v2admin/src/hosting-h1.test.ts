@@ -4,7 +4,7 @@ import {describe,expect,it} from 'vitest';
 describe('MFK Admin Cloudflare H2 + config sync runtime',()=>{
   const source=readFileSync(new URL('../wrangler.jsonc',import.meta.url),'utf8');
 
-  it('targets mfk-admin, serves SPA assets, and exposes only the dedicated Admin sync Durable Object',()=>{
+  it('targets mfk-admin, serves SPA assets, and exposes dedicated Admin + Keeta edge Durable Objects',()=>{
     expect(source).toContain('"name": "mfk-admin"');
     expect(source).toContain('"main": "./worker.ts"');
     expect(source).toContain('"directory": "./dist"');
@@ -13,6 +13,10 @@ describe('MFK Admin Cloudflare H2 + config sync runtime',()=>{
     expect(source).toContain('"durable_objects"');
     expect(source).toContain('"name": "ADMIN_SYNC"');
     expect(source).toContain('"class_name": "AdminSyncStore"');
+    expect(source).toContain('"name": "KEETA_EDGE"');
+    expect(source).toContain('"class_name": "KeetaEdgeStore"');
+    expect(source).toContain('"tag": "keeta-edge-k0-v1"');
+    expect(source).toContain('"nodejs_compat"');
   });
 
   it('allows SMT appassets to fetch/ACK config while Publish remains Admin-origin-only',()=>{
@@ -35,6 +39,17 @@ describe('MFK Admin Cloudflare H2 + config sync runtime',()=>{
       "authorizeAdminRead",
     ])expect(worker).toContain(marker);
     expect(worker).toContain("acks[event.deviceId]");
+  });
+
+  it('exposes bounded Keeta K0 OAuth/status/probe/webhook routes without order mutation',()=>{
+    const worker=readFileSync(new URL('../worker.ts',import.meta.url),'utf8');
+    const edge=readFileSync(new URL('../keeta-edge.js',import.meta.url),'utf8');
+    expect(worker).toContain("/api/keeta/");
+    for(const marker of ["/status","/oauth/start","/oauth/callback","/probe","/webhook","KEETA_LIVE_WEBHOOK_SIGNING_SEMANTICS_MISMATCH"]){
+      expect(edge).toContain(marker);
+    }
+    expect(edge).toContain("mutation:'NONE_K0_CAPTURE_ONLY'");
+    expect(edge).not.toMatch(/createOrder\s*\(|StoreKernel|PaymentAuthority/);
   });
 
   it('does not inherit legacy/provider/transaction runtime bindings or background triggers',()=>{
