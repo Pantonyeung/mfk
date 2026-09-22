@@ -63,6 +63,13 @@ export function normalizeKeetaOrderPlacementEvidence(envelope) {
   });
 }
 
+export function buildKeetaOrderGetShape(input) {
+  return request(PROVIDER_OPERATIONS.orderGet, identity(input), {
+    action: 'READBACK',
+    authorityBoundary: 'PROVIDER_READBACK_ONLY_NO_MFK_MUTATION',
+  });
+}
+
 export function buildKeetaOrderConfirmShape(input) {
   return request(PROVIDER_OPERATIONS.orderConfirm, identity(input), { action: 'CONFIRM' });
 }
