@@ -4,6 +4,7 @@ import {buildOrderPrintPlan,groupTscBitmapJobsByPhysicalPrinter,type PrintBindin
 import {queueOrderProjection} from './projection-outbox.ts';
 import {readActiveStaffSession} from './staff-auth.ts';
 import {readSmtPrintConfig} from './admin-operational-config.ts';
+import {mirrorKeetaOrderCommand,type KeetaProviderMirrorResult} from './keeta-provider-commands.ts';
 
 export interface SmtOperationalMetric{readonly id:string;readonly label:string;readonly value:string;readonly detail?:string}
 export interface SmtOrderListItemViewModel{readonly orderId:string;readonly orderIdLabel:string;readonly itemCount:number;readonly totalLabel:string;readonly paymentLabel:string;readonly fulfillmentLabel:string;readonly sourceLabel?:string;readonly localSequenceLabel?:string}
@@ -97,7 +98,8 @@ export interface SmtReprintOption{readonly jobId:string;readonly role:string;rea
 export interface CleanSmtCoreRuntimePort{
   subscribe(listener:()=>void):()=>void;
   readOrders?(selectedOrderId?:string):Promise<SmtOrdersProjection>;
-  markOrderReady?(orderId:string):Promise<{readonly orderId:string;readonly canonicalRevision:number;readonly status:'READY'}>;
+  acceptOrder?(orderId:string):Promise<{readonly orderId:string;readonly status:'ACCEPTED';readonly provider:KeetaProviderMirrorResult}>;
+  markOrderReady?(orderId:string):Promise<{readonly orderId:string;readonly canonicalRevision:number;readonly status:'READY';readonly provider:KeetaProviderMirrorResult}>;
   printOrderReceipt?(orderId:string):Promise<{readonly printJobId:string;readonly state:string}>;
   printOrderOutputs?(orderId:string):Promise<PrintDispatchSummary>;
   readOrderReprintOptions?(orderId:string):Promise<readonly SmtReprintOption[]>;
@@ -170,6 +172,7 @@ export interface MfkLocalRuntime extends CleanSmtCoreRuntimePort{
     initialFulfillmentLabel?:StoredOrder['fulfillmentLabel'];
   }):StoredOrder;
   orders():readonly StoredOrder[];
+  acceptOrder(orderId:string):Promise<{readonly orderId:string;readonly status:'ACCEPTED';readonly provider:KeetaProviderMirrorResult}>;
   printOrderOutputs(orderId:string):Promise<PrintDispatchSummary>;
   readOrderReprintOptions(orderId:string):Promise<readonly SmtReprintOption[]>;
   reprintOrderJobs(orderId:string,jobIds:readonly string[],reason?:string):Promise<PrintDispatchSummary>;
@@ -486,13 +489,31 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
     };
     return {items,detailsByOrderId:details,selectedOrderId:selectedId,selectedOrder:selectedId?details[selectedId]:undefined};
   },
+  async acceptOrder(orderId){
+    const found=data.orders.find(x=>x.id===orderId);if(!found)throw new Error('ORDER_NOT_FOUND');
+    if(found.fulfillmentLabel==='已完成'||found.fulfillmentLabel==='已取消')throw new Error('ORDER_NOT_ACCEPTABLE');
+    const updatedAt=new Date().toISOString();
+    if(found.fulfillmentLabel==='待處理'){
+      data={...data,orders:data.orders.map(x=>x.id===orderId?{...x,fulfillmentLabel:'進行中',updatedAt}:x)};
+      save();
+      projectOrder(data.orders.find(x=>x.id===orderId)!);
+      appendActionAudit({action:'ACCEPT',orderId});
+    }
+    const current=data.orders.find(x=>x.id===orderId)!;
+    const provider=await mirrorKeetaOrderCommand(current,'CONFIRM');
+    return {orderId,status:'ACCEPTED' as const,provider};
+  },
   async markOrderReady(orderId){
     const found=data.orders.find(x=>x.id===orderId);if(!found)throw new Error('ORDER_NOT_FOUND');
+    if(found.fulfillmentLabel==='已完成'||found.fulfillmentLabel==='已取消')throw new Error('ORDER_NOT_READYABLE');
     const updatedAt=new Date().toISOString();
     data={...data,orders:data.orders.map(x=>x.id===orderId?{...x,fulfillmentLabel:'可取餐',updatedAt}:x)};
     save();
     projectOrder(data.orders.find(x=>x.id===orderId)!);
-    return {orderId,canonicalRevision:Date.now(),status:'READY'};
+    appendActionAudit({action:'READY',orderId});
+    const current=data.orders.find(x=>x.id===orderId)!;
+    const provider=await mirrorKeetaOrderCommand(current,'READY');
+    return {orderId,canonicalRevision:Date.now(),status:'READY' as const,provider};
   },
   async printOrderOutputs(orderId){
     const order=data.orders.find(x=>x.id===orderId);

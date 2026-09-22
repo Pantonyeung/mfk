@@ -1,4 +1,4 @@
-import {beforeEach,describe,expect,it} from 'vitest';
+import {beforeEach,describe,expect,it,vi} from 'vitest';
 import {createMfkAdminConfigEnvelope} from '../../../contracts/admin-config-sync-v1.ts';
 import {MFK_KEETA_ORDER_INTENT_SCHEMA,type MfkKeetaOrderIntent} from '../../../contracts/keeta-order-intake-v1.ts';
 import {applyAdminConfigEnvelope} from './admin-config-sync.ts';
@@ -113,4 +113,26 @@ describe('Keeta → SMT canonical local intake',()=>{
     }));
     expect(()=>translateKeetaIntentToLocalOrder(intent())).toThrow(/KEETA_ORDER_MAPPING_REQUIRED/);
   });
+
+  it('keeps the SMT canonical accept/READY decision when Keeta provider mirroring needs attention',async()=>{
+    const translated=translateKeetaIntentToLocalOrder(intent());
+    const order=localRuntime.createOrder(translated);
+    const providerFetch=vi.fn(async()=>new Response(
+      JSON.stringify({state:'UNKNOWN',code:'KEETA_PROVIDER_COMMAND_UNKNOWN_READBACK_REQUIRED'}),
+      {status:409,headers:{'content-type':'application/json'}},
+    ));
+    vi.stubGlobal('fetch',providerFetch);
+    try{
+      const accepted=await localRuntime.acceptOrder(order.id);
+      expect(accepted.status).toBe('ACCEPTED');
+      expect(accepted.provider.state).toBe('ATTENTION');
+      expect(localRuntime.orders().find(row=>row.id===order.id)?.fulfillmentLabel).toBe('進行中');
+
+      const ready=await localRuntime.markOrderReady(order.id);
+      expect(ready.status).toBe('READY');
+      expect(ready.provider.state).toBe('ATTENTION');
+      expect(localRuntime.orders().find(row=>row.id===order.id)?.fulfillmentLabel).toBe('可取餐');
+    }finally{vi.unstubAllGlobals();}
+  });
+
 });

@@ -562,4 +562,119 @@ describe('Keeta live edge runtime',()=>{
     }
   });
 
+
+  it('gates Keeta CONFIRM and READY on the committed canonical order and makes success idempotent',async()=>{
+    const key=Buffer.alloc(32,14).toString('base64');
+    const storage=new Map<string,unknown>([
+      ['order:intent:998',{
+        schema:'MFK_KEETA_ORDER_INTENT_V1',storeId:'MF01',provider:'KEETA',state:'COMMITTED',
+        providerShopId:721578302,providerOrderId:'998',providerMessageId:'msg-998',
+        providerPushedAt:'2026-09-23T00:00:00.000Z',receivedAt:'2026-09-23T00:00:01.000Z',
+        fingerprint:'f'.repeat(64),rawMessage:'{}',
+        canonicalOrderId:'MFK-1',canonicalDisplay:'P001',committedAt:'2026-09-23T00:00:02.000Z',
+      }],
+    ]);
+    const state={storage:{
+      get:async(key:string)=>storage.get(key),
+      put:async(key:string,value:unknown)=>{storage.set(key,value);},
+      delete:async(key:string)=>{storage.delete(key);},
+      list:async({prefix}:{prefix:string})=>new Map([...storage.entries()].filter(([key])=>key.startsWith(prefix))),
+    }};
+    const env={
+      KEETA_APP_ID:'3419700273',KEETA_APP_SECRET:'test-secret',
+      KEETA_TOKEN_ENCRYPTION_KEY:key,KEETA_PROVIDER_SHOP_ID:'721578302',
+      KEETA_OAUTH_REDIRECT_URI:'https://admin.morefunos.com/api/keeta/oauth/callback',
+    };
+    const {KeetaRuntimeStore}=await import('../keeta-runtime.ts');
+    const runtime=new KeetaRuntimeStore(state as never,env as never);
+    const imported=await runtime.fetch(new Request('https://internal/admin/token/import-test',{
+      method:'POST',headers:{'content-type':'application/json'},
+      body:JSON.stringify({accessToken:'access',tokenType:'bearer',expiresIn:7776000,refreshToken:'refresh',scope:'all',issuedAtTime:Date.now()}),
+    }));
+    expect(imported.status).toBe(200);
+
+    const providerFetch=vi.fn(async(input:string|URL|Request)=>new Response(
+      JSON.stringify({code:0,message:'Success',data:{}}),
+      {status:200,headers:{'content-type':'application/json'}},
+    ));
+    vi.stubGlobal('fetch',providerFetch);
+    try{
+      const confirmBody={providerOrderId:'998',canonicalOrderId:'MFK-1',action:'CONFIRM'};
+      const confirm=await runtime.fetch(new Request('https://internal/smt/orders/command',{
+        method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(confirmBody),
+      }));
+      expect(confirm.status).toBe(200);
+      expect((await confirm.json() as {state:string}).state).toBe('SUCCESS');
+      expect(String(providerFetch.mock.calls[0]?.[0])).toBe('https://open.mykeeta.com/api/open/order/confirm');
+
+      const duplicate=await runtime.fetch(new Request('https://internal/smt/orders/command',{
+        method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(confirmBody),
+      }));
+      expect((await duplicate.json() as {state:string}).state).toBe('IDEMPOTENT');
+      expect(providerFetch).toHaveBeenCalledTimes(1);
+
+      const mismatch=await runtime.fetch(new Request('https://internal/smt/orders/command',{
+        method:'POST',headers:{'content-type':'application/json'},
+        body:JSON.stringify({providerOrderId:'998',canonicalOrderId:'MFK-WRONG',action:'READY'}),
+      }));
+      expect(mismatch.status).toBe(409);
+      expect((await mismatch.json() as {code:string}).code).toBe('KEETA_PROVIDER_COMMAND_CANONICAL_ORDER_MISMATCH');
+
+      const ready=await runtime.fetch(new Request('https://internal/smt/orders/command',{
+        method:'POST',headers:{'content-type':'application/json'},
+        body:JSON.stringify({providerOrderId:'998',canonicalOrderId:'MFK-1',action:'READY'}),
+      }));
+      expect(ready.status).toBe(200);
+      expect(String(providerFetch.mock.calls[1]?.[0])).toBe('https://open.mykeeta.com/api/open/order/prepare');
+    }finally{vi.unstubAllGlobals();}
+  });
+
+  it('banks ambiguous Keeta provider command transport as UNKNOWN and never blind-retries',async()=>{
+    const key=Buffer.alloc(32,15).toString('base64');
+    const storage=new Map<string,unknown>([
+      ['order:intent:999',{
+        schema:'MFK_KEETA_ORDER_INTENT_V1',storeId:'MF01',provider:'KEETA',state:'COMMITTED',
+        providerShopId:721578302,providerOrderId:'999',providerMessageId:'msg-999',
+        providerPushedAt:'2026-09-23T00:00:00.000Z',receivedAt:'2026-09-23T00:00:01.000Z',
+        fingerprint:'a'.repeat(64),rawMessage:'{}',
+        canonicalOrderId:'MFK-9',canonicalDisplay:'P009',committedAt:'2026-09-23T00:00:02.000Z',
+      }],
+    ]);
+    const state={storage:{
+      get:async(key:string)=>storage.get(key),
+      put:async(key:string,value:unknown)=>{storage.set(key,value);},
+      delete:async(key:string)=>{storage.delete(key);},
+      list:async({prefix}:{prefix:string})=>new Map([...storage.entries()].filter(([key])=>key.startsWith(prefix))),
+    }};
+    const env={
+      KEETA_APP_ID:'3419700273',KEETA_APP_SECRET:'test-secret',
+      KEETA_TOKEN_ENCRYPTION_KEY:key,KEETA_PROVIDER_SHOP_ID:'721578302',
+      KEETA_OAUTH_REDIRECT_URI:'https://admin.morefunos.com/api/keeta/oauth/callback',
+    };
+    const {KeetaRuntimeStore}=await import('../keeta-runtime.ts');
+    const runtime=new KeetaRuntimeStore(state as never,env as never);
+    await runtime.fetch(new Request('https://internal/admin/token/import-test',{
+      method:'POST',headers:{'content-type':'application/json'},
+      body:JSON.stringify({accessToken:'access',tokenType:'bearer',expiresIn:7776000,refreshToken:'refresh',scope:'all',issuedAtTime:Date.now()}),
+    }));
+    const providerFetch=vi.fn(async()=>{throw new TypeError('network uncertain');});
+    vi.stubGlobal('fetch',providerFetch);
+    try{
+      const body={providerOrderId:'999',canonicalOrderId:'MFK-9',action:'CONFIRM'};
+      const first=await runtime.fetch(new Request('https://internal/smt/orders/command',{
+        method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body),
+      }));
+      expect(first.status).toBe(409);
+      expect((await first.json() as {state:string}).state).toBe('UNKNOWN');
+      const second=await runtime.fetch(new Request('https://internal/smt/orders/command',{
+        method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body),
+      }));
+      const secondBody=await second.json() as {state:string;code:string};
+      expect(second.status).toBe(409);
+      expect(secondBody.state).toBe('UNKNOWN');
+      expect(secondBody.code).toBe('KEETA_PROVIDER_COMMAND_UNKNOWN_READBACK_REQUIRED');
+      expect(providerFetch).toHaveBeenCalledTimes(1);
+    }finally{vi.unstubAllGlobals();}
+  });
+
 });

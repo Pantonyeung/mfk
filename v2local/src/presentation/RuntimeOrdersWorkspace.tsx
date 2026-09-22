@@ -41,6 +41,7 @@ export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePor
   const [paymentFilter,setPaymentFilter]=useState<PaymentFilter>('全部');
   const [history,setHistory]=useState(false);
   const [modal,setModal]=useState<Modal>(null);
+  const [acceptBusy,setAcceptBusy]=useState(false);
   const [readyBusy,setReadyBusy]=useState(false);
   const [message,setMessage]=useState<string|null>(null);
   const [reprintOptions,setReprintOptions]=useState<readonly SmtReprintOption[]>([]);
@@ -93,10 +94,28 @@ export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePor
     })));
   },[snapshot?.selectedOrderId]);
 
+  const acceptSelected=async()=>{
+    if(!selected||!runtime.acceptOrder||acceptBusy)return;
+    setAcceptBusy(true);setMessage(null);
+    try{
+      const result=await runtime.acceptOrder(selected.orderId);
+      await load(selected.orderId,true);
+      setMessage(result.provider.state==='ATTENTION'
+        ?'本地已接單；Keeta confirm 需要處理：'+(result.provider.code??'UNKNOWN')
+        :'已接單；Keeta confirm 已同步');
+    }catch(cause){setMessage(cause instanceof Error?cause.message:'未能接單');}
+    finally{setAcceptBusy(false);}
+  };
   const markReady=async()=>{
     if(!selected||!runtime.markOrderReady||readyBusy)return;
     setReadyBusy(true);setMessage(null);
-    try{await runtime.markOrderReady(selected.orderId);await load(selected.orderId,true);setMessage('已標記可取餐');}
+    try{
+      const result=await runtime.markOrderReady(selected.orderId);
+      await load(selected.orderId,true);
+      setMessage(result.provider.state==='ATTENTION'
+        ?'本地已標記可取餐；Keeta READY 需要處理：'+(result.provider.code??'UNKNOWN')
+        :'已標記可取餐；Keeta READY 已同步');
+    }
     catch(cause){setMessage(cause instanceof Error?cause.message:'未能標記可取餐');}
     finally{setReadyBusy(false);}
   };
@@ -169,7 +188,10 @@ export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePor
         <footer>
           <button onClick={()=>void openReprint()}>▣ 重印</button>
           <button disabled={!canCorrect} title={canCorrect?'':'需要 ORDER_CORRECTION 權限'} onClick={()=>setModal('actions')}>✎ 取消／修改</button>
-          <button className="primary" disabled={!runtime.markOrderReady||readyBusy||selected.fulfillmentLabel==='可取餐'||selected.fulfillmentLabel==='已完成'||selected.fulfillmentLabel==='已取消'} onClick={()=>void markReady()}>{readyBusy?'處理中…':'提前完成／可取餐'}</button>
+          {String(selected.sourceLabel||'').startsWith('Keeta')&&selected.fulfillmentLabel==='待處理'
+            ?<button className="primary" disabled={!runtime.acceptOrder||acceptBusy} onClick={()=>void acceptSelected()}>{acceptBusy?'接單中…':'接受 Keeta 訂單'}</button>
+            :null}
+          <button className="primary" disabled={!runtime.markOrderReady||readyBusy||selected.fulfillmentLabel==='待處理'||selected.fulfillmentLabel==='可取餐'||selected.fulfillmentLabel==='已完成'||selected.fulfillmentLabel==='已取消'} onClick={()=>void markReady()}>{readyBusy?'處理中…':'提前完成／可取餐'}</button>
         </footer>
       </article>:<div className="order-empty">選擇一張訂單。</div>}
     </aside>
