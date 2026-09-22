@@ -60,6 +60,11 @@ export function ProductsWorkspace(){
   const [query,setQuery]=useState('');
   const [status,setStatus]=useState<'ALL'|'ACTIVE'|'INACTIVE'>('ALL');
   const [category,setCategory]=useState('ALL');
+  const [page,setPage]=useState(1);
+  const [expandedId,setExpandedId]=useState<string|null>(null);
+  const PAGE_SIZE=20;
+
+  const categoryName=useMemo(()=>new Map(draft.categories.map(row=>[row.id,row.name||row.id])),[draft.categories]);
   const filtered=useMemo(()=>{
     const needle=query.trim().toLowerCase();
     return draft.products.filter(row=>{
@@ -70,50 +75,126 @@ export function ProductsWorkspace(){
     });
   },[draft.products,query,status,category]);
 
+  const pageCount=Math.max(1,Math.ceil(filtered.length/PAGE_SIZE));
+  const safePage=Math.min(page,pageCount);
+  const pageRows=filtered.slice((safePage-1)*PAGE_SIZE,safePage*PAGE_SIZE);
+
+  useEffect(()=>{
+    setPage(1);
+    setExpandedId(null);
+  },[query,status,category]);
+  useEffect(()=>{
+    if(page>pageCount)setPage(pageCount);
+  },[page,pageCount]);
+
+  const toggleExpanded=(id:string)=>setExpandedId(current=>current===id?null:id);
+  const deleteProduct=(id:string,name:string)=>{
+    if(typeof window!=='undefined'&&!window.confirm('確定刪除「'+name+'」？'))return;
+    removeProduct(id);
+    setExpandedId(current=>current===id?null:current);
+  };
+
   return <section className="admin-editor-page">
-    <WorkspaceHeader title="商品資料" description="商品係正式營運資料：名稱、商品編號、分類、價格、外賣規則、選項組、庫存編號、描述同顯示資料都喺呢度管理。" onAdd={addProduct} addLabel="新增商品"/>
+    <WorkspaceHeader title="商品資料" description="預設只顯示營運需要嘅摘要；要修改某件商品先展開詳細資料。搜尋、分類同狀態篩選會即時收窄清單。" onAdd={addProduct} addLabel="新增商品"/>
     <div className="admin-kpi-grid">
       <article><span>商品總數</span><strong>{draft.products.length}</strong><small>包含停用資料</small></article>
       <article><span>已啟用</span><strong>{draft.products.filter(row=>row.active).length}</strong><small>目前菜單候選</small></article>
       <article><span>已停用</span><strong>{draft.products.filter(row=>!row.active).length}</strong><small>保留歷史身份</small></article>
       <article><span>未填價格</span><strong>{draft.products.filter(row=>row.active&&!row.basePrice.trim()).length}</strong><small>發布前必須處理</small></article>
     </div>
-    <div className="admin-filterbar">
-      <input value={query} onChange={event=>setQuery(event.target.value)} placeholder="搜尋商品名稱／商品編號／條碼／庫存編號"/>
-      <select value={category} onChange={event=>setCategory(event.target.value)}><option value="ALL">全部分類</option>{draft.categories.map(row=><option key={row.id} value={row.id}>{row.name}</option>)}</select>
-      <select value={status} onChange={event=>setStatus(event.target.value as typeof status)}><option value="ALL">全部狀態</option><option value="ACTIVE">已啟用</option><option value="INACTIVE">已停用</option></select>
-      <span>{filtered.length} / {draft.products.length}</span>
+
+    <div className="admin-product-toolbar">
+      <div className="admin-filterbar">
+        <input value={query} onChange={event=>setQuery(event.target.value)} placeholder="搜尋商品名稱／商品編號／條碼／庫存編號"/>
+        <select value={category} onChange={event=>setCategory(event.target.value)}><option value="ALL">全部分類</option>{draft.categories.map(row=><option key={row.id} value={row.id}>{row.name}</option>)}</select>
+        <select value={status} onChange={event=>setStatus(event.target.value as typeof status)}><option value="ALL">全部狀態</option><option value="ACTIVE">已啟用</option><option value="INACTIVE">已停用</option></select>
+        <span>找到 {filtered.length} 件</span>
+      </div>
+      <div className="admin-product-page-status">
+        <span>第 {safePage} / {pageCount} 頁</span>
+        <small>每頁最多 {PAGE_SIZE} 件</small>
+      </div>
     </div>
+
     {draft.categories.length===0?<div className="admin-callout">請先建立至少一個分類。</div>:null}
+
     {filtered.length===0
       ?<div className="admin-read-empty">搵唔到符合條件嘅商品。</div>
-      :<div className="admin-editor-grid">{filtered.map(row=><article className="admin-card-editor" key={row.id}>
-        <header><div><small>{row.productCode||row.id}{row.legacy條碼?' · '+row.legacy條碼:''}</small><b>{row.name||'未命名商品'}</b></div><div className="admin-editor-actions"><Toggle checked={row.active} onChange={active=>updateProduct(row.id,{active})} label={row.active?'啟用':'停用'}/><button type="button" onClick={()=>removeProduct(row.id)}>刪除</button></div></header>
-        <div className="admin-form-grid two">
-          <label><span>商品名稱 *</span><input value={row.name} onChange={event=>updateProduct(row.id,{name:event.target.value})}/></label>
-          <label><span>商品編號 *</span><input value={row.productCode??''} onChange={event=>updateProduct(row.id,{productCode:event.target.value})}/></label>
-          <label><span>簡稱</span><input value={row.shortName??''} onChange={event=>updateProduct(row.id,{shortName:event.target.value})}/></label>
-          <label><span>庫存編號</span><input value={row.sku??''} onChange={event=>updateProduct(row.id,{sku:event.target.value})}/></label>
-          <label><span>分類 *</span><select value={row.categoryId} onChange={event=>updateProduct(row.id,{categoryId:event.target.value})}><option value="">未選分類</option>{draft.categories.map(category=><option key={category.id} value={category.id}>{category.name||category.id}</option>)}</select></label>
-          <label><span>基本價 HK$ *</span><input inputMode="decimal" value={row.basePrice} onChange={event=>updateProduct(row.id,{basePrice:event.target.value})} placeholder="0.00"/></label>
-          <label><span>條碼</span><input value={row.legacy條碼??''} onChange={event=>updateProduct(row.id,{legacy條碼:event.target.value})}/></label>
-          <label><span>圖片參考</span><input value={row.imageRef??''} onChange={event=>updateProduct(row.id,{imageRef:event.target.value})} placeholder="圖片 URL / Asset ID"/></label>
-        </div>
-        <label><span>商品描述</span><textarea rows={3} value={row.description??''} onChange={event=>updateProduct(row.id,{description:event.target.value})} placeholder="顧客／員工可讀描述"/></label>
-        <label><span>標籤（逗號分隔）</span><input value={(row.tags??[]).join(', ')} onChange={event=>updateProduct(row.id,{tags:event.target.value.split(',').map(value=>value.trim()).filter(Boolean)})}/></label>
-        <section className="admin-sub-editor">
-          <header><b>外賣價格規則</b><small>正式計價規則會使用呢個設定</small></header>
-          <Toggle checked={Boolean(row.takeawaySurchargeEnabled)} onChange={takeawaySurchargeEnabled=>updateProduct(row.id,{takeawaySurchargeEnabled})} label={row.takeawaySurchargeEnabled?'此商品外賣 +$1：開':'此商品外賣 +$1：關'}/>
-          <label><span>其他外賣調整 HK$（選填）</span><input inputMode="decimal" value={row.takeawayAdjustment} onChange={event=>updateProduct(row.id,{takeawayAdjustment:event.target.value})} placeholder="例如 -1.00 / 2.00"/></label>
-        </section>
-        <section className="admin-sub-editor">
-          <header><b>選項組綁定</b><small>{row.modifierGroupIds.length} 組</small></header>
-          {draft.modifierGroups.length===0?<p>未有選項組。</p>:<div className="admin-check-grid">{draft.modifierGroups.map(group=><label key={group.id}><input type="checkbox" checked={row.modifierGroupIds.includes(group.id)} onChange={event=>{
-            const next=event.target.checked?[...row.modifierGroupIds,group.id]:row.modifierGroupIds.filter(id=>id!==group.id);
-            updateProduct(row.id,{modifierGroupIds:next});
-          }}/><span>{group.name||group.id}</span></label>)}</div>}
-        </section>
-      </article>)}</div>}
+      :<div className="admin-product-list">
+        <header className="admin-product-list-head">
+          <span>商品</span><span>分類</span><span>售價</span><span>狀態</span><span></span>
+        </header>
+        {pageRows.map(row=>{
+          const expanded=expandedId===row.id;
+          const needsPrice=row.active&&!row.basePrice.trim();
+          return <article className={'admin-product-row '+(expanded?'is-open':'')} key={row.id}>
+            <div className="admin-product-summary">
+              <div className="admin-product-identity">
+                <b>{row.name||'未命名商品'}</b>
+                <small>{row.productCode||row.id}{row.legacy條碼?' · '+row.legacy條碼:''}</small>
+              </div>
+              <span className="admin-product-category">{categoryName.get(row.categoryId)??'未分類'}</span>
+              <span className={'admin-product-price '+(needsPrice?'is-warning':'')}>{row.basePrice.trim()?'HK$'+Number(row.basePrice).toFixed(2):'未填價格'}</span>
+              <div className="admin-product-state">
+                <span className={'admin-product-status '+(row.active?'is-active':'is-inactive')}>{row.active?'啟用':'停用'}</span>
+                {row.modifierGroupIds.length?<small>{row.modifierGroupIds.length} 個選項組</small>:null}
+              </div>
+              <button type="button" className="admin-product-edit-button" aria-expanded={expanded} onClick={()=>toggleExpanded(row.id)}>{expanded?'收起':'編輯'}</button>
+            </div>
+
+            {expanded?<div className="admin-product-detail">
+              <div className="admin-product-detail-head">
+                <div><small>商品詳細資料</small><h2>{row.name||'未命名商品'}</h2></div>
+                <Toggle checked={row.active} onChange={active=>updateProduct(row.id,{active})} label={row.active?'啟用':'停用'}/>
+              </div>
+
+              <div className="admin-form-grid two">
+                <label><span>商品名稱 *</span><input value={row.name} onChange={event=>updateProduct(row.id,{name:event.target.value})}/></label>
+                <label><span>商品編號 *</span><input value={row.productCode??''} onChange={event=>updateProduct(row.id,{productCode:event.target.value})}/></label>
+                <label><span>簡稱</span><input value={row.shortName??''} onChange={event=>updateProduct(row.id,{shortName:event.target.value})}/></label>
+                <label><span>庫存編號</span><input value={row.sku??''} onChange={event=>updateProduct(row.id,{sku:event.target.value})}/></label>
+                <label><span>分類 *</span><select value={row.categoryId} onChange={event=>updateProduct(row.id,{categoryId:event.target.value})}><option value="">未選分類</option>{draft.categories.map(item=><option key={item.id} value={item.id}>{item.name||item.id}</option>)}</select></label>
+                <label><span>基本價 HK$ *</span><input inputMode="decimal" value={row.basePrice} onChange={event=>updateProduct(row.id,{basePrice:event.target.value})} placeholder="0.00"/></label>
+                <label><span>條碼</span><input value={row.legacy條碼??''} onChange={event=>updateProduct(row.id,{legacy條碼:event.target.value})}/></label>
+                <label><span>圖片參考</span><input value={row.imageRef??''} onChange={event=>updateProduct(row.id,{imageRef:event.target.value})} placeholder="圖片 URL / Asset ID"/></label>
+              </div>
+
+              <div className="admin-product-detail-secondary">
+                <label><span>商品描述</span><textarea rows={3} value={row.description??''} onChange={event=>updateProduct(row.id,{description:event.target.value})} placeholder="顧客／員工可讀描述"/></label>
+                <label><span>標籤（逗號分隔）</span><input value={(row.tags??[]).join(', ')} onChange={event=>updateProduct(row.id,{tags:event.target.value.split(',').map(value=>value.trim()).filter(Boolean)})}/></label>
+              </div>
+
+              <section className="admin-sub-editor">
+                <header><b>外賣價格規則</b><small>正式計價規則會使用呢個設定</small></header>
+                <Toggle checked={Boolean(row.takeawaySurchargeEnabled)} onChange={takeawaySurchargeEnabled=>updateProduct(row.id,{takeawaySurchargeEnabled})} label={row.takeawaySurchargeEnabled?'此商品外賣 +$1：開':'此商品外賣 +$1：關'}/>
+                <label><span>其他外賣調整 HK$（選填）</span><input inputMode="decimal" value={row.takeawayAdjustment} onChange={event=>updateProduct(row.id,{takeawayAdjustment:event.target.value})} placeholder="例如 -1.00 / 2.00"/></label>
+              </section>
+
+              <section className="admin-sub-editor">
+                <header><b>選項組綁定</b><small>{row.modifierGroupIds.length} 組</small></header>
+                {draft.modifierGroups.length===0?<p>未有選項組。</p>:<div className="admin-check-grid">{draft.modifierGroups.map(group=><label key={group.id}><input type="checkbox" checked={row.modifierGroupIds.includes(group.id)} onChange={event=>{
+                  const next=event.target.checked?[...row.modifierGroupIds,group.id]:row.modifierGroupIds.filter(id=>id!==group.id);
+                  updateProduct(row.id,{modifierGroupIds:next});
+                }}/><span>{group.name||group.id}</span></label>)}</div>}
+              </section>
+
+              <div className="admin-product-danger-zone">
+                <span>刪除只應用於確定唔再保留嘅商品；一般停售請使用「停用」。</span>
+                <button type="button" onClick={()=>deleteProduct(row.id,row.name||row.id)}>刪除商品</button>
+              </div>
+            </div>:null}
+          </article>;
+        })}
+
+        <footer className="admin-product-pagination">
+          <span>顯示 {(safePage-1)*PAGE_SIZE+1}–{Math.min(safePage*PAGE_SIZE,filtered.length)} / {filtered.length}</span>
+          <div>
+            <button type="button" disabled={safePage<=1} onClick={()=>{setPage(value=>Math.max(1,value-1));setExpandedId(null);}}>上一頁</button>
+            <b>{safePage} / {pageCount}</b>
+            <button type="button" disabled={safePage>=pageCount} onClick={()=>{setPage(value=>Math.min(pageCount,value+1));setExpandedId(null);}}>下一頁</button>
+          </div>
+        </footer>
+      </div>}
   </section>;
 }
 
