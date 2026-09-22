@@ -92,7 +92,12 @@ describe('MFK Admin complete catalog product',()=>{
 
   it('locks complete Option and pricing responsibilities',()=>{
     const modifiers=renderToStaticMarkup(<MemoryRouter initialEntries={['/admin/catalog/modifiers']}><MfkAdminApp/></MemoryRouter>);
-    for(const marker of ['名稱／ID／價格全部必填','可選但必須顯示一次','單選／多選','重覆數量']) expect(modifiers).toContain(marker);
+    expect(modifiers).toContain('每個選項必須有名稱、選項 ID 同價格');
+    expect(modifiers).toContain('新增選項組');
+
+    const detailProductId=LEGACY_MF01_ADMIN_DRAFT.products[0]!.id;
+    const detail=renderToStaticMarkup(<AdminDraftProvider><ProductOperationalDetail productId={detailProductId}/></AdminDraftProvider>);
+    expect(detail).toContain('每個選項必須有：名稱、選項 ID、價錢');
 
     const pricing=renderToStaticMarkup(<MemoryRouter initialEntries={['/admin/catalog/pricing']}><MfkAdminApp/></MemoryRouter>);
     expect(pricing).toContain('商品價格');
