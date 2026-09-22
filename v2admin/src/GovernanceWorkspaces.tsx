@@ -2,6 +2,7 @@ import {useMemo,useState} from 'react';
 import {ADMIN_CAPABILITIES} from './admin-capabilities.ts';
 import {useAdminDraft,type AdminSessionDraft} from './admin-draft.tsx';
 import {appendAdminAudit,createAdminRelease,readAdminReleases,readAdminStored,restoreAdminReleaseAsDraft,usePersistentAdminState,writeAdminStored,type AdminRelease} from './admin-local-store.ts';
+import {normalizeProductPrintRule,useProductPrintRules,type ProductPrintRule} from './admin-product-operational-config.ts';
 
 function Header({title,description,badge='已自動保存'}:{title:string;description:string;badge?:string}){
   return <header className="admin-editor-head"><div><small>{badge}</small><h1>{title}</h1><p>{description}</p></div></header>;
@@ -15,6 +16,7 @@ function collectAdminSnapshot(catalog:AdminSessionDraft){
     logicalPrinters:readAdminStored('logical-printers.v1',[]),
     printTemplates:readAdminStored('print-templates.v1',{}),
     printRules:readAdminStored('print-rules.v1',{}),
+    productMedia:readAdminStored('product-media.v1',{}),
     storeSettings:readAdminStored('store-settings.v1',{}),
     quickReasons:readAdminStored('quick-reasons.v1',[]),
     staff:readAdminStored('staff.v1',[]),
@@ -34,7 +36,7 @@ function restoreSnapshot(release:AdminRelease,replaceDraft:(draft:AdminSessionDr
   if(snapshot.catalog)replaceDraft(snapshot.catalog as AdminSessionDraft,'由設定版本 R'+release.version+' 建立新草稿');
   const map:Record<string,string>={
     availability:'availability.v1',businessDay:'business-day.v1',logicalPrinters:'logical-printers.v1',
-    printTemplates:'print-templates.v1',printRules:'print-rules.v1',storeSettings:'store-settings.v1',
+    printTemplates:'print-templates.v1',printRules:'print-rules.v1',productMedia:'product-media.v1',storeSettings:'store-settings.v1',
     quickReasons:'quick-reasons.v1',staff:'staff.v1',channelPolicy:'channel-policy.keeta.v1',
     channelMapping:'channel-mapping.keeta.v1',capacity:'capacity.v1',presentation:'presentation.v1',
     inventory:'inventory-lite.v1',loyalty:'loyalty.v1',coupons:'coupons.v1',announcements:'announcements.v1',
@@ -107,25 +109,25 @@ export function PublishCenterWorkspace(){
   </section>;
 }
 
-interface ProductPrintRule{
-  receipt:boolean;production:boolean;packing:boolean;label:boolean;dineIn:boolean;labelPrinterIds:string[];
-}
 export function PrintRulesWorkspace(){
   const {draft}=useAdminDraft();
-  const [rows,setRows]=usePersistentAdminState<Record<string,ProductPrintRule>>('print-rules.v1',{});
+  const [rows,setRows]=useProductPrintRules();
   const printers=readAdminStored<Array<{id:string;name:string;type:string;active:boolean}>>('logical-printers.v1',[]);
   const labelPrinters=printers.filter(row=>row.type==='LABEL'&&row.active);
-  const current=(id:string):ProductPrintRule=>rows[id]??{receipt:true,production:true,packing:true,label:false,dineIn:true,labelPrinterIds:[]};
+  const current=(id:string):ProductPrintRule=>normalizeProductPrintRule(rows[id]);
   const patch=(id:string,change:Partial<ProductPrintRule>)=>setRows(value=>{
-    const before=current(id);const after={...before,...change};appendAdminAudit({action:'修改商品打印規則',target:id,before,after});return {...value,[id]:after};
+    const before=current(id);
+    const after=normalizeProductPrintRule({...before,...change});
+    appendAdminAudit({action:'修改商品打印規則',target:id,before,after});
+    return {...value,[id]:after};
   });
   return <section className="admin-editor-page">
-    <Header title="商品／堂食打印規則" description="每件商品獨立設定收據、製作單、打包單、Label 同堂食打印。Label 開啟時可指定一個或多個 Logical Label destination。"/>
+    <Header title="商品打印規則" description="每件商品獨立設定收據、製作單、打包單、Label、堂食同外賣打印。Label 開啟時可指定一個或多個 Logical Label destination。"/>
     <div className="admin-editor-list">
       {draft.products.map(product=>{const row=current(product.id);return <article className="admin-card-editor" key={product.id}>
         <header><div><b>{product.name}</b><small>{product.productCode??product.id}</small></div></header>
         <div className="admin-check-grid">
-          {([['receipt','收據'],['production','製作單'],['packing','打包單'],['label','Label'],['dineIn','堂食打印']] as const).map(([key,label])=><label key={key}><input type="checkbox" checked={row[key]} onChange={event=>patch(product.id,{[key]:event.target.checked})}/><span>{label}</span></label>)}
+          {([['receipt','收據'],['production','製作單'],['packing','打包單'],['label','Label'],['dineIn','堂食打印'],['takeaway','外賣打印']] as const).map(([key,label])=><label key={key}><input type="checkbox" checked={row[key]} onChange={event=>patch(product.id,{[key]:event.target.checked})}/><span>{label}</span></label>)}
         </div>
         {row.label?<section className="admin-sub-editor"><header><b>Label 目的地</b><small>{row.labelPrinterIds.length} 個</small></header>{labelPrinters.length===0?<p>請先喺打印中心建立 Logical Label Printer。</p>:<div className="admin-check-grid">{labelPrinters.map(printer=><label key={printer.id}><input type="checkbox" checked={row.labelPrinterIds.includes(printer.id)} onChange={event=>patch(product.id,{labelPrinterIds:event.target.checked?[...row.labelPrinterIds,printer.id]:row.labelPrinterIds.filter(id=>id!==printer.id)})}/><span>{printer.name}</span></label>)}</div>}</section>:null}
       </article>})}
