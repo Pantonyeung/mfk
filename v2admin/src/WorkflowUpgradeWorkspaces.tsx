@@ -1,4 +1,6 @@
 import {useMemo,useState} from 'react';
+import {useAdminDraft,validateAdminDraft} from './admin-draft.tsx';
+import {appendAdminAudit,readAdminAudit,readAdminReleases,readAdminStored,usePersistentAdminState} from './admin-local-store.ts';
 
 function UpgradeHeader({title,description,kicker='功能尚未啟用'}:{title:string;description:string;kicker?:string}){
   return <header className="admin-editor-head">
