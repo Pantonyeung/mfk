@@ -1,5 +1,7 @@
 import {validateMfkAdminConfigAck,validateMfkAdminConfigEnvelope} from '../contracts/admin-config-sync-v1.ts';
 import {validateSmtProjectionBatch} from '../contracts/smt-projection-v1.ts';
+import {KeetaRuntimeStore} from './keeta-runtime.ts';
+export {KeetaRuntimeStore};
 
 const JSON_HEADERS={'content-type':'application/json; charset=utf-8','cache-control':'no-store'};
 const ADMIN_ORIGIN='https://admin.morefunos.com';
@@ -119,6 +121,10 @@ export class AdminSyncStore{
 
   async fetch(request){
     const url=new URL(request.url);
+    if(url.pathname==='/authorize-admin'){
+      if(!await this.authorizeAdminRead(request))return json({code:'ADMIN_READ_UNAUTHORIZED'},401);
+      return json({ok:true});
+    }
     if(url.pathname==='/active'){
       const active=await this.state.storage.get('active');
       return active?json(active):json({code:'ADMIN_CONFIG_NOT_PUBLISHED'},404);
@@ -252,6 +258,41 @@ export class AdminSyncStore{
 export default {
   async fetch(request,env){
     const url=new URL(request.url);
+
+    if(url.pathname.startsWith('/api/keeta/')){
+      if(request.method==='OPTIONS')return new Response(null,{status:204,headers:cors(request)});
+      const storeId=storeIdFrom(url);
+      const keetaId=env.KEETA_RUNTIME.idFromName(storeId);
+      const keeta=env.KEETA_RUNTIME.get(keetaId);
+
+      if(url.pathname.startsWith('/api/keeta/admin/')){
+        const adminId=env.ADMIN_SYNC.idFromName(storeId);
+        const admin=env.ADMIN_SYNC.get(adminId);
+        const authorizeUrl=new URL(request.url);
+        authorizeUrl.pathname='/authorize-admin';
+        authorizeUrl.search='';
+        const authResponse=await admin.fetch(new Request(authorizeUrl.toString(),request));
+        if(!authResponse.ok)return json({code:'KEETA_ADMIN_UNAUTHORIZED'},401,cors(request));
+        const target=new URL(request.url);
+        target.pathname='/admin/'+url.pathname.slice('/api/keeta/admin/'.length);
+        target.search=url.search;
+        const response=await keeta.fetch(new Request(target.toString(),request));
+        const headers=new Headers(response.headers);
+        for(const [key,value] of Object.entries(cors(request)))headers.set(key,value);
+        return new Response(response.body,{status:response.status,statusText:response.statusText,headers});
+      }
+
+      const target=new URL(request.url);
+      target.pathname=url.pathname==='/api/keeta/webhook'
+        ?'/webhook'
+        :url.pathname==='/api/keeta/oauth/callback'
+          ?'/oauth/callback'
+          :'/not-found';
+      const response=await keeta.fetch(new Request(target.toString(),request));
+      const headers=new Headers(response.headers);
+      for(const [key,value] of Object.entries(cors(request)))headers.set(key,value);
+      return new Response(response.body,{status:response.status,statusText:response.statusText,headers});
+    }
     if(url.pathname.startsWith('/api/admin-sync/')||url.pathname.startsWith('/api/projection/')){
       if(request.method==='OPTIONS')return new Response(null,{status:204,headers:cors(request)});
       const storeId=storeIdFrom(url);
