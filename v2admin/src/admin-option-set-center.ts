@@ -102,7 +102,7 @@ function normalizeSet(set:Partial<OptionSetDraft>,fallbackId:string):OptionSetDr
   });
 }
 
-function fromLegacyDraft(draft:AdminSessionDraft):OptionSetCenterState{
+export function migrateLegacyDraftToOptionSetCenter(draft:AdminSessionDraft):OptionSetCenterState{
   const sets=draft.modifierGroups.map(group=>normalizeSet({
     id:group.id,
     name:group.name,
@@ -143,7 +143,7 @@ function fromFlatV1(draft:AdminSessionDraft):OptionSetCenterState{
   const flatGroups=readAdminStored<LegacyFlatGroup[]>('option-center.groups.v1',[]);
   const flatLinks=readAdminStored<LegacyFlatLink[]>('option-center.product-links.v1',[]);
 
-  if(flatOptions.length===0&&flatGroups.length===0&&flatLinks.length===0)return fromLegacyDraft(draft);
+  if(flatOptions.length===0&&flatGroups.length===0&&flatLinks.length===0)return migrateLegacyDraftToOptionSetCenter(draft);
 
   const optionById=new Map(flatOptions.map(option=>[option.id,option]));
   const usedOptionIds=new Set<string>();
