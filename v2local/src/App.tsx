@@ -11,6 +11,7 @@ import {RuntimeSoldoutWorkspace} from './presentation/RuntimeSoldoutWorkspace.ts
 import {LocalMoreWorkspace} from './presentation/LocalMoreWorkspace.tsx';
 import {localRuntime,type DiningTender} from './runtime/local-runtime.ts';
 import {readLocalAdminMenu,subscribeLocalAdminMenu} from './runtime/local-admin-menu.ts';
+import {RuntimeReadyActivation} from './runtime/RuntimeReadyActivation.tsx';
 import {ComboWorkspace,HoldCartWorkspace,HoldListWorkspace,OrganizeWorkspace,ProductConfigWorkspace,type OrderingPanelState,type WorkspaceHoldDraft,type WorkspaceProduct} from './features/ordering/OrderingCenterWorkspaces.tsx';
 
 type Product={id:string;category:string;name:string;priceMinor:number;priceReady:boolean};
@@ -444,7 +445,7 @@ export function MfkV2LocalApp(){
     setCartState(next);
   };
 
-  return <ProductionViewport><div className="clean-app">
+  return <><RuntimeReadyActivation/><ProductionViewport><div className="clean-app">
     <aside className="clean-rail">
       <div className="clean-brand" aria-label="磨飯">磨</div>
       <nav aria-label="MFK 主導航">
@@ -467,5 +468,5 @@ export function MfkV2LocalApp(){
         <Route path="*" element={<Navigate to="/" replace/>}/>
       </Routes>
     </section>
-  </div></ProductionViewport>;
+  </div></ProductionViewport></>;
 }
