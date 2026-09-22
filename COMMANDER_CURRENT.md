@@ -3,147 +3,29 @@
 Status: CURRENT / CONTROLLING
 Protocol: #39
 Control: #22
-Updated: 2026-09-22 13:13 Asia/Hong_Kong
+Updated: 2026-09-22 13:49 Asia/Hong_Kong
 System: MFK ONLY
 
 ## 0. Mandatory read order
-
 1. COMMANDER_CURRENT.md
 2. #22 latest controlling comment
-3. docs/navigation/MFK_航海圖_V1.20_Round021_2026-09-22.txt
+3. docs/navigation/MFK_航海圖_V1.21_Round022_2026-09-22.txt
 4. HANDOFF_CURRENT.md
 5. active issue(s)
 
-## 1. One-line current reality
+## 1. Current control
 
-Admin complete-product R1 remains in Owner live walkthrough.
-
-Current parent:
+Parent Admin completion:
 #45
 
-Current exact UX correction:
-#50
+Current Product-detail correction:
+#62
+
+Known next RED:
+#66 MFK-native Product Media R2 + D1 + Auth
 
 State:
-`MFK_ADMIN_PRODUCT_LIST_UX_DEPLOYED_OWNER_REVIEW_PENDING`
-
-Admin→SMT automatic connection:
-#44 HOLD
-
-SMT OTA:
-#40 HOLD
-
-## 2. Owner UX standard
-
-A formal operator page must be:
-- clean by default
-- summary-first
-- details only when needed
-- necessary warnings visible
-- non-essential fields hidden until edit
-- bounded in page length
-- mobile usable
-- no 200+ fully-expanded editor cards
-
-This is now part of the Admin product-completeness acceptance standard.
-
-## 3. Exact work completed
-
-WORK_ID:
-`MFK-ADMIN-PRODUCT-LIST-UX-R1`
-
-Issue:
-#50
-
-Branch:
-`work/MFK/ADMIN-PRODUCT-LIST-UX-R1`
-
-Source verification:
-`35689711947`
-SUCCESS
-- npm test SUCCESS
-- npm run build SUCCESS
-
-Clean landing:
-- CatalogWorkspaces `43f373a23198942837e537623e578584bbe52ff8`
-- catalog test `0ade0b1ede925abfdb310db1031e78cd7c7a2139`
-- styles `41bcdcd06c6b0f5bbc196baad96b3101f5be2f8c`
-
-Deploy trigger:
-`df5feb12d0245ba74ff7e574f5c693228e9b0496`
-
-Live deploy:
-`35689795493`
-SUCCESS
-
-Canonical:
-`https://admin.morefunos.com`
-
-## 4. Product page UX now
-
-Default 商品資料 view:
-- max 20 product summaries per page
-- search by name / product code / barcode / SKU
-- category filter
-- active / inactive filter
-- current filtered count
-- page X / Y
-- compact summary shows:
-  - product name
-  - product code / barcode
-  - category
-  - price or missing-price warning
-  - active state
-  - modifier group count
-
-Detailed fields are hidden by default.
-
-Operator presses `編輯` for one product:
-- only that product detail expands
-- name
-- product code
-- short name
-- SKU
-- category
-- base price
-- barcode
-- image ref
-- description
-- tags
-- takeaway +$1
-- other takeaway adjustment
-- modifier binding
-- active / inactive
-- delete action
-
-Pagination:
-20 items per page.
-
-Mobile:
-summary-first two-column compact layout with one edit control.
-
-## 5. Exact NEXT
-
-ONE next action only:
-
-Owner refreshes:
-`https://admin.morefunos.com/admin/catalog/products`
-
-Acceptance:
-1. default page is compact, not 203 expanded cards
-2. first page shows no more than 20 summaries
-3. search / category / status filters are usable
-4. press one `編輯` and only that product detail expands
-5. mobile page remains clean and readable
-6. pagination works
-
-If accepted:
-BANK #50 and continue #45 walkthrough to the next Admin page.
-
-If not accepted:
-STOP on Product page and fix the exact visual/interaction break.
-
-## 6. HOLD
+`MFK_ADMIN_PRODUCT_DETAIL_R2_DEPLOYED_OWNER_REVIEW_PENDING`
 
 #44 Admin→SMT:
 HOLD
@@ -154,8 +36,198 @@ HOLD
 Keeta live:
 NOT AUTHORIZED
 
-SMM / Customer / Owner live:
+## 2. Owner Product-detail lock
+
+Every formal Product must expose the complete operating information, not only name/category/price.
+
+Required Product responsibilities now represented:
+- Product name / Product Code / SKU / barcode / category / description / tags
+- base price
+- takeaway +$1
+- other positive/negative takeaway adjustment
+- Option Group bindings and settings
+- every Option: Name + Option ID + Price
+- required / optional / optional-force-show
+- single / multi
+- min / max
+- quantity allowance
+- option default / active
+- Receipt print
+- Kitchen Production print
+- Packing print
+- Label print
+- Label logical destination(s)
+- Dine-in print
+- Takeaway print
+- canonical Product imageRef
+- R2 object / D1 media reference status
+- Customer/SMM/SMT canonical image responsibility
+- independent Keeta image override
+
+## 3. UX
+
+Product list remains summary-first:
+- 20 products per page
+- search / category / active filters
+- one Product expands on demand
+
+Expanded Product is bounded into collapsible sections:
+1. 基本資料
+2. 價格
+3. 選項／加料
+4. 打印
+5. 圖片／媒體
+6. 進階／危險操作
+
+No return to 200+ fully-expanded cards.
+
+## 4. Source / verification
+
+WORK_ID:
+`MFK-ADMIN-PRODUCT-DETAIL-COMPLETENESS-R2`
+
+Branch:
+`work/MFK/ADMIN-PRODUCT-DETAIL-COMPLETENESS-R2`
+
+Final verification source:
+`a038e96f29a15fc296aa00ba5719dc9c8f543478`
+
+Verification run:
+`35691896826`
+
+Job:
+`106630464142`
+
+Result:
+SUCCESS
+- npm test SUCCESS
+- npm run build SUCCESS
+- migration firewall GREEN
+
+Final branch workflow removed after verification.
+
+Product source clean-landed to main.
+Branch/main Product-detail source blobs match.
+
+Deploy trigger:
+`fc434fbe7d68987edfe4cc8da301892255f3cd17`
+
+Live deploy:
+`35692031072`
+SUCCESS
+- npm test SUCCESS
+- npm run build SUCCESS
+- Deploy mfk-admin SUCCESS
+
+Canonical:
+`https://admin.morefunos.com`
+
+## 5. Pricing status
+
+Admin pricing responsibility is now explicit for both:
+- Product prices
+- Option prices
+
+Option price may be:
+- positive
+- zero
+- negative
+
+Option Name / Option ID / Price are validated as required.
+
+This is configuration only.
+Formal Quote authority remains the one existing Pricing authority.
+
+## 6. Print status
+
+Per-Product Print configuration now includes:
+- Receipt
+- Production
+- Packing
+- Label
+- Dine-in
+- Takeaway
+
+Label ON:
+one or more Logical Label destinations may be selected.
+
+Admin owns Logical Printer identity/config.
+Physical IP / USB remains SMT responsibility later.
+
+## 7. Product Media status
+
+Product Media UI / data contract is now present:
+- canonical imageRef
+- public/media reference
+- R2 object-key field/readback state
+- D1 media reference field/readback state
+- independent Keeta image override
+- storage/readback state
+- max 8MB media contract
+- browser never receives R2 credentials
+
+Historical design oracle confirmed:
+authenticated Admin Worker
+→ R2 binary object
+→ mediaRef
+→ canonical Product imageRef
+→ consumer projections.
+
+IMPORTANT CURRENT FIRST BREAK:
+
+Current MFK `mfk-admin` deployment is still static-assets-only and has no proven MFK-native authenticated mutation boundary, MFK R2 binding, or MFK D1 media binding.
+
+Therefore:
+
+`PRODUCT MEDIA REAL UPLOAD / R2 / D1 = NOT GREEN`
+
+The UI explicitly fails closed and does NOT fake upload success.
+
+Active backend issue:
+#66
+
+Do not reuse old Morefun-v2 D1 or R2 as current authority.
+
+## 8. Exact NEXT
+
+Owner first reviews live Product detail only:
+
+`https://admin.morefunos.com/admin/catalog/products`
+
+Open one Product → 編輯.
+
+Verify:
+- bounded sections are clean
+- Option Name / ID / Price rules are correct
+- Option Group settings are correct
+- print flags include Receipt / Production / Packing / Label / Dine-in / Takeaway
+- Label destinations are visible when Label is enabled
+- Product / Option pricing presentation is correct
+- Image section clearly separates canonical image from Keeta override
+- media status clearly says MFK R2/D1 is not yet connected
+
+If Product-detail UI is accepted:
+BANK #62 UI/schema portion.
+
+Then exact next technical seam is #66:
+authenticated Admin mutation boundary
+→ new MFK-native R2
+→ new MFK-native D1 media metadata
+→ real upload/readback
+→ real-device proof.
+
+Only after #66 GREEN can Product image management be called complete.
+
+## 9. HOLD
+
+#44 Admin→SMT automatic publish:
+HOLD
+
+#40 SMT OTA:
+HOLD
+
+Keeta live provider activation:
 NOT AUTHORIZED
 
-Manual A2 JSON shuttle:
+Manual A2 file shuttle:
 SUPERSEDED / NOT PRODUCTION
