@@ -80,6 +80,28 @@ export function projectOptionSetsForProduct(state:OptionSetCenterState,productId
 }
 
 
+export function applyProductSetLinksBulk(
+  current:readonly ProductOptionSetLink[],
+  setId:string,
+  productIds:readonly string[],
+  linked:boolean,
+):readonly ProductOptionSetLink[]{
+  const targets=new Set(unique(productIds));
+  if(targets.size===0)return current;
+
+  if(!linked){
+    const next=current.filter(link=>link.setId!==setId||!targets.has(link.productId));
+    return next.length===current.length?current:Object.freeze(next);
+  }
+
+  const existing=new Set(current.filter(link=>link.setId===setId).map(link=>link.productId));
+  const additions=[...targets]
+    .filter(productId=>!existing.has(productId))
+    .map(productId=>Object.freeze({productId,setId,defaultOptionIds:Object.freeze([])}) as ProductOptionSetLink);
+  return additions.length===0?current:Object.freeze([...current,...additions]);
+}
+
+
 interface LegacyFlatOption{
   readonly id:string;
   readonly code:string;
@@ -364,16 +386,23 @@ export function useOptionSetCenter(draft:AdminSessionDraft){
 
   const getProductLink=(productId:string,setId:string)=>productLinks.find(link=>link.productId===productId&&link.setId===setId);
 
-  const setProductSetLinked=(productId:string,setId:string,linked:boolean)=>{
+  const setProductSetLinksBulk=(productIds:readonly string[],setId:string,linked:boolean)=>{
+    if(!sets.some(set=>set.id===setId))return false;
+    const targets=unique(productIds);
+    const next=applyProductSetLinksBulk(productLinks,setId,targets,linked);
+    if(next===productLinks)return false;
     setDirty(true);
-    setProductLinks(current=>{
-      const exists=current.some(link=>link.productId===productId&&link.setId===setId);
-      if(linked&&exists)return current;
-      if(!linked)return current.filter(link=>!(link.productId===productId&&link.setId===setId));
-      const row:ProductOptionSetLink={productId,setId,defaultOptionIds:[]};
-      appendAdminAudit({action:'商品加入選項組',target:productId,after:{setId}});
-      return [...current,row];
+    setProductLinks([...next]);
+    appendAdminAudit({
+      action:linked?'批量加入選項組':'批量移除選項組',
+      target:setId,
+      after:{productIds:targets,count:targets.length},
     });
+    return true;
+  };
+
+  const setProductSetLinked=(productId:string,setId:string,linked:boolean)=>{
+    return setProductSetLinksBulk([productId],setId,linked);
   };
 
   const setProductDefault=(productId:string,setId:string,optionId:string,selected:boolean)=>{
@@ -395,7 +424,7 @@ export function useOptionSetCenter(draft:AdminSessionDraft){
     state,sets,productLinks,dirty,errors:validateOptionSetCenter(state),
     addSet,updateSet,removeSet,
     addChild,updateChild,removeChild,moveChild,
-    getProductLink,setProductSetLinked,setProductDefault,markClean,
+    getProductLink,setProductSetLinked,setProductSetLinksBulk,setProductDefault,markClean,
   };
 }
 
