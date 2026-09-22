@@ -9,6 +9,8 @@ import {
   refreshAdminProjection,
   subscribeAdminProjection,
 } from './admin-projection-client.ts';
+import {AdminResponsiveDataView} from './AdminResponsiveDataView.tsx';
+import {AdminSearchField} from './AdminUiPrimitives.tsx';
 
 function ReadHeader({title,description,badge='只讀資料'}:{title:string;description:string;badge?:string}){
   return <header className="admin-editor-head"><div><small>{badge}</small><h1>{title}</h1><p>{description}</p></div></header>;
@@ -61,7 +63,7 @@ interface CapacityConfig{dailyLimit:string;warningAt:number;hardStop:boolean;not
 export function CapacityWorkspace(){
   const [config,setConfig]=usePersistentAdminState<CapacityConfig>('capacity.v1',{dailyLimit:'',warningAt:80,hardStop:false,note:''});
   return <section className="admin-editor-page">
-    <ReadHeader title="每日產能／原料額度" description="設定提示、每日容量同注意事項。預設只提醒；強制停止屬高風險設定，啟用前仍需額外權限審核。" badge="已自動保存設定"/>
+    <ReadHeader title="每日產能／原料額度" description="設定提示、每日容量同注意事項。預設只提醒；強制停止屬高風險設定，啟用前仍需額外權限審核。" badge="本機設定自動保存"/>
     <div className="admin-policy-grid two">
       <article className="admin-policy-card"><h2>每日容量</h2><label><span>每日上限（空白 = 無設定）</span><input inputMode="numeric" value={config.dailyLimit} onChange={event=>setConfig({...config,dailyLimit:event.target.value})}/></label><label><span>提醒門檻 %</span><input type="number" min={1} max={100} value={config.warningAt} onChange={event=>setConfig({...config,warningAt:Number(event.target.value)||80})}/></label><label><span>備註</span><textarea rows={4} value={config.note} onChange={event=>setConfig({...config,note:event.target.value})}/></label></article>
       <article className="admin-policy-card"><h2>行為</h2><label className="admin-toggle"><input type="checkbox" checked={config.hardStop} onChange={event=>setConfig({...config,hardStop:event.target.checked})}/><span>強制停止（預設關閉）</span></label><div className="admin-callout compact">產能／庫存設定唔可以無聲改變正式交易結果。</div></article>
@@ -98,8 +100,21 @@ export function OpenOrdersWorkspace(){
   return <section className="admin-editor-page">
     <ReadHeader title="進行中訂單" description="只讀 SMT Cloud Projection。Order authority 仍然係門店本機；Admin 只顯示已回傳資料。"/>
     <div className="admin-callout compact">Projection：{projectionStatus.updatedAt?new Date(projectionStatus.updatedAt).toLocaleString('zh-HK'):'未同步'}{projectionStatus.error?' · '+projectionStatus.error:''} <button type="button" onClick={()=>void refreshAdminProjection()}>更新</button></div>
-    <div className="admin-filterbar"><input value={query} onChange={event=>setQuery(event.target.value)} placeholder="訂單／取餐／平台參考編號"/><select value={status} onChange={event=>setStatus(event.target.value)}><option value="ALL">全部狀態</option><option value="PENDING">待處理</option><option value="PRODUCTION">進行中</option><option value="READY">可取餐</option></select><span>{filtered.length} 張</span></div>
-    {filtered.length===0?<div className="admin-read-empty">目前未有正式訂單資料。介面同查詢條件已完成，未有正式訂單資料前唔會製造假訂單。</div>:<section className="admin-read-table"><header><span>訂單</span><span>來源</span><span>金額</span><span>狀態</span><span>時間</span></header>{filtered.map(row=><article key={row.orderId}><span>{row.orderId}{row.staffName?<small> · {row.staffName}</small>:null}</span><span>{row.source}</span><span>{money(row.amountMinor)}</span><span>{row.status}</span><span>{new Date(row.createdAt).toLocaleString('zh-HK')}</span></article>)}</section>}
+    <div className="admin-filterbar"><AdminSearchField label="搜尋進行中訂單" value={query} onChange={setQuery} placeholder="訂單／取餐／平台參考編號"/><label><span>狀態</span><select value={status} onChange={event=>setStatus(event.target.value)}><option value="ALL">全部狀態</option><option value="PENDING">待處理</option><option value="PRODUCTION">進行中</option><option value="READY">可取餐</option></select></label><span>{filtered.length} 張</span></div>
+    <AdminResponsiveDataView
+      label="進行中訂單"
+      rows={filtered}
+      rowKey={row=>row.orderId}
+      emptyTitle="未有進行中訂單"
+      emptyDescription="目前未有 SMT Cloud Projection；未有 authoritative data 前唔會製造假訂單。"
+      columns={[
+        {key:'order',label:'訂單',render:(row:OrderReadRow)=><>{row.orderId}{row.staffName?<small> · {row.staffName}</small>:null}</>},
+        {key:'source',label:'來源',render:(row:OrderReadRow)=>row.source},
+        {key:'amount',label:'金額',numeric:true,render:(row:OrderReadRow)=>money(row.amountMinor)},
+        {key:'status',label:'狀態',render:(row:OrderReadRow)=>row.status},
+        {key:'time',label:'時間',render:(row:OrderReadRow)=>new Date(row.createdAt).toLocaleString('zh-HK')},
+      ]}
+    />
   </section>;
 }
 
@@ -113,8 +128,21 @@ export function OrdersHistoryWorkspace(){
   return <section className="admin-editor-page">
     <ReadHeader title="訂單歷史" description="查詢 SMT Cloud Projection；重試同離線補送按同一 Order identity 去重。"/>
     <div className="admin-callout compact">Projection：{projectionStatus.updatedAt?new Date(projectionStatus.updatedAt).toLocaleString('zh-HK'):'未同步'}{projectionStatus.error?' · '+projectionStatus.error:''}</div>
-    <div className="admin-filterbar"><input value={query} onChange={event=>setQuery(event.target.value)} placeholder="訂單／取餐／平台參考編號"/><label><span>由</span><input type="date" value={from} onChange={event=>setFrom(event.target.value)}/></label><label><span>至</span><input type="date" value={to} onChange={event=>setTo(event.target.value)}/></label><span>{filtered.length} 張</span></div>
-    {filtered.length===0?<div className="admin-read-empty">目前未有正式訂單歷史資料。</div>:<section className="admin-read-table"><header><span>訂單</span><span>來源</span><span>金額</span><span>狀態</span><span>完成時間</span></header>{filtered.map(row=><article key={row.orderId}><span>{row.orderId}</span><span>{row.source}</span><span>{money(row.amountMinor)}</span><span>{row.status}</span><span>{row.completedAt?new Date(row.completedAt).toLocaleString('zh-HK'):'—'}</span></article>)}</section>}
+    <div className="admin-filterbar"><AdminSearchField label="搜尋訂單歷史" value={query} onChange={setQuery} placeholder="訂單／取餐／平台參考編號"/><label><span>由</span><input type="date" value={from} onChange={event=>setFrom(event.target.value)}/></label><label><span>至</span><input type="date" value={to} onChange={event=>setTo(event.target.value)}/></label><span>{filtered.length} 張</span></div>
+    <AdminResponsiveDataView
+      label="訂單歷史"
+      rows={filtered}
+      rowKey={row=>row.orderId}
+      emptyTitle="未有訂單歷史"
+      emptyDescription="目前 SMT Cloud Projection 未有符合篩選條件嘅訂單歷史資料。"
+      columns={[
+        {key:'order',label:'訂單',render:(row:OrderReadRow)=>row.orderId},
+        {key:'source',label:'來源',render:(row:OrderReadRow)=>row.source},
+        {key:'amount',label:'金額',numeric:true,render:(row:OrderReadRow)=>money(row.amountMinor)},
+        {key:'status',label:'狀態',render:(row:OrderReadRow)=>row.status},
+        {key:'completed',label:'完成時間',render:(row:OrderReadRow)=>row.completedAt?new Date(row.completedAt).toLocaleString('zh-HK'):'—'},
+      ]}
+    />
   </section>;
 }
 
@@ -126,8 +154,21 @@ export function ExceptionsWorkspace(){
   const filtered=rows.filter(row=>(kind==='ALL'||row.kind===kind)&&(!query||row.orderId.includes(query)||row.id.includes(query)));
   return <section className="admin-editor-page">
     <ReadHeader title="退款／異常" description="集中查詢退款、付款方式更正、取消同打印異常。真正更正由相應功能處理；未確認唔會被當成失敗。"/>
-    <div className="admin-filterbar"><input value={query} onChange={event=>setQuery(event.target.value)} placeholder="訂單／事件編號"/><select value={kind} onChange={event=>setKind(event.target.value)}><option value="ALL">全部類型</option><option value="PAYMENT">付款方式</option><option value="REFUND">退款</option><option value="CANCEL">取消</option><option value="PRINT">打印</option></select><span>{filtered.length} 項</span></div>
-    {filtered.length===0?<div className="admin-read-empty">目前未有正式異常／退款資料。</div>:<section className="admin-read-table"><header><span>事件</span><span>訂單</span><span>類型</span><span>狀態</span><span>更新</span></header>{filtered.map(row=><article key={row.id}><span>{row.id}</span><span>{row.orderId}</span><span>{row.kind}</span><span>{row.state}</span><span>{new Date(row.updatedAt).toLocaleString('zh-HK')}</span></article>)}</section>}
+    <div className="admin-filterbar"><AdminSearchField label="搜尋退款及異常" value={query} onChange={setQuery} placeholder="訂單／事件編號"/><label><span>類型</span><select value={kind} onChange={event=>setKind(event.target.value)}><option value="ALL">全部類型</option><option value="PAYMENT">付款方式</option><option value="REFUND">退款</option><option value="CANCEL">取消</option><option value="PRINT">打印</option></select></label><span>{filtered.length} 項</span></div>
+    <AdminResponsiveDataView
+      label="退款及異常"
+      rows={filtered}
+      rowKey={row=>row.id}
+      emptyTitle="未有退款或異常"
+      emptyDescription="目前未有符合條件嘅正式異常資料；未確認狀態唔會被當成成功或失敗。"
+      columns={[
+        {key:'event',label:'事件',render:(row:ExceptionReadRow)=>row.id},
+        {key:'order',label:'訂單',render:(row:ExceptionReadRow)=>row.orderId},
+        {key:'kind',label:'類型',render:(row:ExceptionReadRow)=>row.kind},
+        {key:'state',label:'狀態',render:(row:ExceptionReadRow)=>row.state},
+        {key:'updated',label:'更新',render:(row:ExceptionReadRow)=>new Date(row.updatedAt).toLocaleString('zh-HK')},
+      ]}
+    />
   </section>;
 }
 
@@ -166,7 +207,20 @@ export function SalesReportWorkspace(){
         <article><span>留櫃現金</span><strong>{close&&close.retainedCashMinor!==undefined?money(Number(close.retainedCashMinor||0)):'—'}</strong><small>下一 Business Day 建議</small></article>
       </div>
     </section>:null}
-    {filtered.length===0?<div className="admin-read-empty">目前未有 SMT projection。門店離線時會保留 Outbox，恢復網絡後自動補送。</div>:<section className="admin-read-table"><header><span>日期</span><span>總額</span><span>現金</span><span>淨額</span><span>訂單</span></header>{filtered.map(row=><article key={row.date}><span>{row.date}</span><span>{money(row.grossMinor)}</span><span>{money(row.cashSalesMinor)}</span><span>{money(row.netMinor)}</span><span>{row.orders}</span></article>)}</section>}
+    <AdminResponsiveDataView
+      label="銷售報表"
+      rows={filtered}
+      rowKey={row=>row.date}
+      emptyTitle="未有銷售資料"
+      emptyDescription="目前未有 SMT projection。門店離線時會保留 Outbox，恢復網絡後自動補送。"
+      columns={[
+        {key:'date',label:'日期',render:(row:SalesMetricRow)=>row.date},
+        {key:'gross',label:'總額',numeric:true,render:(row:SalesMetricRow)=>money(row.grossMinor)},
+        {key:'cash',label:'現金',numeric:true,render:(row:SalesMetricRow)=>money(row.cashSalesMinor)},
+        {key:'net',label:'淨額',numeric:true,render:(row:SalesMetricRow)=>money(row.netMinor)},
+        {key:'orders',label:'訂單',numeric:true,render:(row:SalesMetricRow)=>row.orders},
+      ]}
+    />
   </section>;
 }
 
@@ -190,7 +244,20 @@ export function AuditWorkspace(){
   const filtered=rows.filter(row=>!query||[row.action,row.target,row.reason].filter(Boolean).join(' ').toLowerCase().includes(query.toLowerCase()));
   return <section className="admin-editor-page">
     <ReadHeader title="操作記錄" description="後台設定變更會留下不可變式操作記錄：時間、動作、目標、原因，同變更前後摘要。"/>
-    <div className="admin-filterbar"><input value={query} onChange={event=>setQuery(event.target.value)} placeholder="搜尋動作／目標／原因"/><span>{filtered.length} 筆</span></div>
-    {filtered.length===0?<div className="admin-read-empty">未有操作記錄。</div>:<section className="admin-read-table"><header><span>時間</span><span>動作</span><span>目標</span><span>原因</span><span>記錄 ID</span></header>{filtered.map(row=><article key={row.id}><span>{new Date(row.at).toLocaleString('zh-HK')}</span><span>{row.action}</span><span>{row.target}</span><span>{row.reason||'—'}</span><code>{row.id}</code></article>)}</section>}
+    <div className="admin-filterbar"><AdminSearchField label="搜尋操作記錄" value={query} onChange={setQuery} placeholder="搜尋動作／目標／原因"/><span>{filtered.length} 筆</span></div>
+    <AdminResponsiveDataView
+      label="操作記錄"
+      rows={filtered}
+      rowKey={row=>row.id}
+      emptyTitle="未有操作記錄"
+      emptyDescription="建立或修改後台設定後，操作記錄會出現在呢度。"
+      columns={[
+        {key:'time',label:'時間',render:row=>new Date(row.at).toLocaleString('zh-HK')},
+        {key:'action',label:'動作',render:row=>row.action},
+        {key:'target',label:'目標',render:row=>row.target},
+        {key:'reason',label:'原因',render:row=>row.reason||'—'},
+        {key:'id',label:'記錄 ID',render:row=><code>{row.id}</code>},
+      ]}
+    />
   </section>;
 }
