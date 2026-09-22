@@ -12,6 +12,7 @@ describe('MFK Admin complete catalog product',()=>{
     for(const marker of ['商品資料','新增商品','商品名稱','Product Code','基本價 HK$','Barcode','圖片參考','商品描述','外賣價格規則','此商品外賣 +$1','選項組綁定']) expect(html).toContain(marker);
     expect(html).toContain('203');
     expect(html).toContain('188');
+    expect(html).toContain('已自動保存草稿');
   });
 
   it('routes core catalog responsibilities to concrete editors',()=>{
@@ -30,7 +31,7 @@ describe('MFK Admin complete catalog product',()=>{
     }
   });
 
-  it('provides real business-day and logical print configuration',()=>{
+  it('provides business-day and logical printer configuration as real Admin responsibilities',()=>{
     const businessDay=renderToStaticMarkup(<MemoryRouter initialEntries={['/admin/business-day']}><MfkAdminApp/></MemoryRouter>);
     expect(businessDay).toContain('營業日／交更');
     expect(businessDay).toContain('每日分界時間');
@@ -51,11 +52,11 @@ describe('MFK Admin complete catalog product',()=>{
     }
   });
 
-  it('keeps primary operator routes free of old migration and transport protocol copy',()=>{
+  it('keeps primary operator routes free of superseded manual transport copy',()=>{
     for(const path of ['/admin/publish','/admin/print/rules','/admin/channels/settlement','/admin/store/quick-reasons']){
       const html=renderToStaticMarkup(<MemoryRouter initialEntries={[path]}><MfkAdminApp/></MemoryRouter>);
       const visible=html.replace(/<[^>]*>/g,' ');
-      expect(visible,path).not.toMatch(/NOT_WIRED|MIGRATION_ONLY|SOURCE_INTENT|TARGET_OBSERVED|Transport Bundle|Readback Receipt|HUMAN CONTROLLED|NO CLOUD|NO HTTP|NO POLLING/i);
+      expect(visible,path).not.toMatch(/NOT_WIRED|MIGRATION_ONLY|SOURCE_INTENT|TARGET_OBSERVED|Transport Bundle|Readback Receipt|HUMAN CONTROLLED|NO CLOUD|NO HTTP|NO POLLING|建立並下載發布檔案|匯入門店回傳檔案/i);
     }
   });
 
