@@ -57,12 +57,12 @@ export interface LocalBackup{
 
 const HK_OFFSET_MS=8*60*60*1000;
 
-export function resolveBusinessWindow(now:number,businessStartHour:number){
+export function resolveBusinessWindow(now:number,businessStartHour:number,businessStartMinute=0){
   const shifted=new Date(now+HK_OFFSET_MS);
   const year=shifted.getUTCFullYear();
   const month=shifted.getUTCMonth();
   const date=shifted.getUTCDate();
-  let startShifted=Date.UTC(year,month,date,businessStartHour,0,0,0);
+  let startShifted=Date.UTC(year,month,date,businessStartHour,businessStartMinute,0,0);
   if(now+HK_OFFSET_MS<startShifted)startShifted-=24*60*60*1000;
   const start=startShifted-HK_OFFSET_MS;
   const end=start+24*60*60*1000;
@@ -77,11 +77,12 @@ export function resolveBusinessWindow(now:number,businessStartHour:number){
 
 export function buildLocalReport(
   orders:readonly LocalReportOrder[],
-  options:{readonly now?:number;readonly businessStartHour?:number}={},
+  options:{readonly now?:number;readonly businessStartHour?:number;readonly businessStartMinute?:number}={},
 ):LocalReport{
   const now=options.now??Date.now();
   const businessStartHour=options.businessStartHour??5;
-  const window=resolveBusinessWindow(now,businessStartHour);
+  const businessStartMinute=options.businessStartMinute??0;
+  const window=resolveBusinessWindow(now,businessStartHour,businessStartMinute);
   const selected=orders.filter(order=>{
     const at=Date.parse(order.createdAt);
     return Number.isFinite(at)&&at>=window.start&&at<window.end;
@@ -124,6 +125,7 @@ export function createLocalDayClose(input:{
   readonly orders:readonly LocalReportOrder[];
   readonly now?:number;
   readonly businessStartHour?:number;
+  readonly businessStartMinute?:number;
   readonly openingCashMinor:number;
   readonly countedCashMinor:number;
   readonly cashRemovedMinor?:number;
@@ -131,7 +133,11 @@ export function createLocalDayClose(input:{
   readonly note?:string;
 }):LocalDayClose{
   const now=input.now??Date.now();
-  const report=buildLocalReport(input.orders,{now,businessStartHour:input.businessStartHour??5});
+  const report=buildLocalReport(input.orders,{
+    now,
+    businessStartHour:input.businessStartHour??5,
+    businessStartMinute:input.businessStartMinute??0,
+  });
   const version=input.existing
     .filter(row=>row.businessDate===report.businessDate)
     .reduce((max,row)=>Math.max(max,row.version),0)+1;
