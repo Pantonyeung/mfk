@@ -1,0 +1,29 @@
+name: deploy-mfk-customer-acceptance
+
+on:
+  push:
+    branches:
+      - acceptance/MFK/CUSTOMER-PRODUCT-R1-CLOUDFLARE
+    paths:
+      - 'v2customer/DEPLOY_REQUEST'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: v2customer
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-audit --no-fund --legacy-peer-deps --package-lock=false
+      - run: npm test
+      - run: npm run build
+      - name: Deploy mfk-customer-acceptance
+        run: npx --yes wrangler@latest deploy
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
