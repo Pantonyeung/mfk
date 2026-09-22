@@ -15,12 +15,13 @@ export function buildAdminMenuIndexRevisionFromDraft(
   if(activeCategories.length===0)throw new Error('ADMIN_MENU_INDEX_ACTIVE_CATEGORY_REQUIRED');
   const activeIds=new Set(activeCategories.map(row=>row.id));
 
+  const sourceOrder=new Map(draft.products.map((row,index)=>[row.id,row.legacySourcePosition??index] as const));
   const activeProducts=[...draft.products]
     .filter(row=>row.active&&activeIds.has(row.categoryId))
     .sort((a,b)=>{
       const ac=activeCategories.find(category=>category.id===a.categoryId)?.position??9999;
       const bc=activeCategories.find(category=>category.id===b.categoryId)?.position??9999;
-      return ac-bc||a.id.localeCompare(b.id);
+      return ac-bc||(sourceOrder.get(a.id)??9999)-(sourceOrder.get(b.id)??9999)||a.id.localeCompare(b.id);
     });
   if(activeProducts.length===0)throw new Error('ADMIN_MENU_INDEX_ACTIVE_PRODUCT_REQUIRED');
 
@@ -32,7 +33,7 @@ export function buildAdminMenuIndexRevisionFromDraft(
       id:row.id,
       label:row.name,
       categoryId:row.categoryId,
-      position:(index+1)*10,
+      position:sourceOrder.get(row.id)??index,
       enabled:true,
     })),
   });
