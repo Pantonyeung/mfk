@@ -19,6 +19,13 @@ describe('Admin UI recomposition',()=>{
     expect(html).toContain('/admin/publish');
   });
 
+  it('keeps each page and nested product editors collapsed until requested',()=>{
+    const page=render('/admin/catalog/products');
+    expect(page).toContain('class="mfk-admin-focus-workspace"');
+    expect(page).not.toContain('class="mfk-admin-focus-workspace" open=""');
+    expect(page).not.toContain('class="admin-product-section" open=""');
+  });
+
   it('bounds the initial pricing editor and names every visible price field',()=>{
     const html=render('/admin/catalog/pricing');
     expect(html).toContain('顯示 1–25 / 203 件商品');

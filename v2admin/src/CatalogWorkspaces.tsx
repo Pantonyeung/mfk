@@ -163,7 +163,7 @@ export function ProductOperationalDetail({productId,optionCenter}:{productId:str
       <Toggle checked={product.active} onChange={active=>updateProduct(product.id,{active})} label={product.active?'啟用':'停用'}/>
     </div>
 
-    <details className="admin-product-section" open>
+    <details className="admin-product-section">
       <summary><span><b>基本資料</b><small>名稱、編號、分類、條碼、描述</small></span><span>›</span></summary>
       <div className="admin-product-section-body">
         <div className="admin-form-grid two">
@@ -676,7 +676,7 @@ export function CombosWorkspace(){
       {pools.length===0?<div className="admin-read-empty">未有 Pool。</div>:<div className="admin-combo-pool-list">{pools.map(pool=>{
         const usedBy=draft.combos.filter(combo=>combo.mainPoolId===pool.id||(combo.addonPoolIds??[]).includes(pool.id));
         const poolTypeLabel=pool.kind==='MAIN_COURSE'?'飯糰主食 Pool':pool.addonKind==='DRINK'?'飲品 Pool':'小食 Pool';
-        return <details className="admin-combo-pool-card" key={pool.id} open={pool.kind==='ADDON'}>
+        return <details className="admin-combo-pool-card" key={pool.id}>
           <summary>
             <span><b>{pool.name}</b><small>{poolTypeLabel} · {pool.groups.length} 個大分組 · {usedBy.length} 個套餐使用</small></span>
             <span>{pool.active?'啟用':'停用'}</span>

@@ -1,96 +1,94 @@
-# MFK Admin control-plane design system
+# MFK Admin — calm focus design system
 
-Source influence: [`VoltAgent/awesome-design-md`](https://github.com/VoltAgent/awesome-design-md),
-`design-md/ibm/DESIGN.md` at commit
-`f6961238d5cddcf8042a74a70fc400ec67181abb`.
-
-This is a Carbon-derived product UI system, adapted for a restaurant operations
-control plane. It borrows the upstream system's density, 4px grid, flat
-geometry, hairline hierarchy, restrained typography, and responsive 16/8/4
-column logic. It does not copy IBM branding. MFK orange is the sole product
-accent.
+This interface follows Apple-style product-design foundations: purpose,
+familiarity, agency, progressive disclosure, platform typography, responsive
+materials, and immediate feedback. It is an MFK interface—not an imitation of
+an Apple product.
 
 ## Product posture
 
-- Admin is a control plane, not a POS and not a marketing site.
-- Operational truth outranks decoration. Unknown, stale, pending, and failed
-  states must remain explicit.
-- High-frequency actions stay visible; low-frequency configuration is grouped
-  contextually.
-- Hierarchy comes from alignment, surface changes, rules, and type scale—not
-  shadows, gradients, or collections of floating cards.
+- Admin is a control plane. It should feel calm even when the underlying system
+  is complex.
+- The first view answers only: where am I, what is this for, and what do I open
+  next?
+- Every route starts collapsed. Opening a route is an explicit act; navigating
+  to another route collapses the previous workspace again.
+- Nested editors and advanced settings also start collapsed. A user opens only
+  the product, pool, section, or configuration they are working on.
+- Unknown, offline, stale, failed, queued, and readback-waiting states remain
+  explicit. Visual calm must never manufacture success.
 
-## Tokens
+## Visual language
 
 | Role | Value |
 | --- | --- |
-| Ink | `#161616` |
-| Muted ink | `#525252` |
-| Subtle ink | `#6f6f6f` |
-| Canvas | `#ffffff` |
-| Workspace | `#f4f4f4` |
-| Raised/disabled surface | `#e0e0e0` |
-| Hairline | `#d6d6d6` |
-| Strong rule | `#8d8d8d` |
-| MFK action accent | `#b54708` |
-| Accent hover | `#8a3608` |
-| Focus | `#b54708` |
-| Success | `#198038` |
-| Warning | `#8e6a00` |
-| Error | `#da1e28` |
-| Information | `#0f62fe` |
+| Canvas | `#f5f5f7` |
+| Surface | `#ffffff` |
+| Primary ink | `#1d1d1f` |
+| Secondary ink | `#6e6e73` |
+| Divider | `rgba(0,0,0,.08)` |
+| System action | `#0071e3` |
+| System action hover | `#0077ed` |
+| MFK brand mark | `#f05a28` |
+| Success | `#248a3d` |
+| Warning | `#9a6700` |
+| Error | `#d70015` |
 
-- Spacing uses a 4px base: `4, 8, 12, 16, 24, 32, 48`.
-- Corners are square by default. A 2px radius is reserved for compact status
-  tags only.
-- No drop shadows in normal application surfaces.
-- Body type is 14–16px with `0.16px` tracking. Display headings are light or
-  regular weight, never decorative bold.
-- Runtime fonts are local/system fonts: `IBM Plex Sans` when available, then
-  `Noto Sans TC`, `PingFang HK`, `Segoe UI`, and `sans-serif`. No remote font
-  request is introduced.
+- Use the platform system-font stack. Large headings use tighter tracking;
+  body copy keeps natural tracking and comfortable leading.
+- Major surfaces use 18–24px radii. Controls use 10–12px radii. Status chips
+  may use a capsule only when they represent a compact state.
+- Use broad whitespace and grouping instead of borders around every element.
+- Shadows are quiet and local. Translucency is reserved for persistent chrome,
+  never stacked across multiple content layers.
+- Orange identifies MFK. Blue identifies an interactive system action. Do not
+  use multiple decorative accent colours.
 
-## Composition
+## Information hierarchy
 
-- Desktop: 248px navigation rail + a 48px global header + 48–64px contextual
-  navigation + 16-column-aligned workspace.
-- Tablet: 80px task rail, abbreviated labels, two-column work surfaces.
-- Mobile: no shrunken desktop rail. Use a 48px global header, a native page
-  selector, single-column task surfaces, card-transformed data rows, and a
-  fixed five-target bottom navigation.
-- KPI tiles form a continuous bordered strip, not a collection of floating
-  cards.
-- Tables retain column rhythm on desktop and transform into labelled records
-  on mobile.
+1. Persistent chrome: MFK, primary areas, conservative sync state.
+2. Compact route picker: one current secondary destination, not a row of every
+   possible tab.
+3. Focus card: page title, one-sentence purpose, and one Open action.
+4. Revealed workspace: primary action toolbar, then operational content.
+5. Nested disclosure: detailed editors and advanced settings closed by default.
 
-## Component rules
+The old card and table placement is not a constraint. Composition follows the
+user task, reading order, and action frequency.
 
-- Primary buttons: solid MFK accent, square, minimum 40px desktop / 48px touch.
-- Secondary buttons: dark ink or white with a strong hairline according to
-  hierarchy.
-- Inputs: gray fill, no rounded border, 1px bottom rule; focus uses a 2px MFK
-  underline plus visible outline.
-- Tabs: white/gray surface, selected state uses a 3px MFK left or bottom rule.
-- Cards: white canvas with 1px hairline. Use gray alternate bands instead of
-  elevation.
-- Status tags: compact rectangles. Semantic colors communicate actual state
-  only and never manufacture success.
-- Destructive actions retain explicit confirmation and the error color.
+## Interaction
 
-## Accessibility and interaction
+- Route changes remount the focus card in its collapsed state.
+- Native `details` / `summary` semantics provide keyboard and assistive-
+  technology support without creating a parallel interaction model.
+- Press feedback starts immediately with a small, critically damped scale
+  response. No bounce is used for ordinary menus or form controls.
+- Open and close use the same spatial origin and remain interruptible.
+- Save, destructive confirmation, validation, sync, ACK, and readback behavior
+  remain the existing product contract.
 
-- Keyboard focus must remain visible on every interactive element.
-- Touch targets are at least 44px, and 48px on primary mobile navigation.
-- Form errors remain programmatically associated with their fields.
-- Dialogs keep native dialog semantics and labelled headings.
-- Reduced-motion and forced-colors preferences remain supported.
-- Save, sync, ACK/readback, stale, and offline wording stays conservative and
-  is derived from existing runtime truth.
+## Responsive composition
 
-## Prohibited drift
+- Desktop: quiet 220px sidebar, translucent top chrome, centered focus surface.
+- Tablet: compact 76px area rail with shortened labels; content remains a real
+  two-column composition where useful.
+- Mobile: no desktop sidebar. Use a compact top bar, route picker, single focus
+  surface, and a five-target translucent bottom bar. Data tables become
+  labelled records after the workspace is opened.
+- Touch targets are at least 44px; primary mobile navigation is at least 50px.
 
-- No new product, pricing, option, combo, auth, sync, print, order, or payment
-  model.
-- No gradients, glass cards, ornamental shadows, pill-button systems, or fake
-  dashboard data.
-- No use of presentation state to claim save, sync, or readback success.
+## Accessibility
+
+- Focus rings are always visible and meet contrast requirements.
+- Summary controls expose native expanded/collapsed semantics.
+- Dynamic status surfaces retain live-region behavior.
+- Reduced motion uses short opacity changes without scale or spatial travel.
+- Reduced transparency replaces glass materials with opaque white.
+- High-contrast mode restores solid borders around translucent chrome.
+
+## Frozen contracts
+
+This system must not change Product, Category, Option Set, Combo/Pool, Pricing,
+Save, Active Revision, Admin-to-SMT sync, fingerprint, ACK/readback, persistence
+keys, endpoints, payloads, auth, Store Kernel, Order, Payment, Print authority,
+idempotency, offline, or LKG semantics.

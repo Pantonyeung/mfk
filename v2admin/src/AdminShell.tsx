@@ -126,19 +126,24 @@ export function AdminShell({children}:{children:ReactNode}){
 
       <section className="mfk-admin-context" aria-label={activeGroup.label+'功能'}>
         <div className="mfk-admin-context-title">
-          <div><small>功能組</small><strong>{activeGroup.label}</strong></div>
-          <label className="mfk-admin-section-select"><span>目前頁面</span><select value={active?.path??activeGroup.capabilities[0]?.path} onChange={event=>navigate(event.target.value)}>{activeGroup.capabilities.map(item=><option key={item.id} value={item.path}>{item.label}</option>)}</select></label>
+          <span className="mfk-admin-context-group">{activeGroup.label}</span>
+          <label className="mfk-admin-section-select"><span className="admin-visually-hidden">目前頁面</span><select aria-label={activeGroup.label+'目前頁面'} value={active?.path??activeGroup.capabilities[0]?.path} onChange={event=>navigate(event.target.value)}>{activeGroup.capabilities.map(item=><option key={item.id} value={item.path}>{item.label}</option>)}</select></label>
         </div>
-        <nav className="mfk-admin-section-nav" aria-label={activeGroup.label+'內頁'}>
-          {activeGroup.capabilities.map(item=><NavLink
-            key={item.id}
-            to={item.path}
-            className={({isActive})=>isActive?'active':''}
-          ><span>{item.label}</span><small data-status={item.status}>{statusLabel[item.status]}</small></NavLink>)}
-        </nav>
       </section>
 
-      <div className="mfk-admin-workspace">{children}</div>
+      <div className="mfk-admin-workspace">
+        <details className="mfk-admin-focus-workspace" key={location.pathname}>
+          <summary>
+            <div className="mfk-admin-focus-copy">
+              <span>{activeGroup.label}</span>
+              <h1>{active?.label??'管理後台'}</h1>
+              <p>{active?.purpose??'按需要打開工作區。'}</p>
+            </div>
+            <span className="mfk-admin-focus-action" aria-hidden="true"><span className="when-closed">打開</span><span className="when-open">收起</span><i>⌄</i></span>
+          </summary>
+          <div className="mfk-admin-focus-body">{children}</div>
+        </details>
+      </div>
     </main>
 
     <nav className="mfk-admin-mobile-nav" aria-label="手機主要功能">
