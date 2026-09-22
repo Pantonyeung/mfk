@@ -7,7 +7,7 @@ import {LEGACY_MF01_ADMIN_DRAFT} from './admin-menu-seed-mf01-v2.ts';
 import {PRODUCT_MEDIA_BACKEND_CONTRACT,normalizeProductPrintRule} from './admin-product-operational-config.ts';
 import {MfkAdminApp} from './App.tsx';
 import {ADMIN_CAPABILITIES} from './admin-capabilities.ts';
-import {migrateLegacyDraftToOptionSetCenter,projectOptionSetsForProduct,useOptionSetCenter,validateOptionSetCenter,type OptionSetCenterState} from './admin-option-set-center.ts';
+import {applyProductSetLinksBulk,migrateLegacyDraftToOptionSetCenter,projectOptionSetsForProduct,useOptionSetCenter,validateOptionSetCenter,type OptionSetCenterState} from './admin-option-set-center.ts';
 import {validateAdminConfig} from './admin-config-save.ts';
 
 
@@ -127,7 +127,7 @@ describe('MFK Admin complete catalog product',()=>{
 
   it('locks Option Center as group-first parent with child Options',()=>{
     const center=renderToStaticMarkup(<MemoryRouter initialEntries={['/admin/catalog/modifiers']}><MfkAdminApp/></MemoryRouter>);
-    for(const marker of ['選項中心','新增選項組','一個選項組就係一個完整可重用單位','組內選項','新增子選項'])expect(center).toContain(marker);
+    for(const marker of ['選項中心','新增選項組','一個選項組就係一個完整可重用單位','組內選項','新增子選項','批量映射商品','全部商品'])expect(center).toContain(marker);
     expect(center).toContain('飯量');
     expect(center).toContain('青瓜');
     expect(center).not.toContain('選項 Master');
@@ -182,6 +182,27 @@ describe('MFK Admin complete catalog product',()=>{
     expect(validateOptionSetCenter(state)).toEqual([]);
     expect(state.productLinks[0]?.defaultOptionIds).toEqual(['less-cucumber']);
     expect(state.productLinks[1]?.defaultOptionIds).toEqual(['more-cucumber']);
+  });
+
+  it('bulk maps one Option Set without duplicating links or resetting Product defaults',()=>{
+    const current=[
+      {productId:'product-a',setId:'rice',defaultOptionIds:['small']},
+      {productId:'product-b',setId:'cucumber',defaultOptionIds:['more']},
+    ] as const;
+
+    const added=applyProductSetLinksBulk(current,'rice',['product-a','product-b','product-b'],true);
+    expect(added).toHaveLength(3);
+    expect(added.filter(link=>link.productId==='product-a'&&link.setId==='rice')).toHaveLength(1);
+    expect(added.find(link=>link.productId==='product-a'&&link.setId==='rice')?.defaultOptionIds).toEqual(['small']);
+    expect(added.find(link=>link.productId==='product-b'&&link.setId==='rice')?.defaultOptionIds).toEqual([]);
+
+    const replay=applyProductSetLinksBulk(added,'rice',['product-a','product-b'],true);
+    expect(replay).toBe(added);
+
+    const removed=applyProductSetLinksBulk(added,'rice',['product-a'],false);
+    expect(removed.some(link=>link.productId==='product-a'&&link.setId==='rice')).toBe(false);
+    expect(removed.some(link=>link.productId==='product-b'&&link.setId==='rice')).toBe(true);
+    expect(removed.find(link=>link.productId==='product-b'&&link.setId==='cucumber')?.defaultOptionIds).toEqual(['more']);
   });
 
   it('projects only R2-linked Option Sets into Product menu truth',()=>{
