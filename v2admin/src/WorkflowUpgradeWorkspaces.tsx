@@ -35,7 +35,7 @@ export function ActionQueueWorkspace(){
   return <section className="admin-editor-page">
     <UpgradeHeader title="待處理事項" description="由真實 Admin 狀態聚合需要處理嘅事項，再帶去責任頁；呢度唔直接改正式資料。" kicker="真實 Admin 狀態"/>
     <div className="admin-filterbar"><select value={domain} onChange={event=>setDomain(event.target.value)}><option value="ALL">全部範圍</option>{['菜單','平台','打印','裝置'].map(item=><option key={item} value={item}>{item}</option>)}</select><span>{filtered.length} 項</span></div>
-    {filtered.length===0?<div className="admin-read-empty">目前冇 Admin 端待處理事項。</div>:<section className="admin-read-table"><header><span>事項</span><span>負責範圍</span><span>狀態</span><span>前往頁面</span><span>操作</span></header>{filtered.map(row=><article key={row.id}><span>{row.kind}</span><span>{row.owner}</span><span>{row.state}</span><a href={row.route}>前往責任頁</a><StateChip>只作分流</StateChip></article>)}</section>}
+    {filtered.length===0?<div className="admin-read-empty">目前冇 Admin 端待處理事項。</div>:<section className="admin-read-table"><header><span>事項</span><span>負責範圍</span><span>狀態</span><span>前往頁面</span><span>操作</span></header>{filtered.map(row=><article key={row.id}><span>{row.kind}</span><span>{row.owner}</span><span>{row.state==='HEALTHY'?'正常':row.state==='DEGRADED'?'需注意':'未確認'}</span><a href={row.route}>前往責任頁</a><StateChip>只作分流</StateChip></article>)}</section>}
     <section className="admin-rule-card"><h2>處理原則</h2><p>未有證據唔可以標記已解決；未確認唔等於失敗；真正修復由責任頁完成。</p></section>
   </section>;
 }
@@ -106,7 +106,7 @@ export function AccessSessionWorkspace(){
   </section>;
 }
 
-interface FixedMetricSnapshot{metricVersion:string;completeness:'COMPLETE'|'PARTIAL'|'UNAVAILABLE';freshness:'FRESH'|'STALE'|'未確認';updatedAt?:string;metrics:Record<string,number|string>}
+interface FixedMetricSnapshot{metricVersion:string;completeness:'COMPLETE'|'PARTIAL'|'UNAVAILABLE';freshness:'FRESH'|'STALE'|'UNKNOWN';updatedAt?:string;metrics:Record<string,number|string>}
 function FixedReport({title,metrics,storeKey}:{title:string;metrics:readonly string[];storeKey:string}){
   const [from,setFrom]=useState('');
   const [to,setTo]=useState('');
@@ -146,14 +146,14 @@ export function ExportGovernanceWorkspace(){
   </section>;
 }
 
-interface DiagnosticFinding{id:string;domain:string;state:'HEALTHY'|'需注意'|'未確認';updatedAt:string;pendingCount:number;lastError?:string;recovery?:string;evidenceRef?:string}
-export function 系統狀態Workspace(){
+interface DiagnosticFinding{id:string;domain:string;state:'HEALTHY'|'DEGRADED'|'UNKNOWN';updatedAt:string;pendingCount:number;lastError?:string;recovery?:string;evidenceRef?:string}
+export function DiagnosticsWorkspace(){
   const [findings]=usePersistentAdminState<DiagnosticFinding[]>('diagnostics-read.v1',[]);
-  const unknown=findings.filter(row=>row.state==='未確認').length;
-  const degraded=findings.filter(row=>row.state==='需注意').length;
+  const unknown=findings.filter(row=>row.state==='UNKNOWN').length;
+  const degraded=findings.filter(row=>row.state==='DEGRADED').length;
   return <section className="admin-editor-page">
     <UpgradeHeader title="系統狀態" description="系統狀態顯示功能範圍、目前狀態、資料新鮮度、待處理數量、最後錯誤、安全修復方法同回傳證據。冇證據唔會硬判根因。" kicker="診斷證據"/>
-    <div className="admin-kpi-grid"><article><span>健康</span><strong>{findings.filter(row=>row.state==='HEALTHY').length}</strong><small>已確認</small></article><article><span>需注意</span><strong>{degraded}</strong><small>需注意</small></article><article><span>未確認</span><strong>{unknown}</strong><small>未確認</small></article><article><span>總項目</span><strong>{findings.length}</strong><small>系統狀態</small></article></div>
+    <div className="admin-kpi-grid"><article><span>健康</span><strong>{findings.filter(row=>row.state==='HEALTHY').length}</strong><small>已確認</small></article><article><span>需注意</span><strong>{degraded}</strong><small>需要跟進</small></article><article><span>未確認</span><strong>{unknown}</strong><small>等待資料</small></article><article><span>總項目</span><strong>{findings.length}</strong><small>系統狀態</small></article></div>
     {findings.length===0?<div className="admin-read-empty">目前未有系統狀態回傳；唔會用假綠燈代替健康證據。</div>:<section className="admin-read-table"><header><span>範圍</span><span>狀態</span><span>待處理</span><span>最後錯誤</span><span>證據</span></header>{findings.map(row=><article key={row.id}><span>{row.domain}</span><span>{row.state}</span><span>{row.pendingCount}</span><span>{row.lastError||'—'}</span><span>{row.evidenceRef||'—'}</span></article>)}</section>}
   </section>;
 }
@@ -167,7 +167,7 @@ export function IntegrationsGovernanceWorkspace(){
     <header className="admin-editor-head"><div><small>治理設定</small><h1>外部連接</h1><p>管理憑證引用名稱、權限範圍、接收路徑、簽章驗證、資料格式版本同防重放時限。永遠唔保存秘密值。</p></div><div className="admin-editor-actions"><button onClick={add}>新增連接設定</button></div></header>
     {rows.length===0?<div className="admin-read-empty">未有外部連接治理設定。</div>:<div className="admin-editor-grid">{rows.map((row,index)=><article className="admin-policy-card" key={index}>
       <label><span>平台</span><input value={row.provider} onChange={event=>patch(index,{provider:event.target.value})}/></label>
-      <label><span>憑證引用名稱</span><input value={row.credentialRef} onChange={event=>patch(index,{credentialRef:event.target.value})} placeholder="只填引用名稱，唔填 秘密值"/></label>
+      <label><span>憑證引用名稱</span><input value={row.credentialRef} onChange={event=>patch(index,{credentialRef:event.target.value})} placeholder="只填引用名稱，唔填秘密值"/></label>
       <label><span>權限範圍</span><input value={row.scope} onChange={event=>patch(index,{scope:event.target.value})}/></label>
       <label><span>接收路徑</span><input value={row.webhookPath} onChange={event=>patch(index,{webhookPath:event.target.value})}/></label>
       <label><span>簽章驗證規則</span><input value={row.signaturePolicy} onChange={event=>patch(index,{signaturePolicy:event.target.value})}/></label>
@@ -178,17 +178,17 @@ export function IntegrationsGovernanceWorkspace(){
   </section>;
 }
 
-interface EffectiveSettingRow{id:string;label:string;baseValue:string;source:string;securityFloor:string;覆寫:string}
+interface EffectiveSettingRow{id:string;label:string;baseValue:string;source:string;securityFloor:string;override:string}
 export function EffectiveSettingsWorkspace(){
   const [rows,setRows]=usePersistentAdminState<EffectiveSettingRow[]>('effective-settings.v1',[
-    {id:'business-timezone',label:'門店時區',baseValue:'Asia/Hong_Kong',source:'門店設定',securityFloor:'不可空白',覆寫:''},
-    {id:'business-day-cutoff',label:'營業日分界',baseValue:'05:00',source:'營業日設定',securityFloor:'只作記錄',覆寫:''},
-    {id:'quick-reason-required',label:'快捷原因必填',baseValue:'否',source:'快捷原因政策',securityFloor:'原因不可成為交易 blocker',覆寫:''},
-    {id:'capacity-hard-stop',label:'產能強制停止',baseValue:'關',source:'產能設定',securityFloor:'預設不可無聲阻交易',覆寫:''},
+    {id:'business-timezone',label:'門店時區',baseValue:'Asia/Hong_Kong',source:'門店設定',securityFloor:'不可空白',override:''},
+    {id:'business-day-cutoff',label:'營業日分界',baseValue:'05:00',source:'營業日設定',securityFloor:'只作記錄',override:''},
+    {id:'quick-reason-required',label:'快捷原因必填',baseValue:'否',source:'快捷原因政策',securityFloor:'原因不可阻止交易',override:''},
+    {id:'capacity-hard-stop',label:'產能強制停止',baseValue:'關',source:'產能設定',securityFloor:'預設不可無聲阻交易',override:''},
   ]);
-  const patch=(id:string,覆寫:string)=>setRows(current=>current.map(row=>row.id===id?{...row,覆寫}:row));
+  const patch=(id:string,override:string)=>setRows(current=>current.map(row=>row.id===id?{...row,override}:row));
   return <section className="admin-editor-page">
-    <UpgradeHeader title="進階設定" description="顯示 目前生效值、來源、可選 覆寫 同安全底線；唔建立一個可以跨 domain 任意覆寫嘅巨型 設定引擎。" kicker="Effective Settings"/>
-    <section className="admin-read-table"><header><span>設定項目</span><span>目前生效值</span><span>來源</span><span>安全底線</span><span>覆寫草稿</span></header>{rows.map(row=><article key={row.id}><span>{row.label}</span><span>{row.覆寫||row.baseValue}</span><span>{row.source}</span><span>{row.securityFloor}</span><input value={row.覆寫} onChange={event=>patch(row.id,event.target.value)} placeholder="可選覆寫"/></article>)}</section>
+    <UpgradeHeader title="進階設定" description="顯示目前生效值、來源、可選覆寫同安全底線；唔建立一個可以跨功能範圍任意覆寫嘅巨型設定頁。" kicker="生效設定"/>
+    <section className="admin-read-table"><header><span>設定項目</span><span>目前生效值</span><span>來源</span><span>安全底線</span><span>覆寫草稿</span></header>{rows.map(row=><article key={row.id}><span>{row.label}</span><span>{row.override||row.baseValue}</span><span>{row.source}</span><span>{row.securityFloor}</span><input value={row.override} onChange={event=>patch(row.id,event.target.value)} placeholder="可選覆寫"/></article>)}</section>
   </section>;
 }
