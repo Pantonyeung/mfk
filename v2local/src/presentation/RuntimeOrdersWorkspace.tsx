@@ -1,6 +1,7 @@
 import {useCallback,useEffect,useMemo,useState} from 'react';
 import {useSearchParams} from 'react-router';
 import type {CleanSmtCoreRuntimePort,SmtOrdersProjection,SmtReprintOption} from '../runtime/local-runtime.ts';
+import {hasStaffPermission} from '../runtime/staff-auth.ts';
 import './orders-workspace.css';
 
 type PaymentFilter='全部'|'現金'|'Alipay'|'WeChat Pay'|'FPS / PayMe';
@@ -22,6 +23,8 @@ function paymentMatches(label:string,filter:PaymentFilter){
 }
 
 export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePort}){
+  const canReview=hasStaffPermission('ORDER_REVIEW');
+  const canCorrect=hasStaffPermission('ORDER_CORRECTION');
   const [params]=useSearchParams();
   const initialOrderId=params.get('orderId')??undefined;
   const [snapshot,setSnapshot]=useState<SmtOrdersProjection|null>(null);
@@ -108,6 +111,7 @@ export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePor
   };
 
   const saveEdit=async()=>{
+    if(!canCorrect){setMessage('你冇訂單更正權限。');return;}
     if(!selected||!runtime.updateOrderItems)return;
     try{
       await runtime.updateOrderItems(selected.orderId,editLines);
@@ -116,6 +120,7 @@ export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePor
   };
 
   const cancelSelected=async()=>{
+    if(!canCorrect){setMessage('你冇訂單更正權限。');return;}
     if(!selected||!runtime.cancelOrder)return;
     try{
       await runtime.cancelOrder(selected.orderId);
@@ -132,6 +137,8 @@ export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePor
     const current=map.get(key)??{bindingId:key,printerName:option.printerName,physicalKey:option.physicalKey,options:[] as SmtReprintOption[]};
     current.options.push(option);map.set(key,current);return map;
   },new Map<string,{bindingId:string;printerName:string;physicalKey:string;options:SmtReprintOption[]}>()).values()];
+
+  if(!canReview)return <main className="order-manager"><section className="order-empty"><b>你冇查看訂單權限</b><p>需要 Admin 權限：ORDER_REVIEW。</p></section></main>;
 
   return <main className="order-manager">
     <header className="order-manager-top">
@@ -151,7 +158,7 @@ export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePor
         {message?<p className="order-inline-message">{message}</p>:null}
         <footer>
           <button onClick={()=>void openReprint()}>▣ 重印</button>
-          <button onClick={()=>setModal('actions')}>✎ 取消／修改</button>
+          <button disabled={!canCorrect} title={canCorrect?'':'需要 ORDER_CORRECTION 權限'} onClick={()=>setModal('actions')}>✎ 取消／修改</button>
           <button className="primary" disabled={!runtime.markOrderReady||readyBusy||selected.fulfillmentLabel==='可取餐'||selected.fulfillmentLabel==='已完成'||selected.fulfillmentLabel==='已取消'} onClick={()=>void markReady()}>{readyBusy?'處理中…':'提前完成／可取餐'}</button>
         </footer>
       </article>:<div className="order-empty">選擇一張訂單。</div>}
