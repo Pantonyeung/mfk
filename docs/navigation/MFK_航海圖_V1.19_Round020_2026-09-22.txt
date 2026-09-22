@@ -1,0 +1,178 @@
+MFK 航海圖 V1.19｜Round020｜2026-09-22
+主題：ADMIN COMPLETE PRODUCT DEPLOYED / OWNER PRODUCT WALKTHROUGH
+狀態：CURRENT / CONTROLLING
+CONTROL：#22
+ACTIVE ISSUE：#45
+
+==================================================
+0. OWNER PRIORITY
+==================================================
+
+Admin Product Completion:
+P0
+
+Admin→SMT Connection #44:
+HOLD
+
+SMT OTA #40:
+HOLD
+
+==================================================
+1. ADMIN PRODUCT COMPLETION
+==================================================
+
+WORK:
+MFK-ADMIN-PRODUCT-COMPLETION-R1
+
+SOURCE:
+c03a7a547e8ec6d1485d48053ae0a80e033c2d99
+
+SOURCE TEST:
+35688504352 SUCCESS
+
+CLEAN LANDING:
+d22b9bf1bfc059f1d0227cb758027b71c87af111
+
+DEPLOY TRIGGER:
+13987b48181f7423eed01144eae76ebdbfb9dd4a
+
+LIVE DEPLOY:
+35688802387 SUCCESS
+
+CANONICAL:
+https://admin.morefunos.com
+
+STATE:
+MFK_ADMIN_PRODUCT_COMPLETE_DEPLOYED_OWNER_REVIEW_PENDING
+
+==================================================
+2. COMPLETENESS STANDARD
+==================================================
+
+NO empty formal routes.
+NO demo-only product responsibility.
+NO fake data.
+NO fake success.
+NO engineering transport workflow as operator workflow.
+Traditional Chinese operator UI.
+Persistent Admin config.
+Audit / release history.
+One authority per domain.
+
+==================================================
+3. PRODUCT SURFACES
+==================================================
+
+Today / Readiness / Action Queue
+
+Orders:
+Open
+History
+Exceptions
+Availability
+
+Menu:
+Product detail
+Category
+Modifier / Option
+Pricing
+Combo
+Ordering
+Immutable config release history
+
+Print:
+Logical Printer Registry
+Templates
+Product output flags
+Label destinations
+
+Store:
+Store identity
+Weekly hours
+Service modes
+Reminder policy
+Business Day
+Cash close
+Quick Reasons
+Capacity
+
+People:
+Staff
+Roles
+PIN
+Scope
+Admin login policy
+
+Channels:
+Policy
+Store binding
+Product mapping
+Mapping failure
+Settlement / reconciliation
+
+Reports:
+Sales
+Product
+Channel
+Refund
+Operations
+Export governance
+
+System:
+Audit
+Diagnostics
+Device desired/observed
+OTA governance
+Integrations governance
+Effective settings
+
+P1-lite:
+Inventory
+Customer 360
+Loyalty
+Coupons
+Announcements
+Presentation
+RFM
+
+==================================================
+4. EXACT NEXT
+==================================================
+
+OWNER LIVE ADMIN WALKTHROUGH ONLY.
+
+No cross-system connection.
+
+Acceptance:
+formal routes are real product surfaces
+editable Admin configs persist across refresh
+no fake success / fake metrics
+no demo-shell behavior
+Owner accepts Admin responsibility
+
+Then BANK:
+
+MFK_ADMIN_PRODUCT_COMPLETE_GREEN
+
+==================================================
+5. HOLD
+==================================================
+
+#44 Admin→SMT:
+HOLD
+
+Manual A2:
+SUPERSEDED / NOT PRODUCTION
+
+#40 SMT OTA:
+HOLD
+
+Keeta live:
+NOT AUTHORIZED
+
+SMM / Customer / Owner live connection:
+NOT AUTHORIZED
+
+==================================================
+END ROUND020
+==================================================
