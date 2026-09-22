@@ -178,13 +178,17 @@ export function IntegrationsGovernanceWorkspace(){
   </section>;
 }
 
+interface EffectiveSettingRow{id:string;label:string;baseValue:string;source:string;securityFloor:string;override:string}
 export function EffectiveSettingsWorkspace(){
-  const [override,setOverride]=useState('');
+  const [rows,setRows]=usePersistentAdminState<EffectiveSettingRow[]>('effective-settings.v1',[
+    {id:'business-timezone',label:'門店時區',baseValue:'Asia/Hong_Kong',source:'門店設定',securityFloor:'不可空白',override:''},
+    {id:'business-day-cutoff',label:'營業日分界',baseValue:'05:00',source:'營業日設定',securityFloor:'只作記錄',override:''},
+    {id:'quick-reason-required',label:'快捷原因必填',baseValue:'否',source:'快捷原因政策',securityFloor:'原因不可成為交易 blocker',override:''},
+    {id:'capacity-hard-stop',label:'產能強制停止',baseValue:'關',source:'產能設定',securityFloor:'預設不可無聲阻交易',override:''},
+  ]);
+  const patch=(id:string,override:string)=>setRows(current=>current.map(row=>row.id===id?{...row,override}:row));
   return <section className="admin-editor-page">
-    <UpgradeHeader title="進階設定" description="顯示目前生效值、來源同可選覆寫；只提供設定介面。"/>
-    <section className="admin-read-table"><header><span>設定項目</span><span>目前生效值</span><span>來源</span><span>最低限制</span><span>覆寫草稿</span></header>
-      <div className="admin-policy-row"><span>範例規則</span><span>—</span><span>尚未啟用</span><span>安全底線</span><input value={override} onChange={e=>setOverride(e.target.value)} placeholder="可選覆寫"/></div>
-    </section>
-    <div className="admin-editor-actions"><button disabled>發布設定尚未開放</button></div>
+    <UpgradeHeader title="進階設定" description="顯示 effective value、來源、可選 override 同安全底線；唔建立一個可以跨 domain 任意覆寫嘅巨型 Settings engine。" kicker="Effective Settings"/>
+    <section className="admin-read-table"><header><span>設定項目</span><span>目前生效值</span><span>來源</span><span>安全底線</span><span>覆寫草稿</span></header>{rows.map(row=><article key={row.id}><span>{row.label}</span><span>{row.override||row.baseValue}</span><span>{row.source}</span><span>{row.securityFloor}</span><input value={row.override} onChange={event=>patch(row.id,event.target.value)} placeholder="可選覆寫"/></article>)}</section>
   </section>;
 }
