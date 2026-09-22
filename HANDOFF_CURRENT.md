@@ -4,7 +4,7 @@ Mandatory entry:
 `COMMANDER_CURRENT.md`
 
 Current navigation:
-`docs/navigation/MFK_航海圖_V1.12_Round013_2026-09-22.txt`
+`docs/navigation/MFK_航海圖_V1.13_Round014_2026-09-22.txt`
 
 Control:
 #22
@@ -14,65 +14,66 @@ Commander protocol:
 
 ## CURRENT PRIORITY
 
-SMT OTA persistence P0 has Owner priority over Admin A2 real walkthrough.
+SMT OTA baseline-lock persistence P0 remains above Admin A2.
 
 Active issue:
 #40
 
-## ROOT CAUSE
+## OWNER TARGET
 
-The failing candidate `runtime-candidate-mfk-814043c809bb` came from MFK commit `814043c809bbc236df1383c320bad906bcd3f1cd`, which did not contain the native Carrier `runtime.ready` promotion acknowledgement.
+Owner explicitly locks the desired SMT runtime/product baseline to:
 
-Carrier 1.0.6 intentionally treats a candidate boot as provisional until exact `runtime.ready` is received. If the process restarts before confirmation, it falls back to the persisted old Current.
+`runtime-candidate-mfk-814043c809bb`
 
-## FIX
+Source:
+`814043c809bbc236df1383c320bad906bcd3f1cd`
 
-Current MFK clean landing:
-`2fd6e10cc7c8bf73db854559243dc6c0c4fbe34f`
+Current stable physical runtime:
+`runtime-candidate-55fea91e128a`
 
-Landing run:
-`35679476262` SUCCESS
+This current runtime survives reboot and proves Carrier persistence can work, but it is not the desired product baseline.
 
-Fixed runtime source now emits exact `runtime.ready` after app mount.
+## CORRECTION
 
-## PUBLISHED CANDIDATE
-
-Release:
+Previous candidate:
 `runtime-candidate-mfk-2fd6e10cc7c8`
 
-Publisher run:
-`35679889303` SUCCESS
+must not be treated as a minimal repair of 814.
 
-Public manifest / bundle hash:
-GREEN
+GitHub compare:
+- status = diverged
+- ahead = 63
+- behind = 10
+- merge base = `3725ead94a2bf31469f054c955d1b46503e15481`
 
-## NEXT
+So the correct target is:
 
-Real device acceptance only:
+`814 BASELINE + MINIMAL runtime.ready FIX`
 
-1. install/activate `runtime-candidate-mfk-2fd6e10cc7c8`
-2. Recovery must show new Current + Candidate cleared
-3. close/reopen app → same Current
-4. full power off/on → same Current
-5. Previous remains rollback target
+with zero unrelated product drift.
 
-Only then BANK:
-`MFK_SMT_OTA_PERSISTENCE_RUNTIME_READY_GREEN`
+The repaired artifact must use a new release ID. Reusing 814 release identity with changed bytes is forbidden.
 
-## PAUSED
+## EXACT NEXT
 
-Admin A2 real cross-device walkthrough is paused until #40 is physically GREEN.
+Prepare one isolated candidate from exact base `814043...` with only the runtime.ready persistence seam.
 
+Before publish:
+- verify exact base
+- verify allowlist-only SMT delta
+- tests/build GREEN
+- prove semantic/product equivalence to 814 except persistence seam
+
+Then publish and perform real-device:
+- visual/function baseline match
+- Current promotion
+- app restart persistence
+- full power-cycle persistence
+
+## PAUSED / NOT AUTHORIZED
+
+Admin A2 remains PAUSED.
 A3 remains NOT AUTHORIZED.
-
-## ADMIN HOSTING
-
-Canonical Admin is already live and BANKED:
-`https://admin.morefunos.com`
-
-## DO NOT
-
-No OTA infra migration.
+No OTA infrastructure migration.
 No Keeta live wiring.
 No SMM/Customer/Owner live seams.
-No next Admin seam until P0 proof.
