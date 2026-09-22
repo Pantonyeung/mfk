@@ -15,6 +15,10 @@
       {
         "name": "ADMIN_SYNC",
         "class_name": "AdminSyncStore"
+      },
+      {
+        "name": "KEETA_RUNTIME",
+        "class_name": "KeetaRuntimeStore"
       }
     ]
   },
@@ -22,6 +26,10 @@
     {
       "tag": "admin-sync-v1",
       "new_sqlite_classes": ["AdminSyncStore"]
+    },
+    {
+      "tag": "keeta-runtime-v1",
+      "new_sqlite_classes": ["KeetaRuntimeStore"]
     }
   ]
 }
