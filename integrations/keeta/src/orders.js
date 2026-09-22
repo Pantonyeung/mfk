@@ -41,10 +41,20 @@ export function normalizeKeetaOrderPlacementEvidence(envelope) {
   if (envelope.eventId !== 1001) throw new Error('KEETA_ORDER_PLACEMENT_EVENT_REQUIRED');
   let message;
   try { message = JSON.parse(envelope.message); } catch { throw new Error('KEETA_ORDER_WEBHOOK_MESSAGE_INVALID_JSON'); }
-  if (!isRecord(message) || !isRecord(message.orderInfo) || !isRecord(message.orderInfo.baseOrder)) {
-    throw new Error('KEETA_ORDER_PLACEMENT_ORDER_INFO_REQUIRED');
+  if (!isRecord(message)) throw new Error('KEETA_ORDER_PLACEMENT_ORDER_INFO_REQUIRED');
+  const nestedOrderInfo = isRecord(message.orderInfo) ? message.orderInfo : null;
+  const baseOrder = isRecord(message.baseOrder)
+    ? message.baseOrder
+    : nestedOrderInfo && isRecord(nestedOrderInfo.baseOrder)
+      ? nestedOrderInfo.baseOrder
+      : null;
+  if (!baseOrder) throw new Error('KEETA_ORDER_PLACEMENT_BASE_ORDER_REQUIRED');
+  const rawProviderOrderId = baseOrder.orderViewIdStr ?? baseOrder.orderViewId;
+  if ((typeof rawProviderOrderId !== 'string' && typeof rawProviderOrderId !== 'number')
+    || String(rawProviderOrderId).trim().length === 0) {
+    throw new Error('KEETA_STANDARD_ORDER_ID_REQUIRED');
   }
-  const providerOrderId = nonEmpty(message.orderInfo.baseOrder.orderViewIdStr, 'KEETA_STANDARD_ORDER_ID_REQUIRED');
+  const providerOrderId = String(rawProviderOrderId).trim();
   return Object.freeze({
     evidenceKind: 'PROVIDER_ORDER_PLACEMENT',
     provider: 'KEETA',
@@ -56,7 +66,8 @@ export function normalizeKeetaOrderPlacementEvidence(envelope) {
     normalizedProviderEvidence: Object.freeze({
       eventId: 1001,
       timestampSeconds: envelope.timestampSeconds,
-      orderInfo: Object.freeze({ ...message.orderInfo }),
+      orderInfo: Object.freeze(nestedOrderInfo ? { ...nestedOrderInfo } : { baseOrder: Object.freeze({ ...baseOrder }) }),
+      rawMessage: Object.freeze({ ...message }),
     }),
     formalOrderAuthority: 'ABSENT',
     executionGate: EXECUTION_GATE.NOT_WIRED,
