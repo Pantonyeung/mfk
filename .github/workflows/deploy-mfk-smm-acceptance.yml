@@ -1,6 +1,9 @@
 name: deploy-mfk-smm-acceptance
 
 on:
+  pull_request:
+    branches:
+      - acceptance/MFK/SMM-PRODUCT-R1-CLOUDFLARE
   push:
     branches:
       - acceptance/MFK/SMM-PRODUCT-R1-CLOUDFLARE
