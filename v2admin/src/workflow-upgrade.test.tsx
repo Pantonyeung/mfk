@@ -24,7 +24,7 @@ describe('MFK Admin workflow capability upgrade R1',()=>{
 
   it('completes publish governance shape without wiring',()=>{
     const html=render('/admin/publish');
-    for(const marker of ['確認影響範圍','門店目前版本','核對結果','建立新版還原','尚未可發布']){
+    for(const marker of ['確認影響範圍','門店目前版本','核對結果','建立新版還原','自動發布尚未開放']){
       expect(html).toContain(marker);
     }
   });
