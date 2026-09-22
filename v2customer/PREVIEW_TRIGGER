@@ -1,2 +1,3 @@
-OWNER_ACCEPTANCE_PREVIEW
+CUSTOMER_ACCEPTANCE_PREVIEW
 alias=customer-acceptance
+rerun=verify-after-preview-enable
