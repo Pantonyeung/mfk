@@ -17,6 +17,7 @@ import {
   type LocalDayClose,
 } from '../runtime/local-operations.ts';
 import {readBusinessCutoff,readCurrentCashOpeningState} from '../runtime/cash-opening.ts';
+import {queueDayCloseProjection} from '../runtime/projection-outbox.ts';
 import './more-workspace.css';
 
 export type PrinterBinding={
@@ -560,6 +561,7 @@ export function LocalMoreWorkspace(){
 }
 +value+'×'+qtyFor(value)).join('、'):''),
     });
+    queueDayCloseProjection(result.row);
     setCompletion(result.row);
     setMessage(result.created?'日結完成。':'今日已經完成日結；冇建立重複版本。');
     onSaved();
