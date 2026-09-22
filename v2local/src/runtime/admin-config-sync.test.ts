@@ -8,6 +8,7 @@ import {
   readSmtAdminSyncStatus,
 } from './admin-config-sync.ts';
 import {projectSyncedCombos,projectSyncedOrderingCatalog} from './admin-config-projection.ts';
+import {capacityNoticeForCount,readSmtFrontlinePresentation,readSmtPrintConfig,readSmtQuickReasons,readSmtStoreSettings} from './admin-operational-config.ts';
 
 function installStorage(){
   const values=new Map<string,string>();
@@ -57,17 +58,33 @@ const snapshot={
   },
   availability:{p1:{sellable:false,reason:'測試',updatedAt:'2026-09-22T09:00:00.000Z'}},
   businessDay:{cutoff:'05:00'},
-  logicalPrinters:[],
-  printTemplates:{},
-  printRules:{},
+  logicalPrinters:[
+    {id:'logical-receipt',name:'收據機',type:'RECEIPT',active:true},
+    {id:'logical-production',name:'製作單',type:'PRODUCTION',active:false},
+  ],
+  printTemplates:{receipt:'店名\n訂單編號'},
+  printRules:{
+    p1:{receipt:true,production:false,packing:true,label:false,dineIn:true,takeaway:false,labelPrinterIds:[]},
+  },
   productMedia:{p1:{publicUrl:'https://example.test/p1.webp'}},
-  storeSettings:{storeCode:'MF01'},
-  quickReasons:[],
+  storeSettings:{
+    storeName:'磨飯測試店',storeCode:'MF01',currency:'HKD',timezone:'Asia/Hong_Kong',
+    fulfillmentMinutes:18,lateArrivalMinutes:12,archiveHours:24,
+    reminderAfterMinutes:4,reminderIntervalMinutes:3,repeatReminder:true,timeoutPriority:'URGENT',
+    dineInEnabled:true,takeawayEnabled:false,paymentRefs:['CASH'],printRefs:['RECEIPT'],channelRefs:['KEETA'],
+  },
+  quickReasons:[
+    {id:'cancel-1',scope:'CANCEL',label:'客人要求取消',active:true},
+    {id:'cancel-off',scope:'CANCEL',label:'停用原因',active:false},
+    {id:'reprint-1',scope:'REPRINT',label:'單據損壞',active:true},
+  ],
   staff:[],
   channelPolicy:{},
   channelMapping:[],
-  capacity:{},
-  presentation:{},
+  capacity:{dailyLimit:'100',warningAt:80,hardStop:true,note:'繁忙時段留意'},
+  presentation:{
+    frontline:{headline:'前線點單',showCategories:false,showImages:false,tabletColumns:5,mobileColumns:2,quickProductIds:['p1']},
+  },
   inventory:[],
   loyalty:{},
   coupons:[],
@@ -107,6 +124,37 @@ describe('SMT full Admin config LKG',()=>{
     expect(applyAdminConfigEnvelope(envelope(2)).disposition).toBe('STALE');
     expect(()=>applyAdminConfigEnvelope(envelope(3,'different'))).toThrow('ADMIN_CONFIG_REVISION_CONFLICT');
     expect(readSmtAdminConfigLkg()?.revision).toBe(3);
+  });
+
+  it('projects remaining low-risk Admin operational settings into SMT consumers',()=>{
+    const row=envelope(4);
+    applyAdminConfigEnvelope(row);
+
+    const store=readSmtStoreSettings();
+    expect(store.storeName).toBe('磨飯測試店');
+    expect(store.fulfillmentMinutes).toBe(18);
+    expect(store.takeawayEnabled).toBe(false);
+    expect(store.dineInEnabled).toBe(true);
+    expect(store.timeoutPriority).toBe('URGENT');
+
+    expect(readSmtQuickReasons('CANCEL').map(reason=>reason.label)).toEqual(['客人要求取消']);
+    expect(readSmtQuickReasons('REPRINT').map(reason=>reason.label)).toEqual(['單據損壞']);
+
+    const capacity=capacityNoticeForCount(80);
+    expect(capacity).toMatchObject({dailyLimit:100,warningAt:80,currentCount:80,hardStopConfigured:true});
+    expect(capacityNoticeForCount(79)).toBeNull();
+
+    const presentation=readSmtFrontlinePresentation();
+    expect(presentation.showCategories).toBe(false);
+    expect(presentation.showImages).toBe(false);
+    expect(presentation.quickProductIds).toEqual(['p1']);
+
+    const print=readSmtPrintConfig();
+    expect(print.logicalPrinters.map(row=>[row.id,row.active])).toEqual([
+      ['logical-receipt',true],['logical-production',false],
+    ]);
+    expect(print.productRules.p1?.takeaway).toBe(false);
+    expect(print.templateSpec.receipt).toBe('店名\n訂單編號');
   });
 
   it('projects Admin price, availability, Option Sets, media, and Combo pools into SMT',()=>{
