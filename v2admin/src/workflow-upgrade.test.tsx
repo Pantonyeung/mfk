@@ -14,7 +14,7 @@ describe('MFK Admin complete operational workflows',()=>{
     const today=render('/admin/overview');
     expect(today).toContain('每日營運入口');
     expect(today).toContain('營運準備');
-    expect(today).toContain('待發布變更');
+    expect(today).toContain('未保存變更');
     expect(today).toContain('最近操作');
 
     const queue=render('/admin/action-queue');
@@ -23,13 +23,14 @@ describe('MFK Admin complete operational workflows',()=>{
     expect(queue).toContain('未有證據唔可以標記已解決');
   });
 
-  it('builds immutable Admin configuration releases without pretending delivery',()=>{
+  it('uses Save as the immutable active-version boundary',()=>{
     const html=render('/admin/publish');
-    for(const marker of ['設定版本管理','檢查內容','確認影響範圍','建立正式設定版本','版本歷史','未有正式生效證據之前']){
+    for(const marker of ['設定版本歷史','保存','目前版本','版本總數','版本歷史','還原']){
       expect(html).toContain(marker);
     }
-    expect(html).not.toContain('建立並下載發布檔案');
-    expect(html).not.toContain('匯入門店回傳');
+    for(const retired of ['待發布變更','確認影響範圍','建立正式設定版本','建立並下載發布檔案','匯入門店回傳','建立新草稿']){
+      expect(html).not.toContain(retired);
+    }
   });
 
   it('provides device, OTA and access governance with desired-vs-observed separation',()=>{
