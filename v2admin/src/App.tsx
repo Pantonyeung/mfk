@@ -62,7 +62,7 @@ function capabilityElement(id:string){
   if(id==='members')return <Customer360Workspace/>;
   if(id==='loyalty')return <LoyaltyWorkspace/>;
   if(id==='coupons')return <CouponsWorkspace/>;
-  return <CapabilityPage/>;
+  return <Navigate to="/admin/overview" replace/>;
 }
 
 export function MfkAdminApp(){
