@@ -271,12 +271,30 @@ export default {
         const authorizeUrl=new URL(request.url);
         authorizeUrl.pathname='/authorize-admin';
         authorizeUrl.search='';
-        const authResponse=await admin.fetch(new Request(authorizeUrl.toString(),request));
+        let authResponse;
+        try{
+          authResponse=await admin.fetch(new Request(authorizeUrl.toString(),{
+            method:'GET',
+            headers:new Headers(request.headers),
+          }));
+        }catch{
+          return json({code:'KEETA_ADMIN_AUTH_RUNTIME_FAILED'},500,cors(request));
+        }
         if(!authResponse.ok)return json({code:'KEETA_ADMIN_UNAUTHORIZED'},401,cors(request));
         const target=new URL(request.url);
         target.pathname='/admin/'+url.pathname.slice('/api/keeta/admin/'.length);
         target.search=url.search;
-        const response=await keeta.fetch(new Request(target.toString(),request));
+        const init={method:request.method,headers:new Headers(request.headers)};
+        if(request.method!=='GET'&&request.method!=='HEAD'){
+          const body=await request.arrayBuffer();
+          if(body.byteLength)init.body=body;
+        }
+        let response;
+        try{
+          response=await keeta.fetch(new Request(target.toString(),init));
+        }catch{
+          return json({code:'KEETA_RUNTIME_DO_FETCH_FAILED'},500,cors(request));
+        }
         const headers=new Headers(response.headers);
         for(const [key,value] of Object.entries(cors(request)))headers.set(key,value);
         return new Response(response.body,{status:response.status,statusText:response.statusText,headers});
