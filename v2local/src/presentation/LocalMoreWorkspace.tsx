@@ -16,6 +16,7 @@ import {
   writeLocalDayCloses,
   type LocalBackup,
 } from '../runtime/local-operations.ts';
+import {readBusinessCutoff,readCurrentCashOpeningState} from '../runtime/cash-opening.ts';
 import './more-workspace.css';
 
 export type PrinterBinding={
@@ -140,7 +141,8 @@ function productLabelPurpose(binding:PrinterBinding){
 }
 
 function OverviewPanel({onOpen}:{onOpen:(section:Section)=>void}){
-  const report=buildLocalReport(localRuntime.orders());
+  const cutoff=readBusinessCutoff();
+  const report=buildLocalReport(localRuntime.orders(),{businessStartHour:cutoff.hour,businessStartMinute:cutoff.minute});
   const printers=loadPrinters();
   const online=printers.filter(printer=>printer.host.trim()).length;
   const lastPrint=readLastPrintDiagnostic();
@@ -326,25 +328,35 @@ function ReportsPanel({revision}:{revision:number}){
 
 function DayClosePanel({revision,onSaved}:{revision:number;onSaved:()=>void}){
   void revision;
-  const report=buildLocalReport(localRuntime.orders());
-  const [opening,setOpening]=useState('0');
+  const cutoff=readBusinessCutoff();
+  const report=buildLocalReport(localRuntime.orders(),{
+    businessStartHour:cutoff.hour,
+    businessStartMinute:cutoff.minute,
+  });
+  const openingRecord=readCurrentCashOpeningState().opening;
+  const openingCashMinor=openingRecord?.amountMinor??0;
   const [mode,setMode]=useState<'total'|'denom'>('denom');
   const [denomEntryMode,setDenomEntryMode]=useState<'count'|'amount'>('amount');
   const [counted,setCounted]=useState('');
   const [counts,setCounts]=useState<Record<string,number>>({});
   const [amounts,setAmounts]=useState<Record<string,string>>({});
+  const [cashRemoved,setCashRemoved]=useState('');
   const [note,setNote]=useState('');
   const [message,setMessage]=useState('');
   const closes=readLocalDayCloses();
   const latest=[...closes].filter(x=>x.businessDate===report.businessDate).sort((a,b)=>b.version-a.version)[0];
-  const denominations=[1,2,5,10,20,100,500] as const;
+  const denominations=[1,2,5,10,20,50,100,500,1000] as const;
 
   const qtyFor=(value:number)=>Math.max(0,Math.floor(Number(counts[String(value)])||0));
   const denomTotal=denominations.reduce((sum,value)=>sum+value*qtyFor(value),0);
   const countedMinor=mode==='denom'?Math.round(denomTotal*100):Math.round(Number(counted||0)*100);
-  const expected=Math.round(Number(opening||0)*100)+report.cashSalesMinor;
+  const expected=openingCashMinor+report.cashSalesMinor;
   const difference=countedMinor-expected;
   const hasCount=mode==='denom'?denominations.some(value=>qtyFor(value)>0):Boolean(counted);
+  const hasRemoval=cashRemoved.trim()!=='';
+  const cashRemovedMinor=Math.max(0,Math.round(Number(cashRemoved||0)*100));
+  const removalValid=hasRemoval&&cashRemovedMinor<=countedMinor;
+  const retainedCashMinor=removalValid?countedMinor-cashRemovedMinor:0;
 
   const setQty=(value:number,qty:number)=>{
     const normalized=Math.max(0,Math.floor(Number(qty)||0));
@@ -359,16 +371,27 @@ function DayClosePanel({revision,onSaved}:{revision:number;onSaved:()=>void}){
   };
 
   const close=()=>{
+    if(!openingRecord){setMessage('今日未確認開更現金；請重新進入 SMT 完成開更現金確認。');return;}
     if(!hasCount){setMessage('請先輸入實點現金。');return;}
+    if(!hasRemoval){setMessage('請輸入今次取走現金；如果唔取走請填 0。');return;}
+    if(cashRemovedMinor>countedMinor){setMessage('取走現金唔可以大過實點現金。');return;}
     const row=createLocalDayClose({
       orders:localRuntime.orders(),
-      openingCashMinor:Math.round(Number(opening||0)*100),
+      businessStartHour:cutoff.hour,
+      businessStartMinute:cutoff.minute,
+      openingCashMinor,
       countedCashMinor:countedMinor,
+      cashRemovedMinor,
       existing:closes,
       note:note+(mode==='denom'?'｜面額點算 '+denominations.map(value=>'$'+value+'×'+qtyFor(value)).join('、'):''),
     });
     writeLocalDayCloses([...closes,row]);
-    setMessage('日結已保存：V'+row.version+' · 差額 '+money(row.cashDifferenceMinor));
+    setMessage(
+      '日結已保存：V'+row.version+
+      ' · 實點 '+money(row.countedCashMinor)+
+      ' · 取走 '+money(row.cashRemovedMinor??0)+
+      ' · 留櫃 '+money(row.retainedCashMinor??0)
+    );
     onSaved();
   };
 
@@ -376,6 +399,7 @@ function DayClosePanel({revision,onSaved}:{revision:number;onSaved:()=>void}){
     <header className="more-section-heading"><div><span>LOCAL DAY CLOSE</span><h2>收銀與日結</h2></div><strong>{latest?'已日結 V'+latest.version:'今日未日結'}</strong></header>
 
     <div className="more-kpis">
+      <article><span>今日開更現金</span><b>{money(openingCashMinor)}</b></article>
       <article><span>今日現金銷售</span><b>{money(report.cashSalesMinor)}</b></article>
       <article><span>預計櫃桶</span><b>{money(expected)}</b></article>
       <article><span>實點現金</span><b>{money(countedMinor)}</b></article>
@@ -388,14 +412,16 @@ function DayClosePanel({revision,onSaved}:{revision:number;onSaved:()=>void}){
     </div>
 
     <div className="fusion-form-grid dayclose-base-fields">
-      <label className="more-field"><span>開更現金</span><input inputMode="decimal" value={opening} onChange={e=>setOpening(e.target.value)}/></label>
-      {mode==='total'?<label className="more-field"><span>實點現金</span><input inputMode="decimal" value={counted} onChange={e=>setCounted(e.target.value)}/></label>:null}
-      <label className="more-field fusion-wide"><span>備註</span><input value={note} onChange={e=>setNote(e.target.value)} placeholder="例如：現金差異原因"/></label>
+      <label className="more-field"><span>開更現金</span><input value={(openingCashMinor/100).toFixed(2)} readOnly/></label>
+      {mode==='total'?<label className="more-field"><span>實點現金</span><input inputMode="decimal" value={counted} onChange={e=>setCounted(e.target.value.replace(/[^0-9.]/g,''))}/></label>:null}
+      <label className="more-field"><span>今次取走現金</span><input inputMode="decimal" value={cashRemoved} onChange={e=>setCashRemoved(e.target.value.replace(/[^0-9.]/g,''))} placeholder="例如 4000"/></label>
+      <label className="more-field"><span>計算後留櫃現金</span><input value={removalValid?(retainedCashMinor/100).toFixed(2):''} readOnly placeholder="實點 − 取走"/></label>
+      <label className="more-field fusion-wide"><span>備註</span><input value={note} onChange={e=>setNote(e.target.value)} placeholder="例如：現金差異原因／額外補回散紙"/></label>
     </div>
 
     {mode==='denom'?<section className="cash-denomination-shell">
       <header className="cash-denomination-toolbar">
-        <div><b>面額點算</b><span>可以輸入張／個數，亦可以直接輸入該面額總金額。</span></div>
+        <div><b>面額點算</b><span>先點清實際櫃桶現金，再輸入今次攞走幾多；系統會自動計留櫃現金。</span></div>
         <div className="cash-entry-toggle">
           <button type="button" className={denomEntryMode==='count'?'active':''} onClick={()=>setDenomEntryMode('count')}>輸入張／個數</button>
           <button type="button" className={denomEntryMode==='amount'?'active':''} onClick={()=>setDenomEntryMode('amount')}>輸入面額總金額</button>
@@ -421,13 +447,23 @@ function DayClosePanel({revision,onSaved}:{revision:number;onSaved:()=>void}){
       </section>
     </section>:null}
 
+    <section className="cash-retain-summary">
+      <article><span>實點現金</span><b>{hasCount?money(countedMinor):'—'}</b></article>
+      <article><span>取走現金</span><b>{hasRemoval?money(cashRemovedMinor):'—'}</b></article>
+      <article className="retained"><span>留櫃至下個 Business Day</span><b>{removalValid?money(retainedCashMinor):'—'}</b></article>
+    </section>
+
     <footer className="dayclose-sticky-footer">
-      <div>{hasCount?<><span>實點 {money(countedMinor)}</span><span>差額 {money(difference)}</span></>:<span>未輸入點算資料</span>}</div>
+      <div>{hasCount?<><span>差額 {money(difference)}</span>{removalValid?<span>留櫃 {money(retainedCashMinor)}</span>:<span>未確認取走現金</span>}</>:<span>未輸入點算資料</span>}</div>
       <button type="button" className="more-primary" onClick={close}>確認本機日結</button>
     </footer>
 
     {message?<p role="status" className="fusion-status">{message}</p>:null}
-    {latest?<section className="fusion-list"><header><b>最近日結</b><span>{latest.id}</span></header><article><span>實點 {money(latest.countedCashMinor)}</span><b>預計 {money(latest.expectedCashMinor)}</b><strong>差額 {money(latest.cashDifferenceMinor)}</strong></article></section>:null}
+    {latest?<section className="fusion-list"><header><b>最近日結</b><span>{latest.id}</span></header><article>
+      <span>實點 {money(latest.countedCashMinor)}</span>
+      <b>取走 {latest.cashRemovedMinor===undefined?'未記錄':money(latest.cashRemovedMinor)}</b>
+      <strong>留櫃 {latest.retainedCashMinor===undefined?'未記錄':money(latest.retainedCashMinor)}</strong>
+    </article></section>:null}
   </section>;
 }
 

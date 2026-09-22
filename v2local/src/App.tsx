@@ -15,6 +15,7 @@ import {readSmtAdminConfigLkg,readSmtAdminSyncStatus,subscribeSmtAdminConfig} fr
 import {projectSyncedCombos,projectSyncedOrderingCatalog,type SyncedOptionSet} from './runtime/admin-config-projection.ts';
 import {RuntimeReadyActivation} from './runtime/RuntimeReadyActivation.tsx';
 import {StaffAuthGate,StaffSessionBadge} from './presentation/StaffAuthGate.tsx';
+import {CashOpeningGate} from './presentation/CashOpeningGate.tsx';
 import {ComboWorkspace,HoldCartWorkspace,HoldListWorkspace,OrganizeWorkspace,ProductConfigWorkspace,type OrderingPanelState,type WorkspaceHoldDraft,type WorkspaceProduct} from './features/ordering/OrderingCenterWorkspaces.tsx';
 
 type Product={
@@ -531,5 +532,5 @@ function OperationalApp(){
 
 
 export function MfkV2LocalApp(){
-  return <StaffAuthGate><OperationalApp/></StaffAuthGate>;
+  return <StaffAuthGate><CashOpeningGate><OperationalApp/></CashOpeningGate></StaffAuthGate>;
 }
