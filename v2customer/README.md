@@ -1,34 +1,48 @@
-# MFK v2customer｜Clean Migration R1
+# MFK v2customer｜Product Completeness R1
 
-WORK_ID: `MFK-CUSTOMER-CLEAN-MIGRATION-R1`
+WORK_ID: `MFK-CUSTOMER-PRODUCT-COMPLETION-R1`
 
-Role: `CUSTOMER ORDERING SURFACE / MIGRATION_ONLY`
+Role: `CUSTOMER ORDERING PRODUCT / ORDER SOURCE`
 
-呢個 Port 只包含 Customer UI、頁面、表單、workflow shape、operation/failure presentation 同 capability registry。
+Current state:
+`PRODUCT_COMPLETE_NOT_CONNECTED`
 
-Current boundary:
+Product responsibility now implemented:
+- Home / Store Context / Own-channel availability
+- Menu / Category / Search / zero-result recovery
+- Product detail / Variation / Modifier / Option / Combo
+- min/max/required validation
+- durable local non-authoritative Cart
+- quantity/edit/remove/partial-repair presentation
+- quote presentation only through injected MFK runtime port
+- persistent checkout name/phone draft
+- stable Submission ID + idempotency identity
+- PENDING / UNKNOWN / readback-first / no blind resubmit
+- Store received / rejected / accepted / preparing / delayed / ready
+- Pickup Verification / Handed Over / Completed separation
+- Pickup code / masked phone presentation
+- Order detail / timeline
+- History / Buy Again / Reorder current revalidation
+- own-channel unavailable + explicit fallback surface
+- offline/not-connected/loading/error/empty recovery
+- browser refresh persistence for local cart/draft/pending intent
 
-- independent `v2customer/**` app；
-- Home → Menu → Product Config → Cart → Checkout → Safe Submit presentation；
-- phone input + pickup-code presentation shape；
-- Store Acceptance → Preparing → Ready → Pickup → Completed tracking shape；
-- Order Status / Order Detail / History / Reorder shape；
-- own-channel unavailable + WhatsApp fallback presentation；
-- Offline / Failure / Retry / UNKNOWN / STALE presentation；
-- 44-item Customer capability registry；
-- 所有 `COMMAND_SHAPE` 一律 `NOT_WIRED`。
+Connection boundary:
+- runtime is injected only through `window.__MFK_CUSTOMER_PRODUCT_PORT__`
+- missing runtime produces empty/not-connected states, never fake product/order/price truth
+- localStorage stores customer intent/preferences only and is `LOCAL_NON_AUTHORITATIVE`
 
-Hard boundary:
+Hard authority rules:
+- no live Customer→SMT
+- no direct fetch/WebSocket/XHR/API
+- no Formal Order writer
+- no Display Number allocator
+- no local Pricing engine
+- no Payment execution
+- no Store Kernel writer
+- no pickup/fulfillment authority
+- no provider mutation
+- no background auto-resubmit
+- all command capabilities remain `NOT_WIRED`
 
-- 無 live Customer → SMT submit；
-- 無 LAN / provider / cloud connection；
-- 無 Store Kernel write；
-- 無 Formal Order creation；
-- 無 Display Number allocation；
-- 無 pricing engine；
-- 無 payment execution；
-- 無 background replay / delayed submit；
-- 無 SMT mutation；
-- 無 browser persistence。
-
-所有商品、訂單、狀態與金額字樣都係 migration fixture，只用作驗證 UI / workflow shape，唔係 current business truth。
+The old fixture/migration shell has been removed from production source.
