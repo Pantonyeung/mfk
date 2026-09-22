@@ -70,17 +70,24 @@ export function OtaWorkspace(){
   </section>;
 }
 
+interface CashCloseRecord{id:string;businessDate:string;openingMinor:number;countedMinor:number;expectedMinor?:number;note:string;createdAt:string;status:'DRAFT'|'SEALED'}
 export function CashCloseRecordWorkspace(){
+  const [records,setRecords]=usePersistentAdminState<CashCloseRecord[]>('cash-close.v1',[]);
+  const [date,setDate]=useState(new Date().toISOString().slice(0,10));
   const [opening,setOpening]=useState('');
   const [counted,setCounted]=useState('');
   const [note,setNote]=useState('');
+  const save=(sealed:boolean)=>{
+    const row:CashCloseRecord={id:'close-'+Date.now().toString(36),businessDate:date,openingMinor:Math.round((Number(opening)||0)*100),countedMinor:Math.round((Number(counted)||0)*100),note,createdAt:new Date().toISOString(),status:sealed?'SEALED':'DRAFT'};
+    setRecords(current=>[row,...current]);
+    appendAdminAudit({action:sealed?'封存收舖記錄':'保存收舖草稿',target:date,after:row});
+    setNote('');
+  };
   return <section className="admin-editor-page">
-    <UpgradeHeader title="現金／收舖記錄" description="只做現金同收舖記錄；同營業日一樣只作提示同交接，永遠唔會阻止落單、結帳、付款或本機保存。"/>
+    <UpgradeHeader title="現金／收舖記錄" description="記錄開舖底箱、實點現金、交更備註同封存狀態。只作 record / attention，永遠唔阻止落單、結帳、付款或本機保存。" kicker="只作記錄"/>
     <div className="admin-policy-grid two">
-      <article className="admin-policy-card"><h2>開舖記錄</h2><label><span>開舖現金</span><input inputMode="decimal" value={opening} onChange={e=>setOpening(e.target.value)} placeholder="0.00"/></label><StateChip>只作記錄</StateChip></article>
-      <article className="admin-policy-card"><h2>收舖預覽</h2><div className="admin-read-empty">預期現金資料尚未啟用</div><small>任何差異或待處理事項只會提示，唔會阻止交易。</small></article>
-      <article className="admin-policy-card"><h2>點算／交更草稿</h2><label><span>點算現金</span><input inputMode="decimal" value={counted} onChange={e=>setCounted(e.target.value)} placeholder="0.00"/></label><label><span>備註</span><textarea value={note} onChange={e=>setNote(e.target.value)} placeholder="交更備註"/></label><StateChip>只保存今次草稿</StateChip></article>
-      <article className="admin-policy-card"><h2>收舖記錄</h2><button disabled>保存收舖記錄尚未開放</button><small>唔會停止門店交易。</small></article>
+      <article className="admin-policy-card"><h2>建立記錄</h2><label><span>營業日</span><input type="date" value={date} onChange={event=>setDate(event.target.value)}/></label><label><span>開舖現金 HK$</span><input inputMode="decimal" value={opening} onChange={event=>setOpening(event.target.value)}/></label><label><span>實點現金 HK$</span><input inputMode="decimal" value={counted} onChange={event=>setCounted(event.target.value)}/></label><label><span>交更備註</span><textarea value={note} onChange={event=>setNote(event.target.value)}/></label><div className="admin-editor-actions"><button onClick={()=>save(false)}>保存草稿</button><button className="primary" onClick={()=>save(true)}>封存記錄</button></div></article>
+      <article className="admin-policy-card"><h2>歷史記錄</h2>{records.length===0?<div className="admin-read-empty">未有收舖記錄。</div>:records.slice(0,20).map(row=><p key={row.id}>{row.businessDate} · 開舖 HK{(row.openingMinor/100).toFixed(2)} · 實點 HK{(row.countedMinor/100).toFixed(2)} · {row.status==='SEALED'?'已封存':'草稿'}</p>)}</article>
     </div>
   </section>;
 }
