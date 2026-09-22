@@ -48,25 +48,13 @@ export function StaffAuthGate({children}:{children:ReactNode}){
     }
   };
 
-  return <main className="smt-access-screen">
-    <section className="smt-access-shell">
-      <aside className="smt-access-brand-panel">
-        <div className="smt-access-brand-mark">磨</div>
-        <div className="smt-access-brand-copy">
-          <span className="smt-access-kicker">MOREFUNOS SMT</span>
-          <h1>員工登入</h1>
-          <p>身份、角色同權限由 Admin 已生效版本提供。門店離線時，仍然使用本機最後有效設定驗證。</p>
-        </div>
-        <div className="smt-access-trust-list">
-          <div><span>01</span><p><strong>本機驗證</strong><br/>登入唔依賴每次連雲端。</p></div>
-          <div><span>02</span><p><strong>權限跟人</strong><br/>登入後使用該員工目前 Role / Permissions。</p></div>
-          <div><span>03</span><p><strong>Session 唔持久</strong><br/>重新開 App 需要重新登入。</p></div>
-        </div>
-      </aside>
-      <section className="smt-access-card smt-access-card--login">
+  return <>
+    <div className="smt-gated-underlay" aria-hidden="true">{children}</div>
+    <div className="smt-blocking-overlay">
+      <section className="smt-access-card smt-access-card--compact" role="dialog" aria-modal="true" aria-labelledby="staff-login-title">
         <span className="smt-access-section-label">STAFF ACCESS</span>
-        <h2>選擇員工</h2>
-        <p className="smt-access-lead">只有 Admin 已啟用而且已設定 PIN 嘅員工可以登入。</p>
+        <h2 id="staff-login-title">員工登入</h2>
+        <p className="smt-access-lead">選擇員工，再輸入 PIN。登入後先可以操作 SMT；背景畫面只作參考，未登入前唔可以操作。</p>
 
         <label className="smt-access-field">
           <span>員工</span>
@@ -91,10 +79,10 @@ export function StaffAuthGate({children}:{children:ReactNode}){
         {error?<div className="smt-access-error" role="alert">{error}</div>:null}
 
         <button className="smt-access-primary" disabled={!staffId||pin.length<4} onClick={()=>void submit()}>登入 SMT</button>
-        <p className="smt-access-help">Admin Config R{sync.revision||'—'} · {sync.state}</p>
+        <p className="smt-access-help">Admin Config R{sync.revision||'—'} · {sync.state} · 離線可用最後有效設定驗證</p>
       </section>
-    </section>
-  </main>;
+    </div>
+  </>;
 }
 
 export function StaffSessionBadge(){
