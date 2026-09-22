@@ -447,6 +447,37 @@ export function ChannelsWorkspace({mode}:{mode:'overview'|'mapping'|'failures'|'
         <button type="button" className="secondary" disabled={menuBusy} onClick={()=>void refreshMenu()}>更新同步狀態</button>
       </div>
     </section>:null}
+    {mode==='sync'?<section className="admin-policy-card">
+      <header><div><small>KEETA SELLABILITY</small><h2>Keeta 售罄／供應同步</h2></div><span className={sellabilityStatus?.state==='COMPLETED'?'admin-status-good':'admin-not-wired-chip'}>{sellabilityStatus?.state??'未同步'}</span></header>
+      <p>來源固定為已發布 MFK Availability + Catalog。SPU OpenItemCode 同完整菜單使用同一套 deterministic identity。</p>
+      {sellabilityPreview?<div className="admin-readback-proof">
+        <p><span>Admin Revision</span><b>R{sellabilityPreview.revision}</b></p>
+        <p><span>同步設定</span><b>{sellabilityPreview.state}</b></p>
+        <p><span>商品總數</span><b>{sellabilityPreview.total}</b></p>
+        <p><span>可售</span><b>{sellabilityPreview.available}</b></p>
+        <p><span>停售</span><b>{sellabilityPreview.unavailable}</b></p>
+      </div>:null}
+      <div className="admin-callout compact">目前只同步有 canonical product availability 嘅 SPU；Option 獨立售罄要等 MFK 有獨立 option availability truth，唔會由 provider 反推。</div>
+      <div className="admin-editor-actions">
+        <button type="button" className="secondary" disabled={providerOpsBusy} onClick={()=>void previewSellability()}>預檢供應狀態</button>
+        <button type="button" className="primary" disabled={providerOpsBusy||liveStatus?.oauth.state!=='CONNECTED'||!config.syncSellability} onClick={()=>void submitSellability()}>同步售罄到 Keeta</button>
+      </div>
+    </section>:null}
+    {mode==='sync'?<section className="admin-policy-card">
+      <header><div><small>KEETA STORE OPS</small><h2>Keeta 營業時間／開關店</h2></div><span className={storeStatus?.state==='AVAILABLE'?'admin-status-good':'admin-not-wired-chip'}>{storeStatus?.state??'未讀取'}</span></header>
+      <p>七日營業時間由已發布 Admin 門店設定投影；REST／OPEN 係 Keeta provider 營運動作，唔會改寫 MFK Store identity。</p>
+      {storePreview?<div className="admin-readback-proof">
+        <p><span>Admin Revision</span><b>R{storePreview.revision}</b></p>
+        <p><span>星期資料</span><b>{Object.keys(storePreview.businessHourOfTheWeek).length} / 7</b></p>
+      </div>:null}
+      <div className="admin-editor-actions">
+        <button type="button" className="secondary" disabled={providerOpsBusy} onClick={()=>void previewStore()}>預檢營業時間</button>
+        <button type="button" className="primary" disabled={providerOpsBusy||liveStatus?.oauth.state!=='CONNECTED'} onClick={()=>void submitStoreHours()}>同步營業時間</button>
+        <button type="button" className="secondary" disabled={providerOpsBusy||liveStatus?.oauth.state!=='CONNECTED'} onClick={()=>void runStoreOperation('REST')}>Keeta 暫停接單</button>
+        <button type="button" className="secondary" disabled={providerOpsBusy||liveStatus?.oauth.state!=='CONNECTED'} onClick={()=>void runStoreOperation('OPEN')}>Keeta 恢復接單</button>
+        <button type="button" className="secondary" disabled={providerOpsBusy} onClick={()=>void refreshStoreReadback()}>更新 Provider Readback</button>
+      </div>
+    </section>:null}
     <div className="admin-policy-grid two">
       <article className="admin-policy-card"><h2>Keeta 平台設定</h2><label><span>顯示名稱</span><input value={config.displayName} onChange={event=>patch({displayName:event.target.value})}/></label><Toggle checked={config.enabled} onChange={enabled=>patch({enabled})} label="啟用平台設定"/><Toggle checked={config.autoAccept} onChange={autoAccept=>patch({autoAccept})} label="正常單自動接單"/><Toggle checked={config.syncSellability} onChange={syncSellability=>patch({syncSellability})} label="同步售罄／供應"/><label><span>遲到訂單界線（分鐘）</span><input type="number" min={0} value={config.lateCutoffMinutes} onChange={event=>patch({lateCutoffMinutes:Number(event.target.value)||0})}/></label><label><span>佣金估算 %</span><input inputMode="decimal" value={config.commissionPct} onChange={event=>patch({commissionPct:event.target.value})}/></label></article>
       <article className="admin-policy-card"><h2>{mode==='failures'?'未完成對應':'商品對應'}</h2>
