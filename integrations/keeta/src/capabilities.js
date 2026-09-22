@@ -40,6 +40,8 @@ export const KEETA_CAPABILITY_REGISTRY = Object.freeze([
   ['KEETA-AFS-004','AFTERSALE','PARTIAL_REFUND_APPLY','REQUEST_SHAPE','NOT_WIRED','BLOCKED_CANONICAL_AUTHORITY','Morefun-v2 order provider requests'],
   ['KEETA-STORE-003','STORE','STORE_DETAILS_READBACK','REQUEST_SHAPE','NOT_WIRED','PROVIDER_READBACK_ONLY','Morefun-v2 store provider requests'],
   ['KEETA-HRS-002','STORE','BUSINESS_HOURS_READBACK','REQUEST_SHAPE','NOT_WIRED','PROVIDER_READBACK_ONLY','Morefun-v2 store provider requests'],
+  ['KEETA-ORD-008','ORDER','STANDARD_ORDER_FACTS','NORMALIZER','NOT_WIRED','PROVIDER_FACTS_ONLY','Morefun-v2 keeta-standard-order-facts donor stripped of canonical writer'],
+  ['KEETA-FIN-001','COMMERCIAL','ORDER_COMMERCIAL_SNAPSHOT','NORMALIZER','NOT_WIRED','PROVIDER_EVIDENCE_NOT_SETTLEMENT_AUTHORITY','Morefun-v2 keeta-order-commercial-snapshot donor'],
 ].map(([capId,domain,providerOperation,kind,status,authority,evidence]) => Object.freeze({
   CAP_ID: capId,
   DOMAIN: domain,
