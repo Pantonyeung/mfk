@@ -1,3 +1,3 @@
-work_id=MFK-KEETA-TOKEN-AUTO-REFRESH-R1
-purpose=automatic Keeta OAuth token rotation validation
-dispatch_base=99226fd3b2c382cbfc3941f9f8e5544924c7e955
+work_id=MFK-KEETA-K3-MENU-SUBMIT-FEEDBACK-R1
+purpose=surface exact Keeta K3 menu submit/status errors and busy feedback
+dispatch_base=4330c599f2fbded7da91358e306e6bdcdbcfc9b6
