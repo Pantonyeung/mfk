@@ -353,3 +353,115 @@ GitHub correction:
 STATUS:
 PRE_704_KEETA_EVIDENCE_BASELINE_RESTORED
 #881_DONOR_SUPERSEDED
+
+
+==================================================
+10. COMMANDER INDEPENDENT VERIFICATION｜HISTORICAL BASELINE
+==================================================
+
+VERDICT:
+#881 MUST NOT BE USED AS KEETA DONOR BASELINE.
+
+Independent Git history confirms the direct evidence predates #704:
+
+1. Golden Thread real payload mapping
+   file:
+   docs/recovery/team1/KEETA-GOLDEN-THREAD-REAL-PAYLOAD-MAPPING-2026-09-05.md
+   original evidence commits include:
+   8ee012a00f257b6e28aacf625913aaf051e704d5
+   2026-09-05
+   real 1001 / 1002 / 1003 / 1005 / 1006 / 1007 mappings.
+
+2. Live SMM Keeta 6893 closure
+   file:
+   docs/recovery/team3/SMM-B0314-LIVE-KEETA-6893-FUNCTIONAL-CLOSURE-2026-09-05.md
+   originating commit:
+   a615689b5328ea9e644e343d5a134d3d23c81216
+   provider:
+   5133442032976893
+   canonical:
+   9011ca2e-dd04-5198-b8d5-d96249564a15
+
+3. SMT/SMM same-order linkage
+   file:
+   docs/recovery/keeta/KEETA-SMT-SMM-DISPLAY-LINKAGE-CLOSURE-2026-09-05.md
+   originating commit:
+   cf5018b98bccd31b1bb024648bbc5dea4ecd3839
+   final assertion:
+   SMT_KEETA_6893_UI_PASS
+
+4. Provider handoff pack
+   file:
+   docs/recovery/keeta/KEETA-SIT-UAT-PROVIDER-HANDOFF-PACK-2026-09-05.md
+   originating commit:
+   2955d7d5a2a8c9c3d957452cc68f450359272345
+   explicitly records LIVE PROVEN:
+   signed 1001 ingress
+   canonical Order bridge
+   merchant ACCEPT
+   provider /order/confirm
+   provider SKU mapping
+   Keeta → SMM
+   Keeta → SMT
+
+5. No-redo authority
+   file:
+   docs/recovery/commander/KEETA-SIT-NO-REDO-LOCK-2026-09-06.md
+   originating commit:
+   10c8ecbf36e376d67bbc7d819ecae368da468391
+   OWNER_DECISION:
+   SIT COMPLETE / NO REDO
+
+Important limitation:
+SIT COMPLETE means MoreFun assigned SIT evidence work is reusable.
+It does NOT fabricate provider UAT or production certification.
+
+#704 later confirms the same chain and is useful as a later continuity proof:
+
+- #704 5642250077:
+  live Keeta 2922 reached SMM Gateway;
+  merchantDecision ACCEPTED;
+  provider CONFIRM SENT;
+  1002 status 30;
+  canonical commit then exposed ORDER_BUSINESS_DAY_STALE.
+
+- #704 5642345195:
+  repaired bad ordering from
+  provider CONFIRM → canonical acceptance
+  to
+  canonical acceptance → provider CONFIRM.
+
+- #704 5643162879:
+  MF699-CHAT-17 FINAL CLOSURE.
+  runtime exact source:
+  d37266077847e9c0c46cdfa73eb4b4afc2673875
+  R12 Builder:
+  34667870541 SUCCESS
+  live Keeta 7205:
+  provider order 5203440160087205
+  canonical Order c25bf3fe-9e2d-576a-80ce-ba2b989fa359
+  durable receipt DELIVERED
+  lastError=null
+  provider CONFIRM SENT
+  no duplicate recovery CONFIRM
+  SMM HTTP 200
+  lifecycle ACCEPTED
+  operationalOnly=false
+  production readback 34668703321
+
+- #704 5643435474:
+  later Golden Day audit confirms
+  Keeta recovery/provider CONFIRM exactly-once = GREEN
+  and SMM / SMT common canonical Order projection parity = GREEN.
+
+Historical donor hierarchy is therefore:
+
+2026-09-05/06 DIRECT LIVE EVIDENCE
+→ #704 LIVE REGRESSION/CLOSURE CONFIRMATION
+→ current MFK source/runtime
+
+NOT:
+#881 → infer historical state.
+
+STATUS:
+HISTORICAL_KEETA_BASELINE_INDEPENDENTLY_VERIFIED
