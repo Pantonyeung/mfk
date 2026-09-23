@@ -1,6 +1,12 @@
 name: deploy-mfk-smt-ui-preview
 
 on:
+  push:
+    branches:
+      - 'ops/MFK/SMT-UI-PUBLIC-PREVIEW-R1'
+    paths:
+      - 'v2local/**'
+      - '.github/workflows/deploy-mfk-smt-ui-preview.yml'
   pull_request:
     branches:
       - main
@@ -10,7 +16,7 @@ on:
 
 jobs:
   deploy:
-    if: github.head_ref == 'ops/MFK/SMT-UI-PUBLIC-PREVIEW-R1'
+    if: github.event_name == 'push' || github.head_ref == 'ops/MFK/SMT-UI-PUBLIC-PREVIEW-R1'
     runs-on: ubuntu-latest
     defaults:
       run:
