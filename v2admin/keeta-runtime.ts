@@ -891,7 +891,18 @@ export class KeetaRuntimeStore{
         const config=requireRuntimeConfig(this.env);
         const stateValue=url.searchParams.get('state')||'';
         const code=nonEmpty(url.searchParams.get('code')||'','KEETA_OAUTH_CODE_REQUIRED');
-        await completeAuthorizationCode(config,this,stateValue,code,callbackAt,{allowMissingState:false});
+        const signedGet=url.searchParams.has('sig')||url.searchParams.has('timestamp')||url.searchParams.has('appId');
+        if(signedGet){
+          const callbackParams=Object.fromEntries(url.searchParams.entries());
+          const appId=positiveInt(callbackParams.appId,'KEETA_OAUTH_APP_ID_INVALID');
+          if(appId!==config.appId)throw new Error('KEETA_OAUTH_APP_ID_MISMATCH');
+          const timestamp=positiveInt(callbackParams.timestamp,'KEETA_OAUTH_TIMESTAMP_INVALID');
+          if(Math.abs(Date.now()-timestamp)>10*60*1000)throw new Error('KEETA_OAUTH_CODE_NOTIFICATION_STALE');
+          const externalUrl=new URL(request.headers.get('x-mfk-keeta-external-url')||request.url);
+          externalUrl.search='';
+          await verifyWebhookSignature(externalUrl.toString(),callbackParams,config.appSecret);
+        }
+        await completeAuthorizationCode(config,this,stateValue,code,callbackAt,{allowMissingState:signedGet});
         await this.state.storage.put('oauth:callback-status',{
           lastCallbackAt:callbackAt,
           lastCallbackResult:'CONNECTED',
