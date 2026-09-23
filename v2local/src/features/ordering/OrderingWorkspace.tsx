@@ -20,16 +20,10 @@ function ProductCard({product,actions,recentlyAdded,mode}:{product:OrderingProdu
   </article>;
 }
 
-function ServiceToggle({value,onChange,availability}:{value:ServiceMode;onChange:(mode:ServiceMode)=>void;availability:Readonly<{takeaway:boolean;dineIn:boolean}>}){
-  return <div className="ordering-service-toggle" role="group" aria-label="全單用餐方式">
-    <button type="button" disabled={!availability.takeaway} className={value==='takeaway'?'active':''} aria-pressed={value==='takeaway'} onClick={()=>onChange('takeaway')}>外賣</button>
-    <button type="button" disabled={!availability.dineIn} className={value==='dine-in'?'active':''} aria-pressed={value==='dine-in'} onClick={()=>onChange('dine-in')}>堂食</button>
-  </div>;
-}
-
 function CartLineRow({line,index,highlighted,actions,availability}:{line:CartLineViewModel;index:number;highlighted:boolean;actions:OrderingWorkspaceActions;availability:NonNullable<OrderingWorkspaceViewModel['actionAvailability']>}){
   const nextMode:ServiceMode=line.serviceMode==='takeaway'?'dine-in':'takeaway';
   const modeLabel=line.serviceMode==='takeaway'?'外':'堂';
+  const sourceLineIds=line.sourceLineIds??[line.id];
   const fallbackDetail=!line.optionDetail&&!line.comboDetail&&!line.note?line.detail:undefined;
   const content=<>
     <b>{line.name}</b>
@@ -43,13 +37,13 @@ function CartLineRow({line,index,highlighted,actions,availability}:{line:CartLin
   </>;
   return <article className={`ordering-cart-line${highlighted?' line-updated':''}`} aria-label={`購物籃商品 ${line.name}`}>
     {availability.lineServiceMode
-      ?<button type="button" className="ordering-line-identity" onClick={()=>actions.onChangeLineServiceMode(line.id,nextMode)} aria-label={`第 ${index+1} 項，${line.serviceMode==='takeaway'?'外賣':'堂食'}，按一下切換為${nextMode==='takeaway'?'外賣':'堂食'}`}>{identity}</button>
+      ?<button type="button" className="ordering-line-identity" onClick={()=>actions.onChangeLineServiceMode(sourceLineIds,nextMode)} aria-label={`第 ${index+1} 項，${line.serviceMode==='takeaway'?'外賣':'堂食'}，按一下切換為${nextMode==='takeaway'?'外賣':'堂食'}`}>{identity}</button>
       :<div className="ordering-line-identity" aria-label={`第 ${index+1} 項，${line.serviceMode==='takeaway'?'外賣':'堂食'}`}>{identity}</div>}
-    {availability.lineEdit?<button type="button" className="ordering-line-copy ordering-line-copy-button" onClick={()=>actions.onEditCartLine(line.id)} aria-label={`修改 ${line.name}`}>{content}</button>:<div className="ordering-line-copy">{content}</div>}
+    {availability.lineEdit?<button type="button" className="ordering-line-copy ordering-line-copy-button" onClick={()=>actions.onEditCartLine(sourceLineIds[0]??line.id)} aria-label={`修改 ${line.name}`}>{content}</button>:<div className="ordering-line-copy">{content}</div>}
     <div className="ordering-line-qty">
-      {availability.lineQuantity?<button type="button" onClick={()=>actions.onAdjustLineQuantity(line.id,-1)} aria-label={`減少 ${line.name}`}>−</button>:null}
+      {availability.lineQuantity?<button type="button" onClick={()=>actions.onAdjustLineQuantity(sourceLineIds,-1)} aria-label={`減少 ${line.name}`}>−</button>:null}
       <strong>{line.quantity}</strong>
-      {availability.lineQuantity?<button type="button" onClick={()=>actions.onAdjustLineQuantity(line.id,1)} aria-label={`增加 ${line.name}`}>＋</button>:null}
+      {availability.lineQuantity?<button type="button" onClick={()=>actions.onAdjustLineQuantity(sourceLineIds,1)} aria-label={`增加 ${line.name}`}>＋</button>:null}
     </div>
     <strong className="ordering-line-total">{line.lineTotalLabel}</strong>
   </article>;
@@ -84,6 +78,8 @@ export function OrderingWorkspace({view,actions,centerPanel}:{view:OrderingWorks
   const [cancelOpen,setCancelOpen]=useState(false);
   const availability=view.actionAvailability??{lineServiceMode:true,lineEdit:true,lineQuantity:true,holdCart:true,cancelCart:true};
   const serviceModes=view.serviceModes??{takeaway:true,dineIn:true};
+  const wholeNextMode:ServiceMode=view.cart.serviceMode==='takeaway'?'dine-in':'takeaway';
+  const wholeNextAllowed=wholeNextMode==='takeaway'?serviceModes.takeaway:serviceModes.dineIn;
   const itemCount=view.cart.lines.reduce((sum,line)=>sum+line.quantity,0);
   const checkoutReason=!view.cart.lines.length?'先選擇商品，加入購物籃後就可以結帳。':!view.cart.checkoutEnabled?'目前用餐方式暫停接單，請選擇可用方式。':'';
 
@@ -124,12 +120,21 @@ export function OrderingWorkspace({view,actions,centerPanel}:{view:OrderingWorks
     <aside key={view.cartPulseNonce} className={`ordering-cart${view.cartPulseNonce>0?' cart-updated':''}`} aria-label="購物籃">
       <header className="ordering-cart-head">
         <div className="ordering-cart-order-id"><small>目前訂單</small><strong>#{view.cart.orderId}</strong><span>{itemCount?`${itemCount} 件商品`:'等待加入商品'}</span></div>
-        <ServiceToggle value={view.cart.serviceMode} onChange={actions.onChangeServiceMode} availability={serviceModes}/>
       </header>
-      {view.cart.lines.length?<div className="ordering-cart-view-row"><span>核對商品</span><div className="ordering-cart-view-toggle" role="group" aria-label="購物籃檢視"><button type="button" className={view.cart.viewMode==='original'?'active':''} aria-pressed={view.cart.viewMode==='original'} onClick={()=>actions.onChangeCartView('original')}>逐項</button><button type="button" className={view.cart.viewMode==='organized'?'active':''} aria-pressed={view.cart.viewMode==='organized'} onClick={()=>actions.onChangeCartView('organized')}>按類整理</button></div></div>:null}
+      {view.cart.lines.length?<div className="ordering-cart-controls" aria-label="購物車顯示與用餐方式">
+        <button type="button" className="ordering-cart-cycle" aria-label={`目前${view.cart.viewMode==='original'?'原單':'整理'}，按一下切換`} onClick={()=>actions.onChangeCartView(view.cart.viewMode==='original'?'organized':'original')}>
+          <small>顯示</small><b>{view.cart.viewMode==='original'?'原單':'整理'}</b>
+        </button>
+        <button type="button" className={`ordering-cart-cycle service ${view.cart.serviceMode}`} disabled={!wholeNextAllowed} aria-label={`目前${view.cart.serviceMode==='takeaway'?'外賣':'堂食'}，按一下切換`} onClick={()=>actions.onChangeServiceMode(wholeNextMode)}>
+          <small>全單</small><b>{view.cart.serviceMode==='takeaway'?'外賣':'堂食'}</b>
+        </button>
+        <button type="button" className={`ordering-cart-cycle combine${view.cart.combineSimilar?' active':''}`} aria-pressed={view.cart.combineSimilar} onClick={actions.onToggleCombine}>
+          <small>相同商品</small><b>組合 {view.cart.combineSimilar?'開':'關'}</b>
+        </button>
+      </div>:null}
       <div className={`ordering-cart-lines ${view.cart.viewMode}`}>
         {view.cart.lines.length?(view.cart.viewMode==='original'
-          ?view.cart.lines.map((line,index)=><CartLineRow key={line.id} line={line} index={index} highlighted={view.highlightedCartLineId===line.id} actions={actions} availability={availability}/>)
+          ?view.cart.lines.map((line,index)=><CartLineRow key={line.id} line={line} index={index} highlighted={view.highlightedCartLineId===line.id||(line.sourceLineIds?.includes(view.highlightedCartLineId??'')??false)} actions={actions} availability={availability}/>)
           :<OrganizedCart lines={view.cart.lines} highlightedLineId={view.highlightedCartLineId} actions={actions} availability={availability}/>
         ):<EmptyState icon="＋" title="購物籃仲未有商品" detail="由左邊揀一件商品開始；需要設定嘅商品會逐步帶你完成。"/>}
       </div>
