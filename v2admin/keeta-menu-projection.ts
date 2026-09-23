@@ -65,8 +65,9 @@ export function buildKeetaMenuProjection(adminSnapshot:unknown):KeetaMenuProject
     }
   }
 
+  const activeProducts=products.filter(product=>product.active!==false);
   const productCodes=new Set<string>();
-  for(const product of products){
+  for(const product of activeProducts){
     const id=text(product.id);
     const code=text(product.productCode)||id;
     if(!id)issues.push('KEETA_MENU_PRODUCT_ID_REQUIRED');
@@ -138,7 +139,6 @@ export function buildKeetaMenuProjection(adminSnapshot:unknown):KeetaMenuProject
   });
   if(optionCount>10000)issues.push('KEETA_MENU_CHOICE_GROUP_SKU_LIMIT_EXCEEDED');
 
-  const activeProducts=products.filter(product=>product.active!==false);
   const spuList=activeProducts.map(product=>{
     const id=text(product.id);
     const productCode=text(product.productCode)||id;
