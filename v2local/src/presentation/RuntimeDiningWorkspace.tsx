@@ -40,10 +40,10 @@ export function RuntimeDiningWorkspace({runtime,onCheckout}:{runtime:CleanSmtCor
   const [now,setNow]=useState(Date.now());
 
   const load=useCallback(async()=>{
-    if(!runtime.readDining){setError('DINE_IN_PROVIDER_UNAVAILABLE');return;}
+    if(!runtime.readDining){setError('目前未能讀取堂食資料。');return;}
     setBusy(true);setError(null);
     try{setView(await runtime.readDining());}
-    catch{setError('DINE_IN_READ_FAILED');}
+    catch{setError('堂食資料載入失敗，請稍後再試。');}
     finally{setBusy(false);}
   },[runtime]);
 
@@ -177,7 +177,7 @@ export function RuntimeDiningWorkspace({runtime,onCheckout}:{runtime:CleanSmtCor
 
   return <main className="dining-operations-workspace runtime-dining-workspace" aria-label="堂食／輪候工作台">
     <aside className="dining-wait-column">
-      <header><div><small>QUEUE · LOCAL</small><h2>輪候／叫號</h2></div><span>{view?.queue.length??0}</span></header>
+      <header><div><small>本機輪候資料</small><h2>輪候／叫號</h2></div><span>{view?.queue.length??0}</span></header>
       <button className="dining-add-wait" type="button" onClick={()=>setShowAdd(value=>!value)}>＋ 加入輪候</button>
       {showAdd?<section className="dining-wait-form">
         <label><span>人數</span><div><button onClick={()=>setPartySize(Math.max(1,partySize-1))}>−</button><b>{partySize}</b><button onClick={()=>setPartySize(partySize+1)}>＋</button></div></label>

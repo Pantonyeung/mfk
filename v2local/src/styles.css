@@ -687,3 +687,17 @@
   .dayclose-complete-card{grid-template-columns:1fr;text-align:center}
   .dayclose-complete-card .dayclose-complete-icon{margin:0 auto}
 }
+
+/* SMT human-centered shell: blue consistently means current destination. */
+.clean-brand{
+  background:#1768dc;
+  box-shadow:0 8px 18px rgb(23 104 220 / 22%);
+}
+.clean-rail nav a.active{
+  border-color:#a9c8ef;
+  color:#1559af;
+  background:#eef5ff;
+}
+.clean-rail nav a.active .clean-rail-icon{background:#1768dc;color:#fff}
+.clean-rail nav a.active .clean-rail-badge{border-color:#eef5ff}
+.clean-runtime-state{border-color:#b9d9c8;background:#edf8f2;color:#176b49}

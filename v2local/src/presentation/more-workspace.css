@@ -124,3 +124,15 @@
 .dayclose-sticky-footer{position:sticky;bottom:-1px;z-index:8;display:grid!important;grid-template-columns:minmax(0,1fr) 280px;gap:12px;align-items:center!important;padding:12px 0 0!important;background:#fff!important;border-top:1px solid #e0e3e8!important;color:#252635!important}
 .dayclose-sticky-footer>div{display:flex;gap:18px;align-items:center}.dayclose-sticky-footer>div span{font-size:15px;font-weight:850}.dayclose-sticky-footer>.more-primary{min-height:54px;font-size:18px}
 @media(max-width:1200px){.dayclose-panel .cash-denomination-table>header,.dayclose-panel .cash-denomination-table>div{grid-template-columns:90px minmax(180px,1fr) 130px 130px}.cash-denomination-toolbar{align-items:flex-start;flex-direction:column}.dayclose-sticky-footer{grid-template-columns:1fr 220px}}
+
+/* Human-centered R1: low-frequency choices stay neutral; blue marks the current action. */
+.more-overview>header span,.more-card-topbar small,.more-section-heading span{color:#1768dc}
+.more-overview-cards{grid-template-columns:repeat(3,minmax(0,1fr))}
+.more-overview-cards button{min-height:150px;box-shadow:none}
+.more-overview-cards button>span{background:#eaf2ff;color:#165dcc}
+.more-overview-cards button>i{color:#1768dc}
+.more-overview-cards button>em{background:#eef5ff;color:#1559af}
+.more-primary,.dayclose-mode-switch button.active,.cash-entry-toggle button.active{border-color:#1768dc;background:#1768dc}
+.more-section-heading>strong{color:#1559af;background:#eef5ff}
+.cash-denomination-table>footer strong{color:#165dcc}
+.more-card-workspace button:focus-visible,.more-card-workspace input:focus-visible,.more-card-workspace select:focus-visible{outline:3px solid #79aaf3;outline-offset:3px}

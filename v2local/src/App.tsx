@@ -6,9 +6,11 @@ import type {OrderingWorkspaceActions,OrderingWorkspaceViewModel,ServiceMode} fr
 import {CheckoutWorkspace} from './features/checkout/CheckoutWorkspace.tsx';
 import type {CheckoutChannelId,CheckoutTenderId,CheckoutWorkspaceActions,CheckoutWorkspaceViewModel} from './features/checkout/checkout-workspace-model.ts';
 import {RuntimeOrdersWorkspace} from './presentation/RuntimeOrdersWorkspace.tsx';
+import {RuntimeWorkWorkspace} from './presentation/RuntimeWorkWorkspace.tsx';
 import {RuntimeDiningWorkspace,type DiningCheckoutRequest} from './presentation/RuntimeDiningWorkspace.tsx';
 import {RuntimeSoldoutWorkspace} from './presentation/RuntimeSoldoutWorkspace.tsx';
 import {LocalMoreWorkspace} from './presentation/LocalMoreWorkspace.tsx';
+import {SmtOperationsHub} from './presentation/SmtOperationsHub.tsx';
 import {localRuntime,type DiningTender} from './runtime/local-runtime.ts';
 import {readLocalAdminMenu,subscribeLocalAdminMenu} from './runtime/local-admin-menu.ts';
 import {readSmtAdminConfigLkg,readSmtAdminSyncStatus,subscribeSmtAdminConfig} from './runtime/admin-config-sync.ts';
@@ -69,10 +71,10 @@ function productArtwork(product:Product){
 }
 
 const nav=[
-  {to:'/',label:'點餐',icon:'▦',end:true},
+  {to:'/',label:'點單',icon:'＋',end:true},
+  {to:'/work',label:'工作',icon:'✓'},
   {to:'/orders',label:'訂單',icon:'▤'},
-  {to:'/dining',label:'堂食',icon:'▱'},
-  {to:'/soldout',label:'售罄',icon:'⊘'},
+  {to:'/operations',label:'營運',icon:'◎'},
   {to:'/more',label:'更多',icon:'•••'},
 ] as const;
 
@@ -81,6 +83,8 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
   const [runtimeRevision,setRuntimeRevision]=useState(0);
   useEffect(()=>localRuntime.subscribe(()=>setRuntimeRevision(value=>value+1)),[]);
   const [category,setCategory]=useState('all');
+  const [searchQuery,setSearchQuery]=useState('');
+  const [feedbackMessage,setFeedbackMessage]=useState<string|undefined>();
   const [viewMode,setViewMode]=useState<'original'|'organized'>('original');
   const [pulse,setPulse]=useState(0);
   const [recent,setRecent]=useState<string|undefined>();
@@ -155,6 +159,7 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
   ];
   const visible=products
     .filter(product=>category==='all'||product.categoryId===category)
+    .filter(product=>!searchQuery.trim()||product.name.toLocaleLowerCase('zh-HK').includes(searchQuery.trim().toLocaleLowerCase('zh-HK')))
     .slice()
     .sort((a,b)=>{
       if(category!=='all')return 0;
@@ -208,6 +213,7 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
 
   const view:OrderingWorkspaceViewModel={
     pendingOrders,activeOrders,categories,selectedCategoryId:category,
+    searchQuery,feedbackMessage,
     products:visible.map(product=>({
       id:product.id,
       name:product.name,
@@ -218,10 +224,10 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
       ...(!product.priceReady?{badge:'未接價格'}:!product.sellable?{badge:'停售'}:{}),
     })),
     menuRevisionLabel:adminConfig
-      ?storeSettings.storeName+' · ADMIN R'+adminConfig.revision+' · '+(syncStatus.state==='SYNCED'?'已同步':syncStatus.state==='LOCAL_LKG'?'LKG':'同步中')
-      :'LOCAL FALLBACK · R'+adminMenu.revision,
+      ?storeSettings.storeName+' · 管理端版本 '+adminConfig.revision+' · '+(syncStatus.state==='SYNCED'?'已同步':syncStatus.state==='LOCAL_LKG'?'使用本機最後版本':'同步中')
+      :'本機菜單 · 版本 '+adminMenu.revision,
     operationalNotice:capacityNotice
-      ?'今日 '+capacityNotice.currentCount+'/'+capacityNotice.dailyLimit+' 單 · 已到 '+capacityNotice.warningAt+'% 提醒門檻'+(capacityNotice.hardStopConfigured?' · Admin 有 hard-stop 設定但目前只提示':'')
+      ?'今日 '+capacityNotice.currentCount+'/'+capacityNotice.dailyLimit+' 單 · 已到 '+capacityNotice.warningAt+'% 提醒門檻'+(capacityNotice.hardStopConfigured?' · 管理端設有停止接單門檻，目前只作提示':'')
       :undefined,
     showCategories:frontlinePresentation.showCategories,
     serviceModes:{takeaway:storeSettings.takeawayEnabled,dineIn:storeSettings.dineInEnabled},
@@ -258,18 +264,19 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
     setRecent(id);
     setHighlight(existing?.id??next[next.length-1]?.id);
     setPulse(value=>value+1);
+    setFeedbackMessage(`已加入「${product.name}」`);
     window.setTimeout(()=>{setRecent(undefined);setHighlight(undefined)},700);
   };
 
   const addConfigured=(productId:string,detail:string,deltaMinor:number,qty:number)=>{
     const product=products.find(item=>item.id===productId);if(!product||!product.priceReady||!product.sellable)return;
     const line:CartLine={id:'line-'+Date.now().toString(36),productId:product.id,name:product.name,qty,unitMinor:product.priceMinor+deltaMinor,serviceMode,detail};
-    setCart([...cart,line]);setRecent(product.id);setHighlight(line.id);setPulse(value=>value+1);setPanel(null);
+    setCart([...cart,line]);setRecent(product.id);setHighlight(line.id);setPulse(value=>value+1);setPanel(null);setFeedbackMessage(`已完成設定並加入「${product.name}」`);
   };
 
   const addCombo=(comboId:string,comboName:string,detail:string,unitMinor:number)=>{
     const line:CartLine={id:'line-'+Date.now().toString(36),productId:comboId,name:comboName,qty:1,unitMinor,serviceMode,detail};
-    setCart([...cart,line]);setHighlight(line.id);setPulse(value=>value+1);setPanel(null);
+    setCart([...cart,line]);setHighlight(line.id);setPulse(value=>value+1);setPanel(null);setFeedbackMessage(`已加入套餐「${comboName}」`);
   };
 
   const holdItems=()=>cart.map(line=>({
@@ -336,6 +343,7 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
             :null;
 
   const actions:OrderingWorkspaceActions={
+    onSearchQuery:setSearchQuery,
     onSelectCategory:setCategory,
     onAddProduct:add,
     onConfigureProduct:id=>setPanel({type:'product',productId:id}),
@@ -479,7 +487,7 @@ function CheckoutPage({cart,setCart,diningCheckout,onDiningCheckoutDone}:{cart:C
       setState('success');
       setPrintStatus('訂單已完成 · 正在送打印…');
       void localRuntime.printOrderOutputs(order.id).then(summary=>{
-        if(summary.planned===0){setPrintStatus('訂單已完成 · 未有已綁定打印 Route');return;}
+        if(summary.planned===0){setPrintStatus('訂單已完成 · 未有已綁定打印用途');return;}
         if(summary.failed===0){setPrintStatus('訂單已完成 · 已送出 '+summary.sent+'/'+summary.planned+' 個打印工作');return;}
         const failures=summary.results.filter(row=>!row.ok).map(row=>row.role+':'+row.code).join('；');
         setPrintStatus('訂單已完成 · 打印部分失敗 '+summary.sent+'/'+summary.planned+' · '+failures);
@@ -551,17 +559,19 @@ function OperationalApp(){
         {nav.map(item=><NavLink key={item.to} to={item.to} end={'end' in item?item.end:false} className={({isActive})=>isActive?'active':''}>
           <span className="clean-rail-icon">{item.icon}</span>
           <span className="clean-rail-label">{item.label}</span>
-          {item.to==='/orders'&&activeOrderCount>0?<span className="clean-rail-badge" aria-label={'進行中訂單 '+activeOrderCount}>{activeOrderCount>99?'99+':activeOrderCount}</span>:null}
+          {item.to==='/work'&&activeOrderCount>0?<span className="clean-rail-badge" aria-label={'待處理工作 '+activeOrderCount}>{activeOrderCount>99?'99+':activeOrderCount}</span>:null}
         </NavLink>)}
       </nav>
       <StaffSessionBadge/>
-      <div className="clean-runtime-state">LOCAL<br/>OFFLINE</div>
+      <div className="clean-runtime-state">本機<br/>運作</div>
     </aside>
     <section className="clean-route-stage">
       <Routes>
         <Route index element={<OrderingPage cart={cart} setCart={setCart} serviceMode={serviceMode} setServiceMode={setServiceMode}/>}/>
         <Route path="checkout" element={<CheckoutPage cart={cart} setCart={setCart} diningCheckout={diningCheckout} onDiningCheckoutDone={()=>setDiningCheckout(null)}/>}/>
+        <Route path="work" element={<RuntimeWorkWorkspace runtime={runtime}/>}/>
         <Route path="orders" element={<RuntimeOrdersWorkspace runtime={runtime}/>}/>
+        <Route path="operations" element={<SmtOperationsHub runtime={runtime}/>}/>
         <Route path="dining" element={<RuntimeDiningWorkspace runtime={runtime} onCheckout={prepareDiningCheckout}/>}/>
         <Route path="soldout" element={<RuntimeSoldoutWorkspace runtime={runtime}/>}/>
         <Route path="more" element={<LocalMoreWorkspace/>}/>
