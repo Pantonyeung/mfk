@@ -151,3 +151,37 @@ GITHUB EVIDENCE
 
 STATUS
 K3_PREVIEW_GREEN / ONE_PROVIDER_SUBMIT_AUTHORIZED
+
+
+LIVE RESULT｜ONE-SHOT MENU SUBMIT UNKNOWN
+
+Owner pressed 同步完整菜單到 Keeta once after GREEN preview.
+Observed: no visible UI transition / taskId / success / error.
+
+CURRENT
+K3_PROVIDER_SUBMIT_UNKNOWN
+
+LAST_GREEN
+R4 preview GREEN:
+14 categories / 188 SPU / 188 SKU / 2 groups / 6 options.
+
+FIRST_BREAK
+ONE_SHOT_MENU_SUBMIT_NO_VISIBLE_RESULT
+
+RULE
+Provider side effect UNKNOWN.
+Do not submit again blindly.
+
+NEXT
+Press 更新同步狀態 once and classify:
+- SUBMITTED + taskId -> continue waiting 1202
+- COMPLETED + errors=0 -> bank K3
+- PARTIAL/FAILED -> capture exact task/provider error
+- NEVER_SYNCED -> submit did not persist; investigate request/submit path
+- status read error -> capture exact code
+
+GITHUB
+#162 5788337765
+
+STATUS
+UNKNOWN_SIDE_EFFECT / READBACK_REQUIRED / NO_BLIND_RETRY
