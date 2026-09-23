@@ -68,8 +68,20 @@ export class CustomerRuntimeStore{
     if(url.pathname==='/public/quote/readback'&&request.method==='GET'){
       const requestId=(url.searchParams.get('requestId')||'').trim();
       if(!requestId)return json({code:'CUSTOMER_QUOTE_REQUEST_ID_REQUIRED'},400);
-      const row=await this.state.storage.get('quote:'+requestId);
-      return row?json(row):json({state:'UNKNOWN',requestId},404);
+      const row=await this.state.storage.get('quote:'+requestId) as any;
+      if(!row)return json({state:'UNKNOWN',requestId},404);
+      return json({
+        state:row.state,
+        requestId,
+        ...(row.state==='CONFIRMED'?{
+          quoteId:row.quoteId,
+          revision:row.revision,
+          currency:row.currency,
+          totalMinor:row.totalMinor,
+          observedAt:row.observedAt,
+        }:{}),
+        ...(row.state==='REJECTED'?{code:row.code,message:row.message}:{}),
+      });
     }
 
     if(url.pathname==='/public/orders/submit'&&request.method==='POST'){
@@ -98,8 +110,19 @@ export class CustomerRuntimeStore{
     if(url.pathname==='/public/orders/readback'&&request.method==='GET'){
       const submissionId=(url.searchParams.get('submissionId')||'').trim();
       if(!submissionId)return json({code:'CUSTOMER_SUBMISSION_ID_REQUIRED'},400);
-      const row=await this.state.storage.get('order:'+submissionId);
-      return row?json(row):json({state:'UNKNOWN',submissionId},404);
+      const row=await this.state.storage.get('order:'+submissionId) as any;
+      if(!row)return json({state:'UNKNOWN',submissionId},404);
+      return json({
+        state:row.state,
+        submissionId,
+        ...(row.state==='CONFIRMED'?{
+          canonicalOrderId:row.canonicalOrderId,
+          canonicalDisplay:row.canonicalDisplay,
+          committedAt:row.committedAt,
+          totalMinor:row.totalMinor,
+        }:{}),
+        ...(row.state==='REJECTED'?{code:row.code,message:row.message}:{}),
+      });
     }
 
     if(url.pathname==='/smt/quotes/pending'&&request.method==='GET'){
