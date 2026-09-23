@@ -7,7 +7,7 @@ import {
   normalizeKeetaStandardProviderOrderFacts,
   type KeetaStandardProviderOrderFacts,
 } from '../../../integrations/keeta/src/order-facts.js';
-import {readSmtAdminConfigLkg,readSmtDeviceId,subscribeSmtCloudDoorbell} from './admin-config-sync.ts';
+import {readSmtAdminConfigLkg,readSmtDeviceId,subscribeSmtAdminConfig,subscribeSmtCloudDoorbell} from './admin-config-sync.ts';
 import {localRuntime,type StoredOrder} from './local-runtime.ts';
 
 const ENDPOINT='https://admin.morefunos.com';
@@ -129,6 +129,9 @@ export function translateKeetaIntentToLocalOrder(input:MfkKeetaOrderIntent):Orde
   });
 }
 
+function emitIntakeUpdate(){
+  if(typeof window!=='undefined')window.dispatchEvent(new CustomEvent('mfk-keeta-order-intake'));
+}
 function attention(providerOrderId:string,code:string){
   try{
     const current=JSON.parse(localStorage.getItem(ATTENTION_KEY)||'[]');
@@ -138,6 +141,7 @@ function attention(providerOrderId:string,code:string){
       ...rows.filter(row=>String(row?.providerOrderId)!==providerOrderId),
     ].slice(0,100);
     localStorage.setItem(ATTENTION_KEY,JSON.stringify(next));
+    emitIntakeUpdate();
   }catch{}
 }
 function clearAttention(providerOrderId:string){
@@ -145,6 +149,7 @@ function clearAttention(providerOrderId:string){
     const current=JSON.parse(localStorage.getItem(ATTENTION_KEY)||'[]');
     if(!Array.isArray(current))return;
     localStorage.setItem(ATTENTION_KEY,JSON.stringify(current.filter(row=>String(row?.providerOrderId)!==providerOrderId)));
+    emitIntakeUpdate();
   }catch{}
 }
 export function readKeetaOrderIntakeAttention(){
@@ -187,16 +192,25 @@ export async function reconcileKeetaOrderIntake(){
       ENDPOINT+'/api/keeta/smt/orders/pending?storeId=MF01&deviceId='+encodeURIComponent(deviceId),
       {cache:'no-store'},
     );
-    if(response.status===401)return;
     const body=await response.json().catch(()=>({})) as {orders?:unknown[];code?:string};
-    if(!response.ok)throw new Error(body.code||'KEETA_ORDER_PENDING_HTTP_'+response.status);
+    if(response.status===401){
+      attention('__TRANSPORT__',body.code||'KEETA_SMT_UNAUTHORIZED');
+      return;
+    }
+    if(!response.ok){
+      attention('__TRANSPORT__',body.code||'KEETA_ORDER_PENDING_HTTP_'+response.status);
+      return;
+    }
+    clearAttention('__TRANSPORT__');
     for(const raw of Array.isArray(body.orders)?body.orders:[]){
       let intent:MfkKeetaOrderIntent|undefined;
       try{
         intent=validateMfkKeetaOrderIntent(raw);
         const orderInput=translateKeetaIntentToLocalOrder(intent);
+        const beforeId=localRuntime.orders().find(row=>row.providerRef===orderInput.providerRef)?.id;
         const order=localRuntime.createOrder(orderInput);
         await ack(intent,order);
+        if(!beforeId)emitIntakeUpdate();
         if(autoAcceptEnabled()&&order.fulfillmentLabel==='待處理'){
           await localRuntime.acceptOrder(order.id);
         }
@@ -212,13 +226,24 @@ export async function reconcileKeetaOrderIntake(){
 }
 
 let installed=false;
+let fallbackTimer:number|undefined;
 export function installKeetaOrderIntake(){
   if(installed||typeof window==='undefined')return;
   installed=true;
+  const reconcile=()=>void reconcileKeetaOrderIntake();
   subscribeSmtCloudDoorbell(event=>{
-    if(event.type==='KEETA_ORDER_AVAILABLE')void reconcileKeetaOrderIntake();
+    if(event.type==='KEETA_ORDER_AVAILABLE')reconcile();
   });
-  window.addEventListener('online',()=>void reconcileKeetaOrderIntake());
-  window.addEventListener('focus',()=>void reconcileKeetaOrderIntake());
-  window.setTimeout(()=>void reconcileKeetaOrderIntake(),0);
+  // K1 transport authorization and mapping both depend on the latest Admin LKG.
+  // Re-run intake immediately after Admin config/ACK changes so startup races cannot strand PENDING_SMT.
+  subscribeSmtAdminConfig(reconcile);
+  window.addEventListener('online',reconcile);
+  window.addEventListener('focus',reconcile);
+  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')reconcile();});
+  // Doorbell remains primary. This visible-only bounded fallback closes a missed-doorbell gap
+  // without creating a second order path; providerRef dedup + cloud ACK remain authoritative.
+  fallbackTimer=window.setInterval(()=>{
+    if(document.visibilityState==='visible'&&navigator.onLine)reconcile();
+  },5000);
+  window.setTimeout(reconcile,0);
 }
