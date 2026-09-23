@@ -381,3 +381,76 @@ Do NOT place another order yet.
    - COMMITTED => SMT already created canonical order; break is SMT presentation/readback.
    - no row => second 1001 never entered current order:intent store; inspect provider webhook evidence/identity.
 3. Menu: press 預檢完整菜單 again. The inactive hidden-product false RED is repaired. Do NOT submit provider full-menu sync until preview counts/errors are read back clean.
+
+
+OWNER SCREENSHOT READBACK｜2026-09-23 10:36 HKT
+
+REAL ORDER STATE
+Admin live intake now proves:
+- pending = 3
+- committed = 0
+- latest visible provider order example: 5313440114243101
+- message 2102584550541508653
+- received 2026-09-23 10:23:15 HKT
+- canonicalOrderId = none
+- canonicalDisplay = none
+
+CLASSIFICATION
+PROVIDER → MFK webhook/intake persistence = GREEN.
+The current FIRST_BREAK is definitively after cloud PENDING_SMT and before SMT canonical commit:
+CLOUD_PENDING_TO_SMT_COMMIT_RED.
+
+This is NOT an Admin relay problem. Admin is readback/control-plane only.
+
+TOKEN / MENU REAL RED
+Owner live screenshot:
+KEETA_MENU_SYNC_PROVIDER_115000200:The access token does not exist, please check if the access token is correct.
+
+Meaning:
+- local encrypted token metadata claimed CONNECTED/expiry 2026-12-22
+- provider itself rejects that accessToken as nonexistent
+- webhook ingress remains independent and continues working
+- provider outbound commands/menu sync are blocked until token is refreshed or reauthorized
+
+TOKEN REPAIR
+commit 1f1cd99e0fdd4f3483a6f9b15aedd9ce5c75823c:
+- explicit provider token-invalid detection
+- one safe refresh-token recovery attempt after explicit provider rejection 115000200
+- exact request retried once only after provider rejected the first request (no unknown side effect)
+- failed recovery marks REAUTH_REQUIRED
+- token save clears invalid marker
+- Admin token check now performs real provider read validation, not local expiry only
+
+SMT PULL DIAGNOSTIC
+same commit:
+- /smt/orders/pending now records last authorized SMT pull:
+  deviceId / observedAt / pendingCount
+- Admin intake readback returns lastSmtPull
+
+UI
+c6f0707448c809a6ce3f49f2237a947f9d6578f7 + 1940e2ccb826bb98fb1457225e9f6687b4e982bb:
+- Provider Token Validation surfaced
+- SMT 最近拉單 timestamp + device ID surfaced in Platform Management
+
+TEST
+a90b94cf1ec5c71d41a0c0220613db475bb6ad1c
+- explicit 115000200 → refresh token → menu sync retry success
+- SMT pull diagnostic readback
+Deploy trigger:
+784c0d5d80b95d49e4bea203fdafffb6bfbaf1eb
+Run:
+35811354847 SUCCESS
+15 test files / 89 tests PASS
+Admin Worker:
+5840ed55-068c-4406-b617-2aa8b5f80823
+
+NEXT
+1. Refresh Admin Platform Management.
+2. Read "SMT 最近拉單":
+   - 未見 = current SMT runtime is not reaching authorized pending endpoint (runtime/transport/version).
+   - recent timestamp = SMT has pulled PENDING orders; remaining break is local mapping/commit and current afb runtime should surface exact intake error.
+3. Press "檢查 Token":
+   - TOKEN_USABLE_PROVIDER_CONFIRMED = token recovered/valid.
+   - REAUTH_REQUIRED / unavailable = perform Keeta reauthorization.
+4. Re-run menu PREVIEW only; if clean then submit one menu sync.
+5. Do not create additional test orders until current 3 pending are classified/cleared.
