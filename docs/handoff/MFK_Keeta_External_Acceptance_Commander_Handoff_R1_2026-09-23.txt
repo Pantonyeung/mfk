@@ -168,3 +168,74 @@ STATUS:
 E1_ACTIVE
 E2_ACTIVE
 WAITING_REAL_PROVIDER_EVIDENCE
+
+
+==================================================
+8. WORKER REPLAN｜DIRECT INTEGRATION FAST LOOP
+==================================================
+
+Control correction:
+DIRECT_INTEGRATION_REAL_DEVICE_FAST_LOOP_LOCKED
+
+GitHub #162:
+comment 5787772300
+
+Previous worker model:
+E1 / E2 independent live acceptance lanes
+
+SUPERSEDED AS WORKER EXECUTION MODEL.
+
+New arrangement:
+
+Worker A:
+KEETA_ORDER_DIRECT_INTEGRATION_REAL_DEVICE_FAST_LOOP
+
+- owns current live seam mutation
+- historical V2 evidence reused as regression oracle
+- minimum gate only: exact diff / focused tests / build / authority guard
+- direct runtime/device
+- GREEN bank
+- RED exact FIRST_BREAK → smallest fix → redeploy → same-step retest
+- no full matrix prerequisite
+
+First target:
+1001
+→ dedupe / mapping
+→ SMT reconcile
+→ ONE canonical Order
+→ ONE display
+→ SMT/SMM visibility
+→ merchant confirm
+
+Worker B:
+HISTORICAL_V2_EVIDENCE_REUSE_NEXT_SEAM_PREP
+
+READ_ONLY default.
+
+Only prepares:
+- current Worker A seam
+- ONE next seam
+
+Return:
+- exact historical evidence
+- current MFK equivalent seam
+- DO_NOT_REBUILD / DO_NOT_RETEST foundations
+- minimum regression gate
+- expected real-device behavior
+- likely FIRST_BREAK
+- smallest repair allowlist
+
+Initial next seam:
+merchant ACCEPT / provider confirm
+→ same canonical Order visibility
+
+Collision:
+ONLY Worker A mutates current live seam.
+Worker B cannot parallel-mutate.
+
+Current main observed during replanning:
+afb02b6e09f4f4458c8e556b85d9a7eb6e6ea4b0
+
+STATUS:
+WORKER_REPLAN_READY
+DISPATCH_PAUSED
