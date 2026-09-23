@@ -129,3 +129,42 @@ after all Keeta test-environment-exposed E1–E8 seams have real provider eviden
 
 GitHub #162 Commander takeover comment:
 5787184091
+
+
+==================================================
+7. EXECUTION STARTED
+==================================================
+
+GitHub #162:
+comment 5787238095
+
+Lane A:
+KEETA-E1-MENU-20260923-01
+ACTIVE
+
+Exact operator path:
+Admin
+→ 渠道
+→ 供應同步
+→ Keeta 菜單同步
+→ 預檢完整菜單
+→ if complete: 同步完整菜單到 Keeta ONCE
+→ 更新同步狀態
+→ taskId / 1202 / optional 1201
+
+Lane B:
+KEETA-E2-ORDER-20260923-01
+ACTIVE
+
+Exact operator action:
+Keeta test store
+→ place ONE real test order
+→ SMT first receipt
+→ ONE canonical Order
+→ ONE display number
+→ preserve same Order for E3/E4/E8
+
+STATUS:
+E1_ACTIVE
+E2_ACTIVE
+WAITING_REAL_PROVIDER_EVIDENCE
