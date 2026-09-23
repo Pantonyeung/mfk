@@ -624,3 +624,77 @@ STATUS:
 WORKER_A_DISPATCHED
 WORKER_B_DISPATCHED
 K3_CURRENT_SEAM
+
+
+==================================================
+11. KEETA TOKEN AUTOMATIC ROTATION RESTORED
+==================================================
+
+Owner correction:
+routine manual token paste is NOT an accepted operating model.
+
+Historical proof:
+Keeta token refresh rotates BOTH accessToken and refreshToken and persists the new pair.
+
+Current MFK restoration:
+- encrypted accessToken + refreshToken pair retained after bootstrap
+- Durable Object alarm scheduled from token expiry metadata
+- proactive refresh before expiry
+- newly rotated accessToken + refreshToken both persisted
+- next alarm scheduled after each successful refresh
+- explicit provider 115000200 triggers one safe refresh recovery
+- temporary proactive refresh failure while old token valid -> bounded retry, not forced reauth
+- REAUTH_REQUIRED only after refresh recovery truly cannot continue
+
+Admin visibility:
+- Token 自動刷新
+- 下次自動刷新
+- 最近自動刷新
+- 自動刷新錯誤
+
+Manual token import:
+TEST / RECOVERY fallback only.
+Not routine operation.
+
+PR:
+#168
+
+Merged:
+82f9a2d2d490dbb7f9f6d77bd6421edeeed6f150
+
+Exact-main deploy trigger:
+ffd862bdaa36b1b9fdd40163abe3e2f1dc2f6b65
+
+Preview:
+35813415653 SUCCESS
+15 files / 91 tests PASS
+Worker version:
+40648025-6ea2-4207-b279-2e4fc7275c11
+
+Production:
+35813529301 SUCCESS
+15 files / 91 tests PASS
+Worker version:
+c08b7b30-6c36-4b90-801b-48ad76bb3513
+
+GitHub:
+#162 5788366483
+#22 5788366810
+
+Workers:
+A/B continue their existing K3/K1 work.
+Token lifecycle is now returned to frozen runtime foundation.
+
+Operator rule:
+one bootstrap/authorization
+→ automatic token rotation
+
+Never:
+manual token paste every refresh cycle.
+
+If current refreshToken was already revoked before this repair,
+one reauthorization may still be required once.
+After a usable token pair exists, refresh is automatic.
+
+STATUS:
+KEETA_TOKEN_AUTO_REFRESH_SOURCE_TEST_DEPLOY_GREEN
