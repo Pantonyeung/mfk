@@ -13,8 +13,8 @@
 .ordering-catalog {
   min-width: 0;
   min-height: 0;
-  display: grid;
-  grid-template-rows: auto auto auto minmax(0, 1fr);
+  display: flex;
+  flex-direction: column;
   gap: 14px;
 }
 
@@ -66,8 +66,9 @@
   gap: 8px;
   overflow-x: auto;
   overscroll-behavior-inline: contain;
-  scrollbar-width: thin;
+  scrollbar-width: none;
 }
+.ordering-categories::-webkit-scrollbar { display: none; }
 
 .ordering-categories button {
   flex: 0 0 auto;
@@ -85,6 +86,7 @@
 .ordering-categories button.active { border-color: #1768dc; color: #fff; background: #1768dc; }
 
 .ordering-product-grid {
+  flex: 1 1 auto;
   min-height: 0;
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
@@ -237,6 +239,57 @@
 .ordering-center-panel-body { min-height: 0; overflow: auto; }
 .ordering-catalog--panel { grid-template-rows: minmax(0, 1fr); }
 
+.ordering-command-bar {
+  display: grid;
+  grid-template-columns: minmax(260px, .72fr) minmax(560px, 2fr);
+  gap: 12px;
+}
+
+.ordering-mode-switch {
+  min-height: 76px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 10px 12px 10px 15px;
+  border: 1px solid #ccd6e2;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.ordering-mode-switch > span { min-width: 0; display: grid; gap: 3px; }
+.ordering-mode-switch > span b { font-size: 15px; }
+.ordering-mode-switch > span small { overflow: hidden; color: #6c788b; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.ordering-mode-switch > div { flex: 0 0 auto; display: flex; gap: 3px; padding: 3px; border-radius: 9px; background: #edf1f6; }
+.ordering-mode-switch button { min-width: 68px; min-height: 44px; padding: 0 12px; border: 0; border-radius: 7px; color: #536177; background: transparent; font-size: 14px; font-weight: 900; }
+.ordering-mode-switch button.active { color: #fff; background: #1768dc; box-shadow: 0 2px 6px rgb(23 104 220 / 20%); }
+
+.ordering-work-items { min-width: 0; display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 8px; }
+.ordering-work-items > button {
+  min-width: 0;
+  min-height: 76px;
+  display: grid;
+  grid-template-columns: minmax(0,1fr) auto;
+  grid-template-rows: 1fr auto;
+  gap: 2px 10px;
+  padding: 10px 12px;
+  border: 1px solid #d0d9e5;
+  border-radius: 12px;
+  color: #26374e;
+  background: #fff;
+  text-align: left;
+}
+.ordering-work-items > button > span { min-width: 0; display: grid; gap: 2px; }
+.ordering-work-items b { overflow: hidden; font-size: 15px; text-overflow: ellipsis; white-space: nowrap; }
+.ordering-work-items small { overflow: hidden; color: #6c788b; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.ordering-work-items strong { align-self: start; color: #203750; font-size: 25px; line-height: 1; }
+.ordering-work-items em { grid-column: 1/-1; color: #1768dc; font-size: 11px; font-style: normal; font-weight: 900; }
+.ordering-work-items > button.riceball { border-left: 4px solid #c88932; }
+.ordering-work-items > button.required { border-left: 4px solid #1768dc; }
+.ordering-work-items > button.combo { border-left: 4px solid #394a61; }
+.ordering-work-items > button.active { border-color: #1768dc; background: #eef5ff; box-shadow: 0 0 0 2px rgb(23 104 220 / 12%); }
+.ordering-work-items > button:disabled { cursor: not-allowed; opacity: .62; background: #f3f5f7; }
+
 .ordering-workspace button { cursor: pointer; touch-action: manipulation; }
 .ordering-workspace button:focus-visible,
 .ordering-workspace input:focus-visible { outline: 3px solid #79aaf3; outline-offset: 3px; }
@@ -249,6 +302,9 @@
   .ordering-product-body { grid-template-rows: 120px minmax(0, 1fr); }
   .ordering-cart { padding: 15px; }
   .ordering-line-copy b { font-size: 18px; }
+  .ordering-command-bar { grid-template-columns: 1fr; }
+  .ordering-mode-switch { min-height: 64px; }
+  .ordering-work-items > button { min-height: 66px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

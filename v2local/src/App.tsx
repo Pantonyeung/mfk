@@ -21,7 +21,7 @@ import {resolveBusinessWindow} from './runtime/local-operations.ts';
 import {RuntimeReadyActivation} from './runtime/RuntimeReadyActivation.tsx';
 import {StaffAuthGate,StaffSessionBadge} from './presentation/StaffAuthGate.tsx';
 import {CashOpeningGate} from './presentation/CashOpeningGate.tsx';
-import {ComboWorkspace,HoldCartWorkspace,HoldListWorkspace,OrganizeWorkspace,ProductConfigWorkspace,type OrderingPanelState,type WorkspaceHoldDraft,type WorkspaceProduct} from './features/ordering/OrderingCenterWorkspaces.tsx';
+import {ComboWorkspace,HoldCartWorkspace,HoldListWorkspace,OrganizeWorkspace,ProductConfigWorkspace,type OrderingPanelState,type ProductConfiguration,type WorkspaceHoldDraft,type WorkspaceProduct} from './features/ordering/OrderingCenterWorkspaces.tsx';
 
 type Product={
   id:string;
@@ -34,7 +34,7 @@ type Product={
   imageUrl?:string;
   optionSets:readonly SyncedOptionSet[];
 };
-type CartLine={id:string;productId:string;name:string;qty:number;unitMinor:number;serviceMode:ServiceMode;detail?:string};
+type CartLine={id:string;productId:string;name:string;qty:number;unitMinor:number;serviceMode:ServiceMode;detail?:string;configuration?:ProductConfiguration};
 
 const BASE_PRODUCTS:readonly Product[]=[
   {id:'riceball',category:'飯團',name:'原味飯團',priceMinor:4100,priceReady:true},
@@ -83,6 +83,8 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
   const [runtimeRevision,setRuntimeRevision]=useState(0);
   useEffect(()=>localRuntime.subscribe(()=>setRuntimeRevision(value=>value+1)),[]);
   const [category,setCategory]=useState('all');
+  const [requiredOnly,setRequiredOnly]=useState(false);
+  const [orderingMode,setOrderingMode]=useState<'quick'|'standard'>('quick');
   const [searchQuery,setSearchQuery]=useState('');
   const [feedbackMessage,setFeedbackMessage]=useState<string|undefined>();
   const [viewMode,setViewMode]=useState<'original'|'organized'>('original');
@@ -159,6 +161,7 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
   ];
   const visible=products
     .filter(product=>category==='all'||product.categoryId===category)
+    .filter(product=>!requiredOnly||product.optionSets.some(set=>set.required||set.min>0))
     .filter(product=>!searchQuery.trim()||product.name.toLocaleLowerCase('zh-HK').includes(searchQuery.trim().toLocaleLowerCase('zh-HK')))
     .slice()
     .sort((a,b)=>{
@@ -211,15 +214,21 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
     return {id,label:String(index+1),occupied:Boolean(occupied),codeLabel:occupied?.codeLabel};
   });
 
+  const riceballProducts=products.filter(product=>product.category.includes('飯團'));
+  const requiredProducts=products.filter(product=>product.optionSets.some(set=>set.required||set.min>0));
+  const activeCombos=comboData.combos.filter(combo=>combo.active);
+  const riceballCategory=categories.find(item=>item.label.includes('飯團'));
+
   const view:OrderingWorkspaceViewModel={
     pendingOrders,activeOrders,categories,selectedCategoryId:category,
-    searchQuery,feedbackMessage,
+    searchQuery,feedbackMessage,orderingMode,
     products:visible.map(product=>({
       id:product.id,
       name:product.name,
       priceLabel:product.priceReady?money(product.priceMinor):'未接價格',
       enabled:product.priceReady&&product.sellable&&((serviceMode==='takeaway'&&storeSettings.takeawayEnabled)||(serviceMode==='dine-in'&&storeSettings.dineInEnabled)),
       requiresOptions:product.priceReady&&product.sellable&&product.optionSets.length>0,
+      hasRequiredOptions:product.priceReady&&product.sellable&&product.optionSets.some(set=>set.required||set.min>0),
       imageUrl:frontlinePresentation.showImages?(product.imageUrl??productArtwork(product)):undefined,
       ...(!product.priceReady?{badge:'未接價格'}:!product.sellable?{badge:'停售'}:{}),
     })),
@@ -240,9 +249,9 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
       subtotalLabel:money(total),packagingLabel:'$0.00',discountLabel:'$0.00',totalLabel:money(total),checkoutEnabled:cart.length>0&&((serviceMode==='takeaway'&&storeSettings.takeawayEnabled)||(serviceMode==='dine-in'&&storeSettings.dineInEnabled)),
     },
     workItems:[
-      {id:'riceball-pool',label:'飯團待組區',count:0},
-      {id:'required',label:'必選區',count:0},
-      {id:'combo',label:'紫米套餐區',count:comboData.combos.length},
+      {id:'riceball-pool',label:'飯團待組區',count:riceballProducts.length,description:'集中揀飯團',statusLabel:riceballProducts.length?'查看商品':'未有商品',enabled:riceballProducts.length>0,active:Boolean(riceballCategory&&category===riceballCategory.id&&!requiredOnly),tone:'riceball'},
+      {id:'required',label:'必選區',count:requiredProducts.length,description:'需要完成選項',statusLabel:requiredProducts.length?'查看必選':'目前沒有',enabled:requiredProducts.length>0,active:requiredOnly,tone:'required'},
+      {id:'combo',label:'飯團套餐區',count:activeCombos.length,description:'組合主食與加配',statusLabel:activeCombos.length?'開始配搭':'未發布',enabled:activeCombos.length>0,active:panel?.type==='combo',tone:'combo'},
     ],
     actionAvailability:{
       lineServiceMode:true,
@@ -254,12 +263,27 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
     recentlyAddedProductId:recent,highlightedCartLineId:highlight,cartPulseNonce:pulse,
   };
 
+  const defaultConfiguration=(product:Product):{detail:string;deltaMinor:number;configuration:ProductConfiguration}=>{
+    const selected=Object.fromEntries(product.optionSets.map(set=>[set.id,set.options.filter(option=>option.defaultSelected).map(option=>option.id)]));
+    const chosen=product.optionSets.flatMap(set=>{
+      const ids=new Set(selected[set.id]??[]);
+      const options=set.options.filter(option=>ids.has(option.id));
+      return options.length?[{set,options}]:[];
+    });
+    return {
+      detail:chosen.map(({set,options})=>set.name+'：'+options.map(option=>option.name).join('、')).join(' · '),
+      deltaMinor:chosen.flatMap(row=>row.options).reduce((sum,option)=>sum+option.priceAdjustmentMinor,0),
+      configuration:{selected,note:''},
+    };
+  };
+
   const add=(id:string)=>{
     const product=products.find(item=>item.id===id);if(!product||!product.priceReady||!product.sellable)return;
-    const existing=cart.find(item=>item.productId===id&&item.serviceMode===serviceMode);
+    const defaults=defaultConfiguration(product);
+    const existing=cart.find(item=>item.productId===id&&item.serviceMode===serviceMode&&(item.detail??'')===defaults.detail);
     const next=existing
       ?cart.map(item=>item.id===existing.id?{...item,qty:item.qty+1}:item)
-      :[...cart,{id:'line-'+Date.now().toString(36),productId:product.id,name:product.name,qty:1,unitMinor:product.priceMinor,serviceMode}];
+      :[...cart,{id:'line-'+Date.now().toString(36),productId:product.id,name:product.name,qty:1,unitMinor:product.priceMinor+defaults.deltaMinor,serviceMode,detail:defaults.detail||undefined,configuration:defaults.configuration}];
     setCart(next);
     setRecent(id);
     setHighlight(existing?.id??next[next.length-1]?.id);
@@ -268,10 +292,11 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
     window.setTimeout(()=>{setRecent(undefined);setHighlight(undefined)},700);
   };
 
-  const addConfigured=(productId:string,detail:string,deltaMinor:number,qty:number)=>{
+  const addConfigured=(productId:string,detail:string,deltaMinor:number,qty:number,configuration:ProductConfiguration,lineId?:string)=>{
     const product=products.find(item=>item.id===productId);if(!product||!product.priceReady||!product.sellable)return;
-    const line:CartLine={id:'line-'+Date.now().toString(36),productId:product.id,name:product.name,qty,unitMinor:product.priceMinor+deltaMinor,serviceMode,detail};
-    setCart([...cart,line]);setRecent(product.id);setHighlight(line.id);setPulse(value=>value+1);setPanel(null);setFeedbackMessage(`已完成設定並加入「${product.name}」`);
+    const line:CartLine={id:lineId??'line-'+Date.now().toString(36),productId:product.id,name:product.name,qty,unitMinor:product.priceMinor+deltaMinor,serviceMode,detail:detail||undefined,configuration};
+    setCart(lineId?cart.map(item=>item.id===lineId?{...line,serviceMode:item.serviceMode}:item):[...cart,line]);
+    setRecent(product.id);setHighlight(line.id);setPulse(value=>value+1);setPanel(null);setFeedbackMessage(lineId?`已更新「${product.name}」`:`已完成設定並加入「${product.name}」`);
   };
 
   const addCombo=(comboId:string,comboName:string,detail:string,unitMinor:number)=>{
@@ -294,7 +319,7 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
     :panel?.type==='holds'?'暫存單':'';
 
   const panelBody=panel?.type==='product'
-    ?(()=>{const product=workspaceProducts.find(item=>item.id===panel.productId);return product?<ProductConfigWorkspace product={product} onAdd={(detail,delta,qty)=>addConfigured(product.id,detail,delta,qty)}/>:null})()
+    ?(()=>{const product=workspaceProducts.find(item=>item.id===panel.productId);const line=panel.lineId?cart.find(item=>item.id===panel.lineId):undefined;return product?<ProductConfigWorkspace product={product} initial={line?{qty:line.qty,configuration:line.configuration}:undefined} onAdd={(detail,delta,qty,configuration)=>addConfigured(product.id,detail,delta,qty,configuration,panel.lineId)}/>:null})()
     :panel?.type==='organize'
       ?<OrganizeWorkspace lines={cart} onDone={()=>setPanel(null)}/>
       :panel?.type==='combo'
@@ -344,7 +369,8 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
 
   const actions:OrderingWorkspaceActions={
     onSearchQuery:setSearchQuery,
-    onSelectCategory:setCategory,
+    onSelectCategory:id=>{setCategory(id);setRequiredOnly(false);},
+    onChangeOrderingMode:setOrderingMode,
     onAddProduct:add,
     onConfigureProduct:id=>setPanel({type:'product',productId:id}),
     onChangeServiceMode:mode=>{
@@ -352,7 +378,7 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
       if(mode==='dine-in'&&!storeSettings.dineInEnabled)return;
       setServiceMode(mode);setCart(cart.map(item=>({...item,serviceMode:mode})));
     },
-    onChangeCartView:mode=>{setViewMode(mode);if(mode==='organized')setPanel({type:'organize'});},
+    onChangeCartView:setViewMode,
     onChangeLineServiceMode:(lineId,mode)=>{
       if(mode==='takeaway'&&!storeSettings.takeawayEnabled)return;
       if(mode==='dine-in'&&!storeSettings.dineInEnabled)return;
@@ -363,11 +389,17 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
       const line=cart.find(item=>item.id===lineId);
       if(!line)return;
       if(comboData.combos.some(combo=>combo.id===line.productId))setPanel({type:'combo'});
-      else setPanel({type:'product',productId:line.productId});
+      else setPanel({type:'product',productId:line.productId,lineId});
     },
     onHoldCart:()=>cart.length?setPanel({type:'hold'}):setPanel({type:'holds'}),
     onCancelCart:()=>setCart([]),
-    onOpenWorkItem:id=>{if(id==='combo')setPanel({type:'combo'});else setPanel({type:'organize'});},
+    onOpenWorkItem:id=>{
+      setSearchQuery('');
+      if(id==='combo'){if(activeCombos.length)setPanel({type:'combo'});return;}
+      setPanel(null);
+      if(id==='required'){setCategory('all');setRequiredOnly(true);return;}
+      if(riceballCategory){setCategory(riceballCategory.id);setRequiredOnly(false);}
+    },
     onOpenQueueOrder:(_kind,id)=>navigate('/orders?orderId='+encodeURIComponent(id)),
     onCheckout:()=>navigate('/checkout'),
   };

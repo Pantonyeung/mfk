@@ -3,21 +3,21 @@ import {ActionFeedback,ConfirmDialog,DisabledReason,EmptyState,StatusTag} from '
 import type {CartLineViewModel,OrderingProductViewModel,OrderingWorkspaceActions,OrderingWorkspaceViewModel,ServiceMode} from './ordering-workspace-model.ts';
 import './ordering-workspace.css';
 
-function ProductCard({product,actions,recentlyAdded}:{product:OrderingProductViewModel;actions:OrderingWorkspaceActions;recentlyAdded:boolean}){
+function ProductCard({product,actions,recentlyAdded,mode}:{product:OrderingProductViewModel;actions:OrderingWorkspaceActions;recentlyAdded:boolean;mode:'quick'|'standard'}){
   const onBody=()=>{
     if(!product.enabled)return;
-    if(product.requiresOptions)actions.onConfigureProduct(product.id);
+    if(mode==='standard'||product.hasRequiredOptions)actions.onConfigureProduct(product.id);
     else actions.onAddProduct(product.id);
   };
   return <article className={`ordering-product-card ${product.imageUrl?'has-media':'text-only'}${product.enabled?'':' disabled'}${recentlyAdded?' recently-added':''}`}>
     <button type="button" className="ordering-product-body" aria-label={`${product.name}，${product.priceLabel}${product.requiresOptions?'，需要設定選項':''}`} disabled={!product.enabled} onClick={onBody}>
       {product.imageUrl?<span className="ordering-product-media" aria-hidden="true"><span>磨</span><img src={product.imageUrl} alt="" loading="lazy" decoding="async" onError={event=>event.currentTarget.remove()}/></span>:null}
       <span className="ordering-product-copy">
-        <span className="ordering-product-topline">{product.badge?<small>{product.badge}</small>:product.requiresOptions?<small className="configure">需要設定</small>:<small className="quick">可直接加入</small>}</span>
+        <span className="ordering-product-topline">{product.badge?<small>{product.badge}</small>:product.hasRequiredOptions?<small className="configure">必選設定</small>:mode==='standard'?<small>開啟設定</small>:product.requiresOptions?<small className="quick">可快加 · 可設定</small>:<small className="quick">一按加入</small>}</span>
         <b>{product.name}</b><strong>{product.priceLabel}</strong>
       </span>
     </button>
-    {product.enabled&&product.requiresOptions?<button type="button" className="ordering-product-more" aria-label={`設定 ${product.name}`} onClick={()=>actions.onConfigureProduct(product.id)}>設定</button>:null}
+    {product.enabled&&mode==='quick'&&product.requiresOptions&&!product.hasRequiredOptions?<button type="button" className="ordering-product-more" aria-label={`設定 ${product.name}`} onClick={()=>actions.onConfigureProduct(product.id)}>設定</button>:null}
   </article>;
 }
 
@@ -80,16 +80,28 @@ export function OrderingWorkspace({view,actions,centerPanel}:{view:OrderingWorks
   return <div className={`ordering-workspace${centerPanel?' panel-open':''}`}>
     <main className={`ordering-catalog${centerPanel?' ordering-catalog--panel':''}`} aria-label={centerPanel?centerPanel.title:'點單商品'}>
       {centerPanel?<section className="ordering-center-panel">
-        <header className="ordering-center-panel-head"><div><small>逐步設定</small><strong>{centerPanel.title}</strong><span>完成目前選擇後，系統先會顯示下一步。</span></div><button type="button" aria-label="關閉設定" onClick={centerPanel.onClose}>×</button></header>
+        <header className="ordering-center-panel-head"><div><small>即時設定</small><strong>{centerPanel.title}</strong><span>選項、數量同價錢會即時更新；必選完成先可以儲存。</span></div><button type="button" aria-label="關閉設定" onClick={centerPanel.onClose}>×</button></header>
         <div className="ordering-center-panel-body">{centerPanel.body}</div>
       </section>:<>
         <header className="ordering-task-header">
-          <div><span>點單</span><h1>先搵商品，再逐件設定</h1><p>商品加入後會留喺右邊購物籃；準備好就按「前往結帳」。</p></div>
+          <div><span>點單</span><h1>一按加入，有必選先停低</h1><p>快速模式適合繁忙時段；普通模式每件商品都先核對設定。</p></div>
           <div className="ordering-source-status"><StatusTag tone="success">本機可用</StatusTag>{view.menuRevisionLabel?<small>{view.menuRevisionLabel}</small>:null}</div>
         </header>
 
         {view.feedbackMessage?<ActionFeedback tone="success" title={view.feedbackMessage} detail={`購物籃而家有 ${itemCount} 件商品；可以繼續揀，或者前往結帳。`}/>:null}
         {view.operationalNotice?<ActionFeedback tone="warning" title="營運提醒" detail={view.operationalNotice}/>:null}
+
+        <section className="ordering-command-bar" aria-label="點單模式與快捷區">
+          <div className="ordering-mode-switch" role="group" aria-label="商品點選模式">
+            <span><b>點選模式</b><small>{view.orderingMode==='quick'?'冇必選就直接加入':'每件商品先打開設定'}</small></span>
+            <div><button type="button" className={view.orderingMode==='quick'?'active':''} aria-pressed={view.orderingMode==='quick'} onClick={()=>actions.onChangeOrderingMode('quick')}>快速</button><button type="button" className={view.orderingMode==='standard'?'active':''} aria-pressed={view.orderingMode==='standard'} onClick={()=>actions.onChangeOrderingMode('standard')}>普通</button></div>
+          </div>
+          <div className="ordering-work-items">
+            {view.workItems.map(item=><button type="button" key={item.id} className={`${item.tone}${item.active?' active':''}`} aria-pressed={item.active} disabled={!item.enabled} onClick={()=>actions.onOpenWorkItem(item.id)}>
+              <span><b>{item.label}</b><small>{item.description}</small></span><strong>{item.count}</strong><em>{item.statusLabel}</em>
+            </button>)}
+          </div>
+        </section>
 
         <section className="ordering-find-products" aria-label="搜尋及篩選商品">
           <label className="ordering-search"><span aria-hidden="true">⌕</span><input type="search" value={view.searchQuery} onChange={event=>actions.onSearchQuery(event.target.value)} placeholder="搜尋商品名稱" aria-label="搜尋商品"/>{view.searchQuery?<button type="button" aria-label="清除搜尋" onClick={()=>actions.onSearchQuery('')}>×</button>:null}</label>
@@ -98,7 +110,9 @@ export function OrderingWorkspace({view,actions,centerPanel}:{view:OrderingWorks
           </nav>}
         </section>
 
-        {view.products.length?<section className="ordering-product-grid" aria-live="polite">{view.products.map(product=><ProductCard key={product.id} product={product} actions={actions} recentlyAdded={view.recentlyAddedProductId===product.id}/>)}</section>:<EmptyState icon="⌕" title="搵唔到商品" detail="試下清除搜尋，或者選擇其他分類。" actionLabel="清除搜尋" onAction={()=>actions.onSearchQuery('')}/>}
+        {view.products.length
+          ?<section className="ordering-product-grid" aria-live="polite">{view.products.map(product=><ProductCard key={product.id} product={product} actions={actions} mode={view.orderingMode} recentlyAdded={view.recentlyAddedProductId===product.id}/>)}</section>
+          :<EmptyState icon="⌕" title="搵唔到商品" detail="試下清除搜尋，或者選擇其他分類。" actionLabel="清除搜尋" onAction={()=>actions.onSearchQuery('')}/>}
       </>}
     </main>
 
@@ -120,7 +134,7 @@ export function OrderingWorkspace({view,actions,centerPanel}:{view:OrderingWorks
         {availability.holdCart||availability.cancelCart?<div className={`ordering-cart-secondary-actions${!availability.cancelCart?' single':''}`}>{availability.holdCart?<button type="button" onClick={actions.onHoldCart}>{view.cart.lines.length?'暫存訂單':'取回訂單'}</button>:null}{availability.cancelCart?<button type="button" className="destructive" onClick={()=>setCancelOpen(true)}>取消呢張單</button>:null}</div>:null}
       </>:null}
       {!view.cart.checkoutEnabled?<DisabledReason>{checkoutReason}</DisabledReason>:null}
-      <button type="button" className="ordering-checkout" disabled={!view.cart.checkoutEnabled} onClick={actions.onCheckout}>{view.cart.checkoutEnabled?`下一步：結帳 ${view.cart.totalLabel}`:'加入商品後前往結帳'}</button>
+      <button type="button" className="ordering-checkout" disabled={!view.cart.checkoutEnabled} onClick={actions.onCheckout}>{view.cart.checkoutEnabled?`前往結帳 ${view.cart.totalLabel}`:'加入商品後前往結帳'}</button>
     </aside>
 
     <ConfirmDialog open={cancelOpen} title="取消目前訂單？" description="購物籃入面嘅商品會全部移除。呢個動作唔會建立正式訂單。" confirmLabel="確認取消" tone="danger" onClose={()=>setCancelOpen(false)} onConfirm={()=>{actions.onCancelCart();setCancelOpen(false)}}/>

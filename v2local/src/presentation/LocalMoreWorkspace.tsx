@@ -151,24 +151,20 @@ function OverviewPanel({onOpen}:{onOpen:(section:Section)=>void}){
   const printers=loadPrinters();
   const online=printers.filter(printer=>printer.host.trim()).length;
   const lastPrint=readLastPrintDiagnostic();
-  const cards=[
-    {id:'dayclose' as const,no:'01',icon:'▣',title:'收銀與日結',desc:'現金點算、開工底箱、日結確認與本機紀錄'},
-    {id:'reports' as const,no:'02',icon:'↗',title:'報表與分析',desc:'營業額、訂單、商品排行與本機報表'},
-    {id:'printing' as const,no:'03',icon:'▤',title:'打印與設備',desc:'打印機設定、路由、測試與標籤綁定'},
-    {id:'backup' as const,no:'04',icon:'☁',title:'備份與恢復',desc:'本機備份、校驗、恢復與資料安全'},
-    {id:'diagnostics' as const,no:'05',icon:'⚙',title:'顯示與操作／診斷',desc:'打印記錄、用途、錯誤碼與本機健康狀態'},
-    {id:'admin-menu' as const,no:'06',icon:'↻',title:'管理端同步',desc:'只讀查看管理端最新版本、同步狀態同本機最後版本'},
-  ];
   return <section className="more-overview">
-    <header><div><span>本機營運</span><h2>更多功能</h2><p>低頻工作集中喺呢度；揀一項後先會顯示詳細操作。</p></div><strong>{new Date().toLocaleString('zh-HK')}</strong></header>
-    <div className="more-overview-cards">{cards.map(card=><button key={card.id} type="button" onClick={()=>onOpen(card.id)}>
-      <span>{card.no}</span><i>{card.icon}</i><b>{card.title}</b><small>{card.desc}</small><em>進入</em>
-    </button>)}</div>
-    <div className="more-overview-grid">
-      <article><header><b>今日營運</b><span>本機資料</span></header><div><p><span>完成訂單</span><strong>{report.completedOrders}</strong></p><p><span>淨銷售</span><strong>{money(report.netSalesMinor)}</strong></p><p><span>平均客單</span><strong>{money(report.averageOrderMinor)}</strong></p></div></article>
-      <article><header><b>打印設備</b><span>{online}/{printers.length} 已綁定</span></header><div><p><span>最近打印</span><strong>{lastPrint?lastPrint.elapsedMs+' ms':'—'}</strong></p><p><span>成功／計劃</span><strong>{lastPrint?lastPrint.sent+'/'+lastPrint.planned:'—'}</strong></p><p><span>狀態</span><strong>{lastPrint?(lastPrint.failed?'需檢查':'正常'):'待首張'}</strong></p></div></article>
-      <article><header><b>系統資訊</b><span>本機模式</span></header><div><p><span>運作方式</span><strong>本機優先</strong></p><p><span>裝置連接</span><strong>{window.moreFunNative?'已連接':'未連接'}</strong></p><p><span>交易資料</span><strong>以本機記錄為準</strong></p></div></article>
+    <header><div><span>更多</span><h2>低頻工具，按工作目的整理</h2><p>先顯示最常用嘅營運工作；設定細節進入後先展開。</p></div><strong>{new Date().toLocaleString('zh-HK')}</strong></header>
+    <div className="more-overview-layout">
+      <button className="more-primary-action" type="button" onClick={()=>onOpen('dayclose')}>
+        <span>今日主要工作</span><h3>收銀與日結</h3><p>現金點算、開工底箱、日結確認同本機紀錄。</p>
+        <div><b>{report.completedOrders}<small>完成訂單</small></b><b>{money(report.netSalesMinor)}<small>淨銷售</small></b><b>{money(report.averageOrderMinor)}<small>平均客單</small></b></div><strong>進入收銀與日結 →</strong>
+      </button>
+      <div className="more-tool-groups">
+        <section><header><div><b>營運回顧</b><small>今日數字與商品表現</small></div></header><button type="button" onClick={()=>onOpen('reports')}><span>報表與分析<small>營業額、訂單、商品排行</small></span><strong>查看 →</strong></button></section>
+        <section><header><div><b>門店準備</b><small>開舖前與異常時使用</small></div><em>{online}/{printers.length} 打印機已綁定</em></header><button type="button" onClick={()=>onOpen('printing')}><span>打印與設備<small>設定、路由、測試與標籤</small></span><strong>{lastPrint?(lastPrint.failed?'需檢查':'正常'):'待首張'} →</strong></button><button type="button" onClick={()=>onOpen('admin-menu')}><span>管理端同步<small>只讀查看最新版本與本機最後版本</small></span><strong>查看 →</strong></button></section>
+        <section><header><div><b>資料與支援</b><small>需要時先進入</small></div><em>{window.moreFunNative?'裝置已連接':'裝置未連接'}</em></header><button type="button" onClick={()=>onOpen('backup')}><span>備份與恢復<small>備份、校驗、恢復與資料安全</small></span><strong>管理 →</strong></button><button type="button" onClick={()=>onOpen('diagnostics')}><span>顯示與操作／診斷<small>錯誤碼、打印記錄與本機健康</small></span><strong>檢查 →</strong></button></section>
+      </div>
     </div>
+    <footer className="more-truth-strip"><span><b>本機優先</b><small>交易資料以本機記錄為準</small></span><span><b>最近打印</b><small>{lastPrint?`${lastPrint.sent}/${lastPrint.planned} · ${lastPrint.elapsedMs} ms`:'未有記錄'}</small></span><span><b>裝置狀態</b><small>{window.moreFunNative?'已連接':'目前未連接'}</small></span></footer>
   </section>;
 }
 

@@ -86,3 +86,29 @@
 .organize-title>div:first-child>small{color:#1768dc;font-weight:900}
 .organize-title>div:first-child>p{margin:2px 0 0;color:#66748a}
 .organize-drinks button.active{border:2px solid #1768dc;background:#eef5ff;color:#1559af}
+
+/* R2 single-surface product editor: quick to scan, truthful pricing, no extra review click. */
+.cfg-product-head>div:nth-child(2)>p{margin:3px 0 0;color:#637083;font-size:14px}
+.cfg-live-total{display:grid;justify-items:end;gap:2px;text-align:right}
+.cfg-live-total small{font-size:12px;font-weight:900;color:#637083}
+.cfg-live-total strong{font-size:30px;color:#1768dc}
+.cfg-live-total span{color:#778397;font-size:12px}
+.cfg-editor{min-height:0;display:grid;grid-template-columns:minmax(0,1.55fr) minmax(290px,.65fr);gap:14px;align-items:start}
+.cfg-editor-options{min-height:0;display:grid;gap:10px;overflow:auto;padding-right:2px}
+.cfg-editor-options>.cfg-block{padding:16px 18px;border:1px solid #dfe5ec;border-radius:14px;background:#fff}
+.cfg-editor-options>.cfg-block.is-missing{border-color:#e5c36f;background:#fffdf7}
+.cfg-editor-options>.cfg-block>header small{color:#66748a;letter-spacing:0;text-transform:none}
+.cfg-editor-options>.cfg-block.is-missing>header small{color:#936300}
+.cfg-editor-summary{position:sticky;top:0;display:grid;gap:13px;padding:18px;border:1px solid #d5dee9;border-radius:15px;background:#fff;box-shadow:0 8px 24px rgb(34 61 101 / 6%)}
+.cfg-editor-summary>header small{color:#1768dc;font-size:12px;font-weight:900;letter-spacing:.08em}
+.cfg-editor-summary h3{margin:3px 0 0;font-size:22px}
+.cfg-editor-summary .cfg-qty{grid-template-columns:1fr 48px 58px 48px}
+.cfg-editor-summary .cfg-note{display:grid;grid-template-columns:1fr auto;gap:6px;padding:0}
+.cfg-editor-summary .cfg-note input{grid-column:1/-1;height:48px;background:#fff}
+.cfg-price-readback{display:grid;grid-template-columns:1fr auto;gap:7px 16px;padding:12px 0;border-top:1px solid #e5eaf0;border-bottom:1px solid #e5eaf0;color:#637083}
+.cfg-price-readback b{text-align:right;color:#34465e}
+.cfg-price-readback strong{padding-top:7px;border-top:1px solid #e5eaf0;color:#172033;font-size:18px}
+.cfg-price-readback strong:last-child{color:#1768dc;font-size:23px;text-align:right}
+.cfg-save{min-height:58px;border:0;border-radius:11px;color:#fff;background:#1768dc;font-size:17px;font-weight:900}
+.cfg-save:disabled{cursor:not-allowed;color:#8792a3;background:#dce2e9}
+@media(max-width:1350px){.cfg-editor{grid-template-columns:minmax(0,1.35fr) minmax(270px,.65fr)}.cfg-editor-options>.cfg-block{padding:14px}.cfg-live-total span{display:none}}

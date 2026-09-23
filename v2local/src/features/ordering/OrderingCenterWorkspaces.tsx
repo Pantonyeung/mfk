@@ -20,8 +20,12 @@ export interface WorkspaceCartLine{
   readonly unitMinor:number;
   readonly detail?:string;
 }
+export interface ProductConfiguration{
+  readonly selected:Readonly<Record<string,readonly string[]>>;
+  readonly note:string;
+}
 export type OrderingPanelState=
-  |{readonly type:'product';readonly productId:string}
+  |{readonly type:'product';readonly productId:string;readonly lineId?:string}
   |{readonly type:'organize'}
   |{readonly type:'combo'}
   |{readonly type:'hold'}
@@ -30,16 +34,15 @@ export type OrderingPanelState=
 
 const money=(minor:number)=>(minor<0?'-':'')+String.fromCharCode(36)+(Math.abs(minor)/100).toFixed(2);
 
-export function ProductConfigWorkspace({product,onAdd}:{product:WorkspaceProduct;onAdd:(detail:string,deltaMinor:number,qty:number)=>void}){
-  const [qty,setQty]=useState(1);
-  const [note,setNote]=useState('');
-  const [activeStep,setActiveStep]=useState(0);
+export function ProductConfigWorkspace({product,initial,onAdd}:{product:WorkspaceProduct;initial?:{readonly qty:number;readonly configuration?:ProductConfiguration};onAdd:(detail:string,deltaMinor:number,qty:number,configuration:ProductConfiguration)=>void}){
+  const [qty,setQty]=useState(initial?.qty??1);
+  const [note,setNote]=useState(initial?.configuration?.note??'');
   const [choiceFeedback,setChoiceFeedback]=useState('');
   const optionSets=product.optionSets??[];
   const [selected,setSelected]=useState<Record<string,string[]>>(()=>Object.fromEntries(
     optionSets.map(set=>[
       set.id,
-      set.options.filter(option=>option.defaultSelected).map(option=>option.id),
+      [...(initial?.configuration?.selected[set.id]??set.options.filter(option=>option.defaultSelected).map(option=>option.id))],
     ]),
   ));
 
@@ -75,11 +78,6 @@ export function ProductConfigWorkspace({product,onAdd}:{product:WorkspaceProduct
     }),
     note.trim(),
   ].filter(Boolean).join(' · ');
-  const totalSteps=Math.max(1,optionSets.length+1);
-  const reviewing=activeStep>=optionSets.length;
-  const currentSet=optionSets[activeStep];
-  const currentCount=currentSet?(selected[currentSet.id]??[]).length:0;
-  const currentMissing=Boolean(currentSet&&(currentCount<currentSet.min||(currentSet.required&&currentCount<1)));
   const summaryFor=(set:SyncedOptionSet)=>{
     const ids=new Set(selected[set.id]??[]);
     const names=set.options.filter(option=>ids.has(option.id)).map(option=>option.name);
@@ -89,35 +87,37 @@ export function ProductConfigWorkspace({product,onAdd}:{product:WorkspaceProduct
   return <div className="cfg-workspace">
     <header className="cfg-product-head">
       <div className="cfg-product-hero">{product.imageUrl?<img src={product.imageUrl} alt=""/>:null}</div>
-      <div><small>{product.category}</small><h2>{product.name}</h2><strong>{money(product.priceMinor+delta)}</strong></div>
-      <GuidedProgress current={Math.min(activeStep+1,totalSteps)} total={totalSteps} label={reviewing?'核對商品設定':currentSet?.name??'商品設定'}/>
+      <div><small>{product.category}</small><h2>{product.name}</h2><p>基價 {money(product.priceMinor)}{delta?` · 選項 ${delta>0?'+':''}${money(delta)}`:' · 選項不加價'}</p></div>
+      <div className="cfg-live-total"><small>目前單價</small><strong>{money(product.priceMinor+delta)}</strong><span>由菜單與已選選項自動計算</span></div>
     </header>
 
-    {optionSets.slice(0,Math.min(activeStep,optionSets.length)).map(set=><CompletedStep key={set.id} label={set.name} summary={summaryFor(set)} onEdit={()=>{setActiveStep(optionSets.indexOf(set));setChoiceFeedback('')}}/>)}
-
-    {!reviewing&&currentSet?<section className="cfg-block cfg-current-step" key={currentSet.id}>
-      <header><div><small>而家請完成</small><b>{currentSet.name}</b></div><span>{currentSet.required?'必選':'可選'} · {currentSet.selection==='SINGLE'?'單選':'多選'} · {currentSet.min}–{currentSet.max}</span></header>
-      <p className="cfg-step-instruction">選好後撳「繼續」。之後先會顯示下一組。</p>
-      <div className="cfg-choice-grid three">{currentSet.options.map(option=>{
-        const active=(selected[currentSet.id]??[]).includes(option.id);
-        const price=option.priceAdjustmentMinor;
-        return <button type="button" key={option.id} aria-pressed={active} className={active?'active':''} onClick={()=>toggle(currentSet,option.id)}>
-          <span className="cfg-choice-state" aria-hidden="true">{active?'✓':''}</span><b>{option.name}</b>{price!==0?<small>{price>0?'+':''}{money(price)}</small>:null}
-        </button>;
-      })}</div>
-      {choiceFeedback?<DisabledReason>{choiceFeedback}</DisabledReason>:null}
-      {currentMissing?<DisabledReason>{currentSet.required?'請先完成必選項目。':`最少選擇 ${currentSet.min} 項。`}</DisabledReason>:null}
-      <footer className="cfg-step-action"><button type="button" className="primary" disabled={currentMissing} onClick={()=>{setActiveStep(step=>step+1);setChoiceFeedback('')}}>繼續：{activeStep+1<optionSets.length?optionSets[activeStep+1]?.name:'核對商品'}</button></footer>
-    </section>:null}
-
-    {reviewing?<section className="cfg-review" aria-label="核對商品設定">
-      <header><div><small>最後一步</small><h3>核對後加入購物籃</h3></div><strong>{money((product.priceMinor+delta)*qty)}</strong></header>
-      {optionSets.length===0?<p className="cfg-no-options">此商品沒有已發布選項，可以直接設定數量。</p>:null}
-      <div className="cfg-review-summary">{optionSets.map(set=><p key={set.id}><span>{set.name}</span><b>{summaryFor(set)}</b></p>)}</div>
+    <section className="cfg-editor" aria-label="商品設定">
+      <div className="cfg-editor-options">
+        {optionSets.length===0?<p className="cfg-no-options">此商品沒有已發布選項；確認數量就可以加入。</p>:optionSets.map(set=>{
+          const count=(selected[set.id]??[]).length;
+          const missing=count<set.min||(set.required&&count<1);
+          return <section className={`cfg-block${missing?' is-missing':''}`} key={set.id}>
+            <header><div><small>{missing?'尚未完成':'已選 '+summaryFor(set)}</small><b>{set.name}</b></div><span>{set.required?'必選':'可選'} · {set.selection==='SINGLE'?'單選':'多選'} · {set.min}–{set.max}</span></header>
+            <div className="cfg-choice-grid three">{set.options.map(option=>{
+              const active=(selected[set.id]??[]).includes(option.id);
+              const price=option.priceAdjustmentMinor;
+              return <button type="button" key={option.id} aria-pressed={active} className={active?'active':''} onClick={()=>toggle(set,option.id)}>
+                <span className="cfg-choice-state" aria-hidden="true">{active?'✓':''}</span><b>{option.name}</b>{price!==0?<small>{price>0?'+':''}{money(price)}</small>:<small>不加價</small>}
+              </button>;
+            })}</div>
+          </section>;
+        })}
+        {choiceFeedback?<DisabledReason>{choiceFeedback}</DisabledReason>:null}
+      </div>
+      <aside className="cfg-editor-summary">
+        <header><small>即時核對</small><h3>數量與備註</h3></header>
       <div className="cfg-qty"><span>數量</span><button type="button" onClick={()=>setQty(Math.max(1,qty-1))} aria-label="減少數量">−</button><b>{qty}</b><button type="button" onClick={()=>setQty(qty+1)} aria-label="增加數量">＋</button></div>
       <label className="cfg-note"><span>商品備註 <small>選填</small></span><input value={note} maxLength={60} onChange={event=>setNote(event.target.value)} placeholder="例如：不要蔥、醬分開"/><small>{note.length}/60</small></label>
-      <footer className="cfg-action"><div><span>單價</span><b>{money(product.priceMinor+delta)}</b></div><button type="button" className="primary" disabled={invalid} onClick={()=>onAdd(detail,delta,qty)}>加入購物籃　{money((product.priceMinor+delta)*qty)}</button></footer>
-    </section>:null}
+        <div className="cfg-price-readback"><span>基價</span><b>{money(product.priceMinor)}</b><span>選項價差</span><b>{delta>0?'+':''}{money(delta)}</b><strong>合計</strong><strong>{money((product.priceMinor+delta)*qty)}</strong></div>
+        {invalid?<DisabledReason>請先完成所有必選項目，先可以加入購物籃。</DisabledReason>:null}
+        <button type="button" className="cfg-save primary" disabled={invalid} onClick={()=>onAdd(detail,delta,qty,{selected,note})}>{initial?'儲存修改':'加入購物籃'}　{money((product.priceMinor+delta)*qty)}</button>
+      </aside>
+    </section>
   </div>;
 }
 

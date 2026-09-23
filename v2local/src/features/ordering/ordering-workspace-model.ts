@@ -19,6 +19,7 @@ export interface OrderingProductViewModel {
   readonly priceLabel:string;
   readonly enabled:boolean;
   readonly requiresOptions:boolean;
+  readonly hasRequiredOptions:boolean;
   readonly badge?:string;
   readonly imageUrl?:string;
 }
@@ -50,6 +51,11 @@ export interface OrderingWorkItemViewModel {
   readonly id:'riceball-pool'|'required'|'combo';
   readonly label:string;
   readonly count:number;
+  readonly description:string;
+  readonly statusLabel:string;
+  readonly enabled:boolean;
+  readonly active:boolean;
+  readonly tone:'riceball'|'required'|'combo';
 }
 
 export interface OrderingActionAvailability {
@@ -69,6 +75,7 @@ export interface OrderingWorkspaceViewModel {
   readonly menuRevisionLabel?:string;
   readonly operationalNotice?:string;
   readonly searchQuery:string;
+  readonly orderingMode:'quick'|'standard';
   readonly feedbackMessage?:string;
   readonly showCategories?:boolean;
   readonly serviceModes?:Readonly<{takeaway:boolean;dineIn:boolean}>;
@@ -83,6 +90,7 @@ export interface OrderingWorkspaceViewModel {
 export interface OrderingWorkspaceActions {
   readonly onSearchQuery:(query:string)=>void;
   readonly onSelectCategory:(categoryId:string)=>void;
+  readonly onChangeOrderingMode:(mode:'quick'|'standard')=>void;
   readonly onAddProduct:(productId:string)=>void;
   readonly onConfigureProduct:(productId:string)=>void;
   readonly onChangeServiceMode:(mode:ServiceMode)=>void;
