@@ -1017,7 +1017,7 @@ describe('Keeta live edge runtime',()=>{
     expect(webhook.status).toBe(200);
 
     const beforeAck=await runtime.fetch(new Request('https://internal/admin/commercial/list',{method:'POST'}));
-    const beforeRows=await beforeAck.json() as {items:Array<{state:string;canonicalOrderId:null;snapshot:Record<string,unknown>}>>};
+    const beforeRows=await beforeAck.json() as {items:Array<{state:string;canonicalOrderId:null;snapshot:Record<string,unknown>}>};
     expect(beforeRows.items).toHaveLength(1);
     expect(beforeRows.items[0]).toMatchObject({state:'WEBHOOK_CAPTURED',canonicalOrderId:null});
     expect(beforeRows.items[0]?.snapshot).toMatchObject({
