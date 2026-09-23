@@ -1,3 +1,4 @@
-work_id=MFK-KEETA-K3-MENU-SUBMIT-FEEDBACK-R1
-purpose=surface exact Keeta K3 menu submit/status errors and busy feedback
-dispatch_base=4330c599f2fbded7da91358e306e6bdcdbcfc9b6
+work_id=MFK-KEETA-TOKEN-AUTH-REVOCATION-R1
+purpose=preview test and build only for authorization revocation fail-closed candidate
+candidate=39037c6555b84fc0fc8eccb466606be485296333
+deployment_authority=PREVIEW_ONLY

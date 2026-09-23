@@ -126,6 +126,63 @@ describe('Keeta live edge runtime',()=>{
     expect(journal?.eventName).toBe('STORE_AUTHORIZATION_ADDED');
   });
 
+  it('fails closed after signed provider authorization removal without deleting encrypted token custody',async()=>{
+    const key=Buffer.alloc(32,13).toString('base64');
+    const storage=new Map<string,unknown>();
+    const state={storage:{
+      get:async(key:string)=>storage.get(key),
+      put:async(key:string,value:unknown)=>{storage.set(key,value);},
+      delete:async(key:string)=>{storage.delete(key);},
+      setAlarm:async()=>{},
+      getAlarm:async()=>null,
+    }};
+    const env={
+      KEETA_APP_ID:'3419700273',KEETA_APP_SECRET:'test-secret',KEETA_TOKEN_ENCRYPTION_KEY:key,
+      KEETA_PROVIDER_SHOP_ID:'721578302',KEETA_OAUTH_REDIRECT_URI:'https://admin.morefunos.com/api/keeta/oauth/callback',
+    };
+    const {KeetaRuntimeStore}=await import('../keeta-runtime.ts');
+    const runtime=new KeetaRuntimeStore(state as never,env as never);
+    const imported=await runtime.fetch(new Request('https://internal/admin/token/import-test',{
+      method:'POST',headers:{'content-type':'application/json'},
+      body:JSON.stringify({accessToken:'access-custody',tokenType:'bearer',expiresIn:7776000,refreshToken:'refresh-custody',scope:'all',issuedAtTime:Date.now()}),
+    }));
+    expect(imported.status).toBe(200);
+    const tokenBefore=storage.get('oauth:token');
+    expect(tokenBefore).toBeTruthy();
+
+    const url='https://internal/webhook';
+    const signed=await signKeetaRuntimeParams(url,{
+      eventId:1302,appId:3419700273,messageId:'auth-remove-1',shopId:721578302,
+      message:JSON.stringify({authId:'1294288',opType:2,shopId:721578302}),timestamp:1790092904,
+    },'test-secret');
+    const response=await runtime.fetch(new Request(url,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(signed)}));
+    expect(response.status).toBe(200);
+    expect(storage.get('oauth:token')).toEqual(tokenBefore);
+
+    const statusResponse=await runtime.fetch(new Request('https://internal/admin/status',{method:'POST'}));
+    const status=await statusResponse.json() as {oauth:{state:string;authorization:{state:string;eventId:number}|null}};
+    expect(status.oauth.state).toBe('REAUTH_REQUIRED');
+    expect(status.oauth.authorization).toMatchObject({state:'REMOVED',eventId:1302});
+
+    const readiness=await runtime.fetch(new Request('https://internal/admin/token/readiness',{method:'POST'}));
+    expect(readiness.status).toBe(409);
+    expect(await readiness.json()).toMatchObject({state:'TOKEN_UNAVAILABLE',code:'KEETA_ACCESS_TOKEN_REAUTHORIZE_REQUIRED'});
+  });
+
+  it('treats signed brand authorization revocation as fail-closed provider custody evidence',async()=>{
+    const key=Buffer.alloc(32,14).toString('base64');
+    const storage=new Map<string,unknown>();
+    const state={storage:{get:async(key:string)=>storage.get(key),put:async(key:string,value:unknown)=>{storage.set(key,value);},delete:async(key:string)=>{storage.delete(key);}}};
+    const env={KEETA_APP_ID:'3419700273',KEETA_APP_SECRET:'test-secret',KEETA_TOKEN_ENCRYPTION_KEY:key,KEETA_PROVIDER_SHOP_ID:'721578302',KEETA_OAUTH_REDIRECT_URI:'https://admin.morefunos.com/api/keeta/oauth/callback'};
+    const {KeetaRuntimeStore}=await import('../keeta-runtime.ts');
+    const runtime=new KeetaRuntimeStore(state as never,env as never);
+    const url='https://internal/webhook';
+    const signed=await signKeetaRuntimeParams(url,{eventId:1303,appId:3419700273,messageId:'auth-revoke-1',shopId:721578302,message:JSON.stringify({shopId:721578302}),timestamp:1790092905},'test-secret');
+    expect((await runtime.fetch(new Request(url,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(signed)}))).status).toBe(200);
+    const status=await (await runtime.fetch(new Request('https://internal/admin/status',{method:'POST'}))).json() as {oauth:{authorization:{state:string;eventId:number}|null}};
+    expect(status.oauth.authorization).toMatchObject({state:'REVOKED',eventId:1303});
+  });
+
   it('records sanitized OAuth callback failure diagnostics without storing code or state',async()=>{
     const key=Buffer.alloc(32,4).toString('base64');
     const storage=new Map<string,unknown>();
