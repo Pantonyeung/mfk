@@ -167,7 +167,7 @@ function parseTokenMaterial(input){
   const parsed=typeof input==='string'?JSON.parse(input):record(input,'KEETA_TOKEN_RESPONSE_INVALID_SHAPE');
   const root=record(parsed,'KEETA_TOKEN_RESPONSE_INVALID_SHAPE');
   let candidate=root;
-  for(let depth=0;depth<3;depth+=1){
+  for(let depth=0;depth<8;depth+=1){
     if(!(candidate.data&&typeof candidate.data==='object'&&!Array.isArray(candidate.data)))break;
     candidate=record(candidate.data,'KEETA_TOKEN_RESPONSE_INVALID_SHAPE');
   }

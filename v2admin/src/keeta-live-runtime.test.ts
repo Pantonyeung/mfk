@@ -363,6 +363,29 @@ describe('Keeta live edge runtime',()=>{
   });
 
 
+  it('walks the live-proven token envelope beyond depth three with a bounded ceiling',async()=>{
+    const key=Buffer.alloc(32,17).toString('base64');
+    const storage=new Map<string,unknown>();
+    const state={storage:{get:async(key:string)=>storage.get(key),put:async(key:string,value:unknown)=>{storage.set(key,value);},delete:async(key:string)=>{storage.delete(key);}}};
+    const env={KEETA_APP_ID:'3419700273',KEETA_APP_SECRET:'test-secret',KEETA_TOKEN_ENCRYPTION_KEY:key,KEETA_PROVIDER_SHOP_ID:'721578302',KEETA_OAUTH_REDIRECT_URI:'https://admin.morefunos.com/api/keeta/oauth/callback'};
+    const {KeetaRuntimeStore}=await import('../keeta-runtime.ts');
+    const runtime=new KeetaRuntimeStore(state as never,env as never);
+    const issuedAtTime=Date.now();
+    const token={accessToken:'deep-access',tokenType:'bearer',expiresIn:7776000,refreshToken:'deep-refresh',scope:'all',issuedAtTime};
+    let envelope:unknown=token;
+    for(let depth=0;depth<5;depth+=1)envelope={code:0,message:'Success',data:envelope};
+    vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify(envelope),{status:200})));
+    try{
+      const imported=await runtime.fetch(new Request('https://internal/admin/token/import-test',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({accessToken:'expired-access',tokenType:'bearer',expiresIn:1,refreshToken:'old-refresh',scope:'all',issuedAtTime:issuedAtTime-10000})}));
+      expect(imported.status).toBe(200);
+      const status=await (await runtime.fetch(new Request('https://internal/admin/status',{method:'POST'}))).json() as {oauth:{state:string;tokenSource:string}};
+      expect(status.oauth).toMatchObject({state:'CONNECTED',tokenSource:'TEST_PROVIDER_PORTAL_REFRESH'});
+      const serialized=JSON.stringify([...storage.entries()]);
+      expect(serialized).not.toContain('deep-access');
+      expect(serialized).not.toContain('deep-refresh');
+    }finally{vi.unstubAllGlobals();}
+  });
+
   it('accepts the observed nested provider token data envelope without weakening token validation',async()=>{
     const key=Buffer.alloc(32,16).toString('base64');
     const storage=new Map<string,unknown>();
