@@ -1,22 +1,13 @@
 name: deploy-mfk-smt-ui-preview
 
 on:
-  push:
-    branches:
-      - 'ops/MFK/SMT-UI-PUBLIC-PREVIEW-R1'
-    paths:
-      - 'v2local/**'
-      - '.github/workflows/deploy-mfk-smt-ui-preview.yml'
   pull_request:
     branches:
-      - main
-    paths:
-      - 'v2local/**'
-      - '.github/workflows/deploy-mfk-smt-ui-preview.yml'
+      - work/MFK/SMT-HUMAN-UI-RECOMPOSITION-R1
+  workflow_dispatch:
 
 jobs:
-  deploy:
-    if: github.event_name == 'push' || github.head_ref == 'ops/MFK/SMT-UI-PUBLIC-PREVIEW-R1'
+  preview:
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -30,23 +21,21 @@ jobs:
         with:
           node-version: '22'
 
-      - name: Verify preview source identity
+      - name: Verify exact product candidate boundary
         shell: bash
         run: |
           echo "Preview source: $GITHUB_SHA"
           git diff --exit-code 171328b0fec5debd051c3a27eb627933c62768f8 -- src/runtime
 
-      - name: Install
-        run: npm install --no-audit --no-fund --legacy-peer-deps --package-lock=false
+      - run: npm install --no-audit --no-fund --legacy-peer-deps --package-lock=false
+      - run: npm test
+      - run: npm run build
 
-      - name: Test
-        run: npm test
-
-      - name: Build
-        run: npm run build
-
-      - name: Deploy isolated SMT UI preview
-        run: npx --yes wrangler@latest preview --name smt-ui-r1 --config wrangler.preview.jsonc
+      - name: Upload SMT Human UI R1 preview
+        run: npx --yes wrangler@latest versions upload --config wrangler.preview.jsonc --preview-alias smt-human-ui-r1
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+
+      - name: Verify preview
+        run: curl --retry 5 --retry-delay 2 --fail --silent --show-error --head https://smt-human-ui-r1-mfk-admin.yeungyi88.workers.dev
