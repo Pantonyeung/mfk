@@ -1,0 +1,93 @@
+MFK CUSTOMER UI/UX REDESIGN BRIEF R1
+Date: 2026-09-23
+
+STATUS
+- Current repo: Pantonyeung/mfk
+- Surveyed main before this handoff: bb2b34e0f35b00ca374de0f4ca8d713ebd848684
+- Surface: v2customer/**
+- Current product state: PRODUCT_COMPLETE_NOT_CONNECTED
+- Customer capability registry: 58
+- Customer command shapes: 5 / 5 NOT_WIRED
+
+OWNER INTENT
+Redraw the entire Customer client UI/UX while preserving all existing customer capabilities and transaction-safety semantics.
+
+BOUNDARY
+UI_UX_REDESIGN_ALLOWED
+PRESENTATION_LAYER_ALLOWED
+NO_LIVE_WIRING
+NO_AUTHORITY_CHANGE
+NO_SECOND_ORDER_ENGINE
+NO_SECOND_PRICING_ENGINE
+NO_PAYMENT_EXECUTION
+NO_STORE_KERNEL_WRITE
+NO_PROVIDER_MUTATION
+NO_BACKGROUND_AUTO_RESUBMIT
+
+PRESERVE
+- Home / store context / own-channel availability
+- Menu / category / search / zero-result recovery
+- Product detail / variation / modifier / option / combo
+- min/max/required validation and sellability presentation
+- durable local non-authoritative cart and checkout draft
+- quantity/edit/remove/partial repair
+- injected canonical quote presentation only
+- phone/name checkout draft
+- stable submission identity / idempotency
+- PENDING / UNKNOWN / readback-first / no blind resubmit
+- received / rejected / accepted / preparing / delayed / ready
+- pickup verification / handed-over / completed separation
+- pickup code / masked phone
+- order detail / timeline
+- history / Buy Again / Reorder with current revalidation
+- own-channel unavailable fallback
+- offline / not-connected / loading / error / empty / stale recovery
+- browser refresh persistence for local non-authoritative intent
+
+FRESH-READ BEFORE WORK
+- v2customer/README.md
+- v2customer/src/capabilities.json
+- v2customer/src/App.tsx
+- v2customer/src/styles.css
+- v2customer/src/product-types.ts
+- v2customer/src/persistence.ts
+- v2customer/src/runtime.ts
+- v2customer/src/selection.ts
+- v2customer/test/migration.test.mjs
+
+TARGET UX
+- Mobile-first food ordering experience
+- Clear Golden Path: Home -> Menu -> Product Config -> Cart -> Checkout -> Submit certainty -> Store acceptance -> Preparing/Delay -> Ready -> Pickup verification -> Completed -> History/Reorder
+- One primary task per screen
+- Normal customer UI must not expose raw UUID / engineering identifiers
+- Error states repair locally; do not reset the whole journey
+- READY must not imply handed-over/completed
+- UNKNOWN must never become FAILED or trigger blind resubmit
+- Sold-out / unavailable options are clear and non-selectable
+- Quote freshness/material change must be visible before submit
+- Accessibility: usable touch targets, focus states, status messages, not color-only
+
+VISUAL DIRECTION
+Japanese-minimal, warm everyday food brand, calm and premium enough for a real restaurant. Avoid childish visuals, generic SaaS dashboard styling, excessive gradients/glass effects, and technical-looking customer screens.
+
+IMPLEMENTATION GUIDANCE
+- Prefer redesigning App presentation/component structure + styles.
+- New presentational components under v2customer/src/ui/** are allowed.
+- Do not alter runtime/persistence/selection/business semantics unless a compile-only adapter is strictly required.
+- Keep every capability reachable after the redesign.
+- Keep missing runtime as honest NOT_CONNECTED / empty states; do not insert fake business truth.
+
+ACCEPTANCE
+1. npm test passes.
+2. npm run build passes.
+3. capability registry remains 58; no status silently changed to wired.
+4. No direct fetch/WebSocket/XHR/API introduced by Customer.
+5. Five command shapes remain NOT_WIRED.
+6. All major normal + empty/loading/offline/error/UNKNOWN/stale flows have deliberate UI.
+7. Cart/checkout/pending intent survive refresh as before.
+8. Existing transaction semantics and runtime-port boundary remain intact.
+9. Provide before/after screen map and files-touched summary.
+10. No live connection or release/OTA work in this task.
+
+NEXT
+Codex should fresh-read current main, create a dedicated working branch, audit the existing customer interaction flow, then implement the full UI/UX redraw inside the boundary above.
