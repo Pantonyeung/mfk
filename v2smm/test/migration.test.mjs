@@ -58,10 +58,10 @@ test('production App no longer imports fixtures or exposes migration/demo operat
 
 test('complete operator routes and failure states are present',()=>{
   for(const marker of[
-    '快速點餐','前線工作','訂單記錄','桌面管理','店務工具',
-    '搜尋商品','商品設定','購物草稿','待提交草稿','平台狀態',
+    '開始點單','現在要處理甚麼','訂單記錄','堂食桌面','店務工具',
+    '搜尋商品','商品設定','購物籃','待提交草稿','平台狀態',
     '商品供應','營業日','產能','營運報表','退款要求','列印狀態','診斷','正在同步餐單',
-    '同步失敗','重新確認結果'
+    '同步失敗','再次確認結果'
   ])assert.match(source,new RegExp(marker));
 });
 
@@ -78,8 +78,8 @@ test('typed runtime port is an injected boundary only',()=>{
 test('UNKNOWN flow preserves identity and reads back before any resend',()=>{
   const app=fs.readFileSync(path.join(root,'App.tsx'),'utf8');
   assert.match(app,/readSubmission/);
-  assert.match(app,/唔會自動重送/);
-  assert.match(app,/未有重新提交/);
+  assert.match(source,/唔會自動重送/);
+  assert.match(source,/未有重新提交/);
   assert.match(app,/submissionId/);
   const persistence=fs.readFileSync(path.join(root,'persistence.ts'),'utf8');
   assert.match(persistence,/idempotencyKey/);
@@ -87,9 +87,8 @@ test('UNKNOWN flow preserves identity and reads back before any resend',()=>{
 
 test('Business Day remains record-only and non-blocking',()=>{
   const types=fs.readFileSync(path.join(root,'product-types.ts'),'utf8');
-  const app=fs.readFileSync(path.join(root,'App.tsx'),'utf8');
   assert.match(types,/recordOnly:true/);
-  assert.match(app,/永遠唔會阻止落單、付款或者本機提交/);
+  assert.match(source,/永遠唔會阻止落單、付款或者本機提交/);
 });
 
 
@@ -114,7 +113,6 @@ test('quote and mutation operations can only cross the typed injected port',()=>
 
 test('previously banked SMM read surfaces are not dropped by product completion',()=>{
   const types=fs.readFileSync(path.join(root,'product-types.ts'),'utf8');
-  const app=fs.readFileSync(path.join(root,'App.tsx'),'utf8');
   for(const marker of['refundRequests','capacity','reporting','printHealth','channels','dineSessions'])assert.match(types,new RegExp(marker));
-  for(const marker of['退款要求','產能資料尚未連接','營運報表尚未連接','列印狀態尚未連接'])assert.match(app,new RegExp(marker));
+  for(const marker of['退款要求','產能資料尚未連接','營運報表尚未連接','列印狀態尚未連接'])assert.match(source,new RegExp(marker));
 });
