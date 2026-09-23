@@ -142,3 +142,62 @@ CURRENT
 KEETA_AUTO_INGRESS_CONNECTED_IN_SOURCE
 KEETA_MANUAL_PULL_FALLBACK_SOURCE_GREEN
 PHYSICAL_SMT_UPDATE_PENDING_DEVICE_ONLINE
+
+
+E2 ROOT-CAUSE CORRECTION AFTER OWNER PHOTO EVIDENCE
+Owner photo evidence proves real Keeta event 1001 reached https://admin.morefunos.com/api/keeta/webhook at 2026-09-23 09:30:51 and MFK returned {"code":0,"data":{},"message":"Success"} in 512ms.
+Observed provider envelope:
+- eventId: 1001
+- appId: 3419700273
+- messageId: 2102571364841029696
+- shopId: 721578302
+- provider order identity visible in payload: orderViewId/orderViewIdStr 5313441990145415
+
+CORRECTION
+Remote Desktop / home PC is NOT the SMT runtime dependency. Previous diagnosis conflated an optional remote-control surface with the POS runtime.
+Technical reality:
+- GitHub = source authority.
+- admin.morefunos.com / Cloudflare Worker = live cloud backend/webhook edge.
+- SMT UI/runtime executes inside the POS Android Carrier/WebView (origin appassets.androidplatform.net) and consumes signed .mfos Runtime OTA.
+Therefore provider ingress can be GREEN while the shop SMT still runs an older runtime that does not contain current Keeta K1 intake.
+
+REAL FIRST BREAK
+Provider → MFK webhook ingress: GREEN by real provider evidence.
+MFK cloud 1001 handler/source: present.
+SMT installed runtime: current public OTA before this correction was runtime-candidate-mfk-5e6e64ecd032, which predates K1/K2/K5/K6/K7/K8.
+Therefore the operational break is CURRENT_KEETA_INTAKE_RUNTIME_NOT_YET_INSTALLED_ON_SMT, not Remote Desktop.
+
+REPAIRS / DEPLOYMENTS COMPLETED
+1. SMT manual fallback source:
+   commit 1b63fc6eb70ced899b93ba02f5fb9cf143975000
+   adds "手動接 Keeta 新單" using the SAME reconcileKeetaOrderIntake path.
+   V2 Local POS Smoke 35807329071 SUCCESS.
+
+2. Admin cloud intake readback:
+   runtime endpoint /admin/orders/intake
+   Admin UI shows PENDING_SMT vs COMMITTED, providerOrderId, messageId, canonicalOrderId, display.
+   source through 40a503b08e294c833849b1c6e7ccd1813dd44927.
+   deploy trigger 73445806271bb5f498173975e2c289d95fa5dc41.
+   deploy-mfk-admin run 35807997961 SUCCESS.
+
+3. SMT Runtime OTA published from exact MFK source 73445806271bb5f498173975e2c289d95fa5dc41:
+   release runtime-candidate-mfk-73445806271b
+   bundle MoreFunOS-SMT-runtime-candidate-mfk-73445806271b.mfos
+   SHA-256 275f87a59a072419b079bb031fbfb3e8a1d1d84df72737bae16604d56a1569a6
+   Builder run 35808028898 SUCCESS
+   public readback MFK_RUNTIME_OTA_PUBLISHED
+
+OPERATIONAL NEXT
+At the shop SMT:
+- Recovery → 檢查 Runtime OTA
+- offered release must be runtime-candidate-mfk-73445806271b
+- install/activate
+- current runtime auto-runs Keeta pending-order reconciliation on boot/focus/online/doorbell
+- if automatic pull is missed, use "手動接 Keeta 新單"
+- the already-pushed provider order must be reused; DO NOT place another test order until readback of this order is known.
+
+E2 CURRENT
+PROVIDER_1001_DELIVERY = GREEN (real provider evidence)
+WEBHOOK_ACK = GREEN (code 0 Success)
+CANONICAL_ORDER_ADMISSION = PENDING SMT runtime update/readback
+DUPLICATE_ORDER/DISPLAY/PRINT = PENDING readback
