@@ -206,6 +206,30 @@ export function readKeetaStoreStatus():Promise<KeetaStoreStatus>{
 }
 
 
+export interface KeetaOrderIntakeRow{
+  readonly provider:'KEETA';
+  readonly canonicalStoreId:'MF01';
+  readonly providerOrderId:string;
+  readonly providerMessageId:string;
+  readonly providerPushedAt:string;
+  readonly receivedAt:string;
+  readonly state:'PENDING_SMT'|'COMMITTED';
+  readonly canonicalOrderId:string|null;
+  readonly canonicalDisplay:string|null;
+  readonly committedAt:string|null;
+}
+export interface KeetaOrderIntakeList{
+  readonly state:'AVAILABLE';
+  readonly provider:'KEETA';
+  readonly canonicalStoreId:'MF01';
+  readonly pending:number;
+  readonly committed:number;
+  readonly items:readonly KeetaOrderIntakeRow[];
+}
+export function readKeetaOrderIntakeRows():Promise<KeetaOrderIntakeList>{
+  return keetaAdminPost<KeetaOrderIntakeList>('orders/intake');
+}
+
 export interface KeetaCommercialSnapshot{
   readonly provider:'KEETA';
   readonly providerOrderId:string;
