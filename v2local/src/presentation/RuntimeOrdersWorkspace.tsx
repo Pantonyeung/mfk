@@ -58,13 +58,26 @@ export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePor
   const [keetaPullBusy,setKeetaPullBusy]=useState(false);
   const [keetaPullMessage,setKeetaPullMessage]=useState<string|null>(null);
   const [keetaIntakeRevision,setKeetaIntakeRevision]=useState(0);
+  const [keetaArrival,setKeetaArrival]=useState<{orderId:string;display:string;sourceLabel:string}|null>(null);
   useEffect(()=>{
     const refresh=()=>setAfterSaleRevision(value=>value+1);
     window.addEventListener('mfk-keeta-after-sale',refresh);
     return()=>window.removeEventListener('mfk-keeta-after-sale',refresh);
   },[]);
   useEffect(()=>{
-    const refresh=()=>setKeetaIntakeRevision(value=>value+1);
+    const refresh=(raw:Event)=>{
+      setKeetaIntakeRevision(value=>value+1);
+      const detail=(raw as CustomEvent<{canonicalOrderId?:string;display?:string;sourceLabel?:string}>).detail;
+      if(!detail?.canonicalOrderId)return;
+      setKeetaArrival({orderId:detail.canonicalOrderId,display:String(detail.display||''),sourceLabel:String(detail.sourceLabel||'Keeta')});
+      try{
+        const AudioContextCtor=window.AudioContext||(window as unknown as {webkitAudioContext?:typeof AudioContext}).webkitAudioContext;
+        if(AudioContextCtor){
+          const ctx=new AudioContextCtor();const osc=ctx.createOscillator();const gain=ctx.createGain();
+          osc.frequency.value=880;gain.gain.value=0.12;osc.connect(gain);gain.connect(ctx.destination);osc.start();osc.stop(ctx.currentTime+0.22);
+        }
+      }catch{}
+    };
     window.addEventListener('mfk-keeta-order-intake',refresh);
     return()=>window.removeEventListener('mfk-keeta-order-intake',refresh);
   },[]);
@@ -235,6 +248,14 @@ export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePor
   if(!canReview)return <main className="order-manager"><section className="order-empty"><b>你冇查看訂單權限</b><p>需要 Admin 權限：ORDER_REVIEW。</p></section></main>;
 
   return <main className="order-manager">
+    {keetaArrival?<div className="keeta-arrival-backdrop" role="alertdialog" aria-modal="true">
+      <section className="keeta-arrival-card">
+        <strong>Keeta 新訂單到達</strong>
+        <b>#{keetaArrival.display}</b>
+        <span>{keetaArrival.sourceLabel}</span>
+        <button className="primary" onClick={()=>{void load(keetaArrival.orderId,true);setKeetaArrival(null);}}>查看並處理訂單</button>
+      </section>
+    </div>:null}
     <header className="order-manager-top">
       <div className="order-manager-title"><span>☰</span><b>P01-01 訂單管理工作台</b></div>
       <div className="order-system-badges"><span>● 系統正常</span><span>▣ 打印機在線</span><span>SMT-01</span></div>
