@@ -185,3 +185,54 @@ GITHUB
 
 STATUS
 UNKNOWN_SIDE_EFFECT / READBACK_REQUIRED / NO_BLIND_RETRY
+
+
+FIRST_BREAK FIXED｜K3 MENU ACTION SILENT ERROR
+
+OWNER LIVE RESULT
+- 同步完整菜單到 Keeta pressed once.
+- 更新同步狀態 pressed once.
+- UI remained NEVER_SYNCED.
+- No visible taskId / success / error.
+
+FIRST_BREAK
+K3_MENU_ACTION_ERROR_SILENT_IN_UI
+
+SOURCE DEFECT
+submitMenu()/refreshMenu() stored failure in liveError, but Keeta Menu card did not render liveError.
+refreshMenu() also had no busy feedback.
+
+SMALLEST FIX
+PR #169
+merge 5e07a38802276ad3b5cc238c970bf7cd61b7bfc8
+- exact error now rendered in menu card
+- status refresh busy feedback
+- menu action busy labels
+- focused regression
+
+TEST/BUILD
+35813905424 SUCCESS
+
+PRODUCTION
+deploy trigger 0b9dfa59c685cdf2e051a2a2ccf35eeb66288cf0
+run 35813990891 SUCCESS
+
+TOKEN
+Commander token automatic rotation repair is already deployed and GREEN under #162 5788366483.
+Worker A touched no OAuth/token code.
+
+LIVE PROVIDER RESULT
+Earlier one-shot submit remains UNKNOWN.
+NEVER_SYNCED means MFK has no durable menu task record.
+Do not blind resubmit.
+
+NEXT
+Refresh live Admin once.
+Press 更新同步狀態 once.
+Expect visible exact error or status in the Menu card.
+
+GITHUB #162
+5788422637
+
+STATUS
+FIRST_BREAK_FIXED_DEPLOYED / SAME_STEP_REAL_UI_RETEST_REQUIRED
