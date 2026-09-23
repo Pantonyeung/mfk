@@ -10,7 +10,7 @@ export interface KeetaLiveStatus{
   readonly readyForAuthorization:boolean;
   readonly missingConfig:readonly string[];
   readonly oauth:{
-    readonly state:'NOT_CONNECTED'|'CONNECTED'|'EXPIRED';
+    readonly state:'NOT_CONNECTED'|'CONNECTED'|'EXPIRED'|'REAUTH_REQUIRED';
     readonly expiresAt:string|null;
     readonly lastCallbackAt:string|null;
     readonly lastCallbackResult:'CONNECTED'|'FAILED'|null;
@@ -18,6 +18,7 @@ export interface KeetaLiveStatus{
     readonly lastCallbackMethod:'GET'|'POST'|null;
     readonly lastCallbackParamNames:readonly string[];
     readonly tokenSource:'OAUTH_CALLBACK'|'TEST_PROVIDER_PORTAL_IMPORT'|'TEST_PROVIDER_PORTAL_REFRESH'|null;
+    readonly providerValidation:{readonly state:string;readonly code?:string;readonly sourceCode?:string;readonly observedAt:string}|null;
   };
   readonly webhook:{
     readonly callbackUrl:string;
@@ -224,6 +225,7 @@ export interface KeetaOrderIntakeList{
   readonly canonicalStoreId:'MF01';
   readonly pending:number;
   readonly committed:number;
+  readonly lastSmtPull:{readonly deviceId:string;readonly observedAt:string;readonly pendingCount:number}|null;
   readonly items:readonly KeetaOrderIntakeRow[];
 }
 export function readKeetaOrderIntakeRows():Promise<KeetaOrderIntakeList>{
