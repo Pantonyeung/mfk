@@ -53,7 +53,6 @@ describe('customer cloud local quote adapter',()=>{
           {optionGroupId:'rice',optionId:'extra',optionName:'加飯'},
           {optionGroupId:'drink',optionId:'tea',optionName:'台式奶茶'},
         ],
-        createdAt:'2026-09-23T12:00:00.000Z',
       },
     ],products);
     expect(result.totalMinor).toBe(11200);
@@ -76,7 +75,6 @@ describe('customer cloud local quote adapter',()=>{
         productName:'肉燥便當',
         quantity:1,
         selections:[],
-        createdAt:'2026-09-23T12:00:00.000Z',
       },
     ],products)).toThrow('CUSTOMER_OPTION_REQUIRED:bento:rice');
   });
@@ -89,7 +87,6 @@ describe('customer cloud local quote adapter',()=>{
         productName:'肉燥便當',
         quantity:1,
         selections:[{optionGroupId:'rice',optionId:'ghost',optionName:'舊選項'}],
-        createdAt:'2026-09-23T12:00:00.000Z',
       },
     ],products)).toThrow('CUSTOMER_OPTION_UNAVAILABLE:bento:rice:ghost');
   });
