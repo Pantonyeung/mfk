@@ -15,6 +15,7 @@ export interface ProjectionOrderInput{
   readonly paymentLabel:string;
   readonly fulfillmentLabel:string;
   readonly sourceLabel:string;
+  readonly externalRef?:string;
   readonly staffId?:string;
   readonly staffName?:string;
   readonly cancellationReason?:string;
@@ -91,6 +92,7 @@ export function queueOrderProjection(order:ProjectionOrderInput){
       paymentLabel:String(order.paymentLabel||''),
       fulfillmentLabel:String(order.fulfillmentLabel||''),
       sourceLabel:String(order.sourceLabel||''),
+      ...(order.providerRef?{externalRef:String(order.providerRef)}:{}),
       ...(order.staffId?{staffId:String(order.staffId)}:{}),
       ...(order.staffName?{staffName:String(order.staffName)}:{}),
       ...(order.cancellationReason?{cancellationReason:String(order.cancellationReason)}:{}),
