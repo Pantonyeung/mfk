@@ -1,0 +1,44 @@
+name: deploy-mfk-smt-ui-preview
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'v2local/**'
+      - '.github/workflows/deploy-mfk-smt-ui-preview.yml'
+
+jobs:
+  deploy:
+    if: github.head_ref == 'ops/MFK/SMT-UI-PUBLIC-PREVIEW-R1'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: v2local
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Verify preview source identity
+        shell: bash
+        run: |
+          echo "Preview source: $GITHUB_SHA"
+          test -z "$(git diff --name-only 171328b0fec5debd051c3a27eb627933c62768f8 -- src/runtime)"
+
+      - name: Install
+        run: npm install --no-audit --no-fund --legacy-peer-deps --package-lock=false
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+      - name: Deploy isolated SMT UI preview
+        run: npx --yes wrangler@latest deploy --config wrangler.preview.jsonc
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
