@@ -563,6 +563,13 @@ async function completeAuthorizationCode(config,store,stateValue,code,callbackAt
     canonicalStoreId:'MF01',
     providerShopId:config.providerShopId,
     authorizedAt:callbackAt,
+    tokenSource:'OAUTH_CALLBACK',
+  });
+  await store.state.storage.put('provider:authorization',{
+    state:'AUTHORIZED',
+    eventId:1,
+    source:'TOKEN_EXCHANGE',
+    observedAt:callbackAt,
   });
   await store.state.storage.put('oauth:callback-status',{
     lastCallbackAt:callbackAt,
