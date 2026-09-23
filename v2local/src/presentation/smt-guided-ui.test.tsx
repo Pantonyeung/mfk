@@ -9,7 +9,7 @@ describe('SMT human-centered guided UI',()=>{
   it('shows one product decision at a time while keeping quantity and computed pricing visible',()=>{
     const html=renderToStaticMarkup(<ProductConfigWorkspace
       product={{
-        id:'meal',category:'便當',name:'測試便當',priceMinor:5000,priceLabel:'$50.00',
+        id:'meal',category:'便當',name:'測試便當',priceMinor:5000,priceLabel:'$50.00',imageUrl:'https://example.test/product.jpg',
         optionSets:[
           {id:'size',name:'份量',required:true,forceShow:true,selection:'SINGLE',min:1,max:1,options:[
             {id:'large',name:'大份',priceAdjustmentMinor:500,defaultSelected:false,active:true},
@@ -32,6 +32,7 @@ describe('SMT human-centered guided UI',()=>{
     expect(html).toContain('+$5.00');
     expect(html).toContain('加入購物籃');
     expect(html).toContain('disabled=""');
+    expect(html).not.toContain('<img');
   });
 
   it('keeps source, tender, amount and the final commit action on one checkout surface',()=>{
