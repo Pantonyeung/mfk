@@ -471,3 +471,62 @@
 @media(prefers-reduced-motion:reduce){
   .ordering-center-panel{animation:none}
 }
+
+
+/* Owner-accepted cart control row: one-button cycles for view, service and combine. */
+.ordering-cart-controls{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:8px;
+  padding:10px 0 8px;
+}
+.ordering-cart-cycle{
+  min-width:0;
+  min-height:58px;
+  display:grid;
+  place-items:center;
+  align-content:center;
+  gap:2px;
+  padding:7px 8px;
+  border:1px solid #cbd5e1;
+  border-radius:10px;
+  color:#334860;
+  background:#fff;
+  text-align:center;
+}
+.ordering-cart-cycle small{
+  color:#778397;
+  font-size:11px;
+  font-weight:800;
+}
+.ordering-cart-cycle b{
+  font-size:17px;
+  line-height:1.05;
+  font-weight:950;
+}
+.ordering-cart-cycle.service.takeaway{
+  color:#195fba;
+  background:#f4f8ff;
+  border-color:#bdd1ee;
+}
+.ordering-cart-cycle.service.dine-in{
+  color:#8b5a00;
+  background:#fff9eb;
+  border-color:#e6d3a5;
+}
+.ordering-cart-cycle.combine.active{
+  color:#fff;
+  background:#26374e;
+  border-color:#26374e;
+}
+.ordering-cart-cycle.combine.active small{color:#dce4ee}
+.ordering-cart-cycle:disabled{
+  cursor:not-allowed;
+  opacity:.5;
+  background:#f2f4f7;
+}
+@media(max-width:1400px){
+  .ordering-cart-controls{gap:6px}
+  .ordering-cart-cycle{min-height:54px;padding:6px}
+  .ordering-cart-cycle b{font-size:15px}
+}
