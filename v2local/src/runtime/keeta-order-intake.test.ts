@@ -100,6 +100,19 @@ describe('Keeta → SMT canonical local intake',()=>{
     expect(localRuntime.orders()[0]?.fulfillmentLabel).toBe('待處理');
   });
 
+  it('maps published Keeta OpenItemCode namespace back to the canonical product code',()=>{
+    const namespaced={...intent(),rawMessage:JSON.stringify({
+      orderInfo:{
+        baseOrder:{orderViewIdStr:'998',currency:'HKD'},merchantOrder:{orderViewIdStr:'998',seqNoStr:'K998'},
+        products:[{id:1,skuId:11,spuId:22,skuOpenItemCode:'MF:SKU-P1',spuOpenItemCode:'SPU:SKU-P1',name:'Provider 商品',count:1,currency:'HKD',priceWithGroup:{originUnitPrice:4200,unitPrice:4200,originAmount:4200,amount:4200},groups:[]}],
+        feeDtls:[{code:'productPrice',currency:'HKD',price:4200}],orderPromotionDtlList:[],
+      },
+    })};
+    const translated=translateKeetaIntentToLocalOrder(namespaced);
+    expect(translated.items[0]?.id).toBe('p1');
+    expect(translated.items[0]?.name).toBe('磨飯商品一');
+  });
+
   it('fails closed on missing product mapping instead of inventing a canonical product identity',()=>{
     applyAdminConfigEnvelope(createMfkAdminConfigEnvelope({
       storeId:'MF01',
@@ -147,6 +160,23 @@ describe('Keeta → SMT canonical local intake',()=>{
         expect.objectContaining({providerOrderId:'999',code:expect.stringMatching(/KEETA_ORDER_MAPPING_REQUIRED/)}),
       ]));
       expect(localRuntime.orders()).toHaveLength(0);
+    }finally{vi.unstubAllGlobals();}
+  });
+
+  it('prints accepted Keeta outputs only once across repeated acceptance',async()=>{
+    const translated=translateKeetaIntentToLocalOrder(intent());
+    const order=localRuntime.createOrder(translated);
+    const providerFetch=vi.fn(async()=>new Response(JSON.stringify({state:'SUCCESS'}),{status:200,headers:{'content-type':'application/json'}}));
+    vi.stubGlobal('fetch',providerFetch);
+    try{
+      const first=await localRuntime.acceptOrder(order.id);
+      expect(first.status).toBe('ACCEPTED');
+      const afterFirst=localRuntime.orders().find(row=>row.id===order.id);
+      expect(afterFirst?.acceptancePrintedAt).toBeTruthy();
+      const printedAt=afterFirst?.acceptancePrintedAt;
+      const second=await localRuntime.acceptOrder(order.id);
+      expect(second.status).toBe('ACCEPTED');
+      expect(localRuntime.orders().find(row=>row.id===order.id)?.acceptancePrintedAt).toBe(printedAt);
     }finally{vi.unstubAllGlobals();}
   });
 

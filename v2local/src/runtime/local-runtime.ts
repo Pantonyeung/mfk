@@ -24,6 +24,7 @@ export interface StoredOrder{
   staffId?:string;staffName?:string;cancellationReason?:string;
   providerRef?:string;providerMessageId?:string;
   providerLastEventId?:number;providerLastEventName?:string;providerLastEventAt?:string;providerLastMessageId?:string;providerLifecycleNote?:string;
+  acceptancePrintedAt?:string;
   items:readonly {id:string;name:string;qty:number;unitMinor:number;serviceMode?:'takeaway'|'dine-in'}[];
 }
 export type DiningTender='CASH'|'ALIPAY'|'WECHAT'|'FPS'|'PAYME'|'COMBO';
@@ -509,8 +510,18 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
       projectOrder(data.orders.find(x=>x.id===orderId)!);
       appendActionAudit({action:'ACCEPT',orderId});
     }
-    const current=data.orders.find(x=>x.id===orderId)!;
+    let current=data.orders.find(x=>x.id===orderId)!;
     const provider=await mirrorKeetaOrderCommand(current,'CONFIRM');
+    if(!current.acceptancePrintedAt){
+      const print=await dispatchOrderOutputs(current);
+      if(print.failed>0)throw new Error('KEETA_ORDER_ACCEPT_PRINT_FAILED:'+print.sent+'/'+print.planned);
+      const acceptancePrintedAt=new Date().toISOString();
+      data={...data,orders:data.orders.map(x=>x.id===orderId?{...x,acceptancePrintedAt,updatedAt:acceptancePrintedAt}:x)};
+      save();
+      current=data.orders.find(x=>x.id===orderId)!;
+      projectOrder(current);
+      appendActionAudit({action:'ACCEPT_PRINT',orderId});
+    }
     return {orderId,status:'ACCEPTED' as const,provider};
   },
   async markOrderReady(orderId){

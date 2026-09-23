@@ -51,7 +51,12 @@ function resolveProduct(
   catalog:readonly CatalogProduct[],
   mappings:readonly ChannelMappingRow[],
 ){
-  const candidates=[line.skuOpenItemCode,line.spuOpenItemCode,line.providerSkuId,line.providerSpuId].map(String);
+  const rawCandidates=[line.skuOpenItemCode,line.spuOpenItemCode,line.providerSkuId,line.providerSpuId].map(String);
+  const candidates=[...new Set(rawCandidates.flatMap(value=>{
+    const trimmed=value.trim();
+    const stripped=trimmed.replace(/^(?:SPU:|SKU:|MF:)/i,'');
+    return stripped&&stripped!==trimmed?[trimmed,stripped]:[trimmed];
+  }))];
   const explicit=mappings.find(row=>row.status==='MAPPED'&&candidates.includes(String(row.providerItemId||'')));
   if(explicit?.productId){
     const product=catalog.find(row=>String(row.id)===String(explicit.productId)&&row.active!==false);
@@ -129,8 +134,8 @@ export function translateKeetaIntentToLocalOrder(input:MfkKeetaOrderIntent):Orde
   });
 }
 
-function emitIntakeUpdate(){
-  if(typeof window!=='undefined')window.dispatchEvent(new CustomEvent('mfk-keeta-order-intake'));
+function emitIntakeUpdate(detail?:{providerOrderId:string;canonicalOrderId:string;display:string;sourceLabel:string}){
+  if(typeof window!=='undefined')window.dispatchEvent(new CustomEvent('mfk-keeta-order-intake',{detail}));
 }
 function attention(providerOrderId:string,code:string){
   try{
@@ -210,7 +215,7 @@ export async function reconcileKeetaOrderIntake(){
         const beforeId=localRuntime.orders().find(row=>row.providerRef===orderInput.providerRef)?.id;
         const order=localRuntime.createOrder(orderInput);
         await ack(intent,order);
-        if(!beforeId)emitIntakeUpdate();
+        if(!beforeId)emitIntakeUpdate({providerOrderId:intent.providerOrderId,canonicalOrderId:order.id,display:order.display,sourceLabel:order.sourceLabel});
         if(autoAcceptEnabled()&&order.fulfillmentLabel==='待處理'){
           await localRuntime.acceptOrder(order.id);
         }
