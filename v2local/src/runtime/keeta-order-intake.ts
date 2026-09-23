@@ -129,8 +129,8 @@ export function translateKeetaIntentToLocalOrder(input:MfkKeetaOrderIntent):Orde
   });
 }
 
-function emitIntakeUpdate(){
-  if(typeof window!=='undefined')window.dispatchEvent(new CustomEvent('mfk-keeta-order-intake'));
+function emitIntakeUpdate(detail?:{providerOrderId:string;canonicalOrderId:string;display:string;sourceLabel:string}){
+  if(typeof window!=='undefined')window.dispatchEvent(new CustomEvent('mfk-keeta-order-intake',{detail}));
 }
 function attention(providerOrderId:string,code:string){
   try{
@@ -210,7 +210,7 @@ export async function reconcileKeetaOrderIntake(){
         const beforeId=localRuntime.orders().find(row=>row.providerRef===orderInput.providerRef)?.id;
         const order=localRuntime.createOrder(orderInput);
         await ack(intent,order);
-        if(!beforeId)emitIntakeUpdate();
+        if(!beforeId)emitIntakeUpdate({providerOrderId:intent.providerOrderId,canonicalOrderId:order.id,display:order.display,sourceLabel:order.sourceLabel});
         if(autoAcceptEnabled()&&order.fulfillmentLabel==='待處理'){
           await localRuntime.acceptOrder(order.id);
         }
