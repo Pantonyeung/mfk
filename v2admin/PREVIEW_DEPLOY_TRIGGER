@@ -1,4 +1,4 @@
-work_id=MFK-KEETA-TOKEN-LINEAGE-CONVERGENCE-R1
-purpose=validate stale authorization blocker convergence by fresh token lineage
-candidate=7d9a2750b1eeb6881d86563b6853434ed6042755
+work_id=MFK-KEETA-MENU-SPU-AVAILABLE-TIME-R1
+purpose=validate required all-day SPU availableTime for Keeta menu sync
+candidate=557cc0d3a2f79a0175adc1f35f0e4c4e15ee5527
 deployment_authority=PREVIEW_ONLY

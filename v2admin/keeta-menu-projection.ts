@@ -154,6 +154,7 @@ export function buildKeetaMenuProjection(adminSnapshot:unknown):KeetaMenuProject
       name:text(product.name)||productCode,
       sourceLanguageType:'zh-HK',
       status:1,
+      availableTime:Object.freeze({code:0}),
       isSpecialty:0,
       ...(description?{description,descSourceLanguageType:'zh-HK'}:{}),
       ...(imageRef&&/^https?:\/\//i.test(imageRef)?{pictureList:[{url:imageRef}]}:{}),

@@ -45,6 +45,7 @@ describe('Keeta full menu projection',()=>{
       openItemCode:'SPU:RB-A',
       name:'原味飯團',
       status:1,
+      availableTime:{code:0},
       shopCategoryOpenItemCodeList:['CAT:riceball'],
       userGetModeList:['delivery','pickup'],
     });
