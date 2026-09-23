@@ -201,3 +201,33 @@ PROVIDER_1001_DELIVERY = GREEN (real provider evidence)
 WEBHOOK_ACK = GREEN (code 0 Success)
 CANONICAL_ORDER_ADMISSION = PENDING SMT runtime update/readback
 DUPLICATE_ORDER/DISPLAY/PRINT = PENDING readback
+
+
+E2 SECOND REAL ORDER AUTHORIZED BY OWNER
+Owner explicitly supersedes the earlier one-order-only stop for this case:
+- first test order is excluded from acceptance judging;
+- preserve its evidence but do not use it as the acceptance subject;
+- second real Keeta order is now the controlled E2 acceptance subject;
+- do not create a third order unless explicitly authorized after readback.
+
+DOUBLE-CONFIRM BEFORE SECOND ORDER
+1. Owner screenshots show current SMT Runtime UI contains "手動接 Keeta 新單", proving the post-fix runtime containing commit 1b63fc6eb70ced899b93ba02f5fb9cf143975000 is active on the shop SMT.
+2. Current source startup installs both installSmtAdminAutoSync() and installKeetaOrderIntake().
+3. SMT WebSocket connects to wss://admin.morefunos.com/api/admin-sync/events?storeId=MF01.
+4. Successful Keeta 1001 webhook extracts baseOrder.orderViewId/orderViewIdStr and sends KEETA_ORDER_AVAILABLE doorbell.
+5. SMT receives KEETA_ORDER_AVAILABLE and automatically calls reconcileKeetaOrderIntake().
+6. Reconcile fetches /api/keeta/smt/orders/pending, maps products, creates ONE local canonical Order using providerRef dedup, and ACKs canonicalOrderId + canonicalDisplay.
+7. Independently of doorbell, intake also reconciles at runtime startup, browser focus, and network-online.
+8. Manual "手動接 Keeta 新單" invokes the SAME reconcile path only as fallback.
+
+EXPECTED SECOND ORDER BEHAVIOR
+Keeta submit → real 1001 → MFK webhook ACK → cloud PENDING_SMT → automatic SMT pull → canonical Order appears in 平台訂單.
+If auto pull does not surface within a few seconds:
+- press "手動接 Keeta 新單" exactly once;
+- no third order;
+- classify using cloud intake readback PENDING_SMT vs COMMITTED and any SMT intake attention.
+
+NEW ACCEPTANCE CASE
+KEETA-E2-ORDER-20260923-02
+FIRST ORDER
+EXCLUDED_BY_OWNER_FROM_ACCEPTANCE
