@@ -1,0 +1,73 @@
+MFK Keeta Direct Integration｜Worker A｜R1
+Date: 2026-09-23
+Role: CURRENT LIVE SEAM DRIVER / REAL DEVICE FAST LOOP
+Mode: DIRECT_INTEGRATION_FIRST / HISTORICAL_EVIDENCE_REUSE / FIRST_BREAK_ONLY
+
+CURRENT
+- current MFK main fresh-read: dfe2b12922a8af7f8477232e28b5d93544c7fde7
+- K1 runtime-affecting source remains afb02b6e09f4f4458c8e556b85d9a7eb6e6ea4b0
+- main is only 2 documentation commits ahead of afb02b6; compare shows no runtime/product files changed.
+- current seam: Keeta 1001 -> cloud PENDING_SMT -> SMT reconcile -> mapping -> ONE canonical Order -> ONE display -> ACK -> merchant decision.
+- v2local/src/runtime/keeta-order-intake.ts contains:
+  - 401 operator-visible attention
+  - Admin-config-triggered retry
+  - online/focus/visible reconcile
+  - visible-only 5s fallback reconcile
+  - providerRef dedupe through existing localRuntime path
+  - no second Order/Pricing/Sync engine
+
+HISTORICAL EVIDENCE REUSED
+- Morefun-v2 #881 comment 5753715763: Keeta already integrated; DO_NOT_REBUILD provider/order/mapping/store-kernel foundations.
+- Morefun-v2 #881 comment 5753817858: durable receipt/dedupe/mapping and historical live forward-chain evidence including provider Order -> canonical Order -> merchant ACCEPT -> provider confirm -> SMT/SMM same canonical Order.
+- Historical V2 is regression oracle only, not current execution authority.
+
+LAST_GREEN
+- real provider 1001 -> MFK webhook ACK: GREEN from existing #162 evidence.
+- current K1 bounded repair source: GREEN.
+- V2 Local POS Smoke: 35809338650 SUCCESS.
+- Builder: 35809458982 SUCCESS.
+- public Runtime OTA published.
+
+FIRST_BREAK
+- current affected runtime has not yet been re-tested on the shop SMT after the afb02b6 repair.
+- existing second controlled order remains the diagnostic subject.
+- real-device certainty is UNKNOWN until the exact runtime is installed/confirmed and the same order is read back.
+- no new code fix is justified before that real-device readback.
+
+EXACT CHANGE THIS TURN
+- product/runtime code: NONE.
+- handoff branch/document only.
+- DO NOT reapply 190d2b82 / 45bc3c95 / afb02b6; already landed on current main lineage.
+
+MINIMUM TEST / AUTHORITY GATE
+- afb02b6 -> current main compare: only 2 handoff docs changed.
+- therefore tested runtime source identity is unchanged.
+- reuse focused current-MFK proof 35809338650 + Builder 35809458982.
+- authority invariant remains SMT local Formal Order authority; cloud/Admin is transport/readback/control plane only.
+
+DEPLOY / RUNTIME
+- release: runtime-candidate-mfk-afb02b6e09f4
+- bundle: MoreFunOS-SMT-runtime-candidate-mfk-afb02b6e09f4.mfos
+- SHA-256: bc64758000a879ff7d581b6fbd2fa7e2e045ff436e760fed3169dbeb45dddd14
+
+REAL DEVICE RESULT
+- NOT YET OBSERVED in this Worker session.
+- this session has no direct physical SMT control surface; do not fake GREEN.
+
+NEXT EXACT ACTION
+1. On shop SMT: Recovery -> 檢查 Runtime OTA.
+2. Install/confirm runtime-candidate-mfk-afb02b6e09f4.
+3. Reuse existing second order KEETA-E2-ORDER-20260923-02. DO NOT create a third order.
+4. Wait for automatic reconciliation; fallback loop is 5s while visible/online.
+5. If still absent, press 手動接 Keeta 新單 exactly once.
+6. Read back:
+   - ONE provider identity
+   - ONE canonical Order
+   - ONE display number
+   - ZERO duplicate Order / Display / Print Admission
+   - intake attention/error code if RED
+7. If GREEN: immediately continue merchant ACCEPT -> provider confirm on the SAME canonical Order.
+8. If RED: report LAST_GREEN/FIRST_BREAK/EXPECTED/ACTUAL/SOURCE SHA/RUNTIME RELEASE/DEVICE RESULT and patch only that boundary.
+
+STATUS
+WAITING_REAL_DEVICE_SAME_ACTION_READBACK
