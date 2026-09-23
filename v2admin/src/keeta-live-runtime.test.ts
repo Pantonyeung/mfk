@@ -180,7 +180,10 @@ describe('Keeta live edge runtime',()=>{
     const removed=await signKeetaRuntimeParams(webhookUrl,{eventId:1302,appId:3419700273,messageId:'old-remove',shopId:721578302,message:JSON.stringify({authId:'old',opType:2,shopId:721578302}),timestamp:Date.now()},'test-secret');
     const removedResponse=await runtime.fetch(new Request('https://internal/webhook',{method:'POST',headers:{'content-type':'application/json','x-mfk-keeta-external-url':webhookUrl},body:JSON.stringify(removed)}));
     expect(removedResponse.status).toBe(200);
-    vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({accessToken:'fresh-access',tokenType:'bearer',expiresIn:7776000,refreshToken:'fresh-refresh',scope:'all',issuedAtTime:Date.now()}),{status:200})));
+    const providerFetch=vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({accessToken:'fresh-access',tokenType:'bearer',expiresIn:7776000,refreshToken:'fresh-refresh',scope:'all',issuedAtTime:Date.now()}),{status:200}))
+      .mockResolvedValueOnce(new Response(JSON.stringify({code:0,message:'Success',data:{shopId:721578302}}),{status:200}));
+    vi.stubGlobal('fetch',providerFetch);
     try{
       const callbackBase='https://admin.morefunos.com/api/keeta/oauth/callback';
       const params=await signKeetaRuntimeParams(callbackBase,{appId:3419700273,code:'fresh-code',state:'',timestamp:Date.now()},'test-secret');
@@ -194,6 +197,7 @@ describe('Keeta live edge runtime',()=>{
       expect(status.oauth.tokenSource).toBe('OAUTH_CALLBACK');
       const readiness=await runtime.fetch(new Request('https://internal/admin/token/readiness',{method:'POST'}));
       expect(readiness.status).toBe(200);
+      expect(providerFetch).toHaveBeenCalledTimes(2);
     }finally{vi.unstubAllGlobals();}
   });
 
