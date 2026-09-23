@@ -2,7 +2,7 @@ import {beforeEach,describe,expect,it,vi} from 'vitest';
 import {createMfkAdminConfigEnvelope} from '../../../contracts/admin-config-sync-v1.ts';
 import {MFK_KEETA_ORDER_INTENT_SCHEMA,type MfkKeetaOrderIntent} from '../../../contracts/keeta-order-intake-v1.ts';
 import {applyAdminConfigEnvelope} from './admin-config-sync.ts';
-import {translateKeetaIntentToLocalOrder} from './keeta-order-intake.ts';
+import {readKeetaOrderIntakeAttention,reconcileKeetaOrderIntake,translateKeetaIntentToLocalOrder} from './keeta-order-intake.ts';
 import {localRuntime} from './local-runtime.ts';
 
 function installStorage(){
@@ -112,6 +112,42 @@ describe('Keeta → SMT canonical local intake',()=>{
       },
     }));
     expect(()=>translateKeetaIntentToLocalOrder(intent())).toThrow(/KEETA_ORDER_MAPPING_REQUIRED/);
+  });
+
+  it('surfaces SMT transport authorization failure instead of silently returning',async()=>{
+    const providerFetch=vi.fn(async()=>new Response(
+      JSON.stringify({code:'KEETA_SMT_UNAUTHORIZED'}),
+      {status:401,headers:{'content-type':'application/json'}},
+    ));
+    vi.stubGlobal('fetch',providerFetch);
+    try{
+      await reconcileKeetaOrderIntake();
+      expect(readKeetaOrderIntakeAttention()).toEqual(expect.arrayContaining([
+        expect.objectContaining({providerOrderId:'__TRANSPORT__',code:'KEETA_SMT_UNAUTHORIZED'}),
+      ]));
+    }finally{vi.unstubAllGlobals();}
+  });
+
+  it('surfaces mapping RED for a real pending intent instead of disappearing from the operator',async()=>{
+    const bad={...intent(),providerOrderId:'999',providerMessageId:'MSG-999',rawMessage:JSON.stringify({
+      orderInfo:{
+        baseOrder:{orderViewIdStr:'999',currency:'HKD'},merchantOrder:{orderViewIdStr:'999',seqNoStr:'K999'},
+        products:[{id:2,skuId:12,spuId:23,skuOpenItemCode:'UNKNOWN-SKU',spuOpenItemCode:'SPU-UNKNOWN',name:'Unknown',count:1,currency:'HKD',priceWithGroup:{originUnitPrice:1000,unitPrice:1000,originAmount:1000,amount:1000},groups:[]}],
+        feeDtls:[{code:'productPrice',currency:'HKD',price:1000}],orderPromotionDtlList:[],
+      },
+    })};
+    const providerFetch=vi.fn(async()=>new Response(
+      JSON.stringify({orders:[bad]}),
+      {status:200,headers:{'content-type':'application/json'}},
+    ));
+    vi.stubGlobal('fetch',providerFetch);
+    try{
+      await reconcileKeetaOrderIntake();
+      expect(readKeetaOrderIntakeAttention()).toEqual(expect.arrayContaining([
+        expect.objectContaining({providerOrderId:'999',code:expect.stringMatching(/KEETA_ORDER_MAPPING_REQUIRED/)}),
+      ]));
+      expect(localRuntime.orders()).toHaveLength(0);
+    }finally{vi.unstubAllGlobals();}
   });
 
   it('keeps the SMT canonical accept/READY decision when Keeta provider mirroring needs attention',async()=>{
