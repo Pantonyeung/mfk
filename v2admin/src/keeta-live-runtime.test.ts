@@ -972,4 +972,90 @@ describe('Keeta live edge runtime',()=>{
     }finally{vi.unstubAllGlobals();}
   });
 
+
+  it('captures 1001 commercial evidence, links it on canonical ACK and refreshes from provider order/get without mutating canonical truth',async()=>{
+    const key=Buffer.alloc(32,21).toString('base64');
+    const storage=new Map<string,unknown>();
+    const state={storage:{
+      get:async(key:string)=>storage.get(key),
+      put:async(key:string,value:unknown)=>{storage.set(key,value);},
+      delete:async(key:string)=>{storage.delete(key);},
+      list:async({prefix}:{prefix:string})=>new Map([...storage.entries()].filter(([key])=>key.startsWith(prefix))),
+    }};
+    const env={
+      KEETA_APP_ID:'3419700273',KEETA_APP_SECRET:'test-secret',
+      KEETA_TOKEN_ENCRYPTION_KEY:key,KEETA_PROVIDER_SHOP_ID:'721578302',
+      KEETA_OAUTH_REDIRECT_URI:'https://admin.morefunos.com/api/keeta/oauth/callback',
+    };
+    const orderInfo={
+      baseOrder:{orderViewIdStr:'998',currency:'HKD'},
+      merchantOrder:{orderViewIdStr:'998',seqNoStr:'K998'},
+      products:[{
+        id:1,skuId:11,spuId:22,skuOpenItemCode:'SKU-P1',spuOpenItemCode:'SPU-P1',
+        name:'Provider 商品',count:2,currency:'HKD',
+        priceWithGroup:{originUnitPrice:4100,unitPrice:4200,originAmount:8200,amount:8400},
+        groups:[],
+      }],
+      feeDtls:[
+        {code:'productPrice',currency:'HKD',price:8400},
+        {code:'payTotal',currency:'HKD',price:8600},
+        {code:'platformFee',currency:'HKD',price:200},
+      ],
+      feeDtl:{merchantFee:{basicCommission:900,activityFee:100,earnings:7400}},
+      orderPromotionDtlList:[],
+    };
+    const {KeetaRuntimeStore,signKeetaRuntimeParams}=await import('../keeta-runtime.ts');
+    const runtime=new KeetaRuntimeStore(state as never,env as never);
+    const externalUrl='https://admin.morefunos.com/api/keeta/webhook';
+    const signed=await signKeetaRuntimeParams(externalUrl,{
+      eventId:1001,appId:3419700273,messageId:'commercial-msg-1',shopId:721578302,
+      message:JSON.stringify({orderInfo}),timestamp:1790120000,
+    },'test-secret');
+    const webhook=await runtime.fetch(new Request('https://internal/webhook',{
+      method:'POST',headers:{'content-type':'application/json','x-mfk-keeta-external-url':externalUrl},body:JSON.stringify(signed),
+    }));
+    expect(webhook.status).toBe(200);
+
+    const beforeAck=await runtime.fetch(new Request('https://internal/admin/commercial/list',{method:'POST'}));
+    const beforeRows=await beforeAck.json() as {items:Array<{state:string;canonicalOrderId:null;snapshot:Record<string,unknown>}>>};
+    expect(beforeRows.items).toHaveLength(1);
+    expect(beforeRows.items[0]).toMatchObject({state:'WEBHOOK_CAPTURED',canonicalOrderId:null});
+    expect(beforeRows.items[0]?.snapshot).toMatchObject({
+      merchandiseSubtotalMinor:8400,customerPaidMinor:8600,customerPlatformFeeMinor:200,
+      merchantCommissionMinor:900,merchantActivityFeeMinor:100,merchantEarningsMinor:7400,
+    });
+    expect(beforeRows.items[0]?.snapshot.shippingFeeMinor).toBeUndefined();
+
+    const ack=await runtime.fetch(new Request('https://internal/smt/orders/ack',{
+      method:'POST',headers:{'content-type':'application/json'},
+      body:JSON.stringify({
+        schema:'MFK_KEETA_ORDER_ACK_V1',storeId:'MF01',provider:'KEETA',
+        providerOrderId:'998',providerMessageId:'commercial-msg-1',
+        canonicalOrderId:'MFK-998',canonicalDisplay:'P998',committedAt:'2026-09-23T00:01:00.000Z',
+      }),
+    }));
+    expect(ack.status).toBe(200);
+
+    await runtime.fetch(new Request('https://internal/admin/token/import-test',{
+      method:'POST',headers:{'content-type':'application/json'},
+      body:JSON.stringify({accessToken:'commercial-access',tokenType:'bearer',expiresIn:7776000,refreshToken:'commercial-refresh',scope:'all',issuedAtTime:Date.now()}),
+    }));
+    const providerFetch=vi.fn(async(input:string|URL|Request)=>new Response(
+      JSON.stringify({code:0,message:'Success',data:{orderInfo}}),{status:200,headers:{'content-type':'application/json'}},
+    ));
+    vi.stubGlobal('fetch',providerFetch);
+    try{
+      const refresh=await runtime.fetch(new Request('https://internal/admin/commercial/refresh',{
+        method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({providerOrderId:'998'}),
+      }));
+      expect(refresh.status).toBe(200);
+      const row=await refresh.json() as {state:string;canonicalOrderId:string;snapshot:Record<string,unknown>};
+      expect(row.state).toBe('PROVIDER_CONFIRMED');
+      expect(row.canonicalOrderId).toBe('MFK-998');
+      expect(row.snapshot).toMatchObject({merchantEarningsMinor:7400,merchantCommissionMinor:900});
+      expect(row.snapshot.shippingFeeMinor).toBeUndefined();
+      expect(String(providerFetch.mock.calls[0]?.[0])).toBe('https://open.mykeeta.com/api/open/order/get');
+    }finally{vi.unstubAllGlobals();}
+  });
+
 });
