@@ -1,0 +1,80 @@
+MFK Keeta Real External Acceptance｜Worker A｜R1
+Date: 2026-09-23
+Role: E1 MENU LIVE ACCEPTANCE → BANK → E6 SELLABILITY / STORE OPS
+Mode: REAL_EXTERNAL_ACCEPTANCE / NO NEW FEATURE / NO CODE MUTATION UNTIL REAL RED PROVES IMPLEMENTATION DEFECT
+
+FRESH READ
+- current main at Worker A takeover: 9a2cd67fe5e595f30a12df2ddcb95511790494a6
+- #22 Keeta controlling milestone: 5786932900
+- #162 Commander start: 5787238095
+- navigation: docs/navigation/MFK_航海圖_V1.27_Round028_2026-09-23.txt
+- runtime product bank: a6cca587b347cda90cab94e5ff4a647aacacfd24
+- E1/K3 source:
+  - v2admin/keeta-menu-projection.ts
+  - v2admin/keeta-runtime.ts
+  - v2admin/src/PolicyWorkspaces.tsx
+  - v2admin/src/keeta-live-client.ts
+  - v2admin/worker.ts
+- E6/K4 source:
+  - v2admin/keeta-store-projection.ts
+  - v2admin/keeta-runtime.ts
+  - v2admin/src/PolicyWorkspaces.tsx
+  - v2admin/src/keeta-live-client.ts
+  - v2admin/worker.ts
+
+SOURCE REALITY CONFIRMED
+E1:
+- Admin UI path exists: 渠道 → 供應同步 → Keeta 菜單同步.
+- Preflight reads the currently published Admin config from ADMIN_SYNC; it does not use an ad-hoc UI payload.
+- Full-menu projection returns Admin revision, categories, SPUs, SKUs, choice groups, options and snapshot fingerprint.
+- Preview fails closed on invalid/incomplete catalog and does not submit provider mutation.
+- Full sync uses one provider async task and persists taskId / submittedAt.
+- 1202 completion and optional 1201 picture completion are correlated back to the same menu task.
+- Full snapshot omission semantics remain destructive at provider side; therefore preflight completeness is mandatory.
+- Admin Keeta endpoints require the enrolled Admin publish key / same-origin authorization.
+
+E6:
+- Sellability uses published MFK availability + catalog and shares deterministic SPU OpenItemCode identity with E1.
+- Option independent sellability is not mutated without canonical option availability truth.
+- Weekly hours project exactly seven days.
+- REST / OPEN are provider operations only; they do not rewrite MFK canonical authority.
+- Provider UNKNOWN requires readback first; no blind retry.
+
+E1
+ACCEPTANCE_CASE_ID: KEETA-E1-MENU-20260923-01
+CURRENT: E1_ACTIVE / ARMED
+INPUT: currently published Admin config
+ACTION REQUIRED: run authenticated Admin preflight first
+EXPECTED:
+- OAuth CONNECTED
+- preview state READY
+- errors = 0
+- counts + snapshot fingerprint visible
+- no provider sync before complete preflight
+ACTUAL:
+- source/runtime path verified
+- real live preflight not yet executed in this worker session
+READBACK:
+- not yet eligible
+EVIDENCE:
+- current GitHub source + #162 contract verified
+- authenticated Admin execution surface is not currently available to this worker session
+VERDICT:
+- NOT YET ELIGIBLE; no final GREEN/RED/EXTERNAL_TEST_ENV_NOT_EXPOSED verdict has been issued
+FIRST_BREAK:
+AUTHENTICATED_ADMIN_EXECUTION_SURFACE_NOT_AVAILABLE_TO_WORKER
+NEXT:
+1. Open authenticated Admin → 渠道 → 供應同步.
+2. Press 預檢完整菜單 only.
+3. Capture OAuth state, Admin Revision, 分類, 商品, SKU, Option Groups, Options, Snapshot fingerprint, errors/warnings.
+4. If and only if preflight is complete with zero errors, press 同步完整菜單到 Keeta exactly once.
+5. Capture taskId / submittedAt / 1202 / optional 1201 / completion errors / provider readback.
+6. BANK E1 before E6.
+
+NO MUTATION PERFORMED
+- no menu sync submitted
+- no sellability change
+- no hours sync
+- no REST / OPEN
+- no provider reauthorization
+- no code mutation
