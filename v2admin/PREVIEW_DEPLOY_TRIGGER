@@ -1,4 +1,4 @@
-work_id=MFK-KEETA-TOKEN-STRUCTURE-DIAGNOSTIC-R1
-purpose=validate sanitized Keeta token response structural diagnostics
-candidate=af97a7b7a3b3d305e6c02ed86383f885373ff606
+work_id=MFK-KEETA-PROVIDER-ERROR-115000260-R1
+purpose=validate provider authorization-cancelled token semantics exact refresh runtime
+candidate=5d7185f79535bcf8bb2527ba1d8977db5429944b
 deployment_authority=PREVIEW_ONLY

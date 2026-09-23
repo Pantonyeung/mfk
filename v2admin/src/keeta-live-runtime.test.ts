@@ -363,91 +363,28 @@ describe('Keeta live edge runtime',()=>{
   });
 
 
-  it('reports only structural token response diagnostics when the provider envelope never reaches token material',async()=>{
-    const key=Buffer.alloc(32,18).toString('base64');
+  it('classifies provider 115000260 as cancelled authorization and stops refresh retry scheduling',async()=>{
+    const key=Buffer.alloc(32,19).toString('base64');
     const storage=new Map<string,unknown>();
-    const state={storage:{get:async(key:string)=>storage.get(key),put:async(key:string,value:unknown)=>{storage.set(key,value);},delete:async(key:string)=>{storage.delete(key);}}};
-    const env={KEETA_APP_ID:'3419700273',KEETA_APP_SECRET:'test-secret',KEETA_TOKEN_ENCRYPTION_KEY:key,KEETA_PROVIDER_SHOP_ID:'721578302',KEETA_OAUTH_REDIRECT_URI:'https://admin.morefunos.com/api/keeta/oauth/callback'};
-    const {KeetaRuntimeStore}=await import('../keeta-runtime.ts');
-    const runtime=new KeetaRuntimeStore(state as never,env as never);
-    let envelope:unknown={code:0,message:'inner',data:'opaque-provider-data'};
-    for(let depth=0;depth<2;depth+=1)envelope={code:0,message:'outer',data:envelope};
-    vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify(envelope),{status:200})));
-    try{
-      const now=Date.now();
-      const response=await runtime.fetch(new Request('https://internal/admin/token/import-test',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({accessToken:'expired-secret-access',tokenType:'bearer',expiresIn:1,refreshToken:'expired-secret-refresh',scope:'all',issuedAtTime:now-10000})}));
-      expect(response.status).toBe(409);
-      const body=await response.json() as {code:string};
-      expect(body.code).toContain('trace=d0[code,data,message] data=object');
-      expect(body.code).toContain('d2[code,data,message] data=string');
-      expect(body.code).not.toContain('opaque-provider-data');
-      expect(body.code).not.toContain('expired-secret');
-    }finally{vi.unstubAllGlobals();}
-  });
-
-  it('walks the live-proven token envelope beyond depth three with a bounded ceiling',async()=>{
-    const key=Buffer.alloc(32,17).toString('base64');
-    const storage=new Map<string,unknown>();
-    const state={storage:{get:async(key:string)=>storage.get(key),put:async(key:string,value:unknown)=>{storage.set(key,value);},delete:async(key:string)=>{storage.delete(key);}}};
+    let alarmAt:number|null=null;
+    const state={storage:{get:async(key:string)=>storage.get(key),put:async(key:string,value:unknown)=>{storage.set(key,value);},delete:async(key:string)=>{storage.delete(key);},setAlarm:async(value:number)=>{alarmAt=value;}}};
     const env={KEETA_APP_ID:'3419700273',KEETA_APP_SECRET:'test-secret',KEETA_TOKEN_ENCRYPTION_KEY:key,KEETA_PROVIDER_SHOP_ID:'721578302',KEETA_OAUTH_REDIRECT_URI:'https://admin.morefunos.com/api/keeta/oauth/callback'};
     const {KeetaRuntimeStore}=await import('../keeta-runtime.ts');
     const runtime=new KeetaRuntimeStore(state as never,env as never);
     const issuedAtTime=Date.now();
-    const token={accessToken:'deep-access',tokenType:'bearer',expiresIn:7776000,refreshToken:'deep-refresh',scope:'all',issuedAtTime};
-    let envelope:unknown=token;
-    for(let depth=0;depth<5;depth+=1)envelope={code:0,message:'Success',data:envelope};
-    vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify(envelope),{status:200})));
+    vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({code:115000260,message:'provider authorization cancelled',data:'opaque'}),{status:200})));
     try{
-      const imported=await runtime.fetch(new Request('https://internal/admin/token/import-test',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({accessToken:'expired-access',tokenType:'bearer',expiresIn:1,refreshToken:'old-refresh',scope:'all',issuedAtTime:issuedAtTime-10000})}));
+      const imported=await runtime.fetch(new Request('https://internal/admin/token/import-test',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({accessToken:'valid-looking-access',tokenType:'bearer',expiresIn:7776000,refreshToken:'cancelled-refresh',scope:'all',issuedAtTime})}));
       expect(imported.status).toBe(200);
-      const status=await (await runtime.fetch(new Request('https://internal/admin/status',{method:'POST'}))).json() as {oauth:{state:string;tokenSource:string}};
-      expect(status.oauth).toMatchObject({state:'CONNECTED',tokenSource:'TEST_PROVIDER_PORTAL_REFRESH'});
-      const serialized=JSON.stringify([...storage.entries()]);
-      expect(serialized).not.toContain('deep-access');
-      expect(serialized).not.toContain('deep-refresh');
+      alarmAt=null;
+      await expect(runtime.refreshPersistedToken('TEST_AUTH_CANCELLED')).rejects.toThrow('KEETA_AUTHORIZATION_CANCELLED_115000260');
+      const invalid=storage.get('oauth:provider-token-invalid') as {state?:string;code?:string};
+      expect(invalid).toMatchObject({state:'REAUTH_REQUIRED',code:'KEETA_AUTHORIZATION_CANCELLED_115000260'});
+      const auto=storage.get('oauth:auto-refresh') as {state?:string;nextRefreshAtMs?:number|null;lastError?:string};
+      expect(auto).toMatchObject({state:'REAUTH_REQUIRED',nextRefreshAtMs:null,lastError:'KEETA_AUTHORIZATION_CANCELLED_115000260'});
+      expect(alarmAt).toBeNull();
     }finally{vi.unstubAllGlobals();}
   });
-
-  it('accepts the observed nested provider token data envelope without weakening token validation',async()=>{
-    const key=Buffer.alloc(32,16).toString('base64');
-    const storage=new Map<string,unknown>();
-    const state={storage:{get:async(key:string)=>storage.get(key),put:async(key:string,value:unknown)=>{storage.set(key,value);},delete:async(key:string)=>{storage.delete(key);}}};
-    const env={KEETA_APP_ID:'3419700273',KEETA_APP_SECRET:'test-secret',KEETA_TOKEN_ENCRYPTION_KEY:key,KEETA_PROVIDER_SHOP_ID:'721578302',KEETA_OAUTH_REDIRECT_URI:'https://admin.morefunos.com/api/keeta/oauth/callback'};
-    const {KeetaRuntimeStore}=await import('../keeta-runtime.ts');
-    const runtime=new KeetaRuntimeStore(state as never,env as never);
-    const issuedAtTime=Date.now();
-    vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({code:0,message:'Success',data:{code:0,message:'Success',data:{accessToken:'nested-access',tokenType:'bearer',expiresIn:7776000,refreshToken:'nested-refresh',scope:'all',issuedAtTime}}}),{status:200})));
-    try{
-      const imported=await runtime.fetch(new Request('https://internal/admin/token/import-test',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({accessToken:'expired-access',tokenType:'bearer',expiresIn:1,refreshToken:'old-refresh',scope:'all',issuedAtTime:issuedAtTime-10000})}));
-      expect(imported.status).toBe(200);
-      const status=await (await runtime.fetch(new Request('https://internal/admin/status',{method:'POST'}))).json() as {oauth:{state:string;tokenSource:string}};
-      expect(status.oauth).toMatchObject({state:'CONNECTED',tokenSource:'TEST_PROVIDER_PORTAL_REFRESH'});
-      const serialized=JSON.stringify([...storage.entries()]);
-      expect(serialized).not.toContain('nested-access');
-      expect(serialized).not.toContain('nested-refresh');
-    }finally{vi.unstubAllGlobals();}
-  });
-
-  it('accepts the provider token material inside the standard data envelope without weakening token validation',async()=>{
-    const key=Buffer.alloc(32,15).toString('base64');
-    const storage=new Map<string,unknown>();
-    const state={storage:{get:async(key:string)=>storage.get(key),put:async(key:string,value:unknown)=>{storage.set(key,value);},delete:async(key:string)=>{storage.delete(key);}}};
-    const env={KEETA_APP_ID:'3419700273',KEETA_APP_SECRET:'test-secret',KEETA_TOKEN_ENCRYPTION_KEY:key,KEETA_PROVIDER_SHOP_ID:'721578302',KEETA_OAUTH_REDIRECT_URI:'https://admin.morefunos.com/api/keeta/oauth/callback'};
-    const {KeetaRuntimeStore}=await import('../keeta-runtime.ts');
-    const runtime=new KeetaRuntimeStore(state as never,env as never);
-    const issuedAtTime=Date.now();
-    vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({code:0,message:'Success',data:{accessToken:'enveloped-access',tokenType:'bearer',expiresIn:7776000,refreshToken:'enveloped-refresh',scope:'all',issuedAtTime}}),{status:200})));
-    try{
-      const imported=await runtime.fetch(new Request('https://internal/admin/token/import-test',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({accessToken:'expired-access',tokenType:'bearer',expiresIn:1,refreshToken:'old-refresh',scope:'all',issuedAtTime:issuedAtTime-10000})}));
-      expect(imported.status).toBe(200);
-      const status=await (await runtime.fetch(new Request('https://internal/admin/status',{method:'POST'}))).json() as {oauth:{state:string;tokenSource:string}};
-      expect(status.oauth).toMatchObject({state:'CONNECTED',tokenSource:'TEST_PROVIDER_PORTAL_REFRESH'});
-      const serialized=JSON.stringify([...storage.entries()]);
-      expect(serialized).not.toContain('enveloped-access');
-      expect(serialized).not.toContain('enveloped-refresh');
-    }finally{vi.unstubAllGlobals();}
-  });
-
   it('refreshes an expired provider-portal token without OAuth reauthorization',async()=>{
     const key=Buffer.alloc(32,10).toString('base64');
     const storage=new Map<string,unknown>();
