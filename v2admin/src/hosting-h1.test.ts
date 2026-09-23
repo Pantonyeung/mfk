@@ -4,7 +4,7 @@ import {describe,expect,it} from 'vitest';
 describe('MFK Admin Cloudflare H2 + config sync runtime',()=>{
   const source=readFileSync(new URL('../wrangler.jsonc',import.meta.url),'utf8');
 
-  it('targets mfk-admin, serves SPA assets, and exposes dedicated Admin + Keeta runtime Durable Objects',()=>{
+  it('targets mfk-admin, serves SPA assets, and exposes dedicated Admin + Keeta + Customer runtime Durable Objects',()=>{
     expect(source).toContain('"name": "mfk-admin"');
     expect(source).toContain('"main": "./worker.ts"');
     expect(source).toContain('"directory": "./dist"');
@@ -16,12 +16,16 @@ describe('MFK Admin Cloudflare H2 + config sync runtime',()=>{
     expect(source).toContain('"name": "KEETA_RUNTIME"');
     expect(source).toContain('"class_name": "KeetaRuntimeStore"');
     expect(source).toContain('"tag": "keeta-runtime-v1"');
+    expect(source).toContain('"name": "CUSTOMER_RUNTIME"');
+    expect(source).toContain('"class_name": "CustomerRuntimeStore"');
+    expect(source).toContain('"tag": "customer-runtime-v1"');
   });
 
-  it('allows SMT appassets to fetch/ACK config while Publish remains Admin-origin-only',()=>{
+  it('allows SMT appassets plus the public Customer origin while Publish remains Admin-origin-only',()=>{
     const worker=readFileSync(new URL('../worker.ts',import.meta.url),'utf8');
     expect(worker).toContain("const SMT_ORIGIN='https://appassets.androidplatform.net'");
-    expect(worker).toContain('CORS_ORIGINS=new Set([ADMIN_ORIGIN,SMT_ORIGIN])');
+    expect(worker).toContain("const CUSTOMER_ORIGIN='https://order.morefunos.com'");
+    expect(worker).toContain('CORS_ORIGINS=new Set([ADMIN_ORIGIN,SMT_ORIGIN,CUSTOMER_ORIGIN])');
     expect(worker).toContain("if(origin!==ADMIN_ORIGIN)return false");
     expect(worker).toContain("if(site&&site!=='same-origin')return false");
   });

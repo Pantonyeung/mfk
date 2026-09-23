@@ -46,3 +46,32 @@ Hard authority rules:
 - all command capabilities remain `NOT_WIRED`
 
 The old fixture/migration shell has been removed from production source.
+
+
+## Cloud Bridge R1 candidate
+
+Work: `MFK-CUSTOMER-CLOUD-BRIDGE-R1`  
+Issue: #189  
+PR: #190 (DRAFT / NOT DEPLOYED)
+
+Connection candidate:
+- Customer runtime port -> public `/api/customer/**`
+- Admin published config -> public Customer menu/read model projection
+- quote intent -> Customer Durable Object -> SMT authenticated pull -> local published pricing/config validation -> quote ACK/readback
+- order intent -> Customer Durable Object -> SMT authenticated pull -> local canonical Order commit -> Display allocation -> ACK/readback
+- Customer order status -> only submission IDs retained by that browser -> filtered SMT projection
+- stable submissionId/idempotency; UNKNOWN/readback-first; zero blind resubmit
+
+Authority remains:
+- Customer localStorage = non-authoritative cart/draft/submission references only
+- Cloud Durable Object = pending intent / ACK transport state only
+- SMT local = Formal Order + Display authority
+- no D1/R2 binding in this cut
+- no cloud Payment execution
+- no second Pricing/Order/Store Kernel/Sync engine
+
+Current limitations before live deploy:
+- executable multi-port verification still required
+- Customer authentication / stronger privacy binding must be reviewed before public live acceptance
+- variation/combo execution remains fail-closed until mapped to current published canonical semantics
+- physical/store-device acceptance is deferred to Owner onsite testing

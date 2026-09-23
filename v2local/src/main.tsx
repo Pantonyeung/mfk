@@ -7,6 +7,7 @@ import {installStaffSessionInvalidation} from './runtime/staff-auth.ts';
 import {installKeetaOrderIntake} from './runtime/keeta-order-intake.ts';
 import {installKeetaOrderLifecycle} from './runtime/keeta-order-lifecycle.ts';
 import {installKeetaAfterSales} from './runtime/keeta-after-sale.ts';
+import {installCustomerCloudBridge} from './runtime/customer-cloud-intake.ts';
 import {localRuntime} from './runtime/local-runtime.ts';
 import {readLocalCashOpenings,readLocalDayCloses} from './runtime/local-operations.ts';
 import {
@@ -23,6 +24,7 @@ installProjectionOutboxAutoFlush();
 installKeetaOrderIntake();
 installKeetaOrderLifecycle();
 installKeetaAfterSales();
+installCustomerCloudBridge();
 
 for(const order of localRuntime.orders())queueOrderProjection(order);
 for(const opening of readLocalCashOpenings())queueCashOpeningProjection(opening);
