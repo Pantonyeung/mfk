@@ -5,6 +5,7 @@ import {hasStaffPermission} from '../runtime/staff-auth.ts';
 import {readSmtQuickReasons,readSmtStoreSettings} from '../runtime/admin-operational-config.ts';
 import {subscribeSmtAdminConfig} from '../runtime/admin-config-sync.ts';
 import {decideKeetaAfterSale,previewKeetaPartialRefund,readKeetaAfterSales,type KeetaAfterSaleCase} from '../runtime/keeta-after-sale.ts';
+import {readKeetaOrderIntakeAttention,reconcileKeetaOrderIntake} from '../runtime/keeta-order-intake.ts';
 import './orders-workspace.css';
 
 type PaymentFilter='全部'|'現金'|'Alipay'|'WeChat Pay'|'FPS / PayMe';
@@ -54,6 +55,8 @@ export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePor
   const [afterSaleRevision,setAfterSaleRevision]=useState(0);
   const [afterSaleBusy,setAfterSaleBusy]=useState<string|null>(null);
   const [partialPreview,setPartialPreview]=useState<unknown>(null);
+  const [keetaPullBusy,setKeetaPullBusy]=useState(false);
+  const [keetaPullMessage,setKeetaPullMessage]=useState<string|null>(null);
   useEffect(()=>{
     const refresh=()=>setAfterSaleRevision(value=>value+1);
     window.addEventListener('mfk-keeta-after-sale',refresh);
@@ -116,6 +119,20 @@ export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePor
         :'已接單；Keeta confirm 已同步');
     }catch(cause){setMessage(cause instanceof Error?cause.message:'未能接單');}
     finally{setAcceptBusy(false);}
+  };
+  const pullKeetaOrders=async()=>{
+    if(keetaPullBusy)return;
+    setKeetaPullBusy(true);setKeetaPullMessage(null);
+    try{
+      await reconcileKeetaOrderIntake();
+      await load(snapshot?.selectedOrderId,true);
+      const attention=readKeetaOrderIntakeAttention();
+      setKeetaPullMessage(attention.length
+        ?'Keeta 新單已同步；'+attention.length+' 張需要處理。'
+        :'已手動檢查 Keeta 新單。');
+    }catch(cause){
+      setKeetaPullMessage(cause instanceof Error?cause.message:'KEETA_ORDER_PULL_FAILED');
+    }finally{setKeetaPullBusy(false);}
   };
   const markReady=async()=>{
     if(!selected||!runtime.markOrderReady||readyBusy)return;
@@ -260,8 +277,9 @@ export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePor
       </div>
       <div className="order-board-head">
         <span>{history?'歷史訂單':'進行中訂單'}　{filtered.length}</span>
-        <div><label>Admin 出餐計時</label><b>{storeSettings.fulfillmentMinutes} 分鐘</b><button disabled title="由 Admin 門店設定提供">Admin</button></div>
+        <div><button type="button" disabled={keetaPullBusy} onClick={()=>void pullKeetaOrders()}>{keetaPullBusy?'同步中…':'手動接 Keeta 新單'}</button><label>Admin 出餐計時</label><b>{storeSettings.fulfillmentMinutes} 分鐘</b><button disabled title="由 Admin 門店設定提供">Admin</button></div>
       </div>
+      {keetaPullMessage?<p className="order-board-error">{keetaPullMessage}</p>:null}
 
       <div className="order-channel-grid">
         {lanes.map(lane=><section key={lane.id} className="order-channel-lane">
