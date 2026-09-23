@@ -1,3 +1,4 @@
+import {createCloudCustomerRuntimePort} from './cloud-runtime';
 import type {CustomerRuntimePort} from './product-types';
 
 declare global {
@@ -9,5 +10,6 @@ declare global {
 export function resolveCustomerRuntimePort():CustomerRuntimePort|null{
   if(typeof window==='undefined')return null;
   const candidate=window.__MFK_CUSTOMER_PRODUCT_PORT__;
-  return candidate?.portId==='MFK_CUSTOMER_PORT_V1'?candidate:null;
+  if(candidate?.portId==='MFK_CUSTOMER_PORT_V1')return candidate;
+  return createCloudCustomerRuntimePort();
 }
