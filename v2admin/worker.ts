@@ -407,7 +407,9 @@ export default {
               ?'KEETA_ORDER_AVAILABLE'
               :[1002,1003,1004,1006,1008].includes(eventId)
                 ?'KEETA_ORDER_EVENT_AVAILABLE'
-                :null;
+                :[1005,1007].includes(eventId)
+                  ?'KEETA_AFTER_SALE_AVAILABLE'
+                  :null;
             if(type)await admin.fetch(new Request('https://internal/provider-doorbell',{
               method:'POST',
               headers:{'content-type':'application/json'},
