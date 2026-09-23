@@ -189,7 +189,8 @@ describe('Keeta live edge runtime',()=>{
       expect(callback.status).toBe(302);
       const status=await (await runtime.fetch(new Request('https://internal/admin/status',{method:'POST'}))).json() as {oauth:{state:string;authorization:{state:string;source?:string}|null;tokenSource?:string}};
       expect(status.oauth.state).toBe('CONNECTED');
-      expect(status.oauth.authorization).toMatchObject({state:'AUTHORIZED',source:'TOKEN_EXCHANGE'});
+      expect(status.oauth.authorization).toMatchObject({state:'AUTHORIZED',eventId:1});
+      expect(storage.get('provider:authorization')).toMatchObject({state:'AUTHORIZED',eventId:1,source:'TOKEN_EXCHANGE'});
       expect(status.oauth.tokenSource).toBe('OAUTH_CALLBACK');
       const readiness=await runtime.fetch(new Request('https://internal/admin/token/readiness',{method:'POST'}));
       expect(readiness.status).toBe(200);
