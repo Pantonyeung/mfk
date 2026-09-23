@@ -1,4 +1,4 @@
 work_id=MFK-KEETA-PROVIDER-ERROR-115000260-R1
-purpose=validate provider authorization-cancelled token semantics
-candidate=a7d15362d37609a37174884517e8b442ff68fd3d
+purpose=validate provider authorization-cancelled token semantics after retiring disproven envelope tests
+candidate=da9a3c8778a5f4e7920ea78ca1eed19ac52b2ebd
 deployment_authority=PREVIEW_ONLY
