@@ -101,3 +101,44 @@ NOT YET ELIGIBLE
 
 SAFE NEXT
 Resume the same E2 case only when an authenticated SMT/Admin runtime readback surface is available. Preserve the single existing provider order identity. Do not create a replacement test order unless the original order is proven unusable by authoritative provider/canonical evidence.
+
+
+OWNER DIRECTIVE UPDATE — OPERATIONAL SMT CONNECTION FIRST
+Owner clarified priority: Keeta must be operationally connected into SMT now. Automatic receive remains the primary path. If automatic receive is unavailable or missed, SMT must offer a manual receive fallback. Owner does not want external acceptance bookkeeping to block operational usability.
+
+CURRENT SOURCE REALITY
+- Keeta 1001 live webhook → pending intent → SMT canonical intake path already exists.
+- SMT auto receive is installed on app startup, focus, network-online and KEETA_ORDER_AVAILABLE doorbell.
+- SMT merchant manual ACCEPT button already exists after the Keeta order is present locally.
+- Missing operator surface was a manual pull fallback before local order admission.
+
+IMPLEMENTED
+Commit: 1b63fc6eb70ced899b93ba02f5fb9cf143975000
+File: v2local/src/presentation/RuntimeOrdersWorkspace.tsx
+Change:
+- Added "手動接 Keeta 新單" control in SMT Order Manager.
+- The control calls the SAME reconcileKeetaOrderIntake path used by automatic intake.
+- No second Order Engine / no cloud Formal Order writer / no second pricing/payment/print authority.
+- After pull, SMT refreshes local order list.
+- Intake attention is surfaced when mapping/intake needs human handling.
+
+VERIFICATION
+GitHub Actions: V2 Local POS Smoke
+Run: 35807329071
+Job: 107010963021
+Result: SUCCESS
+- Unit tests GREEN
+- Build GREEN
+- Local authority + bounded cloud seam proof GREEN
+- Static bundle proof GREEN
+
+DEPLOYMENT REALITY
+- Source/main is GREEN.
+- Existing physical SMT device is offline, so this new UI fallback cannot be installed/read back on that device at this moment.
+- The physical-device offline state does NOT remove the existing cloud 1001 webhook/pending intent.
+- Formal Order must still be created by SMT; we will not create a cloud-side Formal Order just to bypass the offline device.
+
+CURRENT
+KEETA_AUTO_INGRESS_CONNECTED_IN_SOURCE
+KEETA_MANUAL_PULL_FALLBACK_SOURCE_GREEN
+PHYSICAL_SMT_UPDATE_PENDING_DEVICE_ONLINE
