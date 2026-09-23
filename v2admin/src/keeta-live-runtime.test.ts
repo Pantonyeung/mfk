@@ -169,6 +169,33 @@ describe('Keeta live edge runtime',()=>{
     expect(await readiness.json()).toMatchObject({state:'TOKEN_UNAVAILABLE',code:'KEETA_ACCESS_TOKEN_REAUTHORIZE_REQUIRED'});
   });
 
+  it('lets a fresh successful OAuth callback supersede stale 1302 removal evidence',async()=>{
+    const key=Buffer.alloc(32,22).toString('base64');
+    const storage=new Map<string,unknown>();
+    const state={storage:{get:async(key:string)=>storage.get(key),put:async(key:string,value:unknown)=>{storage.set(key,value);},delete:async(key:string)=>{storage.delete(key);},setAlarm:async()=>{},getAlarm:async()=>null}};
+    const env={KEETA_APP_ID:'3419700273',KEETA_APP_SECRET:'test-secret',KEETA_TOKEN_ENCRYPTION_KEY:key,KEETA_PROVIDER_SHOP_ID:'721578302',KEETA_OAUTH_REDIRECT_URI:'https://admin.morefunos.com/api/keeta/oauth/callback'};
+    const {KeetaRuntimeStore}=await import('../keeta-runtime.ts');
+    const runtime=new KeetaRuntimeStore(state as never,env as never);
+    const webhookUrl='https://admin.morefunos.com/api/keeta/webhook';
+    const removed=await signKeetaRuntimeParams(webhookUrl,{eventId:1302,appId:3419700273,messageId:'old-remove',shopId:721578302,message:JSON.stringify({authId:'old',opType:2,shopId:721578302}),timestamp:Date.now()},'test-secret');
+    const removedResponse=await runtime.fetch(new Request('https://internal/webhook',{method:'POST',headers:{'content-type':'application/json','x-mfk-keeta-external-url':webhookUrl},body:JSON.stringify(removed)}));
+    expect(removedResponse.status).toBe(200);
+    vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({accessToken:'fresh-access',tokenType:'bearer',expiresIn:7776000,refreshToken:'fresh-refresh',scope:'all',issuedAtTime:Date.now()}),{status:200})));
+    try{
+      const callbackBase='https://admin.morefunos.com/api/keeta/oauth/callback';
+      const params=await signKeetaRuntimeParams(callbackBase,{appId:3419700273,code:'fresh-code',state:'',timestamp:Date.now()},'test-secret');
+      const query=new URLSearchParams(Object.entries(params).map(([k,v])=>[k,String(v)]));
+      const callback=await runtime.fetch(new Request('https://internal/oauth/callback?'+query.toString(),{method:'GET',headers:{'x-mfk-keeta-external-url':callbackBase+'?'+query.toString()}}));
+      expect(callback.status).toBe(302);
+      const status=await (await runtime.fetch(new Request('https://internal/admin/status',{method:'POST'}))).json() as {oauth:{state:string;authorization:{state:string;source?:string}|null;tokenSource?:string}};
+      expect(status.oauth.state).toBe('CONNECTED');
+      expect(status.oauth.authorization).toMatchObject({state:'AUTHORIZED',source:'TOKEN_EXCHANGE'});
+      expect(status.oauth.tokenSource).toBe('OAUTH_CALLBACK');
+      const readiness=await runtime.fetch(new Request('https://internal/admin/token/readiness',{method:'POST'}));
+      expect(readiness.status).toBe(200);
+    }finally{vi.unstubAllGlobals();}
+  });
+
   it('treats signed brand authorization revocation as fail-closed provider custody evidence',async()=>{
     const key=Buffer.alloc(32,14).toString('base64');
     const storage=new Map<string,unknown>();
