@@ -228,6 +228,21 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
   const activeCombos=comboData.combos.filter(combo=>combo.active);
   const riceballCategory=categories.find(item=>item.label.includes('飯團'));
 
+  const cartLinePresentation=(line:CartLine)=>{
+    const note=line.configuration?.note.trim()||undefined;
+    const combo=activeCombos.find(item=>item.id===line.productId);
+    if(combo)return {comboDetail:line.detail?.trim()||undefined,note};
+    const product=products.find(item=>item.id===line.productId);
+    const optionDetail=line.configuration&&product
+      ?product.optionSets.flatMap(set=>{
+        const ids=new Set(line.configuration?.selected[set.id]??[]);
+        const names=set.options.filter(option=>ids.has(option.id)).map(option=>option.name);
+        return names.length?[set.name+'：'+names.join('、')]:[];
+      }).join(' · ')
+      :line.detail;
+    return {optionDetail:optionDetail?.trim()||undefined,note};
+  };
+
   const view:OrderingWorkspaceViewModel={
     pendingOrders,activeOrders,categories,selectedCategoryId:category,
     searchQuery,feedbackMessage,orderingMode,
@@ -254,6 +269,7 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
       lines:cart.map(line=>({
         id:line.id,name:line.name,quantity:line.qty,lineTotalLabel:money(line.unitMinor*line.qty),
         serviceMode:line.serviceMode,groupId:'local',groupLabel:'本機',detail:line.detail,
+        ...cartLinePresentation(line),
       })),
       subtotalLabel:money(total),packagingLabel:'$0.00',discountLabel:'$0.00',totalLabel:money(total),checkoutEnabled:cart.length>0&&((serviceMode==='takeaway'&&storeSettings.takeawayEnabled)||(serviceMode==='dine-in'&&storeSettings.dineInEnabled)),
     },
