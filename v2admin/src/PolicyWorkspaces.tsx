@@ -259,6 +259,7 @@ export function ChannelsWorkspace({mode}:{mode:'overview'|'mapping'|'failures'|'
   const [orderIntakeRows,setOrderIntakeRows]=useState<readonly KeetaOrderIntakeRow[]>([]);
   const [orderIntakePending,setOrderIntakePending]=useState(0);
   const [orderIntakeCommitted,setOrderIntakeCommitted]=useState(0);
+  const [orderIntakeLastPull,setOrderIntakeLastPull]=useState<{deviceId:string;observedAt:string;pendingCount:number}|null>(null);
   const [orderIntakeBusy,setOrderIntakeBusy]=useState(false);
   const refreshLive=async()=>{
     try{setLiveStatus(await readKeetaLiveStatus());setLiveError('');}
@@ -286,6 +287,7 @@ export function ChannelsWorkspace({mode}:{mode:'overview'|'mapping'|'failures'|'
       setOrderIntakeRows(result.items);
       setOrderIntakePending(result.pending);
       setOrderIntakeCommitted(result.committed);
+      setOrderIntakeLastPull(result.lastSmtPull);
       setLiveError('');
     }catch(error){
       setLiveError(error instanceof Error?error.message:'KEETA_ORDER_INTAKE_READ_FAILED');
@@ -420,6 +422,7 @@ export function ChannelsWorkspace({mode}:{mode:'overview'|'mapping'|'failures'|'
         <p><span>OAuth</span><b>{liveStatus.oauth.state}</b></p>
         <p><span>Token 到期</span><b>{liveStatus.oauth.expiresAt?new Date(liveStatus.oauth.expiresAt).toLocaleString('zh-HK'):'—'}</b></p>
         <p><span>Token 來源</span><b>{liveStatus.oauth.tokenSource??'—'}</b></p>
+        <p><span>Provider Token 驗證</span><b>{liveStatus.oauth.providerValidation?.state??'未有失效紀錄'}</b></p>
         <p><span>最近 OAuth callback</span><b>{liveStatus.oauth.lastCallbackAt?new Date(liveStatus.oauth.lastCallbackAt).toLocaleString('zh-HK'):'—'}</b></p>
         <p><span>Callback 結果</span><b>{liveStatus.oauth.lastCallbackResult??'—'}</b></p>
         <p><span>Callback 錯誤</span><b>{liveStatus.oauth.lastCallbackError??'—'}</b></p>
@@ -469,6 +472,8 @@ export function ChannelsWorkspace({mode}:{mode:'overview'|'mapping'|'failures'|'
         <p><span>待 SMT 接收</span><b>{orderIntakePending}</b></p>
         <p><span>已入 SMT</span><b>{orderIntakeCommitted}</b></p>
         <p><span>最近記錄</span><b>{orderIntakeRows.length}</b></p>
+        <p><span>SMT 最近拉單</span><b>{orderIntakeLastPull?.observedAt?new Date(orderIntakeLastPull.observedAt).toLocaleString('zh-HK'):'未見'}</b></p>
+        <p><span>拉單裝置</span><b>{orderIntakeLastPull?.deviceId||'—'}</b></p>
       </div>
       {orderIntakeRows.length?<div className="admin-editor-list">
         {orderIntakeRows.slice(0,30).map(row=><article className="admin-policy-row" key={row.providerOrderId}>
