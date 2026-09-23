@@ -1,0 +1,81 @@
+MFK Keeta K3 Direct Live Menu｜Worker A｜R1
+Date: 2026-09-23
+WORK_ID: MFK-KEETA-K3-DIRECT-LIVE-MENU-WORKER-A-R1
+ROLE: CURRENT LIVE SEAM DRIVER
+
+FRESH READ
+- current MFK main: 99226fd3b2c382cbfc3941f9f8e5544924c7e955
+- #22 latest controlling includes Commander dispatch 5788190921
+- #162 formal dispatch: 5788188509
+- #162 K3 control: 5788093815
+- #881 excluded
+
+HISTORICAL EVIDENCE USED
+Only:
+- 2026-09-05 Keeta Golden Thread
+- Keeta SIT Development Acceptance Master Matrix
+- Keeta Provider Handoff Pack
+- 2026-09-06 KEETA-SIT-NO-REDO-LOCK
+- Morefun-v2 #704 comment 5682072533
+- CAP-KEETA-INGRESS-001 = ACTIVE / PHYSICAL_PROVEN / no_redo:true
+
+HISTORICAL TOKEN FACT
+Assigned SIT Case 15 is PASS_LIVE:
+- protected live refresh succeeded
+- tokenType=bearer
+- expiresIn=7776000
+- accessTokenChanged=true
+- refreshTokenChanged=true
+- persistedReadback=true
+This proves refresh-token rotation is an existing capability; do not require routine manual token re-entry.
+
+CURRENT K3 SOURCE
+- v2admin/keeta-menu-projection.ts
+- v2admin/keeta-runtime.ts
+- v2admin/src/keeta-live-client.ts
+- related focused tests
+
+CURRENT IMPLEMENTATION
+- menu preview consumes current published Admin active snapshot
+- active products only
+- SKU openItemCode = productCode
+- SPU openItemCode = SPU:<productCode>
+- full menu submit = /api/open/product/menu/sync
+- returns positive taskId
+- 1202 callback is persisted against the menu task
+- 1201 picture callback is persisted if emitted
+- menu sync attempts usableToken()
+- provider 115000200 can trigger one refresh-token recovery and one retry
+- UNKNOWN/provider side effect must be read back before retry
+
+CURRENT
+K3_MENU_LIVE_SYNC_FIRST
+
+LAST_GREEN
+- historical full-menu + real 1202 error_count=0 is PASS_LIVE / no-redo
+- current K3 source/test/deploy exists
+- active-only preflight repair deployed
+- current provider token recovery repair deployed
+
+FIRST_BREAK
+LIVE_FULL_MENU_SYNC_NOT_YET_EXECUTED / REAL_1202_NOT_YET_READ_BACK
+
+EXECUTION BOUNDARY
+Current Admin mutation/read endpoints require the already-enrolled browser-local publisher identity (sync-publisher-key.v1). This Worker environment does not possess or retrieve that secret and will not rotate/re-enroll it. Live K3 must therefore be executed from the existing enrolled Admin browser session unless an already-authorized protected service-binding executor is provided.
+
+NEXT SAME LIVE ACTION
+1. Existing enrolled normal Admin browser session.
+2. Keeta platform page: run Token check.
+3. If provider-valid/recovered: run full-menu preview.
+4. Require non-empty snapshot, active products only, no validation errors, counts/fingerprint visible.
+5. Submit full menu exactly once.
+6. Capture taskId/submittedAt.
+7. Read status until real 1202; require zero errors.
+8. Capture 1201 if emitted.
+9. GREEN -> bank K3 and hand to K1.
+
+NO CODE MUTATION YET
+No implementation defect has been proven in K3 during this Worker turn.
+
+STATUS
+K3_LIVE_EXECUTION_ARMED / AUTHENTICATED_ADMIN_ACTION_REQUIRED
