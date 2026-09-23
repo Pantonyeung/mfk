@@ -701,17 +701,35 @@ export class KeetaRuntimeStore{
       return refreshed;
     }catch(error){
       const failedAt=Date.now();
-      const retryAt=failedAt+TOKEN_REFRESH_RETRY_MS;
-      if(typeof this.state.storage.setAlarm==='function')await this.state.storage.setAlarm(retryAt);
+      const errorCode=error instanceof Error?error.message:'KEETA_TOKEN_REFRESH_FAILED';
+      const authorizationCancelled=errorCode==='KEETA_AUTHORIZATION_CANCELLED_115000260';
       const latest=await this.state.storage.get('oauth:auto-refresh')||{};
-      await this.state.storage.put('oauth:auto-refresh',{
-        ...latest,
-        state:'RETRY_SCHEDULED',
-        nextRefreshAtMs:retryAt,
-        lastReason:reason,
-        lastError:error instanceof Error?error.message:'KEETA_TOKEN_REFRESH_FAILED',
-        updatedAt:failedAt,
-      });
+      if(authorizationCancelled){
+        await this.state.storage.put('oauth:provider-token-invalid',{
+          state:'REAUTH_REQUIRED',
+          code:errorCode,
+          observedAt:new Date(failedAt).toISOString(),
+        });
+        await this.state.storage.put('oauth:auto-refresh',{
+          ...latest,
+          state:'REAUTH_REQUIRED',
+          nextRefreshAtMs:null,
+          lastReason:reason,
+          lastError:errorCode,
+          updatedAt:failedAt,
+        });
+      }else{
+        const retryAt=failedAt+TOKEN_REFRESH_RETRY_MS;
+        if(typeof this.state.storage.setAlarm==='function')await this.state.storage.setAlarm(retryAt);
+        await this.state.storage.put('oauth:auto-refresh',{
+          ...latest,
+          state:'RETRY_SCHEDULED',
+          nextRefreshAtMs:retryAt,
+          lastReason:reason,
+          lastError:errorCode,
+          updatedAt:failedAt,
+        });
+      }
       throw error;
     }finally{
       await this.state.storage.delete('oauth:refresh-lock');
