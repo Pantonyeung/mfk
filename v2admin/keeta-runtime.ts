@@ -730,6 +730,10 @@ export class KeetaRuntimeStore{
   }
 
   async usableToken(){
+    const authorization=await this.state.storage.get('provider:authorization');
+    if(authorization?.state==='REMOVED'||authorization?.state==='REVOKED'){
+      throw new Error('KEETA_ACCESS_TOKEN_REAUTHORIZE_REQUIRED');
+    }
     const token=await this.loadToken();
     const assessment=tokenAssessment(token);
     if(assessment.disposition==='VALID'){
@@ -773,6 +777,7 @@ export class KeetaRuntimeStore{
     const journal=await this.state.storage.get('webhook:status')||{};
     const providerTokenInvalid=await this.state.storage.get('oauth:provider-token-invalid');
     const autoRefresh=await this.state.storage.get('oauth:auto-refresh')||{};
+    const providerAuthorization=await this.state.storage.get('provider:authorization')||null;
     const scheduledAlarmAt=typeof this.state.storage.getAlarm==='function'
       ?await this.state.storage.getAlarm()
       :null;
@@ -801,6 +806,11 @@ export class KeetaRuntimeStore{
         lastCallbackParamNames:Array.isArray(callbackStatus.lastCallbackParamNames)?callbackStatus.lastCallbackParamNames:[],
         tokenSource:tokenRow?(connection.tokenSource??'OAUTH_CALLBACK'):null,
         providerValidation:providerTokenInvalid??null,
+        authorization:providerAuthorization?{
+          state:providerAuthorization.state,
+          eventId:providerAuthorization.eventId,
+          observedAt:providerAuthorization.observedAt,
+        }:null,
         autoRefresh:{
           state:tokenRow?(autoRefresh.state??'SCHEDULED'):'NOT_CONFIGURED',
           nextRefreshAt:scheduledAlarmAt?new Date(Number(scheduledAlarmAt)).toISOString():null,
@@ -1626,6 +1636,22 @@ export class KeetaRuntimeStore{
           fingerprint,
           authorityBoundary:'PROVIDER_EVIDENCE_ONLY_NO_MFK_MUTATION',
         });
+        if(envelope.eventId===1301||envelope.eventId===1302||envelope.eventId===1303){
+          const authorizationState=envelope.eventId===1301?'AUTHORIZED':envelope.eventId===1302?'REMOVED':'REVOKED';
+          await this.state.storage.put('provider:authorization',Object.freeze({
+            state:authorizationState,
+            eventId:envelope.eventId,
+            messageId:envelope.messageId,
+            observedAt:acceptedAt,
+          }));
+          if(authorizationState!=='AUTHORIZED'){
+            await this.state.storage.put('oauth:provider-token-invalid',{
+              state:'REAUTH_REQUIRED',
+              code:authorizationState==='REMOVED'?'KEETA_PROVIDER_AUTHORIZATION_REMOVED':'KEETA_PROVIDER_AUTHORIZATION_REVOKED',
+              observedAt:acceptedAt,
+            });
+          }
+        }
         if(envelope.eventId===1001){
           const placement=keetaOrderPlacementIdentity(envelope.message);
           const intentKey='order:intent:'+placement.providerOrderId;
