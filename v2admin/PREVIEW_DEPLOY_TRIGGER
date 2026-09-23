@@ -1,4 +1,4 @@
-work_id=MFK-KEETA-TOKEN-ENVELOPE-WALK-R1
-purpose=validate live-proven deep Keeta token envelope walk
-candidate=291272bdcf61a7df3abb3ce0700c06a917fc4cc4
+work_id=MFK-KEETA-TOKEN-STRUCTURE-DIAGNOSTIC-R1
+purpose=validate sanitized Keeta token response structural diagnostics
+candidate=af97a7b7a3b3d305e6c02ed86383f885373ff606
 deployment_authority=PREVIEW_ONLY

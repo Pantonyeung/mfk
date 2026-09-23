@@ -167,7 +167,9 @@ function parseTokenMaterial(input){
   const parsed=typeof input==='string'?JSON.parse(input):record(input,'KEETA_TOKEN_RESPONSE_INVALID_SHAPE');
   const root=record(parsed,'KEETA_TOKEN_RESPONSE_INVALID_SHAPE');
   let candidate=root;
+  const trace=[];
   for(let depth=0;depth<8;depth+=1){
+    trace.push({depth,keys:Object.keys(candidate).sort(),dataType:Array.isArray(candidate.data)?'array':candidate.data===null?'null':typeof candidate.data});
     if(!(candidate.data&&typeof candidate.data==='object'&&!Array.isArray(candidate.data)))break;
     candidate=record(candidate.data,'KEETA_TOKEN_RESPONSE_INVALID_SHAPE');
   }
@@ -181,7 +183,8 @@ function parseTokenMaterial(input){
     ||!Number.isFinite(Number(row.issuedAtTime))||Number(row.issuedAtTime)<0){
     const keys=Object.keys(row).sort().join(',');
     const envelopeKeys=Object.keys(root).sort().join(',');
-    throw new Error('KEETA_TOKEN_RESPONSE_INVALID_SHAPE:envelope='+envelopeKeys+';token='+keys);
+    const structure=trace.map(item=>'d'+item.depth+'['+item.keys.join(',')+'] data='+item.dataType).join('|');
+    throw new Error('KEETA_TOKEN_RESPONSE_INVALID_SHAPE:envelope='+envelopeKeys+';token='+keys+';trace='+structure);
   }
   return Object.freeze({
     accessToken:row.accessToken,
