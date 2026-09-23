@@ -1076,6 +1076,156 @@ export class KeetaRuntimeStore{
       }
     }
 
+    if(url.pathname==='/smt/orders/after-sales/pending'&&request.method==='GET'){
+      const rows=await this.state.storage.list({prefix:'after-sale:event:'});
+      const events=[...rows.values()]
+        .filter(row=>row&&row.state==='PENDING_SMT')
+        .sort((a,b)=>String(a.receivedAt).localeCompare(String(b.receivedAt)))
+        .slice(0,50);
+      return json({schema:'MFK_KEETA_AFTER_SALE_BATCH_V1',storeId:'MF01',events});
+    }
+
+    if(url.pathname==='/smt/orders/after-sales/ack'&&request.method==='POST'){
+      try{
+        const body=record(await request.json(),'KEETA_AFTER_SALE_ACK_INVALID');
+        const providerMessageId=nonEmpty(body.providerMessageId,'KEETA_AFTER_SALE_MESSAGE_ID_REQUIRED');
+        const providerOrderId=nonEmpty(String(body.providerOrderId??''),'KEETA_AFTER_SALE_PROVIDER_ORDER_ID_REQUIRED');
+        const afterSaleOrderId=nonEmpty(String(body.afterSaleOrderId??''),'KEETA_AFTER_SALE_ID_REQUIRED');
+        const canonicalOrderId=nonEmpty(body.canonicalOrderId,'KEETA_CANONICAL_ORDER_ID_REQUIRED');
+        const eventKey='after-sale:event:'+providerMessageId;
+        const event=await this.state.storage.get(eventKey);
+        if(!event)return json({code:'KEETA_AFTER_SALE_EVENT_NOT_FOUND'},404);
+        if(event.providerOrderId!==providerOrderId||event.afterSaleOrderId!==afterSaleOrderId){
+          return json({code:'KEETA_AFTER_SALE_EVENT_IDENTITY_MISMATCH'},409);
+        }
+        const intent=await this.state.storage.get('order:intent:'+providerOrderId);
+        if(!intent||intent.state!=='COMMITTED')return json({code:'KEETA_AFTER_SALE_ORDER_NOT_COMMITTED'},409);
+        if(intent.canonicalOrderId!==canonicalOrderId)return json({code:'KEETA_AFTER_SALE_CANONICAL_MISMATCH'},409);
+        if(event.state==='LINKED'){
+          if(event.canonicalOrderId!==canonicalOrderId)return json({code:'KEETA_AFTER_SALE_ACK_CONFLICT'},409);
+          return json({state:'IDEMPOTENT',event});
+        }
+        const linked=Object.freeze({...event,state:'LINKED',canonicalOrderId,linkedAt:new Date().toISOString()});
+        await this.state.storage.put(eventKey,linked);
+        const caseKey='after-sale:case:'+afterSaleOrderId;
+        const current=await this.state.storage.get(caseKey);
+        await this.state.storage.put(caseKey,Object.freeze({...current,canonicalOrderId,linkedAt:new Date().toISOString()}));
+        return json({state:'ACKED',event:linked});
+      }catch(error){
+        return json({code:error instanceof Error?error.message:'KEETA_AFTER_SALE_ACK_FAILED'},400);
+      }
+    }
+
+    if(url.pathname==='/smt/orders/after-sales/decision'&&request.method==='POST'){
+      try{
+        const body=record(await request.json(),'KEETA_REFUND_DECISION_INPUT_INVALID');
+        const providerOrderId=nonEmpty(String(body.providerOrderId??''),'KEETA_AFTER_SALE_PROVIDER_ORDER_ID_REQUIRED');
+        const canonicalOrderId=nonEmpty(body.canonicalOrderId,'KEETA_CANONICAL_ORDER_ID_REQUIRED');
+        const afterSaleOrderId=nonEmpty(String(body.afterSaleOrderId??''),'KEETA_AFTER_SALE_ID_REQUIRED');
+        const decision=nonEmpty(body.decision,'KEETA_REFUND_DECISION_REQUIRED');
+        if(decision!=='APPROVE'&&decision!=='REJECT')throw new Error('KEETA_REFUND_DECISION_INVALID');
+        const intent=await this.state.storage.get('order:intent:'+providerOrderId);
+        if(!intent||intent.state!=='COMMITTED'||intent.canonicalOrderId!==canonicalOrderId){
+          throw new Error('KEETA_REFUND_DECISION_CANONICAL_ORDER_MISMATCH');
+        }
+        const afterSale=await this.state.storage.get('after-sale:case:'+afterSaleOrderId);
+        if(!afterSale||afterSale.providerOrderId!==providerOrderId)throw new Error('KEETA_AFTER_SALE_CASE_NOT_FOUND');
+
+        const key='after-sale:decision:'+afterSaleOrderId;
+        const existing=await this.state.storage.get(key);
+        if(existing?.state==='SUCCESS'){
+          if(existing.decision!==decision)return json({state:'CONFLICT',code:'KEETA_REFUND_DECISION_ALREADY_FINAL',decision:existing},409);
+          return json({state:'IDEMPOTENT',decision:existing});
+        }
+        if(existing?.state==='UNKNOWN'){
+          return json({state:'UNKNOWN',code:'KEETA_REFUND_DECISION_UNKNOWN_READBACK_REQUIRED',decision:existing},409);
+        }
+
+        const config=requireRuntimeConfig(this.env);
+        const token=await this.usableToken();
+        const requestedAt=new Date().toISOString();
+        try{
+          const receipt=await sendKeetaRefundDecision(config,token,{
+            providerOrderId,decision,rejectCode:body.rejectCode,rejectReason:body.rejectReason,
+          });
+          const row=Object.freeze({
+            state:'SUCCESS',provider:'KEETA',providerOrderId,canonicalOrderId,afterSaleOrderId,
+            decision,requestedAt,completedAt:new Date().toISOString(),receipt,
+          });
+          await this.state.storage.put(key,row);
+          return json({state:'SUCCESS',decision:row});
+        }catch(error){
+          const rejected=Boolean(error&&typeof error==='object'&&error.providerRejected===true);
+          const unknown=Boolean(error&&typeof error==='object'&&error.unknown===true);
+          const row=Object.freeze({
+            state:rejected?'REJECTED':unknown?'UNKNOWN':'FAILED',
+            provider:'KEETA',providerOrderId,canonicalOrderId,afterSaleOrderId,decision,
+            requestedAt,updatedAt:new Date().toISOString(),
+            code:error instanceof Error?error.message:'KEETA_REFUND_DECISION_FAILED',
+          });
+          await this.state.storage.put(key,row);
+          return json({state:row.state,code:row.code,decision:row},409);
+        }
+      }catch(error){
+        return json({code:error instanceof Error?error.message:'KEETA_REFUND_DECISION_INVALID'},409);
+      }
+    }
+
+    if(url.pathname==='/smt/orders/partial-refund/preview'&&request.method==='POST'){
+      try{
+        const body=record(await request.json(),'KEETA_PARTIAL_REFUND_PREVIEW_INPUT_INVALID');
+        const providerOrderId=nonEmpty(String(body.providerOrderId??''),'KEETA_AFTER_SALE_PROVIDER_ORDER_ID_REQUIRED');
+        const canonicalOrderId=nonEmpty(body.canonicalOrderId,'KEETA_CANONICAL_ORDER_ID_REQUIRED');
+        const intent=await this.state.storage.get('order:intent:'+providerOrderId);
+        if(!intent||intent.state!=='COMMITTED'||intent.canonicalOrderId!==canonicalOrderId){
+          throw new Error('KEETA_PARTIAL_REFUND_CANONICAL_ORDER_MISMATCH');
+        }
+        const products=normalizePartialRefundProducts(Array.isArray(body.products)?body.products:[]);
+        const config=requireRuntimeConfig(this.env);
+        const token=await this.usableToken();
+        const receipt=await previewKeetaPartialRefund(config,token,providerOrderId,products);
+        const fingerprint=await sha256Hex(stable(products));
+        const row=Object.freeze({
+          state:'PREVIEWED',providerOrderId,canonicalOrderId,products,fingerprint,
+          previewedAt:new Date().toISOString(),receipt,
+        });
+        await this.state.storage.put('partial-refund:preview:'+providerOrderId,row);
+        return json(row);
+      }catch(error){
+        return json({state:'FAILED',code:error instanceof Error?error.message:'KEETA_PARTIAL_REFUND_PREVIEW_FAILED'},409);
+      }
+    }
+
+    if(url.pathname==='/smt/orders/partial-refund/apply'&&request.method==='POST'){
+      try{
+        const body=record(await request.json(),'KEETA_PARTIAL_REFUND_APPLY_INPUT_INVALID');
+        const providerOrderId=nonEmpty(String(body.providerOrderId??''),'KEETA_AFTER_SALE_PROVIDER_ORDER_ID_REQUIRED');
+        const canonicalOrderId=nonEmpty(body.canonicalOrderId,'KEETA_CANONICAL_ORDER_ID_REQUIRED');
+        const intent=await this.state.storage.get('order:intent:'+providerOrderId);
+        if(!intent||intent.state!=='COMMITTED'||intent.canonicalOrderId!==canonicalOrderId){
+          throw new Error('KEETA_PARTIAL_REFUND_CANONICAL_ORDER_MISMATCH');
+        }
+        const products=normalizePartialRefundProducts(body.products);
+        const fingerprint=await sha256Hex(stable(products));
+        const preview=await this.state.storage.get('partial-refund:preview:'+providerOrderId);
+        if(!preview||preview.fingerprint!==fingerprint)throw new Error('KEETA_PARTIAL_REFUND_PREVIEW_REQUIRED');
+        const config=requireRuntimeConfig(this.env);
+        const token=await this.usableToken();
+        const receipt=await applyKeetaPartialRefund(
+          config,token,providerOrderId,products,body.partRefundType,body.partRefundReason,
+        );
+        const row=Object.freeze({
+          state:'APPLIED',providerOrderId,canonicalOrderId,products,fingerprint,
+          partRefundType:Number(body.partRefundType),partRefundReason:typeof body.partRefundReason==='string'?body.partRefundReason:null,
+          appliedAt:new Date().toISOString(),receipt,
+        });
+        await this.state.storage.put('partial-refund:apply:'+providerOrderId,row);
+        return json(row);
+      }catch(error){
+        return json({state:'FAILED',code:error instanceof Error?error.message:'KEETA_PARTIAL_REFUND_APPLY_FAILED'},409);
+      }
+    }
+
     if(url.pathname==='/smt/orders/command'&&request.method==='POST'){
       let providerOrderId='';
       let canonicalOrderId='';
@@ -1261,6 +1411,44 @@ export class KeetaRuntimeStore{
               state:'PENDING_SMT',
             }));
           }
+        }
+
+        if(envelope.eventId===1005||envelope.eventId===1007){
+          const afterSale=keetaAfterSaleIdentity(envelope.message);
+          const eventKey='after-sale:event:'+envelope.messageId;
+          const eventRow=Object.freeze({
+            schema:'MFK_KEETA_AFTER_SALE_EVENT_V1',
+            storeId:'MF01',
+            provider:'KEETA',
+            providerShopId:envelope.shopId,
+            providerOrderId:afterSale.providerOrderId,
+            afterSaleOrderId:afterSale.afterSaleOrderId,
+            providerMessageId:envelope.messageId,
+            eventId:envelope.eventId,
+            eventName:envelope.eventName,
+            providerPushedAt:new Date(envelope.timestamp*1000).toISOString(),
+            receivedAt:acceptedAt,
+            fingerprint,
+            rawMessage:afterSale.rawMessage,
+            providerStatus:afterSale.providerStatus,
+            refundAmountMinor:afterSale.refundAmountMinor,
+            currency:afterSale.currency,
+            state:'PENDING_SMT',
+          });
+          if(!(await this.state.storage.get(eventKey)))await this.state.storage.put(eventKey,eventRow);
+          await this.state.storage.put('after-sale:case:'+afterSale.afterSaleOrderId,Object.freeze({
+            provider:'KEETA',
+            providerShopId:envelope.shopId,
+            providerOrderId:afterSale.providerOrderId,
+            afterSaleOrderId:afterSale.afterSaleOrderId,
+            latestEventId:envelope.eventId,
+            latestMessageId:envelope.messageId,
+            providerStatus:afterSale.providerStatus,
+            refundAmountMinor:afterSale.refundAmountMinor,
+            currency:afterSale.currency,
+            rawMessage:afterSale.rawMessage,
+            updatedAt:acceptedAt,
+          }));
         }
         await this.state.storage.put('webhook:status',{
           ...status,
