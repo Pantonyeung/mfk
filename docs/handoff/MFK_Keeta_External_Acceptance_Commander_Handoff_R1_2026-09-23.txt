@@ -1,0 +1,131 @@
+MFK｜Keeta Real External Acceptance｜Commander Handoff R1｜2026-09-23
+
+CONTROL:
+Pantonyeung/mfk #22
+
+EXTERNAL ACCEPTANCE:
+#162
+
+CURRENT MAIN BEFORE THIS HANDOFF:
+a0de5fed4327d02f0d893cee48170097a6a631db
+
+NAVIGATION:
+MFK 航海圖 V1.27｜Round028
+
+CURRENT:
+KEETA_K1_K8_SOURCE_TEST_DEPLOY_GREEN
+REAL_EXTERNAL_ACCEPTANCE_ACTIVE
+
+FIRST BREAK:
+REAL_PROVIDER_EXTERNAL_ACCEPTANCE
+
+==================================================
+1. COMMANDER DECISION
+==================================================
+
+不再開新功能。
+不因未完成真 Provider 驗收而預設要改 code。
+
+Maximum active lanes = 2。
+
+Lane A:
+E1 Menu
+→ BANK
+→ E6 Sellability / Hours / REST / OPEN
+
+Lane B:
+E2 Real Test Order
+→ E3 Confirm
+→ E4 READY
+→ E5 Lifecycle / Cancel
+→ E7 After-sale（只在 test environment exposes 時）
+→ E8 Commercial /order/get readback
+
+Immediate NEXT:
+START E1 + E2 ONLY.
+
+==================================================
+2. E1 MENU
+==================================================
+
+Admin：
+1. preflight 完整 MFK canonical menu snapshot
+2. verify counts / OpenItemCode completeness
+3. submit exactly one controlled full-menu sync
+4. capture taskId
+5. capture real 1202 completion
+6. capture 1201 picture completion if emitted
+7. zero unexpected omissions
+8. partial/provider errors must remain visible
+
+No fake GREEN.
+
+==================================================
+3. E2 REAL ORDER
+==================================================
+
+Keeta test store：
+1. place ONE real test order
+2. capture real 1001
+3. SMT receives once
+4. ONE canonical MFK Order
+5. ONE display number
+6. providerRef linked
+7. replay/duplicate creates no second Order / Display / Print
+8. preserve commercial evidence
+
+This same Order should continue into E3 / E4 / E8 where provider lifecycle allows.
+
+==================================================
+4. RED HANDLING
+==================================================
+
+If a real provider step fails：
+
+1. freeze exact failing seam
+2. preserve request / response / webhook / canonical evidence
+3. classify:
+   PROVIDER
+   CONFIG
+   RUNTIME
+   MAPPING
+   UNKNOWN
+4. UNKNOWN external side effect = readback first, no blind retry
+5. only open bounded repair after evidence proves an implementation defect
+
+==================================================
+5. EVIDENCE BUNDLE
+==================================================
+
+Every E-step records：
+
+- acceptance_case_id
+- timestamp
+- source/main identity
+- provider task/message/order IDs
+- canonical order ID
+- display number
+- exact input/action
+- provider response / webhook evidence
+- authoritative readback
+- duplicate/idempotency result
+- screenshot/log/evidence link
+- verdict
+
+Allowed verdict:
+GREEN
+RED
+EXTERNAL_TEST_ENV_NOT_EXPOSED
+
+==================================================
+6. FINAL GATE
+==================================================
+
+Only declare:
+
+KEETA_FULL_PROVIDER_INTEGRATION_GREEN
+
+after all Keeta test-environment-exposed E1–E8 seams have real provider evidence banked.
+
+GitHub #162 Commander takeover comment:
+5787184091
