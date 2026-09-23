@@ -71,3 +71,48 @@ NEXT EXACT ACTION
 
 STATUS
 WAITING_REAL_DEVICE_SAME_ACTION_READBACK
+
+
+REAL DEVICE MILESTONE｜MAPPING FIRST BREAK
+Evidence: Owner SMT photo after manual Keeta receive.
+
+CURRENT
+K1_REAL_DEVICE_MAPPING_RED
+
+LAST_GREEN
+- SMT manual receive/reconcile path executed far enough to inspect the existing pending Keeta intent.
+- Transport/auth is not the current first break.
+- Mapping failure is now operator-visible as designed.
+
+FIRST_BREAK
+KEETA_ORDER_MAPPING_REQUIRED:MF-ORDER-SKU-NG-01
+
+EXPECTED
+Provider SKU/OpenItemCode resolves through current Admin channelMapping or unique canonical productCode/id, then the existing SMT localRuntime creates ONE canonical Order + ONE display and ACKs the same provider identity.
+
+ACTUAL
+SMT shows repeated mapping attention for MF-ORDER-SKU-NG-01 and creates no local Order. This is fail-closed behavior, not a silent intake failure.
+
+SOURCE
+- current main observed: f1aa12d1efd204591bf641783bd305c07e185e3d
+- v2local/src/runtime/keeta-order-intake.ts blob: 300605dc2206dee66d38fad920ae562746b46db3
+- runtime logic unchanged from bounded K1 repair line.
+
+FAILURE LAYER
+CONFIG / PROVIDER_TO_CANONICAL_PRODUCT_MAPPING
+
+SMALLEST SAFE FIX
+Add ONE explicit Admin mapping:
+providerItemId = MF-ORDER-SKU-NG-01
+productId = <correct current canonical MFK product ID>
+status = MAPPED
+Then save/publish an Admin config revision and let SMT receive the new LKG. The existing PENDING_SMT order should be reconciled again by the same K1 path. No third Keeta order and no intake-engine code change.
+
+BLOCKER
+The correct canonical product target is not evidenced by current source/history. Exact-code searches found no grounded mapping for MF-ORDER-SKU-NG-01. Historical proven item MF-SIT-SKU-01 / SIT 測試餐 A 更新 is a different provider identity and must not be reused by guess.
+
+NEXT
+Owner must identify which MFK product was selected in this Keeta test order (local product name is sufficient). Then create/publish the single explicit mapping and retest the SAME pending order.
+
+STATUS
+FIRST_BREAK_FOUND -> SMALLEST_FIX = ONE_EXPLICIT_MAPPING
