@@ -1,3 +1,4 @@
+import {readFileSync} from 'node:fs';
 import {renderToStaticMarkup} from 'react-dom/server';
 import {MemoryRouter} from 'react-router';
 import {describe,expect,it} from 'vitest';
@@ -68,6 +69,12 @@ describe('MFK Admin complete catalog product',()=>{
       expect(html,path).toContain(marker);
       expect(html,path).not.toContain('class="mfk-admin-capability"');
     }
+  });
+
+  it('keeps Keeta token readiness recovery available when encrypted token custody exists',()=>{
+    const source=readFileSync(new URL('./PolicyWorkspaces.tsx',import.meta.url),'utf8');
+    expect(source).toContain("disabled={liveBusy||!liveStatus?.oauth.tokenSource} onClick={()=>void checkToken()}>檢查 Token</button>");
+    expect(source).not.toContain("disabled={liveBusy||liveStatus?.oauth.state!=='CONNECTED'} onClick={()=>void checkToken()}>檢查 Token</button>");
   });
 
   it('provides business-day and logical printer configuration as real Admin responsibilities',()=>{

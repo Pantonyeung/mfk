@@ -449,7 +449,7 @@ export function ChannelsWorkspace({mode}:{mode:'overview'|'mapping'|'failures'|'
       {liveError?<div className="admin-validation is-error" role="alert">{liveError}</div>:null}
       <div className="admin-editor-actions">
         <button type="button" className="secondary" disabled={liveBusy} onClick={()=>void refreshLive()}>更新狀態</button>
-        <button type="button" className="secondary" disabled={liveBusy||liveStatus?.oauth.state!=='CONNECTED'} onClick={()=>void checkToken()}>檢查 Token</button>
+        <button type="button" className="secondary" disabled={liveBusy||!liveStatus?.oauth.tokenSource} onClick={()=>void checkToken()}>檢查 Token</button>
         <button type="button" className="primary" disabled={liveBusy||!liveStatus?.readyForAuthorization} onClick={()=>void authorize()}>{liveStatus?.oauth.state==='CONNECTED'?'重新授權 Keeta':'開始 Keeta 授權'}</button>
       </div>
       <details className="admin-rule-card">
