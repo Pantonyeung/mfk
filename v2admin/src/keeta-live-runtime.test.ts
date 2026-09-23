@@ -434,7 +434,7 @@ describe('Keeta live edge runtime',()=>{
     }));
     expect(webhook.status).toBe(200);
 
-    const pending=await runtime.fetch(new Request('https://internal/smt/orders/pending',{method:'GET'}));
+    const pending=await runtime.fetch(new Request('https://internal/smt/orders/pending?deviceId=SMT-TEST-1',{method:'GET'}));
     const batch=await pending.json() as {orders:Array<{providerOrderId:string;providerMessageId:string;state:string}>};
     expect(batch.orders).toHaveLength(1);
     expect(batch.orders[0]).toMatchObject({providerOrderId:'998',providerMessageId:'msg-order-998',state:'PENDING_SMT'});
@@ -443,6 +443,7 @@ describe('Keeta live edge runtime',()=>{
     const intakeBefore=await adminBefore.json() as {pending:number;committed:number;items:Array<{providerOrderId:string;state:string;canonicalOrderId:null}>};
     expect(intakeBefore.pending).toBe(1);
     expect(intakeBefore.committed).toBe(0);
+    expect((intakeBefore as unknown as {lastSmtPull:{deviceId:string;pendingCount:number}}).lastSmtPull).toMatchObject({deviceId:'SMT-TEST-1',pendingCount:1});
     expect(intakeBefore.items[0]).toMatchObject({providerOrderId:'998',state:'PENDING_SMT',canonicalOrderId:null});
 
     const ackBody={
@@ -574,6 +575,56 @@ describe('Keeta live edge runtime',()=>{
     }
   });
 
+
+  it('refreshes an explicitly rejected access token once before retrying menu sync',async()=>{
+    const key=Buffer.alloc(32,31).toString('base64');
+    const storage=new Map<string,unknown>();
+    const state={storage:{
+      get:async(key:string)=>storage.get(key),
+      put:async(key:string,value:unknown)=>{storage.set(key,value);},
+      delete:async(key:string)=>{storage.delete(key);},
+      list:async({prefix}:{prefix:string})=>new Map([...storage.entries()].filter(([key])=>key.startsWith(prefix))),
+    }};
+    const env={
+      KEETA_APP_ID:'3419700273',KEETA_APP_SECRET:'test-secret',
+      KEETA_TOKEN_ENCRYPTION_KEY:key,KEETA_PROVIDER_SHOP_ID:'721578302',
+      KEETA_OAUTH_REDIRECT_URI:'https://admin.morefunos.com/api/keeta/oauth/callback',
+    };
+    const {KeetaRuntimeStore}=await import('../keeta-runtime.ts');
+    const runtime=new KeetaRuntimeStore(state as never,env as never);
+    const imported=await runtime.fetch(new Request('https://internal/admin/token/import-test',{
+      method:'POST',headers:{'content-type':'application/json'},
+      body:JSON.stringify({accessToken:'stale-access',tokenType:'bearer',expiresIn:7776000,refreshToken:'refresh-ok',scope:'all',issuedAtTime:Date.now()}),
+    }));
+    expect(imported.status).toBe(200);
+    const snapshot={catalog:{categories:[{id:'cat',name:'主食',position:10,active:true}],products:[{
+      id:'p1',productCode:'SKU-P1',name:'商品一',categoryId:'cat',active:true,basePrice:'42.00',takeawayAdjustment:'0.00',takeawaySurchargeEnabled:false,modifierGroupIds:[],
+    }]},optionCenter:{sets:[],productLinks:[]}};
+    const providerFetch=vi.fn(async(input:string|URL|Request,init?:RequestInit)=>{
+      const url=String(input);
+      if(url==='https://open.mykeeta.com/api/open/product/menu/sync'){
+        const sent=JSON.parse(String(init?.body??'{}')) as {accessToken?:string};
+        if(sent.accessToken==='stale-access')return new Response(JSON.stringify({code:115000200,message:'The access token does not exist, please check if the access token is correct.'}),{status:200});
+        expect(sent.accessToken).toBe('fresh-access');
+        return new Response(JSON.stringify({code:0,message:'Success',data:778899}),{status:200});
+      }
+      if(url==='https://open.mykeeta.com/api/open/base/oauth/token'){
+        return new Response(JSON.stringify({accessToken:'fresh-access',tokenType:'bearer',expiresIn:7776000,refreshToken:'fresh-refresh',scope:'all',issuedAtTime:Date.now()}),{status:200});
+      }
+      throw new Error('UNEXPECTED_PROVIDER_URL:'+url);
+    });
+    vi.stubGlobal('fetch',providerFetch);
+    try{
+      const sync=await runtime.fetch(new Request('https://internal/admin/menu/sync',{
+        method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({revision:8,adminFingerprint:'fnv1a32:menu8',snapshot}),
+      }));
+      expect(sync.status).toBe(200);
+      expect(await sync.json()).toMatchObject({state:'SUBMITTED',taskId:778899});
+      expect(providerFetch).toHaveBeenCalledTimes(3);
+      const status=await runtime.fetch(new Request('https://internal/admin/status',{method:'POST'}));
+      expect((await status.json() as {oauth:{state:string;tokenSource:string}}).oauth).toMatchObject({state:'CONNECTED',tokenSource:'TEST_PROVIDER_PORTAL_REFRESH'});
+    }finally{vi.unstubAllGlobals();}
+  });
 
   it('gates Keeta CONFIRM and READY on the committed canonical order and makes success idempotent',async()=>{
     const key=Buffer.alloc(32,14).toString('base64');
