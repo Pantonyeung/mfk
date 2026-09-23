@@ -1,4 +1,4 @@
-import {useCallback,useEffect,useMemo,useState} from 'react';
+import {useCallback,useEffect,useMemo,useRef,useState} from 'react';
 import {useSearchParams} from 'react-router';
 import type {CleanSmtCoreRuntimePort,SmtOrdersProjection,SmtReprintOption} from '../runtime/local-runtime.ts';
 import {hasStaffPermission} from '../runtime/staff-auth.ts';
@@ -6,6 +6,7 @@ import {readSmtQuickReasons,readSmtStoreSettings} from '../runtime/admin-operati
 import {subscribeSmtAdminConfig} from '../runtime/admin-config-sync.ts';
 import {decideKeetaAfterSale,previewKeetaPartialRefund,readKeetaAfterSales,type KeetaAfterSaleCase} from '../runtime/keeta-after-sale.ts';
 import {readKeetaOrderIntakeAttention,reconcileKeetaOrderIntake} from '../runtime/keeta-order-intake.ts';
+import {EmptyState} from './SmtUi.tsx';
 import './orders-workspace.css';
 
 type PaymentFilter='全部'|'現金'|'Alipay'|'WeChat Pay'|'FPS / PayMe';
@@ -58,6 +59,9 @@ export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePor
   const [keetaPullBusy,setKeetaPullBusy]=useState(false);
   const [keetaPullMessage,setKeetaPullMessage]=useState<string|null>(null);
   const [keetaIntakeRevision,setKeetaIntakeRevision]=useState(0);
+  const modalRef=useRef<HTMLDialogElement>(null);
+  const modalCloseRef=useRef<HTMLButtonElement>(null);
+  const previousFocusRef=useRef<HTMLElement|null>(null);
   useEffect(()=>{
     const refresh=()=>setAfterSaleRevision(value=>value+1);
     window.addEventListener('mfk-keeta-after-sale',refresh);
@@ -70,11 +74,11 @@ export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePor
   },[]);
 
   const load=useCallback(async(selectedOrderId?:string,silent=false)=>{
-    if(!runtime.readOrders){setError('ORDERS_PROVIDER_UNAVAILABLE');return;}
+    if(!runtime.readOrders){setError('目前未能讀取訂單資料。');return;}
     if(!silent)setLoading(true);
     setError(null);
     try{setSnapshot(await runtime.readOrders(selectedOrderId));}
-    catch{setError('ORDERS_READ_FAILED');}
+    catch{setError('訂單載入失敗，請稍後再試。');}
     finally{if(!silent)setLoading(false);}
   },[runtime]);
 
@@ -115,6 +119,17 @@ export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePor
       unitMinor:Math.round(Number(line.unitLabel.replace(/[^0-9.]/g,''))*100)
     })));
   },[snapshot?.selectedOrderId]);
+  useEffect(()=>{
+    const dialog=modalRef.current;
+    if(!modal||!dialog)return;
+    previousFocusRef.current=document.activeElement instanceof HTMLElement?document.activeElement:null;
+    if(!dialog.open)dialog.showModal();
+    modalCloseRef.current?.focus();
+    return()=>{
+      if(dialog.open)dialog.close();
+      previousFocusRef.current?.focus();
+    };
+  },[modal]);
 
   const acceptSelected=async()=>{
     if(!selected||!runtime.acceptOrder||acceptBusy)return;
@@ -123,8 +138,8 @@ export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePor
       const result=await runtime.acceptOrder(selected.orderId);
       await load(selected.orderId,true);
       setMessage(result.provider.state==='ATTENTION'
-        ?'本地已接單；Keeta confirm 需要處理：'+(result.provider.code??'UNKNOWN')
-        :'已接單；Keeta confirm 已同步');
+        ?'本機已接單；Keeta 確認仍需處理：'+(result.provider.code??'暫未有錯誤碼')
+        :'已接單；Keeta 已確認同步');
     }catch(cause){setMessage(cause instanceof Error?cause.message:'未能接單');}
     finally{setAcceptBusy(false);}
   };
@@ -136,10 +151,10 @@ export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePor
       await load(snapshot?.selectedOrderId,true);
       const attention=readKeetaOrderIntakeAttention();
       setKeetaPullMessage(attention.length
-        ?'Keeta 接單異常：'+attention.map(row=>String((row as {code?:unknown}).code??'UNKNOWN')).join('；')
+        ?'Keeta 接單需要注意：'+attention.map(row=>String((row as {code?:unknown}).code??'暫未有錯誤碼')).join('；')
         :'已手動檢查 Keeta 新單；目前冇待處理錯誤。');
     }catch(cause){
-      setKeetaPullMessage(cause instanceof Error?cause.message:'KEETA_ORDER_PULL_FAILED');
+      setKeetaPullMessage(cause instanceof Error?cause.message:'未能檢查 Keeta 新單。');
     }finally{setKeetaPullBusy(false);}
   };
   const markReady=async()=>{
@@ -149,8 +164,8 @@ export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePor
       const result=await runtime.markOrderReady(selected.orderId);
       await load(selected.orderId,true);
       setMessage(result.provider.state==='ATTENTION'
-        ?'本地已標記可取餐；Keeta READY 需要處理：'+(result.provider.code??'UNKNOWN')
-        :'已標記可取餐；Keeta READY 已同步');
+        ?'本機已標記可取餐；Keeta 狀態仍需處理：'+(result.provider.code??'暫未有錯誤碼')
+        :'已標記可取餐；Keeta 狀態已同步');
     }
     catch(cause){setMessage(cause instanceof Error?cause.message:'未能標記可取餐');}
     finally{setReadyBusy(false);}
@@ -161,7 +176,7 @@ export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePor
     try{
       const options=await runtime.readOrderReprintOptions(selected.orderId);
       setReprintOptions(options);setSelectedJobs(new Set());setModal('reprint');
-    }catch(cause){setMessage(cause instanceof Error?cause.message:'REPRINT_OPTIONS_FAILED');}
+    }catch(cause){setMessage(cause instanceof Error?cause.message:'未能讀取可重印項目。');}
   };
 
   const runReprint=async()=>{
@@ -171,7 +186,7 @@ export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePor
       const result=await runtime.reprintOrderJobs(selected.orderId,[...selectedJobs],reprintReason.trim()||undefined);
       setMessage(result.failed===0?'重印已送出 '+result.sent+'/'+result.planned:'重印部分失敗 '+result.sent+'/'+result.planned);
       setModal(null);
-    }catch(cause){setMessage(cause instanceof Error?cause.message:'REPRINT_FAILED');}
+    }catch(cause){setMessage(cause instanceof Error?cause.message:'重印未能送出。');}
     finally{setReprintBusy(false);}
   };
 
@@ -181,7 +196,7 @@ export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePor
     try{
       await runtime.updateOrderItems(selected.orderId,editLines);
       await load(selected.orderId,true);setMessage('修改已保存；同一訂單編號，未自動重印。');setModal(null);
-    }catch(cause){setMessage(cause instanceof Error?cause.message:'ORDER_EDIT_FAILED');}
+    }catch(cause){setMessage(cause instanceof Error?cause.message:'訂單修改未能保存。');}
   };
 
   const cancelSelected=async()=>{
@@ -190,7 +205,7 @@ export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePor
     try{
       await runtime.cancelOrder(selected.orderId,cancelReason.trim()||undefined);
       await load(undefined,true);setMessage('訂單已取消；冇自動退款、重印或開錢箱。');setModal(null);
-    }catch(cause){setMessage(cause instanceof Error?cause.message:'ORDER_CANCEL_FAILED');}
+    }catch(cause){setMessage(cause instanceof Error?cause.message:'訂單未能取消。');}
   };
 
   const decideRefund=async(row:KeetaAfterSaleCase,decision:'APPROVE'|'REJECT')=>{
@@ -207,7 +222,7 @@ export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePor
       await decideKeetaAfterSale(row.afterSaleOrderId,decision,decision==='REJECT'?100000:undefined,reason);
       setAfterSaleRevision(value=>value+1);
       setMessage(decision==='APPROVE'?'已送出 Keeta 同意退款決定':'已送出 Keeta 拒絕退款決定');
-    }catch(cause){setMessage(cause instanceof Error?cause.message:'KEETA_REFUND_DECISION_FAILED');}
+    }catch(cause){setMessage(cause instanceof Error?cause.message:'Keeta 退款決定未能送出。');}
     finally{setAfterSaleBusy(null);}
   };
 
@@ -218,7 +233,7 @@ export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePor
       const result=await previewKeetaPartialRefund(selected.orderId,[]);
       setPartialPreview(result);
       setMessage('已讀取 Keeta 可部分退款項目預覽；未執行退款。');
-    }catch(cause){setMessage(cause instanceof Error?cause.message:'KEETA_PARTIAL_REFUND_PREVIEW_FAILED');}
+    }catch(cause){setMessage(cause instanceof Error?cause.message:'未能讀取可部分退款商品。');}
     finally{setAfterSaleBusy(null);}
   };
 
@@ -232,12 +247,12 @@ export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePor
     current.options.push(option);map.set(key,current);return map;
   },new Map<string,{bindingId:string;printerName:string;physicalKey:string;options:SmtReprintOption[]}>()).values()];
 
-  if(!canReview)return <main className="order-manager"><section className="order-empty"><b>你冇查看訂單權限</b><p>需要 Admin 權限：ORDER_REVIEW。</p></section></main>;
+  if(!canReview)return <main className="order-manager"><section className="order-empty"><b>你冇查看訂單權限</b><p>請聯絡管理員開啟「查看訂單」權限。</p></section></main>;
 
-  return <main className="order-manager">
+  return <main className={`order-manager${snapshot&&!filtered.length?' no-orders':''}`}>
     <header className="order-manager-top">
-      <div className="order-manager-title"><span>☰</span><b>P01-01 訂單管理工作台</b></div>
-      <div className="order-system-badges"><span>● 系統正常</span><span>▣ 打印機在線</span><span>SMT-01</span></div>
+      <div className="order-manager-title"><span>訂單</span><b>揀一張訂單查看同處理</b></div>
+      <div className="order-system-badges"><span>資料來自本機</span><span>出餐目標 {storeSettings.fulfillmentMinutes} 分鐘</span></div>
     </header>
 
     <aside className="order-inspector">
@@ -252,7 +267,7 @@ export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePor
         {afterSales.length?<section className="order-after-sale">
           <header><b>Keeta 退款／售後</b><span>{afterSales.length}</span></header>
           {afterSales.map(row=><article key={row.afterSaleOrderId}>
-            <div><b>{row.eventId===1007?'部分退款':'退款'} · #{row.afterSaleOrderId}</b><small>Provider status {row.providerStatus??'—'}{row.isAppeal?' · Appeal':''}</small></div>
+            <div><b>{row.eventId===1007?'部分退款':'退款'} · #{row.afterSaleOrderId}</b><small>平台狀態 {row.providerStatus??'—'}{row.isAppeal?' · 申訴':''}</small></div>
             <strong>{row.refundAmountMinor==null?'—':'$'+(row.refundAmountMinor/100).toFixed(2)} {row.currency??''}</strong>
             {row.applyReason?<p>{row.applyReason}</p>:null}
             {row.handleReason?<p>最新處理：{row.handleReason}</p>:null}
@@ -263,9 +278,9 @@ export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePor
             {row.decisionState?<small>本地決定：{row.decisionState}{row.decisionCode?' · '+row.decisionCode:''}</small>:null}
           </article>)}
           <button type="button" className="order-partial-preview" disabled={!canCorrect||Boolean(afterSaleBusy)} onClick={()=>void previewPartial()}>查詢可部分退款商品</button>
-          {partialPreview?<details><summary>部分退款 Provider Preview</summary><pre>{JSON.stringify(partialPreview,null,2)}</pre></details>:null}
+          {partialPreview?<details><summary>部分退款平台回應</summary><pre>{JSON.stringify(partialPreview,null,2)}</pre></details>:null}
         </section>:null}
-        {message?<p className="order-inline-message">{message}</p>:null}
+        {message?<p className="order-inline-message" role="status" aria-live="polite">{message}</p>:null}
         <footer>
           <button onClick={()=>void openReprint()}>▣ 重印</button>
           <button disabled={!canCorrect} title={canCorrect?'':'需要 ORDER_CORRECTION 權限'} onClick={()=>setModal('actions')}>✎ 取消／修改</button>
@@ -285,13 +300,13 @@ export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePor
       </div>
       <div className="order-board-head">
         <span>{history?'歷史訂單':'進行中訂單'}　{filtered.length}</span>
-        <div><button type="button" disabled={keetaPullBusy} onClick={()=>void pullKeetaOrders()}>{keetaPullBusy?'同步中…':'手動接 Keeta 新單'}</button><label>Admin 出餐計時</label><b>{storeSettings.fulfillmentMinutes} 分鐘</b><button disabled title="由 Admin 門店設定提供">Admin</button></div>
+        <div><button type="button" disabled={keetaPullBusy} onClick={()=>void pullKeetaOrders()}>{keetaPullBusy?'同步中…':'檢查 Keeta 新單'}</button><label>出餐目標</label><b>{storeSettings.fulfillmentMinutes} 分鐘</b><button disabled title="由管理端門店設定提供">管理端設定</button></div>
       </div>
       {keetaPullMessage?<p className="order-board-error">{keetaPullMessage}</p>:null}
-      {keetaIntakeAttention.length?<p className="order-board-error">Keeta 接單注意：{keetaIntakeAttention.map(row=>String((row as {code?:unknown}).code??'UNKNOWN')).join('；')}</p>:null}
+      {keetaIntakeAttention.length?<p className="order-board-error">Keeta 接單注意：{keetaIntakeAttention.map(row=>String((row as {code?:unknown}).code??'暫未有錯誤碼')).join('；')}</p>:null}
 
-      <div className="order-channel-grid">
-        {lanes.map(lane=><section key={lane.id} className="order-channel-lane">
+      <div className={`order-channel-grid${!filtered.length?' empty':''}`}>
+        {filtered.length?lanes.map(lane=><section key={lane.id} className="order-channel-lane">
           <header><b>{lane.label}</b><span>{lane.orders.length}</span></header>
           <div className="order-channel-list">
             {lane.orders.length?lane.orders.map(order=><button key={order.orderId} className={snapshot?.selectedOrderId===order.orderId?'selected':''} onClick={()=>void load(order.orderId)}>
@@ -301,15 +316,19 @@ export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePor
               <div><em>{order.fulfillmentLabel}</em><b>{order.totalLabel}</b></div>
             </button>):<p>目前沒有訂單。</p>}
           </div>
-        </section>)}
+        </section>):<EmptyState
+          icon="✓"
+          title={history?'未有歷史訂單':'目前冇進行中訂單'}
+          detail={history?'完成或取消嘅訂單會顯示喺呢度。':'有新訂單時會按來源分類顯示；需要即時處理嘅工作亦會出現喺「工作」。'}
+        />}
       </div>
       {error?<p className="order-board-error">{error}</p>:null}
       {loading&&!snapshot?<p className="order-board-error">載入訂單…</p>:null}
     </section>
 
-    {selected&&modal?<div className="order-modal-backdrop" onMouseDown={event=>{if(event.target===event.currentTarget)setModal(null)}}>
-      <section className={'order-modal '+modal}>
-        <header><h2>{modal==='reprint'?'重印':modal==='edit'?'修改訂單':modal==='cancel'?'取消訂單':'取消／修改'}</h2><button onClick={()=>setModal(null)}>×</button></header>
+    {selected&&modal?<dialog ref={modalRef} className={'order-modal '+modal} aria-label={modal==='reprint'?'重印':modal==='edit'?'修改訂單':modal==='cancel'?'取消訂單':'取消或修改訂單'} onCancel={event=>{event.preventDefault();setModal(null)}} onClick={event=>{if(event.target===event.currentTarget)setModal(null)}}>
+      <section className="order-modal-surface">
+        <header><div><small>訂單 {selected.orderIdLabel}</small><h2>{modal==='reprint'?'重印':modal==='edit'?'修改訂單':modal==='cancel'?'取消訂單':'取消／修改'}</h2><p>{modal==='actions'?'先選擇要處理嘅工作。':modal==='edit'?'調整商品後，核對新金額再確認。':modal==='cancel'?'先了解影響，再確認取消。':'只揀需要重新打印嘅內容，再開始打印。'}</p></div><button ref={modalCloseRef} type="button" aria-label="關閉" onClick={()=>setModal(null)}>×</button></header>
 
         {modal==='actions'?<div className="order-action-choices">
           <button onClick={()=>setModal('edit')}><b>✎ 修改訂單</b><span>修改商品數量；保持同一訂單編號，完成後唔自動重印。</span></button>
@@ -331,15 +350,16 @@ export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePor
           <p>確定取消 {selected.orderIdLabel}？</p>
           <div className="order-cancel-warning">呢個本地動作只改訂單狀態；唔會自動退款、重印、開錢箱或通知外部平台。</div>
           <label><span>原因（可選）</span><select value={cancelReason} onChange={event=>setCancelReason(event.target.value)}><option value="">唔填原因</option>{cancelReasons.map(reason=><option key={reason.id} value={reason.label}>{reason.label}</option>)}</select></label>
-          <label><span>自填原因（可選）</span><input value={cancelReason} onChange={event=>setCancelReason(event.target.value)} placeholder="Admin 快捷原因以外可自填"/></label>
+          <label><span>自填原因（可選）</span><input value={cancelReason} onChange={event=>setCancelReason(event.target.value)} placeholder="快捷原因以外可自行輸入"/></label>
           <footer><button onClick={()=>setModal(null)}>返回</button><button className="danger" onClick={()=>void cancelSelected()}>確認取消</button></footer>
         </div>:null}
 
         {modal==='reprint'?<div className="order-reprint-body">
-          <p>選擇需要重新打印嘅內容。Label 會按實體打印機分組；同一部機有多張 Label 時可以展開逐張揀。重印永遠唔會開錢箱。</p>
+          <p>選擇需要重新打印嘅內容。標籤會按實體打印機分組；同一部機有多張標籤時可以展開逐張揀。重印永遠唔會開錢箱。</p>
+          <div className="order-modal-progress"><span>1　選擇打印內容</span><strong>{selectedJobs.size?`已選 ${selectedJobs.size} 項`:'尚未選擇'}</strong><span>2　開始打印</span></div>
           {ticketReprintOptions.length?<section className="order-reprint-ticket-group"><header><b>80mm 單據</b><span>{ticketReprintOptions.length}</span></header><div className="order-reprint-options">{ticketReprintOptions.map(option=><label key={option.jobId}><input type="checkbox" checked={selectedJobs.has(option.jobId)} onChange={()=>toggleJob(option.jobId)}/><span><b>{option.label}</b><small>{option.printerName}</small></span></label>)}</div></section>:null}
           <div className="order-reprint-printers">{labelReprintGroups.map(group=><details key={group.bindingId} className="order-reprint-printer-group" open={group.options.length===1}>
-            <summary><span><b>{group.printerName}</b><small>{group.physicalKey||'未綁定'} · {group.options.length} 張 Label</small></span><button type="button" onClick={event=>{event.preventDefault();setSelectedJobs(current=>{const next=new Set(current);const allSelected=group.options.every(option=>next.has(option.jobId));for(const option of group.options){if(allSelected)next.delete(option.jobId);else next.add(option.jobId);}return next;});}}>呢部全選</button></summary>
+            <summary><span><b>{group.printerName}</b><small>{group.physicalKey||'未綁定'} · {group.options.length} 張標籤</small></span><button type="button" onClick={event=>{event.preventDefault();setSelectedJobs(current=>{const next=new Set(current);const allSelected=group.options.every(option=>next.has(option.jobId));for(const option of group.options){if(allSelected)next.delete(option.jobId);else next.add(option.jobId);}return next;});}}>呢部全選</button></summary>
             <div className="order-reprint-options">{group.options.map(option=><label key={option.jobId}><input type="checkbox" checked={selectedJobs.has(option.jobId)} onChange={()=>toggleJob(option.jobId)}/><span><b>{option.label}</b><small>{option.detail??option.role}</small></span></label>)}</div>
           </details>)}</div>
           <div className="order-reprint-tools"><button onClick={()=>setSelectedJobs(new Set(reprintOptions.map(option=>option.jobId)))}>全部選擇</button><button onClick={()=>setSelectedJobs(new Set())}>清除</button></div>
@@ -347,6 +367,6 @@ export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePor
           <footer><button onClick={()=>setModal(null)}>取消</button><button className="primary" disabled={!selectedJobs.size||reprintBusy} onClick={()=>void runReprint()}>{reprintBusy?'打印中…':'開始打印'}</button></footer>
         </div>:null}
       </section>
-    </div>:null}
+    </dialog>:null}
   </main>;
 }

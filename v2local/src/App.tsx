@@ -6,9 +6,11 @@ import type {OrderingWorkspaceActions,OrderingWorkspaceViewModel,ServiceMode} fr
 import {CheckoutWorkspace} from './features/checkout/CheckoutWorkspace.tsx';
 import type {CheckoutChannelId,CheckoutTenderId,CheckoutWorkspaceActions,CheckoutWorkspaceViewModel} from './features/checkout/checkout-workspace-model.ts';
 import {RuntimeOrdersWorkspace} from './presentation/RuntimeOrdersWorkspace.tsx';
+import {RuntimeWorkWorkspace} from './presentation/RuntimeWorkWorkspace.tsx';
 import {RuntimeDiningWorkspace,type DiningCheckoutRequest} from './presentation/RuntimeDiningWorkspace.tsx';
 import {RuntimeSoldoutWorkspace} from './presentation/RuntimeSoldoutWorkspace.tsx';
 import {LocalMoreWorkspace} from './presentation/LocalMoreWorkspace.tsx';
+import {SmtOperationsHub} from './presentation/SmtOperationsHub.tsx';
 import {localRuntime,type DiningTender} from './runtime/local-runtime.ts';
 import {readLocalAdminMenu,subscribeLocalAdminMenu} from './runtime/local-admin-menu.ts';
 import {readSmtAdminConfigLkg,readSmtAdminSyncStatus,subscribeSmtAdminConfig} from './runtime/admin-config-sync.ts';
@@ -19,7 +21,7 @@ import {resolveBusinessWindow} from './runtime/local-operations.ts';
 import {RuntimeReadyActivation} from './runtime/RuntimeReadyActivation.tsx';
 import {StaffAuthGate,StaffSessionBadge} from './presentation/StaffAuthGate.tsx';
 import {CashOpeningGate} from './presentation/CashOpeningGate.tsx';
-import {ComboWorkspace,HoldCartWorkspace,HoldListWorkspace,OrganizeWorkspace,ProductConfigWorkspace,type OrderingPanelState,type WorkspaceHoldDraft,type WorkspaceProduct} from './features/ordering/OrderingCenterWorkspaces.tsx';
+import {ComboWorkspace,HoldCartWorkspace,HoldListWorkspace,OrganizeWorkspace,ProductConfigWorkspace,type OrderingPanelState,type ProductConfiguration,type WorkspaceHoldDraft,type WorkspaceProduct} from './features/ordering/OrderingCenterWorkspaces.tsx';
 
 type Product={
   id:string;
@@ -32,7 +34,7 @@ type Product={
   imageUrl?:string;
   optionSets:readonly SyncedOptionSet[];
 };
-type CartLine={id:string;productId:string;name:string;qty:number;unitMinor:number;serviceMode:ServiceMode;detail?:string};
+type CartLine={id:string;productId:string;name:string;qty:number;unitMinor:number;serviceMode:ServiceMode;detail?:string;configuration?:ProductConfiguration};
 
 const BASE_PRODUCTS:readonly Product[]=[
   {id:'riceball',category:'飯團',name:'原味飯團',priceMinor:4100,priceReady:true},
@@ -69,18 +71,31 @@ function productArtwork(product:Product){
 }
 
 const nav=[
-  {to:'/',label:'點餐',icon:'▦',end:true},
-  {to:'/orders',label:'訂單',icon:'▤'},
-  {to:'/dining',label:'堂食',icon:'▱'},
-  {to:'/soldout',label:'售罄',icon:'⊘'},
-  {to:'/more',label:'更多',icon:'•••'},
+  {to:'/',label:'點單',icon:'order',end:true},
+  {to:'/work',label:'工作',icon:'work'},
+  {to:'/orders',label:'訂單',icon:'orders'},
+  {to:'/operations',label:'狀態',icon:'status'},
+  {to:'/more',label:'更多',icon:'more'},
 ] as const;
+
+function NavGlyph({name}:{name:(typeof nav)[number]['icon']}){
+  const common={width:24,height:24,viewBox:'0 0 24 24',fill:'none',stroke:'currentColor',strokeWidth:1.9,strokeLinecap:'round' as const,strokeLinejoin:'round' as const,'aria-hidden':true};
+  if(name==='order')return <svg {...common}><path d="M5 7h14l-1 12H6L5 7Z"/><path d="M8 7a4 4 0 0 1 8 0M9 12h6"/></svg>;
+  if(name==='work')return <svg {...common}><path d="M8 4h8M9 3v3m6-3v3M6 6h12a2 2 0 0 1 2 2v11H4V8a2 2 0 0 1 2-2Z"/><path d="m8 13 2.3 2.3L16 10"/></svg>;
+  if(name==='orders')return <svg {...common}><path d="M7 3h10v4H7zM5 5H3v16h18V5h-2"/><path d="M8 12h8M8 16h6"/></svg>;
+  if(name==='status')return <svg {...common}><path d="M4 18V6m5 12v-7m5 7V9m5 9V4"/><path d="M3 20h18"/></svg>;
+  return <svg {...common}><circle cx="5" cy="12" r="1.3" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.3" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1.3" fill="currentColor" stroke="none"/></svg>;
+}
 
 function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[];setCart:(v:CartLine[])=>void;serviceMode:ServiceMode;setServiceMode:(m:ServiceMode)=>void}){
   const navigate=useNavigate();
   const [runtimeRevision,setRuntimeRevision]=useState(0);
   useEffect(()=>localRuntime.subscribe(()=>setRuntimeRevision(value=>value+1)),[]);
   const [category,setCategory]=useState('all');
+  const [requiredOnly,setRequiredOnly]=useState(false);
+  const [orderingMode,setOrderingMode]=useState<'quick'|'standard'>('quick');
+  const [searchQuery,setSearchQuery]=useState('');
+  const [feedbackMessage,setFeedbackMessage]=useState<string|undefined>();
   const [viewMode,setViewMode]=useState<'original'|'organized'>('original');
   const [pulse,setPulse]=useState(0);
   const [recent,setRecent]=useState<string|undefined>();
@@ -155,6 +170,8 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
   ];
   const visible=products
     .filter(product=>category==='all'||product.categoryId===category)
+    .filter(product=>!requiredOnly||product.optionSets.some(set=>set.required||set.min>0))
+    .filter(product=>!searchQuery.trim()||product.name.toLocaleLowerCase('zh-HK').includes(searchQuery.trim().toLocaleLowerCase('zh-HK')))
     .slice()
     .sort((a,b)=>{
       if(category!=='all')return 0;
@@ -206,22 +223,29 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
     return {id,label:String(index+1),occupied:Boolean(occupied),codeLabel:occupied?.codeLabel};
   });
 
+  const riceballProducts=products.filter(product=>product.category.includes('飯團'));
+  const requiredProducts=products.filter(product=>product.optionSets.some(set=>set.required||set.min>0));
+  const activeCombos=comboData.combos.filter(combo=>combo.active);
+  const riceballCategory=categories.find(item=>item.label.includes('飯團'));
+
   const view:OrderingWorkspaceViewModel={
     pendingOrders,activeOrders,categories,selectedCategoryId:category,
+    searchQuery,feedbackMessage,orderingMode,
     products:visible.map(product=>({
       id:product.id,
       name:product.name,
       priceLabel:product.priceReady?money(product.priceMinor):'未接價格',
       enabled:product.priceReady&&product.sellable&&((serviceMode==='takeaway'&&storeSettings.takeawayEnabled)||(serviceMode==='dine-in'&&storeSettings.dineInEnabled)),
       requiresOptions:product.priceReady&&product.sellable&&product.optionSets.length>0,
+      hasRequiredOptions:product.priceReady&&product.sellable&&product.optionSets.some(set=>set.required||set.min>0),
       imageUrl:frontlinePresentation.showImages?(product.imageUrl??productArtwork(product)):undefined,
       ...(!product.priceReady?{badge:'未接價格'}:!product.sellable?{badge:'停售'}:{}),
     })),
     menuRevisionLabel:adminConfig
-      ?storeSettings.storeName+' · ADMIN R'+adminConfig.revision+' · '+(syncStatus.state==='SYNCED'?'已同步':syncStatus.state==='LOCAL_LKG'?'LKG':'同步中')
-      :'LOCAL FALLBACK · R'+adminMenu.revision,
+      ?storeSettings.storeName+' · 管理端版本 '+adminConfig.revision+' · '+(syncStatus.state==='SYNCED'?'已同步':syncStatus.state==='LOCAL_LKG'?'使用本機最後版本':'同步中')
+      :'本機菜單 · 版本 '+adminMenu.revision,
     operationalNotice:capacityNotice
-      ?'今日 '+capacityNotice.currentCount+'/'+capacityNotice.dailyLimit+' 單 · 已到 '+capacityNotice.warningAt+'% 提醒門檻'+(capacityNotice.hardStopConfigured?' · Admin 有 hard-stop 設定但目前只提示':'')
+      ?'今日 '+capacityNotice.currentCount+'/'+capacityNotice.dailyLimit+' 單 · 已到 '+capacityNotice.warningAt+'% 提醒門檻'+(capacityNotice.hardStopConfigured?' · 管理端設有停止接單門檻，目前只作提示':'')
       :undefined,
     showCategories:frontlinePresentation.showCategories,
     serviceModes:{takeaway:storeSettings.takeawayEnabled,dineIn:storeSettings.dineInEnabled},
@@ -234,9 +258,9 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
       subtotalLabel:money(total),packagingLabel:'$0.00',discountLabel:'$0.00',totalLabel:money(total),checkoutEnabled:cart.length>0&&((serviceMode==='takeaway'&&storeSettings.takeawayEnabled)||(serviceMode==='dine-in'&&storeSettings.dineInEnabled)),
     },
     workItems:[
-      {id:'riceball-pool',label:'飯團待組區',count:0},
-      {id:'required',label:'必選區',count:0},
-      {id:'combo',label:'紫米套餐區',count:comboData.combos.length},
+      {id:'riceball-pool',label:'飯團待組區',count:riceballProducts.length,description:'集中揀飯團',statusLabel:riceballProducts.length?'查看商品':'未有商品',enabled:riceballProducts.length>0,active:Boolean(riceballCategory&&category===riceballCategory.id&&!requiredOnly),tone:'riceball'},
+      {id:'required',label:'必選區',count:requiredProducts.length,description:'需要完成選項',statusLabel:requiredProducts.length?'查看必選':'目前沒有',enabled:requiredProducts.length>0,active:requiredOnly,tone:'required'},
+      {id:'combo',label:'飯團套餐區',count:activeCombos.length,description:'組合主食與加配',statusLabel:activeCombos.length?'開始配搭':'未發布',enabled:activeCombos.length>0,active:panel?.type==='combo',tone:'combo'},
     ],
     actionAvailability:{
       lineServiceMode:true,
@@ -248,28 +272,45 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
     recentlyAddedProductId:recent,highlightedCartLineId:highlight,cartPulseNonce:pulse,
   };
 
+  const defaultConfiguration=(product:Product):{detail:string;deltaMinor:number;configuration:ProductConfiguration}=>{
+    const selected=Object.fromEntries(product.optionSets.map(set=>[set.id,set.options.filter(option=>option.defaultSelected).map(option=>option.id)]));
+    const chosen=product.optionSets.flatMap(set=>{
+      const ids=new Set(selected[set.id]??[]);
+      const options=set.options.filter(option=>ids.has(option.id));
+      return options.length?[{set,options}]:[];
+    });
+    return {
+      detail:chosen.map(({set,options})=>set.name+'：'+options.map(option=>option.name).join('、')).join(' · '),
+      deltaMinor:chosen.flatMap(row=>row.options).reduce((sum,option)=>sum+option.priceAdjustmentMinor,0),
+      configuration:{selected,note:''},
+    };
+  };
+
   const add=(id:string)=>{
     const product=products.find(item=>item.id===id);if(!product||!product.priceReady||!product.sellable)return;
-    const existing=cart.find(item=>item.productId===id&&item.serviceMode===serviceMode);
+    const defaults=defaultConfiguration(product);
+    const existing=cart.find(item=>item.productId===id&&item.serviceMode===serviceMode&&(item.detail??'')===defaults.detail);
     const next=existing
       ?cart.map(item=>item.id===existing.id?{...item,qty:item.qty+1}:item)
-      :[...cart,{id:'line-'+Date.now().toString(36),productId:product.id,name:product.name,qty:1,unitMinor:product.priceMinor,serviceMode}];
+      :[...cart,{id:'line-'+Date.now().toString(36),productId:product.id,name:product.name,qty:1,unitMinor:product.priceMinor+defaults.deltaMinor,serviceMode,detail:defaults.detail||undefined,configuration:defaults.configuration}];
     setCart(next);
     setRecent(id);
     setHighlight(existing?.id??next[next.length-1]?.id);
     setPulse(value=>value+1);
+    setFeedbackMessage(`已加入「${product.name}」`);
     window.setTimeout(()=>{setRecent(undefined);setHighlight(undefined)},700);
   };
 
-  const addConfigured=(productId:string,detail:string,deltaMinor:number,qty:number)=>{
+  const addConfigured=(productId:string,detail:string,deltaMinor:number,qty:number,configuration:ProductConfiguration,lineId?:string)=>{
     const product=products.find(item=>item.id===productId);if(!product||!product.priceReady||!product.sellable)return;
-    const line:CartLine={id:'line-'+Date.now().toString(36),productId:product.id,name:product.name,qty,unitMinor:product.priceMinor+deltaMinor,serviceMode,detail};
-    setCart([...cart,line]);setRecent(product.id);setHighlight(line.id);setPulse(value=>value+1);setPanel(null);
+    const line:CartLine={id:lineId??'line-'+Date.now().toString(36),productId:product.id,name:product.name,qty,unitMinor:product.priceMinor+deltaMinor,serviceMode,detail:detail||undefined,configuration};
+    setCart(lineId?cart.map(item=>item.id===lineId?{...line,serviceMode:item.serviceMode}:item):[...cart,line]);
+    setRecent(product.id);setHighlight(line.id);setPulse(value=>value+1);setPanel(null);setFeedbackMessage(lineId?`已更新「${product.name}」`:`已完成設定並加入「${product.name}」`);
   };
 
   const addCombo=(comboId:string,comboName:string,detail:string,unitMinor:number)=>{
     const line:CartLine={id:'line-'+Date.now().toString(36),productId:comboId,name:comboName,qty:1,unitMinor,serviceMode,detail};
-    setCart([...cart,line]);setHighlight(line.id);setPulse(value=>value+1);setPanel(null);
+    setCart([...cart,line]);setHighlight(line.id);setPulse(value=>value+1);setPanel(null);setFeedbackMessage(`已加入套餐「${comboName}」`);
   };
 
   const holdItems=()=>cart.map(line=>({
@@ -287,7 +328,7 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
     :panel?.type==='holds'?'暫存單':'';
 
   const panelBody=panel?.type==='product'
-    ?(()=>{const product=workspaceProducts.find(item=>item.id===panel.productId);return product?<ProductConfigWorkspace product={product} onAdd={(detail,delta,qty)=>addConfigured(product.id,detail,delta,qty)}/>:null})()
+    ?(()=>{const product=workspaceProducts.find(item=>item.id===panel.productId);const line=panel.lineId?cart.find(item=>item.id===panel.lineId):undefined;return product?<ProductConfigWorkspace product={product} initial={line?{qty:line.qty,configuration:line.configuration}:undefined} onAdd={(detail,delta,qty,configuration)=>addConfigured(product.id,detail,delta,qty,configuration,panel.lineId)}/>:null})()
     :panel?.type==='organize'
       ?<OrganizeWorkspace lines={cart} onDone={()=>setPanel(null)}/>
       :panel?.type==='combo'
@@ -336,7 +377,9 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
             :null;
 
   const actions:OrderingWorkspaceActions={
-    onSelectCategory:setCategory,
+    onSearchQuery:setSearchQuery,
+    onSelectCategory:id=>{setCategory(id);setRequiredOnly(false);},
+    onChangeOrderingMode:setOrderingMode,
     onAddProduct:add,
     onConfigureProduct:id=>setPanel({type:'product',productId:id}),
     onChangeServiceMode:mode=>{
@@ -344,7 +387,7 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
       if(mode==='dine-in'&&!storeSettings.dineInEnabled)return;
       setServiceMode(mode);setCart(cart.map(item=>({...item,serviceMode:mode})));
     },
-    onChangeCartView:mode=>{setViewMode(mode);if(mode==='organized')setPanel({type:'organize'});},
+    onChangeCartView:setViewMode,
     onChangeLineServiceMode:(lineId,mode)=>{
       if(mode==='takeaway'&&!storeSettings.takeawayEnabled)return;
       if(mode==='dine-in'&&!storeSettings.dineInEnabled)return;
@@ -355,11 +398,17 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
       const line=cart.find(item=>item.id===lineId);
       if(!line)return;
       if(comboData.combos.some(combo=>combo.id===line.productId))setPanel({type:'combo'});
-      else setPanel({type:'product',productId:line.productId});
+      else setPanel({type:'product',productId:line.productId,lineId});
     },
     onHoldCart:()=>cart.length?setPanel({type:'hold'}):setPanel({type:'holds'}),
     onCancelCart:()=>setCart([]),
-    onOpenWorkItem:id=>{if(id==='combo')setPanel({type:'combo'});else setPanel({type:'organize'});},
+    onOpenWorkItem:id=>{
+      setSearchQuery('');
+      if(id==='combo'){if(activeCombos.length)setPanel({type:'combo'});return;}
+      setPanel(null);
+      if(id==='required'){setCategory('all');setRequiredOnly(true);return;}
+      if(riceballCategory){setCategory(riceballCategory.id);setRequiredOnly(false);}
+    },
     onOpenQueueOrder:(_kind,id)=>navigate('/orders?orderId='+encodeURIComponent(id)),
     onCheckout:()=>navigate('/checkout'),
   };
@@ -479,7 +528,7 @@ function CheckoutPage({cart,setCart,diningCheckout,onDiningCheckoutDone}:{cart:C
       setState('success');
       setPrintStatus('訂單已完成 · 正在送打印…');
       void localRuntime.printOrderOutputs(order.id).then(summary=>{
-        if(summary.planned===0){setPrintStatus('訂單已完成 · 未有已綁定打印 Route');return;}
+        if(summary.planned===0){setPrintStatus('訂單已完成 · 未有已綁定打印用途');return;}
         if(summary.failed===0){setPrintStatus('訂單已完成 · 已送出 '+summary.sent+'/'+summary.planned+' 個打印工作');return;}
         const failures=summary.results.filter(row=>!row.ok).map(row=>row.role+':'+row.code).join('；');
         setPrintStatus('訂單已完成 · 打印部分失敗 '+summary.sent+'/'+summary.planned+' · '+failures);
@@ -549,19 +598,21 @@ function OperationalApp(){
       <div className="clean-brand" aria-label="磨飯">磨</div>
       <nav aria-label="MFK 主導航">
         {nav.map(item=><NavLink key={item.to} to={item.to} end={'end' in item?item.end:false} className={({isActive})=>isActive?'active':''}>
-          <span className="clean-rail-icon">{item.icon}</span>
+          <span className="clean-rail-icon"><NavGlyph name={item.icon}/></span>
           <span className="clean-rail-label">{item.label}</span>
-          {item.to==='/orders'&&activeOrderCount>0?<span className="clean-rail-badge" aria-label={'進行中訂單 '+activeOrderCount}>{activeOrderCount>99?'99+':activeOrderCount}</span>:null}
+          {item.to==='/work'&&activeOrderCount>0?<span className="clean-rail-badge" aria-label={'待處理工作 '+activeOrderCount}>{activeOrderCount>99?'99+':activeOrderCount}</span>:null}
         </NavLink>)}
       </nav>
       <StaffSessionBadge/>
-      <div className="clean-runtime-state">LOCAL<br/>OFFLINE</div>
+      <div className="clean-runtime-state">本機<br/>運作</div>
     </aside>
     <section className="clean-route-stage">
       <Routes>
         <Route index element={<OrderingPage cart={cart} setCart={setCart} serviceMode={serviceMode} setServiceMode={setServiceMode}/>}/>
         <Route path="checkout" element={<CheckoutPage cart={cart} setCart={setCart} diningCheckout={diningCheckout} onDiningCheckoutDone={()=>setDiningCheckout(null)}/>}/>
+        <Route path="work" element={<RuntimeWorkWorkspace runtime={runtime}/>}/>
         <Route path="orders" element={<RuntimeOrdersWorkspace runtime={runtime}/>}/>
+        <Route path="operations" element={<SmtOperationsHub runtime={runtime}/>}/>
         <Route path="dining" element={<RuntimeDiningWorkspace runtime={runtime} onCheckout={prepareDiningCheckout}/>}/>
         <Route path="soldout" element={<RuntimeSoldoutWorkspace runtime={runtime}/>}/>
         <Route path="more" element={<LocalMoreWorkspace/>}/>

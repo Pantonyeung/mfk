@@ -124,3 +124,27 @@
 .dayclose-sticky-footer{position:sticky;bottom:-1px;z-index:8;display:grid!important;grid-template-columns:minmax(0,1fr) 280px;gap:12px;align-items:center!important;padding:12px 0 0!important;background:#fff!important;border-top:1px solid #e0e3e8!important;color:#252635!important}
 .dayclose-sticky-footer>div{display:flex;gap:18px;align-items:center}.dayclose-sticky-footer>div span{font-size:15px;font-weight:850}.dayclose-sticky-footer>.more-primary{min-height:54px;font-size:18px}
 @media(max-width:1200px){.dayclose-panel .cash-denomination-table>header,.dayclose-panel .cash-denomination-table>div{grid-template-columns:90px minmax(180px,1fr) 130px 130px}.cash-denomination-toolbar{align-items:flex-start;flex-direction:column}.dayclose-sticky-footer{grid-template-columns:1fr 220px}}
+
+/* Human-centered R1: low-frequency choices stay neutral; blue marks the current action. */
+.more-overview>header span,.more-card-topbar small,.more-section-heading span{color:#1768dc}
+.more-overview-cards{grid-template-columns:repeat(3,minmax(0,1fr))}
+.more-overview-cards button{min-height:150px;box-shadow:none}
+.more-overview-cards button>span{background:#eaf2ff;color:#165dcc}
+.more-overview-cards button>i{color:#1768dc}
+.more-overview-cards button>em{background:#eef5ff;color:#1559af}
+.more-primary,.dayclose-mode-switch button.active,.cash-entry-toggle button.active{border-color:#1768dc;background:#1768dc}
+.more-section-heading>strong{color:#1559af;background:#eef5ff}
+.cash-denomination-table>footer strong{color:#165dcc}
+.more-card-workspace button:focus-visible,.more-card-workspace input:focus-visible,.more-card-workspace select:focus-visible{outline:3px solid #79aaf3;outline-offset:3px}
+
+/* R2: task-led More home. One primary job, then grouped low-frequency tools. */
+.more-overview{display:flex;flex-direction:column;gap:16px;padding:24px 28px;background:#f3f6fa;color:#182033}
+.more-overview>header{margin:0}.more-overview>header span{color:#1768dc}.more-overview>header h2{font-size:30px;color:#182033}.more-overview>header>strong{color:#536177;box-shadow:none}
+.more-overview-layout{min-height:0;display:grid;grid-template-columns:minmax(320px,.82fr) minmax(520px,1.45fr);gap:14px;align-items:stretch}
+.more-primary-action{min-height:0;display:flex;flex-direction:column;align-items:flex-start;padding:25px;border:1px solid #c9d8ec;border-top:5px solid #1768dc;border-radius:15px;color:#182033;background:#fff;text-align:left;box-shadow:0 8px 24px rgb(30 53 85 / 5%)}
+.more-primary-action>span{color:#1768dc;font-size:12px;font-weight:950;letter-spacing:.08em}.more-primary-action h3{margin:7px 0 5px;font-size:30px}.more-primary-action>p{margin:0;color:#657187;line-height:1.5}.more-primary-action>div{width:100%;display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:auto 0 18px}.more-primary-action>div b{display:grid;gap:4px;padding:13px 10px;border-radius:10px;background:#f3f6f9;font-size:20px}.more-primary-action>div small{color:#6f7c90;font-size:11px;font-weight:700}.more-primary-action>strong{width:100%;box-sizing:border-box;padding:15px 17px;border-radius:9px;color:#fff;background:#1768dc;font-size:16px;text-align:center}
+.more-tool-groups{min-height:0;display:grid;gap:10px}.more-tool-groups>section{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;padding:13px;border:1px solid #d5dee9;border-radius:13px;background:#fff}.more-tool-groups>section>header{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:14px;padding:0 2px 5px}.more-tool-groups>section>header>div{display:grid;gap:2px}.more-tool-groups>section>header b{font-size:16px}.more-tool-groups>section>header small,.more-tool-groups>section>header em{color:#727e91;font-size:11px;font-style:normal}.more-tool-groups>section>button{min-height:63px;display:flex;align-items:center;justify-content:space-between;gap:14px;padding:10px 12px;border:1px solid #e0e5ec;border-radius:9px;color:#26374e;background:#f9fafc;text-align:left}.more-tool-groups>section>button>span{display:grid;gap:3px;font-weight:900}.more-tool-groups>section>button small{color:#6f7b8e;font-size:11px;font-weight:600}.more-tool-groups>section>button strong{flex:0 0 auto;color:#1559af;font-size:12px}.more-tool-groups>section:first-child>button{grid-column:1/-1}
+.more-truth-strip{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.more-truth-strip>span{display:grid;gap:2px;padding:10px 13px;border:1px solid #d8e0e9;border-radius:9px;background:#fff}.more-truth-strip b{font-size:13px}.more-truth-strip small{color:#6f7b8e;font-size:11px}
+.more-overview button{cursor:pointer;touch-action:manipulation}.more-overview button:focus-visible{outline:3px solid #79aaf3;outline-offset:3px}.more-overview button:not(:disabled):active{transform:scale(.985)}
+@media(max-width:1350px){.more-overview{padding:20px 22px}.more-overview-layout{grid-template-columns:minmax(290px,.7fr) minmax(480px,1.5fr)}.more-primary-action{padding:20px}.more-primary-action>div{grid-template-columns:1fr}.more-primary-action>div b{display:flex;justify-content:space-between}.more-tool-groups>section{padding:11px}}
+@media(prefers-reduced-motion:reduce){.more-overview button:not(:disabled):active{transform:none}}

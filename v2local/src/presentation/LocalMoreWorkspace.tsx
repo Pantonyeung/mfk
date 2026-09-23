@@ -115,7 +115,7 @@ function loadPrinters():PrinterBinding[]{
   }catch{return defaults.map(x=>({...x,productIds:x.productIds?[...x.productIds]:undefined}))}
 }
 function savePrinters(rows:PrinterBinding[]){localStorage.setItem(PRINTER_BINDING_KEY,JSON.stringify(rows))}
-function resultLabel(result:NativeResult|null){return !result?'未測試':result.ok?(result.code||'PASS'):(result.code||'FAIL')}
+function resultLabel(result:NativeResult|null){return !result?'未測試':result.ok?(result.code||'成功'):(result.code||'失敗')}
 function money(minor:number){return '$'+(Number(minor||0)/100).toFixed(2)}
 function download(name:string,text:string,type='application/json'){
   const blob=new Blob([text],{type});
@@ -142,7 +142,7 @@ function csv(report:ReturnType<typeof buildLocalReport>){
 function productLabelPurpose(binding:PrinterBinding){
   if(binding.id==='product-label-1')return '飯糰專用';
   if(binding.id==='product-label-2')return '外賣專用';
-  return '自訂 Route · 待 Admin 指派商品';
+  return '自訂打印用途 · 等待管理端指派商品';
 }
 
 function OverviewPanel({onOpen}:{onOpen:(section:Section)=>void}){
@@ -151,24 +151,20 @@ function OverviewPanel({onOpen}:{onOpen:(section:Section)=>void}){
   const printers=loadPrinters();
   const online=printers.filter(printer=>printer.host.trim()).length;
   const lastPrint=readLastPrintDiagnostic();
-  const cards=[
-    {id:'dayclose' as const,no:'01',icon:'▣',title:'收銀與日結',desc:'現金點算、開工底箱、日結確認與本機紀錄'},
-    {id:'reports' as const,no:'02',icon:'↗',title:'報表與分析',desc:'營業額、訂單、商品排行與本機報表'},
-    {id:'printing' as const,no:'03',icon:'▤',title:'打印與設備',desc:'打印機設定、路由、測試與標籤綁定'},
-    {id:'backup' as const,no:'04',icon:'☁',title:'備份與恢復',desc:'本機備份、校驗、恢復與資料安全'},
-    {id:'diagnostics' as const,no:'05',icon:'⚙',title:'顯示與操作／診斷',desc:'Printer Trace、Route、錯誤碼與本機健康狀態'},
-    {id:'admin-menu' as const,no:'06',icon:'↻',title:'Admin 同步',desc:'只讀查看 Admin 最新版本、同步狀態同本機 LKG'},
-  ];
   return <section className="more-overview">
-    <header><div><span>SMT LOCAL OPERATIONS</span><h2>更多功能總覽</h2><p>本地營運控制面板；之後可以再接 Admin 發布設定。</p></div><strong>{new Date().toLocaleString('zh-HK')}</strong></header>
-    <div className="more-overview-cards">{cards.map(card=><button key={card.id} type="button" onClick={()=>onOpen(card.id)}>
-      <span>{card.no}</span><i>{card.icon}</i><b>{card.title}</b><small>{card.desc}</small><em>進入</em>
-    </button>)}</div>
-    <div className="more-overview-grid">
-      <article><header><b>今日營運</b><span>LOCAL</span></header><div><p><span>完成訂單</span><strong>{report.completedOrders}</strong></p><p><span>淨銷售</span><strong>{money(report.netSalesMinor)}</strong></p><p><span>平均客單</span><strong>{money(report.averageOrderMinor)}</strong></p></div></article>
-      <article><header><b>打印設備</b><span>{online}/{printers.length} 已綁定</span></header><div><p><span>最近打印</span><strong>{lastPrint?lastPrint.elapsedMs+' ms':'—'}</strong></p><p><span>成功／計劃</span><strong>{lastPrint?lastPrint.sent+'/'+lastPrint.planned:'—'}</strong></p><p><span>狀態</span><strong>{lastPrint?(lastPrint.failed?'需檢查':'正常'):'待首張'}</strong></p></div></article>
-      <article><header><b>系統資訊</b><span>MFK Local</span></header><div><p><span>Runtime</span><strong>LOCAL-FIRST</strong></p><p><span>Native Bridge</span><strong>{window.moreFunNative?'已連接':'未連接'}</strong></p><p><span>資料權威</span><strong>本機交易</strong></p></div></article>
+    <header><div><span>更多</span><h2>低頻工具，按工作目的整理</h2><p>先顯示最常用嘅營運工作；設定細節進入後先展開。</p></div><strong>{new Date().toLocaleString('zh-HK')}</strong></header>
+    <div className="more-overview-layout">
+      <button className="more-primary-action" type="button" onClick={()=>onOpen('dayclose')}>
+        <span>今日主要工作</span><h3>收銀與日結</h3><p>現金點算、開工底箱、日結確認同本機紀錄。</p>
+        <div><b>{report.completedOrders}<small>完成訂單</small></b><b>{money(report.netSalesMinor)}<small>淨銷售</small></b><b>{money(report.averageOrderMinor)}<small>平均客單</small></b></div><strong>進入收銀與日結 →</strong>
+      </button>
+      <div className="more-tool-groups">
+        <section><header><div><b>營運回顧</b><small>今日數字與商品表現</small></div></header><button type="button" onClick={()=>onOpen('reports')}><span>報表與分析<small>營業額、訂單、商品排行</small></span><strong>查看 →</strong></button></section>
+        <section><header><div><b>門店準備</b><small>開舖前與異常時使用</small></div><em>{online}/{printers.length} 打印機已綁定</em></header><button type="button" onClick={()=>onOpen('printing')}><span>打印與設備<small>設定、路由、測試與標籤</small></span><strong>{lastPrint?(lastPrint.failed?'需檢查':'正常'):'待首張'} →</strong></button><button type="button" onClick={()=>onOpen('admin-menu')}><span>管理端同步<small>只讀查看最新版本與本機最後版本</small></span><strong>查看 →</strong></button></section>
+        <section><header><div><b>資料與支援</b><small>需要時先進入</small></div><em>{window.moreFunNative?'裝置已連接':'裝置未連接'}</em></header><button type="button" onClick={()=>onOpen('backup')}><span>備份與恢復<small>備份、校驗、恢復與資料安全</small></span><strong>管理 →</strong></button><button type="button" onClick={()=>onOpen('diagnostics')}><span>顯示與操作／診斷<small>錯誤碼、打印記錄與本機健康</small></span><strong>檢查 →</strong></button></section>
+      </div>
     </div>
+    <footer className="more-truth-strip"><span><b>本機優先</b><small>交易資料以本機記錄為準</small></span><span><b>最近打印</b><small>{lastPrint?`${lastPrint.sent}/${lastPrint.planned} · ${lastPrint.elapsedMs} ms`:'未有記錄'}</small></span><span><b>裝置狀態</b><small>{window.moreFunNative?'已連接':'目前未連接'}</small></span></footer>
   </section>;
 }
 
@@ -252,31 +248,31 @@ function PrinterPanel(){
   };
 
   return <section className="more-panel">
-    <header className="more-section-heading"><div><span>PHYSICAL PRINT ROUTING</span><h2>打印與設備</h2></div><strong>{window.moreFunNative?'Carrier Bridge 已連接':'Native Bridge 未連接'}</strong></header>
-    <p className="fusion-note">Admin 定義 Logical Printer 同商品打印規則；SMT 只負責將 Logical Printer 配對到實體 IP／Port。Admin 關閉用途或商品規則後，SMT print plan 會自動停止相應 job。</p>
+    <header className="more-section-heading"><div><span>實體打印設定</span><h2>打印與設備</h2></div><strong>{window.moreFunNative?'裝置已連接':'裝置未連接'}</strong></header>
+    <p className="fusion-note">管理端定義打印用途同商品規則；SMT 只負責將打印用途配對到實體打印機。管理端關閉用途或商品規則後，本機會自動停止相應打印工作。</p>
     <div className="more-tab-row">
       {printers.map(p=><button key={p.id} type="button" className={p.id===current.id?'active':''} onClick={()=>setSelected(p.id)}>{p.role==='產品標籤'?p.name:p.role}</button>)}
-      <button type="button" onClick={addProductLabel}>＋ 新增產品 Label</button>
+      <button type="button" onClick={addProductLabel}>＋ 新增產品標籤</button>
     </div>
     <div className="more-kpis">
-      <article><span>Route</span><b>{current.routeKey}</b></article>
+      <article><span>打印路徑</span><b>{current.routeKey}</b></article>
       <article><span>實體打印機</span><b>{current.host?current.host+':'+current.port:'未綁定'}</b></article>
       <article><span>結果</span><b>{resultLabel(status[current.id]??null)}</b></article>
     </div>
     <label className="more-field"><span>打印機名稱</span><input value={current.name} onChange={e=>update({name:e.target.value})}/></label>
-    {logicalType?<label className="more-field"><span>Admin Logical Printer</span><select value={current.logicalPrinterId??''} onChange={e=>update({logicalPrinterId:e.target.value||undefined})}><option value="">未配對</option>{logicalOptions.map(row=><option key={row.id} value={row.id}>{row.name} · {row.active?'啟用':'停用'}</option>)}</select></label>:null}
-    <label className="more-field"><span>Printer IP / Host</span><input inputMode="decimal" placeholder="例如 192.168.1.201" value={current.host} onChange={e=>update({host:e.target.value})}/></label>
-    <label className="more-field"><span>Port</span><input inputMode="numeric" value={String(current.port)} onChange={e=>update({port:Number(e.target.value)||0})}/></label>
+    {logicalType?<label className="more-field"><span>管理端打印用途</span><select value={current.logicalPrinterId??''} onChange={e=>update({logicalPrinterId:e.target.value||undefined})}><option value="">未配對</option>{logicalOptions.map(row=><option key={row.id} value={row.id}>{row.name} · {row.active?'啟用':'停用'}</option>)}</select></label>:null}
+    <label className="more-field"><span>打印機網絡位址</span><input inputMode="decimal" placeholder="例如 192.168.1.201" value={current.host} onChange={e=>update({host:e.target.value})}/></label>
+    <label className="more-field"><span>連接埠</span><input inputMode="numeric" value={String(current.port)} onChange={e=>update({port:Number(e.target.value)||0})}/></label>
     <label className="more-field"><span>中文編碼</span><select value={current.encoding} onChange={e=>update({encoding:e.target.value as PrinterBinding['encoding']})}><option value="gb18030">GB18030</option><option value="big5">Big5（標籤預設）</option><option value="utf-8">UTF-8</option></select></label>
-    {current.role==='產品標籤'?<div className="fusion-note"><b>本地用途</b>：{productLabelPurpose(current)}。目前只做 SMT 本地實體綁定；自訂 Route 預設唔自動出產品 Label，避免未有 Admin 商品映射前重覆打印。</div>:null}
-    {current.capability==='label-58mm'?<div className="fusion-note"><b>Label Profile</b>：{LABEL_TSC_PROFILE.protocol} · {LABEL_TSC_PROFILE.widthMm}×{LABEL_TSC_PROFILE.heightMm} mm · 上偏移 {LABEL_TSC_PROFILE.topOffset} · 左偏移 {LABEL_TSC_PROFILE.leftOffset} · 行間隔 {LABEL_TSC_PROFILE.lineGap} · 中文以 Bitmap 出紙</div>:null}
+    {current.role==='產品標籤'?<div className="fusion-note"><b>本地用途</b>：{productLabelPurpose(current)}。目前只做 SMT 本機實體綁定；自訂打印路徑預設唔自動出產品標籤，避免未有管理端商品映射前重覆打印。</div>:null}
+    {current.capability==='label-58mm'?<div className="fusion-note"><b>標籤規格</b>：{LABEL_TSC_PROFILE.protocol} · {LABEL_TSC_PROFILE.widthMm}×{LABEL_TSC_PROFILE.heightMm} 毫米 · 上偏移 {LABEL_TSC_PROFILE.topOffset} · 左偏移 {LABEL_TSC_PROFILE.leftOffset} · 行間隔 {LABEL_TSC_PROFILE.lineGap} · 中文以點陣圖出紙</div>:null}
     <div className="more-tab-row">
       <button type="button" disabled={Boolean(busy)} onClick={()=>void run('test')}>{busy==='test'?'測試中…':'① 測試連線'}</button>
       <button type="button" className="more-primary" disabled={Boolean(busy)} onClick={()=>void run('print')}>{busy==='print'?'出紙中…':'② 測試出紙'}</button>
       <button type="button" disabled={Boolean(busy)} onClick={()=>void run('save')}>{busy==='save'?'保存中…':'③ 保存綁定'}</button>
-      {current.role==='產品標籤'&&!FIXED_PRODUCT_LABEL_IDS.has(current.id)?<button type="button" disabled={Boolean(busy)} onClick={removeProductLabel}>刪除此自訂 Label</button>:null}
+      {current.role==='產品標籤'&&!FIXED_PRODUCT_LABEL_IDS.has(current.id)?<button type="button" disabled={Boolean(busy)} onClick={removeProductLabel}>刪除此自訂標籤</button>:null}
     </div>
-    {status[current.id]?<p role="status"><b>{status[current.id]?.ok?'PASS':'FAIL'}：</b>{resultLabel(status[current.id]??null)}</p>:null}
+    {status[current.id]?<p role="status"><b>{status[current.id]?.ok?'成功':'失敗'}：</b>{resultLabel(status[current.id]??null)}</p>:null}
   </section>;
 }
 
@@ -293,15 +289,15 @@ function DiagnosticsPanel(){
   }
   const unbound=printers.filter(printer=>!printer.host.trim());
   return <section className="more-panel">
-    <header className="more-section-heading"><div><span>LOCAL DIAGNOSTICS</span><h2>診斷中心</h2></div><strong>{window.moreFunNative?'Carrier Bridge 已連接':'Native Bridge 未連接'}</strong></header>
+    <header className="more-section-heading"><div><span>本機診斷</span><h2>診斷中心</h2></div><strong>{window.moreFunNative?'裝置已連接':'裝置未連接'}</strong></header>
     <div className="more-kpis">
-      <article><span>Printer Routes</span><b>{printers.length}</b></article>
+      <article><span>打印路徑</span><b>{printers.length}</b></article>
       <article><span>未綁定</span><b>{unbound.length}</b></article>
       <article><span>實體設備</span><b>{[...groups.keys()].filter(key=>!key.startsWith('UNBOUND:')).length}</b></article>
       <article><span>最近打印</span><b>{lastPrint?lastPrint.elapsedMs+' ms':'—'}</b></article>
     </div>
     <section className="fusion-list">
-      <header><b>打印 Route</b><span>LOCAL STORAGE · v5</span></header>
+      <header><b>打印路徑</b><span>本機保存 · v5</span></header>
       {printers.map(printer=><article key={printer.id}>
         <span>{printer.name}<small> · {printer.routeKey}</small></span>
         <b>{printer.host.trim()?printer.host+':'+printer.port:'未綁定'}</b>
@@ -309,14 +305,14 @@ function DiagnosticsPanel(){
       </article>)}
     </section>
     {lastPrint?<section className="fusion-list">
-      <header><b>最近一次打印 Trace · {lastPrint.display}</b><span>{lastPrint.sent}/{lastPrint.planned} · {lastPrint.elapsedMs} ms</span></header>
+      <header><b>最近一次打印記錄 · {lastPrint.display}</b><span>{lastPrint.sent}/{lastPrint.planned} · {lastPrint.elapsedMs} 毫秒</span></header>
       {lastPrint.physical.map(route=><article key={route.physicalKey}>
         <span>{route.roles.join(' + ')}<small> · {route.bindingIds.join(', ')}</small></span>
         <b>{route.physicalKey}</b>
-        <strong>{route.ok?'PASS':'FAIL'} · {route.planned} jobs · {route.elapsedMs} ms · {route.code}</strong>
+        <strong>{route.ok?'成功':'失敗'} · {route.planned} 項工作 · {route.elapsedMs} 毫秒 · {route.code}</strong>
       </article>)}
-    </section>:<p className="fusion-note">未有最近打印 Trace。下一張單打印後，會記錄每部實體 Printer 嘅 jobs、耗時同錯誤碼。</p>}
-    <p className="fusion-note">同一實體 IP / Port 嘅 Label Route 會合併成一次 LAN socket dispatch；不同實體 Printer 會並行送出。飯糰同外賣仍保留獨立 logical route。診斷中心只顯示本機真實 binding，唔會假裝 Cloud 同步狀態。</p>
+    </section>:<p className="fusion-note">未有最近打印記錄。下一張單打印後，會記錄每部實體打印機嘅工作、耗時同錯誤碼。</p>}
+    <p className="fusion-note">同一實體位址同連接埠嘅標籤工作會合併成一次本機網絡傳送；不同打印機會並行送出。飯糰同外賣仍保留獨立打印路徑。診斷中心只顯示本機真實綁定，唔會假裝雲端同步狀態。</p>
   </section>;
 }
 
@@ -325,7 +321,7 @@ function ReportsPanel({revision}:{revision:number}){
   const cutoff=readBusinessCutoff();
   const report=buildLocalReport(localRuntime.orders(),{businessStartHour:cutoff.hour,businessStartMinute:cutoff.minute});
   return <section className="more-panel">
-    <header className="more-section-heading"><div><span>LOCAL REPORT</span><h2>今日營運</h2></div><strong>{report.businessDate}</strong></header>
+    <header className="more-section-heading"><div><span>本機報表</span><h2>今日營運</h2></div><strong>{report.businessDate}</strong></header>
     <div className="more-kpis fusion-kpis">
       <article><span>完成訂單</span><b>{report.completedOrders}</b></article>
       <article><span>淨銷售</span><b>{money(report.netSalesMinor)}</b></article>
@@ -334,7 +330,7 @@ function ReportsPanel({revision}:{revision:number}){
       <article><span>商品件數</span><b>{report.itemUnits}</b></article>
     </div>
     <section className="fusion-list">
-      <header><b>商品排行</b><span>LOCAL DATA</span></header>
+      <header><b>商品排行</b><span>本機資料</span></header>
       {report.topProducts.length?report.topProducts.map(row=><article key={row.name}><span>{row.name}</span><b>{row.quantity} 件</b><strong>{money(row.salesMinor)}</strong></article>):<p>今日未有訂單。</p>}
     </section>
     <div className="more-tab-row"><button type="button" onClick={()=>download('mfk-report-'+report.businessDate+'.csv',csv(report),'text/csv;charset=utf-8')}>匯出 CSV</button></div>
@@ -411,7 +407,7 @@ function DayClosePanel({revision,onSaved}:{revision:number;onSaved:()=>void}){
   };
 
   if(latest)return <section className="more-panel dayclose-panel">
-    <header className="more-section-heading"><div><span>LOCAL DAY CLOSE</span><h2>收銀與日結</h2></div><strong>今日已完成</strong></header>
+    <header className="more-section-heading"><div><span>本機日結</span><h2>收銀與日結</h2></div><strong>今日已完成</strong></header>
     <section className="dayclose-complete-card">
       <div className="dayclose-complete-icon">✓</div>
       <div>
@@ -432,7 +428,7 @@ function DayClosePanel({revision,onSaved}:{revision:number;onSaved:()=>void}){
   </section>;
 
   return <section className="more-panel dayclose-panel">
-    <header className="more-section-heading"><div><span>LOCAL DAY CLOSE</span><h2>收銀與日結</h2></div><strong>今日未日結</strong></header>
+    <header className="more-section-heading"><div><span>本機日結</span><h2>收銀與日結</h2></div><strong>今日未日結</strong></header>
 
     <div className="more-kpis">
       <article><span>今日開更現金</span><b>{money(openingCashMinor)}</b></article>
@@ -538,8 +534,8 @@ function BackupPanel({onRestore}:{onRestore:()=>void}){
     onRestore();
   };
   return <section className="more-panel">
-    <header className="more-section-heading"><div><span>LOCAL BACKUP</span><h2>備份與恢復</h2></div><strong>只處理 MFK 本機資料</strong></header>
-    <p className="fusion-note">備份唔經 Cloud。檔案只包含 <code>mfk.*</code> 本機資料，其他 App 資料唔會被寫入。</p>
+    <header className="more-section-heading"><div><span>本機備份</span><h2>備份與恢復</h2></div><strong>只處理 MFK 本機資料</strong></header>
+    <p className="fusion-note">備份唔經雲端。檔案只包含 <code>mfk.*</code> 本機資料，其他應用程式資料唔會被寫入。</p>
     <div className="more-tab-row">
       <button type="button" onClick={create}>建立／下載備份</button>
       <label className="fusion-file-button">選擇備份<input type="file" accept=".json,application/json" onChange={e=>{const file=e.target.files?.[0];if(file)void choose(file)}}/></label>
@@ -556,15 +552,15 @@ export function LocalMoreWorkspace(){
   useEffect(()=>localRuntime.subscribe(()=>setRevision(value=>value+1)),[]);
   const bump=()=>setRevision(value=>value+1);
   const titleMap:Record<Section,string>={
-    overview:'更多功能總覽',printing:'打印與設備',diagnostics:'顯示與操作／診斷',
+    overview:'更多功能',printing:'打印與設備',diagnostics:'顯示與操作／診斷',
     dayclose:'收銀與日結',reports:'報表與分析',backup:'備份與恢復',
-    'admin-menu':'Admin 同步狀態'
+    'admin-menu':'管理端同步狀態'
   };
   return <main className="more-workspace more-card-workspace" aria-label="MFK SMT 本地營運中心">
     <header className="more-card-topbar">
-      <button type="button" onClick={()=>section==='overview'?navigate('/'):setSection('overview')}>{section==='overview'?'← 返回點單':'← 更多功能'}</button>
-      <div><small>SMT LOCAL OPERATIONS</small><b>{titleMap[section]}</b></div>
-      <span>LOCAL-FIRST</span>
+      <button type="button" onClick={()=>section==='overview'?navigate('/operations'):setSection('overview')}>{section==='overview'?'← 返回狀態':'← 更多功能'}</button>
+      <div><small>本機營運</small><b>{titleMap[section]}</b></div>
+      <span>本機優先</span>
     </header>
     <section className="more-workspace-content">
       {section==='overview'?<OverviewPanel onOpen={setSection}/>:null}
