@@ -15,7 +15,7 @@ export interface ProjectionOrderInput{
   readonly paymentLabel:string;
   readonly fulfillmentLabel:string;
   readonly sourceLabel:string;
-  readonly externalRef?:string;
+  readonly providerRef?:string;
   readonly staffId?:string;
   readonly staffName?:string;
   readonly cancellationReason?:string;
