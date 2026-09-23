@@ -229,7 +229,7 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
   const activeCombos=comboData.combos.filter(combo=>combo.active);
   const riceballCategory=categories.find(item=>item.label.includes('飯團'));
 
-  const cartLinePresentation=(line:CartLine)=>{
+  const cartLinePresentation=(line:CartLine):{optionDetail?:string;comboDetail?:string;note?:string}=>{
     const note=line.configuration?.note.trim()||undefined;
     const combo=activeCombos.find(item=>item.id===line.productId);
     if(combo)return {comboDetail:line.detail?.trim()||undefined,note};
