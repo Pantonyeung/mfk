@@ -1,6 +1,7 @@
 import {buildKeetaMenuProjection} from './keeta-menu-projection.ts';
 import {buildKeetaSellabilityProjection,buildKeetaWeeklyHoursProjection,chunkKeetaSpuStatus} from './keeta-store-projection.ts';
 import {MFK_KEETA_ORDER_INTENT_SCHEMA,validateMfkKeetaOrderAck} from '../contracts/keeta-order-intake-v1.ts';
+import {normalizeKeetaStandardProviderOrderFacts} from '../integrations/keeta/src/order-facts.js';
 const KEETA_AUTHORIZE_URL='https://merchant.mykeeta.com/m/web/openapi/authorize';
 const KEETA_TOKEN_URL='https://open.mykeeta.com/api/open/base/oauth/token';
 const KEETA_MENU_SYNC_URL='https://open.mykeeta.com/api/open/product/menu/sync';
@@ -75,6 +76,26 @@ function keetaOrderPlacementIdentity(message){
   const raw=baseOrder.orderViewIdStr??baseOrder.orderViewId;
   const providerOrderId=nonEmpty(String(raw??''),'KEETA_PROVIDER_ORDER_ID_REQUIRED');
   return Object.freeze({providerOrderId,rawMessage:JSON.stringify(messageRow)});
+}
+
+function keetaCommercialSnapshot(rawMessage,capturedAt,evidenceRef){
+  let parsed;
+  try{parsed=JSON.parse(rawMessage);}catch{throw new Error('KEETA_COMMERCIAL_MESSAGE_INVALID_JSON');}
+  const facts=normalizeKeetaStandardProviderOrderFacts({
+    orderInfo:parsed,
+    providerCapturedAt:capturedAt,
+    providerEvidenceRef:evidenceRef,
+  });
+  return Object.freeze({
+    providerOrderId:facts.providerOrderId,
+    providerOrderCode:facts.providerOrderCode,
+    snapshot:facts.providerCommercialSnapshot,
+  });
+}
+
+function providerOrderInfoFromReceipt(receipt){
+  const data=record(receipt?.data,'KEETA_ORDER_GET_DATA_REQUIRED');
+  return record(data.orderInfo,'KEETA_ORDER_GET_ORDER_INFO_REQUIRED');
 }
 function keetaOrderLifecycleIdentity(message){
   let root;
