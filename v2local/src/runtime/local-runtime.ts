@@ -23,6 +23,7 @@ export interface StoredOrder{
   id:string;display:string;createdAt:string;updatedAt?:string;totalMinor:number;paymentLabel:string;fulfillmentLabel:'待處理'|'進行中'|'可取餐'|'已完成'|'已取消';sourceLabel:string;
   staffId?:string;staffName?:string;cancellationReason?:string;
   providerRef?:string;providerMessageId?:string;
+  providerLastEventId?:number;providerLastEventName?:string;providerLastEventAt?:string;providerLastMessageId?:string;providerLifecycleNote?:string;
   items:readonly {id:string;name:string;qty:number;unitMinor:number;serviceMode?:'takeaway'|'dine-in'}[];
 }
 export type DiningTender='CASH'|'ALIPAY'|'WECHAT'|'FPS'|'PAYME'|'COMBO';
@@ -106,6 +107,9 @@ export interface CleanSmtCoreRuntimePort{
   reprintOrderJobs?(orderId:string,jobIds:readonly string[],reason?:string):Promise<PrintDispatchSummary>;
   updateOrderItems?(orderId:string,items:readonly {id:string;name:string;qty:number;unitMinor:number}[]):Promise<{readonly orderId:string;readonly totalMinor:number}>;
   cancelOrder?(orderId:string,reason?:string):Promise<{readonly orderId:string;readonly status:'CANCELLED'}>;
+  applyProviderLifecycle?(input:{
+    orderId:string;eventId:1002|1003|1004|1006|1008;eventName:string;providerMessageId:string;providerPushedAt:string;rawMessage:string;
+  }):{readonly orderId:string;readonly disposition:'APPLIED'|'EVIDENCE_ONLY'|'IDEMPOTENT'|'CONFLICT';readonly fulfillmentLabel:StoredOrder['fulfillmentLabel']};
   readDining?(selectedSessionId?:string):Promise<SmtDiningProjection>;
   readAvailability?():Promise<SmtAvailabilityProjection>;
   setAvailability?(nodeId:string,status:SmtAvailabilityStatus,expectedRevision:number):Promise<SmtAvailabilityProjection>;
@@ -178,6 +182,9 @@ export interface MfkLocalRuntime extends CleanSmtCoreRuntimePort{
   reprintOrderJobs(orderId:string,jobIds:readonly string[],reason?:string):Promise<PrintDispatchSummary>;
   updateOrderItems(orderId:string,items:readonly {id:string;name:string;qty:number;unitMinor:number}[]):Promise<{readonly orderId:string;readonly totalMinor:number}>;
   cancelOrder(orderId:string,reason?:string):Promise<{readonly orderId:string;readonly status:'CANCELLED'}>;
+  applyProviderLifecycle(input:{
+    orderId:string;eventId:1002|1003|1004|1006|1008;eventName:string;providerMessageId:string;providerPushedAt:string;rawMessage:string;
+  }):{readonly orderId:string;readonly disposition:'APPLIED'|'EVIDENCE_ONLY'|'IDEMPOTENT'|'CONFLICT';readonly fulfillmentLabel:StoredOrder['fulfillmentLabel']};
   createHold(input:{kind:'dining'|'waiting';items:readonly {id:string;name:string;qty:number;unitMinor:number}[];totalMinor:number;partySize?:number;note?:string}):LocalHoldDraft;
   holds():readonly LocalHoldDraft[];
   removeHold(id:string):void;
@@ -474,10 +481,13 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
     for(const order of data.orders)details[order.id]={
       orderId:order.id,orderIdLabel:'#'+order.display,itemCount:order.items.reduce((s,x)=>s+x.qty,0),totalLabel:money(order.totalMinor),
       paymentLabel:order.paymentLabel,fulfillmentLabel:order.fulfillmentLabel,sourceLabel:order.sourceLabel,localSequenceLabel:order.display,
-      attention:[],metrics:[
+      attention:[
+        ...(order.providerLifecycleNote?[order.providerLifecycleNote]:[]),
+      ],metrics:[
         {id:'time',label:'時間',value:new Date(order.createdAt).toLocaleTimeString('zh-HK')},
         {id:'items',label:'件數',value:String(order.items.reduce((s,x)=>s+x.qty,0))},
-        {id:'total',label:'總額',value:money(order.totalMinor)}
+        {id:'total',label:'總額',value:money(order.totalMinor)},
+        ...(order.providerLastEventId?[{id:'provider-event',label:'Keeta Event',value:String(order.providerLastEventId),detail:order.providerLastEventName}]:[])
       ],
       lines:order.items.map(item=>({
         id:item.id,
@@ -570,6 +580,62 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
     appendActionAudit({action:'CANCEL',orderId,reason:cancellationReason||undefined});
     projectOrder(data.orders.find(current=>current.id===orderId)!);
     return {orderId,status:'CANCELLED'};
+  },
+  applyProviderLifecycle(input){
+    const order=data.orders.find(x=>x.id===input.orderId);
+    if(!order)throw new Error('ORDER_NOT_FOUND');
+    if(order.providerLastMessageId===input.providerMessageId){
+      return {orderId:order.id,disposition:'IDEMPOTENT' as const,fulfillmentLabel:order.fulfillmentLabel};
+    }
+
+    let parsed:Record<string,unknown>={};
+    try{
+      const value=JSON.parse(input.rawMessage);
+      if(value&&typeof value==='object'&&!Array.isArray(value))parsed=value as Record<string,unknown>;
+    }catch{}
+    const reason=typeof parsed.cancelReason==='string'?parsed.cancelReason.trim():'';
+    let disposition:'APPLIED'|'EVIDENCE_ONLY'|'CONFLICT'='EVIDENCE_ONLY';
+    let nextLabel=order.fulfillmentLabel;
+    let note='Keeta '+input.eventId+' '+input.eventName;
+
+    if(input.eventId===1002&&order.fulfillmentLabel==='待處理'){
+      nextLabel='進行中';disposition='APPLIED';
+    }else if(input.eventId===1003&&order.fulfillmentLabel!=='已取消'){
+      nextLabel='已完成';disposition=order.fulfillmentLabel==='已完成'?'EVIDENCE_ONLY':'APPLIED';
+    }else if(input.eventId===1004||input.eventId===1008){
+      if(order.fulfillmentLabel==='已完成'){
+        disposition='CONFLICT';
+        note='Keeta 已回報取消，但本地訂單已完成';
+      }else{
+        nextLabel='已取消';disposition=order.fulfillmentLabel==='已取消'?'EVIDENCE_ONLY':'APPLIED';
+        note=reason?'Keeta 取消：'+reason:'Keeta 已取消訂單';
+      }
+    }else if(input.eventId===1006){
+      const logisticsStatus=Number(parsed.logisticsStatus);
+      note='Keeta 配送狀態 '+(Number.isFinite(logisticsStatus)?String(logisticsStatus):'更新');
+    }
+
+    const updatedAt=new Date().toISOString();
+    data={...data,orders:data.orders.map(current=>current.id===order.id?{
+      ...current,
+      fulfillmentLabel:nextLabel,
+      updatedAt,
+      providerLastEventId:input.eventId,
+      providerLastEventName:input.eventName,
+      providerLastEventAt:input.providerPushedAt,
+      providerLastMessageId:input.providerMessageId,
+      providerLifecycleNote:note,
+      ...((input.eventId===1004||input.eventId===1008)&&reason?{cancellationReason:reason}:{}),
+    }:current)};
+    save();
+    const updated=data.orders.find(x=>x.id===order.id)!;
+    projectOrder(updated);
+    appendActionAudit({
+      action:'PROVIDER_EVENT_'+input.eventId,
+      orderId:order.id,
+      reason:note,
+    });
+    return {orderId:order.id,disposition,fulfillmentLabel:updated.fulfillmentLabel};
   },
   async printOrderReceipt(orderId){
     const order=data.orders.find(x=>x.id===orderId);

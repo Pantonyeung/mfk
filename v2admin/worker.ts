@@ -389,20 +389,31 @@ export default {
         if(body.byteLength)init.body=body;
       }
       const response=await keeta.fetch(new Request(target.toString(),init));
-      if(response.ok&&providerEnvelope?.eventId===1001){
+      if(response.ok&&providerEnvelope){
         try{
+          const eventId=Number(providerEnvelope.eventId);
           const message=typeof providerEnvelope.message==='string'?JSON.parse(providerEnvelope.message):null;
           const orderInfo=message?.orderInfo??message;
           const baseOrder=orderInfo?.baseOrder;
-          const providerOrderId=String(baseOrder?.orderViewIdStr??baseOrder?.orderViewId??'').trim();
+          const providerOrderId=String(
+            eventId===1001
+              ?baseOrder?.orderViewIdStr??baseOrder?.orderViewId??''
+              :message?.orderViewIdStr??message?.orderViewId??''
+          ).trim();
           if(providerOrderId){
             const adminId=env.ADMIN_SYNC.idFromName(storeId);
             const admin=env.ADMIN_SYNC.get(adminId);
-            await admin.fetch(new Request('https://internal/provider-doorbell',{
+            const type=eventId===1001
+              ?'KEETA_ORDER_AVAILABLE'
+              :[1002,1003,1004,1006,1008].includes(eventId)
+                ?'KEETA_ORDER_EVENT_AVAILABLE'
+                :null;
+            if(type)await admin.fetch(new Request('https://internal/provider-doorbell',{
               method:'POST',
               headers:{'content-type':'application/json'},
               body:JSON.stringify({
-                type:'KEETA_ORDER_AVAILABLE',
+                type,
+                eventId,
                 providerOrderId,
                 providerMessageId:String(providerEnvelope.messageId||''),
               }),
