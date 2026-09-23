@@ -68,7 +68,7 @@ function OrganizedCart({lines,highlightedLineId,actions,availability}:{lines:rea
         <button type="button" className="ordering-cart-group-head" aria-expanded={!hidden} onClick={()=>setCollapsed(current=>({...current,[group.id]:!current[group.id]}))}>
           <span><strong>{group.label}</strong><small>{group.lines.length} 款 · {quantity} 件</small></span><b aria-hidden="true">{hidden?'＋':'−'}</b>
         </button>
-        {!hidden?<div className="ordering-cart-group-lines">{group.lines.map(({line,index})=><CartLineRow key={line.id} line={line} index={index} highlighted={highlightedLineId===line.id} actions={actions} availability={availability}/>)}</div>:null}
+        {!hidden?<div className="ordering-cart-group-lines">{group.lines.map(({line,index})=><CartLineRow key={line.id} line={line} index={index} highlighted={highlightedLineId===line.id||(line.sourceLineIds?.includes(highlightedLineId??'')??false)} actions={actions} availability={availability}/>)}</div>:null}
       </section>;
     })}
   </div>;
