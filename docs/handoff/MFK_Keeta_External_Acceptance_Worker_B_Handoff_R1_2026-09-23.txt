@@ -53,3 +53,31 @@ If any result is UNKNOWN: STOP and readback first. No blind retry.
 
 NEXT
 Wait for Owner/operator to place the one real Keeta test order, then continue E2 evidence capture before E3.
+
+
+E2 OPERATOR INPUT RECEIVED
+- Owner/operator reports exactly ONE real Keeta test order has been placed.
+- This satisfies INPUT only. It does NOT prove 1001 receipt, SMT commit, canonical identity, display identity, print admission, or duplicate safety.
+- Authoritative readback has not yet been obtained by Worker B.
+- Current remote execution device "Panton" is OFFLINE, so Worker B cannot inspect authenticated SMT/Admin runtime directly.
+- Public unauthenticated web access is not accepted as a substitute for authenticated canonical/provider readback.
+
+CURRENT
+E2_ORDER_PLACED_BY_OPERATOR / READBACK_REQUIRED
+
+PROVIDER_ORDER_ID: UNKNOWN
+MESSAGE_ID: UNKNOWN
+CANONICAL_ORDER_ID: UNKNOWN
+DISPLAY_NUMBER: UNKNOWN
+PRINT_ADMISSION_COUNT: UNKNOWN
+DUPLICATE_RESULT: UNKNOWN
+
+VERDICT
+NOT YET ELIGIBLE
+
+FIRST_BREAK
+E2_AUTHORITATIVE_RUNTIME_READBACK_NOT_AVAILABLE_TO_WORKER
+
+SAFE NEXT
+Obtain authenticated SMT/Admin runtime readback for the one existing order.
+Do NOT place another test order.
