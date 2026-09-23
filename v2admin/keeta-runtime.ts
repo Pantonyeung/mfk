@@ -24,6 +24,7 @@ const TOKEN_REFRESH_RETRY_MS=5*60*1000;
 const OAUTH_STATE_TTL_MS=10*60*1000;
 
 const KEETA_WEBHOOK_EVENTS=Object.freeze({
+  1:'OAUTH2_AUTHORIZATION_CODE',
   1001:'ORDER_PLACEMENT',
   1002:'ORDER_ACCEPTANCE',
   1003:'ORDER_COMPLETION',
@@ -619,6 +620,17 @@ function validateWebhookBody(body){
   const row=record(body,'KEETA_WEBHOOK_BODY_INVALID');
   const eventId=positiveInt(row.eventId,'KEETA_WEBHOOK_EVENT_ID_INVALID');
   if(!Object.prototype.hasOwnProperty.call(KEETA_WEBHOOK_EVENTS,eventId))throw new Error('KEETA_WEBHOOK_EVENT_UNKNOWN');
+  if(eventId===1){
+    return Object.freeze({
+      eventId,
+      eventName:KEETA_WEBHOOK_EVENTS[eventId],
+      appId:positiveInt(row.appId,'KEETA_WEBHOOK_APP_ID_INVALID'),
+      code:nonEmpty(row.code,'KEETA_OAUTH_CODE_REQUIRED'),
+      state:typeof row.state==='string'?row.state.trim():'',
+      timestamp:positiveInt(row.timestamp,'KEETA_WEBHOOK_TIMESTAMP_INVALID'),
+      sig:nonEmpty(row.sig,'KEETA_WEBHOOK_SIGNATURE_REQUIRED'),
+    });
+  }
   return Object.freeze({
     eventId,
     eventName:KEETA_WEBHOOK_EVENTS[eventId],
