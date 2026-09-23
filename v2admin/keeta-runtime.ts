@@ -691,17 +691,29 @@ export class KeetaRuntimeStore{
       return refreshed;
     }catch(error){
       const failedAt=Date.now();
-      const retryAt=failedAt+TOKEN_REFRESH_RETRY_MS;
-      if(typeof this.state.storage.setAlarm==='function')await this.state.storage.setAlarm(retryAt);
       const latest=await this.state.storage.get('oauth:auto-refresh')||{};
-      await this.state.storage.put('oauth:auto-refresh',{
-        ...latest,
-        state:'RETRY_SCHEDULED',
-        nextRefreshAtMs:retryAt,
-        lastReason:reason,
-        lastError:error instanceof Error?error.message:'KEETA_TOKEN_REFRESH_FAILED',
-        updatedAt:failedAt,
-      });
+      if(error instanceof TypeError){
+        const retryAt=failedAt+TOKEN_REFRESH_RETRY_MS;
+        if(typeof this.state.storage.setAlarm==='function')await this.state.storage.setAlarm(retryAt);
+        await this.state.storage.put('oauth:auto-refresh',{
+          ...latest,
+          state:'RETRY_SCHEDULED',
+          nextRefreshAtMs:retryAt,
+          lastReason:reason,
+          lastError:error.message,
+          updatedAt:failedAt,
+        });
+      }else{
+        if(typeof this.state.storage.deleteAlarm==='function')await this.state.storage.deleteAlarm();
+        await this.state.storage.put('oauth:auto-refresh',{
+          ...latest,
+          state:'REAUTH_REQUIRED',
+          nextRefreshAtMs:null,
+          lastReason:reason,
+          lastError:error instanceof Error?error.message:'KEETA_TOKEN_REFRESH_FAILED',
+          updatedAt:failedAt,
+        });
+      }
       throw error;
     }finally{
       await this.state.storage.delete('oauth:refresh-lock');
@@ -736,6 +748,9 @@ export class KeetaRuntimeStore{
       await this.scheduleTokenRefresh(assessment);
       return token;
     }
+
+    const autoRefresh=await this.state.storage.get('oauth:auto-refresh')||{};
+    if(assessment.disposition==='REFRESH_DUE'&&autoRefresh.state==='REAUTH_REQUIRED')return token;
 
     try{
       return await this.refreshPersistedToken('LIFECYCLE_'+assessment.disposition);
@@ -780,7 +795,7 @@ export class KeetaRuntimeStore{
     let expiresAt=null;
     if(tokenRow){
       expiresAt=Number(tokenRow.expiresAtMs)||null;
-      tokenState=providerTokenInvalid?.state==='REAUTH_REQUIRED'
+      tokenState=providerTokenInvalid?.state==='REAUTH_REQUIRED'||autoRefresh.state==='REAUTH_REQUIRED'
         ?'REAUTH_REQUIRED'
         :expiresAt&&Date.now()>=expiresAt?'EXPIRED':'CONNECTED';
     }
