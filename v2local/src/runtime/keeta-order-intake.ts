@@ -51,7 +51,12 @@ function resolveProduct(
   catalog:readonly CatalogProduct[],
   mappings:readonly ChannelMappingRow[],
 ){
-  const candidates=[line.skuOpenItemCode,line.spuOpenItemCode,line.providerSkuId,line.providerSpuId].map(String);
+  const rawCandidates=[line.skuOpenItemCode,line.spuOpenItemCode,line.providerSkuId,line.providerSpuId].map(String);
+  const candidates=[...new Set(rawCandidates.flatMap(value=>{
+    const trimmed=value.trim();
+    const stripped=trimmed.replace(/^(?:SPU:|SKU:|MF:)/i,'');
+    return stripped&&stripped!==trimmed?[trimmed,stripped]:[trimmed];
+  }))];
   const explicit=mappings.find(row=>row.status==='MAPPED'&&candidates.includes(String(row.providerItemId||'')));
   if(explicit?.productId){
     const product=catalog.find(row=>String(row.id)===String(explicit.productId)&&row.active!==false);
