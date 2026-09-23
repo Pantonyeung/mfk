@@ -102,7 +102,8 @@ describe('MFK Admin complete operational workflows',()=>{
 
   it('exposes the existing Keeta test-token import without persisting token material in Admin state',()=>{
     const channels=render('/admin/channels');
-    expect(channels).toContain('已有 Keeta 測試 Token');
+    expect(channels).toContain('測試／救援：手動匯入 Token（正常毋須使用）');
+    expect(channels).toContain('refreshToken 自動輪換 accessToken 同 refreshToken');
     expect(channels).toContain('授權管理');
     expect(channels).toContain('查看 Token');
     expect(channels).toContain('匯入現有測試 Token');

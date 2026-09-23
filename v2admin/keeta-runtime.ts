@@ -20,6 +20,7 @@ const KEETA_STORE_REST_URL='https://open.mykeeta.com/api/open/scm/shop/status/re
 const KEETA_STORE_OPEN_URL='https://open.mykeeta.com/api/open/scm/shop/status/open';
 const TOKEN_REFRESH_WINDOW_MS=5*24*60*60*1000;
 const TOKEN_REFRESH_MIN_INTERVAL_MS=60_000;
+const TOKEN_REFRESH_RETRY_MS=5*60*1000;
 const OAUTH_STATE_TTL_MS=10*60*1000;
 
 const KEETA_WEBHOOK_EVENTS=Object.freeze({
@@ -623,6 +624,19 @@ function validateWebhookBody(body){
 export class KeetaRuntimeStore{
   constructor(state,env){this.state=state;this.env=env;}
 
+  async scheduleTokenRefresh(assessment,now=Date.now()){
+    const nextRefreshAtMs=Math.max(now+TOKEN_REFRESH_MIN_INTERVAL_MS,assessment.refreshAtMs);
+    if(typeof this.state.storage.setAlarm==='function')await this.state.storage.setAlarm(nextRefreshAtMs);
+    const current=await this.state.storage.get('oauth:auto-refresh')||{};
+    await this.state.storage.put('oauth:auto-refresh',{
+      ...current,
+      state:'SCHEDULED',
+      nextRefreshAtMs,
+      updatedAt:now,
+    });
+    return nextRefreshAtMs;
+  }
+
   async saveToken(token){
     const config=requireRuntimeConfig(this.env);
     const encrypted=await encryptToken(config.encryptionKey,token);
@@ -633,6 +647,7 @@ export class KeetaRuntimeStore{
       updatedAt:Date.now(),
     });
     await this.state.storage.delete('oauth:provider-token-invalid');
+    await this.scheduleTokenRefresh(assessment);
     return assessment;
   }
 
@@ -643,8 +658,57 @@ export class KeetaRuntimeStore{
     return decryptToken(config.encryptionKey,row);
   }
 
-  async recoverProviderAccessToken(currentToken,sourceError){
+  async refreshPersistedToken(reason='LIFECYCLE'){
     const config=requireRuntimeConfig(this.env);
+    const now=Date.now();
+    const lock=await this.state.storage.get('oauth:refresh-lock');
+    if(lock&&now-Number(lock)<TOKEN_REFRESH_MIN_INTERVAL_MS)throw new Error('KEETA_TOKEN_REFRESH_RATE_LIMITED');
+    await this.state.storage.put('oauth:refresh-lock',now);
+    const before=await this.state.storage.get('oauth:auto-refresh')||{};
+    await this.state.storage.put('oauth:auto-refresh',{
+      ...before,
+      state:'REFRESHING',
+      lastReason:reason,
+      lastAttemptAt:now,
+      updatedAt:now,
+    });
+    try{
+      const currentToken=await this.loadToken();
+      const refreshed=await refreshToken(config,currentToken.refreshToken);
+      await this.saveToken(refreshed);
+      const refreshedAt=new Date().toISOString();
+      const connection=await this.state.storage.get('connection')||{};
+      await this.state.storage.put('connection',{...connection,tokenSource:'OAUTH_REFRESH',refreshedAt});
+      const after=await this.state.storage.get('oauth:auto-refresh')||{};
+      await this.state.storage.put('oauth:auto-refresh',{
+        ...after,
+        state:'SCHEDULED',
+        lastReason:reason,
+        lastSuccessAt:refreshedAt,
+        lastError:null,
+        updatedAt:Date.now(),
+      });
+      return refreshed;
+    }catch(error){
+      const failedAt=Date.now();
+      const retryAt=failedAt+TOKEN_REFRESH_RETRY_MS;
+      if(typeof this.state.storage.setAlarm==='function')await this.state.storage.setAlarm(retryAt);
+      const latest=await this.state.storage.get('oauth:auto-refresh')||{};
+      await this.state.storage.put('oauth:auto-refresh',{
+        ...latest,
+        state:'RETRY_SCHEDULED',
+        nextRefreshAtMs:retryAt,
+        lastReason:reason,
+        lastError:error instanceof Error?error.message:'KEETA_TOKEN_REFRESH_FAILED',
+        updatedAt:failedAt,
+      });
+      throw error;
+    }finally{
+      await this.state.storage.delete('oauth:refresh-lock');
+    }
+  }
+
+  async recoverProviderAccessToken(currentToken,sourceError){
     if(!isProviderAccessTokenMissing(sourceError))throw sourceError;
     const observedAt=new Date().toISOString();
     await this.state.storage.put('oauth:provider-token-invalid',{
@@ -653,11 +717,7 @@ export class KeetaRuntimeStore{
       observedAt,
     });
     try{
-      const refreshed=await refreshToken(config,currentToken.refreshToken);
-      await this.saveToken(refreshed);
-      const connection=await this.state.storage.get('connection')||{};
-      await this.state.storage.put('connection',{...connection,tokenSource:'TEST_PROVIDER_PORTAL_REFRESH',refreshedAt:new Date().toISOString()});
-      return refreshed;
+      return await this.refreshPersistedToken('PROVIDER_REJECTED_ACCESS_TOKEN');
     }catch(error){
       await this.state.storage.put('oauth:provider-token-invalid',{
         state:'REAUTH_REQUIRED',
@@ -670,22 +730,38 @@ export class KeetaRuntimeStore{
   }
 
   async usableToken(){
-    const config=requireRuntimeConfig(this.env);
     const token=await this.loadToken();
     const assessment=tokenAssessment(token);
-    if(assessment.disposition==='EXPIRED')throw new Error('KEETA_OAUTH_TOKEN_EXPIRED_REAUTHORIZE');
-    if(assessment.disposition==='VALID')return token;
+    if(assessment.disposition==='VALID'){
+      await this.scheduleTokenRefresh(assessment);
+      return token;
+    }
 
-    const lock=await this.state.storage.get('oauth:refresh-lock');
-    const now=Date.now();
-    if(lock&&now-Number(lock)<TOKEN_REFRESH_MIN_INTERVAL_MS)throw new Error('KEETA_TOKEN_REFRESH_RATE_LIMITED');
-    await this.state.storage.put('oauth:refresh-lock',now);
     try{
-      const refreshed=await refreshToken(config,token.refreshToken);
-      await this.saveToken(refreshed);
-      return refreshed;
-    }finally{
-      await this.state.storage.delete('oauth:refresh-lock');
+      return await this.refreshPersistedToken('LIFECYCLE_'+assessment.disposition);
+    }catch(error){
+      if(assessment.disposition==='REFRESH_DUE')return token;
+      await this.state.storage.put('oauth:provider-token-invalid',{
+        state:'REAUTH_REQUIRED',
+        code:error instanceof Error?error.message:'KEETA_TOKEN_REFRESH_FAILED',
+        observedAt:new Date().toISOString(),
+      });
+      throw new Error('KEETA_ACCESS_TOKEN_REAUTHORIZE_REQUIRED');
+    }
+  }
+
+  async alarm(){
+    try{
+      const token=await this.loadToken();
+      const assessment=tokenAssessment(token);
+      if(assessment.disposition==='VALID'){
+        await this.scheduleTokenRefresh(assessment);
+        return;
+      }
+      await this.refreshPersistedToken('DURABLE_OBJECT_ALARM');
+    }catch(error){
+      if(error instanceof Error&&error.message==='KEETA_OAUTH_TOKEN_NOT_FOUND')return;
+      // refreshPersistedToken already schedules a bounded retry and records sanitized diagnostics.
     }
   }
 
@@ -696,6 +772,10 @@ export class KeetaRuntimeStore{
     const callbackStatus=await this.state.storage.get('oauth:callback-status')||{};
     const journal=await this.state.storage.get('webhook:status')||{};
     const providerTokenInvalid=await this.state.storage.get('oauth:provider-token-invalid');
+    const autoRefresh=await this.state.storage.get('oauth:auto-refresh')||{};
+    const scheduledAlarmAt=typeof this.state.storage.getAlarm==='function'
+      ?await this.state.storage.getAlarm()
+      :null;
     let tokenState='NOT_CONNECTED';
     let expiresAt=null;
     if(tokenRow){
@@ -721,6 +801,12 @@ export class KeetaRuntimeStore{
         lastCallbackParamNames:Array.isArray(callbackStatus.lastCallbackParamNames)?callbackStatus.lastCallbackParamNames:[],
         tokenSource:tokenRow?(connection.tokenSource??'OAUTH_CALLBACK'):null,
         providerValidation:providerTokenInvalid??null,
+        autoRefresh:{
+          state:tokenRow?(autoRefresh.state??'SCHEDULED'):'NOT_CONFIGURED',
+          nextRefreshAt:scheduledAlarmAt?new Date(Number(scheduledAlarmAt)).toISOString():null,
+          lastSuccessAt:autoRefresh.lastSuccessAt??null,
+          lastError:autoRefresh.lastError??null,
+        },
       },
       webhook:{
         callbackUrl:'https://admin.morefunos.com/api/keeta/webhook',
