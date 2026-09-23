@@ -116,3 +116,62 @@ Owner must identify which MFK product was selected in this Keeta test order (loc
 
 STATUS
 FIRST_BREAK_FOUND -> SMALLEST_FIX = ONE_EXPLICIT_MAPPING
+
+
+OWNER CORRECTION｜K3 MENU LIVE SYNC FIRST
+
+The previous mapping-first interpretation is superseded for execution order.
+
+Reason:
+MF-ORDER-SKU-NG-01 is a provider-side test product that was not created from the current MFK full-menu sync. One-off mapping it now would only make the old test artifact pass and would not prove the intended current catalog path.
+
+CURRENT
+K3_MENU_LIVE_SYNC_FIRST
+
+LAST_GREEN
+- Current K3 menu projection/source/test/deploy exists.
+- Inactive hidden donor products are excluded from provider payload.
+- Active products remain fail-closed on invalid category/price.
+- Provider token error 115000200 recovery path is deployed.
+- Current K3 output uses SKU openItemCode = productCode and SPU openItemCode = SPU:<productCode>.
+- Current K1 resolver directly matches provider OpenItemCode to canonical productCode/id.
+
+FIRST_BREAK
+LIVE_FULL_MENU_SYNC_NOT_YET_EXECUTED / REAL_1202_NOT_YET_READ_BACK
+
+CORRECT CHAIN
+MFK Admin canonical catalog
+→ full menu preview
+→ token validation/recovery
+→ /product/menu/sync
+→ taskId
+→ 1202 completion
+→ optional 1201 picture completion
+→ create a Keeta test order from the newly synced MFK menu
+→ K1 direct productCode/OpenItemCode resolution
+→ ONE canonical Order
+→ ONE Display
+→ merchant ACCEPT/provider confirm
+
+NO LONGER NEXT
+Do not patch MF-ORDER-SKU-NG-01 to an arbitrary MFK product.
+The existing legacy test order is evidence of correct fail-closed mapping only.
+
+LIVE EXECUTION NEXT
+1. Admin → Keeta 菜單同步 → 預檢完整菜單.
+2. Require non-empty clean active catalog snapshot and no validation errors.
+3. Submit full menu sync once.
+4. Capture taskId.
+5. Wait for real 1202; require zero provider errors.
+6. Capture 1201 if emitted.
+7. Only then create the next test order from the synced MFK menu.
+8. Re-run K1.
+
+CURRENT MAIN
+71d1fe505b905466475567647bf6e9bca442e972
+
+GITHUB #162
+5788093815
+
+STATUS
+K3_MENU_LIVE_SYNC_FIRST / K1_ORDER_RETEST_AFTER_MENU_GREEN
