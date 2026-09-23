@@ -204,3 +204,56 @@ export function openKeetaStore():Promise<KeetaStoreStatus>{
 export function readKeetaStoreStatus():Promise<KeetaStoreStatus>{
   return keetaAdminPost<KeetaStoreStatus>('store/status');
 }
+
+
+export interface KeetaCommercialSnapshot{
+  readonly provider:'KEETA';
+  readonly providerOrderId:string;
+  readonly currency:string;
+  readonly merchandiseSubtotalMinor?:number;
+  readonly customerPaidMinor?:number;
+  readonly shippingFeeMinor?:number;
+  readonly customerPlatformFeeMinor?:number;
+  readonly minimumOrderTopUpMinor?:number;
+  readonly merchantCommissionMinor?:number;
+  readonly merchantActivityFeeMinor?:number;
+  readonly merchantEarningsMinor?:number;
+  readonly settlementAuthority:'UNKNOWN'|'PROVIDER_ESTIMATE'|'PROVIDER_CONFIRMED'|'PAID_RECONCILED';
+  readonly capturedAt:string;
+  readonly providerEvidenceRef:string;
+}
+export interface KeetaCommercialRow{
+  readonly state:'WEBHOOK_CAPTURED'|'PROVIDER_CONFIRMED';
+  readonly provider:'KEETA';
+  readonly canonicalStoreId:'MF01';
+  readonly providerShopId:number;
+  readonly providerOrderId:string;
+  readonly providerOrderCode:string;
+  readonly canonicalOrderId:string|null;
+  readonly canonicalDisplay:string|null;
+  readonly capturedAt:string;
+  readonly providerConfirmedAt:string|null;
+  readonly latestEvidenceRef:string;
+  readonly snapshot:KeetaCommercialSnapshot;
+}
+export interface KeetaCommercialList{
+  readonly state:'AVAILABLE';
+  readonly provider:'KEETA';
+  readonly canonicalStoreId:'MF01';
+  readonly items:readonly KeetaCommercialRow[];
+}
+export function readKeetaCommercialRows():Promise<KeetaCommercialList>{
+  return keetaAdminPost<KeetaCommercialList>('commercial/list');
+}
+export async function refreshKeetaCommercial(providerOrderId:string):Promise<KeetaCommercialRow>{
+  const response=await fetch('/api/keeta/admin/commercial/refresh?storeId=MF01',{
+    method:'POST',
+    credentials:'same-origin',
+    cache:'no-store',
+    headers:{'content-type':'application/json',...headers()},
+    body:JSON.stringify({providerOrderId}),
+  });
+  const body=await response.json().catch(()=>({})) as KeetaCommercialRow&{code?:string};
+  if(!response.ok)throw new Error(body.code||'KEETA_COMMERCIAL_REFRESH_HTTP_'+response.status);
+  return body;
+}
