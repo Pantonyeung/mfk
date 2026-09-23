@@ -23,6 +23,8 @@ jobs:
         working-directory: v2local
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:
@@ -32,7 +34,7 @@ jobs:
         shell: bash
         run: |
           echo "Preview source: $GITHUB_SHA"
-          test -z "$(git diff --name-only 171328b0fec5debd051c3a27eb627933c62768f8 -- src/runtime)"
+          git diff --exit-code 171328b0fec5debd051c3a27eb627933c62768f8 -- src/runtime
 
       - name: Install
         run: npm install --no-audit --no-fund --legacy-peer-deps --package-lock=false
@@ -44,7 +46,7 @@ jobs:
         run: npm run build
 
       - name: Deploy isolated SMT UI preview
-        run: npx --yes wrangler@latest deploy --config wrangler.preview.jsonc
+        run: npx --yes wrangler@latest preview --name smt-ui-r1 --config wrangler.preview.jsonc
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
