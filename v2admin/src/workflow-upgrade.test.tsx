@@ -2,6 +2,7 @@ import {renderToStaticMarkup} from 'react-dom/server';
 import {MemoryRouter} from 'react-router';
 import {describe,expect,it} from 'vitest';
 import {MfkAdminApp} from './App.tsx';
+import {keetaActionErrorText} from './PolicyWorkspaces.tsx';
 
 const render=(path:string)=>renderToStaticMarkup(
   <MemoryRouter initialEntries={[path]}>
@@ -98,6 +99,14 @@ describe('MFK Admin complete operational workflows',()=>{
       const visible=html.replace(/<[^>]*>/g,' ');
       expect(visible,path).not.toMatch(forbidden);
     }
+  });
+
+  it('surfaces Keeta menu action errors instead of silently failing',()=>{
+    expect(keetaActionErrorText('KEETA_MENU_SYNC_PROVIDER_115000200')).toBe('Keeta 操作未完成：KEETA_MENU_SYNC_PROVIDER_115000200');
+    expect(keetaActionErrorText('')).toBe('');
+    const sync=render('/admin/channels/sync-policy');
+    expect(sync).toContain('同步完整菜單到 Keeta');
+    expect(sync).toContain('更新同步狀態');
   });
 
   it('exposes the existing Keeta test-token import without persisting token material in Admin state',()=>{
