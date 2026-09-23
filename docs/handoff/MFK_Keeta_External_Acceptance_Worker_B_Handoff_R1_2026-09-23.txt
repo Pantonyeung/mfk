@@ -1,0 +1,55 @@
+MFK Keeta Real External Acceptance｜Worker B｜R1
+Date: 2026-09-23
+Role: E2 → E3 → E4 → E5 → E7(if exposed) → E8
+Mode: REAL_EXTERNAL_ACCEPTANCE / NO NEW FEATURE / NO CODE MUTATION UNTIL REAL RED PROVES IMPLEMENTATION DEFECT
+
+FRESH READ
+- current main: bae339342bc000a8fb69753be91ad4d06a634096
+- #22 latest controlling: 5786932900 remains Keeta K1–K8 source/test/deploy green; 5787214530 is unrelated SMM UI review
+- #162 commander: 5787238095
+- navigation: docs/navigation/MFK_航海圖_V1.27_Round028_2026-09-23.txt
+- runtime product bank: a6cca587b347cda90cab94e5ff4a647aacacfd24
+- K1: contracts/keeta-order-intake-v1.ts; v2local/src/runtime/keeta-order-intake.ts; v2admin/keeta-runtime.ts
+- K2/K5: v2local/src/runtime/keeta-provider-commands.ts; v2local/src/runtime/local-runtime.ts; v2admin/keeta-runtime.ts
+- K6: v2local/src/runtime/keeta-order-lifecycle.ts; v2admin/keeta-runtime.ts
+- K7: v2local/src/runtime/keeta-after-sale.ts; v2admin/keeta-runtime.ts
+- K8: v2admin/keeta-runtime.ts; v2admin/src/keeta-live-client.ts
+
+SOURCE REALITY CONFIRMED
+- K1 provider identity dedup: providerRef = KEETA:<providerOrderId>; local createOrder returns existing order when providerRef already exists.
+- K1 provider message dedup: webhook dedup key = webhook:dedup:<messageId>; repeated identical provider message ACKs without second intent.
+- K1 canonical ACK persists canonicalOrderId + canonicalDisplay and rejects conflict.
+- K2/K5 provider command record is keyed by providerOrderId + action; SUCCESS replay returns IDEMPOTENT; UNKNOWN blocks blind resend pending readback.
+- K5 /order/prepare is READY only.
+- K6 lifecycle events 1002/1003/1004/1006/1008 link to the same committed providerOrderId/canonicalOrderId; repeat providerMessageId is idempotent; completed-vs-cancel remains explicit conflict.
+- K7 1005/1007 links afterSaleOrderId to same canonical Order; final decision repeat is idempotent; conflicting final decision blocked; partial refund APPLY requires matching PREVIEW fingerprint.
+- K8 /order/get refresh requires committed Order, exact providerOrderId match, and stores provider commercial facts separately from canonical transaction truth.
+
+E2
+ACCEPTANCE_CASE_ID: KEETA-E2-ORDER-20260923-01
+CURRENT: E2_ACTIVE / ARMED
+PROVIDER_ORDER_ID: PENDING
+CANONICAL_ORDER_ID: PENDING
+DISPLAY_NUMBER: PENDING
+FIRST_BREAK: REAL_TEST_ORDER_NOT_YET_PLACED
+VERDICT: NOT YET ELIGIBLE — no provider action has occurred yet
+
+UNAVOIDABLE OPERATOR ACTION
+Place exactly ONE real order in the Keeta test store.
+Do not place a second order while result certainty is unknown.
+
+AFTER ORDER IS PLACED
+Read back real 1001 first, then prove:
+- providerOrderId + messageId
+- receivedAt
+- SMT first-seen time
+- mapping result
+- ONE canonical Order
+- ONE display number
+- providerRef linked
+- print admission count
+- ZERO duplicate Order / Display / Print Admission
+If any result is UNKNOWN: STOP and readback first. No blind retry.
+
+NEXT
+Wait for Owner/operator to place the one real Keeta test order, then continue E2 evidence capture before E3.
