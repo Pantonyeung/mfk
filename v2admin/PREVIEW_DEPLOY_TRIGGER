@@ -1,4 +1,4 @@
-work_id=MFK-KEETA-TOKEN-RESPONSE-DIAGNOSTIC-R1
-purpose=validate Keeta provider token response envelope normalization
-candidate=73ebbc154f5f4b2384606c6aa117a94dc9e5147a
+work_id=MFK-KEETA-TOKEN-NESTED-ENVELOPE-R1
+purpose=validate observed nested Keeta token response envelope
+candidate=b6fa9b840363ff29ab9434136d83b4212fc7120a
 deployment_authority=PREVIEW_ONLY
