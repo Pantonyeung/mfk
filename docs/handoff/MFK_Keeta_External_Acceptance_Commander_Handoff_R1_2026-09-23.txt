@@ -465,3 +465,88 @@ NOT:
 
 STATUS:
 HISTORICAL_KEETA_BASELINE_INDEPENDENTLY_VERIFIED
+
+
+==================================================
+9. HISTORICAL KEETA EVIDENCE SOURCE CORRECTION
+==================================================
+
+#881:
+EXCLUDED_AS_PRIMARY_HISTORICAL_DONOR
+
+Reason:
+later fusion/research layer; may summarize or reclassify older evidence after architecture drift.
+
+Correct evidence chain:
+
+1.
+docs/recovery/team1/KEETA-GOLDEN-THREAD-REAL-PAYLOAD-MAPPING-2026-09-05.md
+
+Proves real:
+1001
+/order/confirm request
+1002 merchant accepted
+1006 delivery lifecycle
+1003 completion
+1005/1007 refund evidence
+
+2.
+docs/recovery/team3/SMM-B0314-LIVE-KEETA-6893-FUNCTIONAL-CLOSURE-2026-09-05.md
+
+Provider:
+5133442032976893
+
+Canonical:
+9011ca2e-dd04-5198-b8d5-d96249564a15
+
+SMM live proof:
+33950415162 SUCCESS
+
+3.
+docs/recovery/keeta/KEETA-SMT-SMM-DISPLAY-LINKAGE-CLOSURE-2026-09-05.md
+
+SMM:
+33950415162
+
+SMT:
+33952361345
+
+Result:
+KEETA_TO_SMT_SMM_DISPLAY_AND_LINKAGE_CONTRACT = CLOSED
+
+4.
+docs/recovery/commander/KEETA-SIT-NO-REDO-LOCK-2026-09-06.md
+
+SIT COMPLETE / NO REDO
+
+5.
+docs/recovery/commander/CAPABILITY-CATALOG.yaml
+
+CAP-KEETA-INGRESS-001
+ACTIVE
+PHYSICAL_PROVEN
+no_redo: true
+
+6.
+Morefun-v2 #704 comment 5682072533
+
+Later authority confirmation:
+existing CAP-KEETA-INGRESS-001 = PHYSICAL_PROVEN
+vendor receipt/dedup/recovery already exists
+do not redesign vendor receipt/provider API
+only bounded continuation/cutover seam may change
+
+MFK control correction:
+#162 comment 5788003854
+#22 comment 5788004818
+
+Correct lineage:
+2026-09-05 LIVE PROOF
+→ 2026-09-06 NO-REDO LOCK
+→ #704 PHYSICAL_PROVEN confirmation
+→ current MFK direct connect
+→ real-device fast loop
+
+STATUS:
+HISTORICAL_KEETA_EVIDENCE_SOURCE_CORRECTED
+#881_EXCLUDED
