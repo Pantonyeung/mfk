@@ -81,3 +81,23 @@ E2_AUTHORITATIVE_RUNTIME_READBACK_NOT_AVAILABLE_TO_WORKER
 SAFE NEXT
 Obtain authenticated SMT/Admin runtime readback for the one existing order.
 Do NOT place another test order.
+
+
+E2 ACCESS CONSTRAINT UPDATE
+- Owner is away from home and cannot bring the Remote Desktop / shop execution device online.
+- This is an execution-surface availability constraint, not a provider RED and not an implementation defect.
+- No second test order will be placed.
+- No code mutation is authorized.
+- E2 remains parked at authoritative readback.
+
+CURRENT
+E2_ORDER_PLACED_BY_OPERATOR / AUTHENTICATED_RUNTIME_READBACK_DEFERRED
+
+CLASSIFICATION
+EXTERNAL_ACCEPTANCE_EXECUTION_SURFACE_UNAVAILABLE
+
+VERDICT
+NOT YET ELIGIBLE
+
+SAFE NEXT
+Resume the same E2 case only when an authenticated SMT/Admin runtime readback surface is available. Preserve the single existing provider order identity. Do not create a replacement test order unless the original order is proven unusable by authoritative provider/canonical evidence.
