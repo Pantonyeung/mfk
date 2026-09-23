@@ -13,6 +13,21 @@ import type {
 
 const ENDPOINT='https://admin.morefunos.com';
 const STORE_ID='MF01';
+const REF_KEY='mfk:customer:cloud-submission-refs:v1';
+
+function readSubmissionRefs():string[]{
+  try{
+    const raw=localStorage.getItem(REF_KEY);
+    const value=raw?JSON.parse(raw):[];
+    return Array.isArray(value)?value.map(String).filter(Boolean).slice(0,24):[];
+  }catch{return[];}
+}
+function rememberSubmissionRef(submissionId:string){
+  try{
+    const next=[submissionId,...readSubmissionRefs().filter(id=>id!==submissionId)].slice(0,24);
+    localStorage.setItem(REF_KEY,JSON.stringify(next));
+  }catch{}
+}
 
 function requestId(prefix:string){
   const id=typeof crypto!=='undefined'&&typeof crypto.randomUUID==='function'
@@ -80,7 +95,9 @@ export function createCloudCustomerRuntimePort():CustomerRuntimePort{
     portId:'MFK_CUSTOMER_PORT_V1' as const,
 
     async readSnapshot():Promise<CustomerReadModelSnapshot>{
-      const {response,body}=await jsonFetch('/api/customer/snapshot?storeId='+STORE_ID);
+      const params=new URLSearchParams({storeId:STORE_ID});
+      for(const submissionId of readSubmissionRefs())params.append('submissionId',submissionId);
+      const {response,body}=await jsonFetch('/api/customer/snapshot?'+params.toString());
       if(!response.ok)throw new Error(String(body.code||'CUSTOMER_SNAPSHOT_FAILED'));
       return body as unknown as CustomerReadModelSnapshot;
     },
@@ -102,6 +119,7 @@ export function createCloudCustomerRuntimePort():CustomerRuntimePort{
     },
 
     async submitOrder(intent:CustomerPendingIntent):Promise<CustomerCommandResult>{
+      rememberSubmissionRef(intent.submissionId);
       const {response,body}=await jsonFetch('/api/customer/orders/submit?storeId='+STORE_ID,{
         method:'POST',
         body:JSON.stringify({
@@ -121,6 +139,7 @@ export function createCloudCustomerRuntimePort():CustomerRuntimePort{
     },
 
     async readSubmission(submissionId:string):Promise<CustomerCommandResult>{
+      rememberSubmissionRef(submissionId);
       const {response,body}=await jsonFetch('/api/customer/orders/readback?storeId='+STORE_ID+'&submissionId='+encodeURIComponent(submissionId));
       if(response.status===404)return{state:'UNKNOWN',message:'店舖仍未回覆呢個提交身份'};
       if(!response.ok)return{state:'UNKNOWN',message:String(body.code||'暫時未能讀回訂單結果')};
