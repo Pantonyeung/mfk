@@ -110,3 +110,44 @@ IMPORTANT
 
 STATUS
 K3_LIVE_EXECUTION_ARMED / AUTHENTICATED_ADMIN_ACTION_REQUIRED
+
+
+LIVE OWNER SCREENSHOT｜K3 MENU PREVIEW GREEN
+
+Observed in live Admin:
+- state: NEVER_SYNCED
+- Admin Revision: R4
+- Categories: 14
+- Products/SPU: 188
+- SKU: 188
+- Option Groups: 2
+- Options: 6
+- Snapshot fingerprint visible: e3b0a0d9ea5d331313…
+- no validation-error panel visible
+- provider submit button enabled
+
+INTERPRETATION
+NEVER_SYNCED means no current MFK full snapshot has yet been submitted to Keeta. It is not a preflight failure.
+
+CURRENT
+K3_MENU_PREVIEW_GREEN / LIVE_PROVIDER_SUBMIT_NEXT
+
+LAST_GREEN
+Published MFK Admin snapshot -> K3 full-menu projection/preflight.
+
+NEXT EXACT ACTION
+Submit full menu to Keeta exactly once.
+Then capture taskId/submittedAt.
+If result is UNKNOWN, read status first; no blind resubmit.
+Use 更新同步狀態 until real 1202 completion; require errors=0.
+Capture 1201 if emitted.
+
+TOKEN
+Do not manually paste/replace token as routine operation.
+Commander owns token lifecycle repair under #162 5788247985.
+
+GITHUB EVIDENCE
+#162 comment 5788318501
+
+STATUS
+K3_PREVIEW_GREEN / ONE_PROVIDER_SUBMIT_AUTHORIZED
