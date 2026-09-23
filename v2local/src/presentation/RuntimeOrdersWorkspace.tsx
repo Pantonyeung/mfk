@@ -228,7 +228,19 @@ export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePor
           <header><b>Keeta 退款／售後</b><span>{afterSales.length}</span></header>
           {afterSales.map(row=><article key={row.afterSaleOrderId}>
             <div><b>{row.eventId===1007?'部分退款':'退款'} · #{row.afterSaleOrderId}</b><small>Provider status {row.providerStatus??'—'}{row.isAppeal?' · Appeal':''}</small></div>
-            <strong>{row.refundAmountMinor==null?'—':'
+            <strong>{row.refundAmountMinor==null?'—':'$'+(row.refundAmountMinor/100).toFixed(2)} {row.currency??''}</strong>
+            {row.applyReason?<p>{row.applyReason}</p>:null}
+            {row.handleReason?<p>最新處理：{row.handleReason}</p>:null}
+            <footer>
+              <button disabled={!canCorrect||Boolean(afterSaleBusy)||row.decisionState==='APPROVED'||row.decisionState==='REJECTED'} onClick={()=>void decideRefund(row,'REJECT')}>拒絕</button>
+              <button className="primary" disabled={!canCorrect||Boolean(afterSaleBusy)||row.decisionState==='APPROVED'||row.decisionState==='REJECTED'} onClick={()=>void decideRefund(row,'APPROVE')}>同意退款</button>
+            </footer>
+            {row.decisionState?<small>本地決定：{row.decisionState}{row.decisionCode?' · '+row.decisionCode:''}</small>:null}
+          </article>)}
+          <button type="button" className="order-partial-preview" disabled={!canCorrect||Boolean(afterSaleBusy)} onClick={()=>void previewPartial()}>查詢可部分退款商品</button>
+          {partialPreview?<details><summary>部分退款 Provider Preview</summary><pre>{JSON.stringify(partialPreview,null,2)}</pre></details>:null}
+        </section>:null}
+        {message?<p className="order-inline-message">{message}</p>:null}
         <footer>
           <button onClick={()=>void openReprint()}>▣ 重印</button>
           <button disabled={!canCorrect} title={canCorrect?'':'需要 ORDER_CORRECTION 權限'} onClick={()=>setModal('actions')}>✎ 取消／修改</button>
