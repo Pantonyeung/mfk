@@ -1,4 +1,4 @@
-work_id=MFK-KEETA-PROVIDER-ERROR-115000260-R1
-purpose=validate provider authorization-cancelled token semantics exact refresh runtime
-candidate=5d7185f79535bcf8bb2527ba1d8977db5429944b
+work_id=MFK-KEETA-SIGNED-GET-AUTH-CODE-R1
+purpose=validate observed signed GET Keeta authorization-code ingress
+candidate=229c861beb2a4186fc255d0c198fb1bcd0a77fc8
 deployment_authority=PREVIEW_ONLY
