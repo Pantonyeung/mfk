@@ -1,0 +1,22 @@
+name: smm-human-ui-r1-smoke
+
+on:
+  pull_request:
+    branches:
+      - work/MFK/SMM-HUMAN-UI-RECOMPOSITION-R1
+  workflow_dispatch:
+
+jobs:
+  smm:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: v2smm
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-audit --no-fund --legacy-peer-deps --package-lock=false
+      - run: npm test
+      - run: npm run build
