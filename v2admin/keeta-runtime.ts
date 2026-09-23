@@ -1473,30 +1473,41 @@ export class KeetaRuntimeStore{
               state:'PENDING_SMT',
             }));
           }
-          const commercial=keetaCommercialSnapshot(
-            placement.rawMessage,
-            acceptedAt,
-            'KEETA_WEBHOOK:'+envelope.messageId,
-          );
-          if(commercial.providerOrderId!==placement.providerOrderId){
-            throw new Error('KEETA_COMMERCIAL_PROVIDER_ORDER_ID_MISMATCH');
-          }
-          const commercialKey='commercial:order:'+placement.providerOrderId;
-          const existingCommercial=await this.state.storage.get(commercialKey);
-          if(!existingCommercial){
-            await this.state.storage.put(commercialKey,Object.freeze({
-              state:'WEBHOOK_CAPTURED',
+          try{
+            const commercial=keetaCommercialSnapshot(
+              placement.rawMessage,
+              acceptedAt,
+              'KEETA_WEBHOOK:'+envelope.messageId,
+            );
+            if(commercial.providerOrderId!==placement.providerOrderId){
+              throw new Error('KEETA_COMMERCIAL_PROVIDER_ORDER_ID_MISMATCH');
+            }
+            const commercialKey='commercial:order:'+placement.providerOrderId;
+            const existingCommercial=await this.state.storage.get(commercialKey);
+            if(!existingCommercial){
+              await this.state.storage.put(commercialKey,Object.freeze({
+                state:'WEBHOOK_CAPTURED',
+                provider:'KEETA',
+                canonicalStoreId:'MF01',
+                providerShopId:envelope.shopId,
+                providerOrderId:commercial.providerOrderId,
+                providerOrderCode:commercial.providerOrderCode,
+                snapshot:commercial.snapshot,
+                capturedAt:acceptedAt,
+                latestEvidenceRef:'KEETA_WEBHOOK:'+envelope.messageId,
+                providerConfirmedAt:null,
+                canonicalOrderId:null,
+                canonicalDisplay:null,
+              }));
+            }
+          }catch(error){
+            await this.state.storage.put('commercial:issue:'+placement.providerOrderId,Object.freeze({
               provider:'KEETA',
-              canonicalStoreId:'MF01',
-              providerShopId:envelope.shopId,
-              providerOrderId:commercial.providerOrderId,
-              providerOrderCode:commercial.providerOrderCode,
-              snapshot:commercial.snapshot,
-              capturedAt:acceptedAt,
-              latestEvidenceRef:'KEETA_WEBHOOK:'+envelope.messageId,
-              providerConfirmedAt:null,
-              canonicalOrderId:null,
-              canonicalDisplay:null,
+              providerOrderId:placement.providerOrderId,
+              providerMessageId:envelope.messageId,
+              code:error instanceof Error?error.message:'KEETA_COMMERCIAL_CAPTURE_FAILED',
+              observedAt:acceptedAt,
+              authorityBoundary:'COMMERCIAL_EVIDENCE_FAILURE_MUST_NOT_REJECT_ORDER_WEBHOOK',
             }));
           }
         }
