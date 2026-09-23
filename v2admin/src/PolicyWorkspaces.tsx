@@ -40,6 +40,11 @@ function PolicyHeader({title,description,badge='本機設定自動保存'}:{titl
 }
 const Toggle=({checked,onChange,label}:{checked:boolean;onChange:(next:boolean)=>void;label:string})=><label className="admin-toggle"><input type="checkbox" checked={checked} onChange={event=>onChange(event.target.checked)}/><span>{label}</span></label>;
 
+export function keetaActionErrorText(error:string){
+  const code=error.trim();
+  return code?'Keeta 操作未完成：'+code:'';
+}
+
 export interface AvailabilityRule{readonly sellable:boolean;readonly reason:string;readonly updatedAt:string}
 export function AvailabilityWorkspace(){
   const {draft}=useAdminDraft();
@@ -266,8 +271,10 @@ export function ChannelsWorkspace({mode}:{mode:'overview'|'mapping'|'failures'|'
     catch(error){setLiveError(error instanceof Error?error.message:'KEETA_STATUS_FAILED');}
   };
   const refreshMenu=async()=>{
-    try{setMenuStatus(await readKeetaMenuStatus());}
+    setMenuBusy(true);
+    try{setMenuStatus(await readKeetaMenuStatus());setLiveError('');}
     catch(error){setLiveError(error instanceof Error?error.message:'KEETA_MENU_STATUS_FAILED');}
+    finally{setMenuBusy(false);}
   };
   const refreshProviderOps=async()=>{
     try{
@@ -523,10 +530,11 @@ export function ChannelsWorkspace({mode}:{mode:'overview'|'mapping'|'failures'|'
         <p><span>Errors</span><b>{menuStatus.completion?.errors.length??0}</b></p>
       </div>:null}
       <div className="admin-callout compact">Full snapshot 規則：未包含嘅既有 provider OpenItemCode 可能被 Keeta 刪除。呢度用完整已發布 MFK catalog 建 snapshot，唔會由 UI 手工砌半份 payload。</div>
+      {liveError?<div className="admin-validation is-error" role="alert">{keetaActionErrorText(liveError)}</div>:null}
       <div className="admin-editor-actions">
-        <button type="button" className="secondary" disabled={menuBusy} onClick={()=>void previewMenu()}>預檢完整菜單</button>
-        <button type="button" className="primary" disabled={menuBusy||liveStatus?.oauth.state!=='CONNECTED'} onClick={()=>void submitMenu()}>同步完整菜單到 Keeta</button>
-        <button type="button" className="secondary" disabled={menuBusy} onClick={()=>void refreshMenu()}>更新同步狀態</button>
+        <button type="button" className="secondary" disabled={menuBusy} onClick={()=>void previewMenu()}>{menuBusy?'處理中…':'預檢完整菜單'}</button>
+        <button type="button" className="primary" disabled={menuBusy||liveStatus?.oauth.state!=='CONNECTED'} onClick={()=>void submitMenu()}>{menuBusy?'處理中…':'同步完整菜單到 Keeta'}</button>
+        <button type="button" className="secondary" disabled={menuBusy} onClick={()=>void refreshMenu()}>{menuBusy?'讀取中…':'更新同步狀態'}</button>
       </div>
     </section>:null}
     {mode==='sync'?<section className="admin-policy-card">
