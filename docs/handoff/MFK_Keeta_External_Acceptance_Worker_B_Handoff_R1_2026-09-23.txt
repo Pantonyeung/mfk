@@ -231,3 +231,81 @@ NEW ACCEPTANCE CASE
 KEETA-E2-ORDER-20260923-02
 FIRST ORDER
 EXCLUDED_BY_OWNER_FROM_ACCEPTANCE
+
+
+K1 LIVE RED ROOT-CAUSE AUDIT AFTER SECOND ORDER
+Owner reports second controlled order waited >1 minute with:
+- no SMT platform order,
+- no automatic operator prompt,
+- Admin normal Orders surface showing no order.
+
+AUTHORITATIVE FLOW RECONFIRMED
+Keeta 1001
+→ https://admin.morefunos.com/api/keeta/webhook
+→ KeetaRuntimeStore durable order:intent:<providerOrderId> state PENDING_SMT
+→ AdminSyncStore is transport/doorbell only (KEETA_ORDER_AVAILABLE)
+→ SMT authenticated GET /api/keeta/smt/orders/pending
+→ SMT maps against published Admin catalog/channelMapping
+→ existing SMT localRuntime creates ONE canonical Order + Display
+→ SMT ACKs canonicalOrderId + canonicalDisplay
+→ cloud intent becomes COMMITTED
+→ SMT manual ACCEPT then local ACCEPT first → Keeta /order/confirm
+→ SMT READY local first → Keeta /order/prepare
+→ 1002/1003/1004/1006/1008 lifecycle evidence links same canonical Order
+→ 1005/1007 after-sale links same canonical Order
+→ /order/get commercial readback stays reconciliation evidence only.
+
+ADMIN ROLE
+Admin is NOT an order relay or Formal Order authority.
+Admin publishes catalog/mapping/channelPolicy/store config consumed by SMT.
+The shared admin.morefunos.com Worker hosts the provider edge and doorbell transport, but Admin UI does not create the Order.
+Normal Admin Orders/read model only receives SMT projection AFTER SMT canonical commit.
+Therefore a PENDING_SMT provider order is not expected to appear in normal Admin Orders.
+Dedicated diagnostic/readback is under Channels → 接單規則 → Keeta 新單入口／SMT 接收狀態.
+
+WHY "ALL TESTS GREEN" DID NOT MEAN LIVE GREEN
+K1–K8 source/test/deploy were banked GREEN:
+- K1 #140: 35796407931 PASS
+- K2/K5 #147: 35798128788 / 35798153187 PASS
+- K6 #151: 35800516980 / 35800410086 PASS
+- K7 #154: 35801776639 / 35801098970 PASS
+- K8 #158: 35802522878 PASS
+Those proved source contracts and deployed seams.
+#162 exists specifically because real provider external acceptance was still pending.
+Historical MoreFunOS also had prior live 1001→confirm→prepare capability evidence, but current MFK changed final Order authority to SMT local commit, so historical live proof cannot substitute for current MFK live acceptance.
+
+SOURCE DEFECTS FOUND IN CURRENT K1 AFTER REAL RED
+1. /smt/orders/pending HTTP 401 was silently returned with ZERO operator error.
+2. Intake authorization/mapping depends on Admin LKG/ACK, but Keeta intake did not reconcile again when Admin sync completed; startup race could strand PENDING_SMT.
+3. Doorbell was primary with no bounded periodic reconciliation; a missed doorbell could strand PENDING_SMT until focus/online/manual action.
+4. Mapping failures were stored only in localStorage attention and were not automatically surfaced in SMT UI.
+5. Current source has no true incoming-order modal/sound notification. Order visibility depends on successful local commit and queue count/list refresh.
+
+BOUNDED REPAIR LANDED
+- 190d2b82da64aadbc013ab0309d558eae91786da
+  close silent 401 + retry after Admin sync + visible-only 5s fallback reconcile
+- 45bc3c95049001aca4addfb103fc10a701419a77
+  surface exact Keeta intake failure codes in SMT
+- afb02b6e09f4f4458c8e556b85d9a7eb6e6ea4b0
+  explicit navigator online guard correction
+
+Verification:
+- V2 Local POS Smoke 35809338650 SUCCESS
+- unit tests / build / local authority guard / static bundle all GREEN
+- added tests prove unauthorized transport and mapping RED are visible instead of disappearing.
+
+NEW OTA
+release: runtime-candidate-mfk-afb02b6e09f4
+Builder run: 35809458982 SUCCESS
+bundle: MoreFunOS-SMT-runtime-candidate-mfk-afb02b6e09f4.mfos
+SHA-256: bc64758000a879ff7d581b6fbd2fa7e2e045ff436e760fed3169dbeb45dddd14
+public readback: MFK_RUNTIME_OTA_PUBLISHED
+
+NEXT
+Do not create a third order yet.
+Install runtime-candidate-mfk-afb02b6e09f4 on SMT.
+The existing second order is the diagnostic subject:
+- if cloud has it PENDING_SMT, startup/5s fallback should pull it automatically;
+- if unauthorized, SMT now shows KEETA_SMT_UNAUTHORIZED;
+- if mapping fails, SMT now shows exact KEETA_ORDER_MAPPING_* code;
+- if no order and no intake attention, inspect Admin Channels → 接單規則 → Keeta 新單入口; empty there means second 1001 is not in current cloud intent store and the break is before SMT pull.
