@@ -112,6 +112,8 @@ export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePor
     {id:'platform',label:'平台訂單',orders:filtered.filter(order=>sourceLane(order.sourceLabel)==='platform')},
   ] as const,[filtered]);
 
+  const pendingKeetaOrders=useMemo(()=>allItems.filter(order=>String(order.sourceLabel||'').startsWith('Keeta')&&order.fulfillmentLabel==='待處理'),[allItems]);
+
   const paymentCounts=useMemo(()=>{
     const base=allItems.filter(order=>history?(order.fulfillmentLabel==='已完成'||order.fulfillmentLabel==='已取消'):(order.fulfillmentLabel!=='已完成'&&order.fulfillmentLabel!=='已取消'));
     const count=(filter:PaymentFilter)=>base.filter(order=>paymentMatches(order.paymentLabel,filter)).length;
@@ -308,6 +310,7 @@ export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePor
         <span>{history?'歷史訂單':'進行中訂單'}　{filtered.length}</span>
         <div><button type="button" disabled={keetaPullBusy} onClick={()=>void pullKeetaOrders()}>{keetaPullBusy?'同步中…':'手動接 Keeta 新單'}</button><label>Admin 出餐計時</label><b>{storeSettings.fulfillmentMinutes} 分鐘</b><button disabled title="由 Admin 門店設定提供">Admin</button></div>
       </div>
+      {pendingKeetaOrders.length?<button type="button" className="keeta-pending-banner" onClick={()=>void load(pendingKeetaOrders[0]!.orderId,true)}><b>Keeta 有 {pendingKeetaOrders.length} 張訂單未處理</b><span>請立即接受或處理訂單</span></button>:null}
       {keetaPullMessage?<p className="order-board-error">{keetaPullMessage}</p>:null}
       {keetaIntakeAttention.length?<p className="order-board-error">Keeta 接單注意：{keetaIntakeAttention.map(row=>String((row as {code?:unknown}).code??'UNKNOWN')).join('；')}</p>:null}
 
