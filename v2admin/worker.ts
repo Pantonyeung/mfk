@@ -34,7 +34,7 @@ function row(value){
   return value&&typeof value==='object'&&!Array.isArray(value)?value:{};
 }
 function rows(value){return Array.isArray(value)?value:[];}
-function customerPublicSnapshot(active){
+function customerPublicSnapshot(active,customerOrders=[]){
   const snapshot=row(active?.snapshot);
   const catalog=row(snapshot.catalog);
   const optionCenter=row(snapshot.optionCenter);
@@ -95,13 +95,35 @@ function customerPublicSnapshot(active){
     .sort((a,b)=>a.position-b.position||a.productId.localeCompare(b.productId))
     .map(({position,...item})=>item);
   const settings=row(snapshot.storeSettings);
-  const channel=row(snapshot.channelPolicy);
-  const flags=[channel.customerOrderingEnabled,channel.customerEnabled,channel.ownChannelEnabled].filter(value=>typeof value==='boolean');
+  const customerPresentation=row(row(snapshot.presentation).customer);
+  const channelAvailable=customerPresentation.channelAvailable===false?false:true;
+  const stageFor=label=>label==='待處理'?'RECEIVED':label==='進行中'?'PREPARING':label==='可取餐'?'READY':label==='已完成'?'COMPLETED':label==='已取消'?'REJECTED':'RECEIVED';
+  const projectOrder=rawOrder=>{
+    const order=row(rawOrder);
+    const stage=stageFor(String(order.fulfillmentLabel||''));
+    const observedAt=String(order.updatedAt||order.createdAt||new Date().toISOString());
+    const itemRows=rows(order.items);
+    const display=String(order.display||'');
+    const totalMinor=Math.max(0,Number(order.totalMinor)||0);
+    return{
+      orderId:String(order.orderId||''),
+      displayCode:display,
+      stage,
+      itemSummary:itemRows.map(item=>String(row(item).name||'')).filter(Boolean).join('、'),
+      amountLabel:'HK$'+(totalMinor/100).toFixed(2),
+      pickupCode:display||undefined,
+      observedAt,
+      readback:'CONFIRMED',
+      timeline:[{at:observedAt,stage,label:String(order.fulfillmentLabel||stage)}],
+    };
+  };
+  const projectedOrders=customerOrders.map(projectOrder).filter(order=>order.orderId&&order.displayCode);
   return{
     store:{
       storeId:String(active?.storeId||'MF01'),
       storeName:String(settings.storeName||'磨飯'),
-      channelAvailable:flags.length?Boolean(flags[0]):true,
+      channelAvailable,
+      notice:typeof customerPresentation.notice==='string'?customerPresentation.notice:undefined,
       observedAt:new Date().toISOString(),
     },
     menu:{
@@ -110,8 +132,15 @@ function customerPublicSnapshot(active){
       categories:categories.map(item=>({categoryId:item.id,name:item.name,sortOrder:item.position})),
       products,
     },
-    activeOrders:[],
-    history:[],
+    activeOrders:projectedOrders.filter(order=>order.stage!=='COMPLETED'),
+    history:projectedOrders.filter(order=>order.stage==='COMPLETED').map(order=>({
+      orderId:order.orderId,
+      displayCode:order.displayCode,
+      completedAt:order.observedAt,
+      itemSummary:order.itemSummary,
+      amountLabel:order.amountLabel,
+      reorderEligible:true,
+    })),
     observedAt:new Date().toISOString(),
   };
 }
@@ -225,6 +254,15 @@ export class AdminSyncStore{
     if(url.pathname==='/authorize-smt-device'){
       if(!await this.authorizeSmtDevice(request))return json({code:'SMT_DEVICE_UNAUTHORIZED'},401);
       return json({ok:true});
+    }
+    if(url.pathname==='/customer-orders'&&request.method==='GET'){
+      const wanted=new Set(url.searchParams.getAll('submissionId').map(value=>String(value).trim()).filter(Boolean).slice(0,24));
+      if(!wanted.size)return json({orders:[]});
+      const orders=(await this.projectionOrders()).filter(order=>{
+        const ref=String(order.externalRef||'');
+        return ref.startsWith('CUSTOMER:')&&wanted.has(ref.slice('CUSTOMER:'.length));
+      });
+      return json({orders});
     }
     if(url.pathname==='/customer-doorbell'&&request.method==='POST'){
       let body;
@@ -409,7 +447,12 @@ export default {
         const activeResponse=await admin.fetch(new Request('https://internal/active',{method:'GET'}));
         if(!activeResponse.ok)return json({code:'CUSTOMER_CONFIG_NOT_PUBLISHED'},503,cors(request));
         const active=await activeResponse.json();
-        return json(customerPublicSnapshot(active),200,cors(request));
+        const ids=url.searchParams.getAll('submissionId').map(value=>String(value).trim()).filter(Boolean).slice(0,24);
+        const ordersUrl=new URL('https://internal/customer-orders');
+        for(const id of ids)ordersUrl.searchParams.append('submissionId',id);
+        const orderResponse=await admin.fetch(new Request(ordersUrl.toString(),{method:'GET'}));
+        const orderBody=orderResponse.ok?await orderResponse.json():{orders:[]};
+        return json(customerPublicSnapshot(active,Array.isArray(orderBody.orders)?orderBody.orders:[]),200,cors(request));
       }
 
       if(url.pathname.startsWith('/api/customer/smt/')){
@@ -607,7 +650,7 @@ export default {
       for(const [key,value] of Object.entries(cors(request)))headers.set(key,value);
       return new Response(response.body,{status:response.status,statusText:response.statusText,headers});
     }
-    if(url.pathname==='/api/admin-sync/provider-doorbell'||url.pathname==='/api/admin-sync/authorize-smt-device'){
+    if(url.pathname==='/api/admin-sync/provider-doorbell'||url.pathname==='/api/admin-sync/customer-doorbell'||url.pathname==='/api/admin-sync/customer-orders'||url.pathname==='/api/admin-sync/authorize-smt-device'){
       return json({code:'NOT_FOUND'},404,cors(request));
     }
     if(url.pathname.startsWith('/api/admin-sync/')||url.pathname.startsWith('/api/projection/')){
