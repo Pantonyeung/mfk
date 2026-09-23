@@ -363,6 +363,26 @@ describe('Keeta live edge runtime',()=>{
   });
 
 
+  it('accepts the provider token material inside the standard data envelope without weakening token validation',async()=>{
+    const key=Buffer.alloc(32,15).toString('base64');
+    const storage=new Map<string,unknown>();
+    const state={storage:{get:async(key:string)=>storage.get(key),put:async(key:string,value:unknown)=>{storage.set(key,value);},delete:async(key:string)=>{storage.delete(key);}}};
+    const env={KEETA_APP_ID:'3419700273',KEETA_APP_SECRET:'test-secret',KEETA_TOKEN_ENCRYPTION_KEY:key,KEETA_PROVIDER_SHOP_ID:'721578302',KEETA_OAUTH_REDIRECT_URI:'https://admin.morefunos.com/api/keeta/oauth/callback'};
+    const {KeetaRuntimeStore}=await import('../keeta-runtime.ts');
+    const runtime=new KeetaRuntimeStore(state as never,env as never);
+    const issuedAtTime=Date.now();
+    vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({code:0,message:'Success',data:{accessToken:'enveloped-access',tokenType:'bearer',expiresIn:7776000,refreshToken:'enveloped-refresh',scope:'all',issuedAtTime}}),{status:200})));
+    try{
+      const imported=await runtime.fetch(new Request('https://internal/admin/token/import-test',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({accessToken:'expired-access',tokenType:'bearer',expiresIn:1,refreshToken:'old-refresh',scope:'all',issuedAtTime:issuedAtTime-10000})}));
+      expect(imported.status).toBe(200);
+      const status=await (await runtime.fetch(new Request('https://internal/admin/status',{method:'POST'}))).json() as {oauth:{state:string;tokenSource:string}};
+      expect(status.oauth).toMatchObject({state:'CONNECTED',tokenSource:'TEST_PROVIDER_PORTAL_REFRESH'});
+      const serialized=JSON.stringify([...storage.entries()]);
+      expect(serialized).not.toContain('enveloped-access');
+      expect(serialized).not.toContain('enveloped-refresh');
+    }finally{vi.unstubAllGlobals();}
+  });
+
   it('refreshes an expired provider-portal token without OAuth reauthorization',async()=>{
     const key=Buffer.alloc(32,10).toString('base64');
     const storage=new Map<string,unknown>();

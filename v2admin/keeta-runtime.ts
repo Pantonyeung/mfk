@@ -164,7 +164,10 @@ export async function signKeetaRuntimeParams(url,params,appSecret){
 }
 
 function parseTokenMaterial(input){
-  const row=typeof input==='string'?JSON.parse(input):record(input,'KEETA_TOKEN_RESPONSE_INVALID_SHAPE');
+  const parsed=typeof input==='string'?JSON.parse(input):record(input,'KEETA_TOKEN_RESPONSE_INVALID_SHAPE');
+  const root=record(parsed,'KEETA_TOKEN_RESPONSE_INVALID_SHAPE');
+  const candidate=root.data&&typeof root.data==='object'&&!Array.isArray(root.data)?root.data:root;
+  const row=record(candidate,'KEETA_TOKEN_RESPONSE_INVALID_SHAPE');
   if(!row||typeof row!=='object'||Array.isArray(row)
     ||typeof row.accessToken!=='string'||!row.accessToken
     ||row.tokenType!=='bearer'
@@ -172,7 +175,9 @@ function parseTokenMaterial(input){
     ||typeof row.refreshToken!=='string'||!row.refreshToken
     ||typeof row.scope!=='string'
     ||!Number.isFinite(Number(row.issuedAtTime))||Number(row.issuedAtTime)<0){
-    throw new Error('KEETA_TOKEN_RESPONSE_INVALID_SHAPE');
+    const keys=Object.keys(row).sort().join(',');
+    const envelopeKeys=Object.keys(root).sort().join(',');
+    throw new Error('KEETA_TOKEN_RESPONSE_INVALID_SHAPE:envelope='+envelopeKeys+';token='+keys);
   }
   return Object.freeze({
     accessToken:row.accessToken,
