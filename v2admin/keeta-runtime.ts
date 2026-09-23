@@ -1025,6 +1025,34 @@ export class KeetaRuntimeStore{
       return json({state:'AVAILABLE',sync:sync??null,operation:operation??null,readback:readback??null});
     }
 
+    if(url.pathname==='/admin/orders/intake'&&(request.method==='GET'||request.method==='POST')){
+      const rows=await this.state.storage.list({prefix:'order:intent:'});
+      const items=[...rows.values()]
+        .filter(Boolean)
+        .map(row=>Object.freeze({
+          provider:'KEETA',
+          canonicalStoreId:'MF01',
+          providerOrderId:String(row.providerOrderId||''),
+          providerMessageId:String(row.providerMessageId||''),
+          providerPushedAt:String(row.providerPushedAt||''),
+          receivedAt:String(row.receivedAt||''),
+          state:row.state==='COMMITTED'?'COMMITTED':'PENDING_SMT',
+          canonicalOrderId:row.canonicalOrderId?String(row.canonicalOrderId):null,
+          canonicalDisplay:row.canonicalDisplay?String(row.canonicalDisplay):null,
+          committedAt:row.committedAt?String(row.committedAt):null,
+        }))
+        .sort((a,b)=>String(b.receivedAt).localeCompare(String(a.receivedAt)))
+        .slice(0,200);
+      return json({
+        state:'AVAILABLE',
+        provider:'KEETA',
+        canonicalStoreId:'MF01',
+        pending:items.filter(row=>row.state==='PENDING_SMT').length,
+        committed:items.filter(row=>row.state==='COMMITTED').length,
+        items,
+      });
+    }
+
     if(url.pathname==='/admin/commercial/list'&&(request.method==='GET'||request.method==='POST')){
       const rows=await this.state.storage.list({prefix:'commercial:order:'});
       const items=[...rows.values()]
