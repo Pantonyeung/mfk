@@ -163,6 +163,23 @@ describe('Keeta → SMT canonical local intake',()=>{
     }finally{vi.unstubAllGlobals();}
   });
 
+  it('prints accepted Keeta outputs only once across repeated acceptance',async()=>{
+    const translated=translateKeetaIntentToLocalOrder(intent());
+    const order=localRuntime.createOrder(translated);
+    const providerFetch=vi.fn(async()=>new Response(JSON.stringify({state:'SUCCESS'}),{status:200,headers:{'content-type':'application/json'}}));
+    vi.stubGlobal('fetch',providerFetch);
+    try{
+      const first=await localRuntime.acceptOrder(order.id);
+      expect(first.status).toBe('ACCEPTED');
+      const afterFirst=localRuntime.orders().find(row=>row.id===order.id);
+      expect(afterFirst?.acceptancePrintedAt).toBeTruthy();
+      const printedAt=afterFirst?.acceptancePrintedAt;
+      const second=await localRuntime.acceptOrder(order.id);
+      expect(second.status).toBe('ACCEPTED');
+      expect(localRuntime.orders().find(row=>row.id===order.id)?.acceptancePrintedAt).toBe(printedAt);
+    }finally{vi.unstubAllGlobals();}
+  });
+
   it('keeps the SMT canonical accept/READY decision when Keeta provider mirroring needs attention',async()=>{
     const translated=translateKeetaIntentToLocalOrder(intent());
     const order=localRuntime.createOrder(translated);
