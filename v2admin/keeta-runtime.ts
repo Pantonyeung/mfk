@@ -165,26 +165,24 @@ export async function signKeetaRuntimeParams(url,params,appSecret){
 
 function parseTokenMaterial(input){
   const parsed=typeof input==='string'?JSON.parse(input):record(input,'KEETA_TOKEN_RESPONSE_INVALID_SHAPE');
-  const root=record(parsed,'KEETA_TOKEN_RESPONSE_INVALID_SHAPE');
-  let candidate=root;
-  const trace=[];
-  for(let depth=0;depth<8;depth+=1){
-    trace.push({depth,keys:Object.keys(candidate).sort(),dataType:Array.isArray(candidate.data)?'array':candidate.data===null?'null':typeof candidate.data});
-    if(!(candidate.data&&typeof candidate.data==='object'&&!Array.isArray(candidate.data)))break;
-    candidate=record(candidate.data,'KEETA_TOKEN_RESPONSE_INVALID_SHAPE');
+  const row=record(parsed,'KEETA_TOKEN_RESPONSE_INVALID_SHAPE');
+
+  if(Number.isInteger(Number(row.code))&&Number(row.code)!==0){
+    const providerCode=Number(row.code);
+    if(providerCode===115000260)throw new Error('KEETA_AUTHORIZATION_CANCELLED_115000260');
+    if(providerCode>=115000100&&providerCode<=115000199)throw new Error('KEETA_PROVIDER_SIGNATURE_ERROR_'+providerCode);
+    if(providerCode>=115000200&&providerCode<=115000399)throw new Error('KEETA_PROVIDER_BUSINESS_ERROR_'+providerCode);
+    if(providerCode>=315000100&&providerCode<=315000199)throw new Error('KEETA_PROVIDER_SERVER_ERROR_'+providerCode);
+    throw new Error('KEETA_PROVIDER_ERROR_'+providerCode);
   }
-  const row=record(candidate,'KEETA_TOKEN_RESPONSE_INVALID_SHAPE');
-  if(!row||typeof row!=='object'||Array.isArray(row)
-    ||typeof row.accessToken!=='string'||!row.accessToken
+
+  if(typeof row.accessToken!=='string'||!row.accessToken
     ||row.tokenType!=='bearer'
     ||!Number.isFinite(Number(row.expiresIn))||Number(row.expiresIn)<=0
     ||typeof row.refreshToken!=='string'||!row.refreshToken
     ||typeof row.scope!=='string'
     ||!Number.isFinite(Number(row.issuedAtTime))||Number(row.issuedAtTime)<0){
-    const keys=Object.keys(row).sort().join(',');
-    const envelopeKeys=Object.keys(root).sort().join(',');
-    const structure=trace.map(item=>'d'+item.depth+'['+item.keys.join(',')+'] data='+item.dataType).join('|');
-    throw new Error('KEETA_TOKEN_RESPONSE_INVALID_SHAPE:envelope='+envelopeKeys+';token='+keys+';trace='+structure);
+    throw new Error('KEETA_TOKEN_RESPONSE_INVALID_SHAPE');
   }
   return Object.freeze({
     accessToken:row.accessToken,
