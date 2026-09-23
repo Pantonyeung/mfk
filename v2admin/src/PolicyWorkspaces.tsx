@@ -422,6 +422,10 @@ export function ChannelsWorkspace({mode}:{mode:'overview'|'mapping'|'failures'|'
         <p><span>OAuth</span><b>{liveStatus.oauth.state}</b></p>
         <p><span>Token 到期</span><b>{liveStatus.oauth.expiresAt?new Date(liveStatus.oauth.expiresAt).toLocaleString('zh-HK'):'—'}</b></p>
         <p><span>Token 來源</span><b>{liveStatus.oauth.tokenSource??'—'}</b></p>
+        <p><span>Token 自動刷新</span><b>{liveStatus.oauth.autoRefresh?.state??'讀取中'}</b></p>
+        <p><span>下次自動刷新</span><b>{liveStatus.oauth.autoRefresh?.nextRefreshAt?new Date(liveStatus.oauth.autoRefresh.nextRefreshAt).toLocaleString('zh-HK'):'—'}</b></p>
+        <p><span>最近自動刷新</span><b>{liveStatus.oauth.autoRefresh?.lastSuccessAt?new Date(liveStatus.oauth.autoRefresh.lastSuccessAt).toLocaleString('zh-HK'):'—'}</b></p>
+        <p><span>自動刷新錯誤</span><b>{liveStatus.oauth.autoRefresh?.lastError??'—'}</b></p>
         <p><span>Provider Token 驗證</span><b>{liveStatus.oauth.providerValidation?.state??'未有失效紀錄'}</b></p>
         <p><span>最近 OAuth callback</span><b>{liveStatus.oauth.lastCallbackAt?new Date(liveStatus.oauth.lastCallbackAt).toLocaleString('zh-HK'):'—'}</b></p>
         <p><span>Callback 結果</span><b>{liveStatus.oauth.lastCallbackResult??'—'}</b></p>
@@ -442,8 +446,9 @@ export function ChannelsWorkspace({mode}:{mode:'overview'|'mapping'|'failures'|'
         <button type="button" className="primary" disabled={liveBusy||!liveStatus?.readyForAuthorization} onClick={()=>void authorize()}>{liveStatus?.oauth.state==='CONNECTED'?'重新授權 Keeta':'開始 Keeta 授權'}</button>
       </div>
       <details className="admin-rule-card">
-        <summary><b>已有 Keeta 測試 Token</b></summary>
-        <p>位置：Keeta Developers → 應用程式管理 → 磨飯v2 → 授權管理 → 門店數量 → 查看 Token。</p>
+        <summary><b>測試／救援：手動匯入 Token（正常毋須使用）</b></summary>
+        <p>正常情況只需完成一次 OAuth／Token bootstrap；之後會用已保存嘅 refreshToken 自動輪換 accessToken 同 refreshToken。只有 refreshToken 真正失效先需要重新授權。手動匯入只保留俾測試／救援。</p>
+        <p>救援位置：Keeta Developers → 應用程式管理 → 磨飯v2 → 授權管理 → 門店數量 → 查看 Token。</p>
         <label>
           <span>Token JSON</span>
           <textarea
