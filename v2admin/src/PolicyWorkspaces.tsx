@@ -10,6 +10,7 @@ import {
   previewKeetaSellability,
   previewKeetaStoreHours,
   readKeetaCommercialRows,
+  readKeetaOrderIntakeRows,
   refreshKeetaCommercial,
   readKeetaLiveStatus,
   readKeetaMenuStatus,
@@ -22,6 +23,7 @@ import {
   syncKeetaSellability,
   syncKeetaStoreHours,
   type KeetaCommercialRow,
+  type KeetaOrderIntakeRow,
   type KeetaLiveStatus,
   type KeetaMenuPreview,
   type KeetaMenuStatus,
@@ -254,6 +256,10 @@ export function ChannelsWorkspace({mode}:{mode:'overview'|'mapping'|'failures'|'
   const [providerOpsBusy,setProviderOpsBusy]=useState(false);
   const [commercialRows,setCommercialRows]=useState<readonly KeetaCommercialRow[]>([]);
   const [commercialBusy,setCommercialBusy]=useState<string|null>(null);
+  const [orderIntakeRows,setOrderIntakeRows]=useState<readonly KeetaOrderIntakeRow[]>([]);
+  const [orderIntakePending,setOrderIntakePending]=useState(0);
+  const [orderIntakeCommitted,setOrderIntakeCommitted]=useState(0);
+  const [orderIntakeBusy,setOrderIntakeBusy]=useState(false);
   const refreshLive=async()=>{
     try{setLiveStatus(await readKeetaLiveStatus());setLiveError('');}
     catch(error){setLiveError(error instanceof Error?error.message:'KEETA_STATUS_FAILED');}
@@ -273,6 +279,18 @@ export function ChannelsWorkspace({mode}:{mode:'overview'|'mapping'|'failures'|'
     try{setCommercialRows((await readKeetaCommercialRows()).items);}
     catch(error){setLiveError(error instanceof Error?error.message:'KEETA_COMMERCIAL_READ_FAILED');}
   };
+  const refreshOrderIntake=async()=>{
+    setOrderIntakeBusy(true);
+    try{
+      const result=await readKeetaOrderIntakeRows();
+      setOrderIntakeRows(result.items);
+      setOrderIntakePending(result.pending);
+      setOrderIntakeCommitted(result.committed);
+      setLiveError('');
+    }catch(error){
+      setLiveError(error instanceof Error?error.message:'KEETA_ORDER_INTAKE_READ_FAILED');
+    }finally{setOrderIntakeBusy(false);}
+  };
   useEffect(()=>{
     if(mode==='overview'||mode==='sync'){
       void refreshLive();
@@ -282,6 +300,10 @@ export function ChannelsWorkspace({mode}:{mode:'overview'|'mapping'|'failures'|'
     if(mode==='estimate'){
       void refreshLive();
       void refreshCommercialRows();
+    }
+    if(mode==='accept'){
+      void refreshLive();
+      void refreshOrderIntake();
     }
   },[mode]);
   const authorize=async()=>{
@@ -437,6 +459,36 @@ export function ChannelsWorkspace({mode}:{mode:'overview'|'mapping'|'failures'|'
         <small>Token 只會送到 MFK runtime，以現有 encryption key 加密保存；成功後輸入欄會即時清空。呢個輸入唔會寫入 Admin draft、localStorage 或操作記錄。</small>
       </details>
       <small>目前連線層已接通；Provider business commands 會按 Owner 已授權嘅 Keeta Full Integration program 逐 seam 接入。</small>
+    </section>:null}
+    {mode==='accept'?<section className="admin-policy-card">
+      <header>
+        <div><small>KEETA ORDER INTAKE</small><h2>Keeta 新單入口／SMT 接收狀態</h2></div>
+        <span className={orderIntakePending?'admin-not-wired-chip':'admin-status-good'}>{orderIntakePending} 待 SMT</span>
+      </header>
+      <p>呢度直接讀 Keeta webhook 已接收嘅訂單入口。PENDING_SMT = Provider 已推送成功，但 SMT 未正式建立 Order；COMMITTED = SMT 已建立同一張 canonical Order。</p>
+      <div className="admin-readback-proof">
+        <p><span>待 SMT 接收</span><b>{orderIntakePending}</b></p>
+        <p><span>已入 SMT</span><b>{orderIntakeCommitted}</b></p>
+        <p><span>最近記錄</span><b>{orderIntakeRows.length}</b></p>
+      </div>
+      {orderIntakeRows.length?<div className="admin-editor-list">
+        {orderIntakeRows.slice(0,30).map(row=><article className="admin-policy-row" key={row.providerOrderId}>
+          <div>
+            <b>Keeta {row.providerOrderId}</b>
+            <small>Message {row.providerMessageId} · {row.receivedAt?new Date(row.receivedAt).toLocaleString('zh-HK'):'—'}</small>
+          </div>
+          <div className="admin-readback-proof">
+            <p><span>Provider</span><b>{row.state==='PENDING_SMT'?'已收到，待 SMT':'已入 SMT'}</b></p>
+            <p><span>Canonical Order</span><b>{row.canonicalOrderId??'—'}</b></p>
+            <p><span>Display</span><b>{row.canonicalDisplay??'—'}</b></p>
+            <p><span>Committed</span><b>{row.committedAt?new Date(row.committedAt).toLocaleString('zh-HK'):'—'}</b></p>
+          </div>
+        </article>)}
+      </div>:<div className="admin-read-empty">未有 Keeta 1001 訂單入口記錄。</div>}
+      <div className="admin-editor-actions">
+        <button type="button" className="secondary" disabled={orderIntakeBusy} onClick={()=>void refreshOrderIntake()}>{orderIntakeBusy?'讀取中…':'重新讀取 Keeta 新單'}</button>
+      </div>
+      {liveError?<div className="admin-validation is-error" role="alert">{liveError}</div>:null}
     </section>:null}
     {(mode==='overview'||mode==='sync')?<section className="admin-policy-card">
       <header>
