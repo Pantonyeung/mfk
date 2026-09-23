@@ -279,6 +279,31 @@ describe('Keeta live edge runtime',()=>{
     }finally{vi.unstubAllGlobals();}
   });
 
+  it('accepts official webhook Event 1, exchanges its code, and persists only encrypted token material',async()=>{
+    const key=Buffer.alloc(32,21).toString('base64');
+    const storage=new Map<string,unknown>();
+    const state={storage:{get:async(key:string)=>storage.get(key),put:async(key:string,value:unknown)=>{storage.set(key,value);},delete:async(key:string)=>{storage.delete(key);}}};
+    const env={KEETA_APP_ID:'3419700273',KEETA_APP_SECRET:'test-secret',KEETA_TOKEN_ENCRYPTION_KEY:key,KEETA_PROVIDER_SHOP_ID:'721578302',KEETA_OAUTH_REDIRECT_URI:'https://admin.morefunos.com/api/keeta/oauth/callback'};
+    const {KeetaRuntimeStore}=await import('../keeta-runtime.ts');
+    const runtime=new KeetaRuntimeStore(state as never,env as never);
+    const issuedAtTime=Date.now();
+    const providerFetch=vi.fn(async()=>new Response(JSON.stringify({accessToken:'event1-access',tokenType:'bearer',expiresIn:7776000,refreshToken:'event1-refresh',scope:'all',issuedAtTime}),{status:200}));
+    vi.stubGlobal('fetch',providerFetch);
+    try{
+      const externalUrl='https://admin.morefunos.com/api/keeta/webhook';
+      const event=await signKeetaRuntimeParams(externalUrl,{eventId:1,appId:3419700273,code:'single-use-code',state:'',timestamp:Date.now()},'test-secret');
+      const response=await runtime.fetch(new Request('https://internal/webhook',{method:'POST',headers:{'content-type':'application/json','x-mfk-keeta-external-url':externalUrl},body:JSON.stringify(event)}));
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({code:0,message:'Success',data:{}});
+      const status=await (await runtime.fetch(new Request('https://internal/admin/status',{method:'POST'}))).json() as {oauth:{state:string;lastCallbackResult:string;lastCallbackMethod:string}};
+      expect(status.oauth).toMatchObject({state:'CONNECTED',lastCallbackResult:'CONNECTED',lastCallbackMethod:'EVENT_1'});
+      const serialized=JSON.stringify([...storage.entries()]);
+      expect(serialized).not.toContain('event1-access');
+      expect(serialized).not.toContain('event1-refresh');
+      expect(providerFetch).toHaveBeenCalledTimes(1);
+    }finally{vi.unstubAllGlobals();}
+  });
+
   it('accepts signed event-1 authorization code callback and persists an encrypted token',async()=>{
     const key=Buffer.alloc(32,6).toString('base64');
     const storage=new Map<string,unknown>();
