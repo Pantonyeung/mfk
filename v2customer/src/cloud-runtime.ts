@@ -1,7 +1,7 @@
 import {
   MFK_CUSTOMER_ORDER_INTENT_SCHEMA,
   MFK_CUSTOMER_QUOTE_REQUEST_SCHEMA,
-} from '../../contracts/customer-cloud-v1.ts';
+} from '../../contracts/customer-cloud-v1';
 import type {
   CustomerCartLine,
   CustomerCommandResult,
