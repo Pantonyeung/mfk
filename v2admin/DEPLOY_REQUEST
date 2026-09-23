@@ -1,7 +1,7 @@
 MFK_ADMIN_DEPLOY_REQUEST
 target=mfk-admin
 canonical_url=https://admin.morefunos.com
-source_main=0ec12df5f9710b5621b3f3dc92b7a2bc05cc563b
+source_main=a0baca10872a73dcd64447ed4cf0e11514d6148d
 requested_by=owner
-reason=keeta_k4_sellability_store_r1
+reason=keeta_k6_lifecycle_cancel_r1
 ota=unchanged
