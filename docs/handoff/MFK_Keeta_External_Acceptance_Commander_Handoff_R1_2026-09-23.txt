@@ -550,3 +550,77 @@ Correct lineage:
 STATUS:
 HISTORICAL_KEETA_EVIDENCE_SOURCE_CORRECTED
 #881_EXCLUDED
+
+
+==================================================
+10. WORKERS FORMALLY DISPATCHED｜DIRECT FAST LOOP
+==================================================
+
+Owner instruction:
+START
+
+Historical donor:
+#881 EXCLUDED
+
+Historical baseline:
+2026-09-05 / 09-06 direct Keeta live evidence
+→ #704 no-redo / PHYSICAL_PROVEN preservation
+→ current MFK
+
+Current execution order:
+K3_MENU_LIVE_SYNC_FIRST
+→ K1_ORDER_RETEST_AFTER_MENU_GREEN
+
+Worker A:
+MFK-KEETA-K3-DIRECT-LIVE-MENU-WORKER-A-R1
+
+Role:
+CURRENT_LIVE_SEAM_DRIVER
+
+#162 dispatch:
+5788188509
+
+Responsibilities:
+- full-menu preview
+- provider-real token validation/recovery
+- one menu sync submit
+- taskId
+- real 1202 zero errors
+- optional 1201
+- exact FIRST_BREAK repair only
+- immediate live retest
+
+Worker B:
+MFK-KEETA-K1-POST-K3-PREP-WORKER-B-R1
+
+Role:
+ONE_SEAM_AHEAD_DONOR_AND_REGRESSION_PREP
+
+#162 dispatch:
+5788188960
+
+READ ONLY.
+
+Responsibilities:
+- prepare post-K3 K1 exact current seam
+- reuse pre-704 real proof
+- map current OpenItemCode/productCode identity
+- no order creation
+- no provider mutation
+- no deploy
+- no full matrix
+
+Collision:
+Worker A = sole live seam writer
+Worker B = read-only one seam ahead
+
+Observed dispatch-time main:
+71d1fe505b905466475567647bf6e9bca442e972
+
+Control #22:
+5788190921
+
+STATUS:
+WORKER_A_DISPATCHED
+WORKER_B_DISPATCHED
+K3_CURRENT_SEAM
