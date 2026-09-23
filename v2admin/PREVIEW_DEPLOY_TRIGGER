@@ -1,4 +1,4 @@
-work_id=MFK-KEETA-NEW-TOKEN-SUPERSEDES-STALE-1302-R1
-purpose=validate fresh OAuth token supersedes stale 1302 and provider shop readback
-candidate=47aaf28423c86dc4e978c667f1292d587dff5cb1
+work_id=MFK-KEETA-TOKEN-LINEAGE-CONVERGENCE-R1
+purpose=validate stale authorization blocker convergence by fresh token lineage
+candidate=7d9a2750b1eeb6881d86563b6853434ed6042755
 deployment_authority=PREVIEW_ONLY

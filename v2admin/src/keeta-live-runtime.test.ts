@@ -201,6 +201,30 @@ describe('Keeta live edge runtime',()=>{
     }finally{vi.unstubAllGlobals();}
   });
 
+  it('ignores stale removal evidence older than the fresh token lineage but blocks a newer removal',async()=>{
+    const key=Buffer.alloc(32,23).toString('base64');
+    const storage=new Map<string,unknown>();
+    const state={storage:{get:async(key:string)=>storage.get(key),put:async(key:string,value:unknown)=>{storage.set(key,value);},delete:async(key:string)=>{storage.delete(key);},setAlarm:async()=>{},getAlarm:async()=>null}};
+    const env={KEETA_APP_ID:'3419700273',KEETA_APP_SECRET:'test-secret',KEETA_TOKEN_ENCRYPTION_KEY:key,KEETA_PROVIDER_SHOP_ID:'721578302',KEETA_OAUTH_REDIRECT_URI:'https://admin.morefunos.com/api/keeta/oauth/callback'};
+    const {KeetaRuntimeStore}=await import('../keeta-runtime.ts');
+    const runtime=new KeetaRuntimeStore(state as never,env as never);
+    const imported=await runtime.fetch(new Request('https://internal/admin/token/import-test',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({accessToken:'fresh-lineage-access',tokenType:'bearer',expiresIn:7776000,refreshToken:'fresh-lineage-refresh',scope:'all',issuedAtTime:Date.now()})}));
+    expect(imported.status).toBe(200);
+    const freshAt=new Date().toISOString();
+    await state.storage.put('connection',{canonicalStoreId:'MF01',providerShopId:721578302,authorizedAt:freshAt,tokenSource:'OAUTH_CALLBACK'});
+    await state.storage.put('provider:authorization',{state:'REMOVED',eventId:1302,observedAt:new Date(Date.now()-60000).toISOString()});
+    const providerFetch=vi.fn(async()=>new Response(JSON.stringify({code:0,message:'Success',data:{shopId:721578302}}),{status:200}));
+    vi.stubGlobal('fetch',providerFetch);
+    try{
+      const staleReadiness=await runtime.fetch(new Request('https://internal/admin/token/readiness',{method:'POST'}));
+      expect(staleReadiness.status).toBe(200);
+      await state.storage.put('provider:authorization',{state:'REMOVED',eventId:1302,observedAt:new Date(Date.now()+1000).toISOString()});
+      const newerReadiness=await runtime.fetch(new Request('https://internal/admin/token/readiness',{method:'POST'}));
+      expect(newerReadiness.status).toBe(409);
+      expect(await newerReadiness.json()).toMatchObject({code:'KEETA_ACCESS_TOKEN_REAUTHORIZE_REQUIRED'});
+    }finally{vi.unstubAllGlobals();}
+  });
+
   it('treats signed brand authorization revocation as fail-closed provider custody evidence',async()=>{
     const key=Buffer.alloc(32,14).toString('base64');
     const storage=new Map<string,unknown>();

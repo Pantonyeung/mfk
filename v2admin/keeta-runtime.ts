@@ -778,7 +778,12 @@ export class KeetaRuntimeStore{
 
   async usableToken(){
     const authorization=await this.state.storage.get('provider:authorization');
-    if(authorization?.state==='REMOVED'||authorization?.state==='REVOKED'){
+    const connection=await this.state.storage.get('connection')||{};
+    const authorizationObservedAt=Date.parse(String(authorization?.observedAt||''))||0;
+    const tokenAuthorizedAt=Date.parse(String(connection.authorizedAt||''))||0;
+    const removalIsNewerThanToken=(authorization?.state==='REMOVED'||authorization?.state==='REVOKED')
+      && authorizationObservedAt>=tokenAuthorizedAt;
+    if(removalIsNewerThanToken){
       throw new Error('KEETA_ACCESS_TOKEN_REAUTHORIZE_REQUIRED');
     }
     const token=await this.loadToken();
