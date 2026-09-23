@@ -380,7 +380,15 @@ export function ChannelsWorkspace({mode}:{mode:'overview'|'mapping'|'failures'|'
     catch(error){setLiveError(error instanceof Error?error.message:'KEETA_COMMERCIAL_REFRESH_FAILED');}
     finally{setCommercialBusy(null);}
   };
-  const commercialMoney=(value:number|undefined)=>value===undefined?'—':'HK
+  const commercialMoney=(value:number|undefined)=>value===undefined?'—':'HK'+String.fromCharCode(36)+(value/100).toFixed(2);
+  const [config,setConfig]=usePersistentAdminState<ChannelConfig>('channel-policy.keeta.v1',{enabled:false,autoAccept:false,syncSellability:false,commissionPct:'',displayName:'Keeta',lateCutoffMinutes:15});
+  const [mappings,setMappings]=usePersistentAdminState<MappingRow[]>('channel-mapping.keeta.v1',[]);
+  const [providerItemId,setProviderItemId]=useState('');
+  const [productId,setProductId]=useState('');
+  const patch=(change:Partial<ChannelConfig>)=>setConfig(current=>{const after={...current,...change};appendAdminAudit({action:'修改平台設定',target:'Keeta',before:current,after});return after;});
+  const addMapping=()=>{if(!providerItemId.trim()||!productId)return;setMappings(rows=>{const row:MappingRow={providerItemId:providerItemId.trim(),productId,status:'MAPPED'};appendAdminAudit({action:'新增平台商品對應',target:row.providerItemId,after:row});return [...rows.filter(item=>item.providerItemId!==row.providerItemId),row];});setProviderItemId('');setProductId('');};
+  const failures=mappings.filter(row=>row.status==='PENDING');
+  const title=mode==='overview'?'平台管理':mode==='mapping'?'商品映射管理':mode==='failures'?'匹配失敗明細':mode==='accept'?'接單／自動接單':mode==='sync'?'售罄／供應同步':'實收估算設定';
   const [mappings,setMappings]=usePersistentAdminState<MappingRow[]>('channel-mapping.keeta.v1',[]);
   const [providerItemId,setProviderItemId]=useState('');
   const [productId,setProductId]=useState('');
@@ -522,135 +530,6 @@ export function ChannelsWorkspace({mode}:{mode:'overview'|'mapping'|'failures'|'
         </article>)}
       </div>:<div className="admin-read-empty">未有 Keeta commercial evidence。收到並連結第一張 Keeta 訂單後會自動出現。</div>}
       <div className="admin-editor-actions"><button type="button" className="secondary" disabled={Boolean(commercialBusy)} onClick={()=>void refreshCommercialRows()}>重新讀取列表</button></div>
-    </section>:null}
-    <div className="admin-policy-grid two">
-      <article className="admin-policy-card"><h2>Keeta 平台設定</h2><label><span>顯示名稱</span><input value={config.displayName} onChange={event=>patch({displayName:event.target.value})}/></label><Toggle checked={config.enabled} onChange={enabled=>patch({enabled})} label="啟用平台設定"/><Toggle checked={config.autoAccept} onChange={autoAccept=>patch({autoAccept})} label="正常單自動接單"/><Toggle checked={config.syncSellability} onChange={syncSellability=>patch({syncSellability})} label="同步售罄／供應"/><label><span>遲到訂單界線（分鐘）</span><input type="number" min={0} value={config.lateCutoffMinutes} onChange={event=>patch({lateCutoffMinutes:Number(event.target.value)||0})}/></label><label><span>佣金估算 %</span><input inputMode="decimal" value={config.commissionPct} onChange={event=>patch({commissionPct:event.target.value})}/></label></article>
-      <article className="admin-policy-card"><h2>{mode==='failures'?'未完成對應':'商品對應'}</h2>
-        {mode==='failures'
-          ?(failures.length?<div>{failures.map(row=><p key={row.providerItemId}>{row.providerItemId} · 待處理</p>)}</div>:<div className="admin-read-empty">目前冇待處理映射。</div>)
-          :<><label><span>平台商品 ID</span><input value={providerItemId} onChange={event=>setProviderItemId(event.target.value)}/></label><label><span>磨飯商品</span><select value={productId} onChange={event=>setProductId(event.target.value)}><option value="">請選擇</option>{draft.products.map(product=><option key={product.id} value={product.id}>{product.name}</option>)}</select></label><button type="button" onClick={addMapping}>保存對應</button><div className="admin-readback-proof">{mappings.slice(0,20).map(row=><p key={row.providerItemId}><span>{row.providerItemId}</span><b>{draft.products.find(product=>product.id===row.productId)?.name??row.productId}</b></p>)}</div></>}
-      </article>
-    </div>
-  </section>;
-}
-+(value/100).toFixed(2);
-  const [config,setConfig]=usePersistentAdminState<ChannelConfig>('channel-policy.keeta.v1',{enabled:false,autoAccept:false,syncSellability:false,commissionPct:'',displayName:'Keeta',lateCutoffMinutes:15});
-  const [mappings,setMappings]=usePersistentAdminState<MappingRow[]>('channel-mapping.keeta.v1',[]);
-  const [providerItemId,setProviderItemId]=useState('');
-  const [productId,setProductId]=useState('');
-  const patch=(change:Partial<ChannelConfig>)=>setConfig(current=>{const after={...current,...change};appendAdminAudit({action:'修改平台設定',target:'Keeta',before:current,after});return after;});
-  const addMapping=()=>{if(!providerItemId.trim()||!productId)return;setMappings(rows=>{const row:MappingRow={providerItemId:providerItemId.trim(),productId,status:'MAPPED'};appendAdminAudit({action:'新增平台商品對應',target:row.providerItemId,after:row});return [...rows.filter(item=>item.providerItemId!==row.providerItemId),row];});setProviderItemId('');setProductId('');};
-  const failures=mappings.filter(row=>row.status==='PENDING');
-  const title=mode==='overview'?'平台管理':mode==='mapping'?'商品映射管理':mode==='failures'?'匹配失敗明細':mode==='accept'?'接單／自動接單':mode==='sync'?'售罄／供應同步':'實收估算設定';
-  return <section className="admin-editor-page">
-    <PolicyHeader title={title} description="管理平台顯示名稱、接單、供應同步、佣金估算同商品對應。Live connection 狀態同 Provider business authority 分開顯示，唔會因為連線成功就自動啟動接單。"/>
-    {mode==='overview'?<section className="admin-policy-card">
-      <header><div><small>KEETA LIVE CONNECTION</small><h2>Keeta 香港連線</h2></div><span className={liveStatus?.oauth.state==='CONNECTED'?'admin-status-good':'admin-not-wired-chip'}>{liveStatus?.oauth.state??'讀取中'}</span></header>
-      {liveStatus?<div className="admin-readback-proof">
-        <p><span>Canonical Store</span><b>{liveStatus.canonicalStoreId}</b></p>
-        <p><span>Provider Shop</span><b>{liveStatus.providerShopId??'未設定'}</b></p>
-        <p><span>OAuth</span><b>{liveStatus.oauth.state}</b></p>
-        <p><span>Token 到期</span><b>{liveStatus.oauth.expiresAt?new Date(liveStatus.oauth.expiresAt).toLocaleString('zh-HK'):'—'}</b></p>
-        <p><span>Token 來源</span><b>{liveStatus.oauth.tokenSource??'—'}</b></p>
-        <p><span>最近 OAuth callback</span><b>{liveStatus.oauth.lastCallbackAt?new Date(liveStatus.oauth.lastCallbackAt).toLocaleString('zh-HK'):'—'}</b></p>
-        <p><span>Callback 結果</span><b>{liveStatus.oauth.lastCallbackResult??'—'}</b></p>
-        <p><span>Callback 錯誤</span><b>{liveStatus.oauth.lastCallbackError??'—'}</b></p>
-        <p><span>Callback 方法</span><b>{liveStatus.oauth.lastCallbackMethod??'—'}</b></p>
-        <p><span>Callback 參數</span><b>{liveStatus.oauth.lastCallbackParamNames.length?liveStatus.oauth.lastCallbackParamNames.join(', '):'—'}</b></p>
-        <p><span>Webhook</span><b>{liveStatus.webhook.callbackUrl}</b></p>
-        <p><span>Webhook Accepted</span><b>{liveStatus.webhook.acceptedCount}</b></p>
-        <p><span>最近 Event</span><b>{liveStatus.webhook.lastEventId??'—'} / {liveStatus.webhook.lastMessageId??'—'}</b></p>
-        <p><span>最近驗簽失敗</span><b>{liveStatus.webhook.lastSignatureFailureAt?new Date(liveStatus.webhook.lastSignatureFailureAt).toLocaleString('zh-HK'):'—'}</b></p>
-      </div>:<div className="admin-read-empty">正在讀取 Keeta live runtime 狀態。</div>}
-      {liveStatus?.missingConfig.length?<div className="admin-validation is-error"><b>Runtime 尚欠設定</b><ul>{liveStatus.missingConfig.map(item=><li key={item}>{item}</li>)}</ul></div>:null}
-      {liveStatus?.knownExternalBlocker?<div className="admin-callout compact">Known external blocker：{liveStatus.knownExternalBlocker}。驗簽會 fail-closed，唔會為咗接通而放鬆。</div>:null}
-      {liveError?<div className="admin-validation is-error" role="alert">{liveError}</div>:null}
-      <div className="admin-editor-actions">
-        <button type="button" className="secondary" disabled={liveBusy} onClick={()=>void refreshLive()}>更新狀態</button>
-        <button type="button" className="secondary" disabled={liveBusy||liveStatus?.oauth.state!=='CONNECTED'} onClick={()=>void checkToken()}>檢查 Token</button>
-        <button type="button" className="primary" disabled={liveBusy||!liveStatus?.readyForAuthorization} onClick={()=>void authorize()}>{liveStatus?.oauth.state==='CONNECTED'?'重新授權 Keeta':'開始 Keeta 授權'}</button>
-      </div>
-      <details className="admin-rule-card">
-        <summary><b>已有 Keeta 測試 Token</b></summary>
-        <p>位置：Keeta Developers → 應用程式管理 → 磨飯v2 → 授權管理 → 門店數量 → 查看 Token。</p>
-        <label>
-          <span>Token JSON</span>
-          <textarea
-            rows={6}
-            value={testTokenJson}
-            onChange={event=>setTestTokenJson(event.target.value)}
-            placeholder='貼上「查看 Token」顯示嘅完整 JSON'
-            autoComplete="off"
-            spellCheck={false}
-          />
-        </label>
-        <div className="admin-editor-actions">
-          <button type="button" className="primary" disabled={liveBusy||!testTokenJson.trim()} onClick={()=>void importTestToken()}>匯入現有測試 Token</button>
-        </div>
-        <small>Token 只會送到 MFK runtime，以現有 encryption key 加密保存；成功後輸入欄會即時清空。呢個輸入唔會寫入 Admin draft、localStorage 或操作記錄。</small>
-      </details>
-      <small>目前連線層已接通；Provider business commands 會按 Owner 已授權嘅 Keeta Full Integration program 逐 seam 接入。</small>
-    </section>:null}
-    {(mode==='overview'||mode==='sync')?<section className="admin-policy-card">
-      <header>
-        <div><small>KEETA FULL MENU SNAPSHOT</small><h2>Keeta 菜單同步</h2></div>
-        <span className={menuStatus?.state==='COMPLETED'?'admin-status-good':'admin-not-wired-chip'}>{menuStatus?.state??'讀取中'}</span>
-      </header>
-      <p>來源固定為已發布 Admin 設定版本；同步係 full snapshot。預檢會先確認分類、商品、Option Set、OpenItemCode 同完整排序，再提交 Keeta 非同步 task。</p>
-      {menuPreview?<div className="admin-readback-proof">
-        <p><span>Admin Revision</span><b>R{menuPreview.revision}</b></p>
-        <p><span>分類</span><b>{menuPreview.summary.categories}</b></p>
-        <p><span>商品</span><b>{menuPreview.summary.spus}</b></p>
-        <p><span>SKU</span><b>{menuPreview.summary.skus}</b></p>
-        <p><span>Option Groups</span><b>{menuPreview.summary.choiceGroups}</b></p>
-        <p><span>Options</span><b>{menuPreview.summary.options}</b></p>
-        <p><span>Snapshot</span><b>{menuPreview.snapshotFingerprint.slice(0,18)}…</b></p>
-      </div>:null}
-      {menuStatus&&menuStatus.state!=='NEVER_SYNCED'?<div className="admin-readback-proof">
-        <p><span>狀態</span><b>{menuStatus.state}</b></p>
-        <p><span>Task ID</span><b>{menuStatus.taskId??'—'}</b></p>
-        <p><span>提交時間</span><b>{menuStatus.submittedAt?new Date(menuStatus.submittedAt).toLocaleString('zh-HK'):'—'}</b></p>
-        <p><span>1202 Completion</span><b>{menuStatus.completion?new Date(menuStatus.completion.completedAt).toLocaleString('zh-HK'):'—'}</b></p>
-        <p><span>1201 Picture Completion</span><b>{menuStatus.pictureCompletion?new Date(menuStatus.pictureCompletion.completedAt).toLocaleString('zh-HK'):'—'}</b></p>
-        <p><span>Errors</span><b>{menuStatus.completion?.errors.length??0}</b></p>
-      </div>:null}
-      <div className="admin-callout compact">Full snapshot 規則：未包含嘅既有 provider OpenItemCode 可能被 Keeta 刪除。呢度用完整已發布 MFK catalog 建 snapshot，唔會由 UI 手工砌半份 payload。</div>
-      <div className="admin-editor-actions">
-        <button type="button" className="secondary" disabled={menuBusy} onClick={()=>void previewMenu()}>預檢完整菜單</button>
-        <button type="button" className="primary" disabled={menuBusy||liveStatus?.oauth.state!=='CONNECTED'} onClick={()=>void submitMenu()}>同步完整菜單到 Keeta</button>
-        <button type="button" className="secondary" disabled={menuBusy} onClick={()=>void refreshMenu()}>更新同步狀態</button>
-      </div>
-    </section>:null}
-    {mode==='sync'?<section className="admin-policy-card">
-      <header><div><small>KEETA SELLABILITY</small><h2>Keeta 售罄／供應同步</h2></div><span className={sellabilityStatus?.state==='COMPLETED'?'admin-status-good':'admin-not-wired-chip'}>{sellabilityStatus?.state??'未同步'}</span></header>
-      <p>來源固定為已發布 MFK Availability + Catalog。SPU OpenItemCode 同完整菜單使用同一套 deterministic identity。</p>
-      {sellabilityPreview?<div className="admin-readback-proof">
-        <p><span>Admin Revision</span><b>R{sellabilityPreview.revision}</b></p>
-        <p><span>同步設定</span><b>{sellabilityPreview.state}</b></p>
-        <p><span>商品總數</span><b>{sellabilityPreview.total}</b></p>
-        <p><span>可售</span><b>{sellabilityPreview.available}</b></p>
-        <p><span>停售</span><b>{sellabilityPreview.unavailable}</b></p>
-      </div>:null}
-      <div className="admin-callout compact">目前只同步有 canonical product availability 嘅 SPU；Option 獨立售罄要等 MFK 有獨立 option availability truth，唔會由 provider 反推。</div>
-      <div className="admin-editor-actions">
-        <button type="button" className="secondary" disabled={providerOpsBusy} onClick={()=>void previewSellability()}>預檢供應狀態</button>
-        <button type="button" className="primary" disabled={providerOpsBusy||liveStatus?.oauth.state!=='CONNECTED'||!config.syncSellability} onClick={()=>void submitSellability()}>同步售罄到 Keeta</button>
-      </div>
-    </section>:null}
-    {mode==='sync'?<section className="admin-policy-card">
-      <header><div><small>KEETA STORE OPS</small><h2>Keeta 營業時間／開關店</h2></div><span className={storeStatus?.state==='AVAILABLE'?'admin-status-good':'admin-not-wired-chip'}>{storeStatus?.state??'未讀取'}</span></header>
-      <p>七日營業時間由已發布 Admin 門店設定投影；REST／OPEN 係 Keeta provider 營運動作，唔會改寫 MFK Store identity。</p>
-      {storePreview?<div className="admin-readback-proof">
-        <p><span>Admin Revision</span><b>R{storePreview.revision}</b></p>
-        <p><span>星期資料</span><b>{Object.keys(storePreview.businessHourOfTheWeek).length} / 7</b></p>
-      </div>:null}
-      <div className="admin-editor-actions">
-        <button type="button" className="secondary" disabled={providerOpsBusy} onClick={()=>void previewStore()}>預檢營業時間</button>
-        <button type="button" className="primary" disabled={providerOpsBusy||liveStatus?.oauth.state!=='CONNECTED'} onClick={()=>void submitStoreHours()}>同步營業時間</button>
-        <button type="button" className="secondary" disabled={providerOpsBusy||liveStatus?.oauth.state!=='CONNECTED'} onClick={()=>void runStoreOperation('REST')}>Keeta 暫停接單</button>
-        <button type="button" className="secondary" disabled={providerOpsBusy||liveStatus?.oauth.state!=='CONNECTED'} onClick={()=>void runStoreOperation('OPEN')}>Keeta 恢復接單</button>
-        <button type="button" className="secondary" disabled={providerOpsBusy} onClick={()=>void refreshStoreReadback()}>更新 Provider Readback</button>
-      </div>
     </section>:null}
     <div className="admin-policy-grid two">
       <article className="admin-policy-card"><h2>Keeta 平台設定</h2><label><span>顯示名稱</span><input value={config.displayName} onChange={event=>patch({displayName:event.target.value})}/></label><Toggle checked={config.enabled} onChange={enabled=>patch({enabled})} label="啟用平台設定"/><Toggle checked={config.autoAccept} onChange={autoAccept=>patch({autoAccept})} label="正常單自動接單"/><Toggle checked={config.syncSellability} onChange={syncSellability=>patch({syncSellability})} label="同步售罄／供應"/><label><span>遲到訂單界線（分鐘）</span><input type="number" min={0} value={config.lateCutoffMinutes} onChange={event=>patch({lateCutoffMinutes:Number(event.target.value)||0})}/></label><label><span>佣金估算 %</span><input inputMode="decimal" value={config.commissionPct} onChange={event=>patch({commissionPct:event.target.value})}/></label></article>
