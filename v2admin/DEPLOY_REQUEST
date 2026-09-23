@@ -1,9 +1,8 @@
 MFK_ADMIN_DEPLOY_REQUEST
 target=mfk-admin
 canonical_url=https://admin.morefunos.com
-source_main=5e07a38802276ad3b5cc238c970bf7cd61b7bfc8
+source_main=f661517226aeb4c0309667b6835e076ccfc7ce1e
 requested_by=owner
-reason=keeta_k3_menu_submit_feedback
-work_id=MFK-KEETA-K3-DIRECT-LIVE-MENU-WORKER-A-R1
-preview_run=35813905424
-ota=current_afb02b6e09f4
+reason=keeta_token_authorization_revocation_fail_closed
+work_id=MFK-KEETA-TOKEN-AUTH-REVOCATION-R1
+preview_run=35814972275
