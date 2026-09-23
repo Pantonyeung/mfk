@@ -711,6 +711,74 @@ describe('Keeta live edge runtime',()=>{
     }finally{vi.unstubAllGlobals();}
   });
 
+  it('schedules and executes automatic token rotation without another manual token import',async()=>{
+    const key=Buffer.alloc(32,32).toString('base64');
+    const storage=new Map<string,unknown>();
+    let alarmAt:number|null=null;
+    const state={storage:{
+      get:async(key:string)=>storage.get(key),
+      put:async(key:string,value:unknown)=>{storage.set(key,value);},
+      delete:async(key:string)=>{storage.delete(key);},
+      list:async({prefix}:{prefix:string})=>new Map([...storage.entries()].filter(([key])=>key.startsWith(prefix))),
+      setAlarm:async(value:number)=>{alarmAt=value;},
+      getAlarm:async()=>alarmAt,
+    }};
+    const env={
+      KEETA_APP_ID:'3419700273',KEETA_APP_SECRET:'test-secret',
+      KEETA_TOKEN_ENCRYPTION_KEY:key,KEETA_PROVIDER_SHOP_ID:'721578302',
+      KEETA_OAUTH_REDIRECT_URI:'https://admin.morefunos.com/api/keeta/oauth/callback',
+    };
+    const {KeetaRuntimeStore}=await import('../keeta-runtime.ts');
+    const runtime=new KeetaRuntimeStore(state as never,env as never);
+    const baseNow=1_800_000_000_000;
+    const dateSpy=vi.spyOn(Date,'now').mockReturnValue(baseNow);
+    const providerFetch=vi.fn(async(input:string|URL|Request,init?:RequestInit)=>{
+      const url=String(input);
+      if(url!=='https://open.mykeeta.com/api/open/base/oauth/token')throw new Error('UNEXPECTED_PROVIDER_URL:'+url);
+      const sent=JSON.parse(String(init?.body??'{}')) as {grantType?:string;refreshToken?:string};
+      expect(sent.grantType).toBe('refresh_token');
+      expect(sent.refreshToken).toBe('auto-refresh-1');
+      return new Response(JSON.stringify({
+        accessToken:'auto-access-2',tokenType:'bearer',expiresIn:7776000,
+        refreshToken:'auto-refresh-2',scope:'all',issuedAtTime:baseNow+85*24*60*60*1000,
+      }),{status:200,headers:{'content-type':'application/json'}});
+    });
+    vi.stubGlobal('fetch',providerFetch);
+    try{
+      const imported=await runtime.fetch(new Request('https://internal/admin/token/import-test',{
+        method:'POST',headers:{'content-type':'application/json'},
+        body:JSON.stringify({
+          accessToken:'auto-access-1',tokenType:'bearer',expiresIn:7776000,
+          refreshToken:'auto-refresh-1',scope:'all',issuedAtTime:baseNow,
+        }),
+      }));
+      expect(imported.status).toBe(200);
+      expect(alarmAt).toBe(baseNow+(7776000*1000)-(5*24*60*60*1000));
+
+      dateSpy.mockReturnValue(Number(alarmAt)+1);
+      await runtime.alarm();
+
+      expect(providerFetch).toHaveBeenCalledTimes(1);
+      const status=await runtime.fetch(new Request('https://internal/admin/status',{method:'POST'}));
+      const body=await status.json() as {oauth:{state:string;tokenSource:string;autoRefresh:{state:string;nextRefreshAt:string|null;lastSuccessAt:string|null;lastError:string|null}}};
+      expect(body.oauth.state).toBe('CONNECTED');
+      expect(body.oauth.tokenSource).toBe('OAUTH_REFRESH');
+      expect(body.oauth.autoRefresh.state).toBe('SCHEDULED');
+      expect(body.oauth.autoRefresh.nextRefreshAt).toBeTruthy();
+      expect(body.oauth.autoRefresh.lastSuccessAt).toBeTruthy();
+      expect(body.oauth.autoRefresh.lastError).toBeNull();
+
+      const serialized=JSON.stringify([...storage.entries()]);
+      expect(serialized).not.toContain('auto-access-1');
+      expect(serialized).not.toContain('auto-refresh-1');
+      expect(serialized).not.toContain('auto-access-2');
+      expect(serialized).not.toContain('auto-refresh-2');
+    }finally{
+      vi.unstubAllGlobals();
+      dateSpy.mockRestore();
+    }
+  });
+
   it('gates Keeta CONFIRM and READY on the committed canonical order and makes success idempotent',async()=>{
     const key=Buffer.alloc(32,14).toString('base64');
     const storage=new Map<string,unknown>([
