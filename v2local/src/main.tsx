@@ -6,6 +6,7 @@ import {installSmtAdminAutoSync} from './runtime/admin-config-sync.ts';
 import {installStaffSessionInvalidation} from './runtime/staff-auth.ts';
 import {installKeetaOrderIntake} from './runtime/keeta-order-intake.ts';
 import {installKeetaOrderLifecycle} from './runtime/keeta-order-lifecycle.ts';
+import {installKeetaAfterSales} from './runtime/keeta-after-sale.ts';
 import {localRuntime} from './runtime/local-runtime.ts';
 import {readLocalCashOpenings,readLocalDayCloses} from './runtime/local-operations.ts';
 import {
@@ -21,6 +22,7 @@ installStaffSessionInvalidation();
 installProjectionOutboxAutoFlush();
 installKeetaOrderIntake();
 installKeetaOrderLifecycle();
+installKeetaAfterSales();
 
 for(const order of localRuntime.orders())queueOrderProjection(order);
 for(const opening of readLocalCashOpenings())queueCashOpeningProjection(opening);
