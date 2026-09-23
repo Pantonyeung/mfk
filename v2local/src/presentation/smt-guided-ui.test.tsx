@@ -5,7 +5,7 @@ import {CheckoutWorkspace} from '../features/checkout/CheckoutWorkspace.tsx';
 import {ActionFeedback,EmptyState,GuidedProgress} from './SmtUi.tsx';
 
 describe('SMT human-centered guided UI',()=>{
-  it('keeps quantity, published options and computed pricing in one product editor',()=>{
+  it('shows one product decision at a time while keeping quantity and computed pricing visible',()=>{
     const html=renderToStaticMarkup(<ProductConfigWorkspace
       product={{
         id:'meal',category:'便當',name:'測試便當',priceMinor:5000,priceLabel:'$50.00',
@@ -24,9 +24,9 @@ describe('SMT human-centered guided UI',()=>{
     expect(html).toContain('由菜單與已選選項自動計算');
     expect(html).toContain('份量');
     expect(html).toContain('大份');
-    expect(html).toContain('辣度');
-    expect(html).toContain('大辣');
-    expect(html).toContain('數量與備註');
+    expect(html).not.toContain('辣度');
+    expect(html).not.toContain('大辣');
+    expect(html).toContain('仲有設定未完成');
     expect(html).toContain('基價');
     expect(html).toContain('+$5.00');
     expect(html).toContain('加入購物籃');
@@ -46,6 +46,9 @@ describe('SMT human-centered guided UI',()=>{
     expect(html).toContain('訂單來源');
     expect(html).toContain('付款方式');
     expect(html).toContain('收款');
+    expect(html).toContain('優惠與會員');
+    expect(html).toContain('學生優惠');
+    expect(html).toContain('正式優惠計價尚未接駁');
     expect(html).toContain('確認收款並建立訂單');
     expect(html).not.toContain('繼續：');
   });

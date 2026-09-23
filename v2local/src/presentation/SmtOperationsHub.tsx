@@ -29,7 +29,7 @@ export function SmtOperationsHub({runtime}:{runtime:CleanSmtCoreRuntimePort}){
   const unavailable=availability?.nodes.filter(node=>node.status!=='available').length??0;
 
   return <main className="smt-operations-page">
-    <header className="smt-page-heading"><div><span>營運</span><h1>先睇需要注意嘅門店狀態</h1><p>堂食同商品供應分開處理；只顯示系統實際讀取到嘅狀態。</p></div><button type="button" disabled={loading} onClick={()=>void load()}>{loading?'更新中…':'重新整理'}</button></header>
+    <header className="smt-page-heading"><div><span>狀態</span><h1>先睇需要注意嘅門店狀態</h1><p>堂食同商品供應分開處理；只顯示系統實際讀取到嘅狀態。</p></div><button type="button" disabled={loading} onClick={()=>void load()}>{loading?'更新中…':'重新整理'}</button></header>
     {error?<ActionFeedback tone="warning" title="未能讀取全部狀態" detail={error} actionLabel="再試一次" onAction={()=>void load()}/>:null}
     <section className="smt-operations-grid">
       <article className="smt-operation-card">

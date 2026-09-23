@@ -1,4 +1,4 @@
-import {useCallback,useEffect,useMemo,useState} from 'react';
+import {useCallback,useEffect,useMemo,useRef,useState} from 'react';
 import {useSearchParams} from 'react-router';
 import type {CleanSmtCoreRuntimePort,SmtOrdersProjection,SmtReprintOption} from '../runtime/local-runtime.ts';
 import {hasStaffPermission} from '../runtime/staff-auth.ts';
@@ -59,6 +59,9 @@ export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePor
   const [keetaPullBusy,setKeetaPullBusy]=useState(false);
   const [keetaPullMessage,setKeetaPullMessage]=useState<string|null>(null);
   const [keetaIntakeRevision,setKeetaIntakeRevision]=useState(0);
+  const modalRef=useRef<HTMLDialogElement>(null);
+  const modalCloseRef=useRef<HTMLButtonElement>(null);
+  const previousFocusRef=useRef<HTMLElement|null>(null);
   useEffect(()=>{
     const refresh=()=>setAfterSaleRevision(value=>value+1);
     window.addEventListener('mfk-keeta-after-sale',refresh);
@@ -117,10 +120,15 @@ export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePor
     })));
   },[snapshot?.selectedOrderId]);
   useEffect(()=>{
-    if(!modal)return;
-    const close=(event:KeyboardEvent)=>{if(event.key==='Escape')setModal(null)};
-    window.addEventListener('keydown',close);
-    return()=>window.removeEventListener('keydown',close);
+    const dialog=modalRef.current;
+    if(!modal||!dialog)return;
+    previousFocusRef.current=document.activeElement instanceof HTMLElement?document.activeElement:null;
+    if(!dialog.open)dialog.showModal();
+    modalCloseRef.current?.focus();
+    return()=>{
+      if(dialog.open)dialog.close();
+      previousFocusRef.current?.focus();
+    };
   },[modal]);
 
   const acceptSelected=async()=>{
@@ -272,7 +280,7 @@ export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePor
           <button type="button" className="order-partial-preview" disabled={!canCorrect||Boolean(afterSaleBusy)} onClick={()=>void previewPartial()}>查詢可部分退款商品</button>
           {partialPreview?<details><summary>部分退款平台回應</summary><pre>{JSON.stringify(partialPreview,null,2)}</pre></details>:null}
         </section>:null}
-        {message?<p className="order-inline-message">{message}</p>:null}
+        {message?<p className="order-inline-message" role="status" aria-live="polite">{message}</p>:null}
         <footer>
           <button onClick={()=>void openReprint()}>▣ 重印</button>
           <button disabled={!canCorrect} title={canCorrect?'':'需要 ORDER_CORRECTION 權限'} onClick={()=>setModal('actions')}>✎ 取消／修改</button>
@@ -318,9 +326,9 @@ export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePor
       {loading&&!snapshot?<p className="order-board-error">載入訂單…</p>:null}
     </section>
 
-    {selected&&modal?<div className="order-modal-backdrop" onMouseDown={event=>{if(event.target===event.currentTarget)setModal(null)}}>
-      <section className={'order-modal '+modal} role="dialog" aria-modal="true" aria-label={modal==='reprint'?'重印':modal==='edit'?'修改訂單':modal==='cancel'?'取消訂單':'取消或修改訂單'}>
-        <header><h2>{modal==='reprint'?'重印':modal==='edit'?'修改訂單':modal==='cancel'?'取消訂單':'取消／修改'}</h2><button type="button" aria-label="關閉" onClick={()=>setModal(null)}>×</button></header>
+    {selected&&modal?<dialog ref={modalRef} className={'order-modal '+modal} aria-label={modal==='reprint'?'重印':modal==='edit'?'修改訂單':modal==='cancel'?'取消訂單':'取消或修改訂單'} onCancel={event=>{event.preventDefault();setModal(null)}} onClick={event=>{if(event.target===event.currentTarget)setModal(null)}}>
+      <section className="order-modal-surface">
+        <header><div><small>訂單 {selected.orderIdLabel}</small><h2>{modal==='reprint'?'重印':modal==='edit'?'修改訂單':modal==='cancel'?'取消訂單':'取消／修改'}</h2><p>{modal==='actions'?'先選擇要處理嘅工作。':modal==='edit'?'調整商品後，核對新金額再確認。':modal==='cancel'?'先了解影響，再確認取消。':'只揀需要重新打印嘅內容，再開始打印。'}</p></div><button ref={modalCloseRef} type="button" aria-label="關閉" onClick={()=>setModal(null)}>×</button></header>
 
         {modal==='actions'?<div className="order-action-choices">
           <button onClick={()=>setModal('edit')}><b>✎ 修改訂單</b><span>修改商品數量；保持同一訂單編號，完成後唔自動重印。</span></button>
@@ -348,6 +356,7 @@ export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePor
 
         {modal==='reprint'?<div className="order-reprint-body">
           <p>選擇需要重新打印嘅內容。標籤會按實體打印機分組；同一部機有多張標籤時可以展開逐張揀。重印永遠唔會開錢箱。</p>
+          <div className="order-modal-progress"><span>1　選擇打印內容</span><strong>{selectedJobs.size?`已選 ${selectedJobs.size} 項`:'尚未選擇'}</strong><span>2　開始打印</span></div>
           {ticketReprintOptions.length?<section className="order-reprint-ticket-group"><header><b>80mm 單據</b><span>{ticketReprintOptions.length}</span></header><div className="order-reprint-options">{ticketReprintOptions.map(option=><label key={option.jobId}><input type="checkbox" checked={selectedJobs.has(option.jobId)} onChange={()=>toggleJob(option.jobId)}/><span><b>{option.label}</b><small>{option.printerName}</small></span></label>)}</div></section>:null}
           <div className="order-reprint-printers">{labelReprintGroups.map(group=><details key={group.bindingId} className="order-reprint-printer-group" open={group.options.length===1}>
             <summary><span><b>{group.printerName}</b><small>{group.physicalKey||'未綁定'} · {group.options.length} 張標籤</small></span><button type="button" onClick={event=>{event.preventDefault();setSelectedJobs(current=>{const next=new Set(current);const allSelected=group.options.every(option=>next.has(option.jobId));for(const option of group.options){if(allSelected)next.delete(option.jobId);else next.add(option.jobId);}return next;});}}>呢部全選</button></summary>
@@ -358,6 +367,6 @@ export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePor
           <footer><button onClick={()=>setModal(null)}>取消</button><button className="primary" disabled={!selectedJobs.size||reprintBusy} onClick={()=>void runReprint()}>{reprintBusy?'打印中…':'開始打印'}</button></footer>
         </div>:null}
       </section>
-    </div>:null}
+    </dialog>:null}
   </main>;
 }

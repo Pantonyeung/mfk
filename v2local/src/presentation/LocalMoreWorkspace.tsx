@@ -558,7 +558,7 @@ export function LocalMoreWorkspace(){
   };
   return <main className="more-workspace more-card-workspace" aria-label="MFK SMT 本地營運中心">
     <header className="more-card-topbar">
-      <button type="button" onClick={()=>section==='overview'?navigate('/operations'):setSection('overview')}>{section==='overview'?'← 返回營運':'← 更多功能'}</button>
+      <button type="button" onClick={()=>section==='overview'?navigate('/operations'):setSection('overview')}>{section==='overview'?'← 返回狀態':'← 更多功能'}</button>
       <div><small>本機營運</small><b>{titleMap[section]}</b></div>
       <span>本機優先</span>
     </header>

@@ -71,12 +71,21 @@ function productArtwork(product:Product){
 }
 
 const nav=[
-  {to:'/',label:'點單',icon:'＋',end:true},
-  {to:'/work',label:'工作',icon:'✓'},
-  {to:'/orders',label:'訂單',icon:'▤'},
-  {to:'/operations',label:'營運',icon:'◎'},
-  {to:'/more',label:'更多',icon:'•••'},
+  {to:'/',label:'點單',icon:'order',end:true},
+  {to:'/work',label:'工作',icon:'work'},
+  {to:'/orders',label:'訂單',icon:'orders'},
+  {to:'/operations',label:'狀態',icon:'status'},
+  {to:'/more',label:'更多',icon:'more'},
 ] as const;
+
+function NavGlyph({name}:{name:(typeof nav)[number]['icon']}){
+  const common={width:24,height:24,viewBox:'0 0 24 24',fill:'none',stroke:'currentColor',strokeWidth:1.9,strokeLinecap:'round' as const,strokeLinejoin:'round' as const,'aria-hidden':true};
+  if(name==='order')return <svg {...common}><path d="M5 7h14l-1 12H6L5 7Z"/><path d="M8 7a4 4 0 0 1 8 0M9 12h6"/></svg>;
+  if(name==='work')return <svg {...common}><path d="M8 4h8M9 3v3m6-3v3M6 6h12a2 2 0 0 1 2 2v11H4V8a2 2 0 0 1 2-2Z"/><path d="m8 13 2.3 2.3L16 10"/></svg>;
+  if(name==='orders')return <svg {...common}><path d="M7 3h10v4H7zM5 5H3v16h18V5h-2"/><path d="M8 12h8M8 16h6"/></svg>;
+  if(name==='status')return <svg {...common}><path d="M4 18V6m5 12v-7m5 7V9m5 9V4"/><path d="M3 20h18"/></svg>;
+  return <svg {...common}><circle cx="5" cy="12" r="1.3" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.3" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1.3" fill="currentColor" stroke="none"/></svg>;
+}
 
 function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[];setCart:(v:CartLine[])=>void;serviceMode:ServiceMode;setServiceMode:(m:ServiceMode)=>void}){
   const navigate=useNavigate();
@@ -589,7 +598,7 @@ function OperationalApp(){
       <div className="clean-brand" aria-label="磨飯">磨</div>
       <nav aria-label="MFK 主導航">
         {nav.map(item=><NavLink key={item.to} to={item.to} end={'end' in item?item.end:false} className={({isActive})=>isActive?'active':''}>
-          <span className="clean-rail-icon">{item.icon}</span>
+          <span className="clean-rail-icon"><NavGlyph name={item.icon}/></span>
           <span className="clean-rail-label">{item.label}</span>
           {item.to==='/work'&&activeOrderCount>0?<span className="clean-rail-badge" aria-label={'待處理工作 '+activeOrderCount}>{activeOrderCount>99?'99+':activeOrderCount}</span>:null}
         </NavLink>)}

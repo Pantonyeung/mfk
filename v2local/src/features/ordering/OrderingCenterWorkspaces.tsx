@@ -39,6 +39,7 @@ export function ProductConfigWorkspace({product,initial,onAdd}:{product:Workspac
   const [note,setNote]=useState(initial?.configuration?.note??'');
   const [choiceFeedback,setChoiceFeedback]=useState('');
   const optionSets=product.optionSets??[];
+  const [activeStep,setActiveStep]=useState(0);
   const [selected,setSelected]=useState<Record<string,string[]>>(()=>Object.fromEntries(
     optionSets.map(set=>[
       set.id,
@@ -60,6 +61,10 @@ export function ProductConfigWorkspace({product,initial,onAdd}:{product:Workspac
       }
       return {...current,[set.id]:[...existing,optionId]};
     });
+    if(set.selection==='SINGLE'){
+      const index=optionSets.findIndex(row=>row.id===set.id);
+      if(index>=0)window.setTimeout(()=>setActiveStep(current=>current===index?Math.min(optionSets.length,index+1):current),140);
+    }
   };
   const selectedOptions=optionSets.flatMap(set=>{
     const ids=new Set(selected[set.id]??[]);
@@ -83,39 +88,51 @@ export function ProductConfigWorkspace({product,initial,onAdd}:{product:Workspac
     const names=set.options.filter(option=>ids.has(option.id)).map(option=>option.name);
     return names.length?names.join('、'):'沒有選擇';
   };
+  const reviewing=activeStep>=optionSets.length;
+  const activeSet=optionSets[activeStep];
+  const activeCount=activeSet?(selected[activeSet.id]??[]).length:0;
+  const activeReady=!activeSet||(
+    activeCount>=activeSet.min&&
+    activeCount<=activeSet.max&&
+    (!activeSet.required||activeCount>0)
+  );
+  const stepLabel=reviewing?'核對數量與備註':activeSet?.name??'核對商品';
+  const editorReady=!invalid&&(reviewing||optionSets.length===0);
 
   return <div className="cfg-workspace">
     <header className="cfg-product-head">
       <div className="cfg-product-hero">{product.imageUrl?<img src={product.imageUrl} alt=""/>:null}</div>
-      <div><small>{product.category}</small><h2>{product.name}</h2><p>基價 {money(product.priceMinor)}{delta?` · 選項 ${delta>0?'+':''}${money(delta)}`:' · 選項不加價'}</p></div>
+      <div><small>{product.category}</small><h2>{product.name}</h2><p>{optionSets.length?`逐項完成 ${optionSets.length} 組設定；已完成步驟會自動收起。`:'此商品沒有已發布選項，確認數量即可加入。'}</p></div>
       <div className="cfg-live-total"><small>目前單價</small><strong>{money(product.priceMinor+delta)}</strong><span>由菜單與已選選項自動計算</span></div>
     </header>
 
     <section className="cfg-editor" aria-label="商品設定">
       <div className="cfg-editor-options">
-        {optionSets.length===0?<p className="cfg-no-options">此商品沒有已發布選項；確認數量就可以加入。</p>:optionSets.map(set=>{
-          const count=(selected[set.id]??[]).length;
-          const missing=count<set.min||(set.required&&count<1);
-          return <section className={`cfg-block${missing?' is-missing':''}`} key={set.id}>
-            <header><div><small>{missing?'尚未完成':'已選 '+summaryFor(set)}</small><b>{set.name}</b></div><span>{set.required?'必選':'可選'} · {set.selection==='SINGLE'?'單選':'多選'} · {set.min}–{set.max}</span></header>
-            <div className="cfg-choice-grid three">{set.options.map(option=>{
-              const active=(selected[set.id]??[]).includes(option.id);
+        {optionSets.length?<div className="cfg-step-heading"><div><small>而家請完成</small><h3>{stepLabel}</h3><p>{reviewing?'所有必選已完成；核對右邊數量、備註同金額。':activeSet?.selection==='SINGLE'?'揀選一項後會自動進入下一步。':'只處理眼前呢一組，完成後再繼續。'}</p></div><GuidedProgress current={Math.min(activeStep+1,optionSets.length+1)} total={optionSets.length+1} label={stepLabel}/></div>:null}
+
+        {optionSets.slice(0,Math.min(activeStep,optionSets.length)).map(set=><CompletedStep key={set.id} label={set.name} summary={summaryFor(set)} onEdit={()=>{setChoiceFeedback('');setActiveStep(optionSets.findIndex(row=>row.id===set.id))}}/>)}
+
+        {optionSets.length===0?<p className="cfg-no-options">此商品沒有已發布選項；右邊確認數量同備註，就可以加入購物籃。</p>:!reviewing&&activeSet?<section className={`cfg-block cfg-current-option${activeReady?'':' is-missing'}`} key={activeSet.id} aria-live="polite">
+            <header><div><small>{activeReady?'已選 '+summaryFor(activeSet):'尚欠選擇'}</small><b>{activeSet.name}</b></div><span>{activeSet.required?'必選':'可選'} · {activeSet.selection==='SINGLE'?'單選':'多選'} · {activeSet.min}–{activeSet.max}</span></header>
+            <div className="cfg-choice-grid three">{activeSet.options.map(option=>{
+              const active=(selected[activeSet.id]??[]).includes(option.id);
               const price=option.priceAdjustmentMinor;
-              return <button type="button" key={option.id} aria-pressed={active} className={active?'active':''} onClick={()=>toggle(set,option.id)}>
+              return <button type="button" key={option.id} aria-pressed={active} className={active?'active':''} onClick={()=>toggle(activeSet,option.id)}>
                 <span className="cfg-choice-state" aria-hidden="true">{active?'✓':''}</span><b>{option.name}</b>{price!==0?<small>{price>0?'+':''}{money(price)}</small>:<small>不加價</small>}
               </button>;
             })}</div>
-          </section>;
-        })}
+            {activeSet.selection==='MULTIPLE'?<footer className="cfg-step-action"><button type="button" disabled={!activeReady} onClick={()=>setActiveStep(Math.min(optionSets.length,activeStep+1))}>{activeStep===optionSets.length-1?'完成選項':'繼續下一項'} →</button></footer>:!activeSet.required&&activeCount===0?<footer className="cfg-step-action"><button type="button" onClick={()=>setActiveStep(Math.min(optionSets.length,activeStep+1))}>略過呢項，繼續 →</button></footer>:null}
+          </section>:null}
+        {reviewing&&optionSets.length?<section className="cfg-ready-card" role="status"><span aria-hidden="true">✓</span><div><small>選項已完成</small><h3>最後核對數量同備註</h3><p>需要改選項，可以撳上面任何一項返回修改。</p></div></section>:null}
         {choiceFeedback?<DisabledReason>{choiceFeedback}</DisabledReason>:null}
       </div>
       <aside className="cfg-editor-summary">
-        <header><small>即時核對</small><h3>數量與備註</h3></header>
+        <header><small>{invalid?'完成目前必選':'最後核對'}</small><h3>{invalid?'仲有設定未完成':'數量與備註'}</h3></header>
       <div className="cfg-qty"><span>數量</span><button type="button" onClick={()=>setQty(Math.max(1,qty-1))} aria-label="減少數量">−</button><b>{qty}</b><button type="button" onClick={()=>setQty(qty+1)} aria-label="增加數量">＋</button></div>
       <label className="cfg-note"><span>商品備註 <small>選填</small></span><input value={note} maxLength={60} onChange={event=>setNote(event.target.value)} placeholder="例如：不要蔥、醬分開"/><small>{note.length}/60</small></label>
         <div className="cfg-price-readback"><span>基價</span><b>{money(product.priceMinor)}</b><span>選項價差</span><b>{delta>0?'+':''}{money(delta)}</b><strong>合計</strong><strong>{money((product.priceMinor+delta)*qty)}</strong></div>
-        {invalid?<DisabledReason>請先完成所有必選項目，先可以加入購物籃。</DisabledReason>:null}
-        <button type="button" className="cfg-save primary" disabled={invalid} onClick={()=>onAdd(detail,delta,qty,{selected,note})}>{initial?'儲存修改':'加入購物籃'}　{money((product.priceMinor+delta)*qty)}</button>
+        {!editorReady?<DisabledReason>{invalid?'請先完成所有必選項目，先可以加入購物籃。':'請先完成或略過目前選項，再作最後核對。'}</DisabledReason>:null}
+        <button type="button" className="cfg-save primary" disabled={!editorReady} onClick={()=>onAdd(detail,delta,qty,{selected,note})}>{initial?'儲存修改':'加入購物籃'}　{money((product.priceMinor+delta)*qty)}</button>
       </aside>
     </section>
   </div>;

@@ -701,3 +701,17 @@
 .clean-rail nav a.active .clean-rail-icon{background:#1768dc;color:#fff}
 .clean-rail nav a.active .clean-rail-badge{border-color:#eef5ff}
 .clean-runtime-state{border-color:#b9d9c8;background:#edf8f2;color:#176b49}
+
+/* SMT workstation shell R3 — bright, calm and icon-led. */
+:root{--smt-shell-bg:#f3f6fa;--smt-shell-line:#dce3ec;--smt-shell-blue:#1768dc}
+.clean-app,.clean-route-stage,.smt-production-viewport,.smt-production-canvas{background:var(--smt-shell-bg)}
+.clean-rail{padding:12px 8px 10px;border-right:1px solid var(--smt-shell-line);background:rgba(255,255,255,.98);box-shadow:6px 0 20px rgb(28 46 70 / 4%)}
+.clean-brand{width:56px;height:56px;border-radius:16px;background:#172033;color:#fff;box-shadow:0 7px 18px rgb(23 32 51 / 16%);font-size:25px;letter-spacing:-.08em}
+.clean-rail nav{gap:5px}.clean-rail nav a{min-height:72px;gap:2px;border:0;border-radius:12px;color:#5b687b;transition:color 140ms ease,background-color 140ms ease,transform 90ms ease}
+.clean-rail nav a:hover{color:#263950;background:#f3f6f9}.clean-rail nav a:active{transform:scale(.96)}
+.clean-rail nav a.active{border:0;color:#1559af;background:#eaf2ff;box-shadow:inset 3px 0 0 #1768dc}
+.clean-rail-icon{width:40px;height:40px;border-radius:10px;color:#59687d;background:transparent}.clean-rail-icon svg{display:block}
+.clean-rail nav a.active .clean-rail-icon{color:#1768dc;background:transparent}.clean-rail-label{font-size:12px;letter-spacing:0}
+.clean-runtime-state{border:0;border-radius:9px;background:#edf8f2;color:#176b49}.clean-staff-session{border-color:#dfe5ec;border-radius:10px;box-shadow:none}
+.smt-production-canvas button:focus-visible,.smt-production-canvas input:focus-visible,.smt-production-canvas select:focus-visible{outline:3px solid #79aaf3;outline-offset:3px}
+@media(prefers-reduced-motion:reduce){.clean-rail nav a{transition:none}.clean-rail nav a:active{transform:none}}

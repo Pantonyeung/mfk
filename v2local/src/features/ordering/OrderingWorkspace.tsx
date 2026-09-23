@@ -80,11 +80,11 @@ export function OrderingWorkspace({view,actions,centerPanel}:{view:OrderingWorks
   return <div className={`ordering-workspace${centerPanel?' panel-open':''}`}>
     <main className={`ordering-catalog${centerPanel?' ordering-catalog--panel':''}`} aria-label={centerPanel?centerPanel.title:'點單商品'}>
       {centerPanel?<section className="ordering-center-panel">
-        <header className="ordering-center-panel-head"><div><small>即時設定</small><strong>{centerPanel.title}</strong><span>選項、數量同價錢會即時更新；必選完成先可以儲存。</span></div><button type="button" aria-label="關閉設定" onClick={centerPanel.onClose}>×</button></header>
+        <header className="ordering-center-panel-head"><div><small>當前任務</small><strong>{centerPanel.title}</strong><span>只處理眼前一步；選項、數量同價錢會即時更新。</span></div><button type="button" aria-label="關閉設定" onClick={centerPanel.onClose}>×</button></header>
         <div className="ordering-center-panel-body">{centerPanel.body}</div>
       </section>:<>
         <header className="ordering-task-header">
-          <div><span>點單</span><h1>一按加入，有必選先停低</h1><p>快速模式適合繁忙時段；普通模式每件商品都先核對設定。</p></div>
+          <div><span>點單</span><h1>一按加入，有必選先停低</h1><p>快速模式適合繁忙時段；普通模式每件商品都先核對設定。</p><div className="ordering-task-path" aria-label="點單流程"><b>1 選商品</b><span>2 完成必選</span><span>3 核對購物籃</span><span>4 結帳</span></div></div>
           <div className="ordering-source-status"><StatusTag tone="success">本機可用</StatusTag>{view.menuRevisionLabel?<small>{view.menuRevisionLabel}</small>:null}</div>
         </header>
 
@@ -97,8 +97,8 @@ export function OrderingWorkspace({view,actions,centerPanel}:{view:OrderingWorks
             <div><button type="button" className={view.orderingMode==='quick'?'active':''} aria-pressed={view.orderingMode==='quick'} onClick={()=>actions.onChangeOrderingMode('quick')}>快速</button><button type="button" className={view.orderingMode==='standard'?'active':''} aria-pressed={view.orderingMode==='standard'} onClick={()=>actions.onChangeOrderingMode('standard')}>普通</button></div>
           </div>
           <div className="ordering-work-items">
-            {view.workItems.map(item=><button type="button" key={item.id} className={`${item.tone}${item.active?' active':''}`} aria-pressed={item.active} disabled={!item.enabled} onClick={()=>actions.onOpenWorkItem(item.id)}>
-              <span><b>{item.label}</b><small>{item.description}</small></span><strong>{item.count}</strong><em>{item.statusLabel}</em>
+            {view.workItems.map((item,index)=><button type="button" key={item.id} className={`${item.tone}${item.active?' active':''}`} aria-pressed={item.active} disabled={!item.enabled} onClick={()=>actions.onOpenWorkItem(item.id)}>
+              <i aria-hidden="true">{index+1}</i><span><b>{item.label}</b><small>{item.description}</small></span><strong>{item.count}</strong><em>{item.statusLabel} →</em>
             </button>)}
           </div>
         </section>
