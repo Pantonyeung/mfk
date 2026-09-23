@@ -79,7 +79,7 @@ async function ack(event:KeetaOrderLifecycleEvent,canonicalOrderId:string){
 
 let reconciling=false;
 export async function reconcileKeetaOrderLifecycle(){
-  if(reconciling||typeof navigator!=='undefined'&&!navigator.onLine)return;
+  if(reconciling||typeof navigator!=='undefined'&&typeof navigator.onLine==='boolean'&&!navigator.onLine)return;
   reconciling=true;
   try{
     const deviceId=readSmtDeviceId();
