@@ -1639,9 +1639,32 @@ export class KeetaRuntimeStore{
       try{
         const envelope=validateWebhookBody(body);
         if(envelope.appId!==config.appId)throw new Error('KEETA_WEBHOOK_APP_ID_MISMATCH');
-        if(envelope.shopId!==config.providerShopId)throw new Error('KEETA_PROVIDER_SHOP_BINDING_MISMATCH');
         const externalWebhookUrl=request.headers.get('x-mfk-keeta-external-url')||request.url;
         await verifyWebhookSignature(externalWebhookUrl,body,config.appSecret);
+
+        if(envelope.eventId===1){
+          if(Math.abs(Date.now()-envelope.timestamp)>10*60*1000)throw new Error('KEETA_OAUTH_CODE_NOTIFICATION_STALE');
+          const callbackAt=new Date().toISOString();
+          await completeAuthorizationCode(config,this,envelope.state,envelope.code,callbackAt,{allowMissingState:true});
+          await this.state.storage.put('oauth:callback-status',{
+            lastCallbackAt:callbackAt,
+            lastCallbackResult:'CONNECTED',
+            lastCallbackError:null,
+            lastCallbackMethod:'EVENT_1',
+            lastCallbackParamNames:['appId','code','eventId','sig','state','timestamp'],
+          });
+          const latest=await this.state.storage.get('webhook:status')||{};
+          await this.state.storage.put('webhook:status',{
+            ...latest,
+            acceptedCount:(Number(latest.acceptedCount)||0)+1,
+            lastAcceptedAt:callbackAt,
+            lastEventId:1,
+            lastMessageId:null,
+          });
+          return json({code:0,message:'Success',data:{}});
+        }
+
+        if(envelope.shopId!==config.providerShopId)throw new Error('KEETA_PROVIDER_SHOP_BINDING_MISMATCH');
 
         const fingerprint=await sha256Hex(stable({
           eventId:envelope.eventId,
