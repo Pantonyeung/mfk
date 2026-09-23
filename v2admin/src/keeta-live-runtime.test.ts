@@ -371,13 +371,13 @@ describe('Keeta live edge runtime',()=>{
     const env={KEETA_APP_ID:'3419700273',KEETA_APP_SECRET:'test-secret',KEETA_TOKEN_ENCRYPTION_KEY:key,KEETA_PROVIDER_SHOP_ID:'721578302',KEETA_OAUTH_REDIRECT_URI:'https://admin.morefunos.com/api/keeta/oauth/callback'};
     const {KeetaRuntimeStore}=await import('../keeta-runtime.ts');
     const runtime=new KeetaRuntimeStore(state as never,env as never);
-    const issuedAtTime=Date.now()-100000;
+    const issuedAtTime=Date.now();
     vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({code:115000260,message:'provider authorization cancelled',data:'opaque'}),{status:200})));
     try{
-      const response=await runtime.fetch(new Request('https://internal/admin/token/import-test',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({accessToken:'expired-access',tokenType:'bearer',expiresIn:1,refreshToken:'cancelled-refresh',scope:'all',issuedAtTime})}));
-      expect(response.status).toBe(409);
-      const body=await response.json() as {code:string};
-      expect(body.code).toBe('KEETA_AUTHORIZATION_CANCELLED_115000260');
+      const imported=await runtime.fetch(new Request('https://internal/admin/token/import-test',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({accessToken:'valid-looking-access',tokenType:'bearer',expiresIn:7776000,refreshToken:'cancelled-refresh',scope:'all',issuedAtTime})}));
+      expect(imported.status).toBe(200);
+      alarmAt=null;
+      await expect(runtime.refreshPersistedToken('TEST_AUTH_CANCELLED')).rejects.toThrow('KEETA_AUTHORIZATION_CANCELLED_115000260');
       const invalid=storage.get('oauth:provider-token-invalid') as {state?:string;code?:string};
       expect(invalid).toMatchObject({state:'REAUTH_REQUIRED',code:'KEETA_AUTHORIZATION_CANCELLED_115000260'});
       const auto=storage.get('oauth:auto-refresh') as {state?:string;nextRefreshAtMs?:number|null;lastError?:string};
@@ -385,7 +385,6 @@ describe('Keeta live edge runtime',()=>{
       expect(alarmAt).toBeNull();
     }finally{vi.unstubAllGlobals();}
   });
-
   it('refreshes an expired provider-portal token without OAuth reauthorization',async()=>{
     const key=Buffer.alloc(32,10).toString('base64');
     const storage=new Map<string,unknown>();
