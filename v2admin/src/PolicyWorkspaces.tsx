@@ -301,8 +301,7 @@ export function ChannelsWorkspace({mode}:{mode:'overview'|'mapping'|'failures'|'
       void refreshLive();
       void refreshCommercialRows();
     }
-    if(mode==='accept'){
-      void refreshLive();
+    if(mode==='overview'||mode==='accept'){
       void refreshOrderIntake();
     }
   },[mode]);
@@ -460,7 +459,7 @@ export function ChannelsWorkspace({mode}:{mode:'overview'|'mapping'|'failures'|'
       </details>
       <small>目前連線層已接通；Provider business commands 會按 Owner 已授權嘅 Keeta Full Integration program 逐 seam 接入。</small>
     </section>:null}
-    {mode==='accept'?<section className="admin-policy-card">
+    {(mode==='overview'||mode==='accept')?<section className="admin-policy-card">
       <header>
         <div><small>KEETA ORDER INTAKE</small><h2>Keeta 新單入口／SMT 接收狀態</h2></div>
         <span className={orderIntakePending?'admin-not-wired-chip':'admin-status-good'}>{orderIntakePending} 待 SMT</span>
