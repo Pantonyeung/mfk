@@ -327,8 +327,8 @@
 .ordering-work-items>button>span{grid-column:2}.ordering-work-items>button>strong{grid-column:3}.ordering-work-items>button>em{grid-column:2/-1}
 .ordering-work-items>button.active>i{color:#fff;background:#1768dc}
 .ordering-product-card{transition:transform 120ms ease,border-color 140ms ease,box-shadow 140ms ease}
-.ordering-product-card:has(.ordering-product-body:not(:disabled)):hover{transform:translateY(-2px);border-color:#aebdd0;box-shadow:0 8px 20px rgb(33 52 79 / 9%)}
-.ordering-product-card:has(.ordering-product-body:not(:disabled)):active{transform:scale(.985)}
+.ordering-product-card:not(.disabled):hover{transform:translateY(-2px);border-color:#aebdd0;box-shadow:0 8px 20px rgb(33 52 79 / 9%)}
+.ordering-product-card:not(.disabled):active{transform:scale(.985)}
 .ordering-product-card.recently-added{animation:ordering-added 420ms ease-out both}
 .ordering-line-qty{grid-template-columns:44px 40px 44px}.ordering-line-qty button{min-width:44px;height:44px}.ordering-cart-line{grid-template-columns:48px minmax(0,1fr) 128px}
 .ordering-checkout{box-shadow:0 8px 18px rgb(23 104 220 / 18%);transition:transform 100ms ease,background-color 140ms ease,box-shadow 140ms ease}.ordering-checkout:not(:disabled):active{transform:scale(.985)}
@@ -336,4 +336,4 @@
 @keyframes ordering-panel-enter{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
 @keyframes ordering-added{0%{box-shadow:0 0 0 0 rgb(42 148 99 / 0%)}35%{box-shadow:0 0 0 5px rgb(42 148 99 / 20%)}100%{box-shadow:0 0 0 3px rgb(42 148 99 / 16%)}}
 @media(max-width:1400px){.ordering-task-path{margin-top:7px}.ordering-task-path b,.ordering-task-path span{padding:0 7px}.ordering-line-qty{grid-template-columns:42px 36px 42px}.ordering-line-qty button{min-width:42px;height:42px}.ordering-cart-line{grid-template-columns:46px minmax(0,1fr) 120px}}
-@media(prefers-reduced-motion:reduce){.ordering-center-panel,.ordering-product-card.recently-added{animation:none}.ordering-product-card,.ordering-work-items>button,.ordering-checkout{transition:none}.ordering-product-card:has(.ordering-product-body:not(:disabled)):hover,.ordering-product-card:has(.ordering-product-body:not(:disabled)):active{transform:none}}
+@media(prefers-reduced-motion:reduce){.ordering-center-panel,.ordering-product-card.recently-added{animation:none}.ordering-product-card,.ordering-work-items>button,.ordering-checkout{transition:none}.ordering-product-card:not(.disabled):hover,.ordering-product-card:not(.disabled):active{transform:none}}

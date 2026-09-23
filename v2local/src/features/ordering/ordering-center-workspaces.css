@@ -122,7 +122,7 @@
 .cfg-ready-card{min-height:150px;display:flex;align-items:center;justify-content:center;gap:16px;padding:24px;border:1px solid #b9e3d2;border-radius:14px;background:#f2fbf6;animation:cfg-step-enter 180ms ease-out both}
 .cfg-ready-card>span{width:44px;height:44px;display:grid;place-items:center;flex:0 0 44px;border-radius:50%;color:#fff;background:#24835a;font-size:21px;font-weight:950}.cfg-ready-card>div{display:grid;gap:3px}.cfg-ready-card small{color:#176b49;font-weight:900}.cfg-ready-card h3{margin:0;font-size:22px}.cfg-ready-card p{margin:0;color:#5f746a}
 .cfg-editor-options>.smt-completed-step{min-height:58px;animation:cfg-step-enter 160ms ease-out both}
-.cfg-editor-summary{transition:border-color 160ms ease,box-shadow 160ms ease}.cfg-editor-summary:has(.cfg-save:not(:disabled)){border-color:#a9c8ef;box-shadow:0 10px 28px rgb(23 104 220 / 9%)}
+.cfg-editor-summary{border-color:#c9d8ea;box-shadow:0 10px 28px rgb(23 104 220 / 7%);transition:border-color 160ms ease,box-shadow 160ms ease}
 .cfg-choice-grid button,.cfg-save,.cfg-step-action button{transition:transform 90ms ease,border-color 140ms ease,background-color 140ms ease,box-shadow 140ms ease}
 .cfg-choice-grid button:not(:disabled):active,.cfg-save:not(:disabled):active,.cfg-step-action button:not(:disabled):active{transform:scale(.96)}
 @keyframes cfg-step-enter{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
