@@ -1,4 +1,4 @@
-work_id=MFK-KEETA-EVENT1-TOKEN-CUTOVER-R1
-purpose=validate official Keeta Event 1 authorization-code token cutover
-candidate=16d2822dbe9b289241c53976f20d81fd2b797796
+work_id=MFK-KEETA-NEW-TOKEN-SUPERSEDES-STALE-1302-R1
+purpose=validate fresh OAuth token supersedes stale 1302 and provider shop readback
+candidate=47aaf28423c86dc4e978c667f1292d587dff5cb1
 deployment_authority=PREVIEW_ONLY
