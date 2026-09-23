@@ -75,18 +75,18 @@ describe('SMT human-centered guided UI',()=>{
         pendingOrders:[],activeOrders:[],categories:[],selectedCategoryId:'all',products:[],
         searchQuery:'',orderingMode:'quick',cartPulseNonce:0,workItems:[],
         cart:{
-          orderId:'F0030',serviceMode:'takeaway',viewMode:'original',
+          orderId:'F0030',serviceMode:'takeaway',viewMode:'original',combineSimilar:false,
           lines:[
             {
               id:'line-1',name:'海南雞飯',quantity:1,lineTotalLabel:'$77.00',serviceMode:'takeaway',
-              groupId:'local',groupLabel:'本機',
+              groupId:'便當',groupLabel:'便當',sourceLineIds:['line-1'],
               optionDetail:'飯底：少飯 · 加蛋',
               comboDetail:'海南雞飯＋凍檸茶',
               note:'不要蔥',
             },
             {
               id:'line-2',name:'凍檸茶',quantity:1,lineTotalLabel:'$18.00',serviceMode:'dine-in',
-              groupId:'local',groupLabel:'本機',
+              groupId:'飲品',groupLabel:'飲品',sourceLineIds:['line-2'],
             },
           ],
           subtotalLabel:'$95.00',packagingLabel:'$0.00',discountLabel:'$0.00',totalLabel:'$95.00',checkoutEnabled:true,
@@ -94,7 +94,7 @@ describe('SMT human-centered guided UI',()=>{
       }}
       actions={{
         onSearchQuery:nothing,onSelectCategory:nothing,onChangeOrderingMode:nothing,onAddProduct:nothing,onConfigureProduct:nothing,
-        onChangeServiceMode:nothing,onChangeCartView:nothing,onChangeLineServiceMode:nothing,onAdjustLineQuantity:nothing,
+        onChangeServiceMode:nothing,onChangeCartView:nothing,onToggleCombine:nothing,onChangeLineServiceMode:nothing,onAdjustLineQuantity:nothing,
         onEditCartLine:nothing,onHoldCart:nothing,onCancelCart:nothing,onOpenWorkItem:nothing,onOpenQueueOrder:nothing,onCheckout:nothing,
       }}
     />);
@@ -110,6 +110,9 @@ describe('SMT human-centered guided UI',()=>{
     expect(noteAt).toBeGreaterThan(comboAt);
     expect(html).toContain('第 1 項，外賣，按一下切換為堂食');
     expect(html).toContain('第 2 項，堂食，按一下切換為外賣');
+    expect(html).toContain('原單');
+    expect(html).toContain('外賣');
+    expect(html).toContain('組合 關');
     expect(html).not.toContain('按商品名稱修改設定');
   });
 
