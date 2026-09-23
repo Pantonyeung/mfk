@@ -239,3 +239,117 @@ afb02b6e09f4f4458c8e556b85d9a7eb6e6ea4b0
 STATUS:
 WORKER_REPLAN_READY
 DISPATCH_PAUSED
+
+
+==================================================
+9. HISTORICAL DONOR CORRECTION｜#881 EXCLUDED
+==================================================
+
+Owner correction:
+Do NOT use Morefun-v2 #881 as the historical Keeta donor authority.
+
+Previous Worker Replan wording that pointed Worker A/B to #881 is SUPERSEDED.
+
+Correct historical evidence baseline:
+
+A. 2026-09-05 Golden Thread
+docs/recovery/team1/KEETA-GOLDEN-THREAD-REAL-PAYLOAD-MAPPING-2026-09-05.md
+
+Proves:
+- real 1001
+- /order/confirm request
+- 1002 status=30
+- 1006 delivery
+- 1003 completion
+- 1005 / 1007 refund
+- DO NOT REDO list
+
+B. 2026-09-05 live SMM order 6893
+docs/recovery/team3/SMM-B0314-LIVE-KEETA-6893-FUNCTIONAL-CLOSURE-2026-09-05.md
+
+Provider:
+5133442032976893
+
+Canonical:
+9011ca2e-dd04-5198-b8d5-d96249564a15
+
+SMM browser:
+33950415162 SUCCESS
+
+C. 2026-09-05 SMT/SMM linkage closure
+docs/recovery/keeta/KEETA-SMT-SMM-DISPLAY-LINKAGE-CLOSURE-2026-09-05.md
+
+SMT evidence:
+33951637990
+33951701575
+33952081636
+33952154087
+33952361345
+
+Final:
+SMT_KEETA_6893_UI_PASS
+
+Same canonical Order visible in SMM + SMT.
+
+D. 2026-09-05 SIT Master Matrix
+docs/recovery/team1/KEETA-SIT-DEVELOPMENT-ACCEPTANCE-MASTER-MATRIX-2026-09-05.md
+
+Order Case 5:
+Merchant accepts order = PASS_LIVE
+real 1001 → confirm → 1002/status30
+
+E. Provider Handoff Pack
+docs/recovery/keeta/KEETA-SIT-UAT-PROVIDER-HANDOFF-PACK-2026-09-05.md
+
+LIVE PROVEN:
+- signed 1001 ingress
+- canonical Order bridge
+- provider SKU → canonical mapping
+- Keeta → SMM
+- Keeta → SMT
+
+Locked chain:
+durable receipt
+→ canonical ACCEPT
+→ canonical Order commit
+→ provider CONFIRM
+
+F. Commander No-Redo Lock
+docs/recovery/commander/KEETA-SIT-NO-REDO-LOCK-2026-09-06.md
+
+SIT COMPLETE
+NO REDO
+
+G. #704 governance preservation
+comment 5682072533
+
+Records:
+CAP-KEETA-INGRESS-001 = PHYSICAL_PROVEN
+
+Durable provider receipt / dedup / recovery already exists.
+Do not redesign vendor receipt or vendor API.
+
+Current Morefun-v2 capability catalog still records:
+CAP-KEETA-INGRESS-001
+lifecycle ACTIVE
+engineering_maturity PHYSICAL_PROVEN
+no_redo true
+
+Correct donor sequence:
+
+2026-09-05/06 DIRECT EVIDENCE
+→ #704 GOVERNANCE PRESERVATION
+→ CURRENT MFK SOURCE
+
+NOT:
+#881 → historical truth
+
+#881 may be used only to investigate later drift, never as Keeta baseline donor proof.
+
+GitHub correction:
+#162 comment 5787970608
+#22 comment 5787971355
+
+STATUS:
+PRE_704_KEETA_EVIDENCE_BASELINE_RESTORED
+#881_DONOR_SUPERSEDED
