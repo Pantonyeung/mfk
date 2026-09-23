@@ -656,6 +656,7 @@ function OperationalApp(){
       return {
         id:'dining-checkout-'+request.holdId+'-'+line.lineIndex+'-'+index,
         productId:line.id,
+        category:'堂食',
         name,
         qty:line.qty,
         unitMinor:line.unitMinor,
