@@ -33,6 +33,9 @@ export interface CartLineViewModel {
   readonly groupId:string;
   readonly groupLabel:string;
   readonly detail?:string;
+  readonly optionDetail?:string;
+  readonly comboDetail?:string;
+  readonly note?:string;
 }
 
 export interface OrderingCartViewModel {
