@@ -184,7 +184,7 @@ async function ack(intent:MfkKeetaOrderIntent,order:StoredOrder){
 
 let reconciling=false;
 export async function reconcileKeetaOrderIntake(){
-  if(reconciling||typeof navigator!=='undefined'&&!navigator.onLine)return;
+  if(reconciling||typeof navigator!=='undefined'&&typeof navigator.onLine==='boolean'&&!navigator.onLine)return;
   reconciling=true;
   try{
     const deviceId=readSmtDeviceId();
