@@ -439,6 +439,12 @@ describe('Keeta live edge runtime',()=>{
     expect(batch.orders).toHaveLength(1);
     expect(batch.orders[0]).toMatchObject({providerOrderId:'998',providerMessageId:'msg-order-998',state:'PENDING_SMT'});
 
+    const adminBefore=await runtime.fetch(new Request('https://internal/admin/orders/intake',{method:'POST'}));
+    const intakeBefore=await adminBefore.json() as {pending:number;committed:number;items:Array<{providerOrderId:string;state:string;canonicalOrderId:null}>};
+    expect(intakeBefore.pending).toBe(1);
+    expect(intakeBefore.committed).toBe(0);
+    expect(intakeBefore.items[0]).toMatchObject({providerOrderId:'998',state:'PENDING_SMT',canonicalOrderId:null});
+
     const ackBody={
       schema:'MFK_KEETA_ORDER_ACK_V1',
       storeId:'MF01',
@@ -461,6 +467,12 @@ describe('Keeta live edge runtime',()=>{
 
     const after=await runtime.fetch(new Request('https://internal/smt/orders/pending',{method:'GET'}));
     expect((await after.json() as {orders:unknown[]}).orders).toHaveLength(0);
+
+    const adminAfter=await runtime.fetch(new Request('https://internal/admin/orders/intake',{method:'POST'}));
+    const intakeAfter=await adminAfter.json() as {pending:number;committed:number;items:Array<{state:string;canonicalOrderId:string;canonicalDisplay:string}>};
+    expect(intakeAfter.pending).toBe(0);
+    expect(intakeAfter.committed).toBe(1);
+    expect(intakeAfter.items[0]).toMatchObject({state:'COMMITTED',canonicalOrderId:'MFK-local-1',canonicalDisplay:'P001'});
   });
 
 
