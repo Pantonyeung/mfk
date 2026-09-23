@@ -57,10 +57,16 @@ export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePor
   const [partialPreview,setPartialPreview]=useState<unknown>(null);
   const [keetaPullBusy,setKeetaPullBusy]=useState(false);
   const [keetaPullMessage,setKeetaPullMessage]=useState<string|null>(null);
+  const [keetaIntakeRevision,setKeetaIntakeRevision]=useState(0);
   useEffect(()=>{
     const refresh=()=>setAfterSaleRevision(value=>value+1);
     window.addEventListener('mfk-keeta-after-sale',refresh);
     return()=>window.removeEventListener('mfk-keeta-after-sale',refresh);
+  },[]);
+  useEffect(()=>{
+    const refresh=()=>setKeetaIntakeRevision(value=>value+1);
+    window.addEventListener('mfk-keeta-order-intake',refresh);
+    return()=>window.removeEventListener('mfk-keeta-order-intake',refresh);
   },[]);
 
   const load=useCallback(async(selectedOrderId?:string,silent=false)=>{
@@ -77,6 +83,8 @@ export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePor
 
   const selected=snapshot?.selectedOrder;
   void afterSaleRevision;
+  void keetaIntakeRevision;
+  const keetaIntakeAttention=readKeetaOrderIntakeAttention();
   const afterSales=selected?readKeetaAfterSales(selected.orderId):[];
   const allItems=snapshot?.items??[];
   const filtered=useMemo(()=>allItems.filter(order=>{
@@ -128,8 +136,8 @@ export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePor
       await load(snapshot?.selectedOrderId,true);
       const attention=readKeetaOrderIntakeAttention();
       setKeetaPullMessage(attention.length
-        ?'Keeta 新單已同步；'+attention.length+' 張需要處理。'
-        :'已手動檢查 Keeta 新單。');
+        ?'Keeta 接單異常：'+attention.map(row=>String((row as {code?:unknown}).code??'UNKNOWN')).join('；')
+        :'已手動檢查 Keeta 新單；目前冇待處理錯誤。');
     }catch(cause){
       setKeetaPullMessage(cause instanceof Error?cause.message:'KEETA_ORDER_PULL_FAILED');
     }finally{setKeetaPullBusy(false);}
@@ -280,6 +288,7 @@ export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePor
         <div><button type="button" disabled={keetaPullBusy} onClick={()=>void pullKeetaOrders()}>{keetaPullBusy?'同步中…':'手動接 Keeta 新單'}</button><label>Admin 出餐計時</label><b>{storeSettings.fulfillmentMinutes} 分鐘</b><button disabled title="由 Admin 門店設定提供">Admin</button></div>
       </div>
       {keetaPullMessage?<p className="order-board-error">{keetaPullMessage}</p>:null}
+      {keetaIntakeAttention.length?<p className="order-board-error">Keeta 接單注意：{keetaIntakeAttention.map(row=>String((row as {code?:unknown}).code??'UNKNOWN')).join('；')}</p>:null}
 
       <div className="order-channel-grid">
         {lanes.map(lane=><section key={lane.id} className="order-channel-lane">
