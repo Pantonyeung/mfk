@@ -363,6 +363,29 @@ describe('Keeta live edge runtime',()=>{
   });
 
 
+  it('classifies provider 115000260 as cancelled authorization and stops refresh retry scheduling',async()=>{
+    const key=Buffer.alloc(32,19).toString('base64');
+    const storage=new Map<string,unknown>();
+    let alarmAt:number|null=null;
+    const state={storage:{get:async(key:string)=>storage.get(key),put:async(key:string,value:unknown)=>{storage.set(key,value);},delete:async(key:string)=>{storage.delete(key);},setAlarm:async(value:number)=>{alarmAt=value;}}};
+    const env={KEETA_APP_ID:'3419700273',KEETA_APP_SECRET:'test-secret',KEETA_TOKEN_ENCRYPTION_KEY:key,KEETA_PROVIDER_SHOP_ID:'721578302',KEETA_OAUTH_REDIRECT_URI:'https://admin.morefunos.com/api/keeta/oauth/callback'};
+    const {KeetaRuntimeStore}=await import('../keeta-runtime.ts');
+    const runtime=new KeetaRuntimeStore(state as never,env as never);
+    const issuedAtTime=Date.now()-10000;
+    vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({code:115000260,message:'provider authorization cancelled',data:'opaque'}),{status:200})));
+    try{
+      const response=await runtime.fetch(new Request('https://internal/admin/token/import-test',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({accessToken:'expired-access',tokenType:'bearer',expiresIn:1,refreshToken:'cancelled-refresh',scope:'all',issuedAtTime})}));
+      expect(response.status).toBe(409);
+      const body=await response.json() as {code:string};
+      expect(body.code).toBe('KEETA_AUTHORIZATION_CANCELLED_115000260');
+      const invalid=storage.get('oauth:provider-token-invalid') as {state?:string;code?:string};
+      expect(invalid).toMatchObject({state:'REAUTH_REQUIRED',code:'KEETA_AUTHORIZATION_CANCELLED_115000260'});
+      const auto=storage.get('oauth:auto-refresh') as {state?:string;nextRefreshAtMs?:number|null;lastError?:string};
+      expect(auto).toMatchObject({state:'REAUTH_REQUIRED',nextRefreshAtMs:null,lastError:'KEETA_AUTHORIZATION_CANCELLED_115000260'});
+      expect(alarmAt).toBeNull();
+    }finally{vi.unstubAllGlobals();}
+  });
+
   it('reports only structural token response diagnostics when the provider envelope never reaches token material',async()=>{
     const key=Buffer.alloc(32,18).toString('base64');
     const storage=new Map<string,unknown>();
