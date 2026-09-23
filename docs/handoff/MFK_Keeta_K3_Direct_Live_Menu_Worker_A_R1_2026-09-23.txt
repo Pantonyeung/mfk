@@ -79,3 +79,34 @@ No implementation defect has been proven in K3 during this Worker turn.
 
 STATUS
 K3_LIVE_EXECUTION_ARMED / AUTHENTICATED_ADMIN_ACTION_REQUIRED
+
+
+LATEST CONTROL READBACK
+- current main still: 99226fd3b2c382cbfc3941f9f8e5544924c7e955
+- #162 Commander token sub-seam: 5788247985
+- Worker A MUST NOT modify OAuth/token lifecycle while Commander repair is active.
+- Token lifecycle target remains: one bootstrap authorization, rotating accessToken + refreshToken automatically persisted before expiry / on explicit provider invalid-token response.
+- routine token paste is not an accepted operating model.
+
+EXACT ADMIN LIVE ROUTE
+https://admin.morefunos.com/admin/channels/sync-policy
+
+K3 LIVE ACTION ORDER
+1. existing enrolled Admin browser session
+2. 檢查 Token
+3. 預檢完整菜單
+4. require non-empty clean snapshot
+5. 同步完整菜單到 Keeta exactly once
+6. capture taskId
+7. 更新同步狀態 until real 1202
+8. require completion errors = 0
+9. capture 1201 if emitted
+
+IMPORTANT
+- No provider menu submit has been executed by this Worker environment because the live Admin Keeta endpoints are protected by the already-enrolled browser-local publisher identity.
+- Worker will not retrieve/rotate/replace sync-publisher-key.v1.
+- This is an authenticated operator-surface boundary, not evidence of a K3 product defect.
+- UNKNOWN provider side effect => readback first; never click sync twice blindly.
+
+STATUS
+K3_LIVE_EXECUTION_ARMED / AUTHENTICATED_ADMIN_ACTION_REQUIRED
