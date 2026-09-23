@@ -254,6 +254,31 @@ describe('Keeta live edge runtime',()=>{
   });
 
 
+  it('accepts the observed signed GET authorization-code callback and exchanges the code',async()=>{
+    const key=Buffer.alloc(32,20).toString('base64');
+    const storage=new Map<string,unknown>();
+    const state={storage:{get:async(key:string)=>storage.get(key),put:async(key:string,value:unknown)=>{storage.set(key,value);},delete:async(key:string)=>{storage.delete(key);}}};
+    const env={KEETA_APP_ID:'3419700273',KEETA_APP_SECRET:'test-secret',KEETA_TOKEN_ENCRYPTION_KEY:key,KEETA_PROVIDER_SHOP_ID:'721578302',KEETA_OAUTH_REDIRECT_URI:'https://admin.morefunos.com/api/keeta/oauth/callback'};
+    const {KeetaRuntimeStore}=await import('../keeta-runtime.ts');
+    const runtime=new KeetaRuntimeStore(state as never,env as never);
+    const issuedAtTime=Date.now();
+    const providerFetch=vi.fn(async()=>new Response(JSON.stringify({accessToken:'signed-get-access',tokenType:'bearer',expiresIn:7776000,refreshToken:'signed-get-refresh',scope:'all',issuedAtTime}),{status:200}));
+    vi.stubGlobal('fetch',providerFetch);
+    try{
+      const externalUrl='https://admin.morefunos.com/api/keeta/oauth/callback';
+      const params=await signKeetaRuntimeParams(externalUrl,{appId:3419700273,code:'signed-get-code',state:'',timestamp:Date.now()},'test-secret');
+      const query=new URLSearchParams(Object.entries(params).map(([k,v])=>[k,String(v)]));
+      const response=await runtime.fetch(new Request('https://internal/oauth/callback?'+query.toString(),{method:'GET',headers:{'x-mfk-keeta-external-url':externalUrl+'?'+query.toString()}}));
+      expect(response.status).toBe(302);
+      expect(response.headers.get('location')).toContain('keeta=connected');
+      const status=await (await runtime.fetch(new Request('https://internal/admin/status',{method:'POST'}))).json() as {oauth:{state:string;lastCallbackResult:string;lastCallbackMethod:string}};
+      expect(status.oauth).toMatchObject({state:'CONNECTED',lastCallbackResult:'CONNECTED',lastCallbackMethod:'GET'});
+      const serialized=JSON.stringify([...storage.entries()]);
+      expect(serialized).not.toContain('signed-get-access');
+      expect(serialized).not.toContain('signed-get-refresh');
+    }finally{vi.unstubAllGlobals();}
+  });
+
   it('accepts signed event-1 authorization code callback and persists an encrypted token',async()=>{
     const key=Buffer.alloc(32,6).toString('base64');
     const storage=new Map<string,unknown>();
