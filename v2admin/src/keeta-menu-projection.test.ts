@@ -1,5 +1,6 @@
 import {describe,expect,it} from 'vitest';
 import {buildKeetaMenuProjection} from '../keeta-menu-projection.ts';
+import {LEGACY_MF01_ADMIN_DRAFT} from './admin-menu-seed-mf01-v2.ts';
 
 const snapshot={
   catalog:{
@@ -70,6 +71,24 @@ describe('Keeta full menu projection',()=>{
       },
     };
     expect(()=>buildKeetaMenuProjection(duplicate)).toThrow(/KEETA_MENU_PRODUCT_CODE_DUPLICATE:RB-A/);
+  });
+
+  it('ignores inactive hidden donor products that intentionally have no category or price',()=>{
+    const result=buildKeetaMenuProjection({catalog:LEGACY_MF01_ADMIN_DRAFT,optionCenter:{sets:[],productLinks:[]}});
+    expect(result.summary.spus).toBe(188);
+    expect(result.summary.skus).toBe(188);
+    expect(result.payload.spuList.some(row=>row.openItemCode==='SPU:5cef7d6f-dfc0-521c-a5b2-de9cabe99f23')).toBe(false);
+  });
+
+  it('still fails closed when an ACTIVE product is missing category or price',()=>{
+    const broken={
+      ...snapshot,
+      catalog:{
+        ...snapshot.catalog,
+        products:[...snapshot.catalog.products,{id:'bad',name:'壞商品',productCode:'BAD',categoryId:'',active:true,basePrice:'',takeawayAdjustment:'0'}],
+      },
+    };
+    expect(()=>buildKeetaMenuProjection(broken)).toThrow(/KEETA_MENU_PRODUCT_CATEGORY_REQUIRED:bad|KEETA_MENU_PRODUCT_PRICE_INVALID:bad/);
   });
 
   it('keeps option adjustment semantics explicit in the provider payload',()=>{
