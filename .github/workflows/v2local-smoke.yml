@@ -42,6 +42,9 @@ jobs:
           grep -F "KEETA_ORDER_EVENT_AVAILABLE" v2local/src/runtime/keeta-order-lifecycle.ts
           grep -F "installKeetaOrderLifecycle" v2local/src/main.tsx
           grep -F "applyProviderLifecycle" v2local/src/runtime/local-runtime.ts
+          grep -F "KEETA_AFTER_SALE_AVAILABLE" v2local/src/runtime/keeta-after-sale.ts
+          grep -F "installKeetaAfterSales" v2local/src/main.tsx
+          grep -F "decideKeetaAfterSale" v2local/src/runtime/keeta-after-sale.ts
           grep -F "subscribeSmtCloudDoorbell" v2local/src/runtime/admin-config-sync.ts
           ! grep -RInF "print.sunmi." v2local/src
           grep -F "print.lan.endpoint.apply" v2local/src/runtime/native-print.ts

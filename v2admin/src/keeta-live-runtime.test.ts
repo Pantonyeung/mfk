@@ -835,4 +835,141 @@ describe('Keeta live edge runtime',()=>{
     expect((await after.json() as {events:unknown[]}).events).toHaveLength(0);
   });
 
+
+  it('queues verified 1005 refund evidence, links it to the committed order and sends one idempotent approve decision',async()=>{
+    const key=Buffer.alloc(32,19).toString('base64');
+    const storage=new Map<string,unknown>([
+      ['order:intent:998',{
+        schema:'MFK_KEETA_ORDER_INTENT_V1',storeId:'MF01',provider:'KEETA',state:'COMMITTED',
+        providerShopId:721578302,providerOrderId:'998',providerMessageId:'msg-placement-998',
+        providerPushedAt:'2026-09-23T00:00:00.000Z',receivedAt:'2026-09-23T00:00:01.000Z',
+        fingerprint:'d'.repeat(64),rawMessage:'{}',
+        canonicalOrderId:'MFK-998',canonicalDisplay:'P998',committedAt:'2026-09-23T00:00:02.000Z',
+      }],
+    ]);
+    const state={storage:{
+      get:async(key:string)=>storage.get(key),
+      put:async(key:string,value:unknown)=>{storage.set(key,value);},
+      delete:async(key:string)=>{storage.delete(key);},
+      list:async({prefix}:{prefix:string})=>new Map([...storage.entries()].filter(([key])=>key.startsWith(prefix))),
+    }};
+    const env={
+      KEETA_APP_ID:'3419700273',KEETA_APP_SECRET:'test-secret',
+      KEETA_TOKEN_ENCRYPTION_KEY:key,KEETA_PROVIDER_SHOP_ID:'721578302',
+      KEETA_OAUTH_REDIRECT_URI:'https://admin.morefunos.com/api/keeta/oauth/callback',
+    };
+    const {KeetaRuntimeStore,signKeetaRuntimeParams}=await import('../keeta-runtime.ts');
+    const runtime=new KeetaRuntimeStore(state as never,env as never);
+    await runtime.fetch(new Request('https://internal/admin/token/import-test',{
+      method:'POST',headers:{'content-type':'application/json'},
+      body:JSON.stringify({accessToken:'refund-access',tokenType:'bearer',expiresIn:7776000,refreshToken:'refund-refresh',scope:'all',issuedAtTime:Date.now()}),
+    }));
+
+    const externalUrl='https://admin.morefunos.com/api/keeta/webhook';
+    const message=JSON.stringify({
+      orderViewId:998,shopId:721578302,status:2000,afterSaleOrderId:88001,isAppeal:0,
+      money:2800,currency:'HKD',applyOpType:10,applyReason:'Customer requested refund',
+      handleOpType:0,handleReason:'Pending merchant decision',opTime:1790120000000,
+    });
+    const signed=await signKeetaRuntimeParams(externalUrl,{
+      eventId:1005,appId:3419700273,messageId:'refund-msg-1',shopId:721578302,message,timestamp:1790120000,
+    },'test-secret');
+    const webhook=await runtime.fetch(new Request('https://internal/webhook',{
+      method:'POST',headers:{'content-type':'application/json','x-mfk-keeta-external-url':externalUrl},body:JSON.stringify(signed),
+    }));
+    expect(webhook.status).toBe(200);
+
+    const pending=await runtime.fetch(new Request('https://internal/smt/orders/after-sales/pending',{method:'GET'}));
+    const batch=await pending.json() as {events:Array<{afterSaleOrderId:string;providerOrderId:string;eventId:number;state:string}>};
+    expect(batch.events).toEqual([expect.objectContaining({
+      afterSaleOrderId:'88001',providerOrderId:'998',eventId:1005,state:'PENDING_SMT',
+    })]);
+
+    const ackBody={providerOrderId:'998',providerMessageId:'refund-msg-1',afterSaleOrderId:'88001',canonicalOrderId:'MFK-998'};
+    const ack=await runtime.fetch(new Request('https://internal/smt/orders/after-sales/ack',{
+      method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(ackBody),
+    }));
+    expect(ack.status).toBe(200);
+
+    const providerFetch=vi.fn(async(input:string|URL|Request)=>new Response(
+      JSON.stringify({code:0,message:'Success'}),{status:200,headers:{'content-type':'application/json'}},
+    ));
+    vi.stubGlobal('fetch',providerFetch);
+    try{
+      const decisionBody={providerOrderId:'998',canonicalOrderId:'MFK-998',afterSaleOrderId:'88001',decision:'APPROVE'};
+      const decision=await runtime.fetch(new Request('https://internal/smt/orders/after-sales/decision',{
+        method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(decisionBody),
+      }));
+      expect(decision.status).toBe(200);
+      expect((await decision.json() as {state:string}).state).toBe('SUCCESS');
+      expect(String(providerFetch.mock.calls[0]?.[0])).toBe('https://open.mykeeta.com/api/open/order/agree');
+
+      const retry=await runtime.fetch(new Request('https://internal/smt/orders/after-sales/decision',{
+        method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(decisionBody),
+      }));
+      expect((await retry.json() as {state:string}).state).toBe('IDEMPOTENT');
+      expect(providerFetch).toHaveBeenCalledTimes(1);
+    }finally{vi.unstubAllGlobals();}
+  });
+
+  it('requires matching partial-refund preview before apply and sends documented preview/apply endpoints',async()=>{
+    const key=Buffer.alloc(32,20).toString('base64');
+    const storage=new Map<string,unknown>([
+      ['order:intent:999',{
+        schema:'MFK_KEETA_ORDER_INTENT_V1',storeId:'MF01',provider:'KEETA',state:'COMMITTED',
+        providerShopId:721578302,providerOrderId:'999',providerMessageId:'msg-placement-999',
+        providerPushedAt:'2026-09-23T00:00:00.000Z',receivedAt:'2026-09-23T00:00:01.000Z',
+        fingerprint:'e'.repeat(64),rawMessage:'{}',
+        canonicalOrderId:'MFK-999',canonicalDisplay:'P999',committedAt:'2026-09-23T00:00:02.000Z',
+      }],
+    ]);
+    const state={storage:{
+      get:async(key:string)=>storage.get(key),
+      put:async(key:string,value:unknown)=>{storage.set(key,value);},
+      delete:async(key:string)=>{storage.delete(key);},
+      list:async({prefix}:{prefix:string})=>new Map([...storage.entries()].filter(([key])=>key.startsWith(prefix))),
+    }};
+    const env={
+      KEETA_APP_ID:'3419700273',KEETA_APP_SECRET:'test-secret',
+      KEETA_TOKEN_ENCRYPTION_KEY:key,KEETA_PROVIDER_SHOP_ID:'721578302',
+      KEETA_OAUTH_REDIRECT_URI:'https://admin.morefunos.com/api/keeta/oauth/callback',
+    };
+    const {KeetaRuntimeStore}=await import('../keeta-runtime.ts');
+    const runtime=new KeetaRuntimeStore(state as never,env as never);
+    await runtime.fetch(new Request('https://internal/admin/token/import-test',{
+      method:'POST',headers:{'content-type':'application/json'},
+      body:JSON.stringify({accessToken:'partial-access',tokenType:'bearer',expiresIn:7776000,refreshToken:'partial-refresh',scope:'all',issuedAtTime:Date.now()}),
+    }));
+    const providerFetch=vi.fn(async(input:string|URL|Request)=>{
+      const url=String(input);
+      if(url.endsWith('/preview'))return new Response(JSON.stringify({code:0,message:'Success',data:{products:[{orderProductId:555,refundCount:1}],refundPrice:{amount:1200}}}),{status:200});
+      return new Response(JSON.stringify({code:0,message:'Success',data:{afterSaleOrderId:88002}}),{status:200});
+    });
+    vi.stubGlobal('fetch',providerFetch);
+    try{
+      const products=[{orderProductId:555,refundCount:1}];
+      const applyBeforePreview=await runtime.fetch(new Request('https://internal/smt/orders/partial-refund/apply',{
+        method:'POST',headers:{'content-type':'application/json'},
+        body:JSON.stringify({providerOrderId:'999',canonicalOrderId:'MFK-999',products,partRefundType:200001}),
+      }));
+      expect(applyBeforePreview.status).toBe(409);
+      expect((await applyBeforePreview.json() as {code:string}).code).toBe('KEETA_PARTIAL_REFUND_PREVIEW_REQUIRED');
+
+      const preview=await runtime.fetch(new Request('https://internal/smt/orders/partial-refund/preview',{
+        method:'POST',headers:{'content-type':'application/json'},
+        body:JSON.stringify({providerOrderId:'999',canonicalOrderId:'MFK-999',products}),
+      }));
+      expect(preview.status).toBe(200);
+      expect(String(providerFetch.mock.calls[0]?.[0])).toBe('https://open.mykeeta.com/api/open/order/refund/part/products/preview');
+
+      const apply=await runtime.fetch(new Request('https://internal/smt/orders/partial-refund/apply',{
+        method:'POST',headers:{'content-type':'application/json'},
+        body:JSON.stringify({providerOrderId:'999',canonicalOrderId:'MFK-999',products,partRefundType:200001}),
+      }));
+      expect(apply.status).toBe(200);
+      expect((await apply.json() as {state:string}).state).toBe('APPLIED');
+      expect(String(providerFetch.mock.calls[1]?.[0])).toBe('https://open.mykeeta.com/api/open/order/refund/part/apply');
+    }finally{vi.unstubAllGlobals();}
+  });
+
 });
