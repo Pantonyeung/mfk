@@ -309,3 +309,75 @@ The existing second order is the diagnostic subject:
 - if unauthorized, SMT now shows KEETA_SMT_UNAUTHORIZED;
 - if mapping fails, SMT now shows exact KEETA_ORDER_MAPPING_* code;
 - if no order and no intake attention, inspect Admin Channels → 接單規則 → Keeta 新單入口; empty there means second 1001 is not in current cloud intent store and the break is before SMT pull.
+
+
+ADMIN + MENU LIVE RED REPAIR｜2026-09-23 10:26 HKT
+
+OWNER EVIDENCE
+Admin Platform Management showed:
+- KEETA LIVE CONNECTION = CONNECTED
+- Webhook Accepted = 25
+- latest event currently 1005
+- no Keeta order intake state visible on the Platform Management overview
+- menu preflight produced repeated:
+  KEETA_MENU_PRODUCT_CATEGORY_REQUIRED:<productId>
+  KEETA_MENU_PRODUCT_PRICE_INVALID:<productId>
+
+MENU ROOT CAUSE PROVEN
+The failing product IDs include:
+- 5cef7d6f-dfc0-521c-a5b2-de9cabe99f23
+- a68b0e24-2ffb-53b6-b832-918d931b5ca7
+- dbb5aec7-cdbb-50ac-99e9-92065f421ae4
+- 7359e606-82fd-5299-9b84-6bc522c69a8e
+These are canonical donor HIDDEN / inactive products in admin-menu-seed-mf01-v2.ts.
+They intentionally carry:
+- active:false
+- categoryId:""
+- basePrice:""
+Admin draft validation already permits this for inactive donor rows.
+Keeta menu projection incorrectly validated ALL products before later filtering to active products.
+This was an implementation defect in K3 preflight, not bad Owner menu data.
+
+MENU REPAIR
+- commit 35b845dd2b87be4ed5bcc95b8bec1d45c1d23f0d
+- Keeta preflight now validates provider-bound ACTIVE products only.
+- inactive hidden donor products remain in MFK catalog history but are not projected to Keeta.
+- active product missing category/price still fails closed.
+Regression:
+- commit ef797ba6aaa0ece6f000a229f337f4445edc74f9
+- 188 active donor products project; hidden donor product 5cef... is excluded.
+- active invalid row still RED.
+
+ADMIN ORDER VISIBILITY REPAIR
+Admin is not Formal Order authority and normal Admin Orders only sees SMT projection after canonical SMT commit.
+However the provider intake diagnostic was hidden under Channels → 接單規則 only, while Owner was checking Platform Management overview.
+- commit e3f0a146b1ce7b3c1e669de23b5432a0c0f79ec0
+- Platform Management overview now also shows Keeta 新單入口／SMT 接收狀態:
+  PENDING_SMT vs COMMITTED
+  providerOrderId
+  messageId
+  canonicalOrderId
+  display
+This is readback only; no cloud Order writer is introduced.
+
+DEPLOY
+Trigger: 1e8e79260477a9789f91b3643cc34d5a1b8c5169
+Run: 35810598869 SUCCESS
+Tests: 15 files / 88 tests PASS
+Build: GREEN
+Worker Version: e0bf9465-1f62-43b2-8c68-778a41e3a5c5
+
+SMT CURRENT REPAIR
+Latest published SMT Runtime remains:
+runtime-candidate-mfk-afb02b6e09f4
+Builder: 35809458982 SUCCESS
+This runtime exposes transport/mapping errors and retries intake after Admin ACK/config + every 5s while visible/online.
+
+NEXT SAME-ORDER DIAGNOSTIC
+Do NOT place another order yet.
+1. Refresh Admin Platform Management. Intake card is now on that same page.
+2. Read current second-order state:
+   - PENDING_SMT => cloud received 1001; break is SMT auth/mapping/commit.
+   - COMMITTED => SMT already created canonical order; break is SMT presentation/readback.
+   - no row => second 1001 never entered current order:intent store; inspect provider webhook evidence/identity.
+3. Menu: press 預檢完整菜單 again. The inactive hidden-product false RED is repaired. Do NOT submit provider full-menu sync until preview counts/errors are read back clean.
