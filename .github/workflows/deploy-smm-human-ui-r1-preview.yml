@@ -1,0 +1,44 @@
+name: deploy-smm-human-ui-r1-preview
+
+on:
+  pull_request:
+    branches:
+      - work/MFK/SMM-HUMAN-UI-RECOMPOSITION-R1
+  workflow_dispatch:
+
+jobs:
+  preview:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: v2smm
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-audit --no-fund --legacy-peer-deps --package-lock=false
+      - run: npm test
+      - run: npm run build
+      - name: Prepare static-only preview config
+        run: |
+          cat > wrangler.preview.jsonc <<'EOF'
+          {
+            "$schema": "https://raw.githubusercontent.com/cloudflare/workers-sdk/main/packages/wrangler/config-schema.json",
+            "name": "mfk-admin",
+            "compatibility_date": "2026-09-23",
+            "workers_dev": true,
+            "preview_urls": true,
+            "assets": {
+              "directory": "./dist",
+              "not_found_handling": "single-page-application"
+            }
+          }
+          EOF
+      - name: Upload SMM Human UI R1 preview
+        run: npx --yes wrangler@latest versions upload --config wrangler.preview.jsonc --preview-alias smm-human-ui-r1
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      - name: Verify preview
+        run: curl --retry 5 --retry-delay 2 --fail --silent --show-error --head https://smm-human-ui-r1-mfk-admin.yeungyi88.workers.dev
