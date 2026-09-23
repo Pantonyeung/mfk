@@ -1,4 +1,4 @@
-work_id=MFK-KEETA-TOKEN-AUTH-REVOCATION-R1
-purpose=preview test and build only for authorization revocation fail-closed candidate
-candidate=39037c6555b84fc0fc8eccb466606be485296333
+work_id=MFK-KEETA-READINESS-RECOVERY-UI-GATE-R1
+purpose=validate bounded Keeta readiness recovery UI gate
+candidate=b29e62e5e7a7cf31a878e7e848afdad1d6ce7450
 deployment_authority=PREVIEW_ONLY
