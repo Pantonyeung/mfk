@@ -96,7 +96,8 @@ function customerPublicSnapshot(active,customerOrders=[]){
     .map(({position,...item})=>item);
   const settings=row(snapshot.storeSettings);
   const customerPresentation=row(row(snapshot.presentation).customer);
-  const channelAvailable=customerPresentation.channelAvailable===false?false:true;
+  const customerChannel=row(snapshot.customerChannelPolicy);
+  const channelAvailable=customerChannel.enabled===true;
   const stageFor=label=>label==='待處理'?'RECEIVED':label==='進行中'?'PREPARING':label==='可取餐'?'READY':label==='已完成'?'COMPLETED':label==='已取消'?'REJECTED':'RECEIVED';
   const projectOrder=rawOrder=>{
     const order=row(rawOrder);
@@ -480,6 +481,13 @@ export default {
         '/api/customer/orders/readback':'/public/orders/readback',
       };
       const targetPath=publicMap[url.pathname];
+      if(targetPath&&(url.pathname==='/api/customer/quote'||url.pathname==='/api/customer/orders/submit')){
+        const activeResponse=await admin.fetch(new Request('https://internal/active',{method:'GET'}));
+        if(!activeResponse.ok)return json({code:'CUSTOMER_CONFIG_NOT_PUBLISHED'},503,cors(request));
+        const active=await activeResponse.json();
+        const policy=row(row(active?.snapshot).customerChannelPolicy);
+        if(policy.enabled!==true)return json({code:'CUSTOMER_CHANNEL_DISABLED'},503,cors(request));
+      }
       if(targetPath){
         const target=new URL(request.url);
         target.pathname=targetPath;
