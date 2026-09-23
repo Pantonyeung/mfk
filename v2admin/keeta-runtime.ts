@@ -291,6 +291,11 @@ async function sendSignedProviderRequest({url,params,appSecret}){
   return response.text();
 }
 
+function isProviderAccessTokenMissing(error){
+  const message=error instanceof Error?error.message:String(error||'');
+  return message.includes('115000200')||/access token does not exist/i.test(message);
+}
+
 async function submitKeetaMenuSync(config,token,payload){
   const raw=await sendSignedProviderRequest({
     url:KEETA_MENU_SYNC_URL,
@@ -627,6 +632,7 @@ export class KeetaRuntimeStore{
       expiresAtMs:assessment.expiresAtMs,
       updatedAt:Date.now(),
     });
+    await this.state.storage.delete('oauth:provider-token-invalid');
     return assessment;
   }
 
@@ -635,6 +641,32 @@ export class KeetaRuntimeStore{
     const row=await this.state.storage.get('oauth:token');
     if(!row)throw new Error('KEETA_OAUTH_TOKEN_NOT_FOUND');
     return decryptToken(config.encryptionKey,row);
+  }
+
+  async recoverProviderAccessToken(currentToken,sourceError){
+    const config=requireRuntimeConfig(this.env);
+    if(!isProviderAccessTokenMissing(sourceError))throw sourceError;
+    const observedAt=new Date().toISOString();
+    await this.state.storage.put('oauth:provider-token-invalid',{
+      state:'INVALID',
+      code:sourceError instanceof Error?sourceError.message:String(sourceError),
+      observedAt,
+    });
+    try{
+      const refreshed=await refreshToken(config,currentToken.refreshToken);
+      await this.saveToken(refreshed);
+      const connection=await this.state.storage.get('connection')||{};
+      await this.state.storage.put('connection',{...connection,tokenSource:'TEST_PROVIDER_PORTAL_REFRESH',refreshedAt:new Date().toISOString()});
+      return refreshed;
+    }catch(error){
+      await this.state.storage.put('oauth:provider-token-invalid',{
+        state:'REAUTH_REQUIRED',
+        code:error instanceof Error?error.message:'KEETA_TOKEN_REFRESH_FAILED',
+        sourceCode:sourceError instanceof Error?sourceError.message:String(sourceError),
+        observedAt:new Date().toISOString(),
+      });
+      throw new Error('KEETA_ACCESS_TOKEN_REAUTHORIZE_REQUIRED');
+    }
   }
 
   async usableToken(){
@@ -663,11 +695,14 @@ export class KeetaRuntimeStore{
     const connection=await this.state.storage.get('connection')||{};
     const callbackStatus=await this.state.storage.get('oauth:callback-status')||{};
     const journal=await this.state.storage.get('webhook:status')||{};
+    const providerTokenInvalid=await this.state.storage.get('oauth:provider-token-invalid');
     let tokenState='NOT_CONNECTED';
     let expiresAt=null;
     if(tokenRow){
       expiresAt=Number(tokenRow.expiresAtMs)||null;
-      tokenState=expiresAt&&Date.now()>=expiresAt?'EXPIRED':'CONNECTED';
+      tokenState=providerTokenInvalid?.state==='REAUTH_REQUIRED'
+        ?'REAUTH_REQUIRED'
+        :expiresAt&&Date.now()>=expiresAt?'EXPIRED':'CONNECTED';
     }
     return Object.freeze({
       provider:'KEETA',
@@ -685,6 +720,7 @@ export class KeetaRuntimeStore{
         lastCallbackMethod:callbackStatus.lastCallbackMethod??null,
         lastCallbackParamNames:Array.isArray(callbackStatus.lastCallbackParamNames)?callbackStatus.lastCallbackParamNames:[],
         tokenSource:tokenRow?(connection.tokenSource??'OAUTH_CALLBACK'):null,
+        providerValidation:providerTokenInvalid??null,
       },
       webhook:{
         callbackUrl:'https://admin.morefunos.com/api/keeta/webhook',
@@ -828,8 +864,16 @@ export class KeetaRuntimeStore{
 
     if(url.pathname==='/admin/token/readiness'&&request.method==='POST'){
       try{
-        await this.usableToken();
-        return json({state:'TOKEN_USABLE'});
+        const config=requireRuntimeConfig(this.env);
+        let token=await this.usableToken();
+        try{
+          await keetaProviderJson(config,token,KEETA_STORE_DETAILS_URL,{shopId:config.providerShopId});
+        }catch(error){
+          token=await this.recoverProviderAccessToken(token,error);
+          await keetaProviderJson(config,token,KEETA_STORE_DETAILS_URL,{shopId:config.providerShopId});
+        }
+        await this.state.storage.delete('oauth:provider-token-invalid');
+        return json({state:'TOKEN_USABLE_PROVIDER_CONFIRMED'});
       }catch(error){
         return json({state:'TOKEN_UNAVAILABLE',code:error instanceof Error?error.message:'KEETA_TOKEN_UNAVAILABLE'},409);
       }
@@ -863,8 +907,15 @@ export class KeetaRuntimeStore{
         const adminFingerprint=nonEmpty(body.adminFingerprint,'KEETA_MENU_ADMIN_FINGERPRINT_REQUIRED');
         const projection=buildKeetaMenuProjection(body.snapshot);
         const snapshotFingerprint=await sha256Hex(stable(projection.payload));
-        const token=await this.usableToken();
-        const taskId=await submitKeetaMenuSync(requireRuntimeConfig(this.env),token,projection.payload);
+        const config=requireRuntimeConfig(this.env);
+        let token=await this.usableToken();
+        let taskId;
+        try{
+          taskId=await submitKeetaMenuSync(config,token,projection.payload);
+        }catch(error){
+          token=await this.recoverProviderAccessToken(token,error);
+          taskId=await submitKeetaMenuSync(config,token,projection.payload);
+        }
         const submittedAt=new Date().toISOString();
         const row=Object.freeze({
           state:'SUBMITTED',
@@ -1027,6 +1078,7 @@ export class KeetaRuntimeStore{
 
     if(url.pathname==='/admin/orders/intake'&&(request.method==='GET'||request.method==='POST')){
       const rows=await this.state.storage.list({prefix:'order:intent:'});
+      const lastSmtPull=await this.state.storage.get('smt:intake:last-pull')||null;
       const items=[...rows.values()]
         .filter(Boolean)
         .map(row=>Object.freeze({
@@ -1049,6 +1101,7 @@ export class KeetaRuntimeStore{
         canonicalStoreId:'MF01',
         pending:items.filter(row=>row.state==='PENDING_SMT').length,
         committed:items.filter(row=>row.state==='COMMITTED').length,
+        lastSmtPull,
         items,
       });
     }
@@ -1112,6 +1165,11 @@ export class KeetaRuntimeStore{
         .filter(row=>row&&row.state==='PENDING_SMT')
         .sort((a,b)=>String(a.receivedAt).localeCompare(String(b.receivedAt)))
         .slice(0,20);
+      await this.state.storage.put('smt:intake:last-pull',{
+        deviceId:String(url.searchParams.get('deviceId')||''),
+        observedAt:new Date().toISOString(),
+        pendingCount:intents.length,
+      });
       return json({schema:'MFK_KEETA_ORDER_PENDING_BATCH_V1',storeId:'MF01',orders:intents});
     }
 
