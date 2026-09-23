@@ -128,3 +128,95 @@
 @keyframes cfg-step-enter{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
 @media(max-width:1350px){.cfg-step-heading{grid-template-columns:minmax(0,1fr) 280px}.cfg-current-option{min-height:270px}}
 @media(prefers-reduced-motion:reduce){.cfg-current-option,.cfg-ready-card,.cfg-editor-options>.smt-completed-step{animation:none}.cfg-editor-summary,.cfg-choice-grid button,.cfg-save,.cfg-step-action button{transition:none}}
+
+
+/* Owner-locked configuration presentation: no product imagery, large uniform option cards. */
+.cfg-product-head{
+  grid-template-columns:minmax(0,1fr) minmax(320px,420px);
+  gap:24px;
+  align-items:center;
+}
+.cfg-product-hero{display:none!important}
+.cfg-product-head h2{
+  font-size:36px;
+  line-height:1.08;
+}
+.cfg-product-head>div:first-child>p{
+  margin-top:8px;
+  font-size:16px;
+  line-height:1.4;
+}
+.cfg-live-total strong{
+  font-size:34px;
+}
+.cfg-current-option{
+  min-height:340px;
+}
+.cfg-choice-grid{
+  grid-auto-rows:96px;
+  gap:12px;
+}
+.cfg-choice-grid button{
+  width:100%;
+  height:96px;
+  min-height:96px;
+  padding:12px 40px 12px 16px;
+  border-radius:13px;
+  font-size:20px;
+}
+.cfg-choice-grid button b{
+  font-size:20px;
+}
+.cfg-choice-grid button small{
+  font-size:14px;
+}
+.cfg-step-action button{
+  min-height:62px;
+  font-size:19px;
+}
+.cfg-editor-summary{
+  gap:15px;
+  padding:20px;
+}
+.cfg-editor-summary h3{
+  font-size:24px;
+}
+.cfg-editor-summary .cfg-qty{
+  grid-template-columns:1fr 54px 64px 54px;
+}
+.cfg-editor-summary .cfg-note input{
+  height:54px;
+  font-size:17px;
+}
+.cfg-save{
+  min-height:64px;
+  font-size:19px;
+}
+
+.combo-product-grid{
+  grid-auto-rows:108px;
+}
+.combo-product-grid button{
+  min-height:108px;
+  height:108px;
+  grid-template-rows:auto auto;
+  align-content:center;
+  padding:14px 18px;
+}
+.combo-product-grid img{display:none!important}
+.combo-product-grid b{
+  font-size:19px;
+  line-height:1.2;
+}
+.combo-product-grid small{
+  font-size:13px;
+}
+
+@media(max-width:1350px){
+  .cfg-product-head{grid-template-columns:minmax(0,1fr) 300px}
+  .cfg-product-head h2{font-size:32px}
+  .cfg-choice-grid{grid-auto-rows:88px}
+  .cfg-choice-grid button{height:88px;min-height:88px;font-size:18px}
+  .combo-product-grid{grid-auto-rows:100px}
+  .combo-product-grid button{height:100px;min-height:100px}
+}

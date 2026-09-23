@@ -34,7 +34,7 @@ type Product={
   imageUrl?:string;
   optionSets:readonly SyncedOptionSet[];
 };
-type CartLine={id:string;productId:string;name:string;qty:number;unitMinor:number;serviceMode:ServiceMode;detail?:string;configuration?:ProductConfiguration};
+type CartLine={id:string;productId:string;category:string;name:string;qty:number;unitMinor:number;serviceMode:ServiceMode;detail?:string;configuration?:ProductConfiguration};
 
 const BASE_PRODUCTS:readonly Product[]=[
   {id:'riceball',category:'飯團',name:'原味飯團',priceMinor:4100,priceReady:true},
@@ -97,6 +97,7 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
   const [searchQuery,setSearchQuery]=useState('');
   const [feedbackMessage,setFeedbackMessage]=useState<string|undefined>();
   const [viewMode,setViewMode]=useState<'original'|'organized'>('original');
+  const [combineSimilar,setCombineSimilar]=useState(false);
   const [pulse,setPulse]=useState(0);
   const [recent,setRecent]=useState<string|undefined>();
   const [highlight,setHighlight]=useState<string|undefined>();
@@ -228,6 +229,55 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
   const activeCombos=comboData.combos.filter(combo=>combo.active);
   const riceballCategory=categories.find(item=>item.label.includes('飯團'));
 
+  const cartLinePresentation=(line:CartLine):{optionDetail?:string;comboDetail?:string;note?:string}=>{
+    const note=line.configuration?.note.trim()||undefined;
+    const combo=activeCombos.find(item=>item.id===line.productId);
+    if(combo)return {comboDetail:line.detail?.trim()||undefined,note};
+    const product=products.find(item=>item.id===line.productId);
+    const optionDetail=line.configuration&&product
+      ?product.optionSets.flatMap(set=>{
+        const ids=new Set(line.configuration?.selected[set.id]??[]);
+        const names=set.options.filter(option=>ids.has(option.id)).map(option=>option.name);
+        return names.length?[set.name+'：'+names.join('、')]:[];
+      }).join(' · ')
+      :line.detail;
+    return {optionDetail:optionDetail?.trim()||undefined,note};
+  };
+
+  const baseCartLines=cart.map(line=>({
+    id:line.id,
+    name:line.name,
+    quantity:line.qty,
+    lineTotalLabel:money(line.unitMinor*line.qty),
+    serviceMode:line.serviceMode,
+    groupId:line.category,
+    groupLabel:line.category,
+    detail:line.detail,
+    sourceLineIds:[line.id] as readonly string[],
+    ...cartLinePresentation(line),
+  }));
+  const projectedCartLines=combineSimilar
+    ?[...baseCartLines.reduce((map,line)=>{
+      const source=cart.find(item=>item.id===line.id);
+      const key=[
+        source?.productId??line.name,
+        line.serviceMode,
+        source?.unitMinor??line.lineTotalLabel,
+        line.optionDetail??'',
+        line.comboDetail??'',
+        line.note??'',
+      ].join('::');
+      const current=map.get(key);
+      if(current){
+        const sourceLineIds=[...(current.sourceLineIds??[current.id]),...(line.sourceLineIds??[line.id])];
+        const totalQuantity=current.quantity+line.quantity;
+        const unitMinor=source?.unitMinor??0;
+        map.set(key,{...current,quantity:totalQuantity,lineTotalLabel:money(unitMinor*totalQuantity),sourceLineIds});
+      }else map.set(key,line);
+      return map;
+    },new Map<string,(typeof baseCartLines)[number]>()).values()]
+    :baseCartLines;
+
   const view:OrderingWorkspaceViewModel={
     pendingOrders,activeOrders,categories,selectedCategoryId:category,
     searchQuery,feedbackMessage,orderingMode,
@@ -250,11 +300,8 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
     showCategories:frontlinePresentation.showCategories,
     serviceModes:{takeaway:storeSettings.takeawayEnabled,dineIn:storeSettings.dineInEnabled},
     cart:{
-      orderId:nextDisplay,serviceMode,viewMode,
-      lines:cart.map(line=>({
-        id:line.id,name:line.name,quantity:line.qty,lineTotalLabel:money(line.unitMinor*line.qty),
-        serviceMode:line.serviceMode,groupId:'local',groupLabel:'本機',detail:line.detail,
-      })),
+      orderId:nextDisplay,serviceMode,viewMode,combineSimilar,
+      lines:projectedCartLines,
       subtotalLabel:money(total),packagingLabel:'$0.00',discountLabel:'$0.00',totalLabel:money(total),checkoutEnabled:cart.length>0&&((serviceMode==='takeaway'&&storeSettings.takeawayEnabled)||(serviceMode==='dine-in'&&storeSettings.dineInEnabled)),
     },
     workItems:[
@@ -289,13 +336,11 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
   const add=(id:string)=>{
     const product=products.find(item=>item.id===id);if(!product||!product.priceReady||!product.sellable)return;
     const defaults=defaultConfiguration(product);
-    const existing=cart.find(item=>item.productId===id&&item.serviceMode===serviceMode&&(item.detail??'')===defaults.detail);
-    const next=existing
-      ?cart.map(item=>item.id===existing.id?{...item,qty:item.qty+1}:item)
-      :[...cart,{id:'line-'+Date.now().toString(36),productId:product.id,name:product.name,qty:1,unitMinor:product.priceMinor+defaults.deltaMinor,serviceMode,detail:defaults.detail||undefined,configuration:defaults.configuration}];
+    const line:CartLine={id:'line-'+Date.now().toString(36),productId:product.id,category:product.category,name:product.name,qty:1,unitMinor:product.priceMinor+defaults.deltaMinor,serviceMode,detail:defaults.detail||undefined,configuration:defaults.configuration};
+    const next=[...cart,line];
     setCart(next);
     setRecent(id);
-    setHighlight(existing?.id??next[next.length-1]?.id);
+    setHighlight(line.id);
     setPulse(value=>value+1);
     setFeedbackMessage(`已加入「${product.name}」`);
     window.setTimeout(()=>{setRecent(undefined);setHighlight(undefined)},700);
@@ -303,13 +348,28 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
 
   const addConfigured=(productId:string,detail:string,deltaMinor:number,qty:number,configuration:ProductConfiguration,lineId?:string)=>{
     const product=products.find(item=>item.id===productId);if(!product||!product.priceReady||!product.sellable)return;
-    const line:CartLine={id:lineId??'line-'+Date.now().toString(36),productId:product.id,name:product.name,qty,unitMinor:product.priceMinor+deltaMinor,serviceMode,detail:detail||undefined,configuration};
-    setCart(lineId?cart.map(item=>item.id===lineId?{...line,serviceMode:item.serviceMode}:item):[...cart,line]);
-    setRecent(product.id);setHighlight(line.id);setPulse(value=>value+1);setPanel(null);setFeedbackMessage(lineId?`已更新「${product.name}」`:`已完成設定並加入「${product.name}」`);
+    const existing=lineId?cart.find(item=>item.id===lineId):undefined;
+    const makeLine=(index:number):CartLine=>({
+      id:index===0&&lineId?lineId:'line-'+Date.now().toString(36)+'-'+index,
+      productId:product.id,
+      category:product.category,
+      name:product.name,
+      qty:1,
+      unitMinor:product.priceMinor+deltaMinor,
+      serviceMode:existing?.serviceMode??serviceMode,
+      detail:detail||undefined,
+      configuration,
+    });
+    const replacements=Array.from({length:Math.max(1,qty)},(_,index)=>makeLine(index));
+    const next=lineId
+      ?cart.flatMap(item=>item.id===lineId?replacements:[item])
+      :[...cart,...replacements];
+    setCart(next);
+    setRecent(product.id);setHighlight(replacements[0]?.id);setPulse(value=>value+1);setPanel(null);setFeedbackMessage(lineId?`已更新「${product.name}」`:`已完成設定並加入「${product.name}」`);
   };
 
   const addCombo=(comboId:string,comboName:string,detail:string,unitMinor:number)=>{
-    const line:CartLine={id:'line-'+Date.now().toString(36),productId:comboId,name:comboName,qty:1,unitMinor,serviceMode,detail};
+    const line:CartLine={id:'line-'+Date.now().toString(36),productId:comboId,category:'套餐',name:comboName,qty:1,unitMinor,serviceMode,detail};
     setCart([...cart,line]);setHighlight(line.id);setPulse(value=>value+1);setPanel(null);setFeedbackMessage(`已加入套餐「${comboName}」`);
   };
 
@@ -355,19 +415,22 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
           />
           :panel?.type==='holds'
             ?<HoldListWorkspace holds={heldCarts as readonly WorkspaceHoldDraft[]} onRestore={hold=>{
-              const restored:CartLine[]=hold.items.map((item,index)=>{
+              const restored:CartLine[]=hold.items.flatMap((item,index)=>{
                 const parts=item.name.split('｜');
                 const name=parts.shift()||item.name;
                 const detail=parts.length?parts.join('｜'):undefined;
-                return {
-                  id:'line-'+hold.id+'-'+index+'-'+Date.now().toString(36),
+                const product=products.find(row=>row.id===item.id);
+                const category=comboData.combos.some(combo=>combo.id===item.id)?'套餐':product?.category??'其他';
+                return Array.from({length:Math.max(1,item.qty)},(_,unitIndex)=>({
+                  id:'line-'+hold.id+'-'+index+'-'+unitIndex+'-'+Date.now().toString(36),
                   productId:item.id,
+                  category,
                   name,
-                  qty:item.qty,
+                  qty:1,
                   unitMinor:item.unitMinor,
                   serviceMode:hold.kind==='dining'?'dine-in':'takeaway',
                   detail,
-                };
+                }));
               });
               setCart(restored);
               setServiceMode(hold.kind==='dining'?'dine-in':'takeaway');
@@ -388,12 +451,24 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
       setServiceMode(mode);setCart(cart.map(item=>({...item,serviceMode:mode})));
     },
     onChangeCartView:setViewMode,
-    onChangeLineServiceMode:(lineId,mode)=>{
+    onToggleCombine:()=>setCombineSimilar(value=>!value),
+    onChangeLineServiceMode:(lineIds,mode)=>{
       if(mode==='takeaway'&&!storeSettings.takeawayEnabled)return;
       if(mode==='dine-in'&&!storeSettings.dineInEnabled)return;
-      setCart(cart.map(item=>item.id===lineId?{...item,serviceMode:mode}:item));
+      const ids=new Set(lineIds);
+      setCart(cart.map(item=>ids.has(item.id)?{...item,serviceMode:mode}:item));
     },
-    onAdjustLineQuantity:(lineId,delta)=>setCart(cart.map(item=>item.id===lineId?{...item,qty:item.qty+delta}:item).filter(item=>item.qty>0)),
+    onAdjustLineQuantity:(lineIds,delta)=>{
+      if(!lineIds.length)return;
+      if(delta<0){
+        const removeId=lineIds[lineIds.length-1];
+        setCart(cart.filter(item=>item.id!==removeId));
+        return;
+      }
+      const source=cart.find(item=>item.id===lineIds[0]);
+      if(!source)return;
+      setCart([...cart,{...source,id:'line-'+Date.now().toString(36)}]);
+    },
     onEditCartLine:lineId=>{
       const line=cart.find(item=>item.id===lineId);
       if(!line)return;
@@ -581,6 +656,7 @@ function OperationalApp(){
       return {
         id:'dining-checkout-'+request.holdId+'-'+line.lineIndex+'-'+index,
         productId:line.id,
+        category:'堂食',
         name,
         qty:line.qty,
         unitMinor:line.unitMinor,

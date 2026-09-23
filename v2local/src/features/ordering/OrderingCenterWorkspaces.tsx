@@ -101,7 +101,6 @@ export function ProductConfigWorkspace({product,initial,onAdd}:{product:Workspac
 
   return <div className="cfg-workspace">
     <header className="cfg-product-head">
-      <div className="cfg-product-hero">{product.imageUrl?<img src={product.imageUrl} alt=""/>:null}</div>
       <div><small>{product.category}</small><h2>{product.name}</h2><p>{optionSets.length?`逐項完成 ${optionSets.length} 組設定；已完成步驟會自動收起。`:'此商品沒有已發布選項，確認數量即可加入。'}</p></div>
       <div className="cfg-live-total"><small>目前單價</small><strong>{money(product.priceMinor+delta)}</strong><span>由菜單與已選選項自動計算</span></div>
     </header>
@@ -241,7 +240,6 @@ export function ComboWorkspace({
           const product=choice.type==='PRODUCT'?productById.get(choice.productId??''):undefined;
           const active=selected[currentGroup.group.id]===choice.id;
           return <button type="button" key={choice.id} aria-pressed={active} className={active?'active':''} onClick={()=>setSelected(current=>({...current,[currentGroup.group.id]:choice.id}))}>
-            {product?.imageUrl?<img src={product.imageUrl} alt=""/>:null}
             <span className="cfg-choice-state" aria-hidden="true">{active?'✓':''}</span><b>{label}</b>
             {product?.optionSets?.length?<small>{product.optionSets.length} 個商品選項</small>:null}
           </button>;

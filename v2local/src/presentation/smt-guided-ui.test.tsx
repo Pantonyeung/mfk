@@ -2,13 +2,14 @@ import {describe,expect,it} from 'vitest';
 import {renderToStaticMarkup} from 'react-dom/server';
 import {ProductConfigWorkspace} from '../features/ordering/OrderingCenterWorkspaces.tsx';
 import {CheckoutWorkspace} from '../features/checkout/CheckoutWorkspace.tsx';
+import {OrderingWorkspace} from '../features/ordering/OrderingWorkspace.tsx';
 import {ActionFeedback,EmptyState,GuidedProgress} from './SmtUi.tsx';
 
 describe('SMT human-centered guided UI',()=>{
   it('shows one product decision at a time while keeping quantity and computed pricing visible',()=>{
     const html=renderToStaticMarkup(<ProductConfigWorkspace
       product={{
-        id:'meal',category:'便當',name:'測試便當',priceMinor:5000,priceLabel:'$50.00',
+        id:'meal',category:'便當',name:'測試便當',priceMinor:5000,priceLabel:'$50.00',imageUrl:'https://example.test/product.jpg',
         optionSets:[
           {id:'size',name:'份量',required:true,forceShow:true,selection:'SINGLE',min:1,max:1,options:[
             {id:'large',name:'大份',priceAdjustmentMinor:500,defaultSelected:false,active:true},
@@ -31,6 +32,7 @@ describe('SMT human-centered guided UI',()=>{
     expect(html).toContain('+$5.00');
     expect(html).toContain('加入購物籃');
     expect(html).toContain('disabled=""');
+    expect(html).not.toContain('<img');
   });
 
   it('keeps source, tender, amount and the final commit action on one checkout surface',()=>{
@@ -65,4 +67,53 @@ describe('SMT human-centered guided UI',()=>{
     expect(html).toContain('請勿重複操作');
     expect(html).toContain('目前冇工作');
   });
+
+  it('renders cart lines with vertical number/service control and fixed content order',()=>{
+    const nothing=()=>undefined;
+    const html=renderToStaticMarkup(<OrderingWorkspace
+      view={{
+        pendingOrders:[],activeOrders:[],categories:[],selectedCategoryId:'all',products:[],
+        searchQuery:'',orderingMode:'quick',cartPulseNonce:0,workItems:[],
+        cart:{
+          orderId:'F0030',serviceMode:'takeaway',viewMode:'original',combineSimilar:false,
+          lines:[
+            {
+              id:'line-1',name:'海南雞飯',quantity:1,lineTotalLabel:'$77.00',serviceMode:'takeaway',
+              groupId:'便當',groupLabel:'便當',sourceLineIds:['line-1'],
+              optionDetail:'飯底：少飯 · 加蛋',
+              comboDetail:'海南雞飯＋凍檸茶',
+              note:'不要蔥',
+            },
+            {
+              id:'line-2',name:'凍檸茶',quantity:1,lineTotalLabel:'$18.00',serviceMode:'dine-in',
+              groupId:'飲品',groupLabel:'飲品',sourceLineIds:['line-2'],
+            },
+          ],
+          subtotalLabel:'$95.00',packagingLabel:'$0.00',discountLabel:'$0.00',totalLabel:'$95.00',checkoutEnabled:true,
+        },
+      }}
+      actions={{
+        onSearchQuery:nothing,onSelectCategory:nothing,onChangeOrderingMode:nothing,onAddProduct:nothing,onConfigureProduct:nothing,
+        onChangeServiceMode:nothing,onChangeCartView:nothing,onToggleCombine:nothing,onChangeLineServiceMode:nothing,onAdjustLineQuantity:nothing,
+        onEditCartLine:nothing,onHoldCart:nothing,onCancelCart:nothing,onOpenWorkItem:nothing,onOpenQueueOrder:nothing,onCheckout:nothing,
+      }}
+    />);
+
+    const nameAt=html.indexOf('海南雞飯');
+    const optionAt=html.indexOf('飯底：少飯 · 加蛋');
+    const comboAt=html.indexOf('套餐：海南雞飯＋凍檸茶');
+    const noteAt=html.indexOf('備註：不要蔥');
+
+    expect(nameAt).toBeGreaterThan(-1);
+    expect(optionAt).toBeGreaterThan(nameAt);
+    expect(comboAt).toBeGreaterThan(optionAt);
+    expect(noteAt).toBeGreaterThan(comboAt);
+    expect(html).toContain('第 1 項，外賣，按一下切換為堂食');
+    expect(html).toContain('第 2 項，堂食，按一下切換為外賣');
+    expect(html).toContain('原單');
+    expect(html).toContain('外賣');
+    expect(html).toContain('組合 關');
+    expect(html).not.toContain('按商品名稱修改設定');
+  });
+
 });
