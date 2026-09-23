@@ -7,6 +7,10 @@ const KEETA_MENU_SYNC_URL='https://open.mykeeta.com/api/open/product/menu/sync';
 const KEETA_ORDER_CONFIRM_URL='https://open.mykeeta.com/api/open/order/confirm';
 const KEETA_ORDER_READY_URL='https://open.mykeeta.com/api/open/order/prepare';
 const KEETA_ORDER_GET_URL='https://open.mykeeta.com/api/open/order/get';
+const KEETA_REFUND_AGREE_URL='https://open.mykeeta.com/api/open/order/agree';
+const KEETA_REFUND_REJECT_URL='https://open.mykeeta.com/api/open/order/reject';
+const KEETA_PARTIAL_REFUND_PREVIEW_URL='https://open.mykeeta.com/api/open/order/refund/part/products/preview';
+const KEETA_PARTIAL_REFUND_APPLY_URL='https://open.mykeeta.com/api/open/order/refund/part/apply';
 const KEETA_SPU_STATUS_URL='https://open.mykeeta.com/api/open/product/spustatus/batchupdatebycode';
 const KEETA_STORE_HOURS_GET_URL='https://open.mykeeta.com/api/open/scm/shop/business/hour/effective/get';
 const KEETA_STORE_HOURS_UPDATE_URL='https://open.mykeeta.com/api/open/scm/shop/business/hour/effective/update';
@@ -80,6 +84,23 @@ function keetaOrderLifecycleIdentity(message){
   const raw=row.orderViewIdStr??row.orderViewId;
   const providerOrderId=nonEmpty(String(raw??''),'KEETA_ORDER_EVENT_PROVIDER_ORDER_ID_REQUIRED');
   return Object.freeze({providerOrderId,rawMessage:JSON.stringify(row)});
+}
+
+function keetaAfterSaleIdentity(message){
+  let root;
+  try{root=JSON.parse(nonEmpty(message,'KEETA_AFTER_SALE_MESSAGE_REQUIRED'));}
+  catch{throw new Error('KEETA_AFTER_SALE_MESSAGE_INVALID_JSON');}
+  const row=record(root,'KEETA_AFTER_SALE_MESSAGE_INVALID');
+  const providerOrderId=nonEmpty(String(row.orderViewIdStr??row.orderViewId??''),'KEETA_AFTER_SALE_PROVIDER_ORDER_ID_REQUIRED');
+  const afterSaleOrderId=nonEmpty(String(row.afterSaleOrderId??''),'KEETA_AFTER_SALE_ID_REQUIRED');
+  return Object.freeze({
+    providerOrderId,
+    afterSaleOrderId,
+    providerStatus:Number.isFinite(Number(row.status))?Number(row.status):null,
+    refundAmountMinor:Number.isFinite(Number(row.money))?Number(row.money):null,
+    currency:typeof row.currency==='string'?row.currency:null,
+    rawMessage:JSON.stringify(row),
+  });
 }
 function bytesToHex(bytes){
   return [...bytes].map(value=>value.toString(16).padStart(2,'0')).join('');
@@ -401,6 +422,77 @@ async function readKeetaStore(config,token){
     keetaProviderJson(config,token,KEETA_STORE_HOURS_GET_URL,{shopId:config.providerShopId}),
   ]);
   return Object.freeze({observedAt:new Date().toISOString(),details,hours});
+}
+
+async function sendKeetaRefundDecision(config,token,input){
+  const decision=nonEmpty(input.decision,'KEETA_REFUND_DECISION_REQUIRED');
+  if(decision!=='APPROVE'&&decision!=='REJECT')throw new Error('KEETA_REFUND_DECISION_INVALID');
+  const endpoint=decision==='APPROVE'?KEETA_REFUND_AGREE_URL:KEETA_REFUND_REJECT_URL;
+  const params={
+    accessToken:token.accessToken,
+    appId:config.appId,
+    orderViewId:providerOrderIdentity(input.providerOrderId),
+    shopId:config.providerShopId,
+    ...(decision==='REJECT'?{
+      rejectCode:positiveInt(input.rejectCode,'KEETA_REFUND_REJECT_CODE_REQUIRED'),
+      ...(typeof input.rejectReason==='string'&&input.rejectReason.trim()?{rejectReason:input.rejectReason.trim()}:{}),
+    }:{}),
+    timestamp:Math.floor(Date.now()/1000),
+  };
+  if(decision==='REJECT'&&![100000,100001,100002].includes(params.rejectCode))throw new Error('KEETA_REFUND_REJECT_CODE_INVALID');
+  if(decision==='REJECT'&&params.rejectCode===100000&&!params.rejectReason)throw new Error('KEETA_REFUND_REJECT_REASON_REQUIRED');
+
+  const signed=await signKeetaRuntimeParams(endpoint,params,config.appSecret);
+  let response;
+  try{
+    response=await fetch(endpoint,{method:'POST',headers:{'content-type':'application/json; charset=utf-8'},body:JSON.stringify(signed)});
+  }catch(error){
+    throw Object.assign(new Error('KEETA_REFUND_DECISION_TRANSPORT_UNKNOWN'),{cause:error,unknown:true});
+  }
+  if(response.status!==200)throw Object.assign(new Error('KEETA_REFUND_DECISION_HTTP_UNKNOWN_'+response.status),{unknown:true});
+  let row;
+  try{row=record(JSON.parse(await response.text()),'KEETA_REFUND_DECISION_RESPONSE_INVALID');}
+  catch(error){throw Object.assign(new Error(error instanceof Error?error.message:'KEETA_REFUND_DECISION_RESPONSE_INVALID'),{unknown:true});}
+  const code=Number(row.code);
+  if(!Number.isSafeInteger(code))throw Object.assign(new Error('KEETA_REFUND_DECISION_CODE_INVALID'),{unknown:true});
+  if(code!==0){
+    const error=new Error('KEETA_REFUND_DECISION_REJECTED_'+code+':'+String(row.message||''));
+    Object.assign(error,{providerRejected:true});
+    throw error;
+  }
+  return Object.freeze({code,message:String(row.message||'Success')});
+}
+
+function normalizePartialRefundProducts(value){
+  if(!Array.isArray(value))throw new Error('KEETA_PARTIAL_REFUND_PRODUCTS_REQUIRED');
+  return Object.freeze(value.map(item=>{
+    const row=record(item,'KEETA_PARTIAL_REFUND_PRODUCT_INVALID');
+    return Object.freeze({
+      orderProductId:positiveInt(row.orderProductId,'KEETA_PARTIAL_REFUND_ORDER_PRODUCT_ID_INVALID'),
+      refundCount:positiveInt(row.refundCount,'KEETA_PARTIAL_REFUND_COUNT_INVALID'),
+    });
+  }));
+}
+
+async function previewKeetaPartialRefund(config,token,providerOrderId,products){
+  return keetaProviderJson(config,token,KEETA_PARTIAL_REFUND_PREVIEW_URL,{
+    orderViewId:providerOrderIdentity(providerOrderId),
+    shopId:config.providerShopId,
+    products,
+  });
+}
+
+async function applyKeetaPartialRefund(config,token,providerOrderId,products,partRefundType,partRefundReason){
+  const type=positiveInt(partRefundType,'KEETA_PARTIAL_REFUND_TYPE_REQUIRED');
+  if(![200000,200001,200002,200003,200004].includes(type))throw new Error('KEETA_PARTIAL_REFUND_TYPE_INVALID');
+  if(type===200000&&!(typeof partRefundReason==='string'&&partRefundReason.trim()))throw new Error('KEETA_PARTIAL_REFUND_REASON_REQUIRED');
+  return keetaProviderJson(config,token,KEETA_PARTIAL_REFUND_APPLY_URL,{
+    orderViewId:providerOrderIdentity(providerOrderId),
+    shopId:config.providerShopId,
+    products,
+    partRefundType:type,
+    ...(typeof partRefundReason==='string'&&partRefundReason.trim()?{partRefundReason:partRefundReason.trim()}:{}),
+  });
 }
 async function exchangeAuthorizationCode(config,code){
   const raw=await sendSignedProviderRequest({
