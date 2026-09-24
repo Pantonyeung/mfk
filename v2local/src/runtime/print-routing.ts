@@ -284,8 +284,7 @@ function roleItems(order:PrintableOrder,key:'receipt'|'production'|'packing',con
 }
 function preferredDefaultLabelBinding(bindings:readonly PrintBinding[]){
   return bindings.find(binding=>derivedLogicalPrinterId(binding)==='logical-takeaway-label')
-    ??bindings.find(binding=>binding.routeKey==='logical.product-label.takeaway')
-    ??bindings[0];
+    ??bindings.find(binding=>binding.routeKey==='logical.product-label.takeaway');
 }
 function labelAllowed(item:PrintableOrder['items'][number],binding:PrintBinding,config?:PrintRuntimeConfig,allLabelBindings:readonly PrintBinding[]=[]){
   const productId=String(item.id);
