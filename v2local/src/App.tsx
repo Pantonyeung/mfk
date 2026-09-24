@@ -974,7 +974,7 @@ function OperationalApp(){
       </nav>
       {location.pathname==='/'?<div className="clean-order-tools" aria-label="點單快捷工具">
         <button type="button" className={orderingMode==='quick'?'active':''} onClick={()=>setOrderingMode(value=>value==='quick'?'normal':'quick')}><span>快</span><small>{orderingMode==='quick'?'快捷':'普通'}</small></button>
-        <button type="button" className={quickDrinkOpen?'active':''} onClick={()=>setQuickDrinkOpen(value=>!value)}><span>飲</span><small>飲品</small>{quickDrinkCount>0?<b>{quickDrinkCount}</b>:null}</button>
+        <button type="button" className={(quickDrinkOpen?'active ':'')+(quickDrinkCount>0?'flow-next':'')} onClick={()=>setQuickDrinkOpen(value=>!value)}><span>飲</span><small>飲品</small>{quickDrinkCount>0?<b>{quickDrinkCount}</b>:null}</button>
         <button type="button" className={displayToolsOpen?'active':''} onClick={()=>setDisplayToolsOpen(value=>!value)}><span>顯</span><small>顯示</small></button>
         {displayToolsOpen?<div className="clean-display-popover">
           <header><b>顯示設定</b><button type="button" onClick={()=>setDisplayToolsOpen(false)}>×</button></header>
