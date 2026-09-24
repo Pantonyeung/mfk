@@ -44,7 +44,7 @@ describe('SMT donor skeleton fusion V2 parity locks',()=>{
     expect(app).toContain("id:'combo'");
     expect(app).toContain('飯團待組區');
     expect(app).toContain('必選區');
-    expect(app).toContain('紫米套餐區');
+    expect(app).toContain('飯團餐配對');
   });
 
   it('forbids using the rejected Fusion R1 as an implementation dependency',()=>{
