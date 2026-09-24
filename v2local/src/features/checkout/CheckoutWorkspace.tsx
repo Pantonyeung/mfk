@@ -50,8 +50,9 @@ export function CheckoutWorkspace({view,actions}:{view:CheckoutWorkspaceViewMode
     </aside>
 
     <section className="checkout-flow">
+      <div className="checkout-top-stages">
       <section className="checkout-source-stage">
-        <header><div><small>ORDER SOURCE</small><b>訂單來源</b></div><strong>{selectedChannel?.label}</strong></header>
+        <header><div><small><i>01</i> ORDER SOURCE</small><b>訂單來源</b></div><strong>{selectedChannel?.label}</strong></header>
         <div className="checkout-source-grid">
           {view.channels.map(channel=><button type="button" key={channel.id} className={channel.selected?'active':''} disabled={processing||success} onClick={()=>actions.onSelectChannel(channel.id)}>
             <i>{channelIcon[channel.id]??'•'}</i><b>{channel.label}</b>
@@ -59,16 +60,27 @@ export function CheckoutWorkspace({view,actions}:{view:CheckoutWorkspaceViewMode
         </div>
       </section>
 
-      {view.settlementMode==='LOCAL_PAYMENT'?<>
-        <section className="checkout-payment-stage">
-          <header><div><small>PAYMENT</small><b>收款方式</b></div><strong>{view.amount.dueLabel}</strong></header>
+      {view.settlementMode==='LOCAL_PAYMENT'
+        ?<section className="checkout-payment-stage">
+          <header><div><small><i>02</i> PAYMENT</small><b>付款方式</b></div><strong>{view.amount.dueLabel}</strong></header>
           <div className="checkout-method-grid">
             {view.methods.map(method=><button type="button" key={method.id} disabled={!method.enabled||processing||success} className={method.selected?'active':''} onClick={()=>actions.onSelectMethod(method.id)}>
               <i>{tenderIcon[method.id]??'•'}</i><b>{method.label}</b>
             </button>)}
           </div>
         </section>
+        :<section className="checkout-channel-stage">
+        <header><div><small><i>02</i> CHANNEL INFORMATION</small><b>{view.channelInfo.title}</b>{view.channelInfo.helperLabel?<span>{view.channelInfo.helperLabel}</span>:null}</div><strong>{view.amount.dueLabel}</strong></header>
+        <div className="checkout-channel-form">
+          {view.channelInfo.fields.map(field=><label key={field.id} className={field.required?'required':''}>
+            <span>{field.label}{field.required?<b>必填</b>:null}</span>
+            <input value={field.value} inputMode={field.id==='customerPhone'?'tel':'text'} onChange={event=>actions.onChangeChannelInfo(field.id,event.target.value)} placeholder={field.placeholder}/>
+          </label>)}
+        </div>
+      </section>}
+      </div>
 
+      {view.settlementMode==='LOCAL_PAYMENT'?<>
         {view.comboMode?<section className="checkout-combo-stage">
           <header><b>組合付款</b><span>合計必須等於 {view.amount.dueLabel}</span></header>
           <div className="checkout-split-grid">
@@ -77,6 +89,7 @@ export function CheckoutWorkspace({view,actions}:{view:CheckoutWorkspaceViewMode
         </section>:null}
 
         <section className="checkout-payment-body">
+          <header className="checkout-stage-three"><small><i>03</i> COLLECTION</small><b>收款</b></header>
           <article className="checkout-settlement-card">
             <div><span>應付</span><strong>{view.amount.dueLabel}</strong></div>
             <div><span>已收</span><b>{view.amount.receivedLabel}</b></div>
@@ -97,19 +110,10 @@ export function CheckoutWorkspace({view,actions}:{view:CheckoutWorkspaceViewMode
             </div>
           </div>:<div className="checkout-noncash-summary"><div><small>已選擇</small><b>{view.selectedMethodLabel}</b></div><strong>{view.amount.dueLabel}</strong></div>}
         </section>
-      </>:<section className="checkout-channel-stage">
-        <header><div><small>CHANNEL INFORMATION</small><b>{view.channelInfo.title}</b>{view.channelInfo.helperLabel?<span>{view.channelInfo.helperLabel}</span>:null}</div><strong>{view.amount.dueLabel}</strong></header>
-        <div className="checkout-channel-form">
-          {view.channelInfo.fields.map(field=><label key={field.id} className={field.required?'required':''}>
-            <span>{field.label}{field.required?<b>必填</b>:null}</span>
-            <input value={field.value} inputMode={field.id==='customerPhone'?'tel':'text'} onChange={event=>actions.onChangeChannelInfo(field.id,event.target.value)} placeholder={field.placeholder}/>
-          </label>)}
-        </div>
-        <div className="checkout-channel-summary">
-          <div><span>來源</span><b>{selectedChannel?.label}</b></div>
-          <div><span>訂單總額</span><strong>{view.amount.dueLabel}</strong></div>
-          <p>呢類訂單唔需要再揀門店付款方式；資料會跟正式訂單一齊保存。</p>
-        </div>
+      </>:<section className="checkout-channel-summary">
+        <div><span>來源</span><b>{selectedChannel?.label}</b></div>
+        <div><span>訂單總額</span><strong>{view.amount.dueLabel}</strong></div>
+        <p>平台／外部來源資料已喺 02 記錄；唔需要再揀門店付款方式。</p>
       </section>}
 
       <section className="checkout-final-stage">
