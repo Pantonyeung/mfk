@@ -41,7 +41,7 @@ describe('SMT silent guided flow',()=>{
   });
 
   it('uses visual focus instead of explicit previous/next-step instructional copy',()=>{
-    expect(workspaceSource).toContain("guidanceTarget==='quick-drink'?' flow-next':''");
+    expect(appSource).toContain("quickDrinkCount>0?'flow-next':''");
     expect(workspaceSource).toContain("guidanceTarget==='checkout'?' flow-next':''");
     expect(workspaceSource).toContain("isGuided?' flow-next':''");
     expect(fastLaneSource).toContain("index===0?' flow-current':''");
