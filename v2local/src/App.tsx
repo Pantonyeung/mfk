@@ -23,7 +23,7 @@ import {CashOpeningGate} from './presentation/CashOpeningGate.tsx';
 import {HoldCartWorkspace,HoldListWorkspace,ProductConfigWorkspace,type OrderingPanelState,type WorkspaceHoldDraft,type WorkspaceProduct} from './features/ordering/OrderingCenterWorkspaces.tsx';
 import {ComboFastLaneWorkspace,RequiredFastLaneWorkspace,RiceballPoolWorkspace} from './features/ordering/FastLaneWorkspaces.tsx';
 import {PendingOrderReviewWorkspace} from './features/ordering/PendingOrderReviewWorkspace.tsx';
-import {applyPairingPlan,applyRequiredSelection,buildAutoPairingPlans,comboBlockingCount,comboDraftCount,comboSlots,countMainCourseUnits,defaultSelectionsForProduct,dissolveComboLine,fillPendingComboGroup,fillPendingComboGroupFromConfiguredProduct,nextPairingIndex,rebuildConfiguredLine,requiredTasks,restoreFastLaneLineComposition,serializeFastLaneComposition,type FastLaneCartLine,type FastLanePairPlan,type FastLaneProduct} from './features/ordering/fast-lane-model.ts';
+import {applyPairingPlan,applyRequiredSelection,buildAutoPairingPlans,comboBlockingCount,comboDraftCount,comboSlots,countMainCourseUnits,countRiceballCandidateUnits,defaultSelectionsForProduct,dissolveComboLine,fillPendingComboGroup,fillPendingComboGroupFromConfiguredProduct,nextPairingIndex,rebuildConfiguredLine,requiredTasks,restoreFastLaneLineComposition,riceballMealCombos,serializeFastLaneComposition,type FastLaneCartLine,type FastLanePairPlan,type FastLaneProduct} from './features/ordering/fast-lane-model.ts';
 
 type Product={
   id:string;
@@ -217,11 +217,13 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
     optionSets:product.optionSets,
   }));
   const fastLaneProducts:FastLaneProduct[]=workspaceProducts.map(product=>({
-    id:product.id,name:product.name,priceMinor:product.priceMinor,optionSets:product.optionSets??[],
+    id:product.id,name:product.name,category:product.category,priceMinor:product.priceMinor,optionSets:product.optionSets??[],
   }));
   const requiredWork=requiredTasks(cart,fastLaneProducts);
-  const riceballPoolCount=countMainCourseUnits(cart,comboData.combos,comboData.pools,fastLaneProducts);
-  const primaryCombo=comboData.combos.find(combo=>combo.active);
+  const riceballCombos=riceballMealCombos(comboData.combos,comboData.pools,fastLaneProducts);
+  const configuredRiceballUnits=countMainCourseUnits(cart,riceballCombos,comboData.pools,fastLaneProducts);
+  const riceballPoolCount=Math.max(configuredRiceballUnits,countRiceballCandidateUnits(cart,fastLaneProducts));
+  const primaryCombo=riceballCombos[0];
   const autoPairCount=buildAutoPairingPlans(cart,primaryCombo,comboData.pools,fastLaneProducts,nextPairingIndex(cart)).length;
   const comboWorkCount=comboDraftCount(cart)+autoPairCount;
   const requiredBlockers=requiredWork.length;
@@ -497,10 +499,10 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
       }}/>:null})()
     :panel?.type==='fast-lane'
       ?panel.lane==='riceball-pool'
-        ?<RiceballPoolWorkspace cart={cart} products={fastLaneProducts} combos={comboData.combos} pools={comboData.pools} onAutoPair={applyAutoPairs}/>
+        ?<RiceballPoolWorkspace cart={cart} products={fastLaneProducts} combos={riceballCombos} pools={comboData.pools} onAutoPair={applyAutoPairs}/>
         :panel.lane==='required'
           ?<RequiredFastLaneWorkspace cart={cart} products={fastLaneProducts} onDirtyChange={setPanelDirty} onApply={applyRequired}/>
-          :<ComboFastLaneWorkspace cart={cart} products={fastLaneProducts} combos={comboData.combos} pools={comboData.pools} onDirtyChange={setPanelDirty} onPair={applyOnePair} onFillPending={fillComboPending} onDissolve={dissolveCombo}/>
+          :<ComboFastLaneWorkspace cart={cart} products={fastLaneProducts} combos={riceballCombos} pools={comboData.pools} onDirtyChange={setPanelDirty} onPair={applyOnePair} onFillPending={fillComboPending} onDissolve={dissolveCombo}/>
       :panel?.type==='hold'
           ?<HoldCartWorkspace
             lines={cart}
