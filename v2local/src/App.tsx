@@ -370,7 +370,7 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
     workItems:[
       {id:'riceball-pool',label:'飯團待組區',count:riceballPoolCount},
       {id:'required',label:'必選區',count:requiredWork.length},
-      {id:'combo',label:'紫米套餐區',count:comboWorkCount},
+      {id:'combo',label:'飯團餐配對',count:comboWorkCount},
     ],
     actionAvailability:{
       lineServiceMode:true,
@@ -407,11 +407,6 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
       optionSelections:structured.selections,freeNote:structured.note,
     };
     setCart([...cart,line]);setRecent(product.id);setHighlight(line.id);setPulse(value=>value+1);setPanelDirty(false);setPanel(null);
-  };
-
-  const addCombo=(comboId:string,comboName:string,detail:string,unitMinor:number)=>{
-    const line:CartLine={id:nextLocalCartLineId(),productId:comboId,name:comboName,qty:1,unitMinor,serviceMode,detail};
-    setCart([...cart,line]);setHighlight(line.id);setPulse(value=>value+1);setPanel(null);
   };
 
   const applyRequired=(lineId:string,groupId:string,optionIds:readonly string[])=>{
@@ -473,9 +468,7 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
   const panelTitle=panel?.type==='product'?'商品選項'
     :panel?.type==='quick-drink-config'?'快捷飲品設定'
     :panel?.type==='pending-order'?'待處理訂單'
-    :panel?.type==='fast-lane'?(panel.lane==='riceball-pool'?'飯團待組區':panel.lane==='required'?'必選區':'紫米套餐區')
-    :panel?.type==='organize'?'整理工作台'
-    :panel?.type==='combo'?'紫米套餐區'
+    :panel?.type==='fast-lane'?(panel.lane==='riceball-pool'?'飯團待組區':panel.lane==='required'?'必選區':'飯團餐配對')
     :panel?.type==='hold'?'暫存工作台'
     :panel?.type==='holds'?'暫存單':'';
 
