@@ -265,16 +265,28 @@ export interface WorkspaceHoldDraft{
 }
 
 export function HoldListWorkspace({holds,onRestore,onRemove}:{holds:readonly WorkspaceHoldDraft[];onRestore:(hold:WorkspaceHoldDraft)=>void;onRemove:(id:string)=>void}){
-  return <div className="hold-list-workspace">
-    <header><div><h2>暫存單</h2><p>未完成付款／未正式提交嘅 Cart 全部喺呢度取回。</p></div><strong>{holds.length} 張</strong></header>
-    <div className="hold-list">
-      {holds.length?holds.map(hold=><article key={hold.id}>
-        <div className="hold-list-head"><div><b>{hold.codeLabel}</b><span>{hold.kind==='dining'?'堂食／輪候':'暫存待客'}</span></div><strong>{money(hold.totalMinor)}</strong></div>
-        <div className="hold-list-meta"><span>{new Date(hold.createdAt).toLocaleTimeString('zh-HK',{hour:'2-digit',minute:'2-digit'})}</span><span>{hold.partySize} 位</span>{hold.assignedTable?<span>枱 {hold.assignedTable.replace('T','')}</span>:null}</div>
-        <div className="hold-list-items">{hold.items.map((item,index)=><p key={hold.id+'-'+index}><span>{item.qty}×</span><b>{item.name}</b><strong>{money(item.qty*item.unitMinor)}</strong></p>)}</div>
-        {hold.note?<small>備註：{hold.note}</small>:null}
-        <footer><button type="button" className="danger" onClick={()=>onRemove(hold.id)}>刪除暫存</button><button type="button" className="primary" onClick={()=>onRestore(hold)}>取回購物車</button></footer>
-      </article>):<div className="hold-list-empty">而家未有暫存單。</div>}
-    </div>
+  const [selectedId,setSelectedId]=useState<string|undefined>(()=>holds[0]?.id);
+  const selected=holds.find(hold=>hold.id===selectedId)??holds[0];
+
+  return <div className="hold-list-workspace open-checks-workspace">
+    <header className="open-checks-head"><div><small>OPEN CHECKS</small><h2>暫存單</h2></div><strong>{holds.length}</strong></header>
+    {holds.length?<section className="open-checks-layout">
+      <div className="open-checks-list" role="list">
+        {holds.map(hold=>{
+          const units=hold.items.reduce((sum,item)=>sum+item.qty,0);
+          return <button type="button" role="listitem" key={hold.id} className={selected?.id===hold.id?'active':''} onClick={()=>setSelectedId(hold.id)}>
+            <span><b>{hold.codeLabel}</b><em>{new Date(hold.createdAt).toLocaleTimeString('zh-HK',{hour:'2-digit',minute:'2-digit'})}</em></span>
+            <strong>{money(hold.totalMinor)}</strong>
+            <small>{units} 件</small>
+          </button>;
+        })}
+      </div>
+      {selected?<article className="open-checks-preview">
+        <header><div><small>目前選擇</small><h3>{selected.codeLabel}</h3></div><strong>{money(selected.totalMinor)}</strong></header>
+        <div className="open-checks-preview-lines">{selected.items.map((item,index)=><p key={selected.id+'-'+index}><span>{item.qty}×</span><b>{item.name}</b><strong>{money(item.qty*item.unitMinor)}</strong></p>)}</div>
+        {selected.note?<small className="open-checks-note">備註：{selected.note}</small>:null}
+        <footer><button type="button" className="danger" onClick={()=>onRemove(selected.id)}>刪除</button><button type="button" className="primary" onClick={()=>onRestore(selected)}>取回訂單</button></footer>
+      </article>:null}
+    </section>:<div className="hold-list-empty">未有暫存單</div>}
   </div>;
 }
