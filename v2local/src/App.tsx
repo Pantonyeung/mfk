@@ -22,6 +22,7 @@ import {StaffAuthGate,StaffSessionBadge} from './presentation/StaffAuthGate.tsx'
 import {CashOpeningGate} from './presentation/CashOpeningGate.tsx';
 import {HoldCartWorkspace,HoldListWorkspace,ProductConfigWorkspace,type OrderingPanelState,type WorkspaceHoldDraft,type WorkspaceProduct} from './features/ordering/OrderingCenterWorkspaces.tsx';
 import {ComboFastLaneWorkspace,RequiredFastLaneWorkspace,RiceballPoolWorkspace} from './features/ordering/FastLaneWorkspaces.tsx';
+import {PendingOrderReviewWorkspace} from './features/ordering/PendingOrderReviewWorkspace.tsx';
 import {applyPairingPlan,applyRequiredSelection,buildAutoPairingPlans,comboBlockingCount,comboDraftCount,comboSlots,countMainCourseUnits,defaultSelectionsForProduct,dissolveComboLine,fillPendingComboGroup,fillPendingComboGroupFromConfiguredProduct,nextPairingIndex,rebuildConfiguredLine,requiredTasks,type FastLaneCartLine,type FastLanePairPlan,type FastLaneProduct} from './features/ordering/fast-lane-model.ts';
 
 type Product={
@@ -417,6 +418,7 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
 
   const panelTitle=panel?.type==='product'?'商品選項'
     :panel?.type==='quick-drink-config'?'快捷飲品設定'
+    :panel?.type==='pending-order'?'待處理訂單'
     :panel?.type==='fast-lane'?(panel.lane==='riceball-pool'?'飯團待組區':panel.lane==='required'?'必選區':'紫米套餐區')
     :panel?.type==='organize'?'整理工作台'
     :panel?.type==='combo'?'紫米套餐區'
@@ -425,6 +427,20 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
 
   const panelBody=panel?.type==='product'
     ?(()=>{const product=workspaceProducts.find(item=>item.id===panel.productId);return product?<ProductConfigWorkspace product={product} onAdd={(detail,delta,qty,structured)=>addConfigured(product.id,detail,delta,qty,structured)}/>:null})()
+    :panel?.type==='pending-order'
+      ?(()=>{const order=runtimeOrders.find(item=>item.id===panel.orderId);return order?<PendingOrderReviewWorkspace
+        order={order}
+        onAccept={async()=>{
+          const result=await localRuntime.acceptOrder(order.id);
+          const isKeeta=/^Keeta\b/i.test(String(order.sourceLabel||''));
+          if(isKeeta){
+            if(result.provider.state==='ATTENTION')return '本地已接單；Keeta CONFIRM 需要處理：'+(result.provider.code??'UNKNOWN');
+            if(result.provider.state==='SYNCED'||result.provider.state==='IDEMPOTENT')return '已接單；Keeta CONFIRM 已同步，打印沿現有正式路徑完成。';
+          }
+          return '已接受訂單；同一正式訂單進入製作中，打印沿現有正式路徑完成。';
+        }}
+        onOpenOrders={()=>{setPanel(null);navigate('/orders?orderId='+encodeURIComponent(order.id));}}
+      />:null})()
     :panel?.type==='quick-drink-config'
       ?(()=>{const product=workspaceProducts.find(item=>item.id===panel.productId);return product?<ProductConfigWorkspace product={product} maxQty={1} onAdd={(detail,delta,_qty,structured)=>{
         fillQuickDrinkConfigured(panel.comboLineId,panel.groupId,panel.choiceId,{
@@ -533,7 +549,7 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
     onOpenHeldOrders:()=>{if(!cart.length&&waitingHolds.length)setPanel({type:'holds'});},
     onCancelCart:()=>setCart([]),
     onOpenWorkItem:id=>setPanel({type:'fast-lane',lane:id}),
-    onOpenQueueOrder:(_kind,id)=>navigate('/orders?orderId='+encodeURIComponent(id)),
+    onOpenQueueOrder:(_kind,id)=>{setQuickDrinkOpen(false);setPanel({type:'pending-order',orderId:id});},
     onCheckout:()=>navigate('/checkout'),
   };
   return <OrderingWorkspace view={view} actions={actions} centerPanel={panel&&panelBody?{title:panelTitle,body:panelBody,onClose:()=>setPanel(null)}:null}/>;
