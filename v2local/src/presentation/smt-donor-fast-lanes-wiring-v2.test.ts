@@ -10,7 +10,7 @@ const fast=fs.readFileSync(path.join(root,'features/ordering/FastLaneWorkspaces.
 
 describe('SMT donor fast lane wiring',()=>{
   it('routes all three fixed Fast Lanes to real task workspaces',()=>{
-    expect(app).toContain("onOpenWorkItem:id=>setPanel({type:'fast-lane',lane:id})");
+    expect(app).toContain("onOpenWorkItem:id=>{setPanelDirty(false);setPanel({type:'fast-lane',lane:id});}");
     expect(app).toContain('RiceballPoolWorkspace');
     expect(app).toContain('RequiredFastLaneWorkspace');
     expect(app).toContain('ComboFastLaneWorkspace');
@@ -21,12 +21,13 @@ describe('SMT donor fast lane wiring',()=>{
     expect(app).toContain('comboBlockingCount(cart)');
     expect(app).toContain('fastLaneBlockers===0');
     expect(fast).toContain('ADMIN REQUIRED TRUTH');
-    expect(fast).toContain('ADMIN COMBO TRUTH');
+    expect(fast).toContain('RICEBALL MEAL');
   });
 
   it('keeps auto assignment, specified A/B/C pairing, deferred drink and reversible dissolve visible',()=>{
-    expect(fast).toContain('自動組合');
+    expect(fast).toContain('建立 {plans.length} 組飯團餐');
     expect(fast).toContain('指定配對');
+    expect(fast).toContain('A／B／C…');
     expect(fast).toContain('飲品稍後補');
     expect(fast).toContain('拆開套餐');
   });
