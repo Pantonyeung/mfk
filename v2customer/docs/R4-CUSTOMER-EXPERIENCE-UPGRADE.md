@@ -86,3 +86,19 @@ NO second recommendation authority is introduced. R4 recommendation is a determi
 STOP at Owner visual / interaction acceptance.
 No merge.
 No production deploy.
+
+## Public acceptance evidence
+
+- Candidate: `12580147e433de8ea6663ec6d89edcd245d74b4d`
+- Preview-only PR: #208
+- GitHub Actions run: `35961318711` SUCCESS
+- Job: `107510307698`
+- Tests: 24 / 24 PASS
+- Production build: GREEN
+- Cloudflare Worker Version: `8f1d16ae-d462-4af8-9f04-96f69b03d28c`
+- Stable preview: `https://customer-r4-acceptance-mfk-admin.yeungyi88.workers.dev`
+- HTTP readback: 200
+- Production traffic: UNCHANGED
+- Main: NOT MERGED
+
+STATUS: `MFK_CUSTOMER_EXPERIENCE_UPGRADE_R4_OWNER_ACCEPTANCE_READY`
