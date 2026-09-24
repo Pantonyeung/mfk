@@ -27,7 +27,7 @@ function splitSegments(detail:string){
 }
 function classifyKey(key:string):PrintableSelectionPart['kind']{
   const normalized=clean(key).toLowerCase();
-  if(/飯團|主食|飯底|便當|沙律|麵|主餐|餐點|主菜/.test(normalized))return'main';
+  if(/飯團|飯糰|主食|飯底|便當|沙律|麵|主餐|餐點|主菜/.test(normalized))return'main';
   if(/小食|配料|加配|副食/.test(normalized))return'addon';
   if(/飲品|飲料|drink/.test(normalized))return'drink';
   if(/備註|要求|特別要求/.test(normalized))return'note';

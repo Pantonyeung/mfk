@@ -1,5 +1,5 @@
 import type {PrintableOrder} from './print-routing.ts';
-import {productionBlockLines,verticalSelectionLines} from './print-content.ts';
+import {groupPrintableSelections,verticalSelectionLines} from './print-content.ts';
 
 export const ESC_POS_RASTER_PROFILE=Object.freeze({
   widthDots:576,
@@ -183,6 +183,91 @@ class TicketCanvas{
     this.y+=height+18;
   }
 
+  productionItemBlock(item:PrintableOrder['items'][number]){
+    const groups=groupPrintableSelections(detailSource(item));
+    const modifier=groups.modifier.length?'('+groups.modifier.join('，')+')':'';
+    const main=groups.main[0]??'';
+    const addon=groups.addon[0]??'';
+    const firstRow=[
+      main?(main+(modifier?' '+modifier:'')):(modifier||''),
+      addon,
+    ].filter(Boolean).join(' / ');
+    const normalRows=[
+      ...(firstRow?[firstRow]:[]),
+      ...groups.main.slice(1),
+      ...groups.addon.slice(1),
+      ...groups.note,
+    ];
+    const drinks=[...groups.drink];
+
+    const top=this.y;
+    const totalWidth=this.width-this.margin*2;
+    const gap=14;
+    const qtyWidth=132;
+    const leftWidth=totalWidth-qtyWidth-gap;
+
+    font(this.ctx,42,900);
+    const titleLines=wrap(this.ctx,itemTitle(item),leftWidth,3);
+    const normalWrapped:string[]=[];
+    font(this.ctx,39,900);
+    for(const row of normalRows){
+      for(const wrapped of wrap(this.ctx,row,leftWidth,3))normalWrapped.push(wrapped);
+    }
+
+    const drinkWrapped:string[]=[];
+    font(this.ctx,39,900);
+    for(const drink of drinks){
+      for(const wrapped of wrap(this.ctx,drink,leftWidth-22,3))drinkWrapped.push(wrapped);
+    }
+
+    const textHeight=16+titleLines.length*52+(normalWrapped.length?8+normalWrapped.length*48:0);
+    const drinkHeight=drinkWrapped.length?Math.max(62,18+drinkWrapped.length*46):0;
+    const bodyHeight=Math.max(160,textHeight+(drinkHeight?14+drinkHeight:0)+16);
+
+    this.ctx.fillStyle='#000';
+    this.ctx.textAlign='left';
+    this.ctx.textBaseline='top';
+    let textY=top+8;
+
+    font(this.ctx,42,900);
+    for(const line of titleLines){
+      this.ctx.fillText(line,this.margin,textY);
+      textY+=52;
+    }
+
+    font(this.ctx,39,900);
+    for(const line of normalWrapped){
+      this.ctx.fillText(line,this.margin,textY);
+      textY+=48;
+    }
+
+    if(drinkWrapped.length){
+      textY+=8;
+      const drinkTop=textY;
+      this.ctx.strokeStyle='#000';
+      this.ctx.lineWidth=3;
+      this.ctx.strokeRect(this.margin,drinkTop,leftWidth,drinkHeight);
+      font(this.ctx,39,900);
+      let drinkY=drinkTop+9;
+      for(const line of drinkWrapped){
+        this.ctx.fillText(line,this.margin+10,drinkY);
+        drinkY+=46;
+      }
+    }
+
+    const qtyX=this.margin+leftWidth+gap;
+    this.ctx.strokeStyle='#000';
+    this.ctx.lineWidth=3;
+    this.ctx.strokeRect(qtyX,top,qtyWidth,bodyHeight);
+    this.ctx.textAlign='center';
+    this.ctx.textBaseline='middle';
+    font(this.ctx,46,900);
+    this.ctx.fillText(String(item.qty)+'份',qtyX+qtyWidth/2,top+bodyHeight/2);
+    this.ctx.textBaseline='top';
+    this.ctx.textAlign='left';
+    this.y+=bodyHeight+14;
+  }
+
   structuredItemBlock(input:{
     item:PrintableOrder['items'][number];
     lines:readonly string[];
@@ -334,11 +419,7 @@ function production(t:TicketCanvas,order:PrintableOrder){
   t.line(24);
 
   for(const item of order.items){
-    t.structuredItemBlock({
-      item,
-      lines:productionBlockLines(detailSource(item)),
-      qtyBox:true,
-    });
+    t.productionItemBlock(item);
     t.line(22);
   }
 

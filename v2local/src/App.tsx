@@ -469,8 +469,18 @@ function CheckoutPage({cart,setCart,diningCheckout,onDiningCheckoutDone}:{cart:C
       }
 
       const order=localRuntime.createOrder({
-        items:cart.map(line=>({id:line.productId,name:line.detail?line.name+'｜'+line.detail:line.name,qty:line.qty,unitMinor:line.unitMinor,serviceMode:line.serviceMode})),
-        totalMinor:due,paymentLabel,sourceLabel,
+        items:cart.map(line=>({
+          id:line.productId,
+          name:line.name,
+          qty:line.qty,
+          unitMinor:line.unitMinor,
+          serviceMode:line.serviceMode,
+          ...(line.detail?{detail:line.detail}:{}),
+        })),
+        totalMinor:due,
+        paymentLabel,
+        sourceLabel,
+        ...(pickupCode.trim()?{providerPickupCode:pickupCode.trim()}:{}),
       });
       setCompletion({
         displayOrderCode:order.display,tenderLabel:tenderDisplay,dueLabel:money(due),

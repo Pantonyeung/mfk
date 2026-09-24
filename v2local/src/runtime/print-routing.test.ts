@@ -119,6 +119,28 @@ describe('MFK checkout print fanout',()=>{
     expect(plan[0]?.labelSpec?.secondaryText).toBeUndefined();
   });
 
+
+  it('recovers full combo content for Product Label from legacy flattened formal-order name',()=>{
+    const legacyOrder:PrintableOrder={...order,items:[{
+      id:'combo-c',
+      name:'自選飯糰 C 餐｜選擇飯糰：蜜糖芥末雞絲紫米飯糰 · 小食：古早鹽酥雞 · 飲品：手打檸檬茶',
+      qty:1,
+      unitMinor:6000,
+      serviceMode:'takeaway',
+    }]};
+    const plan=buildOrderPrintPlan(legacyOrder,[
+      binding('產品標籤','product-label-takeaway',undefined,'logical-takeaway-label'),
+    ]);
+    expect(plan).toHaveLength(1);
+    expect(plan[0]?.labelSpec).toMatchObject({
+      kind:'product',
+      orderCode:'P001',
+      primaryText:'蜜糖芥末雞絲紫米飯糰',
+      pieceLabel:'1/1',
+      secondaryLines:['古早鹽酥雞','手打檸檬茶'],
+    });
+  });
+
   it('batches eleven labels for one logical printer into one native dispatch batch',()=>{
     const eleven:PrintableOrder={...order,items:[{id:'riceball',name:'原味飯團',qty:11,unitMinor:2100}]};
     const plan=buildOrderPrintPlan(eleven,[binding('產品標籤','product-label-riceball',['riceball'])]);
