@@ -15,6 +15,7 @@ export interface CustomerCloudCartLine{
   readonly selectedVariationId?:string;
   readonly selectedVariationName?:string;
   readonly selections:readonly CustomerCloudSelection[];
+  readonly note?:string;
 }
 export interface CustomerCloudCheckout{
   readonly name:string;
@@ -83,6 +84,7 @@ function line(value:unknown,index:number):CustomerCloudCartLine{
     ...(variationId?{selectedVariationId:variationId}:{}),
     ...(variationName?{selectedVariationName:variationName}:{}),
     selections:Object.freeze(row.selections.map(selection)),
+    ...(optionalText(row.note,240)?{note:optionalText(row.note,240)}:{}),
   });
 }
 function cart(value:unknown){
