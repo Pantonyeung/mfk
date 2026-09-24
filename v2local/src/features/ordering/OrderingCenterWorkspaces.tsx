@@ -25,6 +25,7 @@ export type OrderingPanelState=
   |{readonly type:'combo'}
   |{readonly type:'fast-lane';readonly lane:'riceball-pool'|'required'|'combo'}
   |{readonly type:'quick-drink-config';readonly productId:string;readonly comboLineId:string;readonly groupId:string;readonly choiceId:string}
+  |{readonly type:'pending-order';readonly orderId:string}
   |{readonly type:'hold'}
   |{readonly type:'holds'}
   |null;
