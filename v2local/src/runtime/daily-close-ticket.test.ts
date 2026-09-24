@@ -44,8 +44,8 @@ describe('daily close ticket',()=>{
     expect(data.grossMinor).toBe(12000);
     expect(data.refundMinor).toBeUndefined();
     expect(data.channelRows).toEqual([
-      {label:'Keeta',orders:1,grossMinor:7000,netMinor:7000},
       {label:'店內',orders:1,grossMinor:5000,netMinor:5000},
+      {label:'Keeta',orders:1,grossMinor:7000,netMinor:7000},
     ]);
     expect(data.paymentRows).toEqual([
       {label:'CASH',orders:1,amountMinor:5000},
