@@ -61,7 +61,9 @@ describe('SMT Premium Interaction Donor Fusion R1',()=>{
     expect(html).toContain('飯團待組區');
     expect(html).toContain('必選區');
     expect(html).toContain('紫米套餐');
-    expect(html).toContain('取單');
+    expect(html).not.toContain('取回訂單');
+    expect(html).toContain('暫存');
+    expect(html).toContain('取消');
     expect(html).toContain('刪除 紫米照燒雞便當');
     expect(html).toContain('前往結帳 $68.00');
     expect(html).not.toContain('<img');
