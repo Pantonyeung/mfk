@@ -21,6 +21,7 @@ export interface CustomerPricedLine{
   readonly qty:number;
   readonly unitMinor:number;
   readonly serviceMode:'takeaway';
+  readonly detail?:string;
 }
 export interface CustomerPricedCart{
   readonly items:readonly CustomerPricedLine[];
@@ -75,12 +76,14 @@ export function priceCustomerCart(
     if(!Number.isSafeInteger(unitMinor)||unitMinor<0)throw new Error('CUSTOMER_UNIT_PRICE_INVALID:'+product.id);
     const qty=Math.max(1,Math.floor(Number(line.quantity)||1));
     totalMinor+=unitMinor*qty;
+    const detail=[optionNames.join('、'),String(line.note||'').trim()].filter(Boolean).join(' · ');
     items.push(Object.freeze({
       id:product.id,
-      name:product.name+(optionNames.length?'｜'+optionNames.join('、'):''),
+      name:product.name,
       qty,
       unitMinor,
       serviceMode:'takeaway' as const,
+      ...(detail?{detail}:{}),
     }));
   }
 
