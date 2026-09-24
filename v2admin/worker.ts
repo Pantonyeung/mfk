@@ -34,20 +34,11 @@ function row(value){
   return value&&typeof value==='object'&&!Array.isArray(value)?value:{};
 }
 function rows(value){return Array.isArray(value)?value:[];}
-function minorFromMoney(value){
-  const n=Number(value);
-  return Number.isFinite(n)?Math.round(n*100):0;
-}
-function moneyLabel(minor){
-  const value=Math.max(0,Number(minor)||0)/100;
-  return 'HK'+String.fromCharCode(36)+(Number.isInteger(value)?String(value):value.toFixed(2));
-}
 function customerPublicSnapshot(active,customerOrders=[]){
   const snapshot=row(active?.snapshot);
   const catalog=row(snapshot.catalog);
   const optionCenter=row(snapshot.optionCenter);
   const availability=row(snapshot.availability);
-  const productMedia=row(snapshot.productMedia);
   const categories=rows(catalog.categories)
     .map((raw,index)=>{const item=row(raw);return{id:String(item.id||''),name:String(item.name||''),position:Number(item.position??index*10),active:item.active!==false};})
     .filter(item=>item.id&&item.name&&item.active)
@@ -59,7 +50,7 @@ function customerPublicSnapshot(active,customerOrders=[]){
     const link=row(raw),productId=String(link.productId||''),setId=String(link.setId||'');
     if(!productId||!setId)continue;
     const current=linksByProduct.get(productId)||[];
-    current.push({setId});
+    current.push({setId,defaultOptionIds:rows(link.defaultOptionIds).map(String)});
     linksByProduct.set(productId,current);
   }
   const products=rows(catalog.products)
@@ -68,7 +59,6 @@ function customerPublicSnapshot(active,customerOrders=[]){
       const productId=String(item.id||'');
       const categoryId=String(item.categoryId||'');
       const sellability=row(availability[productId]);
-      const media=row(productMedia[productId]);
       const optionGroups=(linksByProduct.get(productId)||[]).flatMap(link=>{
         const set=sets.get(link.setId);
         if(!set||set.active===false)return[];
@@ -91,19 +81,12 @@ function customerPublicSnapshot(active,customerOrders=[]){
           options,
         }];
       });
-      const priceText=String(item.basePrice??'').trim();
-      const priceReady=priceText!==''&&Number.isFinite(Number(priceText));
-      const baseMinor=minorFromMoney(priceText);
-      const takeawayMinor=minorFromMoney(item.takeawayAdjustment)+(item.takeawaySurchargeEnabled===true?100:0);
-      const imageUrl=String(media.publicUrl||media.canonicalImageRef||item.imageRef||'').trim();
       return{
         productId,
         categoryId,
         name:String(item.name||productId),
         description:String(item.description||''),
-        available:item.active!==false&&sellability.sellable!==false&&priceReady,
-        ...(priceReady?{displayPriceLabel:moneyLabel(baseMinor+takeawayMinor)}:{}),
-        ...(imageUrl?{imageUrl,imageAlt:String(item.name||productId)}:{}),
+        available:item.active!==false&&sellability.sellable!==false,
         optionGroups,
         position:Number(item.legacySourcePosition??item.position??0),
       };
@@ -128,7 +111,7 @@ function customerPublicSnapshot(active,customerOrders=[]){
       displayCode:display,
       stage,
       itemSummary:itemRows.map(item=>String(row(item).name||'')).filter(Boolean).join('、'),
-      amountLabel:moneyLabel(totalMinor),
+      amountLabel:'HK$'+(totalMinor/100).toFixed(2),
       pickupCode:display||undefined,
       observedAt,
       readback:'CONFIRMED',
@@ -141,7 +124,7 @@ function customerPublicSnapshot(active,customerOrders=[]){
       storeId:String(active?.storeId||'MF01'),
       storeName:String(settings.storeName||'磨飯'),
       channelAvailable,
-      notice:typeof customerPresentation.body==='string'&&customerPresentation.body.trim()?customerPresentation.body.trim():undefined,
+      notice:typeof customerPresentation.notice==='string'?customerPresentation.notice:undefined,
       observedAt:new Date().toISOString(),
     },
     menu:{
@@ -162,6 +145,7 @@ function customerPublicSnapshot(active,customerOrders=[]){
     observedAt:new Date().toISOString(),
   };
 }
+
 
 export class AdminSyncStore{
   constructor(state,env){this.state=state;this.env=env;}
@@ -299,6 +283,7 @@ export class AdminSyncStore{
       }
       return json({state:'DOORBELL_SENT'});
     }
+
     if(url.pathname==='/provider-doorbell'&&request.method==='POST'){
       let body;
       try{body=await request.json();}catch{return json({code:'PROVIDER_DOORBELL_INVALID'},400);}
@@ -530,6 +515,7 @@ export default {
         for(const [key,value] of Object.entries(cors(request)))headers.set(key,value);
         return new Response(response.body,{status:response.status,statusText:response.statusText,headers});
       }
+
       return json({code:'NOT_FOUND'},404,cors(request));
     }
 
@@ -696,4 +682,3 @@ export default {
     return env.ASSETS.fetch(request);
   },
 };
-
