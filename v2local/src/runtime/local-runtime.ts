@@ -1,5 +1,6 @@
 import {printBytesLan,printTextLan} from './native-print.ts';
 import {renderTscRasterLabel} from './label-bitmap.ts';
+import {renderEscPosRasterTicket} from './ticket-bitmap.ts';
 import {buildOrderPrintPlan,groupTscBitmapJobsByPhysicalPrinter,type PrintBinding,type PlannedPrintJob} from './print-routing.ts';
 import {queueOrderProjection} from './projection-outbox.ts';
 import {readActiveStaffSession} from './staff-auth.ts';
@@ -335,7 +336,15 @@ async function dispatchOrderOutputs(order:StoredOrder,requestedJobIds?:ReadonlyS
           try{
             const result=job.renderMode==='tsc-bitmap'&&job.labelSpec
               ?await printBytesLan({...printerInput(job.binding),bytes:await renderTscRasterLabel(job.labelSpec)})
-              :await printTextLan({...printerInput(job.binding),text:job.payload,cutAfter:job.cutAfter,kickDrawer:job.kickDrawer,beepAfter:job.beepAfter});
+              :job.renderMode==='escpos-raster'&&job.ticketKind&&job.ticketOrder
+                ?await printBytesLan({...printerInput(job.binding),bytes:await renderEscPosRasterTicket({
+                  kind:job.ticketKind,
+                  order:job.ticketOrder,
+                  cutAfter:job.cutAfter,
+                  kickDrawer:job.kickDrawer,
+                  beepAfter:job.beepAfter,
+                })})
+                :await printTextLan({...printerInput(job.binding),text:job.payload,cutAfter:job.cutAfter,kickDrawer:job.kickDrawer,beepAfter:job.beepAfter});
             const code=result.code||(result.ok?'SENT':'PRINT_FAILED');
             results.push({jobId:job.id,role:job.role,ok:result.ok,code});
             if(!result.ok)groupCode=code;

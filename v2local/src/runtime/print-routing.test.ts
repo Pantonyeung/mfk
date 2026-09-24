@@ -43,6 +43,12 @@ describe('MFK checkout print fanout',()=>{
     ]);
     expect(plan).toHaveLength(7);
     expect(plan[0]?.payload).toContain('P001');
+    expect(plan[0]?.renderMode).toBe('escpos-raster');
+    expect(plan[0]?.ticketKind).toBe('receipt');
+    expect(plan[1]?.renderMode).toBe('escpos-raster');
+    expect(plan[1]?.ticketKind).toBe('production');
+    expect(plan[2]?.renderMode).toBe('escpos-raster');
+    expect(plan[2]?.ticketKind).toBe('packing');
     expect(plan[1]?.payload).toContain('廚房製作單');
     expect(plan[2]?.payload).toContain('外賣打包單');
 
