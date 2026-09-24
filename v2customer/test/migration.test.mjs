@@ -108,3 +108,13 @@ test('quote and order creation cannot be implemented locally',()=>{
 test('production fixture file has been removed',()=>{
   assert.equal(fs.existsSync(path.join(srcRoot,'fixtures.ts')),false);
 });
+
+
+test('quote readback window outlives SMT five-second fallback reconcile',()=>{
+  const cloud=fs.readFileSync(path.join(srcRoot,'cloud-runtime.ts'),'utf8');
+  const attempts=Number(cloud.match(/QUOTE_READBACK_ATTEMPTS=(\d+)/)?.[1]);
+  const interval=Number(cloud.match(/QUOTE_READBACK_INTERVAL_MS=(\d+)/)?.[1]);
+  assert.ok(Number.isFinite(attempts)&&Number.isFinite(interval));
+  assert.ok((attempts-1)*interval>5000,'customer quote wait must survive the SMT 5s fallback reconcile');
+  assert.match(cloud,/waitQuote\(id\)/);
+});
