@@ -239,34 +239,32 @@ function PrinterPanel(){
           const bytes=await renderTscRasterLabel(current.role==='袋標籤'?{
             kind:'bag',
             orderCode:'P028',
-            primaryText:'共 1 件',
-            secondaryText:'共 1 件',
+            primaryText:'共1件',
+            secondaryText:'共1件',
+            pickupCode:'1771',
           }:{
             kind:'product',
             orderCode:'P028',
-            primaryText:'汁燒鰻魚紫米飯團',
-            secondaryLines:['走青瓜'],
+            primaryText:'汁燒鰻魚飯團',
+            secondaryLines:['(走青，少醬)','酥皮椰奶','日式玄米茶'],
             pieceLabel:'1/1',
           });
           result=await printBytesLan({...printer,bytes});
         }else{
           const sample:PrintableOrder={
             id:'MFK-PRINT-TEMPLATE-TEST',
-            display:'P0049',
+            display:'P030',
             createdAt:new Date().toISOString(),
-            totalMinor:5700,
+            totalMinor:6000,
             paymentLabel:'CASH',
-            sourceLabel:'Keeta · 4890',
-            providerPickupCode:'4890',
-            orderRemark:'測試備註',
-            utensilPreference:'需要',
+            sourceLabel:'現場',
+            providerPickupCode:'1771',
             items:[{
-              id:'sample-d1',
-              productCode:'D1',
-              name:'紫米套餐',
-              detail:'招牌雞粒 · 麻薯 · 氣泡水',
+              id:'sample-c',
+              name:'自選飯糰 C 餐',
+              detail:'選擇飯團：蜜糖芥末雞絲紫米飯糰 · 小食：古早鹽酥雞 · 飲品：手打檸檬茶',
               qty:1,
-              unitMinor:5700,
+              unitMinor:6000,
               serviceMode:'takeaway',
             }],
           };
