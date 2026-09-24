@@ -13,8 +13,8 @@ describe('SMT donor Quick Mode + Quick Drink',()=>{
   it('restores Normal / Quick mode without bypassing optional force-show truth',()=>{
     expect(workspace).toContain("orderingMode==='quick'&&product.quickAddAllowed");
     expect(app).toContain("quickAddAllowed:!product.optionSets.some(set=>set.forceShow&&!set.required&&set.min===0)");
-    expect(workspace).toContain('普通');
-    expect(workspace).toContain('快捷');
+    expect(app).toContain("<small>{orderingMode==='quick'?'快捷':'普通'}</small>");
+    expect(app).toContain('clean-order-tools');
   });
 
   it('Quick Mode preserves current Admin default option selections and lets Required flow remain explicit',()=>{
@@ -28,7 +28,7 @@ describe('SMT donor Quick Mode + Quick Drink',()=>{
     expect(app).toContain("filter(group=>group.role==='DRINK')");
     expect(app).toContain("row.groupId===group.groupId&&row.role==='DRINK'");
     expect(app).toContain('quickDrinkChoices');
-    expect(workspace).toContain('快捷飲品');
+    expect(app).toContain('<span>飲</span><small>飲品</small>');
     expect(model).toContain("pool.addonKind==='DRINK'?'DRINK':'SNACK'");
   });
 
