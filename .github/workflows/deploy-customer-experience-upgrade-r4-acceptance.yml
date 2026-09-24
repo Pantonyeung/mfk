@@ -1,0 +1,27 @@
+name: deploy-customer-experience-upgrade-r4-acceptance
+
+on:
+  pull_request:
+    branches:
+      - work/MFK/CUSTOMER-EXPERIENCE-UPGRADE-R4
+
+jobs:
+  preview:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: v2customer
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - run: npm install --no-audit --no-fund --legacy-peer-deps --package-lock=false
+      - run: npm test
+      - run: npm run build
+      - name: Upload R4 acceptance preview
+        run: npx --yes wrangler@latest versions upload --name mfk-admin --preview-alias customer-r4-acceptance
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      - name: Verify preview
+        run: curl --retry 5 --retry-delay 2 --fail --silent --show-error --head https://customer-r4-acceptance-mfk-admin.yeungyi88.workers.dev
