@@ -15,10 +15,11 @@ function QueueStrip({title,kind,orders,onOpen}:{title:string;kind:'pending'|'act
   </section>;
 }
 
-function ProductCard({product,actions,recentlyAdded}:{product:OrderingProductViewModel;actions:OrderingWorkspaceActions;recentlyAdded:boolean}){
+function ProductCard({product,actions,recentlyAdded,orderingMode}:{product:OrderingProductViewModel;actions:OrderingWorkspaceActions;recentlyAdded:boolean;orderingMode:'normal'|'quick'}){
   const onBody=()=>{
     if(!product.enabled)return;
-    if(product.requiresOptions)actions.onConfigureProduct(product.id);
+    if(orderingMode==='quick'&&product.quickAddAllowed)actions.onAddProduct(product.id);
+    else if(product.requiresOptions)actions.onConfigureProduct(product.id);
     else actions.onAddProduct(product.id);
   };
   return <article className={`ordering-product-card ${product.imageUrl?'has-media':'text-only'}${product.enabled?'':' disabled'}${recentlyAdded?' recently-added':''}`}>
@@ -95,14 +96,29 @@ export function OrderingWorkspace({view,actions,centerPanel}:{view:OrderingWorks
         <header className="ordering-center-panel-head"><div><small>點單工作台</small><strong>{centerPanel.title}</strong></div><button type="button" onClick={centerPanel.onClose}>×</button></header>
         <div className="ordering-center-panel-body">{centerPanel.body}</div>
       </section>:<>
-        <div className="ordering-status-stack" aria-live="polite">
-          {view.menuRevisionLabel?<div className="ordering-menu-local-status"><b>{view.menuRevisionLabel}</b><span>本機 Admin → POS</span></div>:null}
-          {view.operationalNotice?<div className="ordering-menu-local-status warning"><b>{view.operationalNotice}</b><span>Admin 營運提示</span></div>:null}
+        <div className="ordering-catalog-toolbar">
+          <div className="ordering-status-stack" aria-live="polite">
+            {view.menuRevisionLabel?<div className="ordering-menu-local-status"><b>{view.menuRevisionLabel}</b><span>本機 Admin → POS</span></div>:null}
+            {view.operationalNotice?<div className="ordering-menu-local-status warning"><b>{view.operationalNotice}</b><span>Admin 營運提示</span></div>:null}
+          </div>
+          <div className="ordering-fast-controls" aria-label="點單快捷">
+            <div className="ordering-mode-switch" aria-label="點單模式">
+              <button type="button" className={view.orderingMode==='normal'?'active':''} aria-pressed={view.orderingMode==='normal'} onClick={()=>actions.onChangeOrderingMode('normal')}>普通</button>
+              <button type="button" className={view.orderingMode==='quick'?'active':''} aria-pressed={view.orderingMode==='quick'} onClick={()=>actions.onChangeOrderingMode('quick')}>快捷</button>
+            </div>
+            <button type="button" className={'ordering-quick-drink-toggle'+(view.quickDrink.pendingCount?' has-work':'')} aria-expanded={view.quickDrink.open} onClick={actions.onToggleQuickDrink}>快捷飲品 <b>{view.quickDrink.pendingCount}</b></button>
+          </div>
         </div>
+        {view.quickDrink.open?<section className="ordering-quick-drink-drawer" aria-label="快捷飲品">
+          <header><div><small>QUICK DRINK</small><strong>{view.quickDrink.targetLabel?'正在補：'+view.quickDrink.targetLabel:'目前冇待補飲品'}</strong></div><span><button type="button" disabled={!view.quickDrink.pendingCount} onClick={actions.onOpenQuickDrinkTargets}>指定餐點</button><button type="button" onClick={actions.onToggleQuickDrink}>×</button></span></header>
+          <div className="ordering-quick-drink-list">
+            {view.quickDrink.choices.length?view.quickDrink.choices.map(choice=><button type="button" key={choice.id} disabled={!choice.enabled||!view.quickDrink.pendingCount} onClick={()=>actions.onSelectQuickDrink(choice.id)}><b>{choice.label}</b>{choice.priceAdjustmentLabel?<small>{choice.priceAdjustmentLabel}</small>:null}{choice.requiresConfiguration?<em>先設定</em>:null}</button>):<p>目前 Admin Combo 冇可用飲品 Choice。</p>}
+          </div>
+        </section>:null}
         {view.showCategories===false?null:<nav className="ordering-categories" aria-label="商品分類">
           {view.categories.map(category=><button type="button" key={category.id} aria-pressed={view.selectedCategoryId===category.id} className={view.selectedCategoryId===category.id?'active':''} onClick={()=>actions.onSelectCategory(category.id)}>{category.label}</button>)}
         </nav>}
-        <section className="ordering-product-grid">{view.products.map(product=><ProductCard key={product.id} product={product} actions={actions} recentlyAdded={view.recentlyAddedProductId===product.id}/>)}</section>
+        <section className="ordering-product-grid">{view.products.map(product=><ProductCard key={product.id} product={product} actions={actions} orderingMode={view.orderingMode} recentlyAdded={view.recentlyAddedProductId===product.id}/>)}</section>
       </>}
     </main>
 
