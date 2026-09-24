@@ -56,8 +56,12 @@ describe('SMT donor pending summary review accept flow',()=>{
     expect(pendingSource).not.toContain('printOrderOutputs(');
   });
 
-  it('does not claim payment proof data that current StoredOrder does not provide',()=>{
-    expect(pendingSource).not.toContain('付款證明');
-    expect(pendingSource).toContain('付款記錄');
+  it('shows current Customer payment evidence as read-only truth without inventing verification mutation',()=>{
+    expect(pendingSource).toContain('paymentEvidenceRef');
+    expect(pendingSource).toContain('readCustomerPaymentEvidence');
+    expect(pendingSource).toContain('付款截圖 · 只讀核對');
+    expect(pendingSource).toContain('確認接單不會自動將付款狀態改成「已核對」');
+    expect(pendingSource).not.toContain("paymentVerificationState:'VERIFIED'");
+    expect(pendingSource).not.toContain('setPaymentVerificationState');
   });
 });
