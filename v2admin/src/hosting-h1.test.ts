@@ -21,7 +21,7 @@ describe('MFK Admin Cloudflare H2 + config sync runtime',()=>{
     expect(source).toContain('"tag": "customer-runtime-v1"');
   });
 
-  it('allows SMT appassets plus Customer origin while Publish remains Admin-origin-only',()=>{
+  it('allows SMT appassets plus the public Customer origin while Publish remains Admin-origin-only',()=>{
     const worker=readFileSync(new URL('../worker.ts',import.meta.url),'utf8');
     expect(worker).toContain("const SMT_ORIGIN='https://appassets.androidplatform.net'");
     expect(worker).toContain("const CUSTOMER_ORIGIN='https://order.morefunos.com'");
