@@ -9,11 +9,15 @@ export const LABEL_TSC_PROFILE=Object.freeze({
   reverseFeed:true,
 });
 
+export type RasterLabelKind='product'|'bag';
+
 export interface RasterLabelSpec{
+  readonly kind?:RasterLabelKind;
   readonly orderCode:string;
   readonly primaryText:string;
-  readonly pieceLabel:string;
+  readonly pieceLabel?:string;
   readonly secondaryText?:string;
+  readonly productCode?:string;
 }
 
 const mmToDots=(mm:number)=>Math.round(mm*LABEL_TSC_PROFILE.dpi/25.4);
@@ -82,6 +86,99 @@ function wrapCharacters(ctx:CanvasRenderingContext2D,text:string,maxWidth:number
   return lines;
 }
 
+function fitFont(
+  ctx:CanvasRenderingContext2D,
+  text:string,
+  maxWidth:number,
+  preferred:number,
+  minimum:number,
+  weight=800,
+){
+  let size=preferred;
+  while(size>minimum){
+    ctx.font=weight+' '+size+'px "Noto Sans TC","Noto Sans CJK TC","PingFang TC","Microsoft JhengHei",sans-serif';
+    if(ctx.measureText(text).width<=maxWidth)break;
+    size-=2;
+  }
+  return size;
+}
+
+function drawProductLabel(
+  ctx:CanvasRenderingContext2D,
+  spec:RasterLabelSpec,
+  widthDots:number,
+  heightDots:number,
+){
+  const margin=14;
+  const gap=8;
+  const top=12;
+  const headerHeight=78;
+  const leftWidth=Math.round(widthDots*0.66);
+  const rightX=leftWidth+gap;
+  const rightWidth=widthDots-rightX-margin;
+
+  // Operational header: order number and piece count are separate black/white blocks.
+  ctx.fillStyle='#000';
+  ctx.fillRect(margin,top,leftWidth-margin,headerHeight);
+  ctx.fillRect(rightX,top,rightWidth,headerHeight);
+  ctx.fillStyle='#fff';
+  ctx.textAlign='center';
+  ctx.textBaseline='middle';
+
+  const orderCode=String(spec.orderCode||'');
+  fitFont(ctx,orderCode,leftWidth-margin-18,46,30,900);
+  ctx.fillText(orderCode,margin+(leftWidth-margin)/2,top+headerHeight/2);
+
+  const piece=String(spec.pieceLabel||'');
+  fitFont(ctx,piece,rightWidth-12,38,25,900);
+  ctx.fillText(piece,rightX+rightWidth/2,top+headerHeight/2);
+
+  // Product identity.
+  ctx.fillStyle='#000';
+  ctx.textAlign='left';
+  ctx.textBaseline='top';
+  const code=String(spec.productCode||'').trim();
+  const name=(code?code+' · ':'')+String(spec.primaryText||'').trim();
+  ctx.font='900 34px "Noto Sans TC","Noto Sans CJK TC","PingFang TC","Microsoft JhengHei",sans-serif';
+  const lines=wrapCharacters(ctx,name,widthDots-margin*2,3);
+  let y=108;
+  for(const line of lines){
+    ctx.fillText(line,margin,y);
+    y+=40;
+  }
+
+  if(spec.secondaryText){
+    const secondaryY=Math.max(y+4,heightDots-58);
+    ctx.font='600 22px "Noto Sans TC","Noto Sans CJK TC","PingFang TC","Microsoft JhengHei",sans-serif';
+    const secondary=wrapCharacters(ctx,String(spec.secondaryText),widthDots-margin*2,1)[0]??'';
+    ctx.fillText(secondary,margin,secondaryY);
+  }
+}
+
+function drawBagLabel(
+  ctx:CanvasRenderingContext2D,
+  spec:RasterLabelSpec,
+  widthDots:number,
+  heightDots:number,
+){
+  const margin=14;
+  // Bag label is intentionally minimal: display number + total item count only.
+  ctx.fillStyle='#000';
+  ctx.fillRect(margin,18,widthDots-margin*2,130);
+  ctx.fillStyle='#fff';
+  ctx.textAlign='center';
+  ctx.textBaseline='middle';
+  const orderCode=String(spec.orderCode||'');
+  fitFont(ctx,orderCode,widthDots-margin*2-24,64,38,900);
+  ctx.fillText(orderCode,widthDots/2,83);
+
+  ctx.fillStyle='#000';
+  ctx.textBaseline='top';
+  const total=String(spec.secondaryText||spec.primaryText||'').trim();
+  fitFont(ctx,total,widthDots-margin*2,48,30,900);
+  ctx.fillText(total,widthDots/2,188);
+}
+
 export async function renderTscRasterLabel(spec:RasterLabelSpec):Promise<Uint8Array>{
   if(typeof document==='undefined')throw new Error('LABEL_CANVAS_UNAVAILABLE');
   const widthDots=mmToDots(LABEL_TSC_PROFILE.widthMm);
@@ -94,30 +191,9 @@ export async function renderTscRasterLabel(spec:RasterLabelSpec):Promise<Uint8Ar
 
   ctx.fillStyle='#fff';
   ctx.fillRect(0,0,widthDots,heightDots);
-  ctx.fillStyle='#000';
-  ctx.textBaseline='top';
 
-  const left=18;
-  const usableWidth=widthDots-left*2;
-
-  ctx.font='700 32px "Noto Sans TC","Noto Sans CJK TC","PingFang TC","Microsoft JhengHei",sans-serif';
-  ctx.fillText(String(spec.orderCode||''),left,22);
-
-  ctx.font='700 42px "Noto Sans TC","Noto Sans CJK TC","PingFang TC","Microsoft JhengHei",sans-serif';
-  const productLines=wrapCharacters(ctx,spec.primaryText,usableWidth,2);
-  let y=72;
-  for(const line of productLines){
-    ctx.fillText(line,left,y);
-    y+=50;
-  }
-
-  if(spec.secondaryText){
-    ctx.font='500 24px "Noto Sans TC","Noto Sans CJK TC","PingFang TC","Microsoft JhengHei",sans-serif';
-    ctx.fillText(spec.secondaryText,left,Math.max(y+LABEL_TSC_PROFILE.lineGap,190));
-  }
-
-  ctx.font='700 28px "Noto Sans TC","Noto Sans CJK TC","PingFang TC","Microsoft JhengHei",sans-serif';
-  ctx.fillText(String(spec.pieceLabel||''),left,heightDots-52);
+  if(spec.kind==='bag')drawBagLabel(ctx,spec,widthDots,heightDots);
+  else drawProductLabel(ctx,spec,widthDots,heightDots);
 
   const image=ctx.getImageData(0,0,widthDots,heightDots);
   const mono=new Uint8Array(widthDots*heightDots);
@@ -128,6 +204,7 @@ export async function renderTscRasterLabel(spec:RasterLabelSpec):Promise<Uint8Ar
     const b=image.data[offset+2]??255;
     const alpha=image.data[offset+3]??255;
     const luminance=(r*299+g*587+b*114)/1000;
+    // Keep the existing printer bitmap polarity contract.
     mono[pixel]=alpha>20&&luminance<180?0:1;
   }
   const bitmap=packMonochromeBitmap(mono,widthDots,heightDots);
