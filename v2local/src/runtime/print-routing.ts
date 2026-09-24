@@ -148,7 +148,7 @@ function reverseBlock(label:string,value:string,size=DOUBLE){
     +NORMAL+BOLD_OFF+REVERSE_OFF+LEFT;
 }
 
-function receipt(order:PrintableOrder){
+export function renderCustomerReceiptTicket(order:PrintableOrder){
   const rows=order.items.map(item=>{
     const detail=itemDetail(item);
     return BOLD_ON+itemIdentity(item)+BOLD_OFF+'\n'
@@ -181,7 +181,7 @@ function receipt(order:PrintableOrder){
     +'\n\n';
 }
 
-function production(order:PrintableOrder){
+export function renderProductionTicket(order:PrintableOrder){
   const blocks=order.items.map(item=>{
     const detail=itemDetail(item);
     return BOLD_ON+DOUBLE+itemIdentity(item)+'\n'+NORMAL+BOLD_OFF
@@ -208,7 +208,7 @@ function production(order:PrintableOrder){
     +'\n\n';
 }
 
-function packing(order:PrintableOrder){
+export function renderPackingTicket(order:PrintableOrder){
   const rows=order.items.map(item=>{
     const detail=itemDetail(item);
     return BOLD_ON+itemIdentity(item)+BOLD_OFF+'\n'
@@ -320,19 +320,19 @@ export function buildOrderPrintPlan(order:PrintableOrder,bindings:readonly Print
     if(binding.role==='顧客小票'){
       const items=roleItems(order,'receipt',config);
       if(items.length<1)continue;
-      jobs.push({id:order.id+':receipt',role:binding.role,binding,payload:receipt(withItems(order,items)),cutAfter:true,kickDrawer:/\bCASH\b/i.test(order.paymentLabel),beepAfter:true});
+      jobs.push({id:order.id+':receipt',role:binding.role,binding,payload:renderCustomerReceiptTicket(withItems(order,items)),cutAfter:true,kickDrawer:/\bCASH\b/i.test(order.paymentLabel),beepAfter:true});
       continue;
     }
     if(binding.role==='製作單'){
       const items=roleItems(order,'production',config);
       if(items.length<1)continue;
-      jobs.push({id:order.id+':production',role:binding.role,binding,payload:production(withItems(order,items)),cutAfter:true,beepAfter:true});
+      jobs.push({id:order.id+':production',role:binding.role,binding,payload:renderProductionTicket(withItems(order,items)),cutAfter:true,beepAfter:true});
       continue;
     }
     if(binding.role==='打包單'){
       const items=roleItems(order,'packing',config);
       if(items.length<1)continue;
-      jobs.push({id:order.id+':packing',role:binding.role,binding,payload:packing(withItems(order,items)),cutAfter:true,beepAfter:true});
+      jobs.push({id:order.id+':packing',role:binding.role,binding,payload:renderPackingTicket(withItems(order,items)),cutAfter:true,beepAfter:true});
       continue;
     }
     if(binding.role==='袋標籤'){
