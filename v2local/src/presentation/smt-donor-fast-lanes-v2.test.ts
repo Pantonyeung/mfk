@@ -5,12 +5,14 @@ import {
   buildAutoPairingPlans,
   comboBlockingCount,
   comboSlots,
+  countRiceballCandidateUnits,
   dissolveComboLine,
   fillPendingComboGroup,
   fillPendingComboGroupFromConfiguredProduct,
   defaultSelectionsForProduct,
   rebuildConfiguredLine,
   requiredTasks,
+  riceballMealCombos,
   type FastLaneCartLine,
   type FastLaneProduct,
 } from '../features/ordering/fast-lane-model.ts';
@@ -18,7 +20,7 @@ import type {SyncedCombo,SyncedComboPool} from '../runtime/admin-config-projecti
 
 const products:FastLaneProduct[]=[
   {
-    id:'main',name:'A飯團',priceMinor:4100,
+    id:'main',name:'A飯團',category:'飯團',priceMinor:4100,
     optionSets:[{
       id:'rice',name:'飯底',required:true,forceShow:true,selection:'SINGLE',min:1,max:1,
       options:[
@@ -27,8 +29,8 @@ const products:FastLaneProduct[]=[
       ],
     }],
   },
-  {id:'snack',name:'鹽酥雞',priceMinor:1800,optionSets:[]},
-  {id:'drink',name:'台式奶茶',priceMinor:1600,optionSets:[]},
+  {id:'snack',name:'鹽酥雞',category:'小食',priceMinor:1800,optionSets:[]},
+  {id:'drink',name:'台式奶茶',category:'飲品',priceMinor:1600,optionSets:[]},
 ];
 
 const combos:SyncedCombo[]=[{
@@ -164,6 +166,16 @@ describe('SMT donor fast lane model',()=>{
 
     const dissolved=dissolveComboLine(next,parent.id,id);
     expect(dissolved.some(row=>row.productId==='drink'&&row.unitMinor===1700&&row.detail==='甜度：少甜')).toBe(true);
+  });
+
+  it('restricts Fast Lane combo semantics to exactly one required 飯團 + 小食 + 飲品 and still counts riceball candidates without a combo rule',()=>{
+    expect(riceballMealCombos(combos,pools,products).map(combo=>combo.id)).toEqual(['combo-a']);
+    const generic:SyncedCombo={...combos[0]!,id:'generic',addonPoolIds:['snack-pool']};
+    expect(riceballMealCombos([generic],pools,products)).toHaveLength(0);
+    expect(countRiceballCandidateUnits([
+      {...line('m1','main','A飯團',2,4100),optionSelections:{rice:['r1']},detail:'飯底：紫米'},
+      line('s1','snack','鹽酥雞',3,1800),
+    ],products)).toBe(2);
   });
 
   it('projects pairing roles from Admin combo pools instead of product-name heuristics',()=>{
