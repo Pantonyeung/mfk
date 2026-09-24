@@ -1,0 +1,349 @@
+MFK SMT DONOR SKELETON FUSION V2 R1｜HANDOFF
+Date: 2026-09-24
+Work Issue: Pantonyeung/mfk #249
+Control: Pantonyeung/mfk #22
+
+==================================================
+CURRENT VERIFIED PRODUCT
+==================================================
+
+Current MFK main at final fresh-read:
+1da69346d30603dad0165bf5b099a9184b7e6451
+
+SMT work branch:
+work/MFK/SMT-DONOR-SKELETON-FUSION-V2-R1
+
+Exact product candidate:
+b253270453cfa461f17d2ebb7eb7761cb9539142
+
+Historical donor:
+Pantonyeung/morefunos-smt@879443a21de5bb34e798d1d4a3c773f14b3168f2
+
+Rejected SMT-FULL-FUSION-OPTIMIZATION-R1:
+NOT BASE
+NOT IMPORTED
+DO NOT RESUME
+
+Main:
+NOT MERGED
+
+Production:
+UNCHANGED
+
+Runtime firewall through current product candidate:
+v2local/src/runtime/** ZERO MUTATION
+
+==================================================
+BANKED CUTS
+==================================================
+
+CUT 1｜DONOR SKELETON
+- dual-purpose Hold preserved
+- Dining partial settlement / unassign / clear preserved
+- Customer + Keeta real intake preserved
+- Keeta Accept / READY preserved
+- 4-column stable Product Grid
+- compact Live Check
+- direct trash
+- combine OFF independent line identity
+- ordinary Hold retrieve separated from Dining
+- 3-second non-blocking incoming-order alert
+
+Validation:
+23 / 23 Test Files
+96 / 96 Tests
+Worker f1facba1-1513-488d-88f1-4c4f3017e67d
+
+CUT 2｜REAL FAST LANES
+飯團待組區:
+- real Cart unit assignment
+- Admin Combo Pool roles only
+- dynamic A/B/C...
+- auto pair
+- unresolved Required line cannot be consumed
+
+必選區:
+- current Admin OptionSet required/min/max
+- exact line + exact group completion
+- SINGLE/MULTI
+- Admin option price adjustment
+- unresolved Required blocks Checkout
+
+紫米套餐區:
+- Admin Combo / Pool / Choice truth
+- specified pairing
+- A/B/C independent identities
+- drink defer
+- later drink fill
+- reversible dissolve
+
+Validation:
+25 / 25 Test Files
+104 / 104 Tests
+Worker bac4758c-8745-4d03-845f-3ea7ff520f47
+
+CUT 3｜QUICK MODE + QUICK DRINK
+- Normal / Quick mode restored
+- Quick Mode direct-add preserves current Admin default selections
+- Required truth remains unresolved when no valid default exists
+- optional force-show configuration is not bypassed
+- Quick Drink derives real DRINK slots from current Admin Combo pools
+- configured drink keeps Admin option price adjustment
+- configured drink child remains reversible
+- multi-target route goes to Combo Fast Lane
+
+Validation:
+GitHub Actions 35994985781 SUCCESS
+Job 107617671603
+26 / 26 Test Files
+111 / 111 Tests
+Build GREEN
+Worker 52662b84-dfc6-4950-837e-4353f3d20859
+Preview:
+https://smt-donor-v2-r1-quick-mfk-admin.yeungyi88.workers.dev
+
+CUT 4｜PENDING → SUMMARY → REVIEW → ACCEPT
+- current Customer + Keeta formal StoredOrder is source truth
+- queue card opens Summary
+- explicit 開始核對
+- Review shows only real StoredOrder fields
+- no fake payment proof
+- Accept calls existing localRuntime.acceptOrder(order.id)
+- Customer uses same local formal order + existing print path
+- Keeta uses same local formal order + existing CONFIRM mirror + existing print path
+- provider ATTENTION remains visible
+- already-running order cannot be accepted again from this surface
+
+Validation:
+GitHub Actions 35995519424 SUCCESS
+Job 107619386991
+27 / 27 Test Files
+116 / 116 Tests
+Build GREEN
+Worker e48d7fc9-55e3-49eb-8bf8-18e51bc80d95
+Preview:
+https://smt-donor-v2-r1-pending-mfk-admin.yeungyi88.workers.dev
+
+==================================================
+STATUS
+==================================================
+
+PASSABLE GREEN
+OWNER_REVIEW_PENDING
+NOT CLOSED
+
+Milestone:
+MFK_SMT_DONOR_SKELETON_FUSION_V2_R1_PENDING_REVIEW_ACCEPT_GREEN
+
+==================================================
+WHY NOT CLOSED
+==================================================
+
+Fast Lane structured state is currently durable only while it remains in the active React Cart.
+
+FastLaneCartLine owns:
+- optionSelections
+- freeNote
+- comboDraft
+- pairingLabel
+- Combo component snapshots
+- pending Combo groups
+
+But existing persistence seams flatten/drop this structure.
+
+A｜HOLD SERIALIZATION
+App.tsx holdItems()
+currently writes only:
+- id = productId
+- name (+ flattened detail)
+- qty
+- unitMinor
+
+B｜HOLD PERSISTENCE
+local-runtime.ts LocalHoldDraft.items
+currently owns only:
+- id
+- name
+- qty
+- unitMinor
+
+C｜HOLD RESTORE
+App.tsx HoldListWorkspace restore
+rebuilds:
+- new line id
+- productId
+- name
+- qty
+- unitMinor
+- serviceMode
+- flattened detail
+
+It cannot restore:
+- optionSelections
+- freeNote as structured field
+- comboDraft
+- pairing label
+- component snapshots
+- pending drink slot
+
+D｜CHECKOUT → FORMAL ORDER
+App.tsx CheckoutPage localRuntime.createOrder(...)
+currently writes:
+- id
+- name
+- qty
+- unitMinor
+- serviceMode
+- detail
+
+E｜FORMAL LOCAL ORDER
+local-runtime.ts StoredOrder.items
+currently owns only:
+- id
+- name
+- qty
+- unitMinor
+- serviceMode?
+- productCode?
+- detail?
+
+F｜ORDERS READBACK
+SmtOrderDetailLineViewModel currently does not expose detail or structured composition.
+
+G｜CLOUD PROJECTION
+projection-outbox.ts ProjectionOrderInput.items strips to:
+- id
+- name
+- qty
+- unitMinor
+
+D1 therefore does not receive structured composition.
+
+H｜PRINT
+Current print content can parse flattened detail and print meaningful selections.
+That is sufficient for current printing, but cannot reconstruct Combo child identity.
+
+==================================================
+SMALLEST FUTURE RUNTIME CONTRACT SEAM
+==================================================
+
+RESEARCH ONLY.
+DO NOT MUTATE RUNTIME WITHOUT A NEW EXPLICIT CUT.
+
+Recommended contract:
+contracts/order-line-composition-v1.ts
+
+Role:
+AUDIT / RECONSTRUCTION METADATA ONLY
+
+Must NOT become:
+- second Pricing engine
+- second Combo engine
+- second Order engine
+- source for recalculating money
+
+Suggested optional line field:
+composition?: MfkOrderLineCompositionV1
+
+Minimum shape should preserve:
+- schema/version
+- kind: PRODUCT | COMBO
+- original cart line identity where required
+- option selection IDs
+- free note
+- Combo id
+- pairing label A/B/C...
+- pairing source AUTO | SPECIFIED
+- component snapshots:
+  - role
+  - productId
+  - choiceId
+  - unitMinor at selection time
+  - serviceMode
+  - detail
+  - option selection IDs
+  - free note
+- pending group IDs for HOLD state
+
+Formal Order rule:
+pending required groups MUST be empty before Checkout commit.
+
+==================================================
+PHASE A｜LOCAL DURABILITY ONLY
+==================================================
+
+Smallest future allowlist:
+- contracts/order-line-composition-v1.ts [NEW]
+- v2local/src/features/ordering/fast-lane-model.ts
+- v2local/src/App.tsx
+- v2local/src/runtime/local-runtime.ts
+- tests only
+
+Target:
+Cart
+→ Hold
+→ restart
+→ Restore
+→ Fast Lane still editable/reversible
+→ Checkout
+→ StoredOrder preserves composition
+→ local readback keeps composition
+
+DO NOT touch:
+- Pricing authority
+- payment
+- print routing
+- Keeta provider semantics
+- D1 projection
+- Store Kernel identity/display allocation
+
+==================================================
+PHASE B｜PROJECTION ONLY AFTER PHASE A GREEN
+==================================================
+
+Potential future seam:
+- v2local/src/runtime/projection-outbox.ts
+- downstream /api/projection/events consumer contract
+
+Reason:
+current ProjectionOrderInput.items deliberately strips structured composition.
+
+Do not extend ORDER_UPSERT payload until downstream D1 consumer compatibility is proven.
+
+==================================================
+DETERMINISTIC RED CONTRACT FOR PHASE A
+==================================================
+
+1. Product line with Admin optionSelections survives Hold + restart + Restore exactly.
+2. Combo parent pairingLabel survives Hold + restart + Restore.
+3. Combo child snapshots survive Hold + restart + Restore.
+4. Deferred drink pending group survives Hold + restart + Restore.
+5. After Restore, fill pending drink still works against same Combo parent.
+6. After Restore, dissolve restores same child:
+   productId
+   unitMinor
+   detail
+   optionSelections
+   freeNote
+7. Checkout is blocked if any required pending group remains.
+8. Formal StoredOrder composition has ZERO pending required group.
+9. Same Order / same Display / no extra Print Admission is created by metadata persistence.
+10. Current totalMinor remains authoritative; composition must never recalculate money.
+11. Existing print output remains equal for the same flattened detail.
+12. Legacy StoredOrder and Hold records without composition still read successfully.
+13. Customer / Keeta intake without composition remains valid.
+14. No second Pricing / Combo / Order / Sync engine.
+
+==================================================
+NEXT
+==================================================
+
+Do not merge current SMT branch until Owner review.
+
+Next executable work requires one explicit choice:
+A. authorize PHASE A local durability runtime contract cut
+or
+B. continue presentation/operations polish while runtime firewall stays frozen.
+
+Until then:
+PASSABLE GREEN / NOT CLOSED.
