@@ -1,4 +1,5 @@
 import type {RasterLabelSpec} from './label-bitmap.ts';
+import {productLabelContent} from './print-content.ts';
 
 export type PrintRole='顧客小票'|'製作單'|'打包單'|'產品標籤'|'袋標籤';
 
