@@ -101,8 +101,9 @@ describe('MFK checkout print fanout',()=>{
       expect(job.payload).not.toContain('·');
       expect(job.payload).not.toContain('—');
       expect(job.payload).not.toContain('Keeta · 4890');
-      expect(job.payload).toContain('Keeta / 4890');
     }
+    expect(plan.find(job=>job.role==='顧客小票')?.payload).toContain('Keeta / 4890');
+    expect(plan.find(job=>job.role==='製作單')?.payload).toContain('Keeta / 4890');
   });
 
   it('batches eleven labels for one logical printer into one native dispatch batch',()=>{
