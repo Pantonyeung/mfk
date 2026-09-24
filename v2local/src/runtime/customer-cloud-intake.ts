@@ -99,6 +99,48 @@ function attention(code:string){
     localStorage.setItem(ATTENTION_KEY,JSON.stringify(current.slice(0,100)));
   }catch{}
 }
+export interface CustomerCloudBridgeDiagnostic{
+  readonly ok:boolean;
+  readonly stage:string;
+  readonly deviceAuthorized?:boolean;
+  readonly pendingQuotes?:number|null;
+  readonly pendingOrders?:number|null;
+  readonly quotePullStatus?:number;
+  readonly orderPullStatus?:number;
+  readonly status?:number;
+  readonly code?:string;
+  readonly observedAt?:string;
+}
+
+export async function diagnoseCustomerCloudBridge():Promise<CustomerCloudBridgeDiagnostic>{
+  const deviceId=readSmtDeviceId();
+  try{
+    const response=await fetch(ENDPOINT+'/api/customer/smt/diagnostics?storeId=MF01&deviceId='+encodeURIComponent(deviceId),{cache:'no-store'});
+    const body=await response.json().catch(()=>({})) as Record<string,unknown>;
+    return Object.freeze({
+      ok:response.ok&&body.ok===true,
+      stage:String(body.stage||'CUSTOMER_BRIDGE_DIAGNOSTIC_UNKNOWN'),
+      deviceAuthorized:body.deviceAuthorized===true,
+      pendingQuotes:Number.isFinite(Number(body.pendingQuotes))?Number(body.pendingQuotes):null,
+      pendingOrders:Number.isFinite(Number(body.pendingOrders))?Number(body.pendingOrders):null,
+      quotePullStatus:Number.isFinite(Number(body.quotePullStatus))?Number(body.quotePullStatus):undefined,
+      orderPullStatus:Number.isFinite(Number(body.orderPullStatus))?Number(body.orderPullStatus):undefined,
+      status:response.status,
+      code:typeof body.code==='string'?body.code:undefined,
+      observedAt:typeof body.observedAt==='string'?body.observedAt:new Date().toISOString(),
+    });
+  }catch(error){
+    return Object.freeze({
+      ok:false,
+      stage:'CUSTOMER_BRIDGE_DIAGNOSTIC_NETWORK_ERROR',
+      deviceAuthorized:false,
+      status:0,
+      code:error instanceof Error?error.message:'NETWORK_ERROR',
+      observedAt:new Date().toISOString(),
+    });
+  }
+}
+
 export function readCustomerCloudIntakeAttention(){
   try{
     const rows=JSON.parse(localStorage.getItem(ATTENTION_KEY)||'[]');
