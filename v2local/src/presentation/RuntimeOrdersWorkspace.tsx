@@ -79,7 +79,8 @@ export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePor
       }catch{}
     };
     window.addEventListener('mfk-keeta-order-intake',refresh);
-    return()=>window.removeEventListener('mfk-keeta-order-intake',refresh);
+    window.addEventListener('mfk-customer-order-intake',refresh);
+    return()=>{window.removeEventListener('mfk-keeta-order-intake',refresh);window.removeEventListener('mfk-customer-order-intake',refresh);};
   },[]);
 
   const load=useCallback(async(selectedOrderId?:string,silent=false)=>{
@@ -139,7 +140,9 @@ export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePor
       await load(selected.orderId,true);
       setMessage(result.provider.state==='ATTENTION'
         ?'本地已接單；Keeta confirm 需要處理：'+(result.provider.code??'UNKNOWN')
-        :'已接單；Keeta confirm 已同步');
+        :result.provider.state==='NOT_APPLICABLE'
+          ?'已接單；本地打印已完成。'
+          :'已接單；Keeta confirm 已同步');
     }catch(cause){setMessage(cause instanceof Error?cause.message:'未能接單');}
     finally{setAcceptBusy(false);}
   };
@@ -165,7 +168,9 @@ export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePor
       await load(selected.orderId,true);
       setMessage(result.provider.state==='ATTENTION'
         ?'本地已標記可取餐；Keeta READY 需要處理：'+(result.provider.code??'UNKNOWN')
-        :'已標記可取餐；Keeta READY 已同步');
+        :result.provider.state==='NOT_APPLICABLE'
+          ?'已標記可取餐。'
+          :'已標記可取餐；Keeta READY 已同步');
     }
     catch(cause){setMessage(cause instanceof Error?cause.message:'未能標記可取餐');}
     finally{setReadyBusy(false);}
@@ -252,7 +257,7 @@ export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePor
   return <main className="order-manager">
     {keetaArrival?<div className="keeta-arrival-backdrop" role="alertdialog" aria-modal="true">
       <section className="keeta-arrival-card">
-        <strong>Keeta 新訂單到達</strong>
+        <strong>{keetaArrival.sourceLabel.startsWith('Keeta')?'Keeta 新訂單到達':'磨飯 App 新訂單到達'}</strong>
         <b>#{keetaArrival.display}</b>
         <span>{keetaArrival.sourceLabel}</span>
         <button className="primary" onClick={()=>{void load(keetaArrival.orderId,true);setKeetaArrival(null);}}>查看並處理訂單</button>
@@ -292,8 +297,8 @@ export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePor
         <footer>
           <button onClick={()=>void openReprint()}>▣ 重印</button>
           <button disabled={!canCorrect} title={canCorrect?'':'需要 ORDER_CORRECTION 權限'} onClick={()=>setModal('actions')}>✎ 取消／修改</button>
-          {String(selected.sourceLabel||'').startsWith('Keeta')&&selected.fulfillmentLabel==='待處理'
-            ?<button className="primary" disabled={!runtime.acceptOrder||acceptBusy} onClick={()=>void acceptSelected()}>{acceptBusy?'接單中…':'接受 Keeta 訂單'}</button>
+          {selected.fulfillmentLabel==='待處理'
+            ?<button className="primary" disabled={!runtime.acceptOrder||acceptBusy} onClick={()=>void acceptSelected()}>{acceptBusy?'接單中…':String(selected.sourceLabel||'').startsWith('Keeta')?'接受 Keeta 訂單':'接受訂單'}</button>
             :null}
           <button className="primary" disabled={!runtime.markOrderReady||readyBusy||selected.fulfillmentLabel==='待處理'||selected.fulfillmentLabel==='可取餐'||selected.fulfillmentLabel==='已完成'||selected.fulfillmentLabel==='已取消'} onClick={()=>void markReady()}>{readyBusy?'處理中…':'提前完成／可取餐'}</button>
         </footer>
