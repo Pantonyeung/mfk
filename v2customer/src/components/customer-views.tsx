@@ -54,6 +54,28 @@ function SectionHeading({eyebrow,title,action}:{eyebrow:string;title:string;acti
   return <div className="section-heading"><div><span className="eyebrow">{eyebrow}</span><h2>{title}</h2></div>{action}</div>;
 }
 
+const orderingJourney=['揀餐','設定','記憶罐','確認'] as const;
+function JourneyCoach({active}:{active:1|2|3|4}){
+  return <ol className="journey-coach" aria-label="點餐進度">
+    {orderingJourney.map((label,index)=>{
+      const step=index+1;
+      const state=step<active?'done':step===active?'active':'upcoming';
+      return <li key={label} className={state}><i>{step<active?'✓':step}</i><span>{label}</span></li>;
+    })}
+  </ol>;
+}
+
+function RecommendationRail({eyebrow,title,products,onProduct,reason}:{
+  eyebrow:string;title:string;products:readonly CustomerProduct[];onProduct:(product:CustomerProduct,origin:ProductOriginRect)=>void;reason:(product:CustomerProduct)=>string;
+}){
+  if(!products.length)return null;
+  return <section className="recommendation-section"><SectionHeading eyebrow={eyebrow} title={title}/><div className="recommendation-rail">{products.map(product=><button key={product.productId} data-product-id={product.productId} onClick={event=>{const rect=event.currentTarget.getBoundingClientRect();onProduct(product,{top:rect.top,left:rect.left,width:rect.width,height:rect.height})}}>
+    <ProductMedia product={product} compact/>
+    <span><small>{reason(product)}</small><strong>{product.name}</strong><em>{product.displayPriceLabel??'價格待店舖提供'}</em></span>
+    <b aria-hidden="true">＋</b>
+  </button>)}</div></section>;
+}
+
 function HeroCarousel(){
   const railRef=useRef<HTMLDivElement>(null);
   const [active,setActive]=useState(0);
@@ -71,7 +93,7 @@ function HeroCarousel(){
       const node=event.currentTarget;
       if(node.clientWidth)setActive(Math.round(node.scrollLeft/node.clientWidth));
     }}>
-      {slides.map((slide,index)=><article className="hero-slide" key={slide.image} aria-label={`${index+1} / ${slides.length}`}>
+      {slides.map((slide,index)=><article className={`hero-slide${active===index?' is-active':''}`} key={slide.image} aria-label={`${index+1} / ${slides.length}`}>
         <img src={slide.image} alt="磨飯新鮮餐點"/>
         <div className="hero-scrim"/>
         <div className="hero-brand-chip" aria-hidden="true"><span>磨飯</span><b>MORE FUN</b><em>{String(index+1).padStart(2,'0')}</em></div>
@@ -115,9 +137,9 @@ export function HomeView({snapshot,connection,activeOrders,history,featuredProdu
       <ActionButton wide disabled={!canBrowse} onClick={onBrowse}>{canBrowse?'開始點餐':connection==='LOADING'?'正在準備菜單':'等待店舖連接'}</ActionButton>
     </section>}
 
-    {featuredProducts.length?<section className="featured-section"><SectionHeading eyebrow="今日推薦" title="大圖先睇，鍾意先揀" action={<button className="text-action" onClick={onBrowse}>全部餐點</button>}/><div className="featured-rail">{featuredProducts.map(product=><button className="featured-food" data-product-id={product.productId} key={product.productId} onClick={event=>{const rect=event.currentTarget.getBoundingClientRect();onProduct(product,{top:rect.top,left:rect.left,width:rect.width,height:rect.height})}}><ProductMedia product={product}/><span><small>{product.badge}</small><strong>{product.name}</strong><em>{product.displayPriceLabel??'價格待店舖提供'}</em></span></button>)}</div></section>:null}
+    {featuredProducts.length?<section className="featured-section"><SectionHeading eyebrow="今日推薦" title="大圖先睇，鍾意先揀" action={<button className="text-action" onClick={onBrowse}>全部餐點</button>}/><div className="featured-rail">{featuredProducts.map(product=><button className="featured-food" data-product-id={product.productId} key={product.productId} onClick={event=>{const rect=event.currentTarget.getBoundingClientRect();onProduct(product,{top:rect.top,left:rect.left,width:rect.width,height:rect.height})}}><ProductMedia product={product}/><span><small>{product.badge??'店舖推薦'}</small><strong>{product.name}</strong><p>由店舖目前提供嘅推薦標記而來</p><em>{product.displayPriceLabel??'價格待店舖提供'}</em></span><i aria-hidden="true">查看</i></button>)}</div></section>:null}
 
-    {lastOrder?<section className="buy-again-section"><SectionHeading eyebrow="上次食過" title="一撳再來一單" action={<button className="text-action" onClick={onHistory}>全部回憶</button>}/><article className="buy-again-row"><div><small>{new Date(lastOrder.completedAt).toLocaleDateString('zh-HK')}</small><strong>{lastOrder.itemSummary}</strong><span>{lastOrder.amountLabel??'歷史價格未提供'}</span></div><ActionButton variant="secondary" disabled={!lastOrder.reorderEligible} onClick={()=>onBuyAgain(lastOrder)}>按目前菜單重建</ActionButton></article></section>:null}
+    {lastOrder?<section className="buy-again-section"><SectionHeading eyebrow="因你上次食過" title="一撳再來一單" action={<button className="text-action" onClick={onHistory}>全部回憶</button>}/><article className="buy-again-row"><div><small>{new Date(lastOrder.completedAt).toLocaleDateString('zh-HK')} · 來自你嘅正式歷史訂單</small><strong>{lastOrder.itemSummary}</strong><span>{lastOrder.amountLabel??'歷史價格未提供'}</span></div><ActionButton variant="secondary" disabled={!lastOrder.reorderEligible} onClick={()=>onBuyAgain(lastOrder)}>按目前菜單重建</ActionButton></article></section>:null}
 
     <section className="memory-ecosystem"><SectionHeading eyebrow="MORE FUN MEMORY" title="將每一餐，儲成你嘅記憶" action={<button className="text-action" onClick={onMember}>我的記憶</button>}/><div className="memory-ecosystem-grid">
       <button className="ecosystem-jar" onClick={onJar}><i className={`mini-jar level-${Math.min(3,cartCount)}`} aria-hidden="true"/><span><small>記憶罐</small><strong>{cartCount?`${cartCount} 件餐點`:'等待第一樣餐點'}</strong></span></button>
@@ -133,7 +155,9 @@ export function MenuView({connection,categories,activeCategoryId,setCategory,que
 }){
   return <section className="page menu-page">
     <CollapsingHeader><PageIntro kicker="點單" title="今日想食咩？" detail="先揀分類，再逐步設定；售價同供應以店舖最新資料為準。"/><div className="menu-tools"><ExpandingSearch value={query} onChange={setQuery}/><div className="layout-toggle" role="group" aria-label="菜單顯示方式"><button className={layout==='grid'?'active':''} aria-pressed={layout==='grid'} onClick={()=>setLayout('grid')}>格狀</button><button className={layout==='list'?'active':''} aria-pressed={layout==='list'} onClick={()=>setLayout('list')}>列表</button></div></div></CollapsingHeader>
+    <JourneyCoach active={1}/>
     {categories.length?<div className="category-rail" role="tablist" aria-label="商品分類">{categories.map(category=><button role="tab" aria-selected={activeCategoryId===category.categoryId} key={category.categoryId} className={activeCategoryId===category.categoryId?'active':''} onClick={()=>setCategory(category.categoryId)}>{category.name}</button>)}</div>:null}
+    <RecommendationRail eyebrow="店舖推薦" title="唔知揀咩？由呢幾樣開始" products={products.filter(product=>product.available&&Boolean(product.badge)).slice(0,3)} onProduct={onProduct} reason={product=>product.badge??'店舖推薦'}/>
     {connection==='LOADING'?<MenuSkeleton/>:
       !categories.length?<EmptyState title={connection==='NOT_CONNECTED'?'菜單服務尚未連接':'今日暫時未有菜單'} detail={connection==='NOT_CONNECTED'?'連接後會顯示正式商品、規格、價格同供應狀態。':'店舖目前未提供可售商品。'}/>:
       products.length?<div className={`product-list layout-${layout}`}>{products.map(product=><button className={'product-card '+(product.available?'available':'unavailable')} data-product-id={product.productId} style={{viewTransitionName:productTransitionName(product.productId)} as CSSProperties} disabled={!product.available} key={product.productId} onClick={event=>{const rect=event.currentTarget.getBoundingClientRect();onProduct(product,{top:rect.top,left:rect.left,width:rect.width,height:rect.height})}}><ProductMedia product={product}/><span className="product-information">{product.badge?<small>{product.badge}</small>:null}<strong>{product.name}</strong><p>{product.description}</p><em>{product.displayPriceLabel??'價格待店舖提供'}</em></span><span className="sellability">{product.available?'設定':'暫停供應'}</span></button>)}</div>:
@@ -166,6 +190,7 @@ export function CartView({cart,quote,checkout,member,suggestions,products,onProd
   const itemCount=cart.reduce((sum,line)=>sum+line.quantity,0);
   return <section className="page cart-page">
     <PageIntro kicker="記憶罐" title={cart.length?'今餐已經有個樣':'由第一樣想食嘅開始'} detail="記憶罐係今次落單草稿。未去到安全提交前，都未建立正式訂單。" aside={cart.length?<button className="text-action" onClick={onMenu}>繼續加餐</button>:null}/>
+    <JourneyCoach active={3}/>
     <JarVisual count={itemCount}/>
     {!cart.length?<EmptyState title="記憶罐仲係空嘅" detail="去菜單揀一樣真正想食嘅，設定會逐步帶你完成。"><ActionButton onClick={onMenu}>開始點餐</ActionButton></EmptyState>:
     <>
@@ -180,7 +205,7 @@ export function CartView({cart,quote,checkout,member,suggestions,products,onProd
       })}</div>
       {member?.state==='READY'&&member.preferences?.length?<section className="remembered-tastes"><span>我哋記得你</span><div>{member.preferences.map(item=><b key={item}>{item}</b>)}</div><small>口味習慣唔會自動改今次餐點；請逐項確認。</small></section>:<section className="remembered-tastes disconnected"><span>已儲存口味</span><p>會員偏好尚未連接，今次設定唔會寫入客戶身份。</p></section>}
       <section className="jar-contact"><SectionHeading eyebrow="取餐聯絡" title="今次點稱呼你？"/><div className="checkout-form compact"><label htmlFor="jar-name"><span>稱呼 <small>選填</small></span><input id="jar-name" value={checkout.name} onChange={event=>onCheckoutChange({...checkout,name:event.target.value})} autoComplete="name" placeholder="例如：陳小姐"/></label><label htmlFor="jar-phone"><span>電話</span><input id="jar-phone" type="tel" inputMode="tel" value={checkout.phone} onChange={event=>onCheckoutChange({...checkout,phone:event.target.value})} autoComplete="tel" placeholder="只作今次取餐核對"/></label></div></section>
-      {suggestions.length?<section className="cart-suggestions"><SectionHeading eyebrow="配搭建議" title="想加多一樣？"/><div>{suggestions.map(product=><button data-product-id={product.productId} key={product.productId} onClick={event=>{const rect=event.currentTarget.getBoundingClientRect();onProduct(product,{top:rect.top,left:rect.left,width:rect.width,height:rect.height})}}><ProductMedia product={product} compact/><span><small>{product.badge}</small><strong>{product.name}</strong><em>{product.displayPriceLabel??'價格待店舖提供'}</em></span><b>設定</b></button>)}</div></section>:null}
+      {suggestions.length?<RecommendationRail eyebrow="店舖推薦 · 未加入記憶罐" title="想再睇多一樣？" products={suggestions} onProduct={(product,origin)=>onProduct(product,origin)} reason={product=>product.badge??'店舖推薦'}/>:null}
       <QuoteSummary quote={quote}/>
       {quote?.freshness==='MATERIAL_CHANGE'?<section className="repair-card" role="alert"><span>需要你確認</span><h2>餐點或價格有重要變更</h2><p>只修正受影響項目。記憶罐其他內容唔會被清空。</p><ActionButton variant="secondary" wide onClick={onMenu}>返回菜單修正</ActionButton></section>:null}
       <div className="screen-primary-action"><div><span>下一步</span><strong>{quote?money(quote.currency,quote.totalMinor):'等待正式報價'}</strong></div><ActionButton wide disabled={quote?.freshness==='MATERIAL_CHANGE'} onClick={onCheckout}>前往最後確認</ActionButton></div>
@@ -202,6 +227,7 @@ export function CheckoutView({cart,quote,checkout,setCheckout,pending,actionStat
   return <section className="page checkout-page">
     <button className="back-link" onClick={onBack}>返回記憶罐</button>
     <PageIntro kicker="最後確認 · 3 / 3" title={unknown?'正在確認訂單':'資料清楚，先安心送出'} detail={unknown?'請勿重複提交。系統只會查詢原本嗰次落單。':'店舖正式接單後，今次訂單先成立。'}/>
+    <JourneyCoach active={4}/>
     <ol className="checkout-steps" aria-label="落單步驟"><li className="done">揀好餐點</li><li className="done">確認聯絡</li><li className="active">安全提交</li></ol>
     <section className="checkout-review" aria-label="訂單摘要"><div><span>餐點</span><strong>{cart.reduce((sum,line)=>sum+line.quantity,0)} 件</strong></div><div><span>店舖報價</span><AnimatedValue>{quote?money(quote.currency,quote.totalMinor):'尚未取得'}</AnimatedValue></div><div><span>價格狀態</span><strong>{quote?quoteMeta[quote.freshness].label:'確認中'}</strong></div></section>
     <section className="checkout-contact"><SectionHeading eyebrow="取餐聯絡" title="核對今次資料"/><div className="checkout-form"><label htmlFor="customer-name"><span>稱呼 <small>選填</small></span><input id="customer-name" name="name" value={checkout.name} onChange={event=>setCheckout({...checkout,name:event.target.value})} autoComplete="name" placeholder="例如：陳小姐"/></label><label htmlFor="customer-phone"><span>電話</span><input id="customer-phone" name="tel" value={checkout.phone} onChange={event=>setCheckout({...checkout,phone:event.target.value})} type="tel" inputMode="tel" autoComplete="tel" placeholder="用作取餐核對" aria-describedby="phone-help"/></label><small id="phone-help">只用作今次取餐核對。會員身份、口味偏好同推廣同意係分開資料。</small></div></section>
@@ -326,6 +352,8 @@ export function ProductSheet({product,selections,selectedVariationId,quantity,no
   const advance=()=>{if(currentComplete)setStep(Math.min(steps.length-1,safeStep+1))};
   return <ProductDialog label={`${product.name} 商品詳情`} origin={origin} returnFocusId={product.productId} onClose={onClose}>
     <div className="product-sheet-hero"><ProductMedia product={product}/><div className="product-sheet-copy"><span>{product.badge??'逐步設定'}</span><h2>{product.name}</h2><p>{product.description}</p><AnimatedValue as="strong">{product.displayPriceLabel??'價格待店舖提供'}</AnimatedValue></div></div>
+    <JourneyCoach active={2}/>
+    <section className={`step-coach ${currentComplete?'is-ready':''}`} aria-live="polite"><span>第 {safeStep+1} 步</span><strong>{step.label}</strong><p>{currentComplete?(step.kind==='finish'?'設定完成，可以加入記憶罐。':'呢一步完成，可以繼續。'):'完成目前必選項目後，會帶你去下一步。'}</p></section>
     <div className="config-progress"><div><span>設定進度</span><strong>{safeStep+1} / {steps.length}</strong></div><i><b style={{transform:`scaleX(${(safeStep+1)/steps.length})`}}/></i></div>
     <ol className="config-step-list" aria-label="商品設定步驟">{steps.map((candidate,index)=><li key={`${candidate.kind}-${candidate.label}`} className={index===safeStep?'active':index<safeStep&&stepComplete(candidate)?'done':''}><button disabled={index>safeStep} aria-current={index===safeStep?'step':undefined} onClick={()=>setStep(index)}><i>{index<safeStep&&stepComplete(candidate)?'✓':index+1}</i><span><small>{index===safeStep?'目前步驟':index<safeStep?'已完成':'稍後'}</small><strong>{candidate.label}</strong>{index<safeStep?<em>{summary(candidate)}</em>:null}</span></button></li>)}</ol>
     <div className="product-config-stage" key={safeStep}>
