@@ -807,3 +807,21 @@
   .donor-skeleton .ordering-categories button{height:40px;min-height:40px;font-size:13px}
   .ordering-modal-window{width:96%;height:94%}
 }
+
+
+/* Owner refinement: product detail modal ≈ 3/4 of the screen; other work modals may stay larger. */
+.donor-skeleton .ordering-catalog{grid-template-rows:minmax(0,1fr)}
+.ordering-modal-window.product-detail{
+  width:75%;
+  height:75%;
+  max-width:none;
+  max-height:none;
+}
+.ordering-modal-window.default-detail{
+  width:min(1180px,92%);
+  height:min(820px,90%);
+}
+@media(max-width:1400px){
+  .ordering-modal-window.product-detail{width:78%;height:78%}
+  .ordering-modal-window.default-detail{width:min(1080px,95%);height:min(760px,93%)}
+}
