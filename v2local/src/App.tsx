@@ -587,8 +587,17 @@ function CheckoutPage({cart,setCart,diningCheckout,onDiningCheckoutDone}:{cart:C
   const change=method==='CASH'?Math.max(0,received-due):0;
   const comboExact=method!=='COMBO'||comboMinor===due;
   const cashReady=method!=='CASH'||received>=due;
-  const confirmEnabled=cart.length>0&&comboExact&&cashReady;
-  const validationMessage=method==='CASH'&&cash&&received<due?'收款金額不足':
+  const checkoutAdminConfig=readSmtAdminConfigLkg();
+  const checkoutFastLaneProducts:FastLaneProduct[]=checkoutAdminConfig
+    ?[...new Map((['takeaway','dine-in'] as const).flatMap(mode=>projectSyncedOrderingCatalog(mode,checkoutAdminConfig).products).map(product=>[
+      product.id,
+      {id:product.id,name:product.name,priceMinor:product.priceMinor,optionSets:product.optionSets??[]},
+    ] as const)).values()]
+    :[];
+  const formalFastLaneBlockers=diningCheckout?0:requiredTasks(cart,checkoutFastLaneProducts).length+comboBlockingCount(cart);
+  const confirmEnabled=cart.length>0&&comboExact&&cashReady&&formalFastLaneBlockers===0;
+  const validationMessage=formalFastLaneBlockers>0?'仍有 '+formalFastLaneBlockers+' 項必選／套餐未完成，返回點餐完成後先可正式結帳':
+    method==='CASH'&&cash&&received<due?'收款金額不足':
     method==='COMBO'&&comboMinor!==due?'組合付款合計 '+money(comboMinor)+'，必須等於 '+money(due):undefined;
 
   const sourceParts=[channelLabels[channel]];
@@ -660,6 +669,7 @@ function CheckoutPage({cart,setCart,diningCheckout,onDiningCheckoutDone}:{cart:C
         return;
       }
 
+      if(formalFastLaneBlockers>0)throw new Error('FAST_LANE_FORMAL_ORDER_INCOMPLETE');
       const order=localRuntime.createOrder({
         items:cart.map(line=>({
           id:line.productId,
