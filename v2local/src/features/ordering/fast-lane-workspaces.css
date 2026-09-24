@@ -27,3 +27,24 @@
 .fast-pending-fill{margin-top:8px;padding:8px;border-radius:9px;background:#fff7e6;border:1px solid #ecd49d}.fast-pending-fill>span{display:flex;justify-content:space-between;gap:8px;margin-bottom:6px}.fast-pending-fill>span small{font-size:10px;color:#876526}.fast-pending-fill>div{display:flex;flex-wrap:wrap;gap:6px}.fast-pending-fill button{min-height:38px;display:flex;align-items:center;gap:4px}
 .combo-lane{grid-template-rows:auto auto minmax(0,1fr)}.fast-specified-builder{min-height:0;display:grid;grid-template-rows:auto auto minmax(0,1fr) auto;gap:9px}.fast-specified-builder>header{display:flex;align-items:center;justify-content:space-between;gap:10px}.fast-specified-builder>header div{display:grid;gap:2px}.fast-specified-builder>header span{font-size:10px;color:#7a8794}.fast-specified-builder>header>strong{font-size:14px;color:#274f77}
 @media(max-width:1400px){.fast-choice-grid,.fast-candidate-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.fast-plan-grid{grid-template-columns:1fr}}
+
+
+/* Guided Flow inside Fast Lane: the next unresolved control becomes the visual anchor. */
+.fast-lane .flow-current{
+  border-color:#83ad92;
+  box-shadow:0 0 0 3px rgba(61,132,88,.09),0 6px 18px rgba(36,93,58,.07);
+}
+.fast-task-card.flow-current>header>span,
+.fast-slot.flow-current>header>span{
+  background:#356d49;
+}
+.fast-sticky-action.flow-current button{
+  background:#356d49;
+}
+.fast-pending-fill.flow-current{
+  background:#f1f8f3;
+  border-color:#a5c4af;
+}
+@media(prefers-reduced-motion:reduce){
+  .fast-lane .flow-current{scroll-behavior:auto}
+}
