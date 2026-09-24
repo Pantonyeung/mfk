@@ -19,7 +19,7 @@ import {resolveBusinessWindow} from './runtime/local-operations.ts';
 import {RuntimeReadyActivation} from './runtime/RuntimeReadyActivation.tsx';
 import {StaffAuthGate,StaffSessionBadge} from './presentation/StaffAuthGate.tsx';
 import {CashOpeningGate} from './presentation/CashOpeningGate.tsx';
-import {ComboWorkspace,HoldCartWorkspace,HoldListWorkspace,OrganizeWorkspace,ProductConfigWorkspace,type OrderingPanelState,type WorkspaceHoldDraft,type WorkspaceProduct} from './features/ordering/OrderingCenterWorkspaces.tsx';
+import {ComboWorkspace,HoldListWorkspace,OrganizeWorkspace,ProductConfigWorkspace,type OrderingPanelState,type WorkspaceHoldDraft,type WorkspaceProduct} from './features/ordering/OrderingCenterWorkspaces.tsx';
 
 type Product={
   id:string;
@@ -180,6 +180,7 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode,uiSettings}:{cart
     .slice();
   const runtimeOrders=useMemo(()=>{void runtimeRevision;return localRuntime.orders();},[runtimeRevision]);
   const heldCarts=useMemo(()=>{void runtimeRevision;return localRuntime.holds();},[runtimeRevision]);
+  const savedCarts=useMemo(()=>heldCarts.filter(hold=>hold.kind==='waiting'),[heldCarts]);
   const businessCutoff=readBusinessCutoff();
   const businessWindow=resolveBusinessWindow(Date.now(),businessCutoff.hour,businessCutoff.minute);
   const businessOrderCount=runtimeOrders.filter(order=>{
@@ -320,7 +321,7 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode,uiSettings}:{cart
       lines:presentationCart,
       subtotalLabel:money(total),packagingLabel:'$0.00',discountLabel:'$0.00',totalLabel:money(total),checkoutEnabled:cart.length>0&&((serviceMode==='takeaway'&&storeSettings.takeawayEnabled)||(serviceMode==='dine-in'&&storeSettings.dineInEnabled)),
     },
-    heldCartCount:heldCarts.length,
+    heldCartCount:savedCarts.length,
     workItems:[
       {id:'riceball-pool',label:'飯團待組區',count:0,description:'未完成飯團會集中喺呢度',statusLabel:'目前清空',enabled:true,active:panel?.type==='organize',tone:'riceball'},
       {id:'required',label:'必選區',count:0,description:'需要處理嘅必選會喺呢度',statusLabel:'目前清空',enabled:true,active:panel?.type==='organize',tone:'required'},
@@ -330,7 +331,7 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode,uiSettings}:{cart
       lineServiceMode:true,
       lineEdit:true,
       lineQuantity:true,
-      holdCart:cart.length>0||heldCarts.length>0,
+      holdCart:cart.length>0,
       cancelCart:cart.length>0,
     },
     recentlyAddedProductId:recent,highlightedCartLineId:highlight,cartPulseNonce:pulse,
@@ -372,7 +373,6 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode,uiSettings}:{cart
   const panelTitle=panel?.type==='product'?'商品選項'
     :panel?.type==='organize'?'整理工作台'
     :panel?.type==='combo'?'紫米套餐區'
-    :panel?.type==='hold'?'暫存工作台'
     :panel?.type==='holds'?'暫存單':'';
 
   const panelBody=panel?.type==='product'
@@ -381,28 +381,8 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode,uiSettings}:{cart
       ?<OrganizeWorkspace lines={cart} onDone={()=>setPanel(null)}/>
       :panel?.type==='combo'
         ?<ComboWorkspace products={workspaceProducts} combos={comboData.combos} pools={comboData.pools} onAdd={addCombo}/>
-        :panel?.type==='hold'
-          ?<HoldCartWorkspace
-            lines={cart}
-            totalMinor={total}
-            tables={holdTables}
-            onHoldWaiting={(partySize,note)=>{
-              localRuntime.createHold({kind:'waiting',items:holdItems(),totalMinor:total,partySize,note:note||'暫存待客'});
-              finishHold();
-            }}
-            onHoldQueue={(partySize,note)=>{
-              localRuntime.createHold({kind:'dining',items:holdItems(),totalMinor:total,partySize,note:note||'堂食輪候'});
-              finishHold();
-            }}
-            onHoldTable={(tableId,partySize,note)=>{
-              const draft=localRuntime.createHold({kind:'dining',items:holdItems(),totalMinor:total,partySize,note:note||'直接掛枱'});
-              void localRuntime.assignDiningTable?.(draft.id,tableId).then(()=>{
-                setCart([]);setServiceMode('dine-in');setPanel(null);
-              });
-            }}
-          />
-          :panel?.type==='holds'
-            ?<HoldListWorkspace holds={heldCarts as readonly WorkspaceHoldDraft[]} currentCartCount={cart.reduce((sum,line)=>sum+line.qty,0)} onRestore={hold=>{
+        :panel?.type==='holds'
+            ?<HoldListWorkspace holds={savedCarts as readonly WorkspaceHoldDraft[]} currentCartCount={cart.reduce((sum,line)=>sum+line.qty,0)} onRestore={hold=>{
               const restored:CartLine[]=hold.items.map((item,index)=>{
                 const parts=item.name.split('｜');
                 const name=parts.shift()||item.name;
@@ -452,8 +432,12 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode,uiSettings}:{cart
       if(comboData.combos.some(combo=>combo.id===line.productId))setPanel({type:'combo'});
       else setPanel({type:'product',productId:line.productId});
     },
-    onHoldCart:()=>{if(cart.length)setPanel({type:'hold'});},
-    onOpenHeldOrders:()=>setPanel({type:'holds'}),
+    onHoldCart:()=>{
+      if(!cart.length)return;
+      localRuntime.createHold({kind:'waiting',items:holdItems(),totalMinor:total,partySize:1,note:'暫存'});
+      finishHold();
+    },
+    onOpenHeldOrders:()=>{if(!cart.length&&savedCarts.length)setPanel({type:'holds'});},
     onRemoveCartLine:lineIds=>{
       const ids=new Set(lineIds);
       if(ids.size===1){
