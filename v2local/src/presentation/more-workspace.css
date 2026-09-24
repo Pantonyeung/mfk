@@ -124,3 +124,288 @@
 .dayclose-sticky-footer{position:sticky;bottom:-1px;z-index:8;display:grid!important;grid-template-columns:minmax(0,1fr) 280px;gap:12px;align-items:center!important;padding:12px 0 0!important;background:#fff!important;border-top:1px solid #e0e3e8!important;color:#252635!important}
 .dayclose-sticky-footer>div{display:flex;gap:18px;align-items:center}.dayclose-sticky-footer>div span{font-size:15px;font-weight:850}.dayclose-sticky-footer>.more-primary{min-height:54px;font-size:18px}
 @media(max-width:1200px){.dayclose-panel .cash-denomination-table>header,.dayclose-panel .cash-denomination-table>div{grid-template-columns:90px minmax(180px,1fr) 130px 130px}.cash-denomination-toolbar{align-items:flex-start;flex-direction:column}.dayclose-sticky-footer{grid-template-columns:1fr 220px}}
+
+
+/* =========================================================
+   SMT R2 — compact day-close workbench
+   ========================================================= */
+.dayclose-compact{
+  gap:10px!important;
+  min-height:0;
+}
+.dayclose-compact-head{
+  min-height:44px;
+}
+.dayclose-compact-head h2{font-size:24px}
+.dayclose-summary-strip,
+.dayclose-locked-grid{
+  display:grid;
+  grid-template-columns:repeat(5,minmax(0,1fr));
+  gap:7px;
+}
+.dayclose-locked-grid{grid-template-columns:repeat(6,minmax(0,1fr))}
+.dayclose-summary-strip article,
+.dayclose-locked-grid article{
+  min-width:0;
+  padding:10px 11px;
+  display:grid;
+  gap:3px;
+  border:1px solid #e1e7ee;
+  border-radius:10px;
+  background:#f8fafc;
+}
+.dayclose-summary-strip span,
+.dayclose-locked-grid span{
+  color:#667085;
+  font-size:10px;
+  font-weight:800;
+}
+.dayclose-summary-strip b,
+.dayclose-locked-grid b{
+  font-size:18px;
+  font-variant-numeric:tabular-nums;
+}
+.dayclose-summary-strip article.attention,
+.dayclose-locked-grid article.attention{
+  border-color:#e2c47f;
+  background:#fff8e8;
+  color:#8a5a08;
+}
+.dayclose-locked-grid article.ok{border-color:#b8dfcb;background:#eef9f3;color:#146c49}
+.dayclose-locked-actions{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  padding-top:4px;
+}
+.dayclose-locked-actions>span{color:#98a2b3;font-size:10px}
+
+.dayclose-workbench{
+  min-height:0;
+  display:grid;
+  grid-template-columns:minmax(0,1fr) 330px;
+  gap:10px;
+  align-items:stretch;
+}
+.dayclose-count-panel,
+.dayclose-settlement-panel{
+  min-height:0;
+  border:1px solid #dbe2ea;
+  border-radius:13px;
+  background:#fff;
+}
+.dayclose-count-panel{
+  display:grid;
+  grid-template-rows:auto minmax(0,1fr);
+  padding:10px;
+}
+.dayclose-count-panel>header{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  padding-bottom:8px;
+}
+.dayclose-mode-switch,
+.cash-entry-toggle{
+  display:inline-flex;
+  gap:3px;
+  padding:3px;
+  border-radius:9px;
+  background:#eef2f6;
+}
+.dayclose-mode-switch button,
+.cash-entry-toggle button{
+  min-height:34px;
+  padding:0 12px;
+  border:0;
+  border-radius:7px;
+  background:transparent;
+  color:#667085;
+  font-size:12px;
+  font-weight:850;
+}
+.dayclose-mode-switch button.active,
+.cash-entry-toggle button.active{
+  background:#fff;
+  color:#1559af;
+  box-shadow:0 1px 4px rgba(24,40,65,.12);
+}
+
+.cash-denomination-grid{
+  min-height:0;
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:7px;
+  align-content:start;
+  overflow-y:auto;
+}
+.cash-denomination-grid label{
+  min-width:0;
+  min-height:92px;
+  padding:8px;
+  display:grid;
+  grid-template-columns:auto minmax(0,1fr);
+  gap:4px 7px;
+  align-items:center;
+  border:1px solid #e1e7ee;
+  border-radius:10px;
+  background:#f9fafb;
+}
+.cash-denomination-grid label>span{
+  color:#25364d;
+  font-size:15px;
+  font-weight:950;
+}
+.cash-denomination-grid input{
+  min-width:0;
+  height:36px;
+  padding:0 7px;
+  border:1px solid #d5dde7;
+  border-radius:7px;
+  background:#fff;
+  font-size:15px;
+  font-weight:850;
+  text-align:right;
+}
+.cash-denomination-grid small{
+  color:#98a2b3;
+  font-size:9px;
+}
+.cash-denomination-grid b{
+  justify-self:end;
+  color:#475467;
+  font-size:12px;
+  font-variant-numeric:tabular-nums;
+}
+.cash-denomination-grid label.invalid{
+  border-color:#e1aa9f;
+  background:#fff4f1;
+}
+.cash-denomination-grid label.invalid small{color:#b23d33}
+
+.dayclose-total-entry{
+  min-height:220px;
+  display:grid;
+  place-items:center;
+  align-content:center;
+  gap:8px;
+}
+.dayclose-total-entry>span{color:#667085;font-size:12px;font-weight:850}
+.dayclose-total-entry>div,
+.dayclose-remove-field>div{
+  display:grid;
+  grid-template-columns:40px minmax(0,1fr);
+  border:2px solid #c9d5e4;
+  border-radius:11px;
+  overflow:hidden;
+  background:#fff;
+}
+.dayclose-total-entry>div{width:min(420px,82%)}
+.dayclose-total-entry b,
+.dayclose-remove-field b{
+  display:grid;
+  place-items:center;
+  background:#f3f6f9;
+  color:#667085;
+}
+.dayclose-total-entry input{
+  height:68px;
+  padding:0 14px;
+  border:0;
+  outline:0;
+  font-size:30px;
+  font-weight:950;
+}
+
+.dayclose-settlement-panel{
+  padding:12px;
+  display:flex;
+  flex-direction:column;
+  gap:9px;
+}
+.dayclose-counted-total{
+  padding:12px 13px;
+  display:flex;
+  align-items:baseline;
+  justify-content:space-between;
+  gap:10px;
+  border-radius:10px;
+  background:#eef5ff;
+}
+.dayclose-counted-total span{color:#526a87;font-size:11px;font-weight:850}
+.dayclose-counted-total strong{color:#1559af;font-size:25px;font-variant-numeric:tabular-nums}
+.dayclose-remove-field{display:grid;gap:5px}
+.dayclose-remove-field>span,
+.dayclose-note>span{font-size:11px;font-weight:850;color:#667085}
+.dayclose-remove-field input{
+  height:46px;
+  padding:0 10px;
+  border:0;
+  outline:0;
+  font-size:19px;
+  font-weight:900;
+}
+.dayclose-quick-retain,
+.dayclose-note-toggle{
+  min-height:38px;
+  border:1px solid #d6dee8;
+  border-radius:8px;
+  background:#fff;
+  color:#344054;
+  font-size:12px;
+  font-weight:850;
+}
+.dayclose-result-grid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:7px;
+}
+.dayclose-result-grid article{
+  padding:10px;
+  display:grid;
+  gap:3px;
+  border:1px solid #dce3eb;
+  border-radius:9px;
+  background:#f8fafc;
+}
+.dayclose-result-grid article.ok{border-color:#b8dfcb;background:#eef9f3}
+.dayclose-result-grid article.attention{border-color:#e2c47f;background:#fff8e8}
+.dayclose-result-grid span{font-size:10px;color:#667085}
+.dayclose-result-grid b{font-size:17px}
+.dayclose-note{display:grid;gap:5px}
+.dayclose-note input{
+  height:42px;
+  padding:0 10px;
+  border:1px solid #d6dee8;
+  border-radius:8px;
+}
+.dayclose-confirm{
+  min-height:52px!important;
+  margin-top:auto;
+  font-size:17px!important;
+  box-shadow:0 8px 18px rgba(23,104,220,.15);
+}
+.dayclose-settlement-panel .fusion-status{
+  margin:0;
+  padding:8px 9px;
+  font-size:11px;
+}
+.dayclose-success-dialog{
+  max-width:520px!important;
+}
+.dayclose-success-dialog h3{margin:0!important}
+.dayclose-success-dialog>span{display:none!important}
+
+@media(max-width:1200px){
+  .dayclose-workbench{grid-template-columns:minmax(0,1fr) 290px}
+  .cash-denomination-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .dayclose-summary-strip{grid-template-columns:repeat(5,minmax(120px,1fr));overflow-x:auto}
+  .dayclose-locked-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+}
+@media(prefers-reduced-motion:reduce){
+  .cash-denomination-grid label,
+  .dayclose-mode-switch button,
+  .cash-entry-toggle button{transition:none!important}
+}
