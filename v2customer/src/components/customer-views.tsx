@@ -207,16 +207,22 @@ export function CartView({cart,quote,checkout,member,suggestions,products,onProd
       {member?.state==='READY'&&member.preferences?.length?<section className="remembered-tastes"><span>我哋記得你</span><div>{member.preferences.map(item=><b key={item}>{item}</b>)}</div><small>口味習慣唔會自動改今次餐點；請逐項確認。</small></section>:<section className="remembered-tastes disconnected"><span>已儲存口味</span><p>會員偏好尚未連接，今次設定唔會寫入客戶身份。</p></section>}
       <section className="jar-contact"><SectionHeading eyebrow="取餐聯絡" title="今次點稱呼你？"/><div className="checkout-form compact"><label htmlFor="jar-name"><span>稱呼 <small>選填</small></span><input id="jar-name" value={checkout.name} onChange={event=>onCheckoutChange({...checkout,name:event.target.value})} autoComplete="name" placeholder="例如：陳小姐"/></label><label htmlFor="jar-phone"><span>電話</span><input id="jar-phone" type="tel" inputMode="tel" value={checkout.phone} onChange={event=>onCheckoutChange({...checkout,phone:event.target.value})} autoComplete="tel" placeholder="只作今次取餐核對"/></label></div></section>
       {suggestions.length?<RecommendationRail eyebrow="今餐可以再睇" title="加一樣，都要有理由" recommendations={suggestions} onProduct={(product,origin)=>onProduct(product,origin)}/>:null}
-      <QuoteSummary quote={quote}/>
+      <QuoteSummary quote={quote} cart={cart}/>
       {quote?.freshness==='MATERIAL_CHANGE'?<section className="repair-card" role="alert"><span>需要你確認</span><h2>餐點或價格有重要變更</h2><p>只修正受影響項目。記憶罐其他內容唔會被清空。</p><ActionButton variant="secondary" wide onClick={onMenu}>返回菜單修正</ActionButton></section>:null}
       <div className="screen-primary-action"><div><span>下一步</span><strong>{quote?money(quote.currency,quote.totalMinor):'等待正式報價'}</strong></div><ActionButton wide disabled={quote?.freshness==='MATERIAL_CHANGE'} onClick={onCheckout}>前往最後確認</ActionButton></div>
     </>}
   </section>;
 }
 
-function QuoteSummary({quote}:{quote:CustomerQuoteSnapshot|null}){
+function localPublishedTotal(cart:readonly CustomerCartLine[]){
+  if(!cart.length||cart.some(line=>!Number.isSafeInteger(line.publishedUnitPriceMinor)))return null;
+  return cart.reduce((sum,line)=>sum+Number(line.publishedUnitPriceMinor)*line.quantity,0);
+}
+
+function QuoteSummary({quote,cart}:{quote:CustomerQuoteSnapshot|null;cart:readonly CustomerCartLine[]}){
   const meta=quote?quoteMeta[quote.freshness]:null;
-  return <section className={`quote-card quote-${meta?.tone??'attention'}`} aria-live="polite"><div><span>店舖正式報價</span><AnimatedValue>{quote?money(quote.currency,quote.totalMinor):'正在取得最新價格'}</AnimatedValue></div><p>{meta?.detail??'記憶罐唔會自行估算最終價格。'}</p>{meta?<b>{meta.label}</b>:<i className="inline-loader" aria-hidden="true"/>}</section>;
+  const published=localPublishedTotal(cart);
+  return <section className={`quote-card quote-${meta?.tone??'current'}`} aria-live="polite"><div><span>訂單總額</span><AnimatedValue>{quote?money(quote.currency,quote.totalMinor):published!==null?money('HKD',published):'更新中'}</AnimatedValue></div><p>{meta?.detail??(published!==null?'按目前餐牌價格顯示；送出時會自動核對最新資料。':'正在更新餐牌資料。')}</p>{meta?<b>{meta.label}</b>:published!==null?<b>目前餐牌價格</b>:<i className="inline-loader" aria-hidden="true"/>}</section>;
 }
 
 export function CheckoutView({cart,quote,checkout,setCheckout,pending,actionState,onSubmit,onReadback,onBack,onRepair}:{

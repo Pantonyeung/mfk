@@ -16,6 +16,7 @@ export interface CustomerCloudCartLine{
   readonly selectedVariationName?:string;
   readonly selections:readonly CustomerCloudSelection[];
   readonly note?:string;
+  readonly publishedUnitPriceMinor?:number;
 }
 export interface CustomerCloudCheckout{
   readonly name:string;
@@ -85,6 +86,7 @@ function line(value:unknown,index:number):CustomerCloudCartLine{
     ...(variationName?{selectedVariationName:variationName}:{}),
     selections:Object.freeze(row.selections.map(selection)),
     ...(optionalText(row.note,240)?{note:optionalText(row.note,240)}:{}),
+    ...(Number.isSafeInteger(Number(row.publishedUnitPriceMinor))&&Number(row.publishedUnitPriceMinor)>=0?{publishedUnitPriceMinor:Number(row.publishedUnitPriceMinor)}:{}),
   });
 }
 function cart(value:unknown){

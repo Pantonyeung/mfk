@@ -212,6 +212,9 @@ export function App(){
       selections:selectedCustomerOptions(selectedProduct,selections),
       createdAt:existing?.createdAt??nowIso(),
       ...(selectedNote.trim()?{note:selectedNote.trim()}:{}),
+      ...(Number.isSafeInteger(selectedProduct.publishedUnitPriceMinor)?{
+        publishedUnitPriceMinor:Number(selectedProduct.publishedUnitPriceMinor)+selectedCustomerOptions(selectedProduct,selections).reduce((sum,option)=>sum+Number(option.publishedAdjustmentMinor||0),0),
+      }:{}),
     });
     updateCart(existing?cart.map(item=>item.lineId===existing.lineId?line:item):[...cart,line]);
     setJarPulseKey(value=>value+1);
