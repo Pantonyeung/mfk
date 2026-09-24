@@ -67,3 +67,146 @@
   .hold-nine-grid{max-width:500px;gap:6px}
   .hold-nine-grid b{font-size:22px}
 }
+
+
+/* =========================================================
+   SMT Fusion R1 — compact Open Checks
+   ========================================================= */
+.open-checks-workspace{
+  height:100%;
+  min-height:0;
+  padding:12px;
+  display:grid;
+  grid-template-rows:auto minmax(0,1fr);
+  gap:9px;
+  box-sizing:border-box;
+  background:#f6f8fa;
+}
+.open-checks-head{
+  min-height:48px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+}
+.open-checks-head>div{display:grid;gap:1px}
+.open-checks-head small{
+  color:#7a8797;
+  font-size:9px;
+  font-weight:950;
+  letter-spacing:.08em;
+}
+.open-checks-head h2{margin:0;font-size:23px}
+.open-checks-head>strong{
+  min-width:32px;height:32px;padding:0 7px;
+  display:grid;place-items:center;
+  border-radius:999px;
+  background:#eaf3ff;
+  color:#1559af;
+}
+.open-checks-layout{
+  min-height:0;
+  display:grid;
+  grid-template-columns:minmax(260px,.8fr) minmax(0,1.2fr);
+  gap:9px;
+}
+.open-checks-list{
+  min-height:0;
+  overflow-y:auto;
+  display:grid;
+  align-content:start;
+  gap:6px;
+}
+.open-checks-list>button{
+  min-height:66px;
+  padding:8px 10px;
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto;
+  gap:3px 9px;
+  border:1px solid #dce3eb;
+  border-radius:9px;
+  background:#fff;
+  text-align:left;
+  transition:transform 90ms ease,border-color 140ms ease,background-color 140ms ease,box-shadow 140ms ease;
+}
+.open-checks-list>button>span{display:flex;align-items:center;gap:7px}
+.open-checks-list b{font-size:16px}
+.open-checks-list em{font-style:normal;color:#7a8797;font-size:10px}
+.open-checks-list>button>strong{font-size:15px}
+.open-checks-list>button>small{grid-column:1/-1;color:#7a8797;font-size:10px}
+.open-checks-list>button.active{
+  border-color:#8db2e4;
+  background:#eef5ff;
+  box-shadow:0 0 0 3px rgba(23,104,220,.07);
+}
+.open-checks-list>button:active{transform:scale(.985)}
+.open-checks-preview{
+  min-height:0;
+  padding:12px;
+  display:grid;
+  grid-template-rows:auto minmax(0,1fr) auto auto;
+  gap:8px;
+  border:1px solid #dce3eb;
+  border-radius:10px;
+  background:#fff;
+}
+.open-checks-preview>header{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:12px;
+}
+.open-checks-preview>header>div{display:grid;gap:1px}
+.open-checks-preview>header small{color:#7a8797;font-size:9px;font-weight:850}
+.open-checks-preview h3{margin:0;font-size:24px}
+.open-checks-preview>header>strong{font-size:22px}
+.open-checks-preview-lines{
+  min-height:0;
+  overflow-y:auto;
+  border-top:1px solid #edf1f5;
+  border-bottom:1px solid #edf1f5;
+}
+.open-checks-preview-lines p{
+  margin:0;
+  min-height:40px;
+  display:grid;
+  grid-template-columns:32px minmax(0,1fr) auto;
+  gap:7px;
+  align-items:center;
+  border-bottom:1px solid #f0f2f5;
+}
+.open-checks-preview-lines p:last-child{border-bottom:0}
+.open-checks-preview-lines span{color:#667085;font-size:10px}
+.open-checks-preview-lines b{font-size:13px}
+.open-checks-preview-lines strong{font-size:12px}
+.open-checks-note{color:#765e3d;font-size:10px}
+.open-checks-preview>footer{
+  display:grid;
+  grid-template-columns:.72fr 1.28fr;
+  gap:7px;
+}
+.open-checks-preview>footer button{
+  min-height:48px;
+  border:1px solid #d7dee8;
+  border-radius:8px;
+  background:#fff;
+  font-size:13px;
+  font-weight:900;
+}
+.open-checks-preview>footer .primary{
+  border-color:#1768dc;
+  background:#1768dc;
+  color:#fff;
+}
+.open-checks-preview>footer .danger{
+  border-color:#e2bbb5;
+  background:#fff7f5;
+  color:#a63f36;
+}
+@media(max-width:1150px){
+  .open-checks-layout{grid-template-columns:1fr}
+  .open-checks-preview{min-height:320px}
+}
+@media(prefers-reduced-motion:reduce){
+  .open-checks-list>button{transition:none!important}
+}
