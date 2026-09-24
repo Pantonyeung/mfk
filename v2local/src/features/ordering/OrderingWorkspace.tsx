@@ -165,7 +165,7 @@ export function OrderingWorkspace({view,actions,centerPanel}:{view:OrderingWorks
       </div>:view.heldCartCount>0?<div className="ordering-cart-secondary-actions empty-cart">
         <button type="button" className="retrieve" onClick={actions.onOpenHeldOrders}>取回訂單 <b>{view.heldCartCount}</b></button>
       </div>:null}
-      {!view.cart.checkoutEnabled?<DisabledReason>{checkoutReason}</DisabledReason>:null}
+      {view.cart.lines.length&&!view.cart.checkoutEnabled?<DisabledReason>{checkoutReason}</DisabledReason>:null}
       <button type="button" className="ordering-checkout" disabled={!view.cart.checkoutEnabled} onClick={actions.onCheckout}>{view.cart.checkoutEnabled?`前往結帳 ${view.cart.totalLabel}`:'加入商品後前往結帳'}</button>
     </aside>
 
