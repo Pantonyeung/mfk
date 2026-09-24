@@ -234,11 +234,17 @@ function PrinterPanel(){
       else if(kind==='test')result=await testLanPrinter(printer);
       else{
         if(current.capability==='label-58mm'){
-          const bytes=await renderTscRasterLabel({
-            orderCode:'MFK TEST',
+          const bytes=await renderTscRasterLabel(current.role==='袋標籤'?{
+            kind:'bag',
+            orderCode:'P0019',
+            primaryText:'共 2 件',
+            secondaryText:'共 2 件',
+          }:{
+            kind:'product',
+            orderCode:'P0017',
             primaryText:current.name,
-            secondaryText:current.role==='產品標籤'?productLabelPurpose(current):'50×40 · TSC',
-            pieceLabel:'1/1',
+            secondaryText:productLabelPurpose(current),
+            pieceLabel:'1/2',
           });
           result=await printBytesLan({...printer,bytes});
         }else{
