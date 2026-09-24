@@ -89,6 +89,20 @@ describe('MFK checkout print fanout',()=>{
     expect(packing).toContain('餐具：未記錄');
   });
 
+
+  it('keeps 80mm templates free of printer-unsafe punctuation that rendered as stray digits',()=>{
+    const plan=buildOrderPrintPlan(order,[
+      binding('顧客小票','receipt'),
+      binding('製作單','production'),
+      binding('打包單','packing'),
+    ]);
+    for(const job of plan){
+      expect(job.payload).not.toContain('・');
+      expect(job.payload).not.toContain('·');
+      expect(job.payload).not.toContain('—');
+    }
+  });
+
   it('batches eleven labels for one logical printer into one native dispatch batch',()=>{
     const eleven:PrintableOrder={...order,items:[{id:'riceball',name:'原味飯團',qty:11,unitMinor:2100}]};
     const plan=buildOrderPrintPlan(eleven,[binding('產品標籤','product-label-riceball',['riceball'])]);
