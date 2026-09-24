@@ -21,7 +21,7 @@ const DEFAULT_WORKSPACE:CustomerLocalWorkspace=Object.freeze({
   schemaVersion:1,
   storageKind:'LOCAL_NON_AUTHORITATIVE',
   cart:Object.freeze([]),
-  checkout:Object.freeze({name:'',phone:''}),
+  checkout:Object.freeze({name:'',phone:'',paymentMethod:'PAY_AT_STORE'}),
   pendingIntents:Object.freeze([]),
   preferences:Object.freeze({activeView:'home',activeCategoryId:null}),
   updatedAt:new Date(0).toISOString(),
@@ -54,6 +54,7 @@ export function readCustomerLocalWorkspace():CustomerLocalWorkspace{
       checkout:Object.freeze({
         name:typeof checkout.name==='string'?checkout.name:'',
         phone:typeof checkout.phone==='string'?checkout.phone:'',
+        paymentMethod:checkout.paymentMethod==='ELECTRONIC'?'ELECTRONIC':'PAY_AT_STORE',
       }),
       pendingIntents:Object.freeze([...safeArray<CustomerPendingIntent>(parsed.pendingIntents)]),
       preferences:Object.freeze({
