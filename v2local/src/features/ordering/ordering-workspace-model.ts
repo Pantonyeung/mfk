@@ -5,7 +5,9 @@ export interface QueueOrderViewModel {
   readonly orderId:string;
   readonly sourceLabel:string;
   readonly waitLabel:string;
+  readonly etaLabel?:string;
   readonly itemCount:number;
+  readonly demo?:boolean;
 }
 
 export interface OrderingCategoryViewModel {
@@ -76,10 +78,11 @@ export interface OrderingWorkspaceViewModel {
   readonly activeOrders:readonly QueueOrderViewModel[];
   readonly categories:readonly OrderingCategoryViewModel[];
   readonly selectedCategoryId:string;
+  readonly categoryRows:1|2;
+  readonly categoryColumns:5|6|7;
   readonly products:readonly OrderingProductViewModel[];
   readonly menuRevisionLabel?:string;
   readonly operationalNotice?:string;
-  readonly searchQuery:string;
   readonly orderingMode:'quick'|'standard';
   readonly feedbackMessage?:string;
   readonly showCategories?:boolean;
@@ -93,7 +96,6 @@ export interface OrderingWorkspaceViewModel {
 }
 
 export interface OrderingWorkspaceActions {
-  readonly onSearchQuery:(query:string)=>void;
   readonly onSelectCategory:(categoryId:string)=>void;
   readonly onChangeOrderingMode:(mode:'quick'|'standard')=>void;
   readonly onAddProduct:(productId:string)=>void;
