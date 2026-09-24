@@ -472,6 +472,23 @@ export default {
         return json(customerPublicSnapshot(active,Array.isArray(orderBody.orders)?orderBody.orders:[]),200,cors(request));
       }
 
+      if(url.pathname==='/api/customer/payment-evidence'&&request.method==='POST'){
+        const contentType=String(request.headers.get('content-type')||'').toLowerCase();
+        if(!['image/jpeg','image/png','image/webp'].includes(contentType))return json({code:'PAYMENT_EVIDENCE_TYPE_INVALID'},415,cors(request));
+        const declared=Number(request.headers.get('content-length')||0);
+        if(declared>8*1024*1024)return json({code:'PAYMENT_EVIDENCE_TOO_LARGE'},413,cors(request));
+        const bytes=await request.arrayBuffer();
+        if(bytes.byteLength<1||bytes.byteLength>8*1024*1024)return json({code:'PAYMENT_EVIDENCE_SIZE_INVALID'},413,cors(request));
+        const submissionId=String(request.headers.get('x-mfk-submission-id')||'').trim();
+        if(!/^CUSTOMER-[A-Za-z0-9._-]{8,180}$/.test(submissionId))return json({code:'PAYMENT_EVIDENCE_SUBMISSION_INVALID'},400,cors(request));
+        const digest=await crypto.subtle.digest('SHA-256',bytes);
+        const sha256=[...new Uint8Array(digest)].map(value=>value.toString(16).padStart(2,'0')).join('');
+        const ext=contentType==='image/png'?'png':contentType==='image/webp'?'webp':'jpg';
+        const evidenceRef='customer-payment/'+storeId+'/'+submissionId+'/'+sha256+'.'+ext;
+        await env.CUSTOMER_PAYMENT_EVIDENCE.put(evidenceRef,bytes,{httpMetadata:{contentType},customMetadata:{storeId,submissionId,sha256,kind:'PAYMENT_SCREENSHOT'}});
+        return json({state:'UPLOADED',evidenceRef,sha256,uploadedAt:new Date().toISOString()},201,cors(request));
+      }
+
       if(url.pathname==='/api/customer/smt/diagnostics'&&request.method==='GET'){
         const authorizeUrl=new URL(request.url);
         authorizeUrl.pathname='/authorize-smt-device';
