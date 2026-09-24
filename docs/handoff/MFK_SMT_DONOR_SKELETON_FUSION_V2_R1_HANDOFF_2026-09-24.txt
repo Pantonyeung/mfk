@@ -816,3 +816,68 @@ MFK_SMT_DONOR_SKELETON_FUSION_V2_R1_BLUE_UX_GREEN_OWNER_ACCEPTANCE_PENDING
 
 HARD RULE:
 未經 Owner 驗收，不准 merge main。
+
+
+==================================================
+CART EDIT + LEFT RAIL CONTROLS + STABLE CHECKOUT KEYPAD｜GREEN
+==================================================
+
+Current candidate:
+7778d801a065da29c318cb6cabca8faea8b8aa1a
+
+Cart edit:
+- existing Cart line opens Product Detail in edit mode.
+- current qty / option selections / free note / effective unit price are preloaded.
+- action becomes 儲存修改.
+- save updates same Cart line id.
+- no duplicate Cart line is created.
+
+Product modal:
+- Product Detail uses approximately 75% × 75% of screen.
+- other operational modals keep independent sizing.
+
+Left rail:
+- Quick Mode moved to left rail.
+- Quick Drink moved to left rail.
+- Display controls moved to left rail.
+- catalog toolbar no longer consumes category/product space.
+- Display popover: image visibility / category visibility / reset to Admin truth.
+- pending Quick Drink keeps badge + silent focus in rail.
+
+Checkout:
+- compact 01 / 02 sizing restored.
+- 03 keypad always remains visible.
+- CASH: keypad enabled.
+- electronic local tender: keypad grey + disabled.
+- external/platform channel: keypad grey + disabled.
+- changing channel/tender no longer shifts keypad geometry.
+
+Validation:
+GitHub Actions 36074123422 SUCCESS
+Job 107881415178
+32 / 32 Test Files PASS
+142 / 142 Tests PASS
+Build GREEN
+Worker e464e54c-fa84-4696-85df-7ca295277b66
+Preview:
+https://smt-donor-v2-r1-cart-edit-rail-mfk-admin.yeungyi88.workers.dev
+
+Preview PR:
+#277 CLOSED / NOT MERGED
+
+Current main:
+26c9b13650d3e46a34ef02d01ea70cc3ff946f52
+
+Current branch:
+DIVERGED FROM MAIN.
+Owner UX acceptance preview only.
+Fresh replay/reconciliation is mandatory before any future merge.
+
+Production:
+UNCHANGED
+
+Status:
+MFK_SMT_DONOR_SKELETON_FUSION_V2_R1_CART_EDIT_RAIL_CHECKOUT_GREEN_OWNER_ACCEPTANCE_PENDING
+
+HARD RULE:
+未經 Owner 驗收，不准 merge main。
