@@ -45,6 +45,7 @@ export function selectedCustomerOptions(product:CustomerProduct,state:CustomerSe
         optionGroupId:group.optionGroupId,
         optionId:option.optionId,
         optionName:option.name,
+        publishedAdjustmentMinor:option.publishedAdjustmentMinor,
       })]:[];
     })
   ));
