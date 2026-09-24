@@ -1,5 +1,5 @@
-import {describe,expect,it} from 'vitest';
-import {priceCustomerCart} from './customer-cloud-intake.ts';
+import {afterEach,describe,expect,it,vi} from 'vitest';
+import {priceCustomerCart,readCustomerPaymentEvidence} from './customer-cloud-intake.ts';
 import type {SyncedOrderingProduct} from './admin-config-projection.ts';
 
 const products:readonly SyncedOrderingProduct[]=[
@@ -40,6 +40,8 @@ const products:readonly SyncedOrderingProduct[]=[
     ],
   },
 ];
+
+afterEach(()=>vi.unstubAllGlobals());
 
 describe('customer cloud local quote adapter',()=>{
   it('prices only from the published SMT ordering projection',()=>{
@@ -90,5 +92,42 @@ describe('customer cloud local quote adapter',()=>{
         selections:[{optionGroupId:'rice',optionId:'ghost',optionName:'舊選項'}],
       },
     ],products)).toThrow('CUSTOMER_OPTION_UNAVAILABLE:bento:rice:ghost');
+  });
+
+  it('reads current Customer payment evidence through the authorized SMT endpoint without mutating verification state',async()=>{
+    const values=new Map<string,string>([['mfk.admin-sync.device.v1',JSON.stringify('SMT-TEST-01')]]);
+    Object.defineProperty(globalThis,'localStorage',{
+      configurable:true,
+      value:{
+        getItem:(key:string)=>values.get(key)??null,
+        setItem:(key:string,value:string)=>{values.set(key,String(value));},
+        removeItem:(key:string)=>{values.delete(key);},
+        clear:()=>values.clear(),
+        key:(index:number)=>[...values.keys()][index]??null,
+        get length(){return values.size;},
+      },
+    });
+    const fetchMock=vi.fn(async()=>new Response(new Uint8Array([1,2,3]),{
+      status:200,
+      headers:{'content-type':'image/png'},
+    }));
+    vi.stubGlobal('fetch',fetchMock);
+
+    const evidence=await readCustomerPaymentEvidence('customer-payment/MF01/evidence/hash.png');
+    expect(evidence.type).toBe('image/png');
+    expect(evidence.size).toBe(3);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const url=String(fetchMock.mock.calls[0]?.[0]??'');
+    expect(url).toContain('/api/customer/smt/payment-evidence?');
+    expect(url).toContain('storeId=MF01');
+    expect(url).toContain('deviceId=SMT-TEST-01');
+    expect(url).toContain('ref=customer-payment%2FMF01%2Fevidence%2Fhash.png');
+  });
+
+  it('rejects a payment evidence ref outside the current store namespace before network I/O',async()=>{
+    const fetchMock=vi.fn();
+    vi.stubGlobal('fetch',fetchMock);
+    await expect(readCustomerPaymentEvidence('customer-payment/OTHER/evidence/hash.png')).rejects.toThrow('PAYMENT_EVIDENCE_REF_INVALID');
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });
