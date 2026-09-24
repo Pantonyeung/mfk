@@ -1,4 +1,4 @@
-import {createElement,useEffect,useLayoutEffect,useRef,useState,type ButtonHTMLAttributes,type CSSProperties,type ElementType,type PointerEvent as ReactPointerEvent,type ReactNode} from 'react';
+import {createElement,useEffect,useLayoutEffect,useRef,useState,type ButtonHTMLAttributes,type CSSProperties,type ElementType,type PointerEvent as ReactPointerEvent,type ReactNode,type TouchEvent as ReactTouchEvent} from 'react';
 import type {CustomerConnectionState} from '../product-types';
 
 type ButtonVariant='primary'|'secondary'|'quiet'|'ghost'|'danger';
@@ -33,6 +33,36 @@ export function QuantityStepper({label,quantity,onChange,min=0}:{label:string;qu
     <button aria-label={`減少${label}`} onClick={()=>onChange(Math.max(min,quantity-1))}>減</button>
     <AnimatedValue>{quantity}</AnimatedValue>
     <button aria-label={`增加${label}`} onClick={()=>onChange(quantity+1)}>加</button>
+  </div>;
+}
+
+export function PullRefreshSurface({children,refreshing,onRefresh}:{children:ReactNode;refreshing:boolean;onRefresh:()=>void}){
+  const startRef=useRef<number|null>(null);
+  const lastRef=useRef({y:0,at:0,velocity:0});
+  const [distance,setDistance]=useState(0);
+  const threshold=76;
+  const touchStart=(event:ReactTouchEvent<HTMLDivElement>)=>{
+    if(window.scrollY>0)return;
+    const y=event.touches[0]?.clientY??0;
+    startRef.current=y;
+    lastRef.current={y,at:event.timeStamp,velocity:0};
+  };
+  const touchMove=(event:ReactTouchEvent<HTMLDivElement>)=>{
+    if(startRef.current===null)return;
+    const y=event.touches[0]?.clientY??startRef.current;
+    const elapsed=Math.max(1,event.timeStamp-lastRef.current.at);
+    lastRef.current={y,at:event.timeStamp,velocity:(y-lastRef.current.y)/elapsed*1000};
+    setDistance(Math.min(112,Math.max(0,(y-startRef.current)*.48)));
+  };
+  const touchEnd=()=>{
+    if(distance>=threshold||lastRef.current.velocity>720)onRefresh();
+    startRef.current=null;
+    setDistance(0);
+  };
+  const progress=Math.min(1,distance/threshold);
+  return <div className="pull-refresh" style={{'--pull-distance':`${distance}px`,'--pull-progress':progress} as CSSProperties} onTouchStart={touchStart} onTouchMove={touchMove} onTouchEnd={touchEnd} onTouchCancel={touchEnd}>
+    <div className="pull-refresh-indicator" aria-live="polite"><i aria-hidden="true"/>{refreshing?'正在更新':progress>=1?'放手更新':'向下拉更新'}</div>
+    <div className="pull-refresh-content">{children}</div>
   </div>;
 }
 
@@ -126,26 +156,28 @@ export function MenuSkeleton(){
   </section>;
 }
 
-export function BottomNavigation({active,cartCount,orderCount,onChange}:{
-  active:'home'|'menu'|'cart'|'orders'|'more';cartCount:number;orderCount:number;onChange:(view:'home'|'menu'|'cart'|'orders')=>void;
+export function BottomNavigation({active,cartCount,orderCount,onChange,pulseKey=0}:{
+  active:'home'|'menu'|'cart'|'orders'|'more';cartCount:number;orderCount:number;pulseKey?:number;onChange:(view:'home'|'menu'|'cart'|'orders'|'more')=>void;
 }){
   const items=[
-    {id:'home' as const,label:'首頁'},
-    {id:'menu' as const,label:'點餐'},
-    {id:'cart' as const,label:'購物籃',badge:cartCount},
-    {id:'orders' as const,label:'訂單',badge:orderCount},
+    {id:'home' as const,label:'首頁',glyph:'home'},
+    {id:'menu' as const,label:'點單',glyph:'menu'},
+    {id:'cart' as const,label:'記憶罐',glyph:'jar',badge:cartCount},
+    {id:'orders' as const,label:'我的訂單',glyph:'orders',badge:orderCount},
+    {id:'more' as const,label:'我的記憶',glyph:'memory'},
   ];
   return <nav className="bottom-navigation" aria-label="主要導覽">
     {items.map(item=><button key={item.id} className={active===item.id?'active':''} aria-current={active===item.id?'page':undefined} onClick={()=>onChange(item.id)}>
+      <i className={`nav-glyph glyph-${item.glyph}`} aria-hidden="true"/>
       <span>{item.label}</span>
-      {item.badge?<b aria-label={`${item.badge} 項`}>{item.badge}</b>:null}
+      {item.badge?<b key={item.id==='cart'?pulseKey:undefined} className={item.id==='cart'?'badge-pop':''} aria-label={`${item.badge} 項`}>{item.badge}</b>:null}
     </button>)}
   </nav>;
 }
 
 export interface ProductOriginRect {readonly top:number;readonly left:number;readonly width:number;readonly height:number}
 
-export function ProductDialog({label,onClose,children,footer,origin}:{label:string;onClose:()=>void;children:ReactNode;footer?:ReactNode;origin?:ProductOriginRect|null}){
+export function ProductDialog({label,onClose,children,footer,origin,returnFocusId}:{label:string;onClose:()=>void;children:ReactNode;footer?:ReactNode;origin?:ProductOriginRect|null;returnFocusId?:string}){
   const ref=useRef<HTMLDialogElement>(null);
   const surfaceRef=useRef<HTMLDivElement>(null);
   const restoreRef=useRef<HTMLElement|null>(null);
@@ -160,8 +192,11 @@ export function ProductDialog({label,onClose,children,footer,origin}:{label:stri
     restoreRef.current=document.activeElement instanceof HTMLElement?document.activeElement:null;
     const dialog=ref.current;
     if(dialog&&!dialog.open)dialog.showModal();
-    return()=>restoreRef.current?.focus();
-  },[]);
+    return()=>{
+      const originControl=returnFocusId?document.querySelector<HTMLElement>(`[data-product-id="${CSS.escape(returnFocusId)}"]`):null;
+      (originControl??restoreRef.current)?.focus();
+    };
+  },[returnFocusId]);
   useLayoutEffect(()=>{
     const surface=surfaceRef.current;
     if(!surface||!origin||reducedMotion())return;
