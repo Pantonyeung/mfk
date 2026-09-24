@@ -1,5 +1,5 @@
 import {useEffect,useMemo,useState} from 'react';
-import {NavLink,Navigate,Route,Routes,useNavigate} from 'react-router';
+import {NavLink,Navigate,Route,Routes,useLocation,useNavigate} from 'react-router';
 import {ProductionViewport} from './app/ProductionViewport.tsx';
 import {OrderingWorkspace} from './features/ordering/OrderingWorkspace.tsx';
 import type {OrderingWorkspaceActions,OrderingWorkspaceViewModel,ServiceMode} from './features/ordering/ordering-workspace-model.ts';
@@ -33,6 +33,9 @@ type Product={
   optionSets:readonly SyncedOptionSet[];
 };
 type CartLine={id:string;productId:string;name:string;qty:number;unitMinor:number;serviceMode:ServiceMode;detail?:string};
+type OrderingUiSettings={mode:'quick'|'standard';categoryRows:1|2;categoryColumns:5|6|7};
+const ORDER_UI_KEY='mfk.smt.presentation.order-ui.v1';
+const DEFAULT_ORDER_UI:OrderingUiSettings={mode:'quick',categoryRows:1,categoryColumns:7};
 
 const BASE_PRODUCTS:readonly Product[]=[
   {id:'riceball',category:'飯團',name:'原味飯團',priceMinor:4100,priceReady:true},
@@ -85,13 +88,11 @@ function NavGlyph({name}:{name:(typeof nav)[number]['icon']}){
   return <svg {...common}><circle cx="5" cy="12" r="1.3" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.3" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1.3" fill="currentColor" stroke="none"/></svg>;
 }
 
-function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[];setCart:(v:CartLine[])=>void;serviceMode:ServiceMode;setServiceMode:(m:ServiceMode)=>void}){
+function OrderingPage({cart,setCart,serviceMode,setServiceMode,uiSettings}:{cart:CartLine[];setCart:(v:CartLine[])=>void;serviceMode:ServiceMode;setServiceMode:(m:ServiceMode)=>void;uiSettings:OrderingUiSettings}){
   const navigate=useNavigate();
   const [runtimeRevision,setRuntimeRevision]=useState(0);
   useEffect(()=>localRuntime.subscribe(()=>setRuntimeRevision(value=>value+1)),[]);
   const [category,setCategory]=useState('all');
-  const [searchQuery,setSearchQuery]=useState('');
-  const [orderingMode,setOrderingMode]=useState<'quick'|'standard'>('quick');
   const [viewMode,setViewMode]=useState<'original'|'organized'>('original');
   const [combineSimilar,setCombineSimilar]=useState(false);
   const [pulse,setPulse]=useState(0);
@@ -159,25 +160,16 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
       });
   },[syncedCatalog,adminMenu,fallbackCategoryById]);
 
-  const categories=[
-    {id:'all',label:'熱門'},
-    ...(syncedCatalog
-      ?syncedCatalog.categories.map(row=>({id:row.id,label:row.label}))
-      :adminMenu.categories.slice().sort((a,b)=>a.position-b.position||a.id.localeCompare(b.id)).map(row=>({id:row.id,label:row.name}))),
-  ];
-  const normalizedSearch=searchQuery.trim().toLocaleLowerCase('zh-HK');
+  const categories=(syncedCatalog
+    ?syncedCatalog.categories.map(row=>({id:row.id,label:row.label}))
+    :adminMenu.categories.slice().sort((a,b)=>a.position-b.position||a.id.localeCompare(b.id)).map(row=>({id:row.id,label:row.name})));
+  useEffect(()=>{
+    if(category==='all'&&categories[0])setCategory(categories[0].id);
+    else if(category!=='all'&&!categories.some(row=>row.id===category)&&categories[0])setCategory(categories[0].id);
+  },[category,categories.map(row=>row.id).join('|')]);
   const visible=products
-    .filter(product=>(category==='all'||product.categoryId===category)&&(!normalizedSearch||product.name.toLocaleLowerCase('zh-HK').includes(normalizedSearch)))
-    .slice()
-    .sort((a,b)=>{
-      if(category!=='all')return 0;
-      const quick=new Map(frontlinePresentation.quickProductIds.map((id,index)=>[id,index] as const));
-      const ai=quick.get(a.id),bi=quick.get(b.id);
-      if(ai===undefined&&bi===undefined)return 0;
-      if(ai===undefined)return 1;
-      if(bi===undefined)return -1;
-      return ai-bi;
-    });
+    .filter(product=>category==='all'||product.categoryId===category)
+    .slice();
   const runtimeOrders=useMemo(()=>{void runtimeRevision;return localRuntime.orders();},[runtimeRevision]);
   const heldCarts=useMemo(()=>{void runtimeRevision;return localRuntime.holds();},[runtimeRevision]);
   const businessCutoff=readBusinessCutoff();
@@ -187,13 +179,18 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
     return Number.isFinite(at)&&at>=businessWindow.start&&at<businessWindow.end&&order.fulfillmentLabel!=='已取消';
   }).length;
   const capacityNotice=capacityNoticeForCount(businessOrderCount);
-  const queueItem=(order:(typeof runtimeOrders)[number])=>({
-    id:order.id,
-    orderId:order.display,
-    sourceLabel:order.sourceLabel,
-    waitLabel:new Date(order.createdAt).toLocaleTimeString('zh-HK',{hour:'2-digit',minute:'2-digit'}),
-    itemCount:order.items.reduce((sum,item)=>sum+item.qty,0),
-  });
+  const queueItem=(order:(typeof runtimeOrders)[number])=>{
+    const createdAt=Date.parse(order.createdAt);
+    const etaAt=Number.isFinite(createdAt)?new Date(createdAt+storeSettings.fulfillmentMinutes*60_000):null;
+    return {
+      id:order.id,
+      orderId:order.display,
+      sourceLabel:order.sourceLabel,
+      waitLabel:new Date(order.createdAt).toLocaleTimeString('zh-HK',{hour:'2-digit',minute:'2-digit'}),
+      etaLabel:etaAt?'ETA '+etaAt.toLocaleTimeString('zh-HK',{hour:'2-digit',minute:'2-digit'}):undefined,
+      itemCount:order.items.reduce((sum,item)=>sum+item.qty,0),
+    };
+  };
   const isKeetaOrder=(order:(typeof runtimeOrders)[number])=>/^Keeta\b/i.test(String(order.sourceLabel||''));
   const pendingOrders=runtimeOrders
     .filter(order=>order.fulfillmentLabel==='待處理'&&!isKeetaOrder(order))
@@ -201,6 +198,14 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
   const activeOrders=runtimeOrders
     .filter(order=>isKeetaOrder(order)&&!['已完成','已取消'].includes(order.fulfillmentLabel))
     .slice(0,8).map(queueItem);
+  const demoPending=typeof window!=='undefined'&&new URLSearchParams(window.location.search).get('demo')==='pending';
+  const pendingQueue=pendingOrders.length||!demoPending?pendingOrders:[
+    {id:'demo-pending-1',orderId:'P031',sourceLabel:'WhatsApp',waitLabel:'14:02',etaLabel:'ETA 14:22',itemCount:2,demo:true},
+    {id:'demo-pending-2',orderId:'P032',sourceLabel:'磨飯 App',waitLabel:'14:05',etaLabel:'ETA 14:25',itemCount:4,demo:true},
+  ];
+  const providerQueue=activeOrders.length||!demoPending?activeOrders:[
+    {id:'demo-keeta-1',orderId:'K824',sourceLabel:'Keeta',waitLabel:'14:01',etaLabel:'ETA 14:21',itemCount:3,demo:true},
+  ];
   const total=cart.reduce((sum,line)=>sum+line.unitMinor*line.qty,0);
   const nextDisplay='P'+String(localRuntime.orders().length+1).padStart(3,'0');
 
@@ -277,8 +282,9 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
   })();
 
   const view:OrderingWorkspaceViewModel={
-    pendingOrders,activeOrders,categories,selectedCategoryId:category,
-    searchQuery,orderingMode,
+    pendingOrders:pendingQueue,activeOrders:providerQueue,categories,selectedCategoryId:category,
+    categoryRows:uiSettings.categoryRows,categoryColumns:uiSettings.categoryColumns,
+    orderingMode:uiSettings.mode,
     products:visible.map(product=>({
       id:product.id,
       name:product.name,
@@ -405,9 +411,7 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
             :null;
 
   const actions:OrderingWorkspaceActions={
-    onSearchQuery:setSearchQuery,
     onSelectCategory:setCategory,
-    onChangeOrderingMode:setOrderingMode,
     onAddProduct:add,
     onConfigureProduct:id=>setPanel({type:'product',productId:id}),
     onChangeServiceMode:mode=>{
@@ -599,11 +603,23 @@ function CheckoutPage({cart,setCart,diningCheckout,onDiningCheckoutDone}:{cart:C
 }
 
 function OperationalApp(){
+  const location=useLocation();
   const [cart,setCartState]=useState<CartLine[]>([]);
   const [serviceMode,setServiceMode]=useState<ServiceMode>('takeaway');
   const [diningCheckout,setDiningCheckout]=useState<DiningCheckoutRequest|null>(null);
   const [navRevision,setNavRevision]=useState(0);
+  const [orderUi,setOrderUi]=useState<OrderingUiSettings>(()=>{
+    try{
+      const parsed=JSON.parse(localStorage.getItem(ORDER_UI_KEY)||'null') as Partial<OrderingUiSettings>|null;
+      return {
+        mode:parsed?.mode==='standard'?'standard':'quick',
+        categoryRows:parsed?.categoryRows===2?2:1,
+        categoryColumns:parsed?.categoryColumns===5||parsed?.categoryColumns===6?parsed.categoryColumns:7,
+      };
+    }catch{return DEFAULT_ORDER_UI;}
+  });
   useEffect(()=>localRuntime.subscribe(()=>setNavRevision(value=>value+1)),[]);
+  useEffect(()=>{localStorage.setItem(ORDER_UI_KEY,JSON.stringify(orderUi));},[orderUi]);
   const activeOrderCount=useMemo(()=>{
     void navRevision;
     return localRuntime.orders().filter(order=>order.fulfillmentLabel==='待處理'||order.fulfillmentLabel==='進行中'||order.fulfillmentLabel==='可取餐').length;
@@ -641,12 +657,18 @@ function OperationalApp(){
           {item.to==='/orders'&&activeOrderCount>0?<span className="clean-rail-badge" aria-label={'進行中訂單 '+activeOrderCount}>{activeOrderCount>99?'99+':activeOrderCount}</span>:null}
         </NavLink>)}
       </nav>
+      {location.pathname==='/'?<section className="clean-order-controls" aria-label="點單顯示設定">
+        <button type="button" onClick={()=>setOrderUi(current=>({...current,mode:current.mode==='quick'?'standard':'quick'}))}><small>點選</small><b>{orderUi.mode==='quick'?'快速':'普通'}</b></button>
+        <button type="button" onClick={()=>setOrderUi(current=>({...current,categoryRows:current.categoryRows===1?2:1}))}><small>分類</small><b>{orderUi.categoryRows} 行</b></button>
+        <button type="button" onClick={()=>setOrderUi(current=>({...current,categoryColumns:current.categoryColumns===7?6:current.categoryColumns===6?5:7}))}><small>每行</small><b>{orderUi.categoryColumns} 格</b></button>
+        <div><small>ETA</small><b>{readSmtStoreSettings().fulfillmentMinutes}m</b></div>
+      </section>:null}
       <StaffSessionBadge/>
       <div className="clean-runtime-state"><b>LOCAL</b><span>本機優先</span></div>
     </aside>
     <section className="clean-route-stage">
       <Routes>
-        <Route index element={<OrderingPage cart={cart} setCart={setCart} serviceMode={serviceMode} setServiceMode={setServiceMode}/>}/>
+        <Route index element={<OrderingPage cart={cart} setCart={setCart} serviceMode={serviceMode} setServiceMode={setServiceMode} uiSettings={orderUi}/>}/>
         <Route path="checkout" element={<CheckoutPage cart={cart} setCart={setCart} diningCheckout={diningCheckout} onDiningCheckoutDone={()=>setDiningCheckout(null)}/>}/>
         <Route path="orders" element={<RuntimeOrdersWorkspace runtime={runtime}/>}/>
         <Route path="dining" element={<RuntimeDiningWorkspace runtime={runtime} onCheckout={prepareDiningCheckout}/>}/>
