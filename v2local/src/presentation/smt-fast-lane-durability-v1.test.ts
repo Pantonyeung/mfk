@@ -138,6 +138,8 @@ describe('SMT Fast Lane local durability contract',()=>{
     expect(appSource).toContain("composition:serializeFastLaneComposition(line,'HOLD')");
     expect(appSource).toContain("composition:serializeFastLaneComposition(line,'ORDER')");
     expect(appSource).toContain('restoreFastLaneLineComposition(base,item.composition)');
+    expect(appSource).toContain('formalFastLaneBlockers');
+    expect(appSource).toContain("throw new Error('FAST_LANE_FORMAL_ORDER_INCOMPLETE')");
     expect(runtimeSource).toContain('composition?:MfkOrderLineCompositionV1');
     expect(runtimeSource).toContain('normalizeCompositionItem');
     expect(projectionSource).not.toContain('composition:');
