@@ -114,12 +114,14 @@ export function RiceballPoolWorkspace({
   const start=nextPairingIndex(cart);
   const plans=useMemo(()=>buildAutoPairingPlans(cart,combo,pools,products,start),[cart,combo,pools,products,start]);
   const mainUnits=countMainCourseUnits(cart,active,pools,products);
+  const previewLabels=Array.from({length:mainUnits},(_,index)=>pairingLabel(start+index));
+  const planByLabel=new Map(plans.map(plan=>[plan.pairingLabel,plan] as const));
 
   if(!combo)return <div className="fast-lane"><div className="fast-empty"><b>未有套餐規則</b><span>Admin 暫時未發布可用 Combo。</span></div></div>;
 
   return <div className="fast-lane">
     <header className="fast-lane-title">
-      <div><small>REAL ASSIGNMENT</small><h2>飯團待組區</h2><p>用目前 Cart + Admin Combo pool 做真正配對；唔再只顯一粒假數字。</p></div>
+      <div><small>RICEBALL MEAL</small><h2>飯團待組區</h2><p>只處理飯團＋小食＋飲品嘅飯團餐配對；固定 F1–F6 類產品照常直接落單。</p></div>
       <strong>{mainUnits} 件主餐</strong>
     </header>
     {active.length>1?<nav className="fast-combo-tabs">{active.map(row=><button type="button" key={row.id} className={row.id===combo.id?'active':''} onClick={()=>setSelectedComboId(row.id)}>{row.name}<small>{money(row.basePriceMinor)}</small></button>)}</nav>:null}
@@ -128,9 +130,14 @@ export function RiceballPoolWorkspace({
       <div><span>目前套餐</span><b>{combo.name}</b></div>
       <div><span>已存在套餐</span><b>{comboDraftCount(cart)} 組</b></div>
     </section>
-    {plans.length?<div className="fast-plan-grid">{plans.map(plan=><PlanSummary key={plan.pairingLabel} plan={plan} cart={cart} combo={combo} pools={pools} products={products}/>)}</div>
-      :<div className="fast-empty compact"><b>未有完整主餐＋小食組合</b><span>飲品可以稍後補，但主餐／小食必須先符合 Admin Combo choice。</span></div>}
-    <footer className={'fast-sticky-action'+(plans.length?' flow-current':'')}><span>自動組合只會消耗已匹配 Cart unit；每組保持獨立 identity。</span><button type="button" disabled={!plans.length} onClick={()=>onAutoPair(plans)}>自動組合 {plans.length} 組</button></footer>
+    {previewLabels.length?<div className="fast-plan-grid">{previewLabels.map(label=>{
+      const plan=planByLabel.get(label);
+      return plan
+        ?<PlanSummary key={label} plan={plan} cart={cart} combo={combo} pools={pools} products={products}/>
+        :<article className="fast-plan-card pending" key={label}><strong>{label} 組</strong><div><span><small>飯團餐</small><b>等待小食配對</b></span><span><small>飲品</small><b>可稍後補</b></span></div></article>;
+    })}</div>
+      :<div className="fast-empty compact"><b>未有飯團待組</b><span>加入飯團後，A／B／C… 組別會即時喺呢度出現。</span></div>}
+    <footer className={'fast-sticky-action'+(plans.length?' flow-current':'')}><span>{plans.length?'已有完整飯團＋小食，可以直接組餐。':'A／B／C 組別會保留；等小食到齊先正式建立飯團餐。'}</span><button type="button" disabled={!plans.length} onClick={()=>onAutoPair(plans)}>建立 {plans.length} 組飯團餐</button></footer>
   </div>;
 }
 
@@ -176,7 +183,7 @@ export function ComboFastLaneWorkspace({
 
   return <div className="fast-lane combo-lane">
     <header className="fast-lane-title">
-      <div><small>ADMIN COMBO TRUTH</small><h2>紫米套餐區</h2><p>指定配對用 A／B／C… 管理；可以飲品稍後補，亦可以拆返原單品。</p></div>
+      <div><small>RICEBALL MEAL</small><h2>飯團餐配對</h2><p>A／B／C… 只代表飯團餐組別；飯團、小食、飲品完成後先成為一組。</p></div>
       <strong>{existing.length} 組</strong>
     </header>
 
