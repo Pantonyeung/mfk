@@ -673,3 +673,67 @@ MFK_SMT_DONOR_SKELETON_FUSION_V2_R1_OWNER_UX_REFINEMENT_GREEN_OWNER_ACCEPTANCE_P
 
 HARD RULE:
 未經 Owner 驗收，不准 merge main。
+
+
+==================================================
+OWNER UX REFINEMENT V2｜GREEN
+==================================================
+
+Source:
+Owner physical-device screenshots + clarification.
+
+Current product candidate:
+429a3ba295fc845a809daf8255a7aefee1608081
+
+Semantics:
+- Fast Lane riceball meal only accepts an Admin combo with exactly:
+  1 required MAIN_COURSE
+  1 required SNACK
+  1 required DRINK
+- generic / future combo types are excluded.
+- fixed F1–F6 / prebuilt meal products remain normal direct Products.
+
+ABC visibility:
+- riceball category candidates can display A/B/C placeholders even when no valid Admin riceball meal rule is present.
+- when rule is absent, UI does not invent pricing, pairing, or formal Combo state.
+- placeholder explicitly waits for valid Admin riceball-meal rule.
+
+Modal:
+- large overlay.
+- untouched backdrop/X exits directly.
+- dirty exit asks:
+  有未保存修改，確定退出？
+
+Category:
+- compact vertical rail.
+- no full-width horizontal strip.
+
+Validation:
+GitHub Actions 36008841640 SUCCESS
+Job 107663951391
+31 / 31 Test Files PASS
+136 / 136 Tests PASS
+Build GREEN
+Worker c4a6142d-b919-4fd1-9e83-944377b33367
+Preview:
+https://smt-donor-v2-r1-owner-ux-refine-v2-mfk-admin.yeungyi88.workers.dev
+
+Preview PR:
+#275 CLOSED / NOT MERGED
+
+Current main advanced during this cut:
+401a3671417dfb72e9ced9362d2b9cf45fae015e
+
+Current-main note:
+main now contains newer v2local payment-evidence changes.
+This candidate is Owner UX acceptance only.
+Before any merge, fresh current-main replay is mandatory.
+
+Production:
+UNCHANGED
+
+Status:
+MFK_SMT_DONOR_SKELETON_FUSION_V2_R1_OWNER_UX_REFINEMENT_V2_GREEN_OWNER_ACCEPTANCE_PENDING
+
+HARD RULE:
+未經 Owner 驗收，不准 merge main。
