@@ -30,17 +30,31 @@
       {
         "name": "KEETA_RUNTIME",
         "class_name": "KeetaRuntimeStore"
+      },
+      {
+        "name": "CUSTOMER_RUNTIME",
+        "class_name": "CustomerRuntimeStore"
       }
     ]
   },
   "migrations": [
     {
       "tag": "admin-sync-v1",
-      "new_sqlite_classes": ["AdminSyncStore"]
+      "new_sqlite_classes": [
+        "AdminSyncStore"
+      ]
     },
     {
       "tag": "keeta-runtime-v1",
-      "new_sqlite_classes": ["KeetaRuntimeStore"]
+      "new_sqlite_classes": [
+        "KeetaRuntimeStore"
+      ]
+    },
+    {
+      "tag": "customer-runtime-v1",
+      "new_sqlite_classes": [
+        "CustomerRuntimeStore"
+      ]
     }
   ]
 }
