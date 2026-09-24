@@ -136,12 +136,12 @@ function totalUnits(order:PrintableOrder){
 }
 function footer(){
   return CENTER+NORMAL+'*** 謝謝！***\n'
-    +'— 手作・真食・更有味 —\n'
+    +'手作 真食 更有味\n'
     +'More Fun Kitchen\n'+LEFT;
 }
 function brand(){
   return CENTER+BOLD_ON+DOUBLE+'More Fun  磨飯\n'+NORMAL+BOLD_OFF
-    +'手作・真食・更有味\n'+LEFT;
+    +'手作 真食 更有味\n'+LEFT;
 }
 function reverseBlock(label:string,value:string,size=DOUBLE){
   return CENTER+REVERSE_ON+BOLD_ON+size+' '+clean(label)+' '+clean(value)+' \n'
@@ -164,7 +164,7 @@ export function renderCustomerReceiptTicket(order:PrintableOrder){
     +'訂單編號\n'
     +CENTER+BOLD_ON+TRIPLE+clean(order.display)+'\n'+NORMAL+BOLD_OFF+LEFT
     +'下單時間 '+hktDateTime(order.createdAt)+'\n'
-    +'來源 '+clean(order.sourceLabel)+' · '+orderService(order)+'\n'
+    +'來源 '+clean(order.sourceLabel)+' / '+orderService(order)+'\n'
     +(pickup?RULE+reverseBlock('取餐碼',pickup,TRIPLE):'')
     +RULE
     +rows
@@ -176,7 +176,7 @@ export function renderCustomerReceiptTicket(order:PrintableOrder){
     +'付款方式 '+clean(order.paymentLabel)+'\n'
     +BOLD_ON+DOUBLE+'合計 '+money(order.totalMinor)+'\n'+NORMAL+BOLD_OFF
     +RULE
-    +CENTER+'請核對餐點 · 謝謝光臨\n'+LEFT
+    +CENTER+'請核對餐點 / 謝謝光臨\n'+LEFT
     +footer()
     +'\n\n';
 }
@@ -197,7 +197,7 @@ export function renderProductionTicket(order:PrintableOrder){
     +'單號\n'
     +CENTER+BOLD_ON+TRIPLE+clean(order.display)+'\n'+NORMAL+BOLD_OFF+LEFT
     +'落單時間 '+hktDateTime(order.createdAt)+'\n'
-    +'來源 '+clean(order.sourceLabel)+' · '+orderService(order)+'\n'
+    +'來源 '+clean(order.sourceLabel)+' / '+orderService(order)+'\n'
     +RULE
     +blocks
     +(clean(order.orderRemark??'')?'備註：'+clean(order.orderRemark??'')+'\n':'')
@@ -213,7 +213,7 @@ export function renderPackingTicket(order:PrintableOrder){
     const detail=itemDetail(item);
     return BOLD_ON+itemIdentity(item)+BOLD_OFF+'\n'
       +'數量 '+item.qty
-      +(detail?' · '+detail:'')
+      +(detail?' / '+detail:'')
       +'\n';
   }).join('');
   const pickup=clean(order.providerPickupCode??'');
@@ -226,7 +226,7 @@ export function renderPackingTicket(order:PrintableOrder){
     +CENTER+BOLD_ON+TRIPLE+clean(order.display)+'\n'+NORMAL+BOLD_OFF+LEFT
     +'下單時間 '+hktDateTime(order.createdAt)+'\n'
     +RULE
-    +'品項 / 數量 / 備註・特別要求\n'
+    +'品項 / 數量 / 備註 / 特別要求\n'
     +rows
     +RULE
     +BOLD_ON+DOUBLE+'總數量 '+totalUnits(order)+' 件\n'+NORMAL+BOLD_OFF
@@ -366,7 +366,7 @@ export function buildOrderPrintPlan(order:PrintableOrder,bindings:readonly Print
           secondaryText:[
             unit.item.serviceMode==='dine-in'?'堂食':unit.item.serviceMode==='takeaway'?'外賣':'',
             clean(unit.item.detail??''),
-          ].filter(Boolean).join(' · '),
+          ].filter(Boolean).join(' / '),
         };
         jobs.push({
           id:order.id+':'+binding.id+':product-label:'+unit.item.id+':'+unit.unit,
