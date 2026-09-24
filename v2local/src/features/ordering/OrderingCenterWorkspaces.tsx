@@ -1,5 +1,6 @@
 import {useMemo,useState} from 'react';
 import type {SyncedCombo,SyncedComboPool,SyncedOptionSet} from '../../runtime/admin-config-projection.ts';
+import type {MfkOrderLineCompositionV1} from '../../../../contracts/order-line-composition-v1.ts';
 import './ordering-center-workspaces.css';
 
 export interface WorkspaceProduct{
@@ -264,7 +265,7 @@ export interface WorkspaceHoldDraft{
   readonly note:string;
   readonly totalMinor:number;
   readonly assignedTable?:string;
-  readonly items:readonly {id:string;name:string;qty:number;unitMinor:number}[];
+  readonly items:readonly {id:string;name:string;qty:number;unitMinor:number;serviceMode?:'takeaway'|'dine-in';detail?:string;composition?:MfkOrderLineCompositionV1}[];
 }
 
 export function HoldListWorkspace({holds,onRestore,onRemove}:{holds:readonly WorkspaceHoldDraft[];onRestore:(hold:WorkspaceHoldDraft)=>void;onRemove:(id:string)=>void}){
@@ -274,7 +275,7 @@ export function HoldListWorkspace({holds,onRestore,onRemove}:{holds:readonly Wor
       {holds.length?holds.map(hold=><article key={hold.id}>
         <div className="hold-list-head"><div><b>{hold.codeLabel}</b><span>{hold.kind==='dining'?'堂食／輪候':'暫存待客'}</span></div><strong>{money(hold.totalMinor)}</strong></div>
         <div className="hold-list-meta"><span>{new Date(hold.createdAt).toLocaleTimeString('zh-HK',{hour:'2-digit',minute:'2-digit'})}</span><span>{hold.partySize} 位</span>{hold.assignedTable?<span>枱 {hold.assignedTable.replace('T','')}</span>:null}</div>
-        <div className="hold-list-items">{hold.items.map((item,index)=><p key={hold.id+'-'+index}><span>{item.qty}×</span><b>{item.name}</b><strong>{money(item.qty*item.unitMinor)}</strong></p>)}</div>
+        <div className="hold-list-items">{hold.items.map((item,index)=><p key={hold.id+'-'+index}><span>{item.qty}×</span><b>{item.name}{item.detail?<small>{item.detail}</small>:null}</b><strong>{money(item.qty*item.unitMinor)}</strong></p>)}</div>
         {hold.note?<small>備註：{hold.note}</small>:null}
         <footer><button type="button" className="danger" onClick={()=>onRemove(hold.id)}>刪除暫存</button><button type="button" className="primary" onClick={()=>onRestore(hold)}>取回購物車</button></footer>
       </article>):<div className="hold-list-empty">而家未有暫存單。</div>}
