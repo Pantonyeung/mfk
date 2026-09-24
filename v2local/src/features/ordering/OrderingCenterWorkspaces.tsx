@@ -21,7 +21,7 @@ export interface WorkspaceCartLine{
   readonly detail?:string;
 }
 export type OrderingPanelState=
-  |{readonly type:'product';readonly productId:string}
+  |{readonly type:'product';readonly productId:string;readonly lineId?:string}
   |{readonly type:'fast-lane';readonly lane:'riceball-pool'|'required'|'combo'}
   |{readonly type:'quick-drink-config';readonly productId:string;readonly comboLineId:string;readonly groupId:string;readonly choiceId:string}
   |{readonly type:'pending-order';readonly orderId:string}
@@ -33,6 +33,7 @@ const money=(minor:number)=>(minor<0?'-':'')+String.fromCharCode(36)+(Math.abs(m
 
 export function ProductConfigWorkspace({
   product,onAdd,maxQty=99,onDirtyChange,canOverridePrice=false,
+  mode='add',initialQty=1,initialNote='',initialSelections,initialUnitMinor,
 }:{
   product:WorkspaceProduct;
   onAdd:(detail:string,deltaMinor:number,qty:number,structured:{
@@ -43,16 +44,33 @@ export function ProductConfigWorkspace({
   maxQty?:number;
   onDirtyChange?:(dirty:boolean)=>void;
   canOverridePrice?:boolean;
+  mode?:'add'|'edit';
+  initialQty?:number;
+  initialNote?:string;
+  initialSelections?:Readonly<Record<string,readonly string[]>>;
+  initialUnitMinor?:number;
 }){
-  const [qty,setQty]=useState(1);
-  const [note,setNote]=useState('');
-  const [overridePrice,setOverridePrice]=useState('');
+  const [qty,setQty]=useState(Math.max(1,Math.min(maxQty,initialQty)));
+  const [note,setNote]=useState(initialNote);
   const [selected,setSelected]=useState<Record<string,string[]>>(()=>Object.fromEntries(
     (product.optionSets??[]).map(set=>[
       set.id,
-      set.options.filter(option=>option.defaultSelected).map(option=>option.id),
+      initialSelections?.[set.id]
+        ?[...initialSelections[set.id]!]
+        :set.options.filter(option=>option.defaultSelected).map(option=>option.id),
     ]),
   ));
+
+  const selectedOptions=(product.optionSets??[]).flatMap(set=>{
+    const ids=new Set(selected[set.id]??[]);
+    return set.options.filter(option=>ids.has(option.id));
+  });
+  const delta=selectedOptions.reduce((sum,option)=>sum+option.priceAdjustmentMinor,0);
+  const calculatedUnitMinor=product.priceMinor+delta;
+  const initialOverride=initialUnitMinor!==undefined&&initialUnitMinor!==calculatedUnitMinor
+    ?(initialUnitMinor/100).toFixed(2)
+    :'';
+  const [overridePrice,setOverridePrice]=useState(initialOverride);
 
   const toggle=(set:SyncedOptionSet,optionId:string)=>{
     onDirtyChange?.(true);
@@ -64,12 +82,6 @@ export function ProductConfigWorkspace({
       return {...current,[set.id]:next.slice(0,Math.max(1,set.max||next.length))};
     });
   };
-  const selectedOptions=(product.optionSets??[]).flatMap(set=>{
-    const ids=new Set(selected[set.id]??[]);
-    return set.options.filter(option=>ids.has(option.id));
-  });
-  const delta=selectedOptions.reduce((sum,option)=>sum+option.priceAdjustmentMinor,0);
-  const calculatedUnitMinor=product.priceMinor+delta;
   const parsedOverride=overridePrice.trim()===''?undefined:Math.round(Number(overridePrice)*100);
   const overrideValid=parsedOverride===undefined||(Number.isSafeInteger(parsedOverride)&&parsedOverride>=0);
   const finalUnitMinor=overrideValid&&parsedOverride!==undefined?parsedOverride:calculatedUnitMinor;
@@ -91,7 +103,11 @@ export function ProductConfigWorkspace({
       <div>
         <small>{product.category}</small>
         <h2>{product.name}</h2>
-        <p>{(product.optionSets??[]).length?'選項會喺下面內容區顯示；右側數量、備註同價錢固定。':'此商品沒有已發布選項，確認數量同備註即可加入。'}</p>
+        <p>{mode==='edit'
+          ?'修改目前購物車內呢件商品；儲存後會更新原項目，不會新增第二件。'
+          :(product.optionSets??[]).length
+            ?'選項會喺下面內容區顯示；右側數量、備註同價錢固定。'
+            :'此商品沒有已發布選項，確認數量同備註即可加入。'}</p>
       </div>
       <div className="cfg-current-price"><span>目前單價</span><strong>{money(finalUnitMinor)}</strong><small>由正式菜單、選項價差或授權改價決定</small></div>
     </header>
@@ -109,11 +125,11 @@ export function ProductConfigWorkspace({
               </button>;
             })}</div>
           </section>)
-          :<section className="cfg-empty-options"><b>此商品沒有已發布選項</b><span>右邊確認數量、備註及價錢即可加入購物籃。</span></section>}
+          :<section className="cfg-empty-options"><b>此商品沒有已發布選項</b><span>{mode==='edit'?'右邊修改數量、備註或價錢後儲存。':'右邊確認數量、備註及價錢即可加入購物籃。'}</span></section>}
       </section>
 
       <aside className="cfg-review-panel">
-        <div className="cfg-review-heading"><small>最後核對</small><h3>數量與備註</h3></div>
+        <div className="cfg-review-heading"><small>{mode==='edit'?'修改商品':'最後核對'}</small><h3>數量與備註</h3></div>
         <div className="cfg-qty"><span>數量</span><button type="button" disabled={qty<=1} onClick={()=>{onDirtyChange?.(true);setQty(Math.max(1,qty-1));}}>−</button><b>{qty}</b><button type="button" disabled={qty>=maxQty} onClick={()=>{onDirtyChange?.(true);setQty(Math.min(maxQty,qty+1));}}>＋</button></div>
         <label className="cfg-note"><span>商品備註 <small>選填</small></span><input value={note} maxLength={60} onChange={event=>{onDirtyChange?.(true);setNote(event.target.value);}} placeholder="例如：不要蔥、醬分開"/><small>{note.length}/60</small></label>
         {canOverridePrice?<label className="cfg-price-override"><span>授權改價 <small>Owner／授權人員</small></span><div><b>$</b><input inputMode="decimal" value={overridePrice} onChange={event=>{onDirtyChange?.(true);setOverridePrice(event.target.value.replace(/[^0-9.]/g,''));}} placeholder={(calculatedUnitMinor/100).toFixed(2)}/></div>{!overrideValid?<em>請輸入有效價錢</em>:parsedOverride!==undefined?<button type="button" onClick={()=>{onDirtyChange?.(true);setOverridePrice('');}}>恢復菜單價</button>:null}</label>:null}
@@ -127,7 +143,7 @@ export function ProductConfigWorkspace({
           selections:selected,
           note:note.trim(),
           ...(parsedOverride!==undefined&&overrideValid?{overrideUnitMinor:parsedOverride}:{}),
-        })}>加入購物籃　{money(finalUnitMinor*qty)}</button>
+        })}>{mode==='edit'?'儲存修改':'加入購物籃'}　{money(finalUnitMinor*qty)}</button>
       </aside>
     </div>
   </div>;
