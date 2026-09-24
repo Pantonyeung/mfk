@@ -29,3 +29,10 @@
 .payment-review-card p{margin:0;font-size:12px;line-height:1.45;color:#665f6e}
 .payment-review-actions{display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px}.payment-review-actions button{min-height:40px;border:1px solid #d9d5df;border-radius:8px;background:#fff;font-size:12px;font-weight:850}.payment-review-actions .primary{background:#5540e7;border-color:#5540e7;color:#fff}.payment-review-actions .danger{border-color:#efc4c0;background:#fff7f6;color:#a8322b}
 .payment-evidence-modal{width:min(920px,92vw)}.payment-evidence-preview{display:grid;place-items:center;min-height:320px;max-height:68vh;padding:14px;background:#111;border-radius:12px;overflow:auto}.payment-evidence-preview img{max-width:100%;max-height:64vh;object-fit:contain}
+
+.payment-followup{display:grid;gap:9px;padding-top:10px;border-top:1px solid rgba(53,17,77,.12)}
+.payment-followup>header{display:flex;justify-content:space-between;align-items:center}.payment-followup>header b{font-size:13px}.payment-followup>header span{font-size:11px;color:#756b7d}
+.payment-followup label{display:grid;grid-template-columns:92px minmax(0,1fr);align-items:center;gap:8px}.payment-followup label span{font-size:12px;color:#665f6e}.payment-followup select{min-height:40px;border:1px solid #d9d5df;border-radius:8px;background:#fff;padding:0 10px;font-size:13px}
+.payment-followup>button{min-height:42px;border:1px solid #25d366;border-radius:9px;background:#f3fff7;color:#126b35;font-size:13px;font-weight:900}
+.payment-followup-qr{display:grid;grid-template-columns:180px minmax(0,1fr);gap:12px;align-items:start;padding:12px;border:1px solid #dce9df;border-radius:10px;background:#fff}
+.payment-followup-qr img{width:180px;height:180px;object-fit:contain;background:#fff}.payment-followup-qr p{margin:0;font-size:12px;line-height:1.55;white-space:pre-wrap}.payment-followup-qr small{grid-column:2;color:#6b7280;font-size:11px;line-height:1.45}
