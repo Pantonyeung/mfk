@@ -89,7 +89,7 @@ export function groupTscBitmapJobsByPhysicalPrinter(plan:readonly PlannedPrintJo
 }
 
 const money=(minor:number)=>'$'+(Math.max(0,Number(minor)||0)/100).toFixed(2);
-const clean=(value:string)=>String(value??'').replace(/[\r\n]+/g,' ').trim();
+const clean=(value:string)=>String(value??'').replace(/[\r\n]+/g,' ').replace(/[・·]/g,' / ').replace(/—/g,'-').replace(/\s*\/\s*/g,' / ').replace(/\s+/g,' ').trim();
 
 const ESC='\x1b';
 const GS='\x1d';
