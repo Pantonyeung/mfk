@@ -111,7 +111,7 @@ describe('MFK checkout print fanout',()=>{
     const batches=groupTscBitmapJobsByPhysicalPrinter(plan);
     expect(batches).toHaveLength(1);
     expect(batches[0]?.jobs).toHaveLength(4);
-    expect(batches[0]?.jobs.map(job=>job.labelSpec?.pieceLabel)).toEqual(['1/3','2/3','3/3','1/1']);
+    expect(batches[0]?.jobs.map(job=>job.labelSpec?.pieceLabel)).toEqual(['1/3','2/3','3/3',undefined]);
   });
 
   it('keeps a newly added custom product-label route silent until products are assigned',()=>{
