@@ -96,6 +96,20 @@ async function waitQuote(requestIdValue:string):Promise<CustomerQuoteSnapshot>{
   throw new Error('店舖暫時未完成報價，請稍後再試');
 }
 
+async function waitOrder(submissionId:string):Promise<CustomerCommandResult>{
+  for(let attempt=0;attempt<48;attempt++){
+    if(attempt>0)await sleep(250);
+    const {response,body}=await jsonFetch('/api/customer/orders/readback?storeId='+STORE_ID+'&submissionId='+encodeURIComponent(submissionId));
+    if(response.ok){
+      const result=commandFromReadback(body);
+      if(result.state!=='UNKNOWN')return result;
+    }else if(response.status!==404){
+      return{state:'UNKNOWN',message:String(body.code||'暫時未能讀回訂單結果')};
+    }
+  }
+  return{state:'UNKNOWN',message:'店舖已收到落單要求，確認仍在處理；請用同一 Submission ID 查詢。'};
+}
+
 export function createCloudCustomerRuntimePort():CustomerRuntimePort{
   return Object.freeze({
     portId:'MFK_CUSTOMER_PORT_V1' as const,
@@ -141,7 +155,7 @@ export function createCloudCustomerRuntimePort():CustomerRuntimePort{
       });
       if(response.status===409)return{state:'FAILED',message:String(body.code||'提交身份衝突')};
       if(!response.ok&&response.status!==202)return{state:'FAILED',message:String(body.code||'未能提交訂單')};
-      return{state:'UNKNOWN',message:'訂單已送出，等待店舖確認；如結果未明請使用同一 Submission ID 查詢。'};
+      return waitOrder(intent.submissionId);
     },
 
     async readSubmission(submissionId:string):Promise<CustomerCommandResult>{
