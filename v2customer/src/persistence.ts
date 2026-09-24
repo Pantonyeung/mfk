@@ -55,6 +55,7 @@ export function readCustomerLocalWorkspace():CustomerLocalWorkspace{
         name:typeof checkout.name==='string'?checkout.name:'',
         phone:typeof checkout.phone==='string'?checkout.phone:'',
         paymentMethod:checkout.paymentMethod==='ELECTRONIC'?'ELECTRONIC':'PAY_AT_STORE',
+        ...(checkout.paymentEvidence&&typeof checkout.paymentEvidence==='object'?{paymentEvidence:checkout.paymentEvidence as CustomerCheckoutDraft['paymentEvidence']}:{}),
       }),
       pendingIntents:Object.freeze([...safeArray<CustomerPendingIntent>(parsed.pendingIntents)]),
       preferences:Object.freeze({
