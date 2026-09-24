@@ -46,6 +46,7 @@ export interface OrderingCartViewModel {
   readonly discountLabel:string;
   readonly totalLabel:string;
   readonly checkoutEnabled:boolean;
+  readonly blockingMessage?:string;
 }
 
 export interface OrderingWorkItemViewModel {
