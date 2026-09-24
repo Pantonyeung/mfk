@@ -21,6 +21,7 @@ export interface CustomerOption {
   readonly optionId:string;
   readonly name:string;
   readonly available:boolean;
+  readonly publishedAdjustmentMinor?:number;
 }
 
 export interface CustomerOptionGroup {
