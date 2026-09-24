@@ -1,4 +1,5 @@
 name: deploy-smt-donor-fusion-v2-r1-quick-preview-01
+# rerun after base compatibility fix
 
 on:
   pull_request:
