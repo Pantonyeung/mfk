@@ -1,6 +1,6 @@
-# MFK v2customer｜Product Completeness R1
+# MFK v2customer｜Ordering Donor Fusion + Brand Experience R2
 
-WORK_ID: `MFK-CUSTOMER-PRODUCT-COMPLETION-R1`
+WORK_ID: `MFK-CUSTOMER-ORDERING-DONOR-FUSION-R2`
 
 Role: `CUSTOMER ORDERING PRODUCT / ORDER SOURCE`
 
@@ -8,11 +8,12 @@ Current state:
 `PRODUCT_COMPLETE_NOT_CONNECTED`
 
 Product responsibility now implemented:
-- Home / Store Context / Own-channel availability
+- five-part customer navigation: Home / Order / Memory Jar / My Orders / My Memory
+- food-first Home / Store Context / Own-channel availability / active-order priority
 - Menu / Category / Search / zero-result recovery
-- Product detail / Variation / Modifier / Option / Combo
+- progressive Product detail / Variation / Modifier / Option / Combo / quantity / one-time note
 - min/max/required validation
-- durable local non-authoritative Cart
+- durable local non-authoritative Cart presented as the Memory Jar
 - quantity/edit/remove/partial-repair presentation
 - quote presentation only through injected MFK runtime port
 - persistent checkout name/phone draft
@@ -26,6 +27,9 @@ Product responsibility now implemented:
 - own-channel unavailable + explicit fallback surface
 - offline/not-connected/loading/error/empty recovery
 - browser refresh persistence for local cart/draft/pending intent
+- read-only Member / Seeds / Coupons / Badges / remembered-taste projection surfaces
+- honest per-module waiting-for-data states when member/loyalty truth is not connected
+- responsive iPhone/Android visual acceptance and reduced-motion/keyboard support
 
 Connection boundary:
 - runtime is injected only through `window.__MFK_CUSTOMER_PRODUCT_PORT__`
@@ -46,3 +50,9 @@ Hard authority rules:
 - all command capabilities remain `NOT_WIRED`
 
 The old fixture/migration shell has been removed from production source.
+
+R2 evidence:
+
+- donor extraction: `docs/DONOR-LEDGER-R2.md`
+- route, state, token and browser proof: `docs/R2-ACCEPTANCE.md`
+- reproducible non-production browser harness: `visual-acceptance.html`

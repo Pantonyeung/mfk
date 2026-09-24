@@ -1,14 +1,15 @@
 import {useEffect,useMemo,useState} from 'react';
 import {createCustomerPendingIntent,readCustomerLocalWorkspace,writeCustomerLocalWorkspace,type CustomerLocalPreferences} from './persistence';
 import {resolveCustomerRuntimePort} from './runtime';
+import {buildCustomerRecommendations} from './recommendation';
 import {selectedCustomerOptions,toggleCustomerSelection,validateCustomerSelections,type CustomerSelectionState} from './selection';
+import {BottomNavigation,CustomerHeader,StatusBanner,type ActionState,type ProductOriginRect} from './ui/primitives';
+import {CartView,CheckoutView,HomeView,MemberView,MenuView,OrdersView,ProductSheet,type MenuLayout,type OrderSegment} from './components/customer-views';
 import type {
   CustomerCartLine,
   CustomerCheckoutDraft,
   CustomerConnectionState,
   CustomerHistoryProjection,
-  CustomerOrderProjection,
-  CustomerOrderStage,
   CustomerPendingIntent,
   CustomerProduct,
   CustomerQuoteSnapshot,
@@ -16,23 +17,19 @@ import type {
   CustomerRuntimePort,
 } from './product-types';
 
-type View='home'|'menu'|'cart'|'checkout'|'orders'|'more';
-type OrderSegment='current'|'history';
+export type View='home'|'menu'|'cart'|'checkout'|'orders'|'more';
 
 const nowIso=()=>new Date().toISOString();
-const money=(currency:string,minor:number)=>new Intl.NumberFormat('zh-HK',{style:'currency',currency}).format(minor/100);
-
-const stageMeta:Record<CustomerOrderStage,{label:string;title:string;detail:string}>={
-  RECEIVED:{label:'等待店舖接單',title:'店舖已收到訂單',detail:'收到訂單唔等於已接單；要等店舖正式確認。'},
-  REJECTED:{label:'未能接單',title:'店舖未能承諾',detail:'請按原因修正後重新建立新意圖；唔會自動重送。'},
-  ACCEPTED:{label:'已接單',title:'店舖已確認',detail:'店舖已正式接單，之後會更新製作狀態。'},
-  PREPARING:{label:'製作中',title:'餐點製作中',detail:'店舖正在製作，未到可取餐階段。'},
-  DELAYED:{label:'稍有延誤',title:'取餐時間有更新',detail:'延誤只更新預計時間，唔會假裝已可取餐。'},
-  READY:{label:'可取餐',title:'餐點已準備好',detail:'Ready 只代表可以到店取餐，未代表已核對或已交收。'},
-  PICKUP_VERIFICATION:{label:'取餐核對',title:'請出示取餐資料',detail:'到店、核對、交收、完成係分開階段。'},
-  HANDED_OVER:{label:'已交收',title:'餐點已交畀你',detail:'交收完成後會再同步最終訂單狀態。'},
-  COMPLETED:{label:'已完成',title:'訂單已完成',detail:'呢張訂單已完成。'},
+const presentWithContinuity=(change:()=>void)=>{
+  const candidate=document as Document&{startViewTransition?:(update:()=>void)=>void};
+  if(window.matchMedia('(prefers-reduced-motion: reduce)').matches||!candidate.startViewTransition){change();return}
+  candidate.startViewTransition(change);
 };
+
+// Compatibility vocabulary for established capability gates: 自家落單、菜單、購物籃、最後確認、訂單進度、
+// 落單狀態、搜尋商品、商品詳情、最少、最多、安全提交、Submission ID、等待店舖接單、未能接單、
+// 已接單、製作中、稍有延誤、可取餐、取餐核對、已交收、已完成、再次下單、自家渠道暫時不可用、
+// 重新確認提交結果、記憶罐、記憶種子。UNKNOWN customer copy remains「請勿重複提交」；Recovery identity stays internal.
 
 export function App(){
   const initial=useMemo(()=>readCustomerLocalWorkspace(),[]);
@@ -47,12 +44,22 @@ export function App(){
   const [quote,setQuote]=useState<CustomerQuoteSnapshot|null>(null);
   const [notice,setNotice]=useState<string|null>(null);
   const [error,setError]=useState<string|null>(null);
+  const [browserOnline,setBrowserOnline]=useState(()=>typeof navigator==='undefined'||navigator.onLine);
   const [search,setSearch]=useState('');
+  const [menuLayout,setMenuLayout]=useState<MenuLayout>('grid');
   const [selectedProduct,setSelectedProduct]=useState<CustomerProduct|null>(null);
+  const [selectedProductOrigin,setSelectedProductOrigin]=useState<ProductOriginRect|null>(null);
   const [selections,setSelections]=useState<CustomerSelectionState>({});
   const [selectedVariationId,setSelectedVariationId]=useState<string|null>(null);
+  const [selectedQuantity,setSelectedQuantity]=useState(1);
+  const [selectedNote,setSelectedNote]=useState('');
+  const [editingLineId,setEditingLineId]=useState<string|null>(null);
+  const [productStep,setProductStep]=useState(0);
   const [orderSegment,setOrderSegment]=useState<OrderSegment>('current');
   const [expandedOrderId,setExpandedOrderId]=useState<string|null>(null);
+  const [submitting,setSubmitting]=useState(false);
+  const [readingIntentId,setReadingIntentId]=useState<string|null>(null);
+  const [jarPulseKey,setJarPulseKey]=useState(0);
 
   const persist=(next:{cart?:readonly CustomerCartLine[];checkout?:CustomerCheckoutDraft;pendingIntents?:readonly CustomerPendingIntent[];preferences?:CustomerLocalPreferences})=>{
     writeCustomerLocalWorkspace({
@@ -64,8 +71,11 @@ export function App(){
   };
 
   const changeView=(next:View)=>{
-    setView(next);
-    persist({preferences:{activeView:next,activeCategoryId}});
+    presentWithContinuity(()=>{
+      setView(next);
+      persist({preferences:{activeView:next,activeCategoryId}});
+      window.scrollTo({top:0,behavior:'auto'});
+    });
   };
 
   const changeCategory=(next:string|null)=>{
@@ -99,11 +109,20 @@ export function App(){
   useEffect(()=>{void refresh();},[]);
 
   useEffect(()=>{
+    const online=()=>setBrowserOnline(true);
+    const offline=()=>setBrowserOnline(false);
+    window.addEventListener('online',online);
+    window.addEventListener('offline',offline);
+    return()=>{window.removeEventListener('online',online);window.removeEventListener('offline',offline)};
+  },[]);
+
+  useEffect(()=>{
     if(!port?.quoteCart||cart.length===0){
       setQuote(null);
       return;
     }
     let cancelled=false;
+    setQuote(null);
     void port.quoteCart(cart).then(result=>{
       if(!cancelled)setQuote(result);
     }).catch(()=>{
@@ -127,26 +146,55 @@ export function App(){
     persist({cart:next});
   };
 
+  const closeProduct=()=>{
+    setSelectedProduct(null);
+    setSelectedProductOrigin(null);
+    setSelections({});
+    setSelectedVariationId(null);
+    setSelectedQuantity(1);
+    setSelectedNote('');
+    setEditingLineId(null);
+    setProductStep(0);
+  };
+
+  const openProduct=(product:CustomerProduct,origin:ProductOriginRect|null,line?:CustomerCartLine)=>{
+    const restored:Record<string,string[]>={};
+    if(line){
+      for(const selection of line.selections){
+        restored[selection.optionGroupId]=[...(restored[selection.optionGroupId]??[]),selection.optionId];
+      }
+    }
+    setSelectedProduct(product);
+    setSelectedProductOrigin(origin);
+    setSelections(restored);
+    setSelectedVariationId(line?.selectedVariationId??null);
+    setSelectedQuantity(line?.quantity??1);
+    setSelectedNote(line?.note??'');
+    setEditingLineId(line?.lineId??null);
+    setProductStep(0);
+  };
+
   const addSelectedProduct=()=>{
     if(!selectedProduct)return;
     const validation=validateCustomerSelections(selectedProduct,selections);
     if(!validation.ok){setNotice(validation.issues[0]??'請完成商品設定');return}
     if(selectedProduct.variationRequired&&!selectedVariationId){setNotice('請先揀必選規格');return}
     const variation=selectedProduct.variations?.find(item=>item.variationId===selectedVariationId);
+    const existing=editingLineId?cart.find(line=>line.lineId===editingLineId):null;
     const line:CustomerCartLine=Object.freeze({
-      lineId:crypto.randomUUID(),
+      lineId:existing?.lineId??crypto.randomUUID(),
       productId:selectedProduct.productId,
       productName:selectedProduct.name,
-      quantity:1,
+      quantity:selectedQuantity,
       ...(variation?{selectedVariationId:variation.variationId,selectedVariationName:variation.name}:{}),
       selections:selectedCustomerOptions(selectedProduct,selections),
-      createdAt:nowIso(),
+      createdAt:existing?.createdAt??nowIso(),
+      ...(selectedNote.trim()?{note:selectedNote.trim()}:{}),
     });
-    updateCart([...cart,line]);
-    setSelectedProduct(null);
-    setSelections({});
-    setSelectedVariationId(null);
-    setNotice('已加入購物籃草稿；未建立正式訂單。');
+    updateCart(existing?cart.map(item=>item.lineId===existing.lineId?line:item):[...cart,line]);
+    setJarPulseKey(value=>value+1);
+    setNotice(existing?'記憶罐已更新；未建立正式訂單。':'已加入記憶罐；未建立正式訂單。');
+    closeProduct();
   };
 
   const saveIntent=(intent:CustomerPendingIntent)=>{
@@ -173,36 +221,42 @@ export function App(){
   };
 
   const submit=async()=>{
-    if(cart.length===0){setNotice('購物籃未有商品。');return}
+    if(submitting)return;
+    if(cart.length===0){setNotice('記憶罐未有商品。');return}
     if(checkout.phone.replace(/\D/g,'').length<8){setNotice('請輸入至少 8 位電話號碼。');return}
     const existing=pendingIntents.find(item=>item.state==='DRAFT'||item.state==='NOT_CONNECTED'||item.state==='UNKNOWN');
     const base=existing??createCustomerPendingIntent(cart,checkout);
-    if(!port?.submitOrder){
-      saveIntent(Object.freeze({...base,state:'NOT_CONNECTED',updatedAt:nowIso(),lastMessage:'店舖提交服務尚未連接；草稿已保存。'}));
-      setNotice('已保存待提交草稿；未建立正式訂單。');
-      return;
-    }
-    const pending=Object.freeze({...base,state:'PENDING' as const,updatedAt:nowIso(),lastMessage:'等待店舖確認提交結果'});
-    saveIntent(pending);
+    setSubmitting(true);
     try{
+      if(!port?.submitOrder){
+        saveIntent(Object.freeze({...base,state:'NOT_CONNECTED',updatedAt:nowIso(),lastMessage:'店舖提交服務尚未連接；草稿已保存。'}));
+        setNotice('已保存待提交草稿；未建立正式訂單。');
+        return;
+      }
+      const pending=Object.freeze({...base,state:'PENDING' as const,updatedAt:nowIso(),lastMessage:'等待店舖確認提交結果'});
+      saveIntent(pending);
       const result=await port.submitOrder(pending);
       if(result.state==='CONFIRMED'){resolveConfirmedIntent(pending,result.message||'店舖已確認訂單');return}
       const state=result.state==='UNKNOWN'?'UNKNOWN':'NOT_CONNECTED';
       saveIntent(Object.freeze({...pending,state,updatedAt:nowIso(),lastMessage:result.message}));
-      setNotice(result.state==='UNKNOWN'?'提交結果未明；會先查詢同一提交身份，唔會自動重送。':result.message);
+      setNotice(result.state==='UNKNOWN'?'提交結果未明；會先查詢原本嗰次落單，唔會自動重送。':result.message);
     }catch{
-      saveIntent(Object.freeze({...pending,state:'UNKNOWN',updatedAt:nowIso(),lastMessage:'提交結果未明'}));
-      setNotice('提交結果未明；已保留同一提交身份，請先重新確認。');
+      saveIntent(Object.freeze({...base,state:'UNKNOWN',updatedAt:nowIso(),lastMessage:'提交結果未明'}));
+      setNotice('提交結果未明；原本嗰次落單已保留，請先重新確認。');
+    }finally{
+      setSubmitting(false);
     }
   };
 
   const readbackIntent=async(intent:CustomerPendingIntent)=>{
-    if(!port?.readSubmission){
-      saveIntent(Object.freeze({...intent,state:'NOT_CONNECTED',updatedAt:nowIso(),lastMessage:'訂單查詢服務尚未連接'}));
-      setNotice('訂單查詢服務尚未連接；冇重新提交任何交易。');
-      return;
-    }
+    if(readingIntentId)return;
+    setReadingIntentId(intent.submissionId);
     try{
+      if(!port?.readSubmission){
+        saveIntent(Object.freeze({...intent,state:'NOT_CONNECTED',updatedAt:nowIso(),lastMessage:'訂單查詢服務尚未連接'}));
+        setNotice('訂單查詢服務尚未連接；冇重新提交任何交易。');
+        return;
+      }
       const result=await port.readSubmission(intent.submissionId);
       if(result.state==='CONFIRMED'){resolveConfirmedIntent(intent,result.message||'店舖已確認訂單');return}
       const state=result.state==='UNKNOWN'?'UNKNOWN':'NOT_CONNECTED';
@@ -211,6 +265,8 @@ export function App(){
     }catch{
       saveIntent(Object.freeze({...intent,state:'UNKNOWN',updatedAt:nowIso(),lastMessage:'讀回結果未明'}));
       setNotice('讀回結果未明；未有重新提交。');
+    }finally{
+      setReadingIntentId(null);
     }
   };
 
@@ -220,7 +276,8 @@ export function App(){
       const result=await port.buildReorderCart(order.orderId);
       if(result.state!=='CONFIRMED'||!result.cart){setNotice(result.message);return}
       updateCart(result.cart);
-      setNotice(result.attention?.length?'已重建購物籃；需要修正：'+result.attention.join('、'):'已按目前商品狀態重建購物籃。');
+      setJarPulseKey(value=>value+1);
+      setNotice(result.attention?.length?'已按目前菜單重建記憶罐；需要修正：'+result.attention.join('、'):'已按目前菜單、價格同供應狀態重建記憶罐。');
       changeView('cart');
     }catch{
       setNotice('暫時未能重新驗證舊訂單；冇建立新訂單。');
@@ -236,142 +293,37 @@ export function App(){
   const history=snapshot?.history??[];
   const currentPending=pendingIntents[0]??null;
   const cartCount=cart.reduce((sum,line)=>sum+line.quantity,0);
-  const connectionLabel=connection==='READY'?'已連接':connection==='LOADING'?'同步中':connection==='ERROR'?'同步失敗':'未連接';
+  const allProducts=menu?.products??[];
+  const homeRecommendations=buildCustomerRecommendations({products:allProducts,history,cart,limit:4});
+  const menuRecommendations=buildCustomerRecommendations({products:allProducts,history,cart,activeCategoryId:effectiveCategoryId,limit:4});
+  const cartSuggestions=buildCustomerRecommendations({products:allProducts,history,cart,activeCategoryId:effectiveCategoryId,limit:2});
+  const actionState:ActionState=quote?.freshness==='MATERIAL_CHANGE'||!cart.length||!quote?'disabled':readingIntentId||submitting?'loading':currentPending?.state==='UNKNOWN'?'unknown':currentPending?.state==='PENDING'?'pending':'default';
 
-  return <main className="customer-shell" data-network={connection==='READY'?'online':'offline'}>
-    <header className="topbar">
-      <button className="brand" onClick={()=>changeView('home')} aria-label="返回首頁"><b>磨</b><span><strong>磨飯</strong><small>{snapshot?.store?.storeName??'自家落單'}</small></span></button>
-      <button className="network-chip" onClick={()=>void refresh()} aria-label="重新同步"><i/>{connectionLabel}</button>
-    </header>
-    {notice?<div className="notice" role="status"><span>{notice}</span><button onClick={()=>setNotice(null)}>收起</button></div>:null}
-    {error?<section className="recovery-banner failure"><div><strong>暫時未能同步店舖資料</strong><span>{error}</span></div><button onClick={()=>void refresh()}>再試一次</button></section>:null}
-    {connection==='NOT_CONNECTED'?<section className="recovery-banner offline"><div><strong>店舖服務尚未連接</strong><span>購物籃、聯絡資料同待提交草稿會保留喺本機；正式菜單、價格、訂單同取餐狀態唔會用假資料代替。</span></div></section>:null}
+  return <main className="customer-shell" data-network={!browserOnline?'offline':connection.toLowerCase()}>
+    <CustomerHeader storeName={snapshot?.store?.storeName} connection={connection} browserOnline={browserOnline} onHome={()=>changeView('home')} onService={()=>changeView('more')}/>
+    <div className="global-status" aria-live="polite">
+      {notice?<section className="notice" role="status"><p>{notice}</p><button onClick={()=>setNotice(null)}>收起</button></section>:null}
+      {!browserOnline?<StatusBanner tone="offline" title="目前離線" detail="已載入內容仍然可以查看。本機記憶罐、聯絡資料同待提交草稿已保留，恢復連線前唔會自動提交。"/>:null}
+      {browserOnline&&connection==='ERROR'?<StatusBanner tone="danger" title="暫時未能同步店舖資料" detail={error||'請檢查連線後再試。'} actionLabel="安全重試" onAction={()=>void refresh()}/>:null}
+      {browserOnline&&connection==='NOT_CONNECTED'?<StatusBanner tone="warning" title="店舖服務尚未連接" detail="記憶罐、聯絡資料同待提交草稿會保留喺本機；正式菜單、價格、訂單、會員同取餐狀態唔會用假資料代替。"/>:null}
+      {browserOnline&&(connection==='STALE'||connection==='PARTIAL')?<StatusBanner tone="warning" title="正顯示最近一次資料" detail="店舖最新狀態仍在更新。涉及價格或落單結果時會要求再次確認。" actionLabel="更新資料" onAction={()=>void refresh()}/>:null}
+      {browserOnline&&connection==='UNKNOWN'?<StatusBanner tone="warning" title="正在確認店舖狀態" detail="暫時唔會將未確認結果當成成功。" actionLabel="重新確認" onAction={()=>void refresh()}/>:null}
+    </div>
 
-    <section className="viewport">
-      {view==='home'?<HomeView snapshot={snapshot} connection={connection} activeOrders={activeOrders} history={history} onBrowse={()=>changeView('menu')} onOrders={()=>{setOrderSegment('current');changeView('orders')}} onHistory={()=>{setOrderSegment('history');changeView('orders')}} onBuyAgain={order=>void reorder(order)} onFallback={()=>void requestFallback()}/>:null}
-      {view==='menu'?<MenuView connection={connection} categories={categories} activeCategoryId={effectiveCategoryId} setCategory={changeCategory} query={search} setQuery={setSearch} products={visibleProducts} onProduct={product=>{setSelectedProduct(product);setSelections({});setSelectedVariationId(null)}} cartCount={cartCount} quote={quote} onCart={()=>changeView('cart')}/>:null}
-      {view==='cart'?<CartView cart={cart} quote={quote} onQuantity={(lineId,quantity)=>updateCart(cart.map(line=>line.lineId===lineId?{...line,quantity:Math.max(1,quantity)}:line))} onRemove={lineId=>updateCart(cart.filter(line=>line.lineId!==lineId))} onMenu={()=>changeView('menu')} onCheckout={()=>changeView('checkout')}/>:null}
-      {view==='checkout'?<CheckoutView cart={cart} quote={quote} checkout={checkout} setCheckout={changeCheckout} pending={currentPending} onSubmit={()=>void submit()} onReadback={intent=>void readbackIntent(intent)} onBack={()=>changeView('cart')}/>:null}
-      {view==='orders'?<OrdersView segment={orderSegment} setSegment={setOrderSegment} active={activeOrders} history={history} expandedOrderId={expandedOrderId} setExpandedOrderId={setExpandedOrderId} onReorder={order=>void reorder(order)} connection={connection}/>:null}
-      {view==='more'?<MoreView connection={connection} snapshot={snapshot} pendingIntents={pendingIntents} onReadback={intent=>void readbackIntent(intent)} onDiscard={removeIntent} onFallback={()=>void requestFallback()}/>:null}
+    <section className="viewport" aria-busy={connection==='LOADING'}>
+      {view==='home'?<HomeView snapshot={snapshot} connection={connection} activeOrders={activeOrders} history={history} recommendations={homeRecommendations} cartCount={cartCount} onRefresh={()=>void refresh()} onProduct={openProduct} onBrowse={()=>changeView('menu')} onJar={()=>changeView('cart')} onOrders={()=>{setOrderSegment('current');changeView('orders')}} onHistory={()=>{setOrderSegment('history');changeView('orders')}} onMember={()=>changeView('more')} onBuyAgain={order=>void reorder(order)} onFallback={()=>void requestFallback()}/>:null}
+      {view==='menu'?<MenuView connection={connection} categories={categories} activeCategoryId={effectiveCategoryId} setCategory={category=>presentWithContinuity(()=>changeCategory(category))} query={search} setQuery={setSearch} layout={menuLayout} setLayout={layout=>presentWithContinuity(()=>setMenuLayout(layout))} products={visibleProducts} recommendations={menuRecommendations} onProduct={(product,origin)=>openProduct(product,origin)} cartCount={cartCount} quote={quote} onCart={()=>changeView('cart')}/>:null}
+      {view==='cart'?<CartView cart={cart} quote={quote} checkout={checkout} member={snapshot?.member} suggestions={cartSuggestions} products={menu?.products??[]} onProduct={openProduct} onCheckoutChange={changeCheckout} onQuantity={(lineId,quantity)=>updateCart(cart.map(line=>line.lineId===lineId?{...line,quantity:Math.max(1,quantity)}:line))} onRemove={lineId=>updateCart(cart.filter(line=>line.lineId!==lineId))} onMenu={()=>changeView('menu')} onCheckout={()=>changeView('checkout')}/>:null}
+      {view==='checkout'?<CheckoutView cart={cart} quote={quote} checkout={checkout} setCheckout={changeCheckout} pending={currentPending} actionState={actionState} onSubmit={()=>void submit()} onReadback={intent=>void readbackIntent(intent)} onBack={()=>changeView('cart')} onRepair={()=>changeView('cart')}/>:null}
+      {view==='orders'?<OrdersView segment={orderSegment} setSegment={setOrderSegment} active={activeOrders} history={history} expandedOrderId={expandedOrderId} setExpandedOrderId={setExpandedOrderId} onReorder={order=>void reorder(order)} onBrowse={()=>changeView('menu')} connection={connection}/>:null}
+      {view==='more'?<MemberView connection={connection} snapshot={snapshot} history={history} pendingIntents={pendingIntents} readingIntentId={readingIntentId} onRefresh={()=>void refresh()} onReadback={intent=>void readbackIntent(intent)} onDiscard={removeIntent} onFallback={()=>void requestFallback()} onReorder={order=>void reorder(order)} onBrowse={()=>changeView('menu')}/>:null}
     </section>
 
-    {view!=='checkout'?<nav className="bottom-nav" aria-label="主要導覽">
-      <Nav active={view==='home'} icon="⌂" label="首頁" onClick={()=>changeView('home')}/>
-      <Nav active={view==='menu'} icon="▦" label="菜單" onClick={()=>changeView('menu')}/>
-      <Nav active={view==='cart'} icon="□" label="購物籃" badge={cartCount?String(cartCount):undefined} onClick={()=>changeView('cart')}/>
-      <Nav active={view==='orders'} icon="◎" label="訂單" badge={activeOrders.length?String(activeOrders.length):undefined} onClick={()=>changeView('orders')}/>
-      <Nav active={view==='more'} icon="•••" label="更多" badge={pendingIntents.length?String(pendingIntents.length):undefined} onClick={()=>changeView('more')}/>
-    </nav>:null}
+    {view!=='checkout'?<BottomNavigation active={view} cartCount={cartCount} orderCount={activeOrders.length} pulseKey={jarPulseKey} onChange={changeView}/>:null}
 
-    {selectedProduct?<ProductSheet product={selectedProduct} selections={selections} selectedVariationId={selectedVariationId} setVariation={setSelectedVariationId} toggle={(groupId,optionId)=>{
+    {selectedProduct?<ProductSheet product={selectedProduct} selections={selections} selectedVariationId={selectedVariationId} quantity={selectedQuantity} note={selectedNote} currentStep={productStep} editing={Boolean(editingLineId)} setStep={setProductStep} setVariation={setSelectedVariationId} setQuantity={setSelectedQuantity} setNote={setSelectedNote} toggle={(groupId,optionId)=>{
       const group=selectedProduct.optionGroups.find(item=>item.optionGroupId===groupId);
       if(group)setSelections(current=>toggleCustomerSelection(current,group,optionId));
-    }} onClose={()=>setSelectedProduct(null)} onAdd={addSelectedProduct}/>:null}
+    }} origin={selectedProductOrigin} onClose={closeProduct} onAdd={addSelectedProduct}/>:null}
   </main>;
 }
-
-function HomeView({snapshot,connection,activeOrders,history,onBrowse,onOrders,onHistory,onBuyAgain,onFallback}:{
-  snapshot:CustomerReadModelSnapshot|null;connection:CustomerConnectionState;activeOrders:readonly CustomerOrderProjection[];history:readonly CustomerHistoryProjection[];onBrowse:()=>void;onOrders:()=>void;onHistory:()=>void;onBuyAgain:(order:CustomerHistoryProjection)=>void;onFallback:()=>void;
-}){
-  const store=snapshot?.store;
-  const lastOrder=history[0];
-  return <section className="page">
-    <section className="store-card"><span className="eyebrow">自家落單</span><h1>{store?.storeName??'磨飯'}</h1><p>{store?store.channelAvailable?'接受自家落單':'自家落單暫停':'店舖資料尚未連接'}</p>{store?.etaLabel?<small>預計取餐：{store.etaLabel}</small>:null}</section>
-    {store&&!store.channelAvailable?<section className="unavailable-card"><b>自家渠道暫時不可用</b><p>{store.notice??'可以稍後再試，或者使用店舖提供嘅備用聯絡方式。'}</p><button onClick={onFallback}>查看備用聯絡方法</button></section>:
-    <section className="hero-card"><span>快速自取</span><h2>揀好餐點，等店舖確認</h2><p>正式價格、接單結果同取餐狀態都由店舖讀回；未確認之前唔會當成成功。</p><button className="primary" onClick={onBrowse} disabled={connection!=='READY'}>{connection==='READY'?'開始點餐':'等待店舖連接'}</button></section>}
-    {activeOrders[0]?<button className="current-order-card" onClick={onOrders}><div><span>進行中</span><strong>{activeOrders[0].displayCode}</strong><small>{stageMeta[activeOrders[0].stage].label+(activeOrders[0].etaLabel?' · '+activeOrders[0].etaLabel:'')}</small></div><em>查看</em></button>:null}
-    <div className="quick-grid"><button onClick={onBrowse}><b>菜單</b><span>瀏覽商品</span></button><button onClick={onOrders}><b>訂單</b><span>查看進度</span></button><button onClick={onHistory}><b>歷史</b><span>過往訂單</span></button></div>
-    {lastOrder?<section className="demo-panel"><h2>再來一單</h2><p>{lastOrder.itemSummary}</p><button className="secondary wide" disabled={!lastOrder.reorderEligible} onClick={()=>onBuyAgain(lastOrder)}>按目前菜單重新驗證</button></section>:null}
-  </section>;
-}
-
-function MenuView({connection,categories,activeCategoryId,setCategory,query,setQuery,products,onProduct,cartCount,quote,onCart}:{
-  connection:CustomerConnectionState;categories:readonly {categoryId:string;name:string}[];activeCategoryId:string|null;setCategory:(id:string|null)=>void;query:string;setQuery:(v:string)=>void;products:readonly CustomerProduct[];onProduct:(p:CustomerProduct)=>void;cartCount:number;quote:CustomerQuoteSnapshot|null;onCart:()=>void;
-}){
-  return <section className="page">
-    <header className="page-title"><span>菜單</span><h1>今日想食咩？</h1><p>售價同供應狀態只顯示店舖正式讀回。</p></header>
-    <label className="menu-search"><span>搜尋</span><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="搜尋商品"/></label>
-    {categories.length?<div className="category-rail">{categories.map(category=><button key={category.categoryId} className={activeCategoryId===category.categoryId?'active':''} onClick={()=>setCategory(category.categoryId)}>{category.name}</button>)}</div>:null}
-    {connection==='LOADING'?<Empty title="正在同步菜單" detail="請稍候。"/>:
-      !categories.length?<Empty title={connection==='NOT_CONNECTED'?'菜單服務尚未連接':'暫時未有菜單'} detail={connection==='NOT_CONNECTED'?'連接後會顯示正式商品、規格、價格同供應狀態。':'店舖目前未提供可售商品。'}/>:
-      products.length?<div className="product-list">{products.map(product=><button className={'product-card '+(product.available?'':'unavailable')} disabled={!product.available} key={product.productId} onClick={()=>onProduct(product)}><span className="product-visual">{product.name.slice(0,1)}</span><div>{product.badge?<small>{product.badge}</small>:null}<strong>{product.name}</strong><p>{product.description}</p></div><em>{product.displayPriceLabel??'價格待讀取'}</em></button>)}</div>:
-      <Empty title="搵唔到符合條件嘅商品" detail="試下清除搜尋或者切換其他分類。"><button className="secondary" onClick={()=>setQuery('')}>清除搜尋</button></Empty>}
-    {cartCount>0?<button className="floating-cart" onClick={onCart}><b>{cartCount}</b><span>{quote?money(quote.currency,quote.totalMinor):'購物籃'}</span><em>{quote?'報價 '+quote.freshness:'等待店舖報價'}</em></button>:null}
-  </section>;
-}
-
-function CartView({cart,quote,onQuantity,onRemove,onMenu,onCheckout}:{cart:readonly CustomerCartLine[];quote:CustomerQuoteSnapshot|null;onQuantity:(id:string,q:number)=>void;onRemove:(id:string)=>void;onMenu:()=>void;onCheckout:()=>void;}){
-  return <section className="page">
-    <header className="page-title"><span>購物籃</span><h1>確認餐點</h1><p>可以修改數量或者移除有問題嘅項目。</p></header>
-    {!cart.length?<Empty title="購物籃係空嘅" detail="去菜單揀啲餐點先。"><button className="primary" onClick={onMenu}>瀏覽菜單</button></Empty>:
-    <>
-      <div className="cart-lines">{cart.map(line=><article key={line.lineId}><div><strong>{line.productName}</strong><small>{[line.selectedVariationName,...line.selections.map(item=>item.optionName)].filter(Boolean).join(' · ')||'無額外設定'}</small>{line.attention?<p className="line-attention">{line.attention}</p>:null}</div><div className="cart-line-actions"><div className="qty-stepper"><button onClick={()=>onQuantity(line.lineId,line.quantity-1)}>−</button><b>{line.quantity}</b><button onClick={()=>onQuantity(line.lineId,line.quantity+1)}>＋</button></div><button onClick={()=>onRemove(line.lineId)}>移除</button></div></article>)}</div>
-      <section className="quote-card"><span>店舖報價</span><strong>{quote?money(quote.currency,quote.totalMinor):'等待正式報價'}</strong><p>{quote?'版本 '+quote.revision+' · '+quote.freshness:'本機唔會自行估算價格。'}</p></section>
-      {quote?.freshness==='MATERIAL_CHANGE'?<section className="repair-card"><b>價格或供應狀態有重要變更</b><p>請先返回菜單修正受影響項目，再繼續結帳。</p></section>:null}
-      <button className="primary wide" onClick={onCheckout}>前往結帳</button>
-    </>}
-  </section>;
-}
-
-function CheckoutView({cart,quote,checkout,setCheckout,pending,onSubmit,onReadback,onBack}:{
-  cart:readonly CustomerCartLine[];quote:CustomerQuoteSnapshot|null;checkout:CustomerCheckoutDraft;setCheckout:(v:CustomerCheckoutDraft)=>void;pending:CustomerPendingIntent|null;onSubmit:()=>void;onReadback:(intent:CustomerPendingIntent)=>void;onBack:()=>void;
-}){
-  const unknown=pending?.state==='UNKNOWN';
-  return <section className="page">
-    <button className="back-link" onClick={onBack}>← 返回購物籃</button>
-    <header className="page-title"><span>結帳</span><h1>最後確認</h1><p>提交只代表送出落單意圖；收到店舖確認先算成立。</p></header>
-    <div className="checkout-review"><div><span>商品</span><strong>{cart.reduce((sum,line)=>sum+line.quantity,0)} 件</strong></div><div><span>正式報價</span><strong>{quote?money(quote.currency,quote.totalMinor):'尚未取得'}</strong></div><div><span>報價狀態</span><strong>{quote?.freshness??'UNKNOWN'}</strong></div></div>
-    <div className="checkout-form"><label>稱呼<input value={checkout.name} onChange={e=>setCheckout({...checkout,name:e.target.value})} autoComplete="name" placeholder="可選"/></label><label>電話<input value={checkout.phone} onChange={e=>setCheckout({...checkout,phone:e.target.value})} inputMode="tel" autoComplete="tel" placeholder="用作取餐核對"/></label></div>
-    <section className="safe-submit"><span>安全提交</span><strong>{quote?'準備送出落單意圖':'等待店舖報價'}</strong><p>同一提交會保留固定 Submission ID；Timeout / UNKNOWN 會先查詢讀回，唔會盲目重送。</p>{unknown&&pending?<button className="primary wide" onClick={()=>onReadback(pending)}>重新確認提交結果</button>:<button className="primary wide" disabled={!cart.length||!quote||quote.freshness==='MATERIAL_CHANGE'} onClick={onSubmit}>{quote?'提交落單意圖':'等待正式報價'}</button>}</section>
-    {pending?<section className="pending-card"><b>{pending.state}</b><h2>{pending.state==='UNKNOWN'?'提交結果未明':pending.state==='NOT_CONNECTED'?'尚未連接店舖':'待店舖確認'}</h2><p>{pending.lastMessage??'本機已保存提交意圖。'}</p><div><span>Submission ID</span><strong>{pending.submissionId}</strong></div></section>:null}
-  </section>;
-}
-
-function OrdersView({segment,setSegment,active,history,expandedOrderId,setExpandedOrderId,onReorder,connection}:{
-  segment:OrderSegment;setSegment:(v:OrderSegment)=>void;active:readonly CustomerOrderProjection[];history:readonly CustomerHistoryProjection[];expandedOrderId:string|null;setExpandedOrderId:(v:string|null)=>void;onReorder:(order:CustomerHistoryProjection)=>void;connection:CustomerConnectionState;
-}){
-  return <section className="page">
-    <header className="page-title"><span>訂單</span><h1>訂單進度</h1><p>Ready、到店、核對、交收、完成會分開顯示。</p></header>
-    <div className="segmented"><button className={segment==='current'?'active':''} onClick={()=>setSegment('current')}>進行中</button><button className={segment==='history'?'active':''} onClick={()=>setSegment('history')}>歷史</button></div>
-    {segment==='current'?(!active.length?<Empty title={connection==='NOT_CONNECTED'?'訂單服務尚未連接':'暫時冇進行中訂單'} detail={connection==='NOT_CONNECTED'?'連接後會顯示店舖正式接單同製作進度。':'完成嘅訂單可以喺歷史查看。'}/>:<div>{active.map(order=><OrderCard key={order.orderId} order={order} expanded={expandedOrderId===order.orderId} onToggle={()=>setExpandedOrderId(expandedOrderId===order.orderId?null:order.orderId)}/>)}</div>):
-    (!history.length?<Empty title={connection==='NOT_CONNECTED'?'訂單歷史尚未連接':'暫時冇歷史訂單'} detail="完成訂單後會顯示喺呢度。"/>:<div className="history-list">{history.map(order=><article key={order.orderId}><div><small>{new Date(order.completedAt).toLocaleDateString('zh-HK')}</small><strong>{order.displayCode}</strong><p>{order.itemSummary}</p><em>{order.amountLabel??''}</em></div><button disabled={!order.reorderEligible} onClick={()=>onReorder(order)}>再次下單</button></article>)}</div>)}
-  </section>;
-}
-
-function OrderCard({order,expanded,onToggle}:{order:CustomerOrderProjection;expanded:boolean;onToggle:()=>void}){
-  const meta=stageMeta[order.stage];
-  return <article className="order-status-card"><div className="order-id"><span>{order.displayCode}</span><b>{order.readback==='CONFIRMED'?'已確認':order.readback==='PARTIAL'?'部分資料':'結果未明'}</b></div><h2>{meta.title}</h2><p>{order.rejectionReason??meta.detail}</p>{order.etaLabel?<small>預計：{order.etaLabel}</small>:null}
-    {order.stage==='DELAYED'?<section className="delay-card"><b>稍有延誤</b><strong>{order.etaLabel??'時間待更新'}</strong><p>店舖仍然製作中，未到 Ready 階段。</p></section>:null}
-    {order.stage==='READY'||order.stage==='PICKUP_VERIFICATION'?<section className="pickup-card"><span>取餐碼</span><strong>{order.pickupCode??'—'}</strong><small>{order.phoneMasked??'電話核對資料未提供'}</small><div className="pickup-boundary"><span>Ready</span><span>Arrived</span><span>Verified</span><span>Handed Over</span></div><p>可取餐 ≠ 已到店 ≠ 已核對 ≠ 已交收 ≠ 已完成。</p></section>:null}
-    <button className="secondary wide" onClick={onToggle}>{expanded?'收起詳情':'查看詳情'}</button>
-    {expanded?<section className="order-detail-card"><header><div><span>訂單內容</span><strong>{order.itemSummary}</strong></div>{order.amountLabel?<em>{order.amountLabel}</em>:null}</header><div className="timeline">{order.timeline.map((item,index)=><button key={index} className={item.stage===order.stage?'active':''}><i/><span>{item.label}</span><small>{new Date(item.at).toLocaleTimeString('zh-HK')}</small></button>)}</div><div className="detail-row"><span>交收狀態</span><strong>{order.handoverState??'UNKNOWN'}</strong></div></section>:null}
-  </article>;
-}
-
-function MoreView({connection,snapshot,pendingIntents,onReadback,onDiscard,onFallback}:{
-  connection:CustomerConnectionState;snapshot:CustomerReadModelSnapshot|null;pendingIntents:readonly CustomerPendingIntent[];onReadback:(intent:CustomerPendingIntent)=>void;onDiscard:(id:string)=>void;onFallback:()=>void;
-}){
-  return <section className="page">
-    <header className="page-title"><span>更多</span><h1>落單狀態</h1><p>呢度只顯示連線、草稿同安全恢復資料。</p></header>
-    <section className="demo-panel"><h2>店舖連線</h2><p>{connection==='READY'?'已連接店舖資料服務。':connection==='LOADING'?'正在同步。':connection==='ERROR'?'同步失敗。':'尚未連接店舖服務。'}</p><small>{snapshot?.observedAt?'最後讀取：'+new Date(snapshot.observedAt).toLocaleString('zh-HK'):'未有正式讀回'}</small></section>
-    <section className="demo-panel"><h2>待提交草稿</h2>{pendingIntents.length?pendingIntents.map(intent=><div className="pending-card" key={intent.submissionId}><b>{intent.state}</b><p>{intent.lastMessage??'本機草稿'}</p><div><span>Submission ID</span><strong>{intent.submissionId}</strong></div><div className="pending-actions"><button onClick={()=>onDiscard(intent.submissionId)}>刪除草稿</button><button onClick={()=>onReadback(intent)}>重新確認</button></div></div>):<p>冇待提交草稿。</p>}</section>
-    <section className="unavailable-card"><b>自家渠道不可用時</b><p>備用聯絡只會喺你主動操作時開啟，唔會自動轉送購物籃或者個人資料。</p><button onClick={onFallback}>查看備用聯絡方法</button></section>
-  </section>;
-}
-
-function ProductSheet({product,selections,selectedVariationId,setVariation,toggle,onClose,onAdd}:{
-  product:CustomerProduct;selections:CustomerSelectionState;selectedVariationId:string|null;setVariation:(id:string)=>void;toggle:(groupId:string,optionId:string)=>void;onClose:()=>void;onAdd:()=>void;
-}){
-  const validation=validateCustomerSelections(product,selections);
-  const variationOk=!product.variationRequired||Boolean(selectedVariationId);
-  return <div className="overlay"><section className="sheet" role="dialog" aria-modal="true"><div className="sheet-grabber"/><header><div><span>商品詳情</span><h2>{product.name}</h2><p>{product.description}</p><small>{product.displayPriceLabel??'價格待讀取'}</small></div><button onClick={onClose}>✕</button></header>
-    {product.variations?.length?<section className="choice-group"><div><strong>規格</strong><span>{product.variationRequired?'必選':'可選'}</span></div><div className="choice-grid">{product.variations.map(item=><button key={item.variationId} disabled={!item.available} className={selectedVariationId===item.variationId?'active':''} onClick={()=>setVariation(item.variationId)}>{item.name}</button>)}</div></section>:null}
-    {product.optionGroups.map(group=><section className="choice-group" key={group.optionGroupId}><div><strong>{group.name}</strong><span>最少 {Math.max(group.required?1:0,group.minSelections)} · 最多 {group.maxSelections}</span></div><div className="choice-grid">{group.options.map(option=><button key={option.optionId} disabled={!option.available} className={(selections[group.optionGroupId]??[]).includes(option.optionId)?'active':''} onClick={()=>toggle(group.optionGroupId,option.optionId)}>{option.name}</button>)}</div></section>)}
-    {!validation.ok?<p className="plain-note">{validation.issues[0]}</p>:null}
-    <div className="sheet-actions"><button onClick={onClose}>取消</button><button className="primary" disabled={!validation.ok||!variationOk} onClick={onAdd}>加入購物籃</button></div>
-  </section></div>;
-}
-
-function Empty({title,detail,children}:{title:string;detail:string;children?:React.ReactNode}){return <section className="empty-card"><strong>{title}</strong><p>{detail}</p>{children}</section>}
-function Nav({active,icon,label,badge,onClick}:{active:boolean;icon:string;label:string;badge?:string;onClick:()=>void}){return <button className={active?'active':''} onClick={onClick}><span>{icon}</span><small>{label}</small>{badge?<b>{badge}</b>:null}</button>}

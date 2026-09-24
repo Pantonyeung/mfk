@@ -46,6 +46,8 @@ export interface CustomerProduct {
   readonly badge?:string;
   readonly available:boolean;
   readonly displayPriceLabel?:string;
+  readonly imageUrl?:string;
+  readonly imageAlt?:string;
   readonly variationRequired?:boolean;
   readonly variations?:readonly CustomerVariation[];
   readonly optionGroups:readonly CustomerOptionGroup[];
@@ -73,7 +75,49 @@ export interface CustomerCartLine {
   readonly selectedVariationName?:string;
   readonly selections:readonly CustomerCartSelection[];
   readonly createdAt:string;
+  readonly note?:string;
   readonly attention?:string;
+}
+
+export type CustomerProjectionState='READY'|'EMPTY'|'LOADING'|'STALE'|'ERROR'|'NOT_CONNECTED';
+
+export interface CustomerMemorySeedProjection {
+  readonly state:CustomerProjectionState;
+  readonly valueLabel?:string;
+  readonly progressLabel?:string;
+  readonly nextBenefitLabel?:string;
+  readonly history?:readonly {readonly label:string;readonly occurredAt:string}[];
+}
+
+export interface CustomerMemoryBadgeProjection {
+  readonly badgeId:string;
+  readonly name:string;
+  readonly state:'EARNED'|'LOCKED';
+  readonly detail?:string;
+  readonly progressLabel?:string;
+  readonly earnedAt?:string;
+}
+
+export interface CustomerMemoryCouponProjection {
+  readonly couponId:string;
+  readonly name:string;
+  readonly state:'AVAILABLE'|'LOCKED'|'USED'|'EXPIRED';
+  readonly detail?:string;
+  readonly expiryLabel?:string;
+}
+
+export interface CustomerMemberProjection {
+  readonly state:CustomerProjectionState;
+  readonly displayName?:string;
+  readonly memberLabel?:string;
+  readonly lastVisitLabel?:string;
+  readonly observedAt:string;
+  readonly preferences?:readonly string[];
+  readonly frequentTasteLabels?:readonly string[];
+  readonly careMessage?:string;
+  readonly seeds?:CustomerMemorySeedProjection;
+  readonly badges?:readonly CustomerMemoryBadgeProjection[];
+  readonly coupons?:readonly CustomerMemoryCouponProjection[];
 }
 
 export interface CustomerQuoteSnapshot {
@@ -138,6 +182,7 @@ export interface CustomerReadModelSnapshot {
   readonly menu?:CustomerMenuSnapshot;
   readonly activeOrders:readonly CustomerOrderProjection[];
   readonly history:readonly CustomerHistoryProjection[];
+  readonly member?:CustomerMemberProjection;
   readonly observedAt:string;
 }
 
