@@ -5,6 +5,9 @@ import {queueOrderProjection} from './projection-outbox.ts';
 import {readActiveStaffSession} from './staff-auth.ts';
 import {readSmtPrintConfig} from './admin-operational-config.ts';
 import {mirrorKeetaOrderCommand,type KeetaProviderMirrorResult} from './keeta-provider-commands.ts';
+import {buildDailyClosePrintData,renderDailyCloseTicket} from './daily-close-ticket.ts';
+import {readLocalDayCloses,resolveBusinessWindow} from './local-operations.ts';
+import {readBusinessCutoff} from './cash-opening.ts';
 
 export interface SmtOperationalMetric{readonly id:string;readonly label:string;readonly value:string;readonly detail?:string}
 export interface SmtOrderListItemViewModel{readonly orderId:string;readonly orderIdLabel:string;readonly itemCount:number;readonly totalLabel:string;readonly paymentLabel:string;readonly fulfillmentLabel:string;readonly sourceLabel?:string;readonly localSequenceLabel?:string}
@@ -103,6 +106,7 @@ export interface CleanSmtCoreRuntimePort{
   acceptOrder?(orderId:string):Promise<{readonly orderId:string;readonly status:'ACCEPTED';readonly provider:KeetaProviderMirrorResult}>;
   markOrderReady?(orderId:string):Promise<{readonly orderId:string;readonly canonicalRevision:number;readonly status:'READY';readonly provider:KeetaProviderMirrorResult}>;
   printOrderReceipt?(orderId:string):Promise<{readonly printJobId:string;readonly state:string}>;
+  printDailyClose?(businessDate?:string):Promise<{readonly printJobId:string;readonly state:string;readonly businessDate:string}>;
   printOrderOutputs?(orderId:string):Promise<PrintDispatchSummary>;
   readOrderReprintOptions?(orderId:string):Promise<readonly SmtReprintOption[]>;
   reprintOrderJobs?(orderId:string,jobIds:readonly string[],reason?:string):Promise<PrintDispatchSummary>;
@@ -182,6 +186,7 @@ export interface MfkLocalRuntime extends CleanSmtCoreRuntimePort{
   orders():readonly StoredOrder[];
   acceptOrder(orderId:string):Promise<{readonly orderId:string;readonly status:'ACCEPTED';readonly provider:KeetaProviderMirrorResult}>;
   printOrderOutputs(orderId:string):Promise<PrintDispatchSummary>;
+  printDailyClose(businessDate?:string):Promise<{readonly printJobId:string;readonly state:string;readonly businessDate:string}>;
   readOrderReprintOptions(orderId:string):Promise<readonly SmtReprintOption[]>;
   reprintOrderJobs(orderId:string,jobIds:readonly string[],reason?:string):Promise<PrintDispatchSummary>;
   updateOrderItems(orderId:string,items:readonly {id:string;name:string;qty:number;unitMinor:number}[]):Promise<{readonly orderId:string;readonly totalMinor:number}>;
@@ -653,6 +658,36 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
       reason:note,
     });
     return {orderId:order.id,disposition,fulfillmentLabel:updated.fulfillmentLabel};
+  },
+  async printDailyClose(businessDate){
+    const closes=readLocalDayCloses();
+    const wanted=String(businessDate||'').trim();
+    const close=[...closes]
+      .filter(row=>!wanted||row.businessDate===wanted)
+      .sort((a,b)=>b.businessDate.localeCompare(a.businessDate)||b.version-a.version||b.createdAt-a.createdAt)[0];
+    if(!close)throw new Error('DAY_CLOSE_NOT_RECORDED');
+
+    const cutoff=readBusinessCutoff();
+    const orders=data.orders.filter(order=>{
+      const at=Date.parse(order.createdAt);
+      if(!Number.isFinite(at))return false;
+      return resolveBusinessWindow(at,cutoff.hour,cutoff.minute).businessDate===close.businessDate;
+    });
+    const ticket=renderDailyCloseTicket(buildDailyClosePrintData({orders,close}));
+    const config=readSmtPrintConfig();
+    const receiptLogical=config.logicalPrinters.find(row=>row.id==='logical-receipt');
+    if(receiptLogical&&receiptLogical.active===false)throw new Error('DAY_CLOSE_RECEIPT_ROUTE_DISABLED');
+    const binding=readPrinterBindings().find(row=>row.role==='顧客小票'&&String(row.host||'').trim());
+    if(!binding)throw new Error('DAY_CLOSE_RECEIPT_PRINTER_UNBOUND');
+    const result=await printTextLan({
+      ...printerInput(binding),
+      text:ticket,
+      cutAfter:true,
+      kickDrawer:false,
+      beepAfter:true,
+    });
+    if(!result.ok)throw new Error(result.code||'DAY_CLOSE_PRINT_FAILED');
+    return {printJobId:'dayclose-'+close.id,state:'SENT',businessDate:close.businessDate};
   },
   async printOrderReceipt(orderId){
     const order=data.orders.find(x=>x.id===orderId);
