@@ -15,6 +15,10 @@ export function CheckoutWorkspace({view,actions}:{view:CheckoutWorkspaceViewMode
   const failure=view.paymentState==='failure';
   const processing=view.paymentState==='processing';
   const success=view.paymentState==='success';
+  const channelReady=Boolean(view.channels.find(channel=>channel.selected));
+  const tenderReady=Boolean(view.methods.find(method=>method.selected));
+  const amountReady=Boolean(view.confirmEnabled||processing||success);
+  const flowStep=success?4:processing?4:!channelReady?1:!tenderReady?2:!amountReady?3:4;
 
   return <main className="checkout-workspace" aria-label="結帳">
     <aside className="checkout-order-panel">
@@ -49,8 +53,11 @@ export function CheckoutWorkspace({view,actions}:{view:CheckoutWorkspaceViewMode
     </aside>
 
     <section className="checkout-flow">
-      <section className="checkout-step">
-        <header><span>1</span><b>選擇來源</b></header>
+      <section className="checkout-decision-rail" aria-label="結帳進度">
+        {(['來源','付款','金額','確認'] as const).map((label,index)=>{const step=index+1;return <span key={label} className={step<flowStep?'done':step===flowStep?'active':'upcoming'}><i>{step<flowStep?'✓':step}</i><b>{label}</b></span>})}
+      </section>
+      <section className="checkout-step is-done">
+        <header><span>1</span><b>選擇來源</b><small>已選擇</small></header>
         <div className="checkout-source-grid">
           {view.channels.map(channel=><button type="button" key={channel.id} className={channel.selected?'active':''} onClick={()=>actions.onSelectChannel(channel.id)}>
             <i>{channelIcon[channel.id]??'•'}</i><b>{channel.label}</b>
@@ -65,8 +72,8 @@ export function CheckoutWorkspace({view,actions}:{view:CheckoutWorkspaceViewMode
         </div>:null}
       </section>
 
-      <section className="checkout-step">
-        <header><span>2</span><b>付款方式</b></header>
+      <section className="checkout-step is-done">
+        <header><span>2</span><b>付款方式</b><small>{view.selectedMethodLabel}</small></header>
         <div className="checkout-method-grid">
           {view.methods.map(method=><button type="button" key={method.id} disabled={!method.enabled||processing||success} className={method.selected?'active':''} onClick={()=>actions.onSelectMethod(method.id)}>
             <i>{tenderIcon[method.id]??'•'}</i><b>{method.label}</b>
@@ -74,7 +81,7 @@ export function CheckoutWorkspace({view,actions}:{view:CheckoutWorkspaceViewMode
         </div>
       </section>
 
-      <section className="checkout-step settlement">
+      <section className={`checkout-step settlement ${amountReady?'is-done':'is-current'}`}>
         <header><span>3</span><b>金額結算</b></header>
         <div className="checkout-settlement-grid">
           <article>
@@ -97,7 +104,7 @@ export function CheckoutWorkspace({view,actions}:{view:CheckoutWorkspaceViewMode
         </div>
       </section>:null}
 
-      <section className="checkout-step amount-entry">
+      <section className={`checkout-step amount-entry ${amountReady?'is-done':'is-current'}`}>
         <header><span>4</span><b>輸入金額</b></header>
         {view.cashEntryVisible?<div className="checkout-entry-grid">
           <div className="checkout-keypad">
@@ -106,7 +113,7 @@ export function CheckoutWorkspace({view,actions}:{view:CheckoutWorkspaceViewMode
           <div className="checkout-entry-side">
             <div className="checkout-quick-cash">
               <button type="button" onClick={actions.onExactCash} disabled={!view.exactCashEnabled||processing||success}>剛好</button>
-              {[50,100,200,500].map(amount=><button type="button" key={amount} disabled={processing||success} onClick={()=>actions.onQuickCash(amount)}>+{amount}</button>)}
+              {[50,100,200,500].map(amount=><button type="button" key={amount} disabled={processing||success} onClick={()=>actions.onQuickCash(amount)}>${amount}</button>)}
             </div>
             <button type="button" className="checkout-delete" onClick={()=>actions.onCashKey('⌫')} disabled={processing||success}>⌫ 刪除</button>
             <div className="checkout-cash-value"><span>實收</span><strong>{view.cashInput||'0'}</strong></div>
@@ -114,7 +121,7 @@ export function CheckoutWorkspace({view,actions}:{view:CheckoutWorkspaceViewMode
         </div>:<div className="checkout-noncash-summary"><b>{view.selectedMethodLabel}</b><span>毋須輸入現金金額</span></div>}
       </section>
 
-      <section className="checkout-step checkout-final-step">
+      <section className={`checkout-step checkout-final-step ${amountReady?'is-current':'is-upcoming'}`}>
         <header><span>5</span><b>備註</b><small>可不填</small></header>
         <div className="checkout-final-row">
           <input value={note} maxLength={80} onChange={e=>setNote(e.target.value)} placeholder="不辣、多醬、少蔥、五指拖鞋…"/>
