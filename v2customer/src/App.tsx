@@ -211,9 +211,11 @@ export function App(){
 
   const resolveConfirmedIntent=(intent:CustomerPendingIntent,message:string)=>{
     const nextPending=pendingIntents.filter(item=>item.submissionId!==intent.submissionId);
+    const sameCart=JSON.stringify(cart)===JSON.stringify(intent.cart);
+    const nextCart=sameCart?[]:cart;
     setPendingIntents(nextPending);
-    setCart([]);
-    persist({cart:[],pendingIntents:nextPending});
+    setCart(nextCart);
+    persist({cart:nextCart,pendingIntents:nextPending});
     setNotice(message);
     setOrderSegment('current');
     changeView('orders');
@@ -224,10 +226,23 @@ export function App(){
     if(submitting)return;
     if(cart.length===0){setNotice('記憶罐未有商品。');return}
     if(checkout.phone.replace(/\D/g,'').length<8){setNotice('請輸入至少 8 位電話號碼。');return}
-    const existing=pendingIntents.find(item=>item.state==='DRAFT'||item.state==='NOT_CONNECTED'||item.state==='UNKNOWN');
-    const base=existing??createCustomerPendingIntent(cart,checkout);
+    let existing=pendingIntents.find(item=>item.state==='DRAFT'||item.state==='NOT_CONNECTED'||item.state==='UNKNOWN');
     setSubmitting(true);
     try{
+      if(existing?.state==='UNKNOWN'&&port?.readSubmission){
+        const prior=await port.readSubmission(existing.submissionId);
+        if(prior.state==='CONFIRMED'){
+          const nextPending=pendingIntents.filter(item=>item.submissionId!==existing!.submissionId);
+          setPendingIntents(nextPending);
+          persist({pendingIntents:nextPending});
+          existing=undefined;
+        }else{
+          saveIntent(Object.freeze({...existing,state:'UNKNOWN',updatedAt:nowIso(),lastMessage:prior.message}));
+          setNotice('上一張訂單結果仍未確認；已先查詢原本 Submission ID，冇建立重複訂單。');
+          return;
+        }
+      }
+      const base=existing??createCustomerPendingIntent(cart,checkout);
       if(!port?.submitOrder){
         saveIntent(Object.freeze({...base,state:'NOT_CONNECTED',updatedAt:nowIso(),lastMessage:'店舖提交服務尚未連接；草稿已保存。'}));
         setNotice('已保存待提交草稿；未建立正式訂單。');
@@ -241,7 +256,6 @@ export function App(){
       saveIntent(Object.freeze({...pending,state,updatedAt:nowIso(),lastMessage:result.message}));
       setNotice(result.state==='UNKNOWN'?'提交結果未明；會先查詢原本嗰次落單，唔會自動重送。':result.message);
     }catch{
-      saveIntent(Object.freeze({...base,state:'UNKNOWN',updatedAt:nowIso(),lastMessage:'提交結果未明'}));
       setNotice('提交結果未明；原本嗰次落單已保留，請先重新確認。');
     }finally{
       setSubmitting(false);
