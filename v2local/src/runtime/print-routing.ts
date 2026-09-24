@@ -42,8 +42,10 @@ export interface PlannedPrintJob{
   readonly role:PrintRole;
   readonly binding:PrintBinding;
   readonly payload:string;
-  readonly renderMode?:'text'|'tsc-bitmap';
+  readonly renderMode?:'text'|'tsc-bitmap'|'escpos-raster';
   readonly labelSpec?:RasterLabelSpec;
+  readonly ticketKind?:'receipt'|'production'|'packing';
+  readonly ticketOrder?:PrintableOrder;
   readonly cutAfter?:boolean;
   readonly kickDrawer?:boolean;
   readonly beepAfter?:boolean;
@@ -320,19 +322,19 @@ export function buildOrderPrintPlan(order:PrintableOrder,bindings:readonly Print
     if(binding.role==='顧客小票'){
       const items=roleItems(order,'receipt',config);
       if(items.length<1)continue;
-      jobs.push({id:order.id+':receipt',role:binding.role,binding,payload:renderCustomerReceiptTicket(withItems(order,items)),cutAfter:true,kickDrawer:/\bCASH\b/i.test(order.paymentLabel),beepAfter:true});
+      jobs.push({id:order.id+':receipt',role:binding.role,binding,payload:renderCustomerReceiptTicket(withItems(order,items)),renderMode:'escpos-raster',ticketKind:'receipt',ticketOrder:withItems(order,items),cutAfter:true,kickDrawer:/\bCASH\b/i.test(order.paymentLabel),beepAfter:true});
       continue;
     }
     if(binding.role==='製作單'){
       const items=roleItems(order,'production',config);
       if(items.length<1)continue;
-      jobs.push({id:order.id+':production',role:binding.role,binding,payload:renderProductionTicket(withItems(order,items)),cutAfter:true,beepAfter:true});
+      jobs.push({id:order.id+':production',role:binding.role,binding,payload:renderProductionTicket(withItems(order,items)),renderMode:'escpos-raster',ticketKind:'production',ticketOrder:withItems(order,items),cutAfter:true,beepAfter:true});
       continue;
     }
     if(binding.role==='打包單'){
       const items=roleItems(order,'packing',config);
       if(items.length<1)continue;
-      jobs.push({id:order.id+':packing',role:binding.role,binding,payload:renderPackingTicket(withItems(order,items)),cutAfter:true,beepAfter:true});
+      jobs.push({id:order.id+':packing',role:binding.role,binding,payload:renderPackingTicket(withItems(order,items)),renderMode:'escpos-raster',ticketKind:'packing',ticketOrder:withItems(order,items),cutAfter:true,beepAfter:true});
       continue;
     }
     if(binding.role==='袋標籤'){
