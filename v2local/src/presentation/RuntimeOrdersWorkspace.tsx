@@ -59,6 +59,7 @@ export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePor
   const [keetaPullMessage,setKeetaPullMessage]=useState<string|null>(null);
   const [keetaIntakeRevision,setKeetaIntakeRevision]=useState(0);
   const [keetaArrival,setKeetaArrival]=useState<{orderId:string;display:string;sourceLabel:string}|null>(null);
+  const [customerArrival,setCustomerArrival]=useState<{orderId:string;display:string;sourceLabel:string}|null>(null);
   useEffect(()=>{
     const refresh=()=>setAfterSaleRevision(value=>value+1);
     window.addEventListener('mfk-keeta-after-sale',refresh);
@@ -80,7 +81,24 @@ export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePor
     };
     window.addEventListener('mfk-keeta-order-intake',refresh);
     return()=>window.removeEventListener('mfk-keeta-order-intake',refresh);
+  },[]);  useEffect(()=>{
+    const refresh=(raw:Event)=>{
+      const detail=(raw as CustomEvent<{canonicalOrderId?:string;display?:string;sourceLabel?:string}>).detail;
+      if(!detail?.canonicalOrderId)return;
+      setCustomerArrival({orderId:detail.canonicalOrderId,display:String(detail.display||''),sourceLabel:String(detail.sourceLabel||'自家 App')});
+      try{
+        const AudioContextCtor=window.AudioContext||(window as unknown as {webkitAudioContext?:typeof AudioContext}).webkitAudioContext;
+        if(AudioContextCtor){
+          const ctx=new AudioContextCtor();const osc=ctx.createOscillator();const gain=ctx.createGain();
+          osc.frequency.value=1040;gain.gain.value=0.16;osc.connect(gain);gain.connect(ctx.destination);osc.start();osc.stop(ctx.currentTime+0.35);
+        }
+      }catch{}
+    };
+    window.addEventListener('mfk-customer-order-intake',refresh);
+    return()=>window.removeEventListener('mfk-customer-order-intake',refresh);
   },[]);
+
+
 
   const load=useCallback(async(selectedOrderId?:string,silent=false)=>{
     if(!runtime.readOrders){setError('ORDERS_PROVIDER_UNAVAILABLE');return;}
@@ -137,9 +155,10 @@ export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePor
     try{
       const result=await runtime.acceptOrder(selected.orderId);
       await load(selected.orderId,true);
-      setMessage(result.provider.state==='ATTENTION'
-        ?'本地已接單；Keeta confirm 需要處理：'+(result.provider.code??'UNKNOWN')
-        :'已接單；Keeta confirm 已同步');
+      const isKeeta=String(selected.sourceLabel||'').startsWith('Keeta');
+      setMessage(isKeeta
+        ?(result.provider.state==='ATTENTION'?'本地已接單；Keeta confirm 需要處理：'+(result.provider.code??'UNKNOWN'):'已接單；Keeta confirm 已同步')
+        :'已接受訂單；狀態已進入製作中。');
     }catch(cause){setMessage(cause instanceof Error?cause.message:'未能接單');}
     finally{setAcceptBusy(false);}
   };
@@ -250,6 +269,14 @@ export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePor
   if(!canReview)return <main className="order-manager"><section className="order-empty"><b>你冇查看訂單權限</b><p>需要 Admin 權限：ORDER_REVIEW。</p></section></main>;
 
   return <main className="order-manager">
+    {customerArrival?<div className="keeta-arrival-backdrop" role="alertdialog" aria-modal="true">
+      <section className="keeta-arrival-card">
+        <strong>自家 App 新訂單到達</strong>
+        <b>#{customerArrival.display}</b>
+        <span>{customerArrival.sourceLabel}</span>
+        <button className="primary" onClick={()=>{void load(customerArrival.orderId,true);setCustomerArrival(null);}}>查看並接受訂單</button>
+      </section>
+    </div>:null}
     {keetaArrival?<div className="keeta-arrival-backdrop" role="alertdialog" aria-modal="true">
       <section className="keeta-arrival-card">
         <strong>Keeta 新訂單到達</strong>
@@ -292,8 +319,8 @@ export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePor
         <footer>
           <button onClick={()=>void openReprint()}>▣ 重印</button>
           <button disabled={!canCorrect} title={canCorrect?'':'需要 ORDER_CORRECTION 權限'} onClick={()=>setModal('actions')}>✎ 取消／修改</button>
-          {String(selected.sourceLabel||'').startsWith('Keeta')&&selected.fulfillmentLabel==='待處理'
-            ?<button className="primary" disabled={!runtime.acceptOrder||acceptBusy} onClick={()=>void acceptSelected()}>{acceptBusy?'接單中…':'接受 Keeta 訂單'}</button>
+          {selected.fulfillmentLabel==='待處理'
+            ?<button className="primary" disabled={!runtime.acceptOrder||acceptBusy} onClick={()=>void acceptSelected()}>{acceptBusy?'接單中…':String(selected.sourceLabel||'').startsWith('Keeta')?'接受 Keeta 訂單':'接受訂單'}</button>
             :null}
           <button className="primary" disabled={!runtime.markOrderReady||readyBusy||selected.fulfillmentLabel==='待處理'||selected.fulfillmentLabel==='可取餐'||selected.fulfillmentLabel==='已完成'||selected.fulfillmentLabel==='已取消'} onClick={()=>void markReady()}>{readyBusy?'處理中…':'提前完成／可取餐'}</button>
         </footer>
