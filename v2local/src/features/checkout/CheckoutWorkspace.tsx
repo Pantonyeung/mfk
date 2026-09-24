@@ -16,6 +16,7 @@ export function CheckoutWorkspace({view,actions}:{view:CheckoutWorkspaceViewMode
   const processing=view.paymentState==='processing';
   const success=view.paymentState==='success';
   const selectedChannel=view.channels.find(channel=>channel.selected);
+  const keypadEnabled=view.settlementMode==='LOCAL_PAYMENT'&&view.cashEntryVisible&&!processing&&!success;
 
   return <main className="checkout-workspace" aria-label="結帳">
     <aside className="checkout-order-panel">
@@ -80,15 +81,14 @@ export function CheckoutWorkspace({view,actions}:{view:CheckoutWorkspaceViewMode
       </section>}
       </div>
 
-      {view.settlementMode==='LOCAL_PAYMENT'?<>
-        {view.comboMode?<section className="checkout-combo-stage">
+      {view.settlementMode==='LOCAL_PAYMENT'&&view.comboMode?<section className="checkout-combo-stage">
           <header><b>組合付款</b><span>合計必須等於 {view.amount.dueLabel}</span></header>
           <div className="checkout-split-grid">
             {view.splitTenders.map(tender=><label key={tender.id}><span>{tender.label}</span><input inputMode="decimal" value={tender.amount} onChange={e=>actions.onChangeSplitAmount(tender.id,e.target.value)} placeholder="0.00"/></label>)}
           </div>
         </section>:null}
 
-        <section className="checkout-payment-body">
+      <section className={'checkout-payment-body'+(keypadEnabled?'':' keypad-disabled')}>
           <header className="checkout-stage-three"><small><i>03</i> COLLECTION</small><b>收款</b></header>
           <article className="checkout-settlement-card">
             <div><span>應付</span><strong>{view.amount.dueLabel}</strong></div>
@@ -96,25 +96,26 @@ export function CheckoutWorkspace({view,actions}:{view:CheckoutWorkspaceViewMode
             <div className="change"><span>找續</span><strong>{view.amount.changeLabel}</strong></div>
           </article>
 
-          {view.cashEntryVisible?<div className="checkout-entry-grid">
+          <div className="checkout-entry-grid">
             <div className="checkout-keypad">
-              {keypad.map(key=><button type="button" key={key} disabled={processing||success} onClick={()=>actions.onCashKey(key==='.'?'00':key)}>{key}</button>)}
+              {keypad.map(key=><button type="button" key={key} disabled={!keypadEnabled} onClick={()=>actions.onCashKey(key==='.'?'00':key)}>{key}</button>)}
             </div>
             <div className="checkout-entry-side">
               <div className="checkout-quick-cash">
-                <button type="button" onClick={actions.onExactCash} disabled={!view.exactCashEnabled||processing||success}>剛好</button>
-                {[50,100,200,500].map(amount=><button type="button" key={amount} disabled={processing||success} onClick={()=>actions.onQuickCash(amount)}>+{amount}</button>)}
+                <button type="button" onClick={actions.onExactCash} disabled={!keypadEnabled||!view.exactCashEnabled}>剛好</button>
+                {[50,100,200,500].map(amount=><button type="button" key={amount} disabled={!keypadEnabled} onClick={()=>actions.onQuickCash(amount)}>+{amount}</button>)}
               </div>
-              <button type="button" className="checkout-delete" onClick={()=>actions.onCashKey('⌫')} disabled={processing||success}>⌫ 刪除</button>
+              <button type="button" className="checkout-delete" onClick={()=>actions.onCashKey('⌫')} disabled={!keypadEnabled}>⌫ 刪除</button>
               <div className="checkout-cash-value"><span>實收</span><strong>{view.cashInput||'0'}</strong></div>
             </div>
-          </div>:<div className="checkout-noncash-summary"><div><small>已選擇</small><b>{view.selectedMethodLabel}</b></div><strong>{view.amount.dueLabel}</strong></div>}
+          </div>
         </section>
-      </>:<section className="checkout-channel-summary">
+
+      {view.settlementMode==='CHANNEL_INFO'?<section className="checkout-channel-summary">
         <div><span>來源</span><b>{selectedChannel?.label}</b></div>
         <div><span>訂單總額</span><strong>{view.amount.dueLabel}</strong></div>
-        <p>平台／外部來源資料已喺 02 記錄；唔需要再揀門店付款方式。</p>
-      </section>}
+        <p>平台／外部來源資料已喺 02 記錄；03 鍵盤保留但鎖定，避免操作位置跳動。</p>
+      </section>:null}
 
       <section className="checkout-final-stage">
         <div className="checkout-note-row">
