@@ -9,12 +9,13 @@ import {mirrorKeetaOrderCommand,type KeetaProviderMirrorResult} from './keeta-pr
 import {buildDailyClosePrintData,renderDailyCloseTicket} from './daily-close-ticket.ts';
 import {readLocalDayCloses,resolveBusinessWindow} from './local-operations.ts';
 import {readBusinessCutoff} from './cash-opening.ts';
+import {readSmtDeviceId} from './admin-config-sync.ts';
 import {normalizeMfkOrderLineCompositionV1,type MfkOrderLineCompositionV1} from '../../../contracts/order-line-composition-v1.ts';
 
 export interface SmtOperationalMetric{readonly id:string;readonly label:string;readonly value:string;readonly detail?:string}
 export interface SmtOrderListItemViewModel{readonly orderId:string;readonly orderIdLabel:string;readonly itemCount:number;readonly totalLabel:string;readonly paymentLabel:string;readonly fulfillmentLabel:string;readonly sourceLabel?:string;readonly localSequenceLabel?:string}
 export interface SmtOrderDetailLineViewModel{readonly id:string;readonly name:string;readonly quantity:number;readonly unitLabel:string;readonly lineTotalLabel:string;readonly detail?:string;readonly composition?:MfkOrderLineCompositionV1}
-export interface SmtOrderDetailViewModel extends SmtOrderListItemViewModel{readonly attention:readonly string[];readonly metrics:readonly SmtOperationalMetric[];readonly lines:readonly SmtOrderDetailLineViewModel[]}
+export interface SmtOrderDetailViewModel extends SmtOrderListItemViewModel{readonly attention:readonly string[];readonly metrics:readonly SmtOperationalMetric[];readonly lines:readonly SmtOrderDetailLineViewModel[];readonly paymentEvidenceRef?:string;readonly paymentVerificationState?:'PENDING'|'VERIFIED'|'REJECTED'}
 export interface SmtOrdersProjection{readonly items:readonly SmtOrderListItemViewModel[];readonly detailsByOrderId?:Readonly<Record<string,SmtOrderDetailViewModel>>;readonly selectedOrderId?:string;readonly selectedOrder?:SmtOrderDetailViewModel}
 export interface SmtDiningQueueItemViewModel{readonly id:string;readonly codeLabel:string;readonly partySize:number;readonly statusLabel:string}
 export interface SmtDiningTableViewModel{readonly id:string;readonly areaLabel:string;readonly label:string;readonly state:'available'|'occupied'|'attention'|'settled';readonly partySize?:number;readonly outstandingLabel?:string;readonly holdId?:string;readonly startedAt?:string;readonly itemCount?:number;readonly itemSummary?:string;readonly totalMinor?:number;readonly paidMinor?:number;readonly remainingMinor?:number}
@@ -113,6 +114,8 @@ export interface CleanSmtCoreRuntimePort{
   subscribe(listener:()=>void):()=>void;
   readOrders?(selectedOrderId?:string):Promise<SmtOrdersProjection>;
   acceptOrder?(orderId:string):Promise<{readonly orderId:string;readonly status:'ACCEPTED';readonly provider:KeetaProviderMirrorResult}>;
+  readPaymentEvidence?(orderId:string):Promise<{readonly objectUrl:string}>;
+  reviewPaymentEvidence?(orderId:string,decision:'VERIFIED'|'REJECTED'):Promise<{readonly orderId:string;readonly state:'VERIFIED'|'REJECTED'}>;
   markOrderReady?(orderId:string):Promise<{readonly orderId:string;readonly canonicalRevision:number;readonly status:'READY';readonly provider:KeetaProviderMirrorResult}>;
   printOrderReceipt?(orderId:string):Promise<{readonly printJobId:string;readonly state:string}>;
   printDailyClose?(businessDate?:string):Promise<{readonly printJobId:string;readonly state:string;readonly businessDate:string}>;
@@ -514,6 +517,8 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
     for(const order of data.orders)details[order.id]={
       orderId:order.id,orderIdLabel:'#'+order.display,itemCount:order.items.reduce((s,x)=>s+x.qty,0),totalLabel:money(order.totalMinor),
       paymentLabel:order.paymentLabel,fulfillmentLabel:order.fulfillmentLabel,sourceLabel:order.sourceLabel,localSequenceLabel:order.display,
+      ...(order.paymentEvidenceRef?{paymentEvidenceRef:order.paymentEvidenceRef}:{}),
+      ...(order.paymentVerificationState?{paymentVerificationState:order.paymentVerificationState}:{}),
       attention:[
         ...(order.providerLifecycleNote?[order.providerLifecycleNote]:[]),
       ],metrics:[
@@ -533,6 +538,29 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
       }))
     };
     return {items,detailsByOrderId:details,selectedOrderId:selectedId,selectedOrder:selectedId?details[selectedId]:undefined};
+  },
+  async readPaymentEvidence(orderId){
+    const order=data.orders.find(row=>row.id===orderId);
+    if(!order)throw new Error('ORDER_NOT_FOUND');
+    if(!order.paymentEvidenceRef)throw new Error('PAYMENT_EVIDENCE_NOT_FOUND');
+    const deviceId=readSmtDeviceId();
+    const response=await fetch('https://admin.morefunos.com/api/customer/smt/payment-evidence?storeId=MF01&deviceId='+encodeURIComponent(deviceId)+'&ref='+encodeURIComponent(order.paymentEvidenceRef),{cache:'no-store'});
+    if(!response.ok)throw new Error('PAYMENT_EVIDENCE_READ_HTTP_'+response.status);
+    const blob=await response.blob();
+    return{objectUrl:URL.createObjectURL(blob)};
+  },
+  async reviewPaymentEvidence(orderId,decision){
+    const order=data.orders.find(row=>row.id===orderId);
+    if(!order)throw new Error('ORDER_NOT_FOUND');
+    if(!order.paymentEvidenceRef)throw new Error('PAYMENT_EVIDENCE_NOT_FOUND');
+    if(decision!=='VERIFIED'&&decision!=='REJECTED')throw new Error('PAYMENT_EVIDENCE_DECISION_INVALID');
+    const updatedAt=new Date().toISOString();
+    data={...data,orders:data.orders.map(row=>row.id===orderId?{...row,paymentVerificationState:decision,updatedAt}:row)};
+    save();
+    const current=data.orders.find(row=>row.id===orderId)!;
+    projectOrder(current);
+    appendActionAudit({action:'PAYMENT_EVIDENCE_'+decision,orderId});
+    return{orderId,state:decision};
   },
   async acceptOrder(orderId){
     const found=data.orders.find(x=>x.id===orderId);if(!found)throw new Error('ORDER_NOT_FOUND');
