@@ -22,10 +22,14 @@ describe('Customer Cloud Edge authority gate',()=>{
     expect(worker).not.toContain("'/api/customer/admin/");
   });
 
-  it('does not introduce D1 or R2 business authority',()=>{
+  it('does not introduce D1 business authority and limits R2 to Owner-approved payment evidence',()=>{
     const wrangler=readFileSync(new URL('../wrangler.jsonc',import.meta.url),'utf8');
     expect(wrangler).not.toContain('"d1_databases"');
-    expect(wrangler).not.toContain('"r2_buckets"');
+    expect(wrangler).toContain('"r2_buckets"');
+    expect(wrangler).toContain('"binding": "CUSTOMER_PAYMENT_EVIDENCE"');
+    expect(wrangler).toContain('"bucket_name": "mfk-customer-payment-evidence"');
     expect(wrangler).toContain('"name": "CUSTOMER_RUNTIME"');
+    expect(worker).toContain("kind:'PAYMENT_SCREENSHOT'");
+    expect(worker).toContain("verificationState:'PENDING'");
   });
 });
