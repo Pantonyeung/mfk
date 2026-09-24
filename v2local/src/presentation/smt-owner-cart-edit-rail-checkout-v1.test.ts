@@ -34,10 +34,15 @@ describe('SMT owner cart edit / rail / checkout refinement',()=>{
   it('moves quick mode, quick drink and display switches to the left rail',()=>{
     expect(app).toContain('clean-order-tools');
     expect(app).toContain('clean-display-popover');
+    expect(app).toContain('分類行數');
+    expect(app).toContain('分類每行');
+    expect(app).toContain('商品密度');
     expect(app).toContain("orderingMode==='quick'?'active':''");
     expect(app).toContain('quickDrinkCount');
     expect(ordering).not.toContain('ordering-fast-controls');
     expect(shellCss).toContain('.clean-order-tools');
+    expect(ordering).toContain('categoryColumns');
+    expect(ordering).toContain('density-');
   });
 
   it('keeps keypad visible but disabled for electronic or external channels',()=>{
