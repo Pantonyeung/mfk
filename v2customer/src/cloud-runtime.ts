@@ -164,7 +164,12 @@ export function createCloudCustomerRuntimePort():CustomerRuntimePort{
           createdAt:intent.createdAt,
           updatedAt:intent.updatedAt,
           cart:intent.cart,
-          checkout:intent.checkout,
+          checkout:{
+            name:intent.checkout.name,
+            phone:intent.checkout.phone,
+            paymentMethod:intent.checkout.paymentMethod,
+            ...(intent.checkout.paymentMethod==='ELECTRONIC'&&intent.checkout.paymentEvidence?.evidenceRef?{paymentEvidenceRef:intent.checkout.paymentEvidence.evidenceRef}:{}),
+          },
         }),
       });
       if(response.status===409)return{state:'FAILED',message:String(body.code||'提交身份衝突')};
