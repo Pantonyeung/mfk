@@ -23,7 +23,7 @@ describe('SMT Frontline Check Flow R4',()=>{
     expect(ordering).toContain('view.cart.lines.length?<div className="ordering-cart-secondary-actions active-cart"');
     expect(ordering).toContain('>暫存</button>');
     expect(ordering).toContain('>取消</button>');
-    expect(ordering).toContain("view.heldCartCount>0?<div className="ordering-cart-secondary-actions empty-cart"");
+    expect(ordering).toContain('view.heldCartCount>0?<div className="ordering-cart-secondary-actions empty-cart"');
     expect(ordering).toContain('取回訂單');
     expect(orderingCss).toContain('.ordering-cart-secondary-actions.active-cart');
     expect(orderingCss).toContain('.ordering-cart-secondary-actions.empty-cart');
