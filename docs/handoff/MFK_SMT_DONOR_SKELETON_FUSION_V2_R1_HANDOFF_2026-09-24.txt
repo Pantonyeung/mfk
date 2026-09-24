@@ -881,3 +881,71 @@ MFK_SMT_DONOR_SKELETON_FUSION_V2_R1_CART_EDIT_RAIL_CHECKOUT_GREEN_OWNER_ACCEPTAN
 
 HARD RULE:
 未經 Owner 驗收，不准 merge main。
+
+
+==================================================
+CART EDIT + FULL LEFT RAIL DISPLAY + STABLE CHECKOUT V2｜GREEN
+==================================================
+
+Current candidate:
+1dfa7ee4aec234fef0dfff3a63889e9057949417
+
+Cart edit:
+- existing Cart line opens Product Detail in edit mode.
+- preloads quantity / selections / note / effective unit price.
+- primary action = 儲存修改.
+- updates SAME Cart line id.
+- no duplicate second line.
+
+Product Detail:
+- approximately 75% width × 75% height.
+
+Left rail:
+- Quick Mode
+- Quick Drink
+- Display settings
+all moved out of catalog area.
+
+Display settings:
+- category rows: 1 / 2
+- categories per row: 5 / 6 / 7
+- product images: hide / show
+- categories: hide / show
+- density: standard / compact
+- reset to Admin truth
+
+Checkout:
+- compact 01 / 02 sizing.
+- 03 keypad always remains visible.
+- CASH = enabled.
+- electronic tender = visible but grey/disabled.
+- external/platform channel = visible but grey/disabled.
+- no keypad geometry jump.
+
+Validation:
+GitHub Actions 36074457185 SUCCESS
+Job 107882430637
+32 / 32 Test Files PASS
+142 / 142 Tests PASS
+Build GREEN
+Worker 7dde2d1b-c783-47f6-93d6-48600e37dd63
+Preview:
+https://smt-donor-v2-r1-cart-edit-rail-v2-mfk-admin.yeungyi88.workers.dev
+
+Preview PR:
+#280 CLOSED / NOT MERGED
+
+Current main:
+052afe738ee1e03668c3d9e8c9df6f9519853603
+
+Main:
+NOT MERGED
+
+Production:
+UNCHANGED
+
+Status:
+MFK_SMT_DONOR_SKELETON_FUSION_V2_R1_CART_EDIT_FULL_RAIL_CHECKOUT_V2_GREEN_OWNER_ACCEPTANCE_PENDING
+
+HARD RULE:
+未經 Owner 驗收，不准 merge main。
