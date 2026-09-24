@@ -62,6 +62,7 @@ export class CustomerRuntimeStore{
         receivedAt:new Date().toISOString(),
       });
       await this.state.storage.put(key,row);
+      await this.state.storage.put('diag:lastPublicQuote',{requestId:quote.requestId,state:row.state,receivedAt:row.receivedAt});
       return json({state:'PENDING',requestId:quote.requestId},202);
     }
 
@@ -126,7 +127,22 @@ export class CustomerRuntimeStore{
     }
 
     if(url.pathname==='/smt/quotes/pending'&&request.method==='GET'){
-      return json({quotes:await this.pending('quote:')});
+      const quotes=await this.pending('quote:');
+      await this.state.storage.put('diag:lastQuotePull',{count:quotes.length,at:new Date().toISOString(),requestIds:quotes.slice(0,5).map((row:any)=>String(row.requestId||''))});
+      return json({quotes});
+    }
+
+    if(url.pathname==='/smt/diagnostics'&&request.method==='GET'){
+      const quotes=await this.pending('quote:');
+      const orders=await this.pending('order:');
+      return json({
+        pendingQuotes:quotes.length,
+        pendingOrders:orders.length,
+        lastPublicQuote:await this.state.storage.get('diag:lastPublicQuote')??null,
+        lastQuotePull:await this.state.storage.get('diag:lastQuotePull')??null,
+        lastQuoteAck:await this.state.storage.get('diag:lastQuoteAck')??null,
+        observedAt:new Date().toISOString(),
+      });
     }
 
     if(url.pathname==='/smt/quotes/ack'&&request.method==='POST'){
@@ -157,6 +173,7 @@ export class CustomerRuntimeStore{
       });
       if(state==='CONFIRMED'&&(!Number.isSafeInteger(next.totalMinor)||next.totalMinor<0))return json({code:'CUSTOMER_QUOTE_TOTAL_INVALID'},400);
       await this.state.storage.put(key,next);
+      await this.state.storage.put('diag:lastQuoteAck',{requestId,state,code:state==='REJECTED'?next.code:undefined,totalMinor:state==='CONFIRMED'?next.totalMinor:undefined,at:new Date().toISOString()});
       return json({state:'ACKED',quote:next});
     }
 

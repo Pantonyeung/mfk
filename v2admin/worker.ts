@@ -480,16 +480,21 @@ export default {
         const quoteBody=quoteResponse.ok?await quoteResponse.json():{};
         const orderResponse=await customer.fetch(new Request('https://internal/smt/orders/pending',{method:'GET'}));
         const orderBody=orderResponse.ok?await orderResponse.json():{};
+        const traceResponse=await customer.fetch(new Request('https://internal/smt/diagnostics',{method:'GET'}));
+        const traceBody=traceResponse.ok?await traceResponse.json():{};
         return json({
-          ok:quoteResponse.ok&&orderResponse.ok,
-          stage:quoteResponse.ok&&orderResponse.ok?'CUSTOMER_BRIDGE_PULL_READY':'CUSTOMER_RUNTIME_PULL_FAILED',
+          ok:quoteResponse.ok&&orderResponse.ok&&traceResponse.ok,
+          stage:quoteResponse.ok&&orderResponse.ok&&traceResponse.ok?'CUSTOMER_BRIDGE_PULL_READY':'CUSTOMER_RUNTIME_PULL_FAILED',
           deviceAuthorized:true,
           pendingQuotes:Array.isArray(quoteBody.quotes)?quoteBody.quotes.length:null,
           pendingOrders:Array.isArray(orderBody.orders)?orderBody.orders.length:null,
           quotePullStatus:quoteResponse.status,
           orderPullStatus:orderResponse.status,
+          lastPublicQuote:traceBody.lastPublicQuote??null,
+          lastQuotePull:traceBody.lastQuotePull??null,
+          lastQuoteAck:traceBody.lastQuoteAck??null,
           observedAt:new Date().toISOString(),
-        },quoteResponse.ok&&orderResponse.ok?200:502,cors(request));
+        },quoteResponse.ok&&orderResponse.ok&&traceResponse.ok?200:502,cors(request));
       }
 
       if(url.pathname.startsWith('/api/customer/smt/')){
