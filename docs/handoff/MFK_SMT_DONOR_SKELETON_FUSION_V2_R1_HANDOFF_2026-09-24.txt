@@ -425,3 +425,119 @@ MFK_SMT_DONOR_SKELETON_FUSION_V2_R1_PHASE_A_LOCAL_DURABILITY_GREEN_OWNER_ACCEPTA
 
 HARD RULE:
 未經 Owner 驗收，不准 merge main。
+
+
+==================================================
+PHASE A HARDENING + CURRENT MAIN REFRESH
+==================================================
+
+Owner instruction:
+continue
+
+Important drift discovered during continuation:
+current main advanced into:
+- Customer payment evidence contract
+- Customer payment evidence R2 binding / endpoint
+- Customer intake payment label/evidence fields
+- v2local local-runtime paymentEvidenceRef / paymentVerificationState
+
+Stale SMT work branch was NOT accepted as a valid final baseline.
+
+Conflict handling:
+- direct main → work merge attempted only on work branch
+- conflicts found
+- zero merge to main
+- stale pre-refresh work head archived:
+  archive/MFK/SMT-DONOR-SKELETON-FUSION-V2-R1-PRE-MAIN-REFRESH-20260924
+
+Refresh method:
+- exact SMT allowlist replayed on top of current main
+- current main base:
+  7c1a64ff2bcad0d438eaaaa170c7efb93b32bee6
+- refreshed product candidate:
+  8d9fcf810c12ef21df8fe463a6e7dd0c71fe4596
+- canonical work branch force-moved only AFTER archive + GREEN proof
+- branch:
+  work/MFK/SMT-DONOR-SKELETON-FUSION-V2-R1
+
+Fresh compare:
+current main → canonical SMT work
+AHEAD 1
+BEHIND 0
+
+Main / Customer truths preserved:
+- paymentMethod PAY_AT_STORE / ELECTRONIC
+- paymentEvidenceRef
+- paymentVerificationState PENDING / VERIFIED / REJECTED
+- current customer-cloud intake price-change guard
+- current payment evidence storage/fetch pipeline
+- all other current-main files remain inherited, not overwritten by stale SMT branch
+
+Phase A hardening:
+- actual local-runtime module reset / restart persistence test added
+- Hold composition survives real localStorage-backed module restart
+- StoredOrder composition survives real localStorage-backed module restart
+- legacy / malformed composition remains readable by dropping unsupported metadata only
+- formal non-dining Checkout independently recalculates current Fast Lane blockers from current Admin config
+- direct Checkout cannot bypass unresolved Required / Combo work
+- fail-closed code:
+  FAST_LANE_FORMAL_ORDER_INCOMPLETE
+- existing serialize guard remains:
+  FAST_LANE_FORMAL_ORDER_PENDING_REQUIRED
+
+Validation:
+GitHub Actions:
+36002200267 SUCCESS
+
+Job:
+107641327041
+
+29 / 29 Test Files PASS
+124 / 124 Tests PASS
+Build GREEN
+HTTP GREEN
+Worker:
+1da199a7-71ad-4dab-ab9f-d26c60085651
+
+Preview:
+https://smt-donor-v2-r1-refreshed-mfk-admin.yeungyi88.workers.dev
+
+Preview PR:
+#265 CLOSED / NOT MERGED
+
+Main:
+NOT MERGED
+
+Production:
+UNCHANGED
+
+==================================================
+NEXT REAL DECISION SEAM
+==================================================
+
+Current main now owns real Customer electronic payment evidence:
+- StoredOrder.paymentEvidenceRef
+- StoredOrder.paymentVerificationState
+- GET /api/customer/smt/payment-evidence?ref=...
+
+Current donor Pending Review does not yet display this new evidence because the field did not exist when that cut was built.
+
+No current mutation contract was found for:
+PENDING → VERIFIED / REJECTED
+
+Therefore do NOT invent:
+- payment approval action
+- payment rejection action
+- automatic accept-order block
+- accept-order == payment verified semantic
+
+Next safe cut can be READ-ONLY only:
+- show 電子支付（待核對）
+- load real payment evidence image from current endpoint
+- show current verification state
+- keep existing order acceptance semantics unchanged
+
+Any rule that blocks Accept until payment evidence is verified changes money/order semantics and requires explicit Owner decision.
+
+STATUS:
+MFK_SMT_DONOR_SKELETON_FUSION_V2_R1_REFRESHED_CURRENT_MAIN_GREEN_PAYMENT_EVIDENCE_DECISION_SEAM
