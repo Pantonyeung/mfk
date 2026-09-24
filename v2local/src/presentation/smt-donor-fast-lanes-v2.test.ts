@@ -7,6 +7,9 @@ import {
   comboSlots,
   dissolveComboLine,
   fillPendingComboGroup,
+  fillPendingComboGroupFromConfiguredProduct,
+  defaultSelectionsForProduct,
+  rebuildConfiguredLine,
   requiredTasks,
   type FastLaneCartLine,
   type FastLaneProduct,
@@ -116,6 +119,51 @@ describe('SMT donor fast lane model',()=>{
     expect(dissolved.some(row=>row.productId==='snack'&&row.unitMinor===1800)).toBe(true);
     expect(dissolved.some(row=>row.productId==='drink'&&row.unitMinor===1600)).toBe(true);
     expect(dissolved.some(row=>row.comboDraft)).toBe(false);
+  });
+
+  it('keeps Admin defaults when Quick Mode direct-adds and leaves unresolved Required work visible',()=>{
+    const requiredWithDefault:FastLaneProduct={
+      id:'default-main',name:'Default Main',priceMinor:4000,
+      optionSets:[{
+        id:'size',name:'Size',required:true,forceShow:true,selection:'SINGLE',min:1,max:1,
+        options:[
+          {id:'regular',name:'Regular',priceAdjustmentMinor:0,defaultSelected:false,active:true},
+          {id:'large',name:'Large',priceAdjustmentMinor:300,defaultSelected:true,active:true},
+        ],
+      }],
+    };
+    const base=line('default-line','default-main','Default Main',1,4000);
+    const configured=rebuildConfiguredLine(base,requiredWithDefault,defaultSelectionsForProduct(requiredWithDefault),'');
+    expect(configured.unitMinor).toBe(4300);
+    expect(configured.optionSelections?.size).toEqual(['large']);
+    expect(requiredTasks([configured],[requiredWithDefault])).toHaveLength(0);
+
+    const noDefault={...requiredWithDefault,id:'missing-main',optionSets:[{...requiredWithDefault.optionSets[0]!,options:requiredWithDefault.optionSets[0]!.options.map(option=>({...option,defaultSelected:false}))}]};
+    const unresolved=line('missing-line','missing-main','Missing Main',1,4000);
+    expect(requiredTasks([unresolved],[noDefault])).toHaveLength(1);
+  });
+
+  it('fills a pending Combo drink directly from configured Admin product truth and keeps the child reversible',()=>{
+    const cart:FastLaneCartLine[]=[
+      {...line('m','main','A飯團',1,4100),optionSelections:{rice:['r1']},detail:'飯底：紫米'},
+      line('s','snack','鹽酥雞',1,1800),
+    ];
+    const plan=buildAutoPairingPlans(cart,combos[0],pools,products)[0]!;
+    let seq=0;
+    const id=()=>`direct-${++seq}`;
+    let next=applyPairingPlan(cart,plan,combos,pools,products,id);
+    const parent=next.find(row=>row.comboDraft)!;
+    const configuredDrink:FastLaneCartLine={
+      id:'configured-drink',productId:'drink',name:'台式奶茶',qty:1,unitMinor:1700,serviceMode:'takeaway',detail:'甜度：少甜',
+    };
+    next=fillPendingComboGroupFromConfiguredProduct(next,parent.id,'drink-group','drink-choice',configuredDrink,combos,pools,products);
+    const filled=next.find(row=>row.id===parent.id)!;
+    expect(filled.unitMinor).toBe(5300);
+    expect(filled.comboDraft?.pendingGroups).toHaveLength(0);
+    expect(filled.comboDraft?.components.some(component=>component.snapshot.unitMinor===1700)).toBe(true);
+
+    const dissolved=dissolveComboLine(next,parent.id,id);
+    expect(dissolved.some(row=>row.productId==='drink'&&row.unitMinor===1700&&row.detail==='甜度：少甜')).toBe(true);
   });
 
   it('projects pairing roles from Admin combo pools instead of product-name heuristics',()=>{
