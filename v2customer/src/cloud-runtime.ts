@@ -66,9 +66,15 @@ function commandFromReadback(body:Record<string,unknown>):CustomerCommandResult{
   };
 }
 
+const QUOTE_READBACK_INTERVAL_MS=250;
+// SMT has a 5s fallback reconcile when the realtime doorbell is missed. Keep the
+// customer readback window safely beyond that fallback so a healthy local-first
+// quote is not abandoned before SMT gets its first polling opportunity.
+const QUOTE_READBACK_ATTEMPTS=48;
+
 async function waitQuote(requestIdValue:string):Promise<CustomerQuoteSnapshot>{
-  for(let attempt=0;attempt<12;attempt++){
-    if(attempt>0)await sleep(250);
+  for(let attempt=0;attempt<QUOTE_READBACK_ATTEMPTS;attempt++){
+    if(attempt>0)await sleep(QUOTE_READBACK_INTERVAL_MS);
     const {response,body}=await jsonFetch('/api/customer/quote/readback?storeId='+STORE_ID+'&requestId='+encodeURIComponent(requestIdValue));
     if(response.ok&&body.state==='CONFIRMED'){
       const totalMinor=Number(body.totalMinor);
