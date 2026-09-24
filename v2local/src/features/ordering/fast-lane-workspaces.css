@@ -58,3 +58,21 @@
   background:#7d8792;
 }
 .fast-plan-card.pending b{color:#596572}
+
+
+/* Owner blue system: no orange / green Fast Lane states. */
+.fast-task-card>header em,.fast-slot>header em{color:#315b8a;background:#eef4ff}
+.fast-candidate-grid button.defer{border-color:#9fb9dc;background:#f3f7fd;color:#315b8a}
+.fast-pending-fill{background:#f3f7fd;border-color:#b9cee9}
+.fast-pending-fill>span small{color:#536f94}
+.fast-choice-grid button.active,.fast-candidate-grid button.active{border-color:#1f5fbf;background:#edf4ff;color:#174a98}
+.fast-combo-tabs button.active{border-color:#1f5fbf;background:#edf4ff;color:#174a98}
+.fast-plan-card>strong{background:#1f5fbf}
+.fast-sticky-action button{background:#1f5fbf}
+.fast-existing-combos article>header b{color:#1f5fbf}
+.fast-specified-builder>header>strong{color:#244a78}
+.fast-lane .flow-current{border-color:#8fb1df;box-shadow:0 0 0 3px rgba(31,95,191,.09),0 6px 18px rgba(31,95,191,.07)}
+.fast-task-card.flow-current>header>span,.fast-slot.flow-current>header>span{background:#1f5fbf}
+.fast-sticky-action.flow-current button{background:#174a98}
+.fast-pending-fill.flow-current{background:#eef4ff;border-color:#9fb9dc}
+.fast-plan-card.pending>strong{background:#6f8fba}
