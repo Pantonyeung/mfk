@@ -687,3 +687,125 @@
   .dayclose-complete-card{grid-template-columns:1fr;text-align:center}
   .dayclose-complete-card .dayclose-complete-icon{margin:0 auto}
 }
+
+
+/* =========================================================
+   SMT Fusion R1 — rail-scoped display preferences
+   ========================================================= */
+.clean-rail{position:relative}
+.clean-order-display-entry{
+  padding:6px 4px;
+  border-top:1px solid #e5eaf0;
+  border-bottom:1px solid #e5eaf0;
+}
+.clean-order-display-entry button{
+  width:100%;
+  min-height:48px;
+  display:grid;
+  justify-items:center;
+  align-content:center;
+  gap:2px;
+  border:1px solid transparent;
+  border-radius:9px;
+  background:#f7f9fb;
+  color:#475467;
+}
+.clean-order-display-entry button>span{font-size:17px;line-height:1}
+.clean-order-display-entry button>small{font-size:9px;font-weight:850}
+.clean-order-display-entry button.active{
+  border-color:#b9d4f4;
+  background:#eaf3ff;
+  color:#1559af;
+}
+
+.clean-display-settings{
+  position:absolute;
+  z-index:150;
+  left:calc(100% + 10px);
+  bottom:92px;
+  width:310px;
+  padding:12px;
+  display:grid;
+  gap:11px;
+  border:1px solid #d8e0e9;
+  border-radius:14px;
+  background:#fff;
+  box-shadow:0 22px 60px rgba(15,23,42,.18);
+}
+.clean-display-settings>header{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  padding-bottom:8px;
+  border-bottom:1px solid #edf1f5;
+}
+.clean-display-settings>header>div{display:grid;gap:1px}
+.clean-display-settings>header small{
+  color:#7a8797;
+  font-size:9px;
+  font-weight:950;
+  letter-spacing:.08em;
+}
+.clean-display-settings>header strong{font-size:17px}
+.clean-display-settings>header>button{
+  width:34px;height:34px;
+  border:1px solid #d8e0e9;
+  border-radius:8px;
+  background:#f7f9fb;
+  color:#667085;
+  font-size:20px;
+}
+.clean-display-settings>label{
+  display:grid;
+  gap:5px;
+}
+.clean-display-settings>label>span{
+  color:#475467;
+  font-size:11px;
+  font-weight:900;
+}
+.clean-display-settings>label>div{
+  display:grid;
+  grid-auto-flow:column;
+  grid-auto-columns:1fr;
+  gap:5px;
+}
+.clean-display-settings>label button{
+  min-height:38px;
+  border:1px solid #d8e0e9;
+  border-radius:8px;
+  background:#fff;
+  color:#475467;
+  font-size:12px;
+  font-weight:850;
+}
+.clean-display-settings>label button.active{
+  border-color:#1768dc;
+  background:#eaf3ff;
+  color:#1559af;
+}
+.clean-display-settings>footer{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:8px;
+  padding-top:8px;
+  border-top:1px solid #edf1f5;
+}
+.clean-display-settings>footer span{color:#98a2b3;font-size:10px}
+.clean-display-settings>footer button{
+  min-height:34px;
+  padding:0 10px;
+  border:1px solid #d8e0e9;
+  border-radius:8px;
+  background:#fff;
+  color:#475467;
+  font-size:11px;
+  font-weight:850;
+}
+@media(max-height:820px){.clean-display-settings{bottom:64px}}
+@media(prefers-reduced-motion:reduce){
+  .clean-order-display-entry button,
+  .clean-display-settings button{transition:none!important}
+}
