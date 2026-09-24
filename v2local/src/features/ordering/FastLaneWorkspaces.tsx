@@ -66,7 +66,7 @@ export function RequiredFastLaneWorkspace({
     {tasks.length?<div className="fast-task-list">{tasks.map((task,index)=>{
       const chosen=draft[task.id]??task.selectedOptionIds;
       const ready=chosen.length>=task.min&&chosen.length<=task.max;
-      return <article className="fast-task-card" key={task.id}>
+      return <article className={'fast-task-card'+(index===0?' flow-current':'')} key={task.id}>
         <header><span>{index+1}</span><div><b>{task.lineName}</b><small>{task.groupName} · 最少 {task.min} / 最多 {task.max}</small></div><em>欠 {task.missingCount}</em></header>
         <TaskChoice task={task} chosen={chosen} onToggle={id=>toggle(task,id)}/>
         <footer><span>{task.selection==='SINGLE'?'單選':'多選'} · 已選 {chosen.length}</span><button type="button" disabled={!ready} onClick={()=>onApply(task.lineId,task.groupId,chosen)}>套用到呢件商品</button></footer>
@@ -128,7 +128,7 @@ export function RiceballPoolWorkspace({
     </section>
     {plans.length?<div className="fast-plan-grid">{plans.map(plan=><PlanSummary key={plan.pairingLabel} plan={plan} cart={cart} combo={combo} pools={pools} products={products}/>)}</div>
       :<div className="fast-empty compact"><b>未有完整主餐＋小食組合</b><span>飲品可以稍後補，但主餐／小食必須先符合 Admin Combo choice。</span></div>}
-    <footer className="fast-sticky-action"><span>自動組合只會消耗已匹配 Cart unit；每組保持獨立 identity。</span><button type="button" disabled={!plans.length} onClick={()=>onAutoPair(plans)}>自動組合 {plans.length} 組</button></footer>
+    <footer className={'fast-sticky-action'+(plans.length?' flow-current':'')}><span>自動組合只會消耗已匹配 Cart unit；每組保持獨立 identity。</span><button type="button" disabled={!plans.length} onClick={()=>onAutoPair(plans)}>自動組合 {plans.length} 組</button></footer>
   </div>;
 }
 
@@ -186,9 +186,9 @@ export function ComboFastLaneWorkspace({
         return <article key={line.id}>
           <header><strong>{draft.pairingLabel} 組 · {line.name}</strong><b>{money(line.unitMinor)}</b></header>
           <p>{line.detail||'已組合'}</p>
-          {draft.pendingGroups.map(group=>{
+          {draft.pendingGroups.map((group,groupIndex)=>{
             const slot=sourceSlots.find(row=>row.groupId===group.groupId);
-            return <div className="fast-pending-fill" key={group.groupId}>
+            return <div className={'fast-pending-fill'+(groupIndex===0?' flow-current':'')} key={group.groupId}>
               <span><b>{group.groupName}</b><small>{group.required?'必須完成先可結帳':'可選'}</small></span>
               <div>{slot?.choices.flatMap(choice=>{
                 if(choice.type!=='PRODUCT'){
@@ -209,7 +209,12 @@ export function ComboFastLaneWorkspace({
       {active.length>1?<nav className="fast-combo-tabs">{active.map(row=><button type="button" key={row.id} className={row.id===combo.id?'active':''} onClick={()=>{setSelectedComboId(row.id);setSelected({});}}>{row.name}<small>{money(row.basePriceMinor)}</small></button>)}</nav>:null}
       <div className="fast-slot-list">{slots.map((slot,index)=>{
         const value=selected[slot.groupId];
-        return <article className="fast-slot" key={slot.groupId}>
+        const firstUnresolvedRequired=slots.find(candidate=>{
+          if(!candidate.required)return false;
+          const candidateValue=selected[candidate.groupId];
+          return !candidateValue?.choiceId&&!candidateValue?.deferred;
+        })?.groupId;
+        return <article className={'fast-slot'+(slot.groupId===firstUnresolvedRequired?' flow-current':'')} key={slot.groupId}>
           <header><span>{index+1}</span><div><b>{slot.groupName}</b><small>{slot.role==='MAIN_COURSE'?'主餐':slot.role==='SNACK'?'小食':'飲品'} · {slot.required?'必選':'可選'}</small></div>{value?.deferred?<em>稍後補</em>:null}</header>
           <div className="fast-candidate-grid">
             {slot.choices.flatMap(choice=>{
