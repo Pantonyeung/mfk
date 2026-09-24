@@ -14,10 +14,10 @@ const checkout=fs.readFileSync(path.join(root,'features/checkout/CheckoutWorkspa
 const checkoutCss=fs.readFileSync(path.join(root,'features/checkout/checkout-workspace.css'),'utf8');
 
 describe('SMT owner UX refinement',()=>{
-  it('uses a compact category rail instead of a full-width category strip',()=>{
+  it('restores the owner screenshot horizontal category layout',()=>{
     expect(ordering).toContain('ordering-browse-body');
-    expect(orderingCss).toContain('grid-template-columns:126px minmax(0,1fr)');
-    expect(orderingCss).toContain('flex-direction:column');
+    expect(orderingCss).toContain('grid-template-columns:repeat(7,minmax(0,1fr))');
+    expect(orderingCss).toContain('grid-template-rows:auto minmax(0,1fr)');
   });
 
   it('uses one large dismissible modal and protects unsaved edits',()=>{
@@ -50,10 +50,19 @@ describe('SMT owner UX refinement',()=>{
     expect(app).toContain("keeta:'KEETA'");
   });
 
-  it('restores large payment choices instead of a thin step-by-step strip',()=>{
-    expect(checkoutCss).toContain('grid-template-rows:repeat(2,minmax(88px,1fr))');
-    expect(checkoutCss).toContain('min-height:88px');
-    expect(checkout).not.toContain('<span>1</span><b>選擇來源</b>');
-    expect(checkout).not.toContain('<span>2</span><b>付款方式</b>');
+  it('locks 01 source and dynamic 02 payment/info with a blue checkout',()=>{
+    expect(checkout).toContain('<i>01</i> ORDER SOURCE');
+    expect(checkout).toContain('<i>02</i> PAYMENT');
+    expect(checkout).toContain('<i>02</i> CHANNEL INFORMATION');
+    expect(checkoutCss).toContain('grid-template-columns:repeat(6,minmax(0,1fr))');
+    expect(checkoutCss).toContain('background:#1f5fbf');
+  });
+
+  it('uses the fixed product-detail geometry with authorized price override',()=>{
+    expect(center).toContain('cfg-options-scroll');
+    expect(center).toContain('cfg-review-panel');
+    expect(center).toContain('canOverridePrice');
+    expect(center).toContain('overrideUnitMinor');
+    expect(app).toContain("hasStaffPermission('PRICE_OVERRIDE')");
   });
 });
