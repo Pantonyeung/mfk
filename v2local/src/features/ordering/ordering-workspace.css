@@ -6,23 +6,23 @@
 .ordering-flow-strip{grid-area:queue;min-width:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
 .ordering-queue-group{min-width:0;min-height:0;padding:10px;border:1px solid #dedfe4;border-radius:16px;background:#fff;box-shadow:0 5px 18px rgba(25,25,30,.05)}
 .ordering-queue-group>header{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}
-.ordering-queue-group>header strong{font-size:18px;font-weight:950;color:#3a332e}.ordering-queue-group>header span{min-width:30px;height:30px;padding:0 7px;display:grid;place-items:center;border-radius:999px;background:#f15a24;color:#fff;font-size:14px;font-weight:950}
+.ordering-queue-group>header strong{font-size:18px;font-weight:950;color:#3a332e}.ordering-queue-group>header span{min-width:30px;height:30px;padding:0 7px;display:grid;place-items:center;border-radius:999px;background:#1f5fbf;color:#fff;font-size:14px;font-weight:950}
 .ordering-pending-head-actions{display:flex;align-items:center;gap:7px}.ordering-pending-head-actions button{height:30px;padding:0 9px;border:1px solid #dedfe4;border-radius:8px;background:#fff;font-size:13px;font-weight:850}
 .ordering-pending-list,.ordering-active-list{display:flex;gap:8px;overflow-x:auto;overscroll-behavior-inline:contain;padding-bottom:2px}
 .ordering-pending-card,.ordering-active-card{flex:0 0 180px;min-height:55px;padding:8px 10px;border:1px solid #dfe1e6;border-radius:10px;background:#fafafa;text-align:left}
-.ordering-pending-card{border-left:4px solid #f15a24}.ordering-active-card{border-left:4px solid #4d8fe8}
+.ordering-pending-card{border-left:4px solid #1f5fbf}.ordering-active-card{border-left:4px solid #4d8fe8}
 .ordering-pending-primary,.ordering-pending-meta,.ordering-active-card>div{display:flex;align-items:center;justify-content:space-between;gap:7px}.ordering-pending-card b,.ordering-active-card b{font-size:17px}.ordering-pending-card strong,.ordering-active-card span{font-size:13px}.ordering-pending-meta,.ordering-active-card small{margin-top:4px;color:#6d6e75;font-size:12px}.ordering-empty{margin:8px 2px;color:#8a8a90;font-size:14px}
 
 .ordering-catalog{grid-area:catalog;min-width:0;min-height:0;display:grid;grid-template-rows:auto auto minmax(0,1fr);gap:10px}
 .ordering-categories{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px}
 .ordering-categories button{min-height:54px;border:1px solid #dddfe5;border-radius:10px;background:#fff;color:#443d39;font-size:18px;font-weight:900;cursor:pointer}
-.ordering-categories button.active{border-color:#6a4f42;background:linear-gradient(180deg,#5c4036,#4a342e);color:#fff}
+.ordering-categories button.active{border-color:#2f74d0;background:linear-gradient(180deg,#1f5fbf,#174a98);color:#fff}
 .ordering-product-grid{min-height:0;display:grid;grid-template-columns:repeat(6,minmax(0,1fr));grid-auto-rows:220px;align-content:start;gap:10px;overflow-y:auto;overscroll-behavior:contain;padding-right:2px}
 .ordering-product-card{min-width:0;position:relative;border:1px solid #dbdde3;border-radius:13px;background:#fff;box-shadow:0 4px 12px rgba(0,0,0,.045);overflow:hidden}
 .ordering-product-body{width:100%;height:100%;padding:0;border:0;background:#fff;display:grid;grid-template-rows:132px minmax(0,1fr);text-align:left}
 .ordering-product-media{position:relative;display:block;overflow:hidden;background:#ddd}.ordering-product-media>span{display:none}.ordering-product-media img{width:100%;height:100%;object-fit:cover;display:block}
-.ordering-product-copy{min-width:0;padding:10px 12px;display:grid;align-content:start;gap:4px}.ordering-product-copy small{position:absolute;left:8px;top:8px;padding:4px 7px;border-radius:6px;background:#ff5a72;color:#fff;font-size:12px;font-weight:900}
-.ordering-product-copy b{font-size:18px;line-height:1.25;font-weight:950;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.ordering-product-copy strong{font-size:20px;line-height:1.2;color:#55443c}
+.ordering-product-copy{min-width:0;padding:10px 12px;display:grid;align-content:start;gap:4px}.ordering-product-copy small{position:absolute;left:8px;top:8px;padding:4px 7px;border-radius:6px;background:#2f74d0;color:#fff;font-size:12px;font-weight:900}
+.ordering-product-copy b{font-size:18px;line-height:1.25;font-weight:950;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.ordering-product-copy strong{font-size:20px;line-height:1.2;color:#244a78}
 .ordering-product-more{position:absolute;right:5px;bottom:6px;width:34px;height:34px;border:0;background:transparent;font-size:25px;color:#3d3e43}
 .ordering-product-card.recently-added{box-shadow:0 0 0 3px rgba(241,90,36,.24)}
 
@@ -34,7 +34,7 @@
 .ordering-cart-view-toggle button.active{background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.12);color:#37373c}.ordering-service-toggle button.active{background:#418cf0;color:#fff}
 .ordering-cart-lines{min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:8px 0}
 .ordering-cart-line{display:grid;grid-template-columns:70px minmax(0,1fr) 86px;gap:8px;align-items:center;padding:11px 2px;border-bottom:1px solid #ededf1}
-.ordering-line-identity{display:flex;align-items:center;gap:6px}.ordering-line-sequence{width:30px;height:30px;display:grid;place-items:center;border:1px solid #cfd2da;border-radius:999px;font-size:15px;font-weight:900}.ordering-line-mode{width:30px;height:30px;border:0;border-radius:999px;background:#efe8e3;color:#825f50;font-size:14px;font-weight:950}.ordering-line-mode.takeaway{background:#e7f1ff;color:#3470bb}
+.ordering-line-identity{display:flex;align-items:center;gap:6px}.ordering-line-sequence{width:30px;height:30px;display:grid;place-items:center;border:1px solid #cfd2da;border-radius:999px;font-size:15px;font-weight:900}.ordering-line-mode{width:30px;height:30px;border:0;border-radius:999px;background:#eef3f9;color:#4b6685;font-size:14px;font-weight:950}.ordering-line-mode.takeaway{background:#e7f1ff;color:#3470bb}
 .ordering-line-copy,.ordering-line-copy-button{min-width:0;border:0;background:transparent;text-align:left;padding:0;display:grid;gap:3px}.ordering-line-copy b{font-size:17px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.ordering-line-copy small{font-size:13px;color:#777}
 .ordering-line-qty{display:grid;grid-template-columns:26px 28px 26px;align-items:center;justify-content:end}.ordering-line-qty button{height:28px;border:1px solid #d8dae0;border-radius:7px;background:#fff;font-size:18px}.ordering-line-qty strong{text-align:center;font-size:16px}
 .ordering-line-total{grid-column:3;text-align:right;font-size:17px}.ordering-cart-empty{display:grid;place-items:center;height:100%;color:#888;font-weight:850}
@@ -69,7 +69,7 @@
 .ordering-hold-placement-body{min-height:0;display:grid;grid-template-columns:135px minmax(0,1fr);gap:10px}
 .ordering-hold-left{min-height:0;display:grid;grid-template-rows:1.35fr .8fr;gap:10px}
 .ordering-hold-left button{min-height:0;padding:14px;display:grid;align-content:center;gap:7px;text-align:left;border:1px solid #d9dce2;border-radius:12px;background:#fff}
-.ordering-hold-left button.queue{border:2px solid #078b7f;background:#eefaf8;color:#066b64}
+.ordering-hold-left button.queue{border:2px solid #1f5fbf;background:#edf4ff;color:#174a98}
 .ordering-hold-left button.waiting{background:#f7f8fa}
 .ordering-hold-left b{font-size:18px}.ordering-hold-left span{font-size:12px;line-height:1.4;color:#69707d}
 .ordering-hold-tables{min-height:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));grid-template-rows:repeat(3,minmax(0,1fr));gap:8px}
@@ -168,8 +168,8 @@
   .ordering-line-copy b{font-size:27px}
 }
 
-.ordering-menu-local-status{min-height:32px;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:4px 10px;border:1px solid #cfe2d8;border-radius:8px;background:#f3faf6;color:#286145}
-.ordering-menu-local-status b{font-size:12px;font-weight:950;letter-spacing:.03em}.ordering-menu-local-status span{font-size:11px;color:#6b7770}
+.ordering-menu-local-status{min-height:32px;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:4px 10px;border:1px solid #c9d9ee;border-radius:8px;background:#f4f8ff;color:#28558d}
+.ordering-menu-local-status b{font-size:12px;font-weight:950;letter-spacing:.03em}.ordering-menu-local-status span{font-size:11px;color:#6d7f95}
 
 
 /* =========================================================
@@ -226,7 +226,7 @@
   display:grid;
   gap:2px;
   border:1px solid #dfe3e8;
-  border-left:4px solid #e79337;
+  border-left:4px solid #2f74d0;
   border-radius:8px;
   background:#fff;
   text-align:left;
@@ -360,9 +360,9 @@
   font-size:21px;
 }
 .donor-skeleton .ordering-product-card.recently-added{
-  border-color:#90c9ab;
-  background:#f2fbf6;
-  box-shadow:0 0 0 3px rgba(21,133,90,.08);
+  border-color:#8fb1df;
+  background:#f4f8ff;
+  box-shadow:0 0 0 3px rgba(31,95,191,.10);
   animation:donor-product-confirm 260ms ease-out both;
 }
 
@@ -403,7 +403,7 @@
   border-color:#bcd0ec;background:#f3f8ff;color:#195fba;
 }
 .donor-skeleton .ordering-cart-cycle.service.dine-in{
-  border-color:#c5ddce;background:#f2fbf6;color:#146c49;
+  border-color:#c3d5ef;background:#f4f8ff;color:#174a98;
 }
 .donor-skeleton .ordering-cart-cycle.combine.active{
   border-color:#2d3c50;background:#2d3c50;color:#fff;
@@ -558,12 +558,12 @@
   background:#eef2f6;
 }
 .donor-skeleton .ordering-workbar button.has-work{
-  border-color:#d7bd7a;
-  background:#fff8e7;
+  border-color:#aac4e6;
+  background:#f3f7fd;
 }
 .donor-skeleton .ordering-workbar button.has-work b{
-  background:#efc766;
-  color:#5e4208;
+  background:#5f8ed1;
+  color:#174a98;
 }
 
 @keyframes donor-product-confirm{
@@ -596,7 +596,7 @@
   .donor-skeleton .ordering-product-card.recently-added{animation:none!important}
 }
 
-.donor-skeleton .ordering-cart-blocking{margin:0 0 8px;padding:8px 10px;border:1px solid #e8c783;border-radius:8px;background:#fff8e8;color:#7a5514;font-size:11px;font-weight:850;line-height:1.35}
+.donor-skeleton .ordering-cart-blocking{margin:0 0 8px;padding:8px 10px;border:1px solid #b9cee9;border-radius:8px;background:#f3f7fd;color:#315b8a;font-size:11px;font-weight:850;line-height:1.35}
 
 /* Quick Mode + Quick Drink donor fusion: overlay controls never resize the product grid. */
 .donor-skeleton .ordering-catalog{position:relative}
@@ -608,8 +608,8 @@
 .donor-skeleton .ordering-mode-switch button.active{background:#fff;color:#21374f;box-shadow:0 1px 4px rgba(20,30,40,.12)}
 .donor-skeleton .ordering-quick-drink-toggle{height:34px;padding:0 10px;border:1px solid #d9dee5;border-radius:9px;background:#fff;color:#485566;font-size:11px;font-weight:900}
 .donor-skeleton .ordering-quick-drink-toggle b{display:inline-grid;place-items:center;min-width:20px;height:20px;margin-left:4px;padding:0 4px;border-radius:999px;background:#edf0f3;color:#596574;font-size:10px}
-.donor-skeleton .ordering-quick-drink-toggle.has-work{border-color:#d99e42;background:#fff8e8;color:#7c571b}
-.donor-skeleton .ordering-quick-drink-toggle.has-work b{background:#d98d25;color:#fff}
+.donor-skeleton .ordering-quick-drink-toggle.has-work{border-color:#8fb1df;background:#f3f7fd;color:#315b8a}
+.donor-skeleton .ordering-quick-drink-toggle.has-work b{background:#2f74d0;color:#fff}
 .donor-skeleton .ordering-quick-drink-drawer{position:absolute;left:0;right:0;bottom:0;z-index:7;max-height:190px;padding:10px;border:1px solid #cfd6df;border-radius:12px;background:#fff;box-shadow:0 -9px 28px rgba(26,37,50,.14)}
 .donor-skeleton .ordering-quick-drink-drawer>header{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}
 .donor-skeleton .ordering-quick-drink-drawer>header>div{display:grid;gap:1px}.donor-skeleton .ordering-quick-drink-drawer>header small{font-size:9px;letter-spacing:.08em;color:#798593}.donor-skeleton .ordering-quick-drink-drawer>header strong{font-size:14px}
@@ -629,20 +629,20 @@
   animation:guided-flow-breathe 2.4s ease-in-out infinite;
 }
 .donor-skeleton .ordering-workbar button.flow-next{
-  background:#eef8f1;
-  color:#245f3c;
+  background:#eef4ff;
+  color:#174a98;
 }
 .donor-skeleton .ordering-workbar button.flow-next b{
-  background:#4e8c65;
+  background:#1f5fbf;
   color:#fff;
 }
 .donor-skeleton .ordering-quick-drink-toggle.flow-next{
-  background:#f0f8f2;
-  color:#285f3d;
+  background:#eef4ff;
+  color:#174a98;
 }
 .donor-skeleton .ordering-checkout.flow-next{
-  background:#245f3c;
-  border-color:#245f3c;
+  background:#174a98;
+  border-color:#174a98;
   color:#fff;
 }
 .donor-skeleton .flow-next-catalog .ordering-product-grid{
