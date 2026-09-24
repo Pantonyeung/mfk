@@ -5,7 +5,7 @@ import {ProductionViewport} from './app/ProductionViewport.tsx';
 import {OrderingWorkspace} from './features/ordering/OrderingWorkspace.tsx';
 import {deriveOrderingGuidance,type OrderingWorkspaceActions,type OrderingWorkspaceViewModel,type ServiceMode} from './features/ordering/ordering-workspace-model.ts';
 import {CheckoutWorkspace} from './features/checkout/CheckoutWorkspace.tsx';
-import type {CheckoutChannelId,CheckoutTenderId,CheckoutWorkspaceActions,CheckoutWorkspaceViewModel} from './features/checkout/checkout-workspace-model.ts';
+import type {CheckoutChannelFieldId,CheckoutChannelId,CheckoutTenderId,CheckoutWorkspaceActions,CheckoutWorkspaceViewModel} from './features/checkout/checkout-workspace-model.ts';
 import {RuntimeOrdersWorkspace} from './presentation/RuntimeOrdersWorkspace.tsx';
 import {RuntimeDiningWorkspace,type DiningCheckoutRequest} from './presentation/RuntimeDiningWorkspace.tsx';
 import {RuntimeSoldoutWorkspace} from './presentation/RuntimeSoldoutWorkspace.tsx';
@@ -635,10 +635,16 @@ function CheckoutPage({cart,setCart,diningCheckout,onDiningCheckoutDone}:{cart:C
   const parseMoney=(value:string)=>Math.max(0,Math.round((Number(value)||0)*100));
   const cashMinor=parseMoney(cash);
   const comboMinor=(Object.values(split) as string[]).reduce((sum,value)=>sum+parseMoney(value),0);
-  const received=method==='CASH'?cashMinor:method==='COMBO'?comboMinor:due;
-  const change=method==='CASH'?Math.max(0,received-due):0;
+  const settlementMode=channel==='walk-in'?'LOCAL_PAYMENT' as const:'CHANNEL_INFO' as const;
+  const received=settlementMode==='LOCAL_PAYMENT'?(method==='CASH'?cashMinor:method==='COMBO'?comboMinor:due):due;
+  const change=settlementMode==='LOCAL_PAYMENT'&&method==='CASH'?Math.max(0,received-due):0;
   const comboExact=method!=='COMBO'||comboMinor===due;
   const cashReady=method!=='CASH'||received>=due;
+  const channelRequiredReady=channel==='walk-in'
+    ?true
+    :channel==='whatsapp'
+      ?Boolean(customerPhone.trim())
+      :Boolean(platformOrderNo.trim());
   const checkoutAdminConfig=readSmtAdminConfigLkg();
   const checkoutFastLaneProducts:FastLaneProduct[]=checkoutAdminConfig
     ?[...new Map((['takeaway','dine-in'] as const).flatMap(mode=>projectSyncedOrderingCatalog(mode,checkoutAdminConfig).products).map(product=>[
@@ -647,25 +653,77 @@ function CheckoutPage({cart,setCart,diningCheckout,onDiningCheckoutDone}:{cart:C
     ] as const)).values()]
     :[];
   const formalFastLaneBlockers=diningCheckout?0:requiredTasks(cart,checkoutFastLaneProducts).length+comboBlockingCount(cart);
-  const confirmEnabled=cart.length>0&&comboExact&&cashReady&&formalFastLaneBlockers===0;
+  const localPaymentReady=comboExact&&cashReady;
+  const confirmEnabled=cart.length>0&&formalFastLaneBlockers===0&&(settlementMode==='LOCAL_PAYMENT'?localPaymentReady:channelRequiredReady);
   const validationMessage=formalFastLaneBlockers>0?'仍有 '+formalFastLaneBlockers+' 項必選／套餐未完成，返回點餐完成後先可正式結帳':
-    method==='CASH'&&cash&&received<due?'收款金額不足':
+    settlementMode==='CHANNEL_INFO'&&!channelRequiredReady
+      ?(channel==='whatsapp'?'請先輸入客戶電話':'請先輸入訂單號碼／流水號')
+      :method==='CASH'&&cash&&received<due?'收款金額不足':
     method==='COMBO'&&comboMinor!==due?'組合付款合計 '+money(comboMinor)+'，必須等於 '+money(due):undefined;
 
   const sourceParts=[channelLabels[channel]];
-  if(channel==='whatsapp'&&customerPhone.trim())sourceParts.push(customerPhone.trim());
-  if(channel!=='walk-in'&&channel!=='whatsapp'){
+  if(channel==='whatsapp'){
+    if(customerPhone.trim())sourceParts.push(customerPhone.trim());
+    if(platformOrderNo.trim())sourceParts.push('參考 '+platformOrderNo.trim());
+  }else if(channel!=='walk-in'){
     if(pickupCode.trim())sourceParts.push('取餐碼 '+pickupCode.trim());
     if(platformOrderNo.trim())sourceParts.push('單號 '+platformOrderNo.trim());
   }
   const sourceLabel=sourceParts.join(' · ');
   const comboEntries=(Object.entries(split) as [keyof typeof split,string][]).filter(([,value])=>parseMoney(value)>0);
-  const paymentLabel=method==='COMBO'
+  const localPaymentLabel=method==='COMBO'
     ?'COMBO '+comboEntries.map(([id,value])=>id+' '+money(parseMoney(value))).join(' + ')
     :method;
-  const tenderDisplay=method==='COMBO'
-    ?comboEntries.map(([id,value])=>methodLabels[id]+' '+money(parseMoney(value))).join(' + ')
-    :methodLabels[method];
+  const externalPaymentLabel:Record<Exclude<CheckoutChannelId,'walk-in'>,string>={
+    whatsapp:'到店付款',
+    'morefun-app':'到店付款',
+    foodpanda:'FOODPANDA',
+    keeta:'KEETA',
+  };
+  const paymentLabel=settlementMode==='LOCAL_PAYMENT'?localPaymentLabel:externalPaymentLabel[channel as Exclude<CheckoutChannelId,'walk-in'>];
+  const tenderDisplay=settlementMode==='CHANNEL_INFO'
+    ?channelLabels[channel]+(paymentLabel==='到店付款'?' · 到店付款':'')
+    :method==='COMBO'
+      ?comboEntries.map(([id,value])=>methodLabels[id]+' '+money(parseMoney(value))).join(' + ')
+      :methodLabels[method];
+
+  const channelInfo:CheckoutWorkspaceViewModel['channelInfo']=channel==='whatsapp'
+    ?{
+      title:'電話／WhatsApp 訂單資料',
+      helperLabel:'付款方式唔喺呢度揀；先記錄客戶資料。',
+      fields:[
+        {id:'customerPhone',label:'客戶電話',placeholder:'輸入電話／WhatsApp',value:customerPhone,required:true},
+        {id:'platformOrderNo',label:'流水號／參考',placeholder:'如有可輸入',value:platformOrderNo,required:false},
+      ],
+    }
+    :channel==='morefun-app'
+      ?{
+        title:'磨飯 App 訂單資料',
+        helperLabel:'記錄 App 訂單識別；到店付款由來源狀態處理。',
+        fields:[
+          {id:'platformOrderNo',label:'App 訂單號碼／流水號',placeholder:'輸入 App 訂單號碼',value:platformOrderNo,required:true},
+          {id:'pickupCode',label:'取餐碼',placeholder:'如有可輸入',value:pickupCode,required:false},
+        ],
+      }
+      :channel==='foodpanda'
+        ?{
+          title:'Foodpanda 訂單資料',
+          helperLabel:'平台單只記錄平台資料，唔再揀門店付款方式。',
+          fields:[
+            {id:'platformOrderNo',label:'Foodpanda 訂單號碼',placeholder:'輸入平台單號',value:platformOrderNo,required:true},
+            {id:'pickupCode',label:'取餐碼',placeholder:'如有可輸入',value:pickupCode,required:false},
+          ],
+        }
+        :channel==='keeta'
+          ?{
+            title:'Keeta 訂單資料',
+            helperLabel:'平台單只記錄平台資料，唔再揀門店付款方式。',
+            fields:[
+              {id:'platformOrderNo',label:'Keeta 訂單號碼',placeholder:'輸入 Keeta 單號',value:platformOrderNo,required:true},
+              {id:'pickupCode',label:'取餐碼',placeholder:'如有可輸入',value:pickupCode,required:false},
+            ],
+          }
+          :{title:'現場收款',fields:[]};
 
   const view:CheckoutWorkspaceViewModel={
     order:{
@@ -680,19 +738,16 @@ function CheckoutPage({cart,setCart,diningCheckout,onDiningCheckoutDone}:{cart:C
       {id:'foodpanda',label:'Foodpanda',selected:channel==='foodpanda'},
       {id:'keeta',label:'Keeta',selected:channel==='keeta'},
     ],
-    methods:(['CASH','FPS','PAYME','ALIPAY','WECHAT','COMBO'] as CheckoutTenderId[]).map(id=>({
+    methods:(['CASH','ALIPAY','WECHAT','FPS','PAYME','COMBO'] as CheckoutTenderId[]).map(id=>({
       id,label:methodLabels[id],enabled:true,selected:method===id,
     })),
+    settlementMode,
     selectedMethodLabel:methodLabels[method],
     amount:{dueLabel:money(due),receivedLabel:money(received),changeLabel:money(change)},
-    cashInput:cash,cashEntryVisible:method==='CASH',exactCashEnabled:method==='CASH',confirmEnabled,
+    cashInput:cash,cashEntryVisible:settlementMode==='LOCAL_PAYMENT'&&method==='CASH',exactCashEnabled:settlementMode==='LOCAL_PAYMENT'&&method==='CASH',confirmEnabled,
     paymentState:state,
-    channelFields:{
-      showCustomerPhone:channel==='whatsapp',customerPhone,
-      showPlatformFields:channel==='morefun-app'||channel==='keeta'||channel==='foodpanda',
-      pickupCode,platformOrderNo,
-    },
-    comboMode:method==='COMBO',
+    channelInfo,
+    comboMode:settlementMode==='LOCAL_PAYMENT'&&method==='COMBO',
     splitTenders:(['CASH','FPS','PAYME','ALIPAY','WECHAT'] as const).map(id=>({id,label:methodLabels[id],amount:split[id]})),
     validationMessage,statusMessage:printStatus,completionReview:completion,
   };
@@ -739,7 +794,7 @@ function CheckoutPage({cart,setCart,diningCheckout,onDiningCheckoutDone}:{cart:C
       });
       setCompletion({
         displayOrderCode:order.display,tenderLabel:tenderDisplay,dueLabel:money(due),
-        receivedLabel:money(received),changeLabel:money(change),statusLabel:'COMPLETED',
+        ...(settlementMode==='LOCAL_PAYMENT'?{receivedLabel:money(received),changeLabel:money(change)}:{}),statusLabel:'COMPLETED',
       });
       setState('success');
       setPrintStatus('訂單已完成 · 正在送打印…');
@@ -758,9 +813,11 @@ function CheckoutPage({cart,setCart,diningCheckout,onDiningCheckoutDone}:{cart:C
     onBack:()=>{if(diningCheckout){setCart([]);onDiningCheckoutDone();navigate('/dining');}else navigate('/')},
     onSelectChannel:setChannel,
     onSelectMethod:setMethod,
-    onChangeCustomerPhone:setCustomerPhone,
-    onChangePickupCode:setPickupCode,
-    onChangePlatformOrderNo:setPlatformOrderNo,
+    onChangeChannelInfo:(fieldId:CheckoutChannelFieldId,value:string)=>{
+      if(fieldId==='customerPhone')setCustomerPhone(value);
+      else if(fieldId==='pickupCode')setPickupCode(value);
+      else setPlatformOrderNo(value);
+    },
     onChangeSplitAmount:(id,value)=>setSplit(current=>({...current,[id]:value})),
     onCashKey:key=>{
       if(key==='⌫')setCash(value=>value.slice(0,-1));
