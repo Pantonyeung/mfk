@@ -1,4 +1,4 @@
-import {useEffect,useMemo,useState} from 'react';
+import {useEffect,useMemo,useRef,useState} from 'react';
 import {NavLink,Navigate,Route,Routes,useNavigate} from 'react-router';
 import {useLocation} from 'react-router';
 import {ProductionViewport} from './app/ProductionViewport.tsx';
@@ -526,10 +526,30 @@ function OperationalApp(){
   const navigate=useNavigate();
   const location=useLocation();
   const [globalArrival,setGlobalArrival]=useState<{orderId:string;display:string;sourceLabel:string}|null>(null);
+  const [snoozedArrival,setSnoozedArrival]=useState<{orderId:string;display:string;sourceLabel:string}|null>(null);
+  const snoozeTimerRef=useRef<number|undefined>(undefined);
   const [cart,setCartState]=useState<CartLine[]>([]);
   const [serviceMode,setServiceMode]=useState<ServiceMode>('takeaway');
   const [diningCheckout,setDiningCheckout]=useState<DiningCheckoutRequest|null>(null);
   const [navRevision,setNavRevision]=useState(0);
+  const snoozeGlobalArrival=(delayMs:number)=>{
+    if(!globalArrival)return;
+    const pending=globalArrival;
+    setGlobalArrival(null);
+    setSnoozedArrival(pending);
+    if(snoozeTimerRef.current!==undefined)window.clearTimeout(snoozeTimerRef.current);
+    snoozeTimerRef.current=window.setTimeout(()=>{
+      setGlobalArrival(pending);
+      setSnoozedArrival(null);
+      try{
+        const AudioContextCtor=window.AudioContext||(window as unknown as {webkitAudioContext?:typeof AudioContext}).webkitAudioContext;
+        if(AudioContextCtor){
+          const ctx=new AudioContextCtor();const osc=ctx.createOscillator();const gain=ctx.createGain();
+          osc.frequency.value=1040;gain.gain.value=0.18;osc.connect(gain);gain.connect(ctx.destination);osc.start();osc.stop(ctx.currentTime+0.4);
+        }
+      }catch{}
+    },delayMs);
+  };
   useEffect(()=>localRuntime.subscribe(()=>setNavRevision(value=>value+1)),[]);
   const activeOrderCount=useMemo(()=>{
     void navRevision;
@@ -590,7 +610,8 @@ function OperationalApp(){
         setGlobalArrival(null);
         navigate('/orders?orderId='+encodeURIComponent(orderId));
       }}>立即處理</button>
-      <button type="button" aria-label="稍後處理" onClick={()=>setGlobalArrival(null)}>稍後</button>
+      <button type="button" aria-label="30 秒後再提示" onClick={()=>snoozeGlobalArrival(30000)}>30 秒後</button>
+      <button type="button" aria-label="1 分鐘後再提示" onClick={()=>snoozeGlobalArrival(60000)}>1 分鐘後</button>
     </div>:null}
     <aside className="clean-rail">
       <div className="clean-brand" aria-label="磨飯">磨</div>
