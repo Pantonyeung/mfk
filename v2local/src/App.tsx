@@ -20,6 +20,7 @@ import {resolveBusinessWindow} from './runtime/local-operations.ts';
 import {RuntimeReadyActivation} from './runtime/RuntimeReadyActivation.tsx';
 import {StaffAuthGate,StaffSessionBadge} from './presentation/StaffAuthGate.tsx';
 import {CashOpeningGate} from './presentation/CashOpeningGate.tsx';
+import {hasStaffPermission,readActiveStaffSession} from './runtime/staff-auth.ts';
 import {HoldCartWorkspace,HoldListWorkspace,ProductConfigWorkspace,type OrderingPanelState,type WorkspaceHoldDraft,type WorkspaceProduct} from './features/ordering/OrderingCenterWorkspaces.tsx';
 import {ComboFastLaneWorkspace,RequiredFastLaneWorkspace,RiceballPoolWorkspace} from './features/ordering/FastLaneWorkspaces.tsx';
 import {PendingOrderReviewWorkspace} from './features/ordering/PendingOrderReviewWorkspace.tsx';
@@ -54,10 +55,10 @@ let localCartLineSequence=0;
 const nextLocalCartLineId=()=>{localCartLineSequence+=1;return 'line-'+Date.now().toString(36)+'-'+localCartLineSequence.toString(36)};
 
 const PRODUCT_ART_COLORS:Record<string,[string,string]>={
-  '飯團':['#f1c98f','#8a4f2b'],
-  '便當':['#edb77d','#7a3f26'],
-  '小食':['#e9c09d','#92552c'],
-  '飲品':['#d7a66a','#7b4c3a'],
+  '飯團':['#dbe9ff','#4d7fca'],
+  '便當':['#cfdef5','#3f6fb4'],
+  '小食':['#e7effc','#5d84bd'],
+  '飲品':['#d5e6ff','#2f6fbd'],
 };
 
 function productArtwork(product:Product){
@@ -119,6 +120,8 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
 
   const storeSettings=useMemo(()=>{void adminConfigRevision;return readSmtStoreSettings();},[adminConfigRevision]);
   const frontlinePresentation=useMemo(()=>{void adminConfigRevision;return readSmtFrontlinePresentation();},[adminConfigRevision]);
+  const activeStaff=readActiveStaffSession();
+  const canOverridePrice=activeStaff?.role==='OWNER'||hasStaffPermission('PRICE_OVERRIDE');
   useEffect(()=>{
     if(serviceMode==='takeaway'&&!storeSettings.takeawayEnabled&&storeSettings.dineInEnabled)setServiceMode('dine-in');
     if(serviceMode==='dine-in'&&!storeSettings.dineInEnabled&&storeSettings.takeawayEnabled)setServiceMode('takeaway');
@@ -402,10 +405,10 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
     window.setTimeout(()=>{setRecent(undefined);setHighlight(undefined)},700);
   };
 
-  const addConfigured=(productId:string,detail:string,deltaMinor:number,qty:number,structured:{readonly selections:Readonly<Record<string,readonly string[]>>;readonly note:string})=>{
+  const addConfigured=(productId:string,detail:string,deltaMinor:number,qty:number,structured:{readonly selections:Readonly<Record<string,readonly string[]>>;readonly note:string;readonly overrideUnitMinor?:number})=>{
     const product=products.find(item=>item.id===productId);if(!product||!product.priceReady||!product.sellable)return;
     const line:CartLine={
-      id:nextLocalCartLineId(),productId:product.id,name:product.name,qty,unitMinor:product.priceMinor+deltaMinor,serviceMode,detail,
+      id:nextLocalCartLineId(),productId:product.id,name:product.name,qty,unitMinor:structured.overrideUnitMinor??(product.priceMinor+deltaMinor),serviceMode,detail,
       optionSelections:structured.selections,freeNote:structured.note,
     };
     setCart([...cart,line]);setRecent(product.id);setHighlight(line.id);setPulse(value=>value+1);setPanelDirty(false);setPanel(null);
@@ -475,7 +478,7 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
     :panel?.type==='holds'?'暫存單':'';
 
   const panelBody=panel?.type==='product'
-    ?(()=>{const product=workspaceProducts.find(item=>item.id===panel.productId);return product?<ProductConfigWorkspace product={product} onDirtyChange={setPanelDirty} onAdd={(detail,delta,qty,structured)=>addConfigured(product.id,detail,delta,qty,structured)}/>:null})()
+    ?(()=>{const product=workspaceProducts.find(item=>item.id===panel.productId);return product?<ProductConfigWorkspace product={product} canOverridePrice={canOverridePrice} onDirtyChange={setPanelDirty} onAdd={(detail,delta,qty,structured)=>addConfigured(product.id,detail,delta,qty,structured)}/>:null})()
     :panel?.type==='pending-order'
       ?(()=>{const order=runtimeOrders.find(item=>item.id===panel.orderId);return order?<PendingOrderReviewWorkspace
         order={order}
@@ -491,9 +494,9 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
         onOpenOrders={()=>{setPanel(null);navigate('/orders?orderId='+encodeURIComponent(order.id));}}
       />:null})()
     :panel?.type==='quick-drink-config'
-      ?(()=>{const product=workspaceProducts.find(item=>item.id===panel.productId);return product?<ProductConfigWorkspace product={product} maxQty={1} onDirtyChange={setPanelDirty} onAdd={(detail,delta,_qty,structured)=>{
+      ?(()=>{const product=workspaceProducts.find(item=>item.id===panel.productId);return product?<ProductConfigWorkspace product={product} maxQty={1} canOverridePrice={canOverridePrice} onDirtyChange={setPanelDirty} onAdd={(detail,delta,_qty,structured)=>{
         fillQuickDrinkConfigured(panel.comboLineId,panel.groupId,panel.choiceId,{
-          id:nextLocalCartLineId(),productId:product.id,name:product.name,qty:1,unitMinor:product.priceMinor+delta,serviceMode,
+          id:nextLocalCartLineId(),productId:product.id,name:product.name,qty:1,unitMinor:structured.overrideUnitMinor??(product.priceMinor+delta),serviceMode,
           detail,optionSelections:structured.selections,freeNote:structured.note,
         });
       }}/>:null})()
