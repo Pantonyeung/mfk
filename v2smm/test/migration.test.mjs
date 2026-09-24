@@ -118,3 +118,15 @@ test('previously banked SMM read surfaces are not dropped by product completion'
   for(const marker of['refundRequests','capacity','reporting','printHealth','channels','dineSessions'])assert.match(types,new RegExp(marker));
   for(const marker of['退款要求','產能資料尚未連接','營運報表尚未連接','列印狀態尚未連接'])assert.match(app,new RegExp(marker));
 });
+
+
+test('runtime boundary remains UI-independent for later SMT transport wiring',()=>{
+  const runtime=fs.readFileSync(path.join(srcRoot,'runtime.ts'),'utf8');
+  const app=fs.readFileSync(path.join(srcRoot,'App.tsx'),'utf8');
+  assert.match(runtime,/installSmmRuntimePort/);
+  assert.match(runtime,/__MFK_SMM_PRODUCT_PORT__/);
+  assert.doesNotMatch(app,/fetch\s*\(/);
+  assert.doesNotMatch(app,/WebSocket\s*\(/);
+  assert.doesNotMatch(app,/XMLHttpRequest/);
+  assert.doesNotMatch(app,/192\.168\./);
+});
