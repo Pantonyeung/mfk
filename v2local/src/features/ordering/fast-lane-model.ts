@@ -1,5 +1,6 @@
 import type {SyncedCombo,SyncedComboPool,SyncedOptionSet} from '../../runtime/admin-config-projection.ts';
 import type {ServiceMode} from './ordering-workspace-model.ts';
+import {MFK_ORDER_LINE_COMPOSITION_SCHEMA,normalizeMfkOrderLineCompositionV1,type MfkOrderLineCompositionV1} from '../../../../contracts/order-line-composition-v1.ts';
 
 export interface FastLaneProduct{
   readonly id:string;
@@ -595,3 +596,68 @@ export function nextPairingIndex(lines:readonly FastLaneCartLine[]):number{
 }
 
 export function pairingLabel(index:number){return letter(index);}
+
+
+export function serializeFastLaneComposition(
+  line:FastLaneCartLine,
+  mode:'HOLD'|'ORDER'='HOLD',
+):MfkOrderLineCompositionV1{
+  if(mode==='ORDER'&&line.comboDraft?.pendingGroups.some(group=>group.required)){
+    throw new Error('FAST_LANE_FORMAL_ORDER_PENDING_REQUIRED');
+  }
+  return Object.freeze({
+    schema:MFK_ORDER_LINE_COMPOSITION_SCHEMA,
+    kind:line.comboDraft?'COMBO':'PRODUCT',
+    cartLineId:line.id,
+    ...(line.optionSelections?{optionSelections:line.optionSelections}:{}),
+    ...(line.freeNote!==undefined?{freeNote:line.freeNote}:{}),
+    ...(line.comboDraft?{combo:{
+      comboId:line.comboDraft.comboId,
+      comboName:line.comboDraft.comboName,
+      pairingLabel:line.comboDraft.pairingLabel,
+      source:line.comboDraft.source,
+      components:line.comboDraft.components.map(component=>({
+        groupId:component.groupId,
+        groupName:component.groupName,
+        role:component.role,
+        choiceId:component.choiceId,
+        choiceLabel:component.choiceLabel,
+        sourceLineId:component.sourceLineId,
+        snapshot:{...component.snapshot},
+      })),
+      resolvedChoices:line.comboDraft.resolvedChoices.map(choice=>({...choice})),
+      pendingGroups:line.comboDraft.pendingGroups.map(group=>({...group})),
+    }}:{}),
+  });
+}
+
+export function restoreFastLaneLineComposition(
+  line:FastLaneCartLine,
+  raw:unknown,
+):FastLaneCartLine{
+  const composition=normalizeMfkOrderLineCompositionV1(raw);
+  if(!composition)return line;
+  return {
+    ...line,
+    id:composition.cartLineId,
+    ...(composition.optionSelections?{optionSelections:composition.optionSelections}:{}),
+    ...(composition.freeNote!==undefined?{freeNote:composition.freeNote}:{}),
+    ...(composition.combo?{comboDraft:{
+      comboId:composition.combo.comboId,
+      comboName:composition.combo.comboName,
+      pairingLabel:composition.combo.pairingLabel,
+      source:composition.combo.source,
+      components:composition.combo.components.map(component=>({
+        groupId:component.groupId,
+        groupName:component.groupName,
+        role:component.role,
+        choiceId:component.choiceId,
+        choiceLabel:component.choiceLabel,
+        sourceLineId:component.sourceLineId,
+        snapshot:{...component.snapshot},
+      })),
+      resolvedChoices:composition.combo.resolvedChoices.map(choice=>({...choice})),
+      pendingGroups:composition.combo.pendingGroups.map(group=>({...group})),
+    }}:{}),
+  };
+}
