@@ -88,7 +88,10 @@ export function OrderingWorkspace({view,actions,centerPanel}:{view:OrderingWorks
   const quickDrink=view.quickDrink??{open:false,pendingCount:0,choices:[]};
   const itemCount=view.cart.lines.reduce((sum,line)=>sum+line.quantity,0);
   const guidanceTarget=view.guidanceTarget??(itemCount?'checkout':'product');
-  return <div className={`ordering-workspace donor-skeleton${centerPanel?' panel-open':''}`} data-guidance={guidanceTarget}>
+  const categoryRows=view.categoryRows??2;
+  const categoryColumns=view.categoryColumns??7;
+  const productDensity=view.productDensity??'standard';
+  return <div className={`ordering-workspace donor-skeleton density-${productDensity}${centerPanel?' panel-open':''}`} data-guidance={guidanceTarget}>
     <header className="ordering-flow-strip">
       <QueueStrip title="待處理" kind="pending" orders={view.pendingOrders} onOpen={actions.onOpenQueueOrder}/>
       <QueueStrip title="Keeta" kind="active" orders={view.activeOrders} onOpen={actions.onOpenQueueOrder}/>
@@ -106,7 +109,15 @@ export function OrderingWorkspace({view,actions,centerPanel}:{view:OrderingWorks
           </div>
         </section>:null}
         <div className="ordering-browse-body">
-          {view.showCategories===false?null:<nav className="ordering-categories" aria-label="商品分類">
+          {view.showCategories===false?null:<nav
+            className="ordering-categories"
+            aria-label="商品分類"
+            style={{
+              gridTemplateColumns:`repeat(${categoryColumns},minmax(0,1fr))`,
+              maxHeight:categoryRows===1?'44px':'95px',
+              overflowY:'auto',
+            }}
+          >
             {view.categories.map(category=><button type="button" key={category.id} aria-pressed={view.selectedCategoryId===category.id} className={view.selectedCategoryId===category.id?'active':''} onClick={()=>actions.onSelectCategory(category.id)}>{category.label}</button>)}
           </nav>}
           <section className="ordering-product-grid">{view.products.map(product=><ProductCard key={product.id} product={product} actions={actions} orderingMode={orderingMode} recentlyAdded={view.recentlyAddedProductId===product.id}/>)}</section>
