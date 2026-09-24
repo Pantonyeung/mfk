@@ -40,7 +40,9 @@ test('motion system is tokenized and has a reduced-motion functional fallback',(
 test('memory jar and recommendations use projected product and history data',()=>{
   assert.match(app,/記憶罐/);
   assert.match(app,/記憶種子/);
-  assert.match(app,/product\.available&&Boolean\(product\.badge\)/);
+  assert.match(app,/buildCustomerRecommendations/);
+  assert.match(recommendation,/product\.badge/);
+  assert.match(recommendation,/appearedInHistory/);
   assert.match(app,/buildReorderCart/);
   assert.doesNotMatch(app,/fake|fixture|mock/i);
 });
