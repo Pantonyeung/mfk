@@ -1,6 +1,8 @@
 export type CheckoutChannelId='walk-in'|'whatsapp'|'morefun-app'|'keeta'|'foodpanda';
 export type CheckoutTenderId='CASH'|'ALIPAY'|'WECHAT'|'FPS'|'PAYME'|'COMBO';
 export type CheckoutPaymentState='selected'|'processing'|'success'|'failure';
+export type CheckoutSettlementMode='LOCAL_PAYMENT'|'CHANNEL_INFO';
+export type CheckoutChannelFieldId='customerPhone'|'platformOrderNo'|'pickupCode';
 
 export interface CheckoutOrderLineViewModel {
   readonly id:string;
@@ -43,6 +45,7 @@ export interface CheckoutWorkspaceViewModel {
   readonly order:CheckoutOrderViewModel;
   readonly channels:readonly CheckoutChannelViewModel[];
   readonly methods:readonly CheckoutPaymentMethodViewModel[];
+  readonly settlementMode:CheckoutSettlementMode;
   readonly selectedMethodLabel:string;
   readonly amount:{readonly dueLabel:string;readonly receivedLabel:string;readonly changeLabel:string};
   readonly cashInput:string;
@@ -50,12 +53,16 @@ export interface CheckoutWorkspaceViewModel {
   readonly exactCashEnabled:boolean;
   readonly confirmEnabled:boolean;
   readonly paymentState:CheckoutPaymentState;
-  readonly channelFields:{
-    readonly showCustomerPhone:boolean;
-    readonly customerPhone:string;
-    readonly showPlatformFields:boolean;
-    readonly pickupCode:string;
-    readonly platformOrderNo:string;
+  readonly channelInfo:{
+    readonly title:string;
+    readonly helperLabel?:string;
+    readonly fields:readonly {
+      readonly id:CheckoutChannelFieldId;
+      readonly label:string;
+      readonly placeholder:string;
+      readonly value:string;
+      readonly required:boolean;
+    }[];
   };
   readonly comboMode:boolean;
   readonly splitTenders:readonly CheckoutSplitTenderViewModel[];
@@ -76,9 +83,7 @@ export interface CheckoutWorkspaceActions {
   readonly onBack:()=>void;
   readonly onSelectChannel:(channelId:CheckoutChannelId)=>void;
   readonly onSelectMethod:(methodId:CheckoutTenderId)=>void;
-  readonly onChangeCustomerPhone:(value:string)=>void;
-  readonly onChangePickupCode:(value:string)=>void;
-  readonly onChangePlatformOrderNo:(value:string)=>void;
+  readonly onChangeChannelInfo:(fieldId:CheckoutChannelFieldId,value:string)=>void;
   readonly onChangeSplitAmount:(methodId:Exclude<CheckoutTenderId,'COMBO'>,value:string)=>void;
   readonly onCashKey:(key:string)=>void;
   readonly onQuickCash:(amount:number)=>void;
