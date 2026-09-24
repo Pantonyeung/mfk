@@ -30,6 +30,7 @@ export interface StoredOrder{
   providerRef?:string;providerMessageId?:string;providerPickupCode?:string;orderRemark?:string;utensilPreference?:'需要'|'不需要';
   providerLastEventId?:number;providerLastEventName?:string;providerLastEventAt?:string;providerLastMessageId?:string;providerLifecycleNote?:string;
   acceptancePrintedAt?:string;
+  paymentEvidenceRef?:string;paymentVerificationState?:'PENDING'|'VERIFIED'|'REJECTED';
   items:readonly {id:string;name:string;qty:number;unitMinor:number;serviceMode?:'takeaway'|'dine-in';productCode?:string;detail?:string;composition?:MfkOrderLineCompositionV1}[];
 }
 export type DiningTender='CASH'|'ALIPAY'|'WECHAT'|'FPS'|'PAYME'|'COMBO';
@@ -189,6 +190,8 @@ export interface MfkLocalRuntime extends CleanSmtCoreRuntimePort{
     providerPickupCode?:string;
     orderRemark?:string;
     utensilPreference?:'需要'|'不需要';
+    paymentEvidenceRef?:string;
+    paymentVerificationState?:'PENDING'|'VERIFIED'|'REJECTED';
     initialFulfillmentLabel?:StoredOrder['fulfillmentLabel'];
   }):StoredOrder;
   orders():readonly StoredOrder[];
@@ -471,6 +474,8 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
       ...(input.providerPickupCode?{providerPickupCode:String(input.providerPickupCode)}:{}),
       ...(input.orderRemark?{orderRemark:String(input.orderRemark)}:{}),
       ...(input.utensilPreference?{utensilPreference:input.utensilPreference}:{}),
+      ...(input.paymentEvidenceRef?{paymentEvidenceRef:input.paymentEvidenceRef}:{}),
+      ...(input.paymentVerificationState?{paymentVerificationState:input.paymentVerificationState}:{}),
       ...(session?{staffId:session.staffId,staffName:session.displayName}:{}),
       items:input.items.map(item=>normalizeCompositionItem({...item})),
     };
