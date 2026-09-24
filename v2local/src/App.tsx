@@ -400,7 +400,7 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode,uiSettings}:{cart
             }}
           />
           :panel?.type==='holds'
-            ?<HoldListWorkspace holds={heldCarts as readonly WorkspaceHoldDraft[]} onRestore={hold=>{
+            ?<HoldListWorkspace holds={heldCarts as readonly WorkspaceHoldDraft[]} currentCartCount={cart.reduce((sum,line)=>sum+line.qty,0)} onRestore={hold=>{
               const restored:CartLine[]=hold.items.map((item,index)=>{
                 const parts=item.name.split('｜');
                 const name=parts.shift()||item.name;
