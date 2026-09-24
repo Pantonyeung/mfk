@@ -170,3 +170,433 @@
 
 .ordering-menu-local-status{min-height:32px;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:4px 10px;border:1px solid #cfe2d8;border-radius:8px;background:#f3faf6;color:#286145}
 .ordering-menu-local-status b{font-size:12px;font-weight:950;letter-spacing:.03em}.ordering-menu-local-status span{font-size:11px;color:#6b7770}
+
+
+/* =========================================================
+   SMT Donor Skeleton Fusion V2 R1
+   Current MFK authority + legacy SMT workflow geometry
+   ========================================================= */
+.ordering-workspace.donor-skeleton{
+  grid-template-columns:minmax(0,1fr) 470px;
+  grid-template-rows:78px minmax(0,1fr) 60px;
+  grid-template-areas:"queue cart" "catalog cart" "work cart";
+  gap:10px;
+  padding:10px;
+  background:#f4f6f8;
+}
+
+/* Donor principle: queue awareness is persistent, compact, and non-blocking. */
+.donor-skeleton .ordering-flow-strip{
+  gap:8px;
+}
+.donor-skeleton .ordering-queue-group{
+  min-height:0;
+  padding:7px 9px;
+  display:grid;
+  grid-template-columns:auto minmax(0,1fr);
+  align-items:center;
+  gap:8px;
+  border-radius:11px;
+  box-shadow:0 3px 12px rgba(25,25,30,.035);
+}
+.donor-skeleton .ordering-queue-group>header{
+  min-width:78px;
+  margin:0;
+  gap:6px;
+}
+.donor-skeleton .ordering-queue-group>header strong{font-size:14px}
+.donor-skeleton .ordering-queue-group>header span{
+  min-width:24px;
+  height:24px;
+  padding:0 5px;
+  font-size:10px;
+}
+.donor-skeleton .ordering-queue-list{
+  min-width:0;
+  display:flex;
+  gap:6px;
+  overflow-x:auto;
+  scrollbar-width:none;
+}
+.donor-skeleton .ordering-queue-list::-webkit-scrollbar{display:none}
+.donor-skeleton .ordering-queue-card{
+  flex:0 0 160px;
+  min-height:46px;
+  padding:5px 8px;
+  display:grid;
+  gap:2px;
+  border:1px solid #dfe3e8;
+  border-left:4px solid #e79337;
+  border-radius:8px;
+  background:#fff;
+  text-align:left;
+  transition:transform 90ms ease,border-color 140ms ease,box-shadow 140ms ease;
+}
+.donor-skeleton .ordering-queue-group--active .ordering-queue-card{border-left-color:#5b71c8}
+.donor-skeleton .ordering-queue-card>span{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:6px;
+}
+.donor-skeleton .ordering-queue-card b{font-size:14px}
+.donor-skeleton .ordering-queue-card strong{font-size:10px;color:#667085}
+.donor-skeleton .ordering-queue-card em{font-style:normal;font-size:10px;color:#667085}
+.donor-skeleton .ordering-queue-card small{font-size:9px;color:#667085}
+.donor-skeleton .ordering-queue-card:active{transform:scale(.98)}
+.donor-skeleton .ordering-empty{margin:0;color:#98a2b3;font-size:11px}
+
+/* Product area: stable four-column muscle-memory grid. */
+.donor-skeleton .ordering-catalog{
+  position:relative;
+  grid-template-rows:auto minmax(0,1fr);
+  gap:8px;
+}
+.donor-skeleton .ordering-status-stack{
+  position:absolute;
+  z-index:35;
+  top:4px;
+  right:4px;
+  width:min(360px,46%);
+  display:grid;
+  gap:5px;
+  pointer-events:none;
+}
+.donor-skeleton .ordering-status-stack .ordering-menu-local-status{
+  min-height:28px;
+  padding:4px 8px;
+  box-shadow:0 8px 20px rgba(15,23,42,.08);
+  pointer-events:auto;
+}
+.donor-skeleton .ordering-categories{
+  grid-template-columns:repeat(7,minmax(0,1fr));
+  gap:7px;
+}
+.donor-skeleton .ordering-categories button{
+  min-height:50px;
+  border-radius:9px;
+  font-size:16px;
+}
+.donor-skeleton .ordering-product-grid{
+  grid-template-columns:repeat(4,minmax(0,1fr))!important;
+  grid-auto-rows:142px!important;
+  align-content:start!important;
+  gap:9px;
+}
+.donor-skeleton .ordering-product-card{
+  height:100%;
+  border-radius:11px;
+}
+.donor-skeleton .ordering-product-card.text-only .ordering-product-body{
+  display:block;
+}
+.donor-skeleton .ordering-product-card.text-only .ordering-product-copy{
+  height:100%;
+  box-sizing:border-box;
+  padding:13px 14px;
+  display:grid;
+  grid-template-rows:minmax(0,1fr) auto;
+  align-content:stretch;
+  gap:5px;
+}
+.donor-skeleton .ordering-product-card.text-only .ordering-product-copy small{
+  position:static;
+  justify-self:start;
+}
+.donor-skeleton .ordering-product-card.text-only .ordering-product-copy b{
+  align-self:center;
+  font-size:23px;
+  line-height:1.12;
+  white-space:normal;
+  overflow:hidden;
+  display:-webkit-box;
+  -webkit-line-clamp:2;
+  -webkit-box-orient:vertical;
+}
+.donor-skeleton .ordering-product-card.text-only .ordering-product-copy strong{
+  align-self:end;
+  font-size:23px;
+}
+.donor-skeleton .ordering-product-card.has-media .ordering-product-body{
+  grid-template-columns:82px minmax(0,1fr);
+  grid-template-rows:1fr;
+}
+.donor-skeleton .ordering-product-card.has-media .ordering-product-media{
+  height:100%;
+}
+.donor-skeleton .ordering-product-card.has-media .ordering-product-copy{
+  min-height:0;
+  height:100%;
+  padding:10px 11px;
+  display:grid;
+  grid-template-rows:auto minmax(0,1fr) auto;
+}
+.donor-skeleton .ordering-product-card.has-media .ordering-product-copy b{
+  align-self:center;
+  font-size:20px;
+  white-space:normal;
+  display:-webkit-box;
+  -webkit-line-clamp:2;
+  -webkit-box-orient:vertical;
+}
+.donor-skeleton .ordering-product-card.has-media .ordering-product-copy strong{
+  align-self:end;
+  font-size:21px;
+}
+.donor-skeleton .ordering-product-card.recently-added{
+  border-color:#90c9ab;
+  background:#f2fbf6;
+  box-shadow:0 0 0 3px rgba(21,133,90,.08);
+  animation:donor-product-confirm 260ms ease-out both;
+}
+
+/* Live Check: functions stay, vertical waste goes away. */
+.donor-skeleton .ordering-cart{
+  grid-template-rows:auto minmax(0,1fr) auto auto auto;
+  padding:12px;
+  border-radius:15px;
+}
+.donor-skeleton .ordering-cart-head{
+  align-items:center;
+  gap:8px;
+  padding-bottom:9px;
+}
+.donor-skeleton .ordering-cart-order-id{
+  min-width:108px;
+}
+.donor-skeleton .ordering-cart-order-id small{font-size:10px}
+.donor-skeleton .ordering-cart-order-id strong{font-size:29px;line-height:1}
+.donor-skeleton .ordering-cart-order-id span{font-size:10px;color:#8a95a3}
+.donor-skeleton .donor-head-actions{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(70px,1fr));
+  gap:5px;
+}
+.donor-skeleton .ordering-cart-cycle{
+  min-height:42px;
+  padding:4px 7px;
+  border:1px solid #ccd5df;
+  border-radius:8px;
+  background:#fff;
+  color:#334860;
+  font-size:12px;
+  font-weight:900;
+  transition:transform 90ms ease,border-color 140ms ease,background-color 140ms ease;
+}
+.donor-skeleton .ordering-cart-cycle.service.takeaway{
+  border-color:#bcd0ec;background:#f3f8ff;color:#195fba;
+}
+.donor-skeleton .ordering-cart-cycle.service.dine-in{
+  border-color:#c5ddce;background:#f2fbf6;color:#146c49;
+}
+.donor-skeleton .ordering-cart-cycle.combine.active{
+  border-color:#2d3c50;background:#2d3c50;color:#fff;
+}
+.donor-skeleton .ordering-cart-cycle:active{transform:scale(.96)}
+
+.donor-skeleton .ordering-cart-lines{padding:6px 0}
+.donor-skeleton .ordering-cart-empty{
+  height:100%;
+  color:#a0a8b3;
+  font-size:13px;
+}
+.donor-skeleton .ordering-cart-line{
+  grid-template-columns:54px minmax(0,1fr) 104px 40px!important;
+  grid-template-rows:auto auto;
+  gap:5px 8px;
+  min-height:90px;
+  padding:8px 0;
+}
+.donor-skeleton .ordering-line-identity{
+  grid-column:1;
+  grid-row:1/3;
+  width:46px;
+}
+.donor-skeleton .ordering-line-copy,.donor-skeleton .ordering-line-copy-button{
+  grid-column:2;
+  grid-row:1/3;
+}
+.donor-skeleton .ordering-line-copy b{
+  font-size:21px;
+  line-height:1.12;
+  white-space:normal;
+  overflow:hidden;
+  display:-webkit-box;
+  -webkit-line-clamp:2;
+  -webkit-box-orient:vertical;
+}
+.donor-skeleton .ordering-line-copy small{font-size:11px}
+.donor-skeleton .ordering-line-qty{
+  grid-column:3;
+  grid-row:1;
+  grid-template-columns:32px 32px 32px;
+}
+.donor-skeleton .ordering-line-qty button{
+  width:32px;
+  height:34px;
+}
+.donor-skeleton .ordering-line-total{
+  grid-column:3;
+  grid-row:2;
+  justify-self:end;
+  font-size:17px;
+}
+.donor-skeleton .ordering-line-remove{
+  grid-column:4;
+  grid-row:1/3;
+  align-self:stretch;
+  width:38px;
+  display:grid;
+  place-items:center;
+  padding:0;
+  border:1px solid #ead8d5;
+  border-radius:8px;
+  background:#fff8f7;
+  color:#aa4239;
+}
+.donor-skeleton .ordering-line-remove:active{
+  transform:scale(.94);
+  background:#fff0ed;
+}
+.donor-skeleton .ordering-cart-price-strip{
+  min-height:40px;
+  padding:6px 0 7px;
+  display:flex;
+  align-items:center;
+  gap:11px;
+  border-top:1px solid #edf1f5;
+  color:#667085;
+  font-size:11px;
+}
+.donor-skeleton .ordering-cart-price-strip span{
+  display:flex;
+  gap:4px;
+  white-space:nowrap;
+}
+.donor-skeleton .ordering-cart-price-strip b{
+  color:#475467;
+}
+.donor-skeleton .ordering-cart-price-strip>strong{
+  margin-left:auto;
+  color:#203a5b;
+  font-size:23px;
+  font-variant-numeric:tabular-nums;
+}
+.donor-skeleton .ordering-cart-secondary-actions{
+  width:100%;
+  display:grid;
+  gap:7px;
+  margin:0 0 8px;
+}
+.donor-skeleton .ordering-cart-secondary-actions.active-cart{grid-template-columns:1fr 1fr}
+.donor-skeleton .ordering-cart-secondary-actions.empty-cart{grid-template-columns:1fr}
+.donor-skeleton .ordering-cart-secondary-actions button,
+.donor-skeleton .ordering-cart-secondary-actions span{
+  min-height:50px;
+  width:100%;
+}
+.donor-skeleton .ordering-cart-secondary-actions button{
+  border:1px solid #c7d1de;
+  border-radius:9px;
+  background:#fff;
+  color:#334860;
+  font-size:15px;
+  font-weight:900;
+}
+.donor-skeleton .ordering-cart-secondary-actions .destructive{
+  border-color:#dfb7b1;background:#fff7f5;color:#a63f36;
+}
+.donor-skeleton .ordering-cart-secondary-actions .retrieve{
+  border-color:#9fc0ea;background:#eef5ff;color:#1559af;
+}
+.donor-skeleton .ordering-cart-secondary-actions .retrieve b{
+  min-width:23px;height:23px;margin-left:5px;display:inline-grid;place-items:center;border-radius:999px;background:#1768dc;color:#fff;font-size:10px;
+}
+.donor-skeleton .ordering-checkout{
+  width:100%;
+  min-height:62px;
+  border-radius:10px;
+  font-size:20px;
+}
+
+/* Fixed MoreFunOS accelerators: zero stays quiet, position never moves. */
+.donor-skeleton .ordering-workbar{
+  gap:7px;
+}
+.donor-skeleton .ordering-workbar button{
+  min-height:54px;
+  padding:0 12px;
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto;
+  align-items:center;
+  border-radius:9px;
+  font-size:14px;
+  text-align:left;
+}
+.donor-skeleton .ordering-workbar b{
+  min-width:27px;
+  height:27px;
+  padding:0 5px;
+  font-size:10px;
+  color:#667085;
+  background:#eef2f6;
+}
+.donor-skeleton .ordering-workbar button.has-work{
+  border-color:#d7bd7a;
+  background:#fff8e7;
+}
+.donor-skeleton .ordering-workbar button.has-work b{
+  background:#efc766;
+  color:#5e4208;
+}
+
+@keyframes donor-product-confirm{
+  0%{transform:scale(.98)}
+  65%{transform:scale(1.01)}
+  100%{transform:none}
+}
+
+@media(max-width:1400px){
+  .ordering-workspace.donor-skeleton{
+    grid-template-columns:minmax(0,1fr) 420px;
+    grid-template-rows:72px minmax(0,1fr) 56px;
+    gap:8px;
+    padding:8px;
+  }
+  .donor-skeleton .ordering-product-grid{grid-auto-rows:124px!important}
+  .donor-skeleton .ordering-product-card.text-only .ordering-product-copy b{font-size:20px}
+  .donor-skeleton .ordering-cart-line{grid-template-columns:50px minmax(0,1fr) 96px 36px!important}
+  .donor-skeleton .ordering-line-remove{width:34px}
+  .donor-skeleton .donor-head-actions{grid-template-columns:repeat(3,minmax(62px,1fr))}
+}
+
+@media(prefers-reduced-motion:reduce){
+  .donor-skeleton .ordering-queue-card,
+  .donor-skeleton .ordering-cart-cycle,
+  .donor-skeleton .ordering-line-remove,
+  .donor-skeleton .ordering-product-card{transition:none!important}
+  .donor-skeleton .ordering-product-card.recently-added{animation:none!important}
+}
+
+.donor-skeleton .ordering-cart-blocking{margin:0 0 8px;padding:8px 10px;border:1px solid #e8c783;border-radius:8px;background:#fff8e8;color:#7a5514;font-size:11px;font-weight:850;line-height:1.35}
+
+/* Quick Mode + Quick Drink donor fusion: overlay controls never resize the product grid. */
+.donor-skeleton .ordering-catalog{position:relative}
+.donor-skeleton .ordering-catalog-toolbar{min-width:0;display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
+.donor-skeleton .ordering-status-stack{min-width:0;flex:1;display:grid;gap:4px}
+.donor-skeleton .ordering-fast-controls{flex:0 0 auto;display:flex;align-items:center;gap:7px}
+.donor-skeleton .ordering-mode-switch{height:34px;padding:3px;display:flex;align-items:center;border:1px solid #d9dee5;border-radius:9px;background:#edf0f3}
+.donor-skeleton .ordering-mode-switch button{height:28px;padding:0 10px;border:0;border-radius:6px;background:transparent;color:#68717d;font-size:11px;font-weight:900}
+.donor-skeleton .ordering-mode-switch button.active{background:#fff;color:#21374f;box-shadow:0 1px 4px rgba(20,30,40,.12)}
+.donor-skeleton .ordering-quick-drink-toggle{height:34px;padding:0 10px;border:1px solid #d9dee5;border-radius:9px;background:#fff;color:#485566;font-size:11px;font-weight:900}
+.donor-skeleton .ordering-quick-drink-toggle b{display:inline-grid;place-items:center;min-width:20px;height:20px;margin-left:4px;padding:0 4px;border-radius:999px;background:#edf0f3;color:#596574;font-size:10px}
+.donor-skeleton .ordering-quick-drink-toggle.has-work{border-color:#d99e42;background:#fff8e8;color:#7c571b}
+.donor-skeleton .ordering-quick-drink-toggle.has-work b{background:#d98d25;color:#fff}
+.donor-skeleton .ordering-quick-drink-drawer{position:absolute;left:0;right:0;bottom:0;z-index:7;max-height:190px;padding:10px;border:1px solid #cfd6df;border-radius:12px;background:#fff;box-shadow:0 -9px 28px rgba(26,37,50,.14)}
+.donor-skeleton .ordering-quick-drink-drawer>header{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}
+.donor-skeleton .ordering-quick-drink-drawer>header>div{display:grid;gap:1px}.donor-skeleton .ordering-quick-drink-drawer>header small{font-size:9px;letter-spacing:.08em;color:#798593}.donor-skeleton .ordering-quick-drink-drawer>header strong{font-size:14px}
+.donor-skeleton .ordering-quick-drink-drawer>header>span{display:flex;gap:6px}.donor-skeleton .ordering-quick-drink-drawer>header button{min-height:30px;padding:0 9px;border:1px solid #d8dee6;border-radius:7px;background:#fff;font-size:10px;font-weight:850}
+.donor-skeleton .ordering-quick-drink-list{display:flex;gap:7px;overflow-x:auto;overscroll-behavior-inline:contain;padding-bottom:2px}
+.donor-skeleton .ordering-quick-drink-list>button{flex:0 0 130px;min-height:66px;padding:8px;border:1px solid #d9dee5;border-radius:9px;background:#fafbfc;display:grid;align-content:center;gap:2px;text-align:left}
+.donor-skeleton .ordering-quick-drink-list>button b{font-size:12px}.donor-skeleton .ordering-quick-drink-list>button small{font-size:10px;color:#7a8592}.donor-skeleton .ordering-quick-drink-list>button em{font-style:normal;font-size:9px;font-weight:900;color:#9a6b1d}
+.donor-skeleton .ordering-quick-drink-list>button:disabled{opacity:.45}.donor-skeleton .ordering-quick-drink-list>p{margin:12px;color:#7c8794;font-size:11px}

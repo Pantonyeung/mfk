@@ -19,6 +19,7 @@ export interface OrderingProductViewModel {
   readonly priceLabel:string;
   readonly enabled:boolean;
   readonly requiresOptions:boolean;
+  readonly quickAddAllowed:boolean;
   readonly badge?:string;
   readonly imageUrl?:string;
 }
@@ -32,24 +33,42 @@ export interface CartLineViewModel {
   readonly groupId:string;
   readonly groupLabel:string;
   readonly detail?:string;
+  readonly sourceLineIds?:readonly string[];
 }
 
 export interface OrderingCartViewModel {
   readonly orderId:string;
   readonly serviceMode:ServiceMode;
   readonly viewMode:'original'|'organized';
+  readonly combineSimilar:boolean;
   readonly lines:readonly CartLineViewModel[];
   readonly subtotalLabel:string;
   readonly packagingLabel:string;
   readonly discountLabel:string;
   readonly totalLabel:string;
   readonly checkoutEnabled:boolean;
+  readonly blockingMessage?:string;
 }
 
 export interface OrderingWorkItemViewModel {
   readonly id:'riceball-pool'|'required'|'combo';
   readonly label:string;
   readonly count:number;
+}
+
+export interface QuickDrinkChoiceViewModel{
+  readonly id:string;
+  readonly label:string;
+  readonly priceAdjustmentLabel?:string;
+  readonly enabled:boolean;
+  readonly requiresConfiguration:boolean;
+}
+
+export interface QuickDrinkViewModel{
+  readonly open:boolean;
+  readonly pendingCount:number;
+  readonly targetLabel?:string;
+  readonly choices:readonly QuickDrinkChoiceViewModel[];
 }
 
 export interface OrderingActionAvailability {
@@ -71,6 +90,9 @@ export interface OrderingWorkspaceViewModel {
   readonly showCategories?:boolean;
   readonly serviceModes?:Readonly<{takeaway:boolean;dineIn:boolean}>;
   readonly cart:OrderingCartViewModel;
+  readonly orderingMode:'normal'|'quick';
+  readonly quickDrink:QuickDrinkViewModel;
+  readonly heldCartCount:number;
   readonly workItems:readonly OrderingWorkItemViewModel[];
   readonly recentlyAddedProductId?:string;
   readonly highlightedCartLineId?:string;
@@ -82,12 +104,19 @@ export interface OrderingWorkspaceActions {
   readonly onSelectCategory:(categoryId:string)=>void;
   readonly onAddProduct:(productId:string)=>void;
   readonly onConfigureProduct:(productId:string)=>void;
+  readonly onChangeOrderingMode:(mode:'normal'|'quick')=>void;
+  readonly onToggleQuickDrink:()=>void;
+  readonly onSelectQuickDrink:(choiceId:string)=>void;
+  readonly onOpenQuickDrinkTargets:()=>void;
   readonly onChangeServiceMode:(mode:ServiceMode)=>void;
   readonly onChangeCartView:(mode:'original'|'organized')=>void;
-  readonly onChangeLineServiceMode:(lineId:string,mode:ServiceMode)=>void;
-  readonly onAdjustLineQuantity:(lineId:string,delta:-1|1)=>void;
-  readonly onEditCartLine:(lineId:string)=>void;
+  readonly onToggleCombine:()=>void;
+  readonly onChangeLineServiceMode:(lineIds:readonly string[],mode:ServiceMode)=>void;
+  readonly onAdjustLineQuantity:(lineIds:readonly string[],delta:-1|1)=>void;
+  readonly onEditCartLine:(lineIds:readonly string[])=>void;
+  readonly onRemoveCartLine:(lineIds:readonly string[])=>void;
   readonly onHoldCart:()=>void;
+  readonly onOpenHeldOrders:()=>void;
   readonly onCancelCart:()=>void;
   readonly onOpenWorkItem:(workItemId:OrderingWorkItemViewModel['id'])=>void;
   readonly onOpenQueueOrder:(kind:'pending'|'active',id:string)=>void;

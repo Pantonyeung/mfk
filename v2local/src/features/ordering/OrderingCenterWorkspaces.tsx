@@ -1,5 +1,6 @@
 import {useMemo,useState} from 'react';
 import type {SyncedCombo,SyncedComboPool,SyncedOptionSet} from '../../runtime/admin-config-projection.ts';
+import type {MfkOrderLineCompositionV1} from '../../../../contracts/order-line-composition-v1.ts';
 import './ordering-center-workspaces.css';
 
 export interface WorkspaceProduct{
@@ -23,13 +24,16 @@ export type OrderingPanelState=
   |{readonly type:'product';readonly productId:string}
   |{readonly type:'organize'}
   |{readonly type:'combo'}
+  |{readonly type:'fast-lane';readonly lane:'riceball-pool'|'required'|'combo'}
+  |{readonly type:'quick-drink-config';readonly productId:string;readonly comboLineId:string;readonly groupId:string;readonly choiceId:string}
+  |{readonly type:'pending-order';readonly orderId:string}
   |{readonly type:'hold'}
   |{readonly type:'holds'}
   |null;
 
 const money=(minor:number)=>(minor<0?'-':'')+String.fromCharCode(36)+(Math.abs(minor)/100).toFixed(2);
 
-export function ProductConfigWorkspace({product,onAdd}:{product:WorkspaceProduct;onAdd:(detail:string,deltaMinor:number,qty:number)=>void}){
+export function ProductConfigWorkspace({product,onAdd,maxQty=99}:{product:WorkspaceProduct;onAdd:(detail:string,deltaMinor:number,qty:number,structured:{readonly selections:Readonly<Record<string,readonly string[]>>;readonly note:string})=>void;maxQty?:number}){
   const [qty,setQty]=useState(1);
   const [note,setNote]=useState('');
   const [selected,setSelected]=useState<Record<string,string[]>>(()=>Object.fromEntries(
@@ -70,7 +74,7 @@ export function ProductConfigWorkspace({product,onAdd}:{product:WorkspaceProduct
     <header className="cfg-product-head">
       <div className="cfg-product-hero">{product.imageUrl?<img src={product.imageUrl} alt=""/>:null}</div>
       <div><small>{product.category}</small><h2>{product.name}</h2><strong>{money(product.priceMinor+delta)}</strong></div>
-      <div className="cfg-qty"><span>數量</span><button onClick={()=>setQty(Math.max(1,qty-1))}>−</button><b>{qty}</b><button onClick={()=>setQty(qty+1)}>＋</button></div>
+      <div className="cfg-qty"><span>數量</span><button disabled={qty<=1} onClick={()=>setQty(Math.max(1,qty-1))}>−</button><b>{qty}</b><button disabled={qty>=maxQty} onClick={()=>setQty(Math.min(maxQty,qty+1))}>＋</button></div>
     </header>
 
     {(product.optionSets??[]).length
@@ -87,7 +91,7 @@ export function ProductConfigWorkspace({product,onAdd}:{product:WorkspaceProduct
       :<section className="cfg-block"><header><b>商品選項</b><span>Admin</span></header><p>此商品目前冇已發布選項組。</p></section>}
 
     <label className="cfg-note"><span>備註</span><input value={note} maxLength={60} onChange={event=>setNote(event.target.value)} placeholder="例如：不要蔥、醬分開"/><small>{note.length}/60</small></label>
-    <footer className="cfg-action"><div><span>單價</span><b>{money(product.priceMinor+delta)}</b></div><button className="primary" disabled={invalid} onClick={()=>onAdd(detail,delta,qty)}>加入訂單　{money((product.priceMinor+delta)*qty)}</button></footer>
+    <footer className="cfg-action"><div><span>單價</span><b>{money(product.priceMinor+delta)}</b></div><button className="primary" disabled={invalid} onClick={()=>onAdd(detail,delta,qty,{selections:selected,note:note.trim()})}>加入訂單　{money((product.priceMinor+delta)*qty)}</button></footer>
   </div>;
 }
 
@@ -261,7 +265,7 @@ export interface WorkspaceHoldDraft{
   readonly note:string;
   readonly totalMinor:number;
   readonly assignedTable?:string;
-  readonly items:readonly {id:string;name:string;qty:number;unitMinor:number}[];
+  readonly items:readonly {id:string;name:string;qty:number;unitMinor:number;serviceMode?:'takeaway'|'dine-in';detail?:string;composition?:MfkOrderLineCompositionV1}[];
 }
 
 export function HoldListWorkspace({holds,onRestore,onRemove}:{holds:readonly WorkspaceHoldDraft[];onRestore:(hold:WorkspaceHoldDraft)=>void;onRemove:(id:string)=>void}){
@@ -271,7 +275,7 @@ export function HoldListWorkspace({holds,onRestore,onRemove}:{holds:readonly Wor
       {holds.length?holds.map(hold=><article key={hold.id}>
         <div className="hold-list-head"><div><b>{hold.codeLabel}</b><span>{hold.kind==='dining'?'堂食／輪候':'暫存待客'}</span></div><strong>{money(hold.totalMinor)}</strong></div>
         <div className="hold-list-meta"><span>{new Date(hold.createdAt).toLocaleTimeString('zh-HK',{hour:'2-digit',minute:'2-digit'})}</span><span>{hold.partySize} 位</span>{hold.assignedTable?<span>枱 {hold.assignedTable.replace('T','')}</span>:null}</div>
-        <div className="hold-list-items">{hold.items.map((item,index)=><p key={hold.id+'-'+index}><span>{item.qty}×</span><b>{item.name}</b><strong>{money(item.qty*item.unitMinor)}</strong></p>)}</div>
+        <div className="hold-list-items">{hold.items.map((item,index)=><p key={hold.id+'-'+index}><span>{item.qty}×</span><b>{item.name}{item.detail?<small>{item.detail}</small>:null}</b><strong>{money(item.qty*item.unitMinor)}</strong></p>)}</div>
         {hold.note?<small>備註：{hold.note}</small>:null}
         <footer><button type="button" className="danger" onClick={()=>onRemove(hold.id)}>刪除暫存</button><button type="button" className="primary" onClick={()=>onRestore(hold)}>取回購物車</button></footer>
       </article>):<div className="hold-list-empty">而家未有暫存單。</div>}
