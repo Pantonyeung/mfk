@@ -1,5 +1,5 @@
 import type {PrintableOrder} from './print-routing.ts';
-import {groupPrintableSelections,productionBlockLines,verticalSelectionLines} from './print-content.ts';
+import {groupPrintableSelections,verticalSelectionLines} from './print-content.ts';
 
 export const ESC_POS_RASTER_PROFILE=Object.freeze({
   widthDots:576,
