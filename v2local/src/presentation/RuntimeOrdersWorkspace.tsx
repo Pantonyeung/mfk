@@ -60,6 +60,9 @@ export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePor
   const [keetaIntakeRevision,setKeetaIntakeRevision]=useState(0);
   const [keetaArrival,setKeetaArrival]=useState<{orderId:string;display:string;sourceLabel:string}|null>(null);
   const [customerArrival,setCustomerArrival]=useState<{orderId:string;display:string;sourceLabel:string}|null>(null);
+  const [paymentEvidenceUrl,setPaymentEvidenceUrl]=useState<string|null>(null);
+  const [paymentEvidenceBusy,setPaymentEvidenceBusy]=useState(false);
+  const [paymentReviewBusy,setPaymentReviewBusy]=useState(false);
   useEffect(()=>{
     const refresh=()=>setAfterSaleRevision(value=>value+1);
     window.addEventListener('mfk-keeta-after-sale',refresh);
@@ -148,6 +151,29 @@ export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePor
       unitMinor:Math.round(Number(line.unitLabel.replace(/[^0-9.]/g,''))*100)
     })));
   },[snapshot?.selectedOrderId]);
+
+  const openPaymentEvidence=async()=>{
+    if(!selected?.paymentEvidenceRef||!runtime.readPaymentEvidence||paymentEvidenceBusy)return;
+    setPaymentEvidenceBusy(true);setMessage(null);
+    try{
+      if(paymentEvidenceUrl)URL.revokeObjectURL(paymentEvidenceUrl);
+      const result=await runtime.readPaymentEvidence(selected.orderId);
+      setPaymentEvidenceUrl(result.objectUrl);
+    }catch(cause){
+      setMessage(cause instanceof Error?cause.message:'付款截圖讀取失敗');
+    }finally{setPaymentEvidenceBusy(false);}
+  };
+  const reviewPaymentEvidence=async(decision:'VERIFIED'|'REJECTED')=>{
+    if(!selected?.paymentEvidenceRef||!runtime.reviewPaymentEvidence||paymentReviewBusy)return;
+    setPaymentReviewBusy(true);setMessage(null);
+    try{
+      await runtime.reviewPaymentEvidence(selected.orderId,decision);
+      await load(selected.orderId,true);
+      setMessage(decision==='VERIFIED'?'付款截圖已核對，可以接受訂單。':'付款截圖未通過；訂單保持待處理，請再聯絡客人或取消。');
+    }catch(cause){
+      setMessage(cause instanceof Error?cause.message:'付款核對失敗');
+    }finally{setPaymentReviewBusy(false);}
+  };
 
   const acceptSelected=async()=>{
     if(!selected||!runtime.acceptOrder||acceptBusy)return;
@@ -299,6 +325,15 @@ export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePor
           {selected.lines.map((line,index)=><div key={line.id+'-'+index}><span>{line.quantity}</span><p><b>{line.name}</b><small>{line.unitLabel} × {line.quantity}</small></p><strong>{line.lineTotalLabel}</strong></div>)}
         </section>
         <section className="order-inspector-money"><div><span>訂單金額</span><b>{selected.totalLabel}</b></div><div><span>付款方式</span><b>{selected.paymentLabel}</b></div></section>
+        {selected.paymentEvidenceRef?<section className={'payment-review-card state-'+String(selected.paymentVerificationState||'PENDING').toLowerCase()}>
+          <header><div><span>電子支付</span><h3>{selected.paymentVerificationState==='VERIFIED'?'付款已核對':selected.paymentVerificationState==='REJECTED'?'付款截圖未通過':'付款待核對'}</h3></div><strong>{selected.paymentVerificationState??'PENDING'}</strong></header>
+          <p>{selected.paymentVerificationState==='VERIFIED'?'可以繼續接受訂單。':selected.paymentVerificationState==='REJECTED'?'訂單未取消；請聯絡客人或者由有權限員工取消訂單。':'先查看客人付款截圖，再決定是否通過。'}</p>
+          <div className="payment-review-actions">
+            <button type="button" disabled={paymentEvidenceBusy} onClick={()=>void openPaymentEvidence()}>{paymentEvidenceBusy?'載入中…':'查看付款截圖'}</button>
+            <button type="button" className="danger" disabled={paymentReviewBusy||selected.paymentVerificationState==='REJECTED'} onClick={()=>void reviewPaymentEvidence('REJECTED')}>不接受付款</button>
+            <button type="button" className="primary" disabled={paymentReviewBusy||selected.paymentVerificationState==='VERIFIED'} onClick={()=>void reviewPaymentEvidence('VERIFIED')}>確認付款</button>
+          </div>
+        </section>:null}
         {afterSales.length?<section className="order-after-sale">
           <header><b>Keeta 退款／售後</b><span>{afterSales.length}</span></header>
           {afterSales.map(row=><article key={row.afterSaleOrderId}>
@@ -320,7 +355,7 @@ export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePor
           <button onClick={()=>void openReprint()}>▣ 重印</button>
           <button disabled={!canCorrect} title={canCorrect?'':'需要 ORDER_CORRECTION 權限'} onClick={()=>setModal('actions')}>✎ 取消／修改</button>
           {selected.fulfillmentLabel==='待處理'
-            ?<button className="primary" disabled={!runtime.acceptOrder||acceptBusy} onClick={()=>void acceptSelected()}>{acceptBusy?'接單中…':String(selected.sourceLabel||'').startsWith('Keeta')?'接受 Keeta 訂單':'接受訂單'}</button>
+            ?<button className="primary" disabled={!runtime.acceptOrder||acceptBusy||(Boolean(selected.paymentEvidenceRef)&&selected.paymentVerificationState!=='VERIFIED')} title={selected.paymentEvidenceRef&&selected.paymentVerificationState!=='VERIFIED'?'請先核對付款截圖':''} onClick={()=>void acceptSelected()}>{acceptBusy?'接單中…':String(selected.sourceLabel||'').startsWith('Keeta')?'接受 Keeta 訂單':'接受訂單'}</button>
             :null}
           <button className="primary" disabled={!runtime.markOrderReady||readyBusy||selected.fulfillmentLabel==='待處理'||selected.fulfillmentLabel==='可取餐'||selected.fulfillmentLabel==='已完成'||selected.fulfillmentLabel==='已取消'} onClick={()=>void markReady()}>{readyBusy?'處理中…':'提前完成／可取餐'}</button>
         </footer>
@@ -357,6 +392,14 @@ export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePor
       {error?<p className="order-board-error">{error}</p>:null}
       {loading&&!snapshot?<p className="order-board-error">載入訂單…</p>:null}
     </section>
+
+    {paymentEvidenceUrl?<div className="order-modal-backdrop" onMouseDown={event=>{if(event.target===event.currentTarget){URL.revokeObjectURL(paymentEvidenceUrl);setPaymentEvidenceUrl(null);}}}>
+      <section className="order-modal payment-evidence-modal">
+        <header><h2>付款截圖</h2><button onClick={()=>{URL.revokeObjectURL(paymentEvidenceUrl);setPaymentEvidenceUrl(null);}}>×</button></header>
+        <div className="payment-evidence-preview"><img src={paymentEvidenceUrl} alt="客戶付款截圖"/></div>
+        <footer><button onClick={()=>{URL.revokeObjectURL(paymentEvidenceUrl);setPaymentEvidenceUrl(null);}}>關閉</button></footer>
+      </section>
+    </div>:null}
 
     {selected&&modal?<div className="order-modal-backdrop" onMouseDown={event=>{if(event.target===event.currentTarget)setModal(null)}}>
       <section className={'order-modal '+modal}>
