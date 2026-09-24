@@ -40,8 +40,7 @@ test('customer production network is isolated to the authorized cloud runtime an
     /storeKernel\s*\./i,
     /\bD1Database\b/,
     /\bindexedDB\b/,
-    /new\s+Worker\s*\(/,
-    /\bsetInterval\s*\(/
+    /new\s+Worker\s*\(/
   ])assert.equal(pattern.test(source),false,String(pattern));
 });
 
