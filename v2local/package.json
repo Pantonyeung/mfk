@@ -13,12 +13,14 @@
     "react-dom": "19.2.8",
     "react-router": "8.3.0",
     "buffer": "6.0.3",
-    "iconv-lite": "0.7.0"
+    "iconv-lite": "0.7.0",
+    "qrcode": "1.5.4"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "6.0.4",
     "typescript": "5.8.3",
     "vite": "8.1.5",
-    "vitest": "4.1.10"
+    "vitest": "4.1.10",
+    "@types/qrcode": "1.5.5"
   }
 }
