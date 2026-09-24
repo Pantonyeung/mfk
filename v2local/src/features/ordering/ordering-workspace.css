@@ -579,3 +579,24 @@
 }
 
 .donor-skeleton .ordering-cart-blocking{margin:0 0 8px;padding:8px 10px;border:1px solid #e8c783;border-radius:8px;background:#fff8e8;color:#7a5514;font-size:11px;font-weight:850;line-height:1.35}
+
+/* Quick Mode + Quick Drink donor fusion: overlay controls never resize the product grid. */
+.donor-skeleton .ordering-catalog{position:relative}
+.donor-skeleton .ordering-catalog-toolbar{min-width:0;display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
+.donor-skeleton .ordering-status-stack{min-width:0;flex:1;display:grid;gap:4px}
+.donor-skeleton .ordering-fast-controls{flex:0 0 auto;display:flex;align-items:center;gap:7px}
+.donor-skeleton .ordering-mode-switch{height:34px;padding:3px;display:flex;align-items:center;border:1px solid #d9dee5;border-radius:9px;background:#edf0f3}
+.donor-skeleton .ordering-mode-switch button{height:28px;padding:0 10px;border:0;border-radius:6px;background:transparent;color:#68717d;font-size:11px;font-weight:900}
+.donor-skeleton .ordering-mode-switch button.active{background:#fff;color:#21374f;box-shadow:0 1px 4px rgba(20,30,40,.12)}
+.donor-skeleton .ordering-quick-drink-toggle{height:34px;padding:0 10px;border:1px solid #d9dee5;border-radius:9px;background:#fff;color:#485566;font-size:11px;font-weight:900}
+.donor-skeleton .ordering-quick-drink-toggle b{display:inline-grid;place-items:center;min-width:20px;height:20px;margin-left:4px;padding:0 4px;border-radius:999px;background:#edf0f3;color:#596574;font-size:10px}
+.donor-skeleton .ordering-quick-drink-toggle.has-work{border-color:#d99e42;background:#fff8e8;color:#7c571b}
+.donor-skeleton .ordering-quick-drink-toggle.has-work b{background:#d98d25;color:#fff}
+.donor-skeleton .ordering-quick-drink-drawer{position:absolute;left:0;right:0;bottom:0;z-index:7;max-height:190px;padding:10px;border:1px solid #cfd6df;border-radius:12px;background:#fff;box-shadow:0 -9px 28px rgba(26,37,50,.14)}
+.donor-skeleton .ordering-quick-drink-drawer>header{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}
+.donor-skeleton .ordering-quick-drink-drawer>header>div{display:grid;gap:1px}.donor-skeleton .ordering-quick-drink-drawer>header small{font-size:9px;letter-spacing:.08em;color:#798593}.donor-skeleton .ordering-quick-drink-drawer>header strong{font-size:14px}
+.donor-skeleton .ordering-quick-drink-drawer>header>span{display:flex;gap:6px}.donor-skeleton .ordering-quick-drink-drawer>header button{min-height:30px;padding:0 9px;border:1px solid #d8dee6;border-radius:7px;background:#fff;font-size:10px;font-weight:850}
+.donor-skeleton .ordering-quick-drink-list{display:flex;gap:7px;overflow-x:auto;overscroll-behavior-inline:contain;padding-bottom:2px}
+.donor-skeleton .ordering-quick-drink-list>button{flex:0 0 130px;min-height:66px;padding:8px;border:1px solid #d9dee5;border-radius:9px;background:#fafbfc;display:grid;align-content:center;gap:2px;text-align:left}
+.donor-skeleton .ordering-quick-drink-list>button b{font-size:12px}.donor-skeleton .ordering-quick-drink-list>button small{font-size:10px;color:#7a8592}.donor-skeleton .ordering-quick-drink-list>button em{font-style:normal;font-size:9px;font-weight:900;color:#9a6b1d}
+.donor-skeleton .ordering-quick-drink-list>button:disabled{opacity:.45}.donor-skeleton .ordering-quick-drink-list>p{margin:12px;color:#7c8794;font-size:11px}
