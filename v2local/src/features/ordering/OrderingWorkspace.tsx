@@ -136,6 +136,7 @@ export function OrderingWorkspace({view,actions,centerPanel}:{view:OrderingWorks
         <button type="button" className="retrieve" onClick={actions.onOpenHeldOrders}>取回訂單 <b>{view.heldCartCount}</b></button>
       </div>:null}
 
+      {view.cart.blockingMessage?<div className="ordering-cart-blocking" role="status">{view.cart.blockingMessage}</div>:null}
       {view.cart.lines.length?<button type="button" className="ordering-checkout" aria-label="結帳" disabled={!view.cart.checkoutEnabled} onClick={actions.onCheckout}>前往結帳　{view.cart.totalLabel}</button>:null}
     </aside>
 
