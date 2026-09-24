@@ -308,23 +308,46 @@ export interface WorkspaceHoldDraft{
 }
 
 export function HoldListWorkspace({holds,currentCartCount=0,onRestore,onRemove}:{holds:readonly WorkspaceHoldDraft[];currentCartCount?:number;onRestore:(hold:WorkspaceHoldDraft)=>void;onRemove:(id:string)=>void}){
+  const [selectedId,setSelectedId]=useState<string|undefined>(()=>holds[0]?.id);
   const [restoreTarget,setRestoreTarget]=useState<WorkspaceHoldDraft|null>(null);
+  const selected=holds.find(hold=>hold.id===selectedId)??holds[0];
+
   const requestRestore=(hold:WorkspaceHoldDraft)=>{
     if(currentCartCount>0){setRestoreTarget(hold);return;}
     onRestore(hold);
   };
-  return <div className="hold-list-workspace">
-    <header><div><h2>暫存單</h2></div><strong>{holds.length} 張</strong></header>
-    {currentCartCount>0?<p className="hold-current-warning">目前購物籃有 {currentCartCount} 件；取回暫存單前會先要求確認。</p>:null}
-    <div className="hold-list">
-      {holds.length?holds.map(hold=><article key={hold.id}>
-        <div className="hold-list-head"><div><b>{hold.codeLabel}</b><span>{hold.kind==='dining'?'堂食／輪候':'暫存'}</span></div><strong>{money(hold.totalMinor)}</strong></div>
-        <div className="hold-list-meta"><span>{new Date(hold.createdAt).toLocaleTimeString('zh-HK',{hour:'2-digit',minute:'2-digit'})}</span><span>{hold.partySize} 位</span>{hold.assignedTable?<span>枱 {hold.assignedTable.replace('T','')}</span>:null}</div>
-        <div className="hold-list-items">{hold.items.map((item,index)=><p key={hold.id+'-'+index}><span>{item.qty}×</span><b>{item.name}</b><strong>{money(item.qty*item.unitMinor)}</strong></p>)}</div>
-        {hold.note?<small>備註：{hold.note}</small>:null}
-        <footer><button type="button" className="danger" onClick={()=>onRemove(hold.id)}>刪除</button><button type="button" className="primary" onClick={()=>requestRestore(hold)}>取回</button></footer>
-      </article>):<div className="hold-list-empty">未有暫存單</div>}
-    </div>
+
+  return <div className="hold-list-workspace open-checks-workspace">
+    <header className="open-checks-head">
+      <div><small>OPEN CHECKS</small><h2>暫存單</h2></div>
+      <strong>{holds.length}</strong>
+    </header>
+
+    {holds.length?<section className="open-checks-layout">
+      <div className="open-checks-list" role="list">
+        {holds.map(hold=>{
+          const active=selected?.id===hold.id;
+          const units=hold.items.reduce((sum,item)=>sum+item.qty,0);
+          return <button type="button" role="listitem" key={hold.id} className={active?'active':''} onClick={()=>setSelectedId(hold.id)}>
+            <span><b>{hold.codeLabel}</b><em>{hold.kind==='dining'?'堂食／輪候':'暫存'}</em></span>
+            <strong>{money(hold.totalMinor)}</strong>
+            <small>{new Date(hold.createdAt).toLocaleTimeString('zh-HK',{hour:'2-digit',minute:'2-digit'})} · {units} 件{hold.assignedTable?' · 枱 '+hold.assignedTable.replace('T',''):''}</small>
+          </button>;
+        })}
+      </div>
+
+      {selected?<article className="open-checks-preview">
+        <header><div><small>目前選擇</small><h3>{selected.codeLabel}</h3></div><strong>{money(selected.totalMinor)}</strong></header>
+        <div className="open-checks-preview-meta"><span>{new Date(selected.createdAt).toLocaleTimeString('zh-HK',{hour:'2-digit',minute:'2-digit'})}</span><span>{selected.partySize} 位</span>{selected.assignedTable?<span>枱 {selected.assignedTable.replace('T','')}</span>:null}</div>
+        <div className="open-checks-preview-lines">{selected.items.map((item,index)=><p key={selected.id+'-'+index}><span>{item.qty}×</span><b>{item.name}</b><strong>{money(item.qty*item.unitMinor)}</strong></p>)}</div>
+        {selected.note?<small className="open-checks-note">備註：{selected.note}</small>:null}
+        <footer>
+          <button type="button" className="danger" onClick={()=>onRemove(selected.id)}>刪除</button>
+          <button type="button" className="primary" onClick={()=>requestRestore(selected)}>取回訂單</button>
+        </footer>
+      </article>:null}
+    </section>:<div className="hold-list-empty">未有暫存單</div>}
+
     {restoreTarget?<div className="hold-restore-confirm" role="dialog" aria-modal="true" aria-label="確認取回暫存單">
       <section><h3>取回 {restoreTarget.codeLabel}？</h3><p>目前購物籃有 {currentCartCount} 件。繼續會以呢張暫存單取代目前購物籃。</p><div><button type="button" onClick={()=>setRestoreTarget(null)}>返回</button><button type="button" className="primary" onClick={()=>{const target=restoreTarget;setRestoreTarget(null);onRestore(target)}}>確認取回</button></div></section>
     </div>:null}
