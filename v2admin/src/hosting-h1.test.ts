@@ -62,7 +62,6 @@ describe('MFK Admin Cloudflare H2 + config sync runtime',()=>{
   it('does not inherit legacy/provider/transaction runtime bindings or background triggers',()=>{
     for(const forbidden of [
       '"d1_databases"',
-      '"r2_buckets"',
       '"services"',
       '"triggers"',
       'KEETA_CHANNEL_GATEWAY',
@@ -70,5 +69,12 @@ describe('MFK Admin Cloudflare H2 + config sync runtime',()=>{
       'morefun-v2-production',
       'morefun-v2-product-media',
     ]) expect(source).not.toContain(forbidden);
+  });
+
+  it('allows only the Owner-approved isolated Customer payment evidence R2 binding',()=>{
+    expect(source).toContain('"r2_buckets"');
+    expect(source).toContain('"binding": "CUSTOMER_PAYMENT_EVIDENCE"');
+    expect(source).toContain('"bucket_name": "mfk-customer-payment-evidence"');
+    expect(source.match(/"r2_buckets"/g)?.length).toBe(1);
   });
 });
