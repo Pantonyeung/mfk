@@ -95,6 +95,12 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
   const [recent,setRecent]=useState<string|undefined>();
   const [highlight,setHighlight]=useState<string|undefined>();
   const [panel,setPanel]=useState<OrderingPanelState>(null);
+  const [panelDirty,setPanelDirty]=useState(false);
+  useEffect(()=>setPanelDirty(false),[panel]);
+  const requestClosePanel=()=>{
+    if(panelDirty&&!window.confirm('有未保存修改，確定退出？'))return;
+    setPanel(null);
+  };
   const [adminMenuRevision,setAdminMenuRevision]=useState(0);
   const [adminConfigRevision,setAdminConfigRevision]=useState(0);
   useEffect(()=>subscribeLocalAdminMenu(()=>setAdminMenuRevision(value=>value+1)),[]);
@@ -298,6 +304,7 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
   });
 
   const guideAfterStructuredChange=(next:readonly FastLaneCartLine[])=>{
+    setPanelDirty(false);
     const nextRequired=requiredTasks(next,fastLaneProducts);
     if(nextRequired.length){
       setQuickDrinkOpen(false);
@@ -399,7 +406,7 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
       id:nextLocalCartLineId(),productId:product.id,name:product.name,qty,unitMinor:product.priceMinor+deltaMinor,serviceMode,detail,
       optionSelections:structured.selections,freeNote:structured.note,
     };
-    setCart([...cart,line]);setRecent(product.id);setHighlight(line.id);setPulse(value=>value+1);setPanel(null);
+    setCart([...cart,line]);setRecent(product.id);setHighlight(line.id);setPulse(value=>value+1);setPanelDirty(false);setPanel(null);
   };
 
   const addCombo=(comboId:string,comboName:string,detail:string,unitMinor:number)=>{
@@ -461,7 +468,7 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
     ...(line.detail?{detail:line.detail}:{}),
     composition:serializeFastLaneComposition(line,'HOLD'),
   }));
-  const finishHold=()=>{setCart([]);setServiceMode('takeaway');setPanel(null);};
+  const finishHold=()=>{setCart([]);setServiceMode('takeaway');setPanelDirty(false);setPanel(null);};
 
   const panelTitle=panel?.type==='product'?'商品選項'
     :panel?.type==='quick-drink-config'?'快捷飲品設定'
@@ -473,7 +480,7 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
     :panel?.type==='holds'?'暫存單':'';
 
   const panelBody=panel?.type==='product'
-    ?(()=>{const product=workspaceProducts.find(item=>item.id===panel.productId);return product?<ProductConfigWorkspace product={product} onAdd={(detail,delta,qty,structured)=>addConfigured(product.id,detail,delta,qty,structured)}/>:null})()
+    ?(()=>{const product=workspaceProducts.find(item=>item.id===panel.productId);return product?<ProductConfigWorkspace product={product} onDirtyChange={setPanelDirty} onAdd={(detail,delta,qty,structured)=>addConfigured(product.id,detail,delta,qty,structured)}/>:null})()
     :panel?.type==='pending-order'
       ?(()=>{const order=runtimeOrders.find(item=>item.id===panel.orderId);return order?<PendingOrderReviewWorkspace
         order={order}
@@ -489,7 +496,7 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
         onOpenOrders={()=>{setPanel(null);navigate('/orders?orderId='+encodeURIComponent(order.id));}}
       />:null})()
     :panel?.type==='quick-drink-config'
-      ?(()=>{const product=workspaceProducts.find(item=>item.id===panel.productId);return product?<ProductConfigWorkspace product={product} maxQty={1} onAdd={(detail,delta,_qty,structured)=>{
+      ?(()=>{const product=workspaceProducts.find(item=>item.id===panel.productId);return product?<ProductConfigWorkspace product={product} maxQty={1} onDirtyChange={setPanelDirty} onAdd={(detail,delta,_qty,structured)=>{
         fillQuickDrinkConfigured(panel.comboLineId,panel.groupId,panel.choiceId,{
           id:nextLocalCartLineId(),productId:product.id,name:product.name,qty:1,unitMinor:product.priceMinor+delta,serviceMode,
           detail,optionSelections:structured.selections,freeNote:structured.note,
@@ -499,13 +506,14 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
       ?panel.lane==='riceball-pool'
         ?<RiceballPoolWorkspace cart={cart} products={fastLaneProducts} combos={comboData.combos} pools={comboData.pools} onAutoPair={applyAutoPairs}/>
         :panel.lane==='required'
-          ?<RequiredFastLaneWorkspace cart={cart} products={fastLaneProducts} onApply={applyRequired}/>
-          :<ComboFastLaneWorkspace cart={cart} products={fastLaneProducts} combos={comboData.combos} pools={comboData.pools} onPair={applyOnePair} onFillPending={fillComboPending} onDissolve={dissolveCombo}/>
+          ?<RequiredFastLaneWorkspace cart={cart} products={fastLaneProducts} onDirtyChange={setPanelDirty} onApply={applyRequired}/>
+          :<ComboFastLaneWorkspace cart={cart} products={fastLaneProducts} combos={comboData.combos} pools={comboData.pools} onDirtyChange={setPanelDirty} onPair={applyOnePair} onFillPending={fillComboPending} onDissolve={dissolveCombo}/>
       :panel?.type==='hold'
           ?<HoldCartWorkspace
             lines={cart}
             totalMinor={total}
             tables={holdTables}
+            onDirtyChange={setPanelDirty}
             onHoldWaiting={(partySize,note)=>{
               localRuntime.createHold({kind:'waiting',items:holdItems(),totalMinor:total,partySize,note:note||'暫存待客'});
               finishHold();
@@ -548,7 +556,7 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
   const actions:OrderingWorkspaceActions={
     onSelectCategory:setCategory,
     onAddProduct:add,
-    onConfigureProduct:id=>{setQuickDrinkOpen(false);setPanel({type:'product',productId:id});},
+    onConfigureProduct:id=>{setQuickDrinkOpen(false);setPanelDirty(false);setPanel({type:'product',productId:id});},
     onChangeOrderingMode:setOrderingMode,
     onToggleQuickDrink:()=>setQuickDrinkOpen(value=>!value),
     onSelectQuickDrink:selectQuickDrink,
@@ -593,14 +601,14 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
       }
       setCart(cart.filter(item=>!ids.has(item.id)));
     },
-    onHoldCart:()=>{if(cart.length)setPanel({type:'hold'});},
-    onOpenHeldOrders:()=>{if(!cart.length&&waitingHolds.length)setPanel({type:'holds'});},
+    onHoldCart:()=>{if(cart.length){setPanelDirty(false);setPanel({type:'hold'});}},
+    onOpenHeldOrders:()=>{if(!cart.length&&waitingHolds.length){setPanelDirty(false);setPanel({type:'holds'});}},
     onCancelCart:()=>setCart([]),
-    onOpenWorkItem:id=>setPanel({type:'fast-lane',lane:id}),
-    onOpenQueueOrder:(_kind,id)=>{setQuickDrinkOpen(false);setPanel({type:'pending-order',orderId:id});},
+    onOpenWorkItem:id=>{setPanelDirty(false);setPanel({type:'fast-lane',lane:id});},
+    onOpenQueueOrder:(_kind,id)=>{setQuickDrinkOpen(false);setPanelDirty(false);setPanel({type:'pending-order',orderId:id});},
     onCheckout:()=>navigate('/checkout'),
   };
-  return <OrderingWorkspace view={view} actions={actions} centerPanel={panel&&panelBody?{title:panelTitle,body:panelBody,onClose:()=>setPanel(null)}:null}/>;
+  return <OrderingWorkspace view={view} actions={actions} centerPanel={panel&&panelBody?{title:panelTitle,body:panelBody,onClose:requestClosePanel,dirty:panelDirty}:null}/>;
 }
 
 function CheckoutPage({cart,setCart,diningCheckout,onDiningCheckoutDone}:{cart:CartLine[];setCart:(v:CartLine[])=>void;diningCheckout:DiningCheckoutRequest|null;onDiningCheckoutDone:()=>void}){
