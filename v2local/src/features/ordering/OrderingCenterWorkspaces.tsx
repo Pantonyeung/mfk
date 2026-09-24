@@ -1,5 +1,5 @@
-import {useMemo,useState} from 'react';
-import type {SyncedCombo,SyncedComboPool,SyncedOptionSet} from '../../runtime/admin-config-projection.ts';
+import {useState} from 'react';
+import type {SyncedOptionSet} from '../../runtime/admin-config-projection.ts';
 import type {MfkOrderLineCompositionV1} from '../../../../contracts/order-line-composition-v1.ts';
 import './ordering-center-workspaces.css';
 
@@ -22,8 +22,6 @@ export interface WorkspaceCartLine{
 }
 export type OrderingPanelState=
   |{readonly type:'product';readonly productId:string}
-  |{readonly type:'organize'}
-  |{readonly type:'combo'}
   |{readonly type:'fast-lane';readonly lane:'riceball-pool'|'required'|'combo'}
   |{readonly type:'quick-drink-config';readonly productId:string;readonly comboLineId:string;readonly groupId:string;readonly choiceId:string}
   |{readonly type:'pending-order';readonly orderId:string}
@@ -93,98 +91,6 @@ export function ProductConfigWorkspace({product,onAdd,maxQty=99,onDirtyChange}:{
 
     <label className="cfg-note"><span>備註</span><input value={note} maxLength={60} onChange={event=>{onDirtyChange?.(true);setNote(event.target.value);}} placeholder="例如：不要蔥、醬分開"/><small>{note.length}/60</small></label>
     <footer className="cfg-action"><div><span>單價</span><b>{money(product.priceMinor+delta)}</b></div><button className="primary" disabled={invalid} onClick={()=>onAdd(detail,delta,qty,{selections:selected,note:note.trim()})}>加入訂單　{money((product.priceMinor+delta)*qty)}</button></footer>
-  </div>;
-}
-
-export function OrganizeWorkspace({lines,onDone}:{lines:readonly WorkspaceCartLine[];onDone:()=>void}){
-  const mealLines=lines.filter(line=>!line.productId.toLowerCase().includes('tea'));
-  const drinkLines=lines.filter(line=>line.productId.toLowerCase().includes('tea'));
-  const [selected,setSelected]=useState<Record<string,string>>({});
-  return <div className="organize-workspace">
-    <header className="organize-title"><h2>整理工作台</h2><div><span>未完成 {Math.max(0,mealLines.length-Object.keys(selected).length)}</span><span>可配對 {Math.ceil(mealLines.length/2)}</span><span>待補飲品 {drinkLines.length}</span></div></header>
-    <section className="organize-section"><header><b><i>1</i> 必選</b><span>{mealLines.length}</span></header>
-      <div className="organize-required">{mealLines.map((line,index)=><article key={line.id}><div><b>{index+1}　{line.name}</b><small>{line.detail??'請確認必選項'}</small></div><div className="organize-options">{['肉燥','咖喱','菜飯'].map(v=><button key={v} className={selected[line.id]===v?'active':''} onClick={()=>setSelected(s=>({...s,[line.id]:v}))}>{v}</button>)}</div></article>)}</div>
-    </section>
-    <section className="organize-section"><header><b><i>2</i> 配對／代補</b><span>{Math.ceil(mealLines.length/2)}</span></header>
-      <div className="organize-pairs">{Array.from({length:Math.ceil(mealLines.length/2)},(_,idx)=>{const a=mealLines[idx*2],b=mealLines[idx*2+1];return <article key={idx}><strong>{idx+1} 組</strong><div>{a?<span>{a.name}</span>:null}{b?<span>{b.name}</span>:<em>＋ 未配對</em>}</div></article>})}</div>
-    </section>
-    <section className="organize-section"><header><b><i>3</i> 快捷飲品</b><span>{drinkLines.length}</span></header><div className="organize-drinks">{['凍檸茶','台式奶茶','手打檸檬茶','不用飲品'].map(v=><button key={v}>{v}</button>)}</div></section>
-    <footer className="organize-footer"><button onClick={onDone}>完成整理</button></footer>
-  </div>;
-}
-
-export function ComboWorkspace({
-  products,combos,pools,onAdd,
-}:{
-  products:readonly WorkspaceProduct[];
-  combos:readonly SyncedCombo[];
-  pools:readonly SyncedComboPool[];
-  onAdd:(comboId:string,comboName:string,detail:string,unitMinor:number)=>void;
-}){
-  const activeCombos=combos.filter(combo=>combo.active);
-  const [comboId,setComboId]=useState(activeCombos[0]?.id??'');
-  const [selected,setSelected]=useState<Record<string,string>>({});
-  const combo=activeCombos.find(row=>row.id===comboId)??activeCombos[0];
-  const poolById=useMemo(()=>new Map(pools.map(pool=>[pool.id,pool] as const)),[pools]);
-  const productById=useMemo(()=>new Map(products.map(product=>[product.id,product] as const)),[products]);
-  const selectedPools=combo
-    ?[combo.mainPoolId,...combo.addonPoolIds].filter(Boolean).map(id=>poolById.get(id!)).filter((pool):pool is SyncedComboPool=>Boolean(pool))
-    :[];
-  const groups=selectedPools.flatMap(pool=>pool.groups.map(group=>({pool,group})));
-
-  const resolveChoice=(groupId:string)=>{
-    const choiceId=selected[groupId];
-    if(!choiceId)return null;
-    for(const {group} of groups){
-      if(group.id!==groupId)continue;
-      for(const subPool of group.subPools){
-        const choice=subPool.choices.find(row=>row.id===choiceId);
-        if(choice)return {subPool,choice};
-      }
-    }
-    return null;
-  };
-  const requiredMissing=groups.some(({group})=>group.required&&!resolveChoice(group.id));
-  const additions=groups.reduce((sum,{group})=>{
-    const resolved=resolveChoice(group.id);
-    return sum+(resolved?.subPool.priceAdjustmentMinor??0)+(resolved?.choice.priceAdjustmentMinor??0);
-  },0);
-  const total=(combo?.basePriceMinor??0)+additions;
-  const detail=groups.flatMap(({group})=>{
-    const resolved=resolveChoice(group.id);
-    if(!resolved)return [];
-    const choice=resolved.choice;
-    const label=choice.type==='PRODUCT'
-      ?productById.get(choice.productId??'')?.name??choice.productId??''
-      :choice.label;
-    return [group.name+'：'+label+(resolved.subPool.priceAdjustmentMinor!==0?' ('+(resolved.subPool.priceAdjustmentMinor>0?'+':'')+money(resolved.subPool.priceAdjustmentMinor)+')':'')];
-  }).join(' · ');
-
-  if(!combo)return <div className="combo-workspace"><div className="ordering-empty">Admin 暫時未有已啟用套餐。</div></div>;
-
-  return <div className="combo-workspace">
-    <header className="combo-title"><div><h2>套餐</h2><p>套餐、Pool、價差同可選商品全部來自 Admin 已保存版本。</p></div><strong>{combo.name}　{money(total)}</strong></header>
-    <div className="combo-tiers">{activeCombos.map(row=><button key={row.id} className={combo.id===row.id?'active':''} onClick={()=>{setComboId(row.id);setSelected({});}}><b>{row.name}</b><span>{money(row.basePriceMinor)}</span></button>)}</div>
-    {groups.map(({pool,group},groupIndex)=><section className="combo-section" key={pool.id+':'+group.id}>
-      <header><b>{groupIndex+1}　{group.name}</b><span>{group.required?'必選':'可選'} {group.min}–{group.max}</span></header>
-      {group.subPools.map(subPool=><div key={subPool.id} className="combo-admin-subpool">
-        <header><strong>{subPool.name}</strong><span>{subPool.priceAdjustmentMinor===0?'餐內':(subPool.priceAdjustmentMinor>0?'+':'')+money(subPool.priceAdjustmentMinor)}</span></header>
-        <div className="combo-product-grid">{subPool.choices.map(choice=>{
-          const label=choice.type==='PRODUCT'
-            ?productById.get(choice.productId??'')?.name??choice.productId??'未命名商品'
-            :choice.label;
-          const product=choice.type==='PRODUCT'?productById.get(choice.productId??''):undefined;
-          const active=selected[group.id]===choice.id;
-          return <button key={choice.id} className={active?'active':''} onClick={()=>setSelected(current=>({...current,[group.id]:choice.id}))}>
-            {product?.imageUrl?<img src={product.imageUrl} alt=""/>:null}
-            <b>{label}</b>
-            {product?.optionSets?.length?<small>{product.optionSets.length} 個商品選項</small>:null}
-          </button>;
-        })}</div>
-      </div>)}
-    </section>)}
-    <section className="combo-summary"><div><span>已選</span><b>{detail||'請完成必選項目'}</b></div><strong>{money(total)}</strong></section>
-    <footer className="combo-footer"><button disabled={requiredMissing} onClick={()=>onAdd(combo.id,combo.name,detail,total)}>加入購物車　{money(total)}</button></footer>
   </div>;
 }
 
