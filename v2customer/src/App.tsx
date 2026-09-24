@@ -109,6 +109,28 @@ export function App(){
   useEffect(()=>{void refresh();},[]);
 
   useEffect(()=>{
+    if(!port)return;
+    let stopped=false;
+    let busy=false;
+    const poll=async()=>{
+      if(stopped||busy||document.visibilityState!=='visible'||!navigator.onLine)return;
+      busy=true;
+      try{
+        const next=await port.readSnapshot();
+        if(!stopped){setSnapshot(next);setConnection('READY');}
+      }catch{
+        if(!stopped)setConnection('STALE');
+      }finally{busy=false;}
+    };
+    const timer=window.setInterval(()=>void poll(),3000);
+    const visible=()=>{if(document.visibilityState==='visible')void poll();};
+    const focused=()=>void poll();
+    document.addEventListener('visibilitychange',visible);
+    window.addEventListener('focus',focused);
+    return()=>{stopped=true;window.clearInterval(timer);document.removeEventListener('visibilitychange',visible);window.removeEventListener('focus',focused);};
+  },[port]);
+
+  useEffect(()=>{
     const online=()=>setBrowserOnline(true);
     const offline=()=>setBrowserOnline(false);
     window.addEventListener('online',online);
