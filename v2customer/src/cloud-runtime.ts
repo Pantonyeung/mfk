@@ -110,6 +110,19 @@ async function waitOrder(submissionId:string):Promise<CustomerCommandResult>{
   return{state:'UNKNOWN',message:'店舖已收到落單要求，確認仍在處理；請用同一 Submission ID 查詢。'};
 }
 
+export async function uploadCustomerPaymentEvidence(file:File):Promise<{evidenceRef:string}>{
+  if(!['image/jpeg','image/png','image/webp'].includes(file.type))throw new Error('付款截圖只支援 JPG、PNG 或 WebP');
+  if(file.size<1||file.size>8*1024*1024)throw new Error('付款截圖必須細過 8MB');
+  const response=await fetch(ENDPOINT+'/api/customer/payment-evidence?storeId='+STORE_ID,{
+    method:'POST',
+    headers:{'content-type':file.type},
+    body:file,
+  });
+  const body=await response.json().catch(()=>({})) as Record<string,unknown>;
+  if(!response.ok||typeof body.evidenceRef!=='string')throw new Error(String(body.code||'付款截圖上載失敗'));
+  return{evidenceRef:body.evidenceRef};
+}
+
 export function createCloudCustomerRuntimePort():CustomerRuntimePort{
   return Object.freeze({
     portId:'MFK_CUSTOMER_PORT_V1' as const,
