@@ -224,4 +224,5 @@ export interface CustomerRuntimePort {
   readSubmission?(submissionId:string):Promise<CustomerCommandResult>;
   buildReorderCart?(orderId:string):Promise<CustomerReorderResult>;
   requestFallback?():Promise<CustomerCommandResult>;
+  uploadPaymentEvidence?(file:File):Promise<{readonly evidenceRef:string}>;
 }

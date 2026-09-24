@@ -228,9 +228,10 @@ async function reconcileOrders(){
       const order=localRuntime.createOrder({
         items:priced.items,
         totalMinor:priced.totalMinor,
-        paymentLabel:'到店付款',
+        paymentLabel:intent.checkout.paymentMethod==='ELECTRONIC'?'電子支付（待核對）':'到店付款',
         sourceLabel:'自家 App',
         providerRef,
+        ...(intent.checkout.paymentMethod==='ELECTRONIC'&&intent.checkout.paymentEvidenceRef?{paymentEvidenceRef:intent.checkout.paymentEvidenceRef,paymentVerificationState:'PENDING' as const}:{}),
         initialFulfillmentLabel:'待處理',
       });
       window.dispatchEvent(new CustomEvent('mfk-customer-order-intake',{detail:{
