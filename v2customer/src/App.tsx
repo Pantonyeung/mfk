@@ -1,6 +1,7 @@
 import {useEffect,useMemo,useState} from 'react';
 import {createCustomerPendingIntent,readCustomerLocalWorkspace,writeCustomerLocalWorkspace,type CustomerLocalPreferences} from './persistence';
 import {resolveCustomerRuntimePort} from './runtime';
+import {buildCustomerRecommendations} from './recommendation';
 import {selectedCustomerOptions,toggleCustomerSelection,validateCustomerSelections,type CustomerSelectionState} from './selection';
 import {BottomNavigation,CustomerHeader,StatusBanner,type ActionState,type ProductOriginRect} from './ui/primitives';
 import {CartView,CheckoutView,HomeView,MemberView,MenuView,OrdersView,ProductSheet,type MenuLayout,type OrderSegment} from './components/customer-views';
@@ -292,9 +293,10 @@ export function App(){
   const history=snapshot?.history??[];
   const currentPending=pendingIntents[0]??null;
   const cartCount=cart.reduce((sum,line)=>sum+line.quantity,0);
-  const featuredProducts=(menu?.products??[]).filter(product=>product.available&&Boolean(product.badge)).slice(0,4);
-  const cartProductIds=new Set(cart.map(line=>line.productId));
-  const cartSuggestions=featuredProducts.filter(product=>!cartProductIds.has(product.productId)).slice(0,2);
+  const allProducts=menu?.products??[];
+  const homeRecommendations=buildCustomerRecommendations({products:allProducts,history,cart,limit:4});
+  const menuRecommendations=buildCustomerRecommendations({products:allProducts,history,cart,activeCategoryId:effectiveCategoryId,limit:4});
+  const cartSuggestions=buildCustomerRecommendations({products:allProducts,history,cart,activeCategoryId:effectiveCategoryId,limit:2});
   const actionState:ActionState=quote?.freshness==='MATERIAL_CHANGE'||!cart.length||!quote?'disabled':readingIntentId||submitting?'loading':currentPending?.state==='UNKNOWN'?'unknown':currentPending?.state==='PENDING'?'pending':'default';
 
   return <main className="customer-shell" data-network={!browserOnline?'offline':connection.toLowerCase()}>
@@ -309,8 +311,8 @@ export function App(){
     </div>
 
     <section className="viewport" aria-busy={connection==='LOADING'}>
-      {view==='home'?<HomeView snapshot={snapshot} connection={connection} activeOrders={activeOrders} history={history} featuredProducts={featuredProducts} cartCount={cartCount} onRefresh={()=>void refresh()} onProduct={openProduct} onBrowse={()=>changeView('menu')} onJar={()=>changeView('cart')} onOrders={()=>{setOrderSegment('current');changeView('orders')}} onHistory={()=>{setOrderSegment('history');changeView('orders')}} onMember={()=>changeView('more')} onBuyAgain={order=>void reorder(order)} onFallback={()=>void requestFallback()}/>:null}
-      {view==='menu'?<MenuView connection={connection} categories={categories} activeCategoryId={effectiveCategoryId} setCategory={category=>presentWithContinuity(()=>changeCategory(category))} query={search} setQuery={setSearch} layout={menuLayout} setLayout={layout=>presentWithContinuity(()=>setMenuLayout(layout))} products={visibleProducts} onProduct={(product,origin)=>openProduct(product,origin)} cartCount={cartCount} quote={quote} onCart={()=>changeView('cart')}/>:null}
+      {view==='home'?<HomeView snapshot={snapshot} connection={connection} activeOrders={activeOrders} history={history} recommendations={homeRecommendations} cartCount={cartCount} onRefresh={()=>void refresh()} onProduct={openProduct} onBrowse={()=>changeView('menu')} onJar={()=>changeView('cart')} onOrders={()=>{setOrderSegment('current');changeView('orders')}} onHistory={()=>{setOrderSegment('history');changeView('orders')}} onMember={()=>changeView('more')} onBuyAgain={order=>void reorder(order)} onFallback={()=>void requestFallback()}/>:null}
+      {view==='menu'?<MenuView connection={connection} categories={categories} activeCategoryId={effectiveCategoryId} setCategory={category=>presentWithContinuity(()=>changeCategory(category))} query={search} setQuery={setSearch} layout={menuLayout} setLayout={layout=>presentWithContinuity(()=>setMenuLayout(layout))} products={visibleProducts} recommendations={menuRecommendations} onProduct={(product,origin)=>openProduct(product,origin)} cartCount={cartCount} quote={quote} onCart={()=>changeView('cart')}/>:null}
       {view==='cart'?<CartView cart={cart} quote={quote} checkout={checkout} member={snapshot?.member} suggestions={cartSuggestions} products={menu?.products??[]} onProduct={openProduct} onCheckoutChange={changeCheckout} onQuantity={(lineId,quantity)=>updateCart(cart.map(line=>line.lineId===lineId?{...line,quantity:Math.max(1,quantity)}:line))} onRemove={lineId=>updateCart(cart.filter(line=>line.lineId!==lineId))} onMenu={()=>changeView('menu')} onCheckout={()=>changeView('checkout')}/>:null}
       {view==='checkout'?<CheckoutView cart={cart} quote={quote} checkout={checkout} setCheckout={changeCheckout} pending={currentPending} actionState={actionState} onSubmit={()=>void submit()} onReadback={intent=>void readbackIntent(intent)} onBack={()=>changeView('cart')} onRepair={()=>changeView('cart')}/>:null}
       {view==='orders'?<OrdersView segment={orderSegment} setSegment={setOrderSegment} active={activeOrders} history={history} expandedOrderId={expandedOrderId} setExpandedOrderId={setExpandedOrderId} onReorder={order=>void reorder(order)} onBrowse={()=>changeView('menu')} connection={connection}/>:null}
