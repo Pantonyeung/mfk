@@ -936,3 +936,323 @@ button:hover .product-media img{transform:scale(1.025)}
   .jar-particles i{animation:none!important;transition:none!important}
   .submit-orbit,.pickup-code-aura,.seed-constellation{transform:none}
 }
+
+
+/* =========================================================
+   Customer R4 — motion, guided ordering, honest recommendations
+   Presentation only. No business authority or pricing logic.
+   ========================================================= */
+
+:root{
+  --motion-tap:100ms;
+  --motion-select:160ms;
+  --motion-journey:220ms;
+  --motion-reveal:320ms;
+}
+
+/* Shared ordering journey */
+.journey-coach{
+  list-style:none;
+  margin:8px 0 18px;
+  padding:0;
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:6px;
+}
+.journey-coach li{
+  position:relative;
+  min-width:0;
+  display:grid;
+  justify-items:center;
+  gap:5px;
+  color:#999ca5;
+  font-size:9px;
+  font-weight:850;
+  text-align:center;
+}
+.journey-coach li:after{
+  content:"";
+  position:absolute;
+  top:12px;
+  left:calc(50% + 16px);
+  width:calc(100% - 26px);
+  height:2px;
+  border-radius:99px;
+  background:var(--line);
+  transition:background-color var(--motion-journey) ease-out,transform var(--motion-journey) var(--ease-out);
+  transform-origin:left;
+}
+.journey-coach li:last-child:after{display:none}
+.journey-coach i{
+  position:relative;
+  z-index:2;
+  width:26px;height:26px;
+  display:grid;place-items:center;
+  border-radius:50%;
+  background:#fff;
+  border:1px solid var(--line);
+  color:var(--muted);
+  font-style:normal;
+  font-size:10px;
+  font-weight:950;
+  transition:transform var(--motion-select) var(--ease-spring),background-color var(--motion-select),color var(--motion-select),border-color var(--motion-select);
+}
+.journey-coach li.done{color:var(--green)}
+.journey-coach li.done i{background:var(--green);border-color:var(--green);color:#fff}
+.journey-coach li.done:after{background:var(--green)}
+.journey-coach li.active{color:var(--purple)}
+.journey-coach li.active i{
+  background:var(--purple);
+  border-color:var(--purple);
+  color:#fff;
+  transform:scale(1.08);
+  box-shadow:0 0 0 5px rgba(90,45,130,.09)
+}
+.journey-coach li.active:after{background:linear-gradient(90deg,var(--purple),var(--line) 44%)}
+
+/* Honest recommendation surfaces */
+.recommendation-section{margin:4px 0 22px}
+.recommendation-rail{
+  display:flex;
+  gap:10px;
+  margin:0 -18px;
+  padding:2px 18px 8px;
+  overflow-x:auto;
+  scroll-snap-type:x mandatory;
+  scrollbar-width:none;
+}
+.recommendation-rail::-webkit-scrollbar{display:none}
+.recommendation-rail>button{
+  flex:0 0 min(82vw,360px);
+  min-width:0;
+  min-height:96px;
+  scroll-snap-align:start;
+  border:1px solid rgba(17,18,24,.055);
+  border-radius:18px;
+  padding:10px;
+  display:flex;
+  align-items:center;
+  gap:11px;
+  background:linear-gradient(135deg,#fff,#faf9fc);
+  text-align:left;
+  box-shadow:0 10px 26px rgba(27,21,33,.055);
+  transition:transform var(--motion-tap) ease-out,box-shadow var(--motion-select) ease-out,border-color var(--motion-select);
+}
+.recommendation-rail>button:not(:disabled):active{
+  transform:scale(.975);
+  box-shadow:0 5px 14px rgba(27,21,33,.05)
+}
+.recommendation-rail>button>.product-media{width:82px;height:82px;flex:0 0 82px;border-radius:14px}
+.recommendation-rail>button>span{min-width:0;display:grid;gap:3px;flex:1}
+.recommendation-rail small{color:var(--purple);font-size:9px;font-weight:950;letter-spacing:.04em}
+.recommendation-rail strong{font-size:15px;overflow-wrap:anywhere}
+.recommendation-rail em{font-style:normal;font-size:11px;font-weight:900}
+.recommendation-rail>button>b{
+  width:32px;height:32px;display:grid;place-items:center;
+  flex:0 0 32px;
+  border-radius:50%;
+  background:var(--purple-soft);
+  color:var(--purple);
+  font-size:18px;
+}
+
+/* Home image/motion response */
+.hero-slide.is-active img{animation:r4-hero-drift 7s ease-out both}
+.hero-slide.is-active .hero-message{animation:r4-copy-rise var(--motion-reveal) var(--ease-out) both}
+.hero-slide.is-active .hero-brand-chip{animation:r4-chip-in 260ms var(--ease-out) both}
+.featured-food>span:last-child p{
+  margin:2px 0 4px;
+  color:var(--muted);
+  font-size:9px;
+  line-height:1.4
+}
+.featured-food>i{
+  position:absolute;
+  right:13px;
+  top:174px;
+  min-height:30px;
+  padding:0 10px;
+  display:grid;place-items:center;
+  border-radius:999px;
+  background:rgba(255,255,255,.92);
+  color:var(--purple);
+  box-shadow:0 5px 16px rgba(20,15,25,.1);
+  font-size:9px;
+  font-style:normal;
+  font-weight:900;
+  opacity:0;
+  transform:translateY(5px);
+  transition:opacity var(--motion-select),transform var(--motion-select) var(--ease-out)
+}
+.featured-food{position:relative}
+.featured-food:focus-visible>i,.featured-food:hover>i{opacity:1;transform:none}
+
+/* Product guidance */
+.product-dialog .journey-coach{
+  margin:10px 18px 13px;
+}
+.step-coach{
+  margin:0 18px 14px;
+  padding:13px 14px;
+  display:grid;
+  grid-template-columns:auto 1fr;
+  gap:2px 10px;
+  border-radius:15px;
+  border:1px solid rgba(90,45,130,.1);
+  background:linear-gradient(135deg,#faf7fd,#f5f0fb);
+  transition:background-color var(--motion-select),border-color var(--motion-select),transform var(--motion-select) var(--ease-out);
+}
+.step-coach>span{
+  grid-row:1/3;
+  align-self:center;
+  min-width:54px;
+  height:32px;
+  display:grid;place-items:center;
+  padding:0 9px;
+  border-radius:999px;
+  background:var(--purple);
+  color:#fff;
+  font-size:9px;
+  font-weight:950
+}
+.step-coach strong{font-size:13px}
+.step-coach p{margin:0;color:var(--muted);font-size:10px;line-height:1.4}
+.step-coach.is-ready{
+  border-color:rgba(22,141,99,.15);
+  background:linear-gradient(135deg,#f0fbf6,#eaf8f1);
+}
+.step-coach.is-ready>span{background:var(--green)}
+.config-step-list li.done button{animation:r4-step-complete 230ms var(--ease-spring)}
+.product-config-stage{animation:r4-stage-forward var(--motion-journey) var(--ease-out)}
+.choice-grid button.active{animation:r4-choice-settle var(--motion-select) var(--ease-spring)}
+
+/* Add-to-jar feedback */
+.glyph-jar.jar-pulse{
+  animation:r4-jar-nav 360ms var(--ease-spring);
+}
+.glyph-jar.jar-pulse:after{
+  content:"";
+  position:absolute;
+  inset:-8px;
+  border:2px solid rgba(90,45,130,.22);
+  border-radius:50%;
+  animation:r4-ring 420ms ease-out forwards;
+}
+.badge-pop{animation:r4-badge-pop 330ms var(--ease-spring)}
+.bottom-navigation button.active .nav-glyph{
+  filter:drop-shadow(0 5px 8px rgba(90,45,130,.12))
+}
+
+/* Cart continuity */
+.cart-line{
+  transition:transform var(--motion-select) var(--ease-out),box-shadow var(--motion-select),background-color var(--motion-select)
+}
+.cart-line:focus-within{box-shadow:0 12px 30px rgba(40,25,51,.08)}
+.jar-live-summary .animated-value{animation:r4-value-pulse 220ms var(--ease-spring)}
+.memory-jar-visual.level-first .jar-stage,
+.memory-jar-visual.level-half .jar-stage,
+.memory-jar-visual.level-full .jar-stage{
+  animation:r4-jar-settle 320ms var(--ease-spring)
+}
+
+/* Checkout / pending / unknown continuity */
+.checkout-page>.journey-coach{margin-top:-2px}
+.safe-submit.state-pending .submit-orbit,
+.safe-submit.state-unknown .submit-orbit{
+  animation:r4-orbit-breathe 2.8s ease-in-out infinite
+}
+.safe-submit.state-pending h2,.safe-submit.state-unknown h2{
+  animation:r4-copy-rise 260ms var(--ease-out) both
+}
+.stateful-action.state-loading .stateful-loader{
+  animation:spin .75s linear infinite
+}
+.stateful-action.state-pending:after,.stateful-action.state-unknown:after{
+  content:"";
+  position:absolute;
+  left:-30%;top:0;bottom:0;width:28%;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.18),transparent);
+  animation:r4-scan 1.7s ease-in-out infinite
+}
+
+/* Order stage motion */
+.order-status-card .order-status-copy .animated-value{
+  animation:r4-copy-rise 240ms var(--ease-out)
+}
+.order-progress li.done i,.order-progress li.active i{
+  transition:transform var(--motion-select) var(--ease-spring),background-color var(--motion-select),border-color var(--motion-select)
+}
+.order-progress li.active i{animation:r4-stage-dot 1.9s ease-in-out infinite}
+.pickup-code-lockup>.animated-value{
+  animation:r4-pickup-reveal 320ms var(--ease-spring)
+}
+
+/* Member collectible feedback */
+.coupon,.badge-collection article,.seed-value,.next-care{
+  transition:transform var(--motion-tap) ease-out,box-shadow var(--motion-select) ease-out
+}
+.coupon:active,.badge-collection article:active,.seed-value:active,.next-care:active{
+  transform:scale(.982)
+}
+.badge-collection article.earned .badge-medallion{
+  animation:r4-medallion-in 340ms var(--ease-spring)
+}
+.seed-constellation b{animation:r4-seed-float 3.6s ease-in-out infinite}
+.seed-constellation b:nth-child(2){animation-delay:-1.1s}
+.seed-constellation b:nth-child(3){animation-delay:-2s}
+
+/* Cross-view polish */
+::view-transition-old(root){animation:r4-view-out 150ms ease-out}
+::view-transition-new(root){animation:r4-view-in 210ms var(--ease-out)}
+::view-transition-group(*){animation-duration:220ms;animation-timing-function:var(--ease-out)}
+
+@keyframes r4-hero-drift{from{transform:scale(1.015)}to{transform:scale(1.055) translate3d(-.5%,0,0)}}
+@keyframes r4-copy-rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@keyframes r4-chip-in{from{opacity:0;transform:translateY(-6px) scale(.97)}to{opacity:1;transform:none}}
+@keyframes r4-step-complete{0%{transform:scale(.96)}70%{transform:scale(1.035)}100%{transform:none}}
+@keyframes r4-stage-forward{from{opacity:0;transform:translateX(10px)}to{opacity:1;transform:none}}
+@keyframes r4-choice-settle{0%{transform:scale(.97)}70%{transform:scale(1.025)}100%{transform:none}}
+@keyframes r4-jar-nav{0%{transform:scale(.82) rotate(-5deg)}65%{transform:scale(1.18) rotate(4deg)}100%{transform:none}}
+@keyframes r4-ring{from{opacity:.8;transform:scale(.72)}to{opacity:0;transform:scale(1.55)}}
+@keyframes r4-badge-pop{0%{transform:scale(.45)}70%{transform:scale(1.25)}100%{transform:scale(1)}}
+@keyframes r4-value-pulse{0%{transform:scale(.94)}65%{transform:scale(1.06)}100%{transform:none}}
+@keyframes r4-jar-settle{0%{transform:translateY(4px) scale(.98)}65%{transform:translateY(-3px) scale(1.015)}100%{transform:none}}
+@keyframes r4-orbit-breathe{0%,100%{opacity:.72;transform:scale(.97)}50%{opacity:1;transform:scale(1.04)}}
+@keyframes r4-scan{0%{left:-30%;opacity:0}20%{opacity:1}75%{opacity:1}100%{left:110%;opacity:0}}
+@keyframes r4-stage-dot{0%,100%{transform:scale(1)}50%{transform:scale(1.18);box-shadow:0 0 0 8px rgba(90,45,130,.07)}}
+@keyframes r4-pickup-reveal{0%{opacity:0;transform:translateY(10px) scale(.94)}70%{transform:translateY(-2px) scale(1.025)}100%{opacity:1;transform:none}}
+@keyframes r4-medallion-in{0%{transform:scale(.84) rotate(-5deg)}70%{transform:scale(1.05) rotate(2deg)}100%{transform:none}}
+@keyframes r4-seed-float{0%,100%{transform:translateY(0) rotate(35deg)}50%{transform:translateY(-6px) rotate(42deg)}}
+@keyframes r4-view-out{to{opacity:0;transform:translateY(-3px)}}
+@keyframes r4-view-in{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
+
+@media(min-width:720px){
+  .journey-coach{max-width:560px;margin-left:auto;margin-right:auto}
+  .recommendation-rail{margin-left:0;margin-right:0;padding-left:0;padding-right:0}
+  .recommendation-rail>button{flex-basis:340px}
+  .product-dialog .journey-coach{margin-left:auto;margin-right:auto}
+}
+
+@media(prefers-reduced-motion:reduce){
+  .hero-slide.is-active img,
+  .hero-slide.is-active .hero-message,
+  .hero-slide.is-active .hero-brand-chip,
+  .config-step-list li.done button,
+  .product-config-stage,
+  .choice-grid button.active,
+  .glyph-jar.jar-pulse,
+  .glyph-jar.jar-pulse:after,
+  .badge-pop,
+  .jar-live-summary .animated-value,
+  .memory-jar-visual .jar-stage,
+  .safe-submit .submit-orbit,
+  .stateful-action:after,
+  .order-status-card .animated-value,
+  .order-progress li.active i,
+  .pickup-code-lockup>.animated-value,
+  .badge-medallion,
+  .seed-constellation b{
+    animation:none!important
+  }
+  ::view-transition-old(root),::view-transition-new(root),::view-transition-group(*){animation:none!important}
+}
