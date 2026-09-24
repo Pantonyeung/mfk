@@ -1,12 +1,15 @@
 import {validateMfkAdminConfigAck,validateMfkAdminConfigEnvelope} from '../contracts/admin-config-sync-v1.ts';
 import {validateSmtProjectionBatch} from '../contracts/smt-projection-v1.ts';
 import {KeetaRuntimeStore} from './keeta-runtime.ts';
-export {KeetaRuntimeStore};
+import {CustomerRuntimeStore} from './customer-runtime.ts';
+import {filterCustomerOwnedOrders,projectCustomerPublicSnapshot} from './customer-public-projection.ts';
+export {KeetaRuntimeStore,CustomerRuntimeStore};
 
 const JSON_HEADERS={'content-type':'application/json; charset=utf-8','cache-control':'no-store'};
 const ADMIN_ORIGIN='https://admin.morefunos.com';
 const SMT_ORIGIN='https://appassets.androidplatform.net';
-const CORS_ORIGINS=new Set([ADMIN_ORIGIN,SMT_ORIGIN]);
+const CUSTOMER_ORIGIN='https://order.morefunos.com';
+const CORS_ORIGINS=new Set([ADMIN_ORIGIN,SMT_ORIGIN,CUSTOMER_ORIGIN]);
 
 function json(value,status=200,extra={}){
   return new Response(JSON.stringify(value),{status,headers:{...JSON_HEADERS,...extra}});
@@ -136,6 +139,29 @@ export class AdminSyncStore{
     if(url.pathname==='/authorize-smt-device'){
       if(!await this.authorizeSmtDevice(request))return json({code:'SMT_DEVICE_UNAUTHORIZED'},401);
       return json({ok:true});
+    }
+    if(url.pathname==='/customer-doorbell'&&request.method==='POST'){
+      let body;
+      try{body=await request.json();}catch{return json({code:'CUSTOMER_DOORBELL_INVALID'},400);}
+      const type=String(body?.type||'');
+      if(type!=='CUSTOMER_QUOTE_AVAILABLE'&&type!=='CUSTOMER_ORDER_AVAILABLE'){
+        return json({code:'CUSTOMER_DOORBELL_TYPE_INVALID'},400);
+      }
+      const message=JSON.stringify({
+        type,
+        storeId:'MF01',
+        requestId:body?.requestId?String(body.requestId):undefined,
+        submissionId:body?.submissionId?String(body.submissionId):undefined,
+        receivedAt:new Date().toISOString(),
+      });
+      for(const socket of this.state.getWebSockets()){
+        try{socket.send(message);}catch{}
+      }
+      return json({state:'DOORBELL_SENT'});
+    }
+    if(url.pathname==='/customer-orders'&&request.method==='GET'){
+      const submissionIds=url.searchParams.getAll('submissionId').map(value=>String(value).trim()).filter(Boolean).slice(0,24);
+      return json({orders:filterCustomerOwnedOrders(await this.projectionOrders(),submissionIds)});
     }
     if(url.pathname==='/provider-doorbell'&&request.method==='POST'){
       let body;
@@ -288,6 +314,96 @@ export default {
   async fetch(request,env){
     const url=new URL(request.url);
 
+    if(url.pathname.startsWith('/api/customer/')){
+      if(request.method==='OPTIONS')return new Response(null,{status:204,headers:cors(request)});
+      const storeId=storeIdFrom(url);
+      const customer=env.CUSTOMER_RUNTIME.get(env.CUSTOMER_RUNTIME.idFromName(storeId));
+      const admin=env.ADMIN_SYNC.get(env.ADMIN_SYNC.idFromName(storeId));
+
+      if(url.pathname==='/api/customer/snapshot'){
+        if(request.method!=='GET')return json({code:'METHOD_NOT_ALLOWED'},405,cors(request));
+        const activeResponse=await admin.fetch(new Request('https://internal/active',{method:'GET'}));
+        if(!activeResponse.ok)return json({code:'CUSTOMER_CONFIG_NOT_PUBLISHED'},503,cors(request));
+        const active=await activeResponse.json();
+        const orderUrl=new URL('https://internal/customer-orders');
+        for(const submissionId of url.searchParams.getAll('submissionId').slice(0,24)){
+          if(String(submissionId).trim())orderUrl.searchParams.append('submissionId',String(submissionId).trim());
+        }
+        const orderResponse=await admin.fetch(new Request(orderUrl.toString(),{method:'GET'}));
+        const orderBody=orderResponse.ok?await orderResponse.json():{orders:[]};
+        return json(
+          projectCustomerPublicSnapshot(active,Array.isArray(orderBody.orders)?orderBody.orders:[]),
+          200,
+          cors(request)
+        );
+      }
+
+      if(url.pathname.startsWith('/api/customer/smt/')){
+        const authorizeUrl=new URL(request.url);
+        authorizeUrl.pathname='/authorize-smt-device';
+        const authResponse=await admin.fetch(new Request(authorizeUrl.toString(),{
+          method:'GET',
+          headers:new Headers(request.headers),
+        }));
+        if(!authResponse.ok)return json({code:'CUSTOMER_SMT_UNAUTHORIZED'},401,cors(request));
+        const target=new URL(request.url);
+        target.pathname='/smt/'+url.pathname.slice('/api/customer/smt/'.length);
+        const init={method:request.method,headers:new Headers(request.headers)};
+        if(request.method!=='GET'&&request.method!=='HEAD'){
+          const body=await request.arrayBuffer();
+          if(body.byteLength)init.body=body;
+        }
+        const response=await customer.fetch(new Request(target.toString(),init));
+        const headers=new Headers(response.headers);
+        for(const [key,value] of Object.entries(cors(request)))headers.set(key,value);
+        return new Response(response.body,{status:response.status,statusText:response.statusText,headers});
+      }
+
+      const publicMap={
+        '/api/customer/quote':'/public/quote',
+        '/api/customer/quote/readback':'/public/quote/readback',
+        '/api/customer/orders/submit':'/public/orders/submit',
+        '/api/customer/orders/readback':'/public/orders/readback',
+      };
+      const targetPath=publicMap[url.pathname];
+      if(targetPath&&(url.pathname==='/api/customer/quote'||url.pathname==='/api/customer/orders/submit')){
+        const activeResponse=await admin.fetch(new Request('https://internal/active',{method:'GET'}));
+        if(!activeResponse.ok)return json({code:'CUSTOMER_CONFIG_NOT_PUBLISHED'},503,cors(request));
+        const active=await activeResponse.json();
+        const policy=active?.snapshot?.customerChannelPolicy;
+        if(policy&&policy.enabled===false)return json({code:'CUSTOMER_CHANNEL_DISABLED'},503,cors(request));
+      }
+      if(targetPath){
+        const target=new URL(request.url);
+        target.pathname=targetPath;
+        const init={method:request.method,headers:new Headers(request.headers)};
+        if(request.method!=='GET'&&request.method!=='HEAD'){
+          const body=await request.arrayBuffer();
+          if(body.byteLength)init.body=body;
+        }
+        const response=await customer.fetch(new Request(target.toString(),init));
+        if(response.status===202&&(url.pathname==='/api/customer/quote'||url.pathname==='/api/customer/orders/submit')){
+          try{
+            const body=await response.clone().json();
+            await admin.fetch(new Request('https://internal/customer-doorbell',{
+              method:'POST',
+              headers:{'content-type':'application/json'},
+              body:JSON.stringify({
+                type:url.pathname==='/api/customer/quote'?'CUSTOMER_QUOTE_AVAILABLE':'CUSTOMER_ORDER_AVAILABLE',
+                requestId:body.requestId,
+                submissionId:body.submissionId,
+              }),
+            }));
+          }catch{}
+        }
+        const headers=new Headers(response.headers);
+        for(const [key,value] of Object.entries(cors(request)))headers.set(key,value);
+        return new Response(response.body,{status:response.status,statusText:response.statusText,headers});
+      }
+
+      return json({code:'NOT_FOUND'},404,cors(request));
+    }
+
     if(url.pathname.startsWith('/api/keeta/')){
       if(request.method==='OPTIONS')return new Response(null,{status:204,headers:cors(request)});
       const storeId=storeIdFrom(url);
@@ -427,7 +543,7 @@ export default {
       for(const [key,value] of Object.entries(cors(request)))headers.set(key,value);
       return new Response(response.body,{status:response.status,statusText:response.statusText,headers});
     }
-    if(url.pathname==='/api/admin-sync/provider-doorbell'||url.pathname==='/api/admin-sync/authorize-smt-device'){
+    if(url.pathname==='/api/admin-sync/provider-doorbell'||url.pathname==='/api/admin-sync/customer-doorbell'||url.pathname==='/api/admin-sync/customer-orders'||url.pathname==='/api/admin-sync/authorize-smt-device'){
       return json({code:'NOT_FOUND'},404,cors(request));
     }
     if(url.pathname.startsWith('/api/admin-sync/')||url.pathname.startsWith('/api/projection/')){
