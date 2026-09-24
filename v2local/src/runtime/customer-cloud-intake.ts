@@ -232,6 +232,7 @@ async function reconcileOrders(){
         sourceLabel:'自家 App',
         providerRef,
         ...(intent.checkout.paymentMethod==='ELECTRONIC'&&intent.checkout.paymentEvidenceRef?{paymentEvidenceRef:intent.checkout.paymentEvidenceRef,paymentVerificationState:'PENDING' as const}:{}),
+        customerPhone:intent.checkout.phone,
         initialFulfillmentLabel:'待處理',
       });
       window.dispatchEvent(new CustomEvent('mfk-customer-order-intake',{detail:{
