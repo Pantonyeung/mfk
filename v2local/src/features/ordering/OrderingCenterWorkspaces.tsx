@@ -24,13 +24,14 @@ export type OrderingPanelState=
   |{readonly type:'organize'}
   |{readonly type:'combo'}
   |{readonly type:'fast-lane';readonly lane:'riceball-pool'|'required'|'combo'}
+  |{readonly type:'quick-drink-config';readonly productId:string;readonly comboLineId:string;readonly groupId:string;readonly choiceId:string}
   |{readonly type:'hold'}
   |{readonly type:'holds'}
   |null;
 
 const money=(minor:number)=>(minor<0?'-':'')+String.fromCharCode(36)+(Math.abs(minor)/100).toFixed(2);
 
-export function ProductConfigWorkspace({product,onAdd}:{product:WorkspaceProduct;onAdd:(detail:string,deltaMinor:number,qty:number,structured:{readonly selections:Readonly<Record<string,readonly string[]>>;readonly note:string})=>void}){
+export function ProductConfigWorkspace({product,onAdd,maxQty=99}:{product:WorkspaceProduct;onAdd:(detail:string,deltaMinor:number,qty:number,structured:{readonly selections:Readonly<Record<string,readonly string[]>>;readonly note:string})=>void;maxQty?:number}){
   const [qty,setQty]=useState(1);
   const [note,setNote]=useState('');
   const [selected,setSelected]=useState<Record<string,string[]>>(()=>Object.fromEntries(
@@ -71,7 +72,7 @@ export function ProductConfigWorkspace({product,onAdd}:{product:WorkspaceProduct
     <header className="cfg-product-head">
       <div className="cfg-product-hero">{product.imageUrl?<img src={product.imageUrl} alt=""/>:null}</div>
       <div><small>{product.category}</small><h2>{product.name}</h2><strong>{money(product.priceMinor+delta)}</strong></div>
-      <div className="cfg-qty"><span>數量</span><button onClick={()=>setQty(Math.max(1,qty-1))}>−</button><b>{qty}</b><button onClick={()=>setQty(qty+1)}>＋</button></div>
+      <div className="cfg-qty"><span>數量</span><button disabled={qty<=1} onClick={()=>setQty(Math.max(1,qty-1))}>−</button><b>{qty}</b><button disabled={qty>=maxQty} onClick={()=>setQty(Math.min(maxQty,qty+1))}>＋</button></div>
     </header>
 
     {(product.optionSets??[]).length
