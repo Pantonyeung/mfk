@@ -56,13 +56,13 @@ describe('MFK checkout print fanout',()=>{
     expect(productJobs.map(job=>job.binding.id)).toEqual([
       'product-label-riceball','product-label-riceball','product-label-takeaway',
     ]);
-    expect(productJobs[0]?.labelSpec).toMatchObject({kind:'product',orderCode:'P001',primaryText:'原味飯團',productCode:'A1',pieceLabel:'1/3',secondaryLines:['少飯']});
+    expect(productJobs[0]?.labelSpec).toMatchObject({kind:'product',orderCode:'P001',primaryText:'原味飯團',pieceLabel:'1/3',secondaryLines:['少飯']});
     expect(productJobs[1]?.labelSpec).toMatchObject({orderCode:'P001',primaryText:'原味飯團',pieceLabel:'2/3'});
     expect(productJobs[2]?.labelSpec).toMatchObject({orderCode:'P001',primaryText:'台式奶茶',pieceLabel:'3/3'});
     expect(productJobs.every(job=>job.renderMode==='tsc-bitmap')).toBe(true);
 
     expect(plan[6]?.renderMode).toBe('tsc-bitmap');
-    expect(plan[6]?.labelSpec).toMatchObject({kind:'bag',orderCode:'P001',primaryText:'共 3 件',secondaryText:'共 3 件'});
+    expect(plan[6]?.labelSpec).toMatchObject({kind:'bag',orderCode:'P001',primaryText:'共 3 件',secondaryText:'共 3 件',pickupCode:'4890'});
     expect(plan[6]?.labelSpec?.pieceLabel).toBeUndefined();
   });
 
@@ -79,24 +79,24 @@ describe('MFK checkout print fanout',()=>{
 
     expect(receipt).toContain('客戶收據');
     expect(receipt).toContain('P001');
-    expect(receipt).toContain('取餐碼');
-    expect(receipt).toContain('4890');
+    expect(receipt).toContain('總數量 3份');
     expect(receipt).toContain('合計 $59.00');
-    expect(receipt).not.toContain('內容物確認');
+    expect(receipt).not.toContain('取餐碼');
 
-    expect(production).toContain('廚房製作單');
+    expect(production).toContain('外賣');
     expect(production).toContain('A1. 原味飯團');
-    expect(production).toContain('數量');
-    expect(production).toContain('少辣');
+    expect(production).toContain('數量 2份');
 
     expect(packing).toContain('外賣打包單');
-    expect(packing).toContain('總數量');
-    expect(packing).toContain('內容物確認');
-    expect(packing).toContain('餐具：未記錄');
+    expect(packing).toContain('總數量 3件');
+    expect(packing).toContain('[ ] 餐具');
+    expect(packing).toContain('[ ] 飲品');
+    expect(packing).toContain('[ ] 醬汁');
+    expect(packing).not.toContain('餐巾紙');
   });
 
 
-  it('projects a combo label as main food plus modifiers only',()=>{
+  it('projects a combo label with main food, modifier, snack and drink as locked',()=>{
     const comboOrder:PrintableOrder={...order,items:[{
       id:'combo-d',
       name:'自選飯團 D 餐',
@@ -114,7 +114,7 @@ describe('MFK checkout print fanout',()=>{
       orderCode:'P001',
       primaryText:'汁燒鰻魚紫米飯團',
       pieceLabel:'1/1',
-      secondaryLines:['少辣'],
+      secondaryLines:['(少辣)','酥皮椰奶','日式玄米茶'],
     });
     expect(plan[0]?.labelSpec?.secondaryText).toBeUndefined();
   });
