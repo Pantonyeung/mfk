@@ -81,7 +81,7 @@ function OrganizedCart({lines,highlightedLineId,actions,availability}:{lines:rea
   </div>;
 }
 
-export function OrderingWorkspace({view,actions,centerPanel}:{view:OrderingWorkspaceViewModel;actions:OrderingWorkspaceActions;centerPanel?:{readonly title:string;readonly body:ReactNode;readonly onClose:()=>void;readonly dirty?:boolean}|null}){
+export function OrderingWorkspace({view,actions,centerPanel}:{view:OrderingWorkspaceViewModel;actions:OrderingWorkspaceActions;centerPanel?:{readonly title:string;readonly body:ReactNode;readonly onClose:()=>void;readonly dirty?:boolean;readonly variant?:'product'|'default'}|null}){
   const availability=view.actionAvailability??{lineServiceMode:true,lineEdit:true,lineQuantity:true,holdCart:true,cancelCart:true};
   const serviceModes=view.serviceModes??{takeaway:true,dineIn:true};
   const orderingMode=view.orderingMode??'normal';
@@ -95,18 +95,9 @@ export function OrderingWorkspace({view,actions,centerPanel}:{view:OrderingWorks
     </header>
 
     <main className={`ordering-catalog${guidanceTarget==='product'?' flow-next-catalog':''}`} aria-label="商品">
-        <div className="ordering-catalog-toolbar">
-          <div className="ordering-status-stack" aria-live="polite">
-            {view.menuRevisionLabel?<div className="ordering-menu-local-status"><b>{view.menuRevisionLabel}</b><span>本機 Admin → POS</span></div>:null}
-            {view.operationalNotice?<div className="ordering-menu-local-status warning"><b>{view.operationalNotice}</b><span>Admin 營運提示</span></div>:null}
-          </div>
-          <div className="ordering-fast-controls" aria-label="點單快捷">
-            <div className="ordering-mode-switch" aria-label="點單模式">
-              <button type="button" className={orderingMode==='normal'?'active':''} aria-pressed={orderingMode==='normal'} onClick={()=>actions.onChangeOrderingMode('normal')}>普通</button>
-              <button type="button" className={orderingMode==='quick'?'active':''} aria-pressed={orderingMode==='quick'} onClick={()=>actions.onChangeOrderingMode('quick')}>快捷</button>
-            </div>
-            <button type="button" className={'ordering-quick-drink-toggle'+(quickDrink.pendingCount?' has-work':'')+(guidanceTarget==='quick-drink'?' flow-next':'')} aria-expanded={quickDrink.open} onClick={actions.onToggleQuickDrink}>快捷飲品 <b>{quickDrink.pendingCount}</b></button>
-          </div>
+        <div className="ordering-status-stack" aria-live="polite">
+          {view.menuRevisionLabel?<div className="ordering-menu-local-status"><b>{view.menuRevisionLabel}</b><span>本機 Admin → POS</span></div>:null}
+          {view.operationalNotice?<div className="ordering-menu-local-status warning"><b>{view.operationalNotice}</b><span>Admin 營運提示</span></div>:null}
         </div>
         {quickDrink.open?<section className="ordering-quick-drink-drawer" aria-label="快捷飲品">
           <header><div><small>QUICK DRINK</small><strong>{quickDrink.targetLabel?'正在補：'+quickDrink.targetLabel:'目前冇待補飲品'}</strong></div><span><button type="button" disabled={!quickDrink.pendingCount} onClick={actions.onOpenQuickDrinkTargets}>指定餐點</button><button type="button" onClick={actions.onToggleQuickDrink}>×</button></span></header>
@@ -162,7 +153,7 @@ export function OrderingWorkspace({view,actions,centerPanel}:{view:OrderingWorks
     })}</footer>
 
     {centerPanel?<div className="ordering-modal-backdrop" onMouseDown={event=>{if(event.target===event.currentTarget)centerPanel.onClose();}}>
-      <section className="ordering-modal-window" role="dialog" aria-modal="true" aria-label={centerPanel.title} onMouseDown={event=>event.stopPropagation()}>
+      <section className={'ordering-modal-window '+(centerPanel.variant==='product'?'product-detail':'default-detail')} role="dialog" aria-modal="true" aria-label={centerPanel.title} onMouseDown={event=>event.stopPropagation()}>
         <header className="ordering-modal-head">
           <div><small>{centerPanel.dirty?'未保存修改':'點單'}</small><strong>{centerPanel.title}</strong></div>
           <button type="button" aria-label="關閉" onClick={centerPanel.onClose}>×</button>
