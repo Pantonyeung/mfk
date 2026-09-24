@@ -222,3 +222,50 @@
   .combo-product-grid{grid-auto-rows:100px}
   .combo-product-grid button{height:100px;min-height:100px}
 }
+
+
+/* R3 held-order restore guard */
+.hold-current-warning{
+  margin:0;
+  padding:9px 11px;
+  border:1px solid #e8c987;
+  border-radius:9px;
+  background:#fff8e8;
+  color:#83570b;
+  font-size:12px;
+  font-weight:800;
+}
+.hold-restore-confirm{
+  position:absolute;
+  inset:0;
+  z-index:30;
+  display:grid;
+  place-items:center;
+  padding:20px;
+  background:rgba(15,23,42,.28);
+  backdrop-filter:blur(3px);
+}
+.hold-restore-confirm>section{
+  width:min(480px,88%);
+  padding:20px;
+  display:grid;
+  gap:12px;
+  border-radius:14px;
+  background:#fff;
+  box-shadow:0 24px 70px rgba(15,23,42,.22);
+}
+.hold-restore-confirm h3{margin:0;font-size:22px}
+.hold-restore-confirm p{margin:0;color:#667085;line-height:1.5}
+.hold-restore-confirm>section>div{display:grid;grid-template-columns:1fr 1.2fr;gap:8px}
+.hold-restore-confirm button{
+  min-height:48px;
+  border:1px solid #d7dee8;
+  border-radius:9px;
+  background:#fff;
+  font-weight:900;
+}
+.hold-restore-confirm button.primary{
+  border-color:#1768dc;
+  background:#1768dc;
+  color:#fff;
+}
