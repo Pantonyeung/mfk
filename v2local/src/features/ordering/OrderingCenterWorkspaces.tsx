@@ -307,17 +307,26 @@ export interface WorkspaceHoldDraft{
   readonly items:readonly {id:string;name:string;qty:number;unitMinor:number}[];
 }
 
-export function HoldListWorkspace({holds,onRestore,onRemove}:{holds:readonly WorkspaceHoldDraft[];onRestore:(hold:WorkspaceHoldDraft)=>void;onRemove:(id:string)=>void}){
+export function HoldListWorkspace({holds,currentCartCount=0,onRestore,onRemove}:{holds:readonly WorkspaceHoldDraft[];currentCartCount?:number;onRestore:(hold:WorkspaceHoldDraft)=>void;onRemove:(id:string)=>void}){
+  const [restoreTarget,setRestoreTarget]=useState<WorkspaceHoldDraft|null>(null);
+  const requestRestore=(hold:WorkspaceHoldDraft)=>{
+    if(currentCartCount>0){setRestoreTarget(hold);return;}
+    onRestore(hold);
+  };
   return <div className="hold-list-workspace">
-    <header><div><h2>暫存單</h2><p>未完成付款／未正式提交嘅 Cart 全部喺呢度取回。</p></div><strong>{holds.length} 張</strong></header>
+    <header><div><h2>暫存單</h2></div><strong>{holds.length} 張</strong></header>
+    {currentCartCount>0?<p className="hold-current-warning">目前購物籃有 {currentCartCount} 件；取回暫存單前會先要求確認。</p>:null}
     <div className="hold-list">
       {holds.length?holds.map(hold=><article key={hold.id}>
-        <div className="hold-list-head"><div><b>{hold.codeLabel}</b><span>{hold.kind==='dining'?'堂食／輪候':'暫存待客'}</span></div><strong>{money(hold.totalMinor)}</strong></div>
+        <div className="hold-list-head"><div><b>{hold.codeLabel}</b><span>{hold.kind==='dining'?'堂食／輪候':'暫存'}</span></div><strong>{money(hold.totalMinor)}</strong></div>
         <div className="hold-list-meta"><span>{new Date(hold.createdAt).toLocaleTimeString('zh-HK',{hour:'2-digit',minute:'2-digit'})}</span><span>{hold.partySize} 位</span>{hold.assignedTable?<span>枱 {hold.assignedTable.replace('T','')}</span>:null}</div>
         <div className="hold-list-items">{hold.items.map((item,index)=><p key={hold.id+'-'+index}><span>{item.qty}×</span><b>{item.name}</b><strong>{money(item.qty*item.unitMinor)}</strong></p>)}</div>
         {hold.note?<small>備註：{hold.note}</small>:null}
-        <footer><button type="button" className="danger" onClick={()=>onRemove(hold.id)}>刪除暫存</button><button type="button" className="primary" onClick={()=>onRestore(hold)}>取回購物車</button></footer>
-      </article>):<div className="hold-list-empty">而家未有暫存單。</div>}
+        <footer><button type="button" className="danger" onClick={()=>onRemove(hold.id)}>刪除</button><button type="button" className="primary" onClick={()=>requestRestore(hold)}>取回</button></footer>
+      </article>):<div className="hold-list-empty">未有暫存單</div>}
     </div>
+    {restoreTarget?<div className="hold-restore-confirm" role="dialog" aria-modal="true" aria-label="確認取回暫存單">
+      <section><h3>取回 {restoreTarget.codeLabel}？</h3><p>目前購物籃有 {currentCartCount} 件。繼續會以呢張暫存單取代目前購物籃。</p><div><button type="button" onClick={()=>setRestoreTarget(null)}>返回</button><button type="button" className="primary" onClick={()=>{const target=restoreTarget;setRestoreTarget(null);onRestore(target)}}>確認取回</button></div></section>
+    </div>:null}
   </div>;
 }
