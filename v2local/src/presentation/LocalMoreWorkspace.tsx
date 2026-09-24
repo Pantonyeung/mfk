@@ -345,6 +345,9 @@ function DiagnosticsPanel(){
       </article>
       <div className="more-tab-row"><button type="button" disabled={customerBridgeBusy} onClick={()=>void runCustomerBridgeDiagnostic()}>{customerBridgeBusy?'檢查中…':'檢查 Customer Bridge'}</button></div>
       {customerBridge?.code?<p role="status"><b>CODE：</b>{customerBridge.code}</p>:null}
+      {customerBridge?.lastPublicQuote?<p role="status"><b>LAST PUBLIC QUOTE：</b>{JSON.stringify(customerBridge.lastPublicQuote)}</p>:null}
+      {customerBridge?.lastQuotePull?<p role="status"><b>LAST SMT PULL：</b>{JSON.stringify(customerBridge.lastQuotePull)}</p>:null}
+      {customerBridge?.lastQuoteAck?<p role="status"><b>LAST SMT ACK：</b>{JSON.stringify(customerBridge.lastQuoteAck)}</p>:null}
     </section>
     <div className="more-kpis">
       <article><span>Printer Routes</span><b>{printers.length}</b></article>

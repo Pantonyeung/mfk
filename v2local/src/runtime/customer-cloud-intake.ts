@@ -110,6 +110,9 @@ export interface CustomerCloudBridgeDiagnostic{
   readonly status?:number;
   readonly code?:string;
   readonly observedAt?:string;
+  readonly lastPublicQuote?:Record<string,unknown>|null;
+  readonly lastQuotePull?:Record<string,unknown>|null;
+  readonly lastQuoteAck?:Record<string,unknown>|null;
 }
 
 export async function diagnoseCustomerCloudBridge():Promise<CustomerCloudBridgeDiagnostic>{
@@ -128,6 +131,9 @@ export async function diagnoseCustomerCloudBridge():Promise<CustomerCloudBridgeD
       status:response.status,
       code:typeof body.code==='string'?body.code:undefined,
       observedAt:typeof body.observedAt==='string'?body.observedAt:new Date().toISOString(),
+      lastPublicQuote:body.lastPublicQuote&&typeof body.lastPublicQuote==='object'?body.lastPublicQuote as Record<string,unknown>:null,
+      lastQuotePull:body.lastQuotePull&&typeof body.lastQuotePull==='object'?body.lastQuotePull as Record<string,unknown>:null,
+      lastQuoteAck:body.lastQuoteAck&&typeof body.lastQuoteAck==='object'?body.lastQuoteAck as Record<string,unknown>:null,
     });
   }catch(error){
     return Object.freeze({
