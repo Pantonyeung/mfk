@@ -346,26 +346,6 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode,uiSettings}:{cart
       if(mode==='dine-in'&&!storeSettings.dineInEnabled)return;
       setServiceMode(mode);setCart(cart.map(item=>({...item,serviceMode:mode})));
     },
-    onChangeCartView:mode=>{setViewMode(mode);if(mode==='organized')setPanel({type:'organize'});},
-    onChangeLineServiceMode:(lineId,mode)=>{
-      if(mode==='takeaway'&&!storeSettings.takeawayEnabled)return;
-      if(mode==='dine-in'&&!storeSettings.dineInEnabled)return;
-      setCart(cart.map(item=>item.id===lineId?{...item,serviceMode:mode}:item));
-    },
-    onAdjustLineQuantity:(lineId,delta)=>setCart(cart.map(item=>item.id===lineId?{...item,qty:item.qty+delta}:item).filter(item=>item.qty>0)),
-    onEditCartLine:lineId=>{
-      const line=cart.find(item=>item.id===lineId);
-      if(!line)return;
-      if(comboData.combos.some(combo=>combo.id===line.productId))setPanel({type:'combo'});
-      els  const actions:OrderingWorkspaceActions={
-    onSelectCategory:setCategory,
-    onAddProduct:add,
-    onConfigureProduct:id=>setPanel({type:'product',productId:id}),
-    onChangeServiceMode:mode=>{
-      if(mode==='takeaway'&&!storeSettings.takeawayEnabled)return;
-      if(mode==='dine-in'&&!storeSettings.dineInEnabled)return;
-      setServiceMode(mode);setCart(cart.map(item=>({...item,serviceMode:mode})));
-    },
     onChangeCartView:setViewMode,
     onToggleCombine:()=>setCombineSimilar(value=>!value),
     onChangeLineServiceMode:(lineIds,mode)=>{
