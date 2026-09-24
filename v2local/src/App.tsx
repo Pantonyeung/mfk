@@ -85,7 +85,7 @@ const nav=[
 
 function OrderingPage({
   cart,setCart,serviceMode,setServiceMode,orderingMode,setOrderingMode,quickDrinkOpen,setQuickDrinkOpen,
-  showImagesOverride,showCategoriesOverride,onQuickDrinkCountChange,
+  showImagesOverride,showCategoriesOverride,categoryRowsOverride,categoryColumnsOverride,productDensityOverride,onQuickDrinkCountChange,
 }:{
   cart:CartLine[];
   setCart:(v:CartLine[])=>void;
@@ -97,6 +97,9 @@ function OrderingPage({
   setQuickDrinkOpen:(value:boolean|((current:boolean)=>boolean))=>void;
   showImagesOverride?:boolean;
   showCategoriesOverride?:boolean;
+  categoryRowsOverride?:1|2;
+  categoryColumnsOverride?:5|6|7;
+  productDensityOverride?:'standard'|'compact';
   onQuickDrinkCountChange:(count:number)=>void;
 }){
   const navigate=useNavigate();
@@ -370,6 +373,9 @@ function OrderingPage({
       ?'今日 '+capacityNotice.currentCount+'/'+capacityNotice.dailyLimit+' 單 · 已到 '+capacityNotice.warningAt+'% 提醒門檻'+(capacityNotice.hardStopConfigured?' · Admin 有 hard-stop 設定但目前只提示':'')
       :undefined,
     showCategories:showCategoriesOverride??frontlinePresentation.showCategories,
+    categoryRows:categoryRowsOverride??2,
+    categoryColumns:categoryColumnsOverride??7,
+    productDensity:productDensityOverride??'standard',
     serviceModes:{takeaway:storeSettings.takeawayEnabled,dineIn:storeSettings.dineInEnabled},
     cart:{
       orderId:nextDisplay,serviceMode,viewMode,combineSimilar,
@@ -897,6 +903,9 @@ function OperationalApp(){
   const [displayToolsOpen,setDisplayToolsOpen]=useState(false);
   const [showImagesOverride,setShowImagesOverride]=useState<boolean|undefined>(undefined);
   const [showCategoriesOverride,setShowCategoriesOverride]=useState<boolean|undefined>(undefined);
+  const [categoryRowsOverride,setCategoryRowsOverride]=useState<1|2|undefined>(undefined);
+  const [categoryColumnsOverride,setCategoryColumnsOverride]=useState<5|6|7|undefined>(undefined);
+  const [productDensityOverride,setProductDensityOverride]=useState<'standard'|'compact'|undefined>(undefined);
   const [navRevision,setNavRevision]=useState(0);
   useEffect(()=>localRuntime.subscribe(()=>setNavRevision(value=>value+1)),[]);
   const activeOrderCount=useMemo(()=>{
@@ -978,9 +987,12 @@ function OperationalApp(){
         <button type="button" className={displayToolsOpen?'active':''} onClick={()=>setDisplayToolsOpen(value=>!value)}><span>顯</span><small>顯示</small></button>
         {displayToolsOpen?<div className="clean-display-popover">
           <header><b>顯示設定</b><button type="button" onClick={()=>setDisplayToolsOpen(false)}>×</button></header>
+          <section><span>分類行數</span><div><button type="button" className={categoryRowsOverride===1?'active':''} onClick={()=>setCategoryRowsOverride(1)}>1 行</button><button type="button" className={categoryRowsOverride===2?'active':''} onClick={()=>setCategoryRowsOverride(2)}>2 行</button></div></section>
+          <section><span>分類每行</span><div className="triple"><button type="button" className={categoryColumnsOverride===5?'active':''} onClick={()=>setCategoryColumnsOverride(5)}>5</button><button type="button" className={categoryColumnsOverride===6?'active':''} onClick={()=>setCategoryColumnsOverride(6)}>6</button><button type="button" className={categoryColumnsOverride===7?'active':''} onClick={()=>setCategoryColumnsOverride(7)}>7</button></div></section>
           <section><span>商品圖片</span><div><button type="button" className={showImagesOverride===false?'active':''} onClick={()=>setShowImagesOverride(false)}>隱藏</button><button type="button" className={showImagesOverride===true?'active':''} onClick={()=>setShowImagesOverride(true)}>顯示</button></div></section>
           <section><span>商品分類</span><div><button type="button" className={showCategoriesOverride===false?'active':''} onClick={()=>setShowCategoriesOverride(false)}>隱藏</button><button type="button" className={showCategoriesOverride===true?'active':''} onClick={()=>setShowCategoriesOverride(true)}>顯示</button></div></section>
-          <button type="button" className="reset" onClick={()=>{setShowImagesOverride(undefined);setShowCategoriesOverride(undefined);}}>跟 Admin 設定</button>
+          <section><span>商品密度</span><div><button type="button" className={productDensityOverride==='standard'?'active':''} onClick={()=>setProductDensityOverride('standard')}>標準</button><button type="button" className={productDensityOverride==='compact'?'active':''} onClick={()=>setProductDensityOverride('compact')}>緊湊</button></div></section>
+          <button type="button" className="reset" onClick={()=>{setShowImagesOverride(undefined);setShowCategoriesOverride(undefined);setCategoryRowsOverride(undefined);setCategoryColumnsOverride(undefined);setProductDensityOverride(undefined);}}>跟 Admin 設定</button>
         </div>:null}
       </div>:null}
       <StaffSessionBadge/>
@@ -999,6 +1011,9 @@ function OperationalApp(){
           setQuickDrinkOpen={setQuickDrinkOpen}
           showImagesOverride={showImagesOverride}
           showCategoriesOverride={showCategoriesOverride}
+          categoryRowsOverride={categoryRowsOverride}
+          categoryColumnsOverride={categoryColumnsOverride}
+          productDensityOverride={productDensityOverride}
           onQuickDrinkCountChange={setQuickDrinkCount}
         />}/>
         <Route path="checkout" element={<CheckoutPage cart={cart} setCart={setCart} diningCheckout={diningCheckout} onDiningCheckoutDone={()=>setDiningCheckout(null)}/>}/>
