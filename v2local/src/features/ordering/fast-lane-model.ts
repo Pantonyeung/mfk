@@ -279,10 +279,13 @@ function matchingLine(
   lines:readonly FastLaneCartLine[],
   units:Map<string,number>,
   choices:readonly FastLaneComboChoice[],
+  products:readonly FastLaneProduct[],
 ):{line:FastLaneCartLine;choice:FastLaneComboChoice}|null{
   for(const choice of choices){
     if(choice.type!=='PRODUCT'||!choice.productId)continue;
-    const line=lines.find(row=>!row.comboDraft&&row.productId===choice.productId&&(units.get(row.id)??0)>0);
+    const line=lines.find(row=>
+      !row.comboDraft&&row.productId===choice.productId&&(units.get(row.id)??0)>0&&requiredTasks([row],products).length===0
+    );
     if(line)return {line,choice};
   }
   return null;
@@ -306,7 +309,7 @@ export function buildAutoPairingPlans(
     let blocked=false;
     let consumedCore=false;
     for(const slot of slots){
-      const match=matchingLine(lines,units,slot.choices);
+      const match=matchingLine(lines,units,slot.choices,products);
       if(match){
         selections.push({groupId:slot.groupId,choiceId:match.choice.id,sourceLineId:match.line.id});
         units.set(match.line.id,(units.get(match.line.id)??0)-1);
@@ -347,7 +350,7 @@ export function countMainCourseUnits(
       slot.choices.forEach(choice=>{if(choice.type==='PRODUCT'&&choice.productId)productIds.add(choice.productId);});
     }
   }
-  return lines.filter(line=>!line.comboDraft&&productIds.has(line.productId)).reduce((sum,line)=>sum+line.qty,0);
+  return lines.filter(line=>!line.comboDraft&&productIds.has(line.productId)&&requiredTasks([line],products).length===0).reduce((sum,line)=>sum+line.qty,0);
 }
 
 function consumeOne(lines:FastLaneCartLine[],lineId:string):{lines:FastLaneCartLine[];taken:FastLaneCartLine}{
@@ -415,6 +418,7 @@ export function applyPairingPlan(
       if(!selection.sourceLineId)throw new Error('FAST_LANE_PAIR_SOURCE_REQUIRED');
       const source=lines.find(line=>line.id===selection.sourceLineId);
       if(!source||source.productId!==choice.productId)throw new Error('FAST_LANE_PAIR_SOURCE_MISMATCH');
+      if(requiredTasks([source],products).length)throw new Error('FAST_LANE_PAIR_SOURCE_REQUIRED_UNRESOLVED');
       const consumed=consumeOne(lines,selection.sourceLineId);
       lines=consumed.lines;
       if(!serviceModeSet){serviceMode=consumed.taken.serviceMode;serviceModeSet=true;}
@@ -467,6 +471,7 @@ export function fillPendingComboGroup(
     if(!sourceLineId)throw new Error('FAST_LANE_PAIR_SOURCE_REQUIRED');
     const source=lines.find(line=>line.id===sourceLineId);
     if(!source||source.productId!==choice.productId)throw new Error('FAST_LANE_PAIR_SOURCE_MISMATCH');
+    if(requiredTasks([source],products).length)throw new Error('FAST_LANE_PAIR_SOURCE_REQUIRED_UNRESOLVED');
     const consumed=consumeOne(lines,sourceLineId);
     lines=consumed.lines;
     component={
