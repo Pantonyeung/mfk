@@ -307,7 +307,7 @@ function packing(t:TicketCanvas,order:PrintableOrder){
   t.text('More Fun Kitchen',23,700,'center',32);
 }
 
-export function packEscPosRasterPixelsexport function packEscPosRasterPixels(pixels:Uint8Array,width:number,height:number){
+export function packEscPosRasterPixels(pixels:Uint8Array,width:number,height:number){
   if(width<1||height<1||pixels.length!==width*height)throw new Error('ESC_POS_RASTER_DIMENSION_INVALID');
   const bytesPerRow=Math.ceil(width/8);
   const output=new Uint8Array(bytesPerRow*height);
