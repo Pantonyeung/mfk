@@ -22,6 +22,7 @@ import {readBusinessCutoff,readCurrentCashOpeningState} from '../runtime/cash-op
 import {queueDayCloseProjection} from '../runtime/projection-outbox.ts';
 import {readSmtPrintConfig} from '../runtime/admin-operational-config.ts';
 import {subscribeSmtAdminConfig} from '../runtime/admin-config-sync.ts';
+import {diagnoseCustomerCloudBridge,type CustomerCloudBridgeDiagnostic} from '../runtime/customer-cloud-intake.ts';
 import './more-workspace.css';
 
 export type PrinterBinding={
@@ -315,6 +316,14 @@ function PrinterPanel(){
 
 function DiagnosticsPanel(){
   const printers=loadPrinters();
+  const [customerBridge,setCustomerBridge]=useState<CustomerCloudBridgeDiagnostic|null>(null);
+  const [customerBridgeBusy,setCustomerBridgeBusy]=useState(false);
+  const runCustomerBridgeDiagnostic=async()=>{
+    if(customerBridgeBusy)return;
+    setCustomerBridgeBusy(true);
+    setCustomerBridge(await diagnoseCustomerCloudBridge());
+    setCustomerBridgeBusy(false);
+  };
   const lastPrint=readLastPrintDiagnostic();
   const groups=new Map<string,PrinterBinding[]>();
   for(const printer of printers){
@@ -327,6 +336,16 @@ function DiagnosticsPanel(){
   const unbound=printers.filter(printer=>!printer.host.trim());
   return <section className="more-panel">
     <header className="more-section-heading"><div><span>LOCAL DIAGNOSTICS</span><h2>診斷中心</h2></div><strong>{window.moreFunNative?'Carrier Bridge 已連接':'Native Bridge 未連接'}</strong></header>
+    <section className="fusion-list">
+      <header><b>Customer Cloud Bridge</b><span>READ ONLY · NO ORDER WRITE</span></header>
+      <article>
+        <span>Customer → Admin → SMT<small> · Device Auth / Pending Queue Pull</small></span>
+        <b>{customerBridge?customerBridge.stage:'未檢查'}</b>
+        <strong>{customerBridge?('HTTP '+customerBridge.status+' · Auth '+(customerBridge.deviceAuthorized?'PASS':'FAIL')+' · Quote '+String(customerBridge.pendingQuotes??'—')+' · Order '+String(customerBridge.pendingOrders??'—')):'—'}</strong>
+      </article>
+      <div className="more-tab-row"><button type="button" disabled={customerBridgeBusy} onClick={()=>void runCustomerBridgeDiagnostic()}>{customerBridgeBusy?'檢查中…':'檢查 Customer Bridge'}</button></div>
+      {customerBridge?.code?<p role="status"><b>CODE：</b>{customerBridge.code}</p>:null}
+    </section>
     <div className="more-kpis">
       <article><span>Printer Routes</span><b>{printers.length}</b></article>
       <article><span>未綁定</span><b>{unbound.length}</b></article>
