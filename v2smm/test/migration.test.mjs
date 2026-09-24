@@ -130,3 +130,16 @@ test('runtime boundary remains UI-independent for later SMT transport wiring',()
   assert.doesNotMatch(app,/XMLHttpRequest/);
   assert.doesNotMatch(app,/192\.168\./);
 });
+
+
+test('live-link contract stays bounded and UNKNOWN-safe without UI transport ownership',()=>{
+  const contract=fs.readFileSync(path.join(repoRoot,'contracts','smm-lan-v1.ts'),'utf8');
+  const adapter=fs.readFileSync(path.join(srcRoot,'smt-lan-adapter.ts'),'utf8');
+  const app=fs.readFileSync(path.join(srcRoot,'App.tsx'),'utf8');
+  assert.match(contract,/smm\.lan\.order\.submit\.v1/);
+  assert.match(contract,/smm\.lan\.order\.readback\.v1/);
+  assert.match(adapter,/state:'UNKNOWN'/);
+  assert.match(adapter,/readSubmission/);
+  assert.doesNotMatch(app,/fetch\s*\(/);
+  assert.doesNotMatch(app,/WebSocket\s*\(/);
+});
