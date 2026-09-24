@@ -2,4 +2,6 @@ work_id=MFK-OFFICIAL-DOMAIN-CUTOVER-R1
 source_sha=4ca38acf2ad852588917615ec1efc89856b17efa
 admin_domain=admin.morefunos.com
 customer_domain=order.morefunos.com
-mode=EXACT_SOURCE_DOMAIN_CUTOVER_AND_LIVE_QUOTE_SMOKE
+mode=PUBLIC_PROBE_THEN_ACCOUNT_GATE_R2
+
+probe_revision=bed04e1f76e35d471e4fd3e28e8875db33ec912c
