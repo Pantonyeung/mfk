@@ -603,3 +603,73 @@ MFK_SMT_DONOR_SKELETON_FUSION_V2_R1_SILENT_GUIDED_FLOW_GREEN_OWNER_ACCEPTANCE_PE
 
 HARD RULE:
 未經 Owner 驗收，不准 merge main。
+
+
+==================================================
+OWNER UX REFINEMENT｜GREEN
+==================================================
+
+Source:
+Owner physical-device review on 2026-09-24.
+
+Current product candidate:
+be725b427922533cab91c16f72aa5bf775f4a586
+
+UX corrections:
+
+1. Riceball-meal semantics only
+- Fast Lane combo UI is now 飯團餐 pairing.
+- Purpose: 飯團 + 小食 + 飲品.
+- fixed F1–F6 / future prebuilt meal products stay direct Product click.
+- no generic breakfast / arbitrary combo builder.
+- generic OrganizeWorkspace / ComboWorkspace removed.
+
+2. A/B/C visibility
+- 飯團待組區 previews A/B/C… groups from current main-course units.
+- incomplete group shows waiting for snack; drink may defer.
+- no requirement to rebuild a fixed preconfigured meal product.
+
+3. Large dismissible modal
+- option / Required / riceball / combo / hold / pending review use modal overlay.
+- untouched modal: backdrop / X closes immediately.
+- dirty modal: close asks:
+  有未保存修改，確定退出？
+- dirty tracking covers config / required / combo selection / hold input.
+
+4. Category layout
+- full-width category strip removed.
+- compact vertical category rail.
+- product grid stays 4 columns.
+
+5. Checkout UX
+- walk-in uses local tender selection.
+- WhatsApp / MoreFun App / Foodpanda / Keeta use channel information instead of asking for a second local tender.
+- payment choices restored as large touch targets.
+
+Validation:
+GitHub Actions 36008362972 SUCCESS
+Job 107662326911
+31 / 31 Test Files PASS
+135 / 135 Tests PASS
+Build GREEN
+Worker 106dc9dc-f39c-4fec-9cfb-e23369f8ec57
+Preview:
+https://smt-donor-v2-r1-owner-ux-refine-mfk-admin.yeungyi88.workers.dev
+
+Preview PR:
+#271 CLOSED / NOT MERGED
+
+Current main:
+ecfcb76dd164d4276e7458e15eb39c6c23179616
+
+Main:
+NOT MERGED
+
+Production:
+UNCHANGED
+
+Status:
+MFK_SMT_DONOR_SKELETON_FUSION_V2_R1_OWNER_UX_REFINEMENT_GREEN_OWNER_ACCEPTANCE_PENDING
+
+HARD RULE:
+未經 Owner 驗收，不准 merge main。
