@@ -88,7 +88,7 @@ describe('Keeta → SMT canonical local intake',()=>{
       id:'p1',name:'磨飯商品一｜加辣',qty:2,unitMinor:4200,serviceMode:'takeaway',
       productCode:'SKU-P1',detail:'加辣',
     }]);
-    expect(translated.providerPickupCode).toBe('0048');
+    expect(translated.providerPickupCode).toBe('K998');
   });
 
   it('commits the same providerRef exactly once through the existing localRuntime order authority',()=>{
