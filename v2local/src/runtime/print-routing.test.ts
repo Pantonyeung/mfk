@@ -50,7 +50,7 @@ describe('MFK checkout print fanout',()=>{
     expect(productJobs.map(job=>job.binding.id)).toEqual([
       'product-label-riceball','product-label-riceball','product-label-takeaway',
     ]);
-    expect(productJobs[0]?.labelSpec).toMatchObject({kind:'product',orderCode:'P001',primaryText:'原味飯團',productCode:'A1',pieceLabel:'1/3',secondaryText:'外賣 · 少飯'});
+    expect(productJobs[0]?.labelSpec).toMatchObject({kind:'product',orderCode:'P001',primaryText:'原味飯團',productCode:'A1',pieceLabel:'1/3',secondaryText:'外賣 / 少飯'});
     expect(productJobs[1]?.labelSpec).toMatchObject({orderCode:'P001',primaryText:'原味飯團',pieceLabel:'2/3'});
     expect(productJobs[2]?.labelSpec).toMatchObject({orderCode:'P001',primaryText:'台式奶茶',pieceLabel:'3/3'});
     expect(productJobs.every(job=>job.renderMode==='tsc-bitmap')).toBe(true);
@@ -100,6 +100,8 @@ describe('MFK checkout print fanout',()=>{
       expect(job.payload).not.toContain('・');
       expect(job.payload).not.toContain('·');
       expect(job.payload).not.toContain('—');
+      expect(job.payload).not.toContain('Keeta · 4890');
+      expect(job.payload).toContain('Keeta / 4890');
     }
   });
 
