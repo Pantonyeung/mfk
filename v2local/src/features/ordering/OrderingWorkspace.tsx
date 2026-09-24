@@ -3,6 +3,19 @@ import {ActionFeedback,ConfirmDialog,DisabledReason,EmptyState,StatusTag} from '
 import type {CartLineViewModel,OrderingProductViewModel,OrderingWorkspaceActions,OrderingWorkspaceViewModel,ServiceMode} from './ordering-workspace-model.ts';
 import './ordering-workspace.css';
 
+function QueueStrip({title,kind,orders,onOpen}:{title:string;kind:'pending'|'active';orders:OrderingWorkspaceViewModel['pendingOrders'];onOpen:(kind:'pending'|'active',id:string)=>void}){
+  const tone=kind==='pending'?'attention':'provider';
+  return <section className={`ordering-queue-group tone-${tone}`} aria-label={title}>
+    <header><div><small>{kind==='pending'?'FRONTLINE QUEUE':'PROVIDER QUEUE'}</small><strong>{title}</strong></div><span>{orders.length}</span></header>
+    <div className="ordering-queue-list">
+      {orders.length?orders.map(order=><button type="button" key={order.id} onClick={()=>onOpen(kind,order.id)}>
+        <span><b>#{order.orderId}</b><strong>{order.sourceLabel}</strong></span>
+        <span><em>{order.waitLabel}</em><small>{order.itemCount} 件</small></span>
+      </button>):<p>{kind==='pending'?'暫時冇待處理單':'暫時冇 Keeta 訂單'}</p>}
+    </div>
+  </section>;
+}
+
 function ProductCard({product,actions,recentlyAdded,mode}:{product:OrderingProductViewModel;actions:OrderingWorkspaceActions;recentlyAdded:boolean;mode:'quick'|'standard'}){
   const onBody=()=>{
     if(!product.enabled)return;
@@ -85,6 +98,10 @@ export function OrderingWorkspace({view,actions,centerPanel}:{view:OrderingWorks
 
   return <div className={`ordering-workspace${centerPanel?' panel-open':''}`}>
     <main className="ordering-catalog" aria-label="點單商品">
+      <section className="ordering-queue-deck" aria-label="訂單工作列">
+        <QueueStrip title="待處理" kind="pending" orders={view.pendingOrders} onOpen={actions.onOpenQueueOrder}/>
+        <QueueStrip title="Keeta" kind="active" orders={view.activeOrders} onOpen={actions.onOpenQueueOrder}/>
+      </section>
       <header className="ordering-task-header">
         <div><span>點單</span><h1>一按加入，有必選先停低</h1><p>快速模式適合繁忙時段；普通模式每件商品都先核對設定。</p><div className="ordering-task-path" aria-label="點單流程"><b>1 選商品</b><span>2 完成必選</span><span>3 核對購物籃</span><span>4 結帳</span></div></div>
         <div className="ordering-source-status"><StatusTag tone="success">本機可用</StatusTag>{view.menuRevisionLabel?<small>{view.menuRevisionLabel}</small>:null}</div>
