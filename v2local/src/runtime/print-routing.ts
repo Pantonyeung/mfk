@@ -70,7 +70,7 @@ export interface PrintRuntimeConfig{
   readonly productRules:Readonly<Record<string,PrintRuntimeRule>>;
 }
 const DEFAULT_RULE:PrintRuntimeRule=Object.freeze({
-  receipt:true,production:true,packing:true,label:false,dineIn:true,takeaway:true,labelPrinterIds:Object.freeze([]),
+  receipt:true,production:true,packing:true,label:true,dineIn:true,takeaway:true,labelPrinterIds:Object.freeze([]),
 });
 
 export function groupTscBitmapJobsByPhysicalPrinter(plan:readonly PlannedPrintJob[]):readonly TscBitmapJobBatch[]{
@@ -282,13 +282,21 @@ function roleItems(order:PrintableOrder,key:'receipt'|'production'|'packing',con
     return rule[key]&&serviceAllowed(item,rule);
   });
 }
-function labelAllowed(item:PrintableOrder['items'][number],binding:PrintBinding,config?:PrintRuntimeConfig){
-  if(!config||Object.keys(config.productRules).length===0)return productMatchesBinding(String(item.id),binding);
-  const rule=printRule(String(item.id),config);
+function preferredDefaultLabelBinding(bindings:readonly PrintBinding[]){
+  return bindings.find(binding=>derivedLogicalPrinterId(binding)==='logical-takeaway-label')
+    ??bindings.find(binding=>binding.routeKey==='logical.product-label.takeaway')
+    ??bindings[0];
+}
+function labelAllowed(item:PrintableOrder['items'][number],binding:PrintBinding,config?:PrintRuntimeConfig,allLabelBindings:readonly PrintBinding[]=[]){
+  const productId=String(item.id);
+  const explicit=config?.productRules[productId];
+  const rule=explicit??DEFAULT_RULE;
   if(!rule.label||!serviceAllowed(item,rule))return false;
   const logicalId=derivedLogicalPrinterId(binding);
-  if(rule.labelPrinterIds.length===0)return productMatchesBinding(String(item.id),binding);
-  return Boolean(logicalId&&rule.labelPrinterIds.includes(logicalId));
+  if(rule.labelPrinterIds.length>0)return Boolean(logicalId&&rule.labelPrinterIds.includes(logicalId));
+  if(productMatchesBinding(productId,binding))return true;
+  const preferred=preferredDefaultLabelBinding(allLabelBindings);
+  return Boolean(preferred&&preferred.id===binding.id);
 }
 function withItems(order:PrintableOrder,items:PrintableOrder['items']):PrintableOrder{
   return {...order,items};
@@ -296,14 +304,10 @@ function withItems(order:PrintableOrder,items:PrintableOrder['items']):Printable
 
 function buildGlobalProductLabelUnits(order:PrintableOrder,bindings:readonly PrintBinding[],config?:PrintRuntimeConfig){
   const labelBindings=bindings.filter(binding=>binding.role==='產品標籤');
-  const legacyRules=!config||Object.keys(config.productRules).length===0;
-  const allProducts=legacyRules&&labelBindings.some(binding=>binding.productIds===undefined);
-  const configured=new Set(labelBindings.flatMap(binding=>binding.productIds??[]).map(String));
   const units:{item:PrintableOrder['items'][number];unit:number;pieceIndex:number}[]=[];
   let pieceIndex=0;
   for(const item of order.items){
-    if(legacyRules&&!allProducts&&!configured.has(String(item.id)))continue;
-    if(!legacyRules&&!labelBindings.some(binding=>labelAllowed(item,binding,config)))continue;
+    if(!labelBindings.some(binding=>labelAllowed(item,binding,config,labelBindings)))continue;
     const qty=Math.max(0,Math.floor(Number(item.qty)||0));
     for(let unit=1;unit<=qty;unit++){
       pieceIndex+=1;
@@ -356,7 +360,8 @@ export function buildOrderPrintPlan(order:PrintableOrder,bindings:readonly Print
       continue;
     }
     if(binding.role==='產品標籤'){
-      const routeUnits=productLabelUnits.filter(unit=>labelAllowed(unit.item,binding,config));
+      const allLabelBindings=active.filter(row=>row.role==='產品標籤');
+      const routeUnits=productLabelUnits.filter(unit=>labelAllowed(unit.item,binding,config,allLabelBindings));
       if(routeUnits.length<1)continue;
       for(const unit of routeUnits){
         const labelSpec:RasterLabelSpec={
