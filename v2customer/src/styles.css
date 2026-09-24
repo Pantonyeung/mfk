@@ -1260,3 +1260,12 @@ button:hover .product-media img{transform:scale(1.025)}
   }
   ::view-transition-old(root),::view-transition-new(root),::view-transition-group(*){animation:none!important}
 }
+
+
+.recommendation-disclosure{
+  margin:7px 2px 0;
+  color:var(--muted);
+  font-size:9px;
+  line-height:1.45;
+}
+.recommendation-section.compact .recommendation-disclosure{display:none}
