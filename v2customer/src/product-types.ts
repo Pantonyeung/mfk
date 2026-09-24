@@ -46,6 +46,7 @@ export interface CustomerProduct {
   readonly badge?:string;
   readonly available:boolean;
   readonly displayPriceLabel?:string;
+  readonly publishedUnitPriceMinor?:number;
   readonly imageUrl?:string;
   readonly imageAlt?:string;
   readonly variationRequired?:boolean;
@@ -64,6 +65,7 @@ export interface CustomerCartSelection {
   readonly optionGroupId:string;
   readonly optionId:string;
   readonly optionName:string;
+  readonly publishedAdjustmentMinor?:number;
 }
 
 export interface CustomerCartLine {
@@ -77,6 +79,7 @@ export interface CustomerCartLine {
   readonly createdAt:string;
   readonly note?:string;
   readonly attention?:string;
+  readonly publishedUnitPriceMinor?:number;
 }
 
 export type CustomerProjectionState='READY'|'EMPTY'|'LOADING'|'STALE'|'ERROR'|'NOT_CONNECTED';
