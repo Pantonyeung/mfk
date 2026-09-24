@@ -40,7 +40,128 @@ function minorFromMoney(value){
 }
 function moneyLabel(minor){
   const value=Math.max(0,Number(minor)||0)/100;
-  return 'HK
+  return 'HK'+String.fromCharCode(36)+(Number.isInteger(value)?String(value):value.toFixed(2));
+}
+function customerPublicSnapshot(active,customerOrders=[]){
+  const snapshot=row(active?.snapshot);
+  const catalog=row(snapshot.catalog);
+  const optionCenter=row(snapshot.optionCenter);
+  const availability=row(snapshot.availability);
+  const productMedia=row(snapshot.productMedia);
+  const categories=rows(catalog.categories)
+    .map((raw,index)=>{const item=row(raw);return{id:String(item.id||''),name:String(item.name||''),position:Number(item.position??index*10),active:item.active!==false};})
+    .filter(item=>item.id&&item.name&&item.active)
+    .sort((a,b)=>a.position-b.position||a.id.localeCompare(b.id));
+  const categoryIds=new Set(categories.map(item=>item.id));
+  const sets=new Map(rows(optionCenter.sets).map(raw=>{const item=row(raw);return[String(item.id||''),item]}).filter(([id])=>id));
+  const linksByProduct=new Map();
+  for(const raw of rows(optionCenter.productLinks)){
+    const link=row(raw),productId=String(link.productId||''),setId=String(link.setId||'');
+    if(!productId||!setId)continue;
+    const current=linksByProduct.get(productId)||[];
+    current.push({setId});
+    linksByProduct.set(productId,current);
+  }
+  const products=rows(catalog.products)
+    .map(raw=>{
+      const item=row(raw);
+      const productId=String(item.id||'');
+      const categoryId=String(item.categoryId||'');
+      const sellability=row(availability[productId]);
+      const media=row(productMedia[productId]);
+      const optionGroups=(linksByProduct.get(productId)||[]).flatMap(link=>{
+        const set=sets.get(link.setId);
+        if(!set||set.active===false)return[];
+        const options=rows(set.options)
+          .map(optionRaw=>{const option=row(optionRaw);return{
+            optionId:String(option.id||option.code||''),
+            name:String(option.name||option.id||option.code||''),
+            available:option.active!==false,
+            position:Number(option.position||0),
+          }})
+          .filter(option=>option.optionId&&option.name&&option.available)
+          .sort((a,b)=>a.position-b.position||a.optionId.localeCompare(b.optionId))
+          .map(({position,...option})=>option);
+        return[{
+          optionGroupId:String(set.id),
+          name:String(set.name||set.id||'選項'),
+          required:set.required===true,
+          minSelections:Math.max(0,Number(set.min)||0),
+          maxSelections:Math.max(1,Number(set.max)||1),
+          options,
+        }];
+      });
+      const priceText=String(item.basePrice??'').trim();
+      const priceReady=priceText!==''&&Number.isFinite(Number(priceText));
+      const baseMinor=minorFromMoney(priceText);
+      const takeawayMinor=minorFromMoney(item.takeawayAdjustment)+(item.takeawaySurchargeEnabled===true?100:0);
+      const imageUrl=String(media.publicUrl||media.canonicalImageRef||item.imageRef||'').trim();
+      return{
+        productId,
+        categoryId,
+        name:String(item.name||productId),
+        description:String(item.description||''),
+        available:item.active!==false&&sellability.sellable!==false&&priceReady,
+        ...(priceReady?{displayPriceLabel:moneyLabel(baseMinor+takeawayMinor)}:{}),
+        ...(imageUrl?{imageUrl,imageAlt:String(item.name||productId)}:{}),
+        optionGroups,
+        position:Number(item.legacySourcePosition??item.position??0),
+      };
+    })
+    .filter(item=>item.productId&&categoryIds.has(item.categoryId)&&item.available)
+    .sort((a,b)=>a.position-b.position||a.productId.localeCompare(b.productId))
+    .map(({position,...item})=>item);
+  const settings=row(snapshot.storeSettings);
+  const customerPresentation=row(row(snapshot.presentation).customer);
+  const customerChannel=row(snapshot.customerChannelPolicy);
+  const channelAvailable=customerChannel.enabled===true;
+  const stageFor=label=>label==='待處理'?'RECEIVED':label==='進行中'?'PREPARING':label==='可取餐'?'READY':label==='已完成'?'COMPLETED':label==='已取消'?'REJECTED':'RECEIVED';
+  const projectOrder=rawOrder=>{
+    const order=row(rawOrder);
+    const stage=stageFor(String(order.fulfillmentLabel||''));
+    const observedAt=String(order.updatedAt||order.createdAt||new Date().toISOString());
+    const itemRows=rows(order.items);
+    const display=String(order.display||'');
+    const totalMinor=Math.max(0,Number(order.totalMinor)||0);
+    return{
+      orderId:String(order.orderId||''),
+      displayCode:display,
+      stage,
+      itemSummary:itemRows.map(item=>String(row(item).name||'')).filter(Boolean).join('、'),
+      amountLabel:moneyLabel(totalMinor),
+      pickupCode:display||undefined,
+      observedAt,
+      readback:'CONFIRMED',
+      timeline:[{at:observedAt,stage,label:String(order.fulfillmentLabel||stage)}],
+    };
+  };
+  const projectedOrders=customerOrders.map(projectOrder).filter(order=>order.orderId&&order.displayCode);
+  return{
+    store:{
+      storeId:String(active?.storeId||'MF01'),
+      storeName:String(settings.storeName||'磨飯'),
+      channelAvailable,
+      notice:typeof customerPresentation.body==='string'&&customerPresentation.body.trim()?customerPresentation.body.trim():undefined,
+      observedAt:new Date().toISOString(),
+    },
+    menu:{
+      revision:String(active?.revision??'0'),
+      observedAt:new Date().toISOString(),
+      categories:categories.map(item=>({categoryId:item.id,name:item.name,sortOrder:item.position})),
+      products,
+    },
+    activeOrders:projectedOrders.filter(order=>order.stage!=='COMPLETED'),
+    history:projectedOrders.filter(order=>order.stage==='COMPLETED').map(order=>({
+      orderId:order.orderId,
+      displayCode:order.displayCode,
+      completedAt:order.observedAt,
+      itemSummary:order.itemSummary,
+      amountLabel:order.amountLabel,
+      reorderEligible:true,
+    })),
+    observedAt:new Date().toISOString(),
+  };
+}
 
 export class AdminSyncStore{
   constructor(state,env){this.state=state;this.env=env;}
