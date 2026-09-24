@@ -58,7 +58,7 @@ function view(){
     workItems:[
       {id:'riceball-pool' as const,label:'飯團待組區',count:0},
       {id:'required' as const,label:'必選區',count:0},
-      {id:'combo' as const,label:'紫米套餐區',count:0},
+      {id:'combo' as const,label:'飯團餐配對',count:0},
     ],
     cartPulseNonce:0,
     actionAvailability:{lineServiceMode:true,lineEdit:true,lineQuantity:true,holdCart:true,cancelCart:true},
@@ -104,7 +104,7 @@ describe('SMT donor skeleton fusion V2 layout',()=>{
     const html=renderToStaticMarkup(<OrderingWorkspace view={view()} actions={actions}/>);
     expect(html).toContain('飯團待組區');
     expect(html).toContain('必選區');
-    expect(html).toContain('紫米套餐區');
+    expect(html).toContain('飯團餐配對');
     expect(html).toContain('ordering-workbar');
   });
 
