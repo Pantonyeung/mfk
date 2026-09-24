@@ -11,11 +11,12 @@ describe('SMT Premium Interaction Donor Fusion R1',()=>{
   it('keeps frontline queues, text-only catalog and one decisive checkout action',()=>{
     const html=renderToStaticMarkup(<OrderingWorkspace
       view={{
-        pendingOrders:[{id:'p1',orderId:'P001',sourceLabel:'現場',waitLabel:'12:10',itemCount:2}],
-        activeOrders:[{id:'k1',orderId:'K021',sourceLabel:'Keeta',waitLabel:'12:11',itemCount:1}],
-        categories:[{id:'all',label:'熱門'},{id:'bento',label:'便當'}],
-        selectedCategoryId:'all',
-        searchQuery:'',
+        pendingOrders:[{id:'p1',orderId:'P001',sourceLabel:'現場',waitLabel:'12:10',etaLabel:'ETA 12:30',itemCount:2}],
+        activeOrders:[{id:'k1',orderId:'K021',sourceLabel:'Keeta',waitLabel:'12:11',etaLabel:'ETA 12:31',itemCount:1}],
+        categories:[{id:'bento',label:'便當'},{id:'drink',label:'飲品'}],
+        selectedCategoryId:'bento',
+        categoryRows:1,
+        categoryColumns:7,
         orderingMode:'quick',
         products:[
           {id:'b1',name:'紫米照燒雞便當',priceLabel:'$68.00',enabled:true,requiresOptions:true,hasRequiredOptions:true},
@@ -36,22 +37,27 @@ describe('SMT Premium Interaction Donor Fusion R1',()=>{
         actionAvailability:{lineServiceMode:true,lineEdit:true,lineQuantity:true,holdCart:true,cancelCart:true},
       }}
       actions={{
-        onSearchQuery:noop,onSelectCategory:noop,onChangeOrderingMode:noop,onAddProduct:noop,onConfigureProduct:noop,
+        onSelectCategory:noop,onAddProduct:noop,onConfigureProduct:noop,
         onChangeServiceMode:noop,onChangeCartView:noop,onToggleCombine:noop,onChangeLineServiceMode:noop,
         onAdjustLineQuantity:noop,onEditCartLine:noop,onHoldCart:noop,onCancelCart:noop,onOpenWorkItem:noop,
         onOpenQueueOrder:noop,onCheckout:noop,
       }}
     />);
 
-    expect(html).toContain('FRONTLINE QUEUE');
-    expect(html).toContain('PROVIDER QUEUE');
-    expect(html).toContain('一按加入，有必選先停低');
-    expect(html).toContain('1 選商品');
-    expect(html).toContain('快速');
-    expect(html).toContain('普通');
+    expect(html).toContain('待處理');
+    expect(html).toContain('Keeta');
+    expect(html).toContain('ETA 12:30');
+    expect(html).toContain('便當');
+    expect(html).toContain('飲品');
+    expect(html).not.toContain('一按加入，有必選先停低');
+    expect(html).not.toContain('搜尋商品名稱');
+    expect(html).not.toContain('點選模式');
     expect(html).toContain('紫米照燒雞便當');
     expect(html).toContain('飯底：紫米飯');
     expect(html).toContain('備註：少汁');
+    expect(html).toContain('飯團待組區');
+    expect(html).toContain('必選區');
+    expect(html).toContain('紫米套餐');
     expect(html).toContain('前往結帳 $68.00');
     expect(html).not.toContain('<img');
   });
