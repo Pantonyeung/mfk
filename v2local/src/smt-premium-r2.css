@@ -683,3 +683,52 @@
     scroll-behavior:auto!important
   }
 }
+
+
+.clean-brand{position:relative}
+.clean-brand:after{
+  content:"SMT";
+  position:absolute;
+  left:50%;bottom:-13px;
+  transform:translateX(-50%);
+  color:var(--smt-r2-purple);
+  font-size:8px;font-weight:950;letter-spacing:.16em
+}
+
+.order-context-strip{
+  min-height:62px;
+  display:grid;
+  grid-template-columns:minmax(0,.9fr) 34px minmax(0,1.1fr);
+  align-items:center;
+  gap:10px;
+  padding:9px 13px;
+  border:1px solid rgba(90,45,130,.08);
+  border-radius:16px;
+  background:
+    radial-gradient(circle at 88% 18%,rgba(22,141,99,.07),transparent 24%),
+    linear-gradient(135deg,#fff,#faf9fd);
+  box-shadow:0 7px 20px rgba(19,17,24,.04)
+}
+.order-context-strip>div{min-width:0;display:grid;gap:1px}
+.order-context-strip small{
+  color:var(--smt-r2-purple);
+  font-size:9px;font-weight:950;letter-spacing:.14em
+}
+.order-context-strip strong{
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  font-size:16px
+}
+.order-context-strip span{color:var(--smt-r2-muted);font-size:11px}
+.order-context-strip>i{
+  width:27px;height:27px;border-radius:50%;
+  background:var(--smt-r2-purple-soft);position:relative
+}
+.order-context-strip>i:after{
+  content:"";position:absolute;left:8px;top:7px;width:8px;height:8px;
+  border-right:2px solid var(--smt-r2-purple);
+  border-top:2px solid var(--smt-r2-purple);
+  transform:rotate(45deg)
+}
+.order-board{
+  grid-template-rows:auto auto auto minmax(0,1fr)!important
+}
