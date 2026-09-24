@@ -2,7 +2,8 @@ import {useEffect,useMemo,useState} from 'react';
 import {useNavigate} from 'react-router';
 import {applyLanPrinter,printBytesLan,printTextLan,testLanPrinter,type NativeResult} from '../runtime/native-print.ts';
 import {LABEL_TSC_PROFILE,renderTscRasterLabel} from '../runtime/label-bitmap.ts';
-import {renderCustomerReceiptTicket,renderPackingTicket,renderProductionTicket,type PrintableOrder} from '../runtime/print-routing.ts';
+import {type PrintableOrder} from '../runtime/print-routing.ts';
+import {renderEscPosRasterTicket} from '../runtime/ticket-bitmap.ts';
 import {localRuntime,readLastPrintDiagnostic} from '../runtime/local-runtime.ts';
 import {LocalAdminMenuWorkspace} from './LocalAdminMenuWorkspace.tsx';
 import {
@@ -269,12 +270,15 @@ function PrinterPanel(){
               serviceMode:'takeaway',
             }],
           };
-          const payload=current.role==='顧客小票'
-            ?renderCustomerReceiptTicket(sample)
-            :current.role==='製作單'
-              ?renderProductionTicket(sample)
-              :renderPackingTicket(sample);
-          result=await printTextLan({...printer,text:payload,cutAfter:true,beepAfter:true,kickDrawer:false});
+          const kind=current.role==='顧客小票'?'receipt':current.role==='製作單'?'production':'packing';
+          const bytes=await renderEscPosRasterTicket({
+            kind,
+            order:sample,
+            cutAfter:true,
+            beepAfter:true,
+            kickDrawer:false,
+          });
+          result=await printBytesLan({...printer,bytes});
         }
       }
     }catch(error){result={ok:false,code:error instanceof Error?error.message:'PRINT_ACTION_FAILED'}}
