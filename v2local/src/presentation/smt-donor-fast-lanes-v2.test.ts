@@ -76,7 +76,7 @@ describe('SMT donor fast lane model',()=>{
 
   it('creates dynamic A/B/C auto pairing plans and defers required drink without inventing a drink',()=>{
     const cart:FastLaneCartLine[]=[
-      line('m','main','A飯團',3,4100),
+      {...line('m','main','A飯團',3,4100),optionSelections:{rice:['r1']},detail:'飯底：紫米'},
       line('s','snack','鹽酥雞',3,1800),
     ];
     const plans=buildAutoPairingPlans(cart,combos[0],pools,products);
