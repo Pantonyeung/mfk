@@ -38,3 +38,60 @@
 .checkout-payment-state,.checkout-payment-alert{padding:9px 12px;border-radius:9px;font-size:14px;font-weight:850}.checkout-payment-state,.checkout-payment-state.success{background:#edf4ff;color:#174a98}.checkout-payment-alert{display:flex;gap:10px;align-items:center;background:#fff2ef;color:#a43e31}.checkout-payment-alert button{margin-left:auto;min-height:36px;border:0;border-radius:8px;background:#ad4437;color:#fff;padding:0 12px;font-weight:850}
 
 @media(max-width:1400px){.checkout-workspace{grid-template-columns:450px minmax(0,1fr)}.checkout-flow{padding:10px 12px;gap:8px}.checkout-top-stages{grid-template-columns:minmax(0,.95fr) minmax(0,1.2fr)}.checkout-source-grid button,.checkout-method-grid button{min-height:54px;font-size:12px}.checkout-method-grid button{grid-template-columns:24px minmax(0,1fr)}.checkout-method-grid button i{width:24px;height:24px}.checkout-payment-body{grid-template-columns:165px minmax(0,1fr)}.checkout-entry-grid{grid-template-columns:minmax(0,1fr) 160px}.checkout-final-stage{grid-template-columns:minmax(0,1fr) 220px}}
+
+
+/* Owner refinement: restore compact checkout proportions and keep keypad geometry stable. */
+.checkout-flow{
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  overflow:hidden;
+}
+.checkout-top-stages{flex:0 0 auto;gap:8px}
+.checkout-source-stage,.checkout-payment-stage,.checkout-channel-stage{padding:9px 10px}
+.checkout-source-stage>header,.checkout-payment-stage>header,.checkout-channel-stage>header{margin-bottom:6px}
+.checkout-source-grid{gap:5px}
+.checkout-source-grid button{min-height:50px;padding:5px 6px;font-size:12px}
+.checkout-source-grid button i{font-size:15px}
+.checkout-method-grid{gap:5px}
+.checkout-method-grid button{min-height:50px;padding:6px 7px;font-size:11px;grid-template-columns:24px minmax(0,1fr)}
+.checkout-method-grid button i{width:23px;height:23px;font-size:12px}
+.checkout-channel-form{gap:7px}
+.checkout-channel-form input{min-height:42px;font-size:15px}
+.checkout-combo-stage{flex:0 0 auto}
+.checkout-payment-body{
+  flex:1 1 auto;
+  min-height:0;
+  grid-template-columns:170px minmax(0,1fr);
+  padding:8px;
+  gap:8px
+}
+.checkout-stage-three{padding-bottom:5px}
+.checkout-settlement-card{padding:9px;gap:7px}
+.checkout-entry-grid{grid-template-columns:minmax(0,1fr) 170px;gap:6px}
+.checkout-keypad{gap:5px}
+.checkout-keypad button{min-height:46px;border-radius:8px;font-size:23px}
+.checkout-quick-cash{gap:5px}
+.checkout-quick-cash button,.checkout-delete{min-height:38px;font-size:12px}
+.checkout-cash-value{padding:9px}
+.checkout-cash-value strong{font-size:27px}
+.checkout-payment-body.keypad-disabled .checkout-keypad,
+.checkout-payment-body.keypad-disabled .checkout-entry-side{
+  opacity:.42;
+  filter:saturate(.45)
+}
+.checkout-payment-body.keypad-disabled .checkout-keypad button,
+.checkout-payment-body.keypad-disabled .checkout-entry-side button{
+  cursor:not-allowed
+}
+.checkout-channel-summary{flex:0 0 auto;padding:9px 11px}
+.checkout-final-stage{flex:0 0 auto;padding:8px 10px}
+.checkout-confirm{min-height:52px;font-size:18px}
+@media(max-width:1400px){
+  .checkout-workspace{grid-template-columns:430px minmax(0,1fr)}
+  .checkout-flow{padding:8px 10px;gap:6px}
+  .checkout-source-grid button,.checkout-method-grid button{min-height:46px}
+  .checkout-payment-body{grid-template-columns:155px minmax(0,1fr)}
+  .checkout-entry-grid{grid-template-columns:minmax(0,1fr) 150px}
+  .checkout-keypad button{min-height:42px;font-size:21px}
+}
