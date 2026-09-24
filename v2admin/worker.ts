@@ -471,6 +471,27 @@ export default {
         return json(customerPublicSnapshot(active,Array.isArray(orderBody.orders)?orderBody.orders:[]),200,cors(request));
       }
 
+      if(url.pathname==='/api/customer/smt/diagnostics'&&request.method==='GET'){
+        const authorizeUrl=new URL(request.url);
+        authorizeUrl.pathname='/authorize-smt-device';
+        const authResponse=await admin.fetch(new Request(authorizeUrl.toString(),{method:'GET',headers:new Headers(request.headers)}));
+        if(!authResponse.ok)return json({ok:false,stage:'SMT_DEVICE_AUTH',status:authResponse.status,code:'CUSTOMER_SMT_UNAUTHORIZED'},401,cors(request));
+        const quoteResponse=await customer.fetch(new Request('https://internal/smt/quotes/pending',{method:'GET'}));
+        const quoteBody=quoteResponse.ok?await quoteResponse.json():{};
+        const orderResponse=await customer.fetch(new Request('https://internal/smt/orders/pending',{method:'GET'}));
+        const orderBody=orderResponse.ok?await orderResponse.json():{};
+        return json({
+          ok:quoteResponse.ok&&orderResponse.ok,
+          stage:quoteResponse.ok&&orderResponse.ok?'CUSTOMER_BRIDGE_PULL_READY':'CUSTOMER_RUNTIME_PULL_FAILED',
+          deviceAuthorized:true,
+          pendingQuotes:Array.isArray(quoteBody.quotes)?quoteBody.quotes.length:null,
+          pendingOrders:Array.isArray(orderBody.orders)?orderBody.orders.length:null,
+          quotePullStatus:quoteResponse.status,
+          orderPullStatus:orderResponse.status,
+          observedAt:new Date().toISOString(),
+        },quoteResponse.ok&&orderResponse.ok?200:502,cors(request));
+      }
+
       if(url.pathname.startsWith('/api/customer/smt/')){
         const authorizeUrl=new URL(request.url);
         authorizeUrl.pathname='/authorize-smt-device';
