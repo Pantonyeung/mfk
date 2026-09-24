@@ -5,6 +5,7 @@ import {MFK_ORDER_LINE_COMPOSITION_SCHEMA,normalizeMfkOrderLineCompositionV1,typ
 export interface FastLaneProduct{
   readonly id:string;
   readonly name:string;
+  readonly category?:string;
   readonly priceMinor:number;
   readonly optionSets:readonly SyncedOptionSet[];
 }
@@ -274,6 +275,34 @@ export function comboSlots(
       }))),
     }));
   });
+}
+
+
+export function riceballMealCombos(
+  combos:readonly SyncedCombo[],
+  pools:readonly SyncedComboPool[],
+  products:readonly FastLaneProduct[],
+):SyncedCombo[]{
+  return combos.filter(combo=>{
+    if(!combo.active)return false;
+    const slots=comboSlots(combo,pools,products);
+    if(slots.length!==3)return false;
+    const roles=slots.map(slot=>slot.role);
+    return roles.filter(role=>role==='MAIN_COURSE').length===1
+      &&roles.filter(role=>role==='SNACK').length===1
+      &&roles.filter(role=>role==='DRINK').length===1
+      &&slots.every(slot=>slot.required);
+  });
+}
+
+export function countRiceballCandidateUnits(
+  lines:readonly FastLaneCartLine[],
+  products:readonly FastLaneProduct[],
+):number{
+  const riceballIds=new Set(products.filter(product=>String(product.category||'').includes('飯團')).map(product=>product.id));
+  return lines
+    .filter(line=>!line.comboDraft&&riceballIds.has(line.productId)&&requiredTasks([line],products).length===0)
+    .reduce((sum,line)=>sum+Math.max(0,line.qty),0);
 }
 
 function matchingLine(
