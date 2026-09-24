@@ -84,6 +84,8 @@ function OrganizedCart({lines,highlightedLineId,actions,availability}:{lines:rea
 export function OrderingWorkspace({view,actions,centerPanel}:{view:OrderingWorkspaceViewModel;actions:OrderingWorkspaceActions;centerPanel?:{readonly title:string;readonly body:ReactNode;readonly onClose:()=>void}|null}){
   const availability=view.actionAvailability??{lineServiceMode:true,lineEdit:true,lineQuantity:true,holdCart:true,cancelCart:true};
   const serviceModes=view.serviceModes??{takeaway:true,dineIn:true};
+  const orderingMode=view.orderingMode??'normal';
+  const quickDrink=view.quickDrink??{open:false,pendingCount:0,choices:[]};
   const itemCount=view.cart.lines.reduce((sum,line)=>sum+line.quantity,0);
   return <div className={`ordering-workspace donor-skeleton${centerPanel?' panel-open':''}`}>
     <header className="ordering-flow-strip">
@@ -103,22 +105,22 @@ export function OrderingWorkspace({view,actions,centerPanel}:{view:OrderingWorks
           </div>
           <div className="ordering-fast-controls" aria-label="點單快捷">
             <div className="ordering-mode-switch" aria-label="點單模式">
-              <button type="button" className={view.orderingMode==='normal'?'active':''} aria-pressed={view.orderingMode==='normal'} onClick={()=>actions.onChangeOrderingMode('normal')}>普通</button>
-              <button type="button" className={view.orderingMode==='quick'?'active':''} aria-pressed={view.orderingMode==='quick'} onClick={()=>actions.onChangeOrderingMode('quick')}>快捷</button>
+              <button type="button" className={orderingMode==='normal'?'active':''} aria-pressed={orderingMode==='normal'} onClick={()=>actions.onChangeOrderingMode('normal')}>普通</button>
+              <button type="button" className={orderingMode==='quick'?'active':''} aria-pressed={orderingMode==='quick'} onClick={()=>actions.onChangeOrderingMode('quick')}>快捷</button>
             </div>
-            <button type="button" className={'ordering-quick-drink-toggle'+(view.quickDrink.pendingCount?' has-work':'')} aria-expanded={view.quickDrink.open} onClick={actions.onToggleQuickDrink}>快捷飲品 <b>{view.quickDrink.pendingCount}</b></button>
+            <button type="button" className={'ordering-quick-drink-toggle'+(quickDrink.pendingCount?' has-work':'')} aria-expanded={quickDrink.open} onClick={actions.onToggleQuickDrink}>快捷飲品 <b>{quickDrink.pendingCount}</b></button>
           </div>
         </div>
-        {view.quickDrink.open?<section className="ordering-quick-drink-drawer" aria-label="快捷飲品">
-          <header><div><small>QUICK DRINK</small><strong>{view.quickDrink.targetLabel?'正在補：'+view.quickDrink.targetLabel:'目前冇待補飲品'}</strong></div><span><button type="button" disabled={!view.quickDrink.pendingCount} onClick={actions.onOpenQuickDrinkTargets}>指定餐點</button><button type="button" onClick={actions.onToggleQuickDrink}>×</button></span></header>
+        {quickDrink.open?<section className="ordering-quick-drink-drawer" aria-label="快捷飲品">
+          <header><div><small>QUICK DRINK</small><strong>{quickDrink.targetLabel?'正在補：'+quickDrink.targetLabel:'目前冇待補飲品'}</strong></div><span><button type="button" disabled={!quickDrink.pendingCount} onClick={actions.onOpenQuickDrinkTargets}>指定餐點</button><button type="button" onClick={actions.onToggleQuickDrink}>×</button></span></header>
           <div className="ordering-quick-drink-list">
-            {view.quickDrink.choices.length?view.quickDrink.choices.map(choice=><button type="button" key={choice.id} disabled={!choice.enabled||!view.quickDrink.pendingCount} onClick={()=>actions.onSelectQuickDrink(choice.id)}><b>{choice.label}</b>{choice.priceAdjustmentLabel?<small>{choice.priceAdjustmentLabel}</small>:null}{choice.requiresConfiguration?<em>先設定</em>:null}</button>):<p>目前 Admin Combo 冇可用飲品 Choice。</p>}
+            {quickDrink.choices.length?quickDrink.choices.map(choice=><button type="button" key={choice.id} disabled={!choice.enabled||!quickDrink.pendingCount} onClick={()=>actions.onSelectQuickDrink(choice.id)}><b>{choice.label}</b>{choice.priceAdjustmentLabel?<small>{choice.priceAdjustmentLabel}</small>:null}{choice.requiresConfiguration?<em>先設定</em>:null}</button>):<p>目前 Admin Combo 冇可用飲品 Choice。</p>}
           </div>
         </section>:null}
         {view.showCategories===false?null:<nav className="ordering-categories" aria-label="商品分類">
           {view.categories.map(category=><button type="button" key={category.id} aria-pressed={view.selectedCategoryId===category.id} className={view.selectedCategoryId===category.id?'active':''} onClick={()=>actions.onSelectCategory(category.id)}>{category.label}</button>)}
         </nav>}
-        <section className="ordering-product-grid">{view.products.map(product=><ProductCard key={product.id} product={product} actions={actions} orderingMode={view.orderingMode} recentlyAdded={view.recentlyAddedProductId===product.id}/>)}</section>
+        <section className="ordering-product-grid">{view.products.map(product=><ProductCard key={product.id} product={product} actions={actions} orderingMode={orderingMode} recentlyAdded={view.recentlyAddedProductId===product.id}/>)}</section>
       </>}
     </main>
 
