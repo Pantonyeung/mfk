@@ -363,16 +363,20 @@ export function buildOrderPrintPlan(order:PrintableOrder,bindings:readonly Print
       const routeUnits=productLabelUnits.filter(unit=>labelAllowed(unit.item,binding,config,allLabelBindings));
       if(routeUnits.length<1)continue;
       for(const unit of routeUnits){
+        const labelContent=productLabelContent({
+          productName:clean(unit.item.name),
+          detail:clean(unit.item.detail??''),
+        });
+        const baseProductName=clean(unit.item.name).split('｜')[0]||clean(unit.item.name);
         const labelSpec:RasterLabelSpec={
           kind:'product',
           orderCode:clean(order.display),
-          primaryText:clean(unit.item.name),
+          primaryText:labelContent.title,
           pieceLabel:unit.pieceIndex+'/'+globalProductLabelTotal,
-          ...(clean(unit.item.productCode??'')?{productCode:clean(unit.item.productCode??'')}:{}),
-          secondaryText:[
-            unit.item.serviceMode==='dine-in'?'堂食':unit.item.serviceMode==='takeaway'?'外賣':'',
-            clean(unit.item.detail??''),
-          ].filter(Boolean).join(' · '),
+          ...(labelContent.title===baseProductName&&clean(unit.item.productCode??'')
+            ?{productCode:clean(unit.item.productCode??'')}
+            :{}),
+          ...(labelContent.modifierLines.length?{secondaryLines:labelContent.modifierLines}:{}),
         };
         jobs.push({
           id:order.id+':'+binding.id+':product-label:'+unit.item.id+':'+unit.unit,
