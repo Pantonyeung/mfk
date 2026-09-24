@@ -71,6 +71,24 @@ export interface QuickDrinkViewModel{
   readonly choices:readonly QuickDrinkChoiceViewModel[];
 }
 
+export type OrderingGuidanceTarget='product'|'required'|'quick-drink'|'combo'|'riceball-pool'|'checkout';
+
+export function deriveOrderingGuidance(input:{
+  readonly cartItemCount:number;
+  readonly requiredCount:number;
+  readonly pendingDrinkCount:number;
+  readonly comboBlockingCount:number;
+  readonly autoPairCount:number;
+  readonly checkoutEnabled:boolean;
+}):OrderingGuidanceTarget{
+  if(input.requiredCount>0)return 'required';
+  if(input.pendingDrinkCount>0)return 'quick-drink';
+  if(input.comboBlockingCount>0)return 'combo';
+  if(input.autoPairCount>0)return 'riceball-pool';
+  if(input.cartItemCount>0&&input.checkoutEnabled)return 'checkout';
+  return 'product';
+}
+
 export interface OrderingActionAvailability {
   readonly lineServiceMode:boolean;
   readonly lineEdit:boolean;
@@ -98,6 +116,7 @@ export interface OrderingWorkspaceViewModel {
   readonly highlightedCartLineId?:string;
   readonly cartPulseNonce:number;
   readonly actionAvailability?:OrderingActionAvailability;
+  readonly guidanceTarget?:OrderingGuidanceTarget;
 }
 
 export interface OrderingWorkspaceActions {
