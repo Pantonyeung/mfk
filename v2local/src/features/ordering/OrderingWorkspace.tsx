@@ -87,13 +87,14 @@ export function OrderingWorkspace({view,actions,centerPanel}:{view:OrderingWorks
   const orderingMode=view.orderingMode??'normal';
   const quickDrink=view.quickDrink??{open:false,pendingCount:0,choices:[]};
   const itemCount=view.cart.lines.reduce((sum,line)=>sum+line.quantity,0);
-  return <div className={`ordering-workspace donor-skeleton${centerPanel?' panel-open':''}`}>
+  const guidanceTarget=view.guidanceTarget??(itemCount?'checkout':'product');
+  return <div className={`ordering-workspace donor-skeleton${centerPanel?' panel-open':''}`} data-guidance={guidanceTarget}>
     <header className="ordering-flow-strip">
       <QueueStrip title="待處理" kind="pending" orders={view.pendingOrders} onOpen={actions.onOpenQueueOrder}/>
       <QueueStrip title="Keeta" kind="active" orders={view.activeOrders} onOpen={actions.onOpenQueueOrder}/>
     </header>
 
-    <main className={`ordering-catalog${centerPanel?' ordering-catalog--panel':''}`} aria-label={centerPanel?centerPanel.title:'商品'}>
+    <main className={`ordering-catalog${centerPanel?' ordering-catalog--panel':''}${!centerPanel&&guidanceTarget==='product'?' flow-next-catalog':''}`} aria-label={centerPanel?centerPanel.title:'商品'}>
       {centerPanel?<section className="ordering-center-panel">
         <header className="ordering-center-panel-head"><div><small>點單工作台</small><strong>{centerPanel.title}</strong></div><button type="button" onClick={centerPanel.onClose}>×</button></header>
         <div className="ordering-center-panel-body">{centerPanel.body}</div>
@@ -108,7 +109,7 @@ export function OrderingWorkspace({view,actions,centerPanel}:{view:OrderingWorks
               <button type="button" className={orderingMode==='normal'?'active':''} aria-pressed={orderingMode==='normal'} onClick={()=>actions.onChangeOrderingMode('normal')}>普通</button>
               <button type="button" className={orderingMode==='quick'?'active':''} aria-pressed={orderingMode==='quick'} onClick={()=>actions.onChangeOrderingMode('quick')}>快捷</button>
             </div>
-            <button type="button" className={'ordering-quick-drink-toggle'+(quickDrink.pendingCount?' has-work':'')} aria-expanded={quickDrink.open} onClick={actions.onToggleQuickDrink}>快捷飲品 <b>{quickDrink.pendingCount}</b></button>
+            <button type="button" className={'ordering-quick-drink-toggle'+(quickDrink.pendingCount?' has-work':'')+(guidanceTarget==='quick-drink'?' flow-next':'')} aria-expanded={quickDrink.open} onClick={actions.onToggleQuickDrink}>快捷飲品 <b>{quickDrink.pendingCount}</b></button>
           </div>
         </div>
         {quickDrink.open?<section className="ordering-quick-drink-drawer" aria-label="快捷飲品">
@@ -155,9 +156,12 @@ export function OrderingWorkspace({view,actions,centerPanel}:{view:OrderingWorks
       </div>:null}
 
       {view.cart.blockingMessage?<div className="ordering-cart-blocking" role="status">{view.cart.blockingMessage}</div>:null}
-      {view.cart.lines.length?<button type="button" className="ordering-checkout" aria-label="結帳" disabled={!view.cart.checkoutEnabled} onClick={actions.onCheckout}>前往結帳　{view.cart.totalLabel}</button>:null}
+      {view.cart.lines.length?<button type="button" className={'ordering-checkout'+(guidanceTarget==='checkout'?' flow-next':'')} aria-label="結帳" disabled={!view.cart.checkoutEnabled} onClick={actions.onCheckout}>前往結帳　{view.cart.totalLabel}</button>:null}
     </aside>
 
-    <footer className="ordering-workbar" aria-label="磨飯快捷工作">{view.workItems.map(item=><button type="button" key={item.id} className={item.count>0?'has-work':''} onClick={()=>actions.onOpenWorkItem(item.id)}><span>{item.label}</span><b>{item.count}</b></button>)}</footer>
+    <footer className="ordering-workbar" aria-label="磨飯快捷工作">{view.workItems.map(item=>{
+      const isGuided=guidanceTarget===item.id;
+      return <button type="button" key={item.id} className={(item.count>0?'has-work':'')+(isGuided?' flow-next':'')} onClick={()=>actions.onOpenWorkItem(item.id)}><span>{item.label}</span><b>{item.count}</b></button>;
+    })}</footer>
   </div>;
 }
