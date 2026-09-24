@@ -48,3 +48,13 @@
 @media(prefers-reduced-motion:reduce){
   .fast-lane .flow-current{scroll-behavior:auto}
 }
+
+.fast-plan-card.pending{
+  border-style:dashed;
+  background:#fafbfc;
+  color:#667381;
+}
+.fast-plan-card.pending>strong{
+  background:#7d8792;
+}
+.fast-plan-card.pending b{color:#596572}
