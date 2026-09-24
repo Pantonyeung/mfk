@@ -195,7 +195,7 @@
     "surface": "結帳",
     "kind": "COMMAND_SHAPE",
     "status": "SOURCE_WIRED_NOT_DEPLOYED",
-    "owner": "MFK Customer Cloud Bridge → SMT local canonical admission"
+    "owner": "MFK Customer Cloud Bridge → SMT Local canonical admission"
   },
   {
     "id": "PENDING_INTENT_PRESENTATION",
