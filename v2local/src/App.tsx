@@ -23,7 +23,7 @@ import {CashOpeningGate} from './presentation/CashOpeningGate.tsx';
 import {HoldCartWorkspace,HoldListWorkspace,ProductConfigWorkspace,type OrderingPanelState,type WorkspaceHoldDraft,type WorkspaceProduct} from './features/ordering/OrderingCenterWorkspaces.tsx';
 import {ComboFastLaneWorkspace,RequiredFastLaneWorkspace,RiceballPoolWorkspace} from './features/ordering/FastLaneWorkspaces.tsx';
 import {PendingOrderReviewWorkspace} from './features/ordering/PendingOrderReviewWorkspace.tsx';
-import {applyPairingPlan,applyRequiredSelection,buildAutoPairingPlans,comboBlockingCount,comboDraftCount,comboSlots,countMainCourseUnits,defaultSelectionsForProduct,dissolveComboLine,fillPendingComboGroup,fillPendingComboGroupFromConfiguredProduct,nextPairingIndex,rebuildConfiguredLine,requiredTasks,type FastLaneCartLine,type FastLanePairPlan,type FastLaneProduct} from './features/ordering/fast-lane-model.ts';
+import {applyPairingPlan,applyRequiredSelection,buildAutoPairingPlans,comboBlockingCount,comboDraftCount,comboSlots,countMainCourseUnits,defaultSelectionsForProduct,dissolveComboLine,fillPendingComboGroup,fillPendingComboGroupFromConfiguredProduct,nextPairingIndex,rebuildConfiguredLine,requiredTasks,restoreFastLaneLineComposition,serializeFastLaneComposition,type FastLaneCartLine,type FastLanePairPlan,type FastLaneProduct} from './features/ordering/fast-lane-model.ts';
 
 type Product={
   id:string;
@@ -410,9 +410,12 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
 
   const holdItems=()=>cart.map(line=>({
     id:line.productId,
-    name:line.detail?line.name+'｜'+line.detail:line.name,
+    name:line.name,
     qty:line.qty,
     unitMinor:line.unitMinor,
+    serviceMode:line.serviceMode,
+    ...(line.detail?{detail:line.detail}:{}),
+    composition:serializeFastLaneComposition(line,'HOLD'),
   }));
   const finishHold=()=>{setCart([]);setServiceMode('takeaway');setPanel(null);};
 
@@ -478,17 +481,18 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
             ?<HoldListWorkspace holds={waitingHolds as readonly WorkspaceHoldDraft[]} onRestore={hold=>{
               const restored:CartLine[]=hold.items.map((item,index)=>{
                 const parts=item.name.split('｜');
-                const name=parts.shift()||item.name;
-                const detail=parts.length?parts.join('｜'):undefined;
-                return {
+                const legacyName=parts.shift()||item.name;
+                const legacyDetail=parts.length?parts.join('｜'):undefined;
+                const base:CartLine={
                   id:'line-'+hold.id+'-'+index+'-'+Date.now().toString(36),
                   productId:item.id,
-                  name,
+                  name:item.detail!==undefined?item.name:legacyName,
                   qty:item.qty,
                   unitMinor:item.unitMinor,
-                  serviceMode:hold.kind==='dining'?'dine-in':'takeaway',
-                  detail,
+                  serviceMode:item.serviceMode??(hold.kind==='dining'?'dine-in':'takeaway'),
+                  detail:item.detail??legacyDetail,
                 };
+                return restoreFastLaneLineComposition(base,item.composition);
               });
               setCart(restored);
               setServiceMode(hold.kind==='dining'?'dine-in':'takeaway');
@@ -664,6 +668,7 @@ function CheckoutPage({cart,setCart,diningCheckout,onDiningCheckoutDone}:{cart:C
           unitMinor:line.unitMinor,
           serviceMode:line.serviceMode,
           ...(line.detail?{detail:line.detail}:{}),
+          composition:serializeFastLaneComposition(line,'ORDER'),
         })),
         totalMinor:due,
         paymentLabel,
