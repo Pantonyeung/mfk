@@ -12,7 +12,7 @@ describe('Admin product operational config',()=>{
       receipt:true,
       production:true,
       packing:true,
-      label:false,
+      label:true,
       dineIn:true,
       takeaway:true,
     });
