@@ -249,6 +249,14 @@ export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePor
 
   if(!canReview)return <main className="order-manager"><section className="order-empty"><b>你冇查看訂單權限</b><p>需要 Admin 權限：ORDER_REVIEW。</p></section></main>;
 
+  const orderNextLabel=pendingKeetaOrders.length
+    ?`先處理 ${pendingKeetaOrders.length} 張 Keeta 待處理單`
+    :selected
+      ?selected.fulfillmentLabel==='待處理'?'核對並決定是否接單'
+      :selected.fulfillmentLabel==='可取餐'?'核對交收／完成狀態'
+      :'處理目前訂單下一步'
+      :'選擇一張訂單查看';
+
   return <main className="order-manager">
     {keetaArrival?<div className="keeta-arrival-backdrop" role="alertdialog" aria-modal="true">
       <section className="keeta-arrival-card">
@@ -301,6 +309,11 @@ export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePor
     </aside>
 
     <section className="order-board">
+      <section className="order-context-strip" aria-live="polite">
+        <div><small>NOW</small><strong>{selected?selected.orderIdLabel:history?'歷史訂單':'訂單工作台'}</strong><span>{selected?selected.fulfillmentLabel:`${filtered.length} 張`}</span></div>
+        <i aria-hidden="true"/>
+        <div><small>NEXT</small><strong>{orderNextLabel}</strong><span>{pendingKeetaOrders.length?'有外部訂單需要留意':'按目前狀態繼續'}</span></div>
+      </section>
       <div className="order-payment-bar">
         <b>付款方式：</b>
         {(['全部','現金','Alipay','WeChat Pay','FPS / PayMe'] as const).map(filter=><button key={filter} className={paymentFilter===filter?'active':''} onClick={()=>setPaymentFilter(filter)}>{filter}<span>{paymentCounts.get(filter)??0}</span></button>)}
