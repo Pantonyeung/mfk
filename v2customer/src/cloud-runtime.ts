@@ -126,6 +126,7 @@ export async function uploadCustomerPaymentEvidence(file:File):Promise<{evidence
 export function createCloudCustomerRuntimePort():CustomerRuntimePort{
   return Object.freeze({
     portId:'MFK_CUSTOMER_PORT_V1' as const,
+    uploadPaymentEvidence:uploadCustomerPaymentEvidence,
 
     async readSnapshot():Promise<CustomerReadModelSnapshot>{
       const params=new URLSearchParams({storeId:STORE_ID});
