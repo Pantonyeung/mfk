@@ -168,7 +168,7 @@ export function BottomNavigation({active,cartCount,orderCount,onChange,pulseKey=
   ];
   return <nav className="bottom-navigation" aria-label="主要導覽">
     {items.map(item=><button key={item.id} className={active===item.id?'active':''} aria-current={active===item.id?'page':undefined} onClick={()=>onChange(item.id)}>
-      <i className={`nav-glyph glyph-${item.glyph}`} aria-hidden="true"/>
+      <i key={item.id==='cart'?pulseKey:undefined} className={`nav-glyph glyph-${item.glyph}${item.id==='cart'&&pulseKey?' jar-pulse':''}`} aria-hidden="true"/>
       <span>{item.label}</span>
       {item.badge?<b key={item.id==='cart'?pulseKey:undefined} className={item.id==='cart'?'badge-pop':''} aria-label={`${item.badge} 項`}>{item.badge}</b>:null}
     </button>)}
