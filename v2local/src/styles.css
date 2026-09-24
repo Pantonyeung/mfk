@@ -809,3 +809,10 @@
 }
 .clean-display-popover>section button.active{border-color:#1f5fbf;background:#edf4ff;color:#174a98}
 .clean-display-popover>.reset{background:#f7f9fc}
+
+.clean-order-tools>button.flow-next{
+  border-color:#7fa8dc;
+  background:#edf4ff;
+  color:#174a98;
+  box-shadow:0 0 0 3px rgba(31,95,191,.09)
+}
