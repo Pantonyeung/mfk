@@ -49,7 +49,7 @@ describe('MFK checkout print fanout',()=>{
     expect(plan[1]?.ticketKind).toBe('production');
     expect(plan[2]?.renderMode).toBe('escpos-raster');
     expect(plan[2]?.ticketKind).toBe('packing');
-    expect(plan[1]?.payload).toContain('廚房製作單');
+    expect(plan[1]?.payload).toContain('外賣');
     expect(plan[2]?.payload).toContain('外賣打包單');
 
     const productJobs=plan.filter(job=>job.role==='產品標籤');
