@@ -50,6 +50,26 @@ jobs:
         with:
           node-version: '24'
 
+      - name: Public DNS and HTTP probe before credential gate
+        shell: bash
+        continue-on-error: true
+        run: |
+          set +e
+          echo "=== DNS admin.morefunos.com ==="
+          dig +short admin.morefunos.com A
+          dig +short admin.morefunos.com CNAME
+          echo "=== DNS order.morefunos.com ==="
+          dig +short order.morefunos.com A
+          dig +short order.morefunos.com CNAME
+          echo "=== ADMIN HEALTH ==="
+          curl -sS -D "$RUNNER_TEMP/admin-public.headers" -o "$RUNNER_TEMP/admin-public.body" -w 'HTTP=%{http_code}\n' -H 'Cache-Control: no-cache' 'https://admin.morefunos.com/api/health'
+          head -c 1200 "$RUNNER_TEMP/admin-public.body" || true
+          echo
+          echo "=== ORDER ROOT ==="
+          curl -sS -D "$RUNNER_TEMP/order-public.headers" -o "$RUNNER_TEMP/order-public.body" -w 'HTTP=%{http_code}\n' -H 'Cache-Control: no-cache' 'https://order.morefunos.com/'
+          head -c 1200 "$RUNNER_TEMP/order-public.body" || true
+          echo
+
       - name: Prove Cloudflare zone ownership
         id: zone
         shell: bash
