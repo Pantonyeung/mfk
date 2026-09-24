@@ -33,9 +33,15 @@ type Product={
   optionSets:readonly SyncedOptionSet[];
 };
 type CartLine={id:string;productId:string;name:string;qty:number;unitMinor:number;serviceMode:ServiceMode;detail?:string};
-type OrderingUiSettings={mode:'quick'|'standard';categoryRows:1|2;categoryColumns:5|6|7};
-const ORDER_UI_KEY='mfk.smt.presentation.order-ui.v1';
-const DEFAULT_ORDER_UI:OrderingUiSettings={mode:'quick',categoryRows:1,categoryColumns:7};
+type OrderingUiSettings={
+  mode:'quick'|'standard';
+  categoryRows:1|2;
+  categoryColumns:5|6|7;
+  showImages:boolean;
+  density:'standard'|'compact';
+};
+const ORDER_UI_KEY='mfk.smt.presentation.order-ui.v2';
+const DEFAULT_ORDER_UI:OrderingUiSettings={mode:'quick',categoryRows:1,categoryColumns:7,showImages:false,density:'standard'};
 
 const BASE_PRODUCTS:readonly Product[]=[
   {id:'riceball',category:'飯團',name:'原味飯團',priceMinor:4100,priceReady:true},
@@ -238,22 +244,24 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode,uiSettings}:{cart
     };
   };
   const presentationCart=(()=>{
+    if(!combineSimilar){
+      return cart.flatMap((line,lineIndex)=>Array.from({length:Math.max(1,line.qty)},(_,unitIndex)=>({
+        id:line.id+'::'+unitIndex,
+        name:line.name,
+        quantity:1,
+        lineTotalLabel:money(line.unitMinor),
+        serviceMode:line.serviceMode,
+        groupId:products.find(product=>product.id===line.productId)?.categoryId??'local',
+        groupLabel:products.find(product=>product.id===line.productId)?.category??'本機',
+        detail:line.detail,
+        ...presentDetail(line),
+        sourceLineIds:[line.id] as readonly string[],
+        _index:lineIndex+unitIndex/100,
+      })));
+    }
     const source=cart.map((line,index)=>({
       key:[line.productId,line.serviceMode,line.unitMinor,line.detail||''].join('::'),
       line,index,
-    }));
-    if(!combineSimilar)return source.map(({line,index})=>({
-      id:line.id,
-      name:line.name,
-      quantity:line.qty,
-      lineTotalLabel:money(line.unitMinor*line.qty),
-      serviceMode:line.serviceMode,
-      groupId:products.find(product=>product.id===line.productId)?.categoryId??'local',
-      groupLabel:products.find(product=>product.id===line.productId)?.category??'本機',
-      detail:line.detail,
-      ...presentDetail(line),
-      sourceLineIds:[line.id] as readonly string[],
-      _index:index,
     }));
     const groups=new Map<string,{line:CartLine;qty:number;totalMinor:number;sourceLineIds:string[];index:number}>();
     for(const {key,line,index} of source){
@@ -284,6 +292,7 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode,uiSettings}:{cart
   const view:OrderingWorkspaceViewModel={
     pendingOrders:pendingQueue,activeOrders:providerQueue,categories,selectedCategoryId:category,
     categoryRows:uiSettings.categoryRows,categoryColumns:uiSettings.categoryColumns,
+    showProductImages:uiSettings.showImages,productDensity:uiSettings.density,
     orderingMode:uiSettings.mode,
     products:visible.map(product=>({
       id:product.id,
@@ -292,6 +301,7 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode,uiSettings}:{cart
       enabled:product.priceReady&&product.sellable&&((serviceMode==='takeaway'&&storeSettings.takeawayEnabled)||(serviceMode==='dine-in'&&storeSettings.dineInEnabled)),
       requiresOptions:product.priceReady&&product.sellable&&product.optionSets.length>0,
       hasRequiredOptions:product.optionSets.some(set=>set.required||set.min>0),
+      ...(uiSettings.showImages?{imageUrl:product.imageUrl??productArtwork(product)}:{}),
       ...(!product.priceReady?{badge:'未接價格'}:!product.sellable?{badge:'停售'}:{}),
     })),
     menuRevisionLabel:adminConfig
@@ -308,6 +318,7 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode,uiSettings}:{cart
       lines:presentationCart,
       subtotalLabel:money(total),packagingLabel:'$0.00',discountLabel:'$0.00',totalLabel:money(total),checkoutEnabled:cart.length>0&&((serviceMode==='takeaway'&&storeSettings.takeawayEnabled)||(serviceMode==='dine-in'&&storeSettings.dineInEnabled)),
     },
+    heldCartCount:heldCarts.length,
     workItems:[
       {id:'riceball-pool',label:'飯團待組區',count:0,description:'未完成飯團會集中喺呢度',statusLabel:'目前清空',enabled:true,active:panel?.type==='organize',tone:'riceball'},
       {id:'required',label:'必選區',count:0,description:'需要處理嘅必選會喺呢度',statusLabel:'目前清空',enabled:true,active:panel?.type==='organize',tone:'required'},
@@ -325,13 +336,14 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode,uiSettings}:{cart
 
   const add=(id:string)=>{
     const product=products.find(item=>item.id===id);if(!product||!product.priceReady||!product.sellable)return;
-    const existing=cart.find(item=>item.productId===id&&item.serviceMode===serviceMode);
+    const existing=combineSimilar?cart.find(item=>item.productId===id&&item.serviceMode===serviceMode&&!item.detail):undefined;
+    const createdId='line-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,6);
     const next=existing
       ?cart.map(item=>item.id===existing.id?{...item,qty:item.qty+1}:item)
-      :[...cart,{id:'line-'+Date.now().toString(36),productId:product.id,name:product.name,qty:1,unitMinor:product.priceMinor,serviceMode}];
+      :[...cart,{id:createdId,productId:product.id,name:product.name,qty:1,unitMinor:product.priceMinor,serviceMode}];
     setCart(next);
     setRecent(id);
-    setHighlight(existing?.id??next[next.length-1]?.id);
+    setHighlight(existing?.id??createdId);
     setPulse(value=>value+1);
     window.setTimeout(()=>{setRecent(undefined);setHighlight(undefined)},700);
   };
@@ -438,7 +450,20 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode,uiSettings}:{cart
       if(comboData.combos.some(combo=>combo.id===line.productId))setPanel({type:'combo'});
       else setPanel({type:'product',productId:line.productId});
     },
-    onHoldCart:()=>cart.length?setPanel({type:'hold'}):setPanel({type:'holds'}),
+    onHoldCart:()=>{if(cart.length)setPanel({type:'hold'});},
+    onOpenHeldOrders:()=>setPanel({type:'holds'}),
+    onRemoveCartLine:lineIds=>{
+      const ids=new Set(lineIds);
+      if(ids.size===1){
+        const id=[...ids][0]!;
+        const target=cart.find(item=>item.id===id);
+        if(target&&target.qty>1&&!combineSimilar){
+          setCart(cart.map(item=>item.id===id?{...item,qty:item.qty-1}:item));
+          return;
+        }
+      }
+      setCart(cart.filter(item=>!ids.has(item.id)));
+    },
     onCancelCart:()=>setCart([]),
     onOpenWorkItem:id=>{if(id==='combo')setPanel({type:'combo'});else setPanel({type:'organize'});},
     onOpenQueueOrder:(_kind,id)=>navigate('/orders?orderId='+encodeURIComponent(id)),
@@ -608,6 +633,7 @@ function OperationalApp(){
   const [serviceMode,setServiceMode]=useState<ServiceMode>('takeaway');
   const [diningCheckout,setDiningCheckout]=useState<DiningCheckoutRequest|null>(null);
   const [navRevision,setNavRevision]=useState(0);
+  const [displaySettingsOpen,setDisplaySettingsOpen]=useState(false);
   const [orderUi,setOrderUi]=useState<OrderingUiSettings>(()=>{
     try{
       const parsed=JSON.parse(localStorage.getItem(ORDER_UI_KEY)||'null') as Partial<OrderingUiSettings>|null;
@@ -615,6 +641,8 @@ function OperationalApp(){
         mode:parsed?.mode==='standard'?'standard':'quick',
         categoryRows:parsed?.categoryRows===2?2:1,
         categoryColumns:parsed?.categoryColumns===5||parsed?.categoryColumns===6?parsed.categoryColumns:7,
+        showImages:parsed?.showImages===true,
+        density:parsed?.density==='compact'?'compact':'standard',
       };
     }catch{return DEFAULT_ORDER_UI;}
   });
@@ -657,11 +685,18 @@ function OperationalApp(){
           {item.to==='/orders'&&activeOrderCount>0?<span className="clean-rail-badge" aria-label={'進行中訂單 '+activeOrderCount}>{activeOrderCount>99?'99+':activeOrderCount}</span>:null}
         </NavLink>)}
       </nav>
-      {location.pathname==='/'?<section className="clean-order-controls" aria-label="點單顯示設定">
+      {location.pathname==='/'?<section className="clean-order-controls" aria-label="點單操作設定">
         <button type="button" onClick={()=>setOrderUi(current=>({...current,mode:current.mode==='quick'?'standard':'quick'}))}><small>點選</small><b>{orderUi.mode==='quick'?'快速':'普通'}</b></button>
-        <button type="button" onClick={()=>setOrderUi(current=>({...current,categoryRows:current.categoryRows===1?2:1}))}><small>分類</small><b>{orderUi.categoryRows} 行</b></button>
-        <button type="button" onClick={()=>setOrderUi(current=>({...current,categoryColumns:current.categoryColumns===7?6:current.categoryColumns===6?5:7}))}><small>每行</small><b>{orderUi.categoryColumns} 格</b></button>
+        <button type="button" className={displaySettingsOpen?'active':''} onClick={()=>setDisplaySettingsOpen(value=>!value)} aria-expanded={displaySettingsOpen}><small>介面</small><b>顯示設定</b></button>
         <div><small>ETA</small><b>{readSmtStoreSettings().fulfillmentMinutes}m</b></div>
+      </section>:null}
+      {location.pathname==='/'&&displaySettingsOpen?<section className="clean-display-settings" role="dialog" aria-label="點單顯示設定">
+        <header><div><small>DISPLAY</small><strong>顯示設定</strong></div><button type="button" aria-label="關閉顯示設定" onClick={()=>setDisplaySettingsOpen(false)}>×</button></header>
+        <label><span>分類行數</span><div><button type="button" className={orderUi.categoryRows===1?'active':''} onClick={()=>setOrderUi(current=>({...current,categoryRows:1}))}>1 行</button><button type="button" className={orderUi.categoryRows===2?'active':''} onClick={()=>setOrderUi(current=>({...current,categoryRows:2}))}>2 行</button></div></label>
+        <label><span>分類每行</span><div>{([5,6,7] as const).map(value=><button type="button" key={value} className={orderUi.categoryColumns===value?'active':''} onClick={()=>setOrderUi(current=>({...current,categoryColumns:value}))}>{value}</button>)}</div></label>
+        <label><span>商品圖片</span><div><button type="button" className={!orderUi.showImages?'active':''} onClick={()=>setOrderUi(current=>({...current,showImages:false}))}>隱藏</button><button type="button" className={orderUi.showImages?'active':''} onClick={()=>setOrderUi(current=>({...current,showImages:true}))}>顯示</button></div></label>
+        <label><span>商品密度</span><div><button type="button" className={orderUi.density==='standard'?'active':''} onClick={()=>setOrderUi(current=>({...current,density:'standard'}))}>標準</button><button type="button" className={orderUi.density==='compact'?'active':''} onClick={()=>setOrderUi(current=>({...current,density:'compact'}))}>緊湊</button></div></label>
+        <footer><span>商品卡固定每行 4 格</span><button type="button" onClick={()=>setOrderUi(DEFAULT_ORDER_UI)}>重設</button></footer>
       </section>:null}
       <StaffSessionBadge/>
       <div className="clean-runtime-state"><b>LOCAL</b><span>本機優先</span></div>
