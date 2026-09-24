@@ -48,9 +48,9 @@ describe('SMT Frontline Layout Correction R3',()=>{
     expect(ordering).toContain('ordering-line-remove');
     expect(ordering).toContain('onRemoveCartLine');
     expect(ordering).toContain('onOpenHeldOrders');
-    expect(ordering).toContain('取單');
-    expect(center).toContain('確認取回');
-    expect(center).toContain('目前購物籃有');
-    expect(app).toContain("onOpenHeldOrders:()=>setPanel({type:'holds'})");
+    expect(ordering).toContain('取回訂單');
+    expect(center).toContain('open-checks-workspace');
+    expect(center).toContain('取回訂單');
+    expect(app).toContain("onOpenHeldOrders:()=>{if(!cart.length&&savedCarts.length)setPanel({type:'holds'});}")
   });
 });
