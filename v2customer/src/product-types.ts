@@ -129,9 +129,19 @@ export interface CustomerQuoteSnapshot {
   readonly freshness:'CURRENT'|'STALE'|'MATERIAL_CHANGE'|'UNKNOWN';
 }
 
+export type CustomerPaymentMethod='PAY_AT_STORE'|'ELECTRONIC';
+
 export interface CustomerCheckoutDraft {
   readonly name:string;
   readonly phone:string;
+  readonly paymentMethod:CustomerPaymentMethod;
+  readonly paymentEvidence?:{
+    readonly fileName:string;
+    readonly mimeType:string;
+    readonly size:number;
+    readonly state:'LOCAL_PENDING_UPLOAD'|'UPLOADED'|'VERIFIED'|'REJECTED';
+    readonly evidenceRef?:string;
+  };
 }
 
 export interface CustomerPendingIntent {
