@@ -1,6 +1,7 @@
 import {useRef,useState,type CSSProperties} from 'react';
 import {validateCustomerSelections,type CustomerSelectionState} from '../selection';
 import {ActionButton,AnimatedValue,CollapsingHeader,EmptyState,ExpandingSearch,MenuSkeleton,PageIntro,ProductDialog,PullRefreshSurface,QuantityStepper,StatefulAction,type ActionState,type ProductOriginRect} from '../ui/primitives';
+import type {CustomerRecommendation} from '../recommendation';
 import type {
   CustomerCartLine,
   CustomerCheckoutDraft,
@@ -65,13 +66,13 @@ function JourneyCoach({active}:{active:1|2|3|4}){
   </ol>;
 }
 
-function RecommendationRail({eyebrow,title,products,onProduct,reason}:{
-  eyebrow:string;title:string;products:readonly CustomerProduct[];onProduct:(product:CustomerProduct,origin:ProductOriginRect)=>void;reason:(product:CustomerProduct)=>string;
+function RecommendationRail({eyebrow,title,recommendations,onProduct,compact=false}:{
+  eyebrow:string;title:string;recommendations:readonly CustomerRecommendation[];onProduct:(product:CustomerProduct,origin:ProductOriginRect)=>void;compact?:boolean;
 }){
-  if(!products.length)return null;
-  return <section className="recommendation-section"><SectionHeading eyebrow={eyebrow} title={title}/><div className="recommendation-rail">{products.map(product=><button key={product.productId} data-product-id={product.productId} onClick={event=>{const rect=event.currentTarget.getBoundingClientRect();onProduct(product,{top:rect.top,left:rect.left,width:rect.width,height:rect.height})}}>
-    <ProductMedia product={product} compact/>
-    <span><small>{reason(product)}</small><strong>{product.name}</strong><em>{product.displayPriceLabel??'價格待店舖提供'}</em></span>
+  if(!recommendations.length)return null;
+  return <section className={`recommendation-section${compact?' compact':''}`}><SectionHeading eyebrow={eyebrow} title={title}/><div className="recommendation-rail">{recommendations.map(item=><button key={item.product.productId} data-product-id={item.product.productId} onClick={event=>{const rect=event.currentTarget.getBoundingClientRect();onProduct(item.product,{top:rect.top,left:rect.left,width:rect.width,height:rect.height})}}>
+    <ProductMedia product={item.product} compact/>
+    <span><small>{item.reasonLabel}</small><strong>{item.product.name}</strong><p>{item.reasonDetail}</p><em>{item.product.displayPriceLabel??'價格待店舖提供'}</em></span>
     <b aria-hidden="true">＋</b>
   </button>)}</div></section>;
 }
@@ -106,8 +107,8 @@ function HeroCarousel(){
   </section>;
 }
 
-export function HomeView({snapshot,connection,activeOrders,history,featuredProducts,cartCount,onRefresh,onProduct,onBrowse,onJar,onOrders,onHistory,onMember,onBuyAgain,onFallback}:{
-  snapshot:CustomerReadModelSnapshot|null;connection:CustomerConnectionState;activeOrders:readonly CustomerOrderProjection[];history:readonly CustomerHistoryProjection[];featuredProducts:readonly CustomerProduct[];cartCount:number;onRefresh:()=>void;onProduct:(product:CustomerProduct,origin:ProductOriginRect|null)=>void;onBrowse:()=>void;onJar:()=>void;onOrders:()=>void;onHistory:()=>void;onMember:()=>void;onBuyAgain:(order:CustomerHistoryProjection)=>void;onFallback:()=>void;
+export function HomeView({snapshot,connection,activeOrders,history,recommendations,cartCount,onRefresh,onProduct,onBrowse,onJar,onOrders,onHistory,onMember,onBuyAgain,onFallback}:{
+  snapshot:CustomerReadModelSnapshot|null;connection:CustomerConnectionState;activeOrders:readonly CustomerOrderProjection[];history:readonly CustomerHistoryProjection[];recommendations:readonly CustomerRecommendation[];cartCount:number;onRefresh:()=>void;onProduct:(product:CustomerProduct,origin:ProductOriginRect|null)=>void;onBrowse:()=>void;onJar:()=>void;onOrders:()=>void;onHistory:()=>void;onMember:()=>void;onBuyAgain:(order:CustomerHistoryProjection)=>void;onFallback:()=>void;
 }){
   const store=snapshot?.store;
   const currentOrder=activeOrders[0];
@@ -137,7 +138,7 @@ export function HomeView({snapshot,connection,activeOrders,history,featuredProdu
       <ActionButton wide disabled={!canBrowse} onClick={onBrowse}>{canBrowse?'開始點餐':connection==='LOADING'?'正在準備菜單':'等待店舖連接'}</ActionButton>
     </section>}
 
-    {featuredProducts.length?<section className="featured-section"><SectionHeading eyebrow="今日推薦" title="大圖先睇，鍾意先揀" action={<button className="text-action" onClick={onBrowse}>全部餐點</button>}/><div className="featured-rail">{featuredProducts.map(product=><button className="featured-food" data-product-id={product.productId} key={product.productId} onClick={event=>{const rect=event.currentTarget.getBoundingClientRect();onProduct(product,{top:rect.top,left:rect.left,width:rect.width,height:rect.height})}}><ProductMedia product={product}/><span><small>{product.badge??'店舖推薦'}</small><strong>{product.name}</strong><p>由店舖目前提供嘅推薦標記而來</p><em>{product.displayPriceLabel??'價格待店舖提供'}</em></span><i aria-hidden="true">查看</i></button>)}</div></section>:null}
+    <RecommendationRail eyebrow="為你揀快一步" title="有理由嘅推薦，唔靠估" recommendations={recommendations} onProduct={(product,origin)=>onProduct(product,origin)}/>
 
     {lastOrder?<section className="buy-again-section"><SectionHeading eyebrow="因你上次食過" title="一撳再來一單" action={<button className="text-action" onClick={onHistory}>全部回憶</button>}/><article className="buy-again-row"><div><small>{new Date(lastOrder.completedAt).toLocaleDateString('zh-HK')} · 來自你嘅正式歷史訂單</small><strong>{lastOrder.itemSummary}</strong><span>{lastOrder.amountLabel??'歷史價格未提供'}</span></div><ActionButton variant="secondary" disabled={!lastOrder.reorderEligible} onClick={()=>onBuyAgain(lastOrder)}>按目前菜單重建</ActionButton></article></section>:null}
 
@@ -150,14 +151,14 @@ export function HomeView({snapshot,connection,activeOrders,history,featuredProdu
   </section></PullRefreshSurface>;
 }
 
-export function MenuView({connection,categories,activeCategoryId,setCategory,query,setQuery,layout,setLayout,products,onProduct,cartCount,quote,onCart}:{
-  connection:CustomerConnectionState;categories:readonly {categoryId:string;name:string}[];activeCategoryId:string|null;setCategory:(id:string|null)=>void;query:string;setQuery:(v:string)=>void;layout:MenuLayout;setLayout:(v:MenuLayout)=>void;products:readonly CustomerProduct[];onProduct:(p:CustomerProduct,origin:ProductOriginRect)=>void;cartCount:number;quote:CustomerQuoteSnapshot|null;onCart:()=>void;
+export function MenuView({connection,categories,activeCategoryId,setCategory,query,setQuery,layout,setLayout,products,recommendations,onProduct,cartCount,quote,onCart}:{
+  connection:CustomerConnectionState;categories:readonly {categoryId:string;name:string}[];activeCategoryId:string|null;setCategory:(id:string|null)=>void;query:string;setQuery:(v:string)=>void;layout:MenuLayout;setLayout:(v:MenuLayout)=>void;products:readonly CustomerProduct[];recommendations:readonly CustomerRecommendation[];onProduct:(p:CustomerProduct,origin:ProductOriginRect)=>void;cartCount:number;quote:CustomerQuoteSnapshot|null;onCart:()=>void;
 }){
   return <section className="page menu-page">
     <CollapsingHeader><PageIntro kicker="點單" title="今日想食咩？" detail="先揀分類，再逐步設定；售價同供應以店舖最新資料為準。"/><div className="menu-tools"><ExpandingSearch value={query} onChange={setQuery}/><div className="layout-toggle" role="group" aria-label="菜單顯示方式"><button className={layout==='grid'?'active':''} aria-pressed={layout==='grid'} onClick={()=>setLayout('grid')}>格狀</button><button className={layout==='list'?'active':''} aria-pressed={layout==='list'} onClick={()=>setLayout('list')}>列表</button></div></div></CollapsingHeader>
     <JourneyCoach active={1}/>
     {categories.length?<div className="category-rail" role="tablist" aria-label="商品分類">{categories.map(category=><button role="tab" aria-selected={activeCategoryId===category.categoryId} key={category.categoryId} className={activeCategoryId===category.categoryId?'active':''} onClick={()=>setCategory(category.categoryId)}>{category.name}</button>)}</div>:null}
-    <RecommendationRail eyebrow="店舖推薦" title="唔知揀咩？由呢幾樣開始" products={products.filter(product=>product.available&&Boolean(product.badge)).slice(0,3)} onProduct={onProduct} reason={product=>product.badge??'店舖推薦'}/>
+    {!query.trim()?<RecommendationRail compact eyebrow="SMART PICKS" title="呢刻值得先睇" recommendations={recommendations.slice(0,3)} onProduct={onProduct}/>:null}
     {connection==='LOADING'?<MenuSkeleton/>:
       !categories.length?<EmptyState title={connection==='NOT_CONNECTED'?'菜單服務尚未連接':'今日暫時未有菜單'} detail={connection==='NOT_CONNECTED'?'連接後會顯示正式商品、規格、價格同供應狀態。':'店舖目前未提供可售商品。'}/>:
       products.length?<div className={`product-list layout-${layout}`}>{products.map(product=><button className={'product-card '+(product.available?'available':'unavailable')} data-product-id={product.productId} style={{viewTransitionName:productTransitionName(product.productId)} as CSSProperties} disabled={!product.available} key={product.productId} onClick={event=>{const rect=event.currentTarget.getBoundingClientRect();onProduct(product,{top:rect.top,left:rect.left,width:rect.width,height:rect.height})}}><ProductMedia product={product}/><span className="product-information">{product.badge?<small>{product.badge}</small>:null}<strong>{product.name}</strong><p>{product.description}</p><em>{product.displayPriceLabel??'價格待店舖提供'}</em></span><span className="sellability">{product.available?'設定':'暫停供應'}</span></button>)}</div>:
@@ -185,7 +186,7 @@ function JarVisual({count}:{count:number}){
   </div>;
 }
 
-export function CartView({cart,quote,checkout,member,suggestions,products,onProduct,onCheckoutChange,onQuantity,onRemove,onMenu,onCheckout}:{cart:readonly CustomerCartLine[];quote:CustomerQuoteSnapshot|null;checkout:CustomerCheckoutDraft;member?:CustomerMemberProjection;suggestions:readonly CustomerProduct[];products:readonly CustomerProduct[];onProduct:(product:CustomerProduct,origin:ProductOriginRect|null,line?:CustomerCartLine)=>void;onCheckoutChange:(value:CustomerCheckoutDraft)=>void;onQuantity:(id:string,q:number)=>void;onRemove:(id:string)=>void;onMenu:()=>void;onCheckout:()=>void;}){
+export function CartView({cart,quote,checkout,member,suggestions,products,onProduct,onCheckoutChange,onQuantity,onRemove,onMenu,onCheckout}:{cart:readonly CustomerCartLine[];quote:CustomerQuoteSnapshot|null;checkout:CustomerCheckoutDraft;member?:CustomerMemberProjection;suggestions:readonly CustomerRecommendation[];products:readonly CustomerProduct[];onProduct:(product:CustomerProduct,origin:ProductOriginRect|null,line?:CustomerCartLine)=>void;onCheckoutChange:(value:CustomerCheckoutDraft)=>void;onQuantity:(id:string,q:number)=>void;onRemove:(id:string)=>void;onMenu:()=>void;onCheckout:()=>void;}){
   const [removeConfirm,setRemoveConfirm]=useState<string|null>(null);
   const itemCount=cart.reduce((sum,line)=>sum+line.quantity,0);
   return <section className="page cart-page">
@@ -205,7 +206,7 @@ export function CartView({cart,quote,checkout,member,suggestions,products,onProd
       })}</div>
       {member?.state==='READY'&&member.preferences?.length?<section className="remembered-tastes"><span>我哋記得你</span><div>{member.preferences.map(item=><b key={item}>{item}</b>)}</div><small>口味習慣唔會自動改今次餐點；請逐項確認。</small></section>:<section className="remembered-tastes disconnected"><span>已儲存口味</span><p>會員偏好尚未連接，今次設定唔會寫入客戶身份。</p></section>}
       <section className="jar-contact"><SectionHeading eyebrow="取餐聯絡" title="今次點稱呼你？"/><div className="checkout-form compact"><label htmlFor="jar-name"><span>稱呼 <small>選填</small></span><input id="jar-name" value={checkout.name} onChange={event=>onCheckoutChange({...checkout,name:event.target.value})} autoComplete="name" placeholder="例如：陳小姐"/></label><label htmlFor="jar-phone"><span>電話</span><input id="jar-phone" type="tel" inputMode="tel" value={checkout.phone} onChange={event=>onCheckoutChange({...checkout,phone:event.target.value})} autoComplete="tel" placeholder="只作今次取餐核對"/></label></div></section>
-      {suggestions.length?<RecommendationRail eyebrow="店舖推薦 · 未加入記憶罐" title="想再睇多一樣？" products={suggestions} onProduct={(product,origin)=>onProduct(product,origin)} reason={product=>product.badge??'店舖推薦'}/>:null}
+      {suggestions.length?<RecommendationRail eyebrow="今餐可以再睇" title="加一樣，都要有理由" recommendations={suggestions} onProduct={(product,origin)=>onProduct(product,origin)}/>:null}
       <QuoteSummary quote={quote}/>
       {quote?.freshness==='MATERIAL_CHANGE'?<section className="repair-card" role="alert"><span>需要你確認</span><h2>餐點或價格有重要變更</h2><p>只修正受影響項目。記憶罐其他內容唔會被清空。</p><ActionButton variant="secondary" wide onClick={onMenu}>返回菜單修正</ActionButton></section>:null}
       <div className="screen-primary-action"><div><span>下一步</span><strong>{quote?money(quote.currency,quote.totalMinor):'等待正式報價'}</strong></div><ActionButton wide disabled={quote?.freshness==='MATERIAL_CHANGE'} onClick={onCheckout}>前往最後確認</ActionButton></div>
