@@ -737,3 +737,82 @@ MFK_SMT_DONOR_SKELETON_FUSION_V2_R1_OWNER_UX_REFINEMENT_V2_GREEN_OWNER_ACCEPTANC
 
 HARD RULE:
 未經 Owner 驗收，不准 merge main。
+
+
+==================================================
+BLUE UX + SCREENSHOT BASELINE REFINEMENT｜GREEN
+==================================================
+
+Owner instruction:
+Blue is the MoreFun SMT primary UI color.
+Legacy AI-chosen green/orange is not part of the intended visual system.
+
+Product candidate:
+3be223867f86e89c846ac71e2416cc2832cdc657
+
+Visual:
+- primary blue #1f5fbf
+- blue-light selected/focus states
+- ordering / checkout / fast lane / detail / dining / more surfaces aligned
+- synthetic product artwork switched to blue palette
+- active SMT CSS / App source has no legacy primary orange/green values
+- red retained only for destructive/error semantics
+
+Desktop categories:
+- screenshot baseline restored
+- horizontal categories
+- 7 columns, wrap to second row
+- product grid remains 4 columns
+
+Product detail modal:
+- width up to 1320px / 96%
+- height up to 94%
+- fixed top product name/current price
+- fixed right review panel
+- left options independently scroll
+- right panel: quantity / note / authorized price override / base price / option delta / total / add
+- no-option product preserves large empty option region
+- untouched backdrop/X closes directly
+- dirty close confirms unsaved exit
+
+Authorized price override:
+- Owner role OR PRICE_OVERRIDE permission
+- explicit final unit price may be entered
+- without override, existing option pricing remains authoritative
+
+Checkout:
+01 = Order Source always
+Walk-in:
+01 Source → 02 Payment → 03 Collection
+External:
+01 Source → 02 Channel Information
+Platform order no / pickup code / customer phone are moved into 02.
+No second local tender choice for external channels.
+
+Validation:
+GitHub Actions 36015399216 SUCCESS
+Job 107686497564
+31 / 31 Test Files PASS
+137 / 137 Tests PASS
+Build GREEN
+Worker 9f43c5a0-c892-442b-9ef2-ce72b690a51d
+Preview:
+https://smt-donor-v2-r1-blue-ux-mfk-admin.yeungyi88.workers.dev
+
+Preview PR:
+#276 CLOSED / NOT MERGED
+
+Current main fresh-read:
+401a3671417dfb72e9ced9362d2b9cf45fae015e
+
+Main:
+NOT MERGED
+
+Production:
+UNCHANGED
+
+Status:
+MFK_SMT_DONOR_SKELETON_FUSION_V2_R1_BLUE_UX_GREEN_OWNER_ACCEPTANCE_PENDING
+
+HARD RULE:
+未經 Owner 驗收，不准 merge main。
