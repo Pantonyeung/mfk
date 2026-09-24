@@ -10,3 +10,8 @@
 .pending-review-facts{align-self:start;border:1px solid #dde3e9;border-radius:11px;background:#f8fafb;padding:10px;display:grid;grid-template-columns:1fr 1fr;gap:7px}.pending-review-facts>div{display:grid;gap:2px;padding:8px;border-radius:8px;background:#fff}.pending-review-facts>div.wide{grid-column:1/-1}.pending-review-facts span{font-size:9px;color:#7d8894}.pending-review-facts b{font-size:12px}.pending-review-facts p{grid-column:1/-1;margin:2px 0 0;font-size:10px;line-height:1.45;color:#677481}
 .pending-order-result{padding:9px 11px;border-radius:9px;font-size:11px;font-weight:850}.pending-order-result.success{border:1px solid #b8dec8;background:#eefaf3;color:#236847}.pending-order-result.error{border:1px solid #e9beb9;background:#fff3f1;color:#95433d}
 @media(max-width:1400px){.pending-review-columns{grid-template-columns:1fr}.pending-review-facts{grid-template-columns:repeat(4,minmax(0,1fr))}.pending-review-facts p{grid-column:1/-1}}
+
+.pending-payment-evidence{grid-column:1/-1;display:grid;gap:7px;padding:9px;border:1px solid #d9e2ea;border-radius:9px;background:#fff}
+.pending-payment-evidence header{display:flex;justify-content:space-between;align-items:center;gap:8px}.pending-payment-evidence header b{font-size:11px}.pending-payment-evidence header span{font-size:9px;font-weight:900;padding:4px 7px;border-radius:999px;background:#fff1dd;color:#8b560f}
+.pending-payment-evidence img{display:block;width:100%;max-height:260px;object-fit:contain;border:1px solid #e3e8ed;border-radius:7px;background:#f4f6f8}
+.pending-payment-evidence p{grid-column:auto;margin:0;font-size:10px;color:#6b7682}.pending-payment-evidence p.error{color:#99453d}.pending-payment-evidence small{font-size:9px;line-height:1.45;color:#75808b}
