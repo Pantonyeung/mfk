@@ -74,6 +74,12 @@ interface PresentationConfig{
 }
 export function PresentationWorkspace({surface}:{surface:'CUSTOMER'|'OWNER'|'FRONTLINE'}){
   const key='presentation.'+surface.toLowerCase()+'.v1';
+  const [customerChannel,setCustomerChannel]=usePersistentAdminState<{enabled:boolean}>('channel-policy.customer.v1',{enabled:true});
+  const setCustomerChannelEnabled=(enabled:boolean)=>{
+    const after={...customerChannel,enabled};
+    appendAdminAudit({action:'修改自家落單渠道',target:'CUSTOMER',before:customerChannel,after});
+    setCustomerChannel(after);
+  };
   const [config,setConfig]=usePersistentAdminState<PresentationConfig>(key,{
     headline:'',eyebrow:'',body:'',ctaLabel:'',showPromos:true,showCategories:true,showImages:true,showDescriptions:true,tabletColumns:4,mobileColumns:2,quickProductIds:[],
   });
@@ -82,6 +88,7 @@ export function PresentationWorkspace({surface}:{surface:'CUSTOMER'|'OWNER'|'FRO
   return <section className="admin-editor-page">
     <Header title={title} description="只管理受控顯示設定：顯示內容、區塊、欄數同快捷商品。商品名、價格、供應同訂單仍由正式資料決定。" badge="顯示設定"/>
     <div className="admin-policy-grid two">
+      {surface==='CUSTOMER'?<article className="admin-policy-card"><h2>自家落單渠道</h2><label className="admin-toggle"><input type="checkbox" checked={customerChannel.enabled} onChange={event=>setCustomerChannelEnabled(event.target.checked)}/><span>{customerChannel.enabled?'接受自家落單':'暫停自家落單'}</span></label><p>關閉後客戶仍可睇已發布資料同已提交訂單，但新報價／新落單會停止。</p></article>:null}
       <article className="admin-policy-card"><h2>內容</h2><label><span>小標題</span><input value={config.eyebrow} onChange={event=>patch({eyebrow:event.target.value})}/></label><label><span>主標題</span><input value={config.headline} onChange={event=>patch({headline:event.target.value})}/></label><label><span>說明</span><textarea rows={4} value={config.body} onChange={event=>patch({body:event.target.value})}/></label><label><span>按鈕文字</span><input value={config.ctaLabel} onChange={event=>patch({ctaLabel:event.target.value})}/></label><label className="admin-toggle"><input type="checkbox" checked={config.showPromos} onChange={event=>patch({showPromos:event.target.checked})}/><span>顯示推廣區</span></label><label className="admin-toggle"><input type="checkbox" checked={config.showCategories} onChange={event=>patch({showCategories:event.target.checked})}/><span>顯示分類導覽</span></label></article>
       <article className="admin-policy-card"><h2>版面</h2><label className="admin-toggle"><input type="checkbox" checked={config.showImages} onChange={event=>patch({showImages:event.target.checked})}/><span>顯示商品圖片</span></label><label className="admin-toggle"><input type="checkbox" checked={config.showDescriptions} onChange={event=>patch({showDescriptions:event.target.checked})}/><span>顯示商品說明</span></label><label><span>平板每行欄數</span><input type="number" min={2} max={6} value={config.tabletColumns} onChange={event=>patch({tabletColumns:Number(event.target.value)||4})}/></label><label><span>手機每行欄數</span><input type="number" min={1} max={3} value={config.mobileColumns} onChange={event=>patch({mobileColumns:Number(event.target.value)||2})}/></label><label><span>快捷商品 ID（逗號分隔）</span><input value={config.quickProductIds.join(', ')} onChange={event=>patch({quickProductIds:event.target.value.split(',').map(value=>value.trim()).filter(Boolean)})}/></label></article>
     </div>
