@@ -16,14 +16,15 @@ function QueueStrip({title,kind,orders,onOpen}:{title:string;kind:'pending'|'act
   </section>;
 }
 
-function ProductCard({product,actions,recentlyAdded,mode}:{product:OrderingProductViewModel;actions:OrderingWorkspaceActions;recentlyAdded:boolean;mode:'quick'|'standard'}){
+function ProductCard({product,actions,recentlyAdded,mode,showImage}:{product:OrderingProductViewModel;actions:OrderingWorkspaceActions;recentlyAdded:boolean;mode:'quick'|'standard';showImage:boolean}){
   const onBody=()=>{
     if(!product.enabled)return;
     if(mode==='standard'||product.hasRequiredOptions)actions.onConfigureProduct(product.id);
     else actions.onAddProduct(product.id);
   };
-  return <article className={`ordering-product-card text-only${product.enabled?'':' disabled'}${recentlyAdded?' recently-added':''}`}>
+  return <article className={`ordering-product-card${showImage&&product.imageUrl?' has-thumb':' text-only'}${product.enabled?'':' disabled'}${recentlyAdded?' recently-added':''}`}>
     <button type="button" className="ordering-product-body" aria-label={`${product.name}，${product.priceLabel}${product.requiresOptions?'，有選項':''}`} disabled={!product.enabled} onClick={onBody}>
+      {showImage&&product.imageUrl?<span className="ordering-product-thumb" aria-hidden="true"><img src={product.imageUrl} alt="" loading="lazy" decoding="async"/></span>:null}
       <span className="ordering-product-copy">
         <span className="ordering-product-topline">{product.badge?<small>{product.badge}</small>:product.hasRequiredOptions?<small className="configure">必選</small>:null}</span>
         <b>{product.name}</b><strong>{product.priceLabel}</strong>
@@ -31,6 +32,12 @@ function ProductCard({product,actions,recentlyAdded,mode}:{product:OrderingProdu
     </button>
     {product.enabled&&product.requiresOptions&&!product.hasRequiredOptions?<button type="button" className="ordering-product-more" aria-label={`設定 ${product.name}`} onClick={()=>actions.onConfigureProduct(product.id)}>設定</button>:null}
   </article>;
+}
+
+function TrashGlyph(){
+  return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M4 7h16"/><path d="M9 7V4h6v3"/><path d="m7 7 1 13h8l1-13"/><path d="M10 11v5M14 11v5"/>
+  </svg>;
 }
 
 function CartLineRow({line,index,highlighted,actions,availability}:{line:CartLineViewModel;index:number;highlighted:boolean;actions:OrderingWorkspaceActions;availability:NonNullable<OrderingWorkspaceViewModel['actionAvailability']>}){
@@ -59,6 +66,7 @@ function CartLineRow({line,index,highlighted,actions,availability}:{line:CartLin
       {availability.lineQuantity?<button type="button" onClick={()=>actions.onAdjustLineQuantity(sourceLineIds,1)} aria-label={`增加 ${line.name}`}>＋</button>:null}
     </div>
     <strong className="ordering-line-total">{line.lineTotalLabel}</strong>
+    <button type="button" className="ordering-line-remove" onClick={()=>actions.onRemoveCartLine(sourceLineIds)} aria-label={`刪除 ${line.name}`}><TrashGlyph/></button>
   </article>;
 }
 
@@ -96,15 +104,17 @@ export function OrderingWorkspace({view,actions,centerPanel}:{view:OrderingWorks
   const itemCount=view.cart.lines.reduce((sum,line)=>sum+line.quantity,0);
   const checkoutReason=!view.cart.lines.length?'先選擇商品，加入購物籃後就可以結帳。':!view.cart.checkoutEnabled?'目前用餐方式暫停接單，請選擇可用方式。':'';
 
-  return <div className={`ordering-workspace${centerPanel?' panel-open':''}`}>
+  return <div className={`ordering-workspace density-${view.productDensity}${view.showProductImages?' show-product-images':''}${centerPanel?' panel-open':''}`}>
     <main className="ordering-catalog" aria-label="點單商品">
       <section className="ordering-queue-deck" aria-label="訂單工作列">
         <QueueStrip title="待處理" kind="pending" orders={view.pendingOrders} onOpen={actions.onOpenQueueOrder}/>
         <QueueStrip title="Keeta" kind="active" orders={view.activeOrders} onOpen={actions.onOpenQueueOrder}/>
       </section>
 
-      {view.operationalNotice?<ActionFeedback tone="warning" title={view.operationalNotice}/>:null}
-      {view.feedbackMessage?<ActionFeedback tone="success" title={view.feedbackMessage}/>:null}
+      <div className="ordering-feedback-stack" aria-live="polite">
+        {view.operationalNotice?<ActionFeedback tone="warning" title={view.operationalNotice}/>:null}
+        {view.feedbackMessage?<ActionFeedback tone="success" title={view.feedbackMessage}/>:null}
+      </div>
 
       {view.showCategories===false?null:<nav
         className={`ordering-categories rows-${view.categoryRows}`}
@@ -115,7 +125,7 @@ export function OrderingWorkspace({view,actions,centerPanel}:{view:OrderingWorks
       </nav>}
 
       {view.products.length
-        ?<section className="ordering-product-grid" aria-live="polite">{view.products.map(product=><ProductCard key={product.id} product={product} actions={actions} mode={view.orderingMode} recentlyAdded={view.recentlyAddedProductId===product.id}/>)}</section>
+        ?<section className="ordering-product-grid" aria-live="polite">{view.products.map(product=><ProductCard key={product.id} product={product} actions={actions} mode={view.orderingMode} showImage={view.showProductImages} recentlyAdded={view.recentlyAddedProductId===product.id}/>)}</section>
         :<div className="ordering-products-empty">此分類未有可顯示商品</div>}
 
       <footer className="ordering-workbar" aria-label="點單輔助工作區">
@@ -148,8 +158,12 @@ export function OrderingWorkspace({view,actions,centerPanel}:{view:OrderingWorks
       {view.cart.lines.length?<>
         <div className="ordering-cart-facts"><span><small>小計</small><b>{view.cart.subtotalLabel}</b></span><span><small>包裝</small><b>{view.cart.packagingLabel}</b></span><span><small>折扣</small><b>{view.cart.discountLabel}</b></span></div>
         <div className="ordering-cart-total"><span>應付總額</span><strong>{view.cart.totalLabel}</strong></div>
-        {availability.holdCart||availability.cancelCart?<div className={`ordering-cart-secondary-actions${!availability.cancelCart?' single':''}`}>{availability.holdCart?<button type="button" onClick={actions.onHoldCart}>{view.cart.lines.length?'暫存訂單':'取回訂單'}</button>:null}{availability.cancelCart?<button type="button" className="destructive" onClick={()=>setCancelOpen(true)}>取消呢張單</button>:null}</div>:null}
       </>:null}
+      {(availability.holdCart&&view.cart.lines.length)||view.heldCartCount>0||availability.cancelCart?<div className="ordering-cart-secondary-actions">
+        {availability.holdCart&&view.cart.lines.length?<button type="button" onClick={actions.onHoldCart}>暫存</button>:null}
+        {view.heldCartCount>0?<button type="button" className="retrieve" onClick={actions.onOpenHeldOrders}>取單 <b>{view.heldCartCount}</b></button>:null}
+        {availability.cancelCart&&view.cart.lines.length?<button type="button" className="destructive" onClick={()=>setCancelOpen(true)}>取消</button>:null}
+      </div>:null}
       {!view.cart.checkoutEnabled?<DisabledReason>{checkoutReason}</DisabledReason>:null}
       <button type="button" className="ordering-checkout" disabled={!view.cart.checkoutEnabled} onClick={actions.onCheckout}>{view.cart.checkoutEnabled?`前往結帳 ${view.cart.totalLabel}`:'加入商品後前往結帳'}</button>
     </aside>
