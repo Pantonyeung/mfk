@@ -31,9 +31,22 @@ export type OrderingPanelState=
 
 const money=(minor:number)=>(minor<0?'-':'')+String.fromCharCode(36)+(Math.abs(minor)/100).toFixed(2);
 
-export function ProductConfigWorkspace({product,onAdd,maxQty=99,onDirtyChange}:{product:WorkspaceProduct;onAdd:(detail:string,deltaMinor:number,qty:number,structured:{readonly selections:Readonly<Record<string,readonly string[]>>;readonly note:string})=>void;maxQty?:number;onDirtyChange?:(dirty:boolean)=>void}){
+export function ProductConfigWorkspace({
+  product,onAdd,maxQty=99,onDirtyChange,canOverridePrice=false,
+}:{
+  product:WorkspaceProduct;
+  onAdd:(detail:string,deltaMinor:number,qty:number,structured:{
+    readonly selections:Readonly<Record<string,readonly string[]>>;
+    readonly note:string;
+    readonly overrideUnitMinor?:number;
+  })=>void;
+  maxQty?:number;
+  onDirtyChange?:(dirty:boolean)=>void;
+  canOverridePrice?:boolean;
+}){
   const [qty,setQty]=useState(1);
   const [note,setNote]=useState('');
+  const [overridePrice,setOverridePrice]=useState('');
   const [selected,setSelected]=useState<Record<string,string[]>>(()=>Object.fromEntries(
     (product.optionSets??[]).map(set=>[
       set.id,
@@ -56,10 +69,14 @@ export function ProductConfigWorkspace({product,onAdd,maxQty=99,onDirtyChange}:{
     return set.options.filter(option=>ids.has(option.id));
   });
   const delta=selectedOptions.reduce((sum,option)=>sum+option.priceAdjustmentMinor,0);
+  const calculatedUnitMinor=product.priceMinor+delta;
+  const parsedOverride=overridePrice.trim()===''?undefined:Math.round(Number(overridePrice)*100);
+  const overrideValid=parsedOverride===undefined||(Number.isSafeInteger(parsedOverride)&&parsedOverride>=0);
+  const finalUnitMinor=overrideValid&&parsedOverride!==undefined?parsedOverride:calculatedUnitMinor;
   const invalid=(product.optionSets??[]).some(set=>{
     const count=(selected[set.id]??[]).length;
     return count<set.min||count>set.max||(set.required&&count<1);
-  });
+  })||!overrideValid;
   const detail=[
     ...(product.optionSets??[]).flatMap(set=>{
       const ids=new Set(selected[set.id]??[]);
@@ -71,26 +88,48 @@ export function ProductConfigWorkspace({product,onAdd,maxQty=99,onDirtyChange}:{
 
   return <div className="cfg-workspace">
     <header className="cfg-product-head">
-      <div className="cfg-product-hero">{product.imageUrl?<img src={product.imageUrl} alt=""/>:null}</div>
-      <div><small>{product.category}</small><h2>{product.name}</h2><strong>{money(product.priceMinor+delta)}</strong></div>
-      <div className="cfg-qty"><span>數量</span><button disabled={qty<=1} onClick={()=>{onDirtyChange?.(true);setQty(Math.max(1,qty-1));}}>−</button><b>{qty}</b><button disabled={qty>=maxQty} onClick={()=>{onDirtyChange?.(true);setQty(Math.min(maxQty,qty+1));}}>＋</button></div>
+      <div>
+        <small>{product.category}</small>
+        <h2>{product.name}</h2>
+        <p>{(product.optionSets??[]).length?'選項會喺下面內容區顯示；右側數量、備註同價錢固定。':'此商品沒有已發布選項，確認數量同備註即可加入。'}</p>
+      </div>
+      <div className="cfg-current-price"><span>目前單價</span><strong>{money(finalUnitMinor)}</strong><small>由正式菜單、選項價差或授權改價決定</small></div>
     </header>
 
-    {(product.optionSets??[]).length
-      ?(product.optionSets??[]).map(set=><section className="cfg-block" key={set.id}>
-        <header><b>{set.name}</b><span>{set.required?'必選':'可選'} · {set.selection==='SINGLE'?'單選':'多選'} · {set.min}–{set.max}</span></header>
-        <div className="cfg-choice-grid three">{set.options.map(option=>{
-          const active=(selected[set.id]??[]).includes(option.id);
-          const price=option.priceAdjustmentMinor;
-          return <button key={option.id} className={active?'active':''} onClick={()=>toggle(set,option.id)}>
-            <b>{option.name}</b>{price!==0?<small>{price>0?'+':''}{money(price)}</small>:null}
-          </button>;
-        })}</div>
-      </section>)
-      :<section className="cfg-block"><header><b>商品選項</b><span>Admin</span></header><p>此商品目前冇已發布選項組。</p></section>}
+    <div className="cfg-layout">
+      <section className="cfg-options-scroll" aria-label="商品選項">
+        {(product.optionSets??[]).length
+          ?(product.optionSets??[]).map(set=><section className="cfg-block" key={set.id}>
+            <header><b>{set.name}</b><span>{set.required?'必選':'可選'} · {set.selection==='SINGLE'?'單選':'多選'} · {set.min}–{set.max}</span></header>
+            <div className="cfg-choice-grid three">{set.options.map(option=>{
+              const active=(selected[set.id]??[]).includes(option.id);
+              const price=option.priceAdjustmentMinor;
+              return <button type="button" key={option.id} className={active?'active':''} onClick={()=>toggle(set,option.id)}>
+                <b>{option.name}</b>{price!==0?<small>{price>0?'+':''}{money(price)}</small>:null}
+              </button>;
+            })}</div>
+          </section>)
+          :<section className="cfg-empty-options"><b>此商品沒有已發布選項</b><span>右邊確認數量、備註及價錢即可加入購物籃。</span></section>}
+      </section>
 
-    <label className="cfg-note"><span>備註</span><input value={note} maxLength={60} onChange={event=>{onDirtyChange?.(true);setNote(event.target.value);}} placeholder="例如：不要蔥、醬分開"/><small>{note.length}/60</small></label>
-    <footer className="cfg-action"><div><span>單價</span><b>{money(product.priceMinor+delta)}</b></div><button className="primary" disabled={invalid} onClick={()=>onAdd(detail,delta,qty,{selections:selected,note:note.trim()})}>加入訂單　{money((product.priceMinor+delta)*qty)}</button></footer>
+      <aside className="cfg-review-panel">
+        <div className="cfg-review-heading"><small>最後核對</small><h3>數量與備註</h3></div>
+        <div className="cfg-qty"><span>數量</span><button type="button" disabled={qty<=1} onClick={()=>{onDirtyChange?.(true);setQty(Math.max(1,qty-1));}}>−</button><b>{qty}</b><button type="button" disabled={qty>=maxQty} onClick={()=>{onDirtyChange?.(true);setQty(Math.min(maxQty,qty+1));}}>＋</button></div>
+        <label className="cfg-note"><span>商品備註 <small>選填</small></span><input value={note} maxLength={60} onChange={event=>{onDirtyChange?.(true);setNote(event.target.value);}} placeholder="例如：不要蔥、醬分開"/><small>{note.length}/60</small></label>
+        {canOverridePrice?<label className="cfg-price-override"><span>授權改價 <small>Owner／授權人員</small></span><div><b>$</b><input inputMode="decimal" value={overridePrice} onChange={event=>{onDirtyChange?.(true);setOverridePrice(event.target.value.replace(/[^0-9.]/g,''));}} placeholder={(calculatedUnitMinor/100).toFixed(2)}/></div>{!overrideValid?<em>請輸入有效價錢</em>:parsedOverride!==undefined?<button type="button" onClick={()=>{onDirtyChange?.(true);setOverridePrice('');}}>恢復菜單價</button>:null}</label>:null}
+        <div className="cfg-price-summary">
+          <div><span>基價</span><b>{money(product.priceMinor)}</b></div>
+          <div><span>選項價差</span><b>{delta===0?'$0.00':(delta>0?'+':'')+money(delta)}</b></div>
+          {parsedOverride!==undefined&&overrideValid?<div><span>授權改價</span><b>{money(parsedOverride)}</b></div>:null}
+          <div className="total"><span>合計</span><strong>{money(finalUnitMinor*qty)}</strong></div>
+        </div>
+        <button type="button" className="cfg-add primary" disabled={invalid} onClick={()=>onAdd(detail,delta,qty,{
+          selections:selected,
+          note:note.trim(),
+          ...(parsedOverride!==undefined&&overrideValid?{overrideUnitMinor:parsedOverride}:{}),
+        })}>加入購物籃　{money(finalUnitMinor*qty)}</button>
+      </aside>
+    </div>
   </div>;
 }
 
