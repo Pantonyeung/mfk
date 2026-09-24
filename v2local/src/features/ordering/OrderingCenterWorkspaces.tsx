@@ -33,7 +33,7 @@ export type OrderingPanelState=
 
 const money=(minor:number)=>(minor<0?'-':'')+String.fromCharCode(36)+(Math.abs(minor)/100).toFixed(2);
 
-export function ProductConfigWorkspace({product,onAdd,maxQty=99}:{product:WorkspaceProduct;onAdd:(detail:string,deltaMinor:number,qty:number,structured:{readonly selections:Readonly<Record<string,readonly string[]>>;readonly note:string})=>void;maxQty?:number}){
+export function ProductConfigWorkspace({product,onAdd,maxQty=99,onDirtyChange}:{product:WorkspaceProduct;onAdd:(detail:string,deltaMinor:number,qty:number,structured:{readonly selections:Readonly<Record<string,readonly string[]>>;readonly note:string})=>void;maxQty?:number;onDirtyChange?:(dirty:boolean)=>void}){
   const [qty,setQty]=useState(1);
   const [note,setNote]=useState('');
   const [selected,setSelected]=useState<Record<string,string[]>>(()=>Object.fromEntries(
@@ -44,6 +44,7 @@ export function ProductConfigWorkspace({product,onAdd,maxQty=99}:{product:Worksp
   ));
 
   const toggle=(set:SyncedOptionSet,optionId:string)=>{
+    onDirtyChange?.(true);
     setSelected(current=>{
       const existing=current[set.id]??[];
       if(set.selection==='SINGLE')return {...current,[set.id]:[optionId]};
@@ -74,7 +75,7 @@ export function ProductConfigWorkspace({product,onAdd,maxQty=99}:{product:Worksp
     <header className="cfg-product-head">
       <div className="cfg-product-hero">{product.imageUrl?<img src={product.imageUrl} alt=""/>:null}</div>
       <div><small>{product.category}</small><h2>{product.name}</h2><strong>{money(product.priceMinor+delta)}</strong></div>
-      <div className="cfg-qty"><span>數量</span><button disabled={qty<=1} onClick={()=>setQty(Math.max(1,qty-1))}>−</button><b>{qty}</b><button disabled={qty>=maxQty} onClick={()=>setQty(Math.min(maxQty,qty+1))}>＋</button></div>
+      <div className="cfg-qty"><span>數量</span><button disabled={qty<=1} onClick={()=>{onDirtyChange?.(true);setQty(Math.max(1,qty-1));}}>−</button><b>{qty}</b><button disabled={qty>=maxQty} onClick={()=>{onDirtyChange?.(true);setQty(Math.min(maxQty,qty+1));}}>＋</button></div>
     </header>
 
     {(product.optionSets??[]).length
@@ -90,7 +91,7 @@ export function ProductConfigWorkspace({product,onAdd,maxQty=99}:{product:Worksp
       </section>)
       :<section className="cfg-block"><header><b>商品選項</b><span>Admin</span></header><p>此商品目前冇已發布選項組。</p></section>}
 
-    <label className="cfg-note"><span>備註</span><input value={note} maxLength={60} onChange={event=>setNote(event.target.value)} placeholder="例如：不要蔥、醬分開"/><small>{note.length}/60</small></label>
+    <label className="cfg-note"><span>備註</span><input value={note} maxLength={60} onChange={event=>{onDirtyChange?.(true);setNote(event.target.value);}} placeholder="例如：不要蔥、醬分開"/><small>{note.length}/60</small></label>
     <footer className="cfg-action"><div><span>單價</span><b>{money(product.priceMinor+delta)}</b></div><button className="primary" disabled={invalid} onClick={()=>onAdd(detail,delta,qty,{selections:selected,note:note.trim()})}>加入訂單　{money((product.priceMinor+delta)*qty)}</button></footer>
   </div>;
 }
@@ -195,7 +196,7 @@ export interface HoldPlacementTable{
 }
 
 export function HoldCartWorkspace({
-  lines,totalMinor,tables,onHoldWaiting,onHoldQueue,onHoldTable
+  lines,totalMinor,tables,onHoldWaiting,onHoldQueue,onHoldTable,onDirtyChange
 }:{
   lines:readonly WorkspaceCartLine[];
   totalMinor:number;
@@ -203,6 +204,7 @@ export function HoldCartWorkspace({
   onHoldWaiting:(partySize:number,note:string)=>void;
   onHoldQueue:(partySize:number,note:string)=>void;
   onHoldTable:(tableId:string,partySize:number,note:string)=>void;
+  onDirtyChange?:(dirty:boolean)=>void;
 }){
   const [mode,setMode]=useState<'cart'|'dining'>('cart');
   const [partySize,setPartySize]=useState(2);
@@ -219,7 +221,7 @@ export function HoldCartWorkspace({
         <b>暫存待客</b>
         <span>客人未確認；保存呢張 Cart，之後由「取回訂單」直接攞返。</span>
       </button>
-      <button className={mode==='dining'?'active dining':'dining'} onClick={()=>setMode('dining')}>
+      <button className={mode==='dining'?'active dining':'dining'} onClick={()=>{onDirtyChange?.(true);setMode('dining');}}>
         <b>掛入堂食</b>
         <span>唔跳頁；下面「購物車內容」即場轉成加入輪候＋1–9 號枱。</span>
       </button>
@@ -236,14 +238,14 @@ export function HoldCartWorkspace({
       <aside className="hold-inline-left">
         <div className="hold-party">
           <span>人數</span>
-          <div><button onClick={()=>setPartySize(Math.max(1,partySize-1))}>−</button><b>{partySize}</b><button onClick={()=>setPartySize(partySize+1)}>＋</button></div>
+          <div><button onClick={()=>{onDirtyChange?.(true);setPartySize(Math.max(1,partySize-1));}}>−</button><b>{partySize}</b><button onClick={()=>{onDirtyChange?.(true);setPartySize(partySize+1);}}>＋</button></div>
         </div>
         <button className="hold-queue-button" onClick={()=>onHoldQueue(partySize,note)}>
           <b>加入輪候</b>
           <span>直接放入堂食輪候，唔使再跳堂食頁揀第二次。</span>
         </button>
-        <label className="hold-note"><span>備註</span><input value={note} onChange={event=>setNote(event.target.value)} placeholder="例如：等 10 分鐘"/></label>
-        <button className="hold-back-cart" onClick={()=>setMode('cart')}>返回購物車內容</button>
+        <label className="hold-note"><span>備註</span><input value={note} onChange={event=>{onDirtyChange?.(true);setNote(event.target.value);}} placeholder="例如：等 10 分鐘"/></label>
+        <button className="hold-back-cart" onClick={()=>{onDirtyChange?.(true);setMode('cart');}}>返回購物車內容</button>
       </aside>
       <div className="hold-nine-grid">
         {tables.map(table=><button key={table.id} className={table.occupied?'occupied':'available'} disabled={table.occupied} onClick={()=>onHoldTable(table.id,partySize,note)}>
