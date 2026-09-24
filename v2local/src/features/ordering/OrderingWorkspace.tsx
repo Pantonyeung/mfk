@@ -137,18 +137,18 @@ export function OrderingWorkspace({view,actions,centerPanel}:{view:OrderingWorks
     <aside key={view.cartPulseNonce} className={`ordering-cart${view.cartPulseNonce>0?' cart-updated':''}`} aria-label="購物籃">
       <header className="ordering-cart-head">
         <div className="ordering-cart-order-id"><small>目前訂單</small><strong>#{view.cart.orderId}</strong><span>{itemCount?`${itemCount} 件商品`:'等待加入商品'}</span></div>
+        <div className="ordering-cart-head-controls" aria-label="購物車顯示與用餐方式">
+          <button type="button" className="ordering-cart-cycle" aria-label={`目前${view.cart.viewMode==='original'?'原單':'整理'}，按一下切換`} onClick={()=>actions.onChangeCartView(view.cart.viewMode==='original'?'organized':'original')}>
+            <b>{view.cart.viewMode==='original'?'原單':'整理'}</b>
+          </button>
+          <button type="button" className={`ordering-cart-cycle service ${view.cart.serviceMode}`} disabled={!wholeNextAllowed} aria-label={`目前${view.cart.serviceMode==='takeaway'?'外賣':'堂食'}，按一下切換`} onClick={()=>actions.onChangeServiceMode(wholeNextMode)}>
+            <b>{view.cart.serviceMode==='takeaway'?'外賣':'堂食'}</b>
+          </button>
+          <button type="button" className={`ordering-cart-cycle combine${view.cart.combineSimilar?' active':''}`} aria-pressed={view.cart.combineSimilar} onClick={actions.onToggleCombine}>
+            <b>組合 {view.cart.combineSimilar?'開':'關'}</b>
+          </button>
+        </div>
       </header>
-      {view.cart.lines.length?<div className="ordering-cart-controls" aria-label="購物車顯示與用餐方式">
-        <button type="button" className="ordering-cart-cycle" aria-label={`目前${view.cart.viewMode==='original'?'原單':'整理'}，按一下切換`} onClick={()=>actions.onChangeCartView(view.cart.viewMode==='original'?'organized':'original')}>
-          <small>顯示</small><b>{view.cart.viewMode==='original'?'原單':'整理'}</b>
-        </button>
-        <button type="button" className={`ordering-cart-cycle service ${view.cart.serviceMode}`} disabled={!wholeNextAllowed} aria-label={`目前${view.cart.serviceMode==='takeaway'?'外賣':'堂食'}，按一下切換`} onClick={()=>actions.onChangeServiceMode(wholeNextMode)}>
-          <small>全單</small><b>{view.cart.serviceMode==='takeaway'?'外賣':'堂食'}</b>
-        </button>
-        <button type="button" className={`ordering-cart-cycle combine${view.cart.combineSimilar?' active':''}`} aria-pressed={view.cart.combineSimilar} onClick={actions.onToggleCombine}>
-          <small>相同商品</small><b>組合 {view.cart.combineSimilar?'開':'關'}</b>
-        </button>
-      </div>:null}
       <div className={`ordering-cart-lines ${view.cart.viewMode}`}>
         {view.cart.lines.length?(view.cart.viewMode==='original'
           ?view.cart.lines.map((line,index)=><CartLineRow key={line.id} line={line} index={index} highlighted={view.highlightedCartLineId===line.id||(line.sourceLineIds?.includes(view.highlightedCartLineId??'')??false)} actions={actions} availability={availability}/>)
@@ -159,10 +159,11 @@ export function OrderingWorkspace({view,actions,centerPanel}:{view:OrderingWorks
         <div className="ordering-cart-facts"><span><small>小計</small><b>{view.cart.subtotalLabel}</b></span><span><small>包裝</small><b>{view.cart.packagingLabel}</b></span><span><small>折扣</small><b>{view.cart.discountLabel}</b></span></div>
         <div className="ordering-cart-total"><span>應付總額</span><strong>{view.cart.totalLabel}</strong></div>
       </>:null}
-      {(availability.holdCart&&view.cart.lines.length)||view.heldCartCount>0||availability.cancelCart?<div className="ordering-cart-secondary-actions">
-        {availability.holdCart&&view.cart.lines.length?<button type="button" onClick={actions.onHoldCart}>暫存</button>:null}
-        {view.heldCartCount>0?<button type="button" className="retrieve" onClick={actions.onOpenHeldOrders}>取單 <b>{view.heldCartCount}</b></button>:null}
-        {availability.cancelCart&&view.cart.lines.length?<button type="button" className="destructive" onClick={()=>setCancelOpen(true)}>取消</button>:null}
+      {view.cart.lines.length?<div className="ordering-cart-secondary-actions active-cart">
+        {availability.holdCart?<button type="button" onClick={actions.onHoldCart}>暫存</button>:<span/>}
+        {availability.cancelCart?<button type="button" className="destructive" onClick={()=>setCancelOpen(true)}>取消</button>:<span/>}
+      </div>:view.heldCartCount>0?<div className="ordering-cart-secondary-actions empty-cart">
+        <button type="button" className="retrieve" onClick={actions.onOpenHeldOrders}>取回訂單 <b>{view.heldCartCount}</b></button>
       </div>:null}
       {!view.cart.checkoutEnabled?<DisabledReason>{checkoutReason}</DisabledReason>:null}
       <button type="button" className="ordering-checkout" disabled={!view.cart.checkoutEnabled} onClick={actions.onCheckout}>{view.cart.checkoutEnabled?`前往結帳 ${view.cart.totalLabel}`:'加入商品後前往結帳'}</button>
