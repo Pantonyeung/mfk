@@ -931,3 +931,48 @@
     transform:none!important;
   }
 }
+
+
+/* SMT R2 — order presentation controls live in the navigation rail */
+.clean-order-controls{
+  display:grid;
+  gap:5px;
+  padding:7px 4px;
+  border-top:1px solid #e5eaf0;
+  border-bottom:1px solid #e5eaf0;
+}
+.clean-order-controls button,
+.clean-order-controls>div{
+  width:100%;
+  min-height:42px;
+  padding:5px 3px;
+  display:grid;
+  justify-items:center;
+  align-content:center;
+  gap:1px;
+  border:1px solid transparent;
+  border-radius:9px;
+  background:#f7f9fb;
+  color:#344054;
+}
+.clean-order-controls button:hover{
+  border-color:#c8d8ec;
+  background:#eef5ff;
+}
+.clean-order-controls small{
+  color:#7a8797;
+  font-size:8px;
+  font-weight:850;
+  letter-spacing:.02em;
+}
+.clean-order-controls b{
+  font-size:11px;
+  line-height:1.05;
+}
+.clean-order-controls>div{
+  background:#f0f8f3;
+  color:#146c49;
+}
+@media(prefers-reduced-motion:reduce){
+  .clean-order-controls button{transition:none!important}
+}
