@@ -1,4 +1,7 @@
 import type {MfkLocalRuntime} from './local-runtime.ts';
+import {priceCustomerCart} from './customer-cloud-intake.ts';
+import {projectSyncedOrderingCatalog} from './admin-config-projection.ts';
+import {readSmtAdminConfigLkg} from './admin-config-sync.ts';
 import type {SmmLanOrderRequest,SmmLanOrderResponse,SmmLanSubmissionReadbackResponse} from '../../../contracts/smm-lan-v1.ts';
 
 const RESULT_KEY='mfk.v2local.smm-lan-results.v1';
@@ -32,14 +35,36 @@ export function createSmmLanIngress(runtime:MfkLocalRuntime){
         if(prior.idempotencyKey!==input.idempotencyKey)return rejected(input,'SMM_LAN_IDEMPOTENCY_CONFLICT');
         return Object.freeze({protocolVersion:1,type:'smm.lan.order.result.v1',requestId:input.requestId,submissionId:input.submissionId,idempotencyKey:input.idempotencyKey,disposition:'ACCEPTED',orderId:prior.orderId,canonicalRevision:prior.canonicalRevision});
       }
-      // No pricing is performed here. Current SMT Store Kernel remains the only
-      // place allowed to turn the intent into a formal Order.
+      // Recover the same canonical Order if the process stopped after Store
+      // Kernel commit but before the SMM result journal was written.
+      const providerRef='SMM:'+input.submissionId;
+      const recovered=runtime.orders().find(order=>order.providerRef===providerRef);
+      if(recovered){
+        const canonicalRevision=1;
+        writeResults([...results(),{submissionId:input.submissionId,orderId:recovered.id,canonicalRevision,idempotencyKey:input.idempotencyKey,requestId:input.requestId}]);
+        return Object.freeze({protocolVersion:1,type:'smm.lan.order.result.v1',requestId:input.requestId,submissionId:input.submissionId,idempotencyKey:input.idempotencyKey,disposition:'ACCEPTED',orderId:recovered.id,canonicalRevision});
+      }
+
+      const envelope=readSmtAdminConfigLkg();
+      if(!envelope)return rejected(input,'SMM_ADMIN_CONFIG_REQUIRED');
+      const catalog=projectSyncedOrderingCatalog('takeaway',envelope);
+      const priced=priceCustomerCart(input.lines.map(line=>Object.freeze({
+        lineId:line.lineId,
+        productId:line.productId,
+        productName:line.productName,
+        quantity:line.quantity,
+        ...(line.selectedVariationId?{selectedVariationId:line.selectedVariationId}:{}),
+        ...(line.selectedVariationName?{selectedVariationName:line.selectedVariationName}:{}),
+        selections:line.selections,
+        createdAt:new Date().toISOString(),
+      })),catalog.products);
+
       const order=runtime.createOrder({
-        items:input.lines.map(line=>({id:line.productId,name:line.productName,qty:line.quantity,unitMinor:0,detail:line.selections.map(x=>x.optionName).join('／')})),
-        totalMinor:0,
+        items:priced.items,
+        totalMinor:priced.totalMinor,
         paymentLabel:'待結帳',
         sourceLabel:'SMM',
-        providerRef:'SMM:'+input.submissionId,
+        providerRef,
         initialFulfillmentLabel:'待處理',
       });
       const canonicalRevision=1;
