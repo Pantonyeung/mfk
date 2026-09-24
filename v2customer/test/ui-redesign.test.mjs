@@ -9,6 +9,7 @@ const srcRoot=path.resolve(testDir,'../src');
 const app=fs.readFileSync(path.join(srcRoot,'App.tsx'),'utf8');
 const primitives=fs.readFileSync(path.join(srcRoot,'ui/primitives.tsx'),'utf8');
 const styles=fs.readFileSync(path.join(srcRoot,'styles.css'),'utf8');
+const recommendation=fs.readFileSync(path.join(srcRoot,'recommendation.ts'),'utf8');
 
 test('shared interaction primitives expose distinct transaction states',()=>{
   for(const state of['loading','pending','success','error','unknown','disabled']){
