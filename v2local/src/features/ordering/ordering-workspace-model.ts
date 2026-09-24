@@ -80,6 +80,8 @@ export interface OrderingWorkspaceViewModel {
   readonly selectedCategoryId:string;
   readonly categoryRows:1|2;
   readonly categoryColumns:5|6|7;
+  readonly showProductImages:boolean;
+  readonly productDensity:'standard'|'compact';
   readonly products:readonly OrderingProductViewModel[];
   readonly menuRevisionLabel?:string;
   readonly operationalNotice?:string;
@@ -88,6 +90,7 @@ export interface OrderingWorkspaceViewModel {
   readonly showCategories?:boolean;
   readonly serviceModes?:Readonly<{takeaway:boolean;dineIn:boolean}>;
   readonly cart:OrderingCartViewModel;
+  readonly heldCartCount:number;
   readonly workItems:readonly OrderingWorkItemViewModel[];
   readonly recentlyAddedProductId?:string;
   readonly highlightedCartLineId?:string;
@@ -106,6 +109,8 @@ export interface OrderingWorkspaceActions {
   readonly onAdjustLineQuantity:(lineIds:readonly string[],delta:-1|1)=>void;
   readonly onEditCartLine:(lineId:string)=>void;
   readonly onHoldCart:()=>void;
+  readonly onOpenHeldOrders:()=>void;
+  readonly onRemoveCartLine:(lineIds:readonly string[])=>void;
   readonly onCancelCart:()=>void;
   readonly onOpenWorkItem:(workItemId:OrderingWorkItemViewModel['id'])=>void;
   readonly onOpenQueueOrder:(kind:'pending'|'active',id:string)=>void;
