@@ -248,6 +248,8 @@ export function App(){
     if(submitting)return;
     if(cart.length===0){setNotice('記憶罐未有商品。');return}
     if(checkout.phone.replace(/\D/g,'').length<8){setNotice('請輸入至少 8 位電話號碼。');return}
+    if(checkout.paymentMethod==='ELECTRONIC'&&!checkout.paymentEvidence){setNotice('電子支付需要先選擇付款截圖，店舖核對後先會確認付款。');return}
+    if(checkout.paymentMethod==='ELECTRONIC'&&checkout.paymentEvidence?.state==='LOCAL_PENDING_UPLOAD'){setNotice('付款截圖正式上載通道仍未接通；目前唔會假裝付款證明已提交。');return}
     const cartFingerprint=JSON.stringify(cart);
     let existing=pendingIntents.find(item=>
       (item.state==='DRAFT'||item.state==='NOT_CONNECTED'||item.state==='UNKNOWN')&&
