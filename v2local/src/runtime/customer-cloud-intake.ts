@@ -154,6 +154,23 @@ export function readCustomerCloudIntakeAttention(){
   }catch{return Object.freeze([]);}
 }
 
+export async function readCustomerPaymentEvidence(evidenceRef:string):Promise<Blob>{
+  const ref=String(evidenceRef||'').trim();
+  if(!ref.startsWith('customer-payment/MF01/'))throw new Error('PAYMENT_EVIDENCE_REF_INVALID');
+  const deviceId=readSmtDeviceId();
+  const response=await fetch(
+    ENDPOINT+'/api/customer/smt/payment-evidence?storeId=MF01&deviceId='+encodeURIComponent(deviceId)+'&ref='+encodeURIComponent(ref),
+    {cache:'no-store'},
+  );
+  if(!response.ok){
+    const body=await response.json().catch(()=>({})) as {code?:string};
+    throw new Error(body.code||'PAYMENT_EVIDENCE_HTTP_'+response.status);
+  }
+  const contentType=String(response.headers.get('content-type')||'').toLowerCase();
+  if(!contentType.startsWith('image/'))throw new Error('PAYMENT_EVIDENCE_CONTENT_TYPE_INVALID');
+  return response.blob();
+}
+
 function activeCatalog(){
   const envelope=readSmtAdminConfigLkg();
   if(!envelope)throw new Error('CUSTOMER_ADMIN_CONFIG_REQUIRED');
