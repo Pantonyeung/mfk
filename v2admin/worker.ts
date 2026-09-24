@@ -77,6 +77,7 @@ function customerPublicSnapshot(active,customerOrders=[]){
             optionId:String(option.id||option.code||''),
             name:String(option.name||option.id||option.code||''),
             available:option.active!==false,
+            publishedAdjustmentMinor:minorFromMoney(option.priceAdjustment),
             position:Number(option.position||0),
           }})
           .filter(option=>option.optionId&&option.name&&option.available)
@@ -102,7 +103,7 @@ function customerPublicSnapshot(active,customerOrders=[]){
         name:String(item.name||productId),
         description:String(item.description||''),
         available:item.active!==false&&sellability.sellable!==false&&priceReady,
-        ...(priceReady?{displayPriceLabel:moneyLabel(baseMinor+takeawayMinor)}:{}),
+        ...(priceReady?{displayPriceLabel:moneyLabel(baseMinor+takeawayMinor),publishedUnitPriceMinor:baseMinor+takeawayMinor}:{}),
         ...(imageUrl?{imageUrl,imageAlt:String(item.name||productId)}:{}),
         optionGroups,
         position:Number(item.legacySourcePosition??item.position??0),
