@@ -248,9 +248,26 @@ export function App(){
     if(submitting)return;
     if(cart.length===0){setNotice('記憶罐未有商品。');return}
     if(checkout.phone.replace(/\D/g,'').length<8){setNotice('請輸入至少 8 位電話號碼。');return}
-    let existing=pendingIntents.find(item=>item.state==='DRAFT'||item.state==='NOT_CONNECTED'||item.state==='UNKNOWN');
+    const cartFingerprint=JSON.stringify(cart);
+    let existing=pendingIntents.find(item=>
+      (item.state==='DRAFT'||item.state==='NOT_CONNECTED'||item.state==='UNKNOWN')&&
+      JSON.stringify(item.cart)===cartFingerprint
+    );
     setSubmitting(true);
     try{
+      const staleUnknowns=pendingIntents.filter(item=>item.state==='UNKNOWN'&&JSON.stringify(item.cart)!==cartFingerprint);
+      if(staleUnknowns.length&&port?.readSubmission){
+        const resolvedIds:string[]=[];
+        for(const priorIntent of staleUnknowns){
+          const prior=await port.readSubmission(priorIntent.submissionId);
+          if(prior.state==='CONFIRMED')resolvedIds.push(priorIntent.submissionId);
+        }
+        if(resolvedIds.length){
+          const nextPending=pendingIntents.filter(item=>!resolvedIds.includes(item.submissionId));
+          setPendingIntents(nextPending);
+          persist({pendingIntents:nextPending});
+        }
+      }
       if(existing?.state==='UNKNOWN'&&port?.readSubmission){
         const prior=await port.readSubmission(existing.submissionId);
         if(prior.state==='CONFIRMED'){
@@ -260,7 +277,7 @@ export function App(){
           existing=undefined;
         }else{
           saveIntent(Object.freeze({...existing,state:'UNKNOWN',updatedAt:nowIso(),lastMessage:prior.message}));
-          setNotice('上一張訂單結果仍未確認；已先查詢原本 Submission ID，冇建立重複訂單。');
+          setNotice('呢一張訂單嘅原提交結果仍未確認；已查詢同一 Submission ID，冇重複提交。');
           return;
         }
       }
