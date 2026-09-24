@@ -347,3 +347,81 @@ B. continue presentation/operations polish while runtime firewall stays frozen.
 
 Until then:
 PASSABLE GREEN / NOT CLOSED.
+
+
+==================================================
+PHASE A｜LOCAL DURABILITY｜GREEN
+==================================================
+
+Owner authorization:
+A = local durability runtime contract cut.
+No authorization to merge main.
+
+Exact product candidate:
+6e7aee10dedeb57499354e9fc0aed22f86d3b35b
+
+New contract:
+contracts/order-line-composition-v1.ts
+
+Now preserved locally:
+- original cart line identity
+- optionSelections
+- freeNote
+- Combo id / name
+- pairing label A/B/C...
+- pairing source AUTO / SPECIFIED
+- Combo component snapshots
+- resolved choices
+- pending groups
+- per-line serviceMode / detail
+
+Durability path:
+Cart
+→ Hold
+→ JSON persistence / restart-compatible record
+→ Restore
+→ Fast Lane edit/fill/dissolve
+→ Checkout
+→ StoredOrder
+→ local readback
+
+Formal checkout guard:
+FAST_LANE_FORMAL_ORDER_PENDING_REQUIRED
+
+Authority rule:
+composition = audit/reconstruction metadata only.
+Existing Cart / totalMinor remains money authority.
+Composition must never recalculate total.
+
+Legacy compatibility:
+Hold / StoredOrder records without composition remain readable.
+
+Cloud boundary:
+projection-outbox.ts UNCHANGED
+D1 projection UNCHANGED
+Phase B NOT STARTED
+
+Validation:
+GitHub Actions 35997281227 SUCCESS
+Job 107625104348
+28 / 28 Test Files PASS
+122 / 122 Tests PASS
+Build GREEN
+Worker d4e24a13-652a-4b7b-9014-f5fd409bf91e
+Preview:
+https://smt-donor-v2-r1-durability-mfk-admin.yeungyi88.workers.dev
+
+Preview PR:
+#258 CLOSED / NOT MERGED
+
+Main:
+NOT MERGED
+
+Production:
+UNCHANGED
+
+Status:
+MFK_SMT_DONOR_SKELETON_FUSION_V2_R1_PHASE_A_LOCAL_DURABILITY_GREEN_OWNER_ACCEPTANCE_PENDING
+
+HARD RULE:
+未經 Owner 驗收，不准 merge main。
