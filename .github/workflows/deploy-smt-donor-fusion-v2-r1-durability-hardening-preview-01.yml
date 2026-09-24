@@ -1,0 +1,32 @@
+name: deploy-smt-donor-fusion-v2-r1-durability-hardening-preview-01
+
+on:
+  pull_request:
+    branches:
+      - work/MFK/SMT-DONOR-SKELETON-FUSION-V2-R1
+
+permissions:
+  contents: read
+
+jobs:
+  preview:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: v2local
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: npm install --no-audit --no-fund --legacy-peer-deps --package-lock=false
+      - run: npm test
+      - run: npm run build
+      - name: Upload SMT Durability hardening preview
+        run: npx --yes wrangler@latest versions upload --name mfk-admin --preview-alias smt-donor-v2-r1-durability-hardening
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      - name: Verify preview
+        run: curl --retry 5 --retry-delay 2 --fail --silent --show-error --head https://smt-donor-v2-r1-durability-hardening-mfk-admin.yeungyi88.workers.dev
