@@ -3,7 +3,7 @@ import {NavLink,Navigate,Route,Routes,useNavigate} from 'react-router';
 import {useLocation} from 'react-router';
 import {ProductionViewport} from './app/ProductionViewport.tsx';
 import {OrderingWorkspace} from './features/ordering/OrderingWorkspace.tsx';
-import type {OrderingWorkspaceActions,OrderingWorkspaceViewModel,ServiceMode} from './features/ordering/ordering-workspace-model.ts';
+import {deriveOrderingGuidance,type OrderingWorkspaceActions,type OrderingWorkspaceViewModel,type ServiceMode} from './features/ordering/ordering-workspace-model.ts';
 import {CheckoutWorkspace} from './features/checkout/CheckoutWorkspace.tsx';
 import type {CheckoutChannelId,CheckoutTenderId,CheckoutWorkspaceActions,CheckoutWorkspaceViewModel} from './features/checkout/checkout-workspace-model.ts';
 import {RuntimeOrdersWorkspace} from './presentation/RuntimeOrdersWorkspace.tsx';
@@ -221,7 +221,7 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
   const requiredBlockers=requiredWork.length;
   const comboBlockers=comboBlockingCount(cart);
   const fastLaneBlockers=requiredBlockers+comboBlockers;
-  const pendingDrinkTargets=cart.flatMap(line=>{
+  const pendingDrinkTargetsFor=(lines:readonly FastLaneCartLine[])=>lines.flatMap(line=>{
     const draft=line.comboDraft;
     if(!draft)return [];
     const combo=comboData.combos.find(row=>row.id===draft.comboId&&row.active);
@@ -234,6 +234,7 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
         return slot?[{comboLine:line,group,slot}]:[];
       });
   });
+  const pendingDrinkTargets=pendingDrinkTargetsFor(cart);
   const quickDrinkTarget=pendingDrinkTargets[0];
   const quickDrinkChoices=(quickDrinkTarget?.slot.choices??[]).map(choice=>{
     const product=choice.productId?products.find(row=>row.id===choice.productId):undefined;
@@ -286,6 +287,44 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
     );
   })();
 
+  const checkoutEnabled=cart.length>0&&fastLaneBlockers===0&&((serviceMode==='takeaway'&&storeSettings.takeawayEnabled)||(serviceMode==='dine-in'&&storeSettings.dineInEnabled));
+  const guidanceTarget=deriveOrderingGuidance({
+    cartItemCount:cart.reduce((sum,line)=>sum+line.qty,0),
+    requiredCount:requiredBlockers,
+    pendingDrinkCount:pendingDrinkTargets.length,
+    comboBlockingCount:comboBlockers,
+    autoPairCount,
+    checkoutEnabled,
+  });
+
+  const guideAfterStructuredChange=(next:readonly FastLaneCartLine[])=>{
+    const nextRequired=requiredTasks(next,fastLaneProducts);
+    if(nextRequired.length){
+      setQuickDrinkOpen(false);
+      setPanel({type:'fast-lane',lane:'required'});
+      return;
+    }
+    const nextDrinks=pendingDrinkTargetsFor(next);
+    if(nextDrinks.length){
+      setPanel(null);
+      setQuickDrinkOpen(true);
+      return;
+    }
+    if(comboBlockingCount(next)>0){
+      setQuickDrinkOpen(false);
+      setPanel({type:'fast-lane',lane:'combo'});
+      return;
+    }
+    const nextPlans=buildAutoPairingPlans(next,primaryCombo,comboData.pools,fastLaneProducts,nextPairingIndex(next));
+    if(nextPlans.length){
+      setQuickDrinkOpen(false);
+      setPanel({type:'fast-lane',lane:'riceball-pool'});
+      return;
+    }
+    setQuickDrinkOpen(false);
+    setPanel(null);
+  };
+
   const view:OrderingWorkspaceViewModel={
     pendingOrders,activeOrders,categories,selectedCategoryId:category,
     products:visible.map(product=>({
@@ -310,7 +349,7 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
       orderId:nextDisplay,serviceMode,viewMode,combineSimilar,
       lines:presentationCart,
       subtotalLabel:money(total),packagingLabel:'$0.00',discountLabel:'$0.00',totalLabel:money(total),
-      checkoutEnabled:cart.length>0&&fastLaneBlockers===0&&((serviceMode==='takeaway'&&storeSettings.takeawayEnabled)||(serviceMode==='dine-in'&&storeSettings.dineInEnabled)),
+      checkoutEnabled,
       blockingMessage:fastLaneBlockers>0?'仍有 '+fastLaneBlockers+' 項必選／套餐待補；完成後先可結帳':undefined,
     },
     orderingMode,
@@ -334,6 +373,7 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
       cancelCart:cart.length>0,
     },
     recentlyAddedProductId:recent,highlightedCartLineId:highlight,cartPulseNonce:pulse,
+    guidanceTarget,
   };
 
   const add=(id:string)=>{
@@ -341,10 +381,15 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
     const base:CartLine={id:nextLocalCartLineId(),productId:product.id,name:product.name,qty:1,unitMinor:product.priceMinor,serviceMode};
     const fastProduct=fastLaneProducts.find(item=>item.id===product.id);
     const line=fastProduct?rebuildConfiguredLine(base,fastProduct,defaultSelectionsForProduct(fastProduct),''):base;
-    setCart([...cart,line]);
+    const next=[...cart,line];
+    setCart(next);
     setRecent(id);
     setHighlight(line.id);
     setPulse(value=>value+1);
+    if(orderingMode==='quick'&&requiredTasks(next,fastLaneProducts).length){
+      setQuickDrinkOpen(false);
+      setPanel({type:'fast-lane',lane:'required'});
+    }
     window.setTimeout(()=>{setRecent(undefined);setHighlight(undefined)},700);
   };
 
@@ -364,34 +409,33 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
 
   const applyRequired=(lineId:string,groupId:string,optionIds:readonly string[])=>{
     const next=applyRequiredSelection(cart,fastLaneProducts,lineId,groupId,optionIds);
-    setCart(next);setHighlight(lineId);setPulse(value=>value+1);
+    setCart(next);setHighlight(lineId);setPulse(value=>value+1);guideAfterStructuredChange(next);
   };
   const applyOnePair=(plan:FastLanePairPlan)=>{
     const next=applyPairingPlan(cart,plan,comboData.combos,comboData.pools,fastLaneProducts,nextLocalCartLineId);
-    setCart(next);setPulse(value=>value+1);
+    setCart(next);setPulse(value=>value+1);guideAfterStructuredChange(next);
   };
   const applyAutoPairs=(plans:readonly FastLanePairPlan[])=>{
     let next:readonly FastLaneCartLine[]=cart;
     for(const plan of plans)next=applyPairingPlan(next,plan,comboData.combos,comboData.pools,fastLaneProducts,nextLocalCartLineId);
-    setCart([...next]);setPulse(value=>value+1);
+    setCart([...next]);setPulse(value=>value+1);guideAfterStructuredChange(next);
   };
   const fillComboPending=(comboLineId:string,groupId:string,choiceId:string,sourceLineId?:string)=>{
     const next=fillPendingComboGroup(cart,comboLineId,groupId,choiceId,sourceLineId,comboData.combos,comboData.pools,fastLaneProducts);
-    setCart(next);setHighlight(comboLineId);setPulse(value=>value+1);
+    setCart(next);setHighlight(comboLineId);setPulse(value=>value+1);guideAfterStructuredChange(next);
   };
   const dissolveCombo=(comboLineId:string)=>{
     setCart(dissolveComboLine(cart,comboLineId,nextLocalCartLineId));setPulse(value=>value+1);
   };
   const fillQuickDrinkConfigured=(comboLineId:string,groupId:string,choiceId:string,configuredLine:CartLine)=>{
     const next=fillPendingComboGroupFromConfiguredProduct(cart,comboLineId,groupId,choiceId,configuredLine,comboData.combos,comboData.pools,fastLaneProducts);
-    setCart(next);setHighlight(comboLineId);setPulse(value=>value+1);setQuickDrinkOpen(false);setPanel(null);
+    setCart(next);setHighlight(comboLineId);setPulse(value=>value+1);guideAfterStructuredChange(next);
   };
   const selectQuickDrink=(choiceId:string)=>{
     const target=quickDrinkTarget;if(!target)return;
     const choice=target.slot.choices.find(row=>row.id===choiceId);if(!choice)return;
     if(choice.type!=='PRODUCT'){
       fillComboPending(target.comboLine.id,target.group.groupId,choice.id);
-      setQuickDrinkOpen(false);
       return;
     }
     const product=products.find(row=>row.id===choice.productId);
