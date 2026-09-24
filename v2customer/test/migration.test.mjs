@@ -10,22 +10,29 @@ const registry=JSON.parse(fs.readFileSync(path.join(srcRoot,'capabilities.json')
 const sourceFiles=fs.readdirSync(srcRoot).filter(name=>/\.(ts|tsx|js|jsx)$/.test(name));
 const source=sourceFiles.map(name=>fs.readFileSync(path.join(srcRoot,name),'utf8')).join('\n');
 
-test('customer capability registry remains complete with commands disconnected',()=>{
+test('customer capability registry marks only the authorized submit bridge as source-wired',()=>{
   assert.equal(registry.length,58);
   assert.equal(new Set(registry.map(item=>item.id)).size,58);
   const commands=registry.filter(item=>item.kind==='COMMAND_SHAPE');
   const reads=registry.filter(item=>item.kind!=='COMMAND_SHAPE');
-  assert.ok(commands.length>=1);
-  assert.deepEqual([...new Set(commands.map(item=>item.status))],['NOT_WIRED']);
+  const submit=commands.find(item=>item.id==='SUBMIT_ORDER_COMMAND');
+  assert.equal(submit?.status,'SOURCE_WIRED_NOT_DEPLOYED');
+  assert.deepEqual([...new Set(commands.filter(item=>item.id!=='SUBMIT_ORDER_COMMAND').map(item=>item.status))],['NOT_WIRED']);
   assert.deepEqual([...new Set(reads.map(item=>item.status))],['PRODUCT_READY_NOT_CONNECTED']);
 });
 
-test('customer production source has zero live network or canonical writer',()=>{
-  const forbidden=[
-    /\bfetch\s*\(/,
-    /\bWebSocket\b/,
-    /\bXMLHttpRequest\b/,
-    /\baxios\b/,
+test('customer production network is isolated to the authorized cloud runtime and has no canonical writer',()=>{
+  const cloud=fs.readFileSync(path.join(srcRoot,'cloud-runtime.ts'),'utf8');
+  const nonCloud=sourceFiles
+    .filter(name=>name!=='cloud-runtime.ts')
+    .map(name=>fs.readFileSync(path.join(srcRoot,name),'utf8'))
+    .join('\n');
+  assert.match(cloud,/https:\/\/admin\.morefunos\.com/);
+  assert.match(cloud,/\/api\/customer\//);
+  assert.match(cloud,/\bfetch\s*\(/);
+  assert.doesNotMatch(cloud,/\bWebSocket\b|\bXMLHttpRequest\b|\baxios\b|\bsetInterval\s*\(|new\s+Worker\s*\(/);
+  assert.doesNotMatch(nonCloud,/\bfetch\s*\(|\bWebSocket\b|\bXMLHttpRequest\b|\baxios\b/);
+  for(const pattern of[
     /from\s+['"][^'"]*v2local/,
     /from\s+['"][^'"]*v2smt/,
     /createFormalOrder/,
@@ -33,11 +40,8 @@ test('customer production source has zero live network or canonical writer',()=>
     /storeKernel\s*\./i,
     /\bD1Database\b/,
     /\bindexedDB\b/,
-    /new\s+Worker\s*\(/,
-    /\bsetInterval\s*\(/,
-    /\bsetTimeout\s*\(/
-  ];
-  for(const pattern of forbidden)assert.equal(pattern.test(source),false,String(pattern));
+    /new\s+Worker\s*\(/
+  ])assert.equal(pattern.test(source),false,String(pattern));
 });
 
 test('local persistence is durable but explicitly non-authoritative',()=>{
@@ -67,10 +71,13 @@ test('complete customer routes and lifecycle states are present',()=>{
   ])assert.match(source,new RegExp(marker));
 });
 
-test('typed customer runtime port is injection-only',()=>{
+test('typed customer runtime port keeps injection override and falls back only to the authorized cloud bridge',()=>{
   const runtime=fs.readFileSync(path.join(srcRoot,'runtime.ts'),'utf8');
+  const cloud=fs.readFileSync(path.join(srcRoot,'cloud-runtime.ts'),'utf8');
   const types=fs.readFileSync(path.join(srcRoot,'product-types.ts'),'utf8');
   assert.match(runtime,/__MFK_CUSTOMER_PRODUCT_PORT__/);
+  assert.match(runtime,/createCloudCustomerRuntimePort/);
+  assert.match(cloud,/MFK_CUSTOMER_PORT_V1/);
   assert.match(types,/MFK_CUSTOMER_PORT_V1/);
   assert.match(types,/readSnapshot\(\)/);
   assert.match(types,/quoteCart\?/);

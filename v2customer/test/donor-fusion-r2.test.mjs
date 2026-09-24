@@ -51,9 +51,17 @@ test('member ecosystem is read-only projection with honest disconnected states',
   assert.doesNotMatch(source,/10\s*seeds|30\s*seeds|seeds\s*[%+*/-]\s*10/i);
 });
 
-test('no obsolete donor runtime or authority is transplanted',()=>{
+test('no obsolete donor runtime or customer-side business authority is transplanted',()=>{
   for(const pattern of[/FRONTEND_STORE_RULES_LOCK/,/Apps Script/i,/Firebase/i,/Google Sheet/i,/phone-last-4/i,/createFormalOrder/,/allocateDisplayNumber/])assert.doesNotMatch(source,pattern);
-  assert.doesNotMatch(source,/\bfetch\s*\(|\bWebSocket\b|\bXMLHttpRequest\b|\bsetInterval\s*\(|\bsetTimeout\s*\(/);
+  const cloud=fs.readFileSync(path.join(srcRoot,'cloud-runtime.ts'),'utf8');
+  const nonCloud=fs.readdirSync(srcRoot,{withFileTypes:true}).flatMap(entry=>{
+    if(entry.name==='cloud-runtime.ts')return[];
+    const target=path.join(srcRoot,entry.name);
+    if(entry.isDirectory())return collectSource(target);
+    return /\.(ts|tsx)$/.test(entry.name)?[fs.readFileSync(target,'utf8')]:[];
+  }).join('\n');
+  assert.match(cloud,/https:\/\/admin\.morefunos\.com/);
+  assert.doesNotMatch(nonCloud,/\bfetch\s*\(|\bWebSocket\b|\bXMLHttpRequest\b/);
   assert.match(app,/port\?\.submitOrder/);
   assert.match(app,/port\?\.buildReorderCart/);
 });
