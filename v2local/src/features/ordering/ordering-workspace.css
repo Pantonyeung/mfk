@@ -1208,3 +1208,20 @@
 @media(prefers-reduced-motion:reduce){
   .ordering-feedback-stack .smt-action-feedback{animation:none!important}
 }
+
+
+/* R3 hard rule: never let product cards stretch beyond five visible rows. */
+.ordering-product-grid{
+  flex:0 1 auto!important;
+  max-height:746px;
+}
+.ordering-workspace.density-compact .ordering-product-grid{
+  max-height:616px;
+}
+.ordering-workbar{
+  margin-top:auto;
+}
+@media(max-width:1350px){
+  .ordering-product-grid{max-height:676px}
+  .ordering-workspace.density-compact .ordering-product-grid{max-height:566px}
+}
