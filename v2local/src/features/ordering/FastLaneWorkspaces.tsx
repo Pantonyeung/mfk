@@ -194,7 +194,7 @@ export function ComboFastLaneWorkspace({
                 if(choice.type!=='PRODUCT'){
                   return [<button type="button" key={choice.id} onClick={()=>onFillPending(line.id,group.groupId,choice.id)}>{choice.label}<ChoicePrice minor={choice.priceAdjustmentMinor}/></button>];
                 }
-                const matches=cart.filter(candidate=>!candidate.comboDraft&&candidate.productId===choice.productId);
+                const matches=cart.filter(candidate=>!candidate.comboDraft&&candidate.productId===choice.productId&&requiredTasks([candidate],products).length===0);
                 return matches.map(candidate=><button type="button" key={choice.id+':'+candidate.id} onClick={()=>onFillPending(line.id,group.groupId,choice.id,candidate.id)}>{candidate.name}{candidate.qty>1?' ×'+candidate.qty:''}<ChoicePrice minor={choice.priceAdjustmentMinor}/></button>);
               })}</div>
             </div>;
@@ -216,7 +216,7 @@ export function ComboFastLaneWorkspace({
               if(choice.type!=='PRODUCT'){
                 return [<button type="button" key={choice.id} className={value?.choiceId===choice.id?'active':''} onClick={()=>select(slot.groupId,{choiceId:choice.id})}><b>{choice.label}</b><ChoicePrice minor={choice.priceAdjustmentMinor}/></button>];
               }
-              const matches=cart.filter(line=>!line.comboDraft&&line.productId===choice.productId);
+              const matches=cart.filter(line=>!line.comboDraft&&line.productId===choice.productId&&requiredTasks([line],products).length===0);
               return matches.map(line=><button type="button" key={choice.id+':'+line.id} className={value?.choiceId===choice.id&&value?.sourceLineId===line.id?'active':''} onClick={()=>select(slot.groupId,{choiceId:choice.id,sourceLineId:line.id})}><b>{line.name}</b><small>{line.qty>1?'Cart ×'+line.qty:'Cart 1件'}</small><ChoicePrice minor={choice.priceAdjustmentMinor}/></button>);
             })}
             {slot.role==='DRINK'?<button type="button" className={value?.deferred?'active defer':''} onClick={()=>select(slot.groupId,{deferred:true})}><b>飲品稍後補</b><small>保留待補狀態</small></button>:null}
