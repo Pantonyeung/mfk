@@ -5,7 +5,9 @@ import {
   comboDraftCount,
   comboSlots,
   countMainCourseUnits,
+  countRiceballCandidateUnits,
   nextPairingIndex,
+  riceballMealCombos,
   pairingLabel,
   requiredTasks,
   type FastLaneCartLine,
@@ -108,16 +110,25 @@ export function RiceballPoolWorkspace({
   pools:readonly SyncedComboPool[];
   onAutoPair:(plans:readonly FastLanePairPlan[])=>void;
 }){
-  const active=combos.filter(combo=>combo.active);
+  const active=riceballMealCombos(combos,pools,products);
   const [selectedComboId,setSelectedComboId]=useState(active[0]?.id??'');
   const combo=active.find(row=>row.id===selectedComboId)??active[0];
   const start=nextPairingIndex(cart);
   const plans=useMemo(()=>buildAutoPairingPlans(cart,combo,pools,products,start),[cart,combo,pools,products,start]);
-  const mainUnits=countMainCourseUnits(cart,active,pools,products);
+  const configuredMainUnits=countMainCourseUnits(cart,active,pools,products);
+  const mainUnits=Math.max(configuredMainUnits,countRiceballCandidateUnits(cart,products));
   const previewLabels=Array.from({length:mainUnits},(_,index)=>pairingLabel(start+index));
   const planByLabel=new Map(plans.map(plan=>[plan.pairingLabel,plan] as const));
 
-  if(!combo)return <div className="fast-lane"><div className="fast-empty"><b>未有套餐規則</b><span>Admin 暫時未發布可用 Combo。</span></div></div>;
+  if(!combo)return <div className="fast-lane">
+    <header className="fast-lane-title">
+      <div><small>RICEBALL MEAL</small><h2>飯團待組區</h2><p>飯團會先保留 A／B／C… 組別；未有 Admin 飯團餐規則之前唔會自行計價或建立套餐。</p></div>
+      <strong>{mainUnits} 件主餐</strong>
+    </header>
+    {previewLabels.length?<div className="fast-plan-grid">{previewLabels.map(label=><article className="fast-plan-card pending" key={label}><strong>{label} 組</strong><div><span><small>飯團餐</small><b>等待飯團餐規則</b></span><span><small>狀態</small><b>未建立套餐</b></span></div></article>)}</div>
+      :<div className="fast-empty compact"><b>未有飯團待組</b><span>加入飯團後，A／B／C… 組別會先出現；規則未發布時唔會自動組餐。</span></div>}
+    <footer className="fast-sticky-action"><span>Admin 未發布有效「飯團＋小食＋飲品」規則；只保留組別，唔執行組餐。</span><button type="button" disabled>等待飯團餐規則</button></footer>
+  </div>;
 
   return <div className="fast-lane">
     <header className="fast-lane-title">
@@ -155,7 +166,7 @@ export function ComboFastLaneWorkspace({
   onDissolve:(comboLineId:string)=>void;
   onDirtyChange?:(dirty:boolean)=>void;
 }){
-  const active=combos.filter(combo=>combo.active);
+  const active=riceballMealCombos(combos,pools,products);
   const [selectedComboId,setSelectedComboId]=useState(active[0]?.id??'');
   const [selected,setSelected]=useState<Record<string,SpecifiedSelection>>({});
   const combo=active.find(row=>row.id===selectedComboId)??active[0];
