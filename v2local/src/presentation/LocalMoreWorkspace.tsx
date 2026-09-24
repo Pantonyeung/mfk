@@ -234,11 +234,17 @@ function PrinterPanel(){
       else if(kind==='test')result=await testLanPrinter(printer);
       else{
         if(current.capability==='label-58mm'){
-          const bytes=await renderTscRasterLabel({
-            orderCode:'MFK TEST',
+          const bytes=await renderTscRasterLabel(current.role==='袋標籤'?{
+            kind:'bag',
+            orderCode:'P0019',
+            primaryText:'共 2 件',
+            secondaryText:'共 2 件',
+          }:{
+            kind:'product',
+            orderCode:'P0017',
             primaryText:current.name,
-            secondaryText:current.role==='產品標籤'?productLabelPurpose(current):'50×40 · TSC',
-            pieceLabel:'1/1',
+            secondaryText:productLabelPurpose(current),
+            pieceLabel:'1/2',
           });
           result=await printBytesLan({...printer,bytes});
         }else{
@@ -386,6 +392,16 @@ function DayClosePanel({revision,onSaved}:{revision:number;onSaved:()=>void}){
     setCounts(current=>({...current,[String(value)]:Math.floor(numeric/value)}));
   };
 
+  const printClose=async(target:LocalDayClose)=>{
+    setMessage('日結單打印中…');
+    try{
+      await localRuntime.printDailyClose(target.businessDate);
+      setMessage('日結單已送到顧客小票打印機。');
+    }catch(error){
+      setMessage('日結單打印失敗：'+(error instanceof Error?error.message:'PRINT_FAILED'));
+    }
+  };
+
   const close=()=>{
     if(latest){setCompletion(latest);setMessage('今日已經完成日結；正常日結唔會再建立新版本。');return;}
     if(!openingRecord){setMessage('今日未確認開更現金；請重新進入 SMT 完成開更現金確認。');return;}
@@ -429,6 +445,8 @@ function DayClosePanel({revision,onSaved}:{revision:number;onSaved:()=>void}){
       <article><span>差額</span><b>{money(latest.cashDifferenceMinor)}</b></article>
     </div>
     <div className="fusion-note">記錄 ID：{latest.id}。如日後需要更正，會走獨立日結更正權限流程，唔會再用正常日結按鈕新增版本。</div>
+    <div className="more-tab-row"><button type="button" className="more-primary" onClick={()=>void printClose(latest)}>打印日結單</button></div>
+    {message?<p role="status" className="fusion-status">{message}</p>:null}
   </section>;
 
   return <section className="more-panel dayclose-panel">

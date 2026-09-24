@@ -23,7 +23,18 @@ export interface PrintableOrder{
   readonly totalMinor:number;
   readonly paymentLabel:string;
   readonly sourceLabel:string;
-  readonly items:readonly {readonly id:string;readonly name:string;readonly qty:number;readonly unitMinor:number;readonly serviceMode?:'takeaway'|'dine-in'}[];
+  readonly providerPickupCode?:string;
+  readonly orderRemark?:string;
+  readonly utensilPreference?:'需要'|'不需要';
+  readonly items:readonly {
+    readonly id:string;
+    readonly name:string;
+    readonly qty:number;
+    readonly unitMinor:number;
+    readonly serviceMode?:'takeaway'|'dine-in';
+    readonly productCode?:string;
+    readonly detail?:string;
+  }[];
 }
 
 export interface PlannedPrintJob{
@@ -80,37 +91,158 @@ export function groupTscBitmapJobsByPhysicalPrinter(plan:readonly PlannedPrintJo
 const money=(minor:number)=>'$'+(Math.max(0,Number(minor)||0)/100).toFixed(2);
 const clean=(value:string)=>String(value??'').replace(/[\r\n]+/g,' ').trim();
 
-function receipt(order:PrintableOrder){
-  return '\x1b\x40'
-    +'磨飯 MFK\n'
-    +order.display+'\n'
-    +'------------------------------\n'
-    +order.items.map(item=>clean(item.name)+' x'+item.qty+'  '+money(item.unitMinor*item.qty)).join('\n')
-    +'\n------------------------------\n'
-    +'TOTAL '+money(order.totalMinor)+'\n'
-    +clean(order.paymentLabel)+'\n'
-    +new Date(order.createdAt).toLocaleString('zh-HK')
-    +'\n\n\n';
+const ESC='\x1b';
+const GS='\x1d';
+const INIT=ESC+'@';
+const LEFT=ESC+'a'+String.fromCharCode(0);
+const CENTER=ESC+'a'+String.fromCharCode(1);
+const BOLD_ON=ESC+'E'+String.fromCharCode(1);
+const BOLD_OFF=ESC+'E'+String.fromCharCode(0);
+const REVERSE_ON=GS+'B'+String.fromCharCode(1);
+const REVERSE_OFF=GS+'B'+String.fromCharCode(0);
+const NORMAL=GS+'!'+String.fromCharCode(0);
+const DOUBLE=GS+'!'+String.fromCharCode(0x11);
+const TRIPLE=GS+'!'+String.fromCharCode(0x22);
+const RULE='------------------------------------------\n';
+
+function hktDateTime(iso:string){
+  const date=new Date(iso);
+  const parts=new Intl.DateTimeFormat('en-CA',{
+    timeZone:'Asia/Hong_Kong',
+    year:'numeric',month:'2-digit',day:'2-digit',
+    hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false,
+  }).formatToParts(date);
+  const pick=(type:string)=>parts.find(part=>part.type===type)?.value??'';
+  return pick('year')+'-'+pick('month')+'-'+pick('day')+' '+pick('hour')+':'+pick('minute')+':'+pick('second');
 }
 
-function production(order:PrintableOrder){
-  return '\x1b\x40'
-    +'製作單  '+order.display+'\n'
-    +'==============================\n'
-    +order.items.map(item=>item.qty+' x '+clean(item.name)).join('\n')
-    +'\n==============================\n'
-    +clean(order.sourceLabel)
-    +'\n\n\n';
+function orderService(order:PrintableOrder){
+  const modes=new Set(order.items.map(item=>item.serviceMode).filter(Boolean));
+  if(modes.size===1)return modes.has('dine-in')?'堂食':'外賣';
+  if(modes.size>1)return '堂食／外賣';
+  return '外賣';
 }
 
-function packing(order:PrintableOrder){
-  return '\x1b\x40'
-    +'打包單  '+order.display+'\n'
-    +'==============================\n'
-    +order.items.map(item=>item.qty+' x '+clean(item.name)).join('\n')
-    +'\n==============================\n'
-    +'共 '+order.items.reduce((sum,item)=>sum+Math.max(0,Number(item.qty)||0),0)+' 件'
-    +'\n\n\n';
+function itemIdentity(item:PrintableOrder['items'][number]){
+  const code=clean(item.productCode??'');
+  return (code?code+'. ':'')+clean(item.name);
+}
+function itemDetail(item:PrintableOrder['items'][number]){
+  const detail=clean(item.detail??'');
+  return detail&&detail!==clean(item.name)?detail:'';
+}
+function totalUnits(order:PrintableOrder){
+  return order.items.reduce((sum,item)=>sum+Math.max(0,Number(item.qty)||0),0);
+}
+function footer(){
+  return CENTER+NORMAL+'*** 謝謝！***\n'
+    +'— 手作・真食・更有味 —\n'
+    +'More Fun Kitchen\n'+LEFT;
+}
+function brand(){
+  return CENTER+BOLD_ON+DOUBLE+'More Fun  磨飯\n'+NORMAL+BOLD_OFF
+    +'手作・真食・更有味\n'+LEFT;
+}
+function reverseBlock(label:string,value:string,size=DOUBLE){
+  return CENTER+REVERSE_ON+BOLD_ON+size+' '+clean(label)+' '+clean(value)+' \n'
+    +NORMAL+BOLD_OFF+REVERSE_OFF+LEFT;
+}
+
+export function renderCustomerReceiptTicket(order:PrintableOrder){
+  const rows=order.items.map(item=>{
+    const detail=itemDetail(item);
+    return BOLD_ON+itemIdentity(item)+BOLD_OFF+'\n'
+      +(detail?'  '+detail+'\n':'')
+      +'  '+item.qty+' × '+money(item.unitMinor)+'   '+money(item.unitMinor*item.qty)+'\n';
+  }).join('');
+  const pickup=clean(order.providerPickupCode??'');
+  return INIT
+    +brand()
+    +RULE
+    +CENTER+BOLD_ON+DOUBLE+'客戶收據\n'+NORMAL+BOLD_OFF+LEFT
+    +RULE
+    +'訂單編號\n'
+    +CENTER+BOLD_ON+TRIPLE+clean(order.display)+'\n'+NORMAL+BOLD_OFF+LEFT
+    +'下單時間 '+hktDateTime(order.createdAt)+'\n'
+    +'來源 '+clean(order.sourceLabel)+' · '+orderService(order)+'\n'
+    +(pickup?RULE+reverseBlock('取餐碼',pickup,TRIPLE):'')
+    +RULE
+    +rows
+    +RULE
+    +BOLD_ON+'總數量 '+totalUnits(order)+' 件\n'+BOLD_OFF
+    +(order.utensilPreference?'餐具 '+order.utensilPreference+'\n':'')
+    +(clean(order.orderRemark??'')?'備註 '+clean(order.orderRemark??'')+'\n':'')
+    +RULE
+    +'付款方式 '+clean(order.paymentLabel)+'\n'
+    +BOLD_ON+DOUBLE+'合計 '+money(order.totalMinor)+'\n'+NORMAL+BOLD_OFF
+    +RULE
+    +CENTER+'請核對餐點 · 謝謝光臨\n'+LEFT
+    +footer()
+    +'\n\n';
+}
+
+export function renderProductionTicket(order:PrintableOrder){
+  const blocks=order.items.map(item=>{
+    const detail=itemDetail(item);
+    return BOLD_ON+DOUBLE+itemIdentity(item)+'\n'+NORMAL+BOLD_OFF
+      +(detail?BOLD_ON+'要求 '+detail+'\n'+BOLD_OFF:'')
+      +reverseBlock('數量',String(item.qty)+'份',DOUBLE)
+      +RULE;
+  }).join('');
+  return INIT
+    +brand()
+    +RULE
+    +CENTER+BOLD_ON+DOUBLE+'廚房製作單\n'+NORMAL+BOLD_OFF+LEFT
+    +RULE
+    +'單號\n'
+    +CENTER+BOLD_ON+TRIPLE+clean(order.display)+'\n'+NORMAL+BOLD_OFF+LEFT
+    +'落單時間 '+hktDateTime(order.createdAt)+'\n'
+    +'來源 '+clean(order.sourceLabel)+' · '+orderService(order)+'\n'
+    +RULE
+    +blocks
+    +(clean(order.orderRemark??'')?'備註：'+clean(order.orderRemark??'')+'\n':'')
+    +(order.utensilPreference?'餐具：'+order.utensilPreference+'\n':'')
+    +(orderService(order)==='外賣'?'外賣請打包\n':'')
+    +RULE
+    +footer()
+    +'\n\n';
+}
+
+export function renderPackingTicket(order:PrintableOrder){
+  const rows=order.items.map(item=>{
+    const detail=itemDetail(item);
+    return BOLD_ON+itemIdentity(item)+BOLD_OFF+'\n'
+      +'數量 '+item.qty
+      +(detail?' · '+detail:'')
+      +'\n';
+  }).join('');
+  const pickup=clean(order.providerPickupCode??'');
+  return INIT
+    +brand()
+    +RULE
+    +CENTER+BOLD_ON+DOUBLE+'外賣打包單\n'+NORMAL+'TAKE AWAY\n'+BOLD_OFF+LEFT
+    +RULE
+    +'訂單編號 No.\n'
+    +CENTER+BOLD_ON+TRIPLE+clean(order.display)+'\n'+NORMAL+BOLD_OFF+LEFT
+    +'下單時間 '+hktDateTime(order.createdAt)+'\n'
+    +RULE
+    +'品項 / 數量 / 備註・特別要求\n'
+    +rows
+    +RULE
+    +BOLD_ON+DOUBLE+'總數量 '+totalUnits(order)+' 件\n'+NORMAL+BOLD_OFF
+    +'餐具：'+(order.utensilPreference??'未記錄')+'\n'
+    +'內容物確認：[ ] 飲品  [ ] 醬汁\n'
+    +'             [ ] 小食/配料 [ ] 餐巾紙\n'
+    +'             [ ] 吸管  [ ] 其他\n'
+    +(clean(order.orderRemark??'')?'訂單備註：'+clean(order.orderRemark??'')+'\n':'')
+    +RULE
+    +'付款方式 '+clean(order.paymentLabel)+'\n'
+    +'金額 '+money(order.totalMinor)+'\n'
+    +(pickup?RULE+reverseBlock('取餐碼',pickup,TRIPLE):'')
+    +RULE
+    +CENTER+'請確認餐點後交予顧客 謝謝！\n'+LEFT
+    +footer()
+    +'\n\n';
 }
 
 function productMatchesBinding(productId:string,binding:PrintBinding){
@@ -188,28 +320,28 @@ export function buildOrderPrintPlan(order:PrintableOrder,bindings:readonly Print
     if(binding.role==='顧客小票'){
       const items=roleItems(order,'receipt',config);
       if(items.length<1)continue;
-      jobs.push({id:order.id+':receipt',role:binding.role,binding,payload:receipt(withItems(order,items)),cutAfter:true,kickDrawer:/\bCASH\b/i.test(order.paymentLabel),beepAfter:true});
+      jobs.push({id:order.id+':receipt',role:binding.role,binding,payload:renderCustomerReceiptTicket(withItems(order,items)),cutAfter:true,kickDrawer:/\bCASH\b/i.test(order.paymentLabel),beepAfter:true});
       continue;
     }
     if(binding.role==='製作單'){
       const items=roleItems(order,'production',config);
       if(items.length<1)continue;
-      jobs.push({id:order.id+':production',role:binding.role,binding,payload:production(withItems(order,items)),cutAfter:true,beepAfter:true});
+      jobs.push({id:order.id+':production',role:binding.role,binding,payload:renderProductionTicket(withItems(order,items)),cutAfter:true,beepAfter:true});
       continue;
     }
     if(binding.role==='打包單'){
       const items=roleItems(order,'packing',config);
       if(items.length<1)continue;
-      jobs.push({id:order.id+':packing',role:binding.role,binding,payload:packing(withItems(order,items)),cutAfter:true,beepAfter:true});
+      jobs.push({id:order.id+':packing',role:binding.role,binding,payload:renderPackingTicket(withItems(order,items)),cutAfter:true,beepAfter:true});
       continue;
     }
     if(binding.role==='袋標籤'){
       const total=order.items.reduce((sum,item)=>sum+Math.max(0,Number(item.qty)||0),0);
       const labelSpec:RasterLabelSpec={
+        kind:'bag',
         orderCode:clean(order.display),
-        primaryText:'袋標籤',
+        primaryText:'共 '+total+' 件',
         secondaryText:'共 '+total+' 件',
-        pieceLabel:'1/1',
       };
       jobs.push({
         id:order.id+':'+binding.id+':bag-label',
@@ -226,9 +358,15 @@ export function buildOrderPrintPlan(order:PrintableOrder,bindings:readonly Print
       if(routeUnits.length<1)continue;
       for(const unit of routeUnits){
         const labelSpec:RasterLabelSpec={
+          kind:'product',
           orderCode:clean(order.display),
           primaryText:clean(unit.item.name),
           pieceLabel:unit.pieceIndex+'/'+globalProductLabelTotal,
+          ...(clean(unit.item.productCode??'')?{productCode:clean(unit.item.productCode??'')}:{}),
+          secondaryText:[
+            unit.item.serviceMode==='dine-in'?'堂食':unit.item.serviceMode==='takeaway'?'外賣':'',
+            clean(unit.item.detail??''),
+          ].filter(Boolean).join(' · '),
         };
         jobs.push({
           id:order.id+':'+binding.id+':product-label:'+unit.item.id+':'+unit.unit,

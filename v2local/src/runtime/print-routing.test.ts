@@ -7,10 +7,12 @@ const order:PrintableOrder={
   createdAt:'2026-09-21T05:00:00.000Z',
   totalMinor:5900,
   paymentLabel:'CASH',
-  sourceLabel:'現場',
+  sourceLabel:'Keeta · 4890',
+  providerPickupCode:'4890',
+  orderRemark:'少辣',
   items:[
-    {id:'riceball',name:'原味飯團',qty:2,unitMinor:2100},
-    {id:'tea',name:'台式奶茶',qty:1,unitMinor:1700},
+    {id:'riceball',name:'原味飯團',qty:2,unitMinor:2100,serviceMode:'takeaway',productCode:'A1',detail:'少飯'},
+    {id:'tea',name:'台式奶茶',qty:1,unitMinor:1700,serviceMode:'takeaway',productCode:'D1'},
   ],
 };
 
@@ -41,20 +43,50 @@ describe('MFK checkout print fanout',()=>{
     ]);
     expect(plan).toHaveLength(7);
     expect(plan[0]?.payload).toContain('P001');
-    expect(plan[1]?.payload).toContain('製作單');
-    expect(plan[2]?.payload).toContain('打包單');
+    expect(plan[1]?.payload).toContain('廚房製作單');
+    expect(plan[2]?.payload).toContain('外賣打包單');
 
     const productJobs=plan.filter(job=>job.role==='產品標籤');
     expect(productJobs.map(job=>job.binding.id)).toEqual([
       'product-label-riceball','product-label-riceball','product-label-takeaway',
     ]);
-    expect(productJobs[0]?.labelSpec).toMatchObject({orderCode:'P001',primaryText:'原味飯團',pieceLabel:'1/3'});
+    expect(productJobs[0]?.labelSpec).toMatchObject({kind:'product',orderCode:'P001',primaryText:'原味飯團',productCode:'A1',pieceLabel:'1/3',secondaryText:'外賣 · 少飯'});
     expect(productJobs[1]?.labelSpec).toMatchObject({orderCode:'P001',primaryText:'原味飯團',pieceLabel:'2/3'});
     expect(productJobs[2]?.labelSpec).toMatchObject({orderCode:'P001',primaryText:'台式奶茶',pieceLabel:'3/3'});
     expect(productJobs.every(job=>job.renderMode==='tsc-bitmap')).toBe(true);
 
     expect(plan[6]?.renderMode).toBe('tsc-bitmap');
-    expect(plan[6]?.labelSpec?.orderCode).toBe('P001');
+    expect(plan[6]?.labelSpec).toMatchObject({kind:'bag',orderCode:'P001',primaryText:'共 3 件',secondaryText:'共 3 件'});
+    expect(plan[6]?.labelSpec?.pieceLabel).toBeUndefined();
+  });
+
+
+  it('renders owner-approved 80mm operational hierarchy without inventing missing facts',()=>{
+    const plan=buildOrderPrintPlan(order,[
+      binding('顧客小票','receipt'),
+      binding('製作單','production'),
+      binding('打包單','packing'),
+    ]);
+    const receipt=plan.find(job=>job.role==='顧客小票')!.payload;
+    const production=plan.find(job=>job.role==='製作單')!.payload;
+    const packing=plan.find(job=>job.role==='打包單')!.payload;
+
+    expect(receipt).toContain('客戶收據');
+    expect(receipt).toContain('P001');
+    expect(receipt).toContain('取餐碼');
+    expect(receipt).toContain('4890');
+    expect(receipt).toContain('合計 $59.00');
+    expect(receipt).not.toContain('內容物確認');
+
+    expect(production).toContain('廚房製作單');
+    expect(production).toContain('A1. 原味飯團');
+    expect(production).toContain('數量');
+    expect(production).toContain('少辣');
+
+    expect(packing).toContain('外賣打包單');
+    expect(packing).toContain('總數量');
+    expect(packing).toContain('內容物確認');
+    expect(packing).toContain('餐具：未記錄');
   });
 
   it('batches eleven labels for one logical printer into one native dispatch batch',()=>{
@@ -79,7 +111,7 @@ describe('MFK checkout print fanout',()=>{
     const batches=groupTscBitmapJobsByPhysicalPrinter(plan);
     expect(batches).toHaveLength(1);
     expect(batches[0]?.jobs).toHaveLength(4);
-    expect(batches[0]?.jobs.map(job=>job.labelSpec?.pieceLabel)).toEqual(['1/3','2/3','3/3','1/1']);
+    expect(batches[0]?.jobs.map(job=>job.labelSpec?.pieceLabel)).toEqual(['1/3','2/3','3/3',undefined]);
   });
 
   it('keeps a newly added custom product-label route silent until products are assigned',()=>{

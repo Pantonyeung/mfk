@@ -25,12 +25,13 @@ interface CatalogProduct{
   readonly active?:boolean;
 }
 interface OrderInput{
-  readonly items:readonly {id:string;name:string;qty:number;unitMinor:number;serviceMode:'takeaway'}[];
+  readonly items:readonly {id:string;name:string;qty:number;unitMinor:number;serviceMode:'takeaway';productCode?:string;detail?:string}[];
   readonly totalMinor:number;
   readonly paymentLabel:string;
   readonly sourceLabel:string;
   readonly providerRef:string;
   readonly providerMessageId:string;
+  readonly providerPickupCode:string;
   readonly initialFulfillmentLabel:'待處理';
 }
 
@@ -118,6 +119,8 @@ export function translateKeetaIntentToLocalOrder(input:MfkKeetaOrderIntent):Orde
       qty:line.quantity,
       unitMinor:line.providerFinalUnitPriceMinor,
       serviceMode:'takeaway' as const,
+      ...(product.productCode?{productCode:String(product.productCode)}:{}),
+      ...(options?{detail:options}:{}),
     });
   });
   const totalMinor=items.reduce((sum,item)=>sum+item.unitMinor*item.qty,0);
@@ -130,6 +133,7 @@ export function translateKeetaIntentToLocalOrder(input:MfkKeetaOrderIntent):Orde
     sourceLabel:'Keeta · '+facts.providerOrderCode,
     providerRef:'KEETA:'+facts.providerOrderId,
     providerMessageId:intent.providerMessageId,
+    providerPickupCode:facts.providerOrderCode,
     initialFulfillmentLabel:'待處理' as const,
   });
 }
