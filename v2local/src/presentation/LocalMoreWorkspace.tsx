@@ -2,6 +2,7 @@ import {useEffect,useMemo,useState} from 'react';
 import {useNavigate} from 'react-router';
 import {applyLanPrinter,printBytesLan,printTextLan,testLanPrinter,type NativeResult} from '../runtime/native-print.ts';
 import {LABEL_TSC_PROFILE,renderTscRasterLabel} from '../runtime/label-bitmap.ts';
+import {renderCustomerReceiptTicket,renderPackingTicket,renderProductionTicket,type PrintableOrder} from '../runtime/print-routing.ts';
 import {localRuntime,readLastPrintDiagnostic} from '../runtime/local-runtime.ts';
 import {LocalAdminMenuWorkspace} from './LocalAdminMenuWorkspace.tsx';
 import {
@@ -248,8 +249,32 @@ function PrinterPanel(){
           });
           result=await printBytesLan({...printer,bytes});
         }else{
-          const payload='\x1b\x40MFK FUSION '+current.role+' TEST\n'+current.name+'\n'+new Date().toISOString()+'\n\n\n';
-          result=await printTextLan({...printer,text:payload});
+          const sample:PrintableOrder={
+            id:'MFK-PRINT-TEMPLATE-TEST',
+            display:'P0049',
+            createdAt:new Date().toISOString(),
+            totalMinor:5700,
+            paymentLabel:'CASH',
+            sourceLabel:'Keeta · 4890',
+            providerPickupCode:'4890',
+            orderRemark:'測試備註',
+            utensilPreference:'需要',
+            items:[{
+              id:'sample-d1',
+              productCode:'D1',
+              name:'紫米套餐',
+              detail:'招牌雞粒 · 麻薯 · 氣泡水',
+              qty:1,
+              unitMinor:5700,
+              serviceMode:'takeaway',
+            }],
+          };
+          const payload=current.role==='顧客小票'
+            ?renderCustomerReceiptTicket(sample)
+            :current.role==='製作單'
+              ?renderProductionTicket(sample)
+              :renderPackingTicket(sample);
+          result=await printTextLan({...printer,text:payload,cutAfter:true,beepAfter:true,kickDrawer:false});
         }
       }
     }catch(error){result={ok:false,code:error instanceof Error?error.message:'PRINT_ACTION_FAILED'}}
