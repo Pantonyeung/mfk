@@ -1,4 +1,5 @@
 import type {PrintableOrder} from './print-routing.ts';
+import {compactSelectionLines,productionSelectionLines} from './print-content.ts';
 
 export const ESC_POS_RASTER_PROFILE=Object.freeze({
   widthDots:576,
@@ -49,11 +50,14 @@ function productIdentity(item:PrintableOrder['items'][number]){
   const base=clean(item.name).split('｜')[0]||clean(item.name);
   return (code?'('+code+') ':'')+base;
 }
-function detail(item:PrintableOrder['items'][number]){
+function detailSource(item:PrintableOrder['items'][number]){
   const explicit=clean(item.detail);
   if(explicit)return explicit;
   const pieces=clean(item.name).split('｜');
-  return pieces.length>1?pieces.slice(1).join(' / '):'';
+  return pieces.length>1?pieces.slice(1).join(' · '):'';
+}
+function detailLines(item:PrintableOrder['items'][number]){
+  return compactSelectionLines(detailSource(item));
 }
 
 function font(ctx:CanvasRenderingContext2D,size:number,weight=600){
@@ -131,6 +135,57 @@ class TicketCanvas{
     const lines=wrap(this.ctx,text,this.width-this.margin*2,maxLines);
     for(const line of lines)this.text(line,size,weight,'left',lineHeight);
   }
+  productionItemBlock(item:PrintableOrder['items'][number]){
+    const title=productIdentity(item);
+    const lines=productionSelectionLines(detailSource(item));
+    const top=this.y;
+    const totalWidth=this.width-this.margin*2;
+    const gap=14;
+    const qtyWidth=132;
+    const leftWidth=totalWidth-qtyWidth-gap;
+
+    font(this.ctx,46,900);
+    const titleLines=wrap(this.ctx,title,leftWidth,4);
+    const detailWrapped:string[]=[];
+    font(this.ctx,31,800);
+    for(const line of lines){
+      for(const wrappedLine of wrap(this.ctx,line,leftWidth,3))detailWrapped.push(wrappedLine);
+    }
+    const bodyHeight=Math.max(
+      132,
+      18+titleLines.length*56+(detailWrapped.length?10+detailWrapped.length*40:0)+18
+    );
+
+    this.ctx.fillStyle='#000';
+    this.ctx.textAlign='left';
+    this.ctx.textBaseline='top';
+    let textY=top+12;
+    font(this.ctx,46,900);
+    for(const line of titleLines){
+      this.ctx.fillText(line,this.margin,textY);
+      textY+=56;
+    }
+    if(detailWrapped.length){
+      textY+=4;
+      font(this.ctx,31,800);
+      for(const line of detailWrapped){
+        this.ctx.fillText(line,this.margin,textY);
+        textY+=40;
+      }
+    }
+
+    const qtyX=this.margin+leftWidth+gap;
+    this.ctx.strokeStyle='#000';
+    this.ctx.lineWidth=3;
+    this.ctx.strokeRect(qtyX,top,qtyWidth,bodyHeight);
+    this.ctx.textAlign='center';
+    this.ctx.textBaseline='middle';
+    font(this.ctx,45,900);
+    this.ctx.fillText(String(item.qty)+'份',qtyX+qtyWidth/2,top+bodyHeight/2);
+    this.ctx.textBaseline='top';
+    this.ctx.textAlign='left';
+    this.y+=bodyHeight+16;
+  }
   blackBlock(label:string,value:string,height=112){
     const top=this.y;
     this.ctx.fillStyle='#000';
@@ -206,8 +261,7 @@ function receipt(t:TicketCanvas,order:PrintableOrder){
   t.text('品項',28,900,'left',38);
   for(const item of order.items){
     t.wrapped(productIdentity(item),40,900,4,48);
-    const d=detail(item);
-    if(d)t.wrapped(d,30,700,4,38);
+    for(const line of detailLines(item))t.wrapped(line,30,700,3,38);
     t.text(String(item.qty)+' × '+money(item.unitMinor)+'     '+money(item.qty*item.unitMinor),29,800,'left',38);
     t.y+=12;
   }
@@ -235,11 +289,8 @@ function production(t:TicketCanvas,order:PrintableOrder){
   t.text('來源：'+clean(order.sourceLabel)+' / '+orderService(order),28,800,'left',38);
   t.line(22);
   for(const item of order.items){
-    t.wrapped(productIdentity(item),48,900,4,58);
-    const d=detail(item);
-    if(d)t.wrapped('要求：'+d,32,800,4,42);
-    t.blackBlock('數量',String(item.qty)+' 份',118);
-    t.line(20);
+    t.productionItemBlock(item);
+    t.line(22);
   }
   if(clean(order.orderRemark))t.wrapped('備註：'+clean(order.orderRemark),32,900,4,42);
   if(order.utensilPreference)t.text('餐具：'+order.utensilPreference,31,900,'left',42);
@@ -267,8 +318,7 @@ function packing(t:TicketCanvas,order:PrintableOrder){
   for(const item of order.items){
     t.wrapped(productIdentity(item),40,900,4,48);
     t.text('數量 '+item.qty,31,900,'left',40);
-    const d=detail(item);
-    if(d)t.wrapped(d,30,750,4,39);
+    for(const line of detailLines(item))t.wrapped(line,30,750,3,39);
     t.y+=10;
   }
   t.line(22);

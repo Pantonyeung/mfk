@@ -17,6 +17,7 @@ export interface RasterLabelSpec{
   readonly primaryText:string;
   readonly pieceLabel?:string;
   readonly secondaryText?:string;
+  readonly secondaryLines?:readonly string[];
   readonly productCode?:string;
 }
 
@@ -109,49 +110,63 @@ function drawProductLabel(
   widthDots:number,
   heightDots:number,
 ){
-  const margin=14;
+  const margin=12;
   const gap=8;
   const top=12;
-  const headerHeight=78;
-  const leftWidth=Math.round(widthDots*0.66);
-  const rightX=leftWidth+gap;
-  const rightWidth=widthDots-rightX-margin;
+  const headerHeight=82;
+  const usable=widthDots-margin*2;
+  const leftWidth=Math.round(usable*0.67);
+  const rightX=margin+leftWidth+gap;
+  const rightWidth=usable-leftWidth-gap;
 
-  // Operational header: order number and piece count are separate black/white blocks.
   ctx.fillStyle='#000';
-  ctx.fillRect(margin,top,leftWidth-margin,headerHeight);
-  ctx.fillRect(rightX,top,rightWidth,headerHeight);
+  ctx.fillRect(margin,top,leftWidth,headerHeight);
   ctx.fillStyle='#fff';
   ctx.textAlign='center';
   ctx.textBaseline='middle';
-
   const orderCode=String(spec.orderCode||'');
-  fitFont(ctx,orderCode,leftWidth-margin-18,46,30,900);
-  ctx.fillText(orderCode,margin+(leftWidth-margin)/2,top+headerHeight/2);
+  fitFont(ctx,orderCode,leftWidth-18,52,34,900);
+  ctx.fillText(orderCode,margin+leftWidth/2,top+headerHeight/2);
 
+  ctx.fillStyle='#fff';
+  ctx.fillRect(rightX,top,rightWidth,headerHeight);
+  ctx.strokeStyle='#000';
+  ctx.lineWidth=3;
+  ctx.strokeRect(rightX,top,rightWidth,headerHeight);
+  ctx.fillStyle='#000';
   const piece=String(spec.pieceLabel||'');
   fitFont(ctx,piece,rightWidth-12,38,25,900);
   ctx.fillText(piece,rightX+rightWidth/2,top+headerHeight/2);
 
-  // Product identity.
+  ctx.fillStyle='#fff';
+  ctx.fillRect(margin,top+headerHeight+8,usable,heightDots-(top+headerHeight+20));
   ctx.fillStyle='#000';
   ctx.textAlign='left';
   ctx.textBaseline='top';
+
   const code=String(spec.productCode||'').trim();
-  const name=(code?code+' · ':'')+String(spec.primaryText||'').trim();
+  const title=(code?code+'  ':'')+String(spec.primaryText||'').trim();
   ctx.font='900 34px "Noto Sans TC","Noto Sans CJK TC","PingFang TC","Microsoft JhengHei",sans-serif';
-  const lines=wrapCharacters(ctx,name,widthDots-margin*2,3);
-  let y=108;
-  for(const line of lines){
+  const titleLines=wrapCharacters(ctx,title,usable,3);
+  let y=112;
+  for(const line of titleLines){
     ctx.fillText(line,margin,y);
-    y+=40;
+    y+=39;
   }
 
-  if(spec.secondaryText){
-    const secondaryY=Math.max(y+4,heightDots-58);
-    ctx.font='600 22px "Noto Sans TC","Noto Sans CJK TC","PingFang TC","Microsoft JhengHei",sans-serif';
-    const secondary=wrapCharacters(ctx,String(spec.secondaryText),widthDots-margin*2,1)[0]??'';
-    ctx.fillText(secondary,margin,secondaryY);
+  const lines=(spec.secondaryLines?.length?spec.secondaryLines:[spec.secondaryText??''])
+    .map(value=>String(value||'').trim())
+    .filter(Boolean);
+  if(lines.length){
+    y+=2;
+    ctx.font='700 24px "Noto Sans TC","Noto Sans CJK TC","PingFang TC","Microsoft JhengHei",sans-serif';
+    for(const raw of lines.slice(0,3)){
+      for(const line of wrapCharacters(ctx,raw,usable,2)){
+        if(y>heightDots-28)break;
+        ctx.fillText(line,margin,y);
+        y+=29;
+      }
+    }
   }
 }
 
@@ -163,29 +178,30 @@ function drawBagLabel(
 ){
   const margin=12;
   const gap=10;
-  const top=16;
+  const top=18;
   const height=heightDots-top*2;
   const usable=widthDots-margin*2;
   const leftWidth=Math.round(usable*0.62);
   const rightX=margin+leftWidth+gap;
   const rightWidth=usable-leftWidth-gap;
 
-  // Owner-locked bag label: landscape, no logo, no bag sequence.
-  // LEFT = order/display number, RIGHT = total item count.
   ctx.fillStyle='#000';
   ctx.fillRect(margin,top,leftWidth,height);
-  ctx.fillRect(rightX,top,rightWidth,height);
-
   ctx.fillStyle='#fff';
   ctx.textAlign='center';
   ctx.textBaseline='middle';
-
   const orderCode=String(spec.orderCode||'');
   fitFont(ctx,orderCode,leftWidth-18,76,42,900);
   ctx.fillText(orderCode,margin+leftWidth/2,top+height/2);
 
+  ctx.fillStyle='#fff';
+  ctx.fillRect(rightX,top,rightWidth,height);
+  ctx.strokeStyle='#000';
+  ctx.lineWidth=3;
+  ctx.strokeRect(rightX,top,rightWidth,height);
+  ctx.fillStyle='#000';
   const total=String(spec.secondaryText||spec.primaryText||'').replace(/\s+/g,'').trim();
-  fitFont(ctx,total,rightWidth-12,48,30,900);
+  fitFont(ctx,total,rightWidth-12,46,28,900);
   ctx.fillText(total,rightX+rightWidth/2,top+height/2);
 }
 
@@ -215,7 +231,7 @@ export async function renderTscRasterLabel(spec:RasterLabelSpec):Promise<Uint8Ar
     const alpha=image.data[offset+3]??255;
     const luminance=(r*299+g*587+b*114)/1000;
     // Keep the existing printer bitmap polarity contract.
-    mono[pixel]=alpha>20&&luminance<180?1:0;
+    mono[pixel]=alpha>20&&luminance<180?0:1;
   }
   const bitmap=packMonochromeBitmap(mono,widthDots,heightDots);
   return buildTscBitmapPayload({bitmap,widthDots,heightDots});
