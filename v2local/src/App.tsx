@@ -203,12 +203,6 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode,uiSettings}:{cart
     imageUrl:product.imageUrl??productArtwork(product),
     optionSets:product.optionSets,
   }));
-  const holdTables=Array.from({length:9},(_,index)=>{
-    const id='T'+String(index+1).padStart(2,'0');
-    const occupied=heldCarts.find(hold=>hold.kind==='dining'&&hold.assignedTable===id);
-    return {id,label:String(index+1),occupied:Boolean(occupied),codeLabel:occupied?.codeLabel};
-  });
-
   const productById=new Map(products.map(product=>[product.id,product] as const));
   const presentLine=(line:CartLine,index:number,quantity=line.qty,sourceLineIds:readonly string[]=[line.id])=>{
     const product=productById.get(line.productId);
@@ -271,7 +265,7 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode,uiSettings}:{cart
     workItems:[
       {id:'riceball-pool',label:'飯團待組',count:0,enabled:false,tone:'riceball'},
       {id:'required',label:'必選',count:0,enabled:false,tone:'required'},
-      {id:'combo',label:'紫米套餐',count:comboData.combos.length,enabled:comboData.combos.length>0,tone:'combo'},
+      {id:'combo',label:'紫米套餐',count:0,enabled:comboData.combos.length>0,tone:'combo'},
     ],
     actionAvailability:{
       lineServiceMode:true,
