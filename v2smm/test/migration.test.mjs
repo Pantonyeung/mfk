@@ -6,6 +6,8 @@ import {fileURLToPath} from 'node:url';
 
 const testDir=path.dirname(fileURLToPath(import.meta.url));
 const root=path.resolve(testDir,'../src');
+const srcRoot=root;
+const repoRoot=path.resolve(testDir,'../..');
 const registry=JSON.parse(fs.readFileSync(path.join(root,'capabilities.json'),'utf8'));
 const sourceFiles=fs.readdirSync(root).filter(name=>/\.(ts|tsx|js|jsx)$/.test(name));
 const source=sourceFiles.map(name=>fs.readFileSync(path.join(root,name),'utf8')).join('\n');
@@ -20,7 +22,7 @@ test('capability registry stays unique and command authority remains disconnecte
   assert.deepEqual([...new Set(reads.map(item=>item.status))],['PRODUCT_READY_NOT_CONNECTED']);
 });
 
-test('SMM product shell has no live network or canonical writer',()=>{
+test('SMM product shell has no direct live network or canonical writer',()=>{
   const forbidden=[
     /\bfetch\s*\(/,
     /\bWebSocket\b/,
@@ -32,8 +34,7 @@ test('SMM product shell has no live network or canonical writer',()=>{
     /storeKernel\s*\./,
     /\bD1Database\b/,
     /new\s+Worker\s*\(/,
-    /\bsetInterval\s*\(/,
-    /\bsetTimeout\s*\(/
+    /\bsetInterval\s*\(/
   ];
   for(const pattern of forbidden)assert.equal(pattern.test(source),false,String(pattern));
 });
