@@ -9,7 +9,7 @@
 | Product | Complete one choice group at a time | Add/update Memory Jar | Inline required/min/max/unavailable repair, back step, dismiss |
 | Memory Jar | Review and repair the current intent | Final review | Per-line edit/remove, add more, material-change repair |
 | Checkout | Confirm contact, quote and submit once | Wait for store result | UNKNOWN readback of the same intent, no blind resend |
-| My Orders | Understand canonical fulfillment | Pickup or inspect history | Rejected/delayed/unknown states, detail timeline |
+| My Orders | Understand canonical fulfillment | Pickup or inspect history | Rejected/delayed/unknown states, detail timeline, local-only hide with undo |
 | My Memory | Review the relationship and return | Buy again or start order | Per-module empty/loading/error/stale/disconnected states |
 
 ## Golden Path
@@ -63,7 +63,7 @@ Executed against the isolated `visual-acceptance.html` runtime harness. The harn
 | Checkout | Item count, official quote status, separated pickup contact and unique submit action rendered. |
 | Pending / UNKNOWN | Same-position transaction surface changed to “正在確認訂單結果”; only readback action remained. |
 | Current Order / Ready | Canonical tracker rendered; pickup code was the Ready focal point with arrival/verification/handover separation. |
-| History | Immutable history cards and current-menu rebuild action rendered. |
+| History | Immutable history cards, local-only hide/undo and current-menu rebuild action rendered. Hiding never deletes the formal record. |
 | Member / Seeds / Coupons / Badges | Connected collections rendered from the test runtime; production-without-port rendered honest waiting-for-data states. |
 | iPhone | 390 × 844 acceptance completed. |
 | Android | 412 × 915 acceptance completed. |

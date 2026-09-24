@@ -97,6 +97,7 @@ export function HomeView({snapshot,connection,activeOrders,history,featuredProdu
       <div><span className="eyebrow">今日自取 · {store?.etaLabel??'時間待店舖確認'}</span><h1>{store?.storeName??'磨飯'}</h1></div>
       <div className={`availability-label ${store?.channelAvailable?'open':'closed'}`}><i aria-hidden="true"/><span>{store?store.channelAvailable?'今日可以落單':'今日暫停落單':'等待店舖資料'}</span></div>
     </header>
+    {store?.notice?<section className="home-notice" role="status"><span>店舖消息</span><p>{store.notice}</p></section>:null}
 
     {currentOrder?<button className={`current-order-spotlight stage-${currentOrder.stage.toLowerCase()}`} onClick={onOrders}>
       <span>進行中訂單 · {currentOrder.displayCode}</span>
@@ -197,10 +198,22 @@ export function CheckoutView({cart,quote,checkout,setCheckout,pending,actionStat
 export function OrdersView({segment,setSegment,active,history,expandedOrderId,setExpandedOrderId,onReorder,onBrowse,connection}:{
   segment:OrderSegment;setSegment:(v:OrderSegment)=>void;active:readonly CustomerOrderProjection[];history:readonly CustomerHistoryProjection[];expandedOrderId:string|null;setExpandedOrderId:(v:string|null)=>void;onReorder:(order:CustomerHistoryProjection)=>void;onBrowse:()=>void;connection:CustomerConnectionState;
 }){
+  const [hiddenHistoryIds,setHiddenHistoryIds]=useState<readonly string[]>([]);
+  const [lastHiddenId,setLastHiddenId]=useState<string|null>(null);
+  const visibleHistory=history.filter(order=>!hiddenHistoryIds.includes(order.orderId));
+  const hideFromView=(orderId:string)=>{
+    setHiddenHistoryIds(ids=>[...ids,orderId]);
+    setLastHiddenId(orderId);
+  };
+  const undoHide=()=>{
+    if(!lastHiddenId)return;
+    setHiddenHistoryIds(ids=>ids.filter(id=>id!==lastHiddenId));
+    setLastHiddenId(null);
+  };
   return <section className="page orders-page">
     <PageIntro kicker="我的訂單" title={segment==='current'?'而家去到邊？':'食過嘅，都收得好好'} detail={segment==='current'?'收到、接單、製作、可取餐與交收會按正式狀態逐步更新。':'歷史只係回憶；再次下單會按目前菜單重新驗證。'}/>
     <div className="segmented" role="tablist" aria-label="訂單類別"><button role="tab" aria-selected={segment==='current'} className={segment==='current'?'active':''} onClick={()=>setSegment('current')}>進行中</button><button role="tab" aria-selected={segment==='history'} className={segment==='history'?'active':''} onClick={()=>setSegment('history')}>歷史訂單</button></div>
-    {segment==='current'?(!active.length?<EmptyState title={connection==='NOT_CONNECTED'?'訂單服務尚未連接':'暫時冇進行中訂單'} detail={connection==='NOT_CONNECTED'?'連接後會顯示店舖正式接單同製作進度。':'點餐後，最新進度會喺呢度。'}><ActionButton onClick={onBrowse}>開始點餐</ActionButton></EmptyState>:<div className="active-order-list">{active.map(order=><OrderCard key={order.orderId} order={order} expanded={expandedOrderId===order.orderId} onToggle={()=>setExpandedOrderId(expandedOrderId===order.orderId?null:order.orderId)}/>)}</div>):(!history.length?<EmptyState title={connection==='NOT_CONNECTED'?'歷史訂單尚未連接':'仲未有完成訂單'} detail={connection==='NOT_CONNECTED'?'連接後只會顯示正式完成嘅訂單。':'完成第一張訂單後，就可以喺呢度再次回味。'}/>:<div className="history-list">{history.map(order=><article className="history-card" key={order.orderId}><div className="history-date"><strong>{new Date(order.completedAt).toLocaleDateString('zh-HK',{day:'2-digit'})}</strong><span>{new Date(order.completedAt).toLocaleDateString('zh-HK',{month:'short',year:'numeric'})}</span></div><div className="history-copy"><small>{order.displayCode}</small><strong>{order.itemSummary}</strong><span>{order.amountLabel??'歷史價格未提供'}</span></div><ActionButton variant="secondary" disabled={!order.reorderEligible} onClick={()=>onReorder(order)}>{order.reorderEligible?'再次下單':'目前不可重建'}</ActionButton></article>)}</div>)}
+    {segment==='current'?(!active.length?<EmptyState title={connection==='NOT_CONNECTED'?'訂單服務尚未連接':'暫時冇進行中訂單'} detail={connection==='NOT_CONNECTED'?'連接後會顯示店舖正式接單同製作進度。':'點餐後，最新進度會喺呢度。'}><ActionButton onClick={onBrowse}>開始點餐</ActionButton></EmptyState>:<div className="active-order-list">{active.map(order=><OrderCard key={order.orderId} order={order} expanded={expandedOrderId===order.orderId} onToggle={()=>setExpandedOrderId(expandedOrderId===order.orderId?null:order.orderId)}/>)}</div>):(!history.length?<EmptyState title={connection==='NOT_CONNECTED'?'歷史訂單尚未連接':'仲未有完成訂單'} detail={connection==='NOT_CONNECTED'?'連接後只會顯示正式完成嘅訂單。':'完成第一張訂單後，就可以喺呢度再次回味。'}/>:<>{lastHiddenId?<section className="history-view-feedback" role="status"><span>已從今次檢視收起；正式訂單紀錄冇被刪除。</span><button onClick={undoHide}>復原</button></section>:null}{visibleHistory.length?<div className="history-list">{visibleHistory.map(order=><article className="history-card" key={order.orderId}><div className="history-date"><strong>{new Date(order.completedAt).toLocaleDateString('zh-HK',{day:'2-digit'})}</strong><span>{new Date(order.completedAt).toLocaleDateString('zh-HK',{month:'short',year:'numeric'})}</span></div><div className="history-copy"><small>{order.displayCode}</small><strong>{order.itemSummary}</strong><span>{order.amountLabel??'歷史價格未提供'}</span></div><div className="history-actions"><button onClick={()=>hideFromView(order.orderId)}>今次收起</button><ActionButton variant="secondary" disabled={!order.reorderEligible} onClick={()=>onReorder(order)}>{order.reorderEligible?'再次下單':'目前不可重建'}</ActionButton></div></article>)}</div>:<EmptyState compact title="今次檢視已經收起全部歷史" detail="正式訂單紀錄冇被刪除；可以復原最近一次操作。"><ActionButton variant="secondary" onClick={undoHide}>復原最近一項</ActionButton></EmptyState>}</>)}
   </section>;
 }
 

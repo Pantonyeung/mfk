@@ -29,6 +29,8 @@ test('R2 keeps the five-part customer mental model and complete memory jar',()=>
   assert.match(views,/JarVisual/);
   assert.match(views,/removeConfirm/);
   assert.match(views,/onProduct\(product,[\s\S]*line/);
+  assert.match(views,/正式訂單紀錄冇被刪除/);
+  assert.match(views,/hideFromView/);
 });
 
 test('product configuration is progressive and preserves required min max unavailable validation',()=>{
