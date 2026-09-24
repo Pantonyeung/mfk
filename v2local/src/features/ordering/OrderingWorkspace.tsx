@@ -81,7 +81,7 @@ function OrganizedCart({lines,highlightedLineId,actions,availability}:{lines:rea
   </div>;
 }
 
-export function OrderingWorkspace({view,actions,centerPanel}:{view:OrderingWorkspaceViewModel;actions:OrderingWorkspaceActions;centerPanel?:{readonly title:string;readonly body:ReactNode;readonly onClose:()=>void}|null}){
+export function OrderingWorkspace({view,actions,centerPanel}:{view:OrderingWorkspaceViewModel;actions:OrderingWorkspaceActions;centerPanel?:{readonly title:string;readonly body:ReactNode;readonly onClose:()=>void;readonly dirty?:boolean}|null}){
   const availability=view.actionAvailability??{lineServiceMode:true,lineEdit:true,lineQuantity:true,holdCart:true,cancelCart:true};
   const serviceModes=view.serviceModes??{takeaway:true,dineIn:true};
   const orderingMode=view.orderingMode??'normal';
@@ -94,11 +94,7 @@ export function OrderingWorkspace({view,actions,centerPanel}:{view:OrderingWorks
       <QueueStrip title="Keeta" kind="active" orders={view.activeOrders} onOpen={actions.onOpenQueueOrder}/>
     </header>
 
-    <main className={`ordering-catalog${centerPanel?' ordering-catalog--panel':''}${!centerPanel&&guidanceTarget==='product'?' flow-next-catalog':''}`} aria-label={centerPanel?centerPanel.title:'商品'}>
-      {centerPanel?<section className="ordering-center-panel">
-        <header className="ordering-center-panel-head"><div><small>點單工作台</small><strong>{centerPanel.title}</strong></div><button type="button" onClick={centerPanel.onClose}>×</button></header>
-        <div className="ordering-center-panel-body">{centerPanel.body}</div>
-      </section>:<>
+    <main className={`ordering-catalog${guidanceTarget==='product'?' flow-next-catalog':''}`} aria-label="商品">
         <div className="ordering-catalog-toolbar">
           <div className="ordering-status-stack" aria-live="polite">
             {view.menuRevisionLabel?<div className="ordering-menu-local-status"><b>{view.menuRevisionLabel}</b><span>本機 Admin → POS</span></div>:null}
@@ -118,11 +114,12 @@ export function OrderingWorkspace({view,actions,centerPanel}:{view:OrderingWorks
             {quickDrink.choices.length?quickDrink.choices.map(choice=><button type="button" key={choice.id} disabled={!choice.enabled||!quickDrink.pendingCount} onClick={()=>actions.onSelectQuickDrink(choice.id)}><b>{choice.label}</b>{choice.priceAdjustmentLabel?<small>{choice.priceAdjustmentLabel}</small>:null}{choice.requiresConfiguration?<em>先設定</em>:null}</button>):<p>目前 Admin Combo 冇可用飲品 Choice。</p>}
           </div>
         </section>:null}
-        {view.showCategories===false?null:<nav className="ordering-categories" aria-label="商品分類">
-          {view.categories.map(category=><button type="button" key={category.id} aria-pressed={view.selectedCategoryId===category.id} className={view.selectedCategoryId===category.id?'active':''} onClick={()=>actions.onSelectCategory(category.id)}>{category.label}</button>)}
-        </nav>}
-        <section className="ordering-product-grid">{view.products.map(product=><ProductCard key={product.id} product={product} actions={actions} orderingMode={orderingMode} recentlyAdded={view.recentlyAddedProductId===product.id}/>)}</section>
-      </>}
+        <div className="ordering-browse-body">
+          {view.showCategories===false?null:<nav className="ordering-categories" aria-label="商品分類">
+            {view.categories.map(category=><button type="button" key={category.id} aria-pressed={view.selectedCategoryId===category.id} className={view.selectedCategoryId===category.id?'active':''} onClick={()=>actions.onSelectCategory(category.id)}>{category.label}</button>)}
+          </nav>}
+          <section className="ordering-product-grid">{view.products.map(product=><ProductCard key={product.id} product={product} actions={actions} orderingMode={orderingMode} recentlyAdded={view.recentlyAddedProductId===product.id}/>)}</section>
+        </div>
     </main>
 
     <aside key={view.cartPulseNonce} className={`ordering-cart${view.cartPulseNonce>0?' cart-updated':''}`} aria-label="購物車">
@@ -163,5 +160,15 @@ export function OrderingWorkspace({view,actions,centerPanel}:{view:OrderingWorks
       const isGuided=guidanceTarget===item.id;
       return <button type="button" key={item.id} className={(item.count>0?'has-work':'')+(isGuided?' flow-next':'')} onClick={()=>actions.onOpenWorkItem(item.id)}><span>{item.label}</span><b>{item.count}</b></button>;
     })}</footer>
+
+    {centerPanel?<div className="ordering-modal-backdrop" onMouseDown={event=>{if(event.target===event.currentTarget)centerPanel.onClose();}}>
+      <section className="ordering-modal-window" role="dialog" aria-modal="true" aria-label={centerPanel.title} onMouseDown={event=>event.stopPropagation()}>
+        <header className="ordering-modal-head">
+          <div><small>{centerPanel.dirty?'未保存修改':'點單'}</small><strong>{centerPanel.title}</strong></div>
+          <button type="button" aria-label="關閉" onClick={centerPanel.onClose}>×</button>
+        </header>
+        <div className="ordering-modal-body">{centerPanel.body}</div>
+      </section>
+    </div>:null}
   </div>;
 }
