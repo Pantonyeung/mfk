@@ -3,13 +3,13 @@ export interface PrintableSelectionPart{
   readonly value:string;
   readonly kind:'main'|'addon'|'drink'|'modifier'|'note';
 }
-
-const STRUCTURAL_MAIN_KEYS=[
-  '選擇飯團','飯團','主食','飯底','便當','沙律','麵','主餐','餐點',
-];
-const STRUCTURAL_ADDON_KEYS=['小食','配料','加配','副食'];
-const STRUCTURAL_DRINK_KEYS=['飲品','飲料'];
-const NOTE_KEYS=['備註','要求','特別要求'];
+export interface PrintableSelectionGroups{
+  readonly main:readonly string[];
+  readonly addon:readonly string[];
+  readonly drink:readonly string[];
+  readonly modifier:readonly string[];
+  readonly note:readonly string[];
+}
 
 function clean(value:unknown){
   return String(value??'').replace(/[\r\n]+/g,' ').replace(/\s+/g,' ').trim();
@@ -26,12 +26,15 @@ function splitSegments(detail:string){
     .filter(Boolean);
 }
 function classifyKey(key:string):PrintableSelectionPart['kind']{
-  const normalized=clean(key);
-  if(STRUCTURAL_MAIN_KEYS.includes(normalized))return'main';
-  if(STRUCTURAL_ADDON_KEYS.includes(normalized))return'addon';
-  if(STRUCTURAL_DRINK_KEYS.includes(normalized))return'drink';
-  if(NOTE_KEYS.includes(normalized))return'note';
+  const normalized=clean(key).toLowerCase();
+  if(/飯團|主食|飯底|便當|沙律|麵|主餐|餐點|主菜/.test(normalized))return'main';
+  if(/小食|配料|加配|副食/.test(normalized))return'addon';
+  if(/飲品|飲料|drink/.test(normalized))return'drink';
+  if(/備註|要求|特別要求/.test(normalized))return'note';
   return'modifier';
+}
+function unique(values:readonly string[]){
+  return [...new Set(values.map(clean).filter(Boolean))];
 }
 
 export function parsePrintableSelections(detail:unknown):readonly PrintableSelectionPart[]{
@@ -39,7 +42,7 @@ export function parsePrintableSelections(detail:unknown):readonly PrintableSelec
   if(!source)return Object.freeze([]);
   const rows:PrintableSelectionPart[]=[];
   for(const segment of splitSegments(source)){
-    const match=segment.match(/^([^：:]{1,24})[：:]\s*(.+)$/u);
+    const match=segment.match(/^([^：:]{1,28})[：:]\s*(.+)$/u);
     if(match){
       const key=clean(match[1]);
       const value=stripPriceSuffix(clean(match[2]));
@@ -52,28 +55,74 @@ export function parsePrintableSelections(detail:unknown):readonly PrintableSelec
   return Object.freeze(rows);
 }
 
-export function productionSelectionLines(detail:unknown):readonly string[]{
-  return Object.freeze(parsePrintableSelections(detail).map(row=>row.value).filter(Boolean));
+export function groupPrintableSelections(detail:unknown):PrintableSelectionGroups{
+  const groups:{main:string[];addon:string[];drink:string[];modifier:string[];note:string[]}={
+    main:[],addon:[],drink:[],modifier:[],note:[],
+  };
+  for(const row of parsePrintableSelections(detail))groups[row.kind].push(row.value);
+  return Object.freeze({
+    main:Object.freeze(unique(groups.main)),
+    addon:Object.freeze(unique(groups.addon)),
+    drink:Object.freeze(unique(groups.drink)),
+    modifier:Object.freeze(unique(groups.modifier)),
+    note:Object.freeze(unique(groups.note)),
+  });
+}
+
+function modifierText(values:readonly string[]){
+  const rows=unique(values);
+  return rows.length?'('+rows.join('，')+')':'';
+}
+
+export function productionBlockLines(detail:unknown):readonly string[]{
+  const groups=groupPrintableSelections(detail);
+  const lines:string[]=[];
+  const main=groups.main[0]??'';
+  const addon=groups.addon[0]??'';
+  const modifier=modifierText(groups.modifier);
+  const mainWithModifier=main?(main+(modifier?' '+modifier:'')):'';
+  if(mainWithModifier||addon)lines.push([mainWithModifier,addon].filter(Boolean).join(' / '));
+  for(const value of groups.main.slice(1))lines.push(value);
+  for(const value of groups.addon.slice(1))lines.push(value);
+  for(const value of groups.drink)lines.push(value);
+  if(!main&&modifier)lines.push(modifier);
+  for(const value of groups.note)lines.push(value);
+  return Object.freeze(unique(lines));
+}
+
+export function verticalSelectionLines(detail:unknown):readonly string[]{
+  const groups=groupPrintableSelections(detail);
+  const lines:string[]=[];
+  const modifier=modifierText(groups.modifier);
+  for(const [index,value] of groups.main.entries()){
+    lines.push(value+(index===0&&modifier?' '+modifier:''));
+  }
+  if(!groups.main.length&&modifier)lines.push(modifier);
+  lines.push(...groups.addon,...groups.drink,...groups.note);
+  return Object.freeze(unique(lines));
 }
 
 export function productLabelContent(input:{
   readonly productName:string;
   readonly detail?:string;
-}):Readonly<{title:string;modifierLines:readonly string[]}>{
+}):Readonly<{title:string;bodyLines:readonly string[]}>{
   const base=clean(input.productName).split('｜')[0]||clean(input.productName);
-  const rows=parsePrintableSelections(input.detail);
-  const main=rows.find(row=>row.kind==='main');
-  const title=main?.value||base;
-  const modifierLines=rows
-    .filter(row=>row.kind==='modifier'||row.kind==='note')
-    .map(row=>row.value)
-    .filter(value=>value&&value!==title);
+  const groups=groupPrintableSelections(input.detail);
+  const title=groups.main[0]||base;
+  const body:string[]=[];
+  const modifier=modifierText(groups.modifier);
+  if(modifier)body.push(modifier);
+  body.push(...groups.main.slice(1),...groups.addon,...groups.drink,...groups.note);
   return Object.freeze({
     title,
-    modifierLines:Object.freeze([...new Set(modifierLines)]),
+    bodyLines:Object.freeze(unique(body.filter(value=>value!==title))),
   });
 }
 
+// Compatibility helpers used by existing ticket code/tests.
+export function productionSelectionLines(detail:unknown):readonly string[]{
+  return productionBlockLines(detail);
+}
 export function compactSelectionLines(detail:unknown):readonly string[]{
-  return productionSelectionLines(detail);
+  return verticalSelectionLines(detail);
 }
