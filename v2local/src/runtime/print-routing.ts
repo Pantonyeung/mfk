@@ -348,6 +348,7 @@ export function buildOrderPrintPlan(order:PrintableOrder,bindings:readonly Print
         orderCode:clean(order.display),
         primaryText:'共 '+total+' 件',
         secondaryText:'共 '+total+' 件',
+        pickupCode:clean(order.providerPickupCode??order.display),
       };
       jobs.push({
         id:order.id+':'+binding.id+':bag-label',
@@ -368,16 +369,12 @@ export function buildOrderPrintPlan(order:PrintableOrder,bindings:readonly Print
           productName:clean(unit.item.name),
           detail:clean(unit.item.detail??''),
         });
-        const baseProductName=clean(unit.item.name).split('｜')[0]||clean(unit.item.name);
         const labelSpec:RasterLabelSpec={
           kind:'product',
           orderCode:clean(order.display),
           primaryText:labelContent.title,
           pieceLabel:unit.pieceIndex+'/'+globalProductLabelTotal,
-          ...(labelContent.title===baseProductName&&clean(unit.item.productCode??'')
-            ?{productCode:clean(unit.item.productCode??'')}
-            :{}),
-          ...(labelContent.modifierLines.length?{secondaryLines:labelContent.modifierLines}:{}),
+          ...(labelContent.bodyLines.length?{secondaryLines:labelContent.bodyLines}:{}),
         };
         jobs.push({
           id:order.id+':'+binding.id+':product-label:'+unit.item.id+':'+unit.unit,
