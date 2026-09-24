@@ -816,3 +816,5 @@
   color:#174a98;
   box-shadow:0 0 0 3px rgba(31,95,191,.09)
 }
+
+.clean-display-popover>section>div.triple{grid-template-columns:repeat(3,1fr)}
