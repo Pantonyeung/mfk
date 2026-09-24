@@ -40,15 +40,17 @@ function TaskChoice({
 }
 
 export function RequiredFastLaneWorkspace({
-  cart,products,onApply,
+  cart,products,onApply,onDirtyChange,
 }:{
   cart:readonly FastLaneCartLine[];
   products:readonly FastLaneProduct[];
   onApply:(lineId:string,groupId:string,optionIds:readonly string[])=>void;
+  onDirtyChange?:(dirty:boolean)=>void;
 }){
   const tasks=useMemo(()=>requiredTasks(cart,products),[cart,products]);
   const [draft,setDraft]=useState<Record<string,string[]>>({});
   const toggle=(task:FastLaneRequiredTask,optionId:string)=>{
+    onDirtyChange?.(true);
     const current=draft[task.id]??[...task.selectedOptionIds];
     if(task.selection==='SINGLE'){
       setDraft(value=>({...value,[task.id]:[optionId]}));
@@ -135,7 +137,7 @@ export function RiceballPoolWorkspace({
 interface SpecifiedSelection{choiceId?:string;sourceLineId?:string;deferred?:boolean}
 
 export function ComboFastLaneWorkspace({
-  cart,products,combos,pools,onPair,onFillPending,onDissolve,
+  cart,products,combos,pools,onPair,onFillPending,onDissolve,onDirtyChange,
 }:{
   cart:readonly FastLaneCartLine[];
   products:readonly FastLaneProduct[];
@@ -144,6 +146,7 @@ export function ComboFastLaneWorkspace({
   onPair:(plan:FastLanePairPlan)=>void;
   onFillPending:(comboLineId:string,groupId:string,choiceId:string,sourceLineId?:string)=>void;
   onDissolve:(comboLineId:string)=>void;
+  onDirtyChange?:(dirty:boolean)=>void;
 }){
   const active=combos.filter(combo=>combo.active);
   const [selectedComboId,setSelectedComboId]=useState(active[0]?.id??'');
@@ -153,7 +156,7 @@ export function ComboFastLaneWorkspace({
   const existing=cart.filter(line=>Boolean(line.comboDraft));
   const nextLabel=pairingLabel(nextPairingIndex(cart));
 
-  const select=(groupId:string,value:SpecifiedSelection)=>setSelected(current=>({...current,[groupId]:value}));
+  const select=(groupId:string,value:SpecifiedSelection)=>{onDirtyChange?.(true);setSelected(current=>({...current,[groupId]:value}));};
   const requiredMissing=slots.some(slot=>{
     if(!slot.required)return false;
     const value=selected[slot.groupId];
