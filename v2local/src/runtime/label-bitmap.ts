@@ -161,22 +161,32 @@ function drawBagLabel(
   widthDots:number,
   heightDots:number,
 ){
-  const margin=14;
-  // Bag label is intentionally minimal: display number + total item count only.
+  const margin=12;
+  const gap=10;
+  const top=16;
+  const height=heightDots-top*2;
+  const usable=widthDots-margin*2;
+  const leftWidth=Math.round(usable*0.62);
+  const rightX=margin+leftWidth+gap;
+  const rightWidth=usable-leftWidth-gap;
+
+  // Owner-locked bag label: landscape, no logo, no bag sequence.
+  // LEFT = order/display number, RIGHT = total item count.
   ctx.fillStyle='#000';
-  ctx.fillRect(margin,18,widthDots-margin*2,130);
+  ctx.fillRect(margin,top,leftWidth,height);
+  ctx.fillRect(rightX,top,rightWidth,height);
+
   ctx.fillStyle='#fff';
   ctx.textAlign='center';
   ctx.textBaseline='middle';
-  const orderCode=String(spec.orderCode||'');
-  fitFont(ctx,orderCode,widthDots-margin*2-24,64,38,900);
-  ctx.fillText(orderCode,widthDots/2,83);
 
-  ctx.fillStyle='#000';
-  ctx.textBaseline='top';
-  const total=String(spec.secondaryText||spec.primaryText||'').trim();
-  fitFont(ctx,total,widthDots-margin*2,48,30,900);
-  ctx.fillText(total,widthDots/2,188);
+  const orderCode=String(spec.orderCode||'');
+  fitFont(ctx,orderCode,leftWidth-18,76,42,900);
+  ctx.fillText(orderCode,margin+leftWidth/2,top+height/2);
+
+  const total=String(spec.secondaryText||spec.primaryText||'').replace(/\s+/g,'').trim();
+  fitFont(ctx,total,rightWidth-12,48,30,900);
+  ctx.fillText(total,rightX+rightWidth/2,top+height/2);
 }
 
 export async function renderTscRasterLabel(spec:RasterLabelSpec):Promise<Uint8Array>{

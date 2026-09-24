@@ -238,14 +238,15 @@ function PrinterPanel(){
         if(current.capability==='label-58mm'){
           const bytes=await renderTscRasterLabel(current.role==='袋標籤'?{
             kind:'bag',
-            orderCode:'P0019',
-            primaryText:'共 2 件',
-            secondaryText:'共 2 件',
+            orderCode:'P026',
+            primaryText:'共 1 件',
+            secondaryText:'共 1 件',
           }:{
             kind:'product',
-            orderCode:'P0017',
-            primaryText:current.name,
-            secondaryText:productLabelPurpose(current),
+            orderCode:'P026',
+            productCode:'D1',
+            primaryText:'今日想食辣',
+            secondaryText:'外賣 / 普通 / 黑芝麻醬',
             pieceLabel:'1/2',
           });
           result=await printBytesLan({...printer,bytes});
