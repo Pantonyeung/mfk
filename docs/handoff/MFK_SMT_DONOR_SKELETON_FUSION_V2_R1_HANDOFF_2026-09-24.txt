@@ -541,3 +541,65 @@ Any rule that blocks Accept until payment evidence is verified changes money/ord
 
 STATUS:
 MFK_SMT_DONOR_SKELETON_FUSION_V2_R1_REFRESHED_CURRENT_MAIN_GREEN_PAYMENT_EVIDENCE_DECISION_SEAM
+
+
+==================================================
+SILENT GUIDED FLOW｜GREEN
+==================================================
+
+Owner intent:
+店員每次操作後，自然知道應該撳邊個位置。
+禁止用「下一步／上一步」式 wizard 文案。
+
+Product candidate:
+72200200fe8b7a11f4aa5b5931d66f5c13501d2f
+
+Guidance priority:
+Required
+→ Quick Drink
+→ Combo blocker
+→ 飯團待組
+→ Checkout
+→ Product
+
+Behavior:
+- 正確 next surface 只用視覺層級／柔和 focus 提示。
+- Quick Mode 產生 unresolved Required：自動開 Required。
+- Required 清完且可配對：自動進飯團待組。
+- Auto / specified pairing 產生待補飲品：自動開 Quick Drink。
+- 飲品補完但仲有下一杯：保持下一個飲品 target。
+- 所有 blocker 清除：Checkout 成為視覺主動作。
+- Checkout 永遠保留人工確認，禁止自動提交。
+- Fast Lane 內 first unresolved card / slot / pending fill / ready auto-pair action 有 silent focus。
+
+Validation:
+GitHub Actions 36005026673 SUCCESS
+Job 107650866823
+30 / 30 Test Files PASS
+130 / 130 Tests PASS
+Build GREEN
+Worker 1424d55b-4b5a-4cf5-b52b-68ccc7437620
+Preview:
+https://smt-donor-v2-r1-guided-flow-mfk-admin.yeungyi88.workers.dev
+
+Preview PR:
+#269 CLOSED / NOT MERGED
+
+Current main fresh-read:
+e736a118b3da1e81a1f4c8375884fbc2406b8ce4
+
+Latest main drift:
+v2admin/src/customer-cloud-edge.test.ts only
+No v2local collision.
+
+Main:
+NOT MERGED
+
+Production:
+UNCHANGED
+
+Status:
+MFK_SMT_DONOR_SKELETON_FUSION_V2_R1_SILENT_GUIDED_FLOW_GREEN_OWNER_ACCEPTANCE_PENDING
+
+HARD RULE:
+未經 Owner 驗收，不准 merge main。
