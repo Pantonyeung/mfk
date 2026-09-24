@@ -1,5 +1,5 @@
 import type {PrintableOrder} from './print-routing.ts';
-import {compactSelectionLines,productionSelectionLines} from './print-content.ts';
+import {productionBlockLines,verticalSelectionLines} from './print-content.ts';
 
 export const ESC_POS_RASTER_PROFILE=Object.freeze({
   widthDots:576,
@@ -21,10 +21,14 @@ function concatBytes(parts:readonly Uint8Array[]){
 }
 
 function clean(value:unknown){
-  return String(value??'').replace(/[\r\n]+/g,' ').trim();
+  return String(value??'').replace(/[\r\n]+/g,' ').replace(/\s+/g,' ').trim();
 }
 function money(minor:number){
   return 'HK$'+(Math.max(0,Number(minor)||0)/100).toFixed(2);
+}
+function moneyCompact(minor:number){
+  const value=Math.max(0,Number(minor)||0)/100;
+  return 'HK$'+(Number.isInteger(value)?String(value):value.toFixed(2));
 }
 function totalUnits(order:PrintableOrder){
   return order.items.reduce((sum,item)=>sum+Math.max(0,Number(item.qty)||0),0);
@@ -45,19 +49,14 @@ function hktDateTime(iso:string){
   const pick=(type:string)=>parts.find(part=>part.type===type)?.value??'';
   return pick('year')+'-'+pick('month')+'-'+pick('day')+' '+pick('hour')+':'+pick('minute')+':'+pick('second');
 }
-function productIdentity(item:PrintableOrder['items'][number]){
-  const code=clean(item.productCode);
-  const base=clean(item.name).split('｜')[0]||clean(item.name);
-  return (code?'('+code+') ':'')+base;
+function itemTitle(item:PrintableOrder['items'][number]){
+  return clean(item.name).split('｜')[0]||clean(item.name);
 }
 function detailSource(item:PrintableOrder['items'][number]){
   const explicit=clean(item.detail);
   if(explicit)return explicit;
   const pieces=clean(item.name).split('｜');
   return pieces.length>1?pieces.slice(1).join(' · '):'';
-}
-function detailLines(item:PrintableOrder['items'][number]){
-  return compactSelectionLines(detailSource(item));
 }
 
 function font(ctx:CanvasRenderingContext2D,size:number,weight=600){
@@ -72,7 +71,7 @@ function measureFit(ctx:CanvasRenderingContext2D,text:string,maxWidth:number,pre
   }
   return size;
 }
-function wrap(ctx:CanvasRenderingContext2D,text:string,maxWidth:number,maxLines=5){
+function wrap(ctx:CanvasRenderingContext2D,text:string,maxWidth:number,maxLines=6){
   const value=clean(text);
   if(!value)return [''];
   const lines:string[]=[];
@@ -99,6 +98,7 @@ class TicketCanvas{
   readonly width:number;
   readonly margin:number;
   y=20;
+
   constructor(readonly canvas:HTMLCanvasElement){
     this.width=canvas.width;
     this.margin=ESC_POS_RASTER_PROFILE.margin;
@@ -110,7 +110,8 @@ class TicketCanvas{
     this.ctx.fillStyle='#000';
     this.ctx.textBaseline='top';
   }
-  line(gap=16){
+
+  line(gap=18){
     this.ctx.strokeStyle='#000';
     this.ctx.lineWidth=2;
     this.ctx.setLineDash([8,6]);
@@ -121,95 +122,38 @@ class TicketCanvas{
     this.ctx.setLineDash([]);
     this.y+=gap;
   }
-  text(text:string,size=26,weight=600,align:'left'|'center'|'right'='left',lineHeight?:number){
+
+  text(text:string,size=28,weight=700,align:'left'|'center'|'right'='left',lineHeight?:number){
     const value=clean(text);
     font(this.ctx,size,weight);
     this.ctx.textAlign=align;
+    this.ctx.textBaseline='top';
     const x=align==='center'?this.width/2:align==='right'?this.width-this.margin:this.margin;
     this.ctx.fillStyle='#000';
     this.ctx.fillText(value,x,this.y);
     this.y+=(lineHeight??Math.round(size*1.35));
   }
-  wrapped(text:string,size=26,weight=600,maxLines=5,lineHeight?:number){
+
+  wrapped(text:string,size=30,weight=700,maxLines=6,lineHeight?:number,maxWidth?:number){
     font(this.ctx,size,weight);
-    const lines=wrap(this.ctx,text,this.width-this.margin*2,maxLines);
+    const width=maxWidth??(this.width-this.margin*2);
+    const lines=wrap(this.ctx,text,width,maxLines);
     for(const line of lines)this.text(line,size,weight,'left',lineHeight);
   }
-  productionItemBlock(item:PrintableOrder['items'][number]){
-    const title=productIdentity(item);
-    const lines=productionSelectionLines(detailSource(item));
-    const top=this.y;
-    const totalWidth=this.width-this.margin*2;
-    const gap=14;
-    const qtyWidth=132;
-    const leftWidth=totalWidth-qtyWidth-gap;
 
-    font(this.ctx,46,900);
-    const titleLines=wrap(this.ctx,title,leftWidth,4);
-    const detailWrapped:string[]=[];
-    font(this.ctx,31,800);
-    for(const line of lines){
-      for(const wrappedLine of wrap(this.ctx,line,leftWidth,3))detailWrapped.push(wrappedLine);
-    }
-    const bodyHeight=Math.max(
-      132,
-      18+titleLines.length*56+(detailWrapped.length?10+detailWrapped.length*40:0)+18
-    );
-
-    this.ctx.fillStyle='#000';
-    this.ctx.textAlign='left';
-    this.ctx.textBaseline='top';
-    let textY=top+12;
-    font(this.ctx,46,900);
-    for(const line of titleLines){
-      this.ctx.fillText(line,this.margin,textY);
-      textY+=56;
-    }
-    if(detailWrapped.length){
-      textY+=4;
-      font(this.ctx,31,800);
-      for(const line of detailWrapped){
-        this.ctx.fillText(line,this.margin,textY);
-        textY+=40;
-      }
-    }
-
-    const qtyX=this.margin+leftWidth+gap;
-    this.ctx.strokeStyle='#000';
-    this.ctx.lineWidth=3;
-    this.ctx.strokeRect(qtyX,top,qtyWidth,bodyHeight);
-    this.ctx.textAlign='center';
-    this.ctx.textBaseline='middle';
-    font(this.ctx,45,900);
-    this.ctx.fillText(String(item.qty)+'份',qtyX+qtyWidth/2,top+bodyHeight/2);
-    this.ctx.textBaseline='top';
-    this.ctx.textAlign='left';
-    this.y+=bodyHeight+16;
+  brand(){
+    this.text('More Fun',26,800,'center',32);
+    this.text('磨飯',68,900,'center',78);
+    this.text('手作 / 真食 / 更有味',25,700,'center',38);
   }
-  blackBlock(label:string,value:string,height=112){
-    const top=this.y;
-    this.ctx.fillStyle='#000';
-    this.ctx.fillRect(this.margin,top,this.width-this.margin*2,height);
-    this.ctx.fillStyle='#fff';
-    this.ctx.textBaseline='middle';
-    this.ctx.textAlign='left';
-    font(this.ctx,30,900);
-    this.ctx.fillText(label,this.margin+18,top+height/2);
-    const valueMax=this.width-this.margin*2-190;
-    const valueSize=measureFit(this.ctx,value,valueMax,66,38,900);
-    font(this.ctx,valueSize,900);
-    this.ctx.textAlign='right';
-    this.ctx.fillText(value,this.width-this.margin-18,top+height/2);
-    this.ctx.textBaseline='top';
-    this.ctx.fillStyle='#000';
-    this.y+=height+18;
-  }
+
   boxedPair(leftLabel:string,leftValue:string,rightLabel:string,rightValue:string){
     const top=this.y;
     const total=this.width-this.margin*2;
     const leftWidth=Math.round(total*0.60);
     const rightWidth=total-leftWidth;
     const height=148;
+
     this.ctx.strokeStyle='#000';
     this.ctx.lineWidth=3;
     this.ctx.strokeRect(this.margin,top,total,height);
@@ -231,17 +175,123 @@ class TicketCanvas{
     font(this.ctx,25,800);
     const rightLines=String(rightValue).split('\n').flatMap(line=>wrap(this.ctx,line,rightWidth-28,2));
     let ry=top+52;
-    for(const line of rightLines.slice(0,2)){this.ctx.fillText(line,this.margin+leftWidth+14,ry);ry+=36;}
+    for(const line of rightLines.slice(0,2)){
+      this.ctx.fillText(line,this.margin+leftWidth+14,ry);
+      ry+=36;
+    }
 
     this.y+=height+18;
   }
-  brand(){
-    this.text('More Fun',26,800,'center',32);
-    this.text('磨飯',68,900,'center',78);
-    this.text('手作 / 真食 / 更有味',25,700,'center',38);
+
+  structuredItemBlock(input:{
+    item:PrintableOrder['items'][number];
+    lines:readonly string[];
+    qtyBox:boolean;
+    priceBox?:boolean;
+  }){
+    const {item,lines,qtyBox,priceBox=false}=input;
+    const top=this.y;
+    const totalWidth=this.width-this.margin*2;
+    const gap=14;
+    const boxWidth=priceBox?144:132;
+    const leftWidth=qtyBox?totalWidth-boxWidth-gap:totalWidth;
+
+    font(this.ctx,42,900);
+    const titleLines=wrap(this.ctx,itemTitle(item),leftWidth,3);
+    const bodyLines:string[]=[];
+    font(this.ctx,39,900);
+    for(const value of lines){
+      for(const row of wrap(this.ctx,value,leftWidth,3))bodyLines.push(row);
+    }
+    const bodyHeight=Math.max(
+      priceBox?176:150,
+      16+titleLines.length*52+(bodyLines.length?8+bodyLines.length*48:0)+16
+    );
+
+    this.ctx.fillStyle='#000';
+    this.ctx.textAlign='left';
+    this.ctx.textBaseline='top';
+    let textY=top+8;
+
+    font(this.ctx,42,900);
+    for(const line of titleLines){
+      this.ctx.fillText(line,this.margin,textY);
+      textY+=52;
+    }
+
+    font(this.ctx,39,900);
+    for(const line of bodyLines){
+      this.ctx.fillText(line,this.margin,textY);
+      textY+=48;
+    }
+
+    if(qtyBox){
+      const boxX=this.margin+leftWidth+gap;
+      this.ctx.strokeStyle='#000';
+      this.ctx.lineWidth=3;
+      this.ctx.strokeRect(boxX,top,boxWidth,bodyHeight);
+
+      this.ctx.textAlign='center';
+      this.ctx.textBaseline='middle';
+      font(this.ctx,46,900);
+
+      if(priceBox){
+        const split=top+Math.round(bodyHeight*0.56);
+        this.ctx.beginPath();
+        this.ctx.moveTo(boxX,split);
+        this.ctx.lineTo(boxX+boxWidth,split);
+        this.ctx.stroke();
+        this.ctx.fillText(String(item.qty)+'份',boxX+boxWidth/2,top+(split-top)/2);
+        const price=moneyCompact(item.qty*item.unitMinor);
+        const priceSize=measureFit(this.ctx,price,boxWidth-14,34,23,900);
+        font(this.ctx,priceSize,900);
+        this.ctx.fillText(price,boxX+boxWidth/2,split+(top+bodyHeight-split)/2);
+      }else{
+        this.ctx.fillText(String(item.qty)+'份',boxX+boxWidth/2,top+bodyHeight/2);
+      }
+      this.ctx.textAlign='left';
+      this.ctx.textBaseline='top';
+    }
+
+    this.y+=bodyHeight+14;
   }
+
+  totalRow(label:string,value:string){
+    const top=this.y;
+    const height=62;
+    font(this.ctx,42,900);
+    this.ctx.textAlign='left';
+    this.ctx.textBaseline='middle';
+    this.ctx.fillStyle='#000';
+    this.ctx.fillText(label,this.margin,top+height/2);
+    font(this.ctx,48,900);
+    this.ctx.textAlign='right';
+    this.ctx.fillText(value,this.width-this.margin,top+height/2);
+    this.ctx.textAlign='left';
+    this.ctx.textBaseline='top';
+    this.y+=height+8;
+  }
+
+  checkboxRow(labels:readonly string[]){
+    const top=this.y;
+    const usable=this.width-this.margin*2;
+    const colWidth=usable/labels.length;
+    for(let i=0;i<labels.length;i++){
+      const x=this.margin+i*colWidth;
+      this.ctx.strokeStyle='#000';
+      this.ctx.lineWidth=3;
+      this.ctx.strokeRect(x,top+4,30,30);
+      this.ctx.textAlign='left';
+      this.ctx.textBaseline='top';
+      this.ctx.fillStyle='#000';
+      font(this.ctx,28,800);
+      this.ctx.fillText(labels[i]??'',x+40,top);
+    }
+    this.y+=48;
+  }
+
   finish(){
-    return Math.min(this.canvas.height,Math.ceil(this.y+20));
+    return Math.min(this.canvas.height,Math.ceil(this.y+24));
   }
 }
 
@@ -251,61 +301,51 @@ function receipt(t:TicketCanvas,order:PrintableOrder){
   t.text('客戶收據',50,900,'center',64);
   t.line(22);
   t.boxedPair('訂單編號 No.',clean(order.display),'下單時間',hktDateTime(order.createdAt).replace(' ','\n'));
-  t.text('來源：'+clean(order.sourceLabel)+' / '+orderService(order),29,800, 'left',38);
-  const pickup=clean(order.providerPickupCode);
-  if(pickup){
-    t.line(20);
-    t.blackBlock('取餐碼',pickup,122);
-  }
-  t.line(22);
-  t.text('品項',28,900,'left',38);
+  t.text('來源：'+clean(order.sourceLabel)+' / '+orderService(order),30,800,'left',40);
+  t.line(20);
+  t.text('品項',29,900,'left',40);
+
   for(const item of order.items){
-    t.wrapped(productIdentity(item),40,900,4,48);
-    for(const line of detailLines(item))t.wrapped(line,30,700,3,38);
-    t.text(String(item.qty)+' × '+money(item.unitMinor)+'     '+money(item.qty*item.unitMinor),29,800,'left',38);
-    t.y+=12;
+    t.structuredItemBlock({
+      item,
+      lines:verticalSelectionLines(detailSource(item)),
+      qtyBox:true,
+      priceBox:true,
+    });
+    t.line(18);
   }
+
+  t.totalRow('總數量：',String(totalUnits(order))+'份');
+  t.line(18);
+  t.text('付款方式：'+clean(order.paymentLabel),32,800,'left',42);
+  t.text('合計 '+money(order.totalMinor),52,900,'left',64);
   t.line(22);
-  t.text('總數量：'+totalUnits(order)+' 件',40,900,'left',52);
-  if(order.utensilPreference)t.text('餐具：'+order.utensilPreference,30,800,'left',40);
-  if(clean(order.orderRemark))t.wrapped('備註：'+clean(order.orderRemark),30,800,4,40);
-  t.line(22);
-  t.text('付款方式：'+clean(order.paymentLabel),30,800,'left',40);
-  t.text('合計 '+money(order.totalMinor),50,900,'left',62);
-  t.line(22);
-  t.text('請核對餐點 / 謝謝光臨',29,800,'center',40);
-  t.text('*** 謝謝！***',32,900,'center',42);
-  t.text('More Fun Kitchen',24,700,'center',32);
+  t.text('請核對餐點 / 謝謝光臨',28,800,'center',38);
+  t.text('*** 謝謝！***',30,900,'center',40);
+  t.text('More Fun Kitchen',23,700,'center',32);
 }
 
 function production(t:TicketCanvas,order:PrintableOrder){
-  t.brand();
-  t.line(22);
-  t.text('廚房製作單',54,900,'center',68);
-  t.line(22);
+  t.text(orderService(order),72,900,'center',88);
+  t.line(24);
   t.text('單號',30,900,'left',40);
-  t.text(clean(order.display),92,900,'center',104);
-  t.text('落單時間：'+hktDateTime(order.createdAt),28,800,'left',38);
-  t.text('來源：'+clean(order.sourceLabel)+' / '+orderService(order),28,800,'left',38);
-  t.line(22);
+  t.text(clean(order.display),96,900,'center',108);
+  t.text('時間：'+hktDateTime(order.createdAt),30,800,'left',42);
+  t.line(24);
+
   for(const item of order.items){
-    t.productionItemBlock(item);
+    t.structuredItemBlock({
+      item,
+      lines:productionBlockLines(detailSource(item)),
+      qtyBox:true,
+    });
     t.line(22);
   }
-  if(clean(order.orderRemark))t.wrapped('備註：'+clean(order.orderRemark),32,900,4,42);
-  if(order.utensilPreference)t.text('餐具：'+order.utensilPreference,31,900,'left',42);
-  if(orderService(order)==='外賣')t.text('外賣請打包',34,900,'left',46);
-  t.line(22);
-  t.text('*** 謝謝！***',32,900,'center',44);
-  t.text('More Fun Kitchen',24,700,'center',34);
+
+  if(clean(order.orderRemark))t.wrapped('備註：'+clean(order.orderRemark),34,900,4,44);
+  t.line(20);
 }
 
-function checkbox(ctx:CanvasRenderingContext2D,x:number,y:number,checked=false){
-  ctx.strokeStyle='#000';ctx.lineWidth=2;ctx.strokeRect(x,y,22,22);
-  if(checked){
-    ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(x+4,y+12);ctx.lineTo(x+9,y+18);ctx.lineTo(x+19,y+4);ctx.stroke();
-  }
-}
 function packing(t:TicketCanvas,order:PrintableOrder){
   t.brand();
   t.line(22);
@@ -315,44 +355,23 @@ function packing(t:TicketCanvas,order:PrintableOrder){
   t.boxedPair('訂單編號 No.',clean(order.display),'下單時間',hktDateTime(order.createdAt).replace(' ','\n'));
   t.text('品項 / 數量 / 備註 / 特別要求',27,900,'left',38);
   t.line(18);
+
   for(const item of order.items){
-    t.wrapped(productIdentity(item),40,900,4,48);
-    t.text('數量 '+item.qty,31,900,'left',40);
-    for(const line of detailLines(item))t.wrapped(line,30,750,3,39);
-    t.y+=10;
+    t.structuredItemBlock({
+      item,
+      lines:verticalSelectionLines(detailSource(item)),
+      qtyBox:true,
+    });
+    t.line(18);
   }
-  t.line(22);
-  t.text('總數量：'+totalUnits(order)+' 件',44,900,'left',56);
-  t.line(22);
-  t.text('餐具（請確認）',30,900,'left',40);
-  const cy=t.y;
-  checkbox(t.ctx,t.margin,cy,order.utensilPreference==='需要');
-  t.ctx.textBaseline='top';t.ctx.textAlign='left';t.ctx.fillStyle='#000';font(t.ctx,27,800);
-  t.ctx.fillText('需要 (Y)',t.margin+38,cy-4);
-  checkbox(t.ctx,t.margin+275,cy,order.utensilPreference==='不需要');
-  t.ctx.fillText('不需要 (N)',t.margin+313,cy-4);
-  t.y+=48;
+
+  t.totalRow('總數量：',String(totalUnits(order))+'件');
   t.line(18);
-  t.text('其他內容物（請確認）',29,900,'left',40);
-  const labels=['飲品','醬汁','小食 / 配料','餐巾紙','吸管','其他'];
-  for(let i=0;i<labels.length;i++){
-    const col=i%2,row=Math.floor(i/2);
-    const x=t.margin+col*278,y=t.y+row*43;
-    checkbox(t.ctx,x,y,false);
-    t.ctx.textAlign='left';t.ctx.textBaseline='top';t.ctx.fillStyle='#000';font(t.ctx,25,750);
-    t.ctx.fillText(labels[i]!,x+34,y-3);
-  }
-  t.y+=142;
-  if(clean(order.orderRemark))t.wrapped('訂單備註：'+clean(order.orderRemark),29,800,4,39);
-  t.line(22);
-  t.text('付款方式：'+clean(order.paymentLabel),30,800,'left',40);
-  t.text('金額：'+money(order.totalMinor),40,900,'left',52);
-  const pickup=clean(order.providerPickupCode);
-  if(pickup){
-    t.line(20);
-    t.blackBlock('取餐碼',pickup,116);
-  }
-  t.line(22);
+  t.checkboxRow(['餐具','飲品','醬汁']);
+  t.line(18);
+  t.text('付款方式：'+clean(order.paymentLabel),32,800,'left',42);
+  t.text('金額：'+money(order.totalMinor),44,900,'left',56);
+  t.line(20);
   t.text('請確認餐點後交予顧客  謝謝！',27,800,'center',38);
   t.text('More Fun Kitchen',23,700,'center',32);
 }
@@ -406,14 +425,16 @@ export async function renderEscPosRasterTicket(input:{
   readonly beepAfter?:boolean;
 }){
   if(typeof document==='undefined')throw new Error('ESC_POS_RASTER_CANVAS_UNAVAILABLE');
-  const estimatedHeight=Math.max(1250,900+input.order.items.length*420);
+  const estimatedHeight=Math.max(1800,1150+input.order.items.length*620);
   const canvas=document.createElement('canvas');
   canvas.width=ESC_POS_RASTER_PROFILE.widthDots;
   canvas.height=estimatedHeight;
   const t=new TicketCanvas(canvas);
+
   if(input.kind==='receipt')receipt(t,input.order);
   else if(input.kind==='production')production(t,input.order);
   else packing(t,input.order);
+
   const usedHeight=t.finish();
   const image=t.ctx.getImageData(0,0,canvas.width,usedHeight);
   const mono=new Uint8Array(canvas.width*usedHeight);
@@ -426,6 +447,7 @@ export async function renderEscPosRasterTicket(input:{
     const luminance=(r*299+g*587+b*114)/1000;
     mono[p]=alpha>20&&luminance<180?1:0;
   }
+
   return buildEscPosRasterPayload({
     bitmap:packEscPosRasterPixels(mono,canvas.width,usedHeight),
     widthDots:canvas.width,

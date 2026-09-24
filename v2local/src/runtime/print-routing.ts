@@ -1,5 +1,5 @@
 import type {RasterLabelSpec} from './label-bitmap.ts';
-import {productLabelContent} from './print-content.ts';
+import {productLabelContent,productionBlockLines,verticalSelectionLines} from './print-content.ts';
 
 export type PrintRole='顧客小票'|'製作單'|'打包單'|'產品標籤'|'袋標籤';
 
@@ -153,98 +153,77 @@ function reverseBlock(label:string,value:string,size=DOUBLE){
 
 export function renderCustomerReceiptTicket(order:PrintableOrder){
   const rows=order.items.map(item=>{
-    const detail=itemDetail(item);
+    const details=verticalSelectionLines(itemDetail(item)).map(line=>'  '+line+'\n').join('');
     return BOLD_ON+itemIdentity(item)+BOLD_OFF+'\n'
-      +(detail?'  '+detail+'\n':'')
-      +'  '+item.qty+' × '+money(item.unitMinor)+'   '+money(item.unitMinor*item.qty)+'\n';
+      +details
+      +'  '+item.qty+'份   '+money(item.unitMinor*item.qty)+'\n';
   }).join('');
-  const pickup=clean(order.providerPickupCode??'');
   return INIT
     +brand()
     +RULE
     +CENTER+BOLD_ON+DOUBLE+'客戶收據\n'+NORMAL+BOLD_OFF+LEFT
     +RULE
-    +'訂單編號\n'
-    +CENTER+BOLD_ON+TRIPLE+clean(order.display)+'\n'+NORMAL+BOLD_OFF+LEFT
+    +'訂單編號 '+clean(order.display)+'\n'
     +'下單時間 '+hktDateTime(order.createdAt)+'\n'
-    +'來源 '+clean(order.sourceLabel)+' · '+orderService(order)+'\n'
-    +(pickup?RULE+reverseBlock('取餐碼',pickup,TRIPLE):'')
+    +'來源 '+clean(order.sourceLabel)+' / '+orderService(order)+'\n'
     +RULE
     +rows
     +RULE
-    +BOLD_ON+'總數量 '+totalUnits(order)+' 件\n'+BOLD_OFF
-    +(order.utensilPreference?'餐具 '+order.utensilPreference+'\n':'')
-    +(clean(order.orderRemark??'')?'備註 '+clean(order.orderRemark??'')+'\n':'')
-    +RULE
+    +BOLD_ON+'總數量 '+totalUnits(order)+'份\n'+BOLD_OFF
     +'付款方式 '+clean(order.paymentLabel)+'\n'
     +BOLD_ON+DOUBLE+'合計 '+money(order.totalMinor)+'\n'+NORMAL+BOLD_OFF
     +RULE
-    +CENTER+'請核對餐點 · 謝謝光臨\n'+LEFT
-    +footer()
+    +CENTER+'請核對餐點 / 謝謝光臨\n'
+    +'*** 謝謝！***\n'
+    +'More Fun Kitchen\n'+LEFT
     +'\n\n';
 }
 
 export function renderProductionTicket(order:PrintableOrder){
   const blocks=order.items.map(item=>{
-    const detail=itemDetail(item);
+    const details=productionBlockLines(itemDetail(item)).map(line=>line+'\n').join('');
     return BOLD_ON+DOUBLE+itemIdentity(item)+'\n'+NORMAL+BOLD_OFF
-      +(detail?BOLD_ON+'要求 '+detail+'\n'+BOLD_OFF:'')
-      +reverseBlock('數量',String(item.qty)+'份',DOUBLE)
+      +details
+      +'數量 '+item.qty+'份\n'
       +RULE;
   }).join('');
   return INIT
-    +brand()
+    +CENTER+BOLD_ON+TRIPLE+orderService(order)+'\n'+NORMAL+BOLD_OFF+LEFT
     +RULE
-    +CENTER+BOLD_ON+DOUBLE+'廚房製作單\n'+NORMAL+BOLD_OFF+LEFT
-    +RULE
-    +'單號\n'
-    +CENTER+BOLD_ON+TRIPLE+clean(order.display)+'\n'+NORMAL+BOLD_OFF+LEFT
-    +'落單時間 '+hktDateTime(order.createdAt)+'\n'
-    +'來源 '+clean(order.sourceLabel)+' · '+orderService(order)+'\n'
+    +'單號 '+clean(order.display)+'\n'
+    +'時間 '+hktDateTime(order.createdAt)+'\n'
     +RULE
     +blocks
-    +(clean(order.orderRemark??'')?'備註：'+clean(order.orderRemark??'')+'\n':'')
-    +(order.utensilPreference?'餐具：'+order.utensilPreference+'\n':'')
-    +(orderService(order)==='外賣'?'外賣請打包\n':'')
+    +(clean(order.orderRemark??'')?'備註 '+clean(order.orderRemark??'')+'\n':'')
     +RULE
-    +footer()
     +'\n\n';
 }
 
 export function renderPackingTicket(order:PrintableOrder){
   const rows=order.items.map(item=>{
-    const detail=itemDetail(item);
+    const details=verticalSelectionLines(itemDetail(item)).map(line=>line+'\n').join('');
     return BOLD_ON+itemIdentity(item)+BOLD_OFF+'\n'
-      +'數量 '+item.qty
-      +(detail?' · '+detail:'')
-      +'\n';
+      +details
+      +'數量 '+item.qty+'份\n';
   }).join('');
-  const pickup=clean(order.providerPickupCode??'');
   return INIT
     +brand()
     +RULE
     +CENTER+BOLD_ON+DOUBLE+'外賣打包單\n'+NORMAL+'TAKE AWAY\n'+BOLD_OFF+LEFT
     +RULE
-    +'訂單編號 No.\n'
-    +CENTER+BOLD_ON+TRIPLE+clean(order.display)+'\n'+NORMAL+BOLD_OFF+LEFT
+    +'訂單編號 '+clean(order.display)+'\n'
     +'下單時間 '+hktDateTime(order.createdAt)+'\n'
     +RULE
-    +'品項 / 數量 / 備註・特別要求\n'
     +rows
     +RULE
-    +BOLD_ON+DOUBLE+'總數量 '+totalUnits(order)+' 件\n'+NORMAL+BOLD_OFF
-    +'餐具：'+(order.utensilPreference??'未記錄')+'\n'
-    +'內容物確認：[ ] 飲品  [ ] 醬汁\n'
-    +'             [ ] 小食/配料 [ ] 餐巾紙\n'
-    +'             [ ] 吸管  [ ] 其他\n'
-    +(clean(order.orderRemark??'')?'訂單備註：'+clean(order.orderRemark??'')+'\n':'')
+    +BOLD_ON+DOUBLE+'總數量 '+totalUnits(order)+'件\n'+NORMAL+BOLD_OFF
+    +'[ ] 餐具   [ ] 飲品   [ ] 醬汁\n'
     +RULE
     +'付款方式 '+clean(order.paymentLabel)+'\n'
     +'金額 '+money(order.totalMinor)+'\n'
-    +(pickup?RULE+reverseBlock('取餐碼',pickup,TRIPLE):'')
     +RULE
-    +CENTER+'請確認餐點後交予顧客 謝謝！\n'+LEFT
-    +footer()
+    +CENTER+'請確認餐點後交予顧客 謝謝！\n'
+    +'More Fun Kitchen\n'+LEFT
     +'\n\n';
 }
 
@@ -348,6 +327,7 @@ export function buildOrderPrintPlan(order:PrintableOrder,bindings:readonly Print
         orderCode:clean(order.display),
         primaryText:'共 '+total+' 件',
         secondaryText:'共 '+total+' 件',
+        pickupCode:clean(order.providerPickupCode??order.display),
       };
       jobs.push({
         id:order.id+':'+binding.id+':bag-label',
@@ -368,16 +348,12 @@ export function buildOrderPrintPlan(order:PrintableOrder,bindings:readonly Print
           productName:clean(unit.item.name),
           detail:clean(unit.item.detail??''),
         });
-        const baseProductName=clean(unit.item.name).split('｜')[0]||clean(unit.item.name);
         const labelSpec:RasterLabelSpec={
           kind:'product',
           orderCode:clean(order.display),
           primaryText:labelContent.title,
           pieceLabel:unit.pieceIndex+'/'+globalProductLabelTotal,
-          ...(labelContent.title===baseProductName&&clean(unit.item.productCode??'')
-            ?{productCode:clean(unit.item.productCode??'')}
-            :{}),
-          ...(labelContent.modifierLines.length?{secondaryLines:labelContent.modifierLines}:{}),
+          ...(labelContent.bodyLines.length?{secondaryLines:labelContent.bodyLines}:{}),
         };
         jobs.push({
           id:order.id+':'+binding.id+':product-label:'+unit.item.id+':'+unit.unit,
