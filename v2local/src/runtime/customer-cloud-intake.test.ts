@@ -59,10 +59,11 @@ describe('customer cloud local quote adapter',()=>{
     expect(result.items).toEqual([
       {
         id:'bento',
-        name:'肉燥便當｜加飯、台式奶茶',
+        name:'肉燥便當',
         qty:2,
         unitMinor:5600,
         serviceMode:'takeaway',
+        detail:'加飯、台式奶茶',
       },
     ]);
   });
