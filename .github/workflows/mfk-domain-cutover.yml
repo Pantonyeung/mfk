@@ -1,0 +1,309 @@
+name: MFK Domain Cutover
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'requests/mfk-domain-cutover.txt'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mfk-domain-cutover
+  cancel-in-progress: false
+
+jobs:
+  cutover:
+    if: github.actor == 'Pantonyeung'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+    steps:
+      - name: Checkout cutover control
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Resolve exact product source
+        id: request
+        shell: bash
+        run: |
+          set -euo pipefail
+          SOURCE_SHA="$(sed -n 's/^source_sha=//p' requests/mfk-domain-cutover.txt | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')"
+          [[ "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          echo "source_sha=$SOURCE_SHA" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout exact MFK product source
+        uses: actions/checkout@v7
+        with:
+          repository: Pantonyeung/mfk
+          ref: ${{ steps.request.outputs.source_sha }}
+          path: source
+          persist-credentials: false
+          fetch-depth: 1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Prove Cloudflare zone ownership
+        id: zone
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$CLOUDFLARE_API_TOKEN"
+          test -n "$CLOUDFLARE_ACCOUNT_ID"
+          H=(-H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" -H "Content-Type: application/json")
+          curl -fsS "${H[@]}" "https://api.cloudflare.com/client/v4/zones?name=morefunos.com&account.id=$CLOUDFLARE_ACCOUNT_ID" > "$RUNNER_TEMP/zone.json"
+          node - <<'NODE'
+          const fs=require('fs');
+          const x=JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP+'/zone.json','utf8'));
+          if(!x.success) throw new Error('CLOUDFLARE_ZONE_QUERY_FAILED');
+          const zone=(x.result||[]).find(z=>z.name==='morefunos.com');
+          if(!zone) throw new Error('MOREFUNOS_ZONE_NOT_IN_THIS_ACCOUNT');
+          fs.appendFileSync(process.env.GITHUB_OUTPUT,'zone_id='+zone.id+'\n');
+          console.log('MOREFUNOS_ZONE_OWNER_ACCOUNT_GREEN');
+          NODE
+
+      - name: Read existing domain bindings
+        shell: bash
+        run: |
+          set -euo pipefail
+          H=(-H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" -H "Content-Type: application/json")
+          curl -fsS "${H[@]}" "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/domains" > "$RUNNER_TEMP/domains-before.json"
+          node - <<'NODE'
+          const fs=require('fs');
+          const x=JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP+'/domains-before.json','utf8'));
+          if(!x.success) throw new Error('CLOUDFLARE_DOMAINS_READ_FAILED');
+          for(const d of x.result||[]) if(['admin.morefunos.com','order.morefunos.com'].includes(d.hostname)) {
+            console.log('BEFORE '+d.hostname+' service='+String(d.service||'')+' environment='+String(d.environment||''));
+          }
+          NODE
+
+      - name: Verify Admin exact source
+        working-directory: source/v2admin
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C .. rev-parse HEAD)" = "${{ steps.request.outputs.source_sha }}"
+          npm install --ignore-scripts --no-audit --no-fund --legacy-peer-deps --package-lock=false
+          npm test
+          npm run build
+
+      - name: Prepare Admin domain deployment
+        working-directory: source/v2admin
+        shell: bash
+        env:
+          KEETA_APP_SECRET: ${{ secrets.KEETA_APP_SECRET }}
+          KEETA_TOKEN_ENCRYPTION_KEY: ${{ secrets.KEETA_TOKEN_ENCRYPTION_KEY }}
+        run: |
+          set -euo pipefail
+          node - <<'NODE'
+          const fs=require('fs');
+          const required=['KEETA_APP_SECRET','KEETA_TOKEN_ENCRYPTION_KEY'];
+          for(const name of required) if(!process.env[name]) throw new Error('MISSING_'+name);
+          const encryptionKey=process.env.KEETA_TOKEN_ENCRYPTION_KEY.trim();
+          const keyBytes=Buffer.from(encryptionKey,'base64');
+          if(!/^[A-Za-z0-9+/]{43}=$/.test(encryptionKey)||keyBytes.length!==32) throw new Error('INVALID_KEETA_TOKEN_ENCRYPTION_KEY');
+          fs.writeFileSync('.wrangler-secrets.json',JSON.stringify({
+            KEETA_APP_SECRET:process.env.KEETA_APP_SECRET,
+            KEETA_TOKEN_ENCRYPTION_KEY:encryptionKey,
+          }));
+          const config=JSON.parse(fs.readFileSync('wrangler.jsonc','utf8'));
+          delete config.secrets;
+          config.routes=[{
+            pattern:'admin.morefunos.com',
+            zone_name:'morefunos.com',
+            custom_domain:true,
+          }];
+          fs.writeFileSync('wrangler.domain.jsonc',JSON.stringify(config,null,2));
+          NODE
+
+      - name: Deploy Admin to zone-owner account
+        working-directory: source/v2admin
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm exec --yes --package=wrangler@4.136.3 -- wrangler deploy --config wrangler.domain.jsonc --secrets-file .wrangler-secrets.json
+          rm -f .wrangler-secrets.json
+
+      - name: Admin official-domain readback
+        shell: bash
+        run: |
+          set -euo pipefail
+          CODE=""
+          for i in $(seq 1 30); do
+            CODE="$(curl -sS -o "$RUNNER_TEMP/admin-health.json" -w '%{http_code}' -H 'Cache-Control: no-cache' 'https://admin.morefunos.com/api/health' || true)"
+            if [ "$CODE" = 200 ] && node -e "const x=require(process.env.RUNNER_TEMP+'/admin-health.json'); process.exit(x?.ok===true&&x?.service==='mfk-admin'?0:1)" 2>/dev/null; then
+              break
+            fi
+            sleep 2
+          done
+          test "$CODE" = 200
+          node -e "const x=require(process.env.RUNNER_TEMP+'/admin-health.json'); if(x?.ok!==true||x?.service!=='mfk-admin')process.exit(1)"
+          SNAP_CODE="$(curl -sS -o "$RUNNER_TEMP/customer-snapshot.json" -w '%{http_code}' -H 'Cache-Control: no-cache' 'https://admin.morefunos.com/api/customer/snapshot?storeId=MF01' || true)"
+          test "$SNAP_CODE" = 200
+          node - <<'NODE'
+          const fs=require('fs');
+          const x=JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP+'/customer-snapshot.json','utf8'));
+          if(x?.store?.storeId!=='MF01'||!Array.isArray(x?.menu?.products)) throw new Error('ADMIN_CUSTOMER_SNAPSHOT_INVALID');
+          console.log('MFK_ADMIN_OFFICIAL_DOMAIN_GREEN products='+x.menu.products.length);
+          NODE
+
+      - name: Verify Customer exact source
+        working-directory: source/v2customer
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C .. rev-parse HEAD)" = "${{ steps.request.outputs.source_sha }}"
+          npm install --ignore-scripts --no-audit --no-fund
+          npm test
+          npm run build
+          test -s dist/index.html
+          grep -R -F "admin.morefunos.com" dist/assets >/dev/null
+
+      - name: Deploy Customer to zone-owner account
+        working-directory: source/v2customer
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > wrangler.domain.jsonc <<'EOF'
+          {
+            "$schema": "https://raw.githubusercontent.com/cloudflare/workers-sdk/main/packages/wrangler/config-schema.json",
+            "name": "mfk-customer",
+            "compatibility_date": "2026-09-24",
+            "workers_dev": true,
+            "preview_urls": true,
+            "assets": {
+              "directory": "./dist",
+              "not_found_handling": "single-page-application"
+            },
+            "routes": [
+              {
+                "pattern": "order.morefunos.com",
+                "zone_name": "morefunos.com",
+                "custom_domain": true
+              }
+            ]
+          }
+          EOF
+          npm exec --yes --package=wrangler@4.136.3 -- wrangler deploy --config wrangler.domain.jsonc
+
+      - name: Customer official-domain and CORS readback
+        shell: bash
+        run: |
+          set -euo pipefail
+          CODE=""
+          for i in $(seq 1 30); do
+            CODE="$(curl -sS -o "$RUNNER_TEMP/customer-index.html" -w '%{http_code}' -H 'Cache-Control: no-cache' 'https://order.morefunos.com/' || true)"
+            if [ "$CODE" = 200 ]; then break; fi
+            sleep 2
+          done
+          test "$CODE" = 200
+          JS_PATH="$(grep -Eo 'src="[^"]*assets/[^"]+\.js"' "$RUNNER_TEMP/customer-index.html" | head -n1 | sed -E 's/^src="([^"]+)"$/\1/')"
+          test -n "$JS_PATH"
+          case "$JS_PATH" in
+            http*) JS_URL="$JS_PATH" ;;
+            /*) JS_URL="https://order.morefunos.com$JS_PATH" ;;
+            *) JS_URL="https://order.morefunos.com/$JS_PATH" ;;
+          esac
+          curl -fsS -H 'Cache-Control: no-cache' "$JS_URL" -o "$RUNNER_TEMP/customer.js"
+          grep -F "admin.morefunos.com" "$RUNNER_TEMP/customer.js"
+
+          curl -sS -D "$RUNNER_TEMP/snapshot.headers" -o "$RUNNER_TEMP/customer-snapshot-cors.json"             -H 'Origin: https://order.morefunos.com'             -H 'Cache-Control: no-cache'             'https://admin.morefunos.com/api/customer/snapshot?storeId=MF01'
+          grep -i -F 'access-control-allow-origin: https://order.morefunos.com' "$RUNNER_TEMP/snapshot.headers"
+          node - <<'NODE'
+          const fs=require('fs');
+          const x=JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP+'/customer-snapshot-cors.json','utf8'));
+          if(x?.store?.storeId!=='MF01'||!Array.isArray(x?.menu?.products)) throw new Error('CUSTOMER_PUBLIC_SNAPSHOT_INVALID');
+          console.log('MFK_CUSTOMER_OFFICIAL_DOMAIN_GREEN products='+x.menu.products.length);
+          NODE
+
+      - name: Verify custom-domain service ownership
+        shell: bash
+        run: |
+          set -euo pipefail
+          H=(-H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" -H "Content-Type: application/json")
+          curl -fsS "${H[@]}" "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/workers/domains" > "$RUNNER_TEMP/domains-after.json"
+          node - <<'NODE'
+          const fs=require('fs');
+          const x=JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP+'/domains-after.json','utf8'));
+          if(!x.success) throw new Error('CLOUDFLARE_DOMAINS_READ_FAILED');
+          const byHost=new Map((x.result||[]).map(d=>[d.hostname,d]));
+          const admin=byHost.get('admin.morefunos.com');
+          const order=byHost.get('order.morefunos.com');
+          if(!admin||admin.service!=='mfk-admin') throw new Error('ADMIN_DOMAIN_BINDING_MISMATCH');
+          if(!order||order.service!=='mfk-customer') throw new Error('ORDER_DOMAIN_BINDING_MISMATCH');
+          console.log('MFK_DOMAIN_BINDINGS_GREEN');
+          NODE
+
+      - name: Customer to Admin to SMT live quote smoke
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp "$RUNNER_TEMP/customer-snapshot-cors.json" "$RUNNER_TEMP/live-snapshot.json"
+          export SMOKE_REQUEST_ID="DOMAIN-CUTOVER-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          node - <<'NODE'
+          const fs=require('fs');
+          const x=JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP+'/live-snapshot.json','utf8'));
+          const products=Array.isArray(x?.menu?.products)?x.menu.products:[];
+          let picked=null;
+          for(const p of products){
+            const groups=Array.isArray(p.optionGroups)?p.optionGroups:[];
+            const selections=[];
+            let valid=true;
+            for(const g of groups){
+              const min=Math.max(g.required?1:0,Number(g.minSelections)||0);
+              const opts=(Array.isArray(g.options)?g.options:[]).filter(o=>o&&o.available!==false);
+              if(opts.length<min){valid=false;break;}
+              for(const o of opts.slice(0,min)) selections.push({
+                optionGroupId:String(g.optionGroupId),
+                optionId:String(o.optionId),
+                optionName:String(o.name),
+              });
+            }
+            if(valid){picked={p,selections};break;}
+          }
+          if(!picked) throw new Error('NO_SMOKEABLE_CUSTOMER_PRODUCT');
+          const payload={
+            schema:'MFK_CUSTOMER_QUOTE_REQUEST_V1',
+            storeId:'MF01',
+            requestId:process.env.SMOKE_REQUEST_ID,
+            createdAt:new Date().toISOString(),
+            cart:[{
+              lineId:'SMOKE-L1',
+              productId:String(picked.p.productId),
+              productName:String(picked.p.name),
+              quantity:1,
+              selections:picked.selections,
+              note:'DOMAIN CUTOVER QUOTE SMOKE',
+            }],
+          };
+          fs.writeFileSync(process.env.RUNNER_TEMP+'/quote-smoke.json',JSON.stringify(payload));
+          console.log('SMOKE_PRODUCT='+String(picked.p.productId));
+          NODE
+          SUBMIT_CODE="$(curl -sS -o "$RUNNER_TEMP/quote-submit.json" -w '%{http_code}'             -H 'Origin: https://order.morefunos.com'             -H 'Content-Type: application/json'             --data-binary "@$RUNNER_TEMP/quote-smoke.json"             'https://admin.morefunos.com/api/customer/quote')"
+          test "$SUBMIT_CODE" = 202
+          STATE="PENDING"
+          for i in $(seq 1 25); do
+            curl -fsS -H 'Origin: https://order.morefunos.com'               "https://admin.morefunos.com/api/customer/quote/readback?requestId=$SMOKE_REQUEST_ID"               -o "$RUNNER_TEMP/quote-readback.json"
+            STATE="$(node -p "JSON.parse(require('fs').readFileSync(process.env.RUNNER_TEMP+'/quote-readback.json','utf8')).state")"
+            case "$STATE" in
+              CONFIRMED) echo "MFK_CUSTOMER_ADMIN_SMT_LIVE_QUOTE_GREEN"; exit 0 ;;
+              REJECTED) cat "$RUNNER_TEMP/quote-readback.json"; exit 1 ;;
+            esac
+            sleep 2
+          done
+          echo "MFK_CUSTOMER_ADMIN_SMT_LIVE_QUOTE_PENDING"
+          cat "$RUNNER_TEMP/quote-readback.json"
+          exit 0
+
+      - name: Final cutover verdict
+        shell: bash
+        run: |
+          echo "MFK_OFFICIAL_DOMAIN_CUTOVER_GREEN"
+          echo "SOURCE_SHA=${{ steps.request.outputs.source_sha }}"
