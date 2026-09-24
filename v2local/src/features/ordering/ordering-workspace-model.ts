@@ -97,7 +97,6 @@ export interface OrderingWorkspaceViewModel {
 
 export interface OrderingWorkspaceActions {
   readonly onSelectCategory:(categoryId:string)=>void;
-  readonly onChangeOrderingMode:(mode:'quick'|'standard')=>void;
   readonly onAddProduct:(productId:string)=>void;
   readonly onConfigureProduct:(productId:string)=>void;
   readonly onChangeServiceMode:(mode:ServiceMode)=>void;
