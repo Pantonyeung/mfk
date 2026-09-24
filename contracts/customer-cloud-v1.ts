@@ -21,6 +21,8 @@ export interface CustomerCloudCartLine{
 export interface CustomerCloudCheckout{
   readonly name:string;
   readonly phone:string;
+  readonly paymentMethod?:'PAY_AT_STORE'|'ELECTRONIC';
+  readonly paymentEvidenceRef?:string;
 }
 export interface MfkCustomerQuoteRequest{
   readonly schema:typeof MFK_CUSTOMER_QUOTE_REQUEST_SCHEMA;
@@ -125,6 +127,8 @@ export function validateMfkCustomerOrderIntent(input:unknown):MfkCustomerOrderIn
     checkout:Object.freeze({
       name:typeof checkout.name==='string'?checkout.name.trim().slice(0,120):'',
       phone,
+      paymentMethod:checkout.paymentMethod==='ELECTRONIC'?'ELECTRONIC':'PAY_AT_STORE',
+      ...(checkout.paymentMethod==='ELECTRONIC'&&optionalText(checkout.paymentEvidenceRef,500)?{paymentEvidenceRef:optionalText(checkout.paymentEvidenceRef,500)}:{}),
     }),
   });
 }
