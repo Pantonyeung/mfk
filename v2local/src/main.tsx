@@ -16,6 +16,7 @@ import {
   queueOrderProjection,
 } from './runtime/projection-outbox.ts';
 import './styles.css';
+import './smt-premium-r2.css';
 
 installSmtAdminAutoSync();
 installStaffSessionInvalidation();
