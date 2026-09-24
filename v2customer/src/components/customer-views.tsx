@@ -70,11 +70,11 @@ function RecommendationRail({eyebrow,title,recommendations,onProduct,compact=fal
   eyebrow:string;title:string;recommendations:readonly CustomerRecommendation[];onProduct:(product:CustomerProduct,origin:ProductOriginRect)=>void;compact?:boolean;
 }){
   if(!recommendations.length)return null;
-  return <section className={`recommendation-section${compact?' compact':''}`}><SectionHeading eyebrow={eyebrow} title={title}/><div className="recommendation-rail">{recommendations.map(item=><button key={item.product.productId} data-product-id={item.product.productId} onClick={event=>{const rect=event.currentTarget.getBoundingClientRect();onProduct(item.product,{top:rect.top,left:rect.left,width:rect.width,height:rect.height})}}>
+  return <section className={`recommendation-section${compact?' compact':''}`}><SectionHeading eyebrow={eyebrow} title={title}/><div className="recommendation-rail">{recommendations.map(item=><button key={item.product.productId} data-product-id={item.product.productId} data-recommendation-source={item.reason} onClick={event=>{const rect=event.currentTarget.getBoundingClientRect();onProduct(item.product,{top:rect.top,left:rect.left,width:rect.width,height:rect.height})}}>
     <ProductMedia product={item.product} compact/>
     <span><small>{item.reasonLabel}</small><strong>{item.product.name}</strong><p>{item.reasonDetail}</p><em>{item.product.displayPriceLabel??'價格待店舖提供'}</em></span>
     <b aria-hidden="true">＋</b>
-  </button>)}</div></section>;
+  </button>)}</div><p className="recommendation-disclosure">推薦只整理目前已載入嘅正式菜單、歷史訂單同店舖標記；唔會自己改價、套優惠或者建立訂單。</p></section>;
 }
 
 function HeroCarousel(){
