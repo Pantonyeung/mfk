@@ -22,10 +22,10 @@ export interface SmtAvailabilityProjection{readonly revision:number;readonly nod
 export interface StoredOrder{
   id:string;display:string;createdAt:string;updatedAt?:string;totalMinor:number;paymentLabel:string;fulfillmentLabel:'待處理'|'進行中'|'可取餐'|'已完成'|'已取消';sourceLabel:string;
   staffId?:string;staffName?:string;cancellationReason?:string;
-  providerRef?:string;providerMessageId?:string;
+  providerRef?:string;providerMessageId?:string;providerPickupCode?:string;orderRemark?:string;utensilPreference?:'需要'|'不需要';
   providerLastEventId?:number;providerLastEventName?:string;providerLastEventAt?:string;providerLastMessageId?:string;providerLifecycleNote?:string;
   acceptancePrintedAt?:string;
-  items:readonly {id:string;name:string;qty:number;unitMinor:number;serviceMode?:'takeaway'|'dine-in'}[];
+  items:readonly {id:string;name:string;qty:number;unitMinor:number;serviceMode?:'takeaway'|'dine-in';productCode?:string;detail?:string}[];
 }
 export type DiningTender='CASH'|'ALIPAY'|'WECHAT'|'FPS'|'PAYME'|'COMBO';
 export interface LocalDiningPayment{
@@ -168,12 +168,15 @@ export function readLastPrintDiagnostic():PrintDispatchDiagnostic|null{
 }
 export interface MfkLocalRuntime extends CleanSmtCoreRuntimePort{
   createOrder(input:{
-    items:readonly {id:string;name:string;qty:number;unitMinor:number;serviceMode?:'takeaway'|'dine-in'}[];
+    items:readonly {id:string;name:string;qty:number;unitMinor:number;serviceMode?:'takeaway'|'dine-in';productCode?:string;detail?:string}[];
     totalMinor:number;
     paymentLabel:string;
     sourceLabel?:string;
     providerRef?:string;
     providerMessageId?:string;
+    providerPickupCode?:string;
+    orderRemark?:string;
+    utensilPreference?:'需要'|'不需要';
     initialFulfillmentLabel?:StoredOrder['fulfillmentLabel'];
   }):StoredOrder;
   orders():readonly StoredOrder[];
@@ -444,6 +447,9 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
       sourceLabel:input.sourceLabel||'現場',
       ...(providerRef?{providerRef}:{}),
       ...(input.providerMessageId?{providerMessageId:String(input.providerMessageId)}:{}),
+      ...(input.providerPickupCode?{providerPickupCode:String(input.providerPickupCode)}:{}),
+      ...(input.orderRemark?{orderRemark:String(input.orderRemark)}:{}),
+      ...(input.utensilPreference?{utensilPreference:input.utensilPreference}:{}),
       ...(session?{staffId:session.staffId,staffName:session.displayName}:{}),
       items:input.items.map(item=>({...item})),
     };
