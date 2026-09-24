@@ -221,6 +221,9 @@ async function reconcileOrders(){
     const intent=raw as MfkCustomerOrderIntent&{state?:string};
     try{
       const priced=priceCustomerCart(intent.cart,catalog.products);
+      const publishedTotal=intent.cart.reduce((sum,line)=>sum+(Number.isSafeInteger(Number(line.publishedUnitPriceMinor))?Number(line.publishedUnitPriceMinor)*line.quantity:0),0);
+      const hasPublishedTotal=intent.cart.every(line=>Number.isSafeInteger(Number(line.publishedUnitPriceMinor))&&Number(line.publishedUnitPriceMinor)>=0);
+      if(hasPublishedTotal&&publishedTotal!==priced.totalMinor)throw new Error('CUSTOMER_MENU_PRICE_CHANGED');
       const providerRef='CUSTOMER:'+intent.submissionId;
       const order=localRuntime.createOrder({
         items:priced.items,
