@@ -1,5 +1,6 @@
 import {useEffect,useMemo,useState} from 'react';
 import {NavLink,Navigate,Route,Routes,useNavigate} from 'react-router';
+import {useLocation} from 'react-router';
 import {ProductionViewport} from './app/ProductionViewport.tsx';
 import {OrderingWorkspace} from './features/ordering/OrderingWorkspace.tsx';
 import type {OrderingWorkspaceActions,OrderingWorkspaceViewModel,ServiceMode} from './features/ordering/ordering-workspace-model.ts';
@@ -522,6 +523,9 @@ function CheckoutPage({cart,setCart,diningCheckout,onDiningCheckoutDone}:{cart:C
 }
 
 function OperationalApp(){
+  const navigate=useNavigate();
+  const location=useLocation();
+  const [globalArrival,setGlobalArrival]=useState<{orderId:string;display:string;sourceLabel:string}|null>(null);
   const [cart,setCartState]=useState<CartLine[]>([]);
   const [serviceMode,setServiceMode]=useState<ServiceMode>('takeaway');
   const [diningCheckout,setDiningCheckout]=useState<DiningCheckoutRequest|null>(null);
@@ -533,6 +537,27 @@ function OperationalApp(){
   },[navRevision]);
   const setCart=(next:CartLine[])=>setCartState(next);
   const runtime=useMemo(()=>localRuntime,[]);
+  useEffect(()=>{
+    const onArrival=(raw:Event)=>{
+      const detail=(raw as CustomEvent<{canonicalOrderId?:string;display?:string;sourceLabel?:string}>).detail;
+      if(!detail?.canonicalOrderId)return;
+      setGlobalArrival({orderId:detail.canonicalOrderId,display:String(detail.display||''),sourceLabel:String(detail.sourceLabel||'新訂單')});
+      try{
+        const AudioContextCtor=window.AudioContext||(window as unknown as {webkitAudioContext?:typeof AudioContext}).webkitAudioContext;
+        if(AudioContextCtor){
+          const ctx=new AudioContextCtor();const osc=ctx.createOscillator();const gain=ctx.createGain();
+          osc.frequency.value=1040;gain.gain.value=0.18;osc.connect(gain);gain.connect(ctx.destination);osc.start();osc.stop(ctx.currentTime+0.4);
+        }
+      }catch{}
+    };
+    window.addEventListener('mfk-customer-order-intake',onArrival);
+    window.addEventListener('mfk-keeta-order-intake',onArrival);
+    return()=>{
+      window.removeEventListener('mfk-customer-order-intake',onArrival);
+      window.removeEventListener('mfk-keeta-order-intake',onArrival);
+    };
+  },[]);
+
 
   const prepareDiningCheckout=(request:DiningCheckoutRequest)=>{
     const next:CartLine[]=request.lines.map((line,index)=>{
@@ -555,6 +580,18 @@ function OperationalApp(){
   };
 
   return <><RuntimeReadyActivation/><ProductionViewport><div className="clean-app">
+    {globalArrival?<div className="mfk-global-order-alert" role="alertdialog" aria-modal="false">
+      <div>
+        <strong>新訂單到達，要處理</strong>
+        <span>#{globalArrival.display} · {globalArrival.sourceLabel}</span>
+      </div>
+      <button type="button" onClick={()=>{
+        const orderId=globalArrival.orderId;
+        setGlobalArrival(null);
+        navigate('/orders?orderId='+encodeURIComponent(orderId));
+      }}>立即處理</button>
+      <button type="button" aria-label="稍後處理" onClick={()=>setGlobalArrival(null)}>稍後</button>
+    </div>:null}
     <aside className="clean-rail">
       <div className="clean-brand" aria-label="磨飯">磨</div>
       <nav aria-label="MFK 主導航">
