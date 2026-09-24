@@ -6,6 +6,7 @@ import {readSmtQuickReasons,readSmtStoreSettings} from '../runtime/admin-operati
 import {subscribeSmtAdminConfig} from '../runtime/admin-config-sync.ts';
 import {decideKeetaAfterSale,previewKeetaPartialRefund,readKeetaAfterSales,type KeetaAfterSaleCase} from '../runtime/keeta-after-sale.ts';
 import {readKeetaOrderIntakeAttention,reconcileKeetaOrderIntake} from '../runtime/keeta-order-intake.ts';
+import {buildWhatsAppPaymentFollowup,createWhatsAppQrDataUrl,PAYMENT_FOLLOWUP_TEMPLATES,type PaymentFollowupTemplateId} from '../runtime/payment-evidence-whatsapp.ts';
 import './orders-workspace.css';
 
 type PaymentFilter='全部'|'現金'|'Alipay'|'WeChat Pay'|'FPS / PayMe';
@@ -63,6 +64,10 @@ export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePor
   const [paymentEvidenceUrl,setPaymentEvidenceUrl]=useState<string|null>(null);
   const [paymentEvidenceBusy,setPaymentEvidenceBusy]=useState(false);
   const [paymentReviewBusy,setPaymentReviewBusy]=useState(false);
+  const [paymentFollowupTemplate,setPaymentFollowupTemplate]=useState<PaymentFollowupTemplateId>('UNCLEAR');
+  const [paymentFollowupQr,setPaymentFollowupQr]=useState<string|null>(null);
+  const [paymentFollowupMessage,setPaymentFollowupMessage]=useState<string|null>(null);
+  const [paymentFollowupBusy,setPaymentFollowupBusy]=useState(false);
   useEffect(()=>{
     const refresh=()=>setAfterSaleRevision(value=>value+1);
     window.addEventListener('mfk-keeta-after-sale',refresh);
@@ -145,7 +150,7 @@ export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePor
   },[allItems,history]);
 
   useEffect(()=>{
-    setModal(null);setMessage(null);setReprintOptions([]);setSelectedJobs(new Set());setCancelReason('');setReprintReason('');
+    setModal(null);setMessage(null);setReprintOptions([]);setSelectedJobs(new Set());setCancelReason('');setReprintReason('');setPaymentFollowupQr(null);setPaymentFollowupMessage(null);setPaymentFollowupTemplate('UNCLEAR');
     if(selected)setEditLines(selected.lines.map(line=>({
       id:line.id,name:line.name,qty:line.quantity,
       unitMinor:Math.round(Number(line.unitLabel.replace(/[^0-9.]/g,''))*100)
@@ -173,6 +178,26 @@ export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePor
     }catch(cause){
       setMessage(cause instanceof Error?cause.message:'付款核對失敗');
     }finally{setPaymentReviewBusy(false);}
+  };
+
+  const buildPaymentFollowupQr=async()=>{
+    if(!selected?.customerPhone||paymentFollowupBusy)return;
+    setPaymentFollowupBusy(true);setMessage(null);
+    try{
+      const followup=buildWhatsAppPaymentFollowup({
+        phone:selected.customerPhone,
+        display:selected.orderIdLabel,
+        totalLabel:selected.totalLabel,
+        templateId:paymentFollowupTemplate,
+      });
+      setPaymentFollowupMessage(followup.message);
+      setPaymentFollowupQr(await createWhatsAppQrDataUrl(followup.url));
+    }catch(cause){
+      setPaymentFollowupQr(null);setPaymentFollowupMessage(null);
+      setMessage(cause instanceof Error&&cause.message==='CUSTOMER_WHATSAPP_PHONE_INVALID'
+        ?'客人電話格式唔適合建立 WhatsApp QR。'
+        :cause instanceof Error?cause.message:'未能建立 WhatsApp QR');
+    }finally{setPaymentFollowupBusy(false);}
   };
 
   const acceptSelected=async()=>{
@@ -333,6 +358,12 @@ export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePor
             <button type="button" className="danger" disabled={paymentReviewBusy||selected.paymentVerificationState==='REJECTED'} onClick={()=>void reviewPaymentEvidence('REJECTED')}>不接受付款</button>
             <button type="button" className="primary" disabled={paymentReviewBusy||selected.paymentVerificationState==='VERIFIED'} onClick={()=>void reviewPaymentEvidence('VERIFIED')}>確認付款</button>
           </div>
+          {selected.paymentVerificationState==='REJECTED'?<section className="payment-followup">
+            <header><b>要求客人重新傳送付款截圖</b><span>{selected.customerPhone?'可建立 WhatsApp QR':'冇可用電話'}</span></header>
+            <label><span>訊息範本</span><select value={paymentFollowupTemplate} onChange={event=>{setPaymentFollowupTemplate(event.target.value as PaymentFollowupTemplateId);setPaymentFollowupQr(null);setPaymentFollowupMessage(null);}}>{PAYMENT_FOLLOWUP_TEMPLATES.map(row=><option key={row.id} value={row.id}>{row.label}</option>)}</select></label>
+            <button type="button" disabled={!selected.customerPhone||paymentFollowupBusy} onClick={()=>void buildPaymentFollowupQr()}>{paymentFollowupBusy?'建立中…':'產生 WhatsApp QR'}</button>
+            {paymentFollowupQr?<div className="payment-followup-qr"><img src={paymentFollowupQr} alt="掃描後開啟 WhatsApp 訊息"/><p>{paymentFollowupMessage}</p><small>用手機掃描後會開啟 WhatsApp 對話並預填訊息；仍由店員確認後送出。</small></div>:null}
+          </section>:null}
         </section>:null}
         {afterSales.length?<section className="order-after-sale">
           <header><b>Keeta 退款／售後</b><span>{afterSales.length}</span></header>
