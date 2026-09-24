@@ -24,7 +24,7 @@ import {hasStaffPermission,readActiveStaffSession} from './runtime/staff-auth.ts
 import {HoldCartWorkspace,HoldListWorkspace,ProductConfigWorkspace,type OrderingPanelState,type WorkspaceHoldDraft,type WorkspaceProduct} from './features/ordering/OrderingCenterWorkspaces.tsx';
 import {ComboFastLaneWorkspace,RequiredFastLaneWorkspace,RiceballPoolWorkspace} from './features/ordering/FastLaneWorkspaces.tsx';
 import {PendingOrderReviewWorkspace} from './features/ordering/PendingOrderReviewWorkspace.tsx';
-import {applyPairingPlan,applyRequiredSelection,buildAutoPairingPlans,comboBlockingCount,comboDraftCount,comboSlots,countMainCourseUnits,countRiceballCandidateUnits,defaultSelectionsForProduct,dissolveComboLine,fillPendingComboGroup,fillPendingComboGroupFromConfiguredProduct,nextPairingIndex,rebuildConfiguredLine,requiredTasks,restoreFastLaneLineComposition,riceballMealCombos,serializeFastLaneComposition,type FastLaneCartLine,type FastLanePairPlan,type FastLaneProduct} from './features/ordering/fast-lane-model.ts';
+import {applyPairingPlan,applyRequiredSelection,buildAutoPairingPlans,comboBlockingCount,comboDraftCount,comboSlots,countMainCourseUnits,countRiceballCandidateUnits,defaultSelectionsForProduct,dissolveComboLine,fillPendingComboGroup,fillPendingComboGroupFromConfiguredProduct,freeNoteForLine,nextPairingIndex,rebuildConfiguredLine,requiredTasks,restoreFastLaneLineComposition,riceballMealCombos,selectionsForLine,serializeFastLaneComposition,type FastLaneCartLine,type FastLanePairPlan,type FastLaneProduct} from './features/ordering/fast-lane-model.ts';
 
 type Product={
   id:string;
@@ -83,15 +83,28 @@ const nav=[
   {to:'/more',label:'更多',icon:'•••'},
 ] as const;
 
-function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[];setCart:(v:CartLine[])=>void;serviceMode:ServiceMode;setServiceMode:(m:ServiceMode)=>void}){
+function OrderingPage({
+  cart,setCart,serviceMode,setServiceMode,orderingMode,setOrderingMode,quickDrinkOpen,setQuickDrinkOpen,
+  showImagesOverride,showCategoriesOverride,onQuickDrinkCountChange,
+}:{
+  cart:CartLine[];
+  setCart:(v:CartLine[])=>void;
+  serviceMode:ServiceMode;
+  setServiceMode:(m:ServiceMode)=>void;
+  orderingMode:'normal'|'quick';
+  setOrderingMode:(mode:'normal'|'quick')=>void;
+  quickDrinkOpen:boolean;
+  setQuickDrinkOpen:(value:boolean|((current:boolean)=>boolean))=>void;
+  showImagesOverride?:boolean;
+  showCategoriesOverride?:boolean;
+  onQuickDrinkCountChange:(count:number)=>void;
+}){
   const navigate=useNavigate();
   const [runtimeRevision,setRuntimeRevision]=useState(0);
   useEffect(()=>localRuntime.subscribe(()=>setRuntimeRevision(value=>value+1)),[]);
   const [category,setCategory]=useState('all');
   const [viewMode,setViewMode]=useState<'original'|'organized'>('original');
   const [combineSimilar,setCombineSimilar]=useState(false);
-  const [orderingMode,setOrderingMode]=useState<'normal'|'quick'>('normal');
-  const [quickDrinkOpen,setQuickDrinkOpen]=useState(false);
   const [pulse,setPulse]=useState(0);
   const [recent,setRecent]=useState<string|undefined>();
   const [highlight,setHighlight]=useState<string|undefined>();
@@ -246,6 +259,7 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
       });
   });
   const pendingDrinkTargets=pendingDrinkTargetsFor(cart);
+  useEffect(()=>onQuickDrinkCountChange(pendingDrinkTargets.length),[pendingDrinkTargets.length,onQuickDrinkCountChange]);
   const quickDrinkTarget=pendingDrinkTargets[0];
   const quickDrinkChoices=(quickDrinkTarget?.slot.choices??[]).map(choice=>{
     const product=choice.productId?products.find(row=>row.id===choice.productId):undefined;
@@ -346,7 +360,7 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
       enabled:product.priceReady&&product.sellable&&((serviceMode==='takeaway'&&storeSettings.takeawayEnabled)||(serviceMode==='dine-in'&&storeSettings.dineInEnabled)),
       requiresOptions:product.priceReady&&product.sellable&&product.optionSets.length>0,
       quickAddAllowed:!product.optionSets.some(set=>set.forceShow&&!set.required&&set.min===0),
-      imageUrl:frontlinePresentation.showImages?(product.imageUrl??productArtwork(product)):undefined,
+      imageUrl:(showImagesOverride??frontlinePresentation.showImages)?(product.imageUrl??productArtwork(product)):undefined,
       ...(!product.priceReady?{badge:'未接價格'}:!product.sellable?{badge:'停售'}:{}),
     })),
     menuRevisionLabel:adminConfig
@@ -355,7 +369,7 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
     operationalNotice:capacityNotice
       ?'今日 '+capacityNotice.currentCount+'/'+capacityNotice.dailyLimit+' 單 · 已到 '+capacityNotice.warningAt+'% 提醒門檻'+(capacityNotice.hardStopConfigured?' · Admin 有 hard-stop 設定但目前只提示':'')
       :undefined,
-    showCategories:frontlinePresentation.showCategories,
+    showCategories:showCategoriesOverride??frontlinePresentation.showCategories,
     serviceModes:{takeaway:storeSettings.takeawayEnabled,dineIn:storeSettings.dineInEnabled},
     cart:{
       orderId:nextDisplay,serviceMode,viewMode,combineSimilar,
@@ -412,6 +426,20 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
       optionSelections:structured.selections,freeNote:structured.note,
     };
     setCart([...cart,line]);setRecent(product.id);setHighlight(line.id);setPulse(value=>value+1);setPanelDirty(false);setPanel(null);
+  };
+
+  const updateConfigured=(lineId:string,productId:string,detail:string,deltaMinor:number,qty:number,structured:{readonly selections:Readonly<Record<string,readonly string[]>>;readonly note:string;readonly overrideUnitMinor?:number})=>{
+    const product=products.find(item=>item.id===productId);if(!product)return;
+    const next=cart.map(line=>line.id===lineId?{
+      ...line,
+      name:product.name,
+      qty,
+      unitMinor:structured.overrideUnitMinor??(product.priceMinor+deltaMinor),
+      detail:detail||undefined,
+      optionSelections:structured.selections,
+      freeNote:structured.note,
+    }:line);
+    setCart(next);setHighlight(lineId);setPulse(value=>value+1);setPanelDirty(false);setPanel(null);
   };
 
   const applyRequired=(lineId:string,groupId:string,optionIds:readonly string[])=>{
@@ -478,7 +506,25 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
     :panel?.type==='holds'?'暫存單':'';
 
   const panelBody=panel?.type==='product'
-    ?(()=>{const product=workspaceProducts.find(item=>item.id===panel.productId);return product?<ProductConfigWorkspace product={product} canOverridePrice={canOverridePrice} onDirtyChange={setPanelDirty} onAdd={(detail,delta,qty,structured)=>addConfigured(product.id,detail,delta,qty,structured)}/>:null})()
+    ?(()=>{
+      const product=workspaceProducts.find(item=>item.id===panel.productId);
+      const line=panel.lineId?cart.find(item=>item.id===panel.lineId):undefined;
+      const fastProduct=fastLaneProducts.find(item=>item.id===panel.productId);
+      if(!product)return null;
+      return <ProductConfigWorkspace
+        product={product}
+        canOverridePrice={canOverridePrice}
+        mode={line?'edit':'add'}
+        initialQty={line?.qty??1}
+        initialSelections={line&&fastProduct?selectionsForLine(line,fastProduct):line?.optionSelections}
+        initialNote={line&&fastProduct?freeNoteForLine(line,fastProduct):(line?.freeNote??'')}
+        initialUnitMinor={line?.unitMinor}
+        onDirtyChange={setPanelDirty}
+        onAdd={(detail,delta,qty,structured)=>line
+          ?updateConfigured(line.id,product.id,detail,delta,qty,structured)
+          :addConfigured(product.id,detail,delta,qty,structured)}
+      />;
+    })()
     :panel?.type==='pending-order'
       ?(()=>{const order=runtimeOrders.find(item=>item.id===panel.orderId);return order?<PendingOrderReviewWorkspace
         order={order}
@@ -586,7 +632,7 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
       const line=cart.find(item=>item.id===lineIds[0]);
       if(!line)return;
       if(line.comboDraft||comboData.combos.some(combo=>combo.id===line.productId))setPanel({type:'fast-lane',lane:'combo'});
-      else setPanel({type:'product',productId:line.productId});
+      else {setPanelDirty(false);setPanel({type:'product',productId:line.productId,lineId:line.id});}
     },
     onRemoveCartLine:lineIds=>{
       const ids=new Set(lineIds);
@@ -606,7 +652,13 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
     onOpenQueueOrder:(_kind,id)=>{setQuickDrinkOpen(false);setPanelDirty(false);setPanel({type:'pending-order',orderId:id});},
     onCheckout:()=>navigate('/checkout'),
   };
-  return <OrderingWorkspace view={view} actions={actions} centerPanel={panel&&panelBody?{title:panelTitle,body:panelBody,onClose:requestClosePanel,dirty:panelDirty}:null}/>;
+  return <OrderingWorkspace view={view} actions={actions} centerPanel={panel&&panelBody?{
+    title:panelTitle,
+    body:panelBody,
+    onClose:requestClosePanel,
+    dirty:panelDirty,
+    variant:panel.type==='product'||panel.type==='quick-drink-config'?'product':'default',
+  }:null}/>;
 }
 
 function CheckoutPage({cart,setCart,diningCheckout,onDiningCheckoutDone}:{cart:CartLine[];setCart:(v:CartLine[])=>void;diningCheckout:DiningCheckoutRequest|null;onDiningCheckoutDone:()=>void}){
@@ -839,6 +891,12 @@ function OperationalApp(){
   const [cart,setCartState]=useState<CartLine[]>([]);
   const [serviceMode,setServiceMode]=useState<ServiceMode>('takeaway');
   const [diningCheckout,setDiningCheckout]=useState<DiningCheckoutRequest|null>(null);
+  const [orderingMode,setOrderingMode]=useState<'normal'|'quick'>('normal');
+  const [quickDrinkOpen,setQuickDrinkOpen]=useState(false);
+  const [quickDrinkCount,setQuickDrinkCount]=useState(0);
+  const [displayToolsOpen,setDisplayToolsOpen]=useState(false);
+  const [showImagesOverride,setShowImagesOverride]=useState<boolean|undefined>(undefined);
+  const [showCategoriesOverride,setShowCategoriesOverride]=useState<boolean|undefined>(undefined);
   const [navRevision,setNavRevision]=useState(0);
   useEffect(()=>localRuntime.subscribe(()=>setNavRevision(value=>value+1)),[]);
   const activeOrderCount=useMemo(()=>{
@@ -914,12 +972,35 @@ function OperationalApp(){
           {item.to==='/orders'&&activeOrderCount>0?<span className="clean-rail-badge" aria-label={'進行中訂單 '+activeOrderCount}>{activeOrderCount>99?'99+':activeOrderCount}</span>:null}
         </NavLink>)}
       </nav>
+      {location.pathname==='/'?<div className="clean-order-tools" aria-label="點單快捷工具">
+        <button type="button" className={orderingMode==='quick'?'active':''} onClick={()=>setOrderingMode(value=>value==='quick'?'normal':'quick')}><span>快</span><small>{orderingMode==='quick'?'快捷':'普通'}</small></button>
+        <button type="button" className={quickDrinkOpen?'active':''} onClick={()=>setQuickDrinkOpen(value=>!value)}><span>飲</span><small>飲品</small>{quickDrinkCount>0?<b>{quickDrinkCount}</b>:null}</button>
+        <button type="button" className={displayToolsOpen?'active':''} onClick={()=>setDisplayToolsOpen(value=>!value)}><span>顯</span><small>顯示</small></button>
+        {displayToolsOpen?<div className="clean-display-popover">
+          <header><b>顯示設定</b><button type="button" onClick={()=>setDisplayToolsOpen(false)}>×</button></header>
+          <section><span>商品圖片</span><div><button type="button" className={showImagesOverride===false?'active':''} onClick={()=>setShowImagesOverride(false)}>隱藏</button><button type="button" className={showImagesOverride===true?'active':''} onClick={()=>setShowImagesOverride(true)}>顯示</button></div></section>
+          <section><span>商品分類</span><div><button type="button" className={showCategoriesOverride===false?'active':''} onClick={()=>setShowCategoriesOverride(false)}>隱藏</button><button type="button" className={showCategoriesOverride===true?'active':''} onClick={()=>setShowCategoriesOverride(true)}>顯示</button></div></section>
+          <button type="button" className="reset" onClick={()=>{setShowImagesOverride(undefined);setShowCategoriesOverride(undefined);}}>跟 Admin 設定</button>
+        </div>:null}
+      </div>:null}
       <StaffSessionBadge/>
       <div className="clean-runtime-state">LOCAL<br/>OFFLINE</div>
     </aside>
     <section className="clean-route-stage">
       <Routes>
-        <Route index element={<OrderingPage cart={cart} setCart={setCart} serviceMode={serviceMode} setServiceMode={setServiceMode}/>}/>
+        <Route index element={<OrderingPage
+          cart={cart}
+          setCart={setCart}
+          serviceMode={serviceMode}
+          setServiceMode={setServiceMode}
+          orderingMode={orderingMode}
+          setOrderingMode={setOrderingMode}
+          quickDrinkOpen={quickDrinkOpen}
+          setQuickDrinkOpen={setQuickDrinkOpen}
+          showImagesOverride={showImagesOverride}
+          showCategoriesOverride={showCategoriesOverride}
+          onQuickDrinkCountChange={setQuickDrinkCount}
+        />}/>
         <Route path="checkout" element={<CheckoutPage cart={cart} setCart={setCart} diningCheckout={diningCheckout} onDiningCheckoutDone={()=>setDiningCheckout(null)}/>}/>
         <Route path="orders" element={<RuntimeOrdersWorkspace runtime={runtime}/>}/>
         <Route path="dining" element={<RuntimeDiningWorkspace runtime={runtime} onCheckout={prepareDiningCheckout}/>}/>
