@@ -23,13 +23,14 @@ export type OrderingPanelState=
   |{readonly type:'product';readonly productId:string}
   |{readonly type:'organize'}
   |{readonly type:'combo'}
+  |{readonly type:'fast-lane';readonly lane:'riceball-pool'|'required'|'combo'}
   |{readonly type:'hold'}
   |{readonly type:'holds'}
   |null;
 
 const money=(minor:number)=>(minor<0?'-':'')+String.fromCharCode(36)+(Math.abs(minor)/100).toFixed(2);
 
-export function ProductConfigWorkspace({product,onAdd}:{product:WorkspaceProduct;onAdd:(detail:string,deltaMinor:number,qty:number)=>void}){
+export function ProductConfigWorkspace({product,onAdd}:{product:WorkspaceProduct;onAdd:(detail:string,deltaMinor:number,qty:number,structured:{readonly selections:Readonly<Record<string,readonly string[]>>;readonly note:string})=>void}){
   const [qty,setQty]=useState(1);
   const [note,setNote]=useState('');
   const [selected,setSelected]=useState<Record<string,string[]>>(()=>Object.fromEntries(
@@ -87,7 +88,7 @@ export function ProductConfigWorkspace({product,onAdd}:{product:WorkspaceProduct
       :<section className="cfg-block"><header><b>商品選項</b><span>Admin</span></header><p>此商品目前冇已發布選項組。</p></section>}
 
     <label className="cfg-note"><span>備註</span><input value={note} maxLength={60} onChange={event=>setNote(event.target.value)} placeholder="例如：不要蔥、醬分開"/><small>{note.length}/60</small></label>
-    <footer className="cfg-action"><div><span>單價</span><b>{money(product.priceMinor+delta)}</b></div><button className="primary" disabled={invalid} onClick={()=>onAdd(detail,delta,qty)}>加入訂單　{money((product.priceMinor+delta)*qty)}</button></footer>
+    <footer className="cfg-action"><div><span>單價</span><b>{money(product.priceMinor+delta)}</b></div><button className="primary" disabled={invalid} onClick={()=>onAdd(detail,delta,qty,{selections:selected,note:note.trim()})}>加入訂單　{money((product.priceMinor+delta)*qty)}</button></footer>
   </div>;
 }
 
