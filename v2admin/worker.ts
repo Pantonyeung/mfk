@@ -514,6 +514,21 @@ export default {
         },quoteResponse.ok&&orderResponse.ok&&traceResponse.ok?200:502,cors(request));
       }
 
+      if(url.pathname==='/api/customer/smt/payment-evidence'&&request.method==='GET'){
+        const authorizeUrl=new URL(request.url);
+        authorizeUrl.pathname='/authorize-smt-device';
+        const authResponse=await admin.fetch(new Request(authorizeUrl.toString(),{method:'GET',headers:new Headers(request.headers)}));
+        if(!authResponse.ok)return json({code:'CUSTOMER_SMT_UNAUTHORIZED'},401,cors(request));
+        const evidenceRef=String(url.searchParams.get('ref')||'').trim();
+        if(!evidenceRef.startsWith('customer-payment/'+storeId+'/'))return json({code:'PAYMENT_EVIDENCE_REF_INVALID'},400,cors(request));
+        const object=await env.CUSTOMER_PAYMENT_EVIDENCE.get(evidenceRef);
+        if(!object)return json({code:'PAYMENT_EVIDENCE_NOT_FOUND'},404,cors(request));
+        const headers=new Headers(cors(request));
+        headers.set('content-type',object.httpMetadata?.contentType||'application/octet-stream');
+        headers.set('cache-control','private, no-store');
+        return new Response(object.body,{status:200,headers});
+      }
+
       if(url.pathname.startsWith('/api/customer/smt/')){
         const authorizeUrl=new URL(request.url);
         authorizeUrl.pathname='/authorize-smt-device';
