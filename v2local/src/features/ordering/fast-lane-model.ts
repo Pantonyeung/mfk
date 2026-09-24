@@ -375,6 +375,18 @@ function snapshot(line:FastLaneCartLine):FastLaneComponentSnapshot{
   };
 }
 
+function configurationAdjustmentMinor(line:FastLaneCartLine,products:readonly FastLaneProduct[]):number{
+  const product=products.find(row=>row.id===line.productId);
+  return product?line.unitMinor-product.priceMinor:0;
+}
+
+export function defaultSelectionsForProduct(product:FastLaneProduct):Record<string,string[]>{
+  return Object.fromEntries(product.optionSets.map(set=>[
+    set.id,
+    set.options.filter(option=>option.defaultSelected).map(option=>option.id),
+  ]));
+}
+
 function comboDetail(draft:FastLaneComboDraft){
   const selected=draft.resolvedChoices.map(choice=>choice.groupName+'：'+choice.choiceLabel);
   const pending=draft.pendingGroups.map(group=>group.groupName+'：稍後補');
@@ -426,6 +438,7 @@ export function applyPairingPlan(
         groupId:slot.groupId,groupName:slot.groupName,role:slot.role,
         choiceId:choice.id,choiceLabel:choice.label,sourceLineId:selection.sourceLineId,snapshot:snapshot(consumed.taken),
       });
+      totalMinor+=configurationAdjustmentMinor(consumed.taken,products);
     }
     totalMinor+=choice.priceAdjustmentMinor;
     resolvedChoices.push({
@@ -479,6 +492,17 @@ export function fillPendingComboGroup(
       choiceId:choice.id,choiceLabel:choice.label,sourceLineId,snapshot:snapshot(consumed.taken),
     };
   }
+  const configAdjustment=component?configurationAdjustmentMinor({
+    id:component.sourceLineId,
+    productId:component.snapshot.productId,
+    name:component.snapshot.name,
+    qty:1,
+    unitMinor:component.snapshot.unitMinor,
+    serviceMode:component.snapshot.serviceMode,
+    detail:component.snapshot.detail,
+    optionSelections:component.snapshot.optionSelections,
+    freeNote:component.snapshot.freeNote,
+  },products):0;
 
   return lines.map(line=>{
     if(line.id!==comboLineId||!line.comboDraft)return line;
@@ -491,7 +515,48 @@ export function fillPendingComboGroup(
       }],
       pendingGroups:line.comboDraft.pendingGroups.filter(group=>group.groupId!==groupId),
     };
-    return {...line,unitMinor:line.unitMinor+choice.priceAdjustmentMinor,detail:comboDetail(nextDraft),comboDraft:nextDraft};
+    return {...line,unitMinor:line.unitMinor+choice.priceAdjustmentMinor+configAdjustment,detail:comboDetail(nextDraft),comboDraft:nextDraft};
+  });
+}
+
+export function fillPendingComboGroupFromConfiguredProduct(
+  input:readonly FastLaneCartLine[],
+  comboLineId:string,
+  groupId:string,
+  choiceId:string,
+  configuredLine:FastLaneCartLine,
+  combos:readonly SyncedCombo[],
+  pools:readonly SyncedComboPool[],
+  products:readonly FastLaneProduct[],
+):FastLaneCartLine[]{
+  const comboLine=input.find(line=>line.id===comboLineId);
+  const draft=comboLine?.comboDraft;
+  if(!comboLine||!draft)throw new Error('FAST_LANE_COMBO_LINE_NOT_FOUND');
+  const combo=combos.find(row=>row.id===draft.comboId&&row.active);
+  if(!combo)throw new Error('FAST_LANE_COMBO_NOT_FOUND');
+  const slot=comboSlots(combo,pools,products).find(row=>row.groupId===groupId);
+  if(!slot)throw new Error('FAST_LANE_COMBO_SLOT_NOT_FOUND');
+  if(!draft.pendingGroups.some(group=>group.groupId===groupId))throw new Error('FAST_LANE_COMBO_SLOT_NOT_PENDING');
+  const choice=slot.choices.find(row=>row.id===choiceId);
+  if(!choice||choice.type!=='PRODUCT'||choice.productId!==configuredLine.productId)throw new Error('FAST_LANE_COMBO_CHOICE_NOT_FOUND');
+  if(requiredTasks([configuredLine],products).length)throw new Error('FAST_LANE_PAIR_SOURCE_REQUIRED_UNRESOLVED');
+  const component:FastLaneComboComponent={
+    groupId:slot.groupId,groupName:slot.groupName,role:slot.role,
+    choiceId:choice.id,choiceLabel:choice.label,sourceLineId:configuredLine.id,snapshot:snapshot({...configuredLine,qty:1}),
+  };
+  const configAdjustment=configurationAdjustmentMinor(configuredLine,products);
+  return input.map(line=>{
+    if(line.id!==comboLineId||!line.comboDraft)return line;
+    const nextDraft:FastLaneComboDraft={
+      ...line.comboDraft,
+      components:[...line.comboDraft.components,component],
+      resolvedChoices:[...line.comboDraft.resolvedChoices,{
+        groupId:slot.groupId,groupName:slot.groupName,role:slot.role,
+        choiceId:choice.id,choiceLabel:choice.label,priceAdjustmentMinor:choice.priceAdjustmentMinor,
+      }],
+      pendingGroups:line.comboDraft.pendingGroups.filter(group=>group.groupId!==groupId),
+    };
+    return {...line,unitMinor:line.unitMinor+choice.priceAdjustmentMinor+configAdjustment,detail:comboDetail(nextDraft),comboDraft:nextDraft};
   });
 }
 
