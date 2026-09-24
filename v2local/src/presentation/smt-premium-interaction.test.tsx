@@ -17,6 +17,8 @@ describe('SMT Premium Interaction Donor Fusion R1',()=>{
         selectedCategoryId:'bento',
         categoryRows:1,
         categoryColumns:7,
+        showProductImages:false,
+        productDensity:'standard',
         orderingMode:'quick',
         products:[
           {id:'b1',name:'紫米照燒雞便當',priceLabel:'$68.00',enabled:true,requiresOptions:true,hasRequiredOptions:true},
@@ -28,6 +30,7 @@ describe('SMT Premium Interaction Donor Fusion R1',()=>{
           lines:[{id:'l1',name:'紫米照燒雞便當',quantity:1,lineTotalLabel:'$68.00',serviceMode:'takeaway',groupId:'bento',groupLabel:'便當',optionDetail:'飯底：紫米飯',note:'少汁',sourceLineIds:['l1']}],
           subtotalLabel:'$68.00',packagingLabel:'$0.00',discountLabel:'$0.00',totalLabel:'$68.00',checkoutEnabled:true,
         },
+        heldCartCount:2,
         workItems:[
           {id:'riceball-pool',label:'飯團待組區',count:0,description:'未完成飯團會集中喺呢度',statusLabel:'目前清空',enabled:true,active:false,tone:'riceball'},
           {id:'required',label:'必選區',count:1,description:'需要處理嘅必選會喺呢度',statusLabel:'有 1 項',enabled:true,active:false,tone:'required'},
@@ -39,7 +42,7 @@ describe('SMT Premium Interaction Donor Fusion R1',()=>{
       actions={{
         onSelectCategory:noop,onAddProduct:noop,onConfigureProduct:noop,
         onChangeServiceMode:noop,onChangeCartView:noop,onToggleCombine:noop,onChangeLineServiceMode:noop,
-        onAdjustLineQuantity:noop,onEditCartLine:noop,onHoldCart:noop,onCancelCart:noop,onOpenWorkItem:noop,
+        onAdjustLineQuantity:noop,onEditCartLine:noop,onHoldCart:noop,onOpenHeldOrders:noop,onRemoveCartLine:noop,onCancelCart:noop,onOpenWorkItem:noop,
         onOpenQueueOrder:noop,onCheckout:noop,
       }}
     />);
@@ -58,6 +61,8 @@ describe('SMT Premium Interaction Donor Fusion R1',()=>{
     expect(html).toContain('飯團待組區');
     expect(html).toContain('必選區');
     expect(html).toContain('紫米套餐');
+    expect(html).toContain('取單');
+    expect(html).toContain('刪除 紫米照燒雞便當');
     expect(html).toContain('前往結帳 $68.00');
     expect(html).not.toContain('<img');
   });
