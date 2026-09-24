@@ -35,7 +35,7 @@ function ProductCard({product,actions,recentlyAdded}:{product:OrderingProductVie
   return <article className={`ordering-product-card ${product.imageUrl?'has-media':'text-only'}${product.enabled?'':' disabled'}${recentlyAdded?' recently-added':''}`}>
     <button type="button" className="ordering-product-body" aria-label={`商品 ${product.name}`} disabled={!product.enabled} onClick={onBody}>
       {product.imageUrl?<span className="ordering-product-media" aria-hidden="true"><span>磨</span><img src={product.imageUrl} alt="" loading="lazy" decoding="async" onError={event=>event.currentTarget.remove()}/></span>:null}
-      <span className="ordering-product-copy">{product.badge?<small>{product.badge}</small>:null}<b>{product.name}</b><strong>{product.priceLabel}</strong></span>
+      <span className="ordering-product-copy">{product.badge?<small>{product.badge}</small>:null}<b>{product.name}</b><strong>{product.priceLabel}</strong><em>{product.requiresOptions?'先設定':'直接加入'}</em></span>
     </button>
     <button type="button" className="ordering-product-more" aria-label={`更多設定 ${product.name}`} disabled={!product.enabled} onClick={()=>actions.onConfigureProduct(product.id)}>⋮</button>
   </article>;
@@ -93,6 +93,12 @@ function OrganizedCart({lines,highlightedLineId,actions,availability}:{lines:rea
 export function OrderingWorkspace({view,actions,centerPanel}:{view:OrderingWorkspaceViewModel;actions:OrderingWorkspaceActions;centerPanel?:{readonly title:string;readonly body:ReactNode;readonly onClose:()=>void}|null}){
   const availability=view.actionAvailability??{lineServiceMode:true,lineEdit:true,lineQuantity:true,holdCart:true,cancelCart:true};
   const serviceModes=view.serviceModes??{takeaway:true,dineIn:true};
+  const cartCount=view.cart.lines.reduce((sum,line)=>sum+line.quantity,0);
+  const nextAction=centerPanel
+    ?`完成「${centerPanel.title}」`
+    :cartCount===0?'揀商品加入目前訂單'
+    :view.cart.checkoutEnabled?'核對購物車，然後結帳':'完成目前必選／整理';
+  const pressureCount=view.pendingOrders.length+view.activeOrders.length;
   return <div className={`ordering-workspace${centerPanel?' panel-open':''}`}>
     <header className="ordering-flow-strip">
       <QueueStrip title="待處理" kind="pending" orders={view.pendingOrders} onOpen={actions.onOpenQueueOrder}/>
@@ -100,6 +106,11 @@ export function OrderingWorkspace({view,actions,centerPanel}:{view:OrderingWorks
     </header>
 
     <main className={`ordering-catalog${centerPanel?' ordering-catalog--panel':''}`} aria-label={centerPanel?centerPanel.title:'商品'}>
+      <section className="ordering-decision-strip" aria-live="polite">
+        <div><small>NOW</small><strong>{centerPanel?centerPanel.title:view.cart.serviceMode==='takeaway'?'外賣點單':'堂食點單'}</strong><span>{cartCount} 件 · {view.cart.totalLabel}</span></div>
+        <i aria-hidden="true"/>
+        <div><small>NEXT</small><strong>{nextAction}</strong><span>{pressureCount?`另有 ${pressureCount} 張待留意訂單`:'目前冇額外訂單壓力'}</span></div>
+      </section>
       {centerPanel?<section className="ordering-center-panel">
         <header className="ordering-center-panel-head"><div><small>點單工作台</small><strong>{centerPanel.title}</strong></div><button type="button" onClick={centerPanel.onClose}>×</button></header>
         <div className="ordering-center-panel-body">{centerPanel.body}</div>
@@ -133,7 +144,8 @@ export function OrderingWorkspace({view,actions,centerPanel}:{view:OrderingWorks
       <div className="ordering-cart-facts"><span><small>小計</small><b>{view.cart.subtotalLabel}</b></span><span><small>包裝</small><b>{view.cart.packagingLabel}</b></span><span><small>折扣</small><b>{view.cart.discountLabel}</b></span></div>
       <div className="ordering-cart-total"><span>總計</span><strong>{view.cart.totalLabel}</strong></div>
       {availability.holdCart||availability.cancelCart?<div className={`ordering-cart-secondary-actions${!availability.cancelCart?' single':''}`}>{availability.holdCart?<button type="button" onClick={actions.onHoldCart}>{view.cart.lines.length?'暫存':'取回訂單'}</button>:null}{availability.cancelCart?<button type="button" className="destructive" onClick={actions.onCancelCart}>取消單</button>:null}</div>:null}
-      <button type="button" className="ordering-checkout" aria-label="結帳" disabled={!view.cart.checkoutEnabled} onClick={actions.onCheckout}>結帳　{view.cart.totalLabel}</button>
+      <div className="ordering-checkout-context"><span>下一步</span><b>{view.cart.checkoutEnabled?'核對付款並完成訂單':'完成必選後可結帳'}</b></div>
+      <button type="button" className="ordering-checkout" aria-label="結帳" disabled={!view.cart.checkoutEnabled} onClick={actions.onCheckout}><span>結帳</span><strong>{view.cart.totalLabel}</strong></button>
     </aside>
 
     <footer className="ordering-workbar">{view.workItems.map(item=><button type="button" key={item.id} onClick={()=>actions.onOpenWorkItem(item.id)}><span>{item.label}</span>{item.count>0?<b>{item.count}</b>:null}</button>)}</footer>
