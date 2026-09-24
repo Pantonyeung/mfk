@@ -54,7 +54,9 @@ const BASE_PRODUCTS:readonly Product[]=[
   {id:'lemonTea',category:'飲品',name:'手打檸檬茶',priceMinor:2000,priceReady:true},
 ];
 
-const money=(minor:number)=>'
+const money=(minor:number)=>String.fromCharCode(36)+(minor/100).toFixed(2);
+let localCartLineSequence=0;
+const nextLocalCartLineId=()=>{localCartLineSequence+=1;return 'line-'+Date.now().toString(36)+'-'+localCartLineSequence.toString(36)};
 
 const PRODUCT_ART_COLORS:Record<string,[string,string]>={
   '飯團':['#f1c98f','#8a4f2b'],
