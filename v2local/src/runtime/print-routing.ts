@@ -126,13 +126,20 @@ function orderService(order:PrintableOrder){
   return '外賣';
 }
 
+function itemBaseName(item:PrintableOrder['items'][number]){
+  const parts=clean(item.name).split('｜');
+  return parts.shift()||clean(item.name);
+}
 function itemIdentity(item:PrintableOrder['items'][number]){
   const code=clean(item.productCode??'');
-  return (code?code+'. ':'')+clean(item.name);
+  return (code?code+'. ':'')+itemBaseName(item);
 }
 function itemDetail(item:PrintableOrder['items'][number]){
-  const detail=clean(item.detail??'');
-  return detail&&detail!==clean(item.name)?detail:'';
+  const explicit=clean(item.detail??'');
+  if(explicit&&explicit!==clean(item.name))return explicit;
+  const parts=clean(item.name).split('｜');
+  parts.shift();
+  return parts.join(' · ');
 }
 function totalUnits(order:PrintableOrder){
   return order.items.reduce((sum,item)=>sum+Math.max(0,Number(item.qty)||0),0);
@@ -345,8 +352,8 @@ export function buildOrderPrintPlan(order:PrintableOrder,bindings:readonly Print
       if(routeUnits.length<1)continue;
       for(const unit of routeUnits){
         const labelContent=productLabelContent({
-          productName:clean(unit.item.name),
-          detail:clean(unit.item.detail??''),
+          productName:itemBaseName(unit.item),
+          detail:itemDetail(unit.item),
         });
         const labelSpec:RasterLabelSpec={
           kind:'product',
