@@ -230,6 +230,12 @@ async function reconcileOrders(){
         providerRef,
         initialFulfillmentLabel:'待處理',
       });
+      window.dispatchEvent(new CustomEvent('mfk-customer-order-intake',{detail:{
+        canonicalOrderId:order.id,
+        display:order.display,
+        sourceLabel:'自家 App',
+        submissionId:intent.submissionId,
+      }}));
       await postJson('/api/customer/smt/orders/ack',{
         submissionId:intent.submissionId,
         idempotencyKey:intent.idempotencyKey,
