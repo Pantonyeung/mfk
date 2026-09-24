@@ -269,3 +269,200 @@
   background:#1768dc;
   color:#fff;
 }
+
+
+/* =========================================================
+   SMT R4 — compact open-check manager for held carts
+   ========================================================= */
+.open-checks-workspace{
+  position:relative;
+  height:100%;
+  min-height:0;
+  display:grid;
+  grid-template-rows:auto minmax(0,1fr);
+  gap:10px;
+  padding:14px;
+  box-sizing:border-box;
+  background:#f5f7fa;
+}
+.open-checks-head{
+  min-height:52px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+}
+.open-checks-head>div{display:grid;gap:1px}
+.open-checks-head small{
+  color:#7b8796;
+  font-size:9px;
+  font-weight:950;
+  letter-spacing:.08em;
+}
+.open-checks-head h2{
+  margin:0;
+  font-size:25px;
+  letter-spacing:-.02em;
+}
+.open-checks-head>strong{
+  min-width:34px;height:34px;padding:0 8px;
+  display:grid;place-items:center;
+  border-radius:999px;
+  background:#eaf3ff;
+  color:#1559af;
+  font-size:13px;
+}
+.open-checks-layout{
+  min-height:0;
+  display:grid;
+  grid-template-columns:minmax(300px,.85fr) minmax(0,1.35fr);
+  gap:10px;
+}
+.open-checks-list{
+  min-height:0;
+  overflow-y:auto;
+  display:grid;
+  align-content:start;
+  gap:7px;
+}
+.open-checks-list>button{
+  min-height:76px;
+  padding:9px 11px;
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto;
+  gap:4px 10px;
+  border:1px solid #dbe2ea;
+  border-radius:10px;
+  background:#fff;
+  text-align:left;
+  transition:transform 90ms ease,border-color 140ms ease,background-color 140ms ease,box-shadow 140ms ease;
+}
+.open-checks-list>button>span{
+  min-width:0;
+  display:flex;
+  align-items:center;
+  gap:7px;
+}
+.open-checks-list>button b{font-size:17px}
+.open-checks-list>button em{
+  padding:3px 6px;
+  border-radius:999px;
+  background:#f0f3f6;
+  color:#667085;
+  font-size:9px;
+  font-style:normal;
+  font-weight:850;
+}
+.open-checks-list>button>strong{
+  font-size:16px;
+  align-self:center;
+}
+.open-checks-list>button>small{
+  grid-column:1/-1;
+  color:#7a8797;
+  font-size:11px;
+}
+.open-checks-list>button.active{
+  border-color:#87b1e6;
+  background:#eef5ff;
+  box-shadow:0 0 0 3px rgba(23,104,220,.07);
+}
+.open-checks-list>button:not(:disabled):active{transform:scale(.985)}
+
+.open-checks-preview{
+  min-height:0;
+  display:grid;
+  grid-template-rows:auto auto minmax(0,1fr) auto auto;
+  gap:9px;
+  padding:14px;
+  border:1px solid #dbe2ea;
+  border-radius:12px;
+  background:#fff;
+}
+.open-checks-preview>header{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:14px;
+}
+.open-checks-preview>header>div{display:grid;gap:2px}
+.open-checks-preview>header small{
+  color:#7a8797;
+  font-size:10px;
+  font-weight:850;
+}
+.open-checks-preview h3{
+  margin:0;
+  font-size:27px;
+  letter-spacing:-.02em;
+}
+.open-checks-preview>header>strong{
+  font-size:25px;
+  color:#203a5b;
+}
+.open-checks-preview-meta{
+  display:flex;
+  flex-wrap:wrap;
+  gap:6px;
+}
+.open-checks-preview-meta span{
+  padding:4px 7px;
+  border-radius:999px;
+  background:#f2f4f7;
+  color:#667085;
+  font-size:10px;
+  font-weight:800;
+}
+.open-checks-preview-lines{
+  min-height:0;
+  overflow-y:auto;
+  border-top:1px solid #edf1f5;
+  border-bottom:1px solid #edf1f5;
+}
+.open-checks-preview-lines p{
+  margin:0;
+  min-height:42px;
+  display:grid;
+  grid-template-columns:34px minmax(0,1fr) auto;
+  gap:8px;
+  align-items:center;
+  border-bottom:1px solid #f0f2f5;
+}
+.open-checks-preview-lines p:last-child{border-bottom:0}
+.open-checks-preview-lines span{color:#667085;font-size:11px}
+.open-checks-preview-lines b{font-size:14px}
+.open-checks-preview-lines strong{font-size:13px}
+.open-checks-note{
+  color:#765e3d;
+  font-size:11px;
+}
+.open-checks-preview>footer{
+  display:grid;
+  grid-template-columns:.72fr 1.28fr;
+  gap:8px;
+}
+.open-checks-preview>footer button{
+  min-height:50px;
+  border:1px solid #d7dee8;
+  border-radius:9px;
+  background:#fff;
+  font-size:14px;
+  font-weight:900;
+}
+.open-checks-preview>footer button.primary{
+  border-color:#1768dc;
+  background:#1768dc;
+  color:#fff;
+}
+.open-checks-preview>footer button.danger{
+  border-color:#e2bbb5;
+  background:#fff7f5;
+  color:#a63f36;
+}
+@media(max-width:1100px){
+  .open-checks-layout{grid-template-columns:1fr}
+  .open-checks-preview{min-height:360px}
+}
+@media(prefers-reduced-motion:reduce){
+  .open-checks-list>button{transition:none!important}
+}
