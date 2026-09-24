@@ -1225,3 +1225,127 @@
   .ordering-product-grid{max-height:676px}
   .ordering-workspace.density-compact .ordering-product-grid{max-height:566px}
 }
+
+
+/* =========================================================
+   SMT R4 — mature POS cart-header controls + save/retrieve flow
+   ========================================================= */
+
+.ordering-cart-head{
+  align-items:center!important;
+  gap:10px!important;
+  padding-bottom:10px!important;
+}
+.ordering-cart-order-id{
+  flex:1 1 auto;
+  min-width:0;
+}
+.ordering-cart-head-controls{
+  flex:0 0 auto;
+  display:grid;
+  grid-template-columns:repeat(3,minmax(72px,1fr));
+  gap:6px;
+}
+.ordering-cart-head-controls .ordering-cart-cycle{
+  min-height:44px;
+  padding:5px 8px;
+  display:grid;
+  place-items:center;
+  border:1px solid #ccd5df;
+  border-radius:9px;
+  background:#fff;
+  color:#334860;
+  box-shadow:none;
+}
+.ordering-cart-head-controls .ordering-cart-cycle b{
+  font-size:14px;
+  line-height:1;
+  white-space:nowrap;
+}
+.ordering-cart-head-controls .ordering-cart-cycle.service.takeaway{
+  border-color:#bdd1ee;
+  background:#f4f8ff;
+  color:#195fba;
+}
+.ordering-cart-head-controls .ordering-cart-cycle.service.dine-in{
+  border-color:#c5ddce;
+  background:#f2fbf6;
+  color:#146c49;
+}
+.ordering-cart-head-controls .ordering-cart-cycle.combine.active{
+  border-color:#26374e;
+  background:#26374e;
+  color:#fff;
+}
+.ordering-cart-head-controls .ordering-cart-cycle:not(:disabled):active{
+  transform:scale(.96);
+}
+.ordering-cart-head-controls .ordering-cart-cycle:disabled{
+  opacity:.45;
+}
+
+.ordering-cart-secondary-actions{
+  width:100%;
+  display:grid!important;
+  gap:8px;
+  margin:0 0 9px!important;
+}
+.ordering-cart-secondary-actions.active-cart{
+  grid-template-columns:1fr 1fr!important;
+}
+.ordering-cart-secondary-actions.empty-cart{
+  grid-template-columns:1fr!important;
+}
+.ordering-cart-secondary-actions button,
+.ordering-cart-secondary-actions span{
+  min-height:54px;
+  width:100%;
+  box-sizing:border-box;
+}
+.ordering-cart-secondary-actions button{
+  border:1px solid #c7d1de;
+  border-radius:9px;
+  background:#fff;
+  color:#334860;
+  font-size:16px;
+  font-weight:900;
+}
+.ordering-cart-secondary-actions button.retrieve{
+  border-color:#9fc0ea;
+  background:#eef5ff;
+  color:#1559af;
+}
+.ordering-cart-secondary-actions button.retrieve b{
+  min-width:24px;
+  height:24px;
+  margin-left:6px;
+  display:inline-grid;
+  place-items:center;
+  border-radius:999px;
+  background:#1768dc;
+  color:#fff;
+  font-size:11px;
+}
+.ordering-cart-secondary-actions button.destructive{
+  border-color:#dfb7b1;
+  background:#fff7f5;
+  color:#a63f36;
+}
+.ordering-cart-secondary-actions button:not(:disabled):active{
+  transform:scale(.985);
+}
+.ordering-checkout{
+  width:100%;
+}
+
+@media(max-width:1350px){
+  .ordering-cart-head-controls{
+    grid-template-columns:repeat(3,minmax(64px,1fr));
+    gap:5px;
+  }
+  .ordering-cart-head-controls .ordering-cart-cycle{
+    min-height:42px;
+    padding:4px 6px;
+  }
+  .ordering-cart-head-controls .ordering-cart-cycle b{font-size:13px}
+}
