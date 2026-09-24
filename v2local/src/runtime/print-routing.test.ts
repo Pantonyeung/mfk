@@ -120,6 +120,43 @@ describe('MFK checkout print fanout',()=>{
     expect(batches[0]?.jobs.map(job=>job.labelSpec?.pieceLabel)).toEqual(['1/3','2/3','3/3',undefined]);
   });
 
+
+  it('sends an unmapped current product to the canonical takeaway label route instead of dropping the product label',()=>{
+    const currentOrder:PrintableOrder={...order,items:[
+      {id:'uuid-current-product',name:'今日想食辣',qty:1,unitMinor:5600,serviceMode:'takeaway'},
+    ]};
+    const plan=buildOrderPrintPlan(currentOrder,[
+      binding('產品標籤','product-label-riceball',['riceball'], 'logical-riceball-label'),
+      binding('產品標籤','product-label-takeaway',['bento'], 'logical-takeaway-label'),
+    ]);
+    const labels=plan.filter(job=>job.role==='產品標籤');
+    expect(labels).toHaveLength(1);
+    expect(labels[0]?.binding.logicalPrinterId).toBe('logical-takeaway-label');
+    expect(labels[0]?.labelSpec).toMatchObject({
+      kind:'product',orderCode:'P001',primaryText:'今日想食辣',pieceLabel:'1/1',
+    });
+  });
+
+  it('still respects an explicit Admin product rule that turns Label off',()=>{
+    const currentOrder:PrintableOrder={...order,items:[
+      {id:'uuid-current-product',name:'今日想食辣',qty:1,unitMinor:5600,serviceMode:'takeaway'},
+    ]};
+    const config={
+      logicalPrinters:[
+        {id:'logical-takeaway-label',type:'LABEL' as const,active:true},
+      ],
+      productRules:{
+        'uuid-current-product':{
+          receipt:true,production:true,packing:true,label:false,dineIn:true,takeaway:true,labelPrinterIds:[],
+        },
+      },
+    };
+    const plan=buildOrderPrintPlan(currentOrder,[
+      binding('產品標籤','product-label-takeaway',['bento'],'logical-takeaway-label'),
+    ],config);
+    expect(plan).toHaveLength(0);
+  });
+
   it('keeps a newly added custom product-label route silent until products are assigned',()=>{
     const plan=buildOrderPrintPlan(order,[binding('產品標籤','product-label-custom',[])]);
     expect(plan).toHaveLength(0);
