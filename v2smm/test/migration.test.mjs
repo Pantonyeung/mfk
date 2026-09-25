@@ -187,8 +187,12 @@ test('dedicated SMM worker keeps auth session only and proxies orders to the sha
   assert.match(worker,/url\.pathname==='\/api\/smm\/snapshot'/);
   assert.match(worker,/SmmIntentStore/);
   assert.match(worker,/\/api\/smm\/orders\/submit/);
-  assert.match(worker,/admin\.morefunos\.com\/api\/customer\/staff-orders\/submit/);
-  assert.match(worker,/admin\.morefunos\.com\/api\/customer\/staff-orders\/readback/);
+  assert.match(worker,/admin\.morefunos\.com\/api\/customer\/orders\/submit/);
+  assert.match(worker,/admin\.morefunos\.com\/api\/customer\/orders\/readback/);
+  assert.match(worker,/__MFK_SMM1__/);
+  assert.match(worker,/bridge\/create/);
+  assert.match(worker,/bridge\/read/);
+  assert.match(worker,/\/api\/smm\/bridge\/claim/);
   assert.doesNotMatch(worker,/\/api\/smm\/smt\/orders\/pending/);
   assert.doesNotMatch(worker,/url\.pathname==='\/orders\/submit'/);
   assert.match(worker,/SMM_STAFF_UNAUTHORIZED/);
@@ -243,9 +247,9 @@ test('Internet staff orders use same-account auth and the existing customer brid
   assert.match(staff,/HMAC/);
   assert.match(staff,/sessionToken/);
   assert.doesNotMatch(staff,/readonly\s+pin\s*:/);
-  assert.match(cloud,/\/api\/customer\/staff-orders\/submit/);
-  assert.match(cloud,/\/api\/customer\/staff-orders\/readback/);
-  assert.doesNotMatch(cloud,/\/api\/smm\/orders\/submit/);
+  assert.match(cloud,/\/api\/smm\/orders\/submit/);
+  assert.match(cloud,/\/api\/smm\/orders\/readback/);
+  assert.doesNotMatch(cloud,/admin\.morefunos\.com/);
   assert.match(cloud,/x-mfk-smm-session/);
   assert.doesNotMatch(cloud,/x-mfk-staff-pin/);
   assert.doesNotMatch(cloud,/x-mfk-staff-id/);
@@ -284,17 +288,17 @@ test('persisted cart reprices from the current published menu before resubmit',(
 });
 
 
-test('SMM Internet orders reuse the proven Customer cloud-to-SMT bridge',()=>{
+test('SMM Internet orders reuse the already-live Customer order endpoint without requiring an Admin redeploy',()=>{
   const cloud=fs.readFileSync(path.join(root,'pwa-cloud.ts'),'utf8');
-  const admin=fs.readFileSync(path.join(repoRoot,'v2admin','worker.ts'),'utf8');
-  const customerRuntime=fs.readFileSync(path.join(repoRoot,'v2admin','customer-runtime.ts'),'utf8');
+  const worker=fs.readFileSync(path.join(repoRoot,'v2smm','worker.ts'),'utf8');
   const intake=fs.readFileSync(path.join(repoRoot,'v2local','src','runtime','customer-cloud-intake.ts'),'utf8');
-  assert.match(cloud,/admin\.morefunos\.com/);
-  assert.match(cloud,/\/api\/customer\/staff-orders\/submit/);
-  assert.match(cloud,/\/api\/customer\/staff-orders\/readback/);
-  assert.doesNotMatch(cloud,/\/api\/smm\/orders\/submit/);
-  assert.match(admin,/CUSTOMER_ORDER_AVAILABLE/);
-  assert.match(customerRuntime,/bridgeKind:'SMM_STAFF'/);
-  assert.match(intake,/bridgeKind==='SMM_STAFF'/);
+  assert.match(cloud,/\/api\/smm\/orders\/submit/);
+  assert.match(worker,/admin\.morefunos\.com\/api\/customer\/orders\/submit/);
+  assert.match(worker,/MFK_CUSTOMER_ORDER_INTENT_V1/);
+  assert.match(worker,/__MFK_SMM1__/);
+  assert.match(worker,/\/api\/smm\/bridge\/claim/);
+  assert.match(intake,/SMM_CUSTOMER_BRIDGE_PREFIX/);
+  assert.match(intake,/claimSmmBridge/);
+  assert.match(intake,/smmRequestFromCustomerIntent/);
   assert.match(intake,/smmIngress\.submit/);
 });
