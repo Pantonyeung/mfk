@@ -6,6 +6,7 @@ export interface QueueOrderViewModel {
   readonly sourceLabel:string;
   readonly waitLabel:string;
   readonly itemCount:number;
+  readonly attentionLabel?:string;
 }
 
 export interface OrderingCategoryViewModel {
