@@ -334,3 +334,14 @@ test('SMM order intent carries published unit price so SMT line-level revalidati
   assert.match(ingress,/input\.lines\[index\]\?\.publishedUnitPriceMinor/);
   assert.match(ingress,/published!==priced\.items\[index\]!\.unitMinor/);
 });
+
+
+test('SMM never reuses an unresolved submission and only creates a fresh id after definitive reject',()=>{
+  const app=fs.readFileSync(path.join(root,'App.tsx'),'utf8');
+  assert.match(app,/await port\.readSubmission\(existing\.submissionId\)/);
+  assert.match(app,/prior\.state==='CONFIRMED'/);
+  assert.match(app,/prior\.state!=='REJECTED'/);
+  assert.match(app,/未重新送出，避免重複訂單/);
+  assert.match(app,/removeIntent\(existing\.submissionId\)/);
+  assert.match(app,/base=createSmmPendingIntent/);
+});
