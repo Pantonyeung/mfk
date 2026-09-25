@@ -14,9 +14,9 @@ type Modal='actions'|'edit'|'cancel'|'reprint'|null;
 
 export function sourceLane(source?:string){
   const value=String(source||'').trim();
-  if(value.startsWith('現場')||value.startsWith('SMM')||value.startsWith('電話')||value.startsWith('WhatsApp'))return 'walkin';
   if(value.startsWith('自家 App')||value.startsWith('磨飯 App')||value.startsWith('Customer'))return 'app';
-  return 'platform';
+  if(value.startsWith('Keeta')||value.startsWith('Foodpanda')||value.startsWith('第三方'))return 'platform';
+  return 'walkin';
 }
 function paymentMatches(label:string,filter:PaymentFilter){
   if(filter==='全部')return true;

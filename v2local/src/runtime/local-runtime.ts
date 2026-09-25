@@ -94,7 +94,7 @@ function read():Persisted{
     const orders=(Array.isArray(value.orders)?value.orders:[]).map((order:any)=>{
       const source=String(order?.sourceLabel||'');
       const paid=Boolean(String(order?.paymentLabel||'').trim());
-      const legacyLocal=source.startsWith('現場')||source.startsWith('電話／WhatsApp')||source.startsWith('WhatsApp／電話');
+      const legacyLocal=source.startsWith('現場')||source.startsWith('SMM')||source.startsWith('電話')||source.startsWith('WhatsApp');
       return {...order,fulfillmentLabel:order?.fulfillmentLabel==='待處理'&&paid&&legacyLocal?'進行中':order?.fulfillmentLabel};
     }) as StoredOrder[];
     return {orders,availability:value.availability||{},holds:Array.isArray(value.holds)?value.holds:[]};
