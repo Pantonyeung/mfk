@@ -85,8 +85,8 @@ android {
 
 val verifySmtWebBundle by tasks.registering {
     doLast {
-        val index = file("../../smt-clean/dist/index.html")
-        check(index.isFile) { "SMT clean baseline missing. Build apps/smt-clean before assembling the Android carrier." }
+        val index = file("../../../v2local/dist/index.html")
+        check(index.isFile) { "MFK SMT runtime missing. Build v2local before assembling the Android carrier." }
     }
 }
 
