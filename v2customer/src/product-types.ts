@@ -134,7 +134,7 @@ export interface CustomerQuoteSnapshot {
 }
 
 export type CustomerPaymentMethod='PAY_AT_STORE'|'ELECTRONIC';
-export type CustomerPaymentChannelId='ALIPAY'|'WECHAT'|'FPS'|'PAYME';
+export type CustomerPaymentChannelId=string;
 
 export interface CustomerPaymentChannel{
   readonly channelId:CustomerPaymentChannelId;
@@ -155,6 +155,7 @@ export interface CustomerCheckoutDraft {
   readonly phone:string;
   readonly paymentMethod:CustomerPaymentMethod;
   readonly paymentChannelId?:CustomerPaymentChannelId;
+  readonly paymentChannelLabel?:string;
   readonly paymentEvidence?:CustomerPaymentEvidenceDraft;
 }
 
