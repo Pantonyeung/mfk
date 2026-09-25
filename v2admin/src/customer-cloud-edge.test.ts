@@ -32,4 +32,16 @@ describe('Customer Cloud Edge authority gate',()=>{
     expect(worker).toContain("kind:'PAYMENT_SCREENSHOT'");
     expect(worker).toContain("verificationState:'PENDING'");
   });
+
+  it('routes SMM staff orders into the existing Customer Runtime bridge without a second cloud order queue',()=>{
+    const runtime=readFileSync(new URL('../customer-runtime.ts',import.meta.url),'utf8');
+    expect(worker).toContain("'/api/customer/staff-orders/submit'");
+    expect(worker).toContain("'/api/customer/staff-orders/readback'");
+    expect(worker).toContain("type:'CUSTOMER_ORDER_AVAILABLE'");
+    expect(runtime).toContain("bridgeKind:'SMM_STAFF'");
+    expect(runtime).toContain("'/smt/orders/pending'");
+    expect(runtime).toContain("'/smt/orders/ack'");
+    expect(runtime).not.toContain('SmmIntentStore');
+  });
+
 });
