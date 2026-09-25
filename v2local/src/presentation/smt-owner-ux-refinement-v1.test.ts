@@ -34,8 +34,8 @@ describe('SMT owner UX refinement',()=>{
     expect(fast).toContain('previewLabels=Array.from({length:mainUnits}');
     expect(fast).toContain('等待小食配對');
     expect(fast).toContain('加入飯團後，A／B／C… 組別會即時喺呢度出現');
-    expect(fast).toContain('固定 F1–F6 類產品照常直接落單');
-    expect(app).toContain("label:'飯團餐配對'");
+    expect(fast).toContain('固定 F1–F6／預組產品照常直接落單');
+    expect(app).toContain("label:'紫米套餐區'");
   });
 
   it('shows local tenders only for walk-in and replaces them with channel information otherwise',()=>{
@@ -63,6 +63,6 @@ describe('SMT owner UX refinement',()=>{
     expect(center).toContain('cfg-review-panel');
     expect(center).toContain('canOverridePrice');
     expect(center).toContain('overrideUnitMinor');
-    expect(app).toContain("hasStaffPermission('PRICE_OVERRIDE')");
+    expect(app).toContain('staffAuthRequired()');
   });
 });
