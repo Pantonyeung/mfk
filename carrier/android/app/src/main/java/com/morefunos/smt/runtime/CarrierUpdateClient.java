@@ -62,11 +62,11 @@ public final class CarrierUpdateClient {
     }
 
     private final Context context;
-    private final RuntimeUpdateEndpointStore endpointStore;
+    private final CarrierUpdateEndpointStore endpointStore;
 
     public CarrierUpdateClient(Context context) {
         this.context = context.getApplicationContext();
-        this.endpointStore = new RuntimeUpdateEndpointStore(context);
+        this.endpointStore = new CarrierUpdateEndpointStore(context);
     }
 
     public Descriptor checkForUpdate() throws IOException {
@@ -177,11 +177,11 @@ public final class CarrierUpdateClient {
         });
     }
 
-    private static URI carrierManifestUri(String runtimeEndpoint) throws IOException {
+    private static URI carrierManifestUri(String endpoint) throws IOException {
         try {
-            final URI runtime = new URI(runtimeEndpoint);
-            assertHttps(runtime, "CARRIER_UPDATE_ENDPOINT_INVALID");
-            return runtime.resolve("carrier-update.json");
+            final URI manifest = new URI(endpoint);
+            assertHttps(manifest, "CARRIER_UPDATE_ENDPOINT_INVALID");
+            return manifest;
         } catch (URISyntaxException error) {
             throw new IOException("CARRIER_UPDATE_ENDPOINT_INVALID", error);
         }
