@@ -1,6 +1,6 @@
 import React from 'react';
 import {createRoot} from 'react-dom/client';
-import {MemoryRouter,Route,Routes} from 'react-router';
+import {MemoryRouter,Route,Routes,useNavigate} from 'react-router';
 import {RuntimeDiningWorkspace,type DiningCheckoutRequest} from '../src/presentation/RuntimeDiningWorkspace.tsx';
 import type {CleanSmtCoreRuntimePort,LocalDiningHoldDetail} from '../src/runtime/local-runtime.ts';
 
@@ -49,8 +49,13 @@ const runtime={
 };
 const warning=new URLSearchParams(location.search).get('warning');
 const optionalProps=warning==='none'?{}:{warningMinutes:30};
+function CheckoutReadback(){
+  const navigate=useNavigate();
+  const request=calls.checkout.at(-1);
+  return <main style={{padding:32,overflow:'auto'}}><h1>已交回同一 Checkout 入口</h1><p>此頁只核對交接資料，不收款、不建立正式交易。</p><button onClick={()=>navigate('/')}>返回堂食預覽</button><pre data-testid="checkout-readback">{JSON.stringify(request??{},null,2)}</pre></main>;
+}
 function App(){return <MemoryRouter><Routes>
   <Route path="/" element={<RuntimeDiningWorkspace {...optionalProps} runtime={runtime} onCheckout={request=>{calls.checkout.push(copy(request));}}/>}/>
-  <Route path="/checkout" element={<main style={{padding:32}}><h1>已交回同一 Checkout 入口</h1><p>此頁只核對交接資料，不收款、不建立正式交易。</p><pre data-testid="checkout-readback">{JSON.stringify(calls.checkout.at(-1),null,2)}</pre></main>}/>
+  <Route path="/checkout" element={<CheckoutReadback/>}/>
 </Routes></MemoryRouter>;}
 createRoot(document.getElementById('root')!).render(<App/>);
