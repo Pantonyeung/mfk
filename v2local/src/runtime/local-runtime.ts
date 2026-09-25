@@ -519,7 +519,7 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
       data={...data,holds:[draft,...data.holds]};save();return draft;
     }
     const tableId=String(target.tableId||'').trim();
-    if(!/^T0[1-9]$/.test(tableId))throw new Error('SMM_DINING_TABLE_INVALID');
+    if(!/^T\d{2}$/.test(tableId))throw new Error('SMM_DINING_TABLE_INVALID');
     const occupied=data.holds.find(hold=>hold.kind==='dining'&&hold.assignedTable===tableId);
     if(occupied){
       if((occupied.smmSubmissionRefs??[]).includes(providerRef))return occupied;
