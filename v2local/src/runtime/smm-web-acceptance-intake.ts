@@ -4,6 +4,11 @@ export interface SmmWebAcceptanceIngress{
   submit(input:SmmLanOrderRequest,context:{deviceId:string;trusted:boolean}):SmmLanOrderResponse;
 }
 
+function targetedSubmissionId(){
+  if(typeof window==='undefined')return '';
+  return new URLSearchParams(window.location.search).get('smm-accept')?.trim()||'';
+}
+
 async function getPending(){
   const response=await fetch('/__mfk/smm-acceptance/pending',{cache:'no-store',headers:{accept:'application/json'}});
   if(!response.ok)throw new Error('SMM_WEB_ACCEPTANCE_PENDING_HTTP_'+response.status);
@@ -44,7 +49,11 @@ export async function reconcileSmmWebAcceptanceIntake(ingress:SmmWebAcceptanceIn
   reconciling=true;
   try{
     const rows=await getPending();
-    for(const raw of rows){
+    const target=targetedSubmissionId();
+    const candidates=target
+      ?rows.filter(raw=>String((raw as any)?.request?.submissionId||'')===target)
+      :rows.length<=1?rows:[];
+    for(const raw of candidates){
       if(!raw||typeof raw!=='object'||Array.isArray(raw))continue;
       const row=raw as Record<string,unknown>;
       const request=row.request as SmmLanOrderRequest|undefined;
