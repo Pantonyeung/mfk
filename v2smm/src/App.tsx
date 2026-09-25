@@ -2,6 +2,7 @@ import {useEffect,useMemo,useState} from 'react';
 import {readSmmLocalWorkspace,writeSmmLocalWorkspace,createSmmPendingIntent,type SmmLocalPreferences} from './persistence';
 import {resolveSmmRuntimePort} from './runtime';
 import {createSmmQrHandoff,renderSmmQrHandoff} from './qr-handoff';
+import {pairSmmLan,probeSmmLan,readSmmLanPwaConfig,saveSmmLanPwaConfig} from './pwa-lan';
 import {selectedSmmCartOptions,toggleSmmSelection,validateSmmSelections,type SmmSelectionState} from './selection';
 import type {
   SmmCartLine,
@@ -234,6 +235,7 @@ export function App(){
     {notice?<div className="notice" role="status"><span>{notice}</span><button onClick={()=>setNotice(null)}>收起</button></div>:null}
     {error?<section className="recovery-banner degraded"><strong>門店資料同步失敗</strong><span>{error}</span><button onClick={()=>void refresh()}>再試一次</button></section>:null}
     {connection==='NOT_CONNECTED'?<section className="recovery-banner offline"><strong>尚未連接門店服務</strong><span>本機草稿同操作偏好可以使用；正式餐單、報價、訂單同營運狀態會保持空白，唔會顯示假資料。</span></section>:null}
+    {!port?<LanSetup onReady={()=>location.reload()}/>:null}
 
     <section className="stage">
       {view==='order'?<OrderView
@@ -529,6 +531,26 @@ function CartSheet({cart,quote,pending,onClose,onQuantity,onRemove,onSubmit,onRe
     {qr?<div className="smm-qr-handoff"><img src={qr} alt="SMM 訂單交接 QR"/><div><strong>QR 交接</strong><p>畀 SMT 掃描後，會重新用門店餐單同價格驗證，再建立正式訂單。呢個 QR 本身唔係正式 Order。</p></div></div>:null}
     <footer><button onClick={onClose}>返回</button><button disabled={!cart.length||qrBusy} onClick={()=>void makeQr()}>{qrBusy?'產生中…':'產生 QR'}</button>{pending?.state==='UNKNOWN'?<button className="primary" onClick={()=>onReadback(pending)}>重新確認結果</button>:<button className="primary" disabled={!cart.length} onClick={onSubmit}>{quote?'提交訂單':'保存待提交草稿'}</button>}</footer>
   </section></div>;
+}
+
+function LanSetup({onReady}:{onReady:()=>void}){
+  const saved=readSmmLanPwaConfig();
+  const [host,setHost]=useState(saved?.host??'');
+  const [port,setPort]=useState(saved?.port??17831);
+  const [deviceId,setDeviceId]=useState(saved?.deviceId??('SMM-'+crypto.randomUUID().slice(0,8)));
+  const [token,setToken]=useState(saved?.pairingToken??'');
+  const [state,setState]=useState('可選：如果瀏覽器支援店內 LAN，可以直接連 SMT；唔支援亦唔會鎖死其他落單方法。');
+  const config={host:host.trim(),port,deviceId:deviceId.trim(),pairingToken:token.trim()};
+  return <section className="panel lan-setup"><h2>店內直接連線（可選）</h2><p>{state}</p>
+    <label>SMT 位址<input value={host} onChange={e=>setHost(e.target.value)} placeholder="例如 192.168.1.20"/></label>
+    <label>連接埠<input type="number" value={port} onChange={e=>setPort(Number(e.target.value)||17831)}/></label>
+    <label>裝置名稱<input value={deviceId} onChange={e=>setDeviceId(e.target.value)}/></label>
+    <label>配對碼<input value={token} onChange={e=>setToken(e.target.value)} placeholder="由 SMT Recovery 顯示"/></label>
+    <div className="lan-actions">
+      <button onClick={async()=>{try{setState('測試中…');await probeSmmLan(config);setState('瀏覽器可以連到 SMT。');}catch{setState('呢個瀏覽器目前未能直接連 SMT；可以繼續使用其他落單方式。');}}}>測試 LAN</button>
+      <button className="primary" onClick={async()=>{try{setState('配對中…');await pairSmmLan(config);saveSmmLanPwaConfig(config);setState('配對成功。');onReady();}catch{setState('配對未成功；唔會阻止其他落單方式。');}}}>配對並使用</button>
+    </div>
+  </section>;
 }
 
 function EmptyState({title,detail,children}:{title:string;detail:string;children?:React.ReactNode}){
