@@ -190,6 +190,9 @@ test('dedicated SMM worker projects published Admin truth and stores only durabl
   assert.match(worker,/verifyStaffPin/);
   assert.match(worker,/sessions\/create/);
   assert.match(worker,/sessions\/read/);
+  assert.match(worker,/auth-selftest/);
+  assert.match(worker,/SMM_STAFF_VERIFY_RUNTIME_ERROR/);
+  assert.match(worker,/SMM_SESSION_STORE_UNAVAILABLE/);
   assert.doesNotMatch(worker,/snapshot\.staff\b/);
   assert.match(wrangler,/SMM_INTENT_STORE/);
   assert.match(wrangler,/new_sqlite_classes/);
@@ -223,6 +226,7 @@ test('Internet staff orders require staff PIN and fall back into the same SMT in
   assert.match(staff,/\/api\/smm\/staff\/verify/);
   assert.match(staff,/\/api\/smm\/staff\/session/);
   assert.match(staff,/sessionToken/);
+  assert.match(staff,/HTTP /);
   assert.doesNotMatch(staff,/readonly\s+pin\s*:/);
   assert.match(cloud,/\/api\/smm\/orders\/submit/);
   assert.match(cloud,/x-mfk-smm-session/);
