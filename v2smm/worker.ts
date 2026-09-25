@@ -261,6 +261,40 @@ export class SmmIntentStore{
       return json({state:'LOGGED_OUT'});
     }
 
+    if(url.pathname==='/bridge/create'&&request.method==='POST'){
+      const body=record(await request.json());
+      const submissionId=text(body.submissionId,180);
+      const staffId=text(body.staffId,120);
+      const menuRevision=text(body.menuRevision,120);
+      const serviceMode=text(body.serviceMode,20);
+      const tender=text(body.tender,20);
+      const publishedTotalMinor=Number(body.publishedTotalMinor);
+      if(!submissionId||!staffId||!menuRevision)return json({code:'SMM_BRIDGE_TICKET_INVALID'},400);
+      if(!['TAKEAWAY','DINE_IN'].includes(serviceMode))return json({code:'SMM_BRIDGE_SERVICE_MODE_INVALID'},400);
+      if(!['CASH','ALIPAY','WECHAT','FPS','PAYME'].includes(tender))return json({code:'SMM_BRIDGE_TENDER_INVALID'},400);
+      if(!Number.isSafeInteger(publishedTotalMinor)||publishedTotalMinor<0)return json({code:'SMM_BRIDGE_TOTAL_INVALID'},400);
+      const ticket=crypto.randomUUID().replaceAll('-','')+crypto.randomUUID().replaceAll('-','');
+      const expiresAt=new Date(Date.now()+24*60*60*1000).toISOString();
+      await this.state.storage.put('bridge:'+ticket,Object.freeze({
+        ticket,submissionId,staffId,menuRevision,serviceMode,tender,publishedTotalMinor,expiresAt,
+      }));
+      return json({ticket,expiresAt},201);
+    }
+
+    if(url.pathname==='/bridge/read'&&request.method==='GET'){
+      const ticket=text(url.searchParams.get('ticket'),256);
+      const submissionId=text(url.searchParams.get('submissionId'),180);
+      if(!ticket||!submissionId)return json({code:'SMM_BRIDGE_TICKET_REQUIRED'},400);
+      const row=await this.state.storage.get('bridge:'+ticket) as any;
+      if(!row)return json({code:'SMM_BRIDGE_TICKET_NOT_FOUND'},404);
+      if(String(row.submissionId)!==submissionId)return json({code:'SMM_BRIDGE_SUBMISSION_MISMATCH'},409);
+      if(!Number.isFinite(Date.parse(String(row.expiresAt||'')))||Date.parse(String(row.expiresAt))<=Date.now()){
+        await this.state.storage.delete('bridge:'+ticket);
+        return json({code:'SMM_BRIDGE_TICKET_EXPIRED'},410);
+      }
+      return json(row);
+    }
+
 
 
 
@@ -433,64 +467,112 @@ export default{
       if(request.method!=='POST')return json({code:'METHOD_NOT_ALLOWED'},405);
       const staff=await readStaffSession(request,storeId,env);
       if(!staff)return json({code:'SMM_STAFF_UNAUTHORIZED',message:'請先使用同一個員工帳戶登入'},401);
-      const token=text(request.headers.get('x-mfk-smm-session'),256);
-      const body=await request.text();
+
+      let orderRequest:Record<string,unknown>;
+      try{orderRequest=validateOrderRequest(await request.json());}
+      catch(error){return json({code:error instanceof Error?error.message:'SMM_ORDER_INVALID'},400);}
+
+      const id=env.SMM_INTENT_STORE.idFromName(storeId);
+      const stub=env.SMM_INTENT_STORE.get(id);
+      const ticketResponse=await stub.fetch(new Request('https://internal/bridge/create',{
+        method:'POST',
+        headers:{'content-type':'application/json'},
+        body:JSON.stringify({
+          submissionId:orderRequest.submissionId,
+          staffId:staff.staffId,
+          menuRevision:orderRequest.menuRevision,
+          serviceMode:orderRequest.serviceMode,
+          tender:orderRequest.tender,
+          publishedTotalMinor:orderRequest.publishedTotalMinor,
+        }),
+      }));
+      if(!ticketResponse.ok)return json({code:'SMM_BRIDGE_TICKET_CREATE_FAILED'},503);
+      const ticketBody=record(await ticketResponse.json());
+      const ticket=text(ticketBody.ticket,256);
+      if(!ticket)return json({code:'SMM_BRIDGE_TICKET_MISSING'},503);
+
+      const lines=list(orderRequest.lines).map(raw=>{
+        const line=record(raw);
+        return{
+          lineId:String(line.lineId||''),
+          productId:String(line.productId||''),
+          productName:String(line.productName||''),
+          quantity:Number(line.quantity)||1,
+          ...(line.selectedVariationId?{selectedVariationId:String(line.selectedVariationId)}:{}),
+          ...(line.selectedVariationName?{selectedVariationName:String(line.selectedVariationName)}:{}),
+          selections:list(line.selections).map(rawSelection=>{
+            const selection=record(rawSelection);
+            return{
+              optionGroupId:String(selection.optionGroupId||''),
+              optionId:String(selection.optionId||''),
+              optionName:String(selection.optionName||''),
+            };
+          }),
+          ...(Number.isSafeInteger(Number(line.publishedUnitPriceMinor))?{publishedUnitPriceMinor:Number(line.publishedUnitPriceMinor)}:{}),
+        };
+      });
+      const now=new Date().toISOString();
+      const customerIntent={
+        schema:'MFK_CUSTOMER_ORDER_INTENT_V1',
+        storeId:'MF01',
+        submissionId:String(orderRequest.submissionId),
+        idempotencyKey:String(orderRequest.idempotencyKey),
+        createdAt:now,
+        updatedAt:now,
+        cart:lines,
+        checkout:{
+          name:'__MFK_SMM1__|'+ticket,
+          phone:'00000000',
+          paymentMethod:'PAY_AT_STORE',
+        },
+      };
+
       let response:Response;
       try{
-        response=await fetch('https://admin.morefunos.com/api/customer/staff-orders/submit?storeId='+encodeURIComponent(storeId),{
+        response=await fetch('https://admin.morefunos.com/api/customer/orders/submit?storeId='+encodeURIComponent(storeId),{
           method:'POST',
-          headers:{
-            'content-type':'application/json',
-            'x-mfk-smm-session':token,
-          },
-          body,
+          headers:{'content-type':'application/json'},
+          body:JSON.stringify(customerIntent),
         });
       }catch{
-        return json({code:'SMM_SHARED_BRIDGE_UNAVAILABLE',message:'暫時未能連接門店 Internet 訂單橋'},503);
+        return json({code:'SMM_CUSTOMER_BRIDGE_UNAVAILABLE',message:'暫時未能連接門店 Internet 訂單橋'},503);
       }
-      return new Response(response.body,{status:response.status,statusText:response.statusText,headers:response.headers});
+      const body=await response.text();
+      return new Response(body,{status:response.status,statusText:response.statusText,headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store'}});
     }
 
     if(url.pathname==='/api/smm/orders/readback'){
       if(request.method!=='GET')return json({code:'METHOD_NOT_ALLOWED'},405);
       const staff=await readStaffSession(request,storeId,env);
       if(!staff)return json({code:'SMM_STAFF_UNAUTHORIZED',message:'請先使用同一個員工帳戶登入'},401);
-      const token=text(request.headers.get('x-mfk-smm-session'),256);
       const submissionId=text(url.searchParams.get('submissionId'),180);
       let response:Response;
       try{
         response=await fetch(
-          'https://admin.morefunos.com/api/customer/staff-orders/readback?storeId='+encodeURIComponent(storeId)+'&submissionId='+encodeURIComponent(submissionId),
-          {method:'GET',headers:{'x-mfk-smm-session':token,'accept':'application/json'}},
+          'https://admin.morefunos.com/api/customer/orders/readback?storeId='+encodeURIComponent(storeId)+'&submissionId='+encodeURIComponent(submissionId),
+          {method:'GET',headers:{accept:'application/json'}},
         );
       }catch{
         return json({state:'UNKNOWN',submissionId},503);
       }
-      const body=record(await response.clone().json().catch(()=>({})));
-      if(response.status===404)return json({state:'UNKNOWN',submissionId},404);
-      if(!response.ok)return json({code:String(body.code||'SMM_SHARED_BRIDGE_READBACK_FAILED')},response.status);
-      if(body.state==='CONFIRMED'){
-        return json({
-          state:'CONFIRMED',
-          submissionId,
-          result:{
-            disposition:'ACCEPTED',
-            orderId:String(body.canonicalOrderId||''),
-            canonicalRevision:1,
-          },
-        });
-      }
-      if(body.state==='REJECTED'){
-        return json({
-          state:'REJECTED',
-          submissionId,
-          result:{
-            disposition:'REJECTED',
-            reasonCode:String(body.code||'SMM_ORDER_REJECTED'),
-          },
-        });
-      }
-      return json({state:'PENDING_SMT',submissionId});
+      const body=await response.text();
+      return new Response(body,{status:response.status,statusText:response.statusText,headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store'}});
+    }
+
+    if(url.pathname==='/api/smm/bridge/claim'){
+      if(request.method!=='GET')return json({code:'METHOD_NOT_ALLOWED'},405,cors(request));
+      const deviceId=text(url.searchParams.get('deviceId'),180);
+      const ticket=text(url.searchParams.get('ticket'),256);
+      const submissionId=text(url.searchParams.get('submissionId'),180);
+      if(!await authorizedSmtDevice(deviceId,storeId))return json({code:'SMM_SMT_UNAUTHORIZED'},401,cors(request));
+      const id=env.SMM_INTENT_STORE.idFromName(storeId);
+      const stub=env.SMM_INTENT_STORE.get(id);
+      const target=new URL('https://internal/bridge/read');
+      target.searchParams.set('ticket',ticket);
+      target.searchParams.set('submissionId',submissionId);
+      const response=await stub.fetch(new Request(target.toString(),{method:'GET'}));
+      const body=await response.text();
+      return new Response(body,{status:response.status,statusText:response.statusText,headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store',...cors(request)}});
     }
 
     if(url.pathname==='/api/smm/config-diagnostics'){
