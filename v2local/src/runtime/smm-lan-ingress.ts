@@ -27,6 +27,7 @@ function serviceModeValue(mode:SmmLanOrderRequest['serviceMode']):'takeaway'|'di
   return mode==='DINE_IN'?'dine-in':'takeaway';
 }
 
+// Dining projection labels are resolved from the Admin-published table registry.
 export function createSmmLanIngress(runtime:MfkLocalRuntime){
   return Object.freeze({
     readSnapshot(){
