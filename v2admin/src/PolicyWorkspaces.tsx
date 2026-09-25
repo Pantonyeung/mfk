@@ -154,18 +154,26 @@ export function PrintTemplatesWorkspace(){
 
 type StoreDay='MON'|'TUE'|'WED'|'THU'|'FRI'|'SAT'|'SUN';
 interface DiningTableConfig{readonly id:string;readonly name:string;readonly active:boolean;readonly sortOrder:number}
+interface CustomerPaymentChannelConfig{readonly id:'ALIPAY'|'WECHAT'|'FPS'|'PAYME';readonly name:string;readonly enabled:boolean;readonly qrImageUrl:string;readonly sortOrder:number}
 interface StoreSettings{
   storeName:string;storeCode:string;currency:string;timezone:string;
   lateArrivalMinutes:number;fulfillmentMinutes:number;archiveHours:number;
   reminderAfterMinutes:number;reminderIntervalMinutes:number;repeatReminder:boolean;timeoutPriority:'NORMAL'|'HIGH'|'URGENT';
   dineInEnabled:boolean;takeawayEnabled:boolean;
   diningTables:DiningTableConfig[];
+  customerPaymentChannels:CustomerPaymentChannelConfig[];
   weeklyHours:Record<StoreDay,{closed:boolean;opensAt:string;closesAt:string}>;
   paymentRefs:string[];printRefs:string[];channelRefs:string[];
 }
 const STORE_DAYS:readonly {id:StoreDay;label:string}[]=[
   {id:'MON',label:'星期一'},{id:'TUE',label:'星期二'},{id:'WED',label:'星期三'},
   {id:'THU',label:'星期四'},{id:'FRI',label:'星期五'},{id:'SAT',label:'星期六'},{id:'SUN',label:'星期日'},
+];
+const DEFAULT_CUSTOMER_PAYMENT_CHANNELS:CustomerPaymentChannelConfig[]=[
+  {id:'ALIPAY',name:'AlipayHK',enabled:true,qrImageUrl:'',sortOrder:1},
+  {id:'WECHAT',name:'WeChat Pay HK',enabled:true,qrImageUrl:'',sortOrder:2},
+  {id:'FPS',name:'轉數快',enabled:true,qrImageUrl:'',sortOrder:3},
+  {id:'PAYME',name:'PayMe',enabled:true,qrImageUrl:'',sortOrder:4},
 ];
 const DEFAULT_DINING_TABLES:DiningTableConfig[]=Array.from({length:9},(_,index)=>({
   id:'T'+String(index+1).padStart(2,'0'),
@@ -188,13 +196,15 @@ export function StoreSettingsWorkspace(){
     storeName:'磨飯',storeCode:'MF01',currency:'HKD',timezone:'Asia/Hong_Kong',
     lateArrivalMinutes:15,fulfillmentMinutes:20,archiveHours:24,
     reminderAfterMinutes:5,reminderIntervalMinutes:5,repeatReminder:true,timeoutPriority:'HIGH',
-    dineInEnabled:true,takeawayEnabled:true,diningTables:DEFAULT_DINING_TABLES,weeklyHours:DEFAULT_WEEKLY_HOURS,
+    dineInEnabled:true,takeawayEnabled:true,diningTables:DEFAULT_DINING_TABLES,customerPaymentChannels:DEFAULT_CUSTOMER_PAYMENT_CHANNELS,weeklyHours:DEFAULT_WEEKLY_HOURS,
     paymentRefs:['CASH'],printRefs:['RECEIPT','PRODUCTION','PACKING','LABEL'],channelRefs:[],
   });
   const patch=(change:Partial<StoreSettings>)=>setConfig(current=>{const after={...current,...change};appendAdminAudit({action:'修改門店設定',target:current.storeCode,before:current,after});return after;});
   const patchDay=(day:StoreDay,change:Partial<StoreSettings['weeklyHours'][StoreDay]>)=>patch({weeklyHours:{...config.weeklyHours,[day]:{...config.weeklyHours[day],...change}}});
   const refs=(value:string)=>value.split(',').map(item=>item.trim()).filter(Boolean);
   const diningTables=(config.diningTables??DEFAULT_DINING_TABLES).slice().sort((a,b)=>a.sortOrder-b.sortOrder);
+  const paymentChannels=(config.customerPaymentChannels??DEFAULT_CUSTOMER_PAYMENT_CHANNELS).slice().sort((a,b)=>a.sortOrder-b.sortOrder);
+  const patchPaymentChannel=(id:CustomerPaymentChannelConfig['id'],change:Partial<CustomerPaymentChannelConfig>)=>patch({customerPaymentChannels:paymentChannels.map(row=>row.id===id?{...row,...change}:row)});
   const patchTable=(id:string,change:Partial<DiningTableConfig>)=>patch({diningTables:diningTables.map(row=>row.id===id?{...row,...change}:row)});
   const addTable=()=>patch({diningTables:[...diningTables,{
     id:'T'+String(Math.min(99,Math.max(0,...diningTables.map(row=>Number(row.id.replace(/\D/g,''))||0))+1)).padStart(2,'0'),
@@ -219,6 +229,13 @@ export function StoreSettingsWorkspace(){
           <button type="button" onClick={()=>removeTable(row.id)}>刪除</button>
         </div>)}</div>
       </article>
+      <article className="admin-policy-card"><h2>客戶電子支付</h2><p>客戶端只顯示已啟用渠道。QR 圖未提供時保留正式位置，但唔會產生假 QR。</p><div className="admin-editor-list">{paymentChannels.map((row,index)=><div className="admin-policy-row" key={row.id}>
+        <b>{row.id}</b>
+        <label><span>顯示名稱</span><input value={row.name} onChange={event=>patchPaymentChannel(row.id,{name:event.target.value})}/></label>
+        <label><span>QR 圖片網址</span><input value={row.qrImageUrl} onChange={event=>patchPaymentChannel(row.id,{qrImageUrl:event.target.value})} placeholder="圖片未提供可留空"/></label>
+        <label><span>排序</span><input type="number" min={1} value={row.sortOrder} onChange={event=>patchPaymentChannel(row.id,{sortOrder:Number(event.target.value)||index+1})}/></label>
+        <Toggle checked={row.enabled} onChange={enabled=>patchPaymentChannel(row.id,{enabled})} label={row.enabled?'啟用':'停用'}/>
+      </div>)}</div></article>
       <article className="admin-policy-card"><h2>系統引用</h2><label><span>付款方式 refs</span><input value={config.paymentRefs.join(', ')} onChange={event=>patch({paymentRefs:refs(event.target.value)})} placeholder="例如 CASH, OCTOPUS"/></label><label><span>打印路由 refs</span><input value={config.printRefs.join(', ')} onChange={event=>patch({printRefs:refs(event.target.value)})} placeholder="例如 RECEIPT, KITCHEN"/></label><label><span>渠道 refs</span><input value={config.channelRefs.join(', ')} onChange={event=>patch({channelRefs:refs(event.target.value)})} placeholder="例如 KEETA"/></label></article>
       <article className="admin-policy-card"><h2>營運計時</h2><label><span>遲到界線（分鐘）</span><input type="number" min={0} value={config.lateArrivalMinutes} onChange={event=>patch({lateArrivalMinutes:Number(event.target.value)||0})}/></label><label><span>出餐計時（分鐘）</span><input type="number" min={0} value={config.fulfillmentMinutes} onChange={event=>patch({fulfillmentMinutes:Number(event.target.value)||0})}/></label><label><span>封存時間（小時）</span><input type="number" min={1} value={config.archiveHours} onChange={event=>patch({archiveHours:Number(event.target.value)||1})}/></label></article>
       <article className="admin-policy-card"><h2>Pending Order 提醒</h2><label><span>幾多分鐘後提醒</span><input type="number" min={0} value={config.reminderAfterMinutes} onChange={event=>patch({reminderAfterMinutes:Number(event.target.value)||0})}/></label><label><span>提醒間隔（分鐘）</span><input type="number" min={1} value={config.reminderIntervalMinutes} onChange={event=>patch({reminderIntervalMinutes:Number(event.target.value)||1})}/></label><Toggle checked={config.repeatReminder} onChange={repeatReminder=>patch({repeatReminder})} label="重複提醒"/><label><span>Timeout 提示優先級</span><select value={config.timeoutPriority} onChange={event=>patch({timeoutPriority:event.target.value as StoreSettings['timeoutPriority']})}><option value="NORMAL">一般</option><option value="HIGH">高</option><option value="URGENT">緊急</option></select></label><small>Timeout 唔會自動接受／拒絕訂單。</small></article>
