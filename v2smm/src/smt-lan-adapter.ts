@@ -47,6 +47,10 @@ export function createSmmLanOrderAdapter(transport:SmmLanTransport,timeoutMs=300
         submissionId:intent.submissionId,
         idempotencyKey:intent.idempotencyKey,
         storeId:'MF01',
+        menuRevision:intent.menuRevision,
+        publishedTotalMinor:intent.publishedTotalMinor,
+        serviceMode:intent.checkout.serviceMode,
+        tender:intent.checkout.tender,
         lines:lines(intent.cart),
       });
       try{
