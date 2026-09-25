@@ -120,4 +120,80 @@ describe('CustomerRuntimeStore public contract',()=>{
     }));
     expect(conflict.status).toBe(409);
   });
+
+  it('stores SMM staff order intents in the same pending order bridge and ACK path',async()=>{
+    const store=runtime();
+    const submissionId='SMM-00000000-0000-4000-8000-000000000001';
+    const idempotencyKey='smm-direct:'+submissionId;
+    const request={
+      protocolVersion:1,
+      type:'smm.lan.order.submit.v1',
+      requestId:'SMM-'+submissionId,
+      submissionId,
+      idempotencyKey,
+      storeId:'MF01',
+      menuRevision:'5',
+      publishedTotalMinor:5600,
+      serviceMode:'TAKEAWAY',
+      tender:'CASH',
+      lines:[{
+        lineId:'L1',
+        productId:'bento',
+        productName:'肉燥便當',
+        quantity:1,
+        publishedUnitPriceMinor:5600,
+        selections:[],
+      }],
+    };
+    const submit=await store.fetch(new Request('https://internal/public/staff-orders/submit',{
+      method:'POST',
+      headers:{'content-type':'application/json'},
+      body:JSON.stringify({
+        request,
+        staff:{staffId:'1111',displayName:'OWNER',role:'OWNER'},
+      }),
+    }));
+    expect(submit.status).toBe(202);
+
+    const pendingResponse=await store.fetch(new Request('https://internal/smt/orders/pending'));
+    const pendingBody=await pendingResponse.json() as {orders?:Array<Record<string,unknown>>};
+    expect(pendingBody.orders).toHaveLength(1);
+    expect(pendingBody.orders?.[0]).toMatchObject({
+      bridgeKind:'SMM_STAFF',
+      submissionId,
+      idempotencyKey,
+      staff:{staffId:'1111',displayName:'OWNER',role:'OWNER'},
+      request:{submissionId,menuRevision:'5',publishedTotalMinor:5600},
+    });
+
+    const ack=await store.fetch(new Request('https://internal/smt/orders/ack',{
+      method:'POST',
+      headers:{'content-type':'application/json'},
+      body:JSON.stringify({
+        submissionId,
+        idempotencyKey,
+        state:'CONFIRMED',
+        canonicalOrderId:'MFK-SMM-1',
+        canonicalDisplay:'P031',
+        committedAt:'2026-09-25T06:30:00.000Z',
+        totalMinor:5600,
+      }),
+    }));
+    expect(ack.status).toBe(200);
+
+    const readback=await store.fetch(new Request(
+      'https://internal/public/staff-orders/readback?submissionId='+encodeURIComponent(submissionId)
+    ));
+    const body=await readback.json() as Record<string,unknown>;
+    expect(body).toMatchObject({
+      state:'CONFIRMED',
+      submissionId,
+      canonicalOrderId:'MFK-SMM-1',
+      canonicalDisplay:'P031',
+      totalMinor:5600,
+    });
+    expect(body).not.toHaveProperty('request');
+    expect(body).not.toHaveProperty('staff');
+  });
+
 });
