@@ -11,6 +11,8 @@ import {
   subscribeSmtCloudDoorbell,
 } from './admin-config-sync.ts';
 import {localRuntime} from './local-runtime.ts';
+import {createSmmLanIngress} from './smm-lan-ingress.ts';
+import type {SmmLanOrderRequest} from '../../../contracts/smm-lan-v1.ts';
 
 const ENDPOINT='https://admin.morefunos.com';
 const ATTENTION_KEY='mfk.customer.cloud-intake.attention.v1';
@@ -154,6 +156,8 @@ export function readCustomerCloudIntakeAttention(){
   }catch{return Object.freeze([]);}
 }
 
+const smmIngress=createSmmLanIngress(localRuntime);
+
 function activeCatalog(){
   const envelope=readSmtAdminConfigLkg();
   if(!envelope)throw new Error('CUSTOMER_ADMIN_CONFIG_REQUIRED');
@@ -218,6 +222,51 @@ async function reconcileOrders(){
   if(!orders.length)return;
   const {catalog}=activeCatalog();
   for(const raw of orders){
+    const bridgeRow=raw as Record<string,unknown>;
+    if(bridgeRow.bridgeKind==='SMM_STAFF'){
+      const request=bridgeRow.request as SmmLanOrderRequest|undefined;
+      if(!request)continue;
+      try{
+        const result=smmIngress.submit(request,{deviceId:readSmtDeviceId(),trusted:true});
+        if(result.disposition==='REJECTED'){
+          await postJson('/api/customer/smt/orders/ack',{
+            submissionId:request.submissionId,
+            idempotencyKey:request.idempotencyKey,
+            state:'REJECTED',
+            code:result.reasonCode,
+            message:'SMM 員工訂單需要重新確認',
+          });
+          continue;
+        }
+        const order=localRuntime.orders().find(row=>row.id===result.orderId);
+        if(!order)throw new Error('SMM_CANONICAL_ORDER_READBACK_MISSING');
+        window.dispatchEvent(new CustomEvent('mfk-customer-order-intake',{detail:{
+          canonicalOrderId:order.id,
+          display:order.display,
+          sourceLabel:'SMM',
+          submissionId:request.submissionId,
+        }}));
+        await postJson('/api/customer/smt/orders/ack',{
+          submissionId:request.submissionId,
+          idempotencyKey:request.idempotencyKey,
+          state:'CONFIRMED',
+          canonicalOrderId:order.id,
+          canonicalDisplay:order.display,
+          committedAt:order.createdAt,
+          totalMinor:order.totalMinor,
+        });
+      }catch(error){
+        await postJson('/api/customer/smt/orders/ack',{
+          submissionId:request.submissionId,
+          idempotencyKey:request.idempotencyKey,
+          state:'REJECTED',
+          code:error instanceof Error?error.message:'SMM_ORDER_REJECTED',
+          message:'店舖未能接受此員工訂單，請重新確認',
+        }).catch(()=>{});
+      }
+      continue;
+    }
+
     const intent=raw as MfkCustomerOrderIntent&{state?:string};
     try{
       const priced=priceCustomerCart(intent.cart,catalog.products);
