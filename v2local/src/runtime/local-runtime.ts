@@ -1306,8 +1306,8 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
 
     let current=data.orders.find(row=>row.id===order!.id)!;
     if(current.productionAdmissionAttemptedAt){
-      const summary=current.productionAdmissionSummary??{planned:0,sent:0,failed:0};
-      return {hold:clone(diningDetail(requireDiningHold(readDiningState(),holdId))),orderId:current.id,display:current.display,print:Object.freeze({orderId:current.id,planned:summary.planned,sent:summary.sent,failed:summary.failed,results:Object.freeze([])})};
+      const summary=current.productionAdmissionSummary??{planned:0,sent:0,failed:current.productionAdmissionState==='FAILED'||current.productionAdmissionState==='UNKNOWN'?1:0};
+      return {hold:clone(diningDetail(requireDiningHold(readDiningState(),holdId))),orderId:current.id,display:current.display,print:Object.freeze({orderId:current.id,planned:0,sent:0,failed:summary.failed,results:Object.freeze([])})};
     }
 
     const attemptedAt=new Date().toISOString();
