@@ -76,7 +76,7 @@ export function createPwaRuntimePort():SmmRuntimePort{
   const config=readSmmLanPwaConfig();
   const lan=config?createPwaLanTransport(config):null;
   const cloud=createPwaCloudTransport();
-  const orders=createSmmLanOrderAdapter(hybridTransport(lan,cloud),6500);
+  const orders=createSmmLanOrderAdapter(hybridTransport(lan,cloud),15000);
   return Object.freeze({
     portId:'MFK_SMM_PORT_V1' as const,
     async readSnapshot(){
