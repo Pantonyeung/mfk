@@ -163,7 +163,7 @@ export function MenuView({connection,categories,activeCategoryId,setCategory,que
       !categories.length?<EmptyState title={connection==='NOT_CONNECTED'?'菜單服務尚未連接':'今日暫時未有菜單'} detail={connection==='NOT_CONNECTED'?'連接後會顯示正式商品、規格、價格同供應狀態。':'店舖目前未提供可售商品。'}/>:
       products.length?<div className={`product-list layout-${layout}`}>{products.map(product=><button className={'product-card '+(product.available?'available':'unavailable')} data-product-id={product.productId} style={{viewTransitionName:productTransitionName(product.productId)} as CSSProperties} disabled={!product.available} key={product.productId} onClick={event=>{const rect=event.currentTarget.getBoundingClientRect();onProduct(product,{top:rect.top,left:rect.left,width:rect.width,height:rect.height})}}><ProductMedia product={product}/><span className="product-information">{product.badge?<small>{product.badge}</small>:null}<strong>{product.name}</strong><p>{product.description}</p><em>{product.displayPriceLabel??'價格待店舖提供'}</em></span><span className="sellability">{product.available?'設定':'暫停供應'}</span></button>)}</div>:
       <EmptyState title={query.trim()?`搵唔到「${query.trim()}」`:'呢個分類暫時未有商品'} detail="試下另一個名稱，或者切換其他分類。"><ActionButton variant="secondary" onClick={()=>setQuery('')}>清除搜尋</ActionButton></EmptyState>}
-    {cartCount>0?<button className="floating-cart" onClick={onCart}><b>{cartCount}</b><span><strong>打開記憶罐</strong><small>{quote?quoteMeta[quote.freshness].label:'等待店舖報價'}</small></span><AnimatedValue>{quote?money(quote.currency,quote.totalMinor):'查看'}</AnimatedValue></button>:null}
+    {cartCount>0?<button className="floating-cart" onClick={onCart}><b>{cartCount}</b><span><strong>打開記憶罐</strong><small>{quote?quoteMeta[quote.freshness].label:'等待餐牌價格'}</small></span><AnimatedValue>{quote?money(quote.currency,quote.totalMinor):'查看'}</AnimatedValue></button>:null}
   </section>;
 }
 
@@ -195,7 +195,7 @@ export function CartView({cart,quote,checkout,member,suggestions,products,onProd
     <JarVisual count={itemCount}/>
     {!cart.length?<EmptyState title="記憶罐仲係空嘅" detail="去菜單揀一樣真正想食嘅，設定會逐步帶你完成。"><ActionButton onClick={onMenu}>開始點餐</ActionButton></EmptyState>:
     <>
-      <section className="jar-live-summary" aria-live="polite"><span>今次已選</span><AnimatedValue as="strong">{itemCount} 件餐點</AnimatedValue><small>{quote?quoteMeta[quote.freshness].label:'等待正式報價'}</small></section>
+      <section className="jar-live-summary" aria-live="polite"><span>今次已選</span><AnimatedValue as="strong">{itemCount} 件餐點</AnimatedValue><small>{quote?quoteMeta[quote.freshness].label:'等待餐牌價格'}</small></section>
       <div className="cart-lines">{cart.map(line=>{
         const product=products.find(item=>item.productId===line.productId);
         return <article className="cart-line" key={line.lineId}>
@@ -209,7 +209,7 @@ export function CartView({cart,quote,checkout,member,suggestions,products,onProd
       {suggestions.length?<RecommendationRail eyebrow="今餐可以再睇" title="加一樣，都要有理由" recommendations={suggestions} onProduct={(product,origin)=>onProduct(product,origin)}/>:null}
       <QuoteSummary quote={quote} cart={cart}/>
       {quote?.freshness==='MATERIAL_CHANGE'?<section className="repair-card" role="alert"><span>需要你確認</span><h2>餐點或價格有重要變更</h2><p>只修正受影響項目。記憶罐其他內容唔會被清空。</p><ActionButton variant="secondary" wide onClick={onMenu}>返回菜單修正</ActionButton></section>:null}
-      <div className="screen-primary-action"><div><span>下一步</span><strong>{quote?money(quote.currency,quote.totalMinor):'等待正式報價'}</strong></div><ActionButton wide disabled={quote?.freshness==='MATERIAL_CHANGE'} onClick={onCheckout}>前往最後確認</ActionButton></div>
+      <div className="screen-primary-action"><div><span>下一步</span><strong>{quote?money(quote.currency,quote.totalMinor):'等待餐牌價格'}</strong></div><ActionButton wide disabled={quote?.freshness==='MATERIAL_CHANGE'} onClick={onCheckout}>前往最後確認</ActionButton></div>
     </>}
   </section>;
 }
@@ -235,10 +235,10 @@ export function CheckoutView({cart,quote,checkout,setCheckout,paymentChannels,pe
   const openPaymentChannel=paymentChannels.find(channel=>channel.channelId===openPaymentChannelId)??null;
   return <section className="page checkout-page">
     <button className="back-link" onClick={onBack}>返回記憶罐</button>
-    <PageIntro kicker="最後確認 · 3 / 3" title={unknown?'正在確認訂單':'資料清楚，先安心送出'} detail={unknown?'請勿重複提交。系統只會查詢原本嗰次落單。':'店舖正式接單後，今次訂單先成立。'}/>
+    <PageIntro kicker="最後確認 · 3 / 3" title={unknown?'正在確認訂單':'資料清楚，先安心送出'} detail={unknown?'請勿重複提交。系統只會查詢原本嗰次落單。':'價格已按發佈餐牌計算；送出後由 SMT 核對版本同價格，一致就直接接單。'}/>
     <JourneyCoach active={4}/>
     <ol className="checkout-steps" aria-label="落單步驟"><li className="done">揀好餐點</li><li className="done">確認聯絡</li><li className="active">安全提交</li></ol>
-    <section className="checkout-review" aria-label="訂單摘要"><div><span>餐點</span><strong>{cart.reduce((sum,line)=>sum+line.quantity,0)} 件</strong></div><div><span>店舖報價</span><AnimatedValue>{quote?money(quote.currency,quote.totalMinor):'尚未取得'}</AnimatedValue></div><div><span>價格狀態</span><strong>{quote?quoteMeta[quote.freshness].label:'確認中'}</strong></div></section>
+    <section className="checkout-review" aria-label="訂單摘要"><div><span>餐點</span><strong>{cart.reduce((sum,line)=>sum+line.quantity,0)} 件</strong></div><div><span>目前餐牌價格</span><AnimatedValue>{quote?money(quote.currency,quote.totalMinor):'尚未取得'}</AnimatedValue></div><div><span>價格狀態</span><strong>{quote?quoteMeta[quote.freshness].label:'確認中'}</strong></div></section>
     <section className="checkout-contact"><SectionHeading eyebrow="取餐聯絡" title="核對今次資料"/><div className="checkout-form"><label htmlFor="customer-name"><span>稱呼 <small>選填</small></span><input id="customer-name" name="name" value={checkout.name} onChange={event=>setCheckout({...checkout,name:event.target.value})} autoComplete="name" placeholder="例如：陳小姐"/></label><label htmlFor="customer-phone"><span>電話</span><input id="customer-phone" name="tel" value={checkout.phone} onChange={event=>setCheckout({...checkout,phone:event.target.value})} type="tel" inputMode="tel" autoComplete="tel" placeholder="用作取餐核對" aria-describedby="phone-help"/></label><small id="phone-help">只用作今次取餐核對。會員身份、口味偏好同推廣同意係分開資料。</small></div></section>
     <section className="checkout-payment"><SectionHeading eyebrow="付款方式" title="今次點樣付款？"/>
       <div className="payment-method-grid">
@@ -252,7 +252,7 @@ export function CheckoutView({cart,quote,checkout,setCheckout,paymentChannels,pe
       </div>:null}
     </section>
     {materialChange?<section className="safe-submit danger" role="alert"><span>目前被阻擋</span><h2>請先重新確認變更</h2><p>總額或餐點狀態有重要變更。未確認前唔可以送出。</p><ActionButton variant="secondary" wide onClick={onRepair}>返回記憶罐查看</ActionButton></section>:
-    <section className={`safe-submit state-${actionState}`} role={unknown||waiting?'status':undefined}><i className="submit-orbit" aria-hidden="true"><b/><b/><b/></i><span>{unknown?'結果未知':waiting?'等待中':'安全提交'}</span><h2>{unknown?'正在確認訂單結果':waiting?'等待店舖確認':quote?'準備送出落單要求':'等待店舖報價'}</h2><p>{unknown?'店舖可能已收到落單要求。請勿重複提交，先查詢原本嗰次結果。':waiting?'落單要求已送出，未有終局前唔會自動重送。':'如果結果未明，系統會保留原本嗰次落單並先讀回結果，唔會盲目重送。'}</p>{unknown||waiting?<div className="order-confirm-progress" role="progressbar" aria-label={unknown?'正在確認訂單結果':'等待店舖確認'} aria-valuetext="處理中"><i/><span>{unknown?'正在查詢原本訂單結果…':'訂單已送出，等待店舖回覆…'}</span></div>:<StatefulAction state={actionState} labels={{default:pending?.state==='NOT_CONNECTED'?'使用原本落單再試':'確認並送出',loading:'正在安全處理',pending:'等待店舖確認',unknown:'重新確認提交結果',disabled:quote?'需要先修正變更':'等待正式報價'}} onClick={onSubmit}/>}
+    <section className={`safe-submit state-${actionState}`} role={unknown||waiting?'status':undefined}><i className="submit-orbit" aria-hidden="true"><b/><b/><b/></i><span>{unknown?'結果未知':waiting?'等待中':'安全提交'}</span><h2>{unknown?'正在確認訂單結果':waiting?'正在確認接單結果':quote?'準備送出落單要求':'等待餐牌價格'}</h2><p>{unknown?'店舖可能已收到落單要求。請勿重複提交，先查詢原本嗰次結果。':waiting?'落單要求已送出，SMT 正核對餐牌版本同價格；未有終局前唔會自動重送。':'如果結果未明，系統會保留原本嗰次落單並先讀回結果，唔會盲目重送。'}</p>{unknown||waiting?<div className="order-confirm-progress" role="progressbar" aria-label={unknown?'正在確認訂單結果':'等待店舖確認'} aria-valuetext="處理中"><i/><span>{unknown?'正在查詢原本訂單結果…':'訂單已送出，等待店舖回覆…'}</span></div>:<StatefulAction state={actionState} labels={{default:pending?.state==='NOT_CONNECTED'?'使用原本落單再試':'確認並送出',loading:'正在安全處理',pending:'等待店舖確認',unknown:'重新確認提交結果',disabled:quote?'需要先修正變更':'等待餐牌價格'}} onClick={onSubmit}/>}
     {unknown&&pending?<button type="button" className="order-confirm-readback" onClick={()=>onReadback(pending)}>立即重新確認結果</button>:null}
     {unknown?<small>系統只會讀取原本結果，未有重新提交。</small>:pending?.state==='NOT_CONNECTED'?<small>本機草稿已保存，未建立正式訂單。</small>:null}</section>}
     {openPaymentChannel?<div className="payment-qr-backdrop" role="presentation" onClick={()=>setOpenPaymentChannelId(null)}><section className="payment-qr-sheet" role="dialog" aria-modal="true" aria-label={openPaymentChannel.label+' 付款 QR'} onClick={event=>event.stopPropagation()}><header><div><small>電子支付</small><h2>{openPaymentChannel.label}</h2></div><button type="button" onClick={()=>setOpenPaymentChannelId(null)}>關閉</button></header>{openPaymentChannel.qrImageUrl?<><div className="payment-qr-image"><img src={openPaymentChannel.qrImageUrl} alt={openPaymentChannel.label+' 付款 QR Code'}/></div><p>可以直接截圖，或者儲存付款碼後用手機付款。完成後返嚟上傳付款截圖。</p><a className="payment-qr-download" href={openPaymentChannel.qrImageUrl+(openPaymentChannel.qrImageUrl.includes('?')?'&':'?')+'download=1'} download>儲存付款碼</a></>:<><div className="payment-qr-placeholder"><b>QR 圖片待提供</b><span>位置已保留；店舖未發布圖片前唔會顯示假付款碼。</span></div><p>呢個渠道暫時未可以完成電子付款。</p></>}</section></div>:null}
