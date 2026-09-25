@@ -41,6 +41,8 @@ export interface StoredOrder{
   initialPrintSummary?:Readonly<{planned:number;sent:number;failed:number}>;
   paymentCorrections?:readonly PaymentCorrectionRecord[];
   staffId?:string;staffName?:string;cancellationReason?:string;
+  customerName?:string;customerPhone?:string;
+  keetaDeferCount?:number;keetaLastDeferredAt?:string;
   providerRef?:string;providerMessageId?:string;providerPickupCode?:string;orderRemark?:string;utensilPreference?:'需要'|'不需要';
   providerLastEventId?:number;providerLastEventName?:string;providerLastEventAt?:string;providerLastMessageId?:string;providerLifecycleNote?:string;
   acceptancePrintedAt?:string;
@@ -206,6 +208,8 @@ export interface MfkLocalRuntime extends CleanSmtCoreRuntimePort{
     providerPickupCode?:string;
     orderRemark?:string;
     utensilPreference?:'需要'|'不需要';
+    customerName?:string;
+    customerPhone?:string;
     paymentEvidenceRef?:string;
     paymentVerificationState?:'PENDING'|'VERIFIED'|'REJECTED';
     initialFulfillmentLabel?:StoredOrder['fulfillmentLabel'];
@@ -216,6 +220,7 @@ export interface MfkLocalRuntime extends CleanSmtCoreRuntimePort{
   printOrderOutputs(orderId:string):Promise<PrintDispatchSummary>;
   printInitialOrderOutputsOnce(orderId:string):Promise<PrintDispatchSummary>;
   correctOrderPayment(orderId:string,paymentLabel:string):Promise<StoredOrder>;
+  deferKeetaOrder(orderId:string):Promise<StoredOrder>;
   printDailyClose(businessDate?:string):Promise<{readonly printJobId:string;readonly state:string;readonly businessDate:string}>;
   readOrderReprintOptions(orderId:string):Promise<readonly SmtReprintOption[]>;
   reprintOrderJobs(orderId:string,jobIds:readonly string[],reason?:string):Promise<PrintDispatchSummary>;
@@ -499,6 +504,8 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
       ...(input.providerPickupCode?{providerPickupCode:String(input.providerPickupCode)}:{}),
       ...(input.orderRemark?{orderRemark:String(input.orderRemark)}:{}),
       ...(input.utensilPreference?{utensilPreference:input.utensilPreference}:{}),
+      ...(input.customerName?{customerName:String(input.customerName).trim().slice(0,120)}:{}),
+      ...(input.customerPhone?{customerPhone:String(input.customerPhone).trim().slice(0,40)}:{}),
       ...(input.paymentEvidenceRef?{paymentEvidenceRef:input.paymentEvidenceRef}:{}),
       ...(input.paymentVerificationState?{paymentVerificationState:input.paymentVerificationState}:{}),
       ...(session?{staffId:session.staffId,staffName:session.displayName}:{}),
@@ -587,6 +594,7 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
   async acceptOrder(orderId){
     const found=data.orders.find(x=>x.id===orderId);if(!found)throw new Error('ORDER_NOT_FOUND');
     if(found.fulfillmentLabel==='已完成'||found.fulfillmentLabel==='已取消')throw new Error('ORDER_NOT_ACCEPTABLE');
+    if(found.paymentEvidenceRef&&found.paymentVerificationState!=='VERIFIED')throw new Error('PAYMENT_EVIDENCE_NOT_VERIFIED');
     const updatedAt=new Date().toISOString();
     if(found.fulfillmentLabel==='待處理'){
       data={...data,orders:data.orders.map(x=>x.id===orderId?{...x,fulfillmentLabel:'進行中',updatedAt}:x)};
@@ -685,6 +693,26 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
     const updated=data.orders.find(x=>x.id===orderId)!;
     projectOrder(updated);
     appendActionAudit({action:'PAYMENT_CORRECTION',orderId,reason:order.paymentLabel+' -> '+next});
+    return updated;
+  },
+  async deferKeetaOrder(orderId){
+    const order=data.orders.find(x=>x.id===orderId);
+    if(!order)throw new Error('ORDER_NOT_FOUND');
+    if(!/^Keeta\b/i.test(String(order.sourceLabel||'')))throw new Error('KEETA_DEFER_NOT_APPLICABLE');
+    if(order.fulfillmentLabel!=='待處理')throw new Error('KEETA_ORDER_NOT_PENDING');
+    const count=Math.max(0,Math.floor(Number(order.keetaDeferCount)||0));
+    if(count>=2)throw new Error('KEETA_DEFER_LIMIT_REACHED');
+    const updatedAt=new Date().toISOString();
+    data={...data,orders:data.orders.map(x=>x.id===orderId?{
+      ...x,
+      keetaDeferCount:count+1,
+      keetaLastDeferredAt:updatedAt,
+      updatedAt,
+    }:x)};
+    save();
+    const updated=data.orders.find(x=>x.id===orderId)!;
+    projectOrder(updated);
+    appendActionAudit({action:'KEETA_DEFER',orderId,reason:String(count+1)+'/2'});
     return updated;
   },
   async readOrderReprintOptions(orderId){
