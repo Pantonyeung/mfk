@@ -91,13 +91,79 @@ export async function listSmmStaff():Promise<readonly SmmStaffDirectoryItem[]>{
   }));
 }
 
+function hexToBytes(value:string){
+  if(!/^[0-9a-f]+$/i.test(value)||value.length%2!==0)throw new Error('SMM_AUTH_HEX_INVALID');
+  const output=new Uint8Array(value.length/2);
+  for(let i=0;i<output.length;i++)output[i]=Number.parseInt(value.slice(i*2,i*2+2),16);
+  return output;
+}
+function bytesToHex(bytes:Uint8Array){
+  return [...bytes].map(value=>value.toString(16).padStart(2,'0')).join('');
+}
+async function derivePinKeyHex(pin:string,saltHex:string,iterations:number){
+  if(!Number.isSafeInteger(iterations)||iterations<100000)throw new Error('SMM_AUTH_ITERATIONS_INVALID');
+  const key=await crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(pin),
+    'PBKDF2',
+    false,
+    ['deriveBits'],
+  );
+  const bits=await crypto.subtle.deriveBits({
+    name:'PBKDF2',
+    hash:'SHA-256',
+    salt:hexToBytes(saltHex),
+    iterations,
+  },key,256);
+  return bytesToHex(new Uint8Array(bits));
+}
+async function hmacHex(keyHex:string,message:string){
+  const key=await crypto.subtle.importKey(
+    'raw',
+    hexToBytes(keyHex),
+    {name:'HMAC',hash:'SHA-256'},
+    false,
+    ['sign'],
+  );
+  const signature=await crypto.subtle.sign('HMAC',key,new TextEncoder().encode(message));
+  return bytesToHex(new Uint8Array(signature));
+}
+
 export async function verifySmmStaff(staffId:string,pin:string):Promise<SmmStaffSession>{
   const cleanPin=String(pin||'').replace(/\D/g,'');
   if(cleanPin.length<4||cleanPin.length>8)throw new Error('PIN 必須為 4–8 位數字');
+
+  const challengeResponse=await fetch('/api/smm/staff/challenge',{
+    method:'POST',
+    headers:{'content-type':'application/json'},
+    body:JSON.stringify({staffId}),
+  });
+  const challengeBody=await challengeResponse.json().catch(()=>({})) as Record<string,unknown>;
+  if(!challengeResponse.ok){
+    throw new Error(String(challengeBody.message||challengeBody.code||'未能開始員工驗證')+' · HTTP '+challengeResponse.status);
+  }
+
+  const challengeId=String(challengeBody.challengeId??'').trim();
+  const nonce=String(challengeBody.nonce??'').trim();
+  const saltHex=String(challengeBody.saltHex??'').trim();
+  const iterations=Number(challengeBody.iterations);
+  if(!challengeId||!nonce||!saltHex||!Number.isSafeInteger(iterations)){
+    throw new Error('SMM_AUTH_CHALLENGE_INVALID');
+  }
+
+  let derivedHex:string;
+  try{
+    derivedHex=await derivePinKeyHex(cleanPin,saltHex,iterations);
+  }catch(error){
+    throw new Error(error instanceof Error?'瀏覽器 PIN 驗證失敗：'+error.message:'瀏覽器 PIN 驗證失敗');
+  }
+  const proofMessage='MFK_SMM_STAFF_LOGIN_V1\n'+challengeId+'\n'+staffId+'\n'+nonce;
+  const proofHex=await hmacHex(derivedHex,proofMessage);
+
   const response=await fetch('/api/smm/staff/verify',{
     method:'POST',
     headers:{'content-type':'application/json'},
-    body:JSON.stringify({staffId,pin:cleanPin}),
+    body:JSON.stringify({staffId,challengeId,proofHex}),
   });
   const raw=await response.text();
   let body:Record<string,unknown>={};
@@ -107,6 +173,7 @@ export async function verifySmmStaff(staffId:string,pin:string):Promise<SmmStaff
     const message=String(body.message||'員工帳戶驗證失敗');
     throw new Error(message+' · '+code+' · HTTP '+response.status);
   }
+
   const session=cleanSession({
     staffId:body.staffId,
     displayName:body.displayName,
