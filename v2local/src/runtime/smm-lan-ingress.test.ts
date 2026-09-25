@@ -15,6 +15,7 @@ vi.mock('./admin-config-sync.ts',()=>({
 }));
 vi.mock('./admin-config-projection.ts',()=>({
   projectSyncedOrderingCatalog:()=>({
+    categories:[],
     products:[{
       id:'riceball',name:'原味飯團',sellable:true,priceReady:true,priceMinor:4100,
       optionSets:[{id:'sauce',name:'醬汁',required:false,min:0,max:1,options:[{id:'double',name:'雙倍醬',active:true,priceAdjustmentMinor:200}]}],
