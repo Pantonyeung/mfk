@@ -18,7 +18,7 @@ function cors(request){
   return CORS_ORIGINS.has(origin)?{
     'access-control-allow-origin':origin,
     'access-control-allow-methods':'GET,POST,OPTIONS',
-    'access-control-allow-headers':'content-type,x-mfk-admin-publish-key',
+    'access-control-allow-headers':'content-type,x-mfk-admin-publish-key,x-mfk-smm-session',
     'access-control-allow-credentials':'true',
     'vary':'origin',
   }:{};
