@@ -162,6 +162,7 @@ export interface CustomerCheckoutDraft {
 
 export interface CustomerPendingIntent {
   readonly submissionId:string;
+  readonly menuRevision:string;
   readonly idempotencyKey:string;
   readonly createdAt:string;
   readonly updatedAt:string;
@@ -203,12 +204,20 @@ export interface CustomerHistoryProjection {
   readonly reorderEligible:boolean;
 }
 
+export interface CustomerWhatsAppFallback {
+  readonly enabled:boolean;
+  readonly phone:string;
+  readonly template:string;
+  readonly retryAttempts:number;
+}
+
 export interface CustomerReadModelSnapshot {
   readonly store?:CustomerStoreContext;
   readonly menu?:CustomerMenuSnapshot;
   readonly activeOrders:readonly CustomerOrderProjection[];
   readonly history:readonly CustomerHistoryProjection[];
   readonly paymentChannels?:readonly CustomerPaymentChannel[];
+  readonly fallback?:CustomerWhatsAppFallback;
   readonly member?:CustomerMemberProjection;
   readonly observedAt:string;
 }
@@ -234,6 +243,7 @@ export interface CustomerRuntimePort {
   submitOrder?(intent:CustomerPendingIntent):Promise<CustomerCommandResult>;
   readSubmission?(submissionId:string):Promise<CustomerCommandResult>;
   buildReorderCart?(orderId:string):Promise<CustomerReorderResult>;
+  probeOrderBackend?():Promise<Readonly<{reachable:boolean;attempts:number;reason?:string}>>;
   requestFallback?():Promise<CustomerCommandResult>;
   uploadPaymentEvidence?(file:File):Promise<{readonly evidenceRef:string}>;
 }
