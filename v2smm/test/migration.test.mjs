@@ -302,3 +302,26 @@ test('SMM Internet orders reuse the already-live Customer order endpoint without
   assert.match(intake,/smmRequestFromCustomerIntent/);
   assert.match(intake,/smmIngress\.submit/);
 });
+
+
+test('SMM bridge diagnostics expose the first missing hop without leaking ticket or staff secrets',()=>{
+  const cloud=fs.readFileSync(path.join(root,'pwa-cloud.ts'),'utf8');
+  const worker=fs.readFileSync(path.join(repoRoot,'v2smm','worker.ts'),'utf8');
+  assert.match(cloud,/HTTP_'\+response\.status\+':'\+code/);
+  assert.match(worker,/bridge\/update/);
+  assert.match(worker,/bridge\/list/);
+  assert.match(worker,/\/api\/smm\/bridge-diagnostics/);
+  assert.match(worker,/SMM_TO_CUSTOMER_RELAY_REJECTED/);
+  assert.match(worker,/CUSTOMER_RUNTIME_NOT_RECEIVED/);
+  assert.match(worker,/SMT_HAS_NOT_CLAIMED_SMM_TICKET/);
+  assert.match(worker,/SMT_CLAIMED_BUT_NOT_ACKED/);
+  assert.match(worker,/SMT_REJECTED_SMM_ORDER/);
+  assert.doesNotMatch(worker,/traceId:ticket/);
+});
+
+test('SMM bridge ticket is stable for the same submission and cart semantics',()=>{
+  const worker=fs.readFileSync(path.join(repoRoot,'v2smm','worker.ts'),'utf8');
+  assert.match(worker,/bridge-submission:/);
+  assert.match(worker,/existingTicket/);
+  assert.match(worker,/publishedTotalMinor\)===publishedTotalMinor/);
+});
