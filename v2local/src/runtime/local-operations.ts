@@ -34,6 +34,21 @@ export interface LocalDayClose{
   readonly note:string;
 }
 
+export interface LocalCashMovement{
+  readonly id:string;
+  readonly businessDate:string;
+  readonly createdAt:number;
+  readonly direction:'IN'|'OUT';
+  readonly kind:'CASH_IN'|'CASH_OUT'|'EXPENSE'|'REFUND'|'ADJUSTMENT';
+  readonly amountMinor:number;
+  readonly purpose:string;
+  readonly orderId?:string;
+  readonly refundId?:string;
+  readonly staffId?:string;
+  readonly staffName?:string;
+  readonly note:string;
+}
+
 export interface LocalCashOpening{
   readonly id:string;
   readonly businessDate:string;
@@ -220,6 +235,55 @@ export function restoreLocalBackup(current:Readonly<Record<string,string>>,backu
 
 export const LOCAL_DAY_CLOSE_KEY='mfk.v2local.day-closes.v1';
 export const LOCAL_CASH_OPENING_KEY='mfk.v2local.cash-openings.v1';
+export const LOCAL_CASH_MOVEMENT_KEY='mfk.v2local.cash-movements.v1';
+
+export function readLocalCashMovements(storage:Pick<Storage,'getItem'>=localStorage):LocalCashMovement[]{
+  try{
+    const value=JSON.parse(storage.getItem(LOCAL_CASH_MOVEMENT_KEY)||'[]');
+    return Array.isArray(value)?value:[];
+  }catch{return []}
+}
+
+export function appendLocalCashMovement(
+  input:{
+    readonly id?:string;
+    readonly businessDate:string;
+    readonly direction:'IN'|'OUT';
+    readonly kind:LocalCashMovement['kind'];
+    readonly amountMinor:number;
+    readonly purpose:string;
+    readonly orderId?:string;
+    readonly refundId?:string;
+    readonly staffId?:string;
+    readonly staffName?:string;
+    readonly note?:string;
+    readonly now?:number;
+  },
+  storage:Pick<Storage,'getItem'|'setItem'>=localStorage,
+):LocalCashMovement{
+  const amountMinor=Math.max(0,Math.round(Number(input.amountMinor)||0));
+  if(amountMinor<=0)throw new Error('CASH_MOVEMENT_AMOUNT_REQUIRED');
+  const id=String(input.id||('CASHMOVE-'+Date.now().toString(36))).trim();
+  const existing=readLocalCashMovements(storage);
+  const prior=existing.find(row=>row.id===id);
+  if(prior)return prior;
+  const row:LocalCashMovement=Object.freeze({
+    id,
+    businessDate:String(input.businessDate),
+    createdAt:input.now??Date.now(),
+    direction:input.direction,
+    kind:input.kind,
+    amountMinor,
+    purpose:String(input.purpose||'').trim()||input.kind,
+    ...(input.orderId?{orderId:input.orderId}:{}),
+    ...(input.refundId?{refundId:input.refundId}:{}),
+    ...(input.staffId?{staffId:input.staffId}:{}),
+    ...(input.staffName?{staffName:input.staffName}:{}),
+    note:String(input.note??'').trim(),
+  });
+  storage.setItem(LOCAL_CASH_MOVEMENT_KEY,JSON.stringify([row,...existing]));
+  return row;
+}
 
 export function readLocalCashOpenings(storage:Pick<Storage,'getItem'>=localStorage):LocalCashOpening[]{
   try{
