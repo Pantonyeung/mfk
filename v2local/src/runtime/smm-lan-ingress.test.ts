@@ -29,7 +29,7 @@ vi.mock('./customer-cloud-intake.ts',()=>({
   },
 }));
 
-import {createSmmLanIngress,trustSmmDevice} from './smm-lan-ingress.ts';
+import {createSmmLanIngress} from './smm-lan-ingress.ts';
 
 describe('SMM LAN ingress',()=>{
   beforeEach(()=>storage.clear());
@@ -40,32 +40,30 @@ describe('SMM LAN ingress',()=>{
     const result=ingress.submit({
       protocolVersion:1,type:'smm.lan.order.submit.v1',requestId:'R1',submissionId:'S1',idempotencyKey:'I1',storeId:'MF01',
       lines:[{lineId:'L1',productId:'riceball',productName:'原味飯團',quantity:1,selections:[]}],
-    },{deviceId:'SMM-1'});
+    },{deviceId:'SMM-1',trusted:false});
     expect(result.disposition).toBe('REJECTED');
     expect(createOrder).not.toHaveBeenCalled();
   });
 
   it('uses SMT catalog pricing and never creates a zero-price placeholder',()=>{
-    trustSmmDevice('SMM-1');
     const createOrder=vi.fn((input:any)=>({id:'ORDER-1',display:'001',createdAt:new Date().toISOString(),...input}));
     const ingress=createSmmLanIngress({createOrder,orders:()=>[]} as any);
     const result=ingress.submit({
       protocolVersion:1,type:'smm.lan.order.submit.v1',requestId:'R2',submissionId:'S2',idempotencyKey:'I2',storeId:'MF01',
       lines:[{lineId:'L1',productId:'riceball',productName:'原味飯團',quantity:2,selections:[{optionGroupId:'sauce',optionId:'double',optionName:'雙倍醬'}]}],
-    },{deviceId:'SMM-1'});
+    },{deviceId:'SMM-1',trusted:true});
     expect(result.disposition).toBe('ACCEPTED');
     expect(createOrder).toHaveBeenCalledWith(expect.objectContaining({totalMinor:8600}));
     expect(createOrder.mock.calls[0][0].items[0].unitMinor).toBe(4300);
   });
 
   it('recovers an already committed providerRef instead of duplicating Order',()=>{
-    trustSmmDevice('SMM-1');
     const createOrder=vi.fn();
     const ingress=createSmmLanIngress({createOrder,orders:()=>[{id:'ORDER-X',providerRef:'SMM:S3'}]} as any);
     const result=ingress.submit({
       protocolVersion:1,type:'smm.lan.order.submit.v1',requestId:'R3',submissionId:'S3',idempotencyKey:'I3',storeId:'MF01',
       lines:[{lineId:'L1',productId:'riceball',productName:'原味飯團',quantity:1,selections:[]}],
-    },{deviceId:'SMM-1'});
+    },{deviceId:'SMM-1',trusted:true});
     expect(result.disposition).toBe('ACCEPTED');
     expect(result.disposition==='ACCEPTED'&&result.orderId).toBe('ORDER-X');
     expect(createOrder).not.toHaveBeenCalled();
