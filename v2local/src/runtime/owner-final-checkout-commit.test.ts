@@ -54,6 +54,44 @@ describe('Owner FINAL checkout commit semantics',()=>{
     expect(module.localRuntime.orders()).toHaveLength(1);
   });
 
+  it('blocks customer electronic acceptance until payment evidence is verified',async()=>{
+    const module=await import('./local-runtime.ts');
+    const order=module.localRuntime.createOrder({
+      items:[{id:'riceball',name:'原味飯團',qty:1,unitMinor:4100,serviceMode:'takeaway'}],
+      totalMinor:4100,
+      paymentLabel:'電子支付（待核對）',
+      sourceLabel:'自家 App',
+      providerRef:'CUSTOMER:PAY-001',
+      paymentEvidenceRef:'customer-payment/MF01/evidence/a.png',
+      paymentVerificationState:'PENDING',
+      initialFulfillmentLabel:'待處理',
+      customerName:'陳小姐',
+      customerPhone:'91234567',
+    });
+    await expect(module.localRuntime.acceptOrder(order.id)).rejects.toThrow('PAYMENT_EVIDENCE_NOT_VERIFIED');
+    await module.localRuntime.reviewPaymentEvidence?.(order.id,'VERIFIED');
+    await expect(module.localRuntime.acceptOrder(order.id)).resolves.toMatchObject({status:'ACCEPTED'});
+  });
+
+  it('allows Keeta 稍後處理 at most twice without cancelling or accepting the order',async()=>{
+    const module=await import('./local-runtime.ts');
+    const order=module.localRuntime.createOrder({
+      items:[{id:'riceball',name:'原味飯團',qty:1,unitMinor:4100,serviceMode:'takeaway'}],
+      totalMinor:4100,
+      paymentLabel:'KEETA',
+      sourceLabel:'Keeta · K001',
+      providerRef:'KEETA:1',
+      initialFulfillmentLabel:'待處理',
+    });
+    const once=await module.localRuntime.deferKeetaOrder(order.id);
+    expect(once.keetaDeferCount).toBe(1);
+    expect(once.fulfillmentLabel).toBe('待處理');
+    const twice=await module.localRuntime.deferKeetaOrder(order.id);
+    expect(twice.keetaDeferCount).toBe(2);
+    expect(twice.fulfillmentLabel).toBe('待處理');
+    await expect(module.localRuntime.deferKeetaOrder(order.id)).rejects.toThrow('KEETA_DEFER_LIMIT_REACHED');
+  });
+
   it('admits initial print only once even when the call is repeated',async()=>{
     const module=await import('./local-runtime.ts');
     const order=module.localRuntime.createOrder({
