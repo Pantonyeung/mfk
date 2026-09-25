@@ -7,7 +7,7 @@ import {readActiveStaffSession} from './staff-auth.ts';
 import {etaMinutesForActiveCount,readSmtPrintConfig} from './admin-operational-config.ts';
 import {mirrorKeetaOrderCommand,type KeetaProviderMirrorResult} from './keeta-provider-commands.ts';
 import {buildDailyClosePrintData,renderDailyCloseTicket} from './daily-close-ticket.ts';
-import {readLocalDayCloses,resolveBusinessWindow} from './local-operations.ts';
+import {appendLocalCashMovement,readLocalDayCloses,resolveBusinessWindow} from './local-operations.ts';
 import {readBusinessCutoff} from './cash-opening.ts';
 import {readSmtDeviceId} from './admin-config-sync.ts';
 import {normalizeMfkOrderLineCompositionV1,type MfkOrderLineCompositionV1} from '../../../contracts/order-line-composition-v1.ts';
@@ -25,6 +25,16 @@ export type SmtAvailabilityStatus='available'|'soldout'|'paused';
 export interface SmtAvailabilityNodeViewModel{readonly nodeId:string;readonly label:string;readonly detail?:string;readonly status:SmtAvailabilityStatus;readonly sourceLabel?:string}
 export interface SmtAvailabilityProjection{readonly revision:number;readonly nodes:readonly SmtAvailabilityNodeViewModel[];readonly canChange:boolean}
 
+export interface OrderRefundRecord{
+  readonly id:string;
+  readonly createdAt:string;
+  readonly kind:'FULL'|'PARTIAL';
+  readonly amountMinor:number;
+  readonly method:string;
+  readonly note:string;
+  readonly staffId?:string;
+  readonly staffName?:string;
+}
 export interface PaymentCorrectionRecord{
   readonly id:string;
   readonly createdAt:string;
@@ -40,6 +50,10 @@ export interface StoredOrder{
   initialPrintState?:'DISPATCHING'|'DONE'|'FAILED'|'UNKNOWN';
   initialPrintSummary?:Readonly<{planned:number;sent:number;failed:number}>;
   paymentCorrections?:readonly PaymentCorrectionRecord[];
+  refunds?:readonly OrderRefundRecord[];
+  productionIssuedAt?:string;
+  cancellationNoticePrintedAt?:string;
+  cancellationNoticeState?:'DONE'|'FAILED'|'UNKNOWN';
   staffId?:string;staffName?:string;cancellationReason?:string;
   customerName?:string;customerPhone?:string;
   keetaDeferCount?:number;keetaLastDeferredAt?:string;
@@ -223,6 +237,7 @@ export interface MfkLocalRuntime extends CleanSmtCoreRuntimePort{
   printOrderOutputs(orderId:string):Promise<PrintDispatchSummary>;
   printInitialOrderOutputsOnce(orderId:string):Promise<PrintDispatchSummary>;
   correctOrderPayment(orderId:string,paymentLabel:string):Promise<StoredOrder>;
+  refundOrder(orderId:string,input:{kind:'FULL'|'PARTIAL';amountMinor:number;method:string;note?:string}):Promise<StoredOrder>;
   deferKeetaOrder(orderId:string):Promise<StoredOrder>;
   markOrderUnready(orderId:string):Promise<{readonly orderId:string;readonly status:'IN_PROGRESS'}>;
   markOrderCompleted(orderId:string):Promise<{readonly orderId:string;readonly status:'COMPLETED'}>;
@@ -344,6 +359,25 @@ function pushDispatchResults(results:PrintDispatchResult[],jobs:readonly Planned
 
 function physicalKey(binding:PrintBinding){
   return binding.host.trim().toLowerCase()+':'+(Number(binding.port)||9100);
+}
+
+async function dispatchCancellationNotice(order:StoredOrder){
+  const bindings=readPrinterBindings().filter(binding=>binding.role==='製作單'&&String(binding.host||'').trim()&&Number(binding.port)>0);
+  if(!bindings.length)return {ok:false,code:'CANCEL_NOTICE_PRODUCTION_ROUTE_MISSING'} as const;
+  let ok=0;
+  let lastCode='CANCEL_NOTICE_FAILED';
+  for(const binding of bindings){
+    const result=await printTextLan({
+      ...printerInput(binding),
+      text:'\n*** 取消通知單 ***\n#'+order.display+' 取消\n來源：'+order.sourceLabel+'\n時間：'+new Date().toLocaleString('zh-HK')+'\n\n',
+      cutAfter:true,
+      kickDrawer:false,
+      beepAfter:true,
+    });
+    if(result.ok)ok+=1;
+    else lastCode=result.code||lastCode;
+  }
+  return ok===bindings.length?{ok:true,code:'CANCEL_NOTICE_SENT'} as const:{ok:false,code:lastCode} as const;
 }
 
 async function dispatchOrderOutputs(order:StoredOrder,requestedJobIds?:ReadonlySet<string>,reprint=false):Promise<PrintDispatchSummary>{
@@ -628,7 +662,13 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
       const print=await dispatchOrderOutputs(current);
       if(print.failed>0)throw new Error('KEETA_ORDER_ACCEPT_PRINT_FAILED:'+print.sent+'/'+print.planned);
       const acceptancePrintedAt=new Date().toISOString();
-      data={...data,orders:data.orders.map(x=>x.id===orderId?{...x,acceptancePrintedAt,updatedAt:acceptancePrintedAt}:x)};
+      const productionIssued=print.results.some(row=>row.role==='製作單'&&row.ok);
+      data={...data,orders:data.orders.map(x=>x.id===orderId?{
+        ...x,
+        acceptancePrintedAt,
+        ...(productionIssued&&!x.productionIssuedAt?{productionIssuedAt:acceptancePrintedAt}:{}),
+        updatedAt:acceptancePrintedAt,
+      }:x)};
       save();
       current=data.orders.find(x=>x.id===orderId)!;
       projectOrder(current);
@@ -693,10 +733,12 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
       const summary=await dispatchOrderOutputs(order);
       const state=summary.failed>0?'FAILED':'DONE';
       const updatedAt=new Date().toISOString();
+      const productionIssued=summary.results.some(row=>row.role==='製作單'&&row.ok);
       data={...data,orders:data.orders.map(x=>x.id===orderId?{
         ...x,
         initialPrintState:state,
         initialPrintSummary:{planned:summary.planned,sent:summary.sent,failed:summary.failed},
+        ...(productionIssued&&!x.productionIssuedAt?{productionIssuedAt:updatedAt}:{}),
         updatedAt,
       }:x)};
       save();
@@ -738,7 +780,58 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
     projectOrder(updated);
     appendActionAudit({action:'PAYMENT_CORRECTION',orderId,reason:order.paymentLabel+' -> '+next});
     return updated;
+  },  async refundOrder(orderId,input){
+    const order=data.orders.find(x=>x.id===orderId);
+    if(!order)throw new Error('ORDER_NOT_FOUND');
+    const amountMinor=Math.max(0,Math.round(Number(input.amountMinor)||0));
+    const refundedMinor=(order.refunds??[]).reduce((sum,row)=>sum+Math.max(0,Number(row.amountMinor)||0),0);
+    const refundableMinor=Math.max(0,order.totalMinor-refundedMinor);
+    if(amountMinor<=0)throw new Error('REFUND_AMOUNT_REQUIRED');
+    if(amountMinor>refundableMinor)throw new Error('REFUND_EXCEEDS_REMAINING');
+    if(input.kind==='FULL'&&amountMinor!==refundableMinor)throw new Error('FULL_REFUND_MUST_EQUAL_REMAINING');
+    const method=String(input.method||'').trim();
+    if(!method)throw new Error('REFUND_METHOD_REQUIRED');
+    const session=readActiveStaffSession();
+    const createdAt=new Date().toISOString();
+    const refundId='REF-'+order.id+'-'+Date.now().toString(36);
+    const refund:OrderRefundRecord=Object.freeze({
+      id:refundId,
+      createdAt,
+      kind:input.kind,
+      amountMinor,
+      method,
+      note:String(input.note??'').trim(),
+      ...(session?{staffId:session.staffId,staffName:session.displayName}:{}),
+    });
+    data={...data,orders:data.orders.map(x=>x.id===orderId?{
+      ...x,
+      refunds:[...(x.refunds??[]),refund],
+      updatedAt:createdAt,
+    }:x)};
+    save();
+    const updated=data.orders.find(x=>x.id===orderId)!;
+    projectOrder(updated);
+    appendActionAudit({action:'REFUND_'+input.kind,orderId,reason:method+' '+money(amountMinor)});
+    if(/\bCASH\b/i.test(method)||method.includes('現金')){
+      const cutoff=readBusinessCutoff();
+      const businessDate=resolveBusinessWindow(Date.parse(createdAt),cutoff.hour,cutoff.minute).businessDate;
+      appendLocalCashMovement({
+        id:'CASHMOVE-'+refundId,
+        businessDate,
+        direction:'OUT',
+        kind:'REFUND',
+        amountMinor,
+        purpose:'訂單退款',
+        orderId,
+        refundId,
+        ...(session?{staffId:session.staffId,staffName:session.displayName}:{}),
+        note:String(input.note??'').trim(),
+        now:Date.parse(createdAt),
+      });
+    }
+    return updated;
   },
+
   async deferKeetaOrder(orderId){
     const order=data.orders.find(x=>x.id===orderId);
     if(!order)throw new Error('ORDER_NOT_FOUND');
@@ -807,9 +900,10 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
     return {orderId,totalMinor};
   },
   async cancelOrder(orderId,reason){
-    const order=data.orders.find(x=>x.id===orderId);
+    let order=data.orders.find(x=>x.id===orderId);
     if(!order)throw new Error('ORDER_NOT_FOUND');
     if(order.fulfillmentLabel==='已完成')throw new Error('COMPLETED_ORDER_CANNOT_CANCEL');
+    if(order.fulfillmentLabel==='已取消')return {orderId,status:'CANCELLED' as const};
     const updatedAt=new Date().toISOString();
     const cancellationReason=String(reason||'').trim();
     data={...data,orders:data.orders.map(current=>current.id===orderId?{
@@ -819,7 +913,22 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
     save();
     appendActionAudit({action:'CANCEL',orderId,reason:cancellationReason||undefined});
     projectOrder(data.orders.find(current=>current.id===orderId)!);
-    return {orderId,status:'CANCELLED'};
+
+    order=data.orders.find(x=>x.id===orderId)!;
+    if(order.productionIssuedAt&&!order.cancellationNoticePrintedAt){
+      const result=await dispatchCancellationNotice(order).catch(()=>({ok:false,code:'CANCEL_NOTICE_UNKNOWN'} as const));
+      const at=new Date().toISOString();
+      data={...data,orders:data.orders.map(current=>current.id===orderId?{
+        ...current,
+        cancellationNoticePrintedAt:at,
+        cancellationNoticeState:result.ok?'DONE':result.code==='CANCEL_NOTICE_UNKNOWN'?'UNKNOWN':'FAILED',
+        updatedAt:at,
+      }:current)};
+      save();
+      projectOrder(data.orders.find(current=>current.id===orderId)!);
+      appendActionAudit({action:'CANCEL_NOTICE',orderId,reason:result.code});
+    }
+    return {orderId,status:'CANCELLED' as const};
   },
   applyProviderLifecycle(input){
     const order=data.orders.find(x=>x.id===input.orderId);
