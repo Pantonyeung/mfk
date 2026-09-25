@@ -41,6 +41,10 @@ jobs:
         run: |
           set -o pipefail
           node acceptance/dining-checkout-r3-proof.mjs 2>&1 | tee /tmp/mfk-dining-r3/browser.log
+      - name: Packaged offline tablet and desktop proof
+        run: |
+          set -o pipefail
+          node acceptance/dining-checkout-r3-offline-proof.mjs 2>&1 | tee /tmp/mfk-dining-r3/offline-browser.log
       - name: Preserve R1 and R2 regression
         run: |
           npm run dev -- --host 127.0.0.1 --port 4173 >/tmp/mfk-dining-r3/vite.log 2>&1 &
