@@ -22,6 +22,7 @@ export interface CustomerCloudCheckout{
   readonly name:string;
   readonly phone:string;
   readonly paymentMethod?:'PAY_AT_STORE'|'ELECTRONIC';
+  readonly paymentChannelId?:'ALIPAY'|'WECHAT'|'FPS'|'PAYME';
   readonly paymentEvidenceRef?:string;
 }
 export interface MfkCustomerQuoteRequest{
@@ -115,6 +116,7 @@ export function validateMfkCustomerOrderIntent(input:unknown):MfkCustomerOrderIn
   if(row.storeId!=='MF01')throw new Error('CUSTOMER_STORE_INVALID');
   const checkout=object(row.checkout,'CUSTOMER_CHECKOUT_INVALID');
   const phone=text(checkout.phone,'CUSTOMER_PHONE_INVALID',40);
+  if(checkout.paymentMethod==='ELECTRONIC'&&checkout.paymentChannelId!==undefined&&!['ALIPAY','WECHAT','FPS','PAYME'].includes(String(checkout.paymentChannelId)))throw new Error('CUSTOMER_PAYMENT_CHANNEL_INVALID');
   if(phone.replace(/\D/g,'').length<8)throw new Error('CUSTOMER_PHONE_INVALID');
   return Object.freeze({
     schema:MFK_CUSTOMER_ORDER_INTENT_SCHEMA,
@@ -128,6 +130,7 @@ export function validateMfkCustomerOrderIntent(input:unknown):MfkCustomerOrderIn
       name:typeof checkout.name==='string'?checkout.name.trim().slice(0,120):'',
       phone,
       paymentMethod:checkout.paymentMethod==='ELECTRONIC'?'ELECTRONIC':'PAY_AT_STORE',
+      ...(checkout.paymentMethod==='ELECTRONIC'&&['ALIPAY','WECHAT','FPS','PAYME'].includes(String(checkout.paymentChannelId))?{paymentChannelId:String(checkout.paymentChannelId) as 'ALIPAY'|'WECHAT'|'FPS'|'PAYME'}:{}),
       ...(checkout.paymentMethod==='ELECTRONIC'&&optionalText(checkout.paymentEvidenceRef,500)?{paymentEvidenceRef:optionalText(checkout.paymentEvidenceRef,500)}:{}),
     }),
   });

@@ -265,12 +265,19 @@ export function App(){
     if(submitting)return;
     if(cart.length===0){setNotice('記憶罐未有商品。');return}
     if(checkout.phone.replace(/\D/g,'').length<8){setNotice('請輸入至少 8 位電話號碼。');return}
+    const selectedPaymentChannel=checkout.paymentMethod==='ELECTRONIC'
+      ?(snapshot?.paymentChannels??[]).find(channel=>channel.channelId===checkout.paymentChannelId)
+      :undefined;
+    if(checkout.paymentMethod==='ELECTRONIC'&&!checkout.paymentChannelId){setNotice('請先選擇 AlipayHK、WeChat Pay HK、轉數快或者 PayMe。');return}
+    if(checkout.paymentMethod==='ELECTRONIC'&&!selectedPaymentChannel?.qrImageUrl){setNotice('呢個電子支付渠道嘅付款 QR 尚未設定，暫時唔可以用呢個渠道提交。');return}
     if(checkout.paymentMethod==='ELECTRONIC'&&!checkout.paymentEvidence){setNotice('電子支付需要提供付款截圖，畀店舖核對。');return}
     if(checkout.paymentMethod==='ELECTRONIC'&&checkout.paymentEvidence?.state==='LOCAL_PENDING_UPLOAD'){setNotice('付款截圖已選擇，但上載仍未完成；未完成前唔會當成已付款。');return}
     const cartFingerprint=JSON.stringify(cart);
+    const checkoutFingerprint=JSON.stringify(checkout);
     let existing=pendingIntents.find(item=>
       (item.state==='DRAFT'||item.state==='NOT_CONNECTED'||item.state==='UNKNOWN')&&
-      JSON.stringify(item.cart)===cartFingerprint
+      JSON.stringify(item.cart)===cartFingerprint&&
+      JSON.stringify(item.checkout)===checkoutFingerprint
     );
     setSubmitting(true);
     try{
@@ -386,7 +393,7 @@ export function App(){
       {view==='home'?<HomeView snapshot={snapshot} connection={connection} activeOrders={activeOrders} history={history} recommendations={homeRecommendations} cartCount={cartCount} onRefresh={()=>void refresh()} onProduct={openProduct} onBrowse={()=>changeView('menu')} onJar={()=>changeView('cart')} onOrders={()=>{setOrderSegment('current');changeView('orders')}} onHistory={()=>{setOrderSegment('history');changeView('orders')}} onMember={()=>changeView('more')} onBuyAgain={order=>void reorder(order)} onFallback={()=>void requestFallback()}/>:null}
       {view==='menu'?<MenuView connection={connection} categories={categories} activeCategoryId={effectiveCategoryId} setCategory={category=>presentWithContinuity(()=>changeCategory(category))} query={search} setQuery={setSearch} layout={menuLayout} setLayout={layout=>presentWithContinuity(()=>setMenuLayout(layout))} products={visibleProducts} recommendations={menuRecommendations} onProduct={(product,origin)=>openProduct(product,origin)} cartCount={cartCount} quote={quote} onCart={()=>changeView('cart')}/>:null}
       {view==='cart'?<CartView cart={cart} quote={quote} checkout={checkout} member={snapshot?.member} suggestions={cartSuggestions} products={menu?.products??[]} onProduct={openProduct} onCheckoutChange={changeCheckout} onQuantity={(lineId,quantity)=>updateCart(cart.map(line=>line.lineId===lineId?{...line,quantity:Math.max(1,quantity)}:line))} onRemove={lineId=>updateCart(cart.filter(line=>line.lineId!==lineId))} onMenu={()=>changeView('menu')} onCheckout={()=>changeView('checkout')}/>:null}
-      {view==='checkout'?<CheckoutView cart={cart} quote={quote} checkout={checkout} setCheckout={changeCheckout} pending={currentPending} actionState={actionState} onSubmit={()=>void submit()} onReadback={intent=>void readbackIntent(intent)} onBack={()=>changeView('cart')} onRepair={()=>changeView('cart')} onPaymentEvidence={file=>void uploadPaymentEvidence(file)}/>:null}
+      {view==='checkout'?<CheckoutView cart={cart} quote={quote} checkout={checkout} setCheckout={changeCheckout} paymentChannels={snapshot?.paymentChannels??[]} pending={currentPending} actionState={actionState} onSubmit={()=>void submit()} onReadback={intent=>void readbackIntent(intent)} onBack={()=>changeView('cart')} onRepair={()=>changeView('cart')} onPaymentEvidence={file=>void uploadPaymentEvidence(file)}/>:null}
       {view==='orders'?<OrdersView segment={orderSegment} setSegment={setOrderSegment} active={activeOrders} history={history} expandedOrderId={expandedOrderId} setExpandedOrderId={setExpandedOrderId} onReorder={order=>void reorder(order)} onBrowse={()=>changeView('menu')} connection={connection}/>:null}
       {view==='more'?<MemberView connection={connection} snapshot={snapshot} history={history} pendingIntents={pendingIntents} readingIntentId={readingIntentId} onRefresh={()=>void refresh()} onReadback={intent=>void readbackIntent(intent)} onDiscard={removeIntent} onFallback={()=>void requestFallback()} onReorder={order=>void reorder(order)} onBrowse={()=>changeView('menu')}/>:null}
     </section>

@@ -168,6 +168,7 @@ export function createCloudCustomerRuntimePort():CustomerRuntimePort{
             name:intent.checkout.name,
             phone:intent.checkout.phone,
             paymentMethod:intent.checkout.paymentMethod,
+            ...(intent.checkout.paymentMethod==='ELECTRONIC'&&intent.checkout.paymentChannelId?{paymentChannelId:intent.checkout.paymentChannelId}:{}),
             ...(intent.checkout.paymentMethod==='ELECTRONIC'&&intent.checkout.paymentEvidence?.evidenceRef?{paymentEvidenceRef:intent.checkout.paymentEvidence.evidenceRef}:{}),
           },
         }),

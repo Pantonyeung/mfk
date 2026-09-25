@@ -134,6 +134,13 @@ export interface CustomerQuoteSnapshot {
 }
 
 export type CustomerPaymentMethod='PAY_AT_STORE'|'ELECTRONIC';
+export type CustomerPaymentChannelId='ALIPAY'|'WECHAT'|'FPS'|'PAYME';
+
+export interface CustomerPaymentChannel{
+  readonly channelId:CustomerPaymentChannelId;
+  readonly label:string;
+  readonly qrImageUrl?:string;
+}
 
 export interface CustomerPaymentEvidenceDraft {
   readonly fileName:string;
@@ -147,6 +154,7 @@ export interface CustomerCheckoutDraft {
   readonly name:string;
   readonly phone:string;
   readonly paymentMethod:CustomerPaymentMethod;
+  readonly paymentChannelId?:CustomerPaymentChannelId;
   readonly paymentEvidence?:CustomerPaymentEvidenceDraft;
 }
 
@@ -198,6 +206,7 @@ export interface CustomerReadModelSnapshot {
   readonly menu?:CustomerMenuSnapshot;
   readonly activeOrders:readonly CustomerOrderProjection[];
   readonly history:readonly CustomerHistoryProjection[];
+  readonly paymentChannels?:readonly CustomerPaymentChannel[];
   readonly member?:CustomerMemberProjection;
   readonly observedAt:string;
 }
