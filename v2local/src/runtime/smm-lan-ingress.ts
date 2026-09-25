@@ -65,7 +65,7 @@ export function createSmmLanIngress(runtime:MfkLocalRuntime){
             });
           })),
         }),
-        orders:Object.freeze(runtime.orders().map(order=>Object.freeze({
+        orders:Object.freeze(runtime.orders().filter(order=>!order.items.length||!order.items.every(item=>item.serviceMode==='dine-in')).map(order=>Object.freeze({
           orderId:order.id,
           displayCode:order.display,
           source:order.sourceLabel,
