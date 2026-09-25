@@ -483,11 +483,22 @@ export function App(){
         covers={dineCovers}
         setTable={setDineTable}
         setCovers={setDineCovers}
-        onCreate={async()=>{
-          if(!port?.createDineSession){setNotice('堂食服務尚未連接；未建立正式桌面。');return}
-          const result=await port.createDineSession({tableLabel:dineTable,covers:dineCovers,operationId:crypto.randomUUID()});
-          setNotice(result.message);
-          if(result.state==='CONFIRMED'){setDineTable('');void refresh()}
+        onCreate={()=>{
+          const n=Number(String(dineTable).replace(/\D/g,''));
+          if(!Number.isInteger(n)||n<1||n>9){setNotice('請選擇 1–9 號枱。');return}
+          const target:SmmDiningTarget={kind:'TABLE',tableId:'T'+String(n).padStart(2,'0'),covers:dineCovers};
+          setDiningTarget(target);
+          changeServiceMode('DINE_IN');
+          setDiningTargetOpen(false);
+          setNotice('已選 '+n+' 號枱；加入商品後提交，SMT 會自動開枱／加單。');
+          changeView('order');
+        }}
+        onWait={()=>{
+          setDiningTarget({kind:'WAITING',covers:dineCovers});
+          changeServiceMode('DINE_IN');
+          setDiningTargetOpen(false);
+          setNotice('已選輪候；加入商品後提交會先進堂食輪候。');
+          changeView('order');
         }}
       />:null}
       {view==='more'?<MoreView
@@ -620,7 +631,7 @@ function OrdersView({connection,rows,segment,setSegment,query,setQuery,sourceFil
   </section>;
 }
 
-function DineView({connection,sessions,table,covers,setTable,setCovers,onCreate}:{
+function DineView({connection,sessions,table,covers,setTable,setCovers,onCreate,onWait}:{
   connection:SmmConnectionState;
   sessions:NonNullable<SmmReadModelSnapshot['dineSessions']>;
   table:string;
@@ -628,10 +639,11 @@ function DineView({connection,sessions,table,covers,setTable,setCovers,onCreate}
   setTable:(v:string)=>void;
   setCovers:(v:number)=>void;
   onCreate:()=>void;
+  onWait:()=>void;
 }){
   return <section className="page">
-    <header className="hero"><div><span>堂食</span><h1>桌面管理</h1><small>正式開枱必須由門店服務確認；本機唔會自行建立桌面真相。</small></div></header>
-    <article className="panel"><h2>開新桌</h2><div className="field-grid"><label>枱號<input value={table} onChange={e=>setTable(e.target.value)} placeholder="例如 A1"/></label><label>人數<input type="number" min={1} max={30} value={covers} onChange={e=>setCovers(Math.max(1,Number(e.target.value)||1))}/></label></div><button className="primary" disabled={connection!=='READY'||!table.trim()} onClick={onCreate}>{connection==='READY'?'建立桌面':'門店服務未連接'}</button></article>
+    <header className="hero"><div><span>堂食</span><h1>桌面管理</h1><small>揀枱／輪候後去點單；第一張堂食單由 SMT 開枱，已有枱就直接加單。</small></div></header>
+    <article className="panel"><h2>開新桌</h2><div className="field-grid"><label>枱號<input value={table} onChange={e=>setTable(e.target.value)} placeholder="例如 A1"/></label><label>人數<input type="number" min={1} max={30} value={covers} onChange={e=>setCovers(Math.max(1,Number(e.target.value)||1))}/></label></div><div className="row-actions"><button className="primary" disabled={connection!=='READY'||!table.trim()} onClick={onCreate}>{connection==='READY'?'揀枱開始點單':'門店服務未連接'}</button><button disabled={connection!=='READY'} onClick={onWait}>加入輪候後點單</button></div></article>
     {!sessions.length?<EmptyState title={connection==='NOT_CONNECTED'?'堂食服務尚未連接':'目前冇開啟中桌面'} detail={connection==='NOT_CONNECTED'?'連接後會顯示正式桌面、客數同狀態。':'可以喺上面建立新桌面。'}/>:
     <div className="cards">{sessions.map(session=><article className="dine-card" key={session.sessionId}><div><small>{new Date(session.openedAt).toLocaleTimeString('zh-HK')}</small><h2>{session.tableLabel}</h2><span>{session.covers} 位 · {session.state}</span></div></article>)}</div>}
   </section>;
