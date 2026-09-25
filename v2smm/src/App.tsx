@@ -298,7 +298,7 @@ export function App(){
     void refresh();
   };
 
-  const releaseSubmitLock=()=>{submitLockRef.current=false;releaseSubmitLock();};
+  const releaseSubmitLock=()=>{submitLockRef.current=false;setSubmitting(false);};
 
   const submitCart=async()=>{
     if(submitLockRef.current||cart.length===0)return;
