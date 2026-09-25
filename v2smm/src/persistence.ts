@@ -1,4 +1,4 @@
-import type {SmmCartLine,SmmPendingIntent,SmmServiceMode,SmmTender} from './product-types';
+import type {SmmCartLine,SmmPendingIntent,SmmServiceMode,SmmTender,SmmDiningTarget} from './product-types';
 
 const STORAGE_KEY='mfk:smm:workspace:v1';
 
@@ -100,6 +100,7 @@ export function createSmmPendingIntent(input:{
   readonly publishedTotalMinor:number;
   readonly serviceMode:SmmServiceMode;
   readonly tender:SmmTender;
+  readonly diningTarget?:SmmDiningTarget;
 }):SmmPendingIntent{
   const submissionId=createSmmStableSubmissionId();
   const now=new Date().toISOString();
@@ -111,7 +112,7 @@ export function createSmmPendingIntent(input:{
     state:'DRAFT',
     menuRevision:input.menuRevision,
     publishedTotalMinor:input.publishedTotalMinor,
-    checkout:Object.freeze({serviceMode:input.serviceMode,tender:input.tender}),
+    checkout:Object.freeze({serviceMode:input.serviceMode,tender:input.tender,...(input.diningTarget?{diningTarget:Object.freeze({...input.diningTarget})}:{})}),
     cart:Object.freeze([...input.cart]),
   });
 }
