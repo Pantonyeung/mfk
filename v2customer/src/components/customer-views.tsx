@@ -225,12 +225,14 @@ function QuoteSummary({quote,cart}:{quote:CustomerQuoteSnapshot|null;cart:readon
   return <section className={`quote-card quote-${meta?.tone??'current'}`} aria-live="polite"><div><span>訂單總額</span><AnimatedValue>{quote?money(quote.currency,quote.totalMinor):published!==null?money('HKD',published):'更新中'}</AnimatedValue></div><p>{meta?.detail??(published!==null?'按目前餐牌價格顯示；送出時會自動核對最新資料。':'正在更新餐牌資料。')}</p>{meta?<b>{meta.label}</b>:published!==null?<b>目前餐牌價格</b>:<i className="inline-loader" aria-hidden="true"/>}</section>;
 }
 
-export function CheckoutView({cart,quote,checkout,setCheckout,pending,actionState,onSubmit,onReadback,onBack,onRepair,onPaymentEvidence}:{
-  cart:readonly CustomerCartLine[];quote:CustomerQuoteSnapshot|null;checkout:CustomerCheckoutDraft;setCheckout:(v:CustomerCheckoutDraft)=>void;pending:CustomerPendingIntent|null;actionState:ActionState;onSubmit:()=>void;onReadback:(intent:CustomerPendingIntent)=>void;onBack:()=>void;onRepair:()=>void;onPaymentEvidence:(file:File)=>void;
+export function CheckoutView({cart,quote,checkout,setCheckout,paymentChannels,pending,actionState,onSubmit,onReadback,onBack,onRepair,onPaymentEvidence}:{
+  cart:readonly CustomerCartLine[];quote:CustomerQuoteSnapshot|null;checkout:CustomerCheckoutDraft;setCheckout:(v:CustomerCheckoutDraft)=>void;paymentChannels:NonNullable<CustomerReadModelSnapshot['paymentChannels']>;pending:CustomerPendingIntent|null;actionState:ActionState;onSubmit:()=>void;onReadback:(intent:CustomerPendingIntent)=>void;onBack:()=>void;onRepair:()=>void;onPaymentEvidence:(file:File)=>void;
 }){
   const unknown=pending?.state==='UNKNOWN';
   const waiting=pending?.state==='PENDING';
   const materialChange=quote?.freshness==='MATERIAL_CHANGE';
+  const [openPaymentChannelId,setOpenPaymentChannelId]=useState<string|null>(null);
+  const openPaymentChannel=paymentChannels.find(channel=>channel.channelId===openPaymentChannelId)??null;
   return <section className="page checkout-page">
     <button className="back-link" onClick={onBack}>返回記憶罐</button>
     <PageIntro kicker="最後確認 · 3 / 3" title={unknown?'正在確認訂單':'資料清楚，先安心送出'} detail={unknown?'請勿重複提交。系統只會查詢原本嗰次落單。':'店舖正式接單後，今次訂單先成立。'}/>
@@ -240,15 +242,20 @@ export function CheckoutView({cart,quote,checkout,setCheckout,pending,actionStat
     <section className="checkout-contact"><SectionHeading eyebrow="取餐聯絡" title="核對今次資料"/><div className="checkout-form"><label htmlFor="customer-name"><span>稱呼 <small>選填</small></span><input id="customer-name" name="name" value={checkout.name} onChange={event=>setCheckout({...checkout,name:event.target.value})} autoComplete="name" placeholder="例如：陳小姐"/></label><label htmlFor="customer-phone"><span>電話</span><input id="customer-phone" name="tel" value={checkout.phone} onChange={event=>setCheckout({...checkout,phone:event.target.value})} type="tel" inputMode="tel" autoComplete="tel" placeholder="用作取餐核對" aria-describedby="phone-help"/></label><small id="phone-help">只用作今次取餐核對。會員身份、口味偏好同推廣同意係分開資料。</small></div></section>
     <section className="checkout-payment"><SectionHeading eyebrow="付款方式" title="今次點樣付款？"/>
       <div className="payment-method-grid">
-        <button type="button" className={checkout.paymentMethod==='PAY_AT_STORE'?'active':''} onClick={()=>setCheckout({...checkout,paymentMethod:'PAY_AT_STORE',paymentEvidence:undefined})}><b>到店付款</b><span>取餐時再付款</span></button>
-        <button type="button" className={checkout.paymentMethod==='ELECTRONIC'?'active':''} onClick={()=>setCheckout({...checkout,paymentMethod:'ELECTRONIC'})}><b>電子支付</b><span>付款後提供付款截圖</span></button>
+        <button type="button" className={checkout.paymentMethod==='PAY_AT_STORE'?'active':''} onClick={()=>{setOpenPaymentChannelId(null);setCheckout({...checkout,paymentMethod:'PAY_AT_STORE',paymentChannelId:undefined,paymentEvidence:undefined})}}><b>到店付款</b><span>取餐時再付款</span></button>
+        <button type="button" className={checkout.paymentMethod==='ELECTRONIC'?'active':''} onClick={()=>setCheckout({...checkout,paymentMethod:'ELECTRONIC'})}><b>電子支付</b><span>選擇支付渠道，再提供付款截圖</span></button>
       </div>
-      {checkout.paymentMethod==='ELECTRONIC'?<div className="payment-evidence"><p>付款截圖會交由店舖核對；提供截圖唔代表付款已確認。</p><label className="evidence-picker"><span>{checkout.paymentEvidence?.fileName??'選擇付款截圖'}</span><input type="file" accept="image/*" onChange={event=>{const file=event.target.files?.[0];if(!file)return;onPaymentEvidence(file)}}/></label>{checkout.paymentEvidence?<small>已選擇：{checkout.paymentEvidence.fileName}</small>:null}</div>:null}
+      {checkout.paymentMethod==='ELECTRONIC'?<div className="electronic-payment-flow">
+        <div className="payment-channel-grid" role="list" aria-label="電子支付渠道">{paymentChannels.map(channel=><button type="button" key={channel.channelId} className={checkout.paymentChannelId===channel.channelId?'active':''} onClick={()=>{const changed=checkout.paymentChannelId!==channel.channelId;setCheckout({...checkout,paymentMethod:'ELECTRONIC',paymentChannelId:channel.channelId,...(changed?{paymentEvidence:undefined}:{})});setOpenPaymentChannelId(channel.channelId)}}><b>{channel.label}</b><span>{channel.qrImageUrl?'查看付款 QR':'QR 圖待提供'}</span></button>)}</div>
+        {!paymentChannels.length?<p className="payment-channel-empty">店舖暫時未開放電子支付渠道。</p>:null}
+        <div className="payment-evidence"><p>完成付款後，再上傳付款截圖畀店舖核對；提供截圖唔代表付款已確認。</p><label className="evidence-picker"><span>{checkout.paymentEvidence?.fileName??'選擇付款截圖'}</span><input type="file" accept="image/*" onChange={event=>{const file=event.target.files?.[0];if(!file)return;onPaymentEvidence(file)}}/></label>{checkout.paymentEvidence?<small>已選擇：{checkout.paymentEvidence.fileName}</small>:null}</div>
+      </div>:null}
     </section>
     {materialChange?<section className="safe-submit danger" role="alert"><span>目前被阻擋</span><h2>請先重新確認變更</h2><p>總額或餐點狀態有重要變更。未確認前唔可以送出。</p><ActionButton variant="secondary" wide onClick={onRepair}>返回記憶罐查看</ActionButton></section>:
     <section className={`safe-submit state-${actionState}`} role={unknown||waiting?'status':undefined}><i className="submit-orbit" aria-hidden="true"><b/><b/><b/></i><span>{unknown?'結果未知':waiting?'等待中':'安全提交'}</span><h2>{unknown?'正在確認訂單結果':waiting?'等待店舖確認':quote?'準備送出落單要求':'等待店舖報價'}</h2><p>{unknown?'店舖可能已收到落單要求。請勿重複提交，先查詢原本嗰次結果。':waiting?'落單要求已送出，未有終局前唔會自動重送。':'如果結果未明，系統會保留原本嗰次落單並先讀回結果，唔會盲目重送。'}</p>{unknown||waiting?<div className="order-confirm-progress" role="progressbar" aria-label={unknown?'正在確認訂單結果':'等待店舖確認'} aria-valuetext="處理中"><i/><span>{unknown?'正在查詢原本訂單結果…':'訂單已送出，等待店舖回覆…'}</span></div>:<StatefulAction state={actionState} labels={{default:pending?.state==='NOT_CONNECTED'?'使用原本落單再試':'確認並送出',loading:'正在安全處理',pending:'等待店舖確認',unknown:'重新確認提交結果',disabled:quote?'需要先修正變更':'等待正式報價'}} onClick={onSubmit}/>}
     {unknown&&pending?<button type="button" className="order-confirm-readback" onClick={()=>onReadback(pending)}>立即重新確認結果</button>:null}
     {unknown?<small>系統只會讀取原本結果，未有重新提交。</small>:pending?.state==='NOT_CONNECTED'?<small>本機草稿已保存，未建立正式訂單。</small>:null}</section>}
+    {openPaymentChannel?<div className="payment-qr-backdrop" role="presentation" onClick={()=>setOpenPaymentChannelId(null)}><section className="payment-qr-sheet" role="dialog" aria-modal="true" aria-label={openPaymentChannel.label+' 付款 QR'} onClick={event=>event.stopPropagation()}><header><div><small>電子支付</small><h2>{openPaymentChannel.label}</h2></div><button type="button" onClick={()=>setOpenPaymentChannelId(null)}>關閉</button></header>{openPaymentChannel.qrImageUrl?<><div className="payment-qr-image"><img src={openPaymentChannel.qrImageUrl} alt={openPaymentChannel.label+' 付款 QR Code'}/></div><p>可以直接截圖，或者儲存付款碼後用手機付款。完成後返嚟上傳付款截圖。</p><a className="payment-qr-download" href={openPaymentChannel.qrImageUrl} download>儲存付款碼</a></>:<><div className="payment-qr-placeholder"><b>QR 圖片待提供</b><span>位置已保留；店舖未發布圖片前唔會顯示假付款碼。</span></div><p>呢個渠道暫時未可以完成電子付款。</p></>}</section></div>:null}
   </section>;
 }
 
