@@ -1,3 +1,4 @@
+// Build refresh: Customer revision/price validation + own-channel auto-admit.
 // Customer electronic tender labels come from the Admin-published payment channel.
 import type {
   CustomerCloudCartLine,
