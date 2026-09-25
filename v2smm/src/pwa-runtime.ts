@@ -1,6 +1,7 @@
 import type {SmmRuntimePort,SmmReadModelSnapshot,SmmPendingIntent,SmmCommandResult} from './product-types';
-import {createSmmLanOrderAdapter} from './smt-lan-adapter';
+import {createSmmLanOrderAdapter,type SmmLanTransport} from './smt-lan-adapter';
 import {createPwaLanTransport,readSmmLanPwaConfig} from './pwa-lan';
+import {createPwaCloudTransport} from './pwa-cloud';
 
 const CLOUD_SNAPSHOT_URL='/api/smm/snapshot?storeId=MF01';
 
@@ -46,9 +47,30 @@ async function readCloudSnapshot():Promise<SmmReadModelSnapshot>{
   return Object.freeze({...json,connectionPath:'INTERNET' as const});
 }
 
+function hybridTransport(lan:SmmLanTransport|null,cloud:SmmLanTransport):SmmLanTransport{
+  return Object.freeze({
+    async send(request,signal){
+      if(lan){
+        const local=await lan.send(request,signal);
+        if(local.kind!=='UNAVAILABLE')return local;
+      }
+      return cloud.send(request,signal);
+    },
+    async readSubmission(submissionId,signal){
+      if(lan?.readSubmission){
+        const local=await lan.readSubmission(submissionId,signal);
+        if(!('state'in local&&local.state==='UNAVAILABLE'))return local;
+      }
+      return cloud.readSubmission?cloud.readSubmission(submissionId,signal):{state:'UNAVAILABLE'};
+    },
+  });
+}
+
 export function createPwaRuntimePort():SmmRuntimePort{
   const config=readSmmLanPwaConfig();
-  const orders=config?createSmmLanOrderAdapter(createPwaLanTransport(config)):null;
+  const lan=config?createPwaLanTransport(config):null;
+  const cloud=createPwaCloudTransport();
+  const orders=createSmmLanOrderAdapter(hybridTransport(lan,cloud),6500);
   return Object.freeze({
     portId:'MFK_SMM_PORT_V1' as const,
     async readSnapshot(){
@@ -65,14 +87,10 @@ export function createPwaRuntimePort():SmmRuntimePort{
       return await readCloudSnapshot();
     },
     submitOrder(intent:SmmPendingIntent):Promise<SmmCommandResult>{
-      return orders
-        ?orders.submitOrder(intent)
-        :Promise.resolve(Object.freeze({state:'NOT_CONNECTED' as const,message:'Internet 已連接；員工正式提交仍需可信門店提交通道，草稿已保存。'}));
+      return orders.submitOrder(intent);
     },
     readSubmission(submissionId:string):Promise<SmmCommandResult>{
-      return orders
-        ?orders.readSubmission(submissionId)
-        :Promise.resolve(Object.freeze({state:'NOT_CONNECTED' as const,message:'Internet 已連接；原提交讀回需要 LAN。'}));
+      return orders.readSubmission(submissionId);
     },
   });
 }
