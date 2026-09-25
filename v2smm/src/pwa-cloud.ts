@@ -75,16 +75,15 @@ export function createPwaCloudTransport():SmmLanTransport{
         if(error instanceof DOMException&&error.name==='AbortError')return{kind:'UNKNOWN'};
         return{kind:'UNAVAILABLE'};
       }
-      if(response.status===401)return{kind:'UNAVAILABLE'};
-      if(response.status===409){
+      if(!response.ok&&response.status!==202){
         const body=await response.json().catch(()=>({})) as Record<string,unknown>;
+        const code=String(body.code||('SMM_CLOUD_HTTP_'+response.status));
         return{kind:'RESPONSE',response:Object.freeze({
           protocolVersion:1,type:'smm.lan.order.result.v1',
           requestId:request.requestId,submissionId:request.submissionId,idempotencyKey:request.idempotencyKey,
-          disposition:'REJECTED',reasonCode:String(body.code||'SMM_CLOUD_SUBMISSION_CONFLICT'),
+          disposition:'REJECTED',reasonCode:'HTTP_'+response.status+':'+code,
         })};
       }
-      if(!response.ok&&response.status!==202)return{kind:'UNAVAILABLE'};
 
       for(let attempt=0;attempt<48;attempt++){
         if(attempt>0)await sleep(250);
