@@ -27,6 +27,8 @@ import com.morefunos.smt.runtime.RuntimeActivationState;
 import com.morefunos.smt.runtime.RuntimeBundleMetadata;
 import com.morefunos.smt.runtime.RuntimeReleaseStore;
 import com.morefunos.smt.runtime.RuntimeUpdateClient;
+import com.morefunos.smt.runtime.RuntimeUpdateEndpointStore;
+import com.morefunos.smt.runtime.CarrierUpdateEndpointStore;
 
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -53,6 +55,10 @@ public final class CarrierRecoveryActivity extends Activity {
     private CarrierUpdateClient.Descriptor pendingCarrierUpdate;
     private PrintCommandController printCommands;
     private RecoveryUsbPrinter usbPrinter;
+    private RuntimeUpdateEndpointStore runtimeEndpointStore;
+    private CarrierUpdateEndpointStore carrierEndpointStore;
+    private EditText runtimeOtaUrl;
+    private EditText carrierOtaUrl;
     private BootEvidenceStore bootEvidenceStore;
 
     private TextView runtimeStatus;
@@ -73,6 +79,8 @@ public final class CarrierRecoveryActivity extends Activity {
         releaseStore = new RuntimeReleaseStore(this);
         runtimeUpdateClient = new RuntimeUpdateClient(this);
         carrierUpdateClient = new CarrierUpdateClient(this);
+        runtimeEndpointStore = new RuntimeUpdateEndpointStore(this);
+        carrierEndpointStore = new CarrierUpdateEndpointStore(this);
         printCommands = new PrintCommandController(this, this::onNativePrintEvent);
         bootEvidenceStore = new BootEvidenceStore(this);
         try { usbPrinter = new RecoveryUsbPrinter(this); }
@@ -95,6 +103,7 @@ public final class CarrierRecoveryActivity extends Activity {
         ));
 
         body.addView(buildHeader());
+        body.addView(buildOtaEndpointCard());
         body.addView(buildRuntimeCard());
         body.addView(buildCarrierCard());
         body.addView(buildUsbPrinterCard());
@@ -114,6 +123,73 @@ public final class CarrierRecoveryActivity extends Activity {
         card.addView(button("返回 SMT", false, v -> restartMain()));
         return card;
     }
+
+    private View buildOtaEndpointCard() {
+        final LinearLayout card=card();
+        card.addView(text("OTA 更新來源",22,TEXT,Typeface.BOLD));
+        card.addView(text("日後 MFK OTA 地址改變，只需要喺呢度更新，唔需要為改 URL 再出 Carrier。",14,MUTED,Typeface.NORMAL));
+        try {
+            runtimeOtaUrl=field(card,"Runtime OTA URL","runtime-update.json",runtimeEndpointStore.effectiveEndpoint(),InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_VARIATION_URI);
+            carrierOtaUrl=field(card,"Carrier OTA URL","carrier-update.json",carrierEndpointStore.effectiveEndpoint(),InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_VARIATION_URI);
+        } catch(Exception error) {
+            runtimeOtaUrl=field(card,"Runtime OTA URL","runtime-update.json","",InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_VARIATION_URI);
+            carrierOtaUrl=field(card,"Carrier OTA URL","carrier-update.json","",InputType.TYPE_CLASS_TEXT|InputType.TYPE_TEXT_VARIATION_URI);
+        }
+        card.addView(button("測試 Runtime OTA URL",false,v->testRuntimeOtaUrl()));
+        card.addView(button("保存 Runtime OTA URL",false,v->saveRuntimeOtaUrl()));
+        card.addView(button("Runtime URL 恢復預設",false,v->restoreRuntimeOtaDefault()));
+        card.addView(button("測試 Carrier OTA URL",false,v->testCarrierOtaUrl()));
+        card.addView(button("保存 Carrier OTA URL",false,v->saveCarrierOtaUrl()));
+        card.addView(button("Carrier URL 恢復預設",false,v->restoreCarrierOtaDefault()));
+        return card;
+    }
+
+    private void testRuntimeOtaUrl(){
+        otaStatusSafe("測試 Runtime OTA URL 中…");
+        io.execute(()->{
+            try{
+                final String endpoint=runtimeEndpointStore.validateCandidate(runtimeOtaUrl.getText().toString());
+                final RuntimeUpdateClient.UpdateDescriptor descriptor=runtimeUpdateClient.checkForUpdate(endpoint);
+                showAsync(otaStatus,new JSONObject().put("state","reachable").put("endpoint",endpoint).put("releaseId",descriptor.releaseId).toString(2));
+            }catch(Exception error){showAsync(otaStatus,jsonFailure("RUNTIME_OTA_URL_TEST_FAILED",error));}
+        });
+    }
+    private void saveRuntimeOtaUrl(){
+        try{runtimeEndpointStore.applyValidatedCandidate(runtimeOtaUrl.getText().toString());refreshOtaEndpointFields();otaStatusSafe("Runtime OTA URL 已保存");}
+        catch(Exception error){otaStatusSafe(jsonFailure("RUNTIME_OTA_URL_SAVE_FAILED",error));}
+    }
+    private void restoreRuntimeOtaDefault(){
+        try{runtimeEndpointStore.restoreDefault();refreshOtaEndpointFields();otaStatusSafe("Runtime OTA URL 已恢復預設");}
+        catch(Exception error){otaStatusSafe(jsonFailure("RUNTIME_OTA_URL_DEFAULT_FAILED",error));}
+    }
+    private void testCarrierOtaUrl(){
+        carrierStatusSafe("測試 Carrier OTA URL 中…");
+        io.execute(()->{
+            try{
+                final String endpoint=carrierEndpointStore.validateCandidate(carrierOtaUrl.getText().toString());
+                final String previous=carrierEndpointStore.effectiveEndpoint();
+                carrierEndpointStore.applyValidatedCandidate(endpoint);
+                try{
+                    final CarrierUpdateClient.Descriptor descriptor=carrierUpdateClient.checkForUpdate();
+                    showAsync(carrierStatus,new JSONObject().put("state","reachable").put("endpoint",endpoint).put("versionName",descriptor.versionName).put("versionCode",descriptor.versionCode).toString(2));
+                } finally { carrierEndpointStore.applyValidatedCandidate(previous); }
+            }catch(Exception error){showAsync(carrierStatus,jsonFailure("CARRIER_OTA_URL_TEST_FAILED",error));}
+        });
+    }
+    private void saveCarrierOtaUrl(){
+        try{carrierEndpointStore.applyValidatedCandidate(carrierOtaUrl.getText().toString());refreshOtaEndpointFields();carrierStatusSafe("Carrier OTA URL 已保存");}
+        catch(Exception error){carrierStatusSafe(jsonFailure("CARRIER_OTA_URL_SAVE_FAILED",error));}
+    }
+    private void restoreCarrierOtaDefault(){
+        try{carrierEndpointStore.restoreDefault();refreshOtaEndpointFields();carrierStatusSafe("Carrier OTA URL 已恢復預設");}
+        catch(Exception error){carrierStatusSafe(jsonFailure("CARRIER_OTA_URL_DEFAULT_FAILED",error));}
+    }
+    private void refreshOtaEndpointFields(){
+        try{runtimeOtaUrl.setText(runtimeEndpointStore.effectiveEndpoint());}catch(Exception ignored){}
+        try{carrierOtaUrl.setText(carrierEndpointStore.effectiveEndpoint());}catch(Exception ignored){}
+    }
+    private void otaStatusSafe(String value){if(otaStatus!=null)otaStatus.setText(value);}
+    private void carrierStatusSafe(String value){if(carrierStatus!=null)carrierStatus.setText(value);}
 
     private View buildRuntimeCard() {
         final LinearLayout card = card();
