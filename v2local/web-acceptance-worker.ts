@@ -67,7 +67,7 @@ async function proxySmmAcceptance(request:Request,url:URL,env:Env){
   const suffix=url.pathname.slice('/__mfk/smm-acceptance'.length)||'/';
   const allowed=
     request.method==='GET'&&suffix==='/pending'||
-    request.method==='POST'&&suffix==='/ack';
+    request.method==='POST'&&(suffix==='/ack'||suffix==='/projection');
   if(!allowed)return new Response(JSON.stringify({code:'WEB_ACCEPTANCE_SMM_PROXY_BLOCKED'}),{
     status:403,
     headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store'},
@@ -75,7 +75,9 @@ async function proxySmmAcceptance(request:Request,url:URL,env:Env){
 
   const targetPath=suffix==='/pending'
     ?'/api/smm/acceptance/smt/pending'
-    :'/api/smm/acceptance/smt/ack';
+    :suffix==='/projection'
+      ?'/api/smm/acceptance/smt/projection'
+      :'/api/smm/acceptance/smt/ack';
   const target=new URL('https://smm.morefunos.com'+targetPath);
   target.searchParams.set('storeId','MF01');
 

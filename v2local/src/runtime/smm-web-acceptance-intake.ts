@@ -2,6 +2,7 @@ import type {SmmLanOrderRequest,SmmLanOrderResponse} from '../../../contracts/sm
 
 export interface SmmWebAcceptanceIngress{
   submit(input:SmmLanOrderRequest,context:{deviceId:string;trusted:boolean}):SmmLanOrderResponse;
+  readSnapshot():unknown;
 }
 
 async function getPending(){
@@ -35,6 +36,15 @@ async function ack(request:SmmLanOrderRequest,result:SmmLanOrderResponse){
   throw new Error('SMM_WEB_ACCEPTANCE_ACK_HTTP_'+lastStatus);
 }
 
+async function publishProjection(snapshot:unknown){
+  const response=await fetch('/__mfk/smm-acceptance/projection',{
+    method:'POST',
+    headers:{'content-type':'application/json'},
+    body:JSON.stringify({snapshot,observedAt:new Date().toISOString()}),
+  });
+  if(!response.ok)throw new Error('SMM_WEB_ACCEPTANCE_PROJECTION_HTTP_'+response.status);
+}
+
 let installed=false;
 let reconciling=false;
 let timer:number|undefined;
@@ -66,6 +76,7 @@ export async function reconcileSmmWebAcceptanceIntake(ingress:SmmWebAcceptanceIn
       }
       await ack(request,result);
     }
+    await publishProjection(ingress.readSnapshot());
   }catch{
     // Temporary browser acceptance must never affect local SMT truth or crash UI.
   }finally{

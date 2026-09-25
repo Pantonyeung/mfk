@@ -320,6 +320,22 @@ export class SmmIntentStore{
       return json({state:'PENDING_WEB_SMT',submissionId});
     }
 
+    if(url.pathname==='/acceptance/smt/projection'&&request.method==='POST'){
+      const body=record(await request.json().catch(()=>({})));
+      const snapshot=record(body.snapshot);
+      if(!Array.isArray(snapshot.orders)||!Array.isArray(snapshot.dineSessions))return json({code:'SMM_ACCEPTANCE_PROJECTION_INVALID'},400);
+      const observedAt=text(body.observedAt,80)||new Date().toISOString();
+      const value=Object.freeze({snapshot:Object.freeze({...snapshot}),observedAt});
+      await this.state.storage.put('acceptance-projection',value);
+      return json({state:'PROJECTED',observedAt});
+    }
+
+    if(url.pathname==='/acceptance/smt/projection'&&request.method==='GET'){
+      const value=await this.state.storage.get('acceptance-projection') as any;
+      if(!value)return json({snapshot:null},404);
+      return json(value);
+    }
+
     if(url.pathname==='/acceptance/smt/pending'&&request.method==='GET'){
       const rows=await this.state.storage.list({prefix:'acceptance-order:'});
       const orders=[...rows.values()]
@@ -498,6 +514,32 @@ export default{
     const url=new URL(request.url);
     const storeId=(url.searchParams.get('storeId')||'MF01').trim().slice(0,64)||'MF01';
 
+    if(url.pathname==='/api/smm/acceptance/snapshot'){
+      if(request.method!=='GET')return json({code:'METHOD_NOT_ALLOWED'},405);
+      const staff=await readStaffSession(request,storeId,env);
+      if(!staff)return json({code:'SMM_STAFF_UNAUTHORIZED',message:'請先使用同一個員工帳戶登入'},401);
+      let active;
+      try{active=await fetchActive(storeId);}catch{return json({code:'SMM_CONFIG_NOT_PUBLISHED'},503);}
+      const base=mapPublishedSnapshot(active);
+      const id=env.SMM_INTENT_STORE.idFromName(storeId);
+      const stub=env.SMM_INTENT_STORE.get(id);
+      const projectionResponse=await stub.fetch(new Request('https://internal/acceptance/smt/projection',{method:'GET'}));
+      if(!projectionResponse.ok)return json({...base,channels:[...base.channels,{channel:'WEB_SMT',state:'STALE',detail:'等待 SMT 共用訂單投影',observedAt:new Date().toISOString()}]});
+      const projectionBody=record(await projectionResponse.json().catch(()=>({})));
+      const projection=record(projectionBody.snapshot);
+      return json({
+        ...base,
+        orders:Array.isArray(projection.orders)?projection.orders:[],
+        work:Array.isArray(projection.work)?projection.work:[],
+        dineSessions:Array.isArray(projection.dineSessions)?projection.dineSessions:[],
+        channels:[
+          ...base.channels,
+          {channel:'WEB_SMT',state:'CONNECTED',detail:'SMT 共用訂單／堂食投影',observedAt:String(projectionBody.observedAt||base.observedAt)},
+        ],
+        observedAt:String(projectionBody.observedAt||base.observedAt),
+      });
+    }
+
     if(url.pathname==='/api/smm/snapshot'){
       if(request.method!=='GET')return json({code:'METHOD_NOT_ALLOWED'},405);
       let active;
@@ -656,7 +698,7 @@ export default{
       return stub.fetch(new Request(target.toString(),{method:'GET'}));
     }
 
-    if(url.pathname==='/api/smm/acceptance/smt/pending'||url.pathname==='/api/smm/acceptance/smt/ack'){
+    if(url.pathname==='/api/smm/acceptance/smt/pending'||url.pathname==='/api/smm/acceptance/smt/ack'||url.pathname==='/api/smm/acceptance/smt/projection'){
       const provided=text(request.headers.get('x-mfk-web-acceptance'),256);
       const expected=String(env.WEB_SMT_ACCEPTANCE_TOKEN||'');
       if(!expected||!provided||provided.length!==expected.length||!sameHex(provided,expected)){
@@ -667,6 +709,14 @@ export default{
       if(url.pathname.endsWith('/pending')){
         if(request.method!=='GET')return json({code:'METHOD_NOT_ALLOWED'},405);
         return stub.fetch(new Request('https://internal/acceptance/smt/pending',{method:'GET'}));
+      }
+      if(url.pathname.endsWith('/projection')){
+        if(request.method!=='POST')return json({code:'METHOD_NOT_ALLOWED'},405);
+        return stub.fetch(new Request('https://internal/acceptance/smt/projection',{
+          method:'POST',
+          headers:{'content-type':'application/json'},
+          body:await request.text(),
+        }));
       }
       if(request.method!=='POST')return json({code:'METHOD_NOT_ALLOWED'},405);
       return stub.fetch(new Request('https://internal/acceptance/smt/ack',{

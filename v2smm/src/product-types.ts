@@ -157,6 +157,18 @@ export interface SmmDineSession {
   readonly covers:number;
   readonly state:string;
   readonly openedAt:string;
+  readonly itemSummary?:string;
+  readonly totalMinor?:number;
+  readonly paidMinor?:number;
+  readonly remainingMinor?:number;
+  readonly lines?:readonly {
+    readonly lineIndex:number;
+    readonly name:string;
+    readonly qty:number;
+    readonly paidQty:number;
+    readonly remainingQty:number;
+    readonly unitMinor:number;
+  }[];
 }
 
 export interface SmmRefundRequest {

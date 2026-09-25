@@ -3,8 +3,17 @@ import type {SmmLanOrderRequest,SmmLanSubmissionReadbackResponse} from '../../co
 import {createSmmLanOrderAdapter,type SmmLanTransport} from './smt-lan-adapter';
 import {createPwaLanTransport,readSmmLanPwaConfig} from './pwa-lan';
 import {createPwaCloudTransport} from './pwa-cloud';
+import {readSmmStaffSession} from './pwa-staff';
 
-const CLOUD_SNAPSHOT_URL='/api/smm/snapshot?storeId=MF01';
+function webSmtAcceptanceMode(){
+  if(typeof window==='undefined')return false;
+  return new URLSearchParams(window.location.search).get('target')==='web-smt';
+}
+function cloudSnapshotUrl(){
+  return webSmtAcceptanceMode()
+    ?'/api/smm/acceptance/snapshot?storeId=MF01'
+    :'/api/smm/snapshot?storeId=MF01';
+}
 
 function isRecord(value:unknown):value is Record<string,unknown>{
   return Boolean(value)&&typeof value==='object'&&!Array.isArray(value);
@@ -41,7 +50,12 @@ async function lanRequest(payload:object){
   return json;
 }
 async function readCloudSnapshot():Promise<SmmReadModelSnapshot>{
-  const response=await fetch(CLOUD_SNAPSHOT_URL,{method:'GET',cache:'no-store',headers:{Accept:'application/json'}});
+  const headers:Record<string,string>={Accept:'application/json'};
+  if(webSmtAcceptanceMode()){
+    const session=readSmmStaffSession();
+    if(session)headers['x-mfk-smm-session']=session.sessionToken;
+  }
+  const response=await fetch(cloudSnapshotUrl(),{method:'GET',cache:'no-store',headers});
   if(!response.ok)throw new Error('SMM_INTERNET_HTTP_'+response.status);
   const json=await response.json();
   if(!isSnapshot(json))throw new Error('SMM_INTERNET_SNAPSHOT_INVALID');
