@@ -21,11 +21,12 @@ describe('SMT donor fast lane wiring',()=>{
     expect(app).toContain('comboBlockingCount(cart)');
     expect(app).toContain('fastLaneBlockers===0');
     expect(fast).toContain('ADMIN REQUIRED TRUTH');
-    expect(fast).toContain('RICEBALL MEAL');
+    expect(fast).toContain('FAST PAIR');
+    expect(fast).toContain('PURPLE RICE COMBO');
   });
 
   it('keeps auto assignment, specified A/B/C pairing, deferred drink and reversible dissolve visible',()=>{
-    expect(fast).toContain('建立 {plans.length} 組飯團餐');
+    expect(fast).toContain('建立 {plans.length} 組快速組合');
     expect(fast).toContain('指定配對');
     expect(fast).toContain('A／B／C…');
     expect(fast).toContain('飲品稍後補');
