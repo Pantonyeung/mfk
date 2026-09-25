@@ -122,7 +122,7 @@ export function RiceballPoolWorkspace({
 
   if(!combo)return <div className="fast-lane">
     <header className="fast-lane-title">
-      <div><small>RICEBALL MEAL</small><h2>飯團待組區</h2><p>飯團會先保留 A／B／C… 組別；未有 Admin 飯團餐規則之前唔會自行計價或建立套餐。</p></div>
+      <div><small>FAST PAIR</small><h2>快速組合</h2><p>飯團會先保留 A／B／C… 槽位；未有有效規則時只顯示待配對，唔自行建立套餐。</p></div>
       <strong>{mainUnits} 件主餐</strong>
     </header>
     {previewLabels.length?<div className="fast-plan-grid">{previewLabels.map(label=><article className="fast-plan-card pending" key={label}><strong>{label} 組</strong><div><span><small>飯團餐</small><b>等待飯團餐規則</b></span><span><small>狀態</small><b>未建立套餐</b></span></div></article>)}</div>
@@ -132,7 +132,7 @@ export function RiceballPoolWorkspace({
 
   return <div className="fast-lane">
     <header className="fast-lane-title">
-      <div><small>RICEBALL MEAL</small><h2>飯團待組區</h2><p>只處理飯團＋小食＋飲品嘅飯團餐配對；固定 F1–F6 類產品照常直接落單。</p></div>
+      <div><small>FAST PAIR</small><h2>快速組合</h2><p>多個飯團＋多個小食按次序一對一配對；唔做智能推薦，剩餘商品保持單點。</p></div>
       <strong>{mainUnits} 件主餐</strong>
     </header>
     {active.length>1?<nav className="fast-combo-tabs">{active.map(row=><button type="button" key={row.id} className={row.id===combo.id?'active':''} onClick={()=>setSelectedComboId(row.id)}>{row.name}<small>{money(row.basePriceMinor)}</small></button>)}</nav>:null}
@@ -148,7 +148,7 @@ export function RiceballPoolWorkspace({
         :<article className="fast-plan-card pending" key={label}><strong>{label} 組</strong><div><span><small>飯團餐</small><b>等待小食配對</b></span><span><small>飲品</small><b>可稍後補</b></span></div></article>;
     })}</div>
       :<div className="fast-empty compact"><b>未有飯團待組</b><span>加入飯團後，A／B／C… 組別會即時喺呢度出現。</span></div>}
-    <footer className={'fast-sticky-action'+(plans.length?' flow-current':'')}><span>{plans.length?'已有完整飯團＋小食，可以直接組餐。':'A／B／C 組別會保留；等小食到齊先正式建立飯團餐。'}</span><button type="button" disabled={!plans.length} onClick={()=>onAutoPair(plans)}>建立 {plans.length} 組飯團餐</button></footer>
+    <footer className={'fast-sticky-action'+(plans.length?' flow-current':'')}><span>{plans.length?'已有完整飯團＋小食，可以直接組餐。':'A／B／C 組別會保留；等小食到齊先正式建立飯團餐。'}</span><button type="button" disabled={!plans.length} onClick={()=>onAutoPair(plans)}>建立 {plans.length} 組快速組合</button></footer>
   </div>;
 }
 
@@ -194,7 +194,7 @@ export function ComboFastLaneWorkspace({
 
   return <div className="fast-lane combo-lane">
     <header className="fast-lane-title">
-      <div><small>RICEBALL MEAL</small><h2>飯團餐配對</h2><p>A／B／C… 只代表飯團餐組別；飯團、小食、飲品完成後先成為一組。</p></div>
+      <div><small>PURPLE RICE COMBO</small><h2>紫米套餐區</h2><p>A／B／C／D… 係套餐槽位；只有明確選套餐＋飯團＋小食＋飲品先建立正式套餐。</p></div>
       <strong>{existing.length} 組</strong>
     </header>
 
