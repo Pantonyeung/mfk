@@ -14,8 +14,8 @@ const runtime=fs.readFileSync(path.join(root,'runtime/local-runtime.ts'),'utf8')
 
 describe('SMT donor skeleton fusion V2 parity locks',()=>{
   it('preserves dual-purpose hold: normal draft plus dining queue/table placement',()=>{
-    expect(center).toContain('暫存待客');
-    expect(center).toContain('掛入堂食');
+    expect(center).toContain('<b>暫存</b>');
+    expect(center).toContain('<b>堂食</b>');
     expect(center).toContain('加入輪候');
     expect(center).toContain('hold-nine-grid');
     expect(app).toContain("localRuntime.createHold({kind:'waiting'");
