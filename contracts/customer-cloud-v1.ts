@@ -22,6 +22,7 @@ export interface CustomerCloudCheckout{
   readonly name:string;
   readonly phone:string;
   readonly paymentMethod?:'PAY_AT_STORE'|'ELECTRONIC';
+  readonly paymentChannelId?:'ALIPAY'|'WECHAT'|'FPS'|'PAYME';
   readonly paymentEvidenceRef?:string;
 }
 export interface MfkCustomerQuoteRequest{
@@ -128,6 +129,7 @@ export function validateMfkCustomerOrderIntent(input:unknown):MfkCustomerOrderIn
       name:typeof checkout.name==='string'?checkout.name.trim().slice(0,120):'',
       phone,
       paymentMethod:checkout.paymentMethod==='ELECTRONIC'?'ELECTRONIC':'PAY_AT_STORE',
+      ...(checkout.paymentMethod==='ELECTRONIC'&&['ALIPAY','WECHAT','FPS','PAYME'].includes(String(checkout.paymentChannelId))?{paymentChannelId:String(checkout.paymentChannelId) as 'ALIPAY'|'WECHAT'|'FPS'|'PAYME'}:{}),
       ...(checkout.paymentMethod==='ELECTRONIC'&&optionalText(checkout.paymentEvidenceRef,500)?{paymentEvidenceRef:optionalText(checkout.paymentEvidenceRef,500)}:{}),
     }),
   });
