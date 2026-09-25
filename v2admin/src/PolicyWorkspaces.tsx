@@ -193,6 +193,7 @@ const DEFAULT_WEEKLY_HOURS=Object.freeze({
 }) as StoreSettings['weeklyHours'];
 
 export function StoreSettingsWorkspace(){
+  const {draft,markClean}=useAdminDraft();
   const [config,setConfig]=usePersistentAdminState<StoreSettings>('store-settings.v1',{
     storeName:'磨飯',storeCode:'MF01',currency:'HKD',timezone:'Asia/Hong_Kong',
     lateArrivalMinutes:15,fulfillmentMinutes:20,archiveHours:24,
@@ -200,6 +201,8 @@ export function StoreSettingsWorkspace(){
     dineInEnabled:true,takeawayEnabled:true,diningTables:DEFAULT_DINING_TABLES,customerPaymentChannels:DEFAULT_CUSTOMER_PAYMENT_CHANNELS,weeklyHours:DEFAULT_WEEKLY_HOURS,
     paymentRefs:['CASH'],printRefs:['RECEIPT','PRODUCTION','PACKING','LABEL'],channelRefs:[],
   });
+  const [saveMessage,setSaveMessage]=useState('');
+  const [saveErrors,setSaveErrors]=useState<readonly string[]>([]);
   const patch=(change:Partial<StoreSettings>)=>setConfig(current=>{const after={...current,...change};appendAdminAudit({action:'修改門店設定',target:current.storeCode,before:current,after});return after;});
   const patchDay=(day:StoreDay,change:Partial<StoreSettings['weeklyHours'][StoreDay]>)=>patch({weeklyHours:{...config.weeklyHours,[day]:{...config.weeklyHours[day],...change}}});
   const refs=(value:string)=>value.split(',').map(item=>item.trim()).filter(Boolean);
@@ -233,10 +236,39 @@ export function StoreSettingsWorkspace(){
     sortOrder:diningTables.length+1,
   }]});
   const removeTable=(id:string)=>patch({diningTables:diningTables.filter(row=>row.id!==id)});
+  const saveStoreSettings=()=>{
+    const errors:string[]=[];
+    const tableIds=new Set<string>();
+    for(const row of diningTables){
+      if(!row.id.trim())errors.push('堂食枱缺少內部 ID');
+      else if(tableIds.has(row.id))errors.push('堂食枱 ID 重複：'+row.id);
+      else tableIds.add(row.id);
+      if(!row.name.trim())errors.push('堂食枱 '+(row.id||'未命名')+' 缺少顯示名稱');
+    }
+    const paymentIds=new Set<string>();
+    for(const row of paymentChannels){
+      if(!row.id.trim())errors.push('付款方式缺少 ID');
+      else if(paymentIds.has(row.id))errors.push('付款方式 ID 重複：'+row.id);
+      else paymentIds.add(row.id);
+      if(!row.name.trim())errors.push('付款方式 '+(row.id||'未命名')+' 缺少顯示名稱');
+    }
+    if(errors.length){setSaveErrors(errors);setSaveMessage('未能保存；請先修正門店設定。');return;}
+    writeAdminStored('store-settings.v1',config);
+    const result=saveAdminConfig(draft);
+    if(!result.ok){setSaveErrors(result.errors);setSaveMessage('未能保存；請先修正設定驗證問題。');return;}
+    markClean();
+    setSaveErrors([]);
+    setSaveMessage('已保存並啟用 R'+result.release.version+'；已排入 Admin → SMT／SMM 自動同步。');
+  };
+  const activeRelease=readActiveAdminRelease();
 
 
   return <section className="admin-editor-page">
-    <PolicyHeader title="門店設定" description="管理門店身份、七日營業時間、服務模式、系統引用、營運計時同 Pending Order 提醒規則。Timeout 只改提示優先級，唔會自動接單或拒單。"/>
+    <header className="admin-editor-head">
+      <div><small>{activeRelease?'目前 R'+activeRelease.version:'未有正式版本'} · 門店設定</small><h1>門店設定</h1><p>本機修改會自動保存草稿；只有撳「保存並發佈」先建立正式版本，並送去 SMT／SMM。</p>{saveMessage?<span>{saveMessage}</span>:null}</div>
+      <div className="admin-editor-actions"><button className="primary" type="button" onClick={saveStoreSettings}>保存並發佈</button></div>
+    </header>
+    {saveErrors.length?<div className="admin-validation is-error" role="alert"><b>有 {saveErrors.length} 項需要處理</b><ul>{saveErrors.map((error,index)=><li key={index}>{error}</li>)}</ul></div>:null}
     <div className="admin-policy-grid two">
       <article className="admin-policy-card"><h2>基本資料</h2><label><span>門店顯示名稱</span><input value={config.storeName} onChange={event=>patch({storeName:event.target.value})}/></label><label><span>門店代碼</span><input value={config.storeCode} onChange={event=>patch({storeCode:event.target.value})}/></label><label><span>貨幣</span><select value={config.currency} onChange={event=>patch({currency:event.target.value})}><option value="HKD">HKD</option></select></label><label><span>時區</span><input value={config.timezone} onChange={event=>patch({timezone:event.target.value})}/></label></article>
       <article className="admin-policy-card"><h2>服務模式</h2><Toggle checked={config.dineInEnabled} onChange={dineInEnabled=>patch({dineInEnabled})} label="堂食"/><Toggle checked={config.takeawayEnabled} onChange={takeawayEnabled=>patch({takeawayEnabled})} label="外賣"/></article>
