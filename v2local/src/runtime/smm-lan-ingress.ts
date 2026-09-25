@@ -97,7 +97,7 @@ export function createSmmLanIngress(runtime:MfkLocalRuntime){
 
       const providerRef='SMM:'+input.submissionId;
       const recovered=runtime.orders().find(order=>order.providerRef===providerRef)
-        ??runtime.holds().find(hold=>hold.providerRef===providerRef);
+        ??runtime.holds().find(hold=>hold.providerRef===providerRef||(hold.smmSubmissionRefs??[]).includes(providerRef));
       if(recovered){
         const canonicalRevision=1;
         writeResults([...results(),{submissionId:input.submissionId,orderId:recovered.id,canonicalRevision,idempotencyKey:input.idempotencyKey,requestId:input.requestId}]);
