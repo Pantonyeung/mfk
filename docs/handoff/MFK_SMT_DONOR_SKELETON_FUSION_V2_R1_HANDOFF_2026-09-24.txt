@@ -1088,3 +1088,78 @@ Production UNCHANGED
 
 Status:
 MFK_SMT_OWNER_FINAL_V1_CUSTOMER_KEETA_PENDING_GREEN_OWNER_ACCEPTANCE_PENDING
+
+
+==================================================
+OWNER FINAL V1｜ETA / AUTO READY｜GREEN
+==================================================
+
+Candidate at validation:
+d4387b7d25428399eae2b7eabd7efaddbd70f93a
+
+- consumes optional Admin capacity.etaRules
+- fallback = Store Settings fulfillmentMinutes
+- ETA starts only when formal Order enters 進行中
+- pending Customer / Keeta has no ETA until accepted
+- persists etaMinutes + etaReadyAt
+- Orders detail exposes 預計取餐
+- restart-safe 10s local loop advances expired 進行中 → 可取餐
+- existing markOrderReady / provider READY path reused
+
+Validation:
+36114967309 SUCCESS
+35 / 35 Test Files PASS
+157 / 157 Tests PASS
+Build GREEN
+Worker 6f453efb-d0ff-4e28-961a-7d606cf5f7e7
+Preview:
+https://smt-owner-final-eta-mfk-admin.yeungyi88.workers.dev
+PR #285 CLOSED / NOT MERGED
+
+==================================================
+OWNER FINAL V1｜ORDERS + FULFILLMENT｜GREEN
+==================================================
+
+Candidate at validation:
+8cb769e2f343afab142fecef5fcfc1050cef487d
+
+Orders:
+- three lanes:
+  現場／直接來源
+  自家平台
+  第三方平台
+- 電話／WhatsApp = direct source
+- 磨飯 App / 自家 App = own platform
+- Keeta / Foodpanda = third party
+- filter sequence = source first, payment second
+- cards surface customer name / external identity / pickup code when present
+- Owner FINAL permission semantics:
+  authenticated SMT operator may use Orders functions
+  no Manager-only ORDER_REVIEW / ORDER_CORRECTION gate
+
+Fulfillment:
+- 進行中 UI semantic = 未完成
+- 進行中 → 可取餐
+- 可取餐 → 退回未完成
+- READY reversal clears stale ETA deadline
+- 可取餐 → 已取餐
+- SAME Order identity throughout
+
+Validation:
+36115326786 SUCCESS
+36 / 36 Test Files PASS
+162 / 162 Tests PASS
+Build GREEN
+Worker 40f8d678-658e-473c-abc8-02dc3014c6c2
+Cumulative preview:
+https://smt-owner-final-orders-mfk-admin.yeungyi88.workers.dev
+PR #286 CLOSED / NOT MERGED
+
+Main:
+NOT MERGED
+
+Production:
+UNCHANGED
+
+Status:
+MFK_SMT_OWNER_FINAL_V1_ORDERS_FULFILLMENT_GREEN_OWNER_ACCEPTANCE_PENDING
