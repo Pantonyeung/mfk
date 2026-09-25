@@ -40,7 +40,7 @@ describe('SMT staff auth',()=>{
     expect(hasStaffPermission('ORDER_CORRECTION')).toBe(false);
   });
 
-  it('does not persist staff session and ignores disabled staff',async()=>{
+  it('rejects disabled staff',async()=>{
     const verifier=await createStaffPinVerifier('9999');
     applyAdminConfigEnvelope(createMfkAdminConfigEnvelope({
       storeId:'MF01',revision:2,publishedAt:'2026-09-22T10:01:00.000Z',adminFingerprint:'fnv1a32:test2',
@@ -52,6 +52,23 @@ describe('SMT staff auth',()=>{
     expect(staffAuthRequired()).toBe(false);
     expect((await loginStaff('off','9999')).ok).toBe(false);
     expect(readActiveStaffSession()).toBeNull();
-    expect([...Array(localStorage.length)].map((_,i)=>localStorage.key(i)).filter(Boolean).some(key=>String(key).includes('staff-session'))).toBe(false);
   });
+  it('persists a verified session without persisting the PIN',async()=>{
+    const staffAuth=await projectStaffForRuntime([{
+      id:'staff-persist',name:'店員乙',role:'STAFF',pin:'2468',scope:'STORE',adminLogin:false,active:true,
+      permissions:['ORDER_REVIEW'],
+    }]);
+    applyAdminConfigEnvelope(createMfkAdminConfigEnvelope({
+      storeId:'MF01',revision:3,publishedAt:'2026-09-22T10:02:00.000Z',adminFingerprint:'fnv1a32:test3',
+      snapshot:{catalog:{categories:[],products:[],combos:[],comboPools:[]},staffAuth},
+    }));
+    expect((await loginStaff('staff-persist','2468')).ok).toBe(true);
+    const keys=[...Array(localStorage.length)].map((_,i)=>localStorage.key(i)).filter(Boolean);
+    const key=keys.find(value=>String(value).includes('staff-session'));
+    expect(key).toBeTruthy();
+    const persisted=localStorage.getItem(String(key));
+    expect(persisted).toContain('staff-persist');
+    expect(persisted).not.toContain('2468');
+  });
+
 });
