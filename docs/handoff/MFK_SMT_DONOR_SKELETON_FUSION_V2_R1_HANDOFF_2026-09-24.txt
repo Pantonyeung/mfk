@@ -949,3 +949,99 @@ MFK_SMT_DONOR_SKELETON_FUSION_V2_R1_CART_EDIT_FULL_RAIL_CHECKOUT_V2_GREEN_OWNER_
 
 HARD RULE:
 未經 Owner 驗收，不准 merge main。
+
+
+==================================================
+OWNER FINAL V1 FRONTLINE PREVIEW｜GREEN
+==================================================
+
+Source:
+Owner_對_SMT_端口要求_FINAL_V1.0
++ Owner Addendum A: Checkout first-confirm commit timing.
+
+Validated product candidate:
+a5295009ab4afc3183009818359d2233d841258b
+
+Current main fresh-read:
+e06ce7c8957d6ee6d6c63ee320f32b319095d3f6
+
+Preview scope:
+This is a frontline visual / interaction / checkout-semantics cut.
+It is NOT a claim that all 40 FINAL chapters are complete.
+
+Implemented:
+- high-frequency nav only: 點單 / 訂單 / 堂食 / 售罄／產能
+- More moved to hamburger
+- persistent fine-grained display preferences:
+  category rows/columns
+  product columns/card height
+  images/categories
+  font scale
+  overall density
+- immediate preview + local persistence
+- major ordering modals ~75%
+- cancel Cart second confirm
+- uncombined Cart lines independent
+- explicit combine uses exact configuration identity including options / note / combo / service mode
+- existing Cart item edit = SAME line
+- Fast Lane labels:
+  快速組合 / 必選區 / 紫米套餐區
+- cash quick keys:
+  20 / 50 / 100 / 200 / 500 / exact
+- 03 keypad remains in stable position and greys out when unavailable
+- first 確認付款 = FORMAL COMMIT
+- stable checkout submission id
+- repeated create with same submission id = SAME Order
+- 75% post-commit Completion Review
+- normal initial print guarded as once-per-order attempt
+- CASH drawer follows customer receipt kick-drawer command
+- non-cash/platform = no automatic drawer
+- Completion Review same-order Payment Method Correction
+- correction appends history and changes current effective tender
+- no new Order / Display / initial print / automatic drawer on correction
+- final 完成 = exit/navigation only
+
+Validation:
+GitHub Actions 36110761322 SUCCESS
+Job 107993463217
+34 / 34 Test Files PASS
+151 / 151 Tests PASS
+Build GREEN
+Worker e35e647d-bd7b-4898-8e7d-78bada214a3c
+Preview:
+https://smt-owner-final-v1-v2-mfk-admin.yeungyi88.workers.dev
+
+Preview PR:
+#283 CLOSED / NOT MERGED
+#282 SUPERSEDED / CLOSED / NOT MERGED
+
+Physical caveat:
+Cloudflare preview does not prove physical LAN printer output or a real cash drawer opening.
+Current print plan sends CASH drawer kick only on the initial customer receipt job.
+Store LAN/native bridge physical acceptance remains separate.
+
+Not yet claimed complete:
+- Customer WhatsApp QR full contract
+- Keeta auto/manual + max-two-later handling
+- ETA/load countdown
+- customer cut-off / immediate stop-new-orders control
+- exact Fast Pair Swap
+- student discount
+- full Orders 3-lane/filter
+- formal order modification/customer confirmation/refund
+- complete dining timeout/printing
+- capacity pools/threshold/override
+- full day-close/cash movements/reporting
+- complete diagnostics/backup physical acceptance
+
+Main:
+NOT MERGED
+
+Production:
+UNCHANGED
+
+Status:
+MFK_SMT_OWNER_FINAL_V1_FRONTLINE_PREVIEW_GREEN_OWNER_ACCEPTANCE_PENDING
+
+HARD RULE:
+未經 Owner 驗收，不准 merge main。
