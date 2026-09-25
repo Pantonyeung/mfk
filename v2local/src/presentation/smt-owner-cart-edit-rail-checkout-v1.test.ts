@@ -36,13 +36,14 @@ describe('SMT owner cart edit / rail / checkout refinement',()=>{
     expect(app).toContain('clean-display-popover');
     expect(app).toContain('分類行數');
     expect(app).toContain('分類每行');
-    expect(app).toContain('商品密度');
+    expect(app).toContain('產品卡高度');
+    expect(app).toContain('整體密度');
     expect(app).toContain("orderingMode==='quick'?'active':''");
     expect(app).toContain('quickDrinkCount');
     expect(ordering).not.toContain('ordering-fast-controls');
     expect(shellCss).toContain('.clean-order-tools');
     expect(ordering).toContain('categoryColumns');
-    expect(ordering).toContain('density-');
+    expect(ordering).toContain("'--mf-density-scale'");
   });
 
   it('keeps keypad visible but disabled for electronic or external channels',()=>{
