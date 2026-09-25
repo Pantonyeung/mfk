@@ -1,0 +1,191 @@
+MFK 航海圖 V1.30｜Round031｜2026-09-25
+主題：CARRIER 1.0.7 OTA PUBLISHED｜SMM PWA LAN/QR PHYSICAL ACCEPTANCE NEXT
+狀態：CURRENT / CONTROLLING｜SOFTWARE RELEASE GREEN / STORE PHYSICAL PENDING
+CONTROL：Pantonyeung/mfk #22
+
+==================================================
+0. CURRENT VERIFIED SOURCE
+==================================================
+MFK product source：
+75759607ba05720f723c77d282327b7f1386f616
+
+Builder verification：
+36084376938 SUCCESS
+
+Verified：
+- SMT Runtime test/build GREEN
+- SMM PWA test/build GREEN
+- Carrier 1.0.7 compile GREEN
+- Carrier lint GREEN
+- Carrier APK assemble GREEN
+- frozen authority guard GREEN
+
+==================================================
+1. LOCKED SMM ARCHITECTURE
+==================================================
+SMM = PWA / Web only.
+NO SMM APK.
+
+Preferred path：
+SMM PWA
+→ LAN HTTP/JSON :17831
+→ SMT
+→ Store Kernel
+→ Formal Order
+
+LAN unavailable：
+→ other allowed network path / QR fallback
+→ must not block staff ordering.
+
+QR：
+QR = Order Intent only.
+QR MUST NOT become Formal Order by itself.
+
+SMT receives intent
+→ revalidate current Menu
+→ revalidate current Pricing
+→ Store Kernel
+→ exactly one Formal Order / Display.
+
+==================================================
+2. CARRIER 1.0.7 OTA PUBLICATION
+==================================================
+Builder release executor added：
+50549d68ad46c07a19efb67446e0667beafe65e4
+
+Publish request：
+a902f7b3e492cc416395000b66a57e1cd9c688e7
+
+Builder publish run：
+36085863280
+SUCCESS
+
+Exact release：
+versionName = 1.0.7
+versionCode = 107
+package = com.morefunos.smt
+
+APK：
+MoreFunOS-SMT-Carrier-1.0.7-75759607ba05.apk
+
+APK SHA-256：
+b521d509f93143e191e9df363b91409e499dc0788776f067e88469611c791046
+
+Signing certificate check：
+GREEN against accepted Carrier signing identity.
+
+Public OTA readback：
+GREEN
+- manifest version = 1.0.7 / 107
+- package = com.morefunos.smt
+- manifest APK hash MATCH
+- public APK download hash MATCH
+
+Evidence artifact：
+Builder artifact 10843946391
+retained 30 days.
+
+MILESTONE：
+MFK_CARRIER_1_0_7_OTA_PUBLISHED_GREEN
+
+==================================================
+3. OTA CONFIGURATION LOCK
+==================================================
+Carrier source default endpoints remain:
+- Runtime OTA manifest
+- Carrier OTA manifest
+
+Recovery supports independent override of:
+- Runtime OTA URL
+- Carrier OTA URL
+
+No new OTA backend/domain was created.
+Existing OTA origin/publisher path was reused.
+
+==================================================
+4. CURRENT FIRST BREAK
+==================================================
+Carrier 1.0.7 is now PUBLISHED.
+
+Still NOT proven:
+- installed on store SMT
+- real store LAN reachability from iPhone Safari
+- iOS Chrome LAN behavior
+- LAN failure non-blocking behavior
+- QR fallback physical workflow
+- duplicate/replay physical safety on QR intent
+
+Therefore current state is:
+SOFTWARE / OTA = GREEN
+PHYSICAL STORE ACCEPTANCE = PENDING
+
+Do not declare CLOSED until Ring 3 proof exists.
+
+==================================================
+5. EXACT PHYSICAL NEXT
+==================================================
+On store SMT:
+
+1. Open Recovery.
+2. Check Carrier OTA.
+3. Fresh offered version MUST be 1.0.7 / 107.
+4. If offered version differs, STOP and classify first break as CARRIER_OTA_MANIFEST_OR_ENDPOINT.
+5. Install/update Carrier.
+6. Confirm installed Carrier = 1.0.7 / 107.
+7. Reopen SMT and confirm normal Runtime boots.
+8. Confirm Runtime OTA URL and Carrier OTA URL are independently readable/editable and unchanged unless intentionally overridden.
+
+Then iPhone on store LAN:
+
+A. Safari
+- Open SMM PWA.
+- Probe/pair SMT LAN host.
+- Confirm LAN path reaches SMT on :17831.
+- Submit one staff order intent.
+- Confirm SMT revalidates current Menu/Pricing.
+- Confirm exactly one canonical Formal Order / Display.
+
+B. iOS Chrome
+- Repeat LAN probe.
+- Record supported / unsupported behavior as physical browser evidence.
+- Chrome result must not change Safari primary-path authority.
+
+C. LAN failure
+- Make LAN endpoint unreachable from iPhone.
+- Confirm SMM remains usable.
+- Confirm no fake success and no lost intent.
+- Confirm fallback remains available.
+
+D. QR fallback
+- Generate QR Order Intent.
+- Scan/receive on SMT.
+- SMT revalidates Menu/Pricing.
+- Confirm exactly one Formal Order / Display.
+- Replay same QR / same intent must not create a second Formal Order.
+
+Capture:
+- Recovery offered version
+- installed Carrier version
+- Safari LAN result
+- Chrome LAN result
+- LAN failure/fallback result
+- QR intent → SMT → Formal Order result
+- duplicate/replay result
+
+==================================================
+6. STOP RULE
+==================================================
+No new product mutation before physical test.
+
+If GREEN:
+BANK
+MFK_CARRIER_1_0_7_SMM_PWA_LAN_QR_PHYSICAL_GREEN
+
+If RED:
+STOP at exact FIRST BREAK.
+Do not redesign the architecture.
+Fix only the smallest proven seam.
+
+==================================================
+END ROUND031
+==================================================
