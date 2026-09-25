@@ -1,6 +1,7 @@
 export const SMT_WEB_ACCEPTANCE_HOSTS=Object.freeze([
   'mfk-smt-web-acceptance.pantonyeung.workers.dev',
   'mfk-smt-web.yeungyi88.workers.dev',
+  'smt.morefunos.com',
 ]);
 
 export function isSmtWebAcceptance(){
