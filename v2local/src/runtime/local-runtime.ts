@@ -4,7 +4,7 @@ import {renderEscPosRasterTicket} from './ticket-bitmap.ts';
 import {buildOrderPrintPlan,groupTscBitmapJobsByPhysicalPrinter,type PrintBinding,type PlannedPrintJob} from './print-routing.ts';
 import {queueOrderProjection} from './projection-outbox.ts';
 import {readActiveStaffSession} from './staff-auth.ts';
-import {readSmtPrintConfig} from './admin-operational-config.ts';
+import {etaMinutesForActiveCount,readSmtPrintConfig} from './admin-operational-config.ts';
 import {mirrorKeetaOrderCommand,type KeetaProviderMirrorResult} from './keeta-provider-commands.ts';
 import {buildDailyClosePrintData,renderDailyCloseTicket} from './daily-close-ticket.ts';
 import {readLocalDayCloses,resolveBusinessWindow} from './local-operations.ts';
@@ -43,6 +43,7 @@ export interface StoredOrder{
   staffId?:string;staffName?:string;cancellationReason?:string;
   customerName?:string;customerPhone?:string;
   keetaDeferCount?:number;keetaLastDeferredAt?:string;
+  etaMinutes?:number;etaReadyAt?:string;
   providerRef?:string;providerMessageId?:string;providerPickupCode?:string;orderRemark?:string;utensilPreference?:'需要'|'不需要';
   providerLastEventId?:number;providerLastEventName?:string;providerLastEventAt?:string;providerLastMessageId?:string;providerLifecycleNote?:string;
   acceptancePrintedAt?:string;
@@ -489,6 +490,10 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
     const n=data.orders.length+1;
     const createdAt=new Date().toISOString();
     const session=readActiveStaffSession();
+    const initialFulfillmentLabel=input.initialFulfillmentLabel??'進行中';
+    const activeCount=data.orders.filter(row=>row.fulfillmentLabel==='進行中').length+1;
+    const etaMinutes=initialFulfillmentLabel==='進行中'?etaMinutesForActiveCount(activeCount):undefined;
+    const etaReadyAt=etaMinutes?new Date(Date.parse(createdAt)+etaMinutes*60_000).toISOString():undefined;
     const order:StoredOrder={
       id:'MFK-'+Date.now().toString(36),
       display:'P'+String(n).padStart(3,'0'),
@@ -496,8 +501,9 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
       updatedAt:createdAt,
       totalMinor:input.totalMinor,
       paymentLabel:input.paymentLabel,
-      fulfillmentLabel:input.initialFulfillmentLabel??'進行中',
+      fulfillmentLabel:initialFulfillmentLabel,
       sourceLabel:input.sourceLabel||'現場',
+      ...(etaMinutes?{etaMinutes,etaReadyAt}:{}),
       ...(submissionId?{checkoutSubmissionId:submissionId}:{}),
       ...(providerRef?{providerRef}:{}),
       ...(input.providerMessageId?{providerMessageId:String(input.providerMessageId)}:{}),
@@ -554,6 +560,7 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
         {id:'time',label:'時間',value:new Date(order.createdAt).toLocaleTimeString('zh-HK')},
         {id:'items',label:'件數',value:String(order.items.reduce((s,x)=>s+x.qty,0))},
         {id:'total',label:'總額',value:money(order.totalMinor)},
+        ...(order.etaReadyAt?[{id:'eta',label:'預計取餐',value:new Date(order.etaReadyAt).toLocaleTimeString('zh-HK',{hour:'2-digit',minute:'2-digit'}),detail:(order.etaMinutes??0)+' 分鐘'}]:[]),
         ...(order.providerLastEventId?[{id:'provider-event',label:'Keeta Event',value:String(order.providerLastEventId),detail:order.providerLastEventName}]:[])
       ],
       lines:order.items.map(item=>({
@@ -597,7 +604,10 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
     if(found.paymentEvidenceRef&&found.paymentVerificationState!=='VERIFIED')throw new Error('PAYMENT_EVIDENCE_NOT_VERIFIED');
     const updatedAt=new Date().toISOString();
     if(found.fulfillmentLabel==='待處理'){
-      data={...data,orders:data.orders.map(x=>x.id===orderId?{...x,fulfillmentLabel:'進行中',updatedAt}:x)};
+      const activeCount=data.orders.filter(row=>row.id!==orderId&&row.fulfillmentLabel==='進行中').length+1;
+      const etaMinutes=etaMinutesForActiveCount(activeCount);
+      const etaReadyAt=new Date(Date.parse(updatedAt)+etaMinutes*60_000).toISOString();
+      data={...data,orders:data.orders.map(x=>x.id===orderId?{...x,fulfillmentLabel:'進行中',etaMinutes,etaReadyAt,updatedAt}:x)};
       save();
       projectOrder(data.orders.find(x=>x.id===orderId)!);
       appendActionAudit({action:'ACCEPT',orderId});
