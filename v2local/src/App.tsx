@@ -606,6 +606,9 @@ function OrderingPage({
               const draft=localRuntime.createHold({kind:'dining',items:holdItems(),totalMinor:total,partySize,note:note||'直接掛枱'});
               void localRuntime.assignDiningTable?.(draft.id,tableId).then(()=>{
                 setCart([]);setServiceMode('dine-in');setPanel(null);
+              }).catch(error=>{
+                const message=error instanceof Error?error.message:'DINING_TABLE_ASSIGN_FAILED';
+                window.alert('掛枱未完成：'+message+'。訂單已保留喺暫存，請處理後再掛枱。');
               });
             }}
           />
