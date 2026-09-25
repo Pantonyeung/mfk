@@ -12,6 +12,7 @@ import {localRuntime} from './runtime/local-runtime.ts';
 import {createSmmLanIngress} from './runtime/smm-lan-ingress.ts';
 import type {SmmLanOrderRequest} from '../../contracts/smm-lan-v1.ts';
 import {readLocalCashOpenings,readLocalDayCloses} from './runtime/local-operations.ts';
+import {isSmtWebAcceptance} from './runtime/web-acceptance.ts';
 import {
   installProjectionOutboxAutoFlush,
   queueCashOpeningProjection,
@@ -20,13 +21,18 @@ import {
 } from './runtime/projection-outbox.ts';
 import './styles.css';
 
+const webAcceptance=isSmtWebAcceptance();
+
 installSmtAdminAutoSync();
 installStaffSessionInvalidation();
-installProjectionOutboxAutoFlush();
-installKeetaOrderIntake();
-installKeetaOrderLifecycle();
-installKeetaAfterSales();
-installCustomerCloudBridge();
+
+if(!webAcceptance){
+  installProjectionOutboxAutoFlush();
+  installKeetaOrderIntake();
+  installKeetaOrderLifecycle();
+  installKeetaAfterSales();
+  installCustomerCloudBridge();
+}
 
 const smmLanIngress=createSmmLanIngress(localRuntime);
 declare global{interface Window{__MFK_SMM_LAN_HANDLE__?:(deviceId:string,payload:string)=>string}}
@@ -44,16 +50,18 @@ window.__MFK_SMM_LAN_HANDLE__=(deviceId,payload)=>{
   }
 };
 
-for(const order of localRuntime.orders())queueOrderProjection(order);
-for(const opening of readLocalCashOpenings())queueCashOpeningProjection(opening);
-const latestCloseByDate=new Map<string,ReturnType<typeof readLocalDayCloses>[number]>();
-for(const close of readLocalDayCloses()){
-  const current=latestCloseByDate.get(close.businessDate);
-  if(!current||close.version>current.version||close.version===current.version&&close.createdAt>current.createdAt){
-    latestCloseByDate.set(close.businessDate,close);
+if(!webAcceptance){
+  for(const order of localRuntime.orders())queueOrderProjection(order);
+  for(const opening of readLocalCashOpenings())queueCashOpeningProjection(opening);
+  const latestCloseByDate=new Map<string,ReturnType<typeof readLocalDayCloses>[number]>();
+  for(const close of readLocalDayCloses()){
+    const current=latestCloseByDate.get(close.businessDate);
+    if(!current||close.version>current.version||close.version===current.version&&close.createdAt>current.createdAt){
+      latestCloseByDate.set(close.businessDate,close);
+    }
   }
+  for(const close of latestCloseByDate.values())queueDayCloseProjection(close);
 }
-for(const close of latestCloseByDate.values())queueDayCloseProjection(close);
 
 const root=document.getElementById('root');
 if(!root)throw new Error('MFK_ROOT_MISSING');
