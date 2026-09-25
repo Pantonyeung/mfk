@@ -211,6 +211,11 @@ function OrderingPage({
     sourceLabel:order.sourceLabel,
     waitLabel:new Date(order.createdAt).toLocaleTimeString('zh-HK',{hour:'2-digit',minute:'2-digit'}),
     itemCount:order.items.reduce((sum,item)=>sum+item.qty,0),
+    attentionLabel:order.paymentEvidenceRef&&order.paymentVerificationState!=='VERIFIED'
+      ?'待核對付款'
+      :/^Keeta\b/i.test(String(order.sourceLabel||''))&&(order.keetaDeferCount??0)>0
+        ?'稍後 '+String(order.keetaDeferCount)+'/2'
+        :undefined,
   });
   const isKeetaOrder=(order:(typeof runtimeOrders)[number])=>/^Keeta\b/i.test(String(order.sourceLabel||''));
   const pendingOrders=runtimeOrders
@@ -218,6 +223,12 @@ function OrderingPage({
     .slice(0,6).map(queueItem);
   const activeOrders=runtimeOrders
     .filter(order=>isKeetaOrder(order)&&!['已完成','已取消'].includes(order.fulfillmentLabel))
+    .slice()
+    .sort((a,b)=>{
+      const ap=a.fulfillmentLabel==='待處理'?0:1;
+      const bp=b.fulfillmentLabel==='待處理'?0:1;
+      return ap-bp||Date.parse(b.updatedAt??b.createdAt)-Date.parse(a.updatedAt??a.createdAt);
+    })
     .slice(0,8).map(queueItem);
   const total=cart.reduce((sum,line)=>sum+line.unitMinor*line.qty,0);
   const nextDisplay='P'+String(localRuntime.orders().length+1).padStart(3,'0');
@@ -550,6 +561,8 @@ function OrderingPage({
           }
           return '已接受訂單；同一正式訂單進入製作中，打印沿現有正式路徑完成。';
         }}
+        onReviewEvidence={order.paymentEvidenceRef?async decision=>{await localRuntime.reviewPaymentEvidence?.(order.id,decision);}:undefined}
+        onDeferKeeta={/^Keeta\b/i.test(String(order.sourceLabel||''))?async()=>{await localRuntime.deferKeetaOrder(order.id);}:undefined}
         onOpenOrders={()=>{setPanel(null);navigate('/orders?orderId='+encodeURIComponent(order.id));}}
       />:null})()
     :panel?.type==='quick-drink-config'
@@ -866,6 +879,7 @@ function CheckoutPage({cart,setCart,diningCheckout,onDiningCheckoutDone}:{cart:C
         paymentLabel,
         sourceLabel,
         submissionId:checkoutSubmissionIdRef.current,
+        ...(channel==='whatsapp'&&customerPhone.trim()?{customerPhone:customerPhone.trim()}:{}),
         ...(pickupCode.trim()?{providerPickupCode:pickupCode.trim()}:{}),
       });
       const cashCommit=settlementMode==='LOCAL_PAYMENT'&&method==='CASH';
