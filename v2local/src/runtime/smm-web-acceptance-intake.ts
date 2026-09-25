@@ -11,17 +11,28 @@ async function getPending(){
   return Array.isArray(body.orders)?body.orders:[];
 }
 
+function wait(ms:number){return new Promise(resolve=>window.setTimeout(resolve,ms));}
+
 async function ack(request:SmmLanOrderRequest,result:SmmLanOrderResponse){
-  const response=await fetch('/__mfk/smm-acceptance/ack',{
-    method:'POST',
-    headers:{'content-type':'application/json'},
-    body:JSON.stringify({
-      submissionId:request.submissionId,
-      idempotencyKey:request.idempotencyKey,
-      result,
-    }),
-  });
-  if(!response.ok)throw new Error('SMM_WEB_ACCEPTANCE_ACK_HTTP_'+response.status);
+  let lastStatus=0;
+  for(let attempt=0;attempt<3;attempt++){
+    try{
+      const response=await fetch('/__mfk/smm-acceptance/ack',{
+        method:'POST',
+        headers:{'content-type':'application/json'},
+        body:JSON.stringify({
+          submissionId:request.submissionId,
+          idempotencyKey:request.idempotencyKey,
+          result,
+        }),
+      });
+      lastStatus=response.status;
+      if(response.ok)return;
+      if(response.status>=400&&response.status<500&&response.status!==408&&response.status!==429)break;
+    }catch{/* transient public-network failure: retry same ACK identity only */}
+    if(attempt<2)await wait(250);
+  }
+  throw new Error('SMM_WEB_ACCEPTANCE_ACK_HTTP_'+lastStatus);
 }
 
 let installed=false;
