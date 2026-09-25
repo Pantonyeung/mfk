@@ -1,4 +1,4 @@
-import {useEffect,useMemo,useState} from 'react';
+import {useEffect,useMemo,useRef,useState} from 'react';
 import {readSmmLocalWorkspace,writeSmmLocalWorkspace,createSmmPendingIntent,type SmmLocalPreferences} from './persistence';
 import {resolveSmmRuntimePort} from './runtime';
 import {pairSmmLan,probeSmmLan,readSmmLanPwaConfig,saveSmmLanPwaConfig} from './pwa-lan';
@@ -43,6 +43,7 @@ export function App(){
   const [selectedVariationId,setSelectedVariationId]=useState<string|null>(null);
   const [cartOpen,setCartOpen]=useState(false);
   const [submitting,setSubmitting]=useState(false);
+  const submitLockRef=useRef(false);
   const [search,setSearch]=useState('');
   const [orderSearch,setOrderSearch]=useState('');
   const [orderSegment,setOrderSegment]=useState<OrderSegment>('active');
@@ -297,17 +298,20 @@ export function App(){
     void refresh();
   };
 
+  const releaseSubmitLock=()=>{submitLockRef.current=false;releaseSubmitLock();};
+
   const submitCart=async()=>{
-    if(submitting||cart.length===0)return;
+    if(submitLockRef.current||cart.length===0)return;
+    submitLockRef.current=true;
     setSubmitting(true);
     if(!menu||publishedTotalMinor===null){
       setNotice('餐單價格／版本未完整，請先重新同步。');
-      setSubmitting(false);
+      releaseSubmitLock();
       return;
     }
     if(snapshot?.connectionPath!=='LAN'&&!staffSession){
       setNotice('Internet 員工落單需要先喺「更多 → 員工帳戶」登入一次；之後呢部手機會保持同一個員工帳戶。');
-      setSubmitting(false);
+      releaseSubmitLock();
       return;
     }
     const existing=pendingIntents.find(item=>
@@ -322,19 +326,19 @@ export function App(){
     if(existing&&existing.state!=='DRAFT'){
       if(!port?.readSubmission){
         setNotice('原提交結果未明；未重新送出，避免重複訂單。');
-        setSubmitting(false);
+        releaseSubmitLock();
         return;
       }
       const prior=await port.readSubmission(existing.submissionId);
       if(prior.state==='CONFIRMED'){
         resolveConfirmedIntent(existing,prior.message||'門店已確認訂單');
-        setSubmitting(false);
+        releaseSubmitLock();
         return;
       }
       if(prior.state!=='REJECTED'){
         saveIntent(Object.freeze({...existing,state:prior.state==='UNKNOWN'?'UNKNOWN':'NOT_CONNECTED',updatedAt:nowIso(),lastMessage:prior.message}));
         setNotice('原提交結果仍未確認；未重新送出，避免重複訂單。');
-        setSubmitting(false);
+        releaseSubmitLock();
         return;
       }
       removeIntent(existing.submissionId);
@@ -359,7 +363,7 @@ export function App(){
       const next={...base,state:'NOT_CONNECTED' as const,updatedAt:nowIso(),lastMessage:'門店提交服務尚未連接；草稿已保存。'};
       saveIntent(Object.freeze(next));
       setNotice('已保存本機待提交草稿；未建立正式訂單。');
-      setSubmitting(false);
+      releaseSubmitLock();
       return;
     }
     const pending=Object.freeze({...base,state:'PENDING' as const,updatedAt:nowIso(),lastMessage:'已送到 Internet 訂單橋，等待 SMT 接收'});
@@ -370,7 +374,7 @@ export function App(){
       const result=await port.submitOrder(pending);
       if(result.state==='CONFIRMED'){
         resolveConfirmedIntent(pending,result.message||'門店已確認訂單');
-        setSubmitting(false);
+        releaseSubmitLock();
         return;
       }
       if(result.state==='REJECTED'){
@@ -381,17 +385,17 @@ export function App(){
         }else{
           setNotice(result.message);
         }
-        setSubmitting(false);
+        releaseSubmitLock();
         return;
       }
       const state=result.state==='UNKNOWN'?'UNKNOWN':'NOT_CONNECTED';
       saveIntent(Object.freeze({...pending,state,updatedAt:nowIso(),lastMessage:result.message}));
       setNotice(result.state==='UNKNOWN'?'結果未明；系統保留同一提交身份，唔會自動重送。':result.message);
-      setSubmitting(false);
+      releaseSubmitLock();
     }catch{
       saveIntent(Object.freeze({...pending,state:'UNKNOWN',updatedAt:nowIso(),lastMessage:'提交結果未明'}));
       setNotice('提交結果未明；已保留同一提交身份，請先重新確認。');
-      setSubmitting(false);
+      releaseSubmitLock();
     }
   };
 
