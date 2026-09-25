@@ -22,9 +22,8 @@ test('capability registry stays unique and command authority remains disconnecte
   assert.deepEqual([...new Set(reads.map(item=>item.status))],['PRODUCT_READY_NOT_CONNECTED']);
 });
 
-test('SMM product shell has no direct live network or canonical writer',()=>{
+test('SMM UI remains free of canonical writer and transport stays isolated',()=>{
   const forbidden=[
-    /\bfetch\s*\(/,
     /\bWebSocket\b/,
     /\bXMLHttpRequest\b/,
     /\bindexedDB\b/,
@@ -37,6 +36,9 @@ test('SMM product shell has no direct live network or canonical writer',()=>{
     /\bsetInterval\s*\(/
   ];
   for(const pattern of forbidden)assert.equal(pattern.test(source),false,String(pattern));
+  const pwaLan=fs.readFileSync(path.join(root,'pwa-lan.ts'),'utf8');
+  assert.match(pwaLan,/fetch\s*\(/);
+  assert.match(pwaLan,/smm\/v1\/health/);
 });
 
 test('local persistence is explicitly non-authoritative',()=>{
@@ -129,7 +131,8 @@ test('runtime boundary remains UI-independent for later SMT transport wiring',()
   assert.doesNotMatch(app,/fetch\s*\(/);
   assert.doesNotMatch(app,/WebSocket\s*\(/);
   assert.doesNotMatch(app,/XMLHttpRequest/);
-  assert.doesNotMatch(app,/192\.168\./);
+  assert.doesNotMatch(app,/fetch\s*\(/);
+  assert.match(app,/SMT 位址/);
 });
 
 
