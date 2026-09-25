@@ -1,0 +1,7 @@
+MFK_CUSTOMER_DEPLOY_REQUEST
+target=mfk-customer
+canonical_url=https://order.morefunos.com
+product_source=2367eb53d4b6282a9e147f530b1caeaf77ae6654
+requested_by=owner
+reason=publish_admin_managed_dynamic_payment_methods_and_qr_assets
+work_id=MFK-ADMIN-PAYMENT-CHANNEL-ASSET-MANAGEMENT-R1
