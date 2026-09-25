@@ -280,3 +280,19 @@ test('persisted cart reprices from the current published menu before resubmit',(
   assert.match(app,/SMT 發現餐單版本／價格已更新/);
   assert.match(app,/removeIntent\(pending\.submissionId\)/);
 });
+
+
+test('SMM Internet orders reuse the proven Customer cloud-to-SMT bridge',()=>{
+  const cloud=fs.readFileSync(path.join(root,'pwa-cloud.ts'),'utf8');
+  const admin=fs.readFileSync(path.join(repoRoot,'v2admin','worker.ts'),'utf8');
+  const customerRuntime=fs.readFileSync(path.join(repoRoot,'v2admin','customer-runtime.ts'),'utf8');
+  const intake=fs.readFileSync(path.join(repoRoot,'v2local','src','runtime','customer-cloud-intake.ts'),'utf8');
+  assert.match(cloud,/admin\.morefunos\.com/);
+  assert.match(cloud,/\/api\/customer\/staff-orders\/submit/);
+  assert.match(cloud,/\/api\/customer\/staff-orders\/readback/);
+  assert.doesNotMatch(cloud,/\/api\/smm\/orders\/submit/);
+  assert.match(admin,/CUSTOMER_ORDER_AVAILABLE/);
+  assert.match(customerRuntime,/bridgeKind:'SMM_STAFF'/);
+  assert.match(intake,/bridgeKind==='SMM_STAFF'/);
+  assert.match(intake,/smmIngress\.submit/);
+});
