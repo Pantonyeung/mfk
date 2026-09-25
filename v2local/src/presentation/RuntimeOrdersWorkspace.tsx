@@ -13,9 +13,9 @@ type PaymentFilter='全部'|'現金'|'Alipay'|'WeChat Pay'|'FPS / PayMe';
 type Modal='actions'|'edit'|'cancel'|'reprint'|null;
 
 function sourceLane(source?:string){
-  const value=String(source||'');
-  if(value.startsWith('現場'))return 'walkin';
-  if(value.startsWith('磨飯 App')||value.startsWith('電話')||value.startsWith('WhatsApp'))return 'app';
+  const value=String(source||'').trim();
+  if(value.startsWith('現場')||value.startsWith('SMM')||value.startsWith('電話')||value.startsWith('WhatsApp'))return 'walkin';
+  if(value.startsWith('自家 App')||value.startsWith('磨飯 App')||value.startsWith('Customer'))return 'app';
   return 'platform';
 }
 function paymentMatches(label:string,filter:PaymentFilter){
@@ -134,8 +134,8 @@ export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePor
 
   const lanes=useMemo(()=>[
     {id:'walkin',label:'現場訂單',orders:filtered.filter(order=>sourceLane(order.sourceLabel)==='walkin')},
-    {id:'app',label:'磨飯 App／電話',orders:filtered.filter(order=>sourceLane(order.sourceLabel)==='app')},
-    {id:'platform',label:'平台訂單',orders:filtered.filter(order=>sourceLane(order.sourceLabel)==='platform')},
+    {id:'app',label:'自家平台',orders:filtered.filter(order=>sourceLane(order.sourceLabel)==='app')},
+    {id:'platform',label:'第三方平台',orders:filtered.filter(order=>sourceLane(order.sourceLabel)==='platform')},
   ] as const,[filtered]);
 
   const pendingKeetaOrders=useMemo(()=>allItems.filter(order=>String(order.sourceLabel||'').startsWith('Keeta')&&order.fulfillmentLabel==='待處理'),[allItems]);
