@@ -135,6 +135,24 @@ function customerPublicSnapshot(active,customerOrders=[]){
     .sort((a,b)=>a.position-b.position||a.productId.localeCompare(b.productId))
     .map(({position,...item})=>item);
   const settings=row(snapshot.storeSettings);
+  const defaultPaymentChannels=[
+    {id:'ALIPAY',name:'AlipayHK',enabled:true,qrImageUrl:'',sortOrder:1},
+    {id:'WECHAT',name:'WeChat Pay HK',enabled:true,qrImageUrl:'',sortOrder:2},
+    {id:'FPS',name:'轉數快',enabled:true,qrImageUrl:'',sortOrder:3},
+    {id:'PAYME',name:'PayMe',enabled:true,qrImageUrl:'',sortOrder:4},
+  ];
+  const configuredPaymentChannels=rows(settings.customerPaymentChannels);
+  const paymentChannels=(configuredPaymentChannels.length?configuredPaymentChannels:defaultPaymentChannels)
+    .map((raw,index)=>{const item=row(raw);const channelId=String(item.id||'');const url=String(item.qrImageUrl||'').trim();return{
+      channelId,
+      label:String(item.name||channelId),
+      enabled:item.enabled!==false,
+      sortOrder:Number(item.sortOrder??index+1),
+      qrImageUrl:(url.startsWith('https://')||url.startsWith('/'))?url:'',
+    };})
+    .filter(item=>['ALIPAY','WECHAT','FPS','PAYME'].includes(item.channelId)&&item.enabled)
+    .sort((a,b)=>a.sortOrder-b.sortOrder)
+    .map(({enabled,sortOrder,qrImageUrl,...item})=>({...item,...(qrImageUrl?{qrImageUrl}:{})}));
   const customerPresentation=row(row(snapshot.presentation).customer);
   const customerChannel=row(snapshot.customerChannelPolicy);
   const channelAvailable=customerChannel.enabled===true;
@@ -173,6 +191,7 @@ function customerPublicSnapshot(active,customerOrders=[]){
       categories:categories.map(item=>({categoryId:item.id,name:item.name,sortOrder:item.position})),
       products,
     },
+    paymentChannels,
     activeOrders:projectedOrders.filter(order=>order.stage!=='COMPLETED'),
     history:projectedOrders.filter(order=>order.stage==='COMPLETED').map(order=>({
       orderId:order.orderId,
