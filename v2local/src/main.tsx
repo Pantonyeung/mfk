@@ -34,9 +34,10 @@ window.__MFK_SMM_LAN_HANDLE__=(deviceId,payload)=>{
   try{
     const request=JSON.parse(payload) as SmmLanOrderRequest;
     if(request.type==='smm.lan.order.submit.v1')return JSON.stringify(smmLanIngress.submit(request,{deviceId,trusted:true}));
-    if((request as {type?:string}).type==='smm.lan.order.readback.v1'){
-      return JSON.stringify(smmLanIngress.readSubmission((request as unknown as {submissionId:string}).submissionId));
-    }
+    const type=(request as {type?:string}).type;
+    if(type==='smm.lan.order.readback.v1')return JSON.stringify(smmLanIngress.readSubmission((request as unknown as {submissionId:string}).submissionId));
+    if(type==='smm.lan.snapshot.v1')return JSON.stringify(smmLanIngress.readSnapshot());
+    if(type==='smm.lan.quote.v1')return JSON.stringify(smmLanIngress.quoteCart((request as unknown as {cart:any[]}).cart));
     return JSON.stringify({protocolVersion:1,type:'smm.lan.order.result.v1',disposition:'REJECTED',reasonCode:'SMM_LAN_OPERATION_UNSUPPORTED'});
   }catch{
     return JSON.stringify({protocolVersion:1,type:'smm.lan.order.result.v1',disposition:'REJECTED',reasonCode:'SMM_LAN_PAYLOAD_INVALID'});
