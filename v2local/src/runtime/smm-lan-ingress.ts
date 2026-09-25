@@ -84,6 +84,7 @@ export function createSmmLanIngress(runtime:MfkLocalRuntime){
         channels:Object.freeze([]),
         dineSessions:Object.freeze(runtime.holds().filter(hold=>hold.kind==='dining').map(hold=>{
           const payments=hold.payments??[];
+          const tableNameById=new Map(readSmtStoreSettings().diningTables.map(table=>[table.id,table.name]));
           const lines=hold.items.map((item,lineIndex)=>{
             const paidQty=payments.reduce((sum,payment)=>sum+payment.selections.filter(selection=>selection.lineIndex===lineIndex).reduce((inner,selection)=>inner+selection.qty,0),0);
             return Object.freeze({lineIndex,name:item.name,qty:item.qty,paidQty,remainingQty:Math.max(0,item.qty-paidQty),unitMinor:item.unitMinor});
@@ -91,7 +92,7 @@ export function createSmmLanIngress(runtime:MfkLocalRuntime){
           const paidMinor=payments.reduce((sum,payment)=>sum+payment.amountMinor,0);
           return Object.freeze({
             sessionId:hold.id,
-            tableLabel:hold.assignedTable?Number(hold.assignedTable.slice(1))+' 號枱':'輪候 '+hold.codeLabel,
+            tableLabel:hold.assignedTable?(tableNameById.get(hold.assignedTable)||hold.assignedTable):'輪候 '+hold.codeLabel,
             covers:hold.partySize,
             state:hold.assignedTable?'OCCUPIED':'WAITING',
             openedAt:hold.createdAt,
