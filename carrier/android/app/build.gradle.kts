@@ -10,6 +10,12 @@ val runtimeUpdateManifestUrl = providers.gradleProperty("morefunRuntimeUpdateMan
     .replace("\\", "\\\\")
     .replace("\"", "\\\"")
 
+val carrierUpdateManifestUrl = providers.gradleProperty("morefunCarrierUpdateManifestUrl")
+    .orElse("https://morefunos-v2-smt-ota.pantonyeung.workers.dev/carrier-update.json")
+    .get()
+    .replace("\\", "\\\\")
+    .replace("\"", "\\\"")
+
 val lanPrinterEndpointsJson = providers.gradleProperty("morefunLanPrinterEndpoints")
     .orElse("[]")
     .get()
@@ -24,9 +30,10 @@ android {
         applicationId = "com.morefunos.smt"
         minSdk = 24
         targetSdk = 30
-        versionCode = 106
-        versionName = "1.0.6"
+        versionCode = 107
+        versionName = "1.0.7"
         buildConfigField("String", "RUNTIME_UPDATE_MANIFEST_URL", "\"$runtimeUpdateManifestUrl\"")
+        buildConfigField("String", "CARRIER_UPDATE_MANIFEST_URL", "\"$carrierUpdateManifestUrl\"")
         buildConfigField("String", "LAN_PRINTER_ENDPOINTS_JSON", "\"$lanPrinterEndpointsJson\"")
         javaCompileOptions {
             annotationProcessorOptions {
@@ -44,7 +51,7 @@ android {
     }
 
     buildFeatures { buildConfig = true }
-    sourceSets["main"].assets.srcDir(file("../../smt-clean/dist"))
+    sourceSets["main"].assets.srcDir(file("../../../v2local/dist"))
 
     testOptions {
         unitTests {
