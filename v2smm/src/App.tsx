@@ -2,7 +2,7 @@ import {useEffect,useMemo,useState} from 'react';
 import {readSmmLocalWorkspace,writeSmmLocalWorkspace,createSmmPendingIntent,type SmmLocalPreferences} from './persistence';
 import {resolveSmmRuntimePort} from './runtime';
 import {pairSmmLan,probeSmmLan,readSmmLanPwaConfig,saveSmmLanPwaConfig} from './pwa-lan';
-import {clearSmmStaffSession,listSmmStaff,readSmmStaffSession,verifySmmStaff,type SmmStaffDirectoryItem,type SmmStaffSession} from './pwa-staff';
+import {clearSmmStaffSession,listSmmStaff,readSmmStaffSession,refreshSmmStaffSession,verifySmmStaff,type SmmStaffDirectoryItem,type SmmStaffSession} from './pwa-staff';
 import {selectedSmmCartOptions,toggleSmmSelection,validateSmmSelections,type SmmSelectionState} from './selection';
 import type {
   SmmCartLine,
@@ -109,6 +109,12 @@ export function App(){
       document.removeEventListener('visibilitychange',onVisibility);
       window.clearInterval(timer);
     };
+  },[]);
+
+  useEffect(()=>{
+    let cancelled=false;
+    void refreshSmmStaffSession().then(session=>{if(!cancelled)setStaffSession(session);});
+    return()=>{cancelled=true};
   },[]);
 
   const menu=snapshot?.menu;
@@ -238,7 +244,7 @@ export function App(){
       return;
     }
     if(snapshot?.connectionPath!=='LAN'&&!staffSession){
-      setNotice('Internet 員工落單需要先喺「更多 → 員工登入」完成登入。');
+      setNotice('Internet 員工落單需要先喺「更多 → 員工帳戶」登入一次；之後呢部手機會保持同一個員工帳戶。');
       return;
     }
     const existing=pendingIntents.find(item=>
@@ -505,7 +511,7 @@ function MoreView({connection,tool,setTool,snapshot,staffSession,onStaffSession,
   return <section className="page">
     <header className="hero"><div><span>更多</span><h1>店務工具</h1><small>只顯示已知資料；未連接嘅功能會保持未連接。</small></div></header>
     <div className="tool-grid">
-      <Tool title="員工登入" detail="Internet 員工操作身份" state={staffSession?.displayName??'未登入'} onClick={()=>setTool('staff')}/>
+      <Tool title="員工帳戶" detail="同 SMT 共用同一員工身份" state={staffSession?.displayName??'未登入'} onClick={()=>setTool('staff')}/>
       <Tool title="連線設定" detail="Internet / LAN 配對" state={snapshot?.connectionPath==='LAN'?'LAN':snapshot?.connectionPath==='INTERNET'?'Internet':'未連接'} onClick={()=>setTool('connection')}/>
       <Tool title="待提交草稿" detail={`${pendingIntents.length} 個本機草稿`} state={pendingIntents.length?'需處理':'正常'} onClick={()=>setTool('pending')}/>
       <Tool title="平台狀態" detail="平台連線同資料新鮮度" state={snapshot?.channels?.length?String(snapshot.channels.length):'未連接'} onClick={()=>setTool('channels')}/>
@@ -537,7 +543,7 @@ function StaffLogin({session,onSession}:{session:SmmStaffSession|null;onSession:
   const [staff,setStaff]=useState<readonly SmmStaffDirectoryItem[]>([]);
   const [staffId,setStaffId]=useState(session?.staffId??'');
   const [pin,setPin]=useState('');
-  const [state,setState]=useState(session?'已登入：'+session.displayName:'請選擇員工並輸入 PIN。');
+  const [state,setState]=useState(session?'已登入：'+session.displayName:'使用同 SMT 一樣嘅員工帳戶同 PIN；首次喺呢部手機登入後會保持登入。');
   const [busy,setBusy]=useState(false);
 
   useEffect(()=>{
@@ -550,10 +556,10 @@ function StaffLogin({session,onSession}:{session:SmmStaffSession|null;onSession:
     return()=>{cancelled=true};
   },[]);
 
-  if(session)return <section className="panel staff-login"><h2>{session.displayName}</h2><p>{session.role} · Internet 員工操作已授權。LAN 配對仍然係獨立可選通道。</p><button className="danger" onClick={()=>{clearSmmStaffSession();onSession(null);setState('已登出。');}}>登出</button></section>;
+  if(session)return <section className="panel staff-login"><h2>{session.displayName}</h2><p>{session.role} · 呢部手機已使用同 SMT 共用嘅員工帳戶。離開收銀機去其他位置工作都會保持呢個帳戶；停用員工時會失效。</p><button className="danger" onClick={()=>{clearSmmStaffSession();onSession(null);setState('已登出。');}}>登出／切換帳戶</button></section>;
 
   return <section className="panel staff-login"><p>{state}</p>
-    <label>員工<select value={staffId} onChange={e=>setStaffId(e.target.value)}>{staff.map(item=><option key={item.staffId} value={item.staffId}>{item.displayName} · {item.role}</option>)}</select></label>
+    <label>員工帳戶<select value={staffId} onChange={e=>setStaffId(e.target.value)}><option value="" disabled>{staff.length?'請選擇帳戶':'未有可用帳戶'}</option>{staff.map(item=><option key={item.staffId} value={item.staffId}>{item.displayName} · {item.role}</option>)}</select></label>
     <label>PIN<input type="password" inputMode="numeric" value={pin} onChange={e=>setPin(e.target.value.replace(/\D/g,'').slice(0,8))} placeholder="4–8 位數字"/></label>
     <button className="primary" disabled={busy||!staffId||pin.length<4} onClick={async()=>{
       if(busy)return;
@@ -690,4 +696,4 @@ function NavButton({active,label,glyph,badge,onClick}:{active:boolean;label:stri
 
 function labelWorkState(state:string){return state==='NORMAL'?'正常':state==='DELAYED'?'延誤':state==='ACTION_REQUIRED'?'需處理':'未知'}
 function connectionLabelShort(state:SmmConnectionState){return state==='READY'?'已連接':state==='LOADING'?'同步中':state==='ERROR'?'錯誤':state==='STALE'?'資料稍舊':state==='PARTIAL'?'部分資料':state==='UNKNOWN'?'未知':'未連接'}
-function moreTitle(tool:string){return tool==='staff'?'員工登入':tool==='connection'?'連線設定':tool==='pending'?'待提交草稿':tool==='channels'?'平台狀態':tool==='business'?'營業日':tool==='capacity'?'產能':tool==='reporting'?'營運報表':tool==='refunds'?'退款要求':tool==='printing'?'列印狀態':tool==='sellability'?'商品供應':'診斷'}
+function moreTitle(tool:string){return tool==='staff'?'員工帳戶':tool==='connection'?'連線設定':tool==='pending'?'待提交草稿':tool==='channels'?'平台狀態':tool==='business'?'營業日':tool==='capacity'?'產能':tool==='reporting'?'營運報表':tool==='refunds'?'退款要求':tool==='printing'?'列印狀態':tool==='sellability'?'商品供應':'診斷'}
