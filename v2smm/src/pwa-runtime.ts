@@ -2,7 +2,36 @@ import type {SmmRuntimePort,SmmCartLine,SmmReadModelSnapshot,SmmQuoteSnapshot,Sm
 import {createSmmLanOrderAdapter} from './smt-lan-adapter';
 import {createPwaLanTransport,readSmmLanPwaConfig} from './pwa-lan';
 
-async function request(payload:object){
+const CLOUD_SNAPSHOT_URL='https://admin.morefunos.com/api/smm/snapshot?storeId=MF01';
+
+function isRecord(value:unknown):value is Record<string,unknown>{
+  return Boolean(value)&&typeof value==='object'&&!Array.isArray(value);
+}
+function isSnapshot(value:unknown):value is SmmReadModelSnapshot{
+  if(!isRecord(value))return false;
+  if(typeof value.observedAt!=='string')return false;
+  for(const key of ['orders','work','channels','dineSessions','printHealth','refundRequests'] as const){
+    if(!Array.isArray(value[key]))return false;
+  }
+  if(value.menu!==undefined){
+    if(!isRecord(value.menu)||typeof value.menu.revision!=='string'||!Array.isArray(value.menu.categories)||!Array.isArray(value.menu.products))return false;
+  }
+  return true;
+}
+function isQuote(value:unknown):value is SmmQuoteSnapshot{
+  return isRecord(value)&&typeof value.quoteId==='string'&&typeof value.revision==='string'&&
+    typeof value.currency==='string'&&typeof value.totalMinor==='number'&&Array.isArray(value.lines)&&typeof value.observedAt==='string';
+}
+async function withTimeout<T>(work:Promise<T>,timeoutMs=3500):Promise<T>{
+  let timer:number|undefined;
+  try{
+    return await Promise.race([
+      work,
+      new Promise<never>((_,reject)=>{timer=window.setTimeout(()=>reject(new Error('SMM_READ_TIMEOUT')),timeoutMs);}),
+    ]);
+  }finally{if(timer!==undefined)window.clearTimeout(timer);}
+}
+async function lanRequest(payload:object){
   const config=readSmmLanPwaConfig();if(!config)throw new Error('SMM_LAN_NOT_CONFIGURED');
   const response=await fetch('http://'+config.host+':'+config.port+'/smm/v1/request',{
     method:'POST',headers:{'Content-Type':'application/json'},cache:'no-store',
@@ -13,15 +42,47 @@ async function request(payload:object){
   if(json.ok===false)throw new Error(String(json.code||'SMM_LAN_REJECTED'));
   return json;
 }
+async function readCloudSnapshot():Promise<SmmReadModelSnapshot>{
+  const response=await fetch(CLOUD_SNAPSHOT_URL,{method:'GET',cache:'no-store',headers:{Accept:'application/json'}});
+  if(!response.ok)throw new Error('SMM_INTERNET_HTTP_'+response.status);
+  const json=await response.json();
+  if(!isSnapshot(json))throw new Error('SMM_INTERNET_SNAPSHOT_INVALID');
+  return Object.freeze({...json,connectionPath:'INTERNET' as const});
+}
 
-export function createPwaLanRuntimePort():SmmRuntimePort|null{
-  const config=readSmmLanPwaConfig();if(!config)return null;
-  const orders=createSmmLanOrderAdapter(createPwaLanTransport(config));
+export function createPwaRuntimePort():SmmRuntimePort{
+  const config=readSmmLanPwaConfig();
+  const orders=config?createSmmLanOrderAdapter(createPwaLanTransport(config)):null;
   return Object.freeze({
     portId:'MFK_SMM_PORT_V1' as const,
-    async readSnapshot(){return await request({protocolVersion:1,type:'smm.lan.snapshot.v1',storeId:'MF01'}) as unknown as SmmReadModelSnapshot;},
-    async quoteCart(cart:readonly SmmCartLine[]){return await request({protocolVersion:1,type:'smm.lan.quote.v1',storeId:'MF01',cart}) as unknown as SmmQuoteSnapshot;},
-    submitOrder(intent:SmmPendingIntent):Promise<SmmCommandResult>{return orders.submitOrder(intent);},
-    readSubmission(submissionId:string):Promise<SmmCommandResult>{return orders.readSubmission(submissionId);},
+    async readSnapshot(){
+      if(config){
+        try{
+          const raw=await withTimeout(lanRequest({protocolVersion:1,type:'smm.lan.snapshot.v1',storeId:'MF01'}));
+          if(!isSnapshot(raw))throw new Error('SMM_LAN_SNAPSHOT_INVALID');
+          return Object.freeze({...raw,connectionPath:'LAN' as const});
+        }catch{
+          // LAN is optional. A bad/unsupported LAN response must never blank or
+          // block the staff app; fall through to the Internet projection.
+        }
+      }
+      return await readCloudSnapshot();
+    },
+    async quoteCart(cart:readonly SmmCartLine[]){
+      if(!config)throw new Error('SMM_LAN_QUOTE_UNAVAILABLE');
+      const raw=await withTimeout(lanRequest({protocolVersion:1,type:'smm.lan.quote.v1',storeId:'MF01',cart}));
+      if(!isQuote(raw))throw new Error('SMM_LAN_QUOTE_INVALID');
+      return raw;
+    },
+    submitOrder(intent:SmmPendingIntent):Promise<SmmCommandResult>{
+      return orders
+        ?orders.submitOrder(intent)
+        :Promise.resolve(Object.freeze({state:'NOT_CONNECTED' as const,message:'Internet 已連接，但直接提交需要 LAN；可使用 QR 交接。'}));
+    },
+    readSubmission(submissionId:string):Promise<SmmCommandResult>{
+      return orders
+        ?orders.readSubmission(submissionId)
+        :Promise.resolve(Object.freeze({state:'NOT_CONNECTED' as const,message:'Internet 已連接；原提交讀回需要 LAN。'}));
+    },
   });
 }
