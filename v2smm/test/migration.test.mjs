@@ -187,7 +187,8 @@ test('dedicated SMM worker projects published Admin truth and stores only durabl
   assert.match(worker,/SMM_STAFF_UNAUTHORIZED/);
   assert.match(worker,/validateRuntimeStaffAuthSnapshot/);
   assert.match(worker,/snapshot\.staffAuth/);
-  assert.match(worker,/verifyStaffPin/);
+  assert.match(worker,/hmacHex/);
+  assert.doesNotMatch(worker,/verifyStaffPin|deriveBits\s*\(/);
   assert.match(worker,/sessions\/create/);
   assert.match(worker,/sessions\/read/);
   assert.match(worker,/auth-selftest/);
