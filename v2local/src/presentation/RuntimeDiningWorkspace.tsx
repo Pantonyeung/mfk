@@ -59,7 +59,6 @@ export function RuntimeDiningWorkspace({runtime,onCheckout,warningMinutes}:{
   const [now,setNow]=useState(Date.now());
   const [actionBusy,setActionBusy]=useState(false);
   const [checkoutBusy,setCheckoutBusy]=useState(false);
-  const [productionBusy,setProductionBusy]=useState(false);
   const alive=useRef(true);
   const activeHold=useRef<string|null>(null);
   const currentDetail=useRef<LocalDiningHoldDetail|null>(null);
@@ -185,21 +184,6 @@ export function RuntimeDiningWorkspace({runtime,onCheckout,warningMinutes}:{
     if(checkoutLock.current||actionLock.current||!detail)return;
     setSelection(Object.fromEntries(detail.lines.filter(line=>line.remainingQty>0).map(line=>[line.lineIndex,line.remainingQty])));
   };
-  const admitProduction=async()=>{
-    const current=currentDetail.current;
-    if(!current||productionBusy||actionLock.current||checkoutLock.current)return;
-    if(!runtime.admitDiningProduction){setMessage('未有正式落廚接口。');return;}
-    setProductionBusy(true);setMessage('');
-    try{
-      const result=await runtime.admitDiningProduction(current.holdId);
-      if(!alive.current||activeHold.current!==current.holdId)return;
-      applyDetail(result.hold);
-      const print=result.print.planned===0?'未有已綁定製作打印 Route':result.print.failed===0?'製作打印已送出 '+result.print.sent+'/'+result.print.planned:'製作打印部分失敗 '+result.print.sent+'/'+result.print.planned;
-      setMessage('正式單 #'+result.display+' 已建立並落廚；'+print+'。未付款，未開錢箱。');
-    }catch(cause){
-      if(alive.current)setMessage(cause instanceof Error?cause.message:'正式落廚失敗，請核對後重試。');
-    }finally{if(alive.current)setProductionBusy(false);}
-  };
   const goCheckout=async()=>{
     const before=currentDetail.current;
     if(!before||selectedUnits<=0||checkoutLock.current||actionLock.current||!runtime.readDiningHold)return;
@@ -289,11 +273,6 @@ export function RuntimeDiningWorkspace({runtime,onCheckout,warningMinutes}:{
               <button type="button" disabled={checkoutBusy||actionBusy||(selection[line.lineIndex]??0)>=line.remainingQty} onClick={()=>adjustSelection(line.lineIndex,1)}>＋</button>
             </div>
           </article>):<p className="dining-no-items">未有商品；目前只記錄輪候／桌台。</p>}
-        </section>
-        <section className="dining-production-panel">
-          <header><div><b>廚房／製作</b><small>{detail.formalOrderId?'已建立正式 Order':'未落廚'}</small></div><strong>{detail.formalOrderId?'已落廚':'待處理'}</strong></header>
-          <button type="button" className="dining-settle-button" disabled={productionBusy||checkoutBusy||actionBusy||detail.lines.length===0||Boolean(detail.formalOrderId)} onClick={()=>void admitProduction()}>{productionBusy?'建立正式單…':detail.formalOrderId?'已正式落廚':'正式落廚／出製作單'}</button>
-          {detail.formalOrderId?<small>正式 Order 已連結同一堂食單；付款仍沿原 Checkout，唔會因再次撳掣建立第二張單。</small>:<small>會先建立一次正式 Order，再送製作／打包／Label；此步唔代表已付款，亦唔開錢箱。</small>}
         </section>
         <section className="dining-payment-panel checkout-authority">
           <header><div><b>本次結帳</b><small>按商品揀選，不受用餐人數限制</small></div><strong>{money(selectedAmount)}</strong></header>
