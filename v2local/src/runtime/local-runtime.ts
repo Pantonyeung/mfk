@@ -25,8 +25,21 @@ export type SmtAvailabilityStatus='available'|'soldout'|'paused';
 export interface SmtAvailabilityNodeViewModel{readonly nodeId:string;readonly label:string;readonly detail?:string;readonly status:SmtAvailabilityStatus;readonly sourceLabel?:string}
 export interface SmtAvailabilityProjection{readonly revision:number;readonly nodes:readonly SmtAvailabilityNodeViewModel[];readonly canChange:boolean}
 
+export interface PaymentCorrectionRecord{
+  readonly id:string;
+  readonly createdAt:string;
+  readonly from:string;
+  readonly to:string;
+  readonly staffId?:string;
+  readonly staffName?:string;
+}
 export interface StoredOrder{
   id:string;display:string;createdAt:string;updatedAt?:string;totalMinor:number;paymentLabel:string;fulfillmentLabel:'待處理'|'進行中'|'可取餐'|'已完成'|'已取消';sourceLabel:string;
+  checkoutSubmissionId?:string;
+  initialPrintAttemptedAt?:string;
+  initialPrintState?:'DISPATCHING'|'DONE'|'FAILED'|'UNKNOWN';
+  initialPrintSummary?:Readonly<{planned:number;sent:number;failed:number}>;
+  paymentCorrections?:readonly PaymentCorrectionRecord[];
   staffId?:string;staffName?:string;cancellationReason?:string;
   providerRef?:string;providerMessageId?:string;providerPickupCode?:string;orderRemark?:string;utensilPreference?:'需要'|'不需要';
   providerLastEventId?:number;providerLastEventName?:string;providerLastEventAt?:string;providerLastMessageId?:string;providerLifecycleNote?:string;
@@ -196,10 +209,13 @@ export interface MfkLocalRuntime extends CleanSmtCoreRuntimePort{
     paymentEvidenceRef?:string;
     paymentVerificationState?:'PENDING'|'VERIFIED'|'REJECTED';
     initialFulfillmentLabel?:StoredOrder['fulfillmentLabel'];
+    submissionId?:string;
   }):StoredOrder;
   orders():readonly StoredOrder[];
   acceptOrder(orderId:string):Promise<{readonly orderId:string;readonly status:'ACCEPTED';readonly provider:KeetaProviderMirrorResult}>;
   printOrderOutputs(orderId:string):Promise<PrintDispatchSummary>;
+  printInitialOrderOutputsOnce(orderId:string):Promise<PrintDispatchSummary>;
+  correctOrderPayment(orderId:string,paymentLabel:string):Promise<StoredOrder>;
   printDailyClose(businessDate?:string):Promise<{readonly printJobId:string;readonly state:string;readonly businessDate:string}>;
   readOrderReprintOptions(orderId:string):Promise<readonly SmtReprintOption[]>;
   reprintOrderJobs(orderId:string,jobIds:readonly string[],reason?:string):Promise<PrintDispatchSummary>;
@@ -455,6 +471,11 @@ function diningDetail(hold:LocalHoldDraft):LocalDiningHoldDetail{
 export const localRuntime:MfkLocalRuntime=Object.freeze({
   subscribe(listener){listeners.add(listener);return()=>listeners.delete(listener)},
   createOrder(input){
+    const submissionId=String(input.submissionId||'').trim();
+    if(submissionId){
+      const existing=data.orders.find(order=>order.checkoutSubmissionId===submissionId);
+      if(existing)return existing;
+    }
     const providerRef=String(input.providerRef||'').trim();
     if(providerRef){
       const existing=data.orders.find(order=>order.providerRef===providerRef);
@@ -602,6 +623,68 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
     const order=data.orders.find(x=>x.id===orderId);
     if(!order)throw new Error('ORDER_NOT_FOUND');
     return dispatchOrderOutputs(order);
+  },
+  async printInitialOrderOutputsOnce(orderId){
+    let order=data.orders.find(x=>x.id===orderId);
+    if(!order)throw new Error('ORDER_NOT_FOUND');
+    if(order.initialPrintAttemptedAt){
+      const summary=order.initialPrintSummary??{planned:0,sent:0,failed:0};
+      return Object.freeze({orderId,planned:summary.planned,sent:summary.sent,failed:summary.failed,results:Object.freeze([])});
+    }
+    const attemptedAt=new Date().toISOString();
+    data={...data,orders:data.orders.map(x=>x.id===orderId?{...x,initialPrintAttemptedAt:attemptedAt,initialPrintState:'DISPATCHING',updatedAt:attemptedAt}:x)};
+    save();
+    order=data.orders.find(x=>x.id===orderId)!;
+    projectOrder(order);
+    try{
+      const summary=await dispatchOrderOutputs(order);
+      const state=summary.failed>0?'FAILED':'DONE';
+      const updatedAt=new Date().toISOString();
+      data={...data,orders:data.orders.map(x=>x.id===orderId?{
+        ...x,
+        initialPrintState:state,
+        initialPrintSummary:{planned:summary.planned,sent:summary.sent,failed:summary.failed},
+        updatedAt,
+      }:x)};
+      save();
+      projectOrder(data.orders.find(x=>x.id===orderId)!);
+      appendActionAudit({action:'INITIAL_PRINT',orderId,reason:state});
+      return summary;
+    }catch(error){
+      const updatedAt=new Date().toISOString();
+      data={...data,orders:data.orders.map(x=>x.id===orderId?{...x,initialPrintState:'UNKNOWN',updatedAt}:x)};
+      save();
+      projectOrder(data.orders.find(x=>x.id===orderId)!);
+      appendActionAudit({action:'INITIAL_PRINT_UNKNOWN',orderId});
+      throw error;
+    }
+  },
+  async correctOrderPayment(orderId,paymentLabel){
+    const order=data.orders.find(x=>x.id===orderId);
+    if(!order)throw new Error('ORDER_NOT_FOUND');
+    const next=String(paymentLabel||'').trim();
+    if(!next)throw new Error('PAYMENT_METHOD_REQUIRED');
+    if(next===order.paymentLabel)return order;
+    const session=readActiveStaffSession();
+    const createdAt=new Date().toISOString();
+    const correction:PaymentCorrectionRecord=Object.freeze({
+      id:'PC-'+Date.now().toString(36),
+      createdAt,
+      from:order.paymentLabel,
+      to:next,
+      ...(session?{staffId:session.staffId,staffName:session.displayName}:{}),
+    });
+    data={...data,orders:data.orders.map(x=>x.id===orderId?{
+      ...x,
+      paymentLabel:next,
+      paymentCorrections:[...(x.paymentCorrections??[]),correction],
+      updatedAt:createdAt,
+    }:x)};
+    save();
+    const updated=data.orders.find(x=>x.id===orderId)!;
+    projectOrder(updated);
+    appendActionAudit({action:'PAYMENT_CORRECTION',orderId,reason:order.paymentLabel+' -> '+next});
+    return updated;
   },
   async readOrderReprintOptions(orderId){
     const order=data.orders.find(x=>x.id===orderId);
