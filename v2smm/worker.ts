@@ -141,6 +141,17 @@ function mapPublishedSnapshot(raw:unknown){
   const takeaway=projectSyncedOrderingCatalog('takeaway',envelope);
   const dineIn=projectSyncedOrderingCatalog('dine-in',envelope);
   const dineById=new Map(dineIn.products.map(row=>[row.id,row] as const));
+  const storeSettings=record(envelope.snapshot.storeSettings);
+  const rawTables=Array.isArray(storeSettings.diningTables)?storeSettings.diningTables:[];
+  const diningTables=(rawTables.length?rawTables:Array.from({length:9},(_,index)=>({id:'T'+String(index+1).padStart(2,'0'),name:String(index+1)+' 號枱',active:true,sortOrder:index+1})))
+    .flatMap((raw,index)=>{
+      const row=record(raw);
+      const tableId=text(row.id,32);
+      const label=text(row.name,80);
+      if(!tableId||!label||row.active===false)return [];
+      return [{tableId,label,sortOrder:Math.max(1,Math.floor(Number(row.sortOrder)||index+1))}];
+    })
+    .sort((a,b)=>a.sortOrder-b.sortOrder);
   const now=new Date().toISOString();
 
   return{
@@ -186,6 +197,7 @@ function mapPublishedSnapshot(raw:unknown){
     work:[],
     channels:[{channel:'INTERNET',state:'CONNECTED',detail:'Admin published menu/config projection',observedAt:now}],
     dineSessions:[],
+    diningTables,
     printHealth:[],
     refundRequests:[],
     staff:{actorId:'SMM-INTERNET',displayName:'店員模式',roleLabel:'SMM',storeId:envelope.storeId,deviceLabel:'Internet'},
