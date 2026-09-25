@@ -1,4 +1,4 @@
-import {validateRuntimeStaffAuthSnapshot,verifyStaffPin,type RuntimeStaffIdentity} from '../contracts/staff-auth-v1.ts';
+import {createStaffPinVerifier,validateRuntimeStaffAuthSnapshot,verifyStaffPin,type RuntimeStaffIdentity} from '../contracts/staff-auth-v1.ts';
 const ADMIN_ACTIVE='https://admin.morefunos.com/api/admin-sync/active';
 const ADMIN_ACKS='https://admin.morefunos.com/api/admin-sync/acks';
 const SMT_ORIGIN='https://appassets.androidplatform.net';
@@ -393,17 +393,51 @@ export default{
       const body=record(await request.json().catch(()=>({})));
       const staffId=text(body.staffId,120);
       const pin=String(body.pin??'').replace(/\D/g,'');
-      const staff=await verifyStaffCredentials(staffId,pin,storeId);
+      let staff;
+      try{
+        staff=await verifyStaffCredentials(staffId,pin,storeId);
+      }catch(error){
+        return json({
+          code:'SMM_STAFF_VERIFY_RUNTIME_ERROR',
+          message:error instanceof Error?error.message:'員工驗證服務錯誤',
+        },503);
+      }
       if(!staff)return json({code:'SMM_STAFF_UNAUTHORIZED',message:'員工帳戶或 PIN 不正確'},401);
-      const id=env.SMM_INTENT_STORE.idFromName(storeId);
-      const stub=env.SMM_INTENT_STORE.get(id);
-      const response=await stub.fetch(new Request('https://internal/sessions/create',{
-        method:'POST',
-        headers:{'content-type':'application/json'},
-        body:JSON.stringify({staff}),
-      }));
-      const session=record(await response.json());
-      return json({ok:true,...staff,sessionToken:session.sessionToken,expiresAt:session.expiresAt});
+      try{
+        const id=env.SMM_INTENT_STORE.idFromName(storeId);
+        const stub=env.SMM_INTENT_STORE.get(id);
+        const response=await stub.fetch(new Request('https://internal/sessions/create',{
+          method:'POST',
+          headers:{'content-type':'application/json'},
+          body:JSON.stringify({staff}),
+        }));
+        if(!response.ok){
+          const failure=record(await response.json().catch(()=>({})));
+          return json({code:String(failure.code||'SMM_SESSION_CREATE_FAILED'),message:'員工身份正確，但手機工作階段建立失敗'},503);
+        }
+        const session=record(await response.json());
+        if(!text(session.sessionToken,256))return json({code:'SMM_SESSION_TOKEN_MISSING',message:'員工身份正確，但手機工作階段建立失敗'},503);
+        return json({ok:true,...staff,sessionToken:session.sessionToken,expiresAt:session.expiresAt});
+      }catch(error){
+        return json({
+          code:'SMM_SESSION_STORE_UNAVAILABLE',
+          message:error instanceof Error?error.message:'員工身份正確，但手機工作階段暫時不可用',
+        },503);
+      }
+    }
+
+    if(url.pathname==='/api/smm/auth-selftest'){
+      if(request.method!=='GET')return json({code:'METHOD_NOT_ALLOWED'},405);
+      try{
+        const verifier=await createStaffPinVerifier('4826');
+        const ok=await verifyStaffPin('4826',verifier);
+        const reject=await verifyStaffPin('6284',verifier);
+        return ok&&!reject
+          ?json({ok:true,algorithm:verifier.algorithm,iterations:verifier.iterations})
+          :json({ok:false,code:'SMM_STAFF_CRYPTO_SELFTEST_FAILED'},503);
+      }catch(error){
+        return json({ok:false,code:'SMM_STAFF_CRYPTO_SELFTEST_ERROR',message:error instanceof Error?error.message:'unknown'},503);
+      }
     }
 
     if(url.pathname==='/api/smm/staff/session'){
