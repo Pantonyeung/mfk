@@ -35,7 +35,7 @@ function sendNative(request:object):Promise<SmmLanOrderResponse|SmmLanSubmission
 
 const transport:SmmLanTransport={
   async send(request){
-    try{return{kind:'RESPONSE',response:await sendNative(request)};}
+    try{return{kind:'RESPONSE',response:await sendNative(request) as SmmLanOrderResponse};}
     catch{return{kind:'UNKNOWN'};}
   },
   async readSubmission(submissionId){
