@@ -1045,3 +1045,46 @@ MFK_SMT_OWNER_FINAL_V1_FRONTLINE_PREVIEW_GREEN_OWNER_ACCEPTANCE_PENDING
 
 HARD RULE:
 未經 Owner 驗收，不准 merge main。
+
+
+==================================================
+OWNER FINAL V1｜CUSTOMER PAYMENT + KEETA PENDING｜GREEN
+==================================================
+
+Candidate:
+ad1b0a8771386c657f121dbbad5878f07c63e103
+
+Customer:
+- preserve customer name + phone
+- electronic order requires payment-evidence ref
+- screenshot = evidence only
+- evidence zoom
+- manual VERIFIED / REJECTED
+- accept blocked until VERIFIED
+- local WhatsApp QR with templates:
+  日期唔啱 / 時間唔啱 / 金額唔啱 / 截圖唔清 / 要求重傳
+
+Keeta:
+- 即刻處理 / 稍後處理
+- 稍後 != reject/cancel/accept
+- max defer = 2
+- deferred order remains pending + attention
+- existing Admin autoAccept preserved
+- existing formal accept / print / provider mirror reused
+
+Validation:
+GitHub Actions 36114427632 SUCCESS
+Job 108005052780
+34 / 34 Test Files PASS
+153 / 153 Tests PASS
+Build GREEN
+Worker ed4a940d-1d4b-4d78-ba2f-695aa767c27c
+Preview:
+https://smt-owner-final-customer-keeta-mfk-admin.yeungyi88.workers.dev
+
+PR #284 CLOSED / NOT MERGED
+Main NOT MERGED
+Production UNCHANGED
+
+Status:
+MFK_SMT_OWNER_FINAL_V1_CUSTOMER_KEETA_PENDING_GREEN_OWNER_ACCEPTANCE_PENDING
