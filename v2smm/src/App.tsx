@@ -404,6 +404,7 @@ export function App(){
 
   const localDraftCount=pendingIntents.length;
   const connectionLabel=connection==='READY'?(snapshot?.connectionPath==='LAN'?'LAN 已連接':'Internet 已連接'):connection==='LOADING'?'同步中':connection==='ERROR'?'同步失敗':'門店服務未連接';
+  const webSmtAcceptance=typeof window!=='undefined'&&new URLSearchParams(window.location.search).get('target')==='web-smt';
 
   return <main className="app-shell" data-mode={connection==='READY'?'online':'offline'}>
     <header className="topbar">
@@ -413,6 +414,7 @@ export function App(){
     </header>
 
     {notice?<div className="notice" role="status"><span>{notice}</span><button onClick={()=>setNotice(null)}>收起</button></div>:null}
+    {webSmtAcceptance?<section className="recovery-banner"><strong>Web SMT 驗收模式</strong><span>呢個頁面只會將測試訂單送到臨時公網 SMT；唔會送去舖頭實機、唔會觸發實體打印。</span></section>:null}
     {error?<section className="recovery-banner degraded"><strong>門店資料同步失敗</strong><span>{error}</span><button onClick={()=>void refresh()}>再試一次</button></section>:null}
     {connection==='NOT_CONNECTED'?<section className="recovery-banner offline"><strong>尚未連接門店服務</strong><span>本機草稿同操作偏好可以使用；正式餐單、報價、訂單同營運狀態會保持空白，唔會顯示假資料。</span></section>:null}
 
