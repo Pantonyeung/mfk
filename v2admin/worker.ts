@@ -30,6 +30,28 @@ async function sha256(value){
 }
 function storeIdFrom(url){return (url.searchParams.get('storeId')||'MF01').trim().slice(0,64)||'MF01';}
 
+async function resolveSmmStaffSession(request,storeId){
+  const token=String(request.headers.get('x-mfk-smm-session')||'').trim();
+  if(!token)return null;
+  const url=new URL('https://smm.morefunos.com/api/smm/staff/session');
+  url.searchParams.set('storeId',storeId);
+  let response;
+  try{
+    response=await fetch(url.toString(),{
+      method:'GET',
+      headers:{'x-mfk-smm-session':token,'accept':'application/json'},
+    });
+  }catch{return null;}
+  if(!response.ok)return null;
+  const body=await response.json().catch(()=>null);
+  if(!body||typeof body!=='object'||Array.isArray(body))return null;
+  const staffId=String(body.staffId||'').trim();
+  const displayName=String(body.displayName||'').trim();
+  const role=String(body.role||'STAFF').trim();
+  if(!staffId||!displayName)return null;
+  return Object.freeze({staffId,displayName,role});
+}
+
 function row(value){
   return value&&typeof value==='object'&&!Array.isArray(value)?value:{};
 }
@@ -486,6 +508,51 @@ export default {
         const evidenceRef='customer-payment/'+storeId+'/'+evidenceId+'/'+sha256+'.'+ext;
         await env.CUSTOMER_PAYMENT_EVIDENCE.put(evidenceRef,bytes,{httpMetadata:{contentType},customMetadata:{storeId,evidenceId,sha256,kind:'PAYMENT_SCREENSHOT',verificationState:'PENDING'}});
         return json({state:'UPLOADED',evidenceRef,sha256,uploadedAt:new Date().toISOString()},201,cors(request));
+      }
+
+      if(url.pathname==='/api/customer/staff-orders/submit'){
+        if(request.method!=='POST')return json({code:'METHOD_NOT_ALLOWED'},405,cors(request));
+        const staff=await resolveSmmStaffSession(request,storeId);
+        if(!staff)return json({code:'SMM_STAFF_UNAUTHORIZED',message:'SMM 員工工作階段無效'},401,cors(request));
+        const body=await request.arrayBuffer();
+        const response=await customer.fetch(new Request('https://internal/public/staff-orders/submit',{
+          method:'POST',
+          headers:{'content-type':'application/json'},
+          body:JSON.stringify({
+            request:body.byteLength?JSON.parse(new TextDecoder().decode(body)):null,
+            staff,
+          }),
+        }));
+        if(response.status===202){
+          try{
+            const result=await response.clone().json();
+            await admin.fetch(new Request('https://internal/customer-doorbell',{
+              method:'POST',
+              headers:{'content-type':'application/json'},
+              body:JSON.stringify({
+                type:'CUSTOMER_ORDER_AVAILABLE',
+                source:'SMM',
+                submissionId:result.submissionId,
+              }),
+            }));
+          }catch{}
+        }
+        const headers=new Headers(response.headers);
+        for(const [key,value] of Object.entries(cors(request)))headers.set(key,value);
+        return new Response(response.body,{status:response.status,statusText:response.statusText,headers});
+      }
+
+      if(url.pathname==='/api/customer/staff-orders/readback'){
+        if(request.method!=='GET')return json({code:'METHOD_NOT_ALLOWED'},405,cors(request));
+        const staff=await resolveSmmStaffSession(request,storeId);
+        if(!staff)return json({code:'SMM_STAFF_UNAUTHORIZED',message:'SMM 員工工作階段無效'},401,cors(request));
+        const submissionId=String(url.searchParams.get('submissionId')||'').trim();
+        const target=new URL('https://internal/public/staff-orders/readback');
+        target.searchParams.set('submissionId',submissionId);
+        const response=await customer.fetch(new Request(target.toString(),{method:'GET'}));
+        const headers=new Headers(response.headers);
+        for(const [key,value] of Object.entries(cors(request)))headers.set(key,value);
+        return new Response(response.body,{status:response.status,statusText:response.statusText,headers});
       }
 
       if(url.pathname==='/api/customer/smt/diagnostics'&&request.method==='GET'){
