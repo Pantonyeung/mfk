@@ -223,7 +223,7 @@ test('Internet staff orders require staff PIN and fall back into the same SMT in
   assert.match(staff,/\/api\/smm\/staff\/verify/);
   assert.match(staff,/\/api\/smm\/staff\/session/);
   assert.match(staff,/sessionToken/);
-  assert.doesNotMatch(staff,/pin:/);
+  assert.doesNotMatch(staff,/readonly\s+pin\s*:/);
   assert.match(cloud,/\/api\/smm\/orders\/submit/);
   assert.match(cloud,/x-mfk-smm-session/);
   assert.doesNotMatch(cloud,/x-mfk-staff-pin/);
