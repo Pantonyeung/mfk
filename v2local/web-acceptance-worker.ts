@@ -28,6 +28,22 @@ function gateResponse(){
   );
 }
 
+async function smmAcceptanceHealth(env:Env){
+  try{
+    const target='https://smm.morefunos.com/api/smm/acceptance/smt/pending?storeId=MF01';
+    const response=await fetch(target,{
+      method:'GET',
+      headers:{
+        accept:'application/json',
+        'x-mfk-web-acceptance':String(env.WEB_ACCEPTANCE_TOKEN||''),
+      },
+    });
+    return Object.freeze({ok:response.ok,status:response.status});
+  }catch{
+    return Object.freeze({ok:false,status:0});
+  }
+}
+
 async function proxySmmAcceptance(request:Request,url:URL,env:Env){
   const suffix=url.pathname.slice('/__mfk/smm-acceptance'.length)||'/';
   const allowed=
@@ -121,12 +137,14 @@ export default{
     if(!authorized(request,env))return gateResponse();
 
     if(url.pathname==='/__mfk/health'){
+      const smmAcceptance=await smmAcceptanceHealth(env);
       return new Response(JSON.stringify({
         ok:true,
         mode:'WEB_ACCEPTANCE_ONLY',
         productionConsumers:false,
         physicalPrint:false,
         cashDrawer:false,
+        smmAcceptance,
         expiresInHours:72,
       }),{
         headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store'},
