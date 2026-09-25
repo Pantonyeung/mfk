@@ -132,7 +132,7 @@ export function RiceballPoolWorkspace({
 
   return <div className="fast-lane">
     <header className="fast-lane-title">
-      <div><small>FAST PAIR</small><h2>快速組合</h2><p>多個飯團＋多個小食按次序一對一配對；唔做智能推薦，剩餘商品保持單點。</p></div>
+      <div><small>FAST PAIR</small><h2>快速組合</h2><p>多個飯團＋多個小食按次序一對一配對；唔做智能推薦，剩餘商品保持單點。固定 F1–F6／預組產品照常直接落單。</p></div>
       <strong>{mainUnits} 件主餐</strong>
     </header>
     {active.length>1?<nav className="fast-combo-tabs">{active.map(row=><button type="button" key={row.id} className={row.id===combo.id?'active':''} onClick={()=>setSelectedComboId(row.id)}>{row.name}<small>{money(row.basePriceMinor)}</small></button>)}</nav>:null}
