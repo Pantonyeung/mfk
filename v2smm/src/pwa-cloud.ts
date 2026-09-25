@@ -9,8 +9,7 @@ function authHeaders(){
   if(!session)return null;
   return{
     'content-type':'application/json',
-    'x-mfk-staff-id':session.staffId,
-    'x-mfk-staff-pin':session.pin,
+    'x-mfk-smm-session':session.sessionToken,
   };
 }
 
