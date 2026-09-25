@@ -154,7 +154,7 @@ export function validateSmmLanOrderRequest(input:unknown):SmmLanOrderRequest{
         const covers=Math.max(1,Math.min(30,Math.floor(Number(raw.covers)||1)));
         if(kind==='TABLE'){
           const tableId=smmText(raw.tableId,'SMM_DINING_TABLE_REQUIRED',16);
-          if(!/^T0[1-9]$/.test(tableId))throw new Error('SMM_DINING_TABLE_INVALID');
+          if(!/^T\d{2}$/.test(tableId))throw new Error('SMM_DINING_TABLE_INVALID');
           return Object.freeze({kind:'TABLE' as const,tableId,covers});
         }
         return Object.freeze({kind:'WAITING' as const,covers});
