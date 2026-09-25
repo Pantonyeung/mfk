@@ -36,6 +36,12 @@ describe('Customer Cloud Edge authority gate',()=>{
     expect(worker).toContain("'/api/customer/payment-qr'");
   });
 
+  it('canonicalizes Customer electronic payment channel from the current Admin release',()=>{
+    expect(worker).toContain("normalizedCustomerOrderBody");
+    expect(worker).toContain("paymentChannelId:channelId,paymentChannelLabel:currentLabel");
+    expect(worker).toContain("if(channelLabel&&channelLabel!==currentLabel)return json({code:'CUSTOMER_PAYMENT_CHANNEL_CHANGED'}");
+  });
+
   it('routes SMM staff orders into the existing Customer Runtime bridge without a second cloud order queue',()=>{
     const runtime=readFileSync(new URL('../customer-runtime.ts',import.meta.url),'utf8');
     expect(worker).toContain("'/api/customer/staff-orders/submit'");

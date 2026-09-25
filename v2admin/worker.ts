@@ -664,8 +664,13 @@ export default {
         target.pathname='/smt/'+url.pathname.slice('/api/customer/smt/'.length);
         const init={method:request.method,headers:new Headers(request.headers)};
         if(request.method!=='GET'&&request.method!=='HEAD'){
-          const body=await request.arrayBuffer();
-          if(body.byteLength)init.body=body;
+          if(url.pathname==='/api/customer/orders/submit'&&normalizedCustomerOrderBody){
+            init.headers.set('content-type','application/json');
+            init.body=JSON.stringify(normalizedCustomerOrderBody);
+          }else{
+            const body=await request.arrayBuffer();
+            if(body.byteLength)init.body=body;
+          }
         }
         const response=await customer.fetch(new Request(target.toString(),init));
         const headers=new Headers(response.headers);
@@ -680,6 +685,7 @@ export default {
         '/api/customer/orders/readback':'/public/orders/readback',
       };
       const targetPath=publicMap[url.pathname];
+      let normalizedCustomerOrderBody=null;
       if(targetPath&&(url.pathname==='/api/customer/quote'||url.pathname==='/api/customer/orders/submit')){
         const activeResponse=await admin.fetch(new Request('https://internal/active',{method:'GET'}));
         if(!activeResponse.ok)return json({code:'CUSTOMER_CONFIG_NOT_PUBLISHED'},503,cors(request));
@@ -704,7 +710,11 @@ export default {
             const qr=channel?String(channel.qrImageUrl||'').trim():'';
             const currentLabel=channel?String(channel.name||'').trim():'';
             if(!channel||!currentLabel||!qr)return json({code:'CUSTOMER_PAYMENT_CHANNEL_UNAVAILABLE'},409,cors(request));
-            if(channelLabel!==currentLabel)return json({code:'CUSTOMER_PAYMENT_CHANNEL_CHANGED'},409,cors(request));
+            if(channelLabel&&channelLabel!==currentLabel)return json({code:'CUSTOMER_PAYMENT_CHANNEL_CHANGED'},409,cors(request));
+            normalizedCustomerOrderBody={
+              ...row(intent),
+              checkout:{...checkout,paymentChannelId:channelId,paymentChannelLabel:currentLabel},
+            };
           }
         }
       }
