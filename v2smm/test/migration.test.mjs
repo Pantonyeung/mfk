@@ -32,13 +32,16 @@ test('SMM UI remains free of canonical writer and transport stays isolated',()=>
     /allocateDisplayNumber/,
     /storeKernel\s*\./,
     /\bD1Database\b/,
-    /new\s+Worker\s*\(/,
-    /\bsetInterval\s*\(/
+    /new\s+Worker\s*\(/
   ];
   for(const pattern of forbidden)assert.equal(pattern.test(source),false,String(pattern));
   const pwaLan=fs.readFileSync(path.join(root,'pwa-lan.ts'),'utf8');
+  const pwaRuntime=fs.readFileSync(path.join(root,'pwa-runtime.ts'),'utf8');
   assert.match(pwaLan,/fetch\s*\(/);
   assert.match(pwaLan,/smm\/v1\/health/);
+  assert.match(pwaRuntime,/admin\.morefunos\.com\/api\/smm\/snapshot/);
+  assert.match(pwaRuntime,/connectionPath:'INTERNET'/);
+  assert.match(pwaRuntime,/SMM_LAN_SNAPSHOT_INVALID/);
 });
 
 test('local persistence is explicitly non-authoritative',()=>{
@@ -123,7 +126,7 @@ test('previously banked SMM read surfaces are not dropped by product completion'
 });
 
 
-test('runtime boundary remains UI-independent for later SMT transport wiring',()=>{
+test('runtime boundary remains UI-independent while transport adapters own LAN and Internet fetches',()=>{
   const runtime=fs.readFileSync(path.join(srcRoot,'runtime.ts'),'utf8');
   const app=fs.readFileSync(path.join(srcRoot,'App.tsx'),'utf8');
   assert.match(runtime,/installSmmRuntimePort/);
@@ -146,4 +149,17 @@ test('live-link contract stays bounded and UNKNOWN-safe without UI transport own
   assert.match(adapter,/readSubmission/);
   assert.doesNotMatch(app,/fetch\s*\(/);
   assert.doesNotMatch(app,/WebSocket\s*\(/);
+});
+
+
+test('LAN failure falls back to Internet and render protection prevents blank screens',()=>{
+  const runtime=fs.readFileSync(path.join(root,'pwa-runtime.ts'),'utf8');
+  const main=fs.readFileSync(path.join(root,'main.tsx'),'utf8');
+  const app=fs.readFileSync(path.join(root,'App.tsx'),'utf8');
+  assert.match(runtime,/fall through to the Internet projection/);
+  assert.match(runtime,/readCloudSnapshot/);
+  assert.match(main,/SmmErrorBoundary/);
+  assert.match(main,/SMM 顯示已自動保護/);
+  assert.match(app,/Internet 資料通道運作中/);
+  assert.match(app,/snapshot\?\.connectionPath!=='LAN'/);
 });
