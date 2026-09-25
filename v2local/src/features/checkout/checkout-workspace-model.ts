@@ -70,12 +70,18 @@ export interface CheckoutWorkspaceViewModel {
   readonly validationMessage?:string;
   readonly failureMessage?:string;
   readonly completionReview?:{
+    readonly orderId?:string;
     readonly displayOrderCode:string;
+    readonly sourceLabel:string;
     readonly tenderLabel:string;
     readonly dueLabel:string;
     readonly receivedLabel?:string;
     readonly changeLabel?:string;
     readonly statusLabel:string;
+    readonly printStatusLabel:string;
+    readonly drawerStatusLabel:string;
+    readonly canCorrectPayment:boolean;
+    readonly correctionMethods:readonly CheckoutPaymentMethodViewModel[];
   };
 }
 
@@ -90,5 +96,6 @@ export interface CheckoutWorkspaceActions {
   readonly onExactCash:()=>void;
   readonly onConfirm:()=>void;
   readonly onRetry:()=>void;
+  readonly onCorrectPayment:(methodId:CheckoutTenderId)=>void;
   readonly onDone:()=>void;
 }
