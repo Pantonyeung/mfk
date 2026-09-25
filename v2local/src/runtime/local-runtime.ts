@@ -73,12 +73,16 @@ export interface DiningSettlementCommand{
   readonly submissionId:string;
   readonly expectedRevision:string;
   readonly receivedMinor?:number;
+  readonly splitTenders?:readonly {tender:Exclude<DiningTender,'COMBO'>;amountMinor:number}[];
 }
 export interface LocalDiningPayment{
   readonly submissionId?:string;
   readonly requestSignature?:string;
   readonly receivedMinor?:number;
   readonly changeMinor?:number;
+  readonly splitTenders?:readonly {tender:Exclude<DiningTender,'COMBO'>;amountMinor:number}[];
+  readonly receiptAttemptedAt?:string;
+  readonly receiptState?:'DISPATCHING'|'DONE'|'FAILED'|'UNKNOWN';
   readonly id:string;
   readonly createdAt:string;
   readonly tender:DiningTender;
@@ -193,6 +197,7 @@ export interface CleanSmtCoreRuntimePort{
   readDiningHold?(holdId:string):Promise<LocalDiningHoldDetail>;
   readDiningHistory?():Promise<readonly LocalDiningHoldDetail[]>;
   printDiningPaymentReceipt?(holdId:string,submissionId:string):Promise<PrintDispatchSummary>;
+  reprintDiningPaymentReceipt?(holdId:string,submissionId:string):Promise<PrintDispatchSummary>;
   readDiningReprintOptions?(holdId:string):Promise<readonly SmtReprintOption[]>;
   reprintDiningJobs?(holdId:string,jobIds:readonly string[],reason?:string):Promise<PrintDispatchSummary>;
   settleDiningHold?(holdId:string,selections:readonly {lineIndex:number;qty:number}[],tender:DiningTender,command?:DiningSettlementCommand):Promise<LocalDiningHoldDetail>;
@@ -284,6 +289,7 @@ export interface MfkLocalRuntime extends CleanSmtCoreRuntimePort{
   readDiningHold(holdId:string):Promise<LocalDiningHoldDetail>;
   readDiningHistory():Promise<readonly LocalDiningHoldDetail[]>;
   printDiningPaymentReceipt(holdId:string,submissionId:string):Promise<PrintDispatchSummary>;
+  reprintDiningPaymentReceipt(holdId:string,submissionId:string):Promise<PrintDispatchSummary>;
   readDiningReprintOptions(holdId:string):Promise<readonly SmtReprintOption[]>;
   reprintDiningJobs(holdId:string,jobIds:readonly string[],reason?:string):Promise<PrintDispatchSummary>;
   settleDiningHold(holdId:string,selections:readonly {lineIndex:number;qty:number}[],tender:DiningTender,command?:DiningSettlementCommand):Promise<LocalDiningHoldDetail>;
@@ -1277,6 +1283,52 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
     }
   },
   async printDiningPaymentReceipt(holdId,submissionId){
+    let snapshot=readDiningState();
+    let hold=requireDiningHold(snapshot,holdId);
+    if(!hold.formalOrderId)throw new Error('DINING_FORMAL_ORDER_NOT_CREATED');
+    let payment=(hold.payments??[]).find(row=>row.submissionId===submissionId);
+    if(!payment)throw new Error('DINING_PAYMENT_NOT_FOUND');
+    const order=snapshot.orders.find(row=>row.id===hold.formalOrderId);
+    if(!order)throw new Error('DINING_FORMAL_ORDER_LINK_BROKEN');
+    if(payment.receiptAttemptedAt){
+      return Object.freeze({orderId:order.id,planned:0,sent:0,failed:payment.receiptState==='FAILED'||payment.receiptState==='UNKNOWN'?1:0,results:Object.freeze([])});
+    }
+    const binding=readPrinterBindings().find(row=>row.role==='顧客小票'&&String(row.host||'').trim());
+    if(!binding)throw new Error('DINING_RECEIPT_ROUTE_MISSING');
+
+    const attemptedAt=new Date().toISOString();
+    const mark=(state:LocalDiningPayment['receiptState'])=>{
+      snapshot=readDiningState();hold=requireDiningHold(snapshot,holdId);
+      const nextHolds=snapshot.holds.map(row=>row.id===holdId?{
+        ...row,payments:(row.payments??[]).map(item=>item.submissionId===submissionId?{...item,receiptAttemptedAt:item.receiptAttemptedAt??attemptedAt,receiptState:state}:item),
+      }:row);
+      const next={...snapshot,holds:nextHolds,diningRevision:(snapshot.diningRevision??0)+1};
+      localStorage.setItem(KEY,JSON.stringify(next));data=next;
+      for(const listener of listeners){try{listener();}catch{console.warn('DINING_OBSERVER_FAILED');}}
+      hold=requireDiningHold(next,holdId);
+      payment=(hold.payments??[]).find(row=>row.submissionId===submissionId)!;
+    };
+    mark('DISPATCHING');
+
+    const paymentLabel=payment.tender==='COMBO'
+      ?'COMBO '+(payment.splitTenders??[]).map(row=>row.tender+' '+money(row.amountMinor)).join(' + ')
+      :payment.tender;
+    const paymentOrder:StoredOrder={...order,totalMinor:payment.amountMinor,paymentLabel,updatedAt:new Date().toISOString()};
+    try{
+      const output=await printBytesLan({...printerInput(binding),bytes:await renderEscPosRasterTicket({
+        kind:'receipt',order:paymentOrder,cutAfter:true,kickDrawer:payment.tender==='CASH'||Boolean(payment.splitTenders?.some(row=>row.tender==='CASH')),beepAfter:true,
+      })});
+      mark(output.ok?'DONE':'FAILED');
+      const result={jobId:order.id+':payment:'+payment.id+':receipt',role:'顧客小票',ok:output.ok,code:output.code||(output.ok?'SENT':'PRINT_FAILED')} satisfies PrintDispatchResult;
+      appendActionAudit({action:'DINING_PAYMENT_RECEIPT',orderId:order.id,reason:paymentLabel+' '+money(payment.amountMinor)});
+      return Object.freeze({orderId:order.id,planned:1,sent:result.ok?1:0,failed:result.ok?0:1,results:Object.freeze([Object.freeze(result)])});
+    }catch(error){
+      mark('UNKNOWN');
+      appendActionAudit({action:'DINING_PAYMENT_RECEIPT_UNKNOWN',orderId:order.id,reason:paymentLabel});
+      throw error;
+    }
+  },
+  async reprintDiningPaymentReceipt(holdId,submissionId){
     const hold=requireDiningHold(readDiningState(),holdId);
     if(!hold.formalOrderId)throw new Error('DINING_FORMAL_ORDER_NOT_CREATED');
     const payment=(hold.payments??[]).find(row=>row.submissionId===submissionId);
@@ -1285,18 +1337,15 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
     if(!order)throw new Error('DINING_FORMAL_ORDER_LINK_BROKEN');
     const binding=readPrinterBindings().find(row=>row.role==='顧客小票'&&String(row.host||'').trim());
     if(!binding)throw new Error('DINING_RECEIPT_ROUTE_MISSING');
-    const paymentOrder:StoredOrder={...order,totalMinor:payment.amountMinor,paymentLabel:payment.tender,updatedAt:new Date().toISOString()};
-    const result=await (async()=>{
-      try{
-        const output=await printBytesLan({...printerInput(binding),bytes:await renderEscPosRasterTicket({
-          kind:'receipt',order:paymentOrder,cutAfter:true,kickDrawer:payment.tender==='CASH',beepAfter:true,
-        })});
-        return {jobId:order.id+':payment:'+payment.id+':receipt',role:'顧客小票',ok:output.ok,code:output.code||(output.ok?'SENT':'PRINT_FAILED')} satisfies PrintDispatchResult;
-      }catch(error){
-        return {jobId:order.id+':payment:'+payment.id+':receipt',role:'顧客小票',ok:false,code:error instanceof Error?error.message:'PRINT_FAILED'} satisfies PrintDispatchResult;
-      }
-    })();
-    appendActionAudit({action:'DINING_PAYMENT_RECEIPT',orderId:order.id,reason:payment.tender+' '+money(payment.amountMinor)});
+    const paymentLabel=payment.tender==='COMBO'
+      ?'COMBO '+(payment.splitTenders??[]).map(row=>row.tender+' '+money(row.amountMinor)).join(' + ')
+      :payment.tender;
+    const paymentOrder:StoredOrder={...order,totalMinor:payment.amountMinor,paymentLabel,updatedAt:new Date().toISOString()};
+    const output=await printBytesLan({...printerInput(binding),bytes:await renderEscPosRasterTicket({
+      kind:'receipt',order:paymentOrder,cutAfter:true,kickDrawer:false,beepAfter:true,
+    })});
+    appendActionAudit({action:'DINING_PAYMENT_RECEIPT_REPRINT',orderId:order.id,reason:submissionId});
+    const result={jobId:order.id+':payment:'+payment.id+':receipt:reprint',role:'顧客小票',ok:output.ok,code:output.code||(output.ok?'SENT':'PRINT_FAILED')} satisfies PrintDispatchResult;
     return Object.freeze({orderId:order.id,planned:1,sent:result.ok?1:0,failed:result.ok?0:1,results:Object.freeze([Object.freeze(result)])});
   },
   async readDiningReprintOptions(holdId){
@@ -1334,7 +1383,13 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
       if(seen.has(selection.lineIndex))throw new Error('DINING_DUPLICATE_SELECTION');
       seen.add(selection.lineIndex);return {lineIndex:selection.lineIndex,qty:selection.qty};
     }).sort((a,b)=>a.lineIndex-b.lineIndex);
-    const signature=JSON.stringify([holdId,tender,normalized,command.receivedMinor??null]);
+    const splitTenders=(command.splitTenders??[]).map(row=>({tender:row.tender,amountMinor:row.amountMinor})).filter(row=>row.amountMinor>0);
+    if(tender==='COMBO'){
+      if(splitTenders.length<2)throw new Error('DINING_COMBO_SPLIT_REQUIRED');
+      if(splitTenders.some(row=>!['CASH','ALIPAY','WECHAT','FPS','PAYME'].includes(row.tender)||!Number.isSafeInteger(row.amountMinor)||row.amountMinor<=0))throw new Error('DINING_COMBO_SPLIT_INVALID');
+      if(new Set(splitTenders.map(row=>row.tender)).size!==splitTenders.length)throw new Error('DINING_COMBO_SPLIT_DUPLICATE');
+    }else if(splitTenders.length)throw new Error('DINING_SPLIT_TENDER_UNEXPECTED');
+    const signature=JSON.stringify([holdId,tender,normalized,command.receivedMinor??null,splitTenders]);
     const snapshot=readDiningState();const hold=requireDiningHold(snapshot,holdId);
     const prior=snapshot.holds.flatMap(row=>(row.payments??[]).map(payment=>({holdId:row.id,payment}))).find(row=>row.payment.submissionId===command.submissionId);
     if(prior){
@@ -1355,10 +1410,19 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
     });
     const amountMinor=paymentSelections.reduce((sum,row)=>sum+row.amountMinor,0);
     if(!Number.isSafeInteger(amountMinor)||amountMinor<0||amountMinor>detail.remainingMinor)throw new Error('DINING_AMOUNT_INVALID');
+    if(tender==='COMBO'&&splitTenders.reduce((sum,row)=>sum+row.amountMinor,0)!==amountMinor)throw new Error('DINING_COMBO_TOTAL_MISMATCH');
+    const cashSplit=tender==='COMBO'?splitTenders.find(row=>row.tender==='CASH'):undefined;
     const receivedMinor=tender==='CASH'?command.receivedMinor:amountMinor;
-    if(!Number.isSafeInteger(receivedMinor)||receivedMinor!<amountMinor)throw new Error('DINING_CASH_INSUFFICIENT');
+    if(tender==='CASH'&&(!Number.isSafeInteger(receivedMinor)||receivedMinor!<amountMinor))throw new Error('DINING_CASH_INSUFFICIENT');
+    if(cashSplit&&command.receivedMinor!==undefined&&command.receivedMinor<cashSplit.amountMinor)throw new Error('DINING_CASH_INSUFFICIENT');
     const createdAt=new Date().toISOString();
-    const payment:LocalDiningPayment={id:'DP:'+holdId+':'+command.submissionId,submissionId:command.submissionId,requestSignature:signature,createdAt,tender,amountMinor,receivedMinor,changeMinor:receivedMinor!-amountMinor,selections:paymentSelections};
+    const payment:LocalDiningPayment={
+      id:'DP:'+holdId+':'+command.submissionId,submissionId:command.submissionId,requestSignature:signature,createdAt,tender,amountMinor,
+      receivedMinor,
+      changeMinor:tender==='CASH'?receivedMinor!-amountMinor:0,
+      ...(splitTenders.length?{splitTenders}:{}),
+      selections:paymentSelections,
+    };
     let updated:LocalHoldDraft={...hold,payments:[...(hold.payments??[]),payment]};
     const after=diningDetail(updated);
     if(after.remainingMinor===0&&after.lines.length>0&&after.lines.every(row=>row.remainingQty===0))updated=archiveDiningHold(updated,createdAt);
