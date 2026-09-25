@@ -106,9 +106,12 @@ export interface OrderingWorkspaceViewModel {
   readonly menuRevisionLabel?:string;
   readonly operationalNotice?:string;
   readonly showCategories?:boolean;
-  readonly categoryRows?:1|2;
-  readonly categoryColumns?:5|6|7;
-  readonly productDensity?:'standard'|'compact';
+  readonly categoryRows?:1|2|3;
+  readonly categoryColumns?:number;
+  readonly productColumns?:number;
+  readonly productCardHeight?:number;
+  readonly fontScale?:number;
+  readonly densityScale?:number;
   readonly serviceModes?:Readonly<{takeaway:boolean;dineIn:boolean}>;
   readonly cart:OrderingCartViewModel;
   readonly orderingMode:'normal'|'quick';
