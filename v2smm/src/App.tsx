@@ -157,6 +157,65 @@ export function App(){
     return categoryOk&&searchOk;
   });
 
+
+  useEffect(()=>{
+    if(!menu||cart.length===0)return;
+    let changed=false;
+    let invalid=false;
+    const next=cart.map(line=>{
+      const product=menu.products.find(item=>item.productId===line.productId);
+      if(!product||!product.available){
+        invalid=true;
+        if(line.publishedUnitPriceMinor!==undefined)changed=true;
+        return Object.freeze({...line,publishedUnitPriceMinor:undefined});
+      }
+
+      let selectionsValid=true;
+      const refreshedSelections=line.selections.map(selection=>{
+        const group=product.optionGroups.find(item=>item.optionGroupId===selection.optionGroupId);
+        const option=group?.options.find(item=>item.optionId===selection.optionId&&item.available);
+        if(!group||!option){
+          selectionsValid=false;
+          return selection;
+        }
+        const adjustment=Number.isSafeInteger(Number(option.publishedAdjustmentMinor))
+          ?Number(option.publishedAdjustmentMinor)
+          :0;
+        if(
+          selection.optionName!==option.name||
+          Number(selection.publishedAdjustmentMinor??0)!==adjustment
+        )changed=true;
+        return Object.freeze({
+          optionGroupId:group.optionGroupId,
+          optionId:option.optionId,
+          optionName:option.name,
+          publishedAdjustmentMinor:adjustment,
+        });
+      });
+
+      const base=productPrice(product,serviceMode);
+      const optionMinor=refreshedSelections.reduce(
+        (sum,item)=>sum+(Number.isSafeInteger(Number(item.publishedAdjustmentMinor))?Number(item.publishedAdjustmentMinor):0),
+        0,
+      );
+      const unitMinor=base!==null&&selectionsValid?base+optionMinor:undefined;
+      if(line.publishedUnitPriceMinor!==unitMinor)changed=true;
+      if(unitMinor===undefined)invalid=true;
+      return Object.freeze({...line,selections:Object.freeze(refreshedSelections),publishedUnitPriceMinor:unitMinor});
+    });
+
+    if(!changed)return;
+    setCart(Object.freeze(next));
+    writeSmmLocalWorkspace({
+      cart:Object.freeze(next),
+      pendingIntents,
+      preferences:{activeView:view,activeCategoryId,sourceFilter,serviceMode,tender},
+    });
+    setNotice(invalid
+      ?'餐單已更新；部分草稿項目需要重新選擇後先可以提交。'
+      :'餐單已更新；購物草稿已按目前發布價格重新計算。');
+  },[menu?.revision,menu?.observedAt]);
+
   const addSelectedProduct=()=>{
     if(!selectedProduct)return;
     const validation=validateSmmSelections(selectedProduct,selections);
@@ -273,6 +332,16 @@ export function App(){
       const result=await port.submitOrder(pending);
       if(result.state==='CONFIRMED'){
         resolveConfirmedIntent(pending,result.message||'門店已確認訂單');
+        return;
+      }
+      if(result.state==='REJECTED'){
+        removeIntent(pending.submissionId);
+        if(result.message==='SMM_PUBLISHED_PRICE_CHANGED'||result.message==='SMM_MENU_REVISION_CHANGED'){
+          await refresh();
+          setNotice('SMT 發現餐單版本／價格已更新；SMM 已重新同步，請確認新總額後再提交。');
+        }else{
+          setNotice(result.message);
+        }
         return;
       }
       const state=result.state==='UNKNOWN'?'UNKNOWN':'NOT_CONNECTED';
