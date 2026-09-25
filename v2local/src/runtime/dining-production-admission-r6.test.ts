@@ -161,6 +161,21 @@ describe('Dining R6 automatic table-order admission',()=>{
     expect(calls.at(-1).kickDrawer).toBe(true);
   });
 
+  it('table transfer keeps SAME Order, updates table label and does not replay first print',async()=>{
+    const runtime=await boot();
+    const hold=runtime.createHold({kind:'dining',items:[{id:'rice',name:'飯團',qty:1,unitMinor:4100,serviceMode:'dine-in'}],totalMinor:4100});
+    await runtime.assignDiningTable(hold.id,'T01');
+    const before=runtime.orders().find((row:any)=>row.diningHoldId===hold.id);
+    const ticket=await import('./ticket-bitmap.ts');
+    const callsBefore=(ticket.renderEscPosRasterTicket as any).mock.calls.length;
+    await runtime.assignDiningTable(hold.id,'T02');
+    const after=runtime.orders().find((row:any)=>row.diningHoldId===hold.id);
+    expect(after.id).toBe(before.id);
+    expect(after.diningTableLabel).toBe('T02');
+    expect((await runtime.readDiningHold(hold.id)).assignedTable).toBe('T02');
+    expect((ticket.renderEscPosRasterTicket as any).mock.calls.length).toBe(callsBefore);
+  });
+
   it('formal Order link survives runtime restart',async()=>{
     let runtime=await boot();
     const hold=runtime.createHold({kind:'dining',items:[{id:'rice',name:'飯團',qty:1,unitMinor:4100,serviceMode:'dine-in'}],totalMinor:4100});
