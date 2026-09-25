@@ -261,76 +261,13 @@ export class SmmIntentStore{
       return json({state:'LOGGED_OUT'});
     }
 
-    if(url.pathname==='/orders/submit'&&request.method==='POST'){
-      const envelope=record(await request.json());
-      const orderRequest=validateOrderRequest(envelope.request);
-      const staff=record(envelope.staff);
-      const submissionId=String(orderRequest.submissionId);
-      const key='order:'+submissionId;
-      const existing=await this.state.storage.get(key) as any;
-      const fingerprint=stable(orderRequest);
-      if(existing){
-        if(existing.idempotencyKey!==orderRequest.idempotencyKey||existing.requestFingerprint!==fingerprint){
-          return json({code:'SMM_SUBMISSION_ID_CONFLICT'},409);
-        }
-        return json({state:existing.state,submissionId},existing.state==='PENDING_SMT'?202:200);
-      }
-      const row=Object.freeze({
-        request:orderRequest,
-        staff:Object.freeze({
-          staffId:text(staff.staffId,120),
-          displayName:text(staff.displayName,160),
-          role:text(staff.role,40),
-        }),
-        idempotencyKey:String(orderRequest.idempotencyKey),
-        requestFingerprint:fingerprint,
-        state:'PENDING_SMT',
-        receivedAt:new Date().toISOString(),
-      });
-      await this.state.storage.put(key,row);
-      return json({state:'PENDING',submissionId},202);
-    }
 
-    if(url.pathname==='/orders/readback'&&request.method==='GET'){
-      const submissionId=text(url.searchParams.get('submissionId'),180);
-      if(!submissionId)return json({code:'SMM_SUBMISSION_ID_REQUIRED'},400);
-      const row=await this.state.storage.get('order:'+submissionId) as any;
-      if(!row)return json({state:'UNKNOWN',submissionId},404);
-      return json({state:row.state,submissionId,result:row.result??null,staff:row.staff??null});
-    }
 
-    if(url.pathname==='/smt/orders/pending'&&request.method==='GET'){
-      const rows=await this.state.storage.list({prefix:'order:'});
-      const orders=[...rows.values()]
-        .filter((row:any)=>row?.state==='PENDING_SMT')
-        .sort((a:any,b:any)=>String(a.receivedAt||'').localeCompare(String(b.receivedAt||'')))
-        .slice(0,50)
-        .map((row:any)=>({request:row.request,staff:row.staff}));
-      return json({orders});
-    }
 
-    if(url.pathname==='/smt/orders/ack'&&request.method==='POST'){
-      const body=record(await request.json());
-      const submissionId=text(body.submissionId,180);
-      const idempotencyKey=text(body.idempotencyKey,240);
-      const result=record(body.result);
-      if(!submissionId||!idempotencyKey)return json({code:'SMM_ACK_IDENTITY_REQUIRED'},400);
-      const key='order:'+submissionId;
-      const current=await this.state.storage.get(key) as any;
-      if(!current)return json({code:'SMM_ORDER_NOT_FOUND'},404);
-      if(current.idempotencyKey!==idempotencyKey)return json({code:'SMM_ACK_IDEMPOTENCY_MISMATCH'},409);
-      if(current.state!=='PENDING_SMT')return json({state:'IDEMPOTENT',order:current});
-      const disposition=result.disposition;
-      if(disposition!=='ACCEPTED'&&disposition!=='REJECTED')return json({code:'SMM_ACK_RESULT_INVALID'},400);
-      const next=Object.freeze({
-        ...current,
-        state:disposition==='ACCEPTED'?'CONFIRMED':'REJECTED',
-        result:Object.freeze({...result}),
-        resolvedAt:new Date().toISOString(),
-      });
-      await this.state.storage.put(key,next);
-      return json({state:'ACKED',submissionId});
-    }
+
+
+
+
 
     return json({code:'NOT_FOUND'},404);
   }
@@ -496,42 +433,64 @@ export default{
       if(request.method!=='POST')return json({code:'METHOD_NOT_ALLOWED'},405);
       const staff=await readStaffSession(request,storeId,env);
       if(!staff)return json({code:'SMM_STAFF_UNAUTHORIZED',message:'請先使用同一個員工帳戶登入'},401);
-      let orderRequest;
-      try{orderRequest=validateOrderRequest(await request.json());}
-      catch(error){return json({code:error instanceof Error?error.message:'SMM_ORDER_INVALID'},400);}
-      const id=env.SMM_INTENT_STORE.idFromName(storeId);
-      const stub=env.SMM_INTENT_STORE.get(id);
-      return stub.fetch(new Request('https://internal/orders/submit',{
-        method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({request:orderRequest,staff}),
-      }));
+      const token=text(request.headers.get('x-mfk-smm-session'),256);
+      const body=await request.text();
+      let response:Response;
+      try{
+        response=await fetch('https://admin.morefunos.com/api/customer/staff-orders/submit?storeId='+encodeURIComponent(storeId),{
+          method:'POST',
+          headers:{
+            'content-type':'application/json',
+            'x-mfk-smm-session':token,
+          },
+          body,
+        });
+      }catch{
+        return json({code:'SMM_SHARED_BRIDGE_UNAVAILABLE',message:'暫時未能連接門店 Internet 訂單橋'},503);
+      }
+      return new Response(response.body,{status:response.status,statusText:response.statusText,headers:response.headers});
     }
 
     if(url.pathname==='/api/smm/orders/readback'){
       if(request.method!=='GET')return json({code:'METHOD_NOT_ALLOWED'},405);
       const staff=await readStaffSession(request,storeId,env);
       if(!staff)return json({code:'SMM_STAFF_UNAUTHORIZED',message:'請先使用同一個員工帳戶登入'},401);
+      const token=text(request.headers.get('x-mfk-smm-session'),256);
       const submissionId=text(url.searchParams.get('submissionId'),180);
-      const id=env.SMM_INTENT_STORE.idFromName(storeId);
-      const stub=env.SMM_INTENT_STORE.get(id);
-      return stub.fetch(new Request('https://internal/orders/readback?submissionId='+encodeURIComponent(submissionId),{method:'GET'}));
-    }
-
-    if(url.pathname.startsWith('/api/smm/smt/')){
-      if(request.method==='OPTIONS')return new Response(null,{status:204,headers:cors(request)});
-      const deviceId=text(url.searchParams.get('deviceId'),180);
-      if(!await authorizedSmtDevice(deviceId,storeId))return json({code:'SMM_SMT_UNAUTHORIZED'},401,cors(request));
-      const id=env.SMM_INTENT_STORE.idFromName(storeId);
-      const stub=env.SMM_INTENT_STORE.get(id);
-      if(url.pathname==='/api/smm/smt/orders/pending'&&request.method==='GET'){
-        const response=await stub.fetch(new Request('https://internal/smt/orders/pending',{method:'GET'}));
-        return new Response(response.body,{status:response.status,headers:{...Object.fromEntries(response.headers),...cors(request)}});
+      let response:Response;
+      try{
+        response=await fetch(
+          'https://admin.morefunos.com/api/customer/staff-orders/readback?storeId='+encodeURIComponent(storeId)+'&submissionId='+encodeURIComponent(submissionId),
+          {method:'GET',headers:{'x-mfk-smm-session':token,'accept':'application/json'}},
+        );
+      }catch{
+        return json({state:'UNKNOWN',submissionId},503);
       }
-      if(url.pathname==='/api/smm/smt/orders/ack'&&request.method==='POST'){
-        const body=await request.text();
-        const response=await stub.fetch(new Request('https://internal/smt/orders/ack',{method:'POST',headers:{'content-type':'application/json'},body}));
-        return new Response(response.body,{status:response.status,headers:{...Object.fromEntries(response.headers),...cors(request)}});
+      const body=record(await response.clone().json().catch(()=>({})));
+      if(response.status===404)return json({state:'UNKNOWN',submissionId},404);
+      if(!response.ok)return json({code:String(body.code||'SMM_SHARED_BRIDGE_READBACK_FAILED')},response.status);
+      if(body.state==='CONFIRMED'){
+        return json({
+          state:'CONFIRMED',
+          submissionId,
+          result:{
+            disposition:'ACCEPTED',
+            orderId:String(body.canonicalOrderId||''),
+            canonicalRevision:1,
+          },
+        });
       }
-      return json({code:'NOT_FOUND'},404,cors(request));
+      if(body.state==='REJECTED'){
+        return json({
+          state:'REJECTED',
+          submissionId,
+          result:{
+            disposition:'REJECTED',
+            reasonCode:String(body.code||'SMM_ORDER_REJECTED'),
+          },
+        });
+      }
+      return json({state:'PENDING_SMT',submissionId});
     }
 
     if(url.pathname==='/api/smm/config-diagnostics'){
@@ -560,7 +519,7 @@ export default{
       });
     }
 
-    if(url.pathname==='/api/health')return json({ok:true,service:'mfk-smm-web',internetProjection:'admin-published-config',internetStaffOrders:'durable-intent-only'});
+    if(url.pathname==='/api/health')return json({ok:true,service:'mfk-smm-web',internetProjection:'admin-published-config',internetStaffOrders:'customer-bridge-shared'});
     return env.ASSETS.fetch(request);
   },
 };
