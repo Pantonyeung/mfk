@@ -9,7 +9,7 @@ CONTROL：Pantonyeung/mfk #22
 MFK product source：
 75759607ba05720f723c77d282327b7f1386f616
 
-Builder verification：
+Source / Build verification：
 36084376938 SUCCESS
 
 Verified：
@@ -26,7 +26,7 @@ Verified：
 SMM = PWA / Web only.
 NO SMM APK.
 
-Preferred path：
+Primary：
 SMM PWA
 → LAN HTTP/JSON :17831
 → SMT
@@ -48,31 +48,36 @@ SMT receives intent
 → exactly one Formal Order / Display.
 
 ==================================================
-2. CARRIER 1.0.7 OTA PUBLICATION
+2. CANONICAL CARRIER 1.0.7 OTA RELEASE
 ==================================================
-Builder release executor added：
-50549d68ad46c07a19efb67446e0667beafe65e4
+Canonical Builder workflow：
+.github/workflows/mfk-carrier-ota.yml
 
-Publish request：
-a902f7b3e492cc416395000b66a57e1cd9c688e7
+Canonical request：
+requests/mfk-carrier-ota-request.txt
 
-Builder publish run：
-36085863280
-SUCCESS
+Builder workflow commit：
+1eb066535f79fbe8d4eb3809682c0e1be2bd61e9
+
+Publish request commit：
+fa51f2d1125497afcea33fd16c57fd79e8809a34
+
+Canonical publish run：
+36085973121 SUCCESS
 
 Exact release：
 versionName = 1.0.7
 versionCode = 107
 package = com.morefunos.smt
 
-APK：
-MoreFunOS-SMT-Carrier-1.0.7-75759607ba05.apk
+Current public APK：
+MoreFunOS-SMT-1.0.7-mfk-75759607ba05.apk
 
 APK SHA-256：
 b521d509f93143e191e9df363b91409e499dc0788776f067e88469611c791046
 
-Signing certificate check：
-GREEN against accepted Carrier signing identity.
+Signing certificate identity：
+GREEN against accepted Carrier signing certificate.
 
 Public OTA readback：
 GREEN
@@ -82,8 +87,19 @@ GREEN
 - public APK download hash MATCH
 
 Evidence artifact：
-Builder artifact 10843946391
-retained 30 days.
+10844450207
+
+Independent earlier publish/readback run：
+36085863280 SUCCESS
+- rebuilt the same exact MFK source
+- produced the same APK SHA-256
+- confirms deterministic signed bytes for this source/signing identity
+
+Duplicate temporary publisher path created during parallel takeover was retired:
+- workflow removal: d1d16f66c22a2561ff5d5ee07286ec703f2fcc09
+- request-path removal: 048dfb21af857da69c2881fcbd4e4c122545f569
+
+Only one active MFK Carrier OTA request/workflow path remains.
 
 MILESTONE：
 MFK_CARRIER_1_0_7_OTA_PUBLISHED_GREEN
@@ -91,21 +107,17 @@ MFK_CARRIER_1_0_7_OTA_PUBLISHED_GREEN
 ==================================================
 3. OTA CONFIGURATION LOCK
 ==================================================
-Carrier source default endpoints remain:
-- Runtime OTA manifest
-- Carrier OTA manifest
-
 Recovery supports independent override of:
 - Runtime OTA URL
 - Carrier OTA URL
 
+Existing OTA origin/bucket are reused.
 No new OTA backend/domain was created.
-Existing OTA origin/publisher path was reused.
 
 ==================================================
 4. CURRENT FIRST BREAK
 ==================================================
-Carrier 1.0.7 is now PUBLISHED.
+Carrier 1.0.7 is PUBLISHED.
 
 Still NOT proven:
 - installed on store SMT
@@ -114,9 +126,10 @@ Still NOT proven:
 - LAN failure non-blocking behavior
 - QR fallback physical workflow
 - duplicate/replay physical safety on QR intent
+- restart sanity after Carrier install
 
-Therefore current state is:
-SOFTWARE / OTA = GREEN
+Therefore:
+SOFTWARE / SIGN / OTA PUBLISH / PUBLIC READBACK = GREEN
 PHYSICAL STORE ACCEPTANCE = PENDING
 
 Do not declare CLOSED until Ring 3 proof exists.
@@ -124,58 +137,56 @@ Do not declare CLOSED until Ring 3 proof exists.
 ==================================================
 5. EXACT PHYSICAL NEXT
 ==================================================
-On store SMT:
-
+Store SMT:
 1. Open Recovery.
 2. Check Carrier OTA.
 3. Fresh offered version MUST be 1.0.7 / 107.
-4. If offered version differs, STOP and classify first break as CARRIER_OTA_MANIFEST_OR_ENDPOINT.
+4. If offered version differs, STOP at CARRIER_OTA_MANIFEST_OR_ENDPOINT.
 5. Install/update Carrier.
 6. Confirm installed Carrier = 1.0.7 / 107.
 7. Reopen SMT and confirm normal Runtime boots.
-8. Confirm Runtime OTA URL and Carrier OTA URL are independently readable/editable and unchanged unless intentionally overridden.
+8. Confirm Runtime OTA URL and Carrier OTA URL remain independently controlled.
 
-Then iPhone on store LAN:
+iPhone on store LAN:
 
 A. Safari
 - Open SMM PWA.
 - Probe/pair SMT LAN host.
 - Confirm LAN path reaches SMT on :17831.
 - Submit one staff order intent.
-- Confirm SMT revalidates current Menu/Pricing.
-- Confirm exactly one canonical Formal Order / Display.
+- SMT revalidates current Menu/Pricing.
+- exactly one canonical Formal Order / Display.
 
 B. iOS Chrome
-- Repeat LAN probe.
-- Record supported / unsupported behavior as physical browser evidence.
+- Repeat LAN capability test.
+- Record actual supported/unsupported result.
 - Chrome result must not change Safari primary-path authority.
 
 C. LAN failure
 - Make LAN endpoint unreachable from iPhone.
-- Confirm SMM remains usable.
-- Confirm no fake success and no lost intent.
-- Confirm fallback remains available.
+- SMM remains usable.
+- no fake success.
+- no lost intent.
+- fallback remains available.
 
 D. QR fallback
 - Generate QR Order Intent.
-- Scan/receive on SMT.
+- SMT receives/scans it.
 - SMT revalidates Menu/Pricing.
-- Confirm exactly one Formal Order / Display.
-- Replay same QR / same intent must not create a second Formal Order.
+- exactly one Formal Order / Display.
+- replay same QR / same intent creates zero duplicate Formal Order.
 
-Capture:
-- Recovery offered version
-- installed Carrier version
-- Safari LAN result
-- Chrome LAN result
-- LAN failure/fallback result
-- QR intent → SMT → Formal Order result
-- duplicate/replay result
+E. Restart sanity
+- restart SMT Carrier/app.
+- repeat one LAN/QR sanity path.
+- no duplicate/replayed order appears.
+
+Capture evidence for every step.
 
 ==================================================
 6. STOP RULE
 ==================================================
-No new product mutation before physical test.
+No new product mutation before physical evidence.
 
 If GREEN:
 BANK
@@ -183,7 +194,7 @@ MFK_CARRIER_1_0_7_SMM_PWA_LAN_QR_PHYSICAL_GREEN
 
 If RED:
 STOP at exact FIRST BREAK.
-Do not redesign the architecture.
+Do not redesign architecture.
 Fix only the smallest proven seam.
 
 ==================================================
