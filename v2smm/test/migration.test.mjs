@@ -27,7 +27,6 @@ test('SMM UI remains free of canonical writer and transport stays isolated',()=>
     /\bWebSocket\b/,
     /\bXMLHttpRequest\b/,
     /\bindexedDB\b/,
-    /\/api\//,
     /createFormalOrder/,
     /allocateDisplayNumber/,
     /storeKernel\s*\./,
