@@ -1,3 +1,4 @@
+// Build refresh: preserve Customer menu revision through SMM bridge.
 // Build refresh: Admin-shared dining labels + hardened source lanes.
 import {validateRuntimeStaffAuthSnapshot,type RuntimeStaffIdentity,type StaffPinVerifier} from '../contracts/staff-auth-v1.ts';
 import {validateMfkAdminConfigEnvelope} from '../contracts/admin-config-sync-v1.ts';
