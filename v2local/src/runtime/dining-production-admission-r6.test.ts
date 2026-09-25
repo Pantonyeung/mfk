@@ -300,6 +300,22 @@ describe('Dining R6 automatic table-order admission',()=>{
     expect((await runtime.readDiningHold(hold.id)).archivedAt).toBeTruthy();
   });
 
+  it('unassign clears current Formal Order table label but retains last table on dining history',async()=>{
+    const runtime=await boot();
+    const hold=runtime.createHold({kind:'dining',items:[{id:'rice',name:'飯團',qty:1,unitMinor:4100,serviceMode:'dine-in'}],totalMinor:4100});
+    await runtime.assignDiningTable(hold.id,'T01');
+    await runtime.unassignDiningTable(hold.id);
+    const detail=await runtime.readDiningHold(hold.id);
+    const order=runtime.orders().find((row:any)=>row.diningHoldId===hold.id);
+    expect(detail.assignedTable).toBeUndefined();
+    expect(detail.lastAssignedTable).toBe('T01');
+    expect(order.diningTableLabel).toBeUndefined();
+    await runtime.assignDiningTable(hold.id,'T02');
+    const moved=runtime.orders().find((row:any)=>row.diningHoldId===hold.id);
+    expect(moved.id).toBe(order.id);
+    expect(moved.diningTableLabel).toBe('T02');
+  });
+
   it('formal Order link survives runtime restart',async()=>{
     let runtime=await boot();
     const hold=runtime.createHold({kind:'dining',items:[{id:'rice',name:'飯團',qty:1,unitMinor:4100,serviceMode:'dine-in'}],totalMinor:4100});
