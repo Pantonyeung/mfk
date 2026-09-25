@@ -65,6 +65,7 @@ export interface StoredOrder{
   productionAdmissionAttemptedAt?:string;
   productionAdmissionState?:'DISPATCHING'|'DONE'|'FAILED'|'UNKNOWN';
   productionAdmissionSummary?:Readonly<{planned:number;sent:number;failed:number}>;
+  productionAdmissionResults?:readonly PrintDispatchResult[];
   paymentEvidenceRef?:string;paymentVerificationState?:'PENDING'|'VERIFIED'|'REJECTED';
   items:readonly {id:string;name:string;qty:number;unitMinor:number;serviceMode?:'takeaway'|'dine-in';productCode?:string;detail?:string;composition?:MfkOrderLineCompositionV1}[];
 }
@@ -106,6 +107,7 @@ export interface LocalDiningHoldDetail{
   readonly productionAdmittedAt?:string;
   readonly firstPrintState?:'NOT_STARTED'|'DISPATCHING'|'DONE'|'FAILED'|'UNKNOWN';
   readonly firstPrintSummary?:Readonly<{planned:number;sent:number;failed:number}>;
+  readonly firstPrintResults?:readonly PrintDispatchResult[];
   readonly holdId:string;
   readonly codeLabel:string;
   readonly assignedTable?:string;
@@ -167,7 +169,7 @@ function save(){localStorage.setItem(KEY,JSON.stringify(data));listeners.forEach
 function projectOrder(order:StoredOrder){queueOrderProjection(order)}
 const money=(minor:number)=>String.fromCharCode(36)+(minor/100).toFixed(2);
 
-export interface SmtReprintOption{readonly jobId:string;readonly role:string;readonly label:string;readonly detail?:string;readonly bindingId:string;readonly printerName:string;readonly physicalKey:string}
+export interface SmtReprintOption{readonly jobId:string;readonly role:string;readonly label:string;readonly detail?:string;readonly bindingId:string;readonly printerName:string;readonly physicalKey:string;readonly firstPrintState?:'DONE'|'FAILED'|'UNKNOWN';readonly firstPrintCode?:string}
 export interface CleanSmtCoreRuntimePort{
   subscribe(listener:()=>void):()=>void;
   readOrders?(selectedOrderId?:string):Promise<SmtOrdersProjection>;
@@ -594,6 +596,10 @@ function diningDetail(hold:LocalHoldDraft):LocalDiningHoldDetail{
       const order=hold.formalOrderId?data.orders.find(row=>row.id===hold.formalOrderId):undefined;
       return order?.productionAdmissionSummary;
     })(),
+    firstPrintResults:(()=>{
+      const order=hold.formalOrderId?data.orders.find(row=>row.id===hold.formalOrderId):undefined;
+      return order?.productionAdmissionResults;
+    })(),
     codeLabel:hold.codeLabel,
     assignedTable:hold.assignedTable,
     createdAt:hold.createdAt,
@@ -959,6 +965,7 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
   async readOrderReprintOptions(orderId){
     const order=data.orders.find(x=>x.id===orderId);
     if(!order)throw new Error('ORDER_NOT_FOUND');
+    const firstResults=new Map((order.productionAdmissionResults??[]).map(row=>[row.jobId,row] as const));
     return buildOrderPrintPlan(order,readPrinterBindings(),readSmtPrintConfig()).map(job=>Object.freeze({
       jobId:job.id,
       role:job.role,
@@ -967,6 +974,8 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
       bindingId:job.binding.id,
       printerName:job.binding.name,
       physicalKey:job.binding.host.trim()+':'+job.binding.port,
+      firstPrintState:firstResults.has(job.id)?(firstResults.get(job.id)!.ok?'DONE':'FAILED'):'UNKNOWN',
+      firstPrintCode:firstResults.get(job.id)?.code,
     }));
   },
   async reprintOrderJobs(orderId,jobIds,reason){
@@ -1311,7 +1320,7 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
       const summary=await dispatchOrderOutputs(current,productionJobIds);
       const state=summary.failed>0?'FAILED':'DONE';
       const updatedAt=new Date().toISOString();
-      data={...data,orders:data.orders.map(row=>row.id===current.id?{...row,productionAdmissionState:state,productionAdmissionSummary:{planned:summary.planned,sent:summary.sent,failed:summary.failed},...(summary.results.some(result=>result.role==='製作單'&&result.ok)&&!row.productionIssuedAt?{productionIssuedAt:updatedAt}:{}),updatedAt}:row)};
+      data={...data,orders:data.orders.map(row=>row.id===current.id?{...row,productionAdmissionState:state,productionAdmissionSummary:{planned:summary.planned,sent:summary.sent,failed:summary.failed},productionAdmissionResults:summary.results,...(summary.results.some(result=>result.role==='製作單'&&result.ok)&&!row.productionIssuedAt?{productionIssuedAt:updatedAt}:{}),updatedAt}:row)};
       save();
       appendActionAudit({action:'DINING_PRODUCTION_PRINT',orderId:current.id,reason:state});
       return {hold:clone(diningDetail(requireDiningHold(readDiningState(),holdId))),orderId:current.id,display:current.display,print:summary};
