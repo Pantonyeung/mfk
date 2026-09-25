@@ -1,7 +1,7 @@
 MFK_ADMIN_DEPLOY_REQUEST
 target=mfk-admin
 canonical_url=https://admin.morefunos.com
-product_source=feae2df093e075a9cf98b47ef601cb6659ce3f10
+product_source=aed05d515061cd0bf078c5f5886270a187a86bcb
 requested_by=owner
-reason=customer_quote_bridge_trace
-work_id=MFK-CUSTOMER-BRIDGE-TRACE-R3
+reason=smm_shared_customer_bridge
+work_id=MFK-SMM-SHARED-CUSTOMER-BRIDGE-R9
