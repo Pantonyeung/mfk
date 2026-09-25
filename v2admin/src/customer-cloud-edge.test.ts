@@ -53,4 +53,16 @@ describe('Customer Cloud Edge authority gate',()=>{
     expect(runtime).not.toContain('SmmIntentStore');
   });
 
+
+  it('publishes Admin-configured WhatsApp fallback and exposes only bounded SMT health',()=>{
+    const runtime=readFileSync(new URL('../customer-runtime.ts',import.meta.url),'utf8');
+    expect(worker).toContain("customerWhatsAppNumber");
+    expect(worker).toContain("customerWhatsAppTemplate");
+    expect(worker).toContain("retryAttempts:3");
+    expect(worker).toContain("'/api/customer/channel-health'");
+    expect(runtime).toContain("'/public/channel-health'");
+    expect(runtime).toContain("diag:lastOrderPull");
+    expect(runtime).toContain("ageMs<=15000");
+  });
+
 });
