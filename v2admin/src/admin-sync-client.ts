@@ -104,6 +104,28 @@ export async function flushAdminSyncOutbox(){
   }
 }
 
+
+export async function uploadAdminPaymentQr(file:File,channelId:string,storeId='MF01'):Promise<{readonly qrImageUrl:string;readonly objectKey:string}>{
+  const id=channelId.trim().toUpperCase();
+  if(!/^[A-Z0-9][A-Z0-9_-]{1,39}$/.test(id))throw new Error('PAYMENT_CHANNEL_ID_INVALID');
+  if(!['image/jpeg','image/png','image/webp'].includes(file.type))throw new Error('付款 QR 只支援 JPG、PNG 或 WebP');
+  if(file.size<1||file.size>5*1024*1024)throw new Error('付款 QR 圖片必須細過 5MB');
+  const key=publisherKey();
+  if(!key)throw new Error('ADMIN_SYNC_PUBLISHER_KEY_UNAVAILABLE');
+  const url='/api/admin/payment-qr?storeId='+encodeURIComponent(storeId)+'&channelId='+encodeURIComponent(id);
+  const response=await fetch(url,{
+    method:'POST',
+    credentials:'same-origin',
+    headers:{'content-type':file.type,'x-mfk-admin-publish-key':key},
+    body:file,
+  });
+  const body=await response.json().catch(()=>({})) as Record<string,unknown>;
+  if(!response.ok||typeof body.qrImageUrl!=='string'||typeof body.objectKey!=='string'){
+    throw new Error(typeof body.code==='string'?body.code:'ADMIN_PAYMENT_QR_UPLOAD_HTTP_'+response.status);
+  }
+  return Object.freeze({qrImageUrl:body.qrImageUrl,objectKey:body.objectKey});
+}
+
 export async function readAdminSyncAcks(storeId='MF01'):Promise<readonly MfkAdminConfigAck[]>{
   if(typeof fetch==='undefined')return [];
   try{
