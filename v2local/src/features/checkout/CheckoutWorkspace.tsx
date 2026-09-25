@@ -98,12 +98,12 @@ export function CheckoutWorkspace({view,actions}:{view:CheckoutWorkspaceViewMode
 
           <div className="checkout-entry-grid">
             <div className="checkout-keypad">
-              {keypad.map(key=><button type="button" key={key} disabled={!keypadEnabled} onClick={()=>actions.onCashKey(key==='.'?'00':key)}>{key}</button>)}
+              {keypad.map(key=><button type="button" key={key} disabled={!keypadEnabled} onClick={()=>actions.onCashKey(key)}>{key}</button>)}
             </div>
             <div className="checkout-entry-side">
               <div className="checkout-quick-cash">
                 <button type="button" onClick={actions.onExactCash} disabled={!keypadEnabled||!view.exactCashEnabled}>剛好</button>
-                {[50,100,200,500].map(amount=><button type="button" key={amount} disabled={!keypadEnabled} onClick={()=>actions.onQuickCash(amount)}>+{amount}</button>)}
+                {[20,50,100,200,500].map(amount=><button type="button" key={amount} disabled={!keypadEnabled} onClick={()=>actions.onQuickCash(amount)}>+{amount}</button>)}
               </div>
               <button type="button" className="checkout-delete" onClick={()=>actions.onCashKey('⌫')} disabled={!keypadEnabled}>⌫ 刪除</button>
               <div className="checkout-cash-value"><span>實收</span><strong>{view.cashInput||'0'}</strong></div>
@@ -132,5 +132,45 @@ export function CheckoutWorkspace({view,actions}:{view:CheckoutWorkspaceViewMode
       {failure?<div className="checkout-payment-alert"><b>未完成</b><span>{view.failureMessage??'請核對資料後重試。'}</span><button type="button" onClick={actions.onRetry}>重試</button></div>:null}
       {success&&view.completionReview?<div className="checkout-payment-state success">已完成 · {view.completionReview.displayOrderCode} · {view.completionReview.tenderLabel}</div>:null}
     </section>
+
+    {view.completionReview?<div className="checkout-completion-backdrop" role="presentation">
+      <section className="checkout-completion-modal" role="dialog" aria-modal="true" aria-label="交易完成核對">
+        <header>
+          <div><small>COMPLETION REVIEW</small><h2>交易已完成</h2><p>正式交易已提交；打印／櫃桶狀態會喺下面更新。</p></div>
+          <strong>#{view.completionReview.displayOrderCode}</strong>
+        </header>
+
+        <div className="checkout-completion-body">
+          <section className="checkout-completion-summary">
+            <article><span>來源</span><b>{view.completionReview.sourceLabel}</b></article>
+            <article><span>付款方式</span><b>{view.completionReview.tenderLabel}</b></article>
+            <article><span>總額</span><b>{view.completionReview.dueLabel}</b></article>
+            {view.completionReview.receivedLabel?<article><span>實收</span><b>{view.completionReview.receivedLabel}</b></article>:null}
+            {view.completionReview.changeLabel?<article><span>找續</span><b>{view.completionReview.changeLabel}</b></article>:null}
+            <article><span>狀態</span><b>{view.completionReview.statusLabel}</b></article>
+          </section>
+
+          <section className="checkout-completion-ops">
+            <div><span>打印</span><b>{view.completionReview.printStatusLabel}</b></div>
+            <div><span>櫃桶</span><b>{view.completionReview.drawerStatusLabel}</b></div>
+          </section>
+
+          {view.completionReview.canCorrectPayment?<section className="checkout-payment-correction">
+            <header><b>付款方式修正</b><span>只修正 SAME Order；不重新打印、不再開櫃桶。</span></header>
+            <div>{view.completionReview.correctionMethods.map(method=><button
+              type="button"
+              key={method.id}
+              className={method.selected?'active':''}
+              disabled={!method.enabled}
+              onClick={()=>actions.onCorrectPayment(method.id)}
+            ><i>{tenderIcon[method.id]??'•'}</i><b>{method.label}</b></button>)}</div>
+          </section>:null}
+        </div>
+
+        <footer>
+          <button type="button" className="checkout-completion-done" onClick={actions.onDone}>完成</button>
+        </footer>
+      </section>
+    </div>:null}
   </main>;
 }
