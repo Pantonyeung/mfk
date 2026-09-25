@@ -104,6 +104,8 @@ export interface LocalDiningHoldDetail{
   readonly lastAssignedTable?:string;
   readonly formalOrderId?:string;
   readonly productionAdmittedAt?:string;
+  readonly firstPrintState?:'NOT_STARTED'|'DISPATCHING'|'DONE'|'FAILED'|'UNKNOWN';
+  readonly firstPrintSummary?:Readonly<{planned:number;sent:number;failed:number}>;
   readonly holdId:string;
   readonly codeLabel:string;
   readonly assignedTable?:string;
@@ -584,6 +586,14 @@ function diningDetail(hold:LocalHoldDraft):LocalDiningHoldDetail{
     lastAssignedTable:hold.lastAssignedTable,
     formalOrderId:hold.formalOrderId,
     productionAdmittedAt:hold.productionAdmittedAt,
+    firstPrintState:(()=>{
+      const order=hold.formalOrderId?data.orders.find(row=>row.id===hold.formalOrderId):undefined;
+      return order?.productionAdmissionState??'NOT_STARTED';
+    })(),
+    firstPrintSummary:(()=>{
+      const order=hold.formalOrderId?data.orders.find(row=>row.id===hold.formalOrderId):undefined;
+      return order?.productionAdmissionSummary;
+    })(),
     codeLabel:hold.codeLabel,
     assignedTable:hold.assignedTable,
     createdAt:hold.createdAt,
@@ -1185,6 +1195,7 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
     commitDiningHolds(snapshot,snapshot.holds.filter(row=>row.id!==id));
   },
   async assignDiningTable(holdId,tableId){
+    return withDiningMutationLock('table:'+holdId,async()=>{
     const snapshot=readDiningState();const hold=requireDiningHold(snapshot,holdId);
     if(hold.archivedAt)throw new Error('DINING_HISTORY_PROTECTED');
     const allowedTables=readSmtStoreSettings().diningTables;
@@ -1209,6 +1220,7 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
     }
     // Owner contract: 第一次掛入堂食枱就係落單 + 首次完整打印。
     if(hold.items.length)await localRuntime.admitDiningProduction(holdId);
+    });
   },
   async unassignDiningTable(holdId){
     const snapshot=readDiningState();const hold=requireDiningHold(snapshot,holdId);
@@ -1224,6 +1236,7 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
       .sort((a,b)=>String(b.archivedAt).localeCompare(String(a.archivedAt))).map(hold=>clone(diningDetail(hold)));
   },
   async admitDiningProduction(holdId){
+    return withDiningMutationLock('admission:'+holdId,async()=>{
     const snapshot=readDiningState();
     const hold=requireDiningHold(snapshot,holdId);
     if(hold.archivedAt)throw new Error('DINING_HISTORY_PROTECTED');
@@ -1294,8 +1307,10 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
       appendActionAudit({action:'DINING_PRODUCTION_PRINT_UNKNOWN',orderId:current.id});
       throw error;
     }
+    });
   },
   async printDiningPaymentReceipt(holdId,submissionId){
+    return withDiningMutationLock('receipt:'+holdId+':'+submissionId,async()=>{
     let snapshot=readDiningState();
     let hold=requireDiningHold(snapshot,holdId);
     if(!hold.formalOrderId)throw new Error('DINING_FORMAL_ORDER_NOT_CREATED');
@@ -1340,6 +1355,7 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
       appendActionAudit({action:'DINING_PAYMENT_RECEIPT_UNKNOWN',orderId:order.id,reason:paymentLabel});
       throw error;
     }
+    });
   },
   async reprintDiningPaymentReceipt(holdId,submissionId){
     const hold=requireDiningHold(readDiningState(),holdId);
@@ -1472,12 +1488,14 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
     });
   },
   async clearDiningHold(holdId){
+    return withDiningMutationLock('payment:'+holdId,async()=>{
     const snapshot=readDiningState();const hold=requireDiningHold(snapshot,holdId);
     if(hold.archivedAt)return;
     const detail=diningDetail(hold);
     if(detail.remainingMinor>0||!detail.lines.length||!detail.payments.length||detail.lines.some(row=>row.remainingQty>0))throw new Error('DINING_BALANCE_REMAINING');
     const archived=archiveDiningHold(hold,new Date().toISOString());
     commitDiningHolds(snapshot,snapshot.holds.map(row=>row.id===holdId?archived:row));
+    });
   },
   async readAvailability(){
     return {revision:1,nodes:Object.entries(productNames).map(([nodeId,label])=>({nodeId,label,status:data.availability[nodeId]||'available',sourceLabel:'LOCAL'})),canChange:true};
