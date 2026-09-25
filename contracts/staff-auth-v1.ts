@@ -63,6 +63,15 @@ export async function createStaffPinVerifier(pin:string):Promise<StaffPinVerifie
   });
 }
 
+export function verifyConfiguredStaffPin(pin:string,configuredPin:string){
+  let left:string,right:string;
+  try{left=cleanPin(pin);right=cleanPin(configuredPin);}catch{return false;}
+  if(left.length!==right.length)return false;
+  let diff=0;
+  for(let i=0;i<left.length;i++)diff|=left.charCodeAt(i)^right.charCodeAt(i);
+  return diff===0;
+}
+
 export async function verifyStaffPin(pin:string,verifier:StaffPinVerifier){
   if(verifier.algorithm!==MFK_STAFF_PIN_ALGORITHM)return false;
   if(!Number.isSafeInteger(verifier.iterations)||verifier.iterations<100000)return false;
