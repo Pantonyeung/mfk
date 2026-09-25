@@ -10,7 +10,7 @@ Object.defineProperty(globalThis,'localStorage',{value:{
 vi.mock('./admin-config-sync.ts',()=>({
   readSmtAdminConfigLkg:()=>({revision:7,fingerprint:'fp7'}),
   readSmtDeviceId:()=> 'SMT-1',
-  readAdminSnapshotSection:(key:string)=>key==='storeSettings'?{diningTables:Array.from({length:9},(_,index)=>({id:'T'+String(index+1).padStart(2,'0'),name:String(index+1)+' 號枱',active:true,sortOrder:index+1}))}:{},
+  readAdminSnapshotSection:(key:string)=>key==='storeSettings'?{diningTables:Array.from({length:9},(_,index)=>({id:'T'+String(index+1).padStart(2,'0'),name:index===2?'堂三':String(index+1)+' 號枱',active:true,sortOrder:index+1}))}:{},
   subscribeSmtAdminConfig:()=>()=>{},
   subscribeSmtCloudDoorbell:()=>()=>{},
 }));
@@ -125,7 +125,7 @@ describe('SMM LAN ingress',()=>{
     expect(snapshot.orders[0]).toMatchObject({displayCode:'P009',lifecycle:'進行中',readback:'CONFIRMED'});
     expect(snapshot.dineSessions).toHaveLength(1);
     expect(snapshot.dineSessions[0]).toMatchObject({
-      sessionId:'HOLD-3',tableLabel:'3 號枱',covers:2,totalMinor:8200,paidMinor:4100,remainingMinor:4100,
+      sessionId:'HOLD-3',tableLabel:'堂三',covers:2,totalMinor:8200,paidMinor:4100,remainingMinor:4100,
     });
     expect(snapshot.dineSessions[0].lines[0]).toMatchObject({qty:2,paidQty:1,remainingQty:1});
   });
