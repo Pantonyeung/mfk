@@ -853,15 +853,15 @@ function CheckoutPage({cart,setCart,diningCheckout,onDiningCheckoutDone}:{cart:C
     const cashPayment=payment.tender==='CASH';
     setCompletion({
       heading:'堂食付款已記錄',
-      helperLabel:'已保存原單付款紀錄；此預覽尚未連接正式訂單及堂食打印。',
+      helperLabel:'付款已寫入同一堂食正式單；付款收據會獨立打印。',
       displayOrderCode:updated.codeLabel,
       sourceLabel:'堂食 · '+place,
       tenderLabel:methodLabels[payment.tender]??payment.tender,
       dueLabel:money(payment.amountMinor),
       ...(cashPayment?{receivedLabel:money(payment.receivedMinor??payment.amountMinor),changeLabel:money(payment.changeMinor??0)}:{}),
       statusLabel:updated.archivedAt?(diningCheckout.tableLabel?'堂食已付清，桌台已釋放':'輪候單已付清，紀錄已保留'):'堂食分項結帳完成，餘額保留 '+money(updated.remainingMinor),
-      printStatusLabel:'堂食打印尚未接通，未發送',
-      drawerStatusLabel:cashPayment?'開櫃指令尚未接通，未發送':'非現金：不開櫃桶',
+      printStatusLabel:'付款已保存 · 正在送付款收據',
+      drawerStatusLabel:cashPayment?'現金櫃桶：等待付款收據打印結果':'非現金：不開櫃桶',
       canCorrectPayment:false,correctionMethods:[],
     });
     setState('success');setCheckoutFailure(undefined);
@@ -902,6 +902,21 @@ function CheckoutPage({cart,setCart,diningCheckout,onDiningCheckoutDone}:{cart:C
         const payment=updated.payments.find(row=>row.submissionId===diningCheckout.submissionId);
         if(!payment)throw new Error('DINING_PAYMENT_READBACK_UNKNOWN');
         showDiningReceipt(updated,payment);
+        void localRuntime.printDiningPaymentReceipt?.(updated.holdId,payment.submissionId??'').then(summary=>{
+          const receipt=summary.results[0];
+          setCompletion(current=>current?{
+            ...current,
+            printStatusLabel:receipt?.ok?'堂食付款收據已送出':'堂食付款收據失敗／需人工檢查',
+            drawerStatusLabel:payment.tender!=='CASH'
+              ?'非現金：不開櫃桶'
+              :receipt?.ok
+                ?'現金櫃桶：已隨付款收據開櫃'
+                :'現金櫃桶：收據／開櫃狀態需人工檢查',
+          }:current);
+        }).catch(error=>{
+          const detail=error instanceof Error?error.message:String(error);
+          setCompletion(current=>current?{...current,printStatusLabel:'堂食付款收據失敗 · '+detail,drawerStatusLabel:payment.tender==='CASH'?'現金櫃桶：狀態需人工檢查':'非現金：不開櫃桶'}:current);
+        });
         return;
       }
 
