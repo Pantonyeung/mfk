@@ -20,7 +20,8 @@ import {resolveBusinessWindow} from './runtime/local-operations.ts';
 import {RuntimeReadyActivation} from './runtime/RuntimeReadyActivation.tsx';
 import {StaffAuthGate,StaffSessionBadge} from './presentation/StaffAuthGate.tsx';
 import {CashOpeningGate} from './presentation/CashOpeningGate.tsx';
-import {hasStaffPermission,readActiveStaffSession} from './runtime/staff-auth.ts';
+import {readActiveStaffSession,staffAuthRequired} from './runtime/staff-auth.ts';
+import {DEFAULT_SMT_FRONTLINE_UI_PREFERENCES,readSmtFrontlineUiPreferences,writeSmtFrontlineUiPreferences,type SmtFrontlineUiPreferences} from './runtime/frontline-ui-preferences.ts';
 import {HoldCartWorkspace,HoldListWorkspace,ProductConfigWorkspace,type OrderingPanelState,type WorkspaceHoldDraft,type WorkspaceProduct} from './features/ordering/OrderingCenterWorkspaces.tsx';
 import {ComboFastLaneWorkspace,RequiredFastLaneWorkspace,RiceballPoolWorkspace} from './features/ordering/FastLaneWorkspaces.tsx';
 import {PendingOrderReviewWorkspace} from './features/ordering/PendingOrderReviewWorkspace.tsx';
@@ -79,13 +80,12 @@ const nav=[
   {to:'/',label:'點餐',icon:'▦',end:true},
   {to:'/orders',label:'訂單',icon:'▤'},
   {to:'/dining',label:'堂食',icon:'▱'},
-  {to:'/soldout',label:'售罄',icon:'⊘'},
-  {to:'/more',label:'更多',icon:'•••'},
+  {to:'/soldout',label:'售罄／產能',icon:'⊘'},
 ] as const;
 
 function OrderingPage({
   cart,setCart,serviceMode,setServiceMode,orderingMode,setOrderingMode,quickDrinkOpen,setQuickDrinkOpen,
-  showImagesOverride,showCategoriesOverride,categoryRowsOverride,categoryColumnsOverride,productDensityOverride,onQuickDrinkCountChange,
+  uiPreferences,onQuickDrinkCountChange,
 }:{
   cart:CartLine[];
   setCart:(v:CartLine[])=>void;
@@ -95,11 +95,7 @@ function OrderingPage({
   setOrderingMode:(mode:'normal'|'quick')=>void;
   quickDrinkOpen:boolean;
   setQuickDrinkOpen:(value:boolean|((current:boolean)=>boolean))=>void;
-  showImagesOverride?:boolean;
-  showCategoriesOverride?:boolean;
-  categoryRowsOverride?:1|2;
-  categoryColumnsOverride?:5|6|7;
-  productDensityOverride?:'standard'|'compact';
+  uiPreferences:SmtFrontlineUiPreferences;
   onQuickDrinkCountChange:(count:number)=>void;
 }){
   const navigate=useNavigate();
@@ -137,7 +133,7 @@ function OrderingPage({
   const storeSettings=useMemo(()=>{void adminConfigRevision;return readSmtStoreSettings();},[adminConfigRevision]);
   const frontlinePresentation=useMemo(()=>{void adminConfigRevision;return readSmtFrontlinePresentation();},[adminConfigRevision]);
   const activeStaff=readActiveStaffSession();
-  const canOverridePrice=activeStaff?.role==='OWNER'||hasStaffPermission('PRICE_OVERRIDE');
+  const canOverridePrice=Boolean(activeStaff)||!staffAuthRequired();
   useEffect(()=>{
     if(serviceMode==='takeaway'&&!storeSettings.takeawayEnabled&&storeSettings.dineInEnabled)setServiceMode('dine-in');
     if(serviceMode==='dine-in'&&!storeSettings.dineInEnabled&&storeSettings.takeawayEnabled)setServiceMode('takeaway');
@@ -363,7 +359,7 @@ function OrderingPage({
       enabled:product.priceReady&&product.sellable&&((serviceMode==='takeaway'&&storeSettings.takeawayEnabled)||(serviceMode==='dine-in'&&storeSettings.dineInEnabled)),
       requiresOptions:product.priceReady&&product.sellable&&product.optionSets.length>0,
       quickAddAllowed:!product.optionSets.some(set=>set.forceShow&&!set.required&&set.min===0),
-      imageUrl:(showImagesOverride??frontlinePresentation.showImages)?(product.imageUrl??productArtwork(product)):undefined,
+      imageUrl:uiPreferences.showImages?(product.imageUrl??productArtwork(product)):undefined,
       ...(!product.priceReady?{badge:'未接價格'}:!product.sellable?{badge:'停售'}:{}),
     })),
     menuRevisionLabel:adminConfig
@@ -372,10 +368,13 @@ function OrderingPage({
     operationalNotice:capacityNotice
       ?'今日 '+capacityNotice.currentCount+'/'+capacityNotice.dailyLimit+' 單 · 已到 '+capacityNotice.warningAt+'% 提醒門檻'+(capacityNotice.hardStopConfigured?' · Admin 有 hard-stop 設定但目前只提示':'')
       :undefined,
-    showCategories:showCategoriesOverride??frontlinePresentation.showCategories,
-    categoryRows:categoryRowsOverride??2,
-    categoryColumns:categoryColumnsOverride??7,
-    productDensity:productDensityOverride??'standard',
+    showCategories:uiPreferences.showCategories,
+    categoryRows:uiPreferences.categoryRows,
+    categoryColumns:uiPreferences.categoryColumns,
+    productColumns:uiPreferences.productColumns,
+    productCardHeight:uiPreferences.productCardHeight,
+    fontScale:uiPreferences.fontScale,
+    densityScale:uiPreferences.densityScale,
     serviceModes:{takeaway:storeSettings.takeawayEnabled,dineIn:storeSettings.dineInEnabled},
     cart:{
       orderId:nextDisplay,serviceMode,viewMode,combineSimilar,
@@ -393,9 +392,9 @@ function OrderingPage({
     },
     heldCartCount:waitingHolds.length,
     workItems:[
-      {id:'riceball-pool',label:'飯團待組區',count:riceballPoolCount},
+      {id:'riceball-pool',label:'快速組合',count:riceballPoolCount},
       {id:'required',label:'必選區',count:requiredWork.length},
-      {id:'combo',label:'飯團餐配對',count:comboWorkCount},
+      {id:'combo',label:'紫米套餐區',count:comboWorkCount},
     ],
     actionAvailability:{
       lineServiceMode:true,
@@ -653,7 +652,7 @@ function OrderingPage({
     },
     onHoldCart:()=>{if(cart.length){setPanelDirty(false);setPanel({type:'hold'});}},
     onOpenHeldOrders:()=>{if(!cart.length&&waitingHolds.length){setPanelDirty(false);setPanel({type:'holds'});}},
-    onCancelCart:()=>setCart([]),
+    onCancelCart:()=>{if(cart.length&&window.confirm('確定取消目前訂單？'))setCart([]);},
     onOpenWorkItem:id=>{setPanelDirty(false);setPanel({type:'fast-lane',lane:id});},
     onOpenQueueOrder:(_kind,id)=>{setQuickDrinkOpen(false);setPanelDirty(false);setPanel({type:'pending-order',orderId:id});},
     onCheckout:()=>navigate('/checkout'),
