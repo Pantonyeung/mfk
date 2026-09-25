@@ -31,13 +31,9 @@ async function readResult(submissionId:string,signal?:AbortSignal):Promise<Recor
 }
 
 function finalResponse(request:SmmLanOrderRequest,body:Record<string,unknown>):SmmLanOrderResponse|null{
-  const result=body.result;
-  if(!result||typeof result!=='object'||Array.isArray(result))return null;
-  const row=result as Record<string,unknown>;
-  if(row.disposition==='ACCEPTED'){
-    const orderId=String(row.orderId??'').trim();
-    const canonicalRevision=Number(row.canonicalRevision);
-    if(!orderId||!Number.isSafeInteger(canonicalRevision))return null;
+  if(body.state==='CONFIRMED'){
+    const orderId=String(body.canonicalOrderId??'').trim();
+    if(!orderId)return null;
     return Object.freeze({
       protocolVersion:1,
       type:'smm.lan.order.result.v1',
@@ -46,10 +42,10 @@ function finalResponse(request:SmmLanOrderRequest,body:Record<string,unknown>):S
       idempotencyKey:request.idempotencyKey,
       disposition:'ACCEPTED',
       orderId,
-      canonicalRevision,
+      canonicalRevision:1,
     });
   }
-  if(row.disposition==='REJECTED'){
+  if(body.state==='REJECTED'){
     return Object.freeze({
       protocolVersion:1,
       type:'smm.lan.order.result.v1',
@@ -57,7 +53,7 @@ function finalResponse(request:SmmLanOrderRequest,body:Record<string,unknown>):S
       submissionId:request.submissionId,
       idempotencyKey:request.idempotencyKey,
       disposition:'REJECTED',
-      reasonCode:String(row.reasonCode||'SMM_CLOUD_REJECTED'),
+      reasonCode:String(body.code||'SMM_CLOUD_REJECTED'),
     });
   }
   return null;
@@ -106,19 +102,16 @@ export function createPwaCloudTransport():SmmLanTransport{
     async readSubmission(submissionId:string,signal:AbortSignal):Promise<SmmLanSubmissionReadbackResponse|Readonly<{state:'UNAVAILABLE'}>>{
       const body=await readResult(submissionId,signal).catch(()=>null);
       if(!body)return{state:'UNAVAILABLE'};
-      const result=body.result;
-      if(!result||typeof result!=='object'||Array.isArray(result))return{protocolVersion:1,type:'smm.lan.order.readback.result.v1',submissionId,state:'UNKNOWN'};
-      const row=result as Record<string,unknown>;
-      if(row.disposition==='ACCEPTED'){
+      if(body.state==='CONFIRMED'){
         return Object.freeze({
           protocolVersion:1,type:'smm.lan.order.readback.result.v1',submissionId,state:'CONFIRMED',
-          orderId:String(row.orderId||''),canonicalRevision:Number(row.canonicalRevision)||1,
+          orderId:String(body.canonicalOrderId||''),canonicalRevision:1,
         });
       }
-      if(row.disposition==='REJECTED'){
+      if(body.state==='REJECTED'){
         return Object.freeze({
           protocolVersion:1,type:'smm.lan.order.readback.result.v1',submissionId,state:'REJECTED',
-          reasonCode:String(row.reasonCode||'SMM_CLOUD_REJECTED'),
+          reasonCode:String(body.code||'SMM_CLOUD_REJECTED'),
         });
       }
       return{protocolVersion:1,type:'smm.lan.order.readback.result.v1',submissionId,state:'UNKNOWN'};
