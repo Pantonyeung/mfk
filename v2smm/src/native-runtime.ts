@@ -21,7 +21,7 @@ window.__MFK_SMM_NATIVE_RESULT__=(correlationId,payload)=>{
   try{item.resolve(JSON.parse(payload) as SmmLanOrderResponse);}catch{item.reject(new Error('SMM_NATIVE_RESPONSE_INVALID'));}
 };
 
-function sendNative(request:SmmLanOrderRequest):Promise<SmmLanOrderResponse>{
+function sendNative(request:object):Promise<SmmLanOrderResponse|SmmLanSubmissionReadbackResponse>{
   const bridge=window.MfkSmmNative;
   if(!bridge)return Promise.reject(new Error('SMM_NATIVE_BRIDGE_UNAVAILABLE'));
   const correlationId=crypto.randomUUID();
@@ -39,16 +39,8 @@ const transport:SmmLanTransport={
   },
   async readSubmission(submissionId){
     try{
-      const response=await sendNative({
-        protocolVersion:1,
-        type:'smm.lan.order.readback.v1',
-        requestId:'READ-'+submissionId,
-        submissionId,
-        idempotencyKey:'READ-'+submissionId,
-        storeId:'MF01',
-        lines:[],
-      } as unknown as SmmLanOrderRequest);
-      return response as unknown as SmmLanSubmissionReadbackResponse;
+      const response=await sendNative({protocolVersion:1,type:'smm.lan.order.readback.v1',submissionId,storeId:'MF01'});
+      return response as SmmLanSubmissionReadbackResponse;
     }catch{return{state:'UNAVAILABLE'};}
   },
 };
