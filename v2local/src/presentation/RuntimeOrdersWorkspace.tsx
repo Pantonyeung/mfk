@@ -1,7 +1,7 @@
 import {useCallback,useEffect,useMemo,useState} from 'react';
 import {useSearchParams} from 'react-router';
 import type {CleanSmtCoreRuntimePort,SmtOrdersProjection,SmtReprintOption} from '../runtime/local-runtime.ts';
-import {hasStaffPermission} from '../runtime/staff-auth.ts';
+import {readActiveStaffSession,staffAuthRequired} from '../runtime/staff-auth.ts';
 import {readSmtQuickReasons,readSmtStoreSettings} from '../runtime/admin-operational-config.ts';
 import {subscribeSmtAdminConfig} from '../runtime/admin-config-sync.ts';
 import {decideKeetaAfterSale,previewKeetaPartialRefund,readKeetaAfterSales,type KeetaAfterSaleCase} from '../runtime/keeta-after-sale.ts';
@@ -9,13 +9,21 @@ import {readKeetaOrderIntakeAttention,reconcileKeetaOrderIntake} from '../runtim
 import './orders-workspace.css';
 
 type PaymentFilter='全部'|'現金'|'Alipay'|'WeChat Pay'|'FPS / PayMe';
+type SourceFilter='全部'|'直接來源'|'自家平台'|'第三方平台';
 type Modal='actions'|'edit'|'cancel'|'reprint'|null;
 
 function sourceLane(source?:string){
   const value=String(source||'');
-  if(value.startsWith('現場'))return 'walkin';
-  if(value.startsWith('磨飯 App')||value.startsWith('電話')||value.startsWith('WhatsApp'))return 'app';
+  if(value.startsWith('現場')||value.startsWith('電話')||value.startsWith('WhatsApp'))return 'direct';
+  if(value.startsWith('磨飯 App')||value.startsWith('自家 App'))return 'owned';
   return 'platform';
+}
+function sourceFilterMatches(source:string|undefined,filter:SourceFilter){
+  if(filter==='全部')return true;
+  const lane=sourceLane(source);
+  if(filter==='直接來源')return lane==='direct';
+  if(filter==='自家平台')return lane==='owned';
+  return lane==='platform';
 }
 function paymentMatches(label:string,filter:PaymentFilter){
   if(filter==='全部')return true;
@@ -27,8 +35,9 @@ function paymentMatches(label:string,filter:PaymentFilter){
 }
 
 export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePort}){
-  const canReview=hasStaffPermission('ORDER_REVIEW');
-  const canCorrect=hasStaffPermission('ORDER_CORRECTION');
+  const activeStaff=readActiveStaffSession();
+  const canReview=Boolean(activeStaff)||!staffAuthRequired();
+  const canCorrect=canReview;
   const [configRevision,setConfigRevision]=useState(0);
   useEffect(()=>subscribeSmtAdminConfig(()=>setConfigRevision(value=>value+1)),[]);
   void configRevision;
@@ -41,10 +50,13 @@ export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePor
   const [loading,setLoading]=useState(false);
   const [error,setError]=useState<string|null>(null);
   const [paymentFilter,setPaymentFilter]=useState<PaymentFilter>('全部');
+  const [sourceFilter,setSourceFilter]=useState<SourceFilter>('全部');
   const [history,setHistory]=useState(false);
   const [modal,setModal]=useState<Modal>(null);
   const [acceptBusy,setAcceptBusy]=useState(false);
   const [readyBusy,setReadyBusy]=useState(false);
+  const [unreadyBusy,setUnreadyBusy]=useState(false);
+  const [completeBusy,setCompleteBusy]=useState(false);
   const [message,setMessage]=useState<string|null>(null);
   const [reprintOptions,setReprintOptions]=useState<readonly SmtReprintOption[]>([]);
   const [selectedJobs,setSelectedJobs]=useState<Set<string>>(new Set());
@@ -124,13 +136,15 @@ export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePor
   const filtered=useMemo(()=>allItems.filter(order=>{
     const state=order.fulfillmentLabel;
     const inHistory=state==='已完成'||state==='已取消';
-    return (history?inHistory:!inHistory)&&paymentMatches(order.paymentLabel,paymentFilter);
-  }),[allItems,history,paymentFilter]);
+    return (history?inHistory:!inHistory)
+      &&sourceFilterMatches(order.sourceLabel,sourceFilter)
+      &&paymentMatches(order.paymentLabel,paymentFilter);
+  }),[allItems,history,sourceFilter,paymentFilter]);
 
   const lanes=useMemo(()=>[
-    {id:'walkin',label:'現場訂單',orders:filtered.filter(order=>sourceLane(order.sourceLabel)==='walkin')},
-    {id:'app',label:'磨飯 App／電話',orders:filtered.filter(order=>sourceLane(order.sourceLabel)==='app')},
-    {id:'platform',label:'平台訂單',orders:filtered.filter(order=>sourceLane(order.sourceLabel)==='platform')},
+    {id:'direct',label:'現場／直接來源',orders:filtered.filter(order=>sourceLane(order.sourceLabel)==='direct')},
+    {id:'owned',label:'自家平台',orders:filtered.filter(order=>sourceLane(order.sourceLabel)==='owned')},
+    {id:'platform',label:'第三方平台',orders:filtered.filter(order=>sourceLane(order.sourceLabel)==='platform')},
   ] as const,[filtered]);
 
   const pendingKeetaOrders=useMemo(()=>allItems.filter(order=>String(order.sourceLabel||'').startsWith('Keeta')&&order.fulfillmentLabel==='待處理'),[allItems]);
@@ -215,6 +229,26 @@ export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePor
     catch(cause){setMessage(cause instanceof Error?cause.message:'未能標記可取餐');}
     finally{setReadyBusy(false);}
   };
+  const markUnready=async()=>{
+    if(!selected||!runtime.markOrderUnready||unreadyBusy)return;
+    setUnreadyBusy(true);setMessage(null);
+    try{
+      await runtime.markOrderUnready(selected.orderId);
+      await load(selected.orderId,true);
+      setMessage('已退回未完成；同一 Order 繼續處理。');
+    }catch(cause){setMessage(cause instanceof Error?cause.message:'未能退回未完成');}
+    finally{setUnreadyBusy(false);}
+  };
+  const markCompleted=async()=>{
+    if(!selected||!runtime.markOrderCompleted||completeBusy)return;
+    setCompleteBusy(true);setMessage(null);
+    try{
+      await runtime.markOrderCompleted(selected.orderId);
+      await load(undefined,true);
+      setMessage('已標記已取餐。');
+    }catch(cause){setMessage(cause instanceof Error?cause.message:'未能標記已取餐');}
+    finally{setCompleteBusy(false);}
+  };
 
   const openReprint=async()=>{
     if(!selected||!runtime.readOrderReprintOptions)return;
@@ -292,7 +326,7 @@ export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePor
     current.options.push(option);map.set(key,current);return map;
   },new Map<string,{bindingId:string;printerName:string;physicalKey:string;options:SmtReprintOption[]}>()).values()];
 
-  if(!canReview)return <main className="order-manager"><section className="order-empty"><b>你冇查看訂單權限</b><p>需要 Admin 權限：ORDER_REVIEW。</p></section></main>;
+  if(!canReview)return <main className="order-manager"><section className="order-empty"><b>未登入 SMT</b><p>登入後即可使用訂單工作台。</p></section></main>;
 
   return <main className="order-manager">
     {customerArrival?<div className="keeta-arrival-backdrop" role="alertdialog" aria-modal="true">
@@ -357,12 +391,18 @@ export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePor
           {selected.fulfillmentLabel==='待處理'
             ?<button className="primary" disabled={!runtime.acceptOrder||acceptBusy||(Boolean(selected.paymentEvidenceRef)&&selected.paymentVerificationState!=='VERIFIED')} title={selected.paymentEvidenceRef&&selected.paymentVerificationState!=='VERIFIED'?'請先核對付款截圖':''} onClick={()=>void acceptSelected()}>{acceptBusy?'接單中…':String(selected.sourceLabel||'').startsWith('Keeta')?'接受 Keeta 訂單':'接受訂單'}</button>
             :null}
-          <button className="primary" disabled={!runtime.markOrderReady||readyBusy||selected.fulfillmentLabel==='待處理'||selected.fulfillmentLabel==='可取餐'||selected.fulfillmentLabel==='已完成'||selected.fulfillmentLabel==='已取消'} onClick={()=>void markReady()}>{readyBusy?'處理中…':'提前完成／可取餐'}</button>
+          {selected.fulfillmentLabel==='進行中'?<button className="primary" disabled={!runtime.markOrderReady||readyBusy} onClick={()=>void markReady()}>{readyBusy?'處理中…':'可取餐'}</button>:null}
+          {selected.fulfillmentLabel==='可取餐'?<button disabled={!runtime.markOrderUnready||unreadyBusy} onClick={()=>void markUnready()}>{unreadyBusy?'處理中…':'退回未完成'}</button>:null}
+          {selected.fulfillmentLabel==='可取餐'?<button className="primary" disabled={!runtime.markOrderCompleted||completeBusy} onClick={()=>void markCompleted()}>{completeBusy?'處理中…':'已取餐'}</button>:null}
         </footer>
       </article>:<div className="order-empty">選擇一張訂單。</div>}
     </aside>
 
     <section className="order-board">
+      <div className="order-source-filter">
+        <b>來源：</b>
+        {(['全部','直接來源','自家平台','第三方平台'] as const).map(filter=><button key={filter} className={sourceFilter===filter?'active':''} onClick={()=>setSourceFilter(filter)}>{filter}</button>)}
+      </div>
       <div className="order-payment-bar">
         <b>付款方式：</b>
         {(['全部','現金','Alipay','WeChat Pay','FPS / PayMe'] as const).map(filter=><button key={filter} className={paymentFilter===filter?'active':''} onClick={()=>setPaymentFilter(filter)}>{filter}<span>{paymentCounts.get(filter)??0}</span></button>)}
@@ -383,8 +423,10 @@ export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePor
             {lane.orders.length?lane.orders.map(order=><button key={order.orderId} className={snapshot?.selectedOrderId===order.orderId?'selected':''} onClick={()=>void load(order.orderId)}>
               <strong>{order.orderIdLabel}</strong>
               <span>{order.sourceLabel}</span>
+              {order.customerName?<small>{order.customerName}</small>:null}
               <small>{order.paymentLabel} · {order.itemCount} 件</small>
-              <div><em>{order.fulfillmentLabel}</em><b>{order.totalLabel}</b></div>
+              {order.externalOrderNo||order.pickupCode?<small>{order.externalOrderNo?'平台 '+order.externalOrderNo:''}{order.externalOrderNo&&order.pickupCode?' · ':''}{order.pickupCode?'取餐 '+order.pickupCode:''}</small>:null}
+              <div><em>{order.fulfillmentLabel==='進行中'?'未完成':order.fulfillmentLabel==='已完成'?'已取餐':order.fulfillmentLabel}</em><b>{order.totalLabel}</b></div>
             </button>):<p>目前沒有訂單。</p>}
           </div>
         </section>)}
