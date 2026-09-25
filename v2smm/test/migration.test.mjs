@@ -12,12 +12,15 @@ const registry=JSON.parse(fs.readFileSync(path.join(root,'capabilities.json'),'u
 const sourceFiles=fs.readdirSync(root).filter(name=>/\.(ts|tsx|js|jsx)$/.test(name));
 const source=sourceFiles.map(name=>fs.readFileSync(path.join(root,name),'utf8')).join('\n');
 
-test('capability registry stays unique and command authority remains disconnected',()=>{
+test('capability registry stays unique and only staff order intent is wired while SMT keeps authority',()=>{
   assert.equal(registry.length,54);
   assert.equal(new Set(registry.map(item=>item.id)).size,54);
   const commands=registry.filter(item=>item.kind==='COMMAND_SHAPE');
   assert.ok(commands.length>=1);
-  assert.deepEqual([...new Set(commands.map(item=>item.status))],['NOT_WIRED']);
+  const order=commands.find(item=>item.id==='FORMAL_ORDER_COMMAND');
+  assert.equal(order?.status,'WIRED_TO_SMT');
+  assert.match(String(order?.owner),/SMT formal order authority/);
+  assert.deepEqual([...new Set(commands.filter(item=>item.id!=='FORMAL_ORDER_COMMAND').map(item=>item.status))],['NOT_WIRED']);
   const reads=registry.filter(item=>item.kind!=='COMMAND_SHAPE');
   assert.deepEqual([...new Set(reads.map(item=>item.status))],['PRODUCT_READY_NOT_CONNECTED']);
 });
@@ -170,15 +173,22 @@ test('LAN failure falls back to Internet and connection setup stays out of the o
 });
 
 
-test('dedicated SMM worker projects the same published Admin release without exposing transaction authority',()=>{
+test('dedicated SMM worker projects published Admin truth and stores only durable staff intents',()=>{
   const worker=fs.readFileSync(path.join(repoRoot,'v2smm','worker.ts'),'utf8');
+  const wrangler=fs.readFileSync(path.join(repoRoot,'v2smm','wrangler.jsonc'),'utf8');
   assert.match(worker,/admin\.morefunos\.com\/api\/admin-sync\/active/);
   assert.match(worker,/publishedTakeawayUnitPriceMinor/);
   assert.match(worker,/publishedDineInUnitPriceMinor/);
   assert.match(worker,/publishedAdjustmentMinor/);
   assert.match(worker,/url\.pathname==='\/api\/smm\/snapshot'/);
+  assert.match(worker,/SmmIntentStore/);
+  assert.match(worker,/\/api\/smm\/orders\/submit/);
+  assert.match(worker,/\/api\/smm\/smt\/orders\/pending/);
+  assert.match(worker,/SMM_STAFF_UNAUTHORIZED/);
+  assert.match(wrangler,/SMM_INTENT_STORE/);
+  assert.match(wrangler,/new_sqlite_classes/);
   assert.match(worker,/env\.ASSETS\.fetch/);
-  assert.doesNotMatch(worker,/orders\/submit|createOrder|StoreKernel|D1Database/);
+  assert.doesNotMatch(worker,/createOrder|StoreKernel|D1Database/);
 });
 
 
@@ -194,4 +204,24 @@ test('SMM staff checkout has service mode and tender but no automatic drawer or 
   assert.match(ingress,/SMM_MENU_REVISION_CHANGED/);
   assert.match(ingress,/SMM_PUBLISHED_PRICE_CHANGED/);
   assert.doesNotMatch(ingress,/drawer|openDrawer|cashDrawer/);
+});
+
+
+test('Internet staff orders require staff PIN and fall back into the same SMT ingress',()=>{
+  const cloud=fs.readFileSync(path.join(root,'pwa-cloud.ts'),'utf8');
+  const staff=fs.readFileSync(path.join(root,'pwa-staff.ts'),'utf8');
+  const runtime=fs.readFileSync(path.join(root,'pwa-runtime.ts'),'utf8');
+  const app=fs.readFileSync(path.join(root,'App.tsx'),'utf8');
+  const smtCloud=fs.readFileSync(path.join(repoRoot,'v2local','src','runtime','smm-cloud-intake.ts'),'utf8');
+  assert.match(staff,/sessionStorage/);
+  assert.match(staff,/\/api\/smm\/staff\/verify/);
+  assert.match(cloud,/\/api\/smm\/orders\/submit/);
+  assert.match(cloud,/x-mfk-staff-id/);
+  assert.match(cloud,/x-mfk-staff-pin/);
+  assert.match(runtime,/hybridTransport/);
+  assert.match(runtime,/local\.kind!=='UNAVAILABLE'/);
+  assert.match(app,/員工登入/);
+  assert.match(app,/Internet 員工落單需要先/);
+  assert.match(smtCloud,/createSmmLanIngress|canonical SMM ingress|ingress\.submit/);
+  assert.doesNotMatch(smtCloud,/createOrder|priceCustomerCart|StoreKernel/);
 });
