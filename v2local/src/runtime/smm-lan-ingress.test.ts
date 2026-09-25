@@ -104,4 +104,28 @@ describe('SMM LAN ingress',()=>{
       sourceLabel:'SMM',
     }));
   });
+
+  it('projects canonical SMT orders and dining holds into the SMM shared read model',()=>{
+    const createdAt='2026-09-25T13:30:00.000Z';
+    const ingress=createSmmLanIngress({
+      orders:()=>[{
+        id:'ORDER-9',display:'P009',createdAt,updatedAt:createdAt,totalMinor:5600,paymentLabel:'現金',
+        fulfillmentLabel:'進行中',sourceLabel:'SMM',items:[{id:'riceball',name:'原味飯團',qty:1,unitMinor:5600}],
+      }],
+      holds:()=>[{
+        id:'HOLD-3',codeLabel:'H003',kind:'dining',createdAt,partySize:2,note:'SMM 堂食',totalMinor:8200,
+        assignedTable:'T03',items:[{id:'riceball',name:'原味飯團',qty:2,unitMinor:4100}],
+        payments:[{id:'PAY-1',createdAt,tender:'FPS',amountMinor:4100,selections:[{lineIndex:0,qty:1,amountMinor:4100}]}],
+      }],
+    } as any);
+    const snapshot=ingress.readSnapshot() as any;
+    expect(snapshot.orders).toHaveLength(1);
+    expect(snapshot.orders[0]).toMatchObject({displayCode:'P009',lifecycle:'進行中',readback:'CONFIRMED'});
+    expect(snapshot.dineSessions).toHaveLength(1);
+    expect(snapshot.dineSessions[0]).toMatchObject({
+      sessionId:'HOLD-3',tableLabel:'3 號枱',covers:2,totalMinor:8200,paidMinor:4100,remainingMinor:4100,
+    });
+    expect(snapshot.dineSessions[0].lines[0]).toMatchObject({qty:2,paidQty:1,remainingQty:1});
+  });
+
 });
