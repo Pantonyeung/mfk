@@ -900,11 +900,8 @@ function OperationalApp(){
   const [quickDrinkOpen,setQuickDrinkOpen]=useState(false);
   const [quickDrinkCount,setQuickDrinkCount]=useState(0);
   const [displayToolsOpen,setDisplayToolsOpen]=useState(false);
-  const [showImagesOverride,setShowImagesOverride]=useState<boolean|undefined>(undefined);
-  const [showCategoriesOverride,setShowCategoriesOverride]=useState<boolean|undefined>(undefined);
-  const [categoryRowsOverride,setCategoryRowsOverride]=useState<1|2|undefined>(undefined);
-  const [categoryColumnsOverride,setCategoryColumnsOverride]=useState<5|6|7|undefined>(undefined);
-  const [productDensityOverride,setProductDensityOverride]=useState<'standard'|'compact'|undefined>(undefined);
+  const [uiPreferences,setUiPreferences]=useState<SmtFrontlineUiPreferences>(()=>readSmtFrontlineUiPreferences());
+  useEffect(()=>writeSmtFrontlineUiPreferences(uiPreferences),[uiPreferences]);
   const [navRevision,setNavRevision]=useState(0);
   useEffect(()=>localRuntime.subscribe(()=>setNavRevision(value=>value+1)),[]);
   const activeOrderCount=useMemo(()=>{
@@ -973,6 +970,7 @@ function OperationalApp(){
     </div>:null}
     <aside className="clean-rail">
       <div className="clean-brand" aria-label="磨飯">磨</div>
+      <button type="button" className={'clean-more-button'+(location.pathname==='/more'?' active':'')} aria-label="更多／工具中心" onClick={()=>navigate('/more')}><span>☰</span><small>更多</small></button>
       <nav aria-label="MFK 主導航">
         {nav.map(item=><NavLink key={item.to} to={item.to} end={'end' in item?item.end:false} className={({isActive})=>isActive?'active':''}>
           <span className="clean-rail-icon">{item.icon}</span>
@@ -986,12 +984,16 @@ function OperationalApp(){
         <button type="button" className={displayToolsOpen?'active':''} onClick={()=>setDisplayToolsOpen(value=>!value)}><span>顯</span><small>顯示</small></button>
         {displayToolsOpen?<div className="clean-display-popover">
           <header><b>顯示設定</b><button type="button" onClick={()=>setDisplayToolsOpen(false)}>×</button></header>
-          <section><span>分類行數</span><div><button type="button" className={categoryRowsOverride===1?'active':''} onClick={()=>setCategoryRowsOverride(1)}>1 行</button><button type="button" className={categoryRowsOverride===2?'active':''} onClick={()=>setCategoryRowsOverride(2)}>2 行</button></div></section>
-          <section><span>分類每行</span><div className="triple"><button type="button" className={categoryColumnsOverride===5?'active':''} onClick={()=>setCategoryColumnsOverride(5)}>5</button><button type="button" className={categoryColumnsOverride===6?'active':''} onClick={()=>setCategoryColumnsOverride(6)}>6</button><button type="button" className={categoryColumnsOverride===7?'active':''} onClick={()=>setCategoryColumnsOverride(7)}>7</button></div></section>
-          <section><span>商品圖片</span><div><button type="button" className={showImagesOverride===false?'active':''} onClick={()=>setShowImagesOverride(false)}>隱藏</button><button type="button" className={showImagesOverride===true?'active':''} onClick={()=>setShowImagesOverride(true)}>顯示</button></div></section>
-          <section><span>商品分類</span><div><button type="button" className={showCategoriesOverride===false?'active':''} onClick={()=>setShowCategoriesOverride(false)}>隱藏</button><button type="button" className={showCategoriesOverride===true?'active':''} onClick={()=>setShowCategoriesOverride(true)}>顯示</button></div></section>
-          <section><span>商品密度</span><div><button type="button" className={productDensityOverride==='standard'?'active':''} onClick={()=>setProductDensityOverride('standard')}>標準</button><button type="button" className={productDensityOverride==='compact'?'active':''} onClick={()=>setProductDensityOverride('compact')}>緊湊</button></div></section>
-          <button type="button" className="reset" onClick={()=>{setShowImagesOverride(undefined);setShowCategoriesOverride(undefined);setCategoryRowsOverride(undefined);setCategoryColumnsOverride(undefined);setProductDensityOverride(undefined);}}>跟 Admin 設定</button>
+          <section className="slider"><span>分類行數 <b>{uiPreferences.categoryRows}</b></span><input type="range" min="1" max="3" step="1" value={uiPreferences.categoryRows} onChange={e=>setUiPreferences(current=>({...current,categoryRows:Number(e.target.value) as 1|2|3}))}/></section>
+          <section className="slider"><span>分類每行 <b>{uiPreferences.categoryColumns}</b></span><input type="range" min="4" max="9" step="1" value={uiPreferences.categoryColumns} onChange={e=>setUiPreferences(current=>({...current,categoryColumns:Number(e.target.value)}))}/></section>
+          <section className="slider"><span>產品每行 <b>{uiPreferences.productColumns}</b></span><input type="range" min="3" max="6" step="1" value={uiPreferences.productColumns} onChange={e=>setUiPreferences(current=>({...current,productColumns:Number(e.target.value)}))}/></section>
+          <section className="slider"><span>產品卡高度 <b>{uiPreferences.productCardHeight}px</b></span><input type="range" min="100" max="190" step="2" value={uiPreferences.productCardHeight} onChange={e=>setUiPreferences(current=>({...current,productCardHeight:Number(e.target.value)}))}/></section>
+          <section className="slider"><span>字體 <b>{Math.round(uiPreferences.fontScale*100)}%</b></span><input type="range" min="0.85" max="1.25" step="0.01" value={uiPreferences.fontScale} onChange={e=>setUiPreferences(current=>({...current,fontScale:Number(e.target.value)}))}/></section>
+          <section className="slider"><span>整體密度 <b>{Math.round(uiPreferences.densityScale*100)}%</b></span><input type="range" min="0.85" max="1.15" step="0.01" value={uiPreferences.densityScale} onChange={e=>setUiPreferences(current=>({...current,densityScale:Number(e.target.value)}))}/></section>
+          <section><span>商品圖片</span><div><button type="button" className={!uiPreferences.showImages?'active':''} onClick={()=>setUiPreferences(current=>({...current,showImages:false}))}>隱藏</button><button type="button" className={uiPreferences.showImages?'active':''} onClick={()=>setUiPreferences(current=>({...current,showImages:true}))}>顯示</button></div></section>
+          <section><span>商品分類</span><div><button type="button" className={!uiPreferences.showCategories?'active':''} onClick={()=>setUiPreferences(current=>({...current,showCategories:false}))}>隱藏</button><button type="button" className={uiPreferences.showCategories?'active':''} onClick={()=>setUiPreferences(current=>({...current,showCategories:true}))}>顯示</button></div></section>
+          <small className="clean-display-saved">即時 Preview · 自動保存 · 重開保留</small>
+          <button type="button" className="reset" onClick={()=>setUiPreferences(DEFAULT_SMT_FRONTLINE_UI_PREFERENCES)}>恢復預設顯示</button>
         </div>:null}
       </div>:null}
       <StaffSessionBadge/>
@@ -1008,11 +1010,7 @@ function OperationalApp(){
           setOrderingMode={setOrderingMode}
           quickDrinkOpen={quickDrinkOpen}
           setQuickDrinkOpen={setQuickDrinkOpen}
-          showImagesOverride={showImagesOverride}
-          showCategoriesOverride={showCategoriesOverride}
-          categoryRowsOverride={categoryRowsOverride}
-          categoryColumnsOverride={categoryColumnsOverride}
-          productDensityOverride={productDensityOverride}
+          uiPreferences={uiPreferences}
           onQuickDrinkCountChange={setQuickDrinkCount}
         />}/>
         <Route path="checkout" element={<CheckoutPage cart={cart} setCart={setCart} diningCheckout={diningCheckout} onDiningCheckoutDone={()=>setDiningCheckout(null)}/>}/>
