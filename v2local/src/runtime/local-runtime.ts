@@ -1470,14 +1470,18 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
     if(!Number.isSafeInteger(amountMinor)||amountMinor<0||amountMinor>detail.remainingMinor)throw new Error('DINING_AMOUNT_INVALID');
     if(tender==='COMBO'&&splitTenders.reduce((sum,row)=>sum+row.amountMinor,0)!==amountMinor)throw new Error('DINING_COMBO_TOTAL_MISMATCH');
     const cashSplit=tender==='COMBO'?splitTenders.find(row=>row.tender==='CASH'):undefined;
-    const receivedMinor=tender==='CASH'?command.receivedMinor:amountMinor;
+    const receivedMinor=tender==='CASH'
+      ?command.receivedMinor
+      :cashSplit
+        ?command.receivedMinor
+        :amountMinor;
     if(tender==='CASH'&&(!Number.isSafeInteger(receivedMinor)||receivedMinor!<amountMinor))throw new Error('DINING_CASH_INSUFFICIENT');
-    if(cashSplit&&command.receivedMinor!==undefined&&command.receivedMinor<cashSplit.amountMinor)throw new Error('DINING_CASH_INSUFFICIENT');
+    if(cashSplit&&(!Number.isSafeInteger(receivedMinor)||receivedMinor!<cashSplit.amountMinor))throw new Error('DINING_CASH_INSUFFICIENT');
     const createdAt=new Date().toISOString();
     const payment:LocalDiningPayment={
       id:'DP:'+holdId+':'+command.submissionId,submissionId:command.submissionId,requestSignature:signature,createdAt,tender,amountMinor,
       receivedMinor,
-      changeMinor:tender==='CASH'?receivedMinor!-amountMinor:0,
+      changeMinor:tender==='CASH'?receivedMinor!-amountMinor:cashSplit?receivedMinor!-cashSplit.amountMinor:0,
       ...(splitTenders.length?{splitTenders}:{}),
       selections:paymentSelections,
     };
