@@ -325,7 +325,8 @@ describe('Dining R6 automatic table-order admission',()=>{
     expect(detail.firstPrintResults?.length).toBeGreaterThan(0);
     expect(detail.firstPrintResults?.every((row:any)=>row.jobId&&row.role&&typeof row.ok==='boolean'&&row.code)).toBe(true);
     const options=await runtime.readDiningReprintOptions(hold.id);
-    expect(options.every((row:any)=>row.firstPrintState==='SENT_TO_PRINTER')).toBe(true);
+    expect(options.length).toBeGreaterThan(0);
+    expect(options.every((row:any)=>row.firstPrintState===undefined&&row.firstPrintCode===undefined)).toBe(true);
   });
 
   it('dining reprint rejects stale or forged job ids instead of silently doing nothing',async()=>{
@@ -362,8 +363,7 @@ describe('Dining R6 automatic table-order admission',()=>{
     expect(detail.firstPrintAttention).toBe('NONE');
     const options=await runtime.readDiningReprintOptions(hold.id);
     expect(options.length).toBeGreaterThan(0);
-    expect(options.every((row:any)=>row.firstPrintState==='SENT_TO_PRINTER')).toBe(true);
-    expect(options.some((row:any)=>String(row.firstPrintState).includes('PHYSICAL'))).toBe(false);
+    expect(options.every((row:any)=>row.firstPrintState===undefined&&row.firstPrintCode===undefined)).toBe(true);
   });
 
   it('formal Order link survives runtime restart',async()=>{
