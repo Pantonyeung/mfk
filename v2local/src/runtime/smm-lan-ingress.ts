@@ -2,6 +2,7 @@ import type {MfkLocalRuntime} from './local-runtime.ts';
 import {priceCustomerCart} from './customer-cloud-intake.ts';
 import {projectSyncedOrderingCatalog} from './admin-config-projection.ts';
 import {readSmtAdminConfigLkg} from './admin-config-sync.ts';
+import {readSmtStoreSettings} from './admin-operational-config.ts';
 import type {SmmLanOrderRequest,SmmLanOrderResponse,SmmLanSubmissionReadbackResponse} from '../../../contracts/smm-lan-v1.ts';
 
 const RESULT_KEY='mfk.v2local.smm-lan-results.v1';
@@ -64,7 +65,7 @@ export function createSmmLanIngress(runtime:MfkLocalRuntime){
             });
           })),
         }),
-        orders:Object.freeze(runtime.orders().map(order=>Object.freeze({
+        orders:Object.freeze(runtime.orders().filter(order=>!order.items.length||!order.items.every(item=>item.serviceMode==='dine-in')).map(order=>Object.freeze({
           orderId:order.id,
           displayCode:order.display,
           source:order.sourceLabel,
@@ -126,6 +127,10 @@ export function createSmmLanIngress(runtime:MfkLocalRuntime){
       if(!Number.isSafeInteger(Number(input.publishedTotalMinor))||Number(input.publishedTotalMinor)<0)return rejected(input,'SMM_PUBLISHED_TOTAL_INVALID');
       if(!['TAKEAWAY','DINE_IN'].includes(String(input.serviceMode)))return rejected(input,'SMM_SERVICE_MODE_INVALID');
       if(!['CASH','ALIPAY','WECHAT','FPS','PAYME'].includes(String(input.tender)))return rejected(input,'SMM_TENDER_INVALID');
+      if(input.serviceMode==='DINE_IN'&&input.diningTarget?.kind==='TABLE'){
+        const tableIds=new Set((readSmtStoreSettings().diningTables.length?readSmtStoreSettings().diningTables:Array.from({length:9},(_,index)=>({id:'T'+String(index+1).padStart(2,'0')}))).map(row=>row.id));
+        if(!tableIds.has(input.diningTarget.tableId||''))return rejected(input,'SMM_DINING_TABLE_NOT_PUBLISHED');
+      }
 
       const prior=results().find(row=>row.submissionId===input.submissionId);
       if(prior){

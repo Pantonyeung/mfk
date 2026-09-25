@@ -151,6 +151,12 @@ export interface SmmChannelHealth {
   readonly observedAt:string;
 }
 
+export interface SmmDiningTableDefinition{
+  readonly tableId:string;
+  readonly label:string;
+  readonly sortOrder:number;
+}
+
 export interface SmmDineSession {
   readonly sessionId:string;
   readonly tableLabel:string;
@@ -228,6 +234,7 @@ export interface SmmReadModelSnapshot {
   readonly work:readonly SmmWorkItem[];
   readonly channels:readonly SmmChannelHealth[];
   readonly dineSessions:readonly SmmDineSession[];
+  readonly diningTables?:readonly SmmDiningTableDefinition[];
   readonly printHealth:readonly SmmPrintHealth[];
   readonly refundRequests:readonly SmmRefundRequest[];
   readonly capacity?:SmmCapacityProjection;

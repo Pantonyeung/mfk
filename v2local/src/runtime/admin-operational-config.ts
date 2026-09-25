@@ -1,5 +1,12 @@
 import {readAdminSnapshotSection} from './admin-config-sync.ts';
 
+export interface SmtDiningTableConfig{
+  readonly id:string;
+  readonly name:string;
+  readonly active:boolean;
+  readonly sortOrder:number;
+}
+
 export interface SmtStoreSettings{
   readonly storeName:string;
   readonly storeCode:string;
@@ -14,6 +21,7 @@ export interface SmtStoreSettings{
   readonly timeoutPriority:'NORMAL'|'HIGH'|'URGENT';
   readonly dineInEnabled:boolean;
   readonly takeawayEnabled:boolean;
+  readonly diningTables:readonly SmtDiningTableConfig[];
   readonly paymentRefs:readonly string[];
   readonly printRefs:readonly string[];
   readonly channelRefs:readonly string[];
@@ -76,6 +84,18 @@ export function readSmtStoreSettings():SmtStoreSettings{
     timeoutPriority:priority==='URGENT'?'URGENT':priority==='NORMAL'?'NORMAL':'HIGH',
     dineInEnabled:row.dineInEnabled===undefined?true:bool(row.dineInEnabled,true),
     takeawayEnabled:row.takeawayEnabled===undefined?true:bool(row.takeawayEnabled,true),
+    diningTables:Object.freeze((Array.isArray(row.diningTables)?row.diningTables:[]).flatMap((raw,index)=>{
+      const item=record(raw);
+      const id=text(item.id);
+      const name=text(item.name);
+      if(!id||!name||item.active===false)return [];
+      return [Object.freeze({
+        id,
+        name,
+        active:true,
+        sortOrder:Math.max(1,Math.floor(number(item.sortOrder,index+1))),
+      })];
+    }).sort((a,b)=>a.sortOrder-b.sortOrder)),
     paymentRefs:Object.freeze(strings(row.paymentRefs)),
     printRefs:Object.freeze(strings(row.printRefs)),
     channelRefs:Object.freeze(strings(row.channelRefs)),
