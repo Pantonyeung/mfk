@@ -52,7 +52,7 @@ public final class MainActivity extends Activity {
         }
         @JavascriptInterface public void pair(String correlationId){
             io.execute(()->{
-                final JSONObject result;
+                JSONObject result;
                 try{result=pairWithSmt();}
                 catch(Exception error){
                     result=new JSONObject();
@@ -64,7 +64,7 @@ public final class MainActivity extends Activity {
         }
         @JavascriptInterface public void send(String correlationId,String payload){
             io.execute(()->{
-                final JSONObject result;
+                JSONObject result;
                 try{result=sendToSmt(payload);}
                 catch(Exception error){
                     result=new JSONObject();
