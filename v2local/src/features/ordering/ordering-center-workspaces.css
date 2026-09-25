@@ -24,3 +24,21 @@
 .hold-list{min-height:0;flex:1;overflow-y:auto;display:grid;align-content:start;gap:10px}.hold-list>article{padding:14px;border:1px solid #dfe5ed;border-radius:12px;background:#fff}.hold-list-head{display:flex;justify-content:space-between;gap:12px;align-items:center}.hold-list-head>div{display:flex;align-items:center;gap:8px}.hold-list-head b{font-size:20px}.hold-list-head span{padding:4px 8px;border-radius:999px;background:#eef3f9;font-size:12px;font-weight:900}.hold-list-head>strong{font-size:20px}.hold-list-meta{display:flex;gap:12px;margin-top:7px;color:#738094;font-size:13px}.hold-list-items{display:grid;gap:5px;margin-top:10px;padding:10px;border-radius:9px;background:#f7f9fc}.hold-list-items p{display:grid;grid-template-columns:36px minmax(0,1fr) auto;gap:8px;margin:0}.hold-list-items p b{font-size:15px}.hold-list-items p strong{font-size:14px}.hold-list>article>small{display:block;margin-top:8px;color:#6f7b8d}.hold-list>article>footer{display:grid;grid-template-columns:1fr 1.4fr;gap:8px;margin-top:12px}.hold-list>article>footer button{min-height:46px;border:1px solid #d4dce7;border-radius:9px;background:#fff;font-weight:900}.hold-list>article>footer .primary{background:#1f5fbf;border-color:#1f5fbf;color:#fff}.hold-list>article>footer .danger{color:#b8322d;border-color:#f0b7b2;background:#fff7f6}.hold-list-empty{display:grid;place-items:center;min-height:240px;color:#7a8492;font-weight:850}
 
 @media(max-width:1350px){.cfg-layout{grid-template-columns:minmax(0,1fr) 290px}.cfg-product-head h2{font-size:30px}.cfg-current-price{flex-basis:220px}.cfg-choice-grid.three{grid-template-columns:repeat(2,minmax(0,1fr))}.hold-inline-dining{grid-template-columns:minmax(210px,240px) minmax(0,500px)}.hold-nine-grid{max-width:500px}}
+
+
+/* R4: 暫存／堂食 keeps both concepts in one modal. */
+.hold-cart-summary{position:relative;padding-bottom:72px}
+.hold-confirm-waiting{
+  position:sticky;
+  bottom:10px;
+  width:calc(100% - 24px);
+  min-height:52px;
+  margin:14px 12px 0;
+  border:0;
+  border-radius:10px;
+  background:#1f5fbf;
+  color:#fff;
+  font-size:18px;
+  font-weight:950;
+  box-shadow:0 5px 16px rgba(31,95,191,.18);
+}
