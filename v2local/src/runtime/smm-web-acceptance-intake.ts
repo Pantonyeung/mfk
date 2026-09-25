@@ -11,7 +11,7 @@ async function getPending(){
   return Array.isArray(body.orders)?body.orders:[];
 }
 
-function wait(ms:number){return new Promise(resolve=>window.setTimeout(resolve,ms));}
+function wait(ms:number){return new Promise(resolve=>globalThis.setTimeout(resolve,ms));}
 
 async function ack(request:SmmLanOrderRequest,result:SmmLanOrderResponse){
   let lastStatus=0;
