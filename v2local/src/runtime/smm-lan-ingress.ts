@@ -17,6 +17,39 @@ function rejected(req:SmmLanOrderRequest,reasonCode:string):SmmLanOrderResponse{
 }
 export function createSmmLanIngress(runtime:MfkLocalRuntime){
   return Object.freeze({
+    readSnapshot(){
+      const envelope=readSmtAdminConfigLkg();
+      if(!envelope)throw new Error('SMM_ADMIN_CONFIG_REQUIRED');
+      const catalog=projectSyncedOrderingCatalog('takeaway',envelope);
+      return Object.freeze({
+        menu:Object.freeze({
+          revision:String(envelope.revision),
+          observedAt:new Date().toISOString(),
+          categories:Object.freeze(catalog.categories.map(row=>Object.freeze({categoryId:row.id,name:row.label,sortOrder:row.position}))),
+          products:Object.freeze(catalog.products.map(row=>Object.freeze({
+            productId:row.id,categoryId:row.categoryId,name:row.name,available:row.sellable&&row.priceReady,
+            ...(row.imageUrl?{imageRef:row.imageUrl}:{}),
+            optionGroups:Object.freeze(row.optionSets.map(set=>Object.freeze({
+              optionGroupId:set.id,name:set.name,required:set.required,minSelections:set.min,maxSelections:set.max,
+              options:Object.freeze(set.options.map(option=>Object.freeze({optionId:option.id,name:option.name,available:option.active}))),
+            }))),
+          }))),
+        }),
+        orders:Object.freeze([]),work:Object.freeze([]),channels:Object.freeze([]),dineSessions:Object.freeze([]),printHealth:Object.freeze([]),refundRequests:Object.freeze([]),
+        observedAt:new Date().toISOString(),
+      });
+    },
+    quoteCart(cart:any[]){
+      const envelope=readSmtAdminConfigLkg();
+      if(!envelope)throw new Error('SMM_ADMIN_CONFIG_REQUIRED');
+      const catalog=projectSyncedOrderingCatalog('takeaway',envelope);
+      const priced=priceCustomerCart(cart,catalog.products);
+      return Object.freeze({
+        quoteId:'SMM-LAN-'+Date.now(),revision:String(envelope.revision),currency:'HKD',totalMinor:priced.totalMinor,
+        lines:Object.freeze(priced.items.map((item:any,index:number)=>Object.freeze({lineId:cart[index]?.lineId??String(index),currency:'HKD',finalUnitPriceMinor:item.unitMinor,lineTotalMinor:item.unitMinor*item.qty}))),
+        observedAt:new Date().toISOString(),
+      });
+    },
     submit(input:SmmLanOrderRequest,context:{deviceId:string;trusted:boolean}):SmmLanOrderResponse{
       if(input.protocolVersion!==1||input.type!=='smm.lan.order.submit.v1')throw new Error('SMM_LAN_PROTOCOL_INVALID');
       if(input.storeId!=='MF01')return rejected(input,'SMM_LAN_STORE_MISMATCH');
