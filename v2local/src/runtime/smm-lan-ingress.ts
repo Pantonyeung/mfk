@@ -96,7 +96,8 @@ export function createSmmLanIngress(runtime:MfkLocalRuntime){
       }
 
       const providerRef='SMM:'+input.submissionId;
-      const recovered=runtime.orders().find(order=>order.providerRef===providerRef);
+      const recovered=runtime.orders().find(order=>order.providerRef===providerRef)
+        ??runtime.holds().find(hold=>hold.providerRef===providerRef);
       if(recovered){
         const canonicalRevision=1;
         writeResults([...results(),{submissionId:input.submissionId,orderId:recovered.id,canonicalRevision,idempotencyKey:input.idempotencyKey,requestId:input.requestId}]);
@@ -134,15 +135,27 @@ export function createSmmLanIngress(runtime:MfkLocalRuntime){
       }
 
       const items=priced.items.map(item=>Object.freeze({...item,serviceMode}));
+      const canonicalRevision=1;
+      if(input.serviceMode==='DINE_IN'){
+        if(!input.diningTarget)return rejected(input,'SMM_DINING_TARGET_REQUIRED');
+        const hold=runtime.upsertSmmDiningHold({
+          providerRef,
+          target:input.diningTarget,
+          items:items.map(item=>({id:item.id,name:item.name,qty:item.qty,unitMinor:item.unitMinor})),
+          totalMinor:priced.totalMinor,
+          sourceLabel:'SMM',
+        });
+        writeResults([...results(),{submissionId:input.submissionId,orderId:hold.id,canonicalRevision,idempotencyKey:input.idempotencyKey,requestId:input.requestId}]);
+        return Object.freeze({protocolVersion:1,type:'smm.lan.order.result.v1',requestId:input.requestId,submissionId:input.submissionId,idempotencyKey:input.idempotencyKey,disposition:'ACCEPTED',orderId:hold.id,canonicalRevision});
+      }
       const order=runtime.createOrder({
         items,
         totalMinor:priced.totalMinor,
         paymentLabel:paymentLabel(input.tender),
         sourceLabel:'SMM',
         providerRef,
-        initialFulfillmentLabel:'待處理',
+        initialFulfillmentLabel:'進行中',
       });
-      const canonicalRevision=1;
       writeResults([...results(),{submissionId:input.submissionId,orderId:order.id,canonicalRevision,idempotencyKey:input.idempotencyKey,requestId:input.requestId}]);
       return Object.freeze({protocolVersion:1,type:'smm.lan.order.result.v1',requestId:input.requestId,submissionId:input.submissionId,idempotencyKey:input.idempotencyKey,disposition:'ACCEPTED',orderId:order.id,canonicalRevision});
     },
