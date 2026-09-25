@@ -1,0 +1,196 @@
+OWNER 對 SMT 端口要求｜FINAL V1.0｜ADDENDUM A
+主題：Checkout Commit / Completion Review / Print / Cash Drawer
+日期：2026-09-25
+狀態：OWNER CLARIFICATION LOCKED
+
+==================================================
+1. 定位
+==================================================
+
+本 Addendum 澄清 FINAL V1.0 第 13 章付款確認語義。
+
+FINAL V1.0 原文容易被理解為：
+75% Final Review
+→ 再做付款確認
+→ 正式成交
+
+Owner 2026-09-25 澄清後，正式流程鎖定為：
+
+Checkout 輸入
+→ 第一次「確認付款」
+→ 正式交易成功
+→ 同步出現 75% Completion Review
+→ 打印／現金櫃桶副作用立即執行
+→ 第二次「完成」只作離開／返回點單
+
+==================================================
+2. 第一次「確認付款」＝正式交易邊界
+==================================================
+
+例如現金訂單：
+
+應付 $XX
+→ 客人畀 $100
+→ 店員按 $100
+→ 店員按「確認付款」
+
+「確認付款」成功的一刻即代表：
+
+- SAME Cart 正式提交
+- 建立正式 Order
+- 記錄正式 Payment
+- 鎖定正式 Display / Order identity
+- 建立正常 Print Admission
+- 進正式 Fulfillment / 製作流程
+- Cash tender 才執行一次 Cash Drawer Open
+
+呢一刻已經係正式成交。
+
+禁止將 75% Completion Review 當成交易前第三個 Gate。
+
+==================================================
+3. 75% Completion Review
+==================================================
+
+第一次「確認付款」成功後，立即彈出約 75% Completion Review。
+
+用途：
+
+- 顯示正式訂單號碼／取餐號
+- 顯示渠道
+- 顯示目前有效付款方式
+- 顯示總額
+- 現金顯示實收／找續
+- 顯示 Print / Drawer / Fulfillment 執行狀態
+- 容許成交後 Payment Method Correction（如權限／流程適用）
+- 最後「完成」離開畫面
+
+Completion Review 係 POST-COMMIT REVIEW。
+
+唔係第二次正式收款。
+唔係第二次正式提交。
+唔係第二次打印 Admission。
+
+==================================================
+4. 打印
+==================================================
+
+第一次「確認付款」成功後：
+
+- 正常 Print Admission 已跟正式交易建立
+- 所有應打印票種即時送入既有唯一 Print Queue / Router
+- Completion Review 彈出時唔需要等 physical printer 完成先顯示
+- 打印狀態可以喺 Completion Review 更新
+
+如打印失敗：
+
+- 保持 SAME Order
+- 顯示 Attention / Failed / Unknown
+- 禁止因重試重新建 Order
+- 禁止重新收款
+- 人工重印沿既有 Reprint 路徑處理
+
+==================================================
+5. Cash Drawer
+==================================================
+
+只有真正現金付款需要自動開櫃桶。
+
+第一次「確認付款」成功後：
+
+CASH
+→ Drawer Open 一次
+
+非現金：
+- Alipay
+- WeChat Pay
+- FPS
+- PayMe
+- 第三方／平台渠道
+
+→ 不自動開櫃桶
+
+Double Tap / Retry / Restart Recovery：
+→ 禁止重複 Drawer Open。
+
+==================================================
+6. Completion Review 內 Payment Method Correction
+==================================================
+
+如果店員喺 Completion Review 發現付款方式揀錯：
+
+例如：
+CASH → FPS
+
+必須：
+- SAME Order
+- 保留原 CASH Audit History
+- append Payment Correction
+- FPS 成為 current effective tender
+- Reporting 只計 FPS
+- 不建立新 Order
+- 不建立新 Display Number
+- 不建立新 Print Admission
+- 不自動重印
+- 不自動再開 Drawer
+
+如果原本 Cash 已經因第一次正式成交開過櫃桶：
+付款方式修正不得嘗試「倒轉」實體開櫃桶事件，只記錄 Correction Audit。
+
+==================================================
+7. 第二次「完成」
+==================================================
+
+75% Completion Review 最後按「完成」：
+
+只代表：
+- 閱讀／核對完成
+- 關閉 Completion Review
+- 返回點單／適當工作頁
+
+「完成」不得：
+- 建立 Order
+- 再次收款
+- 再次 Print Admission
+- 再次送廚房
+- 再次開 Drawer
+
+==================================================
+8. EXACTLY-ONCE
+==================================================
+
+第一次「確認付款」必須 exactly-once。
+
+Double Tap / UI Retry / Restart Recovery 不得造成：
+- duplicate Order
+- duplicate Payment
+- duplicate Display Number
+- duplicate first Print Admission
+- duplicate Kitchen dispatch
+- duplicate Cash Drawer Open
+
+==================================================
+9. Owner UX 語義
+==================================================
+
+前線操作感應該係：
+
+輸入收款
+→ 確認付款
+→ 「交易已經完成」
+→ 75% Completion Review 即時出現
+→ 背後打印／櫃桶同步執行
+→ 店員核對／必要時修正付款方式
+→ 完成
+→ 下一單
+
+==================================================
+10. FINAL
+==================================================
+
+本 Addendum 只澄清 Checkout commit timing。
+
+其他 FINAL V1.0 內容維持不變。
+
+如本 Addendum 與 FINAL V1.0 第 13 章「Final Review 在正式交易前」之文字理解有衝突：
+以本 Addendum 為準。
