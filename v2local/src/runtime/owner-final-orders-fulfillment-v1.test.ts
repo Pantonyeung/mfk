@@ -52,9 +52,9 @@ describe('Owner FINAL Orders / fulfillment',()=>{
     expect(ordersSource.indexOf('order-source-filter')).toBeLessThan(ordersSource.indexOf('order-payment-bar'));
   });
 
-  it('maps phone/WhatsApp to direct source and MoreFun App to owned platform',()=>{
-    expect(ordersSource).toContain("value.startsWith('現場')||value.startsWith('電話')||value.startsWith('WhatsApp')");
-    expect(ordersSource).toContain("value.startsWith('磨飯 App')||value.startsWith('自家 App')");
+  it('maps frontline/SMM/phone/WhatsApp to direct source and self-order channels to owned platform',()=>{
+    expect(ordersSource).toContain("value.startsWith('現場')||value.startsWith('SMM')||value.startsWith('電話')||value.startsWith('WhatsApp')");
+    expect(ordersSource).toContain("value.startsWith('磨飯 App')||value.startsWith('自家 App')||value.startsWith('Customer')");
   });
 
   it('allows any authenticated SMT operator to use order functions and exposes reversible fulfillment controls',()=>{

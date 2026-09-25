@@ -12,10 +12,10 @@ type PaymentFilter='全部'|'現金'|'Alipay'|'WeChat Pay'|'FPS / PayMe';
 type SourceFilter='全部'|'直接來源'|'自家平台'|'第三方平台';
 type Modal='actions'|'edit'|'cancel'|'reprint'|'payment'|'refund'|null;
 
-function sourceLane(source?:string){
-  const value=String(source||'');
-  if(value.startsWith('現場')||value.startsWith('電話')||value.startsWith('WhatsApp'))return 'direct';
-  if(value.startsWith('磨飯 App')||value.startsWith('自家 App'))return 'owned';
+export function sourceLane(source?:string){
+  const value=String(source||'').trim();
+  if(value.startsWith('現場')||value.startsWith('SMM')||value.startsWith('電話')||value.startsWith('WhatsApp'))return 'direct';
+  if(value.startsWith('磨飯 App')||value.startsWith('自家 App')||value.startsWith('Customer'))return 'owned';
   return 'platform';
 }
 function sourceFilterMatches(source:string|undefined,filter:SourceFilter){
