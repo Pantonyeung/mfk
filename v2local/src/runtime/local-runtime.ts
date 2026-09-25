@@ -4,7 +4,7 @@ import {renderEscPosRasterTicket} from './ticket-bitmap.ts';
 import {buildOrderPrintPlan,groupTscBitmapJobsByPhysicalPrinter,type PrintBinding,type PlannedPrintJob} from './print-routing.ts';
 import {queueOrderProjection} from './projection-outbox.ts';
 import {readActiveStaffSession} from './staff-auth.ts';
-import {readSmtPrintConfig} from './admin-operational-config.ts';
+import {readSmtPrintConfig,readSmtStoreSettings} from './admin-operational-config.ts';
 import {mirrorKeetaOrderCommand,type KeetaProviderMirrorResult} from './keeta-provider-commands.ts';
 import {buildDailyClosePrintData,renderDailyCloseTicket} from './daily-close-ticket.ts';
 import {readLocalDayCloses,resolveBusinessWindow} from './local-operations.ts';
@@ -789,16 +789,19 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
         partySize:hold.partySize,
         statusLabel:'待安排座位',
       })),
-      tables:Array.from({length:9},(_,index)=>{
-        const id='T'+String(index+1).padStart(2,'0');
+      tables:(()=>{
+        const configured=readSmtStoreSettings().diningTables;
+        const tables=configured.length?configured:Array.from({length:9},(_,index)=>({id:'T'+String(index+1).padStart(2,'0'),name:String(index+1)+' 號枱',active:true,sortOrder:index+1}));
+        return tables.map(table=>{
+        const id=table.id;
         const seated=data.holds.find(hold=>hold.kind==='dining'&&hold.assignedTable===id);
-        if(!seated)return {id,areaLabel:'堂食',label:String(index+1),state:'available' as const};
+        if(!seated)return {id,areaLabel:'堂食',label:table.name,state:'available' as const};
         const detail=diningDetail(seated);
         const first=detail.lines.filter(line=>line.qty>0).slice(0,2).map(line=>line.name.split('｜')[0]).join('、');
         return {
           id,
           areaLabel:'堂食',
-          label:String(index+1),
+          label:table.name,
           state:detail.remainingMinor===0?'settled' as const:'occupied' as const,
           partySize:seated.partySize,
           outstandingLabel:seated.codeLabel,
@@ -810,7 +813,8 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
           paidMinor:detail.paidMinor,
           remainingMinor:detail.remainingMinor,
         };
-      })
+      });
+      })()
     };
   },
   async createDiningWait(input){
