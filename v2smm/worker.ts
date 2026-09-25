@@ -273,26 +273,96 @@ export class SmmIntentStore{
       if(!['TAKEAWAY','DINE_IN'].includes(serviceMode))return json({code:'SMM_BRIDGE_SERVICE_MODE_INVALID'},400);
       if(!['CASH','ALIPAY','WECHAT','FPS','PAYME'].includes(tender))return json({code:'SMM_BRIDGE_TENDER_INVALID'},400);
       if(!Number.isSafeInteger(publishedTotalMinor)||publishedTotalMinor<0)return json({code:'SMM_BRIDGE_TOTAL_INVALID'},400);
+
+      const existingTicket=await this.state.storage.get('bridge-submission:'+submissionId) as string|undefined;
+      if(existingTicket){
+        const existing=await this.state.storage.get('bridge:'+existingTicket) as any;
+        if(existing&&String(existing.staffId)===staffId&&String(existing.menuRevision)===menuRevision&&String(existing.serviceMode)===serviceMode&&String(existing.tender)===tender&&Number(existing.publishedTotalMinor)===publishedTotalMinor){
+          return json({ticket:existingTicket,expiresAt:existing.expiresAt,state:existing.state||'TICKET_CREATED'},200);
+        }
+      }
+
       const ticket=crypto.randomUUID().replaceAll('-','')+crypto.randomUUID().replaceAll('-','');
+      const createdAt=new Date().toISOString();
       const expiresAt=new Date(Date.now()+24*60*60*1000).toISOString();
-      await this.state.storage.put('bridge:'+ticket,Object.freeze({
-        ticket,submissionId,staffId,menuRevision,serviceMode,tender,publishedTotalMinor,expiresAt,
-      }));
-      return json({ticket,expiresAt},201);
+      const row=Object.freeze({
+        ticket,submissionId,staffId,menuRevision,serviceMode,tender,publishedTotalMinor,
+        state:'TICKET_CREATED',createdAt,expiresAt,claimCount:0,
+      });
+      await this.state.storage.put('bridge:'+ticket,row);
+      await this.state.storage.put('bridge-submission:'+submissionId,ticket);
+      return json({ticket,expiresAt,state:row.state},201);
+    }
+
+    if(url.pathname==='/bridge/update'&&request.method==='POST'){
+      const body=record(await request.json());
+      const submissionId=text(body.submissionId,180);
+      let ticket=text(body.ticket,256);
+      if(!ticket&&submissionId){
+        ticket=String(await this.state.storage.get('bridge-submission:'+submissionId)||'');
+      }
+      if(!ticket)return json({code:'SMM_BRIDGE_TICKET_REQUIRED'},400);
+      const key='bridge:'+ticket;
+      const current=await this.state.storage.get(key) as any;
+      if(!current)return json({code:'SMM_BRIDGE_TICKET_NOT_FOUND'},404);
+      const next=Object.freeze({
+        ...current,
+        ...(typeof body.state==='string'?{state:body.state}:{}),
+        ...(Number.isFinite(Number(body.relayStatus))?{relayStatus:Number(body.relayStatus)}:{}),
+        ...(typeof body.relayState==='string'?{relayState:body.relayState}:{}),
+        ...(typeof body.relayCode==='string'?{relayCode:body.relayCode}:{}),
+        ...(typeof body.customerState==='string'?{customerState:body.customerState}:{}),
+        ...(typeof body.customerCode==='string'?{customerCode:body.customerCode}:{}),
+        updatedAt:new Date().toISOString(),
+      });
+      await this.state.storage.put(key,next);
+      return json({state:'UPDATED'});
     }
 
     if(url.pathname==='/bridge/read'&&request.method==='GET'){
       const ticket=text(url.searchParams.get('ticket'),256);
       const submissionId=text(url.searchParams.get('submissionId'),180);
       if(!ticket||!submissionId)return json({code:'SMM_BRIDGE_TICKET_REQUIRED'},400);
-      const row=await this.state.storage.get('bridge:'+ticket) as any;
+      const key='bridge:'+ticket;
+      const row=await this.state.storage.get(key) as any;
       if(!row)return json({code:'SMM_BRIDGE_TICKET_NOT_FOUND'},404);
       if(String(row.submissionId)!==submissionId)return json({code:'SMM_BRIDGE_SUBMISSION_MISMATCH'},409);
       if(!Number.isFinite(Date.parse(String(row.expiresAt||'')))||Date.parse(String(row.expiresAt))<=Date.now()){
-        await this.state.storage.delete('bridge:'+ticket);
+        await this.state.storage.delete(key);
+        await this.state.storage.delete('bridge-submission:'+submissionId);
         return json({code:'SMM_BRIDGE_TICKET_EXPIRED'},410);
       }
-      return json(row);
+      const next=Object.freeze({
+        ...row,
+        state:'CLAIMED_BY_SMT',
+        claimCount:(Number(row.claimCount)||0)+1,
+        lastClaimAt:new Date().toISOString(),
+        updatedAt:new Date().toISOString(),
+      });
+      await this.state.storage.put(key,next);
+      return json(next);
+    }
+
+    if(url.pathname==='/bridge/list'&&request.method==='GET'){
+      const rows=await this.state.storage.list({prefix:'bridge:'});
+      const traces=[...rows.values()].filter((row:any)=>row&&typeof row==='object')
+        .sort((a:any,b:any)=>String(b.updatedAt||b.createdAt||b.expiresAt||'').localeCompare(String(a.updatedAt||a.createdAt||a.expiresAt||'')))
+        .slice(0,12)
+        .map((row:any)=>({
+          submissionId:String(row.submissionId||''),
+          state:String(row.state||'TICKET_CREATED'),
+          createdAt:String(row.createdAt||''),
+          updatedAt:String(row.updatedAt||''),
+          expiresAt:String(row.expiresAt||''),
+          relayStatus:Number.isFinite(Number(row.relayStatus))?Number(row.relayStatus):null,
+          relayState:String(row.relayState||''),
+          relayCode:String(row.relayCode||''),
+          claimCount:Number(row.claimCount)||0,
+          lastClaimAt:String(row.lastClaimAt||''),
+          customerState:String(row.customerState||''),
+          customerCode:String(row.customerCode||''),
+        }));
+      return json({traces});
     }
 
 
@@ -535,10 +605,27 @@ export default{
           body:JSON.stringify(customerIntent),
         });
       }catch{
+        await stub.fetch(new Request('https://internal/bridge/update',{
+          method:'POST',headers:{'content-type':'application/json'},
+          body:JSON.stringify({ticket,submissionId:orderRequest.submissionId,state:'RELAY_NETWORK_ERROR',relayCode:'SMM_CUSTOMER_BRIDGE_UNAVAILABLE'}),
+        })).catch(()=>{});
         return json({code:'SMM_CUSTOMER_BRIDGE_UNAVAILABLE',message:'暫時未能連接門店 Internet 訂單橋'},503);
       }
-      const body=await response.text();
-      return new Response(body,{status:response.status,statusText:response.statusText,headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store'}});
+      const raw=await response.text();
+      let relayBody:Record<string,unknown>={};
+      try{relayBody=raw?JSON.parse(raw) as Record<string,unknown>:{};}catch{}
+      await stub.fetch(new Request('https://internal/bridge/update',{
+        method:'POST',headers:{'content-type':'application/json'},
+        body:JSON.stringify({
+          ticket,
+          submissionId:orderRequest.submissionId,
+          state:response.ok||response.status===202?'RELAYED_TO_CUSTOMER_BRIDGE':'RELAY_REJECTED',
+          relayStatus:response.status,
+          relayState:String(relayBody.state||''),
+          relayCode:String(relayBody.code||''),
+        }),
+      })).catch(()=>{});
+      return new Response(raw,{status:response.status,statusText:response.statusText,headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store'}});
     }
 
     if(url.pathname==='/api/smm/orders/readback'){
@@ -555,8 +642,21 @@ export default{
       }catch{
         return json({state:'UNKNOWN',submissionId},503);
       }
-      const body=await response.text();
-      return new Response(body,{status:response.status,statusText:response.statusText,headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store'}});
+      const raw=await response.text();
+      let readback:Record<string,unknown>={};
+      try{readback=raw?JSON.parse(raw) as Record<string,unknown>:{};}catch{}
+      const id=env.SMM_INTENT_STORE.idFromName(storeId);
+      const stub=env.SMM_INTENT_STORE.get(id);
+      await stub.fetch(new Request('https://internal/bridge/update',{
+        method:'POST',headers:{'content-type':'application/json'},
+        body:JSON.stringify({
+          submissionId,
+          state:readback.state==='CONFIRMED'?'CUSTOMER_CONFIRMED':readback.state==='REJECTED'?'CUSTOMER_REJECTED':'WAITING_CUSTOMER_READBACK',
+          customerState:String(readback.state||''),
+          customerCode:String(readback.code||''),
+        }),
+      })).catch(()=>{});
+      return new Response(raw,{status:response.status,statusText:response.statusText,headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store'}});
     }
 
     if(url.pathname==='/api/smm/bridge/claim'){
@@ -573,6 +673,55 @@ export default{
       const response=await stub.fetch(new Request(target.toString(),{method:'GET'}));
       const body=await response.text();
       return new Response(body,{status:response.status,statusText:response.statusText,headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store',...cors(request)}});
+    }
+
+    if(url.pathname==='/api/smm/bridge-diagnostics'){
+      if(request.method!=='GET')return json({code:'METHOD_NOT_ALLOWED'},405);
+      const id=env.SMM_INTENT_STORE.idFromName(storeId);
+      const stub=env.SMM_INTENT_STORE.get(id);
+      const traceResponse=await stub.fetch(new Request('https://internal/bridge/list',{method:'GET'}));
+      const traceBody=record(await traceResponse.json().catch(()=>({})));
+      const traces=list(traceBody.traces).map(raw=>record(raw));
+      const enriched=[];
+      for(const trace of traces){
+        const submissionId=String(trace.submissionId||'');
+        let customer:Record<string,unknown>={};
+        if(submissionId){
+          try{
+            const response=await fetch('https://admin.morefunos.com/api/customer/orders/readback?storeId='+encodeURIComponent(storeId)+'&submissionId='+encodeURIComponent(submissionId),{headers:{accept:'application/json','cache-control':'no-cache'}});
+            customer=record(await response.json().catch(()=>({})));
+            if(response.status===404)customer={state:'NOT_FOUND'};
+            else if(!response.ok)customer={state:'HTTP_ERROR',code:String(customer.code||response.status)};
+          }catch{customer={state:'NETWORK_ERROR'};}
+        }
+        const relayStatus=Number(trace.relayStatus);
+        const claimCount=Number(trace.claimCount)||0;
+        const customerState=String(customer.state||trace.customerState||'');
+        const firstBreak=
+          Number.isFinite(relayStatus)&&relayStatus>=400?'SMM_TO_CUSTOMER_RELAY_REJECTED':
+          String(trace.state)==='RELAY_NETWORK_ERROR'?'SMM_TO_CUSTOMER_RELAY_NETWORK':
+          customerState==='NOT_FOUND'?'CUSTOMER_RUNTIME_NOT_RECEIVED':
+          customerState==='PENDING_SMT'&&claimCount===0?'SMT_HAS_NOT_CLAIMED_SMM_TICKET':
+          customerState==='PENDING_SMT'&&claimCount>0?'SMT_CLAIMED_BUT_NOT_ACKED':
+          customerState==='REJECTED'?'SMT_REJECTED_SMM_ORDER':
+          customerState==='CONFIRMED'?'GREEN':
+          'WAITING_OR_UNKNOWN';
+        enriched.push({
+          traceId:submissionId?submissionId.slice(-10):'',
+          state:String(trace.state||''),
+          relayStatus:Number.isFinite(relayStatus)?relayStatus:null,
+          relayState:String(trace.relayState||''),
+          relayCode:String(trace.relayCode||''),
+          claimCount,
+          lastClaimAt:String(trace.lastClaimAt||''),
+          customerState,
+          customerCode:String(customer.code||trace.customerCode||''),
+          firstBreak,
+          createdAt:String(trace.createdAt||''),
+          updatedAt:String(trace.updatedAt||''),
+        });
+      }
+      return json({ok:true,traces:enriched});
     }
 
     if(url.pathname==='/api/smm/config-diagnostics'){
