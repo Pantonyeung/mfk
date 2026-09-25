@@ -1,0 +1,27 @@
+name: mfk-dining-production-admission-r6-proof
+on:
+  pull_request:
+    branches: [work/MFK/SMT-DINING-CONTROL-RECONCILE-R5]
+permissions:
+  contents: read
+jobs:
+  proof:
+    if: github.head_ref == 'work/MFK/SMT-DINING-PRODUCTION-ADMISSION-R6'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    defaults:
+      run:
+        working-directory: v2local
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: npm install --no-audit --no-fund --legacy-peer-deps --package-lock=false
+      - name: Unit and build
+        run: |
+          set -o pipefail
+          npm test
+          npm run build
