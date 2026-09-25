@@ -70,7 +70,11 @@ public final class CarrierUpdateClient {
     }
 
     public Descriptor checkForUpdate() throws IOException {
-        final URI manifestUri = carrierManifestUri(endpointStore.effectiveEndpoint());
+        return checkForUpdate(endpointStore.effectiveEndpoint());
+    }
+
+    public Descriptor checkForUpdate(String endpoint) throws IOException {
+        final URI manifestUri = carrierManifestUri(endpoint);
         final JSONObject json = fetchJson(manifestUri.toURL());
         final int versionCode = json.optInt("versionCode", -1);
         if (versionCode <= 0) throw new IOException("CARRIER_VERSION_CODE_REQUIRED");
