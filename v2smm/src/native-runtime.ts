@@ -13,12 +13,13 @@ declare global{
   }
 }
 
-const pending=new Map<string,{resolve:(value:SmmLanOrderResponse)=>void;reject:(reason:Error)=>void;timer:number}>();
+type NativeResponse=SmmLanOrderResponse|SmmLanSubmissionReadbackResponse;
+const pending=new Map<string,{resolve:(value:NativeResponse)=>void;reject:(reason:Error)=>void;timer:number}>();
 
 window.__MFK_SMM_NATIVE_RESULT__=(correlationId,payload)=>{
   const item=pending.get(correlationId);if(!item)return;
   window.clearTimeout(item.timer);pending.delete(correlationId);
-  try{item.resolve(JSON.parse(payload) as SmmLanOrderResponse);}catch{item.reject(new Error('SMM_NATIVE_RESPONSE_INVALID'));}
+  try{item.resolve(JSON.parse(payload) as NativeResponse);}catch{item.reject(new Error('SMM_NATIVE_RESPONSE_INVALID'));}
 };
 
 function sendNative(request:object):Promise<SmmLanOrderResponse|SmmLanSubmissionReadbackResponse>{
