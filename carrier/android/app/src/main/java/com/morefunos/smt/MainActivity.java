@@ -40,6 +40,8 @@ import com.morefunos.smt.runtime.RuntimeReleaseStore;
 import com.morefunos.smt.print.gateway.NativePrintGatewayService;
 import com.morefunos.smt.storekernel.StoreKernelBridgeController;
 import com.morefunos.smt.storekernel.StoreKernelContract;
+import com.morefunos.smt.smm.SmmLanHost;
+import com.morefunos.smt.smm.SmmTrustedDeviceStore;
 
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -65,6 +67,8 @@ public final class MainActivity extends Activity {
     private CarrierCommandController carrierCommands;
     private PrintCommandController printCommands;
     private StoreKernelBridgeController storeKernelCommands;
+    private SmmLanHost smmLanHost;
+    private SmmTrustedDeviceStore smmTrustedDevices;
     private NativePrintGatewayService printGateway;
     private boolean printGatewayBound;
     private final ServiceConnection printGatewayConnection = new ServiceConnection() {
@@ -157,6 +161,13 @@ public final class MainActivity extends Activity {
             Context.BIND_AUTO_CREATE
         );
         registerNativeMessageBridge(webView);
+        smmTrustedDevices = new SmmTrustedDeviceStore(this);
+        smmLanHost = new SmmLanHost(smmTrustedDevices, this::forwardSmmLanMessage);
+        try {
+            smmLanHost.start();
+        } catch (IOException error) {
+            if (faultJournal != null) faultJournal.record("SMM_LAN", "SMM_LAN_HOST_START_FAILED", error.getMessage(), null);
+        }
         webView.loadUrl(startUrl());
     }
 
@@ -368,6 +379,25 @@ public final class MainActivity extends Activity {
                 }
             }
         );
+    }
+
+    private String forwardSmmLanMessage(String deviceId, String rawPayload) {
+        final WebView current = webView;
+        if (current == null) return errorResponse(null, "SMM_RUNTIME_UNAVAILABLE");
+        // Carrier owns transport/trust only. Business handling remains in the
+        // active runtime. This bridge event is correlated by the payload's own
+        // stable request/submission identity.
+        try {
+            final JSONObject payload = new JSONObject(rawPayload);
+            final JSONObject event = new JSONObject();
+            event.put("type", "smm.lan.request.v1");
+            event.put("deviceId", deviceId);
+            event.put("payload", payload);
+            postTrustedWebMessage(event.toString());
+            return acceptedResponse("smm.lan.forwarded.v1", payload.optString("requestId", "")).toString();
+        } catch (JSONException error) {
+            return errorResponse(null, "SMM_LAN_PAYLOAD_INVALID");
+        }
     }
 
     private String handleBridgeMessage(String rawMessage) {
@@ -611,6 +641,9 @@ public final class MainActivity extends Activity {
         printCommands = null;
         if (carrierCommands != null) carrierCommands.close();
         carrierCommands = null;
+        if (smmLanHost != null) smmLanHost.close();
+        smmLanHost = null;
+        smmTrustedDevices = null;
         if (storeKernelCommands != null) storeKernelCommands.close();
         storeKernelCommands = null;
         if (webView != null) webView.destroy();
