@@ -65,7 +65,7 @@ test('complete operator routes and failure states are present',()=>{
   for(const marker of[
     '快速點餐','前線工作','訂單記錄','桌面管理','店務工具',
     '搜尋商品','商品設定','購物草稿','待提交草稿','平台狀態',
-    '商品供應','營業日','產能','營運報表','退款要求','列印狀態','診斷','正在同步餐單',
+    '連線設定','商品供應','營業日','產能','營運報表','退款要求','列印狀態','診斷','正在同步餐單',
     '同步失敗','重新確認結果'
   ])assert.match(source,new RegExp(marker));
 });
@@ -104,16 +104,21 @@ test('production source contains no static fixture module or fake product truth'
   assert.doesNotMatch(app,/\$6,420|Keeta provider readback|紫米飯團 ×2|DEMO/);
 });
 
-test('quote and mutation operations can only cross the typed injected port',()=>{
+test('SMM uses the shared published menu price and SMT validates only on submit',()=>{
   const types=fs.readFileSync(path.join(root,'product-types.ts'),'utf8');
-  assert.match(types,/quoteCart\?/);
-  assert.match(types,/submitOrder\?/);
-  assert.match(types,/setSellability\?/);
-  assert.match(types,/createDineSession\?/);
   const app=fs.readFileSync(path.join(root,'App.tsx'),'utf8');
-  assert.match(app,/port\?\.quoteCart/);
+  const contract=fs.readFileSync(path.join(repoRoot,'contracts','smm-lan-v1.ts'),'utf8');
+  assert.match(types,/publishedTakeawayUnitPriceMinor/);
+  assert.match(types,/publishedDineInUnitPriceMinor/);
+  assert.match(app,/已發布總額/);
+  assert.match(app,/SMT 提交時再核對/);
+  assert.doesNotMatch(app,/等待門店報價/);
+  assert.doesNotMatch(app,/port\?\.quoteCart/);
   assert.match(app,/port\?\.submitOrder/);
-  assert.doesNotMatch(app,/finalUnitPriceMinor\s*[*+\-\/]/);
+  assert.match(contract,/menuRevision/);
+  assert.match(contract,/publishedTotalMinor/);
+  assert.match(contract,/serviceMode/);
+  assert.match(contract,/tender/);
 });
 
 
@@ -151,7 +156,7 @@ test('live-link contract stays bounded and UNKNOWN-safe without UI transport own
 });
 
 
-test('LAN failure falls back to Internet and render protection prevents blank screens',()=>{
+test('LAN failure falls back to Internet and connection setup stays out of the ordering surface',()=>{
   const runtime=fs.readFileSync(path.join(root,'pwa-runtime.ts'),'utf8');
   const main=fs.readFileSync(path.join(root,'main.tsx'),'utf8');
   const app=fs.readFileSync(path.join(root,'App.tsx'),'utf8');
@@ -159,15 +164,34 @@ test('LAN failure falls back to Internet and render protection prevents blank sc
   assert.match(runtime,/readCloudSnapshot/);
   assert.match(main,/SmmErrorBoundary/);
   assert.match(main,/SMM 顯示已自動保護/);
-  assert.match(app,/Internet 資料通道運作中/);
-  assert.match(app,/snapshot\?\.connectionPath!=='LAN'/);
+  assert.match(app,/title="連線設定"/);
+  assert.match(app,/tool==='connection'\?<ConnectionSettings/);
+  assert.doesNotMatch(app,/Internet 資料通道運作中/);
 });
 
 
-test('dedicated SMM worker keeps Internet reads same-origin and reuses Admin public projection',()=>{
+test('dedicated SMM worker projects the same published Admin release without exposing transaction authority',()=>{
   const worker=fs.readFileSync(path.join(repoRoot,'v2smm','worker.ts'),'utf8');
-  assert.match(worker,/admin\.morefunos\.com\/api\/customer\/snapshot/);
+  assert.match(worker,/admin\.morefunos\.com\/api\/admin-sync\/active/);
+  assert.match(worker,/publishedTakeawayUnitPriceMinor/);
+  assert.match(worker,/publishedDineInUnitPriceMinor/);
+  assert.match(worker,/publishedAdjustmentMinor/);
   assert.match(worker,/url\.pathname==='\/api\/smm\/snapshot'/);
   assert.match(worker,/env\.ASSETS\.fetch/);
   assert.doesNotMatch(worker,/orders\/submit|createOrder|StoreKernel|D1Database/);
+});
+
+
+test('SMM staff checkout has service mode and tender but no automatic drawer or QR handoff',()=>{
+  const app=fs.readFileSync(path.join(root,'App.tsx'),'utf8');
+  const ingress=fs.readFileSync(path.join(repoRoot,'v2local','src','runtime','smm-lan-ingress.ts'),'utf8');
+  assert.match(app,/服務方式/);
+  assert.match(app,/堂食/);
+  assert.match(app,/收款方式/);
+  assert.match(app,/現金只會記錄為收款方式；需要開錢箱時由 SMT 人手操作/);
+  assert.doesNotMatch(app,/產生 QR|QR 交接|createSmmQrHandoff|renderSmmQrHandoff/);
+  assert.match(ingress,/paymentLabel/);
+  assert.match(ingress,/SMM_MENU_REVISION_CHANGED/);
+  assert.match(ingress,/SMM_PUBLISHED_PRICE_CHANGED/);
+  assert.doesNotMatch(ingress,/drawer|openDrawer|cashDrawer/);
 });
