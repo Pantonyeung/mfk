@@ -1,6 +1,7 @@
 import {useEffect,useMemo,useState} from 'react';
 import {readSmmLocalWorkspace,writeSmmLocalWorkspace,createSmmPendingIntent,type SmmLocalPreferences} from './persistence';
 import {resolveSmmRuntimePort} from './runtime';
+import {createSmmQrHandoff,renderSmmQrHandoff} from './qr-handoff';
 import {selectedSmmCartOptions,toggleSmmSelection,validateSmmSelections,type SmmSelectionState} from './selection';
 import type {
   SmmCartLine,
@@ -513,11 +514,20 @@ function CartSheet({cart,quote,pending,onClose,onQuantity,onRemove,onSubmit,onRe
   onSubmit:()=>void;
   onReadback:(intent:SmmPendingIntent)=>void;
 }){
+  const [qr,setQr]=useState<string|null>(null);
+  const [qrBusy,setQrBusy]=useState(false);
+  const makeQr=async()=>{
+    if(!cart.length||qrBusy)return;
+    setQrBusy(true);
+    try{setQr(await renderSmmQrHandoff(createSmmQrHandoff(cart,quote)));}
+    finally{setQrBusy(false);}
+  };
   return <div className="overlay"><section className="sheet" role="dialog" aria-modal="true"><div className="sheet-grabber"/><header><div><span>購物草稿</span><h2>{cart.length} 項</h2><small>本機只保存意圖；總額只接受門店正式報價。</small></div><button onClick={onClose}>✕</button></header>
     {!cart.length?<EmptyState title="草稿係空嘅" detail="返回點單加入商品。"/>:cart.map(line=><div className="cart-line" key={line.lineId}><div><strong>{line.productName}</strong><small>{[line.selectedVariationName,...line.selections.map(item=>item.optionName)].filter(Boolean).join(' · ')||'無額外設定'}</small></div><div className="qty"><button onClick={()=>onQuantity(line.lineId,line.quantity-1)}>−</button><b>{line.quantity}</b><button onClick={()=>onQuantity(line.lineId,line.quantity+1)}>＋</button></div><button className="danger" onClick={()=>onRemove(line.lineId)}>移除</button></div>)}
     <div className="cart-total"><span>正式報價</span><strong>{quote?money(quote.currency,quote.totalMinor):'等待門店報價'}</strong><small>{quote?`版本 ${quote.revision}`:'本機唔會估算價格'}</small></div>
     {pending?<p className="callout">{pending.state==='UNKNOWN'?'上次提交結果未明，請先重新確認，唔好重新送出。':pending.lastMessage??'已有待提交草稿'}</p>:null}
-    <footer><button onClick={onClose}>返回</button>{pending?.state==='UNKNOWN'?<button className="primary" onClick={()=>onReadback(pending)}>重新確認結果</button>:<button className="primary" disabled={!cart.length} onClick={onSubmit}>{quote?'提交訂單':'保存待提交草稿'}</button>}</footer>
+    {qr?<div className="smm-qr-handoff"><img src={qr} alt="SMM 訂單交接 QR"/><div><strong>QR 交接</strong><p>畀 SMT 掃描後，會重新用門店餐單同價格驗證，再建立正式訂單。呢個 QR 本身唔係正式 Order。</p></div></div>:null}
+    <footer><button onClick={onClose}>返回</button><button disabled={!cart.length||qrBusy} onClick={()=>void makeQr()}>{qrBusy?'產生中…':'產生 QR'}</button>{pending?.state==='UNKNOWN'?<button className="primary" onClick={()=>onReadback(pending)}>重新確認結果</button>:<button className="primary" disabled={!cart.length} onClick={onSubmit}>{quote?'提交訂單':'保存待提交草稿'}</button>}</footer>
   </section></div>;
 }
 
