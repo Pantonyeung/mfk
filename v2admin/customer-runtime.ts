@@ -2,6 +2,7 @@ import {
   validateMfkCustomerOrderIntent,
   validateMfkCustomerQuoteRequest,
 } from '../contracts/customer-cloud-v1.ts';
+import {validateSmmLanOrderRequest} from '../contracts/smm-lan-v1.ts';
 
 const JSON_HEADERS={'content-type':'application/json; charset=utf-8','cache-control':'no-store'};
 function json(value:unknown,status=200){return new Response(JSON.stringify(value),{status,headers:JSON_HEADERS});}
@@ -100,12 +101,72 @@ export class CustomerRuntimeStore{
       }
       const row=Object.freeze({
         ...intent,
+        bridgeKind:'CUSTOMER' as const,
         intentFingerprint:fingerprint,
         state:'PENDING_SMT',
         receivedAt:new Date().toISOString(),
       });
       await this.state.storage.put(key,row);
       return json({state:'PENDING',submissionId:intent.submissionId},202);
+    }
+
+    if(url.pathname==='/public/staff-orders/submit'&&request.method==='POST'){
+      let body:Record<string,unknown>;
+      try{body=record(await request.json(),'SMM_STAFF_ORDER_ENVELOPE_INVALID');}
+      catch(error){return json({code:error instanceof Error?error.message:'SMM_STAFF_ORDER_ENVELOPE_INVALID'},400);}
+      let orderRequest;
+      try{orderRequest=validateSmmLanOrderRequest(body.request);}
+      catch(error){return json({code:error instanceof Error?error.message:'SMM_STAFF_ORDER_INVALID'},400);}
+      let staff:Record<string,unknown>;
+      try{staff=record(body.staff,'SMM_STAFF_IDENTITY_INVALID');}
+      catch(error){return json({code:error instanceof Error?error.message:'SMM_STAFF_IDENTITY_INVALID'},400);}
+      const staffId=text(staff.staffId,'SMM_STAFF_ID_REQUIRED',120);
+      const displayName=text(staff.displayName,'SMM_STAFF_NAME_REQUIRED',160);
+      const role=typeof staff.role==='string'?staff.role.trim().slice(0,40):'STAFF';
+      const key='order:'+orderRequest.submissionId;
+      const fingerprint=stable({orderRequest,staff:{staffId,displayName,role}});
+      const existing=await this.state.storage.get(key) as any;
+      if(existing){
+        if(existing.idempotencyKey!==orderRequest.idempotencyKey||existing.intentFingerprint!==fingerprint){
+          return json({code:'SMM_SUBMISSION_ID_CONFLICT'},409);
+        }
+        return json({state:existing.state,submissionId:orderRequest.submissionId,message:'同一員工提交身份已存在'});
+      }
+      const row=Object.freeze({
+        bridgeKind:'SMM_STAFF' as const,
+        request:orderRequest,
+        staff:Object.freeze({staffId,displayName,role}),
+        submissionId:orderRequest.submissionId,
+        idempotencyKey:orderRequest.idempotencyKey,
+        intentFingerprint:fingerprint,
+        state:'PENDING_SMT',
+        receivedAt:new Date().toISOString(),
+      });
+      await this.state.storage.put(key,row);
+      await this.state.storage.put('diag:lastStaffOrderSubmit',{
+        submissionId:orderRequest.submissionId,
+        staffId,
+        receivedAt:row.receivedAt,
+      });
+      return json({state:'PENDING',submissionId:orderRequest.submissionId},202);
+    }
+
+    if(url.pathname==='/public/staff-orders/readback'&&request.method==='GET'){
+      const submissionId=(url.searchParams.get('submissionId')||'').trim();
+      if(!submissionId)return json({code:'SMM_SUBMISSION_ID_REQUIRED'},400);
+      const row=await this.state.storage.get('order:'+submissionId) as any;
+      if(!row||row.bridgeKind!=='SMM_STAFF')return json({state:'UNKNOWN',submissionId},404);
+      return json({
+        state:row.state,
+        submissionId,
+        ...(row.state==='CONFIRMED'?{
+          canonicalOrderId:row.canonicalOrderId,
+          canonicalDisplay:row.canonicalDisplay,
+          committedAt:row.committedAt,
+          totalMinor:row.totalMinor,
+        }:{}),
+        ...(row.state==='REJECTED'?{code:row.code,message:row.message}:{}),
+      });
     }
 
     if(url.pathname==='/public/orders/readback'&&request.method==='GET'){
@@ -141,6 +202,7 @@ export class CustomerRuntimeStore{
         lastPublicQuote:await this.state.storage.get('diag:lastPublicQuote')??null,
         lastQuotePull:await this.state.storage.get('diag:lastQuotePull')??null,
         lastQuoteAck:await this.state.storage.get('diag:lastQuoteAck')??null,
+        lastStaffOrderSubmit:await this.state.storage.get('diag:lastStaffOrderSubmit')??null,
         observedAt:new Date().toISOString(),
       });
     }
