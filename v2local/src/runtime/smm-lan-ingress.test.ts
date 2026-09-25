@@ -10,6 +10,7 @@ Object.defineProperty(globalThis,'localStorage',{value:{
 vi.mock('./admin-config-sync.ts',()=>({
   readSmtAdminConfigLkg:()=>({revision:7,fingerprint:'fp7'}),
   readSmtDeviceId:()=> 'SMT-1',
+  readAdminSnapshotSection:(key:string)=>key==='storeSettings'?{diningTables:Array.from({length:9},(_,index)=>({id:'T'+String(index+1).padStart(2,'0'),name:String(index+1)+' 號枱',active:true,sortOrder:index+1}))}:{},
   subscribeSmtAdminConfig:()=>()=>{},
   subscribeSmtCloudDoorbell:()=>()=>{},
 }));
