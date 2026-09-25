@@ -60,7 +60,7 @@ export function RuntimeDiningWorkspace({runtime,onCheckout,warningMinutes}:{
   const [actionBusy,setActionBusy]=useState(false);
   const [checkoutBusy,setCheckoutBusy]=useState(false);
   const [reprintOpen,setReprintOpen]=useState(false);
-  const [reprintOptions,setReprintOptions]=useState<readonly {jobId:string;role:string;label:string;detail?:string}[]>([]);
+  const [reprintOptions,setReprintOptions]=useState<readonly {jobId:string;role:string;label:string;detail?:string;firstPrintState?:'DONE'|'FAILED'|'UNKNOWN';firstPrintCode?:string}[]>([]);
   const [selectedReprintJobs,setSelectedReprintJobs]=useState<Set<string>>(new Set());
   const alive=useRef(true);
   const activeHold=useRef<string|null>(null);
@@ -330,7 +330,7 @@ export function RuntimeDiningWorkspace({runtime,onCheckout,warningMinutes}:{
         <div className="order-action-choices">
           {reprintOptions.map(option=><label key={option.jobId} style={{display:'flex',gap:10,alignItems:'center',padding:10}}>
             <input type="checkbox" checked={selectedReprintJobs.has(option.jobId)} onChange={()=>toggleReprint(option.jobId)}/>
-            <span><b>{option.label}</b>{option.detail?<small> · {option.detail}</small>:null}</span>
+            <span><b>{option.label}</b>{option.detail?<small> · {option.detail}</small>:null}<small> · 首次：{option.firstPrintState==='DONE'?'已送':option.firstPrintState==='FAILED'?'失敗':option.firstPrintState==='UNKNOWN'?'未知':'未記錄'}{option.firstPrintCode?' · '+option.firstPrintCode:''}</small></span>
           </label>)}
         </div>
         <footer><button type="button" onClick={()=>setReprintOpen(false)}>取消</button><button type="button" className="primary" disabled={!selectedReprintJobs.size||actionBusy} onClick={()=>void runReprint()}>確認重印</button></footer>
