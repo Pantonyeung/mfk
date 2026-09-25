@@ -1,4 +1,4 @@
-import {createStaffPinVerifier,validateRuntimeStaffAuthSnapshot,verifyStaffPin,type RuntimeStaffIdentity} from '../contracts/staff-auth-v1.ts';
+import {validateRuntimeStaffAuthSnapshot,type RuntimeStaffIdentity,type StaffPinVerifier} from '../contracts/staff-auth-v1.ts';
 const ADMIN_ACTIVE='https://admin.morefunos.com/api/admin-sync/active';
 const ADMIN_ACKS='https://admin.morefunos.com/api/admin-sync/acks';
 const SMT_ORIGIN='https://appassets.androidplatform.net';
@@ -53,22 +53,41 @@ function staffRows(active:Record<string,unknown>):readonly RuntimeStaffIdentity[
     return Object.freeze([]);
   }
 }
-async function verifyStaffCredentials(staffId:string,pin:string,storeId:string){
+function hexToBytes(value:string){
+  if(!/^[0-9a-f]+$/i.test(value)||value.length%2!==0)throw new Error('SMM_AUTH_HEX_INVALID');
+  const output=new Uint8Array(value.length/2);
+  for(let i=0;i<output.length;i++)output[i]=Number.parseInt(value.slice(i*2,i*2+2),16);
+  return output;
+}
+function bytesToHex(bytes:Uint8Array){
+  return [...bytes].map(value=>value.toString(16).padStart(2,'0')).join('');
+}
+function sameHex(left:string,right:string){
+  if(left.length!==right.length)return false;
+  let diff=0;
+  for(let i=0;i<left.length;i++)diff|=left.charCodeAt(i)^right.charCodeAt(i);
+  return diff===0;
+}
+async function hmacHex(keyHex:string,message:string){
+  const key=await crypto.subtle.importKey(
+    'raw',
+    hexToBytes(keyHex),
+    {name:'HMAC',hash:'SHA-256'},
+    false,
+    ['sign'],
+  );
+  const signature=await crypto.subtle.sign('HMAC',key,new TextEncoder().encode(message));
+  return bytesToHex(new Uint8Array(signature));
+}
+async function currentStaffVerifier(staffId:string,storeId:string):Promise<{staff:RuntimeStaffIdentity;verifier:StaffPinVerifier}|null>{
   if(!staffId)return null;
   let active:Record<string,unknown>;
   try{active=await fetchActive(storeId);}catch{return null;}
   const staff=staffRows(active).find(row=>row.staffId===staffId);
   if(!staff?.pinVerifier)return null;
-  const ok=await verifyStaffPin(pin,staff.pinVerifier);
-  if(!ok)return null;
-  return Object.freeze({
-    staffId:staff.staffId,
-    displayName:staff.name,
-    role:staff.role,
-    scope:staff.scope,
-    permissions:Object.freeze([...staff.permissions]),
-  });
+  return Object.freeze({staff,verifier:staff.pinVerifier});
 }
+
 async function currentStaffIdentity(staffId:string,storeId:string){
   if(!staffId)return null;
   let active:Record<string,unknown>;
@@ -230,6 +249,33 @@ export class SmmIntentStore{
   async fetch(request:Request){
     const url=new URL(request.url);
 
+    if(url.pathname==='/auth/challenge/create'&&request.method==='POST'){
+      const body=record(await request.json());
+      const staffId=text(body.staffId,120);
+      if(!staffId)return json({code:'SMM_AUTH_STAFF_ID_REQUIRED'},400);
+      const challengeId=crypto.randomUUID();
+      const nonce=crypto.randomUUID().replaceAll('-','')+crypto.randomUUID().replaceAll('-','');
+      const expiresAt=new Date(Date.now()+2*60*1000).toISOString();
+      await this.state.storage.put('challenge:'+challengeId,Object.freeze({challengeId,staffId,nonce,expiresAt}));
+      return json({challengeId,staffId,nonce,expiresAt},201);
+    }
+
+    if(url.pathname==='/auth/challenge/consume'&&request.method==='POST'){
+      const body=record(await request.json());
+      const challengeId=text(body.challengeId,120);
+      const staffId=text(body.staffId,120);
+      if(!challengeId||!staffId)return json({code:'SMM_AUTH_CHALLENGE_ID_REQUIRED'},400);
+      const key='challenge:'+challengeId;
+      const row=await this.state.storage.get(key) as any;
+      if(!row)return json({code:'SMM_AUTH_CHALLENGE_NOT_FOUND'},404);
+      await this.state.storage.delete(key);
+      if(String(row.staffId)!==staffId)return json({code:'SMM_AUTH_CHALLENGE_STAFF_MISMATCH'},409);
+      if(!Number.isFinite(Date.parse(String(row.expiresAt||'')))||Date.parse(String(row.expiresAt))<=Date.now()){
+        return json({code:'SMM_AUTH_CHALLENGE_EXPIRED'},410);
+      }
+      return json({challengeId,staffId,nonce:String(row.nonce||''),expiresAt:String(row.expiresAt||'')});
+    }
+
     if(url.pathname==='/sessions/create'&&request.method==='POST'){
       const body=record(await request.json());
       const staff=record(body.staff);
@@ -388,55 +434,100 @@ export default{
       }))});
     }
 
+    if(url.pathname==='/api/smm/staff/challenge'){
+      if(request.method!=='POST')return json({code:'METHOD_NOT_ALLOWED'},405);
+      const body=record(await request.json().catch(()=>({})));
+      const staffId=text(body.staffId,120);
+      const current=await currentStaffVerifier(staffId,storeId);
+      if(!current)return json({code:'SMM_STAFF_NOT_AVAILABLE',message:'呢個員工帳戶暫時未能登入'},404);
+      const id=env.SMM_INTENT_STORE.idFromName(storeId);
+      const stub=env.SMM_INTENT_STORE.get(id);
+      const response=await stub.fetch(new Request('https://internal/auth/challenge/create',{
+        method:'POST',
+        headers:{'content-type':'application/json'},
+        body:JSON.stringify({staffId}),
+      }));
+      if(!response.ok)return json({code:'SMM_AUTH_CHALLENGE_CREATE_FAILED'},503);
+      const challenge=record(await response.json());
+      return json({
+        challengeId:challenge.challengeId,
+        nonce:challenge.nonce,
+        expiresAt:challenge.expiresAt,
+        algorithm:current.verifier.algorithm,
+        iterations:current.verifier.iterations,
+        saltHex:current.verifier.saltHex,
+      });
+    }
+
     if(url.pathname==='/api/smm/staff/verify'){
       if(request.method!=='POST')return json({code:'METHOD_NOT_ALLOWED'},405);
       const body=record(await request.json().catch(()=>({})));
       const staffId=text(body.staffId,120);
-      const pin=String(body.pin??'').replace(/\D/g,'');
-      let staff;
-      try{
-        staff=await verifyStaffCredentials(staffId,pin,storeId);
-      }catch(error){
-        return json({
-          code:'SMM_STAFF_VERIFY_RUNTIME_ERROR',
-          message:error instanceof Error?error.message:'員工驗證服務錯誤',
-        },503);
+      const challengeId=text(body.challengeId,120);
+      const proofHex=text(body.proofHex,128).toLowerCase();
+      if(!staffId||!challengeId||!/^[0-9a-f]{64}$/.test(proofHex)){
+        return json({code:'SMM_STAFF_PROOF_INVALID',message:'員工驗證資料不完整'},400);
       }
-      if(!staff)return json({code:'SMM_STAFF_UNAUTHORIZED',message:'員工帳戶或 PIN 不正確'},401);
+
+      const current=await currentStaffVerifier(staffId,storeId);
+      if(!current)return json({code:'SMM_STAFF_NOT_AVAILABLE',message:'呢個員工帳戶暫時未能登入'},404);
+
+      const id=env.SMM_INTENT_STORE.idFromName(storeId);
+      const stub=env.SMM_INTENT_STORE.get(id);
+      const challengeResponse=await stub.fetch(new Request('https://internal/auth/challenge/consume',{
+        method:'POST',
+        headers:{'content-type':'application/json'},
+        body:JSON.stringify({challengeId,staffId}),
+      }));
+      if(!challengeResponse.ok){
+        const failure=record(await challengeResponse.json().catch(()=>({})));
+        return json({code:String(failure.code||'SMM_AUTH_CHALLENGE_INVALID'),message:'登入驗證已過期，請再試一次'},401);
+      }
+      const challenge=record(await challengeResponse.json());
+      const message='MFK_SMM_STAFF_LOGIN_V1\n'+challengeId+'\n'+staffId+'\n'+String(challenge.nonce||'');
+      let expectedProof:string;
       try{
-        const id=env.SMM_INTENT_STORE.idFromName(storeId);
-        const stub=env.SMM_INTENT_STORE.get(id);
+        expectedProof=await hmacHex(current.verifier.hashHex,message);
+      }catch(error){
+        return json({code:'SMM_STAFF_PROOF_RUNTIME_ERROR',message:error instanceof Error?error.message:'員工驗證服務錯誤'},503);
+      }
+      if(!sameHex(expectedProof,proofHex)){
+        return json({code:'SMM_STAFF_UNAUTHORIZED',message:'PIN 不正確'},401);
+      }
+
+      const staff=Object.freeze({
+        staffId:current.staff.staffId,
+        displayName:current.staff.name,
+        role:current.staff.role,
+        scope:current.staff.scope,
+        permissions:Object.freeze([...current.staff.permissions]),
+      });
+      try{
         const response=await stub.fetch(new Request('https://internal/sessions/create',{
           method:'POST',
           headers:{'content-type':'application/json'},
           body:JSON.stringify({staff}),
         }));
-        if(!response.ok){
-          const failure=record(await response.json().catch(()=>({})));
-          return json({code:String(failure.code||'SMM_SESSION_CREATE_FAILED'),message:'員工身份正確，但手機工作階段建立失敗'},503);
-        }
+        if(!response.ok)return json({code:'SMM_SESSION_CREATE_FAILED',message:'員工身份正確，但手機工作階段建立失敗'},503);
         const session=record(await response.json());
         if(!text(session.sessionToken,256))return json({code:'SMM_SESSION_TOKEN_MISSING',message:'員工身份正確，但手機工作階段建立失敗'},503);
         return json({ok:true,...staff,sessionToken:session.sessionToken,expiresAt:session.expiresAt});
       }catch(error){
-        return json({
-          code:'SMM_SESSION_STORE_UNAVAILABLE',
-          message:error instanceof Error?error.message:'員工身份正確，但手機工作階段暫時不可用',
-        },503);
+        return json({code:'SMM_SESSION_STORE_UNAVAILABLE',message:error instanceof Error?error.message:'員工身份正確，但手機工作階段暫時不可用'},503);
       }
     }
 
     if(url.pathname==='/api/smm/auth-selftest'){
       if(request.method!=='GET')return json({code:'METHOD_NOT_ALLOWED'},405);
       try{
-        const verifier=await createStaffPinVerifier('4826');
-        const ok=await verifyStaffPin('4826',verifier);
-        const reject=await verifyStaffPin('6284',verifier);
-        return ok&&!reject
-          ?json({ok:true,algorithm:verifier.algorithm,iterations:verifier.iterations})
-          :json({ok:false,code:'SMM_STAFF_CRYPTO_SELFTEST_FAILED'},503);
+        const key='11'.repeat(32);
+        const message='MFK_SMM_AUTH_SELFTEST';
+        const proof=await hmacHex(key,message);
+        return /^[0-9a-f]{64}$/.test(proof)
+          ?json({ok:true,proofAlgorithm:'HMAC-SHA256',pinDerivation:'CLIENT_PBKDF2'})
+          :json({ok:false,code:'SMM_STAFF_HMAC_SELFTEST_FAILED'},503);
       }catch(error){
-        return json({ok:false,code:'SMM_STAFF_CRYPTO_SELFTEST_ERROR',message:error instanceof Error?error.message:'unknown'},503);
+        return json({ok:false,code:'SMM_STAFF_HMAC_SELFTEST_ERROR',message:error instanceof Error?error.message:'unknown'},503);
       }
     }
 
