@@ -268,8 +268,8 @@ export function App(){
     const selectedPaymentChannel=checkout.paymentMethod==='ELECTRONIC'
       ?(snapshot?.paymentChannels??[]).find(channel=>channel.channelId===checkout.paymentChannelId)
       :undefined;
-    if(checkout.paymentMethod==='ELECTRONIC'&&!checkout.paymentChannelId){setNotice('請先選擇 AlipayHK、WeChat Pay HK、轉數快或者 PayMe。');return}
-    if(checkout.paymentMethod==='ELECTRONIC'&&!selectedPaymentChannel?.qrImageUrl){setNotice('呢個電子支付渠道嘅付款 QR 尚未設定，暫時唔可以用呢個渠道提交。');return}
+    if(checkout.paymentMethod==='ELECTRONIC'&&!checkout.paymentChannelId){setNotice('請先選擇一個店舖提供嘅電子支付方式。');return}
+    if(checkout.paymentMethod==='ELECTRONIC'&&(!selectedPaymentChannel?.qrImageUrl||checkout.paymentChannelLabel!==selectedPaymentChannel.label)){setNotice('付款方式資料已更新或者 QR 尚未設定，請重新選擇付款方式。');return}
     if(checkout.paymentMethod==='ELECTRONIC'&&!checkout.paymentEvidence){setNotice('電子支付需要提供付款截圖，畀店舖核對。');return}
     if(checkout.paymentMethod==='ELECTRONIC'&&checkout.paymentEvidence?.state==='LOCAL_PENDING_UPLOAD'){setNotice('付款截圖已選擇，但上載仍未完成；未完成前唔會當成已付款。');return}
     const cartFingerprint=JSON.stringify(cart);

@@ -360,11 +360,7 @@ async function reconcileOrders(){
         items:priced.items,
         totalMinor:priced.totalMinor,
         paymentLabel:intent.checkout.paymentMethod==='ELECTRONIC'
-          ?(intent.checkout.paymentChannelId==='ALIPAY'?'AlipayHK（待核對）'
-            :intent.checkout.paymentChannelId==='WECHAT'?'WeChat Pay HK（待核對）'
-            :intent.checkout.paymentChannelId==='FPS'?'轉數快（待核對）'
-            :intent.checkout.paymentChannelId==='PAYME'?'PayMe（待核對）'
-            :'電子支付（待核對）')
+          ?((String(intent.checkout.paymentChannelLabel||'').trim()||'電子支付')+'（待核對）')
           :'到店付款',
         sourceLabel:'自家 App',
         providerRef,

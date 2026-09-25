@@ -141,17 +141,17 @@ function customerPublicSnapshot(active,customerOrders=[]){
     {id:'FPS',name:'轉數快',enabled:true,qrImageUrl:'',sortOrder:3},
     {id:'PAYME',name:'PayMe',enabled:true,qrImageUrl:'',sortOrder:4},
   ];
-  const configuredPaymentChannels=rows(settings.customerPaymentChannels);
-  const paymentChannels=(configuredPaymentChannels.length?configuredPaymentChannels:defaultPaymentChannels)
-    .map((raw,index)=>{const item=row(raw);const channelId=String(item.id||'');const url=String(item.qrImageUrl||'').trim();return{
+  const configuredPaymentChannels=Array.isArray(settings.customerPaymentChannels)?settings.customerPaymentChannels:defaultPaymentChannels;
+  const paymentChannels=configuredPaymentChannels
+    .map((raw,index)=>{const item=row(raw);const channelId=String(item.id||'').trim().toUpperCase();const label=String(item.name||'').trim();const url=String(item.qrImageUrl||'').trim();return{
       channelId,
-      label:String(item.name||channelId),
+      label,
       enabled:item.enabled!==false,
       sortOrder:Number(item.sortOrder??index+1),
-      qrImageUrl:(url.startsWith('https://')||url.startsWith('/'))?url:'',
+      qrImageUrl:url.startsWith('https://')?url:'',
     };})
-    .filter(item=>['ALIPAY','WECHAT','FPS','PAYME'].includes(item.channelId)&&item.enabled)
-    .sort((a,b)=>a.sortOrder-b.sortOrder)
+    .filter(item=>/^[A-Z0-9][A-Z0-9_-]{1,39}$/.test(item.channelId)&&item.label&&item.enabled)
+    .sort((a,b)=>a.sortOrder-b.sortOrder||a.channelId.localeCompare(b.channelId))
     .map(({enabled,sortOrder,qrImageUrl,...item})=>({...item,...(qrImageUrl?{qrImageUrl}:{})}));
   const customerPresentation=row(row(snapshot.presentation).customer);
   const customerChannel=row(snapshot.customerChannelPolicy);
@@ -308,6 +308,10 @@ export class AdminSyncStore{
     const url=new URL(request.url);
     if(url.pathname==='/authorize-admin'){
       if(!await this.authorizeAdminRead(request))return json({code:'ADMIN_READ_UNAUTHORIZED'},401);
+      return json({ok:true});
+    }
+    if(url.pathname==='/authorize-publish'){
+      if(!await this.authorizePublish(request))return json({code:'ADMIN_PUBLISH_UNAUTHORIZED'},401);
       return json({ok:true});
     }
     if(url.pathname==='/authorize-smt-device'){
@@ -492,6 +496,31 @@ export default {
   async fetch(request,env){
     const url=new URL(request.url);
 
+    if(url.pathname==='/api/admin/payment-qr'){
+      if(request.method!=='POST')return json({code:'METHOD_NOT_ALLOWED'},405);
+      const storeId=storeIdFrom(url);
+      const channelId=String(url.searchParams.get('channelId')||'').trim().toUpperCase();
+      if(!/^[A-Z0-9][A-Z0-9_-]{1,39}$/.test(channelId))return json({code:'PAYMENT_CHANNEL_ID_INVALID'},400);
+      const adminId=env.ADMIN_SYNC.idFromName(storeId);
+      const admin=env.ADMIN_SYNC.get(adminId);
+      const authUrl=new URL(request.url);authUrl.pathname='/authorize-publish';authUrl.search='';
+      const authResponse=await admin.fetch(new Request(authUrl.toString(),{method:'GET',headers:new Headers(request.headers)}));
+      if(!authResponse.ok)return json({code:'ADMIN_PAYMENT_QR_UNAUTHORIZED'},401);
+      const contentType=String(request.headers.get('content-type')||'').toLowerCase();
+      if(!['image/jpeg','image/png','image/webp'].includes(contentType))return json({code:'PAYMENT_QR_TYPE_INVALID'},415);
+      const declared=Number(request.headers.get('content-length')||0);
+      if(declared>5*1024*1024)return json({code:'PAYMENT_QR_TOO_LARGE'},413);
+      const bytes=await request.arrayBuffer();
+      if(bytes.byteLength<1||bytes.byteLength>5*1024*1024)return json({code:'PAYMENT_QR_SIZE_INVALID'},413);
+      const digest=await crypto.subtle.digest('SHA-256',bytes);
+      const sha=[...new Uint8Array(digest)].map(value=>value.toString(16).padStart(2,'0')).join('');
+      const ext=contentType==='image/png'?'png':contentType==='image/webp'?'webp':'jpg';
+      const objectKey='customer-payment-qr/'+storeId+'/'+channelId+'/'+sha+'.'+ext;
+      await env.CUSTOMER_PAYMENT_EVIDENCE.put(objectKey,bytes,{httpMetadata:{contentType},customMetadata:{storeId,channelId,sha256:sha,kind:'PAYMENT_QR'}});
+      const qrImageUrl=ADMIN_ORIGIN+'/api/customer/payment-qr?storeId='+encodeURIComponent(storeId)+'&ref='+encodeURIComponent(objectKey);
+      return json({state:'UPLOADED',objectKey,qrImageUrl,sha256:sha,uploadedAt:new Date().toISOString()},201);
+    }
+
     if(url.pathname.startsWith('/api/customer/')){
       if(request.method==='OPTIONS')return new Response(null,{status:204,headers:cors(request)});
       const storeId=storeIdFrom(url);
@@ -511,6 +540,19 @@ export default {
         const orderResponse=await admin.fetch(new Request(ordersUrl.toString(),{method:'GET'}));
         const orderBody=orderResponse.ok?await orderResponse.json():{orders:[]};
         return json(customerPublicSnapshot(active,Array.isArray(orderBody.orders)?orderBody.orders:[]),200,cors(request));
+      }
+
+      if(url.pathname==='/api/customer/payment-qr'){
+        if(request.method!=='GET')return json({code:'METHOD_NOT_ALLOWED'},405,cors(request));
+        const objectKey=String(url.searchParams.get('ref')||'').trim();
+        if(!objectKey.startsWith('customer-payment-qr/'+storeId+'/'))return json({code:'PAYMENT_QR_REF_INVALID'},400,cors(request));
+        const object=await env.CUSTOMER_PAYMENT_EVIDENCE.get(objectKey);
+        if(!object||object.customMetadata?.kind!=='PAYMENT_QR')return json({code:'PAYMENT_QR_NOT_FOUND'},404,cors(request));
+        const headers=new Headers(cors(request));
+        headers.set('content-type',object.httpMetadata?.contentType||'image/png');
+        headers.set('cache-control','public, max-age=300, must-revalidate');
+        if(url.searchParams.get('download')==='1')headers.set('content-disposition','attachment; filename="payment-qr.'+(object.httpMetadata?.contentType==='image/jpeg'?'jpg':object.httpMetadata?.contentType==='image/webp'?'webp':'png')+'"');
+        return new Response(object.body,{status:200,headers});
       }
 
       if(url.pathname==='/api/customer/payment-evidence'&&request.method==='POST'){
@@ -642,8 +684,29 @@ export default {
         const activeResponse=await admin.fetch(new Request('https://internal/active',{method:'GET'}));
         if(!activeResponse.ok)return json({code:'CUSTOMER_CONFIG_NOT_PUBLISHED'},503,cors(request));
         const active=await activeResponse.json();
-        const policy=row(row(active?.snapshot).customerChannelPolicy);
+        const activeSnapshot=row(active?.snapshot);
+        const policy=row(activeSnapshot.customerChannelPolicy);
         if(policy.enabled!==true)return json({code:'CUSTOMER_CHANNEL_DISABLED'},503,cors(request));
+        if(url.pathname==='/api/customer/orders/submit'){
+          const intent=await request.clone().json().catch(()=>null);
+          const checkout=row(row(intent).checkout);
+          if(checkout.paymentMethod==='ELECTRONIC'){
+            const channelId=String(checkout.paymentChannelId||'').trim().toUpperCase();
+            const channelLabel=String(checkout.paymentChannelLabel||'').trim();
+            const settings=row(activeSnapshot.storeSettings);
+            const configured=Array.isArray(settings.customerPaymentChannels)?settings.customerPaymentChannels:[
+              {id:'ALIPAY',name:'AlipayHK',enabled:true,qrImageUrl:'',sortOrder:1},
+              {id:'WECHAT',name:'WeChat Pay HK',enabled:true,qrImageUrl:'',sortOrder:2},
+              {id:'FPS',name:'轉數快',enabled:true,qrImageUrl:'',sortOrder:3},
+              {id:'PAYME',name:'PayMe',enabled:true,qrImageUrl:'',sortOrder:4},
+            ];
+            const channel=configured.map(raw=>row(raw)).find(item=>String(item.id||'').trim().toUpperCase()===channelId&&item.enabled!==false);
+            const qr=channel?String(channel.qrImageUrl||'').trim():'';
+            const currentLabel=channel?String(channel.name||'').trim():'';
+            if(!channel||!currentLabel||!qr)return json({code:'CUSTOMER_PAYMENT_CHANNEL_UNAVAILABLE'},409,cors(request));
+            if(channelLabel!==currentLabel)return json({code:'CUSTOMER_PAYMENT_CHANNEL_CHANGED'},409,cors(request));
+          }
+        }
       }
       if(targetPath){
         const target=new URL(request.url);
