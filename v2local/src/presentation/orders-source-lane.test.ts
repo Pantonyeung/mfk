@@ -9,10 +9,17 @@ describe('SMT order source lanes',()=>{
     expect(sourceLane('WhatsApp')).toBe('walkin');
   });
 
-  it('separates self platform from third-party platforms',()=>{
+  it('separates self platform from explicit third-party platforms',()=>{
     expect(sourceLane('自家 App')).toBe('app');
     expect(sourceLane('磨飯 App')).toBe('app');
+    expect(sourceLane('Customer Web')).toBe('app');
     expect(sourceLane('Keeta · K123')).toBe('platform');
     expect(sourceLane('Foodpanda')).toBe('platform');
+    expect(sourceLane('第三方 · OTHER')).toBe('platform');
+  });
+
+  it('does not misclassify an unknown frontline label as third-party',()=>{
+    expect(sourceLane('門店代客')).toBe('walkin');
+    expect(sourceLane('')).toBe('walkin');
   });
 });
