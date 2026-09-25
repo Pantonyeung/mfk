@@ -727,10 +727,14 @@ function CheckoutPage({cart,setCart,diningCheckout,onDiningCheckoutDone}:{cart:C
   const cashMinor=parseMoney(cash);
   const comboMinor=(Object.values(split) as string[]).reduce((sum,value)=>sum+parseMoney(value),0);
   const settlementMode=diningCheckout||channel==='walk-in'?'LOCAL_PAYMENT' as const:'CHANNEL_INFO' as const;
-  const received=settlementMode==='LOCAL_PAYMENT'?(method==='CASH'?cashMinor:method==='COMBO'?comboMinor:due):due;
-  const change=settlementMode==='LOCAL_PAYMENT'&&method==='CASH'?Math.max(0,received-due):0;
+  const comboCashMinor=parseMoney(split.CASH);
+  const comboHasCash=method==='COMBO'&&comboCashMinor>0;
+  const received=settlementMode==='LOCAL_PAYMENT'?(method==='CASH'?cashMinor:method==='COMBO'?(comboHasCash?cashMinor:comboMinor):due):due;
+  const change=settlementMode==='LOCAL_PAYMENT'
+    ?method==='CASH'?Math.max(0,received-due):comboHasCash?Math.max(0,received-comboCashMinor):0
+    :0;
   const comboExact=method!=='COMBO'||comboMinor===due;
-  const cashReady=method!=='CASH'||received>=due;
+  const cashReady=method==='CASH'?received>=due:!comboHasCash||received>=comboCashMinor;
   const channelRequiredReady=channel==='walk-in'
     ?true
     :channel==='whatsapp'
@@ -749,7 +753,7 @@ function CheckoutPage({cart,setCart,diningCheckout,onDiningCheckoutDone}:{cart:C
   const validationMessage=formalFastLaneBlockers>0?'仍有 '+formalFastLaneBlockers+' 項必選／套餐未完成，返回點餐完成後先可正式結帳':
     settlementMode==='CHANNEL_INFO'&&!channelRequiredReady
       ?(channel==='whatsapp'?'請先輸入客戶電話':'請先輸入訂單號碼／流水號')
-      :method==='CASH'&&cash&&received<due?'收款金額不足':
+      :(method==='CASH'||comboHasCash)&&cash&&received<(method==='CASH'?due:comboCashMinor)?'現金收款不足':
     method==='COMBO'&&comboMinor!==due?'組合付款合計 '+money(comboMinor)+'，必須等於 '+money(due):undefined;
 
   const sourceParts=[channelLabels[channel]];
@@ -835,7 +839,7 @@ function CheckoutPage({cart,setCart,diningCheckout,onDiningCheckoutDone}:{cart:C
     settlementMode,
     selectedMethodLabel:methodLabels[method],
     amount:{dueLabel:money(due),receivedLabel:money(received),changeLabel:money(change)},
-    cashInput:cash,cashEntryVisible:settlementMode==='LOCAL_PAYMENT'&&method==='CASH',exactCashEnabled:settlementMode==='LOCAL_PAYMENT'&&method==='CASH',confirmEnabled,
+    cashInput:cash,cashEntryVisible:settlementMode==='LOCAL_PAYMENT'&&(method==='CASH'||comboHasCash),exactCashEnabled:settlementMode==='LOCAL_PAYMENT'&&(method==='CASH'||comboHasCash),confirmEnabled,
     paymentState:state,
     channelInfo,
     comboMode:settlementMode==='LOCAL_PAYMENT'&&method==='COMBO',
