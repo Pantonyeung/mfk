@@ -10,7 +10,7 @@ public final class SmmConnectionStore{
     private static final String PREFS="mfk.smm.connection.v1";
     public static final class Config{
         public final String host,deviceId,pairingToken;public final int port;
-        Config(String host,int port,String deviceId,String pairingToken){this.host=host;this.port=port;this.deviceId=deviceId;this.pairingToken=pairingToken;}
+        public Config(String host,int port,String deviceId,String pairingToken){this.host=host;this.port=port;this.deviceId=deviceId;this.pairingToken=pairingToken;}
     }
     private final SharedPreferences preferences;
     public SmmConnectionStore(Context context){preferences=context.getApplicationContext().getSharedPreferences(PREFS,Context.MODE_PRIVATE);}
