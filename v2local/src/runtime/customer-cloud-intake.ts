@@ -216,6 +216,107 @@ async function reconcileQuotes(){
   }
 }
 
+const SMM_CUSTOMER_BRIDGE_PREFIX='__MFK_SMM1__|';
+
+function smmBridgeTicket(intent:MfkCustomerOrderIntent){
+  const name=String(intent.checkout?.name||'');
+  return name.startsWith(SMM_CUSTOMER_BRIDGE_PREFIX)
+    ?name.slice(SMM_CUSTOMER_BRIDGE_PREFIX.length).trim()
+    :'';
+}
+
+async function claimSmmBridge(ticket:string,submissionId:string){
+  const deviceId=readSmtDeviceId();
+  const url=new URL('https://smm.morefunos.com/api/smm/bridge/claim');
+  url.searchParams.set('storeId','MF01');
+  url.searchParams.set('deviceId',deviceId);
+  url.searchParams.set('ticket',ticket);
+  url.searchParams.set('submissionId',submissionId);
+  const response=await fetch(url.toString(),{cache:'no-store'});
+  const body=await response.json().catch(()=>({})) as Record<string,unknown>;
+  if(!response.ok)throw new Error(String(body.code||'SMM_BRIDGE_CLAIM_HTTP_'+response.status));
+  return body;
+}
+
+function smmRequestFromCustomerIntent(intent:MfkCustomerOrderIntent,meta:Record<string,unknown>):SmmLanOrderRequest{
+  const serviceMode=String(meta.serviceMode);
+  const tender=String(meta.tender);
+  if(!['TAKEAWAY','DINE_IN'].includes(serviceMode))throw new Error('SMM_BRIDGE_SERVICE_MODE_INVALID');
+  if(!['CASH','ALIPAY','WECHAT','FPS','PAYME'].includes(tender))throw new Error('SMM_BRIDGE_TENDER_INVALID');
+  const publishedTotalMinor=Number(meta.publishedTotalMinor);
+  if(!Number.isSafeInteger(publishedTotalMinor)||publishedTotalMinor<0)throw new Error('SMM_BRIDGE_TOTAL_INVALID');
+  const menuRevision=String(meta.menuRevision||'').trim();
+  if(!menuRevision)throw new Error('SMM_BRIDGE_MENU_REVISION_REQUIRED');
+  return Object.freeze({
+    protocolVersion:1,
+    type:'smm.lan.order.submit.v1',
+    requestId:'SMM-'+intent.submissionId,
+    submissionId:intent.submissionId,
+    idempotencyKey:intent.idempotencyKey,
+    storeId:'MF01',
+    menuRevision,
+    publishedTotalMinor,
+    serviceMode:serviceMode as SmmLanOrderRequest['serviceMode'],
+    tender:tender as SmmLanOrderRequest['tender'],
+    lines:Object.freeze(intent.cart.map(line=>Object.freeze({
+      lineId:line.lineId,
+      productId:line.productId,
+      productName:line.productName,
+      quantity:line.quantity,
+      ...(line.selectedVariationId?{selectedVariationId:line.selectedVariationId}:{}),
+      ...(line.selectedVariationName?{selectedVariationName:line.selectedVariationName}:{}),
+      selections:Object.freeze(line.selections.map(selection=>Object.freeze({
+        optionGroupId:selection.optionGroupId,
+        optionId:selection.optionId,
+        optionName:selection.optionName,
+      }))),
+      ...(Number.isSafeInteger(Number(line.publishedUnitPriceMinor))?{publishedUnitPriceMinor:Number(line.publishedUnitPriceMinor)}:{}),
+    }))),
+  });
+}
+
+async function commitSmmStaffRequest(request:SmmLanOrderRequest,staffId?:string){
+  try{
+    const result=smmIngress.submit(request,{deviceId:readSmtDeviceId(),trusted:true});
+    if(result.disposition==='REJECTED'){
+      await postJson('/api/customer/smt/orders/ack',{
+        submissionId:request.submissionId,
+        idempotencyKey:request.idempotencyKey,
+        state:'REJECTED',
+        code:result.reasonCode,
+        message:'SMM 員工訂單需要重新確認',
+      });
+      return;
+    }
+    const order=localRuntime.orders().find(row=>row.id===result.orderId);
+    if(!order)throw new Error('SMM_CANONICAL_ORDER_READBACK_MISSING');
+    window.dispatchEvent(new CustomEvent('mfk-customer-order-intake',{detail:{
+      canonicalOrderId:order.id,
+      display:order.display,
+      sourceLabel:'SMM',
+      submissionId:request.submissionId,
+      ...(staffId?{staffId}:{}),
+    }}));
+    await postJson('/api/customer/smt/orders/ack',{
+      submissionId:request.submissionId,
+      idempotencyKey:request.idempotencyKey,
+      state:'CONFIRMED',
+      canonicalOrderId:order.id,
+      canonicalDisplay:order.display,
+      committedAt:order.createdAt,
+      totalMinor:order.totalMinor,
+    });
+  }catch(error){
+    await postJson('/api/customer/smt/orders/ack',{
+      submissionId:request.submissionId,
+      idempotencyKey:request.idempotencyKey,
+      state:'REJECTED',
+      code:error instanceof Error?error.message:'SMM_ORDER_REJECTED',
+      message:'店舖未能接受此員工訂單，請重新確認',
+    }).catch(()=>{});
+  }
+}
+
 async function reconcileOrders(){
   const body=await getJson('/api/customer/smt/orders/pending');
   const orders=Array.isArray(body.orders)?body.orders:[];
@@ -226,48 +327,28 @@ async function reconcileOrders(){
     if(bridgeRow.bridgeKind==='SMM_STAFF'){
       const request=bridgeRow.request as SmmLanOrderRequest|undefined;
       if(!request)continue;
-      try{
-        const result=smmIngress.submit(request,{deviceId:readSmtDeviceId(),trusted:true});
-        if(result.disposition==='REJECTED'){
-          await postJson('/api/customer/smt/orders/ack',{
-            submissionId:request.submissionId,
-            idempotencyKey:request.idempotencyKey,
-            state:'REJECTED',
-            code:result.reasonCode,
-            message:'SMM 員工訂單需要重新確認',
-          });
-          continue;
-        }
-        const order=localRuntime.orders().find(row=>row.id===result.orderId);
-        if(!order)throw new Error('SMM_CANONICAL_ORDER_READBACK_MISSING');
-        window.dispatchEvent(new CustomEvent('mfk-customer-order-intake',{detail:{
-          canonicalOrderId:order.id,
-          display:order.display,
-          sourceLabel:'SMM',
-          submissionId:request.submissionId,
-        }}));
-        await postJson('/api/customer/smt/orders/ack',{
-          submissionId:request.submissionId,
-          idempotencyKey:request.idempotencyKey,
-          state:'CONFIRMED',
-          canonicalOrderId:order.id,
-          canonicalDisplay:order.display,
-          committedAt:order.createdAt,
-          totalMinor:order.totalMinor,
-        });
-      }catch(error){
-        await postJson('/api/customer/smt/orders/ack',{
-          submissionId:request.submissionId,
-          idempotencyKey:request.idempotencyKey,
-          state:'REJECTED',
-          code:error instanceof Error?error.message:'SMM_ORDER_REJECTED',
-          message:'店舖未能接受此員工訂單，請重新確認',
-        }).catch(()=>{});
-      }
+      await commitSmmStaffRequest(request,String(record(bridgeRow.staff).staffId||''));
       continue;
     }
 
     const intent=raw as MfkCustomerOrderIntent&{state?:string};
+    const ticket=smmBridgeTicket(intent);
+    if(ticket){
+      try{
+        const meta=await claimSmmBridge(ticket,intent.submissionId);
+        const request=smmRequestFromCustomerIntent(intent,meta);
+        await commitSmmStaffRequest(request,String(meta.staffId||''));
+      }catch(error){
+        await postJson('/api/customer/smt/orders/ack',{
+          submissionId:intent.submissionId,
+          idempotencyKey:intent.idempotencyKey,
+          state:'REJECTED',
+          code:error instanceof Error?error.message:'SMM_BRIDGE_ORDER_REJECTED',
+          message:'SMM Internet 訂單驗證失敗，請重新確認',
+        }).catch(()=>{});
+      }
+      continue;
+    }
     try{
       const priced=priceCustomerCart(intent.cart,catalog.products);
       const publishedTotal=intent.cart.reduce((sum,line)=>sum+(Number.isSafeInteger(Number(line.publishedUnitPriceMinor))?Number(line.publishedUnitPriceMinor)*line.quantity:0),0);
