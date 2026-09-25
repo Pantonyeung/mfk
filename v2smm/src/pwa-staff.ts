@@ -99,8 +99,14 @@ export async function verifySmmStaff(staffId:string,pin:string):Promise<SmmStaff
     headers:{'content-type':'application/json'},
     body:JSON.stringify({staffId,pin:cleanPin}),
   });
-  const body=await response.json().catch(()=>({})) as Record<string,unknown>;
-  if(!response.ok)throw new Error(String(body.message||body.code||'員工帳戶驗證失敗'));
+  const raw=await response.text();
+  let body:Record<string,unknown>={};
+  try{body=raw?JSON.parse(raw) as Record<string,unknown>:{};}catch{}
+  if(!response.ok){
+    const code=String(body.code||'SMM_STAFF_VERIFY_HTTP_'+response.status);
+    const message=String(body.message||'員工帳戶驗證失敗');
+    throw new Error(message+' · '+code+' · HTTP '+response.status);
+  }
   const session=cleanSession({
     staffId:body.staffId,
     displayName:body.displayName,
