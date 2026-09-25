@@ -25,3 +25,18 @@ jobs:
           set -o pipefail
           npm test
           npm run build
+      - name: Browser tools
+        run: |
+          npm install --no-save --package-lock=false --legacy-peer-deps playwright@1.55.1
+          npx playwright install --with-deps chromium
+      - name: Rendered interaction proof
+        run: |
+          npm run dev -- --host 127.0.0.1 --port 4173 >/tmp/mfk-dining-r4-vite.log 2>&1 &
+          for n in $(seq 1 30); do curl -fsS http://127.0.0.1:4173/acceptance/dining-cart-entry-r4.html >/dev/null && break; sleep 1; done
+          node acceptance/dining-cart-entry-r4-proof.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mfk-dining-cart-entry-r4-${{ github.run_id }}
+          path: /tmp/mfk-dining-r4
+          retention-days: 7
