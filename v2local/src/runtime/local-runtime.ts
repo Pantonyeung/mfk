@@ -108,6 +108,7 @@ export interface LocalDiningHoldDetail{
   readonly firstPrintState?:'NOT_STARTED'|'DISPATCHING'|'DONE'|'FAILED'|'UNKNOWN';
   readonly firstPrintSummary?:Readonly<{planned:number;sent:number;failed:number}>;
   readonly firstPrintResults?:readonly PrintDispatchResult[];
+  readonly firstPrintAttention?:'NONE'|'TRANSPORT_REPORTED_INCOMPLETE'|'TRANSPORT_UNKNOWN';
   readonly holdId:string;
   readonly codeLabel:string;
   readonly assignedTable?:string;
@@ -169,7 +170,7 @@ function save(){localStorage.setItem(KEY,JSON.stringify(data));listeners.forEach
 function projectOrder(order:StoredOrder){queueOrderProjection(order)}
 const money=(minor:number)=>String.fromCharCode(36)+(minor/100).toFixed(2);
 
-export interface SmtReprintOption{readonly jobId:string;readonly role:string;readonly label:string;readonly detail?:string;readonly bindingId:string;readonly printerName:string;readonly physicalKey:string;readonly firstPrintState?:'DONE'|'FAILED'|'UNKNOWN';readonly firstPrintCode?:string}
+export interface SmtReprintOption{readonly jobId:string;readonly role:string;readonly label:string;readonly detail?:string;readonly bindingId:string;readonly printerName:string;readonly physicalKey:string;readonly firstPrintState?:'SENT_TO_PRINTER'|'TRANSPORT_REPORTED_INCOMPLETE'|'NO_TRANSPORT_EVIDENCE';readonly firstPrintCode?:string}
 export interface CleanSmtCoreRuntimePort{
   subscribe(listener:()=>void):()=>void;
   readOrders?(selectedOrderId?:string):Promise<SmtOrdersProjection>;
@@ -600,6 +601,12 @@ function diningDetail(hold:LocalHoldDraft):LocalDiningHoldDetail{
       const order=hold.formalOrderId?data.orders.find(row=>row.id===hold.formalOrderId):undefined;
       return order?.productionAdmissionResults;
     })(),
+    firstPrintAttention:(()=>{
+      const order=hold.formalOrderId?data.orders.find(row=>row.id===hold.formalOrderId):undefined;
+      if(order?.productionAdmissionState==='UNKNOWN')return 'TRANSPORT_UNKNOWN';
+      if(order?.productionAdmissionState==='FAILED')return 'TRANSPORT_REPORTED_INCOMPLETE';
+      return 'NONE';
+    })(),
     codeLabel:hold.codeLabel,
     assignedTable:hold.assignedTable,
     createdAt:hold.createdAt,
@@ -974,7 +981,7 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
       bindingId:job.binding.id,
       printerName:job.binding.name,
       physicalKey:job.binding.host.trim()+':'+job.binding.port,
-      firstPrintState:firstResults.has(job.id)?(firstResults.get(job.id)!.ok?'DONE':'FAILED'):'UNKNOWN',
+      firstPrintState:firstResults.has(job.id)?(firstResults.get(job.id)!.ok?'SENT_TO_PRINTER':'TRANSPORT_REPORTED_INCOMPLETE'):'NO_TRANSPORT_EVIDENCE',
       firstPrintCode:firstResults.get(job.id)?.code,
     }));
   },
