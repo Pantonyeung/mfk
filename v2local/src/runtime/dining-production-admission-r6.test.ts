@@ -42,12 +42,24 @@ beforeEach(()=>{
 });
 afterEach(()=>vi.unstubAllGlobals());
 
-describe('Dining R6 formal production admission',()=>{
+describe('Dining R6 automatic table-order admission',()=>{
+  it('table assignment itself creates the formal Order and dispatches the first dining print set',async()=>{
+    const runtime=await boot();
+    const hold=runtime.createHold({kind:'dining',items:[{id:'rice',name:'飯團',qty:1,unitMinor:4100,serviceMode:'dine-in'}],totalMinor:4100});
+    await runtime.assignDiningTable(hold.id,'T01');
+    const detail=await runtime.readDiningHold(hold.id);
+    const order=runtime.orders().find((row:any)=>row.diningHoldId===hold.id);
+    expect(detail.formalOrderId).toBe(order.id);
+    expect(order.productionAdmissionAttemptedAt).toBeTruthy();
+    expect(order.productionAdmissionState).toBe('DONE');
+  });
   it('creates one formal Order and links the SAME dining hold durably',async()=>{
     const runtime=await boot();
     const hold=runtime.createHold({kind:'dining',items:[{id:'rice',name:'飯團',qty:2,unitMinor:4100,serviceMode:'dine-in'}],totalMinor:8200,partySize:2});
     await runtime.assignDiningTable(hold.id,'T01');
 
+    const firstOrder=runtime.orders().find((row:any)=>row.diningHoldId===hold.id);
+    expect(firstOrder).toBeTruthy();
     const first=await runtime.admitDiningProduction(hold.id);
     const detail=await runtime.readDiningHold(hold.id);
     const stored=JSON.parse(values.get(KEY)!);
