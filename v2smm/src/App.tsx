@@ -41,7 +41,7 @@ export function App(){
   const [search,setSearch]=useState('');
   const [orderSearch,setOrderSearch]=useState('');
   const [orderSegment,setOrderSegment]=useState<OrderSegment>('active');
-  const [moreTool,setMoreTool]=useState<'channels'|'business'|'printing'|'diagnostics'|'sellability'|'pending'|'capacity'|'reporting'|'refunds'|null>(null);
+  const [moreTool,setMoreTool]=useState<'connection'|'channels'|'business'|'printing'|'diagnostics'|'sellability'|'pending'|'capacity'|'reporting'|'refunds'|null>(null);
   const [dineTable,setDineTable]=useState('');
   const [dineCovers,setDineCovers]=useState(2);
 
@@ -250,8 +250,6 @@ export function App(){
     {notice?<div className="notice" role="status"><span>{notice}</span><button onClick={()=>setNotice(null)}>收起</button></div>:null}
     {error?<section className="recovery-banner degraded"><strong>門店資料同步失敗</strong><span>{error}</span><button onClick={()=>void refresh()}>再試一次</button></section>:null}
     {connection==='NOT_CONNECTED'?<section className="recovery-banner offline"><strong>尚未連接門店服務</strong><span>本機草稿同操作偏好可以使用；正式餐單、報價、訂單同營運狀態會保持空白，唔會顯示假資料。</span></section>:null}
-    {snapshot?.connectionPath==='INTERNET'?<section className="recovery-banner"><strong>Internet 資料通道運作中</strong><span>餐單、選項規則同已發布更新會經 Internet 同步；LAN 只係可選直接門店通道，失敗唔會再令 SMM 白屏。</span></section>:null}
-    {snapshot?.connectionPath!=='LAN'?<LanSetup onReady={()=>location.reload()}/>:null}
 
     <section className="stage">
       {view==='order'?<OrderView
@@ -424,8 +422,8 @@ function DineView({connection,sessions,table,covers,setTable,setCovers,onCreate}
 
 function MoreView({connection,tool,setTool,snapshot,pendingIntents,onReadback,onDiscard,onSellability}:{
   connection:SmmConnectionState;
-  tool:'channels'|'business'|'printing'|'diagnostics'|'sellability'|'pending'|'capacity'|'reporting'|'refunds'|null;
-  setTool:(v:'channels'|'business'|'printing'|'diagnostics'|'sellability'|'pending'|'capacity'|'reporting'|'refunds'|null)=>void;
+  tool:'connection'|'channels'|'business'|'printing'|'diagnostics'|'sellability'|'pending'|'capacity'|'reporting'|'refunds'|null;
+  setTool:(v:'connection'|'channels'|'business'|'printing'|'diagnostics'|'sellability'|'pending'|'capacity'|'reporting'|'refunds'|null)=>void;
   snapshot:SmmReadModelSnapshot|null;
   pendingIntents:readonly SmmPendingIntent[];
   onReadback:(intent:SmmPendingIntent)=>void;
@@ -435,6 +433,7 @@ function MoreView({connection,tool,setTool,snapshot,pendingIntents,onReadback,on
   return <section className="page">
     <header className="hero"><div><span>更多</span><h1>店務工具</h1><small>只顯示已知資料；未連接嘅功能會保持未連接。</small></div></header>
     <div className="tool-grid">
+      <Tool title="連線設定" detail="Internet / LAN 配對" state={snapshot?.connectionPath==='LAN'?'LAN':snapshot?.connectionPath==='INTERNET'?'Internet':'未連接'} onClick={()=>setTool('connection')}/>
       <Tool title="待提交草稿" detail={`${pendingIntents.length} 個本機草稿`} state={pendingIntents.length?'需處理':'正常'} onClick={()=>setTool('pending')}/>
       <Tool title="平台狀態" detail="平台連線同資料新鮮度" state={snapshot?.channels?.length?String(snapshot.channels.length):'未連接'} onClick={()=>setTool('channels')}/>
       <Tool title="商品供應" detail="售罄／恢復操作入口" state={connection==='READY'?'可用':'未連接'} onClick={()=>setTool('sellability')}/>
@@ -446,7 +445,8 @@ function MoreView({connection,tool,setTool,snapshot,pendingIntents,onReadback,on
       <Tool title="診斷" detail="連線、資料版本、本機草稿" state={connectionLabelShort(connection)} onClick={()=>setTool('diagnostics')}/>
     </div>
     {tool?<div className="drawer"><div className="drawer-head"><strong>{moreTitle(tool)}</strong><button onClick={()=>setTool(null)}>關閉</button></div>
-      {tool==='pending'?<PendingIntents intents={pendingIntents} onReadback={onReadback} onDiscard={onDiscard}/>:
+      {tool==='connection'?<ConnectionSettings snapshot={snapshot}/>:
+       tool==='pending'?<PendingIntents intents={pendingIntents} onReadback={onReadback} onDiscard={onDiscard}/>:
        tool==='channels'?<ChannelList connection={connection} channels={snapshot?.channels??[]}/>:
        tool==='business'?<BusinessDay projection={snapshot?.businessDay}/>:
        tool==='capacity'?<Capacity projection={snapshot?.capacity}/>:
@@ -549,6 +549,14 @@ function CartSheet({cart,quote,pending,onClose,onQuantity,onRemove,onSubmit,onRe
   </section></div>;
 }
 
+function ConnectionSettings({snapshot}:{snapshot:SmmReadModelSnapshot|null}){
+  const path=snapshot?.connectionPath;
+  return <div className="connection-settings">
+    <p className="callout">目前使用：<strong>{path==='LAN'?'LAN 直接門店':path==='INTERNET'?'Internet':'未連接'}</strong>。LAN 只係可選加速／直接門店通道；唔支援 LAN 嘅瀏覽器仍然會用 Internet 正常同步餐單、規則同更新。</p>
+    <LanSetup onReady={()=>location.reload()}/>
+  </div>;
+}
+
 function LanSetup({onReady}:{onReady:()=>void}){
   const saved=readSmmLanPwaConfig();
   const [host,setHost]=useState(saved?.host??'');
@@ -578,4 +586,4 @@ function NavButton({active,label,glyph,badge,onClick}:{active:boolean;label:stri
 
 function labelWorkState(state:string){return state==='NORMAL'?'正常':state==='DELAYED'?'延誤':state==='ACTION_REQUIRED'?'需處理':'未知'}
 function connectionLabelShort(state:SmmConnectionState){return state==='READY'?'已連接':state==='LOADING'?'同步中':state==='ERROR'?'錯誤':state==='STALE'?'資料稍舊':state==='PARTIAL'?'部分資料':state==='UNKNOWN'?'未知':'未連接'}
-function moreTitle(tool:string){return tool==='pending'?'待提交草稿':tool==='channels'?'平台狀態':tool==='business'?'營業日':tool==='capacity'?'產能':tool==='reporting'?'營運報表':tool==='refunds'?'退款要求':tool==='printing'?'列印狀態':tool==='sellability'?'商品供應':'診斷'}
+function moreTitle(tool:string){return tool==='connection'?'連線設定':tool==='pending'?'待提交草稿':tool==='channels'?'平台狀態':tool==='business'?'營業日':tool==='capacity'?'產能':tool==='reporting'?'營運報表':tool==='refunds'?'退款要求':tool==='printing'?'列印狀態':tool==='sellability'?'商品供應':'診斷'}
