@@ -90,7 +90,7 @@ export function createPwaCloudTransport():SmmLanTransport{
       }
       if(!response.ok&&response.status!==202)return{kind:'UNAVAILABLE'};
 
-      for(let attempt=0;attempt<24;attempt++){
+      for(let attempt=0;attempt<48;attempt++){
         if(attempt>0)await sleep(250);
         if(signal.aborted)return{kind:'UNKNOWN'};
         const body=await readResult(request.submissionId,signal).catch(()=>null);
