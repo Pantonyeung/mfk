@@ -62,6 +62,7 @@ export interface SmmLanSubmissionReadbackRequest{
 
 export type SmmLanSubmissionReadbackResponse=
   |Readonly<{protocolVersion:1;type:'smm.lan.order.readback.result.v1';submissionId:string;state:'CONFIRMED';orderId:string;canonicalRevision:number}>
+  |Readonly<{protocolVersion:1;type:'smm.lan.order.readback.result.v1';submissionId:string;state:'REJECTED';reasonCode:string}>
   |Readonly<{protocolVersion:1;type:'smm.lan.order.readback.result.v1';submissionId:string;state:'UNKNOWN'}>;
 
 export function validSmmLanIdentity(value:string){
