@@ -1,3 +1,4 @@
+import {verifyConfiguredStaffPin} from '../contracts/staff-auth-v1.ts';
 const ADMIN_ACTIVE='https://admin.morefunos.com/api/admin-sync/active';
 const ADMIN_ACKS='https://admin.morefunos.com/api/admin-sync/acks';
 const SMT_ORIGIN='https://appassets.androidplatform.net';
@@ -56,12 +57,6 @@ function staffRows(active:Record<string,unknown>){
     return[{staffId,displayName,role,pin}];
   });
 }
-function equalDigits(left:string,right:string){
-  if(left.length!==right.length)return false;
-  let diff=0;
-  for(let i=0;i<left.length;i++)diff|=left.charCodeAt(i)^right.charCodeAt(i);
-  return diff===0;
-}
 async function verifyStaff(request:Request,storeId:string){
   const staffId=text(request.headers.get('x-mfk-staff-id'),120);
   const pin=String(request.headers.get('x-mfk-staff-pin')??'').replace(/\D/g,'');
@@ -69,7 +64,7 @@ async function verifyStaff(request:Request,storeId:string){
   let active;
   try{active=await fetchActive(storeId);}catch{return null;}
   const staff=staffRows(active).find(row=>row.staffId===staffId);
-  if(!staff||!equalDigits(staff.pin,pin))return null;
+  if(!staff||!verifyConfiguredStaffPin(pin,staff.pin))return null;
   return Object.freeze({staffId:staff.staffId,displayName:staff.displayName,role:staff.role});
 }
 async function authorizedSmtDevice(deviceId:string,storeId:string){
