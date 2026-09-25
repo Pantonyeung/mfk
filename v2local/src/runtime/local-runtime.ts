@@ -155,6 +155,8 @@ export interface CleanSmtCoreRuntimePort{
   readOrderReprintOptions?(orderId:string):Promise<readonly SmtReprintOption[]>;
   reprintOrderJobs?(orderId:string,jobIds:readonly string[],reason?:string):Promise<PrintDispatchSummary>;
   updateOrderItems?(orderId:string,items:readonly {id:string;name:string;qty:number;unitMinor:number}[]):Promise<{readonly orderId:string;readonly totalMinor:number}>;
+  correctOrderPayment?(orderId:string,paymentLabel:string):Promise<StoredOrder>;
+  refundOrder?(orderId:string,input:{kind:'FULL'|'PARTIAL';amountMinor:number;method:string;note?:string}):Promise<StoredOrder>;
   cancelOrder?(orderId:string,reason?:string):Promise<{readonly orderId:string;readonly status:'CANCELLED'}>;
   applyProviderLifecycle?(input:{
     orderId:string;eventId:1002|1003|1004|1006|1008;eventName:string;providerMessageId:string;providerPushedAt:string;rawMessage:string;
