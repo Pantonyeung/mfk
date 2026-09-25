@@ -80,6 +80,7 @@ describe('Dining R6 automatic table-order admission',()=>{
     const second=await runtime.admitDiningProduction(hold.id);
     expect(second.orderId).toBe(first.orderId);
     expect(runtime.orders().filter((row:any)=>row.diningHoldId===hold.id)).toHaveLength(1);
+    expect(second.print.planned).toBe(0);
     expect(second.print.results).toHaveLength(0);
   });
 
