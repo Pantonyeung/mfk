@@ -366,6 +366,25 @@ describe('Dining R6 automatic table-order admission',()=>{
     expect(options.every((row:any)=>row.firstPrintState===undefined&&row.firstPrintCode===undefined)).toBe(true);
   });
 
+  it('waitlist identity never reuses a visible W code after deletion',async()=>{
+    const runtime=await boot();
+    const first=await runtime.createDiningWait({partySize:2,note:'A'});
+    const second=await runtime.createDiningWait({partySize:2,note:'B'});
+    await runtime.removeDiningWait(second.id);
+    const third=await runtime.createDiningWait({partySize:2,note:'C'});
+    expect(first.codeLabel).not.toBe(third.codeLabel);
+    expect(second.codeLabel).not.toBe(third.codeLabel);
+  });
+
+  it('waitlist validates party size and normalizes note length',async()=>{
+    const runtime=await boot();
+    await expect(runtime.createDiningWait({partySize:0,note:'x'})).rejects.toThrow('DINING_PARTY_SIZE_INVALID');
+    await expect(runtime.createDiningWait({partySize:100,note:'x'})).rejects.toThrow('DINING_PARTY_SIZE_INVALID');
+    const hold=await runtime.createDiningWait({partySize:3,note:' x '.repeat(200)});
+    expect(hold.partySize).toBe(3);
+    expect(hold.note.length).toBeLessThanOrEqual(200);
+  });
+
   it('formal Order link survives runtime restart',async()=>{
     let runtime=await boot();
     const hold=runtime.createHold({kind:'dining',items:[{id:'rice',name:'飯團',qty:1,unitMinor:4100,serviceMode:'dine-in'}],totalMinor:4100});
