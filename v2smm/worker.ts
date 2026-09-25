@@ -132,7 +132,7 @@ function validateOrderRequest(value:unknown){
     if(!['TABLE','WAITING'].includes(String(target.kind)))throw new Error('SMM_DINING_TARGET_REQUIRED');
     const covers=Math.floor(Number(target.covers)||1);
     if(covers<1||covers>30)throw new Error('SMM_DINING_COVERS_INVALID');
-    if(target.kind==='TABLE'&&!/^T0[1-9]$/.test(String(target.tableId||'')))throw new Error('SMM_DINING_TABLE_INVALID');
+    if(target.kind==='TABLE'&&!/^T\d{2}$/.test(String(target.tableId||'')))throw new Error('SMM_DINING_TABLE_INVALID');
   }
   return row;
 }
