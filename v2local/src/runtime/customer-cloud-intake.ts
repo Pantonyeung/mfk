@@ -1,3 +1,4 @@
+// Customer electronic tender labels come from the Admin-published payment channel.
 import type {
   CustomerCloudCartLine,
   MfkCustomerOrderIntent,
