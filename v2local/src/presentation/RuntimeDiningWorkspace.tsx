@@ -292,6 +292,12 @@ export function RuntimeDiningWorkspace({runtime,onCheckout,warningMinutes}:{
       </section>:detail?<>
         <header><div><small>{detail.codeLabel}</small><h2>{displayTableName(detail.assignedTable??detail.lastAssignedTable)}</h2></div><span>{detail.partySize} 位</span></header>
         <div className="dining-detail-timer"><span>掛單時間</span><b>{elapsed(detail.createdAt)} 分鐘</b><small>{timerText(elapsed(detail.createdAt))}</small></div>
+        {detail.formalOrderId?<section className="dining-payment-panel">
+          <header><div><b>首次打印</b><small>掛枱時自動建立；唔需要再撳落廚</small></div><strong>{detail.firstPrintState==='DONE'?'完成':detail.firstPrintState==='FAILED'?'有失敗':detail.firstPrintState==='UNKNOWN'?'狀態未知':detail.firstPrintState==='DISPATCHING'?'派發中':'未開始'}</strong></header>
+          {detail.firstPrintSummary?<small>計劃 {detail.firstPrintSummary.planned} · 已送 {detail.firstPrintSummary.sent} · 失敗 {detail.firstPrintSummary.failed}</small>:null}
+          {detail.firstPrintState==='UNKNOWN'?<p className="dining-message">打印結果未知：禁止自動重播整套票。請用下方「重印堂食票」逐項核對及重印。</p>:null}
+          {detail.firstPrintState==='FAILED'?<p className="dining-message">有打印工作失敗：請用「重印堂食票」只補需要嘅票，避免重複出單。</p>:null}
+        </section>:null}
         <section className="dining-detail-lines">
           <header><b>商品／分項結帳</b><button type="button" disabled={checkoutBusy||actionBusy} onClick={selectAllRemaining}>全選未結</button></header>
           {detail.lines.length?detail.lines.map(line=><article key={line.lineIndex} className={line.remainingQty===0?'paid':''}>
@@ -308,7 +314,7 @@ export function RuntimeDiningWorkspace({runtime,onCheckout,warningMinutes}:{
           <button type="button" className="dining-settle-button" disabled={checkoutBusy||actionBusy||selectedUnits<=0||detail.remainingMinor<=0} onClick={()=>void goCheckout()}>{checkoutBusy?'核對最新資料…':'前往結帳 · '+selectedUnits+' 件'}</button>
         </section>
         <section className="dining-balance"><div><span>原總額</span><b>{money(detail.totalMinor)}</b></div><div><span>已結帳</span><b>{money(detail.paidMinor)}</b></div><div className="remaining"><span>未結帳</span><strong>{money(detail.remainingMinor)}</strong></div></section>
-        <section className="dining-payment-history"><header><b>付款紀錄</b><span>{detail.payments.length}</span></header>{detail.payments.length?detail.payments.map(payment=><div key={payment.id}><span>{payment.tender==='COMBO'?(payment.splitTenders??[]).map(row=>(tenderLabels[row.tender]??row.tender)+' '+money(row.amountMinor)).join(' + '):(tenderLabels[payment.tender]??payment.tender)}</span><b>{money(payment.amountMinor)}</b><small>{new Date(payment.createdAt).toLocaleTimeString('zh-HK',{hour:'2-digit',minute:'2-digit'})}</small><button type="button" disabled={actionBusy||checkoutBusy||!payment.submissionId} onClick={()=>void reprintPaymentReceipt(payment.submissionId)}>重印付款收據</button></div>):<p>未有付款紀錄。</p>}</section>
+        <section className="dining-payment-history"><header><b>付款紀錄</b><span>{detail.payments.length}</span></header>{detail.payments.length?detail.payments.map(payment=><div key={payment.id}><span>{payment.tender==='COMBO'?(payment.splitTenders??[]).map(row=>(tenderLabels[row.tender]??row.tender)+' '+money(row.amountMinor)).join(' + '):(tenderLabels[payment.tender]??payment.tender)}</span><b>{money(payment.amountMinor)}</b><small>{new Date(payment.createdAt).toLocaleTimeString('zh-HK',{hour:'2-digit',minute:'2-digit'})}</small><small>{payment.receiptState==='DONE'?'收據已送':payment.receiptState==='FAILED'?'收據失敗':payment.receiptState==='UNKNOWN'?'收據狀態未知':payment.receiptState==='DISPATCHING'?'收據派發中':'未派收據'}</small><button type="button" disabled={actionBusy||checkoutBusy||!payment.submissionId} onClick={()=>void reprintPaymentReceipt(payment.submissionId)}>重印付款收據</button></div>):<p>未有付款紀錄。</p>}</section>
         {detail.archivedAt?<p className="dining-message" role="status">已付清，桌台已釋放；商品及付款紀錄保留。</p>:null}
         <footer className="dining-detail-actions">
           <button type="button" disabled={actionBusy||checkoutBusy||!detail.formalOrderId} onClick={()=>void openReprint()}>重印堂食票</button>
