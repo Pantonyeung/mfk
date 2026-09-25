@@ -173,7 +173,7 @@ test('LAN failure falls back to Internet and connection setup stays out of the o
 });
 
 
-test('dedicated SMM worker projects published Admin truth and stores only durable staff intents',()=>{
+test('dedicated SMM worker keeps auth session only and proxies orders to the shared customer bridge',()=>{
   const worker=fs.readFileSync(path.join(repoRoot,'v2smm','worker.ts'),'utf8');
   const wrangler=fs.readFileSync(path.join(repoRoot,'v2smm','wrangler.jsonc'),'utf8');
   assert.match(worker,/admin\.morefunos\.com\/api\/admin-sync\/active/);
@@ -187,7 +187,10 @@ test('dedicated SMM worker projects published Admin truth and stores only durabl
   assert.match(worker,/url\.pathname==='\/api\/smm\/snapshot'/);
   assert.match(worker,/SmmIntentStore/);
   assert.match(worker,/\/api\/smm\/orders\/submit/);
-  assert.match(worker,/\/api\/smm\/smt\/orders\/pending/);
+  assert.match(worker,/admin\.morefunos\.com\/api\/customer\/staff-orders\/submit/);
+  assert.match(worker,/admin\.morefunos\.com\/api\/customer\/staff-orders\/readback/);
+  assert.doesNotMatch(worker,/\/api\/smm\/smt\/orders\/pending/);
+  assert.doesNotMatch(worker,/url\.pathname==='\/orders\/submit'/);
   assert.match(worker,/SMM_STAFF_UNAUTHORIZED/);
   assert.match(worker,/validateRuntimeStaffAuthSnapshot/);
   assert.match(worker,/snapshot\.staffAuth/);
@@ -224,12 +227,13 @@ test('SMM staff checkout has service mode and tender but no automatic drawer or 
 });
 
 
-test('Internet staff orders use same-account challenge proof and fall back into the same SMT ingress',()=>{
+test('Internet staff orders use same-account auth and the existing customer bridge into the same SMT ingress',()=>{
   const cloud=fs.readFileSync(path.join(root,'pwa-cloud.ts'),'utf8');
   const staff=fs.readFileSync(path.join(root,'pwa-staff.ts'),'utf8');
   const runtime=fs.readFileSync(path.join(root,'pwa-runtime.ts'),'utf8');
   const app=fs.readFileSync(path.join(root,'App.tsx'),'utf8');
-  const smtCloud=fs.readFileSync(path.join(repoRoot,'v2local','src','runtime','smm-cloud-intake.ts'),'utf8');
+  const sharedBridge=fs.readFileSync(path.join(repoRoot,'v2local','src','runtime','customer-cloud-intake.ts'),'utf8');
+  const main=fs.readFileSync(path.join(repoRoot,'v2local','src','main.tsx'),'utf8');
   assert.match(staff,/localStorage/);
   assert.match(staff,/\/api\/smm\/staff\/challenge/);
   assert.match(staff,/\/api\/smm\/staff\/verify/);
@@ -238,7 +242,6 @@ test('Internet staff orders use same-account challenge proof and fall back into 
   assert.match(staff,/PBKDF2/);
   assert.match(staff,/HMAC/);
   assert.match(staff,/sessionToken/);
-  assert.match(staff,/HTTP /);
   assert.doesNotMatch(staff,/readonly\s+pin\s*:/);
   assert.match(cloud,/\/api\/smm\/orders\/submit/);
   assert.match(cloud,/x-mfk-smm-session/);
@@ -248,9 +251,11 @@ test('Internet staff orders use same-account challenge proof and fall back into 
   assert.match(runtime,/local\.kind!=='UNAVAILABLE'/);
   assert.match(app,/員工帳戶/);
   assert.match(app,/同 SMT 共用同一員工身份/);
-  assert.match(app,/Internet 員工落單需要先/);
-  assert.match(smtCloud,/createSmmLanIngress|canonical SMM ingress|ingress\.submit/);
-  assert.doesNotMatch(smtCloud,/createOrder|priceCustomerCart|StoreKernel/);
+  assert.match(sharedBridge,/bridgeKind==='SMM_STAFF'/);
+  assert.match(sharedBridge,/smmIngress\.submit/);
+  assert.match(sharedBridge,/\/api\/customer\/smt\/orders\/pending/);
+  assert.doesNotMatch(main,/installSmmCloudIntake/);
+  assert.equal(fs.existsSync(path.join(repoRoot,'v2local','src','runtime','smm-cloud-intake.ts')),false);
 });
 
 
