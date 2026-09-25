@@ -140,8 +140,8 @@
     "label": "正式落單 Command",
     "surface": "Cart",
     "kind": "COMMAND_SHAPE",
-    "status": "NOT_WIRED",
-    "owner": "SMT formal order authority"
+    "status": "WIRED_TO_SMT",
+    "owner": "SMT formal order authority; SMM submits staff intent only"
   },
   {
     "id": "ORDER_LIST",
