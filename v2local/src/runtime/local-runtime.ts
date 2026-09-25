@@ -4,7 +4,7 @@ import {renderEscPosRasterTicket} from './ticket-bitmap.ts';
 import {buildOrderPrintPlan,groupTscBitmapJobsByPhysicalPrinter,type PrintBinding,type PlannedPrintJob} from './print-routing.ts';
 import {queueOrderProjection} from './projection-outbox.ts';
 import {readActiveStaffSession} from './staff-auth.ts';
-import {readSmtPrintConfig,readSmtStoreSettings} from './admin-operational-config.ts';
+import {readSmtDiningTableRegistry,readSmtPrintConfig,readSmtStoreSettings} from './admin-operational-config.ts';
 import {mirrorKeetaOrderCommand,type KeetaProviderMirrorResult} from './keeta-provider-commands.ts';
 import {buildDailyClosePrintData,renderDailyCloseTicket} from './daily-close-ticket.ts';
 import {readLocalDayCloses,resolveBusinessWindow} from './local-operations.ts';
@@ -791,9 +791,20 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
         statusLabel:'待安排座位',
       })),
       tables:(()=>{
-        const configured=readSmtStoreSettings().diningTables;
-        const tables=configured.length?configured:Array.from({length:9},(_,index)=>({id:'T'+String(index+1).padStart(2,'0'),name:String(index+1)+' 號枱',active:true,sortOrder:index+1}));
-        return tables.map(table=>{
+        const registry=readSmtDiningTableRegistry();
+        const active=registry.filter(table=>table.active);
+        const fallback=Array.from({length:9},(_,index)=>({id:'T'+String(index+1).padStart(2,'0'),name:String(index+1)+' 號枱',active:true,sortOrder:index+1}));
+        const visibleBase=registry.length?active:fallback;
+        const byId=new Map(registry.map(table=>[table.id,table]));
+        const orphanOccupied=data.holds
+          .filter(hold=>hold.kind==='dining'&&hold.assignedTable&&!visibleBase.some(table=>table.id===hold.assignedTable))
+          .map(hold=>{
+            const id=String(hold.assignedTable);
+            const known=byId.get(id);
+            return {id,name:known?.name||id,active:false,sortOrder:Number.MAX_SAFE_INTEGER};
+          });
+        const visible=[...visibleBase,...orphanOccupied.filter((table,index,rows)=>rows.findIndex(row=>row.id===table.id)===index)];
+        return visible.map(table=>{
         const id=table.id;
         const seated=data.holds.find(hold=>hold.kind==='dining'&&hold.assignedTable===id);
         if(!seated)return {id,areaLabel:'堂食',label:table.name,state:'available' as const};
@@ -801,7 +812,7 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
         const first=detail.lines.filter(line=>line.qty>0).slice(0,2).map(line=>line.name.split('｜')[0]).join('、');
         return {
           id,
-          areaLabel:'堂食',
+          areaLabel:table.active===false?'堂食 · 已停用':'堂食',
           label:table.name,
           state:detail.remainingMinor===0?'settled' as const:'occupied' as const,
           partySize:seated.partySize,

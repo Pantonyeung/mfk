@@ -67,6 +67,23 @@ function strings(value:unknown){
   return Array.isArray(value)?value.map(item=>String(item).trim()).filter(Boolean):[];
 }
 
+export function readSmtDiningTableRegistry():readonly SmtDiningTableConfig[]{
+  const row=record(readAdminSnapshotSection('storeSettings'));
+  const rows=Array.isArray(row.diningTables)?row.diningTables:[];
+  return Object.freeze(rows.flatMap((raw,index)=>{
+    const item=record(raw);
+    const id=text(item.id);
+    const name=text(item.name);
+    if(!id||!name)return [];
+    return [Object.freeze({
+      id,
+      name,
+      active:item.active!==false,
+      sortOrder:Math.max(1,Math.floor(number(item.sortOrder,index+1))),
+    })];
+  }).sort((a,b)=>a.sortOrder-b.sortOrder));
+}
+
 export function readSmtStoreSettings():SmtStoreSettings{
   const row=record(readAdminSnapshotSection('storeSettings'));
   const priority=String(row.timeoutPriority);
@@ -84,18 +101,7 @@ export function readSmtStoreSettings():SmtStoreSettings{
     timeoutPriority:priority==='URGENT'?'URGENT':priority==='NORMAL'?'NORMAL':'HIGH',
     dineInEnabled:row.dineInEnabled===undefined?true:bool(row.dineInEnabled,true),
     takeawayEnabled:row.takeawayEnabled===undefined?true:bool(row.takeawayEnabled,true),
-    diningTables:Object.freeze((Array.isArray(row.diningTables)?row.diningTables:[]).flatMap((raw,index)=>{
-      const item=record(raw);
-      const id=text(item.id);
-      const name=text(item.name);
-      if(!id||!name||item.active===false)return [];
-      return [Object.freeze({
-        id,
-        name,
-        active:true,
-        sortOrder:Math.max(1,Math.floor(number(item.sortOrder,index+1))),
-      })];
-    }).sort((a,b)=>a.sortOrder-b.sortOrder)),
+    diningTables:Object.freeze(readSmtDiningTableRegistry().filter(table=>table.active)),
     paymentRefs:Object.freeze(strings(row.paymentRefs)),
     printRefs:Object.freeze(strings(row.printRefs)),
     channelRefs:Object.freeze(strings(row.channelRefs)),

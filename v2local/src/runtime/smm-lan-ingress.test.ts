@@ -10,7 +10,7 @@ Object.defineProperty(globalThis,'localStorage',{value:{
 vi.mock('./admin-config-sync.ts',()=>({
   readSmtAdminConfigLkg:()=>({revision:7,fingerprint:'fp7'}),
   readSmtDeviceId:()=> 'SMT-1',
-  readAdminSnapshotSection:(key:string)=>key==='storeSettings'?{diningTables:Array.from({length:9},(_,index)=>({id:'T'+String(index+1).padStart(2,'0'),name:index===2?'堂三':String(index+1)+' 號枱',active:true,sortOrder:index+1}))}:{},
+  readAdminSnapshotSection:(key:string)=>key==='storeSettings'?{diningTables:Array.from({length:9},(_,index)=>({id:'T'+String(index+1).padStart(2,'0'),name:index===2?'堂三':String(index+1)+' 號枱',active:index!==8,sortOrder:index+1}))}:{},
   subscribeSmtAdminConfig:()=>()=>{},
   subscribeSmtCloudDoorbell:()=>()=>{},
 }));
@@ -128,6 +128,35 @@ describe('SMM LAN ingress',()=>{
       sessionId:'HOLD-3',tableLabel:'堂三',covers:2,totalMinor:8200,paidMinor:4100,remainingMinor:4100,
     });
     expect(snapshot.dineSessions[0].lines[0]).toMatchObject({qty:2,paidQty:1,remainingQty:1});
+  });
+
+
+  it('rejects new assignment to an Admin-disabled table',()=>{
+    const createOrder=vi.fn();
+    const upsertSmmDiningHold=vi.fn();
+    const ingress=createSmmLanIngress({createOrder,orders:()=>[],holds:()=>[],upsertSmmDiningHold} as any);
+    const result=ingress.submit({
+      protocolVersion:1,type:'smm.lan.order.submit.v1',requestId:'R6',submissionId:'S6',idempotencyKey:'I6',storeId:'MF01',
+      menuRevision:'7',publishedTotalMinor:4100,serviceMode:'DINE_IN',tender:'CASH',
+      diningTarget:{kind:'TABLE',tableId:'T09',covers:2},
+      lines:[{lineId:'L1',productId:'riceball',productName:'原味飯團',quantity:1,publishedUnitPriceMinor:4100,selections:[]}],
+    },{deviceId:'SMM-1',trusted:true});
+    expect(result.disposition).toBe('REJECTED');
+    expect(result.disposition==='REJECTED'&&result.reasonCode).toBe('SMM_DINING_TABLE_NOT_PUBLISHED');
+    expect(upsertSmmDiningHold).not.toHaveBeenCalled();
+  });
+
+  it('keeps an existing hold on a disabled table readable with the last Admin label',()=>{
+    const createdAt='2026-09-25T13:31:00.000Z';
+    const ingress=createSmmLanIngress({
+      orders:()=>[],
+      holds:()=>[{
+        id:'HOLD-9',codeLabel:'H009',kind:'dining',createdAt,partySize:2,note:'舊枱單',totalMinor:4100,
+        assignedTable:'T09',items:[{id:'riceball',name:'原味飯團',qty:1,unitMinor:4100}],payments:[],
+      }],
+    } as any);
+    const snapshot=ingress.readSnapshot() as any;
+    expect(snapshot.dineSessions[0]).toMatchObject({sessionId:'HOLD-9',tableLabel:'9 號枱',remainingMinor:4100});
   });
 
 });
