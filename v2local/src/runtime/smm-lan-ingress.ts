@@ -15,25 +15,54 @@ function writeResults(rows:readonly StoredResult[]){localStorage.setItem(RESULT_
 function rejected(req:SmmLanOrderRequest,reasonCode:string):SmmLanOrderResponse{
   return Object.freeze({protocolVersion:1,type:'smm.lan.order.result.v1',requestId:req.requestId,submissionId:req.submissionId,idempotencyKey:req.idempotencyKey,disposition:'REJECTED',reasonCode});
 }
+function paymentLabel(tender:SmmLanOrderRequest['tender']){
+  return tender==='CASH'?'現金'
+    :tender==='ALIPAY'?'AlipayHK'
+    :tender==='WECHAT'?'WeChat Pay HK'
+    :tender==='FPS'?'FPS'
+    :'PayMe';
+}
+function serviceModeValue(mode:SmmLanOrderRequest['serviceMode']):'takeaway'|'dine-in'{
+  return mode==='DINE_IN'?'dine-in':'takeaway';
+}
+
 export function createSmmLanIngress(runtime:MfkLocalRuntime){
   return Object.freeze({
     readSnapshot(){
       const envelope=readSmtAdminConfigLkg();
       if(!envelope)throw new Error('SMM_ADMIN_CONFIG_REQUIRED');
-      const catalog=projectSyncedOrderingCatalog('takeaway',envelope);
+      const takeaway=projectSyncedOrderingCatalog('takeaway',envelope);
+      const dineIn=projectSyncedOrderingCatalog('dine-in',envelope);
+      const dineById=new Map(dineIn.products.map(row=>[row.id,row] as const));
       return Object.freeze({
+        connectionPath:'LAN' as const,
         menu:Object.freeze({
           revision:String(envelope.revision),
           observedAt:new Date().toISOString(),
-          categories:Object.freeze(catalog.categories.map(row=>Object.freeze({categoryId:row.id,name:row.label,sortOrder:row.position}))),
-          products:Object.freeze(catalog.products.map(row=>Object.freeze({
-            productId:row.id,categoryId:row.categoryId,name:row.name,available:row.sellable&&row.priceReady,
-            ...(row.imageUrl?{imageRef:row.imageUrl}:{}),
-            optionGroups:Object.freeze(row.optionSets.map(set=>Object.freeze({
-              optionGroupId:set.id,name:set.name,required:set.required,minSelections:set.min,maxSelections:set.max,
-              options:Object.freeze(set.options.map(option=>Object.freeze({optionId:option.id,name:option.name,available:option.active}))),
-            }))),
-          }))),
+          categories:Object.freeze(takeaway.categories.map(row=>Object.freeze({categoryId:row.id,name:row.label,sortOrder:row.position}))),
+          products:Object.freeze(takeaway.products.map(row=>{
+            const dine=dineById.get(row.id);
+            return Object.freeze({
+              productId:row.id,
+              categoryId:row.categoryId,
+              name:row.name,
+              available:row.sellable&&row.priceReady,
+              ...(row.priceReady?{
+                publishedTakeawayUnitPriceMinor:row.priceMinor,
+                publishedDineInUnitPriceMinor:dine?.priceMinor??row.priceMinor,
+              }:{}),
+              ...(row.imageUrl?{imageRef:row.imageUrl}:{}),
+              optionGroups:Object.freeze(row.optionSets.map(set=>Object.freeze({
+                optionGroupId:set.id,name:set.name,required:set.required,minSelections:set.min,maxSelections:set.max,
+                options:Object.freeze(set.options.map(option=>Object.freeze({
+                  optionId:option.id,
+                  name:option.name,
+                  available:option.active,
+                  publishedAdjustmentMinor:option.priceAdjustmentMinor,
+                }))),
+              }))),
+            });
+          })),
         }),
         orders:Object.freeze([]),work:Object.freeze([]),channels:Object.freeze([]),dineSessions:Object.freeze([]),printHealth:Object.freeze([]),refundRequests:Object.freeze([]),
         observedAt:new Date().toISOString(),
@@ -55,13 +84,17 @@ export function createSmmLanIngress(runtime:MfkLocalRuntime){
       if(input.storeId!=='MF01')return rejected(input,'SMM_LAN_STORE_MISMATCH');
       if(!context.trusted||!String(context.deviceId||'').trim())return rejected(input,'SMM_LAN_DEVICE_NOT_TRUSTED');
       if(!input.lines.length)return rejected(input,'SMM_LAN_LINES_REQUIRED');
+      if(!String(input.menuRevision||'').trim())return rejected(input,'SMM_MENU_REVISION_REQUIRED');
+      if(!Number.isSafeInteger(Number(input.publishedTotalMinor))||Number(input.publishedTotalMinor)<0)return rejected(input,'SMM_PUBLISHED_TOTAL_INVALID');
+      if(!['TAKEAWAY','DINE_IN'].includes(String(input.serviceMode)))return rejected(input,'SMM_SERVICE_MODE_INVALID');
+      if(!['CASH','ALIPAY','WECHAT','FPS','PAYME'].includes(String(input.tender)))return rejected(input,'SMM_TENDER_INVALID');
+
       const prior=results().find(row=>row.submissionId===input.submissionId);
       if(prior){
         if(prior.idempotencyKey!==input.idempotencyKey)return rejected(input,'SMM_LAN_IDEMPOTENCY_CONFLICT');
         return Object.freeze({protocolVersion:1,type:'smm.lan.order.result.v1',requestId:input.requestId,submissionId:input.submissionId,idempotencyKey:input.idempotencyKey,disposition:'ACCEPTED',orderId:prior.orderId,canonicalRevision:prior.canonicalRevision});
       }
-      // Recover the same canonical Order if the process stopped after Store
-      // Kernel commit but before the SMM result journal was written.
+
       const providerRef='SMM:'+input.submissionId;
       const recovered=runtime.orders().find(order=>order.providerRef===providerRef);
       if(recovered){
@@ -72,22 +105,39 @@ export function createSmmLanIngress(runtime:MfkLocalRuntime){
 
       const envelope=readSmtAdminConfigLkg();
       if(!envelope)return rejected(input,'SMM_ADMIN_CONFIG_REQUIRED');
-      const catalog=projectSyncedOrderingCatalog('takeaway',envelope);
-      const priced=priceCustomerCart(input.lines.map(line=>Object.freeze({
-        lineId:line.lineId,
-        productId:line.productId,
-        productName:line.productName,
-        quantity:line.quantity,
-        ...(line.selectedVariationId?{selectedVariationId:line.selectedVariationId}:{}),
-        ...(line.selectedVariationName?{selectedVariationName:line.selectedVariationName}:{}),
-        selections:line.selections,
-        createdAt:new Date().toISOString(),
-      })),catalog.products);
+      if(String(envelope.revision)!==input.menuRevision)return rejected(input,'SMM_MENU_REVISION_CHANGED');
 
+      const serviceMode=serviceModeValue(input.serviceMode);
+      const catalog=projectSyncedOrderingCatalog(serviceMode,envelope);
+      let priced;
+      try{
+        priced=priceCustomerCart(input.lines.map(line=>Object.freeze({
+          lineId:line.lineId,
+          productId:line.productId,
+          productName:line.productName,
+          quantity:line.quantity,
+          ...(line.selectedVariationId?{selectedVariationId:line.selectedVariationId}:{}),
+          ...(line.selectedVariationName?{selectedVariationName:line.selectedVariationName}:{}),
+          selections:line.selections,
+          createdAt:new Date().toISOString(),
+        })),catalog.products);
+      }catch(error){
+        return rejected(input,error instanceof Error?error.message:'SMM_CART_REVALIDATION_FAILED');
+      }
+
+      if(priced.totalMinor!==input.publishedTotalMinor)return rejected(input,'SMM_PUBLISHED_PRICE_CHANGED');
+      for(let index=0;index<priced.items.length;index++){
+        const published=Number(input.lines[index]?.publishedUnitPriceMinor);
+        if(!Number.isSafeInteger(published)||published<0||published!==priced.items[index]!.unitMinor){
+          return rejected(input,'SMM_PUBLISHED_PRICE_CHANGED');
+        }
+      }
+
+      const items=priced.items.map(item=>Object.freeze({...item,serviceMode}));
       const order=runtime.createOrder({
-        items:priced.items,
+        items,
         totalMinor:priced.totalMinor,
-        paymentLabel:'待結帳',
+        paymentLabel:paymentLabel(input.tender),
         sourceLabel:'SMM',
         providerRef,
         initialFulfillmentLabel:'待處理',
