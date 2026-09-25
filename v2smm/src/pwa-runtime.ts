@@ -1,4 +1,5 @@
 import type {SmmRuntimePort,SmmReadModelSnapshot,SmmPendingIntent,SmmCommandResult} from './product-types';
+import type {SmmLanOrderRequest,SmmLanSubmissionReadbackResponse} from '../../contracts/smm-lan-v1';
 import {createSmmLanOrderAdapter,type SmmLanTransport} from './smt-lan-adapter';
 import {createPwaLanTransport,readSmmLanPwaConfig} from './pwa-lan';
 import {createPwaCloudTransport} from './pwa-cloud';
@@ -49,19 +50,24 @@ async function readCloudSnapshot():Promise<SmmReadModelSnapshot>{
 
 function hybridTransport(lan:SmmLanTransport|null,cloud:SmmLanTransport):SmmLanTransport{
   return Object.freeze({
-    async send(request,signal){
+    async send(request:SmmLanOrderRequest,signal:AbortSignal){
       if(lan){
         const local=await lan.send(request,signal);
         if(local.kind!=='UNAVAILABLE')return local;
       }
       return cloud.send(request,signal);
     },
-    async readSubmission(submissionId,signal){
+    async readSubmission(
+      submissionId:string,
+      signal:AbortSignal,
+    ):Promise<SmmLanSubmissionReadbackResponse|Readonly<{state:'UNAVAILABLE'}>>{
       if(lan?.readSubmission){
         const local=await lan.readSubmission(submissionId,signal);
         if(!('state'in local&&local.state==='UNAVAILABLE'))return local;
       }
-      return cloud.readSubmission?cloud.readSubmission(submissionId,signal):{state:'UNAVAILABLE'};
+      return cloud.readSubmission
+        ?cloud.readSubmission(submissionId,signal)
+        :Object.freeze({state:'UNAVAILABLE' as const});
     },
   });
 }
