@@ -97,6 +97,8 @@ export function OrderingWorkspace({view,actions,centerPanel}:{view:OrderingWorks
   const workspaceStyle={
     '--mf-font-scale':String(fontScale),
     '--mf-density-scale':String(densityScale),
+    '--mf-product-columns':String(productColumns),
+    '--mf-product-card-height':productCardHeight+'px',
   } as CSSProperties;
   return <div className={`ordering-workspace donor-skeleton${centerPanel?' panel-open':''}`} data-guidance={guidanceTarget} style={workspaceStyle}>
     <header className="ordering-flow-strip">
