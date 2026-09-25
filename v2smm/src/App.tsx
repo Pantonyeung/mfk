@@ -15,6 +15,7 @@ import type {
   SmmRuntimePort,
   SmmServiceMode,
   SmmTender,
+  SmmDiningTarget,
 } from './product-types';
 
 type View='order'|'work'|'orders'|'dine'|'more';
@@ -50,6 +51,8 @@ export function App(){
   const [moreTool,setMoreTool]=useState<'staff'|'connection'|'channels'|'business'|'printing'|'diagnostics'|'sellability'|'pending'|'capacity'|'reporting'|'refunds'|null>(null);
   const [dineTable,setDineTable]=useState('');
   const [dineCovers,setDineCovers]=useState(2);
+  const [diningTarget,setDiningTarget]=useState<SmmDiningTarget|null>(null);
+  const [diningTargetOpen,setDiningTargetOpen]=useState(false);
 
   const persist=(next:{
     cart?:readonly SmmCartLine[];
@@ -264,6 +267,8 @@ export function App(){
   const changeServiceMode=(next:SmmServiceMode)=>{
     const repriced=cart.map(line=>repriceLine(line,next));
     setServiceMode(next);
+    if(next==='DINE_IN')setDiningTargetOpen(true);
+    else setDiningTarget(null);
     setCart(repriced);
     writeSmmLocalWorkspace({
       cart:repriced,
@@ -309,6 +314,12 @@ export function App(){
       releaseSubmitLock();
       return;
     }
+    if(serviceMode==='DINE_IN'&&!diningTarget){
+      setNotice('堂食要先揀掛入邊張枱，或者加入輪候。');
+      setDiningTargetOpen(true);
+      releaseSubmitLock();
+      return;
+    }
     if(snapshot?.connectionPath!=='LAN'&&!staffSession){
       setNotice('Internet 員工落單需要先喺「更多 → 員工帳戶」登入一次；之後呢部手機會保持同一個員工帳戶。');
       releaseSubmitLock();
@@ -319,7 +330,8 @@ export function App(){
       item.menuRevision===menu.revision&&
       item.checkout?.serviceMode===serviceMode&&
       item.checkout?.tender===tender&&
-      item.publishedTotalMinor===publishedTotalMinor
+      item.publishedTotalMinor===publishedTotalMinor&&
+      JSON.stringify(item.checkout?.diningTarget??null)===JSON.stringify(diningTarget)
     );
 
     let base:SmmPendingIntent;
@@ -348,6 +360,7 @@ export function App(){
         publishedTotalMinor,
         serviceMode,
         tender,
+        ...(diningTarget?{diningTarget}:{}),
       });
     }else{
       base=existing??createSmmPendingIntent({
@@ -356,6 +369,7 @@ export function App(){
         publishedTotalMinor,
         serviceMode,
         tender,
+        ...(diningTarget?{diningTarget}:{}),
       });
     }
 
@@ -522,14 +536,23 @@ export function App(){
       pending={pendingIntents[0]??null}
       serviceMode={serviceMode}
       tender={tender}
+      diningTarget={diningTarget}
       onServiceMode={changeServiceMode}
       onTender={changeTender}
+      onChooseDiningTarget={()=>setDiningTargetOpen(true)}
       onClose={()=>setCartOpen(false)}
       onQuantity={(lineId,quantity)=>updateCart(cart.map(line=>line.lineId===lineId?{...line,quantity:Math.max(1,quantity)}:line))}
       onRemove={lineId=>updateCart(cart.filter(line=>line.lineId!==lineId))}
       submitting={submitting}
       onSubmit={()=>void submitCart()}
       onReadback={intent=>void readbackIntent(intent)}
+    />:null}
+
+    {diningTargetOpen?<DiningTargetSheet
+      covers={dineCovers}
+      setCovers={setDineCovers}
+      onClose={()=>setDiningTargetOpen(false)}
+      onSelect={target=>{setDiningTarget(target);setDiningTargetOpen(false);setNotice(target.kind==='TABLE'?'堂食會掛入 '+Number(target.tableId?.slice(1))+' 號枱。':'堂食會先加入輪候。');}}
     />:null}
   </main>;
 }
@@ -752,14 +775,16 @@ function ProductSheet({product,selections,selectedVariationId,setVariation,toggl
   </section></div>;
 }
 
-function CartSheet({cart,quote,pending,submitting,serviceMode,tender,onServiceMode,onTender,onClose,onQuantity,onRemove,onSubmit,onReadback}:{
+function CartSheet({cart,quote,pending,submitting,serviceMode,tender,diningTarget,onServiceMode,onTender,onChooseDiningTarget,onClose,onQuantity,onRemove,onSubmit,onReadback}:{
   cart:readonly SmmCartLine[];
   quote:SmmQuoteSnapshot|null;
   pending:SmmPendingIntent|null;
   serviceMode:SmmServiceMode;
   tender:SmmTender;
+  diningTarget:SmmDiningTarget|null;
   onServiceMode:(mode:SmmServiceMode)=>void;
   onTender:(tender:SmmTender)=>void;
+  onChooseDiningTarget:()=>void;
   onClose:()=>void;
   onQuantity:(id:string,q:number)=>void;
   onRemove:(id:string)=>void;
@@ -770,11 +795,27 @@ function CartSheet({cart,quote,pending,submitting,serviceMode,tender,onServiceMo
   const tenders:[SmmTender,string][]=[['CASH','現金'],['ALIPAY','AlipayHK'],['WECHAT','WeChat Pay HK'],['FPS','FPS'],['PAYME','PayMe']];
   return <div className="overlay"><section className="sheet" role="dialog" aria-modal="true"><div className="sheet-grabber"/><header><div><span>購物草稿</span><h2>{cart.length} 項</h2><small>價格直接使用已發布餐單；提交時 SMT 會核對版本同價格。</small></div><button onClick={onClose}>✕</button></header>
     <section className="option-group"><div><strong>服務方式</strong><span>員工設定</span></div><div className="segmented"><button className={serviceMode==='TAKEAWAY'?'active':''} onClick={()=>onServiceMode('TAKEAWAY')}>外賣</button><button className={serviceMode==='DINE_IN'?'active':''} onClick={()=>onServiceMode('DINE_IN')}>堂食</button></div></section>
-    <section className="option-group"><div><strong>收款方式</strong><span>只記錄，不自動開錢箱</span></div><div className="option-list">{tenders.map(([value,label])=><button key={value} className={tender===value?'active':''} onClick={()=>onTender(value)}>{label}</button>)}</div>{tender==='CASH'?<p className="callout">現金只會記錄為收款方式；需要開錢箱時由 SMT 人手操作。</p>:null}</section>
+    {serviceMode==='DINE_IN'?<section className="option-group"><div><strong>堂食掛單</strong><span>先揀枱／輪候，再由堂食 Checkout 埋單</span></div><button className="primary" type="button" onClick={onChooseDiningTarget}>{diningTarget?.kind==='TABLE'?(Number(diningTarget.tableId?.slice(1))+' 號枱 · '+diningTarget.covers+' 位'):diningTarget?.kind==='WAITING'?('輪候 · '+diningTarget.covers+' 位'):'選擇枱／輪候'}</button></section>:null}
+    {serviceMode==='TAKEAWAY'?<section className="option-group"><div><strong>收款方式</strong><span>只記錄，不自動開錢箱</span></div><div className="option-list">{tenders.map(([value,label])=><button key={value} className={tender===value?'active':''} onClick={()=>onTender(value)}>{label}</button>)}</div>{tender==='CASH'?<p className="callout">現金只會記錄為收款方式；需要開錢箱時由 SMT 人手操作。</p>:null}</section>:null}
     {!cart.length?<EmptyState title="草稿係空嘅" detail="返回點單加入商品。"/>:cart.map(line=><div className="cart-line" key={line.lineId}><div><strong>{line.productName}</strong><small>{[line.selectedVariationName,...line.selections.map(item=>item.optionName)].filter(Boolean).join(' · ')||'無額外設定'} · {Number.isSafeInteger(Number(line.publishedUnitPriceMinor))?money('HKD',Number(line.publishedUnitPriceMinor)):'價格待同步'}</small></div><div className="qty"><button onClick={()=>onQuantity(line.lineId,line.quantity-1)}>−</button><b>{line.quantity}</b><button onClick={()=>onQuantity(line.lineId,line.quantity+1)}>＋</button></div><button className="danger" onClick={()=>onRemove(line.lineId)}>移除</button></div>)}
     <div className="cart-total"><span>已發布總額</span><strong>{quote?money(quote.currency,quote.totalMinor):'價格資料未完整'}</strong><small>{quote?`餐單版本 ${quote.revision} · SMT 提交時再核對`:'請重新同步餐單'}</small></div>
     {pending?<p className="callout">{pending.state==='UNKNOWN'?'上次提交結果未明，請先重新確認，唔好重新送出。':pending.lastMessage??'已有待提交草稿'}</p>:null}
     <footer><button onClick={onClose}>返回</button>{pending?.state==='UNKNOWN'?<button className="primary" onClick={()=>onReadback(pending)}>重新確認結果</button>:<button className="primary" disabled={submitting||!cart.length||!quote} onClick={onSubmit}>{submitting?'提交中…':'提交訂單'}</button>}</footer>
+  </section></div>;
+}
+
+
+function DiningTargetSheet({covers,setCovers,onClose,onSelect}:{
+  covers:number;
+  setCovers:(value:number)=>void;
+  onClose:()=>void;
+  onSelect:(target:SmmDiningTarget)=>void;
+}){
+  const tables=Array.from({length:9},(_,index)=>'T'+String(index+1).padStart(2,'0'));
+  return <div className="overlay"><section className="sheet" role="dialog" aria-modal="true"><div className="sheet-grabber"/><header><div><span>堂食去向</span><h2>掛枱／輪候</h2><small>揀枱後，SMT 會自動掛入該枱；如果該枱已有堂食單就直接加單。</small></div><button onClick={onClose}>✕</button></header>
+    <section className="option-group"><div><strong>人數</strong><span>1–30 位</span></div><div className="qty"><button onClick={()=>setCovers(Math.max(1,covers-1))}>−</button><b>{covers}</b><button onClick={()=>setCovers(Math.min(30,covers+1))}>＋</button></div></section>
+    <section className="option-group"><div><strong>掛入邊張枱</strong><span>已有單＝加單；空枱＝開枱</span></div><div className="option-list">{tables.map(tableId=><button key={tableId} onClick={()=>onSelect({kind:'TABLE',tableId,covers})}>{Number(tableId.slice(1))} 號枱</button>)}</div></section>
+    <section className="option-group"><div><strong>未決定座位</strong><span>先放入輪候</span></div><button className="primary" onClick={()=>onSelect({kind:'WAITING',covers})}>加入輪候</button></section>
   </section></div>;
 }
 
