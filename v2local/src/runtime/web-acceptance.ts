@@ -1,7 +1,10 @@
-export const SMT_WEB_ACCEPTANCE_HOST='mfk-smt-web-acceptance.pantonyeung.workers.dev';
+export const SMT_WEB_ACCEPTANCE_HOSTS=Object.freeze([
+  'mfk-smt-web-acceptance.pantonyeung.workers.dev',
+  'mfk-smt-web.yeungyi88.workers.dev',
+]);
 
 export function isSmtWebAcceptance(){
-  return typeof window!=='undefined'&&window.location.hostname===SMT_WEB_ACCEPTANCE_HOST;
+  return typeof window!=='undefined'&&SMT_WEB_ACCEPTANCE_HOSTS.includes(window.location.hostname);
 }
 
 export function smtAdminHttpOrigin(){
