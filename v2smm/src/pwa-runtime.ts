@@ -2,7 +2,7 @@ import type {SmmRuntimePort,SmmCartLine,SmmReadModelSnapshot,SmmQuoteSnapshot,Sm
 import {createSmmLanOrderAdapter} from './smt-lan-adapter';
 import {createPwaLanTransport,readSmmLanPwaConfig} from './pwa-lan';
 
-const CLOUD_SNAPSHOT_URL='https://admin.morefunos.com/api/smm/snapshot?storeId=MF01';
+const CLOUD_SNAPSHOT_URL='/api/smm/snapshot?storeId=MF01';
 
 function isRecord(value:unknown):value is Record<string,unknown>{
   return Boolean(value)&&typeof value==='object'&&!Array.isArray(value);
