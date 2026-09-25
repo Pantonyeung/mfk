@@ -13,7 +13,7 @@ import {readSmtDeviceId} from './admin-config-sync.ts';
 import {normalizeMfkOrderLineCompositionV1,type MfkOrderLineCompositionV1} from '../../../contracts/order-line-composition-v1.ts';
 
 export interface SmtOperationalMetric{readonly id:string;readonly label:string;readonly value:string;readonly detail?:string}
-export interface SmtOrderListItemViewModel{readonly orderId:string;readonly orderIdLabel:string;readonly itemCount:number;readonly totalLabel:string;readonly paymentLabel:string;readonly fulfillmentLabel:string;readonly sourceLabel?:string;readonly localSequenceLabel?:string}
+export interface SmtOrderListItemViewModel{readonly orderId:string;readonly orderIdLabel:string;readonly itemCount:number;readonly totalLabel:string;readonly paymentLabel:string;readonly fulfillmentLabel:string;readonly sourceLabel?:string;readonly localSequenceLabel?:string;readonly customerName?:string;readonly externalOrderNo?:string;readonly pickupCode?:string}
 export interface SmtOrderDetailLineViewModel{readonly id:string;readonly name:string;readonly quantity:number;readonly unitLabel:string;readonly lineTotalLabel:string;readonly detail?:string;readonly composition?:MfkOrderLineCompositionV1}
 export interface SmtOrderDetailViewModel extends SmtOrderListItemViewModel{readonly attention:readonly string[];readonly metrics:readonly SmtOperationalMetric[];readonly lines:readonly SmtOrderDetailLineViewModel[];readonly paymentEvidenceRef?:string;readonly paymentVerificationState?:'PENDING'|'VERIFIED'|'REJECTED'}
 export interface SmtOrdersProjection{readonly items:readonly SmtOrderListItemViewModel[];readonly detailsByOrderId?:Readonly<Record<string,SmtOrderDetailViewModel>>;readonly selectedOrderId?:string;readonly selectedOrder?:SmtOrderDetailViewModel}
@@ -133,6 +133,8 @@ export interface CleanSmtCoreRuntimePort{
   readPaymentEvidence?(orderId:string):Promise<{readonly objectUrl:string}>;
   reviewPaymentEvidence?(orderId:string,decision:'VERIFIED'|'REJECTED'):Promise<{readonly orderId:string;readonly state:'VERIFIED'|'REJECTED'}>;
   markOrderReady?(orderId:string):Promise<{readonly orderId:string;readonly canonicalRevision:number;readonly status:'READY';readonly provider:KeetaProviderMirrorResult}>;
+  markOrderUnready?(orderId:string):Promise<{readonly orderId:string;readonly status:'IN_PROGRESS'}>;
+  markOrderCompleted?(orderId:string):Promise<{readonly orderId:string;readonly status:'COMPLETED'}>;
   printOrderReceipt?(orderId:string):Promise<{readonly printJobId:string;readonly state:string}>;
   printDailyClose?(businessDate?:string):Promise<{readonly printJobId:string;readonly state:string;readonly businessDate:string}>;
   printOrderOutputs?(orderId:string):Promise<PrintDispatchSummary>;
@@ -222,6 +224,8 @@ export interface MfkLocalRuntime extends CleanSmtCoreRuntimePort{
   printInitialOrderOutputsOnce(orderId:string):Promise<PrintDispatchSummary>;
   correctOrderPayment(orderId:string,paymentLabel:string):Promise<StoredOrder>;
   deferKeetaOrder(orderId:string):Promise<StoredOrder>;
+  markOrderUnready(orderId:string):Promise<{readonly orderId:string;readonly status:'IN_PROGRESS'}>;
+  markOrderCompleted(orderId:string):Promise<{readonly orderId:string;readonly status:'COMPLETED'}>;
   printDailyClose(businessDate?:string):Promise<{readonly printJobId:string;readonly state:string;readonly businessDate:string}>;
   readOrderReprintOptions(orderId:string):Promise<readonly SmtReprintOption[]>;
   reprintOrderJobs(orderId:string,jobIds:readonly string[],reason?:string):Promise<PrintDispatchSummary>;
@@ -546,12 +550,18 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
       orderId:order.id,orderIdLabel:'#'+order.display,itemCount:order.items.reduce((s,x)=>s+x.qty,0),
       totalLabel:money(order.totalMinor),paymentLabel:order.paymentLabel,fulfillmentLabel:order.fulfillmentLabel,
       sourceLabel:order.sourceLabel,localSequenceLabel:order.display,
+      ...(order.customerName?{customerName:order.customerName}:{}),
+      ...(order.providerRef?{externalOrderNo:order.providerRef.replace(/^[A-Z]+:/,'')}:{}),
+      ...(order.providerPickupCode?{pickupCode:order.providerPickupCode}:{}),
     }));
     const selectedId=selectedOrderId&&data.orders.some(x=>x.id===selectedOrderId)?selectedOrderId:data.orders[0]?.id;
     const details:Record<string,SmtOrderDetailViewModel>={};
     for(const order of data.orders)details[order.id]={
       orderId:order.id,orderIdLabel:'#'+order.display,itemCount:order.items.reduce((s,x)=>s+x.qty,0),totalLabel:money(order.totalMinor),
       paymentLabel:order.paymentLabel,fulfillmentLabel:order.fulfillmentLabel,sourceLabel:order.sourceLabel,localSequenceLabel:order.display,
+      ...(order.customerName?{customerName:order.customerName}:{}),
+      ...(order.providerRef?{externalOrderNo:order.providerRef.replace(/^[A-Z]+:/,'')}:{}),
+      ...(order.providerPickupCode?{pickupCode:order.providerPickupCode}:{}),
       ...(order.paymentEvidenceRef?{paymentEvidenceRef:order.paymentEvidenceRef}:{}),
       ...(order.paymentVerificationState?{paymentVerificationState:order.paymentVerificationState}:{}),
       attention:[
@@ -637,6 +647,30 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
     const current=data.orders.find(x=>x.id===orderId)!;
     const provider=await mirrorKeetaOrderCommand(current,'READY');
     return {orderId,canonicalRevision:Date.now(),status:'READY' as const,provider};
+  },
+  async markOrderUnready(orderId){
+    const found=data.orders.find(x=>x.id===orderId);if(!found)throw new Error('ORDER_NOT_FOUND');
+    if(found.fulfillmentLabel!=='可取餐')throw new Error('ORDER_NOT_UNREADYABLE');
+    const updatedAt=new Date().toISOString();
+    data={...data,orders:data.orders.map(x=>x.id===orderId?{
+      ...x,fulfillmentLabel:'進行中',updatedAt,etaMinutes:undefined,etaReadyAt:undefined,
+    }:x)};
+    save();
+    const current=data.orders.find(x=>x.id===orderId)!;
+    projectOrder(current);
+    appendActionAudit({action:'UNREADY',orderId});
+    return {orderId,status:'IN_PROGRESS' as const};
+  },
+  async markOrderCompleted(orderId){
+    const found=data.orders.find(x=>x.id===orderId);if(!found)throw new Error('ORDER_NOT_FOUND');
+    if(found.fulfillmentLabel!=='可取餐')throw new Error('ORDER_NOT_COMPLETABLE');
+    const updatedAt=new Date().toISOString();
+    data={...data,orders:data.orders.map(x=>x.id===orderId?{...x,fulfillmentLabel:'已完成',updatedAt}:x)};
+    save();
+    const current=data.orders.find(x=>x.id===orderId)!;
+    projectOrder(current);
+    appendActionAudit({action:'PICKED_UP',orderId});
+    return {orderId,status:'COMPLETED' as const};
   },
   async printOrderOutputs(orderId){
     const order=data.orders.find(x=>x.id===orderId);
