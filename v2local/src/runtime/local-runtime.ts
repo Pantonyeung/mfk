@@ -192,6 +192,7 @@ export interface CleanSmtCoreRuntimePort{
   unassignDiningTable?(holdId:string):Promise<void>;
   readDiningHold?(holdId:string):Promise<LocalDiningHoldDetail>;
   readDiningHistory?():Promise<readonly LocalDiningHoldDetail[]>;
+  printDiningPaymentReceipt?(holdId:string,submissionId:string):Promise<PrintDispatchSummary>;
   readDiningReprintOptions?(holdId:string):Promise<readonly SmtReprintOption[]>;
   reprintDiningJobs?(holdId:string,jobIds:readonly string[],reason?:string):Promise<PrintDispatchSummary>;
   settleDiningHold?(holdId:string,selections:readonly {lineIndex:number;qty:number}[],tender:DiningTender,command?:DiningSettlementCommand):Promise<LocalDiningHoldDetail>;
@@ -282,6 +283,7 @@ export interface MfkLocalRuntime extends CleanSmtCoreRuntimePort{
   removeHold(id:string):void;
   readDiningHold(holdId:string):Promise<LocalDiningHoldDetail>;
   readDiningHistory():Promise<readonly LocalDiningHoldDetail[]>;
+  printDiningPaymentReceipt(holdId:string,submissionId:string):Promise<PrintDispatchSummary>;
   readDiningReprintOptions(holdId:string):Promise<readonly SmtReprintOption[]>;
   reprintDiningJobs(holdId:string,jobIds:readonly string[],reason?:string):Promise<PrintDispatchSummary>;
   settleDiningHold(holdId:string,selections:readonly {lineIndex:number;qty:number}[],tender:DiningTender,command?:DiningSettlementCommand):Promise<LocalDiningHoldDetail>;
@@ -1259,6 +1261,29 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
       appendActionAudit({action:'DINING_PRODUCTION_PRINT_UNKNOWN',orderId:current.id});
       throw error;
     }
+  },
+  async printDiningPaymentReceipt(holdId,submissionId){
+    const hold=requireDiningHold(readDiningState(),holdId);
+    if(!hold.formalOrderId)throw new Error('DINING_FORMAL_ORDER_NOT_CREATED');
+    const payment=(hold.payments??[]).find(row=>row.submissionId===submissionId);
+    if(!payment)throw new Error('DINING_PAYMENT_NOT_FOUND');
+    const order=data.orders.find(row=>row.id===hold.formalOrderId);
+    if(!order)throw new Error('DINING_FORMAL_ORDER_LINK_BROKEN');
+    const binding=readPrinterBindings().find(row=>row.role==='顧客小票'&&String(row.host||'').trim());
+    if(!binding)throw new Error('DINING_RECEIPT_ROUTE_MISSING');
+    const paymentOrder:StoredOrder={...order,totalMinor:payment.amountMinor,paymentLabel:payment.tender,updatedAt:new Date().toISOString()};
+    const result=await (async()=>{
+      try{
+        const output=await printBytesLan({...printerInput(binding),bytes:await renderEscPosRasterTicket({
+          kind:'receipt',order:paymentOrder,cutAfter:true,kickDrawer:payment.tender==='CASH',beepAfter:true,
+        })});
+        return {jobId:order.id+':payment:'+payment.id+':receipt',role:'顧客小票',ok:output.ok,code:output.code||(output.ok?'SENT':'PRINT_FAILED')} satisfies PrintDispatchResult;
+      }catch(error){
+        return {jobId:order.id+':payment:'+payment.id+':receipt',role:'顧客小票',ok:false,code:error instanceof Error?error.message:'PRINT_FAILED'} satisfies PrintDispatchResult;
+      }
+    })();
+    appendActionAudit({action:'DINING_PAYMENT_RECEIPT',orderId:order.id,reason:payment.tender+' '+money(payment.amountMinor)});
+    return Object.freeze({orderId:order.id,planned:1,sent:result.ok?1:0,failed:result.ok?0:1,results:Object.freeze([Object.freeze(result)])});
   },
   async readDiningReprintOptions(holdId){
     const hold=requireDiningHold(readDiningState(),holdId);
