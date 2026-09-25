@@ -26,6 +26,42 @@ export interface SmtCapacityConfig{
   readonly note:string;
 }
 
+export interface SmtEtaRule{
+  readonly minActiveOrders:number;
+  readonly minutes:number;
+}
+
+export function normalizeSmtEtaRules(value:unknown,fallbackMinutes:number):readonly SmtEtaRule[]{
+  const raw=Array.isArray(value)?value:[];
+  const normalized=raw.flatMap(item=>{
+    const row=record(item);
+    const threshold=Math.max(0,Math.floor(number(row.minActiveOrders??row.activeOrders??row.threshold,-1)));
+    const minutes=Math.max(1,Math.floor(number(row.minutes??row.etaMinutes,-1)));
+    if(threshold<0||minutes<1)return [];
+    return [{minActiveOrders:threshold,minutes}];
+  }).sort((a,b)=>a.minActiveOrders-b.minActiveOrders||a.minutes-b.minutes);
+  const deduped=new Map<number,SmtEtaRule>();
+  for(const rule of normalized)deduped.set(rule.minActiveOrders,Object.freeze(rule));
+  const rows=[...deduped.values()].sort((a,b)=>a.minActiveOrders-b.minActiveOrders);
+  return Object.freeze(rows.length?rows:[Object.freeze({minActiveOrders:0,minutes:Math.max(1,Math.floor(fallbackMinutes||20))})]);
+}
+
+export function readSmtEtaRules():readonly SmtEtaRule[]{
+  const capacity=record(readAdminSnapshotSection('capacity'));
+  const store=readSmtStoreSettings();
+  return normalizeSmtEtaRules(capacity.etaRules,store.fulfillmentMinutes);
+}
+
+export function etaMinutesForActiveCount(activeOrders:number,rules=readSmtEtaRules()){
+  const count=Math.max(0,Math.floor(Number(activeOrders)||0));
+  let selected=rules[0]??{minActiveOrders:0,minutes:20};
+  for(const rule of rules){
+    if(count<rule.minActiveOrders)break;
+    selected=rule;
+  }
+  return selected.minutes;
+}
+
 export interface SmtFrontlinePresentation{
   readonly headline:string;
   readonly eyebrow:string;
