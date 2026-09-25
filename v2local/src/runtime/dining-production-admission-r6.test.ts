@@ -94,6 +94,33 @@ describe('Dining R6 automatic table-order admission',()=>{
     expect(calls.every((row:any)=>row.kickDrawer!==true)).toBe(true);
   });
 
+  it('first table assignment includes table ticket but never a paid customer receipt',async()=>{
+    const runtime=await boot();
+    const hold=runtime.createHold({kind:'dining',items:[{id:'rice',name:'飯團',qty:1,unitMinor:4100,serviceMode:'dine-in'}],totalMinor:4100});
+    await runtime.assignDiningTable(hold.id,'T01');
+    const options=await runtime.readDiningReprintOptions(hold.id);
+    expect(options.some((row:any)=>row.role==='枱單')).toBe(true);
+    expect(options.some((row:any)=>row.role==='顧客小票')).toBe(false);
+  });
+
+  it('dining reprint reuses SAME Order and forces drawer off',async()=>{
+    const runtime=await boot();
+    const hold=runtime.createHold({kind:'dining',items:[{id:'rice',name:'飯團',qty:1,unitMinor:4100,serviceMode:'dine-in'}],totalMinor:4100});
+    await runtime.assignDiningTable(hold.id,'T01');
+    const before=runtime.orders().filter((row:any)=>row.diningHoldId===hold.id);
+    const options=await runtime.readDiningReprintOptions(hold.id);
+    const table=options.find((row:any)=>row.role==='枱單');
+    expect(table).toBeTruthy();
+    await runtime.reprintDiningJobs(hold.id,[table.jobId],'TEST');
+    const after=runtime.orders().filter((row:any)=>row.diningHoldId===hold.id);
+    expect(after).toHaveLength(1);
+    expect(after[0].id).toBe(before[0].id);
+    const ticket=await import('./ticket-bitmap.ts');
+    const last=(ticket.renderEscPosRasterTicket as any).mock.calls.at(-1)?.[0];
+    expect(last.kind).toBe('table');
+    expect(last.kickDrawer).toBe(false);
+  });
+
   it('formal Order link survives runtime restart',async()=>{
     let runtime=await boot();
     const hold=runtime.createHold({kind:'dining',items:[{id:'rice',name:'飯團',qty:1,unitMinor:4100,serviceMode:'dine-in'}],totalMinor:4100});
