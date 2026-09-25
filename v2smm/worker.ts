@@ -351,6 +351,9 @@ export class SmmIntentStore{
         .map((row:any)=>({
           submissionId:String(row.submissionId||''),
           state:String(row.state||'TICKET_CREATED'),
+          menuRevision:String(row.menuRevision||''),
+          serviceMode:String(row.serviceMode||''),
+          publishedTotalMinor:Number.isFinite(Number(row.publishedTotalMinor))?Number(row.publishedTotalMinor):null,
           createdAt:String(row.createdAt||''),
           updatedAt:String(row.updatedAt||''),
           expiresAt:String(row.expiresAt||''),
@@ -709,6 +712,9 @@ export default{
         enriched.push({
           traceId:submissionId?submissionId.slice(-10):'',
           state:String(trace.state||''),
+          menuRevision:String(trace.menuRevision||''),
+          serviceMode:String(trace.serviceMode||''),
+          publishedTotalMinor:Number.isFinite(Number(trace.publishedTotalMinor))?Number(trace.publishedTotalMinor):null,
           relayStatus:Number.isFinite(relayStatus)?relayStatus:null,
           relayState:String(trace.relayState||''),
           relayCode:String(trace.relayCode||''),
