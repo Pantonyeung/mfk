@@ -1,4 +1,4 @@
-import type {SmmCartLine,SmmPendingIntent} from './product-types';
+import type {SmmCartLine,SmmPendingIntent,SmmServiceMode,SmmTender} from './product-types';
 
 const STORAGE_KEY='mfk:smm:workspace:v1';
 
@@ -6,6 +6,8 @@ export interface SmmLocalPreferences {
   readonly activeView:'order'|'work'|'orders'|'dine'|'more';
   readonly activeCategoryId:string|null;
   readonly sourceFilter:string;
+  readonly serviceMode:SmmServiceMode;
+  readonly tender:SmmTender;
 }
 
 export interface SmmLocalWorkspace {
@@ -26,6 +28,8 @@ const DEFAULT_WORKSPACE:SmmLocalWorkspace=Object.freeze({
     activeView:'order',
     activeCategoryId:null,
     sourceFilter:'全部',
+    serviceMode:'TAKEAWAY',
+    tender:'CASH',
   }),
   updatedAt:new Date(0).toISOString(),
 });
@@ -58,6 +62,8 @@ export function readSmmLocalWorkspace():SmmLocalWorkspace{
         activeView,
         activeCategoryId:typeof preferences.activeCategoryId==='string'?preferences.activeCategoryId:null,
         sourceFilter:typeof preferences.sourceFilter==='string'?preferences.sourceFilter:'全部',
+        serviceMode:preferences.serviceMode==='DINE_IN'?'DINE_IN':'TAKEAWAY',
+        tender:['CASH','ALIPAY','WECHAT','FPS','PAYME'].includes(String(preferences.tender))?preferences.tender as SmmTender:'CASH',
       }),
       updatedAt:typeof parsed.updatedAt==='string'?parsed.updatedAt:new Date(0).toISOString(),
     });
@@ -88,7 +94,13 @@ export function createSmmStableSubmissionId():string{
   return `SMM-${uuid}`;
 }
 
-export function createSmmPendingIntent(cart:readonly SmmCartLine[]):SmmPendingIntent{
+export function createSmmPendingIntent(input:{
+  readonly cart:readonly SmmCartLine[];
+  readonly menuRevision:string;
+  readonly publishedTotalMinor:number;
+  readonly serviceMode:SmmServiceMode;
+  readonly tender:SmmTender;
+}):SmmPendingIntent{
   const submissionId=createSmmStableSubmissionId();
   const now=new Date().toISOString();
   return Object.freeze({
@@ -97,6 +109,9 @@ export function createSmmPendingIntent(cart:readonly SmmCartLine[]):SmmPendingIn
     createdAt:now,
     updatedAt:now,
     state:'DRAFT',
-    cart:Object.freeze([...cart]),
+    menuRevision:input.menuRevision,
+    publishedTotalMinor:input.publishedTotalMinor,
+    checkout:Object.freeze({serviceMode:input.serviceMode,tender:input.tender}),
+    cart:Object.freeze([...input.cart]),
   });
 }
