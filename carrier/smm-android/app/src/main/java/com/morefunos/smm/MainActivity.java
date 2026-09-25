@@ -74,11 +74,11 @@ public final class MainActivity extends Activity {
             socket.setSoTimeout(5000);
             try(BufferedWriter writer=new BufferedWriter(new OutputStreamWriter(socket.getOutputStream(),StandardCharsets.UTF_8));
                 BufferedReader reader=new BufferedReader(new InputStreamReader(socket.getInputStream(),StandardCharsets.UTF_8))){
+                final JSONObject request=new JSONObject(payload);
                 final JSONObject envelope=new JSONObject()
                     .put("deviceId",config.deviceId)
-                    .put("action",new JSONObject(payload).optString("type","").contains("pair")?"pair":"request")
-                    .put("pairingToken",config.pairingToken)
-                    .put("payload",new JSONObject(payload));
+                    .put("action","request")
+                    .put("payload",request);
                 writer.write(envelope.toString());writer.write("\n");writer.flush();
                 final String response=reader.readLine();
                 if(response==null)throw new IOException("SMM_LAN_EMPTY_RESPONSE");
