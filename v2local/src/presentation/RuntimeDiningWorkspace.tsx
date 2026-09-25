@@ -60,7 +60,7 @@ export function RuntimeDiningWorkspace({runtime,onCheckout,warningMinutes}:{
   const [actionBusy,setActionBusy]=useState(false);
   const [checkoutBusy,setCheckoutBusy]=useState(false);
   const [reprintOpen,setReprintOpen]=useState(false);
-  const [reprintOptions,setReprintOptions]=useState<readonly {jobId:string;role:string;label:string;detail?:string;firstPrintState?:'SENT_TO_PRINTER'|'TRANSPORT_REPORTED_INCOMPLETE'|'NO_TRANSPORT_EVIDENCE';firstPrintCode?:string}[]>([]);
+  const [reprintOptions,setReprintOptions]=useState<readonly {jobId:string;role:string;label:string;detail?:string;printerName?:string}[]>([]);
   const [selectedReprintJobs,setSelectedReprintJobs]=useState<Set<string>>(new Set());
   const alive=useRef(true);
   const activeHold=useRef<string|null>(null);
@@ -327,11 +327,11 @@ export function RuntimeDiningWorkspace({runtime,onCheckout,warningMinutes}:{
     {reprintOpen?<div className="order-modal-backdrop" onMouseDown={event=>{if(event.target===event.currentTarget)setReprintOpen(false);}}>
       <section className="order-modal reprint">
         <header><h2>堂食重印</h2><button type="button" onClick={()=>setReprintOpen(false)}>×</button></header>
-        <p>重印只用原本同一張 Order；唔會建立新單、付款或開錢箱。</p>
+        <p>由廚房／真人確認實際少邊張，再喺下面手動揀。系統唔會估邊張實體紙缺失；重印亦唔會建立新單、付款或開錢箱。</p>
         <div className="order-action-choices">
           {reprintOptions.map(option=><label key={option.jobId} style={{display:'flex',gap:10,alignItems:'center',padding:10}}>
             <input type="checkbox" checked={selectedReprintJobs.has(option.jobId)} onChange={()=>toggleReprint(option.jobId)}/>
-            <span><b>{option.label}</b>{option.detail?<small> · {option.detail}</small>:null}<small> · 系統紀錄：{option.firstPrintState==='SENT_TO_PRINTER'?'已送到打印通道（唔代表實體已出紙）':option.firstPrintState==='TRANSPORT_REPORTED_INCOMPLETE'?'打印通道回報未完成':option.firstPrintState==='NO_TRANSPORT_EVIDENCE'?'冇完整通道證據':'未記錄'}{option.firstPrintCode?' · '+option.firstPrintCode:''}</small></span>
+            <span><b>{option.label}</b>{option.detail?<small> · {option.detail}</small>:null}{option.printerName?<small> · {option.printerName}</small>:null}</span>
           </label>)}
         </div>
         <footer><button type="button" onClick={()=>setReprintOpen(false)}>取消</button><button type="button" className="primary" disabled={!selectedReprintJobs.size||actionBusy} onClick={()=>void runReprint()}>確認重印</button></footer>
