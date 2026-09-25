@@ -38,7 +38,7 @@ test('SMM UI remains free of canonical writer and transport stays isolated',()=>
   const pwaRuntime=fs.readFileSync(path.join(root,'pwa-runtime.ts'),'utf8');
   assert.match(pwaLan,/fetch\s*\(/);
   assert.match(pwaLan,/smm\/v1\/health/);
-  assert.match(pwaRuntime,/admin\.morefunos\.com\/api\/smm\/snapshot/);
+  assert.match(pwaRuntime,/\/api\/smm\/snapshot/);
   assert.match(pwaRuntime,/connectionPath:'INTERNET'/);
   assert.match(pwaRuntime,/SMM_LAN_SNAPSHOT_INVALID/);
 });
@@ -161,4 +161,13 @@ test('LAN failure falls back to Internet and render protection prevents blank sc
   assert.match(main,/SMM 顯示已自動保護/);
   assert.match(app,/Internet 資料通道運作中/);
   assert.match(app,/snapshot\?\.connectionPath!=='LAN'/);
+});
+
+
+test('dedicated SMM worker keeps Internet reads same-origin and reuses Admin public projection',()=>{
+  const worker=fs.readFileSync(path.join(repoRoot,'v2smm','worker.ts'),'utf8');
+  assert.match(worker,/admin\.morefunos\.com\/api\/customer\/snapshot/);
+  assert.match(worker,/url\.pathname==='\/api\/smm\/snapshot'/);
+  assert.match(worker,/env\.ASSETS\.fetch/);
+  assert.doesNotMatch(worker,/orders\/submit|createOrder|StoreKernel|D1Database/);
 });
