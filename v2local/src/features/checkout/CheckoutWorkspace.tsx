@@ -1,3 +1,4 @@
+// DINING_REAL_CHECKOUT_R3
 import {useState} from 'react';
 import type {CheckoutWorkspaceActions,CheckoutWorkspaceViewModel} from './checkout-workspace-model.ts';
 import './checkout-workspace.css';
@@ -55,7 +56,7 @@ export function CheckoutWorkspace({view,actions}:{view:CheckoutWorkspaceViewMode
       <section className="checkout-source-stage">
         <header><div><small><i>01</i> ORDER SOURCE</small><b>訂單來源</b></div><strong>{selectedChannel?.label}</strong></header>
         <div className="checkout-source-grid">
-          {view.channels.map(channel=><button type="button" key={channel.id} className={channel.selected?'active':''} disabled={processing||success} onClick={()=>actions.onSelectChannel(channel.id)}>
+          {view.channels.map(channel=><button type="button" key={channel.id} className={channel.selected?'active':''} disabled={processing||success||channel.enabled===false} onClick={()=>actions.onSelectChannel(channel.id)}>
             <i>{channelIcon[channel.id]??'•'}</i><b>{channel.label}</b>
           </button>)}
         </div>
@@ -136,7 +137,7 @@ export function CheckoutWorkspace({view,actions}:{view:CheckoutWorkspaceViewMode
     {view.completionReview?<div className="checkout-completion-backdrop" role="presentation">
       <section className="checkout-completion-modal" role="dialog" aria-modal="true" aria-label="交易完成核對">
         <header>
-          <div><small>COMPLETION REVIEW</small><h2>交易已完成</h2><p>正式交易已提交；打印／櫃桶狀態會喺下面更新。</p></div>
+          <div><small>COMPLETION REVIEW</small><h2>{view.completionReview.heading??'交易已完成'}</h2><p>{view.completionReview.helperLabel??'正式交易已提交；打印／櫃桶狀態會喺下面更新。'}</p></div>
           <strong>#{view.completionReview.displayOrderCode}</strong>
         </header>
 

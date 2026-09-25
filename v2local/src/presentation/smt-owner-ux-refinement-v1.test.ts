@@ -38,8 +38,11 @@ describe('SMT owner UX refinement',()=>{
     expect(app).toContain("label:'紫米套餐區'");
   });
 
-  it('shows local tenders only for walk-in and replaces them with channel information otherwise',()=>{
-    expect(app).toContain("const settlementMode=channel==='walk-in'?'LOCAL_PAYMENT' as const:'CHANNEL_INFO' as const");
+  it('retains walk-in/external selection rules while dining always settles its existing local payment',()=>{
+    expect(app).toContain("const settlementMode=diningCheckout||channel==='walk-in'?'LOCAL_PAYMENT' as const:'CHANNEL_INFO' as const");
+    expect(app).toContain('enabled:!diningCheckout');
+    expect(app).toContain('onSelectChannel:next=>{if(!diningCheckout)setChannel(next);}');
+    expect(checkout).toContain('channel.enabled===false');
     expect(app).toContain("methods:(['CASH','ALIPAY','WECHAT','FPS','PAYME','COMBO']");
     expect(checkout).toContain("view.settlementMode==='LOCAL_PAYMENT'");
     expect(checkout).toContain('checkout-channel-stage');

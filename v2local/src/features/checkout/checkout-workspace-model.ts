@@ -21,7 +21,9 @@ export interface CheckoutOrderViewModel {
   readonly totalLabel:string;
 }
 
+// DINING_REAL_CHECKOUT_R3
 export interface CheckoutChannelViewModel {
+  readonly enabled?:boolean;
   readonly id:CheckoutChannelId;
   readonly label:string;
   readonly selected:boolean;
@@ -70,6 +72,8 @@ export interface CheckoutWorkspaceViewModel {
   readonly validationMessage?:string;
   readonly failureMessage?:string;
   readonly completionReview?:{
+    readonly heading?:string;
+    readonly helperLabel?:string;
     readonly orderId?:string;
     readonly displayOrderCode:string;
     readonly sourceLabel:string;
