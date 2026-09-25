@@ -1,4 +1,4 @@
-import type {SmmRuntimePort,SmmCartLine,SmmReadModelSnapshot,SmmQuoteSnapshot,SmmPendingIntent,SmmCommandResult} from './product-types';
+import type {SmmRuntimePort,SmmReadModelSnapshot,SmmPendingIntent,SmmCommandResult} from './product-types';
 import {createSmmLanOrderAdapter} from './smt-lan-adapter';
 import {createPwaLanTransport,readSmmLanPwaConfig} from './pwa-lan';
 
@@ -17,10 +17,6 @@ function isSnapshot(value:unknown):value is SmmReadModelSnapshot{
     if(!isRecord(value.menu)||typeof value.menu.revision!=='string'||!Array.isArray(value.menu.categories)||!Array.isArray(value.menu.products))return false;
   }
   return true;
-}
-function isQuote(value:unknown):value is SmmQuoteSnapshot{
-  return isRecord(value)&&typeof value.quoteId==='string'&&typeof value.revision==='string'&&
-    typeof value.currency==='string'&&typeof value.totalMinor==='number'&&Array.isArray(value.lines)&&typeof value.observedAt==='string';
 }
 async function withTimeout<T>(work:Promise<T>,timeoutMs=3500):Promise<T>{
   let timer:number|undefined;
@@ -68,16 +64,10 @@ export function createPwaRuntimePort():SmmRuntimePort{
       }
       return await readCloudSnapshot();
     },
-    async quoteCart(cart:readonly SmmCartLine[]){
-      if(!config)throw new Error('SMM_LAN_QUOTE_UNAVAILABLE');
-      const raw=await withTimeout(lanRequest({protocolVersion:1,type:'smm.lan.quote.v1',storeId:'MF01',cart}));
-      if(!isQuote(raw))throw new Error('SMM_LAN_QUOTE_INVALID');
-      return raw;
-    },
     submitOrder(intent:SmmPendingIntent):Promise<SmmCommandResult>{
       return orders
         ?orders.submitOrder(intent)
-        :Promise.resolve(Object.freeze({state:'NOT_CONNECTED' as const,message:'Internet 已連接，但直接提交需要 LAN；可使用 QR 交接。'}));
+        :Promise.resolve(Object.freeze({state:'NOT_CONNECTED' as const,message:'Internet 已連接；員工正式提交仍需可信門店提交通道，草稿已保存。'}));
     },
     readSubmission(submissionId:string):Promise<SmmCommandResult>{
       return orders
