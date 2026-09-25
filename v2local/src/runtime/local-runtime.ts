@@ -75,6 +75,7 @@ export interface LocalHoldDraft{
   readonly payments?:readonly LocalDiningPayment[];
   readonly providerRef?:string;
   readonly sourceLabel?:string;
+  readonly smmSubmissionRefs?:readonly string[];
   readonly items:readonly {id:string;name:string;qty:number;unitMinor:number}[];
 }
 interface Persisted{orders:StoredOrder[];availability:Record<string,SmtAvailabilityStatus>;holds:LocalHoldDraft[]}
@@ -513,7 +514,7 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
       const draft:LocalHoldDraft={
         id:'HOLD-'+Date.now().toString(36),codeLabel:'W'+String(data.holds.length+1).padStart(3,'0'),kind:'dining',
         createdAt:new Date().toISOString(),partySize:covers,note:'SMM 輪候',totalMinor:Math.max(0,Math.floor(Number(input.totalMinor)||0)),
-        payments:[],providerRef,sourceLabel:input.sourceLabel||'SMM',items,
+        payments:[],providerRef,sourceLabel:input.sourceLabel||'SMM',smmSubmissionRefs:[providerRef],items,
       };
       data={...data,holds:[draft,...data.holds]};save();return draft;
     }
@@ -521,13 +522,14 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
     if(!/^T0[1-9]$/.test(tableId))throw new Error('SMM_DINING_TABLE_INVALID');
     const occupied=data.holds.find(hold=>hold.kind==='dining'&&hold.assignedTable===tableId);
     if(occupied){
-      const updated:LocalHoldDraft={...occupied,items:[...occupied.items,...items],totalMinor:occupied.totalMinor+Math.max(0,Math.floor(Number(input.totalMinor)||0))};
+      if((occupied.smmSubmissionRefs??[]).includes(providerRef))return occupied;
+      const updated:LocalHoldDraft={...occupied,items:[...occupied.items,...items],totalMinor:occupied.totalMinor+Math.max(0,Math.floor(Number(input.totalMinor)||0)),smmSubmissionRefs:[...(occupied.smmSubmissionRefs??[]),providerRef]};
       data={...data,holds:data.holds.map(hold=>hold.id===occupied.id?updated:hold)};save();return updated;
     }
     const draft:LocalHoldDraft={
       id:'HOLD-'+Date.now().toString(36),codeLabel:'H'+String(data.holds.length+1).padStart(3,'0'),kind:'dining',
       createdAt:new Date().toISOString(),partySize:covers,note:'SMM 堂食',totalMinor:Math.max(0,Math.floor(Number(input.totalMinor)||0)),
-      assignedTable:tableId,payments:[],providerRef,sourceLabel:input.sourceLabel||'SMM',items,
+      assignedTable:tableId,payments:[],providerRef,sourceLabel:input.sourceLabel||'SMM',smmSubmissionRefs:[providerRef],items,
     };
     data={...data,holds:[draft,...data.holds]};save();return draft;
   },
