@@ -226,6 +226,37 @@ describe('Dining R6 automatic table-order admission',()=>{
     expect(receiptCalls.at(-1).kickDrawer).toBe(false);
   });
 
+  it('concurrent distinct payments from the same checkout revision serialize so only one can commit',async()=>{
+    const runtime=await boot();
+    const hold=runtime.createHold({kind:'dining',items:[{id:'rice',name:'飯團',qty:2,unitMinor:4100,serviceMode:'dine-in'}],totalMinor:8200});
+    await runtime.assignDiningTable(hold.id,'T01');
+    const detail=await runtime.readDiningHold(hold.id);
+    const results=await Promise.allSettled([
+      runtime.settleDiningHold(hold.id,[{lineIndex:0,qty:1}],'FPS',{submissionId:'race-a',expectedRevision:detail.checkoutRevision,receivedMinor:4100}),
+      runtime.settleDiningHold(hold.id,[{lineIndex:0,qty:1}],'PAYME',{submissionId:'race-b',expectedRevision:detail.checkoutRevision,receivedMinor:4100}),
+    ]);
+    expect(results.filter(row=>row.status==='fulfilled')).toHaveLength(1);
+    expect(results.filter(row=>row.status==='rejected')).toHaveLength(1);
+    expect((await runtime.readDiningHold(hold.id)).payments).toHaveLength(1);
+  });
+
+  it('unknown CASH receipt outcome is durable and automatic retry is suppressed',async()=>{
+    const runtime=await boot();
+    const hold=runtime.createHold({kind:'dining',items:[{id:'rice',name:'飯團',qty:1,unitMinor:4100,serviceMode:'dine-in'}],totalMinor:4100});
+    await runtime.assignDiningTable(hold.id,'T01');
+    const detail=await runtime.readDiningHold(hold.id);
+    await runtime.settleDiningHold(hold.id,[{lineIndex:0,qty:1}],'CASH',{submissionId:'cash-unknown',expectedRevision:detail.checkoutRevision,receivedMinor:5000});
+    const native=await import('./native-print.ts');
+    (native.printBytesLan as any).mockRejectedValueOnce(new Error('WIRE_UNKNOWN'));
+    await expect(runtime.printDiningPaymentReceipt(hold.id,'cash-unknown')).rejects.toThrow('WIRE_UNKNOWN');
+    const after=await runtime.readDiningHold(hold.id);
+    expect(after.payments.find((row:any)=>row.submissionId==='cash-unknown').receiptState).toBe('UNKNOWN');
+    const calls=(native.printBytesLan as any).mock.calls.length;
+    const retry=await runtime.printDiningPaymentReceipt(hold.id,'cash-unknown');
+    expect(retry.planned).toBe(0);
+    expect((native.printBytesLan as any).mock.calls.length).toBe(calls);
+  });
+
   it('formal Order link survives runtime restart',async()=>{
     let runtime=await boot();
     const hold=runtime.createHold({kind:'dining',items:[{id:'rice',name:'飯團',qty:1,unitMinor:4100,serviceMode:'dine-in'}],totalMinor:4100});
