@@ -7,8 +7,8 @@ function QueueStrip({title,kind,orders,onOpen}:{title:string;kind:'pending'|'act
   return <section className={`ordering-queue-group ordering-queue-group--${kind}`} aria-label={title}>
     <header><strong>{title}</strong><span>{orders.length}</span></header>
     <div className="ordering-queue-list">
-      {orders.length?orders.map(order=><button type="button" key={order.id} className="ordering-queue-card" onClick={()=>onOpen(kind,order.id)}>
-        <span><b>#{order.orderId}</b><strong>{order.sourceLabel}</strong></span>
+      {orders.length?orders.map(order=><button type="button" key={order.id} className={'ordering-queue-card'+(order.attentionLabel?' attention':'')} onClick={()=>onOpen(kind,order.id)}>
+        <span><b>#{order.orderId}</b><strong>{order.sourceLabel}</strong>{order.attentionLabel?<i>{order.attentionLabel}</i>:null}</span>
         <span><em>{order.waitLabel}</em><small>{order.itemCount} 件</small></span>
       </button>):<p className="ordering-empty">{empty}</p>}
     </div>
