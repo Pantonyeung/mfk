@@ -96,11 +96,13 @@ export function createCustomerSubmissionId():string{
 export function createCustomerPendingIntent(
   cart:readonly CustomerCartLine[],
   checkout:CustomerCheckoutDraft,
+  menuRevision:string,
 ):CustomerPendingIntent{
   const submissionId=createCustomerSubmissionId();
   const now=new Date().toISOString();
   return Object.freeze({
     submissionId,
+    menuRevision:String(menuRevision||'').trim(),
     idempotencyKey:`customer-order:${submissionId}`,
     createdAt:now,
     updatedAt:now,
