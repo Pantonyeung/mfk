@@ -1191,24 +1191,36 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
     };
   },
   async createDiningWait(input){
-    const draft:LocalHoldDraft={
-      id:'HOLD-'+Date.now().toString(36),
-      codeLabel:'W'+String(data.holds.length+1).padStart(3,'0'),
-      kind:'dining',
-      createdAt:new Date().toISOString(),
-      partySize:Math.max(1,Math.floor(Number(input.partySize)||1)),
-      note:String(input.note||''),
-      totalMinor:0,
-      payments:[],
-      items:[],
-    };
-    data={...data,holds:[draft,...data.holds]};save();return draft;
+    return withDiningMutationLock('wait-list',async()=>{
+      const snapshot=readDiningState();
+      const partySize=Math.floor(Number(input.partySize));
+      if(!Number.isSafeInteger(partySize)||partySize<1||partySize>99)throw new Error('DINING_PARTY_SIZE_INVALID');
+      const note=String(input.note||'').trim().slice(0,200);
+      const nextSequence=snapshot.holds.reduce((max,row)=>{
+        const match=/^W(\d+)$/.exec(row.codeLabel);return Math.max(max,match?Number(match[1]):0);
+      },0)+1;
+      const draft:LocalHoldDraft={
+        id:'HOLD-'+Date.now().toString(36)+'-'+nextSequence.toString(36),
+        codeLabel:'W'+String(nextSequence).padStart(3,'0'),
+        kind:'dining',
+        createdAt:new Date().toISOString(),
+        partySize,
+        note,
+        totalMinor:0,
+        payments:[],
+        items:[],
+      };
+      commitDiningHolds(snapshot,[draft,...snapshot.holds]);
+      return clone(draft);
+    });
   },
   async removeDiningWait(id){
-    const snapshot=readDiningState();const hold=requireDiningHold(snapshot,id);
-    if(hold.archivedAt||hold.payments?.length)throw new Error('DINING_HISTORY_PROTECTED');
-    if(hold.assignedTable||hold.items.length)throw new Error('DINING_NONEMPTY_HOLD_PROTECTED');
-    commitDiningHolds(snapshot,snapshot.holds.filter(row=>row.id!==id));
+    return withDiningMutationLock('wait-list',async()=>{
+      const snapshot=readDiningState();const hold=requireDiningHold(snapshot,id);
+      if(hold.archivedAt||hold.payments?.length)throw new Error('DINING_HISTORY_PROTECTED');
+      if(hold.assignedTable||hold.items.length||hold.formalOrderId)throw new Error('DINING_NONEMPTY_HOLD_PROTECTED');
+      commitDiningHolds(snapshot,snapshot.holds.filter(row=>row.id!==id));
+    });
   },
   async assignDiningTable(holdId,tableId){
     return withDiningMutationLock('table:'+holdId,async()=>{
