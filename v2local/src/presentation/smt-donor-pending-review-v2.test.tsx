@@ -46,7 +46,7 @@ describe('SMT donor pending summary review accept flow',()=>{
     expect(pendingSource).toContain("order.fulfillmentLabel==='待處理'");
     expect(pendingSource).toContain('disabled={!canAccept||busy||Boolean(result)}');
     expect(pendingSource).toContain("paymentVerificationState==='VERIFIED'");
-    expect(pendingSource).toContain('KEETA_DEFER');
+    expect(pendingSource).toContain('onDeferKeeta');
   });
 
   it('routes queue cards into the pending review panel instead of jumping directly to Orders',()=>{
