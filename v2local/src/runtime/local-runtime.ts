@@ -1422,8 +1422,12 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
     const order=data.orders.find(row=>row.id===hold.formalOrderId);
     if(!order)throw new Error('DINING_FORMAL_ORDER_LINK_BROKEN');
     if(!jobIds.length)throw new Error('REPRINT_SELECTION_REQUIRED');
-    const result=await dispatchOrderOutputs(order,new Set(jobIds),true);
-    appendActionAudit({action:'DINING_REPRINT',orderId:order.id,reason:String(reason||'').trim()||undefined});
+    const plan=buildOrderPrintPlan(order,readPrinterBindings(),readSmtPrintConfig());
+    const allowed=new Set(plan.map(job=>job.id));
+    const unique=[...new Set(jobIds)];
+    if(unique.some(id=>!allowed.has(id)))throw new Error('DINING_REPRINT_JOB_INVALID');
+    const result=await dispatchOrderOutputs(order,new Set(unique),true);
+    appendActionAudit({action:'DINING_REPRINT',orderId:order.id,reason:(String(reason||'').trim()||'MANUAL')+' jobs='+unique.join(',')});
     return result;
   },
   async settleDiningHold(holdId,selections,tender,command){
