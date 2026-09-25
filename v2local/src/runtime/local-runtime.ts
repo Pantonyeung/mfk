@@ -532,6 +532,19 @@ function commitDiningHolds(snapshot:Persisted,holds:LocalHoldDraft[]){
   data=next;
   for(const listener of listeners){try{listener();}catch{console.warn('DINING_OBSERVER_FAILED');}}
 }
+const diningMutationQueues=new Map<string,Promise<void>>();
+async function withDiningMutationLock<T>(key:string,operation:()=>Promise<T>):Promise<T>{
+  const locks=typeof navigator!=='undefined'?(navigator as Navigator&{locks?:{request:<R>(name:string,options:{mode:'exclusive'},callback:()=>Promise<R>)=>Promise<R>}}).locks:undefined;
+  if(locks?.request)return locks.request('mfk:dining:'+key,{mode:'exclusive'},operation);
+  const previous=diningMutationQueues.get(key)??Promise.resolve();
+  let release!:()=>void;
+  const gate=new Promise<void>(resolve=>{release=resolve;});
+  const tail=previous.then(()=>gate);
+  diningMutationQueues.set(key,tail);
+  await previous;
+  try{return await operation();}
+  finally{release();if(diningMutationQueues.get(key)===tail)diningMutationQueues.delete(key);}
+}
 function diningCheckoutRevision(hold:LocalHoldDraft){return 'DINING2:'+JSON.stringify(hold);}
 function requireDiningHold(snapshot:Persisted,id:string){
   const hold=snapshot.holds.find(row=>row.id===id);
@@ -1374,6 +1387,7 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
     return result;
   },
   async settleDiningHold(holdId,selections,tender,command){
+    return withDiningMutationLock('payment:'+holdId,async()=>{
     if(!command||typeof command.submissionId!=='string'||!command.submissionId.trim()||command.submissionId.length>200||typeof command.expectedRevision!=='string'||!command.expectedRevision)throw new Error('DINING_CHECKOUT_REFRESH_REQUIRED');
     if(!['CASH','ALIPAY','WECHAT','FPS','PAYME','COMBO'].includes(tender))throw new Error('DINING_TENDER_INVALID');
     if(!Array.isArray(selections)||!selections.length)throw new Error('DINING_SELECTION_INVALID');
@@ -1455,6 +1469,7 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
       appendActionAudit({action:'DINING_PAYMENT',orderId:current.id,reason:tender+' '+money(amountMinor)});
     }
     return clone(diningDetail(updated));
+    });
   },
   async clearDiningHold(holdId){
     const snapshot=readDiningState();const hold=requireDiningHold(snapshot,holdId);
