@@ -58,7 +58,7 @@ export interface StoredOrder{
   customerName?:string;customerPhone?:string;
   keetaDeferCount?:number;keetaLastDeferredAt?:string;
   etaMinutes?:number;etaReadyAt?:string;
-  providerRef?:string;providerMessageId?:string;providerPickupCode?:string;orderRemark?:string;utensilPreference?:'需要'|'不需要';
+  providerRef?:string;providerMessageId?:string;providerPickupCode?:string;diningTableLabel?:string;orderRemark?:string;utensilPreference?:'需要'|'不需要';
   providerLastEventId?:number;providerLastEventName?:string;providerLastEventAt?:string;providerLastMessageId?:string;providerLifecycleNote?:string;
   acceptancePrintedAt?:string;
   diningHoldId?:string;
@@ -192,6 +192,8 @@ export interface CleanSmtCoreRuntimePort{
   unassignDiningTable?(holdId:string):Promise<void>;
   readDiningHold?(holdId:string):Promise<LocalDiningHoldDetail>;
   readDiningHistory?():Promise<readonly LocalDiningHoldDetail[]>;
+  readDiningReprintOptions?(holdId:string):Promise<readonly SmtReprintOption[]>;
+  reprintDiningJobs?(holdId:string,jobIds:readonly string[],reason?:string):Promise<PrintDispatchSummary>;
   settleDiningHold?(holdId:string,selections:readonly {lineIndex:number;qty:number}[],tender:DiningTender,command?:DiningSettlementCommand):Promise<LocalDiningHoldDetail>;
   admitDiningProduction?(holdId:string):Promise<{readonly hold:LocalDiningHoldDetail;readonly orderId:string;readonly display:string;readonly print:PrintDispatchSummary}>;
   clearDiningHold?(holdId:string):Promise<void>;
@@ -280,6 +282,8 @@ export interface MfkLocalRuntime extends CleanSmtCoreRuntimePort{
   removeHold(id:string):void;
   readDiningHold(holdId:string):Promise<LocalDiningHoldDetail>;
   readDiningHistory():Promise<readonly LocalDiningHoldDetail[]>;
+  readDiningReprintOptions(holdId:string):Promise<readonly SmtReprintOption[]>;
+  reprintDiningJobs(holdId:string,jobIds:readonly string[],reason?:string):Promise<PrintDispatchSummary>;
   settleDiningHold(holdId:string,selections:readonly {lineIndex:number;qty:number}[],tender:DiningTender,command?:DiningSettlementCommand):Promise<LocalDiningHoldDetail>;
   admitDiningProduction(holdId:string):Promise<{readonly hold:LocalDiningHoldDetail;readonly orderId:string;readonly display:string;readonly print:PrintDispatchSummary}>;
   unassignDiningTable(holdId:string):Promise<void>;
@@ -1214,6 +1218,7 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
         sourceLabel:'堂食',
         checkoutSubmissionId:'DINING-PRODUCTION:'+hold.id,
         diningHoldId:hold.id,
+        diningTableLabel:hold.assignedTable,
         ...(etaMinutes?{etaMinutes,etaReadyAt}:{}),
         ...(session?{staffId:session.staffId,staffName:session.displayName}:{}),
         items:hold.items.map(item=>normalizeCompositionItem({...item,serviceMode:'dine-in' as const})),
@@ -1239,7 +1244,7 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
     current=data.orders.find(row=>row.id===current.id)!;
     try{
       const plan=buildOrderPrintPlan(current,readPrinterBindings(),readSmtPrintConfig());
-      const productionJobIds=new Set(plan.filter(job=>job.role!=='顧客小票').map(job=>job.id));
+      const productionJobIds=new Set(plan.map(job=>job.id));
       const summary=await dispatchOrderOutputs(current,productionJobIds);
       const state=summary.failed>0?'FAILED':'DONE';
       const updatedAt=new Date().toISOString();
@@ -1254,6 +1259,31 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
       appendActionAudit({action:'DINING_PRODUCTION_PRINT_UNKNOWN',orderId:current.id});
       throw error;
     }
+  },
+  async readDiningReprintOptions(holdId){
+    const hold=requireDiningHold(readDiningState(),holdId);
+    if(!hold.formalOrderId)throw new Error('DINING_FORMAL_ORDER_NOT_CREATED');
+    const order=data.orders.find(row=>row.id===hold.formalOrderId);
+    if(!order)throw new Error('DINING_FORMAL_ORDER_LINK_BROKEN');
+    return buildOrderPrintPlan(order,readPrinterBindings(),readSmtPrintConfig()).map(job=>Object.freeze({
+      jobId:job.id,
+      role:job.role,
+      label:job.role==='枱單'?'枱單':job.role,
+      detail:job.labelSpec?.pieceLabel,
+      bindingId:job.binding.id,
+      printerName:job.binding.name,
+      physicalKey:job.binding.host.trim()+':'+job.binding.port,
+    }));
+  },
+  async reprintDiningJobs(holdId,jobIds,reason){
+    const hold=requireDiningHold(readDiningState(),holdId);
+    if(!hold.formalOrderId)throw new Error('DINING_FORMAL_ORDER_NOT_CREATED');
+    const order=data.orders.find(row=>row.id===hold.formalOrderId);
+    if(!order)throw new Error('DINING_FORMAL_ORDER_LINK_BROKEN');
+    if(!jobIds.length)throw new Error('REPRINT_SELECTION_REQUIRED');
+    const result=await dispatchOrderOutputs(order,new Set(jobIds),true);
+    appendActionAudit({action:'DINING_REPRINT',orderId:order.id,reason:String(reason||'').trim()||undefined});
+    return result;
   },
   async settleDiningHold(holdId,selections,tender,command){
     if(!command||typeof command.submissionId!=='string'||!command.submissionId.trim()||command.submissionId.length>200||typeof command.expectedRevision!=='string'||!command.expectedRevision)throw new Error('DINING_CHECKOUT_REFRESH_REQUIRED');
