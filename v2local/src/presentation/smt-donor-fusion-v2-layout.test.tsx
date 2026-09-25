@@ -56,9 +56,9 @@ function view(){
     },
     heldCartCount:0,
     workItems:[
-      {id:'riceball-pool' as const,label:'飯團待組區',count:0},
+      {id:'riceball-pool' as const,label:'快速組合',count:0},
       {id:'required' as const,label:'必選區',count:0},
-      {id:'combo' as const,label:'飯團餐配對',count:0},
+      {id:'combo' as const,label:'紫米套餐區',count:0},
     ],
     cartPulseNonce:0,
     actionAvailability:{lineServiceMode:true,lineEdit:true,lineQuantity:true,holdCart:true,cancelCart:true},
@@ -95,23 +95,24 @@ describe('SMT donor skeleton fusion V2 layout',()=>{
   it('shows retrieve only when cart is empty and ordinary holds exist',()=>{
     const base=view();
     const html=renderToStaticMarkup(<OrderingWorkspace view={{...base,heldCartCount:2}} actions={actions}/>);
-    expect(html).toContain('取回訂單');
+    expect(html).toContain('取單');
     expect(html).not.toContain('前往結帳');
     expect(html).not.toContain('暫存');
   });
 
   it('keeps the three MoreFunOS accelerators in fixed positions even at zero',()=>{
     const html=renderToStaticMarkup(<OrderingWorkspace view={view()} actions={actions}/>);
-    expect(html).toContain('飯團待組區');
+    expect(html).toContain('快速組合');
     expect(html).toContain('必選區');
-    expect(html).toContain('飯團餐配對');
+    expect(html).toContain('紫米套餐區');
     expect(html).toContain('ordering-workbar');
   });
 
   it('keeps independent item identity by default and only groups in explicit combine mode',()=>{
     expect(app).toContain('const [combineSimilar,setCombineSimilar]=useState(false)');
     expect(app).toContain('if(!combineSimilar)');
-    expect(app).toContain("const key=[line.productId,line.serviceMode,line.unitMinor,line.detail??''].join('::')");
+    expect(app).toContain('JSON.stringify(line.optionSelections??{})');
+    expect(app).toContain('JSON.stringify(line.comboDraft??null)');
   });
 
   it('keeps dining holds out of ordinary retrieve list',()=>{
