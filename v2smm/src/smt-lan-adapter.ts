@@ -54,6 +54,7 @@ export function createSmmLanOrderAdapter(transport:SmmLanTransport,timeoutMs=300
         publishedTotalMinor:intent.publishedTotalMinor,
         serviceMode:intent.checkout.serviceMode,
         tender:intent.checkout.tender,
+        ...(intent.checkout.diningTarget?{diningTarget:intent.checkout.diningTarget}:{}),
         lines:lines(intent.cart),
       });
       try{
