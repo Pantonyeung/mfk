@@ -313,13 +313,41 @@ export function App(){
       item.checkout?.tender===tender&&
       item.publishedTotalMinor===publishedTotalMinor
     );
-    const base=existing??createSmmPendingIntent({
-      cart,
-      menuRevision:menu.revision,
-      publishedTotalMinor,
-      serviceMode,
-      tender,
-    });
+
+    let base:SmmPendingIntent;
+    if(existing&&existing.state!=='DRAFT'){
+      if(!port?.readSubmission){
+        setNotice('原提交結果未明；未重新送出，避免重複訂單。');
+        return;
+      }
+      const prior=await port.readSubmission(existing.submissionId);
+      if(prior.state==='CONFIRMED'){
+        resolveConfirmedIntent(existing,prior.message||'門店已確認訂單');
+        return;
+      }
+      if(prior.state!=='REJECTED'){
+        saveIntent(Object.freeze({...existing,state:prior.state==='UNKNOWN'?'UNKNOWN':'NOT_CONNECTED',updatedAt:nowIso(),lastMessage:prior.message}));
+        setNotice('原提交結果仍未確認；未重新送出，避免重複訂單。');
+        return;
+      }
+      removeIntent(existing.submissionId);
+      base=createSmmPendingIntent({
+        cart,
+        menuRevision:menu.revision,
+        publishedTotalMinor,
+        serviceMode,
+        tender,
+      });
+    }else{
+      base=existing??createSmmPendingIntent({
+        cart,
+        menuRevision:menu.revision,
+        publishedTotalMinor,
+        serviceMode,
+        tender,
+      });
+    }
+
     if(!port?.submitOrder){
       const next={...base,state:'NOT_CONNECTED' as const,updatedAt:nowIso(),lastMessage:'門店提交服務尚未連接；草稿已保存。'};
       saveIntent(Object.freeze(next));
@@ -336,7 +364,7 @@ export function App(){
       }
       if(result.state==='REJECTED'){
         removeIntent(pending.submissionId);
-        if(result.message==='SMM_PUBLISHED_PRICE_CHANGED'||result.message==='SMM_MENU_REVISION_CHANGED'){
+        if(result.message.startsWith('SMM_PUBLISHED_PRICE_CHANGED')||result.message.startsWith('SMM_MENU_REVISION_CHANGED')){
           await refresh();
           setNotice('SMT 發現餐單版本／價格已更新；SMM 已重新同步，請確認新總額後再提交。');
         }else{
