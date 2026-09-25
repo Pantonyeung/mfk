@@ -12,6 +12,7 @@ export interface SmmOption {
   readonly optionId:string;
   readonly name:string;
   readonly available:boolean;
+  readonly publishedAdjustmentMinor?:number;
 }
 
 export interface SmmOptionGroup {
@@ -36,6 +37,8 @@ export interface SmmProduct {
   readonly description?:string;
   readonly imageRef?:string;
   readonly available:boolean;
+  readonly publishedTakeawayUnitPriceMinor?:number;
+  readonly publishedDineInUnitPriceMinor?:number;
   readonly variationRequired?:boolean;
   readonly variations?:readonly SmmVariation[];
   readonly optionGroups:readonly SmmOptionGroup[];
@@ -68,6 +71,7 @@ export interface SmmCartSelection {
   readonly optionGroupId:string;
   readonly optionId:string;
   readonly optionName:string;
+  readonly publishedAdjustmentMinor?:number;
 }
 
 export interface SmmCartLine {
@@ -78,7 +82,16 @@ export interface SmmCartLine {
   readonly selectedVariationId?:string;
   readonly selectedVariationName?:string;
   readonly selections:readonly SmmCartSelection[];
+  readonly publishedUnitPriceMinor?:number;
   readonly createdAt:string;
+}
+
+export type SmmServiceMode='TAKEAWAY'|'DINE_IN';
+export type SmmTender='CASH'|'ALIPAY'|'WECHAT'|'FPS'|'PAYME';
+
+export interface SmmStaffCheckout {
+  readonly serviceMode:SmmServiceMode;
+  readonly tender:SmmTender;
 }
 
 export interface SmmPendingIntent {
@@ -87,6 +100,9 @@ export interface SmmPendingIntent {
   readonly createdAt:string;
   readonly updatedAt:string;
   readonly state:'DRAFT'|'NOT_CONNECTED'|'PENDING'|'UNKNOWN';
+  readonly menuRevision:string;
+  readonly publishedTotalMinor:number;
+  readonly checkout:SmmStaffCheckout;
   readonly cart:readonly SmmCartLine[];
   readonly lastMessage?:string;
 }
