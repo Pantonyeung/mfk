@@ -1173,8 +1173,22 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
     if(!allowedTables.length&&!/^T0[1-9]$/.test(tableId))throw new Error('DINING_TABLE_INVALID');
     if(snapshot.holds.some(row=>row.id!==holdId&&!row.archivedAt&&row.kind==='dining'&&row.assignedTable===tableId))throw new Error('DINING_TABLE_OCCUPIED');
     if(hold.assignedTable===tableId)return;
-    commitDiningHolds(snapshot,snapshot.holds.map(row=>row.id===holdId?{...row,assignedTable:tableId}:row));
-    // Owner contract: 掛入堂食枱就係落單。唔需要第二個「正式落廚」動作。
+    const linkedOrder=hold.formalOrderId?snapshot.orders.find(row=>row.id===hold.formalOrderId):undefined;
+    if(hold.formalOrderId&&!linkedOrder)throw new Error('DINING_FORMAL_ORDER_LINK_BROKEN');
+    const next:Persisted={
+      ...snapshot,
+      holds:snapshot.holds.map(row=>row.id===holdId?{...row,assignedTable:tableId}:row),
+      orders:linkedOrder?snapshot.orders.map(row=>row.id===linkedOrder.id?{...row,diningTableLabel:tableId,updatedAt:new Date().toISOString()}:row):snapshot.orders,
+      diningRevision:(snapshot.diningRevision??0)+1,
+    };
+    localStorage.setItem(KEY,JSON.stringify(next));data=next;
+    for(const listener of listeners){try{listener();}catch{console.warn('DINING_OBSERVER_FAILED');}}
+    if(linkedOrder){
+      try{projectOrder(data.orders.find(row=>row.id===linkedOrder.id)!);}catch{console.warn('DINING_TABLE_PROJECTION_NON_BLOCKING');}
+      appendActionAudit({action:'DINING_TABLE_TRANSFER',orderId:linkedOrder.id,reason:tableId});
+      return;
+    }
+    // Owner contract: 第一次掛入堂食枱就係落單 + 首次完整打印。
     if(hold.items.length)await localRuntime.admitDiningProduction(holdId);
   },
   async unassignDiningTable(holdId){
