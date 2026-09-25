@@ -830,3 +830,35 @@
 .donor-skeleton.density-compact .ordering-product-card.text-only .ordering-product-copy{padding:9px 11px}
 .donor-skeleton.density-compact .ordering-product-card.text-only .ordering-product-copy b{font-size:18px}
 .donor-skeleton.density-compact .ordering-product-card.text-only .ordering-product-copy strong{font-size:19px}
+
+
+/* OWNER FINAL V1.0 preview: fixed muscle-memory modal and fine-grained catalog sizing. */
+.donor-skeleton .ordering-product-grid{
+  grid-template-columns:repeat(var(--mf-product-columns,4),minmax(0,1fr))!important;
+  grid-auto-rows:var(--mf-product-card-height,142px)!important;
+  gap:calc(9px * var(--mf-density-scale,1));
+}
+.donor-skeleton .ordering-browse-body{gap:calc(8px * var(--mf-density-scale,1))}
+.donor-skeleton .ordering-categories{gap:calc(7px * var(--mf-density-scale,1))}
+.donor-skeleton .ordering-categories button{font-size:calc(14px * var(--mf-font-scale,1))}
+.donor-skeleton .ordering-product-card.text-only .ordering-product-copy b{font-size:calc(23px * var(--mf-font-scale,1))}
+.donor-skeleton .ordering-product-card.text-only .ordering-product-copy strong{font-size:calc(23px * var(--mf-font-scale,1))}
+.donor-skeleton .ordering-product-card.has-media .ordering-product-copy b{font-size:calc(20px * var(--mf-font-scale,1))}
+.donor-skeleton .ordering-product-card.has-media .ordering-product-copy strong{font-size:calc(21px * var(--mf-font-scale,1))}
+.donor-skeleton .ordering-cart-line{min-height:calc(90px * var(--mf-density-scale,1))}
+.donor-skeleton .ordering-line-copy b{font-size:calc(21px * var(--mf-font-scale,1))}
+.donor-skeleton .ordering-workbar button{font-size:calc(14px * var(--mf-font-scale,1))}
+
+/* All major ordering modals are approximately 75% and keep primary actions in a stable region. */
+.ordering-modal-window.product-detail,
+.ordering-modal-window.default-detail{
+  width:75%;
+  height:75%;
+  max-width:none;
+  max-height:none;
+}
+.ordering-modal-body{min-height:0;overflow:auto}
+@media(max-width:1400px){
+  .ordering-modal-window.product-detail,
+  .ordering-modal-window.default-detail{width:78%;height:78%}
+}
