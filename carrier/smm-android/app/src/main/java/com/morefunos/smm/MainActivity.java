@@ -50,6 +50,18 @@ public final class MainActivity extends Activity {
         @JavascriptInterface public void configure(String host,int port,String deviceId,String pairingToken){
             connectionStore.save(host,port,deviceId,pairingToken);
         }
+        @JavascriptInterface public void pair(String correlationId){
+            io.execute(()->{
+                final JSONObject result;
+                try{result=pairWithSmt();}
+                catch(Exception error){
+                    result=new JSONObject();
+                    try{result.put("ok",false).put("code","SMM_PAIRING_FAILED").put("message",error.getMessage());}catch(Exception ignored){}
+                }
+                final String script="window.__MFK_SMM_NATIVE_RESULT__&&window.__MFK_SMM_NATIVE_RESULT__("+JSONObject.quote(correlationId)+","+JSONObject.quote(result.toString())+")";
+                runOnUiThread(()->webView.evaluateJavascript(script,null));
+            });
+        }
         @JavascriptInterface public void send(String correlationId,String payload){
             io.execute(()->{
                 final JSONObject result;
@@ -63,6 +75,21 @@ public final class MainActivity extends Activity {
                     +JSONObject.quote(correlationId)+","+JSONObject.quote(result.toString())+")";
                 runOnUiThread(()->webView.evaluateJavascript(script,null));
             });
+        }
+    }
+
+    private JSONObject pairWithSmt()throws Exception{
+        final SmmConnectionStore.Config config=connectionStore.read();
+        if(config.host.isEmpty()||config.deviceId.isEmpty()||config.pairingToken.isEmpty())throw new IOException("SMM_PAIRING_NOT_CONFIGURED");
+        try(Socket socket=new Socket()){
+            socket.connect(new InetSocketAddress(config.host,config.port),3000);socket.setSoTimeout(5000);
+            try(BufferedWriter writer=new BufferedWriter(new OutputStreamWriter(socket.getOutputStream(),StandardCharsets.UTF_8));
+                BufferedReader reader=new BufferedReader(new InputStreamReader(socket.getInputStream(),StandardCharsets.UTF_8))){
+                final JSONObject envelope=new JSONObject().put("deviceId",config.deviceId).put("action","pair").put("pairingToken",config.pairingToken);
+                writer.write(envelope.toString());writer.write("\n");writer.flush();
+                final String response=reader.readLine();if(response==null)throw new IOException("SMM_LAN_EMPTY_RESPONSE");
+                return new JSONObject(response);
+            }
         }
     }
 
