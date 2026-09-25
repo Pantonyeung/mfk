@@ -127,6 +127,13 @@ function validateOrderRequest(value:unknown){
   if(!Number.isSafeInteger(Number(row.publishedTotalMinor))||Number(row.publishedTotalMinor)<0)throw new Error('SMM_ORDER_TOTAL_INVALID');
   if(!['TAKEAWAY','DINE_IN'].includes(String(row.serviceMode)))throw new Error('SMM_ORDER_SERVICE_MODE_INVALID');
   if(!['CASH','ALIPAY','WECHAT','FPS','PAYME'].includes(String(row.tender)))throw new Error('SMM_ORDER_TENDER_INVALID');
+  if(row.serviceMode==='DINE_IN'){
+    const target=record(row.diningTarget);
+    if(!['TABLE','WAITING'].includes(String(target.kind)))throw new Error('SMM_DINING_TARGET_REQUIRED');
+    const covers=Math.floor(Number(target.covers)||1);
+    if(covers<1||covers>30)throw new Error('SMM_DINING_COVERS_INVALID');
+    if(target.kind==='TABLE'&&!/^T0[1-9]$/.test(String(target.tableId||'')))throw new Error('SMM_DINING_TABLE_INVALID');
+  }
   return row;
 }
 function mapPublishedSnapshot(raw:unknown){

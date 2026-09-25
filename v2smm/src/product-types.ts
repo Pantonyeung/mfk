@@ -89,9 +89,16 @@ export interface SmmCartLine {
 export type SmmServiceMode='TAKEAWAY'|'DINE_IN';
 export type SmmTender='CASH'|'ALIPAY'|'WECHAT'|'FPS'|'PAYME';
 
+export interface SmmDiningTarget{
+  readonly kind:'TABLE'|'WAITING';
+  readonly tableId?:string;
+  readonly covers:number;
+}
+
 export interface SmmStaffCheckout {
   readonly serviceMode:SmmServiceMode;
   readonly tender:SmmTender;
+  readonly diningTarget?:SmmDiningTarget;
 }
 
 export interface SmmPendingIntent {

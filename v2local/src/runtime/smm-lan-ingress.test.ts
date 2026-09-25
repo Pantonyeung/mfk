@@ -36,7 +36,7 @@ describe('SMM LAN ingress',()=>{
 
   it('rejects untrusted devices before Store Kernel mutation',()=>{
     const createOrder=vi.fn();
-    const ingress=createSmmLanIngress({createOrder,orders:()=>[]} as any);
+    const ingress=createSmmLanIngress({createOrder,orders:()=>[],holds:()=>[]} as any);
     const result=ingress.submit({
       protocolVersion:1,type:'smm.lan.order.submit.v1',requestId:'R1',submissionId:'S1',idempotencyKey:'I1',storeId:'MF01',
       menuRevision:'7',publishedTotalMinor:4100,serviceMode:'TAKEAWAY',tender:'CASH',
@@ -48,20 +48,20 @@ describe('SMM LAN ingress',()=>{
 
   it('uses SMT catalog pricing and never creates a zero-price placeholder',()=>{
     const createOrder=vi.fn((input:any)=>({id:'ORDER-1',display:'001',createdAt:new Date().toISOString(),...input}));
-    const ingress=createSmmLanIngress({createOrder,orders:()=>[]} as any);
+    const ingress=createSmmLanIngress({createOrder,orders:()=>[],holds:()=>[]} as any);
     const result=ingress.submit({
       protocolVersion:1,type:'smm.lan.order.submit.v1',requestId:'R2',submissionId:'S2',idempotencyKey:'I2',storeId:'MF01',
       menuRevision:'7',publishedTotalMinor:8600,serviceMode:'TAKEAWAY',tender:'CASH',
       lines:[{lineId:'L1',productId:'riceball',productName:'原味飯團',quantity:2,publishedUnitPriceMinor:4300,selections:[{optionGroupId:'sauce',optionId:'double',optionName:'雙倍醬',publishedAdjustmentMinor:200}]}],
     },{deviceId:'SMM-1',trusted:true});
     expect(result.disposition).toBe('ACCEPTED');
-    expect(createOrder).toHaveBeenCalledWith(expect.objectContaining({totalMinor:8600}));
+    expect(createOrder).toHaveBeenCalledWith(expect.objectContaining({totalMinor:8600,initialFulfillmentLabel:'進行中'}));
     expect(createOrder.mock.calls[0][0].items[0].unitMinor).toBe(4300);
   });
 
   it('recovers an already committed providerRef instead of duplicating Order',()=>{
     const createOrder=vi.fn();
-    const ingress=createSmmLanIngress({createOrder,orders:()=>[{id:'ORDER-X',providerRef:'SMM:S3'}]} as any);
+    const ingress=createSmmLanIngress({createOrder,orders:()=>[{id:'ORDER-X',providerRef:'SMM:S3'}],holds:()=>[]} as any);
     const result=ingress.submit({
       protocolVersion:1,type:'smm.lan.order.submit.v1',requestId:'R3',submissionId:'S3',idempotencyKey:'I3',storeId:'MF01',
       menuRevision:'7',publishedTotalMinor:4100,serviceMode:'TAKEAWAY',tender:'CASH',
@@ -74,7 +74,7 @@ describe('SMM LAN ingress',()=>{
 
   it('rejects a stale published menu revision before Store Kernel commit',()=>{
     const createOrder=vi.fn();
-    const ingress=createSmmLanIngress({createOrder,orders:()=>[]} as any);
+    const ingress=createSmmLanIngress({createOrder,orders:()=>[],holds:()=>[]} as any);
     const result=ingress.submit({
       protocolVersion:1,type:'smm.lan.order.submit.v1',requestId:'R4',submissionId:'S4',idempotencyKey:'I4',storeId:'MF01',
       menuRevision:'6',publishedTotalMinor:4100,serviceMode:'TAKEAWAY',tender:'CASH',
@@ -85,16 +85,23 @@ describe('SMM LAN ingress',()=>{
     expect(createOrder).not.toHaveBeenCalled();
   });
 
-  it('commits staff-selected dine-in tender without any drawer side effect',()=>{
-    const createOrder=vi.fn((input:any)=>({id:'ORDER-DINE',display:'004',createdAt:new Date().toISOString(),...input}));
-    const ingress=createSmmLanIngress({createOrder,orders:()=>[]} as any);
+  it('routes trusted SMM dine-in into existing dining hold authority instead of formal Order',()=>{
+    const createOrder=vi.fn();
+    const upsertSmmDiningHold=vi.fn(()=>({id:'HOLD-DINE',providerRef:'SMM:S5'}));
+    const ingress=createSmmLanIngress({createOrder,orders:()=>[],holds:()=>[],upsertSmmDiningHold} as any);
     const result=ingress.submit({
       protocolVersion:1,type:'smm.lan.order.submit.v1',requestId:'R5',submissionId:'S5',idempotencyKey:'I5',storeId:'MF01',
       menuRevision:'7',publishedTotalMinor:4100,serviceMode:'DINE_IN',tender:'FPS',
+      diningTarget:{kind:'TABLE',tableId:'T03',covers:2},
       lines:[{lineId:'L1',productId:'riceball',productName:'原味飯團',quantity:1,publishedUnitPriceMinor:4100,selections:[]}],
     },{deviceId:'SMM-1',trusted:true});
     expect(result.disposition).toBe('ACCEPTED');
-    expect(createOrder).toHaveBeenCalledWith(expect.objectContaining({paymentLabel:'FPS',sourceLabel:'SMM'}));
-    expect(createOrder.mock.calls[0][0].items[0].serviceMode).toBe('dine-in');
+    expect(createOrder).not.toHaveBeenCalled();
+    expect(upsertSmmDiningHold).toHaveBeenCalledWith(expect.objectContaining({
+      providerRef:'SMM:S5',
+      target:{kind:'TABLE',tableId:'T03',covers:2},
+      totalMinor:4100,
+      sourceLabel:'SMM',
+    }));
   });
 });
