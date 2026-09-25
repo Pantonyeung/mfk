@@ -1,9 +1,10 @@
 import {validateMfkAdminConfigEnvelope,type MfkAdminConfigAck,type MfkAdminConfigEnvelope} from '../../../contracts/admin-config-sync-v1.ts';
+import {smtAdminHttpOrigin,smtAdminWebSocketUrl} from './web-acceptance.ts';
 
 export const SMT_ADMIN_CONFIG_LKG_KEY='mfk.admin-sync.active.v1';
 export const SMT_ADMIN_CONFIG_STATUS_KEY='mfk.admin-sync.status.v1';
 export const SMT_ADMIN_CONFIG_DEVICE_KEY='mfk.admin-sync.device.v1';
-export const SMT_ADMIN_CONFIG_ENDPOINT='https://admin.morefunos.com';
+export const SMT_ADMIN_CONFIG_ENDPOINT=smtAdminHttpOrigin();
 
 export type SmtAdminSyncState='LOCAL_LKG'|'CONNECTING'|'SYNCED'|'OFFLINE'|'ERROR';
 export interface SmtAdminSyncStatus{
@@ -161,7 +162,7 @@ function connectDoorbell(){
   if(typeof window==='undefined'||typeof WebSocket==='undefined'||!navigator.onLine)return;
   if(socket&&socket.readyState<=WebSocket.OPEN)return;
   try{
-    socket=new WebSocket('wss://admin.morefunos.com/api/admin-sync/events?storeId=MF01');
+    socket=new WebSocket(smtAdminWebSocketUrl());
     socket.addEventListener('open',()=>{
       reconnectAttempt=0;
       void fetchAndApplyAdminConfig();
