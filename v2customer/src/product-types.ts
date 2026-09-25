@@ -1,3 +1,4 @@
+// Payment methods are Admin-published; channel IDs are stable opaque keys.
 export type CustomerConnectionState='NOT_CONNECTED'|'LOADING'|'READY'|'STALE'|'PARTIAL'|'UNKNOWN'|'ERROR';
 export type CustomerCommandState='CONFIRMED'|'REJECTED'|'FAILED'|'UNKNOWN'|'NOT_CONNECTED';
 export type CustomerOrderStage='RECEIVED'|'REJECTED'|'ACCEPTED'|'PREPARING'|'DELAYED'|'READY'|'PICKUP_VERIFICATION'|'HANDED_OVER'|'COMPLETED';
