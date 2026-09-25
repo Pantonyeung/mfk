@@ -850,13 +850,16 @@ function CheckoutPage({cart,setCart,diningCheckout,onDiningCheckoutDone}:{cart:C
   const showDiningReceipt=(updated:LocalDiningHoldDetail,payment:LocalDiningPayment)=>{
     if(!diningCheckout)return;
     const place=diningCheckoutLocation(diningCheckout.tableLabel);
-    const cashPayment=payment.tender==='CASH';
+    const cashPayment=payment.tender==='CASH'||Boolean(payment.splitTenders?.some(row=>row.tender==='CASH'));
+    const diningTenderLabel=payment.tender==='COMBO'
+      ?(payment.splitTenders??[]).map(row=>(methodLabels[row.tender]??row.tender)+' '+money(row.amountMinor)).join(' + ')
+      :methodLabels[payment.tender]??payment.tender;
     setCompletion({
       heading:'堂食付款已記錄',
       helperLabel:'付款已寫入同一堂食正式單；付款收據會獨立打印。',
       displayOrderCode:updated.codeLabel,
       sourceLabel:'堂食 · '+place,
-      tenderLabel:methodLabels[payment.tender]??payment.tender,
+      tenderLabel:diningTenderLabel,
       dueLabel:money(payment.amountMinor),
       ...(cashPayment?{receivedLabel:money(payment.receivedMinor??payment.amountMinor),changeLabel:money(payment.changeMinor??0)}:{}),
       statusLabel:updated.archivedAt?(diningCheckout.tableLabel?'堂食已付清，桌台已釋放':'輪候單已付清，紀錄已保留'):'堂食分項結帳完成，餘額保留 '+money(updated.remainingMinor),
@@ -897,25 +900,34 @@ function CheckoutPage({cart,setCart,diningCheckout,onDiningCheckoutDone}:{cart:C
           diningCheckout.selections,
           tenderCode,
           // DINING_PAYMENT_COMMAND_R2: retain identity and snapshot through retries.
-          {submissionId:diningCheckout.submissionId??'',expectedRevision:diningCheckout.expectedRevision??'',receivedMinor:received}
+          {
+            submissionId:diningCheckout.submissionId??'',
+            expectedRevision:diningCheckout.expectedRevision??'',
+            receivedMinor:received,
+            ...(method==='COMBO'?{splitTenders:comboEntries.map(([id,value])=>({tender:id,amountMinor:parseMoney(value)}))}:{}),
+          }
         );
         const payment=updated.payments.find(row=>row.submissionId===diningCheckout.submissionId);
         if(!payment)throw new Error('DINING_PAYMENT_READBACK_UNKNOWN');
         showDiningReceipt(updated,payment);
         void localRuntime.printDiningPaymentReceipt?.(updated.holdId,payment.submissionId??'').then(summary=>{
           const receipt=summary.results[0];
+          const hasCash=payment.tender==='CASH'||Boolean(payment.splitTenders?.some(row=>row.tender==='CASH'));
+          const alreadyAttempted=summary.planned===0;
           setCompletion(current=>current?{
             ...current,
-            printStatusLabel:receipt?.ok?'堂食付款收據已送出':'堂食付款收據失敗／需人工檢查',
-            drawerStatusLabel:payment.tender!=='CASH'
+            printStatusLabel:alreadyAttempted?'付款收據已曾提交；系統禁止自動重複派發':receipt?.ok?'堂食付款收據已送出':'堂食付款收據失敗／需人工檢查',
+            drawerStatusLabel:!hasCash
               ?'非現金：不開櫃桶'
-              :receipt?.ok
-                ?'現金櫃桶：已隨付款收據開櫃'
-                :'現金櫃桶：收據／開櫃狀態需人工檢查',
+              :alreadyAttempted
+                ?'現金櫃桶：已有首次提交紀錄，禁止自動再次開櫃'
+                :receipt?.ok
+                  ?'現金櫃桶：已隨付款收據開櫃'
+                  :'現金櫃桶：收據／開櫃狀態需人工檢查',
           }:current);
         }).catch(error=>{
           const detail=error instanceof Error?error.message:String(error);
-          setCompletion(current=>current?{...current,printStatusLabel:'堂食付款收據失敗 · '+detail,drawerStatusLabel:payment.tender==='CASH'?'現金櫃桶：狀態需人工檢查':'非現金：不開櫃桶'}:current);
+          setCompletion(current=>current?{...current,printStatusLabel:'堂食付款收據失敗 · '+detail,drawerStatusLabel:(payment.tender==='CASH'||Boolean(payment.splitTenders?.some(row=>row.tender==='CASH')))?'現金櫃桶：狀態需人工檢查':'非現金：不開櫃桶'}:current);
         });
         return;
       }
