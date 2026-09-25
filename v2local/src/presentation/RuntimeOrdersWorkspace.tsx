@@ -12,7 +12,7 @@ import './orders-workspace.css';
 type PaymentFilter='全部'|'現金'|'Alipay'|'WeChat Pay'|'FPS / PayMe';
 type Modal='actions'|'edit'|'cancel'|'reprint'|null;
 
-function sourceLane(source?:string){
+export function sourceLane(source?:string){
   const value=String(source||'').trim();
   if(value.startsWith('現場')||value.startsWith('SMM')||value.startsWith('電話')||value.startsWith('WhatsApp'))return 'walkin';
   if(value.startsWith('自家 App')||value.startsWith('磨飯 App')||value.startsWith('Customer'))return 'app';
