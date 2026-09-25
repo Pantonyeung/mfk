@@ -21,16 +21,13 @@ describe('MFK Admin Cloudflare H2 + config sync runtime',()=>{
     expect(source).toContain('"tag": "customer-runtime-v1"');
   });
 
-  it('allows SMT, Customer, and read-only SMM origins while Publish remains Admin-origin-only',()=>{
+  it('allows SMT appassets plus Customer origin while Publish remains Admin-origin-only',()=>{
     const worker=readFileSync(new URL('../worker.ts',import.meta.url),'utf8');
     expect(worker).toContain("const SMT_ORIGIN='https://appassets.androidplatform.net'");
     expect(worker).toContain("const CUSTOMER_ORIGIN='https://order.morefunos.com'");
-    expect(worker).toContain("const SMM_ORIGIN='https://smm.morefunos.com'");
-    expect(worker).toContain("const SMM_WORKERS_ORIGIN='https://mfk-smm-web.yeungyi88.workers.dev'");
-    expect(worker).toContain('CORS_ORIGINS=new Set([ADMIN_ORIGIN,SMT_ORIGIN,CUSTOMER_ORIGIN,SMM_ORIGIN,SMM_WORKERS_ORIGIN])');
+    expect(worker).toContain('CORS_ORIGINS=new Set([ADMIN_ORIGIN,SMT_ORIGIN,CUSTOMER_ORIGIN])');
     expect(worker).toContain("if(origin!==ADMIN_ORIGIN)return false");
     expect(worker).toContain("if(site&&site!=='same-origin')return false");
-    expect(worker).toContain("url.pathname==='/api/smm/snapshot'");
   });
 
   it('exposes projection-only SMT event ingress and Admin read endpoints on the same store-scoped Durable Object',()=>{
