@@ -37,4 +37,25 @@ describe('Admin full snapshot link-up',()=>{
     });
     expect(snapshot.presentation).not.toHaveProperty('v1');
   });
+
+  it('includes Admin dining table registry in the canonical published storeSettings snapshot',()=>{
+    localStorage.setItem('mfk.admin.store-settings.v1',JSON.stringify({
+      storeName:'磨飯',
+      storeCode:'MF01',
+      diningTables:[
+        {id:'T03',name:'堂三',active:true,sortOrder:3},
+        {id:'T09',name:'9 號枱',active:false,sortOrder:9},
+      ],
+    }));
+
+    const catalog=LEGACY_MF01_ADMIN_DRAFT as unknown as AdminSessionDraft;
+    const optionCenter=migrateLegacyDraftToOptionSetCenter(catalog);
+    const snapshot=collectAdminSnapshot(catalog,optionCenter) as Record<string,any>;
+
+    expect(snapshot.storeSettings.diningTables).toEqual([
+      {id:'T03',name:'堂三',active:true,sortOrder:3},
+      {id:'T09',name:'9 號枱',active:false,sortOrder:9},
+    ]);
+  });
+
 });
