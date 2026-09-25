@@ -153,11 +153,13 @@ export function PrintTemplatesWorkspace(){
 }
 
 type StoreDay='MON'|'TUE'|'WED'|'THU'|'FRI'|'SAT'|'SUN';
+interface DiningTableConfig{readonly id:string;readonly name:string;readonly active:boolean;readonly sortOrder:number}
 interface StoreSettings{
   storeName:string;storeCode:string;currency:string;timezone:string;
   lateArrivalMinutes:number;fulfillmentMinutes:number;archiveHours:number;
   reminderAfterMinutes:number;reminderIntervalMinutes:number;repeatReminder:boolean;timeoutPriority:'NORMAL'|'HIGH'|'URGENT';
   dineInEnabled:boolean;takeawayEnabled:boolean;
+  diningTables:DiningTableConfig[];
   weeklyHours:Record<StoreDay,{closed:boolean;opensAt:string;closesAt:string}>;
   paymentRefs:string[];printRefs:string[];channelRefs:string[];
 }
@@ -165,6 +167,12 @@ const STORE_DAYS:readonly {id:StoreDay;label:string}[]=[
   {id:'MON',label:'星期一'},{id:'TUE',label:'星期二'},{id:'WED',label:'星期三'},
   {id:'THU',label:'星期四'},{id:'FRI',label:'星期五'},{id:'SAT',label:'星期六'},{id:'SUN',label:'星期日'},
 ];
+const DEFAULT_DINING_TABLES:DiningTableConfig[]=Array.from({length:9},(_,index)=>({
+  id:'T'+String(index+1).padStart(2,'0'),
+  name:String(index+1)+' 號枱',
+  active:true,
+  sortOrder:index+1,
+}));
 const DEFAULT_WEEKLY_HOURS=Object.freeze({
   MON:{closed:false,opensAt:'11:00',closesAt:'20:00'},
   TUE:{closed:false,opensAt:'11:00',closesAt:'20:00'},
@@ -180,18 +188,37 @@ export function StoreSettingsWorkspace(){
     storeName:'磨飯',storeCode:'MF01',currency:'HKD',timezone:'Asia/Hong_Kong',
     lateArrivalMinutes:15,fulfillmentMinutes:20,archiveHours:24,
     reminderAfterMinutes:5,reminderIntervalMinutes:5,repeatReminder:true,timeoutPriority:'HIGH',
-    dineInEnabled:true,takeawayEnabled:true,weeklyHours:DEFAULT_WEEKLY_HOURS,
+    dineInEnabled:true,takeawayEnabled:true,diningTables:DEFAULT_DINING_TABLES,weeklyHours:DEFAULT_WEEKLY_HOURS,
     paymentRefs:['CASH'],printRefs:['RECEIPT','PRODUCTION','PACKING','LABEL'],channelRefs:[],
   });
   const patch=(change:Partial<StoreSettings>)=>setConfig(current=>{const after={...current,...change};appendAdminAudit({action:'修改門店設定',target:current.storeCode,before:current,after});return after;});
   const patchDay=(day:StoreDay,change:Partial<StoreSettings['weeklyHours'][StoreDay]>)=>patch({weeklyHours:{...config.weeklyHours,[day]:{...config.weeklyHours[day],...change}}});
   const refs=(value:string)=>value.split(',').map(item=>item.trim()).filter(Boolean);
+  const diningTables=(config.diningTables??DEFAULT_DINING_TABLES).slice().sort((a,b)=>a.sortOrder-b.sortOrder);
+  const patchTable=(id:string,change:Partial<DiningTableConfig>)=>patch({diningTables:diningTables.map(row=>row.id===id?{...row,...change}:row)});
+  const addTable=()=>patch({diningTables:[...diningTables,{
+    id:'T'+String(Math.min(99,Math.max(0,...diningTables.map(row=>Number(row.id.replace(/\D/g,''))||0))+1)).padStart(2,'0'),
+    name:'新枱',
+    active:true,
+    sortOrder:diningTables.length+1,
+  }]});
+  const removeTable=(id:string)=>patch({diningTables:diningTables.filter(row=>row.id!==id)});
+
 
   return <section className="admin-editor-page">
     <PolicyHeader title="門店設定" description="管理門店身份、七日營業時間、服務模式、系統引用、營運計時同 Pending Order 提醒規則。Timeout 只改提示優先級，唔會自動接單或拒單。"/>
     <div className="admin-policy-grid two">
       <article className="admin-policy-card"><h2>基本資料</h2><label><span>門店顯示名稱</span><input value={config.storeName} onChange={event=>patch({storeName:event.target.value})}/></label><label><span>門店代碼</span><input value={config.storeCode} onChange={event=>patch({storeCode:event.target.value})}/></label><label><span>貨幣</span><select value={config.currency} onChange={event=>patch({currency:event.target.value})}><option value="HKD">HKD</option></select></label><label><span>時區</span><input value={config.timezone} onChange={event=>patch({timezone:event.target.value})}/></label></article>
       <article className="admin-policy-card"><h2>服務模式</h2><Toggle checked={config.dineInEnabled} onChange={dineInEnabled=>patch({dineInEnabled})} label="堂食"/><Toggle checked={config.takeawayEnabled} onChange={takeawayEnabled=>patch({takeawayEnabled})} label="外賣"/></article>
+      <article className="admin-policy-card"><header><div><h2>堂食枱號</h2><small>由 Admin 發佈，SMT／SMM 共用同一份枱號同名稱。</small></div><button type="button" onClick={addTable}>新增枱</button></header>
+        <div className="admin-editor-list">{diningTables.map((row,index)=><div className="admin-policy-row" key={row.id}>
+          <b>{row.id}</b>
+          <label><span>顯示名稱</span><input value={row.name} onChange={event=>patchTable(row.id,{name:event.target.value})}/></label>
+          <label><span>排序</span><input type="number" min={1} value={row.sortOrder} onChange={event=>patchTable(row.id,{sortOrder:Number(event.target.value)||index+1})}/></label>
+          <Toggle checked={row.active} onChange={active=>patchTable(row.id,{active})} label={row.active?'啟用':'停用'}/>
+          <button type="button" onClick={()=>removeTable(row.id)}>刪除</button>
+        </div>)}</div>
+      </article>
       <article className="admin-policy-card"><h2>系統引用</h2><label><span>付款方式 refs</span><input value={config.paymentRefs.join(', ')} onChange={event=>patch({paymentRefs:refs(event.target.value)})} placeholder="例如 CASH, OCTOPUS"/></label><label><span>打印路由 refs</span><input value={config.printRefs.join(', ')} onChange={event=>patch({printRefs:refs(event.target.value)})} placeholder="例如 RECEIPT, KITCHEN"/></label><label><span>渠道 refs</span><input value={config.channelRefs.join(', ')} onChange={event=>patch({channelRefs:refs(event.target.value)})} placeholder="例如 KEETA"/></label></article>
       <article className="admin-policy-card"><h2>營運計時</h2><label><span>遲到界線（分鐘）</span><input type="number" min={0} value={config.lateArrivalMinutes} onChange={event=>patch({lateArrivalMinutes:Number(event.target.value)||0})}/></label><label><span>出餐計時（分鐘）</span><input type="number" min={0} value={config.fulfillmentMinutes} onChange={event=>patch({fulfillmentMinutes:Number(event.target.value)||0})}/></label><label><span>封存時間（小時）</span><input type="number" min={1} value={config.archiveHours} onChange={event=>patch({archiveHours:Number(event.target.value)||1})}/></label></article>
       <article className="admin-policy-card"><h2>Pending Order 提醒</h2><label><span>幾多分鐘後提醒</span><input type="number" min={0} value={config.reminderAfterMinutes} onChange={event=>patch({reminderAfterMinutes:Number(event.target.value)||0})}/></label><label><span>提醒間隔（分鐘）</span><input type="number" min={1} value={config.reminderIntervalMinutes} onChange={event=>patch({reminderIntervalMinutes:Number(event.target.value)||1})}/></label><Toggle checked={config.repeatReminder} onChange={repeatReminder=>patch({repeatReminder})} label="重複提醒"/><label><span>Timeout 提示優先級</span><select value={config.timeoutPriority} onChange={event=>patch({timeoutPriority:event.target.value as StoreSettings['timeoutPriority']})}><option value="NORMAL">一般</option><option value="HIGH">高</option><option value="URGENT">緊急</option></select></label><small>Timeout 唔會自動接受／拒絕訂單。</small></article>
