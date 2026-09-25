@@ -4,6 +4,7 @@ interface Env{
 }
 
 const COOKIE='mfk_smt_web_acceptance';
+const SESSION_COOKIE='mfk_smt_web_acceptance_session';
 const MAX_AGE=72*60*60;
 
 function cookieValue(request:Request,name:string){
@@ -15,10 +16,18 @@ function cookieValue(request:Request,name:string){
   return '';
 }
 
-function authorized(request:Request,env:Env){
+async function sessionProof(token:string){
+  const bytes=new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode('MFK-SMT-WEB-ACCEPTANCE:'+token)));
+  return [...bytes].map(value=>value.toString(16).padStart(2,'0')).join('');
+}
+
+async function authorized(request:Request,env:Env){
   const token=String(env.WEB_ACCEPTANCE_TOKEN||'');
   if(!token)return false;
-  return cookieValue(request,COOKIE)===token;
+  const legacy=cookieValue(request,COOKIE);
+  if(legacy===token)return true;
+  const proof=cookieValue(request,SESSION_COOKIE);
+  return Boolean(proof)&&proof===await sessionProof(token);
 }
 
 function gateResponse(){
@@ -122,19 +131,20 @@ export default{
     const expected=String(env.WEB_ACCEPTANCE_TOKEN||'');
 
     if(expected&&supplied===expected){
+      const proof=await sessionProof(expected);
       url.searchParams.delete('access');
       const location=url.pathname+(url.search?url.search:'')+(url.hash?url.hash:'');
       return new Response(null,{
         status:302,
         headers:{
           location:location||'/',
-          'set-cookie':COOKIE+'='+encodeURIComponent(expected)+'; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age='+MAX_AGE,
+          'set-cookie':SESSION_COOKIE+'='+encodeURIComponent(proof)+'; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age='+MAX_AGE,
           'cache-control':'no-store',
         },
       });
     }
 
-    if(!authorized(request,env))return gateResponse();
+    if(!await authorized(request,env))return gateResponse();
 
     if(url.pathname==='/__mfk/health'){
       const smmAcceptance=await smmAcceptanceHealth(env);
