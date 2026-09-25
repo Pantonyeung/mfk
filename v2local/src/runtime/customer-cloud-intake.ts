@@ -238,6 +238,9 @@ async function reconcileOrders(){
     const intent=raw as MfkCustomerOrderIntent&{state?:string};
     try{
       const priced=priceCustomerCart(intent.cart,catalog.products);
+      if(intent.checkout.paymentMethod==='ELECTRONIC'&&!String(intent.checkout.paymentEvidenceRef||'').trim()){
+        throw new Error('CUSTOMER_PAYMENT_EVIDENCE_REQUIRED');
+      }
       const publishedTotal=intent.cart.reduce((sum,line)=>sum+(Number.isSafeInteger(Number(line.publishedUnitPriceMinor))?Number(line.publishedUnitPriceMinor)*line.quantity:0),0);
       const hasPublishedTotal=intent.cart.every(line=>Number.isSafeInteger(Number(line.publishedUnitPriceMinor))&&Number(line.publishedUnitPriceMinor)>=0);
       if(hasPublishedTotal&&publishedTotal!==priced.totalMinor)throw new Error('CUSTOMER_MENU_PRICE_CHANGED');
