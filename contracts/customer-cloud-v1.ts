@@ -37,6 +37,7 @@ export interface MfkCustomerOrderIntent{
   readonly schema:typeof MFK_CUSTOMER_ORDER_INTENT_SCHEMA;
   readonly storeId:'MF01';
   readonly submissionId:string;
+  readonly menuRevision:string;
   readonly idempotencyKey:string;
   readonly createdAt:string;
   readonly updatedAt:string;
@@ -126,6 +127,7 @@ export function validateMfkCustomerOrderIntent(input:unknown):MfkCustomerOrderIn
     schema:MFK_CUSTOMER_ORDER_INTENT_SCHEMA,
     storeId:'MF01',
     submissionId:text(row.submissionId,'CUSTOMER_SUBMISSION_ID_INVALID',180),
+    menuRevision:text(row.menuRevision,'CUSTOMER_MENU_REVISION_REQUIRED',180),
     idempotencyKey:text(row.idempotencyKey,'CUSTOMER_IDEMPOTENCY_KEY_INVALID',220),
     createdAt:instant(row.createdAt,'CUSTOMER_CREATED_AT_INVALID'),
     updatedAt:instant(row.updatedAt,'CUSTOMER_UPDATED_AT_INVALID'),
