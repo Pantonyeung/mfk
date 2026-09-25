@@ -176,6 +176,56 @@ describe('Dining R6 automatic table-order admission',()=>{
     expect((ticket.renderEscPosRasterTicket as any).mock.calls.length).toBe(callsBefore);
   });
 
+  it('COMBO dining payment preserves exact tender breakdown and validates total',async()=>{
+    const runtime=await boot();
+    const hold=runtime.createHold({kind:'dining',items:[{id:'rice',name:'飯團',qty:1,unitMinor:4100,serviceMode:'dine-in'}],totalMinor:4100});
+    await runtime.assignDiningTable(hold.id,'T01');
+    let detail=await runtime.readDiningHold(hold.id);
+    await expect(runtime.settleDiningHold(hold.id,[{lineIndex:0,qty:1}],'COMBO',{
+      submissionId:'bad-combo',expectedRevision:detail.checkoutRevision,receivedMinor:4100,
+      splitTenders:[{tender:'CASH',amountMinor:2000},{tender:'FPS',amountMinor:2000}],
+    })).rejects.toThrow('DINING_COMBO_TOTAL_MISMATCH');
+    detail=await runtime.readDiningHold(hold.id);
+    const paid=await runtime.settleDiningHold(hold.id,[{lineIndex:0,qty:1}],'COMBO',{
+      submissionId:'good-combo',expectedRevision:detail.checkoutRevision,receivedMinor:4100,
+      splitTenders:[{tender:'CASH',amountMinor:2000},{tender:'FPS',amountMinor:2100}],
+    });
+    expect(paid.payments.at(-1).splitTenders).toEqual([{tender:'CASH',amountMinor:2000},{tender:'FPS',amountMinor:2100}]);
+    expect(runtime.orders().find((row:any)=>row.diningHoldId===hold.id).paymentLabel).toBe('COMBO');
+  });
+
+  it('payment receipt first dispatch is durable and retry cannot open drawer twice',async()=>{
+    const runtime=await boot();
+    const hold=runtime.createHold({kind:'dining',items:[{id:'rice',name:'飯團',qty:1,unitMinor:4100,serviceMode:'dine-in'}],totalMinor:4100});
+    await runtime.assignDiningTable(hold.id,'T01');
+    const detail=await runtime.readDiningHold(hold.id);
+    await runtime.settleDiningHold(hold.id,[{lineIndex:0,qty:1}],'CASH',{submissionId:'cash-once',expectedRevision:detail.checkoutRevision,receivedMinor:5000});
+    const ticket=await import('./ticket-bitmap.ts');
+    const before=(ticket.renderEscPosRasterTicket as any).mock.calls.length;
+    const first=await runtime.printDiningPaymentReceipt(hold.id,'cash-once');
+    const afterFirst=(ticket.renderEscPosRasterTicket as any).mock.calls.length;
+    const second=await runtime.printDiningPaymentReceipt(hold.id,'cash-once');
+    expect(first.planned).toBe(1);
+    expect(afterFirst).toBe(before+1);
+    expect(second.planned).toBe(0);
+    expect((ticket.renderEscPosRasterTicket as any).mock.calls.length).toBe(afterFirst);
+    expect((await runtime.readDiningHold(hold.id)).payments.find((row:any)=>row.submissionId==='cash-once').receiptState).toBe('DONE');
+  });
+
+  it('manual payment receipt reprint always suppresses drawer even for CASH',async()=>{
+    const runtime=await boot();
+    const hold=runtime.createHold({kind:'dining',items:[{id:'rice',name:'飯團',qty:1,unitMinor:4100,serviceMode:'dine-in'}],totalMinor:4100});
+    await runtime.assignDiningTable(hold.id,'T01');
+    const detail=await runtime.readDiningHold(hold.id);
+    await runtime.settleDiningHold(hold.id,[{lineIndex:0,qty:1}],'CASH',{submissionId:'cash-reprint',expectedRevision:detail.checkoutRevision,receivedMinor:5000});
+    await runtime.printDiningPaymentReceipt(hold.id,'cash-reprint');
+    await runtime.reprintDiningPaymentReceipt(hold.id,'cash-reprint');
+    const ticket=await import('./ticket-bitmap.ts');
+    const receiptCalls=(ticket.renderEscPosRasterTicket as any).mock.calls.filter((row:any[])=>row[0].kind==='receipt').map((row:any[])=>row[0]);
+    expect(receiptCalls.at(-2).kickDrawer).toBe(true);
+    expect(receiptCalls.at(-1).kickDrawer).toBe(false);
+  });
+
   it('formal Order link survives runtime restart',async()=>{
     let runtime=await boot();
     const hold=runtime.createHold({kind:'dining',items:[{id:'rice',name:'飯團',qty:1,unitMinor:4100,serviceMode:'dine-in'}],totalMinor:4100});
