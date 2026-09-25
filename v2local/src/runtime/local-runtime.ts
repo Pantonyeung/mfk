@@ -537,14 +537,15 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
   removeHold(id){data={...data,holds:data.holds.filter(item=>item.id!==id)};save()},
   clear(){data=clone(defaults);save()},
   async readOrders(selectedOrderId){
-    const items=data.orders.map(order=>({
+    const visibleOrders=data.orders.filter(order=>!order.items.length||!order.items.every(item=>item.serviceMode==='dine-in'));
+    const items=visibleOrders.map(order=>({
       orderId:order.id,orderIdLabel:'#'+order.display,itemCount:order.items.reduce((s,x)=>s+x.qty,0),
       totalLabel:money(order.totalMinor),paymentLabel:order.paymentLabel,fulfillmentLabel:order.fulfillmentLabel,
       sourceLabel:order.sourceLabel,localSequenceLabel:order.display,
     }));
-    const selectedId=selectedOrderId&&data.orders.some(x=>x.id===selectedOrderId)?selectedOrderId:data.orders[0]?.id;
+    const selectedId=selectedOrderId&&visibleOrders.some(x=>x.id===selectedOrderId)?selectedOrderId:visibleOrders[0]?.id;
     const details:Record<string,SmtOrderDetailViewModel>={};
-    for(const order of data.orders)details[order.id]={
+    for(const order of visibleOrders)details[order.id]={
       orderId:order.id,orderIdLabel:'#'+order.display,itemCount:order.items.reduce((s,x)=>s+x.qty,0),totalLabel:money(order.totalMinor),
       paymentLabel:order.paymentLabel,fulfillmentLabel:order.fulfillmentLabel,sourceLabel:order.sourceLabel,localSequenceLabel:order.display,
       ...(order.paymentEvidenceRef?{paymentEvidenceRef:order.paymentEvidenceRef}:{}),
