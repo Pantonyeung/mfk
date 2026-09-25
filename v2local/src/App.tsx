@@ -299,7 +299,15 @@ function OrderingPage({
     }
     const groups=new Map<string,{line:CartLine;quantity:number;ids:string[];index:number}>();
     cart.forEach((line,index)=>{
-      const key=[line.productId,line.serviceMode,line.unitMinor,line.detail??''].join('::');
+      const key=[
+        line.productId,
+        line.serviceMode,
+        line.unitMinor,
+        line.detail??'',
+        JSON.stringify(line.optionSelections??{}),
+        line.freeNote??'',
+        JSON.stringify(line.comboDraft??null),
+      ].join('::');
       const current=groups.get(key);
       if(current){
         current.quantity+=line.qty;
@@ -399,7 +407,7 @@ function OrderingPage({
     actionAvailability:{
       lineServiceMode:true,
       lineEdit:true,
-      lineQuantity:true,
+      lineQuantity:combineSimilar,
       holdCart:cart.length>0,
       cancelCart:cart.length>0,
     },
