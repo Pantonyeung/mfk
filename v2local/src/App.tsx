@@ -679,6 +679,8 @@ function CheckoutPage({cart,setCart,diningCheckout,onDiningCheckoutDone}:{cart:C
   const [state,setState]=useState<'selected'|'processing'|'success'|'failure'>('selected');
   const [completion,setCompletion]=useState<CheckoutWorkspaceViewModel['completionReview']>();
   const [printStatus,setPrintStatus]=useState<string|undefined>();
+  const checkoutSubmissionIdRef=useRef('SMT-CHECKOUT-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2));
+  const checkoutCommitBusyRef=useRef(false);
 
   const methodLabels:Record<CheckoutTenderId,string>={
     CASH:'現金付款',ALIPAY:'AlipayHK',WECHAT:'WeChat Pay HK',FPS:'FPS／轉數快',PAYME:'PayMe',COMBO:'組合付款'
@@ -807,8 +809,13 @@ function CheckoutPage({cart,setCart,diningCheckout,onDiningCheckoutDone}:{cart:C
     validationMessage,statusMessage:printStatus,completionReview:completion,
   };
 
+  const correctionMethods=(selectedId:CheckoutTenderId)=>(['CASH','ALIPAY','WECHAT','FPS','PAYME'] as CheckoutTenderId[]).map(id=>({
+    id,label:methodLabels[id],enabled:true,selected:selectedId===id,
+  }));
+
   const confirm=async()=>{
-    if(!confirmEnabled)return;
+    if(!confirmEnabled||checkoutCommitBusyRef.current||completion)return;
+    checkoutCommitBusyRef.current=true;
     setState('processing');
     try{
       if(diningCheckout){
@@ -820,11 +827,16 @@ function CheckoutPage({cart,setCart,diningCheckout,onDiningCheckoutDone}:{cart:C
         );
         setCompletion({
           displayOrderCode:diningCheckout.codeLabel,
+          sourceLabel:'堂食 · '+diningCheckout.tableLabel+' 號枱',
           tenderLabel:tenderDisplay,
           dueLabel:money(due),
           receivedLabel:money(received),
           changeLabel:money(change),
           statusLabel:updated.remainingMinor===0?'堂食已全數結帳':'堂食分項結帳完成',
+          printStatusLabel:'堂食付款已記錄；按堂食打印規則處理',
+          drawerStatusLabel:method==='CASH'?'現金付款：櫃桶按現場收款路徑處理':'非現金：不開櫃桶',
+          canCorrectPayment:false,
+          correctionMethods:[],
         });
         setState('success');
         setPrintStatus('堂食 '+diningCheckout.tableLabel+' 號枱 · 已記錄 '+tenderDisplay+' · 未結 '+money(updated.remainingMinor));
@@ -845,22 +857,51 @@ function CheckoutPage({cart,setCart,diningCheckout,onDiningCheckoutDone}:{cart:C
         totalMinor:due,
         paymentLabel,
         sourceLabel,
+        submissionId:checkoutSubmissionIdRef.current,
         ...(pickupCode.trim()?{providerPickupCode:pickupCode.trim()}:{}),
       });
+      const cashCommit=settlementMode==='LOCAL_PAYMENT'&&method==='CASH';
       setCompletion({
-        displayOrderCode:order.display,tenderLabel:tenderDisplay,dueLabel:money(due),
-        ...(settlementMode==='LOCAL_PAYMENT'?{receivedLabel:money(received),changeLabel:money(change)}:{}),statusLabel:'COMPLETED',
+        orderId:order.id,
+        displayOrderCode:order.display,
+        sourceLabel,
+        tenderLabel:tenderDisplay,
+        dueLabel:money(due),
+        ...(settlementMode==='LOCAL_PAYMENT'?{receivedLabel:money(received),changeLabel:money(change)}:{}),
+        statusLabel:'正式交易已提交',
+        printStatusLabel:'打印工作已建立 · 正在送出',
+        drawerStatusLabel:cashCommit?'現金櫃桶：開櫃指令隨小票送出':'非現金／平台來源：不開櫃桶',
+        canCorrectPayment:settlementMode==='LOCAL_PAYMENT'&&method!=='COMBO',
+        correctionMethods:settlementMode==='LOCAL_PAYMENT'&&method!=='COMBO'?correctionMethods(method):[],
       });
       setState('success');
-      setPrintStatus('訂單已完成 · 正在送打印…');
-      void localRuntime.printOrderOutputs(order.id).then(summary=>{
-        if(summary.planned===0){setPrintStatus('訂單已完成 · 未有已綁定打印 Route');return;}
-        if(summary.failed===0){setPrintStatus('訂單已完成 · 已送出 '+summary.sent+'/'+summary.planned+' 個打印工作');return;}
-        const failures=summary.results.filter(row=>!row.ok).map(row=>row.role+':'+row.code).join('；');
-        setPrintStatus('訂單已完成 · 打印部分失敗 '+summary.sent+'/'+summary.planned+' · '+failures);
-      }).catch(error=>setPrintStatus('訂單已完成 · 打印失敗 '+(error instanceof Error?error.message:String(error))));
+      setPrintStatus('正式交易已完成 · 正在送打印');
+
+      void localRuntime.printInitialOrderOutputsOnce(order.id).then(summary=>{
+        const receipt=summary.results.find(row=>row.role==='顧客小票');
+        const printLabel=summary.planned===0
+          ?'未有已綁定打印 Route'
+          :summary.failed===0
+            ?'已送出 '+summary.sent+'/'+summary.planned+' 個打印工作'
+            :'部分失敗 '+summary.sent+'/'+summary.planned;
+        const drawerLabel=!cashCommit
+          ?'非現金／平台來源：不開櫃桶'
+          :receipt?.ok
+            ?'現金櫃桶：開櫃指令已隨小票送出'
+            :receipt
+              ?'現金櫃桶：小票／開櫃指令失敗，需人工檢查'
+              :'現金櫃桶：未有可用小票／櫃桶 Route';
+        setCompletion(current=>current?{...current,printStatusLabel:printLabel,drawerStatusLabel:drawerLabel}:current);
+        setPrintStatus('正式交易已完成 · '+printLabel);
+      }).catch(error=>{
+        const detail=error instanceof Error?error.message:String(error);
+        setCompletion(current=>current?{...current,printStatusLabel:'打印狀態 UNKNOWN／FAILED · '+detail,drawerStatusLabel:cashCommit?'現金櫃桶：狀態需人工檢查':'非現金／平台來源：不開櫃桶'}:current);
+        setPrintStatus('正式交易已完成 · 打印狀態需檢查');
+      });
     }catch{
       setState('failure');
+    }finally{
+      checkoutCommitBusyRef.current=false;
     }
   };
 
@@ -882,6 +923,18 @@ function CheckoutPage({cart,setCart,diningCheckout,onDiningCheckoutDone}:{cart:C
     onQuickCash:amount=>setCash(value=>((Number(value)||0)+amount).toFixed(2)),
     onExactCash:()=>setCash((due/100).toFixed(2)),
     onConfirm:confirm,onRetry:confirm,
+    onCorrectPayment:methodId=>{
+      if(!completion?.orderId||methodId==='COMBO')return;
+      void localRuntime.correctOrderPayment(completion.orderId,methodId).then(()=>{
+        setMethod(methodId);
+        setCompletion(current=>current?{
+          ...current,
+          tenderLabel:methodLabels[methodId],
+          correctionMethods:correctionMethods(methodId),
+          statusLabel:'正式交易已提交 · 付款方式已修正',
+        }:current);
+      });
+    },
     onDone:()=>{setCart([]);if(diningCheckout){onDiningCheckoutDone();navigate('/dining');}else navigate('/')},
   };
 
