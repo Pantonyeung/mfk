@@ -13,7 +13,9 @@ export interface SmmLanLineIntent{
     readonly optionGroupId:string;
     readonly optionId:string;
     readonly optionName:string;
+    readonly publishedAdjustmentMinor?:number;
   }[];
+  readonly publishedUnitPriceMinor?:number;
 }
 
 export interface SmmLanOrderRequest{
@@ -23,6 +25,10 @@ export interface SmmLanOrderRequest{
   readonly submissionId:string;
   readonly idempotencyKey:string;
   readonly storeId:string;
+  readonly menuRevision:string;
+  readonly publishedTotalMinor:number;
+  readonly serviceMode:'TAKEAWAY'|'DINE_IN';
+  readonly tender:'CASH'|'ALIPAY'|'WECHAT'|'FPS'|'PAYME';
   readonly lines:readonly SmmLanLineIntent[];
 }
 
