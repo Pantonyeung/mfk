@@ -325,7 +325,7 @@ describe('Dining R6 automatic table-order admission',()=>{
     expect(detail.firstPrintResults?.length).toBeGreaterThan(0);
     expect(detail.firstPrintResults?.every((row:any)=>row.jobId&&row.role&&typeof row.ok==='boolean'&&row.code)).toBe(true);
     const options=await runtime.readDiningReprintOptions(hold.id);
-    expect(options.every((row:any)=>row.firstPrintState==='DONE')).toBe(true);
+    expect(options.every((row:any)=>row.firstPrintState==='SENT_TO_PRINTER')).toBe(true);
   });
 
   it('dining reprint rejects stale or forged job ids instead of silently doing nothing',async()=>{
@@ -352,6 +352,18 @@ describe('Dining R6 automatic table-order admission',()=>{
     const payment=paid.payments.at(-1);
     expect(payment.receivedMinor).toBe(2500);
     expect(payment.changeMinor).toBe(500);
+  });
+
+  it('successful printer transport is never promoted to physical-paper truth',async()=>{
+    const runtime=await boot();
+    const hold=runtime.createHold({kind:'dining',items:[{id:'rice',name:'飯團',qty:1,unitMinor:4100,serviceMode:'dine-in'}],totalMinor:4100});
+    await runtime.assignDiningTable(hold.id,'T01');
+    const detail=await runtime.readDiningHold(hold.id);
+    expect(detail.firstPrintAttention).toBe('NONE');
+    const options=await runtime.readDiningReprintOptions(hold.id);
+    expect(options.length).toBeGreaterThan(0);
+    expect(options.every((row:any)=>row.firstPrintState==='SENT_TO_PRINTER')).toBe(true);
+    expect(options.some((row:any)=>String(row.firstPrintState).includes('PHYSICAL'))).toBe(false);
   });
 
   it('formal Order link survives runtime restart',async()=>{
