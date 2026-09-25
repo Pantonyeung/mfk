@@ -28,6 +28,38 @@ function gateResponse(){
   );
 }
 
+async function proxySmmAcceptance(request:Request,url:URL,env:Env){
+  const suffix=url.pathname.slice('/__mfk/smm-acceptance'.length)||'/';
+  const allowed=
+    request.method==='GET'&&suffix==='/pending'||
+    request.method==='POST'&&suffix==='/ack';
+  if(!allowed)return new Response(JSON.stringify({code:'WEB_ACCEPTANCE_SMM_PROXY_BLOCKED'}),{
+    status:403,
+    headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store'},
+  });
+
+  const targetPath=suffix==='/pending'
+    ?'/api/smm/acceptance/smt/pending'
+    :'/api/smm/acceptance/smt/ack';
+  const target=new URL('https://smm.morefunos.com'+targetPath);
+  target.searchParams.set('storeId','MF01');
+
+  const headers=new Headers();
+  headers.set('accept','application/json');
+  headers.set('x-mfk-web-acceptance',String(env.WEB_ACCEPTANCE_TOKEN||''));
+  if(request.method==='POST')headers.set('content-type','application/json');
+
+  const response=await fetch(target.toString(),{
+    method:request.method,
+    headers,
+    body:request.method==='POST'?await request.text():undefined,
+  });
+  const outHeaders=new Headers(response.headers);
+  outHeaders.set('cache-control','no-store');
+  outHeaders.set('content-type','application/json; charset=utf-8');
+  return new Response(response.body,{status:response.status,statusText:response.statusText,headers:outHeaders});
+}
+
 async function proxyAdmin(request:Request,url:URL){
   const suffix=url.pathname.slice('/__mfk/admin'.length)||'/';
   const allowed=
@@ -99,6 +131,10 @@ export default{
       }),{
         headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store'},
       });
+    }
+
+    if(url.pathname.startsWith('/__mfk/smm-acceptance/')){
+      return proxySmmAcceptance(request,url,env);
     }
 
     if(url.pathname.startsWith('/__mfk/admin/')){
