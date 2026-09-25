@@ -1,7 +1,7 @@
 MFK_ADMIN_DEPLOY_REQUEST
 target=mfk-admin
 canonical_url=https://admin.morefunos.com
-product_source=5a3220b21f254cc84e7a071651223aa7eb19b3c7
+product_source=2af2354544667c30640ea08cd52966819a5241ea
 requested_by=owner
-reason=publish_store_settings_release_action_for_dining_table_acceptance
-work_id=MFK-ADMIN-STORE-SETTINGS-PUBLISH-R1
+reason=publish_customer_local_quote_revision_validation_and_whatsapp_fallback
+work_id=MFK-CUSTOMER-LOCAL-QUOTE-WHATSAPP-FALLBACK-R1
