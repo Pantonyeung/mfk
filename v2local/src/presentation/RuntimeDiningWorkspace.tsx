@@ -60,7 +60,7 @@ export function RuntimeDiningWorkspace({runtime,onCheckout,warningMinutes}:{
   const [actionBusy,setActionBusy]=useState(false);
   const [checkoutBusy,setCheckoutBusy]=useState(false);
   const [reprintOpen,setReprintOpen]=useState(false);
-  const [reprintOptions,setReprintOptions]=useState<readonly {jobId:string;role:string;label:string;detail?:string;firstPrintState?:'DONE'|'FAILED'|'UNKNOWN';firstPrintCode?:string}[]>([]);
+  const [reprintOptions,setReprintOptions]=useState<readonly {jobId:string;role:string;label:string;detail?:string;firstPrintState?:'SENT_TO_PRINTER'|'TRANSPORT_REPORTED_INCOMPLETE'|'NO_TRANSPORT_EVIDENCE';firstPrintCode?:string}[]>([]);
   const [selectedReprintJobs,setSelectedReprintJobs]=useState<Set<string>>(new Set());
   const alive=useRef(true);
   const activeHold=useRef<string|null>(null);
@@ -295,8 +295,9 @@ export function RuntimeDiningWorkspace({runtime,onCheckout,warningMinutes}:{
         {detail.formalOrderId?<section className="dining-payment-panel">
           <header><div><b>首次打印</b><small>掛枱時自動建立；唔需要再撳落廚</small></div><strong>{detail.firstPrintState==='DONE'?'完成':detail.firstPrintState==='FAILED'?'有失敗':detail.firstPrintState==='UNKNOWN'?'狀態未知':detail.firstPrintState==='DISPATCHING'?'派發中':'未開始'}</strong></header>
           {detail.firstPrintSummary?<small>計劃 {detail.firstPrintSummary.planned} · 已送 {detail.firstPrintSummary.sent} · 失敗 {detail.firstPrintSummary.failed}</small>:null}
-          {detail.firstPrintState==='UNKNOWN'?<p className="dining-message">打印結果未知：禁止自動重播整套票。請用下方「重印堂食票」逐項核對及重印。</p>:null}
-          {detail.firstPrintState==='FAILED'?<p className="dining-message">有打印工作失敗：請用「重印堂食票」只補需要嘅票，避免重複出單。</p>:null}
+          <p className="dining-message">打印狀態只係通訊／派發證據，唔代表實體紙張一定已經出到。實際少邊張由廚房／真人確認，再用下方「重印堂食票」手動揀。</p>
+          {detail.firstPrintAttention==='TRANSPORT_UNKNOWN'?<p className="dining-message">打印通道結果未知：系統唔會估邊張實體紙缺失，亦唔會自動重印成套。</p>:null}
+          {detail.firstPrintAttention==='TRANSPORT_REPORTED_INCOMPLETE'?<p className="dining-message">打印通道回報有工作未完成；呢個只係提示。請先真人核對實際缺票，再決定補印。</p>:null}
         </section>:null}
         <section className="dining-detail-lines">
           <header><b>商品／分項結帳</b><button type="button" disabled={checkoutBusy||actionBusy} onClick={selectAllRemaining}>全選未結</button></header>
@@ -330,7 +331,7 @@ export function RuntimeDiningWorkspace({runtime,onCheckout,warningMinutes}:{
         <div className="order-action-choices">
           {reprintOptions.map(option=><label key={option.jobId} style={{display:'flex',gap:10,alignItems:'center',padding:10}}>
             <input type="checkbox" checked={selectedReprintJobs.has(option.jobId)} onChange={()=>toggleReprint(option.jobId)}/>
-            <span><b>{option.label}</b>{option.detail?<small> · {option.detail}</small>:null}<small> · 首次：{option.firstPrintState==='DONE'?'已送':option.firstPrintState==='FAILED'?'失敗':option.firstPrintState==='UNKNOWN'?'未知':'未記錄'}{option.firstPrintCode?' · '+option.firstPrintCode:''}</small></span>
+            <span><b>{option.label}</b>{option.detail?<small> · {option.detail}</small>:null}<small> · 系統紀錄：{option.firstPrintState==='SENT_TO_PRINTER'?'已送到打印通道（唔代表實體已出紙）':option.firstPrintState==='TRANSPORT_REPORTED_INCOMPLETE'?'打印通道回報未完成':option.firstPrintState==='NO_TRANSPORT_EVIDENCE'?'冇完整通道證據':'未記錄'}{option.firstPrintCode?' · '+option.firstPrintCode:''}</small></span>
           </label>)}
         </div>
         <footer><button type="button" onClick={()=>setReprintOpen(false)}>取消</button><button type="button" className="primary" disabled={!selectedReprintJobs.size||actionBusy} onClick={()=>void runReprint()}>確認重印</button></footer>
