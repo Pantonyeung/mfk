@@ -37,6 +37,16 @@ function gateResponse(){
   );
 }
 
+async function smmAcceptanceProbe(env:Env){
+  try{
+    const target='https://smm.morefunos.com/api/smm/acceptance/smt/pending?storeId=MF01';
+    const response=await fetch(target,{method:'GET',headers:{accept:'application/json','x-mfk-web-acceptance':String(env.WEB_ACCEPTANCE_TOKEN||'')}});
+    const body=await response.json().catch(()=>({})) as Record<string,unknown>;
+    const orders=Array.isArray(body.orders)?body.orders:[];
+    return Object.freeze({ok:response.ok,status:response.status,pendingCount:orders.length,pendingSubmissionIds:orders.slice(0,10).map(raw=>String((raw as any)?.request?.submissionId||'')).filter(Boolean)});
+  }catch{return Object.freeze({ok:false,status:0,pendingCount:0,pendingSubmissionIds:[] as string[]});}
+}
+
 async function smmAcceptanceHealth(env:Env){
   try{
     const target='https://smm.morefunos.com/api/smm/acceptance/smt/pending?storeId=MF01';
@@ -159,6 +169,11 @@ export default{
       }),{
         headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store'},
       });
+    }
+
+    if(url.pathname==='/__mfk/smm-acceptance/diagnostics'){
+      const probe=await smmAcceptanceProbe(env);
+      return new Response(JSON.stringify({ok:probe.ok,mode:'WEB_ACCEPTANCE_ONLY',...probe}),{headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store'}});
     }
 
     if(url.pathname.startsWith('/__mfk/smm-acceptance/')){
