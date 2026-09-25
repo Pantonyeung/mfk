@@ -1,7 +1,7 @@
 MFK_ADMIN_DEPLOY_REQUEST
 target=mfk-admin
 canonical_url=https://admin.morefunos.com
-product_source=ba50a107505a9b4583bad5b36b7c337abcc54373
+product_source=bd6cf48a05cd081288dc2e91bfaf1841daa506c8
 requested_by=owner
-reason=publish_admin_managed_dining_tables_for_smt_smm
-work_id=MFK-ADMIN-DINING-TABLE-SOURCE-LANES-R1
+reason=restore_customer_payment_evidence_r2_and_publish_dining_table_management
+work_id=MFK-CUSTOMER-PAYMENT-EVIDENCE-R2-RESTORE-R1
