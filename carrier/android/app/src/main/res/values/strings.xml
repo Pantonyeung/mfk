@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="recovery_launcher_label">MoreFunOS 維護</string>
+    <string name="recovery_title">MoreFunOS 維護 / Recovery</string>
+</resources>

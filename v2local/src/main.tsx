@@ -9,6 +9,8 @@ import {installKeetaOrderLifecycle} from './runtime/keeta-order-lifecycle.ts';
 import {installKeetaAfterSales} from './runtime/keeta-after-sale.ts';
 import {installCustomerCloudBridge} from './runtime/customer-cloud-intake.ts';
 import {localRuntime} from './runtime/local-runtime.ts';
+import {createSmmLanIngress} from './runtime/smm-lan-ingress.ts';
+import type {SmmLanOrderRequest} from '../../contracts/smm-lan-v1.ts';
 import {readLocalCashOpenings,readLocalDayCloses} from './runtime/local-operations.ts';
 import {
   installProjectionOutboxAutoFlush,
@@ -25,6 +27,22 @@ installKeetaOrderIntake();
 installKeetaOrderLifecycle();
 installKeetaAfterSales();
 installCustomerCloudBridge();
+
+const smmLanIngress=createSmmLanIngress(localRuntime);
+declare global{interface Window{__MFK_SMM_LAN_HANDLE__?:(deviceId:string,payload:string)=>string}}
+window.__MFK_SMM_LAN_HANDLE__=(deviceId,payload)=>{
+  try{
+    const request=JSON.parse(payload) as SmmLanOrderRequest;
+    if(request.type==='smm.lan.order.submit.v1')return JSON.stringify(smmLanIngress.submit(request,{deviceId,trusted:true}));
+    const type=(request as {type?:string}).type;
+    if(type==='smm.lan.order.readback.v1')return JSON.stringify(smmLanIngress.readSubmission((request as unknown as {submissionId:string}).submissionId));
+    if(type==='smm.lan.snapshot.v1')return JSON.stringify(smmLanIngress.readSnapshot());
+    if(type==='smm.lan.quote.v1')return JSON.stringify(smmLanIngress.quoteCart((request as unknown as {cart:any[]}).cart));
+    return JSON.stringify({protocolVersion:1,type:'smm.lan.order.result.v1',disposition:'REJECTED',reasonCode:'SMM_LAN_OPERATION_UNSUPPORTED'});
+  }catch{
+    return JSON.stringify({protocolVersion:1,type:'smm.lan.order.result.v1',disposition:'REJECTED',reasonCode:'SMM_LAN_PAYLOAD_INVALID'});
+  }
+};
 
 for(const order of localRuntime.orders())queueOrderProjection(order);
 for(const opening of readLocalCashOpenings())queueCashOpeningProjection(opening);

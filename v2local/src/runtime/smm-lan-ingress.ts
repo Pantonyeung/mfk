@@ -5,7 +5,6 @@ import {readSmtAdminConfigLkg} from './admin-config-sync.ts';
 import type {SmmLanOrderRequest,SmmLanOrderResponse,SmmLanSubmissionReadbackResponse} from '../../../contracts/smm-lan-v1.ts';
 
 const RESULT_KEY='mfk.v2local.smm-lan-results.v1';
-const DEVICE_KEY='mfk.v2local.smm-trusted-devices.v1';
 
 interface StoredResult{readonly submissionId:string;readonly orderId:string;readonly canonicalRevision:number;readonly idempotencyKey:string;readonly requestId:string}
 
@@ -13,22 +12,48 @@ function results():StoredResult[]{
   try{const value=JSON.parse(localStorage.getItem(RESULT_KEY)||'[]');return Array.isArray(value)?value:[];}catch{return[]}
 }
 function writeResults(rows:readonly StoredResult[]){localStorage.setItem(RESULT_KEY,JSON.stringify(rows.slice(-2000)));}
-function trustedDevices():Set<string>{
-  try{const value=JSON.parse(localStorage.getItem(DEVICE_KEY)||'[]');return new Set(Array.isArray(value)?value.map(String):[]);}catch{return new Set()}
-}
-export function trustSmmDevice(deviceId:string){
-  const id=String(deviceId||'').trim();if(!id)throw new Error('SMM_DEVICE_ID_REQUIRED');
-  const set=trustedDevices();set.add(id);localStorage.setItem(DEVICE_KEY,JSON.stringify([...set]));return id;
-}
 function rejected(req:SmmLanOrderRequest,reasonCode:string):SmmLanOrderResponse{
   return Object.freeze({protocolVersion:1,type:'smm.lan.order.result.v1',requestId:req.requestId,submissionId:req.submissionId,idempotencyKey:req.idempotencyKey,disposition:'REJECTED',reasonCode});
 }
 export function createSmmLanIngress(runtime:MfkLocalRuntime){
   return Object.freeze({
-    submit(input:SmmLanOrderRequest,context:{deviceId:string}):SmmLanOrderResponse{
+    readSnapshot(){
+      const envelope=readSmtAdminConfigLkg();
+      if(!envelope)throw new Error('SMM_ADMIN_CONFIG_REQUIRED');
+      const catalog=projectSyncedOrderingCatalog('takeaway',envelope);
+      return Object.freeze({
+        menu:Object.freeze({
+          revision:String(envelope.revision),
+          observedAt:new Date().toISOString(),
+          categories:Object.freeze(catalog.categories.map(row=>Object.freeze({categoryId:row.id,name:row.label,sortOrder:row.position}))),
+          products:Object.freeze(catalog.products.map(row=>Object.freeze({
+            productId:row.id,categoryId:row.categoryId,name:row.name,available:row.sellable&&row.priceReady,
+            ...(row.imageUrl?{imageRef:row.imageUrl}:{}),
+            optionGroups:Object.freeze(row.optionSets.map(set=>Object.freeze({
+              optionGroupId:set.id,name:set.name,required:set.required,minSelections:set.min,maxSelections:set.max,
+              options:Object.freeze(set.options.map(option=>Object.freeze({optionId:option.id,name:option.name,available:option.active}))),
+            }))),
+          }))),
+        }),
+        orders:Object.freeze([]),work:Object.freeze([]),channels:Object.freeze([]),dineSessions:Object.freeze([]),printHealth:Object.freeze([]),refundRequests:Object.freeze([]),
+        observedAt:new Date().toISOString(),
+      });
+    },
+    quoteCart(cart:any[]){
+      const envelope=readSmtAdminConfigLkg();
+      if(!envelope)throw new Error('SMM_ADMIN_CONFIG_REQUIRED');
+      const catalog=projectSyncedOrderingCatalog('takeaway',envelope);
+      const priced=priceCustomerCart(cart,catalog.products);
+      return Object.freeze({
+        quoteId:'SMM-LAN-'+Date.now(),revision:String(envelope.revision),currency:'HKD',totalMinor:priced.totalMinor,
+        lines:Object.freeze(priced.items.map((item:any,index:number)=>Object.freeze({lineId:cart[index]?.lineId??String(index),currency:'HKD',finalUnitPriceMinor:item.unitMinor,lineTotalMinor:item.unitMinor*item.qty}))),
+        observedAt:new Date().toISOString(),
+      });
+    },
+    submit(input:SmmLanOrderRequest,context:{deviceId:string;trusted:boolean}):SmmLanOrderResponse{
       if(input.protocolVersion!==1||input.type!=='smm.lan.order.submit.v1')throw new Error('SMM_LAN_PROTOCOL_INVALID');
       if(input.storeId!=='MF01')return rejected(input,'SMM_LAN_STORE_MISMATCH');
-      if(!trustedDevices().has(String(context.deviceId||'')))return rejected(input,'SMM_LAN_DEVICE_NOT_TRUSTED');
+      if(!context.trusted||!String(context.deviceId||'').trim())return rejected(input,'SMM_LAN_DEVICE_NOT_TRUSTED');
       if(!input.lines.length)return rejected(input,'SMM_LAN_LINES_REQUIRED');
       const prior=results().find(row=>row.submissionId===input.submissionId);
       if(prior){
