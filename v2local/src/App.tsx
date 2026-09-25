@@ -979,6 +979,22 @@ function OperationalApp(){
   useEffect(()=>writeSmtFrontlineUiPreferences(uiPreferences),[uiPreferences]);
   const [navRevision,setNavRevision]=useState(0);
   useEffect(()=>localRuntime.subscribe(()=>setNavRevision(value=>value+1)),[]);
+  useEffect(()=>{
+    let disposed=false;
+    const tick=()=>{
+      if(disposed)return;
+      const now=Date.now();
+      for(const order of localRuntime.orders()){
+        if(order.fulfillmentLabel!=='進行中'||!order.etaReadyAt)continue;
+        const readyAt=Date.parse(order.etaReadyAt);
+        if(!Number.isFinite(readyAt)||readyAt>now)continue;
+        void localRuntime.markOrderReady?.(order.id).catch(()=>{});
+      }
+    };
+    tick();
+    const timer=window.setInterval(tick,10_000);
+    return()=>{disposed=true;window.clearInterval(timer);};
+  },[]);
   const activeOrderCount=useMemo(()=>{
     void navRevision;
     return localRuntime.orders().filter(order=>order.fulfillmentLabel==='待處理'||order.fulfillmentLabel==='進行中'||order.fulfillmentLabel==='可取餐').length;
