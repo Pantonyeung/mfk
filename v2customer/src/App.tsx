@@ -2,6 +2,8 @@ import {useEffect,useMemo,useState} from 'react';
 import {createCustomerPendingIntent,readCustomerLocalWorkspace,writeCustomerLocalWorkspace,type CustomerLocalPreferences} from './persistence';
 import {resolveCustomerRuntimePort} from './runtime';
 import {buildCustomerRecommendations} from './recommendation';
+import {quotePublishedCart} from './local-quote';
+import {buildWhatsAppFallbackUrl} from './whatsapp-fallback';
 import {selectedCustomerOptions,toggleCustomerSelection,validateCustomerSelections,type CustomerSelectionState} from './selection';
 import {BottomNavigation,CustomerHeader,StatusBanner,type ActionState,type ProductOriginRect} from './ui/primitives';
 import {CartView,CheckoutView,HomeView,MemberView,MenuView,OrdersView,ProductSheet,type MenuLayout,type OrderSegment} from './components/customer-views';
@@ -60,6 +62,7 @@ export function App(){
   const [submitting,setSubmitting]=useState(false);
   const [readingIntentId,setReadingIntentId]=useState<string|null>(null);
   const [jarPulseKey,setJarPulseKey]=useState(0);
+  const [fallbackIntentId,setFallbackIntentId]=useState<string|null>(null);
 
   const persist=(next:{cart?:readonly CustomerCartLine[];checkout?:CustomerCheckoutDraft;pendingIntents?:readonly CustomerPendingIntent[];preferences?:CustomerLocalPreferences})=>{
     writeCustomerLocalWorkspace({
@@ -139,19 +142,8 @@ export function App(){
   },[]);
 
   useEffect(()=>{
-    if(!port?.quoteCart||cart.length===0){
-      setQuote(null);
-      return;
-    }
-    let cancelled=false;
-    setQuote(null);
-    void port.quoteCart(cart).then(result=>{
-      if(!cancelled)setQuote(result);
-    }).catch(()=>{
-      if(!cancelled)setQuote(null);
-    });
-    return()=>{cancelled=true};
-  },[port,cart]);
+    setQuote(quotePublishedCart(cart,snapshot?.menu));
+  },[cart,snapshot?.menu]);
 
   const menu=snapshot?.menu;
   const categories=menu?.categories??[];
@@ -277,7 +269,8 @@ export function App(){
     let existing=pendingIntents.find(item=>
       (item.state==='DRAFT'||item.state==='NOT_CONNECTED'||item.state==='UNKNOWN')&&
       JSON.stringify(item.cart)===cartFingerprint&&
-      JSON.stringify(item.checkout)===checkoutFingerprint
+      JSON.stringify(item.checkout)===checkoutFingerprint&&
+      item.menuRevision===String(menu?.revision||'')
     );
     setSubmitting(true);
     try{
@@ -307,18 +300,22 @@ export function App(){
           return;
         }
       }
-      const base=existing??createCustomerPendingIntent(cart,checkout);
+      const base=existing??createCustomerPendingIntent(cart,checkout,String(menu?.revision||''));
       if(!port?.submitOrder){
-        saveIntent(Object.freeze({...base,state:'NOT_CONNECTED',updatedAt:nowIso(),lastMessage:'店舖提交服務尚未連接；草稿已保存。'}));
-        setNotice('已保存待提交草稿；未建立正式訂單。');
+        const offlineIntent=Object.freeze({...base,state:'NOT_CONNECTED' as const,updatedAt:nowIso(),lastMessage:'店舖接單系統暫時未連接；可以改用 WhatsApp。'});
+        saveIntent(offlineIntent);
+        setFallbackIntentId(base.submissionId);
+        setNotice('暫時未能自動接單；可以改用 WhatsApp。');
         return;
       }
-      const pending=Object.freeze({...base,state:'PENDING' as const,updatedAt:nowIso(),lastMessage:'等待店舖確認提交結果'});
+      const pending=Object.freeze({...base,state:'PENDING' as const,updatedAt:nowIso(),lastMessage:'正在連接店舖接單系統'});
       saveIntent(pending);
       const result=await port.submitOrder(pending);
-      if(result.state==='CONFIRMED'){resolveConfirmedIntent(pending,result.message||'店舖已確認訂單');return}
+      if(result.state==='CONFIRMED'){setFallbackIntentId(null);resolveConfirmedIntent(pending,result.message||'店舖已確認訂單');return}
       const state=result.state==='UNKNOWN'?'UNKNOWN':'NOT_CONNECTED';
-      saveIntent(Object.freeze({...pending,state,updatedAt:nowIso(),lastMessage:result.message}));
+      const unresolved=Object.freeze({...pending,state,updatedAt:nowIso(),lastMessage:result.message});
+      saveIntent(unresolved);
+      if(result.state==='NOT_CONNECTED')setFallbackIntentId(pending.submissionId);
       setNotice(result.state==='UNKNOWN'?'提交結果未明；會先查詢原本嗰次落單，唔會自動重送。':result.message);
     }catch{
       setNotice('提交結果未明；原本嗰次落單已保留，請先重新確認。');
@@ -364,8 +361,13 @@ export function App(){
   };
 
   const requestFallback=async()=>{
-    if(!port?.requestFallback){setNotice('備用聯絡入口尚未連接；系統唔會自行轉送你嘅訂單資料。');return}
-    try{setNotice((await port.requestFallback()).message)}catch{setNotice('暫時未能開啟備用聯絡入口。')}
+    const fallback=snapshot?.fallback;
+    const submissionId=fallbackIntentId??pendingIntents[0]?.submissionId;
+    if(!fallback?.enabled){setNotice('店舖暫時未設定 WhatsApp 備用聯絡。');return}
+    const url=buildWhatsAppFallbackUrl({fallback,cart,checkout,quote,submissionId});
+    if(!url){setNotice('WhatsApp 備用聯絡資料未完整。');return}
+    window.open(url,'_blank','noopener,noreferrer');
+    setNotice('已開啟 WhatsApp；訊息只會喺你主動送出後傳送畀店舖。');
   };
 
   const activeOrders=snapshot?.activeOrders??[];
@@ -387,6 +389,7 @@ export function App(){
       {browserOnline&&connection==='NOT_CONNECTED'?<StatusBanner tone="warning" title="店舖服務尚未連接" detail="記憶罐、聯絡資料同待提交草稿會保留喺本機；正式菜單、價格、訂單、會員同取餐狀態唔會用假資料代替。"/>:null}
       {browserOnline&&(connection==='STALE'||connection==='PARTIAL')?<StatusBanner tone="warning" title="正顯示最近一次資料" detail="店舖最新狀態仍在更新。涉及價格或落單結果時會要求再次確認。" actionLabel="更新資料" onAction={()=>void refresh()}/>:null}
       {browserOnline&&connection==='UNKNOWN'?<StatusBanner tone="warning" title="正在確認店舖狀態" detail="暫時唔會將未確認結果當成成功。" actionLabel="重新確認" onAction={()=>void refresh()}/>:null}
+      {fallbackIntentId?<StatusBanner tone="warning" title="暫時未能自動接單" detail="系統已完成有限次連線嘗試，但暫時連唔到 SMT 接單後端。你可以用同一份餐點資料改經 WhatsApp 人手落單。" actionLabel="轉用 WhatsApp" onAction={()=>void requestFallback()}/>:null}
     </div>
 
     <section className="viewport" aria-busy={connection==='LOADING'}>
