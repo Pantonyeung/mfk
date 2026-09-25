@@ -105,4 +105,13 @@ describe('customer cloud local quote adapter',()=>{
     expect(existsSync(new URL('./smm-cloud-intake.ts',import.meta.url))).toBe(false);
   });
 
+
+  it('requires the Customer published menu revision and auto-admits a matching own-channel order',()=>{
+    const source=readFileSync(new URL('./customer-cloud-intake.ts',import.meta.url),'utf8');
+    expect(source).toContain("CUSTOMER_MENU_REVISION_CHANGED");
+    expect(source).toContain("String(intent.menuRevision)!==String(envelope.revision)");
+    expect(source).toContain("initialFulfillmentLabel:'進行中'");
+    expect(source).toContain("sourceLabel:'自家 App'");
+  });
+
 });
