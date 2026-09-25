@@ -19,6 +19,9 @@ const order={
   paymentLabel:'KEETA',
   fulfillmentLabel:'待處理',
   providerPickupCode:'K017',
+  customerName:'陳小姐',
+  customerPhone:'91234567',
+  keetaDeferCount:1,
   items:[
     {id:'main',name:'紫米飯團 A 餐',qty:1,unitMinor:5900,detail:'飯團：原味 · 小食：鹽酥雞'},
   ],
@@ -29,7 +32,9 @@ describe('SMT donor pending summary review accept flow',()=>{
     const html=renderToStaticMarkup(<PendingOrderReviewWorkspace order={order} onAccept={async()=>''} onOpenOrders={()=>undefined}/>);
     expect(html).toContain('#P017');
     expect(html).toContain('摘要');
-    expect(html).toContain('開始核對');
+    expect(html).toContain('即刻處理');
+    expect(html).toContain('稍後處理');
+    expect(html).toContain('1 / 2');
     expect(html).toContain('完整訂單工作台');
     expect(html).not.toContain('確認接單');
   });
@@ -39,7 +44,9 @@ describe('SMT donor pending summary review accept flow',()=>{
     expect(pendingSource).toContain('接單核對');
     expect(pendingSource).toContain('確認接單');
     expect(pendingSource).toContain("order.fulfillmentLabel==='待處理'");
-    expect(pendingSource).toContain('disabled={!isPending||busy||Boolean(result)}');
+    expect(pendingSource).toContain('disabled={!canAccept||busy||Boolean(result)}');
+    expect(pendingSource).toContain("paymentVerificationState==='VERIFIED'");
+    expect(pendingSource).toContain('KEETA_DEFER');
   });
 
   it('routes queue cards into the pending review panel instead of jumping directly to Orders',()=>{
@@ -56,12 +63,16 @@ describe('SMT donor pending summary review accept flow',()=>{
     expect(pendingSource).not.toContain('printOrderOutputs(');
   });
 
-  it('shows current Customer payment evidence as read-only truth without inventing verification mutation',()=>{
+  it('supports manual Customer payment verification, zoom and WhatsApp QR without creating a second order path',()=>{
     expect(pendingSource).toContain('paymentEvidenceRef');
     expect(pendingSource).toContain('readCustomerPaymentEvidence');
-    expect(pendingSource).toContain('付款截圖 · 只讀核對');
-    expect(pendingSource).toContain('確認接單不會自動將付款狀態改成「已核對」');
-    expect(pendingSource).not.toContain("paymentVerificationState:'VERIFIED'");
-    expect(pendingSource).not.toContain('setPaymentVerificationState');
+    expect(pendingSource).toContain('付款截圖 · 人工核對');
+    expect(pendingSource).toContain('核對正確');
+    expect(pendingSource).toContain('有問題');
+    expect(pendingSource).toContain('pending-evidence-zoom');
+    expect(pendingSource).toContain('WhatsApp QR');
+    expect(pendingSource).toContain('QRCode.toDataURL');
+    expect(pendingSource).not.toContain('createOrder(');
+    expect(pendingSource).not.toContain('printOrderOutputs(');
   });
 });
