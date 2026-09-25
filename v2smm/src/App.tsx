@@ -1,7 +1,6 @@
 import {useEffect,useMemo,useState} from 'react';
 import {readSmmLocalWorkspace,writeSmmLocalWorkspace,createSmmPendingIntent,type SmmLocalPreferences} from './persistence';
 import {resolveSmmRuntimePort} from './runtime';
-import {createSmmQrHandoff,renderSmmQrHandoff} from './qr-handoff';
 import {pairSmmLan,probeSmmLan,readSmmLanPwaConfig,saveSmmLanPwaConfig} from './pwa-lan';
 import {selectedSmmCartOptions,toggleSmmSelection,validateSmmSelections,type SmmSelectionState} from './selection';
 import type {
@@ -13,6 +12,8 @@ import type {
   SmmQuoteSnapshot,
   SmmReadModelSnapshot,
   SmmRuntimePort,
+  SmmServiceMode,
+  SmmTender,
 } from './product-types';
 
 type View='order'|'work'|'orders'|'dine'|'more';
@@ -26,12 +27,13 @@ export function App(){
   const [view,setView]=useState<View>(initial.preferences.activeView);
   const [activeCategoryId,setActiveCategoryId]=useState<string|null>(initial.preferences.activeCategoryId);
   const [sourceFilter,setSourceFilter]=useState(initial.preferences.sourceFilter);
+  const [serviceMode,setServiceMode]=useState<SmmServiceMode>(initial.preferences.serviceMode);
+  const [tender,setTender]=useState<SmmTender>(initial.preferences.tender);
   const [cart,setCart]=useState<readonly SmmCartLine[]>(initial.cart);
   const [pendingIntents,setPendingIntents]=useState<readonly SmmPendingIntent[]>(initial.pendingIntents);
   const [port]=useState<SmmRuntimePort|null>(()=>resolveSmmRuntimePort());
   const [connection,setConnection]=useState<SmmConnectionState>(port?'LOADING':'NOT_CONNECTED');
   const [snapshot,setSnapshot]=useState<SmmReadModelSnapshot|null>(null);
-  const [quote,setQuote]=useState<SmmQuoteSnapshot|null>(null);
   const [notice,setNotice]=useState<string|null>(null);
   const [error,setError]=useState<string|null>(null);
   const [selectedProduct,setSelectedProduct]=useState<SmmProduct|null>(null);
@@ -53,23 +55,23 @@ export function App(){
     writeSmmLocalWorkspace({
       cart:next.cart??cart,
       pendingIntents:next.pendingIntents??pendingIntents,
-      preferences:next.preferences??{activeView:view,activeCategoryId,sourceFilter},
+      preferences:next.preferences??{activeView:view,activeCategoryId,sourceFilter,serviceMode,tender},
     });
   };
 
   const changeView=(next:View)=>{
     setView(next);
-    persist({preferences:{activeView:next,activeCategoryId,sourceFilter}});
+    persist({preferences:{activeView:next,activeCategoryId,sourceFilter,serviceMode,tender}});
   };
 
   const changeCategory=(next:string|null)=>{
     setActiveCategoryId(next);
-    persist({preferences:{activeView:view,activeCategoryId:next,sourceFilter}});
+    persist({preferences:{activeView:view,activeCategoryId:next,sourceFilter,serviceMode,tender}});
   };
 
   const changeSource=(next:string)=>{
     setSourceFilter(next);
-    persist({preferences:{activeView:view,activeCategoryId,sourceFilter:next}});
+    persist({preferences:{activeView:view,activeCategoryId,sourceFilter:next,serviceMode,tender}});
   };
 
   const refresh=async()=>{
@@ -107,21 +109,35 @@ export function App(){
     };
   },[]);
 
-  useEffect(()=>{
-    if(!port?.quoteCart||cart.length===0){
-      setQuote(null);
-      return;
-    }
-    let cancelled=false;
-    void port.quoteCart(cart).then(result=>{
-      if(!cancelled)setQuote(result);
-    }).catch(()=>{
-      if(!cancelled)setQuote(null);
-    });
-    return()=>{cancelled=true};
-  },[port,cart]);
-
   const menu=snapshot?.menu;
+  const productPrice=(product:SmmProduct,mode:SmmServiceMode)=>{
+    const value=mode==='DINE_IN'?product.publishedDineInUnitPriceMinor:product.publishedTakeawayUnitPriceMinor;
+    return Number.isSafeInteger(Number(value))&&Number(value)>=0?Number(value):null;
+  };
+  const repriceLine=(line:SmmCartLine,mode:SmmServiceMode):SmmCartLine=>{
+    const product=menu?.products.find(item=>item.productId===line.productId);
+    if(!product)return line;
+    const base=productPrice(product,mode);
+    if(base===null)return {...line,publishedUnitPriceMinor:undefined};
+    const optionMinor=line.selections.reduce((sum,item)=>sum+(Number.isSafeInteger(Number(item.publishedAdjustmentMinor))?Number(item.publishedAdjustmentMinor):0),0);
+    return Object.freeze({...line,publishedUnitPriceMinor:base+optionMinor});
+  };
+  const publishedTotalMinor=cart.every(line=>Number.isSafeInteger(Number(line.publishedUnitPriceMinor))&&Number(line.publishedUnitPriceMinor)>=0)
+    ?cart.reduce((sum,line)=>sum+Number(line.publishedUnitPriceMinor)*line.quantity,0)
+    :null;
+  const quote:SmmQuoteSnapshot|null=menu&&publishedTotalMinor!==null&&cart.length?Object.freeze({
+    quoteId:'PUBLISHED-'+menu.revision,
+    revision:menu.revision,
+    currency:'HKD',
+    totalMinor:publishedTotalMinor,
+    lines:Object.freeze(cart.map(line=>Object.freeze({
+      lineId:line.lineId,
+      currency:'HKD',
+      finalUnitPriceMinor:Number(line.publishedUnitPriceMinor),
+      lineTotalMinor:Number(line.publishedUnitPriceMinor)*line.quantity,
+    }))),
+    observedAt:menu.observedAt,
+  }):null;
   const categories=menu?.categories??[];
   const effectiveCategoryId=activeCategoryId&&categories.some(c=>c.categoryId===activeCategoryId)
     ?activeCategoryId
@@ -145,13 +161,21 @@ export function App(){
       return;
     }
     const variation=selectedProduct.variations?.find(item=>item.variationId===selectedVariationId);
+    const selectedOptions=selectedSmmCartOptions(selectedProduct,selections);
+    const baseMinor=productPrice(selectedProduct,serviceMode);
+    if(baseMinor===null){
+      setNotice('餐單價格資料未完整，請重新同步。');
+      return;
+    }
+    const optionMinor=selectedOptions.reduce((sum,item)=>sum+(Number.isSafeInteger(Number(item.publishedAdjustmentMinor))?Number(item.publishedAdjustmentMinor):0),0);
     const line:SmmCartLine=Object.freeze({
       lineId:crypto.randomUUID(),
       productId:selectedProduct.productId,
       productName:selectedProduct.name,
       quantity:1,
       ...(variation?{selectedVariationId:variation.variationId,selectedVariationName:variation.name}:{}),
-      selections:selectedSmmCartOptions(selectedProduct,selections),
+      selections:selectedOptions,
+      publishedUnitPriceMinor:baseMinor+optionMinor,
       createdAt:nowIso(),
     });
     const next=[...cart,line];
@@ -166,6 +190,22 @@ export function App(){
   const updateCart=(next:readonly SmmCartLine[])=>{
     setCart(next);
     persist({cart:next});
+  };
+
+  const changeServiceMode=(next:SmmServiceMode)=>{
+    const repriced=cart.map(line=>repriceLine(line,next));
+    setServiceMode(next);
+    setCart(repriced);
+    writeSmmLocalWorkspace({
+      cart:repriced,
+      pendingIntents,
+      preferences:{activeView:view,activeCategoryId,sourceFilter,serviceMode:next,tender},
+    });
+  };
+
+  const changeTender=(next:SmmTender)=>{
+    setTender(next);
+    persist({preferences:{activeView:view,activeCategoryId,sourceFilter,serviceMode,tender:next}});
   };
 
   const saveIntent=(intent:SmmPendingIntent)=>{
@@ -191,8 +231,24 @@ export function App(){
 
   const submitCart=async()=>{
     if(cart.length===0)return;
-    const existing=pendingIntents.find(item=>item.state==='DRAFT'||item.state==='NOT_CONNECTED'||item.state==='UNKNOWN');
-    const base=existing??createSmmPendingIntent(cart);
+    if(!menu||publishedTotalMinor===null){
+      setNotice('餐單價格／版本未完整，請先重新同步。');
+      return;
+    }
+    const existing=pendingIntents.find(item=>
+      (item.state==='DRAFT'||item.state==='NOT_CONNECTED'||item.state==='UNKNOWN')&&
+      item.menuRevision===menu.revision&&
+      item.checkout?.serviceMode===serviceMode&&
+      item.checkout?.tender===tender&&
+      item.publishedTotalMinor===publishedTotalMinor
+    );
+    const base=existing??createSmmPendingIntent({
+      cart,
+      menuRevision:menu.revision,
+      publishedTotalMinor,
+      serviceMode,
+      tender,
+    });
     if(!port?.submitOrder){
       const next={...base,state:'NOT_CONNECTED' as const,updatedAt:nowIso(),lastMessage:'門店提交服務尚未連接；草稿已保存。'};
       saveIntent(Object.freeze(next));
@@ -262,6 +318,7 @@ export function App(){
         products={visibleProducts}
         cart={cart}
         quote={quote}
+        serviceMode={serviceMode}
         onProduct={product=>{setSelectedProduct(product);setSelections({});setSelectedVariationId(null)}}
         onCart={()=>setCartOpen(true)}
       />:null}
@@ -332,6 +389,10 @@ export function App(){
       cart={cart}
       quote={quote}
       pending={pendingIntents[0]??null}
+      serviceMode={serviceMode}
+      tender={tender}
+      onServiceMode={changeServiceMode}
+      onTender={changeTender}
       onClose={()=>setCartOpen(false)}
       onQuantity={(lineId,quantity)=>updateCart(cart.map(line=>line.lineId===lineId?{...line,quantity:Math.max(1,quantity)}:line))}
       onRemove={lineId=>updateCart(cart.filter(line=>line.lineId!==lineId))}
@@ -341,7 +402,7 @@ export function App(){
   </main>;
 }
 
-function OrderView({connection,categories,activeCategoryId,setCategory,search,setSearch,products,cart,quote,onProduct,onCart}:{
+function OrderView({connection,categories,activeCategoryId,setCategory,search,setSearch,products,cart,quote,serviceMode,onProduct,onCart}:{
   connection:SmmConnectionState;
   categories:readonly {categoryId:string;name:string}[];
   activeCategoryId:string|null;
@@ -351,19 +412,20 @@ function OrderView({connection,categories,activeCategoryId,setCategory,search,se
   products:readonly SmmProduct[];
   cart:readonly SmmCartLine[];
   quote:SmmQuoteSnapshot|null;
+  serviceMode:SmmServiceMode;
   onProduct:(p:SmmProduct)=>void;
   onCart:()=>void;
 }){
   const count=cart.reduce((sum,line)=>sum+line.quantity,0);
   return <section className="page order-page">
-    <header className="hero compact"><div><span>點單</span><h1>快速點餐</h1><small>商品、報價同正式訂單只會使用門店提供嘅權威資料。</small></div>{connection==='READY'?<b className="tag">已同步</b>:null}</header>
+    <header className="hero compact"><div><span>點單</span><h1>快速點餐</h1><small>使用 Admin 已發布餐單；SMT 只喺提交時核對版本同價格。</small></div>{connection==='READY'?<b className="tag">已同步</b>:null}</header>
     <label className="search"><span>搜尋商品</span><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="輸入商品名稱"/></label>
     {categories.length?<div className="category-rail">{categories.map(item=><button key={item.categoryId} className={activeCategoryId===item.categoryId?'active':''} onClick={()=>setCategory(item.categoryId)}>{item.name}</button>)}</div>:null}
     {connection==='LOADING'?<EmptyState title="正在同步餐單" detail="請稍候。"/>:
       !categories.length?<EmptyState title={connection==='NOT_CONNECTED'?'餐單服務尚未連接':'暫時未有餐單'} detail={connection==='NOT_CONNECTED'?'連接後會顯示正式分類、商品、規格同供應狀態。':'目前門店資料未提供任何可售商品。'}/>:
-      products.length?<div className="product-grid">{products.map(product=><button key={product.productId} className={`product-card ${product.available?'':'disabled'}`} disabled={!product.available} onClick={()=>onProduct(product)}><span className="product-avatar">{product.name.slice(0,1)}</span><strong>{product.name}</strong><small>{product.available?'可供應':'暫停供應'}</small><i>{product.optionGroups.length||product.variations?.length?'可設定':''}</i></button>)}</div>:
+      products.length?<div className="product-grid">{products.map(product=>{const price=serviceMode==='DINE_IN'?product.publishedDineInUnitPriceMinor:product.publishedTakeawayUnitPriceMinor;return <button key={product.productId} className={`product-card ${product.available?'':'disabled'}`} disabled={!product.available} onClick={()=>onProduct(product)}><span className="product-avatar">{product.name.slice(0,1)}</span><strong>{product.name}</strong><small>{Number.isSafeInteger(Number(price))?money('HKD',Number(price)):(product.available?'可供應':'暫停供應')}</small><i>{product.optionGroups.length||product.variations?.length?'可設定':''}</i></button>})}</div>:
       <EmptyState title="搵唔到商品" detail="清除搜尋或者切換其他分類。"><button className="primary" onClick={()=>setSearch('')}>清除搜尋</button></EmptyState>}
-    {count>0?<button className="cart-bar" onClick={onCart}><div><b>{count}</b><span>購物草稿</span></div><div><strong>{quote?money(quote.currency,quote.totalMinor):'等待門店報價'}</strong><small>{quote?`報價版本 ${quote.revision}`:'本機唔會自行計價'}</small></div><em>查看</em></button>:null}
+    {count>0?<button className="cart-bar" onClick={onCart}><div><b>{count}</b><span>購物草稿</span></div><div><strong>{quote?money(quote.currency,quote.totalMinor):'價格資料未完整'}</strong><small>{quote?`已發布餐單版本 ${quote.revision}`:'請重新同步餐單'}</small></div><em>查看</em></button>:null}
   </section>;
 }
 
@@ -522,30 +584,28 @@ function ProductSheet({product,selections,selectedVariationId,setVariation,toggl
   </section></div>;
 }
 
-function CartSheet({cart,quote,pending,onClose,onQuantity,onRemove,onSubmit,onReadback}:{
+function CartSheet({cart,quote,pending,serviceMode,tender,onServiceMode,onTender,onClose,onQuantity,onRemove,onSubmit,onReadback}:{
   cart:readonly SmmCartLine[];
   quote:SmmQuoteSnapshot|null;
   pending:SmmPendingIntent|null;
+  serviceMode:SmmServiceMode;
+  tender:SmmTender;
+  onServiceMode:(mode:SmmServiceMode)=>void;
+  onTender:(tender:SmmTender)=>void;
   onClose:()=>void;
   onQuantity:(id:string,q:number)=>void;
   onRemove:(id:string)=>void;
   onSubmit:()=>void;
   onReadback:(intent:SmmPendingIntent)=>void;
 }){
-  const [qr,setQr]=useState<string|null>(null);
-  const [qrBusy,setQrBusy]=useState(false);
-  const makeQr=async()=>{
-    if(!cart.length||qrBusy)return;
-    setQrBusy(true);
-    try{setQr(await renderSmmQrHandoff(createSmmQrHandoff(cart,quote)));}
-    finally{setQrBusy(false);}
-  };
-  return <div className="overlay"><section className="sheet" role="dialog" aria-modal="true"><div className="sheet-grabber"/><header><div><span>購物草稿</span><h2>{cart.length} 項</h2><small>本機只保存意圖；總額只接受門店正式報價。</small></div><button onClick={onClose}>✕</button></header>
-    {!cart.length?<EmptyState title="草稿係空嘅" detail="返回點單加入商品。"/>:cart.map(line=><div className="cart-line" key={line.lineId}><div><strong>{line.productName}</strong><small>{[line.selectedVariationName,...line.selections.map(item=>item.optionName)].filter(Boolean).join(' · ')||'無額外設定'}</small></div><div className="qty"><button onClick={()=>onQuantity(line.lineId,line.quantity-1)}>−</button><b>{line.quantity}</b><button onClick={()=>onQuantity(line.lineId,line.quantity+1)}>＋</button></div><button className="danger" onClick={()=>onRemove(line.lineId)}>移除</button></div>)}
-    <div className="cart-total"><span>正式報價</span><strong>{quote?money(quote.currency,quote.totalMinor):'等待門店報價'}</strong><small>{quote?`版本 ${quote.revision}`:'本機唔會估算價格'}</small></div>
+  const tenders:[SmmTender,string][]=[['CASH','現金'],['ALIPAY','AlipayHK'],['WECHAT','WeChat Pay HK'],['FPS','FPS'],['PAYME','PayMe']];
+  return <div className="overlay"><section className="sheet" role="dialog" aria-modal="true"><div className="sheet-grabber"/><header><div><span>購物草稿</span><h2>{cart.length} 項</h2><small>價格直接使用已發布餐單；提交時 SMT 會核對版本同價格。</small></div><button onClick={onClose}>✕</button></header>
+    <section className="option-group"><div><strong>服務方式</strong><span>員工設定</span></div><div className="segmented"><button className={serviceMode==='TAKEAWAY'?'active':''} onClick={()=>onServiceMode('TAKEAWAY')}>外賣</button><button className={serviceMode==='DINE_IN'?'active':''} onClick={()=>onServiceMode('DINE_IN')}>堂食</button></div></section>
+    <section className="option-group"><div><strong>收款方式</strong><span>只記錄，不自動開錢箱</span></div><div className="option-list">{tenders.map(([value,label])=><button key={value} className={tender===value?'active':''} onClick={()=>onTender(value)}>{label}</button>)}</div>{tender==='CASH'?<p className="callout">現金只會記錄為收款方式；需要開錢箱時由 SMT 人手操作。</p>:null}</section>
+    {!cart.length?<EmptyState title="草稿係空嘅" detail="返回點單加入商品。"/>:cart.map(line=><div className="cart-line" key={line.lineId}><div><strong>{line.productName}</strong><small>{[line.selectedVariationName,...line.selections.map(item=>item.optionName)].filter(Boolean).join(' · ')||'無額外設定'} · {Number.isSafeInteger(Number(line.publishedUnitPriceMinor))?money('HKD',Number(line.publishedUnitPriceMinor)):'價格待同步'}</small></div><div className="qty"><button onClick={()=>onQuantity(line.lineId,line.quantity-1)}>−</button><b>{line.quantity}</b><button onClick={()=>onQuantity(line.lineId,line.quantity+1)}>＋</button></div><button className="danger" onClick={()=>onRemove(line.lineId)}>移除</button></div>)}
+    <div className="cart-total"><span>已發布總額</span><strong>{quote?money(quote.currency,quote.totalMinor):'價格資料未完整'}</strong><small>{quote?`餐單版本 ${quote.revision} · SMT 提交時再核對`:'請重新同步餐單'}</small></div>
     {pending?<p className="callout">{pending.state==='UNKNOWN'?'上次提交結果未明，請先重新確認，唔好重新送出。':pending.lastMessage??'已有待提交草稿'}</p>:null}
-    {qr?<div className="smm-qr-handoff"><img src={qr} alt="SMM 訂單交接 QR"/><div><strong>QR 交接</strong><p>畀 SMT 掃描後，會重新用門店餐單同價格驗證，再建立正式訂單。呢個 QR 本身唔係正式 Order。</p></div></div>:null}
-    <footer><button onClick={onClose}>返回</button><button disabled={!cart.length||qrBusy} onClick={()=>void makeQr()}>{qrBusy?'產生中…':'產生 QR'}</button>{pending?.state==='UNKNOWN'?<button className="primary" onClick={()=>onReadback(pending)}>重新確認結果</button>:<button className="primary" disabled={!cart.length} onClick={onSubmit}>{quote?'提交訂單':'保存待提交草稿'}</button>}</footer>
+    <footer><button onClick={onClose}>返回</button>{pending?.state==='UNKNOWN'?<button className="primary" onClick={()=>onReadback(pending)}>重新確認結果</button>:<button className="primary" disabled={!cart.length||!quote} onClick={onSubmit}>提交訂單</button>}</footer>
   </section></div>;
 }
 
