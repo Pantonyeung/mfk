@@ -4,7 +4,7 @@ import {renderEscPosRasterTicket} from './ticket-bitmap.ts';
 import {buildOrderPrintPlan,groupTscBitmapJobsByPhysicalPrinter,type PrintBinding,type PlannedPrintJob} from './print-routing.ts';
 import {queueOrderProjection} from './projection-outbox.ts';
 import {readActiveStaffSession} from './staff-auth.ts';
-import {etaMinutesForActiveCount,readSmtPrintConfig} from './admin-operational-config.ts';
+import {etaMinutesForActiveCount,readSmtPrintConfig,readSmtStoreSettings} from './admin-operational-config.ts';
 import {mirrorKeetaOrderCommand,type KeetaProviderMirrorResult} from './keeta-provider-commands.ts';
 import {buildDailyClosePrintData,renderDailyCloseTicket} from './daily-close-ticket.ts';
 import {appendLocalCashMovement,readLocalDayCloses,resolveBusinessWindow} from './local-operations.ts';
@@ -633,7 +633,8 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
   },
   clear(){data=clone(defaults);save()},
   async readOrders(selectedOrderId){
-    const items=data.orders.map(order=>({
+    const visibleOrders=data.orders.filter(order=>!order.items.length||!order.items.every(item=>item.serviceMode==='dine-in'));
+    const items=visibleOrders.map(order=>({
       orderId:order.id,orderIdLabel:'#'+order.display,itemCount:order.items.reduce((s,x)=>s+x.qty,0),
       totalLabel:money(order.totalMinor),paymentLabel:order.paymentLabel,fulfillmentLabel:order.fulfillmentLabel,
       sourceLabel:order.sourceLabel,localSequenceLabel:order.display,
@@ -641,9 +642,9 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
       ...(order.providerRef?{externalOrderNo:order.providerRef.replace(/^[A-Z]+:/,'')}:{}),
       ...(order.providerPickupCode?{pickupCode:order.providerPickupCode}:{}),
     }));
-    const selectedId=selectedOrderId&&data.orders.some(x=>x.id===selectedOrderId)?selectedOrderId:data.orders[0]?.id;
+    const selectedId=selectedOrderId&&visibleOrders.some(x=>x.id===selectedOrderId)?selectedOrderId:visibleOrders[0]?.id;
     const details:Record<string,SmtOrderDetailViewModel>={};
-    for(const order of data.orders)details[order.id]={
+    for(const order of visibleOrders)details[order.id]={
       orderId:order.id,orderIdLabel:'#'+order.display,itemCount:order.items.reduce((s,x)=>s+x.qty,0),totalLabel:money(order.totalMinor),
       paymentLabel:order.paymentLabel,fulfillmentLabel:order.fulfillmentLabel,sourceLabel:order.sourceLabel,localSequenceLabel:order.display,
       ...(order.customerName?{customerName:order.customerName}:{}),
@@ -1093,28 +1094,37 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
         partySize:hold.partySize,
         statusLabel:'待安排座位',
       })),
-      tables:Array.from({length:9},(_,index)=>{
-        const id='T'+String(index+1).padStart(2,'0');
-        const seated=data.holds.find(hold=>hold.kind==='dining'&&!hold.archivedAt&&hold.assignedTable===id);
-        if(!seated)return {id,areaLabel:'堂食',label:String(index+1),state:'available' as const};
-        const detail=diningDetail(seated);
-        const first=detail.lines.filter(line=>line.qty>0).slice(0,2).map(line=>line.name.split('｜')[0]).join('、');
-        return {
-          id,
-          areaLabel:'堂食',
-          label:String(index+1),
-          state:detail.remainingMinor===0&&detail.payments.length>0?'settled' as const:'occupied' as const,
-          partySize:seated.partySize,
-          outstandingLabel:seated.codeLabel,
-          holdId:seated.id,
-          startedAt:seated.createdAt,
-          itemCount:seated.items.reduce((sum,item)=>sum+item.qty,0),
-          itemSummary:first,
-          totalMinor:seated.totalMinor,
-          paidMinor:detail.paidMinor,
-          remainingMinor:detail.remainingMinor,
-        };
-      })
+      tables:(()=>{
+        const configured=readSmtStoreSettings().diningTables;
+        const tables=configured.length?configured:Array.from({length:9},(_,index)=>({
+          id:'T'+String(index+1).padStart(2,'0'),
+          name:String(index+1)+' 號枱',
+          active:true,
+          sortOrder:index+1,
+        }));
+        return tables.map(table=>{
+          const id=table.id;
+          const seated=data.holds.find(hold=>hold.kind==='dining'&&!hold.archivedAt&&hold.assignedTable===id);
+          if(!seated)return {id,areaLabel:'堂食',label:table.name,state:'available' as const};
+          const detail=diningDetail(seated);
+          const first=detail.lines.filter(line=>line.qty>0).slice(0,2).map(line=>line.name.split('｜')[0]).join('、');
+          return {
+            id,
+            areaLabel:'堂食',
+            label:table.name,
+            state:detail.remainingMinor===0&&detail.payments.length>0?'settled' as const:'occupied' as const,
+            partySize:seated.partySize,
+            outstandingLabel:seated.codeLabel,
+            holdId:seated.id,
+            startedAt:seated.createdAt,
+            itemCount:seated.items.reduce((sum,item)=>sum+item.qty,0),
+            itemSummary:first,
+            totalMinor:seated.totalMinor,
+            paidMinor:detail.paidMinor,
+            remainingMinor:detail.remainingMinor,
+          };
+        });
+      })()
     };
   },
   async createDiningWait(input){
