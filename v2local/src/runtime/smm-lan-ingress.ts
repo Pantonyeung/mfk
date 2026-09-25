@@ -2,7 +2,7 @@ import type {MfkLocalRuntime} from './local-runtime.ts';
 import {priceCustomerCart} from './customer-cloud-intake.ts';
 import {projectSyncedOrderingCatalog} from './admin-config-projection.ts';
 import {readSmtAdminConfigLkg} from './admin-config-sync.ts';
-import {readSmtStoreSettings} from './admin-operational-config.ts';
+import {readSmtDiningTableRegistry,readSmtStoreSettings} from './admin-operational-config.ts';
 import type {SmmLanOrderRequest,SmmLanOrderResponse,SmmLanSubmissionReadbackResponse} from '../../../contracts/smm-lan-v1.ts';
 
 const RESULT_KEY='mfk.v2local.smm-lan-results.v1';
@@ -85,7 +85,7 @@ export function createSmmLanIngress(runtime:MfkLocalRuntime){
         channels:Object.freeze([]),
         dineSessions:Object.freeze(runtime.holds().filter(hold=>hold.kind==='dining').map(hold=>{
           const payments=hold.payments??[];
-          const tableNameById=new Map(readSmtStoreSettings().diningTables.map(table=>[table.id,table.name]));
+          const tableNameById=new Map(readSmtDiningTableRegistry().map(table=>[table.id,table.name]));
           const lines=hold.items.map((item,lineIndex)=>{
             const paidQty=payments.reduce((sum,payment)=>sum+payment.selections.filter(selection=>selection.lineIndex===lineIndex).reduce((inner,selection)=>inner+selection.qty,0),0);
             return Object.freeze({lineIndex,name:item.name,qty:item.qty,paidQty,remainingQty:Math.max(0,item.qty-paidQty),unitMinor:item.unitMinor});
