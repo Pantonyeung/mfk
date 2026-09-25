@@ -121,6 +121,46 @@ describe('Dining R6 automatic table-order admission',()=>{
     expect(last.kickDrawer).toBe(false);
   });
 
+  it('dining payment updates the SAME formal Order tender projection',async()=>{
+    const runtime=await boot();
+    const hold=runtime.createHold({kind:'dining',items:[{id:'rice',name:'飯團',qty:2,unitMinor:4100,serviceMode:'dine-in'}],totalMinor:8200});
+    await runtime.assignDiningTable(hold.id,'T01');
+    const detail=await runtime.readDiningHold(hold.id);
+    await runtime.settleDiningHold(hold.id,[{lineIndex:0,qty:1}],'FPS',{submissionId:'pay-fps',expectedRevision:detail.checkoutRevision,receivedMinor:4100});
+    const order=runtime.orders().find((row:any)=>row.diningHoldId===hold.id);
+    expect(order.paymentLabel).toBe('FPS');
+    expect(runtime.orders().filter((row:any)=>row.diningHoldId===hold.id)).toHaveLength(1);
+  });
+
+  it('mixed split tenders project COMBO without creating another Order',async()=>{
+    const runtime=await boot();
+    const hold=runtime.createHold({kind:'dining',items:[{id:'rice',name:'飯團',qty:2,unitMinor:4100,serviceMode:'dine-in'}],totalMinor:8200});
+    await runtime.assignDiningTable(hold.id,'T01');
+    let detail=await runtime.readDiningHold(hold.id);
+    await runtime.settleDiningHold(hold.id,[{lineIndex:0,qty:1}],'FPS',{submissionId:'pay-1',expectedRevision:detail.checkoutRevision,receivedMinor:4100});
+    detail=await runtime.readDiningHold(hold.id);
+    await runtime.settleDiningHold(hold.id,[{lineIndex:0,qty:1}],'CASH',{submissionId:'pay-2',expectedRevision:detail.checkoutRevision,receivedMinor:5000});
+    const orders=runtime.orders().filter((row:any)=>row.diningHoldId===hold.id);
+    expect(orders).toHaveLength(1);
+    expect(orders[0].paymentLabel).toBe('COMBO');
+  });
+
+  it('cash dining payment receipt is the drawer boundary while non-cash never kicks drawer',async()=>{
+    const runtime=await boot();
+    const hold=runtime.createHold({kind:'dining',items:[{id:'rice',name:'飯團',qty:2,unitMinor:4100,serviceMode:'dine-in'}],totalMinor:8200});
+    await runtime.assignDiningTable(hold.id,'T01');
+    let detail=await runtime.readDiningHold(hold.id);
+    await runtime.settleDiningHold(hold.id,[{lineIndex:0,qty:1}],'FPS',{submissionId:'fps',expectedRevision:detail.checkoutRevision,receivedMinor:4100});
+    await runtime.printDiningPaymentReceipt(hold.id,'fps');
+    detail=await runtime.readDiningHold(hold.id);
+    await runtime.settleDiningHold(hold.id,[{lineIndex:0,qty:1}],'CASH',{submissionId:'cash',expectedRevision:detail.checkoutRevision,receivedMinor:5000});
+    await runtime.printDiningPaymentReceipt(hold.id,'cash');
+    const ticket=await import('./ticket-bitmap.ts');
+    const calls=(ticket.renderEscPosRasterTicket as any).mock.calls.filter((row:any[])=>row[0].kind==='receipt').map((row:any[])=>row[0]);
+    expect(calls.at(-2).kickDrawer).toBe(false);
+    expect(calls.at(-1).kickDrawer).toBe(true);
+  });
+
   it('formal Order link survives runtime restart',async()=>{
     let runtime=await boot();
     const hold=runtime.createHold({kind:'dining',items:[{id:'rice',name:'飯團',qty:1,unitMinor:4100,serviceMode:'dine-in'}],totalMinor:4100});
