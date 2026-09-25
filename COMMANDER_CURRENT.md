@@ -17,20 +17,33 @@ System: MFK ONLY
 Product source:
 `75759607ba05720f723c77d282327b7f1386f616`
 
-Builder verification:
+Source/build verification:
 `36084376938` SUCCESS
 
-Carrier OTA publish:
-`36085863280` SUCCESS
+Canonical Carrier OTA publish:
+`36085973121` SUCCESS
 
 Carrier:
 `1.0.7 / 107`
+
+Current public APK:
+`MoreFunOS-SMT-1.0.7-mfk-75759607ba05.apk`
 
 APK SHA-256:
 `b521d509f93143e191e9df363b91409e499dc0788776f067e88469611c791046`
 
 Public Carrier OTA manifest/readback:
 GREEN
+
+Independent replay:
+`36085863280` SUCCESS, same SHA-256.
+
+Canonical Builder release path:
+`.github/workflows/mfk-carrier-ota.yml`
+→ `requests/mfk-carrier-ota-request.txt`
+
+Temporary parallel duplicate publisher path:
+RETIRED.
 
 Current milestone:
 `MFK_CARRIER_1_0_7_OTA_PUBLISHED_GREEN`
@@ -45,7 +58,7 @@ SMM is PWA/Web only. No SMM APK.
 Primary:
 SMM PWA → Carrier LAN HTTP/JSON :17831 → SMT.
 
-LAN failure is never allowed to block staff ordering.
+LAN failure never blocks staff ordering.
 
 QR is only an Order Intent transport.
 QR cannot allocate Formal Order / Display.
@@ -63,10 +76,10 @@ Recovery has two independent controls:
 - Runtime OTA URL
 - Carrier OTA URL
 
-Existing OTA origin is reused.
+Existing OTA origin/bucket reused.
 No new OTA backend/domain.
 
-Published Carrier identity must be read back before store install.
+One active MFK Carrier release workflow only.
 
 ## 4. Exact NEXT
 
@@ -86,10 +99,11 @@ iPhone:
 - LAN unavailable non-blocking proof
 - QR fallback proof
 - same-intent replay zero duplicate Formal Order
+- SMT restart sanity
 
 ## 5. Commander rule
 
-Do not write new code before physical evidence.
+Do not write new product code before physical evidence.
 
 If GREEN:
 BANK `MFK_CARRIER_1_0_7_SMM_PWA_LAN_QR_PHYSICAL_GREEN`.
