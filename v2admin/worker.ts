@@ -153,6 +153,14 @@ function customerPublicSnapshot(active,customerOrders=[]){
     .filter(item=>/^[A-Z0-9][A-Z0-9_-]{1,39}$/.test(item.channelId)&&item.label&&item.enabled)
     .sort((a,b)=>a.sortOrder-b.sortOrder||a.channelId.localeCompare(b.channelId))
     .map(({enabled,sortOrder,qrImageUrl,...item})=>({...item,...(qrImageUrl?{qrImageUrl}:{})}));
+  const whatsappDigits=String(settings.customerWhatsAppNumber||'').replace(/\D/g,'').slice(0,15);
+  const fallbackTemplate=String(settings.customerWhatsAppTemplate||'').trim().slice(0,2000);
+  const customerFallback={
+    enabled:settings.customerWhatsAppEnabled!==false&&whatsappDigits.length>=8&&Boolean(fallbackTemplate),
+    phone:whatsappDigits,
+    template:fallbackTemplate,
+    retryAttempts:3,
+  };
   const customerPresentation=row(row(snapshot.presentation).customer);
   const customerChannel=row(snapshot.customerChannelPolicy);
   const channelAvailable=customerChannel.enabled===true;
@@ -192,6 +200,7 @@ function customerPublicSnapshot(active,customerOrders=[]){
       products,
     },
     paymentChannels,
+    fallback:customerFallback,
     activeOrders:projectedOrders.filter(order=>order.stage!=='COMPLETED'),
     history:projectedOrders.filter(order=>order.stage==='COMPLETED').map(order=>({
       orderId:order.orderId,
@@ -528,6 +537,14 @@ export default {
       const customer=env.CUSTOMER_RUNTIME.get(customerId);
       const adminId=env.ADMIN_SYNC.idFromName(storeId);
       const admin=env.ADMIN_SYNC.get(adminId);
+
+      if(url.pathname==='/api/customer/channel-health'){
+        if(request.method!=='GET')return json({code:'METHOD_NOT_ALLOWED'},405,cors(request));
+        const response=await customer.fetch(new Request('https://internal/public/channel-health',{method:'GET'}));
+        const headers=new Headers(response.headers);
+        for(const [key,value] of Object.entries(cors(request)))headers.set(key,value);
+        return new Response(response.body,{status:response.status,statusText:response.statusText,headers});
+      }
 
       if(url.pathname==='/api/customer/snapshot'){
         if(request.method!=='GET')return json({code:'METHOD_NOT_ALLOWED'},405,cors(request));
