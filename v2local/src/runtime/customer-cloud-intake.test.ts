@@ -1,3 +1,4 @@
+import {readFileSync,existsSync} from 'node:fs';
 import {describe,expect,it} from 'vitest';
 import {priceCustomerCart} from './customer-cloud-intake.ts';
 import type {SyncedOrderingProduct} from './admin-config-projection.ts';
@@ -91,4 +92,17 @@ describe('customer cloud local quote adapter',()=>{
       },
     ],products)).toThrow('CUSTOMER_OPTION_UNAVAILABLE:bento:rice:ghost');
   });
+
+  it('uses the same Customer cloud reconcile loop for SMM staff orders',()=>{
+    const source=readFileSync(new URL('./customer-cloud-intake.ts',import.meta.url),'utf8');
+    const main=readFileSync(new URL('../main.tsx',import.meta.url),'utf8');
+    expect(source).toContain("bridgeKind==='SMM_STAFF'");
+    expect(source).toContain('smmIngress.submit');
+    expect(source).toContain("'/api/customer/smt/orders/pending'");
+    expect(source).toContain("'/api/customer/smt/orders/ack'");
+    expect(main).toContain('installCustomerCloudBridge()');
+    expect(main).not.toContain('installSmmCloudIntake');
+    expect(existsSync(new URL('./smm-cloud-intake.ts',import.meta.url))).toBe(false);
+  });
+
 });
