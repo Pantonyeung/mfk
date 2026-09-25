@@ -8,7 +8,9 @@ const JSON_HEADERS={'content-type':'application/json; charset=utf-8','cache-cont
 const ADMIN_ORIGIN='https://admin.morefunos.com';
 const SMT_ORIGIN='https://appassets.androidplatform.net';
 const CUSTOMER_ORIGIN='https://order.morefunos.com';
-const CORS_ORIGINS=new Set([ADMIN_ORIGIN,SMT_ORIGIN,CUSTOMER_ORIGIN]);
+const SMM_ORIGIN='https://smm.morefunos.com';
+const SMM_WORKERS_ORIGIN='https://mfk-smm-web.yeungyi88.workers.dev';
+const CORS_ORIGINS=new Set([ADMIN_ORIGIN,SMT_ORIGIN,CUSTOMER_ORIGIN,SMM_ORIGIN,SMM_WORKERS_ORIGIN]);
 
 function json(value,status=200,extra={}){
   return new Response(JSON.stringify(value),{status,headers:{...JSON_HEADERS,...extra}});
@@ -161,6 +163,58 @@ function customerPublicSnapshot(active,customerOrders=[]){
       reorderEligible:true,
     })),
     observedAt:new Date().toISOString(),
+  };
+}
+
+
+function smmPublicSnapshot(active){
+  const base=customerPublicSnapshot(active,[]);
+  const now=new Date().toISOString();
+  const menu=row(base.menu);
+  return{
+    connectionPath:'INTERNET',
+    menu:{
+      revision:String(menu.revision||'0'),
+      observedAt:String(menu.observedAt||now),
+      categories:rows(menu.categories).map(raw=>{
+        const item=row(raw);
+        return{categoryId:String(item.categoryId||''),name:String(item.name||''),sortOrder:Number(item.sortOrder)||0};
+      }).filter(item=>item.categoryId&&item.name),
+      products:rows(menu.products).map(raw=>{
+        const item=row(raw);
+        const imageRef=String(item.imageUrl||'').trim();
+        return{
+          productId:String(item.productId||''),
+          categoryId:String(item.categoryId||''),
+          name:String(item.name||''),
+          description:String(item.description||''),
+          ...(imageRef?{imageRef}:{}),
+          available:item.available!==false,
+          optionGroups:rows(item.optionGroups).map(groupRaw=>{
+            const group=row(groupRaw);
+            return{
+              optionGroupId:String(group.optionGroupId||''),
+              name:String(group.name||''),
+              required:group.required===true,
+              minSelections:Math.max(0,Number(group.minSelections)||0),
+              maxSelections:Math.max(1,Number(group.maxSelections)||1),
+              options:rows(group.options).map(optionRaw=>{
+                const option=row(optionRaw);
+                return{optionId:String(option.optionId||''),name:String(option.name||''),available:option.available!==false};
+              }).filter(option=>option.optionId&&option.name),
+            };
+          }).filter(group=>group.optionGroupId&&group.name),
+        };
+      }).filter(item=>item.productId&&item.categoryId&&item.name),
+    },
+    orders:[],
+    work:[],
+    channels:[{channel:'INTERNET',state:'CONNECTED',detail:'Admin published menu/config projection',observedAt:now}],
+    dineSessions:[],
+    printHealth:[],
+    refundRequests:[],
+    staff:{actorId:'SMM-INTERNET',displayName:'店員模式',roleLabel:'SMM',storeId:String(row(base.store).storeId||'MF01'),deviceLabel:'Internet'},
+    observedAt:now,
   };
 }
 
@@ -450,6 +504,21 @@ export class AdminSyncStore{
 export default {
   async fetch(request,env){
     const url=new URL(request.url);
+
+    if(url.pathname.startsWith('/api/smm/')){
+      if(request.method==='OPTIONS')return new Response(null,{status:204,headers:cors(request)});
+      const storeId=storeIdFrom(url);
+      const adminId=env.ADMIN_SYNC.idFromName(storeId);
+      const admin=env.ADMIN_SYNC.get(adminId);
+      if(url.pathname==='/api/smm/snapshot'){
+        if(request.method!=='GET')return json({code:'METHOD_NOT_ALLOWED'},405,cors(request));
+        const activeResponse=await admin.fetch(new Request('https://internal/active',{method:'GET'}));
+        if(!activeResponse.ok)return json({code:'SMM_CONFIG_NOT_PUBLISHED'},503,cors(request));
+        const active=await activeResponse.json();
+        return json(smmPublicSnapshot(active),200,cors(request));
+      }
+      return json({code:'NOT_FOUND'},404,cors(request));
+    }
 
     if(url.pathname.startsWith('/api/customer/')){
       if(request.method==='OPTIONS')return new Response(null,{status:204,headers:cors(request)});
