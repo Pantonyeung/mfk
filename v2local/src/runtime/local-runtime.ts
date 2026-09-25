@@ -170,7 +170,7 @@ function save(){localStorage.setItem(KEY,JSON.stringify(data));listeners.forEach
 function projectOrder(order:StoredOrder){queueOrderProjection(order)}
 const money=(minor:number)=>String.fromCharCode(36)+(minor/100).toFixed(2);
 
-export interface SmtReprintOption{readonly jobId:string;readonly role:string;readonly label:string;readonly detail?:string;readonly bindingId:string;readonly printerName:string;readonly physicalKey:string;readonly firstPrintState?:'SENT_TO_PRINTER'|'TRANSPORT_REPORTED_INCOMPLETE'|'NO_TRANSPORT_EVIDENCE';readonly firstPrintCode?:string}
+export interface SmtReprintOption{readonly jobId:string;readonly role:string;readonly label:string;readonly detail?:string;readonly bindingId:string;readonly printerName:string;readonly physicalKey:string}
 export interface CleanSmtCoreRuntimePort{
   subscribe(listener:()=>void):()=>void;
   readOrders?(selectedOrderId?:string):Promise<SmtOrdersProjection>;
