@@ -1,3 +1,4 @@
+// Build refresh: Admin-shared dining labels + hardened source lanes.
 interface Env{
   ASSETS:{fetch(request:Request):Promise<Response>};
   WEB_ACCEPTANCE_TOKEN:string;
