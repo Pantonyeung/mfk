@@ -33,7 +33,7 @@ declare global{interface Window{__MFK_SMM_LAN_HANDLE__?:(deviceId:string,payload
 window.__MFK_SMM_LAN_HANDLE__=(deviceId,payload)=>{
   try{
     const request=JSON.parse(payload) as SmmLanOrderRequest;
-    if(request.type==='smm.lan.order.submit.v1')return JSON.stringify(smmLanIngress.submit(request,{deviceId}));
+    if(request.type==='smm.lan.order.submit.v1')return JSON.stringify(smmLanIngress.submit(request,{deviceId,trusted:true}));
     if((request as {type?:string}).type==='smm.lan.order.readback.v1'){
       return JSON.stringify(smmLanIngress.readSubmission((request as unknown as {submissionId:string}).submissionId));
     }
