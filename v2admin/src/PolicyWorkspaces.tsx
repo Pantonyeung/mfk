@@ -2,6 +2,7 @@ import {useEffect,useMemo,useState} from 'react';
 import {useAdminDraft} from './admin-draft.tsx';
 import {appendAdminAudit,readActiveAdminRelease,usePersistentAdminState,writeAdminStored} from './admin-local-store.ts';
 import {saveAdminConfig} from './admin-config-save.ts';
+import {uploadAdminPaymentQr} from './admin-sync-client.ts';
 import {
   beginKeetaOAuth,
   checkKeetaTokenReadiness,
@@ -154,7 +155,7 @@ export function PrintTemplatesWorkspace(){
 
 type StoreDay='MON'|'TUE'|'WED'|'THU'|'FRI'|'SAT'|'SUN';
 interface DiningTableConfig{readonly id:string;readonly name:string;readonly active:boolean;readonly sortOrder:number}
-interface CustomerPaymentChannelConfig{readonly id:'ALIPAY'|'WECHAT'|'FPS'|'PAYME';readonly name:string;readonly enabled:boolean;readonly qrImageUrl:string;readonly sortOrder:number}
+interface CustomerPaymentChannelConfig{readonly id:string;readonly name:string;readonly enabled:boolean;readonly qrImageUrl:string;readonly sortOrder:number}
 interface StoreSettings{
   storeName:string;storeCode:string;currency:string;timezone:string;
   lateArrivalMinutes:number;fulfillmentMinutes:number;archiveHours:number;
@@ -204,7 +205,26 @@ export function StoreSettingsWorkspace(){
   const refs=(value:string)=>value.split(',').map(item=>item.trim()).filter(Boolean);
   const diningTables=(config.diningTables??DEFAULT_DINING_TABLES).slice().sort((a,b)=>a.sortOrder-b.sortOrder);
   const paymentChannels=(config.customerPaymentChannels??DEFAULT_CUSTOMER_PAYMENT_CHANNELS).slice().sort((a,b)=>a.sortOrder-b.sortOrder);
-  const patchPaymentChannel=(id:CustomerPaymentChannelConfig['id'],change:Partial<CustomerPaymentChannelConfig>)=>patch({customerPaymentChannels:paymentChannels.map(row=>row.id===id?{...row,...change}:row)});
+  const [paymentUploadState,setPaymentUploadState]=useState<Record<string,string>>({});
+  const patchPaymentChannel=(id:string,change:Partial<CustomerPaymentChannelConfig>)=>patch({customerPaymentChannels:paymentChannels.map(row=>row.id===id?{...row,...change}:row)});
+  const addPaymentChannel=()=>{
+    const used=new Set(paymentChannels.map(row=>row.id));
+    let n=paymentChannels.length+1;
+    let id='PAY-'+String(n).padStart(2,'0');
+    while(used.has(id)){n++;id='PAY-'+String(n).padStart(2,'0')}
+    patch({customerPaymentChannels:[...paymentChannels,{id,name:'新付款方式',enabled:false,qrImageUrl:'',sortOrder:paymentChannels.length+1}]});
+  };
+  const removePaymentChannel=(id:string)=>patch({customerPaymentChannels:paymentChannels.filter(row=>row.id!==id)});
+  const uploadPaymentQr=async(id:string,file:File)=>{
+    setPaymentUploadState(current=>({...current,[id]:'上載中…'}));
+    try{
+      const uploaded=await uploadAdminPaymentQr(file,id,config.storeCode||'MF01');
+      patchPaymentChannel(id,{qrImageUrl:uploaded.qrImageUrl});
+      setPaymentUploadState(current=>({...current,[id]:'已上載'}));
+    }catch(error){
+      setPaymentUploadState(current=>({...current,[id]:error instanceof Error?error.message:'上載失敗'}));
+    }
+  };
   const patchTable=(id:string,change:Partial<DiningTableConfig>)=>patch({diningTables:diningTables.map(row=>row.id===id?{...row,...change}:row)});
   const addTable=()=>patch({diningTables:[...diningTables,{
     id:'T'+String(Math.min(99,Math.max(0,...diningTables.map(row=>Number(row.id.replace(/\D/g,''))||0))+1)).padStart(2,'0'),
@@ -229,13 +249,19 @@ export function StoreSettingsWorkspace(){
           <button type="button" onClick={()=>removeTable(row.id)}>刪除</button>
         </div>)}</div>
       </article>
-      <article className="admin-policy-card"><h2>客戶電子支付</h2><p>客戶端只顯示已啟用渠道。QR 圖未提供時保留正式位置，但唔會產生假 QR。</p><div className="admin-editor-list">{paymentChannels.map((row,index)=><div className="admin-policy-row" key={row.id}>
-        <b>{row.id}</b>
-        <label><span>顯示名稱</span><input value={row.name} onChange={event=>patchPaymentChannel(row.id,{name:event.target.value})}/></label>
-        <label><span>QR 圖片網址</span><input value={row.qrImageUrl} onChange={event=>patchPaymentChannel(row.id,{qrImageUrl:event.target.value})} placeholder="圖片未提供可留空"/></label>
-        <label><span>排序</span><input type="number" min={1} value={row.sortOrder} onChange={event=>patchPaymentChannel(row.id,{sortOrder:Number(event.target.value)||index+1})}/></label>
-        <Toggle checked={row.enabled} onChange={enabled=>patchPaymentChannel(row.id,{enabled})} label={row.enabled?'啟用':'停用'}/>
-      </div>)}</div></article>
+      <article className="admin-policy-card"><header><div><h2>客戶電子支付</h2><small>新增、改名、上傳付款 QR、啟用／停用；Customer 只讀已發佈版本。</small></div><button type="button" onClick={addPaymentChannel}>新增付款方式</button></header>
+        <div className="admin-editor-list">{paymentChannels.map((row,index)=><div className="admin-policy-row" key={row.id}>
+          <b>{row.id}</b>
+          <label><span>顯示名稱</span><input value={row.name} onChange={event=>patchPaymentChannel(row.id,{name:event.target.value})} placeholder="例如 AlipayHK"/></label>
+          <label><span>付款 QR 圖</span><input type="file" accept="image/jpeg,image/png,image/webp" onChange={event=>{const file=event.target.files?.[0];if(file)void uploadPaymentQr(row.id,file)}}/></label>
+          {row.qrImageUrl?<div><img src={row.qrImageUrl} alt={row.name+' QR'} style={{width:72,height:72,objectFit:'contain',borderRadius:10,border:'1px solid rgba(0,0,0,.12)'}}/><button type="button" onClick={()=>patchPaymentChannel(row.id,{qrImageUrl:''})}>移除圖片</button></div>:<span>未有付款 QR</span>}
+          <small>{paymentUploadState[row.id]??''}</small>
+          <label><span>排序</span><input type="number" min={1} value={row.sortOrder} onChange={event=>patchPaymentChannel(row.id,{sortOrder:Number(event.target.value)||index+1})}/></label>
+          <Toggle checked={row.enabled} onChange={enabled=>patchPaymentChannel(row.id,{enabled})} label={row.enabled?'啟用':'停用'}/>
+          <button type="button" onClick={()=>removePaymentChannel(row.id)}>刪除付款方式</button>
+        </div>)}</div>
+        <p>付款 QR 會經 Admin Worker 上載到私有 R2；R2 唔開 Public Access。未有 QR 嘅付款方式可以保留設定，但 Customer 唔可以用佢提交電子付款。</p>
+      </article>
       <article className="admin-policy-card"><h2>系統引用</h2><label><span>付款方式 refs</span><input value={config.paymentRefs.join(', ')} onChange={event=>patch({paymentRefs:refs(event.target.value)})} placeholder="例如 CASH, OCTOPUS"/></label><label><span>打印路由 refs</span><input value={config.printRefs.join(', ')} onChange={event=>patch({printRefs:refs(event.target.value)})} placeholder="例如 RECEIPT, KITCHEN"/></label><label><span>渠道 refs</span><input value={config.channelRefs.join(', ')} onChange={event=>patch({channelRefs:refs(event.target.value)})} placeholder="例如 KEETA"/></label></article>
       <article className="admin-policy-card"><h2>營運計時</h2><label><span>遲到界線（分鐘）</span><input type="number" min={0} value={config.lateArrivalMinutes} onChange={event=>patch({lateArrivalMinutes:Number(event.target.value)||0})}/></label><label><span>出餐計時（分鐘）</span><input type="number" min={0} value={config.fulfillmentMinutes} onChange={event=>patch({fulfillmentMinutes:Number(event.target.value)||0})}/></label><label><span>封存時間（小時）</span><input type="number" min={1} value={config.archiveHours} onChange={event=>patch({archiveHours:Number(event.target.value)||1})}/></label></article>
       <article className="admin-policy-card"><h2>Pending Order 提醒</h2><label><span>幾多分鐘後提醒</span><input type="number" min={0} value={config.reminderAfterMinutes} onChange={event=>patch({reminderAfterMinutes:Number(event.target.value)||0})}/></label><label><span>提醒間隔（分鐘）</span><input type="number" min={1} value={config.reminderIntervalMinutes} onChange={event=>patch({reminderIntervalMinutes:Number(event.target.value)||1})}/></label><Toggle checked={config.repeatReminder} onChange={repeatReminder=>patch({repeatReminder})} label="重複提醒"/><label><span>Timeout 提示優先級</span><select value={config.timeoutPriority} onChange={event=>patch({timeoutPriority:event.target.value as StoreSettings['timeoutPriority']})}><option value="NORMAL">一般</option><option value="HIGH">高</option><option value="URGENT">緊急</option></select></label><small>Timeout 唔會自動接受／拒絕訂單。</small></article>
