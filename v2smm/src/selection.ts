@@ -45,6 +45,7 @@ export function selectedSmmCartOptions(product:SmmProduct,state:SmmSelectionStat
         optionGroupId:group.optionGroupId,
         optionId:option.optionId,
         optionName:option.name,
+        ...(Number.isSafeInteger(Number(option.publishedAdjustmentMinor))?{publishedAdjustmentMinor:Number(option.publishedAdjustmentMinor)}:{}),
       })]:[];
     })
   ));
