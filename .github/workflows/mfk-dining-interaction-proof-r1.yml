@@ -1,0 +1,49 @@
+name: mfk-dining-interaction-proof-r1
+on:
+  pull_request:
+    branches:
+      - work/MFK/SMT-DONOR-SKELETON-FUSION-V2-R1
+permissions:
+  contents: read
+jobs:
+  proof:
+    if: github.head_ref == 'work/MFK/SMT-OWNER-FINAL-DINING-INTERACTION-R1'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    defaults:
+      run:
+        working-directory: v2local
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Record exact source
+        run: git rev-parse HEAD
+      - run: npm install --no-audit --no-fund --legacy-peer-deps --package-lock=false
+      - run: npm test
+      - run: npm run build
+      - name: Install browser test tooling only
+        run: |
+          npm install --no-save --package-lock=false --legacy-peer-deps playwright@1.55.1
+          npx playwright install --with-deps chromium
+      - name: Start isolated fixture
+        run: |
+          mkdir -p /tmp/mfk-dining-proof
+          npm run dev -- --host 127.0.0.1 --port 4173 > /tmp/mfk-dining-proof/vite.log 2>&1 &
+          for n in $(seq 1 30); do
+            curl -fsS http://127.0.0.1:4173/acceptance/dining.html >/dev/null && exit 0
+            sleep 1
+          done
+          exit 1
+      - name: Real browser interaction proof
+        run: node acceptance/dining-proof.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mfk-dining-proof-${{ github.run_id }}
+          path: /tmp/mfk-dining-proof
+          if-no-files-found: warn
+          retention-days: 7
