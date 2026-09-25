@@ -534,6 +534,32 @@ export default{
       return json({code:'NOT_FOUND'},404,cors(request));
     }
 
+    if(url.pathname==='/api/smm/config-diagnostics'){
+      if(request.method!=='GET')return json({code:'METHOD_NOT_ALLOWED'},405);
+      let active:Record<string,unknown>;
+      try{active=await fetchActive(storeId);}catch{return json({code:'SMM_CONFIG_NOT_PUBLISHED'},503);}
+      let acks:Record<string,unknown>={};
+      try{
+        const ackUrl=new URL(ADMIN_ACKS);
+        ackUrl.searchParams.set('storeId',storeId);
+        const ackResponse=await fetch(ackUrl,{headers:{accept:'application/json','cache-control':'no-cache'}});
+        if(ackResponse.ok)acks=record(await ackResponse.json());
+      }catch{}
+      const activeRevision=Number(active.revision)||0;
+      const activeFingerprint=String(active.fingerprint||'');
+      const rows=list(acks.acks).map(raw=>record(raw)).map(row=>({
+        deviceId:String(row.deviceId||''),
+        revision:Number(row.revision)||0,
+        fingerprint:String(row.fingerprint||''),
+        appliedAt:String(row.appliedAt||''),
+      }));
+      return json({
+        active:{revision:activeRevision,fingerprint:activeFingerprint},
+        devices:rows,
+        mismatch:rows.some(row=>row.revision!==activeRevision||row.fingerprint!==activeFingerprint),
+      });
+    }
+
     if(url.pathname==='/api/health')return json({ok:true,service:'mfk-smm-web',internetProjection:'admin-published-config',internetStaffOrders:'durable-intent-only'});
     return env.ASSETS.fetch(request);
   },
