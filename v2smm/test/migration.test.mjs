@@ -180,6 +180,10 @@ test('dedicated SMM worker projects published Admin truth and stores only durabl
   assert.match(worker,/publishedTakeawayUnitPriceMinor/);
   assert.match(worker,/publishedDineInUnitPriceMinor/);
   assert.match(worker,/publishedAdjustmentMinor/);
+  assert.match(worker,/projectSyncedOrderingCatalog/);
+  assert.match(worker,/projectSyncedOrderingCatalog\('takeaway',envelope\)/);
+  assert.match(worker,/projectSyncedOrderingCatalog\('dine-in',envelope\)/);
+  assert.doesNotMatch(worker,/takeawaySurchargeEnabled|takeawayAdjustment/);
   assert.match(worker,/url\.pathname==='\/api\/smm\/snapshot'/);
   assert.match(worker,/SmmIntentStore/);
   assert.match(worker,/\/api\/smm\/orders\/submit/);
@@ -247,4 +251,15 @@ test('Internet staff orders use same-account challenge proof and fall back into 
   assert.match(app,/Internet 員工落單需要先/);
   assert.match(smtCloud,/createSmmLanIngress|canonical SMM ingress|ingress\.submit/);
   assert.doesNotMatch(smtCloud,/createOrder|priceCustomerCart|StoreKernel/);
+});
+
+
+test('SMM Internet menu and SMT commit share one published catalog projection',()=>{
+  const worker=fs.readFileSync(path.join(repoRoot,'v2smm','worker.ts'),'utf8');
+  const ingress=fs.readFileSync(path.join(repoRoot,'v2local','src','runtime','smm-lan-ingress.ts'),'utf8');
+  assert.match(worker,/projectSyncedOrderingCatalog/);
+  assert.match(ingress,/projectSyncedOrderingCatalog/);
+  assert.match(worker,/publishedTakeawayUnitPriceMinor:row\.priceMinor/);
+  assert.match(ingress,/publishedTakeawayUnitPriceMinor:row\.priceMinor/);
+  assert.match(ingress,/SMM_PUBLISHED_PRICE_CHANGED/);
 });
