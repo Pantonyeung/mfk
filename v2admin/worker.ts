@@ -514,14 +514,12 @@ export default {
         if(request.method!=='POST')return json({code:'METHOD_NOT_ALLOWED'},405,cors(request));
         const staff=await resolveSmmStaffSession(request,storeId);
         if(!staff)return json({code:'SMM_STAFF_UNAUTHORIZED',message:'SMM 員工工作階段無效'},401,cors(request));
-        const body=await request.arrayBuffer();
+        const orderBody=await request.json().catch(()=>null);
+        if(!orderBody)return json({code:'SMM_STAFF_ORDER_INVALID'},400,cors(request));
         const response=await customer.fetch(new Request('https://internal/public/staff-orders/submit',{
           method:'POST',
           headers:{'content-type':'application/json'},
-          body:JSON.stringify({
-            request:body.byteLength?JSON.parse(new TextDecoder().decode(body)):null,
-            staff,
-          }),
+          body:JSON.stringify({request:orderBody,staff}),
         }));
         if(response.status===202){
           try{
