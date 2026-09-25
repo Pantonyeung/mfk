@@ -317,7 +317,7 @@ describe('Dining R6 automatic table-order admission',()=>{
     expect(moved.diningTableLabel).toBe('T02');
   });
 
-  it('first print stores per-ticket result for precise recovery',async()=>{
+  it('first print stores transport evidence for diagnostics without driving human reprint choice',async()=>{
     const runtime=await boot();
     const hold=runtime.createHold({kind:'dining',items:[{id:'rice',name:'飯團',qty:1,unitMinor:4100,serviceMode:'dine-in'}],totalMinor:4100});
     await runtime.assignDiningTable(hold.id,'T01');
