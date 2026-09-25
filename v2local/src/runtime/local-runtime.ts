@@ -1162,10 +1162,14 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
   async assignDiningTable(holdId,tableId){
     const snapshot=readDiningState();const hold=requireDiningHold(snapshot,holdId);
     if(hold.archivedAt)throw new Error('DINING_HISTORY_PROTECTED');
-    if(!/^T0[1-9]$/.test(tableId))throw new Error('DINING_TABLE_INVALID');
+    const allowedTables=readSmtStoreSettings().diningTables;
+    if(allowedTables.length&&!allowedTables.some(table=>table.id===tableId))throw new Error('DINING_TABLE_INVALID');
+    if(!allowedTables.length&&!/^T0[1-9]$/.test(tableId))throw new Error('DINING_TABLE_INVALID');
     if(snapshot.holds.some(row=>row.id!==holdId&&!row.archivedAt&&row.kind==='dining'&&row.assignedTable===tableId))throw new Error('DINING_TABLE_OCCUPIED');
     if(hold.assignedTable===tableId)return;
     commitDiningHolds(snapshot,snapshot.holds.map(row=>row.id===holdId?{...row,assignedTable:tableId}:row));
+    // Owner contract: 掛入堂食枱就係落單。唔需要第二個「正式落廚」動作。
+    if(hold.items.length)await localRuntime.admitDiningProduction(holdId);
   },
   async unassignDiningTable(holdId){
     const snapshot=readDiningState();const hold=requireDiningHold(snapshot,holdId);
