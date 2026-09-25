@@ -8,6 +8,8 @@ import {
   createLocalBackup,
   validateLocalBackup,
   restoreLocalBackup,
+  appendLocalCashMovement,
+  readLocalCashMovements,
   type LocalReportOrder,
 } from './local-operations.ts';
 
@@ -151,6 +153,40 @@ describe('MFK local operations fusion',()=>{
     const report=buildLocalReport(split,{now:new Date('2026-09-21T05:00:00.000Z').getTime(),businessStartHour:5});
     expect(report.netSalesMinor).toBe(5000);
     expect(report.cashSalesMinor).toBe(2000);
+  });
+
+  it('records append-only cash movements with idempotent identity',()=>{
+    const values=new Map<string,string>();
+    const storage={
+      getItem:(key:string)=>values.get(key)??null,
+      setItem:(key:string,value:string)=>{values.set(key,value);},
+    };
+    const first=appendLocalCashMovement({
+      id:'CASHMOVE-REF-1',
+      businessDate:'2026-09-25',
+      direction:'OUT',
+      kind:'REFUND',
+      amountMinor:2000,
+      purpose:'訂單退款',
+      orderId:'MFK-1',
+      refundId:'REF-1',
+      staffId:'staff-1',
+      staffName:'店員甲',
+      now:100,
+    },storage);
+    const repeated=appendLocalCashMovement({
+      id:'CASHMOVE-REF-1',
+      businessDate:'2026-09-25',
+      direction:'OUT',
+      kind:'REFUND',
+      amountMinor:9999,
+      purpose:'duplicate',
+    },storage);
+    expect(repeated).toEqual(first);
+    expect(readLocalCashMovements(storage)).toHaveLength(1);
+    expect(readLocalCashMovements(storage)[0]).toMatchObject({
+      direction:'OUT',kind:'REFUND',amountMinor:2000,orderId:'MFK-1',refundId:'REF-1',
+    });
   });
 
   it('backup validates and restores only MFK keys',()=>{
