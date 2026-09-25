@@ -69,7 +69,40 @@ export function createSmmLanIngress(runtime:MfkLocalRuntime){
           displayCode:order.display,
           source:order.sourceLabel,
           lifecycle:order.fulfillmentLabel,
-          amountLabel:'HK
+          amountLabel:'HKD '+(order.totalMinor/100).toFixed(2),
+          itemSummary:order.items.map(item=>item.name+' ×'+item.qty).join('、'),
+          observedAt:order.updatedAt||order.createdAt,
+          readback:'CONFIRMED' as const,
+          ...(order.orderRemark?{note:order.orderRemark}:{}),
+          timeline:Object.freeze([
+            Object.freeze({at:order.createdAt,label:'建立訂單',detail:order.sourceLabel}),
+            ...(order.updatedAt&&order.updatedAt!==order.createdAt?[Object.freeze({at:order.updatedAt,label:order.fulfillmentLabel})]:[]),
+          ]),
+        }))),
+        work:Object.freeze([]),
+        channels:Object.freeze([]),
+        dineSessions:Object.freeze(runtime.holds().filter(hold=>hold.kind==='dining').map(hold=>{
+          const payments=hold.payments??[];
+          const lines=hold.items.map((item,lineIndex)=>{
+            const paidQty=payments.reduce((sum,payment)=>sum+payment.selections.filter(selection=>selection.lineIndex===lineIndex).reduce((inner,selection)=>inner+selection.qty,0),0);
+            return Object.freeze({lineIndex,name:item.name,qty:item.qty,paidQty,remainingQty:Math.max(0,item.qty-paidQty),unitMinor:item.unitMinor});
+          });
+          const paidMinor=payments.reduce((sum,payment)=>sum+payment.amountMinor,0);
+          return Object.freeze({
+            sessionId:hold.id,
+            tableLabel:hold.assignedTable?Number(hold.assignedTable.slice(1))+' 號枱':'輪候 '+hold.codeLabel,
+            covers:hold.partySize,
+            state:hold.assignedTable?'OCCUPIED':'WAITING',
+            openedAt:hold.createdAt,
+            itemSummary:hold.items.map(item=>item.name+' ×'+item.qty).join('、'),
+            totalMinor:hold.totalMinor,
+            paidMinor,
+            remainingMinor:Math.max(0,hold.totalMinor-paidMinor),
+            lines:Object.freeze(lines),
+          });
+        })),
+        printHealth:Object.freeze([]),
+        refundRequests:Object.freeze([]),
         observedAt:new Date().toISOString(),
       });
     },
