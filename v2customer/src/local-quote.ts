@@ -1,3 +1,4 @@
+// Build refresh: Customer local published-menu quote + bounded WhatsApp fallback.
 import type {CustomerCartLine,CustomerMenuSnapshot,CustomerQuoteSnapshot} from './product-types.ts';
 
 export function quotePublishedCart(
