@@ -157,10 +157,10 @@ export function OrderingWorkspace({view,actions,centerPanel}:{view:OrderingWorks
       </div>:null}
 
       {view.cart.lines.length?<div className="ordering-cart-secondary-actions active-cart">
-        {availability.holdCart?<button type="button" onClick={actions.onHoldCart}>暫存</button>:<span/>}
+        {availability.holdCart?<button type="button" onClick={actions.onHoldCart}>暫存單</button>:<span/>}
         {availability.cancelCart?<button type="button" className="destructive" onClick={actions.onCancelCart}>取消</button>:<span/>}
       </div>:view.heldCartCount>0?<div className="ordering-cart-secondary-actions empty-cart">
-        <button type="button" className="retrieve" onClick={actions.onOpenHeldOrders}>取回訂單 <b>{view.heldCartCount}</b></button>
+        <button type="button" className="retrieve" onClick={actions.onOpenHeldOrders}>取單 <b>{view.heldCartCount}</b></button>
       </div>:null}
 
       {view.cart.blockingMessage?<div className="ordering-cart-blocking" role="status">{view.cart.blockingMessage}</div>:null}
