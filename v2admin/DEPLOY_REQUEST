@@ -1,7 +1,7 @@
 MFK_ADMIN_DEPLOY_REQUEST
 target=mfk-admin
 canonical_url=https://admin.morefunos.com
-product_source=c5107d945d926ce83929c49d00efddd94c35eb09
+product_source=863f5e166d669e33710baef8198d5da1f2ba865b
 requested_by=owner
-reason=publish_customer_electronic_payment_channels_and_qr_placeholders
-work_id=MFK-CUSTOMER-ELECTRONIC-PAYMENT-CHANNELS-R1
+reason=publish_admin_managed_dynamic_payment_methods_and_qr_uploads
+work_id=MFK-ADMIN-PAYMENT-CHANNEL-ASSET-MANAGEMENT-R1
