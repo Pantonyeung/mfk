@@ -65,7 +65,6 @@ describe('SMM web acceptance intake',()=>{
   });
 
   it('retries the same ACK identity after a transient public failure without resubmitting the order',async()=>{
-    vi.useFakeTimers();
     const request={
       protocolVersion:1 as const,type:'smm.lan.order.submit.v1' as const,
       requestId:'SMM-ACCEPT-RETRY',submissionId:'SUB-ACCEPT-RETRY',idempotencyKey:'IDEMP-ACCEPT-RETRY',
@@ -91,12 +90,9 @@ describe('SMM web acceptance intake',()=>{
       }
       return new Response('{}',{status:404});
     }));
-    const work=reconcileSmmWebAcceptanceIntake(ingress);
-    await vi.advanceTimersByTimeAsync(300);
-    await work;
+    await reconcileSmmWebAcceptanceIntake(ingress);
     expect(ingress.submit).toHaveBeenCalledTimes(1);
     expect(ackAttempts).toBe(2);
-    vi.useRealTimers();
   });
 
 });
