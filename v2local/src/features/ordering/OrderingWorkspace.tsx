@@ -1,4 +1,4 @@
-import {useMemo,useState,type ReactNode} from 'react';
+import {useMemo,useState,type CSSProperties,type ReactNode} from 'react';
 import type {CartLineViewModel,OrderingProductViewModel,OrderingWorkspaceActions,OrderingWorkspaceViewModel,ServiceMode} from './ordering-workspace-model.ts';
 import './ordering-workspace.css';
 
@@ -90,8 +90,15 @@ export function OrderingWorkspace({view,actions,centerPanel}:{view:OrderingWorks
   const guidanceTarget=view.guidanceTarget??(itemCount?'checkout':'product');
   const categoryRows=view.categoryRows??2;
   const categoryColumns=view.categoryColumns??7;
-  const productDensity=view.productDensity??'standard';
-  return <div className={`ordering-workspace donor-skeleton density-${productDensity}${centerPanel?' panel-open':''}`} data-guidance={guidanceTarget}>
+  const productColumns=view.productColumns??4;
+  const productCardHeight=view.productCardHeight??142;
+  const fontScale=view.fontScale??1;
+  const densityScale=view.densityScale??1;
+  const workspaceStyle={
+    '--mf-font-scale':String(fontScale),
+    '--mf-density-scale':String(densityScale),
+  } as CSSProperties;
+  return <div className={`ordering-workspace donor-skeleton${centerPanel?' panel-open':''}`} data-guidance={guidanceTarget} style={workspaceStyle}>
     <header className="ordering-flow-strip">
       <QueueStrip title="待處理" kind="pending" orders={view.pendingOrders} onOpen={actions.onOpenQueueOrder}/>
       <QueueStrip title="Keeta" kind="active" orders={view.activeOrders} onOpen={actions.onOpenQueueOrder}/>
@@ -120,7 +127,7 @@ export function OrderingWorkspace({view,actions,centerPanel}:{view:OrderingWorks
           >
             {view.categories.map(category=><button type="button" key={category.id} aria-pressed={view.selectedCategoryId===category.id} className={view.selectedCategoryId===category.id?'active':''} onClick={()=>actions.onSelectCategory(category.id)}>{category.label}</button>)}
           </nav>}
-          <section className="ordering-product-grid">{view.products.map(product=><ProductCard key={product.id} product={product} actions={actions} orderingMode={orderingMode} recentlyAdded={view.recentlyAddedProductId===product.id}/>)}</section>
+          <section className="ordering-product-grid" style={{gridTemplateColumns:`repeat(${productColumns},minmax(0,1fr))`,gridAutoRows:productCardHeight+'px'}}>{view.products.map(product=><ProductCard key={product.id} product={product} actions={actions} orderingMode={orderingMode} recentlyAdded={view.recentlyAddedProductId===product.id}/>)}</section>
         </div>
     </main>
 
