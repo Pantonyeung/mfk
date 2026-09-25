@@ -191,7 +191,10 @@ test('dedicated SMM worker projects published Admin truth and stores only durabl
   assert.match(worker,/sessions\/create/);
   assert.match(worker,/sessions\/read/);
   assert.match(worker,/auth-selftest/);
-  assert.match(worker,/SMM_STAFF_VERIFY_RUNTIME_ERROR/);
+  assert.match(worker,/\/api\/smm\/staff\/challenge/);
+  assert.match(worker,/auth\/challenge\/create/);
+  assert.match(worker,/auth\/challenge\/consume/);
+  assert.match(worker,/CLIENT_PBKDF2/);
   assert.match(worker,/SMM_SESSION_STORE_UNAVAILABLE/);
   assert.doesNotMatch(worker,/snapshot\.staff\b/);
   assert.match(wrangler,/SMM_INTENT_STORE/);
@@ -216,21 +219,26 @@ test('SMM staff checkout has service mode and tender but no automatic drawer or 
 });
 
 
-test('Internet staff orders require staff PIN and fall back into the same SMT ingress',()=>{
+test('Internet staff orders use same-account challenge proof and fall back into the same SMT ingress',()=>{
   const cloud=fs.readFileSync(path.join(root,'pwa-cloud.ts'),'utf8');
   const staff=fs.readFileSync(path.join(root,'pwa-staff.ts'),'utf8');
   const runtime=fs.readFileSync(path.join(root,'pwa-runtime.ts'),'utf8');
   const app=fs.readFileSync(path.join(root,'App.tsx'),'utf8');
   const smtCloud=fs.readFileSync(path.join(repoRoot,'v2local','src','runtime','smm-cloud-intake.ts'),'utf8');
   assert.match(staff,/localStorage/);
+  assert.match(staff,/\/api\/smm\/staff\/challenge/);
   assert.match(staff,/\/api\/smm\/staff\/verify/);
   assert.match(staff,/\/api\/smm\/staff\/session/);
+  assert.match(staff,/derivePinKeyHex/);
+  assert.match(staff,/PBKDF2/);
+  assert.match(staff,/HMAC/);
   assert.match(staff,/sessionToken/);
   assert.match(staff,/HTTP /);
   assert.doesNotMatch(staff,/readonly\s+pin\s*:/);
   assert.match(cloud,/\/api\/smm\/orders\/submit/);
   assert.match(cloud,/x-mfk-smm-session/);
   assert.doesNotMatch(cloud,/x-mfk-staff-pin/);
+  assert.doesNotMatch(cloud,/x-mfk-staff-id/);
   assert.match(runtime,/hybridTransport/);
   assert.match(runtime,/local\.kind!=='UNAVAILABLE'/);
   assert.match(app,/員工帳戶/);
