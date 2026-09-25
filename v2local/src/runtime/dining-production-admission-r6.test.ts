@@ -316,6 +316,24 @@ describe('Dining R6 automatic table-order admission',()=>{
     expect(moved.diningTableLabel).toBe('T02');
   });
 
+  it('first print stores per-ticket result for precise recovery',async()=>{
+    const runtime=await boot();
+    const hold=runtime.createHold({kind:'dining',items:[{id:'rice',name:'飯團',qty:1,unitMinor:4100,serviceMode:'dine-in'}],totalMinor:4100});
+    await runtime.assignDiningTable(hold.id,'T01');
+    const detail=await runtime.readDiningHold(hold.id);
+    expect(detail.firstPrintResults?.length).toBeGreaterThan(0);
+    expect(detail.firstPrintResults?.every((row:any)=>row.jobId&&row.role&&typeof row.ok==='boolean'&&row.code)).toBe(true);
+    const options=await runtime.readDiningReprintOptions(hold.id);
+    expect(options.every((row:any)=>row.firstPrintState==='DONE')).toBe(true);
+  });
+
+  it('dining reprint rejects stale or forged job ids instead of silently doing nothing',async()=>{
+    const runtime=await boot();
+    const hold=runtime.createHold({kind:'dining',items:[{id:'rice',name:'飯團',qty:1,unitMinor:4100,serviceMode:'dine-in'}],totalMinor:4100});
+    await runtime.assignDiningTable(hold.id,'T01');
+    await expect(runtime.reprintDiningJobs(hold.id,['forged-job-id'],'TEST')).rejects.toThrow('DINING_REPRINT_JOB_INVALID');
+  });
+
   it('formal Order link survives runtime restart',async()=>{
     let runtime=await boot();
     const hold=runtime.createHold({kind:'dining',items:[{id:'rice',name:'飯團',qty:1,unitMinor:4100,serviceMode:'dine-in'}],totalMinor:4100});
