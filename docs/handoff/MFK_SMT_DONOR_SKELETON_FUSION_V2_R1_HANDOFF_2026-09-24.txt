@@ -1163,3 +1163,70 @@ UNCHANGED
 
 Status:
 MFK_SMT_OWNER_FINAL_V1_ORDERS_FULFILLMENT_GREEN_OWNER_ACCEPTANCE_PENDING
+
+
+==================================================
+OWNER FINAL V1｜ORDER CORRECTION / REFUND / CANCEL NOTICE｜GREEN
+==================================================
+
+Validated candidate:
+ab1c7132dcecaa674e304d7a446094bd76887e4b
+
+Payment Method Correction:
+- Orders page formal correction surface
+- SAME Order / SAME Display
+- old tender retained in audit history
+- new tender = current effective tender
+- no new Order / Print Admission / auto reprint / drawer
+
+Refund:
+- Full Refund
+- Partial Refund
+- original Order retained
+- append-only linked refund record
+- actual refund method + note + staff identity
+- cumulative refund cannot exceed remaining amount
+- CASH refund creates Cash Movement OUT
+
+Formal Order Modification:
+- direct / third-party local modification preserves SAME Order and no auto reprint
+- own-platform formal modification is fail-closed until:
+  通知客戶 → 客戶確認
+  return loop is wired
+
+Post-production cancellation:
+- runtime records productionIssuedAt only after a real production ticket dispatch result
+- cancelling after production issued prints minimal 取消通知單 on existing production route
+- one automatic cancellation notice attempt per Order
+- repeated cancellation does not automatically duplicate the notice
+- cancel notice kickDrawer = false
+- modification does not auto-print modification notice
+
+Validation:
+GitHub Actions 36127886972 SUCCESS
+Job 108048119233
+37 / 37 Test Files PASS
+169 / 169 Tests PASS
+Build GREEN
+Worker 2bf2b39c-89ae-48cb-af93-6479a780a325
+Preview:
+https://smt-owner-final-order-refund-v3-mfk-admin.yeungyi88.workers.dev
+
+Preview PR:
+#289 CLOSED / NOT MERGED
+#287 / #288 SUPERSEDED / CLOSED / NOT MERGED
+
+Current main fresh-read:
+e45e19dbae0cd88a3b000355a1142bcf1ea72e9a
+
+Main:
+NOT MERGED
+
+Production:
+UNCHANGED
+
+Status:
+MFK_SMT_OWNER_FINAL_V1_ORDER_CORRECTION_REFUND_CANCEL_NOTICE_GREEN_OWNER_ACCEPTANCE_PENDING
+
+HARD RULE:
+未經 Owner 驗收，不准 merge main。
