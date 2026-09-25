@@ -327,7 +327,8 @@ async function reconcileOrders(){
     if(bridgeRow.bridgeKind==='SMM_STAFF'){
       const request=bridgeRow.request as SmmLanOrderRequest|undefined;
       if(!request)continue;
-      await commitSmmStaffRequest(request,String(record(bridgeRow.staff).staffId||''));
+      const staffRow=bridgeRow.staff&&typeof bridgeRow.staff==='object'&&!Array.isArray(bridgeRow.staff)?bridgeRow.staff as Record<string,unknown>:{};
+      await commitSmmStaffRequest(request,String(staffRow.staffId||''));
       continue;
     }
 
