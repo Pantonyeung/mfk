@@ -59,6 +59,9 @@ export function RuntimeDiningWorkspace({runtime,onCheckout,warningMinutes}:{
   const [now,setNow]=useState(Date.now());
   const [actionBusy,setActionBusy]=useState(false);
   const [checkoutBusy,setCheckoutBusy]=useState(false);
+  const [reprintOpen,setReprintOpen]=useState(false);
+  const [reprintOptions,setReprintOptions]=useState<readonly {jobId:string;role:string;label:string;detail?:string}[]>([]);
+  const [selectedReprintJobs,setSelectedReprintJobs]=useState<Set<string>>(new Set());
   const alive=useRef(true);
   const activeHold=useRef<string|null>(null);
   const currentDetail=useRef<LocalDiningHoldDetail|null>(null);
@@ -184,6 +187,25 @@ export function RuntimeDiningWorkspace({runtime,onCheckout,warningMinutes}:{
     if(checkoutLock.current||actionLock.current||!detail)return;
     setSelection(Object.fromEntries(detail.lines.filter(line=>line.remainingQty>0).map(line=>[line.lineIndex,line.remainingQty])));
   };
+  const openReprint=()=>command(async()=>{
+    const holdId=activeHold.current;
+    if(!holdId||!runtime.readDiningReprintOptions)throw new Error('未有堂食重印接口。');
+    const options=await runtime.readDiningReprintOptions(holdId);
+    setReprintOptions(options);
+    setSelectedReprintJobs(new Set());
+    setReprintOpen(true);
+  });
+  const toggleReprint=(jobId:string)=>setSelectedReprintJobs(current=>{
+    const next=new Set(current);if(next.has(jobId))next.delete(jobId);else next.add(jobId);return next;
+  });
+  const runReprint=()=>command(async()=>{
+    const holdId=activeHold.current;
+    if(!holdId||!runtime.reprintDiningJobs)throw new Error('未有堂食重印接口。');
+    if(!selectedReprintJobs.size)throw new Error('請先選擇要重印嘅票。');
+    const result=await runtime.reprintDiningJobs(holdId,[...selectedReprintJobs],'DINING_MANUAL_REPRINT');
+    setReprintOpen(false);
+    setMessage(result.failed===0?'堂食重印已送出 '+result.sent+'/'+result.planned:'堂食重印部分失敗 '+result.sent+'/'+result.planned);
+  });
   const goCheckout=async()=>{
     const before=currentDetail.current;
     if(!before||selectedUnits<=0||checkoutLock.current||actionLock.current||!runtime.readDiningHold)return;
@@ -282,10 +304,24 @@ export function RuntimeDiningWorkspace({runtime,onCheckout,warningMinutes}:{
         <section className="dining-payment-history"><header><b>付款紀錄</b><span>{detail.payments.length}</span></header>{detail.payments.length?detail.payments.map(payment=><div key={payment.id}><span>{tenderLabels[payment.tender]??payment.tender}</span><b>{money(payment.amountMinor)}</b><small>{new Date(payment.createdAt).toLocaleTimeString('zh-HK',{hour:'2-digit',minute:'2-digit'})}</small></div>):<p>未有付款紀錄。</p>}</section>
         {detail.archivedAt?<p className="dining-message" role="status">已付清，桌台已釋放；商品及付款紀錄保留。</p>:null}
         <footer className="dining-detail-actions">
+          <button type="button" disabled={actionBusy||checkoutBusy||!detail.formalOrderId} onClick={()=>void openReprint()}>重印堂食票</button>
           <button type="button" className="unassign" disabled={actionBusy||checkoutBusy||!detail.assignedTable||detail.remainingMinor===0} onClick={()=>void unassign()}>退回輪候</button>
           {!detail.archivedAt?<button type="button" className="clear" disabled={actionBusy||checkoutBusy||!detail.assignedTable||detail.remainingMinor>0||detail.payments.length===0} onClick={()=>void clearTable()}>保存紀錄並釋枱</button>:null}
         </footer>
       </>:<div className="dining-detail-empty"><b>{detailLoading?'讀取堂食單…':'枱號／輪候詳情'}</b><p>揀桌台或輪候單，即可核對商品及分項結帳。</p></div>}
     </aside>
+    {reprintOpen?<div className="order-modal-backdrop" onMouseDown={event=>{if(event.target===event.currentTarget)setReprintOpen(false);}}>
+      <section className="order-modal reprint">
+        <header><h2>堂食重印</h2><button type="button" onClick={()=>setReprintOpen(false)}>×</button></header>
+        <p>重印只用原本同一張 Order；唔會建立新單、付款或開錢箱。</p>
+        <div className="order-action-choices">
+          {reprintOptions.map(option=><label key={option.jobId} style={{display:'flex',gap:10,alignItems:'center',padding:10}}>
+            <input type="checkbox" checked={selectedReprintJobs.has(option.jobId)} onChange={()=>toggleReprint(option.jobId)}/>
+            <span><b>{option.label}</b>{option.detail?<small> · {option.detail}</small>:null}</span>
+          </label>)}
+        </div>
+        <footer><button type="button" onClick={()=>setReprintOpen(false)}>取消</button><button type="button" className="primary" disabled={!selectedReprintJobs.size||actionBusy} onClick={()=>void runReprint()}>確認重印</button></footer>
+      </section>
+    </div>:null}
   </main>;
 }
