@@ -257,6 +257,49 @@ describe('Dining R6 automatic table-order admission',()=>{
     expect((native.printBytesLan as any).mock.calls.length).toBe(calls);
   });
 
+  it('concurrent first admission creates only one Formal Order and one first print attempt',async()=>{
+    const runtime=await boot();
+    const hold=runtime.createHold({kind:'dining',items:[{id:'rice',name:'飯團',qty:1,unitMinor:4100,serviceMode:'dine-in'}],totalMinor:4100});
+    const ticket=await import('./ticket-bitmap.ts');
+    const before=(ticket.renderEscPosRasterTicket as any).mock.calls.length;
+    const results=await Promise.all([runtime.admitDiningProduction(hold.id),runtime.admitDiningProduction(hold.id)]);
+    expect(results[0].orderId).toBe(results[1].orderId);
+    expect(runtime.orders().filter((row:any)=>row.diningHoldId===hold.id)).toHaveLength(1);
+    const after=(ticket.renderEscPosRasterTicket as any).mock.calls.length;
+    expect(after).toBeGreaterThan(before);
+    const detail=await runtime.readDiningHold(hold.id);
+    expect(detail.firstPrintState).toBe('DONE');
+  });
+
+  it('concurrent receipt admission for CASH dispatches at most once',async()=>{
+    const runtime=await boot();
+    const hold=runtime.createHold({kind:'dining',items:[{id:'rice',name:'飯團',qty:1,unitMinor:4100,serviceMode:'dine-in'}],totalMinor:4100});
+    await runtime.assignDiningTable(hold.id,'T01');
+    const detail=await runtime.readDiningHold(hold.id);
+    await runtime.settleDiningHold(hold.id,[{lineIndex:0,qty:1}],'CASH',{submissionId:'cash-race',expectedRevision:detail.checkoutRevision,receivedMinor:5000});
+    const native=await import('./native-print.ts');
+    const before=(native.printBytesLan as any).mock.calls.length;
+    const results=await Promise.all([
+      runtime.printDiningPaymentReceipt(hold.id,'cash-race'),
+      runtime.printDiningPaymentReceipt(hold.id,'cash-race'),
+    ]);
+    expect(results.filter((row:any)=>row.planned===1)).toHaveLength(1);
+    expect(results.filter((row:any)=>row.planned===0)).toHaveLength(1);
+    expect((native.printBytesLan as any).mock.calls.length).toBe(before+1);
+  });
+
+  it('clear table cannot race ahead of a payment mutation',async()=>{
+    const runtime=await boot();
+    const hold=runtime.createHold({kind:'dining',items:[{id:'rice',name:'飯團',qty:1,unitMinor:4100,serviceMode:'dine-in'}],totalMinor:4100});
+    await runtime.assignDiningTable(hold.id,'T01');
+    const detail=await runtime.readDiningHold(hold.id);
+    const paid=runtime.settleDiningHold(hold.id,[{lineIndex:0,qty:1}],'FPS',{submissionId:'pay-clear',expectedRevision:detail.checkoutRevision,receivedMinor:4100});
+    const clear=runtime.clearDiningHold(hold.id);
+    await paid;
+    await clear;
+    expect((await runtime.readDiningHold(hold.id)).archivedAt).toBeTruthy();
+  });
+
   it('formal Order link survives runtime restart',async()=>{
     let runtime=await boot();
     const hold=runtime.createHold({kind:'dining',items:[{id:'rice',name:'飯團',qty:1,unitMinor:4100,serviceMode:'dine-in'}],totalMinor:4100});
