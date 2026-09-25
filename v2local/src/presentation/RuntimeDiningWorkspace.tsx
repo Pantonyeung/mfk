@@ -148,7 +148,7 @@ export function RuntimeDiningWorkspace({runtime,onCheckout,warningMinutes}:{
     if(!holdId||!runtime.assignDiningTable)return;
     await runtime.assignDiningTable(holdId,tableId);
     setSelectedWait(null);activeHold.current=holdId;setSelectedHoldId(holdId);
-    setMessage('已安排到'+tableName(tableId)+'，沿用原本堂食單。');
+    setMessage('已安排到'+(view?.tables.find(table=>table.id===tableId)?.label??tableName(tableId))+'，沿用原本堂食單。');
     await load();await loadDetail(holdId);
   });
   const remove=(holdId:string)=>command(async()=>{
@@ -176,6 +176,7 @@ export function RuntimeDiningWorkspace({runtime,onCheckout,warningMinutes}:{
     await runtime.clearDiningHold(holdId);clearSelection();await load();setMessage('已清枱。');
   });
 
+  const displayTableName=(id?:string)=>!id?'外面輪候':view?.tables.find(table=>table.id===id)?.label??tableName(id);
   const selectedAmount=useMemo(()=>detail?.lines.reduce((sum,line)=>sum+(selection[line.lineIndex]??0)*line.unitMinor,0)??0,[detail,selection]);
   const selectedUnits=useMemo(()=>Object.values(selection).reduce((sum,qty)=>sum+qty,0),[selection]);
   const adjustSelection=(lineIndex:number,delta:number)=>{
@@ -281,9 +282,9 @@ export function RuntimeDiningWorkspace({runtime,onCheckout,warningMinutes}:{
     <aside className="dining-detail-panel" aria-busy={detailLoading}>
       {historyOpen?<section className="dining-payment-history" style={{maxHeight:'100%'}}>
         <header><b>已結帳紀錄</b><button type="button" onClick={()=>setHistoryOpen(false)}>返回</button></header>
-        {historyRows.length?historyRows.map(row=><button type="button" key={row.holdId} onClick={()=>openHold(row.holdId)} style={{display:'block',width:'100%',padding:14,marginTop:8,textAlign:'left',background:'#edf4ff',border:'1px solid #bfd0e8',borderRadius:8}}><b>{row.codeLabel} · {tableName(row.lastAssignedTable)}</b><p>{money(row.paidMinor)} · {row.payments.length} 次付款</p></button>):<p>未有已结帳紀錄。</p>}
+        {historyRows.length?historyRows.map(row=><button type="button" key={row.holdId} onClick={()=>openHold(row.holdId)} style={{display:'block',width:'100%',padding:14,marginTop:8,textAlign:'left',background:'#edf4ff',border:'1px solid #bfd0e8',borderRadius:8}}><b>{row.codeLabel} · {displayTableName(row.lastAssignedTable)}</b><p>{money(row.paidMinor)} · {row.payments.length} 次付款</p></button>):<p>未有已结帳紀錄。</p>}
       </section>:detail?<>
-        <header><div><small>{detail.codeLabel}</small><h2>{tableName(detail.assignedTable??detail.lastAssignedTable)}</h2></div><span>{detail.partySize} 位</span></header>
+        <header><div><small>{detail.codeLabel}</small><h2>{displayTableName(detail.assignedTable??detail.lastAssignedTable)}</h2></div><span>{detail.partySize} 位</span></header>
         <div className="dining-detail-timer"><span>掛單時間</span><b>{elapsed(detail.createdAt)} 分鐘</b><small>{timerText(elapsed(detail.createdAt))}</small></div>
         <section className="dining-detail-lines">
           <header><b>商品／分項結帳</b><button type="button" disabled={checkoutBusy||actionBusy} onClick={selectAllRemaining}>全選未結</button></header>
