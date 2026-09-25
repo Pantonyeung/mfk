@@ -818,3 +818,27 @@
 }
 
 .clean-display-popover>section>div.triple{grid-template-columns:repeat(3,1fr)}
+
+
+/* OWNER FINAL V1.0 preview: low-frequency More is a hamburger; display controls are persistent/fine-grained. */
+.clean-more-button{
+  min-height:52px;
+  padding:5px 4px;
+  display:grid;
+  place-items:center;
+  gap:1px;
+  border:1px solid #d6e0ec;
+  border-radius:11px;
+  background:#fff;
+  color:#405772;
+  font-weight:900
+}
+.clean-more-button span{font-size:21px;line-height:1}
+.clean-more-button small{font-size:9px}
+.clean-more-button.active{border-color:#8fb1df;background:#edf4ff;color:#174a98}
+.clean-display-popover{max-height:720px;overflow:auto}
+.clean-display-popover>section.slider{gap:6px}
+.clean-display-popover>section.slider>span{display:flex;align-items:center;justify-content:space-between}
+.clean-display-popover>section.slider>span b{color:#1f5fbf;font-size:11px}
+.clean-display-popover input[type="range"]{width:100%;accent-color:#1f5fbf}
+.clean-display-saved{padding:7px 8px;border-radius:7px;background:#edf4ff;color:#315b8a;font-size:10px;font-weight:850;line-height:1.35}
