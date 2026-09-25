@@ -141,8 +141,8 @@ function customerPublicSnapshot(active,customerOrders=[]){
     {id:'FPS',name:'轉數快',enabled:true,qrImageUrl:'',sortOrder:3},
     {id:'PAYME',name:'PayMe',enabled:true,qrImageUrl:'',sortOrder:4},
   ];
-  const configuredPaymentChannels=rows(settings.customerPaymentChannels);
-  const paymentChannels=(configuredPaymentChannels.length?configuredPaymentChannels:defaultPaymentChannels)
+  const configuredPaymentChannels=Array.isArray(settings.customerPaymentChannels)?settings.customerPaymentChannels:defaultPaymentChannels;
+  const paymentChannels=configuredPaymentChannels
     .map((raw,index)=>{const item=row(raw);const channelId=String(item.id||'').trim().toUpperCase();const label=String(item.name||'').trim();const url=String(item.qrImageUrl||'').trim();return{
       channelId,
       label,
@@ -694,7 +694,12 @@ export default {
             const channelId=String(checkout.paymentChannelId||'').trim().toUpperCase();
             const channelLabel=String(checkout.paymentChannelLabel||'').trim();
             const settings=row(activeSnapshot.storeSettings);
-            const configured=rows(settings.customerPaymentChannels);
+            const configured=Array.isArray(settings.customerPaymentChannels)?settings.customerPaymentChannels:[
+              {id:'ALIPAY',name:'AlipayHK',enabled:true,qrImageUrl:'',sortOrder:1},
+              {id:'WECHAT',name:'WeChat Pay HK',enabled:true,qrImageUrl:'',sortOrder:2},
+              {id:'FPS',name:'轉數快',enabled:true,qrImageUrl:'',sortOrder:3},
+              {id:'PAYME',name:'PayMe',enabled:true,qrImageUrl:'',sortOrder:4},
+            ];
             const channel=configured.map(raw=>row(raw)).find(item=>String(item.id||'').trim().toUpperCase()===channelId&&item.enabled!==false);
             const qr=channel?String(channel.qrImageUrl||'').trim():'';
             const currentLabel=channel?String(channel.name||'').trim():'';
