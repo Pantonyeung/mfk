@@ -345,3 +345,19 @@ test('SMM never reuses an unresolved submission and only creates a fresh id afte
   assert.match(app,/removeIntent\(existing\.submissionId\)/);
   assert.match(app,/base=createSmmPendingIntent/);
 });
+
+
+test('SMM web acceptance target is isolated from production order delivery',()=>{
+  const cloud=fs.readFileSync(path.join(root,'pwa-cloud.ts'),'utf8');
+  const worker=fs.readFileSync(path.join(repoRoot,'v2smm','worker.ts'),'utf8');
+  const acceptance=fs.readFileSync(path.join(repoRoot,'v2local','src','runtime','smm-web-acceptance-intake.ts'),'utf8');
+  const main=fs.readFileSync(path.join(repoRoot,'v2local','src','main.tsx'),'utf8');
+  assert.match(cloud,/target.*web-smt/);
+  assert.match(cloud,/\/api\/smm\/acceptance\/orders/);
+  assert.match(worker,/\/api\/smm\/acceptance\/orders\/submit/);
+  assert.match(worker,/\/api\/smm\/acceptance\/smt\/pending/);
+  assert.match(worker,/WEB_SMT_ACCEPTANCE_TOKEN/);
+  assert.match(acceptance,/WEB-ACCEPTANCE/);
+  assert.match(acceptance,/\/__mfk\/smm-acceptance\/pending/);
+  assert.match(main,/if\(webAcceptance\)installSmmWebAcceptanceIntake/);
+});
