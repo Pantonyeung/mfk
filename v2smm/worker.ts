@@ -261,6 +261,91 @@ export class SmmIntentStore{
       return json({state:'LOGGED_OUT'});
     }
 
+    if(url.pathname==='/acceptance/orders/submit'&&request.method==='POST'){
+      const body=record(await request.json());
+      const orderRequest=record(body.request);
+      const staff=record(body.staff);
+      const submissionId=text(orderRequest.submissionId,180);
+      const idempotencyKey=text(orderRequest.idempotencyKey,240);
+      const staffId=text(staff.staffId,120);
+      if(!submissionId||!idempotencyKey||!staffId)return json({code:'SMM_ACCEPTANCE_INTENT_INVALID'},400);
+      const fingerprint=stable({orderRequest,staff:{staffId,displayName:String(staff.displayName||''),role:String(staff.role||'')}});
+      const key='acceptance-order:'+submissionId;
+      const existing=await this.state.storage.get(key) as any;
+      if(existing){
+        if(existing.idempotencyKey!==idempotencyKey||existing.fingerprint!==fingerprint){
+          return json({code:'SMM_ACCEPTANCE_SUBMISSION_CONFLICT'},409);
+        }
+        return json({state:existing.state,submissionId},existing.state==='PENDING_WEB_SMT'?202:200);
+      }
+      const row=Object.freeze({
+        request:orderRequest,
+        staff:Object.freeze({staffId,displayName:String(staff.displayName||''),role:String(staff.role||'')}),
+        idempotencyKey,
+        fingerprint,
+        state:'PENDING_WEB_SMT',
+        receivedAt:new Date().toISOString(),
+      });
+      await this.state.storage.put(key,row);
+      return json({state:'PENDING_WEB_SMT',submissionId},202);
+    }
+
+    if(url.pathname==='/acceptance/orders/readback'&&request.method==='GET'){
+      const submissionId=text(url.searchParams.get('submissionId'),180);
+      if(!submissionId)return json({code:'SMM_ACCEPTANCE_SUBMISSION_REQUIRED'},400);
+      const row=await this.state.storage.get('acceptance-order:'+submissionId) as any;
+      if(!row)return json({state:'UNKNOWN',submissionId},404);
+      if(row.state==='CONFIRMED'){
+        return json({
+          state:'CONFIRMED',
+          submissionId,
+          canonicalOrderId:String(row.result?.orderId||''),
+          canonicalRevision:Number(row.result?.canonicalRevision)||1,
+        });
+      }
+      if(row.state==='REJECTED'){
+        return json({
+          state:'REJECTED',
+          submissionId,
+          code:String(row.result?.reasonCode||'SMM_ACCEPTANCE_REJECTED'),
+        });
+      }
+      return json({state:'PENDING_WEB_SMT',submissionId});
+    }
+
+    if(url.pathname==='/acceptance/smt/pending'&&request.method==='GET'){
+      const rows=await this.state.storage.list({prefix:'acceptance-order:'});
+      const orders=[...rows.values()]
+        .filter((row:any)=>row?.state==='PENDING_WEB_SMT')
+        .sort((a:any,b:any)=>String(a.receivedAt||'').localeCompare(String(b.receivedAt||'')))
+        .slice(0,50)
+        .map((row:any)=>({request:row.request,staff:row.staff}));
+      return json({orders});
+    }
+
+    if(url.pathname==='/acceptance/smt/ack'&&request.method==='POST'){
+      const body=record(await request.json());
+      const submissionId=text(body.submissionId,180);
+      const idempotencyKey=text(body.idempotencyKey,240);
+      const result=record(body.result);
+      if(!submissionId||!idempotencyKey)return json({code:'SMM_ACCEPTANCE_ACK_IDENTITY_REQUIRED'},400);
+      const key='acceptance-order:'+submissionId;
+      const current=await this.state.storage.get(key) as any;
+      if(!current)return json({code:'SMM_ACCEPTANCE_ORDER_NOT_FOUND'},404);
+      if(current.idempotencyKey!==idempotencyKey)return json({code:'SMM_ACCEPTANCE_ACK_IDEMPOTENCY_MISMATCH'},409);
+      if(current.state!=='PENDING_WEB_SMT')return json({state:'IDEMPOTENT',submissionId});
+      const disposition=String(result.disposition||'');
+      if(disposition!=='ACCEPTED'&&disposition!=='REJECTED')return json({code:'SMM_ACCEPTANCE_ACK_RESULT_INVALID'},400);
+      const next=Object.freeze({
+        ...current,
+        state:disposition==='ACCEPTED'?'CONFIRMED':'REJECTED',
+        result:Object.freeze({...result}),
+        resolvedAt:new Date().toISOString(),
+      });
+      await this.state.storage.put(key,next);
+      return json({state:'ACKED',submissionId});
+    }
+
     if(url.pathname==='/bridge/create'&&request.method==='POST'){
       const body=record(await request.json());
       const submissionId=text(body.submissionId,180);
@@ -402,7 +487,7 @@ async function readStaffSession(request:Request,storeId:string,env:{SMM_INTENT_S
 }
 
 export default{
-  async fetch(request:Request,env:{ASSETS:{fetch(request:Request):Promise<Response>};SMM_INTENT_STORE:any}){
+  async fetch(request:Request,env:{ASSETS:{fetch(request:Request):Promise<Response>};SMM_INTENT_STORE:any;WEB_SMT_ACCEPTANCE_TOKEN?:string}){
     const url=new URL(request.url);
     const storeId=(url.searchParams.get('storeId')||'MF01').trim().slice(0,64)||'MF01';
 
@@ -534,6 +619,54 @@ export default{
         return json({state:'LOGGED_OUT'});
       }
       return json({code:'METHOD_NOT_ALLOWED'},405);
+    }
+
+    if(url.pathname==='/api/smm/acceptance/orders/submit'){
+      if(request.method!=='POST')return json({code:'METHOD_NOT_ALLOWED'},405);
+      const staff=await readStaffSession(request,storeId,env);
+      if(!staff)return json({code:'SMM_STAFF_UNAUTHORIZED',message:'請先使用同一個員工帳戶登入'},401);
+      let orderRequest:Record<string,unknown>;
+      try{orderRequest=validateOrderRequest(await request.json());}
+      catch(error){return json({code:error instanceof Error?error.message:'SMM_ACCEPTANCE_ORDER_INVALID'},400);}
+      const id=env.SMM_INTENT_STORE.idFromName(storeId);
+      const stub=env.SMM_INTENT_STORE.get(id);
+      return stub.fetch(new Request('https://internal/acceptance/orders/submit',{
+        method:'POST',
+        headers:{'content-type':'application/json'},
+        body:JSON.stringify({request:orderRequest,staff}),
+      }));
+    }
+
+    if(url.pathname==='/api/smm/acceptance/orders/readback'){
+      if(request.method!=='GET')return json({code:'METHOD_NOT_ALLOWED'},405);
+      const staff=await readStaffSession(request,storeId,env);
+      if(!staff)return json({code:'SMM_STAFF_UNAUTHORIZED',message:'請先使用同一個員工帳戶登入'},401);
+      const submissionId=text(url.searchParams.get('submissionId'),180);
+      const id=env.SMM_INTENT_STORE.idFromName(storeId);
+      const stub=env.SMM_INTENT_STORE.get(id);
+      const target=new URL('https://internal/acceptance/orders/readback');
+      target.searchParams.set('submissionId',submissionId);
+      return stub.fetch(new Request(target.toString(),{method:'GET'}));
+    }
+
+    if(url.pathname==='/api/smm/acceptance/smt/pending'||url.pathname==='/api/smm/acceptance/smt/ack'){
+      const provided=text(request.headers.get('x-mfk-web-acceptance'),256);
+      const expected=String(env.WEB_SMT_ACCEPTANCE_TOKEN||'');
+      if(!expected||!provided||provided.length!==expected.length||!sameHex(provided,expected)){
+        return json({code:'SMM_WEB_ACCEPTANCE_UNAUTHORIZED'},401);
+      }
+      const id=env.SMM_INTENT_STORE.idFromName(storeId);
+      const stub=env.SMM_INTENT_STORE.get(id);
+      if(url.pathname.endsWith('/pending')){
+        if(request.method!=='GET')return json({code:'METHOD_NOT_ALLOWED'},405);
+        return stub.fetch(new Request('https://internal/acceptance/smt/pending',{method:'GET'}));
+      }
+      if(request.method!=='POST')return json({code:'METHOD_NOT_ALLOWED'},405);
+      return stub.fetch(new Request('https://internal/acceptance/smt/ack',{
+        method:'POST',
+        headers:{'content-type':'application/json'},
+        body:await request.text(),
+      }));
     }
 
     if(url.pathname==='/api/smm/orders/submit'){
