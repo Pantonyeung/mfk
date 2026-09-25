@@ -29,6 +29,7 @@ import com.morefunos.smt.runtime.RuntimeReleaseStore;
 import com.morefunos.smt.runtime.RuntimeUpdateClient;
 import com.morefunos.smt.runtime.RuntimeUpdateEndpointStore;
 import com.morefunos.smt.runtime.CarrierUpdateEndpointStore;
+import com.morefunos.smt.smm.SmmTrustedDeviceStore;
 
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -59,6 +60,7 @@ public final class CarrierRecoveryActivity extends Activity {
     private CarrierUpdateEndpointStore carrierEndpointStore;
     private EditText runtimeOtaUrl;
     private EditText carrierOtaUrl;
+    private SmmTrustedDeviceStore smmTrustedDevices;
     private BootEvidenceStore bootEvidenceStore;
 
     private TextView runtimeStatus;
@@ -81,6 +83,7 @@ public final class CarrierRecoveryActivity extends Activity {
         carrierUpdateClient = new CarrierUpdateClient(this);
         runtimeEndpointStore = new RuntimeUpdateEndpointStore(this);
         carrierEndpointStore = new CarrierUpdateEndpointStore(this);
+        smmTrustedDevices = new SmmTrustedDeviceStore(this);
         printCommands = new PrintCommandController(this, this::onNativePrintEvent);
         bootEvidenceStore = new BootEvidenceStore(this);
         try { usbPrinter = new RecoveryUsbPrinter(this); }
@@ -103,6 +106,7 @@ public final class CarrierRecoveryActivity extends Activity {
         ));
 
         body.addView(buildHeader());
+        body.addView(buildSmmPairingCard());
         body.addView(buildOtaEndpointCard());
         body.addView(buildRuntimeCard());
         body.addView(buildCarrierCard());
@@ -121,6 +125,18 @@ public final class CarrierRecoveryActivity extends Activity {
             16, MUTED, Typeface.NORMAL
         ));
         card.addView(button("返回 SMT", false, v -> restartMain()));
+        return card;
+    }
+
+    private View buildSmmPairingCard(){
+        final LinearLayout card=card();
+        card.addView(text("SMM 本地配對",22,TEXT,Typeface.BOLD));
+        card.addView(text("SMM 必須先用呢個配對碼完成一次本店配對；同一 Wi-Fi 唔代表自動可信。",14,MUTED,Typeface.NORMAL));
+        final TextView token=valueBox();
+        token.setText("配對碼\n"+smmTrustedDevices.pairingToken()+"\nLAN Port: "+com.morefunos.smt.smm.SmmLanHost.DEFAULT_PORT);
+        token.setTextIsSelectable(true);
+        card.addView(token);
+        card.addView(text("已配對裝置："+smmTrustedDevices.snapshot().toString(),13,MUTED,Typeface.NORMAL));
         return card;
     }
 
