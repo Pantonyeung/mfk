@@ -2,6 +2,7 @@ import {useEffect,useMemo,useState} from 'react';
 import {readSmmLocalWorkspace,writeSmmLocalWorkspace,createSmmPendingIntent,type SmmLocalPreferences} from './persistence';
 import {resolveSmmRuntimePort} from './runtime';
 import {pairSmmLan,probeSmmLan,readSmmLanPwaConfig,saveSmmLanPwaConfig} from './pwa-lan';
+import {clearSmmStaffSession,listSmmStaff,readSmmStaffSession,verifySmmStaff,type SmmStaffDirectoryItem,type SmmStaffSession} from './pwa-staff';
 import {selectedSmmCartOptions,toggleSmmSelection,validateSmmSelections,type SmmSelectionState} from './selection';
 import type {
   SmmCartLine,
@@ -31,6 +32,7 @@ export function App(){
   const [tender,setTender]=useState<SmmTender>(initial.preferences.tender);
   const [cart,setCart]=useState<readonly SmmCartLine[]>(initial.cart);
   const [pendingIntents,setPendingIntents]=useState<readonly SmmPendingIntent[]>(initial.pendingIntents);
+  const [staffSession,setStaffSession]=useState<SmmStaffSession|null>(()=>readSmmStaffSession());
   const [port]=useState<SmmRuntimePort|null>(()=>resolveSmmRuntimePort());
   const [connection,setConnection]=useState<SmmConnectionState>(port?'LOADING':'NOT_CONNECTED');
   const [snapshot,setSnapshot]=useState<SmmReadModelSnapshot|null>(null);
@@ -43,7 +45,7 @@ export function App(){
   const [search,setSearch]=useState('');
   const [orderSearch,setOrderSearch]=useState('');
   const [orderSegment,setOrderSegment]=useState<OrderSegment>('active');
-  const [moreTool,setMoreTool]=useState<'connection'|'channels'|'business'|'printing'|'diagnostics'|'sellability'|'pending'|'capacity'|'reporting'|'refunds'|null>(null);
+  const [moreTool,setMoreTool]=useState<'staff'|'connection'|'channels'|'business'|'printing'|'diagnostics'|'sellability'|'pending'|'capacity'|'reporting'|'refunds'|null>(null);
   const [dineTable,setDineTable]=useState('');
   const [dineCovers,setDineCovers]=useState(2);
 
@@ -235,6 +237,10 @@ export function App(){
       setNotice('餐單價格／版本未完整，請先重新同步。');
       return;
     }
+    if(snapshot?.connectionPath!=='LAN'&&!staffSession){
+      setNotice('Internet 員工落單需要先喺「更多 → 員工登入」完成登入。');
+      return;
+    }
     const existing=pendingIntents.find(item=>
       (item.state==='DRAFT'||item.state==='NOT_CONNECTED'||item.state==='UNKNOWN')&&
       item.menuRevision===menu.revision&&
@@ -299,7 +305,7 @@ export function App(){
   return <main className="app-shell" data-mode={connection==='READY'?'online':'offline'}>
     <header className="topbar">
       <div className="brand-mark">磨</div>
-      <div className="brand-copy"><strong>磨飯流動店務</strong><span>{snapshot?.staff?.displayName??'店員模式'} · {snapshot?.staff?.storeId??'未連接門店'}</span></div>
+      <div className="brand-copy"><strong>磨飯流動店務</strong><span>{staffSession?.displayName??snapshot?.staff?.displayName??'店員模式'} · {snapshot?.staff?.storeId??'未連接門店'}</span></div>
       <button className="state-pill" onClick={()=>void refresh()} aria-label="重新同步門店資料"><i/>{connectionLabel}</button>
     </header>
 
@@ -352,6 +358,8 @@ export function App(){
         tool={moreTool}
         setTool={setMoreTool}
         snapshot={snapshot}
+        staffSession={staffSession}
+        onStaffSession={setStaffSession}
         pendingIntents={pendingIntents}
         onReadback={intent=>void readbackIntent(intent)}
         onDiscard={removeIntent}
@@ -482,11 +490,13 @@ function DineView({connection,sessions,table,covers,setTable,setCovers,onCreate}
   </section>;
 }
 
-function MoreView({connection,tool,setTool,snapshot,pendingIntents,onReadback,onDiscard,onSellability}:{
+function MoreView({connection,tool,setTool,snapshot,staffSession,onStaffSession,pendingIntents,onReadback,onDiscard,onSellability}:{
   connection:SmmConnectionState;
-  tool:'connection'|'channels'|'business'|'printing'|'diagnostics'|'sellability'|'pending'|'capacity'|'reporting'|'refunds'|null;
-  setTool:(v:'connection'|'channels'|'business'|'printing'|'diagnostics'|'sellability'|'pending'|'capacity'|'reporting'|'refunds'|null)=>void;
+  tool:'staff'|'connection'|'channels'|'business'|'printing'|'diagnostics'|'sellability'|'pending'|'capacity'|'reporting'|'refunds'|null;
+  setTool:(v:'staff'|'connection'|'channels'|'business'|'printing'|'diagnostics'|'sellability'|'pending'|'capacity'|'reporting'|'refunds'|null)=>void;
   snapshot:SmmReadModelSnapshot|null;
+  staffSession:SmmStaffSession|null;
+  onStaffSession:(session:SmmStaffSession|null)=>void;
   pendingIntents:readonly SmmPendingIntent[];
   onReadback:(intent:SmmPendingIntent)=>void;
   onDiscard:(submissionId:string)=>void;
@@ -495,6 +505,7 @@ function MoreView({connection,tool,setTool,snapshot,pendingIntents,onReadback,on
   return <section className="page">
     <header className="hero"><div><span>更多</span><h1>店務工具</h1><small>只顯示已知資料；未連接嘅功能會保持未連接。</small></div></header>
     <div className="tool-grid">
+      <Tool title="員工登入" detail="Internet 員工操作身份" state={staffSession?.displayName??'未登入'} onClick={()=>setTool('staff')}/>
       <Tool title="連線設定" detail="Internet / LAN 配對" state={snapshot?.connectionPath==='LAN'?'LAN':snapshot?.connectionPath==='INTERNET'?'Internet':'未連接'} onClick={()=>setTool('connection')}/>
       <Tool title="待提交草稿" detail={`${pendingIntents.length} 個本機草稿`} state={pendingIntents.length?'需處理':'正常'} onClick={()=>setTool('pending')}/>
       <Tool title="平台狀態" detail="平台連線同資料新鮮度" state={snapshot?.channels?.length?String(snapshot.channels.length):'未連接'} onClick={()=>setTool('channels')}/>
@@ -507,7 +518,8 @@ function MoreView({connection,tool,setTool,snapshot,pendingIntents,onReadback,on
       <Tool title="診斷" detail="連線、資料版本、本機草稿" state={connectionLabelShort(connection)} onClick={()=>setTool('diagnostics')}/>
     </div>
     {tool?<div className="drawer"><div className="drawer-head"><strong>{moreTitle(tool)}</strong><button onClick={()=>setTool(null)}>關閉</button></div>
-      {tool==='connection'?<ConnectionSettings snapshot={snapshot}/>:
+      {tool==='staff'?<StaffLogin session={staffSession} onSession={onStaffSession}/>:
+       tool==='connection'?<ConnectionSettings snapshot={snapshot}/>:
        tool==='pending'?<PendingIntents intents={pendingIntents} onReadback={onReadback} onDiscard={onDiscard}/>:
        tool==='channels'?<ChannelList connection={connection} channels={snapshot?.channels??[]}/>:
        tool==='business'?<BusinessDay projection={snapshot?.businessDay}/>:
@@ -518,6 +530,38 @@ function MoreView({connection,tool,setTool,snapshot,pendingIntents,onReadback,on
        tool==='sellability'?<Sellability connection={connection} products={snapshot?.menu?.products??[]} onChange={onSellability}/>:
        <Diagnostics connection={connection} snapshot={snapshot} pendingCount={pendingIntents.length}/>}
     </div>:null}
+  </section>;
+}
+
+function StaffLogin({session,onSession}:{session:SmmStaffSession|null;onSession:(session:SmmStaffSession|null)=>void}){
+  const [staff,setStaff]=useState<readonly SmmStaffDirectoryItem[]>([]);
+  const [staffId,setStaffId]=useState(session?.staffId??'');
+  const [pin,setPin]=useState('');
+  const [state,setState]=useState(session?'已登入：'+session.displayName:'請選擇員工並輸入 PIN。');
+  const [busy,setBusy]=useState(false);
+
+  useEffect(()=>{
+    let cancelled=false;
+    void listSmmStaff().then(rows=>{
+      if(cancelled)return;
+      setStaff(rows);
+      if(!staffId&&rows[0])setStaffId(rows[0].staffId);
+    }).catch(()=>{if(!cancelled)setState('暫時未能讀取員工名單。');});
+    return()=>{cancelled=true};
+  },[]);
+
+  if(session)return <section className="panel staff-login"><h2>{session.displayName}</h2><p>{session.role} · Internet 員工操作已授權。LAN 配對仍然係獨立可選通道。</p><button className="danger" onClick={()=>{clearSmmStaffSession();onSession(null);setState('已登出。');}}>登出</button></section>;
+
+  return <section className="panel staff-login"><p>{state}</p>
+    <label>員工<select value={staffId} onChange={e=>setStaffId(e.target.value)}>{staff.map(item=><option key={item.staffId} value={item.staffId}>{item.displayName} · {item.role}</option>)}</select></label>
+    <label>PIN<input type="password" inputMode="numeric" value={pin} onChange={e=>setPin(e.target.value.replace(/\D/g,'').slice(0,8))} placeholder="4–8 位數字"/></label>
+    <button className="primary" disabled={busy||!staffId||pin.length<4} onClick={async()=>{
+      if(busy)return;
+      setBusy(true);setState('驗證中…');
+      try{const next=await verifySmmStaff(staffId,pin);onSession(next);setPin('');setState('已登入：'+next.displayName);}
+      catch(error){setState(error instanceof Error?error.message:'員工驗證失敗');}
+      finally{setBusy(false);}
+    }}>{busy?'驗證中…':'登入'}</button>
   </section>;
 }
 
@@ -646,4 +690,4 @@ function NavButton({active,label,glyph,badge,onClick}:{active:boolean;label:stri
 
 function labelWorkState(state:string){return state==='NORMAL'?'正常':state==='DELAYED'?'延誤':state==='ACTION_REQUIRED'?'需處理':'未知'}
 function connectionLabelShort(state:SmmConnectionState){return state==='READY'?'已連接':state==='LOADING'?'同步中':state==='ERROR'?'錯誤':state==='STALE'?'資料稍舊':state==='PARTIAL'?'部分資料':state==='UNKNOWN'?'未知':'未連接'}
-function moreTitle(tool:string){return tool==='connection'?'連線設定':tool==='pending'?'待提交草稿':tool==='channels'?'平台狀態':tool==='business'?'營業日':tool==='capacity'?'產能':tool==='reporting'?'營運報表':tool==='refunds'?'退款要求':tool==='printing'?'列印狀態':tool==='sellability'?'商品供應':'診斷'}
+function moreTitle(tool:string){return tool==='staff'?'員工登入':tool==='connection'?'連線設定':tool==='pending'?'待提交草稿':tool==='channels'?'平台狀態':tool==='business'?'營業日':tool==='capacity'?'產能':tool==='reporting'?'營運報表':tool==='refunds'?'退款要求':tool==='printing'?'列印狀態':tool==='sellability'?'商品供應':'診斷'}
