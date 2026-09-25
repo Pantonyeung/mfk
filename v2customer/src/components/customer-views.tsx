@@ -38,10 +38,10 @@ const stageMeta:Record<CustomerOrderStage,{label:string;title:string;detail:stri
 };
 
 const quoteMeta:Record<CustomerQuoteSnapshot['freshness'],{label:string;detail:string;tone:'current'|'attention'|'danger'}>={
-  CURRENT:{label:'價格已更新',detail:'以下總額來自店舖最新報價。',tone:'current'},
-  STALE:{label:'價格需要更新',detail:'目前顯示最近一次報價，送出前店舖會再次確認。',tone:'attention'},
+  CURRENT:{label:'目前餐牌價格',detail:'按 Admin 已發佈餐牌即時計算；送出時 SMT 會核對餐牌版本同價格。',tone:'current'},
+  STALE:{label:'餐牌需要更新',detail:'目前顯示最近一次已發佈餐牌；送出前必須重新同步。',tone:'attention'},
   MATERIAL_CHANGE:{label:'餐點或價格有變更',detail:'請先修正受影響項目，再確認今次落單。',tone:'danger'},
-  UNKNOWN:{label:'價格狀態確認中',detail:'未確認最新總額前，不會當成落單成功。',tone:'attention'},
+  UNKNOWN:{label:'餐牌價格未完整',detail:'未有完整已發佈價格前，唔會建立正式訂單。',tone:'attention'},
 };
 
 function ProductMedia({product,compact=false}:{product:CustomerProduct;compact?:boolean}){
@@ -170,7 +170,7 @@ export function MenuView({connection,categories,activeCategoryId,setCategory,que
 function JarVisual({count}:{count:number}){
   const level=count===0?'empty':count===1?'first':count<5?'half':'full';
   const stateLabel=count===0?'等待第一樣':count===1?'第一樣已放好':count<5?'今餐漸漸成形':'準備好去確認';
-  const stateDetail=count===0?'每加一樣，記憶罐都會留下今餐嘅形狀。':count===1?'由第一個選擇開始，今餐已經有咗方向。':count<5?'你嘅選擇正逐樣累積，送出前仍然可以修改。':'今餐已經成形，下一步可以核對正式報價。';
+  const stateDetail=count===0?'每加一樣，記憶罐都會留下今餐嘅形狀。':count===1?'由第一個選擇開始，今餐已經有咗方向。':count<5?'你嘅選擇正逐樣累積，送出前仍然可以修改。':'今餐已經成形，下一步可以核對目前餐牌價格。';
   return <div className={`memory-jar-visual level-${level}`} aria-label={count?`記憶罐有 ${count} 件餐點`:'記憶罐係空嘅'}>
     <div className="jar-aura" aria-hidden="true"><i/><i/><i/></div>
     <div className="jar-stage" aria-hidden="true">
@@ -252,7 +252,7 @@ export function CheckoutView({cart,quote,checkout,setCheckout,paymentChannels,pe
       </div>:null}
     </section>
     {materialChange?<section className="safe-submit danger" role="alert"><span>目前被阻擋</span><h2>請先重新確認變更</h2><p>總額或餐點狀態有重要變更。未確認前唔可以送出。</p><ActionButton variant="secondary" wide onClick={onRepair}>返回記憶罐查看</ActionButton></section>:
-    <section className={`safe-submit state-${actionState}`} role={unknown||waiting?'status':undefined}><i className="submit-orbit" aria-hidden="true"><b/><b/><b/></i><span>{unknown?'結果未知':waiting?'等待中':'安全提交'}</span><h2>{unknown?'正在確認訂單結果':waiting?'正在確認接單結果':quote?'準備送出落單要求':'等待餐牌價格'}</h2><p>{unknown?'店舖可能已收到落單要求。請勿重複提交，先查詢原本嗰次結果。':waiting?'落單要求已送出，SMT 正核對餐牌版本同價格；未有終局前唔會自動重送。':'如果結果未明，系統會保留原本嗰次落單並先讀回結果，唔會盲目重送。'}</p>{unknown||waiting?<div className="order-confirm-progress" role="progressbar" aria-label={unknown?'正在確認訂單結果':'等待店舖確認'} aria-valuetext="處理中"><i/><span>{unknown?'正在查詢原本訂單結果…':'訂單已送出，等待店舖回覆…'}</span></div>:<StatefulAction state={actionState} labels={{default:pending?.state==='NOT_CONNECTED'?'使用原本落單再試':'確認並送出',loading:'正在安全處理',pending:'等待店舖確認',unknown:'重新確認提交結果',disabled:quote?'需要先修正變更':'等待餐牌價格'}} onClick={onSubmit}/>}
+    <section className={`safe-submit state-${actionState}`} role={unknown||waiting?'status':undefined}><i className="submit-orbit" aria-hidden="true"><b/><b/><b/></i><span>{unknown?'結果未知':waiting?'等待中':'安全提交'}</span><h2>{unknown?'正在確認訂單結果':waiting?'正在確認接單結果':quote?'準備送出落單要求':'等待餐牌價格'}</h2><p>{unknown?'店舖可能已收到落單要求。請勿重複提交，先查詢原本嗰次結果。':waiting?'落單要求已送出，SMT 正核對餐牌版本同價格；未有終局前唔會自動重送。':'如果結果未明，系統會保留原本嗰次落單並先讀回結果，唔會盲目重送。'}</p>{unknown||waiting?<div className="order-confirm-progress" role="progressbar" aria-label={unknown?'正在確認訂單結果':'SMT 核對中'} aria-valuetext="處理中"><i/><span>{unknown?'正在查詢原本訂單結果…':'訂單已送出，SMT 正核對版本同價格…'}</span></div>:<StatefulAction state={actionState} labels={{default:pending?.state==='NOT_CONNECTED'?'使用原本落單再試':'確認並送出',loading:'正在安全處理',pending:'等待店舖確認',unknown:'重新確認提交結果',disabled:quote?'需要先修正變更':'等待餐牌價格'}} onClick={onSubmit}/>}
     {unknown&&pending?<button type="button" className="order-confirm-readback" onClick={()=>onReadback(pending)}>立即重新確認結果</button>:null}
     {unknown?<small>系統只會讀取原本結果，未有重新提交。</small>:pending?.state==='NOT_CONNECTED'?<small>本機草稿已保存，未建立正式訂單。</small>:null}</section>}
     {openPaymentChannel?<div className="payment-qr-backdrop" role="presentation" onClick={()=>setOpenPaymentChannelId(null)}><section className="payment-qr-sheet" role="dialog" aria-modal="true" aria-label={openPaymentChannel.label+' 付款 QR'} onClick={event=>event.stopPropagation()}><header><div><small>電子支付</small><h2>{openPaymentChannel.label}</h2></div><button type="button" onClick={()=>setOpenPaymentChannelId(null)}>關閉</button></header>{openPaymentChannel.qrImageUrl?<><div className="payment-qr-image"><img src={openPaymentChannel.qrImageUrl} alt={openPaymentChannel.label+' 付款 QR Code'}/></div><p>可以直接截圖，或者儲存付款碼後用手機付款。完成後返嚟上傳付款截圖。</p><a className="payment-qr-download" href={openPaymentChannel.qrImageUrl+(openPaymentChannel.qrImageUrl.includes('?')?'&':'?')+'download=1'} download>儲存付款碼</a></>:<><div className="payment-qr-placeholder"><b>QR 圖片待提供</b><span>位置已保留；店舖未發布圖片前唔會顯示假付款碼。</span></div><p>呢個渠道暫時未可以完成電子付款。</p></>}</section></div>:null}
@@ -341,7 +341,7 @@ export function MemberView({connection,snapshot,history,pendingIntents,readingIn
 
     {lastOrder?<section className="member-module recent-memory"><SectionHeading eyebrow="最近一次返嚟" title="想唔想再食一次？"/><article><div><small>{new Date(lastOrder.completedAt).toLocaleDateString('zh-HK')}</small><strong>{lastOrder.itemSummary}</strong><span>{lastOrder.amountLabel??'歷史價格未提供'}</span></div><ActionButton variant="secondary" disabled={!lastOrder.reorderEligible} onClick={()=>onReorder(lastOrder)}>按目前菜單重建</ActionButton></article></section>:<section className="member-module recent-memory"><EmptyState compact title="最近回憶仲係空嘅" detail="完成第一張訂單後，就可以喺呢度再次點餐。"><ActionButton onClick={onBrowse}>開始第一餐</ActionButton></EmptyState></section>}
 
-    <section className="member-module recovery-module"><SectionHeading eyebrow="安全恢復" title="等待確認嘅落單" action={<b>{pendingIntents.length}</b>}/>{pendingIntents.length?<div className="pending-list">{pendingIntents.map(intent=>{const copy=intent.state==='UNKNOWN'?'結果仍在確認':intent.state==='PENDING'?'店舖確認中':intent.state==='NOT_CONNECTED'?'尚未連接店舖':'已保存落單草稿';return <article className={`pending-card state-${intent.state.toLowerCase()}`} key={intent.submissionId}><div><span>{copy}</span><p>{intent.lastMessage??'落單資料已安全保留喺本機。'}</p><small>建立於 {new Date(intent.createdAt).toLocaleString('zh-HK')}</small></div><div className="pending-actions"><button onClick={()=>onDiscard(intent.submissionId)}>刪除草稿</button><ActionButton variant="secondary" loading={readingIntentId===intent.submissionId} onClick={()=>onReadback(intent)}>重新確認</ActionButton></div></article>})}</div>:<p className="quiet-state">冇等待確認嘅落單。需要時，本機草稿會喺呢度等你處理。</p>}</section>
+    <section className="member-module recovery-module"><SectionHeading eyebrow="安全恢復" title="等待確認嘅落單" action={<b>{pendingIntents.length}</b>}/>{pendingIntents.length?<div className="pending-list">{pendingIntents.map(intent=>{const copy=intent.state==='UNKNOWN'?'結果仍在確認':intent.state==='PENDING'?'SMT 核對中':intent.state==='NOT_CONNECTED'?'尚未連接店舖':'已保存落單草稿';return <article className={`pending-card state-${intent.state.toLowerCase()}`} key={intent.submissionId}><div><span>{copy}</span><p>{intent.lastMessage??'落單資料已安全保留喺本機。'}</p><small>建立於 {new Date(intent.createdAt).toLocaleString('zh-HK')}</small></div><div className="pending-actions"><button onClick={()=>onDiscard(intent.submissionId)}>刪除草稿</button><ActionButton variant="secondary" loading={readingIntentId===intent.submissionId} onClick={()=>onReadback(intent)}>重新確認</ActionButton></div></article>})}</div>:<p className="quiet-state">冇等待確認嘅落單。需要時，本機草稿會喺呢度等你處理。</p>}</section>
 
     <section className="care-card"><span>MORE FUN CARE</span><h2>{member?.careMessage??'需要我哋補返一點心意？'}</h2><p>由你主動開啟支援；系統唔會自動轉送記憶罐、會員或個人資料。</p><ActionButton variant="secondary" wide onClick={onFallback}>聯絡 More Fun Care</ActionButton></section>
   </section>;
