@@ -24,7 +24,10 @@ function retainSelection(current:Record<number,number>,previous:LocalDiningHoldD
   return result;
 }
 
+// DINING_CHECKOUT_HANDOFF_R2
 export interface DiningCheckoutRequest{
+  readonly submissionId?:string;
+  readonly expectedRevision?:string;
   readonly holdId:string;
   readonly codeLabel:string;
   readonly tableLabel:string;
@@ -51,6 +54,8 @@ export function RuntimeDiningWorkspace({runtime,onCheckout,warningMinutes}:{
   const [detailLoading,setDetailLoading]=useState(false);
   const [selection,setSelection]=useState<Record<number,number>>({});
   const [message,setMessage]=useState('');
+  const [historyRows,setHistoryRows]=useState<readonly LocalDiningHoldDetail[]>([]);
+  const [historyOpen,setHistoryOpen]=useState(false);
   const [now,setNow]=useState(Date.now());
   const [actionBusy,setActionBusy]=useState(false);
   const [checkoutBusy,setCheckoutBusy]=useState(false);
@@ -76,8 +81,9 @@ export function RuntimeDiningWorkspace({runtime,onCheckout,warningMinutes}:{
     setBusy(true);
     try{
       const next=await runtime.readDining();
+      const past=await runtime.readDiningHistory?.()??[];
       if(!alive.current||request!==boardRead.current)return;
-      setView(next);setError(null);
+      setView(next);setHistoryRows(past);setError(null);
     }catch{if(alive.current&&request===boardRead.current)setError('未能更新堂食資料，請稍後再試。');}
     finally{if(alive.current&&request===boardRead.current)setBusy(false);}
   },[runtime]);
@@ -119,7 +125,7 @@ export function RuntimeDiningWorkspace({runtime,onCheckout,warningMinutes}:{
       activeHold.current=holdId;currentDetail.current=null;
       setDetail(null);setSelection({});
     }
-    setSelectedHoldId(holdId);setSelectedWait(isWaiting?holdId:null);setMessage('');
+    setHistoryOpen(false);setSelectedHoldId(holdId);setSelectedWait(isWaiting?holdId:null);setMessage('');
     void loadDetail(holdId);
   };
   const command=async(operation:()=>Promise<void>)=>{
@@ -198,7 +204,7 @@ export function RuntimeDiningWorkspace({runtime,onCheckout,warningMinutes}:{
         const line=latest.lines.find(row=>row.lineIndex===item.lineIndex)!;
         return {lineIndex:line.lineIndex,id:line.id,name:line.name,qty:item.qty,unitMinor:line.unitMinor};
       });
-      onCheckout({holdId:latest.holdId,codeLabel:latest.codeLabel,tableLabel:latest.assignedTable?.replace(/^T/,'')??'',selections,lines});
+      onCheckout({holdId:latest.holdId,codeLabel:latest.codeLabel,tableLabel:latest.assignedTable?.replace(/^T/,'')??'',selections,lines,submissionId:'DINING-'+crypto.randomUUID(),expectedRevision:latest.checkoutRevision});
       navigate('/checkout');
     }catch{if(alive.current)setMessage('未能核對最新結帳資料，未有送出付款。請重新選擇。');}
     finally{checkoutLock.current=false;if(alive.current)setCheckoutBusy(false);}
@@ -225,7 +231,7 @@ export function RuntimeDiningWorkspace({runtime,onCheckout,warningMinutes}:{
       <p className="dining-hint">{selectedWait?'右邊核對輪候單；撳中間空枱即可安排。':'撳輪候單查看商品及分項結帳。'}</p>
     </aside>
     <section className="dining-floor-board">
-      <header><div><small>堂食 · {view?.businessDate??'—'}</small><h1>桌台</h1></div><span>{busy?'更新中':'本機資料'}</span></header>
+      <header><div><small>堂食 · {view?.businessDate??'—'}</small><h1>桌台</h1></div><button type="button" onClick={()=>setHistoryOpen(value=>!value)}>已結帳紀錄 {historyRows.length}</button><span>{busy?'更新中':'本機資料'}</span></header>
       {error?<p className="dining-notice" role="alert">{error}</p>:null}
       <div className="dining-nine-grid">{view?.tables.map(table=>{
         const minutes=elapsed(table.startedAt);
@@ -251,8 +257,11 @@ export function RuntimeDiningWorkspace({runtime,onCheckout,warningMinutes}:{
       {message?<p className="dining-message" role="status">{message}</p>:null}
     </section>
     <aside className="dining-detail-panel" aria-busy={detailLoading}>
-      {detail?<>
-        <header><div><small>{detail.codeLabel}</small><h2>{tableName(detail.assignedTable)}</h2></div><span>{detail.partySize} 位</span></header>
+      {historyOpen?<section className="dining-payment-history" style={{maxHeight:'100%'}}>
+        <header><b>已結帳紀錄</b><button type="button" onClick={()=>setHistoryOpen(false)}>返回</button></header>
+        {historyRows.length?historyRows.map(row=><button type="button" key={row.holdId} onClick={()=>openHold(row.holdId)} style={{display:'block',width:'100%',padding:14,marginTop:8,textAlign:'left',background:'#edf4ff',border:'1px solid #bfd0e8',borderRadius:8}}><b>{row.codeLabel} · {tableName(row.lastAssignedTable)}</b><p>{money(row.paidMinor)} · {row.payments.length} 次付款</p></button>):<p>未有已结帳紀錄。</p>}
+      </section>:detail?<>
+        <header><div><small>{detail.codeLabel}</small><h2>{tableName(detail.assignedTable??detail.lastAssignedTable)}</h2></div><span>{detail.partySize} 位</span></header>
         <div className="dining-detail-timer"><span>掛單時間</span><b>{elapsed(detail.createdAt)} 分鐘</b><small>{timerText(elapsed(detail.createdAt))}</small></div>
         <section className="dining-detail-lines">
           <header><b>商品／分項結帳</b><button type="button" disabled={checkoutBusy||actionBusy} onClick={selectAllRemaining}>全選未結</button></header>
@@ -271,9 +280,10 @@ export function RuntimeDiningWorkspace({runtime,onCheckout,warningMinutes}:{
         </section>
         <section className="dining-balance"><div><span>原總額</span><b>{money(detail.totalMinor)}</b></div><div><span>已結帳</span><b>{money(detail.paidMinor)}</b></div><div className="remaining"><span>未結帳</span><strong>{money(detail.remainingMinor)}</strong></div></section>
         <section className="dining-payment-history"><header><b>付款紀錄</b><span>{detail.payments.length}</span></header>{detail.payments.length?detail.payments.map(payment=><div key={payment.id}><span>{tenderLabels[payment.tender]??payment.tender}</span><b>{money(payment.amountMinor)}</b><small>{new Date(payment.createdAt).toLocaleTimeString('zh-HK',{hour:'2-digit',minute:'2-digit'})}</small></div>):<p>未有付款紀錄。</p>}</section>
+        {detail.archivedAt?<p className="dining-message" role="status">已付清，桌台已釋放；商品及付款紀錄保留。</p>:null}
         <footer className="dining-detail-actions">
           <button type="button" className="unassign" disabled={actionBusy||checkoutBusy||!detail.assignedTable||detail.remainingMinor===0} onClick={()=>void unassign()}>退回輪候</button>
-          <button type="button" className="clear" disabled={actionBusy||checkoutBusy||!detail.assignedTable||detail.remainingMinor>0||detail.payments.length===0} onClick={()=>void clearTable()}>清枱</button>
+          {!detail.archivedAt?<button type="button" className="clear" disabled={actionBusy||checkoutBusy||!detail.assignedTable||detail.remainingMinor>0||detail.payments.length===0} onClick={()=>void clearTable()}>保存紀錄並釋枱</button>:null}
         </footer>
       </>:<div className="dining-detail-empty"><b>{detailLoading?'讀取堂食單…':'枱號／輪候詳情'}</b><p>揀桌台或輪候單，即可核對商品及分項結帳。</p></div>}
     </aside>

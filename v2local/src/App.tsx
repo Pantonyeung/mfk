@@ -844,7 +844,9 @@ function CheckoutPage({cart,setCart,diningCheckout,onDiningCheckoutDone}:{cart:C
         const updated=await localRuntime.settleDiningHold(
           diningCheckout.holdId,
           diningCheckout.selections,
-          tenderCode
+          tenderCode,
+          // DINING_PAYMENT_COMMAND_R2: retain identity and snapshot through retries.
+          {submissionId:diningCheckout.submissionId??'',expectedRevision:diningCheckout.expectedRevision??'',receivedMinor:received}
         );
         setCompletion({
           displayOrderCode:diningCheckout.codeLabel,
@@ -853,9 +855,9 @@ function CheckoutPage({cart,setCart,diningCheckout,onDiningCheckoutDone}:{cart:C
           dueLabel:money(due),
           receivedLabel:money(received),
           changeLabel:money(change),
-          statusLabel:updated.remainingMinor===0?'堂食已全數結帳':'堂食分項結帳完成',
-          printStatusLabel:'堂食付款已記錄；按堂食打印規則處理',
-          drawerStatusLabel:method==='CASH'?'現金付款：櫃桶按現場收款路徑處理':'非現金：不開櫃桶',
+          statusLabel:updated.archivedAt?'堂食已付清，桌台已釋放':'堂食分項結帳完成，餘額保留',
+          printStatusLabel:'堂食打印尚未接通；本輪只驗證付款紀錄',
+          drawerStatusLabel:method==='CASH'?'開櫃指令尚未接通，未發送':'非現金：不開櫃桶',
           canCorrectPayment:false,
           correctionMethods:[],
         });
