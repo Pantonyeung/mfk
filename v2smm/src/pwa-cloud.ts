@@ -2,6 +2,8 @@ import type {SmmLanOrderRequest,SmmLanOrderResponse,SmmLanSubmissionReadbackResp
 import type {SmmLanTransport,SmmLanTransportOutcome} from './smt-lan-adapter';
 import {readSmmStaffSession} from './pwa-staff';
 
+const ENDPOINT='https://admin.morefunos.com';
+
 function sleep(ms:number){return new Promise(resolve=>window.setTimeout(resolve,ms));}
 
 function authHeaders(){
@@ -16,7 +18,7 @@ function authHeaders(){
 async function readResult(submissionId:string,signal?:AbortSignal):Promise<Record<string,unknown>|null>{
   const headers=authHeaders();
   if(!headers)return null;
-  const response=await fetch('/api/smm/orders/readback?submissionId='+encodeURIComponent(submissionId),{
+  const response=await fetch(ENDPOINT+'/api/customer/staff-orders/readback?storeId=MF01&submissionId='+encodeURIComponent(submissionId),{
     method:'GET',
     headers,
     cache:'no-store',
@@ -68,7 +70,7 @@ export function createPwaCloudTransport():SmmLanTransport{
       if(!headers)return{kind:'UNAVAILABLE'};
       let response:Response;
       try{
-        response=await fetch('/api/smm/orders/submit',{
+        response=await fetch(ENDPOINT+'/api/customer/staff-orders/submit?storeId=MF01',{
           method:'POST',
           headers,
           body:JSON.stringify(request),
