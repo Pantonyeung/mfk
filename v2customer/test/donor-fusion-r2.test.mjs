@@ -25,7 +25,7 @@ const styles=fs.readFileSync(path.join(srcRoot,'styles.css'),'utf8');
 
 test('R2 keeps the five-part customer mental model and complete memory jar',()=>{
   for(const label of['首頁','點單','記憶罐','我的訂單','我的記憶'])assert.match(primitives,new RegExp(label));
-  for(const marker of['記憶罐係今次落單草稿','今次已選','取餐聯絡','店舖最新報價','前往最後確認'])assert.match(views,new RegExp(marker));
+  for(const marker of['記憶罐係今次落單草稿','今次已選','取餐聯絡','目前餐牌價格','前往最後確認'])assert.match(views,new RegExp(marker));
   assert.match(views,/JarVisual/);
   assert.match(views,/removeConfirm/);
   assert.match(views,/onProduct\(product,[\s\S]*line/);

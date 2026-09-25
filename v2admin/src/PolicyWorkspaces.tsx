@@ -163,6 +163,9 @@ interface StoreSettings{
   dineInEnabled:boolean;takeawayEnabled:boolean;
   diningTables:DiningTableConfig[];
   customerPaymentChannels:CustomerPaymentChannelConfig[];
+  customerWhatsAppEnabled:boolean;
+  customerWhatsAppNumber:string;
+  customerWhatsAppTemplate:string;
   weeklyHours:Record<StoreDay,{closed:boolean;opensAt:string;closesAt:string}>;
   paymentRefs:string[];printRefs:string[];channelRefs:string[];
 }
@@ -170,6 +173,7 @@ const STORE_DAYS:readonly {id:StoreDay;label:string}[]=[
   {id:'MON',label:'星期一'},{id:'TUE',label:'星期二'},{id:'WED',label:'星期三'},
   {id:'THU',label:'星期四'},{id:'FRI',label:'星期五'},{id:'SAT',label:'星期六'},{id:'SUN',label:'星期日'},
 ];
+const DEFAULT_CUSTOMER_WHATSAPP_TEMPLATE='你好，我想經 WhatsApp 落單。\n姓名：{name}\n電話：{phone}\n餐點：\n{items}\n總額：{total}\n網上自動接單暫時未能連接，請人工確認。';
 const DEFAULT_CUSTOMER_PAYMENT_CHANNELS:CustomerPaymentChannelConfig[]=[
   {id:'ALIPAY',name:'AlipayHK',enabled:true,qrImageUrl:'',sortOrder:1},
   {id:'WECHAT',name:'WeChat Pay HK',enabled:true,qrImageUrl:'',sortOrder:2},
@@ -198,7 +202,11 @@ export function StoreSettingsWorkspace(){
     storeName:'磨飯',storeCode:'MF01',currency:'HKD',timezone:'Asia/Hong_Kong',
     lateArrivalMinutes:15,fulfillmentMinutes:20,archiveHours:24,
     reminderAfterMinutes:5,reminderIntervalMinutes:5,repeatReminder:true,timeoutPriority:'HIGH',
-    dineInEnabled:true,takeawayEnabled:true,diningTables:DEFAULT_DINING_TABLES,customerPaymentChannels:DEFAULT_CUSTOMER_PAYMENT_CHANNELS,weeklyHours:DEFAULT_WEEKLY_HOURS,
+    dineInEnabled:true,takeawayEnabled:true,diningTables:DEFAULT_DINING_TABLES,customerPaymentChannels:DEFAULT_CUSTOMER_PAYMENT_CHANNELS,
+    customerWhatsAppEnabled:true,
+    customerWhatsAppNumber:'',
+    customerWhatsAppTemplate:DEFAULT_CUSTOMER_WHATSAPP_TEMPLATE,
+    weeklyHours:DEFAULT_WEEKLY_HOURS,
     paymentRefs:['CASH'],printRefs:['RECEIPT','PRODUCTION','PACKING','LABEL'],channelRefs:[],
   });
   const [saveMessage,setSaveMessage]=useState('');
@@ -246,6 +254,9 @@ export function StoreSettingsWorkspace(){
       if(!row.name.trim())errors.push('堂食枱 '+(row.id||'未命名')+' 缺少顯示名稱');
     }
     const paymentIds=new Set<string>();
+    const whatsappDigits=String(config.customerWhatsAppNumber??'').replace(/\D/g,'');
+    if(config.customerWhatsAppEnabled!==false&&whatsappDigits&&(whatsappDigits.length<8||whatsappDigits.length>15))errors.push('Customer WhatsApp 電話格式錯誤');
+    if(config.customerWhatsAppEnabled!==false&&whatsappDigits&&!String(config.customerWhatsAppTemplate??'').trim())errors.push('Customer WhatsApp 已啟用但訊息模板未填');
     for(const row of paymentChannels){
       if(!row.id.trim())errors.push('付款方式缺少 ID');
       else if(paymentIds.has(row.id))errors.push('付款方式 ID 重複：'+row.id);
@@ -280,6 +291,12 @@ export function StoreSettingsWorkspace(){
           <Toggle checked={row.active} onChange={active=>patchTable(row.id,{active})} label={row.active?'啟用':'停用'}/>
           <button type="button" onClick={()=>removeTable(row.id)}>刪除</button>
         </div>)}</div>
+      </article>
+      <article className="admin-policy-card"><h2>Customer WhatsApp 備援</h2>
+        <Toggle checked={config.customerWhatsAppEnabled!==false} onChange={customerWhatsAppEnabled=>patch({customerWhatsAppEnabled})} label={config.customerWhatsAppEnabled!==false?'啟用':'停用'}/>
+        <label><span>公司 WhatsApp 電話</span><input inputMode="tel" value={config.customerWhatsAppNumber??''} onChange={event=>patch({customerWhatsAppNumber:event.target.value})} placeholder="例如 85291234567"/></label>
+        <label><span>訊息模板</span><textarea rows={8} value={config.customerWhatsAppTemplate??DEFAULT_CUSTOMER_WHATSAPP_TEMPLATE} onChange={event=>patch({customerWhatsAppTemplate:event.target.value})}/></label>
+        <small>可用：{'{name}'}、{'{phone}'}、{'{items}'}、{'{total}'}、{'{submissionId}'}。系統只會喺 Customer 無法連接 SMT 接單後，由客人主動撳掣先開 WhatsApp；唔會自動傳送。</small>
       </article>
       <article className="admin-policy-card"><header><div><h2>客戶電子支付</h2><small>新增、改名、上傳付款 QR、啟用／停用；Customer 只讀已發佈版本。</small></div><button type="button" onClick={addPaymentChannel}>新增付款方式</button></header>
         <div className="admin-editor-list">{paymentChannels.map((row,index)=><div className="admin-policy-row" key={row.id}>

@@ -352,6 +352,7 @@ async function reconcileOrders(){
       continue;
     }
     try{
+      if(String(intent.menuRevision)!==String(envelope.revision))throw new Error('CUSTOMER_MENU_REVISION_CHANGED');
       const priced=priceCustomerCart(intent.cart,catalog.products);
       const publishedTotal=intent.cart.reduce((sum,line)=>sum+(Number.isSafeInteger(Number(line.publishedUnitPriceMinor))?Number(line.publishedUnitPriceMinor)*line.quantity:0),0);
       const hasPublishedTotal=intent.cart.every(line=>Number.isSafeInteger(Number(line.publishedUnitPriceMinor))&&Number(line.publishedUnitPriceMinor)>=0);
@@ -367,7 +368,7 @@ async function reconcileOrders(){
         providerRef,
         ...(intent.checkout.paymentMethod==='ELECTRONIC'&&intent.checkout.paymentEvidenceRef?{paymentEvidenceRef:intent.checkout.paymentEvidenceRef,paymentVerificationState:'PENDING' as const}:{}),
         customerPhone:intent.checkout.phone,
-        initialFulfillmentLabel:'待處理',
+        initialFulfillmentLabel:'進行中',
       });
       window.dispatchEvent(new CustomEvent('mfk-customer-order-intake',{detail:{
         canonicalOrderId:order.id,

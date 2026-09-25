@@ -97,11 +97,13 @@ test('UNKNOWN preserves same submission identity and requires readback first',()
   assert.match(persistence,/idempotencyKey/);
 });
 
-test('quote and order creation cannot be implemented locally',()=>{
+test('published menu prices are calculated locally while formal order still belongs to SMT',()=>{
   const app=fs.readFileSync(path.join(srcRoot,'App.tsx'),'utf8');
-  assert.match(app,/port\?\.quoteCart/);
+  const quote=fs.readFileSync(path.join(srcRoot,'local-quote.ts'),'utf8');
+  assert.match(app,/quotePublishedCart\(cart,snapshot\?\.menu\)/);
   assert.match(app,/port\?\.submitOrder/);
-  assert.doesNotMatch(app,/finalUnitPriceMinor\s*[*+\-\/]/);
+  assert.match(quote,/publishedUnitPriceMinor/);
+  assert.match(quote,/PUBLISHED-MENU/);
   assert.doesNotMatch(app,/正式訂單已建立/);
 });
 
@@ -110,11 +112,13 @@ test('production fixture file has been removed',()=>{
 });
 
 
-test('quote readback window outlives SMT five-second fallback reconcile',()=>{
+test('customer checks SMT availability a bounded number of times before WhatsApp fallback',()=>{
   const cloud=fs.readFileSync(path.join(srcRoot,'cloud-runtime.ts'),'utf8');
-  const attempts=Number(cloud.match(/QUOTE_READBACK_ATTEMPTS=(\d+)/)?.[1]);
-  const interval=Number(cloud.match(/QUOTE_READBACK_INTERVAL_MS=(\d+)/)?.[1]);
-  assert.ok(Number.isFinite(attempts)&&Number.isFinite(interval));
-  assert.ok((attempts-1)*interval>5000,'customer quote wait must survive the SMT 5s fallback reconcile');
-  assert.match(cloud,/waitQuote\(id\)/);
+  const app=fs.readFileSync(path.join(srcRoot,'App.tsx'),'utf8');
+  const attempts=Number(cloud.match(/BACKEND_PROBE_ATTEMPTS=(\d+)/)?.[1]);
+  assert.equal(attempts,3);
+  assert.match(cloud,/\/api\/customer\/channel-health/);
+  assert.match(cloud,/state:'NOT_CONNECTED'/);
+  assert.match(app,/轉用 WhatsApp/);
+  assert.match(app,/buildWhatsAppFallbackUrl/);
 });

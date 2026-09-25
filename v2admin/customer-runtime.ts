@@ -46,6 +46,20 @@ export class CustomerRuntimeStore{
   async fetch(request:Request){
     const url=new URL(request.url);
 
+    if(url.pathname==='/public/channel-health'&&request.method==='GET'){
+      const lastOrderPull=await this.state.storage.get('diag:lastOrderPull') as any;
+      const observedAt=new Date().toISOString();
+      const lastAt=lastOrderPull&&typeof lastOrderPull.at==='string'?Date.parse(lastOrderPull.at):NaN;
+      const ageMs=Number.isFinite(lastAt)?Math.max(0,Date.now()-lastAt):null;
+      const reachable=ageMs!==null&&ageMs<=15000;
+      return json({
+        reachable,
+        ageMs,
+        lastOrderPull:lastOrderPull??null,
+        observedAt,
+      },200);
+    }
+
     if(url.pathname==='/public/quote'&&request.method==='POST'){
       let quote;
       try{quote=validateMfkCustomerQuoteRequest(await request.json());}
@@ -202,6 +216,7 @@ export class CustomerRuntimeStore{
         lastPublicQuote:await this.state.storage.get('diag:lastPublicQuote')??null,
         lastQuotePull:await this.state.storage.get('diag:lastQuotePull')??null,
         lastQuoteAck:await this.state.storage.get('diag:lastQuoteAck')??null,
+        lastOrderPull:await this.state.storage.get('diag:lastOrderPull')??null,
         lastStaffOrderSubmit:await this.state.storage.get('diag:lastStaffOrderSubmit')??null,
         observedAt:new Date().toISOString(),
       });
@@ -240,7 +255,13 @@ export class CustomerRuntimeStore{
     }
 
     if(url.pathname==='/smt/orders/pending'&&request.method==='GET'){
-      return json({orders:await this.pending('order:')});
+      const orders=await this.pending('order:');
+      await this.state.storage.put('diag:lastOrderPull',{
+        count:orders.length,
+        at:new Date().toISOString(),
+        submissionIds:orders.slice(0,5).map((row:any)=>String(row.submissionId||'')),
+      });
+      return json({orders});
     }
 
     if(url.pathname==='/smt/orders/ack'&&request.method==='POST'){
