@@ -55,7 +55,7 @@ export function readCustomerLocalWorkspace():CustomerLocalWorkspace{
         name:typeof checkout.name==='string'?checkout.name:'',
         phone:typeof checkout.phone==='string'?checkout.phone:'',
         paymentMethod:checkout.paymentMethod==='ELECTRONIC'?'ELECTRONIC':'PAY_AT_STORE',
-        ...(checkout.paymentMethod==='ELECTRONIC'&&['ALIPAY','WECHAT','FPS','PAYME'].includes(String(checkout.paymentChannelId))?{paymentChannelId:checkout.paymentChannelId as CustomerCheckoutDraft['paymentChannelId']}:{}),
+        ...(checkout.paymentMethod==='ELECTRONIC'&&/^[A-Z0-9][A-Z0-9_-]{1,39}$/.test(String(checkout.paymentChannelId||'').toUpperCase())?{paymentChannelId:String(checkout.paymentChannelId).toUpperCase(),paymentChannelLabel:typeof checkout.paymentChannelLabel==='string'?checkout.paymentChannelLabel.slice(0,120):''}:{}),
         ...(checkout.paymentEvidence&&typeof checkout.paymentEvidence==='object'?{paymentEvidence:checkout.paymentEvidence as CustomerCheckoutDraft['paymentEvidence']}:{}),
       }),
       pendingIntents:Object.freeze([...safeArray<CustomerPendingIntent>(parsed.pendingIntents)]),
