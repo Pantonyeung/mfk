@@ -506,7 +506,7 @@ function OrderingPage({
   const panelTitle=panel?.type==='product'?'商品選項'
     :panel?.type==='quick-drink-config'?'快捷飲品設定'
     :panel?.type==='pending-order'?'待處理訂單'
-    :panel?.type==='fast-lane'?(panel.lane==='riceball-pool'?'飯團待組區':panel.lane==='required'?'必選區':'飯團餐配對')
+    :panel?.type==='fast-lane'?(panel.lane==='riceball-pool'?'快速組合':panel.lane==='required'?'必選區':'紫米套餐區')
     :panel?.type==='hold'?'暫存工作台'
     :panel?.type==='holds'?'暫存單':'';
 
