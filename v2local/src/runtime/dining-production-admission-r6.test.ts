@@ -335,6 +335,25 @@ describe('Dining R6 automatic table-order admission',()=>{
     await expect(runtime.reprintDiningJobs(hold.id,['forged-job-id'],'TEST')).rejects.toThrow('DINING_REPRINT_JOB_INVALID');
   });
 
+  it('COMBO containing CASH requires actual received cash and preserves cash change',async()=>{
+    const runtime=await boot();
+    const hold=runtime.createHold({kind:'dining',items:[{id:'rice',name:'飯團',qty:1,unitMinor:4100,serviceMode:'dine-in'}],totalMinor:4100});
+    await runtime.assignDiningTable(hold.id,'T01');
+    let detail=await runtime.readDiningHold(hold.id);
+    await expect(runtime.settleDiningHold(hold.id,[{lineIndex:0,qty:1}],'COMBO',{
+      submissionId:'combo-no-cash-received',expectedRevision:detail.checkoutRevision,
+      splitTenders:[{tender:'CASH',amountMinor:2000},{tender:'FPS',amountMinor:2100}],
+    })).rejects.toThrow('DINING_CASH_INSUFFICIENT');
+    detail=await runtime.readDiningHold(hold.id);
+    const paid=await runtime.settleDiningHold(hold.id,[{lineIndex:0,qty:1}],'COMBO',{
+      submissionId:'combo-cash-change',expectedRevision:detail.checkoutRevision,receivedMinor:2500,
+      splitTenders:[{tender:'CASH',amountMinor:2000},{tender:'FPS',amountMinor:2100}],
+    });
+    const payment=paid.payments.at(-1);
+    expect(payment.receivedMinor).toBe(2500);
+    expect(payment.changeMinor).toBe(500);
+  });
+
   it('formal Order link survives runtime restart',async()=>{
     let runtime=await boot();
     const hold=runtime.createHold({kind:'dining',items:[{id:'rice',name:'飯團',qty:1,unitMinor:4100,serviceMode:'dine-in'}],totalMinor:4100});
