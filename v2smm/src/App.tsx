@@ -1,4 +1,4 @@
-import {useEffect,useMemo,useState} from 'react';
+import {useEffect,useMemo,useRef,useState} from 'react';
 import {readSmmLocalWorkspace,writeSmmLocalWorkspace,createSmmPendingIntent,type SmmLocalPreferences} from './persistence';
 import {resolveSmmRuntimePort} from './runtime';
 import {pairSmmLan,probeSmmLan,readSmmLanPwaConfig,saveSmmLanPwaConfig} from './pwa-lan';
@@ -42,6 +42,8 @@ export function App(){
   const [selections,setSelections]=useState<SmmSelectionState>({});
   const [selectedVariationId,setSelectedVariationId]=useState<string|null>(null);
   const [cartOpen,setCartOpen]=useState(false);
+  const [submitting,setSubmitting]=useState(false);
+  const submitLockRef=useRef(false);
   const [search,setSearch]=useState('');
   const [orderSearch,setOrderSearch]=useState('');
   const [orderSegment,setOrderSegment]=useState<OrderSegment>('active');
@@ -296,14 +298,20 @@ export function App(){
     void refresh();
   };
 
+  const releaseSubmitLock=()=>{submitLockRef.current=false;setSubmitting(false);};
+
   const submitCart=async()=>{
-    if(cart.length===0)return;
+    if(submitLockRef.current||cart.length===0)return;
+    submitLockRef.current=true;
+    setSubmitting(true);
     if(!menu||publishedTotalMinor===null){
       setNotice('餐單價格／版本未完整，請先重新同步。');
+      releaseSubmitLock();
       return;
     }
     if(snapshot?.connectionPath!=='LAN'&&!staffSession){
       setNotice('Internet 員工落單需要先喺「更多 → 員工帳戶」登入一次；之後呢部手機會保持同一個員工帳戶。');
+      releaseSubmitLock();
       return;
     }
     const existing=pendingIntents.find(item=>
@@ -318,16 +326,19 @@ export function App(){
     if(existing&&existing.state!=='DRAFT'){
       if(!port?.readSubmission){
         setNotice('原提交結果未明；未重新送出，避免重複訂單。');
+        releaseSubmitLock();
         return;
       }
       const prior=await port.readSubmission(existing.submissionId);
       if(prior.state==='CONFIRMED'){
         resolveConfirmedIntent(existing,prior.message||'門店已確認訂單');
+        releaseSubmitLock();
         return;
       }
       if(prior.state!=='REJECTED'){
         saveIntent(Object.freeze({...existing,state:prior.state==='UNKNOWN'?'UNKNOWN':'NOT_CONNECTED',updatedAt:nowIso(),lastMessage:prior.message}));
         setNotice('原提交結果仍未確認；未重新送出，避免重複訂單。');
+        releaseSubmitLock();
         return;
       }
       removeIntent(existing.submissionId);
@@ -352,14 +363,18 @@ export function App(){
       const next={...base,state:'NOT_CONNECTED' as const,updatedAt:nowIso(),lastMessage:'門店提交服務尚未連接；草稿已保存。'};
       saveIntent(Object.freeze(next));
       setNotice('已保存本機待提交草稿；未建立正式訂單。');
+      releaseSubmitLock();
       return;
     }
     const pending=Object.freeze({...base,state:'PENDING' as const,updatedAt:nowIso(),lastMessage:'已送到 Internet 訂單橋，等待 SMT 接收'});
     saveIntent(pending);
+    setCartOpen(false);
+    setNotice('訂單提交中；可以繼續其他操作，請勿重複提交。');
     try{
       const result=await port.submitOrder(pending);
       if(result.state==='CONFIRMED'){
         resolveConfirmedIntent(pending,result.message||'門店已確認訂單');
+        releaseSubmitLock();
         return;
       }
       if(result.state==='REJECTED'){
@@ -370,14 +385,17 @@ export function App(){
         }else{
           setNotice(result.message);
         }
+        releaseSubmitLock();
         return;
       }
       const state=result.state==='UNKNOWN'?'UNKNOWN':'NOT_CONNECTED';
       saveIntent(Object.freeze({...pending,state,updatedAt:nowIso(),lastMessage:result.message}));
       setNotice(result.state==='UNKNOWN'?'結果未明；系統保留同一提交身份，唔會自動重送。':result.message);
+      releaseSubmitLock();
     }catch{
       saveIntent(Object.freeze({...pending,state:'UNKNOWN',updatedAt:nowIso(),lastMessage:'提交結果未明'}));
       setNotice('提交結果未明；已保留同一提交身份，請先重新確認。');
+      releaseSubmitLock();
     }
   };
 
@@ -509,6 +527,7 @@ export function App(){
       onClose={()=>setCartOpen(false)}
       onQuantity={(lineId,quantity)=>updateCart(cart.map(line=>line.lineId===lineId?{...line,quantity:Math.max(1,quantity)}:line))}
       onRemove={lineId=>updateCart(cart.filter(line=>line.lineId!==lineId))}
+      submitting={submitting}
       onSubmit={()=>void submitCart()}
       onReadback={intent=>void readbackIntent(intent)}
     />:null}
@@ -733,7 +752,7 @@ function ProductSheet({product,selections,selectedVariationId,setVariation,toggl
   </section></div>;
 }
 
-function CartSheet({cart,quote,pending,serviceMode,tender,onServiceMode,onTender,onClose,onQuantity,onRemove,onSubmit,onReadback}:{
+function CartSheet({cart,quote,pending,submitting,serviceMode,tender,onServiceMode,onTender,onClose,onQuantity,onRemove,onSubmit,onReadback}:{
   cart:readonly SmmCartLine[];
   quote:SmmQuoteSnapshot|null;
   pending:SmmPendingIntent|null;
@@ -744,6 +763,7 @@ function CartSheet({cart,quote,pending,serviceMode,tender,onServiceMode,onTender
   onClose:()=>void;
   onQuantity:(id:string,q:number)=>void;
   onRemove:(id:string)=>void;
+  submitting:boolean;
   onSubmit:()=>void;
   onReadback:(intent:SmmPendingIntent)=>void;
 }){
@@ -754,7 +774,7 @@ function CartSheet({cart,quote,pending,serviceMode,tender,onServiceMode,onTender
     {!cart.length?<EmptyState title="草稿係空嘅" detail="返回點單加入商品。"/>:cart.map(line=><div className="cart-line" key={line.lineId}><div><strong>{line.productName}</strong><small>{[line.selectedVariationName,...line.selections.map(item=>item.optionName)].filter(Boolean).join(' · ')||'無額外設定'} · {Number.isSafeInteger(Number(line.publishedUnitPriceMinor))?money('HKD',Number(line.publishedUnitPriceMinor)):'價格待同步'}</small></div><div className="qty"><button onClick={()=>onQuantity(line.lineId,line.quantity-1)}>−</button><b>{line.quantity}</b><button onClick={()=>onQuantity(line.lineId,line.quantity+1)}>＋</button></div><button className="danger" onClick={()=>onRemove(line.lineId)}>移除</button></div>)}
     <div className="cart-total"><span>已發布總額</span><strong>{quote?money(quote.currency,quote.totalMinor):'價格資料未完整'}</strong><small>{quote?`餐單版本 ${quote.revision} · SMT 提交時再核對`:'請重新同步餐單'}</small></div>
     {pending?<p className="callout">{pending.state==='UNKNOWN'?'上次提交結果未明，請先重新確認，唔好重新送出。':pending.lastMessage??'已有待提交草稿'}</p>:null}
-    <footer><button onClick={onClose}>返回</button>{pending?.state==='UNKNOWN'?<button className="primary" onClick={()=>onReadback(pending)}>重新確認結果</button>:<button className="primary" disabled={!cart.length||!quote} onClick={onSubmit}>提交訂單</button>}</footer>
+    <footer><button onClick={onClose}>返回</button>{pending?.state==='UNKNOWN'?<button className="primary" onClick={()=>onReadback(pending)}>重新確認結果</button>:<button className="primary" disabled={submitting||!cart.length||!quote} onClick={onSubmit}>{submitting?'提交中…':'提交訂單'}</button>}</footer>
   </section></div>;
 }
 
