@@ -792,6 +792,7 @@ export default{
         schema:'MFK_CUSTOMER_ORDER_INTENT_V1',
         storeId:'MF01',
         submissionId:String(orderRequest.submissionId),
+        menuRevision:String(orderRequest.menuRevision),
         idempotencyKey:String(orderRequest.idempotencyKey),
         createdAt:now,
         updatedAt:now,
