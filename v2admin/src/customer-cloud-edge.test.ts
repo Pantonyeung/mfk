@@ -22,7 +22,7 @@ describe('Customer Cloud Edge authority gate',()=>{
     expect(worker).not.toContain("'/api/customer/admin/");
   });
 
-  it('does not introduce D1 business authority and limits R2 to Owner-approved payment evidence',()=>{
+  it('does not introduce D1 business authority and limits R2 to payment media only',()=>{
     const wrangler=readFileSync(new URL('../wrangler.jsonc',import.meta.url),'utf8');
     expect(wrangler).not.toContain('"d1_databases"');
     expect(wrangler).toContain('"r2_buckets"');
@@ -31,6 +31,9 @@ describe('Customer Cloud Edge authority gate',()=>{
     expect(wrangler).toContain('"name": "CUSTOMER_RUNTIME"');
     expect(worker).toContain("kind:'PAYMENT_SCREENSHOT'");
     expect(worker).toContain("verificationState:'PENDING'");
+    expect(worker).toContain("kind:'PAYMENT_QR'");
+    expect(worker).toContain("'/api/admin/payment-qr'");
+    expect(worker).toContain("'/api/customer/payment-qr'");
   });
 
   it('routes SMM staff orders into the existing Customer Runtime bridge without a second cloud order queue',()=>{
