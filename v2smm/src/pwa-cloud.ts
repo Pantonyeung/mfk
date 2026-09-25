@@ -4,6 +4,19 @@ import {readSmmStaffSession} from './pwa-staff';
 
 function sleep(ms:number){return new Promise(resolve=>window.setTimeout(resolve,ms));}
 
+function webSmtAcceptanceMode(){
+  if(typeof window==='undefined')return false;
+  const params=new URLSearchParams(window.location.search);
+  return params.get('target')==='web-smt';
+}
+
+function orderEndpoint(kind:'submit'|'readback',submissionId?:string){
+  const prefix=webSmtAcceptanceMode()?'/api/smm/acceptance/orders':'/api/smm/orders';
+  return kind==='submit'
+    ?prefix+'/submit'
+    :prefix+'/readback?submissionId='+encodeURIComponent(submissionId||'');
+}
+
 function authHeaders(){
   const session=readSmmStaffSession();
   if(!session)return null;
@@ -16,7 +29,7 @@ function authHeaders(){
 async function readResult(submissionId:string,signal?:AbortSignal):Promise<Record<string,unknown>|null>{
   const headers=authHeaders();
   if(!headers)return null;
-  const response=await fetch('/api/smm/orders/readback?submissionId='+encodeURIComponent(submissionId),{
+  const response=await fetch(orderEndpoint('readback',submissionId),{
     method:'GET',
     headers,
     cache:'no-store',
@@ -64,7 +77,7 @@ export function createPwaCloudTransport():SmmLanTransport{
       if(!headers)return{kind:'UNAVAILABLE'};
       let response:Response;
       try{
-        response=await fetch('/api/smm/orders/submit',{
+        response=await fetch(orderEndpoint('submit'),{
           method:'POST',
           headers,
           body:JSON.stringify(request),
