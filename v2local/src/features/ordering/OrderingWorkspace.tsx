@@ -157,8 +157,8 @@ export function OrderingWorkspace({view,actions,centerPanel}:{view:OrderingWorks
       </div>:null}
 
       {view.cart.lines.length?<div className="ordering-cart-secondary-actions active-cart">
-        {availability.holdCart?<button type="button" onClick={actions.onHoldCart}>暫存單</button>:<span/>}
-        {availability.cancelCart?<button type="button" className="destructive" onClick={actions.onCancelCart}>取消</button>:<span/>}
+        {availability.holdCart?<button type="button" className="hold-dining-entry" onClick={actions.onHoldCart}>暫存／堂食</button>:<span/>}
+        {availability.cancelCart?<button type="button" className="cart-clear-icon destructive" aria-label="清除訂單" title="清除訂單" onClick={actions.onCancelCart}><TrashGlyph/></button>:<span/>}
       </div>:view.heldCartCount>0?<div className="ordering-cart-secondary-actions empty-cart">
         <button type="button" className="retrieve" onClick={actions.onOpenHeldOrders}>取單 <b>{view.heldCartCount}</b></button>
       </div>:null}
