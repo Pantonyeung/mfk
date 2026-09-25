@@ -1223,10 +1223,25 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
     });
   },
   async unassignDiningTable(holdId){
-    const snapshot=readDiningState();const hold=requireDiningHold(snapshot,holdId);
-    if(hold.archivedAt)throw new Error('DINING_HISTORY_PROTECTED');
-    const {assignedTable,...rest}=hold;
-    commitDiningHolds(snapshot,snapshot.holds.map(row=>row.id===holdId?{...rest,...(assignedTable?{lastAssignedTable:assignedTable}:{})}:row));
+    return withDiningMutationLock('table:'+holdId,async()=>{
+      const snapshot=readDiningState();const hold=requireDiningHold(snapshot,holdId);
+      if(hold.archivedAt)throw new Error('DINING_HISTORY_PROTECTED');
+      const linkedOrder=hold.formalOrderId?snapshot.orders.find(row=>row.id===hold.formalOrderId):undefined;
+      if(hold.formalOrderId&&!linkedOrder)throw new Error('DINING_FORMAL_ORDER_LINK_BROKEN');
+      const {assignedTable,...rest}=hold;
+      const next:Persisted={
+        ...snapshot,
+        holds:snapshot.holds.map(row=>row.id===holdId?{...rest,...(assignedTable?{lastAssignedTable:assignedTable}:{})}:row),
+        orders:linkedOrder?snapshot.orders.map(row=>row.id===linkedOrder.id?{...row,diningTableLabel:undefined,updatedAt:new Date().toISOString()}:row):snapshot.orders,
+        diningRevision:(snapshot.diningRevision??0)+1,
+      };
+      localStorage.setItem(KEY,JSON.stringify(next));data=next;
+      for(const listener of listeners){try{listener();}catch{console.warn('DINING_OBSERVER_FAILED');}}
+      if(linkedOrder){
+        try{projectOrder(data.orders.find(row=>row.id===linkedOrder.id)!);}catch{console.warn('DINING_TABLE_PROJECTION_NON_BLOCKING');}
+        appendActionAudit({action:'DINING_TABLE_UNASSIGN',orderId:linkedOrder.id,reason:assignedTable});
+      }
+    });
   },
   async readDiningHold(holdId){
     return clone(diningDetail(requireDiningHold(readDiningState(),holdId)));
