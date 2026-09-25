@@ -64,7 +64,15 @@ export function createSmmLanIngress(runtime:MfkLocalRuntime){
             });
           })),
         }),
-        orders:Object.freeze([]),work:Object.freeze([]),channels:Object.freeze([]),dineSessions:Object.freeze([]),printHealth:Object.freeze([]),refundRequests:Object.freeze([]),
+        orders:Object.freeze([]),work:Object.freeze([]),channels:Object.freeze([]),
+        dineSessions:Object.freeze(runtime.holds().filter(hold=>hold.kind==='dining').map(hold=>Object.freeze({
+          sessionId:hold.id,
+          tableLabel:hold.assignedTable?Number(hold.assignedTable.slice(1))+' 號枱':'輪候 '+hold.codeLabel,
+          covers:hold.partySize,
+          state:hold.assignedTable?'OCCUPIED':'WAITING',
+          openedAt:hold.createdAt,
+        }))),
+        printHealth:Object.freeze([]),refundRequests:Object.freeze([]),
         observedAt:new Date().toISOString(),
       });
     },
