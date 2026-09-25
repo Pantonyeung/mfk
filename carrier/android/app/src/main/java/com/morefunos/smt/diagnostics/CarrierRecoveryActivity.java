@@ -167,12 +167,8 @@ public final class CarrierRecoveryActivity extends Activity {
         io.execute(()->{
             try{
                 final String endpoint=carrierEndpointStore.validateCandidate(carrierOtaUrl.getText().toString());
-                final String previous=carrierEndpointStore.effectiveEndpoint();
-                carrierEndpointStore.applyValidatedCandidate(endpoint);
-                try{
-                    final CarrierUpdateClient.Descriptor descriptor=carrierUpdateClient.checkForUpdate();
-                    showAsync(carrierStatus,new JSONObject().put("state","reachable").put("endpoint",endpoint).put("versionName",descriptor.versionName).put("versionCode",descriptor.versionCode).toString(2));
-                } finally { carrierEndpointStore.applyValidatedCandidate(previous); }
+                final CarrierUpdateClient.Descriptor descriptor=carrierUpdateClient.checkForUpdate(endpoint);
+                showAsync(carrierStatus,new JSONObject().put("state","reachable").put("endpoint",endpoint).put("versionName",descriptor.versionName).put("versionCode",descriptor.versionCode).toString(2));
             }catch(Exception error){showAsync(carrierStatus,jsonFailure("CARRIER_OTA_URL_TEST_FAILED",error));}
         });
     }
