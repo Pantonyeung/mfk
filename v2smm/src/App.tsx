@@ -326,7 +326,7 @@ export function App(){
       setNotice('已保存本機待提交草稿；未建立正式訂單。');
       return;
     }
-    const pending=Object.freeze({...base,state:'PENDING' as const,updatedAt:nowIso(),lastMessage:'等待門店確認'});
+    const pending=Object.freeze({...base,state:'PENDING' as const,updatedAt:nowIso(),lastMessage:'已送到 Internet 訂單橋，等待 SMT 接收'});
     saveIntent(pending);
     try{
       const result=await port.submitOrder(pending);
