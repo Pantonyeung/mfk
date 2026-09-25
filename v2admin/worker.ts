@@ -153,7 +153,8 @@ function customerPublicSnapshot(active,customerOrders=[]){
     .filter(item=>/^[A-Z0-9][A-Z0-9_-]{1,39}$/.test(item.channelId)&&item.label&&item.enabled)
     .sort((a,b)=>a.sortOrder-b.sortOrder||a.channelId.localeCompare(b.channelId))
     .map(({enabled,sortOrder,qrImageUrl,...item})=>({...item,...(qrImageUrl?{qrImageUrl}:{})}));
-  const whatsappDigits=String(settings.customerWhatsAppNumber||'').replace(/\D/g,'').slice(0,15);
+  const rawWhatsappDigits=String(settings.customerWhatsAppNumber||'').replace(/\D/g,'').slice(0,15);
+  const whatsappDigits=rawWhatsappDigits.length===8?'852'+rawWhatsappDigits:rawWhatsappDigits;
   const fallbackTemplate=String(settings.customerWhatsAppTemplate||'你好，我想經 WhatsApp 落單。\n姓名：{name}\n電話：{phone}\n餐點：\n{items}\n總額：{total}\n網上自動接單暫時未能連接，請人工確認。').trim().slice(0,2000);
   const customerFallback={
     enabled:settings.customerWhatsAppEnabled!==false&&whatsappDigits.length>=8&&Boolean(fallbackTemplate),
