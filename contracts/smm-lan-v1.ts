@@ -18,6 +18,12 @@ export interface SmmLanLineIntent{
   readonly publishedUnitPriceMinor?:number;
 }
 
+export interface SmmLanDiningTarget{
+  readonly kind:'TABLE'|'WAITING';
+  readonly tableId?:string;
+  readonly covers?:number;
+}
+
 export interface SmmLanOrderRequest{
   readonly protocolVersion:1;
   readonly type:'smm.lan.order.submit.v1';
@@ -29,6 +35,7 @@ export interface SmmLanOrderRequest{
   readonly publishedTotalMinor:number;
   readonly serviceMode:'TAKEAWAY'|'DINE_IN';
   readonly tender:'CASH'|'ALIPAY'|'WECHAT'|'FPS'|'PAYME';
+  readonly diningTarget?:SmmLanDiningTarget;
   readonly lines:readonly SmmLanLineIntent[];
 }
 
@@ -139,6 +146,20 @@ export function validateSmmLanOrderRequest(input:unknown):SmmLanOrderRequest{
     publishedTotalMinor:smmMoney(row.publishedTotalMinor,'SMM_ORDER_TOTAL_INVALID'),
     serviceMode,
     tender,
+    ...(serviceMode==='DINE_IN'?{
+      diningTarget:(()=>{
+        const raw=smmRecord(row.diningTarget,'SMM_DINING_TARGET_REQUIRED');
+        const kind=raw.kind==='TABLE'?'TABLE':raw.kind==='WAITING'?'WAITING':null;
+        if(!kind)throw new Error('SMM_DINING_TARGET_INVALID');
+        const covers=Math.max(1,Math.min(30,Math.floor(Number(raw.covers)||1)));
+        if(kind==='TABLE'){
+          const tableId=smmText(raw.tableId,'SMM_DINING_TABLE_REQUIRED',16);
+          if(!/^T0[1-9]$/.test(tableId))throw new Error('SMM_DINING_TABLE_INVALID');
+          return Object.freeze({kind:'TABLE' as const,tableId,covers});
+        }
+        return Object.freeze({kind:'WAITING' as const,covers});
+      })(),
+    }:{}),
     lines:Object.freeze(lines),
   });
 }
