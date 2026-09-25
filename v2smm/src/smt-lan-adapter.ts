@@ -72,6 +72,7 @@ export function createSmmLanOrderAdapter(transport:SmmLanTransport,timeoutMs=300
         const result=await withTimeout(signal=>transport.readSubmission!(submissionId,signal));
         if('state'in result&&result.state==='UNAVAILABLE')return Object.freeze({state:'NOT_CONNECTED',message:'暫時未能連接主機'});
         if(result.state==='UNKNOWN')return Object.freeze({state:'UNKNOWN',message:'原提交結果仍未確認'});
+        if(result.state==='REJECTED')return Object.freeze({state:'REJECTED',message:result.reasonCode});
         return Object.freeze({state:'CONFIRMED',message:'訂單已建立',orderId:result.orderId,canonicalRevision:result.canonicalRevision});
       }catch{
         return Object.freeze({state:'UNKNOWN',message:'原提交結果暫時未能確認'});
