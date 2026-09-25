@@ -67,6 +67,23 @@ function commandFromReadback(body:Record<string,unknown>):CustomerCommandResult{
 }
 
 const QUOTE_READBACK_INTERVAL_MS=250;
+const BACKEND_PROBE_ATTEMPTS=3;
+const BACKEND_PROBE_INTERVAL_MS=700;
+
+async function probeOrderBackend(){
+  let lastReason='CUSTOMER_SMT_BACKEND_UNAVAILABLE';
+  for(let attempt=1;attempt<=BACKEND_PROBE_ATTEMPTS;attempt++){
+    try{
+      const {response,body}=await jsonFetch('/api/customer/channel-health?storeId='+STORE_ID);
+      if(response.ok&&body.reachable===true)return Object.freeze({reachable:true,attempts:attempt});
+      lastReason=String(body.code||'CUSTOMER_SMT_BACKEND_UNAVAILABLE');
+    }catch(error){
+      lastReason=error instanceof Error?error.message:'CUSTOMER_SMT_BACKEND_UNAVAILABLE';
+    }
+    if(attempt<BACKEND_PROBE_ATTEMPTS)await sleep(BACKEND_PROBE_INTERVAL_MS);
+  }
+  return Object.freeze({reachable:false,attempts:BACKEND_PROBE_ATTEMPTS,reason:lastReason});
+}
 // SMT has a 5s fallback reconcile when the realtime doorbell is missed. Keep the
 // customer readback window safely beyond that fallback so a healthy local-first
 // quote is not abandoned before SMT gets its first polling opportunity.
@@ -127,6 +144,7 @@ export function createCloudCustomerRuntimePort():CustomerRuntimePort{
   return Object.freeze({
     portId:'MFK_CUSTOMER_PORT_V1' as const,
     uploadPaymentEvidence:uploadCustomerPaymentEvidence,
+    probeOrderBackend,
 
     async readSnapshot():Promise<CustomerReadModelSnapshot>{
       const params=new URLSearchParams({storeId:STORE_ID});
@@ -153,6 +171,10 @@ export function createCloudCustomerRuntimePort():CustomerRuntimePort{
     },
 
     async submitOrder(intent:CustomerPendingIntent):Promise<CustomerCommandResult>{
+      const health=await probeOrderBackend();
+      if(!health.reachable){
+        return{state:'NOT_CONNECTED',message:'暫時未能連接店舖接單系統；請改用 WhatsApp 聯絡店舖。'};
+      }
       rememberSubmissionRef(intent.submissionId);
       const {response,body}=await jsonFetch('/api/customer/orders/submit?storeId='+STORE_ID,{
         method:'POST',
@@ -160,6 +182,7 @@ export function createCloudCustomerRuntimePort():CustomerRuntimePort{
           schema:MFK_CUSTOMER_ORDER_INTENT_SCHEMA,
           storeId:STORE_ID,
           submissionId:intent.submissionId,
+          menuRevision:intent.menuRevision,
           idempotencyKey:intent.idempotencyKey,
           createdAt:intent.createdAt,
           updatedAt:intent.updatedAt,
