@@ -49,6 +49,9 @@ import org.json.JSONObject;
 import java.io.File;
 import java.io.IOException;
 import java.util.Collections;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
 public final class MainActivity extends Activity {
     private static final String APP_ORIGIN = "https://appassets.androidplatform.net";
@@ -382,22 +385,29 @@ public final class MainActivity extends Activity {
     }
 
     private String forwardSmmLanMessage(String deviceId, String rawPayload) {
-        final WebView current = webView;
-        if (current == null) return errorResponse(null, "SMM_RUNTIME_UNAVAILABLE");
-        // Carrier owns transport/trust only. Business handling remains in the
-        // active runtime. This bridge event is correlated by the payload's own
-        // stable request/submission identity.
-        try {
-            final JSONObject payload = new JSONObject(rawPayload);
-            final JSONObject event = new JSONObject();
-            event.put("type", "smm.lan.request.v1");
-            event.put("deviceId", deviceId);
-            event.put("payload", payload);
-            postTrustedWebMessage(event.toString());
-            return acceptedResponse("smm.lan.forwarded.v1", payload.optString("requestId", "")).toString();
-        } catch (JSONException error) {
-            return errorResponse(null, "SMM_LAN_PAYLOAD_INVALID");
+        final WebView current=webView;
+        if(current==null)return errorResponse(null,"SMM_RUNTIME_UNAVAILABLE");
+        final CountDownLatch latch=new CountDownLatch(1);
+        final AtomicReference<String> result=new AtomicReference<>();
+        final String script="window.__MFK_SMM_LAN_HANDLE__?window.__MFK_SMM_LAN_HANDLE__("
+            +JSONObject.quote(deviceId)+","+JSONObject.quote(rawPayload)+"):null";
+        current.post(()->current.evaluateJavascript(script,value->{
+            try{
+                if(value!=null&&!"null".equals(value)){
+                    final org.json.JSONArray wrapper=new org.json.JSONArray("["+value+"]");
+                    result.set(wrapper.optString(0,null));
+                }
+            }catch(JSONException ignored){}
+            latch.countDown();
+        }));
+        try{
+            if(!latch.await(4,TimeUnit.SECONDS))return errorResponse(null,"SMM_RUNTIME_TIMEOUT");
+        }catch(InterruptedException error){
+            Thread.currentThread().interrupt();
+            return errorResponse(null,"SMM_RUNTIME_INTERRUPTED");
         }
+        final String response=result.get();
+        return response==null||response.trim().isEmpty()?errorResponse(null,"SMM_RUNTIME_NO_RESPONSE"):response;
     }
 
     private String handleBridgeMessage(String rawMessage) {
