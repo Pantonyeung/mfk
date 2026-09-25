@@ -53,6 +53,24 @@ jobs:
             KEETA_TOKEN_ENCRYPTION_KEY: encryptionKey,
           }));
           NODE
+      - name: Ensure customer payment evidence R2 bucket
+        shell: bash
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          R2_BUCKET: mfk-customer-payment-evidence
+        run: |
+          set -euo pipefail
+          if npx --yes wrangler@latest r2 bucket info "$R2_BUCKET" --json >/tmp/mfk-r2-info.json 2>/tmp/mfk-r2-info.err; then
+            echo "R2 bucket already exists: $R2_BUCKET"
+            cat /tmp/mfk-r2-info.json
+          else
+            echo "R2 bucket missing; creating: $R2_BUCKET"
+            cat /tmp/mfk-r2-info.err || true
+            npx --yes wrangler@latest r2 bucket create "$R2_BUCKET"
+            npx --yes wrangler@latest r2 bucket info "$R2_BUCKET" --json
+          fi
+
       - name: Deploy mfk-admin
         run: npx --yes wrangler@latest deploy --secrets-file .wrangler-secrets.json
         env:
