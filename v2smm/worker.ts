@@ -1,4 +1,4 @@
-import {verifyConfiguredStaffPin} from '../contracts/staff-auth-v1.ts';
+import {validateRuntimeStaffAuthSnapshot,verifyStaffPin,type RuntimeStaffIdentity} from '../contracts/staff-auth-v1.ts';
 const ADMIN_ACTIVE='https://admin.morefunos.com/api/admin-sync/active';
 const ADMIN_ACKS='https://admin.morefunos.com/api/admin-sync/acks';
 const SMT_ORIGIN='https://appassets.androidplatform.net';
@@ -44,29 +44,46 @@ async function fetchActive(storeId:string){
   if(!response.ok)throw new Error('SMM_CONFIG_NOT_PUBLISHED');
   return await response.json() as Record<string,unknown>;
 }
-function staffRows(active:Record<string,unknown>){
+function staffRows(active:Record<string,unknown>):readonly RuntimeStaffIdentity[]{
   const snapshot=record(active.snapshot);
-  return list(snapshot.staff).flatMap(raw=>{
-    const row=record(raw);
-    const staffId=text(row.id,120);
-    const displayName=text(row.name,160);
-    const role=text(row.role,40)||'STAFF';
-    const pin=String(row.pin??'').replace(/\D/g,'');
-    const activeRow=row.active!==false;
-    if(!staffId||!displayName||!activeRow||role==='VIEWER'||pin.length<4||pin.length>8)return[];
-    return[{staffId,displayName,role,pin}];
-  });
+  try{
+    return validateRuntimeStaffAuthSnapshot(snapshot.staffAuth).staff
+      .filter(row=>row.active&&row.role!=='VIEWER'&&Boolean(row.pinVerifier));
+  }catch{
+    return Object.freeze([]);
+  }
 }
-async function verifyStaff(request:Request,storeId:string){
-  const staffId=text(request.headers.get('x-mfk-staff-id'),120);
-  const pin=String(request.headers.get('x-mfk-staff-pin')??'').replace(/\D/g,'');
-  if(!staffId||pin.length<4||pin.length>8)return null;
-  let active;
+async function verifyStaffCredentials(staffId:string,pin:string,storeId:string){
+  if(!staffId)return null;
+  let active:Record<string,unknown>;
   try{active=await fetchActive(storeId);}catch{return null;}
   const staff=staffRows(active).find(row=>row.staffId===staffId);
-  if(!staff||!verifyConfiguredStaffPin(pin,staff.pin))return null;
-  return Object.freeze({staffId:staff.staffId,displayName:staff.displayName,role:staff.role});
+  if(!staff?.pinVerifier)return null;
+  const ok=await verifyStaffPin(pin,staff.pinVerifier);
+  if(!ok)return null;
+  return Object.freeze({
+    staffId:staff.staffId,
+    displayName:staff.name,
+    role:staff.role,
+    scope:staff.scope,
+    permissions:Object.freeze([...staff.permissions]),
+  });
 }
+async function currentStaffIdentity(staffId:string,storeId:string){
+  if(!staffId)return null;
+  let active:Record<string,unknown>;
+  try{active=await fetchActive(storeId);}catch{return null;}
+  const staff=staffRows(active).find(row=>row.staffId===staffId);
+  if(!staff)return null;
+  return Object.freeze({
+    staffId:staff.staffId,
+    displayName:staff.name,
+    role:staff.role,
+    scope:staff.scope,
+    permissions:Object.freeze([...staff.permissions]),
+  });
+}
+
 async function authorizedSmtDevice(deviceId:string,storeId:string){
   if(!deviceId)return false;
   const url=new URL(ADMIN_ACKS);
@@ -212,6 +229,46 @@ export class SmmIntentStore{
 
   async fetch(request:Request){
     const url=new URL(request.url);
+
+    if(url.pathname==='/sessions/create'&&request.method==='POST'){
+      const body=record(await request.json());
+      const staff=record(body.staff);
+      const staffId=text(staff.staffId,120);
+      const displayName=text(staff.displayName,160);
+      const role=text(staff.role,40);
+      if(!staffId||!displayName)return json({code:'SMM_SESSION_STAFF_INVALID'},400);
+      const token=crypto.randomUUID().replaceAll('-','')+crypto.randomUUID().replaceAll('-','');
+      const now=new Date().toISOString();
+      const expiresAt=new Date(Date.now()+10*365*24*60*60*1000).toISOString();
+      await this.state.storage.put('session:'+token,Object.freeze({
+        token,
+        staff:Object.freeze({staffId,displayName,role,scope:text(staff.scope,40),permissions:list(staff.permissions).map(String)}),
+        createdAt:now,
+        lastSeenAt:now,
+        expiresAt,
+      }));
+      return json({sessionToken:token,staff:{staffId,displayName,role},expiresAt},201);
+    }
+
+    if(url.pathname==='/sessions/read'&&request.method==='GET'){
+      const token=text(request.headers.get('x-mfk-smm-session'),256);
+      if(!token)return json({code:'SMM_SESSION_REQUIRED'},401);
+      const row=await this.state.storage.get('session:'+token) as any;
+      if(!row)return json({code:'SMM_SESSION_NOT_FOUND'},401);
+      if(!Number.isFinite(Date.parse(String(row.expiresAt||'')))||Date.parse(String(row.expiresAt))<=Date.now()){
+        await this.state.storage.delete('session:'+token);
+        return json({code:'SMM_SESSION_EXPIRED'},401);
+      }
+      await this.state.storage.put('session:'+token,Object.freeze({...row,lastSeenAt:new Date().toISOString()}));
+      return json({sessionToken:token,staff:row.staff,expiresAt:row.expiresAt});
+    }
+
+    if(url.pathname==='/sessions/logout'&&request.method==='POST'){
+      const token=text(request.headers.get('x-mfk-smm-session'),256);
+      if(token)await this.state.storage.delete('session:'+token);
+      return json({state:'LOGGED_OUT'});
+    }
+
     if(url.pathname==='/orders/submit'&&request.method==='POST'){
       const envelope=record(await request.json());
       const orderRequest=validateOrderRequest(envelope.request);
@@ -287,6 +344,27 @@ export class SmmIntentStore{
   }
 }
 
+async function readStaffSession(request:Request,storeId:string,env:{SMM_INTENT_STORE:any}){
+  const token=text(request.headers.get('x-mfk-smm-session'),256);
+  if(!token)return null;
+  const id=env.SMM_INTENT_STORE.idFromName(storeId);
+  const stub=env.SMM_INTENT_STORE.get(id);
+  const response=await stub.fetch(new Request('https://internal/sessions/read',{
+    method:'GET',
+    headers:{'x-mfk-smm-session':token},
+  }));
+  if(!response.ok)return null;
+  const body=record(await response.json());
+  const sessionStaff=record(body.staff);
+  const staffId=text(sessionStaff.staffId,120);
+  const current=await currentStaffIdentity(staffId,storeId);
+  if(!current){
+    await stub.fetch(new Request('https://internal/sessions/logout',{method:'POST',headers:{'x-mfk-smm-session':token}})).catch(()=>{});
+    return null;
+  }
+  return Object.freeze({...current,sessionToken:token});
+}
+
 export default{
   async fetch(request:Request,env:{ASSETS:{fetch(request:Request):Promise<Response>};SMM_INTENT_STORE:any}){
     const url=new URL(request.url);
@@ -303,24 +381,50 @@ export default{
       if(request.method!=='GET')return json({code:'METHOD_NOT_ALLOWED'},405);
       let active;
       try{active=await fetchActive(storeId);}catch{return json({code:'SMM_CONFIG_NOT_PUBLISHED'},503);}
-      return json({staff:staffRows(active).map(({pin,...item})=>item)});
+      return json({staff:staffRows(active).map(item=>({
+        staffId:item.staffId,
+        displayName:item.name,
+        role:item.role,
+      }))});
     }
 
     if(url.pathname==='/api/smm/staff/verify'){
       if(request.method!=='POST')return json({code:'METHOD_NOT_ALLOWED'},405);
       const body=record(await request.json().catch(()=>({})));
-      const synthetic=new Request(request.url,{headers:{
-        'x-mfk-staff-id':text(body.staffId,120),
-        'x-mfk-staff-pin':String(body.pin??''),
-      }});
-      const staff=await verifyStaff(synthetic,storeId);
-      return staff?json({ok:true,...staff}):json({code:'SMM_STAFF_UNAUTHORIZED',message:'員工編號或 PIN 不正確'},401);
+      const staffId=text(body.staffId,120);
+      const pin=String(body.pin??'').replace(/\D/g,'');
+      const staff=await verifyStaffCredentials(staffId,pin,storeId);
+      if(!staff)return json({code:'SMM_STAFF_UNAUTHORIZED',message:'員工帳戶或 PIN 不正確'},401);
+      const id=env.SMM_INTENT_STORE.idFromName(storeId);
+      const stub=env.SMM_INTENT_STORE.get(id);
+      const response=await stub.fetch(new Request('https://internal/sessions/create',{
+        method:'POST',
+        headers:{'content-type':'application/json'},
+        body:JSON.stringify({staff}),
+      }));
+      const session=record(await response.json());
+      return json({ok:true,...staff,sessionToken:session.sessionToken,expiresAt:session.expiresAt});
+    }
+
+    if(url.pathname==='/api/smm/staff/session'){
+      if(request.method==='GET'){
+        const session=await readStaffSession(request,storeId,env);
+        return session?json({ok:true,...session}):json({code:'SMM_SESSION_UNAUTHORIZED'},401);
+      }
+      if(request.method==='POST'){
+        const token=text(request.headers.get('x-mfk-smm-session'),256);
+        const id=env.SMM_INTENT_STORE.idFromName(storeId);
+        const stub=env.SMM_INTENT_STORE.get(id);
+        await stub.fetch(new Request('https://internal/sessions/logout',{method:'POST',headers:{'x-mfk-smm-session':token}}));
+        return json({state:'LOGGED_OUT'});
+      }
+      return json({code:'METHOD_NOT_ALLOWED'},405);
     }
 
     if(url.pathname==='/api/smm/orders/submit'){
       if(request.method!=='POST')return json({code:'METHOD_NOT_ALLOWED'},405);
-      const staff=await verifyStaff(request,storeId);
-      if(!staff)return json({code:'SMM_STAFF_UNAUTHORIZED',message:'請先完成員工登入'},401);
+      const staff=await readStaffSession(request,storeId,env);
+      if(!staff)return json({code:'SMM_STAFF_UNAUTHORIZED',message:'請先使用同一個員工帳戶登入'},401);
       let orderRequest;
       try{orderRequest=validateOrderRequest(await request.json());}
       catch(error){return json({code:error instanceof Error?error.message:'SMM_ORDER_INVALID'},400);}
@@ -333,8 +437,8 @@ export default{
 
     if(url.pathname==='/api/smm/orders/readback'){
       if(request.method!=='GET')return json({code:'METHOD_NOT_ALLOWED'},405);
-      const staff=await verifyStaff(request,storeId);
-      if(!staff)return json({code:'SMM_STAFF_UNAUTHORIZED',message:'請先完成員工登入'},401);
+      const staff=await readStaffSession(request,storeId,env);
+      if(!staff)return json({code:'SMM_STAFF_UNAUTHORIZED',message:'請先使用同一個員工帳戶登入'},401);
       const submissionId=text(url.searchParams.get('submissionId'),180);
       const id=env.SMM_INTENT_STORE.idFromName(storeId);
       const stub=env.SMM_INTENT_STORE.get(id);
