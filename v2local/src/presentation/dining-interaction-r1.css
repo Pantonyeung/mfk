@@ -1,0 +1,42 @@
+.dining-interaction-r1{grid-template-columns:190px minmax(0,1fr) 370px;gap:10px;padding:10px;background:#f4f7fb;color:#22364d}
+.dining-interaction-r1 .dining-wait-column,.dining-interaction-r1 .dining-floor-board,.dining-interaction-r1 .dining-detail-panel{min-width:0;border-color:#d7e1ed;box-shadow:none;border-radius:13px}
+.dining-interaction-r1 .dining-wait-column{display:flex;flex-direction:column;gap:10px;padding:12px}
+.dining-interaction-r1 .dining-wait-column>header>span{background:#edf4ff;color:#1f5fbf}
+.dining-interaction-r1 .dining-wait-column h2{font-size:20px}
+.dining-interaction-r1 .dining-add-wait{min-height:44px;flex:0 0 auto;border-color:#c4d6ef;background:#f2f7ff;color:#1f5fbf}
+.dining-interaction-r1 .dining-wait-list{flex:1 1 0;min-height:0;align-content:start}
+.dining-interaction-r1 .dining-wait-list article{grid-template-columns:minmax(0,1fr) 36px;flex-shrink:0}
+.dining-interaction-r1 .dining-wait-list article.selected{background:#edf4ff;border-color:#1f5fbf}
+.dining-interaction-r1 .dining-wait-list article>button:first-child{min-height:70px;gap:4px;padding:9px 7px}
+.dining-interaction-r1 .dining-wait-list strong{font-size:18px}.dining-interaction-r1 .dining-wait-list span,.dining-interaction-r1 .dining-wait-list small{font-size:12px}
+.dining-interaction-r1 .dining-hint{flex:0 0 auto;font-size:12px;line-height:1.55;background:#f3f7fd;color:#59708d}
+.dining-interaction-r1 .dining-floor-board{display:flex;flex-direction:column;gap:10px;padding:12px}
+.dining-interaction-r1 .dining-floor-board>header{flex:0 0 auto;min-height:44px}.dining-interaction-r1 .dining-floor-board h1{font-size:25px}
+.dining-interaction-r1 .dining-nine-grid{flex:1 1 0;min-height:0;gap:9px}
+.dining-interaction-r1 .dining-table{min-height:0;padding:12px;gap:7px;overflow:auto;background:#fbfcfe;border-color:#d8e2ee;box-shadow:none}
+.dining-interaction-r1 .dining-table.occupied,.dining-interaction-r1 .dining-table.settled{background:#f2f7ff;border-color:#b9ceed}
+.dining-interaction-r1 .dining-table.selected{border:2px solid #1f5fbf;box-shadow:0 0 0 2px #dce9fa}
+.dining-interaction-r1 .dining-table.available:hover{background:#edf4ff;border-color:#1f5fbf}
+.dining-interaction-r1 .dining-table.overdue{background:#fff1f0!important;border:2px solid #d94a41!important}
+.dining-interaction-r1 .dining-table-top{width:100%;gap:6px}.dining-interaction-r1 .dining-table-top strong{font-size:27px;line-height:1.2;color:#173e77}
+.dining-interaction-r1 .dining-table-top em{font-size:12px;white-space:nowrap}.dining-interaction-r1 .dining-table-items{display:block;width:100%;min-width:0}
+.dining-interaction-r1 .dining-table-time{font-size:12px;color:#315b8a}.dining-interaction-r1 .dining-table-time.overdue{color:#b73129}
+.dining-interaction-r1 .dining-warning-label{font-size:11px;color:#687f98;line-height:1.4}
+.dining-interaction-r1 .dining-table-money{flex-wrap:wrap;gap:4px}.dining-interaction-r1 .dining-table-money strong{color:#1f5fbf;font-size:14px;white-space:nowrap}
+.dining-interaction-r1 .dining-detail-panel{padding:12px;gap:9px}
+.dining-interaction-r1 .dining-detail-panel>header,.dining-interaction-r1 .dining-detail-timer,.dining-interaction-r1 .dining-payment-panel,.dining-interaction-r1 .dining-balance,.dining-interaction-r1 .dining-detail-actions{flex:0 0 auto}
+.dining-interaction-r1 .dining-detail-panel h2{font-size:25px;color:#173e77}
+.dining-interaction-r1 .dining-detail-timer{padding:9px;background:#f3f7fd}.dining-interaction-r1 .dining-detail-timer small{font-size:12px;color:#687f98}
+.dining-interaction-r1 .dining-detail-lines{flex:1 1 180px;min-height:96px}.dining-interaction-r1 .dining-detail-lines article{gap:6px;padding:10px 8px}
+.dining-interaction-r1 .dining-line-selector{grid-template-columns:40px 26px 40px}.dining-interaction-r1 .dining-line-selector button{height:40px;color:#1f5fbf;border-color:#c4d4e8;border-radius:6px}
+.dining-interaction-r1 .dining-line-copy b{font-size:16px;line-height:1.35;overflow-wrap:anywhere}.dining-interaction-r1 .dining-line-copy small,.dining-interaction-r1 .dining-line-copy span{font-size:12px}
+.dining-interaction-r1 .dining-no-items{padding:12px;color:#687f98;font-size:13px}
+.dining-interaction-r1 .dining-payment-panel.checkout-authority{background:#f2f7ff;border-color:#c6d8f0}
+.dining-interaction-r1 .dining-payment-panel.checkout-authority>header small{color:#607898}.dining-interaction-r1 .dining-payment-panel.checkout-authority>header strong{font-size:22px}
+.dining-interaction-r1 .dining-settle-button{min-height:48px;background:#1f5fbf;color:#fff}
+.dining-interaction-r1 .dining-balance .remaining{background:#edf4ff}.dining-interaction-r1 .dining-balance .remaining strong{color:#1f5fbf}
+.dining-interaction-r1 .dining-payment-history{flex:0 1 110px;min-height:56px;max-height:110px}.dining-interaction-r1 .dining-payment-history>header{position:sticky;top:0;background:#fff}
+.dining-interaction-r1 .dining-detail-actions button{min-height:44px;font-size:13px}
+.dining-interaction-r1 button:disabled{cursor:not-allowed}.dining-interaction-r1 button:focus-visible{outline:3px solid #83ade6;outline-offset:2px}
+@media(max-width:1350px){.dining-interaction-r1{grid-template-columns:150px minmax(0,1fr) 340px;padding:8px;gap:8px}.dining-interaction-r1 .dining-floor-board,.dining-interaction-r1 .dining-wait-column,.dining-interaction-r1 .dining-detail-panel{padding:10px}.dining-interaction-r1 .dining-table{padding:8px;gap:6px}.dining-interaction-r1 .dining-table-top strong{font-size:23px}.dining-interaction-r1 .dining-table-money{display:grid}.dining-interaction-r1 .dining-table-items{font-size:11px}.dining-interaction-r1 .dining-payment-history{max-height:84px}}
+@media(max-width:980px){.dining-interaction-r1{grid-template-columns:128px minmax(270px,1fr) 304px;overflow:auto}.dining-interaction-r1 .dining-table-top{flex-wrap:wrap}.dining-interaction-r1 .dining-detail-lines article{grid-template-columns:minmax(0,1fr)}.dining-interaction-r1 .dining-line-selector{justify-content:end}}
