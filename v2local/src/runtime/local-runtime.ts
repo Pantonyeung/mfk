@@ -73,6 +73,8 @@ export interface LocalHoldDraft{
   readonly totalMinor:number;
   readonly assignedTable?:string;
   readonly payments?:readonly LocalDiningPayment[];
+  readonly providerRef?:string;
+  readonly sourceLabel?:string;
   readonly items:readonly {id:string;name:string;qty:number;unitMinor:number}[];
 }
 interface Persisted{orders:StoredOrder[];availability:Record<string,SmtAvailabilityStatus>;holds:LocalHoldDraft[]}
@@ -203,6 +205,7 @@ export interface MfkLocalRuntime extends CleanSmtCoreRuntimePort{
     orderId:string;eventId:1002|1003|1004|1006|1008;eventName:string;providerMessageId:string;providerPushedAt:string;rawMessage:string;
   }):{readonly orderId:string;readonly disposition:'APPLIED'|'EVIDENCE_ONLY'|'IDEMPOTENT'|'CONFLICT';readonly fulfillmentLabel:StoredOrder['fulfillmentLabel']};
   createHold(input:{kind:'dining'|'waiting';items:readonly {id:string;name:string;qty:number;unitMinor:number}[];totalMinor:number;partySize?:number;note?:string}):LocalHoldDraft;
+  upsertSmmDiningHold(input:{providerRef:string;target:{kind:'TABLE'|'WAITING';tableId?:string;covers?:number};items:readonly {id:string;name:string;qty:number;unitMinor:number}[];totalMinor:number;sourceLabel?:string}):LocalHoldDraft;
   holds():readonly LocalHoldDraft[];
   removeHold(id:string):void;
   readDiningHold(holdId:string):Promise<LocalDiningHoldDetail>;
@@ -495,6 +498,36 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
       totalMinor:Math.max(0,Math.floor(Number(input.totalMinor)||0)),
       payments:[],
       items:input.items.map(item=>({...item})),
+    };
+    data={...data,holds:[draft,...data.holds]};save();return draft;
+  },
+  upsertSmmDiningHold(input){
+    const providerRef=String(input.providerRef||'').trim();
+    if(!providerRef)throw new Error('SMM_DINING_PROVIDER_REF_REQUIRED');
+    const existingByRef=data.holds.find(hold=>hold.providerRef===providerRef);
+    if(existingByRef)return existingByRef;
+    const target=input.target;
+    const covers=Math.max(1,Math.floor(Number(target.covers)||1));
+    const items=input.items.map(item=>({...item}));
+    if(target.kind==='WAITING'){
+      const draft:LocalHoldDraft={
+        id:'HOLD-'+Date.now().toString(36),codeLabel:'W'+String(data.holds.length+1).padStart(3,'0'),kind:'dining',
+        createdAt:new Date().toISOString(),partySize:covers,note:'SMM 輪候',totalMinor:Math.max(0,Math.floor(Number(input.totalMinor)||0)),
+        payments:[],providerRef,sourceLabel:input.sourceLabel||'SMM',items,
+      };
+      data={...data,holds:[draft,...data.holds]};save();return draft;
+    }
+    const tableId=String(target.tableId||'').trim();
+    if(!/^T0[1-9]$/.test(tableId))throw new Error('SMM_DINING_TABLE_INVALID');
+    const occupied=data.holds.find(hold=>hold.kind==='dining'&&hold.assignedTable===tableId);
+    if(occupied){
+      const updated:LocalHoldDraft={...occupied,items:[...occupied.items,...items],totalMinor:occupied.totalMinor+Math.max(0,Math.floor(Number(input.totalMinor)||0))};
+      data={...data,holds:data.holds.map(hold=>hold.id===occupied.id?updated:hold)};save();return updated;
+    }
+    const draft:LocalHoldDraft={
+      id:'HOLD-'+Date.now().toString(36),codeLabel:'H'+String(data.holds.length+1).padStart(3,'0'),kind:'dining',
+      createdAt:new Date().toISOString(),partySize:covers,note:'SMM 堂食',totalMinor:Math.max(0,Math.floor(Number(input.totalMinor)||0)),
+      assignedTable:tableId,payments:[],providerRef,sourceLabel:input.sourceLabel||'SMM',items,
     };
     data={...data,holds:[draft,...data.holds]};save();return draft;
   },
