@@ -243,7 +243,9 @@ test('Internet staff orders use same-account auth and the existing customer brid
   assert.match(staff,/HMAC/);
   assert.match(staff,/sessionToken/);
   assert.doesNotMatch(staff,/readonly\s+pin\s*:/);
-  assert.match(cloud,/\/api\/smm\/orders\/submit/);
+  assert.match(cloud,/\/api\/customer\/staff-orders\/submit/);
+  assert.match(cloud,/\/api\/customer\/staff-orders\/readback/);
+  assert.doesNotMatch(cloud,/\/api\/smm\/orders\/submit/);
   assert.match(cloud,/x-mfk-smm-session/);
   assert.doesNotMatch(cloud,/x-mfk-staff-pin/);
   assert.doesNotMatch(cloud,/x-mfk-staff-id/);
