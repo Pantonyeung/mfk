@@ -85,7 +85,7 @@ describe('SMT donor skeleton fusion V2 layout',()=>{
     }} actions={actions}/>);
     expect(html).toContain('ordering-cart-price-strip');
     expect(html).toContain('暫存');
-    expect(html).toContain('取消');
+    expect(html).toContain('清除訂單');
     expect(html).toContain('前往結帳');
     expect(html).toContain('刪除 原味飯團');
     expect(html).not.toContain('ordering-cart-facts');

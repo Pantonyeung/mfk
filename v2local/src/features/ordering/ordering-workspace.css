@@ -867,3 +867,29 @@
 /* Queue attention: deferred Keeta and unverified customer payments stay visually prominent. */
 .donor-skeleton .ordering-queue-card.attention{border-color:#87aee0;background:#eef4ff;box-shadow:0 0 0 2px rgba(31,95,191,.08)}
 .donor-skeleton .ordering-queue-card>span:first-child i{display:inline-flex;align-items:center;min-height:20px;margin-left:5px;padding:2px 6px;border-radius:999px;background:#1f5fbf;color:#fff;font-size:9px;font-style:normal;font-weight:900}
+
+
+/* R4 Owner mindset: one primary 暫存／堂食 entry + low-emphasis clear. */
+.ordering-cart-secondary-actions.active-cart{
+  grid-template-columns:minmax(0,1fr) 48px;
+}
+.ordering-cart-secondary-actions.active-cart .hold-dining-entry{
+  min-width:0;
+  background:#edf4ff;
+  color:#174a98;
+  border:1px solid #b8cdea;
+}
+.ordering-cart-secondary-actions.active-cart .cart-clear-icon{
+  width:48px;
+  min-width:48px;
+  padding:0;
+  display:grid;
+  place-items:center;
+  background:#fff7f7;
+  color:#b73b3b;
+  border:1px solid #efcece;
+}
+.ordering-cart-secondary-actions.active-cart .cart-clear-icon svg{
+  width:20px;
+  height:20px;
+}

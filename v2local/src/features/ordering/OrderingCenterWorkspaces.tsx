@@ -19,6 +19,13 @@ export interface WorkspaceCartLine{
   readonly qty:number;
   readonly unitMinor:number;
   readonly detail?:string;
+  readonly serviceMode?:'takeaway'|'dine-in';
+}
+
+export type HoldWorkspaceMode='cart'|'dining';
+
+export function initialHoldModeForLines(lines:readonly Pick<WorkspaceCartLine,'serviceMode'>[]):HoldWorkspaceMode{
+  return lines.some(line=>line.serviceMode==='dine-in')?'dining':'cart';
 }
 export type OrderingPanelState=
   |{readonly type:'product';readonly productId:string;readonly lineId?:string}
@@ -157,7 +164,7 @@ export interface HoldPlacementTable{
 }
 
 export function HoldCartWorkspace({
-  lines,totalMinor,tables,onHoldWaiting,onHoldQueue,onHoldTable,onDirtyChange
+  lines,totalMinor,tables,onHoldWaiting,onHoldQueue,onHoldTable,onDirtyChange,initialMode='cart'
 }:{
   lines:readonly WorkspaceCartLine[];
   totalMinor:number;
@@ -166,25 +173,26 @@ export function HoldCartWorkspace({
   onHoldQueue:(partySize:number,note:string)=>void;
   onHoldTable:(tableId:string,partySize:number,note:string)=>void;
   onDirtyChange?:(dirty:boolean)=>void;
+  initialMode?:'cart'|'dining';
 }){
-  const [mode,setMode]=useState<'cart'|'dining'>('cart');
+  const [mode,setMode]=useState<'cart'|'dining'>(initialMode);
   const [partySize,setPartySize]=useState(2);
   const [note,setNote]=useState('');
 
   return <div className="hold-cart-workspace">
     <header>
-      <div><h2>暫存工作台</h2><p>同一頁完成：暫存待客，或者掛入堂食／輪候。</p></div>
+      <div><h2>暫存／堂食</h2><p>系統按購物車內容預設第一頁；店員隨時可以切換暫存或堂食。</p></div>
       <strong>{money(totalMinor)}</strong>
     </header>
 
     <section className="hold-kind-grid">
-      <button className="waiting" onClick={()=>onHoldWaiting(partySize,note)}>
-        <b>暫存待客</b>
-        <span>客人未確認；保存呢張 Cart，之後由「取回訂單」直接攞返。</span>
+      <button className={mode==='cart'?'active waiting':'waiting'} onClick={()=>{onDirtyChange?.(true);setMode('cart');}}>
+        <b>暫存</b>
+        <span>Hold 住成張 Cart，之後由「取單」取返；堂食做到一半亦可以暫存。</span>
       </button>
       <button className={mode==='dining'?'active dining':'dining'} onClick={()=>{onDirtyChange?.(true);setMode('dining');}}>
-        <b>掛入堂食</b>
-        <span>唔跳頁；下面「購物車內容」即場轉成加入輪候＋1–9 號枱。</span>
+        <b>堂食</b>
+        <span>直接揀輪候、1–8 號枱或者戶外桌。</span>
       </button>
     </section>
 
@@ -195,6 +203,7 @@ export function HoldCartWorkspace({
         <div><b>{line.name}</b>{line.detail?<small>{line.detail}</small>:null}</div>
         <strong>{money(line.qty*line.unitMinor)}</strong>
       </article>)}
+      <button type="button" className="hold-confirm-waiting" onClick={()=>onHoldWaiting(partySize,note)}>確認暫存</button>
     </section>:<section className="hold-inline-dining">
       <aside className="hold-inline-left">
         <div className="hold-party">
@@ -206,7 +215,7 @@ export function HoldCartWorkspace({
           <span>直接放入堂食輪候，唔使再跳堂食頁揀第二次。</span>
         </button>
         <label className="hold-note"><span>備註</span><input value={note} onChange={event=>{onDirtyChange?.(true);setNote(event.target.value);}} placeholder="例如：等 10 分鐘"/></label>
-        <button className="hold-back-cart" onClick={()=>{onDirtyChange?.(true);setMode('cart');}}>返回購物車內容</button>
+        <button className="hold-back-cart" onClick={()=>{onDirtyChange?.(true);setMode('cart');}}>轉去暫存</button>
       </aside>
       <div className="hold-nine-grid">
         {tables.map(table=><button key={table.id} className={table.occupied?'occupied':'available'} disabled={table.occupied} onClick={()=>onHoldTable(table.id,partySize,note)}>

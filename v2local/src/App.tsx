@@ -24,7 +24,7 @@ import {StaffAuthGate,StaffSessionBadge} from './presentation/StaffAuthGate.tsx'
 import {CashOpeningGate} from './presentation/CashOpeningGate.tsx';
 import {readActiveStaffSession,staffAuthRequired} from './runtime/staff-auth.ts';
 import {DEFAULT_SMT_FRONTLINE_UI_PREFERENCES,readSmtFrontlineUiPreferences,writeSmtFrontlineUiPreferences,type SmtFrontlineUiPreferences} from './runtime/frontline-ui-preferences.ts';
-import {HoldCartWorkspace,HoldListWorkspace,ProductConfigWorkspace,type OrderingPanelState,type WorkspaceHoldDraft,type WorkspaceProduct} from './features/ordering/OrderingCenterWorkspaces.tsx';
+import {HoldCartWorkspace,HoldListWorkspace,ProductConfigWorkspace,initialHoldModeForLines,type OrderingPanelState,type WorkspaceHoldDraft,type WorkspaceProduct} from './features/ordering/OrderingCenterWorkspaces.tsx';
 import {ComboFastLaneWorkspace,RequiredFastLaneWorkspace,RiceballPoolWorkspace} from './features/ordering/FastLaneWorkspaces.tsx';
 import {PendingOrderReviewWorkspace} from './features/ordering/PendingOrderReviewWorkspace.tsx';
 import {applyPairingPlan,applyRequiredSelection,buildAutoPairingPlans,comboBlockingCount,comboDraftCount,comboSlots,countMainCourseUnits,countRiceballCandidateUnits,defaultSelectionsForProduct,dissolveComboLine,fillPendingComboGroup,fillPendingComboGroupFromConfiguredProduct,freeNoteForLine,nextPairingIndex,rebuildConfiguredLine,requiredTasks,restoreFastLaneLineComposition,riceballMealCombos,selectionsForLine,serializeFastLaneComposition,type FastLaneCartLine,type FastLanePairPlan,type FastLaneProduct} from './features/ordering/fast-lane-model.ts';
@@ -528,7 +528,7 @@ function OrderingPage({
     :panel?.type==='quick-drink-config'?'快捷飲品設定'
     :panel?.type==='pending-order'?'待處理訂單'
     :panel?.type==='fast-lane'?(panel.lane==='riceball-pool'?'快速組合':panel.lane==='required'?'必選區':'紫米套餐區')
-    :panel?.type==='hold'?'暫存工作台'
+    :panel?.type==='hold'?'暫存／堂食'
     :panel?.type==='holds'?'暫存單':'';
 
   const panelBody=panel?.type==='product'
@@ -585,6 +585,7 @@ function OrderingPage({
             lines={cart}
             totalMinor={total}
             tables={holdTables}
+            initialMode={initialHoldModeForLines(cart)}
             onDirtyChange={setPanelDirty}
             onHoldWaiting={(partySize,note)=>{
               localRuntime.createHold({kind:'waiting',items:holdItems(),totalMinor:total,partySize,note:note||'暫存待客'});
