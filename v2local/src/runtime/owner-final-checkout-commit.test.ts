@@ -92,6 +92,39 @@ describe('Owner FINAL checkout commit semantics',()=>{
     await expect(module.localRuntime.deferKeetaOrder(order.id)).rejects.toThrow('KEETA_DEFER_LIMIT_REACHED');
   });
 
+  it('keeps the original order and appends linked partial/full refunds',async()=>{
+    const module=await import('./local-runtime.ts');
+    const order=module.localRuntime.createOrder({
+      items:[{id:'p1',name:'商品',qty:1,unitMinor:5000,serviceMode:'takeaway'}],
+      totalMinor:5000,paymentLabel:'FPS',sourceLabel:'現場',submissionId:'REFUND-ORDER-1',
+    });
+    const partial=await module.localRuntime.refundOrder(order.id,{kind:'PARTIAL',amountMinor:2000,method:'FPS',note:'部分退款'});
+    expect(partial.id).toBe(order.id);
+    expect(partial.totalMinor).toBe(5000);
+    expect(partial.refunds).toHaveLength(1);
+    expect(partial.refunds?.[0]).toMatchObject({kind:'PARTIAL',amountMinor:2000,method:'FPS'});
+    const full=await module.localRuntime.refundOrder(order.id,{kind:'FULL',amountMinor:3000,method:'CASH',note:'餘額現金退'});
+    expect(full.id).toBe(order.id);
+    expect(full.totalMinor).toBe(5000);
+    expect(full.refunds).toHaveLength(2);
+    expect(module.localRuntime.orders()).toHaveLength(1);
+    await expect(module.localRuntime.refundOrder(order.id,{kind:'PARTIAL',amountMinor:1,method:'CASH'})).rejects.toThrow('REFUND_EXCEEDS_REMAINING');
+  });
+
+  it('records CASH refund into Cash Movement without deleting or rewriting the original order',async()=>{
+    const module=await import('./local-runtime.ts');
+    const ops=await import('./local-operations.ts');
+    const order=module.localRuntime.createOrder({
+      items:[{id:'p2',name:'商品二',qty:1,unitMinor:1800,serviceMode:'takeaway'}],
+      totalMinor:1800,paymentLabel:'CASH',sourceLabel:'現場',submissionId:'REFUND-CASH-1',
+    });
+    await module.localRuntime.refundOrder(order.id,{kind:'FULL',amountMinor:1800,method:'CASH'});
+    const movement=ops.readLocalCashMovements()[0]!;
+    expect(movement).toMatchObject({direction:'OUT',kind:'REFUND',amountMinor:1800,orderId:order.id});
+    expect(module.localRuntime.orders()[0]?.id).toBe(order.id);
+    expect(module.localRuntime.orders()[0]?.totalMinor).toBe(1800);
+  });
+
   it('admits initial print only once even when the call is repeated',async()=>{
     const module=await import('./local-runtime.ts');
     const order=module.localRuntime.createOrder({
