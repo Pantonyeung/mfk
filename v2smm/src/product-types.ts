@@ -187,6 +187,7 @@ export interface SmmBusinessDayProjection {
 }
 
 export interface SmmReadModelSnapshot {
+  readonly connectionPath?:'LAN'|'INTERNET';
   readonly menu?:SmmMenuSnapshot;
   readonly orders:readonly SmmOrderProjection[];
   readonly work:readonly SmmWorkItem[];
