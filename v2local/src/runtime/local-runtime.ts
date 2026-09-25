@@ -493,6 +493,7 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
       paymentLabel:input.paymentLabel,
       fulfillmentLabel:input.initialFulfillmentLabel??'進行中',
       sourceLabel:input.sourceLabel||'現場',
+      ...(submissionId?{checkoutSubmissionId:submissionId}:{}),
       ...(providerRef?{providerRef}:{}),
       ...(input.providerMessageId?{providerMessageId:String(input.providerMessageId)}:{}),
       ...(input.providerPickupCode?{providerPickupCode:String(input.providerPickupCode)}:{}),
