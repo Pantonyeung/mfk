@@ -1323,7 +1323,34 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
     let updated:LocalHoldDraft={...hold,payments:[...(hold.payments??[]),payment]};
     const after=diningDetail(updated);
     if(after.remainingMinor===0&&after.lines.length>0&&after.lines.every(row=>row.remainingQty===0))updated=archiveDiningHold(updated,createdAt);
-    commitDiningHolds(snapshot,snapshot.holds.map(row=>row.id===holdId?updated:row));
+
+    const formalOrder=hold.formalOrderId?snapshot.orders.find(row=>row.id===hold.formalOrderId):undefined;
+    if(hold.formalOrderId&&!formalOrder)throw new Error('DINING_FORMAL_ORDER_LINK_BROKEN');
+    const effectivePaymentLabel=updated.payments?.length===1
+      ?tender
+      :updated.payments?.map(row=>row.tender).every(value=>value===updated.payments?.[0]?.tender)
+        ?updated.payments?.[0]?.tender??tender
+        :'COMBO';
+    const nextOrders=formalOrder?snapshot.orders.map(row=>row.id===formalOrder.id?{
+      ...row,
+      paymentLabel:effectivePaymentLabel,
+      updatedAt:createdAt,
+    }:row):snapshot.orders;
+    const next:Persisted={
+      ...snapshot,
+      orders:nextOrders,
+      holds:snapshot.holds.map(row=>row.id===holdId?updated:row),
+      diningRevision:(snapshot.diningRevision??0)+1,
+    };
+    // Payment history + current Formal Order tender projection commit together.
+    localStorage.setItem(KEY,JSON.stringify(next));
+    data=next;
+    for(const listener of listeners){try{listener();}catch{console.warn('DINING_OBSERVER_FAILED');}}
+    if(formalOrder){
+      const current=data.orders.find(row=>row.id===formalOrder.id)!;
+      try{projectOrder(current);}catch{console.warn('DINING_PAYMENT_PROJECTION_NON_BLOCKING');}
+      appendActionAudit({action:'DINING_PAYMENT',orderId:current.id,reason:tender+' '+money(amountMinor)});
+    }
     return clone(diningDetail(updated));
   },
   async clearDiningHold(holdId){
