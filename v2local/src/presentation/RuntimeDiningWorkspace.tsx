@@ -188,6 +188,12 @@ export function RuntimeDiningWorkspace({runtime,onCheckout,warningMinutes}:{
     if(checkoutLock.current||actionLock.current||!detail)return;
     setSelection(Object.fromEntries(detail.lines.filter(line=>line.remainingQty>0).map(line=>[line.lineIndex,line.remainingQty])));
   };
+  const reprintPaymentReceipt=(submissionId?:string)=>command(async()=>{
+    const holdId=activeHold.current;
+    if(!holdId||!submissionId||!runtime.reprintDiningPaymentReceipt)throw new Error('未有付款收據重印接口。');
+    const result=await runtime.reprintDiningPaymentReceipt(holdId,submissionId);
+    setMessage(result.failed===0?'付款收據已重印；錢箱不會再次開啟。':'付款收據重印失敗，請檢查打印機。');
+  });
   const openReprint=()=>command(async()=>{
     const holdId=activeHold.current;
     if(!holdId||!runtime.readDiningReprintOptions)throw new Error('未有堂食重印接口。');
@@ -302,7 +308,7 @@ export function RuntimeDiningWorkspace({runtime,onCheckout,warningMinutes}:{
           <button type="button" className="dining-settle-button" disabled={checkoutBusy||actionBusy||selectedUnits<=0||detail.remainingMinor<=0} onClick={()=>void goCheckout()}>{checkoutBusy?'核對最新資料…':'前往結帳 · '+selectedUnits+' 件'}</button>
         </section>
         <section className="dining-balance"><div><span>原總額</span><b>{money(detail.totalMinor)}</b></div><div><span>已結帳</span><b>{money(detail.paidMinor)}</b></div><div className="remaining"><span>未結帳</span><strong>{money(detail.remainingMinor)}</strong></div></section>
-        <section className="dining-payment-history"><header><b>付款紀錄</b><span>{detail.payments.length}</span></header>{detail.payments.length?detail.payments.map(payment=><div key={payment.id}><span>{tenderLabels[payment.tender]??payment.tender}</span><b>{money(payment.amountMinor)}</b><small>{new Date(payment.createdAt).toLocaleTimeString('zh-HK',{hour:'2-digit',minute:'2-digit'})}</small></div>):<p>未有付款紀錄。</p>}</section>
+        <section className="dining-payment-history"><header><b>付款紀錄</b><span>{detail.payments.length}</span></header>{detail.payments.length?detail.payments.map(payment=><div key={payment.id}><span>{payment.tender==='COMBO'?(payment.splitTenders??[]).map(row=>(tenderLabels[row.tender]??row.tender)+' '+money(row.amountMinor)).join(' + '):(tenderLabels[payment.tender]??payment.tender)}</span><b>{money(payment.amountMinor)}</b><small>{new Date(payment.createdAt).toLocaleTimeString('zh-HK',{hour:'2-digit',minute:'2-digit'})}</small><button type="button" disabled={actionBusy||checkoutBusy||!payment.submissionId} onClick={()=>void reprintPaymentReceipt(payment.submissionId)}>重印付款收據</button></div>):<p>未有付款紀錄。</p>}</section>
         {detail.archivedAt?<p className="dining-message" role="status">已付清，桌台已釋放；商品及付款紀錄保留。</p>:null}
         <footer className="dining-detail-actions">
           <button type="button" disabled={actionBusy||checkoutBusy||!detail.formalOrderId} onClick={()=>void openReprint()}>重印堂食票</button>
