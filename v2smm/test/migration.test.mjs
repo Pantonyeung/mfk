@@ -247,8 +247,10 @@ test('Internet staff orders use same-account auth and the existing customer brid
   assert.match(staff,/HMAC/);
   assert.match(staff,/sessionToken/);
   assert.doesNotMatch(staff,/readonly\s+pin\s*:/);
-  assert.match(cloud,/\/api\/smm\/orders\/submit/);
-  assert.match(cloud,/\/api\/smm\/orders\/readback/);
+  assert.match(cloud,/webSmtAcceptanceMode/);
+  assert.match(cloud,/const prefix=webSmtAcceptanceMode\(\)\?'\/api\/smm\/acceptance\/orders':'\/api\/smm\/orders'/);
+  assert.match(cloud,/\?prefix\+'\/submit'/);
+  assert.match(cloud,/prefix\+'\/readback\?submissionId='/);
   assert.doesNotMatch(cloud,/admin\.morefunos\.com/);
   assert.match(cloud,/x-mfk-smm-session/);
   assert.doesNotMatch(cloud,/x-mfk-staff-pin/);
@@ -292,7 +294,8 @@ test('SMM Internet orders reuse the already-live Customer order endpoint without
   const cloud=fs.readFileSync(path.join(root,'pwa-cloud.ts'),'utf8');
   const worker=fs.readFileSync(path.join(repoRoot,'v2smm','worker.ts'),'utf8');
   const intake=fs.readFileSync(path.join(repoRoot,'v2local','src','runtime','customer-cloud-intake.ts'),'utf8');
-  assert.match(cloud,/\/api\/smm\/orders\/submit/);
+  assert.match(cloud,/const prefix=webSmtAcceptanceMode\(\)\?'\/api\/smm\/acceptance\/orders':'\/api\/smm\/orders'/);
+  assert.match(cloud,/\?prefix\+'\/submit'/);
   assert.match(worker,/admin\.morefunos\.com\/api\/customer\/orders\/submit/);
   assert.match(worker,/MFK_CUSTOMER_ORDER_INTENT_V1/);
   assert.match(worker,/__MFK_SMM1__/);
