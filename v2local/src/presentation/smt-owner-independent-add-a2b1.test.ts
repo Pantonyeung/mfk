@@ -32,7 +32,9 @@ describe('SMT A2b-1 independent add identity',()=>{
     expect(app).toContain('const existing=cart.find(item=>item.id===lineId);if(!existing)return;');
   });
 
-  it('keeps quantity plus/minus as an operation on the selected source line',()=>{
-    expect(app).toContain("onAdjustLineQuantity:(lineId,delta)=>setCart(cart.map(item=>item.id===lineId?{...item,qty:item.qty+delta}:item).filter(item=>item.qty>0))");
+  it('keeps quantity plus/minus as an operation on one selected source line even when presentation grouping is enabled',()=>{
+    expect(app).toContain("onAdjustLineQuantity:(lineIds,delta)=>{");
+    expect(app).toContain("const lineId=lineIds[0];if(!lineId)return;");
+    expect(app).toContain("item.id===lineId?{...item,qty:item.qty+delta}:item");
   });
 });
