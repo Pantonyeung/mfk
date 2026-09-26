@@ -19,6 +19,17 @@ export interface ProjectionOrderInput{
   readonly staffId?:string;
   readonly staffName?:string;
   readonly cancellationReason?:string;
+  readonly refunds?:readonly {
+    readonly id:string;
+    readonly createdAt:string;
+    readonly kind:'FULL'|'PARTIAL';
+    readonly amountMinor:number;
+    readonly method:string;
+    readonly note:string;
+    readonly lines:readonly {readonly lineId:string;readonly itemName:string;readonly quantity:number;readonly amountMinor:number}[];
+    readonly staffId?:string;
+    readonly staffName?:string;
+  }[];
   readonly items:readonly {readonly id:string;readonly name:string;readonly qty:number;readonly unitMinor:number}[];
 }
 
@@ -96,6 +107,23 @@ export function queueOrderProjection(order:ProjectionOrderInput){
       ...(order.staffId?{staffId:String(order.staffId)}:{}),
       ...(order.staffName?{staffName:String(order.staffName)}:{}),
       ...(order.cancellationReason?{cancellationReason:String(order.cancellationReason)}:{}),
+      ...(order.refunds?.length?{refunds:Object.freeze(order.refunds.map(refund=>Object.freeze({
+        id:String(refund.id),
+        refundId:String(refund.id),
+        createdAt:String(refund.createdAt),
+        kind:refund.kind,
+        amountMinor:Math.max(0,Math.round(refund.amountMinor)),
+        method:String(refund.method||''),
+        note:String(refund.note||''),
+        lines:Object.freeze(refund.lines.map(line=>Object.freeze({
+          lineId:String(line.lineId),
+          itemName:String(line.itemName),
+          quantity:Math.max(1,Math.floor(line.quantity)),
+          amountMinor:Math.max(0,Math.round(line.amountMinor)),
+        }))),
+        ...(refund.staffId?{staffId:String(refund.staffId)}:{}),
+        ...(refund.staffName?{staffName:String(refund.staffName)}:{}),
+      })))}:{}),
       items:Object.freeze(order.items.map(item=>Object.freeze({
         id:String(item.id),
         name:String(item.name),
