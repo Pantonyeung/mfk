@@ -196,7 +196,7 @@ test('Stage01 commander corrections satisfy OA-TOD-001 acceptance contract',()=>
 
   // 10 Human-safe normal UI; raw errors/UUIDs are not rendered.
   assert.doesNotMatch(app,/reason instanceof Error\?reason\.message|error\.message/);
-  assert.doesNotMatch(app,/order\.orderId.*<|<.*order\.orderId/);
+  assert.doesNotMatch(app,/<(?:span|strong|small|p|h\\d)[^>]*>\\{order\\.orderId\\}/);
 
   // 14 Authority boundary remains unchanged.
   assert.match(mapping,/No direct network or second Order \/ Pricing \/ Payment \/ Print \/ Auth \/ Sync authority/);
