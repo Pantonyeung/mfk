@@ -6,11 +6,9 @@ on:
       - deploy/SMM-STAGE0-ACCEPTANCE-AAD53D5
     paths:
       - 'v2smm/SMM_STAGE0_ACCEPTANCE_DEPLOY_REQUEST'
-      - '.github/workflows/deploy-smm-stage0-acceptance.yml'
-      - 'v2smm/wrangler.acceptance.jsonc'
 
 jobs:
-  preview:
+  deploy:
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -26,38 +24,54 @@ jobs:
         run: npm test
       - name: Build
         run: npm run build
-      - name: Resolve existing yeungyi88 mfk-admin account
+      - name: Deploy Preview under existing mfk-smm-web
+        id: preview
         shell: bash
         env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: |
           set -euo pipefail
-          curl -fsS -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN"             https://api.cloudflare.com/client/v4/accounts > "$RUNNER_TEMP/cf-accounts.json"
-          node <<'NODE' > "$RUNNER_TEMP/cf-account-ids.txt"
+          npx --yes wrangler@4.141.0 preview \
+            --config wrangler.preview.jsonc \
+            --worker-name mfk-smm-web \
+            --name stage0-aad53d5 \
+            --json | tee /tmp/smm-preview.json
+          node <<'NODE'
           const fs=require('fs');
-          const x=JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP+'/cf-accounts.json','utf8'));
-          if(!x.success) process.exit(1);
-          for(const a of x.result||[]) if(a?.id) console.log(a.id);
+          const raw=fs.readFileSync('/tmp/smm-preview.json','utf8').trim();
+          const lines=raw.split(/\r?\n/).filter(Boolean);
+          let parsed=null;
+          for(let i=lines.length-1;i>=0;i--){
+            try{parsed=JSON.parse(lines[i]);break}catch{}
+          }
+          if(!parsed){
+            try{parsed=JSON.parse(raw)}catch{}
+          }
+          const walk=(v)=>{
+            if(typeof v==='string' && /^https:\/\//.test(v) && v.includes('workers.dev')) return v;
+            if(Array.isArray(v)) for(const x of v){const r=walk(x);if(r)return r;}
+            if(v&&typeof v==='object') for(const x of Object.values(v)){const r=walk(x);if(r)return r;}
+            return null;
+          };
+          const url=walk(parsed);
+          if(!url) throw new Error('PREVIEW_URL_NOT_FOUND');
+          fs.appendFileSync(process.env.GITHUB_OUTPUT,'preview_url='+url+'\n');
+          console.log('SMM_PREVIEW_URL='+url);
           NODE
-          TARGET=""
-          while IFS= read -r ACCOUNT_ID; do
-            [ -n "$ACCOUNT_ID" ] || continue
-            CODE="$(curl -sS -o "$RUNNER_TEMP/cf-worker-check" -w '%{http_code}'               -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN"               "https://api.cloudflare.com/client/v4/accounts/$ACCOUNT_ID/workers/services/mfk-admin" || true)"
-            if [ "$CODE" = "200" ]; then
-              TARGET="$ACCOUNT_ID"
-              break
-            fi
-          done < "$RUNNER_TEMP/cf-account-ids.txt"
-          if [ -z "$TARGET" ]; then
-            echo "::error::Existing mfk-admin Worker not found in accounts visible to current token."
-            exit 1
-          fi
-          echo "CLOUDFLARE_ACCOUNT_ID=$TARGET" >> "$GITHUB_ENV"
-          echo "Existing mfk-admin account resolved."
-      - name: Upload SMM Stage 0 preview
-        run: npx --yes wrangler@4.136.3 versions upload --config wrangler.acceptance.jsonc --preview-alias smm-acceptance
+      - name: HTTP readback
+        shell: bash
         env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ env.CLOUDFLARE_ACCOUNT_ID }}
-      - name: Verify preview
-        run: curl --retry 5 --retry-delay 2 --fail --silent --show-error --head https://smm-acceptance-mfk-admin.yeungyi88.workers.dev
+          PREVIEW_URL: ${{ steps.preview.outputs.preview_url }}
+        run: |
+          set -euo pipefail
+          code=""
+          for i in $(seq 1 20); do
+            code="$(curl -L -sS -o /tmp/smm-preview.html -w '%{http_code}' -H 'Cache-Control: no-cache' "$PREVIEW_URL" || true)"
+            if [ "$code" = "200" ]; then break; fi
+            sleep 2
+          done
+          test "$code" = "200"
+          grep -q '<div id="root"></div>' /tmp/smm-preview.html
+          echo "SMM_STAGE0_PREVIEW_HTTP_200"
+          echo "SMM_STAGE0_PREVIEW_URL=$PREVIEW_URL"
