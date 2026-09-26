@@ -94,6 +94,18 @@ export function RuntimeDiningWorkspace({runtime,onCheckout,onAddOrder}:{runtime:
     if(selectedHoldId)void loadDetail(selectedHoldId);
   },[view?.revision,selectedHoldId,loadDetail]);
 
+  const adjustPartySize=async(delta:number)=>{
+    if(!detail||!runtime.updateDiningPartySize)return;
+    const next=detail.partySize+delta;
+    if(next<1)return;
+    try{
+      const updated=await runtime.updateDiningPartySize(detail.holdId,next);
+      setDetail(updated);
+      setMessage('人數已更新為 '+updated.partySize+' 位；訂單、枱號同用餐計時保持不變。');
+      await load();
+    }catch(cause){setMessage(cause instanceof Error?cause.message:'人數更新失敗');}
+  };
+
   const addWait=async()=>{
     if(!runtime.createDiningWait)return;
     try{
@@ -326,8 +338,9 @@ export function RuntimeDiningWorkspace({runtime,onCheckout,onAddOrder}:{runtime:
       </section>:null}
       <div className="dining-wait-list">{view?.queue.map(row=><article key={row.id} className={selectedWait===row.id?'selected':''}>
         <button type="button" onClick={()=>{
-          setSelectedWait(current=>current===row.id?null:row.id);
-          if(row.formalOrderId)void loadDetail(row.id);
+          const nextSelected=selectedWait===row.id?null:row.id;
+          setSelectedWait(nextSelected);
+          if(nextSelected)void loadDetail(row.id);
           else if(selectedHoldId===row.id){setSelectedHoldId(null);setDetail(null);}
         }}>
           <strong>{row.codeLabel}</strong>
@@ -377,7 +390,11 @@ export function RuntimeDiningWorkspace({runtime,onCheckout,onAddOrder}:{runtime:
       {detail?<>
         <header>
           <div><small>{detail.codeLabel}</small><h2>{detail.assignedTable?[detail.assignedTable,...(detail.joinedTables??[])].map(id=>view?.tables.find(table=>table.id===id)?.label??id).join('＋'):'輪候中'}</h2></div>
-          <span>{detail.partySize} 位</span>
+          <div className="dining-party-size-control" aria-label="堂食人數">
+            <button type="button" disabled={detail.partySize<=1} onClick={()=>void adjustPartySize(-1)}>−</button>
+            <span>{detail.partySize} 位</span>
+            <button type="button" onClick={()=>void adjustPartySize(1)}>＋</button>
+          </div>
         </header>
         <div className="dining-detail-timer">
           <span>{detail.assignedTable?'用餐時間':'輪候時間'}</span>
