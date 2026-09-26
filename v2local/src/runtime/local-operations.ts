@@ -20,12 +20,23 @@ export interface LocalReportOrder{
   readonly fulfillmentLabel:string;
   readonly sourceLabel:string;
   readonly refunds?:readonly LocalReportRefund[];
+  readonly recognizedSalesMinor?:number;
+  readonly outstandingMinor?:number;
+  readonly paymentEntries?:readonly {
+    readonly createdAt:string;
+    readonly tender:string;
+    readonly amountMinor:number;
+    readonly selections?:readonly {readonly lineIndex:number;readonly qty:number}[];
+  }[];
   readonly items:readonly {readonly id:string;readonly name:string;readonly qty:number;readonly unitMinor:number}[];
 }
 
 export interface LocalReport{
   readonly businessDate:string;
   readonly completedOrders:number;
+  readonly orderValueMinor:number;
+  readonly confirmedPaidMinor:number;
+  readonly outstandingMinor:number;
   readonly grossSalesMinor:number;
   readonly refundMinor:number;
   readonly netSalesMinor:number;
@@ -121,10 +132,25 @@ export function buildLocalReport(
     const at=Date.parse(refund.createdAt);
     return Number.isFinite(at)&&at>=window.start&&at<window.end;
   });
-  const grossSalesMinor=selected.reduce((sum,order)=>sum+Math.max(0,Number(order.totalMinor)||0),0);
+  const recognizedSales=(order:LocalReportOrder)=>{
+    if(order.recognizedSalesMinor===undefined)return Math.max(0,Number(order.totalMinor)||0);
+    const total=Math.max(0,Number(order.totalMinor)||0);
+    return Math.min(total,Math.max(0,Number(order.recognizedSalesMinor)||0));
+  };
+  const orderValueMinor=selected.reduce((sum,order)=>sum+Math.max(0,Number(order.totalMinor)||0),0);
+  const confirmedPaidMinor=selected.reduce((sum,order)=>sum+recognizedSales(order),0);
+  const outstandingMinor=selected.reduce((sum,order)=>sum+Math.max(0,Number(order.outstandingMinor)||0),0);
+  const grossSalesMinor=confirmedPaidMinor;
   const refundMinor=refunds.reduce((sum,row)=>sum+Math.max(0,Number(row.refund.amountMinor)||0),0);
   const netSalesMinor=grossSalesMinor-refundMinor;
   const cashSalesMinor=selected.reduce((sum,order)=>{
+    if(order.paymentEntries){
+      return sum+order.paymentEntries.reduce((paymentSum,payment)=>
+        String(payment.tender||'').toUpperCase()==='CASH'
+          ?paymentSum+Math.max(0,Number(payment.amountMinor)||0)
+          :paymentSum
+      ,0);
+    }
     const label=String(order.paymentLabel||'');
     const upper=label.toUpperCase();
     if(upper.startsWith('COMBO')){
@@ -141,12 +167,22 @@ export function buildLocalReport(
       :sum;
   },0);
   const cashNetMinor=cashSalesMinor-cashRefundMinor;
-  const itemUnits=selected.reduce((sum,order)=>sum+order.items.reduce((s,item)=>s+Math.max(0,Number(item.qty)||0),0),0);
+  const recognizedItemQty=(order:LocalReportOrder,lineIndex:number,itemQty:number)=>{
+    const qty=Math.max(0,Number(itemQty)||0);
+    if(order.recognizedSalesMinor===undefined)return qty;
+    if(!order.paymentEntries?.length)return recognizedSales(order)>=Math.max(0,Number(order.totalMinor)||0)?qty:0;
+    const paid=order.paymentEntries.reduce((sum,payment)=>
+      sum+(payment.selections??[]).filter(selection=>selection.lineIndex===lineIndex)
+        .reduce((selectionSum,selection)=>selectionSum+Math.max(0,Number(selection.qty)||0),0)
+    ,0);
+    return Math.min(qty,paid);
+  };
+  const itemUnits=selected.reduce((sum,order)=>sum+order.items.reduce((s,item,index)=>s+recognizedItemQty(order,index,item.qty),0),0);
   const products=new Map<string,{name:string;quantity:number;salesMinor:number}>();
   for(const order of selected){
-    for(const item of order.items){
+    for(const [index,item] of order.items.entries()){
       const row=products.get(item.name)??{name:item.name,quantity:0,salesMinor:0};
-      const qty=Math.max(0,Number(item.qty)||0);
+      const qty=recognizedItemQty(order,index,item.qty);
       row.quantity+=qty;
       row.salesMinor+=qty*Math.max(0,Number(item.unitMinor)||0);
       products.set(item.name,row);
@@ -156,6 +192,9 @@ export function buildLocalReport(
   return Object.freeze({
     businessDate:window.businessDate,
     completedOrders:selected.length,
+    orderValueMinor,
+    confirmedPaidMinor,
+    outstandingMinor,
     grossSalesMinor,
     refundMinor,
     netSalesMinor,
