@@ -1,7 +1,8 @@
-import type {OwnerOrderProjection} from './product-types';
+import type {OwnerCanonicalFulfillmentState,OwnerOrderProjection} from './product-types';
 
 export type OwnerOrderScope='DEFAULT'|'ACTIVE'|'DINE_IN_OPEN';
 export type OwnerOrderSegment='ACTIVE'|'COMPLETED';
+export type OwnerFulfillmentDisplayState='未完成'|'可取餐'|'已取餐'|'已取消';
 
 export interface OwnerOrderFilters {
   readonly query:string;
@@ -9,7 +10,7 @@ export interface OwnerOrderFilters {
   readonly source:string;
   readonly segment:OwnerOrderSegment;
   readonly paymentState:string;
-  readonly fulfillmentMode:string;
+  readonly fulfillmentState:'ALL'|OwnerFulfillmentDisplayState;
 }
 
 export interface OwnerOrderListViewModel {
@@ -17,7 +18,7 @@ export interface OwnerOrderListViewModel {
   readonly businessDates:readonly string[];
   readonly sources:readonly string[];
   readonly paymentStates:readonly string[];
-  readonly fulfillmentModes:readonly string[];
+  readonly fulfillmentStates:readonly ('ALL'|OwnerFulfillmentDisplayState)[];
 }
 
 export interface OwnerOrderDetailViewModel {
@@ -38,7 +39,20 @@ export interface OwnerOrderDetailViewModel {
     readonly elapsed:string;
     readonly promised:string;
   };
+  readonly fulfillment:{
+    readonly state:string;
+    readonly mode:string;
+  };
 }
+
+export const DEFAULT_OWNER_ORDER_FILTERS:OwnerOrderFilters={
+  query:'',
+  businessDate:'ALL',
+  source:'ALL',
+  segment:'ACTIVE',
+  paymentState:'ALL',
+  fulfillmentState:'ALL',
+};
 
 function isCompleted(order:OwnerOrderProjection){
   return order.lifecycle==='COMPLETED'||order.lifecycle==='CANCELLED';
@@ -55,6 +69,20 @@ function matchesScope(order:OwnerOrderProjection,scope:OwnerOrderScope){
   return false;
 }
 
+export function mapCanonicalFulfillmentState(
+  value:OwnerCanonicalFulfillmentState|undefined,
+):OwnerFulfillmentDisplayState|null{
+  if(value==='待處理'||value==='進行中')return '未完成';
+  if(value==='可取餐')return '可取餐';
+  if(value==='已完成')return '已取餐';
+  if(value==='已取消')return '已取消';
+  return null;
+}
+
+export function getOwnerOrderFulfillmentStateLabel(order:OwnerOrderProjection):string{
+  return mapCanonicalFulfillmentState(order.fulfillmentLabel)??'未有交收狀態讀回';
+}
+
 export function buildOwnerOrderListViewModel(
   orders:readonly OwnerOrderProjection[],
   filters:OwnerOrderFilters,
@@ -66,7 +94,8 @@ export function buildOwnerOrderListViewModel(
     const dateOk=filters.businessDate==='ALL'||order.businessDate===filters.businessDate;
     const sourceOk=filters.source==='ALL'||order.source===filters.source;
     const paymentOk=filters.paymentState==='ALL'||order.paymentState===filters.paymentState;
-    const fulfillmentOk=filters.fulfillmentMode==='ALL'||order.fulfillmentMode===filters.fulfillmentMode;
+    const canonicalState=mapCanonicalFulfillmentState(order.fulfillmentLabel);
+    const fulfillmentOk=filters.fulfillmentState==='ALL'||canonicalState===filters.fulfillmentState;
     const queryOk=!q||[
       order.displayCode,
       order.customerName??'',
@@ -88,7 +117,7 @@ export function buildOwnerOrderListViewModel(
     businessDates:['ALL',...Array.from(new Set(orders.map(order=>order.businessDate).filter((value):value is string=>Boolean(value))))],
     sources:['ALL',...Array.from(new Set(orders.map(order=>order.source)))],
     paymentStates:['ALL',...Array.from(new Set(orders.map(order=>order.paymentState).filter((value):value is string=>Boolean(value))))],
-    fulfillmentModes:['ALL',...Array.from(new Set(orders.map(order=>order.fulfillmentMode).filter((value):value is string=>Boolean(value))))],
+    fulfillmentStates:['ALL','未完成','可取餐','已取餐','已取消'],
   };
 }
 
@@ -111,5 +140,17 @@ export function buildOwnerOrderDetailViewModel(order:OwnerOrderProjection):Owner
       elapsed:order.elapsedLabel??'未有讀回',
       promised:order.promisedTimeLabel??'未有讀回',
     },
+    fulfillment:{
+      state:getOwnerOrderFulfillmentStateLabel(order),
+      mode:formatFulfillmentMode(order.fulfillmentMode),
+    },
   };
+}
+
+function formatFulfillmentMode(value:OwnerOrderProjection['fulfillmentMode']):string{
+  if(value==='DINE_IN')return '堂食';
+  if(value==='TAKEAWAY')return '外賣';
+  if(value==='PICKUP')return '自取';
+  if(value==='DELIVERY')return '配送';
+  return value??'未有交收方式讀回';
 }
