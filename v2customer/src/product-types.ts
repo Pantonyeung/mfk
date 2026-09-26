@@ -84,6 +84,17 @@ export interface CustomerCartLine {
   readonly publishedUnitPriceMinor?:number;
 }
 
+export interface CustomerCartRepair {
+  readonly lineId:string;
+  readonly kind:'PRICE_CHANGED'|'CONFIG_CHANGED'|'PRODUCT_UNAVAILABLE';
+  readonly title:string;
+  readonly detail:string;
+  readonly canAcceptCurrentPrice:boolean;
+  readonly canEdit:boolean;
+  readonly previousUnitPriceMinor?:number;
+  readonly currentUnitPriceMinor?:number;
+}
+
 export type CustomerProjectionState='READY'|'EMPTY'|'LOADING'|'STALE'|'ERROR'|'NOT_CONNECTED';
 
 export interface CustomerMemorySeedProjection {
@@ -243,7 +254,7 @@ export interface CustomerRuntimePort {
   submitOrder?(intent:CustomerPendingIntent):Promise<CustomerCommandResult>;
   readSubmission?(submissionId:string):Promise<CustomerCommandResult>;
   buildReorderCart?(orderId:string):Promise<CustomerReorderResult>;
-  probeOrderBackend?():Promise<Readonly<{reachable:boolean;attempts:number;reason?:string}>>;
+  probeOrderBackend?(onAttempt?:(attempt:number,total:number)=>void):Promise<Readonly<{reachable:boolean;attempts:number;reason?:string}>>;
   requestFallback?():Promise<CustomerCommandResult>;
   uploadPaymentEvidence?(file:File):Promise<{readonly evidenceRef:string}>;
 }
