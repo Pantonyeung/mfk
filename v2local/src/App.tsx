@@ -677,7 +677,12 @@ function CheckoutPage({cart,setCart,diningCheckout,onDiningCheckoutDone}:{cart:C
         const updated=await localRuntime.settleDiningHold(
           diningCheckout.holdId,
           diningCheckout.selections,
-          tenderCode
+          tenderCode,
+          {
+            submissionId:diningCheckout.submissionId,
+            expectedRevision:diningCheckout.expectedRevision,
+            ...(tenderCode==='CASH'?{receivedMinor:received}:{}),
+          }
         );
         setCompletion({
           displayOrderCode:diningCheckout.codeLabel,
