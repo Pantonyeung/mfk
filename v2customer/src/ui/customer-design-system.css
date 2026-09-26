@@ -86,3 +86,25 @@ body,button,input,textarea{font-family:-apple-system,BlinkMacSystemFont,"PingFan
 .status-banner.danger,.status-banner.offline{border-color:rgba(215,93,93,.34)}
 @media(max-width:520px){.viewport{max-width:var(--mf-content-max)}.page{padding-left:var(--mf-space-md);padding-right:var(--mf-space-md)}}
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
+
+
+/* UI1 Home / Storefront */
+.unavailable-actions{display:grid;gap:10px;margin-top:16px}
+.home-quick-entry-section{margin-top:var(--mf-space-xl)}
+.home-quick-entry-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--mf-space-sm)}
+.home-quick-entry-grid button{border:1px solid var(--mf-color-border);border-radius:var(--mf-radius-lg);background:var(--mf-color-surface);min-height:132px;padding:16px;text-align:left;display:flex;flex-direction:column;justify-content:flex-end;gap:5px;box-shadow:0 6px 18px rgba(37,51,70,.06)}
+.home-quick-entry-grid button>span{font-size:12px;font-weight:850;color:var(--mf-color-brand-orange)}
+.home-quick-entry-grid button>strong{font-size:17px;line-height:1.3;color:var(--mf-color-brand-navy)}
+.home-quick-entry-grid button>small{font-size:11px;line-height:1.45;color:var(--mf-color-text-muted)}
+.home-memory-summary{display:grid;grid-template-columns:1.1fr .9fr;gap:var(--mf-space-sm);margin-top:var(--mf-space-xl)}
+.home-memory-summary button{border:0;border-radius:var(--mf-radius-lg);background:var(--mf-color-brand-navy);color:#fff;min-height:142px;padding:18px;text-align:left;display:flex;align-items:center;gap:16px}
+.home-memory-summary button:last-child{display:grid;align-content:center;gap:5px;background:#fff1e6;color:var(--mf-color-text)}
+.home-memory-summary button span{display:grid;gap:4px}
+.home-memory-summary button small{font-size:11px;opacity:.72}
+.home-memory-summary button strong{font-size:18px}
+.home-memory-summary .mini-jar{flex:0 0 auto;border-color:#fff;border-top-color:#fff}
+@media(max-width:620px){
+  .home-quick-entry-grid{grid-template-columns:1fr}
+  .home-quick-entry-grid button{min-height:104px}
+  .home-memory-summary{grid-template-columns:1fr}
+}
