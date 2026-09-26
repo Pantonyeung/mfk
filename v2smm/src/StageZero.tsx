@@ -172,7 +172,6 @@ function StageZeroConnectionRecovery({
   const [lanState,setLanState]=useState<LanState>(()=>readSmmLanPwaConfig()?'CHECKING':'UNCONFIGURED');
   const [lanMessage,setLanMessage]=useState(readSmmLanPwaConfig()?'檢查中':'未設定');
   const [pairOpen,setPairOpen]=useState(false);
-  const canEnterOffline=hasTrustedStaff;
   const [pairing,setPairing]=useState(false);
   const [pairMessage,setPairMessage]=useState<string|null>(null);
   const [lanForm,setLanForm]=useState(initialLanForm);
