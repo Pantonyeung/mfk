@@ -29,6 +29,13 @@ test('Stage 2 groups expose required optional min max and selected count',()=>{
   assert.match(app,/product\.variationRequired\?'必選':'可選'/);
 });
 
+test('Stage 2 presentation orders required groups before optional while preserving source order inside each bucket',()=>{
+  assert.match(app,/const requiredGroups=product\.optionGroups\.filter\(group=>group\.required\|\|group\.minSelections>0\)/);
+  assert.match(app,/const optionalGroups=product\.optionGroups\.filter\(group=>!group\.required&&group\.minSelections===0\)/);
+  assert.match(app,/const orderedGroups=\[\.\.\.requiredGroups,\.\.\.optionalGroups\]/);
+  assert.match(app,/\{orderedGroups\.map\(group=>\{/);
+});
+
 test('Stage 2 shows published price adjustments and draft unit total',()=>{
   assert.match(app,/selectedAdjustmentMinor/);
   assert.match(app,/deltaLabel/);
@@ -53,6 +60,8 @@ test('Stage 2 max selection guard does not block radio-like replacement groups',
 
 test('Stage 2 sheet locks mobile interaction contract',()=>{
   assert.match(css,/max-height:88dvh/);
+  assert.doesNotMatch(css,/stage2-product-sheet\s*\{[\s\S]*?max-height:90dvh/);
+  assert.doesNotMatch(css,/max-height:90dvh/);
   assert.match(css,/border-radius:24px 24px 0 0/);
   assert.match(css,/\.stage2-option-grid button\{[\s\S]*min-height:48px/);
   assert.match(css,/\.stage2-close\{[\s\S]*width:44px!important;[\s\S]*height:44px!important/);
