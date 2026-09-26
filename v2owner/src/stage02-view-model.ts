@@ -1,3 +1,4 @@
+import {selectOpenActions} from './stage02-open-actions';
 import type {
   OwnerActionItem,
   OwnerActivityRecord,
@@ -38,8 +39,7 @@ function normalizeState(item:OwnerActionItem):OwnerActionQueueRowViewModel['stat
 }
 
 export function buildOwnerActionQueueViewModel(snapshot:OwnerReadModelSnapshot|null):OwnerActionQueueViewModel{
-  const open=(snapshot?.actions??[])
-    .filter(item=>item.state!=='RESOLVED')
+  const open=selectOpenActions(snapshot?.actions??[])
     .map(action=>({
       action,
       ownerDomain:action.ownerDomain??action.domain,
@@ -64,9 +64,9 @@ export function buildOwnerActionDetailViewModel(
 ):OwnerActionDetailViewModel{
   const history=activity
     .filter(record=>{
-      if(row.action.correlationId&&record.correlationId)return row.action.correlationId===record.correlationId;
-      if(record.target)return record.target===row.action.target;
-      return false;
+      if(row.action.correlationId)return record.correlationId===row.action.correlationId;
+      if(row.action.incidentId)return record.incidentId===row.action.incidentId;
+      return record.linkedActionId===row.action.actionId;
     })
     .sort((a,b)=>b.observedAt.localeCompare(a.observedAt));
 
