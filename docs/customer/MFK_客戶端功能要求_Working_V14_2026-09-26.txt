@@ -1,0 +1,336 @@
+MFK 客戶端功能要求｜Working V14
+日期：2026-09-26
+狀態：需求收集中
+里程碑：訂單頁／我的最愛／常用訂單／再來一單 第一版產品契約
+
+==================================================
+0｜訂單頁定位
+==================================================
+
+訂單頁用途：
+- 查看進行中訂單
+- 查看已完成／歷史訂單
+- 按狀態篩選
+- 查看每張訂單目前狀態
+- 進入 Order Detail
+- 再來一單
+- 將常食組合保存為「常用訂單」
+
+==================================================
+1｜訂單頁篩選
+==================================================
+
+建議第一層：
+
+[進行中] [已完成] [全部]
+
+進行中可包含：
+- 等待店舖確認
+- 製作中
+- 可取餐
+
+已完成：
+- 已完成
+- 已取餐
+
+全部：
+- 包含進行中、完成、拒絕、取消等歷史
+
+如日後需要：
+可再加搜尋／日期篩選，
+但第一版不塞太多 Filter。
+
+==================================================
+2｜Order Card
+==================================================
+
+每張 Order Card 建議顯示：
+
+PRIMARY
+- 訂單流水號（Formal Display Number）
+- Customer Pickup Code（電話 last4）
+- Primary Status
+- 下單日期／時間
+
+CONTENT
+- 1–3 件商品摘要
+- 超出部分顯示「另有 X 件」
+
+MONEY
+- Current Total
+- Payment Method
+- 如需關注再顯示 Payment Badge
+
+ACTION
+- 查看詳情
+- 再來一單
+- 常用訂單 Heart / Save
+
+進行中 Order：
+狀態自動更新。
+
+完成 Order：
+保留歷史 snapshot，
+不可直接修改原 Order。
+
+==================================================
+3｜Customer-facing Status
+==================================================
+
+建議主要狀態：
+
+WAITING_STORE_CONFIRMATION
+→ 等待店舖確認
+
+ACCEPTED / PREPARING
+→ 製作中
+
+READY
+→ 可取餐
+
+COMPLETED
+→ 已完成
+
+另有：
+REJECTED
+→ 店舖未能接單
+
+CANCELED
+→ 已取消
+
+UI 只顯示客戶需要理解的主要狀態；
+Payment / Print / Sync technical state 只在需要時做 badge／detail。
+
+==================================================
+4｜Order Detail
+==================================================
+
+Order Detail 顯示：
+
+- 訂單流水號
+- 取餐碼
+- 狀態
+- Timeline
+- 商品完整內容
+- Option / Modifier
+- Qty
+- Total
+- Payment Method
+- Payment Proof Status（適用時）
+- Submitted / Accepted / Ready / Completed time
+
+進行中：
+自動 readback 最新狀態。
+
+完成：
+Read-only historical snapshot。
+
+==================================================
+5｜再來一單
+==================================================
+
+Owner Requirement：
+舊 Order 可以複製，再落一次。
+
+正式行為：
+Past Order
+→ Copy Intent
+→ New Cart
+→ Current Revalidation
+→ 客戶確認
+→ New Checkout
+→ New Order
+
+Copy：
+- Product
+- Variation
+- Modifier
+- Combo Child
+- Qty
+- 備註（如仍適用）
+
+重新驗：
+- Product 是否仍存在
+- Sellability
+- Current Price
+- Required Rule
+- Combo Eligibility
+- Option 是否仍存在
+- 期間／時段
+- Store accepting status
+
+如全部正常：
+可直接帶客戶去記憶罐 Final Review，
+減少重做步驟。
+
+如部分失效：
+只標記有問題的 Line，
+讓客戶局部修正。
+
+禁止：
+直接重開舊 Order。
+禁止：
+舊價／舊售罄狀態直接沿用落新交易。
+
+==================================================
+6｜產品「我的最愛」
+==================================================
+
+所有 Product Card 右上角加入 Heart。
+
+未收藏：
+♡ 空心
+
+收藏：
+♥ 實心
+
+互動：
+- 單 Tap 切換
+- 收藏時播放短微動畫
+- 建議效果：Heart 放大 → 2–3 個小心散開 → 收返成實心 Heart
+- 動畫約短促完成，不阻操作
+- Reduced Motion 時只做簡單顏色／填充切換
+
+不建議使用 Double Tap：
+避免同 Product Card 點擊進 Detail 衝突。
+
+Product Detail 亦顯示同一收藏狀態。
+
+==================================================
+7｜Order「常用訂單」
+==================================================
+
+Owner Requirement：
+常食整套內容可以保存，
+日後快速再落。
+
+正式名稱建議：
+「常用訂單」
+
+它不是舊 Order 本身，
+而是一個 Saved Order Intent / Template。
+
+保存內容：
+- Product references
+- Options / Modifiers
+- Combo selections
+- Qty
+- 顯示名稱
+- 最近使用時間
+
+不保存為永遠有效：
+- 舊價格
+- 舊 Sellability
+- 舊 Coupon eligibility
+- 舊 Checkout validation
+
+每次使用常用訂單：
+Copy Intent
+→ Current Revalidation
+→ Repair if needed
+→ New Cart
+→ Confirm
+→ New Order
+
+==================================================
+8｜我的最愛與常用訂單分工
+==================================================
+
+「我的最愛」：
+- 單件 Product 收藏
+- Product Card / Detail Heart
+
+「常用訂單」：
+- 一整套餐的組合
+- 由歷史 Order 收藏／保存
+
+建議統一入口：
+首頁「常購清單」
+→ 兩個 Tab：
+
+[喜愛商品]
+[常用訂單]
+
+這樣不另外新增導航，
+又可以將上一輪已鎖的「常購清單」真正接起來。
+
+==================================================
+9｜快速再下單
+==================================================
+
+對「常用訂單」提供：
+
+[再來一單]
+
+如果 Current Revalidation 全部通過：
+→ 建立 New Cart
+→ 直接進 Final Review
+
+如果有差異：
+→ 顯示：
+「有 1 項需要更新」
+→ 只處理有問題項目
+
+不能：
+一按就直接 Formal Commit。
+
+原因：
+價格、售罄、選項與套餐規則可能已改。
+
+==================================================
+10｜狀態更新
+==================================================
+
+進行中 Order：
+
+Realtime Doorbell
+→ Order readback
+→ UI 更新
+
+Fallback refresh timing：
+由 Admin Config 提供。
+
+客戶重新進訂單頁：
+→ refresh active order status
+
+歷史完成訂單：
+不需要高頻刷新。
+
+==================================================
+11｜空狀態
+==================================================
+
+進行中無訂單：
+「目前沒有進行中的訂單」
+CTA：
+[去點餐]
+
+已完成無紀錄：
+「完成第一張訂單後會在這裡看到紀錄」
+
+我的最愛無商品：
+「撳商品右上角 ♥，下次會更快搵返」
+
+常用訂單無資料：
+「在完成訂單中將常食組合設為常用」
+
+==================================================
+12｜重要產品邊界
+==================================================
+
+1. Favorite Product ≠ Favorite Order
+2. Reorder ≠ Reopen old Order
+3. 常用訂單 ≠ 永久鎖死舊價格／舊選項
+4. 快速再落仍需 Current Revalidation
+5. Order Status UI 是 projection，不自行創造第二套 Order truth
+6. 收藏功能失效不可阻正常點餐／落單
+
+==================================================
+13｜里程碑
+==================================================
+
+CUSTOMER_ORDER_HISTORY_FILTER_V1_DRAFT_LOCKED
+CUSTOMER_PRODUCT_FAVORITE_HEART_V1_DRAFT_LOCKED
+CUSTOMER_SAVED_ORDER_TEMPLATE_V1_DRAFT_LOCKED
+CUSTOMER_REORDER_CURRENT_REVALIDATION_V1_LOCKED
+CUSTOMER_FREQUENT_LIST_UNIFIED_ENTRY_V1_DRAFT_LOCKED
