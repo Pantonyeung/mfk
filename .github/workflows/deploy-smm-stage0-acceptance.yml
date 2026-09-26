@@ -1,0 +1,31 @@
+name: deploy-smm-stage0-acceptance
+
+on:
+  push:
+    branches:
+      - deploy/SMM-STAGE0-ACCEPTANCE-AAD53D5
+    paths:
+      - 'v2smm/SMM_STAGE0_ACCEPTANCE_DEPLOY_REQUEST'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: v2smm
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install
+        run: npm install --no-audit --no-fund --legacy-peer-deps --package-lock=false
+      - name: Test
+        run: npm test
+      - name: Build
+        run: npm run build
+      - name: Deploy SMM Stage 0 acceptance
+        run: npx --yes wrangler@latest deploy --config wrangler.acceptance.jsonc
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
