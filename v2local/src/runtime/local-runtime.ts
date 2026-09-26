@@ -670,25 +670,38 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
   },
   orders(){return data.orders},
   createHold(input){
-    const n=data.holds.length+1;
+    const snapshot=readDiningState();
+    if(input.kind!=='dining'&&input.kind!=='waiting')throw new Error('HOLD_KIND_INVALID');
+    const partySize=Math.floor(Number(input.partySize??1));
+    if(!Number.isSafeInteger(partySize)||partySize<1||partySize>99)throw new Error('HOLD_PARTY_SIZE_INVALID');
+    const items=input.items.map(item=>normalizeCompositionItem({...item}));
+    if(items.some(item=>!String(item.id||'').trim()||!String(item.name||'').trim()||!Number.isSafeInteger(item.qty)||item.qty<=0||!Number.isSafeInteger(item.unitMinor)||item.unitMinor<0))throw new Error('HOLD_ITEM_INVALID');
+    const computedTotal=items.reduce((sum,item)=>sum+item.qty*item.unitMinor,0);
+    if(!Number.isSafeInteger(computedTotal)||computedTotal!==input.totalMinor)throw new Error('HOLD_TOTAL_MISMATCH');
+    const nextSequence=snapshot.holds.reduce((max,row)=>{
+      const match=/^H(\d+)$/.exec(row.codeLabel);return Math.max(max,match?Number(match[1]):0);
+    },0)+1;
     const draft:LocalHoldDraft={
-      id:'HOLD-'+Date.now().toString(36),
-      codeLabel:'H'+String(n).padStart(3,'0'),
+      id:'HOLD-'+Date.now().toString(36)+'-'+nextSequence.toString(36),
+      codeLabel:'H'+String(nextSequence).padStart(3,'0'),
       kind:input.kind,
       createdAt:new Date().toISOString(),
-      partySize:Math.max(1,Math.floor(Number(input.partySize)||1)),
-      note:String(input.note||''),
-      totalMinor:Math.max(0,Math.floor(Number(input.totalMinor)||0)),
+      partySize,
+      note:String(input.note||'').trim().slice(0,200),
+      totalMinor:computedTotal,
       payments:[],
-      items:input.items.map(item=>normalizeCompositionItem({...item})),
+      items,
     };
-    data={...data,holds:[draft,...data.holds]};save();return draft;
+    const next={...snapshot,holds:[draft,...snapshot.holds],diningRevision:(snapshot.diningRevision??0)+1};
+    localStorage.setItem(KEY,JSON.stringify(next));data=next;listeners.forEach(fn=>fn());
+    return clone(draft);
   },
   holds(){return readDiningState().holds.filter(hold=>!hold.archivedAt)},
   removeHold(id){
     const snapshot=readDiningState();const hold=snapshot.holds.find(row=>row.id===id);
-    if(hold?.archivedAt||hold?.payments?.length)throw new Error('DINING_HISTORY_PROTECTED');
-    if(hold?.kind==='dining'&&(hold.assignedTable||hold.items.length))throw new Error('DINING_NONEMPTY_HOLD_PROTECTED');
+    if(!hold)throw new Error('HOLD_NOT_FOUND');
+    if(hold.archivedAt||hold.payments?.length||hold.formalOrderId)throw new Error('DINING_HISTORY_PROTECTED');
+    if(hold.kind==='dining'&&(hold.assignedTable||hold.items.length))throw new Error('DINING_NONEMPTY_HOLD_PROTECTED');
     commitDiningHolds(snapshot,snapshot.holds.filter(row=>row.id!==id));
   },
   clear(){data=clone(defaults);save()},
