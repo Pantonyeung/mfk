@@ -153,6 +153,53 @@ describe('MFK local operations fusion',()=>{
     expect(report.cashSalesMinor).toBe(2000);
   });
 
+  it('keeps Dining order value, confirmed paid and outstanding as separate report facts',()=>{
+    const dining:LocalReportOrder[]=[{
+      id:'dining-1',
+      display:'P020',
+      createdAt:'2026-09-21T04:00:00.000Z',
+      totalMinor:8200,
+      paymentLabel:'部分付款',
+      fulfillmentLabel:'進行中',
+      sourceLabel:'堂食',
+      recognizedSalesMinor:4100,
+      outstandingMinor:4100,
+      paymentEntries:[{
+        createdAt:'2026-09-21T04:10:00.000Z',
+        tender:'CASH',
+        amountMinor:4100,
+        selections:[{lineIndex:0,qty:1}],
+      }],
+      items:[{id:'rice',name:'飯團',qty:2,unitMinor:4100}],
+    }];
+    const report=buildLocalReport(dining,{now:new Date('2026-09-21T05:00:00.000Z').getTime(),businessStartHour:5});
+    expect(report.orderValueMinor).toBe(8200);
+    expect(report.confirmedPaidMinor).toBe(4100);
+    expect(report.outstandingMinor).toBe(4100);
+    expect(report.grossSalesMinor).toBe(4100);
+    expect(report.netSalesMinor).toBe(4100);
+    expect(report.cashSalesMinor).toBe(4100);
+    expect(report.itemUnits).toBe(1);
+    expect(report.topProducts[0]).toEqual({name:'飯團',quantity:1,salesMinor:4100});
+  });
+
+  it('does not recognize an unpaid Dining open check as paid financial sales',()=>{
+    const dining:LocalReportOrder[]=[{
+      id:'dining-2',display:'P021',createdAt:'2026-09-21T04:00:00.000Z',
+      totalMinor:8200,paymentLabel:'未收款',fulfillmentLabel:'進行中',sourceLabel:'堂食',
+      recognizedSalesMinor:0,outstandingMinor:8200,paymentEntries:[],
+      items:[{id:'rice',name:'飯團',qty:2,unitMinor:4100}],
+    }];
+    const report=buildLocalReport(dining,{now:new Date('2026-09-21T05:00:00.000Z').getTime(),businessStartHour:5});
+    expect(report.orderValueMinor).toBe(8200);
+    expect(report.confirmedPaidMinor).toBe(0);
+    expect(report.outstandingMinor).toBe(8200);
+    expect(report.grossSalesMinor).toBe(0);
+    expect(report.cashSalesMinor).toBe(0);
+    expect(report.itemUnits).toBe(0);
+    expect(report.topProducts[0]).toEqual({name:'飯團',quantity:0,salesMinor:0});
+  });
+
   it('backup validates and restores only MFK keys',()=>{
     const current={
       'mfk.v2local.runtime.v1':'runtime',
