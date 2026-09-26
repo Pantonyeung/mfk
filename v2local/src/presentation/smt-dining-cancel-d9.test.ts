@@ -12,8 +12,8 @@ describe('D9 Dining cancellation operator boundary',()=>{
     expect(dining).toContain("const reason=window.prompt('請輸入取消原因','客人取消堂食')");
     expect(dining).toContain("window.confirm('確認取消 '+detail.codeLabel");
     expect(dining).toContain("await runtime.cancelOrder(detail.formalOrderId,reason.trim()||'堂食取消')");
-    expect(dining).toContain("disabled={!detail.formalOrderId||detail.paidMinor>0}");
-    expect(dining).toContain("detail.paidMinor>0?'已有付款':'取消堂食單'");
+    expect(dining).toContain("detail.paidMinor>0&&detail.formalOrderId");
+    expect(dining).toContain(':<button type="button" className="cancel-order" disabled={!detail.formalOrderId} onClick={()=>void cancelUnpaidDining()}>取消堂食單</button>');
   });
 
   it('states cancel-not-refund and never calls refund from the Dining cancel action',()=>{
