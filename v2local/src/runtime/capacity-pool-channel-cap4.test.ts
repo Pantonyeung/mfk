@@ -83,6 +83,7 @@ describe('CAP4 channel stop projection / admission guard',()=>{
       firstPartyAccepting:true,
       thirdPartyAccepting:false,
     });
+    expect(state.pools[0]?.thirdPartyStopAt).toBe(10);
   });
 
   it('blocks third-party while first-party can still admit a bound product',async()=>{
