@@ -191,6 +191,9 @@ export function createSmmLanIngress(runtime:MfkLocalRuntime){
           sourceLabel:'SMM',
         });
         const canonicalOrderId=hold.formalOrderId??hold.id;
+        if(input.diningTarget.kind==='TABLE'&&hold.formalOrderId){
+          void runtime.ensureDiningInitialPrint?.(hold.id).catch(()=>{});
+        }
         writeResults([...results(),{submissionId:input.submissionId,orderId:canonicalOrderId,canonicalRevision,idempotencyKey:input.idempotencyKey,requestId:input.requestId}]);
         return Object.freeze({protocolVersion:1,type:'smm.lan.order.result.v1',requestId:input.requestId,submissionId:input.submissionId,idempotencyKey:input.idempotencyKey,disposition:'ACCEPTED',orderId:canonicalOrderId,canonicalRevision});
       }
