@@ -26,10 +26,10 @@ function QueueStrip({title,kind,orders,onOpen}:{title:string;kind:'pending'|'act
   </section>;
 }
 
-function ProductCard({product,actions,recentlyAdded}:{product:OrderingProductViewModel;actions:OrderingWorkspaceActions;recentlyAdded:boolean}){
+function ProductCard({product,mode,actions,recentlyAdded}:{product:OrderingProductViewModel;mode:'quick'|'normal';actions:OrderingWorkspaceActions;recentlyAdded:boolean}){
   const onBody=()=>{
     if(!product.enabled)return;
-    if(product.requiresOptions)actions.onConfigureProduct(product.id);
+    if(mode==='normal'||!product.quickAddAllowed)actions.onConfigureProduct(product.id);
     else actions.onAddProduct(product.id);
   };
   return <article className={`ordering-product-card ${product.imageUrl?'has-media':'text-only'}${product.enabled?'':' disabled'}${recentlyAdded?' recently-added':''}`}>
@@ -115,10 +115,17 @@ export function OrderingWorkspace({view,actions,centerPanel}:{view:OrderingWorks
       </section>:<>
         {view.menuRevisionLabel?<div className="ordering-menu-local-status"><b>{view.menuRevisionLabel}</b><span>本機 Admin → POS</span></div>:null}
         {view.operationalNotice?<div className="ordering-menu-local-status warning"><b>{view.operationalNotice}</b><span>Admin 營運提示</span></div>:null}
+        <section className="ordering-mode-bar" aria-label="點單模式">
+          <span><b>點選模式</b><small>{view.orderingMode==='quick'?'安全商品直接加入；必選／強制顯示仍開設定':'每件商品都先開設定'}</small></span>
+          <div role="group" aria-label="快速或普通模式">
+            <button type="button" className={view.orderingMode==='quick'?'active':''} aria-pressed={view.orderingMode==='quick'} onClick={()=>actions.onChangeOrderingMode('quick')}>快速</button>
+            <button type="button" className={view.orderingMode==='normal'?'active':''} aria-pressed={view.orderingMode==='normal'} onClick={()=>actions.onChangeOrderingMode('normal')}>普通</button>
+          </div>
+        </section>
         {view.showCategories===false?null:<nav className="ordering-categories" aria-label="商品分類">
           {view.categories.map(category=><button type="button" key={category.id} aria-pressed={view.selectedCategoryId===category.id} className={view.selectedCategoryId===category.id?'active':''} onClick={()=>actions.onSelectCategory(category.id)}>{category.label}</button>)}
         </nav>}
-        <section className="ordering-product-grid">{view.products.map(product=><ProductCard key={product.id} product={product} actions={actions} recentlyAdded={view.recentlyAddedProductId===product.id}/>)}</section>
+        <section className="ordering-product-grid">{view.products.map(product=><ProductCard key={product.id} product={product} mode={view.orderingMode} actions={actions} recentlyAdded={view.recentlyAddedProductId===product.id}/>)}</section>
       </>}
     </main>
 
