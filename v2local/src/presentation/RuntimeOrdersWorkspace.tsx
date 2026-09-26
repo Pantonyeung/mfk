@@ -141,6 +141,8 @@ export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePor
   useEffect(()=>runtime.subscribe(()=>void load(snapshot?.selectedOrderId,true)),[runtime,load,snapshot?.selectedOrderId]);
 
   const selected=snapshot?.selectedOrder;
+  const selectedIsDining=Boolean(selected?.diningHoldId);
+  const selectedIsActiveDining=Boolean(selectedIsDining&&selected&&!['已完成','已取消'].includes(selected.fulfillmentLabel));
   void afterSaleRevision;
   void keetaIntakeRevision;
   const keetaIntakeAttention=readKeetaOrderIntakeAttention();
@@ -250,6 +252,7 @@ export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePor
     }finally{setKeetaPullBusy(false);}
   };
   const markReady=async()=>{
+    if(selectedIsDining){setMessage('堂食履約狀態由堂食流程管理，唔會改成可取餐。');return;}
     if(!selected||!runtime.markOrderReady||readyBusy)return;
     setReadyBusy(true);setMessage(null);
     try{
@@ -264,6 +267,7 @@ export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePor
   };
 
   const openReprint=async()=>{
+    if(selectedIsActiveDining){setMessage('活躍堂食重印請留喺堂食流程處理，避免重印完整首次票組。');return;}
     if(!selected||!runtime.readOrderReprintOptions)return;
     try{
       const options=await runtime.readOrderReprintOptions(selected.orderId);
@@ -283,6 +287,7 @@ export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePor
   };
 
   const saveEdit=async()=>{
+    if(selectedIsDining){setMessage('堂食商品修改／加單要返堂食流程處理，唔會用一般訂單修改覆寫 Dining truth。');return;}
     if(!canCorrect){setMessage('你冇訂單更正權限。');return;}
     if(!selected||!runtime.updateOrderItems)return;
     try{
@@ -293,6 +298,10 @@ export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePor
 
   const openRefund=()=>{
     if(!selected)return;
+    if(selectedIsActiveDining){
+      setMessage('活躍堂食未關單，暫不直接退款；可先做獨立取消，或者完成堂食後再按正式退款紀錄處理。');
+      return;
+    }
     if(sourceLane(selected.sourceLabel)==='platform'){
       setMessage('第三方平台訂單退款要用平台售後流程；本地 SMT 唔會直接製造 Provider 退款。');
       return;
@@ -337,6 +346,7 @@ export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePor
   };
 
   const correctPayment=async()=>{
+    if(selectedIsDining){setMessage('堂食付款係逐筆 Payment truth；唔會用整單付款方式修正覆寫。');return;}
     if(!canCorrect){setMessage('你冇訂單更正權限。');return;}
     if(!selected||!runtime.correctOrderPayment||!paymentCorrection||paymentCorrectionBusy)return;
     setPaymentCorrectionBusy(true);setMessage(null);
@@ -467,12 +477,12 @@ export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePor
         </section>:null}
         {message?<p className="order-inline-message">{message}</p>:null}
         <footer>
-          <button onClick={()=>void openReprint()}>▣ 重印</button>
-          <button disabled={!canCorrect} title={canCorrect?'':'需要 ORDER_CORRECTION 權限'} onClick={()=>setModal('actions')}>✎ 取消／修改</button>
+          <button disabled={selectedIsActiveDining} title={selectedIsActiveDining?'活躍堂食避免重印完整首次票組':''} onClick={()=>void openReprint()}>▣ 重印</button>
+          <button disabled={!canCorrect} title={canCorrect?'':'需要 ORDER_CORRECTION 權限'} onClick={()=>setModal('actions')}>{selectedIsActiveDining?'✎ 堂食正式處理':'✎ 取消／修改'}</button>
           {selected.fulfillmentLabel==='待處理'
             ?<button className="primary" disabled={!runtime.acceptOrder||acceptBusy||(Boolean(selected.paymentEvidenceRef)&&selected.paymentVerificationState!=='VERIFIED')} title={selected.paymentEvidenceRef&&selected.paymentVerificationState!=='VERIFIED'?'請先核對付款截圖':''} onClick={()=>void acceptSelected()}>{acceptBusy?'接單中…':String(selected.sourceLabel||'').startsWith('Keeta')?'接受 Keeta 訂單':'接受訂單'}</button>
             :null}
-          <button className="primary" disabled={!runtime.markOrderReady||readyBusy||selected.fulfillmentLabel==='待處理'||selected.fulfillmentLabel==='可取餐'||selected.fulfillmentLabel==='已完成'||selected.fulfillmentLabel==='已取消'} onClick={()=>void markReady()}>{readyBusy?'處理中…':'提前完成／可取餐'}</button>
+          <button className="primary" disabled={selectedIsDining||!runtime.markOrderReady||readyBusy||selected.fulfillmentLabel==='待處理'||selected.fulfillmentLabel==='可取餐'||selected.fulfillmentLabel==='已完成'||selected.fulfillmentLabel==='已取消'} title={selectedIsDining?'堂食由堂食流程管理履約狀態':''} onClick={()=>void markReady()}>{readyBusy?'處理中…':'提前完成／可取餐'}</button>
         </footer>
       </article>:<div className="order-empty">選擇一張訂單。</div>}
     </aside>
@@ -521,10 +531,10 @@ export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePor
         <header><h2>{modal==='reprint'?'重印':modal==='edit'?'修改訂單':modal==='cancel'?'取消訂單':modal==='payment'?'修正付款方式':modal==='refund'?'退款':'取消／修改'}</h2><button onClick={()=>setModal(null)}>×</button></header>
 
         {modal==='actions'?<div className="order-action-choices">
-          <button onClick={()=>{setPaymentCorrection('');setModal('payment');}}><b>＄ 修正付款方式</b><span>同一 Order／取餐號；原付款方式保留 Audit。唔會重印或開錢箱。</span></button>
-          <button onClick={openRefund}><b>↩ 退款</b><span>退款係獨立 Money Action；必須揀退款商品、金額同實際退款方式。跨日／已日結只可以去 Admin。</span></button>
-          <button onClick={()=>setModal('edit')}><b>✎ 修改訂單</b><span>修改商品數量；保持同一訂單編號，完成後唔自動重印。</span></button>
-          <button className="danger" onClick={()=>setModal('cancel')}><b>⊗ 取消訂單</b><span>取消只改營運狀態，唔代表已退款；退款一定要另外確認。</span></button>
+          {!selectedIsDining?<button onClick={()=>{setPaymentCorrection('');setModal('payment');}}><b>＄ 修正付款方式</b><span>同一 Order／取餐號；原付款方式保留 Audit。唔會重印或開錢箱。</span></button>:null}
+          {!selectedIsActiveDining?<button onClick={openRefund}><b>↩ 退款</b><span>退款係獨立 Money Action；必須揀退款商品、金額同實際退款方式。跨日／已日結只可以去 Admin。</span></button>:<div className="order-correction-warning">活躍堂食已經有付款。取消同退款係兩個獨立動作；未關單前唔會直接退款，避免破壞未收款計算。</div>}
+          {!selectedIsDining?<button onClick={()=>setModal('edit')}><b>✎ 修改訂單</b><span>修改商品數量；保持同一訂單編號，完成後唔自動重印。</span></button>:null}
+          {selected.fulfillmentLabel!=='已完成'&&selected.fulfillmentLabel!=='已取消'?<button className="danger" onClick={()=>setModal('cancel')}><b>⊗ 取消訂單</b><span>取消只改營運狀態，唔代表已退款；退款一定要另外確認。</span></button>:null}
         </div>:null}
 
         {modal==='payment'?<div className="order-payment-correction-body">
