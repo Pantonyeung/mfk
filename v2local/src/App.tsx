@@ -20,7 +20,7 @@ import {resolveBusinessWindow} from './runtime/local-operations.ts';
 import {RuntimeReadyActivation} from './runtime/RuntimeReadyActivation.tsx';
 import {StaffAuthGate,StaffSessionBadge} from './presentation/StaffAuthGate.tsx';
 import {CashOpeningGate} from './presentation/CashOpeningGate.tsx';
-import {ComboWorkspace,HoldCartWorkspace,HoldListWorkspace,OrganizeWorkspace,ProductConfigWorkspace,initialHoldModeForLines,type OrderingPanelState,type WorkspaceHoldDraft,type WorkspaceProduct} from './features/ordering/OrderingCenterWorkspaces.tsx';
+import {ComboWorkspace,HoldCartWorkspace,HoldListWorkspace,OrganizeWorkspace,ProductConfigWorkspace,initialHoldModeForLines,type OrderingPanelState,type ProductConfiguration,type WorkspaceHoldDraft,type WorkspaceProduct} from './features/ordering/OrderingCenterWorkspaces.tsx';
 
 type Product={
   id:string;
@@ -33,7 +33,7 @@ type Product={
   imageUrl?:string;
   optionSets:readonly SyncedOptionSet[];
 };
-type CartLine={id:string;productId:string;name:string;qty:number;unitMinor:number;serviceMode:ServiceMode;detail?:string};
+type CartLine={id:string;productId:string;name:string;qty:number;unitMinor:number;serviceMode:ServiceMode;detail?:string;configuration?:ProductConfiguration};
 
 const BASE_PRODUCTS:readonly Product[]=[
   {id:'riceball',category:'飯團',name:'原味飯團',priceMinor:4100,priceReady:true},
@@ -269,10 +269,22 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
     window.setTimeout(()=>{setRecent(undefined);setHighlight(undefined)},700);
   };
 
-  const addConfigured=(productId:string,detail:string,deltaMinor:number,qty:number)=>{
+  const addConfigured=(productId:string,detail:string,deltaMinor:number,qty:number,configuration:ProductConfiguration,lineId?:string)=>{
     const product=products.find(item=>item.id===productId);if(!product||!product.priceReady||!product.sellable)return;
-    const line:CartLine={id:'line-'+Date.now().toString(36),productId:product.id,name:product.name,qty,unitMinor:product.priceMinor+deltaMinor,serviceMode,detail};
-    setCart([...cart,line]);setRecent(product.id);setHighlight(line.id);setPulse(value=>value+1);setPanel(null);
+    const line:CartLine={
+      id:lineId??'line-'+Date.now().toString(36),
+      productId:product.id,
+      name:product.name,
+      qty,
+      unitMinor:product.priceMinor+deltaMinor,
+      serviceMode,
+      detail:detail||undefined,
+      configuration,
+    };
+    setCart(lineId
+      ?cart.map(item=>item.id===lineId?{...line,serviceMode:item.serviceMode}:item)
+      :[...cart,line]);
+    setRecent(product.id);setHighlight(line.id);setPulse(value=>value+1);setPanel(null);
   };
 
   const addCombo=(comboId:string,comboName:string,detail:string,unitMinor:number)=>{
@@ -295,7 +307,15 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
     :panel?.type==='holds'?'暫存單':'';
 
   const panelBody=panel?.type==='product'
-    ?(()=>{const product=workspaceProducts.find(item=>item.id===panel.productId);return product?<ProductConfigWorkspace product={product} onAdd={(detail,delta,qty)=>addConfigured(product.id,detail,delta,qty)}/>:null})()
+    ?(()=>{
+      const product=workspaceProducts.find(item=>item.id===panel.productId);
+      const line=panel.lineId?cart.find(item=>item.id===panel.lineId):undefined;
+      return product?<ProductConfigWorkspace
+        product={product}
+        initial={line?{qty:line.qty,detail:line.detail,configuration:line.configuration}:undefined}
+        onAdd={(detail,delta,qty,configuration)=>addConfigured(product.id,detail,delta,qty,configuration,panel.lineId)}
+      />:null;
+    })()
     :panel?.type==='organize'
       ?<OrganizeWorkspace lines={cart} onDone={()=>setPanel(null)}/>
       :panel?.type==='combo'
@@ -364,7 +384,7 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
       const line=cart.find(item=>item.id===lineId);
       if(!line)return;
       if(comboData.combos.some(combo=>combo.id===line.productId))setPanel({type:'combo'});
-      else setPanel({type:'product',productId:line.productId});
+      else setPanel({type:'product',productId:line.productId,lineId});
     },
     onHoldCart:()=>cart.length?setPanel({type:'hold'}):setPanel({type:'holds'}),
     onCancelCart:()=>setCart([]),
