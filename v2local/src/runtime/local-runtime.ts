@@ -1237,7 +1237,7 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
       businessDate:new Date().toISOString().slice(0,10),revision:snapshot.diningRevision??0,
       queue:activeHolds.filter(hold=>!hold.assignedTable).map(hold=>({
         id:hold.id,
-        codeLabel:hold.codeLabel,
+        codeLabel:hold.formalOrderDisplay??hold.codeLabel,
         partySize:hold.partySize,
         statusLabel:'待安排座位',
       })),
