@@ -32,12 +32,14 @@ export interface CartLineViewModel {
   readonly groupId:string;
   readonly groupLabel:string;
   readonly detail?:string;
+  readonly sourceLineIds?:readonly string[];
 }
 
 export interface OrderingCartViewModel {
   readonly orderId:string;
   readonly serviceMode:ServiceMode;
   readonly viewMode:'original'|'organized';
+  readonly combineSimilar:boolean;
   readonly lines:readonly CartLineViewModel[];
   readonly subtotalLabel:string;
   readonly packagingLabel:string;
@@ -84,6 +86,7 @@ export interface OrderingWorkspaceActions {
   readonly onConfigureProduct:(productId:string)=>void;
   readonly onChangeServiceMode:(mode:ServiceMode)=>void;
   readonly onChangeCartView:(mode:'original'|'organized')=>void;
+  readonly onToggleCombine:()=>void;
   readonly onChangeLineServiceMode:(lineId:string,mode:ServiceMode)=>void;
   readonly onAdjustLineQuantity:(lineId:string,delta:-1|1)=>void;
   readonly onEditCartLine:(lineId:string)=>void;
