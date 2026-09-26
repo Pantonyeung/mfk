@@ -14,7 +14,7 @@ import {readSmtDeviceId} from './admin-config-sync.ts';
 export interface SmtOperationalMetric{readonly id:string;readonly label:string;readonly value:string;readonly detail?:string}
 export interface SmtOrderListItemViewModel{readonly orderId:string;readonly orderIdLabel:string;readonly itemCount:number;readonly totalLabel:string;readonly paymentLabel:string;readonly fulfillmentLabel:string;readonly sourceLabel?:string;readonly localSequenceLabel?:string}
 export interface SmtOrderDetailLineViewModel{readonly id:string;readonly name:string;readonly quantity:number;readonly unitLabel:string;readonly lineTotalLabel:string}
-export interface SmtOrderDetailViewModel extends SmtOrderListItemViewModel{readonly attention:readonly string[];readonly metrics:readonly SmtOperationalMetric[];readonly lines:readonly SmtOrderDetailLineViewModel[];readonly paymentEvidenceRef?:string;readonly paymentVerificationState?:'PENDING'|'VERIFIED'|'REJECTED';readonly customerPhone?:string;readonly paymentCorrections?:readonly PaymentCorrectionRecord[]}
+export interface SmtOrderDetailViewModel extends SmtOrderListItemViewModel{readonly attention:readonly string[];readonly metrics:readonly SmtOperationalMetric[];readonly lines:readonly SmtOrderDetailLineViewModel[];readonly paymentEvidenceRef?:string;readonly paymentVerificationState?:'PENDING'|'VERIFIED'|'REJECTED';readonly customerPhone?:string;readonly paymentCorrections?:readonly PaymentCorrectionRecord[];readonly cancellationNoticeState?:'DONE'|'FAILED'|'UNKNOWN'}
 export interface SmtOrdersProjection{readonly items:readonly SmtOrderListItemViewModel[];readonly detailsByOrderId?:Readonly<Record<string,SmtOrderDetailViewModel>>;readonly selectedOrderId?:string;readonly selectedOrder?:SmtOrderDetailViewModel}
 export interface SmtDiningQueueItemViewModel{readonly id:string;readonly codeLabel:string;readonly partySize:number;readonly statusLabel:string}
 export interface SmtDiningTableViewModel{readonly id:string;readonly areaLabel:string;readonly label:string;readonly state:'available'|'occupied'|'attention'|'settled';readonly partySize?:number;readonly outstandingLabel?:string;readonly holdId?:string;readonly startedAt?:string;readonly itemCount?:number;readonly itemSummary?:string;readonly totalMinor?:number;readonly paidMinor?:number;readonly remainingMinor?:number}
@@ -36,6 +36,10 @@ export interface PaymentCorrectionRecord{
 export interface StoredOrder{
   id:string;display:string;createdAt:string;updatedAt?:string;totalMinor:number;paymentLabel:string;fulfillmentLabel:'待處理'|'進行中'|'可取餐'|'已完成'|'已取消';sourceLabel:string;
   paymentCorrections?:readonly PaymentCorrectionRecord[];
+  productionIssuedAt?:string;
+  cancellationNoticeAttemptedAt?:string;
+  cancellationNoticePrintedAt?:string;
+  cancellationNoticeState?:'DONE'|'FAILED'|'UNKNOWN';
   staffId?:string;staffName?:string;cancellationReason?:string;
   providerRef?:string;providerMessageId?:string;providerPickupCode?:string;orderRemark?:string;utensilPreference?:'需要'|'不需要';
   providerLastEventId?:number;providerLastEventName?:string;providerLastEventAt?:string;providerLastMessageId?:string;providerLifecycleNote?:string;
@@ -330,6 +334,41 @@ function physicalKey(binding:PrintBinding){
   return binding.host.trim().toLowerCase()+':'+(Number(binding.port)||9100);
 }
 
+async function dispatchCancellationNotice(order:StoredOrder){
+  const seen=new Set<string>();
+  const bindings=readPrinterBindings().filter(binding=>{
+    if(binding.role!=='製作單'||!String(binding.host||'').trim()||Number(binding.port)<=0)return false;
+    const key=physicalKey(binding);
+    if(seen.has(key))return false;
+    seen.add(key);
+    return true;
+  });
+  if(!bindings.length)return {ok:false,code:'CANCEL_NOTICE_PRODUCTION_ROUTE_MISSING',state:'FAILED' as const};
+  let sent=0;
+  let lastCode='CANCEL_NOTICE_FAILED';
+  for(const binding of bindings){
+    try{
+      const result=await printTextLan({
+        ...printerInput(binding),
+        text:'\n*** 取消通知單 ***\n#'+order.display+' 已取消\n來源：'+order.sourceLabel
+          +(order.cancellationReason?'\n原因：'+order.cancellationReason:'')
+          +'\n時間：'+new Date().toLocaleString('zh-HK')
+          +'\n*** 停止製作／如已製作請通知前台 ***\n\n',
+        cutAfter:true,
+        kickDrawer:false,
+        beepAfter:true,
+      });
+      if(result.ok)sent+=1;
+      else lastCode=result.code||lastCode;
+    }catch{
+      return {ok:false,code:'CANCEL_NOTICE_OUTCOME_UNKNOWN',state:'UNKNOWN' as const};
+    }
+  }
+  return sent===bindings.length
+    ?{ok:true,code:'CANCEL_NOTICE_SENT',state:'DONE' as const}
+    :{ok:false,code:lastCode,state:'FAILED' as const};
+}
+
 async function dispatchOrderOutputs(order:StoredOrder,requestedJobIds?:ReadonlySet<string>,reprint=false):Promise<PrintDispatchSummary>{
   const started=performance.now();
   let plan=[...buildOrderPrintPlan(order,readPrinterBindings(),readSmtPrintConfig())];
@@ -417,6 +456,18 @@ async function dispatchOrderOutputs(order:StoredOrder,requestedJobIds?:ReadonlyS
     physical:Object.freeze(groupResults.map(group=>Object.freeze(group.diagnostic))),
   };
   localStorage.setItem(PRINT_DIAGNOSTIC_KEY,JSON.stringify(diagnostic));
+  const productionIssued=summary.results.some(row=>row.role==='製作單'&&row.ok);
+  if(productionIssued&&order.fulfillmentLabel!=='已取消'){
+    const current=data.orders.find(row=>row.id===order.id);
+    if(current&&!current.productionIssuedAt){
+      const productionIssuedAt=new Date().toISOString();
+      data={...data,orders:data.orders.map(row=>row.id===order.id?{...row,productionIssuedAt,updatedAt:productionIssuedAt}:row)};
+      save();
+      const updated=data.orders.find(row=>row.id===order.id);
+      if(updated)projectOrder(updated);
+      appendActionAudit({action:'PRODUCTION_ISSUED',orderId:order.id});
+    }
+  }
   listeners.forEach(fn=>fn());
   return summary;
 }
@@ -564,6 +615,7 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
       ...(order.paymentVerificationState?{paymentVerificationState:order.paymentVerificationState}:{}),
       ...(order.customerPhone?{customerPhone:order.customerPhone}:{}),
       ...(order.paymentCorrections?.length?{paymentCorrections:order.paymentCorrections}:{}),
+      ...(order.cancellationNoticeState?{cancellationNoticeState:order.cancellationNoticeState}:{}),
       attention:[
         ...(order.providerLifecycleNote?[order.providerLifecycleNote]:[]),
       ],metrics:[
@@ -713,9 +765,10 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
     return {orderId,totalMinor};
   },
   async cancelOrder(orderId,reason){
-    const order=data.orders.find(x=>x.id===orderId);
+    let order=data.orders.find(x=>x.id===orderId);
     if(!order)throw new Error('ORDER_NOT_FOUND');
     if(order.fulfillmentLabel==='已完成')throw new Error('COMPLETED_ORDER_CANNOT_CANCEL');
+    if(order.fulfillmentLabel==='已取消')return {orderId,status:'CANCELLED' as const};
     const updatedAt=new Date().toISOString();
     const cancellationReason=String(reason||'').trim();
     data={...data,orders:data.orders.map(current=>current.id===orderId?{
@@ -725,7 +778,29 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
     save();
     appendActionAudit({action:'CANCEL',orderId,reason:cancellationReason||undefined});
     projectOrder(data.orders.find(current=>current.id===orderId)!);
-    return {orderId,status:'CANCELLED'};
+
+    order=data.orders.find(x=>x.id===orderId)!;
+    if(order.productionIssuedAt&&!order.cancellationNoticeAttemptedAt){
+      const cancellationNoticeAttemptedAt=new Date().toISOString();
+      data={...data,orders:data.orders.map(current=>current.id===orderId?{
+        ...current,cancellationNoticeAttemptedAt,updatedAt:cancellationNoticeAttemptedAt,
+      }:current)};
+      save();
+      order=data.orders.find(x=>x.id===orderId)!;
+      const result=await dispatchCancellationNotice(order).catch(()=>({ok:false,code:'CANCEL_NOTICE_OUTCOME_UNKNOWN',state:'UNKNOWN' as const}));
+      const completedAt=new Date().toISOString();
+      data={...data,orders:data.orders.map(current=>current.id===orderId?{
+        ...current,
+        cancellationNoticeState:result.state,
+        ...(result.ok?{cancellationNoticePrintedAt:completedAt}:{}),
+        updatedAt:completedAt,
+      }:current)};
+      save();
+      const updated=data.orders.find(current=>current.id===orderId)!;
+      projectOrder(updated);
+      appendActionAudit({action:'CANCEL_NOTICE',orderId,reason:result.code});
+    }
+    return {orderId,status:'CANCELLED' as const};
   },
   applyProviderLifecycle(input){
     const order=data.orders.find(x=>x.id===input.orderId);
