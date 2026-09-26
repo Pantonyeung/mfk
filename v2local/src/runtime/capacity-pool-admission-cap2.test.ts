@@ -197,6 +197,43 @@ describe('CAP2 formal admission deduction and cancellation restore',()=>{
     expect(cancelled.capacityEvents.filter((row:any)=>row.kind==='RESTORE')).toHaveLength(2);
   });
 
+  it('deducts SMM addition into an occupied Dining Formal Order once and preserves replay idempotency',async()=>{
+    applyCapacity([purple]);
+    const runtime=await boot();
+
+    const first=runtime.upsertSmmDiningHold({
+      providerRef:'SMM-CAP2-FIRST',
+      target:{kind:'TABLE',tableId:'T01',covers:2},
+      items:[{id:'riceball',name:'原味飯團',qty:1,unitMinor:4100}],
+      totalMinor:4100,
+      sourceLabel:'SMM',
+    });
+    expect((await runtime.readCapacityPoolState()).pools[0]?.remainingQty).toBe(4);
+
+    const added=runtime.upsertSmmDiningHold({
+      providerRef:'SMM-CAP2-ADD',
+      target:{kind:'TABLE',tableId:'T01',covers:2},
+      items:[{id:'pork',name:'泡菜豬肉飯團',qty:2,unitMinor:4700}],
+      totalMinor:9400,
+      sourceLabel:'SMM',
+    });
+    expect(added.id).toBe(first.id);
+    expect((await runtime.readCapacityPoolState()).pools[0]?.remainingQty).toBe(2);
+
+    runtime.upsertSmmDiningHold({
+      providerRef:'SMM-CAP2-ADD',
+      target:{kind:'TABLE',tableId:'T01',covers:2},
+      items:[{id:'pork',name:'泡菜豬肉飯團',qty:2,unitMinor:4700}],
+      totalMinor:9400,
+      sourceLabel:'SMM',
+    });
+    expect((await runtime.readCapacityPoolState()).pools[0]?.remainingQty).toBe(2);
+
+    const detail=await runtime.readDiningHold(first.id);
+    const order=runtime.orders().find((row:any)=>row.id===detail.formalOrderId);
+    expect(order.capacityEvents.filter((row:any)=>row.kind==='DEDUCT')).toHaveLength(2);
+  });
+
   it('provider cancellation restores once even if another cancel event is received later',async()=>{
     applyCapacity([purple]);
     const runtime=await boot();
