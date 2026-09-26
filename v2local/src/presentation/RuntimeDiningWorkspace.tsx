@@ -88,6 +88,7 @@ export function RuntimeDiningWorkspace({runtime,onCheckout}:{runtime:CleanSmtCor
     if(!selectedWait||!runtime.assignDiningTable)return;
     try{
       await runtime.assignDiningTable(selectedWait,tableId);
+      void runtime.ensureDiningInitialPrint?.(selectedWait).catch(()=>{});
       const tableLabel=view?.tables.find(table=>table.id===tableId)?.label??tableId;
       setMessage('已安排到 '+tableLabel+'。');
       setSelectedWait(null);
