@@ -1,6 +1,7 @@
 import {validateAdminDraft,type AdminSessionDraft} from './admin-draft.tsx';
 import {createAdminRelease,readAdminStored,writeAdminStored,type AdminRelease} from './admin-local-store.ts';
 import {OPTION_SET_CENTER_STORAGE_KEYS,readOptionSetCenterState,validateOptionSetCenter,type OptionSetCenterState} from './admin-option-set-center.ts';
+import {DEFAULT_PRICING_PROMOTIONS,RICEBALL_DRINK_PROMOTION_STORAGE_KEY} from './admin-pricing-promotion-seed-r1.ts';
 
 export interface AdminSaveSuccess{
   readonly ok:true;
@@ -68,6 +69,7 @@ export function collectAdminSnapshot(catalog:AdminSessionDraft,optionCenter?:Opt
     inventory:readAdminStored('inventory-lite.v1',[]),
     loyalty:readAdminStored('loyalty.v1',{}),
     coupons:readAdminStored('coupons.v1',[]),
+    pricingPromotions:readAdminStored(RICEBALL_DRINK_PROMOTION_STORAGE_KEY,DEFAULT_PRICING_PROMOTIONS),
     announcements:readAdminStored('announcements.v1',[]),
   };
 }

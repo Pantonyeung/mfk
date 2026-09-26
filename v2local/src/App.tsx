@@ -13,7 +13,7 @@ import {LocalMoreWorkspace} from './presentation/LocalMoreWorkspace.tsx';
 import {localRuntime,type DiningTender} from './runtime/local-runtime.ts';
 import {readLocalAdminMenu,subscribeLocalAdminMenu} from './runtime/local-admin-menu.ts';
 import {readSmtAdminConfigLkg,readSmtAdminSyncStatus,subscribeSmtAdminConfig} from './runtime/admin-config-sync.ts';
-import {projectSyncedCombos,projectSyncedOrderingCatalog,type SyncedOptionSet} from './runtime/admin-config-projection.ts';
+import {projectSyncedCombos,projectSyncedOrderingCatalog,projectSyncedRiceballDrinkPromotion,type SyncedOptionSet} from './runtime/admin-config-projection.ts';
 import {capacityNoticeForCount,readSmtFrontlinePresentation,readSmtStoreSettings} from './runtime/admin-operational-config.ts';
 import {readBusinessCutoff} from './runtime/cash-opening.ts';
 import {resolveBusinessWindow} from './runtime/local-operations.ts';
@@ -23,6 +23,7 @@ import {CashOpeningGate} from './presentation/CashOpeningGate.tsx';
 import {ComboWorkspace,HoldCartWorkspace,HoldListWorkspace,OrganizeWorkspace,ProductConfigWorkspace,RequiredFastLaneWorkspace,applyRequiredSelectionToCart,initialHoldModeForLines,isDrinkSupplementProductId,projectDrinkSupplementChoices,quickConfigurationForProduct,requiredTasksForCart,type OrderingPanelState,type WorkspaceHoldDraft,type WorkspaceProduct} from './features/ordering/OrderingCenterWorkspaces.tsx';
 import {RiceballPairingWorkspace} from './features/ordering/RiceballPairingWorkspace.tsx';
 import {applyRiceballPairings,buildRiceballPairingDraft,existingPairingGroups,isPairedComboLine,nextPairingStartIndex,restorePairingGroup} from './features/ordering/riceball-pairing-model.ts';
+import {applyRiceballDrinkPromotion,riceballDrinkPromotionStateEqual,stripRiceballDrinkPromotionDetail} from './features/ordering/riceball-drink-promotion-model.ts';
 
 type Product={
   id:string;
@@ -107,10 +108,31 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
     ()=>adminConfig?projectSyncedOrderingCatalog(serviceMode,adminConfig):null,
     [adminConfig,serviceMode],
   );
+  const promotionCatalogs=useMemo(
+    ()=>adminConfig?{
+      takeaway:projectSyncedOrderingCatalog('takeaway',adminConfig).products,
+      'dine-in':projectSyncedOrderingCatalog('dine-in',adminConfig).products,
+    }:null,
+    [adminConfig],
+  );
+  const riceballDrinkPromotion=useMemo(
+    ()=>adminConfig?projectSyncedRiceballDrinkPromotion(adminConfig):null,
+    [adminConfig],
+  );
   const comboData=useMemo(
     ()=>adminConfig?projectSyncedCombos(adminConfig):{combos:[] as const,pools:[] as const},
     [adminConfig],
   );
+  useEffect(()=>{
+    if(!promotionCatalogs)return;
+    const normalized=applyRiceballDrinkPromotion(
+      cart,
+      promotionCatalogs,
+      comboData.pools,
+      riceballDrinkPromotion,
+    );
+    if(!riceballDrinkPromotionStateEqual(cart,normalized))setCart(normalized);
+  },[cart,promotionCatalogs,comboData.pools,riceballDrinkPromotion,setCart]);
 
   const storeSettings=useMemo(()=>{void adminConfigRevision;return readSmtStoreSettings();},[adminConfigRevision]);
   const frontlinePresentation=useMemo(()=>{void adminConfigRevision;return readSmtFrontlinePresentation();},[adminConfigRevision]);
@@ -435,7 +457,7 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
     :panel?.type==='holds'?'暫存單':'';
 
   const panelBody=panel?.type==='product'
-    ?(()=>{const product=workspaceProducts.find(item=>item.id===panel.productId);const line=panel.lineId?cart.find(item=>item.id===panel.lineId):undefined;return product?<ProductConfigWorkspace key={product.id+':'+(panel.lineId??'add')} product={product} mode={panel.lineId?'edit':'add'} initial={line?{qty:line.qty,detail:line.detail}:undefined} onAdd={(detail,delta,qty)=>addConfigured(product.id,detail,delta,qty,panel.lineId)}/>:null})()
+    ?(()=>{const product=workspaceProducts.find(item=>item.id===panel.productId);const line=panel.lineId?cart.find(item=>item.id===panel.lineId):undefined;return product?<ProductConfigWorkspace key={product.id+':'+(panel.lineId??'add')} product={product} mode={panel.lineId?'edit':'add'} initial={line?{qty:line.qty,detail:stripRiceballDrinkPromotionDetail(line.detail)||undefined}:undefined} onAdd={(detail,delta,qty)=>addConfigured(product.id,detail,delta,qty,panel.lineId)}/>:null})()
     :panel?.type==='required'
       ?<RequiredFastLaneWorkspace
         cart={cart}
