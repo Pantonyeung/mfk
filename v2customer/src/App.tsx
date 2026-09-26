@@ -1,4 +1,4 @@
-import {useEffect,useMemo,useState} from 'react';
+import {useEffect,useMemo,useRef,useState} from 'react';
 import {createCustomerPendingIntent,readCustomerLocalWorkspace,writeCustomerLocalWorkspace,type CustomerLocalPreferences} from './persistence';
 import {resolveCustomerRuntimePort} from './runtime';
 import {buildCustomerRecommendations} from './recommendation';
@@ -68,6 +68,7 @@ export function App(){
   const [jarPulseKey,setJarPulseKey]=useState(0);
   const [fallbackIntentId,setFallbackIntentId]=useState<string|null>(null);
   const [submitProbe,setSubmitProbe]=useState<Readonly<{attempt:number;total:number}>|null>(null);
+  const submitLockRef=useRef(false);
 
   const persist=(next:{cart?:readonly CustomerCartLine[];checkout?:CustomerCheckoutDraft;pendingIntents?:readonly CustomerPendingIntent[];preferences?:CustomerLocalPreferences})=>{
     writeCustomerLocalWorkspace({
@@ -151,6 +152,20 @@ export function App(){
   },[cart,snapshot?.menu]);
 
   const menu=snapshot?.menu;
+  const selectedPaymentChannel=checkout.paymentMethod==='ELECTRONIC'
+    ?(snapshot?.paymentChannels??[]).find(channel=>channel.channelId===checkout.paymentChannelId)
+    :undefined;
+  const submitBlockReason=(()=>{
+    if(!cart.length)return '記憶罐未有商品。';
+    if(checkout.phone.replace(/\D/g,'').length<8)return '請先輸入至少 8 位電話號碼。';
+    if(checkout.paymentMethod!=='ELECTRONIC')return null;
+    if(!checkout.paymentChannelId)return '請先選擇一個電子支付方式。';
+    if(!selectedPaymentChannel||checkout.paymentChannelLabel!==selectedPaymentChannel.label)return '付款方式資料已更新，請重新選擇付款方式。';
+    if(!selectedPaymentChannel.qrImageUrl)return '呢個電子支付方式未有付款 QR，暫時不可提交。請改用到店付款，或者選擇另一個已設定付款碼嘅渠道。';
+    if(!checkout.paymentEvidence)return '請先上傳今次付款截圖。';
+    if(checkout.paymentEvidence.state==='LOCAL_PENDING_UPLOAD')return '付款截圖仍在上載，請等上載完成。';
+    return null;
+  })();
   const categories=menu?.categories??[];
   const effectiveCategoryId=activeCategoryId&&categories.some(item=>item.categoryId===activeCategoryId)?activeCategoryId:(categories[0]?.categoryId??null);
   const visibleProducts=(menu?.products??[]).filter(product=>{
@@ -276,16 +291,9 @@ export function App(){
   };
 
   const submit=async()=>{
-    if(submitting)return;
-    if(cart.length===0){setNotice('記憶罐未有商品。');return}
-    if(checkout.phone.replace(/\D/g,'').length<8){setNotice('請輸入至少 8 位電話號碼。');return}
-    const selectedPaymentChannel=checkout.paymentMethod==='ELECTRONIC'
-      ?(snapshot?.paymentChannels??[]).find(channel=>channel.channelId===checkout.paymentChannelId)
-      :undefined;
-    if(checkout.paymentMethod==='ELECTRONIC'&&!checkout.paymentChannelId){setNotice('請先選擇一個店舖提供嘅電子支付方式。');return}
-    if(checkout.paymentMethod==='ELECTRONIC'&&(!selectedPaymentChannel?.qrImageUrl||checkout.paymentChannelLabel!==selectedPaymentChannel.label)){setNotice('付款方式資料已更新或者 QR 尚未設定，請重新選擇付款方式。');return}
-    if(checkout.paymentMethod==='ELECTRONIC'&&!checkout.paymentEvidence){setNotice('電子支付需要提供今次付款截圖，畀店舖核對。');return}
-    if(checkout.paymentMethod==='ELECTRONIC'&&checkout.paymentEvidence?.state==='LOCAL_PENDING_UPLOAD'){setNotice('付款截圖已選擇，但上載仍未完成；未完成前唔會當成已付款。');return}
+    if(submitLockRef.current||submitting)return;
+    if(submitBlockReason){setNotice(submitBlockReason);return}
+    submitLockRef.current=true;
     const cartFingerprint=JSON.stringify(cart);
     const checkoutFingerprint=JSON.stringify(checkout);
     let existing=pendingIntents.find(item=>
@@ -388,6 +396,7 @@ export function App(){
         setNotice('暫時未能完成店舖連線檢查；可以改用 WhatsApp。');
       }
     }finally{
+      submitLockRef.current=false;
       setSubmitProbe(null);
       setSubmitting(false);
     }
@@ -472,7 +481,7 @@ export function App(){
   const homeRecommendations=buildCustomerRecommendations({products:allProducts,history,cart,limit:4});
   const menuRecommendations=buildCustomerRecommendations({products:allProducts,history,cart,activeCategoryId:effectiveCategoryId,limit:4});
   const cartSuggestions=buildCustomerRecommendations({products:allProducts,history,cart,activeCategoryId:effectiveCategoryId,limit:2});
-  const actionState:ActionState=quote?.freshness==='MATERIAL_CHANGE'||!cart.length||!quote?'disabled':readingIntentId||submitting?'loading':currentPending?.state==='UNKNOWN'?'unknown':currentPending?.state==='PENDING'?'pending':'default';
+  const actionState:ActionState=quote?.freshness==='MATERIAL_CHANGE'||!cart.length||!quote||Boolean(submitBlockReason)?'disabled':readingIntentId||submitting?'loading':currentPending?.state==='UNKNOWN'?'unknown':currentPending?.state==='PENDING'?'pending':'default';
 
   return <main className="customer-shell" data-network={!browserOnline?'offline':connection.toLowerCase()}>
     <CustomerHeader storeName={snapshot?.store?.storeName} connection={connection} browserOnline={browserOnline} onHome={()=>changeView('home')} onService={()=>changeView('more')}/>
@@ -490,7 +499,7 @@ export function App(){
       {view==='home'?<HomeView snapshot={snapshot} connection={connection} activeOrders={activeOrders} history={history} recommendations={homeRecommendations} cartCount={cartCount} onRefresh={()=>void refresh()} onProduct={openProduct} onBrowse={()=>changeView('menu')} onJar={()=>changeView('cart')} onOrders={()=>{setOrderSegment('current');changeView('orders')}} onHistory={()=>{setOrderSegment('history');changeView('orders')}} onMember={()=>changeView('more')} onBuyAgain={order=>void reorder(order)} onFallback={()=>void requestFallback()}/>:null}
       {view==='menu'?<MenuView connection={connection} categories={categories} activeCategoryId={effectiveCategoryId} setCategory={category=>presentWithContinuity(()=>changeCategory(category))} query={search} setQuery={setSearch} layout={menuLayout} setLayout={layout=>presentWithContinuity(()=>setMenuLayout(layout))} products={visibleProducts} recommendations={menuRecommendations} onProduct={(product,origin)=>openProduct(product,origin)} cartCount={cartCount} quote={quote} onCart={()=>changeView('cart')}/>:null}
       {view==='cart'?<CartView cart={cart} quote={quote} repairs={cartRepairs} checkout={checkout} member={snapshot?.member} suggestions={cartSuggestions} products={menu?.products??[]} onProduct={openProduct} onAcceptRepair={acceptCartRepair} onCheckoutChange={changeCheckout} onQuantity={(lineId,quantity)=>updateCart(cart.map(line=>line.lineId===lineId?{...line,quantity:Math.max(1,quantity)}:line))} onRemove={lineId=>updateCart(cart.filter(line=>line.lineId!==lineId))} onMenu={()=>changeView('menu')} onCheckout={()=>changeView('checkout')}/>:null}
-      {view==='checkout'?<CheckoutView cart={cart} quote={quote} checkout={checkout} setCheckout={changeCheckout} paymentChannels={snapshot?.paymentChannels??[]} pending={currentPending} actionState={actionState} submitProbe={submitProbe} fallbackAvailable={fallbackAvailable} onFallback={()=>void requestFallback()} onSubmit={()=>void submit()} onReadback={intent=>void readbackIntent(intent)} onBack={()=>changeView('cart')} onRepair={()=>changeView('cart')} onPaymentEvidence={file=>void uploadPaymentEvidence(file)}/>:null}
+      {view==='checkout'?<CheckoutView cart={cart} quote={quote} checkout={checkout} setCheckout={changeCheckout} paymentChannels={snapshot?.paymentChannels??[]} pending={currentPending} actionState={actionState} submitProbe={submitProbe} submitBlockReason={submitBlockReason} fallbackAvailable={fallbackAvailable} onFallback={()=>void requestFallback()} onSubmit={()=>void submit()} onReadback={intent=>void readbackIntent(intent)} onBack={()=>changeView('cart')} onRepair={()=>changeView('cart')} onPaymentEvidence={file=>void uploadPaymentEvidence(file)}/>:null}
       {view==='orders'?<OrdersView segment={orderSegment} setSegment={setOrderSegment} active={activeOrders} history={history} expandedOrderId={expandedOrderId} setExpandedOrderId={setExpandedOrderId} onReorder={order=>void reorder(order)} onBrowse={()=>changeView('menu')} connection={connection}/>:null}
       {view==='more'?<MemberView connection={connection} snapshot={snapshot} history={history} pendingIntents={pendingIntents} readingIntentId={readingIntentId} onRefresh={()=>void refresh()} onReadback={intent=>void readbackIntent(intent)} onDiscard={removeIntent} onFallback={()=>void requestFallback()} onReorder={order=>void reorder(order)} onBrowse={()=>changeView('menu')}/>:null}
     </section>
