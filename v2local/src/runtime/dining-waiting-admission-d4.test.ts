@@ -13,6 +13,7 @@ vi.mock('./label-bitmap.ts',()=>({
 vi.mock('./projection-outbox.ts',()=>({queueOrderProjection:vi.fn()}));
 vi.mock('./keeta-provider-commands.ts',()=>({mirrorKeetaOrderCommand:vi.fn(()=>{throw new Error('PROVIDER_FORBIDDEN');})}));
 
+const KEY='mfk.v2local.runtime.v1';
 const PRINTER_KEY='mfk.v2local.printers.v5';
 let values:Map<string,string>;
 
@@ -47,13 +48,12 @@ beforeEach(()=>{
   localStorage.setItem(PRINTER_KEY,JSON.stringify([
     binding('receipt','顧客小票','10.0.0.11'),
     binding('production','製作單','10.0.0.12'),
-    binding('packing','打包單','10.0.0.13'),
   ]));
 });
-afterEach(()=>vi.unstubAllGlobals());
+afterEach(()=>{vi.unstubAllGlobals();});
 
 describe('D4 ordered Dining waiting admission',()=>{
-  it('admits an ordered waiting Hold as ONE Formal Order and prints before a table exists',async()=>{
+  it('admits an ordered waiting Dining Hold into ONE Formal Order before seating and prints immediately',async()=>{
     const runtime=await boot();
     const hold=runtime.createHold({
       kind:'dining',
@@ -65,28 +65,35 @@ describe('D4 ordered Dining waiting admission',()=>{
 
     expect(runtime.orders()).toHaveLength(0);
     const admitted=await runtime.admitDiningHold(hold.id);
+
     expect(admitted.assignedTable).toBeUndefined();
     expect(admitted.formalOrderId).toBeTruthy();
+    expect(admitted.formalOrderDisplay).toBeTruthy();
     expect(runtime.orders()).toHaveLength(1);
     expect(runtime.orders()[0]).toMatchObject({
       id:admitted.formalOrderId,
       display:admitted.formalOrderDisplay,
+      diningHoldId:hold.id,
       recognizedSalesMinor:0,
       outstandingMinor:4100,
+      paymentLabel:'未收款',
     });
 
-    const printed=await runtime.ensureDiningInitialPrint(hold.id);
-    expect(printed).toMatchObject({state:'DONE',planned:3,sent:3,failed:0});
+    const print=await runtime.ensureDiningInitialPrint(hold.id);
+    expect(print).toMatchObject({state:'DONE',planned:2,sent:2,failed:0});
 
     const raster=await import('./ticket-bitmap.ts');
-    const calls=(raster.renderEscPosRasterTicket as any).mock.calls;
-    const waiting=calls.find((call:any[])=>call[0]?.kind==='dining-table');
-    expect(waiting?.[0]?.order?.diningTicketTitle).toBe('堂食輪候單');
-    expect(waiting?.[0]?.order?.diningTableLabel).toContain('輪候');
-    expect(calls.map((call:any[])=>call[0]?.kind)).toEqual(expect.arrayContaining(['dining-table','production','packing']));
+    const calls=(raster.renderEscPosRasterTicket as any).mock.calls.map((row:any[])=>row[0]);
+    const waiting=calls.find((row:any)=>row.kind==='dining-table');
+    expect(waiting).toBeTruthy();
+    expect(waiting.kickDrawer).toBe(false);
+    expect(waiting.order.diningTicketTitle).toBe('堂食輪候單');
+    expect(waiting.order.diningTableLabel).toBe('輪候 '+admitted.formalOrderDisplay);
+    expect(calls.some((row:any)=>row.kind==='receipt')).toBe(false);
+    expect(calls.some((row:any)=>row.kind==='production')).toBe(true);
   });
 
-  it('later seating keeps SAME Formal Order and does not repeat the initial print',async()=>{
+  it('later seating keeps the SAME Formal Order and does not repeat the first print',async()=>{
     const runtime=await boot();
     const hold=runtime.createHold({
       kind:'dining',
@@ -95,24 +102,24 @@ describe('D4 ordered Dining waiting admission',()=>{
       partySize:2,
     });
     const admitted=await runtime.admitDiningHold(hold.id);
-    await runtime.ensureDiningInitialPrint(hold.id);
+    const firstPrint=await runtime.ensureDiningInitialPrint(hold.id);
 
     const native=await import('./native-print.ts');
-    const calls=(native.printBytesLan as any).mock.calls.length;
+    const callsBefore=(native.printBytesLan as any).mock.calls.length;
 
     await runtime.assignDiningTable(hold.id,'T03');
     const seated=await runtime.readDiningHold(hold.id);
+    expect(seated.assignedTable).toBe('T03');
     expect(seated.formalOrderId).toBe(admitted.formalOrderId);
     expect(seated.formalOrderDisplay).toBe(admitted.formalOrderDisplay);
-    expect(seated.assignedTable).toBe('T03');
     expect(runtime.orders()).toHaveLength(1);
 
     const replay=await runtime.ensureDiningInitialPrint(hold.id);
-    expect(replay.state).toBe('DONE');
-    expect((native.printBytesLan as any).mock.calls.length).toBe(calls);
+    expect(replay).toEqual(firstPrint);
+    expect((native.printBytesLan as any).mock.calls.length).toBe(callsBefore);
   });
 
-  it('restart between waiting admission and seating preserves SAME Order identity',async()=>{
+  it('restart preserves waiting Formal Order identity and first-print certainty',async()=>{
     let runtime=await boot();
     const hold=runtime.createHold({
       kind:'dining',
@@ -121,19 +128,58 @@ describe('D4 ordered Dining waiting admission',()=>{
       partySize:2,
     });
     const admitted=await runtime.admitDiningHold(hold.id);
+    const firstPrint=await runtime.ensureDiningInitialPrint(hold.id);
 
     vi.resetModules();
     runtime=await boot();
-    await runtime.assignDiningTable(hold.id,'T02');
+
+    const recovered=await runtime.readDiningHold(hold.id);
+    expect(recovered.formalOrderId).toBe(admitted.formalOrderId);
+    expect(recovered.formalOrderDisplay).toBe(admitted.formalOrderDisplay);
+    expect(recovered.assignedTable).toBeUndefined();
+    expect(runtime.orders()).toHaveLength(1);
+
+    const replay=await runtime.ensureDiningInitialPrint(hold.id);
+    expect(replay).toEqual(firstPrint);
+
+    await runtime.assignDiningTable(hold.id,'T01');
     const seated=await runtime.readDiningHold(hold.id);
     expect(seated.formalOrderId).toBe(admitted.formalOrderId);
     expect(runtime.orders()).toHaveLength(1);
   });
 
-  it('empty waiting entry remains non-financial and cannot be admitted as a Formal Order',async()=>{
+  it('admit replay is idempotent and does not allocate a second Display',async()=>{
     const runtime=await boot();
-    const wait=await runtime.createDiningWait({partySize:2,note:'等位'});
-    await expect(runtime.admitDiningHold(wait.id)).rejects.toThrow('DINING_ORDER_ITEMS_REQUIRED');
-    expect(runtime.orders()).toHaveLength(0);
+    const hold=runtime.createHold({
+      kind:'dining',
+      items:[{id:'riceball',name:'原味飯團',qty:1,unitMinor:4100}],
+      totalMinor:4100,
+      partySize:2,
+    });
+    const first=await runtime.admitDiningHold(hold.id);
+    const second=await runtime.admitDiningHold(hold.id);
+
+    expect(second.formalOrderId).toBe(first.formalOrderId);
+    expect(second.formalOrderDisplay).toBe(first.formalOrderDisplay);
+    expect(runtime.orders()).toHaveLength(1);
+  });
+
+  it('SMM WAITING creates the Formal Order before seating and returns that identity',async()=>{
+    const runtime=await boot();
+    const hold=runtime.upsertSmmDiningHold({
+      providerRef:'SMM:waiting-1',
+      target:{kind:'WAITING',covers:2},
+      items:[{id:'riceball',name:'原味飯團',qty:1,unitMinor:4100}],
+      totalMinor:4100,
+      sourceLabel:'SMM',
+    });
+
+    expect(hold.assignedTable).toBeUndefined();
+    expect(hold.formalOrderId).toBeTruthy();
+    expect(runtime.orders()).toHaveLength(1);
+    expect(runtime.orders()[0].id).toBe(hold.formalOrderId);
+
+    const print=await runtime.ensureDiningInitialPrint(hold.id);
+    expect(print.state).toBe('DONE');
   });
 });
