@@ -1,0 +1,49 @@
+name: crossport-admin-combo-drink-projection-r1
+
+on:
+  push:
+    branches:
+      - work/MFK/CROSSPORT-ADMIN-COMBO-DRINK-PROJECTION-R1
+    paths:
+      - 'v2admin/worker.ts'
+      - 'v2customer/src/product-types.ts'
+      - 'v2customer/test/admin-combo-drink-projection-r1.test.mjs'
+      - '.github/workflows/crossport-admin-combo-drink-projection-r1.yml'
+  workflow_dispatch:
+
+jobs:
+  customer:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: v2customer
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install
+        run: npm install --no-audit --no-fund --legacy-peer-deps --package-lock=false
+      - name: Test
+        run: npm test
+      - name: Build
+        run: npm run build
+
+  admin-worker:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: v2admin
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install
+        run: npm install --no-audit --no-fund --legacy-peer-deps --package-lock=false
+      - name: Test
+        run: npm test
+      - name: Build
+        run: npm run build
+      - name: Worker bundle dry-run
+        run: npx --yes wrangler@4.136.3 deploy --dry-run --config wrangler.jsonc
