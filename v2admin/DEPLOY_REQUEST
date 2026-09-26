@@ -1,7 +1,7 @@
 MFK_ADMIN_DEPLOY_REQUEST
 target=mfk-admin
 canonical_url=https://admin.morefunos.com
-product_source=9903ae87bca927d9444c16b9cfd366c57c14f93a
+product_source=1d4177dc30327fd307018bffa4a160e90fdff63d
 requested_by=owner
-reason=publish_frontline_presentation_save_and_sync_controls
-work_id=MFK-SMT-A3E-FRONTLINE-PRESENTATION-R1
+reason=publish_b2b_cross_day_refund_and_day_close_addendum
+work_id=MFK-ADMIN-B2B-CROSS-DAY-REFUND-R1
