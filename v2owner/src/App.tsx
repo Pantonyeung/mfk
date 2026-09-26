@@ -129,7 +129,7 @@ export function App(){
         setNotice('操作已提交並取得確認；正在重新讀取正式狀態。');
         const readback=await refresh();
         if(value.actionId){
-          const canonicalUnknown=Boolean(readback)&&isCanonicalActionUnknown(readback.actions,value.actionId);
+          const canonicalUnknown=readback?isCanonicalActionUnknown(readback.actions,value.actionId):false;
           setCommandFlight(
             !readback
               ?{actionId:value.actionId,state:'UNKNOWN',message:'操作已確認，但最新正式狀態未能讀回。只可重新確認，禁止重送。'}
