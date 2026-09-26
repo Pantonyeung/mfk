@@ -374,6 +374,7 @@ export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePor
         </section>
         <section className="order-inspector-money"><div><span>訂單金額</span><b>{selected.totalLabel}</b></div><div><span>目前有效付款方式</span><b>{selected.paymentLabel}</b></div></section>
         {selected.paymentCorrections?.length?<section className="order-audit-card"><header><b>付款方式修正歷史</b><span>{selected.paymentCorrections.length}</span></header>{selected.paymentCorrections.map(row=><p key={row.id}><span>{new Date(row.createdAt).toLocaleString('zh-HK')}</span><b>{row.from} → {row.to}</b>{row.staffName?<small>{row.staffName}</small>:null}</p>)}</section>:null}
+        {selected.cancellationNoticeState?<section className="order-audit-card"><header><b>取消通知</b><span>{selected.cancellationNoticeState}</span></header><p><span>製作部通知</span><b>{selected.cancellationNoticeState==='DONE'?'已打印':selected.cancellationNoticeState==='FAILED'?'打印失敗':'結果未能確認'}</b><small>{selected.cancellationNoticeState==='DONE'?'製作單曾經成功出過，取消時已自動通知製作部。':selected.cancellationNoticeState==='FAILED'?'訂單已取消，但取消通知未成功送達；請即時通知製作部。':'訂單已取消，但打印結果未能確認；請先核對製作部，避免重複打印。'}</small></p></section>:null}
         {selected.paymentEvidenceRef?<section className={'payment-review-card state-'+String(selected.paymentVerificationState||'PENDING').toLowerCase()}>
           <header><div><span>電子支付</span><h3>{selected.paymentVerificationState==='VERIFIED'?'付款已核對':selected.paymentVerificationState==='REJECTED'?'付款截圖未通過':'付款待核對'}</h3></div><strong>{selected.paymentVerificationState??'PENDING'}</strong></header>
           <p>{selected.paymentVerificationState==='VERIFIED'?'可以繼續接受訂單。':selected.paymentVerificationState==='REJECTED'?'訂單未取消；請聯絡客人或者由有權限員工取消訂單。':'先查看客人付款截圖，再決定是否通過。'}</p>
@@ -490,7 +491,7 @@ export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePor
 
         {modal==='cancel'?<div className="order-cancel-body">
           <p>確定取消 {selected.orderIdLabel}？</p>
-          <div className="order-cancel-warning">呢個本地動作只改訂單狀態；唔會自動退款、重印、開錢箱或通知外部平台。</div>
+          <div className="order-cancel-warning">唔會自動退款、重印原單、開錢箱或通知外部平台；如果製作單之前真係成功出過，確認取消後會自動印一張取消通知去製作部。</div>
           <label><span>原因（可選）</span><select value={cancelReason} onChange={event=>setCancelReason(event.target.value)}><option value="">唔填原因</option>{cancelReasons.map(reason=><option key={reason.id} value={reason.label}>{reason.label}</option>)}</select></label>
           <label><span>自填原因（可選）</span><input value={cancelReason} onChange={event=>setCancelReason(event.target.value)} placeholder="Admin 快捷原因以外可自填"/></label>
           <footer><button onClick={()=>setModal(null)}>返回</button><button className="danger" onClick={()=>void cancelSelected()}>確認取消</button></footer>
