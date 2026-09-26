@@ -132,6 +132,12 @@ describe('SMT A3c optional drink supplement',()=>{
     expect(app).toContain("productId:'drink-supplement:'+choice.id");
   });
 
+  it('keeps Admin Combo DRINK groups optional even when the source group is marked required',()=>{
+    expect(center).toContain("pool.addonKind!=='DRINK'&&group.required&&!resolveChoice(group.id)");
+    expect(center).toContain("pool.addonKind==='DRINK'?'飲品補選'");
+    expect(center).toContain("'可跳過'");
+  });
+
   it('uses supplement pricing in the drink Product Editor instead of standalone drink base price',()=>{
     expect(app).toContain('pricingBaseMinor={choice.adjustmentMinor}');
     expect(center).toContain('const priceBase=pricingBaseMinor??product.priceMinor');
