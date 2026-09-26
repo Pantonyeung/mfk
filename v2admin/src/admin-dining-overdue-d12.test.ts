@@ -21,7 +21,7 @@ function installStorage(){
   Object.defineProperty(globalThis,'window',{configurable:true,value:{localStorage}});
 }
 
-describe('D11 Admin Dining overdue setting',()=>{
+describe('D12 Admin Dining overdue setting',()=>{
   beforeEach(()=>installStorage());
 
   it('publishes the configured Dining overdue threshold in canonical storeSettings',()=>{

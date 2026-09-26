@@ -25,7 +25,7 @@ async function publishThreshold(minutes:number){
     storeId:'MF01',
     revision:1,
     publishedAt:'2026-09-26T14:20:00.000Z',
-    adminFingerprint:'fnv1a32:dining-overdue-d11',
+    adminFingerprint:'fnv1a32:dining-overdue-d12',
     snapshot:{
       catalog:{categories:[],products:[],combos:[],comboPools:[]},
       storeSettings:{
@@ -37,7 +37,7 @@ async function publishThreshold(minutes:number){
   }));
 }
 
-describe('D11 Admin-controlled Dining overdue threshold',()=>{
+describe('D12 Admin-controlled Dining overdue threshold',()=>{
   beforeEach(()=>{
     installStorage();
     vi.resetModules();
