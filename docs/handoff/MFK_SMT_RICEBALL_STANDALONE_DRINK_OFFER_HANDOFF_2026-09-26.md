@@ -83,3 +83,26 @@ Initial proof run `36232710884` failed only because an Admin static test still e
 - A3d meal pairing / pricing remains intact.
 - Order / Payment / Print authority unchanged.
 - Provider ingress unchanged.
+
+
+## OTA / Store readiness
+Owner cadence changed after this implementation: every bounded SMT implementation must publish its own candidate OTA immediately after GREEN merge/bank.
+
+This part has now been published:
+- exact OTA source: `9498b2e9716f829d91c70cff731cd627639e9f0e`
+- release: `runtime-candidate-mfk-9498b2e9716f`
+- bundle: `MoreFunOS-SMT-runtime-candidate-mfk-9498b2e9716f.mfos`
+- builder run: `36232975523`
+- package/sign/upload/public readback: SUCCESS
+- public readback marker: `MFK_RUNTIME_OTA_PUBLISHED`
+
+Admin support for the pricingPromotions snapshot was also deployed:
+- deploy request commit: `d3b8ddac3b921bbfbf8245dcd5057cfd19505cb9`
+- deploy run: `36232955418`
+- result: SUCCESS
+
+## New standing cadence
+For every next bounded SMT part:
+`IMPLEMENT → PROOF → MERGE → BANK → CANDIDATE OTA → PUBLIC READBACK GREEN → NEXT PART`
+
+Do not batch multiple future SMT changes before OTA.
