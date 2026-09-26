@@ -3,7 +3,7 @@ import {renderTscRasterLabel} from './label-bitmap.ts';
 import {renderEscPosRasterTicket} from './ticket-bitmap.ts';
 import {buildOrderPrintPlan,groupTscBitmapJobsByPhysicalPrinter,type PrintBinding,type PlannedPrintJob} from './print-routing.ts';
 import {queueOrderProjection} from './projection-outbox.ts';
-import {hasStaffPermission,readActiveStaffSession} from './staff-auth.ts';
+import {hasStaffPermission,readActiveStaffSession,staffAuthRequired} from './staff-auth.ts';
 import {readSmtDiningTableRegistry,readSmtPrintConfig,readSmtStoreSettings} from './admin-operational-config.ts';
 import {mirrorKeetaOrderCommand,type KeetaProviderMirrorResult} from './keeta-provider-commands.ts';
 import {buildDailyClosePrintData,renderDailyCloseTicket} from './daily-close-ticket.ts';
@@ -11,6 +11,7 @@ import {buildLocalReport,readLocalDayCloses,resolveBusinessWindow} from './local
 import {readBusinessCutoff} from './cash-opening.ts';
 import {readSmtDeviceId} from './admin-config-sync.ts';
 import {
+  applyManualCapacityCorrection,
   ensureCurrentCapacityPoolState,
   planCapacityDeductionEvents,
   planCapacityRestoreEvents,
@@ -330,6 +331,7 @@ export interface CleanSmtCoreRuntimePort{
   readDining?(selectedSessionId?:string):Promise<SmtDiningProjection>;
   readAvailability?():Promise<SmtAvailabilityProjection>;
   readCapacityPoolState?():Promise<SmtCapacityPoolStateView>;
+  adjustCapacityPool?(poolId:string,remainingQty:number,note?:string):Promise<SmtCapacityPoolStateView>;
   setAvailability?(nodeId:string,status:SmtAvailabilityStatus,expectedRevision:number):Promise<SmtAvailabilityProjection>;
   createDiningWait?(input:{partySize:number;note?:string}):Promise<LocalHoldDraft>;
   updateDiningPartySize?(holdId:string,partySize:number):Promise<LocalDiningHoldDetail>;
@@ -2255,6 +2257,20 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
   },
   async readCapacityPoolState(){
     return ensureCurrentCapacityPoolState(Date.now(),localStorage,capacityEventsFromOrders(data.orders));
+  },
+  async adjustCapacityPool(poolId,remainingQty,note){
+    const session=readActiveStaffSession();
+    if(staffAuthRequired()&&!session)throw new Error('CAPACITY_STAFF_LOGIN_REQUIRED');
+    const view=applyManualCapacityCorrection({
+      poolId,
+      remainingQty,
+      note,
+      staffId:session?.staffId,
+      staffName:session?.displayName,
+      orderEvents:capacityEventsFromOrders(data.orders),
+    });
+    for(const listener of listeners){try{listener();}catch{console.warn('CAPACITY_OBSERVER_FAILED');}}
+    return view;
   },
   async setAvailability(nodeId,status){
     data={...data,availability:{...data.availability,[nodeId]:status}};save();

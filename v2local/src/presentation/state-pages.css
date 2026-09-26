@@ -14,3 +14,6 @@
 .capacity-pool-state-panel>p{margin:0;padding:9px 10px;border-radius:9px;background:#fff3e5;color:#b55f12;font-size:11px}
 @media(max-width:1000px){.capacity-pool-state-panel>div{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:760px){.capacity-pool-state-panel>div{grid-template-columns:1fr}}
+
+.capacity-pool-adjust-button{min-height:44px;padding:0 11px;border:1px solid #d9dce4;border-radius:9px;background:#fff;font-weight:850}
+.capacity-pool-adjust-button:disabled{opacity:.45}
