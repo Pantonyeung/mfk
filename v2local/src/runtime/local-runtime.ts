@@ -3,7 +3,7 @@ import {renderTscRasterLabel} from './label-bitmap.ts';
 import {renderEscPosRasterTicket} from './ticket-bitmap.ts';
 import {buildOrderPrintPlan,groupTscBitmapJobsByPhysicalPrinter,type PrintBinding,type PlannedPrintJob} from './print-routing.ts';
 import {queueOrderProjection} from './projection-outbox.ts';
-import {readActiveStaffSession} from './staff-auth.ts';
+import {hasStaffPermission,readActiveStaffSession} from './staff-auth.ts';
 import {etaMinutesForActiveCount,readSmtPrintConfig,readSmtStoreSettings} from './admin-operational-config.ts';
 import {mirrorKeetaOrderCommand,type KeetaProviderMirrorResult} from './keeta-provider-commands.ts';
 import {buildDailyClosePrintData,renderDailyCloseTicket} from './daily-close-ticket.ts';
@@ -105,6 +105,7 @@ export interface LocalDiningHoldDetail{
   readonly lastAssignedTable?:string;
   readonly formalOrderId?:string;
   readonly productionAdmittedAt?:string;
+  readonly priceOverrides?:readonly LocalPriceOverrideRecord[];
   readonly firstPrintState?:'NOT_STARTED'|'DISPATCHING'|'DONE'|'FAILED'|'UNKNOWN';
   readonly firstPrintSummary?:Readonly<{planned:number;sent:number;failed:number}>;
   readonly firstPrintResults?:readonly PrintDispatchResult[];
@@ -121,11 +122,24 @@ export interface LocalDiningHoldDetail{
   readonly lines:readonly LocalDiningLineViewModel[];
   readonly payments:readonly LocalDiningPayment[];
 }
+export interface LocalPriceOverrideRecord{
+  readonly id:string;
+  readonly createdAt:string;
+  readonly lineIndex:number;
+  readonly productId:string;
+  readonly originalUnitMinor:number;
+  readonly effectiveUnitMinor:number;
+  readonly deltaMinor:number;
+  readonly reason:string;
+  readonly staffId:string;
+  readonly staffName:string;
+}
 export interface LocalHoldDraft{
   readonly archivedAt?:string;
   readonly lastAssignedTable?:string;
   readonly formalOrderId?:string;
   readonly productionAdmittedAt?:string;
+  readonly priceOverrides?:readonly LocalPriceOverrideRecord[];
   readonly id:string;
   readonly codeLabel:string;
   readonly kind:'dining'|'waiting';
@@ -200,6 +214,7 @@ export interface CleanSmtCoreRuntimePort{
   assignDiningTable?(holdId:string,tableId:string):Promise<void>;
   unassignDiningTable?(holdId:string):Promise<void>;
   readDiningHold?(holdId:string):Promise<LocalDiningHoldDetail>;
+  overrideDiningLinePrice?(holdId:string,lineIndex:number,effectiveUnitMinor:number,reason:string):Promise<LocalDiningHoldDetail>;
   readDiningHistory?():Promise<readonly LocalDiningHoldDetail[]>;
   printDiningPaymentReceipt?(holdId:string,submissionId:string):Promise<PrintDispatchSummary>;
   reprintDiningPaymentReceipt?(holdId:string,submissionId:string):Promise<PrintDispatchSummary>;
@@ -292,6 +307,7 @@ export interface MfkLocalRuntime extends CleanSmtCoreRuntimePort{
   holds():readonly LocalHoldDraft[];
   removeHold(id:string):void;
   readDiningHold(holdId:string):Promise<LocalDiningHoldDetail>;
+  overrideDiningLinePrice(holdId:string,lineIndex:number,effectiveUnitMinor:number,reason:string):Promise<LocalDiningHoldDetail>;
   readDiningHistory():Promise<readonly LocalDiningHoldDetail[]>;
   printDiningPaymentReceipt(holdId:string,submissionId:string):Promise<PrintDispatchSummary>;
   reprintDiningPaymentReceipt(holdId:string,submissionId:string):Promise<PrintDispatchSummary>;
@@ -589,6 +605,7 @@ function diningDetail(hold:LocalHoldDraft):LocalDiningHoldDetail{
     lastAssignedTable:hold.lastAssignedTable,
     formalOrderId:hold.formalOrderId,
     productionAdmittedAt:hold.productionAdmittedAt,
+    priceOverrides:hold.priceOverrides??[],
     firstPrintState:(()=>{
       const order=hold.formalOrderId?data.orders.find(row=>row.id===hold.formalOrderId):undefined;
       return order?.productionAdmissionState??'NOT_STARTED';
@@ -1284,6 +1301,47 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
         appendActionAudit({action:'DINING_TABLE_UNASSIGN',orderId:linkedOrder.id,reason:assignedTable});
       }
       return clone(diningDetail(requireDiningHold(next,holdId)));
+    });
+  },
+  async overrideDiningLinePrice(holdId,lineIndex,effectiveUnitMinor,reason){
+    return withDiningMutationLock('price:'+holdId,async()=>{
+      const snapshot=readDiningState();const hold=requireDiningHold(snapshot,holdId);
+      if(hold.archivedAt)throw new Error('DINING_HISTORY_PROTECTED');
+      if(hold.payments?.length)throw new Error('DINING_PRICE_OVERRIDE_AFTER_PAYMENT_FORBIDDEN');
+      const session=readActiveStaffSession();
+      if(!session)throw new Error('DINING_PRICE_OVERRIDE_AUTH_REQUIRED');
+      const authorized=session.role==='OWNER'||session.permissions.includes('PRICE_OVERRIDE')||hasStaffPermission('PRICE_OVERRIDE');
+      if(!authorized)throw new Error('DINING_PRICE_OVERRIDE_FORBIDDEN');
+      if(!Number.isSafeInteger(lineIndex)||lineIndex<0||lineIndex>=hold.items.length)throw new Error('DINING_LINE_NOT_FOUND');
+      if(!Number.isSafeInteger(effectiveUnitMinor)||effectiveUnitMinor<0)throw new Error('DINING_PRICE_OVERRIDE_INVALID');
+      const normalizedReason=String(reason||'').trim().slice(0,200);
+      if(!normalizedReason)throw new Error('DINING_PRICE_OVERRIDE_REASON_REQUIRED');
+      const item=hold.items[lineIndex];
+      const createdAt=new Date().toISOString();
+      const record:LocalPriceOverrideRecord={
+        id:'DPO:'+holdId+':'+createdAt+':'+lineIndex,
+        createdAt,lineIndex,productId:item.id,
+        originalUnitMinor:item.unitMinor,effectiveUnitMinor,
+        deltaMinor:effectiveUnitMinor-item.unitMinor,
+        reason:normalizedReason,staffId:session.staffId,staffName:session.displayName,
+      };
+      const items=hold.items.map((row,index)=>index===lineIndex?{...row,unitMinor:effectiveUnitMinor}:row);
+      const totalMinor=items.reduce((sum,row)=>sum+row.qty*row.unitMinor,0);
+      const nextHold:LocalHoldDraft={...hold,items,totalMinor,priceOverrides:[...(hold.priceOverrides??[]),record]};
+      const linkedOrder=hold.formalOrderId?snapshot.orders.find(row=>row.id===hold.formalOrderId):undefined;
+      const next:Persisted={
+        ...snapshot,
+        holds:snapshot.holds.map(row=>row.id===holdId?nextHold:row),
+        orders:linkedOrder?snapshot.orders.map(row=>row.id===linkedOrder.id?{...row,items,totalMinor,updatedAt:createdAt}:row):snapshot.orders,
+        diningRevision:(snapshot.diningRevision??0)+1,
+      };
+      localStorage.setItem(KEY,JSON.stringify(next));data=next;
+      for(const listener of listeners){try{listener();}catch{console.warn('DINING_OBSERVER_FAILED');}}
+      if(linkedOrder){
+        try{projectOrder(data.orders.find(row=>row.id===linkedOrder.id)!);}catch{console.warn('DINING_PRICE_PROJECTION_NON_BLOCKING');}
+        appendActionAudit({action:'DINING_PRICE_OVERRIDE',orderId:linkedOrder.id,reason:session.displayName+' '+money(item.unitMinor)+'→'+money(effectiveUnitMinor)+' '+normalizedReason});
+      }
+      return clone(diningDetail(nextHold));
     });
   },
   async readDiningHold(holdId){
