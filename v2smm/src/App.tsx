@@ -826,6 +826,9 @@ function ProductSheet({product,serviceMode,selections,selectedVariationId,setVar
 }){
   const validation=validateSmmSelections(product,selections);
   const variationOk=!product.variationRequired||Boolean(selectedVariationId);
+  const requiredGroups=product.optionGroups.filter(group=>group.required||group.minSelections>0);
+  const optionalGroups=product.optionGroups.filter(group=>!group.required&&group.minSelections===0);
+  const orderedGroups=[...requiredGroups,...optionalGroups];
   const baseMinorRaw=serviceMode==='DINE_IN'?product.publishedDineInUnitPriceMinor:product.publishedTakeawayUnitPriceMinor;
   const baseMinor=Number.isSafeInteger(Number(baseMinorRaw))?Number(baseMinorRaw):null;
   const selectedAdjustmentMinor=product.optionGroups.reduce((sum,group)=>{
@@ -881,7 +884,7 @@ function ProductSheet({product,serviceMode,selections,selectedVariationId,setVar
           {product.variationRequired&&!variationOk?<p className="stage2-inline-error">請先選擇必選規格。</p>:null}
         </section>:null}
 
-        {product.optionGroups.map(group=>{
+        {orderedGroups.map(group=>{
           const selected=selections[group.optionGroupId]??[];
           const min=Math.max(group.required?1:0,group.minSelections);
           const groupError=selected.length<min||selected.length>group.maxSelections||
