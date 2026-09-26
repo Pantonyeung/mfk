@@ -4,19 +4,11 @@ import type {OwnerConnectionState,OwnerOrderProjection} from './product-types';
 import {
   buildOwnerOrderDetailViewModel,
   buildOwnerOrderListViewModel,
+  DEFAULT_OWNER_ORDER_FILTERS,
+  getOwnerOrderFulfillmentStateLabel,
   type OwnerOrderFilters,
   type OwnerOrderScope,
-  type OwnerOrderSegment,
 } from './stage03-view-model';
-
-const defaultFilters:OwnerOrderFilters={
-  query:'',
-  businessDate:'ALL',
-  source:'ALL',
-  segment:'ACTIVE',
-  paymentState:'ALL',
-  fulfillmentMode:'ALL',
-};
 
 export function OrderOversightPage({
   connection,
@@ -29,12 +21,13 @@ export function OrderOversightPage({
   scope:OwnerOrderScope;
   onScopeReset:()=>void;
 }){
-  const [filters,setFilters]=useState<OwnerOrderFilters>(defaultFilters);
+  const [filters,setFilters]=useState<OwnerOrderFilters>(DEFAULT_OWNER_ORDER_FILTERS);
   const [selectedOrderId,setSelectedOrderId]=useState<string|null>(null);
 
   useEffect(()=>{
     if(scope==='ACTIVE'||scope==='DINE_IN_OPEN'){
-      setFilters(value=>({...value,segment:'ACTIVE',query:'',source:'ALL'}));
+      setFilters(DEFAULT_OWNER_ORDER_FILTERS);
+      setSelectedOrderId(null);
     }
   },[scope]);
 
@@ -56,16 +49,22 @@ export function OrderOversightPage({
         <strong>{scope==='ACTIVE'?'進行中訂單':'堂食未結帳'}</strong>
         <span>{scope==='ACTIVE'?'由今日頁進入 active order scope。':'由今日頁進入 dine-in + open-payment scope。'}</span>
       </div>
-      <button onClick={onScopeReset}>查看全部訂單</button>
+      <button onClick={()=>{
+        setFilters(DEFAULT_OWNER_ORDER_FILTERS);
+        setSelectedOrderId(null);
+        onScopeReset();
+      }}>查看全部訂單</button>
     </section>:null}
 
-    <div className="segmented order-segmented" role="group" aria-label="訂單範圍">
+    {scope==='DEFAULT'?<div className="segmented order-segmented" role="group" aria-label="訂單範圍">
       {(['ACTIVE','COMPLETED'] as const).map(segment=><button
         key={segment}
         className={filters.segment===segment?'active':''}
         onClick={()=>setFilters(value=>({...value,segment}))}
       >{segment==='ACTIVE'?'進行中':'已完成 / 歷史'}</button>)}
-    </div>
+    </div>:<div className="segmented order-segmented scoped-segment" aria-label="Scoped orders">
+      <button className="active" disabled>進行中</button>
+    </div>}
 
     <label className="search order-search">
       <span>搜尋</span>
@@ -80,7 +79,7 @@ export function OrderOversightPage({
       <OrderFilter label="Business Day" value={filters.businessDate} values={vm.businessDates} onChange={businessDate=>setFilters(value=>({...value,businessDate}))}/>
       <OrderFilter label="來源" value={filters.source} values={vm.sources} onChange={source=>setFilters(value=>({...value,source}))}/>
       <OrderFilter label="付款" value={filters.paymentState} values={vm.paymentStates} onChange={paymentState=>setFilters(value=>({...value,paymentState}))}/>
-      <OrderFilter label="交收" value={filters.fulfillmentMode} values={vm.fulfillmentModes} onChange={fulfillmentMode=>setFilters(value=>({...value,fulfillmentMode}))}/>
+      <OrderFilter label="交收狀態" value={filters.fulfillmentState} values={vm.fulfillmentStates} onChange={fulfillmentState=>setFilters(value=>({...value,fulfillmentState:fulfillmentState as OwnerOrderFilters['fulfillmentState']}))}/>
     </section>
 
     {!vm.rows.length?<OrderEmpty connection={connection}/>:<div className="cards order-oversight-list">
@@ -135,7 +134,7 @@ function OrderOversightCard({order,onOpen}:{order:OwnerOrderProjection;onOpen:()
 
     <div className="order-meta-grid">
       <div><span>付款</span><strong>{tender}</strong></div>
-      <div><span>交收</span><strong>{order.fulfillmentLabel??order.fulfillmentMode??'未有資料'}</strong></div>
+      <div><span>交收狀態</span><strong>{getOwnerOrderFulfillmentStateLabel(order)}</strong></div>
     </div>
 
     {order.exceptionBadges?.length?<div className="order-exception-row">{order.exceptionBadges.slice(0,4).map(label=><span key={label}>{label}</span>)}</div>:null}
@@ -184,10 +183,10 @@ function OrderOversightDrawer({order,onClose}:{order:OwnerOrderProjection;onClos
 
       <DetailSection title="4｜Fulfillment">
         <div className="order-detail-grid">
-          <Detail label="Current" value={order.fulfillmentLabel??order.fulfillmentMode??'未有讀回'}/>
+          <Detail label="State" value={detail.fulfillment.state}/>
+          <Detail label="Mode" value={detail.fulfillment.mode}/>
           <Detail label="Elapsed" value={detail.timing.elapsed}/>
           <Detail label="Promised" value={detail.timing.promised}/>
-          <Detail label="Workflow" value={order.workflowStatusLabel??order.lifecycle}/>
         </div>
         {order.fulfillmentHistory?.length?<div className="order-safe-timeline">{order.fulfillmentHistory.map((event,index)=><article key={event.label+'-'+index}><strong>{event.label}</strong><span>{event.state??''}</span><small>{event.atLabel??''}</small></article>)}</div>:<p className="muted-copy">未有 Fulfillment history projection。</p>}
       </DetailSection>
@@ -240,10 +239,6 @@ function OrderEmpty({connection}:{connection:OwnerConnectionState}){
 
 function formatFilterValue(value:string){
   if(value==='ALL')return '全部';
-  if(value==='DINE_IN')return '堂食';
-  if(value==='TAKEAWAY')return '外賣';
-  if(value==='PICKUP')return '自取';
-  if(value==='DELIVERY')return '配送';
   if(value==='OPEN')return '未結帳';
   if(value==='PARTIAL')return '部分付款';
   if(value==='SETTLED')return '已結清';
