@@ -252,7 +252,14 @@ export function RefundReportWorkspace(){
           {key:'time',label:'實際退款時間',render:row=>new Date(row.executionAt).toLocaleString('zh-HK')},
           {key:'original',label:'原銷售日',render:row=>row.originalBusinessDate+' · '+row.display},
           {key:'item',label:'商品',render:row=>row.lines.map(line=>line.itemName+' ×'+line.quantity).join('、')},
-          {key:'amount',label:'退款',numeric:true,render:row=>'HK
+          {key:'amount',label:'退款',numeric:true,render:row=>'HK$'+(row.amountMinor/100).toFixed(2)},
+          {key:'method',label:'方式',render:row=>row.method},
+          {key:'addendum',label:'附帶版本',render:row=>'v'+row.addendumVersionLabel},
+        ]}
+      />}
+    </section>
+  </section>;
+}
 
 interface ExportPolicy{scope:'REPORT_CURRENT_FILTER'|'STORE_DAY'|'AUDIT_RANGE';includePii:boolean;requireOwnerApproval:boolean;retentionDays:number}
 export function ExportGovernanceWorkspace(){
