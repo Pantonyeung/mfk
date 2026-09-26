@@ -437,9 +437,9 @@ export function assertCapacityChannelAdmission(input:{
   for(const pool of view.pools){
     const quantity=demandedQuantity(input.items,pool.productIds);
     if(quantity<=0)continue;
-    if(quantity>pool.remainingQty)throw new Error('CAPACITY_POOL_INSUFFICIENT:'+pool.poolId);
     const accepting=channel==='FIRST_PARTY'?pool.firstPartyAccepting:pool.thirdPartyAccepting;
     if(!accepting)throw new Error('CAPACITY_CHANNEL_STOP:'+channel+':'+pool.poolId);
+    if(quantity>pool.remainingQty)throw new Error('CAPACITY_POOL_INSUFFICIENT:'+pool.poolId);
   }
   return view;
 }
