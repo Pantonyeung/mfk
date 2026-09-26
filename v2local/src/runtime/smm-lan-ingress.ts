@@ -173,7 +173,7 @@ export function createSmmLanIngress(runtime:MfkLocalRuntime){
       const catalog=projectSyncedOrderingCatalog('takeaway',envelope);
       const priced=priceCustomerCart(cart,catalog.products);
       return Object.freeze({
-        quoteId:'SMM-LAN-'+Date.now(),revision:String(envelope.revision),currency:'HKD',totalMinor:authoritativeTotalMinor,
+        quoteId:'SMM-LAN-'+Date.now(),revision:String(envelope.revision),currency:'HKD',totalMinor:priced.totalMinor,
         lines:Object.freeze(priced.items.map((item:any,index:number)=>Object.freeze({lineId:cart[index]?.lineId??String(index),currency:'HKD',finalUnitPriceMinor:item.unitMinor,lineTotalMinor:item.unitMinor*item.qty}))),
         observedAt:new Date().toISOString(),
       });
