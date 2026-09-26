@@ -22,14 +22,14 @@ test('SMM menu projection exposes canonical Combo definitions and exact product 
   assert.match(types,/readonly combos\?:readonly SmmCombo\[\]/);
   assert.match(types,/readonly comboPools\?:readonly SmmComboPool\[\]/);
   assert.match(types,/readonly comboId\?:string/);
-  assert.match(worker,/projectSyncedCombos\(envelope\)/);
+  assert.match(worker,/projectCanonicalCombos\\(envelope\\)/);
   assert.match(worker,/matches\.length===1\?matches\[0\]!\.id:undefined/);
   assert.match(worker,/choice\.type==='PRODUCT'&&choice\.productId===productId/);
   assert.doesNotMatch(worker,/includes\(['"]套餐['"]\)|includes\(['"]飯團['"]\)/);
 });
 
 test('LAN snapshot mirrors the same canonical Combo projection without name/category heuristics',()=>{
-  assert.match(ingress,/projectSyncedCombos\(envelope\)/);
+  assert.match(ingress,/projectCanonicalCombos\\(envelope\\)/);
   assert.match(ingress,/combos:Object\.freeze\(comboData\.combos\.map/);
   assert.match(ingress,/comboPools:Object\.freeze\(comboData\.pools\.map/);
   assert.match(ingress,/matches\.length===1\?matches\[0\]!\.id:undefined/);
@@ -60,7 +60,7 @@ test('Combo identity and child selections survive local persistence and LAN/clou
 
 test('SMT remains authoritative Combo revalidation seam and SMM does not create a Combo engine',()=>{
   assert.match(ingress,/revalidateSmmComboLine/);
-  assert.match(ingress,/projectSyncedCombos\(envelope\)/);
+  assert.match(ingress,/projectCanonicalCombos\\(envelope\\)/);
   assert.match(ingress,/SMM_PUBLISHED_PRICE_CHANGED/);
   assert.match(app,/正式套餐內容同價格會由 SMT 再驗證/);
   assert.doesNotMatch(app,/function .*ComboEngine|class .*ComboEngine|createComboOrder/);
