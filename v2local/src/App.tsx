@@ -22,7 +22,7 @@ import {StaffAuthGate,StaffSessionBadge} from './presentation/StaffAuthGate.tsx'
 import {CashOpeningGate} from './presentation/CashOpeningGate.tsx';
 import {ComboWorkspace,HoldCartWorkspace,HoldListWorkspace,OrganizeWorkspace,ProductConfigWorkspace,RequiredFastLaneWorkspace,applyRequiredSelectionToCart,initialHoldModeForLines,isDrinkSupplementProductId,projectDrinkSupplementChoices,quickConfigurationForProduct,requiredTasksForCart,type OrderingPanelState,type WorkspaceHoldDraft,type WorkspaceProduct} from './features/ordering/OrderingCenterWorkspaces.tsx';
 import {RiceballPairingWorkspace} from './features/ordering/RiceballPairingWorkspace.tsx';
-import {applyRiceballPairings,buildRiceballPairingDraft,existingPairingGroups,isPairedComboLine,restorePairingGroup} from './features/ordering/riceball-pairing-model.ts';
+import {applyRiceballPairings,buildRiceballPairingDraft,existingPairingGroups,isPairedComboLine,nextPairingStartIndex,restorePairingGroup} from './features/ordering/riceball-pairing-model.ts';
 
 type Product={
   id:string;
@@ -214,8 +214,15 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
   const requiredWork=requiredTasksForCart(cart,workspaceProducts);
   const drinkSupplementChoices=projectDrinkSupplementChoices(workspaceProducts,comboData.pools);
   const pairingBlockedLineIds=new Set(requiredWork.map(task=>task.lineId));
-  const riceballPairingDraft=buildRiceballPairingDraft(cart,workspaceProducts,comboData.combos,comboData.pools,pairingBlockedLineIds);
   const riceballPairingExisting=existingPairingGroups(cart);
+  const riceballPairingDraft=buildRiceballPairingDraft(
+    cart,
+    workspaceProducts,
+    comboData.combos,
+    comboData.pools,
+    pairingBlockedLineIds,
+    nextPairingStartIndex(cart),
+  );
   const diningTableDefinitions=storeSettings.diningTables.length
     ?storeSettings.diningTables
     :Array.from({length:9},(_,index)=>({
@@ -369,7 +376,7 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
     setCart([...cart,line]);
     setHighlight(line.id);
     setPulse(value=>value+1);
-    setPanel({type:returnPanel});
+    setPanel(returnPanel==='riceball-pair'?{type:'riceball-pair'}:{type:'required'});
   };
 
   const configureDrinkSupplement=(choiceId:string,qty:number,targetLineId?:string,returnPanel:'required'|'riceball-pair'='required')=>{
