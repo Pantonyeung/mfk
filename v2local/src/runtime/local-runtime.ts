@@ -1940,6 +1940,7 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
     const allowed=registry.length?registry.filter(table=>table.active).map(table=>table.id):Array.from({length:9},(_,index)=>'T'+String(index+1).padStart(2,'0'));
     if(!allowed.includes(tableId))throw new Error('DINING_TABLE_NOT_ASSIGNABLE');
     if(snapshot.holds.some(row=>row.id!==holdId&&!row.archivedAt&&row.kind==='dining'&&diningAssignedTables(row).includes(tableId)))throw new Error('DINING_TABLE_OCCUPIED');
+    if(hold.assignedTable&&hold.assignedTable!==tableId&&(hold.joinedTables??[]).length)throw new Error('DINING_TRANSFER_REQUIRES_UNJOIN');
     const at=new Date().toISOString();
     const seatedAt=hold.seatedAt??(hold.assignedTable?hold.createdAt:at);
     const joinedTables=(hold.joinedTables??[]).filter(id=>id!==tableId);
