@@ -13,8 +13,8 @@ import {
   TodayLiveOrdersCard,
   TodayStaffSummaryCard,
 } from './today-components';
+import {ActionQueuePage} from './stage02-action-queue';
 import type {
-  OwnerActionItem,
   OwnerConnectionState,
   OwnerOrderProjection,
   OwnerReadModelSnapshot,
@@ -125,7 +125,7 @@ export function App(){
 
     <section className="stage">
       {view==='today'?<TodayPage connection={connection} snapshot={snapshot} onQueue={()=>changeView('queue')} onActiveOrders={()=>openOrdersScope('ACTIVE')} onDineInOrders={()=>openOrdersScope('DINE_IN_OPEN')} onTool={setTool}/>:null}
-      {view==='queue'?<QueuePage connection={connection} items={snapshot?.actions??[]} onCommand={requestBounded}/>:null}
+      {view==='queue'?<ActionQueuePage connection={connection} items={snapshot?.actions??[]} activity={snapshot?.activity??[]} onCommand={requestBounded}/>:null}
       {view==='orders'?<OrdersPage connection={connection} rows={visibleOrders} segment={segment} setSegment={value=>{setOrdersScope('DEFAULT');setSegment(value)}} query={query} setQuery={value=>{setOrdersScope('DEFAULT');setQuery(value)}} source={source} setSource={value=>{setOrdersScope('DEFAULT');setSource(value)}} sources={sources} onOpen={setSelectedOrder}/>:null}
       {view==='more'?<MorePage snapshot={snapshot} connection={connection} onTool={setTool}/>:null}
     </section>
@@ -193,16 +193,6 @@ function TodayPage({
     <TodayStaffSummaryCard value={vm.staffSummary} onOpen={()=>onTool('staff')}/>
     <TodayInsightCard value={vm.insight}/>
   </section>;
-}
-
-function QueuePage({connection,items,onCommand}:{connection:OwnerConnectionState;items:readonly OwnerActionItem[];onCommand:(label:string,target:string,impact:string)=>void}){
-  return <section className="page"><header className="page-head"><div><span>待處理</span><h1>需要你留意</h1><small>Resolved 同 Dismissed 係兩回事；冇讀回唔會當完成。</small></div><b className="hero-number">{items.length}</b></header>
-    {!items.length?<Empty title={connection==='OFFLINE_READONLY'?'待處理服務尚未連接':'暫時冇待處理事項'} detail="真正需要人介入嘅事項先會出現喺呢度。"/>:<div className="cards">{items.map(item=><ActionCard key={item.actionId} item={item} onCommand={onCommand}/>)}</div>}
-  </section>;
-}
-
-function ActionCard({item,onCommand}:{item:OwnerActionItem;onCommand:(label:string,target:string,impact:string)=>void}){
-  return <article className={'action-card severity-'+(item.severity==='URGENT'?'urgent':item.severity==='ATTENTION'?'attention':'info')}><div className="action-top"><span>{item.domain} · {new Date(item.observedAt).toLocaleTimeString('zh-HK')}</span><b>{item.severity==='URGENT'?'緊急':item.severity==='ATTENTION'?'注意':'資訊'}</b></div><h2>{item.title}</h2><p>{item.detail}</p><div className="fact-row"><span>目標：{item.target}</span><em className={'certainty '+item.certainty.toLowerCase()}>{item.certainty}</em></div>{item.actionLabel?<div className="action-buttons"><button className="primary" onClick={()=>onCommand(item.actionLabel!,item.target,'只提交有限度操作意圖；正式狀態必須等目標系統讀回。')}>{item.actionLabel}</button></div>:null}</article>;
 }
 
 function OrdersPage({connection,rows,segment,setSegment,query,setQuery,source,setSource,sources,onOpen}:{connection:OwnerConnectionState;rows:readonly OwnerOrderProjection[];segment:'current'|'completed';setSegment:(v:'current'|'completed')=>void;query:string;setQuery:(v:string)=>void;source:string;setSource:(v:string)=>void;sources:readonly string[];onOpen:(order:OwnerOrderProjection)=>void}){
