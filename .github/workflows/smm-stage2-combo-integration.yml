@@ -1,0 +1,43 @@
+name: smm-stage2-combo-integration
+
+on:
+  push:
+    branches:
+      - work/MFK/SMM-FINAL-UI-IMPLEMENTATION-R1
+    paths:
+      - 'v2smm/**'
+      - 'v2local/src/runtime/smm-lan-ingress.ts'
+      - 'v2local/src/runtime/smm-combo-revalidation.ts'
+      - 'v2local/src/runtime/smm-combo-revalidation.test.ts'
+      - 'v2local/src/runtime/customer-cloud-intake.ts'
+      - 'contracts/smm-lan-v1.ts'
+      - '.github/workflows/smm-stage2-combo-integration.yml'
+
+jobs:
+  smm:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: v2smm
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-audit --no-fund --legacy-peer-deps --package-lock=false
+      - run: npm test
+      - run: npm run build
+
+  smt-authoritative-revalidation:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: v2local
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-audit --no-fund --legacy-peer-deps --package-lock=false
+      - run: npm test
+      - run: npm run build
