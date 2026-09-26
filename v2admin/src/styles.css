@@ -912,3 +912,21 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
 @media(prefers-reduced-motion:reduce){
   *,*::before,*::after{scroll-behavior:auto!important;transition-duration:.01ms!important;animation-duration:.01ms!important;animation-iteration-count:1!important}
 }
+
+
+/* CAP0 capacity pool authoring */
+.capacity-pool-workspace>header>div{display:grid;gap:2px}
+.capacity-pool-workspace>header button{min-height:42px;padding:0 12px;border:1px solid #d7dbe2;border-radius:9px;background:#fff;font-weight:850}
+.capacity-pool-list{display:grid;gap:12px}
+.capacity-pool-card>header{display:flex;justify-content:space-between;gap:12px;align-items:center}
+.capacity-pool-card>header>div{display:grid;gap:2px}
+.capacity-pool-card>header small{font-size:9px;color:#8b93a0}
+.capacity-pool-card>header h3{margin:0;font-size:17px}
+.capacity-pool-card>header button{min-height:36px;padding:0 10px;border:1px solid #e0c3c8;border-radius:8px;background:#fff;color:#8a2d36;font-weight:800}
+.capacity-pool-products{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;margin:0;padding:10px;border:1px solid #e1e4ea;border-radius:10px}
+.capacity-pool-products legend{padding:0 5px;font-size:10px;color:#737c89;font-weight:850}
+.capacity-pool-products label{display:flex!important;align-items:center;gap:7px;min-height:40px;padding:7px 8px;border:1px solid #eceef2;border-radius:8px;background:#fafbfc}
+.capacity-pool-products input{width:17px!important;height:17px!important;min-height:auto!important}
+.capacity-pool-products p{grid-column:1/-1;margin:0;color:#7f8793;font-size:11px}
+@media(max-width:1000px){.capacity-pool-products{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:760px){.capacity-pool-products{grid-template-columns:1fr}.capacity-pool-workspace>header{display:grid}}
