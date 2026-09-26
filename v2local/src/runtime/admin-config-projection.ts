@@ -75,6 +75,12 @@ export interface SyncedCombo{
   readonly addonPoolIds:readonly string[];
 }
 
+export interface SyncedRiceballDrinkPromotion{
+  readonly active:boolean;
+  readonly eligibleMainPoolIds:readonly string[];
+  readonly drinks:readonly {readonly productId:string;readonly label:string;readonly promoPriceMinor:number}[];
+}
+
 function record(value:unknown):Record<string,unknown>{
   return value&&typeof value==='object'&&!Array.isArray(value)?value as Record<string,unknown>:{};
 }
@@ -205,6 +211,33 @@ export function projectSyncedOrderingCatalog(
   return Object.freeze({
     categories:Object.freeze(categories.map(({active:_,...row})=>Object.freeze(row))),
     products:Object.freeze(products),
+  });
+}
+
+export function projectSyncedRiceballDrinkPromotion(
+  envelope?:MfkAdminConfigEnvelope|null,
+):SyncedRiceballDrinkPromotion|null{
+  const snapshot=snapshotOf(envelope);
+  const pricingPromotions=record(snapshot.pricingPromotions);
+  const row=record(pricingPromotions.riceballDrink);
+  if(row.schema!=='MFK_RICEBALL_DRINK_PROMOTION_V1'||!bool(row.active,false))return null;
+  const eligibleMainPoolIds=array(row.eligibleMainPoolIds).map(value=>string(value)).filter(Boolean);
+  const drinks=array(row.drinks).map(raw=>{
+    const drink=record(raw);
+    const productId=string(drink.productId);
+    const priceText=string(drink.promoPrice);
+    const ready=priceText.trim()!==''&&Number.isFinite(Number(priceText));
+    return {
+      productId,
+      label:string(drink.label,productId),
+      promoPriceMinor:ready?moneyMinor(priceText):-1,
+    };
+  }).filter(drink=>drink.productId&&drink.promoPriceMinor>=0);
+  if(!eligibleMainPoolIds.length||!drinks.length)return null;
+  return Object.freeze({
+    active:true,
+    eligibleMainPoolIds:Object.freeze(eligibleMainPoolIds),
+    drinks:Object.freeze(drinks.map(drink=>Object.freeze(drink))),
   });
 }
 
