@@ -1,4 +1,5 @@
 import {useCallback,useEffect,useMemo,useRef,useState} from 'react';
+import {hasStaffPermission,readActiveStaffSession} from '../runtime/staff-auth.ts';
 import {useNavigate} from 'react-router';
 import type {CleanSmtCoreRuntimePort,LocalDiningHoldDetail,SmtDiningProjection} from '../runtime/local-runtime.ts';
 import './dining-operations-workspace.css';
@@ -62,6 +63,10 @@ export function RuntimeDiningWorkspace({runtime,onCheckout,warningMinutes}:{
   const [reprintOpen,setReprintOpen]=useState(false);
   const [reprintOptions,setReprintOptions]=useState<readonly {jobId:string;role:string;label:string;detail?:string;printerName?:string}[]>([]);
   const [selectedReprintJobs,setSelectedReprintJobs]=useState<Set<string>>(new Set());
+  const [priceOverrideLine,setPriceOverrideLine]=useState<number|null>(null);
+  const [priceOverrideValue,setPriceOverrideValue]=useState('');
+  const [priceOverrideReason,setPriceOverrideReason]=useState('');
+  const canOverridePrice=Boolean(readActiveStaffSession())&&hasStaffPermission('PRICE_OVERRIDE');
   const alive=useRef(true);
   const activeHold=useRef<string|null>(null);
   const currentDetail=useRef<LocalDiningHoldDetail|null>(null);
@@ -188,6 +193,22 @@ export function RuntimeDiningWorkspace({runtime,onCheckout,warningMinutes}:{
     if(checkoutLock.current||actionLock.current||!detail)return;
     setSelection(Object.fromEntries(detail.lines.filter(line=>line.remainingQty>0).map(line=>[line.lineIndex,line.remainingQty])));
   };
+  const openPriceOverride=(lineIndex:number,currentMinor:number)=>{
+    if(!canOverridePrice){setMessage('此登入員工未獲 Admin 授權改價。');return;}
+    setPriceOverrideLine(lineIndex);setPriceOverrideValue((currentMinor/100).toFixed(2));setPriceOverrideReason('');
+  };
+  const submitPriceOverride=()=>command(async()=>{
+    const holdId=activeHold.current;
+    if(!holdId||priceOverrideLine===null||!runtime.overrideDiningLinePrice)throw new Error('未有人工改價接口。');
+    const raw=priceOverrideValue.trim().replace(/^\$/,'');
+    if(!/^-?\d+(?:\.\d{1,2})?$/.test(raw))throw new Error('成交價格式不正確。');
+    const effectiveMinor=Math.round(Number(raw)*100);
+    if(!Number.isSafeInteger(effectiveMinor))throw new Error('成交價超出可處理範圍。');
+    const next=await runtime.overrideDiningLinePrice(holdId,priceOverrideLine,effectiveMinor,priceOverrideReason);
+    applyDetail(next);setPriceOverrideLine(null);setPriceOverrideValue('');setPriceOverrideReason('');
+    setMessage('人工成交價已保存；原價及操作員紀錄已保留。');
+    await load();
+  });
   const reprintPaymentReceipt=(submissionId?:string)=>command(async()=>{
     const holdId=activeHold.current;
     if(!holdId||!submissionId||!runtime.reprintDiningPaymentReceipt)throw new Error('未有付款收據重印接口。');
@@ -302,7 +323,7 @@ export function RuntimeDiningWorkspace({runtime,onCheckout,warningMinutes}:{
         <section className="dining-detail-lines">
           <header><b>商品／分項結帳</b><button type="button" disabled={checkoutBusy||actionBusy} onClick={selectAllRemaining}>全選未結</button></header>
           {detail.lines.length?detail.lines.map(line=><article key={line.lineIndex} className={line.remainingQty===0?'paid':''}>
-            <div className="dining-line-copy"><b>{line.name}</b><small>{money(line.unitMinor)} × {line.qty}</small><span>已結 {line.paidQty} · 未結 {line.remainingQty}</span></div>
+            <div className="dining-line-copy"><b>{line.name}</b><small>{money(line.unitMinor)} × {line.qty}</small><span>已結 {line.paidQty} · 未結 {line.remainingQty}</span>{canOverridePrice&&detail.payments.length===0?<button type="button" disabled={actionBusy||checkoutBusy} onClick={()=>openPriceOverride(line.lineIndex,line.unitMinor)}>人工改價</button>:null}</div>
             <div className="dining-line-selector">
               <button type="button" disabled={checkoutBusy||actionBusy||(selection[line.lineIndex]??0)<=0} onClick={()=>adjustSelection(line.lineIndex,-1)}>−</button>
               <b>{selection[line.lineIndex]??0}</b>
@@ -310,6 +331,7 @@ export function RuntimeDiningWorkspace({runtime,onCheckout,warningMinutes}:{
             </div>
           </article>):<p className="dining-no-items">未有商品；目前只記錄輪候／桌台。</p>}
         </section>
+        {detail.priceOverrides?.length?<section className="dining-payment-history"><header><b>人工改價紀錄</b><span>{detail.priceOverrides.length}</span></header>{detail.priceOverrides.map(row=><div key={row.id}><span>{row.staffName}</span><b>{money(row.originalUnitMinor)} → {money(row.effectiveUnitMinor)}</b><small>{money(row.deltaMinor)} · {new Date(row.createdAt).toLocaleTimeString('zh-HK',{hour:'2-digit',minute:'2-digit'})}</small>{row.reason?<small>{row.reason}</small>:null}</div>)}</section>:null}
         <section className="dining-payment-panel checkout-authority">
           <header><div><b>本次結帳</b><small>按商品揀選，不受用餐人數限制</small></div><strong>{money(selectedAmount)}</strong></header>
           <button type="button" className="dining-settle-button" disabled={checkoutBusy||actionBusy||selectedUnits<=0||detail.remainingMinor<=0} onClick={()=>void goCheckout()}>{checkoutBusy?'核對最新資料…':'前往結帳 · '+selectedUnits+' 件'}</button>
@@ -324,6 +346,15 @@ export function RuntimeDiningWorkspace({runtime,onCheckout,warningMinutes}:{
         </footer>
       </>:<div className="dining-detail-empty"><b>{detailLoading?'讀取堂食單…':'枱號／輪候詳情'}</b><p>揀桌台或輪候單，即可核對商品及分項結帳。</p></div>}
     </aside>
+    {priceOverrideLine!==null?<div className="order-modal-backdrop" onMouseDown={event=>{if(event.target===event.currentTarget)setPriceOverrideLine(null);}}>
+      <section className="order-modal">
+        <header><h2>人工成交價</h2><button type="button" onClick={()=>setPriceOverrideLine(null)}>×</button></header>
+        <p>此操作由 Admin 授權嘅「改價權限」控制。成交價可以係正數、$0 或負數；原因可以留空。</p>
+        <label>成交單價<input inputMode="decimal" value={priceOverrideValue} onChange={event=>setPriceOverrideValue(event.target.value)} placeholder="例如 39.00 或 -5.00"/></label>
+        <label>原因（選填）<input value={priceOverrideReason} maxLength={200} onChange={event=>setPriceOverrideReason(event.target.value)} placeholder="可留空"/></label>
+        <footer><button type="button" onClick={()=>setPriceOverrideLine(null)}>取消</button><button type="button" className="primary" disabled={actionBusy||!priceOverrideValue.trim()} onClick={()=>void submitPriceOverride()}>確認成交價</button></footer>
+      </section>
+    </div>:null}
     {reprintOpen?<div className="order-modal-backdrop" onMouseDown={event=>{if(event.target===event.currentTarget)setReprintOpen(false);}}>
       <section className="order-modal reprint">
         <header><h2>堂食重印</h2><button type="button" onClick={()=>setReprintOpen(false)}>×</button></header>
