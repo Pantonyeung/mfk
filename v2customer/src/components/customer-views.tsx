@@ -1,4 +1,4 @@
-import {useRef,useState,type CSSProperties} from 'react';
+import {useRef,useState,type CSSProperties,type MouseEvent as ReactMouseEvent} from 'react';
 import {validateCustomerSelections,type CustomerSelectionState} from '../selection';
 import {ActionButton,AnimatedValue,CollapsingHeader,EmptyState,ExpandingSearch,MenuSkeleton,PageIntro,ProductDialog,PullRefreshSurface,QuantityStepper,StatefulAction,type ActionState,type ProductOriginRect} from '../ui/primitives';
 import type {CustomerRecommendation} from '../recommendation';
@@ -50,6 +50,10 @@ function ProductMedia({product,compact=false}:{product:CustomerProduct;compact?:
     {product.imageUrl?<img src={product.imageUrl} alt={product.imageAlt??product.name}/>:<span className="product-media-fallback"><i/>{product.name.slice(0,1)}</span>}
     {!product.available?<b>暫停供應</b>:null}
   </span>;
+}
+
+function FavoriteHeart(){
+  return <span className="favorite-heart" role="img" aria-label="收藏功能等待會員資料連接" title="收藏功能等待會員資料連接">♡</span>;
 }
 
 function SectionHeading({eyebrow,title,action}:{eyebrow:string;title:string;action?:React.ReactNode}){
@@ -161,15 +165,35 @@ export function HomeView({snapshot,connection,activeOrders,history,recommendatio
 export function MenuView({connection,categories,activeCategoryId,setCategory,query,setQuery,layout,setLayout,products,recommendations,onProduct,cartCount,quote,onCart}:{
   connection:CustomerConnectionState;categories:readonly {categoryId:string;name:string}[];activeCategoryId:string|null;setCategory:(id:string|null)=>void;query:string;setQuery:(v:string)=>void;layout:MenuLayout;setLayout:(v:MenuLayout)=>void;products:readonly CustomerProduct[];recommendations:readonly CustomerRecommendation[];onProduct:(p:CustomerProduct,origin:ProductOriginRect)=>void;cartCount:number;quote:CustomerQuoteSnapshot|null;onCart:()=>void;
 }){
+  const searching=Boolean(query.trim());
+  const featuredProduct=searching?undefined:(products.find(product=>product.available)??products[0]);
+  const remainingProducts=featuredProduct?products.filter(product=>product.productId!==featuredProduct.productId):products;
+  const openProduct=(product:CustomerProduct,event:ReactMouseEvent<HTMLElement>)=>{
+    const rect=event.currentTarget.getBoundingClientRect();
+    onProduct(product,{top:rect.top,left:rect.left,width:rect.width,height:rect.height});
+  };
   return <section className="page menu-page">
-    <CollapsingHeader><PageIntro kicker="點單" title="今日想食咩？" detail="先揀分類，再逐步設定；售價同供應以店舖最新資料為準。"/><div className="menu-tools"><ExpandingSearch value={query} onChange={setQuery}/><div className="layout-toggle" role="group" aria-label="菜單顯示方式"><button className={layout==='grid'?'active':''} aria-pressed={layout==='grid'} onClick={()=>setLayout('grid')}>格狀</button><button className={layout==='list'?'active':''} aria-pressed={layout==='list'} onClick={()=>setLayout('list')}>列表</button></div></div></CollapsingHeader>
+    <CollapsingHeader><PageIntro kicker="點單" title="今日想食咩？" detail="每個分類一個主角，再用細卡快速比較；售價同供應以店舖最新資料為準。"/><div className="menu-tools"><ExpandingSearch value={query} onChange={setQuery}/><div className="layout-toggle" role="group" aria-label="菜單顯示方式"><button className={layout==='grid'?'active':''} aria-pressed={layout==='grid'} onClick={()=>setLayout('grid')}>格狀</button><button className={layout==='list'?'active':''} aria-pressed={layout==='list'} onClick={()=>setLayout('list')}>列表</button></div></div></CollapsingHeader>
     <JourneyCoach active={1}/>
     {categories.length?<div className="category-rail" role="tablist" aria-label="商品分類">{categories.map(category=><button role="tab" aria-selected={activeCategoryId===category.categoryId} key={category.categoryId} className={activeCategoryId===category.categoryId?'active':''} onClick={()=>setCategory(category.categoryId)}>{category.name}</button>)}</div>:null}
-    {!query.trim()?<RecommendationRail compact eyebrow="SMART PICKS" title="呢刻值得先睇" recommendations={recommendations.slice(0,3)} onProduct={onProduct}/>:null}
+    {!searching?<RecommendationRail compact eyebrow="SMART PICKS" title="呢刻值得先睇" recommendations={recommendations.slice(0,3)} onProduct={onProduct}/>:null}
     {connection==='LOADING'?<MenuSkeleton/>:
       !categories.length?<EmptyState title={connection==='NOT_CONNECTED'?'菜單服務尚未連接':'今日暫時未有菜單'} detail={connection==='NOT_CONNECTED'?'連接後會顯示正式商品、規格、價格同供應狀態。':'店舖目前未提供可售商品。'}/>:
-      products.length?<div className={`product-list layout-${layout}`}>{products.map(product=><button className={'product-card '+(product.available?'available':'unavailable')} data-product-id={product.productId} style={{viewTransitionName:productTransitionName(product.productId)} as CSSProperties} disabled={!product.available} key={product.productId} onClick={event=>{const rect=event.currentTarget.getBoundingClientRect();onProduct(product,{top:rect.top,left:rect.left,width:rect.width,height:rect.height})}}><ProductMedia product={product}/><span className="product-information">{product.badge?<small>{product.badge}</small>:null}<strong>{product.name}</strong><p>{product.description}</p><em>{product.displayPriceLabel??'價格待店舖提供'}</em></span><span className="sellability">{product.available?'設定':'暫停供應'}</span></button>)}</div>:
-      <EmptyState title={query.trim()?`搵唔到「${query.trim()}」`:'呢個分類暫時未有商品'} detail="試下另一個名稱，或者切換其他分類。"><ActionButton variant="secondary" onClick={()=>setQuery('')}>清除搜尋</ActionButton></EmptyState>}
+      products.length?<div className="menu-product-discovery">
+        {featuredProduct?<section className="featured-product-section"><SectionHeading eyebrow="今日主角" title="一分類一主角"/><button className={`featured-product-card ${featuredProduct.available?'available':'unavailable'}`} data-product-id={featuredProduct.productId} style={{viewTransitionName:productTransitionName(featuredProduct.productId)} as CSSProperties} disabled={!featuredProduct.available} onClick={event=>openProduct(featuredProduct,event)}>
+          <ProductMedia product={featuredProduct}/>
+          <span className="featured-product-copy">{featuredProduct.badge?<small>{featuredProduct.badge}</small>:<small>分類精選</small>}<strong>{featuredProduct.name}</strong><p>{featuredProduct.description}</p><em>{featuredProduct.displayPriceLabel??'價格待店舖提供'}</em></span>
+          <FavoriteHeart/>
+          <span className="sellability">{featuredProduct.available?'選擇':'售罄'}</span>
+        </button></section>:null}
+        <section className="small-product-section"><SectionHeading eyebrow={searching?'搜尋結果':'更多選擇'} title={searching?`搵到 ${products.length} 款相關餐點`:'快速比較其他餐點'}/><div className={`small-product-grid layout-${layout}`}>{remainingProducts.map(product=><button className={'small-product-card '+(product.available?'available':'unavailable')} data-product-id={product.productId} style={{viewTransitionName:productTransitionName(product.productId)} as CSSProperties} disabled={!product.available} key={product.productId} onClick={event=>openProduct(product,event)}>
+          <ProductMedia product={product}/>
+          <span className="product-information">{product.badge?<small>{product.badge}</small>:null}<strong>{product.name}</strong><p>{product.description}</p><em>{product.displayPriceLabel??'價格待店舖提供'}</em></span>
+          <FavoriteHeart/>
+          <span className="sellability">{product.available?'設定':'售罄'}</span>
+        </button>)}</div></section>
+      </div>:
+      <EmptyState title={searching?`搵唔到「${query.trim()}」`:'呢個分類暫時未有商品'} detail="試下另一個名稱，或者切換其他分類。"><ActionButton variant="secondary" onClick={()=>setQuery('')}>清除搜尋</ActionButton></EmptyState>}
     {cartCount>0?<button className="floating-cart" onClick={onCart}><b>{cartCount}</b><span><strong>打開記憶罐</strong><small>{quote?quoteMeta[quote.freshness].label:'等待餐牌價格'}</small></span><AnimatedValue>{quote?money(quote.currency,quote.totalMinor):'查看'}</AnimatedValue></button>:null}
   </section>;
 }
