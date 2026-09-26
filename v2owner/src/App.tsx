@@ -2,6 +2,7 @@ import {useEffect,useMemo,useState} from 'react';
 import type {ReactNode} from 'react';
 import {readOwnerLocalWorkspace,writeOwnerLocalWorkspace,type OwnerChecklistItem} from './persistence';
 import {resolveOwnerRuntimePort} from './runtime';
+import {OWNER_CANONICAL_LOGO_ASSET_ID,OWNER_CANONICAL_LOGO_SRC} from './assets/brand/canonical-logo';
 import {buildOwnerTodayViewModel} from './today-view-model';
 import {
   DineInOpenChecksCard,
