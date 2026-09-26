@@ -3,7 +3,16 @@ import type {ReactNode} from 'react';
 import {readOwnerLocalWorkspace,writeOwnerLocalWorkspace,type OwnerChecklistItem} from './persistence';
 import {resolveOwnerRuntimePort} from './runtime';
 import {buildOwnerTodayViewModel} from './today-view-model';
-import {DineInOpenChecksCard,TodayLiveOrdersCard} from './today-components';
+import {
+  DineInOpenChecksCard,
+  GlobalStateBanner,
+  TodayActionSummaryCard,
+  TodayContextHeader,
+  TodayHealthSummaryCard,
+  TodayInsightCard,
+  TodayLiveOrdersCard,
+  TodayStaffSummaryCard,
+} from './today-components';
 import type {
   OwnerActionItem,
   OwnerConnectionState,
@@ -13,6 +22,7 @@ import type {
 } from './product-types';
 
 type View='today'|'queue'|'orders'|'more';
+type OrdersScope='DEFAULT'|'ACTIVE'|'DINE_IN_OPEN';
 type Tool='reports'|'sellability'|'channels'|'staff'|'devices'|'customers'|'marketing'|'settlement'|'cash'|'inventory'|'notifications'|'manager'|'activity'|'admin'|'recovery';
 type Confirmation={label:string;target:string;impact:string};
 
@@ -23,16 +33,16 @@ export function App(){
   const [handoffNote,setHandoffNote]=useState(local.handoffNote);
   const [checklist,setChecklist]=useState<readonly OwnerChecklistItem[]>(local.checklist);
   const [port]=useState<OwnerRuntimePort|null>(()=>resolveOwnerRuntimePort());
-  const [connection,setConnection]=useState<OwnerConnectionState>(port?'LOADING':'NOT_CONNECTED');
+  const [connection,setConnection]=useState<OwnerConnectionState>(port?'LOADING':'OFFLINE_READONLY');
   const [snapshot,setSnapshot]=useState<OwnerReadModelSnapshot|null>(null);
   const [notice,setNotice]=useState<string|null>(null);
-  const [error,setError]=useState<string|null>(null);
   const [tool,setTool]=useState<Tool|null>(null);
   const [selectedOrder,setSelectedOrder]=useState<OwnerOrderProjection|null>(null);
   const [confirmation,setConfirmation]=useState<Confirmation|null>(null);
   const [query,setQuery]=useState('');
   const [source,setSource]=useState('全部');
   const [segment,setSegment]=useState<'current'|'completed'>('current');
+  const [ordersScope,setOrdersScope]=useState<OrdersScope>('DEFAULT');
 
   const persistLocal=(next?:Partial<{view:View;managerNote:string;handoffNote:string;checklist:readonly OwnerChecklistItem[]}>)=>{
     writeOwnerLocalWorkspace({
@@ -46,15 +56,14 @@ export function App(){
   const changeView=(next:View)=>{setView(next);persistLocal({view:next})};
 
   const refresh=async()=>{
-    if(!port){setConnection('NOT_CONNECTED');setSnapshot(null);return}
-    setConnection('LOADING');setError(null);
+    if(!port){setConnection('OFFLINE_READONLY');setSnapshot(null);return}
+    setConnection('LOADING');
     try{
       const next=await port.readSnapshot();
       setSnapshot(next);
-      setConnection(next.store?.freshness==='STALE'?'STALE':next.store?.freshness==='PARTIAL'?'PARTIAL':next.store?.freshness==='UNKNOWN'?'UNKNOWN':'READY');
-    }catch(reason){
+      setConnection(resolveSnapshotState(next));
+    }catch{
       setConnection('ERROR');
-      setError(reason instanceof Error?reason.message:'暫時未能同步營運資料');
     }
   };
 
@@ -66,13 +75,31 @@ export function App(){
     const sourceOk=source==='全部'||order.source===source;
     const q=query.trim().toLowerCase();
     const queryOk=!q||[order.displayCode,order.source,order.lifecycle,order.externalRef??'',order.itemSummary].join(' ').toLowerCase().includes(q);
-    return segmentOk&&sourceOk&&queryOk;
+    const scopeOk=ordersScope==='DEFAULT'
+      ?true
+      :ordersScope==='ACTIVE'
+        ?!done
+        :!done&&order.fulfillmentMode==='DINE_IN'&&(order.paymentState==='OPEN'||order.paymentState==='PARTIAL');
+    return segmentOk&&sourceOk&&queryOk&&scopeOk;
   });
 
-  const requestBounded=(label:string,target:string,impact:string)=>setConfirmation({label,target,impact});
+  const openOrdersScope=(scope:OrdersScope)=>{
+    setOrdersScope(scope);
+    setSegment('current');
+    setSource('全部');
+    setQuery('');
+    changeView('orders');
+  };
+
+  const requestBounded=(label:string,target:string,impact:string)=>{
+    if(connection==='OFFLINE_READONLY'){setNotice('離線唯讀：遠端操作已停用。');return}
+    if(connection==='PERMISSION_DENIED'){setNotice('目前身份冇權執行呢個操作。');return}
+    setConfirmation({label,target,impact});
+  };
 
   const executeBounded=async(value:Confirmation)=>{
     setConfirmation(null);
+    if(connection==='OFFLINE_READONLY'){setNotice('離線唯讀：遠端操作已停用。');return}
     if(!port?.requestBoundedAction){setNotice('遠端操作服務尚未連接；冇改變任何正式狀態。');return}
     try{
       const result=await port.requestBoundedAction({actionType:value.label,target:value.target,reason:value.impact,operationId:crypto.randomUUID()});
@@ -83,7 +110,7 @@ export function App(){
     }
   };
 
-  const connectionLabel=connection==='READY'?'資料已同步':connection==='LOADING'?'同步中':connection==='STALE'?'資料稍舊':connection==='PARTIAL'?'部分資料':connection==='UNKNOWN'?'狀態未明':connection==='ERROR'?'同步失敗':'未連接';
+  const connectionLabel=connection==='FRESH'?'資料新鮮':connection==='LOADING'?'同步中':connection==='EMPTY'?'暫無資料':connection==='STALE'?'資料稍舊':connection==='PARTIAL'?'部分資料':connection==='OFFLINE_READONLY'?'離線唯讀':connection==='PERMISSION_DENIED'?'權限不足':connection==='UNKNOWN'?'狀態未明':'同步失敗';
   const sources=['全部',...Array.from(new Set((snapshot?.orders??[]).map(order=>order.source)))];
 
   return <main className="app-shell">
@@ -94,21 +121,19 @@ export function App(){
     </header>
 
     {notice?<div className="notice" role="status"><span>{notice}</span><button onClick={()=>setNotice(null)}>收起</button></div>:null}
-    {error?<RecoveryBanner title="營運資料同步失敗" detail={error} onRetry={()=>void refresh()}/>:null}
-    {connection==='NOT_CONNECTED'?<RecoveryBanner title="老闆資料服務尚未連接" detail="正式營業額、訂單、渠道、結算、設備同人員狀態會保持空白，唔會用假資料代替。" onRetry={()=>void refresh()}/>:null}
-    {connection==='STALE'||connection==='PARTIAL'||connection==='UNKNOWN'?<RecoveryBanner title={connectionLabel} detail="畫面會保留資料新鮮度／確定性；未知唔會當失敗，部分資料亦唔會當完整。" onRetry={()=>void refresh()}/>:null}
+    <GlobalStateBanner state={connection} onRetry={()=>void refresh()}/>
 
     <section className="stage">
-      {view==='today'?<TodayPage connection={connection} snapshot={snapshot} onQueue={()=>changeView('queue')} onOrders={()=>changeView('orders')} onTool={setTool}/>:null}
+      {view==='today'?<TodayPage connection={connection} snapshot={snapshot} onQueue={()=>changeView('queue')} onActiveOrders={()=>openOrdersScope('ACTIVE')} onDineInOrders={()=>openOrdersScope('DINE_IN_OPEN')} onTool={setTool}/>:null}
       {view==='queue'?<QueuePage connection={connection} items={snapshot?.actions??[]} onCommand={requestBounded}/>:null}
-      {view==='orders'?<OrdersPage connection={connection} rows={visibleOrders} segment={segment} setSegment={setSegment} query={query} setQuery={setQuery} source={source} setSource={setSource} sources={sources} onOpen={setSelectedOrder}/>:null}
+      {view==='orders'?<OrdersPage connection={connection} rows={visibleOrders} segment={segment} setSegment={value=>{setOrdersScope('DEFAULT');setSegment(value)}} query={query} setQuery={value=>{setOrdersScope('DEFAULT');setQuery(value)}} source={source} setSource={value=>{setOrdersScope('DEFAULT');setSource(value)}} sources={sources} onOpen={setSelectedOrder}/>:null}
       {view==='more'?<MorePage snapshot={snapshot} connection={connection} onTool={setTool}/>:null}
     </section>
 
     <nav className="bottom-nav" aria-label="主要功能">
       <Nav active={view==='today'} label="今日" onClick={()=>changeView('today')}/>
       <Nav active={view==='queue'} label="待處理" badge={snapshot?.actions.length?String(snapshot.actions.length):undefined} onClick={()=>changeView('queue')}/>
-      <Nav active={view==='orders'} label="訂單" onClick={()=>changeView('orders')}/>
+      <Nav active={view==='orders'} label="訂單" onClick={()=>openOrdersScope('DEFAULT')}/>
       <Nav active={view==='more'} label="更多" onClick={()=>changeView('more')}/>
     </nav>
 
@@ -134,26 +159,45 @@ export function App(){
   </main>;
 }
 
-function TodayPage({connection,snapshot,onQueue,onOrders,onTool}:{connection:OwnerConnectionState;snapshot:OwnerReadModelSnapshot|null;onQueue:()=>void;onOrders:()=>void;onTool:(tool:Tool)=>void}){
+function TodayPage({
+  connection,
+  snapshot,
+  onQueue,
+  onActiveOrders,
+  onDineInOrders,
+  onTool,
+}:{
+  connection:OwnerConnectionState;
+  snapshot:OwnerReadModelSnapshot|null;
+  onQueue:()=>void;
+  onActiveOrders:()=>void;
+  onDineInOrders:()=>void;
+  onTool:(tool:Tool)=>void;
+}){
   const vm=buildOwnerTodayViewModel(snapshot);
   const today=snapshot?.today;
-  const store=snapshot?.store;
   return <section className="page">
-    <header className="page-head"><div><span>今日</span><h1>而家間舖點？</h1><small>{store?'資料截至 '+new Date(store.observedAt).toLocaleString('zh-HK'):'未有正式讀回'}</small></div></header>
-    {!today?<Empty title={connection==='NOT_CONNECTED'?'今日數據尚未連接':'暫時未有今日數據'} detail="正式營業額、訂單同平均單未有讀回之前唔會顯示假 KPI。"/>:
+    <TodayContextHeader
+      storeName={vm.storeName}
+      businessDate={vm.businessDate}
+      operatingStatus={vm.operatingStatus}
+      freshness={vm.storeFreshness}
+      observedAt={vm.observedAt}
+    />
+    {!today?<Empty title={connection==='OFFLINE_READONLY'?'今日數據尚未連接':'暫時未有今日數據'} detail="正式營業額、訂單同平均單未有讀回之前唔會顯示假 KPI。"/>:
       <section className="kpi-grid"><Kpi label="有效營業額" value={today.salesLabel} compare={today.comparisonLabel}/><Kpi label="訂單" value={String(today.orderCount)} compare="正式有效單摘要"/><Kpi label="平均訂單" value={today.averageOrderLabel} compare="有效營業額 / 有效單量"/></section>}
-    <TodayLiveOrdersCard value={vm.liveOrders} onOpen={onOrders}/>
-    <DineInOpenChecksCard value={vm.dineIn} onOpen={onOrders}/>
-    <section className="card attention-card"><div className="section-head"><div><span className="eyebrow danger">需要處理</span><h2>Action Queue</h2></div><b className="count-badge">{today?.attentionCount??0}</b></div><p>只放真正需要人介入嘅事項；未知狀態會保持未知。</p><button className="primary wide" onClick={onQueue}>查看待處理</button></section>
-    <section className="card"><div className="section-head"><div><span className="eyebrow">營運健康</span><h2>Readiness</h2></div><button className="link-btn" onClick={()=>onTool('recovery')}>資料狀態</button></div>{snapshot?.readiness.length?<div className="readiness-grid">{snapshot.readiness.map(item=><article key={item.id}><span>{item.label}</span><strong>{item.value}</strong></article>)}</div>:<p>未有健康讀回。</p>}</section>
-    <section className="card compact-card"><div className="section-head"><div><span className="eyebrow orange">現場</span><h2>目前人手</h2></div><button className="link-btn" onClick={()=>onTool('staff')}>查看</button></div><div className="split-summary"><div><strong>{today?.staffNow??'—'}</strong><span>目前在場</span></div><div><strong>{snapshot?.staff.filter(item=>item.presence.includes('休息')).length??0}</strong><span>休息中</span></div><div><strong>{snapshot?.staff.filter(item=>item.presence.includes('異常')).length??0}</strong><span>需留意</span></div></div></section>
-    <section className="card"><div className="section-head"><div><span className="eyebrow purple">報表</span><h2>可信摘要</h2></div><button className="link-btn" onClick={()=>onTool('reports')}>全部報表</button></div>{snapshot?.reports.slice(0,3).map(item=><div className="detail-row" key={item.reportId}><span>{item.name}</span><strong>{item.value}</strong></div>)}</section>
+    <TodayLiveOrdersCard value={vm.liveOrders} onOpenActive={onActiveOrders}/>
+    <DineInOpenChecksCard value={vm.dineIn} onOpenDineIn={onDineInOrders}/>
+    <TodayActionSummaryCard value={vm.actionSummary} onOpen={onQueue}/>
+    <TodayHealthSummaryCard value={vm.healthSummary} onChannels={()=>onTool('channels')} onDevices={()=>onTool('devices')}/>
+    <TodayStaffSummaryCard value={vm.staffSummary} onOpen={()=>onTool('staff')}/>
+    <TodayInsightCard value={vm.insight}/>
   </section>;
 }
 
 function QueuePage({connection,items,onCommand}:{connection:OwnerConnectionState;items:readonly OwnerActionItem[];onCommand:(label:string,target:string,impact:string)=>void}){
   return <section className="page"><header className="page-head"><div><span>待處理</span><h1>需要你留意</h1><small>Resolved 同 Dismissed 係兩回事；冇讀回唔會當完成。</small></div><b className="hero-number">{items.length}</b></header>
-    {!items.length?<Empty title={connection==='NOT_CONNECTED'?'待處理服務尚未連接':'暫時冇待處理事項'} detail="真正需要人介入嘅事項先會出現喺呢度。"/>:<div className="cards">{items.map(item=><ActionCard key={item.actionId} item={item} onCommand={onCommand}/>)}</div>}
+    {!items.length?<Empty title={connection==='OFFLINE_READONLY'?'待處理服務尚未連接':'暫時冇待處理事項'} detail="真正需要人介入嘅事項先會出現喺呢度。"/>:<div className="cards">{items.map(item=><ActionCard key={item.actionId} item={item} onCommand={onCommand}/>)}</div>}
   </section>;
 }
 
@@ -163,14 +207,14 @@ function ActionCard({item,onCommand}:{item:OwnerActionItem;onCommand:(label:stri
 
 function OrdersPage({connection,rows,segment,setSegment,query,setQuery,source,setSource,sources,onOpen}:{connection:OwnerConnectionState;rows:readonly OwnerOrderProjection[];segment:'current'|'completed';setSegment:(v:'current'|'completed')=>void;query:string;setQuery:(v:string)=>void;source:string;setSource:(v:string)=>void;sources:readonly string[];onOpen:(order:OwnerOrderProjection)=>void}){
   return <section className="page"><header className="page-head"><div><span>訂單監察</span><h1>訂單</h1><small>只讀正式投影；未知結果唔會當完成。</small></div><b className="hero-number">{rows.length}</b></header><div className="segmented"><button className={segment==='current'?'active':''} onClick={()=>setSegment('current')}>進行中</button><button className={segment==='completed'?'active':''} onClick={()=>setSegment('completed')}>已完成</button></div><label className="search"><span>搜尋</span><input value={query} onChange={event=>setQuery(event.target.value)} placeholder="單號／來源／狀態／外部編號"/></label><div className="chip-row">{sources.map(item=><button key={item} className={source===item?'active':''} onClick={()=>setSource(item)}>{item}</button>)}</div>
-    {!rows.length?<Empty title={connection==='NOT_CONNECTED'?'訂單資料尚未連接':'暫時冇符合條件嘅訂單'} detail="可以切換分類或者修改搜尋。"/>:<div className="cards">{rows.map(order=><button className="order-card" key={order.orderId} onClick={()=>onOpen(order)}><div className="order-card-top"><div><small>{new Date(order.observedAt).toLocaleTimeString('zh-HK')} · {order.source}</small><h2>{order.displayCode}</h2></div><span className={'certainty '+order.readback.toLowerCase()}>{order.readback}</span></div><div className="order-card-main"><strong>{order.lifecycle}</strong><b>{order.amountLabel??'—'}</b></div><div className="order-card-meta"><span>{order.fulfillmentLabel??'未有交收資料'}</span><span>{order.tenderLabel??'未有付款摘要'}</span><span>{order.externalRef?'外部 '+order.externalRef:'門店單'}</span></div><em>查看詳情 →</em></button>)}</div>}
+    {!rows.length?<Empty title={connection==='OFFLINE_READONLY'?'訂單資料尚未連接':'暫時冇符合條件嘅訂單'} detail="可以切換分類或者修改搜尋。"/>:<div className="cards">{rows.map(order=><button className="order-card" key={order.orderId} onClick={()=>onOpen(order)}><div className="order-card-top"><div><small>{new Date(order.observedAt).toLocaleTimeString('zh-HK')} · {order.source}</small><h2>{order.displayCode}</h2></div><span className={'certainty '+order.readback.toLowerCase()}>{order.readback}</span></div><div className="order-card-main"><strong>{order.lifecycle}</strong><b>{order.amountLabel??'—'}</b></div><div className="order-card-meta"><span>{order.fulfillmentLabel??'未有交收資料'}</span><span>{order.tenderLabel??'未有付款摘要'}</span><span>{order.externalRef?'外部 '+order.externalRef:'門店單'}</span></div><em>查看詳情 →</em></button>)}</div>}
   </section>;
 }
 
 function MorePage({snapshot,connection,onTool}:{snapshot:OwnerReadModelSnapshot|null;connection:OwnerConnectionState;onTool:(tool:Tool)=>void}){
   const tools:{id:Tool;title:string;detail:string;state:string}[]=[
     {id:'reports',title:'報表',detail:'固定可信摘要',state:String(snapshot?.reports.length??0)},
-    {id:'sellability',title:'商品供應',detail:'售罄／恢復有限操作',state:connection==='READY'?'可查詢':'未連接'},
+    {id:'sellability',title:'商品供應',detail:'售罄／恢復有限操作',state:connection==='FRESH'?'可查詢':'未連接'},
     {id:'channels',title:'渠道',detail:'Desired / Observed / Freshness',state:String(snapshot?.channels.length??0)},
     {id:'staff',title:'員工',detail:'在場／角色／權限摘要',state:String(snapshot?.staff.length??0)},
     {id:'devices',title:'設備／打印',detail:'健康／影響範圍／Job certainty',state:String(snapshot?.devices.length??0)},
@@ -221,7 +265,19 @@ function ConfirmationSheet({value,onClose,onConfirm}:{value:Confirmation;onClose
   return <div className="overlay"><section className="sheet" role="dialog" aria-modal="true"><DrawerHead title={value.label} subtitle={value.target} close={onClose}/><p className="callout">{value.impact}</p><div className="sheet-actions"><button onClick={onClose}>取消</button><button className="primary" onClick={onConfirm}>提交操作意圖</button></div></section></div>;
 }
 
-function RecoveryBanner({title,detail,onRetry}:{title:string;detail:string;onRetry:()=>void}){return <section className="recovery-banner"><div><strong>{title}</strong><span>{detail}</span></div><button onClick={onRetry}>重新確認</button></section>}
+
+function resolveSnapshotState(snapshot:OwnerReadModelSnapshot):OwnerConnectionState{
+  if(snapshot.globalState)return snapshot.globalState;
+  if(!snapshot.store){
+    const hasData=Boolean(snapshot.today)||snapshot.actions.length>0||snapshot.orders.length>0||snapshot.readiness.length>0;
+    return hasData?'PARTIAL':'EMPTY';
+  }
+  if(snapshot.store.freshness==='STALE')return 'STALE';
+  if(snapshot.store.freshness==='PARTIAL')return 'PARTIAL';
+  if(snapshot.store.freshness==='UNKNOWN')return 'UNKNOWN';
+  return 'FRESH';
+}
+
 function Empty({title,detail}:{title:string;detail:string}){return <section className="card empty-state"><h2>{title}</h2><p>{detail}</p></section>}
 function Kpi({label,value,compare}:{label:string;value:string;compare:string}){return <article className="kpi"><span>{label}</span><strong>{value}</strong><small>{compare}</small></article>}
 function Nav({active,label,badge,onClick}:{active:boolean;label:string;badge?:string;onClick:()=>void}){return <button className={active?'active':''} onClick={onClick} data-icon-state="AI_ASSET_PENDING"><span>{label}</span>{badge?<em>{badge}</em>:null}</button>}
