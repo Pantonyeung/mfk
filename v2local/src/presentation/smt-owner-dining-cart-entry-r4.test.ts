@@ -1,3 +1,4 @@
+// A1 final landing proof on latest main after streamlined audit→implement policy.
 // MFK SMT A1 R4 R3 proof on current main.
 import {describe,expect,it} from 'vitest';
 import fs from 'node:fs';
