@@ -324,7 +324,8 @@ describe('MFK Admin complete catalog product',()=>{
       'dcf1a976-ec1d-5d24-bc64-ab9d0a15fa02',
     ]);
     const handMade=group.choices.find(choice=>choice.bandId==='drink-special-plus-10');
-    expect(handMade?.choiceType).toBe('LABEL');
+    expect(handMade?.choiceType).toBe('PRODUCT');
+    expect(handMade?.productId).toBe('b3529ce7-9b4e-5d20-9e1e-e4ef68319561');
     expect(handMade?.label).toBe('手打檸檬茶');
   });
 
