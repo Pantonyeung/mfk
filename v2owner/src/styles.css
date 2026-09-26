@@ -332,3 +332,61 @@ body{
 .tool-card[data-icon-state="AI_ASSET_PENDING"] strong{color:var(--mf-navy)}
 .tool-card[data-icon-state="AI_ASSET_PENDING"] small{color:var(--mf-muted)}
 .tool-card[data-icon-state="AI_ASSET_PENDING"] em{color:var(--mf-purple)}
+
+
+/* Stage02 correction: touch targets, command-in-flight, deterministic responsive gates */
+.action-filter-row button{min-height:44px}
+.drawer-head>button,.sheet header>button{
+  min-width:44px;
+  width:44px;
+  min-height:44px;
+  height:44px;
+}
+.primary,.action-primary,.secondary-action{min-height:44px}
+.action-primary:disabled{
+  opacity:.62;
+  cursor:not-allowed;
+  background:#687b9b!important;
+  border-color:#687b9b!important;
+}
+.command-flight{
+  display:grid;
+  gap:5px;
+  margin-top:9px;
+  padding:11px 12px;
+  border:1px solid var(--mf-border);
+  border-radius:13px;
+  background:var(--mf-blue-soft);
+}
+.command-flight strong{font-size:11px;color:var(--mf-navy)}
+.command-flight span{font-size:10px;color:var(--mf-muted);line-height:1.45}
+.command-flight.unknown{background:var(--mf-purple-soft)}
+.command-flight.failed,.command-flight.rejected{background:var(--mf-critical-soft)}
+.secondary-action{
+  justify-self:start;
+  border:1px solid #cfd7e4!important;
+  background:var(--mf-surface)!important;
+  color:var(--mf-navy)!important;
+  padding:9px 12px!important;
+}
+@media(max-width:520px){
+  .action-queue-card,.action-detail-drawer{max-width:100%}
+  .action-filter-row{padding-bottom:2px}
+}
+@media(max-width:430px){
+  .action-summary-strip{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .action-queue-card{padding:13px}
+}
+@media(max-width:390px){
+  .action-facts-grid,.action-detail-grid{grid-template-columns:1fr}
+  .action-queue-card-top{align-items:flex-start}
+}
+@media(max-width:375px){
+  .action-filter-row button{padding-left:10px;padding-right:10px}
+  .action-summary-strip>div{padding:10px}
+}
+@media(max-width:360px){
+  .action-summary-strip{gap:6px}
+  .action-labels{gap:4px}
+  .action-card-footer{align-items:flex-start;flex-direction:column}
+}
