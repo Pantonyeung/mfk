@@ -1,7 +1,7 @@
 MFK_ADMIN_DEPLOY_REQUEST
 target=mfk-admin
 canonical_url=https://admin.morefunos.com
-product_source=2af2354544667c30640ea08cd52966819a5241ea
+product_source=9498b2e9716f829d91c70cff731cd627639e9f0e
 requested_by=owner
-reason=publish_customer_local_quote_revision_validation_and_whatsapp_fallback
-work_id=MFK-CUSTOMER-LOCAL-QUOTE-WHATSAPP-FALLBACK-R1
+reason=publish_riceball_standalone_drink_offer_and_canonical_handmade_lemon_tea_mapping
+work_id=MFK-SMT-RICEBALL-DRINK-OFFER-R1
