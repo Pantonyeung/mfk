@@ -250,6 +250,73 @@ describe('MFK checkout print fanout',()=>{
     expect(plan[0]?.payload).toContain('台式奶茶');
   });
 
+  it('builds the first Dining print set as an unpaid table ticket plus operational routes with no drawer',()=>{
+    const dineIn:PrintableOrder={
+      ...order,
+      paymentLabel:'未收款',
+      diningTableLabel:'3號枱',
+      items:[
+        {id:'riceball',name:'原味飯團',qty:1,unitMinor:4100,serviceMode:'dine-in',detail:'少飯'},
+      ],
+    };
+    const plan=buildOrderPrintPlan(dineIn,[
+      binding('顧客小票','receipt'),
+      binding('製作單','production'),
+      binding('打包單','packing'),
+      binding('產品標籤','product-label-riceball',['riceball']),
+      binding('袋標籤','bag-label'),
+    ],undefined,'dining-initial');
+
+    expect(plan.map(job=>job.role)).toEqual(['顧客小票','製作單','打包單','產品標籤','袋標籤']);
+    expect(plan.some(job=>job.ticketKind==='receipt')).toBe(false);
+    const table=plan.find(job=>job.ticketKind==='dining-table');
+    expect(table?.id).toBe('MFK-1:dining-table');
+    expect(table?.payload).toContain('堂食枱單');
+    expect(table?.payload).toContain('3號枱');
+    expect(table?.payload).toContain('此枱單不是付款收據');
+    expect(table?.kickDrawer).toBe(false);
+    expect(plan.every(job=>job.kickDrawer!==true)).toBe(true);
+    expect(plan.find(job=>job.ticketKind==='packing')?.payload).toContain('堂食打包單');
+  });
+
+  it('builds Dining payment receipt only and opens drawer only when the payment contains CASH',()=>{
+    const paymentOrder:PrintableOrder={
+      ...order,
+      id:'MFK-1:payment:DP1',
+      display:'P001',
+      totalMinor:4100,
+      paymentLabel:'CASH',
+      diningTableLabel:'3號枱',
+      receiptTitle:'堂食付款收據',
+      receiptNoteLines:['枱號：3號枱','本次付款：$41.00','實收：$50.00','找續：$9.00','付款後未收款：$41.00'],
+      items:[{id:'riceball',name:'原味飯團',qty:1,unitMinor:4100,serviceMode:'dine-in'}],
+    };
+    const bindings=[
+      binding('顧客小票','receipt'),
+      binding('製作單','production'),
+      binding('打包單','packing'),
+      binding('產品標籤','product-label-riceball',['riceball']),
+    ];
+    const cashPlan=buildOrderPrintPlan(paymentOrder,bindings,undefined,'dining-payment');
+    expect(cashPlan).toHaveLength(1);
+    expect(cashPlan[0]?.role).toBe('顧客小票');
+    expect(cashPlan[0]?.ticketKind).toBe('receipt');
+    expect(cashPlan[0]?.kickDrawer).toBe(true);
+    expect(cashPlan[0]?.payload).toContain('堂食付款收據');
+    expect(cashPlan[0]?.payload).toContain('付款後未收款：$41.00');
+
+    const comboPlan=buildOrderPrintPlan({
+      ...paymentOrder,
+      paymentLabel:'COMBO CASH $20.00 + FPS $21.00',
+    },bindings,undefined,'dining-payment');
+    expect(comboPlan).toHaveLength(1);
+    expect(comboPlan[0]?.kickDrawer).toBe(true);
+
+    const fpsPlan=buildOrderPrintPlan({...paymentOrder,paymentLabel:'FPS'},bindings,undefined,'dining-payment');
+    expect(fpsPlan).toHaveLength(1);
+    expect(fpsPlan[0]?.kickDrawer).toBe(false);
+  });
+
   it('prints only routes that are actually bound',()=>{
     const unbound={...binding('製作單','production'),host:''};
     const plan=buildOrderPrintPlan(order,[binding('顧客小票','receipt'),unbound]);

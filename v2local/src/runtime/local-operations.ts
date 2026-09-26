@@ -26,6 +26,7 @@ export interface LocalReportOrder{
     readonly createdAt:string;
     readonly tender:string;
     readonly amountMinor:number;
+    readonly splitTenders?:readonly {readonly tender:string;readonly amountMinor:number}[];
     readonly selections?:readonly {readonly lineIndex:number;readonly qty:number}[];
   }[];
   readonly items:readonly {readonly id:string;readonly name:string;readonly qty:number;readonly unitMinor:number}[];
@@ -145,11 +146,18 @@ export function buildLocalReport(
   const netSalesMinor=grossSalesMinor-refundMinor;
   const cashSalesMinor=selected.reduce((sum,order)=>{
     if(order.paymentEntries){
-      return sum+order.paymentEntries.reduce((paymentSum,payment)=>
-        String(payment.tender||'').toUpperCase()==='CASH'
-          ?paymentSum+Math.max(0,Number(payment.amountMinor)||0)
-          :paymentSum
-      ,0);
+      return sum+order.paymentEntries.reduce((paymentSum,payment)=>{
+        const tender=String(payment.tender||'').toUpperCase();
+        if(tender==='CASH')return paymentSum+Math.max(0,Number(payment.amountMinor)||0);
+        if(tender==='COMBO'){
+          return paymentSum+(payment.splitTenders??[]).reduce((splitSum,row)=>
+            String(row.tender||'').toUpperCase()==='CASH'
+              ?splitSum+Math.max(0,Number(row.amountMinor)||0)
+              :splitSum
+          ,0);
+        }
+        return paymentSum;
+      },0);
     }
     const label=String(order.paymentLabel||'');
     const upper=label.toUpperCase();
@@ -181,8 +189,9 @@ export function buildLocalReport(
   const products=new Map<string,{name:string;quantity:number;salesMinor:number}>();
   for(const order of selected){
     for(const [index,item] of order.items.entries()){
-      const row=products.get(item.name)??{name:item.name,quantity:0,salesMinor:0};
       const qty=recognizedItemQty(order,index,item.qty);
+      if(qty<=0)continue;
+      const row=products.get(item.name)??{name:item.name,quantity:0,salesMinor:0};
       row.quantity+=qty;
       row.salesMinor+=qty*Math.max(0,Number(item.unitMinor)||0);
       products.set(item.name,row);

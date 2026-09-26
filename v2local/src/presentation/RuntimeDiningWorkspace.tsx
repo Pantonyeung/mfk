@@ -88,6 +88,7 @@ export function RuntimeDiningWorkspace({runtime,onCheckout}:{runtime:CleanSmtCor
     if(!selectedWait||!runtime.assignDiningTable)return;
     try{
       await runtime.assignDiningTable(selectedWait,tableId);
+      void runtime.ensureDiningInitialPrint?.(selectedWait).catch(()=>{});
       const tableLabel=view?.tables.find(table=>table.id===tableId)?.label??tableId;
       setMessage('已安排到 '+tableLabel+'。');
       setSelectedWait(null);
@@ -223,7 +224,7 @@ export function RuntimeDiningWorkspace({runtime,onCheckout}:{runtime:CleanSmtCor
             <span className={urgent?'dining-table-time overdue':'dining-table-time'}>
               用餐 {elapsed} 分鐘 · {overdue>0?'超時 '+overdue+' 分鐘':'剩餘 '+Math.max(0,35-elapsed)+' 分鐘'}
             </span>
-            <div className="dining-table-money"><small>已付 {money(table.paidMinor??0)}</small><strong>未付 {money(table.remainingMinor??0)}</strong></div>
+            <div className="dining-table-money"><small>已收 {money(table.paidMinor??0)}</small><strong>未收 {money(table.remainingMinor??0)}</strong></div>
           </>:<small>{selectedWait?'撳此安排':'空枱'}</small>}
         </button>;
       })}</div>
@@ -260,9 +261,9 @@ export function RuntimeDiningWorkspace({runtime,onCheckout}:{runtime:CleanSmtCor
         </section>
 
         <section className="dining-balance">
-          <div><span>原總額</span><b>{money(detail.totalMinor)}</b></div>
-          <div><span>已結帳</span><b>{money(detail.paidMinor)}</b></div>
-          <div className="remaining"><span>未結帳</span><strong>{money(detail.remainingMinor)}</strong></div>
+          <div><span>總額</span><b>{money(detail.totalMinor)}</b></div>
+          <div><span>已收款</span><b>{money(detail.paidMinor)}</b></div>
+          <div className="remaining"><span>未收款</span><strong>{money(detail.remainingMinor)}</strong></div>
         </section>
 
         <section className="dining-payment-history">

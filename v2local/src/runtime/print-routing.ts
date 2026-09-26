@@ -25,6 +25,9 @@ export interface PrintableOrder{
   readonly paymentLabel:string;
   readonly sourceLabel:string;
   readonly providerPickupCode?:string;
+  readonly diningTableLabel?:string;
+  readonly receiptTitle?:string;
+  readonly receiptNoteLines?:readonly string[];
   readonly orderRemark?:string;
   readonly utensilPreference?:'需要'|'不需要';
   readonly items:readonly {
@@ -45,12 +48,14 @@ export interface PlannedPrintJob{
   readonly payload:string;
   readonly renderMode?:'text'|'tsc-bitmap'|'escpos-raster';
   readonly labelSpec?:RasterLabelSpec;
-  readonly ticketKind?:'receipt'|'production'|'packing';
+  readonly ticketKind?:'receipt'|'production'|'packing'|'dining-table';
   readonly ticketOrder?:PrintableOrder;
   readonly cutAfter?:boolean;
   readonly kickDrawer?:boolean;
   readonly beepAfter?:boolean;
 }
+
+export type PrintPlanMode='standard'|'dining-initial'|'dining-payment';
 
 export interface TscBitmapJobBatch{
   readonly binding:PrintBinding;
@@ -168,7 +173,7 @@ export function renderCustomerReceiptTicket(order:PrintableOrder){
   return INIT
     +brand()
     +RULE
-    +CENTER+BOLD_ON+DOUBLE+'客戶收據\n'+NORMAL+BOLD_OFF+LEFT
+    +CENTER+BOLD_ON+DOUBLE+clean(order.receiptTitle??'客戶收據')+'\n'+NORMAL+BOLD_OFF+LEFT
     +RULE
     +'訂單編號 '+clean(order.display)+'\n'
     +'下單時間 '+hktDateTime(order.createdAt)+'\n'
@@ -179,10 +184,37 @@ export function renderCustomerReceiptTicket(order:PrintableOrder){
     +BOLD_ON+'總數量 '+totalUnits(order)+'份\n'+BOLD_OFF
     +'付款方式 '+clean(order.paymentLabel)+'\n'
     +BOLD_ON+DOUBLE+'合計 '+money(order.totalMinor)+'\n'+NORMAL+BOLD_OFF
+    +(order.receiptNoteLines?.length?order.receiptNoteLines.map(line=>clean(line)+'\n').join(''):'')
     +RULE
     +CENTER+'請核對餐點 / 謝謝光臨\n'
     +'*** 謝謝！***\n'
     +'More Fun Kitchen\n'+LEFT
+    +'\n\n';
+}
+
+export function renderDiningTableTicket(order:PrintableOrder){
+  const rows=order.items.map(item=>{
+    const details=verticalSelectionLines(itemDetail(item)).map(line=>'  '+line+'\n').join('');
+    return BOLD_ON+itemIdentity(item)+BOLD_OFF+'\n'
+      +details
+      +'  '+item.qty+'份\n';
+  }).join('');
+  return INIT
+    +brand()
+    +RULE
+    +CENTER+BOLD_ON+DOUBLE+'堂食枱單\n'+NORMAL+BOLD_OFF+LEFT
+    +RULE
+    +'枱號 '+clean(order.diningTableLabel??'未指定')+'\n'
+    +'訂單編號 '+clean(order.display)+'\n'
+    +'下單時間 '+hktDateTime(order.createdAt)+'\n'
+    +RULE
+    +rows
+    +RULE
+    +BOLD_ON+'總數量 '+totalUnits(order)+'份\n'+BOLD_OFF
+    +'訂單總額 '+money(order.totalMinor)+'\n'
+    +BOLD_ON+'付款狀態 未結清\n'+BOLD_OFF
+    +CENTER+'*** 此枱單不是付款收據 ***\n'+LEFT
+    +RULE
     +'\n\n';
 }
 
@@ -216,7 +248,8 @@ export function renderPackingTicket(order:PrintableOrder){
   return INIT
     +brand()
     +RULE
-    +CENTER+BOLD_ON+DOUBLE+'外賣打包單\n'+NORMAL+'TAKE AWAY\n'+BOLD_OFF+LEFT
+    +CENTER+BOLD_ON+DOUBLE+(orderService(order)==='堂食'?'堂食打包單':'外賣打包單')+'\n'
+    +NORMAL+(orderService(order)==='堂食'?'DINE IN':'TAKE AWAY')+'\n'+BOLD_OFF+LEFT
     +RULE
     +'訂單編號 '+clean(order.display)+'\n'
     +'下單時間 '+hktDateTime(order.createdAt)+'\n'
@@ -281,6 +314,8 @@ function labelAllowed(item:PrintableOrder['items'][number],binding:PrintBinding,
   const logicalId=derivedLogicalPrinterId(binding);
   if(rule.labelPrinterIds.length>0)return Boolean(logicalId&&rule.labelPrinterIds.includes(logicalId));
   if(productMatchesBinding(productId,binding))return true;
+  const hasExplicitRoute=allLabelBindings.some(candidate=>productMatchesBinding(productId,candidate));
+  if(hasExplicitRoute)return false;
   const preferred=preferredDefaultLabelBinding(allLabelBindings);
   return Boolean(preferred&&preferred.id===binding.id);
 }
@@ -303,16 +338,46 @@ function buildGlobalProductLabelUnits(order:PrintableOrder,bindings:readonly Pri
   return units;
 }
 
-export function buildOrderPrintPlan(order:PrintableOrder,bindings:readonly PrintBinding[],config?:PrintRuntimeConfig):readonly PlannedPrintJob[]{
+export function buildOrderPrintPlan(order:PrintableOrder,bindings:readonly PrintBinding[],config?:PrintRuntimeConfig,mode:PrintPlanMode='standard'):readonly PlannedPrintJob[]{
   const active=bindings.filter(binding=>String(binding.host||'').trim()&&Number(binding.port)>0&&logicalBindingEnabled(binding,config));
   const productLabelUnits=buildGlobalProductLabelUnits(order,active,config);
   const globalProductLabelTotal=productLabelUnits.length;
   const jobs:PlannedPrintJob[]=[];
   for(const binding of active){
+    if(mode==='dining-payment'&&binding.role!=='顧客小票')continue;
     if(binding.role==='顧客小票'){
       const items=roleItems(order,'receipt',config);
       if(items.length<1)continue;
-      jobs.push({id:order.id+':receipt',role:binding.role,binding,payload:renderCustomerReceiptTicket(withItems(order,items)),renderMode:'escpos-raster',ticketKind:'receipt',ticketOrder:withItems(order,items),cutAfter:true,kickDrawer:/\bCASH\b/i.test(order.paymentLabel),beepAfter:true});
+      const routed=withItems(order,items);
+      if(mode==='dining-initial'){
+        jobs.push({
+          id:order.id+':dining-table',
+          role:binding.role,
+          binding,
+          payload:renderDiningTableTicket(routed),
+          renderMode:'escpos-raster',
+          ticketKind:'dining-table',
+          ticketOrder:routed,
+          cutAfter:true,
+          kickDrawer:false,
+          beepAfter:true,
+        });
+      }else if(mode==='dining-payment'){
+        jobs.push({
+          id:order.id+':receipt',
+          role:binding.role,
+          binding,
+          payload:renderCustomerReceiptTicket(routed),
+          renderMode:'escpos-raster',
+          ticketKind:'receipt',
+          ticketOrder:routed,
+          cutAfter:true,
+          kickDrawer:/\bCASH\b/i.test(order.paymentLabel),
+          beepAfter:true,
+        });
+      }else{
+        jobs.push({id:order.id+':receipt',role:binding.role,binding,payload:renderCustomerReceiptTicket(routed),renderMode:'escpos-raster',ticketKind:'receipt',ticketOrder:routed,cutAfter:true,kickDrawer:/\bCASH\b/i.test(order.paymentLabel),beepAfter:true});
+      }
       continue;
     }
     if(binding.role==='製作單'){
