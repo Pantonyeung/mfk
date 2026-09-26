@@ -153,6 +153,26 @@ export function RuntimeDiningWorkspace({runtime,onCheckout,onAddOrder}:{runtime:
     }catch(cause){setMessage(cause instanceof Error?cause.message:'取消掛枱失敗');}
   };
 
+  const cancelUnpaidDining=async()=>{
+    if(!detail?.formalOrderId||!runtime.cancelOrder||detail.paidMinor>0)return;
+    const reason=window.prompt('請輸入取消原因','客人取消堂食');
+    if(reason===null)return;
+    const confirmed=window.confirm('確認取消 '+detail.codeLabel+'？取消唔等於退款；未收款會停止追收。如已出製作單，系統會通知製作部。');
+    if(!confirmed)return;
+    try{
+      await runtime.cancelOrder(detail.formalOrderId,reason.trim()||'堂食取消');
+      setMessage('堂食單已取消；冇自動退款、冇開錢箱。');
+      setSelectedWait(null);
+      setTransferHoldId(null);
+      setSelectedHoldId(null);
+      setDetail(null);
+      setSelection({});
+      await load();
+    }catch(cause){
+      setMessage(cause instanceof Error?cause.message:'堂食取消失敗');
+    }
+  };
+
   const clearTable=async()=>{
     if(!detail||!runtime.clearDiningHold)return;
     try{
@@ -341,6 +361,7 @@ export function RuntimeDiningWorkspace({runtime,onCheckout,onAddOrder}:{runtime:
             }
           }}>{transferHoldId===detail.holdId?'取消轉枱':'轉枱'}</button>
           <button type="button" className="add-order" disabled={!detail.formalOrderId} onClick={goAddOrder}>＋ 加單</button>
+          <button type="button" className="cancel-order" disabled={!detail.formalOrderId||detail.paidMinor>0} title={detail.paidMinor>0?'已有付款；要先接正式退款／取消流程，避免錯誤改 Money truth':''} onClick={()=>void cancelUnpaidDining()}>{detail.paidMinor>0?'已有付款':'取消堂食單'}</button>
           <button type="button" className="clear" disabled={detail.remainingMinor>0} onClick={()=>void clearTable()}>清枱</button>
         </footer>
       </>:<div className="dining-detail-empty">
