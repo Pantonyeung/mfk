@@ -22,6 +22,7 @@ function installSuccessfulNativeBridge(){
   const messages:string[]=[];
   const listeners=new Set<(event:{data:unknown})=>void>();
   const fakeWindow={
+    location:{hostname:'appassets.androidplatform.net'},
     moreFunNative:{
       postMessage(raw:string){
         messages.push(raw);
