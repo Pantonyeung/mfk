@@ -46,6 +46,7 @@ export function RuntimeDiningWorkspace({runtime,onCheckout,onAddOrder}:{runtime:
   const [partySize,setPartySize]=useState(2);
   const [note,setNote]=useState('');
   const [selectedWait,setSelectedWait]=useState<string|null>(null);
+  const [transferHoldId,setTransferHoldId]=useState<string|null>(null);
   const [selectedHoldId,setSelectedHoldId]=useState<string|null>(null);
   const [detail,setDetail]=useState<LocalDiningHoldDetail|null>(null);
   const [selection,setSelection]=useState<Record<number,number>>({});
@@ -90,6 +91,30 @@ export function RuntimeDiningWorkspace({runtime,onCheckout,onAddOrder}:{runtime:
     }catch(cause){setMessage(cause instanceof Error?cause.message:'加入輪候失敗');}
   };
 
+  const transfer=async(tableId:string)=>{
+    if(!transferHoldId||!runtime.assignDiningTable)return;
+    try{
+      const moving=detail?.holdId===transferHoldId?detail:(runtime.readDiningHold?await runtime.readDiningHold(transferHoldId):null);
+      if(!moving?.assignedTable){
+        setTransferHoldId(null);
+        setMessage('轉枱已取消；此堂食單目前未掛枱。');
+        return;
+      }
+      const fromLabel=view?.tables.find(table=>table.id===moving.assignedTable)?.label??moving.assignedTable;
+      const toLabel=view?.tables.find(table=>table.id===tableId)?.label??tableId;
+      await runtime.assignDiningTable(transferHoldId,tableId);
+      setMessage('已由 '+fromLabel+' 轉到 '+toLabel+'；訂單編號保持不變。');
+      setSelectedWait(null);
+      setSelectedHoldId(transferHoldId);
+      const movedId=transferHoldId;
+      setTransferHoldId(null);
+      await load();
+      await loadDetail(movedId);
+    }catch(cause){
+      setMessage(cause instanceof Error?cause.message:'轉枱失敗');
+    }
+  };
+
   const assign=async(tableId:string)=>{
     if(!selectedWait||!runtime.assignDiningTable)return;
     try{
@@ -98,6 +123,7 @@ export function RuntimeDiningWorkspace({runtime,onCheckout,onAddOrder}:{runtime:
       const tableLabel=view?.tables.find(table=>table.id===tableId)?.label??tableId;
       setMessage('已安排到 '+tableLabel+'。');
       setSelectedWait(null);
+      setTransferHoldId(null);
       setSelectedHoldId(selectedWait);
       await load();
       await loadDetail(selectedWait);
@@ -119,6 +145,7 @@ export function RuntimeDiningWorkspace({runtime,onCheckout,onAddOrder}:{runtime:
     try{
       await runtime.unassignDiningTable(detail.holdId);
       setMessage('已取消掛枱，退回輪候。');
+      setTransferHoldId(null);
       setSelectedWait(detail.holdId);
       setSelectedHoldId(null);
       setDetail(null);
@@ -240,7 +267,11 @@ export function RuntimeDiningWorkspace({runtime,onCheckout,onAddOrder}:{runtime:
         return <button key={table.id} type="button"
           className={'dining-table '+table.state+(urgent?' overdue':'')+(selected?' selected':'')}
           onClick={()=>{
-            if(table.state==='available'){if(selectedWait)void assign(table.id);return;}
+            if(table.state==='available'){
+              if(transferHoldId){void transfer(table.id);return;}
+              if(selectedWait)void assign(table.id);
+              return;
+            }
             if(table.holdId)void loadDetail(table.holdId);
           }}>
           <div className="dining-table-top"><strong>{table.label}</strong><em>{table.state==='settled'?'已結帳':table.state==='available'?'空枱':(table.partySize??0)+' 位'}</em></div>
@@ -251,7 +282,7 @@ export function RuntimeDiningWorkspace({runtime,onCheckout,onAddOrder}:{runtime:
               用餐 {elapsed} 分鐘 · {overdue>0?'超時 '+overdue+' 分鐘':'剩餘 '+Math.max(0,35-elapsed)+' 分鐘'}
             </span>
             <div className="dining-table-money"><small>已收 {money(table.paidMinor??0)}</small><strong>未收 {money(table.remainingMinor??0)}</strong></div>
-          </>:<small>{selectedWait?'撳此安排':'空枱'}</small>}
+          </>:<small>{transferHoldId?'撳此轉枱':selectedWait?'撳此安排':'空枱'}</small>}
         </button>;
       })}</div>
       {message?<p className="dining-message">{message}</p>:null}
@@ -299,6 +330,16 @@ export function RuntimeDiningWorkspace({runtime,onCheckout,onAddOrder}:{runtime:
 
         <footer className="dining-detail-actions">
           <button type="button" className="unassign" disabled={!detail.assignedTable||detail.remainingMinor===0} onClick={()=>void unassign()}>取消掛枱／退回輪候</button>
+          <button type="button" className="transfer" disabled={!detail.assignedTable||detail.remainingMinor===0} onClick={()=>{
+            if(transferHoldId===detail.holdId){
+              setTransferHoldId(null);
+              setMessage('已取消轉枱模式。');
+            }else{
+              setSelectedWait(null);
+              setTransferHoldId(detail.holdId);
+              setMessage('轉枱模式：請撳一張空枱。');
+            }
+          }}>{transferHoldId===detail.holdId?'取消轉枱':'轉枱'}</button>
           <button type="button" className="add-order" disabled={!detail.formalOrderId} onClick={goAddOrder}>＋ 加單</button>
           <button type="button" className="clear" disabled={detail.remainingMinor>0} onClick={()=>void clearTable()}>清枱</button>
         </footer>
