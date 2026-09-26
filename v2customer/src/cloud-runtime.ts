@@ -45,6 +45,15 @@ async function jsonFetch(path:string,init?:RequestInit){
   const body=await response.json().catch(()=>({})) as Record<string,unknown>;
   return {response,body};
 }
+async function jsonFetchWithTimeout(path:string,init:RequestInit|undefined,timeoutMs:number){
+  const controller=new AbortController();
+  const timer=window.setTimeout(()=>controller.abort(),timeoutMs);
+  try{
+    return await jsonFetch(path,{...init,signal:controller.signal});
+  }finally{
+    window.clearTimeout(timer);
+  }
+}
 function commandFromReadback(body:Record<string,unknown>):CustomerCommandResult{
   const state=String(body.state||'UNKNOWN');
   if(state==='CONFIRMED'){
@@ -69,16 +78,23 @@ function commandFromReadback(body:Record<string,unknown>):CustomerCommandResult{
 const QUOTE_READBACK_INTERVAL_MS=250;
 const BACKEND_PROBE_ATTEMPTS=3;
 const BACKEND_PROBE_INTERVAL_MS=700;
+const BACKEND_PROBE_TIMEOUT_MS=1600;
+const BACKEND_PROBE_FRESH_MS=5000;
+let lastReachableBackendProbeAt=0;
 
-async function probeOrderBackend(){
+async function probeOrderBackend(onAttempt?:(attempt:number,total:number)=>void){
   let lastReason='CUSTOMER_SMT_BACKEND_UNAVAILABLE';
   for(let attempt=1;attempt<=BACKEND_PROBE_ATTEMPTS;attempt++){
+    onAttempt?.(attempt,BACKEND_PROBE_ATTEMPTS);
     try{
-      const {response,body}=await jsonFetch('/api/customer/channel-health?storeId='+STORE_ID);
-      if(response.ok&&body.reachable===true)return Object.freeze({reachable:true,attempts:attempt});
+      const {response,body}=await jsonFetchWithTimeout('/api/customer/channel-health?storeId='+STORE_ID,undefined,BACKEND_PROBE_TIMEOUT_MS);
+      if(response.ok&&body.reachable===true){
+        lastReachableBackendProbeAt=Date.now();
+        return Object.freeze({reachable:true,attempts:attempt});
+      }
       lastReason=String(body.code||'CUSTOMER_SMT_BACKEND_UNAVAILABLE');
     }catch(error){
-      lastReason=error instanceof Error?error.message:'CUSTOMER_SMT_BACKEND_UNAVAILABLE';
+      lastReason=error instanceof Error?error.name==='AbortError'?'CUSTOMER_SMT_BACKEND_PROBE_TIMEOUT':error.message:'CUSTOMER_SMT_BACKEND_UNAVAILABLE';
     }
     if(attempt<BACKEND_PROBE_ATTEMPTS)await sleep(BACKEND_PROBE_INTERVAL_MS);
   }
@@ -171,34 +187,40 @@ export function createCloudCustomerRuntimePort():CustomerRuntimePort{
     },
 
     async submitOrder(intent:CustomerPendingIntent):Promise<CustomerCommandResult>{
-      const health=await probeOrderBackend();
-      if(!health.reachable){
-        return{state:'NOT_CONNECTED',message:'暫時未能連接店舖接單系統；請改用 WhatsApp 聯絡店舖。'};
+      if(Date.now()-lastReachableBackendProbeAt>BACKEND_PROBE_FRESH_MS){
+        const health=await probeOrderBackend();
+        if(!health.reachable){
+          return{state:'NOT_CONNECTED',message:'暫時未能連接店舖接單系統；請改用 WhatsApp 聯絡店舖。'};
+        }
       }
       rememberSubmissionRef(intent.submissionId);
-      const {response,body}=await jsonFetch('/api/customer/orders/submit?storeId='+STORE_ID,{
-        method:'POST',
-        body:JSON.stringify({
-          schema:MFK_CUSTOMER_ORDER_INTENT_SCHEMA,
-          storeId:STORE_ID,
-          submissionId:intent.submissionId,
-          menuRevision:intent.menuRevision,
-          idempotencyKey:intent.idempotencyKey,
-          createdAt:intent.createdAt,
-          updatedAt:intent.updatedAt,
-          cart:intent.cart,
-          checkout:{
-            name:intent.checkout.name,
-            phone:intent.checkout.phone,
-            paymentMethod:intent.checkout.paymentMethod,
-            ...(intent.checkout.paymentMethod==='ELECTRONIC'&&intent.checkout.paymentChannelId?{paymentChannelId:intent.checkout.paymentChannelId,paymentChannelLabel:intent.checkout.paymentChannelLabel??''}:{}),
-            ...(intent.checkout.paymentMethod==='ELECTRONIC'&&intent.checkout.paymentEvidence?.evidenceRef?{paymentEvidenceRef:intent.checkout.paymentEvidence.evidenceRef}:{}),
-          },
-        }),
-      });
-      if(response.status===409)return{state:'FAILED',message:String(body.code||'提交身份衝突')};
-      if(!response.ok&&response.status!==202)return{state:'FAILED',message:String(body.code||'未能提交訂單')};
-      return waitOrder(intent.submissionId);
+      try{
+        const {response,body}=await jsonFetchWithTimeout('/api/customer/orders/submit?storeId='+STORE_ID,{
+          method:'POST',
+          body:JSON.stringify({
+            schema:MFK_CUSTOMER_ORDER_INTENT_SCHEMA,
+            storeId:STORE_ID,
+            submissionId:intent.submissionId,
+            menuRevision:intent.menuRevision,
+            idempotencyKey:intent.idempotencyKey,
+            createdAt:intent.createdAt,
+            updatedAt:intent.updatedAt,
+            cart:intent.cart,
+            checkout:{
+              name:intent.checkout.name,
+              phone:intent.checkout.phone,
+              paymentMethod:intent.checkout.paymentMethod,
+              ...(intent.checkout.paymentMethod==='ELECTRONIC'&&intent.checkout.paymentChannelId?{paymentChannelId:intent.checkout.paymentChannelId,paymentChannelLabel:intent.checkout.paymentChannelLabel??''}:{}),
+              ...(intent.checkout.paymentMethod==='ELECTRONIC'&&intent.checkout.paymentEvidence?.evidenceRef?{paymentEvidenceRef:intent.checkout.paymentEvidence.evidenceRef}:{}),
+            },
+          }),
+        },5000);
+        if(response.status===409)return{state:'FAILED',message:String(body.code||'提交身份衝突')};
+        if(!response.ok&&response.status!==202)return{state:'FAILED',message:String(body.code||'未能提交訂單')};
+        return waitOrder(intent.submissionId);
+      }catch{
+        return{state:'UNKNOWN',message:'落單要求可能已送出；系統會先讀回原本結果，請勿重複提交。'};
+      }
     },
 
     async readSubmission(submissionId:string):Promise<CustomerCommandResult>{
