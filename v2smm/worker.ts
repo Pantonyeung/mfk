@@ -226,7 +226,9 @@ function mapPublishedSnapshot(raw:unknown){
                 label:choice.type==='PRODUCT'
                   ?(product?.name??choice.label??choice.productId??'未命名商品')
                   :choice.label,
-                available:choice.type!=='PRODUCT'||Boolean(product?.sellable&&product.priceReady),
+                available:choice.type!=='PRODUCT'||Boolean(
+                  product?.sellable&&product.priceReady&&(pool.kind!=='ADDON'||product.optionSets.length===0)
+                ),
                 publishedAdjustmentMinor:choice.priceAdjustmentMinor,
               };
             }),
