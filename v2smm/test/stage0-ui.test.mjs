@@ -24,6 +24,9 @@ test('Stage 0 has bounded splash and full recovery contract',()=>{
   assert.match(stage0,/配對 LAN|LAN 配對/);
   assert.match(stage0,/pairSmmLan/);
   assert.match(stage0,/probeSmmLan/);
+  assert.match(stage0,/LAST_OBSERVED_KEY/);
+  assert.match(stage0,/rememberLastObservedAt/);
+  assert.match(stage0,/onRetry\(\);/);
 });
 
 test('Stage 0 never shows raw engineering error messages to frontline UI',()=>{
