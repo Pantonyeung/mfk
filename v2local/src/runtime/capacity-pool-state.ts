@@ -50,6 +50,8 @@ export interface SmtCapacityPoolStateViewRow{
   readonly productIds:readonly string[];
   readonly firstPartyStopAt:number;
   readonly thirdPartyStopAt:number;
+  readonly firstPartyAccepting:boolean;
+  readonly thirdPartyAccepting:boolean;
   readonly note:string;
 }
 
@@ -267,6 +269,8 @@ export function ensureCurrentCapacityPoolState(
       productIds:Object.freeze([...pool.productIds]),
       firstPartyStopAt:pool.firstPartyStopAt,
       thirdPartyStopAt:pool.thirdPartyStopAt,
+      firstPartyAccepting:row.remainingQty>pool.firstPartyStopAt,
+      thirdPartyAccepting:row.remainingQty>pool.thirdPartyStopAt,
       note:pool.note,
     });
   });
@@ -407,4 +411,35 @@ export function applyManualCapacityCorrection(
   });
   writeLocalCapacityPoolRows(rows.map((row,rowIndex)=>rowIndex===index?updated:row),storage);
   return ensureCurrentCapacityPoolState(now,storage,events);
+}
+
+
+export type CapacityRemoteChannel='FIRST_PARTY'|'THIRD_PARTY';
+
+export function assertCapacityChannelAdmission(input:{
+  readonly channel:CapacityRemoteChannel;
+  readonly items:readonly {readonly id:string;readonly qty:number}[];
+  readonly orderEvents?:readonly CapacityPoolOrderEvent[];
+  readonly now?:number;
+  readonly storage?:Pick<Storage,'getItem'|'setItem'>;
+}):SmtCapacityPoolStateView{
+  const channel=input.channel;
+  if(channel!=='FIRST_PARTY'&&channel!=='THIRD_PARTY')throw new Error('CAPACITY_CHANNEL_INVALID');
+  const now=input.now??Date.now();
+  const storage=input.storage??localStorage;
+  const events=input.orderEvents??[];
+  const config=readSmtCapacityConfig();
+  for(const pool of config.pools){
+    if(!pool.active||capacityPoolCanActivate(pool))continue;
+    if(demandedQuantity(input.items,pool.productIds)>0)throw new Error('CAPACITY_POOL_CONFIG_INVALID:'+(pool.id||'UNKNOWN'));
+  }
+  const view=ensureCurrentCapacityPoolState(now,storage,events);
+  for(const pool of view.pools){
+    const quantity=demandedQuantity(input.items,pool.productIds);
+    if(quantity<=0)continue;
+    if(quantity>pool.remainingQty)throw new Error('CAPACITY_POOL_INSUFFICIENT:'+pool.poolId);
+    const accepting=channel==='FIRST_PARTY'?pool.firstPartyAccepting:pool.thirdPartyAccepting;
+    if(!accepting)throw new Error('CAPACITY_CHANNEL_STOP:'+channel+':'+pool.poolId);
+  }
+  return view;
 }
