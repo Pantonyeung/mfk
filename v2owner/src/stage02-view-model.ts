@@ -1,4 +1,4 @@
-import {selectOpenActions} from './stage02-open-actions';
+import {selectActionHistory,selectOpenActions} from './stage02-open-actions';
 import type {
   OwnerActionItem,
   OwnerActivityRecord,
@@ -62,13 +62,6 @@ export function buildOwnerActionDetailViewModel(
   row:OwnerActionQueueRowViewModel,
   activity:readonly OwnerActivityRecord[],
 ):OwnerActionDetailViewModel{
-  const history=activity
-    .filter(record=>{
-      if(row.action.correlationId)return record.correlationId===row.action.correlationId;
-      if(row.action.incidentId)return record.incidentId===row.action.incidentId;
-      return record.linkedActionId===row.action.actionId;
-    })
-    .sort((a,b)=>b.observedAt.localeCompare(a.observedAt));
-
+  const history=selectActionHistory(row.action,activity);
   return {row,history};
 }
