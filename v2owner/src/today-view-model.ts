@@ -70,8 +70,8 @@ function firstHealth(snapshot:OwnerReadModelSnapshot|null,kind:Exclude<OwnerHeal
 
 export function buildOwnerTodayViewModel(snapshot:OwnerReadModelSnapshot|null):OwnerTodayViewModel{
   const actions=[...selectOpenActions(snapshot?.actions??[])];
-  const topSeverity=actions.sort((a,b)=>severityRank[b.severity]-severityRank[a.severity]||a.observedAt.localeCompare(b.observedAt))[0]??null;
-  const oldestUnresolved=[...(snapshot?.actions??[])].sort((a,b)=>a.observedAt.localeCompare(b.observedAt))[0]??null;
+  const topSeverity=[...actions].sort((a,b)=>severityRank[b.severity]-severityRank[a.severity]||a.observedAt.localeCompare(b.observedAt))[0]??null;
+  const oldestUnresolved=[...actions].sort((a,b)=>a.observedAt.localeCompare(b.observedAt))[0]??null;
 
   return {
     storeName:snapshot?.store?.storeName??'未連接門店',
