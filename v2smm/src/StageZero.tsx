@@ -22,6 +22,13 @@ const PROBE_TIMEOUT_MS=3500;
 const LAN_PROBE_TIMEOUT_MS=2200;
 const LAST_OBSERVED_KEY='mfk.smm.stage0.last-observed.v1';
 
+function uiAcceptanceBypass(){
+  if(typeof window==='undefined')return false;
+  const query=new URLSearchParams(window.location.search);
+  const host=window.location.hostname.toLowerCase();
+  return query.get('ui-bypass')==='1'||host.startsWith('smm-acceptance-')||host==='localhost'||host==='127.0.0.1';
+}
+
 type ProbeState='CHECKING'|'READY'|'ERROR';
 type LanState='UNCONFIGURED'|'CHECKING'|'READY'|'ERROR';
 
@@ -65,6 +72,7 @@ function initialLanForm(){
 
 export function StageZeroGate({children}:{children:ReactNode}){
   const initialSession=useMemo(()=>readSmmStaffSession(),[]);
+  const bypass=useMemo(()=>uiAcceptanceBypass(),[]);
   const [splashDone,setSplashDone]=useState(false);
   const [probeState,setProbeState]=useState<ProbeState>('CHECKING');
   const [snapshot,setSnapshot]=useState<SmmReadModelSnapshot|null>(null);
@@ -104,9 +112,13 @@ export function StageZeroGate({children}:{children:ReactNode}){
     return()=>window.clearTimeout(timer);
   },[]);
 
-  if(offlineBypass&&staffSession)return <>{children}</>;
-
   if(!splashDone)return <StageZeroSplash/>;
+
+  // Owner-authorised UI acceptance bypass: presentation review must not depend on Internet/LAN auth.
+  // It is deliberately limited to the acceptance hostname, localhost, or explicit ?ui-bypass=1.
+  if(bypass)return <>{children}</>;
+
+  if(offlineBypass&&staffSession)return <>{children}</>;
 
   if(probeState==='CHECKING')return <StageZeroConnectionChecking/>;
 
@@ -134,31 +146,10 @@ function BrandLockup({compact=false}:{compact?:boolean}){
   </div>;
 }
 
-function BrandScene({asset,alt,purpose,tone='blue',compact=false}:{
-  asset:string;
-  alt:string;
-  purpose:string;
-  tone?:'blue'|'purple'|'warm';
-  compact?:boolean;
-}){
-  return <section className={`stage0-brand-scene ${tone} ${compact?'compact':''}`}>
-    <BrandLockup compact/>
-    <div className="stage0-illustration-wrap">
-      <img className="stage0-illustration" src={asset} alt={alt}/>
-      <span className="stage0-purpose-chip">{purpose}</span>
-    </div>
-  </section>;
-}
-
 function StageZeroSplash(){
   return <main className="stage0-shell stage0-splash" aria-busy="true">
     <section className="stage0-center">
-      <BrandScene
-        asset="/brand/stage0/splash-male.svg"
-        alt="重新繪製嘅磨飯男 IP，手持平板並揮手迎接員工"
-        purpose="品牌露出 · 啟動陪伴"
-        tone="warm"
-      />
+      <BrandLockup/>
       <div className="stage0-slogan">
         <strong>前線好幫手</strong>
         <span>令每一張訂單都更順暢</span>
@@ -172,12 +163,7 @@ function StageZeroSplash(){
 function StageZeroConnectionChecking(){
   return <main className="stage0-shell">
     <section className="stage0-card stage0-check-card">
-      <BrandScene
-        asset="/brand/stage0/connecting-male.svg"
-        alt="重新繪製嘅磨飯男 IP，操作平板檢查門店連線"
-        purpose="連線引導 · 穩定等待"
-        compact
-      />
+      <BrandLockup compact/>
       <h1>正在連線</h1>
       <p>檢查門店服務同最新資料，完成後會自動進入工作區。</p>
       <div className="stage0-check-list" aria-live="polite">
@@ -271,13 +257,7 @@ function StageZeroConnectionRecovery({
 
   return <main className="stage0-shell">
     <section className="stage0-card stage0-recovery-card">
-      <BrandScene
-        asset="/brand/stage0/recovery-female.svg"
-        alt="重新繪製嘅磨飯女 IP，手持平板協助處理連線問題"
-        purpose="失敗恢復 · 專業陪伴"
-        tone="purple"
-        compact
-      />
+      <BrandLockup compact/>
       <div className="stage0-status-icon error" aria-hidden="true">!</div>
       <h1>暫時未能連接門店</h1>
       <p>{message}</p>
@@ -366,13 +346,7 @@ function StageZeroStaffLogin({onSuccess}:{onSuccess:(session:SmmStaffSession)=>v
 
   return <main className="stage0-shell">
     <section className="stage0-card stage0-login-card">
-      <BrandScene
-        asset="/brand/stage0/login-female.svg"
-        alt="重新繪製嘅磨飯女 IP，手持員工卡引導登入"
-        purpose="登入引導 · 溫暖迎接"
-        tone="purple"
-        compact
-      />
+      <BrandLockup compact/>
       <header>
         <span>歡迎返嚟</span>
         <h1>員工登入</h1>
