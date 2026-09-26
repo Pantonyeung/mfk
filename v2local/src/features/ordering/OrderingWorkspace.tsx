@@ -55,17 +55,18 @@ function ServiceToggle({value,onChange,availability}:{value:ServiceMode;onChange
 }
 
 function CartLineRow({line,index,highlighted,actions,availability}:{line:CartLineViewModel;index:number;highlighted:boolean;actions:OrderingWorkspaceActions;availability:NonNullable<OrderingWorkspaceViewModel['actionAvailability']>}){
+  const sourceLineIds=line.sourceLineIds?.length?line.sourceLineIds:[line.id];
   const nextMode:ServiceMode=line.serviceMode==='takeaway'?'dine-in':'takeaway';
   return <article className={`ordering-cart-line${highlighted?' line-updated':''}`} aria-label={`購物車商品 ${line.name}`}>
     <div className="ordering-line-identity">
       <span className="ordering-line-sequence">{index+1}</span>
-      {availability.lineServiceMode?<button type="button" className={`ordering-line-mode ${line.serviceMode}`} onClick={()=>actions.onChangeLineServiceMode(line.id,nextMode)} aria-label={`第 ${index+1} 項切換外賣堂食`}>{line.serviceMode==='takeaway'?'外':'堂'}</button>:<span className={`ordering-line-mode ${line.serviceMode}`} aria-label={line.serviceMode==='takeaway'?'外賣':'堂食'}>{line.serviceMode==='takeaway'?'外':'堂'}</span>}
+      {availability.lineServiceMode?<button type="button" className={`ordering-line-mode ${line.serviceMode}`} onClick={()=>actions.onChangeLineServiceMode(sourceLineIds,nextMode)} aria-label={`第 ${index+1} 項切換外賣堂食`}>{line.serviceMode==='takeaway'?'外':'堂'}</button>:<span className={`ordering-line-mode ${line.serviceMode}`} aria-label={line.serviceMode==='takeaway'?'外賣':'堂食'}>{line.serviceMode==='takeaway'?'外':'堂'}</span>}
     </div>
-    {availability.lineEdit?<button type="button" className="ordering-line-copy ordering-line-copy-button" onClick={()=>actions.onEditCartLine(line.id)} aria-label={`修改 ${line.name}`}><b>{line.name}</b>{line.detail?<small>{line.detail}</small>:null}</button>:<div className="ordering-line-copy"><b>{line.name}</b>{line.detail?<small>{line.detail}</small>:null}</div>}
+    {availability.lineEdit?<button type="button" className="ordering-line-copy ordering-line-copy-button" onClick={()=>actions.onEditCartLine(sourceLineIds)} aria-label={`修改 ${line.name}`}><b>{line.name}</b>{line.detail?<small>{line.detail}</small>:null}</button>:<div className="ordering-line-copy"><b>{line.name}</b>{line.detail?<small>{line.detail}</small>:null}</div>}
     <div className="ordering-line-qty">
-      {availability.lineQuantity?<button type="button" onClick={()=>actions.onAdjustLineQuantity(line.id,-1)} aria-label={`減少 ${line.name}`}>−</button>:null}
+      {availability.lineQuantity?<button type="button" onClick={()=>actions.onAdjustLineQuantity(sourceLineIds,-1)} aria-label={`減少 ${line.name}`}>−</button>:null}
       <strong>{line.quantity}</strong>
-      {availability.lineQuantity?<button type="button" onClick={()=>actions.onAdjustLineQuantity(line.id,1)} aria-label={`增加 ${line.name}`}>＋</button>:null}
+      {availability.lineQuantity?<button type="button" onClick={()=>actions.onAdjustLineQuantity(sourceLineIds,1)} aria-label={`增加 ${line.name}`}>＋</button>:null}
     </div>
     <strong className="ordering-line-total">{line.lineTotalLabel}</strong>
   </article>;
@@ -90,7 +91,7 @@ function OrganizedCart({lines,highlightedLineId,actions,availability}:{lines:rea
         <button type="button" className="ordering-cart-group-head" aria-expanded={!hidden} onClick={()=>setCollapsed(current=>({...current,[group.id]:!current[group.id]}))}>
           <span><strong>{group.label}</strong><small>{group.lines.length} 款 · {quantity} 件</small></span><b>{hidden?'＋':'−'}</b>
         </button>
-        {!hidden?<div className="ordering-cart-group-lines">{group.lines.map(({line,index})=><CartLineRow key={line.id} line={line} index={index} highlighted={highlightedLineId===line.id} actions={actions} availability={availability}/>)}</div>:null}
+        {!hidden?<div className="ordering-cart-group-lines">{group.lines.map(({line,index})=><CartLineRow key={line.id} line={line} index={index} highlighted={highlightedLineId===line.id||Boolean(line.sourceLineIds?.includes(highlightedLineId??''))} actions={actions} availability={availability}/>)}</div>:null}
       </section>;
     })}
   </div>;
@@ -127,12 +128,13 @@ export function OrderingWorkspace({view,actions,centerPanel}:{view:OrderingWorks
             <button type="button" className={view.cart.viewMode==='original'?'active':''} aria-pressed={view.cart.viewMode==='original'} onClick={()=>actions.onChangeCartView('original')}>原單</button>
             <button type="button" className={view.cart.viewMode==='organized'?'active':''} aria-pressed={view.cart.viewMode==='organized'} onClick={()=>actions.onChangeCartView('organized')}>整理</button>
           </div>
+          <button type="button" className={'ordering-cart-combine'+(view.cart.combineSimilar?' active':'')} aria-pressed={view.cart.combineSimilar} onClick={actions.onToggleCombine}>合併顯示 {view.cart.combineSimilar?'開':'關'}</button>
           <ServiceToggle value={view.cart.serviceMode} onChange={actions.onChangeServiceMode} availability={serviceModes}/>
         </div>
       </header>
       <div className={`ordering-cart-lines ${view.cart.viewMode}`}>
         {view.cart.lines.length?(view.cart.viewMode==='original'
-          ?view.cart.lines.map((line,index)=><CartLineRow key={line.id} line={line} index={index} highlighted={view.highlightedCartLineId===line.id} actions={actions} availability={availability}/>)
+          ?view.cart.lines.map((line,index)=><CartLineRow key={line.id} line={line} index={index} highlighted={view.highlightedCartLineId===line.id||Boolean(line.sourceLineIds?.includes(view.highlightedCartLineId??''))} actions={actions} availability={availability}/>)
           :<OrganizedCart lines={view.cart.lines} highlightedLineId={view.highlightedCartLineId} actions={actions} availability={availability}/>
         ):<div className="ordering-cart-empty">購物車未有商品</div>}
       </div>
