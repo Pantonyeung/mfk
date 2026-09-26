@@ -112,6 +112,7 @@ export interface DiningAdditionPrintResult{
 export interface LocalDiningAddition{
   readonly id:string;
   readonly submissionId:string;
+  readonly requestSignature?:string;
   readonly createdAt:string;
   readonly totalMinor:number;
   readonly sourceLabel?:string;
@@ -1015,10 +1016,6 @@ function appendDiningItemsToSnapshot(snapshot:Persisted,hold:LocalHoldDraft,inpu
   if(!hold.formalOrderId)throw new Error('DINING_FORMAL_ORDER_REQUIRED');
   const submissionId=String(input.submissionId||'').trim();
   if(!submissionId||submissionId.length>200)throw new Error('DINING_ADDITION_SUBMISSION_REQUIRED');
-  const prior=(hold.additions??[]).find(row=>row.submissionId===submissionId);
-  if(prior){
-    return {hold,addition:prior,order:snapshot.orders.find(row=>row.id===hold.formalOrderId),orders:snapshot.orders,changed:false};
-  }
   const items=input.items
     .map(item=>({
       id:String(item.id||''),
@@ -1031,13 +1028,21 @@ function appendDiningItemsToSnapshot(snapshot:Persisted,hold:LocalHoldDraft,inpu
   const computed=items.reduce((sum,item)=>sum+item.qty*item.unitMinor,0);
   const totalMinor=Math.max(0,Math.floor(Number(input.totalMinor)||0));
   if(!Number.isSafeInteger(computed)||computed<=0||computed!==totalMinor)throw new Error('DINING_ADDITION_TOTAL_MISMATCH');
+  const sourceLabel=String(input.sourceLabel||hold.sourceLabel||'堂食');
+  const requestSignature=JSON.stringify([hold.id,items,totalMinor,sourceLabel]);
+  const prior=(hold.additions??[]).find(row=>row.submissionId===submissionId);
+  if(prior){
+    if(prior.requestSignature&&prior.requestSignature!==requestSignature)throw new Error('DINING_ADDITION_SUBMISSION_CONFLICT');
+    return {hold,addition:prior,order:snapshot.orders.find(row=>row.id===hold.formalOrderId),orders:snapshot.orders,changed:false};
+  }
   const createdAt=new Date().toISOString();
   const addition:LocalDiningAddition={
     id:'DA:'+hold.id+':'+submissionId,
     submissionId,
+    requestSignature,
     createdAt,
     totalMinor,
-    sourceLabel:String(input.sourceLabel||hold.sourceLabel||'堂食'),
+    sourceLabel,
     items,
   };
   const updated:LocalHoldDraft={
@@ -1174,7 +1179,15 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
     if(occupied){
       const priorAddition=(occupied.additions??[]).find(row=>row.submissionId===providerRef);
       if((occupied.smmSubmissionRefs??[]).includes(providerRef)){
-        return priorAddition?occupied:occupied;
+        if(priorAddition){
+          appendDiningItemsToSnapshot(snapshot,occupied,{
+            submissionId:providerRef,
+            items,
+            totalMinor:Math.max(0,Math.floor(Number(input.totalMinor)||0)),
+            sourceLabel:input.sourceLabel||'SMM',
+          });
+        }
+        return occupied;
       }
       const appended=appendDiningItemsToSnapshot(snapshot,occupied,{
         submissionId:providerRef,
