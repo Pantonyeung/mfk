@@ -106,3 +106,43 @@ For every next bounded SMT part:
 `IMPLEMENT → PROOF → MERGE → BANK → CANDIDATE OTA → PUBLIC READBACK GREEN → NEXT PART`
 
 Do not batch multiple future SMT changes before OTA.
+
+
+## OTA R1
+Owner cadence is now:
+`ONE BOUNDED PART → PROOF → MAIN → BANK → CANDIDATE OTA → PUBLIC READBACK → NEXT PART`.
+
+This part has completed that cycle.
+
+OTA source:
+`9498b2e9716f829d91c70cff731cd627639e9f0e`
+
+Builder request:
+`Pantonyeung/morefunos-v1-builder@d9886b5353710fbf29d1942e4221f515f0d87ba0`
+
+OTA workflow:
+- `MFK Runtime OTA`
+- run `36232975523`
+- SUCCESS
+- 37 / 37 SMT test files PASS
+- 162 / 162 tests PASS
+- build PASS
+- signed runtime package PASS
+- R2 publish PASS
+- public manifest / hash readback PASS
+
+Published release:
+`runtime-candidate-mfk-9498b2e9716f`
+
+Bundle:
+`MoreFunOS-SMT-runtime-candidate-mfk-9498b2e9716f.mfos`
+
+Public readback marker:
+`MFK_RUNTIME_OTA_PUBLISHED`
+
+Admin runtime was also deployed for the new `pricingPromotions` snapshot support:
+- deploy request commit `d3b8ddac3b921bbfbf8245dcd5057cfd19505cb9`
+- deploy run `36232955418` SUCCESS
+
+Operational note:
+the SMT runtime is already available on the candidate OTA channel. The promotion remains Admin-authoritative; an existing already-published Admin snapshot that predates `pricingPromotions` must be saved/published as a newer Admin configuration before that rule becomes active in SMT. Do not add an SMT hard-coded pricing fallback.
