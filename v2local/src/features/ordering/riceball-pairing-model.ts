@@ -187,6 +187,7 @@ export function buildRiceballPairingDraft(
   combos:readonly SyncedCombo[],
   pools:readonly SyncedComboPool[],
   blockedLineIds:ReadonlySet<string>=new Set(),
+  startIndex=0,
 ):PairingDraft{
   const unpaired=lines.filter(line=>line.qty>0&&!isPairedComboLine(line)&&!blockedLineIds.has(line.id));
   const snackIds=allSnackProductIds(combos,pools);
@@ -212,7 +213,7 @@ export function buildRiceballPairingDraft(
     if(defaultSnack)usedSnacks.add(defaultSnack.id);
     return Object.freeze({
       id:unit.id,
-      label:letter(index),
+      label:letter(startIndex+index),
       main:unit,
       comboId:combo.id,
       comboName:combo.name,
@@ -415,6 +416,21 @@ export function restorePairingGroup<T extends PairingCartLine>(
     const restored={...line,unitMinor:product.priceMinor+selectedOptionAdjustment({...line,detail},product),detail:detail||undefined};
     return restored as T;
   });
+}
+
+function pairingLabelIndex(label:string){
+  let value=0;
+  for(const char of label.toUpperCase()){
+    const code=char.charCodeAt(0)-64;
+    if(code<1||code>26)return -1;
+    value=value*26+code;
+  }
+  return value-1;
+}
+
+export function nextPairingStartIndex(lines:readonly PairingCartLine[]){
+  const indices=existingPairingGroups(lines).map(pairingLabelIndex).filter(index=>index>=0);
+  return indices.length?Math.max(...indices)+1:0;
 }
 
 export function existingPairingGroups(lines:readonly PairingCartLine[]){
