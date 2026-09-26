@@ -65,6 +65,7 @@ describe('SMT P1-3 Admin dining table registry convergence',()=>{
     const {localRuntime}=await import('../runtime/local-runtime.ts');
     localRuntime.clear();
     const first=await localRuntime.createDiningWait({partySize:2});
+    await new Promise(resolve=>setTimeout(resolve,2));
     const second=await localRuntime.createDiningWait({partySize:2});
     await localRuntime.assignDiningTable(first.id,'T01');
     await expect(localRuntime.assignDiningTable(second.id,'T01')).rejects.toThrow('DINING_TABLE_OCCUPIED');
