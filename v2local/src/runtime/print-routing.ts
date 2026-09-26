@@ -25,6 +25,7 @@ export interface PrintableOrder{
   readonly paymentLabel:string;
   readonly sourceLabel:string;
   readonly providerPickupCode?:string;
+  readonly diningTableLabel?:string;
   readonly orderRemark?:string;
   readonly utensilPreference?:'需要'|'不需要';
   readonly items:readonly {
@@ -45,12 +46,14 @@ export interface PlannedPrintJob{
   readonly payload:string;
   readonly renderMode?:'text'|'tsc-bitmap'|'escpos-raster';
   readonly labelSpec?:RasterLabelSpec;
-  readonly ticketKind?:'receipt'|'production'|'packing';
+  readonly ticketKind?:'receipt'|'production'|'packing'|'dining-table';
   readonly ticketOrder?:PrintableOrder;
   readonly cutAfter?:boolean;
   readonly kickDrawer?:boolean;
   readonly beepAfter?:boolean;
 }
+
+export type PrintPlanMode='standard'|'dining-initial';
 
 export interface TscBitmapJobBatch{
   readonly binding:PrintBinding;
@@ -186,6 +189,32 @@ export function renderCustomerReceiptTicket(order:PrintableOrder){
     +'\n\n';
 }
 
+export function renderDiningTableTicket(order:PrintableOrder){
+  const rows=order.items.map(item=>{
+    const details=verticalSelectionLines(itemDetail(item)).map(line=>'  '+line+'\n').join('');
+    return BOLD_ON+itemIdentity(item)+BOLD_OFF+'\n'
+      +details
+      +'  '+item.qty+'份\n';
+  }).join('');
+  return INIT
+    +brand()
+    +RULE
+    +CENTER+BOLD_ON+DOUBLE+'堂食枱單\n'+NORMAL+BOLD_OFF+LEFT
+    +RULE
+    +'枱號 '+clean(order.diningTableLabel??'未指定')+'\n'
+    +'訂單編號 '+clean(order.display)+'\n'
+    +'下單時間 '+hktDateTime(order.createdAt)+'\n'
+    +RULE
+    +rows
+    +RULE
+    +BOLD_ON+'總數量 '+totalUnits(order)+'份\n'+BOLD_OFF
+    +'訂單總額 '+money(order.totalMinor)+'\n'
+    +BOLD_ON+'付款狀態 未結清\n'+BOLD_OFF
+    +CENTER+'*** 此枱單不是付款收據 ***\n'+LEFT
+    +RULE
+    +'\n\n';
+}
+
 export function renderProductionTicket(order:PrintableOrder){
   const blocks=order.items.map(item=>{
     const details=productionBlockLines(itemDetail(item)).map(line=>line+'\n').join('');
@@ -216,7 +245,8 @@ export function renderPackingTicket(order:PrintableOrder){
   return INIT
     +brand()
     +RULE
-    +CENTER+BOLD_ON+DOUBLE+'外賣打包單\n'+NORMAL+'TAKE AWAY\n'+BOLD_OFF+LEFT
+    +CENTER+BOLD_ON+DOUBLE+(orderService(order)==='堂食'?'堂食打包單':'外賣打包單')+'\n'
+    +NORMAL+(orderService(order)==='堂食'?'DINE IN':'TAKE AWAY')+'\n'+BOLD_OFF+LEFT
     +RULE
     +'訂單編號 '+clean(order.display)+'\n'
     +'下單時間 '+hktDateTime(order.createdAt)+'\n'
@@ -303,7 +333,7 @@ function buildGlobalProductLabelUnits(order:PrintableOrder,bindings:readonly Pri
   return units;
 }
 
-export function buildOrderPrintPlan(order:PrintableOrder,bindings:readonly PrintBinding[],config?:PrintRuntimeConfig):readonly PlannedPrintJob[]{
+export function buildOrderPrintPlan(order:PrintableOrder,bindings:readonly PrintBinding[],config?:PrintRuntimeConfig,mode:PrintPlanMode='standard'):readonly PlannedPrintJob[]{
   const active=bindings.filter(binding=>String(binding.host||'').trim()&&Number(binding.port)>0&&logicalBindingEnabled(binding,config));
   const productLabelUnits=buildGlobalProductLabelUnits(order,active,config);
   const globalProductLabelTotal=productLabelUnits.length;
@@ -312,7 +342,23 @@ export function buildOrderPrintPlan(order:PrintableOrder,bindings:readonly Print
     if(binding.role==='顧客小票'){
       const items=roleItems(order,'receipt',config);
       if(items.length<1)continue;
-      jobs.push({id:order.id+':receipt',role:binding.role,binding,payload:renderCustomerReceiptTicket(withItems(order,items)),renderMode:'escpos-raster',ticketKind:'receipt',ticketOrder:withItems(order,items),cutAfter:true,kickDrawer:/\bCASH\b/i.test(order.paymentLabel),beepAfter:true});
+      const routed=withItems(order,items);
+      if(mode==='dining-initial'){
+        jobs.push({
+          id:order.id+':dining-table',
+          role:binding.role,
+          binding,
+          payload:renderDiningTableTicket(routed),
+          renderMode:'escpos-raster',
+          ticketKind:'dining-table',
+          ticketOrder:routed,
+          cutAfter:true,
+          kickDrawer:false,
+          beepAfter:true,
+        });
+      }else{
+        jobs.push({id:order.id+':receipt',role:binding.role,binding,payload:renderCustomerReceiptTicket(routed),renderMode:'escpos-raster',ticketKind:'receipt',ticketOrder:routed,cutAfter:true,kickDrawer:/\bCASH\b/i.test(order.paymentLabel),beepAfter:true});
+      }
       continue;
     }
     if(binding.role==='製作單'){
