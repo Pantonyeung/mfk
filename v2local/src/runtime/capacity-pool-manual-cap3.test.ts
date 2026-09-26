@@ -75,6 +75,7 @@ describe('CAP3 SMT manual capacity correction',()=>{
     const row=readLocalCapacityPoolRows().find(item=>item.businessDate==='2026-09-27'&&item.poolId==='CAP01');
     expect(row?.remainingQty).toBe(7);
     expect(row?.manualAdjustments).toHaveLength(1);
+    expect(row?.manualAdjustments?.[0]?.id).toContain('CAPADJ:2026-09-27:CAP01:');
     expect(row?.manualAdjustments?.[0]).toMatchObject({
       poolId:'CAP01',businessDate:'2026-09-27',fromQty:3,toQty:7,note:'實際盤點有 7 份',
     });
