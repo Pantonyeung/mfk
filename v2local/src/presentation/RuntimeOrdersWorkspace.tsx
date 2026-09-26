@@ -10,7 +10,14 @@ import {buildWhatsAppPaymentFollowup,createWhatsAppQrDataUrl,PAYMENT_FOLLOWUP_TE
 import './orders-workspace.css';
 
 type PaymentFilter='全部'|'現金'|'Alipay'|'WeChat Pay'|'FPS / PayMe';
-type Modal='actions'|'edit'|'cancel'|'reprint'|null;
+type Modal='actions'|'edit'|'cancel'|'reprint'|'payment'|null;
+const PAYMENT_CORRECTION_TARGETS=Object.freeze([
+  {id:'CASH',label:'現金'},
+  {id:'FPS',label:'FPS／轉數快'},
+  {id:'PAYME',label:'PayMe'},
+  {id:'ALIPAY',label:'AlipayHK'},
+  {id:'WECHAT',label:'WeChat Pay HK'},
+] as const);
 
 export function sourceLane(source?:string){
   const value=String(source||'').trim();
@@ -53,6 +60,8 @@ export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePor
   const [editLines,setEditLines]=useState<{id:string;name:string;qty:number;unitMinor:number}[]>([]);
   const [cancelReason,setCancelReason]=useState('');
   const [reprintReason,setReprintReason]=useState('');
+  const [paymentCorrection,setPaymentCorrection]=useState('');
+  const [paymentCorrectionBusy,setPaymentCorrectionBusy]=useState(false);
   const [afterSaleRevision,setAfterSaleRevision]=useState(0);
   const [afterSaleBusy,setAfterSaleBusy]=useState<string|null>(null);
   const [partialPreview,setPartialPreview]=useState<unknown>(null);
@@ -150,7 +159,7 @@ export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePor
   },[allItems,history]);
 
   useEffect(()=>{
-    setModal(null);setMessage(null);setReprintOptions([]);setSelectedJobs(new Set());setCancelReason('');setReprintReason('');setPaymentFollowupQr(null);setPaymentFollowupMessage(null);setPaymentFollowupTemplate('UNCLEAR');
+    setModal(null);setMessage(null);setReprintOptions([]);setSelectedJobs(new Set());setCancelReason('');setReprintReason('');setPaymentCorrection('');setPaymentFollowupQr(null);setPaymentFollowupMessage(null);setPaymentFollowupTemplate('UNCLEAR');
     if(selected)setEditLines(selected.lines.map(line=>({
       id:line.id,name:line.name,qty:line.quantity,
       unitMinor:Math.round(Number(line.unitLabel.replace(/[^0-9.]/g,''))*100)
@@ -269,6 +278,20 @@ export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePor
     }catch(cause){setMessage(cause instanceof Error?cause.message:'ORDER_EDIT_FAILED');}
   };
 
+  const correctPayment=async()=>{
+    if(!canCorrect){setMessage('你冇訂單更正權限。');return;}
+    if(!selected||!runtime.correctOrderPayment||!paymentCorrection||paymentCorrectionBusy)return;
+    setPaymentCorrectionBusy(true);setMessage(null);
+    try{
+      await runtime.correctOrderPayment(selected.orderId,paymentCorrection);
+      await load(selected.orderId,true);
+      setMessage('付款方式已修正；同一 Order／取餐號，舊付款方式保留 Audit，冇重新成交、重印或開錢箱。');
+      setModal(null);setPaymentCorrection('');
+    }catch(cause){
+      setMessage(cause instanceof Error?cause.message:'PAYMENT_CORRECTION_FAILED');
+    }finally{setPaymentCorrectionBusy(false);}
+  };
+
   const cancelSelected=async()=>{
     if(!canCorrect){setMessage('你冇訂單更正權限。');return;}
     if(!selected||!runtime.cancelOrder)return;
@@ -349,7 +372,8 @@ export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePor
           <header><b>訂單內容</b><span>{selected.itemCount} 件</span></header>
           {selected.lines.map((line,index)=><div key={line.id+'-'+index}><span>{line.quantity}</span><p><b>{line.name}</b><small>{line.unitLabel} × {line.quantity}</small></p><strong>{line.lineTotalLabel}</strong></div>)}
         </section>
-        <section className="order-inspector-money"><div><span>訂單金額</span><b>{selected.totalLabel}</b></div><div><span>付款方式</span><b>{selected.paymentLabel}</b></div></section>
+        <section className="order-inspector-money"><div><span>訂單金額</span><b>{selected.totalLabel}</b></div><div><span>目前有效付款方式</span><b>{selected.paymentLabel}</b></div></section>
+        {selected.paymentCorrections?.length?<section className="order-audit-card"><header><b>付款方式修正歷史</b><span>{selected.paymentCorrections.length}</span></header>{selected.paymentCorrections.map(row=><p key={row.id}><span>{new Date(row.createdAt).toLocaleString('zh-HK')}</span><b>{row.from} → {row.to}</b>{row.staffName?<small>{row.staffName}</small>:null}</p>)}</section>:null}
         {selected.paymentEvidenceRef?<section className={'payment-review-card state-'+String(selected.paymentVerificationState||'PENDING').toLowerCase()}>
           <header><div><span>電子支付</span><h3>{selected.paymentVerificationState==='VERIFIED'?'付款已核對':selected.paymentVerificationState==='REJECTED'?'付款截圖未通過':'付款待核對'}</h3></div><strong>{selected.paymentVerificationState??'PENDING'}</strong></header>
           <p>{selected.paymentVerificationState==='VERIFIED'?'可以繼續接受訂單。':selected.paymentVerificationState==='REJECTED'?'訂單未取消；請聯絡客人或者由有權限員工取消訂單。':'先查看客人付款截圖，再決定是否通過。'}</p>
@@ -434,11 +458,23 @@ export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePor
 
     {selected&&modal?<div className="order-modal-backdrop" onMouseDown={event=>{if(event.target===event.currentTarget)setModal(null)}}>
       <section className={'order-modal '+modal}>
-        <header><h2>{modal==='reprint'?'重印':modal==='edit'?'修改訂單':modal==='cancel'?'取消訂單':'取消／修改'}</h2><button onClick={()=>setModal(null)}>×</button></header>
+        <header><h2>{modal==='reprint'?'重印':modal==='edit'?'修改訂單':modal==='cancel'?'取消訂單':modal==='payment'?'修正付款方式':'取消／修改'}</h2><button onClick={()=>setModal(null)}>×</button></header>
 
         {modal==='actions'?<div className="order-action-choices">
+          <button onClick={()=>{setPaymentCorrection('');setModal('payment');}}><b>＄ 修正付款方式</b><span>同一 Order／取餐號；原付款方式保留 Audit。唔會重印或開錢箱。</span></button>
           <button onClick={()=>setModal('edit')}><b>✎ 修改訂單</b><span>修改商品數量；保持同一訂單編號，完成後唔自動重印。</span></button>
           <button className="danger" onClick={()=>setModal('cancel')}><b>⊗ 取消訂單</b><span>取消此訂單；退款／第三方平台動作唔會自動執行。</span></button>
+        </div>:null}
+
+        {modal==='payment'?<div className="order-payment-correction-body">
+          <p>目前有效付款方式：<b>{selected.paymentLabel}</b></p>
+          <div className="order-correction-warning">只會更新呢張 SAME Order 嘅有效付款方式，並永久保留原付款方式修正歷史。唔建立新 Order、唔重印、唔開錢箱。</div>
+          <label><span>新付款方式</span><select value={paymentCorrection} onChange={event=>setPaymentCorrection(event.target.value)}>
+            <option value="">請選擇</option>
+            {PAYMENT_CORRECTION_TARGETS.filter(row=>row.id!==selected.paymentLabel).map(row=><option key={row.id} value={row.id}>{row.label}</option>)}
+          </select></label>
+          <small>組合付款需要保留實際拆帳金額，唔會喺呢個單一付款修正入口建立。</small>
+          <footer><button onClick={()=>setModal(null)}>返回</button><button className="primary" disabled={!paymentCorrection||paymentCorrectionBusy} onClick={()=>void correctPayment()}>{paymentCorrectionBusy?'修正中…':'確認修正'}</button></footer>
         </div>:null}
 
         {modal==='edit'?<div className="order-edit-body">

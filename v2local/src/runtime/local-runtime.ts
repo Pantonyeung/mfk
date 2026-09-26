@@ -3,7 +3,7 @@ import {renderTscRasterLabel} from './label-bitmap.ts';
 import {renderEscPosRasterTicket} from './ticket-bitmap.ts';
 import {buildOrderPrintPlan,groupTscBitmapJobsByPhysicalPrinter,type PrintBinding,type PlannedPrintJob} from './print-routing.ts';
 import {queueOrderProjection} from './projection-outbox.ts';
-import {readActiveStaffSession} from './staff-auth.ts';
+import {hasStaffPermission,readActiveStaffSession} from './staff-auth.ts';
 import {readSmtDiningTableRegistry,readSmtPrintConfig,readSmtStoreSettings} from './admin-operational-config.ts';
 import {mirrorKeetaOrderCommand,type KeetaProviderMirrorResult} from './keeta-provider-commands.ts';
 import {buildDailyClosePrintData,renderDailyCloseTicket} from './daily-close-ticket.ts';
@@ -14,7 +14,7 @@ import {readSmtDeviceId} from './admin-config-sync.ts';
 export interface SmtOperationalMetric{readonly id:string;readonly label:string;readonly value:string;readonly detail?:string}
 export interface SmtOrderListItemViewModel{readonly orderId:string;readonly orderIdLabel:string;readonly itemCount:number;readonly totalLabel:string;readonly paymentLabel:string;readonly fulfillmentLabel:string;readonly sourceLabel?:string;readonly localSequenceLabel?:string}
 export interface SmtOrderDetailLineViewModel{readonly id:string;readonly name:string;readonly quantity:number;readonly unitLabel:string;readonly lineTotalLabel:string}
-export interface SmtOrderDetailViewModel extends SmtOrderListItemViewModel{readonly attention:readonly string[];readonly metrics:readonly SmtOperationalMetric[];readonly lines:readonly SmtOrderDetailLineViewModel[];readonly paymentEvidenceRef?:string;readonly paymentVerificationState?:'PENDING'|'VERIFIED'|'REJECTED';readonly customerPhone?:string}
+export interface SmtOrderDetailViewModel extends SmtOrderListItemViewModel{readonly attention:readonly string[];readonly metrics:readonly SmtOperationalMetric[];readonly lines:readonly SmtOrderDetailLineViewModel[];readonly paymentEvidenceRef?:string;readonly paymentVerificationState?:'PENDING'|'VERIFIED'|'REJECTED';readonly customerPhone?:string;readonly paymentCorrections?:readonly PaymentCorrectionRecord[]}
 export interface SmtOrdersProjection{readonly items:readonly SmtOrderListItemViewModel[];readonly detailsByOrderId?:Readonly<Record<string,SmtOrderDetailViewModel>>;readonly selectedOrderId?:string;readonly selectedOrder?:SmtOrderDetailViewModel}
 export interface SmtDiningQueueItemViewModel{readonly id:string;readonly codeLabel:string;readonly partySize:number;readonly statusLabel:string}
 export interface SmtDiningTableViewModel{readonly id:string;readonly areaLabel:string;readonly label:string;readonly state:'available'|'occupied'|'attention'|'settled';readonly partySize?:number;readonly outstandingLabel?:string;readonly holdId?:string;readonly startedAt?:string;readonly itemCount?:number;readonly itemSummary?:string;readonly totalMinor?:number;readonly paidMinor?:number;readonly remainingMinor?:number}
@@ -24,8 +24,18 @@ export type SmtAvailabilityStatus='available'|'soldout'|'paused';
 export interface SmtAvailabilityNodeViewModel{readonly nodeId:string;readonly label:string;readonly detail?:string;readonly status:SmtAvailabilityStatus;readonly sourceLabel?:string}
 export interface SmtAvailabilityProjection{readonly revision:number;readonly nodes:readonly SmtAvailabilityNodeViewModel[];readonly canChange:boolean}
 
+export interface PaymentCorrectionRecord{
+  readonly id:string;
+  readonly createdAt:string;
+  readonly from:string;
+  readonly to:string;
+  readonly staffId?:string;
+  readonly staffName?:string;
+}
+
 export interface StoredOrder{
   id:string;display:string;createdAt:string;updatedAt?:string;totalMinor:number;paymentLabel:string;fulfillmentLabel:'待處理'|'進行中'|'可取餐'|'已完成'|'已取消';sourceLabel:string;
+  paymentCorrections?:readonly PaymentCorrectionRecord[];
   staffId?:string;staffName?:string;cancellationReason?:string;
   providerRef?:string;providerMessageId?:string;providerPickupCode?:string;orderRemark?:string;utensilPreference?:'需要'|'不需要';
   providerLastEventId?:number;providerLastEventName?:string;providerLastEventAt?:string;providerLastMessageId?:string;providerLifecycleNote?:string;
@@ -119,6 +129,7 @@ export interface CleanSmtCoreRuntimePort{
   readOrderReprintOptions?(orderId:string):Promise<readonly SmtReprintOption[]>;
   reprintOrderJobs?(orderId:string,jobIds:readonly string[],reason?:string):Promise<PrintDispatchSummary>;
   updateOrderItems?(orderId:string,items:readonly {id:string;name:string;qty:number;unitMinor:number}[]):Promise<{readonly orderId:string;readonly totalMinor:number}>;
+  correctOrderPayment?(orderId:string,paymentLabel:string):Promise<StoredOrder>;
   cancelOrder?(orderId:string,reason?:string):Promise<{readonly orderId:string;readonly status:'CANCELLED'}>;
   applyProviderLifecycle?(input:{
     orderId:string;eventId:1002|1003|1004|1006|1008;eventName:string;providerMessageId:string;providerPushedAt:string;rawMessage:string;
@@ -201,6 +212,7 @@ export interface MfkLocalRuntime extends CleanSmtCoreRuntimePort{
   readOrderReprintOptions(orderId:string):Promise<readonly SmtReprintOption[]>;
   reprintOrderJobs(orderId:string,jobIds:readonly string[],reason?:string):Promise<PrintDispatchSummary>;
   updateOrderItems(orderId:string,items:readonly {id:string;name:string;qty:number;unitMinor:number}[]):Promise<{readonly orderId:string;readonly totalMinor:number}>;
+  correctOrderPayment(orderId:string,paymentLabel:string):Promise<StoredOrder>;
   cancelOrder(orderId:string,reason?:string):Promise<{readonly orderId:string;readonly status:'CANCELLED'}>;
   applyProviderLifecycle(input:{
     orderId:string;eventId:1002|1003|1004|1006|1008;eventName:string;providerMessageId:string;providerPushedAt:string;rawMessage:string;
@@ -551,6 +563,7 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
       ...(order.paymentEvidenceRef?{paymentEvidenceRef:order.paymentEvidenceRef}:{}),
       ...(order.paymentVerificationState?{paymentVerificationState:order.paymentVerificationState}:{}),
       ...(order.customerPhone?{customerPhone:order.customerPhone}:{}),
+      ...(order.paymentCorrections?.length?{paymentCorrections:order.paymentCorrections}:{}),
       attention:[
         ...(order.providerLifecycleNote?[order.providerLifecycleNote]:[]),
       ],metrics:[
@@ -633,6 +646,36 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
     if(!order)throw new Error('ORDER_NOT_FOUND');
     return dispatchOrderOutputs(order);
   },
+  async correctOrderPayment(orderId,paymentLabel){
+    if(!hasStaffPermission('ORDER_CORRECTION'))throw new Error('ORDER_CORRECTION_PERMISSION_REQUIRED');
+    const order=data.orders.find(x=>x.id===orderId);
+    if(!order)throw new Error('ORDER_NOT_FOUND');
+    const next=String(paymentLabel||'').trim();
+    if(!next)throw new Error('PAYMENT_METHOD_REQUIRED');
+    if(next===order.paymentLabel)return order;
+    const session=readActiveStaffSession();
+    const createdAt=new Date().toISOString();
+    const correctionIndex=(order.paymentCorrections?.length??0)+1;
+    const correction:PaymentCorrectionRecord=Object.freeze({
+      id:'PC-'+order.id+'-'+String(correctionIndex).padStart(3,'0'),
+      createdAt,
+      from:order.paymentLabel,
+      to:next,
+      ...(session?{staffId:session.staffId,staffName:session.displayName}:{}),
+    });
+    data={...data,orders:data.orders.map(x=>x.id===orderId?{
+      ...x,
+      paymentLabel:next,
+      paymentCorrections:[...(x.paymentCorrections??[]),correction],
+      updatedAt:createdAt,
+    }:x)};
+    save();
+    const updated=data.orders.find(x=>x.id===orderId)!;
+    projectOrder(updated);
+    appendActionAudit({action:'PAYMENT_CORRECTION',orderId,reason:order.paymentLabel+' -> '+next});
+    return updated;
+  },
+
   async readOrderReprintOptions(orderId){
     const order=data.orders.find(x=>x.id===orderId);
     if(!order)throw new Error('ORDER_NOT_FOUND');
