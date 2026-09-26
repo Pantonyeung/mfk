@@ -44,7 +44,7 @@ export interface LocalDayClose{
   readonly createdAt:number;
   readonly openingCashMinor:number;
   readonly cashSalesMinor:number;
-  readonly cashRefundMinor:number;
+  readonly cashRefundMinor?:number;
   readonly expectedCashMinor:number;
   readonly countedCashMinor:number;
   readonly cashDifferenceMinor:number;
