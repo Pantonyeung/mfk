@@ -83,11 +83,18 @@ export interface OwnerActionItem {
   readonly actionId:string;
   readonly severity:'URGENT'|'ATTENTION'|'INFO';
   readonly domain:string;
+  readonly ownerDomain?:string;
   readonly title:string;
   readonly detail:string;
   readonly target:string;
   readonly certainty:OwnerCertainty;
   readonly actionLabel?:string;
+  readonly safeNextStepLabel?:string;
+  readonly elapsedLabel?:string;
+  readonly state?:'OPEN'|'PENDING_READBACK'|'RESOLVED'|'UNKNOWN';
+  readonly readbackSummary?:string;
+  readonly resolutionProofLabel?:string;
+  readonly correlationId?:string;
   readonly observedAt:string;
 }
 
@@ -217,6 +224,9 @@ export interface OwnerActivityRecord {
   readonly activityId:string;
   readonly title:string;
   readonly actor:string;
+  readonly target?:string;
+  readonly correlationId?:string;
+  readonly detail?:string;
   readonly requester?:string;
   readonly approver?:string;
   readonly result:string;
