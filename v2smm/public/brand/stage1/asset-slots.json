@@ -1,0 +1,54 @@
+{
+  "version": "MFK_SMM_STAGE1_ASSET_SLOTS_V1",
+  "date": "2026-09-26",
+  "ownerLock": {
+    "ipProduction": "PAUSED",
+    "productPhotography": "OFFICIAL_ONLY",
+    "generatedCharacters": "DO_NOT_CREATE",
+    "visualRule": "Each future graphic/icon/banner is a discrete asset file placed into its assigned slot. Do not fake branded imagery by assembling CSS circles/shapes or cropping reference IP art."
+  },
+  "stage1": {
+    "productCards": {
+      "imageStatus": "EMPTY_UNTIL_OFFICIAL_PRODUCT_PHOTO",
+      "currentImplementation": "neutral blank media slot",
+      "fakeFoodImages": false
+    },
+    "futureAssets": [
+      {
+        "slot": "order-announcement-banner",
+        "status": "PENDING_FUTURE_AI_ASSET",
+        "character": false
+      },
+      {
+        "slot": "order-empty-search-illustration",
+        "status": "PENDING_FUTURE_AI_ASSET",
+        "character": false
+      },
+      {
+        "slot": "nav-order-icon",
+        "status": "PENDING_FUTURE_AI_ASSET",
+        "character": false
+      },
+      {
+        "slot": "nav-work-icon",
+        "status": "PENDING_FUTURE_AI_ASSET",
+        "character": false
+      },
+      {
+        "slot": "nav-orders-icon",
+        "status": "PENDING_FUTURE_AI_ASSET",
+        "character": false
+      },
+      {
+        "slot": "nav-dine-icon",
+        "status": "PENDING_FUTURE_AI_ASSET",
+        "character": false
+      },
+      {
+        "slot": "nav-more-icon",
+        "status": "PENDING_FUTURE_AI_ASSET",
+        "character": false
+      }
+    ]
+  }
+}

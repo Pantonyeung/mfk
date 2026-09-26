@@ -4,6 +4,7 @@ import {resolveSmmRuntimePort} from './runtime';
 import {pairSmmLan,probeSmmLan,readSmmLanPwaConfig,saveSmmLanPwaConfig} from './pwa-lan';
 import {clearSmmStaffSession,listSmmStaff,readSmmStaffSession,refreshSmmStaffSession,verifySmmStaff,type SmmStaffDirectoryItem,type SmmStaffSession} from './pwa-staff';
 import {selectedSmmCartOptions,toggleSmmSelection,validateSmmSelections,type SmmSelectionState} from './selection';
+import './stage1.css';
 import type {
   SmmCartLine,
   SmmConnectionState,
@@ -94,8 +95,9 @@ export function App(){
       setSnapshot(next);
       setConnection('READY');
     }catch(reason){
+      console.warn('SMM_APP_REFRESH_DIAGNOSTIC',reason);
       setConnection('ERROR');
-      setError(reason instanceof Error?reason.message:'暫時未能讀取門店資料');
+      setError('暫時未能同步門店資料；可以繼續使用本機介面。');
     }
   };
 
@@ -438,9 +440,9 @@ export function App(){
   const connectionLabel=connection==='READY'?(snapshot?.connectionPath==='LAN'?'LAN 已連接':'Internet 已連接'):connection==='LOADING'?'同步中':connection==='ERROR'?'同步失敗':'門店服務未連接';
   const webSmtAcceptance=typeof window!=='undefined'&&new URLSearchParams(window.location.search).get('target')==='web-smt';
 
-  return <main className="app-shell" data-mode={connection==='READY'?'online':'offline'}>
+  return <main className="app-shell" data-mode={connection==='READY'?'online':'offline'} data-view={view}>
     <header className="topbar">
-      <div className="brand-mark">磨</div>
+      <img className="brand-mark brand-logo-topbar" src="/brand/morefun-logo.webp" alt="磨飯"/>
       <div className="brand-copy"><strong>磨飯流動店務</strong><span>{staffSession?.displayName??snapshot?.staff?.displayName??'店員模式'} · {snapshot?.staff?.storeId??'未連接門店'}</span></div>
       <button className="state-pill" onClick={()=>void refresh()} aria-label="重新同步門店資料"><i/>{connectionLabel}</button>
     </header>
@@ -522,11 +524,11 @@ export function App(){
     </section>
 
     <nav className="bottom-nav" aria-label="主要功能">
-      <NavButton active={view==='order'} label="點單" glyph="＋" onClick={()=>changeView('order')}/>
-      <NavButton active={view==='work'} label="待處理" glyph="◎" badge={(snapshot?.work??[]).filter(item=>item.state!=='NORMAL').length?String((snapshot?.work??[]).filter(item=>item.state!=='NORMAL').length):undefined} onClick={()=>changeView('work')}/>
-      <NavButton active={view==='orders'} label="訂單" glyph="▤" onClick={()=>changeView('orders')}/>
-      <NavButton active={view==='dine'} label="堂食" glyph="⌂" onClick={()=>changeView('dine')}/>
-      <NavButton active={view==='more'} label="更多" glyph="•••" badge={localDraftCount?String(localDraftCount):undefined} onClick={()=>changeView('more')}/>
+      <NavButton active={view==='order'} label="點單" onClick={()=>changeView('order')}/>
+      <NavButton active={view==='work'} label="待處理" badge={(snapshot?.work??[]).filter(item=>item.state!=='NORMAL').length?String((snapshot?.work??[]).filter(item=>item.state!=='NORMAL').length):undefined} onClick={()=>changeView('work')}/>
+      <NavButton active={view==='orders'} label="訂單" onClick={()=>changeView('orders')}/>
+      <NavButton active={view==='dine'} label="堂食" onClick={()=>changeView('dine')}/>
+      <NavButton active={view==='more'} label="更多" badge={localDraftCount?String(localDraftCount):undefined} onClick={()=>changeView('more')}/>
     </nav>
 
     {selectedProduct?<ProductSheet
@@ -586,15 +588,52 @@ function OrderView({connection,categories,activeCategoryId,setCategory,search,se
   onCart:()=>void;
 }){
   const count=cart.reduce((sum,line)=>sum+line.quantity,0);
-  return <section className="page order-page">
-    <header className="hero compact"><div><span>點單</span><h1>快速點餐</h1><small>使用 Admin 已發布餐單；SMT 只喺提交時核對版本同價格。</small></div>{connection==='READY'?<b className="tag">已同步</b>:null}</header>
-    <label className="search"><span>搜尋商品</span><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="輸入商品名稱"/></label>
-    {categories.length?<div className="category-rail">{categories.map(item=><button key={item.categoryId} className={activeCategoryId===item.categoryId?'active':''} onClick={()=>setCategory(item.categoryId)}>{item.name}</button>)}</div>:null}
-    {connection==='LOADING'?<EmptyState title="正在同步餐單" detail="請稍候。"/>:
-      !categories.length?<EmptyState title={connection==='NOT_CONNECTED'?'餐單服務尚未連接':'暫時未有餐單'} detail={connection==='NOT_CONNECTED'?'連接後會顯示正式分類、商品、規格同供應狀態。':'目前門店資料未提供任何可售商品。'}/>:
-      products.length?<div className="product-grid">{products.map(product=>{const price=serviceMode==='DINE_IN'?product.publishedDineInUnitPriceMinor:product.publishedTakeawayUnitPriceMinor;return <button key={product.productId} className={`product-card ${product.available?'':'disabled'}`} disabled={!product.available} onClick={()=>onProduct(product)}><span className="product-avatar">{product.name.slice(0,1)}</span><strong>{product.name}</strong><small>{Number.isSafeInteger(Number(price))?money('HKD',Number(price)):(product.available?'可供應':'暫停供應')}</small><i>{product.optionGroups.length||product.variations?.length?'可設定':''}</i></button>})}</div>:
+  const unavailable=connection!=='READY';
+  return <section className="page order-page stage1-order">
+    <header className="stage1-order-header">
+      <div>
+        <span className="stage1-kicker">點單</span>
+        <h1>快速點餐</h1>
+        <p>商品資料只讀取正式餐單；未有正式產品相之前，圖片位置保持留白。</p>
+      </div>
+      <b className="stage1-service-mode">{serviceMode==='DINE_IN'?'堂食':'外賣'}</b>
+    </header>
+
+    <label className="search stage1-search">
+      <span>搜尋商品</span>
+      <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="輸入商品名稱"/>
+    </label>
+
+    {categories.length?<div className="category-rail stage1-category-rail" aria-label="商品分類">
+      {categories.map(item=><button key={item.categoryId} className={activeCategoryId===item.categoryId?'active':''} onClick={()=>setCategory(item.categoryId)}>{item.name}</button>)}
+    </div>:null}
+
+    <div className="stage1-section-title">
+      <div><span>商品</span><small>{unavailable?'等待正式餐單同步':'選擇商品開始落單'}</small></div>
+      {connection==='READY'?<b>已同步</b>:<b className="muted">本機介面</b>}
+    </div>
+
+    {connection==='LOADING'?<EmptyState title="正在同步餐單" detail="你可以先瀏覽介面；正式商品資料同步完成後會自動顯示。"/>:
+      !categories.length?<EmptyState title={connection==='READY'?'暫時未有餐單':'目前未有正式餐單資料'} detail={connection==='READY'?'目前門店資料未提供任何可售商品。':'Stage 1 已可進入；未連線時唔會建立假商品或者假價格。'}/>:
+      products.length?<div className="product-grid stage1-product-grid">{products.map(product=>{
+        const price=serviceMode==='DINE_IN'?product.publishedDineInUnitPriceMinor:product.publishedTakeawayUnitPriceMinor;
+        return <button key={product.productId} className={`product-card stage1-product-card ${product.available?'':'disabled'}`} disabled={!product.available} onClick={()=>onProduct(product)}>
+          <span className="product-media" aria-label="正式產品圖片待補"/>
+          {!product.available?<span className="stage1-soldout">已售罄</span>:null}
+          <span className="stage1-product-copy">
+            <strong>{product.name}</strong>
+            <small>{Number.isSafeInteger(Number(price))?money('HKD',Number(price)):(product.available?'價格待同步':'暫停供應')}</small>
+            <i>{product.optionGroups.length||product.variations?.length?'可設定':''}</i>
+          </span>
+        </button>;
+      })}</div>:
       <EmptyState title="搵唔到商品" detail="清除搜尋或者切換其他分類。"><button className="primary" onClick={()=>setSearch('')}>清除搜尋</button></EmptyState>}
-    {count>0?<button className="cart-bar" onClick={onCart}><div><b>{count}</b><span>購物草稿</span></div><div><strong>{quote?money(quote.currency,quote.totalMinor):'價格資料未完整'}</strong><small>{quote?`已發布餐單版本 ${quote.revision}`:'請重新同步餐單'}</small></div><em>查看</em></button>:null}
+
+    {count>0?<button className="cart-bar stage1-cart-bar" onClick={onCart}>
+      <div className="stage1-cart-count"><b>{count}</b><span>購物草稿</span></div>
+      <div><strong>{quote?money(quote.currency,quote.totalMinor):'價格資料未完整'}</strong><small>{quote?`餐單版本 ${quote.revision}`:'請重新同步餐單'}</small></div>
+      <em>查看</em>
+    </button>:null}
   </section>;
 }
 
@@ -869,7 +908,7 @@ function EmptyState({title,detail,children}:{title:string;detail:string;children
 }
 function Tool({title,detail,state,onClick}:{title:string;detail:string;state:string;onClick:()=>void}){return <button className="tool-card" onClick={onClick}><span>◆</span><strong>{title}</strong><small>{detail}</small><em>{state}</em></button>}
 function Metric({label,value}:{label:string;value:string}){return <div><small>{label}</small><strong>{value}</strong></div>}
-function NavButton({active,label,glyph,badge,onClick}:{active:boolean;label:string;glyph:string;badge?:string;onClick:()=>void}){return <button className={active?'active':''} onClick={onClick}><span>{glyph}</span><small>{label}</small>{badge?<b>{badge}</b>:null}</button>}
+function NavButton({active,label,glyph,badge,onClick}:{active:boolean;label:string;glyph?:string;badge?:string;onClick:()=>void}){return <button className={active?'active':''} onClick={onClick}>{glyph?<span>{glyph}</span>:null}<small>{label}</small>{badge?<b>{badge}</b>:null}</button>}
 
 function labelWorkState(state:string){return state==='NORMAL'?'正常':state==='DELAYED'?'延誤':state==='ACTION_REQUIRED'?'需處理':'未知'}
 function connectionLabelShort(state:SmmConnectionState){return state==='READY'?'已連接':state==='LOADING'?'同步中':state==='ERROR'?'錯誤':state==='STALE'?'資料稍舊':state==='PARTIAL'?'部分資料':state==='UNKNOWN'?'未知':'未連接'}
