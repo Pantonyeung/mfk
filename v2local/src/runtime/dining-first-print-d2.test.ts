@@ -34,6 +34,7 @@ async function boot(){return (await import('./local-runtime.ts')).localRuntime a
 
 beforeEach(()=>{
   vi.resetModules();
+  vi.clearAllMocks();
   values=new Map();
   Object.defineProperty(globalThis,'localStorage',{configurable:true,value:{
     getItem:(key:string)=>values.get(key)??null,
