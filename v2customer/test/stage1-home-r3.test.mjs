@@ -125,5 +125,7 @@ test('closed store has no active fallback CTA that can silently no-op',()=>{
   assert.ok(home.includes('繼續瀏覽菜單'));
   assert.ok(!home.includes('備用聯絡方法'));
   assert.ok(!home.includes('onFallback'));
-  assert.ok(!app.includes('onFallback={()=>void requestFallback()}'));
+  const stage1Call=app.match(/\{view==='home'\?<Stage1Home[\s\S]*?\/>:null\}/)?.[0]??'';
+  assert.ok(stage1Call);
+  assert.ok(!stage1Call.includes('onFallback='));
 });
