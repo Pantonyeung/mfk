@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - landing/MFK/ADMIN-PORT-R1
-      - work/MFK/CAP0-CAPACITY-POOL-CONFIG-R1
   workflow_dispatch:
 
 jobs:
