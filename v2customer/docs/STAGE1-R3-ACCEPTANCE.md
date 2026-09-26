@@ -2,7 +2,7 @@
 
 WORK_ID: `MFK-CUSTOMER-UI-STAGE1-R3`
 
-STATUS: `READY_FOR_COMMANDER_ACCEPTANCE`
+STATUS: `READY_FOR_COMMANDER_REVIEW_AFTER_CHANGES_REQUIRED`
 
 BASE MAIN: `46f15641de536c988e496987f6504e8efa6d096c`
 
@@ -178,3 +178,87 @@ No merge, landing, deploy, Stage 2 implementation, or mutation of the original/c
 MILESTONE TARGET:
 
 `MFK_CUSTOMER_UI_STAGE1_R3_COMMANDER_ACCEPTED`
+
+
+## CHANGES_REQUIRED correction pass
+
+Owner / Commander correction scope was limited to three items. IP / AI artwork quality remains `DEFERRED_BY_OWNER`.
+
+### 1. Engineering error leakage
+
+Fixed.
+
+- Raw runtime error is no longer stored for Customer UI rendering.
+- Raw `reason` is diagnostics-only through:
+  - `console.warn('[MFK Customer] snapshot sync failed', reason)`
+- Stage 1 ERROR customer copy is fixed to:
+  - `暫時未能同步店舖資料，請稍後再試。`
+- Non-Home global ERROR status uses the same fixed human-safe copy.
+- Retry remains available:
+  - Stage 1: `重新同步`
+  - legacy non-Home global status: `安全重試`
+
+### 2. Product media is truly empty
+
+Fixed.
+
+`stage1-product-placeholder` now contains no child visual.
+
+Removed:
+- product-name first character
+- inner circular avatar
+- icon / emoji substitute
+- generated food substitute
+
+Only neutral background / border / spacing remain.
+
+### 3. Closed Store fallback silent no-op
+
+Fixed by Owner-approved minimal option A.
+
+Closed Store Stage 1 now shows only:
+- `繼續瀏覽菜單`
+
+Removed from Stage 1 Closed Store:
+- `備用聯絡方法`
+- `onFallback` prop / active CTA
+
+Other non-Stage-1 fallback flows remain unchanged.
+
+### Correction TDD evidence
+
+RED:
+- Run `36274573740`
+- Job `108494700961`
+- New correction contracts:
+  - engineering sync error safety: FAIL
+  - truly empty product media: FAIL
+  - closed-store fallback silent-no-op: FAIL
+
+Implementation validation:
+- Run `36274636993`
+- error safety: PASS
+- empty media: PASS
+- fallback contract exposed an over-broad test assertion against unrelated Checkout fallback; production Stage 1 behavior was already corrected.
+- Test assertion was narrowed to the Stage1Home invocation only.
+
+GREEN:
+- Run `36274673967`
+- Job `108494978082`
+- Tests: `42 / 42 PASS`
+- Build: `SUCCESS`
+
+### Branch relation
+
+Against task-declared FRESH MAIN:
+- Base: `46f15641de536c988e496987f6504e8efa6d096c`
+- behind: `0`
+
+Repository `main` advanced after this assignment began to `1f957aec02e457c4788e853a49f5d05d58f9b87b` with one unrelated SMT-only commit under `v2local/**`. It was intentionally not merged into this Stage 1 branch because this task explicitly states `NO MERGE MAIN`.
+
+AUTHORITY CHANGE = NONE.
+
+STOP:
+- no Cloudflare deploy
+- no merge to main
+- no Stage 2
