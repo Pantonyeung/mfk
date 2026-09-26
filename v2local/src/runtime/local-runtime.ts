@@ -10,6 +10,7 @@ import {buildDailyClosePrintData,renderDailyCloseTicket} from './daily-close-tic
 import {buildLocalReport,readLocalDayCloses,resolveBusinessWindow} from './local-operations.ts';
 import {readBusinessCutoff} from './cash-opening.ts';
 import {readSmtDeviceId} from './admin-config-sync.ts';
+import {validateAdminRefundEvent,type AdminRefundEvent} from '../../../contracts/admin-refund-v1.ts';
 
 export interface SmtOperationalMetric{readonly id:string;readonly label:string;readonly value:string;readonly detail?:string}
 export interface SmtOrderListItemViewModel{readonly orderId:string;readonly orderIdLabel:string;readonly itemCount:number;readonly totalLabel:string;readonly paymentLabel:string;readonly fulfillmentLabel:string;readonly sourceLabel?:string;readonly localSequenceLabel?:string}
@@ -154,6 +155,7 @@ export interface CleanSmtCoreRuntimePort{
   updateOrderItems?(orderId:string,items:readonly {id:string;name:string;qty:number;unitMinor:number}[]):Promise<{readonly orderId:string;readonly totalMinor:number}>;
   correctOrderPayment?(orderId:string,paymentLabel:string):Promise<StoredOrder>;
   refundOrder?(orderId:string,input:{lineId:string;quantity:number;amountMinor:number;method:string;note?:string}):Promise<StoredOrder>;
+  applyAdminRefundEvent?(input:unknown):{readonly disposition:'APPLIED'|'IDEMPOTENT';readonly refundId:string;readonly orderId:string};
   cancelOrder?(orderId:string,reason?:string):Promise<{readonly orderId:string;readonly status:'CANCELLED'}>;
   applyProviderLifecycle?(input:{
     orderId:string;eventId:1002|1003|1004|1006|1008;eventName:string;providerMessageId:string;providerPushedAt:string;rawMessage:string;
@@ -238,6 +240,7 @@ export interface MfkLocalRuntime extends CleanSmtCoreRuntimePort{
   updateOrderItems(orderId:string,items:readonly {id:string;name:string;qty:number;unitMinor:number}[]):Promise<{readonly orderId:string;readonly totalMinor:number}>;
   correctOrderPayment(orderId:string,paymentLabel:string):Promise<StoredOrder>;
   refundOrder(orderId:string,input:{lineId:string;quantity:number;amountMinor:number;method:string;note?:string}):Promise<StoredOrder>;
+  applyAdminRefundEvent(input:unknown):{readonly disposition:'APPLIED'|'IDEMPOTENT';readonly refundId:string;readonly orderId:string};
   cancelOrder(orderId:string,reason?:string):Promise<{readonly orderId:string;readonly status:'CANCELLED'}>;
   applyProviderLifecycle(input:{
     orderId:string;eventId:1002|1003|1004|1006|1008;eventName:string;providerMessageId:string;providerPushedAt:string;rawMessage:string;
@@ -813,6 +816,54 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
     return updated;
   },
 
+  applyAdminRefundEvent(input){
+    const event:AdminRefundEvent=validateAdminRefundEvent(input);
+    const order=data.orders.find(row=>row.id===event.orderId);
+    if(!order)throw new Error('ADMIN_REFUND_LOCAL_ORDER_NOT_FOUND');
+    if((order.refunds??[]).some(refund=>refund.id===event.refundId)){
+      return {disposition:'IDEMPOTENT' as const,refundId:event.refundId,orderId:order.id};
+    }
+    if(event.storeId!=='MF01')throw new Error('ADMIN_REFUND_STORE_MISMATCH');
+    const lineEvent=event.lines[0];
+    if(!lineEvent||event.lines.length!==1)throw new Error('ADMIN_REFUND_LINE_CARDINALITY_UNSUPPORTED');
+    const line=order.items.find(row=>row.id===lineEvent.lineId);
+    if(!line)throw new Error('ADMIN_REFUND_LOCAL_LINE_NOT_FOUND');
+    if(lineEvent.quantity<1||lineEvent.quantity>line.qty)throw new Error('ADMIN_REFUND_LOCAL_QUANTITY_INVALID');
+    const priorLineRefund=(order.refunds??[]).flatMap(refund=>refund.lines).filter(row=>row.lineId===line.id)
+      .reduce((sum,row)=>sum+Math.max(0,Number(row.amountMinor)||0),0);
+    const lineRemaining=Math.max(0,line.qty*line.unitMinor-priorLineRefund);
+    if(event.amountMinor>lineRemaining||lineEvent.amountMinor!==event.amountMinor){
+      throw new Error('ADMIN_REFUND_LOCAL_AMOUNT_CONFLICT');
+    }
+    const priorOrderRefund=(order.refunds??[]).reduce((sum,row)=>sum+Math.max(0,Number(row.amountMinor)||0),0);
+    if(priorOrderRefund+event.amountMinor>order.totalMinor)throw new Error('ADMIN_REFUND_LOCAL_ORDER_AMOUNT_CONFLICT');
+    const nextTotal=priorOrderRefund+event.amountMinor;
+    const refund:OrderRefundRecord=Object.freeze({
+      id:event.refundId,
+      createdAt:event.executionAt,
+      kind:nextTotal===order.totalMinor?'FULL':'PARTIAL',
+      amountMinor:event.amountMinor,
+      method:event.method,
+      note:event.note,
+      lines:Object.freeze(event.lines.map(row=>Object.freeze({
+        lineId:row.lineId,
+        itemName:row.itemName,
+        quantity:row.quantity,
+        amountMinor:row.amountMinor,
+      }))),
+    });
+    data={...data,orders:data.orders.map(row=>row.id===order.id?{
+      ...row,
+      refunds:[...(row.refunds??[]),refund],
+      updatedAt:event.executionAt,
+    }:row)};
+    save();
+    const updated=data.orders.find(row=>row.id===order.id)!;
+    projectOrder(updated);
+    appendActionAudit({action:'ADMIN_REFUND_APPLIED',orderId:order.id,reason:event.refundId+' · '+event.method+' '+money(event.amountMinor)});
+    return {disposition:'APPLIED' as const,refundId:event.refundId,orderId:order.id};
+  },
+
   async readOrderReprintOptions(orderId){
     const order=data.orders.find(x=>x.id===orderId);
     if(!order)throw new Error('ORDER_NOT_FOUND');
@@ -963,11 +1014,16 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
       businessStartMinute:cutoff.minute,
     });
     const refunds=data.orders.flatMap(order=>(order.refunds??[]).map(refund=>({
-      ...refund,
-      sourceLabel:order.sourceLabel,
+      id:refund.id,
       orderId:order.id,
+      display:order.display,
+      originalCreatedAt:order.createdAt,
+      executionAt:refund.createdAt,
+      method:refund.method,
+      amountMinor:refund.amountMinor,
+      items:refund.lines.map(line=>line.itemName+' ×'+line.quantity).join('、'),
     }))).filter(refund=>{
-      const at=Date.parse(refund.createdAt);
+      const at=Date.parse(refund.executionAt);
       const window=resolveBusinessWindow(close.createdAt,cutoff.hour,cutoff.minute);
       return Number.isFinite(at)&&at>=window.start&&at<window.end;
     });

@@ -1,8 +1,9 @@
-import {useMemo,useState} from 'react';
+import {useEffect,useMemo,useState} from 'react';
 import {Link} from 'react-router';
 import {useAdminDraft,validateAdminDraft} from './admin-draft.tsx';
 import {appendAdminAudit,readAdminAudit,readAdminReleases,readAdminStored,usePersistentAdminState} from './admin-local-store.ts';
 import {AdminResponsiveDataView} from './AdminResponsiveDataView.tsx';
+import {createAdminCrossDayRefund,readAdminProjectedDays,readAdminProjectedOrders,readAdminRefundAddenda,readAdminRefunds,refreshAdminProjection} from './admin-projection-client.ts';
 
 function UpgradeHeader({title,description,kicker='功能尚未啟用'}:{title:string;description:string;kicker?:string}){
   return <header className="admin-editor-head">
@@ -137,7 +138,128 @@ function FixedReport({title,metrics,storeKey}:{title:string;metrics:readonly str
 
 export const ProductReportWorkspace=()=> <FixedReport title="商品報表" metrics={['銷售件數','銷售額','銷售佔比 %','最高銷量商品']} storeKey="report-products.v1"/>;
 export const ChannelReportWorkspace=()=> <FixedReport title="渠道報表" metrics={['訂單','總額','平台資料','異常']} storeKey="report-channels.v1"/>;
-export const RefundReportWorkspace=()=> <FixedReport title="退款報表" metrics={['申請','已批准','已拒絕','未確認']} storeKey="report-refunds.v1"/>;
+
+const REFUND_METHODS=Object.freeze([
+  {id:'CASH',label:'現金'},
+  {id:'FPS',label:'FPS／轉數快'},
+  {id:'PAYME',label:'PayMe'},
+  {id:'ALIPAY',label:'AlipayHK'},
+  {id:'WECHAT',label:'WeChat Pay HK'},
+] as const);
+function defaultRefundMethod(label:string){
+  const upper=String(label||'').toUpperCase();
+  return REFUND_METHODS.find(row=>upper===row.id||upper.includes(row.id))?.id??'';
+}
+export function RefundReportWorkspace(){
+  const [revision,setRevision]=useState(0);
+  const [query,setQuery]=useState('');
+  const [orderId,setOrderId]=useState('');
+  const [lineId,setLineId]=useState('');
+  const [quantity,setQuantity]=useState(1);
+  const [amount,setAmount]=useState('');
+  const [method,setMethod]=useState('');
+  const [note,setNote]=useState('');
+  const [busy,setBusy]=useState(false);
+  const [message,setMessage]=useState('');
+  useEffect(()=>{void refreshAdminProjection().then(()=>setRevision(value=>value+1));},[]);
+  void revision;
+  const orders=readAdminProjectedOrders();
+  const days=readAdminProjectedDays();
+  const refunds=readAdminRefunds();
+  const addenda=readAdminRefundAddenda();
+  const closedDates=new Set(days.filter(row=>Boolean(row.dayClose)).map(row=>row.date));
+  const eligible=orders.filter(order=>
+    closedDates.has(order.businessDate)&&
+    !/^Keeta\b|^Foodpanda\b|^第三方/.test(String(order.sourceLabel||''))&&
+    (!query||[order.orderId,order.display,order.sourceLabel].join(' ').toLowerCase().includes(query.toLowerCase()))
+  );
+  const selected=orders.find(row=>row.orderId===orderId);
+  const selectedLine=selected?.items.find(row=>row.id===lineId);
+  const lineMaxMinor=selectedLine?selectedLine.unitMinor*Math.max(1,quantity):0;
+  const refresh=async()=>{await refreshAdminProjection();setRevision(value=>value+1);};
+  const chooseOrder=(id:string)=>{
+    const order=orders.find(row=>row.orderId===id);
+    setOrderId(id);
+    const line=order?.items[0];
+    setLineId(line?.id??'');
+    setQuantity(1);
+    setAmount(line?String((line.unitMinor/100).toFixed(2)):'');
+    setMethod(defaultRefundMethod(order?.paymentLabel??''));
+    setNote('');
+    setMessage('');
+  };
+  const chooseLine=(id:string)=>{
+    const line=selected?.items.find(row=>row.id===id);
+    setLineId(id);
+    setQuantity(1);
+    setAmount(line?String((line.unitMinor/100).toFixed(2)):'');
+  };
+  const submit=async()=>{
+    if(!selected||!selectedLine||busy)return;
+    const amountMinor=Math.round(Number(amount||0)*100);
+    if(amountMinor<=0){setMessage('請輸入退款金額。');return;}
+    if(!method){setMessage('請選擇實際退款方式。');return;}
+    setBusy(true);setMessage('');
+    try{
+      const result=await createAdminCrossDayRefund({
+        orderId:selected.orderId,
+        lineId:selectedLine.id,
+        quantity,
+        amountMinor,
+        method,
+        note:note.trim()||undefined,
+      });
+      setMessage('退款已建立：原日結 '+result.addendum.versionLabel+' 附帶記錄；實際退款日 '+result.refund.executionBusinessDate+' 記 Money Out。');
+      await refresh();
+    }catch(error){
+      setMessage(error instanceof Error?error.message:'ADMIN_REFUND_FAILED');
+    }finally{setBusy(false);}
+  };
+  return <section className="admin-editor-page">
+    <header className="admin-editor-head"><div><small>ADMIN-ONLY CROSS-DAY REFUND</small><h1>退款報表／跨日退款</h1><p>已日結嘅舊單只可以喺 Admin 退款。原 Day Close 1.0 永遠唔重寫；每筆跨日退款建立 1.x 附帶記錄，同時喺實際退款日記真正 Money Out。</p></div><div className="admin-editor-actions"><button type="button" onClick={()=>void refresh()}>更新 Projection</button></div></header>
+    <div className="admin-callout compact">同一 refundId 只會計一次：原銷售日 1.x 係 non-posting reference；實際退款日先影響當日退款、現金／Settlement 同期間總數。</div>
+    <div className="admin-policy-grid two">
+      <article className="admin-policy-card">
+        <h2>建立跨日／已日結退款</h2>
+        <label><span>搜尋舊單</span><input value={query} onChange={event=>setQuery(event.target.value)} placeholder="Order／取餐號／來源"/></label>
+        <label><span>訂單</span><select value={orderId} onChange={event=>chooseOrder(event.target.value)}><option value="">請選擇已日結訂單</option>{eligible.slice(0,200).map(order=><option key={order.orderId} value={order.orderId}>{order.businessDate} · {order.display} · {order.sourceLabel} · HK${(order.totalMinor/100).toFixed(2)}</option>)}</select></label>
+        {selected?<><div className="admin-callout compact">原銷售日：{selected.businessDate}　付款：{selected.paymentLabel}　原額：HK${(selected.totalMinor/100).toFixed(2)}</div>
+        <label><span>退款商品</span><select value={lineId} onChange={event=>chooseLine(event.target.value)}><option value="">請選擇</option>{selected.items.map(line=><option key={line.id} value={line.id}>{line.name} · {line.qty}件 · HK${(line.unitMinor/100).toFixed(2)}/件</option>)}</select></label>
+        <label><span>數量 Reference</span><input inputMode="numeric" min={1} max={selectedLine?.qty??1} value={quantity} onChange={event=>{
+          const next=Math.max(1,Math.min(selectedLine?.qty??1,Math.floor(Number(event.target.value)||1)));
+          setQuantity(next);
+          if(selectedLine)setAmount(String((selectedLine.unitMinor*next/100).toFixed(2)));
+        }}/></label>
+        <label><span>實際退款 HK$</span><input inputMode="decimal" value={amount} onChange={event=>setAmount(event.target.value.replace(/[^0-9.]/g,''))}/><small>呢個 item / qty 今次上限 HK${(lineMaxMinor/100).toFixed(2)}；後端仍會再扣已退款額做 fail-closed 驗證。</small></label>
+        <label><span>實際退款方式</span><select value={method} onChange={event=>setMethod(event.target.value)}><option value="">請選擇</option>{REFUND_METHODS.map(row=><option key={row.id} value={row.id}>{row.label}{row.id===defaultRefundMethod(selected.paymentLabel)?'（原路）':''}</option>)}</select></label>
+        <label><span>原因／備註</span><textarea value={note} onChange={event=>setNote(event.target.value)} placeholder="例如：產品退款／客戶要求"/></label>
+        <div className="admin-editor-actions"><button className="primary" type="button" disabled={!selectedLine||!method||!amount||busy} onClick={()=>void submit()}>{busy?'處理中…':'確認跨日退款'}</button></div></>:null}
+        {message?<p role="status">{message}</p>:null}
+      </article>
+      <article className="admin-policy-card">
+        <h2>Day Close 附帶版本</h2>
+        {addenda.length===0?<div className="admin-read-empty">未有跨日退款附帶記錄。</div>:addenda.slice(0,30).map(row=><p key={row.id}><b>{row.businessDate} · v{row.versionLabel}</b><br/><span>{row.display} · 原單 {new Date(row.originalCreatedAt).toLocaleString('zh-HK')} · 實際退款 {new Date(row.executionAt).toLocaleString('zh-HK')}</span><br/><strong>-HK${(row.amountMinor/100).toFixed(2)} · {row.method}</strong><br/><small>NON-POSTING REFERENCE · refundId {row.refundId}</small></p>)}
+      </article>
+    </div>
+    <section className="admin-read-card">
+      <header><h2>實際退款流水</h2><span>{refunds.length}</span></header>
+      {refunds.length===0?<div className="admin-read-empty">未有 Admin 跨日退款。</div>:<AdminResponsiveDataView
+        label="跨日退款"
+        rows={refunds}
+        rowKey={row=>row.refundId}
+        emptyTitle="未有退款"
+        columns={[
+          {key:'time',label:'實際退款時間',render:row=>new Date(row.executionAt).toLocaleString('zh-HK')},
+          {key:'original',label:'原銷售日',render:row=>row.originalBusinessDate+' · '+row.display},
+          {key:'item',label:'商品',render:row=>row.lines.map(line=>line.itemName+' ×'+line.quantity).join('、')},
+          {key:'amount',label:'退款',numeric:true,render:row=>'HK$'+(row.amountMinor/100).toFixed(2)},
+          {key:'method',label:'方式',render:row=>row.method},
+          {key:'addendum',label:'附帶版本',render:row=>'v'+row.addendumVersionLabel},
+        ]}
+      />}
+    </section>
+  </section>;
+}
 
 interface ExportPolicy{scope:'REPORT_CURRENT_FILTER'|'STORE_DAY'|'AUDIT_RANGE';includePii:boolean;requireOwnerApproval:boolean;retentionDays:number}
 export function ExportGovernanceWorkspace(){

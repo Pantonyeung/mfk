@@ -173,7 +173,7 @@ export function ExceptionsWorkspace(){
 }
 
 interface SalesMetricRow{
-  date:string;grossMinor:number;adjustmentMinor:number;netMinor:number;orders:number;cashSalesMinor:number;
+  date:string;grossMinor:number;adjustmentMinor:number;netMinor:number;orders:number;cashSalesMinor:number;refundMinor?:number;cashRefundMinor?:number;
   openingCash:Record<string,unknown>|null;dayClose:Record<string,unknown>|null;
 }
 export function SalesReportWorkspace(){
@@ -183,7 +183,7 @@ export function SalesReportWorkspace(){
   const [from,setFrom]=useState('');
   const [to,setTo]=useState('');
   const filtered=rows.filter(row=>(!from||row.date>=from)&&(!to||row.date<=to));
-  const total=(key:'grossMinor'|'adjustmentMinor'|'netMinor'|'orders'|'cashSalesMinor')=>filtered.reduce((sum,row)=>sum+Number(row[key]||0),0);
+  const total=(key:'grossMinor'|'adjustmentMinor'|'netMinor'|'orders'|'cashSalesMinor'|'refundMinor'|'cashRefundMinor')=>filtered.reduce((sum,row)=>sum+Number(row[key]||0),0);
   const latest=filtered[0];
   const close=latest?.dayClose??null;
   const opening=latest?.openingCash??null;
@@ -193,9 +193,11 @@ export function SalesReportWorkspace(){
     <div className="admin-callout compact">Projection：{projectionStatus.updatedAt?new Date(projectionStatus.updatedAt).toLocaleString('zh-HK'):'未同步'}{projectionStatus.error?' · '+projectionStatus.error:''} <button type="button" onClick={()=>void refreshAdminProjection()}>更新</button></div>
     <div className="admin-filterbar"><label><span>由</span><input type="date" value={from} onChange={event=>setFrom(event.target.value)}/></label><label><span>至</span><input type="date" value={to} onChange={event=>setTo(event.target.value)}/></label><span>{filtered.length} 日</span></div>
     <div className="admin-kpi-grid">
-      <article><span>總額</span><strong>{money(total('grossMinor'))}</strong><small>非取消 Order projection</small></article>
-      <article><span>淨額</span><strong>{money(total('netMinor'))}</strong><small>目前 projection</small></article>
+      <article><span>銷售總額</span><strong>{money(total('grossMinor'))}</strong><small>原 sale inflow</small></article>
+      <article><span>退款總額</span><strong>{money(total('refundMinor'))}</strong><small>按實際退款日入賬</small></article>
+      <article><span>淨額</span><strong>{money(total('netMinor'))}</strong><small>期間 gross - refund</small></article>
       <article><span>現金銷售</span><strong>{money(total('cashSalesMinor'))}</strong><small>Combo 只計 CASH 部分</small></article>
+      <article><span>現金退款</span><strong>{money(total('cashRefundMinor'))}</strong><small>實際退款方式 = CASH</small></article>
       <article><span>訂單</span><strong>{total('orders')}</strong><small>projected orders</small></article>
     </div>
     {latest?<section className="admin-read-card">
@@ -216,7 +218,9 @@ export function SalesReportWorkspace(){
       columns={[
         {key:'date',label:'日期',render:(row:SalesMetricRow)=>row.date},
         {key:'gross',label:'總額',numeric:true,render:(row:SalesMetricRow)=>money(row.grossMinor)},
-        {key:'cash',label:'現金',numeric:true,render:(row:SalesMetricRow)=>money(row.cashSalesMinor)},
+        {key:'refund',label:'退款',numeric:true,render:(row:SalesMetricRow)=>money(Number(row.refundMinor||0))},
+        {key:'cash',label:'現金銷售',numeric:true,render:(row:SalesMetricRow)=>money(row.cashSalesMinor)},
+        {key:'cash-refund',label:'現金退款',numeric:true,render:(row:SalesMetricRow)=>money(Number(row.cashRefundMinor||0))},
         {key:'net',label:'淨額',numeric:true,render:(row:SalesMetricRow)=>money(row.netMinor)},
         {key:'orders',label:'訂單',numeric:true,render:(row:SalesMetricRow)=>row.orders},
       ]}

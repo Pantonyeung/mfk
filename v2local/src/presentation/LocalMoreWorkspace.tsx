@@ -140,6 +140,16 @@ function csv(report:ReturnType<typeof buildLocalReport>){
     ['商品件數',String(report.itemUnits)],
     ['平均客單',money(report.averageOrderMinor)],
     [],
+    ['退款執行時間','原銷售日','訂單','商品','方式','退款金額'],
+    ...report.refundRows.map(row=>[
+      new Date(row.executionAt).toLocaleString('zh-HK'),
+      row.originalBusinessDate,
+      row.display,
+      row.items,
+      row.method,
+      money(row.amountMinor),
+    ]),
+    [],
     ['商品','數量','銷售'],
     ...report.topProducts.map(row=>[row.name,String(row.quantity),money(row.salesMinor)]),
   ];
@@ -396,6 +406,10 @@ function ReportsPanel({revision}:{revision:number}){
       <article><span>平均客單</span><b>{money(report.averageOrderMinor)}</b></article>
       <article><span>商品件數</span><b>{report.itemUnits}</b></article>
     </div>
+    {report.refundRows.length?<section className="fusion-list">
+      <header><b>今日退款</b><span>{report.refundRows.length} 筆</span></header>
+      {report.refundRows.map(row=><article key={row.refundId}><span>{row.display} · {row.items}<small>原銷售日 {row.originalBusinessDate} · 退款 {new Date(row.executionAt).toLocaleString('zh-HK')}</small></span><b>{row.method}</b><strong>-{money(row.amountMinor)}</strong></article>)}
+    </section>:null}
     <section className="fusion-list">
       <header><b>商品排行</b><span>LOCAL DATA</span></header>
       {report.topProducts.length?report.topProducts.map(row=><article key={row.name}><span>{row.name}</span><b>{row.quantity} 件</b><strong>{money(row.salesMinor)}</strong></article>):<p>今日未有訂單。</p>}
@@ -558,6 +572,11 @@ function DayClosePanel({revision,onSaved}:{revision:number;onSaved:()=>void}){
         })}
         <footer><span>面額合計</span><strong>{money(countedMinor)}</strong></footer>
       </section>
+    </section>:null}
+
+    {report.refundRows.length?<section className="fusion-list">
+      <header><b>今日退款</b><span>{report.refundRows.length} 筆</span></header>
+      {report.refundRows.map(row=><article key={row.refundId}><span>{row.display} · {row.items}<small>原銷售日 {row.originalBusinessDate} · 實際退款 {new Date(row.executionAt).toLocaleString('zh-HK')}</small></span><b>{row.method}</b><strong>-{money(row.amountMinor)}</strong></article>)}
     </section>:null}
 
     <section className="cash-retain-summary">
