@@ -8,7 +8,7 @@ export const ESC_POS_RASTER_PROFILE=Object.freeze({
   bandHeight:192,
 });
 
-export type RasterTicketKind='receipt'|'production'|'packing';
+export type RasterTicketKind='receipt'|'production'|'packing'|'dining-table';
 
 const FONT='"Noto Sans TC","Noto Sans CJK TC","PingFang TC","Microsoft JhengHei",sans-serif';
 
@@ -410,6 +410,32 @@ function receipt(t:TicketCanvas,order:PrintableOrder){
   t.text('More Fun Kitchen',23,700,'center',32);
 }
 
+function diningTable(t:TicketCanvas,order:PrintableOrder){
+  t.brand();
+  t.line(22);
+  t.text('堂食枱單',52,900,'center',66);
+  t.text('此枱單不是付款收據',27,900,'center',40);
+  t.line(22);
+  t.boxedPair('枱號',clean(order.diningTableLabel??'未指定'),'訂單編號',clean(order.display));
+  t.text('下單時間：'+hktDateTime(order.createdAt),30,800,'left',42);
+  t.line(20);
+  t.text('品項 / 數量 / 備註',28,900,'left',40);
+
+  for(const item of order.items){
+    t.structuredItemBlock({
+      item,
+      lines:verticalSelectionLines(detailSource(item)),
+      qtyBox:true,
+    });
+    t.line(18);
+  }
+
+  t.totalRow('總數量：',String(totalUnits(order))+'份');
+  t.text('訂單總額：'+money(order.totalMinor),40,900,'left',54);
+  t.text('付款狀態：未結清',34,900,'left',46);
+  t.line(20);
+}
+
 function production(t:TicketCanvas,order:PrintableOrder){
   t.text(orderService(order),72,900,'center',88);
   t.line(24);
@@ -430,8 +456,9 @@ function production(t:TicketCanvas,order:PrintableOrder){
 function packing(t:TicketCanvas,order:PrintableOrder){
   t.brand();
   t.line(22);
-  t.text('外賣打包單',52,900,'center',64);
-  t.text('TAKE AWAY',27,800,'center',40);
+  const dineIn=orderService(order)==='堂食';
+  t.text(dineIn?'堂食打包單':'外賣打包單',52,900,'center',64);
+  t.text(dineIn?'DINE IN':'TAKE AWAY',27,800,'center',40);
   t.line(22);
   t.boxedPair('訂單編號 No.',clean(order.display),'下單時間',hktDateTime(order.createdAt).replace(' ','\n'));
   t.text('品項 / 數量 / 備註 / 特別要求',27,900,'left',38);
@@ -513,6 +540,7 @@ export async function renderEscPosRasterTicket(input:{
   const t=new TicketCanvas(canvas);
 
   if(input.kind==='receipt')receipt(t,input.order);
+  else if(input.kind==='dining-table')diningTable(t,input.order);
   else if(input.kind==='production')production(t,input.order);
   else packing(t,input.order);
 
