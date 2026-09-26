@@ -13,8 +13,10 @@ const workspace=fs.readFileSync(path.join(root,'features/ordering/OrderingWorksp
 describe('SMT A2b independent add identity + presentation-only combine',()=>{
   it('creates a new source cart line for each separate product add action',()=>{
     expect(app).toContain('const nextLocalCartLineId=');
-    expect(app).toContain("const line:CartLine={id:nextLocalCartLineId(),productId:product.id");
-    expect(app).not.toContain('const existing=cart.find(item=>item.productId===id&&item.serviceMode===serviceMode)');
+    const addBlock=app.slice(app.indexOf('const add=(id:string)=>{'),app.indexOf('const addConfigured='));
+    expect(addBlock).toContain("const line:CartLine={id:nextLocalCartLineId(),productId:product.id");
+    expect(addBlock).not.toContain('cart.find(');
+    expect(addBlock).not.toContain('qty:item.qty+1');
   });
 
   it('keeps Combine off by default and groups only exact visible semantics when enabled',()=>{
