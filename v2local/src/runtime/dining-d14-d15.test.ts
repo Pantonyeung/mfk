@@ -77,6 +77,29 @@ describe('D14-A physical-table join',()=>{
     expect(t02?.startedAt).toBe(before.seatedAt);
   });
 
+  it('persists joined tables and SAME Formal Order across runtime restart',async()=>{
+    let runtime=await boot();
+    const hold=runtime.createHold({
+      kind:'dining',
+      items:[{id:'riceball',name:'原味飯團',qty:1,unitMinor:4100}],
+      totalMinor:4100,
+      partySize:4,
+    });
+    await runtime.assignDiningTable(hold.id,'T01');
+    await runtime.joinDiningTable(hold.id,'T02');
+    const before=await runtime.readDiningHold(hold.id);
+
+    vi.resetModules();
+    runtime=await boot();
+    const after=await runtime.readDiningHold(hold.id);
+    expect(after.formalOrderId).toBe(before.formalOrderId);
+    expect(after.seatedAt).toBe(before.seatedAt);
+    expect(after.joinedTables).toEqual(['T02']);
+    const floor=await runtime.readDining();
+    expect(floor.tables.find((row:any)=>row.id==='T01')?.holdId).toBe(hold.id);
+    expect(floor.tables.find((row:any)=>row.id==='T02')?.holdId).toBe(hold.id);
+  });
+
   it('never joins an occupied table / second Formal Order',async()=>{
     const runtime=await boot();
     const a=runtime.createHold({
@@ -99,6 +122,23 @@ describe('D14-A physical-table join',()=>{
     const bAfter=await runtime.readDiningHold(b.id);
     expect(aAfter.formalOrderId).not.toBe(bAfter.formalOrderId);
     expect(aAfter.joinedTables??[]).toEqual([]);
+  });
+
+  it('requires joined tables to be removed before primary-table transfer',async()=>{
+    const runtime=await boot();
+    const hold=runtime.createHold({
+      kind:'dining',
+      items:[{id:'riceball',name:'原味飯團',qty:1,unitMinor:4100}],
+      totalMinor:4100,
+      partySize:3,
+    });
+    await runtime.assignDiningTable(hold.id,'T01');
+    await runtime.joinDiningTable(hold.id,'T02');
+
+    await expect(runtime.assignDiningTable(hold.id,'T03')).rejects.toThrow('DINING_TRANSFER_REQUIRES_UNJOIN');
+    const after=await runtime.readDiningHold(hold.id);
+    expect(after.assignedTable).toBe('T01');
+    expect(after.joinedTables).toEqual(['T02']);
   });
 
   it('removes only the joined table and keeps the Dining session seated on its primary table',async()=>{
@@ -181,6 +221,34 @@ describe('D15-A Dining line correction / void',()=>{
     });
     expect(replay.correction.id).toBe(result.correction.id);
     expect(replay.detail.lines[0].voidedQty).toBe(1);
+  });
+
+  it('persists append-only correction and effective totals across restart',async()=>{
+    let runtime=await boot();
+    const hold=runtime.createHold({
+      kind:'dining',
+      items:[{id:'riceball',name:'原味飯團',qty:2,unitMinor:4100}],
+      totalMinor:8200,
+      partySize:2,
+    });
+    await runtime.assignDiningTable(hold.id,'T01');
+    const before=await runtime.readDiningHold(hold.id);
+    await runtime.correctDiningLine(hold.id,{
+      submissionId:'D15:restart:1',
+      lineIndex:0,
+      quantity:1,
+      reason:'客人取消一件',
+    });
+
+    vi.resetModules();
+    runtime=await boot();
+    const after=await runtime.readDiningHold(hold.id);
+    expect(after.formalOrderId).toBe(before.formalOrderId);
+    expect(after.totalMinor).toBe(4100);
+    expect(after.lines[0]).toMatchObject({originalQty:2,voidedQty:1,qty:1});
+    expect(after.corrections).toHaveLength(1);
+    const order=runtime.orders().find((row:any)=>row.id===before.formalOrderId);
+    expect(order).toMatchObject({originalTotalMinor:8200,totalMinor:4100,outstandingMinor:4100});
   });
 
   it('after production preserves original line and emits exactly one production correction notice',async()=>{
