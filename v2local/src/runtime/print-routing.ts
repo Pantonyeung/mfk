@@ -26,6 +26,7 @@ export interface PrintableOrder{
   readonly sourceLabel:string;
   readonly providerPickupCode?:string;
   readonly diningTableLabel?:string;
+  readonly diningTicketTitle?:string;
   readonly receiptTitle?:string;
   readonly receiptNoteLines?:readonly string[];
   readonly orderRemark?:string;
@@ -202,7 +203,7 @@ export function renderDiningTableTicket(order:PrintableOrder){
   return INIT
     +brand()
     +RULE
-    +CENTER+BOLD_ON+DOUBLE+'堂食枱單\n'+NORMAL+BOLD_OFF+LEFT
+    +CENTER+BOLD_ON+DOUBLE+clean(order.diningTicketTitle??'堂食枱單')+'\n'+NORMAL+BOLD_OFF+LEFT
     +RULE
     +'枱號 '+clean(order.diningTableLabel??'未指定')+'\n'
     +'訂單編號 '+clean(order.display)+'\n'
