@@ -21,6 +21,7 @@ const tenderLabels:Record<string,string>={
 const money=(minor:number)=>String.fromCharCode(36)+(minor/100).toFixed(2);
 let diningSubmissionSequence=0;
 let diningAdditionSequence=0;
+let diningCorrectionSequence=0;
 const nextDiningSubmissionId=(holdId:string)=>{
   diningSubmissionSequence+=1;
   return 'DINPAY:'+holdId+':'+Date.now().toString(36)+':'+diningSubmissionSequence.toString(36);
@@ -28,6 +29,10 @@ const nextDiningSubmissionId=(holdId:string)=>{
 const nextDiningAdditionSubmissionId=(holdId:string)=>{
   diningAdditionSequence+=1;
   return 'DINADD:'+holdId+':'+Date.now().toString(36)+':'+diningAdditionSequence.toString(36);
+};
+const nextDiningCorrectionSubmissionId=(holdId:string)=>{
+  diningCorrectionSequence+=1;
+  return 'DINVOID:'+holdId+':'+Date.now().toString(36)+':'+diningCorrectionSequence.toString(36);
 };
 
 export interface DiningCheckoutRequest{
@@ -49,6 +54,7 @@ export function RuntimeDiningWorkspace({runtime,onCheckout,onAddOrder}:{runtime:
   const [note,setNote]=useState('');
   const [selectedWait,setSelectedWait]=useState<string|null>(null);
   const [transferHoldId,setTransferHoldId]=useState<string|null>(null);
+  const [joinHoldId,setJoinHoldId]=useState<string|null>(null);
   const [selectedHoldId,setSelectedHoldId]=useState<string|null>(null);
   const [detail,setDetail]=useState<LocalDiningHoldDetail|null>(null);
   const [selection,setSelection]=useState<Record<number,number>>({});
@@ -121,6 +127,30 @@ export function RuntimeDiningWorkspace({runtime,onCheckout,onAddOrder}:{runtime:
     }
   };
 
+  const join=async(tableId:string)=>{
+    if(!joinHoldId||!runtime.joinDiningTable)return;
+    try{
+      const joining=detail?.holdId===joinHoldId?detail:(runtime.readDiningHold?await runtime.readDiningHold(joinHoldId):null);
+      if(!joining?.assignedTable){setJoinHoldId(null);setMessage('併枱已取消；此堂食單目前未正式入座。');return;}
+      await runtime.joinDiningTable(joinHoldId,tableId);
+      const tableLabel=view?.tables.find(table=>table.id===tableId)?.label??tableId;
+      setMessage('已加入 '+tableLabel+'；同一堂食單、同一用餐計時。');
+      setSelectedWait(null);setTransferHoldId(null);setSelectedHoldId(joinHoldId);
+      const joinedId=joinHoldId;setJoinHoldId(null);
+      await load();await loadDetail(joinedId);
+    }catch(cause){setMessage(cause instanceof Error?cause.message:'併枱失敗');}
+  };
+
+  const unjoin=async(tableId:string)=>{
+    if(!detail||!runtime.unjoinDiningTable)return;
+    try{
+      await runtime.unjoinDiningTable(detail.holdId,tableId);
+      const tableLabel=view?.tables.find(table=>table.id===tableId)?.label??tableId;
+      setMessage('已拆除 '+tableLabel+'；原堂食單仍留喺主枱。');
+      await load();await loadDetail(detail.holdId);
+    }catch(cause){setMessage(cause instanceof Error?cause.message:'拆枱失敗');}
+  };
+
   const assign=async(tableId:string)=>{
     if(!selectedWait||!runtime.assignDiningTable)return;
     try{
@@ -130,6 +160,7 @@ export function RuntimeDiningWorkspace({runtime,onCheckout,onAddOrder}:{runtime:
       setMessage('已安排到 '+tableLabel+'。');
       setSelectedWait(null);
       setTransferHoldId(null);
+      setJoinHoldId(null);
       setSelectedHoldId(selectedWait);
       await load();
       await loadDetail(selectedWait);
@@ -152,6 +183,7 @@ export function RuntimeDiningWorkspace({runtime,onCheckout,onAddOrder}:{runtime:
       await runtime.unassignDiningTable(detail.holdId);
       setMessage('已取消掛枱，退回輪候。');
       setTransferHoldId(null);
+      setJoinHoldId(null);
       setSelectedWait(detail.holdId);
       setSelectedHoldId(null);
       setDetail(null);
@@ -170,6 +202,7 @@ export function RuntimeDiningWorkspace({runtime,onCheckout,onAddOrder}:{runtime:
       setMessage('堂食單已取消；冇自動退款、冇開錢箱。');
       setSelectedWait(null);
       setTransferHoldId(null);
+      setJoinHoldId(null);
       setSelectedHoldId(null);
       setDetail(null);
       setSelection({});
@@ -184,6 +217,7 @@ export function RuntimeDiningWorkspace({runtime,onCheckout,onAddOrder}:{runtime:
     try{
       await runtime.clearDiningHold(detail.holdId);
       setMessage('已完成結帳並清枱。');
+      setTransferHoldId(null);setJoinHoldId(null);
       setSelectedHoldId(null);setDetail(null);setSelection({});
       await load();
     }catch(cause){setMessage(cause instanceof Error?cause.message:'清枱失敗');}
@@ -210,6 +244,30 @@ export function RuntimeDiningWorkspace({runtime,onCheckout,onAddOrder}:{runtime:
     const next:Record<number,number>={};
     for(const line of detail.lines)next[line.lineIndex]=line.remainingQty;
     setSelection(next);
+  };
+
+  const correctOne=async(lineIndex:number)=>{
+    if(!detail||!runtime.correctDiningLine)return;
+    const line=detail.lines.find(item=>item.lineIndex===lineIndex);
+    if(!line||line.remainingQty<=0)return;
+    const reason=window.prompt('商品更正原因','客人取消一件');
+    if(reason===null)return;
+    if(!window.confirm('確認取消「'+line.name+'」1 件？已出製作後會保留原紀錄並通知製作部。'))return;
+    try{
+      const result=await runtime.correctDiningLine(detail.holdId,{
+        submissionId:nextDiningCorrectionSubmissionId(detail.holdId),
+        lineIndex,quantity:1,reason:reason.trim()||'客人取消一件',
+      });
+      setDetail(result.detail);setSelection({});
+      if(result.correction.productionNoticeState==='UNKNOWN')setMessage('商品更正已記錄；製作通知結果未知，請先核對。');
+      else if(result.correction.productionNoticeState==='FAILED')setMessage('商品更正已記錄；製作通知未成功，請跟進。');
+      else if(result.correction.phase==='POST_PRODUCTION')setMessage('商品更正已記錄，製作部已收到更正通知。');
+      else setMessage('商品更正已記錄；未有製作輸出，不需發更正單。');
+      await load();
+    }catch(cause){
+      const code=cause instanceof Error?cause.message:'商品更正失敗';
+      setMessage(code==='DINING_PRODUCTION_CERTAINTY_UNKNOWN'?'製作結果未知，暫停更改；請先核對打印／製作結果。':code);
+    }
   };
 
   const goAddOrder=()=>{
@@ -294,13 +352,14 @@ export function RuntimeDiningWorkspace({runtime,onCheckout,onAddOrder}:{runtime:
           className={'dining-table '+table.state+(urgent?' overdue':'')+(selected?' selected':'')}
           onClick={()=>{
             if(table.state==='available'){
+              if(joinHoldId){void join(table.id);return;}
               if(transferHoldId){void transfer(table.id);return;}
               if(selectedWait)void assign(table.id);
               return;
             }
             if(table.holdId)void loadDetail(table.holdId);
           }}>
-          <div className="dining-table-top"><strong>{table.label}</strong><em>{table.state==='settled'?'已結帳':table.state==='available'?'空枱':(table.partySize??0)+' 位'}</em></div>
+          <div className="dining-table-top"><strong>{table.label}</strong><em>{table.state==='settled'?'已結帳':table.state==='available'?'空枱':table.areaLabel.includes('併枱')?'併枱 · '+(table.partySize??0)+' 位':(table.partySize??0)+' 位'}</em></div>
           {table.state!=='available'?<>
             <b>{table.outstandingLabel}</b>
             <span className="dining-table-items">{table.itemSummary||'未有商品內容'}{table.itemCount?(' · '+table.itemCount+' 件'):''}</span>
@@ -308,7 +367,7 @@ export function RuntimeDiningWorkspace({runtime,onCheckout,onAddOrder}:{runtime:
               用餐 {elapsed} 分鐘 · {overdue>0?'超時 '+overdue+' 分鐘':'剩餘 '+Math.max(0,diningOverdueMinutes-elapsed)+' 分鐘'}
             </span>
             <div className="dining-table-money"><small>已收 {money(table.paidMinor??0)}</small><strong>未收 {money(table.remainingMinor??0)}</strong></div>
-          </>:<small>{transferHoldId?'撳此轉枱':selectedWait?'撳此安排':'空枱'}</small>}
+          </>:<small>{joinHoldId?'撳此併枱':transferHoldId?'撳此轉枱':selectedWait?'撳此安排':'空枱'}</small>}
         </button>;
       })}</div>
       {message?<p className="dining-message">{message}</p>:null}
@@ -317,7 +376,7 @@ export function RuntimeDiningWorkspace({runtime,onCheckout,onAddOrder}:{runtime:
     <aside className="dining-detail-panel">
       {detail?<>
         <header>
-          <div><small>{detail.codeLabel}</small><h2>{detail.assignedTable?(view?.tables.find(table=>table.id===detail.assignedTable)?.label??detail.assignedTable):'輪候中'}</h2></div>
+          <div><small>{detail.codeLabel}</small><h2>{detail.assignedTable?[detail.assignedTable,...(detail.joinedTables??[])].map(id=>view?.tables.find(table=>table.id===id)?.label??id).join('＋'):'輪候中'}</h2></div>
           <span>{detail.partySize} 位</span>
         </header>
         <div className="dining-detail-timer">
@@ -331,7 +390,13 @@ export function RuntimeDiningWorkspace({runtime,onCheckout,onAddOrder}:{runtime:
         <section className="dining-detail-lines">
           <header><b>商品／分項結帳</b><button type="button" onClick={selectAllRemaining}>全選未結</button></header>
           {detail.lines.map(line=><article key={line.lineIndex} className={line.remainingQty===0?'paid':''}>
-            <div className="dining-line-copy"><b>{line.name}</b><small>{money(line.unitMinor)} × {line.qty}</small><span>已結 {line.paidQty} · 未結 {line.remainingQty}</span></div>
+            <div className="dining-line-copy">
+              <b>{line.name}</b>
+              <small>{money(line.unitMinor)} × {line.qty}{line.voidedQty>0?'（原 '+line.originalQty+' · 已更正 '+line.voidedQty+'）':''}</small>
+              <span>已結 {line.paidQty} · 未結 {line.remainingQty}</span>
+              {line.remainingQty>0?<button type="button" className="dining-line-correction" onClick={()=>void correctOne(line.lineIndex)}>取消 1 件</button>
+                :line.paidQty>0?<em>已付款數量如需移除，請到正式訂單走退款／調整。</em>:null}
+            </div>
             <div className="dining-line-selector">
               <button type="button" disabled={(selection[line.lineIndex]??0)<=0} onClick={()=>adjustSelection(line.lineIndex,-1)}>−</button>
               <b>{selection[line.lineIndex]??0}</b>
@@ -339,6 +404,23 @@ export function RuntimeDiningWorkspace({runtime,onCheckout,onAddOrder}:{runtime:
             </div>
           </article>)}
         </section>
+
+        {detail.joinedTables?.length?<section className="dining-joined-table-list">
+          <header><b>併枱</b><span>同一堂食單</span></header>
+          {detail.joinedTables.map(tableId=><div key={tableId}>
+            <span>{view?.tables.find(table=>table.id===tableId)?.label??tableId}</span>
+            <button type="button" onClick={()=>void unjoin(tableId)}>拆除此枱</button>
+          </div>)}
+        </section>:null}
+
+        {detail.corrections.length?<section className="dining-correction-history">
+          <header><b>商品更正紀錄</b><span>{detail.corrections.length}</span></header>
+          {detail.corrections.slice().reverse().map(row=><div key={row.id}>
+            <span>{row.itemName} ×{row.quantity}</span>
+            <b>{row.phase==='POST_PRODUCTION'?'已出製作後更正':'製作前更正'}</b>
+            <small>{row.productionNoticeState==='NOT_REQUIRED'?'毋須通知製作':row.productionNoticeState==='DONE'?'製作已通知':row.productionNoticeState==='FAILED'?'製作通知失敗':'製作通知結果未知'}</small>
+          </div>)}
+        </section>:null}
 
         <section className="dining-payment-panel checkout-authority">
           <header><div><b>本次結帳選擇</b><small>付款只可以喺 Checkout 介面完成</small></div><strong>{money(selectedAmount)}</strong></header>
@@ -357,13 +439,22 @@ export function RuntimeDiningWorkspace({runtime,onCheckout,onAddOrder}:{runtime:
         </section>
 
         <footer className="dining-detail-actions">
-          <button type="button" className="unassign" disabled={!detail.assignedTable||detail.remainingMinor===0} onClick={()=>void unassign()}>取消掛枱／退回輪候</button>
-          <button type="button" className="transfer" disabled={!detail.assignedTable||detail.remainingMinor===0} onClick={()=>{
+          <button type="button" className="unassign" title={detail.joinedTables?.length?'請先拆除併枱，再退回輪候。':undefined} disabled={!detail.assignedTable||detail.remainingMinor===0||Boolean(detail.joinedTables?.length)} onClick={()=>void unassign()}>取消掛枱／退回輪候</button>
+          <button type="button" className="join-table" disabled={!detail.assignedTable||detail.remainingMinor===0} onClick={()=>{
+            if(joinHoldId===detail.holdId){
+              setJoinHoldId(null);setMessage('已取消併枱模式。');
+            }else{
+              setSelectedWait(null);setTransferHoldId(null);setJoinHoldId(detail.holdId);
+              setMessage('併枱模式：請撳一張空枱。已有人／已有正式訂單嘅枱唔會合併。');
+            }
+          }}>{joinHoldId===detail.holdId?'取消併枱':'併枱'}</button>
+          <button type="button" className="transfer" title={detail.joinedTables?.length?'請先拆除併枱，再進行轉枱。':undefined} disabled={!detail.assignedTable||detail.remainingMinor===0||Boolean(detail.joinedTables?.length)} onClick={()=>{
             if(transferHoldId===detail.holdId){
               setTransferHoldId(null);
               setMessage('已取消轉枱模式。');
             }else{
               setSelectedWait(null);
+              setJoinHoldId(null);
               setTransferHoldId(detail.holdId);
               setMessage('轉枱模式：請撳一張空枱。');
             }
