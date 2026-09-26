@@ -19,8 +19,12 @@ export interface WorkspaceCartLine{
   readonly unitMinor:number;
   readonly detail?:string;
 }
+export interface ProductConfiguration{
+  readonly selected:Readonly<Record<string,readonly string[]>>;
+  readonly note:string;
+}
 export type OrderingPanelState=
-  |{readonly type:'product';readonly productId:string}
+  |{readonly type:'product';readonly productId:string;readonly lineId?:string}
   |{readonly type:'organize'}
   |{readonly type:'combo'}
   |{readonly type:'hold'}
@@ -29,13 +33,49 @@ export type OrderingPanelState=
 
 const money=(minor:number)=>(minor<0?'-':'')+String.fromCharCode(36)+(Math.abs(minor)/100).toFixed(2);
 
-export function ProductConfigWorkspace({product,onAdd}:{product:WorkspaceProduct;onAdd:(detail:string,deltaMinor:number,qty:number)=>void}){
-  const [qty,setQty]=useState(1);
-  const [note,setNote]=useState('');
+export function configurationFromDetail(product:WorkspaceProduct,detail?:string):ProductConfiguration{
+  const sets=product.optionSets??[];
+  const defaults=Object.fromEntries(sets.map(set=>[
+    set.id,
+    set.options.filter(option=>option.defaultSelected).map(option=>option.id),
+  ])) as Record<string,string[]>;
+  if(!detail?.trim())return {selected:defaults,note:''};
+
+  const segments=detail.split(' · ').map(segment=>segment.trim()).filter(Boolean);
+  const consumed=new Set<number>();
+  const selected:Record<string,readonly string[]>={};
+  for(const set of sets){
+    const prefix=set.name+'：';
+    const index=segments.findIndex((segment,segmentIndex)=>!consumed.has(segmentIndex)&&segment.startsWith(prefix));
+    if(index<0){
+      selected[set.id]=defaults[set.id]??[];
+      continue;
+    }
+    const labels=segments[index]!.slice(prefix.length).split('、').map(label=>label.trim()).filter(Boolean);
+    const ids=set.options.filter(option=>labels.includes(option.name)).map(option=>option.id);
+    selected[set.id]=ids.length?ids:(defaults[set.id]??[]);
+    consumed.add(index);
+  }
+  return {
+    selected,
+    note:segments.filter((_,index)=>!consumed.has(index)).join(' · '),
+  };
+}
+
+export function ProductConfigWorkspace({
+  product,initial,onAdd
+}:{
+  product:WorkspaceProduct;
+  initial?:{readonly qty:number;readonly detail?:string;readonly configuration?:ProductConfiguration};
+  onAdd:(detail:string,deltaMinor:number,qty:number,configuration:ProductConfiguration)=>void;
+}){
+  const seed=initial?.configuration??configurationFromDetail(product,initial?.detail);
+  const [qty,setQty]=useState(initial?.qty??1);
+  const [note,setNote]=useState(seed.note);
   const [selected,setSelected]=useState<Record<string,string[]>>(()=>Object.fromEntries(
     (product.optionSets??[]).map(set=>[
       set.id,
-      set.options.filter(option=>option.defaultSelected).map(option=>option.id),
+      [...(seed.selected[set.id]??set.options.filter(option=>option.defaultSelected).map(option=>option.id))],
     ]),
   ));
 
@@ -87,7 +127,7 @@ export function ProductConfigWorkspace({product,onAdd}:{product:WorkspaceProduct
       :<section className="cfg-block"><header><b>商品選項</b><span>Admin</span></header><p>此商品目前冇已發布選項組。</p></section>}
 
     <label className="cfg-note"><span>備註</span><input value={note} maxLength={60} onChange={event=>setNote(event.target.value)} placeholder="例如：不要蔥、醬分開"/><small>{note.length}/60</small></label>
-    <footer className="cfg-action"><div><span>單價</span><b>{money(product.priceMinor+delta)}</b></div><button className="primary" disabled={invalid} onClick={()=>onAdd(detail,delta,qty)}>加入訂單　{money((product.priceMinor+delta)*qty)}</button></footer>
+    <footer className="cfg-action"><div><span>單價</span><b>{money(product.priceMinor+delta)}</b></div><button className="primary" disabled={invalid} onClick={()=>onAdd(detail,delta,qty,{selected:Object.fromEntries(Object.entries(selected).map(([id,ids])=>[id,[...ids]])),note:note.trim()})}>{initial?'儲存修改':'加入訂單'}　{money((product.priceMinor+delta)*qty)}</button></footer>
   </div>;
 }
 
