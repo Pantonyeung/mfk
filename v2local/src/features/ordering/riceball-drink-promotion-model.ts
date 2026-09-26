@@ -22,12 +22,12 @@ function parts(detail?:string){
   return String(detail??'').split(' · ').map(part=>part.trim()).filter(Boolean);
 }
 
-function withoutPromoDetail(detail?:string){
+export function stripRiceballDrinkPromotionDetail(detail?:string){
   return parts(detail).filter(part=>part!==RICEBALL_DRINK_PROMO_DETAIL).join(' · ');
 }
 
 function withPromoDetail(detail?:string){
-  return [RICEBALL_DRINK_PROMO_DETAIL,withoutPromoDetail(detail)].filter(Boolean).join(' · ');
+  return [RICEBALL_DRINK_PROMO_DETAIL,stripRiceballDrinkPromotionDetail(detail)].filter(Boolean).join(' · ');
 }
 
 function eligibleMainProductIds(
@@ -56,7 +56,7 @@ function lineProduct(line:PromoCartLine,catalogs:PromoProductCatalogs){
 function standalonePrice(line:PromoCartLine,catalogs:PromoProductCatalogs){
   const product=lineProduct(line,catalogs);
   if(!product)return line.unitMinor;
-  const cleanDetail=withoutPromoDetail(line.detail);
+  const cleanDetail=stripRiceballDrinkPromotionDetail(line.detail);
   return standalonePriceForLine({...line,detail:cleanDetail},catalogs[line.serviceMode]);
 }
 
@@ -73,7 +73,7 @@ export function applyRiceballDrinkPromotion<T extends PromoCartLine>(
 ):T[]{
   if(!rule?.active)return input.map(line=>{
     if(!parts(line.detail).includes(RICEBALL_DRINK_PROMO_DETAIL))return line;
-    const detail=withoutPromoDetail(line.detail);
+    const detail=stripRiceballDrinkPromotionDetail(line.detail);
     return {...line,unitMinor:standalonePrice(line,catalogs),detail:detail||undefined} as T;
   });
 
@@ -98,7 +98,7 @@ export function applyRiceballDrinkPromotion<T extends PromoCartLine>(
       continue;
     }
     const product=lineProduct(line,catalogs);
-    const cleanDetail=withoutPromoDetail(line.detail);
+    const cleanDetail=stripRiceballDrinkPromotionDetail(line.detail);
     const normal=standalonePrice({...line,detail:cleanDetail},catalogs);
     const optionAdjustment=product?normal-product.priceMinor:0;
     const qty=Math.max(0,Math.floor(line.qty));
