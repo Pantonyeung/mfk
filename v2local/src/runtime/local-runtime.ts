@@ -219,6 +219,7 @@ export interface CleanSmtCoreRuntimePort{
   setAvailability?(nodeId:string,status:SmtAvailabilityStatus,expectedRevision:number):Promise<SmtAvailabilityProjection>;
   createDiningWait?(input:{partySize:number;note?:string}):Promise<LocalHoldDraft>;
   removeDiningWait?(id:string):Promise<void>;
+  admitDiningHold?(holdId:string):Promise<LocalDiningHoldDetail>;
   assignDiningTable?(holdId:string,tableId:string):Promise<void>;
   unassignDiningTable?(holdId:string):Promise<void>;
   readDiningHold?(holdId:string):Promise<LocalDiningHoldDetail>;
@@ -308,6 +309,7 @@ export interface MfkLocalRuntime extends CleanSmtCoreRuntimePort{
   removeHold(id:string):void;
   readDiningHold(holdId:string):Promise<LocalDiningHoldDetail>;
   readDiningHistory():Promise<readonly LocalDiningHoldDetail[]>;
+  admitDiningHold(holdId:string):Promise<LocalDiningHoldDetail>;
   ensureDiningInitialPrint(holdId:string):Promise<DiningInitialPrintResult>;
   ensureDiningPaymentReceipt(holdId:string,submissionId:string):Promise<DiningPaymentReceiptResult>;
   settleDiningHold(holdId:string,selections:readonly {lineIndex:number;qty:number}[],tender:DiningTender,command?:DiningSettlementCommand):Promise<LocalDiningHoldDetail>;
@@ -681,7 +683,7 @@ function projectDiningOrderNonBlocking(order?:StoredOrder){
 
 function diningTableLabel(hold:LocalHoldDraft){
   const id=hold.assignedTable??hold.lastAssignedTable;
-  if(!id)return '未指定';
+  if(!id)return '輪候 '+(hold.formalOrderDisplay??hold.codeLabel);
   const table=readSmtDiningTableRegistry().find(row=>row.id===id);
   return table?.name||id;
 }
@@ -720,7 +722,11 @@ function ensureDiningInitialPrintByHold(holdId:string):Promise<DiningInitialPrin
     let summary:PrintDispatchSummary;
     try{
       summary=await dispatchOrderOutputs(
-        {...attempted,diningTableLabel:diningTableLabel(hold)} as StoredOrder & {diningTableLabel:string},
+        {
+          ...attempted,
+          diningTableLabel:diningTableLabel(hold),
+          diningTicketTitle:hold.assignedTable?'堂食枱單':'堂食輪候單',
+        } as StoredOrder & {diningTableLabel:string;diningTicketTitle:string},
         undefined,
         false,
         'dining-initial',
@@ -979,12 +985,17 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
     const covers=Math.max(1,Math.floor(Number(target.covers)||1));
     const items=input.items.map(item=>({...item}));
     if(target.kind==='WAITING'){
+      const at=new Date().toISOString();
       const draft:LocalHoldDraft={
         id:'HOLD-'+Date.now().toString(36),codeLabel:'W'+String(snapshot.holds.length+1).padStart(3,'0'),kind:'dining',
-        createdAt:new Date().toISOString(),partySize:covers,note:'SMM 輪候',totalMinor:Math.max(0,Math.floor(Number(input.totalMinor)||0)),
+        createdAt:at,partySize:covers,note:'SMM 輪候',totalMinor:Math.max(0,Math.floor(Number(input.totalMinor)||0)),
         payments:[],providerRef,sourceLabel:input.sourceLabel||'SMM',smmSubmissionRefs:[providerRef],items,
       };
-      commitDiningHolds(snapshot,[draft,...snapshot.holds]);return draft;
+      const ensured=ensureDiningFormalOrder(snapshot,draft,at);
+      if(!ensured.order)throw new Error('DINING_ORDER_ITEMS_REQUIRED');
+      commitDiningState(snapshot,{holds:[ensured.hold,...snapshot.holds],orders:ensured.orders});
+      projectDiningOrderNonBlocking(ensured.order);
+      return ensured.hold;
     }
     const tableId=String(target.tableId||'').trim();
     if(!/^T\d{2}$/.test(tableId))throw new Error('SMM_DINING_TABLE_INVALID');
@@ -1536,6 +1547,22 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
     if(hold.archivedAt||hold.payments?.length)throw new Error('DINING_HISTORY_PROTECTED');
     if(hold.assignedTable||hold.items.length)throw new Error('DINING_NONEMPTY_HOLD_PROTECTED');
     commitDiningHolds(snapshot,snapshot.holds.filter(row=>row.id!==id));
+  },
+  async admitDiningHold(holdId){
+    const snapshot=readDiningState();
+    const hold=requireDiningHold(snapshot,holdId);
+    if(hold.archivedAt)throw new Error('DINING_HISTORY_PROTECTED');
+    const at=new Date().toISOString();
+    const ensured=ensureDiningFormalOrder(snapshot,hold,at);
+    if(!ensured.order)throw new Error('DINING_ORDER_ITEMS_REQUIRED');
+    if(ensured.changed){
+      commitDiningState(snapshot,{
+        holds:snapshot.holds.map(row=>row.id===holdId?ensured.hold:row),
+        orders:ensured.orders,
+      });
+      projectDiningOrderNonBlocking(ensured.order);
+    }
+    return clone(diningDetail(ensured.hold));
   },
   async assignDiningTable(holdId,tableId){
     const snapshot=readDiningState();
