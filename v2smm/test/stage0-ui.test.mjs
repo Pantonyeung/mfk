@@ -44,11 +44,26 @@ test('Offline workspace cannot bypass trusted staff identity',()=>{
   assert.match(stage0,/離線模式唔會繞過員工登入/);
 });
 
-test('Stage 0 acceptance bypass does not depend on Internet or LAN authorisation',()=>{
+test('Stage 0 acceptance bypass is restricted to acceptance host or explicit localhost',()=>{
   assert.match(stage0,/function uiAcceptanceBypass/);
-  assert.match(stage0,/ui-bypass/);
-  assert.match(stage0,/smm-acceptance-/);
+  assert.match(stage0,/\.yeungyi88\.workers\.dev/);
+  assert.match(stage0,/isLocal&&query\.get\('ui-bypass'\)==='1'/);
   assert.match(stage0,/if\(bypass\)return <>\{children\}<\/>/);
+
+  const source=stage0.match(/function uiAcceptanceBypass\(\)\{[\s\S]*?\n\}/)?.[0];
+  assert.ok(source,'uiAcceptanceBypass source must exist');
+  const evaluate=(hostname,search='')=>new Function(
+    'window',
+    'URLSearchParams',
+    `${source}; return uiAcceptanceBypass();`,
+  )({location:{hostname,search}},URLSearchParams);
+
+  assert.equal(evaluate('smm.morefunos.com','?ui-bypass=1'),false);
+  assert.equal(evaluate('mfk-smm-web.yeungyi88.workers.dev','?ui-bypass=1'),false);
+  assert.equal(evaluate('smm-acceptance-mfk-admin.yeungyi88.workers.dev',''),true);
+  assert.equal(evaluate('localhost','?ui-bypass=1'),true);
+  assert.equal(evaluate('127.0.0.1','?ui-bypass=1'),true);
+  assert.equal(evaluate('localhost',''),false);
 });
 
 test('Stage 0 IP production is paused and only canonical logo remains active',()=>{
