@@ -134,6 +134,8 @@ export interface OwnerOrderAuditEvent {
   readonly resultLabel?:string;
 }
 
+export type OwnerCanonicalFulfillmentState='待處理'|'進行中'|'可取餐'|'已完成'|'已取消';
+
 export interface OwnerOrderProjection {
   readonly orderId:string;
   readonly displayCode:string;
@@ -150,7 +152,7 @@ export interface OwnerOrderProjection {
   readonly tenderLabel?:string;
   readonly currentTenderLabel?:string;
   readonly paymentState?:'OPEN'|'PARTIAL'|'SETTLED'|string;
-  readonly fulfillmentLabel?:string;
+  readonly fulfillmentLabel?:OwnerCanonicalFulfillmentState;
   readonly fulfillmentMode?:'DINE_IN'|'TAKEAWAY'|'PICKUP'|'DELIVERY'|string;
   readonly elapsedLabel?:string;
   readonly promisedTimeLabel?:string;
