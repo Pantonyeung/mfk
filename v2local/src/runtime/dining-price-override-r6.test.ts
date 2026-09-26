@@ -53,6 +53,27 @@ describe('Dining manual price override authority',()=>{
     expect((await runtime.readDiningHold(hold.id)).lines[0].unitMinor).toBe(4000);
   });
 
+  it('repeated manual overrides form an immutable chronological chain',async()=>{
+    const runtime=await boot();
+    const hold=runtime.createHold({kind:'dining',items:[{id:'meal',name:'套餐',qty:1,unitMinor:4100,serviceMode:'dine-in'}],totalMinor:4100});
+    let detail=await runtime.readDiningHold(hold.id);
+    detail=await runtime.overrideDiningLinePrice(hold.id,0,4000,'第一次',detail.checkoutRevision);
+    detail=await runtime.overrideDiningLinePrice(hold.id,0,3900,'',detail.checkoutRevision);
+    expect(detail.priceOverrides).toHaveLength(2);
+    expect(detail.priceOverrides[0]).toMatchObject({sequence:1,originalUnitMinor:4100,effectiveUnitMinor:4000,reason:'第一次'});
+    expect(detail.priceOverrides[1]).toMatchObject({sequence:2,originalUnitMinor:4000,effectiveUnitMinor:3900,reason:''});
+    expect(detail.lines[0].unitMinor).toBe(3900);
+  });
+
+  it('submitting the same effective price is a no-op and does not create fake audit history',async()=>{
+    const runtime=await boot();
+    const hold=runtime.createHold({kind:'dining',items:[{id:'meal',name:'套餐',qty:1,unitMinor:4100,serviceMode:'dine-in'}],totalMinor:4100});
+    const detail=await runtime.readDiningHold(hold.id);
+    const after=await runtime.overrideDiningLinePrice(hold.id,0,4100,'無變化',detail.checkoutRevision);
+    expect(after.priceOverrides).toHaveLength(0);
+    expect(after.checkoutRevision).toBe(detail.checkoutRevision);
+  });
+
   it('price override is blocked once any payment exists',async()=>{
     const runtime=await boot();
     const hold=runtime.createHold({kind:'dining',items:[{id:'meal',name:'套餐',qty:1,unitMinor:4100,serviceMode:'dine-in'}],totalMinor:4100});
