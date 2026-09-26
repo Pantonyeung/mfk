@@ -1,0 +1,71 @@
+name: combo-crossport-projection
+
+on:
+  push:
+    branches:
+      - work/MFK/COMBO-CROSSPORT-PROJECTION-R1
+    paths:
+      - 'contracts/admin-combo-projection-v1.ts'
+      - 'contracts/smm-lan-v1.ts'
+      - 'v2admin/**'
+      - 'v2customer/**'
+      - 'v2local/**'
+      - 'v2smm/**'
+      - '.github/workflows/combo-crossport-projection.yml'
+
+jobs:
+  admin:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: v2admin
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-audit --no-fund --legacy-peer-deps --package-lock=false
+      - run: npm test
+      - run: npm run build
+
+  customer:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: v2customer
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-audit --no-fund --legacy-peer-deps --package-lock=false
+      - run: npm test
+      - run: npm run build
+
+  smm:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: v2smm
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-audit --no-fund --legacy-peer-deps --package-lock=false
+      - run: npm test
+      - run: npm run build
+
+  smt:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: v2local
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-audit --no-fund --legacy-peer-deps --package-lock=false
+      - run: npm test
+      - run: npm run build
