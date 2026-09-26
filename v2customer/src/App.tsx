@@ -51,7 +51,6 @@ export function App(){
   const [snapshot,setSnapshot]=useState<CustomerReadModelSnapshot|null>(null);
   const [quote,setQuote]=useState<CustomerQuoteSnapshot|null>(null);
   const [notice,setNotice]=useState<string|null>(null);
-  const [error,setError]=useState<string|null>(null);
   const [browserOnline,setBrowserOnline]=useState(()=>typeof navigator==='undefined'||navigator.onLine);
   const [search,setSearch]=useState('');
   const [menuLayout,setMenuLayout]=useState<MenuLayout>('grid');
@@ -106,14 +105,13 @@ export function App(){
       return;
     }
     setConnection('LOADING');
-    setError(null);
     try{
       const next=await port.readSnapshot();
       setSnapshot(next);
       setConnection('READY');
     }catch(reason){
+      console.warn('[MFK Customer] snapshot sync failed',reason);
       setConnection('ERROR');
-      setError(reason instanceof Error?reason.message:'暫時未能同步門店資料');
     }
   };
 
@@ -490,7 +488,7 @@ export function App(){
     {view==='home'?null:<div className="global-status" aria-live="polite">
       {notice?<section className="notice" role="status"><p>{notice}</p><button onClick={()=>setNotice(null)}>收起</button></section>:null}
       {!browserOnline?<StatusBanner tone="offline" title="目前離線" detail="已載入內容仍然可以查看。本機記憶罐、聯絡資料同待提交草稿已保留，恢復連線前唔會自動提交。"/>:null}
-      {browserOnline&&connection==='ERROR'?<StatusBanner tone="danger" title="暫時未能同步店舖資料" detail={error||'請檢查連線後再試。'} actionLabel="安全重試" onAction={()=>void refresh()}/>:null}
+      {browserOnline&&connection==='ERROR'?<StatusBanner tone="danger" title="暫時未能同步店舖資料" detail="暫時未能同步店舖資料，請稍後再試。" actionLabel="安全重試" onAction={()=>void refresh()}/>:null}
       {browserOnline&&connection==='NOT_CONNECTED'?<StatusBanner tone="warning" title="店舖服務尚未連接" detail="記憶罐、聯絡資料同待提交草稿會保留喺本機；正式菜單、價格、訂單、會員同取餐狀態唔會用假資料代替。"/>:null}
       {browserOnline&&(connection==='STALE'||connection==='PARTIAL')?<StatusBanner tone="warning" title="正顯示最近一次資料" detail="店舖最新狀態仍在更新。涉及價格或落單結果時會要求再次確認。" actionLabel="更新資料" onAction={()=>void refresh()}/>:null}
       {browserOnline&&connection==='UNKNOWN'?<StatusBanner tone="warning" title="正在確認店舖狀態" detail="暫時唔會將未確認結果當成成功。" actionLabel="重新確認" onAction={()=>void refresh()}/>:null}
@@ -498,7 +496,7 @@ export function App(){
     </div>}
 
     <section className={view==='home'?'stage1-viewport':'viewport'} aria-busy={connection==='LOADING'}>
-      {view==='home'?<Stage1Home snapshot={snapshot} connection={connection} browserOnline={browserOnline} error={error} activeOrders={activeOrders} history={history} recommendations={homeRecommendations} cartCount={cartCount} onRetry={()=>void refresh()} onProduct={openProduct} onBrowse={()=>changeView('menu')} onJar={()=>changeView('cart')} onOrders={()=>{setOrderSegment('current');changeView('orders')}} onHistory={()=>{setOrderSegment('history');changeView('orders')}} onMember={()=>changeView('more')} onBuyAgain={order=>void reorder(order)} onFallback={()=>void requestFallback()}/>:null}
+      {view==='home'?<Stage1Home snapshot={snapshot} connection={connection} browserOnline={browserOnline} activeOrders={activeOrders} history={history} recommendations={homeRecommendations} cartCount={cartCount} onRetry={()=>void refresh()} onProduct={openProduct} onBrowse={()=>changeView('menu')} onJar={()=>changeView('cart')} onOrders={()=>{setOrderSegment('current');changeView('orders')}} onHistory={()=>{setOrderSegment('history');changeView('orders')}} onMember={()=>changeView('more')} onBuyAgain={order=>void reorder(order)}/>:null}
       {view==='menu'?<MenuView connection={connection} categories={categories} activeCategoryId={effectiveCategoryId} setCategory={category=>presentWithContinuity(()=>changeCategory(category))} query={search} setQuery={setSearch} layout={menuLayout} setLayout={layout=>presentWithContinuity(()=>setMenuLayout(layout))} products={visibleProducts} recommendations={menuRecommendations} onProduct={(product,origin)=>openProduct(product,origin)} cartCount={cartCount} quote={quote} onCart={()=>changeView('cart')}/>:null}
       {view==='cart'?<CartView cart={cart} quote={quote} repairs={cartRepairs} checkout={checkout} member={snapshot?.member} suggestions={cartSuggestions} products={menu?.products??[]} onProduct={openProduct} onAcceptRepair={acceptCartRepair} onCheckoutChange={changeCheckout} onQuantity={(lineId,quantity)=>updateCart(cart.map(line=>line.lineId===lineId?{...line,quantity:Math.max(1,quantity)}:line))} onRemove={lineId=>updateCart(cart.filter(line=>line.lineId!==lineId))} onMenu={()=>changeView('menu')} onCheckout={()=>changeView('checkout')}/>:null}
       {view==='checkout'?<CheckoutView cart={cart} quote={quote} checkout={checkout} setCheckout={changeCheckout} paymentChannels={snapshot?.paymentChannels??[]} pending={currentPending} actionState={actionState} submitProbe={submitProbe} submitBlockReason={submitBlockReason} fallbackAvailable={fallbackAvailable} onFallback={()=>void requestFallback()} onSubmit={()=>void submit()} onReadback={intent=>void readbackIntent(intent)} onBack={()=>changeView('cart')} onRepair={()=>changeView('cart')} onPaymentEvidence={file=>void uploadPaymentEvidence(file)}/>:null}
