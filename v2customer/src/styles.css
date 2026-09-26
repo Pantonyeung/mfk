@@ -243,7 +243,9 @@ button:hover .product-media img{transform:scale(1.025)}
 .quantity-stepper button,.quantity-add{border:0;background:var(--surface);min-width:40px;height:40px;border-radius:11px;font-weight:900}
 .quantity-stepper .animated-value{min-width:28px;text-align:center;font-weight:900}
 .quantity-add{background:var(--purple);color:#fff;padding:0 16px}
-.line-attention{display:grid;gap:3px;background:var(--coral-soft);padding:10px;border-radius:12px;margin-top:6px;color:var(--danger)}
+.cart-line.needs-repair{box-shadow:inset 0 0 0 2px rgba(188,62,62,.16),0 10px 28px rgba(70,28,28,.06)}
+.line-attention{display:grid;gap:6px;background:var(--coral-soft);padding:10px;border-radius:12px;margin-top:6px;color:var(--danger)}
+.line-attention button{justify-self:start;min-height:38px;border:0;border-radius:999px;padding:0 12px;background:#fff;color:var(--danger);font-weight:900}
 .remove-confirm{margin-top:14px;padding:12px;background:#fff2f2;border-radius:13px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .remove-confirm p{margin:0;flex:1 1 100%;font-size:12px}
 .remove-confirm>button:not(.action-button){border:0;background:transparent;min-height:44px;padding:0 12px;font-weight:850}
@@ -265,6 +267,10 @@ button:hover .product-media img{transform:scale(1.025)}
 .quote-danger>b{background:var(--coral-soft);color:var(--danger)}
 .repair-card{background:var(--coral-soft);color:#692c27}
 .repair-card h2{margin:6px 0}.repair-card p{line-height:1.5}
+.safe-submit.state-fallback{background:var(--coral-soft);color:#692c27}
+.safe-submit.state-fallback>span{font-size:11px;font-weight:900;letter-spacing:.08em}
+.safe-submit.state-fallback h2{margin:7px 0 8px}
+.safe-submit.state-fallback p{line-height:1.55}
 .screen-primary-action{position:sticky;bottom:calc(88px + env(safe-area-inset-bottom));z-index:15;margin:24px -8px 0;padding:12px;background:rgba(255,255,255,.92);border-radius:20px;box-shadow:var(--shadow-float);backdrop-filter:blur(10px)}
 .screen-primary-action>div{display:flex;justify-content:space-between;margin-bottom:9px;font-size:12px}.screen-primary-action>div span{color:var(--muted)}
 
