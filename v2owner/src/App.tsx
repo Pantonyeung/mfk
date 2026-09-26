@@ -94,7 +94,7 @@ export function App(){
   const requestBounded=(label:string,target:string,impact:string)=>{
     if(connection==='OFFLINE_READONLY'){setNotice('離線唯讀：遠端操作已停用。');return}
     if(connection==='PERMISSION_DENIED'){setNotice('目前身份冇權執行呢個操作。');return}
-    setConfirmation({label,target,impact});
+    setConfirmation({label,target,impact:impact+' 正式狀態必須等目標系統讀回。'});
   };
 
   const executeBounded=async(value:Confirmation)=>{
