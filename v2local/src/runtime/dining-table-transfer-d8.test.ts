@@ -92,9 +92,14 @@ describe('D8 SAME-order Dining table transfer',()=>{
     const second=runtime.createHold({
       kind:'dining',items:[{id:'b',name:'B',qty:1,unitMinor:1000}],totalMinor:1000,partySize:2,
     });
+    expect(first.id).not.toBe(second.id);
     await runtime.assignDiningTable(first.id,'T01');
     await runtime.assignDiningTable(second.id,'T02');
     const identity=(await runtime.readDiningHold(first.id)).formalOrderId;
+    const secondIdentity=(await runtime.readDiningHold(second.id)).formalOrderId;
+    expect(identity).toBeTruthy();
+    expect(secondIdentity).toBeTruthy();
+    expect(identity).not.toBe(secondIdentity);
 
     await expect(runtime.assignDiningTable(first.id,'T02')).rejects.toThrow('DINING_TABLE_OCCUPIED');
 
