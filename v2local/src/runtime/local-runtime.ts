@@ -1386,7 +1386,8 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
         ...appended.hold,
         smmSubmissionRefs:[...(occupied.smmSubmissionRefs??[]),providerRef],
       };
-      const ensured=ensureDiningFormalOrder(snapshot,withSubmission,new Date().toISOString());
+      const appendedSnapshot:Persisted={...snapshot,orders:appended.orders};
+      const ensured=ensureDiningFormalOrder(appendedSnapshot,withSubmission,new Date().toISOString());
       commitDiningState(snapshot,{
         holds:snapshot.holds.map(hold=>hold.id===occupied.id?ensured.hold:hold),
         orders:ensured.orders,
