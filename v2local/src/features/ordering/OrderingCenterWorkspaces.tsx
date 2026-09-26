@@ -21,6 +21,7 @@ export interface WorkspaceCartLine{
 }
 export type OrderingPanelState=
   |{readonly type:'product';readonly productId:string;readonly lineId?:string}
+  |{readonly type:'required'}
   |{readonly type:'organize'}
   |{readonly type:'combo'}
   |{readonly type:'hold'}
@@ -31,12 +32,14 @@ const money=(minor:number)=>(minor<0?'-':'')+String.fromCharCode(36)+(Math.abs(m
 
 export function quickConfigurationForProduct(product:WorkspaceProduct){
   const sets=product.optionSets??[];
-  if(sets.some(set=>set.required||set.forceShow))return Object.freeze({eligible:false,detail:'',deltaMinor:0});
+  // Owner A3b: Quick mode may admit Required groups into Cart unresolved.
+  // forceShow-only groups still use the full editor unless separately decided.
+  if(sets.some(set=>set.forceShow&&!set.required&&set.min<=0))return Object.freeze({eligible:false,detail:'',deltaMinor:0});
   const chosen=sets.map(set=>({
     set,
-    options:set.options.filter(option=>option.defaultSelected),
+    options:(set.required||set.min>0)?[]:set.options.filter(option=>option.defaultSelected),
   }));
-  const invalid=chosen.some(({set,options})=>options.length<set.min||options.length>set.max);
+  const invalid=chosen.some(({set,options})=>(set.required||set.min>0)?false:options.length<set.min||options.length>set.max);
   if(invalid)return Object.freeze({eligible:false,detail:'',deltaMinor:0});
   const deltaMinor=chosen.reduce((sum,row)=>sum+row.options.reduce((value,option)=>value+option.priceAdjustmentMinor,0),0);
   const detail=chosen.flatMap(({set,options})=>{
@@ -44,6 +47,110 @@ export function quickConfigurationForProduct(product:WorkspaceProduct){
     return names.length?[set.name+'：'+names.join('、')]:[];
   }).join(' · ');
   return Object.freeze({eligible:true,detail,deltaMinor});
+}
+
+export interface WorkspaceRequiredTask{
+  readonly id:string;
+  readonly lineId:string;
+  readonly lineName:string;
+  readonly groupId:string;
+  readonly groupName:string;
+  readonly selection:'SINGLE'|'MULTI';
+  readonly min:number;
+  readonly max:number;
+  readonly missingCount:number;
+  readonly selectedOptionIds:readonly string[];
+  readonly options:readonly {id:string;name:string;priceAdjustmentMinor:number}[];
+}
+
+function explicitConfigurationFromDetail(product:WorkspaceProduct,detail?:string){
+  const sets=product.optionSets??[];
+  const selected:Record<string,string[]>={};
+  const noteParts:string[]=[];
+  const parts=String(detail??'').split(' · ').map(part=>part.trim()).filter(Boolean);
+  for(const part of parts){
+    const set=sets.find(row=>part.startsWith(row.name+'：'));
+    if(!set){noteParts.push(part);continue;}
+    const labels=part.slice(set.name.length+1).split('、').map(label=>label.trim()).filter(Boolean);
+    const ids=set.options.filter(option=>labels.includes(option.name)).map(option=>option.id);
+    if(labels.length&&ids.length===labels.length)selected[set.id]=ids;
+    else noteParts.push(part);
+  }
+  return {selected,note:noteParts.join(' · ')};
+}
+
+export function requiredTasksForCart(lines:readonly WorkspaceCartLine[],products:readonly WorkspaceProduct[]):WorkspaceRequiredTask[]{
+  const byProduct=new Map(products.map(product=>[product.id,product] as const));
+  const tasks:WorkspaceRequiredTask[]=[];
+  for(const line of lines){
+    const product=byProduct.get(line.productId);
+    if(!product)continue;
+    const current=explicitConfigurationFromDetail(product,line.detail).selected;
+    for(const set of product.optionSets??[]){
+      const min=Math.max(set.required?1:0,set.min);
+      if(min<=0)continue;
+      const max=Math.max(min,set.max||min);
+      const ids=(current[set.id]??[]).filter(id=>set.options.some(option=>option.id===id));
+      if(ids.length>=min&&ids.length<=max)continue;
+      tasks.push({
+        id:line.id+'::'+set.id,
+        lineId:line.id,
+        lineName:line.name,
+        groupId:set.id,
+        groupName:set.name,
+        selection:set.selection,
+        min,
+        max,
+        missingCount:Math.max(0,min-ids.length),
+        selectedOptionIds:ids,
+        options:set.options.map(option=>({id:option.id,name:option.name,priceAdjustmentMinor:option.priceAdjustmentMinor})),
+      });
+    }
+  }
+  return tasks;
+}
+
+export function applyRequiredSelectionToCart<T extends WorkspaceCartLine>(
+  lines:readonly T[],
+  products:readonly WorkspaceProduct[],
+  lineId:string,
+  groupId:string,
+  optionIds:readonly string[],
+):T[]{
+  const byProduct=new Map(products.map(product=>[product.id,product] as const));
+  return lines.map(line=>{
+    if(line.id!==lineId)return line;
+    const product=byProduct.get(line.productId);
+    if(!product)throw new Error('REQUIRED_FAST_LANE_PRODUCT_NOT_FOUND');
+    const set=(product.optionSets??[]).find(row=>row.id===groupId);
+    if(!set)throw new Error('REQUIRED_FAST_LANE_GROUP_NOT_FOUND');
+    const allowed=new Set(set.options.map(option=>option.id));
+    const unique=[...new Set(optionIds)].filter(id=>allowed.has(id));
+    const min=Math.max(set.required?1:0,set.min);
+    const max=Math.max(min,set.max||min||1);
+    const normalized=set.selection==='SINGLE'?unique.slice(0,1):unique.slice(0,max);
+    if(normalized.length<min||normalized.length>max)throw new Error('REQUIRED_FAST_LANE_SELECTION_INVALID');
+
+    const configuration=explicitConfigurationFromDetail(product,line.detail);
+    const selected:Record<string,string[]>={...configuration.selected,[groupId]:normalized};
+    let deltaMinor=0;
+    const detailParts:string[]=[];
+    for(const optionSet of product.optionSets??[]){
+      const ids=selected[optionSet.id]??[];
+      const idSet=new Set(ids);
+      const options=optionSet.options.filter(option=>idSet.has(option.id));
+      if(options.length){
+        detailParts.push(optionSet.name+'：'+options.map(option=>option.name).join('、'));
+        deltaMinor+=options.reduce((sum,option)=>sum+option.priceAdjustmentMinor,0);
+      }
+    }
+    if(configuration.note)detailParts.push(configuration.note);
+    return {
+      ...line,
+      unitMinor:product.priceMinor+deltaMinor,
+      detail:detailParts.join(' · ')||undefined,
+    } as T;
+  });
 }
 
 export function productEditorInitialFromDetail(product:WorkspaceProduct,detail?:string){
@@ -128,6 +235,47 @@ export function ProductConfigWorkspace({
 
     <label className="cfg-note"><span>備註</span><input value={note} maxLength={60} onChange={event=>setNote(event.target.value)} placeholder="例如：不要蔥、醬分開"/><small>{note.length}/60</small></label>
     <footer className="cfg-action"><div><span>單價</span><b>{money(product.priceMinor+delta)}</b></div><button className="primary" disabled={invalid} onClick={()=>onAdd(detail,delta,qty)}>{mode==='edit'?'儲存修改':'加入訂單'}　{money((product.priceMinor+delta)*qty)}</button></footer>
+  </div>;
+}
+
+export function RequiredFastLaneWorkspace({
+  cart,products,onApply,
+}:{
+  cart:readonly WorkspaceCartLine[];
+  products:readonly WorkspaceProduct[];
+  onApply:(lineId:string,groupId:string,optionIds:readonly string[])=>void;
+}){
+  const tasks=useMemo(()=>requiredTasksForCart(cart,products),[cart,products]);
+  const [draft,setDraft]=useState<Record<string,string[]>>({});
+  const toggle=(task:WorkspaceRequiredTask,optionId:string)=>{
+    const current=draft[task.id]??[...task.selectedOptionIds];
+    if(task.selection==='SINGLE'){
+      setDraft(value=>({...value,[task.id]:[optionId]}));
+      return;
+    }
+    const next=current.includes(optionId)?current.filter(id=>id!==optionId):[...current,optionId];
+    setDraft(value=>({...value,[task.id]:next.slice(0,task.max)}));
+  };
+
+  return <div className="required-fast-lane">
+    <header className="required-fast-title">
+      <div><small>ADMIN REQUIRED</small><h2>必選區</h2><p>快速模式先入購物車，再喺呢度補齊真正未完成嘅必選；全部選項同價差只讀 Admin 已發布資料。</p></div>
+      <strong>{tasks.length} 項</strong>
+    </header>
+    {tasks.length?<div className="required-fast-list">{tasks.map((task,index)=>{
+      const chosen=draft[task.id]??task.selectedOptionIds;
+      const ready=chosen.length>=task.min&&chosen.length<=task.max;
+      return <article key={task.id} className={index===0?'current':''}>
+        <header><span>{index+1}</span><div><b>{task.lineName}</b><small>{task.groupName} · 最少 {task.min} / 最多 {task.max}</small></div><em>{task.missingCount>0?'欠 '+task.missingCount:'需修正'}</em></header>
+        <div className="required-fast-options">{task.options.map(option=>{
+          const active=chosen.includes(option.id);
+          return <button type="button" key={option.id} className={active?'active':''} onClick={()=>toggle(task,option.id)}>
+            <b>{option.name}</b>{option.priceAdjustmentMinor!==0?<small>{option.priceAdjustmentMinor>0?'+':''}{money(option.priceAdjustmentMinor)}</small>:null}
+          </button>;
+        })}</div>
+        <footer><span>{task.selection==='SINGLE'?'單選':'多選'} · 已選 {chosen.length}</span><button type="button" disabled={!ready} onClick={()=>onApply(task.lineId,task.groupId,chosen)}>套用到呢件商品</button></footer>
+      </article>;
+    })}</div>:<div className="required-fast-empty"><b>必選已齊</b><span>目前購物車冇未完成必選。</span></div>}
   </div>;
 }
 

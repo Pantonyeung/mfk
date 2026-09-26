@@ -20,7 +20,7 @@ import {resolveBusinessWindow} from './runtime/local-operations.ts';
 import {RuntimeReadyActivation} from './runtime/RuntimeReadyActivation.tsx';
 import {StaffAuthGate,StaffSessionBadge} from './presentation/StaffAuthGate.tsx';
 import {CashOpeningGate} from './presentation/CashOpeningGate.tsx';
-import {ComboWorkspace,HoldCartWorkspace,HoldListWorkspace,OrganizeWorkspace,ProductConfigWorkspace,initialHoldModeForLines,quickConfigurationForProduct,type OrderingPanelState,type WorkspaceHoldDraft,type WorkspaceProduct} from './features/ordering/OrderingCenterWorkspaces.tsx';
+import {ComboWorkspace,HoldCartWorkspace,HoldListWorkspace,OrganizeWorkspace,ProductConfigWorkspace,RequiredFastLaneWorkspace,applyRequiredSelectionToCart,initialHoldModeForLines,quickConfigurationForProduct,requiredTasksForCart,type OrderingPanelState,type WorkspaceHoldDraft,type WorkspaceProduct} from './features/ordering/OrderingCenterWorkspaces.tsx';
 
 type Product={
   id:string;
@@ -209,6 +209,7 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
     optionSets:product.optionSets,
   }));
   const quickConfigurationById=new Map(workspaceProducts.map(product=>[product.id,quickConfigurationForProduct(product)] as const));
+  const requiredWork=requiredTasksForCart(cart,workspaceProducts);
   const diningTableDefinitions=storeSettings.diningTables.length
     ?storeSettings.diningTables
     :Array.from({length:9},(_,index)=>({
@@ -271,11 +272,11 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
     cart:{
       orderId:nextDisplay,serviceMode,viewMode,combineSimilar,
       lines:presentationCart,
-      subtotalLabel:money(total),packagingLabel:'$0.00',discountLabel:'$0.00',totalLabel:money(total),checkoutEnabled:cart.length>0&&((serviceMode==='takeaway'&&storeSettings.takeawayEnabled)||(serviceMode==='dine-in'&&storeSettings.dineInEnabled)),
+      subtotalLabel:money(total),packagingLabel:'$0.00',discountLabel:'$0.00',totalLabel:money(total),checkoutEnabled:cart.length>0&&requiredWork.length===0&&((serviceMode==='takeaway'&&storeSettings.takeawayEnabled)||(serviceMode==='dine-in'&&storeSettings.dineInEnabled)),
     },
     workItems:[
       {id:'riceball-pool',label:'飯團待組區',count:0},
-      {id:'required',label:'必選區',count:0},
+      {id:'required',label:'必選區',count:requiredWork.length},
       {id:'combo',label:'紫米套餐區',count:comboData.combos.length},
     ],
     actionAvailability:{
@@ -326,6 +327,13 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
     setCart([...cart,line]);setRecent(product.id);setHighlight(line.id);setPulse(value=>value+1);setPanel(null);
   };
 
+  const applyRequired=(lineId:string,groupId:string,optionIds:readonly string[])=>{
+    const next=applyRequiredSelectionToCart(cart,workspaceProducts,lineId,groupId,optionIds);
+    setCart(next);
+    setHighlight(lineId);
+    setPulse(value=>value+1);
+  };
+
   const addCombo=(comboId:string,comboName:string,detail:string,unitMinor:number)=>{
     const line:CartLine={id:nextLocalCartLineId(),productId:comboId,name:comboName,qty:1,unitMinor,serviceMode,detail};
     setCart([...cart,line]);setHighlight(line.id);setPulse(value=>value+1);setPanel(null);
@@ -340,6 +348,7 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
   const finishHold=()=>{setCart([]);setServiceMode('takeaway');setPanel(null);};
 
   const panelTitle=panel?.type==='product'?'商品選項'
+    :panel?.type==='required'?'必選區'
     :panel?.type==='organize'?'整理工作台'
     :panel?.type==='combo'?'紫米套餐區'
     :panel?.type==='hold'?'暫存工作台'
@@ -347,6 +356,8 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
 
   const panelBody=panel?.type==='product'
     ?(()=>{const product=workspaceProducts.find(item=>item.id===panel.productId);const line=panel.lineId?cart.find(item=>item.id===panel.lineId):undefined;return product?<ProductConfigWorkspace key={product.id+':'+(panel.lineId??'add')} product={product} mode={panel.lineId?'edit':'add'} initial={line?{qty:line.qty,detail:line.detail}:undefined} onAdd={(detail,delta,qty)=>addConfigured(product.id,detail,delta,qty,panel.lineId)}/>:null})()
+    :panel?.type==='required'
+      ?<RequiredFastLaneWorkspace cart={cart} products={workspaceProducts} onApply={applyRequired}/>
     :panel?.type==='organize'
       ?<OrganizeWorkspace lines={cart} onDone={()=>setPanel(null)}/>
       :panel?.type==='combo'
@@ -421,7 +432,11 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
     },
     onHoldCart:()=>cart.length?setPanel({type:'hold'}):setPanel({type:'holds'}),
     onCancelCart:()=>setCart([]),
-    onOpenWorkItem:id=>{if(id==='combo')setPanel({type:'combo'});else setPanel({type:'organize'});},
+    onOpenWorkItem:id=>{
+      if(id==='required')setPanel({type:'required'});
+      else if(id==='combo')setPanel({type:'combo'});
+      else setPanel({type:'organize'});
+    },
     onOpenQueueOrder:(_kind,id)=>navigate('/orders?orderId='+encodeURIComponent(id)),
     onCheckout:()=>navigate('/checkout'),
   };
