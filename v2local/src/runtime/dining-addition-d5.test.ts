@@ -201,6 +201,29 @@ describe('D5 Dining add-order delta print',()=>{
     expect(runtime.orders()[0].id).toBe(original.id);
   });
 
+  it('rejects a conflicting replay that reuses the same add-order submission identity with different content',async()=>{
+    const {runtime,hold}=await setup();
+    await runtime.appendDiningItems(hold.id,{
+      submissionId:'conflict-add',
+      items:[{id:'tea',name:'台式奶茶',qty:1,unitMinor:1500}],
+      totalMinor:1500,
+      sourceLabel:'現場',
+    });
+
+    await expect(runtime.appendDiningItems(hold.id,{
+      submissionId:'conflict-add',
+      items:[{id:'riceball',name:'原味飯團',qty:1,unitMinor:4100}],
+      totalMinor:4100,
+      sourceLabel:'現場',
+    })).rejects.toThrow('DINING_ADDITION_SUBMISSION_CONFLICT');
+
+    const detail=await runtime.readDiningHold(hold.id);
+    expect(detail.additions).toHaveLength(1);
+    expect(detail.totalMinor).toBe(5600);
+    expect(runtime.orders()).toHaveLength(1);
+    expect(runtime.orders()[0].totalMinor).toBe(5600);
+  });
+
   it('UNKNOWN addition print is persisted and never blindly retried',async()=>{
     const {runtime,hold}=await setup();
     const added=await runtime.appendDiningItems(hold.id,{
