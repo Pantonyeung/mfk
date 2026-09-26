@@ -143,7 +143,8 @@ describe('C2 Dining Checkout reload and recovery',()=>{
     expect(app).toContain("useState<CartLine[]>(()=>diningCheckout?diningCheckoutCart(diningCheckout):[])");
     expect(app).toContain('saveDiningCheckoutUiSession(request)');
     expect(app).toContain('const prior=detail.payments.find(payment=>payment.submissionId===diningCheckout.submissionId)');
-    expect(app).toContain("setPrintStatus('堂食付款已存在 · 已由本機記錄恢復，冇重複提交')");
+    expect(app).toContain("setPrintStatus('堂食付款已存在 · 正在核對付款收據狀態…')");
+    expect(app).toContain('localRuntime.ensureDiningPaymentReceipt(detail.holdId,diningCheckout.submissionId)');
     expect(app).toContain("detail.checkoutRevision!==diningCheckout.expectedRevision");
     expect(app).toContain('堂食內容已經更新；請返回堂食重新選擇未結項目，系統冇收款。');
     expect(app).toContain('clearDiningCheckoutUiSession();setDiningCheckout(null);');
