@@ -1,0 +1,63 @@
+name: deploy-customer-stage0-r2-acceptance
+
+on:
+  push:
+    branches:
+      - deploy/CUSTOMER-STAGE0-R2-ACCEPTANCE-715C679
+    paths:
+      - 'v2customer/CUSTOMER_STAGE0_R2_ACCEPTANCE_DEPLOY_REQUEST'
+
+jobs:
+  preview:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: v2customer
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install
+        run: npm install --no-audit --no-fund --legacy-peer-deps --package-lock=false
+      - name: Test
+        run: npm test
+      - name: Build
+        run: npm run build
+      - name: Resolve existing yeungyi88 mfk-admin account
+        shell: bash
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          curl -fsS -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            https://api.cloudflare.com/client/v4/accounts > "$RUNNER_TEMP/cf-accounts.json"
+          node <<'NODE' > "$RUNNER_TEMP/cf-account-ids.txt"
+          const fs=require('fs');
+          const x=JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP+'/cf-accounts.json','utf8'));
+          if(!x.success) process.exit(1);
+          for(const a of x.result||[]) if(a?.id) console.log(a.id);
+          NODE
+          TARGET=""
+          while IFS= read -r ACCOUNT_ID; do
+            [ -n "$ACCOUNT_ID" ] || continue
+            CODE="$(curl -sS -o "$RUNNER_TEMP/cf-worker-check" -w '%{http_code}' \
+              -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+              "https://api.cloudflare.com/client/v4/accounts/$ACCOUNT_ID/workers/services/mfk-admin" || true)"
+            if [ "$CODE" = "200" ]; then
+              TARGET="$ACCOUNT_ID"
+              break
+            fi
+          done < "$RUNNER_TEMP/cf-account-ids.txt"
+          if [ -z "$TARGET" ]; then
+            echo "::error::Existing mfk-admin Worker not found in accounts visible to current token."
+            exit 1
+          fi
+          echo "CLOUDFLARE_ACCOUNT_ID=$TARGET" >> "$GITHUB_ENV"
+      - name: Upload Customer Stage 0 R2 preview
+        run: npx --yes wrangler@4.136.3 versions upload --config wrangler.acceptance.jsonc --preview-alias customer-stage0-acceptance
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ env.CLOUDFLARE_ACCOUNT_ID }}
+      - name: Verify preview
+        run: curl --retry 5 --retry-delay 2 --fail --silent --show-error --head https://customer-stage0-acceptance-mfk-admin.yeungyi88.workers.dev
