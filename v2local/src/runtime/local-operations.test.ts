@@ -200,6 +200,29 @@ describe('MFK local operations fusion',()=>{
     expect(report.topProducts).toEqual([]);
   });
 
+  it('counts only the CASH component of a Dining COMBO payment entry',()=>{
+    const dining:LocalReportOrder[]=[{
+      id:'dining-combo',display:'P030',createdAt:'2026-09-21T04:00:00.000Z',
+      totalMinor:8200,paymentLabel:'COMBO',fulfillmentLabel:'進行中',sourceLabel:'堂食',
+      recognizedSalesMinor:4100,outstandingMinor:4100,
+      paymentEntries:[{
+        createdAt:'2026-09-21T04:10:00.000Z',
+        tender:'COMBO',
+        amountMinor:4100,
+        splitTenders:[
+          {tender:'CASH',amountMinor:2000},
+          {tender:'FPS',amountMinor:2100},
+        ],
+        selections:[{lineIndex:0,qty:1}],
+      }],
+      items:[{id:'rice',name:'飯團',qty:2,unitMinor:4100}],
+    }];
+    const report=buildLocalReport(dining,{now:new Date('2026-09-21T05:00:00.000Z').getTime(),businessStartHour:5});
+    expect(report.confirmedPaidMinor).toBe(4100);
+    expect(report.cashSalesMinor).toBe(2000);
+    expect(report.outstandingMinor).toBe(4100);
+  });
+
   it('backup validates and restores only MFK keys',()=>{
     const current={
       'mfk.v2local.runtime.v1':'runtime',
