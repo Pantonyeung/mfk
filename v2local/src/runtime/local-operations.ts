@@ -123,7 +123,7 @@ export function buildLocalReport(
   });
   const grossSalesMinor=selected.reduce((sum,order)=>sum+Math.max(0,Number(order.totalMinor)||0),0);
   const refundMinor=refunds.reduce((sum,row)=>sum+Math.max(0,Number(row.refund.amountMinor)||0),0);
-  const netSalesMinor=Math.max(0,grossSalesMinor-refundMinor);
+  const netSalesMinor=grossSalesMinor-refundMinor;
   const cashSalesMinor=selected.reduce((sum,order)=>{
     const label=String(order.paymentLabel||'');
     const upper=label.toUpperCase();
