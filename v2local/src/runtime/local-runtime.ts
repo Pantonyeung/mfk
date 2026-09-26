@@ -633,7 +633,8 @@ function ensureDiningFormalOrder(snapshot:Persisted,hold:LocalHoldDraft,at:strin
     items:hold.items.map(item=>({...item,serviceMode:'dine-in' as const})),
   };
   const linked:LocalHoldDraft={...hold,formalOrderId:order.id,formalOrderDisplay:order.display};
-  return {hold:linked,order,orders:[order,...snapshot.orders],created:true,changed:true};
+  const synced=syncDiningFormalOrder(order,linked,at);
+  return {hold:linked,order:synced,orders:[synced,...snapshot.orders],created:true,changed:true};
 }
 function projectDiningOrderNonBlocking(order?:StoredOrder){
   if(!order)return;
