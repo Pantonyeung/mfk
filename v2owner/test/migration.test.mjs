@@ -99,3 +99,21 @@ test('manager log and checklist are local-only product workflows',()=>{
 test('production fixture file has been removed',()=>{
   assert.equal(fs.existsSync(path.join(srcRoot,'fixtures.ts')),false);
 });
+
+
+test('final Owner Today UI contract includes live orders and dine-in outstanding boundary',()=>{
+  const app=fs.readFileSync(path.join(srcRoot,'App.tsx'),'utf8');
+  const types=fs.readFileSync(path.join(srcRoot,'product-types.ts'),'utf8');
+  const mapping=fs.readFileSync(path.join(srcRoot,'ui-data-mapping.ts'),'utf8');
+  const components=fs.readFileSync(path.join(srcRoot,'today-components.tsx'),'utf8');
+  assert.match(app,/TodayLiveOrdersCard/);
+  assert.match(app,/DineInOpenChecksCard/);
+  assert.match(types,/OwnerLiveOrdersSummary/);
+  assert.match(types,/OwnerDineInSummary/);
+  assert.match(types,/includedInEffectiveSales:false/);
+  assert.match(components,/未計入有效營業額/);
+  assert.match(components,/Order Value、已收款、未收款分開/);
+  assert.match(mapping,/liveOrders/);
+  assert.match(mapping,/dineInOpenChecks/);
+  assert.doesNotMatch(mapping,/fetch|WebSocket|XMLHttpRequest/);
+});
