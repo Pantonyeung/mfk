@@ -1,4 +1,5 @@
 import type {MfkAdminConfigEnvelope} from '../../../contracts/admin-config-sync-v1.ts';
+import {projectCanonicalCombos} from '../../../contracts/admin-combo-projection-v1.ts';
 import {readSmtAdminConfigLkg} from './admin-config-sync.ts';
 
 export type SyncedServiceMode='takeaway'|'dine-in';
@@ -246,6 +247,8 @@ export function projectSyncedRiceballDrinkPromotion(
 export function projectSyncedCombos(envelope?:MfkAdminConfigEnvelope|null):{
   readonly combos:readonly SyncedCombo[];
   readonly pools:readonly SyncedComboPool[];
+}{
+  return projectCanonicalCombos(envelope);
 }{
   const snapshot=snapshotOf(envelope);
   const catalog=record(snapshot.catalog);
