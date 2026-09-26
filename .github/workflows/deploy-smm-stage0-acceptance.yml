@@ -26,10 +26,38 @@ jobs:
         run: npm test
       - name: Build
         run: npm run build
-      - name: Upload SMM Stage 0 preview
-        run: npx --yes wrangler@latest versions upload --config wrangler.acceptance.jsonc --preview-alias smm-acceptance
+      - name: Resolve existing yeungyi88 mfk-admin account
+        shell: bash
         env:
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          curl -fsS -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN"             https://api.cloudflare.com/client/v4/accounts > "$RUNNER_TEMP/cf-accounts.json"
+          node <<'NODE' > "$RUNNER_TEMP/cf-account-ids.txt"
+          const fs=require('fs');
+          const x=JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP+'/cf-accounts.json','utf8'));
+          if(!x.success) process.exit(1);
+          for(const a of x.result||[]) if(a?.id) console.log(a.id);
+          NODE
+          TARGET=""
+          while IFS= read -r ACCOUNT_ID; do
+            [ -n "$ACCOUNT_ID" ] || continue
+            CODE="$(curl -sS -o "$RUNNER_TEMP/cf-worker-check" -w '%{http_code}'               -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN"               "https://api.cloudflare.com/client/v4/accounts/$ACCOUNT_ID/workers/services/mfk-admin" || true)"
+            if [ "$CODE" = "200" ]; then
+              TARGET="$ACCOUNT_ID"
+              break
+            fi
+          done < "$RUNNER_TEMP/cf-account-ids.txt"
+          if [ -z "$TARGET" ]; then
+            echo "::error::Existing mfk-admin Worker not found in accounts visible to current token."
+            exit 1
+          fi
+          echo "CLOUDFLARE_ACCOUNT_ID=$TARGET" >> "$GITHUB_ENV"
+          echo "Existing mfk-admin account resolved."
+      - name: Upload SMM Stage 0 preview
+        run: npx --yes wrangler@4.136.3 versions upload --config wrangler.acceptance.jsonc --preview-alias smm-acceptance
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ env.CLOUDFLARE_ACCOUNT_ID }}
       - name: Verify preview
         run: curl --retry 5 --retry-delay 2 --fail --silent --show-error --head https://smm-acceptance-mfk-admin.yeungyi88.workers.dev
