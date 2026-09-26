@@ -952,7 +952,7 @@ function ProductSheet({
           <div>
             <small>{comboEnabled&&combo?'套餐已發布基礎價':serviceMode==='DINE_IN'?'堂食價格':'外賣價格'}</small>
             <strong>{draftBaseMinor===null?'價格待同步':money('HKD',draftBaseMinor)}</strong>
-            <span>商品選項 {deltaLabel(selectedAdjustmentMinor)}</span>
+            <span>選項調整 {deltaLabel(selectedAdjustmentMinor)}</span>
             {comboEnabled?<span>套餐選擇 {deltaLabel(selectedComboAdjustmentMinor)}</span>:null}
             <b>{draftUnitMinor===null?'草稿價格待同步':money('HKD',draftUnitMinor)}</b>
           </div>
