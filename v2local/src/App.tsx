@@ -88,6 +88,7 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
   useEffect(()=>localRuntime.subscribe(()=>setRuntimeRevision(value=>value+1)),[]);
   const [category,setCategory]=useState('all');
   const [viewMode,setViewMode]=useState<'original'|'organized'>('original');
+  const [combineSimilar,setCombineSimilar]=useState(false);
   const [pulse,setPulse]=useState(0);
   const [recent,setRecent]=useState<string|undefined>();
   const [highlight,setHighlight]=useState<string|undefined>();
@@ -219,6 +220,31 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
     return {id:table.id,label:table.name,occupied:Boolean(occupied),codeLabel:occupied?.codeLabel};
   });
 
+  const presentCartLine=(line:CartLine,index:number,quantity=line.qty,sourceLineIds:readonly string[]=[line.id])=>({
+    id:sourceLineIds.length>1?'group:'+sourceLineIds.join('+'):line.id,
+    name:line.name,
+    quantity,
+    lineTotalLabel:money(line.unitMinor*quantity),
+    serviceMode:line.serviceMode,
+    groupId:'local',
+    groupLabel:'本機',
+    detail:line.detail,
+    sourceLineIds,
+  });
+  const presentationCart=(()=>{
+    if(!combineSimilar)return cart.map((line,index)=>presentCartLine(line,index,line.qty,[line.id]));
+    const groups=new Map<string,{line:CartLine;quantity:number;ids:string[];index:number}>();
+    cart.forEach((line,index)=>{
+      const key=[line.productId,line.serviceMode,line.unitMinor,line.detail??''].join('::');
+      const current=groups.get(key);
+      if(current){
+        current.quantity+=line.qty;
+        current.ids.push(line.id);
+      }else groups.set(key,{line,quantity:line.qty,ids:[line.id],index});
+    });
+    return [...groups.values()].sort((a,b)=>a.index-b.index).map(group=>presentCartLine(group.line,group.index,group.quantity,group.ids));
+  })();
+
   const view:OrderingWorkspaceViewModel={
     pendingOrders,activeOrders,categories,selectedCategoryId:category,
     products:visible.map(product=>({
@@ -239,11 +265,8 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
     showCategories:frontlinePresentation.showCategories,
     serviceModes:{takeaway:storeSettings.takeawayEnabled,dineIn:storeSettings.dineInEnabled},
     cart:{
-      orderId:nextDisplay,serviceMode,viewMode,
-      lines:cart.map(line=>({
-        id:line.id,name:line.name,quantity:line.qty,lineTotalLabel:money(line.unitMinor*line.qty),
-        serviceMode:line.serviceMode,groupId:'local',groupLabel:'本機',detail:line.detail,
-      })),
+      orderId:nextDisplay,serviceMode,viewMode,combineSimilar,
+      lines:presentationCart,
       subtotalLabel:money(total),packagingLabel:'$0.00',discountLabel:'$0.00',totalLabel:money(total),checkoutEnabled:cart.length>0&&((serviceMode==='takeaway'&&storeSettings.takeawayEnabled)||(serviceMode==='dine-in'&&storeSettings.dineInEnabled)),
     },
     workItems:[
@@ -375,14 +398,19 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
       setServiceMode(mode);setCart(cart.map(item=>({...item,serviceMode:mode})));
     },
     onChangeCartView:mode=>{setViewMode(mode);if(mode==='organized')setPanel({type:'organize'});},
-    onChangeLineServiceMode:(lineId,mode)=>{
+    onToggleCombine:()=>setCombineSimilar(value=>!value),
+    onChangeLineServiceMode:(lineIds,mode)=>{
       if(mode==='takeaway'&&!storeSettings.takeawayEnabled)return;
       if(mode==='dine-in'&&!storeSettings.dineInEnabled)return;
-      setCart(cart.map(item=>item.id===lineId?{...item,serviceMode:mode}:item));
+      const ids=new Set(lineIds);
+      setCart(cart.map(item=>ids.has(item.id)?{...item,serviceMode:mode}:item));
     },
-    onAdjustLineQuantity:(lineId,delta)=>setCart(cart.map(item=>item.id===lineId?{...item,qty:item.qty+delta}:item).filter(item=>item.qty>0)),
-    onEditCartLine:lineId=>{
-      const line=cart.find(item=>item.id===lineId);
+    onAdjustLineQuantity:(lineIds,delta)=>{
+      const lineId=lineIds[0];if(!lineId)return;
+      setCart(cart.map(item=>item.id===lineId?{...item,qty:item.qty+delta}:item).filter(item=>item.qty>0));
+    },
+    onEditCartLine:lineIds=>{
+      const line=cart.find(item=>item.id===lineIds[0]);
       if(!line)return;
       if(comboData.combos.some(combo=>combo.id===line.productId))setPanel({type:'combo'});
       else setPanel({type:'product',productId:line.productId,lineId:line.id});
