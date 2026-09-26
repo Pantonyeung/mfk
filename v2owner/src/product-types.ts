@@ -95,6 +95,7 @@ export interface OwnerActionItem {
   readonly readbackSummary?:string;
   readonly resolutionProofLabel?:string;
   readonly correlationId?:string;
+  readonly incidentId?:string;
   readonly observedAt:string;
 }
 
@@ -226,6 +227,8 @@ export interface OwnerActivityRecord {
   readonly actor:string;
   readonly target?:string;
   readonly correlationId?:string;
+  readonly incidentId?:string;
+  readonly linkedActionId?:string;
   readonly detail?:string;
   readonly requester?:string;
   readonly approver?:string;
