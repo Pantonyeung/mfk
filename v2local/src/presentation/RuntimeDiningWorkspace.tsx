@@ -183,6 +183,7 @@ export function RuntimeDiningWorkspace({runtime,onCheckout,onAddOrder}:{runtime:
       await runtime.unassignDiningTable(detail.holdId);
       setMessage('已取消掛枱，退回輪候。');
       setTransferHoldId(null);
+      setJoinHoldId(null);
       setSelectedWait(detail.holdId);
       setSelectedHoldId(null);
       setDetail(null);
@@ -201,6 +202,7 @@ export function RuntimeDiningWorkspace({runtime,onCheckout,onAddOrder}:{runtime:
       setMessage('堂食單已取消；冇自動退款、冇開錢箱。');
       setSelectedWait(null);
       setTransferHoldId(null);
+      setJoinHoldId(null);
       setSelectedHoldId(null);
       setDetail(null);
       setSelection({});
@@ -215,6 +217,7 @@ export function RuntimeDiningWorkspace({runtime,onCheckout,onAddOrder}:{runtime:
     try{
       await runtime.clearDiningHold(detail.holdId);
       setMessage('已完成結帳並清枱。');
+      setTransferHoldId(null);setJoinHoldId(null);
       setSelectedHoldId(null);setDetail(null);setSelection({});
       await load();
     }catch(cause){setMessage(cause instanceof Error?cause.message:'清枱失敗');}
@@ -445,7 +448,7 @@ export function RuntimeDiningWorkspace({runtime,onCheckout,onAddOrder}:{runtime:
               setMessage('併枱模式：請撳一張空枱。已有人／已有正式訂單嘅枱唔會合併。');
             }
           }}>{joinHoldId===detail.holdId?'取消併枱':'併枱'}</button>
-          <button type="button" className="transfer" disabled={!detail.assignedTable||detail.remainingMinor===0} onClick={()=>{
+          <button type="button" className="transfer" title={detail.joinedTables?.length?'請先拆除併枱，再進行轉枱。':undefined} disabled={!detail.assignedTable||detail.remainingMinor===0||Boolean(detail.joinedTables?.length)} onClick={()=>{
             if(transferHoldId===detail.holdId){
               setTransferHoldId(null);
               setMessage('已取消轉枱模式。');
