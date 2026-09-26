@@ -201,10 +201,17 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
     imageUrl:product.imageUrl??productArtwork(product),
     optionSets:product.optionSets,
   }));
-  const holdTables=Array.from({length:9},(_,index)=>{
-    const id='T'+String(index+1).padStart(2,'0');
-    const occupied=heldCarts.find(hold=>hold.kind==='dining'&&hold.assignedTable===id);
-    return {id,label:String(index+1),occupied:Boolean(occupied),codeLabel:occupied?.codeLabel};
+  const diningTableDefinitions=storeSettings.diningTables.length
+    ?storeSettings.diningTables
+    :Array.from({length:9},(_,index)=>({
+      id:'T'+String(index+1).padStart(2,'0'),
+      name:String(index+1)+' 號枱',
+      active:true,
+      sortOrder:index+1,
+    }));
+  const holdTables=diningTableDefinitions.map(table=>{
+    const occupied=heldCarts.find(hold=>hold.kind==='dining'&&hold.assignedTable===table.id);
+    return {id:table.id,label:table.name,occupied:Boolean(occupied),codeLabel:occupied?.codeLabel};
   });
 
   const view:OrderingWorkspaceViewModel={
