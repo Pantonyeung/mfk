@@ -1,6 +1,6 @@
 import {Component,StrictMode,type ErrorInfo,type ReactNode} from 'react';
 import {createRoot} from 'react-dom/client';
-import {App} from './App';
+import {App} from './App';\nimport {StageZeroGate} from './StageZero';
 import {installSmmRuntimePort} from './runtime';
 import {createPwaRuntimePort} from './pwa-runtime';
 import './styles.css';
@@ -21,4 +21,4 @@ installSmmRuntimePort(createPwaRuntimePort());
 
 const root=document.getElementById('root');
 if(!root)throw new Error('MFK_SMM_ROOT_REQUIRED');
-createRoot(root).render(<StrictMode><SmmErrorBoundary><App/></SmmErrorBoundary></StrictMode>);
+createRoot(root).render(<StrictMode><SmmErrorBoundary><StageZeroGate><App/></StageZeroGate></SmmErrorBoundary></StrictMode>);
