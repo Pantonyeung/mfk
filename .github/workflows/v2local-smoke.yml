@@ -2,7 +2,7 @@ name: V2 Local POS Smoke
 
 on:
   push:
-    branches: [main]
+    branches: [main, 'work/MFK/SMT-A2A-SAME-LINE-EDIT-2026-09-26']
     paths:
       - 'v2local/**'
   workflow_dispatch:
