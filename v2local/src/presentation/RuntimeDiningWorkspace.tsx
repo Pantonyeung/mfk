@@ -21,6 +21,7 @@ const tenderLabels:Record<string,string>={
 const money=(minor:number)=>String.fromCharCode(36)+(minor/100).toFixed(2);
 let diningSubmissionSequence=0;
 let diningAdditionSequence=0;
+let diningCorrectionSequence=0;
 const nextDiningSubmissionId=(holdId:string)=>{
   diningSubmissionSequence+=1;
   return 'DINPAY:'+holdId+':'+Date.now().toString(36)+':'+diningSubmissionSequence.toString(36);
@@ -28,6 +29,10 @@ const nextDiningSubmissionId=(holdId:string)=>{
 const nextDiningAdditionSubmissionId=(holdId:string)=>{
   diningAdditionSequence+=1;
   return 'DINADD:'+holdId+':'+Date.now().toString(36)+':'+diningAdditionSequence.toString(36);
+};
+const nextDiningCorrectionSubmissionId=(holdId:string)=>{
+  diningCorrectionSequence+=1;
+  return 'DINVOID:'+holdId+':'+Date.now().toString(36)+':'+diningCorrectionSequence.toString(36);
 };
 
 export interface DiningCheckoutRequest{
@@ -49,6 +54,7 @@ export function RuntimeDiningWorkspace({runtime,onCheckout,onAddOrder}:{runtime:
   const [note,setNote]=useState('');
   const [selectedWait,setSelectedWait]=useState<string|null>(null);
   const [transferHoldId,setTransferHoldId]=useState<string|null>(null);
+  const [joinHoldId,setJoinHoldId]=useState<string|null>(null);
   const [selectedHoldId,setSelectedHoldId]=useState<string|null>(null);
   const [detail,setDetail]=useState<LocalDiningHoldDetail|null>(null);
   const [selection,setSelection]=useState<Record<number,number>>({});
@@ -121,6 +127,30 @@ export function RuntimeDiningWorkspace({runtime,onCheckout,onAddOrder}:{runtime:
     }
   };
 
+  const join=async(tableId:string)=>{
+    if(!joinHoldId||!runtime.joinDiningTable)return;
+    try{
+      const joining=detail?.holdId===joinHoldId?detail:(runtime.readDiningHold?await runtime.readDiningHold(joinHoldId):null);
+      if(!joining?.assignedTable){setJoinHoldId(null);setMessage('併枱已取消；此堂食單目前未正式入座。');return;}
+      await runtime.joinDiningTable(joinHoldId,tableId);
+      const tableLabel=view?.tables.find(table=>table.id===tableId)?.label??tableId;
+      setMessage('已加入 '+tableLabel+'；同一堂食單、同一用餐計時。');
+      setSelectedWait(null);setTransferHoldId(null);setSelectedHoldId(joinHoldId);
+      const joinedId=joinHoldId;setJoinHoldId(null);
+      await load();await loadDetail(joinedId);
+    }catch(cause){setMessage(cause instanceof Error?cause.message:'併枱失敗');}
+  };
+
+  const unjoin=async(tableId:string)=>{
+    if(!detail||!runtime.unjoinDiningTable)return;
+    try{
+      await runtime.unjoinDiningTable(detail.holdId,tableId);
+      const tableLabel=view?.tables.find(table=>table.id===tableId)?.label??tableId;
+      setMessage('已拆除 '+tableLabel+'；原堂食單仍留喺主枱。');
+      await load();await loadDetail(detail.holdId);
+    }catch(cause){setMessage(cause instanceof Error?cause.message:'拆枱失敗');}
+  };
+
   const assign=async(tableId:string)=>{
     if(!selectedWait||!runtime.assignDiningTable)return;
     try{
@@ -130,6 +160,7 @@ export function RuntimeDiningWorkspace({runtime,onCheckout,onAddOrder}:{runtime:
       setMessage('已安排到 '+tableLabel+'。');
       setSelectedWait(null);
       setTransferHoldId(null);
+      setJoinHoldId(null);
       setSelectedHoldId(selectedWait);
       await load();
       await loadDetail(selectedWait);
@@ -210,6 +241,30 @@ export function RuntimeDiningWorkspace({runtime,onCheckout,onAddOrder}:{runtime:
     const next:Record<number,number>={};
     for(const line of detail.lines)next[line.lineIndex]=line.remainingQty;
     setSelection(next);
+  };
+
+  const correctOne=async(lineIndex:number)=>{
+    if(!detail||!runtime.correctDiningLine)return;
+    const line=detail.lines.find(item=>item.lineIndex===lineIndex);
+    if(!line||line.remainingQty<=0)return;
+    const reason=window.prompt('商品更正原因','客人取消一件');
+    if(reason===null)return;
+    if(!window.confirm('確認取消「'+line.name+'」1 件？已出製作後會保留原紀錄並通知製作部。'))return;
+    try{
+      const result=await runtime.correctDiningLine(detail.holdId,{
+        submissionId:nextDiningCorrectionSubmissionId(detail.holdId),
+        lineIndex,quantity:1,reason:reason.trim()||'客人取消一件',
+      });
+      setDetail(result.detail);setSelection({});
+      if(result.correction.productionNoticeState==='UNKNOWN')setMessage('商品更正已記錄；製作通知結果未知，請先核對。');
+      else if(result.correction.productionNoticeState==='FAILED')setMessage('商品更正已記錄；製作通知未成功，請跟進。');
+      else if(result.correction.phase==='POST_PRODUCTION')setMessage('商品更正已記錄，製作部已收到更正通知。');
+      else setMessage('商品更正已記錄；未有製作輸出，不需發更正單。');
+      await load();
+    }catch(cause){
+      const code=cause instanceof Error?cause.message:'商品更正失敗';
+      setMessage(code==='DINING_PRODUCTION_CERTAINTY_UNKNOWN'?'製作結果未知，暫停更改；請先核對打印／製作結果。':code);
+    }
   };
 
   const goAddOrder=()=>{
