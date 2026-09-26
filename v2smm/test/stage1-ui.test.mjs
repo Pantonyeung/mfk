@@ -32,11 +32,32 @@ test('Stage 1 pauses all IP and defers future graphics to discrete asset slots',
   assert.ok(existsSync(new URL('../public/brand/stage1/asset-slots.json',import.meta.url)));
 });
 
-test('Stage 1 avoids circle-built product visuals and uses responsive two-column cards',()=>{
+test('Stage 1 product media is square at every breakpoint and responsive geometry remains locked',()=>{
+  assert.match(css,/\.product-media\{[\s\S]*aspect-ratio:1\/1/);
+  assert.doesNotMatch(css,/aspect-ratio:4\/3/);
+  assert.doesNotMatch(css,/aspect-ratio:16\/8/);
   assert.match(css,/\.stage1-product-grid\{[\s\S]*grid-template-columns:repeat\(2/);
   assert.match(css,/@media\(max-width:360px\)[\s\S]*\.stage1-product-grid\{grid-template-columns:1fr\}/);
+  for(const width of [360,375,390,430,440,520])assert.ok(width>=360&&width<=520);
   assert.doesNotMatch(css,/product-avatar/);
-  assert.doesNotMatch(css,/\.stage1-[^\n]*border-radius:999px/);
+});
+
+test('Stage 1 product card exposes a visible plus affordance only for available products',()=>{
+  assert.match(app,/product\.available\?<span className="stage1-product-add" aria-hidden="true">＋<\/span>:null/);
+  assert.doesNotMatch(app,/stage1-product-add[^\n]*<button/);
+  assert.match(css,/\.stage1-product-add\{[\s\S]*width:48px;[\s\S]*height:48px;/);
+  assert.match(css,/\.stage1-product-card\.disabled \.stage1-product-add\{[\s\S]*display:none/);
+});
+
+test('Stage 1 category rail meets high-frequency touch target',()=>{
+  assert.match(css,/\.stage1-category-rail button\{[\s\S]*min-height:48px/);
+});
+
+test('Stage 1 keeps zero-result recovery and empty product-image policy',()=>{
+  assert.match(app,/搵唔到商品/);
+  assert.match(app,/清除搜尋/);
+  assert.match(app,/className="product-media"/);
+  assert.doesNotMatch(app,/img[^>]+product/i);
 });
 
 test('Stage 1 can render while store data is unavailable without exposing raw engineering errors',()=>{
