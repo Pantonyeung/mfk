@@ -4,6 +4,7 @@ import {ActionButton,AnimatedValue,CollapsingHeader,EmptyState,ExpandingSearch,M
 import type {CustomerRecommendation} from '../recommendation';
 import type {
   CustomerCartLine,
+  CustomerCartRepair,
   CustomerCheckoutDraft,
   CustomerConnectionState,
   CustomerHistoryProjection,
@@ -186,7 +187,7 @@ function JarVisual({count}:{count:number}){
   </div>;
 }
 
-export function CartView({cart,quote,checkout,member,suggestions,products,onProduct,onCheckoutChange,onQuantity,onRemove,onMenu,onCheckout}:{cart:readonly CustomerCartLine[];quote:CustomerQuoteSnapshot|null;checkout:CustomerCheckoutDraft;member?:CustomerMemberProjection;suggestions:readonly CustomerRecommendation[];products:readonly CustomerProduct[];onProduct:(product:CustomerProduct,origin:ProductOriginRect|null,line?:CustomerCartLine)=>void;onCheckoutChange:(value:CustomerCheckoutDraft)=>void;onQuantity:(id:string,q:number)=>void;onRemove:(id:string)=>void;onMenu:()=>void;onCheckout:()=>void;}){
+export function CartView({cart,quote,repairs,checkout,member,suggestions,products,onProduct,onAcceptRepair,onCheckoutChange,onQuantity,onRemove,onMenu,onCheckout}:{cart:readonly CustomerCartLine[];quote:CustomerQuoteSnapshot|null;repairs:readonly CustomerCartRepair[];checkout:CustomerCheckoutDraft;member?:CustomerMemberProjection;suggestions:readonly CustomerRecommendation[];products:readonly CustomerProduct[];onProduct:(product:CustomerProduct,origin:ProductOriginRect|null,line?:CustomerCartLine)=>void;onAcceptRepair:(lineId:string)=>void;onCheckoutChange:(value:CustomerCheckoutDraft)=>void;onQuantity:(id:string,q:number)=>void;onRemove:(id:string)=>void;onMenu:()=>void;onCheckout:()=>void;}){
   const [removeConfirm,setRemoveConfirm]=useState<string|null>(null);
   const itemCount=cart.reduce((sum,line)=>sum+line.quantity,0);
   return <section className="page cart-page">
@@ -198,9 +199,10 @@ export function CartView({cart,quote,checkout,member,suggestions,products,onProd
       <section className="jar-live-summary" aria-live="polite"><span>今次已選</span><AnimatedValue as="strong">{itemCount} 件餐點</AnimatedValue><small>{quote?quoteMeta[quote.freshness].label:'等待餐牌價格'}</small></section>
       <div className="cart-lines">{cart.map(line=>{
         const product=products.find(item=>item.productId===line.productId);
-        return <article className="cart-line" key={line.lineId}>
-          <div className="cart-line-main"><span className="cart-line-index" aria-hidden="true">{String(cart.indexOf(line)+1).padStart(2,'0')}</span><div><strong>{line.productName}</strong><p>{[line.selectedVariationName,...line.selections.map(item=>item.optionName)].filter(Boolean).join('、')||'原味設定'}</p>{line.note?<small>備註：{line.note}</small>:null}{line.attention?<div className="line-attention" role="alert"><b>只修正呢一項</b><span>{line.attention}</span></div>:null}</div></div>
-          <div className="cart-line-actions"><QuantityStepper label={line.productName} quantity={line.quantity} min={1} onChange={quantity=>onQuantity(line.lineId,quantity)}/><div><button disabled={!product} onClick={event=>{if(product){const rect=event.currentTarget.getBoundingClientRect();onProduct(product,{top:rect.top,left:rect.left,width:rect.width,height:rect.height},line)}}}>{line.attention?'修正':'編輯'}</button><button className="remove-line" onClick={()=>setRemoveConfirm(line.lineId)}>移除</button></div></div>
+        const repair=repairs.find(item=>item.lineId===line.lineId);
+        return <article className={'cart-line'+(repair?' needs-repair':'')} id={'cart-line-'+line.lineId} key={line.lineId}>
+          <div className="cart-line-main"><span className="cart-line-index" aria-hidden="true">{String(cart.indexOf(line)+1).padStart(2,'0')}</span><div><strong>{line.productName}</strong><p>{[line.selectedVariationName,...line.selections.map(item=>item.optionName)].filter(Boolean).join('、')||'原味設定'}</p>{line.note?<small>備註：{line.note}</small>:null}{repair?<div className="line-attention" role="alert"><b>{repair.title}</b><span>{repair.detail}</span>{repair.canAcceptCurrentPrice?<button type="button" onClick={()=>onAcceptRepair(line.lineId)}>接受並更新呢項價格</button>:null}</div>:line.attention?<div className="line-attention" role="alert"><b>只修正呢一項</b><span>{line.attention}</span></div>:null}</div></div>
+          <div className="cart-line-actions"><QuantityStepper label={line.productName} quantity={line.quantity} min={1} onChange={quantity=>onQuantity(line.lineId,quantity)}/><div><button disabled={!product||!product.available} onClick={event=>{if(product&&product.available){const rect=event.currentTarget.getBoundingClientRect();onProduct(product,{top:rect.top,left:rect.left,width:rect.width,height:rect.height},line)}}}>{repair&&!repair.canAcceptCurrentPrice?'修正':line.attention?'修正':'編輯'}</button><button className="remove-line" onClick={()=>setRemoveConfirm(line.lineId)}>移除</button></div></div>
           {removeConfirm===line.lineId?<div className="remove-confirm" role="alert"><p>只移除「{line.productName}」？其他餐點會保留。</p><button onClick={()=>setRemoveConfirm(null)}>保留</button><ActionButton variant="danger" onClick={()=>{onRemove(line.lineId);setRemoveConfirm(null)}}>確認移除</ActionButton></div>:null}
         </article>;
       })}</div>
@@ -208,7 +210,7 @@ export function CartView({cart,quote,checkout,member,suggestions,products,onProd
       <section className="jar-contact"><SectionHeading eyebrow="取餐聯絡" title="今次點稱呼你？"/><div className="checkout-form compact"><label htmlFor="jar-name"><span>稱呼 <small>選填</small></span><input id="jar-name" value={checkout.name} onChange={event=>onCheckoutChange({...checkout,name:event.target.value})} autoComplete="name" placeholder="例如：陳小姐"/></label><label htmlFor="jar-phone"><span>電話</span><input id="jar-phone" type="tel" inputMode="tel" value={checkout.phone} onChange={event=>onCheckoutChange({...checkout,phone:event.target.value})} autoComplete="tel" placeholder="只作今次取餐核對"/></label></div></section>
       {suggestions.length?<RecommendationRail eyebrow="今餐可以再睇" title="加一樣，都要有理由" recommendations={suggestions} onProduct={(product,origin)=>onProduct(product,origin)}/>:null}
       <QuoteSummary quote={quote} cart={cart}/>
-      {quote?.freshness==='MATERIAL_CHANGE'?<section className="repair-card" role="alert"><span>需要你確認</span><h2>餐點或價格有重要變更</h2><p>只修正受影響項目。記憶罐其他內容唔會被清空。</p><ActionButton variant="secondary" wide onClick={onMenu}>返回菜單修正</ActionButton></section>:null}
+      {quote?.freshness==='MATERIAL_CHANGE'?<section className="repair-card" role="alert"><span>需要你確認</span><h2>{repairs.length?repairs.length+' 項餐點需要更新':'餐點或價格有重要變更'}</h2><p>已直接標記受影響餐點。價格變更可喺原項目直接接受；設定變更只修正該項，其他餐點全部保留。</p></section>:null}
       <div className="screen-primary-action"><div><span>下一步</span><strong>{quote?money(quote.currency,quote.totalMinor):'等待餐牌價格'}</strong></div><ActionButton wide disabled={quote?.freshness==='MATERIAL_CHANGE'} onClick={onCheckout}>前往最後確認</ActionButton></div>
     </>}
   </section>;
