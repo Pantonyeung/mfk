@@ -1,4 +1,4 @@
-// MFK SMT A1 R4 R2 proof on latest main.
+// MFK SMT A1 R4 R3 proof on current main.
 import {describe,expect,it} from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
