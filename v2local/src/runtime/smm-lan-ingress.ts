@@ -191,7 +191,7 @@ export function createSmmLanIngress(runtime:MfkLocalRuntime){
           sourceLabel:'SMM',
         });
         const canonicalOrderId=hold.formalOrderId??hold.id;
-        if(input.diningTarget.kind==='TABLE'&&hold.formalOrderId){
+        if(hold.formalOrderId){
           void runtime.ensureDiningInitialPrint?.(hold.id).catch(()=>{});
         }
         writeResults([...results(),{submissionId:input.submissionId,orderId:canonicalOrderId,canonicalRevision,idempotencyKey:input.idempotencyKey,requestId:input.requestId}]);
