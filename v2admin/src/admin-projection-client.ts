@@ -139,7 +139,7 @@ function connect(){
     socket.addEventListener('message',event=>{
       try{
         const row=JSON.parse(String(event.data)) as {type?:string};
-        if(row.type==='SMT_PROJECTION_AVAILABLE')void refreshAdminProjection();
+        if(row.type==='SMT_PROJECTION_AVAILABLE'||row.type==='ADMIN_REFUND_AVAILABLE')void refreshAdminProjection();
       }catch{}
     });
     socket.addEventListener('close',()=>{
