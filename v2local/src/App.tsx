@@ -5,6 +5,7 @@ import {ProductionViewport} from './app/ProductionViewport.tsx';
 import {OrderingWorkspace} from './features/ordering/OrderingWorkspace.tsx';
 import type {OrderingWorkspaceActions,OrderingWorkspaceViewModel,ServiceMode} from './features/ordering/ordering-workspace-model.ts';
 import {CheckoutWorkspace} from './features/checkout/CheckoutWorkspace.tsx';
+import {clearDiningCheckoutUiSession,diningCheckoutCart,readDiningCheckoutUiSession,saveDiningCheckoutUiSession} from './features/checkout/dining-checkout-ui-session.ts';
 import type {CheckoutChannelId,CheckoutTenderId,CheckoutWorkspaceActions,CheckoutWorkspaceViewModel} from './features/checkout/checkout-workspace-model.ts';
 import {RuntimeOrdersWorkspace} from './presentation/RuntimeOrdersWorkspace.tsx';
 import {RuntimeDiningWorkspace,type DiningCheckoutRequest} from './presentation/RuntimeDiningWorkspace.tsx';
@@ -604,6 +605,9 @@ function CheckoutPage({cart,setCart,diningCheckout,onDiningCheckoutDone}:{cart:C
   const [state,setState]=useState<'selected'|'processing'|'success'|'failure'>('selected');
   const [completion,setCompletion]=useState<CheckoutWorkspaceViewModel['completionReview']>();
   const [printStatus,setPrintStatus]=useState<string|undefined>();
+  const [diningRecovering,setDiningRecovering]=useState(Boolean(diningCheckout));
+  const [diningRequiresRefresh,setDiningRequiresRefresh]=useState(false);
+  const [checkoutFailure,setCheckoutFailure]=useState<string|undefined>();
 
   const methodLabels:Record<CheckoutTenderId,string>={
     CASH:'現金付款',ALIPAY:'AlipayHK',WECHAT:'WeChat Pay HK',FPS:'FPS／轉數快',PAYME:'PayMe',COMBO:'組合付款'
@@ -612,6 +616,59 @@ function CheckoutPage({cart,setCart,diningCheckout,onDiningCheckoutDone}:{cart:C
     'walk-in':'現場','whatsapp':'電話／WhatsApp','morefun-app':'磨飯 App','keeta':'Keeta','foodpanda':'Foodpanda'
   };
 
+  useEffect(()=>{
+    if(!diningCheckout){
+      setDiningRecovering(false);
+      setDiningRequiresRefresh(false);
+      setCheckoutFailure(undefined);
+      return;
+    }
+    let disposed=false;
+    setDiningRecovering(true);
+    setDiningRequiresRefresh(false);
+    setCheckoutFailure(undefined);
+    void localRuntime.readDiningHold(diningCheckout.holdId).then(detail=>{
+      if(disposed)return;
+      const prior=detail.payments.find(payment=>payment.submissionId===diningCheckout.submissionId);
+      if(prior){
+        const tender=prior.tender as CheckoutTenderId;
+        setMethod(tender);
+        if(prior.tender==='CASH')setCash(((prior.receivedMinor??prior.amountMinor)/100).toFixed(2));
+        setCompletion({
+          displayOrderCode:detail.codeLabel,
+          tenderLabel:methodLabels[tender],
+          dueLabel:money(prior.amountMinor),
+          ...(prior.tender==='CASH'?{
+            receivedLabel:money(prior.receivedMinor??prior.amountMinor),
+            changeLabel:money(prior.changeMinor??0),
+          }:{}),
+          statusLabel:detail.remainingMinor===0?'堂食已全數結帳':'堂食分項結帳完成',
+        });
+        setState('success');
+        setPrintStatus('堂食付款已存在 · 已由本機記錄恢復，冇重複提交');
+        setDiningRecovering(false);
+        return;
+      }
+      if(detail.checkoutRevision!==diningCheckout.expectedRevision){
+        setDiningRequiresRefresh(true);
+        setCheckoutFailure('堂食內容已經更新；請返回堂食重新選擇未結項目，系統冇收款。');
+        setState('failure');
+        setDiningRecovering(false);
+        return;
+      }
+      setState('selected');
+      setPrintStatus('堂食結帳已恢復 · 尚未付款');
+      setDiningRecovering(false);
+    }).catch(cause=>{
+      if(disposed)return;
+      setDiningRequiresRefresh(true);
+      setCheckoutFailure('未能核對堂食付款狀態：'+(cause instanceof Error?cause.message:String(cause))+'。請返回堂食重新讀取，系統冇自動收款。');
+      setState('failure');
+      setDiningRecovering(false);
+    });
+    return()=>{disposed=true;};
+  },[diningCheckout?.holdId,diningCheckout?.submissionId,diningCheckout?.expectedRevision]);
+
   const parseMoney=(value:string)=>Math.max(0,Math.round((Number(value)||0)*100));
   const cashMinor=parseMoney(cash);
   const comboMinor=(Object.values(split) as string[]).reduce((sum,value)=>sum+parseMoney(value),0);
@@ -619,7 +676,7 @@ function CheckoutPage({cart,setCart,diningCheckout,onDiningCheckoutDone}:{cart:C
   const change=method==='CASH'?Math.max(0,received-due):0;
   const comboExact=method!=='COMBO'||comboMinor===due;
   const cashReady=method!=='CASH'||received>=due;
-  const confirmEnabled=cart.length>0&&comboExact&&cashReady;
+  const confirmEnabled=cart.length>0&&!diningRecovering&&!diningRequiresRefresh&&comboExact&&cashReady;
   const validationMessage=method==='CASH'&&cash&&received<due?'收款金額不足':
     method==='COMBO'&&comboMinor!==due?'組合付款合計 '+money(comboMinor)+'，必須等於 '+money(due):undefined;
 
@@ -665,7 +722,7 @@ function CheckoutPage({cart,setCart,diningCheckout,onDiningCheckoutDone}:{cart:C
     },
     comboMode:method==='COMBO',
     splitTenders:(['CASH','FPS','PAYME','ALIPAY','WECHAT'] as const).map(id=>({id,label:methodLabels[id],amount:split[id]})),
-    validationMessage,statusMessage:printStatus,completionReview:completion,
+    validationMessage,statusMessage:printStatus,failureMessage:checkoutFailure,completionReview:completion,
   };
 
   const confirm=async()=>{
@@ -684,16 +741,23 @@ function CheckoutPage({cart,setCart,diningCheckout,onDiningCheckoutDone}:{cart:C
             ...(tenderCode==='CASH'?{receivedMinor:received}:{}),
           }
         );
+        const payment=updated.payments.find(row=>row.submissionId===diningCheckout.submissionId);
         setCompletion({
           displayOrderCode:diningCheckout.codeLabel,
-          tenderLabel:tenderDisplay,
-          dueLabel:money(due),
-          receivedLabel:money(received),
-          changeLabel:money(change),
+          tenderLabel:payment?methodLabels[payment.tender as CheckoutTenderId]:tenderDisplay,
+          dueLabel:money(payment?.amountMinor??due),
+          ...(payment?.tender==='CASH'?{
+            receivedLabel:money(payment.receivedMinor??payment.amountMinor),
+            changeLabel:money(payment.changeMinor??0),
+          }:{
+            receivedLabel:money(received),
+            changeLabel:money(change),
+          }),
           statusLabel:updated.remainingMinor===0?'堂食已全數結帳':'堂食分項結帳完成',
         });
+        setCheckoutFailure(undefined);
         setState('success');
-        setPrintStatus('堂食 '+diningCheckout.tableLabel+' 號枱 · 已記錄 '+tenderDisplay+' · 未結 '+money(updated.remainingMinor));
+        setPrintStatus('堂食 '+diningCheckout.tableLabel+' · 已保存付款 · 未結 '+money(updated.remainingMinor));
         return;
       }
 
@@ -723,7 +787,19 @@ function CheckoutPage({cart,setCart,diningCheckout,onDiningCheckoutDone}:{cart:C
         const failures=summary.results.filter(row=>!row.ok).map(row=>row.role+':'+row.code).join('；');
         setPrintStatus('訂單已完成 · 打印部分失敗 '+summary.sent+'/'+summary.planned+' · '+failures);
       }).catch(error=>setPrintStatus('訂單已完成 · 打印失敗 '+(error instanceof Error?error.message:String(error))));
-    }catch{
+    }catch(cause){
+      const code=cause instanceof Error?cause.message:String(cause);
+      if(diningCheckout){
+        if(code==='DINING_CHECKOUT_STALE'||code==='DINING_CHECKOUT_REFRESH_REQUIRED'){
+          setDiningRequiresRefresh(true);
+          setCheckoutFailure('堂食內容已更新；請返回堂食重新選擇未結項目，系統冇收款。');
+        }else if(code==='DINING_SUBMISSION_CONFLICT'){
+          setDiningRequiresRefresh(true);
+          setCheckoutFailure('同一堂食付款識別出現內容衝突；請返回堂食重新讀取，系統冇建立第二筆付款。');
+        }else{
+          setCheckoutFailure('堂食付款未完成：'+code+'。請核對後重試；系統會沿用同一付款識別。');
+        }
+      }
       setState('failure');
     }
   };
@@ -743,7 +819,7 @@ function CheckoutPage({cart,setCart,diningCheckout,onDiningCheckoutDone}:{cart:C
     },
     onQuickCash:amount=>setCash(value=>((Number(value)||0)+amount).toFixed(2)),
     onExactCash:()=>setCash((due/100).toFixed(2)),
-    onConfirm:confirm,onRetry:confirm,
+    onConfirm:confirm,onRetry:()=>{if(diningCheckout&&diningRequiresRefresh){setCart([]);onDiningCheckoutDone();navigate('/dining');return;}void confirm();},
     onDone:()=>{setCart([]);if(diningCheckout){onDiningCheckoutDone();navigate('/dining');}else navigate('/')},
   };
 
@@ -756,9 +832,9 @@ function OperationalApp(){
   const [globalArrival,setGlobalArrival]=useState<{orderId:string;display:string;sourceLabel:string}|null>(null);
   const [snoozedArrival,setSnoozedArrival]=useState<{orderId:string;display:string;sourceLabel:string}|null>(null);
   const snoozeTimerRef=useRef<number|undefined>(undefined);
-  const [cart,setCartState]=useState<CartLine[]>([]);
-  const [serviceMode,setServiceMode]=useState<ServiceMode>('takeaway');
-  const [diningCheckout,setDiningCheckout]=useState<DiningCheckoutRequest|null>(null);
+  const [diningCheckout,setDiningCheckout]=useState<DiningCheckoutRequest|null>(()=>readDiningCheckoutUiSession());
+  const [cart,setCartState]=useState<CartLine[]>(()=>diningCheckout?diningCheckoutCart(diningCheckout):[]);
+  const [serviceMode,setServiceMode]=useState<ServiceMode>(diningCheckout?'dine-in':'takeaway');
   const [navRevision,setNavRevision]=useState(0);
   const snoozeGlobalArrival=(delayMs:number)=>{
     if(!globalArrival)return;
@@ -808,23 +884,11 @@ function OperationalApp(){
 
 
   const prepareDiningCheckout=(request:DiningCheckoutRequest)=>{
-    const next:CartLine[]=request.lines.map((line,index)=>{
-      const parts=line.name.split('｜');
-      const name=parts.shift()||line.name;
-      const detail=parts.length?parts.join('｜'):undefined;
-      return {
-        id:'dining-checkout-'+request.holdId+'-'+line.lineIndex+'-'+index,
-        productId:line.id,
-        name,
-        qty:line.qty,
-        unitMinor:line.unitMinor,
-        serviceMode:'dine-in',
-        detail,
-      };
-    });
+    // C2: persist UI intent only. Runtime remains the only payment authority.
+    saveDiningCheckoutUiSession(request);
     setDiningCheckout(request);
     setServiceMode('dine-in');
-    setCartState(next);
+    setCartState(diningCheckoutCart(request));
   };
 
   return <><RuntimeReadyActivation/><ProductionViewport><div className="clean-app">
@@ -856,7 +920,7 @@ function OperationalApp(){
     <section className="clean-route-stage">
       <Routes>
         <Route index element={<OrderingPage cart={cart} setCart={setCart} serviceMode={serviceMode} setServiceMode={setServiceMode}/>}/>
-        <Route path="checkout" element={<CheckoutPage cart={cart} setCart={setCart} diningCheckout={diningCheckout} onDiningCheckoutDone={()=>setDiningCheckout(null)}/>}/>
+        <Route path="checkout" element={<CheckoutPage cart={cart} setCart={setCart} diningCheckout={diningCheckout} onDiningCheckoutDone={()=>{clearDiningCheckoutUiSession();setDiningCheckout(null);}}/>}/>
         <Route path="orders" element={<RuntimeOrdersWorkspace runtime={runtime}/>}/>
         <Route path="dining" element={<RuntimeDiningWorkspace runtime={runtime} onCheckout={prepareDiningCheckout}/>}/>
         <Route path="soldout" element={<RuntimeSoldoutWorkspace runtime={runtime}/>}/>
