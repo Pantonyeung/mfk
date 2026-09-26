@@ -1325,6 +1325,7 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
       };
       const items=hold.items.map((row,index)=>index===lineIndex?{...row,unitMinor:effectiveUnitMinor}:row);
       const totalMinor=items.reduce((sum,row)=>sum+row.qty*row.unitMinor,0);
+      if(!Number.isSafeInteger(totalMinor))throw new Error('DINING_PRICE_OVERRIDE_TOTAL_INVALID');
       const nextHold:LocalHoldDraft={...hold,items,totalMinor,priceOverrides:[...(hold.priceOverrides??[]),record]};
       const linkedOrder=hold.formalOrderId?snapshot.orders.find(row=>row.id===hold.formalOrderId):undefined;
       const next:Persisted={
