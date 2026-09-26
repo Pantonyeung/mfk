@@ -7,6 +7,8 @@ import {
   type SmmStaffDirectoryItem,
   type SmmStaffSession,
 } from './pwa-staff';
+import {pairSmmLan,readSmmLanPwaConfig} from './pwa-lan';
+import {APPROVED_LOGO_SRC,APPROVED_MALE_IP_SRC} from './approved-brand-assets';
 import type {SmmReadModelSnapshot} from './product-types';
 import './stage0.css';
 
@@ -21,32 +23,44 @@ function withTimeout<T>(promise:Promise<T>,ms:number):Promise<T>{
     promise.then(value=>{window.clearTimeout(timer);resolve(value)},reason=>{window.clearTimeout(timer);reject(reason)});
   });
 }
+function humanProbeMessage(){
+  return navigator.onLine
+    ?'暫時未能連接門店服務，請稍後再試。'
+    :'目前裝置未連接網絡，請檢查 Wi‑Fi 或流動數據。';
+}
+function humanStaffMessage(){
+  return '員工編號或 PIN 未能驗證，請檢查後再試一次。';
+}
+function humanDirectoryMessage(){
+  return '暫時未能讀取員工名單，你仍可直接輸入員工編號。';
+}
+function formatObservedAt(value:string|null){
+  if(!value)return '未有可確認記錄';
+  const date=new Date(value);
+  return Number.isNaN(date.getTime())?'未有可確認記錄':date.toLocaleString('zh-HK',{hour12:false});
+}
 
 export function StageZeroGate({children}:{children:ReactNode}){
   const initialSession=useMemo(()=>readSmmStaffSession(),[]);
   const [splashDone,setSplashDone]=useState(false);
   const [probeState,setProbeState]=useState<ProbeState>('CHECKING');
   const [snapshot,setSnapshot]=useState<SmmReadModelSnapshot|null>(null);
-  const [probeError,setProbeError]=useState<string|null>(null);
+  const [lastObservedAt,setLastObservedAt]=useState<string|null>(null);
   const [staffSession,setStaffSession]=useState<SmmStaffSession|null>(initialSession);
   const [offlineBypass,setOfflineBypass]=useState(false);
 
   const probe=async()=>{
     const port=resolveSmmRuntimePort();
-    if(!port){
-      setProbeState('ERROR');
-      setProbeError('門店服務未準備好。');
-      return;
-    }
+    if(!port){setProbeState('ERROR');return;}
     setProbeState('CHECKING');
-    setProbeError(null);
     try{
       const next=await withTimeout(port.readSnapshot(),PROBE_TIMEOUT_MS);
       setSnapshot(next);
+      setLastObservedAt(next.observedAt);
       setProbeState('READY');
-    }catch(reason){
+    }catch(error){
+      console.warn('SMM_STAGE0_PROBE_FAILED',error);
       setProbeState('ERROR');
-      setProbeError(reason instanceof Error?reason.message:'暫時未能連接門店服務');
     }
   };
 
@@ -56,21 +70,18 @@ export function StageZeroGate({children}:{children:ReactNode}){
     return()=>window.clearTimeout(timer);
   },[]);
 
-  if(offlineBypass)return <>{children}</>;
+  if(!splashDone)return <StageZeroSplash/>;
 
-  if(!splashDone){
-    return <StageZeroSplash/>;
-  }
+  if(offlineBypass&&staffSession)return <>{children}</>;
 
-  if(probeState==='CHECKING'){
-    return <StageZeroConnectionChecking/>;
-  }
+  if(probeState==='CHECKING')return <StageZeroConnectionChecking/>;
 
   if(probeState==='ERROR'){
     return <StageZeroConnectionRecovery
-      message={probeError??'暫時未能連接門店服務'}
+      hasTrustedStaff={Boolean(staffSession)}
+      lastObservedAt={lastObservedAt}
       onRetry={()=>void probe()}
-      onOffline={()=>setOfflineBypass(true)}
+      onOffline={()=>{if(staffSession)setOfflineBypass(true)}}
     />;
   }
 
@@ -82,11 +93,9 @@ export function StageZeroGate({children}:{children:ReactNode}){
 }
 
 function BrandLockup(){
-  return <div className="stage0-brand" aria-label="磨飯 SMM">
-    <span className="stage0-morefun">More Fun</span>
-    <strong>磨飯</strong>
-    <small>手作 · 輕食</small>
-    <b>SMM</b>
+  return <div className="stage0-brand">
+    <img src={APPROVED_LOGO_SRC} alt="磨飯 More Fun"/>
+    <b>SMM 流動店務</b>
   </div>;
 }
 
@@ -94,11 +103,8 @@ function StageZeroSplash(){
   return <main className="stage0-shell stage0-splash" aria-busy="true">
     <section className="stage0-center">
       <BrandLockup/>
-      <div className="stage0-team-art" role="img" aria-label="磨飯前線店務夥伴"/>
-      <div className="stage0-slogan">
-        <strong>前線好幫手</strong>
-        <span>令每一張訂單都更順暢</span>
-      </div>
+      <img className="stage0-approved-ip" src={APPROVED_MALE_IP_SRC} alt="磨飯前線店務角色"/>
+      <div className="stage0-slogan"><strong>前線好幫手</strong><span>令每一張訂單都更順暢</span></div>
       <div className="stage0-progress" aria-label="啟動中"><i/></div>
       <small className="stage0-footnote">正在準備工作環境…</small>
     </section>
@@ -121,16 +127,53 @@ function StageZeroConnectionChecking(){
   </main>;
 }
 
-function StageZeroConnectionRecovery({message,onRetry,onOffline}:{message:string;onRetry:()=>void;onOffline:()=>void}){
+function StageZeroConnectionRecovery({hasTrustedStaff,lastObservedAt,onRetry,onOffline}:{
+  hasTrustedStaff:boolean;
+  lastObservedAt:string|null;
+  onRetry:()=>void;
+  onOffline:()=>void;
+}){
+  const config=readSmmLanPwaConfig();
+  const [pairing,setPairing]=useState(false);
+  const [pairMessage,setPairMessage]=useState<string|null>(null);
+
+  const pair=async()=>{
+    if(!config){setPairMessage('呢部裝置未有 LAN 配對設定。請先恢復網絡，再到「更多 > 連線」完成設定。');return;}
+    setPairing(true);
+    setPairMessage(null);
+    try{
+      await pairSmmLan(config);
+      setPairMessage('LAN 已重新配對，可以再試連線。');
+    }catch(error){
+      console.warn('SMM_STAGE0_PAIR_FAILED',error);
+      setPairMessage('未能完成 LAN 配對，請確認 SMT 已開啟配對後再試。');
+    }finally{setPairing(false);}
+  };
+
   return <main className="stage0-shell">
     <section className="stage0-card stage0-recovery-card">
       <BrandLockup/>
       <div className="stage0-status-icon error" aria-hidden="true">!</div>
       <h1>暫時未能連接門店</h1>
-      <p>你仍然可以進入離線工作區處理本機草稿；正式餐單、訂單同營運狀態會保持空白，唔會顯示假資料。</p>
-      <div className="stage0-inline-message" role="status">{message}</div>
-      <button className="stage0-primary" onClick={onRetry}>重新連線</button>
-      <button className="stage0-secondary" onClick={onOffline}>進入離線工作區</button>
+      <p>{humanProbeMessage()}</p>
+
+      <div className="stage0-connection-grid" aria-label="連線狀態">
+        <div><span>Internet</span><strong>{navigator.onLine?'裝置有網絡':'未連接'}</strong></div>
+        <div><span>LAN</span><strong>{config?'已設定配對':'未設定'}</strong></div>
+        <div className="wide"><span>最後觀察時間</span><strong>{formatObservedAt(lastObservedAt)}</strong></div>
+      </div>
+
+      {pairMessage?<div className="stage0-inline-message" role="status">{pairMessage}</div>:null}
+
+      <div className="stage0-action-grid">
+        <button className="stage0-primary" onClick={onRetry}>重新連線</button>
+        <button className="stage0-secondary" disabled={pairing} onClick={()=>void pair()}>{pairing?'配對中…':config?'重新配對':'配對設定'}</button>
+      </div>
+
+      <button className="stage0-secondary" disabled={!hasTrustedStaff} onClick={onOffline}>
+        {hasTrustedStaff?'進入離線工作區':'需先完成員工登入'}
+      </button>
+      {!hasTrustedStaff?<small className="stage0-security">離線模式唔會繞過員工身份驗證；請先恢復連線完成登入。</small>:null}
     </section>
   </main>;
 }
@@ -151,40 +194,30 @@ function StageZeroStaffLogin({onSuccess}:{onSuccess:(session:SmmStaffSession)=>v
       setStaff(rows);
       if(!staffId&&rows[0])setStaffId(rows[0].staffId);
     }catch(reason){
-      setError(reason instanceof Error?reason.message:'未能讀取員工名單；可以直接輸入員工編號。');
-    }finally{
-      setDirectoryLoading(false);
-    }
+      console.warn('SMM_STAGE0_STAFF_DIRECTORY_FAILED',reason);
+      setError(humanDirectoryMessage());
+    }finally{setDirectoryLoading(false);}
   };
 
   useEffect(()=>{void loadDirectory()},[]);
 
   const submit=async()=>{
-    if(!staffId.trim()){
-      setError('請先選擇或輸入員工編號。');
-      return;
-    }
+    if(!staffId.trim()){setError('請先選擇或輸入員工編號。');return;}
     setLoading(true);
     setError(null);
     try{
       const session=await verifySmmStaff(staffId.trim(),pin);
       onSuccess(session);
     }catch(reason){
-      setError(reason instanceof Error?reason.message:'員工驗證失敗');
-    }finally{
-      setLoading(false);
-    }
+      console.warn('SMM_STAGE0_STAFF_VERIFY_FAILED',reason);
+      setError(humanStaffMessage());
+    }finally{setLoading(false);}
   };
 
   return <main className="stage0-shell">
     <section className="stage0-card stage0-login-card">
       <BrandLockup/>
-      <div className="stage0-team-art compact" role="img" aria-label="磨飯前線店務夥伴"/>
-      <header>
-        <span>歡迎返嚟</span>
-        <h1>員工登入</h1>
-        <p>使用你嘅員工身份進入 SMM。</p>
-      </header>
+      <header><span>歡迎返嚟</span><h1>員工登入</h1><p>使用你嘅員工身份進入 SMM。</p></header>
 
       {staff.length?<label className="stage0-field">
         <span>員工</span>
@@ -193,35 +226,18 @@ function StageZeroStaffLogin({onSuccess}:{onSuccess:(session:SmmStaffSession)=>v
         </select>
       </label>:<label className="stage0-field">
         <span>員工編號</span>
-        <input
-          inputMode="text"
-          autoComplete="username"
-          value={staffId}
-          onChange={event=>setStaffId(event.target.value)}
-          placeholder={directoryLoading?'讀取員工名單中…':'輸入員工編號'}
-        />
+        <input inputMode="text" autoComplete="username" value={staffId} onChange={event=>setStaffId(event.target.value)} placeholder={directoryLoading?'讀取員工名單中…':'輸入員工編號'}/>
       </label>}
 
       <label className="stage0-field">
         <span>PIN</span>
-        <input
-          inputMode="numeric"
-          autoComplete="current-password"
-          maxLength={8}
-          value={pin}
-          onChange={event=>setPin(event.target.value.replace(/\D/g,'').slice(0,8))}
-          placeholder="4–8 位數字"
-          type="password"
-        />
+        <input inputMode="numeric" autoComplete="current-password" maxLength={8} value={pin} onChange={event=>setPin(event.target.value.replace(/\D/g,'').slice(0,8))} placeholder="4–8 位數字" type="password"/>
       </label>
 
       {error?<div className="stage0-inline-message danger" role="alert">{error}</div>:null}
-
-      <button className="stage0-primary" disabled={loading||pin.length<4} onClick={()=>void submit()}>
-        {loading?'驗證中…':'登入 SMM'}
-      </button>
+      <button className="stage0-primary" disabled={loading||pin.length<4} onClick={()=>void submit()}>{loading?'驗證中…':'登入 SMM'}</button>
       {!staff.length&&!directoryLoading?<button className="stage0-text-button" onClick={()=>void loadDirectory()}>重新讀取員工名單</button>:null}
-      <small className="stage0-security">員工身份只會交畀現有 MFK 驗證流程；SMM 唔會建立第二套登入系統。</small>
+      <small className="stage0-security">員工身份沿用現有 MFK 驗證流程；一般畫面唔會顯示工程錯誤碼。</small>
     </section>
   </main>;
 }
