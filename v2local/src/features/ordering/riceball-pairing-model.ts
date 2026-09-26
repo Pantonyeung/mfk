@@ -265,6 +265,38 @@ export function swapPairingSnack(
   return assignments;
 }
 
+export function pairingPriceForAssignment(
+  lines:readonly PairingCartLine[],
+  products:readonly PairingProduct[],
+  combos:readonly SyncedCombo[],
+  pools:readonly SyncedComboPool[],
+  draft:PairingDraft,
+  slotId:string,
+  snackUnitId:string|undefined,
+){
+  if(!snackUnitId)return undefined;
+  const slot=draft.slots.find(row=>row.id===slotId);
+  const snack=draft.snacks.find(row=>row.id===snackUnitId);
+  if(!slot||!snack||!slot.compatibleSnackUnitIds.includes(snackUnitId))return undefined;
+  const combo=combos.find(row=>row.id===slot.comboId&&row.active);
+  const mainLine=lines.find(row=>row.id===slot.main.lineId);
+  const snackLine=lines.find(row=>row.id===snack.lineId);
+  if(!combo||!mainLine||!snackLine)return undefined;
+  const mainProduct=products.find(row=>row.id===mainLine.productId);
+  const snackProduct=products.find(row=>row.id===snackLine.productId);
+  if(!mainProduct||!snackProduct)return undefined;
+  const snackAdjustment=snackAdjustmentForCombo(combo,snackLine.productId,pools);
+  if(snackAdjustment===undefined)return undefined;
+  const mainPriceMinor=combo.basePriceMinor+selectedOptionAdjustment(mainLine,mainProduct);
+  const snackPriceMinor=snackAdjustment+selectedOptionAdjustment(snackLine,snackProduct);
+  return Object.freeze({
+    mainPriceMinor,
+    snackPriceMinor,
+    totalMinor:mainPriceMinor+snackPriceMinor,
+    snackAdjustmentMinor:snackAdjustment,
+  });
+}
+
 function withPairingDetail(
   original:string|undefined,
   label:string,
