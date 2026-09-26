@@ -73,6 +73,7 @@ describe('SMT A2a SAME-line product edit',()=>{
 
   it('keeps the same-line edit inside presentation/composition instead of adding runtime authority',()=>{
     expect(app).not.toContain('createCartEditEngine');
-    expect(center).not.toContain('runtime/');
+    expect(center).not.toContain('localRuntime');
+    expect(center).not.toContain('createOrder(');
   });
 });
