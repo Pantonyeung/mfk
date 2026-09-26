@@ -14,6 +14,7 @@ import {
 } from './admin-config-sync.ts';
 import {localRuntime} from './local-runtime.ts';
 import {createSmmLanIngress} from './smm-lan-ingress.ts';
+import {assertCapacityChannelAdmission} from './capacity-pool-state.ts';
 import type {SmmLanOrderRequest} from '../../../contracts/smm-lan-v1.ts';
 
 const ENDPOINT='https://admin.morefunos.com';
@@ -160,6 +161,10 @@ export function readCustomerCloudIntakeAttention(){
 
 const smmIngress=createSmmLanIngress(localRuntime);
 
+function capacityEventsFromRuntime(){
+  return localRuntime.orders().flatMap(order=>order.capacityEvents??[]);
+}
+
 function activeCatalog(){
   const envelope=readSmtAdminConfigLkg();
   if(!envelope)throw new Error('CUSTOMER_ADMIN_CONFIG_REQUIRED');
@@ -198,6 +203,11 @@ async function reconcileQuotes(){
     const quote=raw as MfkCustomerQuoteRequest&{state?:string};
     try{
       const priced=priceCustomerCart(quote.cart,catalog.products);
+      assertCapacityChannelAdmission({
+        channel:'FIRST_PARTY',
+        items:priced.items,
+        orderEvents:capacityEventsFromRuntime(),
+      });
       await postJson('/api/customer/smt/quotes/ack',{
         requestId:quote.requestId,
         state:'CONFIRMED',
@@ -359,6 +369,14 @@ async function reconcileOrders(){
       const hasPublishedTotal=intent.cart.every(line=>Number.isSafeInteger(Number(line.publishedUnitPriceMinor))&&Number(line.publishedUnitPriceMinor)>=0);
       if(hasPublishedTotal&&publishedTotal!==priced.totalMinor)throw new Error('CUSTOMER_MENU_PRICE_CHANGED');
       const providerRef='CUSTOMER:'+intent.submissionId;
+      const existing=localRuntime.orders().find(order=>order.providerRef===providerRef);
+      if(!existing){
+        assertCapacityChannelAdmission({
+          channel:'FIRST_PARTY',
+          items:priced.items,
+          orderEvents:capacityEventsFromRuntime(),
+        });
+      }
       const order=localRuntime.createOrder({
         items:priced.items,
         totalMinor:priced.totalMinor,
