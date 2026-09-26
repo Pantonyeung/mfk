@@ -1,5 +1,6 @@
 import {validateMfkAdminConfigAck,validateMfkAdminConfigEnvelope} from '../contracts/admin-config-sync-v1.ts';
 import {validateSmtProjectionBatch} from '../contracts/smt-projection-v1.ts';
+import {MFK_ADMIN_REFUND_SCHEMA,validateAdminRefundEvent} from '../contracts/admin-refund-v1.ts';
 import {KeetaRuntimeStore} from './keeta-runtime.ts';
 import {CustomerRuntimeStore} from './customer-runtime.ts';
 export {KeetaRuntimeStore,CustomerRuntimeStore};
@@ -29,6 +30,17 @@ async function sha256(value){
   return [...new Uint8Array(digest)].map(v=>v.toString(16).padStart(2,'0')).join('');
 }
 function storeIdFrom(url){return (url.searchParams.get('storeId')||'MF01').trim().slice(0,64)||'MF01';}
+function hktBusinessDate(iso,cutoff='05:00'){
+  const at=Date.parse(String(iso||''));
+  const parsed=/^([01]?\d|2[0-3]):([0-5]\d)$/.exec(String(cutoff||''));
+  const cutoffMinutes=parsed?Number(parsed[1])*60+Number(parsed[2]):300;
+  const shifted=new Date((Number.isFinite(at)?at:Date.now())+8*60*60*1000-cutoffMinutes*60*1000);
+  return shifted.toISOString().slice(0,10);
+}
+function isCashMethod(method){
+  const value=String(method||'').toUpperCase();
+  return value.includes('CASH')||String(method||'').includes('現金');
+}
 
 async function resolveSmmStaffSession(request,storeId){
   const token=String(request.headers.get('x-mfk-smm-session')||'').trim();
@@ -269,6 +281,144 @@ export class AdminSyncStore{
       .sort((a,b)=>String(b.updatedAt||b.createdAt||'').localeCompare(String(a.updatedAt||a.createdAt||'')));
   }
 
+  async adminRefunds(){
+    const rows=await this.state.storage.list({prefix:'admin:refund:'});
+    return [...rows.values()]
+      .map(row=>row?.refund??row)
+      .filter(Boolean)
+      .map(row=>{try{return validateAdminRefundEvent(row);}catch{return null;}})
+      .filter(Boolean)
+      .sort((a,b)=>String(b.executionAt||'').localeCompare(String(a.executionAt||'')));
+  }
+
+  async adminRefundAddenda(){
+    const rows=await this.state.storage.list({prefix:'admin:day-close-addendum:'});
+    return [...rows.values()]
+      .filter(Boolean)
+      .sort((a,b)=>String(b.createdAt||'').localeCompare(String(a.createdAt||'')));
+  }
+
+  async businessCutoff(){
+    const active=await this.state.storage.get('active');
+    const raw=active?.snapshot?.businessDay?.cutoff;
+    return /^([01]?\d|2[0-3]):([0-5]\d)$/.test(String(raw||''))?String(raw):'05:00';
+  }
+
+  async createAdminRefund(input){
+    const orderId=String(input?.orderId||'').trim();
+    const lineId=String(input?.lineId||'').trim();
+    const quantity=Math.max(0,Math.floor(Number(input?.quantity)||0));
+    const amountMinor=Math.max(0,Math.round(Number(input?.amountMinor)||0));
+    const method=String(input?.method||'').trim();
+    const note=String(input?.note||'').trim().slice(0,500);
+    if(!orderId)return {error:'ADMIN_REFUND_ORDER_REQUIRED',status:400};
+    if(!lineId)return {error:'ADMIN_REFUND_LINE_REQUIRED',status:400};
+    if(quantity<1)return {error:'ADMIN_REFUND_QUANTITY_INVALID',status:400};
+    if(amountMinor<1)return {error:'ADMIN_REFUND_AMOUNT_INVALID',status:400};
+    if(!['CASH','FPS','PAYME','ALIPAY','WECHAT'].includes(method))return {error:'ADMIN_REFUND_METHOD_INVALID',status:400};
+
+    const orders=await this.projectionOrders();
+    const order=orders.find(row=>String(row.orderId||'')===orderId);
+    if(!order)return {error:'ADMIN_REFUND_ORDER_NOT_FOUND',status:404};
+    if(/^Keeta\b|^Foodpanda\b|^第三方/.test(String(order.sourceLabel||'')))return {error:'PROVIDER_REFUND_USE_AFTERSALE',status:409};
+    const line=(Array.isArray(order.items)?order.items:[]).find(row=>String(row?.id||'')===lineId);
+    if(!line)return {error:'ADMIN_REFUND_LINE_NOT_FOUND',status:404};
+    if(quantity>Math.max(0,Math.floor(Number(line.qty)||0)))return {error:'ADMIN_REFUND_QUANTITY_INVALID',status:400};
+
+    const closes=await this.projectionCashRows('projection:day-close:');
+    const originalBusinessDate=String(order.businessDate||'');
+    const close=closes.filter(row=>String(row.businessDate||'')===originalBusinessDate)
+      .sort((a,b)=>(Number(b.version)||0)-(Number(a.version)||0))[0];
+    if(!close)return {error:'ADMIN_REFUND_ORIGINAL_DAY_CLOSE_REQUIRED',status:409};
+
+    const refunds=await this.adminRefunds();
+    const embedded=(Array.isArray(order.refunds)?order.refunds:[]).filter(Boolean);
+    const allRefunds=[...refunds,...embedded].filter((row,index,rows)=>
+      String(row?.orderId||orderId)===orderId&&rows.findIndex(other=>String(other?.refundId||other?.id||'')===String(row?.refundId||row?.id||''))===index
+    );
+    const lineOriginalMinor=Math.max(0,Math.floor(Number(line.qty)||0)*Math.max(0,Math.round(Number(line.unitMinor)||0)));
+    const priorLineRefund=allRefunds.flatMap(row=>Array.isArray(row?.lines)?row.lines:[])
+      .filter(row=>String(row?.lineId||'')===lineId)
+      .reduce((sum,row)=>sum+Math.max(0,Math.round(Number(row?.amountMinor)||0)),0);
+    const lineRemaining=Math.max(0,lineOriginalMinor-priorLineRefund);
+    const selectedMax=Math.max(0,quantity*Math.max(0,Math.round(Number(line.unitMinor)||0)));
+    if(amountMinor>lineRemaining||amountMinor>selectedMax)return {error:'ADMIN_REFUND_EXCEEDS_LINE_REMAINING',status:409};
+    const priorOrderRefund=allRefunds.reduce((sum,row)=>sum+Math.max(0,Math.round(Number(row?.amountMinor)||0)),0);
+    if(priorOrderRefund+amountMinor>Math.max(0,Math.round(Number(order.totalMinor)||0))){
+      return {error:'ADMIN_REFUND_EXCEEDS_ORDER_REMAINING',status:409};
+    }
+
+    const executionAt=new Date().toISOString();
+    const cutoff=await this.businessCutoff();
+    const executionBusinessDate=hktBusinessDate(executionAt,cutoff);
+    const existingAddenda=(await this.adminRefundAddenda()).filter(row=>String(row.businessDate||'')===originalBusinessDate);
+    const addendumSequence=existingAddenda.length+1;
+    const originalDayCloseVersion=Math.max(1,Math.floor(Number(close.version)||1));
+    const refundId='AR-'+crypto.randomUUID();
+    const event=validateAdminRefundEvent({
+      schema:MFK_ADMIN_REFUND_SCHEMA,
+      refundId,
+      storeId:'MF01',
+      orderId,
+      display:String(order.display||orderId),
+      originalBusinessDate,
+      originalCreatedAt:String(order.createdAt||executionAt),
+      executionAt,
+      executionBusinessDate,
+      method,
+      amountMinor,
+      lines:[{
+        lineId,
+        itemName:String(line.name||lineId),
+        quantity,
+        amountMinor,
+      }],
+      note,
+      source:'ADMIN',
+      originalDayCloseVersion,
+      addendumSequence,
+      addendumVersionLabel:String(originalDayCloseVersion)+'.'+String(addendumSequence),
+    });
+    const addendum={
+      schema:'MFK_DAY_CLOSE_REFUND_ADDENDUM_V1',
+      id:'DCA-'+originalBusinessDate+'-'+String(addendumSequence).padStart(3,'0'),
+      storeId:'MF01',
+      businessDate:originalBusinessDate,
+      baseVersion:originalDayCloseVersion,
+      addendumSequence,
+      versionLabel:event.addendumVersionLabel,
+      createdAt:executionAt,
+      refundId,
+      orderId,
+      display:event.display,
+      originalCreatedAt:event.originalCreatedAt,
+      executionAt,
+      executionBusinessDate,
+      method,
+      amountMinor,
+      lines:event.lines,
+      note,
+      postingMode:'NON_POSTING_REFERENCE',
+    };
+    await this.state.storage.put('admin:refund:'+refundId,{refund:event});
+    await this.state.storage.put(
+      'admin:day-close-addendum:'+originalBusinessDate+':'+String(addendumSequence).padStart(6,'0')+':'+refundId,
+      addendum,
+    );
+    const doorbell=JSON.stringify({
+      type:'ADMIN_REFUND_AVAILABLE',
+      storeId:'MF01',
+      refundId,
+      orderId,
+      executionAt,
+      executionBusinessDate,
+    });
+    for(const socket of this.state.getWebSockets()){
+      try{socket.send(doorbell);}catch{}
+    }
+    return {event,addendum};
+  }
+
   async projectionCashRows(prefix){
     const rows=await this.state.storage.list({prefix});
     return [...rows.values()]
@@ -278,11 +428,13 @@ export class AdminSyncStore{
   }
 
   async projectionReports(){
-    const [orders,openings,closes]=await Promise.all([
+    const [orders,openings,closes,adminRefunds]=await Promise.all([
       this.projectionOrders(),
       this.projectionCashRows('projection:cash-opening:'),
       this.projectionCashRows('projection:day-close:'),
+      this.adminRefunds(),
     ]);
+    const cutoff=await this.businessCutoff();
     const byDate=new Map();
     for(const order of orders){
       const date=String(order.businessDate||'');
@@ -304,11 +456,38 @@ export class AdminSyncStore{
       }
       byDate.set(date,row);
     }
+    const refundById=new Map();
+    for(const order of orders){
+      for(const refund of Array.isArray(order.refunds)?order.refunds:[]){
+        const id=String(refund?.refundId||refund?.id||'').trim();
+        if(!id)continue;
+        refundById.set(id,{
+          ...refund,
+          refundId:id,
+          orderId:String(order.orderId||''),
+          originalBusinessDate:String(order.businessDate||''),
+          executionBusinessDate:hktBusinessDate(String(refund.createdAt||''),cutoff),
+          executionAt:String(refund.createdAt||''),
+        });
+      }
+    }
+    for(const refund of adminRefunds)refundById.set(refund.refundId,refund);
+    for(const refund of refundById.values()){
+      const date=String(refund.executionBusinessDate||hktBusinessDate(refund.executionAt,cutoff));
+      if(!date)continue;
+      const row=byDate.get(date)||{date,grossMinor:0,adjustmentMinor:0,netMinor:0,orders:0,cashSalesMinor:0,refundMinor:0,cashRefundMinor:0};
+      const amount=Math.max(0,Math.round(Number(refund.amountMinor)||0));
+      row.refundMinor=(Number(row.refundMinor)||0)+amount;
+      row.cashRefundMinor=(Number(row.cashRefundMinor)||0)+(isCashMethod(refund.method)?amount:0);
+      row.adjustmentMinor=-(Number(row.refundMinor)||0);
+      row.netMinor=(Number(row.grossMinor)||0)-(Number(row.refundMinor)||0);
+      byDate.set(date,row);
+    }
     const openingByDate=new Map(openings.map(row=>[String(row.businessDate||''),row]));
     const closeByDate=new Map(closes.map(row=>[String(row.businessDate||''),row]));
     const dates=new Set([...byDate.keys(),...openingByDate.keys(),...closeByDate.keys()]);
     return [...dates].sort((a,b)=>b.localeCompare(a)).map(date=>({
-      ...(byDate.get(date)||{date,grossMinor:0,adjustmentMinor:0,netMinor:0,orders:0,cashSalesMinor:0}),
+      ...(()=>{const row=byDate.get(date)||{date,grossMinor:0,adjustmentMinor:0,netMinor:0,orders:0,cashSalesMinor:0,refundMinor:0,cashRefundMinor:0};const refundMinor=Number(row.refundMinor)||0;return {...row,refundMinor,cashRefundMinor:Number(row.cashRefundMinor)||0,adjustmentMinor:-refundMinor,netMinor:(Number(row.grossMinor)||0)-refundMinor};})(),
       openingCash:openingByDate.get(date)||null,
       dayClose:closeByDate.get(date)||null,
     }));
@@ -433,6 +612,28 @@ export class AdminSyncStore{
         server.send(JSON.stringify({type:'ADMIN_CONFIG_AVAILABLE',storeId:active.storeId,revision:active.revision,fingerprint:active.fingerprint,publishedAt:active.publishedAt}));
       }
       return new Response(null,{status:101,webSocket:client});
+    }
+
+    if(url.pathname==='/refunds'){
+      if(request.method==='GET'){
+        if(!await this.authorizeAdminRead(request))return json({code:'ADMIN_REFUND_READ_UNAUTHORIZED'},401);
+        return json({refunds:await this.adminRefunds(),addenda:await this.adminRefundAddenda()});
+      }
+      if(request.method==='POST'){
+        if(!await this.authorizePublish(request))return json({code:'ADMIN_REFUND_WRITE_UNAUTHORIZED'},401);
+        let input;
+        try{input=await request.json();}catch{return json({code:'ADMIN_REFUND_INPUT_INVALID'},400);}
+        const created=await this.createAdminRefund(input);
+        if(created.error)return json({code:created.error},created.status||400);
+        return json({state:'REFUNDED',refund:created.event,addendum:created.addendum},201);
+      }
+      return json({code:'METHOD_NOT_ALLOWED'},405);
+    }
+
+    if(url.pathname==='/smt-refunds'){
+      if(request.method!=='GET')return json({code:'METHOD_NOT_ALLOWED'},405);
+      if(!await this.authorizeSmtDevice(request))return json({code:'SMT_REFUND_READ_UNAUTHORIZED'},401);
+      return json({refunds:(await this.adminRefunds()).slice(0,500)});
     }
 
     if(url.pathname==='/projection/events'){
