@@ -135,6 +135,7 @@ export interface LocalPriceOverrideRecord{
   readonly staffName:string;
   readonly source:'MANUAL_OVERRIDE';
   readonly permission:'PRICE_OVERRIDE';
+  readonly sequence:number;
 }
 export interface LocalHoldDraft{
   readonly archivedAt?:string;
@@ -1318,14 +1319,16 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
       if(!Number.isSafeInteger(effectiveUnitMinor))throw new Error('DINING_PRICE_OVERRIDE_INVALID');
       const normalizedReason=String(reason||'').trim().slice(0,200);
       const item=hold.items[lineIndex];
+      if(item.unitMinor===effectiveUnitMinor)return clone(diningDetail(hold));
       const createdAt=new Date().toISOString();
+      const sequence=(hold.priceOverrides?.length??0)+1;
       const record:LocalPriceOverrideRecord={
         id:'DPO:'+holdId+':'+createdAt+':'+lineIndex,
         createdAt,lineIndex,productId:item.id,
         originalUnitMinor:item.unitMinor,effectiveUnitMinor,
         deltaMinor:effectiveUnitMinor-item.unitMinor,
         reason:normalizedReason,staffId:session.staffId,staffName:session.displayName,
-        source:'MANUAL_OVERRIDE',permission:'PRICE_OVERRIDE',
+        source:'MANUAL_OVERRIDE',permission:'PRICE_OVERRIDE',sequence,
       };
       const items=hold.items.map((row,index)=>index===lineIndex?{...row,unitMinor:effectiveUnitMinor}:row);
       const totalMinor=items.reduce((sum,row)=>sum+row.qty*row.unitMinor,0);
@@ -1342,7 +1345,7 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
       for(const listener of listeners){try{listener();}catch{console.warn('DINING_OBSERVER_FAILED');}}
       if(linkedOrder){
         try{projectOrder(data.orders.find(row=>row.id===linkedOrder.id)!);}catch{console.warn('DINING_PRICE_PROJECTION_NON_BLOCKING');}
-        appendActionAudit({action:'DINING_PRICE_OVERRIDE',orderId:linkedOrder.id,reason:session.displayName+' '+money(item.unitMinor)+'→'+money(effectiveUnitMinor)+' '+normalizedReason});
+        appendActionAudit({action:'DINING_PRICE_OVERRIDE',orderId:linkedOrder.id,reason:'#'+sequence+' '+session.displayName+' '+money(item.unitMinor)+'→'+money(effectiveUnitMinor)+(normalizedReason?' '+normalizedReason:'')});
       }
       return clone(diningDetail(nextHold));
     });
