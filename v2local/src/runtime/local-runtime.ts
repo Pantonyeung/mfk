@@ -864,9 +864,6 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
     const ensured=ensureDiningFormalOrder(snapshot,draft,at);
     commitDiningState(snapshot,{holds:[ensured.hold,...snapshot.holds],orders:ensured.orders});
     projectDiningOrderNonBlocking(ensured.order);
-    if(ensured.created&&ensured.hold.assignedTable){
-      void ensureDiningInitialPrintByHold(ensured.hold.id).catch(()=>{});
-    }
     return ensured.hold;
   },
   holds(){return readDiningState().holds.filter(hold=>!hold.archivedAt)},
@@ -1415,9 +1412,6 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
       orders:ensured.orders,
     });
     projectDiningOrderNonBlocking(ensured.order);
-    if(ensured.created&&ensured.hold.assignedTable){
-      void ensureDiningInitialPrintByHold(ensured.hold.id).catch(()=>{});
-    }
   },
   async unassignDiningTable(holdId){
     const snapshot=readDiningState();
