@@ -19,6 +19,7 @@ export interface OrderingProductViewModel {
   readonly priceLabel:string;
   readonly enabled:boolean;
   readonly requiresOptions:boolean;
+  readonly quickAddAllowed:boolean;
   readonly badge?:string;
   readonly imageUrl?:string;
 }
@@ -72,6 +73,7 @@ export interface OrderingWorkspaceViewModel {
   readonly operationalNotice?:string;
   readonly showCategories?:boolean;
   readonly serviceModes?:Readonly<{takeaway:boolean;dineIn:boolean}>;
+  readonly orderingMode:'quick'|'normal';
   readonly cart:OrderingCartViewModel;
   readonly workItems:readonly OrderingWorkItemViewModel[];
   readonly recentlyAddedProductId?:string;
@@ -82,6 +84,7 @@ export interface OrderingWorkspaceViewModel {
 
 export interface OrderingWorkspaceActions {
   readonly onSelectCategory:(categoryId:string)=>void;
+  readonly onChangeOrderingMode:(mode:'quick'|'normal')=>void;
   readonly onAddProduct:(productId:string)=>void;
   readonly onConfigureProduct:(productId:string)=>void;
   readonly onChangeServiceMode:(mode:ServiceMode)=>void;

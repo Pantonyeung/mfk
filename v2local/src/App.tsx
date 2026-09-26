@@ -20,7 +20,7 @@ import {resolveBusinessWindow} from './runtime/local-operations.ts';
 import {RuntimeReadyActivation} from './runtime/RuntimeReadyActivation.tsx';
 import {StaffAuthGate,StaffSessionBadge} from './presentation/StaffAuthGate.tsx';
 import {CashOpeningGate} from './presentation/CashOpeningGate.tsx';
-import {ComboWorkspace,HoldCartWorkspace,HoldListWorkspace,OrganizeWorkspace,ProductConfigWorkspace,initialHoldModeForLines,type OrderingPanelState,type WorkspaceHoldDraft,type WorkspaceProduct} from './features/ordering/OrderingCenterWorkspaces.tsx';
+import {ComboWorkspace,HoldCartWorkspace,HoldListWorkspace,OrganizeWorkspace,ProductConfigWorkspace,initialHoldModeForLines,quickConfigurationForProduct,type OrderingPanelState,type WorkspaceHoldDraft,type WorkspaceProduct} from './features/ordering/OrderingCenterWorkspaces.tsx';
 
 type Product={
   id:string;
@@ -89,6 +89,7 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
   const [category,setCategory]=useState('all');
   const [viewMode,setViewMode]=useState<'original'|'organized'>('original');
   const [combineSimilar,setCombineSimilar]=useState(false);
+  const [orderingMode,setOrderingMode]=useState<'quick'|'normal'>('quick');
   const [pulse,setPulse]=useState(0);
   const [recent,setRecent]=useState<string|undefined>();
   const [highlight,setHighlight]=useState<string|undefined>();
@@ -207,6 +208,7 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
     imageUrl:product.imageUrl??productArtwork(product),
     optionSets:product.optionSets,
   }));
+  const quickConfigurationById=new Map(workspaceProducts.map(product=>[product.id,quickConfigurationForProduct(product)] as const));
   const diningTableDefinitions=storeSettings.diningTables.length
     ?storeSettings.diningTables
     :Array.from({length:9},(_,index)=>({
@@ -253,6 +255,7 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
       priceLabel:product.priceReady?money(product.priceMinor):'未接價格',
       enabled:product.priceReady&&product.sellable&&((serviceMode==='takeaway'&&storeSettings.takeawayEnabled)||(serviceMode==='dine-in'&&storeSettings.dineInEnabled)),
       requiresOptions:product.priceReady&&product.sellable&&product.optionSets.length>0,
+      quickAddAllowed:Boolean(quickConfigurationById.get(product.id)?.eligible),
       imageUrl:frontlinePresentation.showImages?(product.imageUrl??productArtwork(product)):undefined,
       ...(!product.priceReady?{badge:'未接價格'}:!product.sellable?{badge:'停售'}:{}),
     })),
@@ -264,6 +267,7 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
       :undefined,
     showCategories:frontlinePresentation.showCategories,
     serviceModes:{takeaway:storeSettings.takeawayEnabled,dineIn:storeSettings.dineInEnabled},
+    orderingMode,
     cart:{
       orderId:nextDisplay,serviceMode,viewMode,combineSimilar,
       lines:presentationCart,
@@ -286,13 +290,16 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
 
   const add=(id:string)=>{
     const product=products.find(item=>item.id===id);if(!product||!product.priceReady||!product.sellable)return;
+    const quickConfig=quickConfigurationById.get(id);
+    if(!quickConfig?.eligible){setPanel({type:'product',productId:id});return;}
     const line:CartLine={
       id:nextLocalCartLineId(),
       productId:product.id,
       name:product.name,
       qty:1,
-      unitMinor:product.priceMinor,
+      unitMinor:product.priceMinor+quickConfig.deltaMinor,
       serviceMode,
+      detail:quickConfig.detail||undefined,
     };
     setCart([...cart,line]);
     setRecent(id);
@@ -390,6 +397,7 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
 
   const actions:OrderingWorkspaceActions={
     onSelectCategory:setCategory,
+    onChangeOrderingMode:setOrderingMode,
     onAddProduct:add,
     onConfigureProduct:id=>setPanel({type:'product',productId:id}),
     onChangeServiceMode:mode=>{
