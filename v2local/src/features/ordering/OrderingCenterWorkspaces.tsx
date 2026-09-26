@@ -20,7 +20,7 @@ export interface WorkspaceCartLine{
   readonly detail?:string;
 }
 export type OrderingPanelState=
-  |{readonly type:'product';readonly productId:string}
+  |{readonly type:'product';readonly productId:string;readonly lineId?:string}
   |{readonly type:'organize'}
   |{readonly type:'combo'}
   |{readonly type:'hold'}
@@ -29,14 +29,37 @@ export type OrderingPanelState=
 
 const money=(minor:number)=>(minor<0?'-':'')+String.fromCharCode(36)+(Math.abs(minor)/100).toFixed(2);
 
-export function ProductConfigWorkspace({product,onAdd}:{product:WorkspaceProduct;onAdd:(detail:string,deltaMinor:number,qty:number)=>void}){
-  const [qty,setQty]=useState(1);
-  const [note,setNote]=useState('');
+export function productEditorInitialFromDetail(product:WorkspaceProduct,detail?:string){
+  const sets=product.optionSets??[];
+  const selected:Record<string,string[]>=Object.fromEntries(
+    sets.map(set=>[set.id,set.options.filter(option=>option.defaultSelected).map(option=>option.id)]),
+  );
+  const noteParts:string[]=[];
+  const parts=String(detail??'').split(' · ').map(part=>part.trim()).filter(Boolean);
+  for(const part of parts){
+    const set=sets.find(row=>part.startsWith(row.name+'：'));
+    if(!set){noteParts.push(part);continue;}
+    const labels=part.slice(set.name.length+1).split('、').map(label=>label.trim()).filter(Boolean);
+    const ids=set.options.filter(option=>labels.includes(option.name)).map(option=>option.id);
+    if(labels.length&&ids.length===labels.length)selected[set.id]=ids;
+    else noteParts.push(part);
+  }
+  return Object.freeze({selected:Object.freeze(selected),note:noteParts.join(' · ')});
+}
+
+export function ProductConfigWorkspace({
+  product,initial,mode='add',onAdd
+}:{
+  product:WorkspaceProduct;
+  initial?:{readonly qty:number;readonly detail?:string};
+  mode?:'add'|'edit';
+  onAdd:(detail:string,deltaMinor:number,qty:number)=>void;
+}){
+  const initialState=useMemo(()=>productEditorInitialFromDetail(product,initial?.detail),[product,initial?.detail]);
+  const [qty,setQty]=useState(initial?.qty??1);
+  const [note,setNote]=useState(initialState.note);
   const [selected,setSelected]=useState<Record<string,string[]>>(()=>Object.fromEntries(
-    (product.optionSets??[]).map(set=>[
-      set.id,
-      set.options.filter(option=>option.defaultSelected).map(option=>option.id),
-    ]),
+    Object.entries(initialState.selected).map(([id,ids])=>[id,[...ids]]),
   ));
 
   const toggle=(set:SyncedOptionSet,optionId:string)=>{
@@ -87,7 +110,7 @@ export function ProductConfigWorkspace({product,onAdd}:{product:WorkspaceProduct
       :<section className="cfg-block"><header><b>商品選項</b><span>Admin</span></header><p>此商品目前冇已發布選項組。</p></section>}
 
     <label className="cfg-note"><span>備註</span><input value={note} maxLength={60} onChange={event=>setNote(event.target.value)} placeholder="例如：不要蔥、醬分開"/><small>{note.length}/60</small></label>
-    <footer className="cfg-action"><div><span>單價</span><b>{money(product.priceMinor+delta)}</b></div><button className="primary" disabled={invalid} onClick={()=>onAdd(detail,delta,qty)}>加入訂單　{money((product.priceMinor+delta)*qty)}</button></footer>
+    <footer className="cfg-action"><div><span>單價</span><b>{money(product.priceMinor+delta)}</b></div><button className="primary" disabled={invalid} onClick={()=>onAdd(detail,delta,qty)}>{mode==='edit'?'儲存修改':'加入訂單'}　{money((product.priceMinor+delta)*qty)}</button></footer>
   </div>;
 }
 
