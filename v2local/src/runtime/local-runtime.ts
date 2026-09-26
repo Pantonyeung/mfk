@@ -1122,6 +1122,14 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
   async assignDiningTable(holdId,tableId){
     const found=data.holds.find(item=>item.id===holdId);
     if(!found)throw new Error('HOLD_NOT_FOUND');
+    const registry=readSmtDiningTableRegistry();
+    const allowed=registry.length
+      ?registry.filter(table=>table.active).map(table=>table.id)
+      :Array.from({length:9},(_,index)=>'T'+String(index+1).padStart(2,'0'));
+    if(!allowed.includes(tableId))throw new Error('DINING_TABLE_NOT_ASSIGNABLE');
+    const occupied=data.holds.find(item=>item.id!==holdId&&item.kind==='dining'&&item.assignedTable===tableId);
+    if(occupied)throw new Error('DINING_TABLE_OCCUPIED');
+    if(found.assignedTable===tableId)return;
     data={...data,holds:data.holds.map(item=>item.id===holdId?{...item,assignedTable:tableId}:item)};save();
   },
   async unassignDiningTable(holdId){

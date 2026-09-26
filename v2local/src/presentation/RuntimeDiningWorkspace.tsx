@@ -81,7 +81,8 @@ export function RuntimeDiningWorkspace({runtime,onCheckout}:{runtime:CleanSmtCor
     if(!selectedWait||!runtime.assignDiningTable)return;
     try{
       await runtime.assignDiningTable(selectedWait,tableId);
-      setMessage('已安排到 '+tableId.replace('T','')+' 號枱。');
+      const tableLabel=view?.tables.find(table=>table.id===tableId)?.label??tableId;
+      setMessage('已安排到 '+tableLabel+'。');
       setSelectedWait(null);
       setSelectedHoldId(selectedWait);
       await load();
@@ -163,7 +164,7 @@ export function RuntimeDiningWorkspace({runtime,onCheckout}:{runtime:CleanSmtCor
     onCheckout({
       holdId:detail.holdId,
       codeLabel:detail.codeLabel,
-      tableLabel:detail.assignedTable?detail.assignedTable.replace('T',''):'',
+      tableLabel:detail.assignedTable?(view?.tables.find(table=>table.id===detail.assignedTable)?.label??detail.assignedTable):'',
       selections,
       lines,
     });
@@ -223,7 +224,7 @@ export function RuntimeDiningWorkspace({runtime,onCheckout}:{runtime:CleanSmtCor
     <aside className="dining-detail-panel">
       {detail?<>
         <header>
-          <div><small>{detail.codeLabel}</small><h2>{detail.assignedTable?detail.assignedTable.replace('T','')+' 號枱':'未掛枱'}</h2></div>
+          <div><small>{detail.codeLabel}</small><h2>{detail.assignedTable?(view?.tables.find(table=>table.id===detail.assignedTable)?.label??detail.assignedTable):'未掛枱'}</h2></div>
           <span>{detail.partySize} 位</span>
         </header>
         <div className="dining-detail-timer">
