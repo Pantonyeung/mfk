@@ -47,6 +47,11 @@ const BASE_PRODUCTS:readonly Product[]=[
 ];
 
 const money=(minor:number)=>'$'+(minor/100).toFixed(2);
+let localCartLineSequence=0;
+const nextLocalCartLineId=()=>{
+  localCartLineSequence+=1;
+  return 'line-'+Date.now().toString(36)+'-'+localCartLineSequence.toString(36);
+};
 
 const PRODUCT_ART_COLORS:Record<string,[string,string]>={
   '飯團':['#f1c98f','#8a4f2b'],
@@ -258,13 +263,17 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
 
   const add=(id:string)=>{
     const product=products.find(item=>item.id===id);if(!product||!product.priceReady||!product.sellable)return;
-    const existing=cart.find(item=>item.productId===id&&item.serviceMode===serviceMode);
-    const next=existing
-      ?cart.map(item=>item.id===existing.id?{...item,qty:item.qty+1}:item)
-      :[...cart,{id:'line-'+Date.now().toString(36),productId:product.id,name:product.name,qty:1,unitMinor:product.priceMinor,serviceMode}];
-    setCart(next);
+    const line:CartLine={
+      id:nextLocalCartLineId(),
+      productId:product.id,
+      name:product.name,
+      qty:1,
+      unitMinor:product.priceMinor,
+      serviceMode,
+    };
+    setCart([...cart,line]);
     setRecent(id);
-    setHighlight(existing?.id??next[next.length-1]?.id);
+    setHighlight(line.id);
     setPulse(value=>value+1);
     window.setTimeout(()=>{setRecent(undefined);setHighlight(undefined)},700);
   };
@@ -283,12 +292,12 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
       }:item);
       setCart(next);setRecent(product.id);setHighlight(lineId);setPulse(value=>value+1);setPanel(null);return;
     }
-    const line:CartLine={id:'line-'+Date.now().toString(36),productId:product.id,name:product.name,qty,unitMinor:product.priceMinor+deltaMinor,serviceMode,detail:detail||undefined};
+    const line:CartLine={id:nextLocalCartLineId(),productId:product.id,name:product.name,qty,unitMinor:product.priceMinor+deltaMinor,serviceMode,detail:detail||undefined};
     setCart([...cart,line]);setRecent(product.id);setHighlight(line.id);setPulse(value=>value+1);setPanel(null);
   };
 
   const addCombo=(comboId:string,comboName:string,detail:string,unitMinor:number)=>{
-    const line:CartLine={id:'line-'+Date.now().toString(36),productId:comboId,name:comboName,qty:1,unitMinor,serviceMode,detail};
+    const line:CartLine={id:nextLocalCartLineId(),productId:comboId,name:comboName,qty:1,unitMinor,serviceMode,detail};
     setCart([...cart,line]);setHighlight(line.id);setPulse(value=>value+1);setPanel(null);
   };
 
