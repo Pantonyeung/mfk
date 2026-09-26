@@ -133,6 +133,8 @@ export interface LocalPriceOverrideRecord{
   readonly reason:string;
   readonly staffId:string;
   readonly staffName:string;
+  readonly source:'MANUAL_OVERRIDE';
+  readonly permission:'PRICE_OVERRIDE';
 }
 export interface LocalHoldDraft{
   readonly archivedAt?:string;
@@ -214,7 +216,7 @@ export interface CleanSmtCoreRuntimePort{
   assignDiningTable?(holdId:string,tableId:string):Promise<void>;
   unassignDiningTable?(holdId:string):Promise<void>;
   readDiningHold?(holdId:string):Promise<LocalDiningHoldDetail>;
-  overrideDiningLinePrice?(holdId:string,lineIndex:number,effectiveUnitMinor:number,reason:string):Promise<LocalDiningHoldDetail>;
+  overrideDiningLinePrice?(holdId:string,lineIndex:number,effectiveUnitMinor:number,reason:string,expectedRevision?:string):Promise<LocalDiningHoldDetail>;
   readDiningHistory?():Promise<readonly LocalDiningHoldDetail[]>;
   printDiningPaymentReceipt?(holdId:string,submissionId:string):Promise<PrintDispatchSummary>;
   reprintDiningPaymentReceipt?(holdId:string,submissionId:string):Promise<PrintDispatchSummary>;
@@ -307,7 +309,7 @@ export interface MfkLocalRuntime extends CleanSmtCoreRuntimePort{
   holds():readonly LocalHoldDraft[];
   removeHold(id:string):void;
   readDiningHold(holdId:string):Promise<LocalDiningHoldDetail>;
-  overrideDiningLinePrice(holdId:string,lineIndex:number,effectiveUnitMinor:number,reason:string):Promise<LocalDiningHoldDetail>;
+  overrideDiningLinePrice(holdId:string,lineIndex:number,effectiveUnitMinor:number,reason:string,expectedRevision?:string):Promise<LocalDiningHoldDetail>;
   readDiningHistory():Promise<readonly LocalDiningHoldDetail[]>;
   printDiningPaymentReceipt(holdId:string,submissionId:string):Promise<PrintDispatchSummary>;
   reprintDiningPaymentReceipt(holdId:string,submissionId:string):Promise<PrintDispatchSummary>;
@@ -1303,9 +1305,10 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
       return clone(diningDetail(requireDiningHold(next,holdId)));
     });
   },
-  async overrideDiningLinePrice(holdId,lineIndex,effectiveUnitMinor,reason){
+  async overrideDiningLinePrice(holdId,lineIndex,effectiveUnitMinor,reason,expectedRevision){
     return withDiningMutationLock('price:'+holdId,async()=>{
       const snapshot=readDiningState();const hold=requireDiningHold(snapshot,holdId);
+      if(expectedRevision&&expectedRevision!==diningCheckoutRevision(hold))throw new Error('DINING_PRICE_OVERRIDE_STALE');
       if(hold.archivedAt)throw new Error('DINING_HISTORY_PROTECTED');
       if(hold.payments?.length)throw new Error('DINING_PRICE_OVERRIDE_AFTER_PAYMENT_FORBIDDEN');
       const session=readActiveStaffSession();
@@ -1322,6 +1325,7 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
         originalUnitMinor:item.unitMinor,effectiveUnitMinor,
         deltaMinor:effectiveUnitMinor-item.unitMinor,
         reason:normalizedReason,staffId:session.staffId,staffName:session.displayName,
+        source:'MANUAL_OVERRIDE',permission:'PRICE_OVERRIDE',
       };
       const items=hold.items.map((row,index)=>index===lineIndex?{...row,unitMinor:effectiveUnitMinor}:row);
       const totalMinor=items.reduce((sum,row)=>sum+row.qty*row.unitMinor,0);
