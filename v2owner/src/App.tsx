@@ -14,7 +14,7 @@ import {
   TodayStaffSummaryCard,
 } from './today-components';
 import {ActionQueuePage,type OwnerActionCommandFlight} from './stage02-action-queue';
-import {selectOpenActions} from './stage02-open-actions';
+import {isCanonicalActionUnknown,selectOpenActions} from './stage02-open-actions';
 import type {
   OwnerConnectionState,
   OwnerOrderProjection,
@@ -57,17 +57,17 @@ export function App(){
 
   const changeView=(next:View)=>{setView(next);persistLocal({view:next})};
 
-  const refresh=async():Promise<boolean>=>{
-    if(!port){setConnection('OFFLINE_READONLY');setSnapshot(null);return false}
+  const refresh=async():Promise<OwnerReadModelSnapshot|null>=>{
+    if(!port){setConnection('OFFLINE_READONLY');setSnapshot(null);return null}
     setConnection('LOADING');
     try{
       const next=await port.readSnapshot();
       setSnapshot(next);
       setConnection(resolveSnapshotState(next));
-      return true;
+      return next;
     }catch{
       setConnection('ERROR');
-      return false;
+      return null;
     }
   };
 
@@ -100,6 +100,10 @@ export function App(){
   const requestBounded=(label:string,target:string,impact:string,actionId?:string)=>{
     if(connection==='OFFLINE_READONLY'){setNotice('離線唯讀：遠端操作已停用。');return}
     if(connection==='PERMISSION_DENIED'){setNotice('目前身份冇權執行呢個操作。');return}
+    if(actionId&&isCanonicalActionUnknown(snapshot?.actions??[],actionId)){
+      setNotice('正式狀態仍未明；只可重新確認讀回，禁止再次提交。');
+      return;
+    }
     if(actionId&&commandFlight?.actionId===actionId&&(commandFlight.state==='PENDING'||commandFlight.state==='UNKNOWN')){
       setNotice('呢項操作仍在等待正式讀回；禁止重複提交。');
       return;
@@ -110,6 +114,11 @@ export function App(){
   const executeBounded=async(value:Confirmation)=>{
     setConfirmation(null);
     if(connection==='OFFLINE_READONLY'){setNotice('離線唯讀：遠端操作已停用。');return}
+    if(value.actionId&&isCanonicalActionUnknown(snapshot?.actions??[],value.actionId)){
+      setNotice('正式狀態仍未明；禁止再次提交，只可重新確認讀回。');
+      setCommandFlight({actionId:value.actionId,state:'UNKNOWN',message:'Canonical projection 仍 UNKNOWN；只可重新確認讀回，禁止 blind resend。'});
+      return;
+    }
     if(!port?.requestBoundedAction){setNotice('遠端操作服務尚未連接；冇改變任何正式狀態。');return}
 
     if(value.actionId)setCommandFlight({actionId:value.actionId,state:'PENDING',message:'正在提交／等待 canonical readback。'});
@@ -118,8 +127,17 @@ export function App(){
       const result=await port.requestBoundedAction({actionType:value.label,target:value.target,reason:value.impact,operationId:crypto.randomUUID()});
       if(result.state==='CONFIRMED'){
         setNotice('操作已提交並取得確認；正在重新讀取正式狀態。');
-        const readbackOk=await refresh();
-        if(value.actionId)setCommandFlight(readbackOk?null:{actionId:value.actionId,state:'UNKNOWN',message:'操作已確認，但最新正式狀態未能讀回。只可重新確認，禁止重送。'});
+        const readback=await refresh();
+        if(value.actionId){
+          const canonicalUnknown=Boolean(readback)&&isCanonicalActionUnknown(readback.actions,value.actionId);
+          setCommandFlight(
+            !readback
+              ?{actionId:value.actionId,state:'UNKNOWN',message:'操作已確認，但最新正式狀態未能讀回。只可重新確認，禁止重送。'}
+              :canonicalUnknown
+                ?{actionId:value.actionId,state:'UNKNOWN',message:'最新 canonical projection 仍 UNKNOWN；禁止重送，只可重新確認讀回。'}
+                :null
+          );
+        }
         return;
       }
       if(result.state==='REJECTED'){
@@ -142,8 +160,16 @@ export function App(){
 
   const recheckAction=async(actionId:string)=>{
     setCommandFlight({actionId,state:'PENDING',message:'正在重新確認正式狀態。'});
-    const ok=await refresh();
-    setCommandFlight(ok?null:{actionId,state:'UNKNOWN',message:'仍未能取得正式讀回；禁止 blind resend。'});
+    const readback=await refresh();
+    if(!readback){
+      setCommandFlight({actionId,state:'UNKNOWN',message:'仍未能取得正式讀回；禁止 blind resend。'});
+      return;
+    }
+    if(isCanonicalActionUnknown(readback.actions,actionId)){
+      setCommandFlight({actionId,state:'UNKNOWN',message:'Canonical projection 仍 UNKNOWN；保持鎖定，只可再次重新確認讀回。'});
+      return;
+    }
+    setCommandFlight(null);
   };
 
   const connectionLabel=connection==='FRESH'?'資料新鮮':connection==='LOADING'?'同步中':connection==='EMPTY'?'暫無資料':connection==='STALE'?'資料稍舊':connection==='PARTIAL'?'部分資料':connection==='OFFLINE_READONLY'?'離線唯讀':connection==='PERMISSION_DENIED'?'權限不足':connection==='UNKNOWN'?'狀態未明':'同步失敗';
