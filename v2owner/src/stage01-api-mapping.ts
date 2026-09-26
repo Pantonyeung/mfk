@@ -23,7 +23,7 @@ export const OWNER_UI_STAGE01_DATA_MAPPING={
       'exceptionBadge',
     ],
   },
-  dineIn:{
+  dineInOpenChecks:{
     source:'dineIn',
     ctaScope:'DINE_IN_OPEN',
     requiredCheckFields:[
