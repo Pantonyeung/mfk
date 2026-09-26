@@ -42,3 +42,13 @@ test('touch size and reduced motion contracts stay explicit',()=>{
   assert.ok(system.includes('--mf-touch-min:44px'));
   assert.ok(system.includes('@media(prefers-reduced-motion:reduce)'));
 });
+
+
+test('Stage 1 storefront follows the locked home brief',()=>{
+  const views=fs.readFileSync(path.join(srcRoot,'components/customer-views.tsx'),'utf8');
+  assert.ok(views.includes("const canBrowse=Boolean(snapshot?.menu);"));
+  assert.ok(views.includes('人氣推薦 · TOP 6'));
+  for(const label of['記憶券','常購清單','期間限定'])assert.ok(views.includes(label));
+  assert.ok(views.includes('仍然可以慢慢睇、慢慢揀。'));
+  assert.ok(views.includes("recommendations.filter(item=>item.product.available).slice(0,6)"));
+});
