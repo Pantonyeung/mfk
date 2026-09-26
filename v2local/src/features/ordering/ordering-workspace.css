@@ -14,6 +14,11 @@
 .ordering-pending-primary,.ordering-pending-meta,.ordering-active-card>div{display:flex;align-items:center;justify-content:space-between;gap:7px}.ordering-pending-card b,.ordering-active-card b{font-size:17px}.ordering-pending-card strong,.ordering-active-card span{font-size:13px}.ordering-pending-meta,.ordering-active-card small{margin-top:4px;color:#6d6e75;font-size:12px}.ordering-empty{margin:8px 2px;color:#8a8a90;font-size:14px}
 
 .ordering-catalog{grid-area:catalog;min-width:0;min-height:0;display:grid;grid-template-rows:auto auto minmax(0,1fr);gap:10px}
+.ordering-mode-bar{min-height:46px;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:5px 9px;border:1px solid #dfe2e8;border-radius:10px;background:#fff}
+.ordering-mode-bar>span{display:grid;gap:2px}.ordering-mode-bar b{font-size:14px;font-weight:950}.ordering-mode-bar small{font-size:11px;color:#737985}
+.ordering-mode-bar>div{display:flex;align-items:center;padding:3px;border-radius:999px;background:#f0f1f4}
+.ordering-mode-bar button{min-height:34px;padding:0 14px;border:0;border-radius:999px;background:transparent;color:#666;font-size:14px;font-weight:900}
+.ordering-mode-bar button.active{background:#2877d5;color:#fff;box-shadow:0 1px 4px rgba(40,119,213,.18)}
 .ordering-categories{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px}
 .ordering-categories button{min-height:54px;border:1px solid #dddfe5;border-radius:10px;background:#fff;color:#443d39;font-size:18px;font-weight:900;cursor:pointer}
 .ordering-categories button.active{border-color:#6a4f42;background:linear-gradient(180deg,#5c4036,#4a342e);color:#fff}
