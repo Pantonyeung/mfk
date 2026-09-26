@@ -96,7 +96,7 @@
 .stage2-category-rail::-webkit-scrollbar{display:none}
 .stage2-category-rail button,.stage2-filter-strip button{
   flex:0 0 auto;
-  min-height:40px;
+  min-height:44px;
   border:0;
   border-radius:999px;
   padding:0 15px;
@@ -108,7 +108,7 @@
 }
 .stage2-category-rail button.is-active,.stage2-filter-strip button.is-active{background:var(--mf-brand-orange);color:#fff}
 .stage2-filter-strip{display:flex;gap:7px;padding:8px 0 2px}
-.stage2-filter-strip button{min-height:36px;padding:0 13px;background:#f5f0ea}
+.stage2-filter-strip button{min-height:44px;padding:0 13px;background:#f5f0ea}
 
 .stage2-section-heading{display:flex;align-items:end;justify-content:space-between;gap:12px;margin:20px 0 10px}
 .stage2-section-heading span{font-size:10px;letter-spacing:.14em;font-weight:900;color:var(--mf-brand-orange)}
@@ -162,9 +162,9 @@
   z-index:3;
   top:10px;
   right:10px;
-  width:38px;
-  height:38px;
-  min-height:38px;
+  width:44px;
+  height:44px;
+  min-height:44px;
   border:1px solid rgba(21,57,107,.12);
   border-radius:50%;
   background:rgba(255,253,250,.94);
@@ -202,7 +202,7 @@
 .stage2-zero-repair p{margin:0 auto;max-width:320px;color:var(--mf-muted);font-size:12px;line-height:1.55}
 .stage2-repair-categories{display:flex;flex-wrap:wrap;justify-content:center;gap:7px;margin:16px 0}
 .stage2-repair-categories button{
-  min-height:40px;
+  min-height:44px;
   border:0;
   border-radius:999px;
   padding:0 14px;
