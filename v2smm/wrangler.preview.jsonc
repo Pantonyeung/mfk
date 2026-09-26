@@ -1,0 +1,37 @@
+{
+  "$schema": "https://raw.githubusercontent.com/cloudflare/workers-sdk/main/packages/wrangler/config-schema.json",
+  "name": "mfk-smm-web",
+  "main": "./worker.ts",
+  "compatibility_date": "2026-09-25",
+  "workers_dev": true,
+  "preview_urls": true,
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "SMM_INTENT_STORE",
+        "class_name": "SmmIntentStore"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "smm-intent-v1",
+      "new_sqlite_classes": ["SmmIntentStore"]
+    }
+  ],
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application"
+  },
+  "previews": {
+    "durable_objects": {
+      "bindings": [
+        {
+          "name": "SMM_INTENT_STORE",
+          "class_name": "SmmIntentStore"
+        }
+      ]
+    }
+  }
+}
