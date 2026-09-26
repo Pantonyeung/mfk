@@ -11,7 +11,7 @@ const BOLD_OFF=ESC+'E'+String.fromCharCode(0);
 const NORMAL=GS+'!'+String.fromCharCode(0);
 const DOUBLE=GS+'!'+String.fromCharCode(0x11);
 const RULE='------------------------------------------\n';
-const money=(minor:number)=>{const n=Math.round(Number(minor)||0);return (n<0?'-':'')+'
+const money=(minor:number)=>{const n=Math.round(Number(minor)||0);return (n<0?'-':'')+String.fromCharCode(36)+(Math.abs(n)/100).toFixed(2)};
 
 export interface DailyCloseBreakdownRow{
   readonly label:string;
