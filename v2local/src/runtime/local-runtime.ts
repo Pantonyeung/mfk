@@ -631,7 +631,7 @@ function diningDetail(hold:LocalHoldDraft):LocalDiningHoldDetail{
     note:hold.note,
     totalMinor:hold.totalMinor,
     paidMinor,
-    remainingMinor:Math.max(0,hold.totalMinor-paidMinor),
+    remainingMinor:hold.totalMinor-paidMinor,
     lines,
     payments,
   };
@@ -1356,7 +1356,7 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
     const hold=requireDiningHold(snapshot,holdId);
     if(hold.archivedAt)throw new Error('DINING_HISTORY_PROTECTED');
     if(!hold.items.length)throw new Error('DINING_ITEMS_REQUIRED');
-    if(hold.items.some(row=>!Number.isSafeInteger(row.qty)||row.qty<=0||!Number.isSafeInteger(row.unitMinor)||row.unitMinor<0))throw new Error('DINING_AMOUNT_INVALID');
+    if(hold.items.some(row=>!Number.isSafeInteger(row.qty)||row.qty<=0||!Number.isSafeInteger(row.unitMinor)))throw new Error('DINING_AMOUNT_INVALID');
     const totalMinor=hold.items.reduce((sum,row)=>sum+row.qty*row.unitMinor,0);
     if(!Number.isSafeInteger(totalMinor)||totalMinor!==hold.totalMinor)throw new Error('DINING_TOTAL_MISMATCH');
 
@@ -1558,7 +1558,9 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
       return {...selection,amountMinor:line.unitMinor*selection.qty};
     });
     const amountMinor=paymentSelections.reduce((sum,row)=>sum+row.amountMinor,0);
-    if(!Number.isSafeInteger(amountMinor)||amountMinor<0||amountMinor>detail.remainingMinor)throw new Error('DINING_AMOUNT_INVALID');
+    if(!Number.isSafeInteger(amountMinor))throw new Error('DINING_AMOUNT_INVALID');
+    if(detail.totalMinor<0||detail.remainingMinor<0)throw new Error('DINING_NEGATIVE_BALANCE_REQUIRES_ADJUSTMENT');
+    if(amountMinor<0||amountMinor>detail.remainingMinor)throw new Error('DINING_AMOUNT_INVALID');
     if(tender==='COMBO'&&splitTenders.reduce((sum,row)=>sum+row.amountMinor,0)!==amountMinor)throw new Error('DINING_COMBO_TOTAL_MISMATCH');
     const cashSplit=tender==='COMBO'?splitTenders.find(row=>row.tender==='CASH'):undefined;
     const receivedMinor=tender==='CASH'
