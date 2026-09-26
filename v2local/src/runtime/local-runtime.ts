@@ -62,8 +62,29 @@ export interface OrderRefundRecord{
   readonly staffName?:string;
 }
 
+export type DiningLineCorrectionPhase='PRE_PRODUCTION'|'POST_PRODUCTION';
+export type DiningProductionNoticeState='NOT_REQUIRED'|'DONE'|'FAILED'|'UNKNOWN';
+export interface LocalDiningLineCorrection{
+  readonly id:string;
+  readonly submissionId:string;
+  readonly requestSignature:string;
+  readonly createdAt:string;
+  readonly phase:DiningLineCorrectionPhase;
+  readonly lineIndex:number;
+  readonly itemId:string;
+  readonly itemName:string;
+  readonly quantity:number;
+  readonly amountMinor:number;
+  readonly reason:string;
+  readonly productionNoticeState:DiningProductionNoticeState;
+  readonly productionNoticeAttemptedAt?:string;
+  readonly productionNoticeCompletedAt?:string;
+}
+
 export interface StoredOrder{
   id:string;display:string;createdAt:string;updatedAt?:string;totalMinor:number;paymentLabel:string;fulfillmentLabel:'待處理'|'進行中'|'可取餐'|'已完成'|'已取消';sourceLabel:string;
+  originalTotalMinor?:number;
+  diningLineCorrections?:readonly LocalDiningLineCorrection[];
   paymentCorrections?:readonly PaymentCorrectionRecord[];
   refunds?:readonly OrderRefundRecord[];
   diningHoldId?:string;
@@ -156,6 +177,8 @@ export interface LocalDiningLineViewModel{
   readonly lineIndex:number;
   readonly id:string;
   readonly name:string;
+  readonly originalQty:number;
+  readonly voidedQty:number;
   readonly qty:number;
   readonly paidQty:number;
   readonly remainingQty:number;
@@ -167,6 +190,8 @@ export interface LocalDiningHoldDetail{
   readonly cancelledAt?:string;
   readonly lastAssignedTable?:string;
   readonly seatedAt?:string;
+  readonly joinedTables?:readonly string[];
+  readonly corrections:readonly LocalDiningLineCorrection[];
   readonly formalOrderId?:string;
   readonly formalOrderDisplay?:string;
   readonly holdId:string;
@@ -187,6 +212,8 @@ export interface LocalHoldDraft{
   readonly cancelledAt?:string;
   readonly lastAssignedTable?:string;
   readonly seatedAt?:string;
+  readonly joinedTables?:readonly string[];
+  readonly lineCorrections?:readonly LocalDiningLineCorrection[];
   readonly formalOrderId?:string;
   readonly formalOrderDisplay?:string;
   readonly id:string;
@@ -271,6 +298,8 @@ export interface CleanSmtCoreRuntimePort{
   removeDiningWait?(id:string):Promise<void>;
   admitDiningHold?(holdId:string):Promise<LocalDiningHoldDetail>;
   assignDiningTable?(holdId:string,tableId:string):Promise<void>;
+  joinDiningTable?(holdId:string,tableId:string):Promise<void>;
+  unjoinDiningTable?(holdId:string,tableId:string):Promise<void>;
   unassignDiningTable?(holdId:string):Promise<void>;
   readDiningHold?(holdId:string):Promise<LocalDiningHoldDetail>;
   readDiningHistory?():Promise<readonly LocalDiningHoldDetail[]>;
@@ -278,6 +307,7 @@ export interface CleanSmtCoreRuntimePort{
   ensureDiningPaymentReceipt?(holdId:string,submissionId:string):Promise<DiningPaymentReceiptResult>;
   appendDiningItems?(holdId:string,input:{submissionId:string;items:readonly {id:string;name:string;qty:number;unitMinor:number}[];totalMinor:number;sourceLabel?:string}):Promise<{readonly detail:LocalDiningHoldDetail;readonly additionId:string}>;
   ensureDiningAdditionPrint?(holdId:string,additionId:string):Promise<DiningAdditionPrintResult>;
+  correctDiningLine?(holdId:string,input:{submissionId:string;lineIndex:number;quantity:number;reason?:string}):Promise<{readonly detail:LocalDiningHoldDetail;readonly correction:LocalDiningLineCorrection}>;
   settleDiningHold?(holdId:string,selections:readonly {lineIndex:number;qty:number}[],tender:DiningTender,command?:DiningSettlementCommand):Promise<LocalDiningHoldDetail>;
   clearDiningHold?(holdId:string):Promise<void>;
 }
@@ -366,7 +396,10 @@ export interface MfkLocalRuntime extends CleanSmtCoreRuntimePort{
   ensureDiningPaymentReceipt(holdId:string,submissionId:string):Promise<DiningPaymentReceiptResult>;
   appendDiningItems(holdId:string,input:{submissionId:string;items:readonly {id:string;name:string;qty:number;unitMinor:number}[];totalMinor:number;sourceLabel?:string}):Promise<{readonly detail:LocalDiningHoldDetail;readonly additionId:string}>;
   ensureDiningAdditionPrint(holdId:string,additionId:string):Promise<DiningAdditionPrintResult>;
+  correctDiningLine(holdId:string,input:{submissionId:string;lineIndex:number;quantity:number;reason?:string}):Promise<{readonly detail:LocalDiningHoldDetail;readonly correction:LocalDiningLineCorrection}>;
   settleDiningHold(holdId:string,selections:readonly {lineIndex:number;qty:number}[],tender:DiningTender,command?:DiningSettlementCommand):Promise<LocalDiningHoldDetail>;
+  joinDiningTable(holdId:string,tableId:string):Promise<void>;
+  unjoinDiningTable(holdId:string,tableId:string):Promise<void>;
   unassignDiningTable(holdId:string):Promise<void>;
   clearDiningHold(holdId:string):Promise<void>;
   clear():void;
@@ -506,6 +539,41 @@ async function dispatchCancellationNotice(order:StoredOrder){
   }
   return sent===bindings.length
     ?{ok:true,code:'CANCEL_NOTICE_SENT',state:'DONE' as const}
+    :{ok:false,code:lastCode,state:'FAILED' as const};
+}
+
+async function dispatchDiningLineCorrectionNotice(order:StoredOrder,hold:LocalHoldDraft,correction:LocalDiningLineCorrection){
+  const seen=new Set<string>();
+  const bindings=readPrinterBindings().filter(binding=>{
+    if(binding.role!=='製作單'||!String(binding.host||'').trim()||Number(binding.port)<=0)return false;
+    const key=physicalKey(binding);
+    if(seen.has(key))return false;
+    seen.add(key);
+    return true;
+  });
+  if(!bindings.length)return {ok:false,code:'DINING_CORRECTION_PRODUCTION_ROUTE_MISSING',state:'FAILED' as const};
+  let sent=0;
+  let lastCode='DINING_CORRECTION_NOTICE_FAILED';
+  for(const binding of bindings){
+    try{
+      const result=await printTextLan({
+        ...printerInput(binding),
+        text:'\n*** 商品更正通知 ***\n#'+order.display
+          +'\n枱：'+diningTableLabel(hold)
+          +'\n取消 '+correction.quantity+' 件：'+correction.itemName
+          +(correction.reason?'\n原因：'+correction.reason:'')
+          +'\n時間：'+new Date().toLocaleString('zh-HK')
+          +'\n*** 原商品保留紀錄；請按此通知停止／更正製作 ***\n\n',
+        cutAfter:true,kickDrawer:false,beepAfter:true,
+      });
+      if(result.ok)sent+=1;
+      else lastCode=result.code||lastCode;
+    }catch{
+      return {ok:false,code:'DINING_CORRECTION_NOTICE_OUTCOME_UNKNOWN',state:'UNKNOWN' as const};
+    }
+  }
+  return sent===bindings.length
+    ?{ok:true,code:'DINING_CORRECTION_NOTICE_SENT',state:'DONE' as const}
     :{ok:false,code:lastCode,state:'FAILED' as const};
 }
 
@@ -656,6 +724,25 @@ function requireDiningHold(snapshot:Persisted,id:string){
   if(hold.kind!=='dining')throw new Error('NOT_DINING_HOLD');
   return hold;
 }
+function diningAssignedTables(hold:LocalHoldDraft):string[]{
+  const values=[hold.assignedTable,...(hold.joinedTables??[])].filter((value):value is string=>Boolean(value));
+  return [...new Set(values)];
+}
+function diningCorrectionQuantity(hold:LocalHoldDraft,lineIndex:number){
+  return (hold.lineCorrections??[]).filter(row=>row.lineIndex===lineIndex).reduce((sum,row)=>sum+Math.max(0,Number(row.quantity)||0),0);
+}
+function diningEffectiveItems(hold:LocalHoldDraft){
+  return hold.items.map((item,lineIndex)=>({...item,qty:Math.max(0,item.qty-diningCorrectionQuantity(hold,lineIndex))}));
+}
+function diningEffectiveTotalMinor(hold:LocalHoldDraft){
+  return diningEffectiveItems(hold).reduce((sum,item)=>sum+item.qty*item.unitMinor,0);
+}
+function diningProductionCertaintyUnknown(hold:LocalHoldDraft,order:StoredOrder){
+  if(order.productionIssuedAt)return false;
+  if(order.diningInitialPrintState==='UNKNOWN')return true;
+  return (hold.additions??[]).some(addition=>addition.printState==='UNKNOWN');
+}
+
 function archiveDiningHold(hold:LocalHoldDraft,at:string):LocalHoldDraft{
   const {assignedTable,...rest}=hold;
   return {...rest,archivedAt:hold.archivedAt??at,...(assignedTable?{lastAssignedTable:assignedTable}:{})};
@@ -670,19 +757,21 @@ function diningPaymentLabel(payments:readonly LocalDiningPayment[]){
 }
 function syncDiningFormalOrder(order:StoredOrder,hold:LocalHoldDraft,at:string):StoredOrder{
   const payments=Array.isArray(hold.payments)?hold.payments:[];
+  const corrections=Array.isArray(hold.lineCorrections)?hold.lineCorrections:[];
   const confirmedPaidMinor=payments.reduce((sum,payment)=>sum+Math.max(0,Number(payment.amountMinor)||0),0);
-  const fullyPaid=hold.totalMinor>0&&confirmedPaidMinor>=hold.totalMinor;
+  const effectiveItems=diningEffectiveItems(hold);
+  const effectiveTotalMinor=effectiveItems.reduce((sum,item)=>sum+item.qty*item.unitMinor,0);
+  const fullyPaid=effectiveTotalMinor>0&&confirmedPaidMinor>=effectiveTotalMinor;
   const fulfillmentLabel:StoredOrder['fulfillmentLabel']=hold.cancelledAt
     ?'已取消'
-    :hold.archivedAt&&fullyPaid
-      ?'已完成'
-      :order.fulfillmentLabel;
+    :hold.archivedAt&&fullyPaid?'已完成':order.fulfillmentLabel;
   const next:StoredOrder={
     ...order,
     diningHoldId:hold.id,
-    totalMinor:hold.totalMinor,
+    ...(corrections.length?{originalTotalMinor:hold.totalMinor,diningLineCorrections:corrections.map(row=>({...row}))}:{}),
+    totalMinor:effectiveTotalMinor,
     recognizedSalesMinor:confirmedPaidMinor,
-    outstandingMinor:hold.cancelledAt?0:Math.max(0,hold.totalMinor-confirmedPaidMinor),
+    outstandingMinor:hold.cancelledAt?0:Math.max(0,effectiveTotalMinor-confirmedPaidMinor),
     fulfillmentLabel,
     paymentEntries:payments.map(payment=>({
       ...payment,
@@ -690,7 +779,7 @@ function syncDiningFormalOrder(order:StoredOrder,hold:LocalHoldDraft,at:string):
       selections:payment.selections.map(selection=>({...selection})),
     })),
     paymentLabel:diningPaymentLabel(payments),
-    items:hold.items.map(item=>({...item,serviceMode:'dine-in' as const})),
+    items:effectiveItems.map(item=>({...item,serviceMode:'dine-in' as const})),
   };
   return JSON.stringify(next)===JSON.stringify(order)?order:{...next,updatedAt:at};
 }
@@ -743,10 +832,11 @@ function projectDiningOrderNonBlocking(order?:StoredOrder){
 }
 
 function diningTableLabel(hold:LocalHoldDraft){
-  const id=hold.assignedTable??hold.lastAssignedTable;
-  if(!id)return '輪候 '+(hold.formalOrderDisplay??hold.codeLabel);
-  const table=readSmtDiningTableRegistry().find(row=>row.id===id);
-  return table?.name||id;
+  const ids=diningAssignedTables(hold);
+  if(!ids.length&&hold.lastAssignedTable)ids.push(hold.lastAssignedTable);
+  if(!ids.length)return '輪候 '+(hold.formalOrderDisplay??hold.codeLabel);
+  const registry=readSmtDiningTableRegistry();
+  return ids.map(id=>registry.find(row=>row.id===id)?.name||id).join('＋');
 }
 const diningInitialPrintInflight=new Map<string,Promise<DiningInitialPrintResult>>();
 function storedDiningInitialPrintResult(order:StoredOrder):DiningInitialPrintResult{
@@ -989,11 +1079,23 @@ function ensureDiningAdditionPrintById(holdId:string,additionId:string):Promise<
     const printable={
       ...attemptedEnsured.order!,
       id:attemptedEnsured.order!.id+':addition:'+attemptedAddition.id,
-      totalMinor:attemptedAddition.totalMinor,
+      totalMinor:(()=>{
+        const additions=attemptedEnsured.hold.additions??[];
+        const addedCount=additions.reduce((sum,row)=>sum+row.items.length,0);
+        let start=Math.max(0,attemptedEnsured.hold.items.length-addedCount);
+        for(const row of additions){if(row.id===attemptedAddition.id)break;start+=row.items.length;}
+        return attemptedAddition.items.reduce((sum,item,offset)=>sum+Math.max(0,item.qty-diningCorrectionQuantity(attemptedEnsured.hold,start+offset))*item.unitMinor,0);
+      })(),
       paymentLabel:'未收款',
       sourceLabel:attemptedAddition.sourceLabel||attemptedEnsured.order!.sourceLabel,
       orderRemark:['堂食加單',diningTableLabel(attemptedEnsured.hold)].filter(Boolean).join(' · '),
-      items:attemptedAddition.items.map(item=>({...item,serviceMode:'dine-in' as const})),
+      items:(()=>{
+        const additions=attemptedEnsured.hold.additions??[];
+        const addedCount=additions.reduce((sum,row)=>sum+row.items.length,0);
+        let start=Math.max(0,attemptedEnsured.hold.items.length-addedCount);
+        for(const row of additions){if(row.id===attemptedAddition.id)break;start+=row.items.length;}
+        return attemptedAddition.items.map((item,offset)=>({...item,qty:Math.max(0,item.qty-diningCorrectionQuantity(attemptedEnsured.hold,start+offset)),serviceMode:'dine-in' as const})).filter(item=>item.qty>0);
+      })(),
     } as StoredOrder;
 
     let summary:PrintDispatchSummary;
@@ -1025,12 +1127,16 @@ function ensureDiningAdditionPrintById(holdId:string,additionId:string):Promise<
       additions:(currentHold.additions??[]).map(row=>row.id===addition.id?finalizedAddition:row),
     };
     const finalizedEnsured=ensureDiningFormalOrder(after,finalizedHold,completedAt);
+    const productionIssued=summary.results.some(result=>result.role==='製作單'&&result.ok);
+    const finalizedOrders=productionIssued&&finalizedEnsured.order&&!finalizedEnsured.order.productionIssuedAt
+      ?finalizedEnsured.orders.map(row=>row.id===finalizedEnsured.order!.id?{...row,productionIssuedAt:completedAt,updatedAt:completedAt}:row)
+      :finalizedEnsured.orders;
     commitDiningState(after,{
       holds:after.holds.map(row=>row.id===holdId?finalizedEnsured.hold:row),
-      orders:finalizedEnsured.orders,
+      orders:finalizedOrders,
     });
-    projectDiningOrderNonBlocking(finalizedEnsured.order);
-    return storedDiningAdditionPrintResult(finalizedEnsured.order!,finalizedAddition);
+    projectDiningOrderNonBlocking(finalizedOrders.find(row=>row.id===finalizedEnsured.order!.id));
+    return storedDiningAdditionPrintResult(finalizedOrders.find(row=>row.id===finalizedEnsured.order!.id)!,finalizedAddition);
   })().finally(()=>diningAdditionPrintInflight.delete(key));
 
   diningAdditionPrintInflight.set(key,task);
@@ -1089,31 +1195,28 @@ function appendDiningItemsToSnapshot(snapshot:Persisted,hold:LocalHoldDraft,inpu
 
 function diningDetail(hold:LocalHoldDraft):LocalDiningHoldDetail{
   const payments=Array.isArray(hold.payments)?hold.payments:[];
+  const corrections=Array.isArray(hold.lineCorrections)?hold.lineCorrections:[];
   const paidByLine=new Map<number,number>();
   for(const payment of payments){
-    for(const selection of payment.selections){
-      paidByLine.set(selection.lineIndex,(paidByLine.get(selection.lineIndex)??0)+selection.qty);
-    }
+    for(const selection of payment.selections)paidByLine.set(selection.lineIndex,(paidByLine.get(selection.lineIndex)??0)+selection.qty);
   }
   const lines=hold.items.map((item,lineIndex)=>{
-    const paidQty=Math.min(item.qty,paidByLine.get(lineIndex)??0);
-    return {
-      lineIndex,
-      id:item.id,
-      name:item.name,
-      qty:item.qty,
-      paidQty,
-      remainingQty:Math.max(0,item.qty-paidQty),
-      unitMinor:item.unitMinor,
-    };
+    const originalQty=Math.max(0,item.qty);
+    const voidedQty=Math.min(originalQty,diningCorrectionQuantity(hold,lineIndex));
+    const qty=Math.max(0,originalQty-voidedQty);
+    const paidQty=Math.min(qty,paidByLine.get(lineIndex)??0);
+    return {lineIndex,id:item.id,name:item.name,originalQty,voidedQty,qty,paidQty,remainingQty:Math.max(0,qty-paidQty),unitMinor:item.unitMinor};
   });
   const paidMinor=payments.reduce((sum,payment)=>sum+payment.amountMinor,0);
+  const totalMinor=diningEffectiveTotalMinor(hold);
   return {
     checkoutRevision:diningCheckoutRevision(hold),
     ...(hold.archivedAt?{archivedAt:hold.archivedAt}:{}),
     ...(hold.cancelledAt?{cancelledAt:hold.cancelledAt}:{}),
     ...(hold.lastAssignedTable?{lastAssignedTable:hold.lastAssignedTable}:{}),
     ...(hold.seatedAt?{seatedAt:hold.seatedAt}:{}),
+    ...(hold.joinedTables?.length?{joinedTables:[...hold.joinedTables]}:{}),
+    corrections:corrections.map(row=>({...row})),
     ...(hold.formalOrderId?{formalOrderId:hold.formalOrderId}:{}),
     ...(hold.formalOrderDisplay?{formalOrderDisplay:hold.formalOrderDisplay}:{}),
     holdId:hold.id,
@@ -1122,12 +1225,10 @@ function diningDetail(hold:LocalHoldDraft):LocalDiningHoldDetail{
     createdAt:hold.createdAt,
     partySize:hold.partySize,
     note:hold.note,
-    totalMinor:hold.totalMinor,
+    totalMinor,
     paidMinor,
-    remainingMinor:hold.cancelledAt?0:Math.max(0,hold.totalMinor-paidMinor),
-    lines,
-    payments,
-    additions:Array.isArray(hold.additions)?hold.additions:[],
+    remainingMinor:hold.cancelledAt?0:Math.max(0,totalMinor-paidMinor),
+    lines,payments,additions:Array.isArray(hold.additions)?hold.additions:[],
   };
 }
 
@@ -1207,7 +1308,7 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
     }
     const tableId=String(target.tableId||'').trim();
     if(!/^T\d{2}$/.test(tableId))throw new Error('SMM_DINING_TABLE_INVALID');
-    const occupied=snapshot.holds.find(hold=>hold.kind==='dining'&&!hold.archivedAt&&hold.assignedTable===tableId);
+    const occupied=snapshot.holds.find(hold=>hold.kind==='dining'&&!hold.archivedAt&&diningAssignedTables(hold).includes(tableId));
     if(occupied){
       const priorAddition=(occupied.additions??[]).find(row=>row.submissionId===providerRef);
       if((occupied.smmSubmissionRefs??[]).includes(providerRef)){
@@ -1255,7 +1356,7 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
     const snapshot=readDiningState();
     const hold=snapshot.holds.find(row=>row.id===id);
     if(hold?.archivedAt||hold?.payments?.length)throw new Error('DINING_HISTORY_PROTECTED');
-    if(hold?.kind==='dining'&&(hold.assignedTable||hold.items.length))throw new Error('DINING_NONEMPTY_HOLD_PROTECTED');
+    if(hold?.kind==='dining'&&(diningAssignedTables(hold).length||hold.items.length))throw new Error('DINING_NONEMPTY_HOLD_PROTECTED');
     commitDiningHolds(snapshot,snapshot.holds.filter(row=>row.id!==id));
   },
   clear(){data=clone(defaults);save()},
@@ -1739,7 +1840,7 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
     const activeHolds=snapshot.holds.filter(hold=>hold.kind==='dining'&&!hold.archivedAt);
     return {
       businessDate:new Date().toISOString().slice(0,10),revision:snapshot.diningRevision??0,
-      queue:activeHolds.filter(hold=>!hold.assignedTable).map(hold=>{
+      queue:activeHolds.filter(hold=>diningAssignedTables(hold).length===0).map(hold=>{
         const detail=diningDetail(hold);
         const itemCount=hold.items.reduce((sum,item)=>sum+item.qty,0);
         return {
@@ -1761,22 +1862,22 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
         const visibleBase=registry.length?active:fallback;
         const byId=new Map(registry.map(table=>[table.id,table]));
         const orphanOccupied=activeHolds
-          .filter(hold=>hold.assignedTable&&!visibleBase.some(table=>table.id===hold.assignedTable))
-          .map(hold=>{
-            const id=String(hold.assignedTable);
+          .flatMap(hold=>diningAssignedTables(hold))
+          .filter(id=>!visibleBase.some(table=>table.id===id))
+          .map(id=>{
             const known=byId.get(id);
             return {id,name:known?.name||id,active:false,sortOrder:Number.MAX_SAFE_INTEGER};
           });
         const visible=[...visibleBase,...orphanOccupied.filter((table,index,rows)=>rows.findIndex(row=>row.id===table.id)===index)];
         return visible.map(table=>{
           const id=table.id;
-          const seated=activeHolds.find(hold=>hold.assignedTable===id);
+          const seated=activeHolds.find(hold=>diningAssignedTables(hold).includes(id));
           if(!seated)return {id,areaLabel:'堂食',label:table.name,state:'available' as const};
           const detail=diningDetail(seated);
           const first=detail.lines.filter(line=>line.qty>0).slice(0,2).map(line=>line.name.split('｜')[0]).join('、');
           return {
             id,
-            areaLabel:table.active===false?'堂食 · 已停用':'堂食',
+            areaLabel:table.active===false?'堂食 · 已停用':seated.assignedTable!==id?'堂食 · 併枱':'堂食',
             label:table.name,
             state:detail.remainingMinor===0?'settled' as const:'occupied' as const,
             partySize:seated.partySize,
@@ -1813,7 +1914,7 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
     const snapshot=readDiningState();
     const hold=requireDiningHold(snapshot,id);
     if(hold.archivedAt||hold.payments?.length)throw new Error('DINING_HISTORY_PROTECTED');
-    if(hold.assignedTable||hold.items.length)throw new Error('DINING_NONEMPTY_HOLD_PROTECTED');
+    if(diningAssignedTables(hold).length||hold.items.length)throw new Error('DINING_NONEMPTY_HOLD_PROTECTED');
     commitDiningHolds(snapshot,snapshot.holds.filter(row=>row.id!==id));
   },
   async admitDiningHold(holdId){
@@ -1837,30 +1938,53 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
     const hold=requireDiningHold(snapshot,holdId);
     if(hold.archivedAt)throw new Error('DINING_HISTORY_PROTECTED');
     const registry=readSmtDiningTableRegistry();
-    const allowed=registry.length
-      ?registry.filter(table=>table.active).map(table=>table.id)
-      :Array.from({length:9},(_,index)=>'T'+String(index+1).padStart(2,'0'));
+    const allowed=registry.length?registry.filter(table=>table.active).map(table=>table.id):Array.from({length:9},(_,index)=>'T'+String(index+1).padStart(2,'0'));
     if(!allowed.includes(tableId))throw new Error('DINING_TABLE_NOT_ASSIGNABLE');
-    if(snapshot.holds.some(row=>row.id!==holdId&&!row.archivedAt&&row.kind==='dining'&&row.assignedTable===tableId)){
-      throw new Error('DINING_TABLE_OCCUPIED');
-    }
+    if(snapshot.holds.some(row=>row.id!==holdId&&!row.archivedAt&&row.kind==='dining'&&diningAssignedTables(row).includes(tableId)))throw new Error('DINING_TABLE_OCCUPIED');
     const at=new Date().toISOString();
     const seatedAt=hold.seatedAt??(hold.assignedTable?hold.createdAt:at);
-    const seated=hold.assignedTable===tableId&&hold.seatedAt
-      ?hold
-      :{...hold,assignedTable:tableId,seatedAt};
+    const joinedTables=(hold.joinedTables??[]).filter(id=>id!==tableId);
+    const seated=hold.assignedTable===tableId&&hold.seatedAt?hold:{...hold,assignedTable:tableId,seatedAt,...(joinedTables.length?{joinedTables}:{joinedTables:undefined})};
     const ensured=ensureDiningFormalOrder(snapshot,seated,at);
     if(hold.assignedTable===tableId&&!ensured.changed)return;
-    commitDiningState(snapshot,{
-      holds:snapshot.holds.map(row=>row.id===holdId?ensured.hold:row),
-      orders:ensured.orders,
-    });
+    commitDiningState(snapshot,{holds:snapshot.holds.map(row=>row.id===holdId?ensured.hold:row),orders:ensured.orders});
     projectDiningOrderNonBlocking(ensured.order);
+  },
+  async joinDiningTable(holdId,tableId){
+    const snapshot=readDiningState();
+    const hold=requireDiningHold(snapshot,holdId);
+    if(hold.archivedAt||hold.cancelledAt)throw new Error('DINING_HISTORY_PROTECTED');
+    if(!hold.assignedTable)throw new Error('DINING_JOIN_REQUIRES_SEATED');
+    if(diningDetail(hold).remainingMinor===0)throw new Error('DINING_JOIN_SETTLED');
+    const registry=readSmtDiningTableRegistry();
+    const allowed=registry.length?registry.filter(table=>table.active).map(table=>table.id):Array.from({length:9},(_,index)=>'T'+String(index+1).padStart(2,'0'));
+    if(!allowed.includes(tableId))throw new Error('DINING_TABLE_NOT_ASSIGNABLE');
+    if(diningAssignedTables(hold).includes(tableId))return;
+    if(snapshot.holds.some(row=>row.id!==holdId&&!row.archivedAt&&row.kind==='dining'&&diningAssignedTables(row).includes(tableId)))throw new Error('DINING_TABLE_OCCUPIED');
+    const at=new Date().toISOString();
+    const joined:LocalHoldDraft={...hold,joinedTables:[...(hold.joinedTables??[]),tableId]};
+    const ensured=ensureDiningFormalOrder(snapshot,joined,at);
+    commitDiningState(snapshot,{holds:snapshot.holds.map(row=>row.id===holdId?ensured.hold:row),orders:ensured.orders});
+    projectDiningOrderNonBlocking(ensured.order);
+    if(ensured.hold.formalOrderId)appendActionAudit({action:'DINING_TABLE_JOIN',orderId:ensured.hold.formalOrderId,reason:hold.assignedTable+' + '+tableId});
+  },
+  async unjoinDiningTable(holdId,tableId){
+    const snapshot=readDiningState();
+    const hold=requireDiningHold(snapshot,holdId);
+    if(hold.archivedAt||hold.cancelledAt)throw new Error('DINING_HISTORY_PROTECTED');
+    if(hold.assignedTable===tableId)throw new Error('DINING_PRIMARY_TABLE_CANNOT_UNJOIN');
+    const joined=hold.joinedTables??[];
+    if(!joined.includes(tableId))throw new Error('DINING_JOINED_TABLE_NOT_FOUND');
+    const nextJoined=joined.filter(id=>id!==tableId);
+    const updated:LocalHoldDraft={...hold,...(nextJoined.length?{joinedTables:nextJoined}:{joinedTables:undefined})};
+    commitDiningHolds(snapshot,snapshot.holds.map(row=>row.id===holdId?updated:row));
+    if(hold.formalOrderId)appendActionAudit({action:'DINING_TABLE_UNJOIN',orderId:hold.formalOrderId,reason:tableId});
   },
   async unassignDiningTable(holdId){
     const snapshot=readDiningState();
     const hold=requireDiningHold(snapshot,holdId);
     if(hold.archivedAt)throw new Error('DINING_HISTORY_PROTECTED');
+    if((hold.joinedTables??[]).length)throw new Error('DINING_UNASSIGN_REQUIRES_UNJOIN');
     const {assignedTable,...rest}=hold;
     commitDiningHolds(snapshot,snapshot.holds.map(row=>row.id===holdId?{...rest,...(assignedTable?{lastAssignedTable:assignedTable}:{})}:row));
   },
@@ -1893,6 +2017,59 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
   },
   async ensureDiningAdditionPrint(holdId,additionId){
     return clone(await ensureDiningAdditionPrintById(holdId,additionId));
+  },
+  async correctDiningLine(holdId,input){
+    const snapshot=readDiningState();
+    const hold=requireDiningHold(snapshot,holdId);
+    if(hold.archivedAt||hold.cancelledAt)throw new Error('DINING_HISTORY_PROTECTED');
+    if(!hold.formalOrderId)throw new Error('DINING_FORMAL_ORDER_REQUIRED');
+    const order=snapshot.orders.find(row=>row.id===hold.formalOrderId);
+    if(!order)throw new Error('DINING_FORMAL_ORDER_NOT_FOUND');
+    const submissionId=String(input.submissionId||'').trim();
+    if(!submissionId||submissionId.length>200)throw new Error('DINING_CORRECTION_SUBMISSION_REQUIRED');
+    const lineIndex=Math.floor(Number(input.lineIndex));
+    const quantity=Math.floor(Number(input.quantity));
+    const reason=String(input.reason||'堂食商品更正').trim()||'堂食商品更正';
+    if(!Number.isSafeInteger(lineIndex)||lineIndex<0||!Number.isSafeInteger(quantity)||quantity<=0)throw new Error('DINING_CORRECTION_INVALID');
+    const signature=JSON.stringify([holdId,lineIndex,quantity,reason]);
+    const prior=(hold.lineCorrections??[]).find(row=>row.submissionId===submissionId);
+    if(prior){
+      if(prior.requestSignature!==signature)throw new Error('DINING_CORRECTION_SUBMISSION_CONFLICT');
+      return Object.freeze({detail:clone(diningDetail(hold)),correction:clone(prior)});
+    }
+    const detail=diningDetail(hold);
+    const line=detail.lines[lineIndex];
+    if(!line)throw new Error('DINING_LINE_NOT_FOUND');
+    if(quantity>line.remainingQty)throw new Error('DINING_CORRECTION_EXCEEDS_UNPAID_QUANTITY');
+    if(diningProductionCertaintyUnknown(hold,order))throw new Error('DINING_PRODUCTION_CERTAINTY_UNKNOWN');
+    const postProduction=Boolean(order.productionIssuedAt)||(hold.additions??[]).some(addition=>addition.printState==='DONE'&&Math.max(0,Number(addition.printSent)||0)>0);
+    const createdAt=new Date().toISOString();
+    const correction:LocalDiningLineCorrection={
+      id:'DLC:'+hold.id+':'+submissionId,
+      submissionId,requestSignature:signature,createdAt,
+      phase:postProduction?'POST_PRODUCTION':'PRE_PRODUCTION',
+      lineIndex,itemId:line.id,itemName:line.name,quantity,amountMinor:line.unitMinor*quantity,reason,
+      productionNoticeState:postProduction?'UNKNOWN':'NOT_REQUIRED',
+      ...(postProduction?{productionNoticeAttemptedAt:createdAt}:{}),
+    };
+    const correctedHold:LocalHoldDraft={...hold,lineCorrections:[...(hold.lineCorrections??[]),correction]};
+    const ensured=ensureDiningFormalOrder(snapshot,correctedHold,createdAt);
+    commitDiningState(snapshot,{holds:snapshot.holds.map(row=>row.id===holdId?ensured.hold:row),orders:ensured.orders});
+    projectDiningOrderNonBlocking(ensured.order);
+    appendActionAudit({action:'DINING_LINE_VOID',orderId:order.id,reason:line.name+' ×'+quantity+' · '+reason});
+    if(!postProduction)return Object.freeze({detail:clone(diningDetail(ensured.hold)),correction:clone(correction)});
+    const result=await dispatchDiningLineCorrectionNotice(ensured.order!,ensured.hold,correction)
+      .catch(()=>({ok:false,code:'DINING_CORRECTION_NOTICE_OUTCOME_UNKNOWN',state:'UNKNOWN' as const}));
+    const after=readDiningState();
+    const currentHold=requireDiningHold(after,holdId);
+    const completedAt=new Date().toISOString();
+    const finalizedCorrection:LocalDiningLineCorrection={...correction,productionNoticeState:result.state,...(result.state==='DONE'?{productionNoticeCompletedAt:completedAt}:{})};
+    const finalizedHold:LocalHoldDraft={...currentHold,lineCorrections:(currentHold.lineCorrections??[]).map(row=>row.id===correction.id?finalizedCorrection:row)};
+    const finalized=ensureDiningFormalOrder(after,finalizedHold,completedAt);
+    commitDiningState(after,{holds:after.holds.map(row=>row.id===holdId?finalized.hold:row),orders:finalized.orders});
+    projectDiningOrderNonBlocking(finalized.order);
+    appendActionAudit({action:'DINING_LINE_VOID_NOTICE',orderId:order.id,reason:result.code});
+    return Object.freeze({detail:clone(diningDetail(finalized.hold)),correction:clone(finalizedCorrection)});
   },
   async settleDiningHold(holdId,selections,tender,command){
     if(!command||typeof command.submissionId!=='string'||!command.submissionId.trim()||command.submissionId.length>200||
