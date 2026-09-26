@@ -96,3 +96,27 @@ A3d Riceball / Combo pairing is the next bounded audit slice.
 
 Rule:
 fresh latest main → audit exact current seam and donor delta → implement only if no new Owner semantic branch appears.
+
+
+## Follow-up R1.1 — Combo drink optional
+After landing A3c, a current-main recheck found the existing basic ComboWorkspace still treated every Admin group marked required as mandatory, including DRINK pools. That conflicted with the Owner-final A3c rule.
+
+Corrected:
+- `addonKind=DRINK` no longer contributes to Combo `requiredMissing`.
+- Combo DRINK UI is shown as 「飲品補選 / 可跳過」.
+- Other required Combo groups remain unchanged.
+
+Landed:
+- main `4da40b04153c9b0a373204bb44258761bb75c4cd`
+- PR `#334`
+- same bank branch advanced to this final A3c head
+
+Proof:
+- bounded run `36228924116` SUCCESS
+- 35 / 35 test files PASS
+- 150 / 150 tests PASS
+- build PASS
+- diff check PASS
+- post-merge V2 Local POS Smoke `36228978196` SUCCESS
+
+A3c final functional head is therefore `4da40b04153c9b0a373204bb44258761bb75c4cd`.
