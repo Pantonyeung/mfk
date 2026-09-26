@@ -1,3 +1,4 @@
+// MFK SMT A1 R4 integration proof on locked current main.
 import {describe,expect,it} from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
