@@ -246,10 +246,18 @@ export function App(){
     setCart(nextCart);
     setCheckout(nextCheckout);
     setFallbackIntentId(null);
-    persist({cart:nextCart,checkout:nextCheckout,pendingIntents:nextPending});
     setNotice(message);
     setOrderSegment('current');
-    changeView('orders');
+    presentWithContinuity(()=>{
+      setView('orders');
+      persist({
+        cart:nextCart,
+        checkout:nextCheckout,
+        pendingIntents:nextPending,
+        preferences:{activeView:'orders',activeCategoryId},
+      });
+      window.scrollTo({top:0,behavior:'auto'});
+    });
     void refresh();
   };
 
@@ -412,10 +420,20 @@ export function App(){
     try{
       const result=await port.buildReorderCart(order.orderId);
       if(result.state!=='CONFIRMED'||!result.cart){setNotice(result.message);return}
-      updateCart(result.cart);
+      const nextCheckout=checkout.paymentEvidence?withoutPaymentEvidence(checkout):checkout;
+      setCart(result.cart);
+      if(nextCheckout!==checkout)setCheckout(nextCheckout);
+      persist({
+        cart:result.cart,
+        checkout:nextCheckout,
+        preferences:{activeView:'cart',activeCategoryId},
+      });
       setJarPulseKey(value=>value+1);
       setNotice(result.attention?.length?'已按目前菜單重建記憶罐；需要修正：'+result.attention.join('、'):'已按目前菜單、價格同供應狀態重建記憶罐。');
-      changeView('cart');
+      presentWithContinuity(()=>{
+        setView('cart');
+        window.scrollTo({top:0,behavior:'auto'});
+      });
     }catch{
       setNotice('暫時未能重新驗證舊訂單；冇建立新訂單。');
     }
