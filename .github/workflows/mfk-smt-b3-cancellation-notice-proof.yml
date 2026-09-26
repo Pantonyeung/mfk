@@ -1,0 +1,40 @@
+name: mfk-smt-b3-cancellation-notice-proof
+on:
+  pull_request:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  proof:
+    if: github.head_ref == 'work/MFK/SMT-B3-CANCELLATION-NOTICE-R1'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install SMT
+        working-directory: v2local
+        run: npm install --legacy-peer-deps --ignore-scripts --no-audit --no-fund
+      - name: SMT tests
+        working-directory: v2local
+        run: npm run test
+      - name: SMT build
+        working-directory: v2local
+        run: npm run build
+      - name: Protected seams
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -F "summary.results.some(row=>row.role==='製作單'&&row.ok)" v2local/src/runtime/local-runtime.ts
+          grep -F "if(order.productionIssuedAt&&!order.cancellationNoticeAttemptedAt)" v2local/src/runtime/local-runtime.ts
+          grep -F "kickDrawer:false" v2local/src/runtime/local-runtime.ts
+          grep -F "applyProviderLifecycle(input)" v2local/src/runtime/local-runtime.ts
+          grep -F "localRuntime.createOrder" v2local/src/App.tsx
+          grep -F "localRuntime.printOrderOutputs" v2local/src/App.tsx
+      - name: Diff check
+        run: git diff --check origin/main...HEAD
