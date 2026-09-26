@@ -1,0 +1,21 @@
+name: customer-ui-stage1-r3-smoke
+
+on:
+  push:
+    branches:
+      - work/MFK/CUSTOMER-UI-STAGE1-R3
+
+jobs:
+  v2customer:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: v2customer
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-audit --no-fund --legacy-peer-deps --package-lock=false
+      - run: npm test
+      - run: npm run build
