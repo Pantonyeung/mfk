@@ -181,8 +181,9 @@ export function buildLocalReport(
   const products=new Map<string,{name:string;quantity:number;salesMinor:number}>();
   for(const order of selected){
     for(const [index,item] of order.items.entries()){
-      const row=products.get(item.name)??{name:item.name,quantity:0,salesMinor:0};
       const qty=recognizedItemQty(order,index,item.qty);
+      if(qty<=0)continue;
+      const row=products.get(item.name)??{name:item.name,quantity:0,salesMinor:0};
       row.quantity+=qty;
       row.salesMinor+=qty*Math.max(0,Number(item.unitMinor)||0);
       products.set(item.name,row);
