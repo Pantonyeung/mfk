@@ -19,6 +19,49 @@ export interface OwnerTodaySummary {
   readonly attentionCount:number;
 }
 
+export interface OwnerLiveOrderSummaryItem {
+  readonly orderId:string;
+  readonly displayCode:string;
+  readonly source:string;
+  readonly amountLabel?:string;
+  readonly fulfillmentLabel:string;
+  readonly elapsedLabel?:string;
+  readonly promisedTimeLabel?:string;
+  readonly hasAttention:boolean;
+}
+
+export interface OwnerLiveOrdersSummary {
+  readonly activeCount:number;
+  readonly attentionCount:number;
+  readonly readyCount:number;
+  readonly recentOrders:readonly OwnerLiveOrderSummaryItem[];
+  readonly observedAt:string;
+}
+
+export type OwnerDineInPaymentState='UNPAID'|'PARTIAL'|'SETTLED';
+
+export interface OwnerDineInOpenCheck {
+  readonly checkId:string;
+  readonly displayCode?:string;
+  readonly tableLabel:string;
+  readonly openedAt:string;
+  readonly guestCount?:number;
+  readonly currentOrderTotalLabel:string;
+  readonly confirmedPaidLabel:string;
+  readonly outstandingLabel:string;
+  readonly paymentState:OwnerDineInPaymentState;
+}
+
+export interface OwnerDineInSummary {
+  readonly activeCheckCount:number;
+  readonly unpaidCheckCount:number;
+  readonly estimatedOpenAmountLabel:string;
+  readonly oldestOpenAgeLabel?:string;
+  readonly openChecks:readonly OwnerDineInOpenCheck[];
+  readonly includedInEffectiveSales:false;
+  readonly observedAt:string;
+}
+
 export interface OwnerReadinessItem {
   readonly id:string;
   readonly label:string;
@@ -166,6 +209,8 @@ export interface OwnerActivityRecord {
 export interface OwnerReadModelSnapshot {
   readonly store?:OwnerStoreContext;
   readonly today?:OwnerTodaySummary;
+  readonly liveOrders?:OwnerLiveOrdersSummary;
+  readonly dineIn?:OwnerDineInSummary;
   readonly readiness:readonly OwnerReadinessItem[];
   readonly actions:readonly OwnerActionItem[];
   readonly orders:readonly OwnerOrderProjection[];
