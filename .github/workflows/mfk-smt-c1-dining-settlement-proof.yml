@@ -1,0 +1,42 @@
+name: mfk-smt-c1-dining-settlement-proof
+on:
+  pull_request:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  proof:
+    if: github.head_ref == 'work/MFK/SMT-C1-DINING-SETTLEMENT-R1'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install SMT
+        working-directory: v2local
+        run: npm install --legacy-peer-deps --ignore-scripts --no-audit --no-fund
+      - name: SMT tests
+        working-directory: v2local
+        run: npm run test
+      - name: SMT build
+        working-directory: v2local
+        run: npm run build
+      - name: Protected seams
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -F "DINING_SUBMISSION_CONFLICT" v2local/src/runtime/local-runtime.ts
+          grep -F "DINING_CHECKOUT_STALE" v2local/src/runtime/local-runtime.ts
+          grep -F "DINING_CASH_INSUFFICIENT" v2local/src/runtime/local-runtime.ts
+          grep -F "DINING_TABLE_NOT_ASSIGNABLE" v2local/src/runtime/local-runtime.ts
+          grep -F "submissionId:diningCheckout.submissionId" v2local/src/App.tsx
+          grep -F "expectedRevision:diningCheckout.expectedRevision" v2local/src/App.tsx
+          grep -F "localRuntime.createOrder" v2local/src/App.tsx
+          ! grep -A110 "async settleDiningHold(holdId,selections,tender,command)" v2local/src/runtime/local-runtime.ts | grep -E "dispatchOrderOutputs|kickDrawer|createOrder"
+      - name: Diff check
+        run: git diff --check origin/main...HEAD
