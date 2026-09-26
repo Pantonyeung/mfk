@@ -216,6 +216,68 @@
   cursor:not-allowed;
 }
 
+.stage2-combo-section{
+  background:#fbfcff;
+  border-color:#ccd9ee;
+}
+
+.stage2-combo-head{
+  align-items:center;
+}
+
+.stage2-combo-toggle{
+  flex:0 0 auto;
+  min-height:48px;
+  padding:0 14px;
+  border:1px solid #9fb9e3;
+  border-radius:12px;
+  background:#fff;
+  color:#163568;
+  font:inherit;
+  font-size:11px;
+  font-weight:800;
+}
+
+.stage2-combo-toggle.active{
+  border-color:#2f73ff;
+  background:#eaf2ff;
+  color:#215bd4;
+}
+
+.stage2-combo-base{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  padding:10px 12px;
+  border-radius:12px;
+  background:#eef4ff;
+}
+
+.stage2-combo-base span{
+  color:#67738a;
+  font-size:11px;
+}
+
+.stage2-combo-base strong{
+  color:#163568;
+  font-size:14px;
+}
+
+.stage2-combo-group{
+  display:grid;
+  gap:10px;
+  padding-top:12px;
+  border-top:1px solid #e3e8f0;
+}
+
+.stage2-combo-group.has-error{
+  padding:12px;
+  border:1px solid #efb3b9;
+  border-radius:12px;
+  background:#fffafa;
+}
+
 .stage2-inline-error{
   margin:0;
   padding:9px 10px;
