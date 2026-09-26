@@ -127,18 +127,38 @@ export function StageZeroGate({children}:{children:ReactNode}){
   return <>{children}</>;
 }
 
-function BrandLockup(){
-  return <div className="stage0-brand">
+function BrandLockup({compact=false}:{compact?:boolean}){
+  return <div className={compact?'stage0-brand compact':'stage0-brand'}>
     <img className="stage0-brand-logo" src="/brand/morefun-logo.webp" alt="磨飯 More Fun"/>
     <span className="stage0-product-label">SMM</span>
   </div>;
 }
 
+function BrandScene({asset,alt,purpose,tone='blue',compact=false}:{
+  asset:string;
+  alt:string;
+  purpose:string;
+  tone?:'blue'|'purple'|'warm';
+  compact?:boolean;
+}){
+  return <section className={`stage0-brand-scene ${tone} ${compact?'compact':''}`}>
+    <BrandLockup compact/>
+    <div className="stage0-illustration-wrap">
+      <img className="stage0-illustration" src={asset} alt={alt}/>
+      <span className="stage0-purpose-chip">{purpose}</span>
+    </div>
+  </section>;
+}
+
 function StageZeroSplash(){
   return <main className="stage0-shell stage0-splash" aria-busy="true">
     <section className="stage0-center">
-      <BrandLockup/>
-      <img className="stage0-ip stage0-ip-splash" src="/brand/ip-male.webp" alt="磨飯男店員角色"/>
+      <BrandScene
+        asset="/brand/stage0/splash-male.svg"
+        alt="重新繪製嘅磨飯男 IP，手持平板並揮手迎接員工"
+        purpose="品牌露出 · 啟動陪伴"
+        tone="warm"
+      />
       <div className="stage0-slogan">
         <strong>前線好幫手</strong>
         <span>令每一張訂單都更順暢</span>
@@ -152,8 +172,12 @@ function StageZeroSplash(){
 function StageZeroConnectionChecking(){
   return <main className="stage0-shell">
     <section className="stage0-card stage0-check-card">
-      <BrandLockup/>
-      <div className="stage0-orbit" aria-hidden="true"><span>●</span></div>
+      <BrandScene
+        asset="/brand/stage0/connecting-male.svg"
+        alt="重新繪製嘅磨飯男 IP，操作平板檢查門店連線"
+        purpose="連線引導 · 穩定等待"
+        compact
+      />
       <h1>正在連線</h1>
       <p>檢查門店服務同最新資料，完成後會自動進入工作區。</p>
       <div className="stage0-check-list" aria-live="polite">
@@ -247,7 +271,13 @@ function StageZeroConnectionRecovery({
 
   return <main className="stage0-shell">
     <section className="stage0-card stage0-recovery-card">
-      <BrandLockup/>
+      <BrandScene
+        asset="/brand/stage0/recovery-female.svg"
+        alt="重新繪製嘅磨飯女 IP，手持平板協助處理連線問題"
+        purpose="失敗恢復 · 專業陪伴"
+        tone="purple"
+        compact
+      />
       <div className="stage0-status-icon error" aria-hidden="true">!</div>
       <h1>暫時未能連接門店</h1>
       <p>{message}</p>
@@ -336,8 +366,13 @@ function StageZeroStaffLogin({onSuccess}:{onSuccess:(session:SmmStaffSession)=>v
 
   return <main className="stage0-shell">
     <section className="stage0-card stage0-login-card">
-      <BrandLockup/>
-      <img className="stage0-ip stage0-ip-login" src="/brand/ip-female.webp" alt="磨飯女店員角色"/>
+      <BrandScene
+        asset="/brand/stage0/login-female.svg"
+        alt="重新繪製嘅磨飯女 IP，手持員工卡引導登入"
+        purpose="登入引導 · 溫暖迎接"
+        tone="purple"
+        compact
+      />
       <header>
         <span>歡迎返嚟</span>
         <h1>員工登入</h1>
