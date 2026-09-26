@@ -9,6 +9,7 @@ import {
 } from '../../../integrations/keeta/src/order-facts.js';
 import {readSmtAdminConfigLkg,readSmtDeviceId,subscribeSmtAdminConfig,subscribeSmtCloudDoorbell} from './admin-config-sync.ts';
 import {localRuntime,type StoredOrder} from './local-runtime.ts';
+import {assertCapacityChannelAdmission} from './capacity-pool-state.ts';
 
 const ENDPOINT='https://admin.morefunos.com';
 const ATTENTION_KEY='mfk.keeta.order-intake.attention.v1';
@@ -217,6 +218,13 @@ export async function reconcileKeetaOrderIntake(){
         intent=validateMfkKeetaOrderIntent(raw);
         const orderInput=translateKeetaIntentToLocalOrder(intent);
         const beforeId=localRuntime.orders().find(row=>row.providerRef===orderInput.providerRef)?.id;
+        if(!beforeId){
+          assertCapacityChannelAdmission({
+            channel:'THIRD_PARTY',
+            items:orderInput.items,
+            orderEvents:localRuntime.orders().flatMap(order=>order.capacityEvents??[]),
+          });
+        }
         const order=localRuntime.createOrder(orderInput);
         await ack(intent,order);
         if(!beforeId)emitIntakeUpdate({providerOrderId:intent.providerOrderId,canonicalOrderId:order.id,display:order.display,sourceLabel:order.sourceLabel});
