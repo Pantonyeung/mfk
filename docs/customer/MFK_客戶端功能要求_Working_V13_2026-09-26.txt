@@ -1,0 +1,38 @@
+MFK 客戶端功能要求｜Working V13
+日期：2026-09-26
+狀態：需求收集中
+里程碑：Customer Waiting / Refresh / Reminder Timing 全部改為 Admin Config
+
+0｜Owner 決定
+以下時間全部禁止寫死：
+- Customer Waiting Screen 自動查狀態間隔
+- 首次等待幾多秒後改提示文字
+- 幾多秒後可再次手動查新狀態
+- 幾多秒後 SMT 再提醒店員
+- Reminder 重覆間隔
+- 幾耐後顯示「店舖可能繁忙」
+- 幾耐後顯示「聯絡店舖」
+全部由 Admin 配置。
+
+1｜Admin Config 建議欄位
+Customer：
+- waitingPollIntervalInitialSec
+- waitingPollIntervalLaterSec
+- manualRefreshCooldownSec
+- busyHintAfterSec
+- contactStoreAfterSec
+
+SMT：
+- pendingOrderReminderAfterSec
+- pendingOrderReminderIntervalSec
+- pendingOrderReminderRepeatEnabled
+
+2｜規則
+- Customer 只讀最新 Order 狀態，不重新 Submit。
+- SMT reminder 只提醒店員，不自動 Accept / Reject。
+- Admin 修改後，新等待流程使用最新已發布設定。
+- 前端只 consume config，不自行 hardcode 第二套時間規則。
+- 如 Admin 未配置，系統可有安全 default，但 default 亦屬同一 config contract，可由 Admin 覆蓋。
+
+3｜狀態
+CUSTOMER_WAITING_TIMING_ADMIN_CONFIG_V1_LOCKED
