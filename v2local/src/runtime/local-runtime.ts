@@ -60,6 +60,12 @@ export interface StoredOrder{
   recognizedSalesMinor?:number;
   outstandingMinor?:number;
   paymentEntries?:readonly LocalDiningPayment[];
+  diningInitialPrintAttemptedAt?:string;
+  diningInitialPrintCompletedAt?:string;
+  diningInitialPrintState?:'DONE'|'FAILED'|'UNKNOWN';
+  diningInitialPrintPlanned?:number;
+  diningInitialPrintSent?:number;
+  diningInitialPrintFailed?:number;
   productionIssuedAt?:string;
   cancellationNoticeAttemptedAt?:string;
   cancellationNoticePrintedAt?:string;
@@ -76,6 +82,13 @@ export interface DiningSettlementCommand{
   readonly submissionId:string;
   readonly expectedRevision:string;
   readonly receivedMinor?:number;
+}
+export interface DiningInitialPrintResult{
+  readonly orderId:string;
+  readonly state:'DONE'|'FAILED'|'UNKNOWN';
+  readonly planned:number;
+  readonly sent:number;
+  readonly failed:number;
 }
 export interface LocalDiningPayment{
   readonly submissionId?:string;
@@ -193,6 +206,7 @@ export interface CleanSmtCoreRuntimePort{
   unassignDiningTable?(holdId:string):Promise<void>;
   readDiningHold?(holdId:string):Promise<LocalDiningHoldDetail>;
   readDiningHistory?():Promise<readonly LocalDiningHoldDetail[]>;
+  ensureDiningInitialPrint?(holdId:string):Promise<DiningInitialPrintResult>;
   settleDiningHold?(holdId:string,selections:readonly {lineIndex:number;qty:number}[],tender:DiningTender,command?:DiningSettlementCommand):Promise<LocalDiningHoldDetail>;
   clearDiningHold?(holdId:string):Promise<void>;
 }
@@ -276,6 +290,7 @@ export interface MfkLocalRuntime extends CleanSmtCoreRuntimePort{
   removeHold(id:string):void;
   readDiningHold(holdId:string):Promise<LocalDiningHoldDetail>;
   readDiningHistory():Promise<readonly LocalDiningHoldDetail[]>;
+  ensureDiningInitialPrint(holdId:string):Promise<DiningInitialPrintResult>;
   settleDiningHold(holdId:string,selections:readonly {lineIndex:number;qty:number}[],tender:DiningTender,command?:DiningSettlementCommand):Promise<LocalDiningHoldDetail>;
   unassignDiningTable(holdId:string):Promise<void>;
   clearDiningHold(holdId:string):Promise<void>;
@@ -419,9 +434,9 @@ async function dispatchCancellationNotice(order:StoredOrder){
     :{ok:false,code:lastCode,state:'FAILED' as const};
 }
 
-async function dispatchOrderOutputs(order:StoredOrder,requestedJobIds?:ReadonlySet<string>,reprint=false):Promise<PrintDispatchSummary>{
+async function dispatchOrderOutputs(order:StoredOrder,requestedJobIds?:ReadonlySet<string>,reprint=false,mode:'standard'|'dining-initial'='standard'):Promise<PrintDispatchSummary>{
   const started=performance.now();
-  let plan=[...buildOrderPrintPlan(order,readPrinterBindings(),readSmtPrintConfig())];
+  let plan=[...buildOrderPrintPlan(order,readPrinterBindings(),readSmtPrintConfig(),mode)];
   if(requestedJobIds)plan=plan.filter(job=>requestedJobIds.has(job.id));
   if(reprint)plan=plan.map(job=>({...job,kickDrawer:false}));
   const groups=new Map<string,PlannedPrintJob[]>();
@@ -641,6 +656,79 @@ function projectDiningOrderNonBlocking(order?:StoredOrder){
   try{projectOrder(order);}catch{console.warn('DINING_ORDER_PROJECTION_DEFERRED');}
 }
 
+function diningTableLabel(hold:LocalHoldDraft){
+  if(!hold.assignedTable)return '未指定';
+  const table=readSmtDiningTableRegistry().find(row=>row.id===hold.assignedTable);
+  return table?.name||hold.assignedTable;
+}
+const diningInitialPrintInflight=new Map<string,Promise<DiningInitialPrintResult>>();
+function storedDiningInitialPrintResult(order:StoredOrder):DiningInitialPrintResult{
+  return {
+    orderId:order.id,
+    state:order.diningInitialPrintState??'UNKNOWN',
+    planned:Math.max(0,Number(order.diningInitialPrintPlanned)||0),
+    sent:Math.max(0,Number(order.diningInitialPrintSent)||0),
+    failed:Math.max(0,Number(order.diningInitialPrintFailed)||0),
+  };
+}
+function ensureDiningInitialPrintByHold(holdId:string):Promise<DiningInitialPrintResult>{
+  const active=diningInitialPrintInflight.get(holdId);
+  if(active)return active;
+
+  const snapshot=readDiningState();
+  const hold=requireDiningHold(snapshot,holdId);
+  if(!hold.formalOrderId)throw new Error('DINING_FORMAL_ORDER_REQUIRED');
+  const order=snapshot.orders.find(row=>row.id===hold.formalOrderId);
+  if(!order)throw new Error('DINING_FORMAL_ORDER_NOT_FOUND');
+  if(order.diningInitialPrintAttemptedAt)return Promise.resolve(storedDiningInitialPrintResult(order));
+
+  const task=(async()=>{
+    const attemptedAt=new Date().toISOString();
+    const attempted:StoredOrder={
+      ...order,
+      diningInitialPrintAttemptedAt:attemptedAt,
+      diningInitialPrintState:'UNKNOWN',
+      updatedAt:attemptedAt,
+    };
+    commitDiningState(snapshot,{orders:snapshot.orders.map(row=>row.id===order.id?attempted:row)});
+    projectDiningOrderNonBlocking(attempted);
+
+    let summary:PrintDispatchSummary;
+    try{
+      summary=await dispatchOrderOutputs(
+        {...attempted,diningTableLabel:diningTableLabel(hold)} as StoredOrder & {diningTableLabel:string},
+        undefined,
+        false,
+        'dining-initial',
+      );
+    }catch{
+      summary=Object.freeze({orderId:order.id,planned:0,sent:0,failed:0,results:Object.freeze([])});
+    }
+
+    const unknown=summary.results.some(result=>String(result.code||'').toUpperCase().includes('UNKNOWN'));
+    const state:DiningInitialPrintResult['state']=unknown?'UNKNOWN':summary.planned>0&&summary.failed===0?'DONE':'FAILED';
+    const after=readDiningState();
+    const current=after.orders.find(row=>row.id===order.id);
+    if(!current)throw new Error('DINING_FORMAL_ORDER_NOT_FOUND');
+    const completedAt=new Date().toISOString();
+    const finalized:StoredOrder={
+      ...current,
+      diningInitialPrintState:state,
+      diningInitialPrintPlanned:summary.planned,
+      diningInitialPrintSent:summary.sent,
+      diningInitialPrintFailed:summary.failed,
+      ...(state==='DONE'?{diningInitialPrintCompletedAt:completedAt}:{}),
+      updatedAt:completedAt,
+    };
+    commitDiningState(after,{orders:after.orders.map(row=>row.id===order.id?finalized:row)});
+    projectDiningOrderNonBlocking(finalized);
+    return storedDiningInitialPrintResult(finalized);
+  })().finally(()=>diningInitialPrintInflight.delete(holdId));
+
+  diningInitialPrintInflight.set(holdId,task);
+  return task;
+}
+
 function diningDetail(hold:LocalHoldDraft):LocalDiningHoldDetail{
   const payments=Array.isArray(hold.payments)?hold.payments:[];
   const paidByLine=new Map<number,number>();
@@ -776,6 +864,9 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
     const ensured=ensureDiningFormalOrder(snapshot,draft,at);
     commitDiningState(snapshot,{holds:[ensured.hold,...snapshot.holds],orders:ensured.orders});
     projectDiningOrderNonBlocking(ensured.order);
+    if(ensured.created&&ensured.hold.assignedTable){
+      void ensureDiningInitialPrintByHold(ensured.hold.id).catch(()=>{});
+    }
     return ensured.hold;
   },
   holds(){return readDiningState().holds.filter(hold=>!hold.archivedAt)},
@@ -1324,6 +1415,9 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
       orders:ensured.orders,
     });
     projectDiningOrderNonBlocking(ensured.order);
+    if(ensured.created&&ensured.hold.assignedTable){
+      void ensureDiningInitialPrintByHold(ensured.hold.id).catch(()=>{});
+    }
   },
   async unassignDiningTable(holdId){
     const snapshot=readDiningState();
@@ -1339,6 +1433,9 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
     return readDiningState().holds.filter(hold=>hold.kind==='dining'&&hold.archivedAt)
       .sort((a,b)=>String(b.archivedAt).localeCompare(String(a.archivedAt)))
       .map(hold=>clone(diningDetail(hold)));
+  },
+  async ensureDiningInitialPrint(holdId){
+    return clone(await ensureDiningInitialPrintByHold(holdId));
   },
   async settleDiningHold(holdId,selections,tender,command){
     if(!command||typeof command.submissionId!=='string'||!command.submissionId.trim()||command.submissionId.length>200||
