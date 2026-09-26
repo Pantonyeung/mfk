@@ -409,6 +409,15 @@ describe('Dining R6 automatic table-order admission',()=>{
     expect(()=>runtime.removeHold(hold.id)).toThrow('DINING_HISTORY_PROTECTED');
   });
 
+  it('free Admin-priced line at $0 is valid in dining Hold and Formal Order',async()=>{
+    const runtime=await boot();
+    const hold=runtime.createHold({kind:'dining',items:[{id:'gift-drink',name:'附送飲品',qty:1,unitMinor:0,serviceMode:'dine-in'}],totalMinor:0});
+    await runtime.assignDiningTable(hold.id,'T01');
+    const order=runtime.orders().find((row:any)=>row.diningHoldId===hold.id);
+    expect(order.totalMinor).toBe(0);
+    expect(order.items[0].unitMinor).toBe(0);
+  });
+
   it('formal Order link survives runtime restart',async()=>{
     let runtime=await boot();
     const hold=runtime.createHold({kind:'dining',items:[{id:'rice',name:'飯團',qty:1,unitMinor:4100,serviceMode:'dine-in'}],totalMinor:4100});
