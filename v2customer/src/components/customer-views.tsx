@@ -115,8 +115,10 @@ export function HomeView({snapshot,connection,activeOrders,history,recommendatio
   const currentOrder=activeOrders[0];
   const lastOrder=history[0];
   const member=snapshot?.member;
-  const canBrowse=Boolean(snapshot?.menu)&&store?.channelAvailable!==false;
+  const canBrowse=Boolean(snapshot?.menu);
   const seeds=member?.state==='READY'&&member.seeds?.state==='READY'?member.seeds.valueLabel:'待連接';
+  const availableCouponCount=member?.state==='READY'&&member.coupons?member.coupons.filter(item=>item.state==='AVAILABLE').length:0;
+  const topRecommendations=recommendations.filter(item=>item.product.available).slice(0,6);
   return <PullRefreshSurface refreshing={connection==='LOADING'} onRefresh={onRefresh}><section className="page home-page entrance-sequence">
     <header className="home-store-heading">
       <div><span className="eyebrow">今日自取 · {store?.etaLabel??'時間待店舖確認'}</span><h1>{store?.storeName??'磨飯'}</h1></div>
@@ -133,22 +135,26 @@ export function HomeView({snapshot,connection,activeOrders,history,recommendatio
 
     <HeroCarousel/>
 
-    {store&&!store.channelAvailable?<section className="unavailable-card"><span>自家渠道暫時不可用</span><h2>而家未能直接落單</h2><p>{store.notice??'可以稍後再試，或者由你主動開啟店舖提供嘅備用聯絡方法。'}</p><ActionButton wide onClick={onFallback}>查看備用聯絡方法</ActionButton></section>:
+    {store&&!store.channelAvailable?<section className="unavailable-card"><span>今日暫停正式落單</span><h2>仍然可以慢慢睇、慢慢揀。</h2><p>{store.notice??'關店期間仍可瀏覽菜單同整理記憶罐；去到正式提交先會再確認店舖狀態。'}</p><div className="unavailable-actions"><ActionButton wide disabled={!canBrowse} onClick={onBrowse}>{canBrowse?'繼續睇菜單':connection==='LOADING'?'正在準備菜單':'等待店舖資料'}</ActionButton><ActionButton wide variant="quiet" onClick={onFallback}>查看備用聯絡方法</ActionButton></div></section>:
     <section className="home-primary-action">
       <div><span>{canBrowse?'菜單已經準備好':'等待正式菜單'}</span><strong>想食咩，由呢度開始。</strong></div>
       <ActionButton wide disabled={!canBrowse} onClick={onBrowse}>{canBrowse?'開始點餐':connection==='LOADING'?'正在準備菜單':'等待店舖連接'}</ActionButton>
     </section>}
 
-    <RecommendationRail eyebrow="為你揀快一步" title="有理由嘅推薦，唔靠估" recommendations={recommendations} onProduct={(product,origin)=>onProduct(product,origin)}/>
+    <RecommendationRail eyebrow="人氣推薦 · TOP 6" title="今日最多人想食嘅，先畀你睇" recommendations={topRecommendations} onProduct={(product,origin)=>onProduct(product,origin)}/>
 
-    {lastOrder?<section className="buy-again-section"><SectionHeading eyebrow="因你上次食過" title="一撳再來一單" action={<button className="text-action" onClick={onHistory}>全部回憶</button>}/><article className="buy-again-row"><div><small>{new Date(lastOrder.completedAt).toLocaleDateString('zh-HK')} · 來自你嘅正式歷史訂單</small><strong>{lastOrder.itemSummary}</strong><span>{lastOrder.amountLabel??'歷史價格未提供'}</span></div><ActionButton variant="secondary" disabled={!lastOrder.reorderEligible} onClick={()=>onBuyAgain(lastOrder)}>按目前菜單重建</ActionButton></article></section>:null}
+    <section className="home-quick-entry-section" aria-label="首頁快捷入口">
+      <SectionHeading eyebrow="下次更快" title="磨飯記得你嘅日常"/>
+      <div className="home-quick-entry-grid">
+        <button onClick={onMember}><span>記憶券</span><strong>{availableCouponCount?availableCouponCount+' 張可用':'查看回憶券'}</strong><small>正式交易成功先會 Redeem</small></button>
+        <button onClick={onHistory}><span>常購清單</span><strong>{history.length?'由過往訂單再來一單':'建立第一份常用'}</strong><small>喜愛商品＋常用訂單</small></button>
+        <button onClick={onBrowse}><span>期間限定</span><strong>睇今期限定</strong><small>以店舖最新菜單為準</small></button>
+      </div>
+    </section>
 
-    <section className="memory-ecosystem"><SectionHeading eyebrow="MORE FUN MEMORY" title="將每一餐，儲成你嘅記憶" action={<button className="text-action" onClick={onMember}>我的記憶</button>}/><div className="memory-ecosystem-grid">
-      <button className="ecosystem-jar" onClick={onJar}><i className={`mini-jar level-${Math.min(3,cartCount)}`} aria-hidden="true"/><span><small>記憶罐</small><strong>{cartCount?`${cartCount} 件餐點`:'等待第一樣餐點'}</strong></span></button>
-      <button onClick={onMember}><span>記憶種子</span><strong>{seeds}</strong><small>由正式會員資料提供</small></button>
-      <button onClick={onMember}><span>記憶勳章</span><strong>{member?.state==='READY'&&member.badges?`${member.badges.filter(item=>item.state==='EARNED').length} 枚`:'待連接'}</strong><small>查看收藏</small></button>
-      <button onClick={onMember}><span>回憶券</span><strong>{member?.state==='READY'&&member.coupons?`${member.coupons.filter(item=>item.state==='AVAILABLE').length} 張`:'待連接'}</strong><small>優惠由正式定價確認</small></button>
-    </div></section>
+    {lastOrder?<section className="buy-again-section"><SectionHeading eyebrow="因你上次食過" title="一撳再來一單" action={<button className="text-action" onClick={onHistory}>全部訂單</button>}/><article className="buy-again-row"><div><small>{new Date(lastOrder.completedAt).toLocaleDateString('zh-HK')} · 來自你嘅正式歷史訂單</small><strong>{lastOrder.itemSummary}</strong><span>{lastOrder.amountLabel??'歷史價格未提供'}</span></div><ActionButton variant="secondary" disabled={!lastOrder.reorderEligible} onClick={()=>onBuyAgain(lastOrder)}>按目前菜單重建</ActionButton></article></section>:null}
+
+    <section className="home-memory-summary"><button onClick={onJar}><i className={`mini-jar level-${Math.min(3,cartCount)}`} aria-hidden="true"/><span><small>記憶罐</small><strong>{cartCount?`${cartCount} 件餐點`:'今餐未開始'}</strong></span></button><button onClick={onMember}><span>Memory Seeds</span><strong>{seeds}</strong><small>日結後按合資格完成訂單累積</small></button></section>
   </section></PullRefreshSurface>;
 }
 
