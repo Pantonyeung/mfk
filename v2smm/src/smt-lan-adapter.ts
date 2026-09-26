@@ -21,6 +21,12 @@ function lines(cart:readonly SmmCartLine[]){
     ...(line.selectedVariationId?{selectedVariationId:line.selectedVariationId}:{}),
     ...(line.selectedVariationName?{selectedVariationName:line.selectedVariationName}:{}),
     selections:Object.freeze(line.selections.map(option=>Object.freeze({...option}))),
+    ...(line.combo?{combo:Object.freeze({
+      comboId:line.combo.comboId,
+      comboName:line.combo.comboName,
+      publishedBasePriceMinor:line.combo.publishedBasePriceMinor,
+      selections:Object.freeze(line.combo.selections.map(selection=>Object.freeze({...selection}))),
+    })}:{}),
     ...(Number.isSafeInteger(Number(line.publishedUnitPriceMinor))&&Number(line.publishedUnitPriceMinor)>=0
       ?{publishedUnitPriceMinor:Number(line.publishedUnitPriceMinor)}
       :{}),
