@@ -324,3 +324,11 @@ body{
 @media(max-width:390px){
   .action-facts-grid,.action-detail-grid{grid-template-columns:1fr}
 }
+
+.tool-card[data-icon-state="AI_ASSET_PENDING"]{
+  grid-template-columns:1fr;
+  min-height:102px;
+}
+.tool-card[data-icon-state="AI_ASSET_PENDING"] strong{color:var(--mf-navy)}
+.tool-card[data-icon-state="AI_ASSET_PENDING"] small{color:var(--mf-muted)}
+.tool-card[data-icon-state="AI_ASSET_PENDING"] em{color:var(--mf-purple)}
