@@ -21,6 +21,8 @@ import {RuntimeReadyActivation} from './runtime/RuntimeReadyActivation.tsx';
 import {StaffAuthGate,StaffSessionBadge} from './presentation/StaffAuthGate.tsx';
 import {CashOpeningGate} from './presentation/CashOpeningGate.tsx';
 import {ComboWorkspace,HoldCartWorkspace,HoldListWorkspace,OrganizeWorkspace,ProductConfigWorkspace,RequiredFastLaneWorkspace,applyRequiredSelectionToCart,initialHoldModeForLines,isDrinkSupplementProductId,projectDrinkSupplementChoices,quickConfigurationForProduct,requiredTasksForCart,type OrderingPanelState,type WorkspaceHoldDraft,type WorkspaceProduct} from './features/ordering/OrderingCenterWorkspaces.tsx';
+import {RiceballPairingWorkspace} from './features/ordering/RiceballPairingWorkspace.tsx';
+import {applyRiceballPairings,buildRiceballPairingDraft,existingPairingGroups,isPairedComboLine,nextPairingStartIndex,restorePairingGroup} from './features/ordering/riceball-pairing-model.ts';
 
 type Product={
   id:string;
@@ -211,6 +213,16 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
   const quickConfigurationById=new Map(workspaceProducts.map(product=>[product.id,quickConfigurationForProduct(product)] as const));
   const requiredWork=requiredTasksForCart(cart,workspaceProducts);
   const drinkSupplementChoices=projectDrinkSupplementChoices(workspaceProducts,comboData.pools);
+  const pairingBlockedLineIds=new Set(requiredWork.map(task=>task.lineId));
+  const riceballPairingExisting=existingPairingGroups(cart);
+  const riceballPairingDraft=buildRiceballPairingDraft(
+    cart,
+    workspaceProducts,
+    comboData.combos,
+    comboData.pools,
+    pairingBlockedLineIds,
+    nextPairingStartIndex(cart),
+  );
   const diningTableDefinitions=storeSettings.diningTables.length
     ?storeSettings.diningTables
     :Array.from({length:9},(_,index)=>({
@@ -276,7 +288,7 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
       subtotalLabel:money(total),packagingLabel:'$0.00',discountLabel:'$0.00',totalLabel:money(total),checkoutEnabled:cart.length>0&&requiredWork.length===0&&((serviceMode==='takeaway'&&storeSettings.takeawayEnabled)||(serviceMode==='dine-in'&&storeSettings.dineInEnabled)),
     },
     workItems:[
-      {id:'riceball-pool',label:'飯團待組區',count:0},
+      {id:'riceball-pool',label:'飯團待組區',count:riceballPairingDraft.slots.length+riceballPairingExisting.length},
       {id:'required',label:'必選／補選',count:requiredWork.length},
       {id:'combo',label:'紫米套餐區',count:comboData.combos.length},
     ],
@@ -341,6 +353,7 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
     targetLineId?:string,
     configurationDetail='',
     configurationAdjustmentMinor=0,
+    returnPanel:'required'|'riceball-pair'='required',
   )=>{
     const choice=drinkSupplementChoices.find(row=>row.id===choiceId);
     if(!choice||!choice.enabled)return;
@@ -363,17 +376,40 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
     setCart([...cart,line]);
     setHighlight(line.id);
     setPulse(value=>value+1);
-    setPanel({type:'required'});
+    setPanel(returnPanel==='riceball-pair'?{type:'riceball-pair'}:{type:'required'});
   };
 
-  const configureDrinkSupplement=(choiceId:string,qty:number,targetLineId?:string)=>{
+  const configureDrinkSupplement=(choiceId:string,qty:number,targetLineId?:string,returnPanel:'required'|'riceball-pair'='required')=>{
     const choice=drinkSupplementChoices.find(row=>row.id===choiceId);
     if(!choice?.enabled)return;
     if(!choice.requiresConfiguration||!choice.productId){
-      addDrinkSupplement(choiceId,qty,targetLineId);
+      addDrinkSupplement(choiceId,qty,targetLineId,'',0,returnPanel);
       return;
     }
-    setPanel({type:'drink-config',choiceId,qty:Math.max(1,Math.floor(qty||1)),...(targetLineId?{targetLineId}:{})});
+    setPanel({type:'drink-config',choiceId,qty:Math.max(1,Math.floor(qty||1)),...(targetLineId?{targetLineId}:{}),returnTo:returnPanel});
+  };
+
+  const applyPairingAssignments=(assignments:Readonly<Record<string,string|undefined>>)=>{
+    const applied=applyRiceballPairings(
+      cart,
+      workspaceProducts,
+      comboData.combos,
+      comboData.pools,
+      riceballPairingDraft,
+      assignments,
+      nextLocalCartLineId,
+    );
+    if(!applied.groups.length)return;
+    setCart(applied.lines);
+    setHighlight(applied.lines[applied.lines.length-1]?.id);
+    setPulse(value=>value+1);
+    setPanel({type:'riceball-pair'});
+  };
+
+  const restorePairing=(label:string)=>{
+    setCart(restorePairingGroup(cart,workspaceProducts,label));
+    setPulse(value=>value+1);
+    setPanel({type:'riceball-pair'});
   };
 
   const addCombo=(comboId:string,comboName:string,detail:string,unitMinor:number)=>{
@@ -392,6 +428,7 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
   const panelTitle=panel?.type==='product'?'商品選項'
     :panel?.type==='required'?'必選／補選'
     :panel?.type==='drink-config'?'飲品設定'
+    :panel?.type==='riceball-pair'?'飯團待組區'
     :panel?.type==='organize'?'整理工作台'
     :panel?.type==='combo'?'紫米套餐區'
     :panel?.type==='hold'?'暫存工作台'
@@ -414,8 +451,21 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
         product={product}
         initial={{qty:panel.qty}}
         pricingBaseMinor={choice.adjustmentMinor}
-        onAdd={(detail,delta,qty)=>addDrinkSupplement(choice.id,qty,panel.targetLineId,detail,delta)}
+        onAdd={(detail,delta,qty)=>addDrinkSupplement(choice.id,qty,panel.targetLineId,detail,delta,panel.returnTo??'required')}
       />:null})()
+    :panel?.type==='riceball-pair'
+      ?<RiceballPairingWorkspace
+        cart={cart}
+        products={workspaceProducts}
+        combos={comboData.combos}
+        pools={comboData.pools}
+        blockedLineIds={pairingBlockedLineIds}
+        onApply={applyPairingAssignments}
+        onRestore={restorePairing}
+        drinkChoices={drinkSupplementChoices}
+        onAddDrink={(choiceId,qty,targetLineId)=>addDrinkSupplement(choiceId,qty,targetLineId,'',0,'riceball-pair')}
+        onConfigureDrink={(choiceId,qty,targetLineId)=>configureDrinkSupplement(choiceId,qty,targetLineId,'riceball-pair')}
+      />
     :panel?.type==='organize'
       ?<OrganizeWorkspace lines={cart} onDone={()=>setPanel(null)}/>
       :panel?.type==='combo'
@@ -477,14 +527,21 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
     onChangeCartView:mode=>{setViewMode(mode);if(mode==='organized')setPanel({type:'organize'});},
     onToggleCombine:()=>setCombineSimilar(value=>!value),
     onChangeLineServiceMode:(lineId,mode)=>{
+      const line=cart.find(item=>item.id===lineId);
+      if(line&&isPairedComboLine(line)){setPanel({type:'riceball-pair'});return;}
       if(mode==='takeaway'&&!storeSettings.takeawayEnabled)return;
       if(mode==='dine-in'&&!storeSettings.dineInEnabled)return;
       setCart(cart.map(item=>item.id===lineId?{...item,serviceMode:mode}:item));
     },
-    onAdjustLineQuantity:(lineId,delta)=>setCart(cart.map(item=>item.id===lineId?{...item,qty:item.qty+delta}:item).filter(item=>item.qty>0)),
+    onAdjustLineQuantity:(lineId,delta)=>{
+      const line=cart.find(item=>item.id===lineId);
+      if(line&&isPairedComboLine(line)){setPanel({type:'riceball-pair'});return;}
+      setCart(cart.map(item=>item.id===lineId?{...item,qty:item.qty+delta}:item).filter(item=>item.qty>0));
+    },
     onEditCartLine:lineId=>{
       const line=cart.find(item=>item.id===lineId);
       if(!line)return;
+      if(isPairedComboLine(line)){setPanel({type:'riceball-pair'});return;}
       if(isDrinkSupplementProductId(line.productId)){setPanel({type:'required'});return;}
       if(comboData.combos.some(combo=>combo.id===line.productId))setPanel({type:'combo'});
       else setPanel({type:'product',productId:line.productId,lineId:line.id});
@@ -492,7 +549,8 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
     onHoldCart:()=>cart.length?setPanel({type:'hold'}):setPanel({type:'holds'}),
     onCancelCart:()=>setCart([]),
     onOpenWorkItem:id=>{
-      if(id==='required')setPanel({type:'required'});
+      if(id==='riceball-pool')setPanel({type:'riceball-pair'});
+      else if(id==='required')setPanel({type:'required'});
       else if(id==='combo')setPanel({type:'combo'});
       else setPanel({type:'organize'});
     },

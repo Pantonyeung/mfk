@@ -33,6 +33,11 @@ describe('SMT A2b-1 independent add identity',()=>{
   });
 
   it('keeps quantity plus/minus as an operation on the selected source line',()=>{
-    expect(app).toContain("onAdjustLineQuantity:(lineId,delta)=>setCart(cart.map(item=>item.id===lineId?{...item,qty:item.qty+delta}:item).filter(item=>item.qty>0))");
+    const start=app.indexOf('    onAdjustLineQuantity:(lineId,delta)=>');
+    const end=app.indexOf('    onEditCartLine:',start);
+    const quantity=app.slice(start,end);
+    expect(quantity).toContain("item.id===lineId?{...item,qty:item.qty+delta}:item");
+    expect(quantity).toContain(".filter(item=>item.qty>0)");
+    expect(quantity).toContain("isPairedComboLine(line)");
   });
 });
