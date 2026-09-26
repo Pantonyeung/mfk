@@ -111,3 +111,26 @@ test('Stage 2 uses the new mobile visual system, not the old menu layout toggle'
   assert.ok(!menu.includes('格狀'));
   assert.ok(!menu.includes('列表'));
 });
+
+
+function cssRule(selector){
+  const start=css.indexOf(selector);
+  if(start<0)return '';
+  const open=css.indexOf('{',start);
+  const close=css.indexOf('}',open);
+  return open>=0&&close>open?css.slice(open+1,close):'';
+}
+
+test('all high-frequency Stage 2 controls have at least 44px touch targets',()=>{
+  const category=cssRule('.stage2-category-rail button,.stage2-filter-strip button');
+  const filter=cssRule('.stage2-filter-strip button');
+  const favorite=cssRule('.stage2-favorite');
+  const repair=cssRule('.stage2-repair-categories button');
+
+  assert.ok(category.includes('min-height:44px'),category);
+  assert.ok(filter.includes('min-height:44px'),filter);
+  assert.ok(favorite.includes('width:44px'),favorite);
+  assert.ok(favorite.includes('height:44px'),favorite);
+  assert.ok(favorite.includes('min-height:44px'),favorite);
+  assert.ok(repair.includes('min-height:44px'),repair);
+});
