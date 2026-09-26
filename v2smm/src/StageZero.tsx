@@ -26,7 +26,9 @@ function uiAcceptanceBypass(){
   if(typeof window==='undefined')return false;
   const query=new URLSearchParams(window.location.search);
   const host=window.location.hostname.toLowerCase();
-  return query.get('ui-bypass')==='1'||host.startsWith('smm-acceptance-')||host==='localhost'||host==='127.0.0.1';
+  const isLocal=host==='localhost'||host==='127.0.0.1';
+  const isAcceptance=host.startsWith('smm-acceptance-')&&host.endsWith('.yeungyi88.workers.dev');
+  return isAcceptance||(isLocal&&query.get('ui-bypass')==='1');
 }
 
 type ProbeState='CHECKING'|'READY'|'ERROR';
