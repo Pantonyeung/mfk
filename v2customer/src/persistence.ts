@@ -56,7 +56,6 @@ export function readCustomerLocalWorkspace():CustomerLocalWorkspace{
         phone:typeof checkout.phone==='string'?checkout.phone:'',
         paymentMethod:checkout.paymentMethod==='ELECTRONIC'?'ELECTRONIC':'PAY_AT_STORE',
         ...(checkout.paymentMethod==='ELECTRONIC'&&/^[A-Z0-9][A-Z0-9_-]{1,39}$/.test(String(checkout.paymentChannelId||'').toUpperCase())?{paymentChannelId:String(checkout.paymentChannelId).toUpperCase(),paymentChannelLabel:typeof checkout.paymentChannelLabel==='string'?checkout.paymentChannelLabel.slice(0,120):''}:{}),
-        ...(checkout.paymentEvidence&&typeof checkout.paymentEvidence==='object'?{paymentEvidence:checkout.paymentEvidence as CustomerCheckoutDraft['paymentEvidence']}:{}),
       }),
       pendingIntents:Object.freeze([...safeArray<CustomerPendingIntent>(parsed.pendingIntents)]),
       preferences:Object.freeze({
@@ -71,11 +70,12 @@ export function readCustomerLocalWorkspace():CustomerLocalWorkspace{
 }
 
 export function writeCustomerLocalWorkspace(workspace:Omit<CustomerLocalWorkspace,'schemaVersion'|'storageKind'|'updatedAt'>):CustomerLocalWorkspace{
+  const {paymentEvidence:_paymentEvidence,...persistedCheckout}=workspace.checkout;
   const next:CustomerLocalWorkspace=Object.freeze({
     schemaVersion:1,
     storageKind:'LOCAL_NON_AUTHORITATIVE',
     cart:Object.freeze([...workspace.cart]),
-    checkout:Object.freeze({...workspace.checkout}),
+    checkout:Object.freeze({...persistedCheckout}),
     pendingIntents:Object.freeze([...workspace.pendingIntents]),
     preferences:Object.freeze({...workspace.preferences}),
     updatedAt:new Date().toISOString(),
