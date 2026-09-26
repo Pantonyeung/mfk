@@ -118,6 +118,7 @@ describe('SMT B2a same-day item-linked refund',()=>{
       items:[{id:'cash-line',name:'飯團',qty:1,unitMinor:5000,serviceMode:'takeaway'}],
       totalMinor:5000,paymentLabel:'CASH',sourceLabel:'現場',
     });
+    vi.setSystemTime(new Date('2026-09-26T10:00:00.001Z'));
     const fps=localRuntime.createOrder({
       items:[{id:'fps-line',name:'便當',qty:1,unitMinor:4000,serviceMode:'takeaway'}],
       totalMinor:4000,paymentLabel:'FPS',sourceLabel:'現場',
