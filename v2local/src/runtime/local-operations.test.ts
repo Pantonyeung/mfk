@@ -197,7 +197,7 @@ describe('MFK local operations fusion',()=>{
     expect(report.grossSalesMinor).toBe(0);
     expect(report.cashSalesMinor).toBe(0);
     expect(report.itemUnits).toBe(0);
-    expect(report.topProducts[0]).toEqual({name:'飯團',quantity:0,salesMinor:0});
+    expect(report.topProducts).toEqual([]);
   });
 
   it('backup validates and restores only MFK keys',()=>{
