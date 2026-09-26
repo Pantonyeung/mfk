@@ -29,6 +29,23 @@ export type OrderingPanelState=
 
 const money=(minor:number)=>(minor<0?'-':'')+String.fromCharCode(36)+(Math.abs(minor)/100).toFixed(2);
 
+export function quickConfigurationForProduct(product:WorkspaceProduct){
+  const sets=product.optionSets??[];
+  if(sets.some(set=>set.required||set.forceShow))return Object.freeze({eligible:false,detail:'',deltaMinor:0});
+  const chosen=sets.map(set=>({
+    set,
+    options:set.options.filter(option=>option.defaultSelected),
+  }));
+  const invalid=chosen.some(({set,options})=>options.length<set.min||options.length>set.max);
+  if(invalid)return Object.freeze({eligible:false,detail:'',deltaMinor:0});
+  const deltaMinor=chosen.reduce((sum,row)=>sum+row.options.reduce((value,option)=>value+option.priceAdjustmentMinor,0),0);
+  const detail=chosen.flatMap(({set,options})=>{
+    const names=options.map(option=>option.name);
+    return names.length?[set.name+'：'+names.join('、')]:[];
+  }).join(' · ');
+  return Object.freeze({eligible:true,detail,deltaMinor});
+}
+
 export function productEditorInitialFromDetail(product:WorkspaceProduct,detail?:string){
   const sets=product.optionSets??[];
   const selected:Record<string,string[]>=Object.fromEntries(
