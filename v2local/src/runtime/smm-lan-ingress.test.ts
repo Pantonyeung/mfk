@@ -131,6 +131,34 @@ describe('SMM LAN ingress',()=>{
     expect(createOrder).not.toHaveBeenCalled();
   });
 
+  it('triggers only the delta-print path when SMM adds items to an existing Dining Formal Order',()=>{
+    const createOrder=vi.fn();
+    const ensureDiningInitialPrint=vi.fn();
+    const ensureDiningAdditionPrint=vi.fn(()=>Promise.resolve({
+      orderId:'ORDER-DINE',additionId:'ADD-1',submissionId:'SMM:S5A',state:'DONE',planned:2,sent:2,failed:0,
+    }));
+    const upsertSmmDiningHold=vi.fn(()=>({
+      id:'HOLD-DINE',
+      formalOrderId:'ORDER-DINE',
+      providerRef:'SMM:ORIGINAL',
+      additions:[{id:'ADD-1',submissionId:'SMM:S5A'}],
+    }));
+    const ingress=createSmmLanIngress({
+      createOrder,orders:()=>[],holds:()=>[],upsertSmmDiningHold,ensureDiningInitialPrint,ensureDiningAdditionPrint,
+    } as any);
+    const result=ingress.submit({
+      protocolVersion:1,type:'smm.lan.order.submit.v1',requestId:'R5A',submissionId:'S5A',idempotencyKey:'I5A',storeId:'MF01',
+      menuRevision:'7',publishedTotalMinor:1500,serviceMode:'DINE_IN',tender:'FPS',
+      diningTarget:{kind:'TABLE',tableId:'T03',covers:2},
+      lines:[{lineId:'L1',productId:'tea',productName:'台式奶茶',quantity:1,publishedUnitPriceMinor:1500,selections:[]}],
+    },{deviceId:'SMM-1',trusted:true});
+    expect(result.disposition).toBe('ACCEPTED');
+    expect(result.disposition==='ACCEPTED'&&result.orderId).toBe('ORDER-DINE');
+    expect(ensureDiningAdditionPrint).toHaveBeenCalledWith('HOLD-DINE','ADD-1');
+    expect(ensureDiningInitialPrint).not.toHaveBeenCalled();
+    expect(createOrder).not.toHaveBeenCalled();
+  });
+
   it('projects canonical SMT orders and dining holds into the SMM shared read model',()=>{
     const createdAt='2026-09-25T13:30:00.000Z';
     const ingress=createSmmLanIngress({
