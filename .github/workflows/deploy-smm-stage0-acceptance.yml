@@ -6,9 +6,11 @@ on:
       - deploy/SMM-STAGE0-ACCEPTANCE-AAD53D5
     paths:
       - 'v2smm/SMM_STAGE0_ACCEPTANCE_DEPLOY_REQUEST'
+      - '.github/workflows/deploy-smm-stage0-acceptance.yml'
+      - 'v2smm/wrangler.acceptance.jsonc'
 
 jobs:
-  deploy:
+  preview:
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -24,8 +26,10 @@ jobs:
         run: npm test
       - name: Build
         run: npm run build
-      - name: Deploy SMM Stage 0 acceptance
-        run: npx --yes wrangler@latest deploy --config wrangler.acceptance.jsonc
+      - name: Upload SMM Stage 0 preview
+        run: npx --yes wrangler@latest versions upload --config wrangler.acceptance.jsonc --preview-alias smm-acceptance
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      - name: Verify preview
+        run: curl --retry 5 --retry-delay 2 --fail --silent --show-error --head https://smm-acceptance-mfk-admin.yeungyi88.workers.dev
