@@ -361,7 +361,9 @@ export function RuntimeDiningWorkspace({runtime,onCheckout,onAddOrder}:{runtime:
             }
           }}>{transferHoldId===detail.holdId?'取消轉枱':'轉枱'}</button>
           <button type="button" className="add-order" disabled={!detail.formalOrderId} onClick={goAddOrder}>＋ 加單</button>
-          <button type="button" className="cancel-order" disabled={!detail.formalOrderId||detail.paidMinor>0} title={detail.paidMinor>0?'已有付款；要先接正式退款／取消流程，避免錯誤改 Money truth':''} onClick={()=>void cancelUnpaidDining()}>{detail.paidMinor>0?'已有付款':'取消堂食單'}</button>
+          {detail.paidMinor>0&&detail.formalOrderId
+            ?<button type="button" className="formal-order" onClick={()=>navigate('/orders?orderId='+encodeURIComponent(detail.formalOrderId!))}>正式訂單處理</button>
+            :<button type="button" className="cancel-order" disabled={!detail.formalOrderId} onClick={()=>void cancelUnpaidDining()}>取消堂食單</button>}
           <button type="button" className="clear" disabled={detail.remainingMinor>0} onClick={()=>void clearTable()}>清枱</button>
         </footer>
       </>:<div className="dining-detail-empty">
