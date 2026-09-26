@@ -1,4 +1,5 @@
 name: mfk-smt-a3c-optional-drink-proof
+# rerun after A3b presentation-contract compatibility update
 on:
   pull_request:
     branches: [main]
