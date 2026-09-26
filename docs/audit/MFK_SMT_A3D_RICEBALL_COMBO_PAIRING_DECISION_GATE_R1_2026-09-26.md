@@ -163,3 +163,39 @@ Status:
 A3D_PAIRING_UI_SEMANTICS_LOCKED
 A3D_MONEY_SEMANTIC_STILL_REQUIRED
 NO_A3D_PRODUCT_MUTATION
+
+
+## Owner final decision｜M1 Combo pricing｜2026-09-26
+
+Owner selected M1.
+
+### Pricing authority
+- Pairing slot A/B/C... is only the visible pairing position.
+- Meal tier comes from the riceball/main Product ID's Admin Main Pool membership.
+- A-tier riceball uses A meal base.
+- B-tier riceball uses B meal base.
+- C-tier riceball uses C meal base.
+- D-tier riceball uses D meal base.
+- Snack surcharge comes from the snack actually paired to that riceball:
+  - free band +$0
+  - +$3 band +$3
+  - +$5 band +$5
+  - future values follow Admin published truth.
+- Swapping snacks moves the surcharge with the snack immediately.
+- Drink is separate and remains under A3c optional semantics.
+
+### Identity / print guard
+The implementation must preserve the underlying riceball and snack Product IDs so production rules, labels and printer routing keep seeing the actual products.
+
+Therefore A3d should not flatten a pair into one opaque Combo product if doing so would erase the source Product IDs.
+
+### Final price shape
+For each paired meal:
+`Admin meal-tier base determined by riceball + actual snack adjustment + preserved product-option adjustments`
+
+Drink supplement remains separate.
+
+Status:
+A3D_PAIRING_SEMANTICS_LOCKED
+A3D_M1_COMBO_PRICING_LOCKED
+IMPLEMENTATION_AUTHORIZED
