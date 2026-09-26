@@ -122,6 +122,7 @@ test('Stage01 Today implements live orders and dine-in outstanding without fake 
   const vm=fs.readFileSync(path.join(srcRoot,'today-view-model.ts'),'utf8');
   const components=fs.readFileSync(path.join(srcRoot,'today-components.tsx'),'utf8');
   const mapping=fs.readFileSync(path.join(srcRoot,'stage01-api-mapping.ts'),'utf8');
+  const orderVm=fs.readFileSync(path.join(srcRoot,'stage03-view-model.ts'),'utf8');
 
   assert.match(app,/TodayLiveOrdersCard/);
   assert.match(app,/DineInOpenChecksCard/);
@@ -168,8 +169,8 @@ test('Stage01 commander corrections satisfy OA-TOD-001 acceptance contract',()=>
 
   // 3 Dine-in CTA always opens dine-in + open-payment scope.
   assert.match(app,/openOrdersScope\('DINE_IN_OPEN'\)/);
-  assert.match(app,/fulfillmentMode==='DINE_IN'/);
-  assert.match(app,/paymentState==='OPEN'.*paymentState==='PARTIAL'/);
+  assert.match(orderVm,/fulfillmentMode==='DINE_IN'/);
+  assert.match(orderVm,/paymentState==='OPEN'.*paymentState==='PARTIAL'/);
 
   // 4 Open Check renders Total / Paid / Outstanding + payment state.
   assert.match(components,/currentOrderTotalLabel/);
