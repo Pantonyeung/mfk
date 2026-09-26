@@ -581,7 +581,7 @@ function diningPaymentLabel(payments:readonly LocalDiningPayment[]){
 function syncDiningFormalOrder(order:StoredOrder,hold:LocalHoldDraft,at:string):StoredOrder{
   const payments=Array.isArray(hold.payments)?hold.payments:[];
   const confirmedPaidMinor=payments.reduce((sum,payment)=>sum+Math.max(0,Number(payment.amountMinor)||0),0);
-  return {
+  const next:StoredOrder={
     ...order,
     diningHoldId:hold.id,
     totalMinor:hold.totalMinor,
@@ -590,8 +590,8 @@ function syncDiningFormalOrder(order:StoredOrder,hold:LocalHoldDraft,at:string):
     paymentEntries:payments.map(payment=>({...payment,selections:payment.selections.map(selection=>({...selection}))})),
     paymentLabel:diningPaymentLabel(payments),
     items:hold.items.map(item=>({...item,serviceMode:'dine-in' as const})),
-    updatedAt:at,
   };
+  return JSON.stringify(next)===JSON.stringify(order)?order:{...next,updatedAt:at};
 }
 function ensureDiningFormalOrder(snapshot:Persisted,hold:LocalHoldDraft,at:string){
   const byId=hold.formalOrderId?snapshot.orders.find(order=>order.id===hold.formalOrderId):undefined;
