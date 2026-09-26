@@ -79,7 +79,11 @@ export function CapacityWorkspace(){
   const products=draft.products.filter(product=>product.active);
   const savePools=(next:readonly CapacityPoolDefinitionV1[])=>setConfig({...config,pools:next});
   const updatePool=(id:string,patch:Partial<CapacityPoolDefinitionV1>)=>{
-    savePools(pools.map(pool=>pool.id===id?normalizeCapacityPool({...pool,...patch}):pool));
+    savePools(pools.map(pool=>{
+      if(pool.id!==id)return pool;
+      const next=normalizeCapacityPool({...pool,...patch});
+      return next.active&&!capacityPoolCanActivate(next)?normalizeCapacityPool({...next,active:false}):next;
+    }));
   };
   const addPool=()=>{
     const id=nextCapacityPoolId(pools);
