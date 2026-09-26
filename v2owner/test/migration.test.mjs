@@ -482,3 +482,122 @@ test('Stage02 selected drawer follows fresh canonical row state after readback',
   assert.match(components,/vm\.rows\.find\(row=>row\.action\.actionId===selectedActionId\)/);
   assert.doesNotMatch(components,/useState<OwnerActionQueueRowViewModel\|null>/);
 });
+
+
+test('Stage03 Order Oversight replaces legacy order page with read-only OA-ORD-001',()=>{
+  const app=fs.readFileSync(path.join(srcRoot,'App.tsx'),'utf8');
+  const components=fs.readFileSync(path.join(srcRoot,'stage03-order-oversight.tsx'),'utf8');
+  const mapping=fs.readFileSync(path.join(srcRoot,'stage03-api-mapping.ts'),'utf8');
+
+  assert.match(app,/OrderOversightPage/);
+  assert.doesNotMatch(app,/function OrdersPage\(/);
+  assert.doesNotMatch(app,/function OrderDrawer\(/);
+  assert.match(mapping,/OA-ORD-001/);
+  assert.match(mapping,/READ_OVERSIGHT_FIRST/);
+
+  for(const forbidden of['CREATE_ORDER','EDIT_ORDER','CANCEL_ORDER','REFUND','TENDER_CORRECTION']){
+    assert.match(mapping,new RegExp(forbidden));
+  }
+  assert.doesNotMatch(components,/>取消訂單<|>退款<|>修改付款<|>Tender Correction</);
+});
+
+test('Stage03 list search and filters use explicit order projection fields',()=>{
+  const vm=fs.readFileSync(path.join(srcRoot,'stage03-view-model.ts'),'utf8');
+  const components=fs.readFileSync(path.join(srcRoot,'stage03-order-oversight.tsx'),'utf8');
+
+  for(const field of['displayCode','customerName','customerPhone','externalRef']){
+    assert.match(vm,new RegExp('order\\.'+field));
+  }
+  for(const field of['businessDate','source','paymentState','fulfillmentMode']){
+    assert.match(vm,new RegExp(field));
+  }
+  assert.match(components,/Display Number／客戶／電話／外部編號/);
+  assert.match(components,/Business Day/);
+  assert.match(components,/來源/);
+  assert.match(components,/付款/);
+  assert.match(components,/交收/);
+});
+
+test('Stage03 preserves Today active and dine-in open scopes',()=>{
+  const app=fs.readFileSync(path.join(srcRoot,'App.tsx'),'utf8');
+  const vm=fs.readFileSync(path.join(srcRoot,'stage03-view-model.ts'),'utf8');
+  const components=fs.readFileSync(path.join(srcRoot,'stage03-order-oversight.tsx'),'utf8');
+
+  assert.match(app,/openOrdersScope\('ACTIVE'\)/);
+  assert.match(app,/openOrdersScope\('DINE_IN_OPEN'\)/);
+  assert.match(app,/scope=\{ordersScope\}/);
+  assert.match(vm,/scope==='ACTIVE'/);
+  assert.match(vm,/scope==='DINE_IN_OPEN'/);
+  assert.match(vm,/order\.fulfillmentMode==='DINE_IN'/);
+  assert.match(vm,/order\.paymentState==='OPEN'.*order\.paymentState==='PARTIAL'/);
+  assert.match(components,/由今日頁進入 active order scope/);
+  assert.match(components,/由今日頁進入 dine-in \+ open-payment scope/);
+});
+
+test('Stage03 order card renders required oversight summary without raw order identity',()=>{
+  const components=fs.readFileSync(path.join(srcRoot,'stage03-order-oversight.tsx'),'utf8');
+  const types=fs.readFileSync(path.join(srcRoot,'product-types.ts'),'utf8');
+
+  for(const field of[
+    'displayCode','source','workflowStatusLabel','elapsedLabel','promisedTimeLabel',
+    'currentEffectiveAmountLabel','currentTenderLabel','fulfillmentLabel','exceptionBadges'
+  ]){
+    assert.match(types,new RegExp(field));
+    assert.match(components,new RegExp(field));
+  }
+
+  assert.doesNotMatch(components,/<(?:span|strong|small|p|h\d)[^>]*>\{order\.orderId\}/);
+  assert.doesNotMatch(components,/order\.exceptions\.map|order\.timeline\.map|order\.prints\.map/);
+});
+
+test('Stage03 order detail has seven safe sections and no raw engineering payload fallback',()=>{
+  const components=fs.readFileSync(path.join(srcRoot,'stage03-order-oversight.tsx'),'utf8');
+
+  for(const section of[
+    '1｜Identity',
+    '2｜Items / Option / Modifier / Remark',
+    '3｜Money',
+    '4｜Fulfillment',
+    '5｜External',
+    '6｜Side-effects',
+    '7｜Timeline / Audit',
+  ])assert.match(components,new RegExp(section.replace(/[|/]/g,'\\$&')));
+
+  for(const label of['Original','Adjustments','Current Effective','Current Tender','Receipt','Production','Packing','Label']){
+    assert.match(components,new RegExp(label));
+  }
+
+  assert.match(components,/auditTrail/);
+  assert.match(components,/唔會直接顯示 raw engineering timeline/);
+  assert.doesNotMatch(components,/order\.timeline\.map|order\.prints\.map|order\.exceptions\.map/);
+});
+
+test('Stage03 visual and touch contract remains in approved Owner language',()=>{
+  const css=fs.readFileSync(path.join(srcRoot,'styles.css'),'utf8');
+  const components=fs.readFileSync(path.join(srcRoot,'stage03-order-oversight.tsx'),'utf8');
+
+  assert.match(css,/\.order-scope-banner button\{[\s\S]*min-height:44px/);
+  assert.match(css,/\.order-segmented button\{min-height:44px\}/);
+  assert.match(css,/\.order-search input\{min-height:44px\}/);
+  assert.match(css,/\.order-filter select\{[\s\S]*min-height:44px/);
+  assert.match(css,/var\(--mf-navy\)/);
+  assert.match(css,/var\(--mf-surface\)/);
+
+  for(const width of[360,375,390,430,520]){
+    assert.match(css,new RegExp('@media\\(max-width:'+width+'px\\)'));
+  }
+
+  assert.doesNotMatch(components,/productImage|product-photo|stock-photo|mascot|blue-haired|purple-haired/i);
+});
+
+test('Stage03 creates no new transaction or command authority',()=>{
+  const app=fs.readFileSync(path.join(srcRoot,'App.tsx'),'utf8');
+  const components=fs.readFileSync(path.join(srcRoot,'stage03-order-oversight.tsx'),'utf8');
+  const mapping=fs.readFileSync(path.join(srcRoot,'stage03-api-mapping.ts'),'utf8');
+  const combined=components+'\n'+mapping;
+
+  assert.doesNotMatch(components,/requestBoundedAction|requestAdminDeepLink|fetch\(|WebSocket|XMLHttpRequest/);
+  assert.match(mapping,/No second Order \/ Pricing \/ Payment \/ Print \/ Auth \/ Sync authority/);
+  assert.match(app,/OrderOversightPage/);
+  assert.doesNotMatch(combined,/createFormalOrder|allocateDisplayNumber|cashDrawer|physicalPrinter/);
+});
