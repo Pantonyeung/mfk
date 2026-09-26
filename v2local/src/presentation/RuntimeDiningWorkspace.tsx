@@ -321,9 +321,11 @@ export function RuntimeDiningWorkspace({runtime,onCheckout,onAddOrder}:{runtime:
           <span>{detail.partySize} 位</span>
         </header>
         <div className="dining-detail-timer">
-          <span>用餐時間</span>
-          <b>{tableElapsed(detail.createdAt)} 分鐘</b>
-          <small>{tableElapsed(detail.createdAt)>=diningOverdueMinutes?'已超時 '+(tableElapsed(detail.createdAt)-diningOverdueMinutes)+' 分鐘':'距離 '+diningOverdueMinutes+' 分鐘仲有 '+(diningOverdueMinutes-tableElapsed(detail.createdAt))+' 分鐘'}</small>
+          <span>{detail.assignedTable?'用餐時間':'輪候時間'}</span>
+          <b>{tableElapsed(detail.assignedTable?(detail.seatedAt??detail.createdAt):detail.createdAt)} 分鐘</b>
+          {detail.assignedTable
+            ?<small>{tableElapsed(detail.seatedAt??detail.createdAt)>=diningOverdueMinutes?'已超時 '+(tableElapsed(detail.seatedAt??detail.createdAt)-diningOverdueMinutes)+' 分鐘':'距離 '+diningOverdueMinutes+' 分鐘仲有 '+(diningOverdueMinutes-tableElapsed(detail.seatedAt??detail.createdAt))+' 分鐘'}</small>
+            :<small>由輪候建立時間計；未入座唔會計堂食超時。</small>}
         </div>
 
         <section className="dining-detail-lines">

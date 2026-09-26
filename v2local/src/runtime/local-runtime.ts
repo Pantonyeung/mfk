@@ -166,6 +166,7 @@ export interface LocalDiningHoldDetail{
   readonly archivedAt?:string;
   readonly cancelledAt?:string;
   readonly lastAssignedTable?:string;
+  readonly seatedAt?:string;
   readonly formalOrderId?:string;
   readonly formalOrderDisplay?:string;
   readonly holdId:string;
@@ -185,6 +186,7 @@ export interface LocalHoldDraft{
   readonly archivedAt?:string;
   readonly cancelledAt?:string;
   readonly lastAssignedTable?:string;
+  readonly seatedAt?:string;
   readonly formalOrderId?:string;
   readonly formalOrderDisplay?:string;
   readonly id:string;
@@ -1111,6 +1113,7 @@ function diningDetail(hold:LocalHoldDraft):LocalDiningHoldDetail{
     ...(hold.archivedAt?{archivedAt:hold.archivedAt}:{}),
     ...(hold.cancelledAt?{cancelledAt:hold.cancelledAt}:{}),
     ...(hold.lastAssignedTable?{lastAssignedTable:hold.lastAssignedTable}:{}),
+    ...(hold.seatedAt?{seatedAt:hold.seatedAt}:{}),
     ...(hold.formalOrderId?{formalOrderId:hold.formalOrderId}:{}),
     ...(hold.formalOrderDisplay?{formalOrderDisplay:hold.formalOrderDisplay}:{}),
     holdId:hold.id,
@@ -1240,7 +1243,7 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
     const draft:LocalHoldDraft={
       id:nextRuntimeIdentity('HOLD-'),codeLabel:'H'+String(snapshot.holds.length+1).padStart(3,'0'),kind:'dining',
       createdAt:at,partySize:covers,note:'SMM 堂食',totalMinor:Math.max(0,Math.floor(Number(input.totalMinor)||0)),
-      assignedTable:tableId,payments:[],providerRef,sourceLabel:input.sourceLabel||'SMM',smmSubmissionRefs:[providerRef],items,
+      assignedTable:tableId,seatedAt:at,payments:[],providerRef,sourceLabel:input.sourceLabel||'SMM',smmSubmissionRefs:[providerRef],items,
     };
     const ensured=ensureDiningFormalOrder(snapshot,draft,at);
     commitDiningState(snapshot,{holds:[ensured.hold,...snapshot.holds],orders:ensured.orders});
@@ -1779,7 +1782,7 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
             partySize:seated.partySize,
             outstandingLabel:seated.formalOrderDisplay??seated.codeLabel,
             holdId:seated.id,
-            startedAt:seated.createdAt,
+            startedAt:seated.seatedAt??seated.createdAt,
             itemCount:seated.items.reduce((sum,item)=>sum+item.qty,0),
             itemSummary:first,
             totalMinor:seated.totalMinor,
@@ -1841,8 +1844,11 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
     if(snapshot.holds.some(row=>row.id!==holdId&&!row.archivedAt&&row.kind==='dining'&&row.assignedTable===tableId)){
       throw new Error('DINING_TABLE_OCCUPIED');
     }
-    const seated=hold.assignedTable===tableId?hold:{...hold,assignedTable:tableId};
     const at=new Date().toISOString();
+    const seatedAt=hold.seatedAt??(hold.assignedTable?hold.createdAt:at);
+    const seated=hold.assignedTable===tableId&&hold.seatedAt
+      ?hold
+      :{...hold,assignedTable:tableId,seatedAt};
     const ensured=ensureDiningFormalOrder(snapshot,seated,at);
     if(hold.assignedTable===tableId&&!ensured.changed)return;
     commitDiningState(snapshot,{
