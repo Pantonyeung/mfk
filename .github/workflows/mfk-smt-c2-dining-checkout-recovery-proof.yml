@@ -1,0 +1,41 @@
+name: mfk-smt-c2-dining-checkout-recovery-proof
+on:
+  pull_request:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  proof:
+    if: github.head_ref == 'work/MFK/SMT-C2-DINING-CHECKOUT-RECOVERY-R1'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install SMT
+        working-directory: v2local
+        run: npm install --legacy-peer-deps --ignore-scripts --no-audit --no-fund
+      - name: SMT tests
+        working-directory: v2local
+        run: npm run test
+      - name: SMT build
+        working-directory: v2local
+        run: npm run build
+      - name: Protected seams
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -F "readDiningCheckoutUiSession()" v2local/src/App.tsx
+          grep -F "saveDiningCheckoutUiSession(request)" v2local/src/App.tsx
+          grep -F "localRuntime.readDiningHold(diningCheckout.holdId)" v2local/src/App.tsx
+          grep -F "payment.submissionId===diningCheckout.submissionId" v2local/src/App.tsx
+          grep -F "detail.checkoutRevision!==diningCheckout.expectedRevision" v2local/src/App.tsx
+          grep -F "localRuntime.settleDiningHold(" v2local/src/App.tsx
+          grep -F "DINING_CHECKOUT_UI_KEY" v2local/src/features/checkout/dining-checkout-ui-session.ts
+      - name: Diff check
+        run: git diff --check origin/main...HEAD
