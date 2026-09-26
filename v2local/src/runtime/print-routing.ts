@@ -311,6 +311,8 @@ function labelAllowed(item:PrintableOrder['items'][number],binding:PrintBinding,
   const logicalId=derivedLogicalPrinterId(binding);
   if(rule.labelPrinterIds.length>0)return Boolean(logicalId&&rule.labelPrinterIds.includes(logicalId));
   if(productMatchesBinding(productId,binding))return true;
+  const hasExplicitRoute=allLabelBindings.some(candidate=>productMatchesBinding(productId,candidate));
+  if(hasExplicitRoute)return false;
   const preferred=preferredDefaultLabelBinding(allLabelBindings);
   return Boolean(preferred&&preferred.id===binding.id);
 }
