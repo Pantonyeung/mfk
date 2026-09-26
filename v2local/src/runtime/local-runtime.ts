@@ -17,7 +17,17 @@ export interface SmtOrderListItemViewModel{readonly orderId:string;readonly orde
 export interface SmtOrderDetailLineViewModel{readonly id:string;readonly name:string;readonly quantity:number;readonly unitLabel:string;readonly lineTotalLabel:string}
 export interface SmtOrderDetailViewModel extends SmtOrderListItemViewModel{readonly attention:readonly string[];readonly metrics:readonly SmtOperationalMetric[];readonly lines:readonly SmtOrderDetailLineViewModel[];readonly paymentEvidenceRef?:string;readonly paymentVerificationState?:'PENDING'|'VERIFIED'|'REJECTED';readonly customerPhone?:string;readonly paymentCorrections?:readonly PaymentCorrectionRecord[];readonly refunds?:readonly OrderRefundRecord[];readonly cancellationNoticeState?:'DONE'|'FAILED'|'UNKNOWN'}
 export interface SmtOrdersProjection{readonly items:readonly SmtOrderListItemViewModel[];readonly detailsByOrderId?:Readonly<Record<string,SmtOrderDetailViewModel>>;readonly selectedOrderId?:string;readonly selectedOrder?:SmtOrderDetailViewModel}
-export interface SmtDiningQueueItemViewModel{readonly id:string;readonly codeLabel:string;readonly partySize:number;readonly statusLabel:string}
+export interface SmtDiningQueueItemViewModel{
+  readonly id:string;
+  readonly codeLabel:string;
+  readonly partySize:number;
+  readonly statusLabel:string;
+  readonly formalOrderId?:string;
+  readonly itemCount?:number;
+  readonly totalMinor?:number;
+  readonly paidMinor?:number;
+  readonly remainingMinor?:number;
+}
 export interface SmtDiningTableViewModel{readonly id:string;readonly areaLabel:string;readonly label:string;readonly state:'available'|'occupied'|'attention'|'settled';readonly partySize?:number;readonly outstandingLabel?:string;readonly holdId?:string;readonly startedAt?:string;readonly itemCount?:number;readonly itemSummary?:string;readonly totalMinor?:number;readonly paidMinor?:number;readonly remainingMinor?:number}
 export interface SmtDiningSessionViewModel{readonly sessionId:string;readonly tableLabels:readonly string[];readonly statusLabel:string;readonly metrics:readonly SmtOperationalMetric[]}
 export interface SmtDiningProjection{readonly businessDate:string;readonly revision:number;readonly queue:readonly SmtDiningQueueItemViewModel[];readonly tables:readonly SmtDiningTableViewModel[];readonly selectedSession?:SmtDiningSessionViewModel}
@@ -1675,12 +1685,21 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
     const activeHolds=snapshot.holds.filter(hold=>hold.kind==='dining'&&!hold.archivedAt);
     return {
       businessDate:new Date().toISOString().slice(0,10),revision:snapshot.diningRevision??0,
-      queue:activeHolds.filter(hold=>!hold.assignedTable).map(hold=>({
-        id:hold.id,
-        codeLabel:hold.formalOrderDisplay??hold.codeLabel,
-        partySize:hold.partySize,
-        statusLabel:'待安排座位',
-      })),
+      queue:activeHolds.filter(hold=>!hold.assignedTable).map(hold=>{
+        const detail=diningDetail(hold);
+        const itemCount=hold.items.reduce((sum,item)=>sum+item.qty,0);
+        return {
+          id:hold.id,
+          codeLabel:hold.formalOrderDisplay??hold.codeLabel,
+          partySize:hold.partySize,
+          statusLabel:hold.formalOrderId?'待安排座位 · 已落單':'待安排座位',
+          ...(hold.formalOrderId?{formalOrderId:hold.formalOrderId}:{}),
+          itemCount,
+          totalMinor:hold.totalMinor,
+          paidMinor:detail.paidMinor,
+          remainingMinor:detail.remainingMinor,
+        };
+      }),
       tables:(()=>{
         const registry=readSmtDiningTableRegistry();
         const active=registry.filter(table=>table.active);
