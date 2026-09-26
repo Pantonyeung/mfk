@@ -98,3 +98,32 @@ test('Stage 1 is reduced-motion safe and does not color-code status alone',()=>{
   assert.ok(home.includes('暫停正式落單'));
   assert.ok(home.includes('同步中'));
 });
+
+
+test('engineering sync error is diagnostics-only and customer UI stays human-safe',()=>{
+  const engineeringError=new Error('HTTP 500 /api/private provider=EDGE42 correlation_id=abc123');
+  assert.ok(!home.includes('{error'));
+  assert.ok(!app.includes('reason instanceof Error?reason.message'));
+  assert.ok(!app.includes('detail={error'));
+  assert.ok(app.includes("console.warn('[MFK Customer] snapshot sync failed',reason)"));
+  assert.ok(home.includes('暫時未能同步店舖資料，請稍後再試。'));
+  assert.ok(app.includes('暫時未能同步店舖資料，請稍後再試。'));
+  assert.ok(home.includes('重新同步'));
+  assert.ok(!home.includes(engineeringError.message));
+  assert.ok(!app.includes(engineeringError.message));
+});
+
+test('Stage 1 product media placeholder is truly empty neutral space',()=>{
+  assert.ok(home.includes('<span className="stage1-product-placeholder" aria-hidden="true"/>'));
+  assert.ok(!home.includes('product.name.slice(0,1)'));
+  assert.ok(!home.includes('<Stage1ProductPlaceholder product={item.product}/>'));
+  assert.ok(!css.includes('.stage1-product-placeholder>span'));
+});
+
+test('closed store has no active fallback CTA that can silently no-op',()=>{
+  assert.ok(home.includes('今日暫停正式落單'));
+  assert.ok(home.includes('繼續瀏覽菜單'));
+  assert.ok(!home.includes('備用聯絡方法'));
+  assert.ok(!home.includes('onFallback'));
+  assert.ok(!app.includes('onFallback={()=>void requestFallback()}'));
+});
