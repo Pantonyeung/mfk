@@ -82,3 +82,14 @@ test('brand photography and reproducible browser acceptance surface exist outsid
   assert.equal(fs.existsSync(path.join(testDir,'visual-acceptance.mjs')),true);
   assert.doesNotMatch(fs.readFileSync(path.join(root,'index.html'),'utf8'),/visual-acceptance/);
 });
+
+
+test('material menu changes identify exact cart lines and allow in-place price acceptance',()=>{
+  const quote=fs.readFileSync(path.join(srcRoot,'local-quote.ts'),'utf8');
+  assert.match(quote,/publishedCartRepairs/);
+  assert.match(quote,/repairPublishedCartLine/);
+  assert.match(quote,/PRICE_CHANGED/);
+  assert.match(views,/接受並更新呢項價格/);
+  assert.match(views,/直接標記受影響餐點/);
+  assert.doesNotMatch(views,/返回菜單修正/);
+});
