@@ -192,7 +192,7 @@ export function RuntimeDiningWorkspace({runtime,onCheckout,onAddOrder}:{runtime:
       submissionId:nextDiningSubmissionId(detail.holdId),
       expectedRevision:detail.checkoutRevision,
       codeLabel:detail.codeLabel,
-      tableLabel:detail.assignedTable?(view?.tables.find(table=>table.id===detail.assignedTable)?.label??detail.assignedTable):'',
+      tableLabel:detail.assignedTable?(view?.tables.find(table=>table.id===detail.assignedTable)?.label??detail.assignedTable):'輪候',
       selections,
       lines,
     });
@@ -214,8 +214,16 @@ export function RuntimeDiningWorkspace({runtime,onCheckout,onAddOrder}:{runtime:
         <button className="primary" onClick={()=>void addWait()}>確認加入</button>
       </section>:null}
       <div className="dining-wait-list">{view?.queue.map(row=><article key={row.id} className={selectedWait===row.id?'selected':''}>
-        <button type="button" onClick={()=>setSelectedWait(current=>current===row.id?null:row.id)}><strong>{row.codeLabel}</strong><span>{row.partySize} 位</span><small>{row.statusLabel}</small></button>
-        <button type="button" className="remove" onClick={()=>void remove(row.id)}>×</button>
+        <button type="button" onClick={()=>{
+          setSelectedWait(current=>current===row.id?null:row.id);
+          if(row.formalOrderId)void loadDetail(row.id);
+          else if(selectedHoldId===row.id){setSelectedHoldId(null);setDetail(null);}
+        }}>
+          <strong>{row.codeLabel}</strong>
+          <span>{row.partySize} 位</span>
+          <small>{row.statusLabel}{row.itemCount?(' · '+row.itemCount+' 件 · 未收 '+money(row.remainingMinor??0)):''}</small>
+        </button>
+        {!row.formalOrderId&&!(row.itemCount??0)?<button type="button" className="remove" onClick={()=>void remove(row.id)}>×</button>:null}
       </article>)}</div>
       <p className="dining-hint">{selectedWait?'已揀輪候單；撳中間任何空枱即可安排。':'撳輪候單可以選擇／取消選擇。'}</p>
     </aside>
@@ -252,7 +260,7 @@ export function RuntimeDiningWorkspace({runtime,onCheckout,onAddOrder}:{runtime:
     <aside className="dining-detail-panel">
       {detail?<>
         <header>
-          <div><small>{detail.codeLabel}</small><h2>{detail.assignedTable?(view?.tables.find(table=>table.id===detail.assignedTable)?.label??detail.assignedTable):'未掛枱'}</h2></div>
+          <div><small>{detail.codeLabel}</small><h2>{detail.assignedTable?(view?.tables.find(table=>table.id===detail.assignedTable)?.label??detail.assignedTable):'輪候中'}</h2></div>
           <span>{detail.partySize} 位</span>
         </header>
         <div className="dining-detail-timer">
@@ -290,7 +298,7 @@ export function RuntimeDiningWorkspace({runtime,onCheckout,onAddOrder}:{runtime:
         </section>
 
         <footer className="dining-detail-actions">
-          <button type="button" className="unassign" disabled={detail.remainingMinor===0} onClick={()=>void unassign()}>取消掛枱／退回輪候</button>
+          <button type="button" className="unassign" disabled={!detail.assignedTable||detail.remainingMinor===0} onClick={()=>void unassign()}>取消掛枱／退回輪候</button>
           <button type="button" className="add-order" disabled={!detail.formalOrderId} onClick={goAddOrder}>＋ 加單</button>
           <button type="button" className="clear" disabled={detail.remainingMinor>0} onClick={()=>void clearTable()}>清枱</button>
         </footer>
