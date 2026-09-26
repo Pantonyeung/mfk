@@ -1,4 +1,4 @@
-import {useMemo,useState} from 'react';
+import {useEffect,useMemo,useState} from 'react';
 import type {
   OwnerActionItem,
   OwnerActivityRecord,
@@ -12,16 +12,26 @@ import {
 
 type SeverityFilter='ALL'|'URGENT'|'ATTENTION'|'INFO';
 
+export interface OwnerActionCommandFlight {
+  readonly actionId:string;
+  readonly state:'PENDING'|'UNKNOWN'|'FAILED'|'REJECTED';
+  readonly message:string;
+}
+
 export function ActionQueuePage({
   connection,
   items,
   activity,
+  commandFlight,
   onCommand,
+  onRecheck,
 }:{
   connection:OwnerConnectionState;
   items:readonly OwnerActionItem[];
   activity:readonly OwnerActivityRecord[];
-  onCommand:(label:string,target:string,impact:string)=>void;
+  commandFlight:OwnerActionCommandFlight|null;
+  onCommand:(label:string,target:string,impact:string,actionId?:string)=>void;
+  onRecheck:(actionId:string)=>void;
 }){
   const [filter,setFilter]=useState<SeverityFilter>('ALL');
   const [selected,setSelected]=useState<OwnerActionQueueRowViewModel|null>(null);
@@ -35,6 +45,10 @@ export function ActionQueuePage({
     activity:snapshot.activity,
   }),[snapshot]);
   const rows=filter==='ALL'?vm.rows:vm.rows.filter(row=>row.action.severity===filter);
+
+  useEffect(()=>{
+    if(selected&&!vm.rows.some(row=>row.action.actionId===selected.action.actionId))setSelected(null);
+  },[vm.rows,selected]);
 
   return <section className="page action-queue-page">
     <header className="page-head action-queue-head">
@@ -67,7 +81,9 @@ export function ActionQueuePage({
     {selected?<ActionDetailDrawer
       row={selected}
       activity={activity}
+      commandFlight={commandFlight}
       onCommand={onCommand}
+      onRecheck={onRecheck}
       onClose={()=>setSelected(null)}
     />:null}
   </section>;
@@ -98,16 +114,22 @@ function ActionQueueCard({row,onOpen}:{row:OwnerActionQueueRowViewModel;onOpen:(
 function ActionDetailDrawer({
   row,
   activity,
+  commandFlight,
   onCommand,
+  onRecheck,
   onClose,
 }:{
   row:OwnerActionQueueRowViewModel;
   activity:readonly OwnerActivityRecord[];
-  onCommand:(label:string,target:string,impact:string)=>void;
+  commandFlight:OwnerActionCommandFlight|null;
+  onCommand:(label:string,target:string,impact:string,actionId?:string)=>void;
+  onRecheck:(actionId:string)=>void;
   onClose:()=>void;
 }){
   const detail=buildOwnerActionDetailViewModel(row,activity);
   const item=row.action;
+  const flight=commandFlight?.actionId===item.actionId?commandFlight:null;
+  const commandLocked=flight?.state==='PENDING'||flight?.state==='UNKNOWN';
   return <div className="overlay">
     <section className="drawer action-detail-drawer" role="dialog" aria-modal="true" aria-label="Action Detail">
       <header className="drawer-head">
@@ -137,10 +159,15 @@ function ActionDetailDrawer({
 
       <section className="detail-section">
         <h3>安全處理</h3>
-        {item.actionLabel?<button className="primary wide" onClick={()=>{
-          onCommand(item.actionLabel!,item.target,'Stage02 bounded action：提交後必須等待 canonical readback；Dismissed 不等於 Resolved。');
-        }}>{row.safeNextStepLabel??item.actionLabel}</button>:<p className="muted-copy">目前冇已授權嘅 bounded action；保持只讀。</p>}
-        <p className="queue-rule-copy">Command → Pending → Canonical Readback → Confirmed / Unknown。冇讀回唔會當完成。</p>
+        {item.actionLabel?<button className="primary wide action-primary" disabled={commandLocked} onClick={()=>{
+          onCommand(item.actionLabel!,item.target,'Stage02 bounded action：提交後必須等待 canonical readback；Dismissed 不等於 Resolved。',item.actionId);
+        }}>{flight?.state==='PENDING'?'正在提交／等待讀回':flight?.state==='UNKNOWN'?'狀態未明 — 禁止重送':row.safeNextStepLabel??item.actionLabel}</button>:<p className="muted-copy">目前冇已授權嘅 bounded action；保持只讀。</p>}
+        {flight?<div className={'command-flight '+flight.state.toLowerCase()} role="status">
+          <strong>{flight.state==='PENDING'?'等待 canonical readback':flight.state==='UNKNOWN'?'結果未明':flight.state==='REJECTED'?'未獲接受':'操作未完成'}</strong>
+          <span>{flight.message}</span>
+          {flight.state==='UNKNOWN'?<button className="secondary-action" onClick={()=>onRecheck(item.actionId)}>重新確認讀回</button>:null}
+        </div>:null}
+        <p className="queue-rule-copy">Command → Pending → Canonical Readback → Confirmed / Unknown。UI 唔會自行標記 RESOLVED；只有 canonical readback / proof 先可以真正移出 Queue。</p>
       </section>
 
       <section className="detail-section">
