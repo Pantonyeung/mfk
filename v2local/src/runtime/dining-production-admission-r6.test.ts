@@ -385,6 +385,30 @@ describe('Dining R6 automatic table-order admission',()=>{
     expect(hold.note.length).toBeLessThanOrEqual(200);
   });
 
+  it('generic hold rejects tampered totals and invalid line quantities before persistence',async()=>{
+    const runtime=await boot();
+    expect(()=>runtime.createHold({kind:'dining',items:[{id:'rice',name:'飯團',qty:1,unitMinor:4100,serviceMode:'dine-in'}],totalMinor:4000})).toThrow('HOLD_TOTAL_MISMATCH');
+    expect(()=>runtime.createHold({kind:'dining',items:[{id:'rice',name:'飯團',qty:0,unitMinor:4100,serviceMode:'dine-in'}],totalMinor:0})).toThrow('HOLD_ITEM_INVALID');
+    expect(runtime.holds()).toHaveLength(0);
+  });
+
+  it('generic visible hold code is not reused after a removable waiting hold disappears',async()=>{
+    const runtime=await boot();
+    const first=runtime.createHold({kind:'waiting',items:[],totalMinor:0,partySize:1});
+    const second=runtime.createHold({kind:'waiting',items:[],totalMinor:0,partySize:1});
+    runtime.removeHold(second.id);
+    const third=runtime.createHold({kind:'waiting',items:[],totalMinor:0,partySize:1});
+    expect(third.codeLabel).not.toBe(first.codeLabel);
+    expect(third.codeLabel).not.toBe(second.codeLabel);
+  });
+
+  it('generic hold cannot be deleted after it has formal Order custody',async()=>{
+    const runtime=await boot();
+    const hold=runtime.createHold({kind:'dining',items:[{id:'rice',name:'飯團',qty:1,unitMinor:4100,serviceMode:'dine-in'}],totalMinor:4100});
+    await runtime.assignDiningTable(hold.id,'T01');
+    expect(()=>runtime.removeHold(hold.id)).toThrow('DINING_HISTORY_PROTECTED');
+  });
+
   it('formal Order link survives runtime restart',async()=>{
     let runtime=await boot();
     const hold=runtime.createHold({kind:'dining',items:[{id:'rice',name:'飯團',qty:1,unitMinor:4100,serviceMode:'dine-in'}],totalMinor:4100});
