@@ -17,6 +17,18 @@ export interface CapacityPoolOrderEvent{
   readonly sourceEventId?:string;
 }
 
+export interface LocalCapacityManualAdjustment{
+  readonly id:string;
+  readonly businessDate:string;
+  readonly poolId:string;
+  readonly createdAt:number;
+  readonly fromQty:number;
+  readonly toQty:number;
+  readonly staffId?:string;
+  readonly staffName?:string;
+  readonly note:string;
+}
+
 export interface LocalCapacityPoolStateRow{
   readonly businessDate:string;
   readonly poolId:string;
@@ -25,6 +37,7 @@ export interface LocalCapacityPoolStateRow{
   readonly createdAt:number;
   readonly updatedAt:number;
   readonly appliedEventIds?:readonly string[];
+  readonly manualAdjustments?:readonly LocalCapacityManualAdjustment[];
 }
 
 export interface SmtCapacityPoolStateViewRow{
@@ -54,6 +67,32 @@ function whole(value:unknown){
 function eventIds(value:unknown){
   if(!Array.isArray(value))return Object.freeze([] as string[]);
   return Object.freeze([...new Set(value.map(item=>String(item||'').trim()).filter(Boolean))]);
+}
+function parseManualAdjustment(value:unknown):LocalCapacityManualAdjustment{
+  if(!value||typeof value!=='object'||Array.isArray(value))throw new Error('CAPACITY_MANUAL_ADJUSTMENT_INVALID');
+  const row=value as Record<string,unknown>;
+  const id=String(row.id??'').trim();
+  const businessDate=String(row.businessDate??'').trim();
+  const poolId=String(row.poolId??'').trim();
+  const createdAt=Number(row.createdAt);
+  const fromQty=Number(row.fromQty);
+  const toQty=Number(row.toQty);
+  const note=String(row.note??'').trim();
+  if(!id||!poolId||!/^\d{4}-\d{2}-\d{2}$/.test(businessDate)||!Number.isFinite(createdAt)||
+     !Number.isSafeInteger(fromQty)||fromQty<0||!Number.isSafeInteger(toQty)||toQty<0){
+    throw new Error('CAPACITY_MANUAL_ADJUSTMENT_INVALID');
+  }
+  const staffId=String(row.staffId??'').trim();
+  const staffName=String(row.staffName??'').trim();
+  return Object.freeze({
+    id,businessDate,poolId,createdAt,fromQty,toQty,note,
+    ...(staffId?{staffId}:{}),
+    ...(staffName?{staffName}:{}),
+  });
+}
+function manualAdjustments(value:unknown){
+  if(!Array.isArray(value))return Object.freeze([] as LocalCapacityManualAdjustment[]);
+  return Object.freeze(value.map(parseManualAdjustment));
 }
 function parseEvent(value:unknown):CapacityPoolOrderEvent{
   if(!value||typeof value!=='object'||Array.isArray(value))throw new Error('CAPACITY_POOL_EVENT_INVALID');
@@ -95,6 +134,7 @@ function parseRow(value:unknown):LocalCapacityPoolStateRow{
     createdAt,
     updatedAt,
     appliedEventIds:eventIds(row.appliedEventIds),
+    manualAdjustments:manualAdjustments(row.manualAdjustments),
   });
 }
 function assertUnique(rows:readonly LocalCapacityPoolStateRow[]){
@@ -172,7 +212,6 @@ function applyPendingEvents(
         remaining-=event.quantity;
       }else{
         remaining+=event.quantity;
-        if(remaining>row.initialQtyAtOpen)throw new Error('CAPACITY_POOL_PROJECTION_OVERFLOW:'+row.poolId);
       }
       applied.add(event.id);
       updatedAt=Math.max(updatedAt,Date.parse(event.createdAt));
@@ -318,4 +357,54 @@ export function planCapacityRestoreEvents(input:{
       sourceEventId:deduction.id,
     }));
   return Object.freeze(events);
+}
+
+
+export function applyManualCapacityCorrection(
+  input:{
+    readonly poolId:string;
+    readonly remainingQty:number;
+    readonly note?:string;
+    readonly now?:number;
+    readonly staffId?:string;
+    readonly staffName?:string;
+    readonly orderEvents?:readonly CapacityPoolOrderEvent[];
+  },
+  storage:Pick<Storage,'getItem'|'setItem'>=localStorage,
+):SmtCapacityPoolStateView{
+  const poolId=String(input.poolId||'').trim();
+  const remainingQty=Number(input.remainingQty);
+  if(!poolId)throw new Error('CAPACITY_POOL_ID_REQUIRED');
+  if(!Number.isSafeInteger(remainingQty)||remainingQty<0)throw new Error('CAPACITY_MANUAL_QUANTITY_INVALID');
+  const now=input.now??Date.now();
+  const events=input.orderEvents??[];
+  const view=ensureCurrentCapacityPoolState(now,storage,events);
+  if(!view.pools.some(pool=>pool.poolId===poolId))throw new Error('CAPACITY_POOL_NOT_ACTIVE');
+
+  const rows=readLocalCapacityPoolRows(storage);
+  const index=rows.findIndex(row=>row.businessDate===view.businessDate&&row.poolId===poolId);
+  if(index<0)throw new Error('CAPACITY_POOL_STATE_MISSING:'+poolId);
+  const current=rows[index]!;
+  if(current.remainingQty===remainingQty)return view;
+
+  const history=current.manualAdjustments??[];
+  const adjustment:LocalCapacityManualAdjustment=Object.freeze({
+    id:['CAPADJ',view.businessDate,poolId,String(now),String(history.length+1)].join(':'),
+    businessDate:view.businessDate,
+    poolId,
+    createdAt:now,
+    fromQty:current.remainingQty,
+    toQty:remainingQty,
+    ...(String(input.staffId||'').trim()?{staffId:String(input.staffId).trim()}:{}),
+    ...(String(input.staffName||'').trim()?{staffName:String(input.staffName).trim()}:{}),
+    note:String(input.note||'').trim(),
+  });
+  const updated:LocalCapacityPoolStateRow=Object.freeze({
+    ...current,
+    remainingQty,
+    updatedAt:now,
+    manualAdjustments:Object.freeze([...history,adjustment]),
+  });
+  writeLocalCapacityPoolRows(rows.map((row,rowIndex)=>rowIndex===index?updated:row),storage);
+  return ensureCurrentCapacityPoolState(now,storage,events);
 }
