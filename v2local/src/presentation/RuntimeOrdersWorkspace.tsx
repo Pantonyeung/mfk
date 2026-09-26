@@ -10,7 +10,7 @@ import {buildWhatsAppPaymentFollowup,createWhatsAppQrDataUrl,PAYMENT_FOLLOWUP_TE
 import './orders-workspace.css';
 
 type PaymentFilter='全部'|'現金'|'Alipay'|'WeChat Pay'|'FPS / PayMe';
-type Modal='actions'|'edit'|'cancel'|'reprint'|'payment'|null;
+type Modal='actions'|'edit'|'cancel'|'reprint'|'payment'|'refund'|null;
 const PAYMENT_CORRECTION_TARGETS=Object.freeze([
   {id:'CASH',label:'現金'},
   {id:'FPS',label:'FPS／轉數快'},
@@ -18,6 +18,11 @@ const PAYMENT_CORRECTION_TARGETS=Object.freeze([
   {id:'ALIPAY',label:'AlipayHK'},
   {id:'WECHAT',label:'WeChat Pay HK'},
 ] as const);
+const singleTender=(label:string)=>{
+  const upper=String(label||'').toUpperCase();
+  return PAYMENT_CORRECTION_TARGETS.find(row=>upper===row.id||upper.includes(row.id))?.id??'';
+};
+const labelMinor=(label:string)=>Math.round(Number(String(label||'').replace(/[^0-9.]/g,''))*100)||0;
 
 export function sourceLane(source?:string){
   const value=String(source||'').trim();
@@ -62,6 +67,12 @@ export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePor
   const [reprintReason,setReprintReason]=useState('');
   const [paymentCorrection,setPaymentCorrection]=useState('');
   const [paymentCorrectionBusy,setPaymentCorrectionBusy]=useState(false);
+  const [refundLineId,setRefundLineId]=useState('');
+  const [refundQuantity,setRefundQuantity]=useState(1);
+  const [refundAmount,setRefundAmount]=useState('');
+  const [refundMethod,setRefundMethod]=useState('');
+  const [refundNote,setRefundNote]=useState('');
+  const [refundBusy,setRefundBusy]=useState(false);
   const [afterSaleRevision,setAfterSaleRevision]=useState(0);
   const [afterSaleBusy,setAfterSaleBusy]=useState<string|null>(null);
   const [partialPreview,setPartialPreview]=useState<unknown>(null);
@@ -159,7 +170,9 @@ export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePor
   },[allItems,history]);
 
   useEffect(()=>{
-    setModal(null);setMessage(null);setReprintOptions([]);setSelectedJobs(new Set());setCancelReason('');setReprintReason('');setPaymentCorrection('');setPaymentFollowupQr(null);setPaymentFollowupMessage(null);setPaymentFollowupTemplate('UNCLEAR');
+    setModal(null);setMessage(null);setReprintOptions([]);setSelectedJobs(new Set());setCancelReason('');setReprintReason('');setPaymentCorrection('');
+    setRefundLineId('');setRefundQuantity(1);setRefundAmount('');setRefundMethod('');setRefundNote('');
+    setPaymentFollowupQr(null);setPaymentFollowupMessage(null);setPaymentFollowupTemplate('UNCLEAR');
     if(selected)setEditLines(selected.lines.map(line=>({
       id:line.id,name:line.name,qty:line.quantity,
       unitMinor:Math.round(Number(line.unitLabel.replace(/[^0-9.]/g,''))*100)
@@ -278,6 +291,51 @@ export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePor
     }catch(cause){setMessage(cause instanceof Error?cause.message:'ORDER_EDIT_FAILED');}
   };
 
+  const openRefund=()=>{
+    if(!selected)return;
+    if(sourceLane(selected.sourceLabel)==='platform'){
+      setMessage('第三方平台訂單退款要用平台售後流程；本地 SMT 唔會直接製造 Provider 退款。');
+      return;
+    }
+    const line=selected.lines[0];
+    setRefundLineId(line?.id??'');
+    setRefundQuantity(1);
+    setRefundAmount(line?String((labelMinor(line.unitLabel)/100).toFixed(2)):'');
+    setRefundMethod(singleTender(selected.paymentLabel));
+    setRefundNote('');
+    setModal('refund');
+  };
+
+  const confirmRefund=async()=>{
+    if(!canCorrect){setMessage('你冇訂單更正權限。');return;}
+    if(!selected||!runtime.refundOrder||refundBusy)return;
+    const line=selected.lines.find(row=>row.id===refundLineId);
+    if(!line){setMessage('請先選擇退款商品。');return;}
+    const amountMinor=Math.round(Number(refundAmount||0)*100);
+    if(amountMinor<=0){setMessage('請輸入退款金額。');return;}
+    if(!refundMethod){setMessage('請選擇實際退款方式。');return;}
+    setRefundBusy(true);setMessage(null);
+    try{
+      await runtime.refundOrder(selected.orderId,{
+        lineId:line.id,
+        quantity:refundQuantity,
+        amountMinor,
+        method:refundMethod,
+        note:refundNote.trim()||undefined,
+      });
+      await load(selected.orderId,true);
+      setMessage('退款已確認；SAME Order 保留退款商品、金額同退款方式。取消狀態冇自動改，亦冇重印或開錢箱。');
+      setModal(null);
+    }catch(cause){
+      const code=cause instanceof Error?cause.message:'REFUND_FAILED';
+      setMessage(code==='REFUND_ADMIN_REQUIRED_CLOSED_DAY'
+        ?'呢張單已跨 Business Day 或已完成日結；SMT 禁止退款，請去 Admin 做跨日退款／日結附帶版本。'
+        :code==='PROVIDER_REFUND_USE_AFTERSALE'
+          ?'第三方平台訂單要使用 Provider 售後退款流程。'
+          :code);
+    }finally{setRefundBusy(false);}
+  };
+
   const correctPayment=async()=>{
     if(!canCorrect){setMessage('你冇訂單更正權限。');return;}
     if(!selected||!runtime.correctOrderPayment||!paymentCorrection||paymentCorrectionBusy)return;
@@ -374,6 +432,168 @@ export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePor
         </section>
         <section className="order-inspector-money"><div><span>訂單金額</span><b>{selected.totalLabel}</b></div><div><span>目前有效付款方式</span><b>{selected.paymentLabel}</b></div></section>
         {selected.paymentCorrections?.length?<section className="order-audit-card"><header><b>付款方式修正歷史</b><span>{selected.paymentCorrections.length}</span></header>{selected.paymentCorrections.map(row=><p key={row.id}><span>{new Date(row.createdAt).toLocaleString('zh-HK')}</span><b>{row.from} → {row.to}</b>{row.staffName?<small>{row.staffName}</small>:null}</p>)}</section>:null}
+        {selected.refunds?.length?<section className="order-audit-card"><header><b>退款紀錄</b><span>{selected.refunds.length}</span></header>{selected.refunds.map(row=><p key={row.id}><span>{new Date(row.createdAt).toLocaleString('zh-HK')}</span><b>{row.lines.map(line=>line.itemName+' ×'+line.quantity).join('、')} · -{'
+        {selected.cancellationNoticeState?<section className="order-audit-card"><header><b>取消通知</b><span>{selected.cancellationNoticeState}</span></header><p><span>製作部通知</span><b>{selected.cancellationNoticeState==='DONE'?'已打印':selected.cancellationNoticeState==='FAILED'?'打印失敗':'結果未能確認'}</b><small>{selected.cancellationNoticeState==='DONE'?'製作單曾經成功出過，取消時已自動通知製作部。':selected.cancellationNoticeState==='FAILED'?'訂單已取消，但取消通知未成功送達；請即時通知製作部。':'訂單已取消，但打印結果未能確認；請先核對製作部，避免重複打印。'}</small></p></section>:null}
+        {selected.paymentEvidenceRef?<section className={'payment-review-card state-'+String(selected.paymentVerificationState||'PENDING').toLowerCase()}>
+          <header><div><span>電子支付</span><h3>{selected.paymentVerificationState==='VERIFIED'?'付款已核對':selected.paymentVerificationState==='REJECTED'?'付款截圖未通過':'付款待核對'}</h3></div><strong>{selected.paymentVerificationState??'PENDING'}</strong></header>
+          <p>{selected.paymentVerificationState==='VERIFIED'?'可以繼續接受訂單。':selected.paymentVerificationState==='REJECTED'?'訂單未取消；請聯絡客人或者由有權限員工取消訂單。':'先查看客人付款截圖，再決定是否通過。'}</p>
+          <div className="payment-review-actions">
+            <button type="button" disabled={paymentEvidenceBusy} onClick={()=>void openPaymentEvidence()}>{paymentEvidenceBusy?'載入中…':'查看付款截圖'}</button>
+            <button type="button" className="danger" disabled={paymentReviewBusy||selected.paymentVerificationState==='REJECTED'} onClick={()=>void reviewPaymentEvidence('REJECTED')}>不接受付款</button>
+            <button type="button" className="primary" disabled={paymentReviewBusy||selected.paymentVerificationState==='VERIFIED'} onClick={()=>void reviewPaymentEvidence('VERIFIED')}>確認付款</button>
+          </div>
+          {selected.paymentVerificationState==='REJECTED'?<section className="payment-followup">
+            <header><b>要求客人重新傳送付款截圖</b><span>{selected.customerPhone?'可建立 WhatsApp QR':'冇可用電話'}</span></header>
+            <label><span>訊息範本</span><select value={paymentFollowupTemplate} onChange={event=>{setPaymentFollowupTemplate(event.target.value as PaymentFollowupTemplateId);setPaymentFollowupQr(null);setPaymentFollowupMessage(null);}}>{PAYMENT_FOLLOWUP_TEMPLATES.map(row=><option key={row.id} value={row.id}>{row.label}</option>)}</select></label>
+            <button type="button" disabled={!selected.customerPhone||paymentFollowupBusy} onClick={()=>void buildPaymentFollowupQr()}>{paymentFollowupBusy?'建立中…':'產生 WhatsApp QR'}</button>
+            {paymentFollowupQr?<div className="payment-followup-qr"><img src={paymentFollowupQr} alt="掃描後開啟 WhatsApp 訊息"/><p>{paymentFollowupMessage}</p><small>用手機掃描後會開啟 WhatsApp 對話並預填訊息；仍由店員確認後送出。</small></div>:null}
+          </section>:null}
+        </section>:null}
+        {afterSales.length?<section className="order-after-sale">
+          <header><b>Keeta 退款／售後</b><span>{afterSales.length}</span></header>
+          {afterSales.map(row=><article key={row.afterSaleOrderId}>
+            <div><b>{row.eventId===1007?'部分退款':'退款'} · #{row.afterSaleOrderId}</b><small>Provider status {row.providerStatus??'—'}{row.isAppeal?' · Appeal':''}</small></div>
+            <strong>{row.refundAmountMinor==null?'—':'$'+(row.refundAmountMinor/100).toFixed(2)} {row.currency??''}</strong>
+            {row.applyReason?<p>{row.applyReason}</p>:null}
+            {row.handleReason?<p>最新處理：{row.handleReason}</p>:null}
+            <footer>
+              <button disabled={!canCorrect||Boolean(afterSaleBusy)||row.decisionState==='APPROVED'||row.decisionState==='REJECTED'} onClick={()=>void decideRefund(row,'REJECT')}>拒絕</button>
+              <button className="primary" disabled={!canCorrect||Boolean(afterSaleBusy)||row.decisionState==='APPROVED'||row.decisionState==='REJECTED'} onClick={()=>void decideRefund(row,'APPROVE')}>同意退款</button>
+            </footer>
+            {row.decisionState?<small>本地決定：{row.decisionState}{row.decisionCode?' · '+row.decisionCode:''}</small>:null}
+          </article>)}
+          <button type="button" className="order-partial-preview" disabled={!canCorrect||Boolean(afterSaleBusy)} onClick={()=>void previewPartial()}>查詢可部分退款商品</button>
+          {partialPreview?<details><summary>部分退款 Provider Preview</summary><pre>{JSON.stringify(partialPreview,null,2)}</pre></details>:null}
+        </section>:null}
+        {message?<p className="order-inline-message">{message}</p>:null}
+        <footer>
+          <button onClick={()=>void openReprint()}>▣ 重印</button>
+          <button disabled={!canCorrect} title={canCorrect?'':'需要 ORDER_CORRECTION 權限'} onClick={()=>setModal('actions')}>✎ 取消／修改</button>
+          {selected.fulfillmentLabel==='待處理'
+            ?<button className="primary" disabled={!runtime.acceptOrder||acceptBusy||(Boolean(selected.paymentEvidenceRef)&&selected.paymentVerificationState!=='VERIFIED')} title={selected.paymentEvidenceRef&&selected.paymentVerificationState!=='VERIFIED'?'請先核對付款截圖':''} onClick={()=>void acceptSelected()}>{acceptBusy?'接單中…':String(selected.sourceLabel||'').startsWith('Keeta')?'接受 Keeta 訂單':'接受訂單'}</button>
+            :null}
+          <button className="primary" disabled={!runtime.markOrderReady||readyBusy||selected.fulfillmentLabel==='待處理'||selected.fulfillmentLabel==='可取餐'||selected.fulfillmentLabel==='已完成'||selected.fulfillmentLabel==='已取消'} onClick={()=>void markReady()}>{readyBusy?'處理中…':'提前完成／可取餐'}</button>
+        </footer>
+      </article>:<div className="order-empty">選擇一張訂單。</div>}
+    </aside>
+
+    <section className="order-board">
+      <div className="order-payment-bar">
+        <b>付款方式：</b>
+        {(['全部','現金','Alipay','WeChat Pay','FPS / PayMe'] as const).map(filter=><button key={filter} className={paymentFilter===filter?'active':''} onClick={()=>setPaymentFilter(filter)}>{filter}<span>{paymentCounts.get(filter)??0}</span></button>)}
+        <button className="history" onClick={()=>setHistory(value=>!value)}>{history?'進行中訂單':'歷史訂單'}</button>
+      </div>
+      <div className="order-board-head">
+        <span>{history?'歷史訂單':'進行中訂單'}　{filtered.length}</span>
+        <div><button type="button" disabled={keetaPullBusy} onClick={()=>void pullKeetaOrders()}>{keetaPullBusy?'同步中…':'手動接 Keeta 新單'}</button><label>Admin 出餐計時</label><b>{storeSettings.fulfillmentMinutes} 分鐘</b><button disabled title="由 Admin 門店設定提供">Admin</button></div>
+      </div>
+      {pendingKeetaOrders.length?<button type="button" className="keeta-pending-banner" onClick={()=>void load(pendingKeetaOrders[0]!.orderId,true)}><b>Keeta 有 {pendingKeetaOrders.length} 張訂單未處理</b><span>請立即接受或處理訂單</span></button>:null}
+      {keetaPullMessage?<p className="order-board-error">{keetaPullMessage}</p>:null}
+      {keetaIntakeAttention.length?<p className="order-board-error">Keeta 接單注意：{keetaIntakeAttention.map(row=>String((row as {code?:unknown}).code??'UNKNOWN')).join('；')}</p>:null}
+
+      <div className="order-channel-grid">
+        {lanes.map(lane=><section key={lane.id} className="order-channel-lane">
+          <header><b>{lane.label}</b><span>{lane.orders.length}</span></header>
+          <div className="order-channel-list">
+            {lane.orders.length?lane.orders.map(order=><button key={order.orderId} className={snapshot?.selectedOrderId===order.orderId?'selected':''} onClick={()=>void load(order.orderId)}>
+              <strong>{order.orderIdLabel}</strong>
+              <span>{order.sourceLabel}</span>
+              <small>{order.paymentLabel} · {order.itemCount} 件</small>
+              <div><em>{order.fulfillmentLabel}</em><b>{order.totalLabel}</b></div>
+            </button>):<p>目前沒有訂單。</p>}
+          </div>
+        </section>)}
+      </div>
+      {error?<p className="order-board-error">{error}</p>:null}
+      {loading&&!snapshot?<p className="order-board-error">載入訂單…</p>:null}
+    </section>
+
+    {paymentEvidenceUrl?<div className="order-modal-backdrop" onMouseDown={event=>{if(event.target===event.currentTarget){URL.revokeObjectURL(paymentEvidenceUrl);setPaymentEvidenceUrl(null);}}}>
+      <section className="order-modal payment-evidence-modal">
+        <header><h2>付款截圖</h2><button onClick={()=>{URL.revokeObjectURL(paymentEvidenceUrl);setPaymentEvidenceUrl(null);}}>×</button></header>
+        <div className="payment-evidence-preview"><img src={paymentEvidenceUrl} alt="客戶付款截圖"/></div>
+        <footer><button onClick={()=>{URL.revokeObjectURL(paymentEvidenceUrl);setPaymentEvidenceUrl(null);}}>關閉</button></footer>
+      </section>
+    </div>:null}
+
+    {selected&&modal?<div className="order-modal-backdrop" onMouseDown={event=>{if(event.target===event.currentTarget)setModal(null)}}>
+      <section className={'order-modal '+modal}>
+        <header><h2>{modal==='reprint'?'重印':modal==='edit'?'修改訂單':modal==='cancel'?'取消訂單':modal==='payment'?'修正付款方式':modal==='refund'?'退款':'取消／修改'}</h2><button onClick={()=>setModal(null)}>×</button></header>
+
+        {modal==='actions'?<div className="order-action-choices">
+          <button onClick={()=>{setPaymentCorrection('');setModal('payment');}}><b>＄ 修正付款方式</b><span>同一 Order／取餐號；原付款方式保留 Audit。唔會重印或開錢箱。</span></button>
+          <button onClick={openRefund}><b>↩ 退款</b><span>退款係獨立 Money Action；必須揀退款商品、金額同實際退款方式。跨日／已日結只可以去 Admin。</span></button>
+          <button onClick={()=>setModal('edit')}><b>✎ 修改訂單</b><span>修改商品數量；保持同一訂單編號，完成後唔自動重印。</span></button>
+          <button className="danger" onClick={()=>setModal('cancel')}><b>⊗ 取消訂單</b><span>取消只改營運狀態，唔代表已退款；退款一定要另外確認。</span></button>
+        </div>:null}
+
+        {modal==='payment'?<div className="order-payment-correction-body">
+          <p>目前有效付款方式：<b>{selected.paymentLabel}</b></p>
+          <div className="order-correction-warning">只會更新呢張 SAME Order 嘅有效付款方式，並永久保留原付款方式修正歷史。唔建立新 Order、唔重印、唔開錢箱。</div>
+          <label><span>新付款方式</span><select value={paymentCorrection} onChange={event=>setPaymentCorrection(event.target.value)}>
+            <option value="">請選擇</option>
+            {PAYMENT_CORRECTION_TARGETS.filter(row=>row.id!==selected.paymentLabel).map(row=><option key={row.id} value={row.id}>{row.label}</option>)}
+          </select></label>
+          <small>組合付款需要保留實際拆帳金額，唔會喺呢個單一付款修正入口建立。</small>
+          <footer><button onClick={()=>setModal(null)}>返回</button><button className="primary" disabled={!paymentCorrection||paymentCorrectionBusy} onClick={()=>void correctPayment()}>{paymentCorrectionBusy?'修正中…':'確認修正'}</button></footer>
+        </div>:null}
+
+        {modal==='refund'?<div className="order-payment-correction-body">
+          <p>退款同取消係兩個獨立動作。呢度只處理<b>同一 Business Day、未日結</b>嘅本地退款。</p>
+          <div className="order-correction-warning">預設原路退款，但你可以明確揀第二種退款方式。跨日／已完成日結嘅退款，必須去 Admin，唔可以喺 SMT 改舊日結。</div>
+          <label><span>退款商品</span><select value={refundLineId} onChange={event=>{
+            const id=event.target.value;setRefundLineId(id);setRefundQuantity(1);
+            const line=selected.lines.find(row=>row.id===id);setRefundAmount(line?String((labelMinor(line.unitLabel)/100).toFixed(2)):'');
+          }}>
+            <option value="">請選擇</option>
+            {selected.lines.map(line=><option key={line.id} value={line.id}>{line.name} · {line.quantity}件 · {line.lineTotalLabel}</option>)}
+          </select></label>
+          <label><span>退款數量／Reference</span><input inputMode="numeric" min={1} max={selected.lines.find(row=>row.id===refundLineId)?.quantity??1} value={refundQuantity} onChange={event=>setRefundQuantity(Math.max(1,Math.min(selected.lines.find(row=>row.id===refundLineId)?.quantity??1,Math.floor(Number(event.target.value)||1))))}/></label>
+          <label><span>退款金額</span><input inputMode="decimal" value={refundAmount} onChange={event=>setRefundAmount(event.target.value.replace(/[^0-9.]/g,''))}/></label>
+          <label><span>實際退款方式</span><select value={refundMethod} onChange={event=>setRefundMethod(event.target.value)}>
+            <option value="">請選擇</option>
+            {PAYMENT_CORRECTION_TARGETS.map(row=><option key={row.id} value={row.id}>{row.label}{row.id===singleTender(selected.paymentLabel)?'（原路）':''}</option>)}
+          </select></label>
+          <label><span>退款原因／備註</span><input value={refundNote} onChange={event=>setRefundNote(event.target.value)} placeholder="例如：產品問題／客人要求"/></label>
+          <small>每筆退款永久保存 exact Order line、數量 Reference、金額、方式、員工同時間；唔會自動取消訂單、重印或開錢箱。</small>
+          <footer><button onClick={()=>setModal(null)}>返回</button><button className="primary" disabled={!refundLineId||!refundMethod||!refundAmount||refundBusy} onClick={()=>void confirmRefund()}>{refundBusy?'退款中…':'確認退款'}</button></footer>
+        </div>:null}
+
+        {modal==='edit'?<div className="order-edit-body">
+          <p>原訂單商品（同一 Order identity）</p>
+          <div className="order-edit-lines">{editLines.map((line,index)=><article key={line.id+'-'+index}>
+            <div><b>{line.name}</b><small>{'$'+(line.unitMinor/100).toFixed(2)}</small></div>
+            <div className="order-edit-qty"><button onClick={()=>setEditLines(lines=>lines.map((row,i)=>i===index?{...row,qty:Math.max(0,row.qty-1)}:row))}>−</button><strong>{line.qty}</strong><button onClick={()=>setEditLines(lines=>lines.map((row,i)=>i===index?{...row,qty:row.qty+1}:row))}>＋</button></div>
+            <button className="trash" onClick={()=>setEditLines(lines=>lines.filter((_,i)=>i!==index))}>刪除</button>
+          </article>)}</div>
+          <div className="order-edit-total"><span>修改後金額</span><b>{'$'+(editLines.reduce((sum,row)=>sum+row.qty*row.unitMinor,0)/100).toFixed(2)}</b></div>
+          <footer><button onClick={()=>setModal(null)}>取消修改</button><button className="primary" onClick={()=>void saveEdit()}>確認修改</button></footer>
+        </div>:null}
+
+        {modal==='cancel'?<div className="order-cancel-body">
+          <p>確定取消 {selected.orderIdLabel}？</p>
+          <div className="order-cancel-warning">唔會自動退款、重印原單、開錢箱或通知外部平台；如果製作單之前真係成功出過，確認取消後會自動印一張取消通知去製作部。</div>
+          <label><span>原因（可選）</span><select value={cancelReason} onChange={event=>setCancelReason(event.target.value)}><option value="">唔填原因</option>{cancelReasons.map(reason=><option key={reason.id} value={reason.label}>{reason.label}</option>)}</select></label>
+          <label><span>自填原因（可選）</span><input value={cancelReason} onChange={event=>setCancelReason(event.target.value)} placeholder="Admin 快捷原因以外可自填"/></label>
+          <footer><button onClick={()=>setModal(null)}>返回</button><button className="danger" onClick={()=>void cancelSelected()}>確認取消</button></footer>
+        </div>:null}
+
+        {modal==='reprint'?<div className="order-reprint-body">
+          <p>選擇需要重新打印嘅內容。Label 會按實體打印機分組；同一部機有多張 Label 時可以展開逐張揀。重印永遠唔會開錢箱。</p>
+          {ticketReprintOptions.length?<section className="order-reprint-ticket-group"><header><b>80mm 單據</b><span>{ticketReprintOptions.length}</span></header><div className="order-reprint-options">{ticketReprintOptions.map(option=><label key={option.jobId}><input type="checkbox" checked={selectedJobs.has(option.jobId)} onChange={()=>toggleJob(option.jobId)}/><span><b>{option.label}</b><small>{option.printerName}</small></span></label>)}</div></section>:null}
+          <div className="order-reprint-printers">{labelReprintGroups.map(group=><details key={group.bindingId} className="order-reprint-printer-group" open={group.options.length===1}>
+            <summary><span><b>{group.printerName}</b><small>{group.physicalKey||'未綁定'} · {group.options.length} 張 Label</small></span><button type="button" onClick={event=>{event.preventDefault();setSelectedJobs(current=>{const next=new Set(current);const allSelected=group.options.every(option=>next.has(option.jobId));for(const option of group.options){if(allSelected)next.delete(option.jobId);else next.add(option.jobId);}return next;});}}>呢部全選</button></summary>
+            <div className="order-reprint-options">{group.options.map(option=><label key={option.jobId}><input type="checkbox" checked={selectedJobs.has(option.jobId)} onChange={()=>toggleJob(option.jobId)}/><span><b>{option.label}</b><small>{option.detail??option.role}</small></span></label>)}</div>
+          </details>)}</div>
+          <div className="order-reprint-tools"><button onClick={()=>setSelectedJobs(new Set(reprintOptions.map(option=>option.jobId)))}>全部選擇</button><button onClick={()=>setSelectedJobs(new Set())}>清除</button></div>
+          <label><span>重印原因（可選）</span><select value={reprintReason} onChange={event=>setReprintReason(event.target.value)}><option value="">唔填原因</option>{reprintReasons.map(reason=><option key={reason.id} value={reason.label}>{reason.label}</option>)}</select></label>
+          <footer><button onClick={()=>setModal(null)}>取消</button><button className="primary" disabled={!selectedJobs.size||reprintBusy} onClick={()=>void runReprint()}>{reprintBusy?'打印中…':'開始打印'}</button></footer>
+        </div>:null}
+      </section>
+    </div>:null}
+  </main>;
+}
++(row.amountMinor/100).toFixed(2)}</b><small>{row.method}{row.note?' · '+row.note:''}{row.staffName?' · '+row.staffName:''}</small></p>)}</section>:null}
         {selected.cancellationNoticeState?<section className="order-audit-card"><header><b>取消通知</b><span>{selected.cancellationNoticeState}</span></header><p><span>製作部通知</span><b>{selected.cancellationNoticeState==='DONE'?'已打印':selected.cancellationNoticeState==='FAILED'?'打印失敗':'結果未能確認'}</b><small>{selected.cancellationNoticeState==='DONE'?'製作單曾經成功出過，取消時已自動通知製作部。':selected.cancellationNoticeState==='FAILED'?'訂單已取消，但取消通知未成功送達；請即時通知製作部。':'訂單已取消，但打印結果未能確認；請先核對製作部，避免重複打印。'}</small></p></section>:null}
         {selected.paymentEvidenceRef?<section className={'payment-review-card state-'+String(selected.paymentVerificationState||'PENDING').toLowerCase()}>
           <header><div><span>電子支付</span><h3>{selected.paymentVerificationState==='VERIFIED'?'付款已核對':selected.paymentVerificationState==='REJECTED'?'付款截圖未通過':'付款待核對'}</h3></div><strong>{selected.paymentVerificationState??'PENDING'}</strong></header>
