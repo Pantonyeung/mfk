@@ -57,8 +57,8 @@ test('production Owner app has no fixture or migration operator truth',()=>{
   const app=fs.readFileSync(path.join(srcRoot,'App.tsx'),'utf8');
   assert.doesNotMatch(app,/\.\/fixtures/);
   assert.doesNotMatch(app,/CAPABILITY_UPGRADE_ONLY|Migration|fixture 截至|MFK Owner|Capability Registry/);
-  assert.match(app,/老闆資料服務尚未連接/);
-  assert.match(app,/唔會用假資料代替/);
+  assert.match(app,/OFFLINE_READONLY|離線唯讀/);
+  assert.match(app,/唔會顯示假 KPI|唔會用假資料代替/);
 });
 
 test('complete Owner product surfaces remain present',()=>{
@@ -127,4 +127,83 @@ test('Stage01 does not introduce non-AI decorative icon assets or product photos
   assert.match(app,/AI_ASSET_PENDING/);
   assert.doesNotMatch(app,/glyph="◆"|glyph="▤"|glyph="•••"/);
   assert.doesNotMatch(app,/productImage|product-photo|stock-photo/i);
+});
+
+test('Stage01 commander corrections satisfy OA-TOD-001 acceptance contract',()=>{
+  const app=fs.readFileSync(path.join(srcRoot,'App.tsx'),'utf8');
+  const types=fs.readFileSync(path.join(srcRoot,'product-types.ts'),'utf8');
+  const vm=fs.readFileSync(path.join(srcRoot,'today-view-model.ts'),'utf8');
+  const components=fs.readFileSync(path.join(srcRoot,'today-components.tsx'),'utf8');
+  const mapping=fs.readFileSync(path.join(srcRoot,'stage01-api-mapping.ts'),'utf8');
+
+  // 1 Header: store / business day / operating status / freshness.
+  assert.match(types,/operatingStatus:string/);
+  assert.match(components,/門店/);
+  assert.match(components,/Business Day/);
+  assert.match(components,/營業狀態/);
+  assert.match(components,/Freshness/);
+  assert.doesNotMatch(vm,/operatingStatus:.*connection/i);
+
+  // 2 Live orders always open active scope, with all summary fields.
+  assert.match(app,/openOrdersScope\('ACTIVE'\)/);
+  for(const field of['displayCode','source','amountLabel','fulfillmentLabel','elapsedLabel','promisedTimeLabel','exceptionBadge']){
+    assert.match(types,new RegExp(field));
+    assert.match(components,new RegExp(field));
+  }
+
+  // 3 Dine-in CTA always opens dine-in + open-payment scope.
+  assert.match(app,/openOrdersScope\('DINE_IN_OPEN'\)/);
+  assert.match(app,/fulfillmentMode==='DINE_IN'/);
+  assert.match(app,/paymentState==='OPEN'.*paymentState==='PARTIAL'/);
+
+  // 4 Open Check renders Total / Paid / Outstanding + payment state.
+  assert.match(components,/currentOrderTotalLabel/);
+  assert.match(components,/confirmedPaidLabel/);
+  assert.match(components,/outstandingLabel/);
+  assert.match(components,/paymentState/);
+  assert.match(components,/未計入有效營業額/);
+
+  // 5 Action summary count / top severity / oldest unresolved.
+  assert.match(vm,/openCount/);
+  assert.match(vm,/topSeverity/);
+  assert.match(vm,/oldestUnresolved/);
+  assert.match(components,/最高優先/);
+  assert.match(components,/最舊未處理/);
+  assert.match(components,/唔係 SMT Pending Order Queue/);
+
+  // 6 Explicit Health Summary, no provider truth guessing.
+  for(const health of['INTERNET','KEETA','OWN_PLATFORM','SMT','PRINTER'])assert.match(mapping,new RegExp(health));
+  assert.match(vm,/row\.kind===kind/);
+  assert.doesNotMatch(vm,/label\.includes|name\.includes/);
+  assert.match(components,/Health 同 Availability 分開/);
+
+  // 7 Staff summary is projection-driven, including scheduled count.
+  for(const field of['staffNow','scheduledStaffCount','onBreakStaffCount','abnormalStaffCount'])assert.match(types,new RegExp(field));
+  assert.doesNotMatch(app,/presence\.includes\('休息'\)|presence\.includes\('異常'\)/);
+
+  // 8 Explicit Top Product + Current Hour Trend contract.
+  assert.match(types,/OwnerTodayInsight/);
+  assert.match(components,/Top Product/);
+  assert.match(components,/Current Hour Trend/);
+  assert.match(components,/UNAVAILABLE/);
+  assert.doesNotMatch(app,/reports\.slice\(0,3\)/);
+
+  // 9 Nine global states can be represented.
+  for(const state of['LOADING','EMPTY','FRESH','STALE','PARTIAL','OFFLINE_READONLY','PERMISSION_DENIED','ERROR','UNKNOWN']){
+    assert.match(types,new RegExp(state));
+    assert.match(mapping,new RegExp(state));
+  }
+
+  // 10 Human-safe normal UI; raw errors/UUIDs are not rendered.
+  assert.doesNotMatch(app,/reason instanceof Error\?reason\.message|error\.message/);
+  assert.doesNotMatch(app,/order\.orderId.*<|<.*order\.orderId/);
+
+  // 14 Authority boundary remains unchanged.
+  assert.match(mapping,/No direct network or second Order \/ Pricing \/ Payment \/ Print \/ Auth \/ Sync authority/);
+});
+
+test('Stage01 offline mode disables remote mutation',()=>{
+  const app=fs.readFileSync(path.join(srcRoot,'App.tsx'),'utf8');
+  assert.match(app,/connection==='OFFLINE_READONLY'/);
+  assert.match(app,/離線唯讀：遠端操作已停用/);
 });
