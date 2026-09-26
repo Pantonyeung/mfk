@@ -1,0 +1,50 @@
+name: mfk-b2b-cross-day-refund-proof
+on:
+  pull_request:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  proof:
+    if: github.head_ref == 'work/MFK/ADMIN-B2B-CROSS-DAY-REFUND-R1'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install Admin
+        working-directory: v2admin
+        run: npm install --legacy-peer-deps --ignore-scripts --no-audit --no-fund
+      - name: Admin tests
+        working-directory: v2admin
+        run: npm run test
+      - name: Admin build
+        working-directory: v2admin
+        run: npm run build
+      - name: Install SMT
+        working-directory: v2local
+        run: npm install --legacy-peer-deps --ignore-scripts --no-audit --no-fund
+      - name: SMT tests
+        working-directory: v2local
+        run: npm run test
+      - name: SMT build
+        working-directory: v2local
+        run: npm run build
+      - name: Protected seams
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -F "postingMode:'NON_POSTING_REFERENCE'" v2admin/worker.ts
+          grep -F "ADMIN_REFUND_AVAILABLE" v2admin/worker.ts
+          grep -F "PROVIDER_REFUND_USE_AFTERSALE" v2admin/worker.ts
+          grep -F "applyAdminRefundEvent(input)" v2local/src/runtime/local-runtime.ts
+          grep -F "installAdminRefundIntake" v2local/src/main.tsx
+          grep -F "【退款明細】" v2local/src/runtime/daily-close-ticket.ts
+          grep -F "refundRows" v2local/src/runtime/local-operations.ts
+      - name: Diff check
+        run: git diff --check origin/main...HEAD
