@@ -295,6 +295,7 @@ export interface CleanSmtCoreRuntimePort{
   readAvailability?():Promise<SmtAvailabilityProjection>;
   setAvailability?(nodeId:string,status:SmtAvailabilityStatus,expectedRevision:number):Promise<SmtAvailabilityProjection>;
   createDiningWait?(input:{partySize:number;note?:string}):Promise<LocalHoldDraft>;
+  updateDiningPartySize?(holdId:string,partySize:number):Promise<LocalDiningHoldDetail>;
   removeDiningWait?(id:string):Promise<void>;
   admitDiningHold?(holdId:string):Promise<LocalDiningHoldDetail>;
   assignDiningTable?(holdId:string,tableId:string):Promise<void>;
@@ -386,6 +387,7 @@ export interface MfkLocalRuntime extends CleanSmtCoreRuntimePort{
     orderId:string;eventId:1002|1003|1004|1006|1008;eventName:string;providerMessageId:string;providerPushedAt:string;rawMessage:string;
   }):{readonly orderId:string;readonly disposition:'APPLIED'|'EVIDENCE_ONLY'|'IDEMPOTENT'|'CONFLICT';readonly fulfillmentLabel:StoredOrder['fulfillmentLabel']};
   createHold(input:{kind:'dining'|'waiting';items:readonly {id:string;name:string;qty:number;unitMinor:number}[];totalMinor:number;partySize?:number;note?:string}):LocalHoldDraft;
+  updateDiningPartySize(holdId:string,partySize:number):Promise<LocalDiningHoldDetail>;
   upsertSmmDiningHold(input:{providerRef:string;target:{kind:'TABLE'|'WAITING';tableId?:string;covers?:number};items:readonly {id:string;name:string;qty:number;unitMinor:number}[];totalMinor:number;sourceLabel?:string}):LocalHoldDraft;
   holds():readonly LocalHoldDraft[];
   removeHold(id:string):void;
@@ -1908,6 +1910,24 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
     };
     commitDiningHolds(snapshot,[draft,...snapshot.holds]);
     return draft;
+  },
+  async updateDiningPartySize(holdId,partySize){
+    const snapshot=readDiningState();
+    const hold=requireDiningHold(snapshot,holdId);
+    if(hold.archivedAt||hold.cancelledAt)throw new Error('DINING_HISTORY_PROTECTED');
+    const nextPartySize=Number(partySize);
+    if(!Number.isSafeInteger(nextPartySize)||nextPartySize<1)throw new Error('DINING_PARTY_SIZE_INVALID');
+    if(nextPartySize===hold.partySize)return clone(diningDetail(hold));
+    const updated:LocalHoldDraft={...hold,partySize:nextPartySize};
+    commitDiningHolds(snapshot,snapshot.holds.map(row=>row.id===holdId?updated:row));
+    if(hold.formalOrderId){
+      appendActionAudit({
+        action:'DINING_PARTY_SIZE_CHANGE',
+        orderId:hold.formalOrderId,
+        reason:String(hold.partySize)+' -> '+String(nextPartySize),
+      });
+    }
+    return clone(diningDetail(updated));
   },
   async removeDiningWait(id){
     const snapshot=readDiningState();
