@@ -44,29 +44,22 @@ test('Offline workspace cannot bypass trusted staff identity',()=>{
   assert.match(stage0,/離線模式唔會繞過員工登入/);
 });
 
-test('Stage 0 uses canonical logo plus regenerated purpose-specific IP illustrations',()=>{
+test('Stage 0 acceptance bypass does not depend on Internet or LAN authorisation',()=>{
+  assert.match(stage0,/function uiAcceptanceBypass/);
+  assert.match(stage0,/ui-bypass/);
+  assert.match(stage0,/smm-acceptance-/);
+  assert.match(stage0,/if\(bypass\)return <>\{children\}<\/>/);
+});
+
+test('Stage 0 IP production is paused and only canonical logo remains active',()=>{
   assert.match(stage0,/\/brand\/morefun-logo\.webp/);
-  assert.match(stage0,/\/brand\/stage0\/splash-male\.svg/);
-  assert.match(stage0,/\/brand\/stage0\/login-female\.svg/);
-  assert.match(stage0,/\/brand\/stage0\/connecting-male\.svg/);
-  assert.match(stage0,/\/brand\/stage0\/recovery-female\.svg/);
-  assert.doesNotMatch(stage0,/\/brand\/ip-male\.webp/);
-  assert.doesNotMatch(stage0,/\/brand\/ip-female\.webp/);
-  assert.doesNotMatch(css,/data:image\/webp;base64/);
-  assert.match(stage0,/BrandScene/);
+  assert.doesNotMatch(stage0,/\/brand\/stage0\//);
+  assert.doesNotMatch(stage0,/BrandScene/);
+  assert.doesNotMatch(stage0,/ip-male|ip-female/);
   assert.ok(existsSync(new URL('../public/brand/morefun-logo.webp',import.meta.url)));
-  for(const file of ['splash-male.svg','login-female.svg','connecting-male.svg','recovery-female.svg']){
-    assert.ok(existsSync(new URL('../public/brand/stage0/'+file,import.meta.url)));
-  }
-  const provenance=JSON.parse(readFileSync(new URL('../public/brand/stage0/asset-provenance.json',import.meta.url),'utf8'));
-  assert.equal(provenance.logo.source,'OWNER_CANONICAL_LOGO');
-  assert.equal(provenance.logo.transformation,'NONE');
-  assert.equal(provenance.illustrations.length,4);
-  for(const asset of provenance.illustrations){
-    assert.equal(asset.rendering,'AI_GENERATED_REDRAW');
-    assert.equal(asset.source,'OWNER_IP_REFERENCE_ONLY');
-    assert.equal(asset.crop,false);
-  }
+  assert.equal(existsSync(new URL('../public/brand/ip-male.webp',import.meta.url)),false);
+  assert.equal(existsSync(new URL('../public/brand/ip-female.webp',import.meta.url)),false);
+  assert.equal(existsSync(new URL('../public/brand/stage0/splash-male.svg',import.meta.url)),false);
 });
 
 test('Stage 0 staff login reuses current staff verification',()=>{
@@ -84,11 +77,3 @@ test('Stage 0 style respects mobile viewport and accessibility preferences',()=>
 });
 
 
-test('Stage 0 brand scenes keep one purpose-specific IP per surface and preserve logo ratio',()=>{
-  for(const file of ['splash-male.svg','login-female.svg','connecting-male.svg','recovery-female.svg']){
-    assert.equal((stage0.match(new RegExp(file.replace('.','\\.'),'g'))||[]).length,1);
-  }
-  assert.match(css,/\.stage0-brand-logo\{[\s\S]*height:auto/);
-  assert.match(css,/\.stage0-brand-scene/);
-  assert.match(css,/\.stage0-purpose-chip/);
-});
