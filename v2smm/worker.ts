@@ -2,7 +2,8 @@
 // Build refresh: Admin-shared dining labels + hardened source lanes.
 import {validateRuntimeStaffAuthSnapshot,type RuntimeStaffIdentity,type StaffPinVerifier} from '../contracts/staff-auth-v1.ts';
 import {validateMfkAdminConfigEnvelope} from '../contracts/admin-config-sync-v1.ts';
-import {projectSyncedOrderingCatalog} from '../v2local/src/runtime/admin-config-projection.ts';
+import {projectSyncedCombos,projectSyncedOrderingCatalog} from '../v2local/src/runtime/admin-config-projection.ts';
+import {validateSmmLanOrderRequest} from '../contracts/smm-lan-v1.ts';
 const ADMIN_ACTIVE='https://admin.morefunos.com/api/admin-sync/active';
 const ADMIN_ACKS='https://admin.morefunos.com/api/admin-sync/acks';
 const SMT_ORIGIN='https://appassets.androidplatform.net';
@@ -119,30 +120,28 @@ async function authorizedSmtDevice(deviceId:string,storeId:string){
   }catch{return false;}
 }
 function validateOrderRequest(value:unknown){
-  const row=record(value);
-  if(row.protocolVersion!==1||row.type!=='smm.lan.order.submit.v1')throw new Error('SMM_ORDER_PROTOCOL_INVALID');
-  for(const field of ['requestId','submissionId','idempotencyKey','storeId','menuRevision']){
-    if(!text(row[field],240))throw new Error('SMM_ORDER_'+field.toUpperCase()+'_INVALID');
-  }
-  if(row.storeId!=='MF01')throw new Error('SMM_ORDER_STORE_INVALID');
-  if(!Array.isArray(row.lines)||row.lines.length<1||row.lines.length>100)throw new Error('SMM_ORDER_LINES_INVALID');
-  if(!Number.isSafeInteger(Number(row.publishedTotalMinor))||Number(row.publishedTotalMinor)<0)throw new Error('SMM_ORDER_TOTAL_INVALID');
-  if(!['TAKEAWAY','DINE_IN'].includes(String(row.serviceMode)))throw new Error('SMM_ORDER_SERVICE_MODE_INVALID');
-  if(!['CASH','ALIPAY','WECHAT','FPS','PAYME'].includes(String(row.tender)))throw new Error('SMM_ORDER_TENDER_INVALID');
-  if(row.serviceMode==='DINE_IN'){
-    const target=record(row.diningTarget);
-    if(!['TABLE','WAITING'].includes(String(target.kind)))throw new Error('SMM_DINING_TARGET_REQUIRED');
-    const covers=Math.floor(Number(target.covers)||1);
-    if(covers<1||covers>30)throw new Error('SMM_DINING_COVERS_INVALID');
-    if(target.kind==='TABLE'&&!/^T\d{2}$/.test(String(target.tableId||'')))throw new Error('SMM_DINING_TABLE_INVALID');
-  }
-  return row;
+  return validateSmmLanOrderRequest(value) as unknown as Record<string,unknown>;
 }
 function mapPublishedSnapshot(raw:unknown){
   const envelope=validateMfkAdminConfigEnvelope(raw);
   const takeaway=projectSyncedOrderingCatalog('takeaway',envelope);
   const dineIn=projectSyncedOrderingCatalog('dine-in',envelope);
+  const comboData=projectSyncedCombos(envelope);
   const dineById=new Map(dineIn.products.map(row=>[row.id,row] as const));
+  const productById=new Map(takeaway.products.map(row=>[row.id,row] as const));
+  const comboPoolById=new Map(comboData.pools.map(pool=>[pool.id,pool] as const));
+  const uniqueComboIdForProduct=(productId:string)=>{
+    const matches=comboData.combos.filter(combo=>{
+      if(!combo.mainPoolId)return false;
+      const pool=comboPoolById.get(combo.mainPoolId);
+      return Boolean(pool&&pool.kind==='MAIN_COURSE'&&pool.groups.some(group=>
+        group.subPools.some(subPool=>subPool.choices.some(choice=>
+          choice.type==='PRODUCT'&&choice.productId===productId
+        ))
+      ));
+    });
+    return matches.length===1?matches[0]!.id:undefined;
+  };
   const storeSettings=record(envelope.snapshot.storeSettings);
   const rawTables=Array.isArray(storeSettings.diningTables)?storeSettings.diningTables:[];
   const diningTables=(rawTables.length?rawTables:Array.from({length:9},(_,index)=>({id:'T'+String(index+1).padStart(2,'0'),name:String(index+1)+' 號枱',active:true,sortOrder:index+1})))
@@ -168,6 +167,7 @@ function mapPublishedSnapshot(raw:unknown){
       })),
       products:takeaway.products.map(row=>{
         const dine=dineById.get(row.id);
+        const comboId=uniqueComboIdForProduct(row.id);
         return{
           productId:row.id,
           categoryId:row.categoryId,
@@ -192,8 +192,47 @@ function mapPublishedSnapshot(raw:unknown){
               publishedAdjustmentMinor:option.priceAdjustmentMinor,
             })),
           })),
+          ...(comboId?{comboId}:{}),
         };
       }),
+      combos:comboData.combos.map(combo=>({
+        comboId:combo.id,
+        name:combo.name,
+        publishedBasePriceMinor:combo.basePriceMinor,
+        ...(combo.mainPoolId?{mainPoolId:combo.mainPoolId}:{}),
+        addonPoolIds:[...combo.addonPoolIds],
+      })),
+      comboPools:comboData.pools.map(pool=>({
+        poolId:pool.id,
+        name:pool.name,
+        kind:pool.kind,
+        ...(pool.addonKind?{addonKind:pool.addonKind}:{}),
+        groups:pool.groups.map(group=>({
+          groupId:group.id,
+          name:group.name,
+          required:group.required,
+          minSelections:group.min,
+          maxSelections:group.max,
+          subPools:group.subPools.map(subPool=>({
+            subPoolId:subPool.id,
+            name:subPool.name,
+            publishedAdjustmentMinor:subPool.priceAdjustmentMinor,
+            choices:subPool.choices.map(choice=>{
+              const product=choice.productId?productById.get(choice.productId):undefined;
+              return{
+                choiceId:choice.id,
+                choiceType:choice.type,
+                ...(choice.productId?{productId:choice.productId}:{}),
+                label:choice.type==='PRODUCT'
+                  ?(product?.name??choice.label??choice.productId??'未命名商品')
+                  :choice.label,
+                available:choice.type!=='PRODUCT'||Boolean(product?.sellable&&product.priceReady),
+                publishedAdjustmentMinor:choice.priceAdjustmentMinor,
+              };
+            }),
+          })),
+        })),
+      })),
     },
     orders:[],
     work:[],
@@ -391,6 +430,8 @@ export class SmmIntentStore{
       const serviceMode=text(body.serviceMode,20);
       const tender=text(body.tender,20);
       const publishedTotalMinor=Number(body.publishedTotalMinor);
+      const orderRequest=record(body.request);
+      const requestFingerprint=Object.keys(orderRequest).length?stable(orderRequest):'';
       if(!submissionId||!staffId||!menuRevision)return json({code:'SMM_BRIDGE_TICKET_INVALID'},400);
       if(!['TAKEAWAY','DINE_IN'].includes(serviceMode))return json({code:'SMM_BRIDGE_SERVICE_MODE_INVALID'},400);
       if(!['CASH','ALIPAY','WECHAT','FPS','PAYME'].includes(tender))return json({code:'SMM_BRIDGE_TENDER_INVALID'},400);
@@ -399,7 +440,7 @@ export class SmmIntentStore{
       const existingTicket=await this.state.storage.get('bridge-submission:'+submissionId) as string|undefined;
       if(existingTicket){
         const existing=await this.state.storage.get('bridge:'+existingTicket) as any;
-        if(existing&&String(existing.staffId)===staffId&&String(existing.menuRevision)===menuRevision&&String(existing.serviceMode)===serviceMode&&String(existing.tender)===tender&&Number(existing.publishedTotalMinor)===publishedTotalMinor){
+        if(existing&&String(existing.staffId)===staffId&&String(existing.menuRevision)===menuRevision&&String(existing.serviceMode)===serviceMode&&String(existing.tender)===tender&&Number(existing.publishedTotalMinor)===publishedTotalMinor&&String(existing.requestFingerprint||'')===requestFingerprint){
           return json({ticket:existingTicket,expiresAt:existing.expiresAt,state:existing.state||'TICKET_CREATED'},200);
         }
       }
@@ -409,6 +450,7 @@ export class SmmIntentStore{
       const expiresAt=new Date(Date.now()+24*60*60*1000).toISOString();
       const row=Object.freeze({
         ticket,submissionId,staffId,menuRevision,serviceMode,tender,publishedTotalMinor,
+        ...(requestFingerprint?{request:Object.freeze({...orderRequest}),requestFingerprint}:{}),
         state:'TICKET_CREATED',createdAt,expiresAt,claimCount:0,
       });
       await this.state.storage.put('bridge:'+ticket,row);
@@ -761,6 +803,7 @@ export default{
           serviceMode:orderRequest.serviceMode,
           tender:orderRequest.tender,
           publishedTotalMinor:orderRequest.publishedTotalMinor,
+          request:orderRequest,
         }),
       }));
       if(!ticketResponse.ok)return json({code:'SMM_BRIDGE_TICKET_CREATE_FAILED'},503);
