@@ -16,7 +16,7 @@
 
 ## Safety Contracts Added
 1. Three attempts = one submissionId / idempotencyKey, never three Orders.
-2. Screenshot = payment evidence only, never automatic PAID truth.
+2. Screenshot = payment evidence only, never automatic PAID truth; scope it to one submission and detect duplicate evidence reuse by hash/fingerprint.
 3. Before WhatsApp fallback: stop all auto-submit/retry.
 4. WhatsApp fallback must carry a manual fallback reference.
 5. No formal pickup/display code before SMT creates Formal Order.
