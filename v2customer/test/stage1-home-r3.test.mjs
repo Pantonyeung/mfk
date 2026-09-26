@@ -81,7 +81,7 @@ test('closed store remains browsable and only later commit may block',()=>{
 
 test('Stage 1 owns its header, state surfaces and nav instead of rendering legacy shell chrome',()=>{
   assert.ok(app.includes("view==='home'?null:<CustomerHeader"));
-  assert.ok(app.includes("view==='home'?null:<div className="global-status""));
+  assert.ok(app.includes(`view==='home'?null:<div className="global-status"`));
   assert.ok(app.includes("view==='home'?<Stage1BottomNavigation"));
 });
 
