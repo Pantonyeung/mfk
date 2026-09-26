@@ -1,6 +1,7 @@
 import {validateMfkAdminConfigAck,validateMfkAdminConfigEnvelope} from '../contracts/admin-config-sync-v1.ts';
 import {validateSmtProjectionBatch} from '../contracts/smt-projection-v1.ts';
 import {MFK_ADMIN_REFUND_SCHEMA,validateAdminRefundEvent} from '../contracts/admin-refund-v1.ts';
+import {projectCanonicalCombos} from '../contracts/admin-combo-projection-v1.ts';
 import {KeetaRuntimeStore} from './keeta-runtime.ts';
 import {CustomerRuntimeStore} from './customer-runtime.ts';
 export {KeetaRuntimeStore,CustomerRuntimeStore};
@@ -82,6 +83,20 @@ function customerPublicSnapshot(active,customerOrders=[]){
   const optionCenter=row(snapshot.optionCenter);
   const availability=row(snapshot.availability);
   const productMedia=row(snapshot.productMedia);
+  const comboData=projectCanonicalCombos(active);
+  const comboPoolById=new Map(comboData.pools.map(pool=>[pool.id,pool]));
+  const uniqueComboIdForProduct=productId=>{
+    const matches=comboData.combos.filter(combo=>{
+      if(!combo.mainPoolId)return false;
+      const pool=comboPoolById.get(combo.mainPoolId);
+      return Boolean(pool&&pool.kind==='MAIN_COURSE'&&pool.groups.some(group=>
+        group.subPools.some(subPool=>subPool.choices.some(choice=>
+          choice.type==='PRODUCT'&&choice.productId===productId
+        ))
+      ));
+    });
+    return matches.length===1?matches[0].id:undefined;
+  };
   const categories=rows(catalog.categories)
     .map((raw,index)=>{const item=row(raw);return{id:String(item.id||''),name:String(item.name||''),position:Number(item.position??index*10),active:item.active!==false};})
     .filter(item=>item.id&&item.name&&item.active)
@@ -131,6 +146,7 @@ function customerPublicSnapshot(active,customerOrders=[]){
       const baseMinor=minorFromMoney(priceText);
       const takeawayMinor=minorFromMoney(item.takeawayAdjustment)+(item.takeawaySurchargeEnabled===true?100:0);
       const imageUrl=String(media.publicUrl||media.canonicalImageRef||item.imageRef||'').trim();
+      const comboId=uniqueComboIdForProduct(productId);
       return{
         productId,
         categoryId,
@@ -140,12 +156,49 @@ function customerPublicSnapshot(active,customerOrders=[]){
         ...(priceReady?{displayPriceLabel:moneyLabel(baseMinor+takeawayMinor),publishedUnitPriceMinor:baseMinor+takeawayMinor}:{}),
         ...(imageUrl?{imageUrl,imageAlt:String(item.name||productId)}:{}),
         optionGroups,
+        ...(comboId?{comboId}:{}),
         position:Number(item.legacySourcePosition??item.position??0),
       };
     })
     .filter(item=>item.productId&&categoryIds.has(item.categoryId)&&item.available)
     .sort((a,b)=>a.position-b.position||a.productId.localeCompare(b.productId))
     .map(({position,...item})=>item);
+  const customerProductById=new Map(products.map(product=>[product.productId,product]));
+  const customerCombos=comboData.combos.map(combo=>({
+    comboId:combo.id,
+    name:combo.name,
+    publishedBasePriceMinor:combo.basePriceMinor,
+    ...(combo.mainPoolId?{mainPoolId:combo.mainPoolId}:{}),
+    addonPoolIds:[...combo.addonPoolIds],
+  }));
+  const customerComboPools=comboData.pools.map(pool=>({
+    poolId:pool.id,
+    name:pool.name,
+    kind:pool.kind,
+    ...(pool.addonKind?{addonKind:pool.addonKind}:{}),
+    groups:pool.groups.map(group=>({
+      groupId:group.id,
+      name:group.name,
+      required:group.required,
+      minSelections:group.min,
+      maxSelections:group.max,
+      subPools:group.subPools.map(subPool=>({
+        subPoolId:subPool.id,
+        name:subPool.name,
+        publishedAdjustmentMinor:subPool.priceAdjustmentMinor,
+        choices:subPool.choices.map(choice=>({
+          choiceId:choice.id,
+          choiceType:choice.type,
+          ...(choice.productId?{productId:choice.productId}:{}),
+          label:choice.type==='PRODUCT'
+            ?(customerProductById.get(choice.productId)?.name||choice.label||choice.productId||'未命名商品')
+            :choice.label,
+          available:choice.type!=='PRODUCT'||customerProductById.has(choice.productId),
+          publishedAdjustmentMinor:choice.priceAdjustmentMinor,
+        })),
+      })),
+    })),
+  }));
   const settings=row(snapshot.storeSettings);
   const defaultPaymentChannels=[
     {id:'ALIPAY',name:'AlipayHK',enabled:true,qrImageUrl:'',sortOrder:1},
@@ -211,6 +264,8 @@ function customerPublicSnapshot(active,customerOrders=[]){
       observedAt:new Date().toISOString(),
       categories:categories.map(item=>({categoryId:item.id,name:item.name,sortOrder:item.position})),
       products,
+      combos:customerCombos,
+      comboPools:customerComboPools,
     },
     paymentChannels,
     fallback:customerFallback,
