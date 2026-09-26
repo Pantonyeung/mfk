@@ -108,6 +108,29 @@ describe('SMM LAN ingress',()=>{
     }));
   });
 
+  it('returns linked Formal Order and triggers initial print for SMM ordered WAITING Dining',()=>{
+    const createOrder=vi.fn();
+    const ensureDiningInitialPrint=vi.fn(()=>Promise.resolve({orderId:'ORDER-WAIT',state:'DONE',planned:3,sent:3,failed:0}));
+    const upsertSmmDiningHold=vi.fn(()=>({id:'HOLD-WAIT',formalOrderId:'ORDER-WAIT',providerRef:'SMM:S5W'}));
+    const ingress=createSmmLanIngress({createOrder,orders:()=>[],holds:()=>[],upsertSmmDiningHold,ensureDiningInitialPrint} as any);
+    const result=ingress.submit({
+      protocolVersion:1,type:'smm.lan.order.submit.v1',requestId:'R5W',submissionId:'S5W',idempotencyKey:'I5W',storeId:'MF01',
+      menuRevision:'7',publishedTotalMinor:4100,serviceMode:'DINE_IN',tender:'FPS',
+      diningTarget:{kind:'WAITING',covers:2},
+      lines:[{lineId:'L1',productId:'riceball',productName:'原味飯團',quantity:1,publishedUnitPriceMinor:4100,selections:[]}],
+    },{deviceId:'SMM-1',trusted:true});
+    expect(result.disposition).toBe('ACCEPTED');
+    expect(result.disposition==='ACCEPTED'&&result.orderId).toBe('ORDER-WAIT');
+    expect(upsertSmmDiningHold).toHaveBeenCalledWith(expect.objectContaining({
+      providerRef:'SMM:S5W',
+      target:{kind:'WAITING',covers:2},
+      totalMinor:4100,
+      sourceLabel:'SMM',
+    }));
+    expect(ensureDiningInitialPrint).toHaveBeenCalledWith('HOLD-WAIT');
+    expect(createOrder).not.toHaveBeenCalled();
+  });
+
   it('projects canonical SMT orders and dining holds into the SMM shared read model',()=>{
     const createdAt='2026-09-25T13:30:00.000Z';
     const ingress=createSmmLanIngress({
