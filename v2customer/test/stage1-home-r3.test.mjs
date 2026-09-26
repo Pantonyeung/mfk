@@ -1,3 +1,4 @@
+// Stage 1 R3 spec-driven RED contract
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
