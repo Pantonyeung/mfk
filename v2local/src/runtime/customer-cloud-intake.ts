@@ -14,7 +14,7 @@ import {
 } from './admin-config-sync.ts';
 import {localRuntime} from './local-runtime.ts';
 import {createSmmLanIngress} from './smm-lan-ingress.ts';
-import type {SmmLanOrderRequest} from '../../../contracts/smm-lan-v1.ts';
+import {validateSmmLanOrderRequest,type SmmLanOrderRequest} from '../../../contracts/smm-lan-v1.ts';
 
 const ENDPOINT='https://admin.morefunos.com';
 const ATTENTION_KEY='mfk.customer.cloud-intake.attention.v1';
@@ -241,6 +241,14 @@ async function claimSmmBridge(ticket:string,submissionId:string){
 }
 
 function smmRequestFromCustomerIntent(intent:MfkCustomerOrderIntent,meta:Record<string,unknown>):SmmLanOrderRequest{
+  if(meta.request&&typeof meta.request==='object'&&!Array.isArray(meta.request)){
+    const request=validateSmmLanOrderRequest(meta.request);
+    if(request.submissionId!==intent.submissionId)throw new Error('SMM_BRIDGE_SUBMISSION_MISMATCH');
+    if(request.idempotencyKey!==intent.idempotencyKey)throw new Error('SMM_BRIDGE_IDEMPOTENCY_MISMATCH');
+    if(request.storeId!=='MF01')throw new Error('SMM_BRIDGE_STORE_MISMATCH');
+    return request;
+  }
+
   const serviceMode=String(meta.serviceMode);
   const tender=String(meta.tender);
   if(!['TAKEAWAY','DINE_IN'].includes(serviceMode))throw new Error('SMM_BRIDGE_SERVICE_MODE_INVALID');
