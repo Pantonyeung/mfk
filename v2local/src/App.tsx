@@ -30,6 +30,7 @@ type Product={
   categoryId:string;
   category:string;
   name:string;
+  description?:string;
   priceMinor:number;
   priceReady:boolean;
   sellable:boolean;
@@ -149,6 +150,7 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
         categoryId:row.categoryId,
         category:row.category,
         name:row.name,
+        description:row.description,
         priceMinor:row.priceMinor,
         priceReady:row.priceReady,
         sellable:row.sellable,
@@ -288,6 +290,7 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
     products:visible.map(product=>({
       id:product.id,
       name:product.name,
+      description:product.description,
       priceLabel:product.priceReady?money(product.priceMinor):'未接價格',
       enabled:product.priceReady&&product.sellable&&((serviceMode==='takeaway'&&storeSettings.takeawayEnabled)||(serviceMode==='dine-in'&&storeSettings.dineInEnabled)),
       requiresOptions:product.priceReady&&product.sellable&&product.optionSets.length>0,
@@ -302,6 +305,11 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
       ?'今日 '+capacityNotice.currentCount+'/'+capacityNotice.dailyLimit+' 單 · 已到 '+capacityNotice.warningAt+'% 提醒門檻'+(capacityNotice.hardStopConfigured?' · Admin 有 hard-stop 設定但目前只提示':'')
       :undefined,
     showCategories:frontlinePresentation.showCategories,
+    showDescriptions:frontlinePresentation.showDescriptions,
+    productColumns:frontlinePresentation.tabletColumns,
+    frontlineGuidance:(frontlinePresentation.headline||frontlinePresentation.body)
+      ?{headline:frontlinePresentation.headline||undefined,body:frontlinePresentation.body||undefined}
+      :undefined,
     serviceModes:{takeaway:storeSettings.takeawayEnabled,dineIn:storeSettings.dineInEnabled},
     orderingMode,
     cart:{
