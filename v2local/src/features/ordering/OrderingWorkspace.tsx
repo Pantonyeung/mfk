@@ -1,4 +1,4 @@
-import {useMemo,useState,type ReactNode} from 'react';
+import {useMemo,useState,type CSSProperties,type ReactNode} from 'react';
 import type {CartLineViewModel,OrderingProductViewModel,OrderingWorkspaceActions,OrderingWorkspaceViewModel,ServiceMode} from './ordering-workspace-model.ts';
 import './ordering-workspace.css';
 
@@ -26,7 +26,7 @@ function QueueStrip({title,kind,orders,onOpen}:{title:string;kind:'pending'|'act
   </section>;
 }
 
-function ProductCard({product,mode,actions,recentlyAdded}:{product:OrderingProductViewModel;mode:'quick'|'normal';actions:OrderingWorkspaceActions;recentlyAdded:boolean}){
+function ProductCard({product,mode,actions,recentlyAdded,showDescription}:{product:OrderingProductViewModel;mode:'quick'|'normal';actions:OrderingWorkspaceActions;recentlyAdded:boolean;showDescription:boolean}){
   const onBody=()=>{
     if(!product.enabled)return;
     if(mode==='normal'||!product.quickAddAllowed)actions.onConfigureProduct(product.id);
@@ -35,7 +35,7 @@ function ProductCard({product,mode,actions,recentlyAdded}:{product:OrderingProdu
   return <article className={`ordering-product-card ${product.imageUrl?'has-media':'text-only'}${product.enabled?'':' disabled'}${recentlyAdded?' recently-added':''}`}>
     <button type="button" className="ordering-product-body" aria-label={`商品 ${product.name}`} disabled={!product.enabled} onClick={onBody}>
       {product.imageUrl?<span className="ordering-product-media" aria-hidden="true"><span>磨</span><img src={product.imageUrl} alt="" loading="lazy" decoding="async" onError={event=>event.currentTarget.remove()}/></span>:null}
-      <span className="ordering-product-copy">{product.badge?<small>{product.badge}</small>:null}<b>{product.name}</b><strong>{product.priceLabel}</strong></span>
+      <span className="ordering-product-copy">{product.badge?<small>{product.badge}</small>:null}<b>{product.name}</b>{showDescription&&product.description?<span className="ordering-product-description">{product.description}</span>:null}<strong>{product.priceLabel}</strong></span>
     </button>
     <button type="button" className="ordering-product-more" aria-label={`更多設定 ${product.name}`} disabled={!product.enabled} onClick={()=>actions.onConfigureProduct(product.id)}>⋮</button>
   </article>;
@@ -116,7 +116,9 @@ export function OrderingWorkspace({view,actions,centerPanel}:{view:OrderingWorks
         {view.menuRevisionLabel?<div className="ordering-menu-local-status"><b>{view.menuRevisionLabel}</b><span>本機 Admin → POS</span></div>:null}
         {view.operationalNotice?<div className="ordering-menu-local-status warning"><b>{view.operationalNotice}</b><span>Admin 營運提示</span></div>:null}
         <section className="ordering-mode-bar" aria-label="點單模式">
-          <span><b>點選模式</b><small>{view.orderingMode==='quick'?'快速加入；必選會進必選區補齊，強制顯示仍開設定':'每件商品都先開設定，必選即時完成'}</small></span>
+          <span><b>點選模式</b><small>{view.frontlineGuidance?.headline
+            ?view.frontlineGuidance.headline+(view.frontlineGuidance.body?' · '+view.frontlineGuidance.body:'')
+            :view.orderingMode==='quick'?'快速加入；必選會進必選區補齊，強制顯示仍開設定':'每件商品都先開設定，必選即時完成'}</small></span>
           <div role="group" aria-label="快速或普通模式">
             <button type="button" className={view.orderingMode==='quick'?'active':''} aria-pressed={view.orderingMode==='quick'} onClick={()=>actions.onChangeOrderingMode('quick')}>快速</button>
             <button type="button" className={view.orderingMode==='normal'?'active':''} aria-pressed={view.orderingMode==='normal'} onClick={()=>actions.onChangeOrderingMode('normal')}>普通</button>
@@ -125,7 +127,7 @@ export function OrderingWorkspace({view,actions,centerPanel}:{view:OrderingWorks
         {view.showCategories===false?null:<nav className="ordering-categories" aria-label="商品分類">
           {view.categories.map(category=><button type="button" key={category.id} aria-pressed={view.selectedCategoryId===category.id} className={view.selectedCategoryId===category.id?'active':''} onClick={()=>actions.onSelectCategory(category.id)}>{category.label}</button>)}
         </nav>}
-        <section className="ordering-product-grid">{view.products.map(product=><ProductCard key={product.id} product={product} mode={view.orderingMode} actions={actions} recentlyAdded={view.recentlyAddedProductId===product.id}/>)}</section>
+        <section className="ordering-product-grid" style={{'--ordering-product-columns':String(view.productColumns??4)} as CSSProperties}>{view.products.map(product=><ProductCard key={product.id} product={product} mode={view.orderingMode} actions={actions} recentlyAdded={view.recentlyAddedProductId===product.id} showDescription={view.showDescriptions!==false}/>)}</section>
       </>}
     </main>
 

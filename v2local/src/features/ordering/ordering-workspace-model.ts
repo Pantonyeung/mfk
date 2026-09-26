@@ -22,6 +22,7 @@ export interface OrderingProductViewModel {
   readonly quickAddAllowed:boolean;
   readonly badge?:string;
   readonly imageUrl?:string;
+  readonly description?:string;
 }
 
 export interface CartLineViewModel {
@@ -72,6 +73,9 @@ export interface OrderingWorkspaceViewModel {
   readonly menuRevisionLabel?:string;
   readonly operationalNotice?:string;
   readonly showCategories?:boolean;
+  readonly showDescriptions?:boolean;
+  readonly productColumns?:number;
+  readonly frontlineGuidance?:Readonly<{readonly headline?:string;readonly body?:string}>;
   readonly serviceModes?:Readonly<{takeaway:boolean;dineIn:boolean}>;
   readonly orderingMode:'quick'|'normal';
   readonly cart:OrderingCartViewModel;

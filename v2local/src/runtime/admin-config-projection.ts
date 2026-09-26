@@ -25,6 +25,7 @@ export interface SyncedOrderingProduct{
   readonly categoryId:string;
   readonly category:string;
   readonly name:string;
+  readonly description?:string;
   readonly priceMinor:number;
   readonly priceReady:boolean;
   readonly sellable:boolean;
@@ -191,6 +192,7 @@ export function projectSyncedOrderingCatalog(
         categoryId,
         category:category?.label??'其他',
         name:string(row.name,id),
+        description:string(row.description)||undefined,
         active:bool(row.active,true),
         position:integer(row.legacySourcePosition,index),
         priceMinor:moneyMinor(priceText)+surcharge+adjustment,
