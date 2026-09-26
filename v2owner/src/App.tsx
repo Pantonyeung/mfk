@@ -115,7 +115,7 @@ export function App(){
 
   return <main className="app-shell">
     <header className="topbar">
-      <div className="brand-mark">磨</div>
+      <img className="brand-logo" src="/brand/morefun-logo-canonical.png" alt="磨飯 More Fun" />
       <div className="brand-copy"><strong>老闆中心</strong><span>{snapshot?.store?.storeName??'未連接門店'} · {snapshot?.store?.businessDate??'營業日未有資料'}</span></div>
       <button className="state-pill" onClick={()=>void refresh()} aria-label="重新同步"><i/>{connectionLabel}</button>
     </header>
