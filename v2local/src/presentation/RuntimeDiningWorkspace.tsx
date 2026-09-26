@@ -15,10 +15,17 @@ const tenderLabels:Record<string,string>={
   PAYME:'PayMe',
   COMBO:'組合付款',
 };
-const money=(minor:number)=>'$'+(minor/100).toFixed(2);
+const money=(minor:number)=>String.fromCharCode(36)+(minor/100).toFixed(2);
+let diningSubmissionSequence=0;
+const nextDiningSubmissionId=(holdId:string)=>{
+  diningSubmissionSequence+=1;
+  return 'DINPAY:'+holdId+':'+Date.now().toString(36)+':'+diningSubmissionSequence.toString(36);
+};
 
 export interface DiningCheckoutRequest{
   readonly holdId:string;
+  readonly submissionId:string;
+  readonly expectedRevision:string;
   readonly codeLabel:string;
   readonly tableLabel:string;
   readonly selections:readonly {lineIndex:number;qty:number}[];
@@ -163,6 +170,8 @@ export function RuntimeDiningWorkspace({runtime,onCheckout}:{runtime:CleanSmtCor
     });
     onCheckout({
       holdId:detail.holdId,
+      submissionId:nextDiningSubmissionId(detail.holdId),
+      expectedRevision:detail.checkoutRevision,
       codeLabel:detail.codeLabel,
       tableLabel:detail.assignedTable?(view?.tables.find(table=>table.id===detail.assignedTable)?.label??detail.assignedTable):'',
       selections,
