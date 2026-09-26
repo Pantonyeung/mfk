@@ -170,3 +170,23 @@
 
 .ordering-menu-local-status{min-height:32px;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:4px 10px;border:1px solid #cfe2d8;border-radius:8px;background:#f3faf6;color:#286145}
 .ordering-menu-local-status b{font-size:12px;font-weight:950;letter-spacing:.03em}.ordering-menu-local-status span{font-size:11px;color:#6b7770}
+
+
+/* 2026-09-26 R4 Owner mindset: one primary 暫存／堂食 entry + low-emphasis clear. */
+.ordering-cart-secondary-actions.active-cart{grid-template-columns:minmax(0,1fr) 48px}
+.ordering-cart-secondary-actions.active-cart .hold-dining-entry{
+  min-width:0;
+  background:#eef5ff;
+  color:#225f9f;
+  border:1px solid #c8d9ef;
+}
+.ordering-cart-secondary-actions.active-cart .cart-clear-icon{
+  width:48px;
+  min-width:48px;
+  padding:0;
+  display:grid;
+  place-items:center;
+  background:#fff0f2;
+  color:#d43a52;
+}
+.ordering-cart-secondary-actions.active-cart .cart-clear-icon svg{width:20px;height:20px}
