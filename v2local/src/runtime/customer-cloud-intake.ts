@@ -323,7 +323,7 @@ async function reconcileOrders(){
   const body=await getJson('/api/customer/smt/orders/pending');
   const orders=Array.isArray(body.orders)?body.orders:[];
   if(!orders.length)return;
-  const {catalog}=activeCatalog();
+  const {envelope,catalog}=activeCatalog();
   for(const raw of orders){
     const bridgeRow=raw as Record<string,unknown>;
     if(bridgeRow.bridgeKind==='SMM_STAFF'){
