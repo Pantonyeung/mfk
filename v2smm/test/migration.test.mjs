@@ -334,8 +334,9 @@ test('SMM order intent carries published unit price so SMT line-level revalidati
   const adapter=fs.readFileSync(path.join(root,'smt-lan-adapter.ts'),'utf8');
   const ingress=fs.readFileSync(path.join(repoRoot,'v2local','src','runtime','smm-lan-ingress.ts'),'utf8');
   assert.match(adapter,/publishedUnitPriceMinor:Number\(line\.publishedUnitPriceMinor\)/);
-  assert.match(ingress,/input\.lines\[index\]\?\.publishedUnitPriceMinor/);
-  assert.match(ingress,/published!==priced\.items\[index\]!\.unitMinor/);
+  assert.match(ingress,/const published=Number\(line\.publishedUnitPriceMinor\)/);
+  assert.match(ingress,/published!==standaloneItem\.unitMinor/);
+  assert.match(ingress,/published!==comboResult\.unitMinor/);
 });
 
 
