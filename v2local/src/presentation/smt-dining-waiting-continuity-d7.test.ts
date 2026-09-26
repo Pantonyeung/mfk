@@ -9,7 +9,7 @@ describe('D7 waiting Dining operator continuity',()=>{
     const root=path.resolve(here,'..');
     const dining=fs.readFileSync(path.join(root,'presentation/RuntimeDiningWorkspace.tsx'),'utf8');
 
-    expect(dining).toContain('if(row.formalOrderId)void loadDetail(row.id)');
+    expect(dining).toContain('if(nextSelected)void loadDetail(row.id)');
     expect(dining).toContain("row.itemCount+' 件 · 未收 '+money(row.remainingMinor??0)");
     expect(dining).toContain("!row.formalOrderId&&!(row.itemCount??0)?<button");
     expect(dining).toContain(":'輪候中'");

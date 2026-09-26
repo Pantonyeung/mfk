@@ -56,3 +56,9 @@
 .dining-correction-history>div small{grid-column:1/-1;color:#737985}
 .dining-line-copy .dining-line-correction{justify-self:start;min-height:32px;padding:0 9px;border:1px solid #e0a6a0;border-radius:7px;background:#fff4f2;color:#9b392f;font-size:11px;font-weight:850}
 .dining-line-copy>em{font-style:normal;font-size:10px;color:#8c6b55}
+
+/* D16 Dining party / cover adjustment */
+.dining-party-size-control{display:grid;grid-template-columns:44px auto 44px;align-items:center;gap:6px}
+.dining-party-size-control button{min-width:44px;min-height:44px;border:1px solid #d8dbe2;border-radius:8px;background:#fff;font-size:20px;font-weight:900}
+.dining-party-size-control button:disabled{opacity:.35}
+.dining-party-size-control span{min-width:58px;text-align:center;padding:6px 8px;border-radius:999px;background:#eef1f5;font-weight:900}
