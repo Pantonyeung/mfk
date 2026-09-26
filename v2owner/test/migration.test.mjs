@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import crypto from 'node:crypto';
+import ts from 'typescript';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 
@@ -12,6 +13,19 @@ const source=fs.readdirSync(srcRoot)
   .filter(name=>/\.(ts|tsx|js|jsx)$/.test(name))
   .map(name=>fs.readFileSync(path.join(srcRoot,name),'utf8'))
   .join('\n');
+
+function loadPureTsModule(filename){
+  const input=fs.readFileSync(path.join(srcRoot,filename),'utf8');
+  const output=ts.transpileModule(input,{
+    compilerOptions:{
+      module:ts.ModuleKind.CommonJS,
+      target:ts.ScriptTarget.ES2020,
+    },
+  }).outputText;
+  const module={exports:{}};
+  new Function('module','exports',output)(module,module.exports);
+  return module.exports;
+}
 
 test('owner capability registry remains complete with commands disconnected',()=>{
   assert.equal(registry.length,110);
@@ -282,4 +296,125 @@ test('Stage02 does not add product imagery or large mascot to normal operational
   const source=app+'\n'+components;
   assert.doesNotMatch(source,/productImage|product-photo|stock-photo/i);
   assert.doesNotMatch(source,/mascot|blue-haired|purple-haired|boy-ip|girl-ip/i);
+});
+
+
+test('Stage02 shared openActions selector excludes RESOLVED everywhere and dedupes explicit incidents',()=>{
+  const app=fs.readFileSync(path.join(srcRoot,'App.tsx'),'utf8');
+  const todayVm=fs.readFileSync(path.join(srcRoot,'today-view-model.ts'),'utf8');
+  const stageVm=fs.readFileSync(path.join(srcRoot,'stage02-view-model.ts'),'utf8');
+  const selectorSource=fs.readFileSync(path.join(srcRoot,'stage02-open-actions.ts'),'utf8');
+  const {selectOpenActions}=loadPureTsModule('stage02-open-actions.ts');
+
+  assert.match(selectorSource,/actions\.filter\(item=>item\.state!==\'RESOLVED\'\)/);
+  assert.match(todayVm,/selectOpenActions\(snapshot\?\.actions\?\?\[\]\)/);
+  assert.match(stageVm,/selectOpenActions\(snapshot\?\.actions\?\?\[\]\)/);
+  assert.match(app,/const openActions=useMemo\(\(\)=>selectOpenActions\(snapshot\?\.actions\?\?\[\]\)/);
+  assert.match(app,/items=\{openActions\}/);
+  assert.match(app,/badge=\{openActions\.length\?String\(openActions\.length\):undefined\}/);
+  assert.doesNotMatch(todayVm,/openCount:snapshot\?\.actions\.length/);
+
+  const base={
+    severity:'ATTENTION',
+    domain:'TEST',
+    title:'Incident',
+    detail:'detail',
+    target:'same-target',
+    certainty:'CONFIRMED',
+    observedAt:'2026-09-26T12:00:00Z',
+  };
+
+  const rows=selectOpenActions([
+    {...base,actionId:'resolved',correlationId:'resolved-c',state:'RESOLVED'},
+    {...base,actionId:'open-a-old',correlationId:'same-c',state:'OPEN',observedAt:'2026-09-26T12:01:00Z'},
+    {...base,actionId:'open-a-new',correlationId:'same-c',state:'OPEN',observedAt:'2026-09-26T12:02:00Z'},
+    {...base,actionId:'open-b',correlationId:'other-c',state:'OPEN',observedAt:'2026-09-26T12:03:00Z'},
+  ]);
+  assert.equal(rows.length,2);
+  assert.equal(rows.some(row=>row.actionId==='resolved'),false);
+  assert.equal(rows.some(row=>row.actionId==='open-a-new'),true);
+  assert.equal(rows.some(row=>row.actionId==='open-a-old'),false);
+
+  const sameTargetDifferentIncidents=selectOpenActions([
+    {...base,actionId:'a',correlationId:'A',state:'OPEN'},
+    {...base,actionId:'b',correlationId:'B',state:'OPEN'},
+  ]);
+  assert.equal(sameTargetDifferentIncidents.length,2);
+});
+
+test('Stage02 Today top severity and oldest unresolved derive only from shared open actions',()=>{
+  const todayVm=fs.readFileSync(path.join(srcRoot,'today-view-model.ts'),'utf8');
+  assert.match(todayVm,/const actions=\[\.\.\.selectOpenActions/);
+  assert.match(todayVm,/const topSeverity=actions\.sort/);
+  assert.match(todayVm,/oldestUnresolved=\[\.\.\.actions\]\.sort/);
+  assert.match(todayVm,/openCount:actions\.length/);
+});
+
+test('Stage02 Action history uses exact incident linkage and never target-only fallback',()=>{
+  const selectorSource=fs.readFileSync(path.join(srcRoot,'stage02-open-actions.ts'),'utf8');
+  const stageVm=fs.readFileSync(path.join(srcRoot,'stage02-view-model.ts'),'utf8');
+  const {selectActionHistory}=loadPureTsModule('stage02-open-actions.ts');
+
+  assert.match(selectorSource,/if\(action\.correlationId\)return record\.correlationId===action\.correlationId/);
+  assert.match(selectorSource,/if\(action\.incidentId\)return record\.incidentId===action\.incidentId/);
+  assert.match(selectorSource,/record\.linkedActionId===action\.actionId/);
+  assert.doesNotMatch(selectorSource,/record\.target===action\.target/);
+  assert.match(stageVm,/selectActionHistory\(row\.action,activity\)/);
+
+  const actionA={actionId:'action-a',correlationId:'A',severity:'ATTENTION',domain:'TEST',title:'A',detail:'',target:'shared-target',certainty:'CONFIRMED',observedAt:'2026-09-26T12:00:00Z'};
+  const history=selectActionHistory(actionA,[
+    {activityId:'ha',title:'A history',actor:'owner',correlationId:'A',target:'shared-target',result:'OK',observedAt:'2026-09-26T12:01:00Z'},
+    {activityId:'hb',title:'B history',actor:'owner',correlationId:'B',target:'shared-target',result:'OK',observedAt:'2026-09-26T12:02:00Z'},
+    {activityId:'ht',title:'Target only',actor:'owner',target:'shared-target',result:'OK',observedAt:'2026-09-26T12:03:00Z'},
+  ]);
+  assert.deepEqual(history.map(row=>row.activityId),['ha']);
+
+  const actionB={actionId:'action-b',incidentId:'INC-B',severity:'INFO',domain:'TEST',title:'B',detail:'',target:'shared-target',certainty:'CONFIRMED',observedAt:'2026-09-26T12:00:00Z'};
+  const historyB=selectActionHistory(actionB,[
+    {activityId:'bi',title:'B incident',actor:'owner',incidentId:'INC-B',target:'shared-target',result:'OK',observedAt:'2026-09-26T12:01:00Z'},
+    {activityId:'bt',title:'target only',actor:'owner',target:'shared-target',result:'OK',observedAt:'2026-09-26T12:02:00Z'},
+  ]);
+  assert.deepEqual(historyB.map(row=>row.activityId),['bi']);
+});
+
+test('Stage02 command flow exposes Pending, locks duplicates, and UNKNOWN only permits recheck',()=>{
+  const app=fs.readFileSync(path.join(srcRoot,'App.tsx'),'utf8');
+  const components=fs.readFileSync(path.join(srcRoot,'stage02-action-queue.tsx'),'utf8');
+
+  const pendingIndex=app.indexOf("state:'PENDING'");
+  const requestIndex=app.indexOf('await port.requestBoundedAction');
+  assert.ok(pendingIndex>=0&&requestIndex>pendingIndex);
+
+  assert.match(components,/disabled=\{commandLocked\}/);
+  assert.match(components,/commandLocked=flight\?\.state===\'PENDING\'\|\|flight\?\.state===\'UNKNOWN\'/);
+  assert.match(components,/正在提交／等待讀回/);
+  assert.match(components,/狀態未明 — 禁止重送/);
+  assert.match(components,/重新確認讀回/);
+  assert.match(app,/禁止重複提交/);
+  assert.match(app,/禁止 blind resend/);
+  assert.doesNotMatch(app,/setCommandFlight\([^\n]*RESOLVED/);
+  assert.doesNotMatch(app,/result\.message/);
+  assert.match(components,/只有 canonical readback \/ proof 先可以真正移出 Queue/);
+});
+
+test('Stage02 primary touch targets are at least 44px and responsive gates cover target widths',()=>{
+  const css=fs.readFileSync(path.join(srcRoot,'styles.css'),'utf8');
+
+  assert.match(css,/\.action-filter-row button\{min-height:44px\}/);
+  assert.match(css,/\.drawer-head>button,\.sheet header>button\{[\s\S]*min-height:44px/);
+  assert.match(css,/\.primary,\.action-primary,\.secondary-action\{min-height:44px\}/);
+
+  for(const width of[360,375,390,430,520]){
+    assert.match(css,new RegExp('@media\\(max-width:'+width+'px\\)'));
+  }
+});
+
+test('Stage02 normal UI does not render raw correlation identity or engineering result payloads',()=>{
+  const app=fs.readFileSync(path.join(srcRoot,'App.tsx'),'utf8');
+  const components=fs.readFileSync(path.join(srcRoot,'stage02-action-queue.tsx'),'utf8');
+
+  assert.doesNotMatch(components,/\{(?:item|record)\.correlationId\}/);
+  assert.doesNotMatch(components,/\{(?:item|record)\.incidentId\}/);
+  assert.doesNotMatch(app,/result\.message/);
+  assert.doesNotMatch(app,/reason instanceof Error\?reason\.message|error\.message/);
 });
