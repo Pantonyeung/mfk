@@ -332,7 +332,7 @@ export function RuntimeDiningWorkspace({runtime,onCheckout,warningMinutes}:{
             </div>
           </article>):<p className="dining-no-items">未有商品；目前只記錄輪候／桌台。</p>}
         </section>
-        {detail.priceOverrides?.length?<section className="dining-payment-history"><header><b>人工改價紀錄</b><span>{detail.priceOverrides.length}</span></header>{detail.priceOverrides.map(row=><div key={row.id}><span>{row.staffName}</span><b>{money(row.originalUnitMinor)} → {money(row.effectiveUnitMinor)}</b><small>{money(row.deltaMinor)} · {new Date(row.createdAt).toLocaleTimeString('zh-HK',{hour:'2-digit',minute:'2-digit'})}</small>{row.reason?<small>{row.reason}</small>:null}</div>)}</section>:null}
+        {detail.priceOverrides?.length?<section className="dining-payment-history"><header><b>人工改價紀錄</b><span>{detail.priceOverrides.length}</span></header>{[...detail.priceOverrides].reverse().map(row=><div key={row.id}><span>#{row.sequence??'—'} · {row.staffName}</span><b>{money(row.originalUnitMinor)} → {money(row.effectiveUnitMinor)}</b><small>{row.deltaMinor>=0?'+':''}{money(row.deltaMinor)} · {new Date(row.createdAt).toLocaleTimeString('zh-HK',{hour:'2-digit',minute:'2-digit'})}</small>{row.reason?<small>{row.reason}</small>:null}</div>)}</section>:null}
         <section className="dining-payment-panel checkout-authority">
           <header><div><b>本次結帳</b><small>按商品揀選，不受用餐人數限制</small></div><strong>{money(selectedAmount)}</strong></header>
           <button type="button" className="dining-settle-button" disabled={checkoutBusy||actionBusy||selectedUnits<=0||detail.remainingMinor<=0||detail.totalMinor<0} onClick={()=>void goCheckout()}>{checkoutBusy?'核對最新資料…':'前往結帳 · '+selectedUnits+' 件'}</button>
