@@ -23,6 +23,7 @@ export type OrderingPanelState=
   |{readonly type:'product';readonly productId:string;readonly lineId?:string}
   |{readonly type:'required'}
   |{readonly type:'drink-config';readonly choiceId:string;readonly qty:number;readonly targetLineId?:string}
+  |{readonly type:'riceball-pair'}
   |{readonly type:'organize'}
   |{readonly type:'combo'}
   |{readonly type:'hold'}
