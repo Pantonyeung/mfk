@@ -25,7 +25,7 @@ export function RiceballPairingWorkspace({
   onApply,onRestore,
   drinkChoices,onAddDrink,onConfigureDrink,
 }:{
-  cart:readonly WorkspaceCartLine[];
+  cart:readonly (WorkspaceCartLine&{readonly serviceMode:'takeaway'|'dine-in'})[];
   products:readonly WorkspaceProduct[];
   combos:readonly SyncedCombo[];
   pools:readonly SyncedComboPool[];
