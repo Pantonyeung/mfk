@@ -44,16 +44,29 @@ test('Offline workspace cannot bypass trusted staff identity',()=>{
   assert.match(stage0,/離線模式唔會繞過員工登入/);
 });
 
-test('Stage 0 uses Owner-approved brand assets with at most one main IP per screen',()=>{
+test('Stage 0 uses canonical logo plus regenerated purpose-specific IP illustrations',()=>{
   assert.match(stage0,/\/brand\/morefun-logo\.webp/);
-  assert.match(stage0,/\/brand\/ip-male\.webp/);
-  assert.match(stage0,/\/brand\/ip-female\.webp/);
+  assert.match(stage0,/\/brand\/stage0\/splash-male\.svg/);
+  assert.match(stage0,/\/brand\/stage0\/login-female\.svg/);
+  assert.match(stage0,/\/brand\/stage0\/connecting-male\.svg/);
+  assert.match(stage0,/\/brand\/stage0\/recovery-female\.svg/);
+  assert.doesNotMatch(stage0,/\/brand\/ip-male\.webp/);
+  assert.doesNotMatch(stage0,/\/brand\/ip-female\.webp/);
   assert.doesNotMatch(css,/data:image\/webp;base64/);
-  assert.equal((stage0.match(/ip-male\.webp/g)||[]).length,1);
-  assert.equal((stage0.match(/ip-female\.webp/g)||[]).length,1);
+  assert.match(stage0,/BrandScene/);
   assert.ok(existsSync(new URL('../public/brand/morefun-logo.webp',import.meta.url)));
-  assert.ok(existsSync(new URL('../public/brand/ip-male.webp',import.meta.url)));
-  assert.ok(existsSync(new URL('../public/brand/ip-female.webp',import.meta.url)));
+  for(const file of ['splash-male.svg','login-female.svg','connecting-male.svg','recovery-female.svg']){
+    assert.ok(existsSync(new URL('../public/brand/stage0/'+file,import.meta.url)));
+  }
+  const provenance=JSON.parse(readFileSync(new URL('../public/brand/stage0/asset-provenance.json',import.meta.url),'utf8'));
+  assert.equal(provenance.logo.source,'OWNER_CANONICAL_LOGO');
+  assert.equal(provenance.logo.transformation,'NONE');
+  assert.equal(provenance.illustrations.length,4);
+  for(const asset of provenance.illustrations){
+    assert.equal(asset.rendering,'AI_GENERATED_REDRAW');
+    assert.equal(asset.source,'OWNER_IP_REFERENCE_ONLY');
+    assert.equal(asset.crop,false);
+  }
 });
 
 test('Stage 0 staff login reuses current staff verification',()=>{
@@ -68,4 +81,14 @@ test('Stage 0 style respects mobile viewport and accessibility preferences',()=>
   assert.match(css,/env\(safe-area-inset-top\)/);
   assert.match(css,/env\(safe-area-inset-bottom\)/);
   assert.match(css,/prefers-reduced-motion:reduce/);
+});
+
+
+test('Stage 0 brand scenes keep one purpose-specific IP per surface and preserve logo ratio',()=>{
+  for(const file of ['splash-male.svg','login-female.svg','connecting-male.svg','recovery-female.svg']){
+    assert.equal((stage0.match(new RegExp(file.replace('.','\\.'),'g'))||[]).length,1);
+  }
+  assert.match(css,/\.stage0-brand-logo\{[\s\S]*height:auto/);
+  assert.match(css,/\.stage0-brand-scene/);
+  assert.match(css,/\.stage0-purpose-chip/);
 });
