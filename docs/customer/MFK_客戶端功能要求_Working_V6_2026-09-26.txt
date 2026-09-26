@@ -1,0 +1,71 @@
+MFK 客戶端功能要求｜Working V6
+日期：2026-09-26
+狀態：點單頁畫面結構 Draft
+里程碑：Order Page IA / Product Card / Detail Layout 第一版
+
+1｜點單頁總結構
+- 全局固定頂部：Logo + 店舖營業狀態
+- 全局固定底部：首頁 / 點單 / 記憶罐 / 訂單 / 會員
+- 中間：搜尋 → sticky 橫向分類 → 分類 Hero → 兩欄 Product Grid → 下一分類 Hero/Grid
+- 點分類 smooth scroll；垂直滾動時同步 active 分類
+
+2｜Category Hero
+- 每分類都有 Hero
+- 手機全寬，約 16:9
+- 首個優先載入、下一個預載、其餘 lazy-load
+- 可導向指定商品／分類活動
+- 售罄 Hero 可展示，但購買 CTA 必須不可用
+
+3｜Product Card
+- 預設兩欄
+- 1:1 商品圖
+- 商品名 / 價格 / 一個短標籤 / 售罄狀態
+- 零 Required Choice 商品可 Quick Add
+- 有 Required / Combo / Variation 商品顯示「選擇」並進 Detail
+- 售罄保留卡位，CTA Disabled，建議仍可進 Detail
+
+4｜Product Detail
+Shared Element Expansion：
+Product Card 圖 → 放大成 Detail Hero。
+Fallback：fade + scale；Reduced Motion 用簡單轉場。
+
+Detail 順序：
+Hero → 名稱/簡介/價格 → 套餐升級 → Required → Optional → 數量 → 推薦 → 配置摘要 → Sticky 加入記憶罐
+
+Required 未完成：
+- 不可建立 Cart Line
+- CTA 顯示欠缺項目
+- 點 CTA 導向第一個未完成 Required Group
+
+5｜套餐升級
+- 單點 Product 讀正式 comboTier / eligibility
+- A/B/C/D 由 Catalog metadata 決定，不以顯示價反推
+- 接受套餐後保留原合法配置
+- 只補新增 Required
+- Quote 即時計算
+- 可撤回至單點，不應無故遺失原配置
+
+6｜推薦 UI
+- Detail 最多 2–3 件
+- 標題按情境：「配埋會更完整」「大家通常會加」「升級做套餐」「今期限量」
+- 客戶 Skip 後，同 Session 降低同類推薦頻率
+- Recommendation 無 Pricing / Sellability / Required / Order authority
+
+7｜搜尋
+- 基本商品名 / 關鍵字 / 同義詞
+- 零結果回相關分類
+- 不做 AI 對話搜尋
+
+8｜驗收
+- Required 商品不能 Quick Add 半合法 Cart Line
+- 套餐升級不遺失合法配置
+- Tier 不靠價格猜
+- 推薦不能繞過正式驗證
+- Hero 不一次下載晒全部大圖
+- active 分類同步正確
+- 返回點單頁盡量保留原分類與 scroll context
+
+里程碑：
+CUSTOMER_ORDER_PAGE_IA_V1_DRAFT_READY
+CUSTOMER_PRODUCT_CARD_V1_DRAFT_READY
+CUSTOMER_PRODUCT_DETAIL_UI_V1_DRAFT_READY
