@@ -2,6 +2,8 @@ import {useEffect,useMemo,useState} from 'react';
 import type {ReactNode} from 'react';
 import {readOwnerLocalWorkspace,writeOwnerLocalWorkspace,type OwnerChecklistItem} from './persistence';
 import {resolveOwnerRuntimePort} from './runtime';
+import {buildOwnerTodayViewModel} from './today-view-model';
+import {DineInOpenChecksCard,TodayLiveOrdersCard} from './today-components';
 import type {
   OwnerActionItem,
   OwnerConnectionState,
@@ -97,7 +99,7 @@ export function App(){
     {connection==='STALE'||connection==='PARTIAL'||connection==='UNKNOWN'?<RecoveryBanner title={connectionLabel} detail="畫面會保留資料新鮮度／確定性；未知唔會當失敗，部分資料亦唔會當完整。" onRetry={()=>void refresh()}/>:null}
 
     <section className="stage">
-      {view==='today'?<TodayPage connection={connection} snapshot={snapshot} onQueue={()=>changeView('queue')} onTool={setTool}/>:null}
+      {view==='today'?<TodayPage connection={connection} snapshot={snapshot} onQueue={()=>changeView('queue')} onOrders={()=>changeView('orders')} onTool={setTool}/>:null}
       {view==='queue'?<QueuePage connection={connection} items={snapshot?.actions??[]} onCommand={requestBounded}/>:null}
       {view==='orders'?<OrdersPage connection={connection} rows={visibleOrders} segment={segment} setSegment={setSegment} query={query} setQuery={setQuery} source={source} setSource={setSource} sources={sources} onOpen={setSelectedOrder}/>:null}
       {view==='more'?<MorePage snapshot={snapshot} connection={connection} onTool={setTool}/>:null}
@@ -132,13 +134,16 @@ export function App(){
   </main>;
 }
 
-function TodayPage({connection,snapshot,onQueue,onTool}:{connection:OwnerConnectionState;snapshot:OwnerReadModelSnapshot|null;onQueue:()=>void;onTool:(tool:Tool)=>void}){
+function TodayPage({connection,snapshot,onQueue,onOrders,onTool}:{connection:OwnerConnectionState;snapshot:OwnerReadModelSnapshot|null;onQueue:()=>void;onOrders:()=>void;onTool:(tool:Tool)=>void}){
+  const vm=buildOwnerTodayViewModel(snapshot);
   const today=snapshot?.today;
   const store=snapshot?.store;
   return <section className="page">
     <header className="page-head"><div><span>今日</span><h1>而家間舖點？</h1><small>{store?'資料截至 '+new Date(store.observedAt).toLocaleString('zh-HK'):'未有正式讀回'}</small></div></header>
     {!today?<Empty title={connection==='NOT_CONNECTED'?'今日數據尚未連接':'暫時未有今日數據'} detail="正式營業額、訂單同平均單未有讀回之前唔會顯示假 KPI。"/>:
-      <section className="kpi-grid"><Kpi label="有效營業額" value={today.salesLabel} compare={today.comparisonLabel}/><Kpi label="訂單" value={String(today.orderCount)} compare="正式單摘要"/><Kpi label="平均訂單" value={today.averageOrderLabel} compare="有效營業額 / 有效單量"/></section>}
+      <section className="kpi-grid"><Kpi label="有效營業額" value={today.salesLabel} compare={today.comparisonLabel}/><Kpi label="訂單" value={String(today.orderCount)} compare="正式有效單摘要"/><Kpi label="平均訂單" value={today.averageOrderLabel} compare="有效營業額 / 有效單量"/></section>}
+    <TodayLiveOrdersCard value={vm.liveOrders} onOpen={onOrders}/>
+    <DineInOpenChecksCard value={vm.dineIn} onOpen={onOrders}/>
     <section className="card attention-card"><div className="section-head"><div><span className="eyebrow danger">需要處理</span><h2>Action Queue</h2></div><b className="count-badge">{today?.attentionCount??0}</b></div><p>只放真正需要人介入嘅事項；未知狀態會保持未知。</p><button className="primary wide" onClick={onQueue}>查看待處理</button></section>
     <section className="card"><div className="section-head"><div><span className="eyebrow">營運健康</span><h2>Readiness</h2></div><button className="link-btn" onClick={()=>onTool('recovery')}>資料狀態</button></div>{snapshot?.readiness.length?<div className="readiness-grid">{snapshot.readiness.map(item=><article key={item.id}><span>{item.label}</span><strong>{item.value}</strong></article>)}</div>:<p>未有健康讀回。</p>}</section>
     <section className="card compact-card"><div className="section-head"><div><span className="eyebrow orange">現場</span><h2>目前人手</h2></div><button className="link-btn" onClick={()=>onTool('staff')}>查看</button></div><div className="split-summary"><div><strong>{today?.staffNow??'—'}</strong><span>目前在場</span></div><div><strong>{snapshot?.staff.filter(item=>item.presence.includes('休息')).length??0}</strong><span>休息中</span></div><div><strong>{snapshot?.staff.filter(item=>item.presence.includes('異常')).length??0}</strong><span>需留意</span></div></div></section>
