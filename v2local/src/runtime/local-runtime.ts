@@ -1310,12 +1310,10 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
       if(hold.payments?.length)throw new Error('DINING_PRICE_OVERRIDE_AFTER_PAYMENT_FORBIDDEN');
       const session=readActiveStaffSession();
       if(!session)throw new Error('DINING_PRICE_OVERRIDE_AUTH_REQUIRED');
-      const authorized=session.role==='OWNER'||session.permissions.includes('PRICE_OVERRIDE')||hasStaffPermission('PRICE_OVERRIDE');
-      if(!authorized)throw new Error('DINING_PRICE_OVERRIDE_FORBIDDEN');
+      if(!hasStaffPermission('PRICE_OVERRIDE'))throw new Error('DINING_PRICE_OVERRIDE_FORBIDDEN');
       if(!Number.isSafeInteger(lineIndex)||lineIndex<0||lineIndex>=hold.items.length)throw new Error('DINING_LINE_NOT_FOUND');
-      if(!Number.isSafeInteger(effectiveUnitMinor)||effectiveUnitMinor<0)throw new Error('DINING_PRICE_OVERRIDE_INVALID');
+      if(!Number.isSafeInteger(effectiveUnitMinor))throw new Error('DINING_PRICE_OVERRIDE_INVALID');
       const normalizedReason=String(reason||'').trim().slice(0,200);
-      if(!normalizedReason)throw new Error('DINING_PRICE_OVERRIDE_REASON_REQUIRED');
       const item=hold.items[lineIndex];
       const createdAt=new Date().toISOString();
       const record:LocalPriceOverrideRecord={
