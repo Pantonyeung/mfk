@@ -13,7 +13,8 @@ import {
   TodayLiveOrdersCard,
   TodayStaffSummaryCard,
 } from './today-components';
-import {ActionQueuePage} from './stage02-action-queue';
+import {ActionQueuePage,type OwnerActionCommandFlight} from './stage02-action-queue';
+import {selectOpenActions} from './stage02-open-actions';
 import type {
   OwnerConnectionState,
   OwnerOrderProjection,
@@ -24,7 +25,7 @@ import type {
 type View='today'|'queue'|'orders'|'more';
 type OrdersScope='DEFAULT'|'ACTIVE'|'DINE_IN_OPEN';
 type Tool='reports'|'sellability'|'channels'|'staff'|'devices'|'customers'|'marketing'|'settlement'|'cash'|'inventory'|'notifications'|'manager'|'activity'|'admin'|'recovery';
-type Confirmation={label:string;target:string;impact:string};
+type Confirmation={label:string;target:string;impact:string;actionId?:string};
 
 export function App(){
   const local=useMemo(()=>readOwnerLocalWorkspace(),[]);
@@ -39,6 +40,7 @@ export function App(){
   const [tool,setTool]=useState<Tool|null>(null);
   const [selectedOrder,setSelectedOrder]=useState<OwnerOrderProjection|null>(null);
   const [confirmation,setConfirmation]=useState<Confirmation|null>(null);
+  const [commandFlight,setCommandFlight]=useState<OwnerActionCommandFlight|null>(null);
   const [query,setQuery]=useState('');
   const [source,setSource]=useState('全部');
   const [segment,setSegment]=useState<'current'|'completed'>('current');
@@ -55,19 +57,23 @@ export function App(){
 
   const changeView=(next:View)=>{setView(next);persistLocal({view:next})};
 
-  const refresh=async()=>{
-    if(!port){setConnection('OFFLINE_READONLY');setSnapshot(null);return}
+  const refresh=async():Promise<boolean>=>{
+    if(!port){setConnection('OFFLINE_READONLY');setSnapshot(null);return false}
     setConnection('LOADING');
     try{
       const next=await port.readSnapshot();
       setSnapshot(next);
       setConnection(resolveSnapshotState(next));
+      return true;
     }catch{
       setConnection('ERROR');
+      return false;
     }
   };
 
   useEffect(()=>{void refresh()},[]);
+
+  const openActions=useMemo(()=>selectOpenActions(snapshot?.actions??[]),[snapshot?.actions]);
 
   const visibleOrders=(snapshot?.orders??[]).filter(order=>{
     const done=order.lifecycle==='COMPLETED'||order.lifecycle==='CANCELLED';
@@ -91,23 +97,53 @@ export function App(){
     changeView('orders');
   };
 
-  const requestBounded=(label:string,target:string,impact:string)=>{
+  const requestBounded=(label:string,target:string,impact:string,actionId?:string)=>{
     if(connection==='OFFLINE_READONLY'){setNotice('離線唯讀：遠端操作已停用。');return}
     if(connection==='PERMISSION_DENIED'){setNotice('目前身份冇權執行呢個操作。');return}
-    setConfirmation({label,target,impact:impact+' 正式狀態必須等目標系統讀回。'});
+    if(actionId&&commandFlight?.actionId===actionId&&(commandFlight.state==='PENDING'||commandFlight.state==='UNKNOWN')){
+      setNotice('呢項操作仍在等待正式讀回；禁止重複提交。');
+      return;
+    }
+    setConfirmation({label,target,impact:impact+' 正式狀態必須等目標系統讀回。',actionId});
   };
 
   const executeBounded=async(value:Confirmation)=>{
     setConfirmation(null);
     if(connection==='OFFLINE_READONLY'){setNotice('離線唯讀：遠端操作已停用。');return}
     if(!port?.requestBoundedAction){setNotice('遠端操作服務尚未連接；冇改變任何正式狀態。');return}
+
+    if(value.actionId)setCommandFlight({actionId:value.actionId,state:'PENDING',message:'正在提交／等待 canonical readback。'});
+
     try{
       const result=await port.requestBoundedAction({actionType:value.label,target:value.target,reason:value.impact,operationId:crypto.randomUUID()});
-      setNotice(result.message);
-      if(result.state==='CONFIRMED')void refresh();
+      if(result.state==='CONFIRMED'){
+        setNotice('操作已提交並取得確認；正在重新讀取正式狀態。');
+        const readbackOk=await refresh();
+        if(value.actionId)setCommandFlight(readbackOk?null:{actionId:value.actionId,state:'UNKNOWN',message:'操作已確認，但最新正式狀態未能讀回。只可重新確認，禁止重送。'});
+        return;
+      }
+      if(result.state==='REJECTED'){
+        setNotice('操作未獲接受；正式狀態未改變。');
+        if(value.actionId)setCommandFlight({actionId:value.actionId,state:'REJECTED',message:'操作未獲接受；可檢查條件後再決定。'});
+        return;
+      }
+      if(result.state==='FAILED'){
+        setNotice('操作未完成；正式狀態未被標記為已解決。');
+        if(value.actionId)setCommandFlight({actionId:value.actionId,state:'FAILED',message:'操作未完成；請檢查目前狀態。'});
+        return;
+      }
+      setNotice('操作結果未明；請重新確認正式狀態，唔好重複提交。');
+      if(value.actionId)setCommandFlight({actionId:value.actionId,state:'UNKNOWN',message:'結果未明；只可重新確認 canonical readback，禁止 blind resend。'});
     }catch{
-      setNotice('操作結果未明；請先重新確認讀回，唔好重複操作。');
+      setNotice('操作結果未明；請重新確認正式狀態，唔好重複提交。');
+      if(value.actionId)setCommandFlight({actionId:value.actionId,state:'UNKNOWN',message:'結果未明；只可重新確認 canonical readback，禁止 blind resend。'});
     }
+  };
+
+  const recheckAction=async(actionId:string)=>{
+    setCommandFlight({actionId,state:'PENDING',message:'正在重新確認正式狀態。'});
+    const ok=await refresh();
+    setCommandFlight(ok?null:{actionId,state:'UNKNOWN',message:'仍未能取得正式讀回；禁止 blind resend。'});
   };
 
   const connectionLabel=connection==='FRESH'?'資料新鮮':connection==='LOADING'?'同步中':connection==='EMPTY'?'暫無資料':connection==='STALE'?'資料稍舊':connection==='PARTIAL'?'部分資料':connection==='OFFLINE_READONLY'?'離線唯讀':connection==='PERMISSION_DENIED'?'權限不足':connection==='UNKNOWN'?'狀態未明':'同步失敗';
@@ -125,14 +161,14 @@ export function App(){
 
     <section className="stage">
       {view==='today'?<TodayPage connection={connection} snapshot={snapshot} onQueue={()=>changeView('queue')} onActiveOrders={()=>openOrdersScope('ACTIVE')} onDineInOrders={()=>openOrdersScope('DINE_IN_OPEN')} onTool={setTool}/>:null}
-      {view==='queue'?<ActionQueuePage connection={connection} items={snapshot?.actions??[]} activity={snapshot?.activity??[]} onCommand={requestBounded}/>:null}
+      {view==='queue'?<ActionQueuePage connection={connection} items={openActions} activity={snapshot?.activity??[]} commandFlight={commandFlight} onCommand={requestBounded} onRecheck={actionId=>void recheckAction(actionId)}/>:null}
       {view==='orders'?<OrdersPage connection={connection} rows={visibleOrders} segment={segment} setSegment={value=>{setOrdersScope('DEFAULT');setSegment(value)}} query={query} setQuery={value=>{setOrdersScope('DEFAULT');setQuery(value)}} source={source} setSource={value=>{setOrdersScope('DEFAULT');setSource(value)}} sources={sources} onOpen={setSelectedOrder}/>:null}
       {view==='more'?<MorePage snapshot={snapshot} connection={connection} onTool={setTool}/>:null}
     </section>
 
     <nav className="bottom-nav" aria-label="主要功能">
       <Nav active={view==='today'} label="今日" onClick={()=>changeView('today')}/>
-      <Nav active={view==='queue'} label="待處理" badge={snapshot?.actions.length?String(snapshot.actions.length):undefined} onClick={()=>changeView('queue')}/>
+      <Nav active={view==='queue'} label="待處理" badge={openActions.length?String(openActions.length):undefined} onClick={()=>changeView('queue')}/>
       <Nav active={view==='orders'} label="訂單" onClick={()=>openOrdersScope('DEFAULT')}/>
       <Nav active={view==='more'} label="更多" onClick={()=>changeView('more')}/>
     </nav>
