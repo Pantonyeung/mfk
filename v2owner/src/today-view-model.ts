@@ -1,3 +1,4 @@
+import {selectOpenActions} from './stage02-open-actions';
 import type {
   OwnerActionItem,
   OwnerHealthKind,
@@ -68,7 +69,7 @@ function firstHealth(snapshot:OwnerReadModelSnapshot|null,kind:Exclude<OwnerHeal
 }
 
 export function buildOwnerTodayViewModel(snapshot:OwnerReadModelSnapshot|null):OwnerTodayViewModel{
-  const actions=[...(snapshot?.actions??[])];
+  const actions=[...selectOpenActions(snapshot?.actions??[])];
   const topSeverity=actions.sort((a,b)=>severityRank[b.severity]-severityRank[a.severity]||a.observedAt.localeCompare(b.observedAt))[0]??null;
   const oldestUnresolved=[...(snapshot?.actions??[])].sort((a,b)=>a.observedAt.localeCompare(b.observedAt))[0]??null;
 
@@ -85,7 +86,7 @@ export function buildOwnerTodayViewModel(snapshot:OwnerReadModelSnapshot|null):O
     liveOrders:snapshot?.liveOrders??null,
     dineIn:snapshot?.dineIn??null,
     actionSummary:{
-      openCount:snapshot?.actions.length??0,
+      openCount:actions.length,
       topSeverity,
       oldestUnresolved,
     },
