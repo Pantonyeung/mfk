@@ -15,15 +15,15 @@ import {
 } from './today-components';
 import {ActionQueuePage,type OwnerActionCommandFlight} from './stage02-action-queue';
 import {isCanonicalActionUnknown,selectOpenActions} from './stage02-open-actions';
+import {OrderOversightPage} from './stage03-order-oversight';
+import type {OwnerOrderScope} from './stage03-view-model';
 import type {
   OwnerConnectionState,
-  OwnerOrderProjection,
   OwnerReadModelSnapshot,
   OwnerRuntimePort,
 } from './product-types';
 
 type View='today'|'queue'|'orders'|'more';
-type OrdersScope='DEFAULT'|'ACTIVE'|'DINE_IN_OPEN';
 type Tool='reports'|'sellability'|'channels'|'staff'|'devices'|'customers'|'marketing'|'settlement'|'cash'|'inventory'|'notifications'|'manager'|'activity'|'admin'|'recovery';
 type Confirmation={label:string;target:string;impact:string;actionId?:string};
 
@@ -38,13 +38,9 @@ export function App(){
   const [snapshot,setSnapshot]=useState<OwnerReadModelSnapshot|null>(null);
   const [notice,setNotice]=useState<string|null>(null);
   const [tool,setTool]=useState<Tool|null>(null);
-  const [selectedOrder,setSelectedOrder]=useState<OwnerOrderProjection|null>(null);
   const [confirmation,setConfirmation]=useState<Confirmation|null>(null);
   const [commandFlight,setCommandFlight]=useState<OwnerActionCommandFlight|null>(null);
-  const [query,setQuery]=useState('');
-  const [source,setSource]=useState('全部');
-  const [segment,setSegment]=useState<'current'|'completed'>('current');
-  const [ordersScope,setOrdersScope]=useState<OrdersScope>('DEFAULT');
+  const [ordersScope,setOrdersScope]=useState<OwnerOrderScope>('DEFAULT');
 
   const persistLocal=(next?:Partial<{view:View;managerNote:string;handoffNote:string;checklist:readonly OwnerChecklistItem[]}>)=>{
     writeOwnerLocalWorkspace({
@@ -75,25 +71,8 @@ export function App(){
 
   const openActions=useMemo(()=>selectOpenActions(snapshot?.actions??[]),[snapshot?.actions]);
 
-  const visibleOrders=(snapshot?.orders??[]).filter(order=>{
-    const done=order.lifecycle==='COMPLETED'||order.lifecycle==='CANCELLED';
-    const segmentOk=segment==='completed'?done:!done;
-    const sourceOk=source==='全部'||order.source===source;
-    const q=query.trim().toLowerCase();
-    const queryOk=!q||[order.displayCode,order.source,order.lifecycle,order.externalRef??'',order.itemSummary].join(' ').toLowerCase().includes(q);
-    const scopeOk=ordersScope==='DEFAULT'
-      ?true
-      :ordersScope==='ACTIVE'
-        ?!done
-        :!done&&order.fulfillmentMode==='DINE_IN'&&(order.paymentState==='OPEN'||order.paymentState==='PARTIAL');
-    return segmentOk&&sourceOk&&queryOk&&scopeOk;
-  });
-
-  const openOrdersScope=(scope:OrdersScope)=>{
+  const openOrdersScope=(scope:OwnerOrderScope)=>{
     setOrdersScope(scope);
-    setSegment('current');
-    setSource('全部');
-    setQuery('');
     changeView('orders');
   };
 
@@ -173,7 +152,6 @@ export function App(){
   };
 
   const connectionLabel=connection==='FRESH'?'資料新鮮':connection==='LOADING'?'同步中':connection==='EMPTY'?'暫無資料':connection==='STALE'?'資料稍舊':connection==='PARTIAL'?'部分資料':connection==='OFFLINE_READONLY'?'離線唯讀':connection==='PERMISSION_DENIED'?'權限不足':connection==='UNKNOWN'?'狀態未明':'同步失敗';
-  const sources=['全部',...Array.from(new Set((snapshot?.orders??[]).map(order=>order.source)))];
 
   return <main className="app-shell">
     <header className="topbar">
@@ -188,7 +166,7 @@ export function App(){
     <section className="stage">
       {view==='today'?<TodayPage connection={connection} snapshot={snapshot} onQueue={()=>changeView('queue')} onActiveOrders={()=>openOrdersScope('ACTIVE')} onDineInOrders={()=>openOrdersScope('DINE_IN_OPEN')} onTool={setTool}/>:null}
       {view==='queue'?<ActionQueuePage connection={connection} items={openActions} activity={snapshot?.activity??[]} commandFlight={commandFlight} onCommand={requestBounded} onRecheck={actionId=>void recheckAction(actionId)}/>:null}
-      {view==='orders'?<OrdersPage connection={connection} rows={visibleOrders} segment={segment} setSegment={value=>{setOrdersScope('DEFAULT');setSegment(value)}} query={query} setQuery={value=>{setOrdersScope('DEFAULT');setQuery(value)}} source={source} setSource={value=>{setOrdersScope('DEFAULT');setSource(value)}} sources={sources} onOpen={setSelectedOrder}/>:null}
+      {view==='orders'?<OrderOversightPage connection={connection} orders={snapshot?.orders??[]} scope={ordersScope} onScopeReset={()=>setOrdersScope('DEFAULT')}/>:null}
       {view==='more'?<MorePage snapshot={snapshot} connection={connection} onTool={setTool}/>:null}
     </section>
 
@@ -216,7 +194,6 @@ export function App(){
       }}
       onClose={()=>setTool(null)}
     />:null}
-    {selectedOrder?<OrderDrawer order={selectedOrder} onClose={()=>setSelectedOrder(null)}/>:null}
     {confirmation?<ConfirmationSheet value={confirmation} onClose={()=>setConfirmation(null)} onConfirm={()=>void executeBounded(confirmation)}/>:null}
   </main>;
 }
@@ -254,12 +231,6 @@ function TodayPage({
     <TodayHealthSummaryCard value={vm.healthSummary} onChannels={()=>onTool('channels')} onDevices={()=>onTool('devices')}/>
     <TodayStaffSummaryCard value={vm.staffSummary} onOpen={()=>onTool('staff')}/>
     <TodayInsightCard value={vm.insight}/>
-  </section>;
-}
-
-function OrdersPage({connection,rows,segment,setSegment,query,setQuery,source,setSource,sources,onOpen}:{connection:OwnerConnectionState;rows:readonly OwnerOrderProjection[];segment:'current'|'completed';setSegment:(v:'current'|'completed')=>void;query:string;setQuery:(v:string)=>void;source:string;setSource:(v:string)=>void;sources:readonly string[];onOpen:(order:OwnerOrderProjection)=>void}){
-  return <section className="page"><header className="page-head"><div><span>訂單監察</span><h1>訂單</h1><small>只讀正式投影；未知結果唔會當完成。</small></div><b className="hero-number">{rows.length}</b></header><div className="segmented"><button className={segment==='current'?'active':''} onClick={()=>setSegment('current')}>進行中</button><button className={segment==='completed'?'active':''} onClick={()=>setSegment('completed')}>已完成</button></div><label className="search"><span>搜尋</span><input value={query} onChange={event=>setQuery(event.target.value)} placeholder="單號／來源／狀態／外部編號"/></label><div className="chip-row">{sources.map(item=><button key={item} className={source===item?'active':''} onClick={()=>setSource(item)}>{item}</button>)}</div>
-    {!rows.length?<Empty title={connection==='OFFLINE_READONLY'?'訂單資料尚未連接':'暫時冇符合條件嘅訂單'} detail="可以切換分類或者修改搜尋。"/>:<div className="cards">{rows.map(order=><button className="order-card" key={order.orderId} onClick={()=>onOpen(order)}><div className="order-card-top"><div><small>{new Date(order.observedAt).toLocaleTimeString('zh-HK')} · {order.source}</small><h2>{order.displayCode}</h2></div><span className={'certainty '+order.readback.toLowerCase()}>{order.readback}</span></div><div className="order-card-main"><strong>{order.lifecycle}</strong><b>{order.amountLabel??'—'}</b></div><div className="order-card-meta"><span>{order.fulfillmentLabel??'未有交收資料'}</span><span>{order.tenderLabel??'未有付款摘要'}</span><span>{order.externalRef?'外部 '+order.externalRef:'門店單'}</span></div><em>查看詳情 →</em></button>)}</div>}
   </section>;
 }
 
@@ -307,10 +278,6 @@ function ToolDrawer({tool,snapshot,connection,managerNote,handoffNote,checklist,
 
 function ManagerWorkspace({managerNote,handoffNote,checklist,setManagerNote,setHandoffNote,setChecklist}:{managerNote:string;handoffNote:string;checklist:readonly OwnerChecklistItem[];setManagerNote:(v:string)=>void;setHandoffNote:(v:string)=>void;setChecklist:(v:readonly OwnerChecklistItem[])=>void}){
   return <section className="manager-workspace"><p className="callout">以下只係本機私人草稿，唔係共享營運真相、唔會改 Admin/SMT 狀態。</p><label>經理筆記<textarea value={managerNote} onChange={e=>setManagerNote(e.target.value)} placeholder="記低要跟進嘅事項"/></label><div>{checklist.map(item=><label className="check-row" key={item.id}><input type="checkbox" checked={item.done} onChange={e=>setChecklist(checklist.map(row=>row.id===item.id?{...row,done:e.target.checked}:row))}/><span>{item.label}</span></label>)}</div><label>交接草稿<textarea value={handoffNote} onChange={e=>setHandoffNote(e.target.value)} placeholder="交畀下一更嘅本機備忘"/></label></section>;
-}
-
-function OrderDrawer({order,onClose}:{order:OwnerOrderProjection;onClose:()=>void}){
-  return <div className="overlay"><section className="drawer order-drawer" role="dialog" aria-modal="true"><DrawerHead title={'訂單 '+order.displayCode} subtitle={order.source+' · '+new Date(order.observedAt).toLocaleString('zh-HK')} close={onClose}/><div className="detail-grid"><Detail label="狀態" value={order.lifecycle}/><Detail label="Readback" value={order.readback}/><Detail label="有效金額" value={order.amountLabel??'—'}/><Detail label="付款摘要" value={order.tenderLabel??'—'}/></div><DetailSection title="商品"><p>{order.itemSummary}</p></DetailSection><DetailSection title="Fulfillment"><p>{order.fulfillmentLabel??'未有資料'}</p></DetailSection><DetailSection title="列印／副作用">{order.prints.length?order.prints.map(item=><p key={item}>{item}</p>):<p>未有資料</p>}</DetailSection><DetailSection title="Exceptions">{order.exceptions.length?order.exceptions.map(item=><p key={item}>{item}</p>):<p>冇已知 exception</p>}</DetailSection><DetailSection title="Timeline">{order.timeline.length?order.timeline.map(item=><p key={item}>{item}</p>):<p>未有 timeline</p>}</DetailSection><div className="boundary-box">只讀監察｜本頁唔會建立、付款、退款、打印、開錢箱或者改正式訂單。</div></section></div>;
 }
 
 function ConfirmationSheet({value,onClose,onConfirm}:{value:Confirmation;onClose:()=>void;onConfirm:()=>void}){
