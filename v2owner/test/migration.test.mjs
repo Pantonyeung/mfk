@@ -510,9 +510,10 @@ test('Stage03 list search and filters use explicit order projection fields',()=>
   for(const field of['displayCode','customerName','customerPhone','externalRef']){
     assert.match(vm,new RegExp('order\\.'+field));
   }
-  for(const field of['businessDate','source','paymentState','fulfillmentMode']){
+  for(const field of['businessDate','source','paymentState','fulfillmentState']){
     assert.match(vm,new RegExp(field));
   }
+  assert.doesNotMatch(vm,/filters\.fulfillmentMode|fulfillmentModes/);
   assert.match(components,/Display Number／客戶／電話／外部編號/);
   assert.match(components,/Business Day/);
   assert.match(components,/來源/);
@@ -542,11 +543,14 @@ test('Stage03 order card renders required oversight summary without raw order id
 
   for(const field of[
     'displayCode','source','workflowStatusLabel','elapsedLabel','promisedTimeLabel',
-    'currentEffectiveAmountLabel','currentTenderLabel','fulfillmentLabel','exceptionBadges'
+    'currentEffectiveAmountLabel','currentTenderLabel','exceptionBadges'
   ]){
     assert.match(types,new RegExp(field));
     assert.match(components,new RegExp(field));
   }
+  assert.match(types,/OwnerCanonicalFulfillmentState/);
+  assert.match(types,/fulfillmentLabel\?:OwnerCanonicalFulfillmentState/);
+  assert.match(components,/getOwnerOrderFulfillmentStateLabel\(order\)/);
 
   assert.doesNotMatch(components,/<(?:span|strong|small|p|h\d)[^>]*>\{order\.orderId\}/);
   assert.doesNotMatch(components,/order\.exceptions\.map|order\.timeline\.map|order\.prints\.map/);
@@ -602,4 +606,110 @@ test('Stage03 creates no new transaction or command authority',()=>{
   assert.match(mapping,/No second Order \/ Pricing \/ Payment \/ Print \/ Auth \/ Sync authority/);
   assert.match(app,/OrderOversightPage/);
   assert.doesNotMatch(combined,/createFormalOrder|allocateDisplayNumber|cashDrawer|physicalPrinter/);
+});
+
+
+test('Stage03 fulfillment filter/card/detail use canonical fulfillment state, never mode fallback',()=>{
+  const vmSource=fs.readFileSync(path.join(srcRoot,'stage03-view-model.ts'),'utf8');
+  const components=fs.readFileSync(path.join(srcRoot,'stage03-order-oversight.tsx'),'utf8');
+  const mapping=fs.readFileSync(path.join(srcRoot,'stage03-api-mapping.ts'),'utf8');
+  const {mapCanonicalFulfillmentState,getOwnerOrderFulfillmentStateLabel}=loadPureTsModule('stage03-view-model.ts');
+
+  assert.match(vmSource,/filters\.fulfillmentState/);
+  assert.match(vmSource,/mapCanonicalFulfillmentState\(order\.fulfillmentLabel\)/);
+  assert.doesNotMatch(vmSource,/filters\.fulfillmentMode|fulfillmentModes/);
+
+  assert.equal(mapCanonicalFulfillmentState('待處理'),'未完成');
+  assert.equal(mapCanonicalFulfillmentState('進行中'),'未完成');
+  assert.equal(mapCanonicalFulfillmentState('可取餐'),'可取餐');
+  assert.equal(mapCanonicalFulfillmentState('已完成'),'已取餐');
+  assert.equal(mapCanonicalFulfillmentState('已取消'),'已取消');
+  assert.equal(mapCanonicalFulfillmentState(undefined),null);
+
+  assert.equal(getOwnerOrderFulfillmentStateLabel({fulfillmentLabel:'可取餐'}),'可取餐');
+  assert.equal(getOwnerOrderFulfillmentStateLabel({fulfillmentMode:'TAKEAWAY'}),'未有交收狀態讀回');
+
+  assert.match(components,/label="交收狀態"/);
+  assert.match(components,/getOwnerOrderFulfillmentStateLabel\(order\)/);
+  assert.match(components,/Detail label="State" value=\{detail\.fulfillment\.state\}/);
+  assert.match(components,/Detail label="Mode" value=\{detail\.fulfillment\.mode\}/);
+  assert.doesNotMatch(components,/fulfillmentLabel\?\?order\.fulfillmentMode|fulfillmentLabel\?\?order\.fulfillmentMode\?\?/);
+
+  assert.match(mapping,/StoredOrder\.fulfillmentLabel -> v2local projection-outbox fulfillmentLabel -> Owner order projection/);
+  assert.match(mapping,/DO_NOT_USE_FULFILLMENT_MODE_AS_STATE/);
+  assert.match(mapping,/DO_NOT_INFER_READY_OR_PICKED_UP_FROM_LIFECYCLE/);
+});
+
+test('Stage03 scoped entry resets every conflicting filter before applying scope',()=>{
+  const components=fs.readFileSync(path.join(srcRoot,'stage03-order-oversight.tsx'),'utf8');
+  const vmSource=fs.readFileSync(path.join(srcRoot,'stage03-view-model.ts'),'utf8');
+  const {DEFAULT_OWNER_ORDER_FILTERS,buildOwnerOrderListViewModel}=loadPureTsModule('stage03-view-model.ts');
+
+  assert.deepEqual(DEFAULT_OWNER_ORDER_FILTERS,{
+    query:'',
+    businessDate:'ALL',
+    source:'ALL',
+    segment:'ACTIVE',
+    paymentState:'ALL',
+    fulfillmentState:'ALL',
+  });
+  assert.match(components,/if\(scope==='ACTIVE'\|\|scope==='DINE_IN_OPEN'\)\{\s*setFilters\(DEFAULT_OWNER_ORDER_FILTERS\)/);
+  assert.doesNotMatch(components,/setFilters\(value=>\(\{\.\.\.value,segment:'ACTIVE',query:'',source:'ALL'\}\)\)/);
+
+  const dineInOpen={
+    orderId:'o1',
+    displayCode:'001',
+    source:'STORE',
+    lifecycle:'ACTIVE',
+    businessDate:'2026-09-27',
+    paymentState:'OPEN',
+    fulfillmentMode:'DINE_IN',
+    fulfillmentLabel:'進行中',
+    itemSummary:'x',
+    readback:'CONFIRMED',
+    observedAt:'2026-09-27T00:00:00Z',
+    prints:[],
+    exceptions:[],
+    timeline:[],
+  };
+
+  const resetRows=buildOwnerOrderListViewModel([dineInOpen],DEFAULT_OWNER_ORDER_FILTERS,'DINE_IN_OPEN').rows;
+  assert.equal(resetRows.length,1);
+
+  const staleSettled={...DEFAULT_OWNER_ORDER_FILTERS,paymentState:'SETTLED'};
+  assert.equal(buildOwnerOrderListViewModel([dineInOpen],staleSettled,'DINE_IN_OPEN').rows.length,0);
+  assert.match(components,/setFilters\(DEFAULT_OWNER_ORDER_FILTERS\);\s*setSelectedOrderId\(null\);\s*onScopeReset\(\)/);
+});
+
+test('Stage03 scoped ACTIVE cannot coexist with completed history in UI',()=>{
+  const components=fs.readFileSync(path.join(srcRoot,'stage03-order-oversight.tsx'),'utf8');
+  assert.match(components,/scope==='DEFAULT'\?<div className="segmented order-segmented"/);
+  assert.match(components,/Scoped orders/);
+  assert.match(components,/<button className="active" disabled>進行中<\/button>/);
+});
+
+test('Stage03 fulfillment mode remains mode-only and old TAKEAWAY filter cannot survive scoped entry',()=>{
+  const vmSource=fs.readFileSync(path.join(srcRoot,'stage03-view-model.ts'),'utf8');
+  const components=fs.readFileSync(path.join(srcRoot,'stage03-order-oversight.tsx'),'utf8');
+
+  assert.match(vmSource,/order\.fulfillmentMode==='DINE_IN'/);
+  assert.match(vmSource,/formatFulfillmentMode\(order\.fulfillmentMode\)/);
+  assert.doesNotMatch(vmSource,/readonly fulfillmentMode:string/);
+  assert.doesNotMatch(components,/value=\{filters\.fulfillmentMode\}|fulfillmentModes/);
+  assert.match(components,/fulfillmentState/);
+});
+
+test('Stage03 keeps seven detail sections, four-field search, and no mutations after correction',()=>{
+  const components=fs.readFileSync(path.join(srcRoot,'stage03-order-oversight.tsx'),'utf8');
+  const mapping=fs.readFileSync(path.join(srcRoot,'stage03-api-mapping.ts'),'utf8');
+
+  assert.match(components,/Display Number／客戶／電話／外部編號/);
+  for(const section of[
+    '1｜Identity','2｜Items / Option / Modifier / Remark','3｜Money',
+    '4｜Fulfillment','5｜External','6｜Side-effects','7｜Timeline / Audit'
+  ])assert.match(components,new RegExp(section.replace(/[|/]/g,'\\$&')));
+
+  assert.doesNotMatch(components,/>取消訂單<|>退款<|>修改付款<|>Tender Correction/);
+  assert.doesNotMatch(components,/<(?:span|strong|small|p|h\d)[^>]*>\{order\.orderId\}/);
+  assert.match(mapping,/No second Order \/ Pricing \/ Payment \/ Print \/ Auth \/ Sync authority/);
 });
