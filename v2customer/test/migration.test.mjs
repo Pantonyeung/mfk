@@ -145,3 +145,17 @@ test('backend preflight is wall-clock bounded and shows visible progress before 
   assert.match(views,/轉用 WhatsApp/);
   assert.match(views,/正在檢查店舖連線/);
 });
+
+
+test('checkout submit is fail-closed before click and guarded by a synchronous mutex',()=>{
+  const app=fs.readFileSync(path.join(srcRoot,'App.tsx'),'utf8');
+  const views=fs.readFileSync(path.join(srcRoot,'components/customer-views.tsx'),'utf8');
+  assert.match(app,/submitLockRef=useRef\(false\)/);
+  assert.match(app,/if\(submitLockRef\.current\|\|submitting\)return/);
+  assert.match(app,/submitLockRef\.current=true/);
+  assert.match(app,/submitLockRef\.current=false/);
+  assert.match(app,/if\(!selectedPaymentChannel\.qrImageUrl\)return '呢個電子支付方式未有付款 QR/);
+  assert.match(app,/Boolean\(submitBlockReason\)\?'disabled'/);
+  assert.match(views,/submitBlockReason\?<section className="safe-submit danger"/);
+  assert.match(views,/未完成提交條件/);
+});
