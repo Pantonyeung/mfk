@@ -21,13 +21,20 @@ jobs:
       run:
         working-directory: v2smm
     steps:
-      - name: Checkout exact acceptance source
+      - name: Checkout acceptance branch
         uses: actions/checkout@v4
 
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: '24'
+
+      - name: Verify exact product source ancestry
+        shell: bash
+        run: |
+          set -euo pipefail
+          git merge-base --is-ancestor aad53d5b76a1ca6ac2e9ae175b755c69fd2f58be HEAD
+          git diff --exit-code aad53d5b76a1ca6ac2e9ae175b755c69fd2f58be --             src public package.json tsconfig.json vite.config.ts worker.ts wrangler.jsonc
 
       - name: Install
         run: npm install --no-audit --no-fund --legacy-peer-deps --package-lock=false
@@ -38,8 +45,8 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Deploy isolated Cloudflare Preview
-        id: preview
+      - name: Deploy isolated Stage0 acceptance worker
+        id: deploy
         shell: bash
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -48,49 +55,50 @@ jobs:
           set -euo pipefail
           test -n "$CLOUDFLARE_ACCOUNT_ID"
           test -n "$CLOUDFLARE_API_TOKEN"
-          npm exec --yes --package=wrangler@4.136.3 -- wrangler preview --name smm-stage0-acceptance --worker-name mfk-smm-web --json > "$RUNNER_TEMP/smm-preview.json"
-          cat "$RUNNER_TEMP/smm-preview.json"
-          PREVIEW_URL="$(node - <<'NODE'
-          const fs=require('fs');
-          const raw=fs.readFileSync(process.env.RUNNER_TEMP+'/smm-preview.json','utf8');
-          const matches=raw.match(/https:\/\/[^\s"'<>]+\.workers\.dev[^\s"'<>]*/g)||[];
-          const url=matches.find(x=>x.includes('smm-stage0-acceptance'))||matches[0];
-          if(!url) process.exit(2);
-          process.stdout.write(url.replace(/[),.;]+$/,''));
-          NODE
-          )"
+          npm exec --yes --package=wrangler@4.136.3 --             wrangler deploy --config wrangler.stage0-acceptance.jsonc             > "$RUNNER_TEMP/deploy.log" 2>&1
+          cat "$RUNNER_TEMP/deploy.log"
+          PREVIEW_URL="$(grep -Eo 'https://[^[:space:]]+\.workers\.dev' "$RUNNER_TEMP/deploy.log" | tail -n1)"
+          test -n "$PREVIEW_URL"
           echo "preview_url=$PREVIEW_URL" >> "$GITHUB_OUTPUT"
-          echo "SMM_PREVIEW_URL=$PREVIEW_URL"
+          echo "SMM_STAGE0_ACCEPTANCE_URL=$PREVIEW_URL"
 
-      - name: Preview readback
+      - name: Acceptance readback
         shell: bash
         env:
-          PREVIEW_URL: ${{ steps.preview.outputs.preview_url }}
+          PREVIEW_URL: ${{ steps.deploy.outputs.preview_url }}
         run: |
           set -euo pipefail
           ROOT_CODE=""
           for i in $(seq 1 30); do
-            ROOT_CODE="$(curl -sS -o "$RUNNER_TEMP/smm-index.html" -w '%{http_code}' -H 'Cache-Control: no-cache' "$PREVIEW_URL/" || true)"
+            ROOT_CODE="$(curl -sS -o "$RUNNER_TEMP/index.html" -w '%{http_code}' -H 'Cache-Control: no-cache' "$PREVIEW_URL/" || true)"
             [ "$ROOT_CODE" = "200" ] && break
             sleep 2
           done
           test "$ROOT_CODE" = "200"
-          grep -q '<div id="root"></div>' "$RUNNER_TEMP/smm-index.html"
+          grep -q '<div id="root"></div>' "$RUNNER_TEMP/index.html"
 
-          HEALTH_CODE="$(curl -sS -o "$RUNNER_TEMP/smm-health.json" -w '%{http_code}' -H 'Cache-Control: no-cache' "$PREVIEW_URL/api/health" || true)"
+          HEALTH_CODE="$(curl -sS -o "$RUNNER_TEMP/health.json" -w '%{http_code}' -H 'Cache-Control: no-cache' "$PREVIEW_URL/api/health" || true)"
           test "$HEALTH_CODE" = "200"
           node - <<'NODE'
           const fs=require('fs');
-          const x=JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP+'/smm-health.json','utf8'));
-          if(x?.ok!==true||x?.service!=='mfk-smm-web') process.exit(1);
-          console.log('SMM_STAGE0_ACCEPTANCE_PREVIEW_READBACK_GREEN');
+          const x=JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP+'/health.json','utf8'));
+          if(x?.ok!==true||x?.service!=='mfk-smm-stage0-ui-acceptance'||x?.productSource!=='aad53d5b76a1ca6ac2e9ae175b755c69fd2f58be') process.exit(1);
+          NODE
+
+          BLOCK_CODE="$(curl -sS -o "$RUNNER_TEMP/blocked.json" -w '%{http_code}' -X POST -H 'Content-Type: application/json' --data '{}' "$PREVIEW_URL/api/smm/orders/submit" || true)"
+          test "$BLOCK_CODE" = "403"
+          node - <<'NODE'
+          const fs=require('fs');
+          const x=JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP+'/blocked.json','utf8'));
+          if(x?.code!=='SMM_STAGE0_ACCEPTANCE_ROUTE_BLOCKED') process.exit(1);
+          console.log('SMM_STAGE0_ACCEPTANCE_ISOLATION_GREEN');
           NODE
 
       - name: Final verdict
         shell: bash
         env:
-          PREVIEW_URL: ${{ steps.preview.outputs.preview_url }}
+          PREVIEW_URL: ${{ steps.deploy.outputs.preview_url }}
         run: |
-          echo "MFK_SMM_STAGE0_CLOUDFLARE_PREVIEW_GREEN"
+          echo "MFK_SMM_STAGE0_CLOUDFLARE_ACCEPTANCE_GREEN"
           echo "PRODUCT_SOURCE=aad53d5b76a1ca6ac2e9ae175b755c69fd2f58be"
           echo "PREVIEW_URL=$PREVIEW_URL"
