@@ -43,7 +43,7 @@ test('Stage 2 matches effect-board browse anatomy',()=>{
 test('each normal category has one featured large card and the rest small cards',()=>{
   assert.ok(menu.includes('const featuredProduct=displayProducts.find(product=>product.available)??displayProducts[0]??null'));
   assert.ok(menu.includes('const smallProducts=featuredProduct?displayProducts.filter(product=>product.productId!==featuredProduct.productId):[]'));
-  assert.equal((menu.match(/className="stage2-featured-card/g)||[]).length,1);
+  assert.equal((menu.match(/<FeaturedProductCard/g)||[]).length,1);
 });
 
 test('product media slots stay truly empty while name price and status remain text',()=>{
