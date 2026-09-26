@@ -52,3 +52,14 @@ test('Stage 1 storefront follows the locked home brief',()=>{
   assert.ok(views.includes('仍然可以慢慢睇、慢慢揀。'));
   assert.ok(views.includes("recommendations.filter(item=>item.product.available).slice(0,6)"));
 });
+
+
+test('Stage 2 browse keeps one featured product plus small product cards per category',()=>{
+  const views=fs.readFileSync(path.join(srcRoot,'components/customer-views.tsx'),'utf8');
+  assert.ok(views.includes('featured-product-card'));
+  assert.ok(views.includes('small-product-grid'));
+  assert.ok(views.includes('const featuredProduct'));
+  assert.ok(views.includes('const remainingProducts'));
+  assert.ok(views.includes('FavoriteHeart'));
+  assert.ok(views.includes('售罄'));
+});
