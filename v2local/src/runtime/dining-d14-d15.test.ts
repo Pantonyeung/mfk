@@ -287,6 +287,6 @@ describe('D15-A Dining line correction / void',()=>{
       lineIndex:0,
       quantity:1,
       reason:'已付款商品移除',
-    })).rejects.toThrow('DINING_CORRECTION_EXCEEDS_UNPAID_QUANTITY');
+    })).rejects.toThrow('DINING_PAID_LINE_USE_REFUND');
   });
 });
