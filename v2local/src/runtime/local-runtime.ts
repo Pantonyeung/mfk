@@ -1178,7 +1178,8 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
           active:true,
           sortOrder:index+1,
         }));
-        return tables.map(table=>{
+        const activeTables=tables.filter(table=>table.active!==false).sort((a,b)=>(Number(a.sortOrder)||0)-(Number(b.sortOrder)||0)||String(a.name).localeCompare(String(b.name),'zh-HK'));
+        return activeTables.map(table=>{
           const id=table.id;
           const seated=data.holds.find(hold=>hold.kind==='dining'&&!hold.archivedAt&&hold.assignedTable===id);
           if(!seated)return {id,areaLabel:'堂食',label:table.name,state:'available' as const};
