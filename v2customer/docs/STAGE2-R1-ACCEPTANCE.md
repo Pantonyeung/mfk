@@ -2,7 +2,7 @@
 
 WORK_ID: `MFK-CUSTOMER-UI-STAGE2-R1`
 
-STATUS: `READY_FOR_COMMANDER_ACCEPTANCE`
+STATUS: `READY_FOR_COMMANDER_REVIEW_AFTER_CHANGES_REQUIRED`
 
 BASE MAIN: `6d37d3c2a4e778657627da79660b9e1314845b4a`
 
@@ -285,3 +285,71 @@ No mutation of the original/current branch.
 MILESTONE TARGET:
 
 `MFK_CUSTOMER_UI_STAGE2_R1_COMMANDER_ACCEPTED`
+
+
+## CHANGES_REQUIRED touch-target correction
+
+Commander result:
+`CHANGES_REQUIRED`
+
+Only blocker:
+- high-frequency touch targets below the locked `>=44px` minimum.
+
+Corrected without changing the accepted visual hierarchy:
+
+- Category Rail: `40px -> 44px`
+- Filter `全部 / 人氣 / 已收藏`: `36px -> 44px`
+- Favorite `♥ / ♡`: `38 x 38px -> 44 x 44px`
+- Zero-result category CTA: `40px -> 44px`
+
+Visual density remains restrained:
+- existing typography retained
+- existing chip/card hierarchy retained
+- only hit-area / minimum control dimensions increased
+- no new UI feature
+- no layout redesign
+- no authority change
+
+### Correction TDD
+
+RED:
+- Run `36278680945`
+- Job `108506235201`
+- New touch-target contract failed as expected.
+
+GREEN:
+- Run `36278709025`
+- Job `108506313432`
+- touch-target contract PASS
+- existing tests PASS
+- build PASS
+
+### Fresh-main sync
+
+Repository main advanced during the correction to:
+
+`dedd986ca9eca5d4f7f324ea9ae88bcf35233def`
+
+The new main delta is unrelated to Customer Stage 2 and affects:
+- `contracts/capacity-pool-v1.ts`
+- `v2admin/**`
+
+Stage 2 branch was brought forward to that main with merge commit:
+
+`ee41f5f956f9eb6eb56d84f0bb85d44994f7619a`
+
+This updates the Stage 2 branch only. Main was not mutated.
+
+Post-sync verification:
+- Run `36278766332`
+- Job `108506474250`
+- Tests: `42 / 42 PASS`
+- Build: `SUCCESS`
+- Fresh main behind: `0`
+
+AUTHORITY CHANGE = NONE.
+
+STOP:
+- CLOUDFLARE = NOT_DEPLOYED
+- NO MERGE TO MAIN
+- STAGE 3 = HOLD
