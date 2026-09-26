@@ -241,6 +241,7 @@ test('Stage02 Action Queue is a unified actionable projection, not SMT pending o
   const app=fs.readFileSync(path.join(srcRoot,'App.tsx'),'utf8');
   const components=fs.readFileSync(path.join(srcRoot,'stage02-action-queue.tsx'),'utf8');
   const vm=fs.readFileSync(path.join(srcRoot,'stage02-view-model.ts'),'utf8');
+  const selector=fs.readFileSync(path.join(srcRoot,'stage02-open-actions.ts'),'utf8');
   const mapping=fs.readFileSync(path.join(srcRoot,'stage02-api-mapping.ts'),'utf8');
 
   assert.match(app,/ActionQueuePage/);
@@ -257,7 +258,8 @@ test('Stage02 Action Queue is a unified actionable projection, not SMT pending o
   assert.match(mapping,/Dismissed != Resolved/);
   assert.match(mapping,/RESOLVED_OR_UNKNOWN/);
 
-  assert.match(vm,/item\.state!==\'RESOLVED\'/);
+  assert.match(selector,/item\.state!==\'RESOLVED\'/);
+  assert.match(vm,/selectOpenActions/);
   assert.match(vm,/severityRank/);
   assert.doesNotMatch(components,/\{item\.correlationId\}/);
 });
@@ -346,7 +348,7 @@ test('Stage02 Today top severity and oldest unresolved derive only from shared o
   const todayVm=fs.readFileSync(path.join(srcRoot,'today-view-model.ts'),'utf8');
   assert.match(todayVm,/const actions=\[\.\.\.selectOpenActions/);
   assert.match(todayVm,/const topSeverity=actions\.sort/);
-  assert.match(todayVm,/oldestUnresolved=\[\.\.\.actions\]\.sort/);
+  assert.match(todayVm,/oldestUnresolved=\[\.\.\.actions\]\s*\.sort/);
   assert.match(todayVm,/openCount:actions\.length/);
 });
 
