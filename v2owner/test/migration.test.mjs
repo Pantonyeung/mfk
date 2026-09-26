@@ -151,6 +151,7 @@ test('Stage01 commander corrections satisfy OA-TOD-001 acceptance contract',()=>
   const vm=fs.readFileSync(path.join(srcRoot,'today-view-model.ts'),'utf8');
   const components=fs.readFileSync(path.join(srcRoot,'today-components.tsx'),'utf8');
   const mapping=fs.readFileSync(path.join(srcRoot,'stage01-api-mapping.ts'),'utf8');
+  const orderVm=fs.readFileSync(path.join(srcRoot,'stage03-view-model.ts'),'utf8');
 
   // 1 Header: store / business day / operating status / freshness.
   assert.match(types,/operatingStatus:string/);
