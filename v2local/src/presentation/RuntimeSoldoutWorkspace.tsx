@@ -68,6 +68,10 @@ export function RuntimeSoldoutWorkspace({runtime,embedded=false}:{runtime:CleanS
         <div><b>{pool.name}</b><small>{pool.poolId} · {pool.productIds.length} 件商品</small></div>
         <strong>{pool.remainingQty} / {pool.configuredInitialQty}</strong>
         <small>自家 ≤ {pool.firstPartyStopAt} · 第三方 ≤ {pool.thirdPartyStopAt}</small>
+        <div className="capacity-channel-state">
+          <span className={pool.firstPartyAccepting?'accepting':'stopped'}>自家接單 · {pool.firstPartyAccepting?'接受新單':'暫停新單'}</span>
+          <span className={pool.thirdPartyAccepting?'accepting':'stopped'}>第三方接單 · {pool.thirdPartyAccepting?'接受新單':'暫停新單'}</span>
+        </div>
         <button type="button" className="capacity-pool-adjust-button" disabled={busy||!runtime.adjustCapacityPool} onClick={()=>void adjustCapacity(pool.poolId,pool.remainingQty)}>調整數量</button>
       </article>)}</div>
       {capacity.invalidActivePoolIds.length?<p role="alert">有 {capacity.invalidActivePoolIds.length} 個啟用 Pool 設定無效，未建立本機狀態。</p>:null}
