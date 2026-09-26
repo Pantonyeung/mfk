@@ -34,6 +34,17 @@ export interface LocalReport{
   readonly cashNetMinor:number;
   readonly itemUnits:number;
   readonly averageOrderMinor:number;
+  readonly refundRows:readonly {
+    readonly refundId:string;
+    readonly orderId:string;
+    readonly display:string;
+    readonly originalBusinessDate:string;
+    readonly originalCreatedAt:string;
+    readonly executionAt:string;
+    readonly method:string;
+    readonly amountMinor:number;
+    readonly items:string;
+  }[];
   readonly topProducts:readonly {readonly name:string;readonly quantity:number;readonly salesMinor:number}[];
 }
 
@@ -153,6 +164,17 @@ export function buildLocalReport(
     cashNetMinor,
     itemUnits,
     averageOrderMinor:selected.length?Math.round(netSalesMinor/selected.length):0,
+    refundRows:Object.freeze(refunds.map(({order,refund})=>Object.freeze({
+      refundId:String((refund as {id?:string}).id||''),
+      orderId:order.id,
+      display:order.display,
+      originalBusinessDate:resolveBusinessWindow(Date.parse(order.createdAt),businessStartHour,businessStartMinute).businessDate,
+      originalCreatedAt:order.createdAt,
+      executionAt:refund.createdAt,
+      method:refund.method,
+      amountMinor:refund.amountMinor,
+      items:refund.lines.map(line=>line.itemName+' ×'+line.quantity).join('、'),
+    })).sort((a,b)=>b.executionAt.localeCompare(a.executionAt))),
     topProducts:Object.freeze(topProducts.map(row=>Object.freeze({...row}))),
   });
 }
