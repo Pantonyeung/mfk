@@ -41,6 +41,12 @@ function ProductCard({product,actions,recentlyAdded}:{product:OrderingProductVie
   </article>;
 }
 
+function TrashGlyph(){
+  return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M4 7h16"/><path d="M9 7V4h6v3"/><path d="m7 7 1 13h8l1-13"/><path d="M10 11v5M14 11v5"/>
+  </svg>;
+}
+
 function ServiceToggle({value,onChange,availability}:{value:ServiceMode;onChange:(mode:ServiceMode)=>void;availability:Readonly<{takeaway:boolean;dineIn:boolean}>}){
   return <div className="ordering-service-toggle" role="group" aria-label="全單用餐方式">
     <button type="button" disabled={!availability.takeaway} className={value==='takeaway'?'active':''} aria-pressed={value==='takeaway'} onClick={()=>onChange('takeaway')}>外賣</button>
@@ -132,7 +138,10 @@ export function OrderingWorkspace({view,actions,centerPanel}:{view:OrderingWorks
       </div>
       <div className="ordering-cart-facts"><span><small>小計</small><b>{view.cart.subtotalLabel}</b></span><span><small>包裝</small><b>{view.cart.packagingLabel}</b></span><span><small>折扣</small><b>{view.cart.discountLabel}</b></span></div>
       <div className="ordering-cart-total"><span>總計</span><strong>{view.cart.totalLabel}</strong></div>
-      {availability.holdCart||availability.cancelCart?<div className={`ordering-cart-secondary-actions${!availability.cancelCart?' single':''}`}>{availability.holdCart?<button type="button" onClick={actions.onHoldCart}>{view.cart.lines.length?'暫存':'取回訂單'}</button>:null}{availability.cancelCart?<button type="button" className="destructive" onClick={actions.onCancelCart}>取消單</button>:null}</div>:null}
+      {view.cart.lines.length?<div className="ordering-cart-secondary-actions active-cart">
+        {availability.holdCart?<button type="button" className="hold-dining-entry" onClick={actions.onHoldCart}>暫存／堂食</button>:<span/>}
+        {availability.cancelCart?<button type="button" className="cart-clear-icon destructive" aria-label="清除訂單" title="清除訂單" onClick={actions.onCancelCart}><TrashGlyph/></button>:<span/>}
+      </div>:availability.holdCart?<div className="ordering-cart-secondary-actions single"><button type="button" onClick={actions.onHoldCart}>取回訂單</button></div>:null}
       <button type="button" className="ordering-checkout" aria-label="結帳" disabled={!view.cart.checkoutEnabled} onClick={actions.onCheckout}>結帳　{view.cart.totalLabel}</button>
     </aside>
 
