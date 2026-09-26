@@ -20,6 +20,7 @@ import './stage0.css';
 const SPLASH_MS=650;
 const PROBE_TIMEOUT_MS=3500;
 const LAN_PROBE_TIMEOUT_MS=2200;
+const LAST_OBSERVED_KEY='mfk.smm.stage0.last-observed.v1';
 
 type ProbeState='CHECKING'|'READY'|'ERROR';
 type LanState='UNCONFIGURED'|'CHECKING'|'READY'|'ERROR';
@@ -29,6 +30,14 @@ function withTimeout<T>(promise:Promise<T>,ms:number):Promise<T>{
     const timer=window.setTimeout(()=>reject(new Error('SMM_STAGE0_PROBE_TIMEOUT')),ms);
     promise.then(value=>{window.clearTimeout(timer);resolve(value)},reason=>{window.clearTimeout(timer);reject(reason)});
   });
+}
+
+function readLastObservedAt():string|null{
+  try{return localStorage.getItem(LAST_OBSERVED_KEY)}catch{return null}
+}
+
+function rememberLastObservedAt(value:string){
+  try{localStorage.setItem(LAST_OBSERVED_KEY,value)}catch{}
 }
 
 function formatObservedAt(value:string|null){
@@ -62,7 +71,7 @@ export function StageZeroGate({children}:{children:ReactNode}){
   const [probeMessage,setProbeMessage]=useState('暫時未能連接門店服務，請檢查網絡後再試。');
   const [staffSession,setStaffSession]=useState<SmmStaffSession|null>(initialSession);
   const [offlineBypass,setOfflineBypass]=useState(false);
-  const [lastObservedAt,setLastObservedAt]=useState<string|null>(null);
+  const [lastObservedAt,setLastObservedAt]=useState<string|null>(()=>readLastObservedAt());
 
   const probe=async()=>{
     const port=resolveSmmRuntimePort();
@@ -78,6 +87,7 @@ export function StageZeroGate({children}:{children:ReactNode}){
       const next=await withTimeout(port.readSnapshot(),PROBE_TIMEOUT_MS);
       setSnapshot(next);
       setLastObservedAt(next.observedAt);
+      rememberLastObservedAt(next.observedAt);
       setProbeState('READY');
     }catch(reason){
       console.warn('SMM_STAGE0_PROBE_DIAGNOSTIC',reason);
@@ -224,6 +234,7 @@ function StageZeroConnectionRecovery({
       setPairMessage('LAN 配對完成。');
       setPairOpen(false);
       await checkLan(config);
+      onRetry();
     }catch(reason){
       console.warn('SMM_STAGE0_PAIR_DIAGNOSTIC',reason);
       setPairMessage('LAN 配對未完成，請檢查主機、裝置 ID 同配對碼後再試。');
