@@ -362,7 +362,7 @@ export function RuntimeDiningWorkspace({runtime,onCheckout,onAddOrder}:{runtime:
           }}>{transferHoldId===detail.holdId?'取消轉枱':'轉枱'}</button>
           <button type="button" className="add-order" disabled={!detail.formalOrderId} onClick={goAddOrder}>＋ 加單</button>
           {detail.paidMinor>0&&detail.formalOrderId
-            ?<button type="button" className="formal-order" onClick={()=>navigate('/orders?orderId='+encodeURIComponent(detail.formalOrderId!))}>正式訂單處理</button>
+            ?<button type="button" className="formal-order" title="已有付款；退款同取消係兩個獨立正式動作，請到訂單頁處理。" onClick={()=>navigate('/orders?orderId='+encodeURIComponent(detail.formalOrderId!))}>正式訂單處理</button>
             :<button type="button" className="cancel-order" disabled={!detail.formalOrderId} onClick={()=>void cancelUnpaidDining()}>取消堂食單</button>}
           <button type="button" className="clear" disabled={detail.remainingMinor>0} onClick={()=>void clearTable()}>清枱</button>
         </footer>
