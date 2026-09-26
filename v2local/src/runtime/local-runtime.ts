@@ -1282,6 +1282,7 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
         try{projectOrder(data.orders.find(row=>row.id===linkedOrder.id)!);}catch{console.warn('DINING_TABLE_PROJECTION_NON_BLOCKING');}
         appendActionAudit({action:'DINING_TABLE_UNASSIGN',orderId:linkedOrder.id,reason:assignedTable});
       }
+      return clone(diningDetail(requireDiningHold(next,holdId)));
     });
   },
   async readDiningHold(holdId){
