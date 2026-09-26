@@ -1,0 +1,30 @@
+name: mfk-smt-a3c-combo-drink-optional-proof
+on:
+  pull_request:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  test:
+    if: github.head_ref == 'work/MFK/SMT-A3C-COMBO-DRINK-OPTIONAL-R1'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install
+        working-directory: v2local
+        run: npm install --legacy-peer-deps --ignore-scripts --no-audit --no-fund
+      - name: Unit tests
+        working-directory: v2local
+        run: npm run test
+      - name: Build
+        working-directory: v2local
+        run: npm run build
+      - name: Diff check
+        run: git diff --check origin/main...HEAD
