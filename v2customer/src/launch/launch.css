@@ -1,0 +1,89 @@
+.launch-overlay{
+  position:fixed;
+  inset:0;
+  z-index:1000;
+  display:grid;
+  place-items:stretch;
+  overflow:hidden;
+  background:#fbf6ed;
+  color:#15396b;
+  isolation:isolate;
+}
+.launch-media{
+  position:absolute;
+  inset:0;
+  display:grid;
+  place-items:center;
+  background:#fbf6ed;
+}
+.launch-poster,.launch-video{
+  position:absolute;
+  inset:0;
+  width:100%;
+  height:100%;
+  object-fit:contain;
+  object-position:center;
+  background:#fbf6ed;
+}
+.launch-poster{z-index:0}
+.launch-video{z-index:1}
+.launch-vignette{
+  position:absolute;
+  z-index:2;
+  inset:auto 0 0;
+  height:36%;
+  pointer-events:none;
+  background:linear-gradient(180deg,rgba(251,246,237,0),rgba(251,246,237,.52) 34%,rgba(251,246,237,.96) 78%);
+}
+.launch-actions{
+  position:absolute;
+  z-index:3;
+  left:50%;
+  bottom:calc(24px + env(safe-area-inset-bottom));
+  width:min(calc(100% - 32px),440px);
+  transform:translate(-50%,18px);
+  display:grid;
+  gap:14px;
+  opacity:0;
+  visibility:hidden;
+  transition:opacity 280ms ease,transform 280ms ease,visibility 0s linear 280ms;
+}
+.launch-overlay.is-ready .launch-actions{
+  opacity:1;
+  visibility:visible;
+  transform:translate(-50%,0);
+  transition-delay:0s;
+}
+.launch-slogan{
+  margin:0;
+  text-align:center;
+  color:#15396b;
+  font-size:18px;
+  line-height:1.4;
+  font-weight:750;
+  letter-spacing:.02em;
+  text-shadow:0 1px 8px rgba(255,253,248,.85);
+}
+.launch-action-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.launch-action-row button{
+  min-height:52px;
+  border-radius:26px;
+  padding:0 16px;
+  font:inherit;
+  font-weight:800;
+  border:1px solid transparent;
+  -webkit-tap-highlight-color:transparent;
+}
+.launch-action-row button:disabled{pointer-events:none}
+.launch-primary{background:#15396b;color:#fff;box-shadow:0 8px 24px rgba(21,57,107,.16)}
+.launch-secondary{background:rgba(255,253,250,.9);color:#15396b;border-color:rgba(21,57,107,.24)!important;backdrop-filter:blur(10px)}
+.launch-action-row button:focus-visible{outline:3px solid rgba(240,127,36,.42);outline-offset:3px}
+.launch-action-row button:active{transform:scale(.985)}
+@media(max-width:360px){
+  .launch-action-row{grid-template-columns:1fr}
+  .launch-actions{bottom:calc(18px + env(safe-area-inset-bottom))}
+}
+@media(prefers-reduced-motion:reduce){
+  .launch-video{display:none}
+  .launch-actions,.launch-overlay.is-ready .launch-actions{transition:none;transform:translate(-50%,0)}
+}
