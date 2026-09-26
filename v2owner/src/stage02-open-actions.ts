@@ -1,4 +1,4 @@
-import type {OwnerActionItem} from './product-types';
+import type {OwnerActionItem,OwnerActivityRecord} from './product-types';
 
 export function getActionIncidentIdentity(action:OwnerActionItem):string{
   if(action.correlationId)return 'correlation:'+action.correlationId;
@@ -17,4 +17,17 @@ export function selectOpenActions(actions:readonly OwnerActionItem[]):readonly O
   }
 
   return [...byIncident.values()];
+}
+
+export function selectActionHistory(
+  action:OwnerActionItem,
+  activity:readonly OwnerActivityRecord[],
+):readonly OwnerActivityRecord[]{
+  return activity
+    .filter(record=>{
+      if(action.correlationId)return record.correlationId===action.correlationId;
+      if(action.incidentId)return record.incidentId===action.incidentId;
+      return record.linkedActionId===action.actionId;
+    })
+    .sort((a,b)=>b.observedAt.localeCompare(a.observedAt));
 }
