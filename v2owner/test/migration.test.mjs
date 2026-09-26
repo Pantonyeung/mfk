@@ -99,3 +99,32 @@ test('manager log and checklist are local-only product workflows',()=>{
 test('production fixture file has been removed',()=>{
   assert.equal(fs.existsSync(path.join(srcRoot,'fixtures.ts')),false);
 });
+
+
+test('Stage01 Today implements live orders and dine-in outstanding without fake sales',()=>{
+  const app=fs.readFileSync(path.join(srcRoot,'App.tsx'),'utf8');
+  const types=fs.readFileSync(path.join(srcRoot,'product-types.ts'),'utf8');
+  const vm=fs.readFileSync(path.join(srcRoot,'today-view-model.ts'),'utf8');
+  const components=fs.readFileSync(path.join(srcRoot,'today-components.tsx'),'utf8');
+  const mapping=fs.readFileSync(path.join(srcRoot,'stage01-api-mapping.ts'),'utf8');
+
+  assert.match(app,/TodayLiveOrdersCard/);
+  assert.match(app,/DineInOpenChecksCard/);
+  assert.match(types,/OwnerLiveOrdersSummary/);
+  assert.match(types,/OwnerDineInSummary/);
+  assert.match(types,/includedInEffectiveSales:false/);
+  assert.match(vm,/liveOrders:snapshot\?\.liveOrders\?\?null/);
+  assert.match(vm,/dineIn:snapshot\?\.dineIn\?\?null/);
+  assert.match(components,/未計入有效營業額/);
+  assert.match(components,/總額、已收款、未收款分開/);
+  assert.match(mapping,/OA-TOD-001/);
+  assert.match(mapping,/liveOrders/);
+  assert.match(mapping,/dineInOpenChecks/);
+});
+
+test('Stage01 does not introduce non-AI decorative icon assets or product photos',()=>{
+  const app=fs.readFileSync(path.join(srcRoot,'App.tsx'),'utf8');
+  assert.match(app,/AI_ASSET_PENDING/);
+  assert.doesNotMatch(app,/glyph="◆"|glyph="▤"|glyph="•••"/);
+  assert.doesNotMatch(app,/productImage|product-photo|stock-photo/i);
+});
