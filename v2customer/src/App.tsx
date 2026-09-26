@@ -7,6 +7,7 @@ import {buildWhatsAppFallbackUrl} from './whatsapp-fallback';
 import {selectedCustomerOptions,toggleCustomerSelection,validateCustomerSelections,type CustomerSelectionState} from './selection';
 import {BottomNavigation,CustomerHeader,StatusBanner,type ActionState,type ProductOriginRect} from './ui/primitives';
 import {CartView,CheckoutView,HomeView,MemberView,MenuView,OrdersView,ProductSheet,type MenuLayout,type OrderSegment} from './components/customer-views';
+import {LaunchOverlay} from './launch/LaunchOverlay';
 import type {
   CustomerCartLine,
   CustomerCheckoutDraft,
@@ -67,6 +68,7 @@ export function App(){
   const [readingIntentId,setReadingIntentId]=useState<string|null>(null);
   const [jarPulseKey,setJarPulseKey]=useState(0);
   const [fallbackIntentId,setFallbackIntentId]=useState<string|null>(null);
+  const [launchOpen,setLaunchOpen]=useState(true);
   const [submitProbe,setSubmitProbe]=useState<Readonly<{attempt:number;total:number}>|null>(null);
   const submitLockRef=useRef(false);
 
@@ -510,5 +512,10 @@ export function App(){
       const group=selectedProduct.optionGroups.find(item=>item.optionGroupId===groupId);
       if(group)setSelections(current=>toggleCustomerSelection(current,group,optionId));
     }} origin={selectedProductOrigin} onClose={closeProduct} onAdd={addSelectedProduct}/>:null}
+
+    {launchOpen?<LaunchOverlay
+      onEnterHome={()=>{changeView('home');setLaunchOpen(false)}}
+      onEnterMember={()=>{changeView('more');setLaunchOpen(false)}}
+    />:null}
   </main>;
 }
