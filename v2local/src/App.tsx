@@ -518,6 +518,7 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
             onHoldTable={(tableId,partySize,note)=>{
               const draft=localRuntime.createHold({kind:'dining',items:holdItems(),totalMinor:total,partySize,note:note||'直接掛枱'});
               void localRuntime.assignDiningTable?.(draft.id,tableId).then(()=>{
+                void localRuntime.ensureDiningInitialPrint?.(draft.id).catch(()=>{});
                 setCart([]);setServiceMode('dine-in');setPanel(null);
               });
             }}
