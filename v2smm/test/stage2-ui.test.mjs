@@ -47,7 +47,7 @@ test('Stage 2 shows published price adjustments and draft unit total',()=>{
 test('Stage 2 validation remains local to invalid section and add stays disabled until valid',()=>{
   assert.match(app,/stage2-inline-error/);
   assert.match(app,/groupError/);
-  assert.match(app,/disabled=\{!validation\.ok\|\|!variationOk\}/);
+  assert.match(app,/disabled=\{!validation\.ok\|\|!variationOk\|\|!comboValidation\.ok\}/);
   assert.match(app,/最少需要選擇/);
   assert.match(app,/最多只可以選擇/);
   assert.match(app,/暫停供應選項/);
