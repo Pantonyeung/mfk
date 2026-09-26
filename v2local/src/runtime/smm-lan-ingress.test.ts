@@ -87,9 +87,9 @@ describe('SMM LAN ingress',()=>{
     expect(createOrder).not.toHaveBeenCalled();
   });
 
-  it('routes trusted SMM dine-in into existing dining hold authority instead of formal Order',()=>{
+  it('routes trusted SMM dine-in through Dining authority and returns the linked Formal Order identity',()=>{
     const createOrder=vi.fn();
-    const upsertSmmDiningHold=vi.fn(()=>({id:'HOLD-DINE',providerRef:'SMM:S5'}));
+    const upsertSmmDiningHold=vi.fn(()=>({id:'HOLD-DINE',formalOrderId:'ORDER-DINE',providerRef:'SMM:S5'}));
     const ingress=createSmmLanIngress({createOrder,orders:()=>[],holds:()=>[],upsertSmmDiningHold} as any);
     const result=ingress.submit({
       protocolVersion:1,type:'smm.lan.order.submit.v1',requestId:'R5',submissionId:'S5',idempotencyKey:'I5',storeId:'MF01',
@@ -98,6 +98,7 @@ describe('SMM LAN ingress',()=>{
       lines:[{lineId:'L1',productId:'riceball',productName:'原味飯團',quantity:1,publishedUnitPriceMinor:4100,selections:[]}],
     },{deviceId:'SMM-1',trusted:true});
     expect(result.disposition).toBe('ACCEPTED');
+    expect(result.disposition==='ACCEPTED'&&result.orderId).toBe('ORDER-DINE');
     expect(createOrder).not.toHaveBeenCalled();
     expect(upsertSmmDiningHold).toHaveBeenCalledWith(expect.objectContaining({
       providerRef:'SMM:S5',
