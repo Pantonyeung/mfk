@@ -1014,11 +1014,16 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
       businessStartMinute:cutoff.minute,
     });
     const refunds=data.orders.flatMap(order=>(order.refunds??[]).map(refund=>({
-      ...refund,
-      sourceLabel:order.sourceLabel,
+      id:refund.id,
       orderId:order.id,
+      display:order.display,
+      originalCreatedAt:order.createdAt,
+      executionAt:refund.createdAt,
+      method:refund.method,
+      amountMinor:refund.amountMinor,
+      items:refund.lines.map(line=>line.itemName+' ×'+line.quantity).join('、'),
     }))).filter(refund=>{
-      const at=Date.parse(refund.createdAt);
+      const at=Date.parse(refund.executionAt);
       const window=resolveBusinessWindow(close.createdAt,cutoff.hour,cutoff.minute);
       return Number.isFinite(at)&&at>=window.start&&at<window.end;
     });
