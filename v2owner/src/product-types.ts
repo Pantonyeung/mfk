@@ -1,4 +1,5 @@
-export type OwnerConnectionState='NOT_CONNECTED'|'LOADING'|'READY'|'STALE'|'PARTIAL'|'UNKNOWN'|'ERROR';
+export type OwnerGlobalState='LOADING'|'EMPTY'|'FRESH'|'STALE'|'PARTIAL'|'OFFLINE_READONLY'|'PERMISSION_DENIED'|'ERROR'|'UNKNOWN';
+export type OwnerConnectionState=OwnerGlobalState;
 export type OwnerCertainty='CONFIRMED'|'PARTIAL'|'UNKNOWN';
 export type OwnerActionState='CONFIRMED'|'REJECTED'|'FAILED'|'UNKNOWN'|'NOT_CONNECTED';
 
@@ -6,6 +7,7 @@ export interface OwnerStoreContext {
   readonly storeId:string;
   readonly storeName:string;
   readonly businessDate:string;
+  readonly operatingStatus:string;
   readonly observedAt:string;
   readonly freshness:'CURRENT'|'STALE'|'PARTIAL'|'UNKNOWN';
 }
@@ -16,6 +18,9 @@ export interface OwnerTodaySummary {
   readonly averageOrderLabel:string;
   readonly comparisonLabel:string;
   readonly staffNow:number;
+  readonly scheduledStaffCount:number;
+  readonly onBreakStaffCount:number;
+  readonly abnormalStaffCount:number;
   readonly attentionCount:number;
 }
 
@@ -27,6 +32,7 @@ export interface OwnerLiveOrderSummaryItem {
   readonly fulfillmentLabel:string;
   readonly elapsedLabel?:string;
   readonly promisedTimeLabel?:string;
+  readonly exceptionBadge?:string;
   readonly hasAttention:boolean;
 }
 
@@ -62,8 +68,11 @@ export interface OwnerDineInSummary {
   readonly observedAt:string;
 }
 
+export type OwnerHealthKind='INTERNET'|'KEETA'|'OWN_PLATFORM'|'SMT'|'PRINTER'|'OTHER';
+
 export interface OwnerReadinessItem {
   readonly id:string;
+  readonly kind?:OwnerHealthKind;
   readonly label:string;
   readonly value:string;
   readonly tone:'GOOD'|'WARN'|'CRITICAL'|'UNKNOWN';
@@ -91,6 +100,8 @@ export interface OwnerOrderProjection {
   readonly tenderLabel?:string;
   readonly fulfillmentLabel?:string;
   readonly externalRef?:string;
+  readonly fulfillmentMode?:'DINE_IN'|'TAKEAWAY'|'PICKUP'|'DELIVERY'|string;
+  readonly paymentState?:'OPEN'|'PARTIAL'|'SETTLED'|string;
   readonly itemSummary:string;
   readonly readback:OwnerCertainty;
   readonly observedAt:string;
@@ -143,6 +154,13 @@ export interface OwnerReportCard {
   readonly value:string;
   readonly compare?:string;
   readonly freshness:string;
+}
+
+export interface OwnerTodayInsight {
+  readonly topProductLabel?:string;
+  readonly currentHourTrendLabel?:string;
+  readonly observedAt:string;
+  readonly freshness:'CURRENT'|'STALE'|'PARTIAL'|'UNKNOWN';
 }
 
 export interface OwnerCustomerSummary {
@@ -207,8 +225,10 @@ export interface OwnerActivityRecord {
 }
 
 export interface OwnerReadModelSnapshot {
+  readonly globalState?:OwnerGlobalState;
   readonly store?:OwnerStoreContext;
   readonly today?:OwnerTodaySummary;
+  readonly insight?:OwnerTodayInsight;
   readonly liveOrders?:OwnerLiveOrdersSummary;
   readonly dineIn?:OwnerDineInSummary;
   readonly readiness:readonly OwnerReadinessItem[];
