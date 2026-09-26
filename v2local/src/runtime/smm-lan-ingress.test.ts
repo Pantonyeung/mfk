@@ -15,6 +15,7 @@ vi.mock('./admin-config-sync.ts',()=>({
   subscribeSmtCloudDoorbell:()=>()=>{},
 }));
 vi.mock('./admin-config-projection.ts',()=>({
+  projectSyncedCombos:()=>({combos:[],pools:[]}),
   projectSyncedOrderingCatalog:()=>({
     categories:[],
     products:[{
