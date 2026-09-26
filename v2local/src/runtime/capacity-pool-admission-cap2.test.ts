@@ -87,6 +87,7 @@ describe('CAP2 formal admission deduction and cancellation restore',()=>{
       sourceLabel:'現場',
     });
 
+    expect(runtime.orders()[0]?.id).toBe(order.id);
     expect((order as any).capacityEvents).toHaveLength(1);
     expect((order as any).capacityEvents[0]).toMatchObject({
       kind:'DEDUCT',
