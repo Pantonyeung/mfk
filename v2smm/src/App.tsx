@@ -593,7 +593,7 @@ function OrderView({connection,categories,activeCategoryId,setCategory,search,se
     <header className="stage1-order-header">
       <div>
         <span className="stage1-kicker">點單</span>
-        <h1>快速落單</h1>
+        <h1>快速點餐</h1>
         <p>商品資料只讀取正式餐單；未有正式產品相之前，圖片位置保持留白。</p>
       </div>
       <b className="stage1-service-mode">{serviceMode==='DINE_IN'?'堂食':'外賣'}</b>
