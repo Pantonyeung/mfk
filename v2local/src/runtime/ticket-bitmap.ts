@@ -383,7 +383,7 @@ class TicketCanvas{
 function receipt(t:TicketCanvas,order:PrintableOrder){
   t.brand();
   t.line(22);
-  t.text('客戶收據',50,900,'center',64);
+  t.text(clean(order.receiptTitle??'客戶收據'),50,900,'center',64);
   t.line(22);
   t.boxedPair('訂單編號 No.',clean(order.display),'下單時間',hktDateTime(order.createdAt).replace(' ','\n'));
   t.text('來源：'+clean(order.sourceLabel)+' / '+orderService(order),30,800,'left',40);
@@ -404,6 +404,7 @@ function receipt(t:TicketCanvas,order:PrintableOrder){
   t.line(18);
   t.text('付款方式：'+clean(order.paymentLabel),32,800,'left',42);
   t.text('合計 '+money(order.totalMinor),52,900,'left',64);
+  for(const line of order.receiptNoteLines??[])t.wrapped(clean(line),30,800,4,40);
   t.line(22);
   t.text('請核對餐點 / 謝謝光臨',28,800,'center',38);
   t.text('*** 謝謝！***',30,900,'center',40);
