@@ -10,6 +10,7 @@ import {buildDailyClosePrintData,renderDailyCloseTicket} from './daily-close-tic
 import {buildLocalReport,readLocalDayCloses,resolveBusinessWindow} from './local-operations.ts';
 import {readBusinessCutoff} from './cash-opening.ts';
 import {readSmtDeviceId} from './admin-config-sync.ts';
+import {ensureCurrentCapacityPoolState,type SmtCapacityPoolStateView} from './capacity-pool-state.ts';
 import {validateAdminRefundEvent,type AdminRefundEvent} from '../../../contracts/admin-refund-v1.ts';
 
 export interface SmtOperationalMetric{readonly id:string;readonly label:string;readonly value:string;readonly detail?:string}
@@ -293,6 +294,7 @@ export interface CleanSmtCoreRuntimePort{
   }):{readonly orderId:string;readonly disposition:'APPLIED'|'EVIDENCE_ONLY'|'IDEMPOTENT'|'CONFLICT';readonly fulfillmentLabel:StoredOrder['fulfillmentLabel']};
   readDining?(selectedSessionId?:string):Promise<SmtDiningProjection>;
   readAvailability?():Promise<SmtAvailabilityProjection>;
+  readCapacityPoolState?():Promise<SmtCapacityPoolStateView>;
   setAvailability?(nodeId:string,status:SmtAvailabilityStatus,expectedRevision:number):Promise<SmtAvailabilityProjection>;
   createDiningWait?(input:{partySize:number;note?:string}):Promise<LocalHoldDraft>;
   updateDiningPartySize?(holdId:string,partySize:number):Promise<LocalDiningHoldDetail>;
@@ -2197,6 +2199,9 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
   },
   async readAvailability(){
     return {revision:1,nodes:Object.entries(productNames).map(([nodeId,label])=>({nodeId,label,status:data.availability[nodeId]||'available',sourceLabel:'LOCAL'})),canChange:true};
+  },
+  async readCapacityPoolState(){
+    return ensureCurrentCapacityPoolState();
   },
   async setAvailability(nodeId,status){
     data={...data,availability:{...data.availability,[nodeId]:status}};save();
