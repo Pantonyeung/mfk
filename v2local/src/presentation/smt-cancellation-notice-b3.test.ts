@@ -20,9 +20,9 @@ function installStorage(){
 
 function installSuccessfulNativeBridge(){
   const messages:string[]=[];
-  Object.defineProperty(window,'moreFunNative',{
-    configurable:true,
-    value:{
+  const listeners=new Set<(event:{data:unknown})=>void>();
+  const fakeWindow={
+    moreFunNative:{
       postMessage(raw:string){
         messages.push(raw);
         const request=JSON.parse(raw) as {type:string;requestId:string};
@@ -31,14 +31,22 @@ function installSuccessfulNativeBridge(){
           :request.type==='print.lan.dispatch'
             ?'print.lan.dispatch.completed'
             :'carrier.error';
-        window.setTimeout(()=>window.dispatchEvent(new MessageEvent('message',{data:JSON.stringify({
-          type:responseType,
-          requestId:request.requestId,
-          outcome:responseType==='carrier.error'?'REJECTED_BEFORE_SEND':'SENT',
-        })})),0);
+        setTimeout(()=>{
+          const data=JSON.stringify({
+            type:responseType,
+            requestId:request.requestId,
+            outcome:responseType==='carrier.error'?'REJECTED_BEFORE_SEND':'SENT',
+          });
+          for(const listener of [...listeners])listener({data});
+        },0);
       },
     },
-  });
+    addEventListener(type:string,listener:(event:{data:unknown})=>void){if(type==='message')listeners.add(listener);},
+    removeEventListener(type:string,listener:(event:{data:unknown})=>void){if(type==='message')listeners.delete(listener);},
+    setTimeout(fn:()=>void,ms:number){return setTimeout(fn,ms);},
+    clearTimeout(id:ReturnType<typeof setTimeout>){clearTimeout(id);},
+  };
+  Object.defineProperty(globalThis,'window',{configurable:true,value:fakeWindow});
   return messages;
 }
 
@@ -76,7 +84,7 @@ describe('SMT B3 automatic cancellation notice',()=>{
   beforeEach(()=>{
     installStorage();
     vi.resetModules();
-    if(typeof window!=='undefined')delete window.moreFunNative;
+    try{delete (globalThis as {window?:unknown}).window;}catch{}
   });
 
   it('prints exactly one cancellation notice after confirmed production issue and persists DONE',async()=>{
