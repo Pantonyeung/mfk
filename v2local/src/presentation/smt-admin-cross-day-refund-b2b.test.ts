@@ -127,7 +127,7 @@ describe('SMT B2b Admin cross-day refund intake',()=>{
   it('installs Admin refund doorbell intake and prints refund original/execution timing in day close',()=>{
     const here=path.dirname(fileURLToPath(import.meta.url));
     const root=path.resolve(here,'..');
-    const main=fs.readFileSync(path.resolve(root,'../main.tsx'),'utf8');
+    const main=fs.readFileSync(path.join(root,'main.tsx'),'utf8');
     const intake=fs.readFileSync(path.join(root,'runtime/admin-refund-intake.ts'),'utf8');
     const ticket=fs.readFileSync(path.join(root,'runtime/daily-close-ticket.ts'),'utf8');
     expect(main).toContain('installAdminRefundIntake');
