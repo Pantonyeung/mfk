@@ -26,6 +26,8 @@ export interface PrintableOrder{
   readonly sourceLabel:string;
   readonly providerPickupCode?:string;
   readonly diningTableLabel?:string;
+  readonly receiptTitle?:string;
+  readonly receiptNoteLines?:readonly string[];
   readonly orderRemark?:string;
   readonly utensilPreference?:'需要'|'不需要';
   readonly items:readonly {
@@ -53,7 +55,7 @@ export interface PlannedPrintJob{
   readonly beepAfter?:boolean;
 }
 
-export type PrintPlanMode='standard'|'dining-initial';
+export type PrintPlanMode='standard'|'dining-initial'|'dining-payment';
 
 export interface TscBitmapJobBatch{
   readonly binding:PrintBinding;
@@ -171,7 +173,7 @@ export function renderCustomerReceiptTicket(order:PrintableOrder){
   return INIT
     +brand()
     +RULE
-    +CENTER+BOLD_ON+DOUBLE+'客戶收據\n'+NORMAL+BOLD_OFF+LEFT
+    +CENTER+BOLD_ON+DOUBLE+clean(order.receiptTitle??'客戶收據')+'\n'+NORMAL+BOLD_OFF+LEFT
     +RULE
     +'訂單編號 '+clean(order.display)+'\n'
     +'下單時間 '+hktDateTime(order.createdAt)+'\n'
@@ -182,6 +184,7 @@ export function renderCustomerReceiptTicket(order:PrintableOrder){
     +BOLD_ON+'總數量 '+totalUnits(order)+'份\n'+BOLD_OFF
     +'付款方式 '+clean(order.paymentLabel)+'\n'
     +BOLD_ON+DOUBLE+'合計 '+money(order.totalMinor)+'\n'+NORMAL+BOLD_OFF
+    +(order.receiptNoteLines?.length?order.receiptNoteLines.map(line=>clean(line)+'\n').join(''):'')
     +RULE
     +CENTER+'請核對餐點 / 謝謝光臨\n'
     +'*** 謝謝！***\n'
@@ -341,6 +344,7 @@ export function buildOrderPrintPlan(order:PrintableOrder,bindings:readonly Print
   const globalProductLabelTotal=productLabelUnits.length;
   const jobs:PlannedPrintJob[]=[];
   for(const binding of active){
+    if(mode==='dining-payment'&&binding.role!=='顧客小票')continue;
     if(binding.role==='顧客小票'){
       const items=roleItems(order,'receipt',config);
       if(items.length<1)continue;
@@ -356,6 +360,19 @@ export function buildOrderPrintPlan(order:PrintableOrder,bindings:readonly Print
           ticketOrder:routed,
           cutAfter:true,
           kickDrawer:false,
+          beepAfter:true,
+        });
+      }else if(mode==='dining-payment'){
+        jobs.push({
+          id:order.id+':receipt',
+          role:binding.role,
+          binding,
+          payload:renderCustomerReceiptTicket(routed),
+          renderMode:'escpos-raster',
+          ticketKind:'receipt',
+          ticketOrder:routed,
+          cutAfter:true,
+          kickDrawer:/\bCASH\b/i.test(order.paymentLabel),
           beepAfter:true,
         });
       }else{
