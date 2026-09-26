@@ -72,11 +72,10 @@
 .stage1-hero-copy>span{font-size:10px;letter-spacing:.16em;font-weight:900;color:var(--mf-brand-orange)}
 .stage1-hero-copy h1{margin:0;font-size:30px;line-height:1.06;color:var(--mf-brand-navy);letter-spacing:-.035em}
 .stage1-hero-copy p{margin:0;color:#526071;font-size:13px;line-height:1.5;max-width:350px}
-.stage1-primary-cta,.stage1-secondary-cta{
+.stage1-primary-cta{
   min-height:52px;border-radius:24px;padding:0 18px;font:inherit;font-weight:850;
+  border:0;background:var(--mf-brand-orange);color:#fff;
 }
-.stage1-primary-cta{border:0;background:var(--mf-brand-orange);color:#fff}
-.stage1-secondary-cta{border:1px solid rgba(21,57,107,.22);background:var(--mf-surface);color:var(--mf-brand-navy)}
 .stage1-primary-cta:disabled{background:#d9d3cb;color:#8e8b87}
 
 .stage1-announcement-strip{
@@ -91,7 +90,7 @@
 .stage1-closed-panel>span{font-size:10px;font-weight:900;color:#a76420}
 .stage1-closed-panel h2{margin:5px 0 7px;font-size:21px;color:var(--mf-brand-navy)}
 .stage1-closed-panel p{margin:0;color:var(--mf-muted);font-size:13px;line-height:1.55}
-.stage1-closed-panel>div{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
+.stage1-closed-browse{width:100%;margin-top:14px}
 
 .stage1-section-title{display:flex;align-items:end;justify-content:space-between;gap:12px;margin:28px 0 12px}
 .stage1-section-title span{font-size:10px;letter-spacing:.15em;font-weight:900;color:var(--mf-brand-orange)}
@@ -103,8 +102,7 @@
   min-width:0;padding:10px;border:1px solid var(--mf-border);border-radius:20px;background:var(--mf-surface);
   display:grid;gap:10px;text-align:left;
 }
-.stage1-product-placeholder{height:132px;display:grid;place-items:center;border-radius:15px;background:linear-gradient(145deg,#ece5dc,#faf6f1)}
-.stage1-product-placeholder>span{width:46px;height:46px;border-radius:50%;display:grid;place-items:center;background:rgba(21,57,107,.07);color:rgba(21,57,107,.25);font-weight:900}
+.stage1-product-placeholder{height:132px;border-radius:15px;background:#f2ede7;border:1px solid var(--mf-border)}
 .stage1-product-info{display:grid;gap:3px}
 .stage1-product-info small{font-size:10px;color:var(--mf-brand-orange);font-weight:900}
 .stage1-product-info strong{font-size:15px;color:var(--mf-brand-navy);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -147,7 +145,6 @@
 @media(max-width:360px){
   .stage1-hero-banner{min-height:390px}
   .stage1-top6-grid{grid-template-columns:1fr}
-  .stage1-closed-panel>div{grid-template-columns:1fr}
 }
 @media(prefers-reduced-motion:reduce){
   .stage1-shell *{animation:none!important;transition:none!important;scroll-behavior:auto!important}
