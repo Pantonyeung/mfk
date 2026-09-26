@@ -625,6 +625,7 @@ function OrderView({connection,categories,activeCategoryId,setCategory,search,se
             <small>{Number.isSafeInteger(Number(price))?money('HKD',Number(price)):(product.available?'價格待同步':'暫停供應')}</small>
             <i>{product.optionGroups.length||product.variations?.length?'可設定':''}</i>
           </span>
+          {product.available?<span className="stage1-product-add" aria-hidden="true">＋</span>:null}
         </button>;
       })}</div>:
       <EmptyState title="搵唔到商品" detail="清除搜尋或者切換其他分類。"><button className="primary" onClick={()=>setSearch('')}>清除搜尋</button></EmptyState>}
