@@ -56,6 +56,10 @@ export interface StoredOrder{
   id:string;display:string;createdAt:string;updatedAt?:string;totalMinor:number;paymentLabel:string;fulfillmentLabel:'待處理'|'進行中'|'可取餐'|'已完成'|'已取消';sourceLabel:string;
   paymentCorrections?:readonly PaymentCorrectionRecord[];
   refunds?:readonly OrderRefundRecord[];
+  diningHoldId?:string;
+  recognizedSalesMinor?:number;
+  outstandingMinor?:number;
+  paymentEntries?:readonly LocalDiningPayment[];
   productionIssuedAt?:string;
   cancellationNoticeAttemptedAt?:string;
   cancellationNoticePrintedAt?:string;
@@ -96,7 +100,10 @@ export interface LocalDiningLineViewModel{
 export interface LocalDiningHoldDetail{
   readonly checkoutRevision:string;
   readonly archivedAt?:string;
+  readonly cancelledAt?:string;
   readonly lastAssignedTable?:string;
+  readonly formalOrderId?:string;
+  readonly formalOrderDisplay?:string;
   readonly holdId:string;
   readonly codeLabel:string;
   readonly assignedTable?:string;
@@ -111,7 +118,10 @@ export interface LocalDiningHoldDetail{
 }
 export interface LocalHoldDraft{
   readonly archivedAt?:string;
+  readonly cancelledAt?:string;
   readonly lastAssignedTable?:string;
+  readonly formalOrderId?:string;
+  readonly formalOrderDisplay?:string;
   readonly id:string;
   readonly codeLabel:string;
   readonly kind:'dining'|'waiting';
@@ -534,11 +544,20 @@ function readDiningState():Persisted{
     diningRevision:Number.isSafeInteger(value.diningRevision)?value.diningRevision:0,
   };
 }
-function commitDiningHolds(snapshot:Persisted,holds:LocalHoldDraft[]){
-  const next:Persisted={...snapshot,holds,diningRevision:(snapshot.diningRevision??0)+1};
+function commitDiningState(snapshot:Persisted,input:{holds?:LocalHoldDraft[];orders?:StoredOrder[]}){
+  const next:Persisted={
+    ...snapshot,
+    holds:input.holds??snapshot.holds,
+    orders:input.orders??snapshot.orders,
+    diningRevision:(snapshot.diningRevision??0)+1,
+  };
   localStorage.setItem(KEY,JSON.stringify(next));
   data=next;
   for(const listener of listeners){try{listener();}catch{console.warn('DINING_OBSERVER_FAILED');}}
+  return next;
+}
+function commitDiningHolds(snapshot:Persisted,holds:LocalHoldDraft[]){
+  return commitDiningState(snapshot,{holds});
 }
 function diningCheckoutRevision(hold:LocalHoldDraft){return 'DINING2:'+JSON.stringify(hold);}
 function requireDiningHold(snapshot:Persisted,id:string){
@@ -550,6 +569,75 @@ function requireDiningHold(snapshot:Persisted,id:string){
 function archiveDiningHold(hold:LocalHoldDraft,at:string):LocalHoldDraft{
   const {assignedTable,...rest}=hold;
   return {...rest,archivedAt:hold.archivedAt??at,...(assignedTable?{lastAssignedTable:assignedTable}:{})};
+}
+function cancelDiningHold(hold:LocalHoldDraft,at:string):LocalHoldDraft{
+  return {...archiveDiningHold(hold,at),cancelledAt:hold.cancelledAt??at};
+}
+function diningPaymentLabel(payments:readonly LocalDiningPayment[]){
+  if(!payments.length)return '未收款';
+  const tenders=[...new Set(payments.map(payment=>payment.tender))];
+  return tenders.length===1?tenders[0]:'COMBO';
+}
+function syncDiningFormalOrder(order:StoredOrder,hold:LocalHoldDraft,at:string):StoredOrder{
+  const payments=Array.isArray(hold.payments)?hold.payments:[];
+  const confirmedPaidMinor=payments.reduce((sum,payment)=>sum+Math.max(0,Number(payment.amountMinor)||0),0);
+  return {
+    ...order,
+    diningHoldId:hold.id,
+    totalMinor:hold.totalMinor,
+    recognizedSalesMinor:confirmedPaidMinor,
+    outstandingMinor:hold.cancelledAt?0:Math.max(0,hold.totalMinor-confirmedPaidMinor),
+    paymentEntries:payments.map(payment=>({...payment,selections:payment.selections.map(selection=>({...selection}))})),
+    paymentLabel:diningPaymentLabel(payments),
+    items:hold.items.map(item=>({...item,serviceMode:'dine-in' as const})),
+    updatedAt:at,
+  };
+}
+function ensureDiningFormalOrder(snapshot:Persisted,hold:LocalHoldDraft,at:string){
+  const byId=hold.formalOrderId?snapshot.orders.find(order=>order.id===hold.formalOrderId):undefined;
+  const existing=byId??snapshot.orders.find(order=>order.diningHoldId===hold.id);
+  if(existing){
+    const linked:LocalHoldDraft={
+      ...hold,
+      formalOrderId:existing.id,
+      formalOrderDisplay:existing.display,
+    };
+    const synced=syncDiningFormalOrder(existing,linked,at);
+    const changed=JSON.stringify(existing)!==JSON.stringify(synced)||hold.formalOrderId!==existing.id||hold.formalOrderDisplay!==existing.display;
+    return {
+      hold:linked,
+      order:synced,
+      orders:snapshot.orders.map(order=>order.id===existing.id?synced:order),
+      created:false,
+      changed,
+    };
+  }
+  if(!hold.items.length||hold.totalMinor<=0){
+    return {hold,order:undefined,orders:snapshot.orders,created:false,changed:false};
+  }
+  const session=readActiveStaffSession();
+  const order:StoredOrder={
+    id:'MFK-'+Date.now().toString(36),
+    display:'P'+String(snapshot.orders.length+1).padStart(3,'0'),
+    createdAt:at,
+    updatedAt:at,
+    totalMinor:hold.totalMinor,
+    paymentLabel:'未收款',
+    fulfillmentLabel:'進行中',
+    sourceLabel:hold.sourceLabel||'堂食',
+    diningHoldId:hold.id,
+    recognizedSalesMinor:0,
+    outstandingMinor:hold.totalMinor,
+    paymentEntries:[],
+    ...(session?{staffId:session.staffId,staffName:session.displayName}:{}),
+    items:hold.items.map(item=>({...item,serviceMode:'dine-in' as const})),
+  };
+  const linked:LocalHoldDraft={...hold,formalOrderId:order.id,formalOrderDisplay:order.display};
+  return {hold:linked,order,orders:[order,...snapshot.orders],created:true,changed:true};
+}
+function projectDiningOrderNonBlocking(order?:StoredOrder){
+  if(!order)return;
+  try{projectOrder(order);}catch{console.warn('DINING_ORDER_PROJECTION_DEFERRED');}
 }
 
 function diningDetail(hold:LocalHoldDraft):LocalDiningHoldDetail{
@@ -576,16 +664,19 @@ function diningDetail(hold:LocalHoldDraft):LocalDiningHoldDetail{
   return {
     checkoutRevision:diningCheckoutRevision(hold),
     ...(hold.archivedAt?{archivedAt:hold.archivedAt}:{}),
+    ...(hold.cancelledAt?{cancelledAt:hold.cancelledAt}:{}),
     ...(hold.lastAssignedTable?{lastAssignedTable:hold.lastAssignedTable}:{}),
+    ...(hold.formalOrderId?{formalOrderId:hold.formalOrderId}:{}),
+    ...(hold.formalOrderDisplay?{formalOrderDisplay:hold.formalOrderDisplay}:{}),
     holdId:hold.id,
-    codeLabel:hold.codeLabel,
+    codeLabel:hold.formalOrderDisplay??hold.codeLabel,
     assignedTable:hold.assignedTable,
     createdAt:hold.createdAt,
     partySize:hold.partySize,
     note:hold.note,
     totalMinor:hold.totalMinor,
     paidMinor,
-    remainingMinor:Math.max(0,hold.totalMinor-paidMinor),
+    remainingMinor:hold.cancelledAt?0:Math.max(0,hold.totalMinor-paidMinor),
     lines,
     payments,
   };
@@ -644,35 +735,47 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
     data={...data,holds:[draft,...data.holds]};save();return draft;
   },
   upsertSmmDiningHold(input){
+    const snapshot=readDiningState();
     const providerRef=String(input.providerRef||'').trim();
     if(!providerRef)throw new Error('SMM_DINING_PROVIDER_REF_REQUIRED');
-    const existingByRef=data.holds.find(hold=>hold.providerRef===providerRef);
+    const existingByRef=snapshot.holds.find(hold=>hold.providerRef===providerRef);
     if(existingByRef)return existingByRef;
     const target=input.target;
     const covers=Math.max(1,Math.floor(Number(target.covers)||1));
     const items=input.items.map(item=>({...item}));
     if(target.kind==='WAITING'){
       const draft:LocalHoldDraft={
-        id:'HOLD-'+Date.now().toString(36),codeLabel:'W'+String(data.holds.length+1).padStart(3,'0'),kind:'dining',
+        id:'HOLD-'+Date.now().toString(36),codeLabel:'W'+String(snapshot.holds.length+1).padStart(3,'0'),kind:'dining',
         createdAt:new Date().toISOString(),partySize:covers,note:'SMM 輪候',totalMinor:Math.max(0,Math.floor(Number(input.totalMinor)||0)),
         payments:[],providerRef,sourceLabel:input.sourceLabel||'SMM',smmSubmissionRefs:[providerRef],items,
       };
-      data={...data,holds:[draft,...data.holds]};save();return draft;
+      commitDiningHolds(snapshot,[draft,...snapshot.holds]);return draft;
     }
     const tableId=String(target.tableId||'').trim();
     if(!/^T\d{2}$/.test(tableId))throw new Error('SMM_DINING_TABLE_INVALID');
-    const occupied=data.holds.find(hold=>hold.kind==='dining'&&hold.assignedTable===tableId);
+    const occupied=snapshot.holds.find(hold=>hold.kind==='dining'&&!hold.archivedAt&&hold.assignedTable===tableId);
     if(occupied){
       if((occupied.smmSubmissionRefs??[]).includes(providerRef))return occupied;
+      const at=new Date().toISOString();
       const updated:LocalHoldDraft={...occupied,items:[...occupied.items,...items],totalMinor:occupied.totalMinor+Math.max(0,Math.floor(Number(input.totalMinor)||0)),smmSubmissionRefs:[...(occupied.smmSubmissionRefs??[]),providerRef]};
-      data={...data,holds:data.holds.map(hold=>hold.id===occupied.id?updated:hold)};save();return updated;
+      const ensured=ensureDiningFormalOrder(snapshot,updated,at);
+      commitDiningState(snapshot,{
+        holds:snapshot.holds.map(hold=>hold.id===occupied.id?ensured.hold:hold),
+        orders:ensured.orders,
+      });
+      projectDiningOrderNonBlocking(ensured.order);
+      return ensured.hold;
     }
+    const at=new Date().toISOString();
     const draft:LocalHoldDraft={
-      id:'HOLD-'+Date.now().toString(36),codeLabel:'H'+String(data.holds.length+1).padStart(3,'0'),kind:'dining',
-      createdAt:new Date().toISOString(),partySize:covers,note:'SMM 堂食',totalMinor:Math.max(0,Math.floor(Number(input.totalMinor)||0)),
+      id:'HOLD-'+Date.now().toString(36),codeLabel:'H'+String(snapshot.holds.length+1).padStart(3,'0'),kind:'dining',
+      createdAt:at,partySize:covers,note:'SMM 堂食',totalMinor:Math.max(0,Math.floor(Number(input.totalMinor)||0)),
       assignedTable:tableId,payments:[],providerRef,sourceLabel:input.sourceLabel||'SMM',smmSubmissionRefs:[providerRef],items,
     };
-    data={...data,holds:[draft,...data.holds]};save();return draft;
+    const ensured=ensureDiningFormalOrder(snapshot,draft,at);
+    commitDiningState(snapshot,{holds:[ensured.hold,...snapshot.holds],orders:ensured.orders});
+    projectDiningOrderNonBlocking(ensured.order);
+    return ensured.hold;
   },
   holds(){return readDiningState().holds.filter(hold=>!hold.archivedAt)},
   removeHold(id){
@@ -967,10 +1070,21 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
     if(order.fulfillmentLabel==='已取消')return {orderId,status:'CANCELLED' as const};
     const updatedAt=new Date().toISOString();
     const cancellationReason=String(reason||'').trim();
-    data={...data,orders:data.orders.map(current=>current.id===orderId?{
-      ...current,fulfillmentLabel:'已取消',updatedAt,
-      ...(cancellationReason?{cancellationReason}:{}),
-    }:current)};
+    const linkedHoldId=order.diningHoldId;
+    const linkedHold=linkedHoldId?data.holds.find(hold=>hold.id===linkedHoldId):undefined;
+    const nextHolds=linkedHold
+      ?data.holds.map(hold=>hold.id===linkedHoldId?cancelDiningHold(hold,updatedAt):hold)
+      :data.holds;
+    data={
+      ...data,
+      holds:nextHolds,
+      diningRevision:linkedHold?(data.diningRevision??0)+1:data.diningRevision,
+      orders:data.orders.map(current=>current.id===orderId?{
+        ...current,fulfillmentLabel:'已取消',updatedAt,
+        ...(current.diningHoldId?{outstandingMinor:0}:{}),
+        ...(cancellationReason?{cancellationReason}:{}),
+      }:current),
+    };
     save();
     appendActionAudit({action:'CANCEL',orderId,reason:cancellationReason||undefined});
     projectOrder(data.orders.find(current=>current.id===orderId)!);
@@ -1152,7 +1266,7 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
             label:table.name,
             state:detail.remainingMinor===0?'settled' as const:'occupied' as const,
             partySize:seated.partySize,
-            outstandingLabel:seated.codeLabel,
+            outstandingLabel:seated.formalOrderDisplay??seated.codeLabel,
             holdId:seated.id,
             startedAt:seated.createdAt,
             itemCount:seated.items.reduce((sum,item)=>sum+item.qty,0),
@@ -1200,8 +1314,15 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
     if(snapshot.holds.some(row=>row.id!==holdId&&!row.archivedAt&&row.kind==='dining'&&row.assignedTable===tableId)){
       throw new Error('DINING_TABLE_OCCUPIED');
     }
-    if(hold.assignedTable===tableId)return;
-    commitDiningHolds(snapshot,snapshot.holds.map(row=>row.id===holdId?{...row,assignedTable:tableId}:row));
+    const seated=hold.assignedTable===tableId?hold:{...hold,assignedTable:tableId};
+    const at=new Date().toISOString();
+    const ensured=ensureDiningFormalOrder(snapshot,seated,at);
+    if(hold.assignedTable===tableId&&!ensured.changed)return;
+    commitDiningState(snapshot,{
+      holds:snapshot.holds.map(row=>row.id===holdId?ensured.hold:row),
+      orders:ensured.orders,
+    });
+    projectDiningOrderNonBlocking(ensured.order);
   },
   async unassignDiningTable(holdId){
     const snapshot=readDiningState();
@@ -1287,8 +1408,13 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
     if(after.remainingMinor===0&&after.lines.length>0&&after.lines.every(row=>row.remainingQty===0)){
       updated=archiveDiningHold(updated,createdAt);
     }
-    commitDiningHolds(snapshot,snapshot.holds.map(row=>row.id===holdId?updated:row));
-    return clone(diningDetail(updated));
+    const ensured=ensureDiningFormalOrder(snapshot,updated,createdAt);
+    commitDiningState(snapshot,{
+      holds:snapshot.holds.map(row=>row.id===holdId?ensured.hold:row),
+      orders:ensured.orders,
+    });
+    projectDiningOrderNonBlocking(ensured.order);
+    return clone(diningDetail(ensured.hold));
   },
   async clearDiningHold(holdId){
     const snapshot=readDiningState();
