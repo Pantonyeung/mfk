@@ -10,7 +10,13 @@ import {buildDailyClosePrintData,renderDailyCloseTicket} from './daily-close-tic
 import {buildLocalReport,readLocalDayCloses,resolveBusinessWindow} from './local-operations.ts';
 import {readBusinessCutoff} from './cash-opening.ts';
 import {readSmtDeviceId} from './admin-config-sync.ts';
-import {ensureCurrentCapacityPoolState,type SmtCapacityPoolStateView} from './capacity-pool-state.ts';
+import {
+  ensureCurrentCapacityPoolState,
+  planCapacityDeductionEvents,
+  planCapacityRestoreEvents,
+  type CapacityPoolOrderEvent,
+  type SmtCapacityPoolStateView,
+} from './capacity-pool-state.ts';
 import {validateAdminRefundEvent,type AdminRefundEvent} from '../../../contracts/admin-refund-v1.ts';
 
 export interface SmtOperationalMetric{readonly id:string;readonly label:string;readonly value:string;readonly detail?:string}
@@ -88,6 +94,7 @@ export interface StoredOrder{
   diningLineCorrections?:readonly LocalDiningLineCorrection[];
   paymentCorrections?:readonly PaymentCorrectionRecord[];
   refunds?:readonly OrderRefundRecord[];
+  capacityEvents?:readonly CapacityPoolOrderEvent[];
   diningHoldId?:string;
   recognizedSalesMinor?:number;
   outstandingMinor?:number;
@@ -270,6 +277,34 @@ function nextRuntimeIdentity(prefix:'MFK-'|'HOLD-'|'ACT-'){
 function save(){localStorage.setItem(KEY,JSON.stringify(data));listeners.forEach(fn=>fn())}
 function projectOrder(order:StoredOrder){queueOrderProjection(order)}
 const money=(minor:number)=>String.fromCharCode(36)+(minor/100).toFixed(2);
+function capacityEventsFromOrders(orders:readonly StoredOrder[]):CapacityPoolOrderEvent[]{
+  return orders.flatMap(order=>(order.capacityEvents??[]).map(event=>({...event})));
+}
+function appendCapacityDeductionEvents(
+  order:StoredOrder,
+  admissionId:string,
+  items:readonly {id:string;qty:number}[],
+  otherOrders:readonly StoredOrder[],
+  at:string,
+){
+  const existingEvents=capacityEventsFromOrders(otherOrders);
+  const events=planCapacityDeductionEvents({
+    orderId:order.id,
+    admissionId,
+    items,
+    existingEvents,
+    now:Date.parse(at),
+  });
+  return events.length?{...order,capacityEvents:[...(order.capacityEvents??[]),...events]}:order;
+}
+function appendCapacityRestoreEvents(order:StoredOrder,at:string){
+  const events=planCapacityRestoreEvents({
+    orderId:order.id,
+    existingEvents:order.capacityEvents??[],
+    now:Date.parse(at),
+  });
+  return events.length?{...order,capacityEvents:[...(order.capacityEvents??[]),...events]}:order;
+}
 
 export interface SmtReprintOption{readonly jobId:string;readonly role:string;readonly label:string;readonly detail?:string;readonly bindingId:string;readonly printerName:string;readonly physicalKey:string}
 export interface CleanSmtCoreRuntimePort{
@@ -810,7 +845,7 @@ function ensureDiningFormalOrder(snapshot:Persisted,hold:LocalHoldDraft,at:strin
     return {hold,order:undefined,orders:snapshot.orders,created:false,changed:false};
   }
   const session=readActiveStaffSession();
-  const order:StoredOrder={
+  const baseOrder:StoredOrder={
     id:nextRuntimeIdentity('MFK-'),
     display:'P'+String(snapshot.orders.length+1).padStart(3,'0'),
     createdAt:at,
@@ -826,6 +861,7 @@ function ensureDiningFormalOrder(snapshot:Persisted,hold:LocalHoldDraft,at:strin
     ...(session?{staffId:session.staffId,staffName:session.displayName}:{}),
     items:hold.items.map(item=>({...item,serviceMode:'dine-in' as const})),
   };
+  const order=appendCapacityDeductionEvents(baseOrder,'ORDER',baseOrder.items,snapshot.orders,at);
   const linked:LocalHoldDraft={...hold,formalOrderId:order.id,formalOrderDisplay:order.display};
   const synced=syncDiningFormalOrder(order,linked,at);
   return {hold:linked,order:synced,orders:[synced,...snapshot.orders],created:true,changed:true};
@@ -1192,7 +1228,20 @@ function appendDiningItemsToSnapshot(snapshot:Persisted,hold:LocalHoldDraft,inpu
     totalMinor:hold.totalMinor+totalMinor,
     additions:[...(hold.additions??[]),addition],
   };
-  const ensured=ensureDiningFormalOrder(snapshot,updated,createdAt);
+  const existingOrder=snapshot.orders.find(row=>row.id===hold.formalOrderId);
+  if(!existingOrder)throw new Error('DINING_FORMAL_ORDER_NOT_FOUND');
+  const capacityOrder=appendCapacityDeductionEvents(
+    existingOrder,
+    'DINING_ADD:'+submissionId,
+    items,
+    snapshot.orders,
+    createdAt,
+  );
+  const capacitySnapshot:Persisted={
+    ...snapshot,
+    orders:snapshot.orders.map(row=>row.id===existingOrder.id?capacityOrder:row),
+  };
+  const ensured=ensureDiningFormalOrder(capacitySnapshot,updated,createdAt);
   if(!ensured.order)throw new Error('DINING_FORMAL_ORDER_REQUIRED');
   return {hold:ensured.hold,addition,order:ensured.order,orders:ensured.orders,changed:true};
 }
@@ -1247,7 +1296,7 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
     const n=data.orders.length+1;
     const createdAt=new Date().toISOString();
     const session=readActiveStaffSession();
-    const order:StoredOrder={
+    const baseOrder:StoredOrder={
       id:nextRuntimeIdentity('MFK-'),
       display:'P'+String(n).padStart(3,'0'),
       createdAt,
@@ -1263,10 +1312,11 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
       ...(input.utensilPreference?{utensilPreference:input.utensilPreference}:{}),
       ...(input.paymentEvidenceRef?{paymentEvidenceRef:input.paymentEvidenceRef}:{}),
       ...(input.paymentVerificationState?{paymentVerificationState:input.paymentVerificationState}:{}),
-      ...(input.customerPhone?{customerPhone:input.customerPhone}:{}),
+      ...(input.customerPhone?{customerPhone:String(input.customerPhone)}:{}),
       ...(session?{staffId:session.staffId,staffName:session.displayName}:{}),
       items:input.items.map(item=>({...item})),
     };
+    const order=appendCapacityDeductionEvents(baseOrder,'ORDER',baseOrder.items,data.orders,createdAt);
     data={...data,orders:[order,...data.orders]};
     save();
     projectOrder(order);
@@ -1336,7 +1386,8 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
         ...appended.hold,
         smmSubmissionRefs:[...(occupied.smmSubmissionRefs??[]),providerRef],
       };
-      const ensured=ensureDiningFormalOrder(snapshot,withSubmission,new Date().toISOString());
+      const appendedSnapshot:Persisted={...snapshot,orders:appended.orders};
+      const ensured=ensureDiningFormalOrder(appendedSnapshot,withSubmission,new Date().toISOString());
       commitDiningState(snapshot,{
         holds:snapshot.holds.map(hold=>hold.id===occupied.id?ensured.hold:hold),
         orders:ensured.orders,
@@ -1661,6 +1712,7 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
     const order=data.orders.find(x=>x.id===orderId);
     if(!order)throw new Error('ORDER_NOT_FOUND');
     if(order.diningHoldId)throw new Error('DINING_ITEMS_MANAGED_BY_DINING');
+    if((order.capacityEvents??[]).some(event=>event.kind==='DEDUCT'))throw new Error('CAPACITY_LINKED_ORDER_EDIT_REQUIRES_CORRECTION');
     if(order.fulfillmentLabel==='已取消'||order.fulfillmentLabel==='已完成')throw new Error('ORDER_NOT_EDITABLE');
     const normalized=items
       .map(item=>({...item,qty:Math.max(0,Math.floor(Number(item.qty)||0)),unitMinor:Math.max(0,Math.floor(Number(item.unitMinor)||0))}))
@@ -1690,7 +1742,8 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
       holds:nextHolds,
       diningRevision:linkedHold?(data.diningRevision??0)+1:data.diningRevision,
       orders:data.orders.map(current=>current.id===orderId?{
-        ...current,fulfillmentLabel:'已取消',updatedAt,
+        ...appendCapacityRestoreEvents(current,updatedAt),
+        fulfillmentLabel:'已取消',updatedAt,
         ...(current.diningHoldId?{outstandingMinor:0}:{}),
         ...(cancellationReason?{cancellationReason}:{}),
       }:current),
@@ -1758,7 +1811,7 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
 
     const updatedAt=new Date().toISOString();
     data={...data,orders:data.orders.map(current=>current.id===order.id?{
-      ...current,
+      ...((nextLabel==='已取消')?appendCapacityRestoreEvents(current,updatedAt):current),
       fulfillmentLabel:nextLabel,
       updatedAt,
       providerLastEventId:input.eventId,
@@ -2201,7 +2254,7 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
     return {revision:1,nodes:Object.entries(productNames).map(([nodeId,label])=>({nodeId,label,status:data.availability[nodeId]||'available',sourceLabel:'LOCAL'})),canChange:true};
   },
   async readCapacityPoolState(){
-    return ensureCurrentCapacityPoolState();
+    return ensureCurrentCapacityPoolState(Date.now(),localStorage,capacityEventsFromOrders(data.orders));
   },
   async setAvailability(nodeId,status){
     data={...data,availability:{...data.availability,[nodeId]:status}};save();

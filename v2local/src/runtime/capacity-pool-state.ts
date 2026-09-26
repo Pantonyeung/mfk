@@ -5,6 +5,18 @@ import {resolveBusinessWindow} from './local-operations.ts';
 
 export const LOCAL_CAPACITY_POOL_STATE_KEY='mfk.v2local.capacity-pools.v1';
 
+export interface CapacityPoolOrderEvent{
+  readonly id:string;
+  readonly kind:'DEDUCT'|'RESTORE';
+  readonly orderId:string;
+  readonly admissionId:string;
+  readonly businessDate:string;
+  readonly poolId:string;
+  readonly quantity:number;
+  readonly createdAt:string;
+  readonly sourceEventId?:string;
+}
+
 export interface LocalCapacityPoolStateRow{
   readonly businessDate:string;
   readonly poolId:string;
@@ -12,6 +24,7 @@ export interface LocalCapacityPoolStateRow{
   readonly remainingQty:number;
   readonly createdAt:number;
   readonly updatedAt:number;
+  readonly appliedEventIds?:readonly string[];
 }
 
 export interface SmtCapacityPoolStateViewRow{
@@ -38,6 +51,32 @@ function whole(value:unknown){
   if(!Number.isSafeInteger(n)||n<0)throw new Error('CAPACITY_POOL_STATE_INVALID');
   return n;
 }
+function eventIds(value:unknown){
+  if(!Array.isArray(value))return Object.freeze([] as string[]);
+  return Object.freeze([...new Set(value.map(item=>String(item||'').trim()).filter(Boolean))]);
+}
+function parseEvent(value:unknown):CapacityPoolOrderEvent{
+  if(!value||typeof value!=='object'||Array.isArray(value))throw new Error('CAPACITY_POOL_EVENT_INVALID');
+  const row=value as Record<string,unknown>;
+  const kind=row.kind;
+  const id=String(row.id??'').trim();
+  const orderId=String(row.orderId??'').trim();
+  const admissionId=String(row.admissionId??'').trim();
+  const businessDate=String(row.businessDate??'').trim();
+  const poolId=String(row.poolId??'').trim();
+  const createdAt=String(row.createdAt??'').trim();
+  const quantity=Number(row.quantity);
+  if((kind!=='DEDUCT'&&kind!=='RESTORE')||!id||!orderId||!admissionId||!poolId||
+     !/^\d{4}-\d{2}-\d{2}$/.test(businessDate)||!Number.isSafeInteger(quantity)||quantity<=0||
+     !Number.isFinite(Date.parse(createdAt))){
+    throw new Error('CAPACITY_POOL_EVENT_INVALID');
+  }
+  const sourceEventId=String(row.sourceEventId??'').trim();
+  return Object.freeze({
+    id,kind,orderId,admissionId,businessDate,poolId,quantity,createdAt,
+    ...(sourceEventId?{sourceEventId}:{}),
+  });
+}
 function parseRow(value:unknown):LocalCapacityPoolStateRow{
   if(!value||typeof value!=='object'||Array.isArray(value))throw new Error('CAPACITY_POOL_STATE_INVALID');
   const row=value as Record<string,unknown>;
@@ -55,6 +94,7 @@ function parseRow(value:unknown):LocalCapacityPoolStateRow{
     remainingQty:whole(row.remainingQty),
     createdAt,
     updatedAt,
+    appliedEventIds:eventIds(row.appliedEventIds),
   });
 }
 function assertUnique(rows:readonly LocalCapacityPoolStateRow[]){
@@ -65,7 +105,7 @@ function assertUnique(rows:readonly LocalCapacityPoolStateRow[]){
     seen.add(key);
   }
 }
-function capacityBusinessDate(now:number){
+export function capacityBusinessDate(now:number){
   const cutoff=readBusinessCutoff();
   return resolveBusinessWindow(now,cutoff.hour,cutoff.minute).businessDate;
 }
@@ -104,30 +144,80 @@ export function writeLocalCapacityPoolRows(
   storage.setItem(LOCAL_CAPACITY_POOL_STATE_KEY,JSON.stringify(normalized));
 }
 
+function normalizeEvents(events:readonly CapacityPoolOrderEvent[]){
+  const normalized=events.map(parseEvent);
+  const seen=new Set<string>();
+  for(const event of normalized){
+    if(seen.has(event.id))throw new Error('CAPACITY_POOL_EVENT_DUPLICATE');
+    seen.add(event.id);
+  }
+  return normalized;
+}
+function applyPendingEvents(
+  rows:readonly LocalCapacityPoolStateRow[],
+  events:readonly CapacityPoolOrderEvent[],
+){
+  let changed=false;
+  const next=rows.map(row=>{
+    const applied=new Set(row.appliedEventIds??[]);
+    const pending=events
+      .filter(event=>event.businessDate===row.businessDate&&event.poolId===row.poolId&&!applied.has(event.id))
+      .sort((a,b)=>a.createdAt.localeCompare(b.createdAt)||a.id.localeCompare(b.id));
+    if(!pending.length)return row;
+    let remaining=row.remainingQty;
+    let updatedAt=row.updatedAt;
+    for(const event of pending){
+      if(event.kind==='DEDUCT'){
+        if(event.quantity>remaining)throw new Error('CAPACITY_POOL_PROJECTION_UNDERFLOW:'+row.poolId);
+        remaining-=event.quantity;
+      }else{
+        remaining+=event.quantity;
+        if(remaining>row.initialQtyAtOpen)throw new Error('CAPACITY_POOL_PROJECTION_OVERFLOW:'+row.poolId);
+      }
+      applied.add(event.id);
+      updatedAt=Math.max(updatedAt,Date.parse(event.createdAt));
+    }
+    changed=true;
+    return Object.freeze({...row,remainingQty:remaining,updatedAt,appliedEventIds:Object.freeze([...applied])});
+  });
+  return {rows:next,changed};
+}
+
 export function ensureCurrentCapacityPoolState(
   now=Date.now(),
   storage:Pick<Storage,'getItem'|'setItem'>=localStorage,
+  orderEvents:readonly CapacityPoolOrderEvent[]=[],
 ):SmtCapacityPoolStateView{
   const businessDate=capacityBusinessDate(now);
+  const events=normalizeEvents(orderEvents);
   const existing=readLocalCapacityPoolRows(storage);
-  const byKey=new Map(existing.map(row=>[row.businessDate+'::'+row.poolId,row] as const));
+  const reconciled=applyPendingEvents(existing,events);
+  const baseRows=reconciled.rows;
+  const byKey=new Map(baseRows.map(row=>[row.businessDate+'::'+row.poolId,row] as const));
   const {valid,invalid}=activePoolConfig();
   const created:LocalCapacityPoolStateRow[]=[];
-  const current=valid.map(pool=>{
+  for(const pool of valid){
     const key=businessDate+'::'+pool.id;
-    let row=byKey.get(key);
-    if(!row){
-      row=Object.freeze({
-        businessDate,
-        poolId:pool.id,
-        initialQtyAtOpen:pool.initialQty,
-        remainingQty:pool.initialQty,
-        createdAt:now,
-        updatedAt:now,
-      });
-      created.push(row);
-      byKey.set(key,row);
-    }
+    if(byKey.has(key))continue;
+    const row:LocalCapacityPoolStateRow=Object.freeze({
+      businessDate,
+      poolId:pool.id,
+      initialQtyAtOpen:pool.initialQty,
+      remainingQty:pool.initialQty,
+      createdAt:now,
+      updatedAt:now,
+      appliedEventIds:Object.freeze([]),
+    });
+    created.push(row);
+    byKey.set(key,row);
+  }
+  const afterCreate=created.length?applyPendingEvents([...baseRows,...created],events):{rows:baseRows,changed:false};
+  const finalRows=afterCreate.rows;
+  if(reconciled.changed||created.length||afterCreate.changed)writeLocalCapacityPoolRows(finalRows,storage);
+  const finalByKey=new Map(finalRows.map(row=>[row.businessDate+'::'+row.poolId,row] as const));
+  const current=valid.map(pool=>{
+    const row=finalByKey.get(businessDate+'::'+pool.id);
+    if(!row)throw new Error('CAPACITY_POOL_STATE_MISSING:'+pool.id);
     return Object.freeze({
       poolId:pool.id,
       name:pool.name,
@@ -141,10 +231,91 @@ export function ensureCurrentCapacityPoolState(
       note:pool.note,
     });
   });
-  if(created.length)writeLocalCapacityPoolRows([...existing,...created],storage);
   return Object.freeze({
     businessDate,
     pools:Object.freeze(current),
     invalidActivePoolIds:Object.freeze(invalid),
   });
+}
+
+
+function demandedQuantity(items:readonly {readonly id:string;readonly qty:number}[],productIds:readonly string[]){
+  const linked=new Set(productIds);
+  return items.reduce((sum,item)=>{
+    const qty=Number(item.qty);
+    if(!linked.has(String(item.id))||!Number.isSafeInteger(qty)||qty<=0)return sum;
+    return sum+qty;
+  },0);
+}
+
+export function planCapacityDeductionEvents(input:{
+  readonly orderId:string;
+  readonly admissionId:string;
+  readonly items:readonly {readonly id:string;readonly qty:number}[];
+  readonly existingEvents:readonly CapacityPoolOrderEvent[];
+  readonly now?:number;
+  readonly storage?:Pick<Storage,'getItem'|'setItem'>;
+}):readonly CapacityPoolOrderEvent[]{
+  const orderId=String(input.orderId||'').trim();
+  const admissionId=String(input.admissionId||'').trim();
+  if(!orderId||!admissionId)throw new Error('CAPACITY_ADMISSION_ID_REQUIRED');
+  const now=input.now??Date.now();
+  const storage=input.storage??localStorage;
+  const existing=normalizeEvents(input.existingEvents);
+  const config=readSmtCapacityConfig();
+  for(const pool of config.pools){
+    if(!pool.active||capacityPoolCanActivate(pool))continue;
+    if(demandedQuantity(input.items,pool.productIds)>0)throw new Error('CAPACITY_POOL_CONFIG_INVALID:'+(pool.id||'UNKNOWN'));
+  }
+  const view=ensureCurrentCapacityPoolState(now,storage,existing);
+  const events:CapacityPoolOrderEvent[]=[];
+  for(const pool of config.pools){
+    if(!pool.active||!capacityPoolCanActivate(pool))continue;
+    const quantity=demandedQuantity(input.items,pool.productIds);
+    if(quantity<=0)continue;
+    const prior=existing.find(event=>
+      event.kind==='DEDUCT'&&event.orderId===orderId&&event.admissionId===admissionId&&event.poolId===pool.id
+    );
+    if(prior)continue;
+    const state=view.pools.find(row=>row.poolId===pool.id);
+    if(!state)throw new Error('CAPACITY_POOL_STATE_MISSING:'+pool.id);
+    if(quantity>state.remainingQty)throw new Error('CAPACITY_POOL_INSUFFICIENT:'+pool.id);
+    events.push(Object.freeze({
+      id:['CAPD',view.businessDate,orderId,admissionId,pool.id].join(':'),
+      kind:'DEDUCT' as const,
+      orderId,
+      admissionId,
+      businessDate:view.businessDate,
+      poolId:pool.id,
+      quantity,
+      createdAt:new Date(now).toISOString(),
+    }));
+  }
+  return Object.freeze(events);
+}
+
+export function planCapacityRestoreEvents(input:{
+  readonly orderId:string;
+  readonly existingEvents:readonly CapacityPoolOrderEvent[];
+  readonly now?:number;
+}):readonly CapacityPoolOrderEvent[]{
+  const orderId=String(input.orderId||'').trim();
+  if(!orderId)throw new Error('CAPACITY_RESTORE_ORDER_ID_REQUIRED');
+  const now=input.now??Date.now();
+  const existing=normalizeEvents(input.existingEvents);
+  const restoredSources=new Set(existing.filter(event=>event.kind==='RESTORE').map(event=>event.sourceEventId).filter(Boolean));
+  const events=existing
+    .filter(event=>event.kind==='DEDUCT'&&event.orderId===orderId&&!restoredSources.has(event.id))
+    .map(deduction=>Object.freeze({
+      id:'CAPR:'+deduction.id,
+      kind:'RESTORE' as const,
+      orderId,
+      admissionId:'CANCEL',
+      businessDate:deduction.businessDate,
+      poolId:deduction.poolId,
+      quantity:deduction.quantity,
+      createdAt:new Date(now).toISOString(),
+      sourceEventId:deduction.id,
+    }));
+  return Object.freeze(events);
 }
