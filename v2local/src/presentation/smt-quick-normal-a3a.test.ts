@@ -17,10 +17,10 @@ describe('SMT A3a bounded Quick / Normal ordering',()=>{
     expect(quickConfigurationForProduct(base)).toEqual({eligible:true,detail:'',deltaMinor:0});
   });
 
-  it('blocks Quick direct-add for required or forceShow sets',()=>{
-    const required:WorkspaceProduct={...base,optionSets:[{id:'s',name:'必選',required:true,forceShow:false,selection:'SINGLE',min:1,max:1,options:[{id:'a',name:'A',priceAdjustmentMinor:0,defaultSelected:true,active:true}]}]};
+  it('admits Required products in Quick mode but keeps forceShow-only editor-first',()=>{
+    const required:WorkspaceProduct={...base,optionSets:[{id:'s',name:'必選',required:true,forceShow:false,selection:'SINGLE',min:1,max:1,options:[{id:'a',name:'A',priceAdjustmentMinor:200,defaultSelected:true,active:true}]}]};
     const forceShow:WorkspaceProduct={...base,optionSets:[{id:'s',name:'顯示',required:false,forceShow:true,selection:'SINGLE',min:0,max:1,options:[{id:'a',name:'A',priceAdjustmentMinor:0,defaultSelected:false,active:true}]}]};
-    expect(quickConfigurationForProduct(required).eligible).toBe(false);
+    expect(quickConfigurationForProduct(required)).toEqual({eligible:true,detail:'',deltaMinor:0});
     expect(quickConfigurationForProduct(forceShow).eligible).toBe(false);
   });
 
@@ -31,6 +31,7 @@ describe('SMT A3a bounded Quick / Normal ordering',()=>{
 
   it('keeps Normal mode editor-first and Quick mode guarded by quickAddAllowed',()=>{
     expect(workspace).toContain("if(mode==='normal'||!product.quickAddAllowed)actions.onConfigureProduct(product.id)");
+    expect(workspace).toContain("onClick={()=>actions.onConfigureProduct(product.id)}>⋮</button>");
     expect(workspace).toContain("actions.onChangeOrderingMode('quick')");
     expect(workspace).toContain("actions.onChangeOrderingMode('normal')");
     expect(app).toContain("const [orderingMode,setOrderingMode]=useState<'quick'|'normal'>('quick')");
