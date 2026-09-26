@@ -31,3 +31,11 @@ export function selectActionHistory(
     })
     .sort((a,b)=>b.observedAt.localeCompare(a.observedAt));
 }
+
+
+export function isCanonicalActionUnknown(
+  actions:readonly OwnerActionItem[],
+  actionId:string,
+):boolean{
+  return selectOpenActions(actions).some(action=>action.actionId===actionId&&action.state==='UNKNOWN');
+}
