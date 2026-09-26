@@ -1,3 +1,16 @@
+export interface LocalReportRefundLine{
+  readonly lineId:string;
+  readonly itemName:string;
+  readonly quantity:number;
+  readonly amountMinor:number;
+}
+export interface LocalReportRefund{
+  readonly id:string;
+  readonly createdAt:string;
+  readonly method:string;
+  readonly amountMinor:number;
+  readonly lines:readonly LocalReportRefundLine[];
+}
 export interface LocalReportOrder{
   readonly id:string;
   readonly display:string;
@@ -6,14 +19,19 @@ export interface LocalReportOrder{
   readonly paymentLabel:string;
   readonly fulfillmentLabel:string;
   readonly sourceLabel:string;
+  readonly refunds?:readonly LocalReportRefund[];
   readonly items:readonly {readonly id:string;readonly name:string;readonly qty:number;readonly unitMinor:number}[];
 }
 
 export interface LocalReport{
   readonly businessDate:string;
   readonly completedOrders:number;
+  readonly grossSalesMinor:number;
+  readonly refundMinor:number;
   readonly netSalesMinor:number;
   readonly cashSalesMinor:number;
+  readonly cashRefundMinor:number;
+  readonly cashNetMinor:number;
   readonly itemUnits:number;
   readonly averageOrderMinor:number;
   readonly topProducts:readonly {readonly name:string;readonly quantity:number;readonly salesMinor:number}[];
@@ -26,6 +44,7 @@ export interface LocalDayClose{
   readonly createdAt:number;
   readonly openingCashMinor:number;
   readonly cashSalesMinor:number;
+  readonly cashRefundMinor?:number;
   readonly expectedCashMinor:number;
   readonly countedCashMinor:number;
   readonly cashDifferenceMinor:number;
@@ -87,7 +106,13 @@ export function buildLocalReport(
     const at=Date.parse(order.createdAt);
     return Number.isFinite(at)&&at>=window.start&&at<window.end;
   });
-  const netSalesMinor=selected.reduce((sum,order)=>sum+Math.max(0,Number(order.totalMinor)||0),0);
+  const refunds=orders.flatMap(order=>(order.refunds??[]).map(refund=>({order,refund}))).filter(({refund})=>{
+    const at=Date.parse(refund.createdAt);
+    return Number.isFinite(at)&&at>=window.start&&at<window.end;
+  });
+  const grossSalesMinor=selected.reduce((sum,order)=>sum+Math.max(0,Number(order.totalMinor)||0),0);
+  const refundMinor=refunds.reduce((sum,row)=>sum+Math.max(0,Number(row.refund.amountMinor)||0),0);
+  const netSalesMinor=Math.max(0,grossSalesMinor-refundMinor);
   const cashSalesMinor=selected.reduce((sum,order)=>{
     const label=String(order.paymentLabel||'');
     const upper=label.toUpperCase();
@@ -98,6 +123,13 @@ export function buildLocalReport(
     if(upper.includes('CASH')||label.includes('現金'))return sum+Math.max(0,Number(order.totalMinor)||0);
     return sum;
   },0);
+  const cashRefundMinor=refunds.reduce((sum,row)=>{
+    const method=String(row.refund.method||'').toUpperCase();
+    return method.includes('CASH')||String(row.refund.method||'').includes('現金')
+      ?sum+Math.max(0,Number(row.refund.amountMinor)||0)
+      :sum;
+  },0);
+  const cashNetMinor=cashSalesMinor-cashRefundMinor;
   const itemUnits=selected.reduce((sum,order)=>sum+order.items.reduce((s,item)=>s+Math.max(0,Number(item.qty)||0),0),0);
   const products=new Map<string,{name:string;quantity:number;salesMinor:number}>();
   for(const order of selected){
@@ -113,8 +145,12 @@ export function buildLocalReport(
   return Object.freeze({
     businessDate:window.businessDate,
     completedOrders:selected.length,
+    grossSalesMinor,
+    refundMinor,
     netSalesMinor,
     cashSalesMinor,
+    cashRefundMinor,
+    cashNetMinor,
     itemUnits,
     averageOrderMinor:selected.length?Math.round(netSalesMinor/selected.length):0,
     topProducts:Object.freeze(topProducts.map(row=>Object.freeze({...row}))),
@@ -143,7 +179,7 @@ export function createLocalDayClose(input:{
     .reduce((max,row)=>Math.max(max,row.version),0)+1;
   const openingCashMinor=Math.max(0,Math.round(input.openingCashMinor));
   const countedCashMinor=Math.max(0,Math.round(input.countedCashMinor));
-  const expectedCashMinor=openingCashMinor+report.cashSalesMinor;
+  const expectedCashMinor=openingCashMinor+report.cashSalesMinor-report.cashRefundMinor;
   const cashRemovedMinor=input.cashRemovedMinor===undefined?undefined:Math.max(0,Math.round(input.cashRemovedMinor));
   if(cashRemovedMinor!==undefined&&cashRemovedMinor>countedCashMinor)throw new Error('CASH_REMOVED_EXCEEDS_COUNTED');
   const retainedCashMinor=cashRemovedMinor===undefined?undefined:countedCashMinor-cashRemovedMinor;
@@ -154,6 +190,7 @@ export function createLocalDayClose(input:{
     createdAt:now,
     openingCashMinor,
     cashSalesMinor:report.cashSalesMinor,
+    cashRefundMinor:report.cashRefundMinor,
     expectedCashMinor,
     countedCashMinor,
     cashDifferenceMinor:countedCashMinor-expectedCashMinor,

@@ -126,7 +126,7 @@ describe('SMT B1 payment correction',()=>{
     const here=path.dirname(fileURLToPath(import.meta.url));
     const root=path.resolve(here,'..');
     const ui=fs.readFileSync(path.join(root,'presentation/RuntimeOrdersWorkspace.tsx'),'utf8');
-    expect(ui).toContain("type Modal='actions'|'edit'|'cancel'|'reprint'|'payment'|null");
+    expect(ui).toContain("type Modal='actions'|'edit'|'cancel'|'reprint'|'payment'|'refund'|null");
     expect(ui).toContain('付款方式修正歷史');
     expect(ui).toContain('目前有效付款方式');
     expect(ui).toContain("runtime.correctOrderPayment");

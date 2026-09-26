@@ -10,7 +10,7 @@ import {buildWhatsAppPaymentFollowup,createWhatsAppQrDataUrl,PAYMENT_FOLLOWUP_TE
 import './orders-workspace.css';
 
 type PaymentFilter='全部'|'現金'|'Alipay'|'WeChat Pay'|'FPS / PayMe';
-type Modal='actions'|'edit'|'cancel'|'reprint'|'payment'|null;
+type Modal='actions'|'edit'|'cancel'|'reprint'|'payment'|'refund'|null;
 const PAYMENT_CORRECTION_TARGETS=Object.freeze([
   {id:'CASH',label:'現金'},
   {id:'FPS',label:'FPS／轉數快'},
@@ -18,6 +18,11 @@ const PAYMENT_CORRECTION_TARGETS=Object.freeze([
   {id:'ALIPAY',label:'AlipayHK'},
   {id:'WECHAT',label:'WeChat Pay HK'},
 ] as const);
+const singleTender=(label:string)=>{
+  const upper=String(label||'').toUpperCase();
+  return PAYMENT_CORRECTION_TARGETS.find(row=>upper===row.id||upper.includes(row.id))?.id??'';
+};
+const labelMinor=(label:string)=>Math.round(Number(String(label||'').replace(/[^0-9.]/g,''))*100)||0;
 
 export function sourceLane(source?:string){
   const value=String(source||'').trim();
@@ -62,6 +67,12 @@ export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePor
   const [reprintReason,setReprintReason]=useState('');
   const [paymentCorrection,setPaymentCorrection]=useState('');
   const [paymentCorrectionBusy,setPaymentCorrectionBusy]=useState(false);
+  const [refundLineId,setRefundLineId]=useState('');
+  const [refundQuantity,setRefundQuantity]=useState(1);
+  const [refundAmount,setRefundAmount]=useState('');
+  const [refundMethod,setRefundMethod]=useState('');
+  const [refundNote,setRefundNote]=useState('');
+  const [refundBusy,setRefundBusy]=useState(false);
   const [afterSaleRevision,setAfterSaleRevision]=useState(0);
   const [afterSaleBusy,setAfterSaleBusy]=useState<string|null>(null);
   const [partialPreview,setPartialPreview]=useState<unknown>(null);
@@ -159,7 +170,9 @@ export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePor
   },[allItems,history]);
 
   useEffect(()=>{
-    setModal(null);setMessage(null);setReprintOptions([]);setSelectedJobs(new Set());setCancelReason('');setReprintReason('');setPaymentCorrection('');setPaymentFollowupQr(null);setPaymentFollowupMessage(null);setPaymentFollowupTemplate('UNCLEAR');
+    setModal(null);setMessage(null);setReprintOptions([]);setSelectedJobs(new Set());setCancelReason('');setReprintReason('');setPaymentCorrection('');
+    setRefundLineId('');setRefundQuantity(1);setRefundAmount('');setRefundMethod('');setRefundNote('');
+    setPaymentFollowupQr(null);setPaymentFollowupMessage(null);setPaymentFollowupTemplate('UNCLEAR');
     if(selected)setEditLines(selected.lines.map(line=>({
       id:line.id,name:line.name,qty:line.quantity,
       unitMinor:Math.round(Number(line.unitLabel.replace(/[^0-9.]/g,''))*100)
@@ -278,6 +291,51 @@ export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePor
     }catch(cause){setMessage(cause instanceof Error?cause.message:'ORDER_EDIT_FAILED');}
   };
 
+  const openRefund=()=>{
+    if(!selected)return;
+    if(sourceLane(selected.sourceLabel)==='platform'){
+      setMessage('第三方平台訂單退款要用平台售後流程；本地 SMT 唔會直接製造 Provider 退款。');
+      return;
+    }
+    const line=selected.lines[0];
+    setRefundLineId(line?.id??'');
+    setRefundQuantity(1);
+    setRefundAmount(line?String((labelMinor(line.unitLabel)/100).toFixed(2)):'');
+    setRefundMethod(singleTender(selected.paymentLabel));
+    setRefundNote('');
+    setModal('refund');
+  };
+
+  const confirmRefund=async()=>{
+    if(!canCorrect){setMessage('你冇訂單更正權限。');return;}
+    if(!selected||!runtime.refundOrder||refundBusy)return;
+    const line=selected.lines.find(row=>row.id===refundLineId);
+    if(!line){setMessage('請先選擇退款商品。');return;}
+    const amountMinor=Math.round(Number(refundAmount||0)*100);
+    if(amountMinor<=0){setMessage('請輸入退款金額。');return;}
+    if(!refundMethod){setMessage('請選擇實際退款方式。');return;}
+    setRefundBusy(true);setMessage(null);
+    try{
+      await runtime.refundOrder(selected.orderId,{
+        lineId:line.id,
+        quantity:refundQuantity,
+        amountMinor,
+        method:refundMethod,
+        note:refundNote.trim()||undefined,
+      });
+      await load(selected.orderId,true);
+      setMessage('退款已確認；SAME Order 保留退款商品、金額同退款方式。取消狀態冇自動改，亦冇重印或開錢箱。');
+      setModal(null);
+    }catch(cause){
+      const code=cause instanceof Error?cause.message:'REFUND_FAILED';
+      setMessage(code==='REFUND_ADMIN_REQUIRED_CLOSED_DAY'
+        ?'呢張單已跨 Business Day 或已完成日結；SMT 禁止退款，請去 Admin 做跨日退款／日結附帶版本。'
+        :code==='PROVIDER_REFUND_USE_AFTERSALE'
+          ?'第三方平台訂單要使用 Provider 售後退款流程。'
+          :code);
+    }finally{setRefundBusy(false);}
+  };
+
   const correctPayment=async()=>{
     if(!canCorrect){setMessage('你冇訂單更正權限。');return;}
     if(!selected||!runtime.correctOrderPayment||!paymentCorrection||paymentCorrectionBusy)return;
@@ -374,6 +432,7 @@ export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePor
         </section>
         <section className="order-inspector-money"><div><span>訂單金額</span><b>{selected.totalLabel}</b></div><div><span>目前有效付款方式</span><b>{selected.paymentLabel}</b></div></section>
         {selected.paymentCorrections?.length?<section className="order-audit-card"><header><b>付款方式修正歷史</b><span>{selected.paymentCorrections.length}</span></header>{selected.paymentCorrections.map(row=><p key={row.id}><span>{new Date(row.createdAt).toLocaleString('zh-HK')}</span><b>{row.from} → {row.to}</b>{row.staffName?<small>{row.staffName}</small>:null}</p>)}</section>:null}
+        {selected.refunds?.length?<section className="order-audit-card"><header><b>退款紀錄</b><span>{selected.refunds.length}</span></header>{selected.refunds.map(row=><p key={row.id}><span>{new Date(row.createdAt).toLocaleString('zh-HK')}</span><b>{row.lines.map(line=>line.itemName+' ×'+line.quantity).join('、')}{' · -$'+(row.amountMinor/100).toFixed(2)}</b><small>{row.method}{row.note?' · '+row.note:''}{row.staffName?' · '+row.staffName:''}</small></p>)}</section>:null}
         {selected.cancellationNoticeState?<section className="order-audit-card"><header><b>取消通知</b><span>{selected.cancellationNoticeState}</span></header><p><span>製作部通知</span><b>{selected.cancellationNoticeState==='DONE'?'已打印':selected.cancellationNoticeState==='FAILED'?'打印失敗':'結果未能確認'}</b><small>{selected.cancellationNoticeState==='DONE'?'製作單曾經成功出過，取消時已自動通知製作部。':selected.cancellationNoticeState==='FAILED'?'訂單已取消，但取消通知未成功送達；請即時通知製作部。':'訂單已取消，但打印結果未能確認；請先核對製作部，避免重複打印。'}</small></p></section>:null}
         {selected.paymentEvidenceRef?<section className={'payment-review-card state-'+String(selected.paymentVerificationState||'PENDING').toLowerCase()}>
           <header><div><span>電子支付</span><h3>{selected.paymentVerificationState==='VERIFIED'?'付款已核對':selected.paymentVerificationState==='REJECTED'?'付款截圖未通過':'付款待核對'}</h3></div><strong>{selected.paymentVerificationState??'PENDING'}</strong></header>
@@ -459,12 +518,13 @@ export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePor
 
     {selected&&modal?<div className="order-modal-backdrop" onMouseDown={event=>{if(event.target===event.currentTarget)setModal(null)}}>
       <section className={'order-modal '+modal}>
-        <header><h2>{modal==='reprint'?'重印':modal==='edit'?'修改訂單':modal==='cancel'?'取消訂單':modal==='payment'?'修正付款方式':'取消／修改'}</h2><button onClick={()=>setModal(null)}>×</button></header>
+        <header><h2>{modal==='reprint'?'重印':modal==='edit'?'修改訂單':modal==='cancel'?'取消訂單':modal==='payment'?'修正付款方式':modal==='refund'?'退款':'取消／修改'}</h2><button onClick={()=>setModal(null)}>×</button></header>
 
         {modal==='actions'?<div className="order-action-choices">
           <button onClick={()=>{setPaymentCorrection('');setModal('payment');}}><b>＄ 修正付款方式</b><span>同一 Order／取餐號；原付款方式保留 Audit。唔會重印或開錢箱。</span></button>
+          <button onClick={openRefund}><b>↩ 退款</b><span>退款係獨立 Money Action；必須揀退款商品、金額同實際退款方式。跨日／已日結只可以去 Admin。</span></button>
           <button onClick={()=>setModal('edit')}><b>✎ 修改訂單</b><span>修改商品數量；保持同一訂單編號，完成後唔自動重印。</span></button>
-          <button className="danger" onClick={()=>setModal('cancel')}><b>⊗ 取消訂單</b><span>取消此訂單；退款／第三方平台動作唔會自動執行。</span></button>
+          <button className="danger" onClick={()=>setModal('cancel')}><b>⊗ 取消訂單</b><span>取消只改營運狀態，唔代表已退款；退款一定要另外確認。</span></button>
         </div>:null}
 
         {modal==='payment'?<div className="order-payment-correction-body">
@@ -476,6 +536,27 @@ export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePor
           </select></label>
           <small>組合付款需要保留實際拆帳金額，唔會喺呢個單一付款修正入口建立。</small>
           <footer><button onClick={()=>setModal(null)}>返回</button><button className="primary" disabled={!paymentCorrection||paymentCorrectionBusy} onClick={()=>void correctPayment()}>{paymentCorrectionBusy?'修正中…':'確認修正'}</button></footer>
+        </div>:null}
+
+        {modal==='refund'?<div className="order-payment-correction-body">
+          <p>退款同取消係兩個獨立動作。呢度只處理<b>同一 Business Day、未日結</b>嘅本地退款。</p>
+          <div className="order-correction-warning">預設原路退款，但你可以明確揀第二種退款方式。跨日／已完成日結嘅退款，必須去 Admin，唔可以喺 SMT 改舊日結。</div>
+          <label><span>退款商品</span><select value={refundLineId} onChange={event=>{
+            const id=event.target.value;setRefundLineId(id);setRefundQuantity(1);
+            const line=selected.lines.find(row=>row.id===id);setRefundAmount(line?String((labelMinor(line.unitLabel)/100).toFixed(2)):'');
+          }}>
+            <option value="">請選擇</option>
+            {selected.lines.map(line=><option key={line.id} value={line.id}>{line.name} · {line.quantity}件 · {line.lineTotalLabel}</option>)}
+          </select></label>
+          <label><span>退款數量／Reference</span><input inputMode="numeric" min={1} max={selected.lines.find(row=>row.id===refundLineId)?.quantity??1} value={refundQuantity} onChange={event=>setRefundQuantity(Math.max(1,Math.min(selected.lines.find(row=>row.id===refundLineId)?.quantity??1,Math.floor(Number(event.target.value)||1))))}/></label>
+          <label><span>退款金額</span><input inputMode="decimal" value={refundAmount} onChange={event=>setRefundAmount(event.target.value.replace(/[^0-9.]/g,''))}/></label>
+          <label><span>實際退款方式</span><select value={refundMethod} onChange={event=>setRefundMethod(event.target.value)}>
+            <option value="">請選擇</option>
+            {PAYMENT_CORRECTION_TARGETS.map(row=><option key={row.id} value={row.id}>{row.label}{row.id===singleTender(selected.paymentLabel)?'（原路）':''}</option>)}
+          </select></label>
+          <label><span>退款原因／備註</span><input value={refundNote} onChange={event=>setRefundNote(event.target.value)} placeholder="例如：產品問題／客人要求"/></label>
+          <small>每筆退款永久保存 exact Order line、數量 Reference、金額、方式、員工同時間；唔會自動取消訂單、重印或開錢箱。</small>
+          <footer><button onClick={()=>setModal(null)}>返回</button><button className="primary" disabled={!refundLineId||!refundMethod||!refundAmount||refundBusy} onClick={()=>void confirmRefund()}>{refundBusy?'退款中…':'確認退款'}</button></footer>
         </div>:null}
 
         {modal==='edit'?<div className="order-edit-body">

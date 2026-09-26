@@ -131,8 +131,12 @@ function csv(report:ReturnType<typeof buildLocalReport>){
   const rows=[
     ['MFK LOCAL REPORT',report.businessDate],
     ['完成訂單',String(report.completedOrders)],
+    ['銷售總額',money(report.grossSalesMinor)],
+    ['退款總額',money(report.refundMinor)],
     ['淨銷售',money(report.netSalesMinor)],
     ['現金銷售',money(report.cashSalesMinor)],
+    ['現金退款',money(report.cashRefundMinor)],
+    ['現金淨額',money(report.cashNetMinor)],
     ['商品件數',String(report.itemUnits)],
     ['平均客單',money(report.averageOrderMinor)],
     [],
@@ -383,8 +387,12 @@ function ReportsPanel({revision}:{revision:number}){
     <header className="more-section-heading"><div><span>LOCAL REPORT</span><h2>今日營運</h2></div><strong>{report.businessDate}</strong></header>
     <div className="more-kpis fusion-kpis">
       <article><span>完成訂單</span><b>{report.completedOrders}</b></article>
+      <article><span>銷售總額</span><b>{money(report.grossSalesMinor)}</b></article>
+      <article><span>退款總額</span><b>{money(report.refundMinor)}</b></article>
       <article><span>淨銷售</span><b>{money(report.netSalesMinor)}</b></article>
       <article><span>現金銷售</span><b>{money(report.cashSalesMinor)}</b></article>
+      <article><span>現金退款</span><b>{money(report.cashRefundMinor)}</b></article>
+      <article><span>現金淨額</span><b>{money(report.cashNetMinor)}</b></article>
       <article><span>平均客單</span><b>{money(report.averageOrderMinor)}</b></article>
       <article><span>商品件數</span><b>{report.itemUnits}</b></article>
     </div>
@@ -421,7 +429,7 @@ function DayClosePanel({revision,onSaved}:{revision:number;onSaved:()=>void}){
   const qtyFor=(value:number)=>Math.max(0,Math.floor(Number(counts[String(value)])||0));
   const denomTotal=denominations.reduce((sum,value)=>sum+value*qtyFor(value),0);
   const countedMinor=mode==='denom'?Math.round(denomTotal*100):Math.round(Number(counted||0)*100);
-  const expected=openingCashMinor+report.cashSalesMinor;
+  const expected=openingCashMinor+report.cashSalesMinor-report.cashRefundMinor;
   const difference=countedMinor-expected;
   const hasCount=mode==='denom'?denominations.some(value=>qtyFor(value)>0):Boolean(counted);
   const hasRemoval=cashRemoved.trim()!=='';
@@ -488,6 +496,7 @@ function DayClosePanel({revision,onSaved}:{revision:number;onSaved:()=>void}){
     <div className="more-kpis">
       <article><span>開更現金</span><b>{money(latest.openingCashMinor)}</b></article>
       <article><span>現金銷售</span><b>{money(latest.cashSalesMinor)}</b></article>
+      <article><span>現金退款</span><b>{money(latest.cashRefundMinor)}</b></article>
       <article><span>實點現金</span><b>{money(latest.countedCashMinor)}</b></article>
       <article><span>取走現金</span><b>{latest.cashRemovedMinor===undefined?'未記錄':money(latest.cashRemovedMinor)}</b></article>
       <article><span>留櫃現金</span><b>{latest.retainedCashMinor===undefined?'未記錄':money(latest.retainedCashMinor)}</b></article>
@@ -504,6 +513,7 @@ function DayClosePanel({revision,onSaved}:{revision:number;onSaved:()=>void}){
     <div className="more-kpis">
       <article><span>今日開更現金</span><b>{money(openingCashMinor)}</b></article>
       <article><span>今日現金銷售</span><b>{money(report.cashSalesMinor)}</b></article>
+      <article><span>今日現金退款</span><b>{money(report.cashRefundMinor)}</b></article>
       <article><span>預計櫃桶</span><b>{money(expected)}</b></article>
       <article><span>實點現金</span><b>{money(countedMinor)}</b></article>
       <article><span>目前差額</span><b>{hasCount?money(difference):'—'}</b></article>
