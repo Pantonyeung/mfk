@@ -1,6 +1,7 @@
 import type {MfkLocalRuntime} from './local-runtime.ts';
 import {priceCustomerCart} from './customer-cloud-intake.ts';
-import {projectSyncedCombos,projectSyncedOrderingCatalog} from './admin-config-projection.ts';
+import {projectSyncedOrderingCatalog} from './admin-config-projection.ts';
+import {projectCanonicalCombos} from '../../../contracts/admin-combo-projection-v1.ts';
 import {revalidateSmmComboLine} from './smm-combo-revalidation.ts';
 import {readSmtAdminConfigLkg} from './admin-config-sync.ts';
 import {readSmtDiningTableRegistry,readSmtStoreSettings} from './admin-operational-config.ts';
@@ -36,7 +37,7 @@ export function createSmmLanIngress(runtime:MfkLocalRuntime){
       if(!envelope)throw new Error('SMM_ADMIN_CONFIG_REQUIRED');
       const takeaway=projectSyncedOrderingCatalog('takeaway',envelope);
       const dineIn=projectSyncedOrderingCatalog('dine-in',envelope);
-      const comboData=projectSyncedCombos(envelope);
+      const comboData=projectCanonicalCombos(envelope);
       const dineById=new Map(dineIn.products.map(row=>[row.id,row] as const));
       const productById=new Map(takeaway.products.map(row=>[row.id,row] as const));
       const comboPoolById=new Map(comboData.pools.map(pool=>[pool.id,pool] as const));
@@ -213,7 +214,7 @@ export function createSmmLanIngress(runtime:MfkLocalRuntime){
 
       const serviceMode=serviceModeValue(input.serviceMode);
       const catalog=projectSyncedOrderingCatalog(serviceMode,envelope);
-      const comboData=projectSyncedCombos(envelope);
+      const comboData=projectCanonicalCombos(envelope);
       const items:{
         id:string;
         name:string;
