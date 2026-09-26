@@ -1,3 +1,4 @@
+// A2a proof trigger on locked main.
 import {describe,expect,it} from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
