@@ -5,6 +5,7 @@ import type {
   LocalDiningHoldDetail,
   SmtDiningProjection
 } from '../runtime/local-runtime.ts';
+import type {DiningAddOrderRequest} from '../features/ordering/dining-add-order-ui-session.ts';
 import './dining-operations-workspace.css';
 
 const tenderLabels:Record<string,string>={
@@ -17,9 +18,14 @@ const tenderLabels:Record<string,string>={
 };
 const money=(minor:number)=>String.fromCharCode(36)+(minor/100).toFixed(2);
 let diningSubmissionSequence=0;
+let diningAdditionSequence=0;
 const nextDiningSubmissionId=(holdId:string)=>{
   diningSubmissionSequence+=1;
   return 'DINPAY:'+holdId+':'+Date.now().toString(36)+':'+diningSubmissionSequence.toString(36);
+};
+const nextDiningAdditionSubmissionId=(holdId:string)=>{
+  diningAdditionSequence+=1;
+  return 'DINADD:'+holdId+':'+Date.now().toString(36)+':'+diningAdditionSequence.toString(36);
 };
 
 export interface DiningCheckoutRequest{
@@ -31,7 +37,7 @@ export interface DiningCheckoutRequest{
   readonly selections:readonly {lineIndex:number;qty:number}[];
   readonly lines:readonly {lineIndex:number;id:string;name:string;qty:number;unitMinor:number}[];
 }
-export function RuntimeDiningWorkspace({runtime,onCheckout}:{runtime:CleanSmtCoreRuntimePort;onCheckout:(request:DiningCheckoutRequest)=>void}){
+export function RuntimeDiningWorkspace({runtime,onCheckout,onAddOrder}:{runtime:CleanSmtCoreRuntimePort;onCheckout:(request:DiningCheckoutRequest)=>void;onAddOrder:(request:DiningAddOrderRequest)=>void}){
   const navigate=useNavigate();
   const [view,setView]=useState<SmtDiningProjection|null>(null);
   const [busy,setBusy]=useState(false);
@@ -151,6 +157,18 @@ export function RuntimeDiningWorkspace({runtime,onCheckout}:{runtime:CleanSmtCor
     const next:Record<number,number>={};
     for(const line of detail.lines)next[line.lineIndex]=line.remainingQty;
     setSelection(next);
+  };
+
+  const goAddOrder=()=>{
+    if(!detail?.formalOrderId)return;
+    onAddOrder({
+      holdId:detail.holdId,
+      submissionId:nextDiningAdditionSubmissionId(detail.holdId),
+      codeLabel:detail.codeLabel,
+      tableLabel:detail.assignedTable?(view?.tables.find(table=>table.id===detail.assignedTable)?.label??detail.assignedTable):'輪候',
+      formalOrderId:detail.formalOrderId,
+    });
+    navigate('/');
   };
 
   const goCheckout=()=>{
@@ -273,6 +291,7 @@ export function RuntimeDiningWorkspace({runtime,onCheckout}:{runtime:CleanSmtCor
 
         <footer className="dining-detail-actions">
           <button type="button" className="unassign" disabled={detail.remainingMinor===0} onClick={()=>void unassign()}>取消掛枱／退回輪候</button>
+          <button type="button" className="add-order" disabled={!detail.formalOrderId} onClick={goAddOrder}>＋ 加單</button>
           <button type="button" className="clear" disabled={detail.remainingMinor>0} onClick={()=>void clearTable()}>清枱</button>
         </footer>
       </>:<div className="dining-detail-empty">
