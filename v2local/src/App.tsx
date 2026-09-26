@@ -646,7 +646,12 @@ function CheckoutPage({cart,setCart,diningCheckout,onDiningCheckoutDone}:{cart:C
           statusLabel:detail.remainingMinor===0?'堂食已全數結帳':'堂食分項結帳完成',
         });
         setState('success');
-        setPrintStatus('堂食付款已存在 · 已由本機記錄恢復，冇重複提交');
+        setPrintStatus('堂食付款已存在 · 正在核對付款收據狀態…');
+        void localRuntime.ensureDiningPaymentReceipt(detail.holdId,diningCheckout.submissionId).then(result=>{
+          if(result.state==='DONE'){setPrintStatus('堂食付款已存在 · 付款收據已處理');return;}
+          if(result.state==='UNKNOWN'){setPrintStatus('堂食付款已存在 · 收據／錢箱結果未知，系統唔會自動重試');return;}
+          setPrintStatus('堂食付款已存在 · 付款收據未完成，請人手檢查');
+        }).catch(error=>setPrintStatus('堂食付款已存在 · 收據狀態讀取失敗 '+(error instanceof Error?error.message:String(error))));
         setDiningRecovering(false);
         return;
       }
@@ -740,6 +745,9 @@ function CheckoutPage({cart,setCart,diningCheckout,onDiningCheckoutDone}:{cart:C
             submissionId:diningCheckout.submissionId,
             expectedRevision:diningCheckout.expectedRevision,
             ...(tenderCode==='CASH'?{receivedMinor:received}:{}),
+            ...(tenderCode==='COMBO'?{
+              splitTenders:comboEntries.map(([id,value])=>({tender:id,amountMinor:parseMoney(value)})),
+            }:{}),
           }
         );
         const payment=updated.payments.find(row=>row.submissionId===diningCheckout.submissionId);
@@ -758,7 +766,12 @@ function CheckoutPage({cart,setCart,diningCheckout,onDiningCheckoutDone}:{cart:C
         });
         setCheckoutFailure(undefined);
         setState('success');
-        setPrintStatus('堂食 '+diningCheckout.tableLabel+' · 已保存付款 · 未結 '+money(updated.remainingMinor));
+        setPrintStatus('堂食 '+diningCheckout.tableLabel+' · 已保存付款 · 正在打印付款收據…');
+        void localRuntime.ensureDiningPaymentReceipt(diningCheckout.holdId,diningCheckout.submissionId).then(result=>{
+          if(result.state==='DONE'){setPrintStatus('堂食 '+diningCheckout.tableLabel+' · 付款收據已送出 · 未收 '+money(updated.remainingMinor));return;}
+          if(result.state==='UNKNOWN'){setPrintStatus('堂食 '+diningCheckout.tableLabel+' · 收據／錢箱結果未知 · 唔會自動重試');return;}
+          setPrintStatus('堂食 '+diningCheckout.tableLabel+' · 付款已保存，但付款收據未完成 · 請人手檢查');
+        }).catch(error=>setPrintStatus('堂食付款已保存 · 收據處理失敗 '+(error instanceof Error?error.message:String(error))));
         return;
       }
 
