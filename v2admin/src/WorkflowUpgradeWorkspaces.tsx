@@ -1,8 +1,9 @@
-import {useMemo,useState} from 'react';
+import {useEffect,useMemo,useState} from 'react';
 import {Link} from 'react-router';
 import {useAdminDraft,validateAdminDraft} from './admin-draft.tsx';
 import {appendAdminAudit,readAdminAudit,readAdminReleases,readAdminStored,usePersistentAdminState} from './admin-local-store.ts';
 import {AdminResponsiveDataView} from './AdminResponsiveDataView.tsx';
+import {createAdminCrossDayRefund,readAdminProjectedDays,readAdminProjectedOrders,readAdminRefundAddenda,readAdminRefunds,refreshAdminProjection} from './admin-projection-client.ts';
 
 function UpgradeHeader({title,description,kicker='功能尚未啟用'}:{title:string;description:string;kicker?:string}){
   return <header className="admin-editor-head">
@@ -137,7 +138,223 @@ function FixedReport({title,metrics,storeKey}:{title:string;metrics:readonly str
 
 export const ProductReportWorkspace=()=> <FixedReport title="商品報表" metrics={['銷售件數','銷售額','銷售佔比 %','最高銷量商品']} storeKey="report-products.v1"/>;
 export const ChannelReportWorkspace=()=> <FixedReport title="渠道報表" metrics={['訂單','總額','平台資料','異常']} storeKey="report-channels.v1"/>;
-export const RefundReportWorkspace=()=> <FixedReport title="退款報表" metrics={['申請','已批准','已拒絕','未確認']} storeKey="report-refunds.v1"/>;
+
+const REFUND_METHODS=Object.freeze([
+  {id:'CASH',label:'現金'},
+  {id:'FPS',label:'FPS／轉數快'},
+  {id:'PAYME',label:'PayMe'},
+  {id:'ALIPAY',label:'AlipayHK'},
+  {id:'WECHAT',label:'WeChat Pay HK'},
+] as const);
+function defaultRefundMethod(label:string){
+  const upper=String(label||'').toUpperCase();
+  return REFUND_METHODS.find(row=>upper===row.id||upper.includes(row.id))?.id??'';
+}
+export function RefundReportWorkspace(){
+  const [revision,setRevision]=useState(0);
+  const [query,setQuery]=useState('');
+  const [orderId,setOrderId]=useState('');
+  const [lineId,setLineId]=useState('');
+  const [quantity,setQuantity]=useState(1);
+  const [amount,setAmount]=useState('');
+  const [method,setMethod]=useState('');
+  const [note,setNote]=useState('');
+  const [busy,setBusy]=useState(false);
+  const [message,setMessage]=useState('');
+  useEffect(()=>{void refreshAdminProjection().then(()=>setRevision(value=>value+1));},[]);
+  void revision;
+  const orders=readAdminProjectedOrders();
+  const days=readAdminProjectedDays();
+  const refunds=readAdminRefunds();
+  const addenda=readAdminRefundAddenda();
+  const closedDates=new Set(days.filter(row=>Boolean(row.dayClose)).map(row=>row.date));
+  const eligible=orders.filter(order=>
+    closedDates.has(order.businessDate)&&
+    !/^Keeta\b|^Foodpanda\b|^第三方/.test(String(order.sourceLabel||''))&&
+    (!query||[order.orderId,order.display,order.sourceLabel].join(' ').toLowerCase().includes(query.toLowerCase()))
+  );
+  const selected=orders.find(row=>row.orderId===orderId);
+  const selectedLine=selected?.items.find(row=>row.id===lineId);
+  const lineMaxMinor=selectedLine?selectedLine.unitMinor*Math.max(1,quantity):0;
+  const refresh=async()=>{await refreshAdminProjection();setRevision(value=>value+1);};
+  const chooseOrder=(id:string)=>{
+    const order=orders.find(row=>row.orderId===id);
+    setOrderId(id);
+    const line=order?.items[0];
+    setLineId(line?.id??'');
+    setQuantity(1);
+    setAmount(line?String((line.unitMinor/100).toFixed(2)):'');
+    setMethod(defaultRefundMethod(order?.paymentLabel??''));
+    setNote('');
+    setMessage('');
+  };
+  const chooseLine=(id:string)=>{
+    const line=selected?.items.find(row=>row.id===id);
+    setLineId(id);
+    setQuantity(1);
+    setAmount(line?String((line.unitMinor/100).toFixed(2)):'');
+  };
+  const submit=async()=>{
+    if(!selected||!selectedLine||busy)return;
+    const amountMinor=Math.round(Number(amount||0)*100);
+    if(amountMinor<=0){setMessage('請輸入退款金額。');return;}
+    if(!method){setMessage('請選擇實際退款方式。');return;}
+    setBusy(true);setMessage('');
+    try{
+      const result=await createAdminCrossDayRefund({
+        orderId:selected.orderId,
+        lineId:selectedLine.id,
+        quantity,
+        amountMinor,
+        method,
+        note:note.trim()||undefined,
+      });
+      setMessage('退款已建立：原日結 '+result.addendum.versionLabel+' 附帶記錄；實際退款日 '+result.refund.executionBusinessDate+' 記 Money Out。');
+      await refresh();
+    }catch(error){
+      setMessage(error instanceof Error?error.message:'ADMIN_REFUND_FAILED');
+    }finally{setBusy(false);}
+  };
+  return <section className="admin-editor-page">
+    <header className="admin-editor-head"><div><small>ADMIN-ONLY CROSS-DAY REFUND</small><h1>退款報表／跨日退款</h1><p>已日結嘅舊單只可以喺 Admin 退款。原 Day Close 1.0 永遠唔重寫；每筆跨日退款建立 1.x 附帶記錄，同時喺實際退款日記真正 Money Out。</p></div><div className="admin-editor-actions"><button type="button" onClick={()=>void refresh()}>更新 Projection</button></div></header>
+    <div className="admin-callout compact">同一 refundId 只會計一次：原銷售日 1.x 係 non-posting reference；實際退款日先影響當日退款、現金／Settlement 同期間總數。</div>
+    <div className="admin-policy-grid two">
+      <article className="admin-policy-card">
+        <h2>建立跨日／已日結退款</h2>
+        <label><span>搜尋舊單</span><input value={query} onChange={event=>setQuery(event.target.value)} placeholder="Order／取餐號／來源"/></label>
+        <label><span>訂單</span><select value={orderId} onChange={event=>chooseOrder(event.target.value)}><option value="">請選擇已日結訂單</option>{eligible.slice(0,200).map(order=><option key={order.orderId} value={order.orderId}>{order.businessDate} · {order.display} · {order.sourceLabel} · HK${(order.totalMinor/100).toFixed(2)}</option>)}</select></label>
+        {selected?<><div className="admin-callout compact">原銷售日：{selected.businessDate}　付款：{selected.paymentLabel}　原額：HK${(selected.totalMinor/100).toFixed(2)}</div>
+        <label><span>退款商品</span><select value={lineId} onChange={event=>chooseLine(event.target.value)}><option value="">請選擇</option>{selected.items.map(line=><option key={line.id} value={line.id}>{line.name} · {line.qty}件 · HK${(line.unitMinor/100).toFixed(2)}/件</option>)}</select></label>
+        <label><span>數量 Reference</span><input inputMode="numeric" min={1} max={selectedLine?.qty??1} value={quantity} onChange={event=>{
+          const next=Math.max(1,Math.min(selectedLine?.qty??1,Math.floor(Number(event.target.value)||1)));
+          setQuantity(next);
+          if(selectedLine)setAmount(String((selectedLine.unitMinor*next/100).toFixed(2)));
+        }}/></label>
+        <label><span>實際退款 HK$</span><input inputMode="decimal" value={amount} onChange={event=>setAmount(event.target.value.replace(/[^0-9.]/g,''))}/><small>呢個 item / qty 今次上限 HK${(lineMaxMinor/100).toFixed(2)}；後端仍會再扣已退款額做 fail-closed 驗證。</small></label>
+        <label><span>實際退款方式</span><select value={method} onChange={event=>setMethod(event.target.value)}><option value="">請選擇</option>{REFUND_METHODS.map(row=><option key={row.id} value={row.id}>{row.label}{row.id===defaultRefundMethod(selected.paymentLabel)?'（原路）':''}</option>)}</select></label>
+        <label><span>原因／備註</span><textarea value={note} onChange={event=>setNote(event.target.value)} placeholder="例如：產品退款／客戶要求"/></label>
+        <div className="admin-editor-actions"><button className="primary" type="button" disabled={!selectedLine||!method||!amount||busy} onClick={()=>void submit()}>{busy?'處理中…':'確認跨日退款'}</button></div></>:null}
+        {message?<p role="status">{message}</p>:null}
+      </article>
+      <article className="admin-policy-card">
+        <h2>Day Close 附帶版本</h2>
+        {addenda.length===0?<div className="admin-read-empty">未有跨日退款附帶記錄。</div>:addenda.slice(0,30).map(row=><p key={row.id}><b>{row.businessDate} · v{row.versionLabel}</b><br/><span>{row.display} · 原單 {new Date(row.originalCreatedAt).toLocaleString('zh-HK')} · 實際退款 {new Date(row.executionAt).toLocaleString('zh-HK')}</span><br/><strong>-HK${(row.amountMinor/100).toFixed(2)} · {row.method}</strong><br/><small>NON-POSTING REFERENCE · refundId {row.refundId}</small></p>)}
+      </article>
+    </div>
+    <section className="admin-read-card">
+      <header><h2>實際退款流水</h2><span>{refunds.length}</span></header>
+      {refunds.length===0?<div className="admin-read-empty">未有 Admin 跨日退款。</div>:<AdminResponsiveDataView
+        label="跨日退款"
+        rows={refunds}
+        rowKey={row=>row.refundId}
+        emptyTitle="未有退款"
+        columns={[
+          {key:'time',label:'實際退款時間',render:row=>new Date(row.executionAt).toLocaleString('zh-HK')},
+          {key:'original',label:'原銷售日',render:row=>row.originalBusinessDate+' · '+row.display},
+          {key:'item',label:'商品',render:row=>row.lines.map(line=>line.itemName+' ×'+line.quantity).join('、')},
+          {key:'amount',label:'退款',numeric:true,render:row=>'HK
+
+interface ExportPolicy{scope:'REPORT_CURRENT_FILTER'|'STORE_DAY'|'AUDIT_RANGE';includePii:boolean;requireOwnerApproval:boolean;retentionDays:number}
+export function ExportGovernanceWorkspace(){
+  const [policy,setPolicy]=usePersistentAdminState<ExportPolicy>('export-policy.v1',{scope:'REPORT_CURRENT_FILTER',includePii:false,requireOwnerApproval:true,retentionDays:30});
+  const audit=readAdminAudit();
+  const patch=(change:Partial<ExportPolicy>)=>setPolicy(current=>{const after={...current,...change};appendAdminAudit({action:'修改匯出治理設定',target:'Export Policy',before:current,after});return after;});
+  const exportAudit=()=>{
+    const data=JSON.stringify(audit,null,2);
+    const blob=new Blob([data],{type:'application/json'});
+    const url=URL.createObjectURL(blob);
+    const anchor=document.createElement('a');
+    anchor.href=url;anchor.download='mfk-admin-audit-'+new Date().toISOString().slice(0,10)+'.json';anchor.click();URL.revokeObjectURL(url);
+    appendAdminAudit({action:'匯出操作記錄',target:'Audit',after:{rows:audit.length}});
+  };
+  return <section className="admin-editor-page">
+    <UpgradeHeader title="匯出治理" description="管理匯出範圍、個人資料、審批同保留日數；每次匯出都要留操作記錄。" kicker="匯出政策"/>
+    <div className="admin-policy-grid two">
+      <article className="admin-policy-card"><h2>匯出規則</h2><label><span>預設範圍</span><select value={policy.scope} onChange={event=>patch({scope:event.target.value as ExportPolicy['scope']})}><option value="REPORT_CURRENT_FILTER">目前報表篩選</option><option value="STORE_DAY">門店／日期</option><option value="AUDIT_RANGE">操作記錄範圍</option></select></label><label className="admin-toggle"><input type="checkbox" checked={policy.includePii} onChange={event=>patch({includePii:event.target.checked})}/><span>允許個人資料欄位</span></label><label className="admin-toggle"><input type="checkbox" checked={policy.requireOwnerApproval} onChange={event=>patch({requireOwnerApproval:event.target.checked})}/><span>敏感匯出需要 Owner 批准</span></label><label><span>匯出檔保留日數</span><input type="number" min={1} value={policy.retentionDays} onChange={event=>patch({retentionDays:Number(event.target.value)||30})}/></label></article>
+      <article className="admin-policy-card"><h2>目前可匯出資料</h2><p>後台操作記錄：{audit.length} 筆</p><button type="button" onClick={exportAudit}>匯出操作記錄 JSON</button><small>未有正式報表資料就唔會輸出假資料。</small></article>
+    </div>
+  </section>;
+}
+
+interface DiagnosticFinding{id:string;domain:string;state:'HEALTHY'|'DEGRADED'|'UNKNOWN';updatedAt:string;pendingCount:number;lastError?:string;recovery?:string;evidenceRef?:string}
+export function DiagnosticsWorkspace(){
+  const [findings]=usePersistentAdminState<DiagnosticFinding[]>('diagnostics-read.v1',[]);
+  const unknown=findings.filter(row=>row.state==='UNKNOWN').length;
+  const degraded=findings.filter(row=>row.state==='DEGRADED').length;
+  return <section className="admin-editor-page">
+    <UpgradeHeader title="系統狀態" description="系統狀態顯示功能範圍、目前狀態、資料新鮮度、待處理數量、最後錯誤、安全修復方法同回傳證據。冇證據唔會硬判根因。" kicker="診斷證據"/>
+    <div className="admin-kpi-grid"><article><span>健康</span><strong>{findings.filter(row=>row.state==='HEALTHY').length}</strong><small>已確認</small></article><article><span>需注意</span><strong>{degraded}</strong><small>需要跟進</small></article><article><span>未確認</span><strong>{unknown}</strong><small>等待資料</small></article><article><span>總項目</span><strong>{findings.length}</strong><small>系統狀態</small></article></div>
+    <AdminResponsiveDataView
+      label="系統狀態"
+      rows={findings}
+      rowKey={row=>row.id}
+      emptyTitle="未有系統狀態回傳"
+      emptyDescription="未有正式回傳，所以唔會用假綠燈代替健康證據。"
+      columns={[
+        {key:'domain',label:'範圍',render:(row:DiagnosticFinding)=>row.domain},
+        {key:'state',label:'狀態',render:(row:DiagnosticFinding)=>row.state},
+        {key:'pending',label:'待處理',numeric:true,render:(row:DiagnosticFinding)=>row.pendingCount},
+        {key:'error',label:'最後錯誤',render:(row:DiagnosticFinding)=>row.lastError||'—'},
+        {key:'evidence',label:'證據',render:(row:DiagnosticFinding)=>row.evidenceRef||'—'},
+      ]}
+    />
+  </section>;
+}
+
+interface IntegrationGovernance{provider:string;credentialRef:string;scope:string;webhookPath:string;signaturePolicy:string;schemaVersion:string;replayWindowMinutes:number;active:boolean}
+export function IntegrationsGovernanceWorkspace(){
+  const [rows,setRows]=usePersistentAdminState<IntegrationGovernance[]>('integrations-governance.v1',[]);
+  const add=()=>setRows(current=>[...current,{provider:'',credentialRef:'',scope:'',webhookPath:'',signaturePolicy:'',schemaVersion:'',replayWindowMinutes:5,active:false}]);
+  const patch=(index:number,change:Partial<IntegrationGovernance>)=>setRows(current=>current.map((row,i)=>i===index?{...row,...change}:row));
+  return <section className="admin-editor-page">
+    <header className="admin-editor-head"><div><small>治理設定</small><h1>外部連接</h1><p>管理憑證引用名稱、權限範圍、接收路徑、簽章驗證、資料格式版本同防重放時限。永遠唔保存秘密值。</p></div><div className="admin-editor-actions"><button onClick={add}>新增連接設定</button></div></header>
+    {rows.length===0?<div className="admin-read-empty">未有外部連接治理設定。</div>:<div className="admin-editor-grid">{rows.map((row,index)=><article className="admin-policy-card" key={index}>
+      <label><span>平台</span><input value={row.provider} onChange={event=>patch(index,{provider:event.target.value})}/></label>
+      <label><span>憑證引用名稱</span><input value={row.credentialRef} onChange={event=>patch(index,{credentialRef:event.target.value})} placeholder="只填引用名稱，唔填秘密值"/></label>
+      <label><span>權限範圍</span><input value={row.scope} onChange={event=>patch(index,{scope:event.target.value})}/></label>
+      <label><span>接收路徑</span><input value={row.webhookPath} onChange={event=>patch(index,{webhookPath:event.target.value})}/></label>
+      <label><span>簽章驗證規則</span><input value={row.signaturePolicy} onChange={event=>patch(index,{signaturePolicy:event.target.value})}/></label>
+      <label><span>資料格式版本</span><input value={row.schemaVersion} onChange={event=>patch(index,{schemaVersion:event.target.value})}/></label>
+      <label><span>防重放時限（分鐘）</span><input type="number" min={1} value={row.replayWindowMinutes} onChange={event=>patch(index,{replayWindowMinutes:Number(event.target.value)||5})}/></label>
+      <label className="admin-toggle"><input type="checkbox" checked={row.active} onChange={event=>patch(index,{active:event.target.checked})}/><span>{row.active?'啟用設定':'停用設定'}</span></label>
+    </article>)}</div>}
+  </section>;
+}
+
+interface EffectiveSettingRow{id:string;label:string;baseValue:string;source:string;securityFloor:string;override:string}
+export function EffectiveSettingsWorkspace(){
+  const [rows,setRows]=usePersistentAdminState<EffectiveSettingRow[]>('effective-settings.v1',[
+    {id:'business-timezone',label:'門店時區',baseValue:'Asia/Hong_Kong',source:'門店設定',securityFloor:'不可空白',override:''},
+    {id:'business-day-cutoff',label:'營業日分界',baseValue:'05:00',source:'營業日設定',securityFloor:'只作記錄',override:''},
+    {id:'quick-reason-required',label:'快捷原因必填',baseValue:'否',source:'快捷原因政策',securityFloor:'原因不可阻止交易',override:''},
+    {id:'capacity-hard-stop',label:'產能強制停止',baseValue:'關',source:'產能設定',securityFloor:'預設不可無聲阻交易',override:''},
+  ]);
+  const patch=(id:string,override:string)=>setRows(current=>current.map(row=>row.id===id?{...row,override}:row));
+  return <section className="admin-editor-page">
+    <UpgradeHeader title="進階設定" description="顯示目前生效值、來源、可選覆寫同安全底線；唔建立一個可以跨功能範圍任意覆寫嘅巨型設定頁。" kicker="生效設定"/>
+    <AdminResponsiveDataView
+      label="進階生效設定"
+      rows={rows}
+      rowKey={row=>row.id}
+      emptyDescription="未有生效設定。"
+      columns={[
+        {key:'setting',label:'設定項目',render:(row:EffectiveSettingRow)=>row.label},
+        {key:'effective',label:'目前生效值',render:(row:EffectiveSettingRow)=>row.override||row.baseValue},
+        {key:'source',label:'來源',render:(row:EffectiveSettingRow)=>row.source},
+        {key:'floor',label:'安全底線',render:(row:EffectiveSettingRow)=>row.securityFloor},
+        {key:'override',label:'覆寫草稿',render:(row:EffectiveSettingRow)=><label className="admin-inline-field"><span className="admin-visually-hidden">{row.label}覆寫草稿</span><input value={row.override} onChange={event=>patch(row.id,event.target.value)} placeholder="可選覆寫"/></label>},
+      ]}
+    />
+  </section>;
+}
++(row.amountMinor/100).toFixed(2)},
+          {key:'method',label:'方式',render:row=>row.method},
+          {key:'addendum',label:'附帶版本',render:row=>'v'+row.addendumVersionLabel},
+        ]}
+      />}
+    </section>
+  </section>;
+}
 
 interface ExportPolicy{scope:'REPORT_CURRENT_FILTER'|'STORE_DAY'|'AUDIT_RANGE';includePii:boolean;requireOwnerApproval:boolean;retentionDays:number}
 export function ExportGovernanceWorkspace(){
