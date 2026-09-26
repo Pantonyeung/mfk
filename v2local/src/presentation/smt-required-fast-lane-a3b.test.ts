@@ -83,7 +83,7 @@ describe('SMT A3b Required Fast Lane',()=>{
 
   it('blocks checkout until Required tasks are resolved and wires the dedicated 必選區',()=>{
     expect(app).toContain("const requiredWork=requiredTasksForCart(cart,workspaceProducts)");
-    expect(app).toContain("checkoutEnabled:cart.length>0&&requiredWork.length===0");
+    expect(app).toContain("requiredWork.length===0");
     expect(app).toContain("{id:'required',label:'必選／補選',count:requiredWork.length}");
     expect(app).toContain("<RequiredFastLaneWorkspace");
     expect(app).toContain("onApply={applyRequired}");

@@ -133,7 +133,7 @@ export function OrderingWorkspace({view,actions,centerPanel}:{view:OrderingWorks
 
     <aside key={view.cartPulseNonce} className={`ordering-cart${view.cartPulseNonce>0?' cart-updated':''}`} aria-label="購物車">
       <header className="ordering-cart-head">
-        <div className="ordering-cart-order-id"><small>ORDER</small><strong>#{view.cart.orderId}</strong></div>
+        <div className="ordering-cart-order-id"><small>{view.cart.contextLabel??'ORDER'}</small><strong>#{view.cart.orderId}</strong></div>
         <div className="ordering-cart-head-actions">
           <div className="ordering-cart-view-toggle" role="group" aria-label="購物車檢視">
             <button type="button" className={view.cart.viewMode==='original'?'active':''} aria-pressed={view.cart.viewMode==='original'} onClick={()=>actions.onChangeCartView('original')}>原單</button>
@@ -155,7 +155,7 @@ export function OrderingWorkspace({view,actions,centerPanel}:{view:OrderingWorks
         {availability.holdCart?<button type="button" className="hold-dining-entry" onClick={actions.onHoldCart}>暫存／堂食</button>:<span/>}
         {availability.cancelCart?<button type="button" className="cart-clear-icon destructive" aria-label="清除訂單" title="清除訂單" onClick={actions.onCancelCart}><TrashGlyph/></button>:<span/>}
       </div>:availability.holdCart?<div className="ordering-cart-secondary-actions single"><button type="button" onClick={actions.onHoldCart}>取回訂單</button></div>:null}
-      <button type="button" className="ordering-checkout" aria-label="結帳" disabled={!view.cart.checkoutEnabled} onClick={actions.onCheckout}>結帳　{view.cart.totalLabel}</button>
+      <button type="button" className="ordering-checkout" aria-label={view.cart.primaryActionLabel??'結帳'} disabled={!view.cart.checkoutEnabled} onClick={actions.onCheckout}>{view.cart.primaryActionLabel??'結帳'}　{view.cart.totalLabel}</button>
     </aside>
 
     <footer className="ordering-workbar">{view.workItems.map(item=><button type="button" key={item.id} onClick={()=>actions.onOpenWorkItem(item.id)}><span>{item.label}</span>{item.count>0?<b>{item.count}</b>:null}</button>)}</footer>

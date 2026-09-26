@@ -158,7 +158,7 @@ interface DiningTableConfig{readonly id:string;readonly name:string;readonly act
 interface CustomerPaymentChannelConfig{readonly id:string;readonly name:string;readonly enabled:boolean;readonly qrImageUrl:string;readonly sortOrder:number}
 interface StoreSettings{
   storeName:string;storeCode:string;currency:string;timezone:string;
-  lateArrivalMinutes:number;fulfillmentMinutes:number;archiveHours:number;
+  lateArrivalMinutes:number;fulfillmentMinutes:number;archiveHours:number;diningOverdueMinutes:number;
   reminderAfterMinutes:number;reminderIntervalMinutes:number;repeatReminder:boolean;timeoutPriority:'NORMAL'|'HIGH'|'URGENT';
   dineInEnabled:boolean;takeawayEnabled:boolean;
   diningTables:DiningTableConfig[];
@@ -200,7 +200,7 @@ export function StoreSettingsWorkspace(){
   const {draft,markClean}=useAdminDraft();
   const [config,setConfig]=usePersistentAdminState<StoreSettings>('store-settings.v1',{
     storeName:'磨飯',storeCode:'MF01',currency:'HKD',timezone:'Asia/Hong_Kong',
-    lateArrivalMinutes:15,fulfillmentMinutes:20,archiveHours:24,
+    lateArrivalMinutes:15,fulfillmentMinutes:20,archiveHours:24,diningOverdueMinutes:35,
     reminderAfterMinutes:5,reminderIntervalMinutes:5,repeatReminder:true,timeoutPriority:'HIGH',
     dineInEnabled:true,takeawayEnabled:true,diningTables:DEFAULT_DINING_TABLES,customerPaymentChannels:DEFAULT_CUSTOMER_PAYMENT_CHANNELS,
     customerWhatsAppEnabled:true,
@@ -254,6 +254,7 @@ export function StoreSettingsWorkspace(){
       if(!row.name.trim())errors.push('堂食枱 '+(row.id||'未命名')+' 缺少顯示名稱');
     }
     const paymentIds=new Set<string>();
+    if(!Number.isFinite(Number(config.diningOverdueMinutes))||Number(config.diningOverdueMinutes)<1)errors.push('堂食超時提醒分鐘必須至少 1 分鐘');
     const whatsappDigits=String(config.customerWhatsAppNumber??'').replace(/\D/g,'');
     if(config.customerWhatsAppEnabled!==false&&whatsappDigits&&(whatsappDigits.length<8||whatsappDigits.length>15))errors.push('Customer WhatsApp 電話格式錯誤');
     if(config.customerWhatsAppEnabled!==false&&whatsappDigits&&!String(config.customerWhatsAppTemplate??'').trim())errors.push('Customer WhatsApp 已啟用但訊息模板未填');
@@ -312,7 +313,7 @@ export function StoreSettingsWorkspace(){
         <p>付款 QR 會經 Admin Worker 上載到私有 R2；R2 唔開 Public Access。未有 QR 嘅付款方式可以保留設定，但 Customer 唔可以用佢提交電子付款。</p>
       </article>
       <article className="admin-policy-card"><h2>系統引用</h2><label><span>付款方式 refs</span><input value={config.paymentRefs.join(', ')} onChange={event=>patch({paymentRefs:refs(event.target.value)})} placeholder="例如 CASH, OCTOPUS"/></label><label><span>打印路由 refs</span><input value={config.printRefs.join(', ')} onChange={event=>patch({printRefs:refs(event.target.value)})} placeholder="例如 RECEIPT, KITCHEN"/></label><label><span>渠道 refs</span><input value={config.channelRefs.join(', ')} onChange={event=>patch({channelRefs:refs(event.target.value)})} placeholder="例如 KEETA"/></label></article>
-      <article className="admin-policy-card"><h2>營運計時</h2><label><span>遲到界線（分鐘）</span><input type="number" min={0} value={config.lateArrivalMinutes} onChange={event=>patch({lateArrivalMinutes:Number(event.target.value)||0})}/></label><label><span>出餐計時（分鐘）</span><input type="number" min={0} value={config.fulfillmentMinutes} onChange={event=>patch({fulfillmentMinutes:Number(event.target.value)||0})}/></label><label><span>封存時間（小時）</span><input type="number" min={1} value={config.archiveHours} onChange={event=>patch({archiveHours:Number(event.target.value)||1})}/></label></article>
+      <article className="admin-policy-card"><h2>營運計時</h2><label><span>遲到界線（分鐘）</span><input type="number" min={0} value={config.lateArrivalMinutes} onChange={event=>patch({lateArrivalMinutes:Number(event.target.value)||0})}/></label><label><span>出餐計時（分鐘）</span><input type="number" min={0} value={config.fulfillmentMinutes} onChange={event=>patch({fulfillmentMinutes:Number(event.target.value)||0})}/></label><label><span>堂食超時變紅（分鐘）</span><input type="number" min={1} value={config.diningOverdueMinutes??35} onChange={event=>patch({diningOverdueMinutes:Math.max(1,Math.floor(Number(event.target.value)||35))})}/></label><small>堂食枱由開始時間計；超過此分鐘數先標紅。35 分鐘只係預設值。</small><label><span>封存時間（小時）</span><input type="number" min={1} value={config.archiveHours} onChange={event=>patch({archiveHours:Number(event.target.value)||1})}/></label></article>
       <article className="admin-policy-card"><h2>Pending Order 提醒</h2><label><span>幾多分鐘後提醒</span><input type="number" min={0} value={config.reminderAfterMinutes} onChange={event=>patch({reminderAfterMinutes:Number(event.target.value)||0})}/></label><label><span>提醒間隔（分鐘）</span><input type="number" min={1} value={config.reminderIntervalMinutes} onChange={event=>patch({reminderIntervalMinutes:Number(event.target.value)||1})}/></label><Toggle checked={config.repeatReminder} onChange={repeatReminder=>patch({repeatReminder})} label="重複提醒"/><label><span>Timeout 提示優先級</span><select value={config.timeoutPriority} onChange={event=>patch({timeoutPriority:event.target.value as StoreSettings['timeoutPriority']})}><option value="NORMAL">一般</option><option value="HIGH">高</option><option value="URGENT">緊急</option></select></label><small>Timeout 唔會自動接受／拒絕訂單。</small></article>
     </div>
     <section className="admin-rule-card"><h2>七日營業時間</h2><div className="admin-editor-list">{STORE_DAYS.map(day=>{const row=config.weeklyHours[day.id]??DEFAULT_WEEKLY_HOURS[day.id];return <article className="admin-policy-row" key={day.id}><b>{day.label}</b><select value={row.closed?'CLOSED':'OPEN'} onChange={event=>patchDay(day.id,{closed:event.target.value==='CLOSED'})}><option value="OPEN">營業</option><option value="CLOSED">休息</option></select>{row.closed?<span>休息</span>:<><label><span>開門</span><input type="time" value={row.opensAt} onChange={event=>patchDay(day.id,{opensAt:event.target.value})}/></label><label><span>關門</span><input type="time" value={row.closesAt} onChange={event=>patchDay(day.id,{closesAt:event.target.value})}/></label></>}</article>})}</div></section>

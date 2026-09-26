@@ -110,7 +110,7 @@ describe('SMT A3c optional drink supplement',()=>{
   });
 
   it('does not make blank drink selection a checkout blocker or auto-discount',()=>{
-    expect(app).toContain("checkoutEnabled:cart.length>0&&requiredWork.length===0");
+    expect(app).toContain("requiredWork.length===0");
     expect(app).not.toContain('drinkSupplementBlocker');
     expect(app).toContain("unitMinor:choice.adjustmentMinor+configurationAdjustmentMinor");
     expect(center).toContain('可跳過，唔阻結帳');

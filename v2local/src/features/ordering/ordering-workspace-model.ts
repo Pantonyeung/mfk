@@ -48,6 +48,8 @@ export interface OrderingCartViewModel {
   readonly discountLabel:string;
   readonly totalLabel:string;
   readonly checkoutEnabled:boolean;
+  readonly primaryActionLabel?:string;
+  readonly contextLabel?:string;
 }
 
 export interface OrderingWorkItemViewModel {

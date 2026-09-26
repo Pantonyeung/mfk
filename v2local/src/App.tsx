@@ -4,6 +4,7 @@ import {useLocation} from 'react-router';
 import {ProductionViewport} from './app/ProductionViewport.tsx';
 import {OrderingWorkspace} from './features/ordering/OrderingWorkspace.tsx';
 import type {OrderingWorkspaceActions,OrderingWorkspaceViewModel,ServiceMode} from './features/ordering/ordering-workspace-model.ts';
+import {clearDiningAddOrderUiSession,readDiningAddOrderUiSession,saveDiningAddOrderUiSession,type DiningAddOrderRequest} from './features/ordering/dining-add-order-ui-session.ts';
 import {CheckoutWorkspace} from './features/checkout/CheckoutWorkspace.tsx';
 import {clearDiningCheckoutUiSession,diningCheckoutCart,readDiningCheckoutUiSession,saveDiningCheckoutUiSession} from './features/checkout/dining-checkout-ui-session.ts';
 import type {CheckoutChannelId,CheckoutTenderId,CheckoutWorkspaceActions,CheckoutWorkspaceViewModel} from './features/checkout/checkout-workspace-model.ts';
@@ -87,8 +88,17 @@ const nav=[
   {to:'/more',label:'更多',icon:'•••'},
 ] as const;
 
-function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[];setCart:(v:CartLine[])=>void;serviceMode:ServiceMode;setServiceMode:(m:ServiceMode)=>void}){
+function OrderingPage({cart,setCart,serviceMode,setServiceMode,diningAddition,onDiningAdditionDone}:{
+  cart:CartLine[];
+  setCart:(v:CartLine[])=>void;
+  serviceMode:ServiceMode;
+  setServiceMode:(m:ServiceMode)=>void;
+  diningAddition:DiningAddOrderRequest|null;
+  onDiningAdditionDone:()=>void;
+}){
   const navigate=useNavigate();
+  const [diningAddState,setDiningAddState]=useState<'idle'|'processing'|'done'|'failed'|'unknown'>('idle');
+  const [diningAddStatus,setDiningAddStatus]=useState<string|undefined>();
   const [runtimeRevision,setRuntimeRevision]=useState(0);
   useEffect(()=>localRuntime.subscribe(()=>setRuntimeRevision(value=>value+1)),[]);
   const [category,setCategory]=useState('all');
@@ -103,6 +113,49 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
   const [adminConfigRevision,setAdminConfigRevision]=useState(0);
   useEffect(()=>subscribeLocalAdminMenu(()=>setAdminMenuRevision(value=>value+1)),[]);
   useEffect(()=>subscribeSmtAdminConfig(()=>setAdminConfigRevision(value=>value+1)),[]);
+  useEffect(()=>{
+    if(diningAddition&&serviceMode!=='dine-in')setServiceMode('dine-in');
+  },[diningAddition?.holdId,serviceMode,setServiceMode]);
+  useEffect(()=>{
+    if(!diningAddition){
+      setDiningAddState('idle');
+      setDiningAddStatus(undefined);
+      return;
+    }
+    let disposed=false;
+    setDiningAddState('idle');
+    setDiningAddStatus('堂食 '+diningAddition.tableLabel+' · 加單模式 · 會加入同一張訂單');
+    void localRuntime.readDiningHold(diningAddition.holdId).then(async detail=>{
+      if(disposed)return;
+      if(detail.formalOrderId!==diningAddition.formalOrderId){
+        setDiningAddState('failed');
+        setDiningAddStatus('堂食訂單已更新；請返回堂食重新進入加單。');
+        return;
+      }
+      const existing=detail.additions.find(row=>row.submissionId===diningAddition.submissionId);
+      if(!existing)return;
+      setDiningAddState('processing');
+      setDiningAddStatus('加單已存在 · 正在核對新增項目打印狀態…');
+      const result=await localRuntime.ensureDiningAdditionPrint(diningAddition.holdId,existing.id);
+      if(disposed)return;
+      if(result.state==='DONE'){
+        setDiningAddState('done');
+        setDiningAddStatus('加單已保存 · 新增項目已送打印');
+      }else if(result.state==='UNKNOWN'){
+        setDiningAddState('unknown');
+        setDiningAddStatus('加單已保存 · 打印結果未知，系統唔會自動重印');
+      }else{
+        setDiningAddState('failed');
+        setDiningAddStatus('加單已保存 · 新增項目打印未完成，請人手檢查');
+      }
+    }).catch(cause=>{
+      if(disposed)return;
+      console.warn('DINING_ADD_ORDER_RECOVERY_FAILED',cause);
+      setDiningAddState('idle');
+      setDiningAddStatus('未能核對加單狀態；請返回堂食重新讀取。');
+    });
+    return()=>{disposed=true;};
+  },[diningAddition?.holdId,diningAddition?.submissionId,diningAddition?.formalOrderId]);
   const adminMenu=useMemo(()=>{void adminMenuRevision;return readLocalAdminMenu();},[adminMenuRevision]);
   const adminConfig=useMemo(()=>{void adminConfigRevision;return readSmtAdminConfigLkg();},[adminConfigRevision]);
   const syncStatus=useMemo(()=>{void adminConfigRevision;return readSmtAdminSyncStatus();},[adminConfigRevision]);
@@ -224,7 +277,7 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
     .filter(order=>isKeetaOrder(order)&&!['已完成','已取消'].includes(order.fulfillmentLabel))
     .slice(0,8).map(queueItem);
   const total=cart.reduce((sum,line)=>sum+line.unitMinor*line.qty,0);
-  const nextDisplay='P'+String(localRuntime.orders().length+1).padStart(3,'0');
+  const nextDisplay=diningAddition?.codeLabel??('P'+String(localRuntime.orders().length+1).padStart(3,'0'));
 
   const workspaceProducts:WorkspaceProduct[]=products.filter(product=>product.priceReady&&product.sellable).map(product=>({
     id:product.id,
@@ -302,21 +355,32 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
     menuRevisionLabel:adminConfig
       ?storeSettings.storeName+' · ADMIN R'+adminConfig.revision+' · '+(syncStatus.state==='SYNCED'?'已同步':syncStatus.state==='LOCAL_LKG'?'LKG':'同步中')
       :'LOCAL FALLBACK · R'+adminMenu.revision,
-    operationalNotice:capacityNotice
-      ?'今日 '+capacityNotice.currentCount+'/'+capacityNotice.dailyLimit+' 單 · 已到 '+capacityNotice.warningAt+'% 提醒門檻'+(capacityNotice.hardStopConfigured?' · Admin 有 hard-stop 設定但目前只提示':'')
-      :undefined,
+    operationalNotice:diningAddition
+      ?(diningAddStatus??('堂食 '+diningAddition.tableLabel+' · 加單模式'))
+      :capacityNotice
+        ?'今日 '+capacityNotice.currentCount+'/'+capacityNotice.dailyLimit+' 單 · 已到 '+capacityNotice.warningAt+'% 提醒門檻'+(capacityNotice.hardStopConfigured?' · Admin 有 hard-stop 設定但目前只提示':'')
+        :undefined,
     showCategories:frontlinePresentation.showCategories,
     showDescriptions:frontlinePresentation.showDescriptions,
     productColumns:frontlinePresentation.tabletColumns,
     frontlineGuidance:(frontlinePresentation.headline||frontlinePresentation.body)
       ?{headline:frontlinePresentation.headline||undefined,body:frontlinePresentation.body||undefined}
       :undefined,
-    serviceModes:{takeaway:storeSettings.takeawayEnabled,dineIn:storeSettings.dineInEnabled},
+    serviceModes:diningAddition
+      ?{takeaway:false,dineIn:storeSettings.dineInEnabled}
+      :{takeaway:storeSettings.takeawayEnabled,dineIn:storeSettings.dineInEnabled},
     orderingMode,
     cart:{
       orderId:nextDisplay,serviceMode,viewMode,combineSimilar,
       lines:presentationCart,
-      subtotalLabel:money(total),packagingLabel:'$0.00',discountLabel:'$0.00',totalLabel:money(total),checkoutEnabled:cart.length>0&&requiredWork.length===0&&((serviceMode==='takeaway'&&storeSettings.takeawayEnabled)||(serviceMode==='dine-in'&&storeSettings.dineInEnabled)),
+      subtotalLabel:money(total),packagingLabel:'$0.00',discountLabel:'$0.00',totalLabel:money(total),
+      checkoutEnabled:diningAddition
+        ?((diningAddState==='done'||diningAddState==='failed'||diningAddState==='unknown')||(cart.length>0&&requiredWork.length===0&&storeSettings.dineInEnabled&&diningAddState!=='processing'))
+        :(cart.length>0&&requiredWork.length===0&&((serviceMode==='takeaway'&&storeSettings.takeawayEnabled)||(serviceMode==='dine-in'&&storeSettings.dineInEnabled))),
+      ...(diningAddition?{
+        primaryActionLabel:diningAddState==='processing'?'加單處理中':(diningAddState==='done'||diningAddState==='failed'||diningAddState==='unknown')?'返回堂食':'確認加單',
+        contextLabel:'加單 · '+diningAddition.tableLabel,
+      }:{}),
     },
     workItems:[
       {id:'riceball-pool',label:'飯團待組區',count:riceballPairingDraft.slots.length+riceballPairingExisting.length},
@@ -324,10 +388,10 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
       {id:'combo',label:'紫米套餐區',count:comboData.combos.length},
     ],
     actionAvailability:{
-      lineServiceMode:true,
+      lineServiceMode:!diningAddition,
       lineEdit:true,
       lineQuantity:true,
-      holdCart:cart.length>0||heldCarts.length>0,
+      holdCart:!diningAddition&&(cart.length>0||heldCarts.length>0),
       cancelCart:cart.length>0,
     },
     recentlyAddedProductId:recent,highlightedCartLineId:highlight,cartPulseNonce:pulse,
@@ -549,12 +613,73 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
             }} onRemove={id=>localRuntime.removeHold(id)}/>
             :null;
 
+  const finishDiningAddition=()=>{
+    setCart([]);
+    onDiningAdditionDone();
+    navigate('/dining');
+  };
+
+  const submitDiningAddition=async()=>{
+    if(!diningAddition)return;
+    if(diningAddState==='done'||diningAddState==='failed'||diningAddState==='unknown'){
+      finishDiningAddition();
+      return;
+    }
+    if(diningAddState==='processing'||!cart.length||requiredWork.length>0)return;
+    setDiningAddState('processing');
+    setDiningAddStatus('堂食 '+diningAddition.tableLabel+' · 正在保存加單…');
+    try{
+      const committed=await localRuntime.appendDiningItems(diningAddition.holdId,{
+        submissionId:diningAddition.submissionId,
+        items:holdItems(),
+        totalMinor:total,
+        sourceLabel:'現場',
+      });
+      const result=await localRuntime.ensureDiningAdditionPrint(diningAddition.holdId,committed.additionId);
+      if(result.state==='DONE'){
+        setDiningAddState('done');
+        setDiningAddStatus('加單已保存 · 新增項目已送打印');
+      }else if(result.state==='UNKNOWN'){
+        setDiningAddState('unknown');
+        setDiningAddStatus('加單已保存 · 打印結果未知，系統唔會自動重印');
+      }else{
+        setDiningAddState('failed');
+        setDiningAddStatus('加單已保存 · 新增項目打印未完成，請人手檢查');
+      }
+    }catch(cause){
+      console.warn('DINING_ADD_ORDER_SUBMIT_FAILED',cause);
+      try{
+        const detail=await localRuntime.readDiningHold(diningAddition.holdId);
+        const existing=detail.additions.find(row=>row.submissionId===diningAddition.submissionId);
+        if(existing){
+          const result=await localRuntime.ensureDiningAdditionPrint(diningAddition.holdId,existing.id);
+          if(result.state==='DONE'){
+            setDiningAddState('done');
+            setDiningAddStatus('加單已保存 · 新增項目已送打印');
+          }else if(result.state==='UNKNOWN'){
+            setDiningAddState('unknown');
+            setDiningAddStatus('加單已保存 · 打印結果未知，系統唔會自動重印');
+          }else{
+            setDiningAddState('failed');
+            setDiningAddStatus('加單已保存 · 新增項目打印未完成，請人手檢查');
+          }
+          return;
+        }
+      }catch(readbackCause){
+        console.warn('DINING_ADD_ORDER_READBACK_FAILED',readbackCause);
+      }
+      setDiningAddState('idle');
+      setDiningAddStatus('加單未完成；請核對堂食內容後再試。');
+    }
+  };
+
   const actions:OrderingWorkspaceActions={
     onSelectCategory:setCategory,
     onChangeOrderingMode:setOrderingMode,
     onAddProduct:add,
     onConfigureProduct:id=>setPanel({type:'product',productId:id}),
     onChangeServiceMode:mode=>{
+      if(diningAddition)return;
       if(mode==='takeaway'&&!storeSettings.takeawayEnabled)return;
       if(mode==='dine-in'&&!storeSettings.dineInEnabled)return;
       setServiceMode(mode);setCart(cart.map(item=>({...item,serviceMode:mode})));
@@ -562,6 +687,7 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
     onChangeCartView:mode=>{setViewMode(mode);if(mode==='organized')setPanel({type:'organize'});},
     onToggleCombine:()=>setCombineSimilar(value=>!value),
     onChangeLineServiceMode:(lineId,mode)=>{
+      if(diningAddition)return;
       const line=cart.find(item=>item.id===lineId);
       if(line&&isPairedComboLine(line)){setPanel({type:'riceball-pair'});return;}
       if(mode==='takeaway'&&!storeSettings.takeawayEnabled)return;
@@ -581,7 +707,7 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
       if(comboData.combos.some(combo=>combo.id===line.productId))setPanel({type:'combo'});
       else setPanel({type:'product',productId:line.productId,lineId:line.id});
     },
-    onHoldCart:()=>cart.length?setPanel({type:'hold'}):setPanel({type:'holds'}),
+    onHoldCart:()=>{if(diningAddition)return;cart.length?setPanel({type:'hold'}):setPanel({type:'holds'});},
     onCancelCart:()=>setCart([]),
     onOpenWorkItem:id=>{
       if(id==='riceball-pool')setPanel({type:'riceball-pair'});
@@ -590,7 +716,7 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
       else setPanel({type:'organize'});
     },
     onOpenQueueOrder:(_kind,id)=>navigate('/orders?orderId='+encodeURIComponent(id)),
-    onCheckout:()=>navigate('/checkout'),
+    onCheckout:()=>{if(diningAddition){void submitDiningAddition();return;}navigate('/checkout');},
   };
 
   return <OrderingWorkspace view={view} actions={actions} centerPanel={panel&&panelBody?{title:panelTitle,body:panelBody,onClose:()=>setPanel(null)}:null}/>;
@@ -850,9 +976,18 @@ function OperationalApp(){
   const [snoozedArrival,setSnoozedArrival]=useState<{orderId:string;display:string;sourceLabel:string}|null>(null);
   const snoozeTimerRef=useRef<number|undefined>(undefined);
   const [diningCheckout,setDiningCheckout]=useState<DiningCheckoutRequest|null>(()=>readDiningCheckoutUiSession());
+  const [diningAddition,setDiningAddition]=useState<DiningAddOrderRequest|null>(()=>readDiningAddOrderUiSession());
   const [cart,setCartState]=useState<CartLine[]>(()=>diningCheckout?diningCheckoutCart(diningCheckout):[]);
-  const [serviceMode,setServiceMode]=useState<ServiceMode>(diningCheckout?'dine-in':'takeaway');
+  const [serviceMode,setServiceMode]=useState<ServiceMode>(diningCheckout||diningAddition?'dine-in':'takeaway');
   const [navRevision,setNavRevision]=useState(0);
+  useEffect(()=>{
+    if(location.pathname==='/dining'&&diningAddition){
+      clearDiningAddOrderUiSession();
+      setDiningAddition(null);
+      setCartState([]);
+      setServiceMode('dine-in');
+    }
+  },[location.pathname]);
   const snoozeGlobalArrival=(delayMs:number)=>{
     if(!globalArrival)return;
     const pending=globalArrival;
@@ -902,10 +1037,21 @@ function OperationalApp(){
 
   const prepareDiningCheckout=(request:DiningCheckoutRequest)=>{
     // C2: persist UI intent only. Runtime remains the only payment authority.
+    clearDiningAddOrderUiSession();
+    setDiningAddition(null);
     saveDiningCheckoutUiSession(request);
     setDiningCheckout(request);
     setServiceMode('dine-in');
     setCartState(diningCheckoutCart(request));
+  };
+
+  const prepareDiningAddition=(request:DiningAddOrderRequest)=>{
+    clearDiningCheckoutUiSession();
+    setDiningCheckout(null);
+    saveDiningAddOrderUiSession(request);
+    setDiningAddition(request);
+    setServiceMode('dine-in');
+    setCartState([]);
   };
 
   return <><RuntimeReadyActivation/><ProductionViewport><div className="clean-app">
@@ -936,10 +1082,10 @@ function OperationalApp(){
     </aside>
     <section className="clean-route-stage">
       <Routes>
-        <Route index element={<OrderingPage cart={cart} setCart={setCart} serviceMode={serviceMode} setServiceMode={setServiceMode}/>}/>
+        <Route index element={<OrderingPage cart={cart} setCart={setCart} serviceMode={serviceMode} setServiceMode={setServiceMode} diningAddition={diningAddition} onDiningAdditionDone={()=>{clearDiningAddOrderUiSession();setDiningAddition(null);}}/>}/>
         <Route path="checkout" element={<CheckoutPage cart={cart} setCart={setCart} diningCheckout={diningCheckout} onDiningCheckoutDone={()=>{clearDiningCheckoutUiSession();setDiningCheckout(null);}}/>}/>
         <Route path="orders" element={<RuntimeOrdersWorkspace runtime={runtime}/>}/>
-        <Route path="dining" element={<RuntimeDiningWorkspace runtime={runtime} onCheckout={prepareDiningCheckout}/>}/>
+        <Route path="dining" element={<RuntimeDiningWorkspace runtime={runtime} onCheckout={prepareDiningCheckout} onAddOrder={prepareDiningAddition}/>}/>
         <Route path="soldout" element={<RuntimeSoldoutWorkspace runtime={runtime}/>}/>
         <Route path="more" element={<LocalMoreWorkspace/>}/>
         <Route path="*" element={<Navigate to="/" replace/>}/>
