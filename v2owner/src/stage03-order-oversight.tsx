@@ -1,4 +1,5 @@
 import {useEffect,useMemo,useState} from 'react';
+import type {ReactNode} from 'react';
 import type {OwnerConnectionState,OwnerOrderProjection} from './product-types';
 import {
   buildOwnerOrderDetailViewModel,
@@ -222,7 +223,7 @@ function OrderOversightDrawer({order,onClose}:{order:OwnerOrderProjection;onClos
   </div>;
 }
 
-function DetailSection({title,children}:{title:string;children:React.ReactNode}){
+function DetailSection({title,children}:{title:string;children:ReactNode}){
   return <section className="detail-section"><h3>{title}</h3>{children}</section>;
 }
 
