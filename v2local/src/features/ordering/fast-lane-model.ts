@@ -178,9 +178,13 @@ export function rebuildConfiguredLine(
     deltaMinor+=set.options.filter(option=>idSet.has(option.id)).reduce((sum,option)=>sum+option.priceAdjustmentMinor,0);
   }
   if(freeNote.trim())detailParts.push(freeNote.trim());
+  const unitMinor=product.priceMinor+deltaMinor;
+  if(!Number.isSafeInteger(unitMinor)||unitMinor<0)throw new Error('FAST_LANE_PUBLISHED_PRICE_INVALID');
   return {
     ...line,
-    unitMinor:product.priceMinor+deltaMinor,
+    // Negative option adjustments are valid when they come from the Admin-published option set.
+    // Example: 「不要飲品」 -$1. The resulting sell price may be $0 (free), but never below $0.
+    unitMinor,
     detail:detailParts.join(' · ')||undefined,
     optionSelections:normalized,
     freeNote:freeNote.trim(),

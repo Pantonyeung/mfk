@@ -3,7 +3,7 @@ import {renderTscRasterLabel} from './label-bitmap.ts';
 import {renderEscPosRasterTicket} from './ticket-bitmap.ts';
 import {buildOrderPrintPlan,groupTscBitmapJobsByPhysicalPrinter,type PrintBinding,type PlannedPrintJob} from './print-routing.ts';
 import {queueOrderProjection} from './projection-outbox.ts';
-import {readActiveStaffSession} from './staff-auth.ts';
+import {hasStaffPermission,readActiveStaffSession} from './staff-auth.ts';
 import {etaMinutesForActiveCount,readSmtPrintConfig,readSmtStoreSettings} from './admin-operational-config.ts';
 import {mirrorKeetaOrderCommand,type KeetaProviderMirrorResult} from './keeta-provider-commands.ts';
 import {buildDailyClosePrintData,renderDailyCloseTicket} from './daily-close-ticket.ts';
@@ -58,9 +58,14 @@ export interface StoredOrder{
   customerName?:string;customerPhone?:string;
   keetaDeferCount?:number;keetaLastDeferredAt?:string;
   etaMinutes?:number;etaReadyAt?:string;
-  providerRef?:string;providerMessageId?:string;providerPickupCode?:string;orderRemark?:string;utensilPreference?:'需要'|'不需要';
+  providerRef?:string;providerMessageId?:string;providerPickupCode?:string;diningTableLabel?:string;orderRemark?:string;utensilPreference?:'需要'|'不需要';
   providerLastEventId?:number;providerLastEventName?:string;providerLastEventAt?:string;providerLastMessageId?:string;providerLifecycleNote?:string;
   acceptancePrintedAt?:string;
+  diningHoldId?:string;
+  productionAdmissionAttemptedAt?:string;
+  productionAdmissionState?:'DISPATCHING'|'DONE'|'FAILED'|'UNKNOWN';
+  productionAdmissionSummary?:Readonly<{planned:number;sent:number;failed:number}>;
+  productionAdmissionResults?:readonly PrintDispatchResult[];
   paymentEvidenceRef?:string;paymentVerificationState?:'PENDING'|'VERIFIED'|'REJECTED';
   items:readonly {id:string;name:string;qty:number;unitMinor:number;serviceMode?:'takeaway'|'dine-in';productCode?:string;detail?:string;composition?:MfkOrderLineCompositionV1}[];
 }
@@ -69,12 +74,16 @@ export interface DiningSettlementCommand{
   readonly submissionId:string;
   readonly expectedRevision:string;
   readonly receivedMinor?:number;
+  readonly splitTenders?:readonly {tender:Exclude<DiningTender,'COMBO'>;amountMinor:number}[];
 }
 export interface LocalDiningPayment{
   readonly submissionId?:string;
   readonly requestSignature?:string;
   readonly receivedMinor?:number;
   readonly changeMinor?:number;
+  readonly splitTenders?:readonly {tender:Exclude<DiningTender,'COMBO'>;amountMinor:number}[];
+  readonly receiptAttemptedAt?:string;
+  readonly receiptState?:'DISPATCHING'|'DONE'|'FAILED'|'UNKNOWN';
   readonly id:string;
   readonly createdAt:string;
   readonly tender:DiningTender;
@@ -94,6 +103,13 @@ export interface LocalDiningHoldDetail{
   readonly checkoutRevision?:string;
   readonly archivedAt?:string;
   readonly lastAssignedTable?:string;
+  readonly formalOrderId?:string;
+  readonly productionAdmittedAt?:string;
+  readonly priceOverrides?:readonly LocalPriceOverrideRecord[];
+  readonly firstPrintState?:'NOT_STARTED'|'DISPATCHING'|'DONE'|'FAILED'|'UNKNOWN';
+  readonly firstPrintSummary?:Readonly<{planned:number;sent:number;failed:number}>;
+  readonly firstPrintResults?:readonly PrintDispatchResult[];
+  readonly firstPrintAttention?:'NONE'|'TRANSPORT_REPORTED_INCOMPLETE'|'TRANSPORT_UNKNOWN';
   readonly holdId:string;
   readonly codeLabel:string;
   readonly assignedTable?:string;
@@ -106,9 +122,27 @@ export interface LocalDiningHoldDetail{
   readonly lines:readonly LocalDiningLineViewModel[];
   readonly payments:readonly LocalDiningPayment[];
 }
+export interface LocalPriceOverrideRecord{
+  readonly id:string;
+  readonly createdAt:string;
+  readonly lineIndex:number;
+  readonly productId:string;
+  readonly originalUnitMinor:number;
+  readonly effectiveUnitMinor:number;
+  readonly deltaMinor:number;
+  readonly reason:string;
+  readonly staffId:string;
+  readonly staffName:string;
+  readonly source:'MANUAL_OVERRIDE';
+  readonly permission:'PRICE_OVERRIDE';
+  readonly sequence:number;
+}
 export interface LocalHoldDraft{
   readonly archivedAt?:string;
   readonly lastAssignedTable?:string;
+  readonly formalOrderId?:string;
+  readonly productionAdmittedAt?:string;
+  readonly priceOverrides?:readonly LocalPriceOverrideRecord[];
   readonly id:string;
   readonly codeLabel:string;
   readonly kind:'dining'|'waiting';
@@ -183,8 +217,14 @@ export interface CleanSmtCoreRuntimePort{
   assignDiningTable?(holdId:string,tableId:string):Promise<void>;
   unassignDiningTable?(holdId:string):Promise<void>;
   readDiningHold?(holdId:string):Promise<LocalDiningHoldDetail>;
+  overrideDiningLinePrice?(holdId:string,lineIndex:number,effectiveUnitMinor:number,reason:string,expectedRevision?:string):Promise<LocalDiningHoldDetail>;
   readDiningHistory?():Promise<readonly LocalDiningHoldDetail[]>;
+  printDiningPaymentReceipt?(holdId:string,submissionId:string):Promise<PrintDispatchSummary>;
+  reprintDiningPaymentReceipt?(holdId:string,submissionId:string):Promise<PrintDispatchSummary>;
+  readDiningReprintOptions?(holdId:string):Promise<readonly SmtReprintOption[]>;
+  reprintDiningJobs?(holdId:string,jobIds:readonly string[],reason?:string):Promise<PrintDispatchSummary>;
   settleDiningHold?(holdId:string,selections:readonly {lineIndex:number;qty:number}[],tender:DiningTender,command?:DiningSettlementCommand):Promise<LocalDiningHoldDetail>;
+  admitDiningProduction?(holdId:string):Promise<{readonly hold:LocalDiningHoldDetail;readonly orderId:string;readonly display:string;readonly print:PrintDispatchSummary}>;
   clearDiningHold?(holdId:string):Promise<void>;
 }
 export interface PrintDispatchResult{readonly jobId:string;readonly role:string;readonly ok:boolean;readonly code:string}
@@ -270,8 +310,14 @@ export interface MfkLocalRuntime extends CleanSmtCoreRuntimePort{
   holds():readonly LocalHoldDraft[];
   removeHold(id:string):void;
   readDiningHold(holdId:string):Promise<LocalDiningHoldDetail>;
+  overrideDiningLinePrice(holdId:string,lineIndex:number,effectiveUnitMinor:number,reason:string,expectedRevision?:string):Promise<LocalDiningHoldDetail>;
   readDiningHistory():Promise<readonly LocalDiningHoldDetail[]>;
+  printDiningPaymentReceipt(holdId:string,submissionId:string):Promise<PrintDispatchSummary>;
+  reprintDiningPaymentReceipt(holdId:string,submissionId:string):Promise<PrintDispatchSummary>;
+  readDiningReprintOptions(holdId:string):Promise<readonly SmtReprintOption[]>;
+  reprintDiningJobs(holdId:string,jobIds:readonly string[],reason?:string):Promise<PrintDispatchSummary>;
   settleDiningHold(holdId:string,selections:readonly {lineIndex:number;qty:number}[],tender:DiningTender,command?:DiningSettlementCommand):Promise<LocalDiningHoldDetail>;
+  admitDiningProduction(holdId:string):Promise<{readonly hold:LocalDiningHoldDetail;readonly orderId:string;readonly display:string;readonly print:PrintDispatchSummary}>;
   unassignDiningTable(holdId:string):Promise<void>;
   clearDiningHold(holdId:string):Promise<void>;
   clear():void;
@@ -510,6 +556,19 @@ function commitDiningHolds(snapshot:Persisted,holds:LocalHoldDraft[]){
   data=next;
   for(const listener of listeners){try{listener();}catch{console.warn('DINING_OBSERVER_FAILED');}}
 }
+const diningMutationQueues=new Map<string,Promise<void>>();
+async function withDiningMutationLock<T>(key:string,operation:()=>Promise<T>):Promise<T>{
+  const locks=typeof navigator!=='undefined'?(navigator as Navigator&{locks?:{request:<R>(name:string,options:{mode:'exclusive'},callback:()=>Promise<R>)=>Promise<R>}}).locks:undefined;
+  if(locks?.request)return locks.request('mfk:dining:'+key,{mode:'exclusive'},operation);
+  const previous=diningMutationQueues.get(key)??Promise.resolve();
+  let release!:()=>void;
+  const gate=new Promise<void>(resolve=>{release=resolve;});
+  const tail=previous.then(()=>gate);
+  diningMutationQueues.set(key,tail);
+  await previous;
+  try{return await operation();}
+  finally{release();if(diningMutationQueues.get(key)===tail)diningMutationQueues.delete(key);}
+}
 function diningCheckoutRevision(hold:LocalHoldDraft){return 'DINING2:'+JSON.stringify(hold);}
 function requireDiningHold(snapshot:Persisted,id:string){
   const hold=snapshot.holds.find(row=>row.id===id);
@@ -547,6 +606,27 @@ function diningDetail(hold:LocalHoldDraft):LocalDiningHoldDetail{
     checkoutRevision:diningCheckoutRevision(hold),
     archivedAt:hold.archivedAt,
     lastAssignedTable:hold.lastAssignedTable,
+    formalOrderId:hold.formalOrderId,
+    productionAdmittedAt:hold.productionAdmittedAt,
+    priceOverrides:hold.priceOverrides??[],
+    firstPrintState:(()=>{
+      const order=hold.formalOrderId?data.orders.find(row=>row.id===hold.formalOrderId):undefined;
+      return order?.productionAdmissionState??'NOT_STARTED';
+    })(),
+    firstPrintSummary:(()=>{
+      const order=hold.formalOrderId?data.orders.find(row=>row.id===hold.formalOrderId):undefined;
+      return order?.productionAdmissionSummary;
+    })(),
+    firstPrintResults:(()=>{
+      const order=hold.formalOrderId?data.orders.find(row=>row.id===hold.formalOrderId):undefined;
+      return order?.productionAdmissionResults;
+    })(),
+    firstPrintAttention:(()=>{
+      const order=hold.formalOrderId?data.orders.find(row=>row.id===hold.formalOrderId):undefined;
+      if(order?.productionAdmissionState==='UNKNOWN')return 'TRANSPORT_UNKNOWN';
+      if(order?.productionAdmissionState==='FAILED')return 'TRANSPORT_REPORTED_INCOMPLETE';
+      return 'NONE';
+    })(),
     codeLabel:hold.codeLabel,
     assignedTable:hold.assignedTable,
     createdAt:hold.createdAt,
@@ -554,7 +634,7 @@ function diningDetail(hold:LocalHoldDraft):LocalDiningHoldDetail{
     note:hold.note,
     totalMinor:hold.totalMinor,
     paidMinor,
-    remainingMinor:Math.max(0,hold.totalMinor-paidMinor),
+    remainingMinor:hold.totalMinor-paidMinor,
     lines,
     payments,
   };
@@ -610,25 +690,38 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
   },
   orders(){return data.orders},
   createHold(input){
-    const n=data.holds.length+1;
+    const snapshot=readDiningState();
+    if(input.kind!=='dining'&&input.kind!=='waiting')throw new Error('HOLD_KIND_INVALID');
+    const partySize=Math.floor(Number(input.partySize??1));
+    if(!Number.isSafeInteger(partySize)||partySize<1||partySize>99)throw new Error('HOLD_PARTY_SIZE_INVALID');
+    const items=input.items.map(item=>normalizeCompositionItem({...item}));
+    if(items.some(item=>!String(item.id||'').trim()||!String(item.name||'').trim()||!Number.isSafeInteger(item.qty)||item.qty<=0||!Number.isSafeInteger(item.unitMinor)||item.unitMinor<0))throw new Error('HOLD_ITEM_INVALID');
+    const computedTotal=items.reduce((sum,item)=>sum+item.qty*item.unitMinor,0);
+    if(!Number.isSafeInteger(computedTotal)||computedTotal!==input.totalMinor)throw new Error('HOLD_TOTAL_MISMATCH');
+    const nextSequence=snapshot.holds.reduce((max,row)=>{
+      const match=/^H(\d+)$/.exec(row.codeLabel);return Math.max(max,match?Number(match[1]):0);
+    },0)+1;
     const draft:LocalHoldDraft={
-      id:'HOLD-'+Date.now().toString(36),
-      codeLabel:'H'+String(n).padStart(3,'0'),
+      id:'HOLD-'+Date.now().toString(36)+'-'+nextSequence.toString(36),
+      codeLabel:'H'+String(nextSequence).padStart(3,'0'),
       kind:input.kind,
       createdAt:new Date().toISOString(),
-      partySize:Math.max(1,Math.floor(Number(input.partySize)||1)),
-      note:String(input.note||''),
-      totalMinor:Math.max(0,Math.floor(Number(input.totalMinor)||0)),
+      partySize,
+      note:String(input.note||'').trim().slice(0,200),
+      totalMinor:computedTotal,
       payments:[],
-      items:input.items.map(item=>normalizeCompositionItem({...item})),
+      items,
     };
-    data={...data,holds:[draft,...data.holds]};save();return draft;
+    const next={...snapshot,holds:[draft,...snapshot.holds],diningRevision:(snapshot.diningRevision??0)+1};
+    localStorage.setItem(KEY,JSON.stringify(next));data=next;listeners.forEach(fn=>fn());
+    return clone(draft);
   },
   holds(){return readDiningState().holds.filter(hold=>!hold.archivedAt)},
   removeHold(id){
     const snapshot=readDiningState();const hold=snapshot.holds.find(row=>row.id===id);
-    if(hold?.archivedAt||hold?.payments?.length)throw new Error('DINING_HISTORY_PROTECTED');
-    if(hold?.kind==='dining'&&(hold.assignedTable||hold.items.length))throw new Error('DINING_NONEMPTY_HOLD_PROTECTED');
+    if(!hold)throw new Error('HOLD_NOT_FOUND');
+    if(hold.archivedAt||hold.payments?.length||hold.formalOrderId)throw new Error('DINING_HISTORY_PROTECTED');
+    if(hold.kind==='dining'&&(hold.assignedTable||hold.items.length))throw new Error('DINING_NONEMPTY_HOLD_PROTECTED');
     commitDiningHolds(snapshot,snapshot.holds.filter(row=>row.id!==id));
   },
   clear(){data=clone(defaults);save()},
@@ -912,6 +1005,7 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
   async readOrderReprintOptions(orderId){
     const order=data.orders.find(x=>x.id===orderId);
     if(!order)throw new Error('ORDER_NOT_FOUND');
+    const firstResults=new Map((order.productionAdmissionResults??[]).map(row=>[row.jobId,row] as const));
     return buildOrderPrintPlan(order,readPrinterBindings(),readSmtPrintConfig()).map(job=>Object.freeze({
       jobId:job.id,
       role:job.role,
@@ -920,6 +1014,8 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
       bindingId:job.binding.id,
       printerName:job.binding.name,
       physicalKey:job.binding.host.trim()+':'+job.binding.port,
+      firstPrintState:firstResults.has(job.id)?(firstResults.get(job.id)!.ok?'SENT_TO_PRINTER':'TRANSPORT_REPORTED_INCOMPLETE'):'NO_TRANSPORT_EVIDENCE',
+      firstPrintCode:firstResults.get(job.id)?.code,
     }));
   },
   async reprintOrderJobs(orderId,jobIds,reason){
@@ -1102,7 +1198,8 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
           active:true,
           sortOrder:index+1,
         }));
-        return tables.map(table=>{
+        const activeTables=tables.filter(table=>table.active!==false).sort((a,b)=>(Number(a.sortOrder)||0)-(Number(b.sortOrder)||0)||String(a.name).localeCompare(String(b.name),'zh-HK'));
+        return activeTables.map(table=>{
           const id=table.id;
           const seated=data.holds.find(hold=>hold.kind==='dining'&&!hold.archivedAt&&hold.assignedTable===id);
           if(!seated)return {id,areaLabel:'堂食',label:table.name,state:'available' as const};
@@ -1128,38 +1225,130 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
     };
   },
   async createDiningWait(input){
-    const draft:LocalHoldDraft={
-      id:'HOLD-'+Date.now().toString(36),
-      codeLabel:'W'+String(data.holds.length+1).padStart(3,'0'),
-      kind:'dining',
-      createdAt:new Date().toISOString(),
-      partySize:Math.max(1,Math.floor(Number(input.partySize)||1)),
-      note:String(input.note||''),
-      totalMinor:0,
-      payments:[],
-      items:[],
-    };
-    data={...data,holds:[draft,...data.holds]};save();return draft;
+    return withDiningMutationLock('wait-list',async()=>{
+      const snapshot=readDiningState();
+      const partySize=Math.floor(Number(input.partySize));
+      if(!Number.isSafeInteger(partySize)||partySize<1||partySize>99)throw new Error('DINING_PARTY_SIZE_INVALID');
+      const note=String(input.note||'').trim().slice(0,200);
+      const nextSequence=snapshot.holds.reduce((max,row)=>{
+        const match=/^W(\d+)$/.exec(row.codeLabel);return Math.max(max,match?Number(match[1]):0);
+      },0)+1;
+      const draft:LocalHoldDraft={
+        id:'HOLD-'+Date.now().toString(36)+'-'+nextSequence.toString(36),
+        codeLabel:'W'+String(nextSequence).padStart(3,'0'),
+        kind:'dining',
+        createdAt:new Date().toISOString(),
+        partySize,
+        note,
+        totalMinor:0,
+        payments:[],
+        items:[],
+      };
+      commitDiningHolds(snapshot,[draft,...snapshot.holds]);
+      return clone(draft);
+    });
   },
   async removeDiningWait(id){
-    const snapshot=readDiningState();const hold=requireDiningHold(snapshot,id);
-    if(hold.archivedAt||hold.payments?.length)throw new Error('DINING_HISTORY_PROTECTED');
-    if(hold.assignedTable||hold.items.length)throw new Error('DINING_NONEMPTY_HOLD_PROTECTED');
-    commitDiningHolds(snapshot,snapshot.holds.filter(row=>row.id!==id));
+    return withDiningMutationLock('wait-list',async()=>{
+      const snapshot=readDiningState();const hold=requireDiningHold(snapshot,id);
+      if(hold.archivedAt||hold.payments?.length)throw new Error('DINING_HISTORY_PROTECTED');
+      if(hold.assignedTable||hold.items.length||hold.formalOrderId)throw new Error('DINING_NONEMPTY_HOLD_PROTECTED');
+      commitDiningHolds(snapshot,snapshot.holds.filter(row=>row.id!==id));
+    });
   },
   async assignDiningTable(holdId,tableId){
+    return withDiningMutationLock('table:'+holdId,async()=>{
     const snapshot=readDiningState();const hold=requireDiningHold(snapshot,holdId);
     if(hold.archivedAt)throw new Error('DINING_HISTORY_PROTECTED');
-    if(!/^T0[1-9]$/.test(tableId))throw new Error('DINING_TABLE_INVALID');
+    const allowedTables=readSmtStoreSettings().diningTables;
+    if(allowedTables.length&&!allowedTables.some(table=>table.id===tableId))throw new Error('DINING_TABLE_INVALID');
+    if(!allowedTables.length&&!/^T0[1-9]$/.test(tableId))throw new Error('DINING_TABLE_INVALID');
     if(snapshot.holds.some(row=>row.id!==holdId&&!row.archivedAt&&row.kind==='dining'&&row.assignedTable===tableId))throw new Error('DINING_TABLE_OCCUPIED');
     if(hold.assignedTable===tableId)return;
-    commitDiningHolds(snapshot,snapshot.holds.map(row=>row.id===holdId?{...row,assignedTable:tableId}:row));
+    const linkedOrder=hold.formalOrderId?snapshot.orders.find(row=>row.id===hold.formalOrderId):undefined;
+    if(hold.formalOrderId&&!linkedOrder)throw new Error('DINING_FORMAL_ORDER_LINK_BROKEN');
+    const next:Persisted={
+      ...snapshot,
+      holds:snapshot.holds.map(row=>row.id===holdId?{...row,assignedTable:tableId}:row),
+      orders:linkedOrder?snapshot.orders.map(row=>row.id===linkedOrder.id?{...row,diningTableLabel:tableId,updatedAt:new Date().toISOString()}:row):snapshot.orders,
+      diningRevision:(snapshot.diningRevision??0)+1,
+    };
+    localStorage.setItem(KEY,JSON.stringify(next));data=next;
+    for(const listener of listeners){try{listener();}catch{console.warn('DINING_OBSERVER_FAILED');}}
+    if(linkedOrder){
+      try{projectOrder(data.orders.find(row=>row.id===linkedOrder.id)!);}catch{console.warn('DINING_TABLE_PROJECTION_NON_BLOCKING');}
+      appendActionAudit({action:'DINING_TABLE_TRANSFER',orderId:linkedOrder.id,reason:tableId});
+      return;
+    }
+    // Owner contract: 第一次掛入堂食枱就係落單 + 首次完整打印。
+    if(hold.items.length)await localRuntime.admitDiningProduction(holdId);
+    });
   },
   async unassignDiningTable(holdId){
-    const snapshot=readDiningState();const hold=requireDiningHold(snapshot,holdId);
-    if(hold.archivedAt)throw new Error('DINING_HISTORY_PROTECTED');
-    const {assignedTable,...rest}=hold;
-    commitDiningHolds(snapshot,snapshot.holds.map(row=>row.id===holdId?{...rest,...(assignedTable?{lastAssignedTable:assignedTable}:{})}:row));
+    return withDiningMutationLock('table:'+holdId,async()=>{
+      const snapshot=readDiningState();const hold=requireDiningHold(snapshot,holdId);
+      if(hold.archivedAt)throw new Error('DINING_HISTORY_PROTECTED');
+      const linkedOrder=hold.formalOrderId?snapshot.orders.find(row=>row.id===hold.formalOrderId):undefined;
+      if(hold.formalOrderId&&!linkedOrder)throw new Error('DINING_FORMAL_ORDER_LINK_BROKEN');
+      const {assignedTable,...rest}=hold;
+      const next:Persisted={
+        ...snapshot,
+        holds:snapshot.holds.map(row=>row.id===holdId?{...rest,...(assignedTable?{lastAssignedTable:assignedTable}:{})}:row),
+        orders:linkedOrder?snapshot.orders.map(row=>row.id===linkedOrder.id?{...row,diningTableLabel:undefined,updatedAt:new Date().toISOString()}:row):snapshot.orders,
+        diningRevision:(snapshot.diningRevision??0)+1,
+      };
+      localStorage.setItem(KEY,JSON.stringify(next));data=next;
+      for(const listener of listeners){try{listener();}catch{console.warn('DINING_OBSERVER_FAILED');}}
+      if(linkedOrder){
+        try{projectOrder(data.orders.find(row=>row.id===linkedOrder.id)!);}catch{console.warn('DINING_TABLE_PROJECTION_NON_BLOCKING');}
+        appendActionAudit({action:'DINING_TABLE_UNASSIGN',orderId:linkedOrder.id,reason:assignedTable});
+      }
+      return clone(diningDetail(requireDiningHold(next,holdId)));
+    });
+  },
+  async overrideDiningLinePrice(holdId,lineIndex,effectiveUnitMinor,reason,expectedRevision){
+    return withDiningMutationLock('price:'+holdId,async()=>{
+      const snapshot=readDiningState();const hold=requireDiningHold(snapshot,holdId);
+      if(expectedRevision&&expectedRevision!==diningCheckoutRevision(hold))throw new Error('DINING_PRICE_OVERRIDE_STALE');
+      if(hold.archivedAt)throw new Error('DINING_HISTORY_PROTECTED');
+      if(hold.payments?.length)throw new Error('DINING_PRICE_OVERRIDE_AFTER_PAYMENT_FORBIDDEN');
+      const session=readActiveStaffSession();
+      if(!session)throw new Error('DINING_PRICE_OVERRIDE_AUTH_REQUIRED');
+      if(!hasStaffPermission('PRICE_OVERRIDE'))throw new Error('DINING_PRICE_OVERRIDE_FORBIDDEN');
+      if(!Number.isSafeInteger(lineIndex)||lineIndex<0||lineIndex>=hold.items.length)throw new Error('DINING_LINE_NOT_FOUND');
+      if(!Number.isSafeInteger(effectiveUnitMinor))throw new Error('DINING_PRICE_OVERRIDE_INVALID');
+      const normalizedReason=String(reason||'').trim().slice(0,200);
+      const item=hold.items[lineIndex];
+      if(item.unitMinor===effectiveUnitMinor)return clone(diningDetail(hold));
+      const createdAt=new Date().toISOString();
+      const sequence=(hold.priceOverrides?.length??0)+1;
+      const record:LocalPriceOverrideRecord={
+        id:'DPO:'+holdId+':'+createdAt+':'+lineIndex,
+        createdAt,lineIndex,productId:item.id,
+        originalUnitMinor:item.unitMinor,effectiveUnitMinor,
+        deltaMinor:effectiveUnitMinor-item.unitMinor,
+        reason:normalizedReason,staffId:session.staffId,staffName:session.displayName,
+        source:'MANUAL_OVERRIDE',permission:'PRICE_OVERRIDE',sequence,
+      };
+      const items=hold.items.map((row,index)=>index===lineIndex?{...row,unitMinor:effectiveUnitMinor}:row);
+      const totalMinor=items.reduce((sum,row)=>sum+row.qty*row.unitMinor,0);
+      if(!Number.isSafeInteger(totalMinor))throw new Error('DINING_PRICE_OVERRIDE_TOTAL_INVALID');
+      const nextHold:LocalHoldDraft={...hold,items,totalMinor,priceOverrides:[...(hold.priceOverrides??[]),record]};
+      const linkedOrder=hold.formalOrderId?snapshot.orders.find(row=>row.id===hold.formalOrderId):undefined;
+      const next:Persisted={
+        ...snapshot,
+        holds:snapshot.holds.map(row=>row.id===holdId?nextHold:row),
+        orders:linkedOrder?snapshot.orders.map(row=>row.id===linkedOrder.id?{...row,items,totalMinor,updatedAt:createdAt}:row):snapshot.orders,
+        diningRevision:(snapshot.diningRevision??0)+1,
+      };
+      localStorage.setItem(KEY,JSON.stringify(next));data=next;
+      for(const listener of listeners){try{listener();}catch{console.warn('DINING_OBSERVER_FAILED');}}
+      if(linkedOrder){
+        try{projectOrder(data.orders.find(row=>row.id===linkedOrder.id)!);}catch{console.warn('DINING_PRICE_PROJECTION_NON_BLOCKING');}
+        appendActionAudit({action:'DINING_PRICE_OVERRIDE',orderId:linkedOrder.id,reason:'#'+sequence+' '+session.displayName+' '+money(item.unitMinor)+'→'+money(effectiveUnitMinor)+(normalizedReason?' '+normalizedReason:'')});
+      }
+      return clone(diningDetail(nextHold));
+    });
   },
   async readDiningHold(holdId){
     return clone(diningDetail(requireDiningHold(readDiningState(),holdId)));
@@ -1168,7 +1357,179 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
     return readDiningState().holds.filter(hold=>hold.kind==='dining'&&hold.archivedAt)
       .sort((a,b)=>String(b.archivedAt).localeCompare(String(a.archivedAt))).map(hold=>clone(diningDetail(hold)));
   },
+  async admitDiningProduction(holdId){
+    return withDiningMutationLock('admission:'+holdId,async()=>{
+    const snapshot=readDiningState();
+    const hold=requireDiningHold(snapshot,holdId);
+    if(hold.archivedAt)throw new Error('DINING_HISTORY_PROTECTED');
+    if(!hold.items.length)throw new Error('DINING_ITEMS_REQUIRED');
+    if(hold.items.some(row=>!Number.isSafeInteger(row.qty)||row.qty<=0||!Number.isSafeInteger(row.unitMinor)))throw new Error('DINING_AMOUNT_INVALID');
+    const totalMinor=hold.items.reduce((sum,row)=>sum+row.qty*row.unitMinor,0);
+    if(!Number.isSafeInteger(totalMinor)||totalMinor!==hold.totalMinor)throw new Error('DINING_TOTAL_MISMATCH');
+
+    let order=hold.formalOrderId?snapshot.orders.find(row=>row.id===hold.formalOrderId):undefined;
+    if(hold.formalOrderId&&!order)throw new Error('DINING_FORMAL_ORDER_LINK_BROKEN');
+
+    if(!order){
+      const createdAt=new Date().toISOString();
+      const session=readActiveStaffSession();
+      const n=snapshot.orders.length+1;
+      const activeCount=snapshot.orders.filter(row=>row.fulfillmentLabel==='進行中').length+1;
+      const etaMinutes=etaMinutesForActiveCount(activeCount);
+      const etaReadyAt=etaMinutes?new Date(Date.parse(createdAt)+etaMinutes*60_000).toISOString():undefined;
+      order={
+        id:'MFK-'+Date.now().toString(36),
+        display:'P'+String(n).padStart(3,'0'),
+        createdAt,
+        updatedAt:createdAt,
+        totalMinor,
+        paymentLabel:'未結帳',
+        fulfillmentLabel:'進行中',
+        sourceLabel:'堂食',
+        checkoutSubmissionId:'DINING-PRODUCTION:'+hold.id,
+        diningHoldId:hold.id,
+        diningTableLabel:hold.assignedTable,
+        ...(etaMinutes?{etaMinutes,etaReadyAt}:{}),
+        ...(session?{staffId:session.staffId,staffName:session.displayName}:{}),
+        items:hold.items.map(item=>normalizeCompositionItem({...item,serviceMode:'dine-in' as const})),
+      };
+      const linkedHold:LocalHoldDraft={...hold,formalOrderId:order.id,productionAdmittedAt:createdAt};
+      const next:Persisted={...snapshot,orders:[order,...snapshot.orders],holds:snapshot.holds.map(row=>row.id===hold.id?linkedHold:row),diningRevision:(snapshot.diningRevision??0)+1};
+      localStorage.setItem(KEY,JSON.stringify(next));
+      data=next;
+      for(const listener of listeners){try{listener();}catch{console.warn('DINING_OBSERVER_FAILED');}}
+      try{projectOrder(order);}catch{console.warn('DINING_ORDER_PROJECTION_NON_BLOCKING');}
+      appendActionAudit({action:'DINING_PRODUCTION_ADMISSION',orderId:order.id,reason:hold.id});
+    }
+
+    let current=data.orders.find(row=>row.id===order!.id)!;
+    if(current.productionAdmissionAttemptedAt){
+      const summary=current.productionAdmissionSummary??{planned:0,sent:0,failed:current.productionAdmissionState==='FAILED'||current.productionAdmissionState==='UNKNOWN'?1:0};
+      return {hold:clone(diningDetail(requireDiningHold(readDiningState(),holdId))),orderId:current.id,display:current.display,print:Object.freeze({orderId:current.id,planned:0,sent:0,failed:summary.failed,results:Object.freeze([])})};
+    }
+
+    const attemptedAt=new Date().toISOString();
+    data={...data,orders:data.orders.map(row=>row.id===current.id?{...row,productionAdmissionAttemptedAt:attemptedAt,productionAdmissionState:'DISPATCHING',updatedAt:attemptedAt}:row)};
+    save();
+    current=data.orders.find(row=>row.id===current.id)!;
+    try{
+      const plan=buildOrderPrintPlan(current,readPrinterBindings(),readSmtPrintConfig());
+      const productionJobIds=new Set(plan.map(job=>job.id));
+      const summary=await dispatchOrderOutputs(current,productionJobIds);
+      const state=summary.failed>0?'FAILED':'DONE';
+      const updatedAt=new Date().toISOString();
+      data={...data,orders:data.orders.map(row=>row.id===current.id?{...row,productionAdmissionState:state,productionAdmissionSummary:{planned:summary.planned,sent:summary.sent,failed:summary.failed},productionAdmissionResults:summary.results,...(summary.results.some(result=>result.role==='製作單'&&result.ok)&&!row.productionIssuedAt?{productionIssuedAt:updatedAt}:{}),updatedAt}:row)};
+      save();
+      appendActionAudit({action:'DINING_PRODUCTION_PRINT',orderId:current.id,reason:state});
+      return {hold:clone(diningDetail(requireDiningHold(readDiningState(),holdId))),orderId:current.id,display:current.display,print:summary};
+    }catch(error){
+      const updatedAt=new Date().toISOString();
+      data={...data,orders:data.orders.map(row=>row.id===current.id?{...row,productionAdmissionState:'UNKNOWN',updatedAt}:row)};
+      save();
+      appendActionAudit({action:'DINING_PRODUCTION_PRINT_UNKNOWN',orderId:current.id});
+      throw error;
+    }
+    });
+  },
+  async printDiningPaymentReceipt(holdId,submissionId){
+    return withDiningMutationLock('receipt:'+holdId+':'+submissionId,async()=>{
+    let snapshot=readDiningState();
+    let hold=requireDiningHold(snapshot,holdId);
+    if(!hold.formalOrderId)throw new Error('DINING_FORMAL_ORDER_NOT_CREATED');
+    let payment=(hold.payments??[]).find(row=>row.submissionId===submissionId);
+    if(!payment)throw new Error('DINING_PAYMENT_NOT_FOUND');
+    const order=snapshot.orders.find(row=>row.id===hold.formalOrderId);
+    if(!order)throw new Error('DINING_FORMAL_ORDER_LINK_BROKEN');
+    if(payment.receiptAttemptedAt){
+      return Object.freeze({orderId:order.id,planned:0,sent:0,failed:payment.receiptState==='FAILED'||payment.receiptState==='UNKNOWN'?1:0,results:Object.freeze([])});
+    }
+    const binding=readPrinterBindings().find(row=>row.role==='顧客小票'&&String(row.host||'').trim());
+    if(!binding)throw new Error('DINING_RECEIPT_ROUTE_MISSING');
+
+    const attemptedAt=new Date().toISOString();
+    const mark=(state:LocalDiningPayment['receiptState'])=>{
+      snapshot=readDiningState();hold=requireDiningHold(snapshot,holdId);
+      const nextHolds=snapshot.holds.map(row=>row.id===holdId?{
+        ...row,payments:(row.payments??[]).map(item=>item.submissionId===submissionId?{...item,receiptAttemptedAt:item.receiptAttemptedAt??attemptedAt,receiptState:state}:item),
+      }:row);
+      const next={...snapshot,holds:nextHolds,diningRevision:(snapshot.diningRevision??0)+1};
+      localStorage.setItem(KEY,JSON.stringify(next));data=next;
+      for(const listener of listeners){try{listener();}catch{console.warn('DINING_OBSERVER_FAILED');}}
+      hold=requireDiningHold(next,holdId);
+      payment=(hold.payments??[]).find(row=>row.submissionId===submissionId)!;
+    };
+    mark('DISPATCHING');
+
+    const paymentLabel=payment.tender==='COMBO'
+      ?'COMBO '+(payment.splitTenders??[]).map(row=>row.tender+' '+money(row.amountMinor)).join(' + ')
+      :payment.tender;
+    const paymentOrder:StoredOrder={...order,totalMinor:payment.amountMinor,paymentLabel,updatedAt:new Date().toISOString()};
+    try{
+      const output=await printBytesLan({...printerInput(binding),bytes:await renderEscPosRasterTicket({
+        kind:'receipt',order:paymentOrder,cutAfter:true,kickDrawer:payment.tender==='CASH'||Boolean(payment.splitTenders?.some(row=>row.tender==='CASH')),beepAfter:true,
+      })});
+      mark(output.ok?'DONE':'FAILED');
+      const result={jobId:order.id+':payment:'+payment.id+':receipt',role:'顧客小票',ok:output.ok,code:output.code||(output.ok?'SENT':'PRINT_FAILED')} satisfies PrintDispatchResult;
+      appendActionAudit({action:'DINING_PAYMENT_RECEIPT',orderId:order.id,reason:paymentLabel+' '+money(payment.amountMinor)});
+      return Object.freeze({orderId:order.id,planned:1,sent:result.ok?1:0,failed:result.ok?0:1,results:Object.freeze([Object.freeze(result)])});
+    }catch(error){
+      mark('UNKNOWN');
+      appendActionAudit({action:'DINING_PAYMENT_RECEIPT_UNKNOWN',orderId:order.id,reason:paymentLabel});
+      throw error;
+    }
+    });
+  },
+  async reprintDiningPaymentReceipt(holdId,submissionId){
+    const hold=requireDiningHold(readDiningState(),holdId);
+    if(!hold.formalOrderId)throw new Error('DINING_FORMAL_ORDER_NOT_CREATED');
+    const payment=(hold.payments??[]).find(row=>row.submissionId===submissionId);
+    if(!payment)throw new Error('DINING_PAYMENT_NOT_FOUND');
+    const order=data.orders.find(row=>row.id===hold.formalOrderId);
+    if(!order)throw new Error('DINING_FORMAL_ORDER_LINK_BROKEN');
+    const binding=readPrinterBindings().find(row=>row.role==='顧客小票'&&String(row.host||'').trim());
+    if(!binding)throw new Error('DINING_RECEIPT_ROUTE_MISSING');
+    const paymentLabel=payment.tender==='COMBO'
+      ?'COMBO '+(payment.splitTenders??[]).map(row=>row.tender+' '+money(row.amountMinor)).join(' + ')
+      :payment.tender;
+    const paymentOrder:StoredOrder={...order,totalMinor:payment.amountMinor,paymentLabel,updatedAt:new Date().toISOString()};
+    const output=await printBytesLan({...printerInput(binding),bytes:await renderEscPosRasterTicket({
+      kind:'receipt',order:paymentOrder,cutAfter:true,kickDrawer:false,beepAfter:true,
+    })});
+    appendActionAudit({action:'DINING_PAYMENT_RECEIPT_REPRINT',orderId:order.id,reason:submissionId});
+    const result={jobId:order.id+':payment:'+payment.id+':receipt:reprint',role:'顧客小票',ok:output.ok,code:output.code||(output.ok?'SENT':'PRINT_FAILED')} satisfies PrintDispatchResult;
+    return Object.freeze({orderId:order.id,planned:1,sent:result.ok?1:0,failed:result.ok?0:1,results:Object.freeze([Object.freeze(result)])});
+  },
+  async readDiningReprintOptions(holdId){
+    const hold=requireDiningHold(readDiningState(),holdId);
+    if(!hold.formalOrderId)throw new Error('DINING_FORMAL_ORDER_NOT_CREATED');
+    const order=data.orders.find(row=>row.id===hold.formalOrderId);
+    if(!order)throw new Error('DINING_FORMAL_ORDER_LINK_BROKEN');
+    return buildOrderPrintPlan(order,readPrinterBindings(),readSmtPrintConfig()).map(job=>Object.freeze({
+      jobId:job.id,
+      role:job.role,
+      label:job.role==='枱單'?'枱單':job.role,
+      detail:job.labelSpec?.pieceLabel,
+      bindingId:job.binding.id,
+      printerName:job.binding.name,
+      physicalKey:job.binding.host.trim()+':'+job.binding.port,
+    }));
+  },
+  async reprintDiningJobs(holdId,jobIds,reason){
+    const hold=requireDiningHold(readDiningState(),holdId);
+    if(!hold.formalOrderId)throw new Error('DINING_FORMAL_ORDER_NOT_CREATED');
+    const order=data.orders.find(row=>row.id===hold.formalOrderId);
+    if(!order)throw new Error('DINING_FORMAL_ORDER_LINK_BROKEN');
+    if(!jobIds.length)throw new Error('REPRINT_SELECTION_REQUIRED');
+    const plan=buildOrderPrintPlan(order,readPrinterBindings(),readSmtPrintConfig());
+    const allowed=new Set(plan.map(job=>job.id));
+    const unique=[...new Set(jobIds)];
+    if(unique.some(id=>!allowed.has(id)))throw new Error('DINING_REPRINT_JOB_INVALID');
+    const result=await dispatchOrderOutputs(order,new Set(unique),true);
+    appendActionAudit({action:'DINING_REPRINT',orderId:order.id,reason:(String(reason||'').trim()||'MANUAL')+' jobs='+unique.join(',')});
+    return result;
+  },
   async settleDiningHold(holdId,selections,tender,command){
+    return withDiningMutationLock('payment:'+holdId,async()=>{
     if(!command||typeof command.submissionId!=='string'||!command.submissionId.trim()||command.submissionId.length>200||typeof command.expectedRevision!=='string'||!command.expectedRevision)throw new Error('DINING_CHECKOUT_REFRESH_REQUIRED');
     if(!['CASH','ALIPAY','WECHAT','FPS','PAYME','COMBO'].includes(tender))throw new Error('DINING_TENDER_INVALID');
     if(!Array.isArray(selections)||!selections.length)throw new Error('DINING_SELECTION_INVALID');
@@ -1178,7 +1539,13 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
       if(seen.has(selection.lineIndex))throw new Error('DINING_DUPLICATE_SELECTION');
       seen.add(selection.lineIndex);return {lineIndex:selection.lineIndex,qty:selection.qty};
     }).sort((a,b)=>a.lineIndex-b.lineIndex);
-    const signature=JSON.stringify([holdId,tender,normalized,command.receivedMinor??null]);
+    const splitTenders=(command.splitTenders??[]).map(row=>({tender:row.tender,amountMinor:row.amountMinor})).filter(row=>row.amountMinor>0);
+    if(tender==='COMBO'){
+      if(splitTenders.length<2)throw new Error('DINING_COMBO_SPLIT_REQUIRED');
+      if(splitTenders.some(row=>!['CASH','ALIPAY','WECHAT','FPS','PAYME'].includes(row.tender)||!Number.isSafeInteger(row.amountMinor)||row.amountMinor<=0))throw new Error('DINING_COMBO_SPLIT_INVALID');
+      if(new Set(splitTenders.map(row=>row.tender)).size!==splitTenders.length)throw new Error('DINING_COMBO_SPLIT_DUPLICATE');
+    }else if(splitTenders.length)throw new Error('DINING_SPLIT_TENDER_UNEXPECTED');
+    const signature=JSON.stringify([holdId,tender,normalized,command.receivedMinor??null,splitTenders]);
     const snapshot=readDiningState();const hold=requireDiningHold(snapshot,holdId);
     const prior=snapshot.holds.flatMap(row=>(row.payments??[]).map(payment=>({holdId:row.id,payment}))).find(row=>row.payment.submissionId===command.submissionId);
     if(prior){
@@ -1198,24 +1565,69 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
       return {...selection,amountMinor:line.unitMinor*selection.qty};
     });
     const amountMinor=paymentSelections.reduce((sum,row)=>sum+row.amountMinor,0);
-    if(!Number.isSafeInteger(amountMinor)||amountMinor<0||amountMinor>detail.remainingMinor)throw new Error('DINING_AMOUNT_INVALID');
-    const receivedMinor=tender==='CASH'?command.receivedMinor:amountMinor;
-    if(!Number.isSafeInteger(receivedMinor)||receivedMinor!<amountMinor)throw new Error('DINING_CASH_INSUFFICIENT');
+    if(!Number.isSafeInteger(amountMinor))throw new Error('DINING_AMOUNT_INVALID');
+    if(detail.totalMinor<0||detail.remainingMinor<0)throw new Error('DINING_NEGATIVE_BALANCE_REQUIRES_ADJUSTMENT');
+    if(amountMinor<0||amountMinor>detail.remainingMinor)throw new Error('DINING_AMOUNT_INVALID');
+    if(tender==='COMBO'&&splitTenders.reduce((sum,row)=>sum+row.amountMinor,0)!==amountMinor)throw new Error('DINING_COMBO_TOTAL_MISMATCH');
+    const cashSplit=tender==='COMBO'?splitTenders.find(row=>row.tender==='CASH'):undefined;
+    const receivedMinor=tender==='CASH'
+      ?command.receivedMinor
+      :cashSplit
+        ?command.receivedMinor
+        :amountMinor;
+    if(tender==='CASH'&&(!Number.isSafeInteger(receivedMinor)||receivedMinor!<amountMinor))throw new Error('DINING_CASH_INSUFFICIENT');
+    if(cashSplit&&(!Number.isSafeInteger(receivedMinor)||receivedMinor!<cashSplit.amountMinor))throw new Error('DINING_CASH_INSUFFICIENT');
     const createdAt=new Date().toISOString();
-    const payment:LocalDiningPayment={id:'DP:'+holdId+':'+command.submissionId,submissionId:command.submissionId,requestSignature:signature,createdAt,tender,amountMinor,receivedMinor,changeMinor:receivedMinor!-amountMinor,selections:paymentSelections};
+    const payment:LocalDiningPayment={
+      id:'DP:'+holdId+':'+command.submissionId,submissionId:command.submissionId,requestSignature:signature,createdAt,tender,amountMinor,
+      receivedMinor,
+      changeMinor:tender==='CASH'?receivedMinor!-amountMinor:cashSplit?receivedMinor!-cashSplit.amountMinor:0,
+      ...(splitTenders.length?{splitTenders}:{}),
+      selections:paymentSelections,
+    };
     let updated:LocalHoldDraft={...hold,payments:[...(hold.payments??[]),payment]};
     const after=diningDetail(updated);
     if(after.remainingMinor===0&&after.lines.length>0&&after.lines.every(row=>row.remainingQty===0))updated=archiveDiningHold(updated,createdAt);
-    commitDiningHolds(snapshot,snapshot.holds.map(row=>row.id===holdId?updated:row));
+
+    const formalOrder=hold.formalOrderId?snapshot.orders.find(row=>row.id===hold.formalOrderId):undefined;
+    if(hold.formalOrderId&&!formalOrder)throw new Error('DINING_FORMAL_ORDER_LINK_BROKEN');
+    const effectivePaymentLabel=updated.payments?.length===1
+      ?tender
+      :updated.payments?.map(row=>row.tender).every(value=>value===updated.payments?.[0]?.tender)
+        ?updated.payments?.[0]?.tender??tender
+        :'COMBO';
+    const nextOrders=formalOrder?snapshot.orders.map(row=>row.id===formalOrder.id?{
+      ...row,
+      paymentLabel:effectivePaymentLabel,
+      updatedAt:createdAt,
+    }:row):snapshot.orders;
+    const next:Persisted={
+      ...snapshot,
+      orders:nextOrders,
+      holds:snapshot.holds.map(row=>row.id===holdId?updated:row),
+      diningRevision:(snapshot.diningRevision??0)+1,
+    };
+    // Payment history + current Formal Order tender projection commit together.
+    localStorage.setItem(KEY,JSON.stringify(next));
+    data=next;
+    for(const listener of listeners){try{listener();}catch{console.warn('DINING_OBSERVER_FAILED');}}
+    if(formalOrder){
+      const current=data.orders.find(row=>row.id===formalOrder.id)!;
+      try{projectOrder(current);}catch{console.warn('DINING_PAYMENT_PROJECTION_NON_BLOCKING');}
+      appendActionAudit({action:'DINING_PAYMENT',orderId:current.id,reason:tender+' '+money(amountMinor)});
+    }
     return clone(diningDetail(updated));
+    });
   },
   async clearDiningHold(holdId){
+    return withDiningMutationLock('payment:'+holdId,async()=>{
     const snapshot=readDiningState();const hold=requireDiningHold(snapshot,holdId);
     if(hold.archivedAt)return;
     const detail=diningDetail(hold);
     if(detail.remainingMinor>0||!detail.lines.length||!detail.payments.length||detail.lines.some(row=>row.remainingQty>0))throw new Error('DINING_BALANCE_REMAINING');
     const archived=archiveDiningHold(hold,new Date().toISOString());
     commitDiningHolds(snapshot,snapshot.holds.map(row=>row.id===holdId?archived:row));
+    });
   },
   async readAvailability(){
     return {revision:1,nodes:Object.entries(productNames).map(([nodeId,label])=>({nodeId,label,status:data.availability[nodeId]||'available',sourceLabel:'LOCAL'})),canChange:true};

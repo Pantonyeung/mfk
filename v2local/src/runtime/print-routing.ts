@@ -1,7 +1,7 @@
 import type {RasterLabelSpec} from './label-bitmap.ts';
 import {productLabelContent,productionBlockLines,verticalSelectionLines} from './print-content.ts';
 
-export type PrintRole='顧客小票'|'製作單'|'打包單'|'產品標籤'|'袋標籤';
+export type PrintRole='顧客小票'|'枱單'|'製作單'|'打包單'|'產品標籤'|'袋標籤';
 
 export interface PrintBinding{
   readonly id:string;
@@ -25,6 +25,7 @@ export interface PrintableOrder{
   readonly paymentLabel:string;
   readonly sourceLabel:string;
   readonly providerPickupCode?:string;
+  readonly diningTableLabel?:string;
   readonly orderRemark?:string;
   readonly utensilPreference?:'需要'|'不需要';
   readonly items:readonly {
@@ -45,7 +46,7 @@ export interface PlannedPrintJob{
   readonly payload:string;
   readonly renderMode?:'text'|'tsc-bitmap'|'escpos-raster';
   readonly labelSpec?:RasterLabelSpec;
-  readonly ticketKind?:'receipt'|'production'|'packing';
+  readonly ticketKind?:'receipt'|'table'|'production'|'packing';
   readonly ticketOrder?:PrintableOrder;
   readonly cutAfter?:boolean;
   readonly kickDrawer?:boolean;
@@ -186,6 +187,33 @@ export function renderCustomerReceiptTicket(order:PrintableOrder){
     +'\n\n';
 }
 
+export function renderDiningTableTicket(order:PrintableOrder){
+  const rows=order.items.map(item=>{
+    const details=verticalSelectionLines(itemDetail(item)).map(line=>'  '+line+'\n').join('');
+    return BOLD_ON+itemIdentity(item)+BOLD_OFF+'\n'
+      +details
+      +'  '+item.qty+'份   '+money(item.unitMinor*item.qty)+'\n';
+  }).join('');
+  return INIT
+    +brand()
+    +RULE
+    +CENTER+BOLD_ON+DOUBLE+'堂食枱單\n'+NORMAL+BOLD_OFF+LEFT
+    +RULE
+    +'枱號 '+clean(order.diningTableLabel??'—')+'\n'
+    +'訂單編號 '+clean(order.display)+'\n'
+    +'下單時間 '+hktDateTime(order.createdAt)+'\n'
+    +RULE
+    +rows
+    +RULE
+    +BOLD_ON+'總數量 '+totalUnits(order)+'份\n'+BOLD_OFF
+    +BOLD_ON+DOUBLE+'合計 '+money(order.totalMinor)+'\n'+NORMAL+BOLD_OFF
+    +RULE
+    +'*** 未付款／堂食核對單 ***\n'
+    +'此單不代表付款完成\n'
+    +RULE
+    +'\n\n';
+}
+
 export function renderProductionTicket(order:PrintableOrder){
   const blocks=order.items.map(item=>{
     const details=productionBlockLines(itemDetail(item)).map(line=>line+'\n').join('');
@@ -312,7 +340,12 @@ export function buildOrderPrintPlan(order:PrintableOrder,bindings:readonly Print
     if(binding.role==='顧客小票'){
       const items=roleItems(order,'receipt',config);
       if(items.length<1)continue;
-      jobs.push({id:order.id+':receipt',role:binding.role,binding,payload:renderCustomerReceiptTicket(withItems(order,items)),renderMode:'escpos-raster',ticketKind:'receipt',ticketOrder:withItems(order,items),cutAfter:true,kickDrawer:/\bCASH\b/i.test(order.paymentLabel),beepAfter:true});
+      if(order.items.every(item=>item.serviceMode==='dine-in')&&order.paymentLabel==='未結帳'){
+        const tableOrder=withItems(order,items);
+        jobs.push({id:order.id+':table-ticket',role:'枱單',binding,payload:renderDiningTableTicket(tableOrder),renderMode:'escpos-raster',ticketKind:'table',ticketOrder:tableOrder,cutAfter:true,kickDrawer:false,beepAfter:true});
+      }else{
+        jobs.push({id:order.id+':receipt',role:binding.role,binding,payload:renderCustomerReceiptTicket(withItems(order,items)),renderMode:'escpos-raster',ticketKind:'receipt',ticketOrder:withItems(order,items),cutAfter:true,kickDrawer:/\bCASH\b/i.test(order.paymentLabel),beepAfter:true});
+      }
       continue;
     }
     if(binding.role==='製作單'){

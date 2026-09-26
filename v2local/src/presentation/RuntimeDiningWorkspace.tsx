@@ -1,4 +1,5 @@
 import {useCallback,useEffect,useMemo,useRef,useState} from 'react';
+import {hasStaffPermission,readActiveStaffSession} from '../runtime/staff-auth.ts';
 import {useNavigate} from 'react-router';
 import type {CleanSmtCoreRuntimePort,LocalDiningHoldDetail,SmtDiningProjection} from '../runtime/local-runtime.ts';
 import './dining-operations-workspace.css';
@@ -59,6 +60,14 @@ export function RuntimeDiningWorkspace({runtime,onCheckout,warningMinutes}:{
   const [now,setNow]=useState(Date.now());
   const [actionBusy,setActionBusy]=useState(false);
   const [checkoutBusy,setCheckoutBusy]=useState(false);
+  const [reprintOpen,setReprintOpen]=useState(false);
+  const [reprintOptions,setReprintOptions]=useState<readonly {jobId:string;role:string;label:string;detail?:string;printerName?:string}[]>([]);
+  const [selectedReprintJobs,setSelectedReprintJobs]=useState<Set<string>>(new Set());
+  const [priceOverrideLine,setPriceOverrideLine]=useState<number|null>(null);
+  const [priceOverrideValue,setPriceOverrideValue]=useState('');
+  const [priceOverrideReason,setPriceOverrideReason]=useState('');
+  const [priceOverrideRevision,setPriceOverrideRevision]=useState<string|undefined>(undefined);
+  const canOverridePrice=Boolean(readActiveStaffSession())&&hasStaffPermission('PRICE_OVERRIDE');
   const alive=useRef(true);
   const activeHold=useRef<string|null>(null);
   const currentDetail=useRef<LocalDiningHoldDetail|null>(null);
@@ -145,7 +154,7 @@ export function RuntimeDiningWorkspace({runtime,onCheckout,warningMinutes}:{
     if(!holdId||!runtime.assignDiningTable)return;
     await runtime.assignDiningTable(holdId,tableId);
     setSelectedWait(null);activeHold.current=holdId;setSelectedHoldId(holdId);
-    setMessage('已安排到'+tableName(tableId)+'，沿用原本堂食單。');
+    setMessage('已安排到'+(view?.tables.find(table=>table.id===tableId)?.label??tableName(tableId))+'，沿用原本堂食單。');
     await load();await loadDetail(holdId);
   });
   const remove=(holdId:string)=>command(async()=>{
@@ -173,6 +182,7 @@ export function RuntimeDiningWorkspace({runtime,onCheckout,warningMinutes}:{
     await runtime.clearDiningHold(holdId);clearSelection();await load();setMessage('已清枱。');
   });
 
+  const displayTableName=(id?:string)=>!id?'外面輪候':view?.tables.find(table=>table.id===id)?.label??tableName(id);
   const selectedAmount=useMemo(()=>detail?.lines.reduce((sum,line)=>sum+(selection[line.lineIndex]??0)*line.unitMinor,0)??0,[detail,selection]);
   const selectedUnits=useMemo(()=>Object.values(selection).reduce((sum,qty)=>sum+qty,0),[selection]);
   const adjustSelection=(lineIndex:number,delta:number)=>{
@@ -184,6 +194,47 @@ export function RuntimeDiningWorkspace({runtime,onCheckout,warningMinutes}:{
     if(checkoutLock.current||actionLock.current||!detail)return;
     setSelection(Object.fromEntries(detail.lines.filter(line=>line.remainingQty>0).map(line=>[line.lineIndex,line.remainingQty])));
   };
+  const openPriceOverride=(lineIndex:number,currentMinor:number)=>{
+    if(!canOverridePrice){setMessage('此登入員工未獲 Admin 授權改價。');return;}
+    setPriceOverrideLine(lineIndex);setPriceOverrideValue((currentMinor/100).toFixed(2));setPriceOverrideReason('');setPriceOverrideRevision(currentDetail.current?.checkoutRevision);
+  };
+  const submitPriceOverride=()=>command(async()=>{
+    const holdId=activeHold.current;
+    if(!holdId||priceOverrideLine===null||!runtime.overrideDiningLinePrice)throw new Error('未有人工改價接口。');
+    const raw=priceOverrideValue.trim().replace(/^\$/,'');
+    if(!/^-?\d+(?:\.\d{1,2})?$/.test(raw))throw new Error('成交價格式不正確。');
+    const effectiveMinor=Math.round(Number(raw)*100);
+    if(!Number.isSafeInteger(effectiveMinor))throw new Error('成交價超出可處理範圍。');
+    const next=await runtime.overrideDiningLinePrice(holdId,priceOverrideLine,effectiveMinor,priceOverrideReason,priceOverrideRevision);
+    applyDetail(next);setPriceOverrideLine(null);setPriceOverrideValue('');setPriceOverrideReason('');setPriceOverrideRevision(undefined);
+    setMessage('人工成交價已保存；原價及操作員紀錄已保留。');
+    await load();
+  });
+  const reprintPaymentReceipt=(submissionId?:string)=>command(async()=>{
+    const holdId=activeHold.current;
+    if(!holdId||!submissionId||!runtime.reprintDiningPaymentReceipt)throw new Error('未有付款收據重印接口。');
+    const result=await runtime.reprintDiningPaymentReceipt(holdId,submissionId);
+    setMessage(result.failed===0?'付款收據已重印；錢箱不會再次開啟。':'付款收據重印失敗，請檢查打印機。');
+  });
+  const openReprint=()=>command(async()=>{
+    const holdId=activeHold.current;
+    if(!holdId||!runtime.readDiningReprintOptions)throw new Error('未有堂食重印接口。');
+    const options=await runtime.readDiningReprintOptions(holdId);
+    setReprintOptions(options);
+    setSelectedReprintJobs(new Set());
+    setReprintOpen(true);
+  });
+  const toggleReprint=(jobId:string)=>setSelectedReprintJobs(current=>{
+    const next=new Set(current);if(next.has(jobId))next.delete(jobId);else next.add(jobId);return next;
+  });
+  const runReprint=()=>command(async()=>{
+    const holdId=activeHold.current;
+    if(!holdId||!runtime.reprintDiningJobs)throw new Error('未有堂食重印接口。');
+    if(!selectedReprintJobs.size)throw new Error('請先選擇要重印嘅票。');
+    const result=await runtime.reprintDiningJobs(holdId,[...selectedReprintJobs],'DINING_MANUAL_REPRINT');
+    setReprintOpen(false);
+    setMessage(result.failed===0?'堂食重印已送出 '+result.sent+'/'+result.planned:'堂食重印部分失敗 '+result.sent+'/'+result.planned);
+  });
   const goCheckout=async()=>{
     const before=currentDetail.current;
     if(!before||selectedUnits<=0||checkoutLock.current||actionLock.current||!runtime.readDiningHold)return;
@@ -259,14 +310,21 @@ export function RuntimeDiningWorkspace({runtime,onCheckout,warningMinutes}:{
     <aside className="dining-detail-panel" aria-busy={detailLoading}>
       {historyOpen?<section className="dining-payment-history" style={{maxHeight:'100%'}}>
         <header><b>已結帳紀錄</b><button type="button" onClick={()=>setHistoryOpen(false)}>返回</button></header>
-        {historyRows.length?historyRows.map(row=><button type="button" key={row.holdId} onClick={()=>openHold(row.holdId)} style={{display:'block',width:'100%',padding:14,marginTop:8,textAlign:'left',background:'#edf4ff',border:'1px solid #bfd0e8',borderRadius:8}}><b>{row.codeLabel} · {tableName(row.lastAssignedTable)}</b><p>{money(row.paidMinor)} · {row.payments.length} 次付款</p></button>):<p>未有已结帳紀錄。</p>}
+        {historyRows.length?historyRows.map(row=><button type="button" key={row.holdId} onClick={()=>openHold(row.holdId)} style={{display:'block',width:'100%',padding:14,marginTop:8,textAlign:'left',background:'#edf4ff',border:'1px solid #bfd0e8',borderRadius:8}}><b>{row.codeLabel} · {displayTableName(row.lastAssignedTable)}</b><p>{money(row.paidMinor)} · {row.payments.length} 次付款</p></button>):<p>未有已结帳紀錄。</p>}
       </section>:detail?<>
-        <header><div><small>{detail.codeLabel}</small><h2>{tableName(detail.assignedTable??detail.lastAssignedTable)}</h2></div><span>{detail.partySize} 位</span></header>
+        <header><div><small>{detail.codeLabel}</small><h2>{displayTableName(detail.assignedTable??detail.lastAssignedTable)}</h2></div><span>{detail.partySize} 位</span></header>
         <div className="dining-detail-timer"><span>掛單時間</span><b>{elapsed(detail.createdAt)} 分鐘</b><small>{timerText(elapsed(detail.createdAt))}</small></div>
+        {detail.formalOrderId?<section className="dining-payment-panel">
+          <header><div><b>首次打印</b><small>掛枱時自動建立；唔需要再撳落廚</small></div><strong>{detail.firstPrintState==='DONE'?'完成':detail.firstPrintState==='FAILED'?'有失敗':detail.firstPrintState==='UNKNOWN'?'狀態未知':detail.firstPrintState==='DISPATCHING'?'派發中':'未開始'}</strong></header>
+          {detail.firstPrintSummary?<small>計劃 {detail.firstPrintSummary.planned} · 已送 {detail.firstPrintSummary.sent} · 失敗 {detail.firstPrintSummary.failed}</small>:null}
+          <p className="dining-message">打印狀態只係通訊／派發證據，唔代表實體紙張一定已經出到。實際少邊張由廚房／真人確認，再用下方「重印堂食票」手動揀。</p>
+          {detail.firstPrintAttention==='TRANSPORT_UNKNOWN'?<p className="dining-message">打印通道結果未知：系統唔會估邊張實體紙缺失，亦唔會自動重印成套。</p>:null}
+          {detail.firstPrintAttention==='TRANSPORT_REPORTED_INCOMPLETE'?<p className="dining-message">打印通道回報有工作未完成；呢個只係提示。請先真人核對實際缺票，再決定補印。</p>:null}
+        </section>:null}
         <section className="dining-detail-lines">
           <header><b>商品／分項結帳</b><button type="button" disabled={checkoutBusy||actionBusy} onClick={selectAllRemaining}>全選未結</button></header>
           {detail.lines.length?detail.lines.map(line=><article key={line.lineIndex} className={line.remainingQty===0?'paid':''}>
-            <div className="dining-line-copy"><b>{line.name}</b><small>{money(line.unitMinor)} × {line.qty}</small><span>已結 {line.paidQty} · 未結 {line.remainingQty}</span></div>
+            <div className="dining-line-copy"><b>{line.name}</b><small>{money(line.unitMinor)} × {line.qty}</small><span>已結 {line.paidQty} · 未結 {line.remainingQty}</span>{canOverridePrice&&detail.payments.length===0?<button type="button" disabled={actionBusy||checkoutBusy} onClick={()=>openPriceOverride(line.lineIndex,line.unitMinor)}>人工改價</button>:null}</div>
             <div className="dining-line-selector">
               <button type="button" disabled={checkoutBusy||actionBusy||(selection[line.lineIndex]??0)<=0} onClick={()=>adjustSelection(line.lineIndex,-1)}>−</button>
               <b>{selection[line.lineIndex]??0}</b>
@@ -274,18 +332,42 @@ export function RuntimeDiningWorkspace({runtime,onCheckout,warningMinutes}:{
             </div>
           </article>):<p className="dining-no-items">未有商品；目前只記錄輪候／桌台。</p>}
         </section>
+        {detail.priceOverrides?.length?<section className="dining-payment-history"><header><b>人工改價紀錄</b><span>{detail.priceOverrides.length}</span></header>{[...detail.priceOverrides].reverse().map(row=><div key={row.id}><span>#{row.sequence??'—'} · {row.staffName}</span><b>{money(row.originalUnitMinor)} → {money(row.effectiveUnitMinor)}</b><small>{row.deltaMinor>=0?'+':''}{money(row.deltaMinor)} · {new Date(row.createdAt).toLocaleTimeString('zh-HK',{hour:'2-digit',minute:'2-digit'})}</small>{row.reason?<small>{row.reason}</small>:null}</div>)}</section>:null}
         <section className="dining-payment-panel checkout-authority">
           <header><div><b>本次結帳</b><small>按商品揀選，不受用餐人數限制</small></div><strong>{money(selectedAmount)}</strong></header>
-          <button type="button" className="dining-settle-button" disabled={checkoutBusy||actionBusy||selectedUnits<=0||detail.remainingMinor<=0} onClick={()=>void goCheckout()}>{checkoutBusy?'核對最新資料…':'前往結帳 · '+selectedUnits+' 件'}</button>
+          <button type="button" className="dining-settle-button" disabled={checkoutBusy||actionBusy||selectedUnits<=0||detail.remainingMinor<=0||detail.totalMinor<0} onClick={()=>void goCheckout()}>{checkoutBusy?'核對最新資料…':'前往結帳 · '+selectedUnits+' 件'}</button>
         </section>
-        <section className="dining-balance"><div><span>原總額</span><b>{money(detail.totalMinor)}</b></div><div><span>已結帳</span><b>{money(detail.paidMinor)}</b></div><div className="remaining"><span>未結帳</span><strong>{money(detail.remainingMinor)}</strong></div></section>
-        <section className="dining-payment-history"><header><b>付款紀錄</b><span>{detail.payments.length}</span></header>{detail.payments.length?detail.payments.map(payment=><div key={payment.id}><span>{tenderLabels[payment.tender]??payment.tender}</span><b>{money(payment.amountMinor)}</b><small>{new Date(payment.createdAt).toLocaleTimeString('zh-HK',{hour:'2-digit',minute:'2-digit'})}</small></div>):<p>未有付款紀錄。</p>}</section>
+        <section className="dining-balance"><div><span>原總額</span><b>{money(detail.totalMinor)}</b></div><div><span>已結帳</span><b>{money(detail.paidMinor)}</b></div><div className="remaining"><span>未結帳</span><strong>{money(detail.remainingMinor)}</strong></div></section>{detail.totalMinor<0?<p className="dining-message" role="status">此單目前係負數成交總額。系統保留真實金額，但一般收款 Checkout 已停用，避免將負數錯當找續或退款。</p>:null}
+        <section className="dining-payment-history"><header><b>付款紀錄</b><span>{detail.payments.length}</span></header>{detail.payments.length?detail.payments.map(payment=><div key={payment.id}><span>{payment.tender==='COMBO'?(payment.splitTenders??[]).map(row=>(tenderLabels[row.tender]??row.tender)+' '+money(row.amountMinor)).join(' + '):(tenderLabels[payment.tender]??payment.tender)}</span><b>{money(payment.amountMinor)}</b><small>{new Date(payment.createdAt).toLocaleTimeString('zh-HK',{hour:'2-digit',minute:'2-digit'})}</small><small>{payment.receiptState==='DONE'?'收據已送':payment.receiptState==='FAILED'?'收據失敗':payment.receiptState==='UNKNOWN'?'收據狀態未知':payment.receiptState==='DISPATCHING'?'收據派發中':'未派收據'}</small><button type="button" disabled={actionBusy||checkoutBusy||!payment.submissionId} onClick={()=>void reprintPaymentReceipt(payment.submissionId)}>重印付款收據</button></div>):<p>未有付款紀錄。</p>}</section>
         {detail.archivedAt?<p className="dining-message" role="status">已付清，桌台已釋放；商品及付款紀錄保留。</p>:null}
         <footer className="dining-detail-actions">
+          <button type="button" disabled={actionBusy||checkoutBusy||!detail.formalOrderId} onClick={()=>void openReprint()}>重印堂食票</button>
           <button type="button" className="unassign" disabled={actionBusy||checkoutBusy||!detail.assignedTable||detail.remainingMinor===0} onClick={()=>void unassign()}>退回輪候</button>
           {!detail.archivedAt?<button type="button" className="clear" disabled={actionBusy||checkoutBusy||!detail.assignedTable||detail.remainingMinor>0||detail.payments.length===0} onClick={()=>void clearTable()}>保存紀錄並釋枱</button>:null}
         </footer>
       </>:<div className="dining-detail-empty"><b>{detailLoading?'讀取堂食單…':'枱號／輪候詳情'}</b><p>揀桌台或輪候單，即可核對商品及分項結帳。</p></div>}
     </aside>
+    {priceOverrideLine!==null?<div className="order-modal-backdrop" onMouseDown={event=>{if(event.target===event.currentTarget)setPriceOverrideLine(null);}}>
+      <section className="order-modal">
+        <header><h2>人工成交價</h2><button type="button" onClick={()=>setPriceOverrideLine(null)}>×</button></header>
+        <p>此操作由 Admin 授權嘅「改價權限」控制。成交價可以係正數、$0 或負數；原因可以留空。</p>
+        <label>成交單價<input inputMode="decimal" value={priceOverrideValue} onChange={event=>setPriceOverrideValue(event.target.value)} placeholder="例如 39.00 或 -5.00"/></label>
+        <label>原因（選填）<input value={priceOverrideReason} maxLength={200} onChange={event=>setPriceOverrideReason(event.target.value)} placeholder="可留空"/></label>
+        <footer><button type="button" onClick={()=>setPriceOverrideLine(null)}>取消</button><button type="button" className="primary" disabled={actionBusy||!priceOverrideValue.trim()} onClick={()=>void submitPriceOverride()}>確認成交價</button></footer>
+      </section>
+    </div>:null}
+    {reprintOpen?<div className="order-modal-backdrop" onMouseDown={event=>{if(event.target===event.currentTarget)setReprintOpen(false);}}>
+      <section className="order-modal reprint">
+        <header><h2>堂食重印</h2><button type="button" onClick={()=>setReprintOpen(false)}>×</button></header>
+        <p>由廚房／真人確認實際少邊張，再喺下面手動揀。系統唔會估邊張實體紙缺失；重印亦唔會建立新單、付款或開錢箱。</p>
+        <div className="order-action-choices">
+          {reprintOptions.map(option=><label key={option.jobId} style={{display:'flex',gap:10,alignItems:'center',padding:10}}>
+            <input type="checkbox" checked={selectedReprintJobs.has(option.jobId)} onChange={()=>toggleReprint(option.jobId)}/>
+            <span><b>{option.label}</b>{option.detail?<small> · {option.detail}</small>:null}{option.printerName?<small> · {option.printerName}</small>:null}</span>
+          </label>)}
+        </div>
+        <footer><button type="button" onClick={()=>setReprintOpen(false)}>取消</button><button type="button" className="primary" disabled={!selectedReprintJobs.size||actionBusy} onClick={()=>void runReprint()}>確認重印</button></footer>
+      </section>
+    </div>:null}
   </main>;
 }

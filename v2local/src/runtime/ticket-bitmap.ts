@@ -8,7 +8,7 @@ export const ESC_POS_RASTER_PROFILE=Object.freeze({
   bandHeight:192,
 });
 
-export type RasterTicketKind='receipt'|'production'|'packing';
+export type RasterTicketKind='receipt'|'table'|'production'|'packing';
 
 const FONT='"Noto Sans TC","Noto Sans CJK TC","PingFang TC","Microsoft JhengHei",sans-serif';
 
@@ -410,6 +410,26 @@ function receipt(t:TicketCanvas,order:PrintableOrder){
   t.text('More Fun Kitchen',23,700,'center',32);
 }
 
+function tableTicket(t:TicketCanvas,order:PrintableOrder){
+  t.brand();
+  t.line(22);
+  t.text('堂食枱單',52,900,'center',64);
+  t.text('未付款 / 核對用途',28,900,'center',40);
+  t.line(22);
+  t.boxedPair('枱號',clean(order.diningTableLabel??'—'),'訂單編號',clean(order.display));
+  t.text('下單時間：'+hktDateTime(order.createdAt),28,800,'left',40);
+  t.line(18);
+  for(const item of order.items){
+    t.structuredItemBlock({item,lines:verticalSelectionLines(detailSource(item)),qtyBox:true,priceBox:true});
+    t.line(18);
+  }
+  t.totalRow('總數量：',String(totalUnits(order))+'份');
+  t.line(18);
+  t.text('合計 '+money(order.totalMinor),48,900,'left',60);
+  t.line(20);
+  t.text('此單不代表付款完成',30,900,'center',42);
+}
+
 function production(t:TicketCanvas,order:PrintableOrder){
   t.text(orderService(order),72,900,'center',88);
   t.line(24);
@@ -513,6 +533,7 @@ export async function renderEscPosRasterTicket(input:{
   const t=new TicketCanvas(canvas);
 
   if(input.kind==='receipt')receipt(t,input.order);
+  else if(input.kind==='table')tableTicket(t,input.order);
   else if(input.kind==='production')production(t,input.order);
   else packing(t,input.order);
 
