@@ -15,7 +15,7 @@ import {validateAdminRefundEvent,type AdminRefundEvent} from '../../../contracts
 export interface SmtOperationalMetric{readonly id:string;readonly label:string;readonly value:string;readonly detail?:string}
 export interface SmtOrderListItemViewModel{readonly orderId:string;readonly orderIdLabel:string;readonly itemCount:number;readonly totalLabel:string;readonly paymentLabel:string;readonly fulfillmentLabel:string;readonly sourceLabel?:string;readonly localSequenceLabel?:string}
 export interface SmtOrderDetailLineViewModel{readonly id:string;readonly name:string;readonly quantity:number;readonly unitLabel:string;readonly lineTotalLabel:string}
-export interface SmtOrderDetailViewModel extends SmtOrderListItemViewModel{readonly attention:readonly string[];readonly metrics:readonly SmtOperationalMetric[];readonly lines:readonly SmtOrderDetailLineViewModel[];readonly paymentEvidenceRef?:string;readonly paymentVerificationState?:'PENDING'|'VERIFIED'|'REJECTED';readonly customerPhone?:string;readonly paymentCorrections?:readonly PaymentCorrectionRecord[];readonly refunds?:readonly OrderRefundRecord[];readonly cancellationNoticeState?:'DONE'|'FAILED'|'UNKNOWN'}
+export interface SmtOrderDetailViewModel extends SmtOrderListItemViewModel{readonly attention:readonly string[];readonly metrics:readonly SmtOperationalMetric[];readonly lines:readonly SmtOrderDetailLineViewModel[];readonly diningHoldId?:string;readonly recognizedSalesMinor?:number;readonly outstandingMinor?:number;readonly paymentEvidenceRef?:string;readonly paymentVerificationState?:'PENDING'|'VERIFIED'|'REJECTED';readonly customerPhone?:string;readonly paymentCorrections?:readonly PaymentCorrectionRecord[];readonly refunds?:readonly OrderRefundRecord[];readonly cancellationNoticeState?:'DONE'|'FAILED'|'UNKNOWN'}
 export interface SmtOrdersProjection{readonly items:readonly SmtOrderListItemViewModel[];readonly detailsByOrderId?:Readonly<Record<string,SmtOrderDetailViewModel>>;readonly selectedOrderId?:string;readonly selectedOrder?:SmtOrderDetailViewModel}
 export interface SmtDiningQueueItemViewModel{
   readonly id:string;
@@ -669,12 +669,19 @@ function diningPaymentLabel(payments:readonly LocalDiningPayment[]){
 function syncDiningFormalOrder(order:StoredOrder,hold:LocalHoldDraft,at:string):StoredOrder{
   const payments=Array.isArray(hold.payments)?hold.payments:[];
   const confirmedPaidMinor=payments.reduce((sum,payment)=>sum+Math.max(0,Number(payment.amountMinor)||0),0);
+  const fullyPaid=hold.totalMinor>0&&confirmedPaidMinor>=hold.totalMinor;
+  const fulfillmentLabel:StoredOrder['fulfillmentLabel']=hold.cancelledAt
+    ?'已取消'
+    :hold.archivedAt&&fullyPaid
+      ?'已完成'
+      :order.fulfillmentLabel;
   const next:StoredOrder={
     ...order,
     diningHoldId:hold.id,
     totalMinor:hold.totalMinor,
     recognizedSalesMinor:confirmedPaidMinor,
     outstandingMinor:hold.cancelledAt?0:Math.max(0,hold.totalMinor-confirmedPaidMinor),
+    fulfillmentLabel,
     paymentEntries:payments.map(payment=>({
       ...payment,
       ...(payment.splitTenders?{splitTenders:payment.splitTenders.map(row=>({...row}))}:{}),
@@ -1250,7 +1257,12 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
   },
   clear(){data=clone(defaults);save()},
   async readOrders(selectedOrderId){
-    const visibleOrders=data.orders.filter(order=>!order.items.length||!order.items.every(item=>item.serviceMode==='dine-in'));
+    const visibleOrders=data.orders.filter(order=>{
+      const pureDining=Boolean(order.items.length)&&order.items.every(item=>item.serviceMode==='dine-in');
+      if(!pureDining)return true;
+      if(order.fulfillmentLabel==='已完成'||order.fulfillmentLabel==='已取消')return true;
+      return Boolean(selectedOrderId&&order.id===selectedOrderId);
+    });
     const items=visibleOrders.map(order=>({
       orderId:order.id,orderIdLabel:'#'+order.display,itemCount:order.items.reduce((s,x)=>s+x.qty,0),
       totalLabel:money(order.totalMinor),paymentLabel:order.paymentLabel,fulfillmentLabel:order.fulfillmentLabel,
@@ -1261,6 +1273,9 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
     for(const order of visibleOrders)details[order.id]={
       orderId:order.id,orderIdLabel:'#'+order.display,itemCount:order.items.reduce((s,x)=>s+x.qty,0),totalLabel:money(order.totalMinor),
       paymentLabel:order.paymentLabel,fulfillmentLabel:order.fulfillmentLabel,sourceLabel:order.sourceLabel,localSequenceLabel:order.display,
+      ...(order.diningHoldId?{diningHoldId:order.diningHoldId}:{}),
+      ...(order.recognizedSalesMinor!==undefined?{recognizedSalesMinor:order.recognizedSalesMinor}:{}),
+      ...(order.outstandingMinor!==undefined?{outstandingMinor:order.outstandingMinor}:{}),
       ...(order.paymentEvidenceRef?{paymentEvidenceRef:order.paymentEvidenceRef}:{}),
       ...(order.paymentVerificationState?{paymentVerificationState:order.paymentVerificationState}:{}),
       ...(order.customerPhone?{customerPhone:order.customerPhone}:{}),
@@ -1334,6 +1349,7 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
   },
   async markOrderReady(orderId){
     const found=data.orders.find(x=>x.id===orderId);if(!found)throw new Error('ORDER_NOT_FOUND');
+    if(found.diningHoldId)throw new Error('DINING_FULFILLMENT_MANAGED_BY_DINING');
     if(found.fulfillmentLabel==='已完成'||found.fulfillmentLabel==='已取消')throw new Error('ORDER_NOT_READYABLE');
     const updatedAt=new Date().toISOString();
     data={...data,orders:data.orders.map(x=>x.id===orderId?{...x,fulfillmentLabel:'可取餐',updatedAt}:x)};
@@ -1353,6 +1369,7 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
     if(!hasStaffPermission('ORDER_CORRECTION'))throw new Error('ORDER_CORRECTION_PERMISSION_REQUIRED');
     const order=data.orders.find(x=>x.id===orderId);
     if(!order)throw new Error('ORDER_NOT_FOUND');
+    if(order.diningHoldId)throw new Error('DINING_PAYMENT_CORRECTION_REQUIRES_PAYMENT_ENTRY');
     const next=String(paymentLabel||'').trim();
     if(!next)throw new Error('PAYMENT_METHOD_REQUIRED');
     if(next===order.paymentLabel)return order;
@@ -1384,6 +1401,9 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
     const order=data.orders.find(x=>x.id===orderId);
     if(!order)throw new Error('ORDER_NOT_FOUND');
     if(/^Keeta\b|^Foodpanda\b|^第三方/.test(String(order.sourceLabel||'')))throw new Error('PROVIDER_REFUND_USE_AFTERSALE');
+    if(order.diningHoldId&&!['已完成','已取消'].includes(order.fulfillmentLabel)){
+      throw new Error('DINING_REFUND_REQUIRES_CLOSED_CHECK');
+    }
 
     const cutoff=readBusinessCutoff();
     const now=Date.now();
@@ -1394,10 +1414,23 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
     if(orderWindow.businessDate!==currentWindow.businessDate)throw new Error('REFUND_ADMIN_REQUIRED_CLOSED_DAY');
     if(readLocalDayCloses().some(row=>row.businessDate===orderWindow.businessDate))throw new Error('REFUND_ADMIN_REQUIRED_CLOSED_DAY');
 
-    const line=order.items.find(row=>row.id===input.lineId);
-    if(!line)throw new Error('REFUND_LINE_NOT_FOUND');
+    const matchingLineIndexes=order.items.map((row,index)=>row.id===input.lineId?index:-1).filter(index=>index>=0);
+    if(!matchingLineIndexes.length)throw new Error('REFUND_LINE_NOT_FOUND');
+    if(order.diningHoldId&&matchingLineIndexes.length!==1)throw new Error('DINING_REFUND_LINE_AMBIGUOUS');
+    const lineIndex=matchingLineIndexes[0]!;
+    const line=order.items[lineIndex]!;
     const quantity=Math.max(0,Math.floor(Number(input.quantity)||0));
     if(quantity<1||quantity>line.qty)throw new Error('REFUND_QUANTITY_INVALID');
+    if(order.diningHoldId){
+      const paidQty=(order.paymentEntries??[]).reduce((sum,payment)=>
+        sum+(payment.selections??[]).filter(selection=>selection.lineIndex===lineIndex)
+          .reduce((selectionSum,selection)=>selectionSum+Math.max(0,Number(selection.qty)||0),0)
+      ,0);
+      const priorRefundQty=(order.refunds??[]).flatMap(refund=>refund.lines)
+        .filter(row=>row.lineId===line.id)
+        .reduce((sum,row)=>sum+Math.max(0,Number(row.quantity)||0),0);
+      if(quantity>Math.max(0,paidQty-priorRefundQty))throw new Error('DINING_REFUND_EXCEEDS_PAID_QUANTITY');
+    }
     const amountMinor=Math.max(0,Math.round(Number(input.amountMinor)||0));
     if(amountMinor<=0)throw new Error('REFUND_AMOUNT_REQUIRED');
 
@@ -1410,6 +1443,9 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
 
     const priorOrderRefund=(order.refunds??[]).reduce((sum,row)=>sum+Math.max(0,Number(row.amountMinor)||0),0);
     if(priorOrderRefund+amountMinor>order.totalMinor)throw new Error('REFUND_EXCEEDS_ORDER_REMAINING');
+    if(order.diningHoldId&&priorOrderRefund+amountMinor>Math.max(0,Number(order.recognizedSalesMinor)||0)){
+      throw new Error('DINING_REFUND_EXCEEDS_CONFIRMED_PAID');
+    }
 
     const method=String(input.method||'').trim();
     if(!method)throw new Error('REFUND_METHOD_REQUIRED');
@@ -1493,6 +1529,7 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
   async readOrderReprintOptions(orderId){
     const order=data.orders.find(x=>x.id===orderId);
     if(!order)throw new Error('ORDER_NOT_FOUND');
+    if(order.diningHoldId&&!['已完成','已取消'].includes(order.fulfillmentLabel))throw new Error('DINING_REPRINT_USE_DINING_SURFACE');
     return buildOrderPrintPlan(order,readPrinterBindings(),readSmtPrintConfig()).map(job=>Object.freeze({
       jobId:job.id,
       role:job.role,
@@ -1506,6 +1543,7 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
   async reprintOrderJobs(orderId,jobIds,reason){
     const order=data.orders.find(x=>x.id===orderId);
     if(!order)throw new Error('ORDER_NOT_FOUND');
+    if(order.diningHoldId&&!['已完成','已取消'].includes(order.fulfillmentLabel))throw new Error('DINING_REPRINT_USE_DINING_SURFACE');
     if(!jobIds.length)throw new Error('REPRINT_SELECTION_REQUIRED');
     const result=await dispatchOrderOutputs(order,new Set(jobIds),true);
     appendActionAudit({action:'REPRINT',orderId,reason:String(reason||'').trim()||undefined});
@@ -1514,6 +1552,7 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
   async updateOrderItems(orderId,items){
     const order=data.orders.find(x=>x.id===orderId);
     if(!order)throw new Error('ORDER_NOT_FOUND');
+    if(order.diningHoldId)throw new Error('DINING_ITEMS_MANAGED_BY_DINING');
     if(order.fulfillmentLabel==='已取消'||order.fulfillmentLabel==='已完成')throw new Error('ORDER_NOT_EDITABLE');
     const normalized=items
       .map(item=>({...item,qty:Math.max(0,Math.floor(Number(item.qty)||0)),unitMinor:Math.max(0,Math.floor(Number(item.unitMinor)||0))}))
