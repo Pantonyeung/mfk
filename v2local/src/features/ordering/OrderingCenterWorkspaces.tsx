@@ -422,7 +422,7 @@ export function ComboWorkspace({
     }
     return null;
   };
-  const requiredMissing=groups.some(({group})=>group.required&&!resolveChoice(group.id));
+  const requiredMissing=groups.some(({pool,group})=>pool.addonKind!=='DRINK'&&group.required&&!resolveChoice(group.id));
   const additions=groups.reduce((sum,{group})=>{
     const resolved=resolveChoice(group.id);
     return sum+(resolved?.subPool.priceAdjustmentMinor??0)+(resolved?.choice.priceAdjustmentMinor??0);
@@ -444,7 +444,7 @@ export function ComboWorkspace({
     <header className="combo-title"><div><h2>套餐</h2><p>套餐、Pool、價差同可選商品全部來自 Admin 已保存版本。</p></div><strong>{combo.name}　{money(total)}</strong></header>
     <div className="combo-tiers">{activeCombos.map(row=><button key={row.id} className={combo.id===row.id?'active':''} onClick={()=>{setComboId(row.id);setSelected({});}}><b>{row.name}</b><span>{money(row.basePriceMinor)}</span></button>)}</div>
     {groups.map(({pool,group},groupIndex)=><section className="combo-section" key={pool.id+':'+group.id}>
-      <header><b>{groupIndex+1}　{group.name}</b><span>{group.required?'必選':'可選'} {group.min}–{group.max}</span></header>
+      <header><b>{groupIndex+1}　{group.name}</b><span>{pool.addonKind==='DRINK'?'飲品補選':group.required?'必選':'可選'} {pool.addonKind==='DRINK'?'可跳過':group.min+'–'+group.max}</span></header>
       {group.subPools.map(subPool=><div key={subPool.id} className="combo-admin-subpool">
         <header><strong>{subPool.name}</strong><span>{subPool.priceAdjustmentMinor===0?'餐內':(subPool.priceAdjustmentMinor>0?'+':'')+money(subPool.priceAdjustmentMinor)}</span></header>
         <div className="combo-product-grid">{subPool.choices.map(choice=>{
