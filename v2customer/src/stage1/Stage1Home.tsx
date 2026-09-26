@@ -21,33 +21,28 @@ const statusLabel=(storeAvailable:boolean|undefined)=>{
 function Stage1StatePanel({
   connection,
   browserOnline,
-  error,
   onRetry,
 }:{
   connection:CustomerConnectionState;
   browserOnline:boolean;
-  error:string|null;
   onRetry:()=>void;
 }){
   if(!browserOnline)return <section className="stage1-state-panel state-offline" role="status"><strong>目前離線</strong><p>已載入內容可以繼續查看；正式提交仍會喺正確交易邊界再次確認。</p></section>;
-  if(connection==='ERROR')return <section className="stage1-state-panel state-error" role="alert"><strong>暫時未能同步店舖資料</strong><p>{error||'請檢查連線後再試。'}</p><button onClick={onRetry}>重新同步</button></section>;
+  if(connection==='ERROR')return <section className="stage1-state-panel state-error" role="alert"><strong>暫時未能同步店舖資料</strong><p>暫時未能同步店舖資料，請稍後再試。</p><button onClick={onRetry}>重新同步</button></section>;
   if(connection==='STALE'||connection==='PARTIAL')return <section className="stage1-state-panel state-stale" role="status"><strong>正顯示最近一次資料</strong><p>最新店舖狀態仍在更新；價格、供應及提交會喺後續正確邊界再確認。</p><button onClick={onRetry}>更新資料</button></section>;
   if(connection==='NOT_CONNECTED')return <section className="stage1-state-panel state-empty" role="status"><strong>店舖服務尚未連接</strong><p>首頁只顯示已有正式資料，不會用假價格、假商品或假營業狀態補位。</p></section>;
   if(connection==='LOADING')return <section className="stage1-state-panel state-loading" role="status" aria-busy="true"><strong>正在準備首頁</strong><p>店舖狀態、公告同推薦會逐項出現。</p></section>;
   return null;
 }
 
-function Stage1ProductPlaceholder({product}:{product:CustomerProduct}){
-  return <span className="stage1-product-placeholder" aria-hidden="true">
-    <span>{product.name.slice(0,1)}</span>
-  </span>;
+function Stage1ProductPlaceholder(){
+  return <span className="stage1-product-placeholder" aria-hidden="true"/>;
 }
 
 export function Stage1Home({
   snapshot,
   connection,
   browserOnline,
-  error,
   activeOrders,
   history,
   recommendations,
@@ -60,12 +55,10 @@ export function Stage1Home({
   onHistory,
   onMember,
   onBuyAgain,
-  onFallback,
 }:{
   snapshot:CustomerReadModelSnapshot|null;
   connection:CustomerConnectionState;
   browserOnline:boolean;
-  error:string|null;
   activeOrders:readonly CustomerOrderProjection[];
   history:readonly CustomerHistoryProjection[];
   recommendations:readonly CustomerRecommendation[];
@@ -78,7 +71,6 @@ export function Stage1Home({
   onHistory:()=>void;
   onMember:()=>void;
   onBuyAgain:(order:CustomerHistoryProjection)=>void;
-  onFallback:()=>void;
 }){
   const store=snapshot?.store;
   const member=snapshot?.member;
@@ -102,7 +94,7 @@ export function Stage1Home({
     </header>
 
     <div className="stage1-content">
-      <Stage1StatePanel connection={connection} browserOnline={browserOnline} error={error} onRetry={onRetry}/>
+      <Stage1StatePanel connection={connection} browserOnline={browserOnline} onRetry={onRetry}/>
 
       {currentOrder?<button className="stage1-live-order" onClick={onOrders}>
         <span>進行中訂單</span>
@@ -133,10 +125,7 @@ export function Stage1Home({
         <span>今日暫停正式落單</span>
         <h2>仍然可以慢慢睇、慢慢揀。</h2>
         <p>關店時仍可 Browse / Build Cart；只會喺正式 Commit 阻止交易。</p>
-        <div>
-          <button className="stage1-primary-cta" disabled={!canBrowse} onClick={onBrowse}>{canBrowse?'繼續瀏覽菜單':'菜單同步中'}</button>
-          <button className="stage1-secondary-cta" onClick={onFallback}>備用聯絡方法</button>
-        </div>
+        <button className="stage1-primary-cta stage1-closed-browse" disabled={!canBrowse} onClick={onBrowse}>{canBrowse?'繼續瀏覽菜單':'菜單同步中'}</button>
       </section>:null}
 
       <section className="stage1-top6">
@@ -155,7 +144,7 @@ export function Stage1Home({
               onProduct(item.product,{top:rect.top,left:rect.left,width:rect.width,height:rect.height});
             }}
           >
-            <Stage1ProductPlaceholder product={item.product}/>
+            <Stage1ProductPlaceholder/>
             <span className="stage1-product-info">
               {item.product.badge?<small>{item.product.badge}</small>:null}
               <strong>{item.product.name}</strong>
