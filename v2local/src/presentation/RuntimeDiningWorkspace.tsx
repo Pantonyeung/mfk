@@ -66,6 +66,7 @@ export function RuntimeDiningWorkspace({runtime,onCheckout,warningMinutes}:{
   const [priceOverrideLine,setPriceOverrideLine]=useState<number|null>(null);
   const [priceOverrideValue,setPriceOverrideValue]=useState('');
   const [priceOverrideReason,setPriceOverrideReason]=useState('');
+  const [priceOverrideRevision,setPriceOverrideRevision]=useState<string|undefined>(undefined);
   const canOverridePrice=Boolean(readActiveStaffSession())&&hasStaffPermission('PRICE_OVERRIDE');
   const alive=useRef(true);
   const activeHold=useRef<string|null>(null);
@@ -195,7 +196,7 @@ export function RuntimeDiningWorkspace({runtime,onCheckout,warningMinutes}:{
   };
   const openPriceOverride=(lineIndex:number,currentMinor:number)=>{
     if(!canOverridePrice){setMessage('此登入員工未獲 Admin 授權改價。');return;}
-    setPriceOverrideLine(lineIndex);setPriceOverrideValue((currentMinor/100).toFixed(2));setPriceOverrideReason('');
+    setPriceOverrideLine(lineIndex);setPriceOverrideValue((currentMinor/100).toFixed(2));setPriceOverrideReason('');setPriceOverrideRevision(currentDetail.current?.checkoutRevision);
   };
   const submitPriceOverride=()=>command(async()=>{
     const holdId=activeHold.current;
@@ -204,8 +205,8 @@ export function RuntimeDiningWorkspace({runtime,onCheckout,warningMinutes}:{
     if(!/^-?\d+(?:\.\d{1,2})?$/.test(raw))throw new Error('成交價格式不正確。');
     const effectiveMinor=Math.round(Number(raw)*100);
     if(!Number.isSafeInteger(effectiveMinor))throw new Error('成交價超出可處理範圍。');
-    const next=await runtime.overrideDiningLinePrice(holdId,priceOverrideLine,effectiveMinor,priceOverrideReason);
-    applyDetail(next);setPriceOverrideLine(null);setPriceOverrideValue('');setPriceOverrideReason('');
+    const next=await runtime.overrideDiningLinePrice(holdId,priceOverrideLine,effectiveMinor,priceOverrideReason,priceOverrideRevision);
+    applyDetail(next);setPriceOverrideLine(null);setPriceOverrideValue('');setPriceOverrideReason('');setPriceOverrideRevision(undefined);
     setMessage('人工成交價已保存；原價及操作員紀錄已保留。');
     await load();
   });
