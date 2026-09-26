@@ -99,18 +99,72 @@ export interface OwnerActionItem {
   readonly observedAt:string;
 }
 
+export interface OwnerOrderItemLine {
+  readonly lineId:string;
+  readonly name:string;
+  readonly quantity:number;
+  readonly optionLabels?:readonly string[];
+  readonly modifierLabels?:readonly string[];
+  readonly remark?:string;
+  readonly amountLabel?:string;
+}
+
+export interface OwnerOrderAdjustment {
+  readonly label:string;
+  readonly amountLabel:string;
+}
+
+export interface OwnerOrderFulfillmentEvent {
+  readonly label:string;
+  readonly atLabel?:string;
+  readonly state?:string;
+}
+
+export interface OwnerOrderSideEffects {
+  readonly receipt?:string;
+  readonly production?:string;
+  readonly packing?:string;
+  readonly label?:string;
+}
+
+export interface OwnerOrderAuditEvent {
+  readonly title:string;
+  readonly actorLabel?:string;
+  readonly atLabel:string;
+  readonly resultLabel?:string;
+}
+
 export interface OwnerOrderProjection {
   readonly orderId:string;
   readonly displayCode:string;
   readonly source:string;
   readonly lifecycle:string;
+  readonly workflowStatusLabel?:string;
+  readonly businessDate?:string;
+  readonly customerName?:string;
+  readonly customerPhone?:string;
   readonly amountLabel?:string;
+  readonly originalAmountLabel?:string;
+  readonly adjustmentAmountLabel?:string;
+  readonly currentEffectiveAmountLabel?:string;
   readonly tenderLabel?:string;
-  readonly fulfillmentLabel?:string;
-  readonly externalRef?:string;
-  readonly fulfillmentMode?:'DINE_IN'|'TAKEAWAY'|'PICKUP'|'DELIVERY'|string;
+  readonly currentTenderLabel?:string;
   readonly paymentState?:'OPEN'|'PARTIAL'|'SETTLED'|string;
+  readonly fulfillmentLabel?:string;
+  readonly fulfillmentMode?:'DINE_IN'|'TAKEAWAY'|'PICKUP'|'DELIVERY'|string;
+  readonly elapsedLabel?:string;
+  readonly promisedTimeLabel?:string;
+  readonly externalProvider?:string;
+  readonly externalRef?:string;
+  readonly externalCancelRequestLabel?:string;
   readonly itemSummary:string;
+  readonly itemLines?:readonly OwnerOrderItemLine[];
+  readonly orderRemark?:string;
+  readonly adjustments?:readonly OwnerOrderAdjustment[];
+  readonly fulfillmentHistory?:readonly OwnerOrderFulfillmentEvent[];
+  readonly sideEffects?:OwnerOrderSideEffects;
+  readonly exceptionBadges?:readonly string[];
+  readonly auditTrail?:readonly OwnerOrderAuditEvent[];
   readonly readback:OwnerCertainty;
   readonly observedAt:string;
   readonly prints:readonly string[];
