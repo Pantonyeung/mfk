@@ -112,3 +112,54 @@ A3D_OWNER_MONEY_IDENTITY_DECISION_REQUIRED
 NO_A3D_PRODUCT_MUTATION
 A3C_FINAL_GREEN
 FIVE_PORT_E2E_FROZEN
+
+
+## Owner pairing semantics refinement｜2026-09-26
+
+Owner has now defined the operator behavior of 飯團待組區:
+
+1. Detect eligible riceball/main items and snack items already in Cart.
+2. If there are 3 eligible mains, create visible pairing slots A / B / C.
+3. Default pairing is deterministic by Cart order:
+   - A main ↔ A snack
+   - B main ↔ B snack
+   - C main ↔ C snack
+4. Staff can tap another snack slot to swap assignments immediately.
+   Example:
+   - A main currently paired to snack A.
+   - Customer specifies snack C for A.
+   - Staff taps C; the pairings swap so identities remain one-to-one rather than duplicating a snack.
+5. The UI is a list / pairing surface. It should not render the same snack simultaneously in two groups.
+6. Unequal counts:
+   - 3 mains + 2 snacks → two pairs; one main remains standalone.
+   - 2 mains + 3 snacks → two pairs; one snack remains standalone.
+   - In general, pair only the deterministic intersection; leftovers stay standalone.
+7. Drink handling uses the already-banked A3c semantics:
+   - optional supplement;
+   - blank does not block or change price;
+   - explicit drink choice uses Admin-published adjustment;
+   - explicit no-drink uses published negative adjustment;
+   - batch / deterministic allocation when unspecified;
+   - manual targeting only when specified.
+8. No random pairing.
+9. Eligibility must come from Admin Combo Pool Product IDs / roles, not category/name heuristics.
+
+## Remaining money semantic
+One material question remains before A3d product mutation:
+
+When a main + snack pair is formed as A / B / C, should the money change at that moment?
+
+### M1 — Convert to Admin Combo price
+Pairing creates a real Combo price outcome from Admin combo base + published adjustments.
+This can change the total versus the original standalone sum.
+
+### M2 — Pairing is production/grouping only
+A / B / C only records which main belongs with which snack.
+The original standalone prices remain unchanged.
+
+This is a direct money semantic and cannot be inferred from the pairing UX description.
+
+Status:
+A3D_PAIRING_UI_SEMANTICS_LOCKED
+A3D_MONEY_SEMANTIC_STILL_REQUIRED
+NO_A3D_PRODUCT_MUTATION
