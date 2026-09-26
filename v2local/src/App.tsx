@@ -512,8 +512,11 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
               finishHold();
             }}
             onHoldQueue={(partySize,note)=>{
-              localRuntime.createHold({kind:'dining',items:holdItems(),totalMinor:total,partySize,note:note||'堂食輪候'});
-              finishHold();
+              const draft=localRuntime.createHold({kind:'dining',items:holdItems(),totalMinor:total,partySize,note:note||'堂食輪候'});
+              void localRuntime.admitDiningHold?.(draft.id).then(()=>{
+                void localRuntime.ensureDiningInitialPrint?.(draft.id).catch(()=>{});
+                finishHold();
+              }).catch(()=>{});
             }}
             onHoldTable={(tableId,partySize,note)=>{
               const draft=localRuntime.createHold({kind:'dining',items:holdItems(),totalMinor:total,partySize,note:note||'直接掛枱'});
