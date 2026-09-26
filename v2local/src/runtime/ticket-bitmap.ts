@@ -414,7 +414,7 @@ function receipt(t:TicketCanvas,order:PrintableOrder){
 function diningTable(t:TicketCanvas,order:PrintableOrder){
   t.brand();
   t.line(22);
-  t.text('堂食枱單',52,900,'center',66);
+  t.text(clean(order.diningTicketTitle??'堂食枱單'),52,900,'center',66);
   t.text('此枱單不是付款收據',27,900,'center',40);
   t.line(22);
   t.boxedPair('枱號',clean(order.diningTableLabel??'未指定'),'訂單編號',clean(order.display));
