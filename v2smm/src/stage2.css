@@ -292,9 +292,6 @@
 }
 
 @media(max-width:360px){
-  .stage2-product-sheet{
-    max-height:90dvh;
-  }
   .stage2-config-section{
     padding:12px;
   }
