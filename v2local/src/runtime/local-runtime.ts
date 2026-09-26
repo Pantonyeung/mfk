@@ -225,6 +225,18 @@ function read():Persisted{
   }catch{return clone(defaults)}
 }
 let data=read();
+let runtimeIdentitySequence=0;
+function nextRuntimeIdentity(prefix:'MFK-'|'HOLD-'|'ACT-'){
+  const stamp=Date.now().toString(36);
+  for(let attempt=0;attempt<4096;attempt++){
+    runtimeIdentitySequence=(runtimeIdentitySequence+1)%0x1000000;
+    const id=prefix+stamp+'-'+runtimeIdentitySequence.toString(36);
+    if(prefix==='MFK-'&&!data.orders.some(order=>order.id===id))return id;
+    if(prefix==='HOLD-'&&!data.holds.some(hold=>hold.id===id))return id;
+    if(prefix==='ACT-')return id;
+  }
+  throw new Error('LOCAL_IDENTITY_EXHAUSTED');
+}
 function save(){localStorage.setItem(KEY,JSON.stringify(data));listeners.forEach(fn=>fn())}
 function projectOrder(order:StoredOrder){queueOrderProjection(order)}
 const money=(minor:number)=>String.fromCharCode(36)+(minor/100).toFixed(2);
@@ -301,7 +313,7 @@ function appendActionAudit(input:{action:string;orderId:string;reason?:string}){
   try{
     const rows=JSON.parse(localStorage.getItem(ACTION_AUDIT_KEY)||'[]');
     const current=Array.isArray(rows)?rows:[];
-    current.unshift({id:'ACT-'+Date.now().toString(36),at:new Date().toISOString(),...input});
+    current.unshift({id:nextRuntimeIdentity('ACT-'),at:new Date().toISOString(),...input});
     localStorage.setItem(ACTION_AUDIT_KEY,JSON.stringify(current.slice(0,1000)));
   }catch{}
 }
@@ -697,7 +709,7 @@ function ensureDiningFormalOrder(snapshot:Persisted,hold:LocalHoldDraft,at:strin
   }
   const session=readActiveStaffSession();
   const order:StoredOrder={
-    id:'MFK-'+Date.now().toString(36),
+    id:nextRuntimeIdentity('MFK-'),
     display:'P'+String(snapshot.orders.length+1).padStart(3,'0'),
     createdAt:at,
     updatedAt:at,
@@ -1121,7 +1133,7 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
     const createdAt=new Date().toISOString();
     const session=readActiveStaffSession();
     const order:StoredOrder={
-      id:'MFK-'+Date.now().toString(36),
+      id:nextRuntimeIdentity('MFK-'),
       display:'P'+String(n).padStart(3,'0'),
       createdAt,
       updatedAt:createdAt,
@@ -1149,7 +1161,7 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
   createHold(input){
     const n=data.holds.length+1;
     const draft:LocalHoldDraft={
-      id:'HOLD-'+Date.now().toString(36),
+      id:nextRuntimeIdentity('HOLD-'),
       codeLabel:'H'+String(n).padStart(3,'0'),
       kind:input.kind,
       createdAt:new Date().toISOString(),
@@ -1173,7 +1185,7 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
     if(target.kind==='WAITING'){
       const at=new Date().toISOString();
       const draft:LocalHoldDraft={
-        id:'HOLD-'+Date.now().toString(36),codeLabel:'W'+String(snapshot.holds.length+1).padStart(3,'0'),kind:'dining',
+        id:nextRuntimeIdentity('HOLD-'),codeLabel:'W'+String(snapshot.holds.length+1).padStart(3,'0'),kind:'dining',
         createdAt:at,partySize:covers,note:'SMM 輪候',totalMinor:Math.max(0,Math.floor(Number(input.totalMinor)||0)),
         payments:[],providerRef,sourceLabel:input.sourceLabel||'SMM',smmSubmissionRefs:[providerRef],items,
       };
@@ -1219,7 +1231,7 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
     }
     const at=new Date().toISOString();
     const draft:LocalHoldDraft={
-      id:'HOLD-'+Date.now().toString(36),codeLabel:'H'+String(snapshot.holds.length+1).padStart(3,'0'),kind:'dining',
+      id:nextRuntimeIdentity('HOLD-'),codeLabel:'H'+String(snapshot.holds.length+1).padStart(3,'0'),kind:'dining',
       createdAt:at,partySize:covers,note:'SMM 堂食',totalMinor:Math.max(0,Math.floor(Number(input.totalMinor)||0)),
       assignedTable:tableId,payments:[],providerRef,sourceLabel:input.sourceLabel||'SMM',smmSubmissionRefs:[providerRef],items,
     };
@@ -1742,7 +1754,7 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
   async createDiningWait(input){
     const snapshot=readDiningState();
     const draft:LocalHoldDraft={
-      id:'HOLD-'+Date.now().toString(36),
+      id:nextRuntimeIdentity('HOLD-'),
       codeLabel:'W'+String(snapshot.holds.length+1).padStart(3,'0'),
       kind:'dining',
       createdAt:new Date().toISOString(),
