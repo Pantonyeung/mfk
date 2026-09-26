@@ -6,6 +6,8 @@ import type {
   SmtDiningProjection
 } from '../runtime/local-runtime.ts';
 import type {DiningAddOrderRequest} from '../features/ordering/dining-add-order-ui-session.ts';
+import {readSmtStoreSettings} from '../runtime/admin-operational-config.ts';
+import {subscribeSmtAdminConfig} from '../runtime/admin-config-sync.ts';
 import './dining-operations-workspace.css';
 
 const tenderLabels:Record<string,string>={
@@ -52,6 +54,10 @@ export function RuntimeDiningWorkspace({runtime,onCheckout,onAddOrder}:{runtime:
   const [selection,setSelection]=useState<Record<number,number>>({});
   const [message,setMessage]=useState('');
   const [now,setNow]=useState(Date.now());
+  const [adminConfigRevision,setAdminConfigRevision]=useState(0);
+  useEffect(()=>subscribeSmtAdminConfig(()=>setAdminConfigRevision(value=>value+1)),[]);
+  void adminConfigRevision;
+  const diningOverdueMinutes=readSmtStoreSettings().diningOverdueMinutes;
 
   const load=useCallback(async()=>{
     if(!runtime.readDining){setError('DINE_IN_PROVIDER_UNAVAILABLE');return;}
@@ -281,8 +287,8 @@ export function RuntimeDiningWorkspace({runtime,onCheckout,onAddOrder}:{runtime:
       {busy&&!view?<p>讀取堂食資料中…</p>:null}
       <div className="dining-nine-grid">{view?.tables.map(table=>{
         const elapsed=tableElapsed(table.startedAt);
-        const overdue=Math.max(0,elapsed-35);
-        const urgent=table.state!=='settled'&&table.state!=='available'&&elapsed>=35;
+        const overdue=Math.max(0,elapsed-diningOverdueMinutes);
+        const urgent=table.state!=='settled'&&table.state!=='available'&&elapsed>=diningOverdueMinutes;
         const selected=Boolean(table.holdId&&table.holdId===selectedHoldId);
         return <button key={table.id} type="button"
           className={'dining-table '+table.state+(urgent?' overdue':'')+(selected?' selected':'')}
@@ -299,7 +305,7 @@ export function RuntimeDiningWorkspace({runtime,onCheckout,onAddOrder}:{runtime:
             <b>{table.outstandingLabel}</b>
             <span className="dining-table-items">{table.itemSummary||'未有商品內容'}{table.itemCount?(' · '+table.itemCount+' 件'):''}</span>
             <span className={urgent?'dining-table-time overdue':'dining-table-time'}>
-              用餐 {elapsed} 分鐘 · {overdue>0?'超時 '+overdue+' 分鐘':'剩餘 '+Math.max(0,35-elapsed)+' 分鐘'}
+              用餐 {elapsed} 分鐘 · {overdue>0?'超時 '+overdue+' 分鐘':'剩餘 '+Math.max(0,diningOverdueMinutes-elapsed)+' 分鐘'}
             </span>
             <div className="dining-table-money"><small>已收 {money(table.paidMinor??0)}</small><strong>未收 {money(table.remainingMinor??0)}</strong></div>
           </>:<small>{transferHoldId?'撳此轉枱':selectedWait?'撳此安排':'空枱'}</small>}
@@ -317,7 +323,7 @@ export function RuntimeDiningWorkspace({runtime,onCheckout,onAddOrder}:{runtime:
         <div className="dining-detail-timer">
           <span>用餐時間</span>
           <b>{tableElapsed(detail.createdAt)} 分鐘</b>
-          <small>{tableElapsed(detail.createdAt)>=35?'已超時 '+(tableElapsed(detail.createdAt)-35)+' 分鐘':'距離 35 分鐘仲有 '+(35-tableElapsed(detail.createdAt))+' 分鐘'}</small>
+          <small>{tableElapsed(detail.createdAt)>=diningOverdueMinutes?'已超時 '+(tableElapsed(detail.createdAt)-diningOverdueMinutes)+' 分鐘':'距離 '+diningOverdueMinutes+' 分鐘仲有 '+(diningOverdueMinutes-tableElapsed(detail.createdAt))+' 分鐘'}</small>
         </div>
 
         <section className="dining-detail-lines">
