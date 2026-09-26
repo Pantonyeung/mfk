@@ -56,7 +56,7 @@ export interface PlannedPrintJob{
   readonly beepAfter?:boolean;
 }
 
-export type PrintPlanMode='standard'|'dining-initial'|'dining-payment';
+export type PrintPlanMode='standard'|'dining-initial'|'dining-payment'|'dining-addition';
 
 export interface TscBitmapJobBatch{
   readonly binding:PrintBinding;
@@ -346,6 +346,7 @@ export function buildOrderPrintPlan(order:PrintableOrder,bindings:readonly Print
   const jobs:PlannedPrintJob[]=[];
   for(const binding of active){
     if(mode==='dining-payment'&&binding.role!=='顧客小票')continue;
+    if(mode==='dining-addition'&&binding.role==='顧客小票')continue;
     if(binding.role==='顧客小票'){
       const items=roleItems(order,'receipt',config);
       if(items.length<1)continue;
