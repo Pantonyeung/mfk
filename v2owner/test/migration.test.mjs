@@ -388,7 +388,8 @@ test('Stage02 command flow exposes Pending, locks duplicates, and UNKNOWN only p
   assert.ok(pendingIndex>=0&&requestIndex>pendingIndex);
 
   assert.match(components,/disabled=\{commandLocked\}/);
-  assert.match(components,/commandLocked=flight\?\.state===\'PENDING\'\|\|flight\?\.state===\'UNKNOWN\'/);
+  assert.match(components,/canonicalUnknown=row\.state===\'UNKNOWN\'/);
+  assert.match(components,/commandLocked=canonicalUnknown\|\|flight\?\.state===\'PENDING\'\|\|flight\?\.state===\'UNKNOWN\'/);
   assert.match(components,/正在提交／等待讀回/);
   assert.match(components,/狀態未明 — 禁止重送/);
   assert.match(components,/重新確認讀回/);
@@ -419,4 +420,65 @@ test('Stage02 normal UI does not render raw correlation identity or engineering 
   assert.doesNotMatch(components,/\{(?:item|record)\.incidentId\}/);
   assert.doesNotMatch(app,/result\.message/);
   assert.doesNotMatch(app,/reason instanceof Error\?reason\.message|error\.message/);
+});
+
+
+test('Stage02 canonical UNKNOWN locks action even with no commandFlight and exposes readback-only UX',()=>{
+  const components=fs.readFileSync(path.join(srcRoot,'stage02-action-queue.tsx'),'utf8');
+  assert.match(components,/const canonicalUnknown=row\.state===\'UNKNOWN\'/);
+  assert.match(components,/const commandLocked=canonicalUnknown\|\|flight\?\.state===\'PENDING\'\|\|flight\?\.state===\'UNKNOWN\'/);
+  assert.match(components,/disabled=\{commandLocked\}/);
+  assert.match(components,/canonicalUnknown\?\'狀態未明 — 禁止重送\'/);
+  assert.match(components,/重新確認讀回/);
+  assert.match(components,/Canonical projection 仍 UNKNOWN；只准 refresh \/ readback，禁止再次提交/);
+});
+
+test('Stage02 canonical UNKNOWN cannot reach requestBoundedAction',()=>{
+  const app=fs.readFileSync(path.join(srcRoot,'App.tsx'),'utf8');
+  const requestGuard=app.indexOf("if(actionId&&isCanonicalActionUnknown(snapshot?.actions??[],actionId))");
+  const confirmation=app.indexOf("setConfirmation({label,target");
+  assert.ok(requestGuard>=0&&confirmation>requestGuard);
+
+  const executeGuard=app.indexOf("if(value.actionId&&isCanonicalActionUnknown(snapshot?.actions??[],value.actionId))");
+  const requestCall=app.indexOf("await port.requestBoundedAction");
+  assert.ok(executeGuard>=0&&requestCall>executeGuard);
+  assert.match(app,/正式狀態仍未明；禁止再次提交，只可重新確認讀回/);
+});
+
+test('Stage02 recheck success keeps UNKNOWN locked until canonical projection leaves UNKNOWN',()=>{
+  const app=fs.readFileSync(path.join(srcRoot,'App.tsx'),'utf8');
+  const selectorSource=fs.readFileSync(path.join(srcRoot,'stage02-open-actions.ts'),'utf8');
+  const {isCanonicalActionUnknown}=loadPureTsModule('stage02-open-actions.ts');
+
+  const unknownAction={
+    actionId:'unknown-action',
+    severity:'URGENT',
+    domain:'TEST',
+    title:'Unknown',
+    detail:'',
+    target:'target',
+    certainty:'UNKNOWN',
+    state:'UNKNOWN',
+    observedAt:'2026-09-27T00:00:00Z',
+  };
+  const openAction={...unknownAction,state:'OPEN',certainty:'CONFIRMED'};
+
+  assert.equal(isCanonicalActionUnknown([unknownAction],'unknown-action'),true);
+  assert.equal(isCanonicalActionUnknown([openAction],'unknown-action'),false);
+  assert.match(selectorSource,/action\.actionId===actionId&&action\.state===\'UNKNOWN\'/);
+
+  const recheckStart=app.indexOf('const recheckAction=async(actionId:string)=>');
+  const recheckEnd=app.indexOf('const connectionLabel=',recheckStart);
+  const recheck=app.slice(recheckStart,recheckEnd);
+  const canonicalCheck=recheck.indexOf('isCanonicalActionUnknown(readback.actions,actionId)');
+  const unlock=recheck.indexOf('setCommandFlight(null)');
+  assert.ok(canonicalCheck>=0&&unlock>canonicalCheck);
+  assert.match(recheck,/Canonical projection 仍 UNKNOWN；保持鎖定/);
+});
+
+test('Stage02 selected drawer follows fresh canonical row state after readback',()=>{
+  const components=fs.readFileSync(path.join(srcRoot,'stage02-action-queue.tsx'),'utf8');
+  assert.match(components,/selectedActionId/);
+  assert.match(components,/vm\.rows\.find\(row=>row\.action\.actionId===selectedActionId\)/);
+  assert.doesNotMatch(components,/useState<OwnerActionQueueRowViewModel\|null>/);
 });
