@@ -19,3 +19,39 @@
 .money-boundary{padding:10px;border-radius:12px;background:#fff8e9;border:1px solid #ead7ac;color:#725936;font-size:10px;line-height:1.45}
 .bottom-nav button[data-icon-state="AI_ASSET_PENDING"]{gap:2px}
 @media(max-width:380px){.live-count-grid,.dinein-money{grid-template-columns:1fr}}
+
+.today-context{display:grid;gap:12px}
+.today-context-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;width:100%}
+.today-context-grid>div{display:grid;gap:3px;padding:10px;border-radius:13px;background:#f7f2eb}
+.today-context-grid span,.today-context-grid small{font-size:9px;color:#766b60}
+.today-context-grid strong{font-size:12px;line-height:1.35}
+.live-order-main,.live-order-side,.open-check-title{display:grid;gap:3px}
+.live-order-main span{font-size:10px;color:#5f574f}
+.live-order-side{text-align:right}
+.exception-badge{justify-self:start;font-style:normal;font-size:8px;font-weight:900;padding:4px 6px;border-radius:999px;background:#ffe7e2;color:#973c32}
+.open-check-money{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px;min-width:210px}
+.open-check-money span{display:grid;gap:2px;text-align:right}
+.open-check-money small{font-size:8px;color:#82766a}
+.open-check-money b{font-size:11px}
+.payment-state{justify-self:start;font-size:8px;font-weight:900;padding:4px 6px;border-radius:999px;background:#f1ece4;color:#665c52}
+.today-summary-rows{display:grid;gap:7px}
+.today-summary-rows>div{display:grid;gap:3px;padding:10px;border-radius:13px;background:#f7f2eb}
+.today-summary-rows span,.today-summary-rows small{font-size:9px;color:#7b7065}
+.today-summary-rows strong{font-size:11px}
+.health-summary-list{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px;margin-top:10px}
+.health-summary-list button{display:grid;gap:4px;min-height:76px;padding:9px!important;text-align:left}
+.health-summary-list span,.health-summary-list small{font-size:8px;color:#7b7065}
+.health-summary-list strong{font-size:10px;overflow-wrap:anywhere}
+.staff-summary-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:11px}
+.staff-summary-grid div{display:grid;gap:2px;padding:10px;background:#f7f2eb;border-radius:13px}
+.staff-summary-grid strong{font-size:18px}
+.staff-summary-grid span{font-size:9px;color:#786d61}
+.insight-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+.insight-grid>div,.insight-empty{display:grid;gap:4px;padding:11px;border-radius:13px;background:#f6f0e8}
+.insight-grid span,.insight-empty span{font-size:9px;color:#817468}
+.insight-grid strong,.insight-empty strong{font-size:12px}
+@media(max-width:430px){
+  .health-summary-list{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .staff-summary-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .open-check-money{grid-template-columns:1fr;min-width:92px}
+}
