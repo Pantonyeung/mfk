@@ -7,6 +7,7 @@ on:
     paths:
       - 'v2smm/**'
       - 'v2local/src/runtime/smm-lan-ingress.ts'
+      - 'v2local/src/runtime/smm-lan-ingress.test.ts'
       - 'v2local/src/runtime/smm-combo-revalidation.ts'
       - 'v2local/src/runtime/smm-combo-revalidation.test.ts'
       - 'v2local/src/runtime/customer-cloud-intake.ts'
