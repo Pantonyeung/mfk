@@ -7,14 +7,14 @@ import {hasStaffPermission,readActiveStaffSession} from './staff-auth.ts';
 import {readSmtDiningTableRegistry,readSmtPrintConfig,readSmtStoreSettings} from './admin-operational-config.ts';
 import {mirrorKeetaOrderCommand,type KeetaProviderMirrorResult} from './keeta-provider-commands.ts';
 import {buildDailyClosePrintData,renderDailyCloseTicket} from './daily-close-ticket.ts';
-import {readLocalDayCloses,resolveBusinessWindow} from './local-operations.ts';
+import {buildLocalReport,readLocalDayCloses,resolveBusinessWindow} from './local-operations.ts';
 import {readBusinessCutoff} from './cash-opening.ts';
 import {readSmtDeviceId} from './admin-config-sync.ts';
 
 export interface SmtOperationalMetric{readonly id:string;readonly label:string;readonly value:string;readonly detail?:string}
 export interface SmtOrderListItemViewModel{readonly orderId:string;readonly orderIdLabel:string;readonly itemCount:number;readonly totalLabel:string;readonly paymentLabel:string;readonly fulfillmentLabel:string;readonly sourceLabel?:string;readonly localSequenceLabel?:string}
 export interface SmtOrderDetailLineViewModel{readonly id:string;readonly name:string;readonly quantity:number;readonly unitLabel:string;readonly lineTotalLabel:string}
-export interface SmtOrderDetailViewModel extends SmtOrderListItemViewModel{readonly attention:readonly string[];readonly metrics:readonly SmtOperationalMetric[];readonly lines:readonly SmtOrderDetailLineViewModel[];readonly paymentEvidenceRef?:string;readonly paymentVerificationState?:'PENDING'|'VERIFIED'|'REJECTED';readonly customerPhone?:string;readonly paymentCorrections?:readonly PaymentCorrectionRecord[];readonly cancellationNoticeState?:'DONE'|'FAILED'|'UNKNOWN'}
+export interface SmtOrderDetailViewModel extends SmtOrderListItemViewModel{readonly attention:readonly string[];readonly metrics:readonly SmtOperationalMetric[];readonly lines:readonly SmtOrderDetailLineViewModel[];readonly paymentEvidenceRef?:string;readonly paymentVerificationState?:'PENDING'|'VERIFIED'|'REJECTED';readonly customerPhone?:string;readonly paymentCorrections?:readonly PaymentCorrectionRecord[];readonly refunds?:readonly OrderRefundRecord[];readonly cancellationNoticeState?:'DONE'|'FAILED'|'UNKNOWN'}
 export interface SmtOrdersProjection{readonly items:readonly SmtOrderListItemViewModel[];readonly detailsByOrderId?:Readonly<Record<string,SmtOrderDetailViewModel>>;readonly selectedOrderId?:string;readonly selectedOrder?:SmtOrderDetailViewModel}
 export interface SmtDiningQueueItemViewModel{readonly id:string;readonly codeLabel:string;readonly partySize:number;readonly statusLabel:string}
 export interface SmtDiningTableViewModel{readonly id:string;readonly areaLabel:string;readonly label:string;readonly state:'available'|'occupied'|'attention'|'settled';readonly partySize?:number;readonly outstandingLabel?:string;readonly holdId?:string;readonly startedAt?:string;readonly itemCount?:number;readonly itemSummary?:string;readonly totalMinor?:number;readonly paidMinor?:number;readonly remainingMinor?:number}
@@ -33,9 +33,28 @@ export interface PaymentCorrectionRecord{
   readonly staffName?:string;
 }
 
+export interface OrderRefundLineRecord{
+  readonly lineId:string;
+  readonly itemName:string;
+  readonly quantity:number;
+  readonly amountMinor:number;
+}
+export interface OrderRefundRecord{
+  readonly id:string;
+  readonly createdAt:string;
+  readonly kind:'FULL'|'PARTIAL';
+  readonly amountMinor:number;
+  readonly method:string;
+  readonly note:string;
+  readonly lines:readonly OrderRefundLineRecord[];
+  readonly staffId?:string;
+  readonly staffName?:string;
+}
+
 export interface StoredOrder{
   id:string;display:string;createdAt:string;updatedAt?:string;totalMinor:number;paymentLabel:string;fulfillmentLabel:'待處理'|'進行中'|'可取餐'|'已完成'|'已取消';sourceLabel:string;
   paymentCorrections?:readonly PaymentCorrectionRecord[];
+  refunds?:readonly OrderRefundRecord[];
   productionIssuedAt?:string;
   cancellationNoticeAttemptedAt?:string;
   cancellationNoticePrintedAt?:string;
@@ -134,6 +153,7 @@ export interface CleanSmtCoreRuntimePort{
   reprintOrderJobs?(orderId:string,jobIds:readonly string[],reason?:string):Promise<PrintDispatchSummary>;
   updateOrderItems?(orderId:string,items:readonly {id:string;name:string;qty:number;unitMinor:number}[]):Promise<{readonly orderId:string;readonly totalMinor:number}>;
   correctOrderPayment?(orderId:string,paymentLabel:string):Promise<StoredOrder>;
+  refundOrder?(orderId:string,input:{lineId:string;quantity:number;amountMinor:number;method:string;note?:string}):Promise<StoredOrder>;
   cancelOrder?(orderId:string,reason?:string):Promise<{readonly orderId:string;readonly status:'CANCELLED'}>;
   applyProviderLifecycle?(input:{
     orderId:string;eventId:1002|1003|1004|1006|1008;eventName:string;providerMessageId:string;providerPushedAt:string;rawMessage:string;
@@ -217,6 +237,7 @@ export interface MfkLocalRuntime extends CleanSmtCoreRuntimePort{
   reprintOrderJobs(orderId:string,jobIds:readonly string[],reason?:string):Promise<PrintDispatchSummary>;
   updateOrderItems(orderId:string,items:readonly {id:string;name:string;qty:number;unitMinor:number}[]):Promise<{readonly orderId:string;readonly totalMinor:number}>;
   correctOrderPayment(orderId:string,paymentLabel:string):Promise<StoredOrder>;
+  refundOrder(orderId:string,input:{lineId:string;quantity:number;amountMinor:number;method:string;note?:string}):Promise<StoredOrder>;
   cancelOrder(orderId:string,reason?:string):Promise<{readonly orderId:string;readonly status:'CANCELLED'}>;
   applyProviderLifecycle(input:{
     orderId:string;eventId:1002|1003|1004|1006|1008;eventName:string;providerMessageId:string;providerPushedAt:string;rawMessage:string;
@@ -615,6 +636,7 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
       ...(order.paymentVerificationState?{paymentVerificationState:order.paymentVerificationState}:{}),
       ...(order.customerPhone?{customerPhone:order.customerPhone}:{}),
       ...(order.paymentCorrections?.length?{paymentCorrections:order.paymentCorrections}:{}),
+      ...(order.refunds?.length?{refunds:order.refunds}:{}),
       ...(order.cancellationNoticeState?{cancellationNoticeState:order.cancellationNoticeState}:{}),
       attention:[
         ...(order.providerLifecycleNote?[order.providerLifecycleNote]:[]),
@@ -725,6 +747,69 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
     const updated=data.orders.find(x=>x.id===orderId)!;
     projectOrder(updated);
     appendActionAudit({action:'PAYMENT_CORRECTION',orderId,reason:order.paymentLabel+' -> '+next});
+    return updated;
+  },
+
+  async refundOrder(orderId,input){
+    if(!hasStaffPermission('ORDER_CORRECTION'))throw new Error('ORDER_CORRECTION_PERMISSION_REQUIRED');
+    const order=data.orders.find(x=>x.id===orderId);
+    if(!order)throw new Error('ORDER_NOT_FOUND');
+    if(/^Keeta\b|^Foodpanda\b|^第三方/.test(String(order.sourceLabel||'')))throw new Error('PROVIDER_REFUND_USE_AFTERSALE');
+
+    const cutoff=readBusinessCutoff();
+    const now=Date.now();
+    const currentWindow=resolveBusinessWindow(now,cutoff.hour,cutoff.minute);
+    const orderAt=Date.parse(order.createdAt);
+    if(!Number.isFinite(orderAt))throw new Error('ORDER_CREATED_AT_INVALID');
+    const orderWindow=resolveBusinessWindow(orderAt,cutoff.hour,cutoff.minute);
+    if(orderWindow.businessDate!==currentWindow.businessDate)throw new Error('REFUND_ADMIN_REQUIRED_CLOSED_DAY');
+    if(readLocalDayCloses().some(row=>row.businessDate===orderWindow.businessDate))throw new Error('REFUND_ADMIN_REQUIRED_CLOSED_DAY');
+
+    const line=order.items.find(row=>row.id===input.lineId);
+    if(!line)throw new Error('REFUND_LINE_NOT_FOUND');
+    const quantity=Math.max(0,Math.floor(Number(input.quantity)||0));
+    if(quantity<1||quantity>line.qty)throw new Error('REFUND_QUANTITY_INVALID');
+    const amountMinor=Math.max(0,Math.round(Number(input.amountMinor)||0));
+    if(amountMinor<=0)throw new Error('REFUND_AMOUNT_REQUIRED');
+
+    const priorLineRefund=(order.refunds??[]).flatMap(refund=>refund.lines).filter(row=>row.lineId===line.id)
+      .reduce((sum,row)=>sum+Math.max(0,Number(row.amountMinor)||0),0);
+    const lineOriginalMinor=Math.max(0,line.qty*line.unitMinor);
+    const lineRemainingMinor=Math.max(0,lineOriginalMinor-priorLineRefund);
+    const selectedMaximumMinor=Math.max(0,quantity*line.unitMinor);
+    if(amountMinor>lineRemainingMinor||amountMinor>selectedMaximumMinor)throw new Error('REFUND_EXCEEDS_LINE_REMAINING');
+
+    const priorOrderRefund=(order.refunds??[]).reduce((sum,row)=>sum+Math.max(0,Number(row.amountMinor)||0),0);
+    if(priorOrderRefund+amountMinor>order.totalMinor)throw new Error('REFUND_EXCEEDS_ORDER_REMAINING');
+
+    const method=String(input.method||'').trim();
+    if(!method)throw new Error('REFUND_METHOD_REQUIRED');
+    const createdAt=new Date(now).toISOString();
+    const session=readActiveStaffSession();
+    const nextTotal=priorOrderRefund+amountMinor;
+    const index=(order.refunds?.length??0)+1;
+    const refund:OrderRefundRecord=Object.freeze({
+      id:'REF-'+order.id+'-'+String(index).padStart(3,'0'),
+      createdAt,
+      kind:nextTotal===order.totalMinor?'FULL':'PARTIAL',
+      amountMinor,
+      method,
+      note:String(input.note??'').trim(),
+      lines:Object.freeze([Object.freeze({
+        lineId:line.id,
+        itemName:line.name,
+        quantity,
+        amountMinor,
+      })]),
+      ...(session?{staffId:session.staffId,staffName:session.displayName}:{}),
+    });
+    data={...data,orders:data.orders.map(x=>x.id===orderId?{
+      ...x,refunds:[...(x.refunds??[]),refund],updatedAt:createdAt,
+    }:x)};
+    save();
+    const updated=data.orders.find(x=>x.id===orderId)!;
+    projectOrder(updated);
+    appendActionAudit({action:'REFUND_'+refund.kind,orderId,reason:method+' '+money(amountMinor)+' · '+line.name});
     return updated;
   },
 
@@ -872,7 +957,21 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
       if(!Number.isFinite(at))return false;
       return resolveBusinessWindow(at,cutoff.hour,cutoff.minute).businessDate===close.businessDate;
     });
-    const ticket=renderDailyCloseTicket(buildDailyClosePrintData({orders,close}));
+    const report=buildLocalReport(data.orders,{
+      now:close.createdAt,
+      businessStartHour:cutoff.hour,
+      businessStartMinute:cutoff.minute,
+    });
+    const refunds=data.orders.flatMap(order=>(order.refunds??[]).map(refund=>({
+      ...refund,
+      sourceLabel:order.sourceLabel,
+      orderId:order.id,
+    }))).filter(refund=>{
+      const at=Date.parse(refund.createdAt);
+      const window=resolveBusinessWindow(close.createdAt,cutoff.hour,cutoff.minute);
+      return Number.isFinite(at)&&at>=window.start&&at<window.end;
+    });
+    const ticket=renderDailyCloseTicket(buildDailyClosePrintData({orders,close,refunds,refundMinor:report.refundMinor}));
     const config=readSmtPrintConfig();
     const receiptLogical=config.logicalPrinters.find(row=>row.id==='logical-receipt');
     if(receiptLogical&&receiptLogical.active===false)throw new Error('DAY_CLOSE_RECEIPT_ROUTE_DISABLED');
