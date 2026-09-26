@@ -47,9 +47,12 @@ function isCompleted(order:OwnerOrderProjection){
 function matchesScope(order:OwnerOrderProjection,scope:OwnerOrderScope){
   if(scope==='DEFAULT')return true;
   if(scope==='ACTIVE')return !isCompleted(order);
-  return !isCompleted(order)
-    &&order.fulfillmentMode==='DINE_IN'
-    &&(order.paymentState==='OPEN'||order.paymentState==='PARTIAL');
+  if(scope==='DINE_IN_OPEN'){
+    return !isCompleted(order)
+      &&order.fulfillmentMode==='DINE_IN'
+      &&(order.paymentState==='OPEN'||order.paymentState==='PARTIAL');
+  }
+  return false;
 }
 
 export function buildOwnerOrderListViewModel(
