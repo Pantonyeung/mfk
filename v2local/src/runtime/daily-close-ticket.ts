@@ -36,6 +36,16 @@ export interface DailyClosePrintData{
   readonly channelRows:readonly DailyCloseBreakdownRow[];
   readonly paymentRows:readonly DailyClosePaymentRow[];
   readonly refundRows:readonly DailyClosePaymentRow[];
+  readonly refundDetails:readonly {
+    readonly id:string;
+    readonly orderId:string;
+    readonly display:string;
+    readonly originalCreatedAt:string;
+    readonly executionAt:string;
+    readonly method:string;
+    readonly amountMinor:number;
+    readonly items:string;
+  }[];
   readonly close:LocalDayClose;
 }
 
@@ -73,7 +83,16 @@ export function buildDailyClosePrintData(input:{
   readonly orders:readonly PrintableOrder[];
   readonly close:LocalDayClose;
   readonly refundMinor?:number;
-  readonly refunds?:readonly {readonly id:string;readonly method:string;readonly amountMinor:number}[];
+  readonly refunds?:readonly {
+    readonly id:string;
+    readonly orderId:string;
+    readonly display:string;
+    readonly originalCreatedAt:string;
+    readonly executionAt:string;
+    readonly method:string;
+    readonly amountMinor:number;
+    readonly items:string;
+  }[];
 }):DailyClosePrintData{
   const sales=input.orders;
   const grossMinor=sales.reduce((sum,order)=>sum+Math.max(0,Number(order.totalMinor)||0),0);
@@ -126,6 +145,7 @@ export function buildDailyClosePrintData(input:{
     refundRows:Object.freeze([...refundPayments.entries()].sort(([a],[b])=>a.localeCompare(b)).map(([label,row])=>Object.freeze({
       label,orders:row.orders.size,amountMinor:row.amountMinor,
     }))),
+    refundDetails:Object.freeze([...(input.refunds??[])].sort((a,b)=>b.executionAt.localeCompare(a.executionAt)).map(row=>Object.freeze({...row}))),
     close:input.close,
   });
 }
@@ -143,6 +163,15 @@ export function renderDailyCloseTicket(data:DailyClosePrintData){
   const refundLine=data.refundMinor===undefined
     ?'退款總額：—（未接正式退款帳）\n'
     :'退款總額：-'+money(data.refundMinor)+'\n';
+  const refundDetailLines=data.refundDetails.length
+    ?data.refundDetails.map(row=>{
+      const original=new Date(row.originalCreatedAt).toLocaleString('zh-HK',{timeZone:'Asia/Hong_Kong',hour12:false});
+      const execution=new Date(row.executionAt).toLocaleString('zh-HK',{timeZone:'Asia/Hong_Kong',hour12:false});
+      return row.display+' · '+row.items+'\n'
+        +'原單：'+original+'\n'
+        +'退款：'+execution+' · '+row.method+' · -'+money(row.amountMinor)+'\n';
+    }).join('')
+    :'—\n';
 
   return INIT
     +CENTER+BOLD_ON+DOUBLE+'More Fun  磨飯\n'+NORMAL+BOLD_OFF
@@ -166,6 +195,9 @@ export function renderDailyCloseTicket(data:DailyClosePrintData){
     +RULE
     +BOLD_ON+'【退款方式】\n'+BOLD_OFF
     +refundPaymentLines
+    +RULE
+    +BOLD_ON+'【退款明細】\n'+BOLD_OFF
+    +refundDetailLines
     +RULE
     +BOLD_ON+'【現金核數】\n'+BOLD_OFF
     +'開櫃金：'+money(data.close.openingCashMinor)+'\n'
