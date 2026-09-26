@@ -5,6 +5,7 @@ import {pairSmmLan,probeSmmLan,readSmmLanPwaConfig,saveSmmLanPwaConfig} from './
 import {clearSmmStaffSession,listSmmStaff,readSmmStaffSession,refreshSmmStaffSession,verifySmmStaff,type SmmStaffDirectoryItem,type SmmStaffSession} from './pwa-staff';
 import {selectedSmmCartOptions,toggleSmmSelection,validateSmmSelections,type SmmSelectionState} from './selection';
 import './stage1.css';
+import './stage2.css';
 import type {
   SmmCartLine,
   SmmConnectionState,
@@ -533,6 +534,7 @@ export function App(){
 
     {selectedProduct?<ProductSheet
       product={selectedProduct}
+      serviceMode={serviceMode}
       selections={selections}
       selectedVariationId={selectedVariationId}
       setVariation={setSelectedVariationId}
@@ -812,8 +814,9 @@ function Diagnostics({connection,snapshot,pendingCount}:{connection:SmmConnectio
   return <><div className="diag-line"><span>門店連線</span><b className={connection==='READY'?'':'warn'}>{connectionLabelShort(connection)}</b><small>{snapshot?.connectionPath??'—'} · {snapshot?.observedAt?new Date(snapshot.observedAt).toLocaleString('zh-HK'):'未有讀回'}</small></div><div className="diag-line"><span>餐單版本</span><b>{snapshot?.menu?.revision??'—'}</b><small>{snapshot?.menu?.observedAt?new Date(snapshot.menu.observedAt).toLocaleString('zh-HK'):'未有餐單'}</small></div><div className="diag-line"><span>本機待提交</span><b>{pendingCount}</b><small>只係本機草稿，不係正式訂單</small></div></>;
 }
 
-function ProductSheet({product,selections,selectedVariationId,setVariation,toggle,onClose,onAdd}:{
+function ProductSheet({product,serviceMode,selections,selectedVariationId,setVariation,toggle,onClose,onAdd}:{
   product:SmmProduct;
+  serviceMode:SmmServiceMode;
   selections:SmmSelectionState;
   selectedVariationId:string|null;
   setVariation:(id:string)=>void;
@@ -823,12 +826,113 @@ function ProductSheet({product,selections,selectedVariationId,setVariation,toggl
 }){
   const validation=validateSmmSelections(product,selections);
   const variationOk=!product.variationRequired||Boolean(selectedVariationId);
-  return <div className="overlay"><section className="sheet" role="dialog" aria-modal="true"><div className="sheet-grabber"/><header><div><span>商品設定</span><h2>{product.name}</h2><small>{product.description??'請完成所需選項'}</small></div><button onClick={onClose}>✕</button></header>
-    {product.variations?.length?<section className="option-group"><div><strong>規格</strong><span>{product.variationRequired?'必選':'可選'}</span></div><div className="option-list">{product.variations.map(item=><button key={item.variationId} disabled={!item.available} className={selectedVariationId===item.variationId?'active':''} onClick={()=>setVariation(item.variationId)}>{item.name}</button>)}</div></section>:null}
-    {product.optionGroups.map(group=><section className="option-group" key={group.optionGroupId}><div><strong>{group.name}</strong><span>最少 {Math.max(group.required?1:0,group.minSelections)} · 最多 {group.maxSelections}</span></div><div className="option-list">{group.options.map(option=><button key={option.optionId} disabled={!option.available} className={(selections[group.optionGroupId]??[]).includes(option.optionId)?'active':''} onClick={()=>toggle(group.optionGroupId,option.optionId)}>{option.name}</button>)}</div></section>)}
-    {!validation.ok?<p className="callout">{validation.issues[0]}</p>:null}
-    <footer><button onClick={onClose}>取消</button><button className="primary" disabled={!validation.ok||!variationOk} onClick={onAdd}>加入草稿</button></footer>
-  </section></div>;
+  const baseMinorRaw=serviceMode==='DINE_IN'?product.publishedDineInUnitPriceMinor:product.publishedTakeawayUnitPriceMinor;
+  const baseMinor=Number.isSafeInteger(Number(baseMinorRaw))?Number(baseMinorRaw):null;
+  const selectedAdjustmentMinor=product.optionGroups.reduce((sum,group)=>{
+    const selected=selections[group.optionGroupId]??[];
+    return sum+selected.reduce((groupSum,optionId)=>{
+      const option=group.options.find(candidate=>candidate.optionId===optionId);
+      const adjustment=Number(option?.publishedAdjustmentMinor??0);
+      return groupSum+(Number.isSafeInteger(adjustment)?adjustment:0);
+    },0);
+  },0);
+  const draftUnitMinor=baseMinor===null?null:baseMinor+selectedAdjustmentMinor;
+  const deltaLabel=(minor:number)=>{
+    if(minor===0)return '不加價';
+    return (minor>0?'+':'')+money('HKD',minor);
+  };
+
+  return <div className="overlay stage2-overlay">
+    <section className="sheet stage2-product-sheet" role="dialog" aria-modal="true" aria-label={product.name+' 商品設定'}>
+      <div className="sheet-grabber"/>
+      <header className="stage2-sheet-header">
+        <div>
+          <span>商品設定</span>
+          <h2>{product.name}</h2>
+          <small>{product.description??'按需要完成規格同選項'}</small>
+        </div>
+        <button className="stage2-close" onClick={onClose} aria-label="關閉商品設定">✕</button>
+      </header>
+
+      <div className="stage2-scroll-body">
+        <section className="stage2-product-summary" aria-label="商品摘要">
+          <span className="stage2-product-media" aria-label="正式產品圖片待補"/>
+          <div>
+            <small>{serviceMode==='DINE_IN'?'堂食價格':'外賣價格'}</small>
+            <strong>{baseMinor===null?'價格待同步':money('HKD',baseMinor)}</strong>
+            <span>選項調整 {deltaLabel(selectedAdjustmentMinor)}</span>
+            <b>{draftUnitMinor===null?'草稿價格待同步':money('HKD',draftUnitMinor)}</b>
+          </div>
+        </section>
+
+        {product.variations?.length?<section className={`stage2-config-section ${product.variationRequired&&!variationOk?'has-error':''}`}>
+          <div className="stage2-section-head">
+            <div><strong>規格</strong><small>{product.variationRequired?'必選':'可選'}</small></div>
+            <span>{selectedVariationId?'已選 1':'未選'}</span>
+          </div>
+          <div className="stage2-option-grid">
+            {product.variations.map(item=><button
+              key={item.variationId}
+              disabled={!item.available}
+              className={selectedVariationId===item.variationId?'active':''}
+              onClick={()=>setVariation(item.variationId)}
+            ><span>{item.name}</span>{!item.available?<small>暫停供應</small>:null}</button>)}
+          </div>
+          {product.variationRequired&&!variationOk?<p className="stage2-inline-error">請先選擇必選規格。</p>:null}
+        </section>:null}
+
+        {product.optionGroups.map(group=>{
+          const selected=selections[group.optionGroupId]??[];
+          const min=Math.max(group.required?1:0,group.minSelections);
+          const groupError=selected.length<min||selected.length>group.maxSelections||
+            selected.some(id=>!group.options.find(option=>option.optionId===id&&option.available));
+          const maxReached=group.maxSelections>1&&selected.length>=group.maxSelections;
+          return <section className={`stage2-config-section ${groupError?'has-error':''}`} key={group.optionGroupId}>
+            <div className="stage2-section-head">
+              <div>
+                <strong>{group.name}</strong>
+                <small>{min>0?'必選':'可選'} · 最少 {min} · 最多 {group.maxSelections}</small>
+              </div>
+              <span>已選 {selected.length}/{group.maxSelections}</span>
+            </div>
+            <div className="stage2-option-grid">
+              {group.options.map(option=>{
+                const active=selected.includes(option.optionId);
+                const disabled=!option.available||(maxReached&&!active);
+                const adjustment=Number(option.publishedAdjustmentMinor??0);
+                const adjustmentSafe=Number.isSafeInteger(adjustment)?adjustment:0;
+                return <button
+                  key={option.optionId}
+                  disabled={disabled}
+                  className={active?'active':''}
+                  onClick={()=>toggle(group.optionGroupId,option.optionId)}
+                >
+                  <span>{option.name}</span>
+                  <small>{!option.available?'暫停供應':deltaLabel(adjustmentSafe)}</small>
+                </button>;
+              })}
+            </div>
+            {groupError?<p className="stage2-inline-error">
+              {selected.length<min?`最少需要選擇 ${min} 項。`:selected.length>group.maxSelections?`最多只可以選擇 ${group.maxSelections} 項。`:'已選項目包含暫停供應選項，請重新選擇。'}
+            </p>:null}
+          </section>;
+        })}
+
+        {!validation.ok&&validation.issues.length?<section className="stage2-validation-summary" role="status">
+          <strong>仲有設定未完成</strong>
+          <span>{validation.issues[0]}</span>
+        </section>:null}
+      </div>
+
+      <footer className="stage2-sticky-footer">
+        <button onClick={onClose}>取消</button>
+        <button className="primary" disabled={!validation.ok||!variationOk} onClick={onAdd}>
+          <span>加入草稿</span>
+          <small>{draftUnitMinor===null?'價格待同步':money('HKD',draftUnitMinor)}</small>
+        </button>
+      </footer>
+    </section>
+  </div>;
 }
 
 function CartSheet({cart,quote,pending,submitting,serviceMode,tender,diningTarget,diningTables,onServiceMode,onTender,onChooseDiningTarget,onClose,onQuantity,onRemove,onSubmit,onReadback}:{
