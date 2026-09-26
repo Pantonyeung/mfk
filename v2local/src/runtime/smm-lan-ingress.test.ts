@@ -148,9 +148,9 @@ describe('SMM LAN ingress',()=>{
     } as any);
     const result=ingress.submit({
       protocolVersion:1,type:'smm.lan.order.submit.v1',requestId:'R5A',submissionId:'S5A',idempotencyKey:'I5A',storeId:'MF01',
-      menuRevision:'7',publishedTotalMinor:1500,serviceMode:'DINE_IN',tender:'FPS',
+      menuRevision:'7',publishedTotalMinor:4100,serviceMode:'DINE_IN',tender:'FPS',
       diningTarget:{kind:'TABLE',tableId:'T03',covers:2},
-      lines:[{lineId:'L1',productId:'tea',productName:'台式奶茶',quantity:1,publishedUnitPriceMinor:1500,selections:[]}],
+      lines:[{lineId:'L1',productId:'riceball',productName:'原味飯團',quantity:1,publishedUnitPriceMinor:4100,selections:[]}],
     },{deviceId:'SMM-1',trusted:true});
     expect(result.disposition).toBe('ACCEPTED');
     expect(result.disposition==='ACCEPTED'&&result.orderId).toBe('ORDER-DINE');
