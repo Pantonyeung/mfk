@@ -13,6 +13,7 @@ import {
   pairingGroupFromDetail,
   pairingPriceForAssignment,
   pairingRoleFromDetail,
+  nextPairingStartIndex,
   standalonePriceForLine,
   swapPairingSnack,
 } from './riceball-pairing-model.ts';
@@ -36,9 +37,11 @@ export function RiceballPairingWorkspace({
   onAddDrink:(choiceId:string,qty:number,targetLineId?:string)=>void;
   onConfigureDrink:(choiceId:string,qty:number,targetLineId?:string)=>void;
 }){
+  const existing=existingPairingGroups(cart);
+  const startIndex=nextPairingStartIndex(cart);
   const draft=useMemo(
-    ()=>buildRiceballPairingDraft(cart,products,combos,pools,blockedLineIds),
-    [cart,products,combos,pools,blockedLineIds],
+    ()=>buildRiceballPairingDraft(cart,products,combos,pools,blockedLineIds,startIndex),
+    [cart,products,combos,pools,blockedLineIds,startIndex],
   );
   const draftKey=draft.slots.map(slot=>slot.id+':'+(slot.defaultSnackUnitId??'')).join('|')+'//'+draft.snacks.map(snack=>snack.id).join('|');
   const [assignments,setAssignments]=useState<Record<string,string|undefined>>(()=>({...pairingAssignmentsFromDraft(draft)}));
@@ -50,7 +53,6 @@ export function RiceballPairingWorkspace({
 
   const activeSlot=draft.slots.find(slot=>slot.id===activeSlotId)??draft.slots[0];
   const assignedSnackIds=new Set(Object.values(assignments).filter((id):id is string=>Boolean(id)));
-  const existing=existingPairingGroups(cart);
   const pairCount=draft.slots.filter(slot=>Boolean(assignments[slot.id])).length;
   const mainLineIds=new Set(draft.slots.map(slot=>slot.main.lineId));
   const drinkTargetCart=cart.filter(line=>mainLineIds.has(line.id)||pairingRoleFromDetail(line.detail)==='MAIN');
