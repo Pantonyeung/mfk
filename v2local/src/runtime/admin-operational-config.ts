@@ -15,6 +15,7 @@ export interface SmtStoreSettings{
   readonly lateArrivalMinutes:number;
   readonly fulfillmentMinutes:number;
   readonly archiveHours:number;
+  readonly diningOverdueMinutes:number;
   readonly reminderAfterMinutes:number;
   readonly reminderIntervalMinutes:number;
   readonly repeatReminder:boolean;
@@ -95,6 +96,7 @@ export function readSmtStoreSettings():SmtStoreSettings{
     lateArrivalMinutes:Math.max(0,number(row.lateArrivalMinutes,15)),
     fulfillmentMinutes:Math.max(0,number(row.fulfillmentMinutes,20)),
     archiveHours:Math.max(1,number(row.archiveHours,24)),
+    diningOverdueMinutes:Math.max(1,Math.floor(number(row.diningOverdueMinutes,35))),
     reminderAfterMinutes:Math.max(0,number(row.reminderAfterMinutes,5)),
     reminderIntervalMinutes:Math.max(1,number(row.reminderIntervalMinutes,5)),
     repeatReminder:bool(row.repeatReminder,true),
