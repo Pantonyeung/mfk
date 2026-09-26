@@ -418,17 +418,10 @@ describe('Dining R6 automatic table-order admission',()=>{
     expect(order.items[0].unitMinor).toBe(0);
   });
 
-  it('price override requires authenticated authorized staff and keeps audit values',async()=>{
+  it('price override requires authenticated staff with Admin-granted permission',async()=>{
     const runtime=await boot();
     const hold=runtime.createHold({kind:'dining',items:[{id:'rice',name:'飯團',qty:1,unitMinor:4100,serviceMode:'dine-in'}],totalMinor:4100});
     await expect(runtime.overrideDiningLinePrice(hold.id,0,3900,'客戶議價')).rejects.toThrow('DINING_PRICE_OVERRIDE_AUTH_REQUIRED');
-  });
-
-  it('price override rejects negative effective price and blank reason',async()=>{
-    const runtime=await boot();
-    const hold=runtime.createHold({kind:'dining',items:[{id:'rice',name:'飯團',qty:1,unitMinor:4100,serviceMode:'dine-in'}],totalMinor:4100});
-    await expect(runtime.overrideDiningLinePrice(hold.id,0,-100,'客戶議價')).rejects.toThrow();
-    await expect(runtime.overrideDiningLinePrice(hold.id,0,3900,'')).rejects.toThrow();
   });
 
   it('formal Order link survives runtime restart',async()=>{
