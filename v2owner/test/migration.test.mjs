@@ -347,7 +347,7 @@ test('Stage02 shared openActions selector excludes RESOLVED everywhere and dedup
 test('Stage02 Today top severity and oldest unresolved derive only from shared open actions',()=>{
   const todayVm=fs.readFileSync(path.join(srcRoot,'today-view-model.ts'),'utf8');
   assert.match(todayVm,/const actions=\[\.\.\.selectOpenActions/);
-  assert.match(todayVm,/const topSeverity=actions\.sort/);
+  assert.match(todayVm,/const topSeverity=\[\.\.\.actions\]\.sort/);
   assert.match(todayVm,/oldestUnresolved=\[\.\.\.actions\]\s*\.sort/);
   assert.match(todayVm,/openCount:actions\.length/);
 });
