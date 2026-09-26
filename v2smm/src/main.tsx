@@ -1,6 +1,7 @@
 import {Component,StrictMode,type ErrorInfo,type ReactNode} from 'react';
 import {createRoot} from 'react-dom/client';
-import {App} from './App';\nimport {StageZeroGate} from './StageZero';
+import {App} from './App';
+import {StageZeroGate} from './StageZero';
 import {installSmmRuntimePort} from './runtime';
 import {createPwaRuntimePort} from './pwa-runtime';
 import './styles.css';
