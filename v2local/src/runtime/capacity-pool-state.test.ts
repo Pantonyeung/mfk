@@ -136,6 +136,13 @@ describe('CAP1 local capacity pool state',()=>{
     ]));
   });
 
+  it('fails closed on corrupted local state instead of silently refilling a pool',()=>{
+    applyCapacity(1,[purple]);
+    localStorage.setItem(LOCAL_CAPACITY_POOL_STATE_KEY,'not-json');
+    expect(()=>ensureCurrentCapacityPoolState(new Date('2026-09-27T04:00:00.000Z').getTime()))
+      .toThrow('CAPACITY_POOL_STATE_INVALID');
+  });
+
   it('initializes a new active pool introduced mid-day without resetting existing pools',()=>{
     applyCapacity(1,[purple]);
     const now=new Date('2026-09-27T04:00:00.000Z').getTime();
