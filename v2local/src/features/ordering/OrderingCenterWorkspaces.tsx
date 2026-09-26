@@ -22,6 +22,7 @@ export interface WorkspaceCartLine{
 export type OrderingPanelState=
   |{readonly type:'product';readonly productId:string;readonly lineId?:string}
   |{readonly type:'required'}
+  |{readonly type:'drink-config';readonly choiceId:string;readonly qty:number;readonly targetLineId?:string}
   |{readonly type:'organize'}
   |{readonly type:'combo'}
   |{readonly type:'hold'}
@@ -47,6 +48,52 @@ export function quickConfigurationForProduct(product:WorkspaceProduct){
     return names.length?[set.name+'：'+names.join('、')]:[];
   }).join(' · ');
   return Object.freeze({eligible:true,detail,deltaMinor});
+}
+
+export const DRINK_SUPPLEMENT_PRODUCT_PREFIX='drink-supplement:' as const;
+
+export interface WorkspaceDrinkSupplementChoice{
+  readonly id:string;
+  readonly label:string;
+  readonly adjustmentMinor:number;
+  readonly kind:'PRODUCT'|'LABEL'|'NONE';
+  readonly productId?:string;
+  readonly enabled:boolean;
+  readonly requiresConfiguration:boolean;
+}
+
+export function isDrinkSupplementProductId(productId:string){
+  return productId.startsWith(DRINK_SUPPLEMENT_PRODUCT_PREFIX);
+}
+
+export function projectDrinkSupplementChoices(
+  products:readonly WorkspaceProduct[],
+  pools:readonly SyncedComboPool[],
+):WorkspaceDrinkSupplementChoice[]{
+  const byProduct=new Map(products.map(product=>[product.id,product] as const));
+  const rows:WorkspaceDrinkSupplementChoice[]=[];
+  for(const pool of pools){
+    if(pool.kind!=='ADDON'||pool.addonKind!=='DRINK')continue;
+    for(const group of pool.groups){
+      for(const subPool of group.subPools){
+        for(const choice of subPool.choices){
+          const product=choice.type==='PRODUCT'&&choice.productId?byProduct.get(choice.productId):undefined;
+          rows.push(Object.freeze({
+            id:[pool.id,group.id,subPool.id,choice.id].join('::'),
+            label:choice.type==='PRODUCT'
+              ?(product?.name??choice.label??choice.productId??'未命名飲品')
+              :choice.label,
+            adjustmentMinor:subPool.priceAdjustmentMinor+choice.priceAdjustmentMinor,
+            kind:choice.type,
+            ...(choice.productId?{productId:choice.productId}:{}),
+            enabled:choice.type!=='PRODUCT'||Boolean(product),
+            requiresConfiguration:Boolean(product?.optionSets?.length),
+          }));
+        }
+      }
+    }
+  }
+  return rows;
 }
 
 export interface WorkspaceRequiredTask{
@@ -172,14 +219,16 @@ export function productEditorInitialFromDetail(product:WorkspaceProduct,detail?:
 }
 
 export function ProductConfigWorkspace({
-  product,initial,mode='add',onAdd
+  product,initial,mode='add',pricingBaseMinor,onAdd
 }:{
   product:WorkspaceProduct;
   initial?:{readonly qty:number;readonly detail?:string};
   mode?:'add'|'edit';
+  pricingBaseMinor?:number;
   onAdd:(detail:string,deltaMinor:number,qty:number)=>void;
 }){
   const initialState=useMemo(()=>productEditorInitialFromDetail(product,initial?.detail),[product,initial?.detail]);
+  const priceBase=pricingBaseMinor??product.priceMinor;
   const [qty,setQty]=useState(initial?.qty??1);
   const [note,setNote]=useState(initialState.note);
   const [selected,setSelected]=useState<Record<string,string[]>>(()=>Object.fromEntries(
@@ -216,7 +265,7 @@ export function ProductConfigWorkspace({
   return <div className="cfg-workspace">
     <header className="cfg-product-head">
       <div className="cfg-product-hero">{product.imageUrl?<img src={product.imageUrl} alt=""/>:null}</div>
-      <div><small>{product.category}</small><h2>{product.name}</h2><strong>{money(product.priceMinor+delta)}</strong></div>
+      <div><small>{product.category}</small><h2>{product.name}</h2><strong>{money(priceBase+delta)}</strong></div>
       <div className="cfg-qty"><span>數量</span><button onClick={()=>setQty(Math.max(1,qty-1))}>−</button><b>{qty}</b><button onClick={()=>setQty(qty+1)}>＋</button></div>
     </header>
 
@@ -234,16 +283,62 @@ export function ProductConfigWorkspace({
       :<section className="cfg-block"><header><b>商品選項</b><span>Admin</span></header><p>此商品目前冇已發布選項組。</p></section>}
 
     <label className="cfg-note"><span>備註</span><input value={note} maxLength={60} onChange={event=>setNote(event.target.value)} placeholder="例如：不要蔥、醬分開"/><small>{note.length}/60</small></label>
-    <footer className="cfg-action"><div><span>單價</span><b>{money(product.priceMinor+delta)}</b></div><button className="primary" disabled={invalid} onClick={()=>onAdd(detail,delta,qty)}>{mode==='edit'?'儲存修改':'加入訂單'}　{money((product.priceMinor+delta)*qty)}</button></footer>
+    <footer className="cfg-action"><div><span>單價</span><b>{money(priceBase+delta)}</b></div><button className="primary" disabled={invalid} onClick={()=>onAdd(detail,delta,qty)}>{mode==='edit'?'儲存修改':'加入訂單'}　{money((priceBase+delta)*qty)}</button></footer>
   </div>;
 }
 
+export function DrinkSupplementWorkspace({
+  cart,choices,onAdd,onConfigure,
+}:{
+  cart:readonly WorkspaceCartLine[];
+  choices:readonly WorkspaceDrinkSupplementChoice[];
+  onAdd:(choiceId:string,qty:number,targetLineId?:string)=>void;
+  onConfigure:(choiceId:string,qty:number,targetLineId?:string)=>void;
+}){
+  const targets=cart.filter(line=>!isDrinkSupplementProductId(line.productId));
+  const [qty,setQty]=useState(1);
+  const [targetLineId,setTargetLineId]=useState('');
+  return <section className="drink-supplement-workspace" aria-label="飲品補選">
+    <header>
+      <div><small>OPTIONAL DRINK</small><h3>飲品補選</h3><p>可跳過，唔阻結帳。只有明確揀「唔飲嘢」先按 Admin 價差扣減；留空唔會自動扣錢。</p></div>
+      <span>Admin 飲品 Pool</span>
+    </header>
+    <div className="drink-supplement-controls">
+      <div className="drink-targets">
+        <b>配餐</b>
+        <button type="button" className={targetLineId===''?'active':''} onClick={()=>setTargetLineId('')}>未指定（按落單次序）</button>
+        {targets.map((line,index)=><button type="button" key={line.id} className={targetLineId===line.id?'active':''} onClick={()=>setTargetLineId(line.id)}>
+          {index+1}　{line.name}
+        </button>)}
+      </div>
+      <div className="drink-qty"><span>數量</span><button type="button" onClick={()=>setQty(Math.max(1,qty-1))}>−</button><b>{qty}</b><button type="button" onClick={()=>setQty(qty+1)}>＋</button></div>
+    </div>
+    <div className="drink-supplement-grid">
+      {choices.length?choices.map(choice=><button
+        type="button"
+        key={choice.id}
+        disabled={!choice.enabled}
+        onClick={()=>choice.requiresConfiguration
+          ?onConfigure(choice.id,qty,targetLineId||undefined)
+          :onAdd(choice.id,qty,targetLineId||undefined)}
+      >
+        <b>{choice.label}</b>
+        <small>{choice.adjustmentMinor===0?'餐內':(choice.adjustmentMinor>0?'+':'')+money(choice.adjustmentMinor)}</small>
+        {choice.requiresConfiguration?<em>有選項</em>:null}
+      </button>):<p>Admin 暫時未有已發布 DRINK Pool。</p>}
+    </div>
+  </section>;
+}
+
 export function RequiredFastLaneWorkspace({
-  cart,products,onApply,
+  cart,products,onApply,drinkChoices=[],onAddDrink,onConfigureDrink,
 }:{
   cart:readonly WorkspaceCartLine[];
   products:readonly WorkspaceProduct[];
   onApply:(lineId:string,groupId:string,optionIds:readonly string[])=>void;
+  drinkChoices?:readonly WorkspaceDrinkSupplementChoice[];
+  onAddDrink?:(choiceId:string,qty:number,targetLineId?:string)=>void;
+  onConfigureDrink?:(choiceId:string,qty:number,targetLineId?:string)=>void;
 }){
   const tasks=useMemo(()=>requiredTasksForCart(cart,products),[cart,products]);
   const [draft,setDraft]=useState<Record<string,string[]>>({});
@@ -259,7 +354,7 @@ export function RequiredFastLaneWorkspace({
 
   return <div className="required-fast-lane">
     <header className="required-fast-title">
-      <div><small>ADMIN REQUIRED</small><h2>必選區</h2><p>快速模式先入購物車，再喺呢度補齊真正未完成嘅必選；全部選項同價差只讀 Admin 已發布資料。</p></div>
+      <div><small>ADMIN REQUIRED + OPTIONAL</small><h2>必選／補選</h2><p>真正 Required 仍然會阻結帳；飲品補選只係快捷處理，留空亦可以照常結帳。</p></div>
       <strong>{tasks.length} 項</strong>
     </header>
     {tasks.length?<div className="required-fast-list">{tasks.map((task,index)=>{
@@ -276,22 +371,22 @@ export function RequiredFastLaneWorkspace({
         <footer><span>{task.selection==='SINGLE'?'單選':'多選'} · 已選 {chosen.length}</span><button type="button" disabled={!ready} onClick={()=>onApply(task.lineId,task.groupId,chosen)}>套用到呢件商品</button></footer>
       </article>;
     })}</div>:<div className="required-fast-empty"><b>必選已齊</b><span>目前購物車冇未完成必選。</span></div>}
+    {onAddDrink&&onConfigureDrink?<DrinkSupplementWorkspace cart={cart} choices={drinkChoices} onAdd={onAddDrink} onConfigure={onConfigureDrink}/>:null}
   </div>;
 }
 
 export function OrganizeWorkspace({lines,onDone}:{lines:readonly WorkspaceCartLine[];onDone:()=>void}){
-  const mealLines=lines.filter(line=>!line.productId.toLowerCase().includes('tea'));
-  const drinkLines=lines.filter(line=>line.productId.toLowerCase().includes('tea'));
+  const mealLines=lines.filter(line=>!isDrinkSupplementProductId(line.productId));
   const [selected,setSelected]=useState<Record<string,string>>({});
   return <div className="organize-workspace">
-    <header className="organize-title"><h2>整理工作台</h2><div><span>未完成 {Math.max(0,mealLines.length-Object.keys(selected).length)}</span><span>可配對 {Math.ceil(mealLines.length/2)}</span><span>待補飲品 {drinkLines.length}</span></div></header>
+    <header className="organize-title"><h2>整理工作台</h2><div><span>未完成 {Math.max(0,mealLines.length-Object.keys(selected).length)}</span><span>可配對 {Math.ceil(mealLines.length/2)}</span><span>飲品改用補選區</span></div></header>
     <section className="organize-section"><header><b><i>1</i> 必選</b><span>{mealLines.length}</span></header>
       <div className="organize-required">{mealLines.map((line,index)=><article key={line.id}><div><b>{index+1}　{line.name}</b><small>{line.detail??'請確認必選項'}</small></div><div className="organize-options">{['肉燥','咖喱','菜飯'].map(v=><button key={v} className={selected[line.id]===v?'active':''} onClick={()=>setSelected(s=>({...s,[line.id]:v}))}>{v}</button>)}</div></article>)}</div>
     </section>
     <section className="organize-section"><header><b><i>2</i> 配對／代補</b><span>{Math.ceil(mealLines.length/2)}</span></header>
       <div className="organize-pairs">{Array.from({length:Math.ceil(mealLines.length/2)},(_,idx)=>{const a=mealLines[idx*2],b=mealLines[idx*2+1];return <article key={idx}><strong>{idx+1} 組</strong><div>{a?<span>{a.name}</span>:null}{b?<span>{b.name}</span>:<em>＋ 未配對</em>}</div></article>})}</div>
     </section>
-    <section className="organize-section"><header><b><i>3</i> 快捷飲品</b><span>{drinkLines.length}</span></header><div className="organize-drinks">{['凍檸茶','台式奶茶','手打檸檬茶','不用飲品'].map(v=><button key={v}>{v}</button>)}</div></section>
+    <section className="organize-section"><header><b><i>3</i> 飲品補選</b><span>可跳過</span></header><p className="organize-drink-note">飲品選擇已統一移到「必選／補選」區，直接讀 Admin DRINK Pool；整理工作台唔再寫死飲品。</p></section>
     <footer className="organize-footer"><button onClick={onDone}>完成整理</button></footer>
   </div>;
 }
