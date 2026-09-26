@@ -1842,15 +1842,14 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
       businessDate:new Date().toISOString().slice(0,10),revision:snapshot.diningRevision??0,
       queue:activeHolds.filter(hold=>diningAssignedTables(hold).length===0).map(hold=>{
         const detail=diningDetail(hold);
-        const itemCount=hold.items.reduce((sum,item)=>sum+item.qty,0);
         return {
           id:hold.id,
           codeLabel:hold.formalOrderDisplay??hold.codeLabel,
           partySize:hold.partySize,
           statusLabel:hold.formalOrderId?'待安排座位 · 已落單':'待安排座位',
           ...(hold.formalOrderId?{formalOrderId:hold.formalOrderId}:{}),
-          itemCount,
-          totalMinor:hold.totalMinor,
+          itemCount:detail.lines.reduce((sum,line)=>sum+line.qty,0),
+          totalMinor:detail.totalMinor,
           paidMinor:detail.paidMinor,
           remainingMinor:detail.remainingMinor,
         };
@@ -1884,9 +1883,9 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
             outstandingLabel:seated.formalOrderDisplay??seated.codeLabel,
             holdId:seated.id,
             startedAt:seated.seatedAt??seated.createdAt,
-            itemCount:seated.items.reduce((sum,item)=>sum+item.qty,0),
+            itemCount:detail.lines.reduce((sum,line)=>sum+line.qty,0),
             itemSummary:first,
-            totalMinor:seated.totalMinor,
+            totalMinor:detail.totalMinor,
             paidMinor:detail.paidMinor,
             remainingMinor:detail.remainingMinor,
           };
@@ -2021,6 +2020,7 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
   async correctDiningLine(holdId,input){
     const snapshot=readDiningState();
     const hold=requireDiningHold(snapshot,holdId);
+    if(hold.archivedAt&&(hold.payments??[]).length)throw new Error('DINING_PAID_LINE_USE_REFUND');
     if(hold.archivedAt||hold.cancelledAt)throw new Error('DINING_HISTORY_PROTECTED');
     if(!hold.formalOrderId)throw new Error('DINING_FORMAL_ORDER_REQUIRED');
     const order=snapshot.orders.find(row=>row.id===hold.formalOrderId);
