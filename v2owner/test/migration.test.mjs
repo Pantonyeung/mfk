@@ -221,3 +221,65 @@ test('Stage01 uses the exact Owner-approved canonical logo asset in the top bar'
   assert.equal(digest,'9932546497935faaaf9c8d75c5a193d5ce9e3d70c0e16bd9d9f987777790d95f');
   assert.doesNotMatch(app,/mascot|character|blue-haired|purple-haired|boy-ip|girl-ip/i);
 });
+
+
+test('Stage02 Action Queue is a unified actionable projection, not SMT pending orders',()=>{
+  const app=fs.readFileSync(path.join(srcRoot,'App.tsx'),'utf8');
+  const components=fs.readFileSync(path.join(srcRoot,'stage02-action-queue.tsx'),'utf8');
+  const vm=fs.readFileSync(path.join(srcRoot,'stage02-view-model.ts'),'utf8');
+  const mapping=fs.readFileSync(path.join(srcRoot,'stage02-api-mapping.ts'),'utf8');
+
+  assert.match(app,/ActionQueuePage/);
+  assert.doesNotMatch(app,/function QueuePage\(/);
+  assert.doesNotMatch(app,/function ActionCard\(/);
+
+  for(const marker of[
+    '影響目標','責任域','確定性','安全下一步','已持續',
+    'Dismissed ≠ Resolved','Readback / Proof','相關處理紀錄'
+  ])assert.match(components,new RegExp(marker));
+
+  assert.match(mapping,/OPEN_ACTIONABLE_ONLY/);
+  assert.match(mapping,/SMT_PENDING_ORDER_QUEUE/);
+  assert.match(mapping,/Dismissed != Resolved/);
+  assert.match(mapping,/RESOLVED_OR_UNKNOWN/);
+
+  assert.match(vm,/item\.state!==\'RESOLVED\'/);
+  assert.match(vm,/severityRank/);
+  assert.doesNotMatch(components,/\{item\.correlationId\}/);
+});
+
+test('Stage02 bounded action continues through existing Owner runtime only',()=>{
+  const app=fs.readFileSync(path.join(srcRoot,'App.tsx'),'utf8');
+  const components=fs.readFileSync(path.join(srcRoot,'stage02-action-queue.tsx'),'utf8');
+  const mapping=fs.readFileSync(path.join(srcRoot,'stage02-api-mapping.ts'),'utf8');
+
+  assert.match(components,/onCommand\(item\.actionLabel!/);
+  assert.match(app,/requestBoundedAction/);
+  assert.match(mapping,/No direct network transport is added/);
+  assert.match(mapping,/No Order \/ Pricing \/ Payment \/ Print \/ Auth \/ Sync authority changes/);
+});
+
+test('Stage02 visual convergence matches approved warm ivory navy Owner direction',()=>{
+  const css=fs.readFileSync(path.join(srcRoot,'styles.css'),'utf8');
+  const app=fs.readFileSync(path.join(srcRoot,'App.tsx'),'utf8');
+
+  assert.match(css,/--mf-navy:#173b72/);
+  assert.match(css,/--mf-ivory:#f6f3ed/);
+  assert.match(css,/--mf-purple:#735ab1/);
+  assert.match(css,/body\{[\s\S]*background:var\(--mf-ivory\)/);
+  assert.match(css,/\.bottom-nav button\.active\{[\s\S]*var\(--mf-blue-soft\)/);
+  assert.match(css,/\.action-queue-card/);
+  assert.match(css,/\.action-detail-drawer/);
+
+  assert.match(app,/morefun-logo-canonical\.png/);
+  assert.doesNotMatch(app,/>◆</);
+  assert.match(app,/AI_ASSET_PENDING/);
+});
+
+test('Stage02 does not add product imagery or large mascot to normal operational UI',()=>{
+  const app=fs.readFileSync(path.join(srcRoot,'App.tsx'),'utf8');
+  const components=fs.readFileSync(path.join(srcRoot,'stage02-action-queue.tsx'),'utf8');
+  const source=app+'\n'+components;
+  assert.doesNotMatch(source,/productImage|product-photo|stock-photo/i);
+  assert.doesNotMatch(source,/mascot|blue-haired|purple-haired|boy-ip|girl-ip/i);
+});
