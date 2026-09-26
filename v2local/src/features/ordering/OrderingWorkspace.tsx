@@ -116,7 +116,7 @@ export function OrderingWorkspace({view,actions,centerPanel}:{view:OrderingWorks
         {view.menuRevisionLabel?<div className="ordering-menu-local-status"><b>{view.menuRevisionLabel}</b><span>本機 Admin → POS</span></div>:null}
         {view.operationalNotice?<div className="ordering-menu-local-status warning"><b>{view.operationalNotice}</b><span>Admin 營運提示</span></div>:null}
         <section className="ordering-mode-bar" aria-label="點單模式">
-          <span><b>點選模式</b><small>{view.orderingMode==='quick'?'安全商品直接加入；必選／強制顯示仍開設定':'每件商品都先開設定'}</small></span>
+          <span><b>點選模式</b><small>{view.orderingMode==='quick'?'快速加入；必選會進必選區補齊，強制顯示仍開設定':'每件商品都先開設定，必選即時完成'}</small></span>
           <div role="group" aria-label="快速或普通模式">
             <button type="button" className={view.orderingMode==='quick'?'active':''} aria-pressed={view.orderingMode==='quick'} onClick={()=>actions.onChangeOrderingMode('quick')}>快速</button>
             <button type="button" className={view.orderingMode==='normal'?'active':''} aria-pressed={view.orderingMode==='normal'} onClick={()=>actions.onChangeOrderingMode('normal')}>普通</button>
