@@ -1,108 +1,92 @@
 # MFK SMT D1/D2 Money Recognition Refinement R1｜2026-09-26
 
 ## STATUS
-SOURCE AUDIT COMPLETE / OWNER GATE REDUCED TO ONE QUESTION / NO PRODUCT MUTATION
+OWNER HYBRID MONEY MODEL LOCKED / REPORTING PROJECTION FIRST / D1 PRODUCT MUTATION MAY PROCEED AFTER RED CONTRACT
 
 ## Fresh current
-- main: `bf1d31456f20660516109222e35ca11f745d6027`
+- main before this refinement: `bf1d31456f20660516109222e35ca11f745d6027`
+- prior audit landing: `85b49604e7afe5e27f4ff1ef3a2f57fe272b150c`
 - C1 + C2: BANKED / OTA GREEN
-- current D1/D2 gate audit exists on main.
 
 ## Fresh source findings
+Current local reporting sums every selected Formal Order total into grossSalesMinor. Dining payment facts already preserve exact tender, amount, line/quantity selection, received/change, paid and remaining.
 
-### 1. Current reporting collision is real
-`v2local/src/runtime/local-operations.ts` currently selects all Orders in the Business Window and computes:
+## OWNER DECISION｜A + B HYBRID MODEL
+A and B are not mutually exclusive. Dining money must expose three facts simultaneously.
 
-`grossSalesMinor = sum(order.totalMinor)`
+No payment, total HK$82:
+- Total = 82
+- Confirmed paid = 0
+- Outstanding = 82
+- State = UNPAID
 
-There is no payment/open-check guard in `buildLocalReport`.
+Partial payment HK$41:
+- Total = 82
+- Confirmed paid = 41
+- Outstanding = 41
+- State = PARTIALLY_PAID
 
-Therefore once D1 creates a Formal Dining Order at table assignment, the whole Order value would enter current sales unless reporting semantics are changed.
+Fully paid:
+- Total = 82
+- Confirmed paid = 82
+- Outstanding = 0
+- State = PAID
 
-### 2. Dining payment facts already exist separately
-`v2local/src/runtime/local-runtime.ts` already stores each Dining payment with:
-- tender
-- amountMinor
-- exact line/quantity selections
-- receivedMinor / changeMinor
-- stable submission identity
-- paidMinor
-- remainingMinor
+Formula:
+`outstandingMinor = max(currentOrderTotalMinor - confirmedPaidMinor, 0)`
 
-So the system already has enough facts to keep:
-- Order/Open Check value
-- Tender collected
-- Outstanding balance
-as separate truths.
+## Reporting meaning
+- Open Check / Current Order Value = current Order total.
+- Current recognized Dining money = confirmed paid amount.
+- Tender Collected = confirmed payment facts split by tender.
+- Outstanding Dining = remaining unpaid balance.
+- Open Check full total must never be silently treated as paid financial sales while balance remains.
 
-### 3. Existing Owner lock already rules out silent Open Check sales
-GitHub #22 Owner UI Stage 0 V2 explicitly locked:
-- 「預計未結帳金額」與「有效營業額」分開
-- 未結帳 / Open Checks 不得靜默計入 Current Effective Sales
-- UI 要標示「未計入有效營業額」
+## Terminology safeguard
+Preferred internal fields:
+- currentOrderTotalMinor
+- confirmedPaidMinor
+- outstandingMinor
 
-Therefore M2（table assignment immediately counts full Order as financial sales）conflicts with current Owner direction.
+Preferred frontline labels:
+- 總額
+- 已收款
+- 未收款
 
-## Important correction to the original M1/M2 framing
-The remaining question is NOT simply M1 vs M2.
+Status:
+- 未結清
+- 部分付款
+- 已結清
 
-Original M1 says “Sales follows actual payment”.
-But the project already distinguishes Sales from Tender Collected.
+Avoid using provider/accounting Settlement identity for this frontline concept.
 
-The exact unresolved money semantic is:
+## Cancel / Refund edge
+Cancel != Refund remains locked.
 
-### D-MONEY-01｜PARTIAL-PAID OPEN CHECK RECOGNITION
+If a HK$82 Order has HK$41 confirmed paid and is then cancelled:
+- historical Order total remains HK$82;
+- confirmed paid HK$41 remains money truth until explicit Refund;
+- unpaid HK$41 must not remain collectible outstanding after cancellation;
+- explicit Refund reverses the confirmed paid portion through the refund path.
 
-Dining Order = HK$82
-- Formal Order exists
-- table is still open
-- HK$41 has been confirmed as payment
-- outstanding HK$41
-
-What is Current Effective Sales?
-
-A. `HK$0` until the Check is fully settled; meanwhile:
-- Open Order Value = HK$82
-- Tender Collected = HK$41
-- Outstanding = HK$41
-- Current Effective Sales = HK$0
-- final settlement causes Current Effective Sales to become HK$82
-
-B. `HK$41` while the Check remains open; meanwhile:
-- Open Order Value = HK$82
-- Tender Collected = HK$41
-- Outstanding = HK$41
-- Current Effective Sales = HK$41
-- final settlement causes Current Effective Sales to become HK$82
-
-## Commander assessment
-A is the cleaner fit with the already-recorded Owner rule that Open Checks are not Current Effective Sales, and it preserves:
-Sales ≠ Tender Collected ≠ Outstanding.
-
-B is possible, but it makes Current Effective Sales partially payment-recognition-based while the Check is still open.
-
-This is a true money semantic and requires Owner confirmation.
-
-## Invariants independent of A/B
-- Table assignment may create ONE Formal Order only.
+## Invariants
+- Table assignment creates ONE Formal Order only.
 - SAME Dining Hold ↔ SAME Formal Order.
 - First Dining print occurs after durable D1 admission and before payment.
 - No paid customer receipt on first Dining print.
 - Drawer remains closed.
-- Partial payments remain append-only facts.
-- Cancel ≠ Refund.
-- Confirmed payment remains payment truth until explicit Refund.
-- No duplicate Order / display / print on retry/restart.
+- Partial payments are append-only.
+- Retry/restart cannot duplicate Order / display / print.
 - Reporting must not infer money from fulfillment status.
 
-## NEXT after Owner decision
-1. Freeze D-MONEY-01 RED/GREEN contract.
-2. Patch reporting projection first so D1 cannot create false Sales.
+## NEXT
+1. Freeze RED/GREEN contract for Total / Confirmed Paid / Outstanding.
+2. Patch Reporting projection first.
 3. Implement D1 Formal Order + Hold linkage.
 4. Prove restart/idempotency/no duplicate.
 5. Merge / Bank / OTA.
-6. Implement D2 first-print side effect as an independent knife.
+6. Implement D2 first-print as independent knife.
 7. Merge / Bank / OTA.
 
 ## MILESTONE
-`MFK_D1_D2_MONEY_GATE_REDUCED_TO_PARTIAL_OPEN_CHECK_RECOGNITION_R1`
+`MFK_D1_D2_HYBRID_TOTAL_PAID_OUTSTANDING_MONEY_MODEL_LOCKED`
