@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import crypto from 'node:crypto';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 
@@ -206,4 +207,17 @@ test('Stage01 offline mode disables remote mutation',()=>{
   const app=fs.readFileSync(path.join(srcRoot,'App.tsx'),'utf8');
   assert.match(app,/connection==='OFFLINE_READONLY'/);
   assert.match(app,/離線唯讀：遠端操作已停用/);
+});
+
+
+test('Stage01 uses the exact Owner-approved canonical logo asset in the top bar',()=>{
+  const app=fs.readFileSync(path.join(srcRoot,'App.tsx'),'utf8');
+  const logoPath=path.resolve(testDir,'../public/brand/morefun-logo-canonical.png');
+  assert.doesNotMatch(app,/className="brand-mark">磨</);
+  assert.match(app,/src="\/brand\/morefun-logo-canonical\.png"/);
+  assert.match(app,/className="brand-logo"/);
+  assert.equal(fs.existsSync(logoPath),true);
+  const digest=crypto.createHash('sha256').update(fs.readFileSync(logoPath)).digest('hex');
+  assert.equal(digest,'9932546497935faaaf9c8d75c5a193d5ce9e3d70c0e16bd9d9f987777790d95f');
+  assert.doesNotMatch(app,/mascot|character|blue-haired|purple-haired|boy-ip|girl-ip/i);
 });
