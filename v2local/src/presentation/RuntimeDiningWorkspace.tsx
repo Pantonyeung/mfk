@@ -15,7 +15,12 @@ const tenderLabels:Record<string,string>={
   PAYME:'PayMe',
   COMBO:'組合付款',
 };
-const money=(minor:number)=>'
+const money=(minor:number)=>String.fromCharCode(36)+(minor/100).toFixed(2);
+let diningSubmissionSequence=0;
+const nextDiningSubmissionId=(holdId:string)=>{
+  diningSubmissionSequence+=1;
+  return 'DINPAY:'+holdId+':'+Date.now().toString(36)+':'+diningSubmissionSequence.toString(36);
+};
 
 export interface DiningCheckoutRequest{
   readonly holdId:string;
