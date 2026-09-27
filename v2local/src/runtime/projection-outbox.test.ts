@@ -101,4 +101,23 @@ describe('SMT projection outbox',()=>{
     });
     expect(JSON.parse(values.get(SMT_PROJECTION_OUTBOX_KEY)||'[]')).toHaveLength(0);
   });
+
+  it('projects canonical recognized sales separately so open dine-in does not enter effective sales',()=>{
+    queueOrderProjection({
+      id:'MFK-DINE-1',
+      display:'P010',
+      createdAt:'2026-09-27T04:00:00.000Z',
+      updatedAt:'2026-09-27T04:00:00.000Z',
+      totalMinor:8200,
+      recognizedSalesMinor:0,
+      paymentLabel:'未收款',
+      fulfillmentLabel:'進行中',
+      sourceLabel:'堂食',
+      items:[{id:'p1',name:'堂食套餐',qty:1,unitMinor:8200}],
+    });
+    const payload=readProjectionOutbox()[0]!.event.payload as Record<string,unknown>;
+    expect(payload.totalMinor).toBe(8200);
+    expect(payload.recognizedSalesMinor).toBe(0);
+  });
+
 });
