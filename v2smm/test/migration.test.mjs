@@ -284,12 +284,12 @@ test('SMM Internet menu and SMT commit share one published catalog projection',(
 });
 
 
-test('persisted cart reprices from the current published menu before resubmit',()=>{
+test('passive menu refresh preserves accepted cart facts and requires line-scoped confirmation before resubmit',()=>{
   const app=fs.readFileSync(path.join(root,'App.tsx'),'utf8');
-  assert.match(app,/cart\.map\(line=>/);
-  assert.match(app,/publishedUnitPriceMinor:unitMinor/);
-  assert.match(app,/menu\?\.revision,menu\?\.observedAt/);
-  assert.match(app,/購物草稿已按目前發布價格重新計算/);
+  assert.match(app,/buildSmmCartRefreshAttention/);
+  assert.match(app,/refreshAttention:proposal/);
+  assert.match(app,/未確認前唔會靜默接受新價格或套餐資料/);
+  assert.match(app,/const repriced=cart\.map\(line=>repriceLine\(line,next\)\)/);
   assert.match(app,/SMM_PUBLISHED_PRICE_CHANGED/);
   assert.match(app,/SMT 發現餐單版本／價格已更新/);
   assert.match(app,/removeIntent\(pending\.submissionId\)/);
