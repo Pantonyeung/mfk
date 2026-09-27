@@ -12,6 +12,7 @@ const app=readFileSync(new URL('../src/App.tsx',import.meta.url),'utf8');
 const persistence=readFileSync(new URL('../src/persistence.ts',import.meta.url),'utf8');
 const staff=readFileSync(new URL('../src/pwa-staff.ts',import.meta.url),'utf8');
 const selection=readFileSync(new URL('../src/selection.ts',import.meta.url),'utf8');
+const cartRefresh=readFileSync(new URL('../src/cart-refresh.ts',import.meta.url),'utf8');
 const css=readFileSync(new URL('../src/stage4.css',import.meta.url),'utf8');
 
 const checkoutStart=app.indexOf('function Stage4CheckoutView');
@@ -93,14 +94,15 @@ test('Stage 4 normal UI removes engineering copy while keeping source hierarchy'
     assert.match(checkout,new RegExp(marker));
   }
   assert.doesNotMatch(checkout,/第 4 階段|第 5 階段|SMT \/ Store Kernel|餐單版本|PRICE_CHANGED|CONFIG_CHANGED|正式價格、Combo、餐單 revision/);
+  assert.doesNotMatch(app.slice(app.indexOf('function DiningTargetSheet'),app.indexOf('function ConnectionSettings')),/SMT|Admin|正式|發佈/);
 });
 
 test('Stage 0-3 Auth Combo and repair seams remain present',()=>{
   assert.match(app,/stage1-order/);
   assert.match(app,/stage2-product-sheet/);
   assert.match(app,/stage3-cart-sheet/);
-  assert.match(app,/PRICE_CHANGED/);
-  assert.match(app,/CONFIG_CHANGED/);
+  assert.match(cartRefresh,/PRICE_CHANGED/);
+  assert.match(cartRefresh,/CONFIG_CHANGED/);
   assert.match(staff,/loginId/);
   assert.match(selection,/resolveSmmProductCombo/);
   assert.match(selection,/revalidateSmmCartComboIntent/);
