@@ -62,7 +62,7 @@ export function App(){
   const [comboSelections,setComboSelections]=useState<SmmComboSelectionState>({});
   const [cartOpen,setCartOpen]=useState(false);
   const [editingLineId,setEditingLineId]=useState<string|null>(null);
-  const [cartNote,setCartNote]=useState('');
+  const [cartNote,setCartNote]=useState(initial.cartNote);
   const [submitting,setSubmitting]=useState(false);
   const submitLockRef=useRef(false);
   const [search,setSearch]=useState('');
@@ -77,10 +77,12 @@ export function App(){
   const persist=(next:{
     cart?:readonly SmmCartLine[];
     pendingIntents?:readonly SmmPendingIntent[];
+    cartNote?:string;
     preferences?:SmmLocalPreferences;
   })=>{
     writeSmmLocalWorkspace({
       cart:next.cart??cart,
+      cartNote:next.cartNote??cartNote,
       pendingIntents:next.pendingIntents??pendingIntents,
       preferences:next.preferences??{activeView:view,activeCategoryId,sourceFilter,serviceMode,tender},
     });
@@ -256,6 +258,7 @@ export function App(){
     setCart(Object.freeze(next));
     writeSmmLocalWorkspace({
       cart:Object.freeze(next),
+      cartNote,
       pendingIntents,
       preferences:{activeView:view,activeCategoryId,sourceFilter,serviceMode,tender},
     });
@@ -360,6 +363,7 @@ export function App(){
     setCart(repriced);
     writeSmmLocalWorkspace({
       cart:repriced,
+      cartNote,
       pendingIntents,
       preferences:{activeView:view,activeCategoryId,sourceFilter,serviceMode:next,tender},
     });
@@ -385,7 +389,8 @@ export function App(){
   const resolveConfirmedIntent=(intent:SmmPendingIntent,message:string)=>{
     removeIntent(intent.submissionId);
     setCart([]);
-    persist({cart:[],pendingIntents:pendingIntents.filter(item=>item.submissionId!==intent.submissionId)});
+    setCartNote('');
+    persist({cart:[],cartNote:'',pendingIntents:pendingIntents.filter(item=>item.submissionId!==intent.submissionId)});
     setCartOpen(false);
     setNotice(message);
     void refresh();
@@ -522,6 +527,12 @@ export function App(){
     }
   };
 
+  const changeCartNote=(value:string)=>{
+    const next=value.slice(0,160);
+    setCartNote(next);
+    persist({cartNote:next});
+  };
+
   const localDraftCount=pendingIntents.length;
   const connectionLabel=connection==='READY'?(snapshot?.connectionPath==='LAN'?'LAN 已連接':'Internet 已連接'):connection==='LOADING'?'同步中':connection==='ERROR'?'同步失敗':'門店服務未連接';
   const webSmtAcceptance=typeof window!=='undefined'&&new URLSearchParams(window.location.search).get('target')==='web-smt';
@@ -647,13 +658,13 @@ export function App(){
       menu={menu}
       serviceMode={serviceMode}
       note={cartNote}
-      onNote={value=>setCartNote(value.slice(0,160))}
+      onNote={changeCartNote}
       onServiceMode={changeServiceMode}
       onClose={()=>setCartOpen(false)}
       onEdit={openCartLineEditor}
       onQuantity={(lineId,quantity)=>updateCart(cart.map(line=>line.lineId===lineId?{...line,quantity:Math.min(99,Math.max(1,quantity))}:line))}
       onRemove={lineId=>updateCart(cart.filter(line=>line.lineId!==lineId))}
-      onClear={()=>{setCart([]);setCartNote('');persist({cart:[]})}}
+      onClear={()=>{setCart([]);setCartNote('');persist({cart:[],cartNote:''})}}
       onCheckout={()=>{setCartOpen(false);setNotice('購物草稿已準備完成；今輪停喺 Stage 3，結帳會喺下一個 Stage 接上。')}}
     />:null}
 
