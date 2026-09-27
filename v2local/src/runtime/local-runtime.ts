@@ -21,7 +21,7 @@ import {
 import {validateAdminRefundEvent,type AdminRefundEvent} from '../../../contracts/admin-refund-v1.ts';
 
 export interface SmtOperationalMetric{readonly id:string;readonly label:string;readonly value:string;readonly detail?:string}
-export interface SmtOrderListItemViewModel{readonly orderId:string;readonly orderIdLabel:string;readonly itemCount:number;readonly totalLabel:string;readonly paymentLabel:string;readonly fulfillmentLabel:string;readonly sourceLabel?:string;readonly localSequenceLabel?:string}
+export interface SmtOrderListItemViewModel{readonly orderId:string;readonly orderIdLabel:string;readonly itemCount:number;readonly totalLabel:string;readonly paymentLabel:string;readonly fulfillmentLabel:string;readonly sourceLabel?:string;readonly localSequenceLabel?:string;readonly customerName?:string;readonly externalOrderNo?:string;readonly pickupCode?:string;readonly keetaDeferCount?:number}
 export interface SmtOrderDetailLineViewModel{readonly id:string;readonly name:string;readonly quantity:number;readonly unitLabel:string;readonly lineTotalLabel:string}
 export interface SmtOrderDetailViewModel extends SmtOrderListItemViewModel{readonly attention:readonly string[];readonly metrics:readonly SmtOperationalMetric[];readonly lines:readonly SmtOrderDetailLineViewModel[];readonly diningHoldId?:string;readonly recognizedSalesMinor?:number;readonly outstandingMinor?:number;readonly paymentEvidenceRef?:string;readonly paymentVerificationState?:'PENDING'|'VERIFIED'|'REJECTED';readonly customerPhone?:string;readonly paymentCorrections?:readonly PaymentCorrectionRecord[];readonly refunds?:readonly OrderRefundRecord[];readonly cancellationNoticeState?:'DONE'|'FAILED'|'UNKNOWN'}
 export interface SmtOrdersProjection{readonly items:readonly SmtOrderListItemViewModel[];readonly detailsByOrderId?:Readonly<Record<string,SmtOrderDetailViewModel>>;readonly selectedOrderId?:string;readonly selectedOrder?:SmtOrderDetailViewModel}
@@ -1479,12 +1479,20 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
       orderId:order.id,orderIdLabel:'#'+order.display,itemCount:order.items.reduce((s,x)=>s+x.qty,0),
       totalLabel:money(order.totalMinor),paymentLabel:order.paymentLabel,fulfillmentLabel:order.fulfillmentLabel,
       sourceLabel:order.sourceLabel,localSequenceLabel:order.display,
+      ...(order.customerName?{customerName:order.customerName}:{}),
+      ...(order.providerRef?{externalOrderNo:order.providerRef}:{}),
+      ...(order.providerPickupCode?{pickupCode:order.providerPickupCode}:{}),
+      ...(order.keetaDeferCount?{keetaDeferCount:order.keetaDeferCount}:{}),
     }));
     const selectedId=selectedOrderId&&visibleOrders.some(x=>x.id===selectedOrderId)?selectedOrderId:visibleOrders[0]?.id;
     const details:Record<string,SmtOrderDetailViewModel>={};
     for(const order of visibleOrders)details[order.id]={
       orderId:order.id,orderIdLabel:'#'+order.display,itemCount:order.items.reduce((s,x)=>s+x.qty,0),totalLabel:money(order.totalMinor),
       paymentLabel:order.paymentLabel,fulfillmentLabel:order.fulfillmentLabel,sourceLabel:order.sourceLabel,localSequenceLabel:order.display,
+      ...(order.customerName?{customerName:order.customerName}:{}),
+      ...(order.providerRef?{externalOrderNo:order.providerRef}:{}),
+      ...(order.providerPickupCode?{pickupCode:order.providerPickupCode}:{}),
+      ...(order.keetaDeferCount?{keetaDeferCount:order.keetaDeferCount}:{}),
       ...(order.diningHoldId?{diningHoldId:order.diningHoldId}:{}),
       ...(order.recognizedSalesMinor!==undefined?{recognizedSalesMinor:order.recognizedSalesMinor}:{}),
       ...(order.outstandingMinor!==undefined?{outstandingMinor:order.outstandingMinor}:{}),
