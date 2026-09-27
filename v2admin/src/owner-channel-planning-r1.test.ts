@@ -1,7 +1,7 @@
 import {describe,expect,it} from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
-import {calculateOwnerPlanningMetrics,normalizeOwnerKeetaChannel,normalizeOwnerOwnPlatformChannel} from '../worker.ts';
+import {calculateOwnerPlanningMetrics,normalizeOwnerKeetaChannel,normalizeOwnerOwnPlatformChannel,ownerRemainingOperatingDays} from '../worker.ts';
 
 describe('Owner Stage04 channel + planning',()=>{
   it('keeps channel health separate from accepting orders and exposes only supported controls',()=>{
@@ -53,6 +53,13 @@ describe('Owner Stage04 channel + planning',()=>{
     expect(metrics.costCoverage).toBe('MANUAL_ESTIMATE');
   });
 
+  it('uses canonical weekly schedule for remaining operating days when available',()=>{
+    const active={snapshot:{storeSettings:{weeklyHours:{
+      MON:{closed:false},TUE:{closed:false},WED:{closed:false},THU:{closed:false},FRI:{closed:false},SAT:{closed:true},SUN:{closed:false},
+    }}}};
+    expect(ownerRemainingOperatingDays(active,'2026-09','2026-09-25T04:00:00Z')).toBe(5);
+  });
+
   it('shows target reached without mutating transaction truth and keeps incomplete actual cost partial',()=>{
     const metrics=calculateOwnerPlanningMetrics({
       monthKey:'2026-09',
@@ -72,6 +79,8 @@ describe('Owner Stage04 channel + planning',()=>{
     const worker=fs.readFileSync(path.resolve(process.cwd(),'worker.ts'),'utf8');
     expect(worker).toContain("MFK_OWNER_MONTHLY_PLAN_V1");
     expect(worker).toContain("owner:planning:");
+    expect(worker).toContain("owner:planning:operation:");
+    expect(worker).toContain("owner:channel:operation:");
     expect(worker).toContain("recognizedSalesMinor");
     expect(worker).toContain("'/owner/planning'");
     expect(worker).toContain("'/owner/channels'");
