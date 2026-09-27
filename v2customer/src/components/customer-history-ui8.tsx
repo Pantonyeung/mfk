@@ -211,7 +211,7 @@ export function HistoryReorderUi8View({
   phase:Ui8Phase;setPhase:(value:Ui8Phase)=>void;
   active:readonly CustomerOrderProjection[];history:readonly CustomerHistoryProjection[];selectedHistory:CustomerHistoryProjection|null;
   cart:readonly CustomerCartLine[];repairs:readonly CustomerCartRepair[];quote:CustomerQuoteSnapshot|null;menu:CustomerMenuSnapshot|null|undefined;
-  connection:CustomerConnectionState;browserOnline:boolean;characterVariant?:'male'|'female';
+  connection:CustomerConnectionState;browserOnline:boolean;
   onOpenCurrent:(order:CustomerOrderProjection)=>void;onOpenHistory:(order:CustomerHistoryProjection)=>void;
   onStartReorder:(order:CustomerHistoryProjection)=>void;onAcceptRepair:(lineId:string)=>void;onEditRepair:(line:CustomerCartLine)=>void;onRemoveLine:(lineId:string)=>void;
   onGoCart:()=>void;onBrowse:()=>void;
