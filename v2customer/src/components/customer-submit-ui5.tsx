@@ -123,7 +123,7 @@ export function SubmitUi5View({
     {intent.checkout.paymentMethod==='ELECTRONIC'?<section className="ui5-proof-state">
       <span>付款憑證</span>
       <strong>{intent.checkout.paymentEvidence?.state==='UPLOADED'?'已提交付款憑證':'付款憑證狀態待重新確認'}</strong>
-      <p>付款截圖只係 Evidence；付款仍由 SMT / 店員正式核對，唔會顯示「已確認付款」。</p>
+      <p>付款截圖只係 Evidence；付款結果仍待 SMT / 店員正式核對。</p>
     </section>:null}
 
     {state==='UNKNOWN'?<section className="ui5-unknown" role="alert">
