@@ -30,6 +30,7 @@ const productTransitionName=(productId:string)=>`product-${productId.replace(/[^
 const stageMeta:Record<CustomerOrderStage,{label:string;title:string;detail:string}>={
   RECEIVED:{label:'等待店舖接單',title:'店舖已收到訂單',detail:'收到訂單唔等於已接單；要等店舖正式確認。'},
   REJECTED:{label:'未能接單',title:'店舖今次未能接單',detail:'睇清楚原因後，可以返回菜單重新選擇；系統唔會自動再送。'},
+  CANCELED:{label:'已取消',title:'訂單已取消',detail:'已取消係正式店舖狀態；系統唔會因取消而自動重新提交。'},
   ACCEPTED:{label:'已接單',title:'店舖已確認',detail:'店舖已正式接單，之後會更新製作狀態。'},
   PREPARING:{label:'製作中',title:'餐點製作中',detail:'店舖正在製作，未到可取餐階段。'},
   DELAYED:{label:'稍有延誤',title:'取餐時間有更新',detail:'延誤只更新預計時間，唔會假裝已可取餐。'},
