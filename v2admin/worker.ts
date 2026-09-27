@@ -188,7 +188,7 @@ export function calculateOwnerPlanningMetrics({monthKey,currentEffectiveSalesMin
   const actualLines=costLines.filter(item=>row(item).actualToDateMinor!==undefined&&row(item).actualToDateMinor!==null);
   const actualToDateCostMinor=actualLines.reduce((sum,item)=>sum+Math.max(0,Math.round(Number(row(item).actualToDateMinor)||0)),0);
   const actualCostAvailable=actualLines.length>0;
-  const costCoverage=actualLines.length===0?'MANUAL_ESTIMATE':actualLines.length<costLines.length?'PARTIAL':'COMPLETE';
+  const costCoverage=actualLines.length===0||actualLines.length<costLines.length?'PARTIAL':'MANUAL_ESTIMATE';
   const targetOperatingSurplusMinor=target-monthlyPlannedCostMinor;
   const estimatedOperatingProfitToDateMinor=actualCostAvailable?sales-actualToDateCostMinor:undefined;
   let forecastTargetDate;
