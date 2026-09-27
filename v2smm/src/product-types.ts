@@ -222,6 +222,22 @@ export interface SmmWorkItem {
   readonly eta?:string;
   readonly state:'NORMAL'|'DELAYED'|'ACTION_REQUIRED'|'UNKNOWN';
   readonly observedAt:string;
+
+  /** Optional canonical projection fields for Stage 6 presentation only. */
+  readonly source?:string;
+  readonly orderTime?:string;
+  readonly itemCount?:number;
+  readonly serviceMode?:SmmServiceMode;
+  readonly statusLabel?:string;
+  readonly customerName?:string;
+  readonly customerContact?:string;
+  readonly note?:string;
+  readonly items?:readonly {
+    readonly quantity:number;
+    readonly name:string;
+    readonly detail?:string;
+    readonly amountLabel?:string;
+  }[];
 }
 
 export interface SmmChannelHealth {
