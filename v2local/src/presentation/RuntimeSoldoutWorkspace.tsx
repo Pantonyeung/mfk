@@ -5,6 +5,11 @@ import type {SmtCapacityPoolStateView} from '../runtime/capacity-pool-state.ts';
 import './state-pages.css';
 
 const statusLabel:Record<SmtAvailabilityStatus,string>={available:'可售',soldout:'售罄',paused:'暫停'};
+let capacityOverrideSequence=0;
+const nextCapacityOverrideSubmissionId=(poolId:string)=>{
+  capacityOverrideSequence+=1;
+  return 'CAPOVR:'+poolId+':'+Date.now().toString(36)+':'+capacityOverrideSequence.toString(36);
+};
 
 export function RuntimeSoldoutWorkspace({runtime,embedded=false}:{runtime:CleanSmtCoreRuntimePort;embedded?:boolean}){
   const navigate=useNavigate();
@@ -51,6 +56,37 @@ export function RuntimeSoldoutWorkspace({runtime,embedded=false}:{runtime:CleanS
     finally{setBusy(false);}
   };
 
+  const approveOverride=async(poolId:string)=>{
+    if(!runtime.approveCapacityOverride)return;
+    const rawQty=window.prompt('Override 額外份數','1');
+    if(rawQty===null)return;
+    const quantity=Number(rawQty.trim());
+    if(!Number.isSafeInteger(quantity)||quantity<=0){setError('CAPACITY_OVERRIDE_QUANTITY_INVALID');return;}
+    const rawScope=window.prompt('Override 範圍：自家／第三方／全部','全部');
+    if(rawScope===null)return;
+    const scopeText=rawScope.trim().toUpperCase();
+    const scope=scopeText==='自家'||scopeText==='FIRST_PARTY'
+      ?'FIRST_PARTY'
+      :scopeText==='第三方'||scopeText==='THIRD_PARTY'
+        ?'THIRD_PARTY'
+        :scopeText==='全部'||scopeText==='ALL'||scopeText==='ALL_REMOTE'
+          ?'ALL_REMOTE'
+          :null;
+    if(!scope){setError('CAPACITY_OVERRIDE_SCOPE_INVALID');return;}
+    const note=window.prompt('批准內容／原因','現場確認有額外可製作份數');
+    if(note===null)return;
+    setBusy(true);setError(null);
+    try{
+      setCapacity(await runtime.approveCapacityOverride(poolId,{
+        submissionId:nextCapacityOverrideSubmissionId(poolId),
+        scope,
+        quantity,
+        note,
+      }));
+    }catch(cause){setError(cause instanceof Error?cause.message:'CAPACITY_OVERRIDE_FAILED');}
+    finally{setBusy(false);}
+  };
+
   const mutate=async(nodeId:string,status:SmtAvailabilityStatus)=>{
     if(!view||!view.canChange||!runtime.setAvailability)return;
     setBusy(true);setError(null);
@@ -72,7 +108,13 @@ export function RuntimeSoldoutWorkspace({runtime,embedded=false}:{runtime:CleanS
           <span className={pool.firstPartyAccepting?'accepting':'stopped'}>自家接單 · {pool.firstPartyAccepting?'接受新單':'暫停新單'}</span>
           <span className={pool.thirdPartyAccepting?'accepting':'stopped'}>第三方接單 · {pool.thirdPartyAccepting?'接受新單':'暫停新單'}</span>
         </div>
-        <button type="button" className="capacity-pool-adjust-button" disabled={busy||!runtime.adjustCapacityPool} onClick={()=>void adjustCapacity(pool.poolId,pool.remainingQty)}>調整數量</button>
+        {(pool.firstPartyOverrideRemaining>0||pool.thirdPartyOverrideRemaining>0)?<small className="capacity-override-summary">
+          Override 剩餘：自家 {pool.firstPartyOverrideRemaining} · 第三方 {pool.thirdPartyOverrideRemaining}
+        </small>:null}
+        <div className="capacity-pool-actions">
+          <button type="button" className="capacity-pool-adjust-button" disabled={busy||!runtime.adjustCapacityPool} onClick={()=>void adjustCapacity(pool.poolId,pool.remainingQty)}>調整數量</button>
+          <button type="button" className="capacity-pool-override-button" title="本機有限額批准；不代表第三方平台已完成遠端恢復" disabled={busy||!runtime.approveCapacityOverride} onClick={()=>void approveOverride(pool.poolId)}>批准 Override</button>
+        </div>
       </article>)}</div>
       {capacity.invalidActivePoolIds.length?<p role="alert">有 {capacity.invalidActivePoolIds.length} 個啟用 Pool 設定無效，未建立本機狀態。</p>:null}
     </section>:null}
