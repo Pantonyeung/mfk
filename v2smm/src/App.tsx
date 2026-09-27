@@ -4,6 +4,7 @@ import {resolveSmmRuntimePort} from './runtime';
 import {pairSmmLan,probeSmmLan,readSmmLanPwaConfig,saveSmmLanPwaConfig} from './pwa-lan';
 import {clearSmmStaffSession,listSmmStaff,readSmmStaffSession,refreshSmmStaffSession,verifySmmStaff,type SmmStaffDirectoryItem,type SmmStaffSession} from './pwa-staff';
 import {
+  comboSelectionStateFromIntent,
   publishedSmmComboUnitMinor,
   revalidateSmmCartComboIntent,
   resolveSmmProductCombo,
@@ -18,6 +19,7 @@ import {
 } from './selection';
 import './stage1.css';
 import './stage2.css';
+import './stage3.css';
 import type {
   SmmCartLine,
   SmmConnectionState,
@@ -59,6 +61,8 @@ export function App(){
   const [comboEnabled,setComboEnabled]=useState(false);
   const [comboSelections,setComboSelections]=useState<SmmComboSelectionState>({});
   const [cartOpen,setCartOpen]=useState(false);
+  const [editingLineId,setEditingLineId]=useState<string|null>(null);
+  const [cartNote,setCartNote]=useState('');
   const [submitting,setSubmitting]=useState(false);
   const submitLockRef=useRef(false);
   const [search,setSearch]=useState('');
@@ -256,9 +260,40 @@ export function App(){
       preferences:{activeView:view,activeCategoryId,sourceFilter,serviceMode,tender},
     });
     setNotice(invalid
-      ?'餐單已更新；部分草稿項目需要重新選擇後先可以提交。'
+      ?'餐單已更新；需要處理嘅商品已逐項標示，其他草稿保持不變。'
       :'餐單已更新；購物草稿已按目前發布價格重新計算。');
   },[menu?.revision,menu?.observedAt]);
+
+  const resetProductEditor=()=>{
+    setSelectedProduct(null);
+    setSelections({});
+    setSelectedVariationId(null);
+    setComboEnabled(false);
+    setComboSelections({});
+    setEditingLineId(null);
+  };
+
+  const openCartLineEditor=(line:SmmCartLine)=>{
+    const product=menu?.products.find(item=>item.productId===line.productId);
+    if(!product){
+      setNotice('呢件商品已不在目前餐單；請移除後重新選擇。');
+      return;
+    }
+    const restored:Record<string,readonly string[]>={};
+    for(const selection of line.selections){
+      restored[selection.optionGroupId]=Object.freeze([
+        ...(restored[selection.optionGroupId]??[]),
+        selection.optionId,
+      ]);
+    }
+    setEditingLineId(line.lineId);
+    setSelectedProduct(product);
+    setSelections(Object.freeze(restored));
+    setSelectedVariationId(line.selectedVariationId??null);
+    setComboEnabled(Boolean(line.combo));
+    setComboSelections(line.combo?comboSelectionStateFromIntent(line.combo):{});
+    setCartOpen(false);
+  };
 
   const addSelectedProduct=()=>{
     if(!selectedProduct)return;
@@ -288,26 +323,29 @@ export function App(){
       setNotice('餐單／套餐價格資料未完整，請重新同步。');
       return;
     }
+    const existingLine=editingLineId?cart.find(item=>item.lineId===editingLineId):undefined;
     const line:SmmCartLine=Object.freeze({
-      lineId:crypto.randomUUID(),
+      lineId:existingLine?.lineId??crypto.randomUUID(),
       productId:selectedProduct.productId,
       productName:selectedProduct.name,
-      quantity:1,
+      quantity:existingLine?.quantity??1,
       ...(variation?{selectedVariationId:variation.variationId,selectedVariationName:variation.name}:{}),
       selections:selectedOptions,
       ...(combo?{combo}:{}),
       publishedUnitPriceMinor,
-      createdAt:nowIso(),
+      createdAt:existingLine?.createdAt??nowIso(),
     });
-    const next=[...cart,line];
+    const next=existingLine
+      ?cart.map(item=>item.lineId===existingLine.lineId?line:item)
+      :[...cart,line];
     setCart(next);
     persist({cart:next});
-    setSelectedProduct(null);
-    setSelections({});
-    setSelectedVariationId(null);
-    setComboEnabled(false);
-    setComboSelections({});
-    setNotice(combo?'已加入套餐購物草稿；正式套餐內容同價格會由 SMT 再驗證。':'已加入本機購物草稿；未提交正式訂單。');
+    const edited=Boolean(existingLine);
+    resetProductEditor();
+    if(edited)setCartOpen(true);
+    setNotice(edited
+      ?'已更新呢一行購物草稿；原有項目身份保持不變。'
+      :combo?'已加入套餐購物草稿；正式套餐內容同價格會由 SMT 再驗證。':'已加入本機購物草稿；未提交正式訂單。');
   };
 
   const updateCart=(next:readonly SmmCartLine[])=>{
@@ -318,8 +356,7 @@ export function App(){
   const changeServiceMode=(next:SmmServiceMode)=>{
     const repriced=cart.map(line=>repriceLine(line,next));
     setServiceMode(next);
-    if(next==='DINE_IN')setDiningTargetOpen(true);
-    else setDiningTarget(null);
+    if(next==='TAKEAWAY')setDiningTarget(null);
     setCart(repriced);
     writeSmmLocalWorkspace({
       cart:repriced,
@@ -513,7 +550,7 @@ export function App(){
         cart={cart}
         quote={quote}
         serviceMode={serviceMode}
-        onProduct={product=>{setSelectedProduct(product);setSelections({});setSelectedVariationId(null);setComboEnabled(false);setComboSelections({})}}
+        onProduct={product=>{setEditingLineId(null);setSelectedProduct(product);setSelections({});setSelectedVariationId(null);setComboEnabled(false);setComboSelections({})}}
         onCart={()=>setCartOpen(true)}
       />:null}
       {view==='work'?<WorkView connection={connection} items={snapshot?.work??[]} onRefresh={()=>void refresh()}/>:null}
@@ -584,6 +621,7 @@ export function App(){
       product={selectedProduct}
       menu={menu}
       serviceMode={serviceMode}
+      editing={Boolean(editingLineId)}
       selections={selections}
       selectedVariationId={selectedVariationId}
       comboEnabled={comboEnabled}
@@ -599,27 +637,24 @@ export function App(){
         const group=resolved?.groups.find(item=>item.pool.poolId===poolId&&item.group.groupId===groupId);
         if(group)setComboSelections(current=>toggleSmmComboSelection(current,group,choiceId));
       }}
-      onClose={()=>{setSelectedProduct(null);setSelections({});setSelectedVariationId(null);setComboEnabled(false);setComboSelections({})}}
+      onClose={()=>{const returnToCart=Boolean(editingLineId);resetProductEditor();if(returnToCart)setCartOpen(true)}}
       onAdd={addSelectedProduct}
     />:null}
 
     {cartOpen?<CartSheet
       cart={cart}
       quote={quote}
-      pending={pendingIntents[0]??null}
+      menu={menu}
       serviceMode={serviceMode}
-      tender={tender}
-      diningTarget={diningTarget}
-      diningTables={snapshot?.diningTables??[]}
+      note={cartNote}
+      onNote={value=>setCartNote(value.slice(0,160))}
       onServiceMode={changeServiceMode}
-      onTender={changeTender}
-      onChooseDiningTarget={()=>setDiningTargetOpen(true)}
       onClose={()=>setCartOpen(false)}
-      onQuantity={(lineId,quantity)=>updateCart(cart.map(line=>line.lineId===lineId?{...line,quantity:Math.max(1,quantity)}:line))}
+      onEdit={openCartLineEditor}
+      onQuantity={(lineId,quantity)=>updateCart(cart.map(line=>line.lineId===lineId?{...line,quantity:Math.min(99,Math.max(1,quantity))}:line))}
       onRemove={lineId=>updateCart(cart.filter(line=>line.lineId!==lineId))}
-      submitting={submitting}
-      onSubmit={()=>void submitCart()}
-      onReadback={intent=>void readbackIntent(intent)}
+      onClear={()=>{setCart([]);setCartNote('');persist({cart:[]})}}
+      onCheckout={()=>{setCartOpen(false);setNotice('購物草稿已準備完成；今輪停喺 Stage 3，結帳會喺下一個 Stage 接上。')}}
     />:null}
 
     {diningTargetOpen?<DiningTargetSheet
@@ -875,6 +910,7 @@ function ProductSheet({
   product,
   menu,
   serviceMode,
+  editing,
   selections,
   selectedVariationId,
   comboEnabled,
@@ -889,6 +925,7 @@ function ProductSheet({
   product:SmmProduct;
   menu:SmmReadModelSnapshot['menu'];
   serviceMode:SmmServiceMode;
+  editing:boolean;
   selections:SmmSelectionState;
   selectedVariationId:string|null;
   comboEnabled:boolean;
@@ -939,7 +976,7 @@ function ProductSheet({
       <div className="sheet-grabber"/>
       <header className="stage2-sheet-header">
         <div>
-          <span>商品設定</span>
+          <span>{editing?'編輯商品':'商品設定'}</span>
           <h2>{product.name}</h2>
           <small>{product.description??'按需要完成規格、選項同套餐設定'}</small>
         </div>
@@ -1076,7 +1113,7 @@ function ProductSheet({
       <footer className="stage2-sticky-footer">
         <button onClick={onClose}>取消</button>
         <button className="primary" disabled={!validation.ok||!variationOk||!comboValidation.ok} onClick={onAdd}>
-          <span>{comboEnabled?'加入套餐草稿':'加入草稿'}</span>
+          <span>{editing?'完成':comboEnabled?'加入套餐草稿':'加入草稿'}</span>
           <small>{draftUnitMinor===null?'價格待同步':money('HKD',draftUnitMinor)}</small>
         </button>
       </footer>
@@ -1084,36 +1121,127 @@ function ProductSheet({
   </div>;
 }
 
-function CartSheet({cart,quote,pending,submitting,serviceMode,tender,diningTarget,diningTables,onServiceMode,onTender,onChooseDiningTarget,onClose,onQuantity,onRemove,onSubmit,onReadback}:{
+function CartSheet({cart,quote,menu,serviceMode,note,onNote,onServiceMode,onClose,onEdit,onQuantity,onRemove,onClear,onCheckout}:{
   cart:readonly SmmCartLine[];
   quote:SmmQuoteSnapshot|null;
-  pending:SmmPendingIntent|null;
+  menu:SmmReadModelSnapshot['menu'];
   serviceMode:SmmServiceMode;
-  tender:SmmTender;
-  diningTarget:SmmDiningTarget|null;
-  diningTables:NonNullable<SmmReadModelSnapshot['diningTables']>;
+  note:string;
+  onNote:(value:string)=>void;
   onServiceMode:(mode:SmmServiceMode)=>void;
-  onTender:(tender:SmmTender)=>void;
-  onChooseDiningTarget:()=>void;
   onClose:()=>void;
+  onEdit:(line:SmmCartLine)=>void;
   onQuantity:(id:string,q:number)=>void;
   onRemove:(id:string)=>void;
-  submitting:boolean;
-  onSubmit:()=>void;
-  onReadback:(intent:SmmPendingIntent)=>void;
+  onClear:()=>void;
+  onCheckout:()=>void;
 }){
-  const tenders:[SmmTender,string][]=[['CASH','現金'],['ALIPAY','AlipayHK'],['WECHAT','WeChat Pay HK'],['FPS','FPS'],['PAYME','PayMe']];
-  return <div className="overlay"><section className="sheet" role="dialog" aria-modal="true"><div className="sheet-grabber"/><header><div><span>購物草稿</span><h2>{cart.length} 項</h2><small>價格直接使用已發布餐單；提交時 SMT 會核對版本同價格。</small></div><button onClick={onClose}>✕</button></header>
-    <section className="option-group"><div><strong>服務方式</strong><span>員工設定</span></div><div className="segmented"><button className={serviceMode==='TAKEAWAY'?'active':''} onClick={()=>onServiceMode('TAKEAWAY')}>外賣</button><button className={serviceMode==='DINE_IN'?'active':''} onClick={()=>onServiceMode('DINE_IN')}>堂食</button></div></section>
-    {serviceMode==='DINE_IN'?<section className="option-group"><div><strong>堂食掛單</strong><span>先揀枱／輪候，再由堂食 Checkout 埋單</span></div><button className="primary" type="button" onClick={onChooseDiningTarget}>{diningTarget?.kind==='TABLE'?((diningTables.find(row=>row.tableId===diningTarget.tableId)?.label??diningTarget.tableId)+' · '+diningTarget.covers+' 位'):diningTarget?.kind==='WAITING'?('輪候 · '+diningTarget.covers+' 位'):'選擇枱／輪候'}</button></section>:null}
-    {serviceMode==='TAKEAWAY'?<section className="option-group"><div><strong>收款方式</strong><span>只記錄，不自動開錢箱</span></div><div className="option-list">{tenders.map(([value,label])=><button key={value} className={tender===value?'active':''} onClick={()=>onTender(value)}>{label}</button>)}</div>{tender==='CASH'?<p className="callout">現金只會記錄為收款方式；需要開錢箱時由 SMT 人手操作。</p>:null}</section>:null}
-    {!cart.length?<EmptyState title="草稿係空嘅" detail="返回點單加入商品。"/>:cart.map(line=><div className="cart-line" key={line.lineId}><div><strong>{line.productName}</strong><small>{[line.combo?.comboName,line.selectedVariationName,...line.selections.map(item=>item.optionName),...(line.combo?.selections.map(item=>item.choiceLabel)??[])].filter(Boolean).join(' · ')||'無額外設定'} · {Number.isSafeInteger(Number(line.publishedUnitPriceMinor))?money('HKD',Number(line.publishedUnitPriceMinor)):'價格待同步'}</small></div><div className="qty"><button onClick={()=>onQuantity(line.lineId,line.quantity-1)}>−</button><b>{line.quantity}</b><button onClick={()=>onQuantity(line.lineId,line.quantity+1)}>＋</button></div><button className="danger" onClick={()=>onRemove(line.lineId)}>移除</button></div>)}
-    <div className="cart-total"><span>已發布總額</span><strong>{quote?money(quote.currency,quote.totalMinor):'價格資料未完整'}</strong><small>{quote?`餐單版本 ${quote.revision} · SMT 提交時再核對`:'請重新同步餐單'}</small></div>
-    {pending?<p className="callout">{pending.state==='UNKNOWN'?'上次提交結果未明，請先重新確認，唔好重新送出。':pending.lastMessage??'已有待提交草稿'}</p>:null}
-    <footer><button onClick={onClose}>返回</button>{pending?.state==='UNKNOWN'?<button className="primary" onClick={()=>onReadback(pending)}>重新確認結果</button>:<button className="primary" disabled={submitting||!cart.length||!quote} onClick={onSubmit}>{submitting?'提交中…':'提交訂單'}</button>}</footer>
-  </section></div>;
-}
+  const attentionFor=(line:SmmCartLine)=>{
+    if(!menu)return null;
+    const product=menu.products.find(item=>item.productId===line.productId);
+    if(!product)return '餐單已更新；呢件商品已不在目前餐單';
+    if(!product.available)return '此商品已暫停供應';
+    if(!Number.isSafeInteger(Number(line.publishedUnitPriceMinor)))return '餐單內容已更新；請重新編輯呢件商品';
+    return null;
+  };
+  const rows=cart.map(line=>Object.freeze({line,attention:attentionFor(line)}));
+  const affectedCount=rows.filter(row=>Boolean(row.attention)).length;
+  const validRows=rows.filter(row=>!row.attention&&Number.isSafeInteger(Number(row.line.publishedUnitPriceMinor)));
+  const validItemCount=validRows.reduce((sum,row)=>sum+row.line.quantity,0);
+  const validSubtotalMinor=validRows.reduce((sum,row)=>sum+Number(row.line.publishedUnitPriceMinor)*row.line.quantity,0);
+  const itemCount=cart.reduce((sum,line)=>sum+line.quantity,0);
+  const checkoutReady=Boolean(menu&&cart.length&&affectedCount===0&&quote);
 
+  return <div className="overlay stage3-overlay">
+    <section className="sheet stage3-cart-sheet" role="dialog" aria-modal="true" aria-label="購物草稿">
+      <div className="sheet-grabber"/>
+      <header className="stage3-cart-header">
+        <div>
+          <span>購物草稿</span>
+          <h2>{itemCount} 件商品</h2>
+          <small>只係本機草稿；正式價格、套餐同可售狀態仍由 SMT 提交時重新驗證。</small>
+        </div>
+        <div className="stage3-header-actions">
+          {cart.length?<button className="stage3-clear" type="button" onClick={onClear}>清空</button>:null}
+          <button className="stage3-close" type="button" onClick={onClose} aria-label="關閉購物草稿">✕</button>
+        </div>
+      </header>
+
+      <div className="stage3-scroll-body">
+        <section className="stage3-mode" aria-label="服務方式">
+          <div><strong>服務方式</strong><small>Stage 3 只設定草稿模式；枱號、付款同提交留待下一 Stage。</small></div>
+          <div className="stage3-segmented">
+            <button className={serviceMode==='DINE_IN'?'active':''} type="button" onClick={()=>onServiceMode('DINE_IN')}>堂食</button>
+            <button className={serviceMode==='TAKEAWAY'?'active':''} type="button" onClick={()=>onServiceMode('TAKEAWAY')}>外賣</button>
+          </div>
+        </section>
+
+        {!menu&&cart.length?<section className="stage3-sync-warning" role="status">
+          <strong>正式餐單未同步</strong>
+          <span>草稿會保留喺本機；重新同步餐單後先可以進入結帳。</span>
+        </section>:null}
+
+        {affectedCount>0?<section className="stage3-repair-summary" role="status">
+          <strong>有 {affectedCount} 項需要調整</strong>
+          <span>只修正有問題嗰一行；其他購物草稿保持不變。</span>
+        </section>:null}
+
+        {!cart.length?<section className="stage3-empty">
+          <span className="stage3-empty-bag" aria-hidden="true">□</span>
+          <h3>購物草稿係空嘅</h3>
+          <p>返回點單加入商品；同一商品唔同設定會保留做獨立項目。</p>
+          <button className="primary" type="button" onClick={onClose}>去點單</button>
+        </section>:<div className="stage3-lines">
+          {rows.map(({line,attention})=>{
+            const summary=[
+              line.combo?.comboName,
+              line.selectedVariationName,
+              ...line.selections.map(item=>item.optionName),
+              ...(line.combo?.selections.map(item=>item.choiceLabel)??[]),
+            ].filter(Boolean).join(' · ')||'無額外設定';
+            const unitPrice=Number.isSafeInteger(Number(line.publishedUnitPriceMinor))
+              ?money('HKD',Number(line.publishedUnitPriceMinor))
+              :'價格待同步';
+            return <article className={`stage3-line ${attention?'has-attention':''}`} key={line.lineId}>
+              <span className="stage3-line-media" aria-label="正式產品圖片待補"/>
+              <div className="stage3-line-main">
+                <div className="stage3-line-title">
+                  <div><strong>{line.productName}</strong><small>{summary}</small></div>
+                  <button className="stage3-edit" type="button" onClick={()=>onEdit(line)} aria-label={'編輯 '+line.productName}>編輯</button>
+                </div>
+                <div className="stage3-line-bottom">
+                  <strong>{unitPrice}</strong>
+                  <div className="stage3-qty" aria-label={line.productName+' 數量'}>
+                    <button type="button" disabled={line.quantity<=1} onClick={()=>onQuantity(line.lineId,line.quantity-1)} aria-label="減少數量">−</button>
+                    <b>{line.quantity}</b>
+                    <button type="button" disabled={line.quantity>=99} onClick={()=>onQuantity(line.lineId,line.quantity+1)} aria-label="增加數量">＋</button>
+                  </div>
+                </div>
+                {attention?<div className="stage3-line-attention"><span>{attention}</span><button type="button" onClick={()=>onEdit(line)}>立即處理</button></div>:null}
+                <button className="stage3-remove" type="button" onClick={()=>onRemove(line.lineId)}>移除</button>
+              </div>
+            </article>;
+          })}
+        </div>}
+
+        {cart.length?<label className="stage3-note">
+          <span>訂單備註 <small>選填</small></span>
+          <textarea value={note} maxLength={160} onChange={event=>onNote(event.target.value)} placeholder="例如：請分開袋（此備註仍未提交）"/>
+          <small>{note.length}/160</small>
+        </label>:null}
+      </div>
+
+      <footer className="stage3-footer">
+        <div>
+          <span>{affectedCount?'可用小計 · '+validItemCount+' 件':'總額'}</span>
+          <strong>{affectedCount?money('HKD',validSubtotalMinor):(quote?money(quote.currency,quote.totalMinor):'價格待同步')}</strong>
+          <small>{menu?'餐單版本 '+menu.revision+' · SMT 仍會再驗證':'等待正式餐單同步'}</small>
+        </div>
+        <button className="primary stage3-checkout" type="button" disabled={!checkoutReady} onClick={onCheckout}>前往結帳 →</button>
+      </footer>
+    </section>
+  </div>;
+}
 
 function DiningTargetSheet({tables,covers,setCovers,onClose,onSelect}:{
   tables:NonNullable<SmmReadModelSnapshot['diningTables']>;
