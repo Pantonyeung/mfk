@@ -1,7 +1,7 @@
 // Payment methods are Admin-published; channel IDs are stable opaque keys.
 export type CustomerConnectionState='NOT_CONNECTED'|'LOADING'|'READY'|'STALE'|'PARTIAL'|'UNKNOWN'|'ERROR';
 export type CustomerCommandState='CONFIRMED'|'REJECTED'|'FAILED'|'UNKNOWN'|'NOT_CONNECTED';
-export type CustomerOrderStage='RECEIVED'|'REJECTED'|'ACCEPTED'|'PREPARING'|'DELAYED'|'READY'|'PICKUP_VERIFICATION'|'HANDED_OVER'|'COMPLETED';
+export type CustomerOrderStage='RECEIVED'|'REJECTED'|'CANCELED'|'ACCEPTED'|'PREPARING'|'DELAYED'|'READY'|'PICKUP_VERIFICATION'|'HANDED_OVER'|'COMPLETED';
 
 export interface CustomerStoreContext {
   readonly storeId:string;
@@ -267,6 +267,7 @@ export interface CustomerOrderProjection {
   readonly stage:CustomerOrderStage;
   readonly itemSummary:string;
   readonly amountLabel?:string;
+  readonly paymentStatusLabel?:string;
   readonly pickupCode?:string;
   readonly phoneMasked?:string;
   readonly etaLabel?:string;
