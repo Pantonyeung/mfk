@@ -1,7 +1,0 @@
-MFK_OWNER_DEPLOY_REQUEST
-target=mfk-owner
-canonical_url=https://owner.morefunos.com
-product_source=ADMIN_IDENTITY_CANONICAL_R1
-requested_by=owner
-reason=deploy_owner_human_login_id_client
-work_id=MFK-ADMIN-IDENTITY-CANONICAL-R1
