@@ -435,7 +435,7 @@ function customerPublicSnapshot(active,customerOrders=[]){
     const priceText=String(item.basePrice??'').trim();
     const priceReady=priceText!==''&&Number.isFinite(Number(priceText));
     const sellability=row(availability[productId]);
-    return item.active!==false&&sellability.sellable!==false&&priceReady;
+    return item.active!==false&&ownerSellabilityEffective(sellability)&&priceReady;
   };
   const comboPools=rows(catalog.comboPools)
     .map(poolRaw=>{
@@ -477,7 +477,7 @@ function customerPublicSnapshot(active,customerOrders=[]){
                     label:choice.choiceType==='PRODUCT'
                       ?String(rawProductById.get(choice.productId)?.name||choice.label||choice.productId||'')
                       :choice.label,
-                    available:choice.choiceType!=='PRODUCT'||productAvailableForCombo(choice.productId),
+                    available:ownerSellabilityEffective(availability['COMBO_CHILD:'+choice.choiceId])&&(choice.choiceType!=='PRODUCT'||productAvailableForCombo(choice.productId)),
                   })),
               };
             })
@@ -547,7 +547,7 @@ function customerPublicSnapshot(active,customerOrders=[]){
           .map(optionRaw=>{const option=row(optionRaw);return{
             optionId:String(option.id||option.code||''),
             name:String(option.name||option.id||option.code||''),
-            available:option.active!==false,
+            available:option.active!==false&&ownerSellabilityEffective(availability['OPTION:'+String(option.id||option.code||'')]),
             publishedAdjustmentMinor:minorFromMoney(option.priceAdjustment),
             position:Number(option.position||0),
           }})
@@ -573,7 +573,7 @@ function customerPublicSnapshot(active,customerOrders=[]){
         categoryId,
         name:String(item.name||productId),
         description:String(item.description||''),
-        available:item.active!==false&&sellability.sellable!==false&&priceReady,
+        available:item.active!==false&&ownerSellabilityEffective(sellability)&&priceReady,
         ...(priceReady?{displayPriceLabel:moneyLabel(baseMinor+takeawayMinor),publishedUnitPriceMinor:baseMinor+takeawayMinor}:{}),
         ...(imageUrl?{imageUrl,imageAlt:String(item.name||productId)}:{}),
         optionGroups,
