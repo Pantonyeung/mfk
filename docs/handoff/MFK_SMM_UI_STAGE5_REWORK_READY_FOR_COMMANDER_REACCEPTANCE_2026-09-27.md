@@ -10,10 +10,10 @@ PR:
 #402
 
 FINAL_HEAD:
-47154a212464a6f791d2a3c51bd0c05952daa3f7
+a5e1f6b1c6fdcfdedea38050074d678c2fc7c686
 
 FINAL_CI:
-36310163528 = SUCCESS
+36310294357 = SUCCESS
 
 FRESH_MAIN:
 c2d5b016fe3dd08d276e915ae0f0fb2301e964cf
@@ -70,7 +70,7 @@ Transaction UNKNOWN remains same-submission readback-first.
 ## CI evidence
 
 Existing governance CI:
-run 36310163528 = SUCCESS
+run 36310294357 = SUCCESS
 
 SMM:
 - 110 / 110 PASS
@@ -128,10 +128,10 @@ NO DEPLOY
 NO STAGE 6
 
 FINAL_VALIDATED_HEAD:
-47154a212464a6f791d2a3c51bd0c05952daa3f7
+a5e1f6b1c6fdcfdedea38050074d678c2fc7c686
 
 FINAL_VALIDATED_CI:
-36310163528 = SUCCESS
+36310294357 = SUCCESS
 
 NOTE:
-This handoff metadata commit is documentation-only and does not alter the validated Stage 5 candidate. Commander reacceptance evidence is pinned to FINAL_VALIDATED_HEAD above.
+FINAL_HEAD has passed the existing governance CI. No production deploy was performed.
