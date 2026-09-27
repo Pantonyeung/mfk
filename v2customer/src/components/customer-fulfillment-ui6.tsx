@@ -158,6 +158,10 @@ export function StoreFulfillmentUi6View({
   const freshness=freshnessFrom(connection,browserOnline);
   const stage=order&&isUi6Stage(order.stage)?order.stage:null;
   const unsupported=Boolean(order&&!stage);
+  const elapsed=useElapsed(intent?.committedAt??intent?.updatedAt??order?.timeline?.[0]?.at??order?.observedAt);
+  const timeline=useMemo(()=>(
+    order?.timeline.filter(item=>isUi6Stage(item.stage)).slice(-6)??[]
+  ),[order?.timeline]);
 
   if(!stage){
     return <ReadbackPending
@@ -171,10 +175,6 @@ export function StoreFulfillmentUi6View({
   }
 
   const meta=UI6_META[stage];
-  const elapsed=useElapsed(intent?.committedAt??intent?.updatedAt??order.timeline?.[0]?.at??order.observedAt);
-  const timeline=useMemo(()=>(
-    order.timeline.filter(item=>isUi6Stage(item.stage)).slice(-6)
-  ),[order.timeline]);
   const summary=order.itemSummary||intent?.cart.map(line=>line.productName+' ×'+line.quantity).join('、')||'訂單內容等待讀回';
   const terminal=stage==='REJECTED'||stage==='CANCELED';
 
