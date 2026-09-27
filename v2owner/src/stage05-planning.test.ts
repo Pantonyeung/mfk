@@ -22,18 +22,25 @@ const plan:OwnerMonthlyPlan={
 const snapshot={
   globalState:'PARTIAL',
   store:{storeId:'MF01',storeName:'磨飯',businessDate:'2026-09-27',operatingStatus:'OPEN',observedAt:'2026-09-27T12:00:00+08:00',freshness:'FRESH'},
+  planningBasis:{
+    month:'2026-09',
+    businessDate:'2026-09-27',
+    sourceMetric:'CURRENT_EFFECTIVE_SALES',
+    sourceAuthority:'CANONICAL_REPORTING_PROJECTION',
+    currentEffectiveSalesMtdMinor:1300000,
+    metricVersion:'MFK_CURRENT_EFFECTIVE_SALES_V1',
+    completeness:'PARTIAL',
+    observedAt:'2026-09-27T12:00:00+08:00',
+  },
   liveOrders:{activeCount:0,readyCount:0,recentOrders:[],observedAt:'2026-09-27T12:00:00+08:00'},
   readiness:[],actions:[],orders:[],channels:[],sellability:[],staff:[],devices:[],
   reports:[
-    {reportId:'daily:2026-09-27',name:'9/27',value:'HK$6,000',freshness:'CANONICAL_PROJECTION',businessDate:'2026-09-27',metricKind:'CURRENT_EFFECTIVE_SALES',currentEffectiveSalesMinor:600000},
-    {reportId:'daily:2026-09-26',name:'9/26',value:'HK$7,000',freshness:'CANONICAL_PROJECTION',businessDate:'2026-09-26',metricKind:'CURRENT_EFFECTIVE_SALES',currentEffectiveSalesMinor:700000},
     {reportId:'legacy',name:'legacy',value:'HK$999,999',freshness:'LEGACY',businessDate:'2026-09-25',currentEffectiveSalesMinor:99999900},
   ],
   campaigns:[],settlements:[],inventory:[],notifications:[],activity:[],observedAt:'2026-09-27T12:00:00+08:00',
 } as unknown as OwnerReadModelSnapshot;
-
 describe('OA-PLN-001 monthly planning',()=>{
-  it('sums only canonical Current Effective Sales and derives target metrics',()=>{
+  it('consumes only canonical Current Effective Sales MTD basis and derives target metrics',()=>{
     const vm=buildOwnerPlanningViewModel(snapshot,plan,new Date('2026-09-27T04:00:00Z'));
     expect(vm.mtdMinor).toBe(1300000);
     expect(vm.remainingMinor).toBe(18700000);
@@ -61,7 +68,7 @@ describe('OA-PLN-001 monthly planning',()=>{
   });
 
   it('does not fabricate MTD from order or display totals when canonical metric is absent',()=>{
-    const withoutMetric={...snapshot,reports:[]} as OwnerReadModelSnapshot;
+    const withoutMetric={...snapshot,planningBasis:undefined} as OwnerReadModelSnapshot;
     const vm=buildOwnerPlanningViewModel(withoutMetric,plan,new Date('2026-09-27T04:00:00Z'));
     expect(vm.mtdAvailable).toBe(false);
     expect(vm.mtdLabel).toBe('—');
