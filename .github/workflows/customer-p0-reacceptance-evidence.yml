@@ -1,0 +1,55 @@
+name: customer-p0-reacceptance-evidence
+
+on:
+  pull_request:
+    paths:
+      - 'v2customer/**'
+      - '.github/workflows/customer-p0-reacceptance-evidence.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  visual-evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: v2customer
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install app dependencies
+        run: npm install --no-audit --no-fund --legacy-peer-deps --package-lock=false
+      - name: Full Customer regression
+        run: npm test
+      - name: Build
+        run: npm run build
+      - name: Install Playwright Chromium
+        run: |
+          npm install --no-save --no-audit --no-fund playwright@1.55.0
+          npx playwright install --with-deps chromium
+      - name: Start acceptance server
+        run: |
+          npm run dev -- --host 127.0.0.1 --port 4173 > /tmp/mfk-customer-vite.log 2>&1 &
+          echo $! > /tmp/mfk-customer-vite.pid
+          for i in $(seq 1 40); do
+            curl -fsS http://127.0.0.1:4173/visual-acceptance.html >/dev/null && exit 0
+            sleep 1
+          done
+          cat /tmp/mfk-customer-vite.log
+          exit 1
+      - name: Render 390 and 360 visual evidence
+        env:
+          MFK_VISUAL_BASE_URL: http://127.0.0.1:4173/visual-acceptance.html
+        run: node test/p0-visual-evidence.mjs
+      - name: Upload visual evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: customer-p0-reacceptance-visual-evidence-${{ github.sha }}
+          path: v2customer/evidence/p0-reacceptance/
+          if-no-files-found: error
+          retention-days: 30
