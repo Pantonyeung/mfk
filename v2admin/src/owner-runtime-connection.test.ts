@@ -1,5 +1,5 @@
 import {describe,expect,it} from 'vitest';
-import {buildOwnerReadModelSnapshot,mapOwnerOrderProjection} from '../worker.ts';
+import {AdminSyncStore,buildOwnerReadModelSnapshot,mapOwnerOrderProjection} from '../worker.ts';
 
 describe('Owner canonical read projection',()=>{
   it('preserves canonical fulfillmentLabel and never invents fulfillmentMode or payment state',()=>{
@@ -51,6 +51,62 @@ describe('Owner canonical read projection',()=>{
     expect(snapshot.channels[0].health).toBe('HEALTHY');
     expect(snapshot.channels[0].acceptingOrders).toBe(false);
     expect(snapshot.channels[0].observedState).toBe('PAUSED');
+  });
+
+  it('derives Keeta and Customer channel health from existing responsibility domains',async()=>{
+    const jsonResponse=(body:unknown)=>new Response(JSON.stringify(body),{status:200,headers:{'content-type':'application/json'}});
+    const env={
+      KEETA_RUNTIME:{
+        idFromName:(value:string)=>value,
+        get:()=>({
+          fetch:async(request:Request)=>{
+            const path=new URL(request.url).pathname;
+            if(path==='/admin/status')return jsonResponse({
+              oauth:{state:'CONNECTED',lastCallbackAt:'2026-09-27T01:00:00Z'},
+              webhook:{lastAcceptedAt:'2026-09-27T01:09:00Z'},
+              knownExternalBlocker:null,
+            });
+            return jsonResponse({
+              state:'AVAILABLE',
+              readback:{observedAt:'2026-09-27T01:09:30Z',details:{data:{status:4}}},
+              operation:{action:'REST',state:'COMPLETED',completedAt:'2026-09-27T01:09:30Z'},
+            });
+          },
+        }),
+      },
+      CUSTOMER_RUNTIME:{
+        idFromName:(value:string)=>value,
+        get:()=>({fetch:async()=>jsonResponse({
+          reachable:true,ageMs:2000,observedAt:'2026-09-27T01:10:00Z',
+          lastOrderPull:{at:'2026-09-27T01:09:58Z'},
+        })}),
+      },
+    };
+    const state={
+      storage:{
+        get:async(key:string)=>key==='active'?{
+          storeId:'MF01',
+          snapshot:{
+            channelPolicy:{enabled:true,displayName:'Keeta'},
+            customerChannelPolicy:{enabled:true},
+          },
+        }:key==='acks'?{}:undefined,
+        list:async()=>new Map(),
+      },
+      getWebSockets:()=>[],
+    };
+    const runtime=new AdminSyncStore(state as never,env as never);
+    const channels=await runtime.ownerChannelReadModel(await state.storage.get('active'),'2026-09-27T01:10:00Z');
+    expect(channels[0]).toMatchObject({
+      channelId:'KEETA',acceptingOrders:false,desiredState:'OPEN',observedState:'PAUSED',
+      health:'HEALTHY',mode:'PAUSED',freshness:'CURRENT',
+    });
+    expect(channels[1]).toMatchObject({
+      channelId:'CUSTOMER',acceptingOrders:true,desiredState:'OPEN',observedState:'OPEN',
+      health:'HEALTHY',mode:'NORMAL',freshness:'CURRENT',
+    });
+    expect(channels[0].availableActions).toEqual([]);
+    expect(channels[1].availableActions).toEqual([]);
   });
 
   it('maps only existing canonical sources and leaves missing Owner domains empty',()=>{
