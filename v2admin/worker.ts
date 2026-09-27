@@ -300,7 +300,8 @@ export function mapOwnerOrderProjection(input){
 }
 function ownerSellabilityKey(grain,targetId){
   const id=String(targetId||'').trim();
-  return grain==='PRODUCT'?id:String(grain||'').trim()+':'+id;
+  const canonicalGrain=grain==='MODIFIER'?'OPTION':String(grain||'').trim();
+  return canonicalGrain==='PRODUCT'?id:canonicalGrain+':'+id;
 }
 function ownerSellabilityEffective(rawState,now=new Date().toISOString()){
   const state=row(rawState);
@@ -869,7 +870,7 @@ export class AdminSyncStore{
     for(const target of resolved){
       let item=projected.find(row=>row.targetId===target.targetId&&row.grain===target.grain);
       if(target.grain==='MODIFIER'){
-        const stateRow=row(row(readback?.snapshot).availability['MODIFIER:'+target.targetId]);
+        const stateRow=row(row(readback?.snapshot).availability['OPTION:'+target.targetId]);
         item={targetId:target.targetId,name:target.name,grain:'MODIFIER',state:ownerSellabilityEffective(stateRow)?'SELLABLE':'SOLD_OUT',scope:stateRow.scope==='ONLINE_ONLY'?'ONLINE_ONLY':'ALL',...(stateRow.restoreAt?{restoreAt:String(stateRow.restoreAt)}:{}),observedAt:new Date().toISOString(),readback:'CONFIRMED'};
       }
       const expected=action==='RESTORE'?'SELLABLE':'SOLD_OUT';
