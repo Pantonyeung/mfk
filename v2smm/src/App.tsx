@@ -1495,9 +1495,9 @@ function Stage4CheckoutView({cart,quote,menu,serviceMode,tender,diningTarget,din
       <div className="sheet-grabber"/>
       <header className="stage4-header">
         <div>
-          <span>第 4 階段 · 結帳</span>
-          <h2>提交前確認</h2>
-          <small>確認以下資料後會進入第 5 階段正式提交；正式結果只以 SMT / Store Kernel 讀回為準。</small>
+          <span>結帳</span>
+          <h2>落單前確認</h2>
+          <small>逐步確認服務方式、堂食去向同付款方式。</small>
         </div>
         <button className="stage4-close" type="button" onClick={onClose} aria-label="關閉結帳">✕</button>
       </header>
@@ -1505,7 +1505,7 @@ function Stage4CheckoutView({cart,quote,menu,serviceMode,tender,diningTarget,din
       <div className="stage4-scroll-body">
         <section className="stage4-section">
           <div className="stage4-section-head">
-            <div><strong>服務方式</strong><small>切換屬店員明確操作；價格會按目前已發布資料即時重算。</small></div>
+            <div><strong>服務方式</strong><small>今張單係外賣定堂食？</small></div>
             <span>1</span>
           </div>
           <div className="stage4-segmented">
@@ -1516,7 +1516,7 @@ function Stage4CheckoutView({cart,quote,menu,serviceMode,tender,diningTarget,din
 
         {serviceMode==='DINE_IN'?<section className={`stage4-section stage4-dining ${diningStatus.valid?'':'required'}`}>
           <div className="stage4-section-head">
-            <div><strong>堂食去向</strong><small>必須使用 Admin 已發布餐枱，或者加入輪候。</small></div>
+            <div><strong>堂食去向</strong><small>揀枱號；未有座位就先加入輪候。</small></div>
             <span>2</span>
           </div>
           <div className="stage4-target-row">
@@ -1526,12 +1526,12 @@ function Stage4CheckoutView({cart,quote,menu,serviceMode,tender,diningTarget,din
             </div>
             <button type="button" className={diningStatus.valid?'':'primary'} onClick={onChooseDiningTarget}>{diningStatus.valid?'更改':'選擇餐枱／輪候'}</button>
           </div>
-          {!diningStatus.valid?<p className="stage4-inline-warning">堂食未選 Table / Waiting target，提交按鈕會保持停用。</p>:null}
+          {!diningStatus.valid?<p className="stage4-inline-warning">堂食需要先揀枱號或者加入輪候。</p>:null}
         </section>:null}
 
         <section className="stage4-section">
           <div className="stage4-section-head">
-            <div><strong>付款方式</strong><small>今階段只記錄 Tender；唔執行付款、唔自動開錢箱。</small></div>
+            <div><strong>付款方式</strong><small>揀客人今次使用嘅付款方式。</small></div>
             <span>{serviceMode==='DINE_IN'?'3':'2'}</span>
           </div>
           <div className="stage4-tender-grid">
@@ -1546,7 +1546,7 @@ function Stage4CheckoutView({cart,quote,menu,serviceMode,tender,diningTarget,din
 
         <section className="stage4-section stage4-summary">
           <div className="stage4-section-head">
-            <div><strong>最後摘要</strong><small>正式價格、Combo、餐單 revision 仍由 SMT 提交時重新驗證。</small></div>
+            <div><strong>訂單確認</strong><small>核對商品、服務方式、付款方式同總額。</small></div>
             <span>{serviceMode==='DINE_IN'?'4':'3'}</span>
           </div>
 
@@ -1555,15 +1555,18 @@ function Stage4CheckoutView({cart,quote,menu,serviceMode,tender,diningTarget,din
             <div><span>服務方式</span><strong>{serviceLabel}</strong></div>
             {serviceMode==='DINE_IN'?<div><span>堂食去向</span><strong className={diningStatus.valid?'':'warn'}>{diningStatus.label}</strong></div>:null}
             <div><span>付款方式</span><strong>{smmStage4TenderLabel(tender)}</strong></div>
-            <div><span>餐單版本</span><strong>{menu?.revision??'等待同步'}</strong></div>
+            <div><span>商品數量</span><strong>{itemCount} 件</strong></div>
           </div>
 
           <div className="stage4-review-lines">
             {cart.map(line=>{
               const total=smmLineTotalMinor(line.publishedUnitPriceMinor,line.quantity);
+              const product=menu?.products.find(item=>item.productId===line.productId);
+              const mediaProduct=product??{productId:line.productId,name:line.productName,imageRef:undefined};
               return <div key={line.lineId}>
+                <ProductMedia product={mediaProduct} className="stage4-line-media"/>
                 <span>{line.productName} × {line.quantity}</span>
-                <strong>{total===null?'價格待同步':money('HKD',total)}</strong>
+                <strong>{total===null?'價格更新中':money('HKD',total)}</strong>
               </div>;
             })}
           </div>
@@ -1571,21 +1574,25 @@ function Stage4CheckoutView({cart,quote,menu,serviceMode,tender,diningTarget,din
           {note.trim()?<div className="stage4-note-summary"><span>備註</span><p>{note}</p></div>:null}
 
           <div className="stage4-total">
-            <div><span>總額</span><small>{quote?'已發布價格預覽 · SMT 最終再驗證':'價格資料未完整'}</small></div>
+            <div><span>總額</span><small>{quote?'已按最新餐單資料計算':'價格更新中'}</small></div>
             <strong>{quote?money(quote.currency,quote.totalMinor):'—'}</strong>
           </div>
 
           {hasAttention?<section className="stage4-blocker" role="alert">
-            <strong>購物草稿有未確認更新</strong>
-            <span>返回購物草稿處理 PRICE_CHANGED / CONFIG_CHANGED 後先可以提交。</span>
+            <strong>有商品資料更新咗</strong>
+            <span>返回購物車確認有變更嘅商品，就可以繼續落單。</span>
           </section>:null}
+          <section className="stage4-final-callout">
+            <img src="/brand/stage0/stage0-female.svg" alt="" aria-hidden="true"/>
+            <div><strong>最後一步</strong><span>資料確認好就可以落單。</span></div>
+          </section>
         </section>
       </div>
 
-      <footer className="stage4-footer">
-        <button type="button" onClick={onBackToCart}>返回購物草稿</button>
-        <button className="primary stage4-submit" type="button" disabled={!submitReady} onClick={onSubmitBoundary}>提交訂單</button>
-        <small>{submitReady?'結帳資料已齊；按一次後會鎖定同一提交身份。':serviceMode==='DINE_IN'&&!diningStatus.valid?'請先選擇餐枱或輪候。':hasAttention?'請先處理購物草稿更新。':'請確認餐單價格資料。'}</small>
+      <footer className="stage4-footer" data-menu-revision={menu?.revision??''}>
+        <button type="button" onClick={onBackToCart}>返回購物車</button>
+        <button className="primary stage4-submit" type="button" disabled={!submitReady} onClick={onSubmitBoundary}>確認落單</button>
+        <small>{submitReady?'資料已齊，按一次確認落單。':serviceMode==='DINE_IN'&&!diningStatus.valid?'請先揀枱號或加入輪候。':hasAttention?'請先處理購物車內有更新嘅商品。':'等價格更新完成就可以落單。'}</small>
       </footer>
     </section>
   </div>;
