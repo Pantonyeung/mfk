@@ -1,5 +1,5 @@
 import {useEffect,useMemo,useRef,useState} from 'react';
-import {createCustomerPendingIntent,readCustomerLocalWorkspace,writeCustomerLocalWorkspace,type CustomerLocalPreferences} from './persistence';
+import {createCustomerPendingIntent,customerFallbackReference,readCustomerLocalWorkspace,writeCustomerLocalWorkspace,type CustomerLocalPreferences} from './persistence';
 import {resolveCustomerRuntimePort} from './runtime';
 import {buildCustomerRecommendations} from './recommendation';
 import {publishedCartRepairs,quotePublishedCart,repairPublishedCartLine} from './local-quote';
@@ -8,6 +8,7 @@ import {customerComboPublishedUnitMinor,customerStandalonePublishedUnitMinor,res
 import {BottomNavigation,CustomerHeader,StatusBanner,type ActionState,type ProductOriginRect} from './ui/primitives';
 import {CartView,HomeView,MemberView,OrdersView,type MenuLayout,type OrderSegment} from './components/customer-views';
 import {CheckoutUi4View,type CustomerUi4CheckoutStep} from './components/customer-checkout-ui4';
+import {SubmitUi5View,WaitingStoreConfirmationUi5View} from './components/customer-submit-ui5';
 import {ProductSheet} from './components/product-sheet-ui3';
 import {Stage2Menu} from './stage2/Stage2Menu';
 import {Stage2BottomNavigation} from './stage2/Stage2BottomNavigation';
@@ -23,20 +24,30 @@ import type {
   CustomerRuntimePort,
 } from './product-types';
 
-export type View='home'|'menu'|'cart'|'checkout'|'orders'|'more';
+export type View='home'|'menu'|'cart'|'checkout'|'submit'|'waiting'|'orders'|'more';
 
-const customerRouteFromPath=(pathname:string):{view:View;checkoutStep?:CustomerUi4CheckoutStep}|null=>{
+type CustomerRoute={
+  view:View;
+  checkoutStep?:CustomerUi4CheckoutStep;
+  submissionId?:string;
+  waitingOrderId?:string;
+};
+const customerRouteFromPath=(pathname:string):CustomerRoute|null=>{
   if(pathname==='/memory-jar')return {view:'cart'};
   if(pathname==='/checkout/contact')return {view:'checkout',checkoutStep:'contact'};
   if(pathname==='/checkout/payment')return {view:'checkout',checkoutStep:'payment'};
   if(pathname==='/checkout/review')return {view:'checkout',checkoutStep:'review'};
+  const submitMatch=pathname.match(/^\/submit\/([^/]+)$/);
+  if(submitMatch)return {view:'submit',submissionId:decodeURIComponent(submitMatch[1])};
+  const waitingMatch=pathname.match(/^\/orders\/([^/]+)\/waiting$/);
+  if(waitingMatch)return {view:'waiting',waitingOrderId:decodeURIComponent(waitingMatch[1])};
   if(pathname==='/menu')return {view:'menu'};
   if(pathname==='/orders')return {view:'orders'};
   if(pathname==='/member')return {view:'more'};
   if(pathname==='/'||pathname==='')return {view:'home'};
   return null;
 };
-const pathForView=(view:Exclude<View,'checkout'>)=>({
+const pathForView=(view:'home'|'menu'|'cart'|'orders'|'more')=>({
   home:'/',
   menu:'/menu',
   cart:'/memory-jar',
@@ -70,6 +81,8 @@ export function App(){
   const initialRoute=useMemo(()=>customerRouteFromPath(typeof window==='undefined'?'':window.location.pathname),[]);
   const [view,setView]=useState<View>(initialRoute?.view??initial.preferences.activeView);
   const [checkoutStep,setCheckoutStep]=useState<CustomerUi4CheckoutStep>(initialRoute?.checkoutStep??'contact');
+  const [submitRouteId,setSubmitRouteId]=useState<string|null>(initialRoute?.submissionId??null);
+  const [waitingOrderId,setWaitingOrderId]=useState<string|null>(initialRoute?.waitingOrderId??null);
   const [activeCategoryId,setActiveCategoryId]=useState<string|null>(initial.preferences.activeCategoryId);
   const [cart,setCart]=useState<readonly CustomerCartLine[]>(initial.cart);
   const [checkout,setCheckout]=useState<CustomerCheckoutDraft>(initial.checkout);
@@ -113,8 +126,8 @@ export function App(){
   const changeView=(next:View)=>{
     presentWithContinuity(()=>{
       setView(next);
-      if(next!=='checkout')replacePath(pathForView(next));
-      persist({preferences:{activeView:next,activeCategoryId}});
+      if(next==='home'||next==='menu'||next==='cart'||next==='orders'||next==='more')replacePath(pathForView(next));
+      persist({preferences:{activeView:next==='submit'||next==='waiting'?'orders':next,activeCategoryId}});
       window.scrollTo({top:0,behavior:'auto'});
     });
   };
@@ -196,6 +209,8 @@ export function App(){
       if(!route)return;
       setView(route.view);
       if(route.checkoutStep)setCheckoutStep(route.checkoutStep);
+      setSubmitRouteId(route.submissionId??null);
+      setWaitingOrderId(route.waitingOrderId??null);
     };
     window.addEventListener('popstate',onPopState);
     return()=>window.removeEventListener('popstate',onPopState);
