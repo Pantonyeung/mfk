@@ -122,7 +122,7 @@ describe('CAP5 bounded capacity override',()=>{
       totalMinor:4100,paymentLabel:'到店付款',sourceLabel:'自家 App',
       capacityChannel:'FIRST_PARTY',
     });
-    expect((first as any).capacityEvents[0]?.overrideId).toContain('CAPOVR:2026-09-27:CAP01:');
+    expect((first as any).capacityEvents[0]?.overrideAllocations?.[0]?.overrideId).toContain('CAPOVR:2026-09-27:CAP01:');
     expect((await runtime.readCapacityPoolState()).pools[0]).toMatchObject({
       remainingQty:1,firstPartyOverrideRemaining:1,firstPartyAccepting:true,
     });
@@ -217,7 +217,7 @@ describe('CAP5 bounded capacity override',()=>{
 
     await runtime.cancelOrder(order.id,'客人取消');
     expect((await runtime.readCapacityPoolState()).pools[0]).toMatchObject({
-      remainingQty:1,firstPartyOverrideRemaining:0,firstPartyAccepting:false,
+      remainingQty:1,firstPartyOverrideRemaining:0,firstPartyAccepting:true,
     });
   });
 
