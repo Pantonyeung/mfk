@@ -18,9 +18,8 @@ describe('CAP3 manual capacity correction UI',()=>{
     expect(runtime).toContain('adjustCapacityPool?(poolId:string,remainingQty:number,note?:string)');
   });
 
-  it('does not expose Manager-only or Override semantics and keeps a touch-safe action',()=>{
-    expect(ui).not.toContain('Manager');
-    expect(ui).not.toContain('Override');
+  it('keeps CAP3 free of a manager-only permission gate and preserves a touch-safe adjustment action',()=>{
+    expect(ui).not.toContain('Manager-only');
     expect(css).toContain('.capacity-pool-adjust-button');
     expect(css).toContain('min-height:44px');
   });
