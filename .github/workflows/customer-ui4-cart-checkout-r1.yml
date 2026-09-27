@@ -7,7 +7,18 @@ permissions:
 on:
   push:
     branches:
+      - main
       - work/MFK/CUSTOMER-UI4-CART-CHECKOUT-R1
+      - work/MFK/CUSTOMER-UI4-REVIEW-RESET-R1
+    paths:
+      - 'v2customer/**'
+      - 'v2local/**'
+      - '.github/workflows/customer-ui4-cart-checkout-r1.yml'
+  pull_request:
+    paths:
+      - 'v2customer/**'
+      - 'v2local/**'
+      - '.github/workflows/customer-ui4-cart-checkout-r1.yml'
   workflow_dispatch:
 
 jobs:
