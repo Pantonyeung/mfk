@@ -1,0 +1,7 @@
+MFK_OWNER_DEPLOY_REQUEST
+target=mfk-owner
+canonical_url=https://owner.morefunos.com
+product_source=MAIN_OWNER_STAGE03_PLUS_AUTHENTICATED_READ
+requested_by=owner
+reason=first_owner_cloudflare_worker_hosting
+work_id=MFK-OWNER-HOSTING-R1
