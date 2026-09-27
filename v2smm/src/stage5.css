@@ -225,7 +225,7 @@
 }
 .stage5-primary,.stage5-secondary,.stage5-danger{
   width:100%;
-  min-height:52px!important;
+  min-height:50px!important;
   border-radius:14px!important;
   font-weight:900!important;
   font-size:13px!important;
