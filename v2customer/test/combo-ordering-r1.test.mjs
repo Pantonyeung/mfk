@@ -12,6 +12,7 @@ const types=fs.readFileSync(path.join(src,'product-types.ts'),'utf8');
 const selection=fs.readFileSync(path.join(src,'selection.ts'),'utf8');
 const quote=fs.readFileSync(path.join(src,'local-quote.ts'),'utf8');
 const views=fs.readFileSync(path.join(src,'components/customer-views.tsx'),'utf8');
+const ui3Views=fs.readFileSync(path.join(src,'components/product-sheet-ui3.tsx'),'utf8');
 const app=fs.readFileSync(path.join(src,'App.tsx'),'utf8');
 const persistence=fs.readFileSync(path.join(src,'persistence.ts'),'utf8');
 const cloudRuntime=fs.readFileSync(path.join(src,'cloud-runtime.ts'),'utf8');
@@ -112,7 +113,7 @@ test('Customer Cloud contract validates and preserves bounded Combo payload',()=
 });
 
 test('Customer Combo completion adds no second authority engine',()=>{
-  const combined=[types,selection,quote,views,app,cloudRuntime,cloudContract].join('\n');
+  const combined=[types,selection,quote,views,ui3Views,app,cloudRuntime,cloudContract].join('\n');
   for(const forbidden of[
     'class CustomerComboEngine',
     'class ComboEngine',
