@@ -111,7 +111,15 @@ export function App(){
       const session=await port.loginOwner(loginStaffId,loginPin);
       setOwnerSession(session);setLoginPin('');setConnection('LOADING');await refresh();
     }catch(reason){
-      setConnection('PERMISSION_DENIED');setLoginError(reason instanceof Error?reason.message:'Owner 登入失敗');
+      const code=typeof reason==='object'&&reason&&'code' in reason?String((reason as {code?:unknown}).code||''):'';
+      setConnection(code==='OWNER_NETWORK_ERROR'?'OFFLINE_READONLY':'PERMISSION_DENIED');
+      setLoginError(
+        code==='OWNER_NETWORK_ERROR'
+          ?'暫時未能連接 Owner 服務，請檢查網絡後再試。'
+          :code==='OWNER_AUTH_UNAUTHORIZED'||code==='OWNER_AUTH_UNAVAILABLE'
+            ?'Staff ID 或 PIN 未能通過 Owner 身份驗證。'
+            :'未能完成 Owner 身份驗證，請重新嘗試。'
+      );
     }finally{setLoginBusy(false);}
   };
   const logout=async()=>{
