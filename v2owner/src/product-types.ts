@@ -174,14 +174,129 @@ export interface OwnerOrderProjection {
   readonly timeline:readonly string[];
 }
 
+export type OwnerChannelMode='NORMAL'|'BUSY'|'SNOOZED'|'PAUSED'|'CLOSED';
+export type OwnerChannelCause='manual'|'schedule'|'internet'|'integration'|'provider'|'platform_suspension'|'policy';
+
+export interface OwnerChannelLastCommand {
+  readonly action:'PAUSE'|'RESUME'|'SNOOZE'|'BUSY';
+  readonly state:'CONFIRMED'|'REJECTED'|'FAILED'|'UNKNOWN'|'IDEMPOTENT';
+  readonly requestedAt?:string;
+  readonly completedAt?:string;
+}
+
 export interface OwnerChannelHealth {
   readonly channelId:string;
   readonly name:string;
-  readonly desired:string;
-  readonly observed:string;
+  readonly acceptingOrders:boolean|null;
+  readonly desiredState:string;
+  readonly observedState:string;
   readonly health:'HEALTHY'|'DEGRADED'|'OFFLINE'|'UNKNOWN';
-  readonly freshness:string;
+  readonly mode:OwnerChannelMode;
+  readonly cause:OwnerChannelCause;
   readonly observedAt:string;
+  readonly freshness:'CURRENT'|'STALE'|'PARTIAL'|'UNKNOWN';
+  readonly lastCommand?:OwnerChannelLastCommand;
+  readonly readback:'CONFIRMED'|'PARTIAL'|'UNKNOWN';
+  readonly controls:Readonly<{
+    pause:boolean;
+    resume:boolean;
+    snooze:boolean;
+    busy:boolean;
+  }>;
+}
+
+
+export type OwnerCostCategory='RENT'|'UTILITIES_WATER'|'UTILITIES_ELECTRICITY'|'UTILITIES_GAS'|'LABOR'|'OTHER'|'CUSTOM';
+export type OwnerCostCoverage='COMPLETE'|'PARTIAL'|'MANUAL_ESTIMATE';
+
+export interface OwnerMonthlyCostLine {
+  readonly costLineId:string;
+  readonly category:OwnerCostCategory;
+  readonly label:string;
+  readonly plannedMonthlyMinor:number;
+  readonly actualToDateMinor?:number;
+  readonly note?:string;
+  readonly updatedAt:string;
+  readonly updatedBy:string;
+}
+
+export interface OwnerMonthlyPlan {
+  readonly schema:'MFK_OWNER_MONTHLY_PLAN_V1';
+  readonly storeId:string;
+  readonly monthKey:string;
+  readonly monthlyRevenueTargetMinor:number;
+  readonly note?:string;
+  readonly revision:number;
+  readonly updatedAt:string;
+  readonly updatedBy:string;
+  readonly costLines:readonly OwnerMonthlyCostLine[];
+}
+
+export interface OwnerPlanningMetrics {
+  readonly currentEffectiveSalesMinor:number;
+  readonly monthlyRevenueTargetMinor:number;
+  readonly achievementPercent:number;
+  readonly remainingMinor:number;
+  readonly remainingCalendarDays:number;
+  readonly remainingOperatingDays?:number;
+  readonly requiredDailyAverageMinor:number;
+  readonly actualDailyAverageMinor:number;
+  readonly paceState:'ON_TRACK'|'ATTENTION'|'TARGET_REACHED';
+  readonly monthlyPlannedCostMinor:number;
+  readonly targetOperatingSurplusMinor:number;
+  readonly actualToDateCostMinor:number;
+  readonly actualCostAvailable:boolean;
+  readonly estimatedOperatingProfitToDateMinor?:number;
+  readonly costCoverage:OwnerCostCoverage;
+  readonly forecastTargetDate?:string;
+  readonly forecastLabel?:'預計';
+  readonly salesSource:'CURRENT_EFFECTIVE_SALES';
+}
+
+export interface OwnerPlanningSnapshot {
+  readonly plan:OwnerMonthlyPlan;
+  readonly metrics:OwnerPlanningMetrics;
+  readonly observedAt:string;
+  readonly freshness:'CURRENT'|'STALE'|'PARTIAL'|'UNKNOWN';
+  readonly readback:'CONFIRMED'|'PARTIAL'|'UNKNOWN';
+}
+
+export interface OwnerPlanningSaveInput {
+  readonly monthKey:string;
+  readonly monthlyRevenueTargetMinor:number;
+  readonly note?:string;
+  readonly baseRevision:number;
+  readonly operationId:string;
+  readonly costLines:readonly {
+    readonly costLineId:string;
+    readonly category:OwnerCostCategory;
+    readonly label:string;
+    readonly plannedMonthlyMinor:number;
+    readonly actualToDateMinor?:number;
+    readonly note?:string;
+  }[];
+}
+
+export interface OwnerPlanningCommandResult {
+  readonly state:'CONFIRMED'|'REJECTED'|'FAILED'|'UNKNOWN';
+  readonly message:string;
+  readonly snapshot?:OwnerPlanningSnapshot;
+  readonly readback?:string;
+}
+
+export interface OwnerChannelCommandInput {
+  readonly channelId:string;
+  readonly action:'PAUSE'|'RESUME'|'SNOOZE'|'BUSY';
+  readonly operationId:string;
+  readonly snoozeUntil?:string;
+  readonly extraPrepMinutes?:number;
+}
+
+export interface OwnerChannelCommandResult {
+  readonly state:'CONFIRMED'|'REJECTED'|'FAILED'|'UNKNOWN';
+  readonly message:string;
+  readonly channel?:OwnerChannelHealth;
+  readonly readback?:string;
 }
 
 export interface OwnerSellabilityItem {
@@ -297,6 +412,7 @@ export interface OwnerReadModelSnapshot {
   readonly globalState?:OwnerGlobalState;
   readonly store?:OwnerStoreContext;
   readonly today?:OwnerTodaySummary;
+  readonly planning?:OwnerPlanningSnapshot;
   readonly insight?:OwnerTodayInsight;
   readonly liveOrders?:OwnerLiveOrdersSummary;
   readonly dineIn?:OwnerDineInSummary;
@@ -350,5 +466,8 @@ export interface OwnerRuntimePort {
   loginOwner?(loginId:string,pin:string):Promise<OwnerAuthSession>;
   logoutOwner?():Promise<void>;
   requestBoundedAction?(input:OwnerBoundedAction):Promise<OwnerCommandResult>;
+  commandChannel?(input:OwnerChannelCommandInput):Promise<OwnerChannelCommandResult>;
+  readPlanning?(monthKey:string):Promise<OwnerPlanningSnapshot>;
+  savePlanning?(input:OwnerPlanningSaveInput):Promise<OwnerPlanningCommandResult>;
   requestAdminDeepLink?():Promise<OwnerCommandResult>;
 }
