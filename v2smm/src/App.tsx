@@ -16,6 +16,8 @@ import {
   type SmmComboSelectionState,
   type SmmSelectionState,
 } from './selection';
+import './stage1.css';
+import './stage2.css';
 import type {
   SmmCartLine,
   SmmConnectionState,
@@ -108,8 +110,9 @@ export function App(){
       setSnapshot(next);
       setConnection('READY');
     }catch(reason){
+      console.warn('SMM_APP_REFRESH_DIAGNOSTIC',reason);
       setConnection('ERROR');
-      setError(reason instanceof Error?reason.message:'暫時未能讀取門店資料');
+      setError('暫時未能同步門店資料；可以繼續使用本機介面。');
     }
   };
 
@@ -486,9 +489,9 @@ export function App(){
   const connectionLabel=connection==='READY'?(snapshot?.connectionPath==='LAN'?'LAN 已連接':'Internet 已連接'):connection==='LOADING'?'同步中':connection==='ERROR'?'同步失敗':'門店服務未連接';
   const webSmtAcceptance=typeof window!=='undefined'&&new URLSearchParams(window.location.search).get('target')==='web-smt';
 
-  return <main className="app-shell" data-mode={connection==='READY'?'online':'offline'}>
+  return <main className="app-shell" data-mode={connection==='READY'?'online':'offline'} data-view={view}>
     <header className="topbar">
-      <div className="brand-mark">磨</div>
+      <img className="brand-mark brand-logo-topbar" src="/brand/morefun-logo.webp" alt="磨飯"/>
       <div className="brand-copy"><strong>磨飯流動店務</strong><span>{staffSession?.displayName??snapshot?.staff?.displayName??'店員模式'} · {snapshot?.staff?.storeId??'未連接門店'}</span></div>
       <button className="state-pill" onClick={()=>void refresh()} aria-label="重新同步門店資料"><i/>{connectionLabel}</button>
     </header>
@@ -570,16 +573,17 @@ export function App(){
     </section>
 
     <nav className="bottom-nav" aria-label="主要功能">
-      <NavButton active={view==='order'} label="點單" glyph="＋" onClick={()=>changeView('order')}/>
-      <NavButton active={view==='work'} label="待處理" glyph="◎" badge={(snapshot?.work??[]).filter(item=>item.state!=='NORMAL').length?String((snapshot?.work??[]).filter(item=>item.state!=='NORMAL').length):undefined} onClick={()=>changeView('work')}/>
-      <NavButton active={view==='orders'} label="訂單" glyph="▤" onClick={()=>changeView('orders')}/>
-      <NavButton active={view==='dine'} label="堂食" glyph="⌂" onClick={()=>changeView('dine')}/>
-      <NavButton active={view==='more'} label="更多" glyph="•••" badge={localDraftCount?String(localDraftCount):undefined} onClick={()=>changeView('more')}/>
+      <NavButton active={view==='order'} label="點單" onClick={()=>changeView('order')}/>
+      <NavButton active={view==='work'} label="待處理" badge={(snapshot?.work??[]).filter(item=>item.state!=='NORMAL').length?String((snapshot?.work??[]).filter(item=>item.state!=='NORMAL').length):undefined} onClick={()=>changeView('work')}/>
+      <NavButton active={view==='orders'} label="訂單" onClick={()=>changeView('orders')}/>
+      <NavButton active={view==='dine'} label="堂食" onClick={()=>changeView('dine')}/>
+      <NavButton active={view==='more'} label="更多" badge={localDraftCount?String(localDraftCount):undefined} onClick={()=>changeView('more')}/>
     </nav>
 
     {selectedProduct?<ProductSheet
       product={selectedProduct}
       menu={menu}
+      serviceMode={serviceMode}
       selections={selections}
       selectedVariationId={selectedVariationId}
       comboEnabled={comboEnabled}
@@ -643,15 +647,53 @@ function OrderView({connection,categories,activeCategoryId,setCategory,search,se
   onCart:()=>void;
 }){
   const count=cart.reduce((sum,line)=>sum+line.quantity,0);
-  return <section className="page order-page">
-    <header className="hero compact"><div><span>點單</span><h1>快速點餐</h1><small>使用 Admin 已發布餐單；SMT 只喺提交時核對版本同價格。</small></div>{connection==='READY'?<b className="tag">已同步</b>:null}</header>
-    <label className="search"><span>搜尋商品</span><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="輸入商品名稱"/></label>
-    {categories.length?<div className="category-rail">{categories.map(item=><button key={item.categoryId} className={activeCategoryId===item.categoryId?'active':''} onClick={()=>setCategory(item.categoryId)}>{item.name}</button>)}</div>:null}
-    {connection==='LOADING'?<EmptyState title="正在同步餐單" detail="請稍候。"/>:
-      !categories.length?<EmptyState title={connection==='NOT_CONNECTED'?'餐單服務尚未連接':'暫時未有餐單'} detail={connection==='NOT_CONNECTED'?'連接後會顯示正式分類、商品、規格同供應狀態。':'目前門店資料未提供任何可售商品。'}/>:
-      products.length?<div className="product-grid">{products.map(product=>{const price=serviceMode==='DINE_IN'?product.publishedDineInUnitPriceMinor:product.publishedTakeawayUnitPriceMinor;return <button key={product.productId} className={`product-card ${product.available?'':'disabled'}`} disabled={!product.available} onClick={()=>onProduct(product)}><span className="product-avatar">{product.name.slice(0,1)}</span><strong>{product.name}</strong><small>{Number.isSafeInteger(Number(price))?money('HKD',Number(price)):(product.available?'可供應':'暫停供應')}</small><i>{product.optionGroups.length||product.variations?.length||product.comboId?'可設定':''}</i></button>})}</div>:
+  const unavailable=connection!=='READY';
+  return <section className="page order-page stage1-order">
+    <header className="stage1-order-header">
+      <div>
+        <span className="stage1-kicker">點單</span>
+        <h1>快速點餐</h1>
+        <p>商品資料只讀取正式餐單；未有正式產品相之前，圖片位置保持留白。</p>
+      </div>
+      <b className="stage1-service-mode">{serviceMode==='DINE_IN'?'堂食':'外賣'}</b>
+    </header>
+
+    <label className="search stage1-search">
+      <span>搜尋商品</span>
+      <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="輸入商品名稱"/>
+    </label>
+
+    {categories.length?<div className="category-rail stage1-category-rail" aria-label="商品分類">
+      {categories.map(item=><button key={item.categoryId} className={activeCategoryId===item.categoryId?'active':''} onClick={()=>setCategory(item.categoryId)}>{item.name}</button>)}
+    </div>:null}
+
+    <div className="stage1-section-title">
+      <div><span>商品</span><small>{unavailable?'等待正式餐單同步':'選擇商品開始落單'}</small></div>
+      {connection==='READY'?<b>已同步</b>:<b className="muted">本機介面</b>}
+    </div>
+
+    {connection==='LOADING'?<EmptyState title="正在同步餐單" detail="你可以先瀏覽介面；正式商品資料同步完成後會自動顯示。"/>:
+      !categories.length?<EmptyState title={connection==='READY'?'暫時未有餐單':'目前未有正式餐單資料'} detail={connection==='READY'?'目前門店資料未提供任何可售商品。':'Stage 1 已可進入；未連線時唔會建立假商品或者假價格。'}/>:
+      products.length?<div className="product-grid stage1-product-grid">{products.map(product=>{
+        const price=serviceMode==='DINE_IN'?product.publishedDineInUnitPriceMinor:product.publishedTakeawayUnitPriceMinor;
+        return <button key={product.productId} className={`product-card stage1-product-card ${product.available?'':'disabled'}`} disabled={!product.available} onClick={()=>onProduct(product)}>
+          <span className="product-media" aria-label="正式產品圖片待補"/>
+          {!product.available?<span className="stage1-soldout">已售罄</span>:null}
+          <span className="stage1-product-copy">
+            <strong>{product.name}</strong>
+            <small>{Number.isSafeInteger(Number(price))?money('HKD',Number(price)):(product.available?'價格待同步':'暫停供應')}</small>
+            <i>{product.optionGroups.length||product.variations?.length||product.comboId?'可設定':''}</i>
+          </span>
+          {product.available?<span className="stage1-product-add" aria-hidden="true">＋</span>:null}
+        </button>;
+      })}</div>:
       <EmptyState title="搵唔到商品" detail="清除搜尋或者切換其他分類。"><button className="primary" onClick={()=>setSearch('')}>清除搜尋</button></EmptyState>}
-    {count>0?<button className="cart-bar" onClick={onCart}><div><b>{count}</b><span>購物草稿</span></div><div><strong>{quote?money(quote.currency,quote.totalMinor):'價格資料未完整'}</strong><small>{quote?`已發布餐單版本 ${quote.revision}`:'請重新同步餐單'}</small></div><em>查看</em></button>:null}
+
+    {count>0?<button className="cart-bar stage1-cart-bar" onClick={onCart}>
+      <div className="stage1-cart-count"><b>{count}</b><span>購物草稿</span></div>
+      <div><strong>{quote?money(quote.currency,quote.totalMinor):'價格資料未完整'}</strong><small>{quote?`餐單版本 ${quote.revision}`:'請重新同步餐單'}</small></div>
+      <em>查看</em>
+    </button>:null}
   </section>;
 }
 
@@ -832,6 +874,7 @@ function Diagnostics({connection,snapshot,pendingCount}:{connection:SmmConnectio
 function ProductSheet({
   product,
   menu,
+  serviceMode,
   selections,
   selectedVariationId,
   comboEnabled,
@@ -845,6 +888,7 @@ function ProductSheet({
 }:{
   product:SmmProduct;
   menu:SmmReadModelSnapshot['menu'];
+  serviceMode:SmmServiceMode;
   selections:SmmSelectionState;
   selectedVariationId:string|null;
   comboEnabled:boolean;
@@ -858,38 +902,186 @@ function ProductSheet({
 }){
   const validation=validateSmmSelections(product,selections);
   const variationOk=!product.variationRequired||Boolean(selectedVariationId);
+  const requiredGroups=product.optionGroups.filter(group=>group.required||group.minSelections>0);
+  const optionalGroups=product.optionGroups.filter(group=>!group.required&&group.minSelections===0);
+  const orderedGroups=[...requiredGroups,...optionalGroups];
   const combo=resolveSmmProductCombo(product,menu);
   const comboValidation=validateSmmComboSelections(product,menu,comboEnabled,comboSelections);
+  const baseMinorRaw=serviceMode==='DINE_IN'?product.publishedDineInUnitPriceMinor:product.publishedTakeawayUnitPriceMinor;
+  const baseMinor=Number.isSafeInteger(Number(baseMinorRaw))?Number(baseMinorRaw):null;
+  const selectedAdjustmentMinor=product.optionGroups.reduce((sum,group)=>{
+    const selected=selections[group.optionGroupId]??[];
+    return sum+selected.reduce((groupSum,optionId)=>{
+      const option=group.options.find(candidate=>candidate.optionId===optionId);
+      const adjustment=Number(option?.publishedAdjustmentMinor??0);
+      return groupSum+(Number.isSafeInteger(adjustment)?adjustment:0);
+    },0);
+  },0);
+  const selectedComboAdjustmentMinor=comboEnabled&&combo
+    ?combo.groups.reduce((sum,group)=>{
+      const selected=comboSelections[group.key]??[];
+      return sum+selected.reduce((groupSum,choiceId)=>{
+        const choice=group.choices.find(candidate=>candidate.choiceId===choiceId);
+        return groupSum+(choice?.publishedAdjustmentMinor??0);
+      },0);
+    },0)
+    :0;
+  const draftBaseMinor=comboEnabled&&combo?combo.combo.publishedBasePriceMinor:baseMinor;
+  const draftUnitMinor=draftBaseMinor===null?null:draftBaseMinor+selectedAdjustmentMinor+selectedComboAdjustmentMinor;
+  const deltaLabel=(minor:number)=>{
+    if(minor===0)return '不加價';
+    return (minor>0?'+':'')+money('HKD',minor);
+  };
   const firstIssue=validation.issues[0]??comboValidation.issues[0];
-  const deltaLabel=(minor:number)=>minor===0?'不加價':(minor>0?'+':'')+money('HKD',minor);
-  return <div className="overlay"><section className="sheet" role="dialog" aria-modal="true"><div className="sheet-grabber"/><header><div><span>商品設定</span><h2>{product.name}</h2><small>{product.description??'請完成所需選項'}</small></div><button onClick={onClose}>✕</button></header>
-    {product.variations?.length?<section className="option-group"><div><strong>規格</strong><span>{product.variationRequired?'必選':'可選'}</span></div><div className="option-list">{product.variations.map(item=><button key={item.variationId} disabled={!item.available} className={selectedVariationId===item.variationId?'active':''} onClick={()=>setVariation(item.variationId)}>{item.name}</button>)}</div></section>:null}
-    {product.optionGroups.map(group=><section className="option-group" key={group.optionGroupId}><div><strong>{group.name}</strong><span>最少 {Math.max(group.required?1:0,group.minSelections)} · 最多 {group.maxSelections}</span></div><div className="option-list">{group.options.map(option=><button key={option.optionId} disabled={!option.available} className={(selections[group.optionGroupId]??[]).includes(option.optionId)?'active':''} onClick={()=>toggle(group.optionGroupId,option.optionId)}>{option.name}</button>)}</div></section>)}
-    {combo?<section className={`option-group stage2-combo-section ${comboEnabled&&!comboValidation.ok?'has-error':''}`}>
-      <div><strong>套餐</strong><span>{combo.combo.name} · 只讀 Admin 已發布 Combo / Pool；正式提交由 SMT 再驗證</span></div>
-      <div className="segmented"><button type="button" className={comboEnabled?'active':''} aria-pressed={comboEnabled} onClick={()=>setComboEnabled(!comboEnabled)}>{comboEnabled?'已選套餐':'升級套餐'}</button></div>
-      {comboEnabled?<><p className="callout">套餐基礎價 {money('HKD',combo.combo.publishedBasePriceMinor)}</p>
-        {combo.groups.map(group=>{
-          const selected=comboSelections[group.key]??[];
-          const groupError=selected.length<group.effectiveMinSelections||
-            selected.length>group.effectiveMaxSelections||
-            selected.some(id=>!group.choices.find(choice=>choice.choiceId===id&&choice.available));
-          const maxReached=group.effectiveMaxSelections>1&&selected.length>=group.effectiveMaxSelections;
-          return <section className={`option-group stage2-combo-group ${groupError?'has-error':''}`} key={group.key}>
-            <div><strong>{group.group.name}</strong><span>{group.pool.addonKind==='DRINK'?'飲品可跳過':group.effectiveMinSelections>0?'必選':'可選'} · 最少 {group.effectiveMinSelections} · 最多 {group.effectiveMaxSelections}</span></div>
-            <div className="option-list">{group.choices.map(choice=>{
-              const active=selected.includes(choice.choiceId);
-              const disabled=!choice.available||(maxReached&&!active);
-              return <button key={choice.choiceId} type="button" disabled={disabled} className={active?'active':''} onClick={()=>toggleCombo(group.pool.poolId,group.group.groupId,choice.choiceId)}>{choice.choiceLabel} · {!choice.available?'暫停供應':deltaLabel(choice.publishedAdjustmentMinor)}</button>;
-            })}</div>
-            {groupError?<p className="callout">{selected.length<group.effectiveMinSelections?`最少需要選擇 ${group.effectiveMinSelections} 項。`:selected.length>group.effectiveMaxSelections?`最多只可以選擇 ${group.effectiveMaxSelections} 項。`:'已選套餐內容包含暫停供應項目，請重新選擇。'}</p>:null}
+
+  return <div className="overlay stage2-overlay">
+    <section className="sheet stage2-product-sheet" role="dialog" aria-modal="true" aria-label={product.name+' 商品設定'}>
+      <div className="sheet-grabber"/>
+      <header className="stage2-sheet-header">
+        <div>
+          <span>商品設定</span>
+          <h2>{product.name}</h2>
+          <small>{product.description??'按需要完成規格、選項同套餐設定'}</small>
+        </div>
+        <button className="stage2-close" onClick={onClose} aria-label="關閉商品設定">✕</button>
+      </header>
+
+      <div className="stage2-scroll-body">
+        <section className="stage2-product-summary" aria-label="商品摘要">
+          <span className="stage2-product-media" aria-label="正式產品圖片待補"/>
+          <div>
+            <small>{comboEnabled&&combo?'套餐已發布基礎價':serviceMode==='DINE_IN'?'堂食價格':'外賣價格'}</small>
+            <strong>{draftBaseMinor===null?'價格待同步':money('HKD',draftBaseMinor)}</strong>
+            <span>選項調整 {deltaLabel(selectedAdjustmentMinor)}</span>
+            {comboEnabled?<span>套餐選擇 {deltaLabel(selectedComboAdjustmentMinor)}</span>:null}
+            <b>{draftUnitMinor===null?'草稿價格待同步':money('HKD',draftUnitMinor)}</b>
+          </div>
+        </section>
+
+        {product.variations?.length?<section className={`stage2-config-section ${product.variationRequired&&!variationOk?'has-error':''}`}>
+          <div className="stage2-section-head">
+            <div><strong>規格</strong><small>{product.variationRequired?'必選':'可選'}</small></div>
+            <span>{selectedVariationId?'已選 1':'未選'}</span>
+          </div>
+          <div className="stage2-option-grid">
+            {product.variations.map(item=><button
+              key={item.variationId}
+              disabled={!item.available}
+              className={selectedVariationId===item.variationId?'active':''}
+              onClick={()=>setVariation(item.variationId)}
+            ><span>{item.name}</span>{!item.available?<small>暫停供應</small>:null}</button>)}
+          </div>
+          {product.variationRequired&&!variationOk?<p className="stage2-inline-error">請先選擇必選規格。</p>:null}
+        </section>:null}
+
+        {orderedGroups.map(group=>{
+          const selected=selections[group.optionGroupId]??[];
+          const min=Math.max(group.required?1:0,group.minSelections);
+          const groupError=selected.length<min||selected.length>group.maxSelections||
+            selected.some(id=>!group.options.find(option=>option.optionId===id&&option.available));
+          const maxReached=group.maxSelections>1&&selected.length>=group.maxSelections;
+          return <section className={`stage2-config-section ${groupError?'has-error':''}`} key={group.optionGroupId}>
+            <div className="stage2-section-head">
+              <div>
+                <strong>{group.name}</strong>
+                <small>{min>0?'必選':'可選'} · 最少 {min} · 最多 {group.maxSelections}</small>
+              </div>
+              <span>已選 {selected.length}/{group.maxSelections}</span>
+            </div>
+            <div className="stage2-option-grid">
+              {group.options.map(option=>{
+                const active=selected.includes(option.optionId);
+                const disabled=!option.available||(maxReached&&!active);
+                const adjustment=Number(option.publishedAdjustmentMinor??0);
+                const adjustmentSafe=Number.isSafeInteger(adjustment)?adjustment:0;
+                return <button
+                  key={option.optionId}
+                  disabled={disabled}
+                  className={active?'active':''}
+                  onClick={()=>toggle(group.optionGroupId,option.optionId)}
+                >
+                  <span>{option.name}</span>
+                  <small>{!option.available?'暫停供應':deltaLabel(adjustmentSafe)}</small>
+                </button>;
+              })}
+            </div>
+            {groupError?<p className="stage2-inline-error">
+              {selected.length<min?`最少需要選擇 ${min} 項。`:selected.length>group.maxSelections?`最多只可以選擇 ${group.maxSelections} 項。`:'已選項目包含暫停供應選項，請重新選擇。'}
+            </p>:null}
           </section>;
         })}
-      </>:null}
-    </section>:null}
-    {(!validation.ok||!comboValidation.ok)&&firstIssue?<p className="callout">{firstIssue}</p>:null}
-    <footer><button onClick={onClose}>取消</button><button className="primary" disabled={!validation.ok||!variationOk||!comboValidation.ok} onClick={onAdd}>{comboEnabled?'加入套餐草稿':'加入草稿'}</button></footer>
-  </section></div>;
+
+        {combo?<section className={`stage2-config-section stage2-combo-section ${comboEnabled&&!comboValidation.ok?'has-error':''}`}>
+          <div className="stage2-section-head stage2-combo-head">
+            <div>
+              <strong>套餐</strong>
+              <small>{combo.combo.name} · 只讀 Admin 已發布 Combo / Pool；正式提交由 SMT 再驗證</small>
+            </div>
+            <button
+              type="button"
+              className={`stage2-combo-toggle ${comboEnabled?'active':''}`}
+              aria-pressed={comboEnabled}
+              onClick={()=>setComboEnabled(!comboEnabled)}
+            >{comboEnabled?'已選套餐':'升級套餐'}</button>
+          </div>
+          {comboEnabled?<>
+            <div className="stage2-combo-base">
+              <span>套餐基礎價</span>
+              <strong>{money('HKD',combo.combo.publishedBasePriceMinor)}</strong>
+            </div>
+            {combo.groups.map(group=>{
+              const selected=comboSelections[group.key]??[];
+              const groupError=selected.length<group.effectiveMinSelections||
+                selected.length>group.effectiveMaxSelections||
+                selected.some(id=>!group.choices.find(choice=>choice.choiceId===id&&choice.available));
+              const maxReached=group.effectiveMaxSelections>1&&selected.length>=group.effectiveMaxSelections;
+              return <section className={`stage2-combo-group ${groupError?'has-error':''}`} key={group.key}>
+                <div className="stage2-section-head">
+                  <div>
+                    <strong>{group.group.name}</strong>
+                    <small>{group.pool.addonKind==='DRINK'?'飲品可跳過':group.effectiveMinSelections>0?'必選':'可選'} · 最少 {group.effectiveMinSelections} · 最多 {group.effectiveMaxSelections}</small>
+                  </div>
+                  <span>已選 {selected.length}/{group.effectiveMaxSelections}</span>
+                </div>
+                <div className="stage2-option-grid">
+                  {group.choices.map(choice=>{
+                    const active=selected.includes(choice.choiceId);
+                    const disabled=!choice.available||(maxReached&&!active);
+                    return <button
+                      key={choice.choiceId}
+                      type="button"
+                      disabled={disabled}
+                      className={active?'active':''}
+                      onClick={()=>toggleCombo(group.pool.poolId,group.group.groupId,choice.choiceId)}
+                    >
+                      <span>{choice.choiceLabel}</span>
+                      <small>{!choice.available?'暫停供應':deltaLabel(choice.publishedAdjustmentMinor)}</small>
+                    </button>;
+                  })}
+                </div>
+                {groupError?<p className="stage2-inline-error">
+                  {selected.length<group.effectiveMinSelections?`最少需要選擇 ${group.effectiveMinSelections} 項。`:selected.length>group.effectiveMaxSelections?`最多只可以選擇 ${group.effectiveMaxSelections} 項。`:'已選套餐內容包含暫停供應項目，請重新選擇。'}
+                </p>:null}
+              </section>;
+            })}
+          </>:null}
+        </section>:null}
+
+        {(!validation.ok||!comboValidation.ok)&&firstIssue?<section className="stage2-validation-summary" role="status">
+          <strong>仲有設定未完成</strong>
+          <span>{firstIssue}</span>
+        </section>:null}
+      </div>
+
+      <footer className="stage2-sticky-footer">
+        <button onClick={onClose}>取消</button>
+        <button className="primary" disabled={!validation.ok||!variationOk||!comboValidation.ok} onClick={onAdd}>
+          <span>{comboEnabled?'加入套餐草稿':'加入草稿'}</span>
+          <small>{draftUnitMinor===null?'價格待同步':money('HKD',draftUnitMinor)}</small>
+        </button>
+      </footer>
+    </section>
+  </div>;
 }
 
 function CartSheet({cart,quote,pending,submitting,serviceMode,tender,diningTarget,diningTables,onServiceMode,onTender,onChooseDiningTarget,onClose,onQuantity,onRemove,onSubmit,onReadback}:{
@@ -970,7 +1162,7 @@ function EmptyState({title,detail,children}:{title:string;detail:string;children
 }
 function Tool({title,detail,state,onClick}:{title:string;detail:string;state:string;onClick:()=>void}){return <button className="tool-card" onClick={onClick}><span>◆</span><strong>{title}</strong><small>{detail}</small><em>{state}</em></button>}
 function Metric({label,value}:{label:string;value:string}){return <div><small>{label}</small><strong>{value}</strong></div>}
-function NavButton({active,label,glyph,badge,onClick}:{active:boolean;label:string;glyph:string;badge?:string;onClick:()=>void}){return <button className={active?'active':''} onClick={onClick}><span>{glyph}</span><small>{label}</small>{badge?<b>{badge}</b>:null}</button>}
+function NavButton({active,label,glyph,badge,onClick}:{active:boolean;label:string;glyph?:string;badge?:string;onClick:()=>void}){return <button className={active?'active':''} onClick={onClick}>{glyph?<span>{glyph}</span>:null}<small>{label}</small>{badge?<b>{badge}</b>:null}</button>}
 
 function labelWorkState(state:string){return state==='NORMAL'?'正常':state==='DELAYED'?'延誤':state==='ACTION_REQUIRED'?'需處理':'未知'}
 function connectionLabelShort(state:SmmConnectionState){return state==='READY'?'已連接':state==='LOADING'?'同步中':state==='ERROR'?'錯誤':state==='STALE'?'資料稍舊':state==='PARTIAL'?'部分資料':state==='UNKNOWN'?'未知':'未連接'}
