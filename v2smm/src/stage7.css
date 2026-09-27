@@ -71,6 +71,7 @@
   box-shadow:0 4px 12px rgba(47,115,255,.18);
 }
 .stage7-source-filters,
+.stage7-status-filters,
 .stage7-search-scopes,
 .stage7-date-filter{
   display:flex;
@@ -80,9 +81,11 @@
   scrollbar-width:none;
 }
 .stage7-source-filters::-webkit-scrollbar,
+.stage7-status-filters::-webkit-scrollbar,
 .stage7-search-scopes::-webkit-scrollbar,
 .stage7-date-filter::-webkit-scrollbar{display:none}
 .stage7-source-filters button,
+.stage7-status-filters button,
 .stage7-search-scopes button,
 .stage7-date-filter button{
   min-height:38px;
@@ -100,6 +103,7 @@
   white-space:nowrap;
 }
 .stage7-source-filters button.active,
+.stage7-status-filters button.active,
 .stage7-search-scopes button.active,
 .stage7-date-filter button.active{
   border-color:#bcd3ff;
