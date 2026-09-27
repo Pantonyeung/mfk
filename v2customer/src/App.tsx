@@ -8,7 +8,8 @@ import {customerComboPublishedUnitMinor,customerStandalonePublishedUnitMinor,res
 import {BottomNavigation,CustomerHeader,StatusBanner,type ActionState,type ProductOriginRect} from './ui/primitives';
 import {CartView,HomeView,MemberView,OrdersView,type MenuLayout,type OrderSegment} from './components/customer-views';
 import {CheckoutUi4View,type CustomerUi4CheckoutStep} from './components/customer-checkout-ui4';
-import {SubmitUi5View,WaitingStoreConfirmationUi5View} from './components/customer-submit-ui5';
+import {SubmitUi5View} from './components/customer-submit-ui5';
+import {StoreFulfillmentUi6View} from './components/customer-fulfillment-ui6';
 import {ProductSheet} from './components/product-sheet-ui3';
 import {Stage2Menu} from './stage2/Stage2Menu';
 import {Stage2BottomNavigation} from './stage2/Stage2BottomNavigation';
@@ -708,7 +709,7 @@ export function App(){
       {view==='cart'?<CartView cart={cart} quote={quote} repairs={cartRepairs} member={snapshot?.member} suggestions={cartSuggestions} products={menu?.products??[]} onProduct={openProduct} onAcceptRepair={acceptCartRepair} onQuantity={(lineId,quantity)=>updateCart(cart.map(line=>line.lineId===lineId?{...line,quantity:Math.max(1,quantity)}:line))} onRemove={lineId=>updateCart(cart.filter(line=>line.lineId!==lineId))} onMenu={()=>changeView('menu')} onCheckout={()=>void openCheckoutStep('contact')}/>:null}
       {view==='checkout'?<CheckoutUi4View step={checkoutStep} cart={cart} quote={quote} repairs={cartRepairs} checkout={checkout} setCheckout={changeCheckout} paymentChannels={snapshot?.paymentChannels??[]} onStep={step=>void openCheckoutStep(step)} onBackToJar={()=>changeView('cart')} onRepair={()=>changeView('cart')} onPaymentEvidence={file=>void uploadPaymentEvidence(file)} onReviewConfirmed={startUi5Submission}/>:null}
       {view==='submit'?(activeSubmitIntent?<SubmitUi5View intent={activeSubmitIntent} submitting={submitting} submitProbe={submitProbe} reading={readingIntentId===activeSubmitIntent.submissionId} fallbackAvailable={Boolean(snapshot?.fallback?.enabled)&&activeSubmitIntent.state==='NOT_CONNECTED'} onSubmit={()=>void submit(activeSubmitIntent)} onReadback={()=>void readbackIntent(activeSubmitIntent)} onFallback={()=>void requestFallback(activeSubmitIntent)} onBackReview={()=>void openCheckoutStep('review')} onBackToJar={()=>changeView('cart')}/>:<section className="page ui5-missing"><h1>提交資料未找到</h1><p>唔會建立新 Submission；請返回記憶罐重新確認。</p><button onClick={()=>changeView('cart')}>返回記憶罐</button></section>):null}
-      {view==='waiting'?<WaitingStoreConfirmationUi5View order={waitingOrder} intent={waitingIntent} connection={connection} onRefresh={()=>void refresh()} onOrders={()=>{setOrderSegment('current');changeView('orders')}} onHome={()=>changeView('home')}/>:null}
+      {view==='waiting'?<StoreFulfillmentUi6View order={waitingOrder} intent={waitingIntent} connection={connection} onRefresh={()=>void refresh()} onOrders={()=>{setOrderSegment('current');changeView('orders')}} onHome={()=>changeView('home')}/>:null}
       {view==='orders'?<OrdersView segment={orderSegment} setSegment={setOrderSegment} active={activeOrders} history={history} expandedOrderId={expandedOrderId} setExpandedOrderId={setExpandedOrderId} onReorder={order=>void reorder(order)} onBrowse={()=>changeView('menu')} connection={connection}/>:null}
       {view==='more'?<MemberView connection={connection} snapshot={snapshot} history={history} pendingIntents={recoveryIntents} readingIntentId={readingIntentId} onRefresh={()=>void refresh()} onReadback={intent=>void readbackIntent(intent)} onDiscard={removeIntent} onFallback={()=>void requestFallback()} onReorder={order=>void reorder(order)} onBrowse={()=>changeView('menu')}/>:null}
     </section>
