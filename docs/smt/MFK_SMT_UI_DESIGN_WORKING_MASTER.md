@@ -3975,3 +3975,48 @@ NEXT：
 
 MILESTONE：
 MFK_SMT_GOOGLE_DRIVE_STAGE_LINKUP_STRUCTURE_READY
+
+
+RECORD 007｜UI-STAGE-00 VISUAL DRAFT LINK-UP
+
+
+==================================================
+VISUAL UPDATE｜UI-STAGE-00
+日期：2026-09-27
+==================================================
+
+第一張自動生成 Visual Draft 因違反已鎖定 Stage 0 規格，已正式標記：
+REJECTED-VISUAL-DRAFT-01
+
+拒絕原因：
+- 左 Rail 出現 More／更多
+- 正常狀態排出多個綠燈／domain health
+- 主色偏離 Primary Blue system
+- 提前畫入 Ordering / Hero / Product content
+- Stage 0 應只驗證 Shell / Navigation / Global Layer
+
+合規 Visual Draft 02 已拆成三張：
+
+02A｜DEFAULT SHELL
+https://drive.google.com/file/d/1d0ZXacfW2TpKgQnVKtsFny4nnX16XN-p/view?usp=drivesdk
+
+02B｜NEW ORDER ALERT
+https://drive.google.com/file/d/1xPKlgx4_ldBvLJosjiLYFDBRLRFoqC_d/view?usp=drivesdk
+
+02C｜ATTENTION CENTER
+https://drive.google.com/file/d/1gtjiOLga4NSgMHgpBr2-JLJdc9kYs81I/view?usp=drivesdk
+
+REJECTED DRAFT 01：
+https://drive.google.com/file/d/1WaqDfbBn5o2fArVouaBg3CLhyqHnFfT9/view?usp=drivesdk
+
+Visual Draft 02 狀態：
+CANDIDATE FOR OWNER REVIEW
+NOT ACCEPTED YET
+
+Visual Link-up：
+UI-STAGE-00 SPEC
+→ 02A Default
+→ 02B New Order Alert
+→ 02C Attention Center
+→ Owner Review
+→ Acceptance / Rework
