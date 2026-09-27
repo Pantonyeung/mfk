@@ -1,0 +1,27 @@
+name: customer-ui-stage2-r1-fresh-integration
+
+on:
+  push:
+    branches:
+      - work/MFK/CUSTOMER-UI-STAGE2-R1-FRESH-INTEGRATION
+
+jobs:
+  v2customer:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: v2customer
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-audit --no-fund --legacy-peer-deps --package-lock=false
+      - name: Stage 2 contract
+        run: node --test test/stage2-menu-r1.test.mjs
+      - name: Combo Drink regression
+        run: node --test test/admin-combo-drink-projection-r1.test.mjs
+      - name: Full Customer test
+        run: npm test
+      - name: Build
+        run: npm run build
