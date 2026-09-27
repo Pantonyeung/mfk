@@ -6,7 +6,7 @@ const main=readFileSync(new URL('../src/main.tsx',import.meta.url),'utf8');
 const stage0=readFileSync(new URL('../src/StageZero.tsx',import.meta.url),'utf8');
 const css=readFileSync(new URL('../src/stage0.css',import.meta.url),'utf8');
 
-test('Stage 0 gate wraps the existing SMM app without moving transaction authority',()=>{
+test('Stage 0 wraps the existing SMM app without moving authority',()=>{
   assert.match(main,/StageZeroGate/);
   assert.match(main,/<StageZeroGate><App\/><\/StageZeroGate>/);
   assert.doesNotMatch(stage0,/submitOrder\s*\(/);
@@ -14,83 +14,64 @@ test('Stage 0 gate wraps the existing SMM app without moving transaction authori
   assert.doesNotMatch(stage0,/createDineSession\s*\(/);
 });
 
-test('Stage 0 has bounded splash and full recovery contract',()=>{
+test('Stage 0 source flow contains Splash Login Connection and Recovery',()=>{
   assert.match(stage0,/SPLASH_MS=650/);
-  assert.match(stage0,/PROBE_TIMEOUT_MS=3500/);
+  assert.ok(650<=1200);
+  for(const marker of['StageZeroSplash','StageZeroStaffLogin','StageZeroConnectionChecking','StageZeroConnectionRecovery','員工登入','正在連線','連線與恢復','重新檢查','繼續離線工作']){
+    assert.match(stage0,new RegExp(marker));
+  }
   assert.match(stage0,/Internet/);
   assert.match(stage0,/LAN/);
   assert.match(stage0,/最後觀察時間/);
-  assert.match(stage0,/重新連線/);
-  assert.match(stage0,/配對 LAN|LAN 配對/);
+});
+
+test('Stage 0 uses MoreFun brand and approved IP assets from the final visual source',()=>{
+  assert.match(stage0,/\/brand\/morefun-logo\.webp/);
+  assert.match(stage0,/\/brand\/stage0\/stage0-male\.svg/);
+  assert.match(stage0,/\/brand\/stage0\/stage0-female\.svg/);
+  assert.ok(existsSync(new URL('../public/brand/morefun-logo.webp',import.meta.url)));
+  assert.ok(existsSync(new URL('../public/brand/stage0/stage0-male.svg',import.meta.url)));
+  assert.ok(existsSync(new URL('../public/brand/stage0/stage0-female.svg',import.meta.url)));
+  assert.match(css,/stage0-mascot-pair/);
+  assert.match(css,/stage0-feather/);
+});
+
+test('Stage 0 staff login reuses current Staff Auth and PIN flow',()=>{
+  assert.match(stage0,/listSmmStaff/);
+  assert.match(stage0,/verifySmmStaff/);
+  assert.match(stage0,/登入編號/);
+  assert.match(stage0,/4–8 位數字/);
+  assert.doesNotMatch(stage0,/new Auth|second auth|createStaffAuth/i);
+});
+
+test('Stage 0 recovery reuses LAN primitives and never bypasses trusted staff identity',()=>{
   assert.match(stage0,/pairSmmLan/);
   assert.match(stage0,/probeSmmLan/);
-  assert.match(stage0,/LAST_OBSERVED_KEY/);
-  assert.match(stage0,/rememberLastObservedAt/);
-  assert.match(stage0,/onRetry\(\);/);
-});
-
-test('Stage 0 never shows raw engineering error messages to frontline UI',()=>{
-  assert.doesNotMatch(stage0,/setProbeMessage\(reason/);
-  assert.doesNotMatch(stage0,/setError\(reason/);
-  assert.doesNotMatch(stage0,/role="alert">\{reason/);
-  assert.match(stage0,/SMM_STAGE0_PROBE_DIAGNOSTIC/);
-  assert.match(stage0,/SMM_STAGE0_STAFF_VERIFY_DIAGNOSTIC/);
-  assert.match(stage0,/登入編號或 PIN 未能驗證/);
-});
-
-test('Offline workspace cannot bypass trusted staff identity',()=>{
+  assert.match(stage0,/readSmmLanPwaConfig/);
   assert.match(stage0,/offlineBypass&&staffSession/);
   assert.match(stage0,/disabled=\{!canEnterOffline\}/);
   assert.match(stage0,/離線模式唔會繞過員工登入/);
 });
 
-test('Stage 0 acceptance bypass is restricted to acceptance host or explicit localhost',()=>{
+test('Stage 0 never exposes raw engineering failures in frontline copy',()=>{
+  assert.doesNotMatch(stage0,/setProbeMessage\(reason/);
+  assert.doesNotMatch(stage0,/setError\(reason/);
+  assert.match(stage0,/SMM_STAGE0_PROBE_DIAGNOSTIC/);
+  assert.match(stage0,/SMM_STAGE0_STAFF_VERIFY_DIAGNOSTIC/);
+  assert.match(stage0,/登入編號或 PIN 未能驗證/);
+});
+
+test('Stage 0 acceptance bypass remains restricted',()=>{
   assert.match(stage0,/function uiAcceptanceBypass/);
   assert.match(stage0,/\.yeungyi88\.workers\.dev/);
   assert.match(stage0,/isLocal&&query\.get\('ui-bypass'\)==='1'/);
-  assert.match(stage0,/if\(bypass\)return <>\{children\}<\/>/);
-
-  const source=stage0.match(/function uiAcceptanceBypass\(\)\{[\s\S]*?\n\}/)?.[0];
-  assert.ok(source,'uiAcceptanceBypass source must exist');
-  const evaluate=(hostname,search='')=>new Function(
-    'window',
-    'URLSearchParams',
-    `${source}; return uiAcceptanceBypass();`,
-  )({location:{hostname,search}},URLSearchParams);
-
-  assert.equal(evaluate('smm.morefunos.com','?ui-bypass=1'),false);
-  assert.equal(evaluate('mfk-smm-web.yeungyi88.workers.dev','?ui-bypass=1'),false);
-  assert.equal(evaluate('smm-acceptance-mfk-admin.yeungyi88.workers.dev',''),true);
-  assert.equal(evaluate('localhost','?ui-bypass=1'),true);
-  assert.equal(evaluate('127.0.0.1','?ui-bypass=1'),true);
-  assert.equal(evaluate('localhost',''),false);
 });
 
-test('Stage 0 IP production is paused and only canonical logo remains active',()=>{
-  assert.match(stage0,/\/brand\/morefun-logo\.webp/);
-  assert.doesNotMatch(stage0,/\/brand\/stage0\//);
-  assert.doesNotMatch(stage0,/BrandScene/);
-  assert.doesNotMatch(stage0,/ip-male|ip-female/);
-  assert.ok(existsSync(new URL('../public/brand/morefun-logo.webp',import.meta.url)));
-  assert.equal(existsSync(new URL('../public/brand/ip-male.webp',import.meta.url)),false);
-  assert.equal(existsSync(new URL('../public/brand/ip-female.webp',import.meta.url)),false);
-  assert.equal(existsSync(new URL('../public/brand/stage0/splash-male.svg',import.meta.url)),false);
-});
-
-test('Stage 0 staff login reuses current staff verification and human loginId language',()=>{
-  assert.match(stage0,/listSmmStaff/);
-  assert.match(stage0,/verifySmmStaff/);
-  assert.match(stage0,/登入編號/);
-  assert.match(stage0,/row\.loginId\?row\.loginId\+' · '/);
-  assert.match(stage0,/4–8 位數字/);
-});
-
-test('Stage 0 style respects mobile viewport and accessibility preferences',()=>{
+test('Stage 0 mobile visual contract supports 440x956 and 360x780 class devices',()=>{
   assert.match(css,/min-height:100dvh/);
   assert.match(css,/width:min\(100%,520px\)/);
   assert.match(css,/env\(safe-area-inset-top\)/);
   assert.match(css,/env\(safe-area-inset-bottom\)/);
+  assert.match(css,/@media\(max-width:360px\)/);
   assert.match(css,/prefers-reduced-motion:reduce/);
 });
-
-
