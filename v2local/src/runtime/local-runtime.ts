@@ -779,6 +779,24 @@ function commitDiningState(snapshot:Persisted,input:{holds?:LocalHoldDraft[];ord
 function commitDiningHolds(snapshot:Persisted,holds:LocalHoldDraft[]){
   return commitDiningState(snapshot,{holds});
 }
+const diningMutationQueues=new Map<string,Promise<void>>();
+async function withDiningMutationLock<T>(key:string,operation:()=>Promise<T>):Promise<T>{
+  const locks=typeof navigator!=='undefined'
+    ?(navigator as Navigator&{locks?:{request:<R>(name:string,options:{mode:'exclusive'},callback:()=>Promise<R>)=>Promise<R>}}).locks
+    :undefined;
+  if(locks?.request)return locks.request('mfk:dining:'+key,{mode:'exclusive'},operation);
+  const previous=diningMutationQueues.get(key)??Promise.resolve();
+  let release!:()=>void;
+  const gate=new Promise<void>(resolve=>{release=resolve;});
+  const tail=previous.then(()=>gate);
+  diningMutationQueues.set(key,tail);
+  await previous;
+  try{return await operation();}
+  finally{
+    release();
+    if(diningMutationQueues.get(key)===tail)diningMutationQueues.delete(key);
+  }
+}
 function diningCheckoutRevision(hold:LocalHoldDraft){return 'DINING2:'+JSON.stringify(hold);}
 function requireDiningHold(snapshot:Persisted,id:string){
   const hold=snapshot.holds.find(row=>row.id===id);
@@ -820,6 +838,7 @@ function diningPaymentLabel(payments:readonly LocalDiningPayment[]){
 function syncDiningFormalOrder(order:StoredOrder,hold:LocalHoldDraft,at:string):StoredOrder{
   const payments=Array.isArray(hold.payments)?hold.payments:[];
   const corrections=Array.isArray(hold.lineCorrections)?hold.lineCorrections:[];
+  const priceOverrides=Array.isArray(hold.priceOverrides)?hold.priceOverrides:[];
   const confirmedPaidMinor=payments.reduce((sum,payment)=>sum+Math.max(0,Number(payment.amountMinor)||0),0);
   const effectiveItems=diningEffectiveItems(hold);
   const effectiveTotalMinor=effectiveItems.reduce((sum,item)=>sum+item.qty*item.unitMinor,0);
@@ -831,9 +850,10 @@ function syncDiningFormalOrder(order:StoredOrder,hold:LocalHoldDraft,at:string):
     ...order,
     diningHoldId:hold.id,
     ...(corrections.length?{originalTotalMinor:hold.totalMinor,diningLineCorrections:corrections.map(row=>({...row}))}:{}),
+    ...(priceOverrides.length?{diningPriceOverrides:priceOverrides.map(row=>({...row}))}:{}),
     totalMinor:effectiveTotalMinor,
     recognizedSalesMinor:confirmedPaidMinor,
-    outstandingMinor:hold.cancelledAt?0:Math.max(0,effectiveTotalMinor-confirmedPaidMinor),
+    outstandingMinor:hold.cancelledAt?0:effectiveTotalMinor-confirmedPaidMinor,
     fulfillmentLabel,
     paymentEntries:payments.map(payment=>({
       ...payment,
@@ -864,7 +884,7 @@ function ensureDiningFormalOrder(snapshot:Persisted,hold:LocalHoldDraft,at:strin
       changed,
     };
   }
-  if(!hold.items.length||hold.totalMinor<=0){
+  if(!hold.items.length){
     return {hold,order:undefined,orders:snapshot.orders,created:false,changed:false};
   }
   const session=readActiveStaffSession();
@@ -1272,6 +1292,7 @@ function appendDiningItemsToSnapshot(snapshot:Persisted,hold:LocalHoldDraft,inpu
 function diningDetail(hold:LocalHoldDraft):LocalDiningHoldDetail{
   const payments=Array.isArray(hold.payments)?hold.payments:[];
   const corrections=Array.isArray(hold.lineCorrections)?hold.lineCorrections:[];
+  const priceOverrides=Array.isArray(hold.priceOverrides)?hold.priceOverrides:[];
   const paidByLine=new Map<number,number>();
   for(const payment of payments){
     for(const selection of payment.selections)paidByLine.set(selection.lineIndex,(paidByLine.get(selection.lineIndex)??0)+selection.qty);
@@ -1293,6 +1314,7 @@ function diningDetail(hold:LocalHoldDraft):LocalDiningHoldDetail{
     ...(hold.seatedAt?{seatedAt:hold.seatedAt}:{}),
     ...(hold.joinedTables?.length?{joinedTables:[...hold.joinedTables]}:{}),
     corrections:corrections.map(row=>({...row})),
+    priceOverrides:priceOverrides.map(row=>({...row})),
     ...(hold.formalOrderId?{formalOrderId:hold.formalOrderId}:{}),
     ...(hold.formalOrderDisplay?{formalOrderDisplay:hold.formalOrderDisplay}:{}),
     holdId:hold.id,
@@ -1303,7 +1325,7 @@ function diningDetail(hold:LocalHoldDraft):LocalDiningHoldDetail{
     note:hold.note,
     totalMinor,
     paidMinor,
-    remainingMinor:hold.cancelledAt?0:Math.max(0,totalMinor-paidMinor),
+    remainingMinor:hold.cancelledAt?0:totalMinor-paidMinor,
     lines,payments,additions:Array.isArray(hold.additions)?hold.additions:[],
   };
 }
