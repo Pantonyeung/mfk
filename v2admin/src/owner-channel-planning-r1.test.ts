@@ -69,7 +69,7 @@ describe('Owner Stage04 channel + planning',()=>{
   });
 
   it('canonical planning writer is bounded to AdminSyncStore and channel command is readback-first',()=>{
-    const worker=fs.readFileSync(path.resolve(__dirname,'../worker.ts'),'utf8');
+    const worker=fs.readFileSync(path.resolve(process.cwd(),'worker.ts'),'utf8');
     expect(worker).toContain("MFK_OWNER_MONTHLY_PLAN_V1");
     expect(worker).toContain("owner:planning:");
     expect(worker).toContain("'/owner/planning'");
