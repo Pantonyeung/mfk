@@ -17,7 +17,12 @@ export function buildWhatsAppFallbackMessage(input:{
   pickupCode?:string;
 }){
   const items=input.cart.map(line=>{
-    const choices=line.selections.map(item=>item.optionName).filter(Boolean).join('、');
+    const choices=[
+      line.selectedVariationName,
+      ...line.selections.map(item=>item.optionName),
+      line.combo?.comboName,
+      ...(line.combo?.selections.map(item=>item.choiceLabel)??[]),
+    ].filter(Boolean).join('、');
     const detail=[choices,line.note?.trim()].filter(Boolean).join(' · ');
     return '- '+line.productName+' ×'+line.quantity+(detail?'（'+detail+'）':'');
   }).join('\n');
