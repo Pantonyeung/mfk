@@ -176,7 +176,7 @@ export function App(){
       else if(result.state==='PARTIAL')setNotice('部分商品已完成更新；其餘商品狀態仍待確認。');
       else setNotice('操作結果未能確認；請先重新整理，暫時唔好重複操作。');
       await loadSellability();
-    }catch{setNotice('操作結果未明；請重新讀取，禁止 blind retry。');}
+    }catch{setNotice('操作結果未能確認；請先重新整理最新狀態，暫時唔好重複操作。');}
     finally{setSellabilityBusy(false);}
   };
 
@@ -326,7 +326,7 @@ export function App(){
   }
   if(port?.loginOwner&&!ownerSession){
     return <main className="app-shell owner-auth-shell"><form className="owner-auth-gate" onSubmit={event=>{event.preventDefault();void login();}}>
-      <span>OWNER ACCESS</span><h1>老闆登入</h1>
+      <span>老闆專用</span><h1>老闆登入</h1>
       <p>使用 Admin 已發布嘅 OWNER 登入編號同 PIN。身份未確認前不會讀取訂單、電話或營業資料。</p>
       <label><span>登入編號</span><input value={loginStaffId} onChange={event=>setLoginStaffId(event.target.value.replace(/[^A-Za-z0-9._-]/g,'').slice(0,64))} autoComplete="username" placeholder="例如 1111" /></label>
       <label><span>PIN</span><input value={loginPin} onChange={event=>setLoginPin(event.target.value.replace(/\D/g,'').slice(0,8))} inputMode="numeric" type="password" autoComplete="current-password" /></label>
@@ -440,7 +440,7 @@ function MorePage({snapshot,connection,onTool,onChannels,onPlanning,onSellabilit
     {id:'admin',title:'前往 Admin',detail:'設定留喺 Admin',state:'導航'},
     {id:'recovery',title:'資料狀態',detail:'離線／資料稍舊／狀態未明／部分資料',state:humanConnectionLabel(connection)},
   ];
-  return <section className="page"><header className="page-head"><div><span>更多</span><h1>營運工具</h1><small>設定留 Admin；交易、付款、打印同實體設備執行留喺責任端。</small></div></header><div className="tool-grid"><button className="tool-card" onClick={onChannels}><strong>渠道</strong><small>健康／接單／有限控制</small><em>{String(snapshot?.channels.length??0)}</em></button><button className="tool-card" onClick={onPlanning}><strong>營業目標與成本</strong><small>Monthly Target / Cost Planning</small><em>{snapshot?.planning?.plan.revision?'已設定':'未設定'}</em></button><button className="tool-card" onClick={onSellability}><strong>商品供應</strong><small>售罄／恢復有限操作</small><em>{String(snapshot?.sellability.length??0)}</em></button><button className="tool-card" onClick={onStaff}><strong>員工</strong><small>唯讀出勤／角色摘要</small><em>{String(snapshot?.staff.length??0)}</em></button>{tools.map(item=><button key={item.id} className="tool-card" onClick={()=>onTool(item.id)} data-icon-state="AI_ASSET_PENDING"><strong>{item.title}</strong><small>{item.detail}</small><em>{item.state}</em></button>)}</div></section>;
+  return <section className="page"><header className="page-head"><div><span>更多</span><h1>營運工具</h1><small>設定留 Admin；交易、付款、打印同實體設備執行留喺責任端。</small></div></header><div className="tool-grid"><button className="tool-card" onClick={onChannels}><strong>渠道</strong><small>健康／接單／有限控制</small><em>{String(snapshot?.channels.length??0)}</em></button><button className="tool-card" onClick={onPlanning}><strong>營業目標與成本</strong><small>每月目標／成本規劃</small><em>{snapshot?.planning?.plan.revision?'已設定':'未設定'}</em></button><button className="tool-card" onClick={onSellability}><strong>商品供應</strong><small>售罄／恢復有限操作</small><em>{String(snapshot?.sellability.length??0)}</em></button><button className="tool-card" onClick={onStaff}><strong>員工</strong><small>唯讀出勤／角色摘要</small><em>{String(snapshot?.staff.length??0)}</em></button>{tools.map(item=><button key={item.id} className="tool-card" onClick={()=>onTool(item.id)} data-icon-state="AI_ASSET_PENDING"><strong>{item.title}</strong><small>{item.detail}</small><em>{item.state}</em></button>)}</div></section>;
 }
 
 function ToolDrawer({tool,snapshot,connection,managerNote,handoffNote,checklist,setManagerNote,setHandoffNote,setChecklist,onCommand,onAdmin,onClose}:{tool:Tool;snapshot:OwnerReadModelSnapshot|null;connection:OwnerConnectionState;managerNote:string;handoffNote:string;checklist:readonly OwnerChecklistItem[];setManagerNote:(v:string)=>void;setHandoffNote:(v:string)=>void;setChecklist:(v:readonly OwnerChecklistItem[])=>void;onCommand:(label:string,target:string,impact:string)=>void;onAdmin:()=>void;onClose:()=>void}){
@@ -448,9 +448,9 @@ function ToolDrawer({tool,snapshot,connection,managerNote,handoffNote,checklist,
   return <div className="overlay"><section className="drawer" role="dialog" aria-modal="true"><DrawerHead title={title} subtitle="老闆中心" close={onClose}/>
     {tool==='reports'?<ListOrEmpty rows={snapshot?.reports??[]} render={item=><div className="list-row" key={item.reportId}><div><strong>{item.name}</strong><small>{item.compare??item.freshness}</small></div><b>{item.value}</b></div>} empty="報表尚未連接"/>:null}
 
-    {tool==='devices'?<ListOrEmpty rows={snapshot?.devices??[]} render={item=><div className="list-row" key={item.deviceId}><div><strong>{item.name}</strong><small>{item.kind} · {item.affected??'未有影響摘要'} · {item.jobs??'未有 Job 摘要'}</small></div><span>{item.health}</span></div>} empty="設備資料尚未連接"/>:null}
+    {tool==='devices'?<ListOrEmpty rows={snapshot?.devices??[]} render={item=><div className="list-row" key={item.deviceId}><div><strong>{item.name}</strong><small>{item.kind} · {item.affected??'未有影響摘要'} · {item.jobs??'未有打印工作摘要'}</small></div><span>{item.health}</span></div>} empty="設備資料尚未連接"/>:null}
     {tool==='customers'?snapshot?.customers?<div className="metric-grid"><Metric label="客戶" value={snapshot.customers.totalLabel}/><Metric label="新客" value={snapshot.customers.newLabel}/><Metric label="回頭客" value={snapshot.customers.returningLabel}/><Metric label="同意狀態" value={snapshot.customers.consentLabel}/></div>:<Empty title="客戶摘要尚未連接" detail="唔會用假 CRM 數字代替。"/>:null}
-    {tool==='marketing'?<ListOrEmpty rows={snapshot?.campaigns??[]} render={item=><div className="list-row" key={item.campaignId}><div><strong>{item.name}</strong><small>Attributed Orders：{item.attributedOrdersLabel} · {item.fundingLabel??'Funding 未提供'}</small></div><b>{item.attributedSalesLabel}</b></div>} empty="推廣資料尚未連接"/>:null}
+    {tool==='marketing'?<ListOrEmpty rows={snapshot?.campaigns??[]} render={item=><div className="list-row" key={item.campaignId}><div><strong>{item.name}</strong><small>相關訂單：{item.attributedOrdersLabel} · {item.fundingLabel??'資助資料未提供'}</small></div><b>{item.attributedSalesLabel}</b></div>} empty="推廣資料尚未連接"/>:null}
     {tool==='settlement'?<ListOrEmpty rows={snapshot?.settlements??[]} render={(item,index)=><div className="list-row" key={item.channel+'-'+index}><div><strong>{item.channel}</strong><small>銷售 {item.salesLabel} · 費用 {item.feesLabel} · {item.finality}</small></div><b>{item.payoutLabel}</b></div>} empty="結算資料尚未連接"/>:null}
     {tool==='cash'?snapshot?.cash?<div className="metric-grid"><Metric label="應有" value={snapshot.cash.expectedLabel}/><Metric label="實有" value={snapshot.cash.actualLabel}/><Metric label="差異" value={snapshot.cash.varianceLabel}/><Metric label="交更" value={snapshot.cash.closeoutState}/></div>:<Empty title="現金摘要尚未連接" detail="Owner App 唔會開錢箱或者改付款結果。"/>:null}
     {tool==='inventory'?<ListOrEmpty rows={snapshot?.inventory??[]} render={item=><div className="list-row" key={item.itemId}><div><strong>{item.name}</strong><small>{item.detail}</small></div><span>{item.state}</span></div>} empty="庫存提示尚未連接"/>:null}
