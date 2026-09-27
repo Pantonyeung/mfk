@@ -55,12 +55,12 @@ export function ActionQueuePage({
       <div>
         <span>待處理</span>
         <h1>真正要你介入嘅事</h1>
-        <small>Action Queue 係營運 exception projection，唔係 SMT Pending Order Queue。</small>
+        <small>集中顯示真正需要你留意同處理嘅營運事項。</small>
       </div>
       <b className="hero-number">{vm.openCount}</b>
     </header>
 
-    <section className="action-summary-strip" aria-label="Action Queue 摘要">
+    <section className="action-summary-strip" aria-label="待處理摘要">
       <div><strong>{vm.urgentCount}</strong><span>緊急</span></div>
       <div><strong>{vm.attentionCount}</strong><span>注意</span></div>
       <div><strong>{vm.infoCount}</strong><span>資訊</span></div>
@@ -95,7 +95,7 @@ function ActionQueueCard({row,onOpen}:{row:OwnerActionQueueRowViewModel;onOpen:(
     <div className="action-queue-card-top">
       <div className="action-labels">
         <span className={'severity-pill '+item.severity.toLowerCase()}>{item.severity==='URGENT'?'緊急':item.severity==='ATTENTION'?'注意':'資訊'}</span>
-        <span className={'queue-state '+row.state.toLowerCase()}>{row.state==='PENDING_READBACK'?'等待讀回':row.state==='UNKNOWN'?'狀態未明':'待處理'}</span>
+        <span className={'queue-state '+row.state.toLowerCase()}>{row.state==='PENDING_READBACK'?'處理中':row.state==='UNKNOWN'?'待確認':'待處理'}</span>
       </div>
       <small>{row.elapsedLabel}</small>
     </div>
@@ -103,11 +103,11 @@ function ActionQueueCard({row,onOpen}:{row:OwnerActionQueueRowViewModel;onOpen:(
     <p>{item.detail}</p>
     <div className="action-facts-grid">
       <div><span>影響目標</span><strong>{item.target}</strong></div>
-      <div><span>責任域</span><strong>{row.ownerDomain}</strong></div>
-      <div><span>確定性</span><strong>{certaintyLabel(item.certainty)}</strong></div>
+      <div><span>已持續</span><strong>{row.elapsedLabel}</strong></div>
+      <div><span>目前狀態</span><strong>{certaintyLabel(item.certainty)}</strong></div>
       <div><span>安全下一步</span><strong>{row.safeNextStepLabel??'只讀檢視'}</strong></div>
     </div>
-    <div className="action-card-footer"><span>查看詳情</span><small>Dismissed ≠ Resolved</small></div>
+    <div className="action-card-footer"><span>查看詳情</span><small>處理紀錄會保留</small></div>
   </button>;
 }
 
@@ -134,14 +134,14 @@ function ActionDetailDrawer({
   return <div className="overlay">
     <section className="drawer action-detail-drawer" role="dialog" aria-modal="true" aria-label="Action Detail">
       <header className="drawer-head">
-        <div><small>{row.ownerDomain}</small><h2>{item.title}</h2></div>
+        <div><small>待處理詳情</small><h2>{item.title}</h2></div>
         <button onClick={onClose}>✕</button>
       </header>
 
       <section className="action-detail-status">
-        <span className={'severity-pill '+item.severity.toLowerCase()}>{item.severity}</span>
-        <span className={'queue-state '+row.state.toLowerCase()}>{row.state}</span>
-        <span className={'certainty '+item.certainty.toLowerCase()}>{item.certainty}</span>
+        <span className={'severity-pill '+item.severity.toLowerCase()}>{item.severity==='URGENT'?'緊急':item.severity==='ATTENTION'?'注意':'資訊'}</span>
+        <span className={'queue-state '+row.state.toLowerCase()}>{row.state==='PENDING_READBACK'?'處理中':row.state==='UNKNOWN'?'待確認':'待處理'}</span>
+        <span className={'certainty '+item.certainty.toLowerCase()}>{certaintyLabel(item.certainty)}</span>
       </section>
 
       <section className="detail-section">
@@ -153,7 +153,7 @@ function ActionDetailDrawer({
         <div className="action-detail-grid">
           <div><span>目標</span><strong>{item.target}</strong></div>
           <div><span>已持續</span><strong>{row.elapsedLabel}</strong></div>
-          <div><span>責任域</span><strong>{row.ownerDomain}</strong></div>
+          <div><span>處理建議</span><strong>{row.safeNextStepLabel??'查看詳情'}</strong></div>
           <div><span>目前確定性</span><strong>{certaintyLabel(item.certainty)}</strong></div>
         </div>
       </section>
@@ -161,21 +161,21 @@ function ActionDetailDrawer({
       <section className="detail-section">
         <h3>安全處理</h3>
         {item.actionLabel?<button className="primary wide action-primary" disabled={commandLocked} onClick={()=>{
-          onCommand(item.actionLabel!,item.target,'Stage02 bounded action：提交後必須等待 canonical readback；Dismissed 不等於 Resolved。',item.actionId);
-        }}>{canonicalUnknown?'狀態未明 — 禁止重送':flight?.state==='PENDING'?'正在提交／等待讀回':flight?.state==='UNKNOWN'?'狀態未明 — 禁止重送':row.safeNextStepLabel??item.actionLabel}</button>:<p className="muted-copy">目前冇已授權嘅 bounded action；保持只讀。</p>}
+          onCommand(item.actionLabel!,item.target,'提交後會再次確認最新狀態；未確認完成前不會重複操作。',item.actionId);
+        }}>{canonicalUnknown?'結果待確認':flight?.state==='PENDING'?'正在處理':flight?.state==='UNKNOWN'?'結果待確認':row.safeNextStepLabel??item.actionLabel}</button>:<p className="muted-copy">目前只供查看，未有可直接處理嘅操作。</p>}
         {canonicalUnknown||flight?<div className={'command-flight '+(flight?.state??'UNKNOWN').toLowerCase()} role="status">
-          <strong>{flight?.state==='PENDING'?'正在重新確認 canonical readback':canonicalUnknown||flight?.state==='UNKNOWN'?'狀態未明 — 禁止重送':flight?.state==='REJECTED'?'未獲接受':'操作未完成'}</strong>
-          <span>{flight?.message??'Canonical projection 仍 UNKNOWN；只准 refresh / readback，禁止再次提交。'}</span>
-          {(canonicalUnknown||flight?.state==='UNKNOWN')&&flight?.state!=='PENDING'?<button className="secondary-action" onClick={()=>onRecheck(item.actionId)}>重新確認讀回</button>:null}
+          <strong>{flight?.state==='PENDING'?'正在確認最新狀態':canonicalUnknown||flight?.state==='UNKNOWN'?'結果待確認':flight?.state==='REJECTED'?'未獲接受':'操作未完成'}</strong>
+          <span>{flight?.message??'最新狀態仍未能確認；請先重新檢查，暫時唔好再次提交。'}</span>
+          {(canonicalUnknown||flight?.state==='UNKNOWN')&&flight?.state!=='PENDING'?<button className="secondary-action" onClick={()=>onRecheck(item.actionId)}>重新確認狀態</button>:null}
         </div>:null}
-        <p className="queue-rule-copy">Command → Pending → Canonical Readback → Confirmed / Unknown。UI 唔會自行標記 RESOLVED；只有 canonical readback / proof 先可以真正移出 Queue。</p>
+        <p className="queue-rule-copy">處理後會再次核對最新結果；未確認完成嘅事項會繼續留喺待處理清單。</p>
       </section>
 
       <section className="detail-section">
-        <h3>Readback / Proof</h3>
+        <h3>處理結果</h3>
         <div className="action-detail-grid">
-          <div><span>Readback</span><strong>{item.readbackSummary??certaintyLabel(item.certainty)}</strong></div>
-          <div><span>Resolution Proof</span><strong>{item.resolutionProofLabel??'未有完成證據'}</strong></div>
+          <div><span>最新狀態</span><strong>{item.readbackSummary??certaintyLabel(item.certainty)}</strong></div>
+          <div><span>完成確認</span><strong>{item.resolutionProofLabel??'尚未完成確認'}</strong></div>
         </div>
       </section>
 
@@ -183,17 +183,17 @@ function ActionDetailDrawer({
         <h3>相關處理紀錄</h3>
         {detail.history.length?<div className="queue-history">{detail.history.slice(0,8).map(record=><article key={record.activityId}>
           <div><strong>{record.title}</strong><span>{record.actor}</span></div>
-          <small>{new Date(record.observedAt).toLocaleString('zh-HK')} · {record.result}{record.readback?' · '+record.readback:''}</small>
+          <small>{new Date(record.observedAt).toLocaleString('zh-HK')} · {record.result}</small>
         </article>)}</div>:<p className="muted-copy">未有已連結嘅處理紀錄。</p>}
       </section>
 
-      <div className="boundary-box">同一 incident 可以用 correlation 關聯，但 normal UI 唔顯示 raw correlation ID／工程碼。</div>
+      <div className="boundary-box">相同問題會合併顯示，避免重複提醒；已處理紀錄仍會保留。</div>
     </section>
   </div>;
 }
 
 function ActionQueueEmpty({connection}:{connection:OwnerConnectionState}){
-  const title=connection==='OFFLINE_READONLY'?'離線唯讀：未能取得新 Action':'暫時冇待處理事項';
+  const title=connection==='OFFLINE_READONLY'?'離線唯讀：暫時未能取得新事項':'暫時冇待處理事項';
   return <section className="card empty-state action-empty" data-visual-asset="AI_ASSET_PENDING">
     <h2>{title}</h2>
     <p>真正需要人介入嘅營運事項先會出現喺呢度。</p>
