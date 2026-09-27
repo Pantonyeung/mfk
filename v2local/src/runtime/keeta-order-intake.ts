@@ -225,7 +225,7 @@ export async function reconcileKeetaOrderIntake(){
             orderEvents:localRuntime.orders().flatMap(order=>order.capacityEvents??[]),
           });
         }
-        const order=localRuntime.createOrder(orderInput);
+        const order=localRuntime.createOrder({...orderInput,capacityChannel:'THIRD_PARTY'});
         await ack(intent,order);
         if(!beforeId)emitIntakeUpdate({providerOrderId:intent.providerOrderId,canonicalOrderId:order.id,display:order.display,sourceLabel:order.sourceLabel});
         if(autoAcceptEnabled()&&order.fulfillmentLabel==='待處理'){
