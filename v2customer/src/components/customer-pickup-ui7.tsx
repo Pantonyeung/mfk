@@ -16,8 +16,8 @@ type Ui7CanonicalStage='READY'|'ARRIVED'|'VERIFIED'|'HANDED_OVER'|'COMPLETED'|'P
 type Ui7Freshness='CURRENT'|'LOADING'|'ERROR'|'OFFLINE'|'STALE'|'UNKNOWN';
 
 const characterPath=(variant:CharacterVariant)=>variant==='female'
-  ?'/brand/stage7-pickup-female.png'
-  :'/brand/stage7-pickup-male.png';
+  ?'/brand/stage7-pickup-female.svg'
+  :'/brand/stage7-pickup-male.svg';
 
 const isUi7Stage=(stage:CustomerOrderStage):stage is Ui7CanonicalStage=>
   ['READY','ARRIVED','VERIFIED','HANDED_OVER','COMPLETED','PICKUP_EXCEPTION'].includes(stage);
