@@ -330,7 +330,7 @@ export function Stage7OrdersView({
   }
   if(surface==='SEARCH'){
     return <Stage7Search
-      rows={filteredRows}
+      rows={segmentRows}
       query={query}
       setQuery={setQuery}
       scope={searchScope}
@@ -374,7 +374,12 @@ export function Stage7OrdersView({
       <span aria-hidden="true">⌕</span><span>{query||'搜尋 Display Number / 商品 / 電話'}</span>
     </button>
 
-    {connection==='READY'&&filteredRows.length===0?<Stage7Empty segment={segment}/>:null}
+    {connection==='READY'&&segmentRows.length===0?<Stage7Empty segment={segment}/>:null}
+
+    {segmentRows.length>0&&filteredRows.length===0?<section className="stage7-filter-empty" data-stage7-filter-empty="true" role="status">
+      <strong>目前篩選條件沒有符合訂單</strong>
+      <span>目前分頁有 {segmentRows.length} 張正式訂單；請調整來源、狀態或日期篩選。</span>
+    </section>:null}
 
     {filteredRows.length?<div className="stage7-list">{filteredRows.map(row=><Stage7Card key={row.orderId} row={row} onOpen={()=>openDetail(row)}/>)}</div>:null}
 
