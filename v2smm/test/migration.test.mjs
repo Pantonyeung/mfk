@@ -69,7 +69,7 @@ test('complete operator routes and failure states are present',()=>{
     '快速點餐','前線工作','訂單記錄','桌面管理','店務工具',
     '搜尋商品','商品設定','購物草稿','待提交草稿','平台狀態',
     '連線設定','商品供應','營業日','產能','營運報表','退款要求','列印狀態','診斷','正在同步餐單',
-    '同步失敗','重新確認結果'
+    '同步失敗','前往結帳'
   ])assert.match(source,new RegExp(marker));
 });
 
@@ -113,8 +113,8 @@ test('SMM uses the shared published menu price and SMT validates only on submit'
   const contract=fs.readFileSync(path.join(repoRoot,'contracts','smm-lan-v1.ts'),'utf8');
   assert.match(types,/publishedTakeawayUnitPriceMinor/);
   assert.match(types,/publishedDineInUnitPriceMinor/);
-  assert.match(app,/已發布總額/);
-  assert.match(app,/SMT 提交時再核對/);
+  assert.match(app,/SMT 仍會再驗證/);
+  assert.match(app,/SMT 提交時重新驗證/);
   assert.doesNotMatch(app,/等待門店報價/);
   assert.doesNotMatch(app,/port\?\.quoteCart/);
   assert.match(app,/port\?\.submitOrder/);
@@ -216,13 +216,19 @@ test('dedicated SMM worker keeps auth session only and proxies orders to the sha
 });
 
 
-test('SMM staff checkout has service mode and tender but no automatic drawer or QR handoff',()=>{
+test('SMM Stage 3 keeps service mode visible while tender and submit UI remain deferred to the next stage',()=>{
   const app=fs.readFileSync(path.join(root,'App.tsx'),'utf8');
+  const types=fs.readFileSync(path.join(root,'product-types.ts'),'utf8');
   const ingress=fs.readFileSync(path.join(repoRoot,'v2local','src','runtime','smm-lan-ingress.ts'),'utf8');
-  assert.match(app,/服務方式/);
-  assert.match(app,/堂食/);
-  assert.match(app,/收款方式/);
-  assert.match(app,/現金只會記錄為收款方式；需要開錢箱時由 SMT 人手操作/);
+  const start=app.indexOf('function CartSheet');
+  const end=app.indexOf('function DiningTargetSheet',start);
+  const cartSheet=app.slice(start,end);
+  assert.match(cartSheet,/服務方式/);
+  assert.match(cartSheet,/堂食/);
+  assert.match(cartSheet,/外賣/);
+  assert.match(cartSheet,/前往結帳/);
+  assert.doesNotMatch(cartSheet,/收款方式|提交訂單|重新確認結果/);
+  assert.match(types,/export type SmmTender=/);
   assert.doesNotMatch(app,/產生 QR|QR 交接|createSmmQrHandoff|renderSmmQrHandoff/);
   assert.match(ingress,/paymentLabel/);
   assert.match(ingress,/SMM_MENU_REVISION_CHANGED/);
@@ -278,12 +284,12 @@ test('SMM Internet menu and SMT commit share one published catalog projection',(
 });
 
 
-test('persisted cart reprices from the current published menu before resubmit',()=>{
+test('passive menu refresh preserves accepted cart facts and requires line-scoped confirmation before resubmit',()=>{
   const app=fs.readFileSync(path.join(root,'App.tsx'),'utf8');
-  assert.match(app,/cart\.map\(line=>/);
-  assert.match(app,/publishedUnitPriceMinor:unitMinor/);
-  assert.match(app,/menu\?\.revision,menu\?\.observedAt/);
-  assert.match(app,/購物草稿已按目前發布價格重新計算/);
+  assert.match(app,/buildSmmCartRefreshAttention/);
+  assert.match(app,/refreshAttention:proposal/);
+  assert.match(app,/未確認前唔會靜默接受新價格或套餐資料/);
+  assert.match(app,/const repriced=cart\.map\(line=>repriceLine\(line,next\)\)/);
   assert.match(app,/SMM_PUBLISHED_PRICE_CHANGED/);
   assert.match(app,/SMT 發現餐單版本／價格已更新/);
   assert.match(app,/removeIntent\(pending\.submissionId\)/);
