@@ -113,10 +113,47 @@ test('Stage8 page states distinguish LOADING READY EMPTY ERROR OFFLINE STALE UNK
   assert.match(ui8,/禁止由 Stage 8 直接建立或提交新 Order/);
 });
 
-test('saved-template CTA is safe unavailable because current main has no mutation seam',()=>{
-  assert.match(ui8,/SAFE_UNAVAILABLE_FIRST_BREAK:CUSTOMER_SAVED_ORDER_TEMPLATE_MUTATION_SEAM_MISSING_IN_CURRENT_MAIN/);
+
+test('OFFLINE STALE UNKNOWN cannot start reorder while history stays readable; READY + menu can start',()=>{
+  assert.match(ui8,/const reorderFresh=browserOnline&&connection==='READY'&&Boolean\(menu\)/);
+  assert.match(ui8,/disabled=\{!order\.reorderEligible\|\|!reorderFresh\}/);
+  assert.match(ui8,/歷史訂單仍可查看；重新同步 current menu 後先可以建立 New Cart/);
+  assert.match(ui8,/>只讀 Refresh</);
+  const start=app.indexOf('const reorder=async');
+  const build=app.indexOf('buildCurrentReorderCart(order,menu)',start);
+  const gate=app.indexOf("if(!browserOnline||connection!=='READY'||!menu)",start);
+  assert.ok(start>=0&&gate>start&&build>gate);
+  assert.match(app,/歷史訂單仍可查看；需要重新同步目前餐牌後先可以建立新購物車/);
+});
+
+test('freshness loss during COPY REPAIR REVIEW preserves draft and blocks progression',()=>{
+  assert.match(ui8,/if\(!reorderFresh\)return <section className="page ui8-page ui8-freshness-block"/);
+  assert.match(ui8,/已建立嘅 draft cart 會保留/);
+  assert.match(ui8,/已保留 Draft/);
+  assert.match(ui8,/{cart\.length} 個 Line/);
+  assert.match(ui8,/恢復 READY 後會用 current menu \/ current quote 重新驗證/);
+  const blocked=ui8.slice(ui8.indexOf("if(!reorderFresh)return"),ui8.indexOf("if(phase==='COPY')"));
+  assert.doesNotMatch(blocked,/setCart|updateCart|onGoCart|onContinue/);
+  assert.match(app,/if\(!browserOnline\|\|connection!=='READY'\|\|!menu\)\{setNotice\('目前資料未 fresh；draft cart 已保留/);
+});
+
+test('Final Review cannot become ready on stale local quote and reconnect READY re-enables current validation',()=>{
+  assert.match(ui8,/const ready=Boolean\(fresh&&cart\.length&&quote\?\.freshness==='CURRENT'&&!cart\.some\(line=>line\.attention\)\)/);
+  assert.match(ui8,/fresh=\{reorderFresh\}/);
+  assert.match(ui8,/需要重新同步 current truth；已建立嘅 draft cart 會保留/);
+  assert.match(ui8,/onClick=\{onRefresh\}>只讀 Refresh/);
+  assert.match(ui8,/const reorderFresh=browserOnline&&connection==='READY'&&Boolean\(menu\)/);
+});
+
+test('saved-template CTA keeps exact diagnostic classification but renders only human-safe copy',()=>{
+  const exact='SAFE_UNAVAILABLE_FIRST_BREAK:CUSTOMER_SAVED_ORDER_TEMPLATE_MUTATION_SEAM_MISSING_IN_CURRENT_MAIN';
+  assert.ok(ui8.includes(exact));
   assert.match(ui8,/>設為常用訂單</);
   assert.match(ui8,/disabled aria-disabled="true"/);
+  assert.match(ui8,/常用訂單功能尚未開放/);
+  const historyDetail=ui8.slice(ui8.indexOf('function HistoryDetail'),ui8.indexOf('function CopyIntent'));
+  assert.equal(historyDetail.includes(exact),false);
+  assert.doesNotMatch(historyDetail,/{CUSTOMER_UI8_SAVED_TEMPLATE_SEAM_CLASSIFICATION}/);
   assert.doesNotMatch(app,/saveOrderTemplate|createSavedOrder|mutateSavedTemplate/);
 });
 
