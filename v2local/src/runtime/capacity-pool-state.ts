@@ -313,10 +313,16 @@ function applyPendingEvents(
 function scopeMatches(scope:CapacityOverrideScope,channel:'FIRST_PARTY'|'THIRD_PARTY'){
   return scope==='ALL_REMOTE'||scope===channel;
 }
+function totalOverrideAllowance(row:LocalCapacityPoolStateRow){
+  return (row.overrides??[]).reduce((sum,approval)=>sum+approval.remainingAllowance,0);
+}
 function overrideAllowance(row:LocalCapacityPoolStateRow,channel:'FIRST_PARTY'|'THIRD_PARTY'){
   return (row.overrides??[])
     .filter(approval=>scopeMatches(approval.scope,channel))
     .reduce((sum,approval)=>sum+approval.remainingAllowance,0);
+}
+function baseRemainingWithoutOverride(row:LocalCapacityPoolStateRow){
+  return Math.max(0,row.remainingQty-totalOverrideAllowance(row));
 }
 function planOverrideAllocations(
   row:LocalCapacityPoolStateRow,
