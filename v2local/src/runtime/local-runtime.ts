@@ -20,7 +20,7 @@ import {
 } from './capacity-pool-state.ts';
 import {validateAdminRefundEvent,type AdminRefundEvent} from '../../../contracts/admin-refund-v1.ts';
 import {normalizeMfkOrderLineCompositionV1,type MfkOrderLineCompositionV1} from '../../../contracts/order-line-composition-v1.ts';
-import type {CustomerReorderIntentLine} from '../../../contracts/customer-cloud-v1.ts';
+import type {CustomerReorderHistoryPriceFact,CustomerReorderIntentLine} from '../../../contracts/customer-cloud-v1.ts';
 
 export interface SmtOperationalMetric{readonly id:string;readonly label:string;readonly value:string;readonly detail?:string}
 export interface SmtOrderListItemViewModel{readonly orderId:string;readonly orderIdLabel:string;readonly itemCount:number;readonly totalLabel:string;readonly paymentLabel:string;readonly fulfillmentLabel:string;readonly sourceLabel?:string;readonly localSequenceLabel?:string;readonly customerName?:string}
@@ -146,6 +146,7 @@ export interface StoredOrder{
   acceptancePrintedAt?:string;
   paymentEvidenceRef?:string;paymentVerificationState?:'PENDING'|'VERIFIED'|'REJECTED';customerName?:string;customerPhone?:string;keetaDeferCount?:number;keetaDeferredAt?:string;
   customerReorderIntent?:readonly CustomerReorderIntentLine[];
+  customerReorderHistoryPriceFacts?:readonly CustomerReorderHistoryPriceFact[];
   items:readonly LocalOrderLineItem[];
 }
 export type DiningTender='CASH'|'ALIPAY'|'WECHAT'|'FPS'|'PAYME'|'COMBO';
@@ -473,6 +474,7 @@ export interface MfkLocalRuntime extends CleanSmtCoreRuntimePort{
     customerName?:string;
     customerPhone?:string;
     customerReorderIntent?:readonly CustomerReorderIntentLine[];
+    customerReorderHistoryPriceFacts?:readonly CustomerReorderHistoryPriceFact[];
     initialFulfillmentLabel?:StoredOrder['fulfillmentLabel'];
   }):StoredOrder;
   orders():readonly StoredOrder[];
@@ -1443,6 +1445,7 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
       ...(input.customerName?{customerName:String(input.customerName).trim().slice(0,120)}:{}),
       ...(input.customerPhone?{customerPhone:String(input.customerPhone)}:{}),
       ...(input.customerReorderIntent?.length?{customerReorderIntent:input.customerReorderIntent.map(line=>({...line,selections:line.selections.map(selection=>({...selection})),...(line.combo?{combo:{...line.combo,selections:line.combo.selections.map(selection=>({...selection}))}}:{})}))}:{}),
+      ...(input.customerReorderHistoryPriceFacts?.length?{customerReorderHistoryPriceFacts:input.customerReorderHistoryPriceFacts.map(fact=>({...fact}))}:{}),
       ...(session?{staffId:session.staffId,staffName:session.displayName}:{}),
       items:input.items.map(item=>normalizeLocalOrderLineItem(item as unknown as Record<string,unknown>)),
     };
