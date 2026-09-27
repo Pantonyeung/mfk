@@ -19,10 +19,18 @@ import {
   type SmtCapacityPoolStateView,
 } from './capacity-pool-state.ts';
 import {validateAdminRefundEvent,type AdminRefundEvent} from '../../../contracts/admin-refund-v1.ts';
+import {normalizeMfkOrderLineCompositionV1,type MfkOrderLineCompositionV1} from '../../../contracts/order-line-composition-v1.ts';
 
 export interface SmtOperationalMetric{readonly id:string;readonly label:string;readonly value:string;readonly detail?:string}
 export interface SmtOrderListItemViewModel{readonly orderId:string;readonly orderIdLabel:string;readonly itemCount:number;readonly totalLabel:string;readonly paymentLabel:string;readonly fulfillmentLabel:string;readonly sourceLabel?:string;readonly localSequenceLabel?:string;readonly customerName?:string;readonly externalOrderNo?:string;readonly pickupCode?:string;readonly keetaDeferCount?:number}
-export interface SmtOrderDetailLineViewModel{readonly id:string;readonly name:string;readonly quantity:number;readonly unitLabel:string;readonly lineTotalLabel:string}
+export interface SmtOrderDetailLineViewModel{
+  readonly id:string;
+  readonly name:string;
+  readonly quantity:number;
+  readonly unitLabel:string;
+  readonly lineTotalLabel:string;
+  readonly composition?:MfkOrderLineCompositionV1;
+}
 export interface SmtOrderDetailViewModel extends SmtOrderListItemViewModel{readonly attention:readonly string[];readonly metrics:readonly SmtOperationalMetric[];readonly lines:readonly SmtOrderDetailLineViewModel[];readonly diningHoldId?:string;readonly recognizedSalesMinor?:number;readonly outstandingMinor?:number;readonly paymentEvidenceRef?:string;readonly paymentVerificationState?:'PENDING'|'VERIFIED'|'REJECTED';readonly customerPhone?:string;readonly paymentCorrections?:readonly PaymentCorrectionRecord[];readonly refunds?:readonly OrderRefundRecord[];readonly cancellationNoticeState?:'DONE'|'FAILED'|'UNKNOWN'}
 export interface SmtOrdersProjection{readonly items:readonly SmtOrderListItemViewModel[];readonly detailsByOrderId?:Readonly<Record<string,SmtOrderDetailViewModel>>;readonly selectedOrderId?:string;readonly selectedOrder?:SmtOrderDetailViewModel}
 export interface SmtDiningQueueItemViewModel{
@@ -105,6 +113,27 @@ export interface LocalPriceOverrideRecord{
   readonly sequence:number;
 }
 
+export interface LocalOrderItem{
+  readonly id:string;
+  readonly name:string;
+  readonly qty:number;
+  readonly unitMinor:number;
+  readonly serviceMode?:'takeaway'|'dine-in';
+  readonly productCode?:string;
+  readonly detail?:string;
+  readonly composition?:MfkOrderLineCompositionV1;
+}
+
+export interface LocalHoldItem{
+  readonly id:string;
+  readonly name:string;
+  readonly qty:number;
+  readonly unitMinor:number;
+  readonly serviceMode?:'takeaway'|'dine-in';
+  readonly detail?:string;
+  readonly composition?:MfkOrderLineCompositionV1;
+}
+
 export interface StoredOrder{
   id:string;display:string;createdAt:string;updatedAt?:string;totalMinor:number;paymentLabel:string;fulfillmentLabel:'待處理'|'進行中'|'可取餐'|'已完成'|'已取消';sourceLabel:string;
   checkoutSubmissionId?:string;
@@ -142,7 +171,7 @@ export interface StoredOrder{
   providerLastEventId?:number;providerLastEventName?:string;providerLastEventAt?:string;providerLastMessageId?:string;providerLifecycleNote?:string;
   acceptancePrintedAt?:string;
   paymentEvidenceRef?:string;paymentVerificationState?:'PENDING'|'VERIFIED'|'REJECTED';customerPhone?:string;
-  items:readonly {id:string;name:string;qty:number;unitMinor:number;serviceMode?:'takeaway'|'dine-in';productCode?:string;detail?:string}[];
+  items:readonly LocalOrderItem[];
 }
 export type DiningTender='CASH'|'ALIPAY'|'WECHAT'|'FPS'|'PAYME'|'COMBO';
 export interface DiningSettlementCommand{
@@ -271,7 +300,7 @@ export interface LocalHoldDraft{
   readonly providerRef?:string;
   readonly sourceLabel?:string;
   readonly smmSubmissionRefs?:readonly string[];
-  readonly items:readonly {id:string;name:string;qty:number;unitMinor:number}[];
+  readonly items:readonly LocalHoldItem[];
 }
 interface Persisted{orders:StoredOrder[];availability:Record<string,SmtAvailabilityStatus>;holds:LocalHoldDraft[];diningRevision?:number}
 const KEY='mfk.v2local.runtime.v1';
@@ -282,6 +311,14 @@ const TAKEAWAY_PRODUCT_IDS=Object.freeze(['bento','curry','wedges','milkTea','le
 const listeners=new Set<()=>void>();
 const defaults:Persisted={orders:[],availability:{},holds:[]};
 const clone=<T,>(value:T):T=>JSON.parse(JSON.stringify(value)) as T;
+function normalizeCompositionItem<T extends {readonly composition?:unknown}>(item:T):T{
+  const composition=normalizeMfkOrderLineCompositionV1(item.composition);
+  if(composition)return {...item,composition} as T;
+  if(!('composition' in item))return item;
+  const copy={...(item as Record<string,unknown>)};
+  delete copy.composition;
+  return copy as T;
+}
 function read():Persisted{
   try{
     const value=JSON.parse(localStorage.getItem(KEY)||'null');
@@ -290,9 +327,18 @@ function read():Persisted{
       const source=String(order?.sourceLabel||'');
       const paid=Boolean(String(order?.paymentLabel||'').trim());
       const legacyLocal=source.startsWith('現場')||source.startsWith('SMM')||source.startsWith('電話')||source.startsWith('WhatsApp');
-      return {...order,fulfillmentLabel:order?.fulfillmentLabel==='待處理'&&paid&&legacyLocal?'進行中':order?.fulfillmentLabel};
+      const items=(Array.isArray(order?.items)?order.items:[]).map((item:any)=>normalizeCompositionItem(item));
+      return {
+        ...order,
+        items,
+        fulfillmentLabel:order?.fulfillmentLabel==='待處理'&&paid&&legacyLocal?'進行中':order?.fulfillmentLabel,
+      };
     }) as StoredOrder[];
-    return {orders,availability:value.availability||{},holds:Array.isArray(value.holds)?value.holds:[],diningRevision:Number.isSafeInteger(value.diningRevision)?value.diningRevision:0};
+    const holds=(Array.isArray(value.holds)?value.holds:[]).map((hold:any)=>({
+      ...hold,
+      items:(Array.isArray(hold?.items)?hold.items:[]).map((item:any)=>normalizeCompositionItem(item)),
+    })) as LocalHoldDraft[];
+    return {orders,availability:value.availability||{},holds,diningRevision:Number.isSafeInteger(value.diningRevision)?value.diningRevision:0};
   }catch{return clone(defaults)}
 }
 let data=read();
@@ -437,7 +483,7 @@ export function readLastPrintDiagnostic():PrintDispatchDiagnostic|null{
 }
 export interface MfkLocalRuntime extends CleanSmtCoreRuntimePort{
   createOrder(input:{
-    items:readonly {id:string;name:string;qty:number;unitMinor:number;serviceMode?:'takeaway'|'dine-in';productCode?:string;detail?:string}[];
+    items:readonly LocalOrderItem[];
     totalMinor:number;
     paymentLabel:string;
     sourceLabel?:string;
@@ -471,7 +517,7 @@ export interface MfkLocalRuntime extends CleanSmtCoreRuntimePort{
   applyProviderLifecycle(input:{
     orderId:string;eventId:1002|1003|1004|1006|1008;eventName:string;providerMessageId:string;providerPushedAt:string;rawMessage:string;
   }):{readonly orderId:string;readonly disposition:'APPLIED'|'EVIDENCE_ONLY'|'IDEMPOTENT'|'CONFLICT';readonly fulfillmentLabel:StoredOrder['fulfillmentLabel']};
-  createHold(input:{kind:'dining'|'waiting';items:readonly {id:string;name:string;qty:number;unitMinor:number}[];totalMinor:number;partySize?:number;note?:string}):LocalHoldDraft;
+  createHold(input:{kind:'dining'|'waiting';items:readonly LocalHoldItem[];totalMinor:number;partySize?:number;note?:string}):LocalHoldDraft;
   updateDiningPartySize(holdId:string,partySize:number):Promise<LocalDiningHoldDetail>;
   upsertSmmDiningHold(input:{providerRef:string;target:{kind:'TABLE'|'WAITING';tableId?:string;covers?:number};items:readonly {id:string;name:string;qty:number;unitMinor:number}[];totalMinor:number;sourceLabel?:string}):LocalHoldDraft;
   holds():readonly LocalHoldDraft[];
@@ -786,8 +832,14 @@ function readDiningState():Persisted{
   }
   return {
     ...value,
-    orders:value.orders as StoredOrder[],
-    holds:value.holds as LocalHoldDraft[],
+    orders:value.orders.map((order:any)=>({
+      ...order,
+      items:(Array.isArray(order?.items)?order.items:[]).map((item:any)=>normalizeCompositionItem(item)),
+    })) as StoredOrder[],
+    holds:value.holds.map((hold:any)=>({
+      ...hold,
+      items:(Array.isArray(hold?.items)?hold.items:[]).map((item:any)=>normalizeCompositionItem(item)),
+    })) as LocalHoldDraft[],
     availability:value.availability as Record<string,SmtAvailabilityStatus>,
     diningRevision:Number.isSafeInteger(value.diningRevision)?value.diningRevision:0,
   };
@@ -1431,7 +1483,7 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
       ...(input.customerPhone?{customerPhone:String(input.customerPhone).trim().slice(0,40)}:{}),
       ...(input.customerName?{customerName:String(input.customerName).trim().slice(0,120)}:{}),
       ...(session?{staffId:session.staffId,staffName:session.displayName}:{}),
-      items:input.items.map(item=>({...item})),
+      items:input.items.map(item=>normalizeCompositionItem({...item})),
     };
     const order=appendCapacityDeductionEvents(baseOrder,'ORDER',baseOrder.items,data.orders,createdAt);
     data={...data,orders:[order,...data.orders]};
@@ -1451,7 +1503,7 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
       note:String(input.note||''),
       totalMinor:Math.max(0,Math.floor(Number(input.totalMinor)||0)),
       payments:[],
-      items:input.items.map(item=>({...item})),
+      items:input.items.map(item=>normalizeCompositionItem({...item})),
     };
     data={...data,holds:[draft,...data.holds]};save();return draft;
   },
@@ -1581,6 +1633,7 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
         quantity:item.qty,
         unitLabel:money(item.unitMinor),
         lineTotalLabel:money(item.unitMinor*item.qty),
+        ...(item.composition?{composition:item.composition}:{}),
       }))
     };
     return {items,detailsByOrderId:details,selectedOrderId:selectedId,selectedOrder:selectedId?details[selectedId]:undefined};
@@ -1919,8 +1972,18 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
     if(order.diningHoldId)throw new Error('DINING_ITEMS_MANAGED_BY_DINING');
     if((order.capacityEvents??[]).some(event=>event.kind==='DEDUCT'))throw new Error('CAPACITY_LINKED_ORDER_EDIT_REQUIRES_CORRECTION');
     if(order.fulfillmentLabel==='已取消'||order.fulfillmentLabel==='已完成')throw new Error('ORDER_NOT_EDITABLE');
+    const remaining=[...order.items];
     const normalized=items
-      .map(item=>({...item,qty:Math.max(0,Math.floor(Number(item.qty)||0)),unitMinor:Math.max(0,Math.floor(Number(item.unitMinor)||0))}))
+      .map((item,index)=>{
+        const matchIndex=remaining.findIndex(existing=>existing.id===item.id);
+        const previous=matchIndex>=0?remaining.splice(matchIndex,1)[0]:order.items[index];
+        return normalizeCompositionItem({
+          ...(previous??{}),
+          ...item,
+          qty:Math.max(0,Math.floor(Number(item.qty)||0)),
+          unitMinor:Math.max(0,Math.floor(Number(item.unitMinor)||0)),
+        } as LocalOrderItem);
+      })
       .filter(item=>item.qty>0);
     if(!normalized.length)throw new Error('ORDER_ITEMS_REQUIRED');
     const totalMinor=normalized.reduce((sum,item)=>sum+item.qty*item.unitMinor,0);
