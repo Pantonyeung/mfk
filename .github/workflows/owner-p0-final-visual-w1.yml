@@ -6,6 +6,10 @@ on:
       - work/MFK/OWNER-P0-FINAL-VISUAL-SYSTEM-W1
   workflow_dispatch:
 
+concurrency:
+  group: owner-p0-final-visual-w1-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
