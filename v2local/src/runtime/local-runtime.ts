@@ -2192,6 +2192,66 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
     appendActionAudit({action:'DINING_LINE_VOID_NOTICE',orderId:order.id,reason:result.code});
     return Object.freeze({detail:clone(diningDetail(finalized.hold)),correction:clone(finalizedCorrection)});
   },
+  async overrideDiningLinePrice(holdId,lineIndex,effectiveUnitMinor,reason,expectedRevision){
+    return withDiningMutationLock('price:'+holdId,async()=>{
+      const snapshot=readDiningState();
+      const hold=requireDiningHold(snapshot,holdId);
+      if(expectedRevision&&expectedRevision!==diningCheckoutRevision(hold))throw new Error('DINING_PRICE_OVERRIDE_STALE');
+      if(hold.archivedAt||hold.cancelledAt)throw new Error('DINING_HISTORY_PROTECTED');
+      if((hold.payments??[]).length)throw new Error('DINING_PRICE_OVERRIDE_AFTER_PAYMENT_FORBIDDEN');
+      const session=readActiveStaffSession();
+      if(!session)throw new Error('DINING_PRICE_OVERRIDE_AUTH_REQUIRED');
+      if(!hasStaffPermission('PRICE_OVERRIDE'))throw new Error('DINING_PRICE_OVERRIDE_FORBIDDEN');
+      if(!Number.isSafeInteger(lineIndex)||lineIndex<0||lineIndex>=hold.items.length)throw new Error('DINING_LINE_NOT_FOUND');
+      if(!Number.isSafeInteger(effectiveUnitMinor))throw new Error('DINING_PRICE_OVERRIDE_INVALID');
+
+      const normalizedReason=String(reason||'').trim().slice(0,200);
+      const item=hold.items[lineIndex]!;
+      if(item.unitMinor===effectiveUnitMinor)return clone(diningDetail(hold));
+
+      const createdAt=new Date().toISOString();
+      const sequence=(hold.priceOverrides?.length??0)+1;
+      const record:LocalPriceOverrideRecord={
+        id:'DPO:'+holdId+':'+createdAt+':'+lineIndex,
+        createdAt,
+        lineIndex,
+        productId:item.id,
+        originalUnitMinor:item.unitMinor,
+        effectiveUnitMinor,
+        deltaMinor:effectiveUnitMinor-item.unitMinor,
+        reason:normalizedReason,
+        staffId:session.staffId,
+        staffName:session.displayName,
+        source:'MANUAL_OVERRIDE',
+        permission:'PRICE_OVERRIDE',
+        sequence,
+      };
+      const items=hold.items.map((row,index)=>index===lineIndex?{...row,unitMinor:effectiveUnitMinor}:row);
+      const totalMinor=items.reduce((sum,row)=>sum+row.qty*row.unitMinor,0);
+      if(!Number.isSafeInteger(totalMinor))throw new Error('DINING_PRICE_OVERRIDE_TOTAL_INVALID');
+      const nextHold:LocalHoldDraft={
+        ...hold,
+        items,
+        totalMinor,
+        priceOverrides:[...(hold.priceOverrides??[]),record],
+      };
+      const ensured=ensureDiningFormalOrder(snapshot,nextHold,createdAt);
+      const next=commitDiningState(snapshot,{
+        holds:snapshot.holds.map(row=>row.id===holdId?ensured.hold:row),
+        orders:ensured.orders,
+      });
+      const committedHold=requireDiningHold(next,holdId);
+      projectDiningOrderNonBlocking(ensured.order);
+      if(ensured.order){
+        appendActionAudit({
+          action:'DINING_PRICE_OVERRIDE',
+          orderId:ensured.order.id,
+          reason:'#'+sequence+' '+session.displayName+' '+money(item.unitMinor)+'→'+money(effectiveUnitMinor)+(normalizedReason?' '+normalizedReason:''),
+        });
+      }
+      return clone(diningDetail(committedHold));
+    });
+  },
   async settleDiningHold(holdId,selections,tender,command){
     if(!command||typeof command.submissionId!=='string'||!command.submissionId.trim()||command.submissionId.length>200||
        typeof command.expectedRevision!=='string'||!command.expectedRevision){
@@ -2235,13 +2295,14 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
 
     if(hold.archivedAt)throw new Error('DINING_ALREADY_SETTLED');
     if(command.expectedRevision!==diningCheckoutRevision(hold))throw new Error('DINING_CHECKOUT_STALE');
-    if(hold.items.some(row=>!Number.isSafeInteger(row.qty)||row.qty<=0||!Number.isSafeInteger(row.unitMinor)||row.unitMinor<0)){
+    if(hold.items.some(row=>!Number.isSafeInteger(row.qty)||row.qty<=0||!Number.isSafeInteger(row.unitMinor))){
       throw new Error('DINING_AMOUNT_INVALID');
     }
     const computedTotal=hold.items.reduce((total,row)=>total+row.qty*row.unitMinor,0);
     if(!Number.isSafeInteger(computedTotal)||computedTotal!==hold.totalMinor)throw new Error('DINING_TOTAL_MISMATCH');
 
     const detail=diningDetail(hold);
+    if(detail.totalMinor<0||detail.remainingMinor<0)throw new Error('DINING_NEGATIVE_BALANCE_REQUIRES_ADJUSTMENT');
     const paymentSelections=normalized.map(selection=>{
       const line=detail.lines[selection.lineIndex];
       if(!line)throw new Error('DINING_LINE_NOT_FOUND');
@@ -2249,7 +2310,7 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
       return {...selection,amountMinor:line.unitMinor*selection.qty};
     });
     const amountMinor=paymentSelections.reduce((sum,row)=>sum+row.amountMinor,0);
-    if(!Number.isSafeInteger(amountMinor)||amountMinor<=0||amountMinor>detail.remainingMinor)throw new Error('DINING_AMOUNT_INVALID');
+    if(!Number.isSafeInteger(amountMinor)||amountMinor<0||amountMinor>detail.remainingMinor)throw new Error('DINING_AMOUNT_INVALID');
     if(tender==='COMBO'){
       const splitTotal=splitTenders.reduce((sum,row)=>sum+row.amountMinor,0);
       if(!splitTenders.length||splitTotal!==amountMinor)throw new Error('DINING_SPLIT_TENDER_TOTAL_MISMATCH');
