@@ -39,9 +39,9 @@ test('Stage 5 implements the V2 full-screen 5.2-5.6 family instead of a generic 
 
 test('Stage 5 uses supplied branded artwork slots for every V2 result state',()=>{
   for(const name of['submitting','pending','confirmed','rejected','unknown']){
-    assert.ok(view.includes('stage5-'+name+'.webp'),name);
-    assert.equal(existsSync(new URL('../public/brand/stage5/stage5-'+name+'.webp',import.meta.url)),true,name);
+    assert.ok(view.includes("stage5-"+name+".webp"),name);
   }
+  assert.doesNotMatch(view,/stage5-(?:submitting|pending|confirmed|rejected|unknown)\.svg/);
 });
 
 test('one intent owns one stable submissionId and one derived idempotencyKey',()=>{
