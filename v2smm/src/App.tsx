@@ -784,7 +784,7 @@ export function App(){
 
     <nav className="bottom-nav" aria-label="主要功能">
       <NavButton active={view==='order'} label="點單" onClick={()=>changeView('order')}/>
-      <NavButton active={view==='work'} label="待處理" badge={(snapshot?.work??[]).filter(item=>item.state!=='NORMAL').length?String((snapshot?.work??[]).filter(item=>item.state!=='NORMAL').length):undefined} onClick={()=>changeView('work')}/>
+      <NavButton active={view==='work'} label="待處理" badge={(snapshot?.work??[]).length?String((snapshot?.work??[]).length):undefined} onClick={()=>changeView('work')}/>
       <NavButton active={view==='orders'} label="訂單" onClick={()=>changeView('orders')}/>
       <NavButton active={view==='dine'} label="堂食" onClick={()=>changeView('dine')}/>
       <NavButton active={view==='more'} label="更多" badge={localDraftCount?String(localDraftCount):undefined} onClick={()=>changeView('more')}/>
@@ -1653,6 +1653,5 @@ function Tool({title,detail,state,onClick}:{title:string;detail:string;state:str
 function Metric({label,value}:{label:string;value:string}){return <div><small>{label}</small><strong>{value}</strong></div>}
 function NavButton({active,label,glyph,badge,onClick}:{active:boolean;label:string;glyph?:string;badge?:string;onClick:()=>void}){return <button className={active?'active':''} onClick={onClick}>{glyph?<span>{glyph}</span>:null}<small>{label}</small>{badge?<b>{badge}</b>:null}</button>}
 
-function labelWorkState(state:string){return state==='NORMAL'?'正常':state==='DELAYED'?'延誤':state==='ACTION_REQUIRED'?'需處理':'未知'}
 function connectionLabelShort(state:SmmConnectionState){return state==='READY'?'已連接':state==='LOADING'?'同步中':state==='ERROR'?'錯誤':state==='STALE'?'資料稍舊':state==='PARTIAL'?'部分資料':state==='UNKNOWN'?'未知':'未連接'}
 function moreTitle(tool:string){return tool==='staff'?'員工帳戶':tool==='connection'?'連線設定':tool==='pending'?'待提交草稿':tool==='channels'?'平台狀態':tool==='business'?'營業日':tool==='capacity'?'產能':tool==='reporting'?'營運報表':tool==='refunds'?'退款要求':tool==='printing'?'列印狀態':tool==='sellability'?'商品供應':'診斷'}
