@@ -59,8 +59,8 @@ test('menu refresh creates line-scoped PRICE_CHANGED or CONFIG_CHANGED repair an
   assert.match(app,/buildSmmCartRefreshAttention/);
   assert.match(cartSheet,/line\.refreshAttention\?\?null/);
   assert.match(cartSheet,/attention\.kind/);
-  assert.match(app,/PRICE_CHANGED/);
-  assert.match(app,/CONFIG_CHANGED/);
+  assert.match(cartSheet,/attention\.kind==='PRICE_CHANGED'/);
+  assert.match(cartSheet,/商品／套餐發布資料已更新/);
   assert.match(cartSheet,/舊價/);
   assert.match(cartSheet,/新價/);
   assert.match(cartSheet,/接受更新/);
