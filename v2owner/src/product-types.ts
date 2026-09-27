@@ -234,6 +234,17 @@ export interface OwnerReportCard {
   readonly metricVersion?:string;
 }
 
+export interface OwnerPlanningBasis {
+  readonly month:string;
+  readonly businessDate:string;
+  readonly sourceMetric:'CURRENT_EFFECTIVE_SALES';
+  readonly sourceAuthority:'CANONICAL_REPORTING_PROJECTION';
+  readonly currentEffectiveSalesMtdMinor:number|null;
+  readonly metricVersion:string;
+  readonly completeness:'COMPLETE'|'PARTIAL'|'UNAVAILABLE';
+  readonly observedAt:string;
+}
+
 export interface OwnerTodayInsight {
   readonly topProductLabel?:string;
   readonly currentHourTrendLabel?:string;
@@ -311,6 +322,7 @@ export interface OwnerReadModelSnapshot {
   readonly globalState?:OwnerGlobalState;
   readonly store?:OwnerStoreContext;
   readonly today?:OwnerTodaySummary;
+  readonly planningBasis?:OwnerPlanningBasis;
   readonly insight?:OwnerTodayInsight;
   readonly liveOrders?:OwnerLiveOrdersSummary;
   readonly dineIn?:OwnerDineInSummary;
