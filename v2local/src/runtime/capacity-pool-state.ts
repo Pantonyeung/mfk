@@ -451,12 +451,17 @@ export function planCapacityDeductionEvents(input:{
     if(quantity>state.remainingQty)throw new Error('CAPACITY_POOL_INSUFFICIENT:'+pool.id);
     let overrideAllocations:readonly {overrideId:string;quantity:number}[]|undefined;
     if(input.channel){
-      const threshold=input.channel==='FIRST_PARTY'?pool.firstPartyStopAt:pool.thirdPartyStopAt;
-      if(state.remainingQty<=threshold){
-        const rows=readLocalCapacityPoolRows(storage);
-        const stateRow=rows.find(row=>row.businessDate===view.businessDate&&row.poolId===pool.id);
-        if(!stateRow)throw new Error('CAPACITY_POOL_STATE_MISSING:'+pool.id);
+      const rows=readLocalCapacityPoolRows(storage);
+      const stateRow=rows.find(row=>row.businessDate===view.businessDate&&row.poolId===pool.id);
+      if(!stateRow)throw new Error('CAPACITY_POOL_STATE_MISSING:'+pool.id);
+      const matchingAllowance=overrideAllowance(stateRow,input.channel);
+      if(matchingAllowance>0){
         overrideAllocations=planOverrideAllocations(stateRow,input.channel,quantity);
+      }else{
+        const threshold=input.channel==='FIRST_PARTY'?pool.firstPartyStopAt:pool.thirdPartyStopAt;
+        if(baseRemainingWithoutOverride(stateRow)<=threshold){
+          throw new Error('CAPACITY_CHANNEL_STOP:'+input.channel+':'+pool.id);
+        }
       }
     }
     events.push(Object.freeze({
