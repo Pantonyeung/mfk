@@ -588,7 +588,7 @@ test('Stage03 visual and touch contract remains in approved Owner language',()=>
   assert.match(css,/\.order-search input\{min-height:44px\}/);
   assert.match(css,/\.order-filter select\{[\s\S]*min-height:44px/);
   assert.match(css,/var\(--owner-final-navy\)/);
-  assert.match(css,/var\(--owner-final-surface\)/);
+  assert.match(css,/--owner-final-surface:#ffffff/);
 
   for(const width of[360,375,390,430,520]){
     assert.match(css,new RegExp('@media\\(max-width:'+width+'px\\)'));
