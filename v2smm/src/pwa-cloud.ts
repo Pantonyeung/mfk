@@ -88,7 +88,7 @@ export function createPwaCloudTransport():SmmLanTransport{
         });
       }catch(error){
         if(error instanceof DOMException&&error.name==='AbortError')return{kind:'UNKNOWN'};
-        return{kind:'UNAVAILABLE'};
+        return{kind:'UNKNOWN'};
       }
       if(!response.ok&&response.status!==202){
         const body=await response.json().catch(()=>({})) as Record<string,unknown>;
