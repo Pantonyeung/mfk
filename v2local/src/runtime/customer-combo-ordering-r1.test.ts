@@ -10,7 +10,8 @@ import {
   readCustomerLocalWorkspace,
   writeCustomerLocalWorkspace,
 } from '../../../v2customer/src/persistence.ts';
-import type {CustomerCartLine,CustomerCheckoutDraft} from '../../../v2customer/src/product-types.ts';
+import type {CustomerCartLine,CustomerCheckoutDraft,CustomerComboPool} from '../../../v2customer/src/product-types.ts';
+import {toggleCustomerComboSelection} from '../../../v2customer/src/selection.ts';
 import type {SyncedCombo,SyncedComboPool,SyncedOrderingProduct,SyncedOptionSet} from './admin-config-projection.ts';
 import {priceCustomerCart} from './customer-cloud-intake.ts';
 
@@ -225,6 +226,40 @@ describe('Customer Combo ordering → existing SMT revalidation',()=>{
     expect(restored.pendingIntents[0]?.cart[0]?.combo).toEqual(line.combo);
     expect(restored.pendingIntents[0]?.submissionId).toBe(pending.submissionId);
     expect(restored.pendingIntents[0]?.idempotencyKey).toBe(pending.idempotencyKey);
+  });
+
+
+  it('prunes stale hidden Combo choices so a multi-select group remains repairable',()=>{
+    const customerPool:CustomerComboPool={
+      poolId:'repair-pool',
+      name:'加配',
+      kind:'ADDON',
+      addonKind:'SNACK',
+      groups:[{
+        groupId:'repair-group',
+        name:'加配',
+        required:true,
+        minSelections:1,
+        maxSelections:2,
+        subPools:[{
+          subPoolId:'repair-band',
+          name:'加配',
+          publishedAdjustmentMinor:0,
+          available:true,
+          choices:[
+            {choiceId:'choice-a',choiceType:'LABEL',label:'A',publishedAdjustmentMinor:0,available:true},
+            {choiceId:'choice-b',choiceType:'LABEL',label:'B',publishedAdjustmentMinor:0,available:true},
+          ],
+        }],
+      }],
+    };
+    const group=customerPool.groups[0]!;
+    const repaired=toggleCustomerComboSelection([
+      {poolId:'repair-pool',groupId:'repair-group',subPoolId:'old-band',choiceId:'removed-choice'},
+      {poolId:'repair-pool',groupId:'repair-group',subPoolId:'repair-band',choiceId:'choice-a'},
+    ],customerPool,group,'repair-band','choice-b');
+
+    expect(repaired.map(row=>row.choiceId).sort()).toEqual(['choice-a','choice-b']);
   });
 
 });
