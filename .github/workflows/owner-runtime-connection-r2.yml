@@ -1,0 +1,43 @@
+name: owner-runtime-connection-r2
+
+on:
+  push:
+    branches:
+      - work/MFK/OWNER-RUNTIME-CONNECTION-R2
+  pull_request:
+    paths:
+      - 'v2owner/**'
+      - 'v2admin/**'
+      - '.github/workflows/owner-runtime-connection-r2.yml'
+  workflow_dispatch:
+
+jobs:
+  owner:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: v2owner
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-audit --no-fund --legacy-peer-deps --package-lock=false
+      - run: npm test
+      - run: npm run build
+
+  admin:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: v2admin
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-audit --no-fund --legacy-peer-deps --package-lock=false
+      - run: npm test
+      - run: npm run build
+      - name: Wrangler dry-run
+        run: npx --yes wrangler@4 deploy --dry-run --config wrangler.jsonc
