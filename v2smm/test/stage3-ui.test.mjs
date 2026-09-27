@@ -21,11 +21,12 @@ test('Stage 3 CartSheet is present and does not start Stage 4 checkout execution
   assert.doesNotMatch(cartSheet,/onSubmit|onTender|diningTarget|submitCart|submitOrder|readSubmission/);
 });
 
-test('Stage 3 line workflow supports edit quantity remove total and optional note',()=>{
+test('Stage 3 line workflow supports edit quantity remove unit line-total and optional note',()=>{
   for(const marker of[
     'onEdit','onQuantity','onRemove','stage3-line','stage3-qty','stage3-remove',
-    '訂單備註','總額','validSubtotalMinor'
+    '訂單備註','單價','行總額','validSubtotalMinor'
   ])assert.match(cartSheet,new RegExp(marker));
+  assert.match(cartSheet,/smmLineTotalMinor\(line\.publishedUnitPriceMinor,line\.quantity\)/);
   assert.match(cartSheet,/maxLength=\{160\}/);
   assert.match(app,/onNote=\{changeCartNote\}/);
 });
@@ -53,11 +54,16 @@ test('editing restores Stage 2 modifier variation and canonical Combo selections
   assert.match(app,/setSelections\(Object\.freeze\(restored\)\)/);
 });
 
-test('menu refresh repairs only affected lines and blocks checkout until every cart line is valid',()=>{
-  assert.match(app,/需要處理嘅商品已逐項標示，其他草稿保持不變/);
-  assert.match(cartSheet,/const attentionFor=\(line:SmmCartLine\)=>/);
-  assert.match(cartSheet,/此商品已暫停供應/);
-  assert.match(cartSheet,/請重新編輯呢件商品/);
+test('menu refresh creates line-scoped PRICE_CHANGED or CONFIG_CHANGED repair and blocks checkout',()=>{
+  assert.match(app,/未確認前唔會靜默接受新價格或套餐資料/);
+  assert.match(app,/buildSmmCartRefreshAttention/);
+  assert.match(cartSheet,/line\.refreshAttention\?\?null/);
+  assert.match(cartSheet,/PRICE_CHANGED/);
+  assert.match(cartSheet,/CONFIG_CHANGED/);
+  assert.match(cartSheet,/舊價/);
+  assert.match(cartSheet,/新價/);
+  assert.match(cartSheet,/接受更新/);
+  assert.match(cartSheet,/重新編輯/);
   assert.match(cartSheet,/只修正有問題嗰一行；其他購物草稿保持不變/);
   assert.match(cartSheet,/const checkoutReady=Boolean\(menu&&cart\.length&&affectedCount===0&&quote\)/);
   assert.match(cartSheet,/disabled=\{!checkoutReady\}/);
