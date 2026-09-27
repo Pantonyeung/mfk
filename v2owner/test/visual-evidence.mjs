@@ -66,21 +66,21 @@ const snapshot={
 };
 
 const session={staffId:'owner',loginId:'owner',displayName:'Panton',role:'OWNER',scope:'STORE',permissions:['OWNER_READ'],sessionToken:'x'.repeat(64)};
-const port={
-  portId:'MFK_OWNER_PORT_V1',
-  async readOwnerSession(){return session},
-  async readSnapshot(){return snapshot},
-  async readChannels(){return snapshot.channels},
-  async readSellability(){return snapshot.sellability},
-  async requestBoundedAction(){return {state:'CONFIRMED',message:'操作已完成'}},
-  async commandSellability(input){
-    return {state:'CONFIRMED',message:'已更新',targets:input.targets.map(target=>({targetId:target.targetId,grain:target.grain,state:'CONFIRMED',message:'已確認'}))};
-  },
-};
-
 const browser=await chromium.launch({headless:true});
 const page=await browser.newPage({viewport:{width:390,height:844},deviceScaleFactor:1});
-await page.addInitScript(portValue=>{window.__MFK_OWNER_PRODUCT_PORT__=portValue},port);
+await page.addInitScript(({snapshotValue,sessionValue})=>{
+  window.__MFK_OWNER_PRODUCT_PORT__={
+    portId:'MFK_OWNER_PORT_V1',
+    async readOwnerSession(){return sessionValue},
+    async readSnapshot(){return snapshotValue},
+    async readChannels(){return snapshotValue.channels},
+    async readSellability(){return snapshotValue.sellability},
+    async requestBoundedAction(){return {state:'CONFIRMED',message:'操作已完成'}},
+    async commandSellability(input){
+      return {state:'CONFIRMED',message:'已更新',targets:input.targets.map(target=>({targetId:target.targetId,grain:target.grain,state:'CONFIRMED',message:'已確認'}))};
+    },
+  };
+},{snapshotValue:snapshot,sessionValue:session});
 await page.goto(baseURL,{waitUntil:'networkidle'});
 await page.getByRole('heading',{name:'而家間舖點？'}).waitFor();
 
