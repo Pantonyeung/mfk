@@ -1223,22 +1223,48 @@ function ProductSheet({
   </div>;
 }
 
-function CartSheet({cart,quote,menu,serviceMode,note,onNote,onServiceMode,onClose,onEdit,onAcceptRefresh,onQuantity,onRemove,onClear,onCheckout}:{
+function CartSheet({cart,quote,menu,checkoutStage,serviceMode,tender,diningTarget,diningTables,note,onNote,onServiceMode,onTender,onChooseDiningTarget,onClose,onBackToCart,onEdit,onAcceptRefresh,onQuantity,onRemove,onClear,onCheckout,onSubmitBoundary}:{
   cart:readonly SmmCartLine[];
   quote:SmmQuoteSnapshot|null;
   menu:SmmReadModelSnapshot['menu'];
+  checkoutStage:boolean;
   serviceMode:SmmServiceMode;
+  tender:SmmTender;
+  diningTarget:SmmDiningTarget|null;
+  diningTables:NonNullable<SmmReadModelSnapshot['diningTables']>;
   note:string;
   onNote:(value:string)=>void;
   onServiceMode:(mode:SmmServiceMode)=>void;
+  onTender:(tender:SmmTender)=>void;
+  onChooseDiningTarget:()=>void;
   onClose:()=>void;
+  onBackToCart:()=>void;
   onEdit:(line:SmmCartLine)=>void;
   onAcceptRefresh:(lineId:string)=>void;
   onQuantity:(id:string,q:number)=>void;
   onRemove:(id:string)=>void;
   onClear:()=>void;
   onCheckout:()=>void;
+  onSubmitBoundary:()=>void;
 }){
+  if(checkoutStage){
+    return <Stage4CheckoutView
+      cart={cart}
+      quote={quote}
+      menu={menu}
+      serviceMode={serviceMode}
+      tender={tender}
+      diningTarget={diningTarget}
+      diningTables={diningTables}
+      note={note}
+      onServiceMode={onServiceMode}
+      onTender={onTender}
+      onChooseDiningTarget={onChooseDiningTarget}
+      onClose={onClose}
+      onBackToCart={onBackToCart}
+      onSubmitBoundary={onSubmitBoundary}
+    />;
+  }
   const rows=cart.map(line=>Object.freeze({line,attention:line.refreshAttention??null}));
   const affectedCount=rows.filter(row=>Boolean(row.attention)).length;
   const validRows=rows.filter(row=>!row.attention&&Number.isSafeInteger(Number(row.line.publishedUnitPriceMinor)));
@@ -1357,6 +1383,136 @@ function CartSheet({cart,quote,menu,serviceMode,note,onNote,onServiceMode,onClos
     </section>
   </div>;
 }
+
+function Stage4CheckoutView({cart,quote,menu,serviceMode,tender,diningTarget,diningTables,note,onServiceMode,onTender,onChooseDiningTarget,onClose,onBackToCart,onSubmitBoundary}:{
+  cart:readonly SmmCartLine[];
+  quote:SmmQuoteSnapshot|null;
+  menu:SmmReadModelSnapshot['menu'];
+  serviceMode:SmmServiceMode;
+  tender:SmmTender;
+  diningTarget:SmmDiningTarget|null;
+  diningTables:NonNullable<SmmReadModelSnapshot['diningTables']>;
+  note:string;
+  onServiceMode:(mode:SmmServiceMode)=>void;
+  onTender:(tender:SmmTender)=>void;
+  onChooseDiningTarget:()=>void;
+  onClose:()=>void;
+  onBackToCart:()=>void;
+  onSubmitBoundary:()=>void;
+}){
+  const itemCount=cart.reduce((sum,line)=>sum+line.quantity,0);
+  const hasAttention=cart.some(line=>Boolean(line.refreshAttention));
+  const diningStatus=smmStage4DiningTargetStatus(serviceMode,diningTarget,diningTables);
+  const submitReady=smmStage4CheckoutReady({
+    cartLength:cart.length,
+    totalMinor:quote?.totalMinor,
+    hasAttention,
+    tender,
+    diningTargetValid:diningStatus.valid,
+  });
+  const serviceLabel=serviceMode==='DINE_IN'?'堂食':'外賣';
+
+  return <div className="overlay stage4-overlay">
+    <section className="sheet stage4-checkout-sheet" role="dialog" aria-modal="true" aria-label="結帳">
+      <div className="sheet-grabber"/>
+      <header className="stage4-header">
+        <div>
+          <span>第 4 階段 · 結帳</span>
+          <h2>提交前確認</h2>
+          <small>呢一步只確認結帳資料；正式送出同 PENDING／CONFIRMED／REJECTED／UNKNOWN 留待第 5 階段。</small>
+        </div>
+        <button className="stage4-close" type="button" onClick={onClose} aria-label="關閉結帳">✕</button>
+      </header>
+
+      <div className="stage4-scroll-body">
+        <section className="stage4-section">
+          <div className="stage4-section-head">
+            <div><strong>服務方式</strong><small>切換屬店員明確操作；價格會按目前已發布資料即時重算。</small></div>
+            <span>1</span>
+          </div>
+          <div className="stage4-segmented">
+            <button type="button" className={serviceMode==='TAKEAWAY'?'active':''} onClick={()=>onServiceMode('TAKEAWAY')}>外賣</button>
+            <button type="button" className={serviceMode==='DINE_IN'?'active':''} onClick={()=>onServiceMode('DINE_IN')}>堂食</button>
+          </div>
+        </section>
+
+        {serviceMode==='DINE_IN'?<section className={`stage4-section stage4-dining ${diningStatus.valid?'':'required'}`}>
+          <div className="stage4-section-head">
+            <div><strong>堂食去向</strong><small>必須使用 Admin 已發布餐枱，或者加入輪候。</small></div>
+            <span>2</span>
+          </div>
+          <div className="stage4-target-row">
+            <div>
+              <small>{diningStatus.valid?'已選擇':'必選'}</small>
+              <strong>{diningStatus.label}</strong>
+            </div>
+            <button type="button" className={diningStatus.valid?'':'primary'} onClick={onChooseDiningTarget}>{diningStatus.valid?'更改':'選擇餐枱／輪候'}</button>
+          </div>
+          {!diningStatus.valid?<p className="stage4-inline-warning">堂食未選 Table / Waiting target，提交按鈕會保持停用。</p>:null}
+        </section>:null}
+
+        <section className="stage4-section">
+          <div className="stage4-section-head">
+            <div><strong>付款方式</strong><small>今階段只記錄 Tender；唔執行付款、唔自動開錢箱。</small></div>
+            <span>{serviceMode==='DINE_IN'?'3':'2'}</span>
+          </div>
+          <div className="stage4-tender-grid">
+            {SMM_STAGE4_TENDERS.map(row=><button
+              key={row.value}
+              type="button"
+              className={tender===row.value?'active':''}
+              onClick={()=>onTender(row.value)}
+            >{row.label}</button>)}
+          </div>
+        </section>
+
+        <section className="stage4-section stage4-summary">
+          <div className="stage4-section-head">
+            <div><strong>最後摘要</strong><small>正式價格、Combo、餐單 revision 仍由 SMT 提交時重新驗證。</small></div>
+            <span>{serviceMode==='DINE_IN'?'4':'3'}</span>
+          </div>
+
+          <div className="stage4-summary-facts">
+            <div><span>商品</span><strong>{itemCount} 件</strong></div>
+            <div><span>服務方式</span><strong>{serviceLabel}</strong></div>
+            {serviceMode==='DINE_IN'?<div><span>堂食去向</span><strong className={diningStatus.valid?'':'warn'}>{diningStatus.label}</strong></div>:null}
+            <div><span>付款方式</span><strong>{smmStage4TenderLabel(tender)}</strong></div>
+            <div><span>餐單版本</span><strong>{menu?.revision??'等待同步'}</strong></div>
+          </div>
+
+          <div className="stage4-review-lines">
+            {cart.map(line=>{
+              const total=smmLineTotalMinor(line.publishedUnitPriceMinor,line.quantity);
+              return <div key={line.lineId}>
+                <span>{line.productName} × {line.quantity}</span>
+                <strong>{total===null?'價格待同步':money('HKD',total)}</strong>
+              </div>;
+            })}
+          </div>
+
+          {note.trim()?<div className="stage4-note-summary"><span>備註</span><p>{note}</p></div>:null}
+
+          <div className="stage4-total">
+            <div><span>總額</span><small>{quote?'已發布價格預覽 · SMT 最終再驗證':'價格資料未完整'}</small></div>
+            <strong>{quote?money(quote.currency,quote.totalMinor):'—'}</strong>
+          </div>
+
+          {hasAttention?<section className="stage4-blocker" role="alert">
+            <strong>購物草稿有未確認更新</strong>
+            <span>返回購物草稿處理 PRICE_CHANGED / CONFIG_CHANGED 後先可以提交。</span>
+          </section>:null}
+        </section>
+      </div>
+
+      <footer className="stage4-footer">
+        <button type="button" onClick={onBackToCart}>返回購物草稿</button>
+        <button className="primary stage4-submit" type="button" disabled={!submitReady} onClick={onSubmitBoundary}>提交訂單</button>
+        <small>{submitReady?'結帳資料已齊；正式送出流程會喺第 5 階段接入。':serviceMode==='DINE_IN'&&!diningStatus.valid?'請先選擇餐枱或輪候。':hasAttention?'請先處理購物草稿更新。':'請確認餐單價格資料。'}</small>
+      </footer>
+    </section>
+  </div>;
+}
+
 
 function DiningTargetSheet({tables,covers,setCovers,onClose,onSelect}:{
   tables:NonNullable<SmmReadModelSnapshot['diningTables']>;
