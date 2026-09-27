@@ -1,4 +1,5 @@
 import {chromium} from 'playwright';
+import {preview} from 'vite';
 import {mkdir} from 'node:fs/promises';
 import path from 'node:path';
 
@@ -272,11 +273,16 @@ async function captureSize(browser,width,height){
   }
 }
 
+const server=await preview({
+  preview:{host:'127.0.0.1',port:4173,strictPort:true},
+  logLevel:'error',
+});
 const browser=await chromium.launch({headless:true});
 try{
   await captureSize(browser,440,956);
   await captureSize(browser,360,780);
 }finally{
   await browser.close();
+  await server.close();
 }
 console.log('SMM_P0_VISUAL_EVIDENCE_READY');
