@@ -4,55 +4,96 @@ STATUS:
 READY_FOR_COMMANDER_REACCEPTANCE
 
 CONTROL:
-Pantonyeung/mfk #399 comment 5854435845
+Pantonyeung/mfk #399 comment 5854794499
 
 PR:
 #402
 
-FINAL_HEAD:
-a5e1f6b1c6fdcfdedea38050074d678c2fc7c686
+FINAL_CODE_HEAD:
+64843dd7b69a2d856acff7d598354dc28ae58926
 
-FINAL_CI:
-36310294357 = SUCCESS
+FINAL_CODE_CI:
+36310817457 = SUCCESS
 
-FRESH_MAIN:
+FINAL_RECEIPT_BINDING:
+This repository handoff intentionally does not self-record its own commit SHA as FINAL_RECEIPT_HEAD.
+The single binding final receipt is the latest #399 comment whose status is READY_FOR_COMMANDER_REACCEPTANCE.
+That receipt must carry the exact FINAL_RECEIPT_HEAD, exact FINAL_CI, BEHIND_MAIN, FILES_CHANGED, and PREVIEW_CLASSIFICATION.
+Older FINAL_HEAD / FINAL_VALIDATED_HEAD values are non-binding and removed from this handoff.
+
+FRESH_MAIN_AT_CODE_VALIDATION:
 c2d5b016fe3dd08d276e915ae0f0fb2301e964cf
 
-BEHIND_MAIN:
+BEHIND_MAIN_AT_CODE_VALIDATION:
 0
 
-## Stage 5 visual acceptance
+## Final correction 1 — OFFLINE DRAFT false-submission presentation
+
+Fixed without adding a transaction state engine or authority.
+
+- 5.2 SUBMITTING renders only when an actual submit attempt is in-flight.
+- DRAFT with no submit port never enters Stage 5 submit-progress UI.
+- submitOrder => NOT_CONNECTED restores the same DRAFT identity and returns to the safe checkout surface.
+- original cart remains present.
+- no 「已建立提交」 claim exists in Stage 5.
+- submit step is shown as 「進行中」, not completed, during the actual in-flight attempt.
+- NOT_CONNECTED final presentation says the formal order was not sent and that no background resend will occur.
+- later explicit user retry reuses the matching saved DRAFT via the existing DRAFT identity lookup.
+- UNKNOWN remains same-submission readback-first.
+- no reconnect/background/blind resend added.
+
+Deterministic regression:
+- !port.submitOrder => no 5.2 completed submit claims
+- NOT_CONNECTED => no false completed-submit claims
+- cart preserved
+- same DRAFT identity preserved
+- 5.2 gated by DRAFT && submitting
+- UNKNOWN readback path still calls readSubmission(same submissionId) only
+- no background resend
+
+## Final correction 2 — handoff identity drift
+
+Identity is split explicitly:
+
+- FINAL_CODE_HEAD = 64843dd7b69a2d856acff7d598354dc28ae58926
+- FINAL_CODE_CI = 36310817457 = SUCCESS
+- FINAL_RECEIPT_HEAD / FINAL_CI are bound only by the latest #399 READY_FOR_COMMANDER_REACCEPTANCE receipt.
+
+This avoids the impossible self-referential requirement for a repository file to contain the SHA of the commit that contains itself.
+
+## Stage 5 visual acceptance preserved
 
 Source:
 Stage_5_提交正式訂單_V2.png
 
-Implemented as full-screen state family, not generic bottom sheet:
-- 5.2 提交中 / DRAFT
+Full-screen state family remains:
+- 5.2 提交中 / DRAFT + submitting only
 - 5.3 已提交 / PENDING
 - 5.4 訂單確認 / CONFIRMED
 - 5.5 提交失敗 / REJECTED
 - 5.6 狀態未明 / UNKNOWN
 
-Supplied artwork:
+Supplied WebP artwork remains:
 - stage5-submitting.webp
 - stage5-pending.webp
 - stage5-confirmed.webp
 - stage5-rejected.webp
 - stage5-unknown.webp
 
-Responsive acceptance:
+Responsive contract remains:
 - 440×956 primary
 - 360px minimum
-- touch targets
-- reduced motion
+- safe-area handling
+- reduced-motion handling
 
-## Shared state separation
+## Shared state separation preserved
 
 Loading / Empty / Offline / Stale / Partial / Unknown / Error remain distinct.
-Transport Offline does not rewrite transaction UNKNOWN.
-Stale / Partial do not become submission results.
-Error exposes no resubmit.
-Transaction UNKNOWN remains same-submission readback-first.
+
+- transport Offline != transaction UNKNOWN
+- Stale / Partial do not become submission results
+- Error exposes no resubmit
+- transaction UNKNOWN remains same-submission readback-first
 
 ## Formal submit semantics preserved
 
@@ -67,15 +108,16 @@ Transaction UNKNOWN remains same-submission readback-first.
 - NO Stage 6
 - NO second authority
 
-## CI evidence
+## CI evidence for FINAL_CODE_HEAD
 
-Existing governance CI:
-run 36310294357 = SUCCESS
+Existing governance CI only:
+admin-identity-canonical-r1 run 36310817457 = SUCCESS
 
 SMM:
-- 110 / 110 PASS
+- 113 / 113 PASS
 - build PASS
 - Wrangler deploy --dry-run PASS
+- production deploy = NONE
 
 v2local:
 - 87 test files PASS
@@ -83,25 +125,23 @@ v2local:
 - build PASS
 
 One-off workflow:
-.github/workflows/smm-stage5-formal-submit-r1.yml = removed from landing diff.
+.github/workflows/smm-stage5-formal-submit-r1.yml = ABSENT from landing diff.
 
 ## Preview classification
 
-PR #402 Cloudflare failures:
-- mfk-customer = failure
-- mfk-owner = failure
-
-Base main c2d5b016fe3dd08d276e915ae0f0fb2301e964cf shows the same two failures:
-- mfk-customer = failure
-- mfk-owner = failure
-
-Classification:
 PRE_EXISTING / PREVIEW_ENV_CONFIG
-NOT NEW_REGRESSION from Stage 5 candidate.
+
+Evidence:
+- base main c2d5b016fe3dd08d276e915ae0f0fb2301e964cf: mfk-customer + mfk-owner Cloudflare Workers Builds already fail
+- PR candidate shows the same two failures
+- Stage 5 landing diff contains no v2customer/** or v2owner/** product changes
+
+Therefore the Cloudflare preview failures are not a Stage 5 new regression.
 
 ## Landing diff files
 
 - contracts/smm-lan-v1.ts
+- docs/handoff/MFK_SMM_UI_STAGE5_REWORK_READY_FOR_COMMANDER_REACCEPTANCE_2026-09-27.md
 - v2local/src/runtime/smm-lan-ingress.test.ts
 - v2local/src/runtime/smm-lan-ingress.ts
 - v2smm/public/brand/stage5/stage5-confirmed.webp
@@ -126,12 +166,3 @@ LOCKS:
 NO MAIN MERGE
 NO DEPLOY
 NO STAGE 6
-
-FINAL_VALIDATED_HEAD:
-a5e1f6b1c6fdcfdedea38050074d678c2fc7c686
-
-FINAL_VALIDATED_CI:
-36310294357 = SUCCESS
-
-NOTE:
-FINAL_HEAD has passed the existing governance CI. No production deploy was performed.
