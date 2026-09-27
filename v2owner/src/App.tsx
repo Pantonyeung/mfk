@@ -319,7 +319,7 @@ export function App(){
     finally{setPlanningSaving(false);}
   };
 
-  const connectionLabel=connection==='FRESH'?'資料新鮮':connection==='LOADING'?'同步中':connection==='EMPTY'?'暫無資料':connection==='STALE'?'資料稍舊':connection==='PARTIAL'?'部分資料':connection==='OFFLINE_READONLY'?'離線唯讀':connection==='PERMISSION_DENIED'?'權限不足':connection==='UNKNOWN'?'狀態未明':'同步失敗';
+  const connectionLabel=humanConnectionLabel(connection);
 
   if(!authChecked){
     return <main className="app-shell owner-auth-shell"><section className="owner-auth-gate"><strong>正在驗證 Owner 工作階段</strong><p>正式資料未完成身份確認前唔會載入。</p></section></main>;
@@ -438,7 +438,7 @@ function MorePage({snapshot,connection,onTool,onChannels,onPlanning,onSellabilit
     {id:'manager',title:'經理日誌',detail:'本機筆記／Checklist／交接草稿',state:'本機'},
     {id:'activity',title:'活動紀錄',detail:'操作人／批核人／結果／狀態',state:String(snapshot?.activity.length??0)},
     {id:'admin',title:'前往 Admin',detail:'設定留喺 Admin',state:'導航'},
-    {id:'recovery',title:'資料狀態',detail:'離線／資料稍舊／狀態未明／部分資料',state:connection},
+    {id:'recovery',title:'資料狀態',detail:'離線／資料稍舊／狀態未明／部分資料',state:humanConnectionLabel(connection)},
   ];
   return <section className="page"><header className="page-head"><div><span>更多</span><h1>營運工具</h1><small>設定留 Admin；交易、付款、打印同實體設備執行留喺責任端。</small></div></header><div className="tool-grid"><button className="tool-card" onClick={onChannels}><strong>渠道</strong><small>健康／接單／有限控制</small><em>{String(snapshot?.channels.length??0)}</em></button><button className="tool-card" onClick={onPlanning}><strong>營業目標與成本</strong><small>Monthly Target / Cost Planning</small><em>{snapshot?.planning?.plan.revision?'已設定':'未設定'}</em></button><button className="tool-card" onClick={onSellability}><strong>商品供應</strong><small>售罄／恢復有限操作</small><em>{String(snapshot?.sellability.length??0)}</em></button><button className="tool-card" onClick={onStaff}><strong>員工</strong><small>唯讀出勤／角色摘要</small><em>{String(snapshot?.staff.length??0)}</em></button>{tools.map(item=><button key={item.id} className="tool-card" onClick={()=>onTool(item.id)} data-icon-state="AI_ASSET_PENDING"><strong>{item.title}</strong><small>{item.detail}</small><em>{item.state}</em></button>)}</div></section>;
 }
@@ -458,7 +458,7 @@ function ToolDrawer({tool,snapshot,connection,managerNote,handoffNote,checklist,
     {tool==='activity'?<ListOrEmpty rows={snapshot?.activity??[]} render={item=><div className="activity-card" key={item.activityId}><strong>{item.title}</strong><p>{item.actor} · {new Date(item.observedAt).toLocaleString('zh-HK')}</p><small>操作人：{item.requester??'—'} · 批核人：{item.approver??'—'} · 結果：{item.result}</small></div>} empty="活動紀錄尚未連接"/>:null}
     {tool==='manager'?<ManagerWorkspace managerNote={managerNote} handoffNote={handoffNote} checklist={checklist} setManagerNote={setManagerNote} setHandoffNote={setHandoffNote} setChecklist={setChecklist}/>:null}
     {tool==='admin'?<><p className="callout">正式設定、權限、產品、價格、渠道同規則由 Admin 負責；Owner 只提供導航入口。</p><button className="primary wide" onClick={onAdmin}>前往 Admin</button></>:null}
-    {tool==='recovery'?<><div className="diag-line"><span>連線</span><b>{connectionLabel}</b><small>{snapshot?.observedAt?new Date(snapshot.observedAt).toLocaleString('zh-HK'):'未有更新時間'}</small></div><p className="callout">資料未確認完整前會保持相應提示，唔會將未明結果當成成功。</p></>:null}
+    {tool==='recovery'?<><div className="diag-line"><span>連線</span><b>{humanConnectionLabel(connection)}</b><small>{snapshot?.observedAt?new Date(snapshot.observedAt).toLocaleString('zh-HK'):'未有更新時間'}</small></div><p className="callout">資料未確認完整前會保持相應提示，唔會將未明結果當成成功。</p></>:null}
   </section></div>;
 }
 
@@ -470,6 +470,18 @@ function ConfirmationSheet({value,onClose,onConfirm}:{value:Confirmation;onClose
   return <div className="overlay"><section className="sheet" role="dialog" aria-modal="true"><DrawerHead title={value.label} subtitle={value.target} close={onClose}/><p className="callout">{value.impact}</p><div className="sheet-actions"><button onClick={onClose}>取消</button><button className="primary" onClick={onConfirm}>提交操作意圖</button></div></section></div>;
 }
 
+
+function humanConnectionLabel(value:OwnerConnectionState){
+  if(value==='FRESH')return '資料新鮮';
+  if(value==='LOADING')return '同步中';
+  if(value==='EMPTY')return '暫無資料';
+  if(value==='STALE')return '資料稍舊';
+  if(value==='PARTIAL')return '部分資料';
+  if(value==='OFFLINE_READONLY')return '離線唯讀';
+  if(value==='PERMISSION_DENIED')return '權限不足';
+  if(value==='UNKNOWN')return '狀態未明';
+  return '同步失敗';
+}
 
 function resolveSnapshotState(snapshot:OwnerReadModelSnapshot):OwnerConnectionState{
   if(snapshot.globalState)return snapshot.globalState;
