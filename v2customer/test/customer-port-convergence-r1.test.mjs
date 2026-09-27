@@ -16,8 +16,8 @@ const homeCss=fs.readFileSync(path.join(srcRoot,'stage1/stage1.css'),'utf8');
 test('UI0 final reconciliation uses male/female 50:50 and dedicated Stage0 source assets',()=>{
   assert.match(config,/export type LaunchVariant='male'\|'female'/);
   assert.ok(config.includes("<.5?'male':'female'"));
-  assert.ok(config.includes('/brand/stage0-male.webp'));
-  assert.ok(config.includes('/brand/stage0-female.webp'));
+  assert.ok(config.includes('CUSTOMER_FINAL_SOURCE.maleIpSheet.url'));
+  assert.ok(config.includes('CUSTOMER_FINAL_SOURCE.femaleIpSheet.url'));
   assert.ok(!config.includes('stage7-pickup'));
   assert.ok(!config.includes('stage0-character-male.svg'));
   assert.ok(!config.includes("'hybrid'"));
