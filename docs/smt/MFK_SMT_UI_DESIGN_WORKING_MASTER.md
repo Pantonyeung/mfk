@@ -2233,3 +2233,1028 @@ NOT YET：
 
 MILESTONE：
 MFK_SMT_UI_STAGE0_TEXT_WIREFRAME_READY
+
+
+==================================================
+RECORD 005｜STAGE 0 VISUAL LAYOUT DRAFT
+日期：2026-09-27
+狀態：LAYOUT SPEC / NO HIGH-FIDELITY ART YET
+目標：鎖定 SMT Shell 的實際 1920×1080 幾何、區域尺寸、層級、Alert / Attention 展開方式，作為 Stage 1–12 共用母版。
+==================================================
+
+STAGE 0 VISUAL LAYOUT 核心原則
+--------------------------------------------------
+
+1. 先鎖「位置」，後鎖「美術」。
+2. 所有 Stage 共用同一 Shell，唔准之後每頁自行改導航／頂欄位置。
+3. 主工作區優先，Shell 只佔必要空間。
+4. Alert 可以跨頁出現，但不可遮住主要付款／堂食操作。
+5. Attention Center 係 persistent operational layer，不係 Toast。
+6. More 係低頻工具入口，唔再佔左 Rail 高頻位置。
+7. 所有尺寸以 1920×1080 為 Primary；1366×768 只做壓縮，不改主區域順序。
+8. 右手操作優先：Primary CTA、Attention CTA、More、Staff 均避免放到左上角深位。
+
+--------------------------------------------------
+0V.1｜1920×1080 MASTER GRID
+--------------------------------------------------
+
+畫布：
+1920 × 1080
+
+Safe Area：
+四邊 12px
+
+主要區：
+
+A. Left Rail
+X = 12
+Y = 12
+W = 76
+H = 1056
+
+B. Top Utility Bar
+X = 100
+Y = 12
+W = 1808
+H = 60
+
+C. Route Stage
+X = 100
+Y = 84
+W = 1808
+H = 984
+
+D. Global Floating Layer
+覆蓋 Route Stage 上方
+只用於：
+- New Order Alert
+- Attention Drawer
+- Confirm Leave
+- Critical System Modal
+
+Shell Gap：
+12px
+
+--------------------------------------------------
+0V.2｜LEFT RAIL
+--------------------------------------------------
+
+整體：
+W = 76
+Background = Surface
+Radius = 16
+Border = 1px Border
+Padding Top / Bottom = 10
+Padding X = 8
+
+區域結構：
+
+[Brand]
+高度 64
+
+[Primary Nav]
+4 × 76 高度單元
+中間 gap 8
+
+[Flexible Spacer]
+
+[Optional Offline / Local Mark]
+高度 56
+
+注意：
+More 唔放 Rail。
+
+--------------------------------------------------
+0V.3｜BRAND AREA
+--------------------------------------------------
+
+Brand Box：
+W 60
+H 60
+置中
+
+內容：
+正式「磨飯」品牌簡化標記／正式 Logo 符號版本。
+
+如果正式 Logo 在 60×60 太細：
+只使用批准過的簡化 Brand Mark。
+不可自行重畫 Logo。
+
+Brand 區唔做：
+- Home button
+- Hidden shortcut
+- Easter egg
+
+純品牌識別。
+
+--------------------------------------------------
+0V.4｜PRIMARY NAV ITEM
+--------------------------------------------------
+
+每個 Nav Item：
+
+W = 60
+Min H = 72
+Radius = 12
+
+內容垂直排列：
+
+Icon
+8px gap
+Label
+
+Icon：
+24–26px
+
+Label：
+14–15px
+Semi-bold
+
+四項固定：
+
+01 點單
+02 訂單
+03 堂食
+04 售罄／產能
+
+「售罄／產能」如果兩行：
+售罄
+產能
+
+Active：
+- Primary Soft
+- Primary Blue text/icon
+- 2px left or inner indicator（只可選一種，不兩種同時）
+
+Inactive：
+- Transparent
+- Text Secondary
+
+Hover：
+- Neutral Soft
+
+Pressed：
+- Primary Soft darker
+
+--------------------------------------------------
+0V.5｜NAV BADGE
+--------------------------------------------------
+
+只在有實際 count 時顯示。
+
+位置：
+Nav Item 右上角
+
+Badge：
+min 22×22
+Padding X 6
+
+用於：
+- Orders active/pending count
+
+顯示：
+1–99
+99+
+
+禁止：
+- 永遠顯 0
+- 純裝飾紅點
+- 未有實際 count source 時顯 badge
+
+--------------------------------------------------
+0V.6｜TOP UTILITY BAR
+--------------------------------------------------
+
+整體：
+H = 60
+Background = Surface
+Radius = 14
+Border = 1px Border
+
+Grid 建議：
+
+[Store / Business Day]
+260 px
+
+[Local Runtime]
+180 px
+
+[Domain / Sync]
+220 px
+
+[Flexible Spacer]
+
+[Attention]
+180 px
+
+[Staff]
+190 px
+
+[More]
+56 px
+
+總體原則：
+左邊顯示「系統位置與狀態」
+右邊顯示「人與操作」
+
+--------------------------------------------------
+0V.7｜STORE / BUSINESS DAY BLOCK
+--------------------------------------------------
+
+第一行：
+磨飯
+
+第二行：
+Business Day 2026-09-27
+
+字級：
+Store = 16–17 / 700
+Business Day = 12–13 / 500
+
+如果 Business Day 同 Calendar Date 不同：
+要顯示 Business Day，唔用「今日」代替。
+
+可選：
+Store Code MF01
+只在必要時顯示。
+
+--------------------------------------------------
+0V.8｜LOCAL RUNTIME BLOCK
+--------------------------------------------------
+
+正常：
+● LOCAL READY
+
+Local-only：
+● LOCAL ONLY
+
+Degraded：
+⚠ LOCAL READY · 部分外部服務不可用
+
+規則：
+Local Runtime Status 只代表本機交易工作面是否可用。
+
+禁止文字：
+「系統正常」
+除非所有 domain 真有 aggregate health contract。
+
+--------------------------------------------------
+0V.9｜DOMAIN / SYNC BLOCK
+--------------------------------------------------
+
+預設只顯示一個摘要：
+
+Admin Sync
+已同步
+
+或者：
+
+Admin Sync
+使用最後有效設定
+
+如果需要查看更多 domain：
+點擊後開輕量 popover：
+
+Admin
+Customer
+Keeta
+Cloud Projection
+
+每項：
+Status + Last Readback
+
+唔在 Top Bar 同時塞 6 粒 badge。
+
+--------------------------------------------------
+0V.10｜ATTENTION SUMMARY
+--------------------------------------------------
+
+Default：
+待處理 0
+
+有 Attention：
+⚠ 待處理 3
+
+Critical：
+! 待處理 3
+
+W = 160–180
+H = 44
+
+點擊：
+打開右側 Attention Drawer。
+
+狀態：
+0 時可以 Neutral。
+>0 按最高 severity 顯示 accent。
+
+禁止：
+用純紅色數字但無「待處理」文字。
+
+--------------------------------------------------
+0V.11｜STAFF BLOCK
+--------------------------------------------------
+
+W = 180–190
+H = 44
+
+內容：
+
+Avatar / Initial
+員工顯示名稱
+loginId 或短識別
+
+例如：
+
+CY
+陳小姐
+1111
+
+點擊：
+Staff Popover
+
+可有：
+- Login identity
+- Session state
+- Logout
+
+不顯：
+- internal staffId
+- UUID
+- Permission JSON
+
+--------------------------------------------------
+0V.12｜MORE / HAMBURGER
+--------------------------------------------------
+
+56×44
+
+Icon：
+Hamburger / 3-line
+
+ARIA / Label：
+更多工具
+
+點擊：
+打開 More Menu / Drawer
+
+不直接 navigate。
+
+--------------------------------------------------
+0V.13｜MORE MENU GEOMETRY
+--------------------------------------------------
+
+桌面建議：
+右上角 Popover / Drawer
+
+Option A｜Popover
+W = 360
+Max H = 720
+
+Option B｜Right Drawer
+W = 420
+H = calc(100vh - 24px)
+
+本輪推薦：
+Right Drawer
+
+原因：
+More 內功能唔止 3–4 個；
+之後會有 Day Close、Reports、Print、Diagnostics、Backup、Admin Sync，
+Drawer 比小 Popover 穩定。
+
+結構：
+
+Header
+「更多工具」
+
+Body Cards：
+1. 收銀與日結
+2. 報表
+3. 打印與設備
+4. 診斷
+5. 備份／恢復
+6. Admin Sync
+7. Cash In / Out（Future）
+
+Footer：
+版本／Build info（低層級，可展開）
+
+重要：
+More Drawer 開啟時，
+Route Stage 背景仍保留；
+如果當前 transaction 高風險，
+關 Drawer 返回原位置。
+
+--------------------------------------------------
+0V.14｜ROUTE STAGE
+--------------------------------------------------
+
+X = 100
+Y = 84
+W = 1808
+H = 984
+
+Stage 1–12 所有頁面只可以使用呢個區。
+
+Route Stage 自己：
+唔再加第二個全局 Header。
+
+每個 Stage 內可有：
+- Page Header
+- Local Toolbar
+- Local Filter
+
+但：
+不得重複 Staff / More / Global Attention。
+
+--------------------------------------------------
+0V.15｜GLOBAL NEW ORDER ALERT GEOMETRY
+--------------------------------------------------
+
+Default Position：
+右上，Top Utility Bar 下方 12px
+
+X 約：
+1920 - 24 - 440 = 1456
+
+Y：
+84
+
+W：
+440
+
+Min H：
+132
+
+Max H：
+220
+
+Radius：
+16
+
+Shadow：
+Modal-light
+
+Alert Card 結構：
+
+[Source / 新訂單]
+[Display Number] [到達時間]
+
+[簡要資訊]
+- Source
+- Item Count
+
+[Actions]
+立即處理
+30 秒後
+1 分鐘後
+
+Primary：
+立即處理
+
+Secondary：
+30秒 / 1分鐘
+
+如果多張：
+Header：
+「3 張新訂單待處理」
+
+Body：
+顯示最舊 1 張
+＋
+「查看全部 3 張」
+
+--------------------------------------------------
+0V.16｜ALERT INTRUSION RULE
+--------------------------------------------------
+
+Alert 唔可以遮：
+
+- Checkout Confirm
+- Checkout Keypad
+- Dining Settlement CTA
+- Refund Confirm
+- Payment Correction Confirm
+
+如果 Route Stage 右上本身係高風險操作：
+
+Alert 自動向左移 460px，
+或者縮成 Compact Alert Bar。
+
+Compact Alert：
+
+W 360
+H 72
+
+內容：
+「新訂單：Keeta #P034」
+[處理] [稍後]
+
+--------------------------------------------------
+0V.17｜MULTIPLE NEW ORDER QUEUE
+--------------------------------------------------
+
+當 2 張以上：
+
+Global Alert Header：
+「3 張新訂單待處理」
+
+顯示：
+最舊一張優先
+
+Secondary：
+查看全部
+
+查看全部後：
+開 Mini Queue Drawer
+
+W = 480
+Max H = 720
+
+每張：
+- Source
+- Display
+- Age
+- Item Count
+- Processing State
+
+排序：
+Oldest Pending First
+
+不可：
+Newest 覆蓋 Oldest。
+
+--------------------------------------------------
+0V.18｜ATTENTION DRAWER GEOMETRY
+--------------------------------------------------
+
+位置：
+右側
+
+W = 480
+
+Top：
+84
+
+Bottom：
+12
+
+H：
+984
+
+Background：
+Surface
+
+左邊：
+1px Border
+Shadow
+
+Header：
+64px
+
+Body：
+scroll
+
+Footer：
+可選 Filter
+
+Attention Drawer 唔取代 Route Stage；
+Overlay route 但唔改 route。
+
+--------------------------------------------------
+0V.19｜ATTENTION DRAWER HEADER
+--------------------------------------------------
+
+左：
+待處理事項
+
+右：
+X Close
+
+Sub-row：
+全部
+Critical
+需處理
+資訊
+
+如果 filter 未真正接線：
+唔畫 active interactive filter；
+先用 grouping。
+
+--------------------------------------------------
+0V.20｜ATTENTION CARD
+--------------------------------------------------
+
+Min H：
+124
+
+Padding：
+16
+
+結構：
+
+[Severity Icon] [Domain] [Time]
+
+Title
+Description
+
+Impact / Next Action
+
+[Primary CTA] [Secondary]
+
+例如：
+
+⚠ 打印
+2 分鐘前
+
+廚房製作單打印結果未能確認
+
+訂單 #P032 已成立，
+但系統未能確認廚房打印機有冇出紙。
+
+請先檢查廚房打印機，
+避免重複打印。
+
+[檢查打印狀態] [查看訂單]
+
+--------------------------------------------------
+0V.21｜ATTENTION SEVERITY VISUAL
+--------------------------------------------------
+
+INFO：
+Blue line / icon
+Neutral background
+
+ACTION REQUIRED：
+Warning line / icon
+Warning soft background
+
+CRITICAL：
+Danger line / icon
+Danger soft background
+
+RESOLVED：
+Neutral muted
+
+唔用整張深紅／深黃卡。
+保持高可讀。
+
+--------------------------------------------------
+0V.22｜DOMAIN STATUS POPOVER
+--------------------------------------------------
+
+位置：
+Top Utility Domain Block
+
+W：
+360
+
+Row：
+
+Admin
+已同步
+Last 17:03
+
+Customer
+在線
+Last 17:04
+
+Keeta
+需要留意
+2 pending
+
+Cloud Projection
+離線
+本地交易不受影響
+
+重要：
+每個 domain 自己一行。
+
+唔做：
+一粒「ONLINE」統一代表全部。
+
+--------------------------------------------------
+0V.23｜STAFF POPOVER
+--------------------------------------------------
+
+W：
+280
+
+內容：
+
+登入員工
+陳小姐
+登入編號 1111
+
+Session：
+有效
+
+Actions：
+[登出]
+
+如有 switch staff 功能：
+另按 current runtime 決定，
+未證實就唔畫。
+
+--------------------------------------------------
+0V.24｜CONFIRM LEAVE GUARD
+--------------------------------------------------
+
+只在真係會丟失／中斷高風險 draft 時出。
+
+例如：
+- Checkout 有未提交狀態
+- Refund modal 有輸入
+- Price Override 未確認
+
+Modal：
+W = 520
+Auto height
+
+Title：
+尚有未完成操作
+
+Body：
+「離開後，今次輸入將不會提交。」
+
+Buttons：
+繼續操作
+放棄並離開
+
+注意：
+如果 current page state本身 persistence 可安全恢復，
+就唔應濫用 Leave Guard。
+
+--------------------------------------------------
+0V.25｜NORMAL STATE TEXT LAYOUT
+--------------------------------------------------
+
+┌────────────────────────────────────────────────────────────────────────────┐
+│ 磨飯      LOCAL READY       Admin Sync 已同步      待處理 0    陳小姐  ☰ │
+├──────┬─────────────────────────────────────────────────────────────────────┤
+│  磨  │                                                                     │
+│      │                                                                     │
+│ 點單 │                                                                     │
+│      │                                                                     │
+│ 訂單 │                         ROUTE STAGE                                 │
+│  3   │                                                                     │
+│ 堂食 │                                                                     │
+│      │                                                                     │
+│ 售罄 │                                                                     │
+│ 產能 │                                                                     │
+│      │                                                                     │
+└──────┴─────────────────────────────────────────────────────────────────────┘
+
+--------------------------------------------------
+0V.26｜NEW ORDER STATE TEXT LAYOUT
+--------------------------------------------------
+
+┌────────────────────────────────────────────────────────────────────────────┐
+│ 磨飯   LOCAL READY      Admin Sync 已同步      ⚠ 待處理 1   陳小姐  ☰  │
+├──────┬──────────────────────────────────────────────────────┬──────────────┤
+│      │                                                      │ 新訂單到達  │
+│ 點單 │                                                      │ Keeta       │
+│      │                                                      │ #P034       │
+│ 訂單 │                   CURRENT ROUTE                      │ 2 件         │
+│  4   │                                                      │              │
+│ 堂食 │                                                      │ [立即處理]  │
+│      │                                                      │ [30秒][1分] │
+│ 售罄 │                                                      │              │
+│ 產能 │                                                      │              │
+└──────┴──────────────────────────────────────────────────────┴──────────────┘
+
+--------------------------------------------------
+0V.27｜ATTENTION OPEN TEXT LAYOUT
+--------------------------------------------------
+
+┌────────────────────────────────────────────────────────────────────────────┐
+│ 磨飯   LOCAL READY      Cloud 離線      ⚠ 待處理 3        陳小姐  ☰     │
+├──────┬──────────────────────────────────────────────────────┬──────────────┤
+│      │                                                      │ 待處理事項 ×│
+│ 點單 │                                                      ├──────────────┤
+│      │                                                      │ ⚠ PRINT     │
+│ 訂單 │                   CURRENT ROUTE                      │ #P032       │
+│      │                                                      │ 結果未確認  │
+│ 堂食 │                                                      │ [檢查狀態]  │
+│      │                                                      ├──────────────┤
+│ 售罄 │                                                      │ ⚠ PAYMENT   │
+│ 產能 │                                                      │ #P033       │
+│      │                                                      │ 待核對      │
+│      │                                                      │ [核對付款]  │
+│      │                                                      ├──────────────┤
+│      │                                                      │ i SYNC      │
+│      │                                                      │ 使用 LKG    │
+└──────┴──────────────────────────────────────────────────────┴──────────────┘
+
+--------------------------------------------------
+0V.28｜1366×768 COMPACT RULE
+--------------------------------------------------
+
+Left Rail：
+68px
+
+Top Bar：
+54px
+
+Route Stage：
+其餘
+
+Top Bar 簡化：
+- Store / Business Date → 可收成一個 block
+- Domain summary → icon + short label
+- Staff → avatar + short name
+- Attention 不可消失
+- Hamburger 不可消失
+
+Alert：
+W 360
+Max H 180
+
+Attention Drawer：
+W 400
+
+Nav：
+Icon 22
+Label 13
+
+禁止：
+- 轉成 bottom nav
+- 將 Cart / Checkout CTA 移位
+- 把 primary nav 收成 hamburger
+
+--------------------------------------------------
+0V.29｜RESPONSIVE PRIORITY
+--------------------------------------------------
+
+如果空間不足，依次縮：
+
+1. Outer padding
+2. Gap
+3. Secondary copy
+4. Store secondary metadata
+5. Domain detail
+
+最後先縮：
+- Nav label
+- Primary action
+
+不可隱藏：
+- Attention
+- Staff identity
+- Primary Nav
+- More
+- Current page
+
+--------------------------------------------------
+0V.30｜VISUAL STYLE APPLICATION
+--------------------------------------------------
+
+Canvas：
+#F5F4F0
+
+Shell Surfaces：
+#FFFFFF
+
+Primary：
+#1F5FBF
+
+Rail Active：
+#EEF4FF
+
+Text：
+#20242B
+
+Secondary：
+#646B75
+
+Attention Warning：
+#B87416
+配 #FFF6E8
+
+Danger：
+#C93D3D
+配 #FFF0F0
+
+Success：
+#248A5A
+配 #EDF8F2
+
+Shadow：
+非常輕
+
+不可：
+- 大面積 Gradient
+- Neumorphism
+- 彩虹 domain 色
+- Glass blur 遮低文字 contrast
+
+--------------------------------------------------
+0V.31｜COMPONENT SIZING TABLE
+--------------------------------------------------
+
+Primary Nav Item：
+60 × 72+
+
+Top Utility Control：
+44–48 high
+
+Attention Summary：
+160–180 × 44
+
+Staff：
+180–190 × 44
+
+More：
+56 × 44
+
+Global Alert：
+440 × 132–220
+
+Compact Alert：
+360 × 72
+
+Attention Drawer：
+480 × 984
+
+Attention Card：
+min 124 high
+
+Popover：
+280–360 wide
+
+Confirm Leave：
+520 wide
+
+所有 touch target：
+≥48 × 48
+
+--------------------------------------------------
+0V.32｜STAGE 0 FINAL DECISIONS TO CARRY FORWARD
+--------------------------------------------------
+
+DECISION 0-01
+四個高頻 Rail：
+點單／訂單／堂食／售罄產能。
+
+DECISION 0-02
+More 移去 Top Hamburger。
+
+DECISION 0-03
+Top Bar 唔顯一粒「System Green」；
+Local / Domain / Attention 分開。
+
+DECISION 0-04
+New Order Alert 係 non-blocking floating operational alert。
+
+DECISION 0-05
+多張新單用 queue，唔互相覆蓋。
+
+DECISION 0-06
+Attention Center 用右 Drawer。
+
+DECISION 0-07
+UNKNOWN 一律 Warning semantics，
+唔等於 FAILED。
+
+DECISION 0-08
+Technical code 收入 second-level detail。
+
+DECISION 0-09
+所有 Stage 共用同一 Shell。
+
+DECISION 0-10
+1920×1080 為 Primary；
+1366×768 只做 compact，不改主操作位置。
+
+--------------------------------------------------
+STAGE 0 CURRENT RESULT
+--------------------------------------------------
+
+PAGE INVENTORY：
+LOCKED FOR DRAFT
+
+TEXT WIREFRAME：
+COMPLETE
+
+VISUAL LAYOUT GEOMETRY：
+DRAFTED
+
+COMPONENT INVENTORY：
+COMPLETE FOR STAGE 0
+
+STATE MATRIX：
+COMPLETE FOR STAGE 0
+
+HIGH-FIDELITY MOCKUP：
+NOT STARTED
+
+OWNER VISUAL APPROVAL：
+PENDING
+
+NEXT：
+進入 Stage 0 Low-Fidelity Visual Mockup / Wireframe 圖，
+或者先進 Stage 1 Text Wireframe。
+
+MILESTONE：
+MFK_SMT_UI_STAGE0_VISUAL_LAYOUT_DRAFT_READY
