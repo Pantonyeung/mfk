@@ -1,0 +1,43 @@
+name: SMT Consolidation A3 R1
+
+on:
+  push:
+    branches:
+      - work/MFK/SMT-CONSOLIDATION-A3-R1
+  pull_request:
+    paths:
+      - 'contracts/order-line-composition-v1.ts'
+      - 'v2local/**'
+      - '.github/workflows/smt-consolidation-a3-r1.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  a3a:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install
+        working-directory: v2local
+        run: npm install --legacy-peer-deps --ignore-scripts --no-audit --no-fund
+      - name: Unit tests
+        working-directory: v2local
+        run: npm run test
+      - name: Build
+        working-directory: v2local
+        run: npm run build
+      - name: A3A bounded authority proof
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -F "MFK_ORDER_LINE_COMPOSITION_V1" contracts/order-line-composition-v1.ts
+          grep -F "composition:serializeCartLineComposition(line)" v2local/src/App.tsx
+          grep -F "normalizeMfkOrderLineCompositionV1" v2local/src/runtime/local-runtime.ts
+          grep -F "pairing:Object.freeze" v2local/src/features/ordering/riceball-pairing-model.ts
+          ! grep -F "totalMinor" contracts/order-line-composition-v1.ts
