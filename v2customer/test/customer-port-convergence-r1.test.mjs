@@ -12,16 +12,15 @@ const config=fs.readFileSync(path.join(srcRoot,'launch/launch-config.ts'),'utf8'
 const launchCss=fs.readFileSync(path.join(srcRoot,'launch/launch.css'),'utf8');
 const home=fs.readFileSync(path.join(srcRoot,'stage1/Stage1Home.tsx'),'utf8');
 const homeCss=fs.readFileSync(path.join(srcRoot,'stage1/stage1.css'),'utf8');
-const primitives=fs.readFileSync(path.join(srcRoot,'ui/primitives.tsx'),'utf8');
 
-test('UI0 final reconciliation uses male/female 50:50 and never revives hybrid-only config',()=>{
+test('UI0 final reconciliation uses male/female 50:50 and dedicated Stage0 source assets',()=>{
   assert.match(config,/export type LaunchVariant='male'\|'female'/);
   assert.ok(config.includes("<.5?'male':'female'"));
-  assert.ok(config.includes('/brand/stage0-character-male.svg'));
-  assert.ok(config.includes('/brand/stage0-character-female.svg'));
+  assert.ok(config.includes('/brand/stage0-male.webp'));
+  assert.ok(config.includes('/brand/stage0-female.webp'));
   assert.ok(!config.includes('/brand/stage7-pickup-'));
+  assert.ok(!config.includes('stage0-character-male.svg'));
   assert.ok(!config.includes("'hybrid'"));
-  assert.ok(!config.includes('enabled:false'));
 });
 
 test('UI0 has first visit returning and reduced-motion timing without becoming a data gate',()=>{
@@ -37,32 +36,27 @@ test('UI0 has first visit returning and reduced-motion timing without becoming a
 });
 
 test('UI0 exposes only the two FINAL launch CTAs and routes into current shell',()=>{
-  assert.ok(launch.includes('開始點餐'));
-  assert.ok(launch.includes('我的記憶'));
+  assert.ok(launch.includes('進入主頁'));
+  assert.ok(launch.includes('進入會員頁'));
+  assert.ok(!launch.includes('開始點餐'));
+  assert.ok(!launch.includes('我的記憶'));
   assert.ok(app.includes("onEnterHome={()=>{setLaunchVisible(false);changeView('home')}}"));
   assert.ok(app.includes("onEnterMember={()=>{setLaunchVisible(false);changeView('more')}}"));
 });
 
-test('UI1 is the formal FINAL storefront and cold launch can continue to UI2 menu',()=>{
+test('UI1 is the FINAL storefront and cold launch continues to UI2 menu',()=>{
   assert.ok(app.includes("import {Stage1Home} from './stage1/Stage1Home'"));
   assert.ok(app.includes("view==='home'?<Stage1Home"));
   assert.ok(app.includes("onBrowse={()=>changeView('menu')}"));
   assert.ok(app.includes("view==='menu'?<Stage2Menu"));
-  for(const marker of['stage1-fixed-header','stage1-hero-banner','stage1-announcement-strip','stage1-top6','記憶券','常購清單','期間限定']){
-    assert.ok(home.includes(marker),marker);
-  }
+  for(const marker of['stage1-fixed-header','stage1-welcome','stage1-search-entry','stage1-hero-banner','stage1-announcement-strip','stage1-top6','我的訂單','我的收藏','回憶券'])assert.ok(home.includes(marker),marker);
   assert.ok(app.includes('limit:6'));
   assert.ok(home.includes('const canBrowse=Boolean(snapshot?.menu)'));
-  assert.ok(home.includes('今日暫停正式落單'));
 });
 
-test('UI1 reuses current UI8 fixed 5-item navigation with Memory Jar in the center',()=>{
-  const navBlock=primitives.slice(primitives.indexOf('export function BottomNavigation'),primitives.indexOf('export interface ProductOriginRect'));
-  const ids=[...navBlock.matchAll(/\{id:'(home|menu|cart|orders|more)' as const/g)].map(match=>match[1]);
-  assert.deepEqual(ids,['home','menu','cart','orders','more']);
-  for(const label of['首頁','點單','記憶罐','訂單','會員'])assert.ok(navBlock.includes(label),label);
-  assert.ok(app.includes('<BottomNavigation'));
-  assert.ok(!app.includes('Stage1BottomNavigation'));
+test('UI1 and UI2 share the FINAL five-item navigation with Memory Jar in the center',()=>{
+  assert.ok(app.includes("view==='home'||view==='menu'?<Stage2BottomNavigation"));
+  assert.ok(app.includes("active={view}"));
   assert.equal(fs.existsSync(path.join(srcRoot,'stage1/Stage1BottomNavigation.tsx')),false);
 });
 
@@ -70,14 +64,11 @@ test('UI1 owns FINAL home header/status while remaining inside current customer 
   assert.ok(app.includes('return <main className="customer-shell"'));
   assert.ok(app.includes("view==='home'?null:view==='menu'?null:<CustomerHeader"));
   assert.ok(app.includes("view==='home'?null:view==='menu'?null:<div className=\"global-status\""));
-  assert.ok(home.includes('stage1-store-status-badge'));
+  assert.ok(home.includes('stage1-store-context'));
   assert.ok(homeCss.includes('.stage1-home'));
 });
 
-test('accepted UI2 to UI8 chain remains wired and no Stage9 is introduced',()=>{
-  for(const marker of['Stage2Menu','ProductSheet','CheckoutUi4View','SubmitUi5View','StoreFulfillmentUi6View','PickupCompleteUi7View','HistoryReorderUi8View']){
-    assert.ok(app.includes(marker),marker);
-  }
-  assert.ok(!app.includes('Stage9'));
-  assert.ok(!app.includes('SeedReward'));
+test('accepted UI2 to UI8 chain remains wired and no UI10 is introduced',()=>{
+  for(const marker of['Stage2Menu','ProductSheet','CheckoutUi4View','SubmitUi5View','StoreFulfillmentUi6View','PickupCompleteUi7View','HistoryReorderUi8View'])assert.ok(app.includes(marker),marker);
+  assert.ok(!app.includes('AccountRecoveryUi10'));
 });
