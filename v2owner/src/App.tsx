@@ -258,7 +258,7 @@ export function App(){
       managerNote={managerNote}
       handoffNote={handoffNote}
       checklist={checklist}
-      runtime={runtime}
+      runtime={port}
       setManagerNote={value=>{setManagerNote(value);persistLocal({managerNote:value})}}
       setHandoffNote={value=>{setHandoffNote(value);persistLocal({handoffNote:value})}}
       setChecklist={value=>{setChecklist(value);persistLocal({checklist:value})}}
@@ -334,7 +334,7 @@ function MorePage({snapshot,connection,onTool}:{snapshot:OwnerReadModelSnapshot|
 function ToolDrawer({tool,snapshot,connection,managerNote,handoffNote,checklist,runtime,setManagerNote,setHandoffNote,setChecklist,onCommand,onAdmin,onClose}:{tool:Tool;snapshot:OwnerReadModelSnapshot|null;connection:OwnerConnectionState;managerNote:string;handoffNote:string;checklist:readonly OwnerChecklistItem[];runtime:OwnerRuntimePort|null;setManagerNote:(v:string)=>void;setHandoffNote:(v:string)=>void;setChecklist:(v:readonly OwnerChecklistItem[])=>void;onCommand:(label:string,target:string,impact:string)=>void;onAdmin:()=>void;onClose:()=>void}){
   const title=tool==='planning'?'月目標／成本':tool==='reports'?'報表':tool==='sellability'?'商品供應':tool==='channels'?'渠道健康':tool==='staff'?'員工':tool==='devices'?'設備／打印':tool==='customers'?'客戶':tool==='marketing'?'推廣':tool==='settlement'?'平台結算':tool==='cash'?'現金':tool==='inventory'?'庫存':tool==='notifications'?'通知':tool==='manager'?'經理日誌':tool==='activity'?'活動紀錄':tool==='admin'?'Admin':tool==='recovery'?'資料狀態':'工具';
   return <div className="overlay"><section className={tool==='planning'?'drawer drawer-wide':'drawer'} role="dialog" aria-modal="true"><DrawerHead title={title} subtitle="老闆中心" close={onClose}/>
-    {tool==='planning'?<MonthlyPlanningWorkspace snapshot={snapshot} connection={connection} runtime={port}/>:null}
+    {tool==='planning'?<MonthlyPlanningWorkspace snapshot={snapshot} connection={connection} runtime={runtime}/>:null}
     {tool==='reports'?<ListOrEmpty rows={snapshot?.reports??[]} render={item=><div className="list-row" key={item.reportId}><div><strong>{item.name}</strong><small>{item.compare??item.freshness}</small></div><b>{item.value}</b></div>} empty="報表尚未連接"/>:null}
     {tool==='channels'?<ChannelHealthWorkspace channels={snapshot?.channels??[]} connection={connection} onCommand={onCommand}/>:null}
     {tool==='sellability'?<ListOrEmpty rows={snapshot?.sellability??[]} render={item=><div className="list-row" key={item.targetId}><div><strong>{item.name}</strong><small>{item.grain} · {item.scope} · {item.state}</small></div><button onClick={()=>onCommand(item.state==='AVAILABLE'?'標記售罄':'恢復供應',item.targetId,'有限度供應狀態操作；必須等正式讀回。')}>{item.state==='AVAILABLE'?'售罄':'恢復'}</button></div>} empty="商品供應資料尚未連接"/>:null}
