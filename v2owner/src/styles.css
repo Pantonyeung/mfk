@@ -1258,3 +1258,70 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid 
   .order-filter-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}
   .staff-kpi-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}
 }
+
+
+/* FINAL P0 compact list refinement for source screenshot fidelity. */
+.action-queue-meta{
+  display:flex;align-items:center;justify-content:space-between;gap:8px;
+  padding:5px 0;color:var(--owner-final-muted);font-size:8px;
+}
+.action-queue-meta strong{color:var(--owner-final-blue);font-size:8px;font-weight:800}
+.action-queue-card{padding:10px 12px!important}
+.action-queue-card-top{align-items:center}
+.action-queue-card-top small{font-size:8px}
+.action-card-footer{border-top:1px solid #edf1f6;padding-top:6px}
+
+/* Channel FINAL overview is a dense status list; per-channel controls live in detail. */
+.channel-overview-meta{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:0 3px;color:var(--owner-final-muted);font-size:9px;
+}
+.channel-overview-meta small{font-size:8px}
+.channel-overview-list{
+  display:grid;gap:0;border:1px solid var(--owner-final-border);
+  border-radius:16px;background:#fff;overflow:hidden;box-shadow:var(--owner-final-shadow);
+}
+.channel-overview-row{
+  width:100%;display:grid;grid-template-columns:42px minmax(0,1fr) 16px;
+  gap:9px;align-items:center;padding:11px 10px!important;
+  border:0!important;border-bottom:1px solid #edf1f6!important;border-radius:0!important;
+  background:#fff!important;text-align:left;color:var(--owner-final-ink)!important;
+}
+.channel-overview-row:last-child{border-bottom:0!important}
+.channel-overview-copy{display:grid;gap:3px;min-width:0}
+.channel-overview-copy>div:first-child{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.channel-overview-copy strong{font-size:13px;color:var(--owner-final-navy-deep)}
+.channel-overview-copy>small{font-size:8px;color:var(--owner-final-muted)}
+.channel-inline-stats{display:grid;grid-template-columns:.7fr 1.05fr 1fr;gap:6px;margin-top:2px}
+.channel-inline-stats span{display:grid;gap:1px;min-width:0}
+.channel-inline-stats b{font-size:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.channel-inline-stats small{font-size:6.5px;color:var(--owner-final-muted)}
+.channel-chevron{color:#8190a5;font-size:18px}
+.channel-detail-drawer{border-top:4px solid var(--owner-final-blue)}
+.channel-detail-title{display:flex!important;gap:10px!important;align-items:center}
+.channel-detail-title>div{display:grid;gap:2px}
+.channel-detail-status{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;margin-bottom:10px}
+.channel-detail-status>div,.channel-detail-grid>div{
+  display:grid;gap:3px;padding:9px;border:1px solid #edf1f6;border-radius:11px;background:#f8fafd;
+}
+.channel-detail-status span,.channel-detail-grid span{font-size:8px;color:var(--owner-final-muted)}
+.channel-detail-status strong,.channel-detail-grid strong{font-size:10px}
+.channel-detail-section{display:grid;gap:8px;padding:10px 0;border-top:1px solid #edf1f6}
+.channel-detail-section h3{margin:0;font-size:11px;color:var(--owner-final-navy)}
+.channel-detail-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
+.channel-last-action{margin:0;font-size:9px;color:var(--owner-final-muted)}
+.channel-detail-section .channel-actions{display:grid}
+.channel-detail-section .unsupported-note{font-size:8px}
+
+/* Force compact staff summary at all P0 target widths. */
+.staff-kpi-grid{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important}
+.staff-source-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+.staff-kpi.role-kpi{grid-column:1/-1!important;min-height:66px}
+.staff-kpi{min-height:68px!important}
+.staff-overview-list{gap:6px}
+.staff-overview-row{min-height:68px}
+
+@media(max-width:380px){
+  .channel-inline-stats{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .staff-source-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+}
