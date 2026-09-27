@@ -508,7 +508,7 @@ export function App(){
       const base=existing??createCustomerPendingIntent(intentCart,intentCheckout,intentMenuRevision);
       if(!port?.submitOrder){
         const cleanCheckout=withoutPaymentEvidence(intentCheckout);
-        const offlineIntent=Object.freeze({...base,checkout:cleanCheckout,state:'NOT_CONNECTED' as const,updatedAt:nowIso(),lastMessage:'店舖接單系統暫時未連接；可以改用 WhatsApp。'});
+        const offlineIntent=Object.freeze({...base,state:'NOT_CONNECTED' as const,updatedAt:nowIso(),lastMessage:'店舖接單系統暫時未連接；可以改用 WhatsApp。'});
         setCheckout(cleanCheckout);
         saveIntent(offlineIntent);
         setFallbackIntentId(base.submissionId);
@@ -522,7 +522,7 @@ export function App(){
         setSubmitProbe(null);
         if(!health.reachable){
           const cleanCheckout=withoutPaymentEvidence(intentCheckout);
-          const offlineIntent=Object.freeze({...base,checkout:cleanCheckout,state:'NOT_CONNECTED' as const,updatedAt:nowIso(),lastMessage:'已完成 3 次有限連線檢查；暫時未能自動接單。'});
+          const offlineIntent=Object.freeze({...base,state:'NOT_CONNECTED' as const,updatedAt:nowIso(),lastMessage:'已完成 3 次有限連線檢查；暫時未能自動接單。'});
           setCheckout(cleanCheckout);
           saveIntent(offlineIntent);
           setFallbackIntentId(base.submissionId);
@@ -553,7 +553,7 @@ export function App(){
         setNotice(result.message||'店舖未能接受今次訂單；請返回記憶罐重新確認。');
         return;
       }
-      const unresolved=Object.freeze({...pending,checkout:cleanCheckout,state:'NOT_CONNECTED' as const,updatedAt:nowIso(),lastMessage:result.message});
+      const unresolved=Object.freeze({...pending,state:'NOT_CONNECTED' as const,updatedAt:nowIso(),lastMessage:result.message});
       saveIntent(unresolved);
       setFallbackIntentId(pending.submissionId);
       setNotice(result.message);
@@ -565,8 +565,8 @@ export function App(){
         setFallbackIntentId(null);
         setNotice('提交結果未明；原本嗰次落單已保留並會先讀回，唔會自動重送。');
       }else{
-        const base=existing??createCustomerPendingIntent(intentCart,cleanCheckout,intentMenuRevision);
-        const offlineIntent=Object.freeze({...base,checkout:cleanCheckout,state:'NOT_CONNECTED' as const,updatedAt:nowIso(),lastMessage:'店舖接單系統暫時未連接；可以改用 WhatsApp。'});
+        const base=existing??createCustomerPendingIntent(intentCart,intentCheckout,intentMenuRevision);
+        const offlineIntent=Object.freeze({...base,state:'NOT_CONNECTED' as const,updatedAt:nowIso(),lastMessage:'店舖接單系統暫時未連接；可以改用 WhatsApp。'});
         saveIntent(offlineIntent);
         setFallbackIntentId(base.submissionId);
         setNotice('暫時未能完成店舖連線檢查；可以改用 WhatsApp。');
