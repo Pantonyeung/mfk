@@ -2192,6 +2192,7 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
     }));
   },
   async reprintDiningJobs(holdId,jobIds,reason){
+    return withDiningMutationLock('hold:'+holdId,async()=>{
     const snapshot=readDiningState();
     const hold=requireDiningHold(snapshot,holdId);
     if(!hold.formalOrderId)throw new Error('DINING_FORMAL_ORDER_NOT_CREATED');
@@ -2214,12 +2215,13 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
       reason:(String(reason||'').trim()||'MANUAL')+' jobs='+unique.join(','),
     });
     return result;
+    });
   },
   async ensureDiningInitialPrint(holdId){
-    return clone(await ensureDiningInitialPrintByHold(holdId));
+    return withDiningMutationLock('hold:'+holdId,async()=>clone(await ensureDiningInitialPrintByHold(holdId)));
   },
   async ensureDiningPaymentReceipt(holdId,submissionId){
-    return clone(await ensureDiningPaymentReceiptBySubmission(holdId,submissionId));
+    return withDiningMutationLock('hold:'+holdId,async()=>clone(await ensureDiningPaymentReceiptBySubmission(holdId,submissionId)));
   },
   async appendDiningItems(holdId,input){
     return withDiningMutationLock('hold:'+holdId,async()=>{
@@ -2237,7 +2239,7 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
     });
   },
   async ensureDiningAdditionPrint(holdId,additionId){
-    return clone(await ensureDiningAdditionPrintById(holdId,additionId));
+    return withDiningMutationLock('hold:'+holdId,async()=>clone(await ensureDiningAdditionPrintById(holdId,additionId)));
   },
   async correctDiningLine(holdId,input){
     return withDiningMutationLock('hold:'+holdId,async()=>{
