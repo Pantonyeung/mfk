@@ -1,7 +1,7 @@
 import {useCallback,useEffect,useMemo,useState} from 'react';
 import {useSearchParams} from 'react-router';
 import type {CleanSmtCoreRuntimePort,SmtOrdersProjection,SmtReprintOption} from '../runtime/local-runtime.ts';
-import {hasStaffPermission} from '../runtime/staff-auth.ts';
+import {readActiveStaffSession,staffAuthRequired} from '../runtime/staff-auth.ts';
 import {readSmtQuickReasons,readSmtStoreSettings} from '../runtime/admin-operational-config.ts';
 import {subscribeSmtAdminConfig} from '../runtime/admin-config-sync.ts';
 import {decideKeetaAfterSale,previewKeetaPartialRefund,readKeetaAfterSales,type KeetaAfterSaleCase} from '../runtime/keeta-after-sale.ts';
@@ -40,8 +40,10 @@ function paymentMatches(label:string,filter:PaymentFilter){
 }
 
 export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePort}){
-  const canReview=hasStaffPermission('ORDER_REVIEW');
-  const canCorrect=hasStaffPermission('ORDER_CORRECTION');
+  const activeStaff=readActiveStaffSession();
+  const canOperate=Boolean(activeStaff)||!staffAuthRequired();
+  const canReview=canOperate;
+  const canCorrect=canOperate;
   const [configRevision,setConfigRevision]=useState(0);
   useEffect(()=>subscribeSmtAdminConfig(()=>setConfigRevision(value=>value+1)),[]);
   void configRevision;
@@ -58,6 +60,9 @@ export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePor
   const [modal,setModal]=useState<Modal>(null);
   const [acceptBusy,setAcceptBusy]=useState(false);
   const [readyBusy,setReadyBusy]=useState(false);
+  const [unreadyBusy,setUnreadyBusy]=useState(false);
+  const [completeBusy,setCompleteBusy]=useState(false);
+  const [deferBusy,setDeferBusy]=useState(false);
   const [message,setMessage]=useState<string|null>(null);
   const [reprintOptions,setReprintOptions]=useState<readonly SmtReprintOption[]>([]);
   const [selectedJobs,setSelectedJobs]=useState<Set<string>>(new Set());
@@ -155,7 +160,7 @@ export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePor
   }),[allItems,history,paymentFilter]);
 
   const lanes=useMemo(()=>[
-    {id:'walkin',label:'現場訂單',orders:filtered.filter(order=>sourceLane(order.sourceLabel)==='walkin')},
+    {id:'walkin',label:'現場／直接來源',orders:filtered.filter(order=>sourceLane(order.sourceLabel)==='walkin')},
     {id:'app',label:'自家平台',orders:filtered.filter(order=>sourceLane(order.sourceLabel)==='app')},
     {id:'platform',label:'第三方平台',orders:filtered.filter(order=>sourceLane(order.sourceLabel)==='platform')},
   ] as const,[filtered]);
@@ -264,6 +269,39 @@ export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePor
     }
     catch(cause){setMessage(cause instanceof Error?cause.message:'未能標記可取餐');}
     finally{setReadyBusy(false);}
+  };
+
+  const markUnready=async()=>{
+    if(!selected||!runtime.markOrderUnready||unreadyBusy)return;
+    setUnreadyBusy(true);setMessage(null);
+    try{
+      await runtime.markOrderUnready(selected.orderId);
+      await load(selected.orderId,true);
+      setMessage('已由可取餐退回未完成；同一訂單繼續製作。');
+    }catch(cause){setMessage(cause instanceof Error?cause.message:'未能退回未完成');}
+    finally{setUnreadyBusy(false);}
+  };
+
+  const markCompleted=async()=>{
+    if(!selected||!runtime.markOrderCompleted||completeBusy)return;
+    setCompleteBusy(true);setMessage(null);
+    try{
+      await runtime.markOrderCompleted(selected.orderId);
+      await load(selected.orderId,true);
+      setMessage('已確認取餐；訂單已完成。');
+    }catch(cause){setMessage(cause instanceof Error?cause.message:'未能完成取餐');}
+    finally{setCompleteBusy(false);}
+  };
+
+  const deferSelectedKeeta=async()=>{
+    if(!selected||!runtime.deferKeetaOrder||deferBusy)return;
+    setDeferBusy(true);setMessage(null);
+    try{
+      const updated=await runtime.deferKeetaOrder(selected.orderId);
+      await load(selected.orderId,true);
+      setMessage('Keeta 稍後處理 '+String(updated.keetaDeferCount??0)+' / 2；訂單保持待處理同 Attention。');
+    }catch(cause){setMessage(cause instanceof Error?cause.message:'KEETA_DEFER_FAILED');}
+    finally{setDeferBusy(false);}
   };
 
   const openReprint=async()=>{
@@ -408,7 +446,7 @@ export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePor
     current.options.push(option);map.set(key,current);return map;
   },new Map<string,{bindingId:string;printerName:string;physicalKey:string;options:SmtReprintOption[]}>()).values()];
 
-  if(!canReview)return <main className="order-manager"><section className="order-empty"><b>你冇查看訂單權限</b><p>需要 Admin 權限：ORDER_REVIEW。</p></section></main>;
+  if(!canReview)return <main className="order-manager"><section className="order-empty"><b>請先登入 SMT</b><p>本輪 Owner 決定：可登入 SMT 嘅員工即可使用本機訂單操作，唔另設 Manager-only Gate。</p></section></main>;
 
   return <main className="order-manager">
     {customerArrival?<div className="keeta-arrival-backdrop" role="alertdialog" aria-modal="true">
@@ -436,6 +474,11 @@ export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePor
       {selected?<article>
         <header><div><h1>{selected.orderIdLabel}</h1><span>{selected.fulfillmentLabel}</span></div></header>
         <div className="order-inspector-meta"><b>{selected.sourceLabel??'現場'}</b><span>{selected.paymentLabel}</span></div>
+        {(selected.customerName||selected.externalOrderNo||selected.pickupCode)?<div className="order-identity-strip">
+          {selected.customerName?<span>客人：{selected.customerName}</span>:null}
+          {selected.externalOrderNo?<span>外部單：{selected.externalOrderNo}</span>:null}
+          {selected.pickupCode?<span>取餐碼：{selected.pickupCode}</span>:null}
+        </div>:null}
         <section className="order-inspector-lines">
           <header><b>訂單內容</b><span>{selected.itemCount} 件</span></header>
           {selected.lines.map((line,index)=><div key={line.id+'-'+index}><span>{line.quantity}</span><p><b>{line.name}</b><small>{line.unitLabel} × {line.quantity}</small></p><strong>{line.lineTotalLabel}</strong></div>)}
@@ -480,9 +523,17 @@ export function RuntimeOrdersWorkspace({runtime}:{runtime:CleanSmtCoreRuntimePor
           <button disabled={selectedIsActiveDining} title={selectedIsActiveDining?'活躍堂食避免重印完整首次票組':''} onClick={()=>void openReprint()}>▣ 重印</button>
           <button disabled={!canCorrect} title={canCorrect?'':'需要 ORDER_CORRECTION 權限'} onClick={()=>setModal('actions')}>{selectedIsActiveDining?'✎ 堂食正式處理':'✎ 取消／修改'}</button>
           {selected.fulfillmentLabel==='待處理'
-            ?<button className="primary" disabled={!runtime.acceptOrder||acceptBusy||(Boolean(selected.paymentEvidenceRef)&&selected.paymentVerificationState!=='VERIFIED')} title={selected.paymentEvidenceRef&&selected.paymentVerificationState!=='VERIFIED'?'請先核對付款截圖':''} onClick={()=>void acceptSelected()}>{acceptBusy?'接單中…':String(selected.sourceLabel||'').startsWith('Keeta')?'接受 Keeta 訂單':'接受訂單'}</button>
+            ?<>
+              <button className="primary" disabled={!runtime.acceptOrder||acceptBusy||(Boolean(selected.paymentEvidenceRef)&&selected.paymentVerificationState!=='VERIFIED')} title={selected.paymentEvidenceRef&&selected.paymentVerificationState!=='VERIFIED'?'請先核對付款截圖':''} onClick={()=>void acceptSelected()}>{acceptBusy?'接單中…':String(selected.sourceLabel||'').startsWith('Keeta')?'接受 Keeta 訂單':'接受訂單'}</button>
+              {String(selected.sourceLabel||'').startsWith('Keeta')?<button type="button" className="defer-order" disabled={!runtime.deferKeetaOrder||deferBusy||(selected.keetaDeferCount??0)>=2} onClick={()=>void deferSelectedKeeta()}>{deferBusy?'處理中…':'稍後處理 '+String(selected.keetaDeferCount??0)+' / 2'}</button>:null}
+            </>
             :null}
-          <button className="primary" disabled={selectedIsDining||!runtime.markOrderReady||readyBusy||selected.fulfillmentLabel==='待處理'||selected.fulfillmentLabel==='可取餐'||selected.fulfillmentLabel==='已完成'||selected.fulfillmentLabel==='已取消'} title={selectedIsDining?'堂食由堂食流程管理履約狀態':''} onClick={()=>void markReady()}>{readyBusy?'處理中…':'提前完成／可取餐'}</button>
+          {selected.fulfillmentLabel==='可取餐'&&!selectedIsDining
+            ?<>
+              <button type="button" className="unready-order" disabled={!runtime.markOrderUnready||unreadyBusy} onClick={()=>void markUnready()}>{unreadyBusy?'處理中…':'退回未完成'}</button>
+              <button type="button" className="primary" disabled={!runtime.markOrderCompleted||completeBusy} onClick={()=>void markCompleted()}>{completeBusy?'處理中…':'已取餐'}</button>
+            </>
+            :<button className="primary" disabled={selectedIsDining||!runtime.markOrderReady||readyBusy||selected.fulfillmentLabel==='待處理'||selected.fulfillmentLabel==='已完成'||selected.fulfillmentLabel==='已取消'} title={selectedIsDining?'堂食由堂食流程管理履約狀態':''} onClick={()=>void markReady()}>{readyBusy?'處理中…':'提前完成／可取餐'}</button>}
         </footer>
       </article>:<div className="order-empty">選擇一張訂單。</div>}
     </aside>
