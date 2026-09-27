@@ -346,11 +346,12 @@ export interface OwnerSellabilityCommandResult {
 
 export interface OwnerStaffPresence {
   readonly staffId:string;
+  readonly loginId?:string;
   readonly name:string;
   readonly role:string;
   readonly presence:string;
   readonly schedule?:string;
-  readonly permissions:string;
+  readonly capabilitySummary?:string;
 }
 
 export interface OwnerDeviceHealth {
@@ -433,13 +434,16 @@ export interface OwnerActivityRecord {
   readonly activityId:string;
   readonly title:string;
   readonly actor:string;
+  readonly actorStaffId?:string;
   readonly target?:string;
   readonly correlationId?:string;
   readonly incidentId?:string;
   readonly linkedActionId?:string;
   readonly detail?:string;
   readonly requester?:string;
+  readonly requesterStaffId?:string;
   readonly approver?:string;
+  readonly approverStaffId?:string;
   readonly result:string;
   readonly readback?:string;
   readonly observedAt:string;
