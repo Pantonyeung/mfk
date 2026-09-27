@@ -77,12 +77,16 @@ function HistoryCard({order,onOpen}:{order:CustomerHistoryProjection;onOpen:(ord
 
 function HistoryDetail({
   order,
+  reorderFresh,
   onBack,
   onReorder,
+  onRefresh,
 }:{
   order:CustomerHistoryProjection;
+  reorderFresh:boolean;
   onBack:()=>void;
   onReorder:(order:CustomerHistoryProjection)=>void;
+  onRefresh:()=>void;
 }){
   return <section className="ui8-history-detail">
     <button className="ui8-back" onClick={onBack}>返回訂單列表</button>
@@ -97,9 +101,10 @@ function HistoryDetail({
     </section>
     <section className="ui8-history-warning"><strong>歷史快照｜只讀</strong><p>舊 Price / Sellability / Coupon eligibility 或 redemption 不可直接帶去新交易。舊 Order 唔會被重新開啟或修改。</p></section>
     <div className="ui8-detail-actions">
-      <ActionButton wide disabled={!order.reorderEligible} onClick={()=>onReorder(order)}>{order.reorderEligible?'再來一單':'舊訂單未有可安全複製嘅 Intent'}</ActionButton>
+      <ActionButton wide disabled={!order.reorderEligible||!reorderFresh} onClick={()=>onReorder(order)}>{!order.reorderEligible?'舊訂單未有可安全複製嘅 Intent':reorderFresh?'再來一單':'需要重新同步目前餐牌'}</ActionButton>
+      {!reorderFresh&&order.reorderEligible?<section className="ui8-reorder-unavailable" role="status"><strong>暫時未能開始再來一單</strong><p>歷史訂單仍可查看；重新同步 current menu 後先可以建立 New Cart。</p><button type="button" onClick={onRefresh}>只讀 Refresh</button></section>:null}
       <button className="ui8-template-unavailable" disabled aria-disabled="true">設為常用訂單</button>
-      <small>{CUSTOMER_UI8_SAVED_TEMPLATE_SEAM_CLASSIFICATION}</small>
+      <small>常用訂單功能尚未開放</small>
     </div>
   </section>;
 }
@@ -181,20 +186,22 @@ function Repair({
 function FinalReview({
   cart,
   quote,
+  fresh,
   onCart,
   onRepair,
 }:{
   cart:readonly CustomerCartLine[];
   quote:CustomerQuoteSnapshot|null;
+  fresh:boolean;
   onCart:()=>void;
   onRepair:()=>void;
 }){
-  const ready=Boolean(cart.length&&quote?.freshness==='CURRENT'&&!cart.some(line=>line.attention));
+  const ready=Boolean(fresh&&cart.length&&quote?.freshness==='CURRENT'&&!cart.some(line=>line.attention));
   return <section className="ui8-final-review">
     <header className="ui8-section-hero"><span>Final Review</span><h1>新購物車已準備好</h1><p>以下全部係 current catalog / current quote；歷史 Order 保持不變。</p></header>
     <section className="ui8-review-lines">{cart.map(line=><article key={line.lineId}><div><strong>{line.productName} ×{line.quantity}</strong><small>{line.selections.map(item=>item.optionName).join('、')||'標準設定'}</small></div><b>{line.publishedUnitPriceMinor!==undefined?'HK$'+(line.publishedUnitPriceMinor/100).toFixed(0):'待修正'}</b></article>)}</section>
     <section className={"ui8-current-quote "+(quote?.freshness.toLowerCase()??'unknown')}><span>Current Quote</span><AnimatedValue as="strong">{moneyLabel(quote)}</AnimatedValue><small>{quote?.freshness??'UNKNOWN'} · revision {quote?.revision??'待讀回'}</small></section>
-    {!ready?<section className="ui8-review-block"><strong>未可以離開 Repair</strong><p>Current Quote 未係 CURRENT，或者仍有受影響 Line。</p><ActionButton variant="secondary" wide onClick={onRepair}>返回局部 Repair</ActionButton></section>:null}
+    {!ready?<section className="ui8-review-block"><strong>未可以完成 Final Review</strong><p>{fresh?'Current Quote 未係 CURRENT，或者仍有受影響 Line。':'需要重新同步 current truth；已建立嘅 draft cart 會保留。'}</p><ActionButton variant="secondary" wide onClick={onRepair}>返回局部 Repair</ActionButton></section>:null}
     <ActionButton wide disabled={!ready} onClick={onCart}>前往記憶罐</ActionButton>
     <small className="ui8-checkout-lock">之後只可經正常 UI4 Checkout → UI5 Submit；Stage 8 本身唔會 commit Order。</small>
   </section>;
@@ -204,7 +211,7 @@ export function HistoryReorderUi8View({
   segment,setSegment,phase,setPhase,
   active,history,selectedHistory,
   cart,repairs,quote,menu,connection,browserOnline,
-  onOpenCurrent,onOpenHistory,onStartReorder,onAcceptRepair,onEditRepair,onRemoveLine,onGoCart,onBrowse,
+  onOpenCurrent,onOpenHistory,onStartReorder,onAcceptRepair,onEditRepair,onRemoveLine,onGoCart,onBrowse,onRefresh,
   characterVariant='male',
 }:{
   segment:Ui8OrderSegment;setSegment:(value:Ui8OrderSegment)=>void;
@@ -214,14 +221,22 @@ export function HistoryReorderUi8View({
   connection:CustomerConnectionState;browserOnline:boolean;
   onOpenCurrent:(order:CustomerOrderProjection)=>void;onOpenHistory:(order:CustomerHistoryProjection)=>void;
   onStartReorder:(order:CustomerHistoryProjection)=>void;onAcceptRepair:(lineId:string)=>void;onEditRepair:(line:CustomerCartLine)=>void;onRemoveLine:(lineId:string)=>void;
-  onGoCart:()=>void;onBrowse:()=>void;
+  onGoCart:()=>void;onBrowse:()=>void;onRefresh:()=>void;
   characterVariant?:Ui8CharacterVariant;
 }){
+  const reorderFresh=browserOnline&&connection==='READY'&&Boolean(menu);
   if(phase!=='LIST'&&selectedHistory){
-    if(phase==='DETAIL')return <section className="page ui8-page"><HistoryDetail order={selectedHistory} onBack={()=>setPhase('LIST')} onReorder={onStartReorder}/></section>;
+    if(phase==='DETAIL')return <section className="page ui8-page"><HistoryDetail order={selectedHistory} reorderFresh={reorderFresh} onBack={()=>setPhase('LIST')} onReorder={onStartReorder} onRefresh={onRefresh}/></section>;
+    if(!reorderFresh)return <section className="page ui8-page ui8-freshness-block" data-ui8-reorder-freshness="BLOCKED">
+      <StateBanner state={pageState(connection,browserOnline,false)}/>
+      <header className="ui8-section-hero"><span>Reorder 已暫停</span><h1>需要重新同步 current truth</h1><p>已建立嘅 draft cart 會保留；唔會刪資料、唔會重開舊 Order，亦唔會繼續聲稱 current validation 已完成。</p></header>
+      <section className="ui8-copy-summary"><span>已保留 Draft</span><strong>{cart.length} 個 Line</strong><small>恢復 READY 後會用 current menu / current quote 重新驗證。</small></section>
+      <ActionButton wide onClick={onRefresh}>只讀 Refresh</ActionButton>
+      <ActionButton variant="secondary" wide onClick={()=>setPhase('DETAIL')}>返回歷史訂單</ActionButton>
+    </section>;
     if(phase==='COPY')return <section className="page ui8-page"><CopyIntent order={selectedHistory} cart={cart} issueCount={new Set([...repairs.map(item=>item.lineId),...cart.filter(line=>line.attention).map(line=>line.lineId)]).size} onContinue={()=>setPhase(repairs.length||cart.some(line=>line.attention)?'REPAIR':'REVIEW')} onBack={()=>setPhase('DETAIL')} variant={characterVariant}/></section>;
     if(phase==='REPAIR')return <section className="page ui8-page"><Repair cart={cart} repairs={repairs} menu={menu} onAccept={onAcceptRepair} onEdit={onEditRepair} onRemove={onRemoveLine} onContinue={()=>setPhase('REVIEW')}/></section>;
-    if(phase==='REVIEW')return <section className="page ui8-page"><FinalReview cart={cart} quote={quote} onCart={onGoCart} onRepair={()=>setPhase('REPAIR')}/></section>;
+    if(phase==='REVIEW')return <section className="page ui8-page"><FinalReview cart={cart} quote={quote} fresh={reorderFresh} onCart={onGoCart} onRepair={()=>setPhase('REPAIR')}/></section>;
   }
 
   const rows=segment==='current'?active:segment==='completed'?history:[...active,...history];
