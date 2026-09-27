@@ -85,7 +85,7 @@ await page.goto(baseURL,{waitUntil:'networkidle'});
 await page.getByRole('heading',{name:'而家間舖點？'}).waitFor();
 
 async function shot(name){
-  await page.screenshot({path:path.join(out,name),fullPage:true});
+  await page.screenshot({path:path.join(out,name)});
 }
 await shot('01_Today_FINAL_390.png');
 
