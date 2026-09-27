@@ -265,7 +265,7 @@ export interface OwnerPlanningSaveInput {
   readonly monthKey:string;
   readonly monthlyRevenueTargetMinor:number;
   readonly note?:string;
-  readonly baseRevision:number;
+  readonly expectedRevision:number;
   readonly operationId:string;
   readonly costLines:readonly {
     readonly costLineId:string;
@@ -466,7 +466,6 @@ export interface OwnerRuntimePort {
   loginOwner?(loginId:string,pin:string):Promise<OwnerAuthSession>;
   logoutOwner?():Promise<void>;
   requestBoundedAction?(input:OwnerBoundedAction):Promise<OwnerCommandResult>;
-  commandChannel?(input:OwnerChannelCommandInput):Promise<OwnerChannelCommandResult>;
   readChannels?():Promise<readonly OwnerChannelHealth[]>;
   readPlanning?(monthKey:string):Promise<OwnerPlanningSnapshot>;
   savePlanning?(input:OwnerPlanningSaveInput):Promise<OwnerPlanningCommandResult>;
