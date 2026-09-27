@@ -75,10 +75,10 @@ describe('OA-SEL-001 canonical sellability',()=>{
   it('temporary stop expires by effective availability without rewriting inventory',async()=>{
     const {data,runtime}=harness();data.set('active',active());
     await runtime.ownerSellabilityCommand(session,{
-      operationId:'sel-4',action:'SOLD_OUT',scope:'ALL',restoreAt:'2026-09-27T07:00:00Z',targets:[{targetId:'p1',grain:'PRODUCT'}],
+      operationId:'sel-4',action:'SOLD_OUT',scope:'ALL',restoreAt:'2099-09-27T07:00:00Z',targets:[{targetId:'p1',grain:'PRODUCT'}],
     });
-    expect((await runtime.ownerSellabilityReadModel('2026-09-27T06:30:00Z')).find((x:any)=>x.targetId==='p1').state).toBe('SOLD_OUT');
-    expect((await runtime.ownerSellabilityReadModel('2026-09-27T07:01:00Z')).find((x:any)=>x.targetId==='p1').state).toBe('SELLABLE');
+    expect((await runtime.ownerSellabilityReadModel('2099-09-27T06:30:00Z')).find((x:any)=>x.targetId==='p1').state).toBe('SOLD_OUT');
+    expect((await runtime.ownerSellabilityReadModel('2099-09-27T07:01:00Z')).find((x:any)=>x.targetId==='p1').state).toBe('SELLABLE');
     expect(data.get('active').snapshot.inventory[0].quantity).toBe(0);
   });
 
