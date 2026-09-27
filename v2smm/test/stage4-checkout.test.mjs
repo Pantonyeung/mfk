@@ -12,7 +12,7 @@ const app=readFileSync(new URL('../src/App.tsx',import.meta.url),'utf8');
 const persistence=readFileSync(new URL('../src/persistence.ts',import.meta.url),'utf8');
 const staff=readFileSync(new URL('../src/pwa-staff.ts',import.meta.url),'utf8');
 const selection=readFileSync(new URL('../src/selection.ts',import.meta.url),'utf8');
-const cartRefresh=readFileSync(new URL('../src/cart-refresh.ts',import.meta.url),'utf8');
+const cartRefresh=readFileSync(new URL('../src/stage3-cart.mjs',import.meta.url),'utf8');
 const css=readFileSync(new URL('../src/stage4.css',import.meta.url),'utf8');
 
 const checkoutStart=app.indexOf('function Stage4CheckoutView');
