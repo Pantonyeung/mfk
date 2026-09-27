@@ -720,7 +720,7 @@ test('Stage03 keeps seven detail sections, four-field search, and no mutations a
 test('Owner auth UI is fail-closed before canonical read',()=>{
   const app=fs.readFileSync(path.join(srcRoot,'App.tsx'),'utf8');
   assert.match(app,/OWNER ACCESS/);
-  assert.match(app,/Admin 已發布嘅 OWNER Staff ID 同 PIN/);
+  assert.match(app,/Admin 已發布嘅 OWNER 登入編號同 PIN/);
   assert.match(app,/PERMISSION_DENIED/);
   assert.match(app,/正式資料未完成身份確認前唔會載入/);
 });
