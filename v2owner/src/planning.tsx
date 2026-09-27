@@ -49,7 +49,7 @@ export function MonthlyTargetSummaryCard({value,onOpen}:{value:OwnerPlanningSnap
         ?<div><span>估算營運淨利</span><b>{hk(m.estimatedOperatingProfitToDateMinor)}</b></div>
         :null}
     </div>
-    <small>{m.paceState==='TARGET_REACHED'?'本月目標已達成':m.paceState==='ON_TRACK'?'進度正常':'需要留意'} · 深入管理 → 營業目標與成本</small>
+    <small>{m.paceState==='TARGET_REACHED'?'本月目標已達成':m.paceState==='ON_TRACK'?'On Track／進度正常':'Attention／需要留意'} · 深入管理 → 營業目標與成本</small>
   </article>;
 }
 
