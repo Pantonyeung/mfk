@@ -6,11 +6,13 @@ import {publishedCartRepairs,quotePublishedCart,repairPublishedCartLine} from '.
 import {buildWhatsAppFallbackUrl} from './whatsapp-fallback';
 import {customerComboPublishedUnitMinor,customerStandalonePublishedUnitMinor,restoreCustomerComboSelectionState,selectedCustomerComboIntent,selectedCustomerOptions,toggleCustomerComboSelection,toggleCustomerSelection,validateCustomerComboSelection,validateCustomerSelections,type CustomerComboSelectionState,type CustomerSelectionState} from './selection';
 import {BottomNavigation,CustomerHeader,StatusBanner,type ActionState,type ProductOriginRect} from './ui/primitives';
-import {CartView,HomeView,MemberView,OrdersView,type MenuLayout,type OrderSegment} from './components/customer-views';
+import {CartView,HomeView,MemberView,type MenuLayout} from './components/customer-views';
 import {CheckoutUi4View,type CustomerUi4CheckoutStep} from './components/customer-checkout-ui4';
 import {SubmitUi5View} from './components/customer-submit-ui5';
 import {StoreFulfillmentUi6View} from './components/customer-fulfillment-ui6';
 import {PickupCompleteUi7View} from './components/customer-pickup-ui7';
+import {HistoryReorderUi8View,type Ui8OrderSegment,type Ui8Phase} from './components/customer-history-ui8';
+import {buildCurrentReorderCart,clearReorderAttention} from './reorder';
 import {ProductSheet} from './components/product-sheet-ui3';
 import {Stage2Menu} from './stage2/Stage2Menu';
 import {Stage2BottomNavigation} from './stage2/Stage2BottomNavigation';
@@ -114,8 +116,9 @@ export function App(){
   const [selectedQuantity,setSelectedQuantity]=useState(1);
   const [selectedNote,setSelectedNote]=useState('');
   const [editingLineId,setEditingLineId]=useState<string|null>(null);
-  const [orderSegment,setOrderSegment]=useState<OrderSegment>('current');
-  const [expandedOrderId,setExpandedOrderId]=useState<string|null>(null);
+  const [orderSegment,setOrderSegment]=useState<Ui8OrderSegment>('current');
+  const [ui8Phase,setUi8Phase]=useState<Ui8Phase>('LIST');
+  const [ui8SelectedOrderId,setUi8SelectedOrderId]=useState<string|null>(null);
   const [submitting,setSubmitting]=useState(false);
   const [readingIntentId,setReadingIntentId]=useState<string|null>(null);
   const [jarPulseKey,setJarPulseKey]=useState(0);
@@ -135,6 +138,7 @@ export function App(){
   const changeView=(next:View)=>{
     presentWithContinuity(()=>{
       setView(next);
+      if(next==='orders'){setUi8Phase('LIST');setUi8SelectedOrderId(null);}
       if(next==='home'||next==='menu'||next==='cart'||next==='orders'||next==='more')replacePath(pathForView(next));
       persist({preferences:{activeView:next==='submit'||next==='waiting'||next==='pickup'?'orders':next,activeCategoryId}});
       window.scrollTo({top:0,behavior:'auto'});
@@ -387,6 +391,7 @@ export function App(){
       ...(publishedUnitPriceMinor!==null&&Number.isSafeInteger(publishedUnitPriceMinor)?{publishedUnitPriceMinor}:{}),
     });
     updateCart(existing?cart.map(item=>item.lineId===existing.lineId?line:item):[...cart,line]);
+    if(existing&&view==='orders'&&ui8Phase==='REPAIR')setUi8Phase('REPAIR');
     setJarPulseKey(value=>value+1);
     setNotice(existing?'記憶罐已更新；未建立正式訂單。':'已加入記憶罐；未建立正式訂單。');
     closeProduct();
@@ -632,28 +637,69 @@ export function App(){
   };
 
   const reorder=async(order:CustomerHistoryProjection)=>{
-    if(!port?.buildReorderCart){setNotice('再次下單服務尚未連接；冇複製舊價格或者舊供應狀態。');return}
-    try{
-      const result=await port.buildReorderCart(order.orderId);
-      if(result.state!=='CONFIRMED'||!result.cart){setNotice(result.message);return}
-      const nextCheckout=checkout.paymentEvidence?withoutPaymentEvidence(checkout):checkout;
-      setCart(result.cart);
-      if(nextCheckout!==checkout)setCheckout(nextCheckout);
-      persist({
-        cart:result.cart,
-        checkout:nextCheckout,
-        preferences:{activeView:'cart',activeCategoryId},
-      });
-      setJarPulseKey(value=>value+1);
-      setNotice(result.attention?.length?'已按目前菜單重建記憶罐；需要修正：'+result.attention.join('、'):'已按目前菜單、價格同供應狀態重建記憶罐。');
-      presentWithContinuity(()=>{
-        setView('cart');
-        replacePath('/memory-jar');
-        window.scrollTo({top:0,behavior:'auto'});
-      });
-    }catch{
-      setNotice('暫時未能重新驗證舊訂單；冇建立新訂單。');
+    if(!order.reorderEligible||!order.reorderIntent?.length){
+      setUi8SelectedOrderId(order.orderId);
+      setUi8Phase('DETAIL');
+      setOrderSegment('completed');
+      setView('orders');
+      replacePath('/orders');
+      setNotice('呢張歷史訂單未有可安全複製嘅 Intent；舊 Order 保持唯讀。');
+      return;
     }
+    const result=buildCurrentReorderCart(order,menu);
+    if(!result.cart.length){
+      setUi8SelectedOrderId(order.orderId);
+      setUi8Phase('DETAIL');
+      setOrderSegment('completed');
+      setView('orders');
+      replacePath('/orders');
+      setNotice(result.issues[0]?.detail??'目前餐牌未能建立新購物車。');
+      return;
+    }
+    const nextCheckout=withoutPaymentEvidence(checkout);
+    setCart(result.cart);
+    setCheckout(nextCheckout);
+    persist({
+      cart:result.cart,
+      checkout:nextCheckout,
+      preferences:{activeView:'orders',activeCategoryId},
+    });
+    setJarPulseKey(value=>value+1);
+    setUi8SelectedOrderId(order.orderId);
+    setUi8Phase('COPY');
+    setOrderSegment('completed');
+    setView('orders');
+    replacePath('/orders');
+    setNotice(result.issues.length
+      ?'已建立新購物車；只需修正 '+String(result.issues.length)+' 個受影響 Line。舊訂單冇改動。'
+      :'已用目前餐牌建立新購物車；舊價、付款憑證、Fulfillment、Coupon 狀態全部冇複製。');
+    window.scrollTo({top:0,behavior:'auto'});
+  };
+
+  const acceptUi8Repair=(lineId:string)=>{
+    const line=cart.find(item=>item.lineId===lineId);
+    if(!line)return;
+    const repaired=repairPublishedCartLine(line,menu);
+    if(!repaired){setNotice('呢一項仍然需要手動修正或移除；其他 Line 保持不變。');return}
+    updateCart(cart.map(item=>item.lineId===lineId?clearReorderAttention(repaired):item));
+    setNotice('只更新受影響 Line「'+repaired.productName+'」；其他 Line 冇改動。');
+  };
+
+  const editUi8Repair=(line:CustomerCartLine)=>{
+    const product=menu?.products.find(item=>item.productId===line.productId);
+    if(!product){setNotice('呢個舊商品已不在目前餐牌；可以移除受影響 Line。');return}
+    openProduct(product,null,line);
+  };
+
+  const openUi8History=(order:CustomerHistoryProjection)=>{
+    setUi8SelectedOrderId(order.orderId);
+    setUi8Phase('DETAIL');
+    setOrderSegment('completed');
+  };
+
+  const openUi8Current=(order:CustomerReadModelSnapshot['activeOrders'][number])=>{
+    if(['READY','ARRIVED','VERIFIED','HANDED_OVER','PICKUP_EXCEPTION','COMPLETED'].includes(order.stage))openPickupRoute(order.orderId);
+    else openWaitingRoute(order.orderId);
   };
 
   const acceptCartRepair=(lineId:string)=>{
@@ -703,6 +749,7 @@ export function App(){
   const pickupOrder=pickupOrderId?activeOrders.find(order=>order.orderId===pickupOrderId)??null:null;
   const pickupHistoryOrder=pickupOrderId?history.find(order=>order.orderId===pickupOrderId)??null:null;
   const pickupIntent=pickupOrderId?pendingIntents.find(item=>item.state==='DELIVERED'&&item.canonicalOrderId===pickupOrderId)??null:null;
+  const ui8SelectedHistory=ui8SelectedOrderId?history.find(order=>order.orderId===ui8SelectedOrderId)??null:null;
   const waitingUi7Ready=Boolean(
     waitingOrderId&&(
       (waitingOrder&&['READY','ARRIVED','VERIFIED','HANDED_OVER','PICKUP_EXCEPTION','COMPLETED'].includes(waitingOrder.stage))||
@@ -737,14 +784,14 @@ export function App(){
     </div>}
 
     <section className={view==='menu'?'stage2-viewport':'viewport'} aria-busy={connection==='LOADING'}>
-      {view==='home'?<HomeView snapshot={snapshot} connection={connection} activeOrders={activeOrders} history={history} recommendations={homeRecommendations} cartCount={cartCount} onRefresh={()=>void refresh()} onProduct={openProduct} onBrowse={()=>changeView('menu')} onJar={()=>changeView('cart')} onOrders={()=>{setOrderSegment('current');changeView('orders')}} onHistory={()=>{setOrderSegment('history');changeView('orders')}} onMember={()=>changeView('more')} onBuyAgain={order=>void reorder(order)} onFallback={()=>void requestFallback()}/>:null}
+      {view==='home'?<HomeView snapshot={snapshot} connection={connection} activeOrders={activeOrders} history={history} recommendations={homeRecommendations} cartCount={cartCount} onRefresh={()=>void refresh()} onProduct={openProduct} onBrowse={()=>changeView('menu')} onJar={()=>changeView('cart')} onOrders={()=>{setOrderSegment('current');changeView('orders')}} onHistory={()=>{setOrderSegment('completed');changeView('orders')}} onMember={()=>changeView('more')} onBuyAgain={order=>void reorder(order)} onFallback={()=>void requestFallback()}/>:null}
       {view==='menu'?<Stage2Menu connection={connection} browserOnline={browserOnline} categories={categories} activeCategoryId={activeCategoryId} setCategory={category=>presentWithContinuity(()=>changeCategory(category))} query={search} setQuery={setSearch} products={menu?.products??[]} recommendations={menuRecommendations} onProduct={(product,origin)=>openProduct(product,origin)} cartCount={cartCount} onCart={()=>changeView('cart')}/>:null}
       {view==='cart'?<CartView cart={cart} quote={quote} repairs={cartRepairs} member={snapshot?.member} suggestions={cartSuggestions} products={menu?.products??[]} onProduct={openProduct} onAcceptRepair={acceptCartRepair} onQuantity={(lineId,quantity)=>updateCart(cart.map(line=>line.lineId===lineId?{...line,quantity:Math.max(1,quantity)}:line))} onRemove={lineId=>updateCart(cart.filter(line=>line.lineId!==lineId))} onMenu={()=>changeView('menu')} onCheckout={()=>void openCheckoutStep('contact')}/>:null}
       {view==='checkout'?<CheckoutUi4View step={checkoutStep} cart={cart} quote={quote} repairs={cartRepairs} checkout={checkout} setCheckout={changeCheckout} paymentChannels={snapshot?.paymentChannels??[]} onStep={step=>void openCheckoutStep(step)} onBackToJar={()=>changeView('cart')} onRepair={()=>changeView('cart')} onPaymentEvidence={file=>void uploadPaymentEvidence(file)} onReviewConfirmed={startUi5Submission}/>:null}
       {view==='submit'?(activeSubmitIntent?<SubmitUi5View intent={activeSubmitIntent} submitting={submitting} submitProbe={submitProbe} reading={readingIntentId===activeSubmitIntent.submissionId} fallbackAvailable={Boolean(snapshot?.fallback?.enabled)&&activeSubmitIntent.state==='NOT_CONNECTED'} onSubmit={()=>void submit(activeSubmitIntent)} onReadback={()=>void readbackIntent(activeSubmitIntent)} onFallback={()=>void requestFallback(activeSubmitIntent)} onBackReview={()=>void openCheckoutStep('review')} onBackToJar={()=>changeView('cart')}/>:<section className="page ui5-missing"><h1>提交資料未找到</h1><p>唔會建立新 Submission；請返回記憶罐重新確認。</p><button onClick={()=>changeView('cart')}>返回記憶罐</button></section>):null}
       {view==='waiting'?<StoreFulfillmentUi6View order={waitingOrder} intent={waitingIntent} connection={connection} browserOnline={browserOnline} onRefresh={()=>void refresh()} onOrders={()=>{setOrderSegment('current');changeView('orders')}} onHome={()=>changeView('home')}/>:null}
-      {view==='pickup'?<PickupCompleteUi7View order={pickupOrder} historyOrder={pickupHistoryOrder} intent={pickupIntent} connection={connection} browserOnline={browserOnline} onRefresh={()=>void refresh()} onOrders={()=>{setOrderSegment(pickupHistoryOrder?'history':'current');changeView('orders')}} onHome={()=>changeView('home')} onHelp={()=>setNotice('請直接向現場店員求助；呢個操作唔會改 Fulfillment、唔會標記完成，亦冇發出假通知。')}/>:null}
-      {view==='orders'?<OrdersView segment={orderSegment} setSegment={setOrderSegment} active={activeOrders} history={history} expandedOrderId={expandedOrderId} setExpandedOrderId={setExpandedOrderId} onReorder={order=>void reorder(order)} onBrowse={()=>changeView('menu')} connection={connection}/>:null}
+      {view==='pickup'?<PickupCompleteUi7View order={pickupOrder} historyOrder={pickupHistoryOrder} intent={pickupIntent} connection={connection} browserOnline={browserOnline} onRefresh={()=>void refresh()} onOrders={()=>{setOrderSegment(pickupHistoryOrder?'completed':'current');changeView('orders')}} onHome={()=>changeView('home')} onHelp={()=>setNotice('請直接向現場店員求助；呢個操作唔會改 Fulfillment、唔會標記完成，亦冇發出假通知。')}/>:null}
+      {view==='orders'?<HistoryReorderUi8View segment={orderSegment} setSegment={setOrderSegment} phase={ui8Phase} setPhase={setUi8Phase} active={activeOrders} history={history} selectedHistory={ui8SelectedHistory} cart={cart} repairs={cartRepairs} quote={quote} menu={menu} connection={connection} browserOnline={browserOnline} onOpenCurrent={openUi8Current} onOpenHistory={openUi8History} onStartReorder={order=>void reorder(order)} onAcceptRepair={acceptUi8Repair} onEditRepair={editUi8Repair} onRemoveLine={lineId=>updateCart(cart.filter(line=>line.lineId!==lineId))} onGoCart={()=>changeView('cart')} onBrowse={()=>changeView('menu')}/>:null}
       {view==='more'?<MemberView connection={connection} snapshot={snapshot} history={history} pendingIntents={recoveryIntents} readingIntentId={readingIntentId} onRefresh={()=>void refresh()} onReadback={intent=>void readbackIntent(intent)} onDiscard={removeIntent} onFallback={()=>void requestFallback()} onReorder={order=>void reorder(order)} onBrowse={()=>changeView('menu')}/>:null}
     </section>
 
