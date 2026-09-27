@@ -211,6 +211,26 @@ export interface SmmOrderProjection {
   readonly readback:'CONFIRMED'|'PARTIAL'|'UNKNOWN';
   readonly note?:string;
   readonly timeline:readonly SmmOrderTimelineItem[];
+
+  /** Optional canonical Stage 7 presentation fields. */
+  readonly orderTime?:string;
+  readonly itemCount?:number;
+  readonly sourceGroup?:'ONSITE'|'SMM'|'OWN_PLATFORM'|'THIRD_PARTY';
+  readonly effectiveAmountLabel?:string;
+  readonly tenderLabel?:string;
+  readonly fulfillmentLabel?:string;
+  readonly eta?:string;
+  readonly externalRef?:string;
+  readonly customerName?:string;
+  readonly customerPhone?:string;
+  readonly customerPhonePermitted?:boolean;
+  readonly items?:readonly {
+    readonly quantity:number;
+    readonly name:string;
+    readonly detail?:string;
+    readonly amountLabel?:string;
+    readonly remark?:string;
+  }[];
 }
 
 export interface SmmWorkItem {
