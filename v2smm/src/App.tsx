@@ -30,12 +30,14 @@ import {
   smmStage4TenderLabel,
 } from './stage4-checkout.mjs';
 import {Stage5SubmitView,type SmmStage5Session} from './Stage5Submit';
+import {Stage6QueueView} from './Stage6Queue';
 import {smmStage5ConfirmedDisplayCode,smmStage5RepairPath,smmStage5SubmissionShortRef} from './stage5-submit.mjs';
 import './stage1.css';
 import './stage2.css';
 import './stage3.css';
 import './stage4.css';
 import './stage5.css';
+import './stage6.css';
 import type {
   SmmCartLine,
   SmmConnectionState,
@@ -724,7 +726,7 @@ export function App(){
         onProduct={product=>{setEditingLineId(null);setSelectedProduct(product);setSelections({});setSelectedVariationId(null);setComboEnabled(false);setComboSelections({})}}
         onCart={()=>{setCheckoutStage(false);setCartOpen(true)}}
       />:null}
-      {view==='work'?<WorkView connection={connection} items={snapshot?.work??[]} onRefresh={()=>void refresh()}/>:null}
+      {view==='work'?<Stage6QueueView connection={connection} items={snapshot?.work??[]} orders={snapshot?.orders??[]} onRefresh={refresh}/>:null}
       {view==='orders'?<OrdersView
         connection={connection}
         rows={snapshot?.orders??[]}
@@ -923,14 +925,6 @@ function OrderView({connection,categories,activeCategoryId,setCategory,search,se
       <div><strong>{quote?money(quote.currency,quote.totalMinor):'價格資料未完整'}</strong><small>{quote?`餐單版本 ${quote.revision}`:'請重新同步餐單'}</small></div>
       <em>查看</em>
     </button>:null}
-  </section>;
-}
-
-function WorkView({connection,items,onRefresh}:{connection:SmmConnectionState;items:NonNullable<SmmReadModelSnapshot['work']>;onRefresh:()=>void}){
-  return <section className="page">
-    <header className="hero"><div><span>待處理</span><h1>前線工作</h1><small>延誤、異常同需要跟進嘅項目會集中喺呢度。</small></div><div className="hero-count"><b>{items.length}</b><small>項</small></div></header>
-    {!items.length?<EmptyState title={connection==='NOT_CONNECTED'?'待處理服務尚未連接':'暫時冇待處理項目'} detail={connection==='NOT_CONNECTED'?'連接後先顯示正式製作、延誤同異常資料。':'目前冇需要前線處理嘅事項。'}><button className="primary" onClick={onRefresh}>重新整理</button></EmptyState>:
-    <div className="cards">{items.map(item=><article className={`work-card ${item.state==='DELAYED'||item.state==='ACTION_REQUIRED'?'alert':''}`} key={item.workId}><div className="work-main"><div className="eyebrow"><span>{new Date(item.observedAt).toLocaleTimeString('zh-HK',{hour:'2-digit',minute:'2-digit'})}</span><b>{item.displayCode??item.kind}</b></div><h2>{item.summary}</h2>{item.eta?<p>預計：{item.eta}</p>:null}</div><div className="work-side"><span className={`status ${item.state==='UNKNOWN'?'unknown':item.state==='NORMAL'?'positive':'critical'}`}>{labelWorkState(item.state)}</span></div></article>)}</div>}
   </section>;
 }
 
