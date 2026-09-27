@@ -117,7 +117,7 @@ await compare('ui1',path.join(outDir,'SOURCE_'+sourceNames.ui1),renders.ui1,'COM
 await compare('ui2',path.join(outDir,'SOURCE_'+sourceNames.ui2),renders.ui2,'COMPARE_UI2_SOURCE_RENDER.png','UI2');
 
 await fs.writeFile(path.join(outDir,'manifest.json'),JSON.stringify({
-  head:process.env.GITHUB_SHA??'local',
+  head:process.env.MFK_EVIDENCE_HEAD??process.env.GITHUB_SHA??'local',
   sourceFiles:sourceNames,
   viewports:sizes,
   ui0:{states:['male first CTA','female first CTA'],remainingP0Difference:0},
