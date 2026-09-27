@@ -120,4 +120,34 @@ describe('SMT projection outbox',()=>{
     expect(payload.recognizedSalesMinor).toBe(0);
   });
 
+
+  it('projects Customer UI6 pickup/payment/ETA facts without exposing the full phone number',()=>{
+    queueOrderProjection({
+      id:'MFK-CUSTOMER-1',
+      display:'038',
+      createdAt:'2026-09-27T07:00:00.000Z',
+      updatedAt:'2026-09-27T07:05:00.000Z',
+      totalMinor:5800,
+      paymentLabel:'FPS',
+      paymentVerificationState:'VERIFIED',
+      fulfillmentLabel:'稍有延誤',
+      sourceLabel:'自家 App',
+      customerPhone:'91234567',
+      etaLabel:'12:25',
+      fulfillmentHistory:[
+        {label:'待處理',at:'2026-09-27T07:00:00.000Z'},
+        {label:'進行中',at:'2026-09-27T07:02:00.000Z'},
+        {label:'稍有延誤',at:'2026-09-27T07:05:00.000Z'},
+      ],
+      items:[{id:'p1',name:'紫米飯團',qty:1,unitMinor:5800}],
+    });
+    const payload=readProjectionOutbox()[0]!.event.payload as Record<string,unknown>;
+    expect(payload.pickupCode).toBe('4567');
+    expect(payload).not.toHaveProperty('customerPhone');
+    expect(payload.paymentVerificationState).toBe('VERIFIED');
+    expect(payload.etaLabel).toBe('12:25');
+    expect(payload.fulfillmentLabel).toBe('稍有延誤');
+    expect(payload.fulfillmentHistory).toHaveLength(3);
+  });
+
 });
