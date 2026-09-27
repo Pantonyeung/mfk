@@ -1,4 +1,4 @@
-import type {OwnerAuthSession,OwnerChannelCommandInput,OwnerChannelCommandResult,OwnerPlanningCommandResult,OwnerPlanningSaveInput,OwnerPlanningSnapshot,OwnerReadModelSnapshot,OwnerRuntimePort} from './product-types';
+import type {OwnerAuthSession,OwnerChannelCommandInput,OwnerChannelCommandResult,OwnerChannelHealth,OwnerPlanningCommandResult,OwnerPlanningSaveInput,OwnerPlanningSnapshot,OwnerReadModelSnapshot,OwnerRuntimePort} from './product-types';
 
 const OWNER_API_ORIGIN='https://admin.morefunos.com';
 const STORE_ID='MF01';
@@ -99,6 +99,12 @@ export async function commandOwnerChannel(input:OwnerChannelCommandInput):Promis
   });
   return body as unknown as OwnerChannelCommandResult;
 }
+export async function readOwnerChannels():Promise<readonly OwnerChannelHealth[]>{
+  const body=await ownerFetch('/api/owner/channels?storeId='+encodeURIComponent(STORE_ID),{
+    method:'GET',cache:'no-store',headers:ownerSessionHeaders(),
+  });
+  return Object.freeze(Array.isArray(body.channels)?body.channels as unknown as OwnerChannelHealth[]:[]);
+}
 export async function readOwnerPlanning(monthKey:string):Promise<OwnerPlanningSnapshot>{
   const body=await ownerFetch('/api/owner/planning?storeId='+encodeURIComponent(STORE_ID)+'&monthKey='+encodeURIComponent(monthKey),{
     method:'GET',cache:'no-store',headers:ownerSessionHeaders(),
@@ -118,6 +124,7 @@ export function createCloudOwnerRuntimePort():OwnerRuntimePort{
     portId:'MFK_OWNER_PORT_V1' as const,
     readOwnerSession:refreshOwnerSession,loginOwner,logoutOwner,
     commandChannel:commandOwnerChannel,
+    readChannels:readOwnerChannels,
     readPlanning:readOwnerPlanning,
     savePlanning:saveOwnerPlanning,
     async readSnapshot():Promise<OwnerReadModelSnapshot>{
