@@ -4,6 +4,7 @@ import {resolveSmmRuntimePort} from './runtime';
 import {pairSmmLan,probeSmmLan,readSmmLanPwaConfig,saveSmmLanPwaConfig} from './pwa-lan';
 import {clearSmmStaffSession,listSmmStaff,readSmmStaffSession,refreshSmmStaffSession,verifySmmStaff,type SmmStaffDirectoryItem,type SmmStaffSession} from './pwa-staff';
 import {
+  comboSelectionStateFromIntent,
   publishedSmmComboUnitMinor,
   revalidateSmmCartComboIntent,
   resolveSmmProductCombo,
@@ -18,6 +19,7 @@ import {
 } from './selection';
 import './stage1.css';
 import './stage2.css';
+import './stage3.css';
 import type {
   SmmCartLine,
   SmmConnectionState,
@@ -59,6 +61,8 @@ export function App(){
   const [comboEnabled,setComboEnabled]=useState(false);
   const [comboSelections,setComboSelections]=useState<SmmComboSelectionState>({});
   const [cartOpen,setCartOpen]=useState(false);
+  const [checkoutOpen,setCheckoutOpen]=useState(false);
+  const [editingLineId,setEditingLineId]=useState<string|null>(null);
   const [submitting,setSubmitting]=useState(false);
   const submitLockRef=useRef(false);
   const [search,setSearch]=useState('');
@@ -192,21 +196,39 @@ export function App(){
   useEffect(()=>{
     if(!menu||cart.length===0)return;
     let changed=false;
-    let invalid=false;
+    let affected=0;
     const next=cart.map(line=>{
       const product=menu.products.find(item=>item.productId===line.productId);
+      const attention=(reason:NonNullable<SmmCartLine['attention']>['reason'],message:string)=>Object.freeze({
+        reason,
+        message,
+        menuRevision:menu.revision,
+        observedAt:menu.observedAt,
+      });
       if(!product||!product.available){
-        invalid=true;
-        if(line.publishedUnitPriceMinor!==undefined)changed=true;
-        return Object.freeze({...line,publishedUnitPriceMinor:undefined});
+        const nextAttention=line.attention??attention('PRODUCT_UNAVAILABLE','商品已暫停供應，請修復呢一項。');
+        if(
+          line.publishedUnitPriceMinor!==undefined||
+          line.publishedMenuRevision!==menu.revision||
+          line.attention!==nextAttention
+        )changed=true;
+        if(!line.attention)affected+=1;
+        return Object.freeze({
+          ...line,
+          publishedUnitPriceMinor:undefined,
+          publishedMenuRevision:menu.revision,
+          attention:nextAttention,
+        });
       }
 
+      let issue:NonNullable<SmmCartLine['attention']>|undefined=line.attention;
       let selectionsValid=true;
       const refreshedSelections=line.selections.map(selection=>{
         const group=product.optionGroups.find(item=>item.optionGroupId===selection.optionGroupId);
-        const option=group?.options.find(item=>item.optionId===selection.optionId&&item.available);
-        if(!group||!option){
+        const option=group?.options.find(item=>item.optionId===selection.optionId);
+        if(!group||!option||!option.available){
           selectionsValid=false;
+          issue=issue??attention('OPTION_UNAVAILABLE','已選配料／選項有更新，請重新確認。');
           return selection;
         }
         const adjustment=Number.isSafeInteger(Number(option.publishedAdjustmentMinor))
@@ -224,13 +246,43 @@ export function App(){
         });
       });
 
+      const selectionState:SmmSelectionState=Object.freeze(product.optionGroups.reduce<Record<string,readonly string[]>>((out,group)=>{
+        out[group.optionGroupId]=Object.freeze(refreshedSelections.filter(row=>row.optionGroupId===group.optionGroupId).map(row=>row.optionId));
+        return out;
+      },{}));
+      if(!validateSmmSelections(product,selectionState).ok){
+        selectionsValid=false;
+        issue=issue??attention('OPTION_UNAVAILABLE','商品選項規則已更新，請重新確認呢一項。');
+      }
+
+      let variationName=line.selectedVariationName;
+      if(product.variationRequired&&!line.selectedVariationId){
+        selectionsValid=false;
+        issue=issue??attention('VARIATION_UNAVAILABLE','商品規格已更新，請重新選擇。');
+      }else if(line.selectedVariationId){
+        const variation=product.variations?.find(item=>item.variationId===line.selectedVariationId);
+        if(!variation||!variation.available){
+          selectionsValid=false;
+          issue=issue??attention('VARIATION_UNAVAILABLE','原本規格已暫停供應，請重新選擇。');
+        }else if(variation.name!==variationName){
+          variationName=variation.name;
+          changed=true;
+        }
+      }
+
       const optionMinor=refreshedSelections.reduce(
         (sum,item)=>sum+(Number.isSafeInteger(Number(item.publishedAdjustmentMinor))?Number(item.publishedAdjustmentMinor):0),
         0,
       );
       const refreshedCombo=line.combo?revalidateSmmCartComboIntent(product,menu,line.combo):null;
-      if(line.combo&&!refreshedCombo)selectionsValid=false;
-      if(refreshedCombo&&JSON.stringify(refreshedCombo)!==JSON.stringify(line.combo))changed=true;
+      if(line.combo&&!refreshedCombo){
+        selectionsValid=false;
+        issue=issue??attention('COMBO_CHANGED','套餐內容已更新，請重新確認。');
+      }else if(refreshedCombo&&JSON.stringify(refreshedCombo)!==JSON.stringify(line.combo)){
+        issue=issue??attention('COMBO_CHANGED','套餐內容／價格已更新，請重新確認。');
+        changed=true;
+      }
+
       const base=line.combo?null:productPrice(product,serviceMode);
       const comboUnit=refreshedCombo?publishedSmmComboUnitMinor(refreshedCombo,optionMinor):null;
       const unitMinor=selectionsValid
@@ -238,14 +290,37 @@ export function App(){
           ?comboUnit??undefined
           :base!==null?base+optionMinor:undefined
         :undefined;
-      if(line.publishedUnitPriceMinor!==unitMinor)changed=true;
-      if(unitMinor===undefined)invalid=true;
-      return Object.freeze({
+
+      if(
+        !issue&&
+        Number.isSafeInteger(Number(line.publishedUnitPriceMinor))&&
+        Number.isSafeInteger(Number(unitMinor))&&
+        Number(line.publishedUnitPriceMinor)!==Number(unitMinor)
+      ){
+        issue=attention('PRICE_CHANGED','已發布價格有更新，請確認新價格。');
+      }
+
+      const nextLine:SmmCartLine=Object.freeze({
         ...line,
+        productName:product.name,
+        ...(variationName?{selectedVariationName:variationName}:{}),
         selections:Object.freeze(refreshedSelections),
         ...(refreshedCombo?{combo:refreshedCombo}:{}),
         publishedUnitPriceMinor:unitMinor,
+        publishedMenuRevision:menu.revision,
+        ...(issue?{attention:issue}:{attention:undefined}),
       });
+
+      if(
+        line.productName!==nextLine.productName||
+        line.publishedUnitPriceMinor!==nextLine.publishedUnitPriceMinor||
+        line.publishedMenuRevision!==nextLine.publishedMenuRevision||
+        line.attention!==nextLine.attention||
+        JSON.stringify(line.selections)!==JSON.stringify(nextLine.selections)||
+        JSON.stringify(line.combo??null)!==JSON.stringify(nextLine.combo??null)
+      )changed=true;
+      if(!line.attention&&issue)affected+=1;
+      return nextLine;
     });
 
     if(!changed)return;
@@ -255,9 +330,7 @@ export function App(){
       pendingIntents,
       preferences:{activeView:view,activeCategoryId,sourceFilter,serviceMode,tender},
     });
-    setNotice(invalid
-      ?'餐單已更新；部分草稿項目需要重新選擇後先可以提交。'
-      :'餐單已更新；購物草稿已按目前發布價格重新計算。');
+    if(affected>0)setNotice(`餐單已更新；${affected} 項購物草稿需要逐項確認，其他項目已保留。`);
   },[menu?.revision,menu?.observedAt]);
 
   const addSelectedProduct=()=>{
@@ -288,18 +361,23 @@ export function App(){
       setNotice('餐單／套餐價格資料未完整，請重新同步。');
       return;
     }
+
+    const existingLine=editingLineId?cart.find(line=>line.lineId===editingLineId):undefined;
     const line:SmmCartLine=Object.freeze({
-      lineId:crypto.randomUUID(),
+      lineId:existingLine?.lineId??crypto.randomUUID(),
       productId:selectedProduct.productId,
       productName:selectedProduct.name,
-      quantity:1,
+      quantity:existingLine?.quantity??1,
       ...(variation?{selectedVariationId:variation.variationId,selectedVariationName:variation.name}:{}),
       selections:selectedOptions,
       ...(combo?{combo}:{}),
       publishedUnitPriceMinor,
-      createdAt:nowIso(),
+      ...(menu?{publishedMenuRevision:menu.revision}:{}),
+      createdAt:existingLine?.createdAt??nowIso(),
     });
-    const next=[...cart,line];
+    const next=existingLine
+      ?cart.map(current=>current.lineId===existingLine.lineId?line:current)
+      :[...cart,line];
     setCart(next);
     persist({cart:next});
     setSelectedProduct(null);
@@ -307,12 +385,39 @@ export function App(){
     setSelectedVariationId(null);
     setComboEnabled(false);
     setComboSelections({});
-    setNotice(combo?'已加入套餐購物草稿；正式套餐內容同價格會由 SMT 再驗證。':'已加入本機購物草稿；未提交正式訂單。');
+    setEditingLineId(null);
+    if(existingLine)setCartOpen(true);
+    setNotice(existingLine
+      ?'已更新同一項購物草稿；項目身份保持不變。'
+      :combo?'已加入套餐購物草稿；正式套餐內容同價格會由 SMT 再驗證。':'已加入本機購物草稿；未提交正式訂單。');
   };
 
-  const updateCart=(next:readonly SmmCartLine[])=>{
+  const updateCart=  const updateCart=(next:readonly SmmCartLine[])=>{
     setCart(next);
     persist({cart:next});
+  };
+
+  const openCartLineEditor=(lineId:string)=>{
+    const line=cart.find(item=>item.lineId===lineId);
+    if(!line)return;
+    const product=menu?.products.find(item=>item.productId===line.productId);
+    if(!product||!product.available){
+      setNotice('呢件商品目前已停止供應；請只移除呢一項，其他購物草稿會保留。');
+      return;
+    }
+    const restoredSelections:Record<string,string[]>={};
+    for(const selection of line.selections){
+      (restoredSelections[selection.optionGroupId]??=[]).push(selection.optionId);
+    }
+    setSelections(Object.freeze(Object.fromEntries(
+      Object.entries(restoredSelections).map(([key,value])=>[key,Object.freeze(value)])
+    )));
+    setSelectedVariationId(line.selectedVariationId??null);
+    setComboEnabled(Boolean(line.combo));
+    setComboSelections(line.combo?comboSelectionStateFromIntent(line.combo):{});
+    setEditingLineId(line.lineId);
+    setCartOpen(false);
+    setSelectedProduct(product);
   };
 
   const changeServiceMode=(next:SmmServiceMode)=>{
@@ -350,6 +455,7 @@ export function App(){
     setCart([]);
     persist({cart:[],pendingIntents:pendingIntents.filter(item=>item.submissionId!==intent.submissionId)});
     setCartOpen(false);
+    setCheckoutOpen(false);
     setNotice(message);
     void refresh();
   };
@@ -433,7 +539,7 @@ export function App(){
     }
     const pending=Object.freeze({...base,state:'PENDING' as const,updatedAt:nowIso(),lastMessage:'已送到 Internet 訂單橋，等待 SMT 接收'});
     saveIntent(pending);
-    setCartOpen(false);
+    setCheckoutOpen(false);
     setNotice('訂單提交中；可以繼續其他操作，請勿重複提交。');
     try{
       const result=await port.submitOrder(pending);
@@ -513,7 +619,7 @@ export function App(){
         cart={cart}
         quote={quote}
         serviceMode={serviceMode}
-        onProduct={product=>{setSelectedProduct(product);setSelections({});setSelectedVariationId(null);setComboEnabled(false);setComboSelections({})}}
+        onProduct={product=>{setEditingLineId(null);setSelectedProduct(product);setSelections({});setSelectedVariationId(null);setComboEnabled(false);setComboSelections({})}}
         onCart={()=>setCartOpen(true)}
       />:null}
       {view==='work'?<WorkView connection={connection} items={snapshot?.work??[]} onRefresh={()=>void refresh()}/>:null}
@@ -599,11 +705,24 @@ export function App(){
         const group=resolved?.groups.find(item=>item.pool.poolId===poolId&&item.group.groupId===groupId);
         if(group)setComboSelections(current=>toggleSmmComboSelection(current,group,choiceId));
       }}
-      onClose={()=>{setSelectedProduct(null);setSelections({});setSelectedVariationId(null);setComboEnabled(false);setComboSelections({})}}
+      onClose={()=>{setSelectedProduct(null);setSelections({});setSelectedVariationId(null);setComboEnabled(false);setComboSelections({});setEditingLineId(null);if(editingLineId)setCartOpen(true)}}
       onAdd={addSelectedProduct}
     />:null}
 
     {cartOpen?<CartSheet
+      cart={cart}
+      quote={quote}
+      menu={menu}
+      serviceMode={serviceMode}
+      onServiceMode={changeServiceMode}
+      onClose={()=>setCartOpen(false)}
+      onQuantity={(lineId,quantity)=>updateCart(cart.map(line=>line.lineId===lineId?{...line,quantity:Math.max(1,quantity)}:line))}
+      onRemove={lineId=>updateCart(cart.filter(line=>line.lineId!==lineId))}
+      onEdit={openCartLineEditor}
+      onCheckout={()=>{setCartOpen(false);setCheckoutOpen(true)}}
+    />:null}
+
+    {checkoutOpen?<CheckoutSheet
       cart={cart}
       quote={quote}
       pending={pendingIntents[0]??null}
@@ -614,7 +733,7 @@ export function App(){
       onServiceMode={changeServiceMode}
       onTender={changeTender}
       onChooseDiningTarget={()=>setDiningTargetOpen(true)}
-      onClose={()=>setCartOpen(false)}
+      onClose={()=>setCheckoutOpen(false)}
       onQuantity={(lineId,quantity)=>updateCart(cart.map(line=>line.lineId===lineId?{...line,quantity:Math.max(1,quantity)}:line))}
       onRemove={lineId=>updateCart(cart.filter(line=>line.lineId!==lineId))}
       submitting={submitting}
@@ -1084,7 +1203,97 @@ function ProductSheet({
   </div>;
 }
 
-function CartSheet({cart,quote,pending,submitting,serviceMode,tender,diningTarget,diningTables,onServiceMode,onTender,onChooseDiningTarget,onClose,onQuantity,onRemove,onSubmit,onReadback}:{
+function CartSheet({cart,quote,menu,serviceMode,onServiceMode,onClose,onQuantity,onRemove,onEdit,onCheckout}:{
+  cart:readonly SmmCartLine[];
+  quote:SmmQuoteSnapshot|null;
+  menu:SmmReadModelSnapshot['menu'];
+  serviceMode:SmmServiceMode;
+  onServiceMode:(mode:SmmServiceMode)=>void;
+  onClose:()=>void;
+  onQuantity:(id:string,q:number)=>void;
+  onRemove:(id:string)=>void;
+  onEdit:(id:string)=>void;
+  onCheckout:()=>void;
+}){
+  const hasAttention=cart.some(line=>Boolean(line.attention));
+  return <div className="overlay stage3-overlay">
+    <section className="sheet stage3-cart-sheet" role="dialog" aria-modal="true" aria-label="購物草稿">
+      <div className="sheet-grabber"/>
+      <header className="stage3-cart-header">
+        <div>
+          <span>購物草稿</span>
+          <h2>{cart.reduce((sum,line)=>sum+line.quantity,0)} 件</h2>
+          <small>只顯示已發布餐單預覽；正式價格仍由 SMT 提交時重新驗證。</small>
+        </div>
+        <button className="stage3-close" onClick={onClose} aria-label="關閉購物草稿">✕</button>
+      </header>
+
+      <section className="stage3-service" aria-label="服務方式">
+        <div><strong>服務方式</strong><span>購物草稿預覽</span></div>
+        <div className="segmented">
+          <button className={serviceMode==='TAKEAWAY'?'active':''} onClick={()=>onServiceMode('TAKEAWAY')}>外賣</button>
+          <button className={serviceMode==='DINE_IN'?'active':''} onClick={()=>onServiceMode('DINE_IN')}>堂食</button>
+        </div>
+      </section>
+
+      <div className="stage3-cart-body">
+        {!cart.length?<EmptyState title="購物草稿係空嘅" detail="返回點單加入商品。"/>:cart.map(line=>{
+          const product=menu?.products.find(item=>item.productId===line.productId);
+          const requiredChoices=line.selections.filter(selection=>{
+            const group=product?.optionGroups.find(item=>item.optionGroupId===selection.optionGroupId);
+            return Boolean(group&&(group.required||group.minSelections>0));
+          });
+          const optionalChoices=line.selections.filter(selection=>!requiredChoices.some(item=>item.optionGroupId===selection.optionGroupId&&item.optionId===selection.optionId));
+          const lineTotal=Number.isSafeInteger(Number(line.publishedUnitPriceMinor))
+            ?Number(line.publishedUnitPriceMinor)*line.quantity
+            :null;
+          const choiceSummary=(rows:readonly SmmCartLine['selections'][number][])=>rows.map(selection=>{
+            const group=product?.optionGroups.find(item=>item.optionGroupId===selection.optionGroupId);
+            return `${group?.name??'選項'}：${selection.optionName}`;
+          }).join('、');
+          return <article className={`stage3-cart-line ${line.attention?'attention':''}`} key={line.lineId}>
+            <div className="stage3-line-title">
+              <div><strong>{line.productName}</strong>{line.attention?<span>需要確認</span>:null}</div>
+              <b>{lineTotal===null?'價格待同步':money('HKD',lineTotal)}</b>
+            </div>
+            <div className="stage3-line-summary">
+              {line.selectedVariationName?<p><b>規格</b><span>{line.selectedVariationName}</span></p>:null}
+              {requiredChoices.length?<p><b>必選</b><span>{choiceSummary(requiredChoices)}</span></p>:null}
+              {optionalChoices.length?<p><b>可選</b><span>{choiceSummary(optionalChoices)}</span></p>:null}
+              {line.combo?<p><b>套餐</b><span>{line.combo.comboName}{line.combo.selections.length?' · '+line.combo.selections.map(item=>item.choiceLabel).join('、'):''}</span></p>:null}
+              {!line.selectedVariationName&&!line.selections.length&&!line.combo?<p><b>設定</b><span>無額外設定</span></p>:null}
+              <p><b>單價預覽</b><span>{Number.isSafeInteger(Number(line.publishedUnitPriceMinor))?money('HKD',Number(line.publishedUnitPriceMinor)):'價格待同步'}</span></p>
+            </div>
+            {line.attention?<div className="stage3-attention" role="status"><strong>餐單已更新</strong><span>{line.attention.message}</span></div>:null}
+            <div className="stage3-line-actions">
+              <button className={line.attention?'repair':''} onClick={()=>onEdit(line.lineId)}>{line.attention?'修復／重新確認':'編輯'}</button>
+              <div className="qty stage3-qty" aria-label={line.productName+' 數量'}>
+                <button aria-label="減少數量" disabled={line.quantity<=1} onClick={()=>onQuantity(line.lineId,line.quantity-1)}>−</button>
+                <b>{line.quantity}</b>
+                <button aria-label="增加數量" onClick={()=>onQuantity(line.lineId,line.quantity+1)}>＋</button>
+              </div>
+              <button className="danger" onClick={()=>onRemove(line.lineId)}>移除</button>
+            </div>
+          </article>;
+        })}
+      </div>
+
+      <div className="cart-total stage3-cart-total">
+        <span>已發布餐單預覽總額</span>
+        <strong>{quote?money(quote.currency,quote.totalMinor):'價格資料未完整'}</strong>
+        <small>{quote?`餐單版本 ${quote.revision} · SMT 正式提交時會再次核對`:'請逐項修復或重新同步餐單'}</small>
+      </div>
+
+      {hasAttention?<p className="stage3-checkout-note">請先逐項修復標記商品；其他購物草稿唔會被清空。</p>:null}
+      <footer className="stage3-footer">
+        <button onClick={onClose}>繼續點單</button>
+        <button className="primary" disabled={!cart.length||!quote||hasAttention} onClick={onCheckout}>前往結帳 →</button>
+      </footer>
+    </section>
+  </div>;
+}
+
+function CheckoutSheet({cart,quote,pending,submitting,serviceMode,tender,diningTarget,diningTables,onServiceMode,onTender,onChooseDiningTarget,onClose,onQuantity,onRemove,onSubmit,onReadback}:{
   cart:readonly SmmCartLine[];
   quote:SmmQuoteSnapshot|null;
   pending:SmmPendingIntent|null;
