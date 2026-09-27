@@ -738,6 +738,7 @@ function CheckoutPage({cart,setCart,diningCheckout,onDiningCheckoutDone}:{cart:C
   const [diningRecovering,setDiningRecovering]=useState(Boolean(diningCheckout));
   const [diningRequiresRefresh,setDiningRequiresRefresh]=useState(false);
   const [checkoutFailure,setCheckoutFailure]=useState<string|undefined>();
+  const checkoutSubmissionId=useRef('CHECKOUT:'+Date.now().toString(36)+':'+Math.random().toString(36).slice(2));
 
   const methodLabels:Record<CheckoutTenderId,string>={
     CASH:'現金付款',ALIPAY:'AlipayHK',WECHAT:'WeChat Pay HK',FPS:'FPS／轉數快',PAYME:'PayMe',COMBO:'組合付款'
@@ -917,6 +918,7 @@ function CheckoutPage({cart,setCart,diningCheckout,onDiningCheckoutDone}:{cart:C
         paymentLabel,
         sourceLabel,
         ...(pickupCode.trim()?{providerPickupCode:pickupCode.trim()}:{}),
+        submissionId:checkoutSubmissionId.current,
       });
       setCompletion({
         displayOrderCode:order.display,tenderLabel:tenderDisplay,dueLabel:money(due),
@@ -924,7 +926,7 @@ function CheckoutPage({cart,setCart,diningCheckout,onDiningCheckoutDone}:{cart:C
       });
       setState('success');
       setPrintStatus('訂單已完成 · 正在送打印…');
-      void localRuntime.printOrderOutputs(order.id).then(summary=>{
+      void localRuntime.printInitialOrderOutputsOnce(order.id).then(summary=>{
         if(summary.planned===0){setPrintStatus('訂單已完成 · 未有已綁定打印 Route');return;}
         if(summary.failed===0){setPrintStatus('訂單已完成 · 已送出 '+summary.sent+'/'+summary.planned+' 個打印工作');return;}
         const failures=summary.results.filter(row=>!row.ok).map(row=>row.role+':'+row.code).join('；');
@@ -980,6 +982,19 @@ function OperationalApp(){
   const [cart,setCartState]=useState<CartLine[]>(()=>diningCheckout?diningCheckoutCart(diningCheckout):[]);
   const [serviceMode,setServiceMode]=useState<ServiceMode>(diningCheckout||diningAddition?'dine-in':'takeaway');
   const [navRevision,setNavRevision]=useState(0);
+  useEffect(()=>{
+    const tick=()=>{
+      const now=Date.now();
+      for(const order of localRuntime.orders()){
+        if(order.fulfillmentLabel!=='進行中'||!order.etaReadyAt)continue;
+        const readyAt=Date.parse(order.etaReadyAt);
+        if(Number.isFinite(readyAt)&&readyAt<=now)void localRuntime.markOrderReady?.(order.id).catch(()=>{});
+      }
+    };
+    tick();
+    const id=window.setInterval(tick,10_000);
+    return()=>window.clearInterval(id);
+  },[]);
   useEffect(()=>{
     if(location.pathname==='/dining'&&diningAddition){
       clearDiningAddOrderUiSession();
