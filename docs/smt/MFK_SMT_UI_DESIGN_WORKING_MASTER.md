@@ -4132,3 +4132,363 @@ UI-STAGE-01 Ordering Main Visual Draft v1
 
 MILESTONE：
 MFK_SMT_UI_STAGE00_HOME_STAGE01_DIRECT_ORDERING_LOCKED
+
+
+==================================================
+RECORD 008｜OWNER STAGE DEFINITION CORRECTION
+日期：2026-09-27
+狀態：LOCKED
+==================================================
+
+Owner 對「UI-STAGE」嘅真正定義正式修正：
+
+Stage 係一段完整、可被員工實際經歷的操作旅程，
+唔只係一個頁面分類／文件章節。
+
+因此：
+
+UI-STAGE-00
+正式由原本「Home / Shell / Global Layer」
+擴充為：
+
+STARTUP / LOGIN / OPENING CASH / HOME
+
+即：
+品牌啟動
+→ Login
+→ First Login / 首次登入分支（如適用）
+→ 前一營業日留底現金 Readback
+→ 今日開更現金確認
+→ 補錢 / 拎走 / 修改
+→ Opening Cash Confirm
+→ Home / Shell
+
+原本已畫／已定義嘅 Home Shell 唔作廢，
+而係變成 UI-STAGE-00 最後一個畫面：
+「00.7 Home / Shell」。
+
+==================================================
+UI-STAGE-00｜STARTUP / LOGIN / OPENING CASH / HOME
+==================================================
+
+Stage Goal：
+員工由「未進入 SMT」
+一路完成身份確認、開更現金確認，
+最後進入可正式營業的 Home / Shell。
+
+呢個 Stage 必須做到：
+1. 開機第一眼有品牌身份。
+2. Login 快。
+3. 首次登入／普通登入分支清楚。
+4. 今日開更唔要求員工重新猜 opening cash。
+5. 自動顯示上一營業日有冇留底現金。
+6. 顯示上一日留低幾多。
+7. 顯示上一日有冇拎走現金。
+8. 顯示今日有冇補入現金。
+9. 員工可以核對、修改。
+10. 任何補入／拎走要有清楚記錄。
+11. Confirm Opening 後先進 Home。
+12. Home 再直接一按進 Ordering，唔再有第二個「開始點單」Gate。
+
+--------------------------------------------------
+00.0｜BRAND SPLASH / BOOT
+--------------------------------------------------
+
+用途：
+SMT 啟動第一幀。
+
+畫面：
+- 磨飯正式 Logo
+- 品牌背景色／暖米白
+- 可使用品牌 IP
+- 簡短品牌識別
+- Loading / Local Runtime Boot 狀態
+
+唔應：
+- 一開機就顯示工程 Log
+- 顯示 UUID
+- 長時間停在品牌動畫
+
+狀態：
+UI_REWORK / BRAND VISUAL
+
+--------------------------------------------------
+00.1｜LOGIN
+--------------------------------------------------
+
+內容：
+- Logo / Brand
+- 員工編號
+- PIN
+- Login
+- 錯誤提示
+- Offline login availability（按 current auth reality）
+
+使用場景：
+- 正常登入
+- PIN 錯
+- Staff disabled
+- Session expired
+- Local available / Cloud unavailable
+
+原則：
+Login 要快。
+唔做 Consumer App 式 Welcome tour。
+
+--------------------------------------------------
+00.2｜FIRST LOGIN / FIRST DEVICE BRANCH
+--------------------------------------------------
+
+只在需要時出現。
+
+用途：
+處理第一次正式使用此 SMT／可信裝置／首次 staff setup 相關流程。
+
+如果 current runtime 無需額外 first-login step：
+直接跳去 Opening Cash。
+
+禁止：
+每次登入都重播 First Login。
+
+--------------------------------------------------
+00.3｜PREVIOUS BUSINESS DAY CASH READBACK
+--------------------------------------------------
+
+用途：
+員工唔需要靠記憶填今日 opening float。
+
+畫面必須清楚顯示：
+
+上一營業日：
+YYYY-MM-DD
+
+昨日 Day Close：
+- Closing Cash / Counted
+- 昨日拎走現金
+- 昨日留底現金
+- 是否已完成 Day Close
+- 資料來源／時間
+
+核心問題：
+「琴日有冇留低錢？」
+「留低幾多？」
+
+如果有：
+顯示：
+昨日留底 HK$____
+
+如果無：
+顯示：
+昨日沒有留底現金
+
+如果上一營業日資料未完整：
+顯示 Exception，
+唔好自動當 $0。
+
+--------------------------------------------------
+00.4｜OPENING CASH REVIEW
+--------------------------------------------------
+
+今日建議 Opening Cash：
+
+上一營業日留底
++ 今日開舖前補入
+- 今日開舖前拎走
+= 建議開櫃金
+
+畫面例：
+
+昨日留底              HK$1,000
+今日補入              HK$0
+今日拎走              HK$0
+--------------------------------
+建議開櫃金            HK$1,000
+
+實際開櫃金            HK$1,000
+
+差異                  HK$0
+
+主要操作：
+[確認開更]
+
+Secondary：
+[修改]
+
+--------------------------------------------------
+00.5｜OPENING CASH ADJUSTMENT
+--------------------------------------------------
+
+按「修改」後先進。
+
+可以處理：
+
+A. 補入現金
+例：
+今日補入 HK$500
+
+B. 拎走現金
+例：
+開舖前拎走 HK$200
+
+C. 實際點算不同
+例：
+系統預期 $1,000
+實際只有 $980
+
+每個 Adjustment：
+- Type
+- Amount
+- Reason
+- Actor
+- Time
+
+唔可以：
+直接改總數而完全冇 audit meaning。
+
+--------------------------------------------------
+00.6｜OPENING CONFIRMATION
+--------------------------------------------------
+
+Final Review：
+
+上一日留底          HK$____
+今日補入            HK$____
+今日拎走            HK$____
+實際 Opening Cash   HK$____
+差異                HK$____
+
+CTA：
+確認開更
+
+Confirm 後：
+建立／確認今日 Cash Shift Opening State。
+
+完成後：
+→ 00.7 Home / Shell
+
+--------------------------------------------------
+00.7｜HOME / SHELL
+--------------------------------------------------
+
+呢個就係之前接受的「首頁」方向。
+
+首頁可以有：
+- Logo / 品牌
+- 簡潔背景
+- 少量 IP
+- 點單快捷入口
+- 訂單
+- 堂食
+- 售罄／產能
+- Top Utility
+- Global Alert
+- Global Attention
+- Staff
+- More
+
+但：
+
+按「點單」
+→ 直接入 UI-STAGE-01 Ordering Main。
+
+禁止：
+點單 → 開始點單 → 再入商品頁。
+
+--------------------------------------------------
+UI-STAGE-00 核心資料模型（UI 層）
+--------------------------------------------------
+
+UI 至少要識表達：
+
+previousBusinessDate
+previousCloseStatus
+previousCountedCash
+previousCashRemoved
+previousRetainedCash
+
+todayCashIn
+todayCashOut
+expectedOpeningCash
+actualOpeningCash
+openingVariance
+
+actor
+confirmedAt
+provenance / source summary
+
+注意：
+UI 命名可以人類化，
+唔需要直接顯示 raw field name。
+
+--------------------------------------------------
+UI-STAGE-00 SCENARIOS
+--------------------------------------------------
+
+S00-A｜正常 carry-forward
+昨日留底 $1,000
+今日無補無拎
+實際 $1,000
+→ 一按確認開更
+
+S00-B｜今日補錢
+昨日留底 $1,000
+今日補 $500
+Opening = $1,500
+
+S00-C｜開舖前拎走
+昨日留底 $1,000
+今日拎走 $200
+Opening = $800
+
+S00-D｜有補又有拎
+昨日留底 $1,000
+補 $500
+拎 $200
+Opening = $1,300
+
+S00-E｜實際點算有差異
+Expected $1,000
+Actual $980
+Variance -$20
+→ 要求 reason / audit
+
+S00-F｜昨日無留底
+Previous retained = $0
+今日人工輸入 opening float
+
+S00-G｜昨日 Day Close 未完整
+不可假設 retained = 0
+顯示 exception / review required
+
+S00-H｜First ever business day
+無 previous business day
+顯示：
+「沒有上一營業日記錄」
+→ 手動設定 Opening Cash
+
+--------------------------------------------------
+UI-STAGE-00 LOCKED ROUTE
+--------------------------------------------------
+
+BOOT / SPLASH
+↓
+LOGIN
+↓
+FIRST LOGIN（conditional）
+↓
+PREVIOUS CASH READBACK
+↓
+OPENING CASH REVIEW
+↓
+ADJUSTMENT（optional）
+↓
+OPENING CONFIRM
+↓
+HOME / SHELL
+↓
+點單
+↓
+UI-STAGE-01 ORDERING MAIN
+
+MILESTONE：
+MFK_SMT_UI_STAGE00_STARTUP_OPENING_CASH_OWNER_DEFINITION_LOCKED
