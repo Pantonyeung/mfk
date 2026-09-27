@@ -369,12 +369,64 @@ export interface OwnerAuthSession {
   readonly expiresAt?:string;
 }
 
+export type OwnerPlanningSaveState='CONFIRMED'|'REJECTED'|'UNKNOWN';
+export type OwnerPlanningReadState='CONFIRMED'|'EMPTY'|'UNKNOWN';
+
+export interface OwnerMonthlyPlanCostLine {
+  readonly costLineId:string;
+  readonly category:string;
+  readonly label:string;
+  readonly plannedMonthlyMinor:number|null;
+  readonly actualToDateMinor:number|null;
+  readonly note?:string;
+}
+
+export interface OwnerMonthlyPlanCanonical {
+  readonly schema:'MFK_OWNER_MONTHLY_PLAN_V1';
+  readonly storeId:string;
+  readonly monthKey:string;
+  readonly monthlyRevenueTargetMinor:number|null;
+  readonly costLines:readonly OwnerMonthlyPlanCostLine[];
+  readonly note?:string;
+  readonly revision:number;
+  readonly updatedAt:string;
+  readonly updatedBy:string;
+}
+
+export interface OwnerMonthlyPlanReadResult {
+  readonly state:OwnerPlanningReadState;
+  readonly monthKey:string;
+  readonly revision:number;
+  readonly plan?:OwnerMonthlyPlanCanonical;
+  readonly message?:string;
+}
+
+export interface OwnerMonthlyPlanSaveInput {
+  readonly monthKey:string;
+  readonly monthlyRevenueTargetMinor:number|null;
+  readonly costLines:readonly OwnerMonthlyPlanCostLine[];
+  readonly note?:string;
+  readonly expectedRevision:number;
+  readonly operationId:string;
+}
+
+export interface OwnerMonthlyPlanSaveResult {
+  readonly state:OwnerPlanningSaveState;
+  readonly monthKey:string;
+  readonly revision:number;
+  readonly plan?:OwnerMonthlyPlanCanonical;
+  readonly currentRevision?:number;
+  readonly message:string;
+}
+
 export interface OwnerRuntimePort {
   readonly portId:'MFK_OWNER_PORT_V1';
   readSnapshot():Promise<OwnerReadModelSnapshot>;
   readOwnerSession?():Promise<OwnerAuthSession|null>;
   loginOwner?(loginId:string,pin:string):Promise<OwnerAuthSession>;
   logoutOwner?():Promise<void>;
+  readMonthlyPlan?(monthKey:string):Promise<OwnerMonthlyPlanReadResult>;
+  saveMonthlyPlan?(input:OwnerMonthlyPlanSaveInput):Promise<OwnerMonthlyPlanSaveResult>;
   requestBoundedAction?(input:OwnerBoundedAction):Promise<OwnerCommandResult>;
   requestAdminDeepLink?():Promise<OwnerCommandResult>;
 }
