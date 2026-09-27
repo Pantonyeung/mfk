@@ -83,7 +83,7 @@ test('Stage 4 submit CTA is boundary-only and does not enter Stage 5 state flow'
   assert.match(checkout,/onSubmitBoundary/);
   assert.doesNotMatch(checkout,/submitCart|submitOrder|readSubmission|createSmmPendingIntent/);
   assert.doesNotMatch(checkout,/state==='PENDING'|state==='CONFIRMED'|state==='REJECTED'|state==='UNKNOWN'/);
-  assert.match(app,/function submitCart/);
+  assert.match(app,/const submitCart=async\(\)=>/);
   assert.match(app,/port\.submitOrder/);
   assert.match(app,/readSubmission/);
   assert.match(persistence,/createSmmStableSubmissionId/);
