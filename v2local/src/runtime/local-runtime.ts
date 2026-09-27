@@ -123,6 +123,7 @@ export interface StoredOrder{
   diningInitialPrintPlanned?:number;
   diningInitialPrintSent?:number;
   diningInitialPrintFailed?:number;
+  diningInitialPrintResults?:readonly PrintDispatchResult[];
   productionIssuedAt?:string;
   cancellationNoticeAttemptedAt?:string;
   cancellationNoticePrintedAt?:string;
@@ -219,6 +220,10 @@ export interface LocalDiningHoldDetail{
   readonly joinedTables?:readonly string[];
   readonly corrections:readonly LocalDiningLineCorrection[];
   readonly priceOverrides:readonly LocalPriceOverrideRecord[];
+  readonly firstPrintState:'NOT_STARTED'|'DISPATCHING'|'DONE'|'FAILED'|'UNKNOWN';
+  readonly firstPrintSummary?:Readonly<{planned:number;sent:number;failed:number}>;
+  readonly firstPrintResults:readonly PrintDispatchResult[];
+  readonly firstPrintAttention:'NONE'|'TRANSPORT_REPORTED_INCOMPLETE'|'TRANSPORT_UNKNOWN';
   readonly formalOrderId?:string;
   readonly formalOrderDisplay?:string;
   readonly holdId:string;
@@ -368,6 +373,8 @@ export interface CleanSmtCoreRuntimePort{
   ensureDiningAdditionPrint?(holdId:string,additionId:string):Promise<DiningAdditionPrintResult>;
   correctDiningLine?(holdId:string,input:{submissionId:string;lineIndex:number;quantity:number;reason?:string}):Promise<{readonly detail:LocalDiningHoldDetail;readonly correction:LocalDiningLineCorrection}>;
   overrideDiningLinePrice?(holdId:string,lineIndex:number,effectiveUnitMinor:number,reason:string,expectedRevision?:string):Promise<LocalDiningHoldDetail>;
+  readDiningReprintOptions?(holdId:string):Promise<readonly SmtReprintOption[]>;
+  reprintDiningJobs?(holdId:string,jobIds:readonly string[],reason?:string):Promise<PrintDispatchSummary>;
   settleDiningHold?(holdId:string,selections:readonly {lineIndex:number;qty:number}[],tender:DiningTender,command?:DiningSettlementCommand):Promise<LocalDiningHoldDetail>;
   clearDiningHold?(holdId:string):Promise<void>;
 }
@@ -459,6 +466,8 @@ export interface MfkLocalRuntime extends CleanSmtCoreRuntimePort{
   ensureDiningAdditionPrint(holdId:string,additionId:string):Promise<DiningAdditionPrintResult>;
   correctDiningLine(holdId:string,input:{submissionId:string;lineIndex:number;quantity:number;reason?:string}):Promise<{readonly detail:LocalDiningHoldDetail;readonly correction:LocalDiningLineCorrection}>;
   overrideDiningLinePrice(holdId:string,lineIndex:number,effectiveUnitMinor:number,reason:string,expectedRevision?:string):Promise<LocalDiningHoldDetail>;
+  readDiningReprintOptions(holdId:string):Promise<readonly SmtReprintOption[]>;
+  reprintDiningJobs(holdId:string,jobIds:readonly string[],reason?:string):Promise<PrintDispatchSummary>;
   settleDiningHold(holdId:string,selections:readonly {lineIndex:number;qty:number}[],tender:DiningTender,command?:DiningSettlementCommand):Promise<LocalDiningHoldDetail>;
   joinDiningTable(holdId:string,tableId:string):Promise<void>;
   unjoinDiningTable(holdId:string,tableId:string):Promise<void>;
