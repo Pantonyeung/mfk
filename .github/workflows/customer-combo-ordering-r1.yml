@@ -1,0 +1,45 @@
+name: customer-combo-ordering-r1
+
+on:
+  push:
+    branches:
+      - work/MFK/CUSTOMER-COMBO-ORDERING-R1
+
+jobs:
+  customer:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: v2customer
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-audit --no-fund --legacy-peer-deps --package-lock=false
+      - name: Customer Combo ordering contract
+        run: node --test test/combo-ordering-r1.test.mjs
+      - name: Stage 2 regression
+        run: node --test test/stage2-menu-r1.test.mjs
+      - name: Combo projection regression
+        run: node --test test/admin-combo-drink-projection-r1.test.mjs
+      - name: Full Customer test
+        run: npm test
+      - name: Customer build
+        run: npm run build
+
+  v2local:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: v2local
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-audit --no-fund --legacy-peer-deps --package-lock=false
+      - name: Customer Combo intake regression
+        run: npx vitest run src/runtime/customer-combo-ordering-r1.test.ts src/runtime/smm-combo-revalidation.test.ts src/runtime/customer-cloud-intake.test.ts
+      - name: v2local build
+        run: npm run build
