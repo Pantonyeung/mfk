@@ -9,7 +9,8 @@ const JSON_HEADERS={'content-type':'application/json; charset=utf-8','cache-cont
 const ADMIN_ORIGIN='https://admin.morefunos.com';
 const SMT_ORIGIN='https://appassets.androidplatform.net';
 const CUSTOMER_ORIGIN='https://order.morefunos.com';
-const CORS_ORIGINS=new Set([ADMIN_ORIGIN,SMT_ORIGIN,CUSTOMER_ORIGIN]);
+const OWNER_ORIGIN='https://owner.morefunos.com';
+const CORS_ORIGINS=new Set([ADMIN_ORIGIN,SMT_ORIGIN,CUSTOMER_ORIGIN,OWNER_ORIGIN]);
 
 function json(value,status=200,extra={}){
   return new Response(JSON.stringify(value),{status,headers:{...JSON_HEADERS,...extra}});
@@ -19,7 +20,7 @@ function cors(request){
   return CORS_ORIGINS.has(origin)?{
     'access-control-allow-origin':origin,
     'access-control-allow-methods':'GET,POST,OPTIONS',
-    'access-control-allow-headers':'content-type,x-mfk-admin-publish-key,x-mfk-smm-session',
+    'access-control-allow-headers':'content-type,x-mfk-admin-publish-key,x-mfk-smm-session,x-mfk-owner-session',
     'access-control-allow-credentials':'true',
     'vary':'origin',
   }:{};
@@ -28,6 +29,23 @@ async function sha256(value){
   const bytes=new TextEncoder().encode(value);
   const digest=await crypto.subtle.digest('SHA-256',bytes);
   return [...new Uint8Array(digest)].map(v=>v.toString(16).padStart(2,'0')).join('');
+}
+function ownerHexToBytes(value){
+  if(!/^[0-9a-f]+$/i.test(String(value||''))||String(value).length%2!==0)throw new Error('OWNER_AUTH_HEX_INVALID');
+  const text=String(value);const out=new Uint8Array(text.length/2);
+  for(let i=0;i<out.length;i++)out[i]=Number.parseInt(text.slice(i*2,i*2+2),16);
+  return out;
+}
+async function ownerHmacHex(keyHex,message){
+  const key=await crypto.subtle.importKey('raw',ownerHexToBytes(keyHex),{name:'HMAC',hash:'SHA-256'},false,['sign']);
+  const signature=await crypto.subtle.sign('HMAC',key,new TextEncoder().encode(message));
+  return [...new Uint8Array(signature)].map(v=>v.toString(16).padStart(2,'0')).join('');
+}
+function ownerSameHex(left,right){
+  const a=String(left||'').toLowerCase(),b=String(right||'').toLowerCase();
+  if(a.length!==b.length||a.length<1)return false;
+  let diff=0;for(let i=0;i<a.length;i++)diff|=a.charCodeAt(i)^b.charCodeAt(i);
+  return diff===0;
 }
 function storeIdFrom(url){return (url.searchParams.get('storeId')||'MF01').trim().slice(0,64)||'MF01';}
 function hktBusinessDate(iso,cutoff='05:00'){
@@ -76,6 +94,55 @@ function moneyLabel(minor){
   const value=Math.max(0,Number(minor)||0)/100;
   return 'HK'+String.fromCharCode(36)+(Number.isInteger(value)?String(value):value.toFixed(2));
 }
+
+const OWNER_CANONICAL_FULFILLMENT=new Set(['待處理','進行中','可取餐','已完成','已取消']);
+export function mapOwnerOrderProjection(input){
+  const order=row(input);
+  const rawFulfillment=String(order.fulfillmentLabel||'');
+  const fulfillmentLabel=OWNER_CANONICAL_FULFILLMENT.has(rawFulfillment)?rawFulfillment:undefined;
+  const lifecycle=fulfillmentLabel==='已完成'?'COMPLETED':fulfillmentLabel==='已取消'?'CANCELLED':'ACTIVE';
+  const observedAt=String(order.updatedAt||order.createdAt||new Date().toISOString());
+  const items=rows(order.items);
+  const totalMinor=Math.max(0,Math.round(Number(order.totalMinor)||0));
+  const paymentLabel=String(order.paymentLabel||'').trim();
+  const externalRef=String(order.externalRef||'').trim();
+  return{
+    orderId:String(order.orderId||''),displayCode:String(order.display||''),
+    source:String(order.sourceLabel||'未有來源讀回'),lifecycle,
+    ...(fulfillmentLabel?{workflowStatusLabel:fulfillmentLabel,fulfillmentLabel}:{}),
+    ...(order.businessDate?{businessDate:String(order.businessDate)}:{}),
+    amountLabel:moneyLabel(totalMinor),originalAmountLabel:moneyLabel(totalMinor),currentEffectiveAmountLabel:moneyLabel(totalMinor),
+    ...(paymentLabel?{tenderLabel:paymentLabel,currentTenderLabel:paymentLabel}:{}),
+    ...(externalRef?{externalRef}:{}),
+    itemSummary:items.map(item=>String(row(item).name||'')).filter(Boolean).join('、'),
+    itemLines:items.map(rawItem=>{const item=row(rawItem);const qty=Math.max(0,Math.floor(Number(item.qty)||0));const unitMinor=Math.max(0,Math.round(Number(item.unitMinor)||0));return{lineId:String(item.id||''),name:String(item.name||''),quantity:qty,amountLabel:moneyLabel(qty*unitMinor)};}),
+    readback:'CONFIRMED',observedAt,prints:[],exceptions:[],timeline:[],
+    ...(fulfillmentLabel?{fulfillmentHistory:[{label:fulfillmentLabel,atLabel:observedAt,state:fulfillmentLabel}]}:{}),
+  };
+}
+export function buildOwnerReadModelSnapshot({active,orders,reports,acks,observedAt}){
+  const now=String(observedAt||new Date().toISOString());
+  const activeEnvelope=row(active),snapshot=row(activeEnvelope.snapshot),settings=row(snapshot.storeSettings),catalog=row(snapshot.catalog),staffAuth=row(snapshot.staffAuth);
+  const reportRows=rows(reports).filter(item=>row(item).date).sort((a,b)=>String(row(b).date).localeCompare(String(row(a).date)));
+  const mappedOrders=rows(orders).map(mapOwnerOrderProjection).filter(order=>order.orderId&&order.displayCode);
+  const latestReport=reportRows[0]?row(reportRows[0]):null;
+  const activeOrders=mappedOrders.filter(order=>order.lifecycle!=='COMPLETED'&&order.lifecycle!=='CANCELLED');
+  const productNames=new Map(rows(catalog.products).map(item=>{const product=row(item);return[String(product.id||''),String(product.name||product.id||'')]}).filter(([id])=>id));
+  const availability=row(snapshot.availability);
+  const sellability=Object.entries(availability).map(([targetId,rawState])=>{const state=row(rawState);return{targetId,name:productNames.get(targetId)||targetId,grain:'PRODUCT',state:state.sellable===false?'停售':state.sellable===true?'可售':'UNKNOWN',scope:'STORE'};});
+  const staff=rows(staffAuth.staff).filter(rawStaff=>row(rawStaff).active!==false).map(rawStaff=>{const person=row(rawStaff);return{staffId:String(person.staffId||''),name:String(person.name||person.staffId||''),role:String(person.role||'STAFF'),presence:'UNKNOWN',permissions:rows(person.permissions).map(String).join('、')||'未有權限讀回'};}).filter(person=>person.staffId&&person.name);
+  const devices=Object.values(row(acks)).map(rawAck=>{const ack=row(rawAck);const deviceId=String(ack.deviceId||'');return{deviceId,name:deviceId||'未命名裝置',kind:'SMT',health:'UNKNOWN',...(ack.appliedAt?{lastSeen:String(ack.appliedAt)}:{}),binding:ack.revision!==undefined?'Admin revision '+String(ack.revision):'未有 revision 讀回',jobs:'未有打印工作讀回',affected:'未有影響範圍讀回'};}).filter(device=>device.deviceId);
+  const reportCards=reportRows.slice(0,31).map(rawReport=>{const report=row(rawReport);const date=String(report.date||'');return{reportId:'daily:'+date,name:date+' 淨銷售',value:moneyLabel(Number(report.netMinor)||0),compare:String(Math.max(0,Number(report.orders)||0))+' 單',freshness:'CANONICAL_PROJECTION'};});
+  const today=latestReport?{salesLabel:moneyLabel(Number(latestReport.netMinor)||0),orderCount:Math.max(0,Number(latestReport.orders)||0),averageOrderLabel:moneyLabel((Number(latestReport.orders)||0)>0?Math.round((Number(latestReport.netMinor)||0)/Number(latestReport.orders)):0),comparisonLabel:'未有比較資料讀回'}:undefined;
+  const store=Object.keys(snapshot).length||latestReport?{storeId:String(activeEnvelope.storeId||'MF01'),storeName:String(settings.storeName||'磨飯'),businessDate:String(latestReport?.date||''),operatingStatus:'未有營業狀態讀回',observedAt:now,freshness:'PARTIAL'}:undefined;
+  return{
+    globalState:Object.keys(snapshot).length||mappedOrders.length||reportRows.length?'PARTIAL':'EMPTY',
+    ...(store?{store}:{}),...(today?{today}:{}),
+    liveOrders:{activeCount:activeOrders.length,readyCount:activeOrders.filter(order=>order.fulfillmentLabel==='可取餐').length,recentOrders:activeOrders.slice(0,10).map(order=>({orderId:order.orderId,displayCode:order.displayCode,source:order.source,amountLabel:order.currentEffectiveAmountLabel,fulfillmentLabel:order.fulfillmentLabel||'未有交收狀態讀回'})),observedAt:now},
+    readiness:[],actions:[],orders:mappedOrders,channels:[],sellability,staff,devices,reports:reportCards,campaigns:[],settlements:[],inventory:[],notifications:[],activity:[],adminLinkLabel:'Admin',observedAt:now,
+  };
+}
+
 function customerPublicSnapshot(active,customerOrders=[]){
   const snapshot=row(active?.snapshot);
   const catalog=row(snapshot.catalog);
@@ -382,6 +449,30 @@ export class AdminSyncStore{
     return Boolean(acks[deviceId]);
   }
 
+
+  async ownerIdentity(staffId){
+    const active=await this.state.storage.get('active');if(!active)return null;
+    const auth=row(row(active.snapshot).staffAuth);
+    const staff=rows(auth.staff).map(row).find(item=>String(item.staffId||'')===String(staffId||''));
+    if(!staff||staff.active===false||String(staff.role)!=='OWNER')return null;
+    const verifier=row(staff.pinVerifier);
+    if(verifier.algorithm!=='PBKDF2-SHA256'||!Number.isSafeInteger(Number(verifier.iterations))||Number(verifier.iterations)<100000)return null;
+    if(!/^[0-9a-f]+$/i.test(String(verifier.saltHex||''))||!/^[0-9a-f]{64}$/i.test(String(verifier.hashHex||'')))return null;
+    return{active,staff,verifier};
+  }
+  async readOwnerSession(request){
+    const token=String(request.headers.get('x-mfk-owner-session')||'').trim();if(token.length<32||token.length>256)return null;
+    const key='owner:session:'+await sha256(token);const session=await this.state.storage.get(key);if(!session)return null;
+    const expiresAt=Date.parse(String(session.expiresAt||''));if(!Number.isFinite(expiresAt)||expiresAt<=Date.now()){await this.state.storage.delete(key);return null;}
+    const current=await this.ownerIdentity(String(session.staffId||''));if(!current){await this.state.storage.delete(key);return null;}
+    const value={staffId:String(current.staff.staffId||''),displayName:String(current.staff.name||current.staff.staffId||''),role:'OWNER',scope:String(current.staff.scope||'STORE'),permissions:rows(current.staff.permissions).map(String),sessionToken:token,createdAt:String(session.createdAt||''),expiresAt:String(session.expiresAt||''),lastSeenAt:new Date().toISOString()};
+    await this.state.storage.put(key,{...session,staffId:value.staffId,lastSeenAt:value.lastSeenAt});return value;
+  }
+  async ownerReadModel(){
+    const [active,orders,reports,acks]=await Promise.all([this.state.storage.get('active'),this.projectionOrders(),this.projectionReports(),this.state.storage.get('acks')]);
+    return buildOwnerReadModelSnapshot({active,orders,reports,acks:acks||{},observedAt:new Date().toISOString()});
+  }
+
   async projectionOrders(){
     const rows=await this.state.storage.list({prefix:'projection:order:'});
     return [...rows.values()]
@@ -616,6 +707,41 @@ export class AdminSyncStore{
       if(!await this.authorizeSmtDevice(request))return json({code:'SMT_DEVICE_UNAUTHORIZED'},401);
       return json({ok:true});
     }
+
+    if(url.pathname==='/owner/auth/challenge'&&request.method==='POST'){
+      let body;try{body=await request.json();}catch{return json({code:'OWNER_AUTH_INPUT_INVALID'},400);}
+      const staffId=String(body?.staffId||'').trim(),current=await this.ownerIdentity(staffId);
+      if(!current)return json({code:'OWNER_AUTH_UNAVAILABLE',message:'Owner 身份或 PIN 尚未可用'},401);
+      const challengeId=crypto.randomUUID(),nonce=crypto.randomUUID().replaceAll('-','')+crypto.randomUUID().replaceAll('-',''),expiresAt=new Date(Date.now()+2*60*1000).toISOString();
+      await this.state.storage.put('owner:challenge:'+challengeId,{staffId,nonce,expiresAt,revision:Number(current.active.revision)||0,fingerprint:String(current.active.fingerprint||'')});
+      return json({challengeId,nonce,saltHex:String(current.verifier.saltHex),iterations:Number(current.verifier.iterations),expiresAt},201);
+    }
+    if(url.pathname==='/owner/auth/verify'&&request.method==='POST'){
+      let body;try{body=await request.json();}catch{return json({code:'OWNER_AUTH_INPUT_INVALID'},400);}
+      const staffId=String(body?.staffId||'').trim(),challengeId=String(body?.challengeId||'').trim(),proofHex=String(body?.proofHex||'').trim().toLowerCase();
+      if(!staffId||!challengeId||!(/^[0-9a-f]{64}$/i.test(proofHex)))return json({code:'OWNER_AUTH_PROOF_INVALID'},400);
+      const challengeKey='owner:challenge:'+challengeId,challenge=await this.state.storage.get(challengeKey);if(!challenge)return json({code:'OWNER_AUTH_CHALLENGE_NOT_FOUND'},401);
+      await this.state.storage.delete(challengeKey);
+      if(String(challenge.staffId)!==staffId)return json({code:'OWNER_AUTH_CHALLENGE_MISMATCH'},401);
+      if(!Number.isFinite(Date.parse(String(challenge.expiresAt||'')))||Date.parse(String(challenge.expiresAt))<=Date.now())return json({code:'OWNER_AUTH_CHALLENGE_EXPIRED'},401);
+      const current=await this.ownerIdentity(staffId);if(!current)return json({code:'OWNER_AUTH_UNAVAILABLE'},401);
+      if(Number(challenge.revision)!==Number(current.active.revision)||String(challenge.fingerprint)!==String(current.active.fingerprint||''))return json({code:'OWNER_AUTH_CONFIG_CHANGED'},409);
+      const message='MFK_OWNER_LOGIN_V1\n'+challengeId+'\n'+staffId+'\n'+String(challenge.nonce||''),expected=await ownerHmacHex(String(current.verifier.hashHex),message);
+      if(!ownerSameHex(expected,proofHex))return json({code:'OWNER_AUTH_UNAUTHORIZED',message:'PIN 不正確'},401);
+      const token=crypto.randomUUID().replaceAll('-','')+crypto.randomUUID().replaceAll('-',''),createdAt=new Date().toISOString(),expiresAt=new Date(Date.now()+10*365*24*60*60*1000).toISOString();
+      await this.state.storage.put('owner:session:'+await sha256(token),{staffId,createdAt,lastSeenAt:createdAt,expiresAt});
+      return json({ok:true,staffId,displayName:String(current.staff.name||staffId),role:'OWNER',scope:String(current.staff.scope||'STORE'),permissions:rows(current.staff.permissions).map(String),sessionToken:token,expiresAt},201);
+    }
+    if(url.pathname==='/owner/auth/session'){
+      if(request.method==='GET'){const session=await this.readOwnerSession(request);return session?json({ok:true,...session}):json({code:'OWNER_SESSION_UNAUTHORIZED'},401);}
+      if(request.method==='POST'){const token=String(request.headers.get('x-mfk-owner-session')||'').trim();if(token)await this.state.storage.delete('owner:session:'+await sha256(token));return json({state:'LOGGED_OUT'});}
+      return json({code:'METHOD_NOT_ALLOWED'},405);
+    }
+    if(url.pathname==='/owner/snapshot'&&request.method==='GET'){
+      const session=await this.readOwnerSession(request);if(!session)return json({code:'OWNER_SESSION_UNAUTHORIZED'},401);
+      return json(await this.ownerReadModel());
+    }
+
     if(url.pathname==='/customer-orders'&&request.method==='GET'){
       const wanted=new Set(url.searchParams.getAll('submissionId').map(value=>String(value).trim()).filter(Boolean).slice(0,24));
       if(!wanted.size)return json({orders:[]});
@@ -839,6 +965,17 @@ export default {
       await env.CUSTOMER_PAYMENT_EVIDENCE.put(objectKey,bytes,{httpMetadata:{contentType},customMetadata:{storeId,channelId,sha256:sha,kind:'PAYMENT_QR'}});
       const qrImageUrl=ADMIN_ORIGIN+'/api/customer/payment-qr?storeId='+encodeURIComponent(storeId)+'&ref='+encodeURIComponent(objectKey);
       return json({state:'UPLOADED',objectKey,qrImageUrl,sha256:sha,uploadedAt:new Date().toISOString()},201);
+    }
+
+
+    if(url.pathname.startsWith('/api/owner/')){
+      if(request.method==='OPTIONS')return new Response(null,{status:204,headers:cors(request)});
+      const origin=request.headers.get('origin')||'';if(origin!==OWNER_ORIGIN&&origin!==ADMIN_ORIGIN)return json({code:'OWNER_ORIGIN_FORBIDDEN'},403,cors(request));
+      const storeId=storeIdFrom(url),id=env.ADMIN_SYNC.idFromName(storeId),stub=env.ADMIN_SYNC.get(id),target=new URL(request.url);
+      target.pathname='/owner/'+url.pathname.slice('/api/owner/'.length);
+      const response=await stub.fetch(new Request(target.toString(),request)),headers=new Headers(response.headers);
+      for(const [key,value] of Object.entries(cors(request)))headers.set(key,value);
+      return new Response(response.body,{status:response.status,statusText:response.statusText,headers});
     }
 
     if(url.pathname.startsWith('/api/customer/')){
