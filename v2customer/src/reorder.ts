@@ -52,7 +52,7 @@ export function buildCurrentReorderCart(
   const cart:CustomerCartLine[]=[];
   const issues:CustomerReorderCopyIssue[]=[];
 
-  for(const oldLine of intent){
+  for(const [intentIndex,oldLine] of intent.entries()){
     const lineId=createLineId();
     const ordinary=currentOrdinarySelections(oldLine,menu);
     const product=ordinary.product;
@@ -92,6 +92,79 @@ export function buildCurrentReorderCart(
       if(currentUnitMinor===null)lineIssues.push('目前價格資料未完整');
     }else if(product&&!product.available){
       lineIssues.push('餐點目前暫停供應');
+    }
+
+    const historicalUnit=order.reorderPriceFacts?.find(fact=>fact.intentIndex===intentIndex)?.historicalPublishedUnitMinor;
+    if(
+      currentUnitMinor!==null&&
+      Number.isSafeInteger(Number(historicalUnit))&&
+      Number(historicalUnit)!==currentUnitMinor
+    ){
+      lineIssues.push('歷史價 HK
+    cart.push(Object.freeze({
+      lineId,
+      productId:oldLine.productId,
+      productName:product?.name??oldLine.productName,
+      quantity:Math.max(1,Math.floor(Number(oldLine.quantity)||1)),
+      ...(variation?{selectedVariationId:variation.variationId,selectedVariationName:variation.name}:oldLine.selectedVariationId?{selectedVariationId:oldLine.selectedVariationId,selectedVariationName:oldLine.selectedVariationName}:{}) ,
+      selections:selections.length?selections:Object.freeze(oldLine.selections.map(selection=>Object.freeze({
+        optionGroupId:selection.optionGroupId,
+        optionId:selection.optionId,
+        optionName:selection.optionName,
+      }))),
+      ...(combo?{combo}:{}),
+      createdAt:now(),
+      ...(oldLine.note?{note:oldLine.note}:{}),
+      ...(attention?{attention}:{}),
+      ...(currentUnitMinor!==null?{publishedUnitPriceMinor:currentUnitMinor}:{}),
+    }));
+    if(attention)issues.push(Object.freeze({lineId,title:'呢一項需要按目前餐牌修正',detail:attention}));
+  }
+
+  return Object.freeze({
+    cart:Object.freeze(cart),
+    issues:Object.freeze(issues),
+    currentMenuRevision:menu.revision,
+  });
+}
+
+export function clearReorderAttention(line:CustomerCartLine):CustomerCartLine{
+  const {attention:_attention,...rest}=line;
+  return Object.freeze(rest);
+}
++(Number(historicalUnit)/100).toFixed(0)+' → 目前 HK
+    cart.push(Object.freeze({
+      lineId,
+      productId:oldLine.productId,
+      productName:product?.name??oldLine.productName,
+      quantity:Math.max(1,Math.floor(Number(oldLine.quantity)||1)),
+      ...(variation?{selectedVariationId:variation.variationId,selectedVariationName:variation.name}:oldLine.selectedVariationId?{selectedVariationId:oldLine.selectedVariationId,selectedVariationName:oldLine.selectedVariationName}:{}) ,
+      selections:selections.length?selections:Object.freeze(oldLine.selections.map(selection=>Object.freeze({
+        optionGroupId:selection.optionGroupId,
+        optionId:selection.optionId,
+        optionName:selection.optionName,
+      }))),
+      ...(combo?{combo}:{}),
+      createdAt:now(),
+      ...(oldLine.note?{note:oldLine.note}:{}),
+      ...(attention?{attention}:{}),
+      ...(currentUnitMinor!==null?{publishedUnitPriceMinor:currentUnitMinor}:{}),
+    }));
+    if(attention)issues.push(Object.freeze({lineId,title:'呢一項需要按目前餐牌修正',detail:attention}));
+  }
+
+  return Object.freeze({
+    cart:Object.freeze(cart),
+    issues:Object.freeze(issues),
+    currentMenuRevision:menu.revision,
+  });
+}
+
+export function clearReorderAttention(line:CustomerCartLine):CustomerCartLine{
+  const {attention:_attention,...rest}=line;
+  return Object.freeze(rest);
+}
++(currentUnitMinor/100).toFixed(0)+'；請確認目前價格');
     }
 
     const attention=[...new Set(lineIssues)].join('；');
