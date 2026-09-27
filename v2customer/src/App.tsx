@@ -441,17 +441,35 @@ export function App(){
     }
   };
 
-  const submit=async()=>{
+  const submit=async(routeIntent?:CustomerPendingIntent)=>{
     if(submitLockRef.current||submitting)return;
-    if(submitBlockReason){setNotice(submitBlockReason);return}
+    if(routeIntent&&routeIntent.state!=='DRAFT')return;
+    const intentCart=routeIntent?.cart??cart;
+    const intentCheckout=routeIntent?.checkout??checkout;
+    const intentMenuRevision=routeIntent?.menuRevision??String(menu?.revision||'');
+    const submitReason=(()=>{
+      if(!intentCart.length)return '記憶罐未有商品。';
+      if(intentCheckout.phone.replace(/\D/g,'').length<8)return '請先輸入至少 8 位電話號碼。';
+      if(intentCheckout.paymentMethod==='ELECTRONIC'){
+        const channel=(snapshot?.paymentChannels??[]).find(item=>item.channelId===intentCheckout.paymentChannelId);
+        if(!intentCheckout.paymentChannelId||!channel||channel.label!==intentCheckout.paymentChannelLabel)return '付款方式資料已更新，請返回付款頁重新確認。';
+        if(!channel.qrImageUrl)return '電子支付 QR 已失效，請返回付款頁重新確認。';
+        if(intentCheckout.paymentEvidence?.state!=='UPLOADED'||!intentCheckout.paymentEvidence.evidenceRef)return '付款憑證未完成，請返回付款頁重新確認。';
+      }
+      const latestQuote=quotePublishedCart(intentCart,menu);
+      const latestRepairs=publishedCartRepairs(intentCart,menu);
+      if(!latestQuote||latestQuote.freshness!=='CURRENT'||latestRepairs.length)return '提交前餐牌、價格或供應資料有變更；請返回記憶罐只修受影響餐點。';
+      return null;
+    })();
+    if(submitReason){setNotice(submitReason);return}
     submitLockRef.current=true;
-    const cartFingerprint=JSON.stringify(cart);
-    const checkoutFingerprint=JSON.stringify(checkout);
-    let existing=pendingIntents.find(item=>
-      (item.state==='DRAFT'||item.state==='NOT_CONNECTED')&&
+    const cartFingerprint=JSON.stringify(intentCart);
+    const checkoutFingerprint=JSON.stringify(intentCheckout);
+    let existing=routeIntent??pendingIntents.find(item=>
+      item.state==='DRAFT'&&
       JSON.stringify(item.cart)===cartFingerprint&&
       JSON.stringify(item.checkout)===checkoutFingerprint&&
-      item.menuRevision===String(menu?.revision||'')
+      item.menuRevision===intentMenuRevision
     );
     setSubmitting(true);
     setFallbackIntentId(null);
@@ -487,9 +505,9 @@ export function App(){
         }
       }
 
-      const base=existing??createCustomerPendingIntent(cart,checkout,String(menu?.revision||''));
+      const base=existing??createCustomerPendingIntent(intentCart,intentCheckout,intentMenuRevision);
       if(!port?.submitOrder){
-        const cleanCheckout=withoutPaymentEvidence(checkout);
+        const cleanCheckout=withoutPaymentEvidence(intentCheckout);
         const offlineIntent=Object.freeze({...base,checkout:cleanCheckout,state:'NOT_CONNECTED' as const,updatedAt:nowIso(),lastMessage:'店舖接單系統暫時未連接；可以改用 WhatsApp。'});
         setCheckout(cleanCheckout);
         saveIntent(offlineIntent);
@@ -503,7 +521,7 @@ export function App(){
         const health=await port.probeOrderBackend((attempt,total)=>setSubmitProbe({attempt,total}));
         setSubmitProbe(null);
         if(!health.reachable){
-          const cleanCheckout=withoutPaymentEvidence(checkout);
+          const cleanCheckout=withoutPaymentEvidence(intentCheckout);
           const offlineIntent=Object.freeze({...base,checkout:cleanCheckout,state:'NOT_CONNECTED' as const,updatedAt:nowIso(),lastMessage:'已完成 3 次有限連線檢查；暫時未能自動接單。'});
           setCheckout(cleanCheckout);
           saveIntent(offlineIntent);
@@ -519,7 +537,7 @@ export function App(){
       const result=await port.submitOrder(pending);
       if(result.state==='CONFIRMED'){resolveDeliveredIntent(pending,result,result.message||'店舖已確認訂單');return}
 
-      const cleanCheckout=withoutPaymentEvidence(checkout);
+      const cleanCheckout=withoutPaymentEvidence(intentCheckout);
       setCheckout(cleanCheckout);
       if(result.state==='UNKNOWN'){
         saveIntent(Object.freeze({...pending,state:'UNKNOWN' as const,updatedAt:nowIso(),lastMessage:result.message}));
@@ -540,14 +558,14 @@ export function App(){
       setFallbackIntentId(pending.submissionId);
       setNotice(result.message);
     }catch{
-      const cleanCheckout=withoutPaymentEvidence(checkout);
+      const cleanCheckout=withoutPaymentEvidence(intentCheckout);
       setCheckout(cleanCheckout);
       if(attemptedIntent){
         saveIntent(Object.freeze({...attemptedIntent,state:'UNKNOWN' as const,updatedAt:nowIso(),lastMessage:'提交結果未明；需要讀回原本結果'}));
         setFallbackIntentId(null);
         setNotice('提交結果未明；原本嗰次落單已保留並會先讀回，唔會自動重送。');
       }else{
-        const base=existing??createCustomerPendingIntent(cart,cleanCheckout,String(menu?.revision||''));
+        const base=existing??createCustomerPendingIntent(intentCart,cleanCheckout,intentMenuRevision);
         const offlineIntent=Object.freeze({...base,checkout:cleanCheckout,state:'NOT_CONNECTED' as const,updatedAt:nowIso(),lastMessage:'店舖接單系統暫時未連接；可以改用 WhatsApp。'});
         saveIntent(offlineIntent);
         setFallbackIntentId(base.submissionId);
