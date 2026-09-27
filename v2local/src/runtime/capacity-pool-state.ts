@@ -657,11 +657,17 @@ export function assertCapacityChannelAdmission(input:{
     const quantity=demandedQuantity(input.items,pool.productIds);
     if(quantity<=0)continue;
     if(quantity>pool.remainingQty)throw new Error('CAPACITY_POOL_INSUFFICIENT:'+pool.poolId);
-    const threshold=channel==='FIRST_PARTY'?pool.firstPartyStopAt:pool.thirdPartyStopAt;
-    if(pool.remainingQty<=threshold){
-      const allowance=channel==='FIRST_PARTY'?pool.firstPartyOverrideRemaining:pool.thirdPartyOverrideRemaining;
-      if(allowance<=0)throw new Error('CAPACITY_CHANNEL_STOP:'+channel+':'+pool.poolId);
+    const rows=readLocalCapacityPoolRows(storage);
+    const stateRow=rows.find(row=>row.businessDate===view.businessDate&&row.poolId===pool.poolId);
+    if(!stateRow)throw new Error('CAPACITY_POOL_STATE_MISSING:'+pool.poolId);
+    const allowance=overrideAllowance(stateRow,channel);
+    if(allowance>0){
       if(quantity>allowance)throw new Error('CAPACITY_OVERRIDE_INSUFFICIENT:'+channel+':'+pool.poolId);
+      continue;
+    }
+    const threshold=channel==='FIRST_PARTY'?pool.firstPartyStopAt:pool.thirdPartyStopAt;
+    if(baseRemainingWithoutOverride(stateRow)<=threshold){
+      throw new Error('CAPACITY_CHANNEL_STOP:'+channel+':'+pool.poolId);
     }
   }
   return view;
