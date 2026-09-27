@@ -552,7 +552,7 @@ function customerPublicSnapshot(active,customerOrders=[]){
             publishedAdjustmentMinor:minorFromMoney(option.priceAdjustment),
             position:Number(option.position||0),
           }})
-          .filter(option=>option.optionId&&option.name&&option.available)
+          .filter(option=>option.optionId&&option.name)
           .sort((a,b)=>a.position-b.position||a.optionId.localeCompare(b.optionId))
           .map(({position,...option})=>option);
         return[{
@@ -582,7 +582,7 @@ function customerPublicSnapshot(active,customerOrders=[]){
         position:Number(item.legacySourcePosition??item.position??0),
       };
     })
-    .filter(item=>item.productId&&categoryIds.has(item.categoryId)&&item.available)
+    .filter(item=>item.productId&&categoryIds.has(item.categoryId))
     .sort((a,b)=>a.position-b.position||a.productId.localeCompare(b.productId))
     .map(({position,...item})=>item);
   const settings=row(snapshot.storeSettings);
