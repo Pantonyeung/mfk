@@ -3,7 +3,7 @@ name: owner-oa-chn-pln-r1
 on:
   push:
     branches:
-      - work/MFK/OWNER-OA-CHN-PLN-R1
+      - work/MFK/OWNER-OA-CHN-PLN-REWORK-R1
   workflow_dispatch:
 
 jobs:
