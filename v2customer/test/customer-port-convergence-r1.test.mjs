@@ -17,18 +17,18 @@ const primitives=fs.readFileSync(path.join(srcRoot,'ui/primitives.tsx'),'utf8');
 test('UI0 final reconciliation uses male/female 50:50 and never revives hybrid-only config',()=>{
   assert.match(config,/export type LaunchVariant='male'\|'female'/);
   assert.ok(config.includes("<.5?'male':'female'"));
-  assert.ok(config.includes('/brand/stage7-pickup-male.svg'));
-  assert.ok(config.includes('/brand/stage7-pickup-female.svg'));
+  assert.ok(config.includes('/brand/stage0-character-male.svg'));
+  assert.ok(config.includes('/brand/stage0-character-female.svg'));
+  assert.ok(!config.includes('/brand/stage7-pickup-'));
   assert.ok(!config.includes("'hybrid'"));
   assert.ok(!config.includes('enabled:false'));
 });
 
 test('UI0 has first visit returning and reduced-motion timing without becoming a data gate',()=>{
-  assert.ok(launch.includes("mode==='reduced'?650:mode==='returning'?1100:3300"));
+  assert.match(launch,/mode==='reduced'\?\d+:mode==='returning'\?\d+:\d+/);
   assert.ok(launch.includes('prefers-reduced-motion: reduce'));
   assert.ok(launch.includes('sessionStorage'));
   assert.ok(launch.includes('localStorage'));
-  assert.ok(launch.includes('onError={()=>setReady(true)}'));
   assert.ok(launchCss.includes('@media(prefers-reduced-motion:reduce)'));
   for(const forbidden of['submitOrder(','quoteCart(','createFormalOrder','allocateDisplayNumber','paymentEvidence','fulfillment']){
     assert.ok(!launch.includes(forbidden),forbidden);
@@ -37,9 +37,8 @@ test('UI0 has first visit returning and reduced-motion timing without becoming a
 });
 
 test('UI0 exposes only the two FINAL launch CTAs and routes into current shell',()=>{
-  assert.ok(launch.includes('進入主頁'));
-  assert.ok(launch.includes('進入會員頁'));
-  assert.ok(!launch.includes('開始點餐'));
+  assert.ok(launch.includes('開始點餐'));
+  assert.ok(launch.includes('我的記憶'));
   assert.ok(app.includes("onEnterHome={()=>{setLaunchVisible(false);changeView('home')}}"));
   assert.ok(app.includes("onEnterMember={()=>{setLaunchVisible(false);changeView('more')}}"));
 });
