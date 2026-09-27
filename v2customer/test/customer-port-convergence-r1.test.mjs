@@ -18,13 +18,13 @@ test('UI0 final reconciliation uses male/female 50:50 and dedicated Stage0 sourc
   assert.ok(config.includes("<.5?'male':'female'"));
   assert.ok(config.includes('/brand/stage0-male.webp'));
   assert.ok(config.includes('/brand/stage0-female.webp'));
-  assert.ok(!config.includes('/brand/stage7-pickup-'));
+  assert.ok(!config.includes('stage7-pickup'));
   assert.ok(!config.includes('stage0-character-male.svg'));
   assert.ok(!config.includes("'hybrid'"));
 });
 
 test('UI0 has first visit returning and reduced-motion timing without becoming a data gate',()=>{
-  assert.match(launch,/mode==='reduced'\?\d+:mode==='returning'\?\d+:\d+/);
+  assert.ok(launch.includes("mode==='reduced'?120:mode==='returning'?1200:3500"));
   assert.ok(launch.includes('prefers-reduced-motion: reduce'));
   assert.ok(launch.includes('sessionStorage'));
   assert.ok(launch.includes('localStorage'));
