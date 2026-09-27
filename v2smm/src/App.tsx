@@ -912,8 +912,8 @@ function OrderView({connection,categories,activeCategoryId,setCategory,search,se
       {connection==='READY'?<b>餐單已更新</b>:<b className="muted">稍後更新</b>}
     </div>
 
-    {connection==='LOADING'?<EmptyState title="正在同步餐單" detail="你可以先瀏覽介面；正式商品資料同步完成後會自動顯示。"/>:
-      !categories.length?<EmptyState title={connection==='READY'?'暫時未有餐單':'目前未有正式餐單資料'} detail={connection==='READY'?'目前門店資料未提供任何可售商品。':'Stage 1 已可進入；未連線時唔會建立假商品或者假價格。'}/>:
+    {connection==='LOADING'?<EmptyState title="正在更新餐單" detail="餐單準備好之後，商品會自動顯示。"/>:
+      !categories.length?<EmptyState title={connection==='READY'?'暫時未有餐單':'餐單暫時未能載入'} detail={connection==='READY'?'目前未有可供選擇嘅商品。':'請稍後重新整理，已揀內容唔會因為重新連線而重複落單。'}/>:
       products.length?<div className="product-grid stage1-product-grid">{products.map(product=>{
         const price=serviceMode==='DINE_IN'?product.publishedDineInUnitPriceMinor:product.publishedTakeawayUnitPriceMinor;
         return <button key={product.productId} className={`product-card stage1-product-card ${product.available?'':'disabled'}`} disabled={!product.available} onClick={()=>onProduct(product)}>
@@ -1606,9 +1606,9 @@ function DiningTargetSheet({tables,covers,setCovers,onClose,onSelect}:{
   onClose:()=>void;
   onSelect:(target:SmmDiningTarget)=>void;
 }){
-  return <div className="overlay"><section className="sheet" role="dialog" aria-modal="true"><div className="sheet-grabber"/><header><div><span>堂食去向</span><h2>掛枱／輪候</h2><small>揀枱後，SMT 會自動掛入該枱；如果該枱已有堂食單就直接加單。</small></div><button onClick={onClose}>✕</button></header>
+  return <div className="overlay"><section className="sheet" role="dialog" aria-modal="true"><div className="sheet-grabber"/><header><div><span>堂食去向</span><h2>掛枱／輪候</h2><small>揀枱後會掛入該枱；如果已有堂食單就直接加單。</small></div><button onClick={onClose}>✕</button></header>
     <section className="option-group"><div><strong>人數</strong><span>1–30 位</span></div><div className="qty"><button onClick={()=>setCovers(Math.max(1,covers-1))}>−</button><b>{covers}</b><button onClick={()=>setCovers(Math.min(30,covers+1))}>＋</button></div></section>
-    <section className="option-group"><div><strong>掛入邊張枱</strong><span>由 Admin 發佈；已有單＝加單；空枱＝開枱</span></div>{tables.length?<div className="option-list">{tables.map(row=><button key={row.tableId} onClick={()=>onSelect({kind:'TABLE',tableId:row.tableId,covers})}>{row.label}</button>)}</div>:<p className="callout">Admin 尚未發布任何可用枱號。</p>}</section>
+    <section className="option-group"><div><strong>掛入邊張枱</strong><span>已有單＝加單；空枱＝開枱</span></div>{tables.length?<div className="option-list">{tables.map(row=><button key={row.tableId} onClick={()=>onSelect({kind:'TABLE',tableId:row.tableId,covers})}>{row.label}</button>)}</div>:<p className="callout">目前未有可用枱號。</p>}</section>
     <section className="option-group"><div><strong>未決定座位</strong><span>先放入輪候</span></div><button className="primary" onClick={()=>onSelect({kind:'WAITING',covers})}>加入輪候</button></section>
   </section></div>;
 }
