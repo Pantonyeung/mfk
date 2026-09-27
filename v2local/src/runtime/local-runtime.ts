@@ -4,7 +4,7 @@ import {renderEscPosRasterTicket} from './ticket-bitmap.ts';
 import {buildOrderPrintPlan,groupTscBitmapJobsByPhysicalPrinter,type PrintBinding,type PlannedPrintJob} from './print-routing.ts';
 import {queueOrderProjection} from './projection-outbox.ts';
 import {hasStaffPermission,readActiveStaffSession,staffAuthRequired} from './staff-auth.ts';
-import {readSmtDiningTableRegistry,readSmtPrintConfig,readSmtStoreSettings} from './admin-operational-config.ts';
+import {etaMinutesForActiveCount,readSmtDiningTableRegistry,readSmtPrintConfig,readSmtStoreSettings} from './admin-operational-config.ts';
 import {mirrorKeetaOrderCommand,type KeetaProviderMirrorResult} from './keeta-provider-commands.ts';
 import {buildDailyClosePrintData,renderDailyCloseTicket} from './daily-close-ticket.ts';
 import {buildLocalReport,readLocalDayCloses,resolveBusinessWindow} from './local-operations.ts';
@@ -91,6 +91,15 @@ export interface LocalDiningLineCorrection{
 
 export interface StoredOrder{
   id:string;display:string;createdAt:string;updatedAt?:string;totalMinor:number;paymentLabel:string;fulfillmentLabel:'待處理'|'進行中'|'可取餐'|'已完成'|'已取消';sourceLabel:string;
+  checkoutSubmissionId?:string;
+  initialPrintAttemptedAt?:string;
+  initialPrintState?:'DISPATCHING'|'DONE'|'FAILED'|'UNKNOWN';
+  initialPrintSummary?:Readonly<{planned:number;sent:number;failed:number}>;
+  keetaDeferCount?:number;
+  keetaLastDeferredAt?:string;
+  etaMinutes?:number;
+  etaReadyAt?:string;
+  customerName?:string;
   originalTotalMinor?:number;
   diningLineCorrections?:readonly LocalDiningLineCorrection[];
   paymentCorrections?:readonly PaymentCorrectionRecord[];
@@ -332,9 +341,13 @@ export interface CleanSmtCoreRuntimePort{
   readPaymentEvidence?(orderId:string):Promise<{readonly objectUrl:string}>;
   reviewPaymentEvidence?(orderId:string,decision:'VERIFIED'|'REJECTED'):Promise<{readonly orderId:string;readonly state:'VERIFIED'|'REJECTED'}>;
   markOrderReady?(orderId:string):Promise<{readonly orderId:string;readonly canonicalRevision:number;readonly status:'READY';readonly provider:KeetaProviderMirrorResult}>;
+  markOrderUnready?(orderId:string):Promise<{readonly orderId:string;readonly status:'IN_PROGRESS'}>;
+  markOrderCompleted?(orderId:string):Promise<{readonly orderId:string;readonly status:'COMPLETED'}>;
+  deferKeetaOrder?(orderId:string):Promise<StoredOrder>;
   printOrderReceipt?(orderId:string):Promise<{readonly printJobId:string;readonly state:string}>;
   printDailyClose?(businessDate?:string):Promise<{readonly printJobId:string;readonly state:string;readonly businessDate:string}>;
   printOrderOutputs?(orderId:string):Promise<PrintDispatchSummary>;
+  printInitialOrderOutputsOnce?(orderId:string):Promise<PrintDispatchSummary>;
   readOrderReprintOptions?(orderId:string):Promise<readonly SmtReprintOption[]>;
   reprintOrderJobs?(orderId:string,jobIds:readonly string[],reason?:string):Promise<PrintDispatchSummary>;
   updateOrderItems?(orderId:string,items:readonly {id:string;name:string;qty:number;unitMinor:number}[]):Promise<{readonly orderId:string;readonly totalMinor:number}>;
@@ -427,11 +440,17 @@ export interface MfkLocalRuntime extends CleanSmtCoreRuntimePort{
     paymentEvidenceRef?:string;
     paymentVerificationState?:'PENDING'|'VERIFIED'|'REJECTED';
     customerPhone?:string;
+    customerName?:string;
+    submissionId?:string;
     initialFulfillmentLabel?:StoredOrder['fulfillmentLabel'];
   }):StoredOrder;
   orders():readonly StoredOrder[];
   acceptOrder(orderId:string):Promise<{readonly orderId:string;readonly status:'ACCEPTED';readonly provider:KeetaProviderMirrorResult}>;
+  markOrderUnready(orderId:string):Promise<{readonly orderId:string;readonly status:'IN_PROGRESS'}>;
+  markOrderCompleted(orderId:string):Promise<{readonly orderId:string;readonly status:'COMPLETED'}>;
+  deferKeetaOrder(orderId:string):Promise<StoredOrder>;
   printOrderOutputs(orderId:string):Promise<PrintDispatchSummary>;
+  printInitialOrderOutputsOnce(orderId:string):Promise<PrintDispatchSummary>;
   printDailyClose(businessDate?:string):Promise<{readonly printJobId:string;readonly state:string;readonly businessDate:string}>;
   readOrderReprintOptions(orderId:string):Promise<readonly SmtReprintOption[]>;
   reprintOrderJobs(orderId:string,jobIds:readonly string[],reason?:string):Promise<PrintDispatchSummary>;
@@ -1310,6 +1329,11 @@ function diningDetail(hold:LocalHoldDraft):LocalDiningHoldDetail{
 export const localRuntime:MfkLocalRuntime=Object.freeze({
   subscribe(listener){listeners.add(listener);return()=>listeners.delete(listener)},
   createOrder(input){
+    const submissionId=String(input.submissionId||'').trim();
+    if(submissionId){
+      const existing=data.orders.find(order=>order.checkoutSubmissionId===submissionId);
+      if(existing)return existing;
+    }
     const providerRef=String(input.providerRef||'').trim();
     if(providerRef){
       const existing=data.orders.find(order=>order.providerRef===providerRef);
@@ -1318,6 +1342,10 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
     const n=data.orders.length+1;
     const createdAt=new Date().toISOString();
     const session=readActiveStaffSession();
+    const initialFulfillmentLabel=input.initialFulfillmentLabel??'進行中';
+    const activeCount=data.orders.filter(row=>row.fulfillmentLabel==='進行中').length+1;
+    const etaMinutes=initialFulfillmentLabel==='進行中'?etaMinutesForActiveCount(activeCount):undefined;
+    const etaReadyAt=etaMinutes?new Date(Date.parse(createdAt)+etaMinutes*60_000).toISOString():undefined;
     const baseOrder:StoredOrder={
       id:nextRuntimeIdentity('MFK-'),
       display:'P'+String(n).padStart(3,'0'),
@@ -1325,8 +1353,10 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
       updatedAt:createdAt,
       totalMinor:input.totalMinor,
       paymentLabel:input.paymentLabel,
-      fulfillmentLabel:input.initialFulfillmentLabel??'進行中',
+      fulfillmentLabel:initialFulfillmentLabel,
       sourceLabel:input.sourceLabel||'現場',
+      ...(etaMinutes?{etaMinutes,etaReadyAt}:{}),
+      ...(submissionId?{checkoutSubmissionId:submissionId}:{}),
       ...(providerRef?{providerRef}:{}),
       ...(input.providerMessageId?{providerMessageId:String(input.providerMessageId)}:{}),
       ...(input.providerPickupCode?{providerPickupCode:String(input.providerPickupCode)}:{}),
@@ -1334,7 +1364,8 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
       ...(input.utensilPreference?{utensilPreference:input.utensilPreference}:{}),
       ...(input.paymentEvidenceRef?{paymentEvidenceRef:input.paymentEvidenceRef}:{}),
       ...(input.paymentVerificationState?{paymentVerificationState:input.paymentVerificationState}:{}),
-      ...(input.customerPhone?{customerPhone:String(input.customerPhone)}:{}),
+      ...(input.customerPhone?{customerPhone:String(input.customerPhone).trim().slice(0,40)}:{}),
+      ...(input.customerName?{customerName:String(input.customerName).trim().slice(0,120)}:{}),
       ...(session?{staffId:session.staffId,staffName:session.displayName}:{}),
       items:input.items.map(item=>({...item})),
     };
@@ -1469,6 +1500,7 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
         {id:'time',label:'時間',value:new Date(order.createdAt).toLocaleTimeString('zh-HK')},
         {id:'items',label:'件數',value:String(order.items.reduce((s,x)=>s+x.qty,0))},
         {id:'total',label:'總額',value:money(order.totalMinor)},
+        ...(order.etaReadyAt?[{id:'eta',label:'預計取餐',value:new Date(order.etaReadyAt).toLocaleTimeString('zh-HK',{hour:'2-digit',minute:'2-digit'}),detail:(order.etaMinutes??0)+' 分鐘'}]:[]),
         ...(order.providerLastEventId?[{id:'provider-event',label:'Keeta Event',value:String(order.providerLastEventId),detail:order.providerLastEventName}]:[])
       ],
       lines:order.items.map(item=>({
@@ -1507,9 +1539,13 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
   async acceptOrder(orderId){
     const found=data.orders.find(x=>x.id===orderId);if(!found)throw new Error('ORDER_NOT_FOUND');
     if(found.fulfillmentLabel==='已完成'||found.fulfillmentLabel==='已取消')throw new Error('ORDER_NOT_ACCEPTABLE');
+    if(found.paymentEvidenceRef&&found.paymentVerificationState!=='VERIFIED')throw new Error('PAYMENT_EVIDENCE_NOT_VERIFIED');
     const updatedAt=new Date().toISOString();
     if(found.fulfillmentLabel==='待處理'){
-      data={...data,orders:data.orders.map(x=>x.id===orderId?{...x,fulfillmentLabel:'進行中',updatedAt}:x)};
+      const activeCount=data.orders.filter(row=>row.id!==orderId&&row.fulfillmentLabel==='進行中').length+1;
+      const etaMinutes=etaMinutesForActiveCount(activeCount);
+      const etaReadyAt=new Date(Date.parse(updatedAt)+etaMinutes*60_000).toISOString();
+      data={...data,orders:data.orders.map(x=>x.id===orderId?{...x,fulfillmentLabel:'進行中',etaMinutes,etaReadyAt,updatedAt}:x)};
       save();
       projectOrder(data.orders.find(x=>x.id===orderId)!);
       appendActionAudit({action:'ACCEPT',orderId});
@@ -1541,10 +1577,85 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
     const provider=await mirrorKeetaOrderCommand(current,'READY');
     return {orderId,canonicalRevision:Date.now(),status:'READY' as const,provider};
   },
+  async markOrderUnready(orderId){
+    const found=data.orders.find(x=>x.id===orderId);if(!found)throw new Error('ORDER_NOT_FOUND');
+    if(found.diningHoldId)throw new Error('DINING_FULFILLMENT_MANAGED_BY_DINING');
+    if(found.fulfillmentLabel!=='可取餐')throw new Error('ORDER_NOT_UNREADYABLE');
+    const updatedAt=new Date().toISOString();
+    data={...data,orders:data.orders.map(x=>x.id===orderId?{
+      ...x,fulfillmentLabel:'進行中',updatedAt,etaMinutes:undefined,etaReadyAt:undefined,
+    }:x)};
+    save();
+    const current=data.orders.find(x=>x.id===orderId)!;
+    projectOrder(current);appendActionAudit({action:'UNREADY',orderId});
+    return {orderId,status:'IN_PROGRESS' as const};
+  },
+  async markOrderCompleted(orderId){
+    const found=data.orders.find(x=>x.id===orderId);if(!found)throw new Error('ORDER_NOT_FOUND');
+    if(found.diningHoldId)throw new Error('DINING_FULFILLMENT_MANAGED_BY_DINING');
+    if(found.fulfillmentLabel!=='可取餐')throw new Error('ORDER_NOT_COMPLETABLE');
+    const updatedAt=new Date().toISOString();
+    data={...data,orders:data.orders.map(x=>x.id===orderId?{...x,fulfillmentLabel:'已完成',updatedAt}:x)};
+    save();
+    const current=data.orders.find(x=>x.id===orderId)!;
+    projectOrder(current);appendActionAudit({action:'PICKED_UP',orderId});
+    return {orderId,status:'COMPLETED' as const};
+  },
+  async deferKeetaOrder(orderId){
+    const order=data.orders.find(x=>x.id===orderId);
+    if(!order)throw new Error('ORDER_NOT_FOUND');
+    if(!/^Keeta\b/i.test(String(order.sourceLabel||'')))throw new Error('KEETA_DEFER_NOT_APPLICABLE');
+    if(order.fulfillmentLabel!=='待處理')throw new Error('KEETA_ORDER_NOT_PENDING');
+    const count=Math.max(0,Math.floor(Number(order.keetaDeferCount)||0));
+    if(count>=2)throw new Error('KEETA_DEFER_LIMIT_REACHED');
+    const updatedAt=new Date().toISOString();
+    data={...data,orders:data.orders.map(x=>x.id===orderId?{
+      ...x,keetaDeferCount:count+1,keetaLastDeferredAt:updatedAt,updatedAt,
+    }:x)};
+    save();
+    const updated=data.orders.find(x=>x.id===orderId)!;
+    projectOrder(updated);appendActionAudit({action:'KEETA_DEFER',orderId,reason:String(count+1)+'/2'});
+    return updated;
+  },
   async printOrderOutputs(orderId){
     const order=data.orders.find(x=>x.id===orderId);
     if(!order)throw new Error('ORDER_NOT_FOUND');
     return dispatchOrderOutputs(order);
+  },
+  async printInitialOrderOutputsOnce(orderId){
+    let order=data.orders.find(x=>x.id===orderId);
+    if(!order)throw new Error('ORDER_NOT_FOUND');
+    if(order.initialPrintAttemptedAt){
+      const summary=order.initialPrintSummary??{planned:0,sent:0,failed:0};
+      return Object.freeze({orderId,planned:summary.planned,sent:summary.sent,failed:summary.failed,results:Object.freeze([])});
+    }
+    const attemptedAt=new Date().toISOString();
+    data={...data,orders:data.orders.map(x=>x.id===orderId?{
+      ...x,initialPrintAttemptedAt:attemptedAt,initialPrintState:'DISPATCHING',updatedAt:attemptedAt,
+    }:x)};
+    save();
+    order=data.orders.find(x=>x.id===orderId)!;
+    projectOrder(order);
+    try{
+      const summary=await dispatchOrderOutputs(order);
+      const state=summary.failed>0?'FAILED':'DONE';
+      const updatedAt=new Date().toISOString();
+      data={...data,orders:data.orders.map(x=>x.id===orderId?{
+        ...x,
+        initialPrintState:state,
+        initialPrintSummary:{planned:summary.planned,sent:summary.sent,failed:summary.failed},
+        updatedAt,
+      }:x)};
+      save();projectOrder(data.orders.find(x=>x.id===orderId)!);
+      appendActionAudit({action:'INITIAL_PRINT',orderId,reason:state});
+      return summary;
+    }catch(error){
+      const updatedAt=new Date().toISOString();
+      data={...data,orders:data.orders.map(x=>x.id===orderId?{...x,initialPrintState:'UNKNOWN',updatedAt}:x)};
+      save();projectOrder(data.orders.find(x=>x.id===orderId)!);
+      appendActionAudit({action:'INITIAL_PRINT_UNKNOWN',orderId});
+      throw error;
+    }
   },
   async correctOrderPayment(orderId,paymentLabel){
     if(!hasStaffPermission('ORDER_CORRECTION'))throw new Error('ORDER_CORRECTION_PERMISSION_REQUIRED');
