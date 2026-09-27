@@ -20,7 +20,7 @@ function cors(request){
   return CORS_ORIGINS.has(origin)?{
     'access-control-allow-origin':origin,
     'access-control-allow-methods':'GET,POST,OPTIONS',
-    'access-control-allow-headers':'content-type,x-mfk-admin-publish-key,x-mfk-smm-session,x-mfk-owner-session',
+    'access-control-allow-headers':'content-type,x-mfk-admin-publish-key,x-mfk-smm-session,x-mfk-owner-session,x-mfk-admin-session',
     'access-control-allow-credentials':'true',
     'vary':'origin',
   }:{};
@@ -450,23 +450,68 @@ export class AdminSyncStore{
   }
 
 
-  async ownerIdentity(staffId){
+  async staffIdentity(loginId,purpose='OWNER'){
     const active=await this.state.storage.get('active');if(!active)return null;
     const auth=row(row(active.snapshot).staffAuth);
-    const staff=rows(auth.staff).map(row).find(item=>String(item.staffId||'')===String(staffId||''));
-    if(!staff||staff.active===false||String(staff.role)!=='OWNER')return null;
+    const candidates=rows(auth.staff).map(row).filter(item=>item.active!==false);
+    const requested=String(loginId||'').trim();
+    if(!requested)return null;
+    let matches=candidates.filter(item=>String(item.loginId||'').trim()===requested);
+    if(!matches.length){
+      matches=candidates.filter(item=>!String(item.loginId||'').trim()&&(String(item.staffId||'')===requested||String(item.name||'')===requested));
+    }
+    if(matches.length!==1)return null;
+    const staff=matches[0];
+    if(purpose==='OWNER'&&String(staff.role)!=='OWNER')return null;
+    if(purpose==='ADMIN'&&String(staff.role)!=='OWNER'&&!Boolean(staff.adminLogin))return null;
     const verifier=row(staff.pinVerifier);
     if(verifier.algorithm!=='PBKDF2-SHA256'||!Number.isSafeInteger(Number(verifier.iterations))||Number(verifier.iterations)<100000)return null;
     if(!/^[0-9a-f]+$/i.test(String(verifier.saltHex||''))||!/^[0-9a-f]{64}$/i.test(String(verifier.hashHex||'')))return null;
-    return{active,staff,verifier};
+    return{active,staff,verifier,loginId:String(staff.loginId||requested)};
   }
+  async staffIdentityById(staffId,purpose='OWNER'){
+    const active=await this.state.storage.get('active');if(!active)return null;
+    const auth=row(row(active.snapshot).staffAuth);
+    const staff=rows(auth.staff).map(row).find(item=>String(item.staffId||'')===String(staffId||'')&&item.active!==false);
+    if(!staff)return null;
+    if(purpose==='OWNER'&&String(staff.role)!=='OWNER')return null;
+    if(purpose==='ADMIN'&&String(staff.role)!=='OWNER'&&!Boolean(staff.adminLogin))return null;
+    const verifier=row(staff.pinVerifier);
+    if(verifier.algorithm!=='PBKDF2-SHA256'||!Number.isSafeInteger(Number(verifier.iterations))||Number(verifier.iterations)<100000)return null;
+    if(!/^[0-9a-f]+$/i.test(String(verifier.saltHex||''))||!/^[0-9a-f]{64}$/i.test(String(verifier.hashHex||'')))return null;
+    return{active,staff,verifier,loginId:String(staff.loginId||staff.name||staff.staffId||'')};
+  }
+  async ownerIdentity(loginId){return this.staffIdentity(loginId,'OWNER');}
   async readOwnerSession(request){
     const token=String(request.headers.get('x-mfk-owner-session')||'').trim();if(token.length<32||token.length>256)return null;
     const key='owner:session:'+await sha256(token);const session=await this.state.storage.get(key);if(!session)return null;
     const expiresAt=Date.parse(String(session.expiresAt||''));if(!Number.isFinite(expiresAt)||expiresAt<=Date.now()){await this.state.storage.delete(key);return null;}
-    const current=await this.ownerIdentity(String(session.staffId||''));if(!current){await this.state.storage.delete(key);return null;}
-    const value={staffId:String(current.staff.staffId||''),displayName:String(current.staff.name||current.staff.staffId||''),role:'OWNER',scope:String(current.staff.scope||'STORE'),permissions:rows(current.staff.permissions).map(String),sessionToken:token,createdAt:String(session.createdAt||''),expiresAt:String(session.expiresAt||''),lastSeenAt:new Date().toISOString()};
+    const current=await this.staffIdentityById(String(session.staffId||''),'OWNER');if(!current){await this.state.storage.delete(key);return null;}
+    const value={staffId:String(current.staff.staffId||''),loginId:String(current.loginId||''),displayName:String(current.staff.name||current.staff.staffId||''),role:'OWNER',scope:String(current.staff.scope||'STORE'),permissions:rows(current.staff.permissions).map(String),sessionToken:token,createdAt:String(session.createdAt||''),expiresAt:String(session.expiresAt||''),lastSeenAt:new Date().toISOString()};
     await this.state.storage.put(key,{...session,staffId:value.staffId,lastSeenAt:value.lastSeenAt});return value;
+  }
+  async readAdminBrowserSession(request){
+    const token=String(request.headers.get('x-mfk-admin-session')||'').trim();if(token.length<32||token.length>256)return null;
+    const key='admin-browser:session:'+await sha256(token);const session=await this.state.storage.get(key);if(!session)return null;
+    const expiresAt=Date.parse(String(session.expiresAt||''));if(!Number.isFinite(expiresAt)||expiresAt<=Date.now()){await this.state.storage.delete(key);return null;}
+    const current=await this.staffIdentityById(String(session.staffId||''),'ADMIN');if(!current){await this.state.storage.delete(key);return null;}
+    const value={staffId:String(current.staff.staffId||''),loginId:String(current.loginId||''),displayName:String(current.staff.name||current.staff.staffId||''),role:String(current.staff.role||''),scope:String(current.staff.scope||'STORE'),permissions:rows(current.staff.permissions).map(String),sessionToken:token,createdAt:String(session.createdAt||''),expiresAt:String(session.expiresAt||''),lastSeenAt:new Date().toISOString()};
+    await this.state.storage.put(key,{...session,staffId:value.staffId,lastSeenAt:value.lastSeenAt});return value;
+  }
+  async publishEnvelope(envelope){
+    const current=await this.state.storage.get('active');
+    if(current){
+      if(envelope.revision<current.revision)return{status:409,body:{code:'ADMIN_CONFIG_REVISION_STALE',currentRevision:current.revision}};
+      if(envelope.revision===current.revision){
+        if(envelope.fingerprint!==current.fingerprint)return{status:409,body:{code:'ADMIN_CONFIG_REVISION_CONFLICT',currentFingerprint:current.fingerprint}};
+        return{status:200,body:{state:'IDEMPOTENT',active:current}};
+      }
+    }
+    await this.state.storage.put('active',envelope);
+    await this.state.storage.put('activeMeta',{revision:envelope.revision,fingerprint:envelope.fingerprint,publishedAt:envelope.publishedAt});
+    const doorbell=JSON.stringify({type:'ADMIN_CONFIG_AVAILABLE',storeId:envelope.storeId,revision:envelope.revision,fingerprint:envelope.fingerprint,publishedAt:envelope.publishedAt});
+    for(const socket of this.state.getWebSockets()){try{socket.send(doorbell);}catch{}}
+    return{status:200,body:{state:'PUBLISHED',active:{revision:envelope.revision,fingerprint:envelope.fingerprint,publishedAt:envelope.publishedAt}}};
   }
   async ownerReadModel(){
     const [active,orders,reports,acks]=await Promise.all([this.state.storage.get('active'),this.projectionOrders(),this.projectionReports(),this.state.storage.get('acks')]);
@@ -710,27 +755,29 @@ export class AdminSyncStore{
 
     if(url.pathname==='/owner/auth/challenge'&&request.method==='POST'){
       let body;try{body=await request.json();}catch{return json({code:'OWNER_AUTH_INPUT_INVALID'},400);}
-      const staffId=String(body?.staffId||'').trim(),current=await this.ownerIdentity(staffId);
+      const loginId=String(body?.loginId||body?.staffId||'').trim(),current=await this.ownerIdentity(loginId);
       if(!current)return json({code:'OWNER_AUTH_UNAVAILABLE',message:'Owner 身份或 PIN 尚未可用'},401);
       const challengeId=crypto.randomUUID(),nonce=crypto.randomUUID().replaceAll('-','')+crypto.randomUUID().replaceAll('-',''),expiresAt=new Date(Date.now()+2*60*1000).toISOString();
-      await this.state.storage.put('owner:challenge:'+challengeId,{staffId,nonce,expiresAt,revision:Number(current.active.revision)||0,fingerprint:String(current.active.fingerprint||'')});
-      return json({challengeId,nonce,saltHex:String(current.verifier.saltHex),iterations:Number(current.verifier.iterations),expiresAt},201);
+      await this.state.storage.put('owner:challenge:'+challengeId,{loginId,staffId:String(current.staff.staffId||''),nonce,expiresAt,revision:Number(current.active.revision)||0,fingerprint:String(current.active.fingerprint||'')});
+      return json({challengeId,loginId,nonce,saltHex:String(current.verifier.saltHex),iterations:Number(current.verifier.iterations),expiresAt},201);
     }
     if(url.pathname==='/owner/auth/verify'&&request.method==='POST'){
       let body;try{body=await request.json();}catch{return json({code:'OWNER_AUTH_INPUT_INVALID'},400);}
-      const staffId=String(body?.staffId||'').trim(),challengeId=String(body?.challengeId||'').trim(),proofHex=String(body?.proofHex||'').trim().toLowerCase();
-      if(!staffId||!challengeId||!(/^[0-9a-f]{64}$/i.test(proofHex)))return json({code:'OWNER_AUTH_PROOF_INVALID'},400);
+      const loginId=String(body?.loginId||body?.staffId||'').trim(),challengeId=String(body?.challengeId||'').trim(),proofHex=String(body?.proofHex||'').trim().toLowerCase();
+      if(!loginId||!challengeId||!(/^[0-9a-f]{64}$/i.test(proofHex)))return json({code:'OWNER_AUTH_PROOF_INVALID'},400);
       const challengeKey='owner:challenge:'+challengeId,challenge=await this.state.storage.get(challengeKey);if(!challenge)return json({code:'OWNER_AUTH_CHALLENGE_NOT_FOUND'},401);
       await this.state.storage.delete(challengeKey);
-      if(String(challenge.staffId)!==staffId)return json({code:'OWNER_AUTH_CHALLENGE_MISMATCH'},401);
+      if(String(challenge.loginId)!==loginId)return json({code:'OWNER_AUTH_CHALLENGE_MISMATCH'},401);
       if(!Number.isFinite(Date.parse(String(challenge.expiresAt||'')))||Date.parse(String(challenge.expiresAt))<=Date.now())return json({code:'OWNER_AUTH_CHALLENGE_EXPIRED'},401);
-      const current=await this.ownerIdentity(staffId);if(!current)return json({code:'OWNER_AUTH_UNAVAILABLE'},401);
+      const current=await this.ownerIdentity(loginId);if(!current)return json({code:'OWNER_AUTH_UNAVAILABLE'},401);
+      if(String(challenge.staffId)!==String(current.staff.staffId||''))return json({code:'OWNER_AUTH_IDENTITY_CHANGED'},409);
       if(Number(challenge.revision)!==Number(current.active.revision)||String(challenge.fingerprint)!==String(current.active.fingerprint||''))return json({code:'OWNER_AUTH_CONFIG_CHANGED'},409);
-      const message='MFK_OWNER_LOGIN_V1\n'+challengeId+'\n'+staffId+'\n'+String(challenge.nonce||''),expected=await ownerHmacHex(String(current.verifier.hashHex),message);
+      const message='MFK_OWNER_LOGIN_V1\n'+challengeId+'\n'+loginId+'\n'+String(challenge.nonce||''),expected=await ownerHmacHex(String(current.verifier.hashHex),message);
       if(!ownerSameHex(expected,proofHex))return json({code:'OWNER_AUTH_UNAUTHORIZED',message:'PIN 不正確'},401);
       const token=crypto.randomUUID().replaceAll('-','')+crypto.randomUUID().replaceAll('-',''),createdAt=new Date().toISOString(),expiresAt=new Date(Date.now()+10*365*24*60*60*1000).toISOString();
+      const staffId=String(current.staff.staffId||'');
       await this.state.storage.put('owner:session:'+await sha256(token),{staffId,createdAt,lastSeenAt:createdAt,expiresAt});
-      return json({ok:true,staffId,displayName:String(current.staff.name||staffId),role:'OWNER',scope:String(current.staff.scope||'STORE'),permissions:rows(current.staff.permissions).map(String),sessionToken:token,expiresAt},201);
+      return json({ok:true,staffId,loginId:String(current.loginId||loginId),displayName:String(current.staff.name||loginId),role:'OWNER',scope:String(current.staff.scope||'STORE'),permissions:rows(current.staff.permissions).map(String),sessionToken:token,expiresAt},201);
     }
     if(url.pathname==='/owner/auth/session'){
       if(request.method==='GET'){const session=await this.readOwnerSession(request);return session?json({ok:true,...session}):json({code:'OWNER_SESSION_UNAUTHORIZED'},401);}
@@ -740,6 +787,46 @@ export class AdminSyncStore{
     if(url.pathname==='/owner/snapshot'&&request.method==='GET'){
       const session=await this.readOwnerSession(request);if(!session)return json({code:'OWNER_SESSION_UNAUTHORIZED'},401);
       return json(await this.ownerReadModel());
+    }
+
+    if(url.pathname==='/admin-browser/auth/challenge'&&request.method==='POST'){
+      let body;try{body=await request.json();}catch{return json({code:'ADMIN_BROWSER_AUTH_INPUT_INVALID'},400);}
+      const loginId=String(body?.loginId||'').trim(),current=await this.staffIdentity(loginId,'ADMIN');
+      if(!current)return json({code:'ADMIN_BROWSER_AUTH_UNAVAILABLE',message:'Admin 身份或 PIN 尚未可用'},401);
+      const challengeId=crypto.randomUUID(),nonce=crypto.randomUUID().replaceAll('-','')+crypto.randomUUID().replaceAll('-',''),expiresAt=new Date(Date.now()+2*60*1000).toISOString();
+      await this.state.storage.put('admin-browser:challenge:'+challengeId,{loginId,staffId:String(current.staff.staffId||''),nonce,expiresAt,revision:Number(current.active.revision)||0,fingerprint:String(current.active.fingerprint||'')});
+      return json({challengeId,loginId,nonce,saltHex:String(current.verifier.saltHex),iterations:Number(current.verifier.iterations),expiresAt},201);
+    }
+    if(url.pathname==='/admin-browser/auth/verify'&&request.method==='POST'){
+      let body;try{body=await request.json();}catch{return json({code:'ADMIN_BROWSER_AUTH_INPUT_INVALID'},400);}
+      const loginId=String(body?.loginId||'').trim(),challengeId=String(body?.challengeId||'').trim(),proofHex=String(body?.proofHex||'').trim().toLowerCase();
+      if(!loginId||!challengeId||!(/^[0-9a-f]{64}$/i.test(proofHex)))return json({code:'ADMIN_BROWSER_AUTH_PROOF_INVALID'},400);
+      const challengeKey='admin-browser:challenge:'+challengeId,challenge=await this.state.storage.get(challengeKey);if(!challenge)return json({code:'ADMIN_BROWSER_AUTH_CHALLENGE_NOT_FOUND'},401);
+      await this.state.storage.delete(challengeKey);
+      if(String(challenge.loginId)!==loginId)return json({code:'ADMIN_BROWSER_AUTH_CHALLENGE_MISMATCH'},401);
+      if(!Number.isFinite(Date.parse(String(challenge.expiresAt||'')))||Date.parse(String(challenge.expiresAt))<=Date.now())return json({code:'ADMIN_BROWSER_AUTH_CHALLENGE_EXPIRED'},401);
+      const current=await this.staffIdentity(loginId,'ADMIN');if(!current)return json({code:'ADMIN_BROWSER_AUTH_UNAVAILABLE'},401);
+      if(String(challenge.staffId)!==String(current.staff.staffId||''))return json({code:'ADMIN_BROWSER_AUTH_IDENTITY_CHANGED'},409);
+      const message='MFK_ADMIN_BROWSER_LOGIN_V1\n'+challengeId+'\n'+loginId+'\n'+String(challenge.nonce||''),expected=await ownerHmacHex(String(current.verifier.hashHex),message);
+      if(!ownerSameHex(expected,proofHex))return json({code:'ADMIN_BROWSER_AUTH_UNAUTHORIZED',message:'PIN 不正確'},401);
+      const token=crypto.randomUUID().replaceAll('-','')+crypto.randomUUID().replaceAll('-',''),createdAt=new Date().toISOString(),expiresAt=new Date(Date.now()+10*365*24*60*60*1000).toISOString(),staffId=String(current.staff.staffId||'');
+      await this.state.storage.put('admin-browser:session:'+await sha256(token),{staffId,createdAt,lastSeenAt:createdAt,expiresAt});
+      return json({ok:true,staffId,loginId:String(current.loginId||loginId),displayName:String(current.staff.name||loginId),role:String(current.staff.role||''),scope:String(current.staff.scope||'STORE'),permissions:rows(current.staff.permissions).map(String),sessionToken:token,expiresAt},201);
+    }
+    if(url.pathname==='/admin-browser/auth/session'){
+      if(request.method==='GET'){const session=await this.readAdminBrowserSession(request);return session?json({ok:true,...session}):json({code:'ADMIN_BROWSER_SESSION_UNAUTHORIZED'},401);}
+      if(request.method==='POST'){const token=String(request.headers.get('x-mfk-admin-session')||'').trim();if(token)await this.state.storage.delete('admin-browser:session:'+await sha256(token));return json({state:'LOGGED_OUT'});}
+      return json({code:'METHOD_NOT_ALLOWED'},405);
+    }
+    if(url.pathname==='/admin-browser/active'&&request.method==='GET'){
+      const session=await this.readAdminBrowserSession(request);if(!session)return json({code:'ADMIN_BROWSER_SESSION_UNAUTHORIZED'},401);
+      const active=await this.state.storage.get('active');return active?json(active):json({code:'ADMIN_CONFIG_NOT_PUBLISHED'},404);
+    }
+    if(url.pathname==='/admin-browser/publish'&&request.method==='POST'){
+      const session=await this.readAdminBrowserSession(request);if(!session)return json({code:'ADMIN_BROWSER_SESSION_UNAUTHORIZED'},401);
+      if(String(session.role)!=='OWNER'&&!rows(session.permissions).map(String).includes('PUBLISH_CONFIG'))return json({code:'ADMIN_BROWSER_PUBLISH_FORBIDDEN'},403);
+      let envelope;try{envelope=validateMfkAdminConfigEnvelope(await request.json());}catch(error){return json({code:error instanceof Error?error.message:'ADMIN_CONFIG_INVALID'},400);}
+      const result=await this.publishEnvelope(envelope);return json(result.body,result.status);
     }
 
     if(url.pathname==='/customer-orders'&&request.method==='GET'){
@@ -796,27 +883,8 @@ export class AdminSyncStore{
       let envelope;
       try{envelope=validateMfkAdminConfigEnvelope(await request.json());}
       catch(error){return json({code:error instanceof Error?error.message:'ADMIN_CONFIG_INVALID'},400);}
-      const current=await this.state.storage.get('active');
-      if(current){
-        if(envelope.revision<current.revision)return json({code:'ADMIN_CONFIG_REVISION_STALE',currentRevision:current.revision},409);
-        if(envelope.revision===current.revision){
-          if(envelope.fingerprint!==current.fingerprint)return json({code:'ADMIN_CONFIG_REVISION_CONFLICT',currentFingerprint:current.fingerprint},409);
-          return json({state:'IDEMPOTENT',active:current});
-        }
-      }
-      await this.state.storage.put('active',envelope);
-      await this.state.storage.put('activeMeta',{revision:envelope.revision,fingerprint:envelope.fingerprint,publishedAt:envelope.publishedAt});
-      const doorbell=JSON.stringify({
-        type:'ADMIN_CONFIG_AVAILABLE',
-        storeId:envelope.storeId,
-        revision:envelope.revision,
-        fingerprint:envelope.fingerprint,
-        publishedAt:envelope.publishedAt,
-      });
-      for(const socket of this.state.getWebSockets()){
-        try{socket.send(doorbell);}catch{}
-      }
-      return json({state:'PUBLISHED',active:{revision:envelope.revision,fingerprint:envelope.fingerprint,publishedAt:envelope.publishedAt}});
+      const result=await this.publishEnvelope(envelope);
+      return json(result.body,result.status);
     }
     if(url.pathname==='/ack'){
       if(request.method!=='POST')return json({code:'METHOD_NOT_ALLOWED'},405);
@@ -1348,6 +1416,19 @@ export default {
           }
         }catch{}
       }
+      const headers=new Headers(response.headers);
+      for(const [key,value] of Object.entries(cors(request)))headers.set(key,value);
+      return new Response(response.body,{status:response.status,statusText:response.statusText,headers});
+    }
+    if(url.pathname.startsWith('/api/admin-browser/')){
+      if(request.method==='OPTIONS')return new Response(null,{status:204,headers:cors(request)});
+      const storeId=storeIdFrom(url);
+      const id=env.ADMIN_SYNC.idFromName(storeId);
+      const stub=env.ADMIN_SYNC.get(id);
+      const target=new URL(request.url);
+      target.pathname='/admin-browser/'+url.pathname.slice('/api/admin-browser/'.length);
+      target.search='';
+      const response=await stub.fetch(new Request(target.toString(),request));
       const headers=new Headers(response.headers);
       for(const [key,value] of Object.entries(cors(request)))headers.set(key,value);
       return new Response(response.body,{status:response.status,statusText:response.statusText,headers});

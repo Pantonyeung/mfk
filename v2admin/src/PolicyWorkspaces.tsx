@@ -1,4 +1,5 @@
 import {useEffect,useMemo,useState} from 'react';
+import type {StaffPinVerifier} from '../../contracts/staff-auth-v1.ts';
 import {useAdminDraft} from './admin-draft.tsx';
 import {appendAdminAudit,readActiveAdminRelease,usePersistentAdminState,writeAdminStored} from './admin-local-store.ts';
 import {saveAdminConfig} from './admin-config-save.ts';
@@ -321,8 +322,14 @@ export function StoreSettingsWorkspace(){
 }
 
 interface StaffDraft{
-  readonly id:string;readonly name:string;readonly role:'STAFF'|'MANAGER'|'OWNER'|'VIEWER';readonly pin:string;
+  readonly id:string;readonly loginId:string;readonly name:string;readonly role:'STAFF'|'MANAGER'|'OWNER'|'VIEWER';readonly pin:string;
+  readonly pinVerifier?:StaffPinVerifier;
   readonly scope:'STORE'|'MULTI_STORE'|'REPORT_ONLY';readonly adminLogin:boolean;readonly active:boolean;readonly permissions:readonly string[];
+}
+function migrateStaffDraft(row:StaffDraft):StaffDraft{
+  const name=String(row.name??'').trim();
+  const loginId=String(row.loginId??'').trim()||(/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(name)?name:String(row.id??'').trim());
+  return {...row,loginId,pin:String(row.pin??'')};
 }
 const PERMISSIONS=[['ORDER_REVIEW','查看訂單'],['ORDER_CORRECTION','更正訂單／付款'],['ADMIN_CONFIG','修改後台設定'],['PUBLISH_CONFIG','建立設定版本'],['REPORT_VIEW','查看報表'],['REPORT_EXPORT','匯出報表'],['STAFF_MANAGE','管理員工']] as const;
 export function StaffWorkspace(){
@@ -330,8 +337,11 @@ export function StaffWorkspace(){
   const [staff,setStaff]=usePersistentAdminState<StaffDraft[]>('staff.v1',[]);
   const [saveMessage,setSaveMessage]=useState('');
   const [saveErrors,setSaveErrors]=useState<readonly string[]>([]);
-  const add=()=>setStaff(rows=>{const row:StaffDraft={id:'staff-'+Date.now().toString(36),name:'',role:'STAFF',pin:'',scope:'STORE',adminLogin:false,active:true,permissions:['ORDER_REVIEW']};appendAdminAudit({action:'新增員工',target:row.id});return [...rows,row];});
-  const patch=(id:string,change:Partial<StaffDraft>)=>setStaff(rows=>rows.map(row=>{if(row.id!==id)return row;const after={...row,...change};appendAdminAudit({action:'修改員工／權限',target:id,before:{...row,pin:row.pin?'***':''},after:{...after,pin:after.pin?'***':''}});return after;}));
+  useEffect(()=>{
+    if(staff.some(row=>!String(row.loginId??'').trim()))setStaff(rows=>rows.map(row=>migrateStaffDraft(row)));
+  },[]);
+  const add=()=>setStaff(rows=>{const row:StaffDraft={id:'staff-'+Date.now().toString(36),loginId:'',name:'',role:'STAFF',pin:'',scope:'STORE',adminLogin:false,active:true,permissions:['ORDER_REVIEW']};appendAdminAudit({action:'新增員工',target:row.id});return [...rows,row];});
+  const patch=(id:string,change:Partial<StaffDraft>)=>setStaff(rows=>rows.map(row=>{if(row.id!==id)return row;const after={...row,...change};appendAdminAudit({action:'修改員工／權限',target:id,before:{...row,pin:row.pin?'***':'',pinVerifier:row.pinVerifier?'PRESENT':undefined},after:{...after,pin:after.pin?'***':'',pinVerifier:after.pinVerifier?'PRESENT':undefined}});return after;}));
   const remove=(row:StaffDraft)=>{
     if(typeof window!=='undefined'&&!window.confirm('確定移除「'+(row.name||row.id)+'」嘅員工草稿？一般停用請使用狀態開關。'))return;
     setStaff(rows=>{appendAdminAudit({action:'停用並移除員工草稿',target:row.id});return rows.filter(item=>item.id!==row.id);});
@@ -347,13 +357,14 @@ export function StaffWorkspace(){
   };
   const activeRelease=readActiveAdminRelease();
   return <section className="admin-editor-page">
-    <header className="admin-editor-head"><div><small>{activeRelease?'目前 R'+activeRelease.version:'未有保存版本'} · 人員／角色／權限</small><h1>員工／權限</h1><p>管理員工、角色、PIN、權限範圍同後台登入資格。PIN 只會轉成驗證器送到 SMT，唔會將明文 PIN 發布出去。</p>{saveMessage?<span>{saveMessage}</span>:null}</div><div className="admin-editor-actions"><button className="secondary" onClick={add}>新增員工</button><button className="primary" onClick={saveStaff}>保存人員設定</button></div></header>
+    <header className="admin-editor-head"><div><small>{activeRelease?'目前 R'+activeRelease.version:'未有保存版本'} · 人員／角色／權限</small><h1>員工／權限</h1><p>登入編號係人手輸入嘅帳號；Internal Staff ID 只供系統識別。PIN 只會轉成驗證器發布，唔會將明文 PIN 發布出去。</p>{saveMessage?<span>{saveMessage}</span>:null}</div><div className="admin-editor-actions"><button className="secondary" onClick={add}>新增員工</button><button className="primary" onClick={saveStaff}>保存人員設定</button></div></header>
     {saveErrors.length?<div className="admin-validation is-error" role="alert"><b>有 {saveErrors.length} 項需要處理</b><ul>{saveErrors.map((error,index)=><li key={index}>{error}</li>)}</ul></div>:null}
     {staff.length===0?<div className="admin-empty-state"><b>未有員工資料</b><p>新增員工後設定角色、PIN、權限範圍同權限。</p><button onClick={add}>新增員工</button></div>:<div className="admin-editor-grid">{staff.map(row=><article className="admin-policy-card" key={row.id}>
-      <header><h2>{row.name||'未命名員工'}</h2><small>{row.id}</small></header>
+      <header><h2>{row.name||row.loginId||'未命名員工'}</h2><small>{row.loginId?'登入編號 '+row.loginId:'未設定登入編號'}</small></header>
+      <label><span>登入編號</span><input autoComplete="username" value={row.loginId??''} onChange={event=>patch(row.id,{loginId:event.target.value.replace(/[^A-Za-z0-9._-]/g,'').slice(0,64)})} placeholder="例如 1111"/></label>
       <label><span>員工名稱</span><input value={row.name} onChange={event=>patch(row.id,{name:event.target.value})}/></label>
       <label><span>角色</span><select value={row.role} onChange={event=>patch(row.id,{role:event.target.value as StaffDraft['role']})}><option value="STAFF">員工</option><option value="MANAGER">經理</option><option value="OWNER">老闆</option><option value="VIEWER">只讀人員</option></select></label>
-      <label><span>PIN（4–8 位）</span><input type="password" inputMode="numeric" autoComplete="new-password" value={row.pin} onChange={event=>patch(row.id,{pin:event.target.value.replace(/\D/g,'').slice(0,8)})}/></label>
+      <label><span>PIN（4–8 位）</span><input type="password" inputMode="numeric" autoComplete="new-password" value={row.pin} onChange={event=>patch(row.id,{pin:event.target.value.replace(/\D/g,'').slice(0,8)})} placeholder={row.pinVerifier?'留空＝保留現有 PIN':'4–8 位數字'}/></label>
       <label><span>權限範圍</span><select value={row.scope} onChange={event=>patch(row.id,{scope:event.target.value as StaffDraft['scope']})}><option value="STORE">單店</option><option value="MULTI_STORE">多店</option><option value="REPORT_ONLY">只看報表</option></select></label>
       <div className="admin-check-grid">{PERMISSIONS.map(([id,label])=><label key={id}><input type="checkbox" checked={row.permissions.includes(id)} onChange={event=>togglePermission(row,id,event.target.checked)}/><span>{label}</span></label>)}</div>
       <Toggle checked={row.adminLogin} onChange={adminLogin=>patch(row.id,{adminLogin})} label="允許後台登入"/>

@@ -611,6 +611,7 @@ export default{
       try{active=await fetchActive(storeId);}catch{return json({code:'SMM_CONFIG_NOT_PUBLISHED'},503);}
       return json({staff:staffRows(active).map(item=>({
         staffId:item.staffId,
+        loginId:item.loginId,
         displayName:item.name,
         role:item.role,
       }))});

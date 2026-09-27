@@ -1,5 +1,6 @@
 export interface SmmStaffDirectoryItem{
   readonly staffId:string;
+  readonly loginId?:string;
   readonly displayName:string;
   readonly role:string;
 }
@@ -16,12 +17,13 @@ function cleanSession(value:unknown):SmmStaffSession|null{
   if(!value||typeof value!=='object'||Array.isArray(value))return null;
   const row=value as Record<string,unknown>;
   const staffId=String(row.staffId??'').trim();
+  const loginId=String(row.loginId??'').trim();
   const displayName=String(row.displayName??'').trim();
   const role=String(row.role??'').trim();
   const sessionToken=String(row.sessionToken??'').trim();
   const expiresAt=typeof row.expiresAt==='string'?row.expiresAt:undefined;
   if(!staffId||!displayName||sessionToken.length<32)return null;
-  return Object.freeze({staffId,displayName,role,sessionToken,...(expiresAt?{expiresAt}:{})});
+  return Object.freeze({staffId,...(loginId?{loginId}:{}),displayName,role,sessionToken,...(expiresAt?{expiresAt}:{})});
 }
 
 export function readSmmStaffSession():SmmStaffSession|null{
@@ -62,6 +64,7 @@ export async function refreshSmmStaffSession():Promise<SmmStaffSession|null>{
     if(!response.ok){localStorage.removeItem(KEY);return null;}
     const next=cleanSession({
       staffId:body.staffId,
+      loginId:body.loginId??current.loginId,
       displayName:body.displayName,
       role:body.role,
       sessionToken:current.sessionToken,
@@ -85,9 +88,10 @@ export async function listSmmStaff():Promise<readonly SmmStaffDirectoryItem[]>{
     if(!raw||typeof raw!=='object'||Array.isArray(raw))return[];
     const row=raw as Record<string,unknown>;
     const staffId=String(row.staffId??'').trim();
+    const loginId=String(row.loginId??'').trim();
     const displayName=String(row.displayName??'').trim();
     const role=String(row.role??'').trim();
-    return staffId&&displayName?[Object.freeze({staffId,displayName,role})]:[];
+    return staffId&&displayName?[Object.freeze({staffId,...(loginId?{loginId}:{}),displayName,role})]:[];
   }));
 }
 
