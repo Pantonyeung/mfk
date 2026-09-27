@@ -189,3 +189,84 @@ Milestone candidate：
 NO MAIN MERGE  
 NO DEPLOY  
 NO STAGE 9
+
+
+## Final CHANGES_REQUIRED correction
+
+Controlling review：#408 comment `5855641400`
+
+### 1. Reorder freshness fail-closed
+
+History remains readable while connection is OFFLINE / STALE / UNKNOWN.
+
+Starting Reorder now requires all three:
+
+- `browserOnline === true`
+- `connection === 'READY'`
+- current `menu` exists
+
+Otherwise：
+
+- 「再來一單」disabled / unavailable
+- human-safe explanation shown
+- read-only Refresh available
+- no New Cart creation
+
+If freshness is lost after entering COPY / REPAIR / REVIEW：
+
+- existing draft cart remains persisted
+- no draft deletion
+- no old Order reopen
+- no continued claim that current validation is complete
+- progression is blocked behind current-truth resync
+- reconnect + READY resumes validation against current menu / current quote
+
+Final Review ready gate now requires：
+
+- fresh browser connection
+- `connection === READY`
+- current menu present
+- `quote.freshness === CURRENT`
+- zero unresolved line attention
+
+A locally CURRENT quote over last-known menu is not sufficient while connection is stale/offline.
+
+### 2. Customer-safe Saved Template copy
+
+Exact diagnostic classification remains:
+
+`SAFE_UNAVAILABLE_FIRST_BREAK:CUSTOMER_SAVED_ORDER_TEMPLATE_MUTATION_SEAM_MISSING_IN_CURRENT_MAIN`
+
+It remains in source / tests / handoff / diagnostics.
+
+Normal Customer UI no longer renders that raw engineering value.
+
+Customer-visible copy：
+
+「常用訂單功能尚未開放」
+
+Disabled「設為常用訂單」remains.
+
+## Final re-acceptance contract
+
+- OFFLINE history readable, Reorder start blocked
+- STALE Reorder start blocked
+- UNKNOWN Reorder start blocked
+- READY + current menu allows normal Reorder start
+- freshness loss during REPAIR preserves draft and blocks completion
+- freshness loss during REVIEW blocks ready / Memory Jar continuation
+- reconnect READY resumes current validation
+- raw FIRST_BREAK not rendered to Customer
+- UI7 regression remains GREEN
+- Full Customer / Admin / v2local verification required on exact final head
+- fresh main behind = 0
+
+Exact FINAL_HEAD / FINAL_CI / BEHIND_MAIN 以 #408 最終 `READY_FOR_COMMANDER_REACCEPTANCE` receipt 為準。
+
+Milestone candidate：
+
+`MFK_CUSTOMER_UI8_HISTORY_REORDER_R1_READY_FOR_COMMANDER_REACCEPTANCE`
+
+NO MAIN MERGE  
+NO DEPLOY  
+NO STAGE 9
