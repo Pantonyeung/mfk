@@ -27,7 +27,7 @@ test('Stage 3 line workflow supports edit quantity remove total and optional not
     '訂單備註','總額','validSubtotalMinor'
   ])assert.match(cartSheet,new RegExp(marker));
   assert.match(cartSheet,/maxLength=\{160\}/);
-  assert.match(app,/onNote=\{value=>setCartNote\(value\.slice\(0,160\)\)\}/);
+  assert.match(app,/onNote=\{changeCartNote\}/);
 });
 
 test('editing an existing line preserves stable cart line identity and creation identity',()=>{
