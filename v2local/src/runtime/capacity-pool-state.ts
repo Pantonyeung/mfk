@@ -15,6 +15,26 @@ export interface CapacityPoolOrderEvent{
   readonly quantity:number;
   readonly createdAt:string;
   readonly sourceEventId?:string;
+  readonly overrideAllocations?:readonly {readonly overrideId:string;readonly quantity:number}[];
+}
+
+export type CapacityOverrideScope='FIRST_PARTY'|'THIRD_PARTY'|'ALL_REMOTE';
+
+export interface LocalCapacityOverrideApproval{
+  readonly id:string;
+  readonly submissionId:string;
+  readonly requestSignature:string;
+  readonly businessDate:string;
+  readonly poolId:string;
+  readonly scope:CapacityOverrideScope;
+  readonly approvedQty:number;
+  readonly remainingAllowance:number;
+  readonly createdAt:number;
+  readonly fromQty:number;
+  readonly toQty:number;
+  readonly staffId?:string;
+  readonly staffName?:string;
+  readonly note:string;
 }
 
 export interface LocalCapacityManualAdjustment{
@@ -38,6 +58,7 @@ export interface LocalCapacityPoolStateRow{
   readonly updatedAt:number;
   readonly appliedEventIds?:readonly string[];
   readonly manualAdjustments?:readonly LocalCapacityManualAdjustment[];
+  readonly overrides?:readonly LocalCapacityOverrideApproval[];
 }
 
 export interface SmtCapacityPoolStateViewRow{
@@ -52,6 +73,9 @@ export interface SmtCapacityPoolStateViewRow{
   readonly thirdPartyStopAt:number;
   readonly firstPartyAccepting:boolean;
   readonly thirdPartyAccepting:boolean;
+  readonly firstPartyOverrideRemaining:number;
+  readonly thirdPartyOverrideRemaining:number;
+  readonly activeOverrideCount:number;
   readonly note:string;
 }
 
@@ -69,6 +93,42 @@ function whole(value:unknown){
 function eventIds(value:unknown){
   if(!Array.isArray(value))return Object.freeze([] as string[]);
   return Object.freeze([...new Set(value.map(item=>String(item||'').trim()).filter(Boolean))]);
+}
+function parseOverride(value:unknown):LocalCapacityOverrideApproval{
+  if(!value||typeof value!=='object'||Array.isArray(value))throw new Error('CAPACITY_OVERRIDE_INVALID');
+  const row=value as Record<string,unknown>;
+  const id=String(row.id??'').trim();
+  const submissionId=String(row.submissionId??'').trim();
+  const requestSignature=String(row.requestSignature??'').trim();
+  const businessDate=String(row.businessDate??'').trim();
+  const poolId=String(row.poolId??'').trim();
+  const scope=row.scope;
+  const approvedQty=Number(row.approvedQty);
+  const remainingAllowance=Number(row.remainingAllowance);
+  const createdAt=Number(row.createdAt);
+  const fromQty=Number(row.fromQty);
+  const toQty=Number(row.toQty);
+  const note=String(row.note??'').trim();
+  if(!id||!submissionId||!requestSignature||!poolId||!/^\d{4}-\d{2}-\d{2}$/.test(businessDate)||
+     !['FIRST_PARTY','THIRD_PARTY','ALL_REMOTE'].includes(String(scope))||
+     !Number.isSafeInteger(approvedQty)||approvedQty<=0||
+     !Number.isSafeInteger(remainingAllowance)||remainingAllowance<0||remainingAllowance>approvedQty||
+     !Number.isFinite(createdAt)||!Number.isSafeInteger(fromQty)||fromQty<0||
+     !Number.isSafeInteger(toQty)||toQty<fromQty){
+    throw new Error('CAPACITY_OVERRIDE_INVALID');
+  }
+  const staffId=String(row.staffId??'').trim();
+  const staffName=String(row.staffName??'').trim();
+  return Object.freeze({
+    id,submissionId,requestSignature,businessDate,poolId,
+    scope:scope as CapacityOverrideScope,approvedQty,remainingAllowance,createdAt,fromQty,toQty,note,
+    ...(staffId?{staffId}:{}),
+    ...(staffName?{staffName}:{}),
+  });
+}
+function overrides(value:unknown){
+  if(!Array.isArray(value))return Object.freeze([] as LocalCapacityOverrideApproval[]);
+  return Object.freeze(value.map(parseOverride));
 }
 function parseManualAdjustment(value:unknown):LocalCapacityManualAdjustment{
   if(!value||typeof value!=='object'||Array.isArray(value))throw new Error('CAPACITY_MANUAL_ADJUSTMENT_INVALID');
@@ -113,9 +173,20 @@ function parseEvent(value:unknown):CapacityPoolOrderEvent{
     throw new Error('CAPACITY_POOL_EVENT_INVALID');
   }
   const sourceEventId=String(row.sourceEventId??'').trim();
+  const rawAllocations=Array.isArray(row.overrideAllocations)?row.overrideAllocations:[];
+  const overrideAllocations=rawAllocations.map(raw=>{
+    if(!raw||typeof raw!=='object'||Array.isArray(raw))throw new Error('CAPACITY_POOL_EVENT_INVALID');
+    const item=raw as Record<string,unknown>;
+    const overrideId=String(item.overrideId??'').trim();
+    const allocated=Number(item.quantity);
+    if(!overrideId||!Number.isSafeInteger(allocated)||allocated<=0)throw new Error('CAPACITY_POOL_EVENT_INVALID');
+    return Object.freeze({overrideId,quantity:allocated});
+  });
+  if(overrideAllocations.reduce((sum,item)=>sum+item.quantity,0)>quantity)throw new Error('CAPACITY_POOL_EVENT_INVALID');
   return Object.freeze({
     id,kind,orderId,admissionId,businessDate,poolId,quantity,createdAt,
     ...(sourceEventId?{sourceEventId}:{}),
+    ...(overrideAllocations.length?{overrideAllocations:Object.freeze(overrideAllocations)}:{}),
   });
 }
 function parseRow(value:unknown):LocalCapacityPoolStateRow{
@@ -137,6 +208,7 @@ function parseRow(value:unknown):LocalCapacityPoolStateRow{
     updatedAt,
     appliedEventIds:eventIds(row.appliedEventIds),
     manualAdjustments:manualAdjustments(row.manualAdjustments),
+    overrides:overrides(row.overrides),
   });
 }
 function assertUnique(rows:readonly LocalCapacityPoolStateRow[]){
@@ -208,10 +280,18 @@ function applyPendingEvents(
     if(!pending.length)return row;
     let remaining=row.remainingQty;
     let updatedAt=row.updatedAt;
+    let currentOverrides=[...(row.overrides??[])];
     for(const event of pending){
       if(event.kind==='DEDUCT'){
         if(event.quantity>remaining)throw new Error('CAPACITY_POOL_PROJECTION_UNDERFLOW:'+row.poolId);
         remaining-=event.quantity;
+        for(const allocation of event.overrideAllocations??[]){
+          const index=currentOverrides.findIndex(approval=>approval.id===allocation.overrideId);
+          if(index<0)throw new Error('CAPACITY_OVERRIDE_LEDGER_MISMATCH:'+row.poolId);
+          const approval=currentOverrides[index]!;
+          if(allocation.quantity>approval.remainingAllowance)throw new Error('CAPACITY_OVERRIDE_LEDGER_MISMATCH:'+row.poolId);
+          currentOverrides[index]=Object.freeze({...approval,remainingAllowance:approval.remainingAllowance-allocation.quantity});
+        }
       }else{
         remaining+=event.quantity;
       }
@@ -219,9 +299,42 @@ function applyPendingEvents(
       updatedAt=Math.max(updatedAt,Date.parse(event.createdAt));
     }
     changed=true;
-    return Object.freeze({...row,remainingQty:remaining,updatedAt,appliedEventIds:Object.freeze([...applied])});
+    return Object.freeze({
+      ...row,
+      remainingQty:remaining,
+      updatedAt,
+      appliedEventIds:Object.freeze([...applied]),
+      overrides:Object.freeze(currentOverrides),
+    });
   });
   return {rows:next,changed};
+}
+
+function scopeMatches(scope:CapacityOverrideScope,channel:'FIRST_PARTY'|'THIRD_PARTY'){
+  return scope==='ALL_REMOTE'||scope===channel;
+}
+function overrideAllowance(row:LocalCapacityPoolStateRow,channel:'FIRST_PARTY'|'THIRD_PARTY'){
+  return (row.overrides??[])
+    .filter(approval=>scopeMatches(approval.scope,channel))
+    .reduce((sum,approval)=>sum+approval.remainingAllowance,0);
+}
+function planOverrideAllocations(
+  row:LocalCapacityPoolStateRow,
+  channel:'FIRST_PARTY'|'THIRD_PARTY',
+  quantity:number,
+){
+  let needed=quantity;
+  const allocations:{overrideId:string;quantity:number}[]=[];
+  const candidates=[...(row.overrides??[])]
+    .filter(approval=>scopeMatches(approval.scope,channel)&&approval.remainingAllowance>0)
+    .sort((a,b)=>a.createdAt-b.createdAt||a.id.localeCompare(b.id));
+  for(const approval of candidates){
+    if(needed<=0)break;
+    const used=Math.min(needed,approval.remainingAllowance);
+    if(used>0){allocations.push({overrideId:approval.id,quantity:used});needed-=used;}
+  }
+  if(needed>0)throw new Error('CAPACITY_OVERRIDE_INSUFFICIENT:'+channel+':'+row.poolId);
+  return Object.freeze(allocations.map(item=>Object.freeze(item)));
 }
 
 export function ensureCurrentCapacityPoolState(
@@ -259,6 +372,8 @@ export function ensureCurrentCapacityPoolState(
   const current=valid.map(pool=>{
     const row=finalByKey.get(businessDate+'::'+pool.id);
     if(!row)throw new Error('CAPACITY_POOL_STATE_MISSING:'+pool.id);
+    const firstPartyOverrideRemaining=Math.min(row.remainingQty,overrideAllowance(row,'FIRST_PARTY'));
+    const thirdPartyOverrideRemaining=Math.min(row.remainingQty,overrideAllowance(row,'THIRD_PARTY'));
     return Object.freeze({
       poolId:pool.id,
       name:pool.name,
@@ -269,8 +384,11 @@ export function ensureCurrentCapacityPoolState(
       productIds:Object.freeze([...pool.productIds]),
       firstPartyStopAt:pool.firstPartyStopAt,
       thirdPartyStopAt:pool.thirdPartyStopAt,
-      firstPartyAccepting:row.remainingQty>pool.firstPartyStopAt,
-      thirdPartyAccepting:row.remainingQty>pool.thirdPartyStopAt,
+      firstPartyAccepting:row.remainingQty>pool.firstPartyStopAt||firstPartyOverrideRemaining>0,
+      thirdPartyAccepting:row.remainingQty>pool.thirdPartyStopAt||thirdPartyOverrideRemaining>0,
+      firstPartyOverrideRemaining,
+      thirdPartyOverrideRemaining,
+      activeOverrideCount:(row.overrides??[]).filter(approval=>approval.remainingAllowance>0).length,
       note:pool.note,
     });
   });
@@ -296,6 +414,7 @@ export function planCapacityDeductionEvents(input:{
   readonly admissionId:string;
   readonly items:readonly {readonly id:string;readonly qty:number}[];
   readonly existingEvents:readonly CapacityPoolOrderEvent[];
+  readonly channel?:CapacityRemoteChannel;
   readonly now?:number;
   readonly storage?:Pick<Storage,'getItem'|'setItem'>;
 }):readonly CapacityPoolOrderEvent[]{
@@ -323,6 +442,16 @@ export function planCapacityDeductionEvents(input:{
     const state=view.pools.find(row=>row.poolId===pool.id);
     if(!state)throw new Error('CAPACITY_POOL_STATE_MISSING:'+pool.id);
     if(quantity>state.remainingQty)throw new Error('CAPACITY_POOL_INSUFFICIENT:'+pool.id);
+    let overrideAllocations:readonly {overrideId:string;quantity:number}[]|undefined;
+    if(input.channel){
+      const threshold=input.channel==='FIRST_PARTY'?pool.firstPartyStopAt:pool.thirdPartyStopAt;
+      if(state.remainingQty<=threshold){
+        const rows=readLocalCapacityPoolRows(storage);
+        const stateRow=rows.find(row=>row.businessDate===view.businessDate&&row.poolId===pool.id);
+        if(!stateRow)throw new Error('CAPACITY_POOL_STATE_MISSING:'+pool.id);
+        overrideAllocations=planOverrideAllocations(stateRow,input.channel,quantity);
+      }
+    }
     events.push(Object.freeze({
       id:['CAPD',view.businessDate,orderId,admissionId,pool.id].join(':'),
       kind:'DEDUCT' as const,
@@ -332,6 +461,7 @@ export function planCapacityDeductionEvents(input:{
       poolId:pool.id,
       quantity,
       createdAt:new Date(now).toISOString(),
+      ...(overrideAllocations?.length?{overrideAllocations}:{}),
     }));
   }
   return Object.freeze(events);
@@ -414,6 +544,75 @@ export function applyManualCapacityCorrection(
 }
 
 
+export function applyCapacityOverrideApproval(
+  input:{
+    readonly poolId:string;
+    readonly submissionId:string;
+    readonly scope:CapacityOverrideScope;
+    readonly quantity:number;
+    readonly note?:string;
+    readonly now?:number;
+    readonly staffId?:string;
+    readonly staffName?:string;
+    readonly orderEvents?:readonly CapacityPoolOrderEvent[];
+  },
+  storage:Pick<Storage,'getItem'|'setItem'>=localStorage,
+):SmtCapacityPoolStateView{
+  const poolId=String(input.poolId||'').trim();
+  const submissionId=String(input.submissionId||'').trim();
+  const scope=input.scope;
+  const quantity=Number(input.quantity);
+  const note=String(input.note||'').trim();
+  if(!poolId)throw new Error('CAPACITY_POOL_ID_REQUIRED');
+  if(!submissionId||submissionId.length>200)throw new Error('CAPACITY_OVERRIDE_SUBMISSION_REQUIRED');
+  if(!['FIRST_PARTY','THIRD_PARTY','ALL_REMOTE'].includes(scope))throw new Error('CAPACITY_OVERRIDE_SCOPE_INVALID');
+  if(!Number.isSafeInteger(quantity)||quantity<=0)throw new Error('CAPACITY_OVERRIDE_QUANTITY_INVALID');
+
+  const now=input.now??Date.now();
+  const events=input.orderEvents??[];
+  const view=ensureCurrentCapacityPoolState(now,storage,events);
+  if(!view.pools.some(pool=>pool.poolId===poolId))throw new Error('CAPACITY_POOL_NOT_ACTIVE');
+
+  const rows=readLocalCapacityPoolRows(storage);
+  const allApprovals=rows.flatMap(row=>row.overrides??[]);
+  const requestSignature=JSON.stringify([view.businessDate,poolId,scope,quantity,note]);
+  const prior=allApprovals.find(approval=>approval.submissionId===submissionId);
+  if(prior){
+    if(prior.requestSignature!==requestSignature)throw new Error('CAPACITY_OVERRIDE_SUBMISSION_CONFLICT');
+    return view;
+  }
+
+  const index=rows.findIndex(row=>row.businessDate===view.businessDate&&row.poolId===poolId);
+  if(index<0)throw new Error('CAPACITY_POOL_STATE_MISSING:'+poolId);
+  const current=rows[index]!;
+  const toQty=current.remainingQty+quantity;
+  if(!Number.isSafeInteger(toQty))throw new Error('CAPACITY_OVERRIDE_QUANTITY_INVALID');
+  const approval:LocalCapacityOverrideApproval=Object.freeze({
+    id:['CAPOVR',view.businessDate,poolId,submissionId].join(':'),
+    submissionId,
+    requestSignature,
+    businessDate:view.businessDate,
+    poolId,
+    scope,
+    approvedQty:quantity,
+    remainingAllowance:quantity,
+    createdAt:now,
+    fromQty:current.remainingQty,
+    toQty,
+    ...(String(input.staffId||'').trim()?{staffId:String(input.staffId).trim()}:{}),
+    ...(String(input.staffName||'').trim()?{staffName:String(input.staffName).trim()}:{}),
+    note,
+  });
+  const updated:LocalCapacityPoolStateRow=Object.freeze({
+    ...current,
+    remainingQty:toQty,
+    updatedAt:now,
+    overrides:Object.freeze([...(current.overrides??[]),approval]),
+  });
+  writeLocalCapacityPoolRows(rows.map((row,rowIndex)=>rowIndex===index?updated:row),storage);
+  return ensureCurrentCapacityPoolState(now,storage,events);
+}
+
 export type CapacityRemoteChannel='FIRST_PARTY'|'THIRD_PARTY';
 
 export function assertCapacityChannelAdmission(input:{
@@ -437,9 +636,13 @@ export function assertCapacityChannelAdmission(input:{
   for(const pool of view.pools){
     const quantity=demandedQuantity(input.items,pool.productIds);
     if(quantity<=0)continue;
-    const accepting=channel==='FIRST_PARTY'?pool.firstPartyAccepting:pool.thirdPartyAccepting;
-    if(!accepting)throw new Error('CAPACITY_CHANNEL_STOP:'+channel+':'+pool.poolId);
     if(quantity>pool.remainingQty)throw new Error('CAPACITY_POOL_INSUFFICIENT:'+pool.poolId);
+    const threshold=channel==='FIRST_PARTY'?pool.firstPartyStopAt:pool.thirdPartyStopAt;
+    if(pool.remainingQty<=threshold){
+      const allowance=channel==='FIRST_PARTY'?pool.firstPartyOverrideRemaining:pool.thirdPartyOverrideRemaining;
+      if(allowance<=0)throw new Error('CAPACITY_CHANNEL_STOP:'+channel+':'+pool.poolId);
+      if(quantity>allowance)throw new Error('CAPACITY_OVERRIDE_INSUFFICIENT:'+channel+':'+pool.poolId);
+    }
   }
   return view;
 }
