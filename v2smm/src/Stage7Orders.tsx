@@ -8,14 +8,17 @@ import {
   smmStage7MatchesDate,
   smmStage7MatchesSearch,
   smmStage7MatchesSource,
+  smmStage7MatchesStatus,
   smmStage7OrderTime,
   smmStage7Phone,
   smmStage7SourceGroup,
   smmStage7StatusLabel,
+  smmStage7Sort,
   type SmmStage7DateFilter,
   type SmmStage7SearchScope,
   type SmmStage7Segment,
   type SmmStage7SourceFilter,
+  type SmmStage7StatusFilter,
 } from './stage7-orders.mjs';
 
 type Stage7Surface='LIST'|'SEARCH'|'DETAIL'|'STATUS';
@@ -36,6 +39,20 @@ const SEARCH_SCOPES:readonly [SmmStage7SearchScope,string][]=[
 ];
 
 const STATUS_OPTIONS=['待確認','製作中','準備完成 / 可取餐','已取餐','已取消'] as const;
+
+const ACTIVE_STATUS_FILTERS:readonly [SmmStage7StatusFilter,string][]=[
+  ['ALL','全部狀態'],
+  ['PENDING','待確認'],
+  ['WORKING','製作中'],
+  ['READY','可取餐'],
+  ['UNKNOWN','狀態未明'],
+];
+const HISTORY_STATUS_FILTERS:readonly [SmmStage7StatusFilter,string][]=[
+  ['ALL','全部狀態'],
+  ['PICKED_UP','已取餐'],
+  ['CANCELLED','已取消'],
+  ['UNKNOWN','狀態未明'],
+];
 
 function dateTimeLabel(value:string){
   const date=new Date(value);
@@ -279,6 +296,7 @@ export function Stage7OrdersView({
   const [segment,setSegment]=useState<SmmStage7Segment>('ACTIVE');
   const [sourceFilter,setSourceFilter]=useState<SmmStage7SourceFilter>('ALL');
   const [dateFilter,setDateFilter]=useState<SmmStage7DateFilter>('ALL');
+  const [statusFilter,setStatusFilter]=useState<SmmStage7StatusFilter>('ALL');
   const [customDate,setCustomDate]=useState('');
   const [query,setQuery]=useState('');
   const [searchScope,setSearchScope]=useState<SmmStage7SearchScope>('ALL');
@@ -286,11 +304,12 @@ export function Stage7OrdersView({
   const [selectedId,setSelectedId]=useState<string|null>(null);
   const [refreshing,setRefreshing]=useState(false);
 
-  const segmentRows=useMemo(()=>rows.filter(row=>smmStage7InSegment(row,segment)),[rows,segment]);
+  const segmentRows=useMemo(()=>smmStage7Sort(rows.filter(row=>smmStage7InSegment(row,segment))),[rows,segment]);
   const filteredRows=useMemo(()=>segmentRows.filter(row=>
     smmStage7MatchesSource(row,sourceFilter)&&
+    smmStage7MatchesStatus(row,statusFilter)&&
     (segment!=='HISTORY'||smmStage7MatchesDate(row,dateFilter,customDate))
-  ),[segmentRows,sourceFilter,segment,dateFilter,customDate]);
+  ),[segmentRows,sourceFilter,statusFilter,segment,dateFilter,customDate]);
   const selected=selectedId?rows.find(row=>row.orderId===selectedId):undefined;
 
   const refresh=async()=>{
@@ -330,8 +349,8 @@ export function Stage7OrdersView({
     <Stage7StateBanner connection={connection} hasRows={rows.length>0}/>
 
     <div className="stage7-segments" aria-label="訂單範圍">
-      <button type="button" className={segment==='ACTIVE'?'active':''} aria-pressed={segment==='ACTIVE'} onClick={()=>{setSegment('ACTIVE');setDateFilter('ALL')}}>進行中</button>
-      <button type="button" className={segment==='HISTORY'?'active':''} aria-pressed={segment==='HISTORY'} onClick={()=>setSegment('HISTORY')}>歷史</button>
+      <button type="button" className={segment==='ACTIVE'?'active':''} aria-pressed={segment==='ACTIVE'} onClick={()=>{setSegment('ACTIVE');setDateFilter('ALL');setStatusFilter('ALL')}}>進行中</button>
+      <button type="button" className={segment==='HISTORY'?'active':''} aria-pressed={segment==='HISTORY'} onClick={()=>{setSegment('HISTORY');setStatusFilter('ALL')}}>歷史</button>
     </div>
 
     {segment==='HISTORY'?<div className="stage7-date-filter" aria-label="歷史日期">
@@ -345,6 +364,10 @@ export function Stage7OrdersView({
       {SOURCE_FILTERS.map(([value,label])=><button type="button" key={value} className={sourceFilter===value?'active':''} aria-pressed={sourceFilter===value} onClick={()=>setSourceFilter(value)}>
         <span>{label}</span><b>{sourceFilterCount(segmentRows,value)}</b>
       </button>)}
+    </div>
+
+    <div className="stage7-status-filters" aria-label="訂單狀態">
+      {(segment==='ACTIVE'?ACTIVE_STATUS_FILTERS:HISTORY_STATUS_FILTERS).map(([value,label])=><button type="button" key={value} className={statusFilter===value?'active':''} aria-pressed={statusFilter===value} onClick={()=>setStatusFilter(value)}>{label}</button>)}
     </div>
 
     <button type="button" className="stage7-search-entry" onClick={()=>setSurface('SEARCH')}>
