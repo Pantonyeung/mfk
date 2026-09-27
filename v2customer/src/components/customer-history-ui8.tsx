@@ -11,6 +11,8 @@ import type {
 
 export type Ui8OrderSegment='current'|'completed'|'all';
 export type Ui8Phase='LIST'|'DETAIL'|'COPY'|'REPAIR'|'REVIEW';
+type Ui8CharacterVariant='male'|'female';
+const ui8CharacterPath=(variant:Ui8CharacterVariant)=>variant==='female'?'/brand/stage7-pickup-female.svg':'/brand/stage7-pickup-male.svg';
 
 export const CUSTOMER_UI8_SAVED_TEMPLATE_SEAM_CLASSIFICATION=
   'SAFE_UNAVAILABLE_FIRST_BREAK:CUSTOMER_SAVED_ORDER_TEMPLATE_MUTATION_SEAM_MISSING_IN_CURRENT_MAIN' as const;
@@ -108,17 +110,19 @@ function CopyIntent({
   issueCount,
   onContinue,
   onBack,
+  variant,
 }:{
   order:CustomerHistoryProjection;
   cart:readonly CustomerCartLine[];
   issueCount:number;
   onContinue:()=>void;
   onBack:()=>void;
+  variant:Ui8CharacterVariant;
 }){
   return <section className="ui8-copy-intent">
     <button className="ui8-back" onClick={onBack}>返回歷史訂單</button>
     <header className="ui8-copy-hero">
-      <img src="/brand/stage7-pickup-male.svg" alt="磨飯品牌角色"/>
+      <img src={ui8CharacterPath(variant)} alt="磨飯品牌角色"/>
       <span>再來一單</span><h1>正在建立新購物車</h1>
       <p>Past Order → Copy Intent → New Cart。唔會重開舊 Order。</p>
     </header>
@@ -200,6 +204,7 @@ export function HistoryReorderUi8View({
   active,history,selectedHistory,
   cart,repairs,quote,menu,connection,browserOnline,
   onOpenCurrent,onOpenHistory,onStartReorder,onAcceptRepair,onEditRepair,onRemoveLine,onGoCart,onBrowse,
+  characterVariant='male',
 }:{
   segment:Ui8OrderSegment;setSegment:(value:Ui8OrderSegment)=>void;
   phase:Ui8Phase;setPhase:(value:Ui8Phase)=>void;
@@ -209,10 +214,11 @@ export function HistoryReorderUi8View({
   onOpenCurrent:(order:CustomerOrderProjection)=>void;onOpenHistory:(order:CustomerHistoryProjection)=>void;
   onStartReorder:(order:CustomerHistoryProjection)=>void;onAcceptRepair:(lineId:string)=>void;onEditRepair:(line:CustomerCartLine)=>void;onRemoveLine:(lineId:string)=>void;
   onGoCart:()=>void;onBrowse:()=>void;
+  characterVariant?:Ui8CharacterVariant;
 }){
   if(phase!=='LIST'&&selectedHistory){
     if(phase==='DETAIL')return <section className="page ui8-page"><HistoryDetail order={selectedHistory} onBack={()=>setPhase('LIST')} onReorder={onStartReorder}/></section>;
-    if(phase==='COPY')return <section className="page ui8-page"><CopyIntent order={selectedHistory} cart={cart} issueCount={new Set([...repairs.map(item=>item.lineId),...cart.filter(line=>line.attention).map(line=>line.lineId)]).size} onContinue={()=>setPhase(repairs.length||cart.some(line=>line.attention)?'REPAIR':'REVIEW')} onBack={()=>setPhase('DETAIL')}/></section>;
+    if(phase==='COPY')return <section className="page ui8-page"><CopyIntent order={selectedHistory} cart={cart} issueCount={new Set([...repairs.map(item=>item.lineId),...cart.filter(line=>line.attention).map(line=>line.lineId)]).size} onContinue={()=>setPhase(repairs.length||cart.some(line=>line.attention)?'REPAIR':'REVIEW')} onBack={()=>setPhase('DETAIL')} variant={characterVariant}/></section>;
     if(phase==='REPAIR')return <section className="page ui8-page"><Repair cart={cart} repairs={repairs} menu={menu} onAccept={onAcceptRepair} onEdit={onEditRepair} onRemove={onRemoveLine} onContinue={()=>setPhase('REVIEW')}/></section>;
     if(phase==='REVIEW')return <section className="page ui8-page"><FinalReview cart={cart} quote={quote} onCart={onGoCart} onRepair={()=>setPhase('REPAIR')}/></section>;
   }
