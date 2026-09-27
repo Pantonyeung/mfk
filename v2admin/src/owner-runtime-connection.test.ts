@@ -39,7 +39,7 @@ describe('Owner canonical read projection',()=>{
     expect(snapshot.actions).toEqual([]);
     expect(snapshot.channels).toEqual([]);
     expect(snapshot.campaigns).toEqual([]);
-    expect(snapshot.sellability[0].state).toBe('可售');
+    expect(snapshot.sellability[0].state).toBe('SELLABLE');
     expect(snapshot.devices[0].health).toBe('UNKNOWN');
   });
 });

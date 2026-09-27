@@ -19,6 +19,7 @@ import {OrderOversightPage} from './stage03-order-oversight';
 import type {OwnerOrderScope} from './stage03-view-model';
 import {ChannelHealthPage} from './channel-health';
 import {MonthlyTargetSummaryCard,PlanningPage} from './planning';
+import {SellabilityPage} from './sellability';
 import type {
   OwnerAuthSession,
   OwnerConnectionState,
@@ -26,11 +27,12 @@ import type {
   OwnerPlanningSnapshot,
   OwnerReadModelSnapshot,
   OwnerRuntimePort,
+  OwnerSellabilityCommandInput,
 } from './product-types';
 
 type View='today'|'queue'|'orders'|'more';
-type SecondaryView='channels'|'planning';
-type Tool='reports'|'sellability'|'staff'|'devices'|'customers'|'marketing'|'settlement'|'cash'|'inventory'|'notifications'|'manager'|'activity'|'admin'|'recovery';
+type SecondaryView='channels'|'planning'|'sellability';
+type Tool='reports'|'staff'|'devices'|'customers'|'marketing'|'settlement'|'cash'|'inventory'|'notifications'|'manager'|'activity'|'admin'|'recovery';
 type Confirmation={label:string;target:string;impact:string;actionId?:string};
 
 export function App(){
@@ -53,10 +55,11 @@ export function App(){
   const [confirmation,setConfirmation]=useState<Confirmation|null>(null);
   const [commandFlight,setCommandFlight]=useState<OwnerActionCommandFlight|null>(null);
   const [ordersScope,setOrdersScope]=useState<OwnerOrderScope>('DEFAULT');
-  const [secondary,setSecondary]=useState<SecondaryView|null>(()=>typeof window!=='undefined'&&window.location.pathname==='/channels'?'channels':typeof window!=='undefined'&&window.location.pathname==='/planning'?'planning':null);
+  const [secondary,setSecondary]=useState<SecondaryView|null>(()=>typeof window!=='undefined'&&window.location.pathname==='/channels'?'channels':typeof window!=='undefined'&&window.location.pathname==='/planning'?'planning':typeof window!=='undefined'&&window.location.pathname==='/sellability'?'sellability':null);
   const [planning,setPlanning]=useState<OwnerPlanningSnapshot|null>(null);
   const [planningLoading,setPlanningLoading]=useState(false);
   const [planningSaving,setPlanningSaving]=useState(false);
+  const [sellabilityBusy,setSellabilityBusy]=useState(false);
 
   const persistLocal=(next?:Partial<{view:View;managerNote:string;handoffNote:string;checklist:readonly OwnerChecklistItem[]}>)=>{
     writeOwnerLocalWorkspace({
@@ -77,7 +80,7 @@ export function App(){
   const openSecondary=(next:SecondaryView)=>{
     setSecondary(next);
     if(typeof window!=='undefined'){
-      const path=next==='channels'?'/channels':'/planning';
+      const path=next==='channels'?'/channels':next==='planning'?'/planning':'/sellability';
       if(window.location.pathname!==path)window.history.pushState({},'',path);
     }
   };
@@ -131,6 +134,7 @@ export function App(){
       const path=window.location.pathname;
       if(path==='/channels'){setSecondary('channels');return}
       if(path==='/planning'){setSecondary('planning');return}
+      if(path==='/sellability'){setSecondary('sellability');return}
       setSecondary(null);
       if(path==='/actions')setView('queue');
       else if(path==='/orders')setView('orders');
@@ -149,6 +153,31 @@ export function App(){
     catch{setNotice('未能讀取 canonical planning；唔會用本機資料代替。');}
     finally{setPlanningLoading(false);}
   };
+  const loadSellability=async()=>{
+    if(!port?.readSellability){const next=await refresh();return next?.sellability??null}
+    try{
+      const items=await port.readSellability();
+      setSnapshot(current=>current?{...current,sellability:items}:current);
+      return items;
+    }catch{
+      setNotice('未能讀取 canonical Sellability；保持 UNKNOWN，唔會由 Inventory 推斷。');
+      return null;
+    }
+  };
+  const commandSellability=async(input:OwnerSellabilityCommandInput)=>{
+    if(!port?.commandSellability){setNotice('Sellability command seam 未連接；冇改變正式狀態。');return}
+    if(connection==='OFFLINE_READONLY'||connection==='PERMISSION_DENIED'){setNotice('目前只可讀取；售罄操作已停用。');return}
+    setSellabilityBusy(true);
+    try{
+      const result=await port.commandSellability(input);
+      if(result.state==='CONFIRMED')setNotice('售罄操作已完成 canonical apply + per-target readback。');
+      else if(result.state==='PARTIAL')setNotice('部分目標已確認；其餘保持結果未明。');
+      else setNotice('操作結果未明；請重新讀取，禁止 blind retry。');
+      await loadSellability();
+    }catch{setNotice('操作結果未明；請重新讀取，禁止 blind retry。');}
+    finally{setSellabilityBusy(false);}
+  };
+
   const loadChannels=async()=>{
     if(!port?.readChannels){
       const next=await refresh();
@@ -165,6 +194,7 @@ export function App(){
   };
   useEffect(()=>{if(secondary==='planning'&&ownerSession)void loadPlanning(planning?.plan.monthKey);},[secondary,ownerSession?.sessionToken]);
   useEffect(()=>{if(secondary==='channels'&&ownerSession)void loadChannels();},[secondary,ownerSession?.sessionToken]);
+  useEffect(()=>{if(secondary==='sellability'&&ownerSession)void loadSellability();},[secondary,ownerSession?.sessionToken]);
 
   const login=async()=>{
     if(!port?.loginOwner||loginBusy)return;
@@ -317,10 +347,11 @@ export function App(){
     <section className="stage">
       {secondary==='channels'?<ChannelHealthPage channels={snapshot?.channels??[]} connection={connection} onRecheck={channelId=>void recheckChannel(channelId)} onBack={()=>changeView('more')}/>:null}
       {secondary==='planning'?<PlanningPage value={planning} loading={planningLoading} saving={planningSaving} onMonthChange={monthKey=>void loadPlanning(monthKey)} onSave={input=>void savePlanning(input)} onBack={()=>changeView('more')}/>:null}
+      {secondary==='sellability'?<SellabilityPage items={snapshot?.sellability??[]} connection={connection} busy={sellabilityBusy} onCommand={input=>void commandSellability(input)} onReload={()=>void loadSellability()} onBack={()=>changeView('more')}/>:null}
       {!secondary&&view==='today'?<TodayPage connection={connection} snapshot={snapshot} onQueue={()=>changeView('queue')} onActiveOrders={()=>openOrdersScope('ACTIVE')} onDineInOrders={()=>openOrdersScope('DINE_IN_OPEN')} onChannels={()=>openSecondary('channels')} onPlanning={()=>openSecondary('planning')} onTool={setTool}/>:null}
       {!secondary&&view==='queue'?<ActionQueuePage connection={connection} items={openActions} activity={snapshot?.activity??[]} commandFlight={commandFlight} onCommand={requestBounded} onRecheck={actionId=>void recheckAction(actionId)}/>:null}
       {!secondary&&view==='orders'?<OrderOversightPage connection={connection} orders={snapshot?.orders??[]} scope={ordersScope} onScopeReset={()=>setOrdersScope('DEFAULT')}/>:null}
-      {!secondary&&view==='more'?<MorePage snapshot={snapshot} connection={connection} onTool={setTool} onChannels={()=>openSecondary('channels')} onPlanning={()=>openSecondary('planning')}/>:null}
+      {!secondary&&view==='more'?<MorePage snapshot={snapshot} connection={connection} onTool={setTool} onChannels={()=>openSecondary('channels')} onPlanning={()=>openSecondary('planning')} onSellability={()=>openSecondary('sellability')}/>:null}
     </section>
 
     <nav className="bottom-nav" aria-label="主要功能">
@@ -392,10 +423,9 @@ function TodayPage({
   </section>;
 }
 
-function MorePage({snapshot,connection,onTool,onChannels,onPlanning}:{snapshot:OwnerReadModelSnapshot|null;connection:OwnerConnectionState;onTool:(tool:Tool)=>void;onChannels:()=>void;onPlanning:()=>void}){
+function MorePage({snapshot,connection,onTool,onChannels,onPlanning,onSellability}:{snapshot:OwnerReadModelSnapshot|null;connection:OwnerConnectionState;onTool:(tool:Tool)=>void;onChannels:()=>void;onPlanning:()=>void;onSellability:()=>void}){
   const tools:{id:Tool;title:string;detail:string;state:string}[]=[
     {id:'reports',title:'報表',detail:'固定可信摘要',state:String(snapshot?.reports.length??0)},
-    {id:'sellability',title:'商品供應',detail:'售罄／恢復有限操作',state:connection==='FRESH'?'可查詢':'未連接'},
     {id:'staff',title:'員工',detail:'在場／角色／權限摘要',state:String(snapshot?.staff.length??0)},
     {id:'devices',title:'設備／打印',detail:'健康／影響範圍／Job certainty',state:String(snapshot?.devices.length??0)},
     {id:'customers',title:'客戶',detail:'CRM Lite／新客／回頭客／同意',state:snapshot?.customers?'已讀取':'未連接'},
@@ -409,14 +439,14 @@ function MorePage({snapshot,connection,onTool,onChannels,onPlanning}:{snapshot:O
     {id:'admin',title:'前往 Admin',detail:'設定留喺 Admin',state:'導航'},
     {id:'recovery',title:'資料狀態',detail:'Offline / Stale / Unknown / Partial',state:connection},
   ];
-  return <section className="page"><header className="page-head"><div><span>更多</span><h1>營運工具</h1><small>設定留 Admin；交易、付款、打印同實體設備執行留喺責任端。</small></div></header><div className="tool-grid"><button className="tool-card" onClick={onChannels}><strong>渠道</strong><small>健康／接單／有限控制</small><em>{String(snapshot?.channels.length??0)}</em></button><button className="tool-card" onClick={onPlanning}><strong>營業目標與成本</strong><small>Monthly Target / Cost Planning</small><em>{snapshot?.planning?.plan.revision?'已設定':'未設定'}</em></button>{tools.map(item=><button key={item.id} className="tool-card" onClick={()=>onTool(item.id)} data-icon-state="AI_ASSET_PENDING"><strong>{item.title}</strong><small>{item.detail}</small><em>{item.state}</em></button>)}</div></section>;
+  return <section className="page"><header className="page-head"><div><span>更多</span><h1>營運工具</h1><small>設定留 Admin；交易、付款、打印同實體設備執行留喺責任端。</small></div></header><div className="tool-grid"><button className="tool-card" onClick={onChannels}><strong>渠道</strong><small>健康／接單／有限控制</small><em>{String(snapshot?.channels.length??0)}</em></button><button className="tool-card" onClick={onPlanning}><strong>營業目標與成本</strong><small>Monthly Target / Cost Planning</small><em>{snapshot?.planning?.plan.revision?'已設定':'未設定'}</em></button><button className="tool-card" onClick={onSellability}><strong>商品供應</strong><small>售罄／恢復有限操作</small><em>{String(snapshot?.sellability.length??0)}</em></button>{tools.map(item=><button key={item.id} className="tool-card" onClick={()=>onTool(item.id)} data-icon-state="AI_ASSET_PENDING"><strong>{item.title}</strong><small>{item.detail}</small><em>{item.state}</em></button>)}</div></section>;
 }
 
 function ToolDrawer({tool,snapshot,connection,managerNote,handoffNote,checklist,setManagerNote,setHandoffNote,setChecklist,onCommand,onAdmin,onClose}:{tool:Tool;snapshot:OwnerReadModelSnapshot|null;connection:OwnerConnectionState;managerNote:string;handoffNote:string;checklist:readonly OwnerChecklistItem[];setManagerNote:(v:string)=>void;setHandoffNote:(v:string)=>void;setChecklist:(v:readonly OwnerChecklistItem[])=>void;onCommand:(label:string,target:string,impact:string)=>void;onAdmin:()=>void;onClose:()=>void}){
-  const title=tool==='reports'?'報表':tool==='sellability'?'商品供應':tool==='staff'?'員工':tool==='devices'?'設備／打印':tool==='customers'?'客戶':tool==='marketing'?'推廣':tool==='settlement'?'平台結算':tool==='cash'?'現金':tool==='inventory'?'庫存':tool==='notifications'?'通知':tool==='manager'?'經理日誌':tool==='activity'?'活動紀錄':tool==='admin'?'Admin':tool==='recovery'?'資料狀態':'工具';
+  const title=tool==='reports'?'報表':tool==='staff'?'員工':tool==='devices'?'設備／打印':tool==='customers'?'客戶':tool==='marketing'?'推廣':tool==='settlement'?'平台結算':tool==='cash'?'現金':tool==='inventory'?'庫存':tool==='notifications'?'通知':tool==='manager'?'經理日誌':tool==='activity'?'活動紀錄':tool==='admin'?'Admin':tool==='recovery'?'資料狀態':'工具';
   return <div className="overlay"><section className="drawer" role="dialog" aria-modal="true"><DrawerHead title={title} subtitle="老闆中心" close={onClose}/>
     {tool==='reports'?<ListOrEmpty rows={snapshot?.reports??[]} render={item=><div className="list-row" key={item.reportId}><div><strong>{item.name}</strong><small>{item.compare??item.freshness}</small></div><b>{item.value}</b></div>} empty="報表尚未連接"/>:null}
-    {tool==='sellability'?<ListOrEmpty rows={snapshot?.sellability??[]} render={item=><div className="list-row" key={item.targetId}><div><strong>{item.name}</strong><small>{item.grain} · {item.scope} · {item.state}</small></div><button onClick={()=>onCommand(item.state==='AVAILABLE'?'標記售罄':'恢復供應',item.targetId,'有限度供應狀態操作；必須等正式讀回。')}>{item.state==='AVAILABLE'?'售罄':'恢復'}</button></div>} empty="商品供應資料尚未連接"/>:null}
+
     {tool==='staff'?<ListOrEmpty rows={snapshot?.staff??[]} render={item=><div className="list-row" key={item.staffId}><div><strong>{item.name}</strong><small>{item.role} · {item.permissions}</small></div><span>{item.presence}</span></div>} empty="員工資料尚未連接"/>:null}
     {tool==='devices'?<ListOrEmpty rows={snapshot?.devices??[]} render={item=><div className="list-row" key={item.deviceId}><div><strong>{item.name}</strong><small>{item.kind} · {item.affected??'未有影響摘要'} · {item.jobs??'未有 Job 摘要'}</small></div><span>{item.health}</span></div>} empty="設備資料尚未連接"/>:null}
     {tool==='customers'?snapshot?.customers?<div className="metric-grid"><Metric label="客戶" value={snapshot.customers.totalLabel}/><Metric label="新客" value={snapshot.customers.newLabel}/><Metric label="回頭客" value={snapshot.customers.returningLabel}/><Metric label="同意狀態" value={snapshot.customers.consentLabel}/></div>:<Empty title="客戶摘要尚未連接" detail="唔會用假 CRM 數字代替。"/>:null}

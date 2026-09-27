@@ -99,6 +99,13 @@ function moneyMinor(value:unknown){
 function snapshotOf(envelope?:MfkAdminConfigEnvelope|null){
   return record((envelope??readSmtAdminConfigLkg())?.snapshot);
 }
+function localSellable(raw:unknown,now=Date.now()){
+  const state=record(raw);
+  if(state.scope==='ONLINE_ONLY')return true;
+  const restoreAt=Date.parse(string(state.restoreAt));
+  if(Number.isFinite(restoreAt)&&restoreAt<=now)return true;
+  return state.sellable!==false;
+}
 
 export function projectSyncedOrderingCatalog(
   serviceMode:SyncedServiceMode,
@@ -168,7 +175,7 @@ export function projectSyncedOrderingCatalog(
               name:string(option.name,optionId),
               priceAdjustmentMinor:moneyMinor(option.priceAdjustment),
               defaultSelected:defaults.has(optionId),
-              active:bool(option.active,true),
+              active:bool(option.active,true)&&localSellable(availability['OPTION:'+optionId]),
               position:integer(option.position,0),
             };
           })
@@ -197,7 +204,7 @@ export function projectSyncedOrderingCatalog(
         position:integer(row.legacySourcePosition,index),
         priceMinor:moneyMinor(priceText)+surcharge+adjustment,
         priceReady:baseReady,
-        sellable:availabilityRow.sellable===undefined?true:bool(availabilityRow.sellable,true),
+        sellable:localSellable(availabilityRow),
         imageUrl:imageUrl||undefined,
         optionSets:Object.freeze(optionSets),
       };
@@ -274,7 +281,7 @@ export function projectSyncedCombos(envelope?:MfkAdminConfigEnvelope|null):{
           label:string(choice.label),
           bandId:string(choice.bandId),
           priceAdjustmentMinor:moneyMinor(choice.priceAdjustment),
-          active:bool(choice.active,true),
+          active:bool(choice.active,true)&&localSellable(record(snapshot.availability)['COMBO_CHILD:'+string(choice.id)]),
           position:integer(choice.position,0),
         };
       }).filter(choice=>choice.id&&choice.active);

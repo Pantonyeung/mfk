@@ -1,4 +1,4 @@
-import type {OwnerAuthSession,OwnerChannelHealth,OwnerPlanningCommandResult,OwnerPlanningSaveInput,OwnerPlanningSnapshot,OwnerReadModelSnapshot,OwnerRuntimePort} from './product-types';
+import type {OwnerAuthSession,OwnerChannelHealth,OwnerPlanningCommandResult,OwnerPlanningSaveInput,OwnerPlanningSnapshot,OwnerReadModelSnapshot,OwnerRuntimePort,OwnerSellabilityCommandInput,OwnerSellabilityCommandResult,OwnerSellabilityItem} from './product-types';
 
 const OWNER_API_ORIGIN='https://admin.morefunos.com';
 const STORE_ID='MF01';
@@ -111,6 +111,20 @@ export async function saveOwnerPlanning(input:OwnerPlanningSaveInput):Promise<Ow
   });
   return body as unknown as OwnerPlanningCommandResult;
 }
+export async function readOwnerSellability():Promise<readonly OwnerSellabilityItem[]>{
+  const body=await ownerFetch('/api/owner/sellability?storeId='+encodeURIComponent(STORE_ID),{
+    method:'GET',cache:'no-store',headers:ownerSessionHeaders(),
+  });
+  return Object.freeze(Array.isArray(body.items)?body.items as unknown as OwnerSellabilityItem[]:[]);
+}
+export async function commandOwnerSellability(input:OwnerSellabilityCommandInput):Promise<OwnerSellabilityCommandResult>{
+  const body=await ownerFetch('/api/owner/sellability?storeId='+encodeURIComponent(STORE_ID),{
+    method:'POST',
+    headers:ownerSessionHeaders({'content-type':'application/json'}),
+    body:JSON.stringify(input),
+  });
+  return body as unknown as OwnerSellabilityCommandResult;
+}
 export function createCloudOwnerRuntimePort():OwnerRuntimePort{
   return Object.freeze({
     portId:'MFK_OWNER_PORT_V1' as const,
@@ -118,6 +132,8 @@ export function createCloudOwnerRuntimePort():OwnerRuntimePort{
     readChannels:readOwnerChannels,
     readPlanning:readOwnerPlanning,
     savePlanning:saveOwnerPlanning,
+    readSellability:readOwnerSellability,
+    commandSellability:commandOwnerSellability,
     async readSnapshot():Promise<OwnerReadModelSnapshot>{
       const session=readStoredOwnerSession();if(!session)throw new OwnerRuntimeError('OWNER_SESSION_REQUIRED','請先登入 Owner App');
       const body=await ownerFetch('/api/owner/snapshot?storeId='+encodeURIComponent(STORE_ID),{method:'GET',cache:'no-store',headers:{'x-mfk-owner-session':session.sessionToken}});

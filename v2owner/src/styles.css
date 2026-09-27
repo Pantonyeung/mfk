@@ -612,3 +612,23 @@ body{
 @media(max-width:390px){
   .channel-actions,.channel-facts,.planning-summary-grid,.planning-metrics{grid-template-columns:1fr}
 }
+
+
+/* OA-SEL-001 */
+.sellability-page{display:grid;gap:14px}
+.sellability-controls{display:grid;grid-template-columns:minmax(160px,2fr) repeat(3,minmax(120px,1fr)) auto;gap:8px;align-items:center}
+.sellability-controls input,.sellability-controls select{min-height:44px;border:1px solid var(--line,#ded7cc);border-radius:12px;padding:9px 11px;background:#fff;font:inherit}
+.sellability-list{display:grid;gap:10px}
+.sellability-row{display:flex;align-items:center;justify-content:space-between;gap:14px}
+.sellability-copy,.sellability-action{display:flex;flex-direction:column;gap:5px}
+.sellability-copy small{color:var(--muted,#766f66)}
+.sellability-action{align-items:flex-end}
+.sellability-state{font-size:12px;font-weight:700;padding:4px 9px;border-radius:999px;background:#efefef}
+.sellability-state.sellable{background:#eaf5ec}
+.sellability-state.sold_out{background:#fff0dd}
+.sellability-action button{min-width:82px;min-height:44px}
+@media(max-width:760px){
+  .sellability-controls{grid-template-columns:1fr 1fr}
+  .sellability-controls input:first-child{grid-column:1/-1}
+  .sellability-row{align-items:flex-start}
+}
