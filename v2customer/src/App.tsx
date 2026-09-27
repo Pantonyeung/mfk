@@ -594,6 +594,13 @@ export function App(){
         setNotice(result.message||'店舖未能接受今次訂單。');
         return;
       }
+      if(result.readbackCode==='NOT_FOUND'){
+        const fallbackIntent=Object.freeze({...intent,state:'NOT_CONNECTED' as const,updatedAt:nowIso(),lastMessage:result.message});
+        saveIntent(fallbackIntent);
+        setFallbackIntentId(intent.submissionId);
+        setNotice('原本提交經 Readback 仍未找到；Online Submit 已鎖定，可以轉用 WhatsApp 人工救援。');
+        return;
+      }
       saveIntent(Object.freeze({...intent,state:'UNKNOWN',updatedAt:nowIso(),lastMessage:result.message}));
       setNotice(result.message);
     }catch{
