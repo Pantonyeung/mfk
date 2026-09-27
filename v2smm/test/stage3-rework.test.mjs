@@ -102,3 +102,26 @@ test('explicit service-mode repricing still applies current published facts dire
   assert.match(reprice,/const \{refreshAttention:_staleAttention,\.\.\.accepted\}=line/);
   assert.match(app,/const repriced=cart\.map\(line=>repriceLine\(line,next\)\)/);
 });
+
+
+test('unaffected passive cart lines are returned unchanged',()=>{
+  const marker='if(!menu||cart.length===0)return;';
+  const start=app.indexOf(marker);
+  const end=app.indexOf('const resetProductEditor',start);
+  const passive=app.slice(start,end);
+  assert.match(passive,/if\(!proposal\)\{[\s\S]*if\(!line\.refreshAttention\)return line/);
+  assert.match(passive,/sameSmmCartRefreshAttention\(line\.refreshAttention,proposal\)\)return line/);
+});
+
+test('Stage 0-2 loginId and canonical Combo regression seams remain present',()=>{
+  const stage0=readFileSync(new URL('../src/StageZero.tsx',import.meta.url),'utf8');
+  const staff=readFileSync(new URL('../src/pwa-staff.ts',import.meta.url),'utf8');
+  const selection=readFileSync(new URL('../src/selection.ts',import.meta.url),'utf8');
+  assert.match(stage0,/stage0/);
+  assert.match(app,/stage1-order/);
+  assert.match(app,/stage2-product-sheet/);
+  assert.match(staff,/loginId/);
+  assert.match(selection,/resolveSmmProductCombo/);
+  assert.match(selection,/revalidateSmmCartComboIntent/);
+  assert.match(app,/正式套餐內容同價格會由 SMT 再驗證/);
+});
