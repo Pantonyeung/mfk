@@ -2,10 +2,9 @@ name: V2 Local POS Smoke
 
 on:
   push:
-    branches: [main, integration/MFK/SMT-CONSOLIDATION-A2-LANDING]
+    branches: [main]
     paths:
       - 'v2local/**'
-      - '.github/workflows/v2local-smoke.yml'
   workflow_dispatch:
 
 permissions:
