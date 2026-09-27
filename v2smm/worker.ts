@@ -362,6 +362,7 @@ export class SmmIntentStore{
           state:'CONFIRMED',
           submissionId,
           canonicalOrderId:String(row.result?.orderId||''),
+          canonicalDisplay:String(row.result?.displayCode||''),
           canonicalRevision:Number(row.result?.canonicalRevision)||1,
         });
       }
