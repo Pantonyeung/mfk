@@ -30,6 +30,12 @@ jobs:
         run: npm test
       - name: Build
         run: npm run build
+      - name: Upload SMM build evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: smm-p0-dist
+          path: v2smm/dist
+          if-no-files-found: error
       - name: Wrangler dry-run only
         run: npx --yes wrangler@4 deploy --dry-run --config wrangler.jsonc
 
