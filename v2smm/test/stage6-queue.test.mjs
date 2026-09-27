@@ -101,7 +101,7 @@ test('fixed five-tab bottom nav keeps 待處理 active on work view and badge us
   const navStart=app.indexOf('<nav className="bottom-nav"');
   const navEnd=app.indexOf('</nav>',navStart);
   const nav=app.slice(navStart,navEnd);
-  const labels=[...nav.matchAll(/label="([^"]+)"/g)].map(match=>match[1]);
+  const labels=[...nav.matchAll(/<NavButton[^>]*label="([^"]+)"/g)].map(match=>match[1]);
   assert.deepEqual(labels,['點單','待處理','訂單','堂食','更多']);
   assert.match(nav,/active=\{view==='work'\} label="待處理"/);
   assert.match(nav,/badge=\{\(snapshot\?\.work\?\?\[\]\)\.length/);
