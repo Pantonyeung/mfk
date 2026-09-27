@@ -928,7 +928,7 @@ function OrderView({connection,categories,activeCategoryId,setCategory,search,se
         </button>;
       })}</div>:
       <section className="stage1-zero-result">
-        <img src="/brand/stage0/stage0-female.svg" alt="" aria-hidden="true"/>
+        <img src="/brand/stage0/stage0-female.webp" alt="" aria-hidden="true"/>
         <h2>搵唔到呢款商品</h2>
         <p>試下其他關鍵字，或者轉去其他分類睇下。</p>
         <button className="primary" onClick={()=>setSearch('')}>清除搜尋</button>
@@ -1583,7 +1583,7 @@ function Stage4CheckoutView({cart,quote,menu,serviceMode,tender,diningTarget,din
             <span>返回購物車確認有變更嘅商品，就可以繼續落單。</span>
           </section>:null}
           <section className="stage4-final-callout">
-            <img src="/brand/stage0/stage0-female.svg" alt="" aria-hidden="true"/>
+            <img src="/brand/stage0/stage0-female.webp" alt="" aria-hidden="true"/>
             <div><strong>最後一步</strong><span>資料確認好就可以落單。</span></div>
           </section>
         </section>
