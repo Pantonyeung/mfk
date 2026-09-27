@@ -162,6 +162,7 @@ function Repair({
     <div className="ui8-repair-list">{cart.filter(line=>affected.has(line.lineId)).map(line=>{
       const repairItem=repairs.find(item=>item.lineId===line.lineId);
       const product=menu?.products.find(item=>item.productId===line.productId);
+      const canAcceptCurrent=Boolean(repairItem?.canAcceptCurrentPrice||(!repairItem&&line.attention&&line.publishedUnitPriceMinor!==undefined));
       return <article key={line.lineId}>
         {product?.imageUrl?<img src={product.imageUrl} alt={product.imageAlt??product.name}/>:<i aria-hidden="true"/>}
         <div><strong>{line.productName}</strong><p>{line.attention??repairItem?.detail??'目前資料需要重新確認'}</p>{repairItem?.previousUnitPriceMinor!==undefined&&repairItem.currentUnitPriceMinor!==undefined?<small>{'舊 Cart fact HK$'+(repairItem.previousUnitPriceMinor/100).toFixed(0)+' → Current HK$'+(repairItem.currentUnitPriceMinor/100).toFixed(0)}</small>:null}</div>
@@ -210,7 +211,7 @@ export function HistoryReorderUi8View({
   phase:Ui8Phase;setPhase:(value:Ui8Phase)=>void;
   active:readonly CustomerOrderProjection[];history:readonly CustomerHistoryProjection[];selectedHistory:CustomerHistoryProjection|null;
   cart:readonly CustomerCartLine[];repairs:readonly CustomerCartRepair[];quote:CustomerQuoteSnapshot|null;menu:CustomerMenuSnapshot|null|undefined;
-  connection:CustomerConnectionState;browserOnline:boolean;
+  connection:CustomerConnectionState;browserOnline:boolean;characterVariant?:'male'|'female';
   onOpenCurrent:(order:CustomerOrderProjection)=>void;onOpenHistory:(order:CustomerHistoryProjection)=>void;
   onStartReorder:(order:CustomerHistoryProjection)=>void;onAcceptRepair:(lineId:string)=>void;onEditRepair:(line:CustomerCartLine)=>void;onRemoveLine:(lineId:string)=>void;
   onGoCart:()=>void;onBrowse:()=>void;
