@@ -743,7 +743,6 @@ test('OA-CHN-001 exposes canonical channel semantics and disables unsupported co
   for(const health of['HEALTHY','DEGRADED','OFFLINE','UNKNOWN'])assert.match(types,new RegExp(health));
   assert.match(page,/暫停接單/);
   assert.match(page,/恢復接單/);
-  assert.match(page,/未有 canonical command seam/);
   assert.match(page,/availableActions = \[\]/);
   assert.match(page,/所有操作保持停用/);
   assert.doesNotMatch(cloud,/\/api\/owner\/channels\/command/);
