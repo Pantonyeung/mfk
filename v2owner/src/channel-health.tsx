@@ -1,10 +1,4 @@
-import type {OwnerChannelCommandInput,OwnerChannelHealth,OwnerConnectionState} from './product-types';
-
-export interface OwnerChannelCommandFlight {
-  readonly channelId:string;
-  readonly state:'PENDING'|'CONFIRMED'|'REJECTED'|'FAILED'|'UNKNOWN';
-  readonly message:string;
-}
+import type {OwnerChannelHealth,OwnerConnectionState} from './product-types';
 
 function healthLabel(value:OwnerChannelHealth['health']){
   return value==='HEALTHY'?'健康':value==='DEGRADED'?'降級':value==='OFFLINE'?'離線':'狀態未明';
@@ -17,12 +11,10 @@ function causeLabel(value:OwnerChannelHealth['cause']){
 }
 
 export function ChannelHealthPage({
-  channels,connection,commandFlight,onCommand,onRecheck,onBack,
+  channels,connection,onRecheck,onBack,
 }:{
   channels:readonly OwnerChannelHealth[];
   connection:OwnerConnectionState;
-  commandFlight:OwnerChannelCommandFlight|null;
-  onCommand:(input:OwnerChannelCommandInput)=>void;
   onRecheck:(channelId:string)=>void;
   onBack:()=>void;
 }){
@@ -33,11 +25,7 @@ export function ChannelHealthPage({
     </header>
     {!channels.length?<section className="card empty-state"><h2>渠道資料尚未連接</h2><p>未有 canonical readback 前唔會顯示假狀態。</p></section>:
       <div className="channel-grid">{channels.map(channel=>{
-        const flight=commandFlight?.channelId===channel.channelId?commandFlight:null;
-        const unknown=channel.readback==='UNKNOWN'||flight?.state==='UNKNOWN';
-        const disabled=connection==='OFFLINE_READONLY'||connection==='PERMISSION_DENIED'||unknown||flight?.state==='PENDING';
-        const pauseAllowed=channel.controls.pause&&!disabled&&channel.acceptingOrders===true;
-        const resumeAllowed=channel.controls.resume&&!disabled&&channel.acceptingOrders===false;
+        const unknown=channel.readback==='UNKNOWN';
         return <article className="card channel-card" key={channel.channelId}>
           <header><div><strong>{channel.name}</strong><small>{modeLabel(channel.mode)}</small></div><span className={'health-chip '+channel.health.toLowerCase()}>{healthLabel(channel.health)}</span></header>
           <div className="channel-facts">
@@ -49,16 +37,11 @@ export function ChannelHealthPage({
           <small className="muted">Freshness：{channel.freshness} · {new Date(channel.observedAt).toLocaleString('zh-HK')}</small>
           {channel.lastCommand?<p className="channel-readback">上次操作：{channel.lastCommand.action} · {channel.lastCommand.state}</p>:null}
           <p className="channel-readback">Readback：{channel.readback}</p>
-          {flight?<div className={'command-flight '+flight.state.toLowerCase()}><strong>{flight.state}</strong><span>{flight.message}</span></div>:null}
-          {unknown?<button className="primary wide" onClick={()=>onRecheck(channel.channelId)}>重新讀回正式狀態</button>:
-            <div className="channel-actions">
-              <button disabled={!pauseAllowed} onClick={()=>onCommand({channelId:channel.channelId,action:'PAUSE',operationId:crypto.randomUUID()})}>暫停接單</button>
-              <button disabled={!resumeAllowed} onClick={()=>onCommand({channelId:channel.channelId,action:'RESUME',operationId:crypto.randomUUID()})}>恢復接單</button>
-              <button disabled={!channel.controls.snooze||disabled} title={channel.controls.snooze?'':'未有 canonical command seam'}>暫停至時間</button>
-              <button disabled={!channel.controls.busy||disabled} title={channel.controls.busy?'':'未有 canonical command seam'}>繁忙／加時</button>
-            </div>}
-          {!channel.controls.snooze||!channel.controls.busy?<small className="unsupported-note">未支援嘅操作保持停用，唔做假接線。</small>:null}
-          <small className="safety-note">暫停只影響新單；已成立訂單不會被取消、退款或改狀態。UNKNOWN 必須先 readback，禁止 blind retry。</small>
+          {unknown?<button className="primary wide" onClick={()=>onRecheck(channel.channelId)}>重新讀回正式狀態</button>:null}
+          <div className="channel-actions">
+            <button disabled>暫停接單</button><button disabled>恢復接單</button><button disabled>暫停至時間</button><button disabled>繁忙／加時</button>
+          </div>
+          <small className="unsupported-note">OA-CHN-001 目前只讀；未有正式 command seam，availableActions = []，所有操作保持停用。</small>
         </article>
       })}</div>}
   </section>;
