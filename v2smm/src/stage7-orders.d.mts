@@ -1,10 +1,12 @@
 export type SmmStage7Segment='ACTIVE'|'HISTORY';
 export type SmmStage7SourceFilter='ALL'|'ONSITE'|'SMM'|'OWN_PLATFORM'|'THIRD_PARTY';
 export type SmmStage7SearchScope='ALL'|'DISPLAY'|'PRODUCT'|'PHONE';
+export type SmmStage7StatusFilter='ALL'|'PENDING'|'WORKING'|'READY'|'PICKED_UP'|'CANCELLED'|'UNKNOWN';
 export type SmmStage7DateFilter='ALL'|'TODAY'|'YESTERDAY'|'CUSTOM';
 export const SMM_STAGE7_SEGMENTS:readonly SmmStage7Segment[];
 export const SMM_STAGE7_SOURCE_FILTERS:readonly SmmStage7SourceFilter[];
 export const SMM_STAGE7_SEARCH_SCOPES:readonly SmmStage7SearchScope[];
+export const SMM_STAGE7_STATUS_FILTERS:readonly SmmStage7StatusFilter[];
 export function smmStage7IsHistory(row:any):boolean;
 export function smmStage7InSegment(row:any,segment:SmmStage7Segment):boolean;
 export function smmStage7SourceGroup(row:any):SmmStage7SourceFilter|'UNKNOWN';
@@ -17,4 +19,7 @@ export function smmStage7MatchesDate(row:any,dateFilter:SmmStage7DateFilter,cust
 export function smmStage7ItemCount(row:any):number|null;
 export function smmStage7AmountLabel(row:any):string;
 export function smmStage7StatusLabel(row:any):string;
+export function smmStage7StatusKey(row:any):SmmStage7StatusFilter;
+export function smmStage7MatchesStatus(row:any,filter:SmmStage7StatusFilter):boolean;
+export function smmStage7Sort<T extends {displayCode?:string;orderTime?:string;observedAt?:string}>(rows:readonly T[]):readonly T[];
 export function smmStage7ConnectionState(connection:string,hasRows:boolean):Readonly<{kind:'LOADING'|'OFFLINE'|'STALE'|'PARTIAL'|'UNKNOWN'|'ERROR';title:string;detail:string}>|null;
