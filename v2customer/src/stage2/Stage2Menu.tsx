@@ -69,7 +69,7 @@ function FeaturedProductCard({
         onOpen(product,{top:rect.top,left:rect.left,width:rect.width,height:rect.height});
       }}
     >
-      <span className="stage2-product-media" aria-hidden="true"/>
+      {product.imageUrl?<span className="stage2-product-media"><img src={product.imageUrl} alt={product.imageAlt??product.name}/></span>:<span className="stage2-product-media is-unavailable" aria-label="商品圖片暫未提供"><span>磨飯</span></span>}
       <span className="stage2-featured-copy">
         <small>{product.badge??'本分類精選'}</small>
         <strong>{product.name}</strong>
@@ -104,7 +104,7 @@ function SmallProductCard({
         onOpen(product,{top:rect.top,left:rect.left,width:rect.width,height:rect.height});
       }}
     >
-      <span className="stage2-product-media" aria-hidden="true"/>
+      {product.imageUrl?<span className="stage2-product-media"><img src={product.imageUrl} alt={product.imageAlt??product.name}/></span>:<span className="stage2-product-media is-unavailable" aria-label="商品圖片暫未提供"><span>磨飯</span></span>}
       <span className="stage2-small-copy">
         {product.badge?<small>{product.badge}</small>:null}
         <strong>{product.name}</strong>
@@ -239,7 +239,7 @@ export function Stage2Menu({
         </div>:<section className="stage2-zero-repair">
           <span>暫時搵唔到「{query.trim()}」</span>
           <h2>試下其他分類</h2>
-          <p>搜尋失敗唔會阻止你繼續點餐；可以換分類，或者睇下其他人氣選擇。</p>
+          <p>換個關鍵字，或者睇下其他人氣選擇。</p>
           <div className="stage2-repair-categories">
             <button onClick={()=>{setQuery('');setCategory(null)}}>人氣推薦</button>
             {categories.slice(0,4).map(category=><button key={category.categoryId} onClick={()=>{setQuery('');setCategory(category.categoryId)}}>{category.name}</button>)}
