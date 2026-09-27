@@ -126,3 +126,12 @@ LOCKS:
 NO MAIN MERGE
 NO DEPLOY
 NO STAGE 6
+
+FINAL_VALIDATED_HEAD:
+47154a212464a6f791d2a3c51bd0c05952daa3f7
+
+FINAL_VALIDATED_CI:
+36310163528 = SUCCESS
+
+NOTE:
+This handoff metadata commit is documentation-only and does not alter the validated Stage 5 candidate. Commander reacceptance evidence is pinned to FINAL_VALIDATED_HEAD above.
