@@ -537,13 +537,15 @@ function customerPublicSnapshot(active,customerOrders=[]){
     const itemRows=rows(order.items);
     const display=String(order.display||'');
     const totalMinor=Math.max(0,Number(order.totalMinor)||0);
+    const phoneDigits=String(order.customerPhone||'').replace(/\D/g,'');
+    const pickupCode=phoneDigits.length>=4?phoneDigits.slice(-4):'';
     return{
       orderId:String(order.orderId||''),
       displayCode:display,
       stage,
       itemSummary:itemRows.map(item=>String(row(item).name||'')).filter(Boolean).join('、'),
       amountLabel:moneyLabel(totalMinor),
-      pickupCode:display||undefined,
+      ...(pickupCode?{pickupCode,phoneMasked:'•••• '+pickupCode}:{}),
       observedAt,
       readback:'CONFIRMED',
       timeline:[{at:observedAt,stage,label:String(order.fulfillmentLabel||stage)}],
