@@ -935,7 +935,9 @@ export class AdminSyncStore{
       const row=byDate.get(date)||{date,grossMinor:0,adjustmentMinor:0,netMinor:0,orders:0,cashSalesMinor:0};
       const cancelled=String(order.fulfillmentLabel||'')==='已取消';
       if(!cancelled){
-        const total=Math.max(0,Number(order.totalMinor)||0);
+        const total=Number.isFinite(Number(order.recognizedSalesMinor))
+          ?Math.max(0,Number(order.recognizedSalesMinor)||0)
+          :Math.max(0,Number(order.totalMinor)||0);
         row.grossMinor+=total;
         row.netMinor+=total;
         row.orders+=1;
