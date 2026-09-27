@@ -27,8 +27,8 @@ test('Stage 0 source flow contains Splash Login Connection and Recovery',()=>{
 
 test('Stage 0 uses MoreFun brand and approved IP assets from the final visual source',()=>{
   assert.match(stage0,/\/brand\/morefun-logo\.webp/);
-  assert.match(stage0,/\/brand\/stage0\/stage0-male\.svg/);
-  assert.match(stage0,/\/brand\/stage0\/stage0-female\.svg/);
+  assert.match(stage0,/\/brand\/stage0\/stage0-male\.webp/);
+  assert.match(stage0,/\/brand\/stage0\/stage0-female\.webp/);
   assert.ok(existsSync(new URL('../public/brand/morefun-logo.webp',import.meta.url)));
   assert.ok(existsSync(new URL('../public/brand/stage0/stage0-male.webp',import.meta.url)));
   assert.ok(existsSync(new URL('../public/brand/stage0/stage0-female.webp',import.meta.url)));
