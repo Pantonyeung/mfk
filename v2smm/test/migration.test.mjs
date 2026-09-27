@@ -114,7 +114,7 @@ test('SMM uses the shared published menu price and SMT validates only on submit'
   assert.match(types,/publishedTakeawayUnitPriceMinor/);
   assert.match(types,/publishedDineInUnitPriceMinor/);
   assert.match(app,/SMT 仍會再驗證/);
-  assert.match(app,/SMT 提交時再核對/);
+  assert.match(app,/SMT 提交時重新驗證/);
   assert.doesNotMatch(app,/等待門店報價/);
   assert.doesNotMatch(app,/port\?\.quoteCart/);
   assert.match(app,/port\?\.submitOrder/);
