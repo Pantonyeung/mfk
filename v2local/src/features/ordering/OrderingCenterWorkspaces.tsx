@@ -52,10 +52,7 @@ export function quickConfigurationForProduct(product:WorkspaceProduct){
     const names=options.map(option=>option.name);
     return names.length?[set.name+'：'+names.join('、')]:[];
   }).join(' · ');
-  const optionSelections=Object.freeze(Object.fromEntries(
-    chosen.flatMap(({set,options})=>options.length?[[set.id,Object.freeze(options.map(option=>option.id))] as const]:[])
-  )) as MfkOrderLineOptionSelectionsV1;
-  return Object.freeze({eligible:true,detail,deltaMinor,optionSelections});
+  return Object.freeze({eligible:true,detail,deltaMinor});
 }
 
 export const DRINK_SUPPLEMENT_PRODUCT_PREFIX='drink-supplement:' as const;
