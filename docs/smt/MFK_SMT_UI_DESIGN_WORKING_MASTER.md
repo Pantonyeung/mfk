@@ -3871,3 +3871,107 @@ UI-STAGE-00 Visual Draft / Mockup
 
 MILESTONE：
 MFK_SMT_UI_STAGE00_VISUAL_LAYOUT_SPEC_READY
+
+
+==================================================
+RECORD 006｜GOOGLE DRIVE STAGE LINK-UP 架構建立
+日期：2026-09-27
+狀態：ACTIVE
+==================================================
+
+目的：
+將 MFK SMT FULL UI SPEC 由單一長文件，升級成「Master + Stage Folder + Stage SPEC + Stage Visual」可逐階段接手的 Google Drive 結構。
+
+ROOT FOLDER：
+MFK SMT FULL UI SPEC｜STAGE 00-12｜2026-09-27
+https://drive.google.com/drive/folders/1DrIrcgBZ4iCOcZFmfHEVK7_yIKubtoMX
+
+ROOT 內：
+00_MASTER｜MFK SMT UI 設計實作總記錄｜WORKING MASTER
+https://docs.google.com/document/d/1rIdaKX0HSsCoJZJ9vBF68Amh1ZTpljMs0bjXzysEzu4/edit?usp=drivesdk
+
+01_INDEX｜MFK SMT FULL UI SPEC｜Stage Link Map
+https://docs.google.com/document/d/1vuRCP1gWBH2aj41enK-l8kUsf8bJylv1-xTTH2mc4Kg/edit?usp=drivesdk
+
+每個 Stage Folder 固定結構：
+1. Stage SPEC Google Doc
+2. Stage Visual / Mockup 效果圖
+3. 如需要：狀態圖、Modal 圖、補充 Flow 圖
+4. Stage Acceptance / 最終確認記錄可繼續放同一 Folder
+
+Stage Link：
+UI-STAGE-00：
+Folder https://drive.google.com/drive/folders/1v7-mhZiQ8B8N4dO7WoK70l0nb2wYyNGW
+SPEC https://docs.google.com/document/d/1R3Hfv6fm1ade0cZmkBg6W7CgjFx0WGDrgMcBOrtmCZc/edit?usp=drivesdk
+
+UI-STAGE-01：
+Folder https://drive.google.com/drive/folders/1MzN50qW3oeyws-a4yO04KGi0bbmfsvjt
+SPEC https://docs.google.com/document/d/1NIdjB5DJfrWbU--rt_Je6qSU3AAwisg86PNpussPodc/edit?usp=drivesdk
+
+UI-STAGE-02：
+Folder https://drive.google.com/drive/folders/1SSJIN54nytQ4l8e5bXitnp0zXvSqJOj7
+SPEC https://docs.google.com/document/d/1fOOxFbDOyVUdZ85efZp1tBmLSAyqC61u9npE-wjF1gY/edit?usp=drivesdk
+
+UI-STAGE-03：
+Folder https://drive.google.com/drive/folders/1DkaR1T1iuztTor7o4S1O2B0UDOnN9DZr
+SPEC https://docs.google.com/document/d/12hrXhTGAoC7v-ujVv4NFzbzjLLPCoEUKPKHMOD2wqGA/edit?usp=drivesdk
+
+UI-STAGE-04：
+Folder https://drive.google.com/drive/folders/1tbfI-e0NxCYxQEK_l3SCmxKlNOSEXqxO
+SPEC https://docs.google.com/document/d/1uDRfilJ6pnAKvwV-lW7NveGxAzYw4STw7BE5apynu3E/edit?usp=drivesdk
+
+UI-STAGE-05：
+Folder https://drive.google.com/drive/folders/12huwUGpxjFPTURsbl4XTC0-l81kPVVCk
+SPEC https://docs.google.com/document/d/11z5Udov4P95KgqmjtKteBNlcqd7Apqr6_MjzEi653xU/edit?usp=drivesdk
+
+UI-STAGE-06：
+Folder https://drive.google.com/drive/folders/16JFH7mUBeNcFnloLrrnqI1G-Cz9jjNCn
+SPEC https://docs.google.com/document/d/1QfAdqZsXky8xQAtOYM3N9KgQ3ifFB8lh-D8dwB9EWhI/edit?usp=drivesdk
+
+UI-STAGE-07：
+Folder https://drive.google.com/drive/folders/1ohm_2FEBg-AWxbsYW6GH9GnyAYIckY9-
+SPEC https://docs.google.com/document/d/1mQTPFwUgJW28aPXbDIr19o5jzV0XQlm-ev860WcY8C0/edit?usp=drivesdk
+
+UI-STAGE-08：
+Folder https://drive.google.com/drive/folders/1jWdGZr4zKipss1gnaZHtCl_5Xc8l8RCf
+SPEC https://docs.google.com/document/d/140BUQzEOzJMO2onYGT4g-uFYVsEjIQdOyo-QRnbB9OQ/edit?usp=drivesdk
+
+UI-STAGE-09：
+Folder https://drive.google.com/drive/folders/16aIrXOTuY9ejiN_ZdUIJjkv9WD5DMMDo
+SPEC https://docs.google.com/document/d/1wmkc3LDQpWZrj4wZUNURHrCUIFcsbEPiVc5MwGt_8Ec/edit?usp=drivesdk
+
+UI-STAGE-10：
+Folder https://drive.google.com/drive/folders/1QBUC-Tt3VX5gg9C0Vmg4yAeOEb9qu3GU
+SPEC https://docs.google.com/document/d/1WoomFTlHI3lPoJbQQb8LqPJKWMt3WJQm9J0S01HfF3w/edit?usp=drivesdk
+
+UI-STAGE-11：
+Folder https://drive.google.com/drive/folders/14uep_6C4Rylw73y5Htj2jpj0fMek9jkX
+SPEC https://docs.google.com/document/d/15GX-3zxevRdKOIbtJZT8L65y1M71lcHVk6808Q09Stk/edit?usp=drivesdk
+
+UI-STAGE-12：
+Folder https://drive.google.com/drive/folders/1AipY2YZD-1Lymtdsglh1xL3vasn6hkAR
+SPEC https://docs.google.com/document/d/10us9YNTR0i4wm7oU_I6fmmV35WJtnmM2K86LFhPsmPQ/edit?usp=drivesdk
+
+LINK-UP RULE：
+Working Master
+→ Stage Folder
+→ Stage SPEC
+→ Stage Visual(s)
+→ Stage Acceptance
+
+每完成一個 Stage：
+- 設計圖上載到該 Stage Folder
+- Stage SPEC 補 Visual Link
+- 01_INDEX 補 Visual Link
+- Working Master 記錄設計決定與 Acceptance
+- 再進下一 Stage
+
+CURRENT：
+UI-STAGE-00 SPEC 已存在。
+UI-STAGE-00 Visual = PENDING。
+
+NEXT：
+生成 UI-STAGE-00 第一張 Visual Draft，完成後放入 UI-STAGE-00 Folder，並回填 Stage SPEC + 01_INDEX。
+
+MILESTONE：
+MFK_SMT_GOOGLE_DRIVE_STAGE_LINKUP_STRUCTURE_READY
