@@ -1,5 +1,9 @@
 name: customer-ui3-combo-configure-r1
 
+permissions:
+  contents: read
+  issues: write
+
 on:
   push:
     branches:
@@ -64,3 +68,32 @@ jobs:
         run: npm run build
       - name: Wrangler dry-run only
         run: npx --yes wrangler@4 deploy --dry-run --config wrangler.jsonc
+
+
+  report:
+    if: always()
+    needs: [customer, v2local, v2admin]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Publish acceptance result to issue 364
+        env:
+          GH_TOKEN: \${{ github.token }}
+          CUSTOMER_RESULT: \${{ needs.customer.result }}
+          V2LOCAL_RESULT: \${{ needs.v2local.result }}
+          V2ADMIN_RESULT: \${{ needs.v2admin.result }}
+        run: |
+          BODY=$(cat <<EOF
+          CUSTOMER UI3 CONFIGURE R1｜CI RESULT
+
+          RUN_ID: $GITHUB_RUN_ID
+          SHA: $GITHUB_SHA
+          BRANCH: $GITHUB_REF_NAME
+
+          CUSTOMER: $CUSTOMER_RESULT
+          V2LOCAL: $V2LOCAL_RESULT
+          V2ADMIN: $V2ADMIN_RESULT
+
+          This is automated acceptance evidence only. No main merge and no production deploy were performed.
+          EOF
+          )
+          gh api "repos/$GITHUB_REPOSITORY/issues/364/comments" -f body="$BODY"
