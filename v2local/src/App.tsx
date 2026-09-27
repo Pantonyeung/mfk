@@ -24,6 +24,7 @@ import {StaffAuthGate,StaffSessionBadge} from './presentation/StaffAuthGate.tsx'
 import {CashOpeningGate} from './presentation/CashOpeningGate.tsx';
 import {ComboWorkspace,HoldCartWorkspace,HoldListWorkspace,OrganizeWorkspace,ProductConfigWorkspace,RequiredFastLaneWorkspace,applyRequiredSelectionToCart,initialHoldModeForLines,isDrinkSupplementProductId,projectDrinkSupplementChoices,quickConfigurationForProduct,requiredTasksForCart,type OrderingPanelState,type WorkspaceHoldDraft,type WorkspaceProduct} from './features/ordering/OrderingCenterWorkspaces.tsx';
 import {RiceballPairingWorkspace} from './features/ordering/RiceballPairingWorkspace.tsx';
+import {PendingOrderReviewWorkspace} from './features/ordering/PendingOrderReviewWorkspace.tsx';
 import {applyRiceballPairings,buildRiceballPairingDraft,existingPairingGroups,isPairedComboLine,nextPairingStartIndex,restorePairingGroup} from './features/ordering/riceball-pairing-model.ts';
 import {applyRiceballDrinkPromotion,riceballDrinkPromotionStateEqual,stripRiceballDrinkPromotionDetail} from './features/ordering/riceball-drink-promotion-model.ts';
 import {MFK_ORDER_LINE_COMPOSITION_SCHEMA,type MfkOrderLineCompositionV1,type MfkOrderLineOptionSelectionsV1,type MfkOrderLinePairingV1} from '../../contracts/order-line-composition-v1.ts';
@@ -566,12 +567,29 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode,diningAddition,on
     :panel?.type==='required'?'必選／補選'
     :panel?.type==='drink-config'?'飲品設定'
     :panel?.type==='riceball-pair'?'飯團待組區'
+    :panel?.type==='pending-order'?'待處理訂單'
     :panel?.type==='organize'?'整理工作台'
     :panel?.type==='combo'?'紫米套餐區'
     :panel?.type==='hold'?'暫存工作台'
     :panel?.type==='holds'?'暫存單':'';
 
-  const panelBody=panel?.type==='product'
+  const panelBody=panel?.type==='pending-order'
+    ?(()=>{const order=runtimeOrders.find(item=>item.id===panel.orderId);return order?<PendingOrderReviewWorkspace
+      order={order}
+      onAccept={async()=>{
+        const result=await localRuntime.acceptOrder(order.id);
+        if(result.provider.state==='ATTENTION')return '本地已接單；Keeta 同步需要留意。';
+        if(result.provider.state==='SYNCED'||result.provider.state==='IDEMPOTENT')return '已確認接單；Keeta 已同步。';
+        return '已確認接單。';
+      }}
+      onOpenOrders={()=>navigate('/orders?orderId='+encodeURIComponent(order.id))}
+      onReadEvidence={order.paymentEvidenceRef?()=>localRuntime.readPaymentEvidence(order.id):undefined}
+      onReviewEvidence={order.paymentEvidenceRef?async decision=>{await localRuntime.reviewPaymentEvidence(order.id,decision);}:undefined}
+      onDeferKeeta={(String(order.providerRef||'').startsWith('KEETA:')||/^Keeta\\b/i.test(String(order.sourceLabel||'')))
+        ?async()=>{await localRuntime.deferKeetaOrder(order.id);}
+        :undefined}
+    />:null})()
+    :panel?.type==='product'
     ?(()=>{const product=workspaceProducts.find(item=>item.id===panel.productId);const line=panel.lineId?cart.find(item=>item.id===panel.lineId):undefined;return product?<ProductConfigWorkspace key={product.id+':'+(panel.lineId??'add')} product={product} mode={panel.lineId?'edit':'add'} initial={line?{qty:line.qty,detail:stripRiceballDrinkPromotionDetail(line.detail)||undefined,optionSelections:line.optionSelections,freeNote:line.freeNote}:undefined} onAdd={(detail,delta,qty,structured)=>addConfiguredStructured(product.id,detail,delta,qty,panel.lineId,structured)}/>:null})()
     :panel?.type==='required'
       ?<RequiredFastLaneWorkspace
@@ -761,7 +779,11 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode,diningAddition,on
       else if(id==='combo')setPanel({type:'combo'});
       else setPanel({type:'organize'});
     },
-    onOpenQueueOrder:(_kind,id)=>navigate('/orders?orderId='+encodeURIComponent(id)),
+    onOpenQueueOrder:(_kind,id)=>{
+      const order=runtimeOrders.find(item=>item.id===id);
+      if(order?.fulfillmentLabel==='待處理'){setPanel({type:'pending-order',orderId:id});return;}
+      navigate('/orders?orderId='+encodeURIComponent(id));
+    },
     onCheckout:()=>{if(diningAddition){void submitDiningAddition();return;}navigate('/checkout');},
   };
 
