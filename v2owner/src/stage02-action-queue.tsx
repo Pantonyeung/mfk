@@ -174,8 +174,8 @@ function ActionDetailDrawer({
       <section className="detail-section">
         <h3>處理結果</h3>
         <div className="action-detail-grid">
-          <div><span>最新狀態</span><strong>{item.readbackSummary??certaintyLabel(item.certainty)}</strong></div>
-          <div><span>完成確認</span><strong>{item.resolutionProofLabel??'尚未完成確認'}</strong></div>
+          <div><span>最新狀態</span><strong>{certaintyLabel(item.certainty)}</strong></div>
+          <div><span>完成確認</span><strong>{item.resolutionProofLabel?'已確認完成':'尚未完成確認'}</strong></div>
         </div>
       </section>
 
