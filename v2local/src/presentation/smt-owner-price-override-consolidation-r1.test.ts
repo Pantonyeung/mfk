@@ -40,3 +40,4 @@ describe('SMT Owner consolidation price override UI',()=>{
     expect(css).toContain('.dining-price-override-history');
   });
 });
+// branch smoke trigger
