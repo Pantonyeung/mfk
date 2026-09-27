@@ -28,7 +28,7 @@ test('Stage8 list has current completed all and keeps Orders active in the fixed
   const navBlock=primitives.slice(primitives.indexOf('export function BottomNavigation'),primitives.indexOf('export interface ProductOriginRect'));
   const navIds=[...navBlock.matchAll(/\{id:'(home|menu|cart|orders|more)' as const/g)].map(match=>match[1]);
   assert.deepEqual(navIds,['home','menu','cart','orders','more']);
-  assert.match(app,/BottomNavigation active=\{view==='pickup'\?'orders':view as/);
+  assert.match(app,/BottomNavigation active=\{view==='pickup'\|\|view==='orders'\?'orders':view as/);
   assert.match(styles,/\.bottom-navigation\{position:fixed[\s\S]*grid-template-columns:repeat\(5,1fr\)[\s\S]*env\(safe-area-inset-bottom\)/);
   const buttonMinHeight=styles.match(/\.bottom-navigation button\{[^}]*min-height:(\d+)px/);
   assert.ok(buttonMinHeight);
@@ -121,8 +121,8 @@ test('saved-template CTA is safe unavailable because current main has no mutatio
 });
 
 test('Stage8 uses formal male and female IP assets and introduces no Stage9 reward mutation',()=>{
-  assert.match(ui8,/stage8-reorder-female\.svg/);
-  assert.match(ui8,/stage8-reorder-male\.svg/);
+  assert.match(ui8,/stage8-history-female\.svg/);
+  assert.match(ui8,/stage8-history-male\.svg/);
   assert.doesNotMatch(ui8,/Stage9|seed|reward|issueCoupon|redeemCoupon/i);
   assert.match(styles,/@media\(prefers-reduced-motion:reduce\)[\s\S]*\.ui8-page/);
 });
