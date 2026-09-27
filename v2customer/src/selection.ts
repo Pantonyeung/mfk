@@ -312,7 +312,8 @@ export function customerComboPublishedUnitMinor(
     unitMinor+=adjustment;
   }
   for(const selection of ordinarySelections){
-    const adjustment=Number(selection.publishedAdjustmentMinor??0);
+    if(selection.publishedAdjustmentMinor===undefined)return null;
+    const adjustment=Number(selection.publishedAdjustmentMinor);
     if(!Number.isSafeInteger(adjustment))return null;
     unitMinor+=adjustment;
   }
