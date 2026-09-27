@@ -6,6 +6,41 @@ import type {
   OwnerTodayStaffSummary,
 } from './today-view-model';
 
+function humanFreshness(value:string|null|undefined){
+  const key=String(value??'').toUpperCase();
+  if(key==='CURRENT'||key==='FRESH')return '已更新';
+  if(key==='STALE')return '資料稍舊';
+  if(key==='PARTIAL')return '部分資料';
+  return '未有資料';
+}
+
+function humanBusinessState(value:string|null|undefined){
+  const raw=String(value??'').trim();
+  if(!raw||raw.toUpperCase()==='UNKNOWN'||raw.toUpperCase()==='UNAVAILABLE')return '未有資料';
+  return raw;
+}
+
+function humanHealthValue(value:string|undefined){
+  const key=String(value??'').trim().toUpperCase();
+  if(!key||key==='UNKNOWN'||key==='UNAVAILABLE')return '未有資料';
+  if(['HEALTHY','GOOD','ONLINE','READY','OK'].includes(key))return '正常';
+  if(['DEGRADED','WARN','WARNING','PARTIAL'].includes(key))return '需留意';
+  if(['OFFLINE','CRITICAL','FAILED','ERROR'].includes(key))return '異常';
+  return value!;
+}
+
+function humanHealthTone(tone:string|undefined){
+  const key=String(tone??'').toUpperCase();
+  if(key==='GOOD')return '正常';
+  if(key==='WARN')return '需留意';
+  if(key==='CRITICAL')return '異常';
+  return '未有資料';
+}
+
+function humanSeverity(value:string|undefined){
+  return value==='URGENT'?'緊急':value==='ATTENTION'?'注意':value==='INFO'?'資訊':'未有資料';
+}
+
 export function TodayContextHeader({
   storeName,
   businessDate,
@@ -23,13 +58,13 @@ export function TodayContextHeader({
     <div>
       <span>今日</span>
       <h1>而家間舖點？</h1>
-      <small>只顯示正式 Owner read projection。</small>
+      <small>即時掌握今日生意、訂單同營運狀況。</small>
     </div>
     <div className="today-context-grid">
       <div><span>門店</span><strong>{storeName}</strong></div>
-      <div><span>Business Day</span><strong>{businessDate}</strong></div>
-      <div><span>營業狀態</span><strong>{operatingStatus??'未有讀回'}</strong></div>
-      <div><span>Freshness</span><strong>{freshness??'UNKNOWN'}</strong><small>{observedAt?new Date(observedAt).toLocaleString('zh-HK'):'最後更新未有讀回'}</small></div>
+      <div><span>營業日</span><strong>{businessDate}</strong></div>
+      <div><span>營業狀態</span><strong>{humanBusinessState(operatingStatus)}</strong></div>
+      <div><span>資料更新</span><strong>{humanFreshness(freshness)}</strong><small>{observedAt?new Date(observedAt).toLocaleString('zh-HK'):'未有更新時間'}</small></div>
     </div>
   </header>;
 }
@@ -40,7 +75,7 @@ export function TodayLiveOrdersCard({value,onOpenActive}:{value:OwnerLiveOrdersS
       <div><span className="eyebrow">即時訂單</span><h2>而家有幾多張單？</h2></div>
       <button className="link-btn" onClick={onOpenActive}>查看進行中訂單</button>
     </div>
-    {!value?<p className="muted-copy">未有即時訂單讀回；唔會用推算數字代替。</p>:<>
+    {!value?<p className="muted-copy">即時訂單資料未有更新；唔會用推算數字代替。</p>:<>
       <div className="live-count-grid">
         <div><strong>{value.activeCount}</strong><span>進行中</span></div>
         <div><strong>{value.attentionCount??'—'}</strong><span>需留意</span></div>
@@ -69,7 +104,7 @@ export function DineInOpenChecksCard({value,onOpenDineIn}:{value:OwnerDineInSumm
       <div><span className="eyebrow orange">堂食</span><h2>進行中 / 未結帳</h2></div>
       <button className="link-btn" onClick={onOpenDineIn}>查看堂食未結帳</button>
     </div>
-    {!value?<p className="muted-copy">未有堂食未結帳讀回。</p>:<>
+    {!value?<p className="muted-copy">堂食未結帳資料未有更新。</p>:<>
       <div className="dinein-money">
         <div><span>堂食進行中</span><strong>{value.activeCheckCount}</strong><small>張</small></div>
         <div><span>未結帳</span><strong>{value.unpaidCheckCount}</strong><small>張</small></div>
@@ -98,14 +133,14 @@ export function TodayActionSummaryCard({value,onOpen}:{value:OwnerTodayActionSum
   const oldest=value.oldestUnresolved;
   return <section className="card attention-card">
     <div className="section-head">
-      <div><span className="eyebrow danger">需要處理</span><h2>Action Queue</h2></div>
+      <div><span className="eyebrow danger">需要處理</span><h2>待處理事項</h2></div>
       <b className="count-badge">{value.openCount}</b>
     </div>
     <div className="today-summary-rows">
-      <div><span>最高優先</span><strong>{top?top.title:'暫時冇待處理事項'}</strong><small>{top?top.severity:'—'}</small></div>
+      <div><span>最高優先</span><strong>{top?top.title:'暫時冇待處理事項'}</strong><small>{top?humanSeverity(top.severity):'—'}</small></div>
       <div><span>最舊未處理</span><strong>{oldest?oldest.title:'—'}</strong><small>{oldest?new Date(oldest.observedAt).toLocaleString('zh-HK'):'—'}</small></div>
     </div>
-    <p>只顯示真正需要人介入嘅 Action Queue；唔係 SMT Pending Order Queue。</p>
+    <p>只顯示真係需要你介入嘅營運事項。</p>
     <button className="primary wide" onClick={onOpen}>查看待處理</button>
   </section>;
 }
@@ -120,26 +155,26 @@ export function TodayHealthSummaryCard({
   onDevices:()=>void;
 }){
   const rows=[
-    {id:'internet',label:'Internet',item:value.internet,onOpen:onDevices},
+    {id:'internet',label:'網絡',item:value.internet,onOpen:onDevices},
     {id:'keeta',label:'Keeta',item:value.keeta,onOpen:onChannels},
     {id:'own',label:'自家平台',item:value.ownPlatform,onOpen:onChannels},
     {id:'smt',label:'SMT',item:value.smt,onOpen:onDevices},
-    {id:'printer',label:'Printer',item:value.printer,onOpen:onDevices},
+    {id:'printer',label:'打印機',item:value.printer,onOpen:onDevices},
   ];
   return <section className="card">
-    <div className="section-head"><div><span className="eyebrow">營運健康</span><h2>Health Summary</h2></div></div>
+    <div className="section-head"><div><span className="eyebrow">營運健康</span><h2>渠道與設備</h2></div></div>
     <div className="health-summary-list">{rows.map(row=><button key={row.id} onClick={row.onOpen}>
       <span>{row.label}</span>
-      <strong>{row.item?.value??'UNAVAILABLE'}</strong>
-      <small>{row.item?row.item.tone:'UNKNOWN'}</small>
+      <strong>{humanHealthValue(row.item?.value)}</strong>
+      <small>{humanHealthTone(row.item?.tone)}</small>
     </button>)}</div>
-    <p className="muted-copy">Health 同 Availability 分開；未有 provider readback 就顯示 UNAVAILABLE / UNKNOWN。</p>
+    <p className="muted-copy">各渠道同設備分開顯示；有異常可進入相關頁查看。</p>
   </section>;
 }
 
 export function TodayStaffSummaryCard({value,onOpen}:{value:OwnerTodayStaffSummary;onOpen:()=>void}){
   return <section className="card compact-card">
-    <div className="section-head"><div><span className="eyebrow orange">現場</span><h2>Staff Now</h2></div><button className="link-btn" onClick={onOpen}>查看員工</button></div>
+    <div className="section-head"><div><span className="eyebrow orange">現場</span><h2>員工狀態</h2></div><button className="link-btn" onClick={onOpen}>查看員工</button></div>
     <div className="staff-summary-grid">
       <div><strong>{value.workingNow??'—'}</strong><span>目前返工</span></div>
       <div><strong>{value.scheduledNow??'—'}</strong><span>預定返工</span></div>
