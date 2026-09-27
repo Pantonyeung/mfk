@@ -1354,9 +1354,9 @@ function CartSheet({cart,quote,menu,checkoutStage,serviceMode,tender,diningTarge
       <div className="sheet-grabber"/>
       <header className="stage3-cart-header">
         <div>
-          <span>購物草稿</span>
+          <span>購物車</span>
           <h2>{itemCount} 件商品</h2>
-          <small>只係本機草稿；正式價格、套餐同可售狀態仍由 SMT 提交時重新驗證。</small>
+          <small>確認商品、數量同服務方式，之後就可以結帳。</small>
         </div>
         <div className="stage3-header-actions">
           {cart.length?<button className="stage3-clear" type="button" onClick={onClear}>清空</button>:null}
@@ -1366,7 +1366,7 @@ function CartSheet({cart,quote,menu,checkoutStage,serviceMode,tender,diningTarge
 
       <div className="stage3-scroll-body">
         <section className="stage3-mode" aria-label="服務方式">
-          <div><strong>服務方式</strong><small>Stage 3 只設定草稿模式；枱號、付款同提交留待下一 Stage。</small></div>
+          <div><strong>服務方式</strong><small>堂食或外賣都可以喺結帳前再改。</small></div>
           <div className="stage3-segmented">
             <button className={serviceMode==='DINE_IN'?'active':''} type="button" onClick={()=>onServiceMode('DINE_IN')}>堂食</button>
             <button className={serviceMode==='TAKEAWAY'?'active':''} type="button" onClick={()=>onServiceMode('TAKEAWAY')}>外賣</button>
@@ -1374,8 +1374,8 @@ function CartSheet({cart,quote,menu,checkoutStage,serviceMode,tender,diningTarge
         </section>
 
         {!menu&&cart.length?<section className="stage3-sync-warning" role="status">
-          <strong>正式餐單未同步</strong>
-          <span>草稿會保留喺本機；重新同步餐單後先可以進入結帳。</span>
+          <strong>餐單更新中</strong>
+          <span>你揀好嘅商品會保留，資料更新後就可以繼續結帳。</span>
         </section>:null}
 
         {affectedCount>0?<section className="stage3-repair-summary" role="status">
@@ -1384,9 +1384,9 @@ function CartSheet({cart,quote,menu,checkoutStage,serviceMode,tender,diningTarge
         </section>:null}
 
         {!cart.length?<section className="stage3-empty">
-          <span className="stage3-empty-bag" aria-hidden="true">□</span>
-          <h3>購物草稿係空嘅</h3>
-          <p>返回點單加入商品；同一商品唔同設定會保留做獨立項目。</p>
+          <span className="stage3-empty-bag" aria-hidden="true">♡</span>
+          <h3>購物車仲係空嘅</h3>
+          <p>去點單揀返你想食嘅餐點。</p>
           <button className="primary" type="button" onClick={onClose}>去點單</button>
         </section>:<div className="stage3-lines">
           {rows.map(({line,attention})=>{
@@ -1406,8 +1406,10 @@ function CartSheet({cart,quote,menu,checkoutStage,serviceMode,tender,diningTarge
               ?Number(attention.proposedPublishedUnitPriceMinor)
               :null;
             const priceChanged=attention&&unitMinor!==null&&proposedUnit!==null&&unitMinor!==proposedUnit;
+            const product=menu?.products.find(item=>item.productId===line.productId);
+            const mediaProduct=product??{productId:line.productId,name:line.productName,imageRef:undefined};
             return <article className={`stage3-line ${attention?'has-attention':''}`} key={line.lineId}>
-              <span className="stage3-line-media" aria-label="正式產品圖片待補"/>
+              <ProductMedia product={mediaProduct} className="stage3-line-media"/>
               <div className="stage3-line-main">
                 <div className="stage3-line-title">
                   <div><strong>{line.productName}</strong><small>{summary}</small></div>
@@ -1452,9 +1454,9 @@ function CartSheet({cart,quote,menu,checkoutStage,serviceMode,tender,diningTarge
         <div>
           <span>{affectedCount?'可用小計 · '+validItemCount+' 件':'總額'}</span>
           <strong>{affectedCount?money('HKD',validSubtotalMinor):(quote?money(quote.currency,quote.totalMinor):'價格待同步')}</strong>
-          <small>{menu?'餐單版本 '+menu.revision+' · SMT 仍會再驗證':'等待正式餐單同步'}</small>
+          <small>{menu?'結帳前會再確認最新餐單資料':'等待餐單更新'}</small>
         </div>
-        <button className="primary stage3-checkout" type="button" disabled={!checkoutReady} onClick={onCheckout}>前往結帳 →</button>
+        <button className="primary stage3-checkout" type="button" disabled={!checkoutReady} onClick={onCheckout}>去結帳</button>
       </footer>
     </section>
   </div>;
