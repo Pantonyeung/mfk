@@ -216,7 +216,7 @@ export function publishedCartRepairs(
   for(const line of cart){
     const product=products.get(line.productId);
     const previous=Number(line.publishedUnitPriceMinor);
-    if(!product||!product.available||(!line.combo&&!Number.isSafeInteger(Number(product.publishedUnitPriceMinor)))){
+    if(!product||!product.available){
       repairs.push(Object.freeze({
         lineId:line.lineId,
         kind:'PRODUCT_UNAVAILABLE',
@@ -224,6 +224,18 @@ export function publishedCartRepairs(
         detail:!product?'餐點已不在目前餐牌；其他餐點會保留。':'餐點目前暫停供應；其他餐點會保留。',
         canAcceptCurrentPrice:false,
         canEdit:Boolean(product),
+        ...(Number.isSafeInteger(previous)?{previousUnitPriceMinor:previous}:{}),
+      }));
+      continue;
+    }
+    if(!line.combo&&!Number.isSafeInteger(Number(product.publishedUnitPriceMinor))){
+      repairs.push(Object.freeze({
+        lineId:line.lineId,
+        kind:'CONFIG_CHANGED',
+        title:'呢項價格待同步',
+        detail:'店舖未提供完整已發布價格；只需要處理呢一項，其他餐點會保留。',
+        canAcceptCurrentPrice:false,
+        canEdit:true,
         ...(Number.isSafeInteger(previous)?{previousUnitPriceMinor:previous}:{}),
       }));
       continue;
@@ -244,7 +256,18 @@ export function publishedCartRepairs(
     }
 
     const current=currentLinePrice(line,product,menu);
-    if(!current)continue;
+    if(!current){
+      repairs.push(Object.freeze({
+        lineId:line.lineId,
+        kind:'CONFIG_CHANGED',
+        title:'呢項價格待同步',
+        detail:'套餐或選項未有完整已發布價格；只需要處理呢一項，其他餐點會保留。',
+        canAcceptCurrentPrice:false,
+        canEdit:true,
+        ...(Number.isSafeInteger(previous)?{previousUnitPriceMinor:previous}:{}),
+      }));
+      continue;
+    }
     if(!Number.isSafeInteger(previous)||previous!==current.unitMinor||current.comboPublishedFactsChanged){
       repairs.push(Object.freeze({
         lineId:line.lineId,
@@ -298,17 +321,19 @@ export function quotePublishedCart(
     const product=products.get(line.productId);
     const storedUnit=Number(line.publishedUnitPriceMinor);
     const qty=Math.max(1,Math.floor(Number(line.quantity)||1));
-    if(!product||!product.available||(!line.combo&&!Number.isSafeInteger(Number(product.publishedUnitPriceMinor)))){
+    if(!product||!product.available){
       if(!Number.isSafeInteger(storedUnit)||storedUnit<0)return null;
       totalMinor+=storedUnit*qty;
       materialChange=true;
       continue;
     }
+    if(!line.combo&&!Number.isSafeInteger(Number(product.publishedUnitPriceMinor)))return null;
 
     const issue=configIssue(line,product,menu);
     if(issue)materialChange=true;
     const current=issue?null:currentLinePrice(line,product,menu);
     if(!current){
+      if(!issue)return null;
       if(!Number.isSafeInteger(storedUnit)||storedUnit<0)return null;
       totalMinor+=storedUnit*qty;
       materialChange=true;
