@@ -15,6 +15,7 @@ import {Stage2BottomNavigation} from './stage2/Stage2BottomNavigation';
 import type {
   CustomerCartLine,
   CustomerCheckoutDraft,
+  CustomerCommandResult,
   CustomerConnectionState,
   CustomerHistoryProjection,
   CustomerPendingIntent,
@@ -382,8 +383,24 @@ export function App(){
     persist({pendingIntents:next});
   };
 
-  const resolveConfirmedIntent=(intent:CustomerPendingIntent,message:string)=>{
-    const nextPending=pendingIntents.filter(item=>item.submissionId!==intent.submissionId);
+  const resolveDeliveredIntent=(intent:CustomerPendingIntent,result:CustomerCommandResult,message:string)=>{
+    if(!result.orderId){
+      const unknown=Object.freeze({...intent,state:'UNKNOWN' as const,updatedAt:nowIso(),lastMessage:'正式 Order 已回覆成功，但缺少 canonical Order readback identity；保持 UNKNOWN。'});
+      saveIntent(unknown);
+      setSubmitRouteId(intent.submissionId);
+      setNotice('正式結果未完整讀回；請勿重複提交，只可重新確認原本提交。');
+      return;
+    }
+    const delivered=Object.freeze({
+      ...intent,
+      state:'DELIVERED' as const,
+      updatedAt:nowIso(),
+      canonicalOrderId:result.orderId,
+      ...(result.displayCode?{canonicalDisplay:result.displayCode}:{}),
+      ...(result.committedAt?{committedAt:result.committedAt}:{}),
+      lastMessage:message,
+    });
+    const nextPending=[delivered,...pendingIntents.filter(item=>item.submissionId!==intent.submissionId)].slice(0,12);
     const sameCart=JSON.stringify(cart)===JSON.stringify(intent.cart);
     const nextCart=sameCart?[]:cart;
     const nextCheckout=withoutPaymentEvidence(checkout);
@@ -391,10 +408,13 @@ export function App(){
     setCart(nextCart);
     setCheckout(nextCheckout);
     setFallbackIntentId(null);
-    setNotice(message);
     setOrderSegment('current');
+    setSubmitRouteId(null);
+    setWaitingOrderId(result.orderId);
+    setNotice('訂單已成功送達；而家等待店舖正式確認。');
     presentWithContinuity(()=>{
-      setView('orders');
+      setView('waiting');
+      replacePath('/orders/'+encodeURIComponent(result.orderId!)+'/waiting');
       persist({
         cart:nextCart,
         checkout:nextCheckout,
@@ -444,7 +464,7 @@ export function App(){
         }
         const prior=await port.readSubmission(sameCartUnknown.submissionId);
         if(prior.state==='CONFIRMED'){
-          resolveConfirmedIntent(sameCartUnknown,prior.message||'店舖已確認上一個提交');
+          resolveDeliveredIntent(sameCartUnknown,prior,prior.message||'店舖已確認上一個提交');
           return;
         }
         saveIntent(Object.freeze({...sameCartUnknown,state:'UNKNOWN',updatedAt:nowIso(),lastMessage:prior.message}));
@@ -496,7 +516,7 @@ export function App(){
       attemptedIntent=pending;
       saveIntent(pending);
       const result=await port.submitOrder(pending);
-      if(result.state==='CONFIRMED'){resolveConfirmedIntent(pending,result.message||'店舖已確認訂單');return}
+      if(result.state==='CONFIRMED'){resolveDeliveredIntent(pending,result,result.message||'店舖已確認訂單');return}
 
       const cleanCheckout=withoutPaymentEvidence(checkout);
       setCheckout(cleanCheckout);
@@ -507,9 +527,16 @@ export function App(){
         return;
       }
 
+      if(result.state==='REJECTED'||result.state==='FAILED'){
+        const rejected=Object.freeze({...pending,state:'REJECTED' as const,updatedAt:nowIso(),lastMessage:result.message});
+        saveIntent(rejected);
+        setFallbackIntentId(null);
+        setNotice(result.message||'店舖未能接受今次訂單；請返回記憶罐重新確認。');
+        return;
+      }
       const unresolved=Object.freeze({...pending,checkout:cleanCheckout,state:'NOT_CONNECTED' as const,updatedAt:nowIso(),lastMessage:result.message});
       saveIntent(unresolved);
-      if(result.state==='NOT_CONNECTED')setFallbackIntentId(pending.submissionId);
+      setFallbackIntentId(pending.submissionId);
       setNotice(result.message);
     }catch{
       const cleanCheckout=withoutPaymentEvidence(checkout);
@@ -537,14 +564,18 @@ export function App(){
     setReadingIntentId(intent.submissionId);
     try{
       if(!port?.readSubmission){
-        saveIntent(Object.freeze({...intent,state:'NOT_CONNECTED',updatedAt:nowIso(),lastMessage:'訂單查詢服務尚未連接'}));
+        saveIntent(Object.freeze({...intent,state:'UNKNOWN',updatedAt:nowIso(),lastMessage:'訂單查詢服務尚未連接；只可稍後重新讀回原本提交'}));
         setNotice('訂單查詢服務尚未連接；冇重新提交任何交易。');
         return;
       }
       const result=await port.readSubmission(intent.submissionId);
-      if(result.state==='CONFIRMED'){resolveConfirmedIntent(intent,result.message||'店舖已確認訂單');return}
-      const state=result.state==='UNKNOWN'?'UNKNOWN':'NOT_CONNECTED';
-      saveIntent(Object.freeze({...intent,state,updatedAt:nowIso(),lastMessage:result.message}));
+      if(result.state==='CONFIRMED'){resolveDeliveredIntent(intent,result,result.message||'店舖已確認訂單');return}
+      if(result.state==='REJECTED'||result.state==='FAILED'){
+        saveIntent(Object.freeze({...intent,state:'REJECTED',updatedAt:nowIso(),lastMessage:result.message}));
+        setNotice(result.message||'店舖未能接受今次訂單。');
+        return;
+      }
+      saveIntent(Object.freeze({...intent,state:'UNKNOWN',updatedAt:nowIso(),lastMessage:result.message}));
       setNotice(result.message);
     }catch{
       saveIntent(Object.freeze({...intent,state:'UNKNOWN',updatedAt:nowIso(),lastMessage:'讀回結果未明'}));
