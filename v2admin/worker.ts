@@ -95,6 +95,184 @@ function moneyLabel(minor){
   return 'HK'+String.fromCharCode(36)+(Number.isInteger(value)?String(value):value.toFixed(2));
 }
 
+export const MFK_OWNER_MONTHLY_PLAN_SCHEMA='MFK_OWNER_MONTHLY_PLAN_V1';
+const OWNER_COST_CATEGORIES=new Set(['RENT','UTILITIES_WATER','UTILITIES_ELECTRICITY','UTILITIES_GAS','LABOR','OTHER','CUSTOM']);
+const OWNER_DEFAULT_COST_LINES=[
+  ['rent','RENT','屋租'],
+  ['water','UTILITIES_WATER','水'],
+  ['electricity','UTILITIES_ELECTRICITY','電'],
+  ['gas','UTILITIES_GAS','煤氣'],
+  ['labor','LABOR','人工'],
+  ['other','OTHER','其他'],
+];
+
+function hktDate(now=new Date().toISOString()){
+  const at=Date.parse(String(now||''));
+  return new Date((Number.isFinite(at)?at:Date.now())+8*60*60*1000).toISOString().slice(0,10);
+}
+function hktMonthKey(now=new Date().toISOString()){return hktDate(now).slice(0,7);}
+function validMonthKey(value){return /^\d{4}-(0[1-9]|1[0-2])$/.test(String(value||''));}
+function ownerDefaultPlan(monthKey,observedAt=new Date().toISOString()){
+  return Object.freeze({
+    schema:MFK_OWNER_MONTHLY_PLAN_SCHEMA,
+    storeId:'MF01',
+    monthKey,
+    monthlyRevenueTargetMinor:0,
+    note:'',
+    revision:0,
+    updatedAt:observedAt,
+    updatedBy:'UNSET',
+    costLines:Object.freeze(OWNER_DEFAULT_COST_LINES.map(([id,category,label])=>Object.freeze({
+      costLineId:'base-'+id,category,label,plannedMonthlyMinor:0,updatedAt:observedAt,updatedBy:'UNSET',
+    }))),
+  });
+}
+function normalizedOwnerCostLine(raw,index,updatedAt,updatedBy){
+  const item=row(raw);
+  const category=String(item.category||'OTHER').trim().toUpperCase();
+  if(!OWNER_COST_CATEGORIES.has(category))throw new Error('OWNER_PLAN_COST_CATEGORY_INVALID');
+  const costLineId=String(item.costLineId||'').trim()||'cost-'+String(index+1);
+  if(costLineId.length>120)throw new Error('OWNER_PLAN_COST_LINE_ID_INVALID');
+  const label=String(item.label||'').trim().slice(0,80);
+  if(!label)throw new Error('OWNER_PLAN_COST_LABEL_REQUIRED');
+  const plannedMonthlyMinor=Math.round(Number(item.plannedMonthlyMinor));
+  if(!Number.isSafeInteger(plannedMonthlyMinor)||plannedMonthlyMinor<0)throw new Error('OWNER_PLAN_COST_PLANNED_INVALID');
+  const actualProvided=item.actualToDateMinor!==undefined&&item.actualToDateMinor!==null&&item.actualToDateMinor!=='';
+  const actualToDateMinor=actualProvided?Math.round(Number(item.actualToDateMinor)):undefined;
+  if(actualProvided&&(!Number.isSafeInteger(actualToDateMinor)||actualToDateMinor<0))throw new Error('OWNER_PLAN_COST_ACTUAL_INVALID');
+  const note=String(item.note||'').trim().slice(0,240);
+  return Object.freeze({
+    costLineId,category,label,plannedMonthlyMinor,
+    ...(actualProvided?{actualToDateMinor}:{}),
+    ...(note?{note}:{}),
+    updatedAt,updatedBy,
+  });
+}
+const OWNER_WEEKDAY_KEYS=Object.freeze(['SUN','MON','TUE','WED','THU','FRI','SAT']);
+export function ownerRemainingOperatingDays(active,monthKey,observedAt=new Date().toISOString()){
+  if(!validMonthKey(monthKey))return undefined;
+  const weekly=row(row(row(active).snapshot).storeSettings).weeklyHours;
+  const schedule=row(weekly);
+  if(!Object.keys(schedule).length)return undefined;
+  const [year,month]=monthKey.split('-').map(Number);
+  const daysInMonth=new Date(Date.UTC(year,month,0)).getUTCDate();
+  const today=hktDate(observedAt);
+  const currentMonth=today.slice(0,7);
+  const startDay=monthKey===currentMonth?Number(today.slice(8,10)):monthKey<currentMonth?daysInMonth+1:1;
+  let count=0;
+  for(let day=Math.max(1,startDay);day<=daysInMonth;day++){
+    const key=OWNER_WEEKDAY_KEYS[new Date(Date.UTC(year,month-1,day)).getUTCDay()];
+    const rule=row(schedule[key]);
+    if(Object.keys(rule).length&&rule.closed!==true)count++;
+  }
+  return count;
+}
+
+export function calculateOwnerPlanningMetrics({monthKey,currentEffectiveSalesMinor,plan,observedAt=new Date().toISOString(),remainingOperatingDays}){
+  if(!validMonthKey(monthKey))throw new Error('OWNER_PLAN_MONTH_INVALID');
+  const [year,month]=monthKey.split('-').map(Number);
+  const daysInMonth=new Date(Date.UTC(year,month,0)).getUTCDate();
+  const today=hktDate(observedAt),currentMonth=today.slice(0,7),day=Number(today.slice(8,10));
+  const elapsedDays=monthKey===currentMonth?Math.max(1,Math.min(day,daysInMonth)):monthKey<currentMonth?daysInMonth:0;
+  const remainingCalendarDays=monthKey===currentMonth?Math.max(0,daysInMonth-day+1):monthKey<currentMonth?0:daysInMonth;
+  const sales=Math.max(0,Math.round(Number(currentEffectiveSalesMinor)||0));
+  const target=Math.max(0,Math.round(Number(plan?.monthlyRevenueTargetMinor)||0));
+  const remaining=Math.max(0,target-sales);
+  const achievementPercent=target>0?sales/target*100:0;
+  const divisor=Number.isSafeInteger(remainingOperatingDays)&&remainingOperatingDays>=0?remainingOperatingDays:remainingCalendarDays;
+  const requiredDailyAverageMinor=remaining<=0?0:divisor>0?Math.ceil(remaining/divisor):remaining;
+  const actualDailyAverageMinor=elapsedDays>0?Math.round(sales/elapsedDays):0;
+  const paceState=remaining<=0&&target>0?'TARGET_REACHED':actualDailyAverageMinor>=requiredDailyAverageMinor&&target>0?'ON_TRACK':'ATTENTION';
+  const costLines=rows(plan?.costLines);
+  const monthlyPlannedCostMinor=costLines.reduce((sum,item)=>sum+Math.max(0,Math.round(Number(row(item).plannedMonthlyMinor)||0)),0);
+  const actualLines=costLines.filter(item=>row(item).actualToDateMinor!==undefined&&row(item).actualToDateMinor!==null);
+  const actualToDateCostMinor=actualLines.reduce((sum,item)=>sum+Math.max(0,Math.round(Number(row(item).actualToDateMinor)||0)),0);
+  const actualCostAvailable=actualLines.length>0;
+  const costCoverage=actualLines.length===0||actualLines.length<costLines.length?'PARTIAL':'MANUAL_ESTIMATE';
+  const targetOperatingSurplusMinor=target-monthlyPlannedCostMinor;
+  const estimatedOperatingProfitToDateMinor=actualCostAvailable?sales-actualToDateCostMinor:undefined;
+  let forecastTargetDate;
+  if(monthKey===currentMonth&&remaining>0&&actualDailyAverageMinor>0){
+    const daysNeeded=Math.ceil(remaining/actualDailyAverageMinor);
+    const base=Date.parse(today+'T00:00:00Z');
+    forecastTargetDate=new Date(base+daysNeeded*24*60*60*1000).toISOString().slice(0,10);
+  }
+  return Object.freeze({
+    currentEffectiveSalesMinor:sales,
+    monthlyRevenueTargetMinor:target,
+    achievementPercent,
+    remainingMinor:remaining,
+    remainingCalendarDays,
+    ...(Number.isSafeInteger(remainingOperatingDays)&&remainingOperatingDays>=0?{remainingOperatingDays}:{}),
+    requiredDailyAverageMinor,
+    actualDailyAverageMinor,
+    paceState,
+    monthlyPlannedCostMinor,
+    targetOperatingSurplusMinor,
+    actualToDateCostMinor,
+    actualCostAvailable,
+    ...(estimatedOperatingProfitToDateMinor!==undefined?{estimatedOperatingProfitToDateMinor}:{}),
+    costCoverage,
+    ...(forecastTargetDate?{forecastTargetDate,forecastLabel:'預計'}:{}),
+    salesSource:'CURRENT_EFFECTIVE_SALES',
+  });
+}
+function keetaObservedRecord(input){
+  const root=row(input),first=row(root.readback);
+  if(first.details)return first;
+  const second=row(first.readback);
+  if(second.details)return second;
+  return {};
+}
+export function normalizeOwnerKeetaChannel(input,now=new Date().toISOString()){
+  const root=row(input),observed=keetaObservedRecord(root),details=row(row(observed.details).data);
+  const status=Number(details.status);
+  const observedState=status===3?'OPEN':status===4?'PAUSED':'UNKNOWN';
+  const operation=row(root.operation);
+  const action=String(operation.action||'');
+  const desiredState=action==='REST'?'PAUSED':action==='OPEN'?'OPEN':observedState;
+  const observedAt=String(observed.observedAt||operation.completedAt||operation.observedAt||now);
+  const age=Date.parse(now)-Date.parse(observedAt);
+  const freshness=Number.isFinite(age)&&age>=0&&age<=2*60*1000?'CURRENT':observed.details?'STALE':'UNKNOWN';
+  const commandState=String(operation.state||'');
+  const lastCommand=action?{
+    action:action==='REST'?'PAUSE':'RESUME',
+    state:commandState==='COMPLETED'?'CONFIRMED':commandState==='IDEMPOTENT'?'IDEMPOTENT':commandState==='FAILED'?'FAILED':'UNKNOWN',
+    ...(operation.completedAt?{completedAt:String(operation.completedAt)}:{}),
+  }:undefined;
+  return Object.freeze({
+    channelId:'KEETA',name:'Keeta',
+    acceptingOrders:status===3?true:status===4?false:null,
+    desiredState,observedState,
+    health:freshness==='CURRENT'&&(status===3||status===4)?'HEALTHY':'UNKNOWN',
+    mode:status===3?'NORMAL':status===4?'PAUSED':'CLOSED',
+    cause:action?'manual':'provider',
+    observedAt,freshness,
+    ...(lastCommand?{lastCommand}:{}),
+    readback:status===3||status===4?'CONFIRMED':'UNKNOWN',
+    controls:Object.freeze({pause:false,resume:false,snooze:false,busy:false}),
+  });
+}
+export function normalizeOwnerOwnPlatformChannel(active,health,now=new Date().toISOString()){
+  const snapshot=row(row(active).snapshot),policy=row(snapshot.customerChannelPolicy);
+  const enabled=policy.enabled===true;
+  const h=row(health),observedAt=String(h.observedAt||now);
+  const reachable=h.reachable===true,hasHealth=typeof h.reachable==='boolean';
+  return Object.freeze({
+    channelId:'OWN_PLATFORM',name:'自家平台',
+    acceptingOrders:enabled,
+    desiredState:enabled?'OPEN':'PAUSED',
+    observedState:enabled?'OPEN':'PAUSED',
+    health:reachable?'HEALTHY':hasHealth?'DEGRADED':'UNKNOWN',
+    mode:enabled?'NORMAL':'PAUSED',
+    cause:enabled?(reachable?'policy':'integration'):'manual',
+    observedAt,
+    freshness:hasHealth?(reachable?'CURRENT':'STALE'):'UNKNOWN',
+    readback:'CONFIRMED',
+    controls:Object.freeze({pause:false,resume:false,snooze:false,busy:false}),
+  });
+}
+
 const OWNER_CANONICAL_FULFILLMENT=new Set(['待處理','進行中','可取餐','已完成','已取消']);
 export function mapOwnerOrderProjection(input){
   const order=row(input);
@@ -513,9 +691,33 @@ export class AdminSyncStore{
     for(const socket of this.state.getWebSockets()){try{socket.send(doorbell);}catch{}}
     return{status:200,body:{state:'PUBLISHED',active:{revision:envelope.revision,fingerprint:envelope.fingerprint,publishedAt:envelope.publishedAt}}};
   }
+  async ownerChannels(active,observedAt=new Date().toISOString(),freshReadback=false){
+    let keetaStatus=null,customerHealth=null;
+    try{
+      const id=this.env.KEETA_RUNTIME.idFromName('MF01'),stub=this.env.KEETA_RUNTIME.get(id);
+      if(freshReadback)await stub.fetch(new Request('https://internal/admin/store/readback',{method:'POST'}));
+      const response=await stub.fetch(new Request('https://internal/admin/store/status',{method:'GET'}));
+      if(response.ok)keetaStatus=await response.json();
+    }catch{}
+    try{
+      const id=this.env.CUSTOMER_RUNTIME.idFromName('MF01'),stub=this.env.CUSTOMER_RUNTIME.get(id);
+      const response=await stub.fetch(new Request('https://internal/public/channel-health',{method:'GET'}));
+      if(response.ok)customerHealth=await response.json();
+    }catch{}
+    return Object.freeze([
+      normalizeOwnerKeetaChannel(keetaStatus,observedAt),
+      normalizeOwnerOwnPlatformChannel(active,customerHealth,observedAt),
+    ]);
+  }
   async ownerReadModel(){
-    const [active,orders,reports,acks]=await Promise.all([this.state.storage.get('active'),this.projectionOrders(),this.projectionReports(),this.state.storage.get('acks')]);
-    return buildOwnerReadModelSnapshot({active,orders,reports,acks:acks||{},observedAt:new Date().toISOString()});
+    const observedAt=new Date().toISOString();
+    const [active,orders,reports,acks,activity]=await Promise.all([this.state.storage.get('active'),this.projectionOrders(),this.projectionReports(),this.state.storage.get('acks'),this.ownerActivityRows()]);
+    const base=buildOwnerReadModelSnapshot({active,orders,reports,acks:acks||{},observedAt});
+    const [channels,planning]=await Promise.all([
+      this.ownerChannels(active,observedAt),
+      this.ownerPlanningSnapshot(hktMonthKey(observedAt),observedAt),
+    ]);
+    return Object.freeze({...base,channels,planning,activity:Object.freeze(activity)});
   }
 
   async projectionOrders(){
@@ -541,6 +743,87 @@ export class AdminSyncStore{
     return [...rows.values()]
       .filter(Boolean)
       .sort((a,b)=>String(b.createdAt||'').localeCompare(String(a.createdAt||'')));
+  }
+
+  async ownerActivityRows(){
+    const values=await this.state.storage.list({prefix:'owner:activity:'});
+    return [...values.values()].filter(Boolean).sort((a,b)=>String(b.observedAt||'').localeCompare(String(a.observedAt||''))).slice(0,200);
+  }
+  async appendOwnerActivity(session,input){
+    const observedAt=new Date().toISOString();
+    const operationId=String(input?.operationId||crypto.randomUUID()).slice(0,160);
+    const activity=Object.freeze({
+      activityId:'OA-'+operationId,
+      title:String(input?.title||'Owner operation').slice(0,160),
+      actor:String(session?.displayName||session?.staffId||'OWNER'),
+      target:String(input?.target||'').slice(0,240),
+      detail:String(input?.detail||'').slice(0,500),
+      requester:String(session?.displayName||session?.staffId||'OWNER'),
+      approver:'OWNER',
+      result:String(input?.result||'UNKNOWN').slice(0,40),
+      readback:String(input?.readback||'UNKNOWN').slice(0,240),
+      observedAt,
+    });
+    await this.state.storage.put('owner:activity:'+observedAt+':'+operationId,activity);
+    return activity;
+  }
+  async readOwnerMonthlyPlan(monthKey,storeId='MF01'){
+    const stored=await this.state.storage.get('owner:planning:'+storeId+':'+monthKey);
+    return stored||ownerDefaultPlan(monthKey);
+  }
+  async ownerPlanningSnapshot(monthKey,observedAt=new Date().toISOString()){
+    const [plan,reports,active]=await Promise.all([this.readOwnerMonthlyPlan(monthKey,'MF01'),this.projectionReports(),this.state.storage.get('active')]);
+    const currentEffectiveSalesMinor=reports.filter(item=>String(item.date||'').startsWith(monthKey+'-')).reduce((sum,item)=>sum+Math.round(Number(item.netMinor)||0),0);
+    const remainingOperatingDays=ownerRemainingOperatingDays(active,monthKey,observedAt);
+    return Object.freeze({
+      plan,
+      metrics:calculateOwnerPlanningMetrics({monthKey,currentEffectiveSalesMinor,plan,observedAt,remainingOperatingDays}),
+      observedAt,
+      freshness:'CURRENT',
+      readback:'CONFIRMED',
+    });
+  }
+  async saveOwnerMonthlyPlan(session,input){
+    const monthKey=String(input?.monthKey||'').trim();
+    if(!validMonthKey(monthKey))return{state:'REJECTED',message:'月份格式無效'};
+    const operationId=String(input?.operationId||'').trim().slice(0,160);
+    if(!operationId)return{state:'REJECTED',message:'缺少 operation identity'};
+    const operationKey='owner:planning:operation:'+operationId;
+    const prior=await this.state.storage.get(operationKey);
+    if(prior){
+      if(String(prior.monthKey)!==monthKey)return{state:'REJECTED',message:'operation identity 已用於另一個月份'};
+      return prior.result;
+    }
+    const current=await this.readOwnerMonthlyPlan(monthKey,'MF01');
+    const expectedRevision=Math.floor(Number(input?.expectedRevision));
+    if(expectedRevision!==Number(current.revision||0))return{state:'REJECTED',message:'規劃已被更新，請重新讀取',currentRevision:Number(current.revision||0)};
+    const target=Math.round(Number(input?.monthlyRevenueTargetMinor));
+    if(!Number.isSafeInteger(target)||target<0)return{state:'REJECTED',message:'營業額目標無效'};
+    const rawLines=rows(input?.costLines);
+    if(rawLines.length<1||rawLines.length>40)return{state:'REJECTED',message:'成本項目數量無效'};
+    const updatedAt=new Date().toISOString(),updatedBy=String(session.staffId||session.loginId||'OWNER');
+    let costLines;
+    try{costLines=Object.freeze(rawLines.map((line,index)=>normalizedOwnerCostLine(line,index,updatedAt,updatedBy)));}
+    catch(error){return{state:'REJECTED',message:error instanceof Error?error.message:'成本資料無效'};}
+    const plan=Object.freeze({
+      schema:MFK_OWNER_MONTHLY_PLAN_SCHEMA,storeId:'MF01',monthKey,
+      monthlyRevenueTargetMinor:target,
+      note:String(input?.note||'').trim().slice(0,240),
+      revision:Number(current.revision||0)+1,
+      updatedAt,updatedBy,costLines,
+    });
+    await this.state.storage.put('owner:planning:MF01:'+monthKey,plan);
+    const readback=await this.state.storage.get('owner:planning:MF01:'+monthKey);
+    if(!readback||Number(readback.revision)!==plan.revision){
+      const result={state:'UNKNOWN',message:'保存結果未明；請重新讀取'};
+      await this.state.storage.put(operationKey,{monthKey,result,createdAt:updatedAt});
+      await this.appendOwnerActivity(session,{operationId,title:'營業目標與成本',target:monthKey,result:'UNKNOWN',readback:'CANONICAL_READBACK_MISMATCH'});
+      return result;
+    }
+    const result={state:'CONFIRMED',message:'規劃已保存並完成 canonical readback',snapshot:await this.ownerPlanningSnapshot(monthKey)};
+    await this.state.storage.put(operationKey,{monthKey,result,createdAt:updatedAt});
+    await this.appendOwnerActivity(session,{operationId,title:'營業目標與成本',target:monthKey,result:'CONFIRMED',readback:'revision '+String(plan.revision)});
+    return result;
   }
 
   async businessCutoff(){
@@ -687,7 +970,9 @@ export class AdminSyncStore{
       const row=byDate.get(date)||{date,grossMinor:0,adjustmentMinor:0,netMinor:0,orders:0,cashSalesMinor:0};
       const cancelled=String(order.fulfillmentLabel||'')==='已取消';
       if(!cancelled){
-        const total=Math.max(0,Number(order.totalMinor)||0);
+        const total=Number.isFinite(Number(order.recognizedSalesMinor))
+          ?Math.max(0,Number(order.recognizedSalesMinor)||0)
+          :Math.max(0,Number(order.totalMinor)||0);
         row.grossMinor+=total;
         row.netMinor+=total;
         row.orders+=1;
@@ -787,6 +1072,25 @@ export class AdminSyncStore{
     if(url.pathname==='/owner/snapshot'&&request.method==='GET'){
       const session=await this.readOwnerSession(request);if(!session)return json({code:'OWNER_SESSION_UNAUTHORIZED'},401);
       return json(await this.ownerReadModel());
+    }
+
+    if(url.pathname==='/owner/channels'&&request.method==='GET'){
+      const session=await this.readOwnerSession(request);if(!session)return json({code:'OWNER_SESSION_UNAUTHORIZED'},401);
+      const observedAt=new Date().toISOString(),active=await this.state.storage.get('active');
+      return json({channels:await this.ownerChannels(active,observedAt,true),observedAt});
+    }
+    if(url.pathname==='/owner/planning'){
+      const session=await this.readOwnerSession(request);if(!session)return json({code:'OWNER_SESSION_UNAUTHORIZED'},401);
+      if(request.method==='GET'){
+        const monthKey=String(url.searchParams.get('monthKey')||hktMonthKey()).trim();
+        if(!validMonthKey(monthKey))return json({code:'OWNER_PLAN_MONTH_INVALID'},400);
+        return json(await this.ownerPlanningSnapshot(monthKey));
+      }
+      if(request.method==='POST'){
+        let input;try{input=await request.json();}catch{return json({code:'OWNER_PLAN_INPUT_INVALID'},400);}
+        return json(await this.saveOwnerMonthlyPlan(session,input));
+      }
+      return json({code:'METHOD_NOT_ALLOWED'},405);
     }
 
     if(url.pathname==='/admin-browser/auth/challenge'&&request.method==='POST'){
