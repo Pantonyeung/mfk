@@ -64,6 +64,7 @@ export function App(){
   const [selectedQuantity,setSelectedQuantity]=useState(1);
   const [selectedNote,setSelectedNote]=useState('');
   const [editingLineId,setEditingLineId]=useState<string|null>(null);
+  const [productStep,setProductStep]=useState(0);
   const [orderSegment,setOrderSegment]=useState<OrderSegment>('current');
   const [expandedOrderId,setExpandedOrderId]=useState<string|null>(null);
   const [submitting,setSubmitting]=useState(false);
@@ -199,6 +200,7 @@ export function App(){
     setSelectedQuantity(1);
     setSelectedNote('');
     setEditingLineId(null);
+    setProductStep(0);
   };
 
   const openProduct=(product:CustomerProduct,origin:ProductOriginRect|null,line?:CustomerCartLine)=>{
@@ -217,6 +219,7 @@ export function App(){
     setSelectedQuantity(line?.quantity??1);
     setSelectedNote(line?.note??'');
     setEditingLineId(line?.lineId??null);
+    setProductStep(0);
   };
 
   const addSelectedProduct=()=>{
@@ -505,7 +508,6 @@ export function App(){
   const homeRecommendations=buildCustomerRecommendations({products:allProducts,history,cart,limit:4});
   const menuRecommendations=buildCustomerRecommendations({products:allProducts,history,cart,limit:8});
   const cartSuggestions=buildCustomerRecommendations({products:allProducts,history,cart,activeCategoryId:effectiveCategoryId,limit:2});
-  const productRecommendations=selectedProduct?buildCustomerRecommendations({products:allProducts,history,cart,activeCategoryId:selectedProduct.categoryId,limit:8}).filter(item=>item.product.productId!==selectedProduct.productId).slice(0,3):[];
   const actionState:ActionState=quote?.freshness==='MATERIAL_CHANGE'||!cart.length||!quote||Boolean(submitBlockReason)?'disabled':readingIntentId||submitting?'loading':currentPending?.state==='UNKNOWN'?'unknown':currentPending?.state==='PENDING'?'pending':'default';
 
   return <main className="customer-shell" data-network={!browserOnline?'offline':connection.toLowerCase()}>
@@ -531,7 +533,7 @@ export function App(){
 
     {view==='menu'?<Stage2BottomNavigation active="menu" cartCount={cartCount} orderCount={activeOrders.length} onChange={changeView}/>:view!=='checkout'?<BottomNavigation active={view} cartCount={cartCount} orderCount={activeOrders.length} pulseKey={jarPulseKey} onChange={changeView}/>:null}
 
-    {selectedProduct?<ProductSheet product={selectedProduct} menu={menu} selections={selections} comboEnabled={selectedComboEnabled} comboSelections={selectedComboSelections} selectedVariationId={selectedVariationId} quantity={selectedQuantity} note={selectedNote} editing={Boolean(editingLineId)} recommendations={productRecommendations} setVariation={setSelectedVariationId} setComboEnabled={setSelectedComboEnabled} clearCombo={()=>setSelectedComboSelections(Object.freeze([]))} setQuantity={setSelectedQuantity} setNote={setSelectedNote} toggle={(groupId,optionId)=>{
+    {selectedProduct?<ProductSheet product={selectedProduct} menu={menu} selections={selections} comboEnabled={selectedComboEnabled} comboSelections={selectedComboSelections} selectedVariationId={selectedVariationId} quantity={selectedQuantity} note={selectedNote} currentStep={productStep} editing={Boolean(editingLineId)} setStep={setProductStep} setVariation={setSelectedVariationId} setComboEnabled={setSelectedComboEnabled} clearCombo={()=>setSelectedComboSelections(Object.freeze([]))} setQuantity={setSelectedQuantity} setNote={setSelectedNote} toggle={(groupId,optionId)=>{
       const group=selectedProduct.optionGroups.find(item=>item.optionGroupId===groupId);
       if(group)setSelections(current=>toggleCustomerSelection(current,group,optionId));
     }} toggleCombo={(poolId,groupId,subPoolId,choiceId)=>{
