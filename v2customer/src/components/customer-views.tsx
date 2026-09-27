@@ -1,5 +1,5 @@
 import {useRef,useState,type CSSProperties} from 'react';
-import {validateCustomerSelections,type CustomerSelectionState} from '../selection';
+import {customerComboChoiceSelected,customerComboEffectiveMin,customerComboGroupSelectionCount,validateCustomerComboSelection,validateCustomerSelections,type CustomerComboSelectionState,type CustomerSelectionState} from '../selection';
 import {ActionButton,AnimatedValue,CollapsingHeader,EmptyState,ExpandingSearch,MenuSkeleton,PageIntro,ProductDialog,PullRefreshSurface,QuantityStepper,StatefulAction,type ActionState,type ProductOriginRect} from '../ui/primitives';
 import type {CustomerRecommendation} from '../recommendation';
 import type {
@@ -8,6 +8,7 @@ import type {
   CustomerCheckoutDraft,
   CustomerConnectionState,
   CustomerHistoryProjection,
+  CustomerMenuSnapshot,
   CustomerMemberProjection,
   CustomerMemoryBadgeProjection,
   CustomerMemoryCouponProjection,
@@ -201,7 +202,7 @@ export function CartView({cart,quote,repairs,checkout,member,suggestions,product
         const product=products.find(item=>item.productId===line.productId);
         const repair=repairs.find(item=>item.lineId===line.lineId);
         return <article className={'cart-line'+(repair?' needs-repair':'')} id={'cart-line-'+line.lineId} key={line.lineId}>
-          <div className="cart-line-main"><span className="cart-line-index" aria-hidden="true">{String(cart.indexOf(line)+1).padStart(2,'0')}</span><div><strong>{line.productName}</strong><p>{[line.selectedVariationName,...line.selections.map(item=>item.optionName)].filter(Boolean).join('、')||'原味設定'}</p>{line.note?<small>備註：{line.note}</small>:null}{repair?<div className="line-attention" role="alert"><b>{repair.title}</b><span>{repair.detail}</span>{repair.canAcceptCurrentPrice?<button type="button" onClick={()=>onAcceptRepair(line.lineId)}>接受並更新呢項價格</button>:null}</div>:line.attention?<div className="line-attention" role="alert"><b>只修正呢一項</b><span>{line.attention}</span></div>:null}</div></div>
+          <div className="cart-line-main"><span className="cart-line-index" aria-hidden="true">{String(cart.indexOf(line)+1).padStart(2,'0')}</span><div><strong>{line.productName}</strong><p>{[line.selectedVariationName,line.combo?.comboName,...(line.combo?.selections.map(item=>item.choiceLabel)??[]),...line.selections.map(item=>item.optionName)].filter(Boolean).join('、')||'原味設定'}</p>{line.note?<small>備註：{line.note}</small>:null}{repair?<div className="line-attention" role="alert"><b>{repair.title}</b><span>{repair.detail}</span>{repair.canAcceptCurrentPrice?<button type="button" onClick={()=>onAcceptRepair(line.lineId)}>接受並更新呢項價格</button>:null}</div>:line.attention?<div className="line-attention" role="alert"><b>只修正呢一項</b><span>{line.attention}</span></div>:null}</div></div>
           <div className="cart-line-actions"><QuantityStepper label={line.productName} quantity={line.quantity} min={1} onChange={quantity=>onQuantity(line.lineId,quantity)}/><div><button disabled={!product||!product.available} onClick={event=>{if(product&&product.available){const rect=event.currentTarget.getBoundingClientRect();onProduct(product,{top:rect.top,left:rect.left,width:rect.width,height:rect.height},line)}}}>{repair&&!repair.canAcceptCurrentPrice?'修正':line.attention?'修正':'編輯'}</button><button className="remove-line" onClick={()=>setRemoveConfirm(line.lineId)}>移除</button></div></div>
           {removeConfirm===line.lineId?<div className="remove-confirm" role="alert"><p>只移除「{line.productName}」？其他餐點會保留。</p><button onClick={()=>setRemoveConfirm(null)}>保留</button><ActionButton variant="danger" onClick={()=>{onRemove(line.lineId);setRemoveConfirm(null)}}>確認移除</ActionButton></div>:null}
         </article>;
@@ -353,43 +354,182 @@ export function MemberView({connection,snapshot,history,pendingIntents,readingIn
   </section>;
 }
 
-type ProductStep={kind:'variation';label:string}|{kind:'group';label:string;groupIndex:number}|{kind:'finish';label:string};
+type ProductStep=
+  |{kind:'variation';label:string}
+  |{kind:'combo';label:string}
+  |{kind:'group';label:string;groupIndex:number}
+  |{kind:'finish';label:string};
 
-export function ProductSheet({product,selections,selectedVariationId,quantity,note,currentStep,editing,setStep,setVariation,setQuantity,setNote,toggle,origin,onClose,onAdd}:{
-  product:CustomerProduct;selections:CustomerSelectionState;selectedVariationId:string|null;quantity:number;note:string;currentStep:number;editing:boolean;setStep:(step:number)=>void;setVariation:(id:string)=>void;setQuantity:(quantity:number)=>void;setNote:(note:string)=>void;toggle:(groupId:string,optionId:string)=>void;origin:ProductOriginRect|null;onClose:()=>void;onAdd:()=>void;
+const comboAdjustmentLabel=(minor:number)=>{
+  if(!Number.isSafeInteger(minor))return '價格待同步';
+  if(minor===0)return '已包括';
+  return (minor>0?'+':'-')+money('HKD',Math.abs(minor));
+};
+
+export function ProductSheet({
+  product,
+  menu,
+  selections,
+  comboEnabled,
+  comboSelections,
+  selectedVariationId,
+  quantity,
+  note,
+  currentStep,
+  editing,
+  setStep,
+  setVariation,
+  setComboEnabled,
+  clearCombo,
+  setQuantity,
+  setNote,
+  toggle,
+  toggleCombo,
+  origin,
+  onClose,
+  onAdd,
+}:{
+  product:CustomerProduct;
+  menu:CustomerMenuSnapshot|null|undefined;
+  selections:CustomerSelectionState;
+  comboEnabled:boolean;
+  comboSelections:CustomerComboSelectionState;
+  selectedVariationId:string|null;
+  quantity:number;
+  note:string;
+  currentStep:number;
+  editing:boolean;
+  setStep:(step:number)=>void;
+  setVariation:(id:string)=>void;
+  setComboEnabled:(enabled:boolean)=>void;
+  clearCombo:()=>void;
+  setQuantity:(quantity:number)=>void;
+  setNote:(note:string)=>void;
+  toggle:(groupId:string,optionId:string)=>void;
+  toggleCombo:(poolId:string,groupId:string,subPoolId:string,choiceId:string)=>void;
+  origin:ProductOriginRect|null;
+  onClose:()=>void;
+  onAdd:()=>void;
 }){
-  const steps:ProductStep[]=[...(product.variations?.length?[{kind:'variation' as const,label:'規格'}]:[]),...product.optionGroups.map((group,groupIndex)=>({kind:'group' as const,label:group.name,groupIndex})),{kind:'finish' as const,label:'數量與備註'}];
+  const combo=product.comboId?menu?.combos?.find(item=>item.comboId===product.comboId):undefined;
+  const poolById=new Map((menu?.comboPools??[]).map(pool=>[pool.poolId,pool] as const));
+  const steps:ProductStep[]=[
+    ...(product.variations?.length?[{kind:'variation' as const,label:'規格'}]:[]),
+    ...(product.comboId?[{kind:'combo' as const,label:combo?.name??'套餐升級'}]:[]),
+    ...product.optionGroups.map((group,groupIndex)=>({kind:'group' as const,label:group.name,groupIndex})),
+    {kind:'finish' as const,label:'數量與備註'},
+  ];
   const safeStep=Math.min(currentStep,steps.length-1);
   const step=steps[safeStep];
   const variationOk=!product.variationRequired||Boolean(selectedVariationId);
   const validation=validateCustomerSelections(product,selections);
+  const comboValidation=comboEnabled
+    ?validateCustomerComboSelection(product,menu,comboSelections)
+    :{ok:true as const,issues:[] as readonly string[]};
+
   const stepComplete=(candidate:ProductStep)=>{
     if(candidate.kind==='variation')return variationOk;
+    if(candidate.kind==='combo')return !comboEnabled||comboValidation.ok;
     if(candidate.kind==='finish')return quantity>0;
     const group=product.optionGroups[candidate.groupIndex];
     const count=(selections[group.optionGroupId]??[]).length;
     return count>=Math.max(group.required?1:0,group.minSelections)&&count<=group.maxSelections;
   };
   const currentComplete=stepComplete(step);
+
+  const comboChoiceNames=()=>{
+    if(!comboEnabled||!combo)return [];
+    const rows:string[]=[];
+    for(const poolId of combo.addonPoolIds){
+      const pool=poolById.get(poolId);
+      if(!pool)continue;
+      for(const group of pool.groups){
+        for(const subPool of group.subPools){
+          for(const choice of subPool.choices){
+            if(customerComboChoiceSelected(comboSelections,pool.poolId,group.groupId,subPool.subPoolId,choice.choiceId)){
+              rows.push(choice.label);
+            }
+          }
+        }
+      }
+    }
+    return rows;
+  };
+
   const summary=(candidate:ProductStep)=>{
     if(candidate.kind==='variation')return product.variations?.find(item=>item.variationId===selectedVariationId)?.name??'未選';
+    if(candidate.kind==='combo')return comboEnabled
+      ?[combo?.name??'套餐',...comboChoiceNames()].join(' · ')
+      :'只要主餐';
     if(candidate.kind==='finish')return `${quantity} 件${note?' · 有備註':''}`;
     const group=product.optionGroups[candidate.groupIndex];
     const names=group.options.filter(item=>(selections[group.optionGroupId]??[]).includes(item.optionId)).map(item=>item.name);
     return names.length?names.join('、'):'不需要';
   };
   const advance=()=>{if(currentComplete)setStep(Math.min(steps.length-1,safeStep+1))};
+
   return <ProductDialog label={`${product.name} 商品詳情`} origin={origin} returnFocusId={product.productId} onClose={onClose}>
     <div className="product-sheet-hero"><ProductMedia product={product}/><div className="product-sheet-copy"><span>{product.badge??'逐步設定'}</span><h2>{product.name}</h2><p>{product.description}</p><AnimatedValue as="strong">{product.displayPriceLabel??'價格待店舖提供'}</AnimatedValue></div></div>
     <JourneyCoach active={2}/>
     <section className={`step-coach ${currentComplete?'is-ready':''}`} aria-live="polite"><span>第 {safeStep+1} 步</span><strong>{step.label}</strong><p>{currentComplete?(step.kind==='finish'?'設定完成，可以加入記憶罐。':'呢一步完成，可以繼續。'):'完成目前必選項目後，會帶你去下一步。'}</p></section>
     <div className="config-progress"><div><span>設定進度</span><strong>{safeStep+1} / {steps.length}</strong></div><i><b style={{transform:`scaleX(${(safeStep+1)/steps.length})`}}/></i></div>
     <ol className="config-step-list" aria-label="商品設定步驟">{steps.map((candidate,index)=><li key={`${candidate.kind}-${candidate.label}`} className={index===safeStep?'active':index<safeStep&&stepComplete(candidate)?'done':''}><button disabled={index>safeStep} aria-current={index===safeStep?'step':undefined} onClick={()=>setStep(index)}><i>{index<safeStep&&stepComplete(candidate)?'✓':index+1}</i><span><small>{index===safeStep?'目前步驟':index<safeStep?'已完成':'稍後'}</small><strong>{candidate.label}</strong>{index<safeStep?<em>{summary(candidate)}</em>:null}</span></button></li>)}</ol>
+
     <div className="product-config-stage" key={safeStep}>
       {step.kind==='variation'?<fieldset className="choice-group"><legend><span>揀一個規格</span><small>{product.variationRequired?'必選':'可選'}</small></legend><div className="choice-grid">{product.variations?.map(item=><button type="button" key={item.variationId} disabled={!item.available} aria-pressed={selectedVariationId===item.variationId} className={selectedVariationId===item.variationId?'active':''} onClick={()=>{setVariation(item.variationId);setStep(Math.min(steps.length-1,safeStep+1))}}><span>{item.name}</span>{!item.available?<small>暫不可選</small>:selectedVariationId===item.variationId?<small>已選</small>:null}</button>)}</div>{product.variationRequired&&!variationOk?<p className="choice-error">請揀一個規格先繼續</p>:null}</fieldset>:null}
+
+      {step.kind==='combo'?<section className="combo-config">
+        <fieldset className="choice-group">
+          <legend><span>升級套餐</span><small>可選</small></legend>
+          {combo?<><p className="selection-count">套餐基本價 {money('HKD',combo.publishedBasePriceMinor)} · 送出時由 SMT 再核對</p>
+            <div className="choice-grid">
+              <button type="button" aria-pressed={!comboEnabled} className={!comboEnabled?'active':''} onClick={()=>{setComboEnabled(false);clearCombo()}}><span>只要主餐</span><small>不升級套餐</small></button>
+              <button type="button" aria-pressed={comboEnabled} className={comboEnabled?'active':''} onClick={()=>setComboEnabled(true)}><span>{combo.name}</span><small>升級套餐</small></button>
+            </div>
+          </>:<><p className="choice-error">套餐資料待同步，暫時只可以主餐方式加入。</p><div className="choice-grid"><button type="button" aria-pressed={!comboEnabled} className={!comboEnabled?'active':''} onClick={()=>{setComboEnabled(false);clearCombo()}}><span>只要主餐</span><small>移除舊套餐設定</small></button><button type="button" disabled aria-pressed={false}><span>升級套餐</span><small>資料待同步</small></button></div></>}
+        </fieldset>
+
+        {comboEnabled&&combo?<>
+          {combo.mainPoolId?(()=>{const mainPool=poolById.get(combo.mainPoolId);return <fieldset className="choice-group"><legend><span>{mainPool?.name??'主餐'}</span><small>主餐</small></legend><div className="selection-summary"><span>目前主餐</span><p>{product.name}</p></div></fieldset>})():null}
+
+          {combo.addonPoolIds.map(poolId=>{
+            const pool=poolById.get(poolId);
+            if(!pool||pool.kind!=='ADDON')return <fieldset className="choice-group" key={poolId}><legend><span>套餐加配</span><small>資料待同步</small></legend><p className="choice-error">套餐群組資料待同步。</p></fieldset>;
+            return <section key={pool.poolId} aria-label={pool.name}>
+              {pool.groups.map(group=>{
+                const minimum=customerComboEffectiveMin(pool,group);
+                const selectedCount=customerComboGroupSelectionCount(comboSelections,pool.poolId,group.groupId);
+                return <fieldset className="choice-group" key={group.groupId}>
+                  <legend><span>{group.name}</span><small>{pool.addonKind==='DRINK'?'飲品 · 可選':pool.addonKind==='SNACK'?'小食':'加配'} · {minimum?`最少 ${minimum}`:'可選'} · 最多 {group.maxSelections}</small></legend>
+                  <p className="selection-count">已選 {selectedCount} 項</p>
+                  <div className="choice-grid">
+                    {group.subPools.flatMap(subPool=>subPool.choices.map(choice=>{
+                      const active=customerComboChoiceSelected(comboSelections,pool.poolId,group.groupId,subPool.subPoolId,choice.choiceId);
+                      const publishedAdjustmentMinor=Number(subPool.publishedAdjustmentMinor)+Number(choice.publishedAdjustmentMinor);
+                      return <button
+                        type="button"
+                        key={`${subPool.subPoolId}::${choice.choiceId}`}
+                        disabled={!choice.available}
+                        aria-pressed={active}
+                        className={active?'active':''}
+                        onClick={()=>toggleCombo(pool.poolId,group.groupId,subPool.subPoolId,choice.choiceId)}
+                      ><span>{choice.label}</span><small>{!choice.available?'暫不可選':`${subPool.name} · ${comboAdjustmentLabel(publishedAdjustmentMinor)}`}</small></button>;
+                    }))}
+                  </div>
+                  {selectedCount<minimum?<p className="choice-error">仲要揀 {minimum-selectedCount} 項</p>:null}
+                </fieldset>;
+              })}
+            </section>;
+          })}
+          {!comboValidation.ok?<p className="choice-error">{comboValidation.issues[0]}</p>:null}
+        </>:null}
+      </section>:null}
+
       {step.kind==='group'?(()=>{const group=product.optionGroups[step.groupIndex];const selected=selections[group.optionGroupId]??[];const minimum=Math.max(group.required?1:0,group.minSelections);return <fieldset className="choice-group"><legend><span>{group.name}</span><small>{minimum?`最少 ${minimum}`:'可選'} · 最多 {group.maxSelections}</small></legend><p className="selection-count">已選 {selected.length} 項</p><div className="choice-grid">{group.options.map(option=>{const isSelected=selected.includes(option.optionId);return <button type="button" key={option.optionId} disabled={!option.available} aria-pressed={isSelected} className={isSelected?'active':''} onClick={()=>{toggle(group.optionGroupId,option.optionId);if(!isSelected&&group.maxSelections===1&&minimum===1)setStep(Math.min(steps.length-1,safeStep+1))}}><span>{option.name}</span>{!option.available?<small>暫不可選</small>:isSelected?<small>已選</small>:null}</button>})}</div>{selected.length<minimum?<p className="choice-error">仲要揀 {minimum-selected.length} 項</p>:null}</fieldset>})():null}
-      {step.kind==='finish'?<section className="finish-step"><div><span>今次數量</span><QuantityStepper label={product.name} quantity={quantity} min={1} onChange={setQuantity}/></div><label htmlFor="product-note"><span>今次備註 <small>選填</small></span><textarea id="product-note" value={note} onChange={event=>setNote(event.target.value)} maxLength={120} placeholder="例如：醬汁分開。請勿填寫敏感個人資料。"/><small>{note.length} / 120</small></label><section className="selection-summary"><span>目前選擇</span><p>{[product.variations?.find(item=>item.variationId===selectedVariationId)?.name,...product.optionGroups.flatMap(group=>group.options.filter(option=>(selections[group.optionGroupId]??[]).includes(option.optionId)).map(option=>option.name))].filter(Boolean).join(' · ')||'原味設定'}</p></section></section>:null}
+
+      {step.kind==='finish'?<section className="finish-step"><div><span>今次數量</span><QuantityStepper label={product.name} quantity={quantity} min={1} onChange={setQuantity}/></div><label htmlFor="product-note"><span>今次備註 <small>選填</small></span><textarea id="product-note" value={note} onChange={event=>setNote(event.target.value)} maxLength={120} placeholder="例如：醬汁分開。請勿填寫敏感個人資料。"/><small>{note.length} / 120</small></label><section className="selection-summary"><span>目前選擇</span><p>{[product.variations?.find(item=>item.variationId===selectedVariationId)?.name,comboEnabled?combo?.name:undefined,...comboChoiceNames(),...product.optionGroups.flatMap(group=>group.options.filter(option=>(selections[group.optionGroupId]??[]).includes(option.optionId)).map(option=>option.name))].filter(Boolean).join(' · ')||'原味設定'}</p></section></section>:null}
     </div>
-    <div className="sheet-actions">{safeStep>0?<ActionButton variant="ghost" onClick={()=>setStep(safeStep-1)}>上一步</ActionButton>:<ActionButton variant="ghost" onClick={onClose}>稍後再揀</ActionButton>}{step.kind==='finish'?<ActionButton wide disabled={!validation.ok||!variationOk||quantity<1} onClick={onAdd}>{editing?'更新記憶罐':'加入記憶罐'}</ActionButton>:<ActionButton wide disabled={!currentComplete} onClick={advance}>{currentComplete?'下一步':'完成必選項目'}</ActionButton>}</div>
+
+    <div className="sheet-actions">{safeStep>0?<ActionButton variant="ghost" onClick={()=>setStep(safeStep-1)}>上一步</ActionButton>:<ActionButton variant="ghost" onClick={onClose}>稍後再揀</ActionButton>}{step.kind==='finish'?<ActionButton wide disabled={!validation.ok||!variationOk||!comboValidation.ok||quantity<1} onClick={onAdd}>{editing?'更新記憶罐':'加入記憶罐'}</ActionButton>:<ActionButton wide disabled={!currentComplete} onClick={advance}>{currentComplete?'下一步':'完成必選項目'}</ActionButton>}</div>
   </ProductDialog>;
 }
