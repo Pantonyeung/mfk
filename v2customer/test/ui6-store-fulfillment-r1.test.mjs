@@ -69,13 +69,12 @@ test('last-known canonical state can remain visible while freshness is not CURRE
 });
 
 test('COMPLETED deep-link leaves UI6 waiting route and never renders waiting confirmation',()=>{
-  assert.match(app,/waitingOrder\?\.stage==='COMPLETED'/);
   assert.match(app,/history\.some\(order=>order\.orderId===waitingOrderId\)/);
-  assert.match(app,/if\(view!=='waiting'\|\|!waitingCompleted\)return/);
-  assert.match(app,/setOrderSegment\('history'\)/);
-  assert.match(app,/replacePath\('\/orders'\)/);
-  assert.match(app,/data-ui6-state="COMPLETED_REDIRECT"/);
-  assert.match(app,/UI6 唔會將 Completed 顯示成等待店舖確認/);
+  assert.match(app,/\['READY','ARRIVED','VERIFIED','HANDED_OVER','PICKUP_EXCEPTION','COMPLETED'\]\.includes\(waitingOrder\.stage\)/);
+  assert.match(app,/if\(view!=='waiting'\|\|!waitingUi7Ready\|\|!waitingOrderId\)return/);
+  assert.match(app,/openPickupRoute\(waitingOrderId\)/);
+  assert.match(app,/view==='pickup'/);
+  assert.match(app,/PickupCompleteUi7View/);
 });
 
 test('UI6 keeps Display Number, Pickup Code and Order ID semantics separate without showing the internal value',()=>{
