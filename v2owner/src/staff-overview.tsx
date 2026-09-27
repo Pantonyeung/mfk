@@ -1,5 +1,6 @@
 import {useMemo,useState} from 'react';
 import type {OwnerActivityRecord,OwnerConnectionState,OwnerStaffPresence} from './product-types';
+import {humanEmployeeCode,selectStaffAuditHistory} from './staff-identity';
 
 function roleLabel(role:string){
   const key=String(role||'').toUpperCase();
@@ -27,14 +28,6 @@ function freshnessLabel(connection:OwnerConnectionState){
   return '同步失敗';
 }
 
-function actorMatches(record:OwnerActivityRecord,staff:OwnerStaffPresence){
-  const stableStaffId=String(staff.staffId||'').trim();
-  if(!stableStaffId)return false;
-  return [record.actorStaffId,record.requesterStaffId,record.approverStaffId]
-    .map(value=>String(value||'').trim())
-    .some(value=>value===stableStaffId);
-}
-
 export function StaffOverviewPage({
   staff,
   activity,
@@ -59,7 +52,7 @@ export function StaffOverviewPage({
     return [...counts.entries()].sort((a,b)=>b[1]-a[1]||a[0].localeCompare(b[0],'zh-HK'));
   },[staff]);
   const selectedHistory=useMemo(
-    ()=>selected?activity.filter(item=>actorMatches(item,selected)).slice(0,20):[],
+    ()=>selected?selectStaffAuditHistory(activity,selected).slice(0,20):[],
     [activity,selected],
   );
 
@@ -110,7 +103,7 @@ export function StaffOverviewPage({
           <div className="staff-avatar" aria-hidden="true">{person.name.trim().slice(0,1)||'員'}</div>
           <div className="staff-overview-copy">
             <strong>{person.name}</strong>
-            <small>{roleLabel(person.role)} · 員工編號 {person.loginId??'未有員工編號資料'}</small>
+            <small>{roleLabel(person.role)} · 員工編號 {humanEmployeeCode(person)??'未有員工編號資料'}</small>
             <span>能力摘要：{person.capabilitySummary??'未有能力摘要資料'}</span>
           </div>
           <div className="staff-overview-state">
@@ -125,7 +118,7 @@ export function StaffOverviewPage({
     {selected?<div className="overlay" onMouseDown={event=>{if(event.target===event.currentTarget)setSelectedId(null)}}>
       <section className="drawer staff-detail-drawer" role="dialog" aria-modal="true" aria-label={selected.name+' 員工詳情'}>
         <header className="drawer-head">
-          <div><span>STAFF DETAIL · READ ONLY</span><h2>{selected.name}</h2><small>{roleLabel(selected.role)} · 員工編號 {selected.loginId??'未有員工編號資料'}</small></div>
+          <div><span>STAFF DETAIL · READ ONLY</span><h2>{selected.name}</h2><small>{roleLabel(selected.role)} · 員工編號 {humanEmployeeCode(selected)??'未有員工編號資料'}</small></div>
           <button onClick={()=>setSelectedId(null)} aria-label="關閉">×</button>
         </header>
 
@@ -133,7 +126,7 @@ export function StaffOverviewPage({
           <h3>1. Identity & Employment</h3>
           <div className="staff-detail-grid">
             <div><span>姓名</span><strong>{selected.name}</strong></div>
-            <div><span>員工編號</span><strong>{selected.loginId??'未有員工編號資料'}</strong></div>
+            <div><span>員工編號</span><strong>{humanEmployeeCode(selected)??'未有員工編號資料'}</strong></div>
             <div><span>角色</span><strong>{roleLabel(selected.role)}</strong></div>
             <div><span>僱傭／入職資料</span><strong>未有資料</strong></div>
           </div>
