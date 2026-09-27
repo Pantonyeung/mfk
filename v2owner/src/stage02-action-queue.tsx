@@ -101,13 +101,11 @@ function ActionQueueCard({row,onOpen}:{row:OwnerActionQueueRowViewModel;onOpen:(
     </div>
     <h2>{item.title}</h2>
     <p>{item.detail}</p>
-    <div className="action-facts-grid">
-      <div><span>影響目標</span><strong>{item.target}</strong></div>
-      <div><span>已持續</span><strong>{row.elapsedLabel}</strong></div>
-      <div><span>目前狀態</span><strong>{certaintyLabel(item.certainty)}</strong></div>
-      <div><span>安全下一步</span><strong>{row.safeNextStepLabel??'只讀檢視'}</strong></div>
+    <div className="action-queue-meta">
+      <span>{item.target}</span>
+      <strong>{row.safeNextStepLabel??'查看詳情'}</strong>
     </div>
-    <div className="action-card-footer"><span>查看詳情</span><small>處理紀錄會保留</small></div>
+    <div className="action-card-footer"><span>查看詳情</span><small>{certaintyLabel(item.certainty)} · 處理紀錄會保留</small></div>
   </button>;
 }
 
@@ -151,10 +149,10 @@ function ActionDetailDrawer({
       <section className="detail-section">
         <h3>影響</h3>
         <div className="action-detail-grid">
-          <div><span>目標</span><strong>{item.target}</strong></div>
+          <div><span>影響目標</span><strong>{item.target}</strong></div>
           <div><span>已持續</span><strong>{row.elapsedLabel}</strong></div>
-          <div><span>處理建議</span><strong>{row.safeNextStepLabel??'查看詳情'}</strong></div>
-          <div><span>目前確定性</span><strong>{certaintyLabel(item.certainty)}</strong></div>
+          <div><span>安全下一步</span><strong>{row.safeNextStepLabel??'查看詳情'}</strong></div>
+          <div><span>目前狀態</span><strong>{certaintyLabel(item.certainty)}</strong></div>
         </div>
       </section>
 
