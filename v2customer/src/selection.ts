@@ -133,26 +133,32 @@ export function toggleCustomerComboSelection(
   const choice=subPool?.choices.find(row=>row.choiceId===choiceId);
   if(!subPool||!choice||!choice.available)return state;
 
+  const canonicalGroupState=state.filter(row=>{
+    if(row.poolId!==pool.poolId||row.groupId!==group.groupId)return true;
+    const currentSubPool=group.subPools.find(candidate=>candidate.subPoolId===row.subPoolId);
+    const currentChoice=currentSubPool?.choices.find(candidate=>candidate.choiceId===row.choiceId);
+    return Boolean(currentSubPool&&currentChoice?.available);
+  });
   const draft:CustomerComboDraftSelection=Object.freeze({
     poolId:pool.poolId,
     groupId:group.groupId,
     subPoolId,
     choiceId,
   });
-  const exists=state.some(row=>comboKey(row)===comboKey(draft));
-  if(exists)return Object.freeze(state.filter(row=>comboKey(row)!==comboKey(draft)));
+  const exists=canonicalGroupState.some(row=>comboKey(row)===comboKey(draft));
+  if(exists)return Object.freeze(canonicalGroupState.filter(row=>comboKey(row)!==comboKey(draft)));
 
-  const current=selectedForGroup(state,pool.poolId,group.groupId);
+  const current=selectedForGroup(canonicalGroupState,pool.poolId,group.groupId);
   const min=customerComboEffectiveMin(pool,group);
   const max=Math.max(min,group.maxSelections);
   if(max<=1){
     return Object.freeze([
-      ...state.filter(row=>!(row.poolId===pool.poolId&&row.groupId===group.groupId)),
+      ...canonicalGroupState.filter(row=>!(row.poolId===pool.poolId&&row.groupId===group.groupId)),
       draft,
     ]);
   }
-  if(current.length>=max)return state;
-  return Object.freeze([...state,draft]);
+  if(current.length>=max)return Object.freeze(canonicalGroupState);
+  return Object.freeze([...canonicalGroupState,draft]);
 }
 
 export function validateCustomerComboSelection(
