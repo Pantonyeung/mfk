@@ -59,7 +59,7 @@ describe('SMT A3e frontline presentation',()=>{
 
   it('keeps business authority outside presentation preferences',()=>{
     expect(app).toContain('localRuntime.createOrder');
-    expect(app).toContain('localRuntime.printOrderOutputs');
+    expect(app).toContain('localRuntime.printInitialOrderOutputsOnce');
     expect(adminDeferred).toContain('商品名、價格、供應、訂單同付款權限完全不變');
     expect(adminDeferred).not.toContain('setPriceFromPresentation');
     expect(workspace).not.toContain('unitMinor');
