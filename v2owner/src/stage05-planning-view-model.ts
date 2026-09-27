@@ -53,11 +53,12 @@ function hktDate(now:Date){
 }
 
 export function resolveOwnerPlanningBusinessDate(snapshot:OwnerReadModelSnapshot|null,now=new Date()){
-  return validBusinessDate(snapshot?.store?.businessDate)??hktDate(now);
+  return validBusinessDate(snapshot?.planningBasis?.businessDate)??validBusinessDate(snapshot?.store?.businessDate)??hktDate(now);
 }
 
 export function resolveOwnerPlanningMonth(snapshot:OwnerReadModelSnapshot|null,now=new Date()){
-  return resolveOwnerPlanningBusinessDate(snapshot,now).slice(0,7);
+  const basisMonth=String(snapshot?.planningBasis?.month||'');
+  return /^\d{4}-(0[1-9]|1[0-2])$/.test(basisMonth)?basisMonth:resolveOwnerPlanningBusinessDate(snapshot,now).slice(0,7);
 }
 
 function addCalendarDays(date:string,days:number){
@@ -72,16 +73,14 @@ export function buildOwnerPlanningViewModel(
   now=new Date(),
 ):OwnerPlanningViewModel{
   const businessDate=resolveOwnerPlanningBusinessDate(snapshot,now);
-  const month=businessDate.slice(0,7);
-  const canonicalRows=(snapshot?.reports??[]).filter(row=>
-    row.metricKind==='CURRENT_EFFECTIVE_SALES'
-    &&typeof row.currentEffectiveSalesMinor==='number'
-    &&Number.isFinite(row.currentEffectiveSalesMinor)
-    &&row.businessDate?.startsWith(month)
-    &&row.businessDate<=businessDate
-  );
-  const mtdAvailable=canonicalRows.length>0;
-  const mtdMinor=canonicalRows.reduce((sum,row)=>sum+Math.round(row.currentEffectiveSalesMinor??0),0);
+  const month=resolveOwnerPlanningMonth(snapshot,now);
+  const basis=snapshot?.planningBasis;
+  const mtdAvailable=basis?.sourceMetric==='CURRENT_EFFECTIVE_SALES'
+    &&basis.sourceAuthority==='CANONICAL_REPORTING_PROJECTION'
+    &&basis.currentEffectiveSalesMtdMinor!==null
+    &&typeof basis.currentEffectiveSalesMtdMinor==='number'
+    &&Number.isFinite(basis.currentEffectiveSalesMtdMinor);
+  const mtdMinor=mtdAvailable?Math.round(basis?.currentEffectiveSalesMtdMinor??0):0;
   const activePlan=plan.month===month?plan:null;
   const targetMinor=activePlan?.targetMinor??null;
   const remainingMinor=targetMinor!==null&&mtdAvailable?Math.max(0,targetMinor-mtdMinor):null;
