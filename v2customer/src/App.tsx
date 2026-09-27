@@ -687,7 +687,7 @@ export function App(){
 
   const editUi8Repair=(line:CustomerCartLine)=>{
     const product=menu?.products.find(item=>item.productId===line.productId);
-    if(!product){setNotice('呢個舊商品已不在目前餐牌；可以移除受影響 Line。');return}
+    if(!product?.available){setNotice('呢個舊商品目前不可用；只可以移除受影響 Line，其他 Line 保持不變。');return}
     openProduct(product,null,line);
   };
 
