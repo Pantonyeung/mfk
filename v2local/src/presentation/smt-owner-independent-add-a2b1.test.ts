@@ -26,10 +26,13 @@ describe('SMT A2b-1 independent add identity',()=>{
   });
 
   it('uses the same identity allocator for new configured and combo lines while preserving A2a edit identity',()=>{
-    expect(app).toContain('const line:CartLine={id:nextLocalCartLineId(),productId:product.id');
+    const configuredStart=app.indexOf('  const addConfigured=(');
+    const configuredEnd=app.indexOf('  const applyRequired=',configuredStart);
+    const configured=app.slice(configuredStart,configuredEnd);
+    expect(configured).toContain('id:nextLocalCartLineId()');
     expect(app).toContain('const line:CartLine={id:nextLocalCartLineId(),productId:comboId');
-    expect(app).toContain('if(lineId){');
-    expect(app).toContain('const existing=cart.find(item=>item.id===lineId);if(!existing)return;');
+    expect(configured).toContain('if(lineId){');
+    expect(configured).toContain('const existing=cart.find(item=>item.id===lineId);if(!existing)return;');
   });
 
   it('keeps quantity plus/minus as an operation on the selected source line',()=>{
