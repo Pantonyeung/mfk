@@ -28,9 +28,11 @@ function freshnessLabel(connection:OwnerConnectionState){
 }
 
 function actorMatches(record:OwnerActivityRecord,staff:OwnerStaffPresence){
-  const keys=[staff.staffId,staff.name].map(value=>String(value||'').trim()).filter(Boolean);
-  const values=[record.actor,record.requester,record.approver].map(value=>String(value||'').trim());
-  return keys.some(key=>values.includes(key));
+  const stableStaffId=String(staff.staffId||'').trim();
+  if(!stableStaffId)return false;
+  return [record.actorStaffId,record.requesterStaffId,record.approverStaffId]
+    .map(value=>String(value||'').trim())
+    .some(value=>value===stableStaffId);
 }
 
 export function StaffOverviewPage({
@@ -108,8 +110,8 @@ export function StaffOverviewPage({
           <div className="staff-avatar" aria-hidden="true">{person.name.trim().slice(0,1)||'員'}</div>
           <div className="staff-overview-copy">
             <strong>{person.name}</strong>
-            <small>{roleLabel(person.role)} · 員工編號 {person.staffId}</small>
-            <span>角色能力：{person.permissions||'未有權限摘要讀回'}</span>
+            <small>{roleLabel(person.role)} · 員工編號 {person.loginId??'未有員工編號資料'}</small>
+            <span>能力摘要：{person.capabilitySummary??'未有能力摘要資料'}</span>
           </div>
           <div className="staff-overview-state">
             <small>今日出勤</small>
@@ -123,7 +125,7 @@ export function StaffOverviewPage({
     {selected?<div className="overlay" onMouseDown={event=>{if(event.target===event.currentTarget)setSelectedId(null)}}>
       <section className="drawer staff-detail-drawer" role="dialog" aria-modal="true" aria-label={selected.name+' 員工詳情'}>
         <header className="drawer-head">
-          <div><span>STAFF DETAIL · READ ONLY</span><h2>{selected.name}</h2><small>{roleLabel(selected.role)} · {selected.staffId}</small></div>
+          <div><span>STAFF DETAIL · READ ONLY</span><h2>{selected.name}</h2><small>{roleLabel(selected.role)} · 員工編號 {selected.loginId??'未有員工編號資料'}</small></div>
           <button onClick={()=>setSelectedId(null)} aria-label="關閉">×</button>
         </header>
 
@@ -131,7 +133,7 @@ export function StaffOverviewPage({
           <h3>1. Identity & Employment</h3>
           <div className="staff-detail-grid">
             <div><span>姓名</span><strong>{selected.name}</strong></div>
-            <div><span>員工編號</span><strong>{selected.staffId}</strong></div>
+            <div><span>員工編號</span><strong>{selected.loginId??'未有員工編號資料'}</strong></div>
             <div><span>角色</span><strong>{roleLabel(selected.role)}</strong></div>
             <div><span>僱傭／入職資料</span><strong>未有資料</strong></div>
           </div>
@@ -152,14 +154,14 @@ export function StaffOverviewPage({
           <h3>3. Role & Capability Summary</h3>
           <div className="staff-detail-grid">
             <div><span>角色</span><strong>{roleLabel(selected.role)}</strong></div>
-            <div><span>能力摘要</span><strong>{selected.permissions||'未有權限摘要讀回'}</strong></div>
+            <div><span>能力摘要</span><strong>{selected.capabilitySummary??'未有能力摘要資料'}</strong></div>
           </div>
           <p className="staff-detail-note">此頁只顯示已讀回摘要；不能新增／停用員工、改角色／權限或重設 PIN。</p>
         </section>
 
         <section className="staff-detail-section">
           <h3>4. History & Audit</h3>
-          {!selectedHistory.length?<div className="staff-empty"><strong>未有可歸屬 Audit 讀回</strong><span>唔會由畫面操作歷史自行推斷。</span></div>:
+          {!selectedHistory.length?<div className="staff-empty"><strong>未有可可靠歸屬 Audit 讀回</strong><span>只接受 stable canonical staff identity；name-only actor 不會歸屬。</span></div>:
             <div className="staff-audit-list">{selectedHistory.map(item=><article key={item.activityId}>
               <div><strong>{item.title}</strong><span>{new Date(item.observedAt).toLocaleString('zh-HK')}</span></div>
               <small>{item.result}{item.readback?' · '+item.readback:''}</small>
