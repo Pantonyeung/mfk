@@ -61,7 +61,7 @@ export function PendingOrderReviewWorkspace({
       if(!disposed)setEvidenceError(cause instanceof Error?cause.message:'PAYMENT_EVIDENCE_READ_FAILED');
     }).finally(()=>{if(!disposed)setEvidenceLoading(false);});
     return()=>{disposed=true;if(objectUrl)URL.revokeObjectURL(objectUrl);};
-  },[stage,order.id,order.paymentEvidenceRef,onReadEvidence]);
+  },[stage,order.id,order.paymentEvidenceRef]);
 
   useEffect(()=>{
     if(stage!=='review'||!order.customerPhone){
