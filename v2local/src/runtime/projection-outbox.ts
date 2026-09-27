@@ -1,7 +1,7 @@
 import {createSmtProjectionEvent,type SmtProjectionEvent} from '../../../contracts/smt-projection-v1.ts';
 import {readSmtDeviceId,readAdminSnapshotSection,subscribeSmtAdminConfig} from './admin-config-sync.ts';
 import {resolveBusinessWindow,type LocalCashOpening,type LocalDayClose} from './local-operations.ts';
-import type {CustomerReorderIntentLine} from '../../../contracts/customer-cloud-v1.ts';
+import type {CustomerReorderHistoryPriceFact,CustomerReorderIntentLine} from '../../../contracts/customer-cloud-v1.ts';
 
 export const SMT_PROJECTION_OUTBOX_KEY='mfk.v2local.projection-outbox.v1';
 export const SMT_PROJECTION_ACKED_KEY='mfk.v2local.projection-acked.v1';
@@ -36,6 +36,7 @@ export interface ProjectionOrderInput{
     readonly observedAt?:string;
   }>;
   readonly customerReorderIntent?:readonly CustomerReorderIntentLine[];
+  readonly customerReorderHistoryPriceFacts?:readonly CustomerReorderHistoryPriceFact[];
   readonly etaLabel?:string;
   readonly promisedReadyLabel?:string;
   readonly fulfillmentHistory?:readonly {
@@ -147,6 +148,7 @@ export function queueOrderProjection(order:ProjectionOrderInput){
       ...(order.completedAt?{completedAt:String(order.completedAt)}:{}),
       ...(order.pickupException?{pickupException:Object.freeze({...order.pickupException})}:{}),
       ...(order.customerReorderIntent?.length?{customerReorderIntent:Object.freeze(order.customerReorderIntent.map(line=>Object.freeze({...line,selections:Object.freeze(line.selections.map(selection=>Object.freeze({...selection}))),...(line.combo?{combo:Object.freeze({...line.combo,selections:Object.freeze(line.combo.selections.map(selection=>Object.freeze({...selection})))})}:{})})))}:{}),
+      ...(order.customerReorderHistoryPriceFacts?.length?{customerReorderHistoryPriceFacts:Object.freeze(order.customerReorderHistoryPriceFacts.map(fact=>Object.freeze({...fact})))}:{}),
       ...(order.etaLabel?{etaLabel:String(order.etaLabel)}:{}),
       ...(order.promisedReadyLabel?{promisedReadyLabel:String(order.promisedReadyLabel)}:{}),
       ...(order.fulfillmentHistory?.length?{fulfillmentHistory:Object.freeze(order.fulfillmentHistory.map(entry=>Object.freeze({...entry})))}:{}),
