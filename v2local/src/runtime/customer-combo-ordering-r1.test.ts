@@ -1,6 +1,16 @@
 import {readFileSync} from 'node:fs';
-import {describe,expect,it} from 'vitest';
-import type {CustomerCloudCartLine} from '../../../contracts/customer-cloud-v1.ts';
+import {afterEach,describe,expect,it,vi} from 'vitest';
+import {
+  MFK_CUSTOMER_ORDER_INTENT_SCHEMA,
+  validateMfkCustomerOrderIntent,
+  type CustomerCloudCartLine,
+} from '../../../contracts/customer-cloud-v1.ts';
+import {
+  createCustomerPendingIntent,
+  readCustomerLocalWorkspace,
+  writeCustomerLocalWorkspace,
+} from '../../../v2customer/src/persistence.ts';
+import type {CustomerCartLine,CustomerCheckoutDraft} from '../../../v2customer/src/product-types.ts';
 import type {SyncedCombo,SyncedComboPool,SyncedOrderingProduct,SyncedOptionSet} from './admin-config-projection.ts';
 import {priceCustomerCart} from './customer-cloud-intake.ts';
 
@@ -72,6 +82,41 @@ function comboLine(overrides:Partial<CustomerCloudCartLine>={}):CustomerCloudCar
   };
 }
 
+afterEach(()=>vi.unstubAllGlobals());
+
+function customerCartLine():CustomerCartLine{
+  const line=comboLine();
+  return {
+    lineId:line.lineId,
+    productId:line.productId,
+    productName:line.productName,
+    quantity:line.quantity,
+    selections:line.selections.map(selection=>({
+      optionGroupId:selection.optionGroupId,
+      optionId:selection.optionId,
+      optionName:selection.optionName,
+      publishedAdjustmentMinor:200,
+    })),
+    combo:line.combo,
+    publishedUnitPriceMinor:line.publishedUnitPriceMinor,
+    createdAt:'2026-09-27T00:00:00.000Z',
+  };
+}
+
+function customerOrderInput(){
+  return {
+    schema:MFK_CUSTOMER_ORDER_INTENT_SCHEMA,
+    storeId:'MF01',
+    submissionId:'CUSTOMER-combo-test',
+    menuRevision:'rev-combo-1',
+    idempotencyKey:'customer-order:CUSTOMER-combo-test',
+    createdAt:'2026-09-27T00:00:00.000Z',
+    updatedAt:'2026-09-27T00:00:00.000Z',
+    cart:[comboLine()],
+    checkout:{name:'Test',phone:'91234567',paymentMethod:'PAY_AT_STORE'},
+  };
+}
+
 describe('Customer Combo ordering → existing SMT revalidation',()=>{
   it('maps Combo-bearing Customer line to existing SMT Combo semantics and prices canonically',()=>{
     const result=priceCustomerCart([comboLine()],products,combos,pools);
@@ -120,4 +165,66 @@ describe('Customer Combo ordering → existing SMT revalidation',()=>{
     expect(source).not.toContain('createCustomerComboEngine');
     expect(source).not.toContain('CustomerComboEngine');
   });
+
+  it('Customer Cloud validator preserves the exact bounded Combo payload and rejects unknown fields',()=>{
+    const input=customerOrderInput();
+    const validated=validateMfkCustomerOrderIntent(input);
+    expect(validated.cart[0]?.combo).toEqual(comboLine().combo);
+    expect(validated.submissionId).toBe(input.submissionId);
+    expect(validated.idempotencyKey).toBe(input.idempotencyKey);
+
+    const invalid={
+      ...input,
+      cart:[{
+        ...comboLine(),
+        combo:{...comboLine().combo!,unexpected:'second-engine-field'},
+      }],
+    };
+    expect(()=>validateMfkCustomerOrderIntent(invalid))
+      .toThrow(/CUSTOMER_COMBO_UNKNOWN_0/);
+
+    const productChoiceMissingId={
+      ...input,
+      cart:[{
+        ...comboLine(),
+        combo:{
+          ...comboLine().combo!,
+          selections:[{
+            ...comboLine().combo!.selections[0],
+            productId:undefined,
+          }],
+        },
+      }],
+    };
+    expect(()=>validateMfkCustomerOrderIntent(productChoiceMissingId))
+      .toThrow(/CUSTOMER_COMBO_PRODUCT_ID_REQUIRED/);
+  });
+
+  it('local workspace restart preserves Combo cart and pending intent without changing request identity',()=>{
+    const storage=new Map<string,string>();
+    vi.stubGlobal('window',{
+      localStorage:{
+        getItem:(key:string)=>storage.get(key)??null,
+        setItem:(key:string,value:string)=>{storage.set(key,value)},
+      },
+    });
+
+    const line=customerCartLine();
+    const checkout:CustomerCheckoutDraft={name:'Test',phone:'91234567',paymentMethod:'PAY_AT_STORE'};
+    const pending=createCustomerPendingIntent([line],checkout,'rev-combo-1');
+
+    writeCustomerLocalWorkspace({
+      cart:[line],
+      checkout,
+      pendingIntents:[pending],
+      preferences:{activeView:'cart',activeCategoryId:null},
+    });
+
+    const restored=readCustomerLocalWorkspace();
+    expect(restored.cart[0]?.combo).toEqual(line.combo);
+    expect(restored.pendingIntents[0]?.cart[0]?.combo).toEqual(line.combo);
+    expect(restored.pendingIntents[0]?.submissionId).toBe(pending.submissionId);
+    expect(restored.pendingIntents[0]?.idempotencyKey).toBe(pending.idempotencyKey);
+  });
+
 });
