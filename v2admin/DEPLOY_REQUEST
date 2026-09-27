@@ -1,7 +1,7 @@
 MFK_ADMIN_DEPLOY_REQUEST
 target=mfk-admin
 canonical_url=https://admin.morefunos.com
-product_source=INTEGRATION_COMBO_DEPLOY_R1
+product_source=OWNER_RUNTIME_AUTHENTICATED_CANONICAL_READ
 requested_by=owner
-reason=deploy_admin_combo_drink_crossport_projection
-work_id=MFK-ADMIN-COMBO-DRINK-CROSSPORT-DEPLOY-R1
+reason=deploy_owner_auth_and_owner_read_runtime
+work_id=MFK-OWNER-RUNTIME-CONNECTION-R2
