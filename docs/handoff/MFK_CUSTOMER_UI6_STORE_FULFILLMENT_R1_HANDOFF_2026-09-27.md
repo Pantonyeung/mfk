@@ -3,11 +3,32 @@
 日期：2026-09-27  
 Issue：#400  
 Branch：`work/MFK/CUSTOMER-UI6-STORE-FULFILLMENT-R1`  
-Base main：`c2d5b016fe3dd08d276e915ae0f0fb2301e964cf`
+STATUS：READY_FOR_COMMANDER_REACCEPTANCE
 
-## Scope completed
+## CHANGES_REQUIRED correction
 
-只完成 Customer UI6：
+本輪只修 Commander 指定 3 項：
+
+1. UI6 canonical-state fail-closed
+   - `order=null` 禁止 fallback `RECEIVED`
+   - unsupported stage 禁止 fallback `RECEIVED`
+   - 無 canonical state 時明確分 `LOADING / EMPTY / ERROR / OFFLINE / STALE / UNKNOWN`
+   - 有 last-known canonical state 時可以保留顯示，但 freshness 必須另外標示
+   - canonical `COMPLETED` deep-link 離開 waiting route，返回 Orders / History；禁止顯示「等待店舖確認」
+
+2. 專用 Workflow 已移除
+   - `.github/workflows/customer-ui6-store-fulfillment-r1.yml` 已刪除
+   - Final diff 無新增 Customer UI6 專用 Workflow
+   - Re-acceptance 使用 repository 已存在 workflow / PR checks，無新增永久 CI path
+
+3. Handoff evidence drift 已清理
+   - 舊 pre-reacceptance SHA / Run 不再作 final evidence
+   - Exact final HEAD / exact final CI 以 #400 最新 `READY_FOR_COMMANDER_REACCEPTANCE` comment 為 immutable acceptance receipt
+   - 本文件所屬 branch HEAD 必須與該 receipt 的 FINAL_HEAD 一致；CI 必須係該 exact HEAD 的 checks
+
+## Scope retained
+
+Customer UI6 只包括：
 
 - 等待店舖確認
 - 製作中
@@ -16,21 +37,43 @@ Base main：`c2d5b016fe3dd08d276e915ae0f0fb2301e964cf`
 - 未能接單
 - 已取消
 
-未做 UI7 完成交收。
+保持：
 
-## Authority / safety
+- READY ≠ COMPLETED
+- NO UI7 完成交收
+- Customer 無 Fulfillment mutation authority
+- Refresh / reconnect 只 readback，零 resubmit
+- Customer UI 不顯示 UUID / internal Order ID
+- 流水號 / 取餐碼 / Order ID identity 分離
+- DELAYED / ETA 只 pass-through canonical truth，client timer 不得自行推斷
 
-- Customer UI 只讀 canonical Order / Fulfillment projection。
-- Customer runtime port 無 Fulfillment mutation command。
-- Refresh / weak-network recovery 只做 readback，唔會重新 Submit。
-- READY 仍然唔等於 COMPLETED。
-- DELAYED 唔會由 client elapsed timer 自行推斷。
-- Customer 唔會 Accept、改 Fulfillment、標記 Ready 或 Completed。
-- 無第二 Order / Fulfillment engine。
+## Readback / freshness contract
+
+無 canonical Order / Fulfillment state：
+
+- `LOADING`：讀取中；唔顯示 Fulfillment stage
+- `EMPTY`：readback 未有 state；唔顯示 Fulfillment stage
+- `ERROR`：讀取錯誤；無 last-known state 就唔顯示 Fulfillment stage
+- `OFFLINE`：離線；無 last-known state 就唔顯示 Fulfillment stage
+- `STALE`：資料過期；無 last-known state 就唔顯示 Fulfillment stage
+- `UNKNOWN`：unsupported / 未確認；fail-closed，唔顯示 RECEIVED
+
+有 last-known canonical Order 時：
+
+- 保留該 canonical stage
+- 另外顯示 freshness
+- connection / browser state 永遠唔改寫 Fulfillment truth
+
+## COMPLETED deep-link
+
+`/orders/:orderId/waiting` 如 readback / history 已證明 canonical `COMPLETED`：
+
+- 不 render RECEIVED
+- 不 render waiting confirmation
+- 不新增 UI7 action
+- 轉去 Orders / History surface
 
 ## Identity
-
-三種身份已分開：
 
 - 流水號 = SMT / Store Formal Order Display Number
 - 取餐碼 = 電話最後 4 位
@@ -38,74 +81,33 @@ Base main：`c2d5b016fe3dd08d276e915ae0f0fb2301e964cf`
 
 Customer UI 不顯示實際 Order ID、UUID 或工程碼。
 
-Projection outbox 只帶最小化 Pickup Code（last4），唔將完整 customer phone 加入 Admin Order projection。
+## Re-acceptance proof contract
 
-## Projection mapping
+Final acceptance 只認 #400 最新 re-acceptance receipt，並要求：
 
-Canonical fulfillment label → Customer UI6：
+- Customer full tests + build GREEN
+- UI5 regression GREEN
+- v2local full tests + build GREEN
+- Admin full tests + build GREEN
+- Wrangler dry-run GREEN
+- behind main = 0
+- Final diff 無 Customer UI6 專用 Workflow
+- exact CI 必須掛喺 exact FINAL_HEAD
+- NO MAIN MERGE
+- NO DEPLOY
 
-- 待處理 / 等待店舖確認 → RECEIVED
-- 已接單 → ACCEPTED（Customer presentation 收斂為製作中）
-- 進行中 / 製作中 → PREPARING
-- 稍有延誤 → DELAYED
-- 可取餐 → READY
-- 未能接單 / 已拒絕 → REJECTED
-- 已取消 → CANCELED
-- 已完成 → COMPLETED（既有 downstream / history；UI6 不新增 UI7）
-
-ETA 只 pass-through canonical `etaLabel` / `promisedReadyLabel`；無 canonical ETA 就顯示未提供，唔估算。
-
-## Files changed
+## Correction files
 
 - `v2customer/src/components/customer-fulfillment-ui6.tsx`
 - `v2customer/src/App.tsx`
-- `v2customer/src/product-types.ts`
-- `v2customer/src/components/customer-views.tsx`
 - `v2customer/src/styles.css`
 - `v2customer/test/ui6-store-fulfillment-r1.test.mjs`
-- `v2admin/worker.ts`
-- `v2admin/src/customer-ui6-projection.test.ts`
-- `v2admin/src/customer-cloud-edge.test.ts`
-- `v2local/src/runtime/projection-outbox.ts`
-- `v2local/src/runtime/projection-outbox.test.ts`
-- `.github/workflows/customer-ui6-store-fulfillment-r1.yml`
-
-## Automated acceptance evidence
-
-Green code run：
-
-- GitHub Actions Run：`36306148806`
-- Tested SHA：`caa0f771a1d17a3cc060bf669ffdaef68329fb6f`
-- Customer UI6 contract：GREEN
-- Customer UI5 regression：GREEN
-- Full Customer tests：GREEN
-- Customer build：GREEN
-- Full v2local tests：GREEN
-- v2local build：GREEN
-- UI6 Admin canonical projection tests：GREEN
-- Full Admin tests：GREEN
-- Admin build：GREEN
-- Wrangler dry-run：GREEN
-
-Branch comparison at tested code SHA：
-
-- behind main：0
-- main merge：未做
-- deploy：未做
-
-## Commander acceptance focus
-
-1. UI6 是否只投影 canonical state，無 Customer mutation authority。
-2. RECEIVED → PREPARING → DELAYED(optional canonical) → READY 呈現。
-3. REJECTED 同 CANCELED 分離。
-4. 流水號 / 取餐碼 / Order ID identity boundary。
-5. UUID / internal Order ID 無 Customer-visible value。
-6. UI7 Handover / Completed 無新增操作。
-7. Refresh / reconnect 無 resubmit。
+- `.github/workflows/customer-ui6-store-fulfillment-r1.yml` — DELETED
+- `docs/handoff/MFK_CUSTOMER_UI6_STORE_FULFILLMENT_R1_HANDOFF_2026-09-27.md`
 
 ## Milestone
 
-`MFK_CUSTOMER_UI6_STORE_FULFILLMENT_R1_READY_FOR_COMMANDER_ACCEPTANCE`
+`MFK_CUSTOMER_UI6_STORE_FULFILLMENT_R1_READY_FOR_COMMANDER_REACCEPTANCE`
 
 NO MAIN MERGE  
 NO DEPLOY
