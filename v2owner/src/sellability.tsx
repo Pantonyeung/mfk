@@ -43,7 +43,7 @@ export function SellabilityPage({
   return <section className="page sellability-page">
     <header className="page-head secondary-head">
       <button className="back-link" onClick={onBack}>‹ 更多</button>
-      <div><span>OA-SEL-001</span><h1>售罄／恢復</h1><small>Availability ≠ Inventory；售罄唔會隱藏商品，亦唔會改寫已成立訂單。</small></div>
+      <div><span>商品供應</span><h1>售罄／恢復</h1><small>即時停售或恢復商品；商品結構同價格設定仍留喺 Admin。</small></div>
     </header>
 
     <section className="card sellability-controls">
@@ -61,11 +61,12 @@ export function SellabilityPage({
       <button type="button" onClick={onReload}>重新讀取</button>
     </section>
 
-    {!rows.length?<section className="card empty-state"><h2>未有符合條件嘅供應項目</h2><p>Owner 只顯示 canonical Sellability projection，唔會由 Inventory 推斷售罄。</p></section>:
+    {!rows.length?<section className="card empty-state"><h2>未有符合條件嘅商品</h2><p>可以調整搜尋或類型篩選再查看。</p></section>:
       <div className="sellability-list">{rows.map(item=><article className="card sellability-row" key={item.grain+':'+item.targetId}>
+        <div className="sellability-media" data-grain={item.grain} aria-hidden="true"><span>{grainLabel(item.grain).slice(0,1)}</span></div>
         <div className="sellability-copy">
           <strong>{item.name}</strong>
-          <small>{grainLabel(item.grain)} · {scopeLabel(item.scope)} · Readback {item.readback}</small>
+          <small>{grainLabel(item.grain)} · {scopeLabel(item.scope)} · {item.readback==='CONFIRMED'?'已確認':item.readback==='PARTIAL'?'部分確認':'待確認'}</small>
           {item.restoreAt?<small>臨時停售至：{new Date(item.restoreAt).toLocaleString('zh-HK')}</small>:null}
           {item.quantity!==undefined?<small>數量資料：{item.quantity}（只展示，唔會自動阻交易）</small>:null}
         </div>
@@ -76,6 +77,6 @@ export function SellabilityPage({
             :<button disabled={disabled||item.state==='UNKNOWN'} onClick={()=>command(item,'SOLD_OUT')}>售罄</button>}
         </div>
       </article>)}</div>}
-    <p className="callout">改價、商品／Combo 結構、Mapping、刪除商品仍然只屬 Admin。Inventory 0 唔會自動變成 Sold-out。</p>
+    <p className="callout">改價、商品／套餐結構、平台對應同刪除商品仍然喺 Admin 處理；數量資料只供參考，唔會自動改成售罄。</p>
   </section>;
 }
