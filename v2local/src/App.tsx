@@ -585,9 +585,7 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode,diningAddition,on
       onOpenOrders={()=>navigate('/orders?orderId='+encodeURIComponent(order.id))}
       onReadEvidence={order.paymentEvidenceRef?()=>localRuntime.readPaymentEvidence(order.id):undefined}
       onReviewEvidence={order.paymentEvidenceRef?async decision=>{await localRuntime.reviewPaymentEvidence(order.id,decision);}:undefined}
-      onDeferKeeta={(String(order.providerRef||'').startsWith('KEETA:')||/^Keeta\\b/i.test(String(order.sourceLabel||'')))
-        ?async()=>{await localRuntime.deferKeetaOrder(order.id);}
-        :undefined}
+      onDeferKeeta={isKeetaOrder(order)?async()=>{await localRuntime.deferKeetaOrder(order.id);}:undefined}
     />:null})()
     :panel?.type==='product'
     ?(()=>{const product=workspaceProducts.find(item=>item.id===panel.productId);const line=panel.lineId?cart.find(item=>item.id===panel.lineId):undefined;return product?<ProductConfigWorkspace key={product.id+':'+(panel.lineId??'add')} product={product} mode={panel.lineId?'edit':'add'} initial={line?{qty:line.qty,detail:stripRiceballDrinkPromotionDetail(line.detail)||undefined,optionSelections:line.optionSelections,freeNote:line.freeNote}:undefined} onAdd={(detail,delta,qty,structured)=>addConfiguredStructured(product.id,detail,delta,qty,panel.lineId,structured)}/>:null})()
