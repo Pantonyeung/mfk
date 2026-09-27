@@ -188,13 +188,13 @@ test('Stage01 commander corrections satisfy OA-TOD-001 acceptance contract',()=>
   assert.match(vm,/oldestUnresolved/);
   assert.match(components,/最高優先/);
   assert.match(components,/最舊未處理/);
-  assert.match(components,/唔係 SMT Pending Order Queue/);
+  assert.match(components,/只顯示真係需要你介入嘅營運事項/);
 
   // 6 Explicit Health Summary, no provider truth guessing.
   for(const health of['INTERNET','KEETA','OWN_PLATFORM','SMT','PRINTER'])assert.match(mapping,new RegExp(health));
   assert.match(vm,/row\.kind===kind/);
   assert.doesNotMatch(vm,/label\.includes|name\.includes/);
-  assert.match(components,/Health 同 Availability 分開/);
+  assert.match(components,/各渠道同設備分開顯示/);
 
   // 7 Staff summary is projection-driven, including scheduled count.
   for(const field of['staffNow','scheduledStaffCount','onBreakStaffCount','abnormalStaffCount'])assert.match(types,new RegExp(field));
@@ -202,9 +202,9 @@ test('Stage01 commander corrections satisfy OA-TOD-001 acceptance contract',()=>
 
   // 8 Explicit Top Product + Current Hour Trend contract.
   assert.match(types,/OwnerTodayInsight/);
-  assert.match(components,/Top Product/);
-  assert.match(components,/Current Hour Trend/);
-  assert.match(components,/UNAVAILABLE/);
+  assert.match(components,/熱賣商品/);
+  assert.match(components,/目前時段/);
+  assert.match(components,/未有資料/);
   assert.doesNotMatch(app,/reports\.slice\(0,3\)/);
 
   // 9 Nine global states can be represented.
@@ -279,21 +279,20 @@ test('Stage02 bounded action continues through existing Owner runtime only',()=>
   assert.match(mapping,/No Order \/ Pricing \/ Payment \/ Print \/ Auth \/ Sync authority changes/);
 });
 
-test('Stage02 visual convergence matches approved warm ivory navy Owner direction',()=>{
+test('Stage02 visual convergence matches FINAL blue white Owner direction',()=>{
   const css=fs.readFileSync(path.join(srcRoot,'styles.css'),'utf8');
   const app=fs.readFileSync(path.join(srcRoot,'App.tsx'),'utf8');
 
-  assert.match(css,/--mf-navy:#173b72/);
-  assert.match(css,/--mf-ivory:#f6f3ed/);
-  assert.match(css,/--mf-purple:#735ab1/);
-  assert.match(css,/body\{[\s\S]*background:var\(--mf-ivory\)/);
-  assert.match(css,/\.bottom-nav button\.active\{[\s\S]*var\(--mf-blue-soft\)/);
+  assert.match(css,/OWNER FINAL VISUAL SYSTEM P0/);
+  assert.match(css,/--owner-final-navy:#103f78/);
+  assert.match(css,/--owner-final-bg:#f5f8fc/);
+  assert.match(css,/--owner-final-surface:#ffffff/);
+  assert.match(css,/\.bottom-nav button::before/);
   assert.match(css,/\.action-queue-card/);
   assert.match(css,/\.action-detail-drawer/);
 
   assert.match(app,/morefun-logo-canonical\.png/);
   assert.doesNotMatch(app,/>◆</);
-  assert.match(app,/AI_ASSET_PENDING/);
 });
 
 test('Stage02 does not add product imagery or large mascot to normal operational UI',()=>{
@@ -569,22 +568,7 @@ test('Stage03 order detail has seven safe sections and no raw engineering payloa
     '5｜來源資料',
     '6｜打印狀況',
     '7｜處理記錄',
-  ])assert.match(components,new RegExp(section.replace(/[|/]/g,'\\  for(const section of[
-    '1｜Identity',
-    '2｜Items / Option / Modifier / Remark',
-    '3｜Money',
-    '4｜Fulfillment',
-    '5｜External',
-    '6｜Side-effects',
-    '7｜Timeline / Audit',
   ])assert.match(components,new RegExp(section.replace(/[|/]/g,'\\$&')));
-
-  for(const label of['Original','Adjustments','Current Effective','Current Tender','Receipt','Production','Packing','Label']){
-    assert.match(components,new RegExp(label));
-  }
-
-  assert.match(components,/auditTrail/);
-  assert.match(components,/唔會直接顯示 raw engineering timeline/);')));
 
   for(const label of['原始金額','調整','目前有效金額','付款方式','小票','製作單','打包單','標籤']){
     assert.match(components,new RegExp(label));
@@ -603,8 +587,8 @@ test('Stage03 visual and touch contract remains in approved Owner language',()=>
   assert.match(css,/\.order-segmented button\{min-height:44px\}/);
   assert.match(css,/\.order-search input\{min-height:44px\}/);
   assert.match(css,/\.order-filter select\{[\s\S]*min-height:44px/);
-  assert.match(css,/var\(--mf-navy\)/);
-  assert.match(css,/var\(--mf-surface\)/);
+  assert.match(css,/var\(--owner-final-navy\)/);
+  assert.match(css,/var\(--owner-final-surface\)/);
 
   for(const width of[360,375,390,430,520]){
     assert.match(css,new RegExp('@media\\(max-width:'+width+'px\\)'));
@@ -724,17 +708,12 @@ test('Stage03 keeps seven detail sections, four-field search, and no mutations a
   for(const section of[
     '1｜訂單資料','2｜訂單內容','3｜金額與付款',
     '4｜交收進度','5｜來源資料','6｜打印狀況','7｜處理記錄'
-  ])assert.match(components,new RegExp(section.replace(/[|/]/g,'\\  assert.match(components,/Display Number／客戶／電話／外部編號/);
-  for(const section of[
-    '1｜Identity','2｜Items / Option / Modifier / Remark','3｜Money',
-    '4｜Fulfillment','5｜External','6｜Side-effects','7｜Timeline / Audit'
-  ])assert.match(components,new RegExp(section.replace(/[|/]/g,'\\$&')));')));
+  ])assert.match(components,new RegExp(section.replace(/[|/]/g,'\\$&')));
 
   assert.doesNotMatch(components,/>取消訂單<|>退款<|>修改付款<|>Tender Correction/);
   assert.doesNotMatch(components,/<(?:span|strong|small|p|h\d)[^>]*>\{order\.orderId\}/);
   assert.match(mapping,/No second Order \/ Pricing \/ Payment \/ Print \/ Auth \/ Sync authority/);
 });
-
 
 test('Owner auth UI is fail-closed before canonical read',()=>{
   const app=fs.readFileSync(path.join(srcRoot,'App.tsx'),'utf8');
