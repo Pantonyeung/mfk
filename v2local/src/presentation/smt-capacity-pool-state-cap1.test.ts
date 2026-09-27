@@ -19,11 +19,9 @@ describe('CAP1 capacity pool read-only presentation',()=>{
     expect(runtime).toContain('readCapacityPoolState?():Promise<SmtCapacityPoolStateView>');
   });
 
-  it('keeps CAP1 read-only and does not expose manual correction, deduction or override yet',()=>{
-    expect(ui).not.toContain('調整產能');
-    expect(ui).not.toContain('Override');
-    expect(runtime).not.toContain('deductCapacityPool');
-    expect(runtime).not.toContain('restoreCapacityPool');
+  it('preserves the CAP1 read projection primitive as later capacity stages layer on top',()=>{
+    expect(runtime).toContain('readCapacityPoolState?():Promise<SmtCapacityPoolStateView>');
     expect(css).toContain('.capacity-pool-state-panel');
+    expect(runtime).not.toContain('secondCapacityPoolEngine');
   });
 });
