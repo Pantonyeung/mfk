@@ -16,6 +16,8 @@ export interface PairingCartLine{
   readonly unitMinor:number;
   readonly serviceMode:ServiceMode;
   readonly detail?:string;
+  readonly optionSelections?:Readonly<Record<string,readonly string[]>>;
+  readonly freeNote?:string;
 }
 
 export interface PairingUnit{
@@ -26,6 +28,8 @@ export interface PairingUnit{
   readonly name:string;
   readonly serviceMode:ServiceMode;
   readonly detail?:string;
+  readonly optionSelections?:Readonly<Record<string,readonly string[]>>;
+  readonly freeNote?:string;
 }
 
 export interface PairingSnackUnit extends PairingUnit{}
@@ -102,6 +106,12 @@ function selectedOptionAdjustment(line:PairingCartLine,product:PairingProduct){
   const parts=cleanParts(stripPairingDetail(line.detail));
   let delta=0;
   for(const set of product.optionSets??[]){
+    const structured=line.optionSelections?.[set.id];
+    if(structured){
+      const selectedIds=new Set(structured);
+      delta+=set.options.filter(option=>selectedIds.has(option.id)).reduce((sum,option)=>sum+option.priceAdjustmentMinor,0);
+      continue;
+    }
     const prefix=set.name+'：';
     const segment=parts.find(part=>part.startsWith(prefix));
     if(!segment)continue;
@@ -126,6 +136,8 @@ function expandLine(line:PairingCartLine):PairingUnit[]{
     name:line.name,
     serviceMode:line.serviceMode,
     detail:line.detail,
+    optionSelections:line.optionSelections,
+    freeNote:line.freeNote,
   }));
 }
 
