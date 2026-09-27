@@ -186,7 +186,7 @@ export interface SmmPendingIntent {
   readonly idempotencyKey:string;
   readonly createdAt:string;
   readonly updatedAt:string;
-  readonly state:'DRAFT'|'NOT_CONNECTED'|'PENDING'|'UNKNOWN';
+  readonly state:'DRAFT'|'NOT_CONNECTED'|'PENDING'|'REJECTED'|'UNKNOWN';
   readonly menuRevision:string;
   readonly publishedTotalMinor:number;
   readonly checkout:SmmStaffCheckout;
@@ -328,6 +328,7 @@ export interface SmmCommandResult {
   readonly state:SmmCommandState;
   readonly message:string;
   readonly orderId?:string;
+  readonly displayCode?:string;
   readonly canonicalRevision?:number;
 }
 
