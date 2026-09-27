@@ -94,6 +94,25 @@ function moneyLabel(minor){
   const value=Math.max(0,Number(minor)||0)/100;
   return 'HK'+String.fromCharCode(36)+(Number.isInteger(value)?String(value):value.toFixed(2));
 }
+function ownerChannelFreshness(observedAt,now){
+  const observed=Date.parse(String(observedAt||'')),current=Date.parse(String(now||''));
+  if(!Number.isFinite(observed)||!Number.isFinite(current))return 'UNKNOWN';
+  return Math.max(0,current-observed)<=5*60*1000?'CURRENT':'STALE';
+}
+function keetaCachedStoreReadback(status){
+  const root=row(status),operation=row(root.operation),sync=row(root.sync);
+  const candidates=[row(root.readback),row(operation.readback),row(sync.readback)];
+  const readback=candidates.find(candidate=>Object.keys(candidate).length)||{};
+  const details=row(readback.details),data=row(details.data);
+  const rawStatus=Number(data.status);
+  return{
+    providerStatus:Number.isFinite(rawStatus)?rawStatus:null,
+    observedAt:String(readback.observedAt||operation.completedAt||operation.observedAt||sync.completedAt||''),
+    lastCommand:Object.keys(operation).length
+      ?[String(operation.action||'').trim(),String(operation.state||'').trim()].filter(Boolean).join(' · ')
+      :'',
+  };
+}
 
 const OWNER_CANONICAL_FULFILLMENT=new Set(['待處理','進行中','可取餐','已完成','已取消']);
 export function mapOwnerOrderProjection(input){
@@ -120,7 +139,7 @@ export function mapOwnerOrderProjection(input){
     ...(fulfillmentLabel?{fulfillmentHistory:[{label:fulfillmentLabel,atLabel:observedAt,state:fulfillmentLabel}]}:{}),
   };
 }
-export function buildOwnerReadModelSnapshot({active,orders,reports,acks,observedAt}){
+export function buildOwnerReadModelSnapshot({active,orders,reports,acks,channels=[],observedAt}){
   const now=String(observedAt||new Date().toISOString());
   const activeEnvelope=row(active),snapshot=row(activeEnvelope.snapshot),settings=row(snapshot.storeSettings),catalog=row(snapshot.catalog),staffAuth=row(snapshot.staffAuth);
   const reportRows=rows(reports).filter(item=>row(item).date).sort((a,b)=>String(row(b).date).localeCompare(String(row(a).date)));
@@ -132,14 +151,31 @@ export function buildOwnerReadModelSnapshot({active,orders,reports,acks,observed
   const sellability=Object.entries(availability).map(([targetId,rawState])=>{const state=row(rawState);return{targetId,name:productNames.get(targetId)||targetId,grain:'PRODUCT',state:state.sellable===false?'停售':state.sellable===true?'可售':'UNKNOWN',scope:'STORE'};});
   const staff=rows(staffAuth.staff).filter(rawStaff=>row(rawStaff).active!==false).map(rawStaff=>{const person=row(rawStaff);return{staffId:String(person.staffId||''),name:String(person.name||person.staffId||''),role:String(person.role||'STAFF'),presence:'UNKNOWN',permissions:rows(person.permissions).map(String).join('、')||'未有權限讀回'};}).filter(person=>person.staffId&&person.name);
   const devices=Object.values(row(acks)).map(rawAck=>{const ack=row(rawAck);const deviceId=String(ack.deviceId||'');return{deviceId,name:deviceId||'未命名裝置',kind:'SMT',health:'UNKNOWN',...(ack.appliedAt?{lastSeen:String(ack.appliedAt)}:{}),binding:ack.revision!==undefined?'Admin revision '+String(ack.revision):'未有 revision 讀回',jobs:'未有打印工作讀回',affected:'未有影響範圍讀回'};}).filter(device=>device.deviceId);
-  const reportCards=reportRows.slice(0,31).map(rawReport=>{const report=row(rawReport);const date=String(report.date||'');return{reportId:'daily:'+date,name:date+' 淨銷售',value:moneyLabel(Number(report.netMinor)||0),compare:String(Math.max(0,Number(report.orders)||0))+' 單',freshness:'CANONICAL_PROJECTION'};});
+  const reportCards=reportRows.slice(0,31).map(rawReport=>{const report=row(rawReport);const date=String(report.date||'');const currentEffectiveSalesMinor=Math.round(Number(report.netMinor)||0);return{reportId:'daily:'+date,name:date+' 有效營業額',value:moneyLabel(currentEffectiveSalesMinor),compare:String(Math.max(0,Number(report.orders)||0))+' 單',freshness:'CANONICAL_PROJECTION',businessDate:date,metricKind:'CURRENT_EFFECTIVE_SALES',currentEffectiveSalesMinor,metricVersion:'MFK_CURRENT_EFFECTIVE_SALES_V1'};});
   const today=latestReport?{salesLabel:moneyLabel(Number(latestReport.netMinor)||0),orderCount:Math.max(0,Number(latestReport.orders)||0),averageOrderLabel:moneyLabel((Number(latestReport.orders)||0)>0?Math.round((Number(latestReport.netMinor)||0)/Number(latestReport.orders)):0),comparisonLabel:'未有比較資料讀回'}:undefined;
-  const store=Object.keys(snapshot).length||latestReport?{storeId:String(activeEnvelope.storeId||'MF01'),storeName:String(settings.storeName||'磨飯'),businessDate:String(latestReport?.date||''),operatingStatus:'未有營業狀態讀回',observedAt:now,freshness:'PARTIAL'}:undefined;
+  const businessDay=row(snapshot.businessDay);
+  const currentBusinessDate=hktBusinessDate(now,String(businessDay.cutoff||'05:00'));
+  const currentMonth=currentBusinessDate.slice(0,7);
+  const monthReports=reportRows.filter(rawReport=>{const report=row(rawReport),date=String(report.date||'');return date.startsWith(currentMonth)&&date<=currentBusinessDate;});
+  const currentEffectiveSalesMtdMinor=monthReports.length
+    ?monthReports.reduce((sum,rawReport)=>sum+Math.round(Number(row(rawReport).netMinor)||0),0)
+    :null;
+  const planningBasis={
+    month:currentMonth,
+    businessDate:currentBusinessDate,
+    sourceMetric:'CURRENT_EFFECTIVE_SALES',
+    sourceAuthority:'CANONICAL_REPORTING_PROJECTION',
+    currentEffectiveSalesMtdMinor,
+    metricVersion:'MFK_CURRENT_EFFECTIVE_SALES_V1',
+    completeness:monthReports.length?'PARTIAL':'UNAVAILABLE',
+    observedAt:now,
+  };
+  const store=Object.keys(snapshot).length||latestReport?{storeId:String(activeEnvelope.storeId||'MF01'),storeName:String(settings.storeName||'磨飯'),businessDate:String(latestReport?.date||currentBusinessDate),operatingStatus:'未有營業狀態讀回',observedAt:now,freshness:'PARTIAL'}:undefined;
   return{
     globalState:Object.keys(snapshot).length||mappedOrders.length||reportRows.length?'PARTIAL':'EMPTY',
-    ...(store?{store}:{}),...(today?{today}:{}),
+    ...(store?{store}:{}),...(today?{today}:{}),planningBasis,
     liveOrders:{activeCount:activeOrders.length,readyCount:activeOrders.filter(order=>order.fulfillmentLabel==='可取餐').length,recentOrders:activeOrders.slice(0,10).map(order=>({orderId:order.orderId,displayCode:order.displayCode,source:order.source,amountLabel:order.currentEffectiveAmountLabel,fulfillmentLabel:order.fulfillmentLabel||'未有交收狀態讀回'})),observedAt:now},
-    readiness:[],actions:[],orders:mappedOrders,channels:[],sellability,staff,devices,reports:reportCards,campaigns:[],settlements:[],inventory:[],notifications:[],activity:[],adminLinkLabel:'Admin',observedAt:now,
+    readiness:[],actions:[],orders:mappedOrders,channels:rows(channels),sellability,staff,devices,reports:reportCards,campaigns:[],settlements:[],inventory:[],notifications:[],activity:[],adminLinkLabel:'Admin',observedAt:now,
   };
 }
 
@@ -513,9 +549,86 @@ export class AdminSyncStore{
     for(const socket of this.state.getWebSockets()){try{socket.send(doorbell);}catch{}}
     return{status:200,body:{state:'PUBLISHED',active:{revision:envelope.revision,fingerprint:envelope.fingerprint,publishedAt:envelope.publishedAt}}};
   }
+  async ownerChannelReadModel(active,observedAt){
+    const activeEnvelope=row(active),snapshot=row(activeEnvelope.snapshot);
+    const storeId=String(activeEnvelope.storeId||'MF01');
+    const keetaPolicy=row(snapshot.channelPolicy);
+    const customerPolicy=row(snapshot.customerChannelPolicy);
+    let keetaLive=null,keetaStore=null,customerHealth=null;
+
+    try{
+      if(this.env?.KEETA_RUNTIME){
+        const keeta=this.env.KEETA_RUNTIME.get(this.env.KEETA_RUNTIME.idFromName(storeId));
+        const [liveResponse,storeResponse]=await Promise.all([
+          keeta.fetch(new Request('https://internal/admin/status',{method:'GET'})),
+          keeta.fetch(new Request('https://internal/admin/store/status',{method:'GET'})),
+        ]);
+        if(liveResponse.ok)keetaLive=await liveResponse.json();
+        if(storeResponse.ok)keetaStore=await storeResponse.json();
+      }
+    }catch{}
+
+    try{
+      if(this.env?.CUSTOMER_RUNTIME){
+        const customer=this.env.CUSTOMER_RUNTIME.get(this.env.CUSTOMER_RUNTIME.idFromName(storeId));
+        const response=await customer.fetch(new Request('https://internal/public/channel-health',{method:'GET'}));
+        if(response.ok)customerHealth=await response.json();
+      }
+    }catch{}
+
+    const channels=[];
+    const live=row(keetaLive),oauth=row(live.oauth),webhook=row(live.webhook);
+    const cached=keetaCachedStoreReadback(keetaStore);
+    const keetaDesired=keetaPolicy.enabled===true;
+    const keetaHealth=String(oauth.state||'')==='CONNECTED'
+      ?live.knownExternalBlocker?'DEGRADED':'HEALTHY'
+      :['REAUTH_REQUIRED','EXPIRED'].includes(String(oauth.state||''))?'OFFLINE':'UNKNOWN';
+    const keetaObserved=cached.providerStatus===3?'OPEN':cached.providerStatus===4?'PAUSED':'UNKNOWN';
+    const keetaAccepting=cached.providerStatus===3?true:cached.providerStatus===4?false:null;
+    const keetaObservedAt=cached.observedAt||String(webhook.lastAcceptedAt||oauth.lastCallbackAt||'');
+    channels.push({
+      channelId:'KEETA',
+      name:String(keetaPolicy.displayName||'Keeta'),
+      acceptingOrders:keetaAccepting,
+      desiredState:keetaDesired?'OPEN':'PAUSED',
+      observedState:keetaObserved,
+      health:keetaHealth,
+      mode:cached.providerStatus===3?'NORMAL':cached.providerStatus===4?'PAUSED':'UNKNOWN',
+      cause:keetaHealth==='OFFLINE'?'integration':cached.providerStatus===4?(keetaDesired?'provider':'manual'):'unknown',
+      freshness:ownerChannelFreshness(keetaObservedAt,observedAt),
+      observedAt:keetaObservedAt,
+      ...(cached.lastCommand?{lastCommand:cached.lastCommand}:{}),
+      readback:cached.providerStatus===3?'PROVIDER_OPEN':cached.providerStatus===4?'PROVIDER_PAUSED':'PROVIDER_STATUS_NOT_OBSERVED',
+      availableActions:[],
+    });
+
+    const customer=row(customerHealth),lastPull=row(customer.lastOrderPull);
+    const customerDesired=customerPolicy.enabled===true;
+    const reachable=customer.reachable===true;
+    const ageMs=Number(customer.ageMs);
+    const customerObservedAt=String(lastPull.at||'');
+    channels.push({
+      channelId:'CUSTOMER',
+      name:'自家網站／App',
+      acceptingOrders:customerDesired?(reachable?true:null):false,
+      desiredState:customerDesired?'OPEN':'PAUSED',
+      observedState:customerDesired?(reachable?'OPEN':'UNKNOWN'):'PAUSED',
+      health:reachable?'HEALTHY':Number.isFinite(ageMs)?'DEGRADED':'UNKNOWN',
+      mode:customerDesired?(reachable?'NORMAL':'UNKNOWN'):'PAUSED',
+      cause:customerDesired?(reachable?'unknown':'integration'):'policy',
+      freshness:reachable?'CURRENT':Number.isFinite(ageMs)?'STALE':'UNKNOWN',
+      observedAt:customerObservedAt,
+      readback:reachable?'SMT_ORDER_PULL_ACTIVE':'NO_RECENT_SMT_PULL',
+      availableActions:[],
+    });
+    return channels;
+  }
+
   async ownerReadModel(){
+    const observedAt=new Date().toISOString();
     const [active,orders,reports,acks]=await Promise.all([this.state.storage.get('active'),this.projectionOrders(),this.projectionReports(),this.state.storage.get('acks')]);
-    return buildOwnerReadModelSnapshot({active,orders,reports,acks:acks||{},observedAt:new Date().toISOString()});
+    const channels=await this.ownerChannelReadModel(active,observedAt);
+    return buildOwnerReadModelSnapshot({active,orders,reports,acks:acks||{},channels,observedAt});
   }
 
   async projectionOrders(){
