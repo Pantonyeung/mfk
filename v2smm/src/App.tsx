@@ -1247,7 +1247,7 @@ function CartSheet({cart,quote,menu,serviceMode,onServiceMode,onClose,onQuantity
           const lineTotal=Number.isSafeInteger(Number(line.publishedUnitPriceMinor))
             ?Number(line.publishedUnitPriceMinor)*line.quantity
             :null;
-          const choiceSummary=(rows:readonly SmmCartLine['selections'][number][])=>rows.map(selection=>{
+          const choiceSummary=(rows:SmmCartLine['selections'])=>rows.map(selection=>{
             const group=product?.optionGroups.find(item=>item.optionGroupId===selection.optionGroupId);
             return `${group?.name??'選項'}：${selection.optionName}`;
           }).join('、');
@@ -1262,7 +1262,7 @@ function CartSheet({cart,quote,menu,serviceMode,onServiceMode,onClose,onQuantity
               {optionalChoices.length?<p><b>可選</b><span>{choiceSummary(optionalChoices)}</span></p>:null}
               {line.combo?<p><b>套餐</b><span>{line.combo.comboName}{line.combo.selections.length?' · '+line.combo.selections.map(item=>item.choiceLabel).join('、'):''}</span></p>:null}
               {!line.selectedVariationName&&!line.selections.length&&!line.combo?<p><b>設定</b><span>無額外設定</span></p>:null}
-              <p><b>單價預覽</b><span>{Number.isSafeInteger(Number(line.publishedUnitPriceMinor))?money('HKD',Number(line.publishedUnitPriceMinor)):'價格待同步'}</span></p>
+              <p><b>單價預覽</b><span>{Number.isSafeInteger(Number(line.publishedUnitPriceMinor))?money('HKD',Number(line.publishedUnitPriceMinor)):'價格待同步'}</span></p><p><b>小計</b><span>{lineTotal===null?'價格待同步':money('HKD',lineTotal)}</span></p>
             </div>
             {line.attention?<div className="stage3-attention" role="status"><strong>餐單已更新</strong><span>{line.attention.message}</span></div>:null}
             <div className="stage3-line-actions">
