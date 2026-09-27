@@ -72,7 +72,7 @@ test('UI3 published preview exposes Combo base and canonical adjustments only',(
   assert.match(productSheet,/subPool\.publishedAdjustmentMinor/);
   assert.match(productSheet,/choice\.publishedAdjustmentMinor/);
   assert.match(productSheet,/customerComboPublishedUnitMinor/);
-  assert.match(productSheet,/ordinaryPriceFactsReady/);
+  assert.match(productSheet,/customerStandalonePublishedUnitMinor/);
   assert.match(productSheet,/已發布套餐基本價/);
   assert.match(productSheet,/正式提交由 SMT 再核對/);
   assert.match(quote,/comboPublishedFactsChanged/);
