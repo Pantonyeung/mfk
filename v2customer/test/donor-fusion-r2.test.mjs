@@ -69,7 +69,7 @@ test('no obsolete donor runtime or customer-side business authority is transplan
   assert.match(cloud,/https:\/\/admin\.morefunos\.com/);
   assert.doesNotMatch(nonCloud,/\bfetch\s*\(|\bWebSocket\b|\bXMLHttpRequest\b/);
   assert.match(app,/port\?\.submitOrder/);
-  assert.match(app,/port\?\.buildReorderCart/);
+  assert.match(app,/buildCurrentReorderCart/);
 });
 
 test('R2 visual and interaction systems are tokenized and accessible',()=>{
