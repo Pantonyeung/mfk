@@ -522,6 +522,13 @@ export function mapCustomerOrderProjection(input){
     };
   }).filter(item=>item.name&&item.quantity>0);
   const reorderIntent=customerReorderIntentProjection(order.customerReorderIntent);
+  const reorderPriceFacts=rows(order.customerReorderHistoryPriceFacts).flatMap(rawFact=>{
+    const fact=row(rawFact);
+    const intentIndex=Number(fact.intentIndex);
+    const historicalPublishedUnitMinor=Number(fact.historicalPublishedUnitMinor);
+    if(!Number.isSafeInteger(intentIndex)||intentIndex<0)return[];
+    return[{intentIndex,...(Number.isSafeInteger(historicalPublishedUnitMinor)&&historicalPublishedUnitMinor>=0?{historicalPublishedUnitMinor}:{})}];
+  });
   const display=String(order.display||'');
   const totalMinor=Math.max(0,Number(order.totalMinor)||0);
   const projectedPickup=String(order.pickupCode||'').replace(/\D/g,'').slice(-4);
@@ -555,6 +562,7 @@ export function mapCustomerOrderProjection(input){
     amountLabel:moneyLabel(totalMinor),
     historicalLines,
     ...(reorderIntent.length?{reorderIntent}:{}),
+    ...(reorderPriceFacts.length?{reorderPriceFacts}:{}),
     ...(paymentStatusLabel?{paymentStatusLabel}:{}),
     ...(pickupCode?{pickupCode,phoneMasked:'•••• '+pickupCode}:{}),
     ...(etaLabel?{etaLabel}:{}),
@@ -799,7 +807,7 @@ function customerPublicSnapshot(active,customerOrders=[]){
     paymentChannels,
     fallback:customerFallback,
     activeOrders:projectedOrders.filter(order=>order.stage!=='COMPLETED').map(order=>{
-      const {historicalLines:_historicalLines,reorderIntent:_reorderIntent,...activeOrder}=order;
+      const {historicalLines:_historicalLines,reorderIntent:_reorderIntent,reorderPriceFacts:_reorderPriceFacts,...activeOrder}=order;
       return activeOrder;
     }),
     history:projectedOrders.filter(order=>order.stage==='COMPLETED').map(order=>({
@@ -812,6 +820,7 @@ function customerPublicSnapshot(active,customerOrders=[]){
       ...(order.pickupCode?{pickupCode:order.pickupCode}:{}),
       ...(order.customerDisplayName?{customerDisplayName:order.customerDisplayName}:{}),
       ...(order.reorderIntent?.length?{reorderIntent:order.reorderIntent}:{}),
+      ...(order.reorderPriceFacts?.length?{reorderPriceFacts:order.reorderPriceFacts}:{}),
       reorderEligible:Boolean(order.reorderIntent?.length),
     })),
     observedAt:new Date().toISOString(),
