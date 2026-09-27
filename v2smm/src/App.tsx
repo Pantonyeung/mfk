@@ -330,7 +330,7 @@ export function App(){
       pendingIntents,
       preferences:{activeView:view,activeCategoryId,sourceFilter,serviceMode,tender},
     });
-    if(affected>0)setNotice(`餐單已更新；${affected} 項購物草稿需要逐項確認，其他項目已保留。`);
+    setNotice(affected>0?`購物草稿已按目前發布價格重新計算；${affected} 項需要逐項確認，其他項目已保留。`:'購物草稿已按目前發布價格重新計算。');
   },[menu?.revision,menu?.observedAt]);
 
   const addSelectedProduct=()=>{
