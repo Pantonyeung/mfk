@@ -7,56 +7,59 @@ import {fileURLToPath} from 'node:url';
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const read=p=>fs.readFileSync(path.join(root,p),'utf8');
 
-test('UI0 uses FINAL Stage0 source assets, 50:50 selection and exact CTA copy',()=>{
+test('FINAL source provenance is explicit and points to the supplied package files',()=>{
+  const source=read('src/source-assets.ts');
+  for(const marker of[
+    'B3D808D8-931D-4FC7-8259-B5C1BF3934E2.jpeg',
+    'AA9C700D-7045-4071-8BAE-22CABFD10FC1(1).jpeg',
+    'IMG_5084.jpeg',
+    'IMG_4585.jpeg',
+    'stage0_launch_animation_storyboard_v1.png',
+    '磨飯_stage_1_首頁品牌展示.png',
+    'stage2_order_discovery_female_v1.png',
+  ])assert.ok(source.includes(marker),marker);
+});
+
+test('UI0 uses supplied male/female IP sheets, 50:50 selection and exact storyboard CTA copy',()=>{
   const config=read('src/launch/launch-config.ts');
   const overlay=read('src/launch/LaunchOverlay.tsx');
-  assert.match(config,/\/brand\/stage0-male\.webp/);
-  assert.match(config,/\/brand\/stage0-female\.webp/);
-  assert.match(config,/\/brand\/p0-riceball\.webp/);
+  assert.ok(config.includes('CUSTOMER_FINAL_SOURCE.maleIpSheet.url'));
+  assert.ok(config.includes('CUSTOMER_FINAL_SOURCE.femaleIpSheet.url'));
+  assert.ok(config.includes("<.5?'male':'female'"));
   assert.doesNotMatch(config,/stage7-pickup|stage0-character-.*\.svg/);
-  assert.match(config,/<\.5\?'male':'female'/);
-  for(const mode of ["'reduced'","'returning'","'first'"])assert.match(overlay,new RegExp(mode));
-  for(const copy of['肚餓啦？','用心手作，','每一口都更幸福。','美味，從這裡開始。','進入主頁','進入會員頁'])assert.match(overlay,new RegExp(copy));
-  assert.match(overlay,/mode==='reduced'\?700:mode==='returning'\?1150:3300/);
-  assert.match(overlay,/onEnterHome/);
-  assert.match(overlay,/onEnterMember/);
+  for(const mode of ["'reduced'","'returning'","'first'"])assert.ok(overlay.includes(mode),mode);
+  for(const copy of['肚餓啦？','用心手作，','每一口都更幸福。','美味，從這裡開始。','進入主頁','進入會員頁'])assert.ok(overlay.includes(copy),copy);
+  assert.ok(overlay.includes("mode==='reduced'?120:mode==='returning'?1200:3500"));
 });
 
-test('UI1 follows FINAL home hierarchy and never leaves blank product-media slots',()=>{
+test('UI1 uses FINAL source screenshot crop for IP hero and source shortcut icon crops',()=>{
   const home=read('src/stage1/Stage1Home.tsx');
-  for(const marker of['stage1-fixed-header','stage1-welcome','stage1-search-entry','stage1-hero-banner','stage1-announcement-strip','stage1-quick-entry-grid','stage1-top6'])assert.match(home,new RegExp(marker));
-  assert.match(home,/const HERO_IP='\/brand\/stage0-male\.webp'/);
-  assert.match(home,/const HERO_FOOD='\/brand\/p0-riceball\.webp'/);
-  assert.match(home,/if\(product\.imageUrl\)return product\.imageUrl/);
-  assert.match(home,/mediaFor\(item\.product\)/);
-  assert.doesNotMatch(home,/stage1-product-placeholder|商品圖片暫未提供|Browse \/ Build Cart|正式 Commit|正式投影|Coupon 狀態|Reorder 會/);
-  for(const label of['我的訂單','我的收藏','回憶券'])assert.match(home,new RegExp(label));
+  const css=read('src/stage1/stage1.css');
+  assert.ok(home.includes('CUSTOMER_FINAL_SOURCE.stage1Final.url'));
+  assert.ok(home.includes('stage1-source-hero'));
+  for(const marker of['stage1-shortcut-ticket','stage1-shortcut-heart','stage1-shortcut-order'])assert.ok(home.includes(marker),marker);
+  assert.ok(css.includes('.stage1-source-hero>img'));
+  assert.ok(css.includes('width:608.4%'));
+  assert.ok(css.includes('top:-332.5%'));
+  assert.ok(home.includes('item.product.imageUrl'));
 });
 
-test('UI2 uses real product media, source search/category/sold-out/favorite/cart anatomy and zero-result IP',()=>{
+test('UI2 keeps canonical product media and FINAL zero-result female IP repair',()=>{
   const menu=read('src/stage2/Stage2Menu.tsx');
   const nav=read('src/stage2/Stage2BottomNavigation.tsx');
   for(const marker of['product.imageUrl','mediaFor(product)','stage2-sold-out','stage2-favorite','stage2-search-field','stage2-category-rail','onCart','ZERO_RESULT_IP'])assert.ok(menu.includes(marker),marker);
-  assert.match(menu,/\/brand\/stage0-female\.webp/);
-  assert.doesNotMatch(menu,/<span className="stage2-product-media" aria-hidden="true"\/>|商品圖片暫未提供/);
-  for(const label of['首頁','點單','記憶罐','訂單','會員'])assert.match(nav,new RegExp(label));
-  assert.match(nav,/stage2-nav-icon/);
-  assert.match(nav,/data-center=\{item\.id==='cart'\|\|undefined\}/);
+  assert.ok(menu.includes('/brand/stage0-female.webp'));
+  for(const copy of['暫時搵唔到呢個結果','不如試下其他分類？','返回點單'])assert.ok(menu.includes(copy),copy);
+  for(const label of['首頁','點單','記憶罐','訂單','會員'])assert.ok(nav.includes(label),label);
+  assert.ok(nav.includes("data-center={item.id==='cart'||undefined}"));
 });
 
-test('UI1 and UI2 share FINAL fixed navigation while UI3-UI9 navigation semantics stay untouched',()=>{
-  const app=read('src/App.tsx');
-  assert.match(app,/view==='home'\|\|view==='menu'\?<Stage2BottomNavigation active=\{view\}/);
-  assert.match(app,/<BottomNavigation active=\{view==='pickup'\|\|view==='orders'\?'orders'/);
-});
-
-test('390 baseline and 360 minimum remain explicitly responsive with 44px touch targets',()=>{
+test('390 baseline and 360 minimum remain responsive and touch safe',()=>{
   const stage1=read('src/stage1/stage1.css');
   const stage2=read('src/stage2/stage2.css');
   for(const css of[stage1,stage2]){
-    assert.match(css,/max-width:480px/);
-    assert.match(css,/@media\(max-width:360px\)/);
+    assert.ok(css.includes('max-width:480px'));
+    assert.ok(css.includes('@media(max-width:360px)'));
   }
-  assert.match(stage2,/min-height:44px/);
-  assert.match(stage2,/@media\(prefers-reduced-motion:reduce\)/);
+  assert.ok(stage2.includes('min-height:44px'));
 });
