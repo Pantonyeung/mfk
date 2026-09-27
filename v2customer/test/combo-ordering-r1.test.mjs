@@ -121,3 +121,14 @@ test('Customer Combo completion adds no second authority engine',()=>{
     'createFormalOrder(',
   ])assert.ok(!combined.includes(forbidden),forbidden);
 });
+
+
+test('stale missing Combo can be repaired back to standalone from ProductSheet',()=>{
+  assert.ok(views.includes('套餐資料待同步，暫時只可以主餐方式加入。'));
+  assert.equal((views.match(/>只要主餐</g)||[]).length,2);
+});
+
+test('cart review exposes selected Combo identity and choices to the customer',()=>{
+  assert.ok(views.includes('line.combo?.comboName'));
+  assert.ok(views.includes('line.combo?.selections.map(item=>item.choiceLabel)'));
+});
