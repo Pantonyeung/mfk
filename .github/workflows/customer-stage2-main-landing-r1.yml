@@ -1,12 +1,21 @@
-name: customer-ui-stage2-r1-fresh-integration
+name: customer-stage2-main-landing-r1
 
 on:
   push:
     branches:
-      - work/MFK/CUSTOMER-UI-STAGE2-R1-FRESH-INTEGRATION
+      - integration/MFK/CUSTOMER-STAGE2-MAIN-LANDING-R1
+      - main
+    paths:
+      - 'v2customer/**'
+      - '.github/workflows/customer-stage2-main-landing-r1.yml'
+  pull_request:
+    paths:
+      - 'v2customer/**'
+      - '.github/workflows/customer-stage2-main-landing-r1.yml'
+  workflow_dispatch:
 
 jobs:
-  v2customer:
+  customer-stage2:
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -17,9 +26,9 @@ jobs:
         with:
           node-version: '22'
       - run: npm install --no-audit --no-fund --legacy-peer-deps --package-lock=false
-      - name: Stage 2 contract
+      - name: Stage2 contract
         run: node --test test/stage2-menu-r1.test.mjs
-      - name: Combo Drink regression
+      - name: Combo projection regression
         run: node --test test/admin-combo-drink-projection-r1.test.mjs
       - name: Full Customer test
         run: npm test
