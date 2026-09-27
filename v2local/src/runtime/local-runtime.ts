@@ -990,6 +990,7 @@ function ensureDiningInitialPrintByHold(holdId:string):Promise<DiningInitialPrin
       diningInitialPrintPlanned:summary.planned,
       diningInitialPrintSent:summary.sent,
       diningInitialPrintFailed:summary.failed,
+      diningInitialPrintResults:summary.results.map(row=>({...row})),
       ...(state==='DONE'?{diningInitialPrintCompletedAt:completedAt}:{}),
       updatedAt:completedAt,
     };
@@ -1298,10 +1299,22 @@ function appendDiningItemsToSnapshot(snapshot:Persisted,hold:LocalHoldDraft,inpu
   return {hold:ensured.hold,addition,order:ensured.order,orders:ensured.orders,changed:true};
 }
 
-function diningDetail(hold:LocalHoldDraft):LocalDiningHoldDetail{
+function diningDetail(hold:LocalHoldDraft,orders:readonly StoredOrder[]=data.orders):LocalDiningHoldDetail{
   const payments=Array.isArray(hold.payments)?hold.payments:[];
   const corrections=Array.isArray(hold.lineCorrections)?hold.lineCorrections:[];
   const priceOverrides=Array.isArray(hold.priceOverrides)?hold.priceOverrides:[];
+  const linkedOrder=hold.formalOrderId?orders.find(row=>row.id===hold.formalOrderId):undefined;
+  const firstPrintState:LocalDiningHoldDetail['firstPrintState']=linkedOrder
+    ?linkedOrder.diningInitialPrintAttemptedAt
+      ?linkedOrder.diningInitialPrintState??'UNKNOWN'
+      :'NOT_STARTED'
+    :'NOT_STARTED';
+  const firstPrintResults=(linkedOrder?.diningInitialPrintResults??[]).map(row=>({...row}));
+  const firstPrintAttention:LocalDiningHoldDetail['firstPrintAttention']=firstPrintState==='UNKNOWN'
+    ?'TRANSPORT_UNKNOWN'
+    :firstPrintState==='FAILED'
+      ?'TRANSPORT_REPORTED_INCOMPLETE'
+      :'NONE';
   const paidByLine=new Map<number,number>();
   for(const payment of payments){
     for(const selection of payment.selections)paidByLine.set(selection.lineIndex,(paidByLine.get(selection.lineIndex)??0)+selection.qty);
@@ -1324,6 +1337,14 @@ function diningDetail(hold:LocalHoldDraft):LocalDiningHoldDetail{
     ...(hold.joinedTables?.length?{joinedTables:[...hold.joinedTables]}:{}),
     corrections:corrections.map(row=>({...row})),
     priceOverrides:priceOverrides.map(row=>({...row})),
+    firstPrintState,
+    ...(linkedOrder?.diningInitialPrintAttemptedAt?{firstPrintSummary:{
+      planned:Math.max(0,Number(linkedOrder.diningInitialPrintPlanned)||0),
+      sent:Math.max(0,Number(linkedOrder.diningInitialPrintSent)||0),
+      failed:Math.max(0,Number(linkedOrder.diningInitialPrintFailed)||0),
+    }}:{}),
+    firstPrintResults,
+    firstPrintAttention,
     ...(hold.formalOrderId?{formalOrderId:hold.formalOrderId}:{}),
     ...(hold.formalOrderDisplay?{formalOrderDisplay:hold.formalOrderDisplay}:{}),
     holdId:hold.id,
@@ -2118,7 +2139,9 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
     commitDiningHolds(snapshot,snapshot.holds.map(row=>row.id===holdId?{...rest,...(assignedTable?{lastAssignedTable:assignedTable}:{})}:row));
   },
   async readDiningHold(holdId){
-    return clone(diningDetail(requireDiningHold(readDiningState(),holdId)));
+    const snapshot=readDiningState();
+    data=snapshot;
+    return clone(diningDetail(requireDiningHold(snapshot,holdId),snapshot.orders));
   },
   async readDiningHistory(){
     return readDiningState().holds.filter(hold=>hold.kind==='dining'&&hold.archivedAt)
