@@ -33,8 +33,16 @@ function Stage5TopBar({title,onBack}:{title:string;onBack:()=>void}){
   </header>;
 }
 
-function Stage5Artwork({name,alt}:{name:'submitting'|'pending'|'confirmed'|'rejected'|'unknown';alt:string}){
-  return <img className={`stage5-art stage5-art-${name}`} src={`/brand/stage5/stage5-${name}.svg`} alt={alt}/>;
+const STAGE5_ART=Object.freeze({
+  submitting:'/brand/stage5/stage5-submitting.svg',
+  pending:'/brand/stage5/stage5-pending.svg',
+  confirmed:'/brand/stage5/stage5-confirmed.svg',
+  rejected:'/brand/stage5/stage5-rejected.svg',
+  unknown:'/brand/stage5/stage5-unknown.svg',
+});
+
+function Stage5Artwork({name,alt}:{name:keyof typeof STAGE5_ART;alt:string}){
+  return <img className={`stage5-art stage5-art-${name}`} src={STAGE5_ART[name]} alt={alt}/>;
 }
 
 function Stage5Submitting({session,submitting}:{session:SmmStage5Session;submitting:boolean}){
@@ -122,7 +130,7 @@ function Stage5Unknown({session,reading,onReadback,onBack}:{session:SmmStage5Ses
     <span className="stage5-badge unknown">結果未確認</span>
     <Stage5Artwork name="unknown" alt="提交結果未確認"/>
     <h1>提交結果未確認</h1>
-    <p>請稍候，或重新確認結果。<br/>系統唔會重新提交訂單。</p>
+    <p>請稍候，或重新確認結果。</p>
     <div className="stage5-recommend-card" role="alert">
       <strong>建議操作</strong>
       <button className="primary stage5-primary" type="button" disabled={reading} onClick={onReadback}>
