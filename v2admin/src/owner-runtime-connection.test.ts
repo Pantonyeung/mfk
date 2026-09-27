@@ -16,6 +16,43 @@ describe('Owner canonical read projection',()=>{
     expect(row.itemLines[0].amountLabel).toBe('HK$52');
   });
 
+  it('publishes Current Effective Sales as the only Owner planning sales metric',()=>{
+    const snapshot=buildOwnerReadModelSnapshot({
+      active:{storeId:'MF01',snapshot:{storeSettings:{storeName:'磨飯'}}},
+      orders:[],
+      reports:[
+        {date:'2026-09-27',grossMinor:6000,refundMinor:800,netMinor:5200,orders:1},
+        {date:'2026-09-26',grossMinor:4300,refundMinor:0,netMinor:4300,orders:1},
+      ],
+      acks:{},
+      observedAt:'2026-09-27T01:10:00Z',
+    });
+    expect(snapshot.reports[0]).toMatchObject({
+      businessDate:'2026-09-27',
+      metricKind:'CURRENT_EFFECTIVE_SALES',
+      currentEffectiveSalesMinor:5200,
+      metricVersion:'MFK_CURRENT_EFFECTIVE_SALES_V1',
+    });
+    expect(snapshot.reports[0].currentEffectiveSalesMinor).not.toBe(6000);
+  });
+
+  it('passes canonical channel projection without converting health into accepting-orders truth',()=>{
+    const channels=[{
+      channelId:'KEETA',name:'Keeta',acceptingOrders:false,
+      desiredState:'OPEN',observedState:'PAUSED',health:'HEALTHY',
+      mode:'PAUSED',cause:'provider',freshness:'CURRENT',
+      observedAt:'2026-09-27T01:09:00Z',readback:'PROVIDER_PAUSED',availableActions:[],
+    }];
+    const snapshot=buildOwnerReadModelSnapshot({
+      active:{storeId:'MF01',snapshot:{storeSettings:{storeName:'磨飯'}}},
+      orders:[],reports:[],acks:{},channels,observedAt:'2026-09-27T01:10:00Z',
+    });
+    expect(snapshot.channels).toEqual(channels);
+    expect(snapshot.channels[0].health).toBe('HEALTHY');
+    expect(snapshot.channels[0].acceptingOrders).toBe(false);
+    expect(snapshot.channels[0].observedState).toBe('PAUSED');
+  });
+
   it('maps only existing canonical sources and leaves missing Owner domains empty',()=>{
     const snapshot=buildOwnerReadModelSnapshot({
       active:{
