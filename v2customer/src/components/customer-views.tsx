@@ -35,9 +35,13 @@ const stageMeta:Record<CustomerOrderStage,{label:string;title:string;detail:stri
   PREPARING:{label:'製作中',title:'餐點製作中',detail:'店舖正在製作，未到可取餐階段。'},
   DELAYED:{label:'稍有延誤',title:'取餐時間有更新',detail:'延誤只更新預計時間，唔會假裝已可取餐。'},
   READY:{label:'可取餐',title:'餐點已準備好',detail:'可取餐只代表可以到店拎餐，未代表已核對或已交收。'},
+  ARRIVED:{label:'已到店',title:'等待店員核對',detail:'到店通知唔等於核對、交收或完成。'},
+  VERIFIED:{label:'已核對',title:'店員核對完成',detail:'已核對仍然未代表已交收或完成。'},
   PICKUP_VERIFICATION:{label:'取餐核對',title:'請出示取餐資料',detail:'到店、核對、交收、完成係分開階段。'},
-  HANDED_OVER:{label:'已交收',title:'餐點已交畀你',detail:'交收完成後會再同步最終訂單狀態。'},
+  PICKUP_EXCEPTION:{label:'取餐需協助',title:'暫時未能完成取餐',detail:'例外未 resolve 不可 Completed。'},
+  HANDED_OVER:{label:'已交收',title:'餐點已交畀你',detail:'交收完成後仍要等 canonical Completed readback。'},
   COMPLETED:{label:'已完成',title:'訂單已完成',detail:'呢張訂單已完成。'},
+  UNKNOWN:{label:'狀態未明',title:'正在確認店舖狀態',detail:'未確認狀態唔會當成成功。'},
 };
 
 const quoteMeta:Record<CustomerQuoteSnapshot['freshness'],{label:string;detail:string;tone:'current'|'attention'|'danger'}>={
