@@ -56,7 +56,7 @@ describe('2026-09-26 integrated main E2E preservation lock',()=>{
     expect(app).toContain("window.addEventListener('mfk-keeta-order-intake',onArrival)");
     expect(orders).toContain("window.addEventListener('mfk-customer-order-intake',refresh)");
     expect(orders).toContain("window.addEventListener('mfk-keeta-order-intake',refresh)");
-    expect(orders).toContain("label:'現場訂單'");
+    expect(orders).toContain("label:'現場／直接來源'");
     expect(orders).toContain("label:'自家平台'");
     expect(orders).toContain("label:'第三方平台'");
   });
