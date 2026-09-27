@@ -392,7 +392,7 @@ export function App(){
       :combo?'已加入套餐購物草稿；正式套餐內容同價格會由 SMT 再驗證。':'已加入本機購物草稿；未提交正式訂單。');
   };
 
-  const updateCart=  const updateCart=(next:readonly SmmCartLine[])=>{
+  const updateCart=(next:readonly SmmCartLine[])=>{
     setCart(next);
     persist({cart:next});
   };
