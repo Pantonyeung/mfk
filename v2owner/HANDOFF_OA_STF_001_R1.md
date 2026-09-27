@@ -1,126 +1,87 @@
-# MFK Owner App｜OA-STF-001 Handoff R1
+# MFK Owner App｜OA-STF-001 Handoff R1 Reacceptance
 
-STATUS: READY_FOR_COMMANDER_ACCEPTANCE
+STATUS: READY_FOR_COMMANDER_REACCEPTANCE
 
-ISSUE: #398
-PR: #401
+ISSUE: #398  
+PR: #401  
 BRANCH: work/398-oa-stf-001-r1
 
-FRESH MAIN:
-c2d5b016fe3dd08d276e915ae0f0fb2301e964cf
+## Commander correction source
 
-CODE HEAD:
-0e36fbceb82db228511e7b3937f5f3c470ce1db6
+Current command: GitHub #398 comment 5854345534.
 
-BEHIND MAIN AT CODE ACCEPTANCE GATE:
-0
+This packet supersedes the previous READY_FOR_COMMANDER_ACCEPTANCE handoff.
 
-## Source
+## Corrected scope
 
-Owner UI Package FINAL V1.0:
-- 02_CURRENT_FINAL_VISUALS/06_Staff_Overview_V1.png
-- 04_IMPLEMENTATION_UI_SPEC/MFK_Owner_App_Implementation_UI_Spec_FINAL_V1.0.md
-- Screen OA-STF-001
+OA-STF-001 remains READ ONLY.
 
-## Scope
+### Human employee ID
+- Normal Owner UI reads canonical human `loginId` / employee code only.
+- Internal `staffId` remains key / stable correlation identity only.
+- Missing or unsafe fallback loginId renders: `未有員工編號資料`.
+- A loginId equal to internal staffId or display name is treated as unreliable legacy fallback and is not shown as employee code.
 
-Read-only staff summary only:
-- 上班中
-- 排班 vs 實際
-- 休息
-- 工時
-- 員工提醒
-- 角色摘要
+### History & Audit custody
+- Audit attribution uses stable canonical staff identity fields only:
+  - `actorStaffId`
+  - `requesterStaffId`
+  - `approverStaffId`
+- `staff.name` is never used for attribution.
+- Historical name-only rows remain unattributed and render: `未有可可靠歸屬 Audit 讀回`.
+- Same-name staff regression is covered.
 
-Staff Detail:
-- Identity & Employment
-- Today
-- Role & Capability Summary
-- History & Audit
+### Capability summary
+- Raw permission tokens are not present in normal Owner staff projection.
+- Canonical permissions are projected through a bounded human-readable label map.
+- Unknown / absent permissions do not leak raw tokens.
+- Missing safe summary renders: `未有能力摘要資料`.
 
-Entry points:
-- Today → 查看員工
-- More → 員工
-- Route: /staff
+### Unchanged safety boundary
+- attendance / clock / break / worked-hours have no canonical source => `未有資料`
+- no create / disable staff
+- no role / permission mutation
+- no PIN / credential reset or display
+- no Wage / Payroll display
+- no second Staff / Auth / Attendance / Payroll authority
 
-## Current canonical reality
+## Preview failure classification
 
-Current main staff projection is sourced from canonical Admin `staffAuth`.
+CLASSIFICATION: **PRE_EXISTING / PREVIEW_ENV_CONFIG — ADVISORY**
 
-Available:
-- staff identity
-- display name
-- role
-- capability / permission summary
+Evidence:
+1. PR #401 Cloudflare preview reported both `mfk-owner` and `mfk-customer` failed at old head `22d35e2`, and again at corrected code head `ea0a964`.
+2. PR #402 is an SMM / v2local-only change set (no `v2owner/**` and no `v2customer/**` files), yet Cloudflare preview also failed both `mfk-owner` and `mfk-customer` on commit `d9469de`.
+3. PR #403 is Customer-focused and contains no `v2owner/**` files, yet Cloudflare preview still failed `mfk-owner`.
+4. Required GitHub CI for the corrected OA-STF code head is green, including Owner tests/build, Admin tests/build and Wrangler dry-run.
 
-Not available in current canonical projection:
-- attendance / clock events
-- scheduled-vs-actual attendance
-- break events
-- worked hours
-- staff attendance alerts
-- labour KPI source
+Therefore the Cloudflare preview failures are not attributable to the OA-STF candidate delta and are classified as preview environment/config behaviour rather than NEW_REGRESSION.
 
-Therefore OA-STF-001 displays **未有資料** for those domains.
-It does not infer attendance from:
-- SMT login
-- store business hours
-- role
-- local browser data
+## Files changed in OA-STF reacceptance branch
 
-## Authority / security
-
-READ ONLY.
-
-Forbidden and not implemented:
-- create staff
-- disable staff
-- role change
-- permission change
-- PIN / credential reset
-- attendance mutation
-- payroll / wage display
-
-Normal UI does not expose:
-- raw PIN
-- pinVerifier
-- password
-- hash
-- salt
-
-No second Staff / Auth / Attendance / Payroll authority.
-
-## Files changed
-
-- `v2owner/src/App.tsx`
+- `v2admin/worker.ts`
+- `v2admin/src/owner-runtime-connection.test.ts`
+- `v2owner/src/product-types.ts`
+- `v2owner/src/staff-identity.ts`
 - `v2owner/src/staff-overview.tsx`
-- `v2owner/src/styles.css`
 - `v2owner/test/migration.test.mjs`
+- `v2owner/HANDOFF_OA_STF_001_R1.md`
 
-Admin / backend files:
-- NOT TOUCHED
+Existing R1 routing / visual files retained:
+- `v2owner/src/App.tsx`
+- `v2owner/src/styles.css`
 
-## Verification on code head
+## Final receipt binding
 
-- owner-runtime-connection-r2 #36305843230 — SUCCESS
-- owner-hosting-r1-smoke #36305843358 — SUCCESS
-- admin-identity-canonical-r1 #36305843234 — SUCCESS
-- owner-stage03-main-landing-r1 #36305843295 — SUCCESS
+Exact `FINAL_HEAD`, exact final CI run IDs, fresh main and behind-main are bound after this handoff commit in:
+- GitHub #398 final worker return
+- PR #401 body
+- Google Drive handoff
+- Jade Note handoff
 
-## External handoff copies
-
-Google Drive:
-https://docs.google.com/document/d/1k85uT8nVQXpT4MreKs1VTm7trIHhmk5ZApd8HU1oFhw/edit?usp=drivesdk
-
-Jade Note:
-a24dc852-3c1b-4475-82f6-1fde6ed9109b
+Those four receipts are the authoritative final identity to avoid a self-referential Git commit SHA.
 
 ## Governance
 
-NO MAIN MERGE
-
+NO MAIN MERGE  
 NO DEPLOY
-
-## Milestone
-
-READY_FOR_COMMANDER_ACCEPTANCE
