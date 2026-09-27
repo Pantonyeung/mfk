@@ -378,6 +378,7 @@ export function ensureCurrentCapacityPoolState(
   const current=valid.map(pool=>{
     const row=finalByKey.get(businessDate+'::'+pool.id);
     if(!row)throw new Error('CAPACITY_POOL_STATE_MISSING:'+pool.id);
+    const baseRemaining=baseRemainingWithoutOverride(row);
     const firstPartyOverrideRemaining=Math.min(row.remainingQty,overrideAllowance(row,'FIRST_PARTY'));
     const thirdPartyOverrideRemaining=Math.min(row.remainingQty,overrideAllowance(row,'THIRD_PARTY'));
     return Object.freeze({
@@ -390,8 +391,8 @@ export function ensureCurrentCapacityPoolState(
       productIds:Object.freeze([...pool.productIds]),
       firstPartyStopAt:pool.firstPartyStopAt,
       thirdPartyStopAt:pool.thirdPartyStopAt,
-      firstPartyAccepting:row.remainingQty>pool.firstPartyStopAt||firstPartyOverrideRemaining>0,
-      thirdPartyAccepting:row.remainingQty>pool.thirdPartyStopAt||thirdPartyOverrideRemaining>0,
+      firstPartyAccepting:baseRemaining>pool.firstPartyStopAt||firstPartyOverrideRemaining>0,
+      thirdPartyAccepting:baseRemaining>pool.thirdPartyStopAt||thirdPartyOverrideRemaining>0,
       firstPartyOverrideRemaining,
       thirdPartyOverrideRemaining,
       activeOverrideCount:(row.overrides??[]).filter(approval=>approval.remainingAllowance>0).length,
