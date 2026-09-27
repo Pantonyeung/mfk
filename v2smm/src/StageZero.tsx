@@ -149,11 +149,11 @@ function BrandLockup({compact=false}:{compact?:boolean}){
 }
 
 function Stage0MascotPair({mode='duo'}:{mode?:'duo'|'male'|'female'}){
-  if(mode==='male')return <img className="stage0-mascot stage0-mascot-male" src="/brand/stage0/stage0-male.svg" alt="" aria-hidden="true"/>;
-  if(mode==='female')return <img className="stage0-mascot stage0-mascot-female" src="/brand/stage0/stage0-female.svg" alt="" aria-hidden="true"/>;
+  if(mode==='male')return <img className="stage0-mascot stage0-mascot-male" src="/brand/stage0/stage0-male.webp" alt="" aria-hidden="true"/>;
+  if(mode==='female')return <img className="stage0-mascot stage0-mascot-female" src="/brand/stage0/stage0-female.webp" alt="" aria-hidden="true"/>;
   return <div className="stage0-mascot-pair" aria-hidden="true">
-    <img src="/brand/stage0/stage0-male.svg" alt=""/>
-    <img src="/brand/stage0/stage0-female.svg" alt=""/>
+    <img src="/brand/stage0/stage0-male.webp" alt=""/>
+    <img src="/brand/stage0/stage0-female.webp" alt=""/>
   </div>;
 }
 
