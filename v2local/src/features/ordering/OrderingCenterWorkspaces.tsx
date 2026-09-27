@@ -1,5 +1,6 @@
 import {useMemo,useState} from 'react';
 import type {SyncedCombo,SyncedComboPool,SyncedOptionSet} from '../../runtime/admin-config-projection.ts';
+import type {MfkOrderLineOptionSelectionsV1,MfkOrderLinePairingV1} from '../../../../contracts/order-line-composition-v1.ts';
 import './ordering-center-workspaces.css';
 
 export interface WorkspaceProduct{
@@ -18,6 +19,9 @@ export interface WorkspaceCartLine{
   readonly qty:number;
   readonly unitMinor:number;
   readonly detail?:string;
+  readonly optionSelections?:MfkOrderLineOptionSelectionsV1;
+  readonly freeNote?:string;
+  readonly pairing?:MfkOrderLinePairingV1;
 }
 export type OrderingPanelState=
   |{readonly type:'product';readonly productId:string;readonly lineId?:string}
@@ -48,7 +52,10 @@ export function quickConfigurationForProduct(product:WorkspaceProduct){
     const names=options.map(option=>option.name);
     return names.length?[set.name+'：'+names.join('、')]:[];
   }).join(' · ');
-  return Object.freeze({eligible:true,detail,deltaMinor});
+  const optionSelections=Object.freeze(Object.fromEntries(
+    chosen.flatMap(({set,options})=>options.length?[[set.id,Object.freeze(options.map(option=>option.id))] as const]:[])
+  )) as MfkOrderLineOptionSelectionsV1;
+  return Object.freeze({eligible:true,detail,deltaMinor,optionSelections});
 }
 
 export const DRINK_SUPPLEMENT_PRODUCT_PREFIX='drink-supplement:' as const;
@@ -133,7 +140,7 @@ export function requiredTasksForCart(lines:readonly WorkspaceCartLine[],products
   for(const line of lines){
     const product=byProduct.get(line.productId);
     if(!product)continue;
-    const current=explicitConfigurationFromDetail(product,line.detail).selected;
+    const current=line.optionSelections??explicitConfigurationFromDetail(product,line.detail).selected;
     for(const set of product.optionSets??[]){
       const min=Math.max(set.required?1:0,set.min);
       if(min<=0)continue;
@@ -180,7 +187,10 @@ export function applyRequiredSelectionToCart<T extends WorkspaceCartLine>(
     if(normalized.length<min||normalized.length>max)throw new Error('REQUIRED_FAST_LANE_SELECTION_INVALID');
 
     const configuration=explicitConfigurationFromDetail(product,line.detail);
-    const selected:Record<string,string[]>={...configuration.selected,[groupId]:normalized};
+    const selected:Record<string,string[]>={...Object.fromEntries(
+      Object.entries(line.optionSelections??configuration.selected).map(([id,ids])=>[id,[...ids]])
+    ),[groupId]:normalized};
+    const freeNote=line.freeNote??configuration.note;
     let deltaMinor=0;
     const detailParts:string[]=[];
     for(const optionSet of product.optionSets??[]){
@@ -192,11 +202,15 @@ export function applyRequiredSelectionToCart<T extends WorkspaceCartLine>(
         deltaMinor+=options.reduce((sum,option)=>sum+option.priceAdjustmentMinor,0);
       }
     }
-    if(configuration.note)detailParts.push(configuration.note);
+    if(freeNote)detailParts.push(freeNote);
     return {
       ...line,
       unitMinor:product.priceMinor+deltaMinor,
       detail:detailParts.join(' · ')||undefined,
+      optionSelections:Object.freeze(Object.fromEntries(
+        Object.entries(selected).flatMap(([id,ids])=>ids.length?[[id,Object.freeze([...ids])] as const]:[])
+      )),
+      freeNote,
     } as T;
   });
 }
@@ -223,17 +237,17 @@ export function ProductConfigWorkspace({
   product,initial,mode='add',pricingBaseMinor,onAdd
 }:{
   product:WorkspaceProduct;
-  initial?:{readonly qty:number;readonly detail?:string};
+  initial?:{readonly qty:number;readonly detail?:string;readonly optionSelections?:MfkOrderLineOptionSelectionsV1;readonly freeNote?:string};
   mode?:'add'|'edit';
   pricingBaseMinor?:number;
-  onAdd:(detail:string,deltaMinor:number,qty:number)=>void;
+  onAdd:(detail:string,deltaMinor:number,qty:number,structured:{readonly optionSelections:MfkOrderLineOptionSelectionsV1;readonly freeNote:string})=>void;
 }){
   const initialState=useMemo(()=>productEditorInitialFromDetail(product,initial?.detail),[product,initial?.detail]);
   const priceBase=pricingBaseMinor??product.priceMinor;
   const [qty,setQty]=useState(initial?.qty??1);
-  const [note,setNote]=useState(initialState.note);
+  const [note,setNote]=useState(initial?.freeNote??initialState.note);
   const [selected,setSelected]=useState<Record<string,string[]>>(()=>Object.fromEntries(
-    Object.entries(initialState.selected).map(([id,ids])=>[id,[...ids]]),
+    Object.entries(initial?.optionSelections??initialState.selected).map(([id,ids])=>[id,[...ids]]),
   ));
 
   const toggle=(set:SyncedOptionSet,optionId:string)=>{
@@ -284,7 +298,12 @@ export function ProductConfigWorkspace({
       :<section className="cfg-block"><header><b>商品選項</b><span>Admin</span></header><p>此商品目前冇已發布選項組。</p></section>}
 
     <label className="cfg-note"><span>備註</span><input value={note} maxLength={60} onChange={event=>setNote(event.target.value)} placeholder="例如：不要蔥、醬分開"/><small>{note.length}/60</small></label>
-    <footer className="cfg-action"><div><span>單價</span><b>{money(priceBase+delta)}</b></div><button className="primary" disabled={invalid} onClick={()=>onAdd(detail,delta,qty)}>{mode==='edit'?'儲存修改':'加入訂單'}　{money((priceBase+delta)*qty)}</button></footer>
+    <footer className="cfg-action"><div><span>單價</span><b>{money(priceBase+delta)}</b></div><button className="primary" disabled={invalid} onClick={()=>onAdd(detail,delta,qty,{
+      optionSelections:Object.freeze(Object.fromEntries(
+        Object.entries(selected).flatMap(([id,ids])=>ids.length?[[id,Object.freeze([...ids])] as const]:[])
+      )),
+      freeNote:note.trim(),
+    })}>{mode==='edit'?'儲存修改':'加入訂單'}　{money((priceBase+delta)*qty)}</button></footer>
   </div>;
 }
 
