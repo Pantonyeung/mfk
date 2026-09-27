@@ -732,3 +732,78 @@ test('Owner read runtime refreshes without enabling bounded mutation transport',
   assert.match(app,/15000/);
   assert.doesNotMatch(cloud,/requestBoundedAction\s*:/);
 });
+
+
+test('OA-CHN-001 separates availability, health, mode, cause, freshness and readback',()=>{
+  const types=fs.readFileSync(path.join(srcRoot,'product-types.ts'),'utf8');
+  const channel=fs.readFileSync(path.join(srcRoot,'stage04-channel-health.tsx'),'utf8');
+  const mapping=fs.readFileSync(path.join(srcRoot,'stage04-api-mapping.ts'),'utf8');
+  for(const field of['acceptingOrders','desiredState','observedState','health','mode','cause','observedAt','freshness','lastCommand','readback']){
+    assert.match(types,new RegExp(field));
+    assert.match(mapping,new RegExp(field));
+  }
+  assert.match(mapping,/OA-CHN-001/);
+  assert.match(mapping,/HEALTH_NE_AVAILABILITY/);
+  assert.match(mapping,/UNKNOWN_REQUIRES_READBACK_BEFORE_RETRY/);
+  assert.match(channel,/網絡正常唔代表平台正常/);
+  assert.match(channel,/只停止新單；不得取消、退款或改動已成立訂單/);
+  assert.match(channel,/遠端渠道操作未接通/);
+});
+
+test('OA-PLN-001 consumes only canonical Current Effective Sales for MTD target progress',()=>{
+  const app=fs.readFileSync(path.join(srcRoot,'App.tsx'),'utf8');
+  const vm=fs.readFileSync(path.join(srcRoot,'stage05-planning-view-model.ts'),'utf8');
+  const mapping=fs.readFileSync(path.join(srcRoot,'stage05-api-mapping.ts'),'utf8');
+  assert.match(app,/月目標／成本/);
+  assert.match(mapping,/OA-PLN-001/);
+  assert.match(mapping,/CURRENT_EFFECTIVE_SALES/);
+  assert.match(mapping,/NO_SECOND_REPORTING_AUTHORITY/);
+  assert.match(vm,/snapshot\?\.planningBasis/);
+  assert.match(vm,/sourceMetric==='CURRENT_EFFECTIVE_SALES'/);
+  assert.match(vm,/sourceAuthority==='CANONICAL_REPORTING_PROJECTION'/);
+  assert.doesNotMatch(vm,/snapshot\?\.orders|snapshot\.orders|snapshot\?\.reports|snapshot\.reports/);
+  for(const marker of['mtdLabel','remainingLabel','attainmentLabel','dailyNeededLabel','projectedTargetLabel']){
+    assert.match(vm,new RegExp(marker));
+  }
+});
+
+test('OA-PLN-001 keeps planned and actual costs separate and labels incomplete profit honestly',()=>{
+  const persistence=fs.readFileSync(path.join(srcRoot,'stage05-planning-persistence.ts'),'utf8');
+  const component=fs.readFileSync(path.join(srcRoot,'stage05-monthly-planning.tsx'),'utf8');
+  const vm=fs.readFileSync(path.join(srcRoot,'stage05-planning-view-model.ts'),'utf8');
+  for(const label of['屋租','水','電','煤氣','人工','其他'])assert.match(persistence,new RegExp(label));
+  assert.match(persistence,/plannedMinor/);
+  assert.match(persistence,/actualToDateMinor/);
+  assert.match(persistence,/LOCAL_NON_AUTHORITATIVE_PLANNING/);
+  assert.match(component,/計劃成本／實際至今/);
+  assert.match(vm,/估算營運淨利（按已輸入成本）/);
+  assert.match(vm,/estimatedOperatingProfitMinor=mtdAvailable&&actualCostFilled>0\?mtdMinor-actualCostMinor:null/);
+});
+
+
+test('OA-PLN-001 planning math is deterministic for target progress and cost totals',()=>{
+  const math=loadPureTsModule('stage05-planning-math.ts');
+  const progress=math.calculateOwnerTargetProgress({
+    businessDate:'2026-09-27',
+    mtdAvailable:true,
+    mtdMinor:1300000,
+    targetMinor:20000000,
+  });
+  assert.equal(progress.remainingMinor,18700000);
+  assert.equal(progress.attainmentPct,6.5);
+  assert.equal(progress.dailyNeededMinor,4675000);
+  assert.equal(progress.projectedTargetDate,'2027-10-21');
+
+  const costs=math.calculateOwnerCostTotals([
+    {plannedMinor:3000000,actualToDateMinor:3000000},
+    {plannedMinor:100000,actualToDateMinor:80000},
+    {plannedMinor:500000,actualToDateMinor:420000},
+    {plannedMinor:200000,actualToDateMinor:170000},
+    {plannedMinor:4000000,actualToDateMinor:3500000},
+    {plannedMinor:500000,actualToDateMinor:null},
+  ]);
+  assert.equal(costs.plannedCostMinor,8300000);
+  assert.equal(costs.actualCostMinor,7170000);
+  assert.equal(costs.actualCostFilled,5);
+  assert.equal(costs.actualCostComplete,false);
+});
