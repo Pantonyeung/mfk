@@ -7,6 +7,27 @@ export interface CustomerCloudSelection{
   readonly optionId:string;
   readonly optionName:string;
 }
+
+export type CustomerCloudComboChoiceType='PRODUCT'|'LABEL'|'NONE';
+
+export interface CustomerCloudComboSelection{
+  readonly poolId:string;
+  readonly groupId:string;
+  readonly subPoolId:string;
+  readonly choiceId:string;
+  readonly choiceType:CustomerCloudComboChoiceType;
+  readonly choiceLabel:string;
+  readonly productId?:string;
+  readonly publishedAdjustmentMinor:number;
+}
+
+export interface CustomerCloudComboIntent{
+  readonly comboId:string;
+  readonly comboName:string;
+  readonly publishedBasePriceMinor:number;
+  readonly selections:readonly CustomerCloudComboSelection[];
+}
+
 export interface CustomerCloudCartLine{
   readonly lineId:string;
   readonly productId:string;
@@ -15,6 +36,7 @@ export interface CustomerCloudCartLine{
   readonly selectedVariationId?:string;
   readonly selectedVariationName?:string;
   readonly selections:readonly CustomerCloudSelection[];
+  readonly combo?:CustomerCloudComboIntent;
   readonly note?:string;
   readonly publishedUnitPriceMinor?:number;
 }
@@ -65,6 +87,20 @@ function qty(value:unknown,code:string){
   if(!Number.isSafeInteger(n)||n<1||n>99)throw new Error(code);
   return n;
 }
+function money(value:unknown,code:string){
+  const n=Number(value);
+  if(!Number.isSafeInteger(n)||n<0)throw new Error(code);
+  return n;
+}
+function signedMoney(value:unknown,code:string){
+  const n=Number(value);
+  if(!Number.isSafeInteger(n))throw new Error(code);
+  return n;
+}
+function onlyKeys(row:Record<string,unknown>,allowed:readonly string[],code:string){
+  const allow=new Set(allowed);
+  if(Object.keys(row).some(key=>!allow.has(key)))throw new Error(code);
+}
 function optionalText(value:unknown,max=240){
   if(value===undefined||value===null||value==='')return undefined;
   return text(value,'CUSTOMER_OPTIONAL_TEXT_INVALID',max);
@@ -77,6 +113,41 @@ function selection(value:unknown,index:number):CustomerCloudSelection{
     optionName:text(row.optionName,'CUSTOMER_SELECTION_NAME_INVALID_'+index,160),
   });
 }
+
+function comboSelection(value:unknown,index:number):CustomerCloudComboSelection{
+  const row=object(value,'CUSTOMER_COMBO_SELECTION_INVALID_'+index);
+  onlyKeys(row,['poolId','groupId','subPoolId','choiceId','choiceType','choiceLabel','productId','publishedAdjustmentMinor'],'CUSTOMER_COMBO_SELECTION_UNKNOWN_'+index);
+  const choiceType:CustomerCloudComboChoiceType=
+    row.choiceType==='PRODUCT'?'PRODUCT':
+    row.choiceType==='LABEL'?'LABEL':
+    row.choiceType==='NONE'?'NONE':
+    (()=>{throw new Error('CUSTOMER_COMBO_CHOICE_TYPE_INVALID_'+index)})();
+  const productId=optionalText(row.productId,160);
+  if(choiceType==='PRODUCT'&&!productId)throw new Error('CUSTOMER_COMBO_PRODUCT_ID_REQUIRED_'+index);
+  return Object.freeze({
+    poolId:text(row.poolId,'CUSTOMER_COMBO_POOL_ID_INVALID_'+index,160),
+    groupId:text(row.groupId,'CUSTOMER_COMBO_GROUP_ID_INVALID_'+index,160),
+    subPoolId:text(row.subPoolId,'CUSTOMER_COMBO_SUBPOOL_ID_INVALID_'+index,160),
+    choiceId:text(row.choiceId,'CUSTOMER_COMBO_CHOICE_ID_INVALID_'+index,160),
+    choiceType,
+    choiceLabel:text(row.choiceLabel,'CUSTOMER_COMBO_CHOICE_LABEL_INVALID_'+index,200),
+    ...(productId?{productId}:{}),
+    publishedAdjustmentMinor:signedMoney(row.publishedAdjustmentMinor,'CUSTOMER_COMBO_ADJUSTMENT_INVALID_'+index),
+  });
+}
+
+function comboIntent(value:unknown,lineIndex:number):CustomerCloudComboIntent{
+  const row=object(value,'CUSTOMER_COMBO_INVALID_'+lineIndex);
+  onlyKeys(row,['comboId','comboName','publishedBasePriceMinor','selections'],'CUSTOMER_COMBO_UNKNOWN_'+lineIndex);
+  if(!Array.isArray(row.selections)||row.selections.length>40)throw new Error('CUSTOMER_COMBO_SELECTIONS_INVALID_'+lineIndex);
+  return Object.freeze({
+    comboId:text(row.comboId,'CUSTOMER_COMBO_ID_INVALID_'+lineIndex,160),
+    comboName:text(row.comboName,'CUSTOMER_COMBO_NAME_INVALID_'+lineIndex,200),
+    publishedBasePriceMinor:money(row.publishedBasePriceMinor,'CUSTOMER_COMBO_BASE_PRICE_INVALID_'+lineIndex),
+    selections:Object.freeze(row.selections.map((item,index)=>comboSelection(item,index))),
+  });
+}
+
 function line(value:unknown,index:number):CustomerCloudCartLine{
   const row=object(value,'CUSTOMER_CART_LINE_INVALID_'+index);
   if(!Array.isArray(row.selections))throw new Error('CUSTOMER_CART_SELECTIONS_INVALID_'+index);
@@ -90,6 +161,7 @@ function line(value:unknown,index:number):CustomerCloudCartLine{
     ...(variationId?{selectedVariationId:variationId}:{}),
     ...(variationName?{selectedVariationName:variationName}:{}),
     selections:Object.freeze(row.selections.map(selection)),
+    ...(row.combo!==undefined?{combo:comboIntent(row.combo,index)}:{}),
     ...(optionalText(row.note,240)?{note:optionalText(row.note,240)}:{}),
     ...(Number.isSafeInteger(Number(row.publishedUnitPriceMinor))&&Number(row.publishedUnitPriceMinor)>=0?{publishedUnitPriceMinor:Number(row.publishedUnitPriceMinor)}:{}),
   });
