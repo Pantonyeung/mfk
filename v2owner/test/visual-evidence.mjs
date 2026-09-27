@@ -89,16 +89,16 @@ async function shot(name){
 }
 await shot('01_Today_FINAL_390.png');
 
-await page.getByRole('button',{name:/待處理/}).click();
+await page.locator('.bottom-nav button').filter({hasText:'待處理'}).click();
 await page.getByRole('heading',{name:'真正要你介入嘅事'}).waitFor();
 await shot('02_Action_FINAL_390.png');
 
-await page.getByRole('button',{name:/訂單/}).click();
+await page.locator('.bottom-nav button').filter({hasText:'訂單'}).click();
 await page.getByRole('heading',{name:'訂單',exact:true}).waitFor();
 await shot('03_Orders_FINAL_390.png');
 
 async function openMore(){
-  await page.getByRole('button',{name:/更多/}).click();
+  await page.locator('.bottom-nav button').filter({hasText:'更多'}).click();
   await page.getByRole('heading',{name:'營運工具'}).waitFor();
 }
 await openMore();
