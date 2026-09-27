@@ -682,6 +682,22 @@ export function App(){
   const activeSubmitIntent=submitRouteId?pendingIntents.find(item=>item.submissionId===submitRouteId)??null:null;
   const waitingOrder=waitingOrderId?activeOrders.find(order=>order.orderId===waitingOrderId)??null:null;
   const waitingIntent=waitingOrderId?pendingIntents.find(item=>item.state==='DELIVERED'&&item.canonicalOrderId===waitingOrderId)??null:null;
+  const waitingCompleted=Boolean(
+    waitingOrderId&&(
+      waitingOrder?.stage==='COMPLETED'||
+      history.some(order=>order.orderId===waitingOrderId)
+    )
+  );
+
+  useEffect(()=>{
+    if(view!=='waiting'||!waitingCompleted)return;
+    setOrderSegment('history');
+    setView('orders');
+    replacePath('/orders');
+    persist({preferences:{activeView:'orders',activeCategoryId}});
+    window.scrollTo({top:0,behavior:'auto'});
+  },[view,waitingCompleted,waitingOrderId,activeCategoryId]);
+
   const cartCount=cart.reduce((sum,line)=>sum+line.quantity,0);
   const cartRepairs=useMemo(()=>publishedCartRepairs(cart,menu),[cart,menu]);
   const allProducts=menu?.products??[];
@@ -709,7 +725,9 @@ export function App(){
       {view==='cart'?<CartView cart={cart} quote={quote} repairs={cartRepairs} member={snapshot?.member} suggestions={cartSuggestions} products={menu?.products??[]} onProduct={openProduct} onAcceptRepair={acceptCartRepair} onQuantity={(lineId,quantity)=>updateCart(cart.map(line=>line.lineId===lineId?{...line,quantity:Math.max(1,quantity)}:line))} onRemove={lineId=>updateCart(cart.filter(line=>line.lineId!==lineId))} onMenu={()=>changeView('menu')} onCheckout={()=>void openCheckoutStep('contact')}/>:null}
       {view==='checkout'?<CheckoutUi4View step={checkoutStep} cart={cart} quote={quote} repairs={cartRepairs} checkout={checkout} setCheckout={changeCheckout} paymentChannels={snapshot?.paymentChannels??[]} onStep={step=>void openCheckoutStep(step)} onBackToJar={()=>changeView('cart')} onRepair={()=>changeView('cart')} onPaymentEvidence={file=>void uploadPaymentEvidence(file)} onReviewConfirmed={startUi5Submission}/>:null}
       {view==='submit'?(activeSubmitIntent?<SubmitUi5View intent={activeSubmitIntent} submitting={submitting} submitProbe={submitProbe} reading={readingIntentId===activeSubmitIntent.submissionId} fallbackAvailable={Boolean(snapshot?.fallback?.enabled)&&activeSubmitIntent.state==='NOT_CONNECTED'} onSubmit={()=>void submit(activeSubmitIntent)} onReadback={()=>void readbackIntent(activeSubmitIntent)} onFallback={()=>void requestFallback(activeSubmitIntent)} onBackReview={()=>void openCheckoutStep('review')} onBackToJar={()=>changeView('cart')}/>:<section className="page ui5-missing"><h1>提交資料未找到</h1><p>唔會建立新 Submission；請返回記憶罐重新確認。</p><button onClick={()=>changeView('cart')}>返回記憶罐</button></section>):null}
-      {view==='waiting'?<StoreFulfillmentUi6View order={waitingOrder} intent={waitingIntent} connection={connection} onRefresh={()=>void refresh()} onOrders={()=>{setOrderSegment('current');changeView('orders')}} onHome={()=>changeView('home')}/>:null}
+      {view==='waiting'?(waitingCompleted
+        ?<section className="page ui6-completed-redirect" data-ui6-state="COMPLETED_REDIRECT" aria-live="polite"><span>訂單已完成</span><h1>正在返回訂單紀錄</h1><p>UI6 唔會將 Completed 顯示成等待店舖確認，亦唔會提供 UI7 交收操作。</p></section>
+        :<StoreFulfillmentUi6View order={waitingOrder} intent={waitingIntent} connection={connection} browserOnline={browserOnline} onRefresh={()=>void refresh()} onOrders={()=>{setOrderSegment('current');changeView('orders')}} onHome={()=>changeView('home')}/>):null}
       {view==='orders'?<OrdersView segment={orderSegment} setSegment={setOrderSegment} active={activeOrders} history={history} expandedOrderId={expandedOrderId} setExpandedOrderId={setExpandedOrderId} onReorder={order=>void reorder(order)} onBrowse={()=>changeView('menu')} connection={connection}/>:null}
       {view==='more'?<MemberView connection={connection} snapshot={snapshot} history={history} pendingIntents={recoveryIntents} readingIntentId={readingIntentId} onRefresh={()=>void refresh()} onReadback={intent=>void readbackIntent(intent)} onDiscard={removeIntent} onFallback={()=>void requestFallback()} onReorder={order=>void reorder(order)} onBrowse={()=>changeView('menu')}/>:null}
     </section>
