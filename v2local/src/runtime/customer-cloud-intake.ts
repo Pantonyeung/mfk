@@ -396,6 +396,7 @@ async function reconcileOrders(){
         ...(intent.checkout.paymentMethod==='ELECTRONIC'&&intent.checkout.paymentEvidenceRef?{paymentEvidenceRef:intent.checkout.paymentEvidenceRef,paymentVerificationState:'PENDING' as const}:{}),
         customerPhone:intent.checkout.phone,
         initialFulfillmentLabel:'進行中',
+        capacityChannel:'FIRST_PARTY',
       });
       window.dispatchEvent(new CustomEvent('mfk-customer-order-intake',{detail:{
         canonicalOrderId:order.id,
