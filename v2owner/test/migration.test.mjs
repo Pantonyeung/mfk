@@ -744,9 +744,9 @@ test('OA-CHN-001 exposes canonical channel semantics and disables unsupported co
   assert.match(page,/暫停接單/);
   assert.match(page,/恢復接單/);
   assert.match(page,/未有 canonical command seam/);
-  assert.match(page,/禁止 blind retry/);
-  assert.match(page,/已成立訂單不會被取消、退款或改狀態/);
-  assert.match(cloud,/\/api\/owner\/channels\/command/);
+  assert.match(page,/availableActions = \[\]/);
+  assert.match(page,/所有操作保持停用/);
+  assert.doesNotMatch(cloud,/\/api\/owner\/channels\/command/);
 });
 
 test('OA-PLN-001 uses canonical runtime rather than localStorage and keeps cost semantics separate',()=>{
@@ -758,6 +758,7 @@ test('OA-PLN-001 uses canonical runtime rather than localStorage and keeps cost 
   assert.match(types,/monthlyRevenueTargetMinor/);
   assert.match(types,/plannedMonthlyMinor/);
   assert.match(types,/actualToDateMinor/);
+  assert.match(types,/expectedRevision/);
   assert.match(types,/COMPLETE.*PARTIAL.*MANUAL_ESTIMATE/s);
   assert.match(page,/Current Effective Sales/);
   assert.match(page,/估算營運淨利（按已輸入成本）/);
