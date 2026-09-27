@@ -4682,3 +4682,40 @@ Overview https://drive.google.com/file/d/1SYZpn-V92zBunM2men2yh9Gey9SFlHcz/view?
 
 NEXT：
 Owner review Stage 00 visuals。
+
+
+==================================================
+RECORD 010｜OWNER CORRECTION｜SMT 必須係 1920×1080 橫向 POS 工作台
+日期：2026-09-27
+狀態：LOCKED / PREVIOUS STAGE-00 MOBILE-LIKE VISUAL REJECTED
+==================================================
+
+Owner 指正：
+
+SMT 係平板／大屏幕收銀工作台，Primary Target 一直係 1920×1080 橫向。
+上一版 UI-STAGE-00 將 Boot / Login / Opening Cash / Confirm 排成四個直向窄版畫面，視覺語義接近手機 App，方向錯誤。
+
+正式鎖定：
+
+1. SMT 所有正式 Visual Mockup 以 1920×1080 Landscape 為主。
+2. 每一個畫面都係一張完整 1920×1080 POS Screen。
+3. 不用「四部手機並排」或「直向 mobile card」表示流程。
+4. 流程圖可以做 overview，但只作索引；不可當成正式 UI 效果圖。
+5. Boot、Login、Opening Cash Review、Opening Confirm 必須各自有一張獨立 1920×1080 橫向效果圖。
+6. 視覺要有桌面／平板 POS 密度、固定工作台感、右手操作考量。
+7. 主要按鈕、現金資訊、登入輸入區應橫向利用螢幕空間，不可集中成手機窄欄。
+8. 1366×768 只係 Secondary Responsive；不可反過來用 mobile-first 思路設計 SMT。
+
+上一版：
+UI-STAGE-00_VISUAL-OVERVIEW / 四直欄 storyboard
+狀態：REJECTED AS FORMAL SMT UI
+用途：最多保留作 flow storyboard reference，不作正式 UI acceptance。
+
+正式下一版：
+- 00_BOOT_LOADING_1920x1080
+- 01_LOGIN_1920x1080
+- 02_OPENING_CASH_REVIEW_1920x1080
+- 03_OPENING_CONFIRM_1920x1080
+
+MILESTONE：
+MFK_SMT_STAGE00_LANDSCAPE_POS_VISUAL_RULE_LOCKED
