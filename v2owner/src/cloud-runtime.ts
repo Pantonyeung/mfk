@@ -1,4 +1,4 @@
-import type {OwnerAuthSession,OwnerReadModelSnapshot,OwnerRuntimePort} from './product-types';
+import type {OwnerAuthSession,OwnerChannelHealth,OwnerPlanningCommandResult,OwnerPlanningSaveInput,OwnerPlanningSnapshot,OwnerReadModelSnapshot,OwnerRuntimePort} from './product-types';
 
 const OWNER_API_ORIGIN='https://admin.morefunos.com';
 const STORE_ID='MF01';
@@ -81,10 +81,43 @@ export async function logoutOwner(){
   const current=readStoredOwnerSession();saveOwnerSession(null);if(!current)return;
   try{await ownerFetch('/api/owner/auth/session?storeId='+encodeURIComponent(STORE_ID),{method:'POST',headers:{'x-mfk-owner-session':current.sessionToken}});}catch{}
 }
+
+function requireOwnerSession():OwnerAuthSession{
+  const session=readStoredOwnerSession();
+  if(!session)throw new OwnerRuntimeError('OWNER_SESSION_REQUIRED','請先登入 Owner App');
+  return session;
+}
+function ownerSessionHeaders(extra:Record<string,string>={}){
+  const session=requireOwnerSession();
+  return {'x-mfk-owner-session':session.sessionToken,...extra};
+}
+export async function readOwnerChannels():Promise<readonly OwnerChannelHealth[]>{
+  const body=await ownerFetch('/api/owner/channels?storeId='+encodeURIComponent(STORE_ID),{
+    method:'GET',cache:'no-store',headers:ownerSessionHeaders(),
+  });
+  return Object.freeze(Array.isArray(body.channels)?body.channels as unknown as OwnerChannelHealth[]:[]);
+}
+export async function readOwnerPlanning(monthKey:string):Promise<OwnerPlanningSnapshot>{
+  const body=await ownerFetch('/api/owner/planning?storeId='+encodeURIComponent(STORE_ID)+'&monthKey='+encodeURIComponent(monthKey),{
+    method:'GET',cache:'no-store',headers:ownerSessionHeaders(),
+  });
+  return body as unknown as OwnerPlanningSnapshot;
+}
+export async function saveOwnerPlanning(input:OwnerPlanningSaveInput):Promise<OwnerPlanningCommandResult>{
+  const body=await ownerFetch('/api/owner/planning?storeId='+encodeURIComponent(STORE_ID),{
+    method:'POST',
+    headers:ownerSessionHeaders({'content-type':'application/json'}),
+    body:JSON.stringify(input),
+  });
+  return body as unknown as OwnerPlanningCommandResult;
+}
 export function createCloudOwnerRuntimePort():OwnerRuntimePort{
   return Object.freeze({
     portId:'MFK_OWNER_PORT_V1' as const,
     readOwnerSession:refreshOwnerSession,loginOwner,logoutOwner,
+    readChannels:readOwnerChannels,
+    readPlanning:readOwnerPlanning,
+    savePlanning:saveOwnerPlanning,
     async readSnapshot():Promise<OwnerReadModelSnapshot>{
       const session=readStoredOwnerSession();if(!session)throw new OwnerRuntimeError('OWNER_SESSION_REQUIRED','請先登入 Owner App');
       const body=await ownerFetch('/api/owner/snapshot?storeId='+encodeURIComponent(STORE_ID),{method:'GET',cache:'no-store',headers:{'x-mfk-owner-session':session.sessionToken}});
