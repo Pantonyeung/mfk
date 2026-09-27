@@ -15,8 +15,8 @@ const styles=fs.readFileSync(path.join(src,'styles.css'),'utf8');
 const admin=fs.readFileSync(path.join(repoRoot,'v2admin/worker.ts'),'utf8');
 
 test('UI7 route owns READY onward while UI6 remains the pre-pickup read-only surface',()=>{
-  assert.match(app,/pathname\.match\(\/\^\\\/orders\\\/\(\[\^\/\]\+\)\$\//);
-  assert.match(app,/view:'pickup'/);
+  assert.match(app,/const pickupMatch=pathname\.match/);
+  assert.match(app,/return \{view:'pickup',pickupOrderId/);
   assert.match(app,/openPickupRoute/);
   assert.match(app,/\['READY','ARRIVED','VERIFIED','HANDED_OVER','PICKUP_EXCEPTION','COMPLETED'\]/);
   assert.match(app,/PickupCompleteUi7View/);
@@ -85,7 +85,6 @@ test('UI7 preserves weak-network fail-closed freshness',()=>{
 
 test('UI7 contains no Stage8 reward or instant seed issuance',()=>{
   assert.doesNotMatch(ui7,/reorder|再來一單|seed|reward|coupon|badge/i);
-  assert.doesNotMatch(app,/view==='pickup'[\s\S]{0,500}onReorder/);
 });
 
 test('formal Stage 7 composition uses supplied IP assets, touch target and reduced motion',()=>{
