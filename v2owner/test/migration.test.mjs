@@ -758,9 +758,10 @@ test('OA-PLN-001 consumes only canonical Current Effective Sales for MTD target 
   assert.match(mapping,/OA-PLN-001/);
   assert.match(mapping,/CURRENT_EFFECTIVE_SALES/);
   assert.match(mapping,/NO_SECOND_REPORTING_AUTHORITY/);
-  assert.match(vm,/snapshot\?\.reports/);
-  assert.match(vm,/row\.metricKind==='CURRENT_EFFECTIVE_SALES'/);
-  assert.doesNotMatch(vm,/snapshot\?\.orders|snapshot\.orders/);
+  assert.match(vm,/snapshot\?\.planningBasis/);
+  assert.match(vm,/sourceMetric==='CURRENT_EFFECTIVE_SALES'/);
+  assert.match(vm,/sourceAuthority==='CANONICAL_REPORTING_PROJECTION'/);
+  assert.doesNotMatch(vm,/snapshot\?\.orders|snapshot\.orders|snapshot\?\.reports|snapshot\.reports/);
   for(const marker of['mtdLabel','remainingLabel','attainmentLabel','dailyNeededLabel','projectedTargetLabel']){
     assert.match(vm,new RegExp(marker));
   }
