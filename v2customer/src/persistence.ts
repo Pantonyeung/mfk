@@ -35,6 +35,57 @@ function safeArray<T>(value:unknown):readonly T[]{
   return Array.isArray(value)?value as readonly T[]:[];
 }
 
+export function customerFallbackReference(value:Pick<CustomerPendingIntent,'submissionId'>|{readonly fallbackReference?:string}):string{
+  const direct='fallbackReference' in value&&typeof value.fallbackReference==='string'?value.fallbackReference.trim():'';
+  if(/^\d{4,6}$/.test(direct))return direct;
+  const source=String('submissionId' in value?value.submissionId:'');
+  let hash=2166136261;
+  for(let index=0;index<source.length;index++){
+    hash^=source.charCodeAt(index);
+    hash=Math.imul(hash,16777619)>>>0;
+  }
+  return String(hash%1_000_000).padStart(6,'0');
+}
+
+function normalizePendingIntent(value:unknown):CustomerPendingIntent|null{
+  if(!isRecord(value))return null;
+  const submissionId=typeof value.submissionId==='string'?value.submissionId:'';
+  const menuRevision=typeof value.menuRevision==='string'?value.menuRevision:'';
+  const idempotencyKey=typeof value.idempotencyKey==='string'?value.idempotencyKey:'';
+  const createdAt=typeof value.createdAt==='string'?value.createdAt:'';
+  const updatedAt=typeof value.updatedAt==='string'?value.updatedAt:createdAt;
+  const state=['DRAFT','NOT_CONNECTED','PENDING','UNKNOWN','REJECTED','DELIVERED'].includes(String(value.state))
+    ?value.state as CustomerPendingIntent['state']
+    :'DRAFT';
+  if(!submissionId||!idempotencyKey||!createdAt)return null;
+  const rawCheckout=isRecord(value.checkout)?value.checkout:{};
+  const checkout:CustomerCheckoutDraft=Object.freeze({
+    name:typeof rawCheckout.name==='string'?rawCheckout.name:'',
+    phone:typeof rawCheckout.phone==='string'?rawCheckout.phone:'',
+    paymentMethod:rawCheckout.paymentMethod==='ELECTRONIC'?'ELECTRONIC':'PAY_AT_STORE',
+    ...(rawCheckout.paymentMethod==='ELECTRONIC'&&typeof rawCheckout.paymentChannelId==='string'?{
+      paymentChannelId:String(rawCheckout.paymentChannelId),
+      paymentChannelLabel:typeof rawCheckout.paymentChannelLabel==='string'?rawCheckout.paymentChannelLabel:'',
+    }:{}),
+    ...(isRecord(rawCheckout.paymentEvidence)?{paymentEvidence:rawCheckout.paymentEvidence as CustomerCheckoutDraft['paymentEvidence']}:{}),
+  });
+  const fallbackReference=customerFallbackReference({
+    submissionId,
+    fallbackReference:typeof value.fallbackReference==='string'?value.fallbackReference:undefined,
+  });
+  return Object.freeze({
+    submissionId,menuRevision,idempotencyKey,createdAt,updatedAt,state,
+    cart:Object.freeze([...safeArray<CustomerCartLine>(value.cart)]),
+    checkout,
+    fallbackReference,
+    ...(Number.isSafeInteger(Number(value.publishedTotalMinor))&&Number(value.publishedTotalMinor)>=0?{publishedTotalMinor:Number(value.publishedTotalMinor)}:{}),
+    ...(typeof value.canonicalOrderId==='string'&&value.canonicalOrderId?{canonicalOrderId:value.canonicalOrderId}:{}),
+    ...(typeof value.canonicalDisplay==='string'&&value.canonicalDisplay?{canonicalDisplay:value.canonicalDisplay}:{}),
+    ...(typeof value.committedAt==='string'&&value.committedAt?{committedAt:value.committedAt}:{}),
+    ...(typeof value.lastMessage==='string'?{lastMessage:value.lastMessage}:{}),
+  });
+}
+
 export function readCustomerLocalWorkspace():CustomerLocalWorkspace{
   if(typeof window==='undefined'||!window.localStorage)return DEFAULT_WORKSPACE;
   const raw=window.localStorage.getItem(STORAGE_KEY);
@@ -57,7 +108,7 @@ export function readCustomerLocalWorkspace():CustomerLocalWorkspace{
         paymentMethod:checkout.paymentMethod==='ELECTRONIC'?'ELECTRONIC':'PAY_AT_STORE',
         ...(checkout.paymentMethod==='ELECTRONIC'&&/^[A-Z0-9][A-Z0-9_-]{1,39}$/.test(String(checkout.paymentChannelId||'').toUpperCase())?{paymentChannelId:String(checkout.paymentChannelId).toUpperCase(),paymentChannelLabel:typeof checkout.paymentChannelLabel==='string'?checkout.paymentChannelLabel.slice(0,120):''}:{}),
       }),
-      pendingIntents:Object.freeze([...safeArray<CustomerPendingIntent>(parsed.pendingIntents)]),
+      pendingIntents:Object.freeze(safeArray<unknown>(parsed.pendingIntents).map(normalizePendingIntent).filter((item):item is CustomerPendingIntent=>Boolean(item))),
       preferences:Object.freeze({
         activeView,
         activeCategoryId:typeof preferences.activeCategoryId==='string'?preferences.activeCategoryId:null,
