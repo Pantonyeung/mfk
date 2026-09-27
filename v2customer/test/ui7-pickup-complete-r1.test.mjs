@@ -12,6 +12,7 @@ const ui7=fs.readFileSync(path.join(src,'components/customer-pickup-ui7.tsx'),'u
 const ui6=fs.readFileSync(path.join(src,'components/customer-fulfillment-ui6.tsx'),'utf8');
 const types=fs.readFileSync(path.join(src,'product-types.ts'),'utf8');
 const styles=fs.readFileSync(path.join(src,'styles.css'),'utf8');
+const primitives=fs.readFileSync(path.join(src,'ui/primitives.tsx'),'utf8');
 const admin=fs.readFileSync(path.join(repoRoot,'v2admin/worker.ts'),'utf8');
 
 test('UI7 route owns READY onward while UI6 remains the pre-pickup read-only surface',()=>{
@@ -81,6 +82,33 @@ test('UI7 preserves weak-network fail-closed freshness',()=>{
   }
   assert.match(ui7,/Realtime 只係提示；canonical readback 先係真相/);
   assert.match(ui7,/唔會推斷 VERIFIED、HANDED_OVER 或 COMPLETED/);
+});
+
+
+test('UI7 healthy no-stage state is deterministic EMPTY while unsupported is UNKNOWN',()=>{
+  assert.match(ui7,/type Ui7EmptyState='LOADING'\|'EMPTY'\|'ERROR'\|'OFFLINE'\|'STALE'\|'UNKNOWN'/);
+  assert.match(ui7,/const emptyStateFrom=\(freshness:Ui7Freshness\):Ui7EmptyState=>freshness==='CURRENT'\?'EMPTY':freshness/);
+  assert.match(ui7,/const unsupported=Boolean\(order&&!canonicalStage&&!isKnownPreUi7Stage\(order\.stage\)\)/);
+  assert.match(ui7,/const emptyState:Ui7EmptyState=unsupported\?'UNKNOWN':emptyStateFrom\(freshness\)/);
+  assert.match(ui7,/data-ui7-state=\{emptyState\}/);
+  assert.match(ui7,/emptyState==='EMPTY'\?'暫時未有取餐狀態':'取餐狀態等待讀回'/);
+  assert.match(ui7,/READY 只會喺店舖正式讀回 READY 時出現/);
+  assert.doesNotMatch(ui7,/freshness==='CURRENT'\?'READY'/);
+});
+
+test('UI7 keeps exactly five fixed bottom-nav items with Orders active',()=>{
+  const navBlock=primitives.slice(primitives.indexOf('export function BottomNavigation'),primitives.indexOf('export interface ProductOriginRect'));
+  const navIds=[...navBlock.matchAll(/\{id:'(home|menu|cart|orders|more)' as const/g)].map(match=>match[1]);
+  assert.deepEqual(navIds,['home','menu','cart','orders','more']);
+  assert.match(app,/!\['checkout','submit','waiting'\]\.includes\(view\)/);
+  assert.match(app,/active=\{view==='pickup'\?'orders'/);
+  assert.doesNotMatch(app,/\['checkout','submit','waiting','pickup'\]/);
+  assert.match(app,/pulseKey=\{jarPulseKey\} onChange=\{changeView\}/);
+  assert.match(styles,/\.bottom-navigation\{position:fixed[\s\S]*grid-template-columns:repeat\(5,1fr\)[\s\S]*env\(safe-area-inset-bottom\)/);
+  const buttonMinHeight=styles.match(/\.bottom-navigation button\{[^}]*min-height:(\d+)px/);
+  assert.ok(buttonMinHeight);
+  assert.ok(Number(buttonMinHeight[1])>=44);
+  assert.doesNotMatch(navBlock,/ARRIVED|VERIFIED|HANDED_OVER|COMPLETED|updateFulfillment|markArrived/);
 });
 
 test('UI7 contains no Stage8 reward or instant seed issuance',()=>{
