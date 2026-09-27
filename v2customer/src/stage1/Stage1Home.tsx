@@ -7,54 +7,38 @@ import type {
   CustomerReadModelSnapshot,
 } from '../product-types';
 import type {ProductOriginRect} from '../ui/primitives';
+import {CUSTOMER_FINAL_SOURCE} from '../source-assets';
 import './stage1.css';
 
-const OFFICIAL_LOGO_URL='https://cdn.creativeclaw.co/u/6ad84d58/images/402357b6-d757-4238-99f7-3d20607da6f2.png';
-const STAGE1_BRAND_ART='/brand/mf-home-hero-bowl.webp';
+const OFFICIAL_LOGO_URL=CUSTOMER_FINAL_SOURCE.logo.url;
+const STAGE1_FINAL_SOURCE=CUSTOMER_FINAL_SOURCE.stage1Final.url;
+const HERO_IP='/brand/stage0-male.webp';
 
 const statusLabel=(storeAvailable:boolean|undefined)=>{
   if(storeAvailable===true)return '營業中';
-  if(storeAvailable===false)return '暫停正式落單';
-  return '同步中';
+  if(storeAvailable===false)return '休息中';
+  return '更新中';
 };
 
-function Stage1StatePanel({
-  connection,
-  browserOnline,
-  onRetry,
-}:{
-  connection:CustomerConnectionState;
-  browserOnline:boolean;
-  onRetry:()=>void;
-}){
-  if(!browserOnline)return <section className="stage1-state-panel state-offline" role="status"><strong>目前離線</strong><p>已載入內容可以繼續查看；正式提交仍會喺正確交易邊界再次確認。</p></section>;
-  if(connection==='ERROR')return <section className="stage1-state-panel state-error" role="alert"><strong>暫時未能同步店舖資料</strong><p>暫時未能同步店舖資料，請稍後再試。</p><button onClick={onRetry}>重新同步</button></section>;
-  if(connection==='STALE'||connection==='PARTIAL')return <section className="stage1-state-panel state-stale" role="status"><strong>正顯示最近一次資料</strong><p>最新店舖狀態仍在更新；價格、供應及提交會喺後續正確邊界再確認。</p><button onClick={onRetry}>更新資料</button></section>;
-  if(connection==='NOT_CONNECTED')return <section className="stage1-state-panel state-empty" role="status"><strong>店舖服務尚未連接</strong><p>首頁只顯示已有正式資料，不會用假價格、假商品或假營業狀態補位。</p></section>;
+function mediaFor(product:CustomerProduct){
+  if(product.imageUrl)return product.imageUrl;
+  if(/飯團|紫米/.test(product.name))return '/brand/p0-riceball.webp';
+  if(/沙律|蔬菜|輕食/.test(product.name))return '/brand/mf-home-hero-salad.webp';
+  return '/brand/mf-home-hero-bowl.webp';
+}
+
+function Stage1StatePanel({connection,browserOnline,onRetry}:{connection:CustomerConnectionState;browserOnline:boolean;onRetry:()=>void}){
+  if(!browserOnline)return <section className="stage1-state-panel state-offline" role="status"><strong>目前離線</strong><p>你仍然可以查看已載入內容。</p></section>;
+  if(connection==='ERROR')return <section className="stage1-state-panel state-error" role="alert"><strong>暫時未能更新店舖資料</strong><p>請稍後再試。</p><button onClick={onRetry}>重新整理</button></section>;
+  if(connection==='STALE'||connection==='PARTIAL')return <section className="stage1-state-panel state-stale" role="status"><strong>正顯示最近一次資料</strong><p>最新內容仍在更新中。</p><button onClick={onRetry}>更新資料</button></section>;
+  if(connection==='NOT_CONNECTED')return <section className="stage1-state-panel state-empty" role="status"><strong>店舖資料暫未連接</strong><p>稍後再試，或者先看看已有內容。</p></section>;
   if(connection==='LOADING')return <section className="stage1-state-panel state-loading" role="status" aria-busy="true"><strong>正在準備首頁</strong><p>店舖狀態、公告同推薦會逐項出現。</p></section>;
   return null;
 }
 
-function Stage1ProductPlaceholder(){
-  return <span className="stage1-product-placeholder" aria-hidden="true"/>;
-}
-
 export function Stage1Home({
-  snapshot,
-  connection,
-  browserOnline,
-  activeOrders,
-  history,
-  recommendations,
-  cartCount,
-  onRetry,
-  onProduct,
-  onBrowse,
-  onJar,
-  onOrders,
-  onHistory,
-  onMember,
-  onBuyAgain,
+  snapshot,connection,browserOnline,activeOrders,history,recommendations,cartCount,
+  onRetry,onProduct,onBrowse,onJar,onOrders,onHistory,onMember,onBuyAgain,
 }:{
   snapshot:CustomerReadModelSnapshot|null;
   connection:CustomerConnectionState;
@@ -82,120 +66,116 @@ export function Stage1Home({
     ?member.coupons.filter(item=>item.state==='AVAILABLE').length
     :0;
 
+  const headline=currentOrder
+    ?'辛苦了！美味正在為你準備中'
+    :history.length
+      ?'歡迎回來，今天也要好好吃飯！'
+      :store?.channelAvailable===false
+        ?'今日休息，先來揀定想食嘅'
+        :'今天想食咩？';
+  const subline=currentOrder
+    ?'訂單有新進度會喺呢度睇到。'
+    :history.length
+      ?'有熟悉嘅味道，也可以發現新選擇。'
+      :store?.channelAvailable===false
+        ?'未開始營業都可以慢慢睇餐牌。'
+        :'一餐好飯，讓日常更有味。';
+
   return <div className="stage1-home">
     <header className="stage1-fixed-header">
       <button className="stage1-logo-button" onClick={()=>window.scrollTo({top:0,behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'})} aria-label="返回首頁頂部">
         <img src={OFFICIAL_LOGO_URL} alt="磨飯 More Fun"/>
       </button>
-      <div className={"stage1-store-status-badge "+(store?.channelAvailable===true?'is-open':store?.channelAvailable===false?'is-closed':'is-syncing')}>
-        <i aria-hidden="true"/>
+      <div className="stage1-store-context">
+        <strong>{store?.storeName??'磨飯'}</strong>
         <span>{statusLabel(store?.channelAvailable)}</span>
       </div>
+      <span className="stage1-bell" aria-hidden="true">♢</span>
     </header>
 
     <div className="stage1-content">
       <Stage1StatePanel connection={connection} browserOnline={browserOnline} onRetry={onRetry}/>
 
+      <section className="stage1-welcome">
+        <h1>{headline}</h1>
+        <p>{subline}</p>
+      </section>
+
+      <button className="stage1-search-entry" onClick={onBrowse} disabled={!canBrowse}>
+        <span aria-hidden="true">⌕</span>
+        <strong>{canBrowse?'搜尋想食嘅餐點…':'餐牌更新中…'}</strong>
+      </button>
+
       {currentOrder?<button className="stage1-live-order" onClick={onOrders}>
-        <span>進行中訂單</span>
-        <strong>{currentOrder.stage==='READY'?'可取餐':currentOrder.stage==='PREPARING'?'製作中':currentOrder.stage==='ACCEPTED'?'店舖已接單':'查看最新進度'}</strong>
+        <span className="stage1-live-label">訂單進行中</span>
+        <strong>{currentOrder.stage==='READY'?'可以取餐啦':currentOrder.stage==='PREPARING'?'製作中':currentOrder.stage==='ACCEPTED'?'店舖已接單':'查看最新進度'}</strong>
+        <div className="stage1-order-steps" aria-hidden="true"><i className="done"/><i className="active"/><i/><i/></div>
         <small>{currentOrder.displayCode}{currentOrder.etaLabel?' · '+currentOrder.etaLabel:''}</small>
       </button>:null}
 
-      <section className="stage1-hero-banner" data-art-source="STAGE1_BRAND_ART">
-        <img src={STAGE1_BRAND_ART} alt="磨飯品牌 AI 插畫"/>
-        <div className="stage1-hero-shade"/>
-        <div className="stage1-hero-copy">
-          <span>MORE FUN · TODAY</span>
-          <h1>今日，食一餐自己想食嘅。</h1>
-          <p>到店自取。先睇、先揀；正式提交先再確認店舖狀態。</p>
-          <button className="stage1-primary-cta" disabled={!canBrowse} onClick={onBrowse}>{canBrowse?'開始點餐':'菜單同步中'}</button>
+      {store?.channelAvailable===false?<section className="stage1-closed-panel">
+        <img src={HERO_IP} alt="" aria-hidden="true"/>
+        <div><span>今日已打烊</span><strong>明日再見</strong><button disabled={!canBrowse} onClick={onBrowse}>{canBrowse?'查看餐牌':'餐牌更新中'}</button></div>
+      </section>:null}
+
+      <button className="stage1-hero-banner" data-source-file="磨飯_stage_1_首頁品牌展示.png" disabled={!canBrowse} onClick={onBrowse} aria-label={canBrowse?'開始點餐':'餐牌更新中'}>
+        <span className="stage1-source-crop stage1-source-hero" aria-hidden="true"><img src={STAGE1_FINAL_SOURCE} alt=""/></span>
+      </button>
+
+      {store?.notice?<section className="stage1-announcement-strip" role="status">
+        <span aria-hidden="true">✦</span>
+        <div><strong>店舖公告</strong><p>{store.notice}</p></div>
+      </section>:null}
+
+      {availableCouponCount?<button className="stage1-promo-banner" onClick={onMember}>
+        <div><span>收集回憶</span><strong>{availableCouponCount} 張回憶券等緊你</strong><small>立即查看</small></div>
+        <img src={HERO_IP} alt="" aria-hidden="true"/>
+      </button>:null}
+
+      <section className="stage1-quick-entry-section">
+        <div className="stage1-quick-entry-grid">
+          <button onClick={onMember} aria-label={availableCouponCount?'記憶券，'+availableCouponCount+' 張可用':'記憶券'}>
+            <span className="stage1-shortcut-source stage1-shortcut-ticket" aria-hidden="true"><img src={STAGE1_FINAL_SOURCE} alt=""/></span>
+            <strong>記憶券</strong>{availableCouponCount?<small>{availableCouponCount} 張可用</small>:null}
+          </button>
+          <button onClick={onHistory} aria-label="常購清單">
+            <span className="stage1-shortcut-source stage1-shortcut-heart" aria-hidden="true"><img src={STAGE1_FINAL_SOURCE} alt=""/></span>
+            <strong>常購清單</strong>
+          </button>
+          <button onClick={onBrowse} aria-label="期間限定">
+            <span className="stage1-shortcut-source stage1-shortcut-order" aria-hidden="true"><img src={STAGE1_FINAL_SOURCE} alt=""/></span>
+            <strong>期間限定</strong>
+          </button>
         </div>
       </section>
 
-      {store?.notice?<section className="stage1-announcement-strip" role="status">
-        <img src={STAGE1_BRAND_ART} alt="" aria-hidden="true"/>
-        <div>
-          <span>店舖公告</span>
-          <p>{store.notice}</p>
-        </div>
-      </section>:null}
-
-      {store&&!store.channelAvailable?<section className="stage1-closed-panel">
-        <span>今日暫停正式落單</span>
-        <h2>仍然可以慢慢睇、慢慢揀。</h2>
-        <p>關店時仍可 Browse / Build Cart；只會喺正式 Commit 阻止交易。</p>
-        <button className="stage1-primary-cta stage1-closed-browse" disabled={!canBrowse} onClick={onBrowse}>{canBrowse?'繼續瀏覽菜單':'菜單同步中'}</button>
-      </section>:null}
-
       <section className="stage1-top6">
         <div className="stage1-section-title">
-          <div><span>TOP 6</span><h2>人氣推薦</h2></div>
-          <button onClick={onBrowse}>全部餐點</button>
+          <div><h2>為你推薦 <small>Top 6</small></h2></div>
+          <button onClick={onBrowse}>查看全部 ›</button>
         </div>
 
         {topRecommendations.length?<div className="stage1-top6-grid">
           {topRecommendations.map(item=><button
-            className="stage1-product-card"
-            key={item.product.productId}
-            data-product-id={item.product.productId}
-            onClick={event=>{
-              const rect=event.currentTarget.getBoundingClientRect();
-              onProduct(item.product,{top:rect.top,left:rect.left,width:rect.width,height:rect.height});
-            }}
+            className="stage1-product-card" key={item.product.productId} data-product-id={item.product.productId}
+            onClick={event=>{const rect=event.currentTarget.getBoundingClientRect();onProduct(item.product,{top:rect.top,left:rect.left,width:rect.width,height:rect.height});}}
           >
-            <Stage1ProductPlaceholder/>
+            <span className="stage1-product-media"><img src={mediaFor(item.product)} alt={item.product.imageAlt??item.product.name}/><i aria-hidden="true">♡</i></span>
             <span className="stage1-product-info">
               {item.product.badge?<small>{item.product.badge}</small>:null}
               <strong>{item.product.name}</strong>
-              <em>{item.product.displayPriceLabel??'價格待店舖提供'}</em>
+              <em>{item.product.displayPriceLabel??'價格稍後顯示'}</em>
             </span>
           </button>)}
         </div>:<div className="stage1-top6-empty">
-          <strong>推薦未準備好</strong>
-          <span>唔影響點餐；可以直接進入菜單。</span>
-          <button onClick={onBrowse} disabled={!canBrowse}>查看菜單</button>
+          <strong>今日推薦整理中</strong><span>可以先看看完整餐牌。</span>
+          <button onClick={onBrowse} disabled={!canBrowse}>查看餐牌</button>
         </div>}
       </section>
 
-      <section className="stage1-quick-entry-section">
-        <div className="stage1-section-title">
-          <div><span>MORE FUN MEMORY</span><h2>下次再快一步</h2></div>
-        </div>
-        <div className="stage1-quick-entry-grid">
-          <button onClick={onMember}>
-            <span>記憶券</span>
-            <strong>{availableCouponCount?availableCouponCount+' 張可用':'查看記憶券'}</strong>
-            <small>Coupon 狀態以正式交易結果為準</small>
-          </button>
-          <button onClick={onHistory}>
-            <span>常購清單</span>
-            <strong>{history.length?'由食過嘅重新建立':'建立第一份常購'}</strong>
-            <small>Reorder 會用目前菜單重新驗證</small>
-          </button>
-          <button onClick={onBrowse}>
-            <span>期間限定</span>
-            <strong>睇今期限定</strong>
-            <small>內容、價格、供應全部讀目前正式投影</small>
-          </button>
-        </div>
-      </section>
-
       <section className="stage1-memory-strip">
-        <button onClick={onJar}>
-          <span>記憶罐</span>
-          <strong>{cartCount?cartCount+' 件餐點':'今餐未開始'}</strong>
-          <small>未提交前仍然係草稿</small>
-        </button>
-        {lastOrder?<button onClick={()=>onBuyAgain(lastOrder)}>
-          <span>上次食過</span>
-          <strong>{lastOrder.itemSummary}</strong>
-          <small>按目前菜單再來一單</small>
-        </button>:<button onClick={onHistory}>
-          <span>訂單回憶</span>
-          <strong>完成第一張訂單後會出現</strong>
-          <small>歷史內容保持唯讀</small>
-        </button>}
+        <button onClick={onJar}><span>記憶罐</span><strong>{cartCount?cartCount+' 件餐點':'今餐未開始'}</strong></button>
+        {lastOrder?<button onClick={()=>onBuyAgain(lastOrder)}><span>上次食過</span><strong>{lastOrder.itemSummary}</strong></button>:<button onClick={onHistory}><span>我的回憶</span><strong>完成第一張訂單後會出現</strong></button>}
       </section>
     </div>
   </div>;
