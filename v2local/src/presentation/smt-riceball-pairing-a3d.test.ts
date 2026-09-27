@@ -166,6 +166,12 @@ describe('SMT A3d riceball / snack pairing',()=>{
     expect(result.lines.find(line=>line.productId==='main-a')?.unitMinor).toBe(4300);
     expect(result.lines.find(line=>line.productId==='snack-free')?.unitMinor).toBe(0);
     expect(result.lines.find(line=>line.productId==='snack-5')?.unitMinor).toBe(600);
+    expect(result.lines.find(line=>line.productId==='main-a')?.pairing).toEqual({
+      groupLabel:'A',comboId:'combo-a',comboName:'A餐',role:'MAIN',source:'AUTO',
+    });
+    expect(result.lines.find(line=>line.productId==='snack-free')?.pairing).toEqual({
+      groupLabel:'A',comboId:'combo-a',comboName:'A餐',role:'SNACK',source:'AUTO',
+    });
     expect(existingPairingGroups(result.lines)).toEqual(['A','B']);
   });
 
@@ -180,6 +186,8 @@ describe('SMT A3d riceball / snack pairing',()=>{
     expect(snack?.unitMinor).toBe(1800);
     expect(main?.detail).toBe('加配：加配');
     expect(snack?.detail).toBeUndefined();
+    expect(main?.pairing).toBeUndefined();
+    expect(snack?.pairing).toBeUndefined();
   });
 
   it('does not use category/name heuristics and keeps drink outside A3d pair pricing',()=>{
