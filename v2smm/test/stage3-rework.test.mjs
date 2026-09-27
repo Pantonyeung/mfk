@@ -99,6 +99,6 @@ test('explicit service-mode repricing still applies current published facts dire
   const reprice=app.slice(start,end);
   assert.match(reprice,/projectLineAgainstCurrentMenu\(line,mode\)/);
   assert.match(reprice,/publishedUnitPriceMinor:projected\.proposedPublishedUnitPriceMinor/);
-  assert.match(reprice,/delete .*refreshAttention/);
+  assert.match(reprice,/const \{refreshAttention:_staleAttention,\.\.\.accepted\}=line/);
   assert.match(app,/const repriced=cart\.map\(line=>repriceLine\(line,next\)\)/);
 });
