@@ -1,7 +1,7 @@
 import {readFileSync,existsSync} from 'node:fs';
 import {describe,expect,it} from 'vitest';
 import {priceCustomerCart} from './customer-cloud-intake.ts';
-import {customerReorderIntentFromCart} from '../../../contracts/customer-cloud-v1.ts';
+import {customerReorderHistoryPriceFactsFromCart,customerReorderIntentFromCart} from '../../../contracts/customer-cloud-v1.ts';
 import type {SyncedOrderingProduct} from './admin-config-projection.ts';
 
 const products:readonly SyncedOrderingProduct[]=[
@@ -140,8 +140,19 @@ describe('customer cloud local quote adapter',()=>{
     expect(JSON.stringify(copied)).not.toContain('publishedUnitPriceMinor');
     expect(JSON.stringify(copied)).not.toMatch(/payment|fulfillment|coupon/i);
 
+    const historicalPriceFacts=customerReorderHistoryPriceFactsFromCart([{
+      lineId:'FORMAL-LINE-OLD',
+      productId:'bento',
+      productName:'肉燥便當',
+      quantity:1,
+      selections:[],
+      publishedUnitPriceMinor:4800,
+    }]);
+    expect(historicalPriceFacts).toEqual([{intentIndex:0,historicalPublishedUnitMinor:4800}]);
+
     const source=readFileSync(new URL('./customer-cloud-intake.ts',import.meta.url),'utf8');
     expect(source).toContain('customerReorderIntent:customerReorderIntentFromCart(intent.cart)');
+    expect(source).toContain('customerReorderHistoryPriceFacts:customerReorderHistoryPriceFactsFromCart(intent.cart)');
   });
 
 });
