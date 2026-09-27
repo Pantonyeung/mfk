@@ -46,11 +46,14 @@ test('each normal category has one featured large card and the rest small cards'
   assert.equal((menu.match(/<FeaturedProductCard/g)||[]).length,1);
 });
 
-test('product media uses canonical imageUrl and never substitutes a blank placeholder',()=>{
+test('product media uses canonical imageUrl with FINAL real-media fallback and never a blank placeholder',()=>{
   assert.ok(menu.includes('product.imageUrl'));
   assert.ok(menu.includes('product.imageAlt??product.name'));
-  assert.ok(menu.includes('商品圖片暫未提供'));
+  assert.ok(menu.includes('mediaFor(product)'));
+  assert.ok(menu.includes('/brand/p0-riceball.webp'));
   assert.ok(css.includes('.stage2-product-media img'));
+  assert.ok(!menu.includes('<span className="stage2-product-media" aria-hidden="true"/>'));
+  assert.ok(!menu.includes('商品圖片暫未提供'));
   assert.ok(menu.includes('displayPriceLabel'));
   assert.ok(menu.includes('已售罄'));
 });
@@ -87,14 +90,14 @@ test('Stage 2 navigation is exact and memory jar is fixed center',()=>{
 test('Stage 2 owns its menu chrome and does not render legacy shell chrome there',()=>{
   assert.ok(app.includes("view==='menu'?null:<CustomerHeader"));
   assert.ok(app.includes(`view==='menu'?null:<div className="global-status"`));
-  assert.ok(app.includes("view==='menu'?<Stage2BottomNavigation"));
+  assert.ok(app.includes("view==='home'||view==='menu'?<Stage2BottomNavigation"));
 });
 
 test('Stage 2 keeps Loading Error Offline Stale Empty states human-safe',()=>{
   for(const marker of['LOADING','ERROR','STALE','NOT_CONNECTED','browserOnline','stage2-state-panel','stage2-empty']){
     assert.ok(menu.includes(marker),marker);
   }
-  assert.ok(menu.includes('暫時未能同步菜單，請稍後再試。'));
+  assert.ok(menu.includes('暫時未能更新餐牌'));
 });
 
 test('Stage 2 uses the new mobile visual system, not the old menu layout toggle',()=>{
