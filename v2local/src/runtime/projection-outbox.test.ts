@@ -150,4 +150,35 @@ describe('SMT projection outbox',()=>{
     expect(payload.fulfillmentHistory).toHaveLength(3);
   });
 
+
+  it('carries optional canonical UI7 pickup facts without creating a fulfillment command',()=>{
+    queueOrderProjection({
+      id:'MFK-PICKUP-7',
+      display:'P038',
+      createdAt:'2026-09-27T08:00:00.000Z',
+      updatedAt:'2026-09-27T08:20:00.000Z',
+      totalMinor:5800,
+      paymentLabel:'CASH',
+      fulfillmentLabel:'可取餐',
+      sourceLabel:'自家 App',
+      customerName:'陳小米',
+      customerPhone:'91234567',
+      handoverState:'VERIFIED',
+      pickupBagCount:2,
+      pickupMealCount:2,
+      completedAt:'2026-09-27T08:20:00.000Z',
+      pickupException:{kind:'CODE_MISMATCH',resolved:true,observedAt:'2026-09-27T08:15:00.000Z'},
+      items:[{id:'p1',name:'紫米飯團',qty:2,unitMinor:2900}],
+    });
+    const payload=readProjectionOutbox()[0]!.event.payload as Record<string,unknown>;
+    expect(payload.pickupCode).toBe('4567');
+    expect(payload.customerName).toBe('陳小米');
+    expect(payload.handoverState).toBe('VERIFIED');
+    expect(payload.pickupBagCount).toBe(2);
+    expect(payload.pickupMealCount).toBe(2);
+    expect(payload.completedAt).toBe('2026-09-27T08:20:00.000Z');
+    expect(payload.pickupException).toEqual({kind:'CODE_MISMATCH',resolved:true,observedAt:'2026-09-27T08:15:00.000Z'});
+    expect(payload).not.toHaveProperty('customerPhone');
+  });
+
 });
