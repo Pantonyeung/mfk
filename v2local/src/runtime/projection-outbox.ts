@@ -12,6 +12,7 @@ export interface ProjectionOrderInput{
   readonly createdAt:string;
   readonly updatedAt?:string;
   readonly totalMinor:number;
+  readonly recognizedSalesMinor?:number;
   readonly paymentLabel:string;
   readonly fulfillmentLabel:string;
   readonly sourceLabel:string;
@@ -100,6 +101,7 @@ export function queueOrderProjection(order:ProjectionOrderInput){
       updatedAt:occurredAt,
       businessDate:businessDateFor(order.createdAt),
       totalMinor:Math.max(0,Math.round(order.totalMinor)),
+      ...(Number.isFinite(Number(order.recognizedSalesMinor))?{recognizedSalesMinor:Math.max(0,Math.round(Number(order.recognizedSalesMinor)))}:{}),
       paymentLabel:String(order.paymentLabel||''),
       fulfillmentLabel:String(order.fulfillmentLabel||''),
       sourceLabel:String(order.sourceLabel||''),
