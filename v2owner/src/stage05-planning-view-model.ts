@@ -1,5 +1,6 @@
 import type {OwnerReadModelSnapshot} from './product-types';
 import {OWNER_COST_DEFINITIONS,type OwnerCostKey,type OwnerMonthlyPlan} from './stage05-planning-persistence';
+import {calculateOwnerCostTotals,calculateOwnerTargetProgress} from './stage05-planning-math';
 
 export interface OwnerPlanningViewModel{
   readonly month:string;
@@ -61,12 +62,6 @@ export function resolveOwnerPlanningMonth(snapshot:OwnerReadModelSnapshot|null,n
   return /^\d{4}-(0[1-9]|1[0-2])$/.test(basisMonth)?basisMonth:resolveOwnerPlanningBusinessDate(snapshot,now).slice(0,7);
 }
 
-function addCalendarDays(date:string,days:number){
-  const [year,month,day]=date.split('-').map(Number);
-  const at=new Date(Date.UTC(year,month-1,day+days));
-  return at.toISOString().slice(0,10);
-}
-
 export function buildOwnerPlanningViewModel(
   snapshot:OwnerReadModelSnapshot|null,
   plan:OwnerMonthlyPlan,
@@ -83,22 +78,12 @@ export function buildOwnerPlanningViewModel(
   const mtdMinor=mtdAvailable?Math.round(basis?.currentEffectiveSalesMtdMinor??0):0;
   const activePlan=plan.month===month?plan:null;
   const targetMinor=activePlan?.targetMinor??null;
-  const remainingMinor=targetMinor!==null&&mtdAvailable?Math.max(0,targetMinor-mtdMinor):null;
-  const attainmentPct=targetMinor!==null&&targetMinor>0&&mtdAvailable?mtdMinor/targetMinor*100:null;
-
-  const [,monthPart,dayPart]=businessDate.split('-').map(Number);
+  const {remainingMinor,attainmentPct,dailyNeededMinor,projectedTargetDate}=calculateOwnerTargetProgress({
+    businessDate,mtdAvailable,mtdMinor,targetMinor,
+  });
+  const [,monthPart]=businessDate.split('-').map(Number);
   const year=Number(businessDate.slice(0,4));
   const daysInMonth=new Date(Date.UTC(year,monthPart,0)).getUTCDate();
-  const elapsedDays=Math.max(1,dayPart);
-  const remainingDaysInclusive=Math.max(1,daysInMonth-dayPart+1);
-  const dailyNeededMinor=remainingMinor===null?null:remainingMinor===0?0:Math.ceil(remainingMinor/remainingDaysInclusive);
-  const averageDailyMinor=mtdAvailable&&elapsedDays>0?mtdMinor/elapsedDays:0;
-  const projectedDays=remainingMinor!==null&&remainingMinor>0&&averageDailyMinor>0?Math.ceil(remainingMinor/averageDailyMinor):0;
-  const projectedTargetDate=remainingMinor===0&&targetMinor!==null
-    ?businessDate
-    :projectedDays>0
-      ?addCalendarDays(businessDate,projectedDays)
-      :null;
   const monthEnd=businessDate.slice(0,8)+String(daysInMonth).padStart(2,'0');
   const projectedTargetLabel=remainingMinor===0&&targetMinor!==null
     ?'已達標'
@@ -113,12 +98,7 @@ export function buildOwnerPlanningViewModel(
     plannedMinor:activePlan?.costs[key]?.plannedMinor??null,
     actualToDateMinor:activePlan?.costs[key]?.actualToDateMinor??null,
   }));
-  const plannedCostMinor=costRows.reduce((sum,row)=>sum+(row.plannedMinor??0),0);
-  const actualCostRows=costRows.filter(row=>row.actualToDateMinor!==null);
-  const actualCostMinor=actualCostRows.reduce((sum,row)=>sum+(row.actualToDateMinor??0),0);
-  const actualCostFilled=actualCostRows.length;
-  const actualCostTotal=costRows.length;
-  const actualCostComplete=actualCostFilled===actualCostTotal;
+  const {plannedCostMinor,actualCostMinor,actualCostFilled,actualCostTotal,actualCostComplete}=calculateOwnerCostTotals(costRows);
   const estimatedOperatingProfitMinor=mtdAvailable&&actualCostFilled>0?mtdMinor-actualCostMinor:null;
 
   return Object.freeze({
