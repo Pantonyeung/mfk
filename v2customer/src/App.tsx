@@ -637,6 +637,15 @@ export function App(){
   };
 
   const reorder=async(order:CustomerHistoryProjection)=>{
+    if(!browserOnline||connection!=='READY'||!menu){
+      setUi8SelectedOrderId(order.orderId);
+      setUi8Phase('DETAIL');
+      setOrderSegment('completed');
+      setView('orders');
+      replacePath('/orders');
+      setNotice('歷史訂單仍可查看；需要重新同步目前餐牌後先可以建立新購物車。');
+      return;
+    }
     if(!order.reorderEligible||!order.reorderIntent?.length){
       setUi8SelectedOrderId(order.orderId);
       setUi8Phase('DETAIL');
@@ -677,6 +686,7 @@ export function App(){
   };
 
   const acceptUi8Repair=(lineId:string)=>{
+    if(!browserOnline||connection!=='READY'||!menu){setNotice('目前資料未 fresh；draft cart 已保留，請先重新同步 current truth。');return}
     const line=cart.find(item=>item.lineId===lineId);
     if(!line)return;
     const repaired=repairPublishedCartLine(line,menu);
@@ -686,7 +696,8 @@ export function App(){
   };
 
   const editUi8Repair=(line:CustomerCartLine)=>{
-    const product=menu?.products.find(item=>item.productId===line.productId);
+    if(!browserOnline||connection!=='READY'||!menu){setNotice('目前資料未 fresh；draft cart 已保留，請先重新同步 current truth。');return}
+    const product=menu.products.find(item=>item.productId===line.productId);
     if(!product?.available){setNotice('呢個舊商品目前不可用；只可以移除受影響 Line，其他 Line 保持不變。');return}
     openProduct(product,null,line);
   };
@@ -791,7 +802,7 @@ export function App(){
       {view==='submit'?(activeSubmitIntent?<SubmitUi5View intent={activeSubmitIntent} submitting={submitting} submitProbe={submitProbe} reading={readingIntentId===activeSubmitIntent.submissionId} fallbackAvailable={Boolean(snapshot?.fallback?.enabled)&&activeSubmitIntent.state==='NOT_CONNECTED'} onSubmit={()=>void submit(activeSubmitIntent)} onReadback={()=>void readbackIntent(activeSubmitIntent)} onFallback={()=>void requestFallback(activeSubmitIntent)} onBackReview={()=>void openCheckoutStep('review')} onBackToJar={()=>changeView('cart')}/>:<section className="page ui5-missing"><h1>提交資料未找到</h1><p>唔會建立新 Submission；請返回記憶罐重新確認。</p><button onClick={()=>changeView('cart')}>返回記憶罐</button></section>):null}
       {view==='waiting'?<StoreFulfillmentUi6View order={waitingOrder} intent={waitingIntent} connection={connection} browserOnline={browserOnline} onRefresh={()=>void refresh()} onOrders={()=>{setOrderSegment('current');changeView('orders')}} onHome={()=>changeView('home')}/>:null}
       {view==='pickup'?<PickupCompleteUi7View order={pickupOrder} historyOrder={pickupHistoryOrder} intent={pickupIntent} connection={connection} browserOnline={browserOnline} onRefresh={()=>void refresh()} onOrders={()=>{setOrderSegment(pickupHistoryOrder?'completed':'current');changeView('orders')}} onHome={()=>changeView('home')} onHelp={()=>setNotice('請直接向現場店員求助；呢個操作唔會改 Fulfillment、唔會標記完成，亦冇發出假通知。')}/>:null}
-      {view==='orders'?<HistoryReorderUi8View segment={orderSegment} setSegment={setOrderSegment} phase={ui8Phase} setPhase={setUi8Phase} active={activeOrders} history={history} selectedHistory={ui8SelectedHistory} cart={cart} repairs={cartRepairs} quote={quote} menu={menu} connection={connection} browserOnline={browserOnline} onOpenCurrent={openUi8Current} onOpenHistory={openUi8History} onStartReorder={order=>void reorder(order)} onAcceptRepair={acceptUi8Repair} onEditRepair={editUi8Repair} onRemoveLine={lineId=>updateCart(cart.filter(line=>line.lineId!==lineId))} onGoCart={()=>changeView('cart')} onBrowse={()=>changeView('menu')}/>:null}
+      {view==='orders'?<HistoryReorderUi8View segment={orderSegment} setSegment={setOrderSegment} phase={ui8Phase} setPhase={setUi8Phase} active={activeOrders} history={history} selectedHistory={ui8SelectedHistory} cart={cart} repairs={cartRepairs} quote={quote} menu={menu} connection={connection} browserOnline={browserOnline} onOpenCurrent={openUi8Current} onOpenHistory={openUi8History} onStartReorder={order=>void reorder(order)} onAcceptRepair={acceptUi8Repair} onEditRepair={editUi8Repair} onRemoveLine={lineId=>updateCart(cart.filter(line=>line.lineId!==lineId))} onGoCart={()=>changeView('cart')} onBrowse={()=>changeView('menu')} onRefresh={()=>void refresh()}/>:null}
       {view==='more'?<MemberView connection={connection} snapshot={snapshot} history={history} pendingIntents={recoveryIntents} readingIntentId={readingIntentId} onRefresh={()=>void refresh()} onReadback={intent=>void readbackIntent(intent)} onDiscard={removeIntent} onFallback={()=>void requestFallback()} onReorder={order=>void reorder(order)} onBrowse={()=>changeView('menu')}/>:null}
     </section>
 
