@@ -35,7 +35,8 @@ test('Stage 5 implements the V2 full-screen 5.2-5.6 family instead of a generic 
   assert.match(css,/\.stage5-screen\{[\s\S]*position:fixed;[\s\S]*height:100dvh/);
   assert.doesNotMatch(css,/\.stage5-overlay|\.stage5-sheet/);
   assert.doesNotMatch(view,/className="overlay stage5|className="sheet stage5/);
-  for(const marker of['300ms','420ms','680ms','請勿關閉應用程式'])assert.ok(view.includes(marker),marker);
+  for(const marker of['請勿關閉應用程式','提交至系統','進行中','等待確認結果','下一步'])assert.ok(view.includes(marker),marker);
+  assert.doesNotMatch(view,/已建立提交/);
 });
 
 test('Stage 5 uses supplied branded artwork slots for every V2 result state',()=>{
@@ -60,6 +61,46 @@ test('rapid multi tap is synchronously locked before any await',()=>{
   assert.match(source,/if\(submitLockRef\.current\|\|cart\.length===0\)return/);
   assert.ok(source.indexOf('submitLockRef.current=true')<source.indexOf('await '));
   assert.match(source,/releaseSubmitLock/);
+});
+
+test('5.2 SUBMITTING renders only while a real submit attempt is in-flight',()=>{
+  assert.match(view,/session\.state==='DRAFT'&&submitting\?<Stage5Submitting/);
+  assert.doesNotMatch(view,/submitting\?'[^']*':'已建立提交'/);
+  const start=app.indexOf('const submitCart=async()=>');
+  const end=app.indexOf('const readbackIntent=',start);
+  const source=app.slice(start,end);
+  const attempt=source.indexOf('const submitAttempt=port.submitOrder(pending)');
+  const submittingView=source.indexOf("setStage5Session(Object.freeze({intent:pending,state:'DRAFT'");
+  const awaitAttempt=source.indexOf('const result=await submitAttempt');
+  assert.ok(attempt>=0&&submittingView>attempt&&awaitAttempt>submittingView);
+});
+
+test('missing submit port preserves the same DRAFT/cart and shows no false submit progress',()=>{
+  const start=app.indexOf('if(!port?.submitOrder){');
+  const end=app.indexOf('const pending=',start);
+  const source=app.slice(start,end);
+  assert.match(source,/setStage5Session\(null\)/);
+  assert.match(source,/setCartOpen\(true\)/);
+  assert.match(source,/setCheckoutStage\(true\)/);
+  assert.match(source,/正式訂單未送出/);
+  assert.match(source,/提交身份/);
+  assert.doesNotMatch(source,/setStage5Session\([^\n]*state:'DRAFT'/);
+  assert.doesNotMatch(source,/已建立提交|等待確認結果|setCart\(\[\]\)|submitOrder\(/);
+});
+
+test('NOT_CONNECTED restores the original DRAFT identity and cart without false submit claims',()=>{
+  const submitStart=app.indexOf('const submitCart=async()=>');
+  const start=app.indexOf("if(result.state==='NOT_CONNECTED'){",submitStart);
+  const end=app.indexOf("const unknown=",start);
+  const source=app.slice(start,end);
+  assert.match(source,/offlineDraft=Object\.freeze\(\{\.\.\.base,state:'DRAFT'/);
+  assert.match(source,/saveIntent\(offlineDraft\)/);
+  assert.match(source,/setStage5Session\(null\)/);
+  assert.match(source,/setCartOpen\(true\)/);
+  assert.match(source,/setCheckoutStage\(true\)/);
+  assert.match(source,/正式訂單未送出/);
+  assert.match(source,/唔會背景重送/);
+  assert.doesNotMatch(source,/已建立提交|等待確認結果|setCart\(\[\]\)|createSmmPendingIntent/);
 });
 
 test('5.2 submitting and 5.3 pending keep a human-safe reference instead of raw UUID',()=>{
