@@ -86,9 +86,10 @@ export function ProductSheet({
   const optionalGroups=product.optionGroups.filter(group=>!group.required&&group.minSelections===0);
 
   const ordinarySelections=selectedCustomerOptions(product,selections);
+  const ordinaryPriceFactsReady=ordinarySelections.every(selection=>selection.publishedAdjustmentMinor!==undefined&&Number.isSafeInteger(Number(selection.publishedAdjustmentMinor)));
   const comboIntent=comboEnabled?selectedCustomerComboIntent(product,menu,comboSelections):null;
-  const comboUnitMinor=comboIntent?customerComboPublishedUnitMinor(comboIntent,ordinarySelections):null;
-  const standaloneUnitMinor=!comboEnabled
+  const comboUnitMinor=comboIntent&&ordinaryPriceFactsReady?customerComboPublishedUnitMinor(comboIntent,ordinarySelections):null;
+  const standaloneUnitMinor=!comboEnabled&&ordinaryPriceFactsReady
     ?customerStandalonePublishedUnitMinor(product,ordinarySelections)
     :null;
   const draftUnitMinor=comboEnabled?comboUnitMinor:standaloneUnitMinor;
