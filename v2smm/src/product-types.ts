@@ -139,6 +139,19 @@ export interface SmmCartSelection {
   readonly publishedAdjustmentMinor?:number;
 }
 
+export type SmmCartRefreshKind='PRICE_CHANGED'|'CONFIG_CHANGED';
+
+export interface SmmCartRefreshAttention {
+  readonly kind:SmmCartRefreshKind;
+  readonly menuRevision:string;
+  readonly oldPublishedUnitPriceMinor?:number;
+  readonly proposedPublishedUnitPriceMinor?:number;
+  readonly proposedSelections?:readonly SmmCartSelection[];
+  readonly proposedCombo?:SmmCartComboIntent;
+  readonly canAccept:boolean;
+  readonly detectedAt:string;
+}
+
 export interface SmmCartLine {
   readonly lineId:string;
   readonly productId:string;
@@ -149,6 +162,7 @@ export interface SmmCartLine {
   readonly selections:readonly SmmCartSelection[];
   readonly combo?:SmmCartComboIntent;
   readonly publishedUnitPriceMinor?:number;
+  readonly refreshAttention?:SmmCartRefreshAttention;
   readonly createdAt:string;
 }
 
