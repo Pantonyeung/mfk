@@ -2,7 +2,7 @@ import {beforeEach,describe,expect,it,vi} from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {restoreProductLineComposition,serializeProductLineComposition} from '../features/ordering/line-composition.ts';
+import {restoreProductLineComposition,serializeLineComposition,serializeProductLineComposition} from '../features/ordering/line-composition.ts';
 import {
   applyRequiredSelectionToCart,
   type WorkspaceCartLine,
@@ -67,6 +67,33 @@ describe('SMT R2 structured line durability',()=>{
     expect(restored.id).toBe('line-original');
     expect(restored.optionSelections).toEqual({rice:['purple']});
     expect(restored.freeNote).toBe('少飯');
+  });
+
+  it('round-trips a paired riceball group with both component snapshots and source identity',()=>{
+    const group=[
+      {
+        id:'paired-main',productId:'main',name:'A飯團',unitMinor:4100,serviceMode:'takeaway' as const,
+        detail:'套餐配對：A組 · 套餐：A餐 · 角色：飯團 · 飯底：紫米',
+        optionSelections:{rice:['purple']},
+        pairing:{groupLabel:'A',comboId:'combo-a',comboName:'A餐',role:'MAIN' as const,source:'AUTO' as const},
+      },
+      {
+        id:'paired-snack',productId:'snack',name:'鹽酥雞',unitMinor:300,serviceMode:'takeaway' as const,
+        detail:'套餐配對：A組 · 套餐：A餐 · 角色：小食',
+        pairing:{groupLabel:'A',comboId:'combo-a',comboName:'A餐',role:'SNACK' as const,source:'AUTO' as const},
+      },
+    ];
+    const persisted=JSON.parse(JSON.stringify(serializeLineComposition(group[0]!,group)));
+    expect(persisted.kind).toBe('COMBO');
+    expect(persisted.combo.components).toHaveLength(2);
+    expect(persisted.combo.components.map((row:{sourceLineId:string})=>row.sourceLineId)).toEqual(['paired-main','paired-snack']);
+    const restored=restoreProductLineComposition({...group[0]!,id:'temporary',pairing:undefined},persisted);
+    expect(restored.id).toBe('paired-main');
+    expect(restored.pairing).toEqual({
+      groupLabel:'A',comboId:'combo-a',comboName:'A餐',role:'MAIN',source:'AUTO',
+    });
+    expect(restored.optionSelections).toEqual({rice:['purple']});
+    expect(restored.unitMinor).toBe(4100);
   });
 
   it('writes Required selections as structured ids while keeping the existing display detail',()=>{
