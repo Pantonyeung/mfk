@@ -671,10 +671,7 @@ export class AdminSyncStore{
     for(const socket of this.state.getWebSockets()){try{socket.send(doorbell);}catch{}}
     return{status:200,body:{state:'PUBLISHED',active:{revision:envelope.revision,fingerprint:envelope.fingerprint,publishedAt:envelope.publishedAt}}};
   }
-  async ownerReadModel(){
-    const observedAt=new Date().toISOString();
-    const [active,orders,reports,acks,activity]=await Promise.all([this.state.storage.get('active'),this.projectionOrders(),this.projectionReports(),this.state.storage.get('acks'),this.ownerActivityRows()]);
-    const base=buildOwnerReadModelSnapshot({active,orders,reports,acks:acks||{},observedAt});
+  async ownerChannels(active,observedAt=new Date().toISOString()){
     let keetaStatus=null,customerHealth=null;
     try{
       const id=this.env.KEETA_RUNTIME.idFromName('MF01'),stub=this.env.KEETA_RUNTIME.get(id);
@@ -686,16 +683,20 @@ export class AdminSyncStore{
       const response=await stub.fetch(new Request('https://internal/public/channel-health',{method:'GET'}));
       if(response.ok)customerHealth=await response.json();
     }catch{}
-    const planning=await this.ownerPlanningSnapshot(hktMonthKey(observedAt),observedAt);
-    return Object.freeze({
-      ...base,
-      channels:Object.freeze([
-        normalizeOwnerKeetaChannel(keetaStatus,observedAt),
-        normalizeOwnerOwnPlatformChannel(active,customerHealth,observedAt),
-      ]),
-      planning,
-      activity:Object.freeze(activity),
-    });
+    return Object.freeze([
+      normalizeOwnerKeetaChannel(keetaStatus,observedAt),
+      normalizeOwnerOwnPlatformChannel(active,customerHealth,observedAt),
+    ]);
+  }
+  async ownerReadModel(){
+    const observedAt=new Date().toISOString();
+    const [active,orders,reports,acks,activity]=await Promise.all([this.state.storage.get('active'),this.projectionOrders(),this.projectionReports(),this.state.storage.get('acks'),this.ownerActivityRows()]);
+    const base=buildOwnerReadModelSnapshot({active,orders,reports,acks:acks||{},observedAt});
+    const [channels,planning]=await Promise.all([
+      this.ownerChannels(active,observedAt),
+      this.ownerPlanningSnapshot(hktMonthKey(observedAt),observedAt),
+    ]);
+    return Object.freeze({...base,channels,planning,activity:Object.freeze(activity)});
   }
 
   async projectionOrders(){
@@ -1039,6 +1040,11 @@ export class AdminSyncStore{
       return json(await this.ownerReadModel());
     }
 
+    if(url.pathname==='/owner/channels'&&request.method==='GET'){
+      const session=await this.readOwnerSession(request);if(!session)return json({code:'OWNER_SESSION_UNAUTHORIZED'},401);
+      const observedAt=new Date().toISOString(),active=await this.state.storage.get('active');
+      return json({channels:await this.ownerChannels(active,observedAt),observedAt});
+    }
     if(url.pathname==='/owner/planning'){
       const session=await this.readOwnerSession(request);if(!session)return json({code:'OWNER_SESSION_UNAUTHORIZED'},401);
       if(request.method==='GET'){
