@@ -334,6 +334,7 @@ export interface OwnerBoundedAction {
 
 export interface OwnerAuthSession {
   readonly staffId:string;
+  readonly loginId:string;
   readonly displayName:string;
   readonly role:'OWNER';
   readonly scope:string;
@@ -346,7 +347,7 @@ export interface OwnerRuntimePort {
   readonly portId:'MFK_OWNER_PORT_V1';
   readSnapshot():Promise<OwnerReadModelSnapshot>;
   readOwnerSession?():Promise<OwnerAuthSession|null>;
-  loginOwner?(staffId:string,pin:string):Promise<OwnerAuthSession>;
+  loginOwner?(loginId:string,pin:string):Promise<OwnerAuthSession>;
   logoutOwner?():Promise<void>;
   requestBoundedAction?(input:OwnerBoundedAction):Promise<OwnerCommandResult>;
   requestAdminDeepLink?():Promise<OwnerCommandResult>;
