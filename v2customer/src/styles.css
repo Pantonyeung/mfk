@@ -1973,3 +1973,215 @@ button:hover .product-media img{transform:scale(1.025)}
   .ui5-submit-orbit i,.ui5-waiting-orbit i{animation:none!important}
   .ui5-submit *,.ui5-waiting *{transition:none!important;scroll-behavior:auto!important}
 }
+
+
+/* =========================================================
+   Customer UI6 — Store Confirmation / Order Tracking
+   Read-only projection. No fulfillment mutation lives here.
+   ========================================================= */
+.ui6-tracking{
+  display:grid;
+  gap:14px;
+  padding-bottom:calc(28px + env(safe-area-inset-bottom));
+}
+.ui6-hero{
+  min-height:210px;
+  display:grid;
+  align-content:center;
+  justify-items:center;
+  gap:7px;
+  text-align:center;
+  border-radius:24px;
+  padding:28px 20px;
+  background:linear-gradient(145deg,#fbf7f1,#fff);
+  border:1px solid var(--line);
+}
+.ui6-hero>span{
+  color:var(--purple);
+  font-size:10px;
+  font-weight:950;
+  letter-spacing:.12em;
+}
+.ui6-hero h1{
+  margin:0;
+  font-size:28px;
+  line-height:1.12;
+  letter-spacing:-.03em;
+}
+.ui6-hero p{
+  max-width:440px;
+  margin:0;
+  color:var(--muted);
+  font-size:11px;
+  line-height:1.55;
+}
+.ui6-eta{
+  margin-top:7px;
+  display:grid;
+  gap:3px;
+  min-width:180px;
+  padding:12px 16px;
+  border-radius:15px;
+  background:#fff5df;
+}
+.ui6-eta small,.ui6-no-eta{color:var(--muted);font-size:9px}
+.ui6-eta strong{font-size:24px;color:#8a5710}
+.ui6-progress{
+  list-style:none;
+  margin:0;
+  padding:14px 18px;
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  border:1px solid var(--line);
+  border-radius:18px;
+  background:var(--surface);
+}
+.ui6-progress li{
+  position:relative;
+  display:grid;
+  justify-items:center;
+  gap:6px;
+  color:var(--muted);
+  font-size:10px;
+  font-weight:850;
+}
+.ui6-progress li:not(:last-child):after{
+  content:"";
+  position:absolute;
+  top:6px;
+  left:calc(50% + 9px);
+  right:calc(-50% + 9px);
+  height:2px;
+  background:var(--line);
+}
+.ui6-progress i{
+  z-index:1;
+  width:13px;
+  height:13px;
+  border-radius:50%;
+  border:2px solid var(--line);
+  background:var(--surface);
+}
+.ui6-progress li.done,.ui6-progress li.active{color:var(--text)}
+.ui6-progress li.done i,.ui6-progress li.active i{border-color:var(--purple);background:var(--purple)}
+.ui6-progress li.done:not(:last-child):after{background:var(--purple)}
+.ui6-progress li.active i{box-shadow:0 0 0 7px rgba(90,45,130,.08)}
+.ui6-identities{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+}
+.ui6-identities article{
+  min-height:104px;
+  display:grid;
+  align-content:center;
+  justify-items:center;
+  gap:4px;
+  padding:14px;
+  border-radius:18px;
+  background:var(--purple-soft);
+  text-align:center;
+}
+.ui6-identities article span{font-size:10px;color:var(--purple);font-weight:850}
+.ui6-identities article strong{font-size:28px;letter-spacing:.1em;color:var(--purple-deep)}
+.ui6-identities article small{font-size:9px;color:var(--muted)}
+.ui6-identities>p{
+  grid-column:1/-1;
+  margin:0 2px;
+  color:var(--muted);
+  font-size:10px;
+  line-height:1.5;
+}
+.ui6-order-summary,.ui6-readback,.ui6-timeline,.ui6-readonly-refresh{
+  border:1px solid var(--line);
+  border-radius:18px;
+  background:var(--surface);
+  padding:16px;
+}
+.ui6-order-summary{display:grid;gap:10px}
+.ui6-order-summary>header{
+  display:flex;
+  justify-content:space-between;
+  gap:12px;
+  align-items:baseline;
+}
+.ui6-order-summary>header span{font-size:10px;color:var(--muted);font-weight:900}
+.ui6-order-summary>header strong{font-size:20px}
+.ui6-order-summary h2{margin:0;font-size:17px;line-height:1.45}
+.ui6-order-summary>p{margin:0;color:var(--muted);font-size:11px}
+.ui6-ready-note,.ui6-terminal-reason{
+  display:grid;
+  gap:4px;
+  padding:12px 14px;
+  border-radius:14px;
+}
+.ui6-ready-note{background:#eef8f1}
+.ui6-ready-note strong{color:var(--green)}
+.ui6-ready-note span,.ui6-terminal-reason span{font-size:10px;color:var(--muted)}
+.ui6-terminal-reason{background:#fff3f1}
+.ui6-terminal-reason strong{font-size:14px}
+.ui6-readback{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+}
+.ui6-readback>div{
+  display:grid;
+  gap:3px;
+  padding:11px 12px;
+  border-radius:13px;
+  background:#f8f6f9;
+}
+.ui6-readback span{font-size:9px;color:var(--muted);font-weight:850}
+.ui6-readback strong{font-size:14px;overflow-wrap:anywhere}
+.ui6-readback>p{
+  grid-column:1/-1;
+  margin:0;
+  color:var(--muted);
+  font-size:10px;
+  line-height:1.5;
+}
+.ui6-timeline>span{display:block;margin-bottom:10px;color:var(--muted);font-size:10px;font-weight:900}
+.ui6-timeline ol{list-style:none;margin:0;padding:0;display:grid}
+.ui6-timeline li{
+  display:grid;
+  grid-template-columns:14px 1fr auto;
+  gap:9px;
+  align-items:start;
+  padding:9px 0;
+  border-top:1px solid var(--line);
+}
+.ui6-timeline li:first-child{border-top:0}
+.ui6-timeline li>i{width:9px;height:9px;margin-top:4px;border-radius:50%;background:var(--purple)}
+.ui6-timeline li>div{display:grid;gap:2px}
+.ui6-timeline li strong{font-size:12px}
+.ui6-timeline li small,.ui6-timeline time{color:var(--muted);font-size:9px}
+.ui6-actions{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.ui6-actions .action-button{min-height:48px}
+.ui6-readonly-refresh{
+  display:grid;
+  justify-items:center;
+  gap:6px;
+  border-style:dashed;
+  background:transparent;
+  box-shadow:none;
+}
+.ui6-readonly-refresh button{
+  min-height:44px;
+  border:1px solid var(--line);
+  border-radius:12px;
+  background:#fff;
+  padding:0 18px;
+  font-weight:850;
+}
+.ui6-readonly-refresh small{color:var(--muted);font-size:9px;text-align:center;line-height:1.45}
+.ui6-tracking.tone-delay .ui6-hero{background:#fff8e9}
+.ui6-tracking.tone-ready .ui6-hero{background:#eff8f1}
+.ui6-tracking.tone-terminal .ui6-hero{background:#fff4f2}
+@media(max-width:390px){
+  .ui6-identities,.ui6-readback,.ui6-actions{grid-template-columns:1fr}
+  .ui6-identities>p,.ui6-readback>p{grid-column:1}
+}
+@media(prefers-reduced-motion:reduce){
+  .ui6-progress li.active i,.ui6-tracking .animated-value{animation:none!important;transition:none!important}
+}
