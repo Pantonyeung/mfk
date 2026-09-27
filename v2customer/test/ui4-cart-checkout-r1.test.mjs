@@ -122,3 +122,15 @@ test('UI4 does not invent coupon, pricing, payment or order authorities',()=>{
   ])assert.equal(combined.includes(forbidden),false,forbidden);
   assert.equal(checkout.includes('CouponCard'),false);
 });
+
+
+test('pre-submit review confirmation resets whenever reviewed cart, checkout, quote or repair facts change',()=>{
+  assert.match(checkout,/reviewFingerprint=JSON\.stringify\(/);
+  assert.match(checkout,/cart,/);
+  assert.match(checkout,/checkout,/);
+  assert.match(checkout,/quoteId:quote\?\.quoteId/);
+  assert.match(checkout,/quoteRevision:quote\?\.revision/);
+  assert.match(checkout,/quoteFreshness:quote\?\.freshness/);
+  assert.match(checkout,/repairs:repairs\.map/);
+  assert.match(checkout,/useEffect\(\(\)=>\{setReviewConfirmed\(false\);\},\[reviewFingerprint\]\)/);
+});
