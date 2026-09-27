@@ -24,7 +24,7 @@ import {normalizeMfkOrderLineCompositionV1,type MfkOrderLineCompositionV1} from 
 export interface SmtOperationalMetric{readonly id:string;readonly label:string;readonly value:string;readonly detail?:string}
 export interface SmtOrderListItemViewModel{readonly orderId:string;readonly orderIdLabel:string;readonly itemCount:number;readonly totalLabel:string;readonly paymentLabel:string;readonly fulfillmentLabel:string;readonly sourceLabel?:string;readonly localSequenceLabel?:string}
 export interface SmtOrderDetailLineViewModel{readonly id:string;readonly name:string;readonly quantity:number;readonly unitLabel:string;readonly lineTotalLabel:string;readonly detail?:string;readonly composition?:MfkOrderLineCompositionV1}
-export interface SmtOrderDetailViewModel extends SmtOrderListItemViewModel{readonly attention:readonly string[];readonly metrics:readonly SmtOperationalMetric[];readonly lines:readonly SmtOrderDetailLineViewModel[];readonly diningHoldId?:string;readonly recognizedSalesMinor?:number;readonly outstandingMinor?:number;readonly paymentEvidenceRef?:string;readonly paymentVerificationState?:'PENDING'|'VERIFIED'|'REJECTED';readonly customerPhone?:string;readonly paymentCorrections?:readonly PaymentCorrectionRecord[];readonly refunds?:readonly OrderRefundRecord[];readonly cancellationNoticeState?:'DONE'|'FAILED'|'UNKNOWN'}
+export interface SmtOrderDetailViewModel extends SmtOrderListItemViewModel{readonly attention:readonly string[];readonly metrics:readonly SmtOperationalMetric[];readonly lines:readonly SmtOrderDetailLineViewModel[];readonly diningHoldId?:string;readonly recognizedSalesMinor?:number;readonly outstandingMinor?:number;readonly paymentEvidenceRef?:string;readonly paymentVerificationState?:'PENDING'|'VERIFIED'|'REJECTED';readonly customerPhone?:string;readonly providerPickupCode?:string;readonly keetaDeferCount?:number;readonly keetaDeferredAt?:string;readonly paymentCorrections?:readonly PaymentCorrectionRecord[];readonly refunds?:readonly OrderRefundRecord[];readonly cancellationNoticeState?:'DONE'|'FAILED'|'UNKNOWN'}
 export interface SmtOrdersProjection{readonly items:readonly SmtOrderListItemViewModel[];readonly detailsByOrderId?:Readonly<Record<string,SmtOrderDetailViewModel>>;readonly selectedOrderId?:string;readonly selectedOrder?:SmtOrderDetailViewModel}
 export interface SmtDiningQueueItemViewModel{
   readonly id:string;
@@ -143,7 +143,7 @@ export interface StoredOrder{
   providerRef?:string;providerMessageId?:string;providerPickupCode?:string;orderRemark?:string;utensilPreference?:'需要'|'不需要';
   providerLastEventId?:number;providerLastEventName?:string;providerLastEventAt?:string;providerLastMessageId?:string;providerLifecycleNote?:string;
   acceptancePrintedAt?:string;
-  paymentEvidenceRef?:string;paymentVerificationState?:'PENDING'|'VERIFIED'|'REJECTED';customerPhone?:string;
+  paymentEvidenceRef?:string;paymentVerificationState?:'PENDING'|'VERIFIED'|'REJECTED';customerPhone?:string;keetaDeferCount?:number;keetaDeferredAt?:string;
   items:readonly LocalOrderLineItem[];
 }
 export type DiningTender='CASH'|'ALIPAY'|'WECHAT'|'FPS'|'PAYME'|'COMBO';
@@ -370,6 +370,7 @@ export interface CleanSmtCoreRuntimePort{
   acceptOrder?(orderId:string):Promise<{readonly orderId:string;readonly status:'ACCEPTED';readonly provider:KeetaProviderMirrorResult}>;
   readPaymentEvidence?(orderId:string):Promise<{readonly objectUrl:string}>;
   reviewPaymentEvidence?(orderId:string,decision:'VERIFIED'|'REJECTED'):Promise<{readonly orderId:string;readonly state:'VERIFIED'|'REJECTED'}>;
+  deferKeetaOrder?(orderId:string):Promise<{readonly orderId:string;readonly deferCount:number;readonly state:'PENDING'}>;
   markOrderReady?(orderId:string):Promise<{readonly orderId:string;readonly canonicalRevision:number;readonly status:'READY';readonly provider:KeetaProviderMirrorResult}>;
   printOrderReceipt?(orderId:string):Promise<{readonly printJobId:string;readonly state:string}>;
   printDailyClose?(businessDate?:string):Promise<{readonly printJobId:string;readonly state:string;readonly businessDate:string}>;
@@ -471,6 +472,7 @@ export interface MfkLocalRuntime extends CleanSmtCoreRuntimePort{
     initialFulfillmentLabel?:StoredOrder['fulfillmentLabel'];
   }):StoredOrder;
   orders():readonly StoredOrder[];
+  deferKeetaOrder(orderId:string):Promise<{readonly orderId:string;readonly deferCount:number;readonly state:'PENDING'}>;
   acceptOrder(orderId:string):Promise<{readonly orderId:string;readonly status:'ACCEPTED';readonly provider:KeetaProviderMirrorResult}>;
   printOrderOutputs(orderId:string):Promise<PrintDispatchSummary>;
   printDailyClose(businessDate?:string):Promise<{readonly printJobId:string;readonly state:string;readonly businessDate:string}>;
@@ -1560,11 +1562,15 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
       ...(order.paymentEvidenceRef?{paymentEvidenceRef:order.paymentEvidenceRef}:{}),
       ...(order.paymentVerificationState?{paymentVerificationState:order.paymentVerificationState}:{}),
       ...(order.customerPhone?{customerPhone:order.customerPhone}:{}),
+      ...(order.providerPickupCode?{providerPickupCode:order.providerPickupCode}:{}),
+      ...(order.keetaDeferCount!==undefined?{keetaDeferCount:order.keetaDeferCount}:{}),
+      ...(order.keetaDeferredAt?{keetaDeferredAt:order.keetaDeferredAt}:{}),
       ...(order.paymentCorrections?.length?{paymentCorrections:order.paymentCorrections}:{}),
       ...(order.refunds?.length?{refunds:order.refunds}:{}),
       ...(order.cancellationNoticeState?{cancellationNoticeState:order.cancellationNoticeState}:{}),
       attention:[
         ...(order.providerLifecycleNote?[order.providerLifecycleNote]:[]),
+        ...((order.keetaDeferCount??0)>0?['Keeta 已稍後處理 '+String(order.keetaDeferCount)+' / 2']:[]),
       ],metrics:[
         {id:'time',label:'時間',value:new Date(order.createdAt).toLocaleTimeString('zh-HK')},
         {id:'items',label:'件數',value:String(order.items.reduce((s,x)=>s+x.qty,0))},
@@ -1605,6 +1611,27 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
     projectOrder(current);
     appendActionAudit({action:'PAYMENT_EVIDENCE_'+decision,orderId});
     return{orderId,state:decision};
+  },
+  async deferKeetaOrder(orderId){
+    const found=data.orders.find(x=>x.id===orderId);if(!found)throw new Error('ORDER_NOT_FOUND');
+    const isKeeta=String(found.providerRef||'').startsWith('KEETA:')||/^Keeta\b/i.test(String(found.sourceLabel||''));
+    if(!isKeeta)throw new Error('KEETA_DEFER_ORDER_REQUIRED');
+    if(found.fulfillmentLabel!=='待處理')throw new Error('KEETA_DEFER_PENDING_ONLY');
+    const current=Math.max(0,Math.floor(Number(found.keetaDeferCount)||0));
+    if(current>=2)throw new Error('KEETA_DEFER_LIMIT_REACHED');
+    const updatedAt=new Date().toISOString();
+    const deferCount=current+1;
+    data={...data,orders:data.orders.map(row=>row.id===orderId?{
+      ...row,
+      keetaDeferCount:deferCount,
+      keetaDeferredAt:updatedAt,
+      updatedAt,
+    }:row)};
+    save();
+    const deferred=data.orders.find(row=>row.id===orderId)!;
+    projectOrder(deferred);
+    appendActionAudit({action:'KEETA_DEFER_'+String(deferCount),orderId});
+    return{orderId,deferCount,state:'PENDING' as const};
   },
   async acceptOrder(orderId){
     const found=data.orders.find(x=>x.id===orderId);if(!found)throw new Error('ORDER_NOT_FOUND');
