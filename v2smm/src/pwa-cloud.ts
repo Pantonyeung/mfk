@@ -75,6 +75,7 @@ function finalResponse(request:SmmLanOrderRequest,body:Record<string,unknown>):S
 export function createPwaCloudTransport():SmmLanTransport{
   return Object.freeze({
     async send(request:SmmLanOrderRequest,signal:AbortSignal):Promise<SmmLanTransportOutcome>{
+      if(typeof navigator!=='undefined'&&navigator.onLine===false)return{kind:'UNAVAILABLE'};
       const headers=authHeaders();
       if(!headers)return{kind:'UNAVAILABLE'};
       let response:Response;
