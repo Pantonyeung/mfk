@@ -1,4 +1,4 @@
-import type {OwnerAuthSession,OwnerReadModelSnapshot,OwnerRuntimePort} from './product-types';
+import type {OwnerAuthSession,OwnerMonthlyPlanReadResult,OwnerMonthlyPlanSaveInput,OwnerMonthlyPlanSaveResult,OwnerReadModelSnapshot,OwnerRuntimePort} from './product-types';
 
 const OWNER_API_ORIGIN='https://admin.morefunos.com';
 const STORE_ID='MF01';
@@ -6,7 +6,8 @@ const SESSION_KEY='mfk.owner.session.v1';
 
 export class OwnerRuntimeError extends Error{
   readonly code:string;
-  constructor(code:string,message?:string){super(message??code);this.code=code;}
+  readonly details?:Readonly<Record<string,unknown>>;
+  constructor(code:string,message?:string,details?:Record<string,unknown>){super(message??code);this.code=code;this.details=details?Object.freeze({...details}):undefined;}
 }
 
 function cleanSession(value:unknown):OwnerAuthSession|null{
@@ -52,7 +53,7 @@ async function ownerFetch(path:string,init:RequestInit={}){
   let response:Response;
   try{response=await fetch(OWNER_API_ORIGIN+path,init);}catch{throw new OwnerRuntimeError('OWNER_NETWORK_ERROR','暫時未能連接 Owner 服務');}
   const body=await response.json().catch(()=>({})) as Record<string,unknown>;
-  if(!response.ok)throw new OwnerRuntimeError(String(body.code||'OWNER_HTTP_'+response.status),String(body.message||body.code||'Owner 服務暫時不可用'));
+  if(!response.ok)throw new OwnerRuntimeError(String(body.code||'OWNER_HTTP_'+response.status),String(body.message||body.code||'Owner 服務暫時不可用'),body);
   return body;
 }
 export async function refreshOwnerSession():Promise<OwnerAuthSession|null>{
@@ -89,6 +90,44 @@ export function createCloudOwnerRuntimePort():OwnerRuntimePort{
       const session=readStoredOwnerSession();if(!session)throw new OwnerRuntimeError('OWNER_SESSION_REQUIRED','請先登入 Owner App');
       const body=await ownerFetch('/api/owner/snapshot?storeId='+encodeURIComponent(STORE_ID),{method:'GET',cache:'no-store',headers:{'x-mfk-owner-session':session.sessionToken}});
       return body as unknown as OwnerReadModelSnapshot;
+    },
+    async readMonthlyPlan(monthKey:string):Promise<OwnerMonthlyPlanReadResult>{
+      const session=readStoredOwnerSession();if(!session)throw new OwnerRuntimeError('OWNER_SESSION_REQUIRED','請先登入 Owner App');
+      try{
+        const body=await ownerFetch('/api/owner/planning/monthly?storeId='+encodeURIComponent(STORE_ID)+'&monthKey='+encodeURIComponent(monthKey),{
+          method:'GET',cache:'no-store',headers:{'x-mfk-owner-session':session.sessionToken},
+        });
+        return body as unknown as OwnerMonthlyPlanReadResult;
+      }catch(error){
+        if(error instanceof OwnerRuntimeError&&error.code==='OWNER_NETWORK_ERROR'){
+          return Object.freeze({state:'UNKNOWN',monthKey,revision:0,message:'未能讀回 canonical 月度計劃；本機資料只可作草稿／快取。'});
+        }
+        throw error;
+      }
+    },
+    async saveMonthlyPlan(input:OwnerMonthlyPlanSaveInput):Promise<OwnerMonthlyPlanSaveResult>{
+      const session=readStoredOwnerSession();if(!session)throw new OwnerRuntimeError('OWNER_SESSION_REQUIRED','請先登入 Owner App');
+      try{
+        const body=await ownerFetch('/api/owner/planning/monthly?storeId='+encodeURIComponent(STORE_ID),{
+          method:'POST',
+          headers:{'content-type':'application/json','x-mfk-owner-session':session.sessionToken},
+          body:JSON.stringify(input),
+        });
+        return body as unknown as OwnerMonthlyPlanSaveResult;
+      }catch(error){
+        if(error instanceof OwnerRuntimeError&&error.code==='OWNER_MONTHLY_PLAN_REVISION_CONFLICT'){
+          const currentRevision=Number(error.details?.currentRevision);
+          return Object.freeze({
+            state:'REJECTED',monthKey:input.monthKey,revision:Number.isSafeInteger(currentRevision)?currentRevision:input.expectedRevision,
+            ...(Number.isSafeInteger(currentRevision)?{currentRevision}:{}),
+            message:'版本已更新，請重新讀取 canonical 月度計劃後再修改。',
+          });
+        }
+        if(error instanceof OwnerRuntimeError&&error.code==='OWNER_NETWORK_ERROR'){
+          return Object.freeze({state:'UNKNOWN',monthKey:input.monthKey,revision:input.expectedRevision,message:'儲存結果未明；禁止當成成功，請重新讀取 canonical 月度計劃。'});
+        }
+        throw error;
+      }
     },
   });
 }
