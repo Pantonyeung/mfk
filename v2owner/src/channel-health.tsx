@@ -58,7 +58,7 @@ export function ChannelHealthPage({
               <button disabled={!channel.controls.busy||disabled} title={channel.controls.busy?'':'未有 canonical command seam'}>繁忙／加時</button>
             </div>}
           {!channel.controls.snooze||!channel.controls.busy?<small className="unsupported-note">未支援嘅操作保持停用，唔做假接線。</small>:null}
-          <small className="safety-note">暫停只影響新單；已成立訂單不會被取消、退款或改狀態。</small>
+          <small className="safety-note">暫停只影響新單；已成立訂單不會被取消、退款或改狀態。UNKNOWN 必須先 readback，禁止 blind retry。</small>
         </article>
       })}</div>}
   </section>;
