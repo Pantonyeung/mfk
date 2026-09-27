@@ -94,6 +94,18 @@ test('Stage 3 mobile interaction and empty state contract is responsive and touc
   assert.doesNotMatch(css,/background-image|url\(/);
 });
 
+
+
+test('Stage 3 optional cart note persists only as local non-authoritative workspace data',()=>{
+  const persistence=readFileSync(new URL('../src/persistence.ts',import.meta.url),'utf8');
+  assert.match(persistence,/LOCAL_NON_AUTHORITATIVE/);
+  assert.match(persistence,/readonly cartNote:string/);
+  assert.match(persistence,/cartNote:typeof parsed\.cartNote==='string'\?parsed\.cartNote\.slice\(0,160\):''/);
+  assert.match(app,/const \[cartNote,setCartNote\]=useState\(initial\.cartNote\)/);
+  assert.match(app,/persist\(\{cartNote:next\}\)/);
+  assert.doesNotMatch(persistence,/Formal Order|Store Kernel|Pricing engine/i);
+});
+
 test('Stage 0-2 surfaces remain present while Stage 3 reuses ProductSheet for line editing',()=>{
   assert.match(app,/stage1-order/);
   assert.match(app,/stage2-product-sheet/);
