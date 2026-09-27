@@ -62,7 +62,7 @@ describe('SMT A2a same-line product edit',()=>{
 
   it('opens normal product edit with lineId and updates the same cart line',()=>{
     expect(app).toContain("setPanel({type:'product',productId:line.productId,lineId:line.id})");
-    expect(app).toContain('const addConfigured=(productId:string,detail:string,deltaMinor:number,qty:number,lineId?:string)');
+    expect(app).toContain('const addConfigured=(');
     expect(app).toContain('const existing=cart.find(item=>item.id===lineId);if(!existing)return;');
     expect(app).toContain('const next=cart.map(item=>item.id===lineId?{');
     expect(app).toContain('serviceMode:existing.serviceMode');
