@@ -448,21 +448,24 @@ export function planCapacityDeductionEvents(input:{
     if(prior)continue;
     const state=view.pools.find(row=>row.poolId===pool.id);
     if(!state)throw new Error('CAPACITY_POOL_STATE_MISSING:'+pool.id);
-    if(quantity>state.remainingQty)throw new Error('CAPACITY_POOL_INSUFFICIENT:'+pool.id);
     let overrideAllocations:readonly {overrideId:string;quantity:number}[]|undefined;
     if(input.channel){
       const rows=readLocalCapacityPoolRows(storage);
       const stateRow=rows.find(row=>row.businessDate===view.businessDate&&row.poolId===pool.id);
       if(!stateRow)throw new Error('CAPACITY_POOL_STATE_MISSING:'+pool.id);
-      const matchingAllowance=overrideAllowance(stateRow,input.channel);
-      if(matchingAllowance>0){
+      const effectiveAllowance=Math.min(state.remainingQty,overrideAllowance(stateRow,input.channel));
+      if(effectiveAllowance>0){
+        if(quantity>effectiveAllowance)throw new Error('CAPACITY_OVERRIDE_INSUFFICIENT:'+input.channel+':'+pool.id);
         overrideAllocations=planOverrideAllocations(stateRow,input.channel,quantity);
       }else{
         const threshold=input.channel==='FIRST_PARTY'?pool.firstPartyStopAt:pool.thirdPartyStopAt;
         if(baseRemainingWithoutOverride(stateRow)<=threshold){
           throw new Error('CAPACITY_CHANNEL_STOP:'+input.channel+':'+pool.id);
         }
+        if(quantity>state.remainingQty)throw new Error('CAPACITY_POOL_INSUFFICIENT:'+pool.id);
       }
+    }else if(quantity>state.remainingQty){
+      throw new Error('CAPACITY_POOL_INSUFFICIENT:'+pool.id);
     }
     events.push(Object.freeze({
       id:['CAPD',view.businessDate,orderId,admissionId,pool.id].join(':'),
@@ -656,11 +659,10 @@ export function assertCapacityChannelAdmission(input:{
   for(const pool of view.pools){
     const quantity=demandedQuantity(input.items,pool.productIds);
     if(quantity<=0)continue;
-    if(quantity>pool.remainingQty)throw new Error('CAPACITY_POOL_INSUFFICIENT:'+pool.poolId);
     const rows=readLocalCapacityPoolRows(storage);
     const stateRow=rows.find(row=>row.businessDate===view.businessDate&&row.poolId===pool.poolId);
     if(!stateRow)throw new Error('CAPACITY_POOL_STATE_MISSING:'+pool.poolId);
-    const allowance=overrideAllowance(stateRow,channel);
+    const allowance=Math.min(pool.remainingQty,overrideAllowance(stateRow,channel));
     if(allowance>0){
       if(quantity>allowance)throw new Error('CAPACITY_OVERRIDE_INSUFFICIENT:'+channel+':'+pool.poolId);
       continue;
@@ -669,6 +671,7 @@ export function assertCapacityChannelAdmission(input:{
     if(baseRemainingWithoutOverride(stateRow)<=threshold){
       throw new Error('CAPACITY_CHANNEL_STOP:'+channel+':'+pool.poolId);
     }
+    if(quantity>pool.remainingQty)throw new Error('CAPACITY_POOL_INSUFFICIENT:'+pool.poolId);
   }
   return view;
 }
