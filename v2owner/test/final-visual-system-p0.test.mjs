@@ -12,6 +12,11 @@ test('FINAL P0 visual system is blue/white and keeps formal four-icon navigation
   assert.match(css,/width:min\(100%,440px\)/);
   assert.match(css,/@media\(max-width:380px\)/);
   assert.match(css,/sellability-media/);
+  const sellability=read('src/sellability.tsx');
+  assert.match(sellability,/FINAL_PRODUCT_MEDIA/);
+  assert.match(sellability,/owner-final\/sellability\/rice-roll-a\.webp/);
+  assert.match(sellability,/owner-final\/sellability\/fried-chicken-bento\.webp/);
+  assert.match(sellability,/<img src=\{media\}/);
 });
 
 test('P0 normal Owner surfaces do not expose engineering copy',()=>{
