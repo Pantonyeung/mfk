@@ -2519,3 +2519,58 @@ button:hover .product-media img{transform:scale(1.025)}
 @media(prefers-reduced-motion:reduce){
   .ui7-shell *{animation:none!important;transition:none!important;scroll-behavior:auto!important}
 }
+
+
+/* =========================================================
+   Customer UI8 — History / Reorder
+   Historical Order is read-only. Reorder creates a new cart.
+   ========================================================= */
+.ui8-page{max-width:720px;margin:0 auto;display:grid;gap:14px;padding-bottom:calc(112px + env(safe-area-inset-bottom))}
+.ui8-list-hero,.ui8-detail-hero,.ui8-section-hero{
+  padding:20px;border:1px solid var(--line);border-radius:24px;background:#fffaf3;
+}
+.ui8-list-hero>span,.ui8-detail-hero>span,.ui8-section-hero>span,.ui8-copy-hero>span{
+  color:#936a47;font-size:10px;font-weight:950;letter-spacing:.12em;
+}
+.ui8-list-hero h1,.ui8-detail-hero h1,.ui8-section-hero h1,.ui8-copy-hero h1{
+  margin:6px 0 5px;color:#173b70;font-size:27px;line-height:1.12;
+}
+.ui8-list-hero p,.ui8-section-hero p,.ui8-copy-hero p{margin:0;color:var(--muted);font-size:11px;line-height:1.55}
+.ui8-detail-hero{display:grid;grid-template-columns:1fr auto;align-items:end;gap:5px}
+.ui8-detail-hero>span{grid-column:1/-1}.ui8-detail-hero h1{margin:0}.ui8-detail-hero time{color:var(--muted);font-size:11px}
+.ui8-state{display:grid;grid-template-columns:auto 1fr;align-items:center;gap:10px;padding:11px 13px;border:1px solid var(--line);border-radius:14px;background:#faf8f5}
+.ui8-state strong{font-size:9px;letter-spacing:.1em}.ui8-state p{margin:0;color:var(--muted);font-size:10px;line-height:1.45}
+.ui8-state.state-error{background:#fff2f2}.ui8-state.state-offline{background:#f2f2f2}.ui8-state.state-stale{background:#fff8e8}.ui8-state.state-unknown{background:#f7f3fb}
+.ui8-filters{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;padding:5px;border-radius:16px;background:#eee8e0}
+.ui8-filters button{min-height:46px;border:0;border-radius:12px;background:transparent;color:#6f6963;font-weight:850}
+.ui8-filters button.active{background:#fff;color:#173b70;box-shadow:0 5px 14px rgba(50,40,30,.08)}
+.ui8-order-list{display:grid;gap:11px}
+.ui8-order-card{display:grid;gap:11px;padding:16px;border:1px solid rgba(40,34,27,.08);border-radius:20px;background:#fff;box-shadow:0 9px 25px rgba(40,30,20,.045)}
+.ui8-order-card header{display:flex;align-items:center;justify-content:space-between;gap:12px}.ui8-order-card header span{color:#2e8b60;font-size:10px;font-weight:950}.ui8-order-card.completed header span{color:#806548}.ui8-order-card time{color:var(--muted);font-size:10px}
+.ui8-order-card h2{margin:0;font-size:16px;line-height:1.45;color:#233850}
+.ui8-card-meta{display:grid;grid-template-columns:auto 1fr 1fr;gap:8px;align-items:center}.ui8-card-meta b{font-size:18px}.ui8-card-meta span{font-size:9px;color:var(--muted);text-align:right}
+.ui8-back{justify-self:start;min-height:44px;border:0;background:transparent;color:#72543d;font-weight:850;padding:4px 0}
+.ui8-identity-pair{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.ui8-identity-pair>div{min-height:104px;display:grid;align-content:center;justify-items:center;gap:4px;padding:14px;border-radius:18px;background:#f5eee6}
+.ui8-identity-pair>div:nth-child(2){background:#edf6f0}.ui8-identity-pair span{font-size:9px;color:var(--muted)}.ui8-identity-pair strong{font-size:27px;color:#173b70;letter-spacing:.08em}.ui8-identity-pair small{font-size:9px;color:var(--muted)}
+.ui8-identity-pair>p{grid-column:1/-1;margin:0;color:var(--muted);font-size:9px;line-height:1.5}
+.ui8-history-lines{display:grid;gap:0;padding:15px;border:1px solid var(--line);border-radius:18px;background:#fff}
+.ui8-history-lines>header{display:flex;justify-content:space-between;gap:10px;padding-bottom:9px}.ui8-history-lines>header span{font-size:10px;color:#936a47;font-weight:950}.ui8-history-lines>header b{font-size:18px}
+.ui8-history-lines article{display:grid;grid-template-columns:1fr auto;gap:10px;padding:11px 0;border-top:1px solid var(--line)}.ui8-history-lines article>div{display:grid;gap:3px}.ui8-history-lines article>div:last-child{text-align:right}.ui8-history-lines strong{font-size:13px}.ui8-history-lines small,.ui8-history-lines span{font-size:9px;color:var(--muted)}
+.ui8-history-warning{padding:14px;border-radius:17px;background:#fff3e4;border:1px solid #f0d9bb}.ui8-history-warning strong{font-size:11px;color:#926037}.ui8-history-warning p{margin:5px 0 0;font-size:10px;color:#6d5d50;line-height:1.55}
+.ui8-detail-actions{display:grid;gap:8px}.ui8-template-unavailable{min-height:48px;border:1px dashed #c7b6a4;border-radius:15px;background:#f8f4ef;color:#8c8177;font-weight:850}.ui8-detail-actions>small{font-size:8px;color:var(--muted);overflow-wrap:anywhere;text-align:center}
+.ui8-copy-hero{display:grid;justify-items:center;gap:7px;padding:20px;border-radius:24px;background:#fffaf3;text-align:center}.ui8-copy-hero img{width:134px;max-height:120px;object-fit:cover;border-radius:17px}.ui8-copy-hero h1{margin:0}
+.ui8-copy-checks{list-style:none;margin:0;padding:15px;border:1px solid var(--line);border-radius:18px;background:#fff;display:grid;gap:7px}.ui8-copy-checks li{display:grid;grid-template-columns:110px 1fr;gap:9px;padding:10px;border-radius:13px;background:#f7f5f1}.ui8-copy-checks li.done{border-left:4px solid #3b9b6e}.ui8-copy-checks li.attention{border-left:4px solid #d47b52;background:#fff5ec}.ui8-copy-checks b{font-size:11px}.ui8-copy-checks span{font-size:10px;color:var(--muted);line-height:1.45}
+.ui8-copy-summary,.ui8-retained-lines,.ui8-repair-note,.ui8-current-quote,.ui8-review-block{padding:14px;border-radius:17px;background:#f2eee8;display:grid;gap:4px}.ui8-copy-summary span,.ui8-retained-lines span,.ui8-repair-note span,.ui8-current-quote span{font-size:9px;color:var(--muted)}.ui8-copy-summary strong{font-size:18px;color:#173b70}.ui8-copy-summary small{font-size:9px;color:var(--muted);line-height:1.45}
+.ui8-retained-lines{background:#eef8f1}.ui8-retained-lines b{font-size:11px;color:#2e7957}
+.ui8-repair-list{display:grid;gap:10px}.ui8-repair-list article{display:grid;grid-template-columns:56px 1fr;gap:11px;padding:14px;border:1px solid #ead8cb;border-radius:18px;background:#fffaf6}.ui8-repair-list img,.ui8-repair-list>article>i{width:56px;height:56px;border-radius:13px;object-fit:cover;background:#eee9e3}.ui8-repair-list article>div:nth-child(2){display:grid;gap:4px;align-content:start}.ui8-repair-list strong{font-size:13px}.ui8-repair-list p{margin:0;color:#9b5c3f;font-size:10px;line-height:1.45}.ui8-repair-list small{font-size:9px;color:var(--muted)}
+.ui8-line-actions{grid-column:1/-1;display:grid;grid-template-columns:repeat(3,1fr);gap:7px}.ui8-line-actions button{min-height:44px;border:1px solid #d9c8b9;border-radius:12px;background:#fff;color:#6c513d;font-size:10px;font-weight:850}
+.ui8-repair-note{background:#fff3e4}.ui8-repair-note strong{font-size:11px;color:#8d5b33}
+.ui8-review-lines{display:grid;gap:0;border:1px solid var(--line);border-radius:18px;background:#fff;padding:6px 15px}.ui8-review-lines article{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 0;border-top:1px solid var(--line)}.ui8-review-lines article:first-child{border-top:0}.ui8-review-lines article>div{display:grid;gap:3px}.ui8-review-lines strong{font-size:12px}.ui8-review-lines small{font-size:9px;color:var(--muted)}.ui8-review-lines b{font-size:14px;color:#173b70}
+.ui8-current-quote{background:#ecf7ef}.ui8-current-quote>strong{font-size:28px;color:#26865a}.ui8-current-quote>small{font-size:9px;color:var(--muted)}.ui8-current-quote.material_change,.ui8-current-quote.unknown{background:#fff1e8}.ui8-review-block{background:#fff1e8}.ui8-review-block strong{font-size:12px;color:#9a5738}.ui8-review-block p{margin:0;font-size:10px;color:var(--muted)}
+.ui8-checkout-lock{display:block;text-align:center;color:var(--muted);font-size:9px;line-height:1.5}
+@media(max-width:390px){
+  .ui8-card-meta{grid-template-columns:1fr 1fr}.ui8-card-meta b{grid-column:1/-1}.ui8-card-meta span{text-align:left}
+  .ui8-identity-pair{grid-template-columns:1fr 1fr}.ui8-copy-checks li{grid-template-columns:1fr}.ui8-line-actions{grid-template-columns:1fr}
+}
+@media(prefers-reduced-motion:reduce){.ui8-page *{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
