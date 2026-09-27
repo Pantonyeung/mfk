@@ -1,4 +1,4 @@
-import {validateMfkAdminConfigAck,validateMfkAdminConfigEnvelope} from '../contracts/admin-config-sync-v1.ts';
+import {createMfkAdminConfigEnvelope,validateMfkAdminConfigAck,validateMfkAdminConfigEnvelope} from '../contracts/admin-config-sync-v1.ts';
 import {validateSmtProjectionBatch} from '../contracts/smt-projection-v1.ts';
 import {MFK_ADMIN_REFUND_SCHEMA,validateAdminRefundEvent} from '../contracts/admin-refund-v1.ts';
 import {KeetaRuntimeStore} from './keeta-runtime.ts';
@@ -298,6 +298,94 @@ export function mapOwnerOrderProjection(input){
     ...(fulfillmentLabel?{fulfillmentHistory:[{label:fulfillmentLabel,atLabel:observedAt,state:fulfillmentLabel}]}:{}),
   };
 }
+function ownerSellabilityKey(grain,targetId){
+  const id=String(targetId||'').trim();
+  return grain==='PRODUCT'?id:String(grain||'').trim()+':'+id;
+}
+function ownerSellabilityEffective(rawState,now=new Date().toISOString()){
+  const state=row(rawState);
+  const restoreAt=String(state.restoreAt||'').trim();
+  const expired=restoreAt&&Number.isFinite(Date.parse(restoreAt))&&Date.parse(restoreAt)<=Date.parse(now);
+  return expired?true:state.sellable!==false;
+}
+function ownerSellabilityTargets(snapshot,observedAt=new Date().toISOString()){
+  const catalog=row(snapshot.catalog),optionCenter=row(snapshot.optionCenter),availability=row(snapshot.availability);
+  const inventoryRows=rows(snapshot.inventory);
+  const quantityById=new Map(inventoryRows.map(raw=>{const item=row(raw);const id=String(item.productId||item.targetId||item.id||'');const quantity=Number(item.quantity??item.onHand??item.count);return[id,Number.isFinite(quantity)?quantity:undefined];}).filter(([id])=>id));
+  const targets=[];
+  for(const raw of rows(catalog.products)){
+    const item=row(raw),targetId=String(item.id||'');if(!targetId)continue;
+    targets.push({targetId,name:String(item.name||targetId),grain:'PRODUCT'});
+  }
+  const seenOption=new Set();
+  for(const rawSet of rows(optionCenter.sets)){
+    const set=row(rawSet);
+    for(const rawOption of rows(set.options)){
+      const option=row(rawOption),targetId=String(option.id||option.code||'');if(!targetId||seenOption.has(targetId))continue;
+      seenOption.add(targetId);
+      targets.push({targetId,name:String(option.name||targetId),grain:'OPTION'});
+    }
+  }
+  for(const rawPool of rows(catalog.comboPools)){
+    const pool=row(rawPool);
+    for(const rawGroup of rows(pool.groups)){
+      const group=row(rawGroup);
+      for(const rawChoice of rows(group.choices)){
+        const choice=row(rawChoice),targetId=String(choice.id||'');if(!targetId)continue;
+        targets.push({targetId,name:String(choice.label||choice.productId||targetId),grain:'COMBO_CHILD'});
+      }
+    }
+  }
+  return Object.freeze(targets.map(target=>{
+    const key=ownerSellabilityKey(target.grain,target.targetId),state=row(availability[key]);
+    const sellable=ownerSellabilityEffective(state,observedAt);
+    const scope=state.scope==='ONLINE_ONLY'?'ONLINE_ONLY':'ALL';
+    const quantity=target.grain==='PRODUCT'?quantityById.get(target.targetId):undefined;
+    return Object.freeze({
+      ...target,
+      state:sellable?'SELLABLE':'SOLD_OUT',
+      scope,
+      ...(state.restoreAt?{restoreAt:String(state.restoreAt)}:{}),
+      ...(Number.isFinite(quantity)?{quantity}:{}),
+      observedAt,
+      readback:'CONFIRMED',
+    });
+  }));
+}
+function ownerResolveSellabilityTarget(snapshot,grain,targetId){
+  const id=String(targetId||'').trim();
+  if(!id)return null;
+  const catalog=row(snapshot.catalog),optionCenter=row(snapshot.optionCenter);
+  if(grain==='PRODUCT'){
+    const found=rows(catalog.products).map(row).find(item=>String(item.id||'')===id);
+    return found?{targetId:id,grain,name:String(found.name||id)}:null;
+  }
+  if(grain==='OPTION'||grain==='MODIFIER'){
+    for(const rawSet of rows(optionCenter.sets)){
+      const found=rows(row(rawSet).options).map(row).find(item=>String(item.id||item.code||'')===id);
+      if(found)return{targetId:id,grain,name:String(found.name||id)};
+    }
+    return null;
+  }
+  if(grain==='COMBO_CHILD'){
+    for(const rawPool of rows(catalog.comboPools))for(const rawGroup of rows(row(rawPool).groups)){
+      const found=rows(row(rawGroup).choices).map(row).find(item=>String(item.id||'')===id);
+      if(found)return{targetId:id,grain,name:String(found.label||found.productId||id)};
+    }
+  }
+  return null;
+}
+function ownerTemporaryRestoreAt(value,now=new Date().toISOString()){
+  const raw=String(value||'').trim();
+  if(!raw)return undefined;
+  if(raw==='TODAY'){
+    const date=hktDate(now);
+    return new Date(date+'T23:59:59+08:00').toISOString();
+  }
+  const at=Date.parse(raw);
+  return Number.isFinite(at)&&at>Date.parse(now)?new Date(at).toISOString():undefined;
+}
+
 export function buildOwnerReadModelSnapshot({active,orders,reports,acks,observedAt}){
   const now=String(observedAt||new Date().toISOString());
   const activeEnvelope=row(active),snapshot=row(activeEnvelope.snapshot),settings=row(snapshot.storeSettings),catalog=row(snapshot.catalog),staffAuth=row(snapshot.staffAuth);
@@ -305,9 +393,7 @@ export function buildOwnerReadModelSnapshot({active,orders,reports,acks,observed
   const mappedOrders=rows(orders).map(mapOwnerOrderProjection).filter(order=>order.orderId&&order.displayCode);
   const latestReport=reportRows[0]?row(reportRows[0]):null;
   const activeOrders=mappedOrders.filter(order=>order.lifecycle!=='COMPLETED'&&order.lifecycle!=='CANCELLED');
-  const productNames=new Map(rows(catalog.products).map(item=>{const product=row(item);return[String(product.id||''),String(product.name||product.id||'')]}).filter(([id])=>id));
-  const availability=row(snapshot.availability);
-  const sellability=Object.entries(availability).map(([targetId,rawState])=>{const state=row(rawState);return{targetId,name:productNames.get(targetId)||targetId,grain:'PRODUCT',state:state.sellable===false?'停售':state.sellable===true?'可售':'UNKNOWN',scope:'STORE'};});
+  const sellability=ownerSellabilityTargets(snapshot,now);
   const staff=rows(staffAuth.staff).filter(rawStaff=>row(rawStaff).active!==false).map(rawStaff=>{const person=row(rawStaff);return{staffId:String(person.staffId||''),name:String(person.name||person.staffId||''),role:String(person.role||'STAFF'),presence:'UNKNOWN',permissions:rows(person.permissions).map(String).join('、')||'未有權限讀回'};}).filter(person=>person.staffId&&person.name);
   const devices=Object.values(row(acks)).map(rawAck=>{const ack=row(rawAck);const deviceId=String(ack.deviceId||'');return{deviceId,name:deviceId||'未命名裝置',kind:'SMT',health:'UNKNOWN',...(ack.appliedAt?{lastSeen:String(ack.appliedAt)}:{}),binding:ack.revision!==undefined?'Admin revision '+String(ack.revision):'未有 revision 讀回',jobs:'未有打印工作讀回',affected:'未有影響範圍讀回'};}).filter(device=>device.deviceId);
   const reportCards=reportRows.slice(0,31).map(rawReport=>{const report=row(rawReport);const date=String(report.date||'');return{reportId:'daily:'+date,name:date+' 淨銷售',value:moneyLabel(Number(report.netMinor)||0),compare:String(Math.max(0,Number(report.orders)||0))+' 單',freshness:'CANONICAL_PROJECTION'};});
@@ -720,6 +806,81 @@ export class AdminSyncStore{
     return Object.freeze({...base,channels,planning,activity:Object.freeze(activity)});
   }
 
+  async ownerSellabilityReadModel(observedAt=new Date().toISOString()){
+    const active=await this.state.storage.get('active');
+    if(!active)return Object.freeze([]);
+    return ownerSellabilityTargets(row(active.snapshot),observedAt);
+  }
+  async ownerSellabilityCommand(session,input){
+    const operationId=String(input?.operationId||'').trim().slice(0,160);
+    if(!operationId)return{state:'UNKNOWN',message:'缺少 operation identity',targets:[]};
+    const operationKey='owner:sellability:operation:'+operationId;
+    const prior=await this.state.storage.get(operationKey);
+    if(prior)return prior.result;
+    const action=String(input?.action||'').toUpperCase(),scope=String(input?.scope||'ALL').toUpperCase();
+    if(!['SOLD_OUT','RESTORE'].includes(action)||!['ALL','ONLINE_ONLY'].includes(scope)){
+      return{state:'UNKNOWN',message:'售罄操作格式無效',targets:[]};
+    }
+    const requested=rows(input?.targets).slice(0,50);
+    if(!requested.length)return{state:'UNKNOWN',message:'未有操作目標',targets:[]};
+    const current=await this.state.storage.get('active');
+    if(!current)return{state:'UNKNOWN',message:'Canonical Sellability Authority 未有 active revision',targets:[]};
+    const snapshot=row(current.snapshot),availability={...row(snapshot.availability)};
+    const now=new Date().toISOString(),restoreAt=action==='SOLD_OUT'?ownerTemporaryRestoreAt(input?.restoreAt,now):undefined;
+    const targetResults=[],resolved=[];
+    for(const rawTarget of requested){
+      const target=row(rawTarget),grain=String(target.grain||'').toUpperCase(),targetId=String(target.targetId||'').trim();
+      const found=ownerResolveSellabilityTarget(snapshot,grain,targetId);
+      if(!found){
+        targetResults.push({targetId,grain,state:'REJECTED',message:'目標不存在或唔屬 Sellability Authority'});
+        continue;
+      }
+      resolved.push(found);
+      const key=ownerSellabilityKey(grain,targetId);
+      if(action==='RESTORE')availability[key]={sellable:true,scope,updatedAt:now,updatedBy:String(session.staffId||session.loginId||'OWNER')};
+      else availability[key]={
+        sellable:false,scope,
+        ...(restoreAt?{restoreAt}:{}),
+        reason:String(input?.reason||'').trim().slice(0,160),
+        updatedAt:now,updatedBy:String(session.staffId||session.loginId||'OWNER'),
+      };
+    }
+    if(!resolved.length){
+      const result={state:'UNKNOWN',message:'冇有效目標可以套用',targets:Object.freeze(targetResults)};
+      await this.state.storage.put(operationKey,{result,createdAt:now});
+      return result;
+    }
+    const nextSnapshot=Object.freeze({...snapshot,availability:Object.freeze(availability)});
+    const envelope=createMfkAdminConfigEnvelope({
+      storeId:String(current.storeId||'MF01'),
+      revision:Number(current.revision||0)+1,
+      publishedAt:now,
+      adminFingerprint:String(current.adminFingerprint||current.fingerprint||'OWNER_SELLABILITY_BOUNDED'),
+      snapshot:nextSnapshot,
+    });
+    const applied=await this.publishEnvelope(envelope);
+    if(applied.status!==200){
+      const result={state:'UNKNOWN',message:'Canonical apply 結果未明；請重新讀取',targets:Object.freeze(resolved.map(target=>({...target,state:'UNKNOWN',message:'未取得 canonical apply'})))};
+      await this.state.storage.put(operationKey,{result,createdAt:now});
+      return result;
+    }
+    const readback=await this.state.storage.get('active');
+    const projected=readback?ownerSellabilityTargets(row(readback.snapshot),new Date().toISOString()):[];
+    for(const target of resolved){
+      const item=projected.find(row=>row.targetId===target.targetId&&(row.grain===target.grain||(target.grain==='MODIFIER'&&row.grain==='OPTION')));
+      const expected=action==='RESTORE'?'SELLABLE':'SOLD_OUT';
+      const confirmed=Boolean(item&&item.state===expected&&item.scope===scope);
+      targetResults.push({...target,state:confirmed?'CONFIRMED':'UNKNOWN',...(item?{readback:item}:{}),message:confirmed?'Canonical projection 已確認':'Per-target readback 未確認'});
+    }
+    const confirmedCount=targetResults.filter(item=>item.state==='CONFIRMED').length;
+    const unknownCount=targetResults.filter(item=>item.state==='UNKNOWN').length;
+    const state=confirmedCount===targetResults.length?'CONFIRMED':confirmedCount>0?'PARTIAL':'UNKNOWN';
+    const result={state,message:state==='CONFIRMED'?'售罄狀態已完成 canonical readback':state==='PARTIAL'?'部分目標已確認；其餘保持未明':'結果未明；禁止假裝成功',revision:Number(readback?.revision||envelope.revision),targets:Object.freeze(targetResults)};
+    await this.state.storage.put(operationKey,{result,createdAt:now});
+    await this.appendOwnerActivity(session,{operationId,title:'售罄／恢復',target:resolved.map(item=>item.name).join('、'),result:state,readback:'revision '+String(result.revision)});
+    return result;
+  }
+
   async projectionOrders(){
     const rows=await this.state.storage.list({prefix:'projection:order:'});
     return [...rows.values()]
@@ -1078,6 +1239,15 @@ export class AdminSyncStore{
       const session=await this.readOwnerSession(request);if(!session)return json({code:'OWNER_SESSION_UNAUTHORIZED'},401);
       const observedAt=new Date().toISOString(),active=await this.state.storage.get('active');
       return json({channels:await this.ownerChannels(active,observedAt,true),observedAt});
+    }
+    if(url.pathname==='/owner/sellability'){
+      const session=await this.readOwnerSession(request);if(!session)return json({code:'OWNER_SESSION_UNAUTHORIZED'},401);
+      if(request.method==='GET')return json({items:await this.ownerSellabilityReadModel(),observedAt:new Date().toISOString()});
+      if(request.method==='POST'){
+        let input;try{input=await request.json();}catch{return json({state:'UNKNOWN',message:'售罄操作格式無效',targets:[]},400);}
+        return json(await this.ownerSellabilityCommand(session,input));
+      }
+      return json({code:'METHOD_NOT_ALLOWED'},405);
     }
     if(url.pathname==='/owner/planning'){
       const session=await this.readOwnerSession(request);if(!session)return json({code:'OWNER_SESSION_UNAUTHORIZED'},401);
