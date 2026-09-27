@@ -26,6 +26,7 @@ import type {
 } from './product-types';
 
 export type View='home'|'menu'|'cart'|'checkout'|'submit'|'waiting'|'orders'|'more';
+const persistedView=(value:View):CustomerLocalPreferences['activeView']=>value==='submit'||value==='waiting'?'orders':value;
 
 type CustomerRoute={
   view:View;
@@ -121,7 +122,7 @@ export function App(){
       cart:next.cart??cart,
       checkout:next.checkout??checkout,
       pendingIntents:next.pendingIntents??pendingIntents,
-      preferences:next.preferences??{activeView:view,activeCategoryId},
+      preferences:next.preferences??{activeView:persistedView(view),activeCategoryId},
     });
   };
 
@@ -136,7 +137,7 @@ export function App(){
 
   const changeCategory=(next:string|null)=>{
     setActiveCategoryId(next);
-    persist({preferences:{activeView:view,activeCategoryId:next}});
+    persist({preferences:{activeView:persistedView(view),activeCategoryId:next}});
   };
 
   const changeCheckout=(next:CustomerCheckoutDraft)=>{
