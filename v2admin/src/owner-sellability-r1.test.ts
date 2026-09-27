@@ -99,4 +99,16 @@ describe('OA-SEL-001 canonical sellability',()=>{
     await runtime.ownerSellabilityCommand(session,{operationId:'sel-6',action:'SOLD_OUT',scope:'ALL',targets:[{targetId:'p1',grain:'PRODUCT'}]});
     expect(JSON.stringify(await runtime.projectionOrders())).toBe(before);
   });
+
+  it('maps legacy Modifier grain onto canonical Option sellability identity',async()=>{
+    const {data,runtime}=harness();data.set('active',active());
+    const result=await runtime.ownerSellabilityCommand(session,{
+      operationId:'sel-modifier',action:'SOLD_OUT',scope:'ALL',targets:[{targetId:'opt1',grain:'MODIFIER'}],
+    });
+    expect(result.state).toBe('CONFIRMED');
+    expect(result.targets[0].readback.grain).toBe('MODIFIER');
+    expect(data.get('active').snapshot.availability['OPTION:opt1'].sellable).toBe(false);
+    expect(data.get('active').snapshot.availability['MODIFIER:opt1']).toBeUndefined();
+  });
+
 });
