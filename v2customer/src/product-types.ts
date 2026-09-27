@@ -311,6 +311,7 @@ export interface CustomerCommandResult {
   readonly displayCode?:string;
   readonly committedAt?:string;
   readonly totalMinor?:number;
+  readonly readbackCode?:'NOT_FOUND'|'PENDING'|'UNKNOWN';
   readonly canonicalRevision?:number;
 }
 
