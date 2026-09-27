@@ -1,0 +1,60 @@
+MFK 客戶端功能要求｜Working V5
+日期：2026-09-26
+狀態：需求收集中
+
+【第二頁：點單】
+點單頁 = 菜單瀏覽 + 商品選擇 + 客製 + 套餐升級 + 推薦 + 加入記憶罐。
+
+【分類 Hero】
+- 每個分類都有 Hero Card。
+- Hero 可由 Admin 指定主打／新品／期間限定／品牌內容。
+- 手機不要一次載入所有 Hero 大圖；採 lazy-load／按目前分類呈現。
+- Hero 點擊仍進同一 Product Detail。
+
+【Product Card → Detail】
+- 點擊後以 Shared Element / View Transition 類效果擴展至全畫面 Detail。
+- 不支援時 fallback fade / slide。
+- Reduced Motion 時減少大型動畫。
+- 動畫不可阻塞操作。
+
+【Detail 順序】
+大圖 → 名稱／價格 → 單點／套餐升級 → Required → Optional → 數量 → 推薦 → Quote → Sticky 加入記憶罐。
+
+【Required Gate】
+- 必選未完成不得 Add to Cart。
+- CTA 提示缺少項目並定位第一個未完成 Required Group。
+- 完成後重新驗證、Quote，再解鎖 CTA。
+
+【飯團套餐升級】
+單點飯團 → 讀 priceTier / comboEligibility → 判斷 A/B/C/D → 找 eligible Combo → 顯示升級價差 → 接受後原飯團成為 Combo Child → 保留已選配置 → 補套餐缺少 Required → 重新 Quote。
+A/B/C/D 必須為正式 Catalog metadata，不靠顯示價格反推。
+
+【推薦引擎】
+推薦只做 Candidate Generation + Ranking + Presentation。
+不擁有 Product / Pricing / Sellability / Combo eligibility / Required validation / Order authority。
+
+V1：
+1. Hard Filter：售罄、時段、禁配、Combo 不符、Required 衝突、stale。
+2. Candidate：完整一餐、套餐升級、共購、會員常購、時段／限定、新品發現。
+3. Rank：35% 完整度、25% 共購、15% 個人偏好、10% Session、10% 時段／限定、5% Admin boost。
+4. Penalty：近期拒絕、重覆曝光、加入後移除、已有同類商品、Session fatigue。
+5. 顯示：Detail 最多 2–3 件；Cart 只一個推薦 Module。
+6. 客戶 Skip 後同一 Session 不立即再追。
+
+【學習事件】
+recommendationShown / Clicked / Accepted / Skipped / addedToCart / removedFromCart / upgradedToCombo / checkoutStarted / orderCommitted / reordered。
+
+【KPI】
+Recommend→Add、Combo Upgrade、Attach Rate、Cart Completion Time、Checkout Completion；
+Guardrail：Remove-after-recommend、Skip、Checkout Abandonment、重覆拒絕、配置重做。
+
+【記憶罐】
+商品小圖、名稱、Option 摘要、數量、Line Total、Edit、Remove。
+如售罄／價格變／Option 失效，只標記受影響 Line 並提供修正，不清空整個 Cart。
+真實優惠才可顯示節省金額。
+
+【里程碑】
+CUSTOMER_ORDER_PAGE_PRODUCT_DETAIL_V1_DRAFT_LOCKED
+CUSTOMER_RECOMMENDER_HYBRID_V1_DRAFT_LOCKED
+CUSTOMER_REQUIRED_GATE_V1_LOCKED
+CUSTOMER_RICEBALL_COMBO_UPGRADE_FLOW_V1_DRAFT_LOCKED

@@ -1,0 +1,139 @@
+MFK 航海圖 V1.24｜Round025｜2026-09-22
+主題：GROUP-FIRST OPTION SET CENTER R2 DEPLOYED / OWNER REVIEW
+狀態：CURRENT / CONTROLLING
+CONTROL：#22
+PARENT：#45
+ACTIVE：#76
+SUPERSEDED：#68
+PRODUCT DETAIL：#62
+LATER RED：#66
+
+==================================================
+0. OPTION CENTER MODEL
+==================================================
+
+Reusable unit:
+OPTION SET / 選項組
+
+Example:
+
+飯量
+  多飯
+  少飯
+  走飯
+
+青瓜
+  多青瓜
+  少青瓜
+  走青瓜
+
+NO flat global Option Master UI.
+
+==================================================
+1. OPTION SET
+==================================================
+
+Owns:
+Set ID
+Name
+Required / Optional / Force-show
+Single / Multi
+Min / Max
+Allow Quantities
+Active
+Ordered Child Options
+
+Child Option:
+ID
+Name
+Price
+Active
+Order
+
+==================================================
+2. PRODUCT LINK
+==================================================
+
+Product Detail:
+加入選項
+→ choose existing Option Set
+→ link whole Set
+
+Linked Set:
+shows child ID / Name / Price
+allows Product-specific default
+allows unlink
+
+NO child master editing inside Product.
+
+==================================================
+3. DEFAULT
+==================================================
+
+Default:
+Product × Option Set × Child Option
+
+Same Set:
+Product A default can differ from Product B.
+
+==================================================
+4. FUTURE SMT SEMANTICS
+==================================================
+
+Product linked 青瓜
+→ SMT tap 青瓜
+→ 多青瓜 / 少青瓜 / 走青瓜
+
+NO connection opened in this work.
+
+==================================================
+5. PROOF
+==================================================
+
+Verification:
+35694910787 SUCCESS
+
+Deploy:
+35695027863 SUCCESS
+
+Canonical:
+https://admin.morefunos.com
+
+State:
+MFK_ADMIN_OPTION_SET_CENTER_R2_DEPLOYED_OWNER_REVIEW_PENDING
+
+==================================================
+6. EXACT NEXT
+==================================================
+
+Owner live review:
+
+菜單 → 選項中心
+- 新增選項組
+- 展開
+- 新增子選項
+
+商品資料 → 編輯 → 選項
+- 加入選項
+- select existing Set
+- Product-specific default
+
+GREEN:
+BANK #76
+resume #62
+
+RED:
+STOP exact first break
+
+==================================================
+7. HOLD
+==================================================
+
+#44 Admin→SMT HOLD
+#40 SMT OTA HOLD
+#66 media backend NOT NEXT
+Keeta live NOT AUTHORIZED
+
+==================================================
+END ROUND025
+==================================================

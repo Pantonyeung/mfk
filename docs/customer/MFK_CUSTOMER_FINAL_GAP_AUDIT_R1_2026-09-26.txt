@@ -1,0 +1,25 @@
+MFK 客戶端｜Final Product Gap Audit R1
+日期：2026-09-26
+狀態：FINAL BRIEF 前審核
+結論：主流程完整，但仍有 5 個需要 Owner 鎖定的產品語義；未解前不應宣稱 Final Brief 無漏洞。
+
+1. 會員登入／身份建立
+建議：Guest 可正常點餐；會員用手機號碼 + OTP 登入／建立帳戶；Customer ID 由系統建立，phone 只係 contact / login factor；會員資料／Seeds／Coupon／Favorite／Preference／Saved Order 綁 Customer ID。
+
+2. 記種子何時獲得／退款後點算
+建議：Seeds 只在 COMPLETED 後發放；Reject / Cancel 不發；Lifetime Seeds 一旦正式發出不刪；milestone 每級只派一次；Seeds 數量／門檻／Coupon benefit／expiry 由 Admin 配置。
+
+3. 電子支付 Screenshot 驗證
+建議：電子支付訂單到 SMT = PAYMENT_PROOF_PENDING；店員核對 Order + Amount + Proof；確認後 VERIFIED 再 Accept；有問題進 PAYMENT_ATTENTION／聯絡客戶／Reject with reason。
+
+4. Coupon + WhatsApp Fallback
+建議：WhatsApp Template 帶 couponName / couponRef / quotedDiscount / quotedTotal；Coupon 在 Customer side 不扣；SMT 人工建單時重驗；Formal Commit 成功先 Redeem。
+
+5. Cart / Member 跨 Session 保留
+建議：Cart 本裝置 durable；Payment Screenshot 不 durable；Guest Contact 由 Autofill 或明確「記住我」；Member Favorite／Preference／Saved Order 上雲；Guest favorite 可 local-only。
+
+結論：解決以上 5 項後，即可將 Working V0–V17 收斂成：
+- MFK Customer Product Brief V1
+- MFK Customer Owner Requirements V1
+
+狀態：FINAL_BRIEF_BLOCKED_BY_5_OWNER_DECISIONS

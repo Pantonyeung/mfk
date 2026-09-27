@@ -1,0 +1,224 @@
+MFK｜Keeta Token 授權｜Commander Handoff R1｜2026-09-23
+
+ROLE：
+COMMANDER / TOKEN AUTHORITY + LIFECYCLE GOVERNANCE
+
+CONTROL：
+Pantonyeung/mfk #22
+
+KEETA ACCEPTANCE：
+#162
+
+HISTORICAL DONOR RULE：
+2026-09-05 / 09-06 direct Keeta live evidence
+→ #704 no-redo / PHYSICAL_PROVEN preservation
+→ current MFK source/runtime
+
+EXCLUDED：
+#881 is NOT historical Keeta donor baseline.
+
+CURRENT MAIN OBSERVED：
+0b9dfa59c685cdf2e051a2a2ccf35eeb66288cf0
+
+CURRENT TOKEN MILESTONE：
+KEETA_TOKEN_AUTO_REFRESH_SOURCE_TEST_DEPLOY_GREEN
+
+==================================================
+1. TOKEN AUTHORITY LOCK
+==================================================
+
+Provider authorization truth:
+Keeta provider.
+
+MFK responsibility:
+- securely hold provider-issued accessToken + refreshToken pair
+- encrypt at rest
+- schedule refresh
+- rotate both tokens after refresh
+- expose sanitized health/readback
+- fail closed when authorization/token certainty is not usable
+
+Admin responsibility:
+- show status / health / diagnostics
+- start supported authorization/bootstrap
+- TEST/RECOVERY import only when explicitly required
+
+Admin is NOT:
+- token authority
+- second provider account
+- manual token-rotation operator
+
+Never persist token values in:
+- GitHub
+- Google Drive
+- Jade Note
+- logs
+- handoff
+- UI local storage
+
+==================================================
+2. NORMAL LIFECYCLE
+==================================================
+
+NORMAL:
+one bootstrap / authorization
+→ encrypted token pair
+→ Durable Object alarm
+→ proactive refresh before expiry
+→ persist BOTH newly rotated accessToken + refreshToken
+→ schedule next refresh
+→ provider API continues
+
+Current runtime constants:
+- proactive window: 5 days before expiry
+- refresh rate-limit floor: 60 seconds
+- bounded refresh retry: 5 minutes
+
+Explicit provider access-token rejection:
+115000200
+→ one safe refresh-token recovery
+→ retry the same provider operation only after successful refresh
+→ no blind loop
+
+Temporary proactive refresh failure while old token remains usable:
+→ keep old usable token
+→ schedule bounded retry
+→ no forced reauthorization
+
+Refresh recovery truly unavailable:
+→ REAUTH_REQUIRED
+→ human/provider authorization boundary
+→ no automatic unbind/rebind/new account
+
+==================================================
+3. CURRENT GREEN EVIDENCE
+==================================================
+
+PR:
+#168
+
+Merged:
+82f9a2d2d490dbb7f9f6d77bd6421edeeed6f150
+
+Production deploy trigger:
+ffd862bdaa36b1b9fdd40163abe3e2f1dc2f6b65
+
+Production run:
+35813529301 SUCCESS
+
+Regression:
+15 files / 91 tests PASS
+build PASS
+
+Runtime proof includes:
+- bootstrap schedules refresh
+- alarm executes refresh_token
+- rotated refreshToken is used/persisted
+- rotated accessToken is used by later provider reads
+- plaintext token values absent from runtime storage evidence
+- next refresh alarm is scheduled
+
+==================================================
+4. AUTHORIZATION LIFECYCLE GAP FOUND BY COMMANDER
+==================================================
+
+Current source recognizes signed webhook events:
+1301 STORE_AUTHORIZATION_ADDED
+1302 STORE_AUTHORIZATION_REMOVED
+1303 BRAND_AUTHORIZATION_REVOKED
+
+Current webhook runtime journals these events and returns success.
+
+However, current runtime has no dedicated authorization-state transition for 1302 / 1303.
+No focused regression currently proves that a provider-side authorization removal/revocation causes outbound provider token use to fail closed.
+
+Classification:
+TOKEN_AUTHORIZATION_LIFECYCLE_GAP
+
+This does NOT invalidate current auto-refresh GREEN.
+It is a separate authorization-custody edge.
+
+==================================================
+5. SAFE TARGET CONTRACT FOR THE GAP
+==================================================
+
+Provider revocation/removal must NOT:
+- delete MFK canonical orders
+- mutate local transaction truth
+- block SMT local trading
+- auto-create a new provider account
+- auto unbind/rebind
+- auto reauthorize
+- leak token material
+
+Provider revocation/removal SHOULD:
+- record provider authorization state with evidence
+- stop future outbound Keeta provider commands fail-closed
+- surface REAUTH_REQUIRED / AUTHORIZATION_REMOVED
+- preserve encrypted token material only as non-usable custody/evidence until explicit recovery policy acts
+- keep webhook evidence journal
+- require explicit supported authorization recovery before provider commands resume
+
+1301 authorization-added:
+- may record AUTHORIZED provider evidence
+- must NOT alone fabricate token usability
+- provider token readiness/readback still decides whether outbound calls can run
+
+==================================================
+6. NEXT EXACT RED
+==================================================
+
+RED CONTRACT:
+signed 1302 / 1303
+→ provider authorization state becomes removed/revoked
+→ usableToken/provider command admission fails closed
+→ local SMT trading continues
+→ no token deletion required for the test
+→ no auto reauthorization
+→ sanitized Admin readback shows exact state
+
+Then:
+1301 / supported recovery
+→ authorization evidence returns
+→ token must still pass provider readiness before provider commands resume
+
+ALLOWLIST:
+- v2admin/keeta-runtime.ts
+- v2admin/src/keeta-live-runtime.test.ts
+- v2admin/src/keeta-live-client.ts only if UI type/readback requires it
+- directly related Admin status projection only if required
+
+NO-TOUCH:
+- K1 order engine
+- Store Kernel
+- pricing/payment/print
+- current K3 menu semantics
+- provider signature algorithm
+- existing auto-refresh behavior except admission guard needed for authorization state
+
+==================================================
+7. CURRENT COMMANDER DECISION
+==================================================
+
+Token auto rotation:
+GREEN / FROZEN FOUNDATION
+
+Routine manual token paste:
+PROHIBITED AS NORMAL OPERATION
+
+Manual import:
+TEST / RECOVERY FALLBACK ONLY
+
+Current Worker A/B K3/K1 work:
+CONTINUES
+Token lifecycle remains shared frozen foundation.
+
+Authorization removal/revocation edge:
+NEW BOUNDED RED
+Do not expand into OAuth redesign.
+
+STATUS：
+KEETA_TOKEN_AUTHORITY_ORGANISED
+AUTO_REFRESH_GREEN
+AUTHORIZATION_REVOCATION_EDGE_RED
+#881_DONOR_EXCLUDED

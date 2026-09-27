@@ -1,0 +1,700 @@
+MFK｜Keeta Real External Acceptance｜Commander Handoff R1｜2026-09-23
+
+CONTROL:
+Pantonyeung/mfk #22
+
+EXTERNAL ACCEPTANCE:
+#162
+
+CURRENT MAIN BEFORE THIS HANDOFF:
+a0de5fed4327d02f0d893cee48170097a6a631db
+
+NAVIGATION:
+MFK 航海圖 V1.27｜Round028
+
+CURRENT:
+KEETA_K1_K8_SOURCE_TEST_DEPLOY_GREEN
+REAL_EXTERNAL_ACCEPTANCE_ACTIVE
+
+FIRST BREAK:
+REAL_PROVIDER_EXTERNAL_ACCEPTANCE
+
+==================================================
+1. COMMANDER DECISION
+==================================================
+
+不再開新功能。
+不因未完成真 Provider 驗收而預設要改 code。
+
+Maximum active lanes = 2。
+
+Lane A:
+E1 Menu
+→ BANK
+→ E6 Sellability / Hours / REST / OPEN
+
+Lane B:
+E2 Real Test Order
+→ E3 Confirm
+→ E4 READY
+→ E5 Lifecycle / Cancel
+→ E7 After-sale（只在 test environment exposes 時）
+→ E8 Commercial /order/get readback
+
+Immediate NEXT:
+START E1 + E2 ONLY.
+
+==================================================
+2. E1 MENU
+==================================================
+
+Admin：
+1. preflight 完整 MFK canonical menu snapshot
+2. verify counts / OpenItemCode completeness
+3. submit exactly one controlled full-menu sync
+4. capture taskId
+5. capture real 1202 completion
+6. capture 1201 picture completion if emitted
+7. zero unexpected omissions
+8. partial/provider errors must remain visible
+
+No fake GREEN.
+
+==================================================
+3. E2 REAL ORDER
+==================================================
+
+Keeta test store：
+1. place ONE real test order
+2. capture real 1001
+3. SMT receives once
+4. ONE canonical MFK Order
+5. ONE display number
+6. providerRef linked
+7. replay/duplicate creates no second Order / Display / Print
+8. preserve commercial evidence
+
+This same Order should continue into E3 / E4 / E8 where provider lifecycle allows.
+
+==================================================
+4. RED HANDLING
+==================================================
+
+If a real provider step fails：
+
+1. freeze exact failing seam
+2. preserve request / response / webhook / canonical evidence
+3. classify:
+   PROVIDER
+   CONFIG
+   RUNTIME
+   MAPPING
+   UNKNOWN
+4. UNKNOWN external side effect = readback first, no blind retry
+5. only open bounded repair after evidence proves an implementation defect
+
+==================================================
+5. EVIDENCE BUNDLE
+==================================================
+
+Every E-step records：
+
+- acceptance_case_id
+- timestamp
+- source/main identity
+- provider task/message/order IDs
+- canonical order ID
+- display number
+- exact input/action
+- provider response / webhook evidence
+- authoritative readback
+- duplicate/idempotency result
+- screenshot/log/evidence link
+- verdict
+
+Allowed verdict:
+GREEN
+RED
+EXTERNAL_TEST_ENV_NOT_EXPOSED
+
+==================================================
+6. FINAL GATE
+==================================================
+
+Only declare:
+
+KEETA_FULL_PROVIDER_INTEGRATION_GREEN
+
+after all Keeta test-environment-exposed E1–E8 seams have real provider evidence banked.
+
+GitHub #162 Commander takeover comment:
+5787184091
+
+
+==================================================
+7. EXECUTION STARTED
+==================================================
+
+GitHub #162:
+comment 5787238095
+
+Lane A:
+KEETA-E1-MENU-20260923-01
+ACTIVE
+
+Exact operator path:
+Admin
+→ 渠道
+→ 供應同步
+→ Keeta 菜單同步
+→ 預檢完整菜單
+→ if complete: 同步完整菜單到 Keeta ONCE
+→ 更新同步狀態
+→ taskId / 1202 / optional 1201
+
+Lane B:
+KEETA-E2-ORDER-20260923-01
+ACTIVE
+
+Exact operator action:
+Keeta test store
+→ place ONE real test order
+→ SMT first receipt
+→ ONE canonical Order
+→ ONE display number
+→ preserve same Order for E3/E4/E8
+
+STATUS:
+E1_ACTIVE
+E2_ACTIVE
+WAITING_REAL_PROVIDER_EVIDENCE
+
+
+==================================================
+8. WORKER REPLAN｜DIRECT INTEGRATION FAST LOOP
+==================================================
+
+Control correction:
+DIRECT_INTEGRATION_REAL_DEVICE_FAST_LOOP_LOCKED
+
+GitHub #162:
+comment 5787772300
+
+Previous worker model:
+E1 / E2 independent live acceptance lanes
+
+SUPERSEDED AS WORKER EXECUTION MODEL.
+
+New arrangement:
+
+Worker A:
+KEETA_ORDER_DIRECT_INTEGRATION_REAL_DEVICE_FAST_LOOP
+
+- owns current live seam mutation
+- historical V2 evidence reused as regression oracle
+- minimum gate only: exact diff / focused tests / build / authority guard
+- direct runtime/device
+- GREEN bank
+- RED exact FIRST_BREAK → smallest fix → redeploy → same-step retest
+- no full matrix prerequisite
+
+First target:
+1001
+→ dedupe / mapping
+→ SMT reconcile
+→ ONE canonical Order
+→ ONE display
+→ SMT/SMM visibility
+→ merchant confirm
+
+Worker B:
+HISTORICAL_V2_EVIDENCE_REUSE_NEXT_SEAM_PREP
+
+READ_ONLY default.
+
+Only prepares:
+- current Worker A seam
+- ONE next seam
+
+Return:
+- exact historical evidence
+- current MFK equivalent seam
+- DO_NOT_REBUILD / DO_NOT_RETEST foundations
+- minimum regression gate
+- expected real-device behavior
+- likely FIRST_BREAK
+- smallest repair allowlist
+
+Initial next seam:
+merchant ACCEPT / provider confirm
+→ same canonical Order visibility
+
+Collision:
+ONLY Worker A mutates current live seam.
+Worker B cannot parallel-mutate.
+
+Current main observed during replanning:
+afb02b6e09f4f4458c8e556b85d9a7eb6e6ea4b0
+
+STATUS:
+WORKER_REPLAN_READY
+DISPATCH_PAUSED
+
+
+==================================================
+9. HISTORICAL DONOR CORRECTION｜#881 EXCLUDED
+==================================================
+
+Owner correction:
+Do NOT use Morefun-v2 #881 as the historical Keeta donor authority.
+
+Previous Worker Replan wording that pointed Worker A/B to #881 is SUPERSEDED.
+
+Correct historical evidence baseline:
+
+A. 2026-09-05 Golden Thread
+docs/recovery/team1/KEETA-GOLDEN-THREAD-REAL-PAYLOAD-MAPPING-2026-09-05.md
+
+Proves:
+- real 1001
+- /order/confirm request
+- 1002 status=30
+- 1006 delivery
+- 1003 completion
+- 1005 / 1007 refund
+- DO NOT REDO list
+
+B. 2026-09-05 live SMM order 6893
+docs/recovery/team3/SMM-B0314-LIVE-KEETA-6893-FUNCTIONAL-CLOSURE-2026-09-05.md
+
+Provider:
+5133442032976893
+
+Canonical:
+9011ca2e-dd04-5198-b8d5-d96249564a15
+
+SMM browser:
+33950415162 SUCCESS
+
+C. 2026-09-05 SMT/SMM linkage closure
+docs/recovery/keeta/KEETA-SMT-SMM-DISPLAY-LINKAGE-CLOSURE-2026-09-05.md
+
+SMT evidence:
+33951637990
+33951701575
+33952081636
+33952154087
+33952361345
+
+Final:
+SMT_KEETA_6893_UI_PASS
+
+Same canonical Order visible in SMM + SMT.
+
+D. 2026-09-05 SIT Master Matrix
+docs/recovery/team1/KEETA-SIT-DEVELOPMENT-ACCEPTANCE-MASTER-MATRIX-2026-09-05.md
+
+Order Case 5:
+Merchant accepts order = PASS_LIVE
+real 1001 → confirm → 1002/status30
+
+E. Provider Handoff Pack
+docs/recovery/keeta/KEETA-SIT-UAT-PROVIDER-HANDOFF-PACK-2026-09-05.md
+
+LIVE PROVEN:
+- signed 1001 ingress
+- canonical Order bridge
+- provider SKU → canonical mapping
+- Keeta → SMM
+- Keeta → SMT
+
+Locked chain:
+durable receipt
+→ canonical ACCEPT
+→ canonical Order commit
+→ provider CONFIRM
+
+F. Commander No-Redo Lock
+docs/recovery/commander/KEETA-SIT-NO-REDO-LOCK-2026-09-06.md
+
+SIT COMPLETE
+NO REDO
+
+G. #704 governance preservation
+comment 5682072533
+
+Records:
+CAP-KEETA-INGRESS-001 = PHYSICAL_PROVEN
+
+Durable provider receipt / dedup / recovery already exists.
+Do not redesign vendor receipt or vendor API.
+
+Current Morefun-v2 capability catalog still records:
+CAP-KEETA-INGRESS-001
+lifecycle ACTIVE
+engineering_maturity PHYSICAL_PROVEN
+no_redo true
+
+Correct donor sequence:
+
+2026-09-05/06 DIRECT EVIDENCE
+→ #704 GOVERNANCE PRESERVATION
+→ CURRENT MFK SOURCE
+
+NOT:
+#881 → historical truth
+
+#881 may be used only to investigate later drift, never as Keeta baseline donor proof.
+
+GitHub correction:
+#162 comment 5787970608
+#22 comment 5787971355
+
+STATUS:
+PRE_704_KEETA_EVIDENCE_BASELINE_RESTORED
+#881_DONOR_SUPERSEDED
+
+
+==================================================
+10. COMMANDER INDEPENDENT VERIFICATION｜HISTORICAL BASELINE
+==================================================
+
+VERDICT:
+#881 MUST NOT BE USED AS KEETA DONOR BASELINE.
+
+Independent Git history confirms the direct evidence predates #704:
+
+1. Golden Thread real payload mapping
+   file:
+   docs/recovery/team1/KEETA-GOLDEN-THREAD-REAL-PAYLOAD-MAPPING-2026-09-05.md
+   original evidence commits include:
+   8ee012a00f257b6e28aacf625913aaf051e704d5
+   2026-09-05
+   real 1001 / 1002 / 1003 / 1005 / 1006 / 1007 mappings.
+
+2. Live SMM Keeta 6893 closure
+   file:
+   docs/recovery/team3/SMM-B0314-LIVE-KEETA-6893-FUNCTIONAL-CLOSURE-2026-09-05.md
+   originating commit:
+   a615689b5328ea9e644e343d5a134d3d23c81216
+   provider:
+   5133442032976893
+   canonical:
+   9011ca2e-dd04-5198-b8d5-d96249564a15
+
+3. SMT/SMM same-order linkage
+   file:
+   docs/recovery/keeta/KEETA-SMT-SMM-DISPLAY-LINKAGE-CLOSURE-2026-09-05.md
+   originating commit:
+   cf5018b98bccd31b1bb024648bbc5dea4ecd3839
+   final assertion:
+   SMT_KEETA_6893_UI_PASS
+
+4. Provider handoff pack
+   file:
+   docs/recovery/keeta/KEETA-SIT-UAT-PROVIDER-HANDOFF-PACK-2026-09-05.md
+   originating commit:
+   2955d7d5a2a8c9c3d957452cc68f450359272345
+   explicitly records LIVE PROVEN:
+   signed 1001 ingress
+   canonical Order bridge
+   merchant ACCEPT
+   provider /order/confirm
+   provider SKU mapping
+   Keeta → SMM
+   Keeta → SMT
+
+5. No-redo authority
+   file:
+   docs/recovery/commander/KEETA-SIT-NO-REDO-LOCK-2026-09-06.md
+   originating commit:
+   10c8ecbf36e376d67bbc7d819ecae368da468391
+   OWNER_DECISION:
+   SIT COMPLETE / NO REDO
+
+Important limitation:
+SIT COMPLETE means MoreFun assigned SIT evidence work is reusable.
+It does NOT fabricate provider UAT or production certification.
+
+#704 later confirms the same chain and is useful as a later continuity proof:
+
+- #704 5642250077:
+  live Keeta 2922 reached SMM Gateway;
+  merchantDecision ACCEPTED;
+  provider CONFIRM SENT;
+  1002 status 30;
+  canonical commit then exposed ORDER_BUSINESS_DAY_STALE.
+
+- #704 5642345195:
+  repaired bad ordering from
+  provider CONFIRM → canonical acceptance
+  to
+  canonical acceptance → provider CONFIRM.
+
+- #704 5643162879:
+  MF699-CHAT-17 FINAL CLOSURE.
+  runtime exact source:
+  d37266077847e9c0c46cdfa73eb4b4afc2673875
+  R12 Builder:
+  34667870541 SUCCESS
+  live Keeta 7205:
+  provider order 5203440160087205
+  canonical Order c25bf3fe-9e2d-576a-80ce-ba2b989fa359
+  durable receipt DELIVERED
+  lastError=null
+  provider CONFIRM SENT
+  no duplicate recovery CONFIRM
+  SMM HTTP 200
+  lifecycle ACCEPTED
+  operationalOnly=false
+  production readback 34668703321
+
+- #704 5643435474:
+  later Golden Day audit confirms
+  Keeta recovery/provider CONFIRM exactly-once = GREEN
+  and SMM / SMT common canonical Order projection parity = GREEN.
+
+Historical donor hierarchy is therefore:
+
+2026-09-05/06 DIRECT LIVE EVIDENCE
+→ #704 LIVE REGRESSION/CLOSURE CONFIRMATION
+→ current MFK source/runtime
+
+NOT:
+#881 → infer historical state.
+
+STATUS:
+HISTORICAL_KEETA_BASELINE_INDEPENDENTLY_VERIFIED
+
+
+==================================================
+9. HISTORICAL KEETA EVIDENCE SOURCE CORRECTION
+==================================================
+
+#881:
+EXCLUDED_AS_PRIMARY_HISTORICAL_DONOR
+
+Reason:
+later fusion/research layer; may summarize or reclassify older evidence after architecture drift.
+
+Correct evidence chain:
+
+1.
+docs/recovery/team1/KEETA-GOLDEN-THREAD-REAL-PAYLOAD-MAPPING-2026-09-05.md
+
+Proves real:
+1001
+/order/confirm request
+1002 merchant accepted
+1006 delivery lifecycle
+1003 completion
+1005/1007 refund evidence
+
+2.
+docs/recovery/team3/SMM-B0314-LIVE-KEETA-6893-FUNCTIONAL-CLOSURE-2026-09-05.md
+
+Provider:
+5133442032976893
+
+Canonical:
+9011ca2e-dd04-5198-b8d5-d96249564a15
+
+SMM live proof:
+33950415162 SUCCESS
+
+3.
+docs/recovery/keeta/KEETA-SMT-SMM-DISPLAY-LINKAGE-CLOSURE-2026-09-05.md
+
+SMM:
+33950415162
+
+SMT:
+33952361345
+
+Result:
+KEETA_TO_SMT_SMM_DISPLAY_AND_LINKAGE_CONTRACT = CLOSED
+
+4.
+docs/recovery/commander/KEETA-SIT-NO-REDO-LOCK-2026-09-06.md
+
+SIT COMPLETE / NO REDO
+
+5.
+docs/recovery/commander/CAPABILITY-CATALOG.yaml
+
+CAP-KEETA-INGRESS-001
+ACTIVE
+PHYSICAL_PROVEN
+no_redo: true
+
+6.
+Morefun-v2 #704 comment 5682072533
+
+Later authority confirmation:
+existing CAP-KEETA-INGRESS-001 = PHYSICAL_PROVEN
+vendor receipt/dedup/recovery already exists
+do not redesign vendor receipt/provider API
+only bounded continuation/cutover seam may change
+
+MFK control correction:
+#162 comment 5788003854
+#22 comment 5788004818
+
+Correct lineage:
+2026-09-05 LIVE PROOF
+→ 2026-09-06 NO-REDO LOCK
+→ #704 PHYSICAL_PROVEN confirmation
+→ current MFK direct connect
+→ real-device fast loop
+
+STATUS:
+HISTORICAL_KEETA_EVIDENCE_SOURCE_CORRECTED
+#881_EXCLUDED
+
+
+==================================================
+10. WORKERS FORMALLY DISPATCHED｜DIRECT FAST LOOP
+==================================================
+
+Owner instruction:
+START
+
+Historical donor:
+#881 EXCLUDED
+
+Historical baseline:
+2026-09-05 / 09-06 direct Keeta live evidence
+→ #704 no-redo / PHYSICAL_PROVEN preservation
+→ current MFK
+
+Current execution order:
+K3_MENU_LIVE_SYNC_FIRST
+→ K1_ORDER_RETEST_AFTER_MENU_GREEN
+
+Worker A:
+MFK-KEETA-K3-DIRECT-LIVE-MENU-WORKER-A-R1
+
+Role:
+CURRENT_LIVE_SEAM_DRIVER
+
+#162 dispatch:
+5788188509
+
+Responsibilities:
+- full-menu preview
+- provider-real token validation/recovery
+- one menu sync submit
+- taskId
+- real 1202 zero errors
+- optional 1201
+- exact FIRST_BREAK repair only
+- immediate live retest
+
+Worker B:
+MFK-KEETA-K1-POST-K3-PREP-WORKER-B-R1
+
+Role:
+ONE_SEAM_AHEAD_DONOR_AND_REGRESSION_PREP
+
+#162 dispatch:
+5788188960
+
+READ ONLY.
+
+Responsibilities:
+- prepare post-K3 K1 exact current seam
+- reuse pre-704 real proof
+- map current OpenItemCode/productCode identity
+- no order creation
+- no provider mutation
+- no deploy
+- no full matrix
+
+Collision:
+Worker A = sole live seam writer
+Worker B = read-only one seam ahead
+
+Observed dispatch-time main:
+71d1fe505b905466475567647bf6e9bca442e972
+
+Control #22:
+5788190921
+
+STATUS:
+WORKER_A_DISPATCHED
+WORKER_B_DISPATCHED
+K3_CURRENT_SEAM
+
+
+==================================================
+11. KEETA TOKEN AUTOMATIC ROTATION RESTORED
+==================================================
+
+Owner correction:
+routine manual token paste is NOT an accepted operating model.
+
+Historical proof:
+Keeta token refresh rotates BOTH accessToken and refreshToken and persists the new pair.
+
+Current MFK restoration:
+- encrypted accessToken + refreshToken pair retained after bootstrap
+- Durable Object alarm scheduled from token expiry metadata
+- proactive refresh before expiry
+- newly rotated accessToken + refreshToken both persisted
+- next alarm scheduled after each successful refresh
+- explicit provider 115000200 triggers one safe refresh recovery
+- temporary proactive refresh failure while old token valid -> bounded retry, not forced reauth
+- REAUTH_REQUIRED only after refresh recovery truly cannot continue
+
+Admin visibility:
+- Token 自動刷新
+- 下次自動刷新
+- 最近自動刷新
+- 自動刷新錯誤
+
+Manual token import:
+TEST / RECOVERY fallback only.
+Not routine operation.
+
+PR:
+#168
+
+Merged:
+82f9a2d2d490dbb7f9f6d77bd6421edeeed6f150
+
+Exact-main deploy trigger:
+ffd862bdaa36b1b9fdd40163abe3e2f1dc2f6b65
+
+Preview:
+35813415653 SUCCESS
+15 files / 91 tests PASS
+Worker version:
+40648025-6ea2-4207-b279-2e4fc7275c11
+
+Production:
+35813529301 SUCCESS
+15 files / 91 tests PASS
+Worker version:
+c08b7b30-6c36-4b90-801b-48ad76bb3513
+
+GitHub:
+#162 5788366483
+#22 5788366810
+
+Workers:
+A/B continue their existing K3/K1 work.
+Token lifecycle is now returned to frozen runtime foundation.
+
+Operator rule:
+one bootstrap/authorization
+→ automatic token rotation
+
+Never:
+manual token paste every refresh cycle.
+
+If current refreshToken was already revoked before this repair,
+one reauthorization may still be required once.
+After a usable token pair exists, refresh is automatic.
+
+STATUS:
+KEETA_TOKEN_AUTO_REFRESH_SOURCE_TEST_DEPLOY_GREEN

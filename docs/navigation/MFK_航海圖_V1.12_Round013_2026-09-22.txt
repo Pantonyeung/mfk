@@ -1,0 +1,314 @@
+MFK 航海圖 V1.12｜Round013｜2026-09-22
+主題：SMT OTA PERSISTENCE P0 SOURCE FIX + CANDIDATE PUBLISHED / REAL DEVICE PROOF REQUIRED
+狀態：CURRENT / CONTROLLING
+CONTROL_BASE_MAIN：2fd6e10cc7c8bf73db854559243dc6c0c4fbe34f
+CONTROL：Pantonyeung/mfk #22
+COMMANDER ENTRY：COMMANDER_CURRENT.md
+ACTIVE ISSUE：#40
+
+==================================================
+0. CURRENT PRIORITY
+==================================================
+
+OWNER PRIORITY OVERRIDE：
+
+SMT OTA PERSISTENCE P0
+BEFORE ADMIN A2 WALKTHROUGH.
+
+Admin A1/A2 implementation remain BANKED.
+Admin A2 real walkthrough is PAUSED,
+not cancelled.
+
+A3 remains NOT AUTHORIZED.
+
+==================================================
+1. OBSERVED PHYSICAL FAILURE
+==================================================
+
+Carrier：
+
+1.0.6 (106)
+
+Owner observed：
+
+- new Runtime OTA can be downloaded / activated
+- new Runtime appears to run immediately
+- app process close/reopen returns to old Runtime
+- full power off/on returns to old Runtime
+
+This is a persistence/promotion failure,
+not a download failure.
+
+==================================================
+2. ROOT CAUSE
+==================================================
+
+Failing OTA release：
+
+runtime-candidate-mfk-814043c809bb
+
+Source：
+
+814043c809bbc236df1383c320bad906bcd3f1cd
+
+That source did NOT contain：
+
+v2local/src/runtime/RuntimeReadyActivation.tsx
+
+v2local/src/runtime/runtime-carrier-boundary.ts
+
+or runtime.ready mount in App.tsx.
+
+Carrier 1.0.6 uses intentional two-phase activation：
+
+STAGE CANDIDATE
+→ REQUEST ACTIVATION
+→ BOOT CANDIDATE PROVISIONALLY
+→ WAIT EXACT runtime.ready
+→ PROMOTE TO currentReleaseId
+
+If runtime.ready is absent：
+
+next app/process boot
+→ bootingReleaseId still present
+→ candidate treated as unconfirmed
+→ Carrier deliberately falls back
+→ old Current retained
+
+Therefore Owner symptom matches Carrier fail-safe
+exactly.
+
+==================================================
+3. CURRENT MFK SOURCE FIX
+==================================================
+
+WORK：
+
+MFK-SMT-OTA-PERSISTENCE-RUNTIME-READY-R1
+
+Issue：
+
+#40
+
+Source candidate：
+
+c7397b77430e145d0b0f8bb6ba34115754263f6f
+
+Source run：
+
+35679373673
+SUCCESS
+
+Clean landing：
+
+2fd6e10cc7c8bf73db854559243dc6c0c4fbe34f
+
+Landing run：
+
+35679476262
+SUCCESS
+
+Fix：
+
+- canonical appassets runtime identity parser
+- exact releaseId
+- bridgeVersion = 1
+- runtime.ready emitted after React mount
+- signal once
+- malformed/noncanonical identity fails closed
+
+Files：
+
+v2local/src/runtime/runtime-carrier-boundary.ts
+
+v2local/src/runtime/RuntimeReadyActivation.tsx
+
+v2local/src/App.tsx
+
+v2local/src/runtime/runtime-carrier-boundary.test.ts
+
+SOURCE STATUS：
+
+MFK_SMT_OTA_PERSISTENCE_RUNTIME_READY_SOURCE_GREEN
+
+==================================================
+4. FIXED OTA CANDIDATE PUBLISHED
+==================================================
+
+Publisher：
+
+Pantonyeung/morefunos-v1-builder
+
+Existing compatibility delivery only.
+This does NOT make old Morefun-v1 current authority.
+
+Workflow：
+
+MFK Runtime OTA
+
+Run：
+
+35679889303
+
+RESULT：
+
+SUCCESS
+
+Published release：
+
+runtime-candidate-mfk-2fd6e10cc7c8
+
+Bundle：
+
+MoreFunOS-SMT-runtime-candidate-mfk-2fd6e10cc7c8.mfos
+
+Public proof：
+
+- signed bundle upload PASS
+- public manifest readback PASS
+- exact release identity PASS
+- bundle hash readback PASS
+- minCarrierVersionCode = 106
+- bridgeVersion = 1
+- MFK_RUNTIME_OTA_PUBLISHED
+
+==================================================
+5. REAL DEVICE ACCEPTANCE｜MANDATORY
+==================================================
+
+Do not BANK #40 from source/CI only.
+
+Owner device must prove in this exact order：
+
+A. BEFORE INSTALL
+
+Recovery
+→ Runtime / OTA
+→ 檢查 Runtime OTA
+
+Available release MUST be：
+
+runtime-candidate-mfk-2fd6e10cc7c8
+
+B. DOWNLOAD / ACTIVATE
+
+Download
+→ Install / Activate
+→ MFK UI loads
+
+C. PROMOTION READBACK
+
+Return to Recovery.
+
+MUST show：
+
+Current：
+runtime-candidate-mfk-2fd6e10cc7c8
+
+Candidate：
+—
+
+Activation Requested：
+false
+
+Previous：
+previous old Current release
+
+D. PROCESS RESTART
+
+Close SMT app/process.
+Reopen.
+
+Recovery MUST still show：
+
+Current：
+runtime-candidate-mfk-2fd6e10cc7c8
+
+E. FULL POWER CYCLE
+
+Power device fully off.
+Power on.
+
+Recovery MUST still show：
+
+Current：
+runtime-candidate-mfk-2fd6e10cc7c8
+
+Previous MUST remain rollback target.
+
+ONLY THEN：
+
+MFK_SMT_OTA_PERSISTENCE_RUNTIME_READY_GREEN
+
+==================================================
+6. FAILURE CLASSIFICATION
+==================================================
+
+If new candidate is not offered：
+
+OTA MANIFEST / ENDPOINT BREAK
+
+If download fails：
+
+OTA DELIVERY / SIGNATURE BREAK
+
+If candidate launches but Recovery Current remains old：
+
+runtime.ready PROMOTION BREAK
+
+If Current becomes new but app restart reverts：
+
+PERSISTED ACTIVATION STATE BREAK
+
+If app restart survives but power-cycle reverts：
+
+COLD BOOT / DURABILITY BREAK
+
+Do not jump to another repair class.
+Fix first observed break only.
+
+==================================================
+7. CURRENT STOP
+==================================================
+
+NEXT TRUE ACTION：
+
+OWNER INSTALLS / ACTIVATES：
+
+runtime-candidate-mfk-2fd6e10cc7c8
+
+Then captures Recovery state
+before restart,
+after app restart,
+and after full power-cycle.
+
+Admin A2：
+
+PAUSED BY OWNER PRIORITY
+
+A3：
+
+NOT AUTHORIZED
+
+OTA INFRA MIGRATION：
+
+NOT AUTHORIZED
+
+KEETA LIVE：
+
+NOT AUTHORIZED
+
+==================================================
+8. COMMANDER RULE
+==================================================
+
+Any next Commander MUST start：
+
+COMMANDER_CURRENT.md
+
+and treat #40 as active priority
+until physical persistence proof is GREEN.
+
+==================================================
+END ROUND013
+==================================================

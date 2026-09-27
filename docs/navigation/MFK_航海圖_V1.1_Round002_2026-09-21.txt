@@ -1,0 +1,182 @@
+MFK 航海圖 V1.1｜Round002｜2026-09-21
+主題：ALL PORTS MIGRATION ONLY
+狀態：CURRENT / CONTROLLING
+
+==================================================
+0. OWNER ABSOLUTE RULE
+==================================================
+
+目前所有 Port 只准搬遷。
+
+禁止接駁。
+
+適用：
+- Main Chat
+- Admin
+- SMM
+- 之後所有 Customer / Owner Worker
+- 任何其他執行者
+
+==================================================
+1. CURRENT PHASE
+==================================================
+
+PHASE：
+PORT_MIGRATION_ONLY
+
+Allowed：
+
+- independent product shell
+- UI
+- Page
+- Form
+- Editor
+- Workflow shape
+- Capability Registry
+- Capability completeness
+- local inert/session-only state
+- test no live authority
+
+Not allowed：
+
+- live cross-port wiring
+- Domain Adapter wiring
+- SMT connection
+- SMM → SMT LAN
+- Customer submit
+- Owner remote command
+- Admin Publish adapter
+- live network read
+- live network write
+- Store Kernel write
+- D1 / Cloud connection
+- Provider connection
+- Order / Pricing / Payment / Print / Outbox authority mutation
+
+所有未接功能：
+
+NOT_WIRED
+MIGRATION_ONLY
+
+==================================================
+2. ACTIVE PORTS
+==================================================
+
+ADMIN
+Executor：Main Chat
+Issue：MFK #23
+Current work：
+Migration only
+
+Stop at：
+ADMIN_PORT_MIGRATED_NOT_WIRED
+
+--------------------------------------------------
+
+SMM
+Executor：Worker
+Issue：MFK #24
+Current work：
+Migration only
+
+Stop at：
+SMM_PORT_MIGRATED_NOT_WIRED
+
+==================================================
+3. CONNECTION PHASE RULE
+==================================================
+
+未經 Owner 明確指令：
+
+NO CONNECTION
+
+之後由 Owner 一步一步開 seam。
+
+每次只准：
+
+CONNECT ONE PIECE
+→ TEST SAME PIECE IMMEDIATELY
+→ BANK RESULT
+→ WAIT OWNER
+
+禁止：
+
+- 一次接多個 seam
+- 接完幾塊先一次測試
+- 自行推斷下一塊可以接
+- 未測 GREEN 就繼續下一塊
+
+==================================================
+4. TEST DISCIPLINE
+==================================================
+
+每一塊 Connection：
+
+1. define exact seam
+2. connect only that seam
+3. run deterministic test immediately
+4. readback exact observed result
+5. classify GREEN / RED
+6. bank exact evidence
+7. stop
+8. Owner decides next seam
+
+==================================================
+5. CURRENT AUTHORITY
+==================================================
+
+Owner：
+決定邊個 seam 可以開始接。
+
+Admin：
+搬遷期只完成 Admin product surface。
+唔發布到 SMT。
+
+SMM：
+搬遷期只完成 assistive terminal surface。
+唔 submit 到 SMT。
+
+SMT：
+current execution surface。
+搬遷期 NO-TOUCH。
+
+==================================================
+6. WORKER LIMIT
+==================================================
+
+最多 2 個 active worker/lane。
+
+Current：
+
+A. Main Chat → Admin
+B. Worker → SMM
+
+未完成前：
+
+NO THIRD WORKER
+
+==================================================
+7. CURRENT CONTROL
+==================================================
+
+GitHub：
+Pantonyeung/mfk #22
+
+Controlling comment：
+5760967689
+
+Admin control：
+MFK #23 comment 5760970777
+
+SMM control：
+MFK #24 comment 5760971273
+
+==================================================
+8. MILESTONE
+==================================================
+
+MFK_ALL_PORTS_MIGRATION_ONLY_OWNER_LOCKED
+
+==================================================
+END ROUND002
+==================================================

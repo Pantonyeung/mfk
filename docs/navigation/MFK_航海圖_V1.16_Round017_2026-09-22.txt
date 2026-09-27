@@ -1,0 +1,123 @@
+MFK 航海圖 V1.16｜Round017｜2026-09-22
+主題：ADMIN OPERATOR CHINESE UI DEPLOYED / A2 BASELINE HYDRATION FIRST BREAK
+狀態：CURRENT / CONTROLLING
+CONTROL：#22
+COMMANDER：COMMANDER_CURRENT.md
+
+==================================================
+0. OWNER PRIORITY
+==================================================
+
+SMT OTA:
+HOLD
+
+Admin:
+ACTIVE
+
+==================================================
+1. OPERATOR CHINESE UI
+==================================================
+
+Issue:
+#41
+
+Source verification:
+35683885708 SUCCESS
+
+Main landing:
+4f332baa67900d33f72cd43a0dc457177c3cca80
+
+Live deploy:
+35684038608 SUCCESS
+
+Test:
+GREEN
+
+Build:
+GREEN
+
+Deploy mfk-admin:
+GREEN
+
+Owner visual readback:
+PENDING
+
+Milestone:
+MFK_ADMIN_OPERATOR_CHINESE_UI_DEPLOYED_GREEN
+
+==================================================
+2. UX RULE
+==================================================
+
+Admin is for operators.
+
+Operator-visible UI:
+Traditional Chinese first.
+No raw engineering/protocol/internal architecture vocabulary.
+
+Internal contract identifiers may remain in:
+source
+tests
+logs
+evidence
+support diagnostics
+
+but not primary operator copy.
+
+==================================================
+3. ADMIN CONNECTION
+==================================================
+
+A1:
+BANKED
+
+A2 implementation:
+GREEN / BANKED
+
+Owner cross-device:
+PENDING
+
+FIRST BREAK:
+
+ADMIN_A2_SOURCE_BASELINE_NOT_HYDRATED
+
+Observed live Admin draft:
+Categories = 0
+Products = 0
+
+A2 full Menu Index bundle requires a safe current source baseline.
+
+Do not publish from empty Admin draft over existing SMT Menu.
+
+==================================================
+4. NEXT
+==================================================
+
+1. Owner refresh live Admin.
+2. confirm Chinese operator UI.
+3. bank #41 after visual readback.
+4. solve exact baseline hydration:
+   SMT Active Menu
+   → Admin source draft
+   → no product loss proof
+5. resume one tiny A2 product-name cross-device acceptance.
+
+==================================================
+5. HOLD
+==================================================
+
+A3:
+NOT AUTHORIZED
+
+SMT OTA #40:
+HOLD
+
+Keeta live:
+NOT AUTHORIZED
+
+SMM/Customer/Owner live:
+NOT AUTHORIZED
+
+==================================================
+END ROUND017
+==================================================

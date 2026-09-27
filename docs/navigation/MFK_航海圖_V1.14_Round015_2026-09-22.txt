@@ -1,0 +1,176 @@
+MFK 航海圖 V1.14｜Round015｜2026-09-22
+主題：OWNER 814 BASELINE + MINIMAL PERSISTENCE FIX PUBLISHED / DEVICE ACCEPTANCE REQUIRED
+狀態：CURRENT / CONTROLLING
+CONTROL：Pantonyeung/mfk #22
+COMMANDER ENTRY：COMMANDER_CURRENT.md
+ACTIVE ISSUE：#40
+
+==================================================
+0. OWNER TARGET
+==================================================
+
+Desired product/runtime baseline:
+
+runtime-candidate-mfk-814043c809bb
+
+Exact source:
+
+814043c809bbc236df1383c320bad906bcd3f1cd
+
+==================================================
+1. ISOLATED REPAIR SOURCE
+==================================================
+
+Branch:
+
+work/MFK/SMT-OTA-814-BASELINE-PERSISTENCE-R2
+
+Candidate source:
+
+d133043dfe7d84e3f4be11ee49e9102c64f518d1
+
+Compare to exact 814:
+
+status = ahead
+behind = 0
+
+Changed product/runtime files only:
+
+v2local/src/App.tsx
+v2local/src/runtime/RuntimeReadyActivation.tsx
+v2local/src/runtime/runtime-carrier-boundary.ts
+v2local/src/runtime/runtime-carrier-boundary.test.ts
+
+App product diff:
+3 additions / 2 deletions only for RuntimeReadyActivation mount.
+
+No unrelated SMT product/runtime drift.
+
+Temporary verification workflow was removed before final source candidate.
+
+Source verification run:
+
+35681551414
+SUCCESS
+
+==================================================
+2. PUBLISHED OTA
+==================================================
+
+Builder:
+
+Pantonyeung/morefunos-v1-builder
+
+Request commit:
+
+c776e070b7938476e05b82633376ea6311eb4f41
+
+Publish run:
+
+35681723140
+SUCCESS
+
+Release:
+
+runtime-candidate-mfk-d133043dfe7d
+
+Bundle:
+
+MoreFunOS-SMT-runtime-candidate-mfk-d133043dfe7d.mfos
+
+SHA-256:
+
+89898b8420b2038cbde0863de21513b9c765c7e2635d2ca244a4a7f7eb1e7111
+
+Public readback:
+GREEN
+
+Carrier:
+106
+
+Bridge:
+1
+
+Milestone:
+
+MFK_SMT_OTA_814_BASELINE_PERSISTENCE_CANDIDATE_PUBLISHED
+
+==================================================
+3. REAL DEVICE ACCEPTANCE
+==================================================
+
+Owner:
+
+Recovery
+→ 檢查 Runtime OTA
+
+Fresh offered release MUST be:
+
+runtime-candidate-mfk-d133043dfe7d
+
+Then:
+
+download
+→ install / activate
+→ visually/functionally verify intended 814 baseline
+→ Recovery
+
+Required readback:
+
+Current = runtime-candidate-mfk-d133043dfe7d
+Candidate = —
+Activation Requested = false
+Previous = prior Current
+
+Then:
+
+close/reopen app
+→ same Current
+
+full power off/on
+→ same Current
+
+Previous remains rollback target.
+
+Any product/UI drift:
+STOP.
+
+Any persistence failure:
+STOP at first break.
+
+Only then BANK:
+
+MFK_SMT_OTA_814_BASELINE_PERSISTENCE_GREEN
+
+==================================================
+4. IMPORTANT SOURCE BOUNDARY
+==================================================
+
+The isolated 814 branch is NOT a current-main product landing.
+
+Do NOT merge/rebase the old baseline branch into current MFK main.
+
+Its only purpose is to generate the exact Owner-baseline OTA with the minimum persistence seam.
+
+==================================================
+5. HOLD
+==================================================
+
+Admin A2:
+PAUSED
+
+A3:
+NOT AUTHORIZED
+
+OTA infra migration:
+NOT AUTHORIZED
+
+Keeta live:
+NOT AUTHORIZED
+
+SMM / Customer / Owner live seams:
+NOT AUTHORIZED
+
+==================================================
+END ROUND015
+==================================================

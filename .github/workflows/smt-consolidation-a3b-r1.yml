@@ -1,0 +1,44 @@
+name: SMT Consolidation A3B R1
+
+on:
+  push:
+    branches:
+      - work/MFK/SMT-CONSOLIDATION-A3B-R1
+  pull_request:
+    paths:
+      - 'v2local/**'
+      - '.github/workflows/smt-consolidation-a3b-r1.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  a3b:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install
+        working-directory: v2local
+        run: npm install --legacy-peer-deps --ignore-scripts --no-audit --no-fund
+      - name: Unit tests
+        working-directory: v2local
+        run: npm run test
+      - name: Build
+        working-directory: v2local
+        run: npm run build
+      - name: A3B bounded authority proof
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -F "type:'pending-order'" v2local/src/App.tsx
+          grep -F "PAYMENT_EVIDENCE_VERIFICATION_REQUIRED" v2local/src/runtime/local-runtime.ts
+          grep -F "KEETA_DEFER_LIMIT_REACHED" v2local/src/runtime/local-runtime.ts
+          grep -F "initialFulfillmentLabel:'待處理'" v2local/src/runtime/customer-cloud-intake.ts
+          grep -F "PendingOrderReviewWorkspace" v2local/src/App.tsx
+          ! grep -F "createOrder(" v2local/src/features/ordering/PendingOrderReviewWorkspace.tsx
+          ! grep -F "printOrderOutputs(" v2local/src/features/ordering/PendingOrderReviewWorkspace.tsx
