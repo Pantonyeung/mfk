@@ -60,6 +60,30 @@ type View='order'|'work'|'orders'|'dine'|'more';
 const nowIso=()=>new Date().toISOString();
 const money=(currency:string,minor:number)=>new Intl.NumberFormat('zh-HK',{style:'currency',currency}).format(minor/100);
 
+const SMM_SOURCE_PRODUCT_MEDIA=Object.freeze([
+  '/brand/stage1/product-feature.webp',
+  '/brand/stage1/product-bowl.webp',
+  '/brand/stage1/product-salad.webp',
+]);
+
+function fallbackProductMedia(name:string,productId=''){
+  const normalized=name.trim();
+  if(/沙律|菜|蔬/.test(normalized))return '/brand/stage1/product-salad.webp';
+  if(/飯|便當|咖喱|米/.test(normalized))return '/brand/stage1/product-bowl.webp';
+  let hash=0;
+  for(const ch of productId||normalized)hash=(hash*31+ch.charCodeAt(0))>>>0;
+  return SMM_SOURCE_PRODUCT_MEDIA[hash%SMM_SOURCE_PRODUCT_MEDIA.length];
+}
+
+function productMediaSrc(product:Pick<SmmProduct,'name'|'productId'|'imageRef'>){
+  const exact=String(product.imageRef??'').trim();
+  return exact||fallbackProductMedia(product.name,product.productId);
+}
+
+function ProductMedia({product,className}:{product:Pick<SmmProduct,'name'|'productId'|'imageRef'>;className:string}){
+  return <span className={className}><img src={productMediaSrc(product)} alt={product.name} loading="lazy"/></span>;
+}
+
 export function App(){
   const initial=useMemo(()=>readSmmLocalWorkspace(),[]);
   const [view,setView]=useState<View>(initial.preferences.activeView);
@@ -1608,7 +1632,15 @@ function EmptyState({title,detail,children}:{title:string;detail:string;children
 }
 function Tool({title,detail,state,onClick}:{title:string;detail:string;state:string;onClick:()=>void}){return <button className="tool-card" onClick={onClick}><span>◆</span><strong>{title}</strong><small>{detail}</small><em>{state}</em></button>}
 function Metric({label,value}:{label:string;value:string}){return <div><small>{label}</small><strong>{value}</strong></div>}
-function NavButton({active,label,glyph,badge,onClick}:{active:boolean;label:string;glyph?:string;badge?:string;onClick:()=>void}){return <button className={active?'active':''} onClick={onClick}>{glyph?<span>{glyph}</span>:null}<small>{label}</small>{badge?<b>{badge}</b>:null}</button>}
+function NavGlyph({label}:{label:string}){
+  const common={viewBox:'0 0 24 24',width:22,height:22,fill:'none',stroke:'currentColor',strokeWidth:1.8,strokeLinecap:'round' as const,strokeLinejoin:'round' as const,'aria-hidden':true};
+  if(label==='點單')return <svg {...common}><rect x="4" y="4" width="16" height="16" rx="4"/><path d="M8 9h8M8 13h5M8 17h3"/></svg>;
+  if(label==='待處理')return <svg {...common}><path d="M7 5h10l2 3v11H5V8l2-3Z"/><path d="M9 5V3h6v2M8 11h8M8 15h5"/></svg>;
+  if(label==='訂單')return <svg {...common}><path d="M6 3h12v18l-2-1.5L14 21l-2-1.5L10 21l-2-1.5L6 21V3Z"/><path d="M9 8h6M9 12h6M9 16h4"/></svg>;
+  if(label==='堂食')return <svg {...common}><path d="M7 3v7M4.5 3v4.5A2.5 2.5 0 0 0 7 10v11M11 3v18M16 3c2 2 3 5 3 8h-4V3h1Z"/></svg>;
+  return <svg {...common}><circle cx="6" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="18" cy="12" r="1.5" fill="currentColor" stroke="none"/></svg>;
+}
+function NavButton({active,label,badge,onClick}:{active:boolean;label:string;badge?:string;onClick:()=>void}){return <button className={active?'active':''} onClick={onClick}><span className="nav-glyph"><NavGlyph label={label}/></span><small>{label}</small>{badge?<b>{badge}</b>:null}</button>}
 
 function connectionLabelShort(state:SmmConnectionState){return state==='READY'?'已連接':state==='LOADING'?'同步中':state==='ERROR'?'錯誤':state==='STALE'?'資料稍舊':state==='PARTIAL'?'部分資料':state==='UNKNOWN'?'未知':'未連接'}
 function moreTitle(tool:string){return tool==='staff'?'員工帳戶':tool==='connection'?'連線設定':tool==='pending'?'待提交草稿':tool==='channels'?'平台狀態':tool==='business'?'營業日':tool==='capacity'?'產能':tool==='reporting'?'營運報表':tool==='refunds'?'退款要求':tool==='printing'?'列印狀態':tool==='sellability'?'商品供應':'診斷'}
