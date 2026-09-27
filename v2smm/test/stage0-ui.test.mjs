@@ -35,7 +35,7 @@ test('Stage 0 never shows raw engineering error messages to frontline UI',()=>{
   assert.doesNotMatch(stage0,/role="alert">\{reason/);
   assert.match(stage0,/SMM_STAGE0_PROBE_DIAGNOSTIC/);
   assert.match(stage0,/SMM_STAGE0_STAFF_VERIFY_DIAGNOSTIC/);
-  assert.match(stage0,/員工編號或 PIN 未能驗證/);
+  assert.match(stage0,/登入編號或 PIN 未能驗證/);
 });
 
 test('Offline workspace cannot bypass trusted staff identity',()=>{
@@ -77,9 +77,11 @@ test('Stage 0 IP production is paused and only canonical logo remains active',()
   assert.equal(existsSync(new URL('../public/brand/stage0/splash-male.svg',import.meta.url)),false);
 });
 
-test('Stage 0 staff login reuses current staff verification',()=>{
+test('Stage 0 staff login reuses current staff verification and human loginId language',()=>{
   assert.match(stage0,/listSmmStaff/);
   assert.match(stage0,/verifySmmStaff/);
+  assert.match(stage0,/登入編號/);
+  assert.match(stage0,/row\.loginId\?row\.loginId\+' · '/);
   assert.match(stage0,/4–8 位數字/);
 });
 
