@@ -29,6 +29,7 @@ import type {
   OwnerReadModelSnapshot,
   OwnerRuntimePort,
   OwnerSellabilityCommandInput,
+  OwnerSellabilityCommandResult,
 } from './product-types';
 
 type View='today'|'queue'|'orders'|'more';
@@ -61,6 +62,7 @@ export function App(){
   const [planningLoading,setPlanningLoading]=useState(false);
   const [planningSaving,setPlanningSaving]=useState(false);
   const [sellabilityBusy,setSellabilityBusy]=useState(false);
+  const [sellabilityResult,setSellabilityResult]=useState<OwnerSellabilityCommandResult|null>(null);
 
   const persistLocal=(next?:Partial<{view:View;managerNote:string;handoffNote:string;checklist:readonly OwnerChecklistItem[]}>)=>{
     writeOwnerLocalWorkspace({
@@ -349,7 +351,7 @@ export function App(){
     <section className="stage">
       {secondary==='channels'?<ChannelHealthPage channels={snapshot?.channels??[]} connection={connection} onRecheck={channelId=>void recheckChannel(channelId)} onBack={()=>changeView('more')}/>:null}
       {secondary==='planning'?<PlanningPage value={planning} loading={planningLoading} saving={planningSaving} onMonthChange={monthKey=>void loadPlanning(monthKey)} onSave={input=>void savePlanning(input)} onBack={()=>changeView('more')}/>:null}
-      {secondary==='sellability'?<SellabilityPage items={snapshot?.sellability??[]} connection={connection} busy={sellabilityBusy} onCommand={input=>void commandSellability(input)} onReload={()=>void loadSellability()} onBack={()=>changeView('more')}/>:null}
+      {secondary==='sellability'?<SellabilityPage items={snapshot?.sellability??[]} connection={connection} busy={sellabilityBusy} result={sellabilityResult} onDismissResult={()=>setSellabilityResult(null)} onCommand={input=>void commandSellability(input)} onReload={()=>void loadSellability()} onBack={()=>changeView('more')}/>:null}
       {secondary==='staff'?<StaffOverviewPage staff={snapshot?.staff??[]} activity={snapshot?.activity??[]} connection={connection} observedAt={snapshot?.observedAt} onBack={()=>changeView('more')}/>:null}
       {!secondary&&view==='today'?<TodayPage connection={connection} snapshot={snapshot} onQueue={()=>changeView('queue')} onActiveOrders={()=>openOrdersScope('ACTIVE')} onDineInOrders={()=>openOrdersScope('DINE_IN_OPEN')} onChannels={()=>openSecondary('channels')} onStaff={()=>openSecondary('staff')} onTool={setTool}/>:null}
       {!secondary&&view==='queue'?<ActionQueuePage connection={connection} items={openActions} activity={snapshot?.activity??[]} commandFlight={commandFlight} onCommand={requestBounded} onRecheck={actionId=>void recheckAction(actionId)}/>:null}
