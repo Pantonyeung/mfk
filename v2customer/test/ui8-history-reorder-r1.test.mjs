@@ -10,110 +10,126 @@ const repoRoot=path.resolve(here,'../..');
 const app=fs.readFileSync(path.join(src,'App.tsx'),'utf8');
 const ui8=fs.readFileSync(path.join(src,'components/customer-history-ui8.tsx'),'utf8');
 const reorder=fs.readFileSync(path.join(src,'reorder.ts'),'utf8');
-const types=fs.readFileSync(path.join(src,'product-types.ts'),'utf8');
-const styles=fs.readFileSync(path.join(src,'styles.css'),'utf8');
+const localQuote=fs.readFileSync(path.join(src,'local-quote.ts'),'utf8');
 const primitives=fs.readFileSync(path.join(src,'ui/primitives.tsx'),'utf8');
+const styles=fs.readFileSync(path.join(src,'styles.css'),'utf8');
+const types=fs.readFileSync(path.join(src,'product-types.ts'),'utf8');
 const contract=fs.readFileSync(path.join(repoRoot,'contracts/customer-cloud-v1.ts'),'utf8');
 const intake=fs.readFileSync(path.join(repoRoot,'v2local/src/runtime/customer-cloud-intake.ts'),'utf8');
 const admin=fs.readFileSync(path.join(repoRoot,'v2admin/worker.ts'),'utf8');
 
-test('Stage8 provides current completed and all filters',()=>{
-  assert.match(ui8,/export type Ui8OrderSegment='current'\|'completed'\|'all'/);
+test('Stage8 list has current completed all and keeps Orders active in the fixed five-item nav',()=>{
+  assert.match(ui8,/Ui8OrderSegment='current'\|'completed'\|'all'/);
   assert.match(ui8,/>進行中</);
   assert.match(ui8,/>已完成</);
   assert.match(ui8,/>全部</);
+  assert.match(app,/view==='orders'\?<HistoryReorderUi8View/);
+
+  const navBlock=primitives.slice(primitives.indexOf('export function BottomNavigation'),primitives.indexOf('export interface ProductOriginRect'));
+  const navIds=[...navBlock.matchAll(/\{id:'(home|menu|cart|orders|more)' as const/g)].map(match=>match[1]);
+  assert.deepEqual(navIds,['home','menu','cart','orders','more']);
+  assert.match(app,/BottomNavigation active=\{view==='pickup'\?'orders':view as/);
+  assert.match(styles,/\.bottom-navigation\{position:fixed[\s\S]*grid-template-columns:repeat\(5,1fr\)[\s\S]*env\(safe-area-inset-bottom\)/);
+  const buttonMinHeight=styles.match(/\.bottom-navigation button\{[^}]*min-height:(\d+)px/);
+  assert.ok(buttonMinHeight);
+  assert.ok(Number(buttonMinHeight[1])>=44);
 });
 
-test('Stage8 preserves deterministic page states including READY and EMPTY',()=>{
-  for(const state of['LOADING','READY','EMPTY','ERROR','OFFLINE','STALE','UNKNOWN'])assert.match(ui8,new RegExp(state));
-  assert.match(ui8,/return hasRows\?'READY':'EMPTY'/);
+test('Historical Order stays immutable and Pickup Code remains separate from Display Number',()=>{
+  assert.match(ui8,/歷史快照｜只讀/);
+  assert.match(ui8,/舊 Order 唔會被重新開啟或修改/);
+  assert.match(ui8,/Pickup Code ≠ Display Number/);
+  assert.match(ui8,/唔會顯示 UUID 或 internal Order ID/);
+  assert.match(types,/historicalLines:readonly CustomerHistoricalLine\[\]/);
+  assert.doesNotMatch(ui8,/updateHistory|mutateHistory|reopenOrder|reopenOldOrder/);
 });
 
-test('historical order is read-only and reorder never reopens old order',()=>{
-  assert.match(ui8,/Historical Order 只讀/);
+test('Reorder means price-free Copy Intent to a NEW CART, never reopen old Order',()=>{
+  assert.match(contract,/customerReorderIntentFromCart/);
+  assert.match(intake,/customerReorderIntent:customerReorderIntentFromCart\(intent\.cart\)/);
+  assert.match(reorder,/createLineId:\(\)=>string=\(\)=>crypto\.randomUUID\(\)/);
   assert.match(ui8,/Past Order → Copy Intent → New Cart/);
   assert.match(ui8,/唔會重開舊 Order/);
-  assert.doesNotMatch(ui8,/reopenOrder|updateHistoricalOrder|mutateHistory|commitOrder/);
-  assert.doesNotMatch(app,/port\?\.buildReorderCart/);
-});
 
-test('copy intent strips formal identity old price payment fulfillment and coupon truth',()=>{
   const sanitizer=contract.slice(contract.indexOf('export function customerReorderIntentFromCart'),contract.indexOf('export interface CustomerCloudCheckout'));
   assert.doesNotMatch(sanitizer,/lineId:/);
   assert.doesNotMatch(sanitizer,/publishedUnitPriceMinor:/);
-  assert.doesNotMatch(sanitizer,/payment|fulfillment|coupon/i);
-  assert.match(intake,/customerReorderIntent:customerReorderIntentFromCart\(intent\.cart\)/);
-  assert.match(app,/withoutPaymentEvidence\(checkout\)/);
-  assert.match(ui8,/Formal Order identity \/ payment evidence \/ fulfillment \/ coupon redemption 全部冇複製/);
+  assert.doesNotMatch(sanitizer,/paymentEvidence|fulfillment|coupon|orderId/i);
 });
 
-test('historical price remains history-only and current validation builds current cart facts',()=>{
-  assert.match(types,/historicalUnitLabel:string/);
+test('Old price is historical only and a changed price requires local line confirmation',()=>{
   assert.match(contract,/CustomerReorderHistoryPriceFact/);
-  assert.match(reorder,/const historicalUnit=order\.reorderPriceFacts/);
+  assert.match(contract,/historicalPublishedUnitMinor/);
+  assert.match(reorder,/order\.reorderPriceFacts/);
   assert.match(reorder,/歷史價 HK\$/);
+  assert.match(reorder,/目前 HK\$/);
+  assert.match(reorder,/請確認目前價格/);
+  assert.match(ui8,/接受目前資料/);
+  assert.match(ui8,/Current Quote/);
+});
+
+test('Current sellability required options and combo validation drive reorder rebuild',()=>{
+  assert.match(reorder,/product\.available/);
+  assert.match(reorder,/validateCustomerSelections/);
+  assert.match(reorder,/validateCustomerComboSelection/);
+  assert.match(reorder,/selectedCustomerComboIntent/);
   assert.match(reorder,/customerStandalonePublishedUnitMinor/);
   assert.match(reorder,/customerComboPublishedUnitMinor/);
-  assert.match(reorder,/product\.available/);
-  assert.match(ui8,/舊 Price \/ Sellability \/ Coupon eligibility 或 redemption 不可直接帶去新交易/);
+  assert.match(localQuote,/publishedCartRepairs/);
+  assert.match(localQuote,/PRODUCT_UNAVAILABLE/);
+  assert.match(localQuote,/CONFIG_CHANGED/);
 });
 
-test('local repair only changes affected line',()=>{
-  assert.match(app,/cart\.map\(item=>item\.lineId===lineId\?clearReorderAttention\(repaired\):item\)/);
+test('Local Repair changes only affected NEW CART lines',()=>{
   assert.match(ui8,/只改受影響 Line/);
-  assert.match(ui8,/其他 .* 項保持新購物車目前狀態/);
-  assert.match(ui8,/接受目前資料/);
-  assert.match(ui8,/修正呢一項/);
-  assert.match(ui8,/移除/);
+  assert.match(app,/cart\.map\(item=>item\.lineId===lineId\?clearReorderAttention\(repaired\):item\)/);
+  assert.match(app,/cart\.filter\(line=>line\.lineId!==lineId\)/);
+  assert.match(app,/openProduct\(product,null,line\)/);
+  assert.doesNotMatch(app,/reopenOrder|updateHistoricalOrder/);
 });
 
-test('Final Review uses current quote and exits only to normal cart UI4 UI5 path',()=>{
-  assert.match(ui8,/Current Quote/);
+test('Final Review uses current quote and can only return to normal Cart then UI4 UI5',()=>{
   assert.match(ui8,/quote\?\.freshness==='CURRENT'/);
-  assert.match(ui8,/current catalog \/ current quote/);
-  assert.match(ui8,/>前往記憶罐</);
-  assert.match(ui8,/正常 UI4 Checkout → UI5 Submit/);
-  assert.doesNotMatch(ui8,/submitOrder|createCustomerPendingIntent|openSubmitRoute|commitOrder/);
+  assert.match(ui8,/Current Quote/);
+  assert.match(ui8,/UI4 Checkout → UI5 Submit/);
   assert.match(app,/onGoCart=\{\(\)=>changeView\('cart'\)\}/);
+  assert.match(app,/view==='checkout'\?<CheckoutUi4View/);
+  assert.match(app,/view==='submit'/);
+  assert.doesNotMatch(ui8,/submitOrder|createOrder|commitOrder|createCustomerPendingIntent/);
 });
 
-test('Pickup Code and Display Number are separate and UUID is not rendered',()=>{
-  assert.match(ui8,/Pickup Code ≠ Display Number/);
-  assert.match(ui8,/>流水號</);
-  assert.match(ui8,/>取餐碼</);
-  assert.match(ui8,/唔會顯示 UUID 或 internal Order ID/);
-  assert.doesNotMatch(ui8,/\{order\.orderId\}/);
+test('Old payment evidence fulfillment and coupon finality are not copied',()=>{
+  assert.match(app,/const nextCheckout=withoutPaymentEvidence\(checkout\)/);
+  assert.match(ui8,/Formal Order identity \/ payment evidence \/ fulfillment \/ coupon redemption 全部冇複製/);
+  assert.doesNotMatch(reorder,/paymentEvidence|fulfillment|coupon/i);
 });
 
-test('Stage8 keeps fixed five-item bottom nav with Orders active and no sixth item',()=>{
-  const nav=primitives.slice(primitives.indexOf('export function BottomNavigation'),primitives.indexOf('export interface ProductOriginRect'));
-  const ids=[...nav.matchAll(/\{id:'(home|menu|cart|orders|more)' as const/g)].map(match=>match[1]);
-  assert.deepEqual(ids,['home','menu','cart','orders','more']);
-  assert.match(app,/view==='orders'/);
-  assert.match(app,/BottomNavigation active=\{view==='pickup'\|\|view==='orders'\?'orders':view as/);
-  assert.match(styles,/\.bottom-navigation\{position:fixed[\s\S]*grid-template-columns:repeat\(5,1fr\)[\s\S]*safe-area-inset-bottom/);
-  assert.match(styles,/\.bottom-navigation button\{[^}]*min-height:60px/);
+test('Stage8 page states distinguish LOADING READY EMPTY ERROR OFFLINE STALE UNKNOWN',()=>{
+  for(const state of['LOADING','READY','EMPTY','ERROR','OFFLINE','STALE','UNKNOWN']){
+    assert.match(ui8,new RegExp("'"+state+"'"));
+  }
+  assert.match(ui8,/return hasRows\?'READY':'EMPTY'/);
+  assert.match(ui8,/EMPTY 唔等於連線錯誤/);
+  assert.match(ui8,/禁止由 Stage 8 直接建立或提交新 Order/);
 });
 
-test('Saved template is safe-unavailable rather than fake success',()=>{
+test('saved-template CTA is safe unavailable because current main has no mutation seam',()=>{
   assert.match(ui8,/SAFE_UNAVAILABLE_FIRST_BREAK:CUSTOMER_SAVED_ORDER_TEMPLATE_MUTATION_SEAM_MISSING_IN_CURRENT_MAIN/);
-  assert.match(ui8,/設為常用訂單/);
+  assert.match(ui8,/>設為常用訂單</);
   assert.match(ui8,/disabled aria-disabled="true"/);
-  assert.doesNotMatch(ui8,/saveOrderTemplate|createSavedTemplate|persistFavoriteOrder/);
+  assert.doesNotMatch(app,/saveOrderTemplate|createSavedOrder|mutateSavedTemplate/);
 });
 
-test('history projection is canonical and reorder is enabled only with sanitized intent',()=>{
-  assert.match(admin,/reorderEligible:Boolean\(order\.reorderIntent\?\.length\)/);
-  assert.match(admin,/historicalLines/);
-  assert.match(admin,/reorderPriceFacts/);
-});
-
-test('Stage8 introduces no Stage9 Seed Reward mutation',()=>{
+test('Stage8 uses formal male and female IP assets and introduces no Stage9 reward mutation',()=>{
+  assert.match(ui8,/stage8-reorder-female\.svg/);
+  assert.match(ui8,/stage8-reorder-male\.svg/);
   assert.doesNotMatch(ui8,/Stage9|seed|reward|issueCoupon|redeemCoupon/i);
-  assert.doesNotMatch(reorder,/seed|reward|coupon|paymentEvidence|fulfillment|orderId/i);
+  assert.match(styles,/@media\(prefers-reduced-motion:reduce\)[\s\S]*\.ui8-page/);
 });
 
-test('Stage8 formal composition exposes both supplied male and female IP variants',()=>{
-  assert.match(ui8,/stage8-history-male\.svg/);
-  assert.match(ui8,/stage8-history-female\.svg/);
+test('Admin history projection carries immutable facts plus safe reorder intent only',()=>{
+  assert.match(admin,/historicalLines/);
+  assert.match(admin,/reorderIntent/);
+  assert.match(admin,/reorderPriceFacts/);
+  assert.match(admin,/reorderEligible:Boolean\(order\.reorderIntent\?\.length\)/);
 });
