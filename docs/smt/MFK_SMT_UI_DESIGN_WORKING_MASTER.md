@@ -4020,3 +4020,115 @@ UI-STAGE-00 SPEC
 → 02C Attention Center
 → Owner Review
 → Acceptance / Rework
+
+
+==================================================
+RECORD 007｜OWNER CORRECTION｜UI-STAGE-00 = 首頁 / SHELL，不是點單頁
+日期：2026-09-27
+狀態：LOCKED
+==================================================
+
+Owner 明確要求：
+
+如果目前 UI-STAGE-00 畫面被定義成「首頁」，方向可以接受。
+如果被定義成「點單頁」，方向不接受。
+
+原因：
+前線點單係最高頻操作。
+如果員工已經按「點單」進入點單頁，之後仲要再按一次「開始點單」，等於每張單都多一次無價值 click，會直接拖慢高峰期操作。
+
+正式鎖定：
+
+LOCK 00-13
+UI-STAGE-00 定義為：
+「首頁 / Shell / Global Layer」
+
+佢可以包含：
+- 系統首頁
+- 四個高頻導航入口
+- Top Utility
+- Global New Order Alert
+- Global Attention
+- Staff
+- More / Tools
+- 營業／Local 狀態
+
+但唔係正式 Ordering Workspace。
+
+LOCK 00-14
+UI-STAGE-01 才係真正「點單頁 / Ordering Main」。
+
+由任何地方按左側「點單」：
+→ 直接進 UI-STAGE-01 Ordering Main
+→ 即時看到 Category + Product Grid + Cart + Fast Lane
+→ 可以即刻選商品
+
+禁止：
+點單
+→ 開始點單
+→ 再進商品頁
+
+即：
+NO SECONDARY START-ORDER GATE
+
+LOCK 00-15
+UI-STAGE-01 不設「開始點單」大卡作為必要前置操作。
+只要進入點單頁，就已經係可直接落單狀態。
+
+LOCK 00-16
+UI-STAGE-00 首頁上的「開始點單」可以存在，因為佢係由首頁進入 Ordering 的捷徑。
+但一旦進入 UI-STAGE-01，就唔再出現第二個「開始點單」。
+
+LOCK 00-17
+UI-STAGE-00 Visual Draft 中，如果左側「點單」已被標示 Active，而中央又出現「開始點單」大卡，語義會令人誤會目前已經身處 Ordering Page。
+呢個視覺語義正式判定為：
+REJECTED AS ORDERING PAGE
+ACCEPTABLE ONLY AS HOME PAGE CONCEPT
+
+後續 Visual Draft 修正：
+- UI-STAGE-00 畫面標題要清楚寫「首頁」
+- 左側點單不可同時用「已進入點單頁」語義
+- 首頁可有「開始點單」快捷卡
+- 點擊後直接去 UI-STAGE-01
+- UI-STAGE-01 第一幀即係完整 POS 點單工作台
+
+==================================================
+ROUTE RULE
+==================================================
+
+HOME：
+UI-STAGE-00
+
+按「點單」
+↓
+UI-STAGE-01 Ordering Main
+
+UI-STAGE-01 第一幀：
+- Pending Customer / Keeta
+- Quick / Normal
+- Category
+- Product Grid
+- Fast Lane
+- Right Cart
+- 暫存／堂食
+- Checkout
+
+不再有：
+「開始點單」
+
+==================================================
+VISUAL STATUS
+==================================================
+
+UI-STAGE-00 Visual Draft v1：
+REJECTED if interpreted as Ordering Page
+CONDITIONALLY ACCEPTED as Home Page direction
+
+下一版要求：
+UI-STAGE-00 HOME Visual Draft v2
++
+UI-STAGE-01 Ordering Main Visual Draft v1
+必須清楚分開。
+
+MILESTONE：
+MFK_SMT_UI_STAGE00_HOME_STAGE01_DIRECT_ORDERING_LOCKED
