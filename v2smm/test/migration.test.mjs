@@ -216,13 +216,19 @@ test('dedicated SMM worker keeps auth session only and proxies orders to the sha
 });
 
 
-test('SMM staff checkout has service mode and tender but no automatic drawer or QR handoff',()=>{
+test('SMM Stage 3 keeps service mode visible while tender and submit UI remain deferred to the next stage',()=>{
   const app=fs.readFileSync(path.join(root,'App.tsx'),'utf8');
+  const types=fs.readFileSync(path.join(root,'product-types.ts'),'utf8');
   const ingress=fs.readFileSync(path.join(repoRoot,'v2local','src','runtime','smm-lan-ingress.ts'),'utf8');
-  assert.match(app,/服務方式/);
-  assert.match(app,/堂食/);
-  assert.match(app,/收款方式/);
-  assert.match(app,/現金只會記錄為收款方式；需要開錢箱時由 SMT 人手操作/);
+  const start=app.indexOf('function CartSheet');
+  const end=app.indexOf('function DiningTargetSheet',start);
+  const cartSheet=app.slice(start,end);
+  assert.match(cartSheet,/服務方式/);
+  assert.match(cartSheet,/堂食/);
+  assert.match(cartSheet,/外賣/);
+  assert.match(cartSheet,/前往結帳/);
+  assert.doesNotMatch(cartSheet,/收款方式|提交訂單|重新確認結果/);
+  assert.match(types,/export type SmmTender=/);
   assert.doesNotMatch(app,/產生 QR|QR 交接|createSmmQrHandoff|renderSmmQrHandoff/);
   assert.match(ingress,/paymentLabel/);
   assert.match(ingress,/SMM_MENU_REVISION_CHANGED/);
