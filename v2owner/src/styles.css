@@ -563,3 +563,52 @@ body{
 .owner-auth-gate button:disabled{opacity:.45}
 .owner-auth-error{padding:10px 12px;border-radius:12px;background:#fff1f1;color:#9a3030;font-size:12px}
 .owner-session-pill{min-height:44px;border:1px solid var(--mf-border);border-radius:999px;background:var(--mf-surface);padding:0 12px;color:var(--mf-navy);font:inherit;font-size:11px;font-weight:850}
+
+
+/* OA-CHN-001 + OA-PLN-001 */
+.secondary-head{display:grid;grid-template-columns:auto 1fr;align-items:start;gap:12px}
+.back-link{min-height:44px;padding:0 14px;border:1px solid var(--mf-line);border-radius:14px;background:var(--mf-surface);color:var(--mf-navy);font-weight:700}
+.channel-grid{display:grid;gap:12px}
+.channel-card{display:grid;gap:14px}
+.channel-card>header,.cost-plan>header,.profit-card>header,.planning-summary>header{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.channel-card>header div{display:grid;gap:4px}
+.channel-card>header small,.muted,.unsupported-note,.safety-note,.planning-source{color:var(--mf-muted)}
+.health-chip{display:inline-flex;align-items:center;min-height:32px;padding:0 10px;border-radius:999px;font-weight:800;font-size:12px;background:var(--mf-soft)}
+.health-chip.healthy{color:var(--mf-success)}
+.health-chip.degraded{color:var(--mf-warning)}
+.health-chip.offline{color:var(--mf-danger)}
+.channel-facts,.planning-summary-grid,.planning-metrics{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.channel-facts div,.planning-summary-grid div,.planning-metrics div{padding:12px;border-radius:14px;background:var(--mf-soft);display:grid;gap:4px}
+.channel-facts span,.planning-summary-grid span,.planning-metrics span{font-size:12px;color:var(--mf-muted)}
+.channel-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.channel-actions button,.cost-plan button{min-height:44px}
+.channel-actions button:disabled{opacity:.45}
+.channel-readback{margin:0;font-size:13px}
+.command-flight{display:grid;gap:2px;padding:10px 12px;border-radius:12px;background:var(--mf-soft)}
+.command-flight.unknown{border:1px solid var(--mf-line)}
+.safety-note{display:block;font-size:12px}
+.month-picker{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 16px;border-radius:16px;background:var(--mf-surface);border:1px solid var(--mf-line)}
+.month-picker input,.planning-target-input input,.cost-line input{min-height:44px;border:1px solid var(--mf-line);border-radius:12px;background:var(--mf-surface);padding:0 12px;font:inherit}
+.planning-hero,.cost-plan,.profit-card,.planning-summary{display:grid;gap:14px}
+.planning-target-input{display:grid;gap:12px}
+.planning-target-input label,.cost-line label{display:grid;gap:6px}
+.money-input{display:grid;grid-template-columns:auto 1fr;align-items:center;gap:8px}
+.forecast-note{padding:10px 12px;border-radius:12px;background:var(--mf-soft);margin:0}
+.cost-lines{display:grid;gap:10px}
+.cost-line{display:grid;grid-template-columns:minmax(100px,.8fr) repeat(3,minmax(0,1fr));gap:10px;padding:12px;border:1px solid var(--mf-line);border-radius:14px}
+.cost-line-title{display:grid;align-content:center;gap:4px}
+.cost-line-title span{font-size:12px;color:var(--mf-muted)}
+.cost-note{grid-column:1/-1}
+.planning-save{min-height:48px}
+.planning-summary header>div{display:grid;gap:4px}
+.planning-summary header button{min-height:44px}
+.empty-planning{grid-template-columns:1fr auto;align-items:center}
+.planning-source{margin:0 2px 84px;font-size:12px}
+@media(max-width:520px){
+  .channel-facts,.planning-summary-grid,.planning-metrics{grid-template-columns:1fr 1fr}
+  .cost-line{grid-template-columns:1fr}
+  .cost-note{grid-column:auto}
+}
+@media(max-width:390px){
+  .channel-actions,.channel-facts,.planning-summary-grid,.planning-metrics{grid-template-columns:1fr}
+}
