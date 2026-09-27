@@ -187,27 +187,27 @@ export function TodayStaffSummaryCard({value,onOpen}:{value:OwnerTodayStaffSumma
 export function TodayInsightCard({value}:{value:OwnerTodayInsightViewModel}){
   const empty=!value.topProductLabel&&!value.currentHourTrendLabel;
   return <section className="card">
-    <div className="section-head"><div><span className="eyebrow purple">Insight</span><h2>商品 / 時段</h2></div></div>
-    {empty?<div className="insight-empty"><strong>UNAVAILABLE</strong><span>Top Product / Current Hour Trend 尚未有正式 projection。</span></div>:
+    <div className="section-head"><div><span className="eyebrow purple">營運觀察</span><h2>商品／時段</h2></div></div>
+    {empty?<div className="insight-empty"><strong>未有資料</strong><span>熱賣商品同目前時段走勢暫未更新。</span></div>:
       <div className="insight-grid">
-        <div><span>Top Product</span><strong>{value.topProductLabel??'UNAVAILABLE'}</strong></div>
-        <div><span>Current Hour Trend</span><strong>{value.currentHourTrendLabel??'UNAVAILABLE'}</strong></div>
+        <div><span>熱賣商品</span><strong>{value.topProductLabel??'未有資料'}</strong></div>
+        <div><span>目前時段</span><strong>{value.currentHourTrendLabel??'未有資料'}</strong></div>
       </div>}
-    <div className="fresh-row"><span>{value.freshness??'UNKNOWN'}</span><span>{value.observedAt?new Date(value.observedAt).toLocaleString('zh-HK'):'未有更新時間'}</span></div>
+    <div className="fresh-row"><span>{humanFreshness(value.freshness)}</span><span>{value.observedAt?new Date(value.observedAt).toLocaleString('zh-HK'):'未有更新時間'}</span></div>
   </section>;
 }
 
 export function GlobalStateBanner({state,onRetry}:{state:OwnerConnectionState;onRetry:()=>void}){
   if(state==='FRESH')return null;
   const copy:Record<Exclude<OwnerConnectionState,'FRESH'>,{title:string;detail:string}>={
-    LOADING:{title:'同步中',detail:'正在讀取正式 Owner projection。'},
-    EMPTY:{title:'暫時冇資料',detail:'目前 projection 為空；唔會用假資料補位。'},
-    STALE:{title:'資料稍舊',detail:'畫面會保留最後讀回，但清楚標示資料已過時。'},
+    LOADING:{title:'同步中',detail:'正在更新最新營運資料。'},
+    EMPTY:{title:'暫時冇資料',detail:'資料未更新完成前，呢度唔會用推算數字補位。'},
+    STALE:{title:'資料稍舊',detail:'畫面會保留最後一次資料，並清楚標示更新時間。'},
     PARTIAL:{title:'部分資料',detail:'只顯示已確認部分；唔會將部分當完整。'},
-    OFFLINE_READONLY:{title:'離線唯讀',detail:'可以查看已保留資料，但所有遠端 mutation 已停用。'},
+    OFFLINE_READONLY:{title:'離線唯讀',detail:'可以查看已保留資料，但遠端操作暫時停用。'},
     PERMISSION_DENIED:{title:'權限不足',detail:'目前身份無權讀取呢部分資料。'},
-    ERROR:{title:'暫時未能同步',detail:'請稍後重試；技術錯誤內容只留 Diagnostics / log。'},
-    UNKNOWN:{title:'狀態未明',detail:'UNKNOWN 會保持獨立，唔會當 ERROR 或成功。'},
+    ERROR:{title:'暫時未能同步',detail:'請稍後再試；詳細技術資料會留喺診斷工具。'},
+    UNKNOWN:{title:'狀態未明',detail:'未確認結果前，畫面唔會當成已完成或失敗。'},
   };
   const value=copy[state];
   return <section className="recovery-banner"><div><strong>{value.title}</strong><span>{value.detail}</span></div>{state==='PERMISSION_DENIED'?null:<button onClick={onRetry}>重新確認</button>}</section>;
