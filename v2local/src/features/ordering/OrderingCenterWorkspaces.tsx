@@ -18,6 +18,8 @@ export interface WorkspaceCartLine{
   readonly qty:number;
   readonly unitMinor:number;
   readonly detail?:string;
+  readonly optionSelections?:Readonly<Record<string,readonly string[]>>;
+  readonly freeNote?:string;
 }
 export type OrderingPanelState=
   |{readonly type:'product';readonly productId:string;readonly lineId?:string}
@@ -48,7 +50,10 @@ export function quickConfigurationForProduct(product:WorkspaceProduct){
     const names=options.map(option=>option.name);
     return names.length?[set.name+'：'+names.join('、')]:[];
   }).join(' · ');
-  return Object.freeze({eligible:true,detail,deltaMinor});
+  const optionSelections=Object.freeze(Object.fromEntries(
+    chosen.flatMap(({set,options})=>options.length?[[set.id,Object.freeze(options.map(option=>option.id))]]:[]),
+  ) as Readonly<Record<string,readonly string[]>>);
+  return Object.freeze({eligible:true,detail,deltaMinor,optionSelections});
 }
 
 export const DRINK_SUPPLEMENT_PRODUCT_PREFIX='drink-supplement:' as const;
@@ -133,7 +138,7 @@ export function requiredTasksForCart(lines:readonly WorkspaceCartLine[],products
   for(const line of lines){
     const product=byProduct.get(line.productId);
     if(!product)continue;
-    const current=explicitConfigurationFromDetail(product,line.detail).selected;
+    const current=line.optionSelections??explicitConfigurationFromDetail(product,line.detail).selected;
     for(const set of product.optionSets??[]){
       const min=Math.max(set.required?1:0,set.min);
       if(min<=0)continue;
@@ -180,7 +185,10 @@ export function applyRequiredSelectionToCart<T extends WorkspaceCartLine>(
     if(normalized.length<min||normalized.length>max)throw new Error('REQUIRED_FAST_LANE_SELECTION_INVALID');
 
     const configuration=explicitConfigurationFromDetail(product,line.detail);
-    const selected:Record<string,string[]>={...configuration.selected,[groupId]:normalized};
+    const selected:Record<string,string[]>=Object.fromEntries(
+      Object.entries(line.optionSelections??configuration.selected).map(([id,ids])=>[id,[...ids]]),
+    );
+    selected[groupId]=normalized;
     let deltaMinor=0;
     const detailParts:string[]=[];
     for(const optionSet of product.optionSets??[]){
@@ -192,11 +200,16 @@ export function applyRequiredSelectionToCart<T extends WorkspaceCartLine>(
         deltaMinor+=options.reduce((sum,option)=>sum+option.priceAdjustmentMinor,0);
       }
     }
-    if(configuration.note)detailParts.push(configuration.note);
+    const freeNote=line.freeNote??configuration.note;
+    if(freeNote)detailParts.push(freeNote);
     return {
       ...line,
       unitMinor:product.priceMinor+deltaMinor,
       detail:detailParts.join(' · ')||undefined,
+      optionSelections:Object.freeze(Object.fromEntries(
+        Object.entries(selected).flatMap(([id,ids])=>ids.length?[[id,Object.freeze([...ids])]]:[]),
+      )),
+      freeNote,
     } as T;
   });
 }
@@ -223,12 +236,35 @@ export function ProductConfigWorkspace({
   product,initial,mode='add',pricingBaseMinor,onAdd
 }:{
   product:WorkspaceProduct;
-  initial?:{readonly qty:number;readonly detail?:string};
+  initial?:{
+    readonly qty:number;
+    readonly detail?:string;
+    readonly optionSelections?:Readonly<Record<string,readonly string[]>>;
+    readonly freeNote?:string;
+  };
   mode?:'add'|'edit';
   pricingBaseMinor?:number;
-  onAdd:(detail:string,deltaMinor:number,qty:number)=>void;
+  onAdd:(
+    detail:string,
+    deltaMinor:number,
+    qty:number,
+    optionSelections:Readonly<Record<string,readonly string[]>>,
+    freeNote:string,
+  )=>void;
 }){
-  const initialState=useMemo(()=>productEditorInitialFromDetail(product,initial?.detail),[product,initial?.detail]);
+  const initialState=useMemo(()=>{
+    const parsed=productEditorInitialFromDetail(product,initial?.detail);
+    if(!initial?.optionSelections&&initial?.freeNote===undefined)return parsed;
+    const selected=Object.fromEntries(
+      (product.optionSets??[]).map(set=>{
+        const supplied=initial?.optionSelections?.[set.id];
+        if(!supplied)return [set.id,parsed.selected[set.id]??[]];
+        const allowed=new Set(set.options.map(option=>option.id));
+        return [set.id,[...new Set(supplied)].filter(id=>allowed.has(id))];
+      }),
+    ) as Record<string,string[]>;
+    return Object.freeze({selected:Object.freeze(selected),note:initial?.freeNote??parsed.note});
+  },[product,initial?.detail,initial?.optionSelections,initial?.freeNote]);
   const priceBase=pricingBaseMinor??product.priceMinor;
   const [qty,setQty]=useState(initial?.qty??1);
   const [note,setNote]=useState(initialState.note);
@@ -284,7 +320,13 @@ export function ProductConfigWorkspace({
       :<section className="cfg-block"><header><b>商品選項</b><span>Admin</span></header><p>此商品目前冇已發布選項組。</p></section>}
 
     <label className="cfg-note"><span>備註</span><input value={note} maxLength={60} onChange={event=>setNote(event.target.value)} placeholder="例如：不要蔥、醬分開"/><small>{note.length}/60</small></label>
-    <footer className="cfg-action"><div><span>單價</span><b>{money(priceBase+delta)}</b></div><button className="primary" disabled={invalid} onClick={()=>onAdd(detail,delta,qty)}>{mode==='edit'?'儲存修改':'加入訂單'}　{money((priceBase+delta)*qty)}</button></footer>
+    <footer className="cfg-action"><div><span>單價</span><b>{money(priceBase+delta)}</b></div><button className="primary" disabled={invalid} onClick={()=>onAdd(
+      detail,
+      delta,
+      qty,
+      Object.freeze(Object.fromEntries(Object.entries(selected).flatMap(([id,ids])=>ids.length?[[id,Object.freeze([...ids])]]:[]))),
+      note.trim(),
+    )}>{mode==='edit'?'儲存修改':'加入訂單'}　{money((priceBase+delta)*qty)}</button></footer>
   </div>;
 }
 
@@ -551,7 +593,14 @@ export interface WorkspaceHoldDraft{
   readonly note:string;
   readonly totalMinor:number;
   readonly assignedTable?:string;
-  readonly items:readonly {id:string;name:string;qty:number;unitMinor:number}[];
+  readonly items:readonly {
+    id:string;
+    name:string;
+    qty:number;
+    unitMinor:number;
+    detail?:string;
+    composition?:unknown;
+  }[];
 }
 
 export function HoldListWorkspace({holds,onRestore,onRemove}:{holds:readonly WorkspaceHoldDraft[];onRestore:(hold:WorkspaceHoldDraft)=>void;onRemove:(id:string)=>void}){
