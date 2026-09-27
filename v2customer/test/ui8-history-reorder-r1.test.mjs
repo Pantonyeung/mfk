@@ -24,6 +24,11 @@ test('Stage8 provides current completed and all filters',()=>{
   assert.match(ui8,/>全部</);
 });
 
+test('Stage8 preserves deterministic page states including READY and EMPTY',()=>{
+  for(const state of['LOADING','READY','EMPTY','ERROR','OFFLINE','STALE','UNKNOWN'])assert.match(ui8,new RegExp(state));
+  assert.match(ui8,/return hasRows\?'READY':'EMPTY'/);
+});
+
 test('historical order is read-only and reorder never reopens old order',()=>{
   assert.match(ui8,/Historical Order 只讀/);
   assert.match(ui8,/Past Order → Copy Intent → New Cart/);
@@ -85,7 +90,7 @@ test('Stage8 keeps fixed five-item bottom nav with Orders active and no sixth it
   const ids=[...nav.matchAll(/\{id:'(home|menu|cart|orders|more)' as const/g)].map(match=>match[1]);
   assert.deepEqual(ids,['home','menu','cart','orders','more']);
   assert.match(app,/view==='orders'/);
-  assert.match(app,/BottomNavigation active=\{view==='pickup'\?'orders':view as/);
+  assert.match(app,/BottomNavigation active=\{view==='pickup'\|\|view==='orders'\?'orders':view as/);
   assert.match(styles,/\.bottom-navigation\{position:fixed[\s\S]*grid-template-columns:repeat\(5,1fr\)[\s\S]*safe-area-inset-bottom/);
   assert.match(styles,/\.bottom-navigation button\{[^}]*min-height:60px/);
 });
@@ -106,4 +111,9 @@ test('history projection is canonical and reorder is enabled only with sanitized
 test('Stage8 introduces no Stage9 Seed Reward mutation',()=>{
   assert.doesNotMatch(ui8,/Stage9|seed|reward|issueCoupon|redeemCoupon/i);
   assert.doesNotMatch(reorder,/seed|reward|coupon|paymentEvidence|fulfillment|orderId/i);
+});
+
+test('Stage8 formal composition exposes both supplied male and female IP variants',()=>{
+  assert.match(ui8,/stage8-history-male\.svg/);
+  assert.match(ui8,/stage8-history-female\.svg/);
 });
