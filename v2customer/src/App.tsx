@@ -4,7 +4,7 @@ import {resolveCustomerRuntimePort} from './runtime';
 import {buildCustomerRecommendations} from './recommendation';
 import {publishedCartRepairs,quotePublishedCart,repairPublishedCartLine} from './local-quote';
 import {buildWhatsAppFallbackUrl} from './whatsapp-fallback';
-import {customerComboPublishedUnitMinor,restoreCustomerComboSelectionState,selectedCustomerComboIntent,selectedCustomerOptions,toggleCustomerComboSelection,toggleCustomerSelection,validateCustomerComboSelection,validateCustomerSelections,type CustomerComboSelectionState,type CustomerSelectionState} from './selection';
+import {customerComboPublishedUnitMinor,customerStandalonePublishedUnitMinor,restoreCustomerComboSelectionState,selectedCustomerComboIntent,selectedCustomerOptions,toggleCustomerComboSelection,toggleCustomerSelection,validateCustomerComboSelection,validateCustomerSelections,type CustomerComboSelectionState,type CustomerSelectionState} from './selection';
 import {BottomNavigation,CustomerHeader,StatusBanner,type ActionState,type ProductOriginRect} from './ui/primitives';
 import {CartView,CheckoutView,HomeView,MemberView,OrdersView,type MenuLayout,type OrderSegment} from './components/customer-views';
 import {ProductSheet} from './components/product-sheet-ui3';
