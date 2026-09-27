@@ -10,9 +10,9 @@ import {
   buildRiceballPairingDraft,
   existingPairingGroups,
   pairingAssignmentsFromDraft,
-  pairingGroupFromDetail,
+  pairingGroupForLine,
   pairingPriceForAssignment,
-  pairingRoleFromDetail,
+  pairingRoleForLine,
   nextPairingStartIndex,
   standalonePriceForLine,
   swapPairingSnack,
@@ -55,7 +55,7 @@ export function RiceballPairingWorkspace({
   const assignedSnackIds=new Set(Object.values(assignments).filter((id):id is string=>Boolean(id)));
   const pairCount=draft.slots.filter(slot=>Boolean(assignments[slot.id])).length;
   const mainLineIds=new Set(draft.slots.map(slot=>slot.main.lineId));
-  const drinkTargetCart=cart.filter(line=>mainLineIds.has(line.id)||pairingRoleFromDetail(line.detail)==='MAIN');
+  const drinkTargetCart=cart.filter(line=>mainLineIds.has(line.id)||pairingRoleForLine(line)==='MAIN');
 
   const snackOwner=(snackId:string)=>{
     const slot=draft.slots.find(row=>assignments[row.id]===snackId);
@@ -71,7 +71,7 @@ export function RiceballPairingWorkspace({
     {existing.length?<section className="pairing-existing">
       <header><b>已建立套餐</b><span>{existing.length} 組</span></header>
       <div>{existing.map(label=>{
-        const rows=cart.filter(line=>pairingGroupFromDetail(line.detail)===label);
+        const rows=cart.filter(line=>pairingGroupForLine(line)===label);
         return <article key={label}>
           <div><b>{label} 組</b><span>{rows.map(line=>line.name).join(' + ')}</span></div>
           <strong>{money(rows.reduce((sum,line)=>sum+line.unitMinor*line.qty,0))}</strong>
