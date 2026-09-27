@@ -592,6 +592,19 @@ body{
 
 .planning-workspace{display:grid;gap:16px;padding-bottom:18px}
 .planning-target-card,.planning-cost-card{border:1px solid var(--line,#e7e1d7);border-radius:18px;background:#fff;padding:16px;display:grid;gap:14px}
+.planning-canonical-state,.planning-save-card{border:1px solid var(--line,#e7e1d7);border-radius:16px;background:#f8f5ef;padding:14px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.planning-canonical-state>div,.planning-save-card>div{display:grid;gap:3px}
+.planning-canonical-state span,.planning-save-card span{font-size:11px;color:var(--muted,#766f66)}
+.planning-canonical-state strong,.planning-save-card strong{font-size:13px}
+.planning-canonical-state p,.planning-save-card p{grid-column:1/-1;margin:2px 0 0;font-size:12px;line-height:1.5}
+.planning-canonical-state button{grid-column:1/-1;min-height:44px;border:1px solid var(--line,#ded7cc);border-radius:12px;background:#fff;font:inherit;font-weight:700}
+.planning-canonical-state[data-read-state="UNKNOWN"],.planning-canonical-state[data-save-state="UNKNOWN"],.planning-canonical-state[data-save-state="REJECTED"]{border-color:#e7b56a;background:#fff8e9}
+.planning-note-input{display:grid;gap:7px}
+.planning-note-input span{font-size:13px;font-weight:700}
+.planning-note-input textarea{width:100%;min-height:76px;resize:vertical;border:1px solid var(--line,#ded7cc);border-radius:12px;padding:10px 12px;background:#fff;font:inherit}
+.planning-save-card{grid-template-columns:1fr;position:sticky;bottom:0;z-index:2;box-shadow:0 -8px 24px rgba(23,59,114,.06)}
+.planning-save-card .primary{min-height:48px}
+
 .planning-target-card>header,.planning-cost-card>header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
 .planning-target-card h3,.planning-cost-card h3{margin:3px 0 0;font-size:20px}
 .planning-target-card header small,.planning-cost-card header small,.planning-target-card header span,.planning-cost-card header span{color:var(--muted,#766f66);font-size:12px}
@@ -622,7 +635,7 @@ body{
 .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 
 @media (max-width:640px){
-  .channel-detail-grid,.channel-proof-card,.channel-actions,.planning-metric-grid{grid-template-columns:1fr}
+  .channel-detail-grid,.channel-proof-card,.channel-actions,.planning-metric-grid,.planning-canonical-state{grid-template-columns:1fr}
   .planning-cost-head,.planning-cost-row{grid-template-columns:72px 1fr 1fr;gap:6px}
   .planning-cost-row input{padding:9px 8px}
 }
