@@ -773,7 +773,7 @@ function StaffLogin({session,onSession}:{session:SmmStaffSession|null;onSession:
   if(session)return <section className="panel staff-login"><h2>{session.displayName}</h2><p>{session.role} · 呢部手機已使用同 SMT 共用嘅員工帳戶。離開收銀機去其他位置工作都會保持呢個帳戶；停用員工時會失效。</p><button className="danger" onClick={()=>{clearSmmStaffSession();onSession(null);setState('已登出。');}}>登出／切換帳戶</button></section>;
 
   return <section className="panel staff-login"><p>{state}</p>
-    <label>員工帳戶<select value={staffId} onChange={e=>setStaffId(e.target.value)}><option value="" disabled>{staff.length?'請選擇帳戶':'未有可用帳戶'}</option>{staff.map(item=><option key={item.staffId} value={item.staffId}>{item.displayName} · {item.role}</option>)}</select></label>
+    <label>員工帳戶<select value={staffId} onChange={e=>setStaffId(e.target.value)}><option value="" disabled>{staff.length?'請選擇帳戶':'未有可用帳戶'}</option>{staff.map(item=><option key={item.staffId} value={item.staffId}>{item.loginId?item.loginId+' · ':''}{item.displayName} · {item.role}</option>)}</select></label>
     <label>PIN<input type="password" inputMode="numeric" value={pin} onChange={e=>setPin(e.target.value.replace(/\D/g,'').slice(0,8))} placeholder="4–8 位數字"/></label>
     <button className="primary" disabled={busy||!staffId||pin.length<4} onClick={async()=>{
       if(busy)return;
