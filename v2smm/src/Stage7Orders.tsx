@@ -340,7 +340,7 @@ export function Stage7OrdersView({
     />;
   }
 
-  return <section className="stage7-page" data-stage7-visual={segment==='ACTIVE'?'7.1_ACTIVE':'7.2_HISTORY'}>
+  return <section className="stage7-page" aria-label="訂單記錄" data-stage7-visual={segment==='ACTIVE'?'7.1_ACTIVE':'7.2_HISTORY'}>
     <header className="stage7-header">
       <h1>訂單</h1>
       <button type="button" onClick={()=>setSurface('SEARCH')} aria-label="搜尋訂單">⌕</button>
