@@ -11,11 +11,14 @@ import {buildLocalReport,readLocalDayCloses,resolveBusinessWindow} from './local
 import {readBusinessCutoff} from './cash-opening.ts';
 import {readSmtDeviceId} from './admin-config-sync.ts';
 import {
+  applyCapacityOverrideApproval,
   applyManualCapacityCorrection,
   ensureCurrentCapacityPoolState,
   planCapacityDeductionEvents,
   planCapacityRestoreEvents,
+  type CapacityOverrideScope,
   type CapacityPoolOrderEvent,
+  type CapacityRemoteChannel,
   type SmtCapacityPoolStateView,
 } from './capacity-pool-state.ts';
 import {validateAdminRefundEvent,type AdminRefundEvent} from '../../../contracts/admin-refund-v1.ts';
@@ -287,6 +290,7 @@ function appendCapacityDeductionEvents(
   items:readonly {id:string;qty:number}[],
   otherOrders:readonly StoredOrder[],
   at:string,
+  channel?:CapacityRemoteChannel,
 ){
   const existingEvents=capacityEventsFromOrders(otherOrders);
   const events=planCapacityDeductionEvents({
@@ -294,6 +298,7 @@ function appendCapacityDeductionEvents(
     admissionId,
     items,
     existingEvents,
+    ...(channel?{channel}:{}),
     now:Date.parse(at),
   });
   return events.length?{...order,capacityEvents:[...(order.capacityEvents??[]),...events]}:order;
@@ -332,6 +337,7 @@ export interface CleanSmtCoreRuntimePort{
   readAvailability?():Promise<SmtAvailabilityProjection>;
   readCapacityPoolState?():Promise<SmtCapacityPoolStateView>;
   adjustCapacityPool?(poolId:string,remainingQty:number,note?:string):Promise<SmtCapacityPoolStateView>;
+  approveCapacityOverride?(poolId:string,input:{submissionId:string;scope:CapacityOverrideScope;quantity:number;note?:string}):Promise<SmtCapacityPoolStateView>;
   setAvailability?(nodeId:string,status:SmtAvailabilityStatus,expectedRevision:number):Promise<SmtAvailabilityProjection>;
   createDiningWait?(input:{partySize:number;note?:string}):Promise<LocalHoldDraft>;
   updateDiningPartySize?(holdId:string,partySize:number):Promise<LocalDiningHoldDetail>;
@@ -410,6 +416,7 @@ export interface MfkLocalRuntime extends CleanSmtCoreRuntimePort{
     paymentVerificationState?:'PENDING'|'VERIFIED'|'REJECTED';
     customerPhone?:string;
     initialFulfillmentLabel?:StoredOrder['fulfillmentLabel'];
+    capacityChannel?:CapacityRemoteChannel;
   }):StoredOrder;
   orders():readonly StoredOrder[];
   acceptOrder(orderId:string):Promise<{readonly orderId:string;readonly status:'ACCEPTED';readonly provider:KeetaProviderMirrorResult}>;
@@ -1318,7 +1325,7 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
       ...(session?{staffId:session.staffId,staffName:session.displayName}:{}),
       items:input.items.map(item=>({...item})),
     };
-    const order=appendCapacityDeductionEvents(baseOrder,'ORDER',baseOrder.items,data.orders,createdAt);
+    const order=appendCapacityDeductionEvents(baseOrder,'ORDER',baseOrder.items,data.orders,createdAt,input.capacityChannel);
     data={...data,orders:[order,...data.orders]};
     save();
     projectOrder(order);
@@ -2265,6 +2272,22 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
       poolId,
       remainingQty,
       note,
+      staffId:session?.staffId,
+      staffName:session?.displayName,
+      orderEvents:capacityEventsFromOrders(data.orders),
+    });
+    for(const listener of listeners){try{listener();}catch{console.warn('CAPACITY_OBSERVER_FAILED');}}
+    return view;
+  },
+  async approveCapacityOverride(poolId,input){
+    const session=readActiveStaffSession();
+    if(staffAuthRequired()&&!session)throw new Error('CAPACITY_STAFF_LOGIN_REQUIRED');
+    const view=applyCapacityOverrideApproval({
+      poolId,
+      submissionId:input.submissionId,
+      scope:input.scope,
+      quantity:input.quantity,
+      note:input.note,
       staffId:session?.staffId,
       staffName:session?.displayName,
       orderEvents:capacityEventsFromOrders(data.orders),
