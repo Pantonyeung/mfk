@@ -61,6 +61,9 @@ function commandFromReadback(body:Record<string,unknown>):CustomerCommandResult{
       state:'CONFIRMED',
       message:'店舖已確認收到訂單',
       orderId:typeof body.canonicalOrderId==='string'?body.canonicalOrderId:undefined,
+      displayCode:typeof body.canonicalDisplay==='string'?body.canonicalDisplay:undefined,
+      committedAt:typeof body.committedAt==='string'?body.committedAt:undefined,
+      totalMinor:Number.isSafeInteger(Number(body.totalMinor))?Number(body.totalMinor):undefined,
     };
   }
   if(state==='REJECTED'){
