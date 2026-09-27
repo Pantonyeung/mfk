@@ -408,6 +408,70 @@ export function buildOwnerReadModelSnapshot({active,orders,reports,acks,observed
   };
 }
 
+const CUSTOMER_STAGE_BY_FULFILLMENT=Object.freeze({
+  '待處理':'RECEIVED',
+  '等待店舖確認':'RECEIVED',
+  '已接單':'ACCEPTED',
+  '進行中':'PREPARING',
+  '製作中':'PREPARING',
+  '稍有延誤':'DELAYED',
+  '可取餐':'READY',
+  '未能接單':'REJECTED',
+  '已拒絕':'REJECTED',
+  '已取消':'CANCELED',
+  '已完成':'COMPLETED',
+});
+function customerStageForFulfillment(label){
+  return CUSTOMER_STAGE_BY_FULFILLMENT[String(label||'').trim()]||'RECEIVED';
+}
+function customerPaymentStatusLabel(order){
+  const state=String(order.paymentVerificationState||'').trim().toUpperCase();
+  if(state==='PENDING')return '付款憑證待店舖核對';
+  if(state==='VERIFIED')return '付款憑證已核對';
+  if(state==='REJECTED')return '付款憑證未通過';
+  const payment=String(order.paymentLabel||'').trim();
+  return payment||'';
+}
+export function mapCustomerOrderProjection(input){
+  const order=row(input);
+  const stage=customerStageForFulfillment(order.fulfillmentLabel);
+  const observedAt=String(order.updatedAt||order.createdAt||new Date().toISOString());
+  const itemRows=rows(order.items);
+  const display=String(order.display||'');
+  const totalMinor=Math.max(0,Number(order.totalMinor)||0);
+  const phoneDigits=String(order.customerPhone||'').replace(/\D/g,'');
+  const pickupCode=phoneDigits.length>=4?phoneDigits.slice(-4):'';
+  const etaLabel=String(order.etaLabel||order.promisedReadyLabel||'').trim();
+  const reason=stage==='CANCELED'
+    ?String(order.cancellationReason||'').trim()
+    :stage==='REJECTED'
+      ?String(order.rejectionReason||'').trim()
+      :'';
+  const paymentStatusLabel=customerPaymentStatusLabel(order);
+  const canonicalTimeline=rows(order.fulfillmentHistory).flatMap(raw=>{
+    const entry=row(raw);
+    const rawLabel=String(entry.label||entry.state||'').trim();
+    if(!rawLabel)return[];
+    const at=String(entry.at||entry.atLabel||entry.observedAt||'').trim();
+    if(!at)return[];
+    return[{at,stage:customerStageForFulfillment(rawLabel),label:rawLabel,...(entry.detail?{detail:String(entry.detail)}:{})}];
+  });
+  return{
+    orderId:String(order.orderId||''),
+    displayCode:display,
+    stage,
+    itemSummary:itemRows.map(item=>String(row(item).name||'')).filter(Boolean).join('、'),
+    amountLabel:moneyLabel(totalMinor),
+    ...(paymentStatusLabel?{paymentStatusLabel}:{}),
+    ...(pickupCode?{pickupCode,phoneMasked:'•••• '+pickupCode}:{}),
+    ...(etaLabel?{etaLabel}:{}),
+    ...(reason?{rejectionReason:reason}:{}),
+    observedAt,
+    readback:'CONFIRMED',
+    timeline:canonicalTimeline.length?canonicalTimeline:[{at:observedAt,stage,label:String(order.fulfillmentLabel||stage)}],
+  };
+}
+
 function customerPublicSnapshot(active,customerOrders=[]){
   const snapshot=row(active?.snapshot);
   const catalog=row(snapshot.catalog);
@@ -616,29 +680,7 @@ function customerPublicSnapshot(active,customerOrders=[]){
   const customerPresentation=row(row(snapshot.presentation).customer);
   const customerChannel=row(snapshot.customerChannelPolicy);
   const channelAvailable=customerChannel.enabled===true;
-  const stageFor=label=>label==='待處理'?'RECEIVED':label==='進行中'?'PREPARING':label==='可取餐'?'READY':label==='已完成'?'COMPLETED':label==='已取消'?'REJECTED':'RECEIVED';
-  const projectOrder=rawOrder=>{
-    const order=row(rawOrder);
-    const stage=stageFor(String(order.fulfillmentLabel||''));
-    const observedAt=String(order.updatedAt||order.createdAt||new Date().toISOString());
-    const itemRows=rows(order.items);
-    const display=String(order.display||'');
-    const totalMinor=Math.max(0,Number(order.totalMinor)||0);
-    const phoneDigits=String(order.customerPhone||'').replace(/\D/g,'');
-    const pickupCode=phoneDigits.length>=4?phoneDigits.slice(-4):'';
-    return{
-      orderId:String(order.orderId||''),
-      displayCode:display,
-      stage,
-      itemSummary:itemRows.map(item=>String(row(item).name||'')).filter(Boolean).join('、'),
-      amountLabel:moneyLabel(totalMinor),
-      ...(pickupCode?{pickupCode,phoneMasked:'•••• '+pickupCode}:{}),
-      observedAt,
-      readback:'CONFIRMED',
-      timeline:[{at:observedAt,stage,label:String(order.fulfillmentLabel||stage)}],
-    };
-  };
-  const projectedOrders=customerOrders.map(projectOrder).filter(order=>order.orderId&&order.displayCode);
+  const projectedOrders=customerOrders.map(mapCustomerOrderProjection).filter(order=>order.orderId&&order.displayCode);
   return{
     store:{
       storeId:String(active?.storeId||'MF01'),
