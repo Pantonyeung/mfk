@@ -1,3 +1,4 @@
+import {createCloudOwnerRuntimePort} from './cloud-runtime';
 import type {OwnerRuntimePort} from './product-types';
 
 declare global {
@@ -8,6 +9,7 @@ declare global {
 
 export function resolveOwnerRuntimePort():OwnerRuntimePort|null{
   if(typeof window==='undefined')return null;
-  const candidate=window.__MFK_OWNER_PRODUCT_PORT__;
-  return candidate?.portId==='MFK_OWNER_PORT_V1'?candidate:null;
+  const injected=window.__MFK_OWNER_PRODUCT_PORT__;
+  if(injected?.portId==='MFK_OWNER_PORT_V1')return injected;
+  return createCloudOwnerRuntimePort();
 }

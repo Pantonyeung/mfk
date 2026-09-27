@@ -34,16 +34,11 @@ test('owner capability registry remains complete with commands disconnected',()=
   const reads=registry.filter(item=>item.KIND!=='COMMAND_SHAPE');
   assert.equal(commands.length,18);
   assert.deepEqual([...new Set(commands.map(item=>item.STATUS))],['NOT_WIRED']);
-  assert.deepEqual([...new Set(reads.map(item=>item.STATUS))],['PRODUCT_READY_NOT_CONNECTED']);
+  assert.ok(reads.every(item=>['PRODUCT_READY_NOT_CONNECTED','PRODUCT_READY_PARTIAL_CONNECTED','CONNECTED_READ'].includes(item.STATUS)));
 });
 
-test('owner production source has zero live network or transaction authority',()=>{
+test('owner production source has bounded read networking and zero transaction authority',()=>{
   const forbidden=[
-    /\bfetch\s*\(/,
-    /\bWebSocket\b/,
-    /\bXMLHttpRequest\b/,
-    /\baxios\b/,
-    /\/api\//,
     /createFormalOrder/,
     /allocateDisplayNumber/,
     /storeKernel\s*\./i,
@@ -51,11 +46,13 @@ test('owner production source has zero live network or transaction authority',()
     /cashDrawer\s*\./i,
     /\bD1Database\b/,
     /\bindexedDB\b/,
-    /new\s+Worker\s*\(/,
-    /\bsetInterval\s*\(/,
-    /\bsetTimeout\s*\(/
+    /new\s+Worker\s*\(/
   ];
   for(const pattern of forbidden)assert.equal(pattern.test(source),false,String(pattern));
+  const cloud=fs.readFileSync(path.join(srcRoot,'cloud-runtime.ts'),'utf8');
+  assert.match(cloud,/\/api\/owner\/snapshot/);
+  assert.match(cloud,/x-mfk-owner-session/);
+  assert.doesNotMatch(cloud,/x-mfk-admin-publish-key|\/api\/projection\/orders/);
 });
 
 test('local Owner workspace is durable and explicitly non-authoritative',()=>{
@@ -84,15 +81,20 @@ test('complete Owner product surfaces remain present',()=>{
   ])assert.match(source,new RegExp(marker));
 });
 
-test('typed Owner runtime port is injection-only',()=>{
+test('typed Owner runtime keeps injection override and adds first-party authenticated read fallback',()=>{
   const runtime=fs.readFileSync(path.join(srcRoot,'runtime.ts'),'utf8');
+  const cloud=fs.readFileSync(path.join(srcRoot,'cloud-runtime.ts'),'utf8');
   const types=fs.readFileSync(path.join(srcRoot,'product-types.ts'),'utf8');
   assert.match(runtime,/__MFK_OWNER_PRODUCT_PORT__/);
+  assert.match(runtime,/createCloudOwnerRuntimePort/);
   assert.match(types,/MFK_OWNER_PORT_V1/);
   assert.match(types,/readSnapshot\(\)/);
-  assert.match(types,/requestBoundedAction\?/);
-  assert.match(types,/requestAdminDeepLink\?/);
-  assert.doesNotMatch(runtime,/fetch|WebSocket|XMLHttpRequest/);
+  assert.match(types,/readOwnerSession\?/);
+  assert.match(types,/loginOwner\?/);
+  assert.match(cloud,/MFK_OWNER_LOGIN_V1/);
+  assert.match(cloud,/PBKDF2/);
+  assert.match(cloud,/HMAC/);
+  assert.doesNotMatch(cloud,/x-mfk-admin-publish-key/);
 });
 
 test('bounded actions require runtime and target readback semantics',()=>{
@@ -712,4 +714,21 @@ test('Stage03 keeps seven detail sections, four-field search, and no mutations a
   assert.doesNotMatch(components,/>取消訂單<|>退款<|>修改付款<|>Tender Correction/);
   assert.doesNotMatch(components,/<(?:span|strong|small|p|h\d)[^>]*>\{order\.orderId\}/);
   assert.match(mapping,/No second Order \/ Pricing \/ Payment \/ Print \/ Auth \/ Sync authority/);
+});
+
+
+test('Owner auth UI is fail-closed before canonical read',()=>{
+  const app=fs.readFileSync(path.join(srcRoot,'App.tsx'),'utf8');
+  assert.match(app,/OWNER ACCESS/);
+  assert.match(app,/Admin 已發布嘅 OWNER Staff ID 同 PIN/);
+  assert.match(app,/PERMISSION_DENIED/);
+  assert.match(app,/正式資料未完成身份確認前唔會載入/);
+});
+
+test('Owner read runtime refreshes without enabling bounded mutation transport',()=>{
+  const app=fs.readFileSync(path.join(srcRoot,'App.tsx'),'utf8');
+  const cloud=fs.readFileSync(path.join(srcRoot,'cloud-runtime.ts'),'utf8');
+  assert.match(app,/visibilitychange/);
+  assert.match(app,/15000/);
+  assert.doesNotMatch(cloud,/requestBoundedAction\s*:/);
 });

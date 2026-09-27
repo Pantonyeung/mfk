@@ -18,6 +18,7 @@ import {isCanonicalActionUnknown,selectOpenActions} from './stage02-open-actions
 import {OrderOversightPage} from './stage03-order-oversight';
 import type {OwnerOrderScope} from './stage03-view-model';
 import type {
+  OwnerAuthSession,
   OwnerConnectionState,
   OwnerReadModelSnapshot,
   OwnerRuntimePort,
@@ -36,6 +37,12 @@ export function App(){
   const [port]=useState<OwnerRuntimePort|null>(()=>resolveOwnerRuntimePort());
   const [connection,setConnection]=useState<OwnerConnectionState>(port?'LOADING':'OFFLINE_READONLY');
   const [snapshot,setSnapshot]=useState<OwnerReadModelSnapshot|null>(null);
+  const [ownerSession,setOwnerSession]=useState<OwnerAuthSession|null>(null);
+  const [authChecked,setAuthChecked]=useState(false);
+  const [loginStaffId,setLoginStaffId]=useState('');
+  const [loginPin,setLoginPin]=useState('');
+  const [loginBusy,setLoginBusy]=useState(false);
+  const [loginError,setLoginError]=useState<string|null>(null);
   const [notice,setNotice]=useState<string|null>(null);
   const [tool,setTool]=useState<Tool|null>(null);
   const [confirmation,setConfirmation]=useState<Confirmation|null>(null);
@@ -61,13 +68,63 @@ export function App(){
       setSnapshot(next);
       setConnection(resolveSnapshotState(next));
       return next;
-    }catch{
-      setConnection('ERROR');
+    }catch(reason){
+      const code=typeof reason==='object'&&reason&&'code' in reason?String((reason as {code?:unknown}).code||''):'';
+      if(code==='OWNER_SESSION_REQUIRED'||code==='OWNER_SESSION_UNAUTHORIZED'){
+        setOwnerSession(null);setConnection('PERMISSION_DENIED');
+      }else if(code==='OWNER_NETWORK_ERROR'){
+        setConnection('OFFLINE_READONLY');
+      }else{
+        setConnection('ERROR');
+      }
       return null;
     }
   };
 
-  useEffect(()=>{void refresh()},[]);
+  useEffect(()=>{
+    let cancelled=false;
+    void(async()=>{
+      if(port?.readOwnerSession){
+        const session=await port.readOwnerSession();
+        if(cancelled)return;
+        setOwnerSession(session);setAuthChecked(true);
+        if(!session){setConnection('PERMISSION_DENIED');return}
+      }else setAuthChecked(true);
+      await refresh();
+    })();
+    return()=>{cancelled=true};
+  },[port]);
+
+  useEffect(()=>{
+    if(!port||!ownerSession)return;
+    const visible=()=>{if(document.visibilityState==='visible')void refresh();};
+    const focus=()=>void refresh();
+    const timer=window.setInterval(()=>{if(document.visibilityState==='visible')void refresh();},15000);
+    document.addEventListener('visibilitychange',visible);window.addEventListener('focus',focus);
+    return()=>{window.clearInterval(timer);document.removeEventListener('visibilitychange',visible);window.removeEventListener('focus',focus);};
+  },[port,ownerSession?.sessionToken]);
+
+  const login=async()=>{
+    if(!port?.loginOwner||loginBusy)return;
+    setLoginBusy(true);setLoginError(null);
+    try{
+      const session=await port.loginOwner(loginStaffId,loginPin);
+      setOwnerSession(session);setLoginPin('');setConnection('LOADING');await refresh();
+    }catch(reason){
+      const code=typeof reason==='object'&&reason&&'code' in reason?String((reason as {code?:unknown}).code||''):'';
+      setConnection(code==='OWNER_NETWORK_ERROR'?'OFFLINE_READONLY':'PERMISSION_DENIED');
+      setLoginError(
+        code==='OWNER_NETWORK_ERROR'
+          ?'暫時未能連接 Owner 服務，請檢查網絡後再試。'
+          :code==='OWNER_AUTH_UNAUTHORIZED'||code==='OWNER_AUTH_UNAVAILABLE'
+            ?'Staff ID 或 PIN 未能通過 Owner 身份驗證。'
+            :'未能完成 Owner 身份驗證，請重新嘗試。'
+      );
+    }finally{setLoginBusy(false);}
+  };
+  const logout=async()=>{
+    await port?.logoutOwner?.();setOwnerSession(null);setSnapshot(null);setConnection('PERMISSION_DENIED');
+  };
 
   const openActions=useMemo(()=>selectOpenActions(snapshot?.actions??[]),[snapshot?.actions]);
 
@@ -153,10 +210,25 @@ export function App(){
 
   const connectionLabel=connection==='FRESH'?'資料新鮮':connection==='LOADING'?'同步中':connection==='EMPTY'?'暫無資料':connection==='STALE'?'資料稍舊':connection==='PARTIAL'?'部分資料':connection==='OFFLINE_READONLY'?'離線唯讀':connection==='PERMISSION_DENIED'?'權限不足':connection==='UNKNOWN'?'狀態未明':'同步失敗';
 
+  if(!authChecked){
+    return <main className="app-shell owner-auth-shell"><section className="owner-auth-gate"><strong>正在驗證 Owner 工作階段</strong><p>正式資料未完成身份確認前唔會載入。</p></section></main>;
+  }
+  if(port?.loginOwner&&!ownerSession){
+    return <main className="app-shell owner-auth-shell"><form className="owner-auth-gate" onSubmit={event=>{event.preventDefault();void login();}}>
+      <span>OWNER ACCESS</span><h1>老闆登入</h1>
+      <p>使用 Admin 已發布嘅 OWNER Staff ID 同 PIN。身份未確認前不會讀取訂單、電話或營業資料。</p>
+      <label><span>Staff ID</span><input value={loginStaffId} onChange={event=>setLoginStaffId(event.target.value)} autoComplete="username" /></label>
+      <label><span>PIN</span><input value={loginPin} onChange={event=>setLoginPin(event.target.value.replace(/\D/g,'').slice(0,8))} inputMode="numeric" type="password" autoComplete="current-password" /></label>
+      {loginError?<div className="owner-auth-error" role="alert">{loginError}</div>:null}
+      <button type="submit" disabled={loginBusy||!loginStaffId.trim()||loginPin.length<4}>{loginBusy?'驗證中…':'登入'}</button>
+    </form></main>;
+  }
+
   return <main className="app-shell">
     <header className="topbar">
       <img className="brand-logo" src="/brand/morefun-logo-canonical.png" alt="磨飯 More Fun" />
       <div className="brand-copy"><strong>老闆中心</strong><span>{snapshot?.store?.storeName??'未連接門店'} · {snapshot?.store?.businessDate??'營業日未有資料'}</span></div>
+      {ownerSession?<button className="owner-session-pill" onClick={()=>void logout()} title="登出 Owner 工作階段">{ownerSession.displayName} · 登出</button>:null}
       <button className="state-pill" onClick={()=>void refresh()} aria-label="重新同步"><i/>{connectionLabel}</button>
     </header>
 
