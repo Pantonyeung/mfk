@@ -2055,6 +2055,7 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
     });
   },
   async updateDiningPartySize(holdId,partySize){
+    return withDiningMutationLock('hold:'+holdId,async()=>{
     const snapshot=readDiningState();
     const hold=requireDiningHold(snapshot,holdId);
     if(hold.archivedAt||hold.cancelledAt)throw new Error('DINING_HISTORY_PROTECTED');
@@ -2071,6 +2072,7 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
       });
     }
     return clone(diningDetail(updated));
+    });
   },
   async removeDiningWait(id){
     return withDiningMutationLock('wait-list',async()=>{
@@ -2082,7 +2084,7 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
     });
   },
   async admitDiningHold(holdId){
-    return withDiningMutationLock('admission:'+holdId,async()=>{
+    return withDiningMutationLock('hold:'+holdId,async()=>{
     const snapshot=readDiningState();
     const hold=requireDiningHold(snapshot,holdId);
     if(hold.archivedAt)throw new Error('DINING_HISTORY_PROTECTED');
@@ -2100,7 +2102,7 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
     });
   },
   async assignDiningTable(holdId,tableId){
-    return withDiningMutationLock('table:'+holdId,async()=>{
+    return withDiningMutationLock('hold:'+holdId,async()=>{
     const snapshot=readDiningState();
     const hold=requireDiningHold(snapshot,holdId);
     if(hold.archivedAt)throw new Error('DINING_HISTORY_PROTECTED');
@@ -2120,7 +2122,7 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
     });
   },
   async joinDiningTable(holdId,tableId){
-    return withDiningMutationLock('table:'+holdId,async()=>{
+    return withDiningMutationLock('hold:'+holdId,async()=>{
     const snapshot=readDiningState();
     const hold=requireDiningHold(snapshot,holdId);
     if(hold.archivedAt||hold.cancelledAt)throw new Error('DINING_HISTORY_PROTECTED');
@@ -2140,7 +2142,7 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
     });
   },
   async unjoinDiningTable(holdId,tableId){
-    return withDiningMutationLock('table:'+holdId,async()=>{
+    return withDiningMutationLock('hold:'+holdId,async()=>{
     const snapshot=readDiningState();
     const hold=requireDiningHold(snapshot,holdId);
     if(hold.archivedAt||hold.cancelledAt)throw new Error('DINING_HISTORY_PROTECTED');
@@ -2154,7 +2156,7 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
     });
   },
   async unassignDiningTable(holdId){
-    return withDiningMutationLock('table:'+holdId,async()=>{
+    return withDiningMutationLock('hold:'+holdId,async()=>{
     const snapshot=readDiningState();
     const hold=requireDiningHold(snapshot,holdId);
     if(hold.archivedAt)throw new Error('DINING_HISTORY_PROTECTED');
@@ -2220,6 +2222,7 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
     return clone(await ensureDiningPaymentReceiptBySubmission(holdId,submissionId));
   },
   async appendDiningItems(holdId,input){
+    return withDiningMutationLock('hold:'+holdId,async()=>{
     const snapshot=readDiningState();
     const hold=requireDiningHold(snapshot,holdId);
     const appended=appendDiningItemsToSnapshot(snapshot,hold,input);
@@ -2231,11 +2234,13 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
       projectDiningOrderNonBlocking(appended.order);
     }
     return Object.freeze({detail:clone(diningDetail(appended.hold)),additionId:appended.addition.id});
+    });
   },
   async ensureDiningAdditionPrint(holdId,additionId){
     return clone(await ensureDiningAdditionPrintById(holdId,additionId));
   },
   async correctDiningLine(holdId,input){
+    return withDiningMutationLock('hold:'+holdId,async()=>{
     const snapshot=readDiningState();
     const hold=requireDiningHold(snapshot,holdId);
     if(hold.archivedAt&&(hold.payments??[]).length)throw new Error('DINING_PAID_LINE_USE_REFUND');
@@ -2288,9 +2293,10 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
     projectDiningOrderNonBlocking(finalized.order);
     appendActionAudit({action:'DINING_LINE_VOID_NOTICE',orderId:order.id,reason:result.code});
     return Object.freeze({detail:clone(diningDetail(finalized.hold)),correction:clone(finalizedCorrection)});
+    });
   },
   async overrideDiningLinePrice(holdId,lineIndex,effectiveUnitMinor,reason,expectedRevision){
-    return withDiningMutationLock('price:'+holdId,async()=>{
+    return withDiningMutationLock('hold:'+holdId,async()=>{
       const snapshot=readDiningState();
       const hold=requireDiningHold(snapshot,holdId);
       if(expectedRevision&&expectedRevision!==diningCheckoutRevision(hold))throw new Error('DINING_PRICE_OVERRIDE_STALE');
@@ -2350,6 +2356,7 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
     });
   },
   async settleDiningHold(holdId,selections,tender,command){
+    return withDiningMutationLock('hold:'+holdId,async()=>{
     if(!command||typeof command.submissionId!=='string'||!command.submissionId.trim()||command.submissionId.length>200||
        typeof command.expectedRevision!=='string'||!command.expectedRevision){
       throw new Error('DINING_CHECKOUT_REFRESH_REQUIRED');
@@ -2441,8 +2448,10 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
     });
     projectDiningOrderNonBlocking(ensured.order);
     return clone(diningDetail(ensured.hold));
+    });
   },
   async clearDiningHold(holdId){
+    return withDiningMutationLock('hold:'+holdId,async()=>{
     const snapshot=readDiningState();
     const hold=requireDiningHold(snapshot,holdId);
     if(hold.archivedAt)return;
@@ -2452,6 +2461,7 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
     }
     const archived=archiveDiningHold(hold,new Date().toISOString());
     commitDiningHolds(snapshot,snapshot.holds.map(row=>row.id===holdId?archived:row));
+    });
   },
   async readAvailability(){
     return {revision:1,nodes:Object.entries(productNames).map(([nodeId,label])=>({nodeId,label,status:data.availability[nodeId]||'available',sourceLabel:'LOCAL'})),canChange:true};
