@@ -29,13 +29,17 @@ import {
   smmStage4DiningTargetStatus,
   smmStage4TenderLabel,
 } from './stage4-checkout.mjs';
+import {Stage5SubmitView,type SmmStage5Session} from './Stage5Submit';
+import {smmStage5ConfirmedDisplayCode,smmStage5RepairPath,smmStage5SubmissionShortRef} from './stage5-submit.mjs';
 import './stage1.css';
 import './stage2.css';
 import './stage3.css';
 import './stage4.css';
+import './stage5.css';
 import type {
   SmmCartLine,
   SmmConnectionState,
+  SmmCommandResult,
   SmmOrderProjection,
   SmmPendingIntent,
   SmmProduct,
@@ -79,6 +83,16 @@ export function App(){
   const [cartNote,setCartNote]=useState(initial.cartNote);
   const [submitting,setSubmitting]=useState(false);
   const submitLockRef=useRef(false);
+  const [stage5Reading,setStage5Reading]=useState(false);
+  const [stage5Session,setStage5Session]=useState<SmmStage5Session|null>(()=>{
+    const restored=initial.pendingIntents.find(item=>item.state==='PENDING'||item.state==='UNKNOWN'||item.state==='REJECTED');
+    if(!restored)return null;
+    return Object.freeze({
+      intent:restored,
+      state:restored.state==='REJECTED'?'REJECTED':'UNKNOWN',
+      message:restored.state==='PENDING'?'上次提交被中斷；只會確認原本結果。':restored.lastMessage,
+    });
+  });
   const [search,setSearch]=useState('');
   const [orderSearch,setOrderSearch]=useState('');
   const [orderSegment,setOrderSegment]=useState<OrderSegment>('active');
@@ -469,14 +483,25 @@ export function App(){
     persist({pendingIntents:next});
   };
 
-  const resolveConfirmedIntent=(intent:SmmPendingIntent,message:string)=>{
+  const resolveConfirmedIntent=(intent:SmmPendingIntent,result:SmmCommandResult)=>{
+    const displayCode=smmStage5ConfirmedDisplayCode(result.displayCode);
+    if(!displayCode){
+      const unknown=Object.freeze({...intent,state:'UNKNOWN' as const,updatedAt:nowIso(),lastMessage:'正式訂單已建立，但流水號讀回未完成'});
+      saveIntent(unknown);
+      setStage5Session(Object.freeze({intent:unknown,state:'UNKNOWN',message:'正式結果未完整；只會讀回原本提交，直至取得正式流水號。'}));
+      setNotice('正式結果未完整；購物草稿仍然保留，未有建立第二張單。');
+      return false;
+    }
     removeIntent(intent.submissionId);
     setCart([]);
     setCartNote('');
+    setCheckoutStage(false);
     persist({cart:[],cartNote:'',pendingIntents:pendingIntents.filter(item=>item.submissionId!==intent.submissionId)});
     setCartOpen(false);
-    setNotice(message);
+    setStage5Session(Object.freeze({intent,state:'CONFIRMED',displayCode,message:result.message}));
+    setNotice(null);
     void refresh();
+    return true;
   };
 
   const releaseSubmitLock=()=>{submitLockRef.current=false;setSubmitting(false);};
@@ -501,113 +526,143 @@ export function App(){
       releaseSubmitLock();
       return;
     }
+
+    const unresolved=pendingIntents.find(item=>item.state==='PENDING'||item.state==='UNKNOWN'||item.state==='NOT_CONNECTED');
+    if(unresolved){
+      if(!port?.readSubmission){
+        const unknown=Object.freeze({...unresolved,state:'UNKNOWN' as const,updatedAt:nowIso(),lastMessage:'原提交結果未明'});
+        saveIntent(unknown);
+        setStage5Session(Object.freeze({intent:unknown,state:'UNKNOWN',message:'原提交結果未明；只會確認原本結果。'}));
+        releaseSubmitLock();
+        return;
+      }
+      const prior=await port.readSubmission(unresolved.submissionId);
+      if(prior.state==='CONFIRMED'){
+        resolveConfirmedIntent(unresolved,prior);
+        releaseSubmitLock();
+        return;
+      }
+      if(prior.state==='REJECTED'){
+        const rejected=Object.freeze({...unresolved,state:'REJECTED' as const,updatedAt:nowIso(),lastMessage:prior.message});
+        saveIntent(rejected);
+        setStage5Session(Object.freeze({intent:rejected,state:'REJECTED',message:prior.message}));
+        releaseSubmitLock();
+        return;
+      }
+      const unknown=Object.freeze({...unresolved,state:'UNKNOWN' as const,updatedAt:nowIso(),lastMessage:prior.message});
+      saveIntent(unknown);
+      setStage5Session(Object.freeze({intent:unknown,state:'UNKNOWN',message:prior.message}));
+      setNotice('原提交結果仍未確認；未有再次送出。');
+      releaseSubmitLock();
+      return;
+    }
+
     const existing=pendingIntents.find(item=>
-      (item.state==='DRAFT'||item.state==='NOT_CONNECTED'||item.state==='UNKNOWN')&&
+      item.state==='DRAFT'&&
       item.menuRevision===menu.revision&&
       item.checkout?.serviceMode===serviceMode&&
       item.checkout?.tender===tender&&
       item.publishedTotalMinor===publishedTotalMinor&&
-      JSON.stringify(item.checkout?.diningTarget??null)===JSON.stringify(diningTarget)
+      JSON.stringify(item.checkout?.diningTarget??null)===JSON.stringify(diningTarget)&&
+      JSON.stringify(item.cart)===JSON.stringify(cart)
     );
-
-    let base:SmmPendingIntent;
-    if(existing&&existing.state!=='DRAFT'){
-      if(!port?.readSubmission){
-        setNotice('原提交結果未明；未重新送出，避免重複訂單。');
-        releaseSubmitLock();
-        return;
-      }
-      const prior=await port.readSubmission(existing.submissionId);
-      if(prior.state==='CONFIRMED'){
-        resolveConfirmedIntent(existing,prior.message||'門店已確認訂單');
-        releaseSubmitLock();
-        return;
-      }
-      if(prior.state!=='REJECTED'){
-        saveIntent(Object.freeze({...existing,state:prior.state==='UNKNOWN'?'UNKNOWN':'NOT_CONNECTED',updatedAt:nowIso(),lastMessage:prior.message}));
-        setNotice('原提交結果仍未確認；未重新送出，避免重複訂單。');
-        releaseSubmitLock();
-        return;
-      }
-      removeIntent(existing.submissionId);
-      base=createSmmPendingIntent({
-        cart,
-        menuRevision:menu.revision,
-        publishedTotalMinor,
-        serviceMode,
-        tender,
-        ...(diningTarget?{diningTarget}:{}),
-      });
-    }else{
-      base=existing??createSmmPendingIntent({
-        cart,
-        menuRevision:menu.revision,
-        publishedTotalMinor,
-        serviceMode,
-        tender,
-        ...(diningTarget?{diningTarget}:{}),
-      });
-    }
+    const base=existing??createSmmPendingIntent({
+      cart,
+      menuRevision:menu.revision,
+      publishedTotalMinor,
+      serviceMode,
+      tender,
+      ...(diningTarget?{diningTarget}:{}),
+    });
+    saveIntent(base);
+    setStage5Session(Object.freeze({intent:base,state:'DRAFT',message:'提交身份已鎖定。'}));
 
     if(!port?.submitOrder){
-      const next={...base,state:'NOT_CONNECTED' as const,updatedAt:nowIso(),lastMessage:'門店提交服務尚未連接；草稿已保存。'};
-      saveIntent(Object.freeze(next));
-      setNotice('已保存本機待提交草稿；未建立正式訂單。');
+      setNotice('門店提交服務尚未連接；草稿已保存，未建立正式訂單。');
       releaseSubmitLock();
       return;
     }
-    const pending=Object.freeze({...base,state:'PENDING' as const,updatedAt:nowIso(),lastMessage:'已送到 Internet 訂單橋，等待 SMT 接收'});
+
+    const pending=Object.freeze({...base,state:'PENDING' as const,updatedAt:nowIso(),lastMessage:'已送出一次，等待 SMT 正式確認'});
     saveIntent(pending);
+    setStage5Session(Object.freeze({intent:pending,state:'PENDING',message:'已送出一次，等待 SMT 正式確認。'}));
     setCartOpen(false);
-    setNotice('訂單提交中；可以繼續其他操作，請勿重複提交。');
+    setNotice(null);
     try{
       const result=await port.submitOrder(pending);
       if(result.state==='CONFIRMED'){
-        resolveConfirmedIntent(pending,result.message||'門店已確認訂單');
+        resolveConfirmedIntent(pending,result);
         releaseSubmitLock();
         return;
       }
-      if(result.state==='REJECTED'){
-        removeIntent(pending.submissionId);
-        if(result.message.startsWith('SMM_PUBLISHED_PRICE_CHANGED')||result.message.startsWith('SMM_MENU_REVISION_CHANGED')){
-          await refresh();
-          setNotice('SMT 發現餐單版本／價格已更新；SMM 已重新同步，請確認新總額後再提交。');
-        }else{
-          setNotice(result.message);
-        }
+      if(result.state==='REJECTED'||result.state==='FAILED'){
+        const rejected=Object.freeze({...pending,state:'REJECTED' as const,updatedAt:nowIso(),lastMessage:result.message});
+        saveIntent(rejected);
+        setStage5Session(Object.freeze({intent:rejected,state:'REJECTED',message:result.message}));
+        if(result.message.startsWith('SMM_PUBLISHED_PRICE_CHANGED')||result.message.startsWith('SMM_MENU_REVISION_CHANGED'))await refresh();
         releaseSubmitLock();
         return;
       }
-      const state=result.state==='UNKNOWN'?'UNKNOWN':'NOT_CONNECTED';
-      saveIntent(Object.freeze({...pending,state,updatedAt:nowIso(),lastMessage:result.message}));
-      setNotice(result.state==='UNKNOWN'?'結果未明；系統保留同一提交身份，唔會自動重送。':result.message);
+      const unknown=Object.freeze({...pending,state:'UNKNOWN' as const,updatedAt:nowIso(),lastMessage:result.message});
+      saveIntent(unknown);
+      setStage5Session(Object.freeze({intent:unknown,state:'UNKNOWN',message:result.message}));
       releaseSubmitLock();
     }catch{
-      saveIntent(Object.freeze({...pending,state:'UNKNOWN',updatedAt:nowIso(),lastMessage:'提交結果未明'}));
-      setNotice('提交結果未明；已保留同一提交身份，請先重新確認。');
+      const unknown=Object.freeze({...pending,state:'UNKNOWN' as const,updatedAt:nowIso(),lastMessage:'提交結果未明'});
+      saveIntent(unknown);
+      setStage5Session(Object.freeze({intent:unknown,state:'UNKNOWN',message:'提交結果未明；只會確認原本結果。'}));
       releaseSubmitLock();
     }
   };
 
   const readbackIntent=async(intent:SmmPendingIntent)=>{
-    if(!port?.readSubmission){
-      saveIntent(Object.freeze({...intent,state:'NOT_CONNECTED',updatedAt:nowIso(),lastMessage:'門店查詢服務尚未連接'}));
-      setNotice('門店查詢服務尚未連接；冇重新送出任何交易。');
-      return;
-    }
+    if(stage5Reading)return;
+    setStage5Reading(true);
     try{
-      const result=await port.readSubmission(intent.submissionId);
-      if(result.state==='CONFIRMED'){
-        resolveConfirmedIntent(intent,result.message||'門店已確認訂單');
+      if(!port?.readSubmission){
+        const unknown=Object.freeze({...intent,state:'UNKNOWN' as const,updatedAt:nowIso(),lastMessage:'門店查詢服務尚未連接'});
+        saveIntent(unknown);
+        setStage5Session(Object.freeze({intent:unknown,state:'UNKNOWN',message:'門店查詢服務尚未連接；未有再次送出。'}));
         return;
       }
-      const state=result.state==='UNKNOWN'?'UNKNOWN':'NOT_CONNECTED';
-      saveIntent(Object.freeze({...intent,state,updatedAt:nowIso(),lastMessage:result.message}));
-      setNotice(result.message);
+      const result=await port.readSubmission(intent.submissionId);
+      if(result.state==='CONFIRMED'){
+        resolveConfirmedIntent(intent,result);
+        return;
+      }
+      if(result.state==='REJECTED'||result.state==='FAILED'){
+        const rejected=Object.freeze({...intent,state:'REJECTED' as const,updatedAt:nowIso(),lastMessage:result.message});
+        saveIntent(rejected);
+        setStage5Session(Object.freeze({intent:rejected,state:'REJECTED',message:result.message}));
+        return;
+      }
+      const unknown=Object.freeze({...intent,state:'UNKNOWN' as const,updatedAt:nowIso(),lastMessage:result.message});
+      saveIntent(unknown);
+      setStage5Session(Object.freeze({intent:unknown,state:'UNKNOWN',message:result.message}));
     }catch{
-      saveIntent(Object.freeze({...intent,state:'UNKNOWN',updatedAt:nowIso(),lastMessage:'讀回結果未明'}));
-      setNotice('讀回結果未明；未有重新提交。');
+      const unknown=Object.freeze({...intent,state:'UNKNOWN' as const,updatedAt:nowIso(),lastMessage:'讀回結果未明'});
+      saveIntent(unknown);
+      setStage5Session(Object.freeze({intent:unknown,state:'UNKNOWN',message:'讀回結果未明；未有再次送出。'}));
+    }finally{
+      setStage5Reading(false);
     }
+  };
+
+  const repairStage5=()=>{
+    const session=stage5Session;
+    if(!session||session.state!=='REJECTED')return;
+    const repair=smmStage5RepairPath(session.message);
+    removeIntent(session.intent.submissionId);
+    setStage5Session(null);
+    if(repair.target==='STAFF'){
+      setCartOpen(false);
+      setCheckoutStage(false);
+      setView('more');
+      setMoreTool('staff');
+      return;
+    }
+    setCartOpen(true);
+    setCheckoutStage(repair.target==='CHECKOUT');
   };
 
   const changeCartNote=(value:string)=>{
@@ -757,7 +812,16 @@ export function App(){
       onRemove={lineId=>updateCart(cart.filter(line=>line.lineId!==lineId))}
       onClear={()=>{setCart([]);setCartNote('');setCheckoutStage(false);persist({cart:[],cartNote:''})}}
       onCheckout={()=>setCheckoutStage(true)}
-      onSubmitBoundary={()=>setNotice('結帳資料已確認；第 4 階段未送出正式訂單。正式提交同 PENDING／CONFIRMED／REJECTED／UNKNOWN 留待第 5 階段。')}
+      onSubmitBoundary={()=>void submitCart()}
+    />:null}
+
+    {stage5Session?<Stage5SubmitView
+      session={stage5Session}
+      submitting={submitting}
+      reading={stage5Reading}
+      onReadback={()=>void readbackIntent(stage5Session.intent)}
+      onRepair={repairStage5}
+      onDone={()=>{setStage5Session(null);setCartOpen(false);setCheckoutStage(false)}}
     />:null}
 
     {diningTargetOpen?<DiningTargetSheet
@@ -967,7 +1031,11 @@ function StaffLogin({session,onSession}:{session:SmmStaffSession|null;onSession:
 
 function PendingIntents({intents,onReadback,onDiscard}:{intents:readonly SmmPendingIntent[];onReadback:(i:SmmPendingIntent)=>void;onDiscard:(id:string)=>void}){
   if(!intents.length)return <EmptyState title="冇待提交草稿" detail="所有本機草稿都已清理。"/>;
-  return <>{intents.map(intent=><div className="list-row" key={intent.submissionId}><div><strong>{intent.state==='UNKNOWN'?'結果未明':intent.state==='NOT_CONNECTED'?'未連接':'待提交'}</strong><small>{intent.cart.length} 項 · {intent.submissionId}</small><small>{intent.lastMessage??'本機草稿，未代表正式訂單'}</small></div><div className="row-actions"><button onClick={()=>onReadback(intent)}>重新確認</button><button className="danger" onClick={()=>onDiscard(intent.submissionId)}>刪除草稿</button></div></div>)}</>;
+  return <>{intents.map(intent=>{
+    const locked=intent.state==='UNKNOWN'||intent.state==='PENDING';
+    const stateLabel=intent.state==='UNKNOWN'?'結果未明':intent.state==='PENDING'?'等待確認':intent.state==='REJECTED'?'已拒絕':intent.state==='NOT_CONNECTED'?'未連接':'待提交';
+    return <div className="list-row" key={intent.submissionId}><div><strong>{stateLabel}</strong><small>{intent.cart.length} 項 · 提交參考 {smmStage5SubmissionShortRef(intent.submissionId)}</small><small>{intent.lastMessage??'本機草稿，未代表正式訂單'}</small></div><div className="row-actions"><button onClick={()=>onReadback(intent)}>{intent.state==='UNKNOWN'?'重新確認結果':'確認結果'}</button>{!locked?<button className="danger" onClick={()=>onDiscard(intent.submissionId)}>刪除草稿</button>:null}</div></div>;
+  })}</>;
 }
 
 function ChannelList({connection,channels}:{connection:SmmConnectionState;channels:NonNullable<SmmReadModelSnapshot['channels']>}){
@@ -1420,7 +1488,7 @@ function Stage4CheckoutView({cart,quote,menu,serviceMode,tender,diningTarget,din
         <div>
           <span>第 4 階段 · 結帳</span>
           <h2>提交前確認</h2>
-          <small>呢一步只確認結帳資料；正式送出同 PENDING／CONFIRMED／REJECTED／UNKNOWN 留待第 5 階段。</small>
+          <small>確認以下資料後會進入第 5 階段正式提交；正式結果只以 SMT / Store Kernel 讀回為準。</small>
         </div>
         <button className="stage4-close" type="button" onClick={onClose} aria-label="關閉結帳">✕</button>
       </header>
@@ -1508,7 +1576,7 @@ function Stage4CheckoutView({cart,quote,menu,serviceMode,tender,diningTarget,din
       <footer className="stage4-footer">
         <button type="button" onClick={onBackToCart}>返回購物草稿</button>
         <button className="primary stage4-submit" type="button" disabled={!submitReady} onClick={onSubmitBoundary}>提交訂單</button>
-        <small>{submitReady?'結帳資料已齊；正式送出流程會喺第 5 階段接入。':serviceMode==='DINE_IN'&&!diningStatus.valid?'請先選擇餐枱或輪候。':hasAttention?'請先處理購物草稿更新。':'請確認餐單價格資料。'}</small>
+        <small>{submitReady?'結帳資料已齊；按一次後會鎖定同一提交身份。':serviceMode==='DINE_IN'&&!diningStatus.valid?'請先選擇餐枱或輪候。':hasAttention?'請先處理購物草稿更新。':'請確認餐單價格資料。'}</small>
       </footer>
     </section>
   </div>;
