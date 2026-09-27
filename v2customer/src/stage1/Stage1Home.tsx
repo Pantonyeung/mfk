@@ -35,9 +35,6 @@ function Stage1StatePanel({
   return null;
 }
 
-function Stage1ProductPlaceholder(){
-  return <span className="stage1-product-placeholder" aria-hidden="true"/>;
-}
 
 export function Stage1Home({
   snapshot,
@@ -124,7 +121,7 @@ export function Stage1Home({
       {store&&!store.channelAvailable?<section className="stage1-closed-panel">
         <span>今日暫停正式落單</span>
         <h2>仍然可以慢慢睇、慢慢揀。</h2>
-        <p>關店時仍可 Browse / Build Cart；只會喺正式 Commit 阻止交易。</p>
+        <p>而家仍然可以睇餐牌同預先揀好想食嘅餐點。</p>
         <button className="stage1-primary-cta stage1-closed-browse" disabled={!canBrowse} onClick={onBrowse}>{canBrowse?'繼續瀏覽菜單':'菜單同步中'}</button>
       </section>:null}
 
@@ -144,7 +141,7 @@ export function Stage1Home({
               onProduct(item.product,{top:rect.top,left:rect.left,width:rect.width,height:rect.height});
             }}
           >
-            <Stage1ProductPlaceholder/>
+            {item.product.imageUrl?<span className="stage1-product-media"><img src={item.product.imageUrl} alt={item.product.imageAlt??item.product.name}/></span>:<span className="stage1-product-media is-unavailable" aria-label="商品圖片暫未提供"><span>磨飯</span></span>}
             <span className="stage1-product-info">
               {item.product.badge?<small>{item.product.badge}</small>:null}
               <strong>{item.product.name}</strong>
@@ -166,17 +163,17 @@ export function Stage1Home({
           <button onClick={onMember}>
             <span>記憶券</span>
             <strong>{availableCouponCount?availableCouponCount+' 張可用':'查看記憶券'}</strong>
-            <small>Coupon 狀態以正式交易結果為準</small>
+            <small>收藏每一餐嘅小心意</small>
           </button>
           <button onClick={onHistory}>
             <span>常購清單</span>
             <strong>{history.length?'由食過嘅重新建立':'建立第一份常購'}</strong>
-            <small>Reorder 會用目前菜單重新驗證</small>
+            <small>一按就搵返熟悉味道</small>
           </button>
           <button onClick={onBrowse}>
             <span>期間限定</span>
             <strong>睇今期限定</strong>
-            <small>內容、價格、供應全部讀目前正式投影</small>
+            <small>今期限定，慢慢揀</small>
           </button>
         </div>
       </section>
@@ -185,16 +182,16 @@ export function Stage1Home({
         <button onClick={onJar}>
           <span>記憶罐</span>
           <strong>{cartCount?cartCount+' 件餐點':'今餐未開始'}</strong>
-          <small>未提交前仍然係草稿</small>
+          <small>睇返今餐揀咗啲咩</small>
         </button>
         {lastOrder?<button onClick={()=>onBuyAgain(lastOrder)}>
           <span>上次食過</span>
           <strong>{lastOrder.itemSummary}</strong>
-          <small>按目前菜單再來一單</small>
+          <small>想食返就再來一單</small>
         </button>:<button onClick={onHistory}>
           <span>訂單回憶</span>
           <strong>完成第一張訂單後會出現</strong>
-          <small>歷史內容保持唯讀</small>
+          <small>食過嘅味道會留喺呢度</small>
         </button>}
       </section>
     </div>
