@@ -6,6 +6,15 @@ function grainLabel(value:OwnerSellabilityItem['grain']){
 }
 function scopeLabel(value:OwnerSellabilityItem['scope']){return value==='ONLINE_ONLY'?'只停網上':'全渠道';}
 
+const FINAL_PRODUCT_MEDIA:Readonly<Record<string,string>>=Object.freeze({
+  '紫米飯團 A':'/brand/owner-final/sellability/rice-roll-a.webp',
+  '紫米飯團 B':'/brand/owner-final/sellability/rice-roll-b.webp',
+  '紫米飯團 C':'/brand/owner-final/sellability/rice-roll-c.webp',
+  '紫米飯團 D':'/brand/owner-final/sellability/rice-roll-d.webp',
+  '台式炸雞便當':'/brand/owner-final/sellability/fried-chicken-bento.webp',
+});
+function productMedia(name:string){return FINAL_PRODUCT_MEDIA[name.trim()]??null;}
+
 export function SellabilityPage({
   items,connection,busy,result,onDismissResult,onCommand,onReload,onBack,
 }:{
@@ -70,8 +79,8 @@ export function SellabilityPage({
     </section>
 
     {!rows.length?<section className="card empty-state"><h2>未有符合條件嘅商品</h2><p>可以調整搜尋或類型篩選再查看。</p></section>:
-      <div className="sellability-list">{rows.map(item=><article className="card sellability-row" key={item.grain+':'+item.targetId}>
-        <div className="sellability-media" data-grain={item.grain} aria-hidden="true"><span>{grainLabel(item.grain).slice(0,1)}</span></div>
+      <div className="sellability-list">{rows.map(item=>{const media=productMedia(item.name);return <article className="card sellability-row" key={item.grain+':'+item.targetId}>
+        <div className="sellability-media" data-grain={item.grain}>{media?<img src={media} alt="" loading="lazy" decoding="async"/>:<span aria-hidden="true">{grainLabel(item.grain).slice(0,1)}</span>}</div>
         <div className="sellability-copy">
           <strong>{item.name}</strong>
           <small>{grainLabel(item.grain)} · {scopeLabel(item.scope)} · {item.readback==='CONFIRMED'?'已確認':item.readback==='PARTIAL'?'部分確認':'待確認'}</small>
@@ -84,7 +93,7 @@ export function SellabilityPage({
             ?<button disabled={disabled} onClick={()=>command(item,'RESTORE')}>恢復</button>
             :<button disabled={disabled||item.state==='UNKNOWN'} onClick={()=>command(item,'SOLD_OUT')}>售罄</button>}
         </div>
-      </article>)}</div>}
+      </article>})}</div>}
     <p className="callout">改價、商品／套餐結構、平台對應同刪除商品仍然喺 Admin 處理；數量資料只供參考，唔會自動改成售罄。</p>
   </section>;
 }
