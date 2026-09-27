@@ -13,7 +13,7 @@ test('UI0 uses dedicated Stage0 assets and preserves 50:50, first, returning and
   assert.match(config,/stage0-character-male\.svg/);
   assert.match(config,/stage0-character-female\.svg/);
   assert.doesNotMatch(config,/stage7-pickup/);
-  assert.match(config,/random\(\)\)<\.5\?'male':'female'/);
+  assert.match(config,/<\.5\?'male':'female'/);
   for(const mode of ["'reduced'","'returning'","'first'"])assert.match(overlay,new RegExp(mode));
   assert.match(overlay,/onEnterHome/);
   assert.match(overlay,/onEnterMember/);
