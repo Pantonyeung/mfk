@@ -41,7 +41,7 @@ test('UI1 uses FINAL source screenshot crop for IP hero and source shortcut icon
   assert.ok(css.includes('.stage1-source-hero>img'));
   assert.ok(css.includes('width:608.4%'));
   assert.ok(css.includes('top:-332.5%'));
-  assert.ok(home.includes('item.product.imageUrl'));
+  assert.ok(home.includes('if(product.imageUrl)return product.imageUrl'));
 });
 
 test('UI2 keeps canonical product media and FINAL zero-result female IP repair',()=>{
