@@ -43,7 +43,7 @@ export function TodayLiveOrdersCard({value,onOpenActive}:{value:OwnerLiveOrdersS
     {!value?<p className="muted-copy">未有即時訂單讀回；唔會用推算數字代替。</p>:<>
       <div className="live-count-grid">
         <div><strong>{value.activeCount}</strong><span>進行中</span></div>
-        <div><strong>{value.attentionCount}</strong><span>需留意</span></div>
+        <div><strong>{value.attentionCount??'—'}</strong><span>需留意</span></div>
         <div><strong>{value.readyCount}</strong><span>可取餐</span></div>
       </div>
       {value.recentOrders.length?<div className="live-order-list">{value.recentOrders.slice(0,3).map(order=><article key={order.orderId}>
