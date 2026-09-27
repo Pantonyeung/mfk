@@ -12,7 +12,7 @@ import type {
 export type Ui8OrderSegment='current'|'completed'|'all';
 export type Ui8Phase='LIST'|'DETAIL'|'COPY'|'REPAIR'|'REVIEW';
 type Ui8CharacterVariant='male'|'female';
-const ui8CharacterPath=(variant:Ui8CharacterVariant)=>variant==='female'?'/brand/stage7-pickup-female.svg':'/brand/stage7-pickup-male.svg';
+const ui8CharacterPath=(variant:Ui8CharacterVariant)=>variant==='female'?'/brand/stage8-history-female.svg':'/brand/stage8-history-male.svg';
 
 export const CUSTOMER_UI8_SAVED_TEMPLATE_SEAM_CLASSIFICATION=
   'SAFE_UNAVAILABLE_FIRST_BREAK:CUSTOMER_SAVED_ORDER_TEMPLATE_MUTATION_SEAM_MISSING_IN_CURRENT_MAIN' as const;
