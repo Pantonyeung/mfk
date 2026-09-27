@@ -66,7 +66,7 @@ test('production App no longer imports fixtures or exposes migration/demo operat
 
 test('complete operator routes and failure states are present',()=>{
   for(const marker of[
-    '快速點餐','前線工作','訂單記錄','桌面管理','店務工具',
+    '快速點餐','待處理','訂單記錄','桌面管理','店務工具',
     '搜尋商品','商品設定','購物草稿','待提交草稿','平台狀態',
     '連線設定','商品供應','營業日','產能','營運報表','退款要求','列印狀態','診斷','正在同步餐單',
     '同步失敗','前往結帳'
