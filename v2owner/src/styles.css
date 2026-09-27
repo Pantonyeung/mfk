@@ -1365,3 +1365,28 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid 
 .compact-order-row .order-exception-row span{font-size:7px;padding:3px 5px}
 .order-filter-drawer{border-top:4px solid var(--owner-final-navy)}
 .order-filter-drawer .order-filter-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+
+
+/* Sellability command result: FINAL success / partial / unknown presentation. */
+.sellability-result-panel{
+  display:grid;grid-template-columns:48px minmax(0,1fr) auto;gap:10px;align-items:center;
+  padding:12px;border:1px solid var(--owner-final-border);border-radius:16px;background:#fff;
+  box-shadow:var(--owner-final-shadow);
+}
+.sellability-result-panel.confirmed{background:linear-gradient(145deg,#f3fff9,#fff);border-color:#ccebdd}
+.sellability-result-panel.partial{background:linear-gradient(145deg,#fffaf0,#fff);border-color:#f0ddb0}
+.sellability-result-panel.unknown{background:linear-gradient(145deg,#f6f7f9,#fff);border-color:#dfe4ea}
+.sellability-result-icon{
+  width:48px;height:48px;border-radius:50%;display:grid;place-items:center;
+  font-size:24px;font-weight:900;background:var(--owner-final-green-soft);color:var(--owner-final-green);
+}
+.sellability-result-panel.partial .sellability-result-icon{background:#fff3d5;color:#b97a11}
+.sellability-result-panel.unknown .sellability-result-icon{background:#eef1f5;color:#68788d}
+.sellability-result-panel>div:nth-child(2){display:grid;gap:2px}
+.sellability-result-panel span{font-size:8px;color:var(--owner-final-muted)}
+.sellability-result-panel h2{margin:0;font-size:14px;color:var(--owner-final-navy-deep)}
+.sellability-result-panel p{margin:0;font-size:8px;line-height:1.4;color:var(--owner-final-muted)}
+.sellability-result-panel>button{
+  min-height:34px;padding:6px 8px;border:1px solid var(--owner-final-border);border-radius:10px;
+  background:#fff;color:var(--owner-final-blue);font-size:8px;font-weight:800;
+}
