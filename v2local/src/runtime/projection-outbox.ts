@@ -22,7 +22,18 @@ export interface ProjectionOrderInput{
   readonly cancellationReason?:string;
   readonly rejectionReason?:string;
   readonly customerPhone?:string;
+  readonly customerName?:string;
   readonly paymentVerificationState?:'PENDING'|'VERIFIED'|'REJECTED';
+  readonly handoverState?:'NOT_ARRIVED'|'ARRIVED'|'VERIFIED'|'HANDED_OVER'|'COMPLETED'|'UNKNOWN';
+  readonly pickupBagCount?:number;
+  readonly pickupMealCount?:number;
+  readonly completedAt?:string;
+  readonly pickupException?:Readonly<{
+    readonly kind:'CODE_MISMATCH'|'MISSING_BAG'|'SAME_NAME'|'NO_SHOW'|'OTHER';
+    readonly resolved:boolean;
+    readonly detail?:string;
+    readonly observedAt?:string;
+  }>;
   readonly etaLabel?:string;
   readonly promisedReadyLabel?:string;
   readonly fulfillmentHistory?:readonly {
@@ -126,7 +137,13 @@ export function queueOrderProjection(order:ProjectionOrderInput){
       ...(order.cancellationReason?{cancellationReason:String(order.cancellationReason)}:{}),
       ...(order.rejectionReason?{rejectionReason:String(order.rejectionReason)}:{}),
       ...(pickupCode?{pickupCode}:{}),
+      ...(order.customerName?{customerName:String(order.customerName)}:{}),
       ...(order.paymentVerificationState?{paymentVerificationState:order.paymentVerificationState}:{}),
+      ...(order.handoverState?{handoverState:order.handoverState}:{}),
+      ...(Number.isSafeInteger(Number(order.pickupBagCount))&&Number(order.pickupBagCount)>=0?{pickupBagCount:Number(order.pickupBagCount)}:{}),
+      ...(Number.isSafeInteger(Number(order.pickupMealCount))&&Number(order.pickupMealCount)>=0?{pickupMealCount:Number(order.pickupMealCount)}:{}),
+      ...(order.completedAt?{completedAt:String(order.completedAt)}:{}),
+      ...(order.pickupException?{pickupException:Object.freeze({...order.pickupException})}:{}),
       ...(order.etaLabel?{etaLabel:String(order.etaLabel)}:{}),
       ...(order.promisedReadyLabel?{promisedReadyLabel:String(order.promisedReadyLabel)}:{}),
       ...(order.fulfillmentHistory?.length?{fulfillmentHistory:Object.freeze(order.fulfillmentHistory.map(entry=>Object.freeze({...entry})))}:{}),
