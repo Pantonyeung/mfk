@@ -104,7 +104,8 @@ function currentOrdinarySelections(line:CustomerCartLine,product:CustomerProduct
     const group=product.optionGroups.find(row=>row.optionGroupId===selection.optionGroupId);
     const option=group?.options.find(row=>row.optionId===selection.optionId&&row.available);
     if(!group||!option)return null;
-    const adjustment=Number(option.publishedAdjustmentMinor||0);
+    if(option.publishedAdjustmentMinor===undefined)return null;
+    const adjustment=Number(option.publishedAdjustmentMinor);
     if(!Number.isSafeInteger(adjustment))return null;
     optionMinor+=adjustment;
     selections.push(Object.freeze({
