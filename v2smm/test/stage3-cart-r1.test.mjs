@@ -68,7 +68,8 @@ test('Stage 3 keeps published preview facts and does not add Pricing or Combo au
 });
 
 test('Stage 3 geometry covers 440x956 primary and 360x780 minimum mobile contracts',()=>{
-  assert.match(css,/max-height:88dvh/);\n  assert.match(css,/grid-template-rows:auto auto auto minmax\\(0,1fr\\) auto auto auto/);
+  assert.match(css,/max-height:88dvh/);
+  assert.match(css,/grid-template-rows:auto auto auto minmax\(0,1fr\) auto auto auto/);
   assert.match(css,/@media\(max-width:360px\)/);
   assert.match(css,/min-height:min\(82dvh,780px\)/);
   assert.match(css,/env\(safe-area-inset-bottom\)/);
