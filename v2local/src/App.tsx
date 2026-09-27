@@ -26,7 +26,7 @@ import {ComboWorkspace,HoldCartWorkspace,HoldListWorkspace,OrganizeWorkspace,Pro
 import {RiceballPairingWorkspace} from './features/ordering/RiceballPairingWorkspace.tsx';
 import {applyRiceballPairings,buildRiceballPairingDraft,existingPairingGroups,isPairedComboLine,nextPairingStartIndex,restorePairingGroup} from './features/ordering/riceball-pairing-model.ts';
 import {applyRiceballDrinkPromotion,riceballDrinkPromotionStateEqual,stripRiceballDrinkPromotionDetail} from './features/ordering/riceball-drink-promotion-model.ts';
-import {restoreProductLineComposition,serializeProductLineComposition} from './features/ordering/line-composition.ts';
+import {restoreProductLineComposition,serializeLineComposition} from './features/ordering/line-composition.ts';
 
 type Product={
   id:string;
@@ -50,6 +50,13 @@ type CartLine={
   detail?:string;
   optionSelections?:Readonly<Record<string,readonly string[]>>;
   freeNote?:string;
+  pairing?:{
+    readonly groupLabel:string;
+    readonly comboId:string;
+    readonly comboName:string;
+    readonly role:'MAIN'|'SNACK';
+    readonly source:'AUTO'|'SPECIFIED';
+  };
 };
 
 const BASE_PRODUCTS:readonly Product[]=[
@@ -556,7 +563,7 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode,diningAddition,on
     unitMinor:line.unitMinor,
     serviceMode:line.serviceMode,
     ...(line.detail?{detail:line.detail}:{}),
-    composition:serializeProductLineComposition(line),
+    composition:serializeLineComposition(line,cart),
   }));
   const finishHold=()=>{setCart([]);setServiceMode('takeaway');setPanel(null);};
 
@@ -965,7 +972,7 @@ function CheckoutPage({cart,setCart,diningCheckout,onDiningCheckoutDone}:{cart:C
           unitMinor:line.unitMinor,
           serviceMode:line.serviceMode,
           ...(line.detail?{detail:line.detail}:{}),
-          composition:serializeProductLineComposition(line),
+          composition:serializeLineComposition(line,cart),
         })),
         totalMinor:due,
         paymentLabel,
