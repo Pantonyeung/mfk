@@ -320,7 +320,7 @@ function StageZeroStaffLogin({onSuccess}:{onSuccess:(session:SmmStaffSession)=>v
       if(!staffId&&rows[0])setStaffId(rows[0].staffId);
     }catch(reason){
       console.warn('SMM_STAGE0_STAFF_DIRECTORY_DIAGNOSTIC',reason);
-      setError('暫時未能讀取員工名單；可以直接輸入員工編號。');
+      setError('暫時未能讀取員工名單；可以直接輸入登入編號。');
     }finally{
       setDirectoryLoading(false);
     }
@@ -330,7 +330,7 @@ function StageZeroStaffLogin({onSuccess}:{onSuccess:(session:SmmStaffSession)=>v
 
   const submit=async()=>{
     if(!staffId.trim()){
-      setError('請先選擇或輸入員工編號。');
+      setError('請先選擇或輸入登入編號。');
       return;
     }
     setLoading(true);
@@ -340,7 +340,7 @@ function StageZeroStaffLogin({onSuccess}:{onSuccess:(session:SmmStaffSession)=>v
       onSuccess(session);
     }catch(reason){
       console.warn('SMM_STAGE0_STAFF_VERIFY_DIAGNOSTIC',reason);
-      setError('員工編號或 PIN 未能驗證，請確認後再試。');
+      setError('登入編號或 PIN 未能驗證，請確認後再試。');
     }finally{
       setLoading(false);
     }
@@ -358,16 +358,16 @@ function StageZeroStaffLogin({onSuccess}:{onSuccess:(session:SmmStaffSession)=>v
       {staff.length?<label className="stage0-field">
         <span>員工</span>
         <select value={staffId} onChange={event=>setStaffId(event.target.value)}>
-          {staff.map(row=><option key={row.staffId} value={row.staffId}>{row.displayName} · {row.role||row.staffId}</option>)}
+          {staff.map(row=><option key={row.staffId} value={row.staffId}>{row.loginId?row.loginId+' · ':''}{row.displayName} · {row.role||row.staffId}</option>)}
         </select>
       </label>:<label className="stage0-field">
-        <span>員工編號</span>
+        <span>登入編號</span>
         <input
           inputMode="text"
           autoComplete="username"
           value={staffId}
           onChange={event=>setStaffId(event.target.value)}
-          placeholder={directoryLoading?'讀取員工名單中…':'輸入員工編號'}
+          placeholder={directoryLoading?'讀取員工名單中…':'輸入登入編號'}
         />
       </label>}
 
