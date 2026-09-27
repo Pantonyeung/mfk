@@ -73,6 +73,22 @@ export interface CustomerReorderIntentLine{
   readonly note?:string;
 }
 
+export interface CustomerReorderHistoryPriceFact{
+  readonly intentIndex:number;
+  readonly historicalPublishedUnitMinor?:number;
+}
+
+export function customerReorderHistoryPriceFactsFromCart(
+  cart:readonly CustomerCloudCartLine[],
+):readonly CustomerReorderHistoryPriceFact[]{
+  return Object.freeze(cart.map((line,intentIndex)=>Object.freeze({
+    intentIndex,
+    ...(Number.isSafeInteger(Number(line.publishedUnitPriceMinor))&&Number(line.publishedUnitPriceMinor)>=0
+      ?{historicalPublishedUnitMinor:Number(line.publishedUnitPriceMinor)}
+      :{}),
+  })));
+}
+
 export function customerReorderIntentFromCart(
   cart:readonly CustomerCloudCartLine[],
 ):readonly CustomerReorderIntentLine[]{
