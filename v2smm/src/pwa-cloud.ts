@@ -44,7 +44,8 @@ async function readResult(submissionId:string,signal?:AbortSignal):Promise<Recor
 function finalResponse(request:SmmLanOrderRequest,body:Record<string,unknown>):SmmLanOrderResponse|null{
   if(body.state==='CONFIRMED'){
     const orderId=String(body.canonicalOrderId??'').trim();
-    if(!orderId)return null;
+    const displayCode=String(body.canonicalDisplay??'').trim();
+    if(!orderId||!displayCode)return null;
     return Object.freeze({
       protocolVersion:1,
       type:'smm.lan.order.result.v1',
@@ -53,7 +54,8 @@ function finalResponse(request:SmmLanOrderRequest,body:Record<string,unknown>):S
       idempotencyKey:request.idempotencyKey,
       disposition:'ACCEPTED',
       orderId,
-      canonicalRevision:1,
+      displayCode,
+      canonicalRevision:Number(body.canonicalRevision)||1,
     });
   }
   if(body.state==='REJECTED'){
@@ -115,7 +117,7 @@ export function createPwaCloudTransport():SmmLanTransport{
       if(body.state==='CONFIRMED'){
         return Object.freeze({
           protocolVersion:1,type:'smm.lan.order.readback.result.v1',submissionId,state:'CONFIRMED',
-          orderId:String(body.canonicalOrderId||''),canonicalRevision:1,
+          orderId:String(body.canonicalOrderId||''),displayCode:String(body.canonicalDisplay||''),canonicalRevision:Number(body.canonicalRevision)||1,
         });
       }
       if(body.state==='REJECTED'){
