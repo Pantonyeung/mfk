@@ -8,7 +8,7 @@ function roleLabel(role:string){
   if(key==='MANAGER')return '經理';
   if(key==='STAFF')return '員工';
   if(key==='VIEWER')return '只讀';
-  return role||'未有角色讀回';
+  return role||'未有角色資料';
 }
 
 function displayPresence(value:string){
@@ -84,7 +84,7 @@ export function StaffOverviewPage({
       <article className="card staff-kpi"><span>排班與實際</span><strong>未有資料</strong><small>排班及打卡資料未連接</small></article>
       <article className="card staff-kpi"><span>休息中</span><strong>未有資料</strong><small>休息資料未連接</small></article>
       <article className="card staff-kpi"><span>今日工時</span><strong>未有資料</strong><small>工時資料未連接</small></article>
-      <article className="card staff-kpi"><span>員工提醒</span><strong>未有資料</strong><small>冇獨立 staff alert source</small></article>
+      <article className="card staff-kpi"><span>員工提醒</span><strong>未有資料</strong><small>提醒資料未連接</small></article>
       <article className="card staff-kpi role-kpi"><span>角色摘要</span><strong>{staff.length?roles.map(([name,count])=>name+' '+count).join(' · '):'未有資料'}</strong><small>{staff.length?'目前啟用員工':'未有資料'}</small></article>
     </section>
 
