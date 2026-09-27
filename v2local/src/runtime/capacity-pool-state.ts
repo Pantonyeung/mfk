@@ -586,6 +586,17 @@ export function applyCapacityOverrideApproval(
   if(!view.pools.some(pool=>pool.poolId===poolId))throw new Error('CAPACITY_POOL_NOT_ACTIVE');
 
   const rows=readLocalCapacityPoolRows(storage);
+  const index=rows.findIndex(row=>row.businessDate===view.businessDate&&row.poolId===poolId);
+  if(index<0)throw new Error('CAPACITY_POOL_STATE_MISSING:'+poolId);
+  const current=rows[index]!;
+  const config=readSmtCapacityConfig().pools.find(pool=>pool.id===poolId&&pool.active&&capacityPoolCanActivate(pool));
+  if(!config)throw new Error('CAPACITY_POOL_NOT_ACTIVE');
+  const baseRemaining=baseRemainingWithoutOverride(current);
+  if(scope==='FIRST_PARTY'&&baseRemaining>config.firstPartyStopAt)throw new Error('CAPACITY_OVERRIDE_NOT_REQUIRED:FIRST_PARTY');
+  if(scope==='THIRD_PARTY'&&baseRemaining>config.thirdPartyStopAt)throw new Error('CAPACITY_OVERRIDE_NOT_REQUIRED:THIRD_PARTY');
+  if(scope==='ALL_REMOTE'&&(baseRemaining>config.firstPartyStopAt||baseRemaining>config.thirdPartyStopAt)){
+    throw new Error('CAPACITY_OVERRIDE_NOT_REQUIRED:ALL_REMOTE');
+  }
   const allApprovals=rows.flatMap(row=>row.overrides??[]);
   const requestSignature=JSON.stringify([view.businessDate,poolId,scope,quantity,note]);
   const prior=allApprovals.find(approval=>approval.submissionId===submissionId);
@@ -594,9 +605,6 @@ export function applyCapacityOverrideApproval(
     return view;
   }
 
-  const index=rows.findIndex(row=>row.businessDate===view.businessDate&&row.poolId===poolId);
-  if(index<0)throw new Error('CAPACITY_POOL_STATE_MISSING:'+poolId);
-  const current=rows[index]!;
   const toQty=current.remainingQty+quantity;
   if(!Number.isSafeInteger(toQty))throw new Error('CAPACITY_OVERRIDE_QUANTITY_INVALID');
   const approval:LocalCapacityOverrideApproval=Object.freeze({
