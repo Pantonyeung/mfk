@@ -225,7 +225,7 @@ test('SMM Stage 4 adds checkout confirmation UI while formal Stage 5 submission 
   const checkout=app.slice(start,end);
   for(const marker of['服務方式','堂食去向','付款方式','最後摘要','提交訂單'])assert.match(checkout,new RegExp(marker));
   assert.doesNotMatch(checkout,/submitCart|submitOrder|readSubmission|createSmmPendingIntent/);
-  assert.match(app,/function submitCart/);
+  assert.match(app,/const submitCart=async\(\)=>/);
   assert.match(app,/readSubmission/);
   assert.match(types,/export type SmmTender=/);
   assert.doesNotMatch(app,/產生 QR|QR 交接|createSmmQrHandoff|renderSmmQrHandoff/);
