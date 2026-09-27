@@ -1484,3 +1484,752 @@ Stage 0–12 頁面架構與使用場景已詳細定義。
 
 MILESTONE：
 MFK_SMT_STAGE_00_12_DETAILED_UI_ARCHITECTURE_RECORDED
+
+
+==================================================
+RECORD 004｜STAGE 0 詳細設計｜SMT SHELL＋GLOBAL SYSTEM LAYER
+日期：2026-09-27
+狀態：TEXT WIREFRAME / FUNCTIONAL UI SPEC
+目標：鎖定全 SMT 共用 Shell、Navigation、Global Alert、Global Attention；未進入高保真 Mockup。
+==================================================
+
+STAGE 0 核心目的
+--------------------------------------------------
+
+Stage 0 係全 SMT 嘅共同骨架。
+
+之後 Stage 1–12 所有頁面，都必須放入同一套 Shell。
+呢個 Stage 唔處理商品、付款、堂食等業務內容本身，而係處理：
+
+1. 員工永遠知道自己喺邊一頁。
+2. 高頻入口位置固定。
+3. 新單無論喺邊一頁都睇得到。
+4. Printer / Payment / Provider / Sync 異常無論喺邊一頁都可以被發現。
+5. Local Offline 唔會被誤解成「SMT 停機」。
+6. More / Tools 退到低頻位置。
+7. Staff identity 只作身份與權限提示，不搶前線空間。
+8. 全局狀態唔靠假綠燈。
+
+--------------------------------------------------
+0A｜1920×1080 MASTER SHELL
+--------------------------------------------------
+
+Primary Target：
+1920 × 1080
+
+建議固定結構：
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ TOP UTILITY BAR                                                             │
+│ Store / Local / Sync / Attention / Staff / More                            │
+├──────┬───────────────────────────────────────────────────────────────────────┤
+│      │                                                                       │
+│ NAV  │                         ROUTE STAGE                                   │
+│      │                                                                       │
+│ 點單 │                                                                       │
+│ 訂單 │                                                                       │
+│ 堂食 │                                                                       │
+│ 售罄 │                                                                       │
+│      │                                                                       │
+│      │                                                                       │
+└──────┴───────────────────────────────────────────────────────────────────────┘
+
+尺寸建議：
+
+Left Rail：
+72–80 px
+
+Top Utility Bar：
+56–64 px
+
+Route Stage：
+其餘全部
+
+Outer Gap：
+12–16 px
+
+注意：
+Stage 0 不固定 Stage 1–12 內部欄位比例；
+只固定 Shell 本身。
+
+--------------------------------------------------
+PAGE 0.1｜SMT MAIN SHELL
+--------------------------------------------------
+
+【狀態】
+UI_REWORK
+
+【目的】
+提供所有頁面共用框架。
+
+【左側 Navigation】
+
+只保留四個高頻入口：
+
+1. 點單
+2. 訂單
+3. 堂食
+4. 售罄／產能
+
+「更多」唔再做第五個高頻 Rail Item。
+More 進入 Top Utility Bar Hamburger。
+
+【Navigation Component】
+
+每項：
+- Icon
+- Label
+- Active State
+- Optional Count Badge
+
+Active：
+- Primary Blue Soft Background
+- Primary Blue Icon / Text
+
+Inactive：
+- Neutral
+
+Badge 只用：
+- Orders 有 active / pending count 時
+
+禁止：
+- 每個 Nav 不同顏色
+- Icon-only 無文字
+- 把 More 同高頻操作同級
+
+【Navigation 使用場景】
+
+Scenario 0.1-A｜正常營業
+- 點單 active
+- 其他 neutral
+- 無 alert
+
+Scenario 0.1-B｜Orders 有進行中單
+- Orders 顯示 count badge
+- 唔強迫跳頁
+
+Scenario 0.1-C｜收到新 Customer / Keeta
+- Global Alert 出現
+- Nav 本身可加 attention dot / count
+- 不自動跳 Orders
+
+Scenario 0.1-D｜當前正 Checkout
+- 左 Nav 可以保持，但 Checkout transaction 未完成時不應因誤觸 Nav 而無提示離開
+- 若離開會丟失 draft，需要 confirm guard
+
+Scenario 0.1-E｜Dining Payment Processing
+- Shell 保持
+- Global Alert 仍可見
+- Transaction area 不被新單 overlay 遮死
+
+【Top Utility Bar】
+
+由左至右建議：
+
+A. Store Identity
+- 磨飯
+- Store Code（如真係需要）
+- Business Day
+
+B. Local Runtime Status
+- LOCAL READY
+- OFFLINE / ONLINE domain status
+
+C. Attention Summary
+- 例如「3 項待處理」
+- 點擊開 Global Attention Center
+
+D. Staff
+- 員工名稱／登入識別
+- 只顯必要資料
+
+E. Hamburger
+- More / Tools
+
+【Top Utility Status 規則】
+
+Local Ready：
+只代表本地 runtime 可工作。
+唔代表：
+- Cloud 正常
+- Printer 正常
+- Keeta 正常
+- Customer 正常
+
+Cloud / Provider status：
+獨立顯示。
+
+禁止：
+單一「系統正常」綠燈代表全部 domain。
+
+【Staff 區】
+
+顯示：
+- Display Name / loginId（以現行身份模型）
+- Staff Session 狀態
+
+可操作：
+- 查看身份
+- Logout
+- 如需要進 Staff info
+
+唔應：
+- 在主 Shell 顯示 permissions JSON
+- 顯示 raw staffId / UUID
+
+【Hamburger / More】
+
+打開後：
+- 收銀與日結
+- 報表
+- 打印與設備
+- 診斷
+- 備份／恢復
+- Admin Sync
+
+Future：
+- Cash In / Out
+
+規則：
+More 係低頻入口。
+打開 More 不應令當前 Draft Transaction 自動消失。
+
+--------------------------------------------------
+PAGE 0.2｜GLOBAL NEW ORDER ALERT
+--------------------------------------------------
+
+【狀態】
+LIVE + UI_REWORK
+
+【觸發來源】
+
+- Customer
+- Keeta
+
+【不應由以下來源觸發同一種 Global New Order Alert】
+- 本機 Walk-in
+- 已經由 staff accept 完成的 order
+- 純 Provider status callback
+- Reprint / Refund / Correction
+
+【Alert 位置】
+
+建議：
+Top Utility Bar 下方，偏右上／中央上方。
+
+不能：
+- 全屏遮罩
+- 完全遮住 Checkout Keypad
+- 遮住 Dining payment action
+- 阻止本機交易繼續
+
+【Alert 結構】
+
+第一行：
+新訂單到達，要處理
+
+第二行：
+#Display / Pickup Identity
+Source
+
+第三行可選：
+到達時間
+Item Count
+
+Actions：
+- 立即處理
+- 30 秒後
+- 1 分鐘後
+
+【視覺層級】
+
+Alert Background：
+Surface Raised
+
+Attention：
+Warning / Info Accent
+
+Primary：
+立即處理
+
+Secondary：
+30 秒後
+1 分鐘後
+
+【聲音】
+
+第一次：
+一個短提示聲
+
+Snooze 回來：
+可再提示一次
+
+禁止：
+- 不停循環響
+- 每秒震動
+- 聲音本身代表已接單
+
+【場景矩陣】
+
+Scenario 0.2-A｜Customer 新單
+顯示：
+- Source = 自家平台
+- Display / customer identity
+- 立即處理
+
+按「立即處理」：
+→ Orders / Pending Review
+
+不會：
+→ 自動 Accept
+
+Scenario 0.2-B｜Keeta 新單
+顯示：
+- Source = Keeta
+- Provider order identity / local display
+
+按「立即處理」：
+→ Keeta Pending Review
+
+Scenario 0.2-C｜按 30 秒後
+- Alert 暫時消失
+- Order 保持 pending
+- 30 秒後重新浮出
+- defer / snooze 唔等於 provider defer business action
+
+Scenario 0.2-D｜按 1 分鐘後
+同上。
+
+Scenario 0.2-E｜Alert 期間另一張新單到達
+設計要求：
+- 不應覆蓋第一張而令佢消失
+- Global Alert 可顯示：
+  「2 張新單待處理」
+- 首張／最舊 pending 可作 Primary
+- 提供「查看全部」
+
+Scenario 0.2-F｜當前 Checkout processing
+- Alert 可見但降低侵入性
+- 不可以蓋住 Confirm / Result
+- 點立即處理前，如離開會破壞未完成 transaction，必須先完成/安全離開
+
+Scenario 0.2-G｜Order 已被另一流程處理
+當 Alert 仲存在：
+- 點擊時先 read current state
+- 若已處理：
+  顯示「此訂單已處理」
+  不再進行第二次 Accept
+
+【不可破壞】
+- Alert ≠ Accept
+- Snooze ≠ Reject
+- Sound ≠ Order State
+- 多張新單不可互相覆蓋遺失
+
+--------------------------------------------------
+PAGE 0.3｜GLOBAL EXCEPTION / ATTENTION CENTER
+--------------------------------------------------
+
+【狀態】
+PARTIAL_UI
+
+【目的】
+將跨頁面、需要人處理的異常集中，但唔把工程 Log 倒落前線。
+
+【入口】
+
+Top Utility：
+「待處理 3」
+
+顏色按最高 severity：
+- Critical → Red
+- Action Required → Warning
+- Information → Blue / Neutral
+
+【Attention 類型】
+
+A. PRINT
+- Printer Offline
+- Print Failed
+- Print Unknown
+- Partial Route Failure
+
+B. PAYMENT
+- Payment Evidence Pending
+- Payment Conflict
+- Payment Unknown
+
+C. PROVIDER
+- Keeta Confirm Attention
+- Keeta Intake Error
+- Provider After-sale pending
+
+D. CUSTOMER
+- Customer Evidence pending
+- Customer Intake problem
+
+E. ADMIN / CONFIG
+- Admin Sync stale
+- No valid config
+- LKG in use
+
+F. RECOVERY
+- Unfinished action
+- Readback required
+- Reconcile required
+
+【Attention Card 結構】
+
+Header：
+- Domain
+- Severity
+- Timestamp
+
+Main：
+- 人類可理解標題
+
+Example：
+「廚房製作單打印結果未能確認」
+
+Description：
+「訂單已成立，但系統無法確認廚房打印機有冇出紙。」
+
+Impact：
+「請先檢查廚房打印機，避免重複打印。」
+
+CTA：
+- 查看訂單
+- 查看打印狀態
+- 核對付款
+- 重新同步
+- 查看詳情
+
+Engineering Detail：
+收起
+點開先見：
+- Code
+- Route
+- Endpoint
+- Revision
+- Elapsed
+- Timestamp
+
+【Attention Lifecycle】
+
+NEW
+→ ACKNOWLEDGED
+→ RESOLVED
+
+如果 current runtime 冇正式 ACK state：
+UI 只做「已查看」local affordance，
+不得偽造 backend resolved state。
+
+【場景】
+
+Scenario 0.3-A｜Print FAILED
+顯示：
+- 哪張 Order
+- 哪條 Route
+- 哪部 Printer
+- Failed
+- 可選人工 Reprint（如果 runtime 允許）
+
+Scenario 0.3-B｜Print UNKNOWN
+顯示：
+- UNKNOWN
+- 禁止 Primary CTA 寫「再打印」
+- Primary 建議：「檢查打印狀態」
+- Secondary：「查看訂單」
+
+Scenario 0.3-C｜Payment Evidence Pending
+顯示：
+- Customer Order
+- Tender
+- 「付款待核對」
+- CTA：核對付款
+
+Scenario 0.3-D｜Keeta Attention
+顯示：
+- Local 已接單 / Provider confirm 未確認（如果係呢種情況）
+- Provider code 在 Engineering detail
+- 前線只見「Keeta 同步需要處理」
+
+Scenario 0.3-E｜Admin Sync Stale
+如果 LKG 可用：
+- 顯示「目前使用最後有效設定」
+- 本地交易繼續
+- CTA：查看同步
+
+如果冇 LKG：
+- 顯示受影響範圍
+- Fail closed 嗰部分
+
+Scenario 0.3-F｜多項異常
+排序：
+1. Payment / Transaction Critical
+2. Print Unknown / Failed
+3. Provider Attention
+4. Config / Sync
+5. Information
+
+【不可破壞】
+- UNKNOWN 不變 FAILED
+- Offline 不等於全部功能失效
+- Provider failure 只影響 provider seam
+- Engineering code 不做第一層訊息
+
+--------------------------------------------------
+0B｜STAGE 0 COMPONENT INVENTORY
+--------------------------------------------------
+
+必須建立：
+
+01. AppShell
+02. PrimaryRail
+03. PrimaryNavItem
+04. TopUtilityBar
+05. LocalRuntimeStatus
+06. DomainStatusChip
+07. AttentionSummaryButton
+08. StaffIdentityButton
+09. MoreMenuButton
+10. GlobalOrderAlert
+11. GlobalOrderAlertQueue
+12. AttentionDrawer / Center
+13. AttentionCard
+14. SeverityBadge
+15. DomainBadge
+16. EngineeringDetailDisclosure
+17. OfflineIndicator
+18. SyncIndicator
+19. PrinterAttentionIndicator
+20. ConfirmLeaveGuard（如 transaction draft 需要）
+
+--------------------------------------------------
+0C｜STAGE 0 STATE MATRIX
+--------------------------------------------------
+
+SHELL：
+- READY
+- LOCAL_ONLY
+- DEGRADED
+- ATTENTION
+- SESSION_EXPIRED
+
+NEW ORDER ALERT：
+- NONE
+- SINGLE_CUSTOMER
+- SINGLE_KEETA
+- MULTIPLE
+- SNOOZED
+- ALREADY_HANDLED
+
+ATTENTION CENTER：
+- EMPTY
+- INFO_ONLY
+- ACTION_REQUIRED
+- CRITICAL
+- MIXED
+- RESOLVED_HISTORY（如保留）
+
+DOMAIN：
+- ONLINE
+- OFFLINE
+- DEGRADED
+- UNKNOWN
+
+注意：
+DOMAIN state 唔可以 collapse 成一個 global boolean。
+
+--------------------------------------------------
+0D｜CURRENT vs FUTURE WIRING
+--------------------------------------------------
+
+LIVE / 可直接接：
+- Current left navigation routes
+- Orders active count
+- Customer new-order event
+- Keeta new-order event
+- Audio alert
+- 30s / 60s snooze
+- Staff session badge
+- Local runtime
+- More route
+- Printer / Diagnostics source
+- Admin sync source
+
+UI_REWORK：
+- More 由 left rail 移去 top hamburger
+- Top Utility Bar
+- Domain status presentation
+- Multi-alert aggregation
+- Attention visual hierarchy
+
+PARTIAL / FUTURE：
+- 統一 persistent Attention Center
+- 真正跨 domain resolved / acknowledged model（如 runtime 未有）
+- 更完整 Printer global alert queue
+
+--------------------------------------------------
+0E｜TEXT WIREFRAME — NORMAL STATE
+--------------------------------------------------
+
+[TOP BAR]
+磨飯 | Business Day 2026-09-27
+LOCAL READY
+Admin Sync：已同步
+待處理：0
+Staff：1111
+[☰]
+
+[LEFT RAIL]
+點單  ← Active
+訂單  3
+堂食
+售罄／產能
+
+[ROUTE STAGE]
+Stage 1 Ordering content
+
+--------------------------------------------------
+0F｜TEXT WIREFRAME — NEW ORDER
+--------------------------------------------------
+
+[TOP BAR]
+磨飯 | LOCAL READY | 待處理 1 | Staff 1111 | [☰]
+
+[GLOBAL ALERT]
+新訂單到達，要處理
+#P034 · Keeta
+剛剛到達
+
+[立即處理] [30 秒後] [1 分鐘後]
+
+[ROUTE STAGE]
+原本頁面保持可操作
+
+--------------------------------------------------
+0G｜TEXT WIREFRAME — MULTIPLE ATTENTION
+--------------------------------------------------
+
+[TOP BAR]
+磨飯
+LOCAL READY
+Cloud：離線
+待處理 3 ⚠
+Staff 1111
+[☰]
+
+點擊「待處理 3」
+
+[ATTENTION DRAWER]
+
+1.
+⚠ 打印結果未能確認
+#P032 · 廚房製作
+請先檢查打印機，避免重複打印
+[查看打印狀態]
+
+2.
+⚠ Customer 付款待核對
+#P033 · FPS
+[核對付款]
+
+3.
+i Admin 暫時未能同步
+目前使用最後有效設定
+[查看同步]
+
+--------------------------------------------------
+0H｜STAGE 0 INTERACTION RULES
+--------------------------------------------------
+
+1. Nav 切頁：
+普通頁面可直接切。
+有未完成高風險 Transaction 時，要按 runtime reality 決定是否需 leave guard。
+
+2. New Order Alert：
+永遠不直接 commit / accept。
+
+3. Attention：
+第一層必須人類可理解。
+Technical detail 第二層先顯示。
+
+4. More：
+打開 overlay / menu，不改當前 business state。
+
+5. Staff：
+身份操作不可遮蓋主要交易長時間。
+
+6. Domain Status：
+只顯示可以證明的 domain state。
+
+7. Error：
+不要用 Toast 一閃就消失處理需要人手 follow-up 的異常。
+需要 follow-up 的一定進 Attention。
+
+--------------------------------------------------
+0I｜STAGE 0 VISUAL PRIORITY
+--------------------------------------------------
+
+最高：
+- Current Page / Primary Nav
+- Active Transaction
+- Critical Attention
+
+第二：
+- New Order Alert
+- Action Required
+- Staff / Local State
+
+第三：
+- Sync detail
+- Info
+- More
+
+最低：
+- Engineering detail
+- Version / diagnostics codes
+
+--------------------------------------------------
+0J｜STAGE 0 ACCEPTANCE CHECKLIST
+--------------------------------------------------
+
+01. 1920×1080 完整顯示。
+02. 四個高頻入口位置固定。
+03. More 不再佔第五個高頻 Rail。
+04. Customer / Keeta 新單任何頁都可見。
+05. Alert 不自動 Accept。
+06. Snooze 不改 Order semantics。
+07. 多張新單不會互相覆蓋遺失。
+08. Checkout / Dining transaction 不被 Alert 阻死。
+09. Offline 不顯示成「整個系統不可用」。
+10. Printer / Payment / Provider / Admin Sync 分 domain 表達。
+11. UNKNOWN 與 FAILED 不同。
+12. 所有需要跟進異常可以留喺 Attention Center。
+13. 第一層不顯 raw code。
+14. Staff 不顯 raw internal ID。
+15. UI 不顯 raw UUID。
+16. More / Tools 不修改 current business state。
+17. Shell 可以承載 Stage 1–12。
+18. 1366×768 可以縮密度但主要位置不搬。
+19. Touch target ≥48px。
+20. 所有 status 都有文字，不靠顏色。
+
+--------------------------------------------------
+STAGE 0 OUTPUT
+--------------------------------------------------
+
+STATUS：
+TEXT WIREFRAME DEFINED
+
+READY FOR：
+Stage 0 Visual Layout Draft
+
+NOT YET：
+- High-fidelity Mockup
+- Final visual approval
+- Stage 1 visual production
+
+MILESTONE：
+MFK_SMT_UI_STAGE0_TEXT_WIREFRAME_READY
