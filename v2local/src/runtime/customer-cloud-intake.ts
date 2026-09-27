@@ -1,6 +1,7 @@
 // A3B: Customer revision/price validation + own-channel pending operator review.
 // Customer electronic tender labels come from the Admin-published payment channel.
 import {
+  customerReorderHistoryPriceFactsFromCart,
   customerReorderIntentFromCart,
   type CustomerCloudCartLine,
   type MfkCustomerOrderIntent,
@@ -439,6 +440,7 @@ async function reconcileOrders(){
         ...(intent.checkout.name?{customerName:intent.checkout.name}:{}),
         customerPhone:intent.checkout.phone,
         customerReorderIntent:customerReorderIntentFromCart(intent.cart),
+        customerReorderHistoryPriceFacts:customerReorderHistoryPriceFactsFromCart(intent.cart),
         initialFulfillmentLabel:'待處理',
       });
       window.dispatchEvent(new CustomEvent('mfk-customer-order-intake',{detail:{
