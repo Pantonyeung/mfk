@@ -35,6 +35,7 @@ test('Stage 5 implements the V2 full-screen 5.2-5.6 family instead of a generic 
   assert.match(css,/\.stage5-screen\{[\s\S]*position:fixed;[\s\S]*height:100dvh/);
   assert.doesNotMatch(css,/\.stage5-overlay|\.stage5-sheet/);
   assert.doesNotMatch(view,/className="overlay stage5|className="sheet stage5/);
+  for(const marker of['300ms','420ms','680ms','請勿關閉應用程式'])assert.ok(view.includes(marker),marker);
 });
 
 test('Stage 5 uses supplied branded artwork slots for every V2 result state',()=>{
