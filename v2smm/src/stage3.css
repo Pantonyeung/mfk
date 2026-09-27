@@ -1,5 +1,5 @@
 .stage3-overlay{z-index:42}
-.stage3-cart-sheet{max-height:88dvh;min-height:min(78dvh,780px);display:grid;grid-template-rows:auto auto minmax(0,1fr) auto auto auto;overflow:hidden;padding:10px 14px calc(12px + env(safe-area-inset-bottom));background:#f7f9fd}
+.stage3-cart-sheet{max-height:88dvh;min-height:min(78dvh,780px);display:grid;grid-template-rows:auto auto auto minmax(0,1fr) auto auto auto;overflow:hidden;padding:10px 14px calc(12px + env(safe-area-inset-bottom));background:#f7f9fd}
 .stage3-cart-header{padding-bottom:10px;border-bottom:1px solid #dde4ee}
 .stage3-cart-header h2{color:#12264a}
 .stage3-cart-header small{max-width:36ch;line-height:1.45}
