@@ -17,11 +17,11 @@ export interface OwnerTodaySummary {
   readonly orderCount:number;
   readonly averageOrderLabel:string;
   readonly comparisonLabel:string;
-  readonly staffNow:number;
-  readonly scheduledStaffCount:number;
-  readonly onBreakStaffCount:number;
-  readonly abnormalStaffCount:number;
-  readonly attentionCount:number;
+  readonly staffNow?:number;
+  readonly scheduledStaffCount?:number;
+  readonly onBreakStaffCount?:number;
+  readonly abnormalStaffCount?:number;
+  readonly attentionCount?:number;
 }
 
 export interface OwnerLiveOrderSummaryItem {
@@ -33,12 +33,12 @@ export interface OwnerLiveOrderSummaryItem {
   readonly elapsedLabel?:string;
   readonly promisedTimeLabel?:string;
   readonly exceptionBadge?:string;
-  readonly hasAttention:boolean;
+  readonly hasAttention?:boolean;
 }
 
 export interface OwnerLiveOrdersSummary {
   readonly activeCount:number;
-  readonly attentionCount:number;
+  readonly attentionCount?:number;
   readonly readyCount:number;
   readonly recentOrders:readonly OwnerLiveOrderSummaryItem[];
   readonly observedAt:string;
@@ -332,9 +332,22 @@ export interface OwnerBoundedAction {
   readonly operationId:string;
 }
 
+export interface OwnerAuthSession {
+  readonly staffId:string;
+  readonly displayName:string;
+  readonly role:'OWNER';
+  readonly scope:string;
+  readonly permissions:readonly string[];
+  readonly sessionToken:string;
+  readonly expiresAt?:string;
+}
+
 export interface OwnerRuntimePort {
   readonly portId:'MFK_OWNER_PORT_V1';
   readSnapshot():Promise<OwnerReadModelSnapshot>;
+  readOwnerSession?():Promise<OwnerAuthSession|null>;
+  loginOwner?(staffId:string,pin:string):Promise<OwnerAuthSession>;
+  logoutOwner?():Promise<void>;
   requestBoundedAction?(input:OwnerBoundedAction):Promise<OwnerCommandResult>;
   requestAdminDeepLink?():Promise<OwnerCommandResult>;
 }
