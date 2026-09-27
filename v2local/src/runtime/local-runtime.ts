@@ -930,6 +930,21 @@ function diningTableLabel(hold:LocalHoldDraft){
   const registry=readSmtDiningTableRegistry();
   return ids.map(id=>registry.find(row=>row.id===id)?.name||id).join('＋');
 }
+function diningPrintableOrder(hold:LocalHoldDraft,order:StoredOrder){
+  return {
+    ...order,
+    diningTableLabel:diningTableLabel(hold),
+    diningTicketTitle:hold.assignedTable?'堂食枱單':'堂食輪候單',
+  } as StoredOrder&{diningTableLabel:string;diningTicketTitle:string};
+}
+function diningCurrentPrintPlan(hold:LocalHoldDraft,order:StoredOrder){
+  return buildOrderPrintPlan(
+    diningPrintableOrder(hold,order),
+    readPrinterBindings(),
+    readSmtPrintConfig(),
+    'dining-initial',
+  );
+}
 const diningInitialPrintInflight=new Map<string,Promise<DiningInitialPrintResult>>();
 function storedDiningInitialPrintResult(order:StoredOrder):DiningInitialPrintResult{
   return {
@@ -965,11 +980,7 @@ function ensureDiningInitialPrintByHold(holdId:string):Promise<DiningInitialPrin
     let summary:PrintDispatchSummary;
     try{
       summary=await dispatchOrderOutputs(
-        {
-          ...attempted,
-          diningTableLabel:diningTableLabel(hold),
-          diningTicketTitle:hold.assignedTable?'堂食枱單':'堂食輪候單',
-        } as StoredOrder & {diningTableLabel:string;diningTicketTitle:string},
+        diningPrintableOrder(hold,attempted),
         undefined,
         false,
         'dining-initial',
@@ -2147,6 +2158,46 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
     return readDiningState().holds.filter(hold=>hold.kind==='dining'&&hold.archivedAt)
       .sort((a,b)=>String(b.archivedAt).localeCompare(String(a.archivedAt)))
       .map(hold=>clone(diningDetail(hold)));
+  },
+  async readDiningReprintOptions(holdId){
+    const snapshot=readDiningState();
+    const hold=requireDiningHold(snapshot,holdId);
+    if(!hold.formalOrderId)throw new Error('DINING_FORMAL_ORDER_NOT_CREATED');
+    const order=snapshot.orders.find(row=>row.id===hold.formalOrderId);
+    if(!order)throw new Error('DINING_FORMAL_ORDER_NOT_FOUND');
+    return diningCurrentPrintPlan(hold,order).map(job=>Object.freeze({
+      jobId:job.id,
+      role:job.role,
+      label:job.id.endsWith(':dining-table')?'堂食枱單':job.role,
+      detail:job.labelSpec?.pieceLabel,
+      bindingId:job.binding.id,
+      printerName:job.binding.name,
+      physicalKey:physicalKey(job.binding),
+    }));
+  },
+  async reprintDiningJobs(holdId,jobIds,reason){
+    const snapshot=readDiningState();
+    const hold=requireDiningHold(snapshot,holdId);
+    if(!hold.formalOrderId)throw new Error('DINING_FORMAL_ORDER_NOT_CREATED');
+    const order=snapshot.orders.find(row=>row.id===hold.formalOrderId);
+    if(!order)throw new Error('DINING_FORMAL_ORDER_NOT_FOUND');
+    const unique=[...new Set(jobIds.map(String).filter(Boolean))];
+    if(!unique.length)throw new Error('REPRINT_SELECTION_REQUIRED');
+    const plan=diningCurrentPrintPlan(hold,order);
+    const allowed=new Set(plan.map(job=>job.id));
+    if(unique.some(id=>!allowed.has(id)))throw new Error('DINING_REPRINT_JOB_INVALID');
+    const result=await dispatchOrderOutputs(
+      diningPrintableOrder(hold,order),
+      new Set(unique),
+      true,
+      'dining-initial',
+    );
+    appendActionAudit({
+      action:'DINING_REPRINT',
+      orderId:order.id,
+      reason:(String(reason||'').trim()||'MANUAL')+' jobs='+unique.join(','),
+    });
+    return result;
   },
   async ensureDiningInitialPrint(holdId){
     return clone(await ensureDiningInitialPrintByHold(holdId));
