@@ -732,3 +732,50 @@ test('Owner read runtime refreshes without enabling bounded mutation transport',
   assert.match(app,/15000/);
   assert.doesNotMatch(cloud,/requestBoundedAction\s*:/);
 });
+
+
+test('OA-CHN-001 exposes canonical channel semantics and disables unsupported commands',()=>{
+  const types=fs.readFileSync(path.join(srcRoot,'product-types.ts'),'utf8');
+  const page=fs.readFileSync(path.join(srcRoot,'channel-health.tsx'),'utf8');
+  const cloud=fs.readFileSync(path.join(srcRoot,'cloud-runtime.ts'),'utf8');
+  for(const field of['acceptingOrders','desiredState','observedState','health','mode','cause','observedAt','freshness','lastCommand','readback'])assert.match(types,new RegExp(field));
+  for(const mode of['NORMAL','BUSY','SNOOZED','PAUSED','CLOSED'])assert.match(types,new RegExp(mode));
+  for(const health of['HEALTHY','DEGRADED','OFFLINE','UNKNOWN'])assert.match(types,new RegExp(health));
+  assert.match(page,/暫停接單/);
+  assert.match(page,/恢復接單/);
+  assert.match(page,/未有 canonical command seam/);
+  assert.match(page,/availableActions = \[\]/);
+  assert.match(page,/所有操作保持停用/);
+  assert.doesNotMatch(cloud,/\/api\/owner\/channels\/command/);
+});
+
+test('OA-PLN-001 uses canonical runtime rather than localStorage and keeps cost semantics separate',()=>{
+  const app=fs.readFileSync(path.join(srcRoot,'App.tsx'),'utf8');
+  const types=fs.readFileSync(path.join(srcRoot,'product-types.ts'),'utf8');
+  const page=fs.readFileSync(path.join(srcRoot,'planning.tsx'),'utf8');
+  const cloud=fs.readFileSync(path.join(srcRoot,'cloud-runtime.ts'),'utf8');
+  assert.match(types,/MFK_OWNER_MONTHLY_PLAN_V1/);
+  assert.match(types,/monthlyRevenueTargetMinor/);
+  assert.match(types,/plannedMonthlyMinor/);
+  assert.match(types,/actualToDateMinor/);
+  assert.match(types,/expectedRevision/);
+  assert.match(types,/COMPLETE.*PARTIAL.*MANUAL_ESTIMATE/s);
+  assert.match(page,/Current Effective Sales/);
+  assert.match(page,/估算營運淨利（按已輸入成本）/);
+  assert.match(page,/本月目標已達成/);
+  assert.match(page,/預計 \/ Forecast/);
+  assert.match(page,/Draft \/ Pending \/ External Pre-admission \/ 未結帳 Open Check \/ estimatedOpenAmount 不會加入/);
+  assert.doesNotMatch(page,/localStorage|sessionStorage/);
+  assert.match(cloud,/\/api\/owner\/planning/);
+  assert.match(app,/營業目標與成本/);
+});
+
+test('Stage04 keeps four-item bottom navigation and secondary routes',()=>{
+  const app=fs.readFileSync(path.join(srcRoot,'App.tsx'),'utf8');
+  const navBlock=app.match(/<nav className="bottom-nav"[\s\S]*?<\/nav>/)?.[0]??'';
+  assert.equal((navBlock.match(/<Nav /g)||[]).length,4);
+  for(const label of['今日','待處理','訂單','更多'])assert.match(navBlock,new RegExp(label));
+  assert.match(app,/\/channels/);
+  assert.match(app,/\/planning/);
+  assert.match(app,/MonthlyTargetSummaryCard/);
+});
