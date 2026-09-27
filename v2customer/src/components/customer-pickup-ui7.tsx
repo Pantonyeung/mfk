@@ -14,6 +14,7 @@ export const CUSTOMER_UI7_ARRIVAL_SEAM_CLASSIFICATION=
 type CharacterVariant='male'|'female';
 type Ui7CanonicalStage='READY'|'ARRIVED'|'VERIFIED'|'HANDED_OVER'|'COMPLETED'|'PICKUP_EXCEPTION';
 type Ui7Freshness='CURRENT'|'LOADING'|'ERROR'|'OFFLINE'|'STALE'|'UNKNOWN';
+type Ui7EmptyState='LOADING'|'EMPTY'|'ERROR'|'OFFLINE'|'STALE'|'UNKNOWN';
 
 const characterPath=(variant:CharacterVariant)=>variant==='female'
   ?'/brand/stage7-pickup-female.svg'
@@ -30,6 +31,9 @@ const freshnessFrom=(connection:CustomerConnectionState,browserOnline:boolean):U
   if(connection==='UNKNOWN')return 'UNKNOWN';
   return 'CURRENT';
 };
+const emptyStateFrom=(freshness:Ui7Freshness):Ui7EmptyState=>freshness==='CURRENT'?'EMPTY':freshness;
+const isKnownPreUi7Stage=(stage:CustomerOrderStage)=>
+  ['RECEIVED','REJECTED','CANCELED','ACCEPTED','PREPARING','DELAYED','PICKUP_VERIFICATION'].includes(stage);
 
 const digits=(value:string)=>value.replace(/\D/g,'');
 const pickupCodeFromPhone=(phone:string)=>{
@@ -267,11 +271,19 @@ export function PickupCompleteUi7View({
   const canonicalStage=order&&isUi7Stage(order.stage)?order.stage:historyOrder?'COMPLETED':null;
   const unresolvedException=Boolean(order?.pickupException&&order.pickupException.resolved!==true);
   const stage:Ui7CanonicalStage|null=unresolvedException?'PICKUP_EXCEPTION':canonicalStage;
+  const unsupported=Boolean(order&&!canonicalStage&&!isKnownPreUi7Stage(order.stage));
+  const emptyState:Ui7EmptyState=unsupported?'UNKNOWN':emptyStateFrom(freshness);
 
   if(!stage){
-    return <section className="page ui7-shell ui7-pending" data-ui7-state={freshness}>
+    return <section className="page ui7-shell ui7-pending" data-ui7-state={emptyState}>
       <FreshnessBanner freshness={freshness}/>
-      <header className="ui7-hero"><h1>取餐狀態等待讀回</h1><p>未有 READY / ARRIVED / VERIFIED / HANDED_OVER / COMPLETED canonical fact 前，UI7 唔會推斷取餐進度。</p></header>
+      <header className="ui7-hero">
+        <span>{emptyState}</span>
+        <h1>{emptyState==='EMPTY'?'暫時未有取餐狀態':'取餐狀態等待讀回'}</h1>
+        <p>{emptyState==='EMPTY'
+          ?'連線正常，但未有 canonical UI7 pickup stage；READY 只會喺店舖正式讀回 READY 時出現。'
+          :'未有 READY / ARRIVED / VERIFIED / HANDED_OVER / COMPLETED canonical fact 前，UI7 唔會推斷取餐進度。'}</p>
+      </header>
       <IdentityPanel order={order} historyOrder={historyOrder} intent={intent}/>
       <div className="ui7-pending-actions"><ActionButton onClick={onRefresh}>只讀 Refresh</ActionButton><ActionButton variant="secondary" onClick={onOrders}>返回訂單</ActionButton></div>
     </section>;
