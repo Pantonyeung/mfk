@@ -90,11 +90,10 @@ function productArtwork(product:Product){
 }
 
 const nav=[
-  {to:'/',label:'點餐',icon:'▦',end:true},
+  {to:'/',label:'點單',icon:'▦',end:true},
   {to:'/orders',label:'訂單',icon:'▤'},
   {to:'/dining',label:'堂食',icon:'▱'},
-  {to:'/soldout',label:'售罄',icon:'⊘'},
-  {to:'/more',label:'更多',icon:'•••'},
+  {to:'/soldout',label:'售罄／產能',icon:'⊘'},
 ] as const;
 
 function OrderingPage({cart,setCart,serviceMode,setServiceMode,diningAddition,onDiningAdditionDone}:{
@@ -1078,6 +1077,16 @@ function OperationalApp(){
     void navRevision;
     return localRuntime.orders().filter(order=>order.fulfillmentLabel==='待處理'||order.fulfillmentLabel==='進行中'||order.fulfillmentLabel==='可取餐').length;
   },[navRevision]);
+  const pageTitle=useMemo(()=>{
+    if(location.pathname.startsWith('/checkout'))return 'Checkout／付款';
+    if(location.pathname.startsWith('/orders'))return '訂單';
+    if(location.pathname.startsWith('/dining'))return '堂食';
+    if(location.pathname.startsWith('/soldout'))return '售罄／產能';
+    if(location.pathname.startsWith('/more'))return '更多／工具中心';
+    return '點單';
+  },[location.pathname]);
+  const businessCutoff=readBusinessCutoff();
+  const businessDate=resolveBusinessWindow(Date.now(),businessCutoff.hour,businessCutoff.minute).businessDate;
   const setCart=(next:CartLine[])=>setCartState(next);
   const runtime=useMemo(()=>localRuntime,[]);
   useEffect(()=>{
@@ -1144,9 +1153,21 @@ function OperationalApp(){
           {item.to==='/orders'&&activeOrderCount>0?<span className="clean-rail-badge" aria-label={'進行中訂單 '+activeOrderCount}>{activeOrderCount>99?'99+':activeOrderCount}</span>:null}
         </NavLink>)}
       </nav>
-      <StaffSessionBadge/>
-      <div className="clean-runtime-state">LOCAL<br/>OFFLINE</div>
     </aside>
+    <header className="clean-topbar">
+      <button type="button" className={location.pathname.startsWith('/more')?'clean-more-button active':'clean-more-button'} onClick={()=>navigate('/more')} aria-label="更多／工具中心" aria-pressed={location.pathname.startsWith('/more')}>
+        <span aria-hidden="true">☰</span><b>更多</b>
+      </button>
+      <div className="clean-topbar-context">
+        <small>BUSINESS DAY · {businessDate}</small>
+        <strong>{pageTitle}</strong>
+      </div>
+      <div className="clean-topbar-status">
+        {activeOrderCount>0?<span className="clean-active-order-chip">進行中 {activeOrderCount}</span>:<span className="clean-active-order-chip quiet">目前無進行中訂單</span>}
+        <span className="clean-local-first-chip">LOCAL FIRST</span>
+        <StaffSessionBadge/>
+      </div>
+    </header>
     <section className="clean-route-stage">
       <Routes>
         <Route index element={<OrderingPage cart={cart} setCart={setCart} serviceMode={serviceMode} setServiceMode={setServiceMode} diningAddition={diningAddition} onDiningAdditionDone={()=>{clearDiningAddOrderUiSession();setDiningAddition(null);}}/>}/>
