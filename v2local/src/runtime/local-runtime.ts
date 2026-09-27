@@ -2173,8 +2173,8 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
     const snapshot=readDiningState();
     const hold=requireDiningHold(snapshot,holdId);
     if(expectedRevision&&expectedRevision!==diningCheckoutRevision(hold))throw new Error('DINING_PRICE_OVERRIDE_STALE');
-    if(hold.archivedAt||hold.cancelledAt)throw new Error('DINING_HISTORY_PROTECTED');
     if(hold.payments?.length)throw new Error('DINING_PRICE_OVERRIDE_AFTER_PAYMENT_FORBIDDEN');
+    if(hold.archivedAt||hold.cancelledAt)throw new Error('DINING_HISTORY_PROTECTED');
     const session=readActiveStaffSession();
     if(!session)throw new Error('DINING_PRICE_OVERRIDE_AUTH_REQUIRED');
     if(!hasStaffPermission('PRICE_OVERRIDE'))throw new Error('DINING_PRICE_OVERRIDE_FORBIDDEN');
