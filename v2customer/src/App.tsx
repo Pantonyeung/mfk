@@ -80,13 +80,14 @@ const presentWithContinuity=(change:()=>void)=>{
 export function App(){
   const initial=useMemo(()=>readCustomerLocalWorkspace(),[]);
   const initialRoute=useMemo(()=>customerRouteFromPath(typeof window==='undefined'?'':window.location.pathname),[]);
+  const initialSubmission=initialRoute?.submissionId?initial.pendingIntents.find(item=>item.submissionId===initialRoute.submissionId):undefined;
   const [view,setView]=useState<View>(initialRoute?.view??initial.preferences.activeView);
   const [checkoutStep,setCheckoutStep]=useState<CustomerUi4CheckoutStep>(initialRoute?.checkoutStep??'contact');
   const [submitRouteId,setSubmitRouteId]=useState<string|null>(initialRoute?.submissionId??null);
   const [waitingOrderId,setWaitingOrderId]=useState<string|null>(initialRoute?.waitingOrderId??null);
   const [activeCategoryId,setActiveCategoryId]=useState<string|null>(initial.preferences.activeCategoryId);
-  const [cart,setCart]=useState<readonly CustomerCartLine[]>(initial.cart);
-  const [checkout,setCheckout]=useState<CustomerCheckoutDraft>(initial.checkout);
+  const [cart,setCart]=useState<readonly CustomerCartLine[]>(initialSubmission?.cart??initial.cart);
+  const [checkout,setCheckout]=useState<CustomerCheckoutDraft>(initialSubmission?.checkout??initial.checkout);
   const [pendingIntents,setPendingIntents]=useState<readonly CustomerPendingIntent[]>(initial.pendingIntents);
   const [port]=useState<CustomerRuntimePort|null>(()=>resolveCustomerRuntimePort());
   const [connection,setConnection]=useState<CustomerConnectionState>(port?'LOADING':'NOT_CONNECTED');
@@ -622,21 +623,38 @@ export function App(){
     setNotice('已按目前餐牌更新「'+repaired.productName+'」；其他餐點冇改動。');
   };
 
-  const requestFallback=async()=>{
+  const requestFallback=async(intent?:CustomerPendingIntent)=>{
     const fallback=snapshot?.fallback;
-    const submissionId=fallbackIntentId??pendingIntents[0]?.submissionId;
+    const target=intent
+      ??(fallbackIntentId?pendingIntents.find(item=>item.submissionId===fallbackIntentId):undefined)
+      ??pendingIntents.find(item=>item.state==='NOT_CONNECTED');
     if(!fallback?.enabled){setNotice('店舖暫時未設定 WhatsApp 備用聯絡。');return}
-    const url=buildWhatsAppFallbackUrl({fallback,cart,checkout,quote,submissionId});
+    const targetCart=target?.cart??cart;
+    const targetCheckout=target?.checkout??checkout;
+    const pickupDigits=targetCheckout.phone.replace(/\D/g,'');
+    const url=buildWhatsAppFallbackUrl({
+      fallback,
+      cart:targetCart,
+      checkout:targetCheckout,
+      quote:target?null:quote,
+      ...(target?.publishedTotalMinor!==undefined?{publishedTotalMinor:target.publishedTotalMinor}:{}),
+      ...(target?{fallbackReference:customerFallbackReference(target)}:{}),
+      ...(pickupDigits.length>=4?{pickupCode:pickupDigits.slice(-4)}:{}),
+    });
     if(!url){setNotice('WhatsApp 備用聯絡資料未完整。');return}
     window.open(url,'_blank','noopener,noreferrer');
-    setNotice('已開啟 WhatsApp；訊息只會喺你主動送出後傳送畀店舖。');
+    setNotice('已開啟 WhatsApp；舊 Online Submit 保持鎖定，訊息只會喺你主動送出後傳送畀店舖。');
   };
 
   const activeOrders=snapshot?.activeOrders??[];
   const history=snapshot?.history??[];
-  const currentPending=pendingIntents[0]??null;
-  const currentFallbackIntent=pendingIntents.find(item=>item.state==='NOT_CONNECTED'&&JSON.stringify(item.cart)===JSON.stringify(cart))??null;
+  const recoveryIntents=pendingIntents.filter(item=>item.state!=='DELIVERED');
+  const currentPending=recoveryIntents[0]??null;
+  const currentFallbackIntent=recoveryIntents.find(item=>item.state==='NOT_CONNECTED'&&JSON.stringify(item.cart)===JSON.stringify(cart))??null;
   const fallbackAvailable=Boolean((fallbackIntentId||currentFallbackIntent)&&snapshot?.fallback?.enabled);
+  const activeSubmitIntent=submitRouteId?pendingIntents.find(item=>item.submissionId===submitRouteId)??null:null;
+  const waitingOrder=waitingOrderId?activeOrders.find(order=>order.orderId===waitingOrderId)??null:null;
+  const waitingIntent=waitingOrderId?pendingIntents.find(item=>item.state==='DELIVERED'&&item.canonicalOrderId===waitingOrderId)??null:null;
   const cartCount=cart.reduce((sum,line)=>sum+line.quantity,0);
   const cartRepairs=useMemo(()=>publishedCartRepairs(cart,menu),[cart,menu]);
   const allProducts=menu?.products??[];
@@ -662,12 +680,14 @@ export function App(){
       {view==='home'?<HomeView snapshot={snapshot} connection={connection} activeOrders={activeOrders} history={history} recommendations={homeRecommendations} cartCount={cartCount} onRefresh={()=>void refresh()} onProduct={openProduct} onBrowse={()=>changeView('menu')} onJar={()=>changeView('cart')} onOrders={()=>{setOrderSegment('current');changeView('orders')}} onHistory={()=>{setOrderSegment('history');changeView('orders')}} onMember={()=>changeView('more')} onBuyAgain={order=>void reorder(order)} onFallback={()=>void requestFallback()}/>:null}
       {view==='menu'?<Stage2Menu connection={connection} browserOnline={browserOnline} categories={categories} activeCategoryId={activeCategoryId} setCategory={category=>presentWithContinuity(()=>changeCategory(category))} query={search} setQuery={setSearch} products={menu?.products??[]} recommendations={menuRecommendations} onProduct={(product,origin)=>openProduct(product,origin)} cartCount={cartCount} onCart={()=>changeView('cart')}/>:null}
       {view==='cart'?<CartView cart={cart} quote={quote} repairs={cartRepairs} member={snapshot?.member} suggestions={cartSuggestions} products={menu?.products??[]} onProduct={openProduct} onAcceptRepair={acceptCartRepair} onQuantity={(lineId,quantity)=>updateCart(cart.map(line=>line.lineId===lineId?{...line,quantity:Math.max(1,quantity)}:line))} onRemove={lineId=>updateCart(cart.filter(line=>line.lineId!==lineId))} onMenu={()=>changeView('menu')} onCheckout={()=>void openCheckoutStep('contact')}/>:null}
-      {view==='checkout'?<CheckoutUi4View step={checkoutStep} cart={cart} quote={quote} repairs={cartRepairs} checkout={checkout} setCheckout={changeCheckout} paymentChannels={snapshot?.paymentChannels??[]} onStep={step=>void openCheckoutStep(step)} onBackToJar={()=>changeView('cart')} onRepair={()=>changeView('cart')} onPaymentEvidence={file=>void uploadPaymentEvidence(file)}/>:null}
+      {view==='checkout'?<CheckoutUi4View step={checkoutStep} cart={cart} quote={quote} repairs={cartRepairs} checkout={checkout} setCheckout={changeCheckout} paymentChannels={snapshot?.paymentChannels??[]} onStep={step=>void openCheckoutStep(step)} onBackToJar={()=>changeView('cart')} onRepair={()=>changeView('cart')} onPaymentEvidence={file=>void uploadPaymentEvidence(file)} onReviewConfirmed={startUi5Submission}/>:null}
+      {view==='submit'?(activeSubmitIntent?<SubmitUi5View intent={activeSubmitIntent} submitting={submitting} submitProbe={submitProbe} reading={readingIntentId===activeSubmitIntent.submissionId} fallbackAvailable={Boolean(snapshot?.fallback?.enabled)&&activeSubmitIntent.state==='NOT_CONNECTED'} onSubmit={()=>void submit(activeSubmitIntent)} onReadback={()=>void readbackIntent(activeSubmitIntent)} onFallback={()=>void requestFallback(activeSubmitIntent)} onBackReview={()=>void openCheckoutStep('review')} onBackToJar={()=>changeView('cart')}/>:<section className="page ui5-missing"><h1>提交資料未找到</h1><p>唔會建立新 Submission；請返回記憶罐重新確認。</p><button onClick={()=>changeView('cart')}>返回記憶罐</button></section>):null}
+      {view==='waiting'?<WaitingStoreConfirmationUi5View order={waitingOrder} intent={waitingIntent} connection={connection} onRefresh={()=>void refresh()} onOrders={()=>{setOrderSegment('current');changeView('orders')}} onHome={()=>changeView('home')}/>:null}
       {view==='orders'?<OrdersView segment={orderSegment} setSegment={setOrderSegment} active={activeOrders} history={history} expandedOrderId={expandedOrderId} setExpandedOrderId={setExpandedOrderId} onReorder={order=>void reorder(order)} onBrowse={()=>changeView('menu')} connection={connection}/>:null}
-      {view==='more'?<MemberView connection={connection} snapshot={snapshot} history={history} pendingIntents={pendingIntents} readingIntentId={readingIntentId} onRefresh={()=>void refresh()} onReadback={intent=>void readbackIntent(intent)} onDiscard={removeIntent} onFallback={()=>void requestFallback()} onReorder={order=>void reorder(order)} onBrowse={()=>changeView('menu')}/>:null}
+      {view==='more'?<MemberView connection={connection} snapshot={snapshot} history={history} pendingIntents={recoveryIntents} readingIntentId={readingIntentId} onRefresh={()=>void refresh()} onReadback={intent=>void readbackIntent(intent)} onDiscard={removeIntent} onFallback={()=>void requestFallback()} onReorder={order=>void reorder(order)} onBrowse={()=>changeView('menu')}/>:null}
     </section>
 
-    {view==='menu'?<Stage2BottomNavigation active="menu" cartCount={cartCount} orderCount={activeOrders.length} onChange={changeView}/>:view!=='checkout'?<BottomNavigation active={view} cartCount={cartCount} orderCount={activeOrders.length} pulseKey={jarPulseKey} onChange={changeView}/>:null}
+    {view==='menu'?<Stage2BottomNavigation active="menu" cartCount={cartCount} orderCount={activeOrders.length} onChange={changeView}/>:!['checkout','submit','waiting'].includes(view)?<BottomNavigation active={view as 'home'|'cart'|'orders'|'more'} cartCount={cartCount} orderCount={activeOrders.length} pulseKey={jarPulseKey} onChange={changeView}/>:null}
 
     {selectedProduct?<ProductSheet product={selectedProduct} menu={menu} selections={selections} comboEnabled={selectedComboEnabled} comboSelections={selectedComboSelections} selectedVariationId={selectedVariationId} quantity={selectedQuantity} note={selectedNote} editing={Boolean(editingLineId)} recommendations={productRecommendations} setVariation={setSelectedVariationId} setComboEnabled={setSelectedComboEnabled} clearCombo={()=>setSelectedComboSelections(Object.freeze([]))} setQuantity={setSelectedQuantity} setNote={setSelectedNote} toggle={(groupId,optionId)=>{
       const group=selectedProduct.optionGroups.find(item=>item.optionGroupId===groupId);
