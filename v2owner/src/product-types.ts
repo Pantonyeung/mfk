@@ -467,6 +467,7 @@ export interface OwnerRuntimePort {
   logoutOwner?():Promise<void>;
   requestBoundedAction?(input:OwnerBoundedAction):Promise<OwnerCommandResult>;
   commandChannel?(input:OwnerChannelCommandInput):Promise<OwnerChannelCommandResult>;
+  readChannels?():Promise<readonly OwnerChannelHealth[]>;
   readPlanning?(monthKey:string):Promise<OwnerPlanningSnapshot>;
   savePlanning?(input:OwnerPlanningSaveInput):Promise<OwnerPlanningCommandResult>;
   requestAdminDeepLink?():Promise<OwnerCommandResult>;
