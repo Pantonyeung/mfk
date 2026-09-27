@@ -72,6 +72,7 @@ describe('Owner Stage04 channel + planning',()=>{
     const worker=fs.readFileSync(path.resolve(process.cwd(),'worker.ts'),'utf8');
     expect(worker).toContain("MFK_OWNER_MONTHLY_PLAN_V1");
     expect(worker).toContain("owner:planning:");
+    expect(worker).toContain("recognizedSalesMinor");
     expect(worker).toContain("'/owner/planning'");
     expect(worker).toContain("'/owner/channels/command'");
     const readIndex=worker.indexOf("https://internal/admin/store/readback");
