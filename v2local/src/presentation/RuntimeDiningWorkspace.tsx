@@ -8,6 +8,7 @@ import type {
 import type {DiningAddOrderRequest} from '../features/ordering/dining-add-order-ui-session.ts';
 import {readSmtStoreSettings} from '../runtime/admin-operational-config.ts';
 import {subscribeSmtAdminConfig} from '../runtime/admin-config-sync.ts';
+import {hasStaffPermission,readActiveStaffSession} from '../runtime/staff-auth.ts';
 import './dining-operations-workspace.css';
 
 const tenderLabels:Record<string,string>={
@@ -59,11 +60,13 @@ export function RuntimeDiningWorkspace({runtime,onCheckout,onAddOrder}:{runtime:
   const [detail,setDetail]=useState<LocalDiningHoldDetail|null>(null);
   const [selection,setSelection]=useState<Record<number,number>>({});
   const [message,setMessage]=useState('');
+  const [priceOverrideBusy,setPriceOverrideBusy]=useState(false);
   const [now,setNow]=useState(Date.now());
   const [adminConfigRevision,setAdminConfigRevision]=useState(0);
   useEffect(()=>subscribeSmtAdminConfig(()=>setAdminConfigRevision(value=>value+1)),[]);
   void adminConfigRevision;
   const diningOverdueMinutes=readSmtStoreSettings().diningOverdueMinutes;
+  const canOverridePrice=Boolean(readActiveStaffSession())&&hasStaffPermission('PRICE_OVERRIDE');
 
   const load=useCallback(async()=>{
     if(!runtime.readDining){setError('DINE_IN_PROVIDER_UNAVAILABLE');return;}
@@ -282,6 +285,34 @@ export function RuntimeDiningWorkspace({runtime,onCheckout,onAddOrder}:{runtime:
     }
   };
 
+  const overrideLinePrice=async(lineIndex:number)=>{
+    if(!detail?.formalOrderId||!runtime.overrideDiningLinePrice||!canOverridePrice||detail.payments.length||priceOverrideBusy)return;
+    const line=detail.lines.find(item=>item.lineIndex===lineIndex);
+    if(!line)return;
+    const raw=window.prompt('人工成交單價（可輸入負數）',(line.unitMinor/100).toFixed(2));
+    if(raw===null)return;
+    const normalized=raw.trim();
+    if(!/^-?\d+(?:\.\d{1,2})?$/.test(normalized)){setMessage('人工改價格式不正確。');return;}
+    const effectiveMinor=Math.round(Number(normalized)*100);
+    if(!Number.isSafeInteger(effectiveMinor)){setMessage('人工改價金額超出可用範圍。');return;}
+    const reason=window.prompt('人工改價原因（選填）','');
+    if(reason===null)return;
+    const expectedRevision=detail.checkoutRevision;
+    setPriceOverrideBusy(true);
+    try{
+      const updated=await runtime.overrideDiningLinePrice(detail.holdId,lineIndex,effectiveMinor,reason,expectedRevision);
+      setDetail(updated);
+      setSelection({});
+      setMessage('人工成交價已保存；同一堂食單／同一正式訂單，Audit 已記錄。');
+      await load();
+    }catch(cause){
+      const code=cause instanceof Error?cause.message:'人工改價失敗';
+      setMessage(code==='DINING_PRICE_OVERRIDE_STALE'
+        ?'堂食內容已更新，人工改價未套用；請重新讀取後再試。'
+        :code);
+    }finally{setPriceOverrideBusy(false);}
+  };
+
   const goAddOrder=()=>{
     if(!detail?.formalOrderId)return;
     onAddOrder({
@@ -411,8 +442,13 @@ export function RuntimeDiningWorkspace({runtime,onCheckout,onAddOrder}:{runtime:
               <b>{line.name}</b>
               <small>{money(line.unitMinor)} × {line.qty}{line.voidedQty>0?'（原 '+line.originalQty+' · 已更正 '+line.voidedQty+'）':''}</small>
               <span>已結 {line.paidQty} · 未結 {line.remainingQty}</span>
-              {line.remainingQty>0?<button type="button" className="dining-line-correction" onClick={()=>void correctOne(line.lineIndex)}>取消 1 件</button>
-                :line.paidQty>0?<em>已付款數量如需移除，請到正式訂單走退款／調整。</em>:null}
+              <div className="dining-line-inline-actions">
+                {line.remainingQty>0?<button type="button" className="dining-line-correction" onClick={()=>void correctOne(line.lineIndex)}>取消 1 件</button>
+                  :line.paidQty>0?<em>已付款數量如需移除，請到正式訂單走退款／調整。</em>:null}
+                {canOverridePrice&&detail.formalOrderId&&detail.payments.length===0
+                  ?<button type="button" className="dining-line-price-override" disabled={priceOverrideBusy} onClick={()=>void overrideLinePrice(line.lineIndex)}>人工改價</button>
+                  :null}
+              </div>
             </div>
             <div className="dining-line-selector">
               <button type="button" disabled={(selection[line.lineIndex]??0)<=0} onClick={()=>adjustSelection(line.lineIndex,-1)}>−</button>
@@ -430,6 +466,15 @@ export function RuntimeDiningWorkspace({runtime,onCheckout,onAddOrder}:{runtime:
           </div>)}
         </section>:null}
 
+        {detail.priceOverrides.length?<section className="dining-price-override-history">
+          <header><b>人工改價紀錄</b><span>{detail.priceOverrides.length}</span></header>
+          {detail.priceOverrides.slice().reverse().map(row=><div key={row.id}>
+            <span>#{row.sequence} · {row.staffName}</span>
+            <b>{money(row.originalUnitMinor)} → {money(row.effectiveUnitMinor)}</b>
+            <small>{row.deltaMinor>=0?'+':''}{money(row.deltaMinor)} · {new Date(row.createdAt).toLocaleTimeString('zh-HK',{hour:'2-digit',minute:'2-digit'})}{row.reason?' · '+row.reason:''}</small>
+          </div>)}
+        </section>:null}
+
         {detail.corrections.length?<section className="dining-correction-history">
           <header><b>商品更正紀錄</b><span>{detail.corrections.length}</span></header>
           {detail.corrections.slice().reverse().map(row=><div key={row.id}>
@@ -442,6 +487,7 @@ export function RuntimeDiningWorkspace({runtime,onCheckout,onAddOrder}:{runtime:
         <section className="dining-payment-panel checkout-authority">
           <header><div><b>本次結帳選擇</b><small>付款只可以喺 Checkout 介面完成</small></div><strong>{money(selectedAmount)}</strong></header>
           <button className="dining-settle-button" disabled={selectedUnits<=0||detail.remainingMinor<=0} onClick={goCheckout}>前往 Checkout · {selectedUnits} 件</button>
+          {detail.remainingMinor<0?<p className="dining-negative-balance-note">負數成交總額已保存；一般收款 Checkout 停用，避免將負數自行當成退款、找續或現金支出。請使用正式調整／退款流程。</p>:null}
         </section>
 
         <section className="dining-balance">
