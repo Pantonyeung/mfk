@@ -17,8 +17,8 @@
   "stage0": {
     "brandLogo": "/brand/morefun-logo.webp",
     "mascotAssets": [
-      "/brand/stage0/stage0-male.svg",
-      "/brand/stage0/stage0-female.svg"
+      "/brand/stage0/stage0-male.webp",
+      "/brand/stage0/stage0-female.webp"
     ]
   },
   "stage1": {
