@@ -121,7 +121,7 @@ export function PlanningPage({
       monthKey,
       monthlyRevenueTargetMinor:dollarsToMinor(target),
       note:note.trim()||undefined,
-      baseRevision:value.plan.revision,
+      expectedRevision:value.plan.revision,
       operationId:crypto.randomUUID(),
       costLines:lines.map(line=>({
         costLineId:line.costLineId,
