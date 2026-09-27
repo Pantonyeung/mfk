@@ -40,6 +40,50 @@ export interface CustomerVariation {
   readonly available:boolean;
 }
 
+
+export type CustomerComboChoiceType='PRODUCT'|'LABEL'|'NONE';
+
+export interface CustomerComboChoice {
+  readonly choiceId:string;
+  readonly choiceType:CustomerComboChoiceType;
+  readonly productId?:string;
+  readonly label:string;
+  readonly available:boolean;
+  readonly publishedAdjustmentMinor:number;
+}
+
+export interface CustomerComboSubPool {
+  readonly subPoolId:string;
+  readonly name:string;
+  readonly publishedAdjustmentMinor:number;
+  readonly choices:readonly CustomerComboChoice[];
+}
+
+export interface CustomerComboGroup {
+  readonly groupId:string;
+  readonly name:string;
+  readonly required:boolean;
+  readonly minSelections:number;
+  readonly maxSelections:number;
+  readonly subPools:readonly CustomerComboSubPool[];
+}
+
+export interface CustomerComboPool {
+  readonly poolId:string;
+  readonly name:string;
+  readonly kind:'MAIN_COURSE'|'ADDON';
+  readonly addonKind?:'SNACK'|'DRINK';
+  readonly groups:readonly CustomerComboGroup[];
+}
+
+export interface CustomerCombo {
+  readonly comboId:string;
+  readonly name:string;
+  readonly publishedBasePriceMinor:number;
+  readonly mainPoolId?:string;
+  readonly addonPoolIds:readonly string[];
+}
+
 export interface CustomerProduct {
   readonly productId:string;
   readonly categoryId:string;
@@ -54,6 +98,7 @@ export interface CustomerProduct {
   readonly variationRequired?:boolean;
   readonly variations?:readonly CustomerVariation[];
   readonly optionGroups:readonly CustomerOptionGroup[];
+  readonly comboId?:string;
 }
 
 export interface CustomerMenuSnapshot {
@@ -61,6 +106,8 @@ export interface CustomerMenuSnapshot {
   readonly observedAt:string;
   readonly categories:readonly CustomerCategory[];
   readonly products:readonly CustomerProduct[];
+  readonly combos?:readonly CustomerCombo[];
+  readonly comboPools?:readonly CustomerComboPool[];
 }
 
 export interface CustomerCartSelection {

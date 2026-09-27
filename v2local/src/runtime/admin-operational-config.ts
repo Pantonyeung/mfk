@@ -1,4 +1,5 @@
 import {readAdminSnapshotSection} from './admin-config-sync.ts';
+import {normalizeCapacityPoolConfig,type CapacityPoolDefinitionV1} from '../../../contracts/capacity-pool-v1.ts';
 
 export interface SmtDiningTableConfig{
   readonly id:string;
@@ -33,6 +34,7 @@ export interface SmtCapacityConfig{
   readonly warningAt:number;
   readonly hardStopConfigured:boolean;
   readonly note:string;
+  readonly pools:readonly CapacityPoolDefinitionV1[];
 }
 
 export interface SmtFrontlinePresentation{
@@ -112,14 +114,15 @@ export function readSmtStoreSettings():SmtStoreSettings{
 
 export function readSmtCapacityConfig():SmtCapacityConfig{
   const row=record(readAdminSnapshotSection('capacity'));
-  const limitText=text(row.dailyLimit);
-  const parsed=Number(limitText);
+  const normalized=normalizeCapacityPoolConfig(row);
+  const parsed=Number(normalized.dailyLimit);
   const dailyLimit=Number.isFinite(parsed)&&parsed>0?Math.floor(parsed):undefined;
   return Object.freeze({
     ...(dailyLimit?{dailyLimit}:{}),
-    warningAt:Math.min(100,Math.max(1,Math.floor(number(row.warningAt,80)))),
-    hardStopConfigured:bool(row.hardStop,false),
-    note:text(row.note),
+    warningAt:normalized.warningAt,
+    hardStopConfigured:normalized.hardStop,
+    note:normalized.note,
+    pools:Object.freeze(normalized.pools.map(pool=>Object.freeze({...pool,productIds:Object.freeze([...pool.productIds])}))),
   });
 }
 
