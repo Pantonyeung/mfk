@@ -40,6 +40,86 @@ export interface CustomerCloudCartLine{
   readonly note?:string;
   readonly publishedUnitPriceMinor?:number;
 }
+export interface CustomerReorderIntentSelection{
+  readonly optionGroupId:string;
+  readonly optionId:string;
+  readonly optionName:string;
+}
+
+export interface CustomerReorderIntentComboSelection{
+  readonly poolId:string;
+  readonly groupId:string;
+  readonly subPoolId:string;
+  readonly choiceId:string;
+  readonly choiceType:CustomerCloudComboChoiceType;
+  readonly choiceLabel:string;
+  readonly productId?:string;
+}
+
+export interface CustomerReorderIntentCombo{
+  readonly comboId:string;
+  readonly comboName:string;
+  readonly selections:readonly CustomerReorderIntentComboSelection[];
+}
+
+export interface CustomerReorderIntentLine{
+  readonly productId:string;
+  readonly productName:string;
+  readonly quantity:number;
+  readonly selectedVariationId?:string;
+  readonly selectedVariationName?:string;
+  readonly selections:readonly CustomerReorderIntentSelection[];
+  readonly combo?:CustomerReorderIntentCombo;
+  readonly note?:string;
+}
+
+export interface CustomerReorderHistoryPriceFact{
+  readonly intentIndex:number;
+  readonly historicalPublishedUnitMinor?:number;
+}
+
+export function customerReorderHistoryPriceFactsFromCart(
+  cart:readonly CustomerCloudCartLine[],
+):readonly CustomerReorderHistoryPriceFact[]{
+  return Object.freeze(cart.map((line,intentIndex)=>Object.freeze({
+    intentIndex,
+    ...(Number.isSafeInteger(Number(line.publishedUnitPriceMinor))&&Number(line.publishedUnitPriceMinor)>=0
+      ?{historicalPublishedUnitMinor:Number(line.publishedUnitPriceMinor)}
+      :{}),
+  })));
+}
+
+export function customerReorderIntentFromCart(
+  cart:readonly CustomerCloudCartLine[],
+):readonly CustomerReorderIntentLine[]{
+  return Object.freeze(cart.map(line=>Object.freeze({
+    productId:line.productId,
+    productName:line.productName,
+    quantity:line.quantity,
+    ...(line.selectedVariationId?{selectedVariationId:line.selectedVariationId}:{}),
+    ...(line.selectedVariationName?{selectedVariationName:line.selectedVariationName}:{}),
+    selections:Object.freeze(line.selections.map(selection=>Object.freeze({
+      optionGroupId:selection.optionGroupId,
+      optionId:selection.optionId,
+      optionName:selection.optionName,
+    }))),
+    ...(line.combo?{combo:Object.freeze({
+      comboId:line.combo.comboId,
+      comboName:line.combo.comboName,
+      selections:Object.freeze(line.combo.selections.map(selection=>Object.freeze({
+        poolId:selection.poolId,
+        groupId:selection.groupId,
+        subPoolId:selection.subPoolId,
+        choiceId:selection.choiceId,
+        choiceType:selection.choiceType,
+        choiceLabel:selection.choiceLabel,
+        ...(selection.productId?{productId:selection.productId}:{}),
+      }))),
+    })}:{}),
+    ...(line.note?{note:line.note}:{}),
+  })));
+}
+
 export interface CustomerCloudCheckout{
   readonly name:string;
   readonly phone:string;

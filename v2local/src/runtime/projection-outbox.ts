@@ -1,6 +1,7 @@
 import {createSmtProjectionEvent,type SmtProjectionEvent} from '../../../contracts/smt-projection-v1.ts';
 import {readSmtDeviceId,readAdminSnapshotSection,subscribeSmtAdminConfig} from './admin-config-sync.ts';
 import {resolveBusinessWindow,type LocalCashOpening,type LocalDayClose} from './local-operations.ts';
+import type {CustomerReorderHistoryPriceFact,CustomerReorderIntentLine} from '../../../contracts/customer-cloud-v1.ts';
 
 export const SMT_PROJECTION_OUTBOX_KEY='mfk.v2local.projection-outbox.v1';
 export const SMT_PROJECTION_ACKED_KEY='mfk.v2local.projection-acked.v1';
@@ -20,6 +21,32 @@ export interface ProjectionOrderInput{
   readonly staffId?:string;
   readonly staffName?:string;
   readonly cancellationReason?:string;
+  readonly rejectionReason?:string;
+  readonly customerPhone?:string;
+  readonly customerName?:string;
+  readonly paymentVerificationState?:'PENDING'|'VERIFIED'|'REJECTED';
+  readonly handoverState?:'NOT_ARRIVED'|'ARRIVED'|'VERIFIED'|'HANDED_OVER'|'COMPLETED'|'UNKNOWN';
+  readonly pickupBagCount?:number;
+  readonly pickupMealCount?:number;
+  readonly completedAt?:string;
+  readonly pickupException?:Readonly<{
+    readonly kind:'CODE_MISMATCH'|'MISSING_BAG'|'SAME_NAME'|'NO_SHOW'|'OTHER';
+    readonly resolved:boolean;
+    readonly detail?:string;
+    readonly observedAt?:string;
+  }>;
+  readonly customerReorderIntent?:readonly CustomerReorderIntentLine[];
+  readonly customerReorderHistoryPriceFacts?:readonly CustomerReorderHistoryPriceFact[];
+  readonly etaLabel?:string;
+  readonly promisedReadyLabel?:string;
+  readonly fulfillmentHistory?:readonly {
+    readonly label?:string;
+    readonly state?:string;
+    readonly at?:string;
+    readonly atLabel?:string;
+    readonly observedAt?:string;
+    readonly detail?:string;
+  }[];
   readonly refunds?:readonly {
     readonly id:string;
     readonly createdAt:string;
@@ -88,6 +115,8 @@ export function readProjectionOutbox(){return Object.freeze(readRows().map(row=>
 
 export function queueOrderProjection(order:ProjectionOrderInput){
   const occurredAt=order.updatedAt||order.createdAt;
+  const customerPhoneDigits=String(order.customerPhone||'').replace(/\D/g,'');
+  const pickupCode=customerPhoneDigits.length>=4?customerPhoneDigits.slice(-4):'';
   return enqueue(createSmtProjectionEvent({
     storeId:'MF01',
     deviceId:readSmtDeviceId(),
@@ -109,6 +138,20 @@ export function queueOrderProjection(order:ProjectionOrderInput){
       ...(order.staffId?{staffId:String(order.staffId)}:{}),
       ...(order.staffName?{staffName:String(order.staffName)}:{}),
       ...(order.cancellationReason?{cancellationReason:String(order.cancellationReason)}:{}),
+      ...(order.rejectionReason?{rejectionReason:String(order.rejectionReason)}:{}),
+      ...(pickupCode?{pickupCode}:{}),
+      ...(order.customerName?{customerName:String(order.customerName)}:{}),
+      ...(order.paymentVerificationState?{paymentVerificationState:order.paymentVerificationState}:{}),
+      ...(order.handoverState?{handoverState:order.handoverState}:{}),
+      ...(Number.isSafeInteger(Number(order.pickupBagCount))&&Number(order.pickupBagCount)>=0?{pickupBagCount:Number(order.pickupBagCount)}:{}),
+      ...(Number.isSafeInteger(Number(order.pickupMealCount))&&Number(order.pickupMealCount)>=0?{pickupMealCount:Number(order.pickupMealCount)}:{}),
+      ...(order.completedAt?{completedAt:String(order.completedAt)}:{}),
+      ...(order.pickupException?{pickupException:Object.freeze({...order.pickupException})}:{}),
+      ...(order.customerReorderIntent?.length?{customerReorderIntent:Object.freeze(order.customerReorderIntent.map(line=>Object.freeze({...line,selections:Object.freeze(line.selections.map(selection=>Object.freeze({...selection}))),...(line.combo?{combo:Object.freeze({...line.combo,selections:Object.freeze(line.combo.selections.map(selection=>Object.freeze({...selection})))})}:{})})))}:{}),
+      ...(order.customerReorderHistoryPriceFacts?.length?{customerReorderHistoryPriceFacts:Object.freeze(order.customerReorderHistoryPriceFacts.map(fact=>Object.freeze({...fact})))}:{}),
+      ...(order.etaLabel?{etaLabel:String(order.etaLabel)}:{}),
+      ...(order.promisedReadyLabel?{promisedReadyLabel:String(order.promisedReadyLabel)}:{}),
+      ...(order.fulfillmentHistory?.length?{fulfillmentHistory:Object.freeze(order.fulfillmentHistory.map(entry=>Object.freeze({...entry})))}:{}),
       ...(order.refunds?.length?{refunds:Object.freeze(order.refunds.map(refund=>Object.freeze({
         id:String(refund.id),
         refundId:String(refund.id),

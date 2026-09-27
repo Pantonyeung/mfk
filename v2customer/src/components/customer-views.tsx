@@ -30,13 +30,18 @@ const productTransitionName=(productId:string)=>`product-${productId.replace(/[^
 const stageMeta:Record<CustomerOrderStage,{label:string;title:string;detail:string}>={
   RECEIVED:{label:'等待店舖接單',title:'店舖已收到訂單',detail:'收到訂單唔等於已接單；要等店舖正式確認。'},
   REJECTED:{label:'未能接單',title:'店舖今次未能接單',detail:'睇清楚原因後，可以返回菜單重新選擇；系統唔會自動再送。'},
+  CANCELED:{label:'已取消',title:'訂單已取消',detail:'已取消係正式店舖狀態；系統唔會因取消而自動重新提交。'},
   ACCEPTED:{label:'已接單',title:'店舖已確認',detail:'店舖已正式接單，之後會更新製作狀態。'},
   PREPARING:{label:'製作中',title:'餐點製作中',detail:'店舖正在製作，未到可取餐階段。'},
   DELAYED:{label:'稍有延誤',title:'取餐時間有更新',detail:'延誤只更新預計時間，唔會假裝已可取餐。'},
   READY:{label:'可取餐',title:'餐點已準備好',detail:'可取餐只代表可以到店拎餐，未代表已核對或已交收。'},
+  ARRIVED:{label:'已到店',title:'等待店員核對',detail:'到店通知唔等於核對、交收或完成。'},
+  VERIFIED:{label:'已核對',title:'店員核對完成',detail:'已核對仍然未代表已交收或完成。'},
   PICKUP_VERIFICATION:{label:'取餐核對',title:'請出示取餐資料',detail:'到店、核對、交收、完成係分開階段。'},
-  HANDED_OVER:{label:'已交收',title:'餐點已交畀你',detail:'交收完成後會再同步最終訂單狀態。'},
+  PICKUP_EXCEPTION:{label:'取餐需協助',title:'暫時未能完成取餐',detail:'例外未 resolve 不可 Completed。'},
+  HANDED_OVER:{label:'已交收',title:'餐點已交畀你',detail:'交收完成後仍要等 canonical Completed readback。'},
   COMPLETED:{label:'已完成',title:'訂單已完成',detail:'呢張訂單已完成。'},
+  UNKNOWN:{label:'狀態未明',title:'正在確認店舖狀態',detail:'未確認狀態唔會當成成功。'},
 };
 
 const quoteMeta:Record<CustomerQuoteSnapshot['freshness'],{label:string;detail:string;tone:'current'|'attention'|'danger'}>={
@@ -312,17 +317,17 @@ export function OrdersView({segment,setSegment,active,history,expandedOrderId,se
 
 function OrderCard({order,expanded,onToggle}:{order:CustomerOrderProjection;expanded:boolean;onToggle:()=>void}){
   const meta=stageMeta[order.stage];
-  const handoverLabel={NOT_ARRIVED:'等待到店',ARRIVED:'已到店',VERIFIED:'已完成取餐核對',HANDED_OVER:'餐點已交收',UNKNOWN:'交收狀態確認中'}[order.handoverState??'UNKNOWN'];
-  const pickupStage=order.stage==='READY'||order.stage==='PICKUP_VERIFICATION';
-  const sequence:CustomerOrderStage[]=['RECEIVED','ACCEPTED','PREPARING','READY','HANDED_OVER','COMPLETED'];
-  const effectiveStage=order.stage==='DELAYED'?'PREPARING':order.stage==='PICKUP_VERIFICATION'?'READY':order.stage;
+  const handoverLabel={NOT_ARRIVED:'等待到店',ARRIVED:'已到店',VERIFIED:'已完成取餐核對',HANDED_OVER:'餐點已交收',COMPLETED:'交收已完成',UNKNOWN:'交收狀態確認中'}[order.handoverState??'UNKNOWN'];
+  const pickupStage=['READY','ARRIVED','VERIFIED','PICKUP_VERIFICATION','PICKUP_EXCEPTION','HANDED_OVER'].includes(order.stage);
+  const sequence:CustomerOrderStage[]=['RECEIVED','ACCEPTED','PREPARING','READY','ARRIVED','VERIFIED','HANDED_OVER','COMPLETED'];
+  const effectiveStage=order.stage==='DELAYED'?'PREPARING':order.stage==='PICKUP_VERIFICATION'||order.stage==='PICKUP_EXCEPTION'?'READY':order.stage;
   const currentIndex=sequence.indexOf(effectiveStage);
   return <article className={`order-status-card stage-${order.stage.toLowerCase()}`}>
     <div className="order-status-top"><span>{order.displayCode}</span><b>{order.readback==='CONFIRMED'?'店舖資料已確認':order.readback==='PARTIAL'?'部分資料更新中':'狀態確認中'}</b></div>
     <div className="order-status-copy"><span className="eyebrow">{meta.label}</span><AnimatedValue as="h2">{meta.title}</AnimatedValue><p>{order.rejectionReason??meta.detail}</p>{order.etaLabel?<div className="eta"><span>預計取餐</span><AnimatedValue>{order.etaLabel}</AnimatedValue></div>:null}</div>
     {order.stage!=='REJECTED'?<ol className="order-progress" aria-label="訂單進度">{sequence.map((stage,index)=><li key={stage} className={index<currentIndex?'done':index===currentIndex?'active':''}><i aria-hidden="true"/><span>{stageMeta[stage].label}</span></li>)}</ol>:null}
     {order.stage==='DELAYED'?<section className="delay-card" role="status"><span>稍有延誤</span><AnimatedValue as="strong">{order.etaLabel??'時間待更新'}</AnimatedValue><p>店舖仍然製作中，未到可取餐階段。</p></section>:null}
-    {pickupStage?<section className="pickup-card"><i className="pickup-code-aura" aria-hidden="true"><b/><b/></i><span>向店員出示取餐碼</span><div className="pickup-code-lockup"><small>YOUR PICKUP CODE</small><AnimatedValue as="strong">{order.pickupCode??'等待店舖提供'}</AnimatedValue><em>{order.phoneMasked??'電話核對資料未提供'}</em></div><ol className="pickup-boundary" aria-label="取餐交收階段"><li className="done">可取餐</li><li className={order.handoverState==='ARRIVED'||order.handoverState==='VERIFIED'||order.handoverState==='HANDED_OVER'?'done':''}>已到店</li><li className={order.handoverState==='VERIFIED'||order.handoverState==='HANDED_OVER'?'done':''}>已核對</li><li className={order.handoverState==='HANDED_OVER'?'done':''}>已交收</li></ol><p>可取餐唔等於已到店、已核對、已交收或已完成。</p></section>:null}
+    {pickupStage?<section className="pickup-card"><i className="pickup-code-aura" aria-hidden="true"><b/><b/></i><span>向店員出示取餐碼</span><div className="pickup-code-lockup"><small>YOUR PICKUP CODE</small><AnimatedValue as="strong">{order.pickupCode??'等待店舖提供'}</AnimatedValue><em>{order.phoneMasked??'電話核對資料未提供'}</em></div><ol className="pickup-boundary" aria-label="取餐交收階段"><li className="done">可取餐</li><li className={order.handoverState==='ARRIVED'||order.handoverState==='VERIFIED'||order.handoverState==='HANDED_OVER'||order.handoverState==='COMPLETED'?'done':''}>已到店</li><li className={order.handoverState==='VERIFIED'||order.handoverState==='HANDED_OVER'||order.handoverState==='COMPLETED'?'done':''}>已核對</li><li className={order.handoverState==='HANDED_OVER'||order.handoverState==='COMPLETED'?'done':''}>已交收</li></ol><p>可取餐唔等於已到店、已核對、已交收或已完成。</p></section>:null}
     <ActionButton variant="secondary" wide aria-expanded={expanded} onClick={onToggle}>{expanded?'收起訂單詳情':'查看訂單詳情'}</ActionButton>
     {expanded?<section className="order-detail-card"><header><div><span>今次餐點</span><strong>{order.itemSummary}</strong></div>{order.amountLabel?<em>{order.amountLabel}</em>:null}</header><ol className="timeline">{order.timeline.map((item,index)=><li key={`${item.at}-${index}`} className={item.stage===order.stage?'active':''}><i aria-hidden="true"/><div><span>{item.label}</span>{item.detail?<p>{item.detail}</p>:null}</div><time dateTime={item.at}>{new Date(item.at).toLocaleTimeString('zh-HK',{hour:'2-digit',minute:'2-digit'})}</time></li>)}</ol><div className="detail-row"><span>取餐交收</span><strong>{handoverLabel}</strong></div></section>:null}
   </article>;
