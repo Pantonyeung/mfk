@@ -1,0 +1,116 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import {
+  smmStage5ConfirmedDisplayCode,
+  smmStage5RepairPath,
+  smmStage5SubmissionShortRef,
+} from '../src/stage5-submit.mjs';
+
+const app=readFileSync(new URL('../src/App.tsx',import.meta.url),'utf8');
+const view=readFileSync(new URL('../src/Stage5Submit.tsx',import.meta.url),'utf8');
+const persistence=readFileSync(new URL('../src/persistence.ts',import.meta.url),'utf8');
+const adapter=readFileSync(new URL('../src/smt-lan-adapter.ts',import.meta.url),'utf8');
+const cloud=readFileSync(new URL('../src/pwa-cloud.ts',import.meta.url),'utf8');
+const contract=readFileSync(new URL('../../contracts/smm-lan-v1.ts',import.meta.url),'utf8');
+const css=readFileSync(new URL('../src/stage5.css',import.meta.url),'utf8');
+
+test('Stage 5 exposes only DRAFT -> PENDING -> CONFIRMED / REJECTED / UNKNOWN',()=>{
+  assert.match(view,/SmmStage5State='DRAFT'\|'PENDING'\|'CONFIRMED'\|'REJECTED'\|'UNKNOWN'/);
+  for(const state of['DRAFT','PENDING','CONFIRMED','REJECTED','UNKNOWN'])assert.match(view,new RegExp(state));
+  assert.doesNotMatch(view,/PREPARING|READY|COMPLETED|Stage 6|第 6 階段/);
+});
+
+test('one intent owns one stable submissionId and one derived idempotencyKey',()=>{
+  assert.match(persistence,/const submissionId=createSmmStableSubmissionId\(\)/);
+  assert.match(persistence,/idempotencyKey:`smm-direct:\$\{submissionId\}`/);
+  assert.match(adapter,/submissionId:intent\.submissionId/);
+  assert.match(adapter,/idempotencyKey:intent\.idempotencyKey/);
+  assert.match(app,/existing\.submissionId/);
+});
+
+test('rapid multi tap is synchronously locked before any await',()=>{
+  const start=app.indexOf('const submitCart=async()=>');
+  const end=app.indexOf('const readbackIntent=',start);
+  const source=app.slice(start,end);
+  assert.match(source,/if\(submitLockRef\.current\|\|cart\.length===0\)return/);
+  assert.ok(source.indexOf('submitLockRef.current=true')<source.indexOf('await '));
+  assert.match(source,/releaseSubmitLock/);
+});
+
+test('PENDING uses a human short ref and never renders raw submissionId',()=>{
+  assert.equal(smmStage5SubmissionShortRef('SMM-550e8400-e29b-41d4-a716-446655440000'),'544000');
+  assert.match(view,/smmStage5SubmissionShortRef\(session\.intent\.submissionId\)/);
+  assert.match(view,/提交參考/);
+  assert.doesNotMatch(view,/\{session\.intent\.submissionId\}/);
+});
+
+test('UNKNOWN has one primary recovery: read same submission result',()=>{
+  const unknownStart=view.indexOf("session.state==='UNKNOWN'?");
+  const unknownEnd=view.indexOf('</section>:null}',unknownStart);
+  const unknown=view.slice(unknownStart,unknownEnd);
+  assert.match(unknown,/重新確認結果/);
+  assert.doesNotMatch(unknown,/重新提交|submitOrder|onSubmit/);
+
+  const start=app.indexOf('const readbackIntent=async');
+  const end=app.indexOf('const changeCartNote=',start);
+  const readback=app.slice(start,end);
+  assert.match(readback,/port\.readSubmission\(intent\.submissionId\)/);
+  assert.doesNotMatch(readback,/submitOrder|createSmmPendingIntent/);
+});
+
+test('CONFIRMED renders only canonical display code, never orderId or UUID',()=>{
+  const confirmedStart=view.indexOf("session.state==='CONFIRMED'?");
+  const confirmedEnd=view.indexOf('</section>:null}',confirmedStart);
+  const confirmed=view.slice(confirmedStart,confirmedEnd);
+  assert.match(confirmed,/流水號/);
+  assert.match(confirmed,/session\.displayCode/);
+  assert.doesNotMatch(confirmed,/orderId|submissionId|UUID/);
+  assert.equal(smmStage5ConfirmedDisplayCode('P0017'),'P0017');
+  assert.equal(smmStage5ConfirmedDisplayCode('550e8400-e29b-41d4-a716-446655440000'),null);
+  assert.equal(smmStage5ConfirmedDisplayCode('SMM-ABC123'),null);
+  assert.match(contract,/displayCode:string/);
+  assert.match(adapter,/displayCode:response\.displayCode/);
+  assert.match(cloud,/canonicalDisplay/);
+});
+
+test('REJECTED has deterministic repair paths and keeps cart until user repairs',()=>{
+  assert.equal(smmStage5RepairPath('SMM_MENU_REVISION_CHANGED').target,'CART');
+  assert.equal(smmStage5RepairPath('SMM_DINING_TABLE_NOT_PUBLISHED').target,'CHECKOUT');
+  assert.equal(smmStage5RepairPath('SMM_STAFF_UNAUTHORIZED').target,'STAFF');
+  assert.match(view,/返回修改/);
+  assert.match(app,/state:'REJECTED'/);
+});
+
+test('cart is cleared only inside canonical confirmed resolver',()=>{
+  const start=app.indexOf('const resolveConfirmedIntent=');
+  const end=app.indexOf('const releaseSubmitLock=',start);
+  const confirmed=app.slice(start,end);
+  assert.match(confirmed,/setCart\(\[\]\)/);
+  assert.match(confirmed,/setCartNote\(''\)/);
+
+  const submitStart=app.indexOf('const submitCart=async()=>');
+  const submitEnd=app.indexOf('const readbackIntent=',submitStart);
+  const submit=app.slice(submitStart,submitEnd);
+  const withoutConfirmed=submit.replace(/if\(result\.state==='CONFIRMED'\)[\s\S]*?return;\n\s*}/,'');
+  assert.doesNotMatch(withoutConfirmed,/setCart\(\[\]\)/);
+});
+
+test('SMM submit client has one POST seam and no reconnect or timer resend',()=>{
+  assert.equal((cloud.match(/orderEndpoint\('submit'\)/g)||[]).length,1);
+  assert.doesNotMatch(app,/addEventListener\(['"]online['"][\s\S]{0,400}submitCart/);
+  assert.doesNotMatch(app,/setInterval\([\s\S]{0,400}submitCart/);
+  assert.doesNotMatch(app,/setTimeout\([\s\S]{0,400}submitCart/);
+});
+
+test('UNKNOWN pending list hides discard and exposes readback only',()=>{
+  assert.match(app,/intent\.state==='UNKNOWN'[\s\S]*重新確認結果/);
+  assert.match(app,/intent\.state!=='UNKNOWN'[\s\S]*刪除草稿/);
+});
+
+test('Stage 5 remains touch safe and reduced-motion aware',()=>{
+  assert.match(css,/\.stage5-primary\{[\s\S]*min-height:50px/);
+  assert.match(css,/env\(safe-area-inset-bottom\)/);
+  assert.match(css,/@media\(max-width:389px\)/);
+  assert.match(css,/prefers-reduced-motion:reduce/);
+});
