@@ -25,7 +25,7 @@ jobs:
       - name: Stage 0-4 source fidelity
         run: node --test test/stage0-ui.test.mjs test/stage1-ui.test.mjs test/stage2-ui.test.mjs test/stage3-ui.test.mjs test/stage4-checkout.test.mjs
       - name: Stage 5-7 regression
-        run: node --test test/stage5-ui.test.mjs test/stage6-ui.test.mjs test/stage7-orders.test.mjs
+        run: node --test test/stage5-submit.test.mjs test/stage6-queue.test.mjs test/stage7-orders.test.mjs
       - name: Full SMM
         run: npm test
       - name: Build
