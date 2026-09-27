@@ -6,7 +6,9 @@ import {publishedCartRepairs,quotePublishedCart,repairPublishedCartLine} from '.
 import {buildWhatsAppFallbackUrl} from './whatsapp-fallback';
 import {selectedCustomerOptions,toggleCustomerSelection,validateCustomerSelections,type CustomerSelectionState} from './selection';
 import {BottomNavigation,CustomerHeader,StatusBanner,type ActionState,type ProductOriginRect} from './ui/primitives';
-import {CartView,CheckoutView,HomeView,MemberView,MenuView,OrdersView,ProductSheet,type MenuLayout,type OrderSegment} from './components/customer-views';
+import {CartView,CheckoutView,HomeView,MemberView,OrdersView,ProductSheet,type MenuLayout,type OrderSegment} from './components/customer-views';
+import {Stage2Menu} from './stage2/Stage2Menu';
+import {Stage2BottomNavigation} from './stage2/Stage2BottomNavigation';
 import type {
   CustomerCartLine,
   CustomerCheckoutDraft,
@@ -479,13 +481,13 @@ export function App(){
   const cartRepairs=useMemo(()=>publishedCartRepairs(cart,menu),[cart,menu]);
   const allProducts=menu?.products??[];
   const homeRecommendations=buildCustomerRecommendations({products:allProducts,history,cart,limit:4});
-  const menuRecommendations=buildCustomerRecommendations({products:allProducts,history,cart,activeCategoryId:effectiveCategoryId,limit:4});
+  const menuRecommendations=buildCustomerRecommendations({products:allProducts,history,cart,limit:8});
   const cartSuggestions=buildCustomerRecommendations({products:allProducts,history,cart,activeCategoryId:effectiveCategoryId,limit:2});
   const actionState:ActionState=quote?.freshness==='MATERIAL_CHANGE'||!cart.length||!quote||Boolean(submitBlockReason)?'disabled':readingIntentId||submitting?'loading':currentPending?.state==='UNKNOWN'?'unknown':currentPending?.state==='PENDING'?'pending':'default';
 
   return <main className="customer-shell" data-network={!browserOnline?'offline':connection.toLowerCase()}>
-    <CustomerHeader storeName={snapshot?.store?.storeName} connection={connection} browserOnline={browserOnline} onHome={()=>changeView('home')} onService={()=>changeView('more')}/>
-    <div className="global-status" aria-live="polite">
+    {view==='menu'?null:<CustomerHeader storeName={snapshot?.store?.storeName} connection={connection} browserOnline={browserOnline} onHome={()=>changeView('home')} onService={()=>changeView('more')}/>}
+    {view==='menu'?null:<div className="global-status" aria-live="polite">
       {notice?<section className="notice" role="status"><p>{notice}</p><button onClick={()=>setNotice(null)}>收起</button></section>:null}
       {!browserOnline?<StatusBanner tone="offline" title="目前離線" detail="已載入內容仍然可以查看。本機記憶罐、聯絡資料同待提交草稿已保留，恢復連線前唔會自動提交。"/>:null}
       {browserOnline&&connection==='ERROR'?<StatusBanner tone="danger" title="暫時未能同步店舖資料" detail={error||'請檢查連線後再試。'} actionLabel="安全重試" onAction={()=>void refresh()}/>:null}
@@ -493,18 +495,18 @@ export function App(){
       {browserOnline&&(connection==='STALE'||connection==='PARTIAL')?<StatusBanner tone="warning" title="正顯示最近一次資料" detail="店舖最新狀態仍在更新。涉及價格或落單結果時會要求再次確認。" actionLabel="更新資料" onAction={()=>void refresh()}/>:null}
       {browserOnline&&connection==='UNKNOWN'?<StatusBanner tone="warning" title="正在確認店舖狀態" detail="暫時唔會將未確認結果當成成功。" actionLabel="重新確認" onAction={()=>void refresh()}/>:null}
       {fallbackAvailable?<StatusBanner tone="warning" title="暫時未能自動接單" detail="系統已完成 3 次有限連線檢查；呢張訂單未送入正式接單流程。你可以用同一份餐點資料改經 WhatsApp 人手落單。" actionLabel="轉用 WhatsApp" onAction={()=>void requestFallback()}/>:null}
-    </div>
+    </div>}
 
-    <section className="viewport" aria-busy={connection==='LOADING'}>
+    <section className={view==='menu'?'stage2-viewport':'viewport'} aria-busy={connection==='LOADING'}>
       {view==='home'?<HomeView snapshot={snapshot} connection={connection} activeOrders={activeOrders} history={history} recommendations={homeRecommendations} cartCount={cartCount} onRefresh={()=>void refresh()} onProduct={openProduct} onBrowse={()=>changeView('menu')} onJar={()=>changeView('cart')} onOrders={()=>{setOrderSegment('current');changeView('orders')}} onHistory={()=>{setOrderSegment('history');changeView('orders')}} onMember={()=>changeView('more')} onBuyAgain={order=>void reorder(order)} onFallback={()=>void requestFallback()}/>:null}
-      {view==='menu'?<MenuView connection={connection} categories={categories} activeCategoryId={effectiveCategoryId} setCategory={category=>presentWithContinuity(()=>changeCategory(category))} query={search} setQuery={setSearch} layout={menuLayout} setLayout={layout=>presentWithContinuity(()=>setMenuLayout(layout))} products={visibleProducts} recommendations={menuRecommendations} onProduct={(product,origin)=>openProduct(product,origin)} cartCount={cartCount} quote={quote} onCart={()=>changeView('cart')}/>:null}
+      {view==='menu'?<Stage2Menu connection={connection} browserOnline={browserOnline} categories={categories} activeCategoryId={activeCategoryId} setCategory={category=>presentWithContinuity(()=>changeCategory(category))} query={search} setQuery={setSearch} products={menu?.products??[]} recommendations={menuRecommendations} onProduct={(product,origin)=>openProduct(product,origin)} cartCount={cartCount} onCart={()=>changeView('cart')}/>:null}
       {view==='cart'?<CartView cart={cart} quote={quote} repairs={cartRepairs} checkout={checkout} member={snapshot?.member} suggestions={cartSuggestions} products={menu?.products??[]} onProduct={openProduct} onAcceptRepair={acceptCartRepair} onCheckoutChange={changeCheckout} onQuantity={(lineId,quantity)=>updateCart(cart.map(line=>line.lineId===lineId?{...line,quantity:Math.max(1,quantity)}:line))} onRemove={lineId=>updateCart(cart.filter(line=>line.lineId!==lineId))} onMenu={()=>changeView('menu')} onCheckout={()=>changeView('checkout')}/>:null}
       {view==='checkout'?<CheckoutView cart={cart} quote={quote} checkout={checkout} setCheckout={changeCheckout} paymentChannels={snapshot?.paymentChannels??[]} pending={currentPending} actionState={actionState} submitProbe={submitProbe} submitBlockReason={submitBlockReason} fallbackAvailable={fallbackAvailable} onFallback={()=>void requestFallback()} onSubmit={()=>void submit()} onReadback={intent=>void readbackIntent(intent)} onBack={()=>changeView('cart')} onRepair={()=>changeView('cart')} onPaymentEvidence={file=>void uploadPaymentEvidence(file)}/>:null}
       {view==='orders'?<OrdersView segment={orderSegment} setSegment={setOrderSegment} active={activeOrders} history={history} expandedOrderId={expandedOrderId} setExpandedOrderId={setExpandedOrderId} onReorder={order=>void reorder(order)} onBrowse={()=>changeView('menu')} connection={connection}/>:null}
       {view==='more'?<MemberView connection={connection} snapshot={snapshot} history={history} pendingIntents={pendingIntents} readingIntentId={readingIntentId} onRefresh={()=>void refresh()} onReadback={intent=>void readbackIntent(intent)} onDiscard={removeIntent} onFallback={()=>void requestFallback()} onReorder={order=>void reorder(order)} onBrowse={()=>changeView('menu')}/>:null}
     </section>
 
-    {view!=='checkout'?<BottomNavigation active={view} cartCount={cartCount} orderCount={activeOrders.length} pulseKey={jarPulseKey} onChange={changeView}/>:null}
+    {view==='menu'?<Stage2BottomNavigation active="menu" cartCount={cartCount} orderCount={activeOrders.length} onChange={changeView}/>:view!=='checkout'?<BottomNavigation active={view} cartCount={cartCount} orderCount={activeOrders.length} pulseKey={jarPulseKey} onChange={changeView}/>:null}
 
     {selectedProduct?<ProductSheet product={selectedProduct} selections={selections} selectedVariationId={selectedVariationId} quantity={selectedQuantity} note={selectedNote} currentStep={productStep} editing={Boolean(editingLineId)} setStep={setProductStep} setVariation={setSelectedVariationId} setQuantity={setSelectedQuantity} setNote={setSelectedNote} toggle={(groupId,optionId)=>{
       const group=selectedProduct.optionGroups.find(item=>item.optionGroupId===groupId);
