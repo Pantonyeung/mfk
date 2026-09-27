@@ -1,5 +1,5 @@
 import type {OwnerReadModelSnapshot} from './product-types';
-import {OWNER_COST_DEFINITIONS,type OwnerCostKey,type OwnerMonthlyPlan} from './stage05-planning-persistence';
+import {OWNER_COST_DEFINITIONS,type OwnerCostKey,type OwnerMonthlyPlanDraft} from './stage05-planning-persistence';
 import {calculateOwnerCostTotals,calculateOwnerTargetProgress} from './stage05-planning-math';
 
 export interface OwnerPlanningViewModel{
@@ -64,7 +64,7 @@ export function resolveOwnerPlanningMonth(snapshot:OwnerReadModelSnapshot|null,n
 
 export function buildOwnerPlanningViewModel(
   snapshot:OwnerReadModelSnapshot|null,
-  plan:OwnerMonthlyPlan,
+  plan:OwnerMonthlyPlanDraft,
   now=new Date(),
 ):OwnerPlanningViewModel{
   const businessDate=resolveOwnerPlanningBusinessDate(snapshot,now);
@@ -76,7 +76,7 @@ export function buildOwnerPlanningViewModel(
     &&typeof basis.currentEffectiveSalesMtdMinor==='number'
     &&Number.isFinite(basis.currentEffectiveSalesMtdMinor);
   const mtdMinor=mtdAvailable?Math.round(basis?.currentEffectiveSalesMtdMinor??0):0;
-  const activePlan=plan.month===month?plan:null;
+  const activePlan=plan.monthKey===month?plan:null;
   const targetMinor=activePlan?.targetMinor??null;
   const {remainingMinor,attainmentPct,dailyNeededMinor,projectedTargetDate}=calculateOwnerTargetProgress({
     businessDate,mtdAvailable,mtdMinor,targetMinor,
