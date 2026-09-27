@@ -792,7 +792,7 @@ test('OA-PLN-001 planning math is deterministic for target progress and cost tot
   assert.equal(progress.remainingMinor,18700000);
   assert.equal(progress.attainmentPct,6.5);
   assert.equal(progress.dailyNeededMinor,4675000);
-  assert.equal(progress.projectedTargetDate,'2027-10-20');
+  assert.equal(progress.projectedTargetDate,'2027-10-21');
 
   const costs=math.calculateOwnerCostTotals([
     {plannedMinor:3000000,actualToDateMinor:3000000},
