@@ -14,6 +14,7 @@ export interface SmmLocalWorkspace {
   readonly schemaVersion:1;
   readonly storageKind:'LOCAL_NON_AUTHORITATIVE';
   readonly cart:readonly SmmCartLine[];
+  readonly cartNote:string;
   readonly pendingIntents:readonly SmmPendingIntent[];
   readonly preferences:SmmLocalPreferences;
   readonly updatedAt:string;
@@ -23,6 +24,7 @@ const DEFAULT_WORKSPACE:SmmLocalWorkspace=Object.freeze({
   schemaVersion:1,
   storageKind:'LOCAL_NON_AUTHORITATIVE',
   cart:Object.freeze([]),
+  cartNote:'',
   pendingIntents:Object.freeze([]),
   preferences:Object.freeze({
     activeView:'order',
@@ -57,6 +59,7 @@ export function readSmmLocalWorkspace():SmmLocalWorkspace{
       schemaVersion:1,
       storageKind:'LOCAL_NON_AUTHORITATIVE',
       cart:Object.freeze([...safeArray<SmmCartLine>(parsed.cart)]),
+      cartNote:typeof parsed.cartNote==='string'?parsed.cartNote.slice(0,160):'',
       pendingIntents:Object.freeze([...safeArray<SmmPendingIntent>(parsed.pendingIntents)]),
       preferences:Object.freeze({
         activeView,
@@ -72,11 +75,13 @@ export function readSmmLocalWorkspace():SmmLocalWorkspace{
   }
 }
 
-export function writeSmmLocalWorkspace(workspace:Omit<SmmLocalWorkspace,'schemaVersion'|'storageKind'|'updatedAt'>):SmmLocalWorkspace{
+export function writeSmmLocalWorkspace(workspace:Omit<SmmLocalWorkspace,'schemaVersion'|'storageKind'|'updatedAt'|'cartNote'>&{readonly cartNote?:string}):SmmLocalWorkspace{
+  const previous=readSmmLocalWorkspace();
   const next:SmmLocalWorkspace=Object.freeze({
     schemaVersion:1,
     storageKind:'LOCAL_NON_AUTHORITATIVE',
     cart:Object.freeze([...workspace.cart]),
+    cartNote:typeof workspace.cartNote==='string'?workspace.cartNote.slice(0,160):previous.cartNote,
     pendingIntents:Object.freeze([...workspace.pendingIntents]),
     preferences:Object.freeze({...workspace.preferences}),
     updatedAt:new Date().toISOString(),
