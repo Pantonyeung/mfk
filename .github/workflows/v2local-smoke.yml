@@ -2,7 +2,7 @@ name: V2 Local POS Smoke
 
 on:
   push:
-    branches: [main]
+    branches: [main, integration/MFK/SMT-CONSOLIDATION-A1-PRICE-OVERRIDE]
     paths:
       - 'v2local/**'
   workflow_dispatch:
