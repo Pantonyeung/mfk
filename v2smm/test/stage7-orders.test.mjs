@@ -94,6 +94,38 @@ test('Stage 7 source and canonical status filters are deterministic',()=>{
   assert.equal(smmStage7MatchesStatus(rows[0],'READY'),false);
 });
 
+test('Stage 7 filter no-match never becomes page EMPTY',()=>{
+  const active=rows.filter(row=>smmStage7InSegment(row,'ACTIVE'));
+  assert.ok(active.length>0);
+
+  const sourceNoMatch=active.filter(row=>smmStage7MatchesSource(row,'ONSITE'));
+  assert.equal(sourceNoMatch.length,0);
+
+  const statusNoMatch=active.filter(row=>smmStage7MatchesStatus(row,'PENDING'));
+  assert.equal(statusNoMatch.length,0);
+
+  const history=rows.filter(row=>smmStage7InSegment(row,'HISTORY'));
+  assert.ok(history.length>0);
+  const dateNoMatch=history.filter(row=>smmStage7MatchesDate(row,'CUSTOM','2026-09-25','2026-09-27T12:00:00+08:00'));
+  assert.equal(dateNoMatch.length,0);
+
+  assert.match(view,/connection==='READY'&&segmentRows\.length===0\?<Stage7Empty/);
+  assert.match(view,/segmentRows\.length>0&&filteredRows\.length===0/);
+  assert.match(view,/目前篩選條件沒有符合訂單/);
+  assert.doesNotMatch(view,/connection==='READY'&&filteredRows\.length===0\?<Stage7Empty/);
+});
+
+test('Stage 7 search ignores hidden list source/status/date filters within the current segment',()=>{
+  assert.match(view,/if\(surface==='SEARCH'\)[\s\S]*rows=\{segmentRows\}/);
+  assert.doesNotMatch(view,/if\(surface==='SEARCH'\)[\s\S]{0,240}rows=\{filteredRows\}/);
+
+  const history=rows.filter(row=>smmStage7InSegment(row,'HISTORY'));
+  const hiddenListThirdParty=history.filter(row=>smmStage7MatchesSource(row,'THIRD_PARTY'));
+  assert.equal(hiddenListThirdParty.length,0);
+  const searchResult=history.filter(row=>smmStage7MatchesSearch(row,'017','DISPLAY'));
+  assert.deepEqual(searchResult.map(row=>row.displayCode),['#017']);
+});
+
 test('Stage 7 history date filter uses canonical order/observed time only',()=>{
   const now='2026-09-27T12:00:00+08:00';
   assert.equal(smmStage7MatchesDate(rows[1],'YESTERDAY','',now),true);
@@ -179,7 +211,8 @@ test('Stage X Loading Empty Offline Stale Partial Unknown Error remain separated
   assert.equal(smmStage7ConnectionState('UNKNOWN',true)?.kind,'UNKNOWN');
   assert.equal(smmStage7ConnectionState('ERROR',true)?.kind,'ERROR');
   assert.equal(smmStage7ConnectionState('READY',false),null);
-  assert.match(view,/connection==='READY'&&filteredRows\.length===0\?<Stage7Empty/);
+  assert.match(view,/connection==='READY'&&segmentRows\.length===0\?<Stage7Empty/);
+  assert.match(view,/segmentRows\.length>0&&filteredRows\.length===0\?<section className="stage7-filter-empty"/);
   assert.match(view,/Stage7StateBanner connection=\{connection\} hasRows=\{rows\.length>0\}/);
 });
 
@@ -207,4 +240,5 @@ test('Stage 7 responsive and accessibility contract covers 440x956 and 360x780',
   assert.match(css,/min-width:44px/);
   assert.match(css,/focus-visible/);
   assert.match(css,/prefers-reduced-motion:reduce/);
+  assert.match(css,/\.stage7-filter-empty/);
 });
