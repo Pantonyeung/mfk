@@ -452,8 +452,9 @@ export function App(){
   };
 
   const changeDiningTarget=(next:SmmDiningTarget|null)=>{
+    const targetMode:SmmServiceMode=next?'DINE_IN':serviceMode;
     setDiningTarget(next);
-    persist({preferences:{activeView:view,activeCategoryId,sourceFilter,serviceMode,tender,diningTarget:next}});
+    persist({preferences:{activeView:view,activeCategoryId,sourceFilter,serviceMode:targetMode,tender,diningTarget:next}});
   };
 
   const saveIntent=(intent:SmmPendingIntent)=>{
