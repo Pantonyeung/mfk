@@ -216,18 +216,17 @@ test('dedicated SMM worker keeps auth session only and proxies orders to the sha
 });
 
 
-test('SMM Stage 3 keeps service mode visible while tender and submit UI remain deferred to the next stage',()=>{
+test('SMM Stage 4 adds checkout confirmation UI while formal Stage 5 submission remains unexposed',()=>{
   const app=fs.readFileSync(path.join(root,'App.tsx'),'utf8');
   const types=fs.readFileSync(path.join(root,'product-types.ts'),'utf8');
-  const ingress=fs.readFileSync(path.join(repoRoot,'v2local','src','runtime','smm-lan-ingress.ts'),'utf8');
-  const start=app.indexOf('function CartSheet');
+  const ingress=fs.readFileSync(path.join(repoRoot,'v2local','src/runtime/smm-lan-ingress.ts'),'utf8');
+  const start=app.indexOf('function Stage4CheckoutView');
   const end=app.indexOf('function DiningTargetSheet',start);
-  const cartSheet=app.slice(start,end);
-  assert.match(cartSheet,/服務方式/);
-  assert.match(cartSheet,/堂食/);
-  assert.match(cartSheet,/外賣/);
-  assert.match(cartSheet,/前往結帳/);
-  assert.doesNotMatch(cartSheet,/收款方式|提交訂單|重新確認結果/);
+  const checkout=app.slice(start,end);
+  for(const marker of['服務方式','堂食去向','付款方式','最後摘要','提交訂單'])assert.match(checkout,new RegExp(marker));
+  assert.doesNotMatch(checkout,/submitCart|submitOrder|readSubmission|createSmmPendingIntent/);
+  assert.match(app,/const submitCart=async\(\)=>/);
+  assert.match(app,/readSubmission/);
   assert.match(types,/export type SmmTender=/);
   assert.doesNotMatch(app,/產生 QR|QR 交接|createSmmQrHandoff|renderSmmQrHandoff/);
   assert.match(ingress,/paymentLabel/);

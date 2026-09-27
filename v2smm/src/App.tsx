@@ -23,9 +23,16 @@ import {
   sameSmmCartRefreshAttention,
   smmLineTotalMinor,
 } from './stage3-cart.mjs';
+import {
+  SMM_STAGE4_TENDERS,
+  smmStage4CheckoutReady,
+  smmStage4DiningTargetStatus,
+  smmStage4TenderLabel,
+} from './stage4-checkout.mjs';
 import './stage1.css';
 import './stage2.css';
 import './stage3.css';
+import './stage4.css';
 import type {
   SmmCartLine,
   SmmConnectionState,
@@ -67,6 +74,7 @@ export function App(){
   const [comboEnabled,setComboEnabled]=useState(false);
   const [comboSelections,setComboSelections]=useState<SmmComboSelectionState>({});
   const [cartOpen,setCartOpen]=useState(false);
+  const [checkoutStage,setCheckoutStage]=useState(false);
   const [editingLineId,setEditingLineId]=useState<string|null>(null);
   const [cartNote,setCartNote]=useState(initial.cartNote);
   const [submitting,setSubmitting]=useState(false);
@@ -77,7 +85,7 @@ export function App(){
   const [moreTool,setMoreTool]=useState<'staff'|'connection'|'channels'|'business'|'printing'|'diagnostics'|'sellability'|'pending'|'capacity'|'reporting'|'refunds'|null>(null);
   const [dineTable,setDineTable]=useState('');
   const [dineCovers,setDineCovers]=useState(2);
-  const [diningTarget,setDiningTarget]=useState<SmmDiningTarget|null>(null);
+  const [diningTarget,setDiningTarget]=useState<SmmDiningTarget|null>(initial.preferences.diningTarget);
   const [diningTargetOpen,setDiningTargetOpen]=useState(false);
 
   const persist=(next:{
@@ -90,23 +98,23 @@ export function App(){
       cart:next.cart??cart,
       cartNote:next.cartNote??cartNote,
       pendingIntents:next.pendingIntents??pendingIntents,
-      preferences:next.preferences??{activeView:view,activeCategoryId,sourceFilter,serviceMode,tender},
+      preferences:next.preferences??{activeView:view,activeCategoryId,sourceFilter,serviceMode,tender,diningTarget},
     });
   };
 
   const changeView=(next:View)=>{
     setView(next);
-    persist({preferences:{activeView:next,activeCategoryId,sourceFilter,serviceMode,tender}});
+    persist({preferences:{activeView:next,activeCategoryId,sourceFilter,serviceMode,tender,diningTarget}});
   };
 
   const changeCategory=(next:string|null)=>{
     setActiveCategoryId(next);
-    persist({preferences:{activeView:view,activeCategoryId:next,sourceFilter,serviceMode,tender}});
+    persist({preferences:{activeView:view,activeCategoryId:next,sourceFilter,serviceMode,tender,diningTarget}});
   };
 
   const changeSource=(next:string)=>{
     setSourceFilter(next);
-    persist({preferences:{activeView:view,activeCategoryId,sourceFilter:next,serviceMode,tender}});
+    persist({preferences:{activeView:view,activeCategoryId,sourceFilter:next,serviceMode,tender,diningTarget}});
   };
 
   const refresh=async()=>{
@@ -319,7 +327,7 @@ export function App(){
       cart:frozen,
       cartNote,
       pendingIntents,
-      preferences:{activeView:view,activeCategoryId,sourceFilter,serviceMode,tender},
+      preferences:{activeView:view,activeCategoryId,sourceFilter,serviceMode,tender,diningTarget},
     });
     if(affected>0)setNotice('餐單有更新；請喺購物草稿逐項確認已標示商品。未確認前唔會靜默接受新價格或套餐資料。');
   },[menu?.revision,menu?.observedAt]);
@@ -426,6 +434,7 @@ export function App(){
 
   const changeServiceMode=(next:SmmServiceMode)=>{
     const repriced=cart.map(line=>repriceLine(line,next));
+    const nextDiningTarget=next==='TAKEAWAY'?null:diningTarget;
     setServiceMode(next);
     if(next==='TAKEAWAY')setDiningTarget(null);
     setCart(repriced);
@@ -433,13 +442,19 @@ export function App(){
       cart:repriced,
       cartNote,
       pendingIntents,
-      preferences:{activeView:view,activeCategoryId,sourceFilter,serviceMode:next,tender},
+      preferences:{activeView:view,activeCategoryId,sourceFilter,serviceMode:next,tender,diningTarget:nextDiningTarget},
     });
   };
 
   const changeTender=(next:SmmTender)=>{
     setTender(next);
-    persist({preferences:{activeView:view,activeCategoryId,sourceFilter,serviceMode,tender:next}});
+    persist({preferences:{activeView:view,activeCategoryId,sourceFilter,serviceMode,tender:next,diningTarget}});
+  };
+
+  const changeDiningTarget=(next:SmmDiningTarget|null)=>{
+    const targetMode:SmmServiceMode=next?'DINE_IN':serviceMode;
+    setDiningTarget(next);
+    persist({preferences:{activeView:view,activeCategoryId,sourceFilter,serviceMode:targetMode,tender,diningTarget:next}});
   };
 
   const saveIntent=(intent:SmmPendingIntent)=>{
@@ -630,7 +645,7 @@ export function App(){
         quote={quote}
         serviceMode={serviceMode}
         onProduct={product=>{setEditingLineId(null);setSelectedProduct(product);setSelections({});setSelectedVariationId(null);setComboEnabled(false);setComboSelections({})}}
-        onCart={()=>setCartOpen(true)}
+        onCart={()=>{setCheckoutStage(false);setCartOpen(true)}}
       />:null}
       {view==='work'?<WorkView connection={connection} items={snapshot?.work??[]} onRefresh={()=>void refresh()}/>:null}
       {view==='orders'?<OrdersView
@@ -655,15 +670,15 @@ export function App(){
           const selected=(snapshot?.diningTables??[]).find(row=>row.tableId===dineTable);
           if(!selected){setNotice('請先選擇 Admin 已發布嘅枱號。');return}
           const target:SmmDiningTarget={kind:'TABLE',tableId:selected.tableId,covers:dineCovers};
-          setDiningTarget(target);
           changeServiceMode('DINE_IN');
+          changeDiningTarget(target);
           setDiningTargetOpen(false);
           setNotice('已選 '+selected.label+'；加入商品後提交，SMT 會自動開枱／加單。');
           changeView('order');
         }}
         onWait={()=>{
-          setDiningTarget({kind:'WAITING',covers:dineCovers});
           changeServiceMode('DINE_IN');
+          changeDiningTarget({kind:'WAITING',covers:dineCovers});
           setDiningTargetOpen(false);
           setNotice('已選輪候；加入商品後提交會先進堂食輪候。');
           changeView('order');
@@ -716,7 +731,7 @@ export function App(){
         const group=resolved?.groups.find(item=>item.pool.poolId===poolId&&item.group.groupId===groupId);
         if(group)setComboSelections(current=>toggleSmmComboSelection(current,group,choiceId));
       }}
-      onClose={()=>{const returnToCart=Boolean(editingLineId);resetProductEditor();if(returnToCart)setCartOpen(true)}}
+      onClose={()=>{const returnToCart=Boolean(editingLineId);resetProductEditor();if(returnToCart){setCheckoutStage(false);setCartOpen(true)}}}
       onAdd={addSelectedProduct}
     />:null}
 
@@ -724,17 +739,25 @@ export function App(){
       cart={cart}
       quote={quote}
       menu={menu}
+      checkoutStage={checkoutStage}
       serviceMode={serviceMode}
+      tender={tender}
+      diningTarget={diningTarget}
+      diningTables={snapshot?.diningTables??[]}
       note={cartNote}
       onNote={changeCartNote}
       onServiceMode={changeServiceMode}
-      onClose={()=>setCartOpen(false)}
+      onTender={changeTender}
+      onChooseDiningTarget={()=>{setDineCovers(diningTarget?.covers??dineCovers);setDiningTargetOpen(true)}}
+      onClose={()=>{setCartOpen(false);setCheckoutStage(false)}}
+      onBackToCart={()=>setCheckoutStage(false)}
       onEdit={openCartLineEditor}
       onAcceptRefresh={acceptCartRefresh}
       onQuantity={(lineId,quantity)=>updateCart(cart.map(line=>line.lineId===lineId?{...line,quantity:Math.min(99,Math.max(1,quantity))}:line))}
       onRemove={lineId=>updateCart(cart.filter(line=>line.lineId!==lineId))}
-      onClear={()=>{setCart([]);setCartNote('');persist({cart:[],cartNote:''})}}
-      onCheckout={()=>{setCartOpen(false);setNotice('購物草稿已準備完成；今輪停喺 Stage 3，結帳會喺下一個 Stage 接上。')}}
+      onClear={()=>{setCart([]);setCartNote('');setCheckoutStage(false);persist({cart:[],cartNote:''})}}
+      onCheckout={()=>setCheckoutStage(true)}
+      onSubmitBoundary={()=>setNotice('結帳資料已確認；第 4 階段未送出正式訂單。正式提交同 PENDING／CONFIRMED／REJECTED／UNKNOWN 留待第 5 階段。')}
     />:null}
 
     {diningTargetOpen?<DiningTargetSheet
@@ -742,7 +765,7 @@ export function App(){
       covers={dineCovers}
       setCovers={setDineCovers}
       onClose={()=>setDiningTargetOpen(false)}
-      onSelect={target=>{setDiningTarget(target);setDiningTargetOpen(false);const label=(snapshot?.diningTables??[]).find(row=>row.tableId===target.tableId)?.label;setNotice(target.kind==='TABLE'?'堂食會掛入 '+(label??target.tableId)+'。':'堂食會先加入輪候。');}}
+      onSelect={target=>{changeDiningTarget(target);setDiningTargetOpen(false);const label=(snapshot?.diningTables??[]).find(row=>row.tableId===target.tableId)?.label;setNotice(target.kind==='TABLE'?'堂食會掛入 '+(label??target.tableId)+'。':'堂食會先加入輪候。');}}
     />:null}
   </main>;
 }
@@ -1201,22 +1224,48 @@ function ProductSheet({
   </div>;
 }
 
-function CartSheet({cart,quote,menu,serviceMode,note,onNote,onServiceMode,onClose,onEdit,onAcceptRefresh,onQuantity,onRemove,onClear,onCheckout}:{
+function CartSheet({cart,quote,menu,checkoutStage,serviceMode,tender,diningTarget,diningTables,note,onNote,onServiceMode,onTender,onChooseDiningTarget,onClose,onBackToCart,onEdit,onAcceptRefresh,onQuantity,onRemove,onClear,onCheckout,onSubmitBoundary}:{
   cart:readonly SmmCartLine[];
   quote:SmmQuoteSnapshot|null;
   menu:SmmReadModelSnapshot['menu'];
+  checkoutStage:boolean;
   serviceMode:SmmServiceMode;
+  tender:SmmTender;
+  diningTarget:SmmDiningTarget|null;
+  diningTables:NonNullable<SmmReadModelSnapshot['diningTables']>;
   note:string;
   onNote:(value:string)=>void;
   onServiceMode:(mode:SmmServiceMode)=>void;
+  onTender:(tender:SmmTender)=>void;
+  onChooseDiningTarget:()=>void;
   onClose:()=>void;
+  onBackToCart:()=>void;
   onEdit:(line:SmmCartLine)=>void;
   onAcceptRefresh:(lineId:string)=>void;
   onQuantity:(id:string,q:number)=>void;
   onRemove:(id:string)=>void;
   onClear:()=>void;
   onCheckout:()=>void;
+  onSubmitBoundary:()=>void;
 }){
+  if(checkoutStage){
+    return <Stage4CheckoutView
+      cart={cart}
+      quote={quote}
+      menu={menu}
+      serviceMode={serviceMode}
+      tender={tender}
+      diningTarget={diningTarget}
+      diningTables={diningTables}
+      note={note}
+      onServiceMode={onServiceMode}
+      onTender={onTender}
+      onChooseDiningTarget={onChooseDiningTarget}
+      onClose={onClose}
+      onBackToCart={onBackToCart}
+      onSubmitBoundary={onSubmitBoundary}
+    />;
+  }
   const rows=cart.map(line=>Object.freeze({line,attention:line.refreshAttention??null}));
   const affectedCount=rows.filter(row=>Boolean(row.attention)).length;
   const validRows=rows.filter(row=>!row.attention&&Number.isSafeInteger(Number(row.line.publishedUnitPriceMinor)));
@@ -1335,6 +1384,136 @@ function CartSheet({cart,quote,menu,serviceMode,note,onNote,onServiceMode,onClos
     </section>
   </div>;
 }
+
+function Stage4CheckoutView({cart,quote,menu,serviceMode,tender,diningTarget,diningTables,note,onServiceMode,onTender,onChooseDiningTarget,onClose,onBackToCart,onSubmitBoundary}:{
+  cart:readonly SmmCartLine[];
+  quote:SmmQuoteSnapshot|null;
+  menu:SmmReadModelSnapshot['menu'];
+  serviceMode:SmmServiceMode;
+  tender:SmmTender;
+  diningTarget:SmmDiningTarget|null;
+  diningTables:NonNullable<SmmReadModelSnapshot['diningTables']>;
+  note:string;
+  onServiceMode:(mode:SmmServiceMode)=>void;
+  onTender:(tender:SmmTender)=>void;
+  onChooseDiningTarget:()=>void;
+  onClose:()=>void;
+  onBackToCart:()=>void;
+  onSubmitBoundary:()=>void;
+}){
+  const itemCount=cart.reduce((sum,line)=>sum+line.quantity,0);
+  const hasAttention=cart.some(line=>Boolean(line.refreshAttention));
+  const diningStatus=smmStage4DiningTargetStatus(serviceMode,diningTarget,diningTables);
+  const submitReady=smmStage4CheckoutReady({
+    cartLength:cart.length,
+    totalMinor:quote?.totalMinor,
+    hasAttention,
+    tender,
+    diningTargetValid:diningStatus.valid,
+  });
+  const serviceLabel=serviceMode==='DINE_IN'?'堂食':'外賣';
+
+  return <div className="overlay stage4-overlay">
+    <section className="sheet stage4-checkout-sheet" role="dialog" aria-modal="true" aria-label="結帳">
+      <div className="sheet-grabber"/>
+      <header className="stage4-header">
+        <div>
+          <span>第 4 階段 · 結帳</span>
+          <h2>提交前確認</h2>
+          <small>呢一步只確認結帳資料；正式送出同 PENDING／CONFIRMED／REJECTED／UNKNOWN 留待第 5 階段。</small>
+        </div>
+        <button className="stage4-close" type="button" onClick={onClose} aria-label="關閉結帳">✕</button>
+      </header>
+
+      <div className="stage4-scroll-body">
+        <section className="stage4-section">
+          <div className="stage4-section-head">
+            <div><strong>服務方式</strong><small>切換屬店員明確操作；價格會按目前已發布資料即時重算。</small></div>
+            <span>1</span>
+          </div>
+          <div className="stage4-segmented">
+            <button type="button" className={serviceMode==='TAKEAWAY'?'active':''} onClick={()=>onServiceMode('TAKEAWAY')}>外賣</button>
+            <button type="button" className={serviceMode==='DINE_IN'?'active':''} onClick={()=>onServiceMode('DINE_IN')}>堂食</button>
+          </div>
+        </section>
+
+        {serviceMode==='DINE_IN'?<section className={`stage4-section stage4-dining ${diningStatus.valid?'':'required'}`}>
+          <div className="stage4-section-head">
+            <div><strong>堂食去向</strong><small>必須使用 Admin 已發布餐枱，或者加入輪候。</small></div>
+            <span>2</span>
+          </div>
+          <div className="stage4-target-row">
+            <div>
+              <small>{diningStatus.valid?'已選擇':'必選'}</small>
+              <strong>{diningStatus.label}</strong>
+            </div>
+            <button type="button" className={diningStatus.valid?'':'primary'} onClick={onChooseDiningTarget}>{diningStatus.valid?'更改':'選擇餐枱／輪候'}</button>
+          </div>
+          {!diningStatus.valid?<p className="stage4-inline-warning">堂食未選 Table / Waiting target，提交按鈕會保持停用。</p>:null}
+        </section>:null}
+
+        <section className="stage4-section">
+          <div className="stage4-section-head">
+            <div><strong>付款方式</strong><small>今階段只記錄 Tender；唔執行付款、唔自動開錢箱。</small></div>
+            <span>{serviceMode==='DINE_IN'?'3':'2'}</span>
+          </div>
+          <div className="stage4-tender-grid">
+            {SMM_STAGE4_TENDERS.map(row=><button
+              key={row.value}
+              type="button"
+              className={tender===row.value?'active':''}
+              onClick={()=>onTender(row.value)}
+            >{row.label}</button>)}
+          </div>
+        </section>
+
+        <section className="stage4-section stage4-summary">
+          <div className="stage4-section-head">
+            <div><strong>最後摘要</strong><small>正式價格、Combo、餐單 revision 仍由 SMT 提交時重新驗證。</small></div>
+            <span>{serviceMode==='DINE_IN'?'4':'3'}</span>
+          </div>
+
+          <div className="stage4-summary-facts">
+            <div><span>商品</span><strong>{itemCount} 件</strong></div>
+            <div><span>服務方式</span><strong>{serviceLabel}</strong></div>
+            {serviceMode==='DINE_IN'?<div><span>堂食去向</span><strong className={diningStatus.valid?'':'warn'}>{diningStatus.label}</strong></div>:null}
+            <div><span>付款方式</span><strong>{smmStage4TenderLabel(tender)}</strong></div>
+            <div><span>餐單版本</span><strong>{menu?.revision??'等待同步'}</strong></div>
+          </div>
+
+          <div className="stage4-review-lines">
+            {cart.map(line=>{
+              const total=smmLineTotalMinor(line.publishedUnitPriceMinor,line.quantity);
+              return <div key={line.lineId}>
+                <span>{line.productName} × {line.quantity}</span>
+                <strong>{total===null?'價格待同步':money('HKD',total)}</strong>
+              </div>;
+            })}
+          </div>
+
+          {note.trim()?<div className="stage4-note-summary"><span>備註</span><p>{note}</p></div>:null}
+
+          <div className="stage4-total">
+            <div><span>總額</span><small>{quote?'已發布價格預覽 · SMT 最終再驗證':'價格資料未完整'}</small></div>
+            <strong>{quote?money(quote.currency,quote.totalMinor):'—'}</strong>
+          </div>
+
+          {hasAttention?<section className="stage4-blocker" role="alert">
+            <strong>購物草稿有未確認更新</strong>
+            <span>返回購物草稿處理 PRICE_CHANGED / CONFIG_CHANGED 後先可以提交。</span>
+          </section>:null}
+        </section>
+      </div>
+
+      <footer className="stage4-footer">
+        <button type="button" onClick={onBackToCart}>返回購物草稿</button>
+        <button className="primary stage4-submit" type="button" disabled={!submitReady} onClick={onSubmitBoundary}>提交訂單</button>
+        <small>{submitReady?'結帳資料已齊；正式送出流程會喺第 5 階段接入。':serviceMode==='DINE_IN'&&!diningStatus.valid?'請先選擇餐枱或輪候。':hasAttention?'請先處理購物草稿更新。':'請確認餐單價格資料。'}</small>
+      </footer>
+    </section>
+  </div>;
+}
+
 
 function DiningTargetSheet({tables,covers,setCovers,onClose,onSelect}:{
   tables:NonNullable<SmmReadModelSnapshot['diningTables']>;
