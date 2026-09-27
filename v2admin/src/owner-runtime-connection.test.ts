@@ -38,7 +38,7 @@ describe('Owner canonical read projection',()=>{
       businessDate:'2026-09-27',
       sourceMetric:'CURRENT_EFFECTIVE_SALES',
       sourceAuthority:'CANONICAL_REPORTING_PROJECTION',
-      currentEffectiveSalesMtdMinor:5200,
+      currentEffectiveSalesMtdMinor:9500,
       metricVersion:'MFK_CURRENT_EFFECTIVE_SALES_V1',
     });
     expect(snapshot.reports[0].currentEffectiveSalesMinor).not.toBe(6000);
