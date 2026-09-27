@@ -23,6 +23,7 @@ export function OrderOversightPage({
 }){
   const [filters,setFilters]=useState<OwnerOrderFilters>(DEFAULT_OWNER_ORDER_FILTERS);
   const [selectedOrderId,setSelectedOrderId]=useState<string|null>(null);
+  const [filtersOpen,setFiltersOpen]=useState(false);
 
   useEffect(()=>{
     if(scope==='ACTIVE'||scope==='DINE_IN_OPEN'){
@@ -75,16 +76,32 @@ export function OrderOversightPage({
       />
     </label>
 
-    <section className="order-filter-grid" aria-label="訂單篩選">
-      <OrderFilter label="營業日" value={filters.businessDate} values={vm.businessDates} onChange={businessDate=>setFilters(value=>({...value,businessDate}))}/>
-      <OrderFilter label="來源" value={filters.source} values={vm.sources} onChange={source=>setFilters(value=>({...value,source}))}/>
-      <OrderFilter label="付款" value={filters.paymentState} values={vm.paymentStates} onChange={paymentState=>setFilters(value=>({...value,paymentState}))}/>
-      <OrderFilter label="交收狀態" value={filters.fulfillmentState} values={vm.fulfillmentStates} onChange={fulfillmentState=>setFilters(value=>({...value,fulfillmentState:fulfillmentState as OwnerOrderFilters['fulfillmentState']}))}/>
-    </section>
+    {scope==='DEFAULT'?<section className="order-filter-summary" aria-label="訂單篩選摘要">
+      <div>
+        <span>{filters.businessDate==='ALL'?'全部日期':filters.businessDate}</span>
+        <span>{filters.source==='ALL'?'全部來源':filters.source}</span>
+        {filters.paymentState!=='ALL'?<span>{formatFilterValue(filters.paymentState)}</span>:null}
+        {filters.fulfillmentState!=='ALL'?<span>{filters.fulfillmentState}</span>:null}
+      </div>
+      <button onClick={()=>setFiltersOpen(true)}>篩選</button>
+    </section>:null}
 
     {!vm.rows.length?<OrderEmpty connection={connection}/>:<div className="cards order-oversight-list">
       {vm.rows.map(order=><OrderOversightCard key={order.orderId} order={order} onOpen={()=>setSelectedOrderId(order.orderId)}/>)}
     </div>}
+
+    {filtersOpen?<div className="overlay" onMouseDown={event=>{if(event.target===event.currentTarget)setFiltersOpen(false)}}>
+      <section className="drawer order-filter-drawer" role="dialog" aria-modal="true" aria-label="篩選條件">
+        <header className="drawer-head"><div><small>訂單</small><h2>篩選條件</h2></div><button onClick={()=>setFiltersOpen(false)} aria-label="關閉">×</button></header>
+        <section className="order-filter-grid" aria-label="訂單篩選">
+          <OrderFilter label="營業日" value={filters.businessDate} values={vm.businessDates} onChange={businessDate=>setFilters(value=>({...value,businessDate}))}/>
+          <OrderFilter label="來源" value={filters.source} values={vm.sources} onChange={source=>setFilters(value=>({...value,source}))}/>
+          <OrderFilter label="付款" value={filters.paymentState} values={vm.paymentStates} onChange={paymentState=>setFilters(value=>({...value,paymentState}))}/>
+          <OrderFilter label="交收狀態" value={filters.fulfillmentState} values={vm.fulfillmentStates} onChange={fulfillmentState=>setFilters(value=>({...value,fulfillmentState:fulfillmentState as OwnerOrderFilters['fulfillmentState']}))}/>
+        </section>
+        <div className="sheet-actions"><button onClick={()=>setFilters(DEFAULT_OWNER_ORDER_FILTERS)}>重設</button><button className="primary" onClick={()=>setFiltersOpen(false)}>套用篩選</button></div>
+      </section>
+    </div>:null}
 
     {selected?<OrderOversightDrawer order={selected} onClose={()=>setSelectedOrderId(null)}/>:null}
   </section>;
@@ -113,33 +130,21 @@ function OrderOversightCard({order,onOpen}:{order:OwnerOrderProjection;onOpen:()
   const effective=order.currentEffectiveAmountLabel??order.amountLabel??'—';
   const tender=order.currentTenderLabel??order.tenderLabel??'未有付款摘要';
   const workflow=order.workflowStatusLabel??order.lifecycle;
-  return <button className="order-oversight-card" onClick={onOpen}>
-    <div className="order-oversight-top">
-      <div>
-        <small>{order.source}</small>
-        <h2>{order.displayCode}</h2>
-      </div>
-      <span className={'certainty '+order.readback.toLowerCase()}>{certaintyLabel(order.readback)}</span>
+  return <button className="order-oversight-card compact-order-row" onClick={onOpen}>
+    <span className="order-source-mark" aria-hidden="true">{order.source.slice(0,1)}</span>
+    <div className="order-list-copy">
+      <div className="order-list-title"><strong>{order.displayCode}</strong><span>{order.source}</span></div>
+      <b>{order.customerName??order.itemSummary}</b>
+      <small>{order.elapsedLabel??'—'} · {effective} · {order.itemSummary}</small>
+      {order.exceptionBadges?.length?<div className="order-exception-row">{order.exceptionBadges.slice(0,2).map(label=><span key={label}>{label}</span>)}</div>:null}
     </div>
-
-    <div className="order-workflow-row">
-      <strong>{workflow}</strong>
-      <b>{effective}</b>
+    <div className="order-list-side">
+      <span className="order-workflow-chip">{workflow}</span>
+      <strong>{effective}</strong>
+      <small>{tender}</small>
+      <small>{getOwnerOrderFulfillmentStateLabel(order)}</small>
+      <small>{order.promisedTimeLabel??'—'}</small>
     </div>
-
-    <div className="order-time-row">
-      <span>已進行：{order.elapsedLabel??'—'}</span>
-      <span>預計：{order.promisedTimeLabel??'—'}</span>
-    </div>
-
-    <div className="order-meta-grid">
-      <div><span>付款</span><strong>{tender}</strong></div>
-      <div><span>交收狀態</span><strong>{getOwnerOrderFulfillmentStateLabel(order)}</strong></div>
-    </div>
-
-    {order.exceptionBadges?.length?<div className="order-exception-row">{order.exceptionBadges.slice(0,4).map(label=><span key={label}>{label}</span>)}</div>:null}
-
-    <div className="order-card-footer"><span>查看訂單詳情</span><small>只供查看</small></div>
   </button>;
 }
 
