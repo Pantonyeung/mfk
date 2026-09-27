@@ -130,7 +130,7 @@ test('payment evidence is transient and cannot reappear in a later checkout draf
   assert.match(persistence,/persistedCheckout/);
   assert.doesNotMatch(persistence,/checkout\.paymentEvidence&&typeof checkout\.paymentEvidence/);
   assert.match(app,/withoutPaymentEvidence/);
-  assert.match(app,/付款截圖需要重新提供/);
+  assert.match(app,/舊付款憑證已失效/);
 });
 
 test('backend preflight is wall-clock bounded and shows visible progress before WhatsApp fallback',()=>{
