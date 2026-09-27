@@ -576,6 +576,7 @@ export function App(){
     });
     saveIntent(base);
     setStage5Session(Object.freeze({intent:base,state:'DRAFT',message:'提交身份已鎖定。'}));
+    await Promise.resolve();
 
     if(!port?.submitOrder){
       setNotice('門店提交服務尚未連接；草稿已保存，未建立正式訂單。');
@@ -600,6 +601,14 @@ export function App(){
         saveIntent(rejected);
         setStage5Session(Object.freeze({intent:rejected,state:'REJECTED',message:result.message}));
         if(result.message.startsWith('SMM_PUBLISHED_PRICE_CHANGED')||result.message.startsWith('SMM_MENU_REVISION_CHANGED'))await refresh();
+        releaseSubmitLock();
+        return;
+      }
+      if(result.state==='NOT_CONNECTED'){
+        const offlineDraft=Object.freeze({...base,state:'DRAFT' as const,updatedAt:nowIso(),lastMessage:result.message});
+        saveIntent(offlineDraft);
+        setStage5Session(Object.freeze({intent:offlineDraft,state:'DRAFT',message:'傳輸通道離線；未將交易結果改寫成 UNKNOWN。'}));
+        setConnection('NOT_CONNECTED');
         releaseSubmitLock();
         return;
       }
@@ -634,6 +643,14 @@ export function App(){
         const rejected=Object.freeze({...intent,state:'REJECTED' as const,updatedAt:nowIso(),lastMessage:result.message});
         saveIntent(rejected);
         setStage5Session(Object.freeze({intent:rejected,state:'REJECTED',message:result.message}));
+        return;
+      }
+      if(result.state==='NOT_CONNECTED'){
+        const unchangedState=intent.state==='UNKNOWN'?'UNKNOWN':intent.state==='PENDING'?'PENDING':'DRAFT';
+        const offlineIntent=Object.freeze({...intent,state:unchangedState as 'DRAFT'|'PENDING'|'UNKNOWN',updatedAt:nowIso(),lastMessage:result.message});
+        saveIntent(offlineIntent);
+        setStage5Session(Object.freeze({intent:offlineIntent,state:unchangedState,message:'傳輸通道離線；原交易狀態保持不變。'}));
+        setConnection('NOT_CONNECTED');
         return;
       }
       const unknown=Object.freeze({...intent,state:'UNKNOWN' as const,updatedAt:nowIso(),lastMessage:result.message});
@@ -819,11 +836,14 @@ export function App(){
       session={stage5Session}
       submitting={submitting}
       reading={stage5Reading}
+      connection={connection}
       onReadback={()=>void readbackIntent(stage5Session.intent)}
       onRepair={repairStage5}
       onBack={()=>{setStage5Session(null);setCartOpen(false);setCheckoutStage(false);changeView('more');setMoreTool('pending')}}
       onViewOrder={()=>{setStage5Session(null);setCartOpen(false);setCheckoutStage(false);changeView('orders')}}
       onContinue={()=>{setStage5Session(null);setCartOpen(false);setCheckoutStage(false);changeView('order')}}
+      onPendingDetails={()=>{setStage5Session(null);setCartOpen(false);setCheckoutStage(false);changeView('more');setMoreTool('pending')}}
+      onHome={()=>{setStage5Session(null);setCartOpen(false);setCheckoutStage(false);changeView('order')}}
     />:null}
 
     {diningTargetOpen?<DiningTargetSheet
