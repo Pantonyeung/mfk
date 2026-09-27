@@ -1,6 +1,6 @@
 // Customer local published-menu quote + line-scoped repair.
 // This is a published-menu draft projection only. SMT remains final authority.
-import {customerComboEffectiveMin} from './selection.ts';
+import {customerComboEffectiveMin} from './selection';
 import type {
   CustomerCartComboIntent,
   CustomerCartComboSelection,
