@@ -1,7 +1,7 @@
 import type {OwnerChannelHealth,OwnerConnectionState} from './product-types';
 
 function healthLabel(value:OwnerChannelHealth['health']){
-  return value==='HEALTHY'?'健康':value==='DEGRADED'?'降級':value==='OFFLINE'?'離線':'狀態未明';
+  return value==='HEALTHY'?'正常':value==='DEGRADED'?'需留意':value==='OFFLINE'?'異常':'狀態未明';
 }
 function modeLabel(value:OwnerChannelHealth['mode']){
   return value==='NORMAL'?'正常接單':value==='BUSY'?'繁忙':value==='SNOOZED'?'暫停至指定時間':value==='PAUSED'?'已暫停接單':'已關閉';
