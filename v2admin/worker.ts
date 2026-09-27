@@ -450,6 +450,44 @@ function customerPickupException(input){
     ...(observedAt?{observedAt}:{}),
   };
 }
+function customerReorderIntentProjection(input){
+  return rows(input).flatMap(rawLine=>{
+    const line=row(rawLine);
+    const productId=String(line.productId||'').trim();
+    const productName=String(line.productName||'').trim();
+    const quantity=Math.max(1,Math.min(99,Math.floor(Number(line.quantity)||1)));
+    if(!productId||!productName)return[];
+    const selections=rows(line.selections).flatMap(rawSelection=>{
+      const selection=row(rawSelection);
+      const optionGroupId=String(selection.optionGroupId||'').trim();
+      const optionId=String(selection.optionId||'').trim();
+      const optionName=String(selection.optionName||'').trim();
+      return optionGroupId&&optionId?[{optionGroupId,optionId,optionName:optionName||optionId}]:[];
+    });
+    const comboSource=row(line.combo);
+    const comboId=String(comboSource.comboId||'').trim();
+    const comboName=String(comboSource.comboName||'').trim();
+    const comboSelections=rows(comboSource.selections).flatMap(rawSelection=>{
+      const selection=row(rawSelection);
+      const poolId=String(selection.poolId||'').trim(),groupId=String(selection.groupId||'').trim(),subPoolId=String(selection.subPoolId||'').trim(),choiceId=String(selection.choiceId||'').trim();
+      const choiceType=['PRODUCT','LABEL','NONE'].includes(String(selection.choiceType||''))?String(selection.choiceType):'LABEL';
+      if(!poolId||!groupId||!subPoolId||!choiceId)return[];
+      const product=String(selection.productId||'').trim();
+      return[{poolId,groupId,subPoolId,choiceId,choiceType,choiceLabel:String(selection.choiceLabel||choiceId),...(product?{productId:product}:{})}];
+    });
+    const selectedVariationId=String(line.selectedVariationId||'').trim();
+    const selectedVariationName=String(line.selectedVariationName||'').trim();
+    const note=String(line.note||'').trim();
+    return[{
+      productId,productName,quantity,
+      ...(selectedVariationId?{selectedVariationId}:{}),
+      ...(selectedVariationName?{selectedVariationName}:{}),
+      selections,
+      ...(comboId&&comboName?{combo:{comboId,comboName,selections:comboSelections}}:{}),
+      ...(note?{note}:{}),
+    }];
+  });
+}
 function customerPaymentStatusLabel(order){
   const state=String(order.paymentVerificationState||'').trim().toUpperCase();
   if(state==='PENDING')return '付款憑證待店舖核對';
@@ -471,6 +509,19 @@ export function mapCustomerOrderProjection(input){
   if(pickupException&&pickupException.resolved!==true)stage='PICKUP_EXCEPTION';
   const observedAt=String(order.updatedAt||order.createdAt||'').trim();
   const itemRows=rows(order.items);
+  const historicalLines=itemRows.map(rawItem=>{
+    const item=row(rawItem);
+    const quantity=Math.max(0,Math.floor(Number(item.qty)||0));
+    const unitMinor=Math.max(0,Math.round(Number(item.unitMinor)||0));
+    return{
+      name:String(item.name||''),
+      quantity,
+      historicalUnitLabel:moneyLabel(unitMinor),
+      historicalLineTotalLabel:moneyLabel(unitMinor*quantity),
+      ...(item.detail?{detail:String(item.detail)}:{}),
+    };
+  }).filter(item=>item.name&&item.quantity>0);
+  const reorderIntent=customerReorderIntentProjection(order.customerReorderIntent);
   const display=String(order.display||'');
   const totalMinor=Math.max(0,Number(order.totalMinor)||0);
   const projectedPickup=String(order.pickupCode||'').replace(/\D/g,'').slice(-4);
@@ -502,6 +553,8 @@ export function mapCustomerOrderProjection(input){
     stage,
     itemSummary:itemRows.map(item=>String(row(item).name||'')).filter(Boolean).join('、'),
     amountLabel:moneyLabel(totalMinor),
+    historicalLines,
+    ...(reorderIntent.length?{reorderIntent}:{}),
     ...(paymentStatusLabel?{paymentStatusLabel}:{}),
     ...(pickupCode?{pickupCode,phoneMasked:'•••• '+pickupCode}:{}),
     ...(etaLabel?{etaLabel}:{}),
@@ -745,16 +798,21 @@ function customerPublicSnapshot(active,customerOrders=[]){
     },
     paymentChannels,
     fallback:customerFallback,
-    activeOrders:projectedOrders.filter(order=>order.stage!=='COMPLETED'),
+    activeOrders:projectedOrders.filter(order=>order.stage!=='COMPLETED').map(order=>{
+      const {historicalLines:_historicalLines,reorderIntent:_reorderIntent,...activeOrder}=order;
+      return activeOrder;
+    }),
     history:projectedOrders.filter(order=>order.stage==='COMPLETED').map(order=>({
       orderId:order.orderId,
       displayCode:order.displayCode,
       completedAt:order.completedAt||'',
       itemSummary:order.itemSummary,
       amountLabel:order.amountLabel,
+      historicalLines:order.historicalLines,
       ...(order.pickupCode?{pickupCode:order.pickupCode}:{}),
       ...(order.customerDisplayName?{customerDisplayName:order.customerDisplayName}:{}),
-      reorderEligible:true,
+      ...(order.reorderIntent?.length?{reorderIntent:order.reorderIntent}:{}),
+      reorderEligible:Boolean(order.reorderIntent?.length),
     })),
     observedAt:new Date().toISOString(),
   };
