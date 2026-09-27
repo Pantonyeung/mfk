@@ -890,17 +890,17 @@ function OrderView({connection,categories,activeCategoryId,setCategory,search,se
   const unavailable=connection!=='READY';
   return <section className="page order-page stage1-order">
     <header className="stage1-order-header">
-      <div>
-        <span className="stage1-kicker">點單</span>
-        <h1>快速點餐</h1>
-        <p>商品資料只讀取正式餐單；未有正式產品相之前，圖片位置保持留白。</p>
+      <div className="stage1-brand-line">
+        <img src="/brand/morefun-logo.webp" alt="磨飯 More Fun"/>
+        <div><span className="stage1-kicker">SMM 點單</span><h1>今日想食咩？</h1></div>
       </div>
       <b className="stage1-service-mode">{serviceMode==='DINE_IN'?'堂食':'外賣'}</b>
     </header>
 
     <label className="search stage1-search">
-      <span>搜尋商品</span>
-      <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="輸入商品名稱"/>
+      <span aria-hidden="true">⌕</span>
+      <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="搜尋商品"/>
+      {search?<button type="button" onClick={()=>setSearch('')} aria-label="清除搜尋">×</button>:null}
     </label>
 
     {categories.length?<div className="category-rail stage1-category-rail" aria-label="商品分類">
@@ -908,8 +908,8 @@ function OrderView({connection,categories,activeCategoryId,setCategory,search,se
     </div>:null}
 
     <div className="stage1-section-title">
-      <div><span>商品</span><small>{unavailable?'等待正式餐單同步':'選擇商品開始落單'}</small></div>
-      {connection==='READY'?<b>已同步</b>:<b className="muted">本機介面</b>}
+      <div><span>{search?'搜尋結果':'人氣餐點'}</span><small>{unavailable?'餐單同步中':'點商品就可以開始客製'}</small></div>
+      {connection==='READY'?<b>餐單已更新</b>:<b className="muted">稍後更新</b>}
     </div>
 
     {connection==='LOADING'?<EmptyState title="正在同步餐單" detail="你可以先瀏覽介面；正式商品資料同步完成後會自動顯示。"/>:
@@ -917,22 +917,27 @@ function OrderView({connection,categories,activeCategoryId,setCategory,search,se
       products.length?<div className="product-grid stage1-product-grid">{products.map(product=>{
         const price=serviceMode==='DINE_IN'?product.publishedDineInUnitPriceMinor:product.publishedTakeawayUnitPriceMinor;
         return <button key={product.productId} className={`product-card stage1-product-card ${product.available?'':'disabled'}`} disabled={!product.available} onClick={()=>onProduct(product)}>
-          <span className="product-media" aria-label="正式產品圖片待補"/>
-          {!product.available?<span className="stage1-soldout">已售罄</span>:null}
+          <ProductMedia product={product} className="product-media"/>
+          {!product.available?<span className="stage1-soldout">暫停供應</span>:null}
           <span className="stage1-product-copy">
             <strong>{product.name}</strong>
-            <small>{Number.isSafeInteger(Number(price))?money('HKD',Number(price)):(product.available?'價格待同步':'暫停供應')}</small>
-            <i>{product.optionGroups.length||product.variations?.length||product.comboId?'可設定':''}</i>
+            <small>{Number.isSafeInteger(Number(price))?money('HKD',Number(price)):(product.available?'價格待更新':'暫停供應')}</small>
+            <i>{product.optionGroups.length||product.variations?.length||product.comboId?'可客製':''}</i>
           </span>
           {product.available?<span className="stage1-product-add" aria-hidden="true">＋</span>:null}
         </button>;
       })}</div>:
-      <EmptyState title="搵唔到商品" detail="清除搜尋或者切換其他分類。"><button className="primary" onClick={()=>setSearch('')}>清除搜尋</button></EmptyState>}
+      <section className="stage1-zero-result">
+        <img src="/brand/stage0/stage0-female.svg" alt="" aria-hidden="true"/>
+        <h2>搵唔到呢款商品</h2>
+        <p>試下其他關鍵字，或者轉去其他分類睇下。</p>
+        <button className="primary" onClick={()=>setSearch('')}>清除搜尋</button>
+      </section>}
 
     {count>0?<button className="cart-bar stage1-cart-bar" onClick={onCart}>
       <div className="stage1-cart-count"><b>{count}</b><span>購物草稿</span></div>
-      <div><strong>{quote?money(quote.currency,quote.totalMinor):'價格資料未完整'}</strong><small>{quote?`餐單版本 ${quote.revision}`:'請重新同步餐單'}</small></div>
-      <em>查看</em>
+      <div><strong>{quote?money(quote.currency,quote.totalMinor):'價格更新中'}</strong><small>{quote?'已選商品會保留到結帳':'餐單同步後可結帳'}</small></div>
+      <em>查看購物車</em>
     </button>:null}
   </section>;
 }
