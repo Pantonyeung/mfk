@@ -4,6 +4,7 @@ import {
   customerComboEffectiveMin,
   customerComboGroupSelectionCount,
   customerComboPublishedUnitMinor,
+  customerStandalonePublishedUnitMinor,
   selectedCustomerComboIntent,
   selectedCustomerOptions,
   validateCustomerComboSelection,
@@ -86,8 +87,8 @@ export function ProductSheet({
   const ordinarySelections=selectedCustomerOptions(product,selections);
   const comboIntent=comboEnabled?selectedCustomerComboIntent(product,menu,comboSelections):null;
   const comboUnitMinor=comboIntent?customerComboPublishedUnitMinor(comboIntent,ordinarySelections):null;
-  const standaloneUnitMinor=!comboEnabled&&Number.isSafeInteger(Number(product.publishedUnitPriceMinor))
-    ?Number(product.publishedUnitPriceMinor)+ordinarySelections.reduce((sum,option)=>sum+Number(option.publishedAdjustmentMinor||0),0)
+  const standaloneUnitMinor=!comboEnabled
+    ?customerStandalonePublishedUnitMinor(product,ordinarySelections)
     :null;
   const draftUnitMinor=comboEnabled?comboUnitMinor:standaloneUnitMinor;
   const draftTotalMinor=draftUnitMinor!==null&&Number.isSafeInteger(draftUnitMinor*quantity)?draftUnitMinor*quantity:null;
