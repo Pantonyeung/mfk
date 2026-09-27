@@ -387,6 +387,27 @@ function ownerTemporaryRestoreAt(value,now=new Date().toISOString()){
   return Number.isFinite(at)&&at>Date.parse(now)?new Date(at).toISOString():undefined;
 }
 
+const OWNER_STAFF_CAPABILITY_LABELS=Object.freeze({
+  ORDER_REVIEW:'查看訂單',
+  ORDER_CORRECTION:'更正訂單／付款',
+  ADMIN_CONFIG:'修改後台設定',
+  PUBLISH_CONFIG:'建立設定版本',
+  REPORT_VIEW:'查看報表',
+  REPORT_EXPORT:'匯出報表',
+  STAFF_MANAGE:'管理員工',
+});
+function ownerHumanStaffLoginId(person){
+  const staffId=String(person.staffId||'').trim();
+  const name=String(person.name||'').trim();
+  const loginId=String(person.loginId||'').trim();
+  if(!loginId||loginId===staffId||loginId===name)return undefined;
+  return loginId;
+}
+function ownerStaffCapabilitySummary(person){
+  const labels=[...new Set(rows(person.permissions).map(value=>OWNER_STAFF_CAPABILITY_LABELS[String(value||'').trim()]).filter(Boolean))];
+  return labels.length?labels.join('、'):undefined;
+}
+
 export function buildOwnerReadModelSnapshot({active,orders,reports,acks,observedAt}){
   const now=String(observedAt||new Date().toISOString());
   const activeEnvelope=row(active),snapshot=row(activeEnvelope.snapshot),settings=row(snapshot.storeSettings),catalog=row(snapshot.catalog),staffAuth=row(snapshot.staffAuth);
@@ -395,7 +416,11 @@ export function buildOwnerReadModelSnapshot({active,orders,reports,acks,observed
   const latestReport=reportRows[0]?row(reportRows[0]):null;
   const activeOrders=mappedOrders.filter(order=>order.lifecycle!=='COMPLETED'&&order.lifecycle!=='CANCELLED');
   const sellability=ownerSellabilityTargets(snapshot,now);
-  const staff=rows(staffAuth.staff).filter(rawStaff=>row(rawStaff).active!==false).map(rawStaff=>{const person=row(rawStaff);return{staffId:String(person.staffId||''),name:String(person.name||person.staffId||''),role:String(person.role||'STAFF'),presence:'UNKNOWN',permissions:rows(person.permissions).map(String).join('、')||'未有權限讀回'};}).filter(person=>person.staffId&&person.name);
+  const staff=rows(staffAuth.staff).filter(rawStaff=>row(rawStaff).active!==false).map(rawStaff=>{
+    const person=row(rawStaff),staffId=String(person.staffId||'').trim(),name=String(person.name||'').trim();
+    const loginId=ownerHumanStaffLoginId(person),capabilitySummary=ownerStaffCapabilitySummary(person);
+    return{staffId,name,role:String(person.role||'STAFF'),presence:'UNKNOWN',...(loginId?{loginId}:{}),...(capabilitySummary?{capabilitySummary}:{})};
+  }).filter(person=>person.staffId&&person.name);
   const devices=Object.values(row(acks)).map(rawAck=>{const ack=row(rawAck);const deviceId=String(ack.deviceId||'');return{deviceId,name:deviceId||'未命名裝置',kind:'SMT',health:'UNKNOWN',...(ack.appliedAt?{lastSeen:String(ack.appliedAt)}:{}),binding:ack.revision!==undefined?'Admin revision '+String(ack.revision):'未有 revision 讀回',jobs:'未有打印工作讀回',affected:'未有影響範圍讀回'};}).filter(device=>device.deviceId);
   const reportCards=reportRows.slice(0,31).map(rawReport=>{const report=row(rawReport);const date=String(report.date||'');return{reportId:'daily:'+date,name:date+' 淨銷售',value:moneyLabel(Number(report.netMinor)||0),compare:String(Math.max(0,Number(report.orders)||0))+' 單',freshness:'CANONICAL_PROJECTION'};});
   const today=latestReport?{salesLabel:moneyLabel(Number(latestReport.netMinor)||0),orderCount:Math.max(0,Number(latestReport.orders)||0),averageOrderLabel:moneyLabel((Number(latestReport.orders)||0)>0?Math.round((Number(latestReport.netMinor)||0)/Number(latestReport.orders)):0),comparisonLabel:'未有比較資料讀回'}:undefined;
@@ -923,11 +948,14 @@ export class AdminSyncStore{
     const activity=Object.freeze({
       activityId:'OA-'+operationId,
       title:String(input?.title||'Owner operation').slice(0,160),
-      actor:String(session?.displayName||session?.staffId||'OWNER'),
+      actor:String(session?.displayName||'OWNER'),
+      actorStaffId:String(session?.staffId||'').trim()||undefined,
       target:String(input?.target||'').slice(0,240),
       detail:String(input?.detail||'').slice(0,500),
-      requester:String(session?.displayName||session?.staffId||'OWNER'),
+      requester:String(session?.displayName||'OWNER'),
+      requesterStaffId:String(session?.staffId||'').trim()||undefined,
       approver:'OWNER',
+      approverStaffId:String(session?.staffId||'').trim()||undefined,
       result:String(input?.result||'UNKNOWN').slice(0,40),
       readback:String(input?.readback||'UNKNOWN').slice(0,240),
       observedAt,
