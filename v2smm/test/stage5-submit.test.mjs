@@ -152,7 +152,8 @@ test('transport Offline is separate from transaction UNKNOWN',()=>{
   assert.equal(smmStage5SharedState('UNKNOWN',true)?.kind,'UNKNOWN');
   assert.notEqual(smmStage5SharedState('NOT_CONNECTED',true)?.kind,'UNKNOWN');
   assert.match(app,/result\.state==='NOT_CONNECTED'/);
-  assert.match(app,/傳輸通道離線；未將交易結果改寫成 UNKNOWN/);
+  assert.match(app,/傳輸通道離線；正式訂單未送出/);
+  assert.match(app,/setStage5Session\(null\)/);
   assert.match(app,/原交易狀態保持不變/);
   assert.match(cloud,/catch\(error\)[\s\S]*return\{kind:'UNKNOWN'\}/);
   assert.match(lan,/catch\(error\)[\s\S]*return\{kind:'UNKNOWN'\}/);
