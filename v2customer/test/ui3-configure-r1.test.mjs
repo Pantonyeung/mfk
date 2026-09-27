@@ -6,7 +6,7 @@ import {fileURLToPath} from 'node:url';
 
 const here=path.dirname(fileURLToPath(import.meta.url));
 const src=path.resolve(here,'../src');
-const views=fs.readFileSync(path.join(src,'components/product-sheet-ui3.tsx'),'utf8');
+const productSheet=fs.readFileSync(path.join(src,'components/product-sheet-ui3.tsx'),'utf8');
 const app=fs.readFileSync(path.join(src,'App.tsx'),'utf8');
 const css=fs.readFileSync(path.join(src,'styles.css'),'utf8');
 const nav=fs.readFileSync(path.join(src,'stage2/Stage2BottomNavigation.tsx'),'utf8');
