@@ -1,6 +1,7 @@
 export const SMM_STAGE7_SEGMENTS=Object.freeze(['ACTIVE','HISTORY']);
 export const SMM_STAGE7_SOURCE_FILTERS=Object.freeze(['ALL','ONSITE','SMM','OWN_PLATFORM','THIRD_PARTY']);
 export const SMM_STAGE7_SEARCH_SCOPES=Object.freeze(['ALL','DISPLAY','PRODUCT','PHONE']);
+export const SMM_STAGE7_STATUS_FILTERS=Object.freeze(['ALL','PENDING','WORKING','READY','PICKED_UP','CANCELLED','UNKNOWN']);
 
 export function smmStage7IsHistory(row){
   const lifecycle=String(row?.lifecycle??'').trim().toUpperCase();
@@ -107,6 +108,30 @@ export function smmStage7StatusLabel(row){
   if(row?.readback==='UNKNOWN')return '狀態未明';
   if(row?.readback==='PARTIAL')return '部分資料';
   return '未有資料';
+}
+
+export function smmStage7StatusKey(row){
+  const label=smmStage7StatusLabel(row);
+  if(label==='待確認')return 'PENDING';
+  if(label==='製作中')return 'WORKING';
+  if(label==='準備完成 / 可取餐')return 'READY';
+  if(label==='已取餐')return 'PICKED_UP';
+  if(label==='已取消')return 'CANCELLED';
+  if(label==='狀態未明'||label==='部分資料'||label==='未有資料')return 'UNKNOWN';
+  return 'UNKNOWN';
+}
+
+export function smmStage7MatchesStatus(row,filter){
+  return filter==='ALL'||smmStage7StatusKey(row)===filter;
+}
+
+export function smmStage7Sort(rows){
+  return Object.freeze([...rows].sort((a,b)=>{
+    const at=Date.parse(smmStage7OrderTime(a))||0;
+    const bt=Date.parse(smmStage7OrderTime(b))||0;
+    if(at!==bt)return bt-at;
+    return String(a?.displayCode??'').localeCompare(String(b?.displayCode??''));
+  }));
 }
 
 export function smmStage7ConnectionState(connection,hasRows){
