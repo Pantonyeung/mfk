@@ -151,7 +151,22 @@ export function App(){
     catch{setNotice('未能讀取 canonical planning；唔會用本機資料代替。');}
     finally{setPlanningLoading(false);}
   };
+  const loadChannels=async()=>{
+    if(!port?.readChannels){
+      const next=await refresh();
+      return next?.channels??null;
+    }
+    try{
+      const channels=await port.readChannels();
+      setSnapshot(current=>current?{...current,channels}:current);
+      return channels;
+    }catch{
+      setNotice('未能讀取渠道正式狀態；保持 UNKNOWN，唔會假裝成功。');
+      return null;
+    }
+  };
   useEffect(()=>{if(secondary==='planning'&&ownerSession)void loadPlanning(planning?.plan.monthKey);},[secondary,ownerSession?.sessionToken]);
+  useEffect(()=>{if(secondary==='channels'&&ownerSession)void loadChannels();},[secondary,ownerSession?.sessionToken]);
 
   const login=async()=>{
     if(!port?.loginOwner||loginBusy)return;
@@ -270,10 +285,10 @@ export function App(){
     }
   };
   const recheckChannel=async(channelId:string)=>{
-    setChannelCommandFlight({channelId,state:'PENDING',message:'正在重新讀取 canonical channel state。'});
-    const next=await refresh();
-    const channel=next?.channels.find(item=>item.channelId===channelId);
-    if(!channel||channel.readback==='UNKNOWN')setChannelCommandFlight({channelId,state:'UNKNOWN',message:'正式狀態仍未明；保持鎖定。'});
+    setChannelCommandFlight({channelId,state:'PENDING',message:'正在重新讀取 canonical / provider channel state。'});
+    const channels=await loadChannels();
+    const channel=channels?.find(item=>item.channelId===channelId);
+    if(!channel||channel.readback==='UNKNOWN')setChannelCommandFlight({channelId,state:'UNKNOWN',message:'正式狀態仍未明；保持鎖定，禁止 blind retry。'});
     else setChannelCommandFlight(null);
   };
   const savePlanning=async(input:OwnerPlanningSaveInput)=>{
