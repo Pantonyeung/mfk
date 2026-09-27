@@ -71,6 +71,14 @@ test('UNKNOWN can only read back the original submission and never creates anoth
   assert.match(app,/未有重新提交/);
 });
 
+test('one original readback that is NOT_FOUND locks Online Submit and enables manual fallback',()=>{
+  assert.match(types,/readbackCode\?:'NOT_FOUND'\|'PENDING'\|'UNKNOWN'/);
+  assert.match(cloud,/response\.status===404.*readbackCode:'NOT_FOUND'/);
+  assert.match(app,/result\.readbackCode==='NOT_FOUND'/);
+  assert.match(app,/state:'NOT_CONNECTED'/);
+  assert.match(app,/Online Submit 已鎖定，可以轉用 WhatsApp 人工救援/);
+});
+
 test('canonical CONFIRMED delivery is cached then routes to Waiting Store Confirmation without entering UI6',()=>{
   assert.match(app,/state:'DELIVERED'/);
   assert.match(app,/canonicalOrderId:result\.orderId/);
