@@ -135,6 +135,11 @@ export async function projectStaffForRuntime(input:unknown):Promise<RuntimeStaff
       ...(pinVerifier?{pinVerifier}:{}),
     }));
   }
+  const loginIds=new Set<string>();
+  for(const item of staff){
+    if(loginIds.has(item.loginId))throw new Error('STAFF_AUTH_LOGIN_ID_DUPLICATE');
+    loginIds.add(item.loginId);
+  }
   return Object.freeze({schema:MFK_STAFF_AUTH_SCHEMA,staff:Object.freeze(staff)});
 }
 
