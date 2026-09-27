@@ -46,11 +46,11 @@ test('each normal category has one featured large card and the rest small cards'
   assert.equal((menu.match(/<FeaturedProductCard/g)||[]).length,1);
 });
 
-test('product media slots stay truly empty while name price and status remain text',()=>{
-  assert.ok(menu.includes('<span className="stage2-product-media" aria-hidden="true"/>'));
-  assert.ok(!menu.includes('product.imageUrl'));
-  assert.ok(!menu.includes('product.name.slice(0,1)'));
-  assert.ok(!css.includes('.stage2-product-media>'));
+test('product media uses canonical imageUrl and never substitutes a blank placeholder',()=>{
+  assert.ok(menu.includes('product.imageUrl'));
+  assert.ok(menu.includes('product.imageAlt??product.name'));
+  assert.ok(menu.includes('商品圖片暫未提供'));
+  assert.ok(css.includes('.stage2-product-media img'));
   assert.ok(menu.includes('displayPriceLabel'));
   assert.ok(menu.includes('已售罄'));
 });
