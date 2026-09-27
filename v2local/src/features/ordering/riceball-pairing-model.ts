@@ -18,6 +18,13 @@ export interface PairingCartLine{
   readonly detail?:string;
   readonly optionSelections?:Readonly<Record<string,readonly string[]>>;
   readonly freeNote?:string;
+  readonly pairing?:{
+    readonly groupLabel:string;
+    readonly comboId:string;
+    readonly comboName:string;
+    readonly role:'MAIN'|'SNACK';
+    readonly source:'AUTO'|'SPECIFIED';
+  };
 }
 
 export interface PairingUnit{
@@ -92,8 +99,16 @@ export function pairingRoleFromDetail(detail?:string):'MAIN'|'SNACK'|undefined{
   return role==='飯團'?'MAIN':role==='小食'?'SNACK':undefined;
 }
 
-export function isPairedComboLine(line:Pick<PairingCartLine,'detail'>){
-  return Boolean(pairingGroupFromDetail(line.detail)&&pairingRoleFromDetail(line.detail));
+export function pairingGroupForLine(line:Pick<PairingCartLine,'detail'|'pairing'>){
+  return line.pairing?.groupLabel??pairingGroupFromDetail(line.detail);
+}
+
+export function pairingRoleForLine(line:Pick<PairingCartLine,'detail'|'pairing'>):'MAIN'|'SNACK'|undefined{
+  return line.pairing?.role??pairingRoleFromDetail(line.detail);
+}
+
+export function isPairedComboLine(line:Pick<PairingCartLine,'detail'|'pairing'>){
+  return Boolean(pairingGroupForLine(line)&&pairingRoleForLine(line));
 }
 
 export function stripPairingDetail(detail?:string){
@@ -372,12 +387,14 @@ export function applyRiceballPairings<T extends PairingCartLine>(
     consumed.set(snackLine.id,(consumed.get(snackLine.id)??0)+1);
     usedSnackUnits.add(snackUnitId);
 
+    const pairingSource=snackUnitId===slot.defaultSnackUnitId?'AUTO':'SPECIFIED';
     created.push({
       ...mainLine,
       id:newLineId(),
       qty:1,
       unitMinor:mainPriceMinor,
       detail:withPairingDetail(mainLine.detail,slot.label,combo.name,'飯團'),
+      pairing:{groupLabel:slot.label,comboId:combo.id,comboName:combo.name,role:'MAIN',source:pairingSource},
     } as T);
     created.push({
       ...snackLine,
@@ -385,6 +402,7 @@ export function applyRiceballPairings<T extends PairingCartLine>(
       qty:1,
       unitMinor:snackPriceMinor,
       detail:withPairingDetail(snackLine.detail,slot.label,combo.name,'小食'),
+      pairing:{groupLabel:slot.label,comboId:combo.id,comboName:combo.name,role:'SNACK',source:pairingSource},
     } as T);
     groups.push(Object.freeze({
       label:slot.label,
@@ -417,7 +435,7 @@ export function restorePairingGroup<T extends PairingCartLine>(
   products:readonly PairingProduct[],
   label:string,
 ):T[]{
-  const group=input.filter(line=>pairingGroupFromDetail(line.detail)===label);
+  const group=input.filter(line=>pairingGroupForLine(line)===label);
   if(group.length===0)return [...input];
   const restoredIds=new Set(group.map(line=>line.id));
   return input.map(line=>{
@@ -425,7 +443,12 @@ export function restorePairingGroup<T extends PairingCartLine>(
     const product=products.find(row=>row.id===line.productId);
     if(!product)throw new Error('PAIRING_PRODUCT_MISSING');
     const detail=stripPairingDetail(line.detail);
-    const restored={...line,unitMinor:product.priceMinor+selectedOptionAdjustment({...line,detail},product),detail:detail||undefined};
+    const restored={
+      ...line,
+      unitMinor:product.priceMinor+selectedOptionAdjustment({...line,detail},product),
+      detail:detail||undefined,
+      pairing:undefined,
+    };
     return restored as T;
   });
 }
@@ -448,7 +471,7 @@ export function nextPairingStartIndex(lines:readonly PairingCartLine[]){
 export function existingPairingGroups(lines:readonly PairingCartLine[]){
   const labels:string[]=[];
   for(const line of lines){
-    const label=pairingGroupFromDetail(line.detail);
+    const label=pairingGroupForLine(line);
     if(label&&!labels.includes(label))labels.push(label);
   }
   return labels;
