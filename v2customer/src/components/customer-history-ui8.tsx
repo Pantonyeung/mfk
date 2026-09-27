@@ -167,8 +167,8 @@ function Repair({
         {product?.imageUrl?<img src={product.imageUrl} alt={product.imageAlt??product.name}/>:<i aria-hidden="true"/>}
         <div><strong>{line.productName}</strong><p>{line.attention??repairItem?.detail??'目前資料需要重新確認'}</p>{repairItem?.previousUnitPriceMinor!==undefined&&repairItem.currentUnitPriceMinor!==undefined?<small>{'舊 Cart fact HK$'+(repairItem.previousUnitPriceMinor/100).toFixed(0)+' → Current HK$'+(repairItem.currentUnitPriceMinor/100).toFixed(0)}</small>:null}</div>
         <div className="ui8-line-actions">
-          {repairItem?.canAcceptCurrentPrice||line.attention&&line.publishedUnitPriceMinor!==undefined?<button onClick={()=>onAccept(line.lineId)}>接受目前資料</button>:null}
-          {product?<button onClick={()=>onEdit(line)}>修正呢一項</button>:null}
+          {canAcceptCurrent?<button onClick={()=>onAccept(line.lineId)}>接受目前資料</button>:null}
+          {product?.available?<button onClick={()=>onEdit(line)}>修正呢一項</button>:null}
           <button onClick={()=>onRemove(line.lineId)}>移除</button>
         </div>
       </article>;
