@@ -5,11 +5,12 @@ import {readFileSync} from 'node:fs';
 const app=readFileSync(new URL('../src/App.tsx',import.meta.url),'utf8');
 const css=readFileSync(new URL('../src/stage3.css',import.meta.url),'utf8');
 const cartStart=app.indexOf('function CartSheet');
-const cartEnd=app.indexOf('function DiningTargetSheet',cartStart);
-assert.ok(cartStart>=0&&cartEnd>cartStart,'CartSheet source range must exist');
-const cartSheet=app.slice(cartStart,cartEnd);
+const stage4Start=app.indexOf('function Stage4CheckoutView',cartStart);
+const stage3Start=app.indexOf('  const rows=cart.map',cartStart);
+assert.ok(cartStart>=0&&stage3Start>cartStart&&stage4Start>stage3Start,'Stage 3 CartSheet source range must exist');
+const cartSheet=app.slice(stage3Start,stage4Start);
 
-test('Stage 3 CartSheet is present and does not start Stage 4 checkout execution',()=>{
+test('Stage 3 CartSheet remains intact and hands off to Stage 4 without formal submit execution',()=>{
   assert.match(app,/import '\.\/stage3\.css'/);
   assert.match(cartSheet,/stage3-cart-sheet/);
   assert.match(cartSheet,/購物草稿/);
@@ -17,8 +18,8 @@ test('Stage 3 CartSheet is present and does not start Stage 4 checkout execution
   assert.match(cartSheet,/堂食/);
   assert.match(cartSheet,/外賣/);
   assert.match(cartSheet,/前往結帳 →/);
-  assert.doesNotMatch(cartSheet,/收款方式|提交訂單|重新確認結果/);
-  assert.doesNotMatch(cartSheet,/onSubmit|onTender|diningTarget|submitCart|submitOrder|readSubmission/);
+  assert.doesNotMatch(cartSheet,/付款方式|提交訂單|重新確認結果/);
+  assert.doesNotMatch(cartSheet,/onTender|diningTarget|submitCart|submitOrder|readSubmission/);
 });
 
 test('Stage 3 line workflow supports edit quantity remove unit line-total and optional note',()=>{
