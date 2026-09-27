@@ -89,10 +89,27 @@ export interface LocalDiningLineCorrection{
   readonly productionNoticeCompletedAt?:string;
 }
 
+export interface LocalPriceOverrideRecord{
+  readonly id:string;
+  readonly createdAt:string;
+  readonly lineIndex:number;
+  readonly productId:string;
+  readonly originalUnitMinor:number;
+  readonly effectiveUnitMinor:number;
+  readonly deltaMinor:number;
+  readonly reason:string;
+  readonly staffId:string;
+  readonly staffName:string;
+  readonly source:'MANUAL_OVERRIDE';
+  readonly permission:'PRICE_OVERRIDE';
+  readonly sequence:number;
+}
+
 export interface StoredOrder{
   id:string;display:string;createdAt:string;updatedAt?:string;totalMinor:number;paymentLabel:string;fulfillmentLabel:'待處理'|'進行中'|'可取餐'|'已完成'|'已取消';sourceLabel:string;
   originalTotalMinor?:number;
   diningLineCorrections?:readonly LocalDiningLineCorrection[];
+  diningPriceOverrides?:readonly LocalPriceOverrideRecord[];
   paymentCorrections?:readonly PaymentCorrectionRecord[];
   refunds?:readonly OrderRefundRecord[];
   capacityEvents?:readonly CapacityPoolOrderEvent[];
@@ -201,6 +218,7 @@ export interface LocalDiningHoldDetail{
   readonly seatedAt?:string;
   readonly joinedTables?:readonly string[];
   readonly corrections:readonly LocalDiningLineCorrection[];
+  readonly priceOverrides:readonly LocalPriceOverrideRecord[];
   readonly formalOrderId?:string;
   readonly formalOrderDisplay?:string;
   readonly holdId:string;
@@ -223,6 +241,7 @@ export interface LocalHoldDraft{
   readonly seatedAt?:string;
   readonly joinedTables?:readonly string[];
   readonly lineCorrections?:readonly LocalDiningLineCorrection[];
+  readonly priceOverrides?:readonly LocalPriceOverrideRecord[];
   readonly formalOrderId?:string;
   readonly formalOrderDisplay?:string;
   readonly id:string;
@@ -348,6 +367,7 @@ export interface CleanSmtCoreRuntimePort{
   appendDiningItems?(holdId:string,input:{submissionId:string;items:readonly {id:string;name:string;qty:number;unitMinor:number}[];totalMinor:number;sourceLabel?:string}):Promise<{readonly detail:LocalDiningHoldDetail;readonly additionId:string}>;
   ensureDiningAdditionPrint?(holdId:string,additionId:string):Promise<DiningAdditionPrintResult>;
   correctDiningLine?(holdId:string,input:{submissionId:string;lineIndex:number;quantity:number;reason?:string}):Promise<{readonly detail:LocalDiningHoldDetail;readonly correction:LocalDiningLineCorrection}>;
+  overrideDiningLinePrice?(holdId:string,lineIndex:number,effectiveUnitMinor:number,reason:string,expectedRevision?:string):Promise<LocalDiningHoldDetail>;
   settleDiningHold?(holdId:string,selections:readonly {lineIndex:number;qty:number}[],tender:DiningTender,command?:DiningSettlementCommand):Promise<LocalDiningHoldDetail>;
   clearDiningHold?(holdId:string):Promise<void>;
 }
@@ -438,6 +458,7 @@ export interface MfkLocalRuntime extends CleanSmtCoreRuntimePort{
   appendDiningItems(holdId:string,input:{submissionId:string;items:readonly {id:string;name:string;qty:number;unitMinor:number}[];totalMinor:number;sourceLabel?:string}):Promise<{readonly detail:LocalDiningHoldDetail;readonly additionId:string}>;
   ensureDiningAdditionPrint(holdId:string,additionId:string):Promise<DiningAdditionPrintResult>;
   correctDiningLine(holdId:string,input:{submissionId:string;lineIndex:number;quantity:number;reason?:string}):Promise<{readonly detail:LocalDiningHoldDetail;readonly correction:LocalDiningLineCorrection}>;
+  overrideDiningLinePrice(holdId:string,lineIndex:number,effectiveUnitMinor:number,reason:string,expectedRevision?:string):Promise<LocalDiningHoldDetail>;
   settleDiningHold(holdId:string,selections:readonly {lineIndex:number;qty:number}[],tender:DiningTender,command?:DiningSettlementCommand):Promise<LocalDiningHoldDetail>;
   joinDiningTable(holdId:string,tableId:string):Promise<void>;
   unjoinDiningTable(holdId:string,tableId:string):Promise<void>;
