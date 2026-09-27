@@ -10,9 +10,9 @@ import type {ProductOriginRect} from '../ui/primitives';
 import {CUSTOMER_FINAL_SOURCE} from '../source-assets';
 import './stage1.css';
 
-const OFFICIAL_LOGO_URL='https://cdn.creativeclaw.co/u/6ad84d58/images/402357b6-d757-4238-99f7-3d20607da6f2.png';
+const OFFICIAL_LOGO_URL=CUSTOMER_FINAL_SOURCE.logo.url;
+const STAGE1_FINAL_SOURCE=CUSTOMER_FINAL_SOURCE.stage1Final.url;
 const HERO_IP='/brand/stage0-male.webp';
-const HERO_FOOD='/brand/p0-riceball.webp';
 
 const statusLabel=(storeAvailable:boolean|undefined)=>{
   if(storeAvailable===true)return '營業中';
@@ -118,15 +118,9 @@ export function Stage1Home({
         <div><span>今日已打烊</span><strong>明日再見</strong><button disabled={!canBrowse} onClick={onBrowse}>{canBrowse?'查看餐牌':'餐牌更新中'}</button></div>
       </section>:null}
 
-      <section className="stage1-hero-banner">
-        <div className="stage1-hero-copy">
-          <span>好好吃飯</span>
-          <h2>就是一件<br/>開心的事。</h2>
-          <em>More Fun · More Good Days!</em>
-        </div>
-        <img className="stage1-hero-ip" src={HERO_IP} alt="" aria-hidden="true"/>
-        <img className="stage1-hero-food" src={HERO_FOOD} alt="" aria-hidden="true"/>
-      </section>
+      <button className="stage1-hero-banner" data-source-file="磨飯_stage_1_首頁品牌展示.png" disabled={!canBrowse} onClick={onBrowse} aria-label={canBrowse?'開始點餐':'餐牌更新中'}>
+        <span className="stage1-source-crop stage1-source-hero" aria-hidden="true"><img src={STAGE1_FINAL_SOURCE} alt=""/></span>
+      </button>
 
       {store?.notice?<section className="stage1-announcement-strip" role="status">
         <span aria-hidden="true">✦</span>
@@ -140,9 +134,18 @@ export function Stage1Home({
 
       <section className="stage1-quick-entry-section">
         <div className="stage1-quick-entry-grid">
-          <button onClick={onOrders}><i aria-hidden="true">▣</i><strong>我的訂單</strong></button>
-          <button onClick={onHistory}><i aria-hidden="true">♡</i><strong>我的收藏</strong></button>
-          <button onClick={onMember}><i aria-hidden="true">⌑</i><strong>回憶券</strong></button>
+          <button onClick={onMember} aria-label={availableCouponCount?'記憶券，'+availableCouponCount+' 張可用':'記憶券'}>
+            <span className="stage1-shortcut-source stage1-shortcut-ticket" aria-hidden="true"><img src={STAGE1_FINAL_SOURCE} alt=""/></span>
+            <strong>記憶券</strong>{availableCouponCount?<small>{availableCouponCount} 張可用</small>:null}
+          </button>
+          <button onClick={onHistory} aria-label="常購清單">
+            <span className="stage1-shortcut-source stage1-shortcut-heart" aria-hidden="true"><img src={STAGE1_FINAL_SOURCE} alt=""/></span>
+            <strong>常購清單</strong>
+          </button>
+          <button onClick={onBrowse} aria-label="期間限定">
+            <span className="stage1-shortcut-source stage1-shortcut-order" aria-hidden="true"><img src={STAGE1_FINAL_SOURCE} alt=""/></span>
+            <strong>期間限定</strong>
+          </button>
         </div>
       </section>
 
