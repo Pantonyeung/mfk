@@ -139,6 +139,20 @@ export interface SmmCartSelection {
   readonly publishedAdjustmentMinor?:number;
 }
 
+export type SmmCartAttentionReason=
+  |'PRODUCT_UNAVAILABLE'
+  |'VARIATION_UNAVAILABLE'
+  |'OPTION_UNAVAILABLE'
+  |'COMBO_CHANGED'
+  |'PRICE_CHANGED';
+
+export interface SmmCartLineAttention {
+  readonly reason:SmmCartAttentionReason;
+  readonly message:string;
+  readonly menuRevision:string;
+  readonly observedAt:string;
+}
+
 export interface SmmCartLine {
   readonly lineId:string;
   readonly productId:string;
@@ -149,6 +163,8 @@ export interface SmmCartLine {
   readonly selections:readonly SmmCartSelection[];
   readonly combo?:SmmCartComboIntent;
   readonly publishedUnitPriceMinor?:number;
+  readonly publishedMenuRevision?:string;
+  readonly attention?:SmmCartLineAttention;
   readonly createdAt:string;
 }
 
