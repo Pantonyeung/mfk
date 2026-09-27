@@ -213,7 +213,7 @@ export function WaitingStoreConfirmationUi5View({
       <p>離開畫面唔會取消訂單，亦唔會觸發重新 Submit。</p>
       <div>
         <ActionButton variant="secondary" onClick={onHome}>返首頁</ActionButton>
-        <ActionButton onClick={onOrders}>查看訂單</ActionButton>
+        <ActionButton onClick={onOrders}>查看訂單詳情</ActionButton>
       </div>
     </section>
 
