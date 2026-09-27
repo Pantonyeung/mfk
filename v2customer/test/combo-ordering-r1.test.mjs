@@ -54,8 +54,8 @@ test('Combo draft selection uses exact IDs and banked DRINK optional semantics o
 test('ProductSheet consumes canonical Combo projection and renders selectable Combo section',()=>{
   for(const marker of[
     "kind:'combo'",
-    'menu.combos',
-    'menu.comboPools',
+    'menu?.combos',
+    'menu?.comboPools',
     'product.comboId',
     '升級套餐',
     '套餐基本價',
