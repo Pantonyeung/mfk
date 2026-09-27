@@ -1,7 +1,7 @@
 MFK_ADMIN_DEPLOY_REQUEST
 target=mfk-admin
 canonical_url=https://admin.morefunos.com
-product_source=ADMIN_CANONICAL_READBACK_R1
+product_source=OWNER_OA_CHN_PLN_R4
 requested_by=owner
-reason=deploy_authenticated_cloud_readback_before_local_trust
-work_id=MFK-ADMIN-CANONICAL-READBACK-R1
+reason=deploy_owner_channel_read_and_canonical_monthly_planning
+work_id=MFK-OWNER-OA-CHN-PLN-R4
