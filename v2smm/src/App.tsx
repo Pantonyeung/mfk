@@ -17,6 +17,12 @@ import {
   type SmmComboSelectionState,
   type SmmSelectionState,
 } from './selection';
+import {
+  acceptSmmCartRefresh,
+  buildSmmCartRefreshAttention,
+  sameSmmCartRefreshAttention,
+  smmLineTotalMinor,
+} from './stage3-cart.mjs';
 import './stage1.css';
 import './stage2.css';
 import './stage3.css';
@@ -150,22 +156,104 @@ export function App(){
     const value=mode==='DINE_IN'?product.publishedDineInUnitPriceMinor:product.publishedTakeawayUnitPriceMinor;
     return Number.isSafeInteger(Number(value))&&Number(value)>=0?Number(value):null;
   };
-  const repriceLine=(line:SmmCartLine,mode:SmmServiceMode):SmmCartLine=>{
+
+  const projectLineAgainstCurrentMenu=(line:SmmCartLine,mode:SmmServiceMode)=>{
     const product=menu?.products.find(item=>item.productId===line.productId);
-    if(!product)return line;
-    const optionMinor=line.selections.reduce((sum,item)=>sum+(Number.isSafeInteger(Number(item.publishedAdjustmentMinor))?Number(item.publishedAdjustmentMinor):0),0);
-    if(line.combo){
-      const combo=menu?revalidateSmmCartComboIntent(product,menu,line.combo):null;
-      const unitMinor=combo?publishedSmmComboUnitMinor(combo,optionMinor):null;
+    if(!menu||!product||!product.available){
       return Object.freeze({
-        ...line,
-        ...(combo?{combo}:{}),
-        publishedUnitPriceMinor:unitMinor??undefined,
+        canAccept:false,
+        configChanged:true,
+        proposedSelections:line.selections,
+        proposedCombo:undefined,
+        proposedPublishedUnitPriceMinor:undefined,
       });
     }
-    const base=productPrice(product,mode);
-    if(base===null)return {...line,publishedUnitPriceMinor:undefined};
-    return Object.freeze({...line,publishedUnitPriceMinor:base+optionMinor});
+
+    let configChanged=false;
+    let selectionsValid=true;
+    const refreshedSelections=line.selections.map(selection=>{
+      const group=product.optionGroups.find(item=>item.optionGroupId===selection.optionGroupId);
+      const option=group?.options.find(item=>item.optionId===selection.optionId&&item.available);
+      if(!group||!option){
+        selectionsValid=false;
+        configChanged=true;
+        return selection;
+      }
+      const adjustment=Number.isSafeInteger(Number(option.publishedAdjustmentMinor))
+        ?Number(option.publishedAdjustmentMinor)
+        :0;
+      if(
+        selection.optionName!==option.name||
+        Number(selection.publishedAdjustmentMinor??0)!==adjustment
+      )configChanged=true;
+      return Object.freeze({
+        optionGroupId:group.optionGroupId,
+        optionId:option.optionId,
+        optionName:option.name,
+        publishedAdjustmentMinor:adjustment,
+      });
+    });
+
+    if(line.selectedVariationId){
+      const variation=product.variations?.find(item=>item.variationId===line.selectedVariationId&&item.available);
+      if(!variation)selectionsValid=false;
+    }else if(product.variationRequired){
+      selectionsValid=false;
+    }
+    if(!selectionsValid)configChanged=true;
+
+    const optionMinor=refreshedSelections.reduce(
+      (sum,item)=>sum+(Number.isSafeInteger(Number(item.publishedAdjustmentMinor))?Number(item.publishedAdjustmentMinor):0),
+      0,
+    );
+    const refreshedCombo=line.combo?revalidateSmmCartComboIntent(product,menu,line.combo):null;
+    if(line.combo&&!refreshedCombo){
+      selectionsValid=false;
+      configChanged=true;
+    }
+    if(refreshedCombo&&JSON.stringify(refreshedCombo)!==JSON.stringify(line.combo))configChanged=true;
+
+    const base=line.combo?null:productPrice(product,mode);
+    const comboUnit=refreshedCombo?publishedSmmComboUnitMinor(refreshedCombo,optionMinor):null;
+    const unitMinor=selectionsValid
+      ?line.combo
+        ?comboUnit??undefined
+        :base!==null?base+optionMinor:undefined
+      :undefined;
+
+    return Object.freeze({
+      canAccept:unitMinor!==undefined,
+      configChanged,
+      proposedSelections:Object.freeze(refreshedSelections),
+      proposedCombo:refreshedCombo??undefined,
+      proposedPublishedUnitPriceMinor:unitMinor,
+    });
+  };
+
+  const repriceLine=(line:SmmCartLine,mode:SmmServiceMode):SmmCartLine=>{
+    if(!menu)return line;
+    const projected=projectLineAgainstCurrentMenu(line,mode);
+    if(!projected.canAccept){
+      const attention=buildSmmCartRefreshAttention({
+        menuRevision:menu.revision,
+        oldPublishedUnitPriceMinor:line.publishedUnitPriceMinor,
+        proposedPublishedUnitPriceMinor:projected.proposedPublishedUnitPriceMinor,
+        proposedSelections:projected.proposedSelections,
+        proposedCombo:projected.proposedCombo,
+        configChanged:true,
+        canAccept:false,
+        detectedAt:line.refreshAttention?.detectedAt??nowIso(),
+      });
+      return Object.freeze({...line,...(attention?{refreshAttention:attention}:{})});
+    }
+    const next:SmmCartLine={
+      ...line,
+      selections:projected.proposedSelections,
+      publishedUnitPriceMinor:projected.proposedPublishedUnitPriceMinor,
+    };
+    if(line.combo&&projected.proposedCombo)next.combo=projected.proposedCombo;
+    delete (next as {refreshAttention?:unknown}).refreshAttention;
+    return Object.freeze(next);
   };
   const publishedTotalMinor=cart.every(line=>Number.isSafeInteger(Number(line.publishedUnitPriceMinor))&&Number(line.publishedUnitPriceMinor)>=0)
     ?cart.reduce((sum,line)=>sum+Number(line.publishedUnitPriceMinor)*line.quantity,0)
@@ -198,73 +286,44 @@ export function App(){
   useEffect(()=>{
     if(!menu||cart.length===0)return;
     let changed=false;
-    let invalid=false;
+    let affected=0;
     const next=cart.map(line=>{
-      const product=menu.products.find(item=>item.productId===line.productId);
-      if(!product||!product.available){
-        invalid=true;
-        if(line.publishedUnitPriceMinor!==undefined)changed=true;
-        return Object.freeze({...line,publishedUnitPriceMinor:undefined});
+      const projected=projectLineAgainstCurrentMenu(line,serviceMode);
+      const proposal=buildSmmCartRefreshAttention({
+        menuRevision:menu.revision,
+        oldPublishedUnitPriceMinor:line.publishedUnitPriceMinor,
+        proposedPublishedUnitPriceMinor:projected.proposedPublishedUnitPriceMinor,
+        proposedSelections:projected.proposedSelections,
+        proposedCombo:projected.proposedCombo,
+        configChanged:projected.configChanged,
+        canAccept:projected.canAccept,
+        detectedAt:line.refreshAttention?.detectedAt??nowIso(),
+      });
+
+      if(!proposal){
+        if(!line.refreshAttention)return line;
+        changed=true;
+        const cleared:{refreshAttention?:unknown}&Record<string,unknown>={...line};
+        delete cleared.refreshAttention;
+        return Object.freeze(cleared) as SmmCartLine;
       }
 
-      let selectionsValid=true;
-      const refreshedSelections=line.selections.map(selection=>{
-        const group=product.optionGroups.find(item=>item.optionGroupId===selection.optionGroupId);
-        const option=group?.options.find(item=>item.optionId===selection.optionId&&item.available);
-        if(!group||!option){
-          selectionsValid=false;
-          return selection;
-        }
-        const adjustment=Number.isSafeInteger(Number(option.publishedAdjustmentMinor))
-          ?Number(option.publishedAdjustmentMinor)
-          :0;
-        if(
-          selection.optionName!==option.name||
-          Number(selection.publishedAdjustmentMinor??0)!==adjustment
-        )changed=true;
-        return Object.freeze({
-          optionGroupId:group.optionGroupId,
-          optionId:option.optionId,
-          optionName:option.name,
-          publishedAdjustmentMinor:adjustment,
-        });
-      });
-
-      const optionMinor=refreshedSelections.reduce(
-        (sum,item)=>sum+(Number.isSafeInteger(Number(item.publishedAdjustmentMinor))?Number(item.publishedAdjustmentMinor):0),
-        0,
-      );
-      const refreshedCombo=line.combo?revalidateSmmCartComboIntent(product,menu,line.combo):null;
-      if(line.combo&&!refreshedCombo)selectionsValid=false;
-      if(refreshedCombo&&JSON.stringify(refreshedCombo)!==JSON.stringify(line.combo))changed=true;
-      const base=line.combo?null:productPrice(product,serviceMode);
-      const comboUnit=refreshedCombo?publishedSmmComboUnitMinor(refreshedCombo,optionMinor):null;
-      const unitMinor=selectionsValid
-        ?line.combo
-          ?comboUnit??undefined
-          :base!==null?base+optionMinor:undefined
-        :undefined;
-      if(line.publishedUnitPriceMinor!==unitMinor)changed=true;
-      if(unitMinor===undefined)invalid=true;
-      return Object.freeze({
-        ...line,
-        selections:Object.freeze(refreshedSelections),
-        ...(refreshedCombo?{combo:refreshedCombo}:{}),
-        publishedUnitPriceMinor:unitMinor,
-      });
+      affected+=1;
+      if(sameSmmCartRefreshAttention(line.refreshAttention,proposal))return line;
+      changed=true;
+      return Object.freeze({...line,refreshAttention:proposal});
     });
 
     if(!changed)return;
-    setCart(Object.freeze(next));
+    const frozen=Object.freeze(next);
+    setCart(frozen);
     writeSmmLocalWorkspace({
-      cart:Object.freeze(next),
+      cart:frozen,
       cartNote,
       pendingIntents,
       preferences:{activeView:view,activeCategoryId,sourceFilter,serviceMode,tender},
     });
-    setNotice(invalid
-      ?'餐單已更新；需要處理嘅商品已逐項標示，其他草稿保持不變。'
-      :'餐單已更新；購物草稿已按目前發布價格重新計算。');
+    if(affected>0)setNotice('餐單有更新；請喺購物草稿逐項確認已標示商品。未確認前唔會靜默接受新價格或套餐資料。');
   },[menu?.revision,menu?.observedAt]);
 
   const resetProductEditor=()=>{
@@ -354,6 +413,17 @@ export function App(){
   const updateCart=(next:readonly SmmCartLine[])=>{
     setCart(next);
     persist({cart:next});
+  };
+
+  const acceptCartRefresh=(lineId:string)=>{
+    const result=acceptSmmCartRefresh(cart,lineId);
+    if(!result.accepted){
+      setNotice('呢一項需要重新編輯，未有可直接接受嘅完整更新。');
+      return;
+    }
+    setCart(result.cart);
+    persist({cart:result.cart});
+    setNotice('已接受指定商品更新；其他購物草稿保持不變。');
   };
 
   const changeServiceMode=(next:SmmServiceMode)=>{
@@ -662,6 +732,7 @@ export function App(){
       onServiceMode={changeServiceMode}
       onClose={()=>setCartOpen(false)}
       onEdit={openCartLineEditor}
+      onAcceptRefresh={acceptCartRefresh}
       onQuantity={(lineId,quantity)=>updateCart(cart.map(line=>line.lineId===lineId?{...line,quantity:Math.min(99,Math.max(1,quantity))}:line))}
       onRemove={lineId=>updateCart(cart.filter(line=>line.lineId!==lineId))}
       onClear={()=>{setCart([]);setCartNote('');persist({cart:[],cartNote:''})}}
@@ -1132,7 +1203,7 @@ function ProductSheet({
   </div>;
 }
 
-function CartSheet({cart,quote,menu,serviceMode,note,onNote,onServiceMode,onClose,onEdit,onQuantity,onRemove,onClear,onCheckout}:{
+function CartSheet({cart,quote,menu,serviceMode,note,onNote,onServiceMode,onClose,onEdit,onAcceptRefresh,onQuantity,onRemove,onClear,onCheckout}:{
   cart:readonly SmmCartLine[];
   quote:SmmQuoteSnapshot|null;
   menu:SmmReadModelSnapshot['menu'];
@@ -1142,20 +1213,13 @@ function CartSheet({cart,quote,menu,serviceMode,note,onNote,onServiceMode,onClos
   onServiceMode:(mode:SmmServiceMode)=>void;
   onClose:()=>void;
   onEdit:(line:SmmCartLine)=>void;
+  onAcceptRefresh:(lineId:string)=>void;
   onQuantity:(id:string,q:number)=>void;
   onRemove:(id:string)=>void;
   onClear:()=>void;
   onCheckout:()=>void;
 }){
-  const attentionFor=(line:SmmCartLine)=>{
-    if(!menu)return null;
-    const product=menu.products.find(item=>item.productId===line.productId);
-    if(!product)return '餐單已更新；呢件商品已不在目前餐單';
-    if(!product.available)return '此商品已暫停供應';
-    if(!Number.isSafeInteger(Number(line.publishedUnitPriceMinor)))return '餐單內容已更新；請重新編輯呢件商品';
-    return null;
-  };
-  const rows=cart.map(line=>Object.freeze({line,attention:attentionFor(line)}));
+  const rows=cart.map(line=>Object.freeze({line,attention:line.refreshAttention??null}));
   const affectedCount=rows.filter(row=>Boolean(row.attention)).length;
   const validRows=rows.filter(row=>!row.attention&&Number.isSafeInteger(Number(row.line.publishedUnitPriceMinor)));
   const validItemCount=validRows.reduce((sum,row)=>sum+row.line.quantity,0);
@@ -1210,9 +1274,16 @@ function CartSheet({cart,quote,menu,serviceMode,note,onNote,onServiceMode,onClos
               ...line.selections.map(item=>item.optionName),
               ...(line.combo?.selections.map(item=>item.choiceLabel)??[]),
             ].filter(Boolean).join(' · ')||'無額外設定';
-            const unitPrice=Number.isSafeInteger(Number(line.publishedUnitPriceMinor))
-              ?money('HKD',Number(line.publishedUnitPriceMinor))
-              :'價格待同步';
+            const unitMinor=Number.isSafeInteger(Number(line.publishedUnitPriceMinor))
+              ?Number(line.publishedUnitPriceMinor)
+              :null;
+            const lineTotalMinor=smmLineTotalMinor(line.publishedUnitPriceMinor,line.quantity);
+            const unitPrice=unitMinor===null?'價格待同步':money('HKD',unitMinor);
+            const lineTotal=lineTotalMinor===null?'價格待同步':money('HKD',lineTotalMinor);
+            const proposedUnit=attention&&Number.isSafeInteger(Number(attention.proposedPublishedUnitPriceMinor))
+              ?Number(attention.proposedPublishedUnitPriceMinor)
+              :null;
+            const priceChanged=attention&&unitMinor!==null&&proposedUnit!==null&&unitMinor!==proposedUnit;
             return <article className={`stage3-line ${attention?'has-attention':''}`} key={line.lineId}>
               <span className="stage3-line-media" aria-label="正式產品圖片待補"/>
               <div className="stage3-line-main">
@@ -1221,14 +1292,27 @@ function CartSheet({cart,quote,menu,serviceMode,note,onNote,onServiceMode,onClos
                   <button className="stage3-edit" type="button" onClick={()=>onEdit(line)} aria-label={'編輯 '+line.productName}>編輯</button>
                 </div>
                 <div className="stage3-line-bottom">
-                  <strong>{unitPrice}</strong>
+                  <div className="stage3-line-prices">
+                    <span>單價 <b>{unitPrice}</b></span>
+                    <strong>行總額 {lineTotal}</strong>
+                  </div>
                   <div className="stage3-qty" aria-label={line.productName+' 數量'}>
                     <button type="button" disabled={line.quantity<=1} onClick={()=>onQuantity(line.lineId,line.quantity-1)} aria-label="減少數量">−</button>
                     <b>{line.quantity}</b>
                     <button type="button" disabled={line.quantity>=99} onClick={()=>onQuantity(line.lineId,line.quantity+1)} aria-label="增加數量">＋</button>
                   </div>
                 </div>
-                {attention?<div className="stage3-line-attention"><span>{attention}</span><button type="button" onClick={()=>onEdit(line)}>立即處理</button></div>:null}
+                {attention?<div className="stage3-line-attention">
+                  <div>
+                    <b>{attention.kind}</b>
+                    <span>{attention.kind==='PRICE_CHANGED'?'餐單價格已更新，請確認新價格。':'商品／套餐發布資料已更新，請確認或重新編輯。'}</span>
+                    {priceChanged?<small>舊價 {money('HKD',unitMinor!)} → 新價 {money('HKD',proposedUnit!)}</small>:null}
+                  </div>
+                  <div className="stage3-attention-actions">
+                    {attention.canAccept?<button type="button" onClick={()=>onAcceptRefresh(line.lineId)}>接受更新</button>:null}
+                    <button type="button" onClick={()=>onEdit(line)}>重新編輯</button>
+                  </div>
+                </div>:null}
                 <button className="stage3-remove" type="button" onClick={()=>onRemove(line.lineId)}>移除</button>
               </div>
             </article>;
