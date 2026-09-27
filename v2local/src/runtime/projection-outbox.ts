@@ -20,6 +20,19 @@ export interface ProjectionOrderInput{
   readonly staffId?:string;
   readonly staffName?:string;
   readonly cancellationReason?:string;
+  readonly rejectionReason?:string;
+  readonly customerPhone?:string;
+  readonly paymentVerificationState?:'PENDING'|'VERIFIED'|'REJECTED';
+  readonly etaLabel?:string;
+  readonly promisedReadyLabel?:string;
+  readonly fulfillmentHistory?:readonly {
+    readonly label?:string;
+    readonly state?:string;
+    readonly at?:string;
+    readonly atLabel?:string;
+    readonly observedAt?:string;
+    readonly detail?:string;
+  }[];
   readonly refunds?:readonly {
     readonly id:string;
     readonly createdAt:string;
@@ -88,6 +101,8 @@ export function readProjectionOutbox(){return Object.freeze(readRows().map(row=>
 
 export function queueOrderProjection(order:ProjectionOrderInput){
   const occurredAt=order.updatedAt||order.createdAt;
+  const customerPhoneDigits=String(order.customerPhone||'').replace(/\D/g,'');
+  const pickupCode=customerPhoneDigits.length>=4?customerPhoneDigits.slice(-4):'';
   return enqueue(createSmtProjectionEvent({
     storeId:'MF01',
     deviceId:readSmtDeviceId(),
@@ -109,6 +124,12 @@ export function queueOrderProjection(order:ProjectionOrderInput){
       ...(order.staffId?{staffId:String(order.staffId)}:{}),
       ...(order.staffName?{staffName:String(order.staffName)}:{}),
       ...(order.cancellationReason?{cancellationReason:String(order.cancellationReason)}:{}),
+      ...(order.rejectionReason?{rejectionReason:String(order.rejectionReason)}:{}),
+      ...(pickupCode?{pickupCode}:{}),
+      ...(order.paymentVerificationState?{paymentVerificationState:order.paymentVerificationState}:{}),
+      ...(order.etaLabel?{etaLabel:String(order.etaLabel)}:{}),
+      ...(order.promisedReadyLabel?{promisedReadyLabel:String(order.promisedReadyLabel)}:{}),
+      ...(order.fulfillmentHistory?.length?{fulfillmentHistory:Object.freeze(order.fulfillmentHistory.map(entry=>Object.freeze({...entry})))}:{}),
       ...(order.refunds?.length?{refunds:Object.freeze(order.refunds.map(refund=>Object.freeze({
         id:String(refund.id),
         refundId:String(refund.id),
