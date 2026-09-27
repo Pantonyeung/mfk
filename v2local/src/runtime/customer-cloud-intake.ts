@@ -1,4 +1,4 @@
-// Build refresh: Customer revision/price validation + own-channel auto-admit.
+// A3B: Customer revision/price validation + own-channel pending operator review.
 // Customer electronic tender labels come from the Admin-published payment channel.
 import type {
   CustomerCloudCartLine,
