@@ -801,3 +801,65 @@ test('OA-SEL-001 uses canonical Sellability Authority with per-target readback',
   assert.match(app,/sellability/);
   assert.doesNotMatch(page,/localStorage|sessionStorage/);
 });
+
+test('OA-STF-001 is read-only and never fabricates attendance data',()=>{
+  const app=fs.readFileSync(path.join(srcRoot,'App.tsx'),'utf8');
+  const page=fs.readFileSync(path.join(srcRoot,'staff-overview.tsx'),'utf8');
+  const types=fs.readFileSync(path.join(srcRoot,'product-types.ts'),'utf8');
+  const identitySource=fs.readFileSync(path.join(srcRoot,'staff-identity.ts'),'utf8');
+
+  assert.match(app,/StaffOverviewPage/);
+  assert.match(app,/\/staff/);
+  assert.match(app,/onStaff/);
+
+  for(const marker of[
+    '員工摘要',
+    '上班中',
+    '排班 vs 實際',
+    '休息中',
+    '今日工時',
+    '員工提醒',
+    '角色摘要',
+    'Identity & Employment',
+    'Role & Capability Summary',
+    'History & Audit',
+    'Admin canonical staffAuth',
+    '未有資料',
+    '未有員工編號資料',
+    '未有能力摘要資料',
+    '未有可可靠歸屬 Audit 讀回',
+    '已打卡 ≠ 已登入 SMT',
+    '已登入 SMT ≠ 有 Manager 權限',
+    'Wage／Payroll 預設不顯示',
+  ])assert.match(page,new RegExp(marker));
+
+  assert.match(page,/冇 canonical attendance \/ break \/ worked-hours source/);
+  assert.match(page,/禁止由 SMT login、營業時間或角色估算/);
+  assert.match(page,/不能新增／停用員工、改角色／權限或重設 PIN/);
+  assert.match(types,/loginId\?:string/);
+  assert.match(types,/capabilitySummary\?:string/);
+  assert.match(identitySource,/staff\.staffId/);
+  assert.doesNotMatch(identitySource,/staff\.name/);
+
+  assert.doesNotMatch(page,/person\.permissions|selected\.permissions/);
+  assert.doesNotMatch(page,/員工編號 \{person\.staffId\}|員工編號<\/span><strong>\{selected\.staffId\}/);
+  assert.doesNotMatch(page,/presence\.includes|schedule\.includes/);
+  assert.doesNotMatch(page,/onCommand|requestBoundedAction|command[A-Z]|fetch\(/);
+  assert.doesNotMatch(page,/localStorage|sessionStorage/);
+  assert.doesNotMatch(page,/<input|<select|<textarea/);
+  assert.doesNotMatch(page,/pinVerifier|password|hashHex|saltHex/);
+});
+
+test('OA-STF-001 audit custody never assigns same-name staff without stable identity',()=>{
+  const {selectStaffAuditHistory,humanEmployeeCode}=loadPureTsModule('staff-identity.ts');
+  const sameNameA={staffId:'staff-a',loginId:'1001',name:'同名員工',role:'STAFF',presence:'UNKNOWN'};
+  const sameNameB={staffId:'staff-b',loginId:'1002',name:'同名員工',role:'STAFF',presence:'UNKNOWN'};
+  const activity=[
+    {activityId:'name-only',title:'舊紀錄',actor:'同名員工',result:'OK',observedAt:'2026-09-27T00:00:00Z'},
+    {activityId:'stable-b',title:'可靠紀錄',actor:'同名員工',actorStaffId:'staff-b',result:'OK',observedAt:'2026-09-27T00:01:00Z'},
+  ];
+  assert.deepEqual(selectStaffAuditHistory(activity,sameNameA).map(row=>row.activityId),[]);
+  assert.deepEqual(selectStaffAuditHistory(activity,sameNameB).map(row=>row.activityId),['stable-b']);
+  assert.equal(humanEmployeeCode(sameNameA),'1001');
+  assert.equal(humanEmployeeCode({...sameNameA,loginId:undefined}),null);
+});
