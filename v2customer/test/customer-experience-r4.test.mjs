@@ -60,5 +60,5 @@ test('R4 does not introduce a new network or business authority path',()=>{
   assert.doesNotMatch(source,/createFormalOrder|allocateDisplayNumber|applyDiscount|awardBadge|redeemCoupon/);
   assert.match(app,/port\?\.submitOrder/);
   assert.match(app,/port\?\.readSubmission/);
-  assert.match(app,/port\?\.buildReorderCart/);
+  assert.match(app,/buildCurrentReorderCart/);
 });
