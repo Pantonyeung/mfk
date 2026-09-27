@@ -215,7 +215,7 @@ export function CartView({cart,quote,repairs,member,suggestions,products,onProdu
               <dl className="ui4-line-summary">
                 {line.selectedVariationName?<><dt>規格</dt><dd>{line.selectedVariationName}</dd></>:null}
                 {optionSummary.length?<><dt>選項</dt><dd>{optionSummary.join(' · ')}</dd></>:null}
-                {line.combo?<><dt>套餐</dt><dd><b>{line.combo.comboName}</b>{comboChildren.length?<small>套餐內容：{comboChildren.join(' · ')}</small>:null}</dd></>:null}
+                {line.combo?<><dt>套餐</dt><dd><b>{line.combo?.comboName}</b>{comboChildren.length?<small>套餐內容：{comboChildren.join(' · ')}</small>:null}</dd></>:null}
                 {!line.selectedVariationName&&!optionSummary.length&&!line.combo?<><dt>設定</dt><dd>原味設定</dd></>:null}
                 {line.note?<><dt>備註</dt><dd>{line.note}</dd></>:null}
               </dl>
