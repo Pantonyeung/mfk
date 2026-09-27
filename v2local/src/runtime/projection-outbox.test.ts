@@ -181,4 +181,34 @@ describe('SMT projection outbox',()=>{
     expect(payload).not.toHaveProperty('customerPhone');
   });
 
+
+  it('projects immutable Stage8 reorder intent without old transaction truth',()=>{
+    queueOrderProjection({
+      id:'MFK-HISTORY-8',
+      display:'038',
+      createdAt:'2026-09-27T10:00:00.000Z',
+      updatedAt:'2026-09-27T10:20:00.000Z',
+      totalMinor:4800,
+      paymentLabel:'CASH',
+      fulfillmentLabel:'已完成',
+      sourceLabel:'自家 App',
+      customerReorderIntent:[{
+        productId:'bento',
+        productName:'肉燥便當',
+        quantity:1,
+        selections:[{optionGroupId:'rice',optionId:'extra',optionName:'加飯'}],
+      }],
+      items:[{id:'bento',name:'肉燥便當',qty:1,unitMinor:4800}],
+    });
+    const payload=readProjectionOutbox()[0]!.event.payload as Record<string,unknown>;
+    expect(payload.customerReorderIntent).toEqual([{
+      productId:'bento',
+      productName:'肉燥便當',
+      quantity:1,
+      selections:[{optionGroupId:'rice',optionId:'extra',optionName:'加飯'}],
+    }]);
+    const serialized=JSON.stringify(payload.customerReorderIntent);
+    expect(serialized).not.toMatch(/payment|fulfillment|coupon|publishedUnitPriceMinor|lineId/i);
+  });
+
 });
