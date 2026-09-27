@@ -16,9 +16,9 @@ const cloud=fs.readFileSync(path.join(src,'../../contracts/customer-cloud-v1.ts'
 const intake=fs.readFileSync(path.join(src,'../../v2local/src/runtime/customer-cloud-intake.ts'),'utf8');
 
 test('UI3 Product Detail follows the locked Configure flow order',()=>{
-  const start=views.indexOf('export function ProductSheet');
+  const start=productSheet.indexOf('export function ProductSheet');
   assert.ok(start>=0);
-  const body=views.slice(start);
+  const body=productSheet.slice(start);
   const markers=[
     'data-ui3-section="hero"',
     'data-ui3-section="combo"',
@@ -49,38 +49,39 @@ test('UI3 keeps exact five-nav with 記憶罐 in the center',()=>{
 });
 
 test('UI3 Combo renders only from exact product.comboId and never heuristics',()=>{
-  assert.match(views,/const combo=product\.comboId\?menu\?\.combos\?\.find\(item=>item\.comboId===product\.comboId\):undefined/);
-  assert.match(views,/\{product\.comboId\?<section className="ui3-config-section ui3-combo-section"/);
+  assert.match(productSheet,/const combo=product\.comboId\?menu\?\.combos\?\.find\(item=>item\.comboId===product\.comboId\):undefined/);
+  assert.match(productSheet,/\{product\.comboId\?<section className="ui3-config-section ui3-combo-section"/);
   for(const forbidden of["includes('套餐')",'includes("套餐")','categoryId.includes','product.name.includes']){
     assert.equal(selection.includes(forbidden),false,forbidden);
-    assert.equal(views.includes(forbidden),false,forbidden);
+    assert.equal(productSheet.includes(forbidden),false,forbidden);
   }
 });
 
 test('UI3 required validation, unavailable choices and price readiness block Add locally',()=>{
-  assert.match(views,/const addReady=product\.available&&variationOk&&validation\.ok&&comboValidation\.ok&&priceReady&&quantity>=1/);
-  assert.match(views,/disabled=\{!choice\.available\|\|\(maxReached&&!active\)\}/);
-  assert.match(views,/disabled=\{!option\.available\|\|\(maxReached&&!isSelected\)\}/);
-  assert.match(views,/disabled=\{!addReady\}/);
-  assert.match(views,/價格待同步/);
+  assert.match(productSheet,/const addReady=product\.available&&variationOk&&validation\.ok&&comboValidation\.ok&&priceReady&&quantity>=1/);
+  assert.match(productSheet,/disabled=\{!choice\.available\|\|\(maxReached&&!active\)\}/);
+  assert.match(productSheet,/disabled=\{disabled\}/);
+  assert.match(productSheet,/disabled=\{!addReady\}/);
+  assert.match(productSheet,/價格待同步/);
 });
 
 test('UI3 published preview exposes Combo base and canonical adjustments only',()=>{
-  assert.match(views,/combo\.publishedBasePriceMinor/);
-  assert.match(views,/subPool\.publishedAdjustmentMinor/);
-  assert.match(views,/choice\.publishedAdjustmentMinor/);
-  assert.match(views,/customerComboPublishedUnitMinor/);
-  assert.match(views,/已發布套餐基本價/);
-  assert.match(views,/正式提交由 SMT 再核對/);
+  assert.match(productSheet,/combo\.publishedBasePriceMinor/);
+  assert.match(productSheet,/subPool\.publishedAdjustmentMinor/);
+  assert.match(productSheet,/choice\.publishedAdjustmentMinor/);
+  assert.match(productSheet,/customerComboPublishedUnitMinor/);
+  assert.match(productSheet,/ordinaryPriceFactsReady/);
+  assert.match(productSheet,/已發布套餐基本價/);
+  assert.match(productSheet,/正式提交由 SMT 再核對/);
   assert.match(quote,/comboPublishedFactsChanged/);
 });
 
 test('UI3 recommendation is non-blocking and uses no fake product media',()=>{
-  assert.match(views,/recommendations\.length\?/);
-  assert.match(views,/暫時未有合適推薦；可以照常完成今次設定/);
-  assert.doesNotMatch(views,/addReady=.*recommend/);
-  assert.match(views,/product-media-fallback true-empty/);
-  assert.doesNotMatch(views,/product\.name\.slice\(0,1\)/);
+  assert.match(productSheet,/recommendations\.length\?/);
+  assert.match(productSheet,/暫時未有合適推薦；可以照常完成今次設定/);
+  assert.doesNotMatch(productSheet,/addReady=.*recommend/);
+  assert.match(productSheet,/product-media-fallback true-empty/);
+  assert.doesNotMatch(productSheet,/product\.name\.slice\(0,1\)/);
 });
 
 test('UI3 mobile contract is <=480px, touch-safe, sticky and Reduced Motion aware',()=>{
