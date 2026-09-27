@@ -4492,3 +4492,166 @@ UI-STAGE-01 ORDERING MAIN
 
 MILESTONE：
 MFK_SMT_UI_STAGE00_STARTUP_OPENING_CASH_OWNER_DEFINITION_LOCKED
+
+
+==================================================
+RECORD 009｜OWNER CORRECTION｜取消 Home Page
+日期：2026-09-27
+狀態：LOCKED / SUPERSEDES PRIOR HOME CONCEPT
+==================================================
+
+Owner 最新定義：
+
+MFK SMT 係前線 Operation System。
+核心目標係速度。
+因此不需要一個獨立「首頁／Home Page」作為 Opening Cash 完成後的中轉頁。
+
+之前提出：
+Opening Cash
+→ Home
+→ 點單
+→ Ordering
+
+正式取消。
+
+新流程：
+
+BOOT / LOADING VISUAL
+↓
+LOGIN
+↓
+FIRST LOGIN（conditional）
+↓
+PREVIOUS BUSINESS DAY CASH READBACK
+↓
+OPENING CASH REVIEW
+↓
+OPENING CASH ADJUSTMENT（optional）
+↓
+OPENING CONFIRM
+↓
+DIRECT TO UI-STAGE-01 ORDERING MAIN
+
+==================================================
+BOOT / LOADING VISUAL 的真正用途
+==================================================
+
+呢個畫面唔係「首頁」。
+
+佢係：
+系統開機／載入期間的品牌視覺承載層。
+
+當 SMT 正在：
+- 啟動 Local Runtime
+- 讀取 Menu / Admin LKG
+- 讀取 Business Day
+- 讀取上一營業日 Cash State
+- 讀取 Printer / Device 基礎狀態
+- 做必要 Startup Readback
+
+與其畀員工見到空白畫面，
+使用：
+- 磨飯 Logo
+- 品牌背景色
+- 可選品牌 IP
+- 短動畫
+- 必要 Loading 狀態
+
+但：
+一完成必要資料讀取，
+就進下一個真正操作畫面。
+唔停留喺品牌頁。
+
+==================================================
+GLOBAL SHELL 的重新定位
+==================================================
+
+Shell / Navigation / Global Alert / Attention
+仍然係全 SMT 共用 UI 基礎。
+
+但佢唔再係一個獨立「Home Page」。
+
+即：
+
+Shell = Persistent UI Frame
+Home = REMOVED
+
+完成 Opening Confirm 後：
+直接載入 Shell + UI-STAGE-01 Ordering Main。
+
+員工第一個正式營業工作畫面：
+就係點單頁。
+
+==================================================
+UI-STAGE-00 正式範圍
+==================================================
+
+00.0 Boot / Loading Brand Visual
+00.1 Login
+00.2 First Login / First Device（conditional）
+00.3 Previous Business Day Cash Readback
+00.4 Opening Cash Review
+00.5 Opening Cash Adjustment
+00.6 Opening Confirmation
+
+Stage 0 到此結束。
+
+之後：
+UI-STAGE-01 Ordering Main
+
+==================================================
+REMOVED
+==================================================
+
+REMOVED：
+- 獨立 Home Page
+- 「開始點單」快捷卡
+- Opening Confirm 後再多一次「點單」導航
+- 任何純中轉頁
+- 空白等待頁
+
+SUPERSEDED：
+之前 Stage 0 Home / Shell 視覺概念。
+
+Shell 本身保留，
+但變成所有正式工作頁共用 Frame，
+唔係一個 Route。
+
+==================================================
+PERFORMANCE PRINCIPLE
+==================================================
+
+每一次固定多出一個 Click，
+如果每日做 100 單，
+就係每日多 100 次無價值操作。
+
+所以：
+只要一個畫面唔提供必要 decision / information / action，
+就唔應該獨立存在。
+
+Boot Visual 有存在價值：
+因為本身需要等待系統讀資料。
+
+Opening Cash 有存在價值：
+因為每日開更要核對現金。
+
+Home Page 無存在價值：
+因為唔提供必要營運決策，
+只增加一次跳轉。
+
+==================================================
+FINAL ROUTE
+==================================================
+
+App Start
+→ Boot Animation / Startup Read
+→ Login
+→ First Login（conditional）
+→ Previous Cash
+→ Opening Cash Review
+→ Adjustment（optional）
+→ Confirm Opening
+→ Ordering Main
+
+MILESTONE：
+MFK_SMT_NO_HOME_DIRECT_OPERATION_FLOW_LOCKED
