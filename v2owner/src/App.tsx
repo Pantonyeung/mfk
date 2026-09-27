@@ -262,8 +262,8 @@ export function App(){
     if(!port?.commandChannel){setNotice('呢個渠道未有 canonical command seam；冇改變任何正式狀態。');return}
     setChannelCommandFlight({channelId:input.channelId,state:'PENDING',message:'Read current → command → canonical readback。'});
     try{
-      const result=await port.commandChannel(input);
-      setChannelCommandFlight({channelId:input.channelId,state:result.state==='CONFIRMED'?'CONFIRMED':result.state,message:result.message});
+      const {state,message}=await port.commandChannel(input);
+      setChannelCommandFlight({channelId:input.channelId,state:state==='CONFIRMED'?'CONFIRMED':state,message});
       await refresh();
     }catch{
       setChannelCommandFlight({channelId:input.channelId,state:'UNKNOWN',message:'結果未明；只可重新讀回，禁止 blind retry。'});
