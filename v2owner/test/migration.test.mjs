@@ -778,3 +778,26 @@ test('Stage04 keeps four-item bottom navigation and secondary routes',()=>{
   assert.match(app,/\/planning/);
   assert.match(app,/MonthlyTargetSummaryCard/);
 });
+
+
+test('OA-SEL-001 uses canonical Sellability Authority with per-target readback',()=>{
+  const types=fs.readFileSync(path.join(srcRoot,'product-types.ts'),'utf8');
+  const page=fs.readFileSync(path.join(srcRoot,'sellability.tsx'),'utf8');
+  const cloud=fs.readFileSync(path.join(srcRoot,'cloud-runtime.ts'),'utf8');
+  const app=fs.readFileSync(path.join(srcRoot,'App.tsx'),'utf8');
+  for(const grain of['PRODUCT','OPTION','MODIFIER','COMBO_CHILD'])assert.match(types,new RegExp(grain));
+  for(const state of['CONFIRMED','PARTIAL','UNKNOWN'])assert.match(types,new RegExp(state));
+  assert.match(types,/ONLINE_ONLY/);
+  assert.match(types,/restoreAt/);
+  assert.match(cloud,/\/api\/owner\/sellability/);
+  assert.match(page,/Availability ≠ Inventory/);
+  assert.match(page,/售罄唔會隱藏商品/);
+  assert.match(page,/已成立訂單/);
+  assert.match(page,/只停網上/);
+  assert.match(page,/只停至今日/);
+  assert.match(page,/停至指定時間/);
+  assert.match(page,/數量資料.*只展示/);
+  assert.match(page,/改價、商品／Combo 結構、Mapping、刪除商品仍然只屬 Admin/);
+  assert.match(app,/sellability/);
+  assert.doesNotMatch(page,/localStorage|sessionStorage/);
+});
