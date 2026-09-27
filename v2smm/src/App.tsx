@@ -246,14 +246,13 @@ export function App(){
       });
       return Object.freeze({...line,...(attention?{refreshAttention:attention}:{})});
     }
-    const next:SmmCartLine={
-      ...line,
+    const {refreshAttention:_staleAttention,...accepted}=line;
+    return Object.freeze({
+      ...accepted,
       selections:projected.proposedSelections,
+      ...(line.combo&&projected.proposedCombo?{combo:projected.proposedCombo}:{}),
       publishedUnitPriceMinor:projected.proposedPublishedUnitPriceMinor,
-    };
-    if(line.combo&&projected.proposedCombo)next.combo=projected.proposedCombo;
-    delete (next as {refreshAttention?:unknown}).refreshAttention;
-    return Object.freeze(next);
+    });
   };
   const publishedTotalMinor=cart.every(line=>Number.isSafeInteger(Number(line.publishedUnitPriceMinor))&&Number(line.publishedUnitPriceMinor)>=0)
     ?cart.reduce((sum,line)=>sum+Number(line.publishedUnitPriceMinor)*line.quantity,0)
@@ -303,9 +302,8 @@ export function App(){
       if(!proposal){
         if(!line.refreshAttention)return line;
         changed=true;
-        const cleared:{refreshAttention?:unknown}&Record<string,unknown>={...line};
-        delete cleared.refreshAttention;
-        return Object.freeze(cleared) as SmmCartLine;
+        const {refreshAttention:_staleAttention,...cleared}=line;
+        return Object.freeze(cleared);
       }
 
       affected+=1;
