@@ -36,15 +36,29 @@ test('LAN snapshot mirrors the same canonical Combo projection without name/cate
   assert.doesNotMatch(ingress,/includes\(['"]套餐['"]\)|includes\(['"]飯團['"]\)/);
 });
 
-test('Stage 2 renders canonical Combo sections and validates them before Add',()=>{
-  assert.match(app,/resolveSmmProductCombo\(product,menu\)/);
-  assert.match(app,/stage2-combo-section/);
+test('Stage 2 renders Combo section only for canonical Combo products and validates required Combo before Add',()=>{
+  assert.match(app,/const combo=resolveSmmProductCombo\(product,menu\)/);
+  assert.match(app,/\{combo\?<section className=\{\`stage2-config-section stage2-combo-section/);
   assert.match(app,/套餐基礎價/);
   assert.match(app,/只讀 Admin 已發布 Combo \/ Pool；正式提交由 SMT 再驗證/);
+  assert.match(app,/const comboValidation=validateSmmComboSelections\(product,menu,comboEnabled,comboSelections\)/);
   assert.match(app,/disabled=\{!validation\.ok\|\|!variationOk\|\|!comboValidation\.ok\}/);
+  assert.match(selection,/if\(!enabled\)return Object\.freeze\(\{ok:true/);
+  assert.match(selection,/if\(!resolved\)return Object\.freeze\(\{ok:false,issues:Object\.freeze\(\['套餐資料未完整，請重新同步'\]\)\}\)/);
   assert.match(selection,/pool\.addonKind==='DRINK'\?false:group\.required/);
   assert.match(selection,/pool\.addonKind==='DRINK'[\s\S]*\?0/);
   assert.doesNotMatch(selection,/product\.name.*套餐|category.*套餐/);
+});
+
+test('Stage 2 Combo preview reads only canonical published price facts',()=>{
+  assert.match(selection,/publishedBasePriceMinor:resolved\.combo\.publishedBasePriceMinor/);
+  assert.match(selection,/publishedAdjustmentMinor:choice\.publishedAdjustmentMinor/);
+  assert.match(selection,/intent\.publishedBasePriceMinor[\s\S]*intent\.selections\.reduce\(\(sum,row\)=>sum\+row\.publishedAdjustmentMinor,0\)/);
+  assert.match(app,/combo\.combo\.publishedBasePriceMinor/);
+  assert.match(app,/choice\?\.publishedAdjustmentMinor\?\?0/);
+  assert.match(ingress,/revalidateSmmComboLine/);
+  assert.match(ingress,/projectSyncedCombos\(envelope\)/);
+  assert.match(ingress,/SMM_PUBLISHED_PRICE_CHANGED/);
 });
 
 test('Combo identity and child selections survive local persistence and LAN/cloud transport',()=>{
