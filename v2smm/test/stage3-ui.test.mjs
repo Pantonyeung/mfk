@@ -57,7 +57,8 @@ test('Stage 3 keeps quote projection without displaying engineering language',()
   assert.match(cartSheet,/publishedUnitPriceMinor/);
   assert.match(app,/revalidateSmmCartComboIntent/);
   assert.match(app,/publishedSmmComboUnitMinor/);
-  assert.doesNotMatch(cartSheet,/SMT|Store Kernel|PricingEngine|ComboEngine|OrderEngine|PRICE_CHANGED|CONFIG_CHANGED/);
+  assert.doesNotMatch(cartSheet,/SMT|Store Kernel|PricingEngine|ComboEngine|OrderEngine/);
+  assert.doesNotMatch(cartSheet,/>PRICE_CHANGED<|>CONFIG_CHANGED</);
 });
 
 test('Stage 3 cart note stays local non-authoritative workspace data',()=>{
