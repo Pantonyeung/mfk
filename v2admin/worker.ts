@@ -439,8 +439,9 @@ export function mapCustomerOrderProjection(input){
   const itemRows=rows(order.items);
   const display=String(order.display||'');
   const totalMinor=Math.max(0,Number(order.totalMinor)||0);
+  const projectedPickup=String(order.pickupCode||'').replace(/\D/g,'').slice(-4);
   const phoneDigits=String(order.customerPhone||'').replace(/\D/g,'');
-  const pickupCode=phoneDigits.length>=4?phoneDigits.slice(-4):'';
+  const pickupCode=projectedPickup||(phoneDigits.length>=4?phoneDigits.slice(-4):'');
   const etaLabel=String(order.etaLabel||order.promisedReadyLabel||'').trim();
   const reason=stage==='CANCELED'
     ?String(order.cancellationReason||'').trim()
