@@ -30,6 +30,68 @@ export interface SmmVariation {
   readonly available:boolean;
 }
 
+
+export type SmmComboChoiceType='PRODUCT'|'LABEL'|'NONE';
+
+export interface SmmComboChoice {
+  readonly choiceId:string;
+  readonly choiceType:SmmComboChoiceType;
+  readonly productId?:string;
+  readonly label:string;
+  readonly available:boolean;
+  readonly publishedAdjustmentMinor:number;
+}
+
+export interface SmmComboSubPool {
+  readonly subPoolId:string;
+  readonly name:string;
+  readonly publishedAdjustmentMinor:number;
+  readonly choices:readonly SmmComboChoice[];
+}
+
+export interface SmmComboGroup {
+  readonly groupId:string;
+  readonly name:string;
+  readonly required:boolean;
+  readonly minSelections:number;
+  readonly maxSelections:number;
+  readonly subPools:readonly SmmComboSubPool[];
+}
+
+export interface SmmComboPool {
+  readonly poolId:string;
+  readonly name:string;
+  readonly kind:'MAIN_COURSE'|'ADDON';
+  readonly addonKind?:'SNACK'|'DRINK';
+  readonly groups:readonly SmmComboGroup[];
+}
+
+export interface SmmCombo {
+  readonly comboId:string;
+  readonly name:string;
+  readonly publishedBasePriceMinor:number;
+  readonly mainPoolId?:string;
+  readonly addonPoolIds:readonly string[];
+}
+
+export interface SmmCartComboSelection {
+  readonly poolId:string;
+  readonly groupId:string;
+  readonly subPoolId:string;
+  readonly choiceId:string;
+  readonly choiceType:SmmComboChoiceType;
+  readonly choiceLabel:string;
+  readonly productId?:string;
+  readonly publishedAdjustmentMinor:number;
+}
+
+export interface SmmCartComboIntent {
+  readonly comboId:string;
+  readonly comboName:string;
+  readonly publishedBasePriceMinor:number;
+  readonly selections:readonly SmmCartComboSelection[];
+}
+
 export interface SmmProduct {
   readonly productId:string;
   readonly categoryId:string;
@@ -42,6 +104,7 @@ export interface SmmProduct {
   readonly variationRequired?:boolean;
   readonly variations?:readonly SmmVariation[];
   readonly optionGroups:readonly SmmOptionGroup[];
+  readonly comboId?:string;
 }
 
 export interface SmmMenuSnapshot {
@@ -49,6 +112,8 @@ export interface SmmMenuSnapshot {
   readonly observedAt:string;
   readonly categories:readonly SmmCategory[];
   readonly products:readonly SmmProduct[];
+  readonly combos?:readonly SmmCombo[];
+  readonly comboPools?:readonly SmmComboPool[];
 }
 
 export interface SmmQuoteLine {
@@ -82,6 +147,7 @@ export interface SmmCartLine {
   readonly selectedVariationId?:string;
   readonly selectedVariationName?:string;
   readonly selections:readonly SmmCartSelection[];
+  readonly combo?:SmmCartComboIntent;
   readonly publishedUnitPriceMinor?:number;
   readonly createdAt:string;
 }

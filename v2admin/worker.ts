@@ -96,7 +96,113 @@ function customerPublicSnapshot(active,customerOrders=[]){
     current.push({setId});
     linksByProduct.set(productId,current);
   }
-  const products=rows(catalog.products)
+  const catalogProducts=rows(catalog.products);
+  const rawProductById=new Map(catalogProducts.map(raw=>{const item=row(raw);return[String(item.id||''),item]}).filter(([id])=>id));
+  const productAvailableForCombo=productId=>{
+    const item=rawProductById.get(productId);
+    if(!item)return false;
+    const priceText=String(item.basePrice??'').trim();
+    const priceReady=priceText!==''&&Number.isFinite(Number(priceText));
+    const sellability=row(availability[productId]);
+    return item.active!==false&&sellability.sellable!==false&&priceReady;
+  };
+  const comboPools=rows(catalog.comboPools)
+    .map(poolRaw=>{
+      const pool=row(poolRaw);
+      const kind=pool.kind==='ADDON'?'ADDON':'MAIN_COURSE';
+      const groups=rows(pool.groups)
+        .map(groupRaw=>{
+          const group=row(groupRaw);
+          const choices=rows(group.choices)
+            .map(choiceRaw=>{
+              const choice=row(choiceRaw);
+              return{
+                choiceId:String(choice.id||''),
+                choiceType:choice.choiceType==='LABEL'?'LABEL':choice.choiceType==='NONE'?'NONE':'PRODUCT',
+                productId:String(choice.productId||'')||undefined,
+                label:String(choice.label||''),
+                bandId:String(choice.bandId||''),
+                publishedAdjustmentMinor:minorFromMoney(choice.priceAdjustment),
+                active:choice.active!==false,
+                position:Number(choice.position||0),
+              };
+            })
+            .filter(choice=>choice.choiceId&&choice.active);
+          const subPools=rows(group.bands)
+            .map(bandRaw=>{
+              const band=row(bandRaw);
+              const subPoolId=String(band.id||'');
+              return{
+                subPoolId,
+                name:String(band.name||subPoolId),
+                publishedAdjustmentMinor:minorFromMoney(band.priceAdjustment),
+                active:band.active!==false,
+                position:Number(band.position||0),
+                choices:choices
+                  .filter(choice=>choice.bandId===subPoolId)
+                  .sort((a,b)=>a.position-b.position||a.choiceId.localeCompare(b.choiceId))
+                  .map(({bandId,position,active,...choice})=>({
+                    ...choice,
+                    label:choice.choiceType==='PRODUCT'
+                      ?String(rawProductById.get(choice.productId)?.name||choice.label||choice.productId||'')
+                      :choice.label,
+                    available:choice.choiceType!=='PRODUCT'||productAvailableForCombo(choice.productId),
+                  })),
+              };
+            })
+            .filter(subPool=>subPool.subPoolId&&subPool.active)
+            .sort((a,b)=>a.position-b.position||a.subPoolId.localeCompare(b.subPoolId))
+            .map(({active,position,...subPool})=>subPool);
+          return{
+            groupId:String(group.id||''),
+            name:String(group.name||group.id||''),
+            required:group.required!==false,
+            minSelections:Math.max(0,Number(group.min)||0),
+            maxSelections:Math.max(1,Number(group.max)||1),
+            position:Number(group.position||0),
+            subPools,
+          };
+        })
+        .filter(group=>group.groupId)
+        .sort((a,b)=>a.position-b.position||a.groupId.localeCompare(b.groupId))
+        .map(({position,...group})=>group);
+      return{
+        poolId:String(pool.id||''),
+        name:String(pool.name||pool.id||''),
+        kind,
+        ...(kind==='ADDON'?{addonKind:pool.addonKind==='DRINK'?'DRINK':'SNACK'}:{}),
+        groups,
+      };
+    })
+    .filter(pool=>pool.poolId);
+  const comboPoolById=new Map(comboPools.map(pool=>[pool.poolId,pool]));
+  const combos=rows(catalog.combos)
+    .map(comboRaw=>{
+      const combo=row(comboRaw);
+      return{
+        comboId:String(combo.id||''),
+        name:String(combo.name||combo.id||''),
+        publishedBasePriceMinor:minorFromMoney(combo.basePrice),
+        mainPoolId:String(combo.mainPoolId||'')||undefined,
+        addonPoolIds:rows(combo.addonPoolIds).map(value=>String(value||'')).filter(Boolean),
+        active:combo.active!==false,
+      };
+    })
+    .filter(combo=>combo.comboId&&combo.active)
+    .map(({active,...combo})=>combo);
+  const uniqueComboIdForProduct=productId=>{
+    const matches=combos.filter(combo=>{
+      if(!combo.mainPoolId)return false;
+      const pool=comboPoolById.get(combo.mainPoolId);
+      return Boolean(pool&&pool.kind==='MAIN_COURSE'&&pool.groups.some(group=>
+        group.subPools.some(subPool=>subPool.choices.some(choice=>
+          choice.choiceType==='PRODUCT'&&choice.productId===productId
+        ))
+      ));
+    });
+    return matches.length===1?matches[0].comboId:undefined;
+  };
+  const products=catalogProducts
     .map(raw=>{
       const item=row(raw);
       const productId=String(item.id||'');
@@ -140,6 +246,7 @@ function customerPublicSnapshot(active,customerOrders=[]){
         ...(priceReady?{displayPriceLabel:moneyLabel(baseMinor+takeawayMinor),publishedUnitPriceMinor:baseMinor+takeawayMinor}:{}),
         ...(imageUrl?{imageUrl,imageAlt:String(item.name||productId)}:{}),
         optionGroups,
+        ...(uniqueComboIdForProduct(productId)?{comboId:uniqueComboIdForProduct(productId)}:{}),
         position:Number(item.legacySourcePosition??item.position??0),
       };
     })
@@ -211,6 +318,8 @@ function customerPublicSnapshot(active,customerOrders=[]){
       observedAt:new Date().toISOString(),
       categories:categories.map(item=>({categoryId:item.id,name:item.name,sortOrder:item.position})),
       products,
+      combos,
+      comboPools,
     },
     paymentChannels,
     fallback:customerFallback,
