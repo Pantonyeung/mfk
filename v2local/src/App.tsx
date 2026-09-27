@@ -26,6 +26,7 @@ import {ComboWorkspace,HoldCartWorkspace,HoldListWorkspace,OrganizeWorkspace,Pro
 import {RiceballPairingWorkspace} from './features/ordering/RiceballPairingWorkspace.tsx';
 import {applyRiceballPairings,buildRiceballPairingDraft,existingPairingGroups,isPairedComboLine,nextPairingStartIndex,restorePairingGroup} from './features/ordering/riceball-pairing-model.ts';
 import {applyRiceballDrinkPromotion,riceballDrinkPromotionStateEqual,stripRiceballDrinkPromotionDetail} from './features/ordering/riceball-drink-promotion-model.ts';
+import {restoreProductLineComposition,serializeProductLineComposition} from './features/ordering/line-composition.ts';
 
 type Product={
   id:string;
@@ -39,7 +40,17 @@ type Product={
   imageUrl?:string;
   optionSets:readonly SyncedOptionSet[];
 };
-type CartLine={id:string;productId:string;name:string;qty:number;unitMinor:number;serviceMode:ServiceMode;detail?:string};
+type CartLine={
+  id:string;
+  productId:string;
+  name:string;
+  qty:number;
+  unitMinor:number;
+  serviceMode:ServiceMode;
+  detail?:string;
+  optionSelections?:Readonly<Record<string,readonly string[]>>;
+  freeNote?:string;
+};
 
 const BASE_PRODUCTS:readonly Product[]=[
   {id:'riceball',category:'飯團',name:'原味飯團',priceMinor:4100,priceReady:true},
@@ -409,6 +420,7 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode,diningAddition,on
       unitMinor:product.priceMinor+quickConfig.deltaMinor,
       serviceMode,
       detail:quickConfig.detail||undefined,
+      optionSelections:quickConfig.optionSelections,
     };
     setCart([...cart,line]);
     setRecent(id);
@@ -417,7 +429,15 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode,diningAddition,on
     window.setTimeout(()=>{setRecent(undefined);setHighlight(undefined)},700);
   };
 
-  const addConfigured=(productId:string,detail:string,deltaMinor:number,qty:number,lineId?:string)=>{
+  const addConfigured=(
+    productId:string,
+    detail:string,
+    deltaMinor:number,
+    qty:number,
+    optionSelections:Readonly<Record<string,readonly string[]>>,
+    freeNote:string,
+    lineId?:string,
+  )=>{
     const product=products.find(item=>item.id===productId);if(!product||!product.priceReady||!product.sellable)return;
     if(lineId){
       const existing=cart.find(item=>item.id===lineId);if(!existing)return;
@@ -427,11 +447,23 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode,diningAddition,on
         qty,
         unitMinor:product.priceMinor+deltaMinor,
         detail:detail||undefined,
+        optionSelections,
+        freeNote,
         serviceMode:existing.serviceMode,
       }:item);
       setCart(next);setRecent(product.id);setHighlight(lineId);setPulse(value=>value+1);setPanel(null);return;
     }
-    const line:CartLine={id:nextLocalCartLineId(),productId:product.id,name:product.name,qty,unitMinor:product.priceMinor+deltaMinor,serviceMode,detail:detail||undefined};
+    const line:CartLine={
+      id:nextLocalCartLineId(),
+      productId:product.id,
+      name:product.name,
+      qty,
+      unitMinor:product.priceMinor+deltaMinor,
+      serviceMode,
+      detail:detail||undefined,
+      optionSelections,
+      freeNote,
+    };
     setCart([...cart,line]);setRecent(product.id);setHighlight(line.id);setPulse(value=>value+1);setPanel(null);
   };
 
@@ -517,6 +549,9 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode,diningAddition,on
     name:line.detail?line.name+'｜'+line.detail:line.name,
     qty:line.qty,
     unitMinor:line.unitMinor,
+    serviceMode:line.serviceMode,
+    ...(line.detail?{detail:line.detail}:{}),
+    composition:serializeProductLineComposition(line),
   }));
   const finishHold=()=>{setCart([]);setServiceMode('takeaway');setPanel(null);};
 
@@ -530,7 +565,18 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode,diningAddition,on
     :panel?.type==='holds'?'暫存單':'';
 
   const panelBody=panel?.type==='product'
-    ?(()=>{const product=workspaceProducts.find(item=>item.id===panel.productId);const line=panel.lineId?cart.find(item=>item.id===panel.lineId):undefined;return product?<ProductConfigWorkspace key={product.id+':'+(panel.lineId??'add')} product={product} mode={panel.lineId?'edit':'add'} initial={line?{qty:line.qty,detail:stripRiceballDrinkPromotionDetail(line.detail)||undefined}:undefined} onAdd={(detail,delta,qty)=>addConfigured(product.id,detail,delta,qty,panel.lineId)}/>:null})()
+    ?(()=>{const product=workspaceProducts.find(item=>item.id===panel.productId);const line=panel.lineId?cart.find(item=>item.id===panel.lineId):undefined;return product?<ProductConfigWorkspace
+      key={product.id+':'+(panel.lineId??'add')}
+      product={product}
+      mode={panel.lineId?'edit':'add'}
+      initial={line?{
+        qty:line.qty,
+        detail:stripRiceballDrinkPromotionDetail(line.detail)||undefined,
+        optionSelections:line.optionSelections,
+        freeNote:line.freeNote,
+      }:undefined}
+      onAdd={(detail,delta,qty,optionSelections,freeNote)=>addConfigured(product.id,detail,delta,qty,optionSelections,freeNote,panel.lineId)}
+    />:null})()
     :panel?.type==='required'
       ?<RequiredFastLaneWorkspace
         cart={cart}
@@ -595,16 +641,17 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode,diningAddition,on
               const restored:CartLine[]=hold.items.map((item,index)=>{
                 const parts=item.name.split('｜');
                 const name=parts.shift()||item.name;
-                const detail=parts.length?parts.join('｜'):undefined;
-                return {
+                const legacyDetail=parts.length?parts.join('｜'):undefined;
+                const base:CartLine={
                   id:'line-'+hold.id+'-'+index+'-'+Date.now().toString(36),
                   productId:item.id,
                   name,
                   qty:item.qty,
                   unitMinor:item.unitMinor,
-                  serviceMode:hold.kind==='dining'?'dine-in':'takeaway',
-                  detail,
+                  serviceMode:item.serviceMode??(hold.kind==='dining'?'dine-in':'takeaway'),
+                  detail:item.detail??legacyDetail,
                 };
+                return restoreProductLineComposition(base,item.composition);
               });
               setCart(restored);
               setServiceMode(hold.kind==='dining'?'dine-in':'takeaway');
@@ -913,6 +960,7 @@ function CheckoutPage({cart,setCart,diningCheckout,onDiningCheckoutDone}:{cart:C
           unitMinor:line.unitMinor,
           serviceMode:line.serviceMode,
           ...(line.detail?{detail:line.detail}:{}),
+          composition:serializeProductLineComposition(line),
         })),
         totalMinor:due,
         paymentLabel,
