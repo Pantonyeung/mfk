@@ -3,6 +3,7 @@ export type LaunchVariant='male'|'female';
 export interface LaunchAsset {
   readonly id:string;
   readonly characterUrl:string;
+  readonly productUrl:string;
   readonly accent:string;
 }
 
@@ -11,12 +12,14 @@ export const OFFICIAL_LOGO_URL='https://cdn.creativeclaw.co/u/6ad84d58/images/40
 export const launchAssets:Readonly<Record<LaunchVariant,LaunchAsset>>=Object.freeze({
   male:Object.freeze({
     id:'MFK_STAGE0_MALE_FINAL',
-    characterUrl:'/brand/stage7-pickup-male.svg',
+    characterUrl:'/brand/stage0-character-male.svg',
+    productUrl:'/brand/mf-home-hero-bowl.webp',
     accent:'#2457c5',
   }),
   female:Object.freeze({
     id:'MFK_STAGE0_FEMALE_FINAL',
-    characterUrl:'/brand/stage7-pickup-female.svg',
+    characterUrl:'/brand/stage0-character-female.svg',
+    productUrl:'/brand/mf-home-hero-salad.webp',
     accent:'#8b55c7',
   }),
 });
