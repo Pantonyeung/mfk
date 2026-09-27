@@ -1,0 +1,57 @@
+/* MFK SMM Final UI — Stage 5 Formal Submit
+   Scope: DRAFT -> PENDING -> CONFIRMED / REJECTED / UNKNOWN only. */
+.stage5-overlay{align-items:flex-end;z-index:80}
+.stage5-sheet{
+  width:min(100%,520px);
+  min-height:58dvh;
+  max-height:94dvh;
+  overflow:auto;
+  padding:20px 18px calc(18px + env(safe-area-inset-bottom));
+  border-radius:24px 24px 0 0;
+  background:#fff;
+  color:#12264a;
+  box-shadow:0 -18px 42px rgba(18,38,74,.16);
+}
+.stage5-header{display:grid;gap:6px;padding:0 2px 18px;border-bottom:1px solid #e3e8f0}
+.stage5-header>span,.stage5-pending>span,.stage5-confirmed>span,.stage5-rejected>span,.stage5-unknown>span{
+  color:#2f73ff;font-size:10px;font-weight:900;letter-spacing:.08em
+}
+.stage5-header h2{margin:0;color:#163568;font-size:24px;line-height:1.2}
+.stage5-header p{margin:0;color:#67738a;font-size:12px;line-height:1.55}
+.stage5-pending,.stage5-confirmed,.stage5-rejected,.stage5-unknown{
+  display:grid;gap:12px;margin-top:18px;padding:18px;border:1px solid #dde4ee;border-radius:18px;background:#fbfcff
+}
+.stage5-pending>strong,.stage5-confirmed>strong,.stage5-rejected h3,.stage5-unknown h3{
+  margin:0;color:#163568;font-size:20px;line-height:1.25
+}
+.stage5-pending p,.stage5-confirmed p,.stage5-rejected p,.stage5-unknown p{
+  margin:0;color:#67738a;font-size:12px;line-height:1.55
+}
+.stage5-pending small,.stage5-rejected small{color:#7b879c;font-size:10px;line-height:1.45}
+.stage5-orbit{width:52px;height:52px;display:grid;place-items:center;position:relative;margin:2px auto 4px}
+.stage5-orbit i{position:absolute;width:10px;height:10px;border-radius:50%;background:#2f73ff;animation:stage5-pulse 1.2s ease-in-out infinite}
+.stage5-orbit i:nth-child(1){transform:translateY(-18px)}
+.stage5-orbit i:nth-child(2){transform:translate(16px,10px);animation-delay:.15s}
+.stage5-orbit i:nth-child(3){transform:translate(-16px,10px);animation-delay:.3s}
+.stage5-short-ref{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px;border-radius:13px;background:#eef4ff}
+.stage5-short-ref small{color:#61708a}
+.stage5-short-ref b{font-size:18px;letter-spacing:.12em;color:#215bd4}
+.stage5-confirmed{text-align:center;background:#f5fbf7;border-color:#cfe7d6}
+.stage5-confirmed>span{color:#2f8b57}
+.stage5-check{width:64px;height:64px;margin:0 auto;display:grid;place-items:center;border-radius:50%;background:#2f8b57;color:#fff;font-size:30px;font-weight:900}
+.stage5-confirmed>small{color:#67738a;font-size:11px}
+.stage5-display-code{font-size:42px!important;letter-spacing:.08em;color:#173f7a!important}
+.stage5-rejected{border-color:#f0d6d6;background:#fff8f8}
+.stage5-rejected>span{color:#b14949}
+.stage5-unknown{border-color:#f2d18e;background:#fffaf0}
+.stage5-unknown>span{color:#a96b00}
+.stage5-primary{min-height:50px!important;margin-top:4px;border-radius:13px!important;font-weight:900!important}
+@keyframes stage5-pulse{0%,100%{opacity:.35;scale:.8}50%{opacity:1;scale:1.1}}
+@media(max-width:389px){
+  .stage5-sheet{padding-left:14px;padding-right:14px}
+  .stage5-header h2{font-size:22px}
+  .stage5-display-code{font-size:36px!important}
+}
+@media(prefers-reduced-motion:reduce){
+  .stage5-orbit i{animation:none}
+}
