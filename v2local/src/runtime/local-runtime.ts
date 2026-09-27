@@ -2037,6 +2037,7 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
     };
   },
   async createDiningWait(input){
+    return withDiningMutationLock('wait-list',async()=>{
     const snapshot=readDiningState();
     const draft:LocalHoldDraft={
       id:nextRuntimeIdentity('HOLD-'),
@@ -2051,6 +2052,7 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
     };
     commitDiningHolds(snapshot,[draft,...snapshot.holds]);
     return draft;
+    });
   },
   async updateDiningPartySize(holdId,partySize){
     const snapshot=readDiningState();
@@ -2071,13 +2073,16 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
     return clone(diningDetail(updated));
   },
   async removeDiningWait(id){
+    return withDiningMutationLock('wait-list',async()=>{
     const snapshot=readDiningState();
     const hold=requireDiningHold(snapshot,id);
     if(hold.archivedAt||hold.payments?.length)throw new Error('DINING_HISTORY_PROTECTED');
     if(diningAssignedTables(hold).length||hold.items.length)throw new Error('DINING_NONEMPTY_HOLD_PROTECTED');
     commitDiningHolds(snapshot,snapshot.holds.filter(row=>row.id!==id));
+    });
   },
   async admitDiningHold(holdId){
+    return withDiningMutationLock('admission:'+holdId,async()=>{
     const snapshot=readDiningState();
     const hold=requireDiningHold(snapshot,holdId);
     if(hold.archivedAt)throw new Error('DINING_HISTORY_PROTECTED');
@@ -2092,8 +2097,10 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
       projectDiningOrderNonBlocking(ensured.order);
     }
     return clone(diningDetail(ensured.hold));
+    });
   },
   async assignDiningTable(holdId,tableId){
+    return withDiningMutationLock('table:'+holdId,async()=>{
     const snapshot=readDiningState();
     const hold=requireDiningHold(snapshot,holdId);
     if(hold.archivedAt)throw new Error('DINING_HISTORY_PROTECTED');
@@ -2110,8 +2117,10 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
     if(hold.assignedTable===tableId&&!ensured.changed)return;
     commitDiningState(snapshot,{holds:snapshot.holds.map(row=>row.id===holdId?ensured.hold:row),orders:ensured.orders});
     projectDiningOrderNonBlocking(ensured.order);
+    });
   },
   async joinDiningTable(holdId,tableId){
+    return withDiningMutationLock('table:'+holdId,async()=>{
     const snapshot=readDiningState();
     const hold=requireDiningHold(snapshot,holdId);
     if(hold.archivedAt||hold.cancelledAt)throw new Error('DINING_HISTORY_PROTECTED');
@@ -2128,8 +2137,10 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
     commitDiningState(snapshot,{holds:snapshot.holds.map(row=>row.id===holdId?ensured.hold:row),orders:ensured.orders});
     projectDiningOrderNonBlocking(ensured.order);
     if(ensured.hold.formalOrderId)appendActionAudit({action:'DINING_TABLE_JOIN',orderId:ensured.hold.formalOrderId,reason:hold.assignedTable+' + '+tableId});
+    });
   },
   async unjoinDiningTable(holdId,tableId){
+    return withDiningMutationLock('table:'+holdId,async()=>{
     const snapshot=readDiningState();
     const hold=requireDiningHold(snapshot,holdId);
     if(hold.archivedAt||hold.cancelledAt)throw new Error('DINING_HISTORY_PROTECTED');
@@ -2140,14 +2151,17 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
     const updated:LocalHoldDraft={...hold,...(nextJoined.length?{joinedTables:nextJoined}:{joinedTables:undefined})};
     commitDiningHolds(snapshot,snapshot.holds.map(row=>row.id===holdId?updated:row));
     if(hold.formalOrderId)appendActionAudit({action:'DINING_TABLE_UNJOIN',orderId:hold.formalOrderId,reason:tableId});
+    });
   },
   async unassignDiningTable(holdId){
+    return withDiningMutationLock('table:'+holdId,async()=>{
     const snapshot=readDiningState();
     const hold=requireDiningHold(snapshot,holdId);
     if(hold.archivedAt)throw new Error('DINING_HISTORY_PROTECTED');
     if((hold.joinedTables??[]).length)throw new Error('DINING_UNASSIGN_REQUIRES_UNJOIN');
     const {assignedTable,...rest}=hold;
     commitDiningHolds(snapshot,snapshot.holds.map(row=>row.id===holdId?{...rest,...(assignedTable?{lastAssignedTable:assignedTable}:{})}:row));
+    });
   },
   async readDiningHold(holdId){
     const snapshot=readDiningState();
