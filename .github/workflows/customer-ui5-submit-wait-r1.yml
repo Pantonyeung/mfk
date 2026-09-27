@@ -7,7 +7,16 @@ permissions:
 on:
   push:
     branches:
+      - main
       - work/MFK/CUSTOMER-UI5-SUBMIT-WAIT-R1
+      - integration/MFK/CUSTOMER-UI5-SUBMIT-WAIT-MAIN-LANDING-R1
+    paths:
+      - 'v2customer/**'
+      - 'v2local/**'
+      - 'v2admin/**'
+      - 'contracts/**'
+      - '.github/workflows/customer-ui5-submit-wait-r1.yml'
+  pull_request:
     paths:
       - 'v2customer/**'
       - 'v2local/**'
