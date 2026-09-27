@@ -292,6 +292,14 @@ export interface CustomerOrderProjection {
   readonly timeline:readonly CustomerOrderTimelineItem[];
 }
 
+export interface CustomerHistoricalLine {
+  readonly name:string;
+  readonly quantity:number;
+  readonly historicalUnitLabel:string;
+  readonly historicalLineTotalLabel:string;
+  readonly detail?:string;
+}
+
 export interface CustomerHistoryProjection {
   readonly orderId:string;
   readonly displayCode:string;
@@ -300,6 +308,8 @@ export interface CustomerHistoryProjection {
   readonly amountLabel?:string;
   readonly pickupCode?:string;
   readonly customerDisplayName?:string;
+  readonly historicalLines:readonly CustomerHistoricalLine[];
+  readonly reorderIntent?:readonly import('../../contracts/customer-cloud-v1').CustomerReorderIntentLine[];
   readonly reorderEligible:boolean;
 }
 
