@@ -39,7 +39,7 @@ export function OrderOversightPage({
       <div>
         <span>訂單監察</span>
         <h1>訂單</h1>
-        <small>只讀正式投影；V1 唔建立、修改、取消、退款或更改付款方式。</small>
+        <small>一眼查看訂單進度、付款、打印同處理記錄；此頁只供監察。</small>
       </div>
       <b className="hero-number">{vm.rows.length}</b>
     </header>
@@ -47,7 +47,7 @@ export function OrderOversightPage({
     {scope!=='DEFAULT'?<section className="order-scope-banner">
       <div>
         <strong>{scope==='ACTIVE'?'進行中訂單':'堂食未結帳'}</strong>
-        <span>{scope==='ACTIVE'?'由今日頁進入 active order scope。':'由今日頁進入 dine-in + open-payment scope。'}</span>
+        <span>{scope==='ACTIVE'?'由今日頁查看正在處理嘅訂單。':'由今日頁查看堂食未結帳訂單。'}</span>
       </div>
       <button onClick={()=>{
         setFilters(DEFAULT_OWNER_ORDER_FILTERS);
@@ -62,7 +62,7 @@ export function OrderOversightPage({
         className={filters.segment===segment?'active':''}
         onClick={()=>setFilters(value=>({...value,segment}))}
       >{segment==='ACTIVE'?'進行中':'已完成 / 歷史'}</button>)}
-    </div>:<div className="segmented order-segmented scoped-segment" aria-label="Scoped orders">
+    </div>:<div className="segmented order-segmented scoped-segment" aria-label="目前訂單範圍">
       <button className="active" disabled>進行中</button>
     </div>}
 
@@ -71,12 +71,12 @@ export function OrderOversightPage({
       <input
         value={filters.query}
         onChange={event=>setFilters(value=>({...value,query:event.target.value}))}
-        placeholder="Display Number／客戶／電話／外部編號"
+        placeholder="訂單編號／客戶／電話／外部訂單編號"
       />
     </label>
 
     <section className="order-filter-grid" aria-label="訂單篩選">
-      <OrderFilter label="Business Day" value={filters.businessDate} values={vm.businessDates} onChange={businessDate=>setFilters(value=>({...value,businessDate}))}/>
+      <OrderFilter label="營業日" value={filters.businessDate} values={vm.businessDates} onChange={businessDate=>setFilters(value=>({...value,businessDate}))}/>
       <OrderFilter label="來源" value={filters.source} values={vm.sources} onChange={source=>setFilters(value=>({...value,source}))}/>
       <OrderFilter label="付款" value={filters.paymentState} values={vm.paymentStates} onChange={paymentState=>setFilters(value=>({...value,paymentState}))}/>
       <OrderFilter label="交收狀態" value={filters.fulfillmentState} values={vm.fulfillmentStates} onChange={fulfillmentState=>setFilters(value=>({...value,fulfillmentState:fulfillmentState as OwnerOrderFilters['fulfillmentState']}))}/>
@@ -139,29 +139,29 @@ function OrderOversightCard({order,onOpen}:{order:OwnerOrderProjection;onOpen:()
 
     {order.exceptionBadges?.length?<div className="order-exception-row">{order.exceptionBadges.slice(0,4).map(label=><span key={label}>{label}</span>)}</div>:null}
 
-    <div className="order-card-footer"><span>查看訂單詳情</span><small>Read-only oversight</small></div>
+    <div className="order-card-footer"><span>查看訂單詳情</span><small>只供查看</small></div>
   </button>;
 }
 
 function OrderOversightDrawer({order,onClose}:{order:OwnerOrderProjection;onClose:()=>void}){
   const detail=buildOwnerOrderDetailViewModel(order);
   return <div className="overlay">
-    <section className="drawer order-oversight-drawer" role="dialog" aria-modal="true" aria-label="Order Oversight Detail">
+    <section className="drawer order-oversight-drawer" role="dialog" aria-modal="true" aria-label="訂單詳情">
       <header className="drawer-head">
         <div><small>{detail.identity.source}</small><h2>訂單 {detail.identity.displayCode}</h2></div>
         <button onClick={onClose}>✕</button>
       </header>
 
-      <DetailSection title="1｜Identity">
+      <DetailSection title="1｜訂單資料">
         <div className="order-detail-grid">
-          <Detail label="Display Number" value={detail.identity.displayCode}/>
-          <Detail label="Business Day" value={detail.identity.businessDate}/>
+          <Detail label="訂單編號" value={detail.identity.displayCode}/>
+          <Detail label="營業日" value={detail.identity.businessDate}/>
           <Detail label="客戶" value={detail.identity.customerName}/>
           <Detail label="電話" value={detail.identity.customerPhone}/>
         </div>
       </DetailSection>
 
-      <DetailSection title="2｜Items / Option / Modifier / Remark">
+      <DetailSection title="2｜訂單內容">
         {order.itemLines?.length?<div className="order-item-lines">{order.itemLines.map(line=><article key={line.lineId}>
           <div><strong>{line.quantity} × {line.name}</strong>{line.amountLabel?<b>{line.amountLabel}</b>:null}</div>
           {line.optionLabels?.length?<small>選項：{line.optionLabels.join('、')}</small>:null}
@@ -171,53 +171,53 @@ function OrderOversightDrawer({order,onClose}:{order:OwnerOrderProjection;onClos
         {order.orderRemark?<p className="order-remark">訂單備註：{order.orderRemark}</p>:null}
       </DetailSection>
 
-      <DetailSection title="3｜Money">
+      <DetailSection title="3｜金額與付款">
         <div className="order-detail-grid">
-          <Detail label="Original" value={detail.money.original}/>
-          <Detail label="Adjustments" value={detail.money.adjustments}/>
-          <Detail label="Current Effective" value={detail.money.effective}/>
-          <Detail label="Current Tender" value={detail.money.tender}/>
+          <Detail label="原始金額" value={detail.money.original}/>
+          <Detail label="調整" value={detail.money.adjustments}/>
+          <Detail label="目前有效金額" value={detail.money.effective}/>
+          <Detail label="付款方式" value={detail.money.tender}/>
         </div>
         {order.adjustments?.length?<div className="adjustment-list">{order.adjustments.map((item,index)=><div key={item.label+'-'+index}><span>{item.label}</span><strong>{item.amountLabel}</strong></div>)}</div>:null}
       </DetailSection>
 
-      <DetailSection title="4｜Fulfillment">
+      <DetailSection title="4｜交收進度">
         <div className="order-detail-grid">
-          <Detail label="State" value={detail.fulfillment.state}/>
-          <Detail label="Mode" value={detail.fulfillment.mode}/>
-          <Detail label="Elapsed" value={detail.timing.elapsed}/>
-          <Detail label="Promised" value={detail.timing.promised}/>
+          <Detail label="狀態" value={detail.fulfillment.state}/>
+          <Detail label="方式" value={detail.fulfillment.mode}/>
+          <Detail label="已進行" value={detail.timing.elapsed}/>
+          <Detail label="預計時間" value={detail.timing.promised}/>
         </div>
-        {order.fulfillmentHistory?.length?<div className="order-safe-timeline">{order.fulfillmentHistory.map((event,index)=><article key={event.label+'-'+index}><strong>{event.label}</strong><span>{event.state??''}</span><small>{event.atLabel??''}</small></article>)}</div>:<p className="muted-copy">未有 Fulfillment history projection。</p>}
+        {order.fulfillmentHistory?.length?<div className="order-safe-timeline">{order.fulfillmentHistory.map((event,index)=><article key={event.label+'-'+index}><strong>{event.label}</strong><span>{event.state??''}</span><small>{event.atLabel??''}</small></article>)}</div>:<p className="muted-copy">暫時未有交收進度記錄。</p>}
       </DetailSection>
 
-      <DetailSection title="5｜External">
+      <DetailSection title="5｜來源資料">
         <div className="order-detail-grid">
-          <Detail label="Provider" value={order.externalProvider??(order.externalRef?'外部平台':'門店')}/>
-          <Detail label="External Ref" value={order.externalRef??'—'}/>
-          <Detail label="Cancel Request" value={order.externalCancelRequestLabel??'未有取消請求'}/>
-          <Detail label="Source" value={order.source}/>
-        </div>
-      </DetailSection>
-
-      <DetailSection title="6｜Side-effects">
-        <div className="order-detail-grid">
-          <Detail label="Receipt" value={order.sideEffects?.receipt??'未有讀回'}/>
-          <Detail label="Production" value={order.sideEffects?.production??'未有讀回'}/>
-          <Detail label="Packing" value={order.sideEffects?.packing??'未有讀回'}/>
-          <Detail label="Label" value={order.sideEffects?.label??'未有讀回'}/>
+          <Detail label="平台" value={order.externalProvider??(order.externalRef?'外部平台':'門店')}/>
+          <Detail label="外部訂單編號" value={order.externalRef??'—'}/>
+          <Detail label="取消要求" value={order.externalCancelRequestLabel??'未有取消要求'}/>
+          <Detail label="來源" value={order.source}/>
         </div>
       </DetailSection>
 
-      <DetailSection title="7｜Timeline / Audit">
+      <DetailSection title="6｜打印狀況">
+        <div className="order-detail-grid">
+          <Detail label="小票" value={order.sideEffects?.receipt??'未有資料'}/>
+          <Detail label="製作單" value={order.sideEffects?.production??'未有資料'}/>
+          <Detail label="打包單" value={order.sideEffects?.packing??'未有資料'}/>
+          <Detail label="標籤" value={order.sideEffects?.label??'未有資料'}/>
+        </div>
+      </DetailSection>
+
+      <DetailSection title="7｜處理記錄">
         {order.auditTrail?.length?<div className="order-safe-timeline">{order.auditTrail.map((event,index)=><article key={event.title+'-'+event.atLabel+'-'+index}>
           <strong>{event.title}</strong>
           <span>{event.actorLabel??''}{event.resultLabel?' · '+event.resultLabel:''}</span>
           <small>{event.atLabel}</small>
-        </article>)}</div>:<p className="muted-copy">未有已整理嘅 Audit projection；唔會直接顯示 raw engineering timeline。</p>}
+        </article>)}</div>:<p className="muted-copy">暫時未有可顯示嘅處理記錄。</p>}
       </DetailSection>
 
-      <div className="boundary-box">V1 只讀監察｜本頁冇建立、編輯、取消、退款、Tender Correction、重印或其他交易 mutation。</div>
+      <div className="boundary-box">此頁只供查看。取消、退款、付款修正等操作請到相應營運流程處理。</div>
     </section>
   </div>;
 }
