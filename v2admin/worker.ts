@@ -439,6 +439,55 @@ function customerPublicSnapshot(active,customerOrders=[]){
   };
 }
 
+const OWNER_MONTHLY_PLAN_SCHEMA='MFK_OWNER_MONTHLY_PLAN_V1';
+function validOwnerMonthKey(value){return /^\d{4}-(0[1-9]|1[0-2])$/.test(String(value||''));}
+function ownerPlanningStorageKey(storeId,monthKey){return 'owner:monthly-plan:'+String(storeId||'MF01')+':'+monthKey;}
+function ownerPlanningAuditKey(storeId,monthKey,revision,operationId){
+  return 'owner:monthly-plan-audit:'+String(storeId||'MF01')+':'+monthKey+':'+String(revision).padStart(8,'0')+':'+operationId;
+}
+function ownerPlanMinor(value,field){
+  if(value===null||value===undefined||value==='')return null;
+  const amount=Number(value);
+  if(!Number.isSafeInteger(amount)||amount<0)throw new Error(field+'_INVALID');
+  return amount;
+}
+function cleanOwnerPlanCostLines(value){
+  if(!Array.isArray(value)||value.length>100)throw new Error('OWNER_MONTHLY_PLAN_COST_LINES_INVALID');
+  const ids=new Set();
+  return value.map(raw=>{
+    const item=row(raw);
+    const costLineId=String(item.costLineId||'').trim().slice(0,64);
+    const category=String(item.category||'').trim().slice(0,64);
+    const label=String(item.label||'').trim().slice(0,120);
+    if(!/^[A-Z0-9][A-Z0-9_-]{0,63}$/i.test(costLineId)||ids.has(costLineId))throw new Error('OWNER_MONTHLY_PLAN_COST_LINE_ID_INVALID');
+    if(!category||!label)throw new Error('OWNER_MONTHLY_PLAN_COST_LINE_INVALID');
+    ids.add(costLineId);
+    return Object.freeze({
+      costLineId,category,label,
+      plannedMonthlyMinor:ownerPlanMinor(item.plannedMonthlyMinor,'OWNER_MONTHLY_PLAN_PLANNED_COST'),
+      actualToDateMinor:ownerPlanMinor(item.actualToDateMinor,'OWNER_MONTHLY_PLAN_ACTUAL_COST'),
+      ...(typeof item.note==='string'&&item.note.trim()?{note:item.note.trim().slice(0,500)}:{}),
+    });
+  });
+}
+function cleanOwnerMonthlyPlanSaveInput(value){
+  const input=row(value);
+  const monthKey=String(input.monthKey||'').trim();
+  if(!validOwnerMonthKey(monthKey))throw new Error('OWNER_MONTHLY_PLAN_MONTH_INVALID');
+  const expectedRevision=Number(input.expectedRevision);
+  if(!Number.isSafeInteger(expectedRevision)||expectedRevision<0)throw new Error('OWNER_MONTHLY_PLAN_EXPECTED_REVISION_INVALID');
+  const operationId=String(input.operationId||'').trim();
+  if(operationId.length<8||operationId.length>128)throw new Error('OWNER_MONTHLY_PLAN_OPERATION_ID_INVALID');
+  return Object.freeze({
+    monthKey,
+    monthlyRevenueTargetMinor:ownerPlanMinor(input.monthlyRevenueTargetMinor,'OWNER_MONTHLY_PLAN_TARGET'),
+    costLines:cleanOwnerPlanCostLines(input.costLines),
+    ...(typeof input.note==='string'&&input.note.trim()?{note:input.note.trim().slice(0,1000)}:{}),
+    expectedRevision,
+    operationId,
+  });
+}
+
 export class AdminSyncStore{
   constructor(state,env){this.state=state;this.env=env;}
 
@@ -629,6 +678,71 @@ export class AdminSyncStore{
     const [active,orders,reports,acks]=await Promise.all([this.state.storage.get('active'),this.projectionOrders(),this.projectionReports(),this.state.storage.get('acks')]);
     const channels=await this.ownerChannelReadModel(active,observedAt);
     return buildOwnerReadModelSnapshot({active,orders,reports,acks:acks||{},channels,observedAt});
+  }
+
+  async ownerMonthlyPlanRead(storeId,monthKey){
+    if(!validOwnerMonthKey(monthKey))return {status:400,body:{code:'OWNER_MONTHLY_PLAN_MONTH_INVALID'}};
+    const stored=await this.state.storage.get(ownerPlanningStorageKey(storeId,monthKey));
+    if(!stored)return {status:200,body:{state:'EMPTY',monthKey,revision:0}};
+    const plan=row(stored);
+    if(plan.schema!==OWNER_MONTHLY_PLAN_SCHEMA||String(plan.storeId)!==String(storeId)||String(plan.monthKey)!==monthKey||!Number.isSafeInteger(Number(plan.revision))){
+      return {status:503,body:{state:'UNKNOWN',code:'OWNER_MONTHLY_PLAN_CANONICAL_INVALID',monthKey,revision:0,message:'Canonical 月度計劃資料未能驗證'}};
+    }
+    return {status:200,body:{state:'CONFIRMED',monthKey,revision:Number(plan.revision),plan}};
+  }
+
+  async ownerMonthlyPlanSave(storeId,input,session){
+    let clean;
+    try{clean=cleanOwnerMonthlyPlanSaveInput(input);}
+    catch(error){return {status:400,body:{state:'REJECTED',code:error instanceof Error?error.message:'OWNER_MONTHLY_PLAN_INPUT_INVALID',monthKey:String(input?.monthKey||''),revision:0,message:'月度計劃輸入無效'}};}
+    const key=ownerPlanningStorageKey(storeId,clean.monthKey);
+    const current=await this.state.storage.get(key);
+    const currentRevision=current&&Number.isSafeInteger(Number(current.revision))?Number(current.revision):0;
+    if(clean.expectedRevision!==currentRevision){
+      return {status:409,body:{
+        state:'REJECTED',code:'OWNER_MONTHLY_PLAN_REVISION_CONFLICT',
+        monthKey:clean.monthKey,revision:currentRevision,currentRevision,
+        message:'Canonical 月度計劃已更新；請重新讀取後再修改。',
+      }};
+    }
+    const revision=currentRevision+1;
+    const updatedAt=new Date().toISOString();
+    const plan=Object.freeze({
+      schema:OWNER_MONTHLY_PLAN_SCHEMA,
+      storeId:String(storeId||'MF01'),
+      monthKey:clean.monthKey,
+      monthlyRevenueTargetMinor:clean.monthlyRevenueTargetMinor,
+      costLines:clean.costLines,
+      ...(clean.note?{note:clean.note}:{}),
+      revision,
+      updatedAt,
+      updatedBy:String(session.staffId||session.loginId||'OWNER'),
+    });
+    await this.state.storage.put(key,plan);
+    await this.state.storage.put(ownerPlanningAuditKey(storeId,clean.monthKey,revision,clean.operationId),{
+      schema:'MFK_OWNER_MONTHLY_PLAN_AUDIT_V1',
+      storeId:String(storeId||'MF01'),
+      monthKey:clean.monthKey,
+      operationId:clean.operationId,
+      expectedRevision:clean.expectedRevision,
+      appliedRevision:revision,
+      actorStaffId:String(session.staffId||''),
+      actorLoginId:String(session.loginId||''),
+      appliedAt:updatedAt,
+      result:'APPLIED',
+    });
+    const readback=await this.state.storage.get(key);
+    if(!readback||Number(readback.revision)!==revision||String(readback.monthKey)!==clean.monthKey){
+      return {status:503,body:{
+        state:'UNKNOWN',code:'OWNER_MONTHLY_PLAN_READBACK_UNKNOWN',
+        monthKey:clean.monthKey,revision,
+        message:'Canonical apply 後 readback 未能確認；禁止當成成功。',
+      }};
+    }
+    return {status:200,body:{
+      state:'CONFIRMED',monthKey:clean.monthKey,revision,plan:readback,
+      message:'Canonical monthly plan apply + readback confirmed.',
+    }};
   }
 
   async projectionOrders(){
@@ -900,6 +1014,22 @@ export class AdminSyncStore{
     if(url.pathname==='/owner/snapshot'&&request.method==='GET'){
       const session=await this.readOwnerSession(request);if(!session)return json({code:'OWNER_SESSION_UNAUTHORIZED'},401);
       return json(await this.ownerReadModel());
+    }
+
+    if(url.pathname==='/owner/planning/monthly'){
+      const session=await this.readOwnerSession(request);if(!session)return json({code:'OWNER_SESSION_UNAUTHORIZED'},401);
+      const storeId=String(url.searchParams.get('storeId')||'MF01').trim()||'MF01';
+      if(request.method==='GET'){
+        const monthKey=String(url.searchParams.get('monthKey')||'').trim();
+        const result=await this.ownerMonthlyPlanRead(storeId,monthKey);
+        return json(result.body,result.status);
+      }
+      if(request.method==='POST'){
+        let input;try{input=await request.json();}catch{return json({state:'REJECTED',code:'OWNER_MONTHLY_PLAN_INPUT_INVALID',message:'月度計劃輸入無效'},400);}
+        const result=await this.ownerMonthlyPlanSave(storeId,input,session);
+        return json(result.body,result.status);
+      }
+      return json({code:'METHOD_NOT_ALLOWED'},405);
     }
 
     if(url.pathname==='/admin-browser/auth/challenge'&&request.method==='POST'){
