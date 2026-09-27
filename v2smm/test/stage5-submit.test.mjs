@@ -166,7 +166,7 @@ test('Stage 5 is usable at 440x956 and 360px minimum with touch targets and redu
   assert.match(css,/width:min\(100%,520px\)/);
   assert.match(css,/@media\(max-width:389px\)/);
   assert.match(css,/@media\(max-width:360px\)/);
-  assert.match(css,/\.stage5-primary,[\s\S]*min-height:50px/);
+  assert.match(css,/\.stage5-primary,[\s\S]*min-height:52px/);
   assert.match(css,/env\(safe-area-inset-bottom\)/);
   assert.match(css,/prefers-reduced-motion:reduce/);
 });
