@@ -21,8 +21,11 @@ export function smmStage5DisplaySuffix(value){
   return digits?digits.slice(-3).padStart(3,'0'):text;
 }
 
-export function smmStage5SharedState(connection,hasSession=true){
+export function smmStage5SharedState(connection,hasSession=true,options={}){
   if(!hasSession)return Object.freeze({kind:'EMPTY',icon:'◇',label:'暫無資料',detail:'未有正式提交工作。'});
+  if(options?.error)return Object.freeze({kind:'ERROR',icon:'!',label:'發生錯誤',detail:'門店資料同步失敗；不會自動重新提交。'});
+  if(options?.partial)return Object.freeze({kind:'PARTIAL',icon:'◫',label:'部分可用',detail:'部分門店資料未完整；不改寫提交結果。'});
+  if(options?.stale)return Object.freeze({kind:'STALE',icon:'◷',label:'資料較舊',detail:'畫面使用最近一次讀回；不改寫提交結果。'});
   if(connection==='LOADING')return Object.freeze({kind:'LOADING',icon:'◌',label:'載入中…',detail:'正在讀取門店狀態。'});
   if(connection==='NOT_CONNECTED')return Object.freeze({kind:'OFFLINE',icon:'⌁',label:'離線中',detail:'傳輸通道未連接；交易結果狀態保持獨立。'});
   if(connection==='STALE')return Object.freeze({kind:'STALE',icon:'◷',label:'資料較舊',detail:'畫面使用最近一次讀回；不改寫提交結果。'});
