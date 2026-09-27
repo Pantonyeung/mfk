@@ -74,6 +74,7 @@ function commandFromReadback(body:Record<string,unknown>):CustomerCommandResult{
   }
   return {
     state:'UNKNOWN',
+    readbackCode:state==='PENDING'?'PENDING':'UNKNOWN',
     message:'訂單已送出，等待店舖確認；系統唔會自動重送。',
   };
 }
@@ -143,7 +144,7 @@ async function waitOrder(submissionId:string):Promise<CustomerCommandResult>{
       return{state:'UNKNOWN',message:String(body.code||'暫時未能讀回訂單結果')};
     }
   }
-  return{state:'UNKNOWN',message:'店舖已收到落單要求，確認仍在處理；請用同一 Submission ID 查詢。'};
+  return{state:'UNKNOWN',readbackCode:'PENDING',message:'店舖已收到落單要求，確認仍在處理；請查詢原本提交結果。'};
 }
 
 export async function uploadCustomerPaymentEvidence(file:File):Promise<{evidenceRef:string}>{
@@ -229,7 +230,7 @@ export function createCloudCustomerRuntimePort():CustomerRuntimePort{
     async readSubmission(submissionId:string):Promise<CustomerCommandResult>{
       rememberSubmissionRef(submissionId);
       const {response,body}=await jsonFetch('/api/customer/orders/readback?storeId='+STORE_ID+'&submissionId='+encodeURIComponent(submissionId));
-      if(response.status===404)return{state:'UNKNOWN',message:'店舖仍未回覆呢個提交身份'};
+      if(response.status===404)return{state:'UNKNOWN',readbackCode:'NOT_FOUND',message:'正式接單橋未找到原本提交；可以轉用人工救援。'};
       if(!response.ok)return{state:'UNKNOWN',message:String(body.code||'暫時未能讀回訂單結果')};
       return commandFromReadback(body);
     },
