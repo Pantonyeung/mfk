@@ -1,4 +1,4 @@
-import {createMfkAdminConfigEnvelope,type MfkAdminConfigEnvelope,type MfkAdminConfigAck} from '../../contracts/admin-config-sync-v1.ts';
+import {createMfkAdminConfigEnvelope,validateMfkAdminConfigEnvelope,type MfkAdminConfigEnvelope,type MfkAdminConfigAck} from '../../contracts/admin-config-sync-v1.ts';
 import {projectStaffForRuntime} from '../../contracts/staff-auth-v1.ts';
 import {readAdminReleases,readAdminStored,writeAdminStored,type AdminRelease} from './admin-local-store.ts';
 import {readStoredAdminBrowserSession} from './admin-browser-session.ts';
@@ -45,6 +45,26 @@ function publisherKey(){
     writeAdminStored(PUBLISHER_KEY,key);
   }
   return key;
+}
+
+export function readExistingAdminPublisherKey(){
+  return readAdminStored<string>(PUBLISHER_KEY,'');
+}
+
+export async function readCanonicalAdminActiveWithPublisherKey(storeId='MF01'):Promise<MfkAdminConfigEnvelope|null>{
+  if(typeof fetch==='undefined')return null;
+  const key=readExistingAdminPublisherKey();
+  if(!key)return null;
+  try{
+    const response=await fetch('/api/admin-browser/publisher-active?storeId='+encodeURIComponent(storeId),{
+      method:'GET',
+      cache:'no-store',
+      credentials:'same-origin',
+      headers:{'x-mfk-admin-publish-key':key},
+    });
+    if(!response.ok)return null;
+    return validateMfkAdminConfigEnvelope(await response.json());
+  }catch{return null;}
 }
 
 async function runtimeSnapshot(release:AdminRelease){

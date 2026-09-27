@@ -822,6 +822,10 @@ export class AdminSyncStore{
       const session=await this.readAdminBrowserSession(request);if(!session)return json({code:'ADMIN_BROWSER_SESSION_UNAUTHORIZED'},401);
       const active=await this.state.storage.get('active');return active?json(active):json({code:'ADMIN_CONFIG_NOT_PUBLISHED'},404);
     }
+    if(url.pathname==='/admin-browser/publisher-active'&&request.method==='GET'){
+      if(!await this.authorizeAdminRead(request))return json({code:'ADMIN_BROWSER_PUBLISHER_UNAUTHORIZED'},401);
+      const active=await this.state.storage.get('active');return active?json(active):json({code:'ADMIN_CONFIG_NOT_PUBLISHED'},404);
+    }
     if(url.pathname==='/admin-browser/publish'&&request.method==='POST'){
       const session=await this.readAdminBrowserSession(request);if(!session)return json({code:'ADMIN_BROWSER_SESSION_UNAUTHORIZED'},401);
       if(String(session.role)!=='OWNER'&&!rows(session.permissions).map(String).includes('PUBLISH_CONFIG'))return json({code:'ADMIN_BROWSER_PUBLISH_FORBIDDEN'},403);

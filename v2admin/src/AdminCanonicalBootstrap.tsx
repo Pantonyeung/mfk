@@ -1,6 +1,6 @@
 import {useEffect,useState,type ReactNode} from 'react';
 import {readActiveAdminRelease} from './admin-local-store.ts';
-import {readAdminSyncStatus,installAdminSyncAutoFlush} from './admin-sync-client.ts';
+import {readAdminSyncStatus,installAdminSyncAutoFlush,readCanonicalAdminActiveWithPublisherKey} from './admin-sync-client.ts';
 import {installAdminProjectionLiveRead} from './admin-projection-client.ts';
 import {
   hydrateAdminFromCanonical,
@@ -48,7 +48,12 @@ export function AdminCanonicalBootstrap({children}:{children:ReactNode}){
         }
       }
 
-      if(local&&sync.state!=='ERROR'){
+      const publisherActive=await readCanonicalAdminActiveWithPublisherKey();
+      if(cancelled)return;
+      if(publisherActive){
+        if(!local||local.version!==publisherActive.revision||local.fingerprint!==publisherActive.adminFingerprint||sync.state==='ERROR'){
+          hydrateAdminFromCanonical(publisherActive);
+        }
         activate();
         return;
       }

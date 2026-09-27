@@ -1,4 +1,5 @@
 import {beforeEach,describe,expect,it} from 'vitest';
+import {readFileSync} from 'node:fs';
 import {createMfkAdminConfigEnvelope} from '../../contracts/admin-config-sync-v1.ts';
 import {hydrateAdminFromCanonical} from './admin-browser-session.ts';
 
@@ -66,5 +67,21 @@ describe('Admin canonical browser hydration',()=>{
     expect(releases[0].version).toBe(7);
     expect(JSON.parse(localStorage.getItem('mfk.admin.catalog-draft.v2')||'null')).toEqual(envelope.snapshot.catalog);
     expect(JSON.parse(localStorage.getItem('mfk.admin.sync-outbox.v1')||'[]')).toEqual([{revision:8}]);
+  });
+});
+
+
+describe('Admin canonical readback gate',()=>{
+  it('never trusts local healthy state without an authenticated cloud comparison path',()=>{
+    const bootstrap=readFileSync(new URL('./AdminCanonicalBootstrap.tsx',import.meta.url),'utf8');
+    const sync=readFileSync(new URL('./admin-sync-client.ts',import.meta.url),'utf8');
+    const worker=readFileSync(new URL('../worker.ts',import.meta.url),'utf8');
+
+    expect(bootstrap).toContain('readCanonicalAdminActiveWithPublisherKey');
+    expect(bootstrap).not.toContain("if(local&&sync.state!=='ERROR'){\n        activate();");
+    expect(sync).toContain('/api/admin-browser/publisher-active');
+    expect(sync).toContain("'x-mfk-admin-publish-key':key");
+    expect(worker).toContain("/admin-browser/publisher-active");
+    expect(worker).toContain('authorizeAdminRead(request)');
   });
 });
