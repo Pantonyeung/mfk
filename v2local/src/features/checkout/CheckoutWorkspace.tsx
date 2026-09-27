@@ -106,7 +106,7 @@ export function CheckoutWorkspace({view,actions}:{view:CheckoutWorkspaceViewMode
           <div className="checkout-entry-side">
             <div className="checkout-quick-cash">
               <button type="button" onClick={actions.onExactCash} disabled={!view.exactCashEnabled||processing||success}>剛好</button>
-              {[50,100,200,500].map(amount=><button type="button" key={amount} disabled={processing||success} onClick={()=>actions.onQuickCash(amount)}>+{amount}</button>)}
+              {[20,50,100,200,500].map(amount=><button type="button" key={amount} disabled={processing||success} onClick={()=>actions.onQuickCash(amount)}>+{amount}</button>)}
             </div>
             <button type="button" className="checkout-delete" onClick={()=>actions.onCashKey('⌫')} disabled={processing||success}>⌫ 刪除</button>
             <div className="checkout-cash-value"><span>實收</span><strong>{view.cashInput||'0'}</strong></div>
