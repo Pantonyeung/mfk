@@ -23,9 +23,9 @@ export function LaunchOverlay({onEnterHome,onEnterMember}:{onEnterHome:()=>void;
   const [ready,setReady]=useState(false);
 
   useEffect(()=>{
-    const delay=mode==='reduced'?700:mode==='returning'?1150:3300;
+    const delay=mode==='reduced'?120:mode==='returning'?1200:3500;
     const timer=window.setTimeout(()=>setReady(true),delay);
-    const guard=window.setTimeout(()=>setReady(true),4200);
+    const guard=window.setTimeout(()=>setReady(true),3900);
     return()=>{window.clearTimeout(timer);window.clearTimeout(guard)};
   },[mode]);
 
@@ -33,7 +33,6 @@ export function LaunchOverlay({onEnterHome,onEnterMember}:{onEnterHome:()=>void;
     if(typeof window!=='undefined')safeWrite(window.localStorage,SEEN_KEY,'1');
     target==='home'?onEnterHome():onEnterMember();
   };
-  const assetFailed=()=>setReady(true);
 
   return <section
     className={'launch-overlay variant-'+variant+' mode-'+mode+(ready?' is-ready':'')}
@@ -42,16 +41,15 @@ export function LaunchOverlay({onEnterHome,onEnterMember}:{onEnterHome:()=>void;
     style={{'--launch-accent':asset.accent} as CSSProperties}
   >
     <div className="launch-brand-scene" aria-hidden="true">
-      <img className="launch-logo" src={OFFICIAL_LOGO_URL} alt="" onError={assetFailed}/>
-      <p className="launch-brand-line">手作・輕食</p>
-
+      <img className="launch-logo" src={OFFICIAL_LOGO_URL} alt=""/>
       <div className="launch-character-stage">
-        <img className="launch-character" src={asset.characterUrl} alt="" onError={assetFailed}/>
-        <p className="launch-hungry">肚餓啦？</p>
-        <span className="launch-riceball"><img src={STAGE0_RICEBALL_URL} alt="" onError={assetFailed}/></span>
-        <span className="launch-bento"><img src={STAGE0_BENTO_URL} alt="" onError={assetFailed}/></span>
+        <span className="launch-character-crop">
+          <img className="launch-character-source-sheet" src={asset.characterSheetUrl} alt=""/>
+        </span>
+        <span className="launch-riceball"><img src={STAGE0_RICEBALL_URL} alt=""/></span>
+        <span className="launch-bento"><img src={STAGE0_BENTO_URL} alt=""/></span>
       </div>
-
+      <p className="launch-question">肚餓啦？</p>
       <p className="launch-story">用心手作，<br/>每一口都更幸福。</p>
     </div>
 
