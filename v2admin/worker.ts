@@ -867,7 +867,11 @@ export class AdminSyncStore{
     const readback=await this.state.storage.get('active');
     const projected=readback?ownerSellabilityTargets(row(readback.snapshot),new Date().toISOString()):[];
     for(const target of resolved){
-      const item=projected.find(row=>row.targetId===target.targetId&&(row.grain===target.grain||(target.grain==='MODIFIER'&&row.grain==='OPTION')));
+      let item=projected.find(row=>row.targetId===target.targetId&&row.grain===target.grain);
+      if(target.grain==='MODIFIER'){
+        const stateRow=row(row(readback?.snapshot).availability['MODIFIER:'+target.targetId]);
+        item={targetId:target.targetId,name:target.name,grain:'MODIFIER',state:ownerSellabilityEffective(stateRow)?'SELLABLE':'SOLD_OUT',scope:stateRow.scope==='ONLINE_ONLY'?'ONLINE_ONLY':'ALL',...(stateRow.restoreAt?{restoreAt:String(stateRow.restoreAt)}:{}),observedAt:new Date().toISOString(),readback:'CONFIRMED'};
+      }
       const expected=action==='RESTORE'?'SELLABLE':'SOLD_OUT';
       const confirmed=Boolean(item&&item.state===expected&&item.scope===scope);
       targetResults.push({...target,state:confirmed?'CONFIRMED':'UNKNOWN',...(item?{readback:item}:{}),message:confirmed?'Canonical projection 已確認':'Per-target readback 未確認'});
