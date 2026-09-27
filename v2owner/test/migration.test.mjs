@@ -774,7 +774,8 @@ test('OA-PLN-001 keeps planned and actual costs separate and labels incomplete p
   for(const label of['屋租','水','電','煤氣','人工','其他'])assert.match(persistence,new RegExp(label));
   assert.match(persistence,/plannedMinor/);
   assert.match(persistence,/actualToDateMinor/);
-  assert.match(persistence,/LOCAL_NON_AUTHORITATIVE_PLANNING/);
+  assert.match(persistence,/LOCAL_PLANNING_DRAFT_CACHE/);
+  assert.doesNotMatch(persistence,/storageKind:'LOCAL_NON_AUTHORITATIVE_PLANNING'/);
   assert.match(component,/計劃成本／實際至今/);
   assert.match(vm,/估算營運淨利（按已輸入成本）/);
   assert.match(vm,/estimatedOperatingProfitMinor=mtdAvailable&&actualCostFilled>0\?mtdMinor-actualCostMinor:null/);
@@ -806,4 +807,61 @@ test('OA-PLN-001 planning math is deterministic for target progress and cost tot
   assert.equal(costs.actualCostMinor,7170000);
   assert.equal(costs.actualCostFilled,5);
   assert.equal(costs.actualCostComplete,false);
+});
+
+
+test('OA-PLN-001 canonical persistence uses authenticated Owner runtime and localStorage only as draft cache',()=>{
+  const types=fs.readFileSync(path.join(srcRoot,'product-types.ts'),'utf8');
+  const cloud=fs.readFileSync(path.join(srcRoot,'cloud-runtime.ts'),'utf8');
+  const persistence=fs.readFileSync(path.join(srcRoot,'stage05-planning-persistence.ts'),'utf8');
+  const component=fs.readFileSync(path.join(srcRoot,'stage05-monthly-planning.tsx'),'utf8');
+  const mapping=fs.readFileSync(path.join(srcRoot,'stage05-api-mapping.ts'),'utf8');
+
+  for(const marker of[
+    'OwnerMonthlyPlanCanonical',
+    "schema:'MFK_OWNER_MONTHLY_PLAN_V1'",
+    'monthlyRevenueTargetMinor',
+    'costLines',
+    'revision',
+    'updatedAt',
+    'updatedBy',
+    'readMonthlyPlan?',
+    'saveMonthlyPlan?',
+  ])assert.match(types,new RegExp(marker.replace(/[?]/g,'\\?')));
+
+  assert.match(cloud,/\/api\/owner\/planning\/monthly/);
+  assert.match(cloud,/x-mfk-owner-session/);
+  assert.match(cloud,/OWNER_MONTHLY_PLAN_REVISION_CONFLICT/);
+  assert.match(cloud,/state:'UNKNOWN'/);
+
+  assert.match(persistence,/LOCAL_PLANNING_DRAFT_CACHE/);
+  assert.match(persistence,/monthly-plan-draft-cache/);
+  assert.match(persistence,/ownerMonthlyPlanDraftFromCanonical/);
+  assert.match(persistence,/expectedRevision:draft\.baseRevision/);
+  assert.doesNotMatch(persistence,/LOCAL_NON_AUTHORITATIVE_PLANNING/);
+
+  assert.match(component,/runtime\.readMonthlyPlan/);
+  assert.match(component,/runtime\.saveMonthlyPlan/);
+  assert.match(component,/expectedRevision/);
+  assert.match(component,/Canonical apply 後 readback/);
+  assert.match(component,/結果保持 UNKNOWN/);
+  assert.match(component,/Revision conflict/);
+  assert.match(component,/localStorage 只係草稿／快取/);
+
+  assert.match(mapping,/CANONICAL_MFK_OWNER_MONTHLY_PLAN_V1/);
+  assert.match(mapping,/EXISTING_ADMIN_SYNC_STORE/);
+  assert.match(mapping,/AUTHENTICATED_OWNER_ONLY/);
+  assert.match(mapping,/UNKNOWN_NEVER_FAKE_GREEN/);
+});
+
+test('OA-PLN-001 canonical target and costs never replace Current Effective Sales reporting truth',()=>{
+  const vm=fs.readFileSync(path.join(srcRoot,'stage05-planning-view-model.ts'),'utf8');
+  const mapping=fs.readFileSync(path.join(srcRoot,'stage05-api-mapping.ts'),'utf8');
+  assert.match(vm,/planningBasis/);
+  assert.match(vm,/CURRENT_EFFECTIVE_SALES/);
+  assert.match(vm,/CANONICAL_REPORTING_PROJECTION/);
+  assert.doesNotMatch(vm,/orders|lineItems|grossMinor|estimatedOpenAmount/);
+  assert.match(mapping,/NO_ORDER_RECALCULATION/);
+  assert.match(mapping,/NO_PRICE_RECALCULATION/);
+  assert.match(mapping,/NO_SECOND_REPORTING_AUTHORITY/);
 });
