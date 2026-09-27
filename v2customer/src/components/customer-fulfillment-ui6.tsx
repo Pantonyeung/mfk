@@ -163,7 +163,7 @@ export function StoreFulfillmentUi6View({
     order?.timeline.filter(item=>isUi6Stage(item.stage)).slice(-6)??[]
   ),[order?.timeline]);
 
-  if(!stage){
+  if(!stage||!order){
     return <ReadbackPending
       state={unsupported?'UNKNOWN':emptyStateFrom(freshness)}
       intent={intent}
