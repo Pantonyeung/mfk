@@ -416,13 +416,39 @@ const CUSTOMER_STAGE_BY_FULFILLMENT=Object.freeze({
   '製作中':'PREPARING',
   '稍有延誤':'DELAYED',
   '可取餐':'READY',
+  '已到店':'ARRIVED',
+  '已核對':'VERIFIED',
+  '核對中':'VERIFIED',
+  '已交收':'HANDED_OVER',
   '未能接單':'REJECTED',
   '已拒絕':'REJECTED',
   '已取消':'CANCELED',
   '已完成':'COMPLETED',
 });
 function customerStageForFulfillment(label){
-  return CUSTOMER_STAGE_BY_FULFILLMENT[String(label||'').trim()]||'RECEIVED';
+  return CUSTOMER_STAGE_BY_FULFILLMENT[String(label||'').trim()]||'UNKNOWN';
+}
+function customerHandoverState(value){
+  const state=String(value||'').trim().toUpperCase();
+  return ['NOT_ARRIVED','ARRIVED','VERIFIED','HANDED_OVER','COMPLETED','UNKNOWN'].includes(state)?state:'';
+}
+function customerPickupException(input){
+  const source=row(input);
+  const raw=String(source.kind||source.type||'').trim().toUpperCase();
+  const kind=raw==='CODE_MISMATCH'?'CODE_MISMATCH'
+    :raw==='MISSING_BAG'||raw==='BAG_SHORTAGE'?'MISSING_BAG'
+      :raw==='SAME_NAME'?'SAME_NAME'
+        :raw==='NO_SHOW'?'NO_SHOW'
+          :raw?'OTHER':'';
+  if(!kind)return null;
+  const detail=String(source.detail||source.message||'').trim();
+  const observedAt=String(source.observedAt||source.at||'').trim();
+  return{
+    kind,
+    resolved:source.resolved===true,
+    ...(detail?{detail}:{}),
+    ...(observedAt?{observedAt}:{}),
+  };
 }
 function customerPaymentStatusLabel(order){
   const state=String(order.paymentVerificationState||'').trim().toUpperCase();
@@ -434,8 +460,16 @@ function customerPaymentStatusLabel(order){
 }
 export function mapCustomerOrderProjection(input){
   const order=row(input);
-  const stage=customerStageForFulfillment(order.fulfillmentLabel);
-  const observedAt=String(order.updatedAt||order.createdAt||new Date().toISOString());
+  const baseStage=customerStageForFulfillment(order.fulfillmentLabel);
+  const canonicalHandover=customerHandoverState(order.handoverState||order.pickupState);
+  const pickupException=customerPickupException(order.pickupException);
+  let stage=canonicalHandover==='ARRIVED'?'ARRIVED'
+    :canonicalHandover==='VERIFIED'?'VERIFIED'
+      :canonicalHandover==='HANDED_OVER'?'HANDED_OVER'
+        :canonicalHandover==='COMPLETED'?'COMPLETED'
+          :baseStage;
+  if(pickupException&&pickupException.resolved!==true)stage='PICKUP_EXCEPTION';
+  const observedAt=String(order.updatedAt||order.createdAt||'').trim();
   const itemRows=rows(order.items);
   const display=String(order.display||'');
   const totalMinor=Math.max(0,Number(order.totalMinor)||0);
@@ -457,6 +491,11 @@ export function mapCustomerOrderProjection(input){
     if(!at)return[];
     return[{at,stage:customerStageForFulfillment(rawLabel),label:rawLabel,...(entry.detail?{detail:String(entry.detail)}:{})}];
   });
+  const timelineCompletedAt=[...canonicalTimeline].reverse().find(item=>item.stage==='COMPLETED')?.at||'';
+  const completedAt=String(order.completedAt||timelineCompletedAt||'').trim();
+  const customerDisplayName=String(order.customerName||order.customerDisplayName||'').trim();
+  const pickupBagCount=Number(order.pickupBagCount);
+  const pickupMealCount=Number(order.pickupMealCount);
   return{
     orderId:String(order.orderId||''),
     displayCode:display,
@@ -467,9 +506,15 @@ export function mapCustomerOrderProjection(input){
     ...(pickupCode?{pickupCode,phoneMasked:'•••• '+pickupCode}:{}),
     ...(etaLabel?{etaLabel}:{}),
     ...(reason?{rejectionReason:reason}:{}),
+    ...(customerDisplayName?{customerDisplayName}:{}),
+    ...(canonicalHandover?{handoverState:canonicalHandover}:{}),
+    ...(Number.isSafeInteger(pickupBagCount)&&pickupBagCount>=0?{pickupBagCount}:{}),
+    ...(Number.isSafeInteger(pickupMealCount)&&pickupMealCount>=0?{pickupMealCount}:{}),
+    ...(completedAt?{completedAt}:{}),
+    ...(pickupException?{pickupException}:{}),
     observedAt,
-    readback:'CONFIRMED',
-    timeline:canonicalTimeline.length?canonicalTimeline:[{at:observedAt,stage,label:String(order.fulfillmentLabel||stage)}],
+    readback:observedAt?'CONFIRMED':'UNKNOWN',
+    timeline:canonicalTimeline.length?canonicalTimeline:(observedAt?[{at:observedAt,stage,label:String(order.fulfillmentLabel||stage)}]:[]),
   };
 }
 
@@ -704,9 +749,11 @@ function customerPublicSnapshot(active,customerOrders=[]){
     history:projectedOrders.filter(order=>order.stage==='COMPLETED').map(order=>({
       orderId:order.orderId,
       displayCode:order.displayCode,
-      completedAt:order.observedAt,
+      completedAt:order.completedAt||'',
       itemSummary:order.itemSummary,
       amountLabel:order.amountLabel,
+      ...(order.pickupCode?{pickupCode:order.pickupCode}:{}),
+      ...(order.customerDisplayName?{customerDisplayName:order.customerDisplayName}:{}),
       reorderEligible:true,
     })),
     observedAt:new Date().toISOString(),
