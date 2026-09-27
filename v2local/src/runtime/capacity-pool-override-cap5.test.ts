@@ -141,7 +141,7 @@ describe('CAP5 bounded capacity override',()=>{
     })).toThrow('CAPACITY_CHANNEL_STOP:FIRST_PARTY:CAP01');
   });
 
-  it('keeps override scope bounded and ALL_REMOTE shares one allowance across both remote channels',async()=>{
+  it('keeps a channel-specific override scoped to that remote channel only',async()=>{
     applyConfig(1);
     const runtime=await boot();
     await runtime.approveCapacityOverride('CAP01',{
@@ -153,17 +153,19 @@ describe('CAP5 bounded capacity override',()=>{
     expect(()=>assertCapacityChannelAdmission({
       channel:'THIRD_PARTY',items:[{id:'riceball',qty:1}],orderEvents:events(runtime),
     })).not.toThrow();
+  });
 
-    const runtime2=runtime;
-    await runtime2.adjustCapacityPool('CAP01',0,'reset test state');
-    await runtime2.approveCapacityOverride('CAP01',{
+  it('shares one ALL_REMOTE allowance across first-party and third-party admissions',async()=>{
+    applyConfig(1);
+    const runtime=await boot();
+    await runtime.approveCapacityOverride('CAP01',{
       submissionId:'OVR-ALL',scope:'ALL_REMOTE',quantity:2,note:'任何遠端兩份',
     });
-    runtime2.createOrder({
+    runtime.createOrder({
       items:[{id:'riceball',name:'原味飯團',qty:1,unitMinor:4100}],
       totalMinor:4100,paymentLabel:'到店付款',sourceLabel:'自家 App',capacityChannel:'FIRST_PARTY',
     });
-    runtime2.createOrder({
+    runtime.createOrder({
       items:[{id:'riceball',name:'原味飯團',qty:1,unitMinor:4100}],
       totalMinor:4100,paymentLabel:'平台已收款',sourceLabel:'Keeta',capacityChannel:'THIRD_PARTY',
       providerRef:'K-CAP5-1',
@@ -171,6 +173,10 @@ describe('CAP5 bounded capacity override',()=>{
     const row=readLocalCapacityPoolRows().find(item=>item.poolId==='CAP01');
     const all=row?.overrides?.find(item=>item.submissionId==='OVR-ALL');
     expect(all?.remainingAllowance).toBe(0);
+    expect((await runtime.readCapacityPoolState()).pools[0]).toMatchObject({
+      firstPartyOverrideRemaining:0,thirdPartyOverrideRemaining:0,
+      firstPartyAccepting:false,thirdPartyAccepting:false,
+    });
   });
 
   it('requires every stopped linked Pool to have adequate matching override allowance',async()=>{
