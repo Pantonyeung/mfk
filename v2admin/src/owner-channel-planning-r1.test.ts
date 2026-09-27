@@ -15,7 +15,7 @@ describe('Owner Stage04 channel + planning',()=>{
     expect(channel.mode).toBe('PAUSED');
     expect(channel.cause).toBe('manual');
     expect(channel.readback).toBe('CONFIRMED');
-    expect(channel.controls).toEqual({pause:true,resume:true,snooze:false,busy:false});
+    expect(channel.controls).toEqual({pause:false,resume:false,snooze:false,busy:false});
   });
 
   it('own platform availability does not pretend integration health is the same fact',()=>{
@@ -75,20 +75,18 @@ describe('Owner Stage04 channel + planning',()=>{
     expect(metrics.costCoverage).toBe('PARTIAL');
   });
 
-  it('canonical planning writer is bounded to AdminSyncStore and channel command is readback-first',()=>{
+  it('canonical planning writer is bounded to AdminSyncStore and OA-CHN stays read-only',()=>{
     const worker=fs.readFileSync(path.resolve(process.cwd(),'worker.ts'),'utf8');
     expect(worker).toContain("MFK_OWNER_MONTHLY_PLAN_V1");
-    expect(worker).toContain("owner:planning:");
+    expect(worker).toContain("owner:planning:'+storeId+':'+monthKey");
     expect(worker).toContain("owner:planning:operation:");
-    expect(worker).toContain("owner:channel:operation:");
+    expect(worker).toContain("expectedRevision");
+    expect(worker).toContain("CANONICAL_READBACK_MISMATCH");
     expect(worker).toContain("recognizedSalesMinor");
     expect(worker).toContain("'/owner/planning'");
     expect(worker).toContain("'/owner/channels'");
-    expect(worker).toContain("'/owner/channels/command'");
-    const readIndex=worker.indexOf("https://internal/admin/store/readback");
-    const commandIndex=worker.indexOf("https://internal/admin/store/status/'+(action==='PAUSE'?'rest':'open')");
-    expect(readIndex).toBeGreaterThan(-1);
-    expect(commandIndex).toBeGreaterThan(readIndex);
+    expect(worker).not.toContain("'/owner/channels/command'");
+    expect(worker).not.toContain("owner:channel:operation:");
     expect(worker).not.toContain('OWNER_FINANCE_DB');
   });
 });
