@@ -13,6 +13,7 @@ const baseOrder={
   pickupCode:'4567',
   customerName:'陳小米',
   items:[{id:'bento',name:'肉燥便當',qty:1,unitMinor:4800,detail:'加飯'}],
+  customerReorderHistoryPriceFacts:[{intentIndex:0,historicalPublishedUnitMinor:4800}],
   customerReorderIntent:[{
     productId:'bento',
     productName:'肉燥便當',
@@ -35,6 +36,7 @@ describe('Customer UI8 historical projection',()=>{
       detail:'加飯',
     }]);
     expect(projected.reorderIntent).toEqual(baseOrder.customerReorderIntent);
+    expect(projected.reorderPriceFacts).toEqual([{intentIndex:0,historicalPublishedUnitMinor:4800}]);
     expect(JSON.stringify(projected.reorderIntent)).not.toMatch(/payment|fulfillment|coupon|publishedUnitPriceMinor|lineId/i);
   });
 
