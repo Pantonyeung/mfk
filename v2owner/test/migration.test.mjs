@@ -801,3 +801,41 @@ test('OA-SEL-001 uses canonical Sellability Authority with per-target readback',
   assert.match(app,/sellability/);
   assert.doesNotMatch(page,/localStorage|sessionStorage/);
 });
+
+
+test('OA-STF-001 is read-only and never fabricates attendance data',()=>{
+  const app=fs.readFileSync(path.join(srcRoot,'App.tsx'),'utf8');
+  const page=fs.readFileSync(path.join(srcRoot,'staff-overview.tsx'),'utf8');
+
+  assert.match(app,/StaffOverviewPage/);
+  assert.match(app,/\/staff/);
+  assert.match(app,/onStaff/);
+
+  for(const marker of[
+    '員工摘要',
+    '上班中',
+    '排班 vs 實際',
+    '休息中',
+    '今日工時',
+    '員工提醒',
+    '角色摘要',
+    'Identity & Employment',
+    'Role & Capability Summary',
+    'History & Audit',
+    'Admin canonical staffAuth',
+    '未有資料',
+    '已打卡 ≠ 已登入 SMT',
+    '已登入 SMT ≠ 有 Manager 權限',
+    'Wage／Payroll 預設不顯示',
+  ])assert.match(page,new RegExp(marker));
+
+  assert.match(page,/冇 canonical attendance \/ break \/ worked-hours source/);
+  assert.match(page,/禁止由 SMT login、營業時間或角色估算/);
+  assert.match(page,/不能新增／停用員工、改角色／權限或重設 PIN/);
+
+  assert.doesNotMatch(page,/presence\.includes|schedule\.includes/);
+  assert.doesNotMatch(page,/onCommand|requestBoundedAction|command[A-Z]|fetch\(/);
+  assert.doesNotMatch(page,/localStorage|sessionStorage/);
+  assert.doesNotMatch(page,/<input|<select|<textarea/);
+  assert.doesNotMatch(page,/pinVerifier|password|hashHex|saltHex/);
+});
