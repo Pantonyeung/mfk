@@ -7,6 +7,7 @@ import type {
   CustomerReadModelSnapshot,
 } from '../product-types';
 import type {ProductOriginRect} from '../ui/primitives';
+import {CUSTOMER_FINAL_SOURCE} from '../source-assets';
 import './stage1.css';
 
 const OFFICIAL_LOGO_URL='https://cdn.creativeclaw.co/u/6ad84d58/images/402357b6-d757-4238-99f7-3d20607da6f2.png';
