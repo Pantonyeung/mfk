@@ -1,0 +1,165 @@
+name: Three-Port Final Main Regression R1
+
+on:
+  push:
+    branches:
+      - audit/MFK/THREE-PORT-FINAL-MAIN-REGRESSION-R1
+
+permissions:
+  contents: read
+
+jobs:
+  final-main-regression:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Checkout authoritative exact main
+        uses: actions/checkout@v4
+        with:
+          ref: 3cab695ef736a75c7fcc0bb3690df39cc01e587d
+          persist-credentials: false
+
+      - name: Verify exact main SHA
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "3cab695ef736a75c7fcc0bb3690df39cc01e587d"
+          test -z "$(git status --porcelain)"
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Customer install
+        working-directory: v2customer
+        run: npm install --no-audit --no-fund --legacy-peer-deps --package-lock=false
+
+      - name: Customer full tests
+        working-directory: v2customer
+        run: npm test
+
+      - name: Customer build
+        working-directory: v2customer
+        run: npm run build
+
+      - name: Customer UI0-UI8 convergence regression
+        working-directory: v2customer
+        run: |
+          node --test \
+            test/customer-port-convergence-r1.test.mjs \
+            test/stage2-menu-r1.test.mjs \
+            test/ui3-configure-r1.test.mjs \
+            test/ui4-cart-checkout-r1.test.mjs \
+            test/ui5-submit-wait-r1.test.mjs \
+            test/ui6-store-fulfillment-r1.test.mjs \
+            test/ui7-pickup-complete-r1.test.mjs \
+            test/ui8-history-reorder-r1.test.mjs
+
+      - name: SMM install
+        working-directory: v2smm
+        run: npm install --no-audit --no-fund --legacy-peer-deps --package-lock=false
+
+      - name: SMM full tests
+        working-directory: v2smm
+        run: npm test
+
+      - name: SMM build
+        working-directory: v2smm
+        run: npm run build
+
+      - name: SMM Stage0-Stage7 continuity
+        working-directory: v2smm
+        run: |
+          node --test \
+            test/stage0-ui.test.mjs \
+            test/stage1-ui.test.mjs \
+            test/stage2-ui.test.mjs \
+            test/stage2-combo-r1.test.mjs \
+            test/stage3-ui.test.mjs \
+            test/stage3-rework.test.mjs \
+            test/stage4-checkout.test.mjs \
+            test/stage5-submit.test.mjs \
+            test/stage6-queue.test.mjs \
+            test/stage7-orders.test.mjs
+
+      - name: Owner install
+        working-directory: v2owner
+        run: npm install --no-audit --no-fund --legacy-peer-deps --package-lock=false
+
+      - name: Owner full tests
+        working-directory: v2owner
+        run: npm test
+
+      - name: Owner build
+        working-directory: v2owner
+        run: npm run build
+
+      - name: Owner Today Action Orders Channel Sellability Staff regression
+        working-directory: v2owner
+        run: node --test test/migration.test.mjs
+
+      - name: Admin install
+        working-directory: v2admin
+        run: npm install --no-audit --no-fund --legacy-peer-deps --package-lock=false
+
+      - name: Admin full tests
+        working-directory: v2admin
+        run: npm test
+
+      - name: Admin build
+        working-directory: v2admin
+        run: npm run build
+
+      - name: Setup Node 24 for v2local
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: v2local install
+        working-directory: v2local
+        run: npm install --legacy-peer-deps --ignore-scripts --no-audit --no-fund
+
+      - name: v2local full tests
+        working-directory: v2local
+        run: npm test
+
+      - name: v2local build
+        working-directory: v2local
+        run: npm run build
+
+      - name: Setup Node 22 for dry-runs
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Admin Wrangler dry-run
+        working-directory: v2admin
+        run: npx --yes wrangler@4 deploy --dry-run --config wrangler.jsonc
+
+      - name: SMM Wrangler dry-run
+        working-directory: v2smm
+        run: npx --yes wrangler@4 deploy --dry-run --config wrangler.jsonc
+
+      - name: Owner hosting smoke dry-run
+        working-directory: v2owner
+        run: npx --yes wrangler@4 deploy --dry-run --config wrangler.jsonc
+
+      - name: Authority regression audit
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --test v2customer/test/migration.test.mjs v2customer/test/customer-port-convergence-r1.test.mjs
+          node --test v2smm/test/stage6-queue.test.mjs v2smm/test/stage7-orders.test.mjs
+          node --test v2owner/test/migration.test.mjs
+          test -f v2owner/src/staff-overview.tsx
+          grep -F "不能新增／停用員工、改角色／權限或重設 PIN" v2owner/src/staff-overview.tsx
+          grep -F "Wage／Payroll 預設不顯示" v2owner/src/staff-overview.tsx
+          grep -F "此操作需由 SMT 處理" v2smm/src/Stage6Queue.tsx
+          ! grep -RInE "createFormalOrder|allocateDisplayNumber" v2customer/src/launch v2customer/src/stage1
+          ! grep -RInE "requestBoundedAction|onCommand|fetch\(" v2owner/src/staff-overview.tsx
+
+      - name: Confirm no production deploy
+        run: |
+          echo "DEPLOY_RESULT=NO_PRODUCTION_DEPLOY"
+          echo "All deploy commands in this workflow use --dry-run only."
