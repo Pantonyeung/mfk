@@ -17,9 +17,10 @@ import {ActionButton,AnimatedValue,ProductDialog,QuantityStepper,type ProductOri
 
 const money=(currency:string,minor:number)=>new Intl.NumberFormat('zh-HK',{style:'currency',currency}).format(minor/100);
 
-const adjustmentLabel=(minor:number)=>{
-  if(!Number.isSafeInteger(minor))return '價格待同步';
-  if(minor===0)return '已包括';
+const adjustmentLabel=(value:number|undefined)=>{
+  if(value===undefined||!Number.isSafeInteger(Number(value)))return '價格待同步';
+  const minor=Number(value);
+  if(minor===0)return money('HKD',0);
   return (minor>0?'+':'-')+money('HKD',Math.abs(minor));
 };
 
@@ -124,12 +125,21 @@ export function ProductSheet({
         const disabled=!option.available||(maxReached&&!active);
         return <button type="button" key={option.optionId} disabled={disabled} aria-pressed={active} className={active?'active':''} onClick={()=>toggle(group.optionGroupId,option.optionId)}>
           <span>{option.name}</span>
-          <small>{!option.available?'暫不可選':(active?'已選 · ':'')+adjustmentLabel(Number(option.publishedAdjustmentMinor||0))}</small>
+          <small>{!option.available?'暫不可選':(active?'已選 · ':'')+adjustmentLabel(option.publishedAdjustmentMinor)}</small>
         </button>;
       })}</div>
       {selected.length<minimum?<p className="choice-error">仲要揀 {minimum-selected.length} 項</p>:null}
     </fieldset>;
   };
+
+  const firstMissingRequired=comboEnabled&&!comboValidation.ok
+    ?comboValidation.issues[0]??'套餐設定'
+    :!variationOk
+      ?'規格'
+      :requiredGroups.find(group=>{
+        const count=(selections[group.optionGroupId]??[]).length;
+        return count<Math.max(group.required?1:0,group.minSelections);
+      })?.name??null;
 
   const summaryParts=[
     product.variations?.find(item=>item.variationId===selectedVariationId)?.name,
@@ -155,7 +165,7 @@ export function ProductSheet({
     {product.comboId?<section className="ui3-config-section ui3-combo-section" data-ui3-section="combo">
       <header className="ui3-section-heading"><div><span>Combo Upgrade</span><h3>套餐升級</h3></div><small>只用 exact comboId</small></header>
       {combo?<>
-        <div className="ui3-combo-summary"><div><span>{combo.name}</span><strong>{money('HKD',combo.publishedBasePriceMinor)}</strong></div><small>已發布套餐基本價 · 正式提交由 SMT 再核對</small></div>
+        <div className="ui3-combo-summary"><div><span>{combo.name}</span><strong>{Number.isSafeInteger(Number(combo.publishedBasePriceMinor))&&Number(combo.publishedBasePriceMinor)>=0?money('HKD',Number(combo.publishedBasePriceMinor)):'價格待同步'}</strong></div><small>已發布套餐基本價 · 正式提交由 SMT 再核對</small></div>
         <div className="choice-grid ui3-combo-mode">
           <button type="button" aria-pressed={!comboEnabled} className={!comboEnabled?'active':''} onClick={()=>{setComboEnabled(false);clearCombo()}}><span>只要主餐</span><small>不升級套餐</small></button>
           <button type="button" aria-pressed={comboEnabled} className={comboEnabled?'active':''} onClick={()=>setComboEnabled(true)}><span>{combo.name}</span><small>升級套餐</small></button>
@@ -228,7 +238,7 @@ export function ProductSheet({
     </section>
 
     <div className="ui3-sticky-actions" data-ui3-section="add">
-      <div><span>目前預覽</span><strong>{priceReady?money('HKD',draftTotalMinor!):'價格待同步'}</strong><small>{!addReady?'完成必選設定及同步價格後先可以加入':'設定完整，仍未建立正式訂單'}</small></div>
+      <div><span>目前預覽</span><strong>{priceReady?money('HKD',draftTotalMinor!):'價格待同步'}</strong><small>{!addReady?(firstMissingRequired?'請先完成：'+firstMissingRequired:'完成必選設定及同步價格後先可以加入'):'設定完整，仍未建立正式訂單'}</small></div>
       <ActionButton disabled={!addReady} onClick={onAdd}>{editing?'更新記憶罐':'加入記憶罐'}</ActionButton>
     </div>
   </ProductDialog>;
