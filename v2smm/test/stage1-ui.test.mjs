@@ -56,7 +56,7 @@ test('Stage 1 zero-result recovery is human-facing and keeps source mascot prese
   assert.match(orderView,/stage1-zero-result/);
   assert.match(orderView,/搵唔到呢款商品/);
   assert.match(orderView,/清除搜尋/);
-  assert.match(orderView,/stage0\/stage0-female\.svg/);
+  assert.match(orderView,/stage0\/stage0-female\.webp/);
 });
 
 test('Stage 1 normal UI removes engineering placeholder copy',()=>{
