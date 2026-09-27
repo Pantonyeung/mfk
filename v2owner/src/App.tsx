@@ -216,8 +216,8 @@ export function App(){
   if(port?.loginOwner&&!ownerSession){
     return <main className="app-shell owner-auth-shell"><form className="owner-auth-gate" onSubmit={event=>{event.preventDefault();void login();}}>
       <span>OWNER ACCESS</span><h1>老闆登入</h1>
-      <p>使用 Admin 已發布嘅 OWNER Staff ID 同 PIN。身份未確認前不會讀取訂單、電話或營業資料。</p>
-      <label><span>Staff ID</span><input value={loginStaffId} onChange={event=>setLoginStaffId(event.target.value)} autoComplete="username" /></label>
+      <p>使用 Admin 已發布嘅 OWNER 登入編號同 PIN。身份未確認前不會讀取訂單、電話或營業資料。</p>
+      <label><span>登入編號</span><input value={loginStaffId} onChange={event=>setLoginStaffId(event.target.value.replace(/[^A-Za-z0-9._-]/g,'').slice(0,64))} autoComplete="username" placeholder="例如 1111" /></label>
       <label><span>PIN</span><input value={loginPin} onChange={event=>setLoginPin(event.target.value.replace(/\D/g,'').slice(0,8))} inputMode="numeric" type="password" autoComplete="current-password" /></label>
       {loginError?<div className="owner-auth-error" role="alert">{loginError}</div>:null}
       <button type="submit" disabled={loginBusy||!loginStaffId.trim()||loginPin.length<4}>{loginBusy?'驗證中…':'登入'}</button>
