@@ -31,6 +31,7 @@ import {
 } from './stage4-checkout.mjs';
 import {Stage5SubmitView,type SmmStage5Session} from './Stage5Submit';
 import {Stage6QueueView} from './Stage6Queue';
+import {Stage7OrdersView} from './Stage7Orders';
 import {smmStage5ConfirmedDisplayCode,smmStage5RepairPath,smmStage5SubmissionShortRef} from './stage5-submit.mjs';
 import './stage1.css';
 import './stage2.css';
@@ -38,6 +39,7 @@ import './stage3.css';
 import './stage4.css';
 import './stage5.css';
 import './stage6.css';
+import './stage7.css';
 import type {
   SmmCartLine,
   SmmConnectionState,
@@ -54,7 +56,6 @@ import type {
 } from './product-types';
 
 type View='order'|'work'|'orders'|'dine'|'more';
-type OrderSegment='active'|'history';
 
 const nowIso=()=>new Date().toISOString();
 const money=(currency:string,minor:number)=>new Intl.NumberFormat('zh-HK',{style:'currency',currency}).format(minor/100);
@@ -96,8 +97,6 @@ export function App(){
     });
   });
   const [search,setSearch]=useState('');
-  const [orderSearch,setOrderSearch]=useState('');
-  const [orderSegment,setOrderSegment]=useState<OrderSegment>('active');
   const [moreTool,setMoreTool]=useState<'staff'|'connection'|'channels'|'business'|'printing'|'diagnostics'|'sellability'|'pending'|'capacity'|'reporting'|'refunds'|null>(null);
   const [dineTable,setDineTable]=useState('');
   const [dineCovers,setDineCovers]=useState(2);
@@ -727,16 +726,7 @@ export function App(){
         onCart={()=>{setCheckoutStage(false);setCartOpen(true)}}
       />:null}
       {view==='work'?<Stage6QueueView connection={connection} items={snapshot?.work??[]} orders={snapshot?.orders??[]} onRefresh={refresh}/>:null}
-      {view==='orders'?<OrdersView
-        connection={connection}
-        rows={snapshot?.orders??[]}
-        segment={orderSegment}
-        setSegment={setOrderSegment}
-        query={orderSearch}
-        setQuery={setOrderSearch}
-        sourceFilter={sourceFilter}
-        setSourceFilter={changeSource}
-      />:null}
+      {view==='orders'?<Stage7OrdersView connection={connection} rows={snapshot?.orders??[]} onRefresh={refresh}/>:null}
       {view==='dine'?<DineView
         connection={connection}
         sessions={snapshot?.dineSessions??[]}
@@ -925,34 +915,6 @@ function OrderView({connection,categories,activeCategoryId,setCategory,search,se
       <div><strong>{quote?money(quote.currency,quote.totalMinor):'價格資料未完整'}</strong><small>{quote?`餐單版本 ${quote.revision}`:'請重新同步餐單'}</small></div>
       <em>查看</em>
     </button>:null}
-  </section>;
-}
-
-function OrdersView({connection,rows,segment,setSegment,query,setQuery,sourceFilter,setSourceFilter}:{
-  connection:SmmConnectionState;
-  rows:readonly SmmOrderProjection[];
-  segment:OrderSegment;
-  setSegment:(v:OrderSegment)=>void;
-  query:string;
-  setQuery:(v:string)=>void;
-  sourceFilter:string;
-  setSourceFilter:(v:string)=>void;
-}){
-  const sources=['全部',...Array.from(new Set(rows.map(row=>row.source)))];
-  const filtered=rows.filter(row=>{
-    const history=row.lifecycle==='COMPLETED'||row.lifecycle==='CANCELLED';
-    const segmentOk=segment==='history'?history:!history;
-    const searchOk=!query.trim()||[row.displayCode,row.source,row.lifecycle,row.itemSummary].join(' ').toLowerCase().includes(query.toLowerCase());
-    const sourceOk=sourceFilter==='全部'||row.source===sourceFilter;
-    return segmentOk&&searchOk&&sourceOk;
-  });
-  return <section className="page">
-    <header className="hero"><div><span>訂單</span><h1>訂單記錄</h1><small>未能確認嘅結果會保留「結果未明」，唔會當失敗。</small></div><div className="hero-count"><b>{filtered.length}</b><small>張</small></div></header>
-    <div className="segmented"><button className={segment==='active'?'active':''} onClick={()=>setSegment('active')}>進行中</button><button className={segment==='history'?'active':''} onClick={()=>setSegment('history')}>歷史</button></div>
-    <label className="search"><span>搜尋</span><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="訂單號／來源／商品"/></label>
-    {sources.length>1?<div className="source-filter">{sources.map(source=><button key={source} className={sourceFilter===source?'active':''} onClick={()=>setSourceFilter(source)}>{source}</button>)}</div>:null}
-    {!filtered.length?<EmptyState title={connection==='NOT_CONNECTED'?'訂單服務尚未連接':'暫時冇符合條件嘅訂單'} detail={connection==='NOT_CONNECTED'?'連接後會顯示正式訂單、來源、狀態同時間線。':'可以改用其他搜尋字或者來源篩選。'}/>:
-    <div className="cards">{filtered.map(row=><article className="order-card" key={row.orderId}><div className="order-head"><div><small>{row.source} · {new Date(row.observedAt).toLocaleString('zh-HK')}</small><h2>{row.displayCode}</h2></div><span className={`status ${row.readback==='UNKNOWN'?'unknown':row.readback==='PARTIAL'?'warning':'positive'}`}>{row.readback==='CONFIRMED'?'已確認':row.readback==='PARTIAL'?'部分資料':'結果未明'}</span></div><div className="order-meta"><span>{row.lifecycle}</span>{row.amountLabel?<b>{row.amountLabel}</b>:null}<span>{row.itemSummary}</span></div>{row.note?<p>備註：{row.note}</p>:null}<div className="timeline">{row.timeline.map((item,index)=><div key={index}><b>{item.label}</b><span>{item.detail??''}</span><small>{new Date(item.at).toLocaleTimeString('zh-HK')}</small></div>)}</div></article>)}</div>}
   </section>;
 }
 
