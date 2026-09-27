@@ -1,5 +1,5 @@
 import {useEffect,useMemo,useState,type CSSProperties} from 'react';
-import {OFFICIAL_LOGO_URL,launchAssetFor,resolveLaunchVariant,type LaunchVariant} from './launch-config';
+import {OFFICIAL_LOGO_URL,STAGE0_BENTO_URL,STAGE0_RICEBALL_URL,launchAssetFor,resolveLaunchVariant,type LaunchVariant} from './launch-config';
 import './launch.css';
 
 const SEEN_KEY='mfk.customer.launch.seen.v2';
@@ -23,9 +23,9 @@ export function LaunchOverlay({onEnterHome,onEnterMember}:{onEnterHome:()=>void;
   const [ready,setReady]=useState(false);
 
   useEffect(()=>{
-    const delay=mode==='reduced'?180:mode==='returning'?760:2450;
+    const delay=mode==='reduced'?700:mode==='returning'?1150:3300;
     const timer=window.setTimeout(()=>setReady(true),delay);
-    const guard=window.setTimeout(()=>setReady(true),3300);
+    const guard=window.setTimeout(()=>setReady(true),4200);
     return()=>{window.clearTimeout(timer);window.clearTimeout(guard)};
   },[mode]);
 
@@ -33,6 +33,7 @@ export function LaunchOverlay({onEnterHome,onEnterMember}:{onEnterHome:()=>void;
     if(typeof window!=='undefined')safeWrite(window.localStorage,SEEN_KEY,'1');
     target==='home'?onEnterHome():onEnterMember();
   };
+  const assetFailed=()=>setReady(true);
 
   return <section
     className={'launch-overlay variant-'+variant+' mode-'+mode+(ready?' is-ready':'')}
@@ -41,18 +42,24 @@ export function LaunchOverlay({onEnterHome,onEnterMember}:{onEnterHome:()=>void;
     style={{'--launch-accent':asset.accent} as CSSProperties}
   >
     <div className="launch-brand-scene" aria-hidden="true">
-      <img className="launch-logo" src={OFFICIAL_LOGO_URL} alt=""/>
+      <img className="launch-logo" src={OFFICIAL_LOGO_URL} alt="" onError={assetFailed}/>
+      <p className="launch-brand-line">手作・輕食</p>
+
       <div className="launch-character-stage">
-        <span className="launch-character-crop"><img className="launch-character" src={asset.characterUrl} alt=""/></span>
-        <span className="launch-product-orbit"><img src={asset.productUrl} alt=""/></span>
+        <img className="launch-character" src={asset.characterUrl} alt="" onError={assetFailed}/>
+        <p className="launch-hungry">肚餓啦？</p>
+        <span className="launch-riceball"><img src={STAGE0_RICEBALL_URL} alt="" onError={assetFailed}/></span>
+        <span className="launch-bento"><img src={STAGE0_BENTO_URL} alt="" onError={assetFailed}/></span>
       </div>
-      <p className="launch-story">今日食咩？等磨飯陪你慢慢揀。</p>
+
+      <p className="launch-story">用心手作，<br/>每一口都更幸福。</p>
     </div>
+
     <div className="launch-actions" aria-hidden={!ready}>
-      <p className="launch-slogan">磨飯 · 元朗台式料理</p>
+      <p className="launch-slogan">美味，從這裡開始。</p>
       <div className="launch-action-row">
-        <button className="launch-primary" tabIndex={ready?0:-1} disabled={!ready} onClick={()=>finish('home')}>開始點餐</button>
-        <button className="launch-secondary" tabIndex={ready?0:-1} disabled={!ready} onClick={()=>finish('member')}>我的記憶</button>
+        <button className="launch-primary" tabIndex={ready?0:-1} disabled={!ready} onClick={()=>finish('home')}>進入主頁</button>
+        <button className="launch-secondary" tabIndex={ready?0:-1} disabled={!ready} onClick={()=>finish('member')}>進入會員頁</button>
       </div>
     </div>
   </section>;
