@@ -405,6 +405,14 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode,diningAddition,on
     recentlyAddedProductId:recent,highlightedCartLineId:highlight,cartPulseNonce:pulse,
   };
 
+  const quickOptionSelectionsForProduct=(product:Product):MfkOrderLineOptionSelectionsV1=>Object.freeze(Object.fromEntries(
+    (product.optionSets??[]).flatMap(set=>{
+      if(set.required||set.min>0)return [];
+      const ids=set.options.filter(option=>option.defaultSelected).map(option=>option.id);
+      return ids.length?[[set.id,Object.freeze(ids)] as const]:[];
+    })
+  ));
+
   const add=(id:string)=>{
     const product=products.find(item=>item.id===id);if(!product||!product.priceReady||!product.sellable)return;
     const quickConfig=quickConfigurationById.get(id);
@@ -417,7 +425,7 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode,diningAddition,on
       unitMinor:product.priceMinor+quickConfig.deltaMinor,
       serviceMode,
       detail:quickConfig.detail||undefined,
-      optionSelections:quickConfig.optionSelections,
+      optionSelections:quickOptionSelectionsForProduct(product),
       freeNote:'',
     };
     setCart([...cart,line]);
@@ -427,7 +435,7 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode,diningAddition,on
     window.setTimeout(()=>{setRecent(undefined);setHighlight(undefined)},700);
   };
 
-  const addConfigured=(productId:string,detail:string,deltaMinor:number,qty:number,lineId?:string,structured?:{readonly optionSelections:MfkOrderLineOptionSelectionsV1;readonly freeNote:string})=>{
+  const addConfigured=(productId:string,detail:string,deltaMinor:number,qty:number,lineId?:string)=>{
     const product=products.find(item=>item.id===productId);if(!product||!product.priceReady||!product.sellable)return;
     if(lineId){
       const existing=cart.find(item=>item.id===lineId);if(!existing)return;
@@ -438,14 +446,29 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode,diningAddition,on
         unitMinor:product.priceMinor+deltaMinor,
         detail:detail||undefined,
         serviceMode:existing.serviceMode,
-        ...(structured?{optionSelections:structured.optionSelections,freeNote:structured.freeNote}:{}),
       }:item);
       setCart(next);setRecent(product.id);setHighlight(lineId);setPulse(value=>value+1);setPanel(null);return;
     }
-    const line:CartLine={
-      id:nextLocalCartLineId(),productId:product.id,name:product.name,qty,unitMinor:product.priceMinor+deltaMinor,serviceMode,detail:detail||undefined,
-      ...(structured?{optionSelections:structured.optionSelections,freeNote:structured.freeNote}:{}),
-    };
+    const line:CartLine={id:nextLocalCartLineId(),productId:product.id,name:product.name,qty,unitMinor:product.priceMinor+deltaMinor,serviceMode,detail:detail||undefined};
+    setCart([...cart,line]);setRecent(product.id);setHighlight(line.id);setPulse(value=>value+1);setPanel(null);
+  };
+  const addConfiguredStructured=(productId:string,detail:string,deltaMinor:number,qty:number,lineId:string|undefined,structured:{readonly optionSelections:MfkOrderLineOptionSelectionsV1;readonly freeNote:string})=>{
+    const product=products.find(item=>item.id===productId);if(!product||!product.priceReady||!product.sellable)return;
+    if(lineId){
+      const existing=cart.find(item=>item.id===lineId);if(!existing)return;
+      const next=cart.map(item=>item.id===lineId?{
+        ...item,
+        name:product.name,
+        qty,
+        unitMinor:product.priceMinor+deltaMinor,
+        detail:detail||undefined,
+        serviceMode:existing.serviceMode,
+        optionSelections:structured.optionSelections,
+        freeNote:structured.freeNote,
+      }:item);
+      setCart(next);setRecent(product.id);setHighlight(lineId);setPulse(value=>value+1);setPanel(null);return;
+    }
+    const line:CartLine={id:nextLocalCartLineId(),productId:product.id,name:product.name,qty,unitMinor:product.priceMinor+deltaMinor,serviceMode,detail:detail||undefined,optionSelections:structured.optionSelections,freeNote:structured.freeNote};
     setCart([...cart,line]);setRecent(product.id);setHighlight(line.id);setPulse(value=>value+1);setPanel(null);
   };
 
@@ -549,7 +572,7 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode,diningAddition,on
     :panel?.type==='holds'?'暫存單':'';
 
   const panelBody=panel?.type==='product'
-    ?(()=>{const product=workspaceProducts.find(item=>item.id===panel.productId);const line=panel.lineId?cart.find(item=>item.id===panel.lineId):undefined;return product?<ProductConfigWorkspace key={product.id+':'+(panel.lineId??'add')} product={product} mode={panel.lineId?'edit':'add'} initial={line?{qty:line.qty,detail:stripRiceballDrinkPromotionDetail(line.detail)||undefined,optionSelections:line.optionSelections,freeNote:line.freeNote}:undefined} onAdd={(detail,delta,qty,structured)=>addConfigured(product.id,detail,delta,qty,panel.lineId,structured)}/>:null})()
+    ?(()=>{const product=workspaceProducts.find(item=>item.id===panel.productId);const line=panel.lineId?cart.find(item=>item.id===panel.lineId):undefined;return product?<ProductConfigWorkspace key={product.id+':'+(panel.lineId??'add')} product={product} mode={panel.lineId?'edit':'add'} initial={line?{qty:line.qty,detail:stripRiceballDrinkPromotionDetail(line.detail)||undefined,optionSelections:line.optionSelections,freeNote:line.freeNote}:undefined} onAdd={(detail,delta,qty,structured)=>addConfiguredStructured(product.id,detail,delta,qty,panel.lineId,structured)}/>:null})()
     :panel?.type==='required'
       ?<RequiredFastLaneWorkspace
         cart={cart}
