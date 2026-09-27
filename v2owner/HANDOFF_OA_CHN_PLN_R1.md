@@ -23,19 +23,21 @@ Target：Owner 本機非權威 planning input。
 成本未完整時明確標示「估算營運淨利（按已輸入成本）」；不冒充正式會計淨利。
 
 ## Authority Guard
-唯一銷售來源：OwnerReadModelSnapshot.reports 中 metricKind = CURRENT_EFFECTIVE_SALES。
+唯一 MTD 銷售來源：OwnerReadModelSnapshot.planningBasis.currentEffectiveSalesMtdMinor。
+
+planningBasis 只由 Admin canonical reporting projection 產生：
+- sourceMetric = CURRENT_EFFECTIVE_SALES
+- sourceAuthority = CANONICAL_REPORTING_PROJECTION
+- metricVersion = MFK_CURRENT_EFFECTIVE_SALES_V1
+- currentEffectiveSalesMtdMinor = 同一 business month 既有 canonical projectionReports().netMinor 聚合
 
 Owner Planning 禁止：
 - 從 Order list 重算 sales
+- 從日報 cards／畫面 value 再聚合 MTD
 - 從 line items 重算 pricing
 - 建第二 reporting authority
 - 將 planned cost 當 actual cost
 - 將估算淨利當正式會計結果
-
-Admin canonical report projection 將既有 canonical projectionReports().netMinor 明確投影為：
-- metricKind = CURRENT_EFFECTIVE_SALES
-- currentEffectiveSalesMinor
-- metricVersion = MFK_CURRENT_EFFECTIVE_SALES_V1
 
 ## Main Drift
 開工時 main：493f014fcf91409612f63955a0b4698ad7815e69
@@ -46,7 +48,7 @@ Commander 驗收／landing 前必須重新做 current-main drift review。今 br
 1. Keeta provider PAUSED + OAuth healthy 時，Health 可以 HEALTHY，但 acceptingOrders 必須 false。
 2. Customer recent SMT pull 只代表 Customer runtime reachability；不得代替其他平台 health。
 3. Channel action 未有正式 mutation seam 時全部 disabled。
-4. MTD 只加總當月 CURRENT_EFFECTIVE_SALES。
+4. MTD 只讀 canonical planningBasis；Owner client 不自行聚合日報或 Orders。
 5. gross / order display amount / legacy report 不得進 MTD。
 6. Target、成本修改只寫 Owner local planning storage。
 7. 成本缺項時淨利必須標示 partial estimate。
@@ -55,7 +57,7 @@ Commander 驗收／landing 前必須重新做 current-main drift review。今 br
 10. NO MAIN MERGE / NO DEPLOY。
 
 ## Test Coverage Added
-Admin Owner projection Current Effective Sales metric contract。
+Admin canonical reporting projection → planningBasis Current Effective Sales MTD contract。
 Admin Owner channel projection Keeta + Customer integration。
 Channel health 與 acceptingOrders 分離。
 Planning MTD / remaining / attainment / daily-needed。
