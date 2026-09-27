@@ -164,3 +164,141 @@ describe('Owner canonical read projection',()=>{
     expect(snapshot.channels[0].readback).toBe('PROVIDER_OPEN');
   });
 });
+
+
+describe('Owner canonical monthly planning domain',()=>{
+  function memoryState(shared=new Map<string,unknown>()){
+    return {
+      shared,
+      state:{
+        storage:{
+          get:async(key:string)=>shared.get(key),
+          put:async(key:string,value:unknown)=>{shared.set(key,value);},
+          delete:async(key:string)=>{shared.delete(key);},
+          list:async(options?:{prefix?:string})=>{
+            const prefix=String(options?.prefix||'');
+            return new Map([...shared.entries()].filter(([key])=>key.startsWith(prefix)));
+          },
+        },
+        getWebSockets:()=>[],
+      },
+    };
+  }
+
+  const input=(expectedRevision=0)=>({
+    monthKey:'2026-09',
+    monthlyRevenueTargetMinor:20000000,
+    costLines:[
+      {costLineId:'RENT',category:'RENT',label:'屋租',plannedMonthlyMinor:3000000,actualToDateMinor:3000000,note:'租金'},
+      {costLineId:'UTILITIES_WATER',category:'UTILITIES_WATER',label:'水',plannedMonthlyMinor:100000,actualToDateMinor:80000},
+      {costLineId:'UTILITIES_ELECTRICITY',category:'UTILITIES_ELECTRICITY',label:'電',plannedMonthlyMinor:500000,actualToDateMinor:420000},
+      {costLineId:'UTILITIES_GAS',category:'UTILITIES_GAS',label:'煤氣',plannedMonthlyMinor:200000,actualToDateMinor:170000},
+      {costLineId:'LABOR',category:'LABOR',label:'人工',plannedMonthlyMinor:4000000,actualToDateMinor:3500000},
+      {costLineId:'OTHER',category:'OTHER',label:'其他',plannedMonthlyMinor:500000,actualToDateMinor:null},
+    ],
+    note:'九月管理計劃',
+    expectedRevision,
+    operationId:'op-owner-plan-0001-'+expectedRevision,
+  });
+
+  it('reads EMPTY then writes canonical MFK_OWNER_MONTHLY_PLAN_V1 with revision and readback',async()=>{
+    const mem=memoryState();
+    const runtime=new AdminSyncStore(mem.state as never,{} as never);
+    const empty=await runtime.ownerMonthlyPlanRead('MF01','2026-09');
+    expect(empty).toEqual({status:200,body:{state:'EMPTY',monthKey:'2026-09',revision:0}});
+
+    const result=await runtime.ownerMonthlyPlanSave('MF01',input(0),{staffId:'owner-1',loginId:'1111'} as never);
+    expect(result.status).toBe(200);
+    expect(result.body).toMatchObject({
+      state:'CONFIRMED',
+      monthKey:'2026-09',
+      revision:1,
+      plan:{
+        schema:'MFK_OWNER_MONTHLY_PLAN_V1',
+        storeId:'MF01',
+        monthKey:'2026-09',
+        monthlyRevenueTargetMinor:20000000,
+        revision:1,
+        updatedBy:'owner-1',
+      },
+    });
+    expect(result.body.plan.costLines).toHaveLength(6);
+
+    const readback=await runtime.ownerMonthlyPlanRead('MF01','2026-09');
+    expect(readback.status).toBe(200);
+    expect(readback.body.state).toBe('CONFIRMED');
+    expect(readback.body.revision).toBe(1);
+    expect(readback.body.plan).toEqual(result.body.plan);
+  });
+
+  it('fails closed on expectedRevision conflict and preserves the canonical version',async()=>{
+    const mem=memoryState();
+    const runtime=new AdminSyncStore(mem.state as never,{} as never);
+    const first=await runtime.ownerMonthlyPlanSave('MF01',input(0),{staffId:'owner-1',loginId:'1111'} as never);
+    expect(first.body.revision).toBe(1);
+
+    const conflict=await runtime.ownerMonthlyPlanSave('MF01',{
+      ...input(0),
+      monthlyRevenueTargetMinor:99999999,
+      operationId:'op-owner-plan-conflict',
+    },{staffId:'owner-2',loginId:'2222'} as never);
+    expect(conflict.status).toBe(409);
+    expect(conflict.body).toMatchObject({
+      state:'REJECTED',
+      code:'OWNER_MONTHLY_PLAN_REVISION_CONFLICT',
+      currentRevision:1,
+    });
+
+    const readback=await runtime.ownerMonthlyPlanRead('MF01','2026-09');
+    expect(readback.body.plan.monthlyRevenueTargetMinor).toBe(20000000);
+    expect(readback.body.revision).toBe(1);
+  });
+
+  it('new runtime instance reads the same canonical monthly plan from shared AdminSyncStore storage',async()=>{
+    const shared=new Map<string,unknown>();
+    const firstDevice=memoryState(shared);
+    const runtimeA=new AdminSyncStore(firstDevice.state as never,{} as never);
+    await runtimeA.ownerMonthlyPlanSave('MF01',input(0),{staffId:'owner-1',loginId:'1111'} as never);
+
+    const secondDevice=memoryState(shared);
+    const runtimeB=new AdminSyncStore(secondDevice.state as never,{} as never);
+    const readback=await runtimeB.ownerMonthlyPlanRead('MF01','2026-09');
+    expect(readback.status).toBe(200);
+    expect(readback.body).toMatchObject({
+      state:'CONFIRMED',
+      revision:1,
+      plan:{monthlyRevenueTargetMinor:20000000,note:'九月管理計劃'},
+    });
+  });
+
+  it('owner planning HTTP write requires authenticated OWNER session and returns canonical readback',async()=>{
+    const shared=new Map<string,unknown>();
+    const token='owner-session-token-abcdefghijklmnopqrstuvwxyz-1234567890';
+    const tokenHash=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(token));
+    const tokenHex=[...new Uint8Array(tokenHash)].map(value=>value.toString(16).padStart(2,'0')).join('');
+    shared.set('active',{
+      storeId:'MF01',revision:1,fingerprint:'active-owner-test',
+      snapshot:{staffAuth:{staff:[{
+        staffId:'owner-1',loginId:'1111',name:'Owner',role:'OWNER',scope:'STORE',active:true,permissions:[],
+        pinVerifier:{algorithm:'PBKDF2-SHA256',iterations:100000,saltHex:'aa',hashHex:'a'.repeat(64)},
+      }]}},
+    });
+    shared.set('owner:session:'+tokenHex,{staffId:'owner-1',createdAt:'2026-09-27T00:00:00Z',lastSeenAt:'2026-09-27T00:00:00Z',expiresAt:'2030-09-27T00:00:00Z'});
+    const mem=memoryState(shared);
+    const runtime=new AdminSyncStore(mem.state as never,{} as never);
+
+    const unauthorized=await runtime.fetch(new Request('https://internal/owner/planning/monthly?storeId=MF01',{
+      method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(input(0)),
+    }));
+    expect(unauthorized.status).toBe(401);
+
+    const response=await runtime.fetch(new Request('https://internal/owner/planning/monthly?storeId=MF01',{
+      method:'POST',
+      headers:{'content-type':'application/json','x-mfk-owner-session':token},
+      body:JSON.stringify(input(0)),
+    }));
+    expect(response.status).toBe(200);
+    const body=await response.json() as any;
+    expect(body).toMatchObject({state:'CONFIRMED',revision:1,plan:{updatedBy:'owner-1'}});
+  });
+});
