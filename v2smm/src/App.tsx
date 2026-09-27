@@ -575,21 +575,24 @@ export function App(){
       ...(diningTarget?{diningTarget}:{}),
     });
     saveIntent(base);
-    setStage5Session(Object.freeze({intent:base,state:'DRAFT',message:'提交身份已鎖定。'}));
 
     if(!port?.submitOrder){
-      setNotice('門店提交服務尚未連接；草稿已保存，未建立正式訂單。');
+      setStage5Session(null);
+      setCartOpen(true);
+      setCheckoutStage(true);
+      setNotice('傳輸通道離線；正式訂單未送出。已保留原購物草稿同提交身份，唔會背景重送。');
       releaseSubmitLock();
       return;
     }
 
-    const pending=Object.freeze({...base,state:'PENDING' as const,updatedAt:nowIso(),lastMessage:'已送出一次，等待 SMT 正式確認'});
-    saveIntent(pending);
-    setStage5Session(Object.freeze({intent:pending,state:'PENDING',message:'已送出一次，等待 SMT 正式確認。'}));
+    const pending=Object.freeze({...base,state:'PENDING' as const,updatedAt:nowIso(),lastMessage:'正式提交已開始，等待本次提交回覆'});
     setCartOpen(false);
     setNotice(null);
     try{
-      const result=await port.submitOrder(pending);
+      const submitAttempt=port.submitOrder(pending);
+      saveIntent(pending);
+      setStage5Session(Object.freeze({intent:pending,state:'DRAFT',message:'正式提交已開始；等待本次提交回覆。'}));
+      const result=await submitAttempt;
       if(result.state==='CONFIRMED'){
         resolveConfirmedIntent(pending,result);
         releaseSubmitLock();
@@ -606,7 +609,10 @@ export function App(){
       if(result.state==='NOT_CONNECTED'){
         const offlineDraft=Object.freeze({...base,state:'DRAFT' as const,updatedAt:nowIso(),lastMessage:result.message});
         saveIntent(offlineDraft);
-        setStage5Session(Object.freeze({intent:offlineDraft,state:'DRAFT',message:'傳輸通道離線；未將交易結果改寫成 UNKNOWN。'}));
+        setStage5Session(null);
+        setCartOpen(true);
+        setCheckoutStage(true);
+        setNotice('傳輸通道離線；正式訂單未送出。已保留原購物草稿同提交身份，唔會背景重送。');
         setConnection('NOT_CONNECTED');
         releaseSubmitLock();
         return;
