@@ -13,7 +13,7 @@ FRESH MAIN AT DISPATCH:
 493f014fcf91409612f63955a0b4698ad7815e69
 
 SOURCE HEAD BEFORE HANDOFF:
-812549e0ce5c519d93a01be5309edd5090870214
+7ca9fdc061b558562f76abbcdbd576664970517b
 
 FRESH MAIN BEHIND:
 0
@@ -68,7 +68,7 @@ Admin Published Config
 ## FINAL GREEN EVIDENCE
 
 GitHub Actions:
-RUN 36295897792
+RUN 36295903850
 
 Customer:
 - UI3 Configure contract: 9/9 PASS
@@ -120,6 +120,11 @@ NO MEMBER IMPLEMENTATION EXPANSION
 NO STAGE4
 NO MAIN MERGE
 NO CLOUDFLARE DEPLOY
+
+STALE CONTRACT REPAIRED:
+- donor-fusion-r2 old labels「我的訂單 / 我的記憶」superseded by fixed canonical five-nav「訂單 / 會員」
+- old progressive Product Detail assertion superseded by UI3 locked flow
+- no product runtime authority changed
 
 MILESTONE:
 MFK_CUSTOMER_UI3_COMBO_CONFIGURE_R1_READY_FOR_COMMANDER_ACCEPTANCE
