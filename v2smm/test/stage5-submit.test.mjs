@@ -169,3 +169,8 @@ test('Stage 5 is usable at 440x956 and 360px minimum with touch targets and redu
   assert.match(css,/env\(safe-area-inset-bottom\)/);
   assert.match(css,/prefers-reduced-motion:reduce/);
 });
+
+
+test('Stage 5 landing candidate contains no one-off workflow',()=>{
+  assert.equal(existsSync(new URL('../../.github/workflows/smm-stage5-formal-submit-r1.yml',import.meta.url)),false);
+});
