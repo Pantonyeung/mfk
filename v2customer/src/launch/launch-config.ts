@@ -3,24 +3,23 @@ export type LaunchVariant='male'|'female';
 export interface LaunchAsset {
   readonly id:string;
   readonly characterUrl:string;
-  readonly productUrl:string;
   readonly accent:string;
 }
 
 export const OFFICIAL_LOGO_URL='https://cdn.creativeclaw.co/u/6ad84d58/images/402357b6-d757-4238-99f7-3d20607da6f2.png';
+export const STAGE0_RICEBALL_URL='/brand/p0-riceball.webp';
+export const STAGE0_BENTO_URL='/brand/mf-home-hero-bowl.webp';
 
 export const launchAssets:Readonly<Record<LaunchVariant,LaunchAsset>>=Object.freeze({
   male:Object.freeze({
     id:'MFK_STAGE0_MALE_FINAL',
-    characterUrl:'/brand/stage0-character-male.svg',
-    productUrl:'/brand/mf-home-hero-bowl.webp',
-    accent:'#2457c5',
+    characterUrl:'/brand/stage0-male.webp',
+    accent:'#2467b2',
   }),
   female:Object.freeze({
     id:'MFK_STAGE0_FEMALE_FINAL',
-    characterUrl:'/brand/stage0-character-female.svg',
-    productUrl:'/brand/mf-home-hero-salad.webp',
-    accent:'#8b55c7',
+    characterUrl:'/brand/stage0-female.webp',
+    accent:'#8659b5',
   }),
 });
 
