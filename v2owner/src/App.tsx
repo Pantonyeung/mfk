@@ -17,11 +17,10 @@ import {ActionQueuePage,type OwnerActionCommandFlight} from './stage02-action-qu
 import {isCanonicalActionUnknown,selectOpenActions} from './stage02-open-actions';
 import {OrderOversightPage} from './stage03-order-oversight';
 import type {OwnerOrderScope} from './stage03-view-model';
-import {ChannelHealthPage,type OwnerChannelCommandFlight} from './channel-health';
+import {ChannelHealthPage} from './channel-health';
 import {MonthlyTargetSummaryCard,PlanningPage} from './planning';
 import type {
   OwnerAuthSession,
-  OwnerChannelCommandInput,
   OwnerConnectionState,
   OwnerPlanningSaveInput,
   OwnerPlanningSnapshot,
@@ -55,7 +54,6 @@ export function App(){
   const [commandFlight,setCommandFlight]=useState<OwnerActionCommandFlight|null>(null);
   const [ordersScope,setOrdersScope]=useState<OwnerOrderScope>('DEFAULT');
   const [secondary,setSecondary]=useState<SecondaryView|null>(()=>typeof window!=='undefined'&&window.location.pathname==='/channels'?'channels':typeof window!=='undefined'&&window.location.pathname==='/planning'?'planning':null);
-  const [channelCommandFlight,setChannelCommandFlight]=useState<OwnerChannelCommandFlight|null>(null);
   const [planning,setPlanning]=useState<OwnerPlanningSnapshot|null>(null);
   const [planningLoading,setPlanningLoading]=useState(false);
   const [planningSaving,setPlanningSaving]=useState(false);
@@ -272,24 +270,10 @@ export function App(){
     setCommandFlight(null);
   };
 
-  const executeChannelCommand=async(input:OwnerChannelCommandInput)=>{
-    if(connection==='OFFLINE_READONLY'||connection==='PERMISSION_DENIED'){setNotice('目前只可讀取，渠道操作已停用。');return}
-    if(!port?.commandChannel){setNotice('呢個渠道未有 canonical command seam；冇改變任何正式狀態。');return}
-    setChannelCommandFlight({channelId:input.channelId,state:'PENDING',message:'Read current → command → canonical readback。'});
-    try{
-      const {state,message}=await port.commandChannel(input);
-      setChannelCommandFlight({channelId:input.channelId,state:state==='CONFIRMED'?'CONFIRMED':state,message});
-      await refresh();
-    }catch{
-      setChannelCommandFlight({channelId:input.channelId,state:'UNKNOWN',message:'結果未明；只可重新讀回，禁止 blind retry。'});
-    }
-  };
   const recheckChannel=async(channelId:string)=>{
-    setChannelCommandFlight({channelId,state:'PENDING',message:'正在重新讀取 canonical / provider channel state。'});
     const channels=await loadChannels();
     const channel=channels?.find(item=>item.channelId===channelId);
-    if(!channel||channel.readback==='UNKNOWN')setChannelCommandFlight({channelId,state:'UNKNOWN',message:'正式狀態仍未明；保持鎖定，禁止 blind retry。'});
-    else setChannelCommandFlight(null);
+    if(!channel||channel.readback==='UNKNOWN')setNotice('正式狀態仍未明；保持只讀，唔會假裝成功。');
   };
   const savePlanning=async(input:OwnerPlanningSaveInput)=>{
     if(!port?.savePlanning){setNotice('Planning writer 尚未連接；冇寫入本機假資料。');return}
@@ -331,7 +315,7 @@ export function App(){
     <GlobalStateBanner state={connection} onRetry={()=>void refresh()}/>
 
     <section className="stage">
-      {secondary==='channels'?<ChannelHealthPage channels={snapshot?.channels??[]} connection={connection} commandFlight={channelCommandFlight} onCommand={input=>void executeChannelCommand(input)} onRecheck={channelId=>void recheckChannel(channelId)} onBack={()=>changeView('more')}/>:null}
+      {secondary==='channels'?<ChannelHealthPage channels={snapshot?.channels??[]} connection={connection} onRecheck={channelId=>void recheckChannel(channelId)} onBack={()=>changeView('more')}/>:null}
       {secondary==='planning'?<PlanningPage value={planning} loading={planningLoading} saving={planningSaving} onMonthChange={monthKey=>void loadPlanning(monthKey)} onSave={input=>void savePlanning(input)} onBack={()=>changeView('more')}/>:null}
       {!secondary&&view==='today'?<TodayPage connection={connection} snapshot={snapshot} onQueue={()=>changeView('queue')} onActiveOrders={()=>openOrdersScope('ACTIVE')} onDineInOrders={()=>openOrdersScope('DINE_IN_OPEN')} onChannels={()=>openSecondary('channels')} onPlanning={()=>openSecondary('planning')} onTool={setTool}/>:null}
       {!secondary&&view==='queue'?<ActionQueuePage connection={connection} items={openActions} activity={snapshot?.activity??[]} commandFlight={commandFlight} onCommand={requestBounded} onRecheck={actionId=>void recheckAction(actionId)}/>:null}
