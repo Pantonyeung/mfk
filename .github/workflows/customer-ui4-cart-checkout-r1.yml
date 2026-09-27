@@ -1,0 +1,80 @@
+name: customer-ui4-cart-checkout-r1
+
+permissions:
+  contents: read
+  issues: write
+
+on:
+  push:
+    branches:
+      - work/MFK/CUSTOMER-UI4-CART-CHECKOUT-R1
+  workflow_dispatch:
+
+jobs:
+  customer:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: v2customer
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-audit --no-fund --legacy-peer-deps --package-lock=false
+      - name: UI4 Cart Checkout contract
+        run: node --test test/ui4-cart-checkout-r1.test.mjs
+      - name: UI3 Configure regression
+        run: node --test test/ui3-configure-r1.test.mjs
+      - name: Combo Ordering regression
+        run: node --test test/combo-ordering-r1.test.mjs
+      - name: UI2 Browse regression
+        run: node --test test/stage2-menu-r1.test.mjs
+      - name: Combo projection regression
+        run: node --test test/admin-combo-drink-projection-r1.test.mjs
+      - name: Full Customer tests
+        run: npm test
+      - name: Customer build
+        run: npm run build
+
+  v2local:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: v2local
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-audit --no-fund --legacy-peer-deps --package-lock=false
+      - name: Customer intake and Combo authoritative revalidation
+        run: npx vitest run src/runtime/customer-cloud-intake.test.ts src/runtime/customer-combo-ordering-r1.test.ts src/runtime/smm-combo-revalidation.test.ts
+      - name: v2local build
+        run: npm run build
+
+  report:
+    if: always()
+    needs: [customer, v2local]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Publish acceptance result to issue 385
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CUSTOMER_RESULT: ${{ needs.customer.result }}
+          V2LOCAL_RESULT: ${{ needs.v2local.result }}
+        run: |
+          BODY=$(cat <<EOF
+          CUSTOMER UI4 CART_CHECKOUT R1｜CI RESULT
+
+          RUN_ID: $GITHUB_RUN_ID
+          SHA: $GITHUB_SHA
+          BRANCH: $GITHUB_REF_NAME
+
+          CUSTOMER: $CUSTOMER_RESULT
+          V2LOCAL: $V2LOCAL_RESULT
+
+          Automated acceptance evidence only. No main merge and no production deploy were performed.
+          EOF
+          )
+          gh api "repos/$GITHUB_REPOSITORY/issues/385/comments" -f body="$BODY"

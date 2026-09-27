@@ -26,7 +26,7 @@ const styles=fs.readFileSync(path.join(srcRoot,'styles.css'),'utf8');
 
 test('R2 keeps the five-part customer mental model and complete memory jar',()=>{
   for(const label of['首頁','點單','記憶罐','訂單','會員'])assert.match(primitives,new RegExp(label));
-  for(const marker of['記憶罐係今次落單草稿','今次已選','取餐聯絡','目前餐牌價格','前往最後確認'])assert.match(views,new RegExp(marker));
+  for(const marker of['記憶罐係今次落單草稿','今次已選','聯絡與取餐','目前餐牌價格'])assert.match(views,new RegExp(marker));
   assert.match(views,/JarVisual/);
   assert.match(views,/removeConfirm/);
   assert.match(views,/onProduct\(product,[\s\S]*line/);
@@ -96,6 +96,6 @@ test('material menu changes identify exact cart lines and allow in-place price a
   assert.match(quote,/repairPublishedCartLine/);
   assert.match(quote,/PRICE_CHANGED/);
   assert.match(views,/接受並更新呢項價格/);
-  assert.match(views,/直接標記受影響餐點/);
+  assert.match(views,/只標記受影響餐點/);
   assert.doesNotMatch(views,/返回菜單修正/);
 });
