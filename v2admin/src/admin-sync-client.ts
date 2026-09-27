@@ -1,6 +1,7 @@
 import {createMfkAdminConfigEnvelope,type MfkAdminConfigEnvelope,type MfkAdminConfigAck} from '../../contracts/admin-config-sync-v1.ts';
 import {projectStaffForRuntime} from '../../contracts/staff-auth-v1.ts';
 import {readAdminReleases,readAdminStored,writeAdminStored,type AdminRelease} from './admin-local-store.ts';
+import {readStoredAdminBrowserSession} from './admin-browser-session.ts';
 
 const OUTBOX_KEY='sync-outbox.v1';
 const STATUS_KEY='sync-status.v1';
@@ -77,18 +78,23 @@ export async function flushAdminSyncOutbox(){
   const rows=readOutbox();
   if(rows.length===0)return readAdminSyncStatus();
   const latest=rows[rows.length-1]!;
-  const key=publisherKey();
-  if(!key){
+  const browserSession=readStoredAdminBrowserSession();
+  const key=browserSession?'':publisherKey();
+  if(!browserSession&&!key){
     const status={state:'ERROR',revision:latest.revision,fingerprint:latest.fingerprint,updatedAt:new Date().toISOString(),error:'ADMIN_SYNC_PUBLISHER_KEY_UNAVAILABLE'} as const;
     writeStatus(status);
     return status;
   }
   writeStatus({state:'PUBLISHING',revision:latest.revision,fingerprint:latest.fingerprint,updatedAt:new Date().toISOString()});
   try{
-    const response=await fetch('/api/admin-sync/publish?storeId='+encodeURIComponent(latest.storeId),{
+    const endpoint=browserSession?'/api/admin-browser/publish':'/api/admin-sync/publish';
+    const headers:Record<string,string>={'content-type':'application/json'};
+    if(browserSession)headers['x-mfk-admin-session']=browserSession.sessionToken;
+    else headers['x-mfk-admin-publish-key']=key;
+    const response=await fetch(endpoint+'?storeId='+encodeURIComponent(latest.storeId),{
       method:'POST',
       credentials:'same-origin',
-      headers:{'content-type':'application/json','x-mfk-admin-publish-key':key},
+      headers,
       body:JSON.stringify(latest),
     });
     const body=await response.json().catch(()=>({})) as Record<string,unknown>;
