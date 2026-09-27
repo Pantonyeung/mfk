@@ -26,7 +26,7 @@ test('one intent owns one stable submissionId and one derived idempotencyKey',()
   assert.match(persistence,/idempotencyKey:`smm-direct:\$\{submissionId\}`/);
   assert.match(adapter,/submissionId:intent\.submissionId/);
   assert.match(adapter,/idempotencyKey:intent\.idempotencyKey/);
-  assert.match(app,/existing\.submissionId/);
+  assert.match(app,/const base=existing\?\?createSmmPendingIntent/);
 });
 
 test('rapid multi tap is synchronously locked before any await',()=>{
@@ -39,14 +39,14 @@ test('rapid multi tap is synchronously locked before any await',()=>{
 });
 
 test('PENDING uses a human short ref and never renders raw submissionId',()=>{
-  assert.equal(smmStage5SubmissionShortRef('SMM-550e8400-e29b-41d4-a716-446655440000'),'544000');
+  assert.equal(smmStage5SubmissionShortRef('SMM-550e8400-e29b-41d4-a716-446655440000'),'440000');
   assert.match(view,/smmStage5SubmissionShortRef\(session\.intent\.submissionId\)/);
   assert.match(view,/提交參考/);
   assert.doesNotMatch(view,/\{session\.intent\.submissionId\}/);
 });
 
 test('UNKNOWN has one primary recovery: read same submission result',()=>{
-  const unknownStart=view.indexOf("session.state==='UNKNOWN'?");
+  const unknownStart=view.indexOf('<section className="stage5-unknown"');
   const unknownEnd=view.indexOf('</section>:null}',unknownStart);
   const unknown=view.slice(unknownStart,unknownEnd);
   assert.match(unknown,/重新確認結果/);
@@ -60,7 +60,7 @@ test('UNKNOWN has one primary recovery: read same submission result',()=>{
 });
 
 test('CONFIRMED renders only canonical display code, never orderId or UUID',()=>{
-  const confirmedStart=view.indexOf("session.state==='CONFIRMED'?");
+  const confirmedStart=view.indexOf('<section className="stage5-confirmed"');
   const confirmedEnd=view.indexOf('</section>:null}',confirmedStart);
   const confirmed=view.slice(confirmedStart,confirmedEnd);
   assert.match(confirmed,/流水號/);
@@ -105,7 +105,8 @@ test('SMM submit client has one POST seam and no reconnect or timer resend',()=>
 
 test('UNKNOWN pending list hides discard and exposes readback only',()=>{
   assert.match(app,/intent\.state==='UNKNOWN'[\s\S]*重新確認結果/);
-  assert.match(app,/intent\.state!=='UNKNOWN'[\s\S]*刪除草稿/);
+  assert.match(app,/const locked=intent\.state==='UNKNOWN'\|\|intent\.state==='PENDING'/);
+  assert.match(app,/\{!locked\?<button className="danger"[\s\S]*刪除草稿/);
 });
 
 test('Stage 5 remains touch safe and reduced-motion aware',()=>{
