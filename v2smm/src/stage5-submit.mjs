@@ -28,7 +28,7 @@ export function smmStage5SharedState(connection,hasSession=true){
   if(connection==='STALE')return Object.freeze({kind:'STALE',icon:'◷',label:'資料較舊',detail:'畫面使用最近一次讀回；不改寫提交結果。'});
   if(connection==='PARTIAL')return Object.freeze({kind:'PARTIAL',icon:'◫',label:'部分可用',detail:'部分門店資料未完整；不改寫提交結果。'});
   if(connection==='UNKNOWN')return Object.freeze({kind:'UNKNOWN',icon:'?',label:'連線狀態未明',detail:'只代表傳輸／資料狀態，唔等於交易 UNKNOWN。'});
-  if(connection==='ERROR')return Object.freeze({kind:'ERROR',icon:'!',label:'發生錯誤',detail:'門店資料同步失敗；不會自動重新提交。'});
+  if(connection==='ERROR')return Object.freeze({kind:'ERROR',icon:'!',label:'發生錯誤',detail:'門店資料同步失敗；不會自動再次送單。'});
   return null;
 }
 
