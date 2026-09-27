@@ -821,7 +821,9 @@ export function App(){
       reading={stage5Reading}
       onReadback={()=>void readbackIntent(stage5Session.intent)}
       onRepair={repairStage5}
-      onDone={()=>{setStage5Session(null);setCartOpen(false);setCheckoutStage(false)}}
+      onBack={()=>{setStage5Session(null);setCartOpen(false);setCheckoutStage(false);changeView('more');setMoreTool('pending')}}
+      onViewOrder={()=>{setStage5Session(null);setCartOpen(false);setCheckoutStage(false);changeView('orders')}}
+      onContinue={()=>{setStage5Session(null);setCartOpen(false);setCheckoutStage(false);changeView('order')}}
     />:null}
 
     {diningTargetOpen?<DiningTargetSheet
