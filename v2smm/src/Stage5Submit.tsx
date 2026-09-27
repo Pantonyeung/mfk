@@ -34,11 +34,11 @@ function Stage5TopBar({title,onBack}:{title:string;onBack:()=>void}){
 }
 
 const STAGE5_ART=Object.freeze({
-  submitting:'/brand/stage5/stage5-submitting.svg',
-  pending:'/brand/stage5/stage5-pending.svg',
-  confirmed:'/brand/stage5/stage5-confirmed.svg',
-  rejected:'/brand/stage5/stage5-rejected.svg',
-  unknown:'/brand/stage5/stage5-unknown.svg',
+  submitting:'/brand/stage5/stage5-submitting.webp',
+  pending:'/brand/stage5/stage5-pending.webp',
+  confirmed:'/brand/stage5/stage5-confirmed.webp',
+  rejected:'/brand/stage5/stage5-rejected.webp',
+  unknown:'/brand/stage5/stage5-unknown.webp',
 });
 
 function Stage5Artwork({name,alt}:{name:keyof typeof STAGE5_ART;alt:string}){
