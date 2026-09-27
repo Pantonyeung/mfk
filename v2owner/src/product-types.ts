@@ -174,14 +174,24 @@ export interface OwnerOrderProjection {
   readonly timeline:readonly string[];
 }
 
+export type OwnerChannelAction='PAUSE'|'RESUME'|'SNOOZE'|'BUSY';
+
 export interface OwnerChannelHealth {
   readonly channelId:string;
   readonly name:string;
-  readonly desired:string;
-  readonly observed:string;
+  readonly acceptingOrders:boolean|null;
+  readonly desiredState:string;
+  readonly observedState:string;
   readonly health:'HEALTHY'|'DEGRADED'|'OFFLINE'|'UNKNOWN';
-  readonly freshness:string;
+  readonly mode:'NORMAL'|'BUSY'|'SNOOZED'|'PAUSED'|'CLOSED'|'UNKNOWN';
+  readonly cause:'manual'|'schedule'|'internet'|'integration'|'provider'|'platform_suspension'|'policy'|'unknown';
+  readonly freshness:'CURRENT'|'STALE'|'PARTIAL'|'UNKNOWN';
   readonly observedAt:string;
+  readonly lastCommand?:string;
+  readonly readback?:string;
+  readonly availableActions?:readonly OwnerChannelAction[];
+  readonly desired?:string;
+  readonly observed?:string;
 }
 
 export interface OwnerSellabilityItem {
@@ -218,6 +228,10 @@ export interface OwnerReportCard {
   readonly value:string;
   readonly compare?:string;
   readonly freshness:string;
+  readonly businessDate?:string;
+  readonly metricKind?:'CURRENT_EFFECTIVE_SALES'|string;
+  readonly currentEffectiveSalesMinor?:number;
+  readonly metricVersion?:string;
 }
 
 export interface OwnerTodayInsight {
