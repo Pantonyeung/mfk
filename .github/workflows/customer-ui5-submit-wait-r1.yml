@@ -1,0 +1,110 @@
+name: customer-ui5-submit-wait-r1
+
+permissions:
+  contents: read
+  issues: write
+
+on:
+  push:
+    branches:
+      - work/MFK/CUSTOMER-UI5-SUBMIT-WAIT-R1-FRESH
+    paths:
+      - 'v2customer/**'
+      - 'v2local/**'
+      - 'v2admin/**'
+      - 'contracts/**'
+      - '.github/workflows/customer-ui5-submit-wait-r1.yml'
+  workflow_dispatch:
+
+jobs:
+  customer:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: v2customer
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-audit --no-fund --legacy-peer-deps --package-lock=false
+      - name: UI5 Submit Wait contract
+        run: node --test test/ui5-submit-wait-r1.test.mjs
+      - name: UI4 Cart Checkout regression
+        run: node --test test/ui4-cart-checkout-r1.test.mjs
+      - name: UI3 Configure regression
+        run: node --test test/ui3-configure-r1.test.mjs
+      - name: Combo Ordering regression
+        run: node --test test/combo-ordering-r1.test.mjs
+      - name: UI2 Browse regression
+        run: node --test test/stage2-menu-r1.test.mjs
+      - name: Combo projection regression
+        run: node --test test/admin-combo-drink-projection-r1.test.mjs
+      - name: Full Customer tests
+        run: npm test
+      - name: Customer build
+        run: npm run build
+
+  v2local:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: v2local
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-audit --no-fund --legacy-peer-deps --package-lock=false
+      - name: Customer intake and canonical revalidation
+        run: npx vitest run src/runtime/customer-cloud-intake.test.ts src/runtime/customer-combo-ordering-r1.test.ts src/runtime/smm-combo-revalidation.test.ts
+      - name: v2local build
+        run: npm run build
+
+  admin:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: v2admin
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-audit --no-fund --legacy-peer-deps --package-lock=false
+      - name: Customer edge identity contract
+        run: npx vitest run src/customer-cloud-edge.test.ts src/customer-runtime.test.ts
+      - name: Full Admin tests
+        run: npm test
+      - name: Admin build
+        run: npm run build
+      - name: Wrangler dry-run
+        run: npx --yes wrangler@4 deploy --dry-run --config wrangler.jsonc
+
+  report:
+    if: always()
+    needs: [customer, v2local, admin]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Publish acceptance result to issue 392
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CUSTOMER_RESULT: ${{ needs.customer.result }}
+          V2LOCAL_RESULT: ${{ needs.v2local.result }}
+          ADMIN_RESULT: ${{ needs.admin.result }}
+        run: |
+          BODY=$(cat <<EOF
+          CUSTOMER UI5 SUBMIT_WAIT R1｜CI RESULT
+
+          RUN_ID: $GITHUB_RUN_ID
+          SHA: $GITHUB_SHA
+          BRANCH: $GITHUB_REF_NAME
+
+          CUSTOMER: $CUSTOMER_RESULT
+          V2LOCAL: $V2LOCAL_RESULT
+          ADMIN: $ADMIN_RESULT
+
+          Automated acceptance evidence only. No main merge and no production deploy were performed.
+          EOF
+          )
+          gh api "repos/$GITHUB_REPOSITORY/issues/392/comments" -f body="$BODY"
