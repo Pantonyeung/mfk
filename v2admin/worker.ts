@@ -148,6 +148,26 @@ function normalizedOwnerCostLine(raw,index,updatedAt,updatedBy){
     updatedAt,updatedBy,
   });
 }
+const OWNER_WEEKDAY_KEYS=Object.freeze(['SUN','MON','TUE','WED','THU','FRI','SAT']);
+export function ownerRemainingOperatingDays(active,monthKey,observedAt=new Date().toISOString()){
+  if(!validMonthKey(monthKey))return undefined;
+  const weekly=row(row(row(active).snapshot).storeSettings).weeklyHours;
+  const schedule=row(weekly);
+  if(!Object.keys(schedule).length)return undefined;
+  const [year,month]=monthKey.split('-').map(Number);
+  const daysInMonth=new Date(Date.UTC(year,month,0)).getUTCDate();
+  const today=hktDate(observedAt);
+  const currentMonth=today.slice(0,7);
+  const startDay=monthKey===currentMonth?Number(today.slice(8,10)):monthKey<currentMonth?daysInMonth+1:1;
+  let count=0;
+  for(let day=Math.max(1,startDay);day<=daysInMonth;day++){
+    const key=OWNER_WEEKDAY_KEYS[new Date(Date.UTC(year,month-1,day)).getUTCDay()];
+    const rule=row(schedule[key]);
+    if(Object.keys(rule).length&&rule.closed!==true)count++;
+  }
+  return count;
+}
+
 export function calculateOwnerPlanningMetrics({monthKey,currentEffectiveSalesMinor,plan,observedAt=new Date().toISOString(),remainingOperatingDays}){
   if(!validMonthKey(monthKey))throw new Error('OWNER_PLAN_MONTH_INVALID');
   const [year,month]=monthKey.split('-').map(Number);
@@ -168,7 +188,7 @@ export function calculateOwnerPlanningMetrics({monthKey,currentEffectiveSalesMin
   const actualLines=costLines.filter(item=>row(item).actualToDateMinor!==undefined&&row(item).actualToDateMinor!==null);
   const actualToDateCostMinor=actualLines.reduce((sum,item)=>sum+Math.max(0,Math.round(Number(row(item).actualToDateMinor)||0)),0);
   const actualCostAvailable=actualLines.length>0;
-  const costCoverage=actualLines.length===0||actualLines.length<costLines.length?'PARTIAL':'MANUAL_ESTIMATE';
+  const costCoverage=actualLines.length===0?'MANUAL_ESTIMATE':actualLines.length<costLines.length?'PARTIAL':'COMPLETE';
   const targetOperatingSurplusMinor=target-monthlyPlannedCostMinor;
   const estimatedOperatingProfitToDateMinor=actualCostAvailable?sales-actualToDateCostMinor:undefined;
   let forecastTargetDate;
@@ -671,10 +691,11 @@ export class AdminSyncStore{
     for(const socket of this.state.getWebSockets()){try{socket.send(doorbell);}catch{}}
     return{status:200,body:{state:'PUBLISHED',active:{revision:envelope.revision,fingerprint:envelope.fingerprint,publishedAt:envelope.publishedAt}}};
   }
-  async ownerChannels(active,observedAt=new Date().toISOString()){
+  async ownerChannels(active,observedAt=new Date().toISOString(),freshReadback=false){
     let keetaStatus=null,customerHealth=null;
     try{
       const id=this.env.KEETA_RUNTIME.idFromName('MF01'),stub=this.env.KEETA_RUNTIME.get(id);
+      if(freshReadback)await stub.fetch(new Request('https://internal/admin/store/readback',{method:'POST'}));
       const response=await stub.fetch(new Request('https://internal/admin/store/status',{method:'GET'}));
       if(response.ok)keetaStatus=await response.json();
     }catch{}
@@ -751,11 +772,12 @@ export class AdminSyncStore{
     return stored||ownerDefaultPlan(monthKey);
   }
   async ownerPlanningSnapshot(monthKey,observedAt=new Date().toISOString()){
-    const [plan,reports]=await Promise.all([this.readOwnerMonthlyPlan(monthKey),this.projectionReports()]);
+    const [plan,reports,active]=await Promise.all([this.readOwnerMonthlyPlan(monthKey),this.projectionReports(),this.state.storage.get('active')]);
     const currentEffectiveSalesMinor=reports.filter(item=>String(item.date||'').startsWith(monthKey+'-')).reduce((sum,item)=>sum+Math.round(Number(item.netMinor)||0),0);
+    const remainingOperatingDays=ownerRemainingOperatingDays(active,monthKey,observedAt);
     return Object.freeze({
       plan,
-      metrics:calculateOwnerPlanningMetrics({monthKey,currentEffectiveSalesMinor,plan,observedAt}),
+      metrics:calculateOwnerPlanningMetrics({monthKey,currentEffectiveSalesMinor,plan,observedAt,remainingOperatingDays}),
       observedAt,
       freshness:'CURRENT',
       readback:'CONFIRMED',
@@ -764,6 +786,14 @@ export class AdminSyncStore{
   async saveOwnerMonthlyPlan(session,input){
     const monthKey=String(input?.monthKey||'').trim();
     if(!validMonthKey(monthKey))return{state:'REJECTED',message:'月份格式無效'};
+    const operationId=String(input?.operationId||'').trim().slice(0,160);
+    if(!operationId)return{state:'REJECTED',message:'缺少 operation identity'};
+    const operationKey='owner:planning:operation:'+operationId;
+    const prior=await this.state.storage.get(operationKey);
+    if(prior){
+      if(String(prior.monthKey)!==monthKey)return{state:'REJECTED',message:'operation identity 已用於另一個月份'};
+      return prior.result;
+    }
     const current=await this.readOwnerMonthlyPlan(monthKey);
     const baseRevision=Math.floor(Number(input?.baseRevision));
     if(baseRevision!==Number(current.revision||0))return{state:'REJECTED',message:'規劃已被更新，請重新讀取',currentRevision:Number(current.revision||0)};
@@ -785,11 +815,15 @@ export class AdminSyncStore{
     await this.state.storage.put('owner:planning:'+monthKey,plan);
     const readback=await this.state.storage.get('owner:planning:'+monthKey);
     if(!readback||Number(readback.revision)!==plan.revision){
-      await this.appendOwnerActivity(session,{operationId:input?.operationId,title:'營業目標與成本',target:monthKey,result:'UNKNOWN',readback:'CANONICAL_READBACK_MISMATCH'});
-      return{state:'UNKNOWN',message:'保存結果未明；請重新讀取'};
+      const result={state:'UNKNOWN',message:'保存結果未明；請重新讀取'};
+      await this.state.storage.put(operationKey,{monthKey,result,createdAt:updatedAt});
+      await this.appendOwnerActivity(session,{operationId,title:'營業目標與成本',target:monthKey,result:'UNKNOWN',readback:'CANONICAL_READBACK_MISMATCH'});
+      return result;
     }
-    await this.appendOwnerActivity(session,{operationId:input?.operationId,title:'營業目標與成本',target:monthKey,result:'CONFIRMED',readback:'revision '+String(plan.revision)});
-    return{state:'CONFIRMED',message:'規劃已保存並完成 canonical readback',snapshot:await this.ownerPlanningSnapshot(monthKey)};
+    const result={state:'CONFIRMED',message:'規劃已保存並完成 canonical readback',snapshot:await this.ownerPlanningSnapshot(monthKey)};
+    await this.state.storage.put(operationKey,{monthKey,result,createdAt:updatedAt});
+    await this.appendOwnerActivity(session,{operationId,title:'營業目標與成本',target:monthKey,result:'CONFIRMED',readback:'revision '+String(plan.revision)});
+    return result;
   }
 
   async businessCutoff(){
@@ -1043,7 +1077,7 @@ export class AdminSyncStore{
     if(url.pathname==='/owner/channels'&&request.method==='GET'){
       const session=await this.readOwnerSession(request);if(!session)return json({code:'OWNER_SESSION_UNAUTHORIZED'},401);
       const observedAt=new Date().toISOString(),active=await this.state.storage.get('active');
-      return json({channels:await this.ownerChannels(active,observedAt),observedAt});
+      return json({channels:await this.ownerChannels(active,observedAt,true),observedAt});
     }
     if(url.pathname==='/owner/planning'){
       const session=await this.readOwnerSession(request);if(!session)return json({code:'OWNER_SESSION_UNAUTHORIZED'},401);
@@ -1063,8 +1097,14 @@ export class AdminSyncStore{
       let input;try{input=await request.json();}catch{return json({code:'OWNER_CHANNEL_COMMAND_INVALID'},400);}
       const channelId=String(input?.channelId||'').trim().toUpperCase();
       const action=String(input?.action||'').trim().toUpperCase();
-      const operationId=String(input?.operationId||'').trim();
+      const operationId=String(input?.operationId||'').trim().slice(0,160);
       if(!operationId)return json({state:'REJECTED',message:'缺少 operation identity'});
+      const operationKey='owner:channel:operation:'+operationId;
+      const priorOperation=await this.state.storage.get(operationKey);
+      if(priorOperation){
+        if(String(priorOperation.channelId)!==channelId||String(priorOperation.action)!==action)return json({state:'REJECTED',message:'operation identity 已用於另一個渠道操作'});
+        return json(priorOperation.result);
+      }
       if(channelId!=='KEETA'||!['PAUSE','RESUME'].includes(action)){
         await this.appendOwnerActivity(session,{operationId,title:'渠道控制 '+action,target:channelId,result:'REJECTED',readback:'UNSUPPORTED_CANONICAL_SEAM'});
         return json({state:'REJECTED',message:'目前未有對應 canonical command seam；操作保持停用。'});
@@ -1072,12 +1112,16 @@ export class AdminSyncStore{
       const id=this.env.KEETA_RUNTIME.idFromName('MF01'),stub=this.env.KEETA_RUNTIME.get(id);
       let beforeResponse;
       try{beforeResponse=await stub.fetch(new Request('https://internal/admin/store/readback',{method:'POST'}));}catch{
+        const result={state:'UNKNOWN',message:'正式狀態未能讀回；未有提交操作，禁止 blind retry。'};
+        await this.state.storage.put(operationKey,{channelId,action,result,createdAt:new Date().toISOString()});
         await this.appendOwnerActivity(session,{operationId,title:'渠道控制 '+action,target:channelId,result:'UNKNOWN',readback:'PRE_COMMAND_READBACK_UNAVAILABLE'});
-        return json({state:'UNKNOWN',message:'正式狀態未能讀回；未有提交操作，禁止 blind retry。'});
+        return json(result);
       }
       if(!beforeResponse.ok){
+        const result={state:'UNKNOWN',message:'正式狀態未能讀回；未有提交操作，禁止 blind retry。'};
+        await this.state.storage.put(operationKey,{channelId,action,result,createdAt:new Date().toISOString()});
         await this.appendOwnerActivity(session,{operationId,title:'渠道控制 '+action,target:channelId,result:'UNKNOWN',readback:'PRE_COMMAND_READBACK_FAILED'});
-        return json({state:'UNKNOWN',message:'正式狀態未能讀回；未有提交操作，禁止 blind retry。'});
+        return json(result);
       }
       let commandResponse;
       try{
@@ -1097,10 +1141,12 @@ export class AdminSyncStore{
       const channel=normalizeOwnerKeetaChannel(afterBody,new Date().toISOString());
       const expectedAccepting=action==='RESUME';
       const confirmed=channel.readback==='CONFIRMED'&&channel.acceptingOrders===expectedAccepting;
-      const result=confirmed?'CONFIRMED':'UNKNOWN';
+      const state=confirmed?'CONFIRMED':'UNKNOWN';
       const message=confirmed?'渠道操作已完成 canonical/provider readback。':'操作結果未明；只可重新讀回，禁止 blind retry。';
-      await this.appendOwnerActivity(session,{operationId,title:'渠道控制 '+action,target:channelId,result,readback:channel.observedState});
-      return json({state:result,message,channel,readback:channel.observedState});
+      const result={state,message,channel,readback:channel.observedState};
+      await this.state.storage.put(operationKey,{channelId,action,result,createdAt:new Date().toISOString()});
+      await this.appendOwnerActivity(session,{operationId,title:'渠道控制 '+action,target:channelId,result:state,readback:channel.observedState});
+      return json(result);
     }
 
     if(url.pathname==='/admin-browser/auth/challenge'&&request.method==='POST'){
