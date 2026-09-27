@@ -133,14 +133,14 @@ async function hmacHex(keyHex:string,message:string){
   return bytesToHex(new Uint8Array(signature));
 }
 
-export async function verifySmmStaff(staffId:string,pin:string):Promise<SmmStaffSession>{
+export async function verifySmmStaff(identifier:string,pin:string):Promise<SmmStaffSession>{
   const cleanPin=String(pin||'').replace(/\D/g,'');
   if(cleanPin.length<4||cleanPin.length>8)throw new Error('PIN 必須為 4–8 位數字');
 
   const challengeResponse=await fetch('/api/smm/staff/challenge',{
     method:'POST',
     headers:{'content-type':'application/json'},
-    body:JSON.stringify({staffId}),
+    body:JSON.stringify({loginId:identifier}),
   });
   const challengeBody=await challengeResponse.json().catch(()=>({})) as Record<string,unknown>;
   if(!challengeResponse.ok){
@@ -148,10 +148,11 @@ export async function verifySmmStaff(staffId:string,pin:string):Promise<SmmStaff
   }
 
   const challengeId=String(challengeBody.challengeId??'').trim();
+  const canonicalStaffId=String(challengeBody.staffId??'').trim();
   const nonce=String(challengeBody.nonce??'').trim();
   const saltHex=String(challengeBody.saltHex??'').trim();
   const iterations=Number(challengeBody.iterations);
-  if(!challengeId||!nonce||!saltHex||!Number.isSafeInteger(iterations)){
+  if(!challengeId||!canonicalStaffId||!nonce||!saltHex||!Number.isSafeInteger(iterations)){
     throw new Error('SMM_AUTH_CHALLENGE_INVALID');
   }
 
@@ -161,13 +162,13 @@ export async function verifySmmStaff(staffId:string,pin:string):Promise<SmmStaff
   }catch(error){
     throw new Error(error instanceof Error?'瀏覽器 PIN 驗證失敗：'+error.message:'瀏覽器 PIN 驗證失敗');
   }
-  const proofMessage='MFK_SMM_STAFF_LOGIN_V1\n'+challengeId+'\n'+staffId+'\n'+nonce;
+  const proofMessage='MFK_SMM_STAFF_LOGIN_V1\n'+challengeId+'\n'+canonicalStaffId+'\n'+nonce;
   const proofHex=await hmacHex(derivedHex,proofMessage);
 
   const response=await fetch('/api/smm/staff/verify',{
     method:'POST',
     headers:{'content-type':'application/json'},
-    body:JSON.stringify({staffId,challengeId,proofHex}),
+    body:JSON.stringify({staffId:canonicalStaffId,challengeId,proofHex}),
   });
   const raw=await response.text();
   let body:Record<string,unknown>={};
@@ -180,6 +181,7 @@ export async function verifySmmStaff(staffId:string,pin:string):Promise<SmmStaff
 
   const session=cleanSession({
     staffId:body.staffId,
+    loginId:body.loginId,
     displayName:body.displayName,
     role:body.role,
     sessionToken:body.sessionToken,
