@@ -420,7 +420,6 @@ export interface OwnerReadModelSnapshot {
   readonly actions:readonly OwnerActionItem[];
   readonly orders:readonly OwnerOrderProjection[];
   readonly channels:readonly OwnerChannelHealth[];
-  readonly planning?:OwnerPlanningSummary;
   readonly sellability:readonly OwnerSellabilityItem[];
   readonly staff:readonly OwnerStaffPresence[];
   readonly devices:readonly OwnerDeviceHealth[];
