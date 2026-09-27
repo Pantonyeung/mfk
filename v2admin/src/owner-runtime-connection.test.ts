@@ -41,5 +41,25 @@ describe('Owner canonical read projection',()=>{
     expect(snapshot.campaigns).toEqual([]);
     expect(snapshot.sellability[0].state).toBe('可售');
     expect(snapshot.devices[0].health).toBe('UNKNOWN');
+    expect(snapshot.reports[0]).toMatchObject({
+      businessDate:'2026-09-27',
+      metricKind:'CURRENT_EFFECTIVE_SALES',
+      currentEffectiveSalesMinor:5200,
+      metricVersion:'MFK_CURRENT_EFFECTIVE_SALES_V1',
+    });
+  });
+
+  it('passes channel facts through as projection without creating a second channel authority',()=>{
+    const channels=[{
+      channelId:'KEETA',name:'Keeta',acceptingOrders:true,desiredState:'OPEN',observedState:'OPEN',
+      health:'HEALTHY',mode:'NORMAL',cause:'unknown',freshness:'CURRENT',
+      observedAt:'2026-09-27T01:09:00Z',readback:'PROVIDER_OPEN',availableActions:[],
+    }];
+    const snapshot=buildOwnerReadModelSnapshot({
+      active:{storeId:'MF01',snapshot:{storeSettings:{storeName:'磨飯'},catalog:{products:[]},availability:{},staffAuth:{staff:[]}}},
+      orders:[],reports:[],acks:{},channels,observedAt:'2026-09-27T01:10:00Z',
+    });
+    expect(snapshot.channels).toEqual(channels);
+    expect(snapshot.channels[0].readback).toBe('PROVIDER_OPEN');
   });
 });
