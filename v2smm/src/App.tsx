@@ -1154,22 +1154,22 @@ function ProductSheet({
       <div className="sheet-grabber"/>
       <header className="stage2-sheet-header">
         <div>
-          <span>{editing?'編輯商品':'商品設定'}</span>
+          <span>{editing?'編輯商品':'商品客製'}</span>
           <h2>{product.name}</h2>
-          <small>{product.description??'按需要完成規格、選項同套餐設定'}</small>
+          <small>{product.description??'揀好必選項，再按需要加配。'}</small>
         </div>
-        <button className="stage2-close" onClick={onClose} aria-label="關閉商品設定">✕</button>
+        <button className="stage2-close" onClick={onClose} aria-label="關閉商品客製">✕</button>
       </header>
 
       <div className="stage2-scroll-body">
         <section className="stage2-product-summary" aria-label="商品摘要">
-          <span className="stage2-product-media" aria-label="正式產品圖片待補"/>
+          <ProductMedia product={product} className="stage2-product-media"/>
           <div>
-            <small>{comboEnabled&&combo?'套餐已發布基礎價':serviceMode==='DINE_IN'?'堂食價格':'外賣價格'}</small>
-            <strong>{draftBaseMinor===null?'價格待同步':money('HKD',draftBaseMinor)}</strong>
-            <span>選項調整 {deltaLabel(selectedAdjustmentMinor)}</span>
-            {comboEnabled?<span>套餐選擇 {deltaLabel(selectedComboAdjustmentMinor)}</span>:null}
-            <b>{draftUnitMinor===null?'草稿價格待同步':money('HKD',draftUnitMinor)}</b>
+            <small>{comboEnabled&&combo?'套餐價':serviceMode==='DINE_IN'?'堂食':'外賣'}</small>
+            <strong>{draftBaseMinor===null?'價格更新中':money('HKD',draftBaseMinor)}</strong>
+            <span>加配 {deltaLabel(selectedAdjustmentMinor)}</span>
+            {comboEnabled?<span>套餐內容 {deltaLabel(selectedComboAdjustmentMinor)}</span>:null}
+            <b>{draftUnitMinor===null?'總價更新中':money('HKD',draftUnitMinor)}</b>
           </div>
         </section>
 
@@ -1230,7 +1230,7 @@ function ProductSheet({
           <div className="stage2-section-head stage2-combo-head">
             <div>
               <strong>套餐</strong>
-              <small>{combo.combo.name} · 只讀 Admin 已發布 Combo / Pool；正式提交由 SMT 再驗證</small>
+              <small>{combo.combo.name} · 揀你想要嘅套餐內容</small>
             </div>
             <button
               type="button"
@@ -1283,7 +1283,7 @@ function ProductSheet({
         </section>:null}
 
         {(!validation.ok||!comboValidation.ok)&&firstIssue?<section className="stage2-validation-summary" role="status">
-          <strong>仲有設定未完成</strong>
+          <strong>仲差一個選擇</strong>
           <span>{firstIssue}</span>
         </section>:null}
       </div>
@@ -1291,8 +1291,8 @@ function ProductSheet({
       <footer className="stage2-sticky-footer">
         <button onClick={onClose}>取消</button>
         <button className="primary" disabled={!validation.ok||!variationOk||!comboValidation.ok} onClick={onAdd}>
-          <span>{editing?'完成':comboEnabled?'加入套餐草稿':'加入草稿'}</span>
-          <small>{draftUnitMinor===null?'價格待同步':money('HKD',draftUnitMinor)}</small>
+          <span>{editing?'儲存修改':'加入購物車'}</span>
+          <small>{draftUnitMinor===null?'價格更新中':money('HKD',draftUnitMinor)}</small>
         </button>
       </footer>
     </section>
