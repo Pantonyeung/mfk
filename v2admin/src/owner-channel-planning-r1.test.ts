@@ -1,7 +1,7 @@
 import {describe,expect,it} from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
-import {calculateOwnerPlanningMetrics,normalizeOwnerKeetaChannel,normalizeOwnerOwnPlatformChannel,ownerRemainingOperatingDays} from '../worker.ts';
+import {AdminSyncStore,calculateOwnerPlanningMetrics,normalizeOwnerKeetaChannel,normalizeOwnerOwnPlatformChannel,ownerRemainingOperatingDays} from '../worker.ts';
 
 describe('Owner Stage04 channel + planning',()=>{
   it('keeps channel health separate from accepting orders and exposes only supported controls',()=>{
@@ -89,4 +89,76 @@ describe('Owner Stage04 channel + planning',()=>{
     expect(worker).not.toContain("owner:channel:operation:");
     expect(worker).not.toContain('OWNER_FINANCE_DB');
   });
+
+  it('canonical plan write increments revision and a fresh runtime instance reads the same plan',async()=>{
+    const data=new Map<string,unknown>();
+    const storage={
+      get:async(key:string)=>data.get(key),
+      put:async(key:string,value:unknown)=>{data.set(key,value);},
+      list:async({prefix}:{prefix:string})=>new Map([...data].filter(([key])=>key.startsWith(prefix))),
+    };
+    const state={storage,getWebSockets:()=>[]} as never;
+    const session={staffId:'owner-1',loginId:'1111',displayName:'Owner'};
+    const first=new AdminSyncStore(state,{} as never);
+    const result=await first.saveOwnerMonthlyPlan(session,{
+      monthKey:'2026-09',monthlyRevenueTargetMinor:3000000,expectedRevision:0,operationId:'plan-op-1',
+      note:'September plan',
+      costLines:[
+        {costLineId:'rent',category:'RENT',label:'屋租',plannedMonthlyMinor:500000,actualToDateMinor:500000},
+        {costLineId:'labor',category:'LABOR',label:'人工',plannedMonthlyMinor:800000,actualToDateMinor:400000},
+      ],
+    });
+    expect(result.state).toBe('CONFIRMED');
+    expect(result.snapshot.plan.revision).toBe(1);
+    expect(result.snapshot.plan.updatedBy).toBe('owner-1');
+
+    const freshDeviceRuntime=new AdminSyncStore(state,{} as never);
+    const readback=await freshDeviceRuntime.readOwnerMonthlyPlan('2026-09','MF01');
+    expect(readback.revision).toBe(1);
+    expect(readback.monthlyRevenueTargetMinor).toBe(3000000);
+    expect(readback.costLines[0].label).toBe('屋租');
+    expect(data.has('owner:planning:MF01:2026-09')).toBe(true);
+  });
+
+  it('revision conflict fails closed and requires refresh',async()=>{
+    const data=new Map<string,unknown>();
+    const storage={
+      get:async(key:string)=>data.get(key),
+      put:async(key:string,value:unknown)=>{data.set(key,value);},
+      list:async({prefix}:{prefix:string})=>new Map([...data].filter(([key])=>key.startsWith(prefix))),
+    };
+    const runtime=new AdminSyncStore({storage,getWebSockets:()=>[]} as never,{} as never);
+    const session={staffId:'owner-1',loginId:'1111',displayName:'Owner'};
+    const input={monthKey:'2026-09',monthlyRevenueTargetMinor:3000000,expectedRevision:0,costLines:[{costLineId:'rent',category:'RENT',label:'屋租',plannedMonthlyMinor:500000}]};
+    expect((await runtime.saveOwnerMonthlyPlan(session,{...input,operationId:'op-a'})).state).toBe('CONFIRMED');
+    const conflict=await runtime.saveOwnerMonthlyPlan(session,{...input,operationId:'op-b',monthlyRevenueTargetMinor:4000000});
+    expect(conflict.state).toBe('REJECTED');
+    expect(conflict.currentRevision).toBe(1);
+    expect((await runtime.readOwnerMonthlyPlan('2026-09','MF01')).monthlyRevenueTargetMinor).toBe(3000000);
+  });
+
+  it('canonical readback mismatch returns UNKNOWN and never fake-green',async()=>{
+    const data=new Map<string,unknown>();
+    let corruptReadback=false;
+    const storage={
+      get:async(key:string)=>{
+        const value=data.get(key) as any;
+        if(corruptReadback&&key==='owner:planning:MF01:2026-09'&&value)return {...value,revision:999};
+        return value;
+      },
+      put:async(key:string,value:unknown)=>{
+        data.set(key,value);
+        if(key==='owner:planning:MF01:2026-09')corruptReadback=true;
+      },
+      list:async({prefix}:{prefix:string})=>new Map([...data].filter(([key])=>key.startsWith(prefix))),
+    };
+    const runtime=new AdminSyncStore({storage,getWebSockets:()=>[]} as never,{} as never);
+    const result=await runtime.saveOwnerMonthlyPlan({staffId:'owner-1',loginId:'1111',displayName:'Owner'},{
+      monthKey:'2026-09',monthlyRevenueTargetMinor:3000000,expectedRevision:0,operationId:'op-unknown',
+      costLines:[{costLineId:'rent',category:'RENT',label:'屋租',plannedMonthlyMinor:500000}],
+    });
+    expect(result.state).toBe('UNKNOWN');
+    expect(result.message).toContain('重新讀取');
+  });
+
 });
