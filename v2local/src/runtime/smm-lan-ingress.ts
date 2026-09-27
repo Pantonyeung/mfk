@@ -8,7 +8,7 @@ import type {SmmLanOrderRequest,SmmLanOrderResponse,SmmLanSubmissionReadbackResp
 
 const RESULT_KEY='mfk.v2local.smm-lan-results.v1';
 
-interface StoredResult{readonly submissionId:string;readonly orderId:string;readonly canonicalRevision:number;readonly idempotencyKey:string;readonly requestId:string}
+interface StoredResult{readonly submissionId:string;readonly orderId:string;readonly displayCode:string;readonly canonicalRevision:number;readonly idempotencyKey:string;readonly requestId:string}
 
 function results():StoredResult[]{
   try{const value=JSON.parse(localStorage.getItem(RESULT_KEY)||'[]');return Array.isArray(value)?value:[];}catch{return[]}
@@ -195,7 +195,7 @@ export function createSmmLanIngress(runtime:MfkLocalRuntime){
       const prior=results().find(row=>row.submissionId===input.submissionId);
       if(prior){
         if(prior.idempotencyKey!==input.idempotencyKey)return rejected(input,'SMM_LAN_IDEMPOTENCY_CONFLICT');
-        return Object.freeze({protocolVersion:1,type:'smm.lan.order.result.v1',requestId:input.requestId,submissionId:input.submissionId,idempotencyKey:input.idempotencyKey,disposition:'ACCEPTED',orderId:prior.orderId,canonicalRevision:prior.canonicalRevision});
+        return Object.freeze({protocolVersion:1,type:'smm.lan.order.result.v1',requestId:input.requestId,submissionId:input.submissionId,idempotencyKey:input.idempotencyKey,disposition:'ACCEPTED',orderId:prior.orderId,displayCode:prior.displayCode,canonicalRevision:prior.canonicalRevision});
       }
 
       const providerRef='SMM:'+input.submissionId;
@@ -203,8 +203,14 @@ export function createSmmLanIngress(runtime:MfkLocalRuntime){
         ??runtime.holds().find(hold=>hold.providerRef===providerRef||(hold.smmSubmissionRefs??[]).includes(providerRef));
       if(recovered){
         const canonicalRevision=1;
-        writeResults([...results(),{submissionId:input.submissionId,orderId:recovered.id,canonicalRevision,idempotencyKey:input.idempotencyKey,requestId:input.requestId}]);
-        return Object.freeze({protocolVersion:1,type:'smm.lan.order.result.v1',requestId:input.requestId,submissionId:input.submissionId,idempotencyKey:input.idempotencyKey,disposition:'ACCEPTED',orderId:recovered.id,canonicalRevision});
+        const recoveredHold='formalOrderId' in recovered?recovered:undefined;
+        const orderId=recoveredHold?.formalOrderId??recovered.id;
+        const displayCode='display' in recovered
+          ?String(recovered.display||'')
+          :String(recoveredHold?.formalOrderDisplay||'');
+        if(!displayCode)return rejected(input,'SMM_CANONICAL_DISPLAY_REQUIRED');
+        writeResults([...results(),{submissionId:input.submissionId,orderId,displayCode,canonicalRevision,idempotencyKey:input.idempotencyKey,requestId:input.requestId}]);
+        return Object.freeze({protocolVersion:1,type:'smm.lan.order.result.v1',requestId:input.requestId,submissionId:input.submissionId,idempotencyKey:input.idempotencyKey,disposition:'ACCEPTED',orderId,displayCode,canonicalRevision});
       }
 
       const envelope=readSmtAdminConfigLkg();
@@ -280,14 +286,16 @@ export function createSmmLanIngress(runtime:MfkLocalRuntime){
           sourceLabel:'SMM',
         });
         const canonicalOrderId=hold.formalOrderId??hold.id;
+        const displayCode=String(hold.formalOrderDisplay||'').trim();
+        if(!displayCode)return rejected(input,'SMM_CANONICAL_DISPLAY_REQUIRED');
         const addition=hold.additions?.find(row=>row.submissionId===providerRef);
         if(addition){
           void runtime.ensureDiningAdditionPrint?.(hold.id,addition.id).catch(()=>{});
         }else if(hold.formalOrderId){
           void runtime.ensureDiningInitialPrint?.(hold.id).catch(()=>{});
         }
-        writeResults([...results(),{submissionId:input.submissionId,orderId:canonicalOrderId,canonicalRevision,idempotencyKey:input.idempotencyKey,requestId:input.requestId}]);
-        return Object.freeze({protocolVersion:1,type:'smm.lan.order.result.v1',requestId:input.requestId,submissionId:input.submissionId,idempotencyKey:input.idempotencyKey,disposition:'ACCEPTED',orderId:canonicalOrderId,canonicalRevision});
+        writeResults([...results(),{submissionId:input.submissionId,orderId:canonicalOrderId,displayCode,canonicalRevision,idempotencyKey:input.idempotencyKey,requestId:input.requestId}]);
+        return Object.freeze({protocolVersion:1,type:'smm.lan.order.result.v1',requestId:input.requestId,submissionId:input.submissionId,idempotencyKey:input.idempotencyKey,disposition:'ACCEPTED',orderId:canonicalOrderId,displayCode,canonicalRevision});
       }
       const order=runtime.createOrder({
         items,
@@ -297,13 +305,13 @@ export function createSmmLanIngress(runtime:MfkLocalRuntime){
         providerRef,
         initialFulfillmentLabel:'進行中',
       });
-      writeResults([...results(),{submissionId:input.submissionId,orderId:order.id,canonicalRevision,idempotencyKey:input.idempotencyKey,requestId:input.requestId}]);
-      return Object.freeze({protocolVersion:1,type:'smm.lan.order.result.v1',requestId:input.requestId,submissionId:input.submissionId,idempotencyKey:input.idempotencyKey,disposition:'ACCEPTED',orderId:order.id,canonicalRevision});
+      writeResults([...results(),{submissionId:input.submissionId,orderId:order.id,displayCode:order.display,canonicalRevision,idempotencyKey:input.idempotencyKey,requestId:input.requestId}]);
+      return Object.freeze({protocolVersion:1,type:'smm.lan.order.result.v1',requestId:input.requestId,submissionId:input.submissionId,idempotencyKey:input.idempotencyKey,disposition:'ACCEPTED',orderId:order.id,displayCode:order.display,canonicalRevision});
     },
     readSubmission(submissionId:string):SmmLanSubmissionReadbackResponse{
       const prior=results().find(row=>row.submissionId===submissionId);
       return prior
-        ?Object.freeze({protocolVersion:1,type:'smm.lan.order.readback.result.v1',submissionId,state:'CONFIRMED',orderId:prior.orderId,canonicalRevision:prior.canonicalRevision})
+        ?Object.freeze({protocolVersion:1,type:'smm.lan.order.readback.result.v1',submissionId,state:'CONFIRMED',orderId:prior.orderId,displayCode:prior.displayCode,canonicalRevision:prior.canonicalRevision})
         :Object.freeze({protocolVersion:1,type:'smm.lan.order.readback.result.v1',submissionId,state:'UNKNOWN'});
     },
   });
