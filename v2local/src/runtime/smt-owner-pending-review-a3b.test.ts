@@ -31,10 +31,6 @@ function installStorage(){
     get length(){return values.size;},
   }});
   Object.defineProperty(globalThis,'navigator',{configurable:true,value:{onLine:false}});
-  Object.defineProperty(globalThis,'URL',{configurable:true,value:{
-    createObjectURL:vi.fn(()=> 'blob:test'),
-    revokeObjectURL:vi.fn(),
-  }});
 }
 async function boot(){return (await import('./local-runtime.ts')).localRuntime as any;}
 
