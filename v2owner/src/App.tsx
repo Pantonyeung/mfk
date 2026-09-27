@@ -152,7 +152,7 @@ export function App(){
     const key=monthKey??new Date(Date.now()+8*60*60*1000).toISOString().slice(0,7);
     setPlanningLoading(true);
     try{setPlanning(await port.readPlanning(key));}
-    catch{setNotice('未能讀取 canonical planning；唔會用本機資料代替。');}
+    catch{setNotice('未能讀取最新規劃；暫時唔會用舊資料代替。');}
     finally{setPlanningLoading(false);}
   };
   const loadSellability=async()=>{
@@ -162,19 +162,19 @@ export function App(){
       setSnapshot(current=>current?{...current,sellability:items}:current);
       return items;
     }catch{
-      setNotice('未能讀取 canonical Sellability；保持 UNKNOWN，唔會由 Inventory 推斷。');
+      setNotice('未能確認最新商品供應狀態；暫時保持未有資料。');
       return null;
     }
   };
   const commandSellability=async(input:OwnerSellabilityCommandInput)=>{
-    if(!port?.commandSellability){setNotice('Sellability command seam 未連接；冇改變正式狀態。');return}
+    if(!port?.commandSellability){setNotice('商品供應操作暫未連接；正式狀態沒有改變。');return}
     if(connection==='OFFLINE_READONLY'||connection==='PERMISSION_DENIED'){setNotice('目前只可讀取；售罄操作已停用。');return}
     setSellabilityBusy(true);
     try{
       const result=await port.commandSellability(input);
-      if(result.state==='CONFIRMED')setNotice('售罄操作已完成 canonical apply + per-target readback。');
-      else if(result.state==='PARTIAL')setNotice('部分目標已確認；其餘保持結果未明。');
-      else setNotice('操作結果未明；請重新讀取，禁止 blind retry。');
+      if(result.state==='CONFIRMED')setNotice('售罄操作已完成，並已確認各項商品狀態。');
+      else if(result.state==='PARTIAL')setNotice('部分商品已完成更新；其餘商品狀態仍待確認。');
+      else setNotice('操作結果未能確認；請先重新整理，暫時唔好重複操作。');
       await loadSellability();
     }catch{setNotice('操作結果未明；請重新讀取，禁止 blind retry。');}
     finally{setSellabilityBusy(false);}
@@ -190,7 +190,7 @@ export function App(){
       setSnapshot(current=>current?{...current,channels}:current);
       return channels;
     }catch{
-      setNotice('未能讀取渠道正式狀態；保持 UNKNOWN，唔會假裝成功。');
+      setNotice('未能確認最新渠道狀態；暫時保持未有資料。');
       return null;
     }
   };
@@ -231,27 +231,27 @@ export function App(){
     if(connection==='OFFLINE_READONLY'){setNotice('離線唯讀：遠端操作已停用。');return}
     if(connection==='PERMISSION_DENIED'){setNotice('目前身份冇權執行呢個操作。');return}
     if(actionId&&isCanonicalActionUnknown(snapshot?.actions??[],actionId)){
-      setNotice('正式狀態仍未明；只可重新確認讀回，禁止再次提交。');
+      setNotice('處理結果仍未確認；請先重新檢查最新狀態，暫時唔好再次提交。');
       return;
     }
     if(actionId&&commandFlight?.actionId===actionId&&(commandFlight.state==='PENDING'||commandFlight.state==='UNKNOWN')){
-      setNotice('呢項操作仍在等待正式讀回；禁止重複提交。');
+      setNotice('呢項操作仍在確認中；暫時唔好重複提交。');
       return;
     }
-    setConfirmation({label,target,impact:impact+' 正式狀態必須等目標系統讀回。',actionId});
+    setConfirmation({label,target,impact:impact+' 完成後會再次確認最新狀態。',actionId});
   };
 
   const executeBounded=async(value:Confirmation)=>{
     setConfirmation(null);
     if(connection==='OFFLINE_READONLY'){setNotice('離線唯讀：遠端操作已停用。');return}
     if(value.actionId&&isCanonicalActionUnknown(snapshot?.actions??[],value.actionId)){
-      setNotice('正式狀態仍未明；禁止再次提交，只可重新確認讀回。');
-      setCommandFlight({actionId:value.actionId,state:'UNKNOWN',message:'Canonical projection 仍 UNKNOWN；只可重新確認讀回，禁止 blind resend。'});
+      setNotice('處理結果仍未確認；請先重新檢查最新狀態，暫時唔好再次提交。');
+      setCommandFlight({actionId:value.actionId,state:'UNKNOWN',message:'最新狀態仍未能確認；請先重新檢查，暫時唔好再次提交。'});
       return;
     }
-    if(!port?.requestBoundedAction){setNotice('遠端操作服務尚未連接；冇改變任何正式狀態。');return}
+    if(!port?.requestBoundedAction){setNotice('遠端操作暫未開放；正式狀態沒有改變。');return}
 
-    if(value.actionId)setCommandFlight({actionId:value.actionId,state:'PENDING',message:'正在提交／等待 canonical readback。'});
+    if(value.actionId)setCommandFlight({actionId:value.actionId,state:'PENDING',message:'正在提交並確認最新狀態。'});
 
     try{
       const result=await port.requestBoundedAction({actionType:value.label,target:value.target,reason:value.impact,operationId:crypto.randomUUID()});
@@ -262,9 +262,9 @@ export function App(){
           const canonicalUnknown=readback?isCanonicalActionUnknown(readback.actions,value.actionId):false;
           setCommandFlight(
             !readback
-              ?{actionId:value.actionId,state:'UNKNOWN',message:'操作已確認，但最新正式狀態未能讀回。只可重新確認，禁止重送。'}
+              ?{actionId:value.actionId,state:'UNKNOWN',message:'操作已送出，但最新狀態暫時未能確認。請先重新檢查，暫時唔好再提交。'}
               :canonicalUnknown
-                ?{actionId:value.actionId,state:'UNKNOWN',message:'最新 canonical projection 仍 UNKNOWN；禁止重送，只可重新確認讀回。'}
+                ?{actionId:value.actionId,state:'UNKNOWN',message:'最新狀態仍未能確認；請先重新檢查，暫時唔好再提交。'}
                 :null
           );
         }
@@ -280,8 +280,8 @@ export function App(){
         if(value.actionId)setCommandFlight({actionId:value.actionId,state:'FAILED',message:'操作未完成；請檢查目前狀態。'});
         return;
       }
-      setNotice('操作結果未明；請重新確認正式狀態，唔好重複提交。');
-      if(value.actionId)setCommandFlight({actionId:value.actionId,state:'UNKNOWN',message:'結果未明；只可重新確認 canonical readback，禁止 blind resend。'});
+      setNotice('操作結果未能確認；請先重新檢查最新狀態，暫時唔好重複提交。');
+      if(value.actionId)setCommandFlight({actionId:value.actionId,state:'UNKNOWN',message:'結果未能確認；請先重新檢查最新狀態，暫時唔好再次提交。'});
     }catch{
       setNotice('操作結果未明；請重新確認正式狀態，唔好重複提交。');
       if(value.actionId)setCommandFlight({actionId:value.actionId,state:'UNKNOWN',message:'結果未明；只可重新確認 canonical readback，禁止 blind resend。'});
@@ -289,14 +289,14 @@ export function App(){
   };
 
   const recheckAction=async(actionId:string)=>{
-    setCommandFlight({actionId,state:'PENDING',message:'正在重新確認正式狀態。'});
+    setCommandFlight({actionId,state:'PENDING',message:'正在重新檢查最新狀態。'});
     const readback=await refresh();
     if(!readback){
-      setCommandFlight({actionId,state:'UNKNOWN',message:'仍未能取得正式讀回；禁止 blind resend。'});
+      setCommandFlight({actionId,state:'UNKNOWN',message:'仍未能確認最新狀態；暫時唔好再次提交。'});
       return;
     }
     if(isCanonicalActionUnknown(readback.actions,actionId)){
-      setCommandFlight({actionId,state:'UNKNOWN',message:'Canonical projection 仍 UNKNOWN；保持鎖定，只可再次重新確認讀回。'});
+      setCommandFlight({actionId,state:'UNKNOWN',message:'最新狀態仍未能確認；暫時保持鎖定，請稍後再重新檢查。'});
       return;
     }
     setCommandFlight(null);
@@ -305,17 +305,17 @@ export function App(){
   const recheckChannel=async(channelId:string)=>{
     const channels=await loadChannels();
     const channel=channels?.find(item=>item.channelId===channelId);
-    if(!channel||channel.readback==='UNKNOWN')setNotice('正式狀態仍未明；保持只讀，唔會假裝成功。');
+    if(!channel||channel.readback==='UNKNOWN')setNotice('渠道狀態仍未能確認；暫時只供查看。');
   };
   const savePlanning=async(input:OwnerPlanningSaveInput)=>{
-    if(!port?.savePlanning){setNotice('Planning writer 尚未連接；冇寫入本機假資料。');return}
+    if(!port?.savePlanning){setNotice('規劃儲存功能暫未連接；資料沒有被更改。');return}
     setPlanningSaving(true);
     try{
       const result=await port.savePlanning(input);
-      if(result.state==='CONFIRMED'&&result.snapshot){setPlanning(result.snapshot);setNotice('規劃已保存並完成 canonical readback。');}
+      if(result.state==='CONFIRMED'&&result.snapshot){setPlanning(result.snapshot);setNotice('規劃已保存並完成狀態確認。');}
       else if(result.state==='REJECTED'){setNotice('規劃版本已更新；請重新讀取再修改。');await loadPlanning(input.monthKey);}
-      else setNotice('保存結果未明；請重新讀取，唔好重複提交。');
-    }catch{setNotice('保存結果未明；請重新讀取，唔好重複提交。');}
+      else setNotice('保存結果未能確認；請先重新整理，暫時唔好重複提交。');
+    }catch{setNotice('保存結果未能確認；請先重新整理，暫時唔好重複提交。');}
     finally{setPlanningSaving(false);}
   };
 
@@ -338,7 +338,7 @@ export function App(){
   return <main className="app-shell">
     <header className="topbar">
       <img className="brand-logo" src="/brand/morefun-logo-canonical.png" alt="磨飯 More Fun" />
-      <div className="brand-copy"><strong>老闆中心</strong><span>{snapshot?.store?.storeName??'未連接門店'} · {snapshot?.store?.businessDate??'營業日未有資料'}</span></div>
+      <div className="brand-copy"><strong>{snapshot?.store?.storeName??'磨飯'}</strong><span>Owner App · {snapshot?.store?.businessDate??'營業日未有資料'}</span></div>
       {ownerSession?<button className="owner-session-pill" onClick={()=>void logout()} title="登出 Owner 工作階段">{ownerSession.displayName} · 登出</button>:null}
       <button className="state-pill" onClick={()=>void refresh()} aria-label="重新同步"><i/>{connectionLabel}</button>
     </header>
@@ -416,14 +416,13 @@ function TodayPage({
       freshness={vm.storeFreshness}
       observedAt={vm.observedAt}
     />
-    {!today?<Empty title={connection==='OFFLINE_READONLY'?'今日數據尚未連接':'暫時未有今日數據'} detail="正式營業額、訂單同平均單未有讀回之前唔會顯示假 KPI。"/>:
-      <section className="kpi-grid"><Kpi label="有效營業額" value={today.salesLabel} compare={today.comparisonLabel}/><Kpi label="訂單" value={String(today.orderCount)} compare="正式有效單摘要"/><Kpi label="平均訂單" value={today.averageOrderLabel} compare="有效營業額 / 有效單量"/></section>}
+    {!today?<Empty title={connection==='OFFLINE_READONLY'?'今日數據尚未連接':'暫時未有今日數據'} detail="營業資料暫未更新完成，呢度唔會顯示推算數字。"/>:
+      <section className="kpi-grid"><Kpi label="有效營業額" value={today.salesLabel} compare={today.comparisonLabel}/><Kpi label="有效訂單" value={String(today.orderCount)} compare="已完成並仍然有效"/><Kpi label="平均訂單金額" value={today.averageOrderLabel} compare="目前每張有效訂單平均"/></section>}
     <TodayLiveOrdersCard value={vm.liveOrders} onOpenActive={onActiveOrders}/>
     <DineInOpenChecksCard value={vm.dineIn} onOpenDineIn={onDineInOrders}/>
     <TodayActionSummaryCard value={vm.actionSummary} onOpen={onQueue}/>
     <TodayHealthSummaryCard value={vm.healthSummary} onChannels={onChannels} onDevices={()=>onTool('devices')}/>
     <TodayStaffSummaryCard value={vm.staffSummary} onOpen={onStaff}/>
-    <MonthlyTargetSummaryCard value={snapshot?.planning} onOpen={onPlanning}/>
     <TodayInsightCard value={vm.insight}/>
   </section>;
 }
