@@ -243,9 +243,14 @@ export interface CustomerPendingIntent {
   readonly idempotencyKey:string;
   readonly createdAt:string;
   readonly updatedAt:string;
-  readonly state:'DRAFT'|'NOT_CONNECTED'|'PENDING'|'UNKNOWN';
+  readonly state:'DRAFT'|'NOT_CONNECTED'|'PENDING'|'UNKNOWN'|'REJECTED'|'DELIVERED';
   readonly cart:readonly CustomerCartLine[];
   readonly checkout:CustomerCheckoutDraft;
+  readonly fallbackReference:string;
+  readonly publishedTotalMinor?:number;
+  readonly canonicalOrderId?:string;
+  readonly canonicalDisplay?:string;
+  readonly committedAt?:string;
   readonly lastMessage?:string;
 }
 
@@ -303,6 +308,10 @@ export interface CustomerCommandResult {
   readonly state:CustomerCommandState;
   readonly message:string;
   readonly orderId?:string;
+  readonly displayCode?:string;
+  readonly committedAt?:string;
+  readonly totalMinor?:number;
+  readonly readbackCode?:'NOT_FOUND'|'PENDING'|'UNKNOWN';
   readonly canonicalRevision?:number;
 }
 

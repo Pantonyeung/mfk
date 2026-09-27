@@ -1,5 +1,5 @@
 import {useEffect,useMemo,useRef,useState} from 'react';
-import {createCustomerPendingIntent,readCustomerLocalWorkspace,writeCustomerLocalWorkspace,type CustomerLocalPreferences} from './persistence';
+import {createCustomerPendingIntent,customerFallbackReference,readCustomerLocalWorkspace,writeCustomerLocalWorkspace,type CustomerLocalPreferences} from './persistence';
 import {resolveCustomerRuntimePort} from './runtime';
 import {buildCustomerRecommendations} from './recommendation';
 import {publishedCartRepairs,quotePublishedCart,repairPublishedCartLine} from './local-quote';
@@ -8,12 +8,14 @@ import {customerComboPublishedUnitMinor,customerStandalonePublishedUnitMinor,res
 import {BottomNavigation,CustomerHeader,StatusBanner,type ActionState,type ProductOriginRect} from './ui/primitives';
 import {CartView,HomeView,MemberView,OrdersView,type MenuLayout,type OrderSegment} from './components/customer-views';
 import {CheckoutUi4View,type CustomerUi4CheckoutStep} from './components/customer-checkout-ui4';
+import {SubmitUi5View,WaitingStoreConfirmationUi5View} from './components/customer-submit-ui5';
 import {ProductSheet} from './components/product-sheet-ui3';
 import {Stage2Menu} from './stage2/Stage2Menu';
 import {Stage2BottomNavigation} from './stage2/Stage2BottomNavigation';
 import type {
   CustomerCartLine,
   CustomerCheckoutDraft,
+  CustomerCommandResult,
   CustomerConnectionState,
   CustomerHistoryProjection,
   CustomerPendingIntent,
@@ -23,20 +25,31 @@ import type {
   CustomerRuntimePort,
 } from './product-types';
 
-export type View='home'|'menu'|'cart'|'checkout'|'orders'|'more';
+export type View='home'|'menu'|'cart'|'checkout'|'submit'|'waiting'|'orders'|'more';
+const persistedView=(value:View):CustomerLocalPreferences['activeView']=>value==='submit'||value==='waiting'?'orders':value;
 
-const customerRouteFromPath=(pathname:string):{view:View;checkoutStep?:CustomerUi4CheckoutStep}|null=>{
+type CustomerRoute={
+  view:View;
+  checkoutStep?:CustomerUi4CheckoutStep;
+  submissionId?:string;
+  waitingOrderId?:string;
+};
+const customerRouteFromPath=(pathname:string):CustomerRoute|null=>{
   if(pathname==='/memory-jar')return {view:'cart'};
   if(pathname==='/checkout/contact')return {view:'checkout',checkoutStep:'contact'};
   if(pathname==='/checkout/payment')return {view:'checkout',checkoutStep:'payment'};
   if(pathname==='/checkout/review')return {view:'checkout',checkoutStep:'review'};
+  const submitMatch=pathname.match(/^\/submit\/([^/]+)$/);
+  if(submitMatch)return {view:'submit',submissionId:decodeURIComponent(submitMatch[1])};
+  const waitingMatch=pathname.match(/^\/orders\/([^/]+)\/waiting$/);
+  if(waitingMatch)return {view:'waiting',waitingOrderId:decodeURIComponent(waitingMatch[1])};
   if(pathname==='/menu')return {view:'menu'};
   if(pathname==='/orders')return {view:'orders'};
   if(pathname==='/member')return {view:'more'};
   if(pathname==='/'||pathname==='')return {view:'home'};
   return null;
 };
-const pathForView=(view:Exclude<View,'checkout'>)=>({
+const pathForView=(view:'home'|'menu'|'cart'|'orders'|'more')=>({
   home:'/',
   menu:'/menu',
   cart:'/memory-jar',
@@ -68,11 +81,14 @@ const presentWithContinuity=(change:()=>void)=>{
 export function App(){
   const initial=useMemo(()=>readCustomerLocalWorkspace(),[]);
   const initialRoute=useMemo(()=>customerRouteFromPath(typeof window==='undefined'?'':window.location.pathname),[]);
+  const initialSubmission=initialRoute?.submissionId?initial.pendingIntents.find(item=>item.submissionId===initialRoute.submissionId):undefined;
   const [view,setView]=useState<View>(initialRoute?.view??initial.preferences.activeView);
   const [checkoutStep,setCheckoutStep]=useState<CustomerUi4CheckoutStep>(initialRoute?.checkoutStep??'contact');
+  const [submitRouteId,setSubmitRouteId]=useState<string|null>(initialRoute?.submissionId??null);
+  const [waitingOrderId,setWaitingOrderId]=useState<string|null>(initialRoute?.waitingOrderId??null);
   const [activeCategoryId,setActiveCategoryId]=useState<string|null>(initial.preferences.activeCategoryId);
-  const [cart,setCart]=useState<readonly CustomerCartLine[]>(initial.cart);
-  const [checkout,setCheckout]=useState<CustomerCheckoutDraft>(initial.checkout);
+  const [cart,setCart]=useState<readonly CustomerCartLine[]>(initialSubmission?.cart??initial.cart);
+  const [checkout,setCheckout]=useState<CustomerCheckoutDraft>(initialSubmission?.checkout??initial.checkout);
   const [pendingIntents,setPendingIntents]=useState<readonly CustomerPendingIntent[]>(initial.pendingIntents);
   const [port]=useState<CustomerRuntimePort|null>(()=>resolveCustomerRuntimePort());
   const [connection,setConnection]=useState<CustomerConnectionState>(port?'LOADING':'NOT_CONNECTED');
@@ -106,22 +122,22 @@ export function App(){
       cart:next.cart??cart,
       checkout:next.checkout??checkout,
       pendingIntents:next.pendingIntents??pendingIntents,
-      preferences:next.preferences??{activeView:view,activeCategoryId},
+      preferences:next.preferences??{activeView:persistedView(view),activeCategoryId},
     });
   };
 
   const changeView=(next:View)=>{
     presentWithContinuity(()=>{
       setView(next);
-      if(next!=='checkout')replacePath(pathForView(next));
-      persist({preferences:{activeView:next,activeCategoryId}});
+      if(next==='home'||next==='menu'||next==='cart'||next==='orders'||next==='more')replacePath(pathForView(next));
+      persist({preferences:{activeView:next==='submit'||next==='waiting'?'orders':next,activeCategoryId}});
       window.scrollTo({top:0,behavior:'auto'});
     });
   };
 
   const changeCategory=(next:string|null)=>{
     setActiveCategoryId(next);
-    persist({preferences:{activeView:view,activeCategoryId:next}});
+    persist({preferences:{activeView:persistedView(view),activeCategoryId:next}});
   };
 
   const changeCheckout=(next:CustomerCheckoutDraft)=>{
@@ -156,6 +172,45 @@ export function App(){
       persist({preferences:{activeView:'checkout',activeCategoryId}});
       window.scrollTo({top:0,behavior:'auto'});
     });
+  };
+
+  const openSubmitRoute=(submissionId:string)=>{
+    presentWithContinuity(()=>{
+      setSubmitRouteId(submissionId);
+      setWaitingOrderId(null);
+      setView('submit');
+      replacePath('/submit/'+encodeURIComponent(submissionId));
+      persist({preferences:{activeView:'orders',activeCategoryId}});
+      window.scrollTo({top:0,behavior:'auto'});
+    });
+  };
+
+  const openWaitingRoute=(orderId:string)=>{
+    presentWithContinuity(()=>{
+      setWaitingOrderId(orderId);
+      setSubmitRouteId(null);
+      setView('waiting');
+      replacePath('/orders/'+encodeURIComponent(orderId)+'/waiting');
+      persist({preferences:{activeView:'orders',activeCategoryId}});
+      window.scrollTo({top:0,behavior:'auto'});
+    });
+  };
+
+  const startUi5Submission=()=>{
+    if(submitBlockReason){setNotice(submitBlockReason);return}
+    if(!quote||quote.freshness!=='CURRENT'){setNotice('提交前價格未係 CURRENT；請先重新確認。');return}
+    if(cartRepairs.length){setNotice('仍有餐點需要修正；只修受影響項目後再提交。');return}
+    const cartFingerprint=JSON.stringify(cart);
+    const checkoutFingerprint=JSON.stringify(checkout);
+    const same=pendingIntents.find(item=>
+      JSON.stringify(item.cart)===cartFingerprint&&
+      JSON.stringify(item.checkout)===checkoutFingerprint&&
+      item.menuRevision===String(menu?.revision||'')
+    );
+    if(same?.state==='DELIVERED'&&same.canonicalOrderId){openWaitingRoute(same.canonicalOrderId);return}
+    const intent=same??createCustomerPendingIntent(cart,checkout,String(menu?.revision||''));
+    if(!same)saveIntent(intent);
+    openSubmitRoute(intent.submissionId);
   };
 
   useEffect(()=>{void refresh();},[]);
@@ -196,6 +251,8 @@ export function App(){
       if(!route)return;
       setView(route.view);
       if(route.checkoutStep)setCheckoutStep(route.checkoutStep);
+      setSubmitRouteId(route.submissionId??null);
+      setWaitingOrderId(route.waitingOrderId??null);
     };
     window.addEventListener('popstate',onPopState);
     return()=>window.removeEventListener('popstate',onPopState);
@@ -328,8 +385,24 @@ export function App(){
     persist({pendingIntents:next});
   };
 
-  const resolveConfirmedIntent=(intent:CustomerPendingIntent,message:string)=>{
-    const nextPending=pendingIntents.filter(item=>item.submissionId!==intent.submissionId);
+  const resolveDeliveredIntent=(intent:CustomerPendingIntent,result:CustomerCommandResult,message:string)=>{
+    if(!result.orderId){
+      const unknown=Object.freeze({...intent,state:'UNKNOWN' as const,updatedAt:nowIso(),lastMessage:'正式 Order 已回覆成功，但缺少 canonical Order readback identity；保持 UNKNOWN。'});
+      saveIntent(unknown);
+      setSubmitRouteId(intent.submissionId);
+      setNotice('正式結果未完整讀回；請勿重複提交，只可重新確認原本提交。');
+      return;
+    }
+    const delivered=Object.freeze({
+      ...intent,
+      state:'DELIVERED' as const,
+      updatedAt:nowIso(),
+      canonicalOrderId:result.orderId,
+      ...(result.displayCode?{canonicalDisplay:result.displayCode}:{}),
+      ...(result.committedAt?{committedAt:result.committedAt}:{}),
+      lastMessage:message,
+    });
+    const nextPending=[delivered,...pendingIntents.filter(item=>item.submissionId!==intent.submissionId)].slice(0,12);
     const sameCart=JSON.stringify(cart)===JSON.stringify(intent.cart);
     const nextCart=sameCart?[]:cart;
     const nextCheckout=withoutPaymentEvidence(checkout);
@@ -337,10 +410,13 @@ export function App(){
     setCart(nextCart);
     setCheckout(nextCheckout);
     setFallbackIntentId(null);
-    setNotice(message);
     setOrderSegment('current');
+    setSubmitRouteId(null);
+    setWaitingOrderId(result.orderId);
+    setNotice('訂單已成功送達；而家等待店舖正式確認。');
     presentWithContinuity(()=>{
-      setView('orders');
+      setView('waiting');
+      replacePath('/orders/'+encodeURIComponent(result.orderId!)+'/waiting');
       persist({
         cart:nextCart,
         checkout:nextCheckout,
@@ -366,17 +442,35 @@ export function App(){
     }
   };
 
-  const submit=async()=>{
+  const submit=async(routeIntent?:CustomerPendingIntent)=>{
     if(submitLockRef.current||submitting)return;
-    if(submitBlockReason){setNotice(submitBlockReason);return}
+    if(routeIntent&&routeIntent.state!=='DRAFT')return;
+    const intentCart=routeIntent?.cart??cart;
+    const intentCheckout=routeIntent?.checkout??checkout;
+    const intentMenuRevision=routeIntent?.menuRevision??String(menu?.revision||'');
+    const submitReason=(()=>{
+      if(!intentCart.length)return '記憶罐未有商品。';
+      if(intentCheckout.phone.replace(/\D/g,'').length<8)return '請先輸入至少 8 位電話號碼。';
+      if(intentCheckout.paymentMethod==='ELECTRONIC'){
+        const channel=(snapshot?.paymentChannels??[]).find(item=>item.channelId===intentCheckout.paymentChannelId);
+        if(!intentCheckout.paymentChannelId||!channel||channel.label!==intentCheckout.paymentChannelLabel)return '付款方式資料已更新，請返回付款頁重新確認。';
+        if(!channel.qrImageUrl)return '電子支付 QR 已失效，請返回付款頁重新確認。';
+        if(intentCheckout.paymentEvidence?.state!=='UPLOADED'||!intentCheckout.paymentEvidence.evidenceRef)return '付款憑證未完成，請返回付款頁重新確認。';
+      }
+      const latestQuote=quotePublishedCart(intentCart,menu);
+      const latestRepairs=publishedCartRepairs(intentCart,menu);
+      if(!latestQuote||latestQuote.freshness!=='CURRENT'||latestRepairs.length)return '提交前餐牌、價格或供應資料有變更；請返回記憶罐只修受影響餐點。';
+      return null;
+    })();
+    if(submitReason){setNotice(submitReason);return}
     submitLockRef.current=true;
-    const cartFingerprint=JSON.stringify(cart);
-    const checkoutFingerprint=JSON.stringify(checkout);
-    let existing=pendingIntents.find(item=>
-      (item.state==='DRAFT'||item.state==='NOT_CONNECTED')&&
+    const cartFingerprint=JSON.stringify(intentCart);
+    const checkoutFingerprint=JSON.stringify(intentCheckout);
+    let existing=routeIntent??pendingIntents.find(item=>
+      item.state==='DRAFT'&&
       JSON.stringify(item.cart)===cartFingerprint&&
       JSON.stringify(item.checkout)===checkoutFingerprint&&
-      item.menuRevision===String(menu?.revision||'')
+      item.menuRevision===intentMenuRevision
     );
     setSubmitting(true);
     setFallbackIntentId(null);
@@ -390,7 +484,7 @@ export function App(){
         }
         const prior=await port.readSubmission(sameCartUnknown.submissionId);
         if(prior.state==='CONFIRMED'){
-          resolveConfirmedIntent(sameCartUnknown,prior.message||'店舖已確認上一個提交');
+          resolveDeliveredIntent(sameCartUnknown,prior,prior.message||'店舖已確認上一個提交');
           return;
         }
         saveIntent(Object.freeze({...sameCartUnknown,state:'UNKNOWN',updatedAt:nowIso(),lastMessage:prior.message}));
@@ -412,10 +506,10 @@ export function App(){
         }
       }
 
-      const base=existing??createCustomerPendingIntent(cart,checkout,String(menu?.revision||''));
+      const base=existing??createCustomerPendingIntent(intentCart,intentCheckout,intentMenuRevision);
       if(!port?.submitOrder){
-        const cleanCheckout=withoutPaymentEvidence(checkout);
-        const offlineIntent=Object.freeze({...base,checkout:cleanCheckout,state:'NOT_CONNECTED' as const,updatedAt:nowIso(),lastMessage:'店舖接單系統暫時未連接；可以改用 WhatsApp。'});
+        const cleanCheckout=withoutPaymentEvidence(intentCheckout);
+        const offlineIntent=Object.freeze({...base,state:'NOT_CONNECTED' as const,updatedAt:nowIso(),lastMessage:'店舖接單系統暫時未連接；可以改用 WhatsApp。'});
         setCheckout(cleanCheckout);
         saveIntent(offlineIntent);
         setFallbackIntentId(base.submissionId);
@@ -428,8 +522,8 @@ export function App(){
         const health=await port.probeOrderBackend((attempt,total)=>setSubmitProbe({attempt,total}));
         setSubmitProbe(null);
         if(!health.reachable){
-          const cleanCheckout=withoutPaymentEvidence(checkout);
-          const offlineIntent=Object.freeze({...base,checkout:cleanCheckout,state:'NOT_CONNECTED' as const,updatedAt:nowIso(),lastMessage:'已完成 3 次有限連線檢查；暫時未能自動接單。'});
+          const cleanCheckout=withoutPaymentEvidence(intentCheckout);
+          const offlineIntent=Object.freeze({...base,state:'NOT_CONNECTED' as const,updatedAt:nowIso(),lastMessage:'已完成 3 次有限連線檢查；暫時未能自動接單。'});
           setCheckout(cleanCheckout);
           saveIntent(offlineIntent);
           setFallbackIntentId(base.submissionId);
@@ -442,9 +536,9 @@ export function App(){
       attemptedIntent=pending;
       saveIntent(pending);
       const result=await port.submitOrder(pending);
-      if(result.state==='CONFIRMED'){resolveConfirmedIntent(pending,result.message||'店舖已確認訂單');return}
+      if(result.state==='CONFIRMED'){resolveDeliveredIntent(pending,result,result.message||'店舖已確認訂單');return}
 
-      const cleanCheckout=withoutPaymentEvidence(checkout);
+      const cleanCheckout=withoutPaymentEvidence(intentCheckout);
       setCheckout(cleanCheckout);
       if(result.state==='UNKNOWN'){
         saveIntent(Object.freeze({...pending,state:'UNKNOWN' as const,updatedAt:nowIso(),lastMessage:result.message}));
@@ -453,20 +547,27 @@ export function App(){
         return;
       }
 
-      const unresolved=Object.freeze({...pending,checkout:cleanCheckout,state:'NOT_CONNECTED' as const,updatedAt:nowIso(),lastMessage:result.message});
+      if(result.state==='REJECTED'||result.state==='FAILED'){
+        const rejected=Object.freeze({...pending,state:'REJECTED' as const,updatedAt:nowIso(),lastMessage:result.message});
+        saveIntent(rejected);
+        setFallbackIntentId(null);
+        setNotice(result.message||'店舖未能接受今次訂單；請返回記憶罐重新確認。');
+        return;
+      }
+      const unresolved=Object.freeze({...pending,state:'NOT_CONNECTED' as const,updatedAt:nowIso(),lastMessage:result.message});
       saveIntent(unresolved);
-      if(result.state==='NOT_CONNECTED')setFallbackIntentId(pending.submissionId);
+      setFallbackIntentId(pending.submissionId);
       setNotice(result.message);
     }catch{
-      const cleanCheckout=withoutPaymentEvidence(checkout);
+      const cleanCheckout=withoutPaymentEvidence(intentCheckout);
       setCheckout(cleanCheckout);
       if(attemptedIntent){
         saveIntent(Object.freeze({...attemptedIntent,state:'UNKNOWN' as const,updatedAt:nowIso(),lastMessage:'提交結果未明；需要讀回原本結果'}));
         setFallbackIntentId(null);
         setNotice('提交結果未明；原本嗰次落單已保留並會先讀回，唔會自動重送。');
       }else{
-        const base=existing??createCustomerPendingIntent(cart,cleanCheckout,String(menu?.revision||''));
-        const offlineIntent=Object.freeze({...base,checkout:cleanCheckout,state:'NOT_CONNECTED' as const,updatedAt:nowIso(),lastMessage:'店舖接單系統暫時未連接；可以改用 WhatsApp。'});
+        const base=existing??createCustomerPendingIntent(intentCart,intentCheckout,intentMenuRevision);
+        const offlineIntent=Object.freeze({...base,state:'NOT_CONNECTED' as const,updatedAt:nowIso(),lastMessage:'店舖接單系統暫時未連接；可以改用 WhatsApp。'});
         saveIntent(offlineIntent);
         setFallbackIntentId(base.submissionId);
         setNotice('暫時未能完成店舖連線檢查；可以改用 WhatsApp。');
@@ -483,14 +584,25 @@ export function App(){
     setReadingIntentId(intent.submissionId);
     try{
       if(!port?.readSubmission){
-        saveIntent(Object.freeze({...intent,state:'NOT_CONNECTED',updatedAt:nowIso(),lastMessage:'訂單查詢服務尚未連接'}));
+        saveIntent(Object.freeze({...intent,state:'UNKNOWN',updatedAt:nowIso(),lastMessage:'訂單查詢服務尚未連接；只可稍後重新讀回原本提交'}));
         setNotice('訂單查詢服務尚未連接；冇重新提交任何交易。');
         return;
       }
       const result=await port.readSubmission(intent.submissionId);
-      if(result.state==='CONFIRMED'){resolveConfirmedIntent(intent,result.message||'店舖已確認訂單');return}
-      const state=result.state==='UNKNOWN'?'UNKNOWN':'NOT_CONNECTED';
-      saveIntent(Object.freeze({...intent,state,updatedAt:nowIso(),lastMessage:result.message}));
+      if(result.state==='CONFIRMED'){resolveDeliveredIntent(intent,result,result.message||'店舖已確認訂單');return}
+      if(result.state==='REJECTED'||result.state==='FAILED'){
+        saveIntent(Object.freeze({...intent,state:'REJECTED',updatedAt:nowIso(),lastMessage:result.message}));
+        setNotice(result.message||'店舖未能接受今次訂單。');
+        return;
+      }
+      if(result.readbackCode==='NOT_FOUND'){
+        const fallbackIntent=Object.freeze({...intent,state:'NOT_CONNECTED' as const,updatedAt:nowIso(),lastMessage:result.message});
+        saveIntent(fallbackIntent);
+        setFallbackIntentId(intent.submissionId);
+        setNotice('原本提交經 Readback 仍未找到；Online Submit 已鎖定，可以轉用 WhatsApp 人工救援。');
+        return;
+      }
+      saveIntent(Object.freeze({...intent,state:'UNKNOWN',updatedAt:nowIso(),lastMessage:result.message}));
       setNotice(result.message);
     }catch{
       saveIntent(Object.freeze({...intent,state:'UNKNOWN',updatedAt:nowIso(),lastMessage:'讀回結果未明'}));
@@ -537,21 +649,38 @@ export function App(){
     setNotice('已按目前餐牌更新「'+repaired.productName+'」；其他餐點冇改動。');
   };
 
-  const requestFallback=async()=>{
+  const requestFallback=async(intent?:CustomerPendingIntent)=>{
     const fallback=snapshot?.fallback;
-    const submissionId=fallbackIntentId??pendingIntents[0]?.submissionId;
+    const target=intent
+      ??(fallbackIntentId?pendingIntents.find(item=>item.submissionId===fallbackIntentId):undefined)
+      ??pendingIntents.find(item=>item.state==='NOT_CONNECTED');
     if(!fallback?.enabled){setNotice('店舖暫時未設定 WhatsApp 備用聯絡。');return}
-    const url=buildWhatsAppFallbackUrl({fallback,cart,checkout,quote,submissionId});
+    const targetCart=target?.cart??cart;
+    const targetCheckout=target?.checkout??checkout;
+    const pickupDigits=targetCheckout.phone.replace(/\D/g,'');
+    const url=buildWhatsAppFallbackUrl({
+      fallback,
+      cart:targetCart,
+      checkout:targetCheckout,
+      quote:target?null:quote,
+      ...(target?.publishedTotalMinor!==undefined?{publishedTotalMinor:target.publishedTotalMinor}:{}),
+      ...(target?{fallbackReference:customerFallbackReference(target)}:{}),
+      ...(pickupDigits.length>=4?{pickupCode:pickupDigits.slice(-4)}:{}),
+    });
     if(!url){setNotice('WhatsApp 備用聯絡資料未完整。');return}
     window.open(url,'_blank','noopener,noreferrer');
-    setNotice('已開啟 WhatsApp；訊息只會喺你主動送出後傳送畀店舖。');
+    setNotice('已開啟 WhatsApp；舊 Online Submit 保持鎖定，訊息只會喺你主動送出後傳送畀店舖。');
   };
 
   const activeOrders=snapshot?.activeOrders??[];
   const history=snapshot?.history??[];
-  const currentPending=pendingIntents[0]??null;
-  const currentFallbackIntent=pendingIntents.find(item=>item.state==='NOT_CONNECTED'&&JSON.stringify(item.cart)===JSON.stringify(cart))??null;
+  const recoveryIntents=pendingIntents.filter(item=>item.state!=='DELIVERED');
+  const currentPending=recoveryIntents[0]??null;
+  const currentFallbackIntent=recoveryIntents.find(item=>item.state==='NOT_CONNECTED'&&JSON.stringify(item.cart)===JSON.stringify(cart))??null;
   const fallbackAvailable=Boolean((fallbackIntentId||currentFallbackIntent)&&snapshot?.fallback?.enabled);
+  const activeSubmitIntent=submitRouteId?pendingIntents.find(item=>item.submissionId===submitRouteId)??null:null;
+  const waitingOrder=waitingOrderId?activeOrders.find(order=>order.orderId===waitingOrderId)??null:null;
+  const waitingIntent=waitingOrderId?pendingIntents.find(item=>item.state==='DELIVERED'&&item.canonicalOrderId===waitingOrderId)??null:null;
   const cartCount=cart.reduce((sum,line)=>sum+line.quantity,0);
   const cartRepairs=useMemo(()=>publishedCartRepairs(cart,menu),[cart,menu]);
   const allProducts=menu?.products??[];
@@ -577,12 +706,14 @@ export function App(){
       {view==='home'?<HomeView snapshot={snapshot} connection={connection} activeOrders={activeOrders} history={history} recommendations={homeRecommendations} cartCount={cartCount} onRefresh={()=>void refresh()} onProduct={openProduct} onBrowse={()=>changeView('menu')} onJar={()=>changeView('cart')} onOrders={()=>{setOrderSegment('current');changeView('orders')}} onHistory={()=>{setOrderSegment('history');changeView('orders')}} onMember={()=>changeView('more')} onBuyAgain={order=>void reorder(order)} onFallback={()=>void requestFallback()}/>:null}
       {view==='menu'?<Stage2Menu connection={connection} browserOnline={browserOnline} categories={categories} activeCategoryId={activeCategoryId} setCategory={category=>presentWithContinuity(()=>changeCategory(category))} query={search} setQuery={setSearch} products={menu?.products??[]} recommendations={menuRecommendations} onProduct={(product,origin)=>openProduct(product,origin)} cartCount={cartCount} onCart={()=>changeView('cart')}/>:null}
       {view==='cart'?<CartView cart={cart} quote={quote} repairs={cartRepairs} member={snapshot?.member} suggestions={cartSuggestions} products={menu?.products??[]} onProduct={openProduct} onAcceptRepair={acceptCartRepair} onQuantity={(lineId,quantity)=>updateCart(cart.map(line=>line.lineId===lineId?{...line,quantity:Math.max(1,quantity)}:line))} onRemove={lineId=>updateCart(cart.filter(line=>line.lineId!==lineId))} onMenu={()=>changeView('menu')} onCheckout={()=>void openCheckoutStep('contact')}/>:null}
-      {view==='checkout'?<CheckoutUi4View step={checkoutStep} cart={cart} quote={quote} repairs={cartRepairs} checkout={checkout} setCheckout={changeCheckout} paymentChannels={snapshot?.paymentChannels??[]} onStep={step=>void openCheckoutStep(step)} onBackToJar={()=>changeView('cart')} onRepair={()=>changeView('cart')} onPaymentEvidence={file=>void uploadPaymentEvidence(file)}/>:null}
+      {view==='checkout'?<CheckoutUi4View step={checkoutStep} cart={cart} quote={quote} repairs={cartRepairs} checkout={checkout} setCheckout={changeCheckout} paymentChannels={snapshot?.paymentChannels??[]} onStep={step=>void openCheckoutStep(step)} onBackToJar={()=>changeView('cart')} onRepair={()=>changeView('cart')} onPaymentEvidence={file=>void uploadPaymentEvidence(file)} onReviewConfirmed={startUi5Submission}/>:null}
+      {view==='submit'?(activeSubmitIntent?<SubmitUi5View intent={activeSubmitIntent} submitting={submitting} submitProbe={submitProbe} reading={readingIntentId===activeSubmitIntent.submissionId} fallbackAvailable={Boolean(snapshot?.fallback?.enabled)&&activeSubmitIntent.state==='NOT_CONNECTED'} onSubmit={()=>void submit(activeSubmitIntent)} onReadback={()=>void readbackIntent(activeSubmitIntent)} onFallback={()=>void requestFallback(activeSubmitIntent)} onBackReview={()=>void openCheckoutStep('review')} onBackToJar={()=>changeView('cart')}/>:<section className="page ui5-missing"><h1>提交資料未找到</h1><p>唔會建立新 Submission；請返回記憶罐重新確認。</p><button onClick={()=>changeView('cart')}>返回記憶罐</button></section>):null}
+      {view==='waiting'?<WaitingStoreConfirmationUi5View order={waitingOrder} intent={waitingIntent} connection={connection} onRefresh={()=>void refresh()} onOrders={()=>{setOrderSegment('current');changeView('orders')}} onHome={()=>changeView('home')}/>:null}
       {view==='orders'?<OrdersView segment={orderSegment} setSegment={setOrderSegment} active={activeOrders} history={history} expandedOrderId={expandedOrderId} setExpandedOrderId={setExpandedOrderId} onReorder={order=>void reorder(order)} onBrowse={()=>changeView('menu')} connection={connection}/>:null}
-      {view==='more'?<MemberView connection={connection} snapshot={snapshot} history={history} pendingIntents={pendingIntents} readingIntentId={readingIntentId} onRefresh={()=>void refresh()} onReadback={intent=>void readbackIntent(intent)} onDiscard={removeIntent} onFallback={()=>void requestFallback()} onReorder={order=>void reorder(order)} onBrowse={()=>changeView('menu')}/>:null}
+      {view==='more'?<MemberView connection={connection} snapshot={snapshot} history={history} pendingIntents={recoveryIntents} readingIntentId={readingIntentId} onRefresh={()=>void refresh()} onReadback={intent=>void readbackIntent(intent)} onDiscard={removeIntent} onFallback={()=>void requestFallback()} onReorder={order=>void reorder(order)} onBrowse={()=>changeView('menu')}/>:null}
     </section>
 
-    {view==='menu'?<Stage2BottomNavigation active="menu" cartCount={cartCount} orderCount={activeOrders.length} onChange={changeView}/>:view!=='checkout'?<BottomNavigation active={view} cartCount={cartCount} orderCount={activeOrders.length} pulseKey={jarPulseKey} onChange={changeView}/>:null}
+    {view==='menu'?<Stage2BottomNavigation active="menu" cartCount={cartCount} orderCount={activeOrders.length} onChange={changeView}/>:!['checkout','submit','waiting'].includes(view)?<BottomNavigation active={view as 'home'|'cart'|'orders'|'more'} cartCount={cartCount} orderCount={activeOrders.length} pulseKey={jarPulseKey} onChange={changeView}/>:null}
 
     {selectedProduct?<ProductSheet product={selectedProduct} menu={menu} selections={selections} comboEnabled={selectedComboEnabled} comboSelections={selectedComboSelections} selectedVariationId={selectedVariationId} quantity={selectedQuantity} note={selectedNote} editing={Boolean(editingLineId)} recommendations={productRecommendations} setVariation={setSelectedVariationId} setComboEnabled={setSelectedComboEnabled} clearCombo={()=>setSelectedComboSelections(Object.freeze([]))} setQuantity={setSelectedQuantity} setNote={setSelectedNote} toggle={(groupId,optionId)=>{
       const group=selectedProduct.optionGroups.find(item=>item.optionGroupId===groupId);
