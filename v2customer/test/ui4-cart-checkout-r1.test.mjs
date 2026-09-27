@@ -30,7 +30,7 @@ test('Memory Jar line shows product configuration, quantity, total, edit, remove
     'line.productName',
     'line.selectedVariationName',
     'optionSummary',
-    'line.combo.comboName',
+    'line.combo?.comboName',
     '套餐內容：',
     'QuantityStepper',
     '小計',
