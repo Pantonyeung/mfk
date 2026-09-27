@@ -35,6 +35,23 @@ function safeArray<T>(value:unknown):readonly T[]{
   return Array.isArray(value)?value as readonly T[]:[];
 }
 
+function normalizePaymentEvidence(value:unknown):CustomerCheckoutDraft['paymentEvidence']|undefined{
+  if(!isRecord(value))return undefined;
+  const state=String(value.state||'');
+  if(!['LOCAL_PENDING_UPLOAD','UPLOADED','VERIFIED','REJECTED'].includes(state))return undefined;
+  const fileName=typeof value.fileName==='string'?value.fileName.slice(0,255):'';
+  const mimeType=typeof value.mimeType==='string'?value.mimeType.slice(0,120):'';
+  const size=Number(value.size);
+  if(!fileName||!mimeType||!Number.isFinite(size)||size<0)return undefined;
+  return Object.freeze({
+    fileName,
+    mimeType,
+    size:Math.round(size),
+    state:state as NonNullable<CustomerCheckoutDraft['paymentEvidence']>['state'],
+    ...(typeof value.evidenceRef==='string'&&value.evidenceRef.trim()?{evidenceRef:value.evidenceRef.trim()}:{}),
+  });
+}
+
 export function customerFallbackReference(value:Pick<CustomerPendingIntent,'submissionId'>|{readonly fallbackReference?:string}):string{
   const direct='fallbackReference' in value&&typeof value.fallbackReference==='string'?value.fallbackReference.trim():'';
   if(/^\d{4,6}$/.test(direct))return direct;
@@ -67,7 +84,7 @@ function normalizePendingIntent(value:unknown):CustomerPendingIntent|null{
       paymentChannelId:String(rawCheckout.paymentChannelId),
       paymentChannelLabel:typeof rawCheckout.paymentChannelLabel==='string'?rawCheckout.paymentChannelLabel:'',
     }:{}),
-    ...(isRecord(rawCheckout.paymentEvidence)?{paymentEvidence:rawCheckout.paymentEvidence as CustomerCheckoutDraft['paymentEvidence']}:{}),
+    ...(()=>{const paymentEvidence=normalizePaymentEvidence(rawCheckout.paymentEvidence);return paymentEvidence?{paymentEvidence}:{}})(),
   });
   const fallbackReference=customerFallbackReference({
     submissionId,
