@@ -3258,3 +3258,616 @@ NEXT：
 
 MILESTONE：
 MFK_SMT_UI_STAGE0_VISUAL_LAYOUT_DRAFT_READY
+
+
+==================================================
+RECORD 005｜命名鎖定＋UI-STAGE-00 視覺佈局規格
+日期：2026-09-27
+狀態：UI SPEC IN PROGRESS
+==================================================
+
+命名正式鎖定：
+
+UI-STAGE-00 ～ UI-STAGE-12
+= 呢份「MFK SMT FULL UI SPEC」嘅設計章節。
+
+佢哋唔代表系統 Runtime 執行順序。
+
+系統真正執行流程之後統一叫：
+SYSTEM FLOW / RUNTIME FLOW
+
+例如：
+Boot → Login → Ordering → Checkout → Formal Commit → Print
+呢啲唔會再叫 Stage 0 / Stage 1。
+
+==================================================
+UI-STAGE-00｜SHELL / NAVIGATION / GLOBAL LAYER
+==================================================
+
+定位：
+整套 SMT UI Spec 第一章。
+負責所有 UI-STAGE 共用嘅 Shell、Navigation、Top Utility、Global Alert、Global Attention。
+唔處理 Ordering / Checkout / Dining 內部業務畫面。
+
+--------------------------------------------------
+00.1｜1920×1080 MASTER FRAME
+--------------------------------------------------
+
+Canvas：
+1920 × 1080
+
+固定區域：
+
+A. Left Navigation Rail
+寬：80 px
+位置：x=0 → 80
+高度：1080
+
+B. Top Utility Bar
+位置：x=80 → 1920
+高度：64 px
+
+C. Route Stage
+位置：x=80 → 1920
+y=64 → 1080
+
+Route Stage 內部 Padding：
+16 px
+
+Shell 背景：
+Canvas #F5F4F0
+
+Navigation Rail：
+Surface #FFFFFF
+右邊 1 px Border #DDE1E6
+
+Top Utility：
+Surface #FFFFFF
+底部 1 px Border #DDE1E6
+
+原則：
+- Rail 不隨 Route 消失
+- Top Utility 不隨 Route 改位置
+- Route Stage 先由各 UI-STAGE 自己定義內部 layout
+- Shell 唔將任何 Cloud status 變成交易阻斷
+
+--------------------------------------------------
+00.2｜LEFT NAVIGATION RAIL
+--------------------------------------------------
+
+Nav Items：
+
+1. 點單
+2. 訂單
+3. 堂食
+4. 售罄／產能
+
+Bottom：
+不放 More。
+
+More 改由 Top Utility Hamburger 進入。
+
+每個 Nav Item：
+
+寬：64 px
+最小高：64 px
+外距：8 px
+Radius：12 px
+
+內容：
+Icon
+Label
+
+Active：
+- Primary Soft #EEF4FF
+- Primary Blue #1F5FBF
+
+Inactive：
+- Transparent
+- Text Secondary
+
+Orders Badge：
+只顯示：
+- Pending / Active count
+
+Badge：
+最小 22 × 22
+超過 99 顯示 99+
+
+禁止：
+- 每個 Nav 自己一隻主色
+- 純 Icon 無文字
+- UUID / engineering identifier
+
+--------------------------------------------------
+00.3｜TOP UTILITY BAR
+--------------------------------------------------
+
+建議由左至右：
+
+[Store / Business Day]
+[Local Runtime]
+[Domain Status]
+[Attention]
+---------------- flexible spacer ----------------
+[Staff]
+[Hamburger]
+
+A. Store Block
+顯示：
+磨飯
+Business Day：YYYY-MM-DD
+
+B. Local Runtime
+顯示：
+LOCAL READY
+或
+LOCAL DEGRADED
+
+注意：
+LOCAL READY 只代表本地 POS runtime 可用。
+唔代表：
+- Cloud
+- Printer
+- Customer
+- Keeta
+- Admin
+全部正常。
+
+C. Domain Status
+預設只顯示真正需要前線知道的異常。
+正常時不需要排一串綠燈。
+
+例如：
+Cloud 離線
+Keeta 注意
+Printer 1 異常
+
+D. Attention Button
+正常：
+待處理 0
+
+有異常：
+待處理 3
+
+按：
+開 Attention Drawer。
+
+E. Staff
+顯示：
+Display Name / Login ID
+不顯 internal staffId。
+
+F. Hamburger
+開 More / Tools Menu。
+
+--------------------------------------------------
+00.4｜TOP UTILITY NORMAL STATE
+--------------------------------------------------
+
+文字 Wireframe：
+
+┌─────────────────────────────────────────────────────────────┐
+│ 磨飯 · 2026-09-27   LOCAL READY              待處理 0  1111  ☰ │
+└─────────────────────────────────────────────────────────────┘
+
+原則：
+正常時保持安靜。
+唔需要：
+「Customer 正常」
+「Keeta 正常」
+「Printer 正常」
+「Cloud 正常」
+四粒綠燈長期佔位。
+
+只有異常／重要狀態先升上第一層。
+
+--------------------------------------------------
+00.5｜TOP UTILITY DEGRADED STATE
+--------------------------------------------------
+
+例：
+
+┌──────────────────────────────────────────────────────────────────────┐
+│ 磨飯 · 2026-09-27  LOCAL READY  Cloud 離線  ⚠ 待處理 3      1111  ☰ │
+└──────────────────────────────────────────────────────────────────────┘
+
+意思：
+- 本地仍可交易
+- Cloud domain 有問題
+- 有 3 項需跟進
+
+禁止：
+顯示一個紅色「SYSTEM OFFLINE」令員工以為唔可以落單。
+
+--------------------------------------------------
+00.6｜GLOBAL NEW ORDER ALERT
+--------------------------------------------------
+
+位置：
+Top Utility 下方
+Route Stage 上層
+建議右上至中上
+
+尺寸：
+寬 520–620 px
+高度按內容約 120–160 px
+
+不使用全屏遮罩。
+
+結構：
+
+[新訂單到達，要處理]
+#P034 · Keeta
+剛剛到達 · 5 件
+
+[立即處理] [30 秒後] [1 分鐘後]
+
+Primary：
+立即處理
+
+Secondary：
+30 秒後
+1 分鐘後
+
+場景：
+
+A. Customer
+Source 顯示「自家平台」
+
+B. Keeta
+Source 顯示「Keeta」
+
+C. 多張新單
+Header：
+3 張新訂單待處理
+
+顯示最舊一張：
+#P034 · Keeta
+
+Secondary：
+查看全部 3 張
+
+D. Snoozed
+Alert 暫時收起。
+Order 本身保持 pending。
+
+E. Already handled
+如果打開時 order 已處理：
+顯示：
+此訂單已經處理
+[返回]
+
+不再 Accept 第二次。
+
+--------------------------------------------------
+00.7｜GLOBAL ALERT Z-ORDER
+--------------------------------------------------
+
+由高至低：
+
+1. Critical transaction modal
+2. Payment / Formal Commit confirmation
+3. Global New Order Alert
+4. Attention Drawer
+5. Route page
+6. Shell
+
+規則：
+新單 Alert 不可以蓋住：
+- Payment Confirm
+- Cash keypad critical action
+- Dining payment final confirmation
+
+如果 Critical Modal 開啟：
+Alert 可以縮成 Top Badge：
+「1 張新單」
+
+完成 critical action 後再展開。
+
+--------------------------------------------------
+00.8｜GLOBAL ATTENTION CENTER
+--------------------------------------------------
+
+形式：
+右側 Drawer
+
+建議：
+寬 520 px
+高度 100%
+由右側滑入
+
+不取代 Route Page。
+
+Header：
+待處理事項
+3
+
+Filter：
+全部
+交易
+打印
+平台
+同步
+
+每張 Attention Card：
+
+[Severity] [Domain]
+Title
+Description
+Impact / Next Step
+Time
+
+CTA：
+查看
+核對
+處理
+
+Technical Detail：
+collapsed by default
+
+--------------------------------------------------
+00.9｜ATTENTION CARD EXAMPLES
+--------------------------------------------------
+
+Example A｜Print UNKNOWN
+
+⚠ 打印 · 結果未能確認
+#P032 · 廚房製作
+
+訂單已成立，但系統無法確認廚房打印機有冇出紙。
+
+請先檢查廚房打印機，避免重複打印。
+
+[查看打印狀態]
+
+Technical Detail ▾
+
+
+Example B｜Payment Evidence
+
+⚠ 付款 · 待核對
+#P033 · FPS
+
+客人已提交付款截圖，
+仍未經店員確認。
+
+[核對付款]
+
+
+Example C｜Cloud Offline
+
+i 同步 · Cloud 離線
+
+本機交易仍可繼續。
+目前使用最後有效設定。
+
+[查看同步]
+
+--------------------------------------------------
+00.10｜ATTENTION PRIORITY
+--------------------------------------------------
+
+P0 Critical：
+- Payment conflict
+- duplicate-risk transaction ambiguity
+- security/session invalid where action must stop
+
+P1 Action Required：
+- Print UNKNOWN
+- Print FAILED
+- Customer Payment Evidence
+- Keeta Attention
+- Config missing affecting action
+
+P2 Information：
+- Cloud Offline but LKG available
+- Admin Sync pending
+- non-blocking provider issue
+
+排序：
+P0 → P1 → P2
+同級按 oldest unresolved first。
+
+--------------------------------------------------
+00.11｜STAFF MENU
+--------------------------------------------------
+
+Click Staff：
+
+顯示：
+- Staff Display Name
+- Login ID
+- Session status
+- Logout
+
+如果 current permission model需要：
+可以顯示簡化角色名稱。
+
+唔顯：
+- permission raw codes
+- internal staffId
+- auth token
+- UUID
+
+--------------------------------------------------
+00.12｜MORE / TOOLS MENU
+--------------------------------------------------
+
+由 Hamburger 開。
+
+第一層：
+
+營運工具
+
+01 收銀與日結
+02 報表
+03 打印與設備
+04 診斷
+05 備份／恢復
+06 Admin Sync
+
+Future：
+07 Cash In / Out
+
+形式：
+可用 Drawer / Large Menu。
+唔需要 full-screen Dashboard。
+
+關閉 More：
+返回原本 Route，
+原本 draft 保持。
+
+--------------------------------------------------
+00.13｜RESPONSIVE RULE｜1366×768
+--------------------------------------------------
+
+Left Rail：
+72 px
+
+Top Utility：
+56 px
+
+Route padding：
+12 px
+
+可縮：
+- Gap
+- Label spacing
+- utility metadata
+- icon spacing
+
+不可：
+- 將 Nav 搬去底部
+- 將 Top Utility 搬位
+- 將主要入口重新排序
+- 隱藏 transaction Attention
+
+--------------------------------------------------
+00.14｜COMPONENT STATES
+--------------------------------------------------
+
+PrimaryNavItem：
+- Default
+- Hover
+- Active
+- Badge
+- Disabled（只在真不可用時）
+
+LocalRuntimeStatus：
+- Ready
+- Degraded
+- Unknown
+
+DomainStatus：
+- Offline
+- Degraded
+- Unknown
+- Hidden when normal
+
+AttentionButton：
+- Empty
+- Info
+- Action Required
+- Critical
+
+GlobalOrderAlert：
+- Single
+- Multiple
+- Snoozed
+- Already handled
+
+AttentionDrawer：
+- Empty
+- Mixed
+- Filtered
+- Loading
+- Error
+
+--------------------------------------------------
+00.15｜UI COPY RULES
+--------------------------------------------------
+
+前線第一層：
+
+用：
+「打印結果未能確認」
+「付款待核對」
+「Keeta 同步需要處理」
+「目前使用最後有效設定」
+
+不用：
+PRINT_UNKNOWN
+PAYMENT_EVIDENCE_PENDING
+KEETA_CONFIRM_ATTENTION
+ADMIN_LKG_ACTIVE
+
+工程 code：
+只入 Technical Detail。
+
+--------------------------------------------------
+00.16｜UI-STAGE-00 LOCKED DECISIONS
+--------------------------------------------------
+
+LOCK 00-01
+Stage 名正式叫 UI-STAGE，不代表 Runtime Flow。
+
+LOCK 00-02
+主導航只有四個高頻入口：
+點單／訂單／堂食／售罄產能。
+
+LOCK 00-03
+More 搬到 Top Hamburger。
+
+LOCK 00-04
+正常狀態唔排一列假綠燈。
+
+LOCK 00-05
+Global New Order Alert 不 auto accept。
+
+LOCK 00-06
+多張新單不可互相覆蓋。
+
+LOCK 00-07
+Critical transaction confirmation 比 New Order Alert 更高 z-index。
+
+LOCK 00-08
+需要跟進的異常進 Attention Center，不用短暫 Toast 代替。
+
+LOCK 00-09
+UNKNOWN 同 FAILED 永遠分開。
+
+LOCK 00-10
+LOCAL READY 不代表所有 Cloud / Provider / Printer 都正常。
+
+LOCK 00-11
+Staff 第一層不顯 internal identity。
+
+LOCK 00-12
+Shell 必須可承載 UI-STAGE-01～12，而唔需要重新改骨架。
+
+--------------------------------------------------
+UI-STAGE-00 CURRENT STATUS
+--------------------------------------------------
+
+INFORMATION ARCHITECTURE：
+LOCKED FOR DRAFT
+
+TEXT WIREFRAME：
+DEFINED
+
+VISUAL LAYOUT SPEC：
+DEFINED
+
+HIGH-FIDELITY MOCKUP：
+NOT STARTED
+
+OWNER VISUAL ACCEPTANCE：
+PENDING
+
+NEXT：
+UI-STAGE-00 Visual Draft / Mockup
+（仍然只畫 Shell、Nav、Global Alert、Attention；不提前畫 Ordering 細節）
+
+MILESTONE：
+MFK_SMT_UI_STAGE00_VISUAL_LAYOUT_SPEC_READY
