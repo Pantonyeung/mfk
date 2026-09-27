@@ -1,19 +1,19 @@
 # MFK SMM UI｜Stage 7 訂單管理 R1｜2026-09-27
 
 STATUS:
-READY_FOR_COMMANDER_ACCEPTANCE
+READY_FOR_COMMANDER_REACCEPTANCE
 
 CONTROL:
-Pantonyeung/mfk #409
+Pantonyeung/mfk #409 comment 5855577991
 
 PR:
 #410
 
 FINAL_CODE_HEAD:
-492d3539a6512a247c02bb9e4316e65e734f7f57
+4d7c93b45779021764e379fe020d1ba3030cde73
 
 FINAL_CODE_CI:
-36316112421 = SUCCESS
+36317260182 = SUCCESS
 
 FINAL_RECEIPT_BINDING:
 The exact final branch head / final CI are bound by the latest #409 READY_FOR_COMMANDER_ACCEPTANCE receipt.
@@ -176,7 +176,7 @@ admin-identity-canonical-r1:
 36316112421 = SUCCESS
 
 SMM:
-- 142 / 142 PASS
+- 144 / 144 PASS
 - build PASS
 - Wrangler deploy --dry-run PASS
 - production deploy = NONE
@@ -206,3 +206,22 @@ LOCKS:
 NO MAIN MERGE
 NO DEPLOY
 NO STAGE 8
+
+
+## Final correction — filter empty vs page empty
+
+- Page EMPTY is now gated by selected segment canonical rows:
+  connection === READY && segmentRows.length === 0.
+- If segmentRows > 0 but source / status / date filtering returns zero rows, UI shows:
+  「目前篩選條件沒有符合訂單」
+- canonical segment count remains visible in filter-empty copy.
+- no fake rows are created.
+- deterministic regressions cover source no-match, status no-match, and date no-match.
+
+## Final correction — search scope
+
+- 7.3 Search now receives current segmentRows.
+- Search no longer silently inherits list source / status / date filters.
+- A canonical order in the selected segment remains searchable even when the current list filter hides it.
+- Example locked by regression: hidden-list filter has zero match, Display Number search still finds the canonical order.
+- Phone search remains CANONICAL_PERMITTED_ONLY.
