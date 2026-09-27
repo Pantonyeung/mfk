@@ -6,7 +6,8 @@ import {publishedCartRepairs,quotePublishedCart,repairPublishedCartLine} from '.
 import {buildWhatsAppFallbackUrl} from './whatsapp-fallback';
 import {customerComboPublishedUnitMinor,customerStandalonePublishedUnitMinor,restoreCustomerComboSelectionState,selectedCustomerComboIntent,selectedCustomerOptions,toggleCustomerComboSelection,toggleCustomerSelection,validateCustomerComboSelection,validateCustomerSelections,type CustomerComboSelectionState,type CustomerSelectionState} from './selection';
 import {BottomNavigation,CustomerHeader,StatusBanner,type ActionState,type ProductOriginRect} from './ui/primitives';
-import {CartView,CheckoutView,HomeView,MemberView,OrdersView,type MenuLayout,type OrderSegment} from './components/customer-views';
+import {CartView,HomeView,MemberView,OrdersView,type MenuLayout,type OrderSegment} from './components/customer-views';
+import {CheckoutUi4View,type CustomerUi4CheckoutStep} from './components/customer-checkout-ui4';
 import {ProductSheet} from './components/product-sheet-ui3';
 import {Stage2Menu} from './stage2/Stage2Menu';
 import {Stage2BottomNavigation} from './stage2/Stage2BottomNavigation';
@@ -23,6 +24,30 @@ import type {
 } from './product-types';
 
 export type View='home'|'menu'|'cart'|'checkout'|'orders'|'more';
+
+const customerRouteFromPath=(pathname:string):{view:View;checkoutStep?:CustomerUi4CheckoutStep}|null=>{
+  if(pathname==='/memory-jar')return {view:'cart'};
+  if(pathname==='/checkout/contact')return {view:'checkout',checkoutStep:'contact'};
+  if(pathname==='/checkout/payment')return {view:'checkout',checkoutStep:'payment'};
+  if(pathname==='/checkout/review')return {view:'checkout',checkoutStep:'review'};
+  if(pathname==='/menu')return {view:'menu'};
+  if(pathname==='/orders')return {view:'orders'};
+  if(pathname==='/member')return {view:'more'};
+  if(pathname==='/'||pathname==='')return {view:'home'};
+  return null;
+};
+const pathForView=(view:Exclude<View,'checkout'>)=>({
+  home:'/',
+  menu:'/menu',
+  cart:'/memory-jar',
+  orders:'/orders',
+  more:'/member',
+})[view];
+const pathForCheckoutStep=(step:CustomerUi4CheckoutStep)=>'/checkout/'+step;
+const replacePath=(path:string)=>{
+  if(typeof window==='undefined'||window.location.pathname===path)return;
+  window.history.pushState({mfkCustomer:true},'',path);
+};
 
 const nowIso=()=>new Date().toISOString();
 const withoutPaymentEvidence=(value:CustomerCheckoutDraft):CustomerCheckoutDraft=>{
@@ -42,7 +67,9 @@ const presentWithContinuity=(change:()=>void)=>{
 
 export function App(){
   const initial=useMemo(()=>readCustomerLocalWorkspace(),[]);
-  const [view,setView]=useState<View>(initial.preferences.activeView);
+  const initialRoute=useMemo(()=>customerRouteFromPath(typeof window==='undefined'?'':window.location.pathname),[]);
+  const [view,setView]=useState<View>(initialRoute?.view??initial.preferences.activeView);
+  const [checkoutStep,setCheckoutStep]=useState<CustomerUi4CheckoutStep>(initialRoute?.checkoutStep??'contact');
   const [activeCategoryId,setActiveCategoryId]=useState<string|null>(initial.preferences.activeCategoryId);
   const [cart,setCart]=useState<readonly CustomerCartLine[]>(initial.cart);
   const [checkout,setCheckout]=useState<CustomerCheckoutDraft>(initial.checkout);
@@ -86,6 +113,7 @@ export function App(){
   const changeView=(next:View)=>{
     presentWithContinuity(()=>{
       setView(next);
+      if(next!=='checkout')replacePath(pathForView(next));
       persist({preferences:{activeView:next,activeCategoryId}});
       window.scrollTo({top:0,behavior:'auto'});
     });
@@ -119,6 +147,17 @@ export function App(){
     }
   };
 
+  const openCheckoutStep=async(step:CustomerUi4CheckoutStep)=>{
+    if(step==='contact'||step==='review')await refresh();
+    presentWithContinuity(()=>{
+      setCheckoutStep(step);
+      setView('checkout');
+      replacePath(pathForCheckoutStep(step));
+      persist({preferences:{activeView:'checkout',activeCategoryId}});
+      window.scrollTo({top:0,behavior:'auto'});
+    });
+  };
+
   useEffect(()=>{void refresh();},[]);
 
   useEffect(()=>{
@@ -149,6 +188,17 @@ export function App(){
     window.addEventListener('online',online);
     window.addEventListener('offline',offline);
     return()=>{window.removeEventListener('online',online);window.removeEventListener('offline',offline)};
+  },[]);
+
+  useEffect(()=>{
+    const onPopState=()=>{
+      const route=customerRouteFromPath(window.location.pathname);
+      if(!route)return;
+      setView(route.view);
+      if(route.checkoutStep)setCheckoutStep(route.checkoutStep);
+    };
+    window.addEventListener('popstate',onPopState);
+    return()=>window.removeEventListener('popstate',onPopState);
   },[]);
 
   useEffect(()=>{
@@ -185,7 +235,7 @@ export function App(){
     setCart(next);
     if(nextCheckout!==checkout){
       setCheckout(nextCheckout);
-      setNotice('餐點已更新；付款截圖需要重新提供，避免沿用上一個版本嘅付款證明。');
+      setNotice('餐點已更新；舊付款憑證已失效，請重新提供今次付款憑證。');
     }
     persist({cart:next,checkout:nextCheckout});
   };
@@ -309,7 +359,7 @@ export function App(){
     try{
       const uploaded=await port.uploadPaymentEvidence(file);
       changeCheckout({...checkout,paymentEvidence:{fileName:file.name,mimeType:file.type,size:file.size,state:'UPLOADED',evidenceRef:uploaded.evidenceRef}});
-      setNotice('付款截圖已上載，等待店舖核對。');
+      setNotice('已提交付款憑證，等待店舖核對。');
     }catch(error){
       changeCheckout({...checkout,paymentEvidence:undefined});
       setNotice(error instanceof Error?error.message:'付款截圖上載失敗，請再試。');
@@ -467,6 +517,7 @@ export function App(){
       setNotice(result.attention?.length?'已按目前菜單重建記憶罐；需要修正：'+result.attention.join('、'):'已按目前菜單、價格同供應狀態重建記憶罐。');
       presentWithContinuity(()=>{
         setView('cart');
+        replacePath('/memory-jar');
         window.scrollTo({top:0,behavior:'auto'});
       });
     }catch{
@@ -525,8 +576,8 @@ export function App(){
     <section className={view==='menu'?'stage2-viewport':'viewport'} aria-busy={connection==='LOADING'}>
       {view==='home'?<HomeView snapshot={snapshot} connection={connection} activeOrders={activeOrders} history={history} recommendations={homeRecommendations} cartCount={cartCount} onRefresh={()=>void refresh()} onProduct={openProduct} onBrowse={()=>changeView('menu')} onJar={()=>changeView('cart')} onOrders={()=>{setOrderSegment('current');changeView('orders')}} onHistory={()=>{setOrderSegment('history');changeView('orders')}} onMember={()=>changeView('more')} onBuyAgain={order=>void reorder(order)} onFallback={()=>void requestFallback()}/>:null}
       {view==='menu'?<Stage2Menu connection={connection} browserOnline={browserOnline} categories={categories} activeCategoryId={activeCategoryId} setCategory={category=>presentWithContinuity(()=>changeCategory(category))} query={search} setQuery={setSearch} products={menu?.products??[]} recommendations={menuRecommendations} onProduct={(product,origin)=>openProduct(product,origin)} cartCount={cartCount} onCart={()=>changeView('cart')}/>:null}
-      {view==='cart'?<CartView cart={cart} quote={quote} repairs={cartRepairs} checkout={checkout} member={snapshot?.member} suggestions={cartSuggestions} products={menu?.products??[]} onProduct={openProduct} onAcceptRepair={acceptCartRepair} onCheckoutChange={changeCheckout} onQuantity={(lineId,quantity)=>updateCart(cart.map(line=>line.lineId===lineId?{...line,quantity:Math.max(1,quantity)}:line))} onRemove={lineId=>updateCart(cart.filter(line=>line.lineId!==lineId))} onMenu={()=>changeView('menu')} onCheckout={()=>changeView('checkout')}/>:null}
-      {view==='checkout'?<CheckoutView cart={cart} quote={quote} checkout={checkout} setCheckout={changeCheckout} paymentChannels={snapshot?.paymentChannels??[]} pending={currentPending} actionState={actionState} submitProbe={submitProbe} submitBlockReason={submitBlockReason} fallbackAvailable={fallbackAvailable} onFallback={()=>void requestFallback()} onSubmit={()=>void submit()} onReadback={intent=>void readbackIntent(intent)} onBack={()=>changeView('cart')} onRepair={()=>changeView('cart')} onPaymentEvidence={file=>void uploadPaymentEvidence(file)}/>:null}
+      {view==='cart'?<CartView cart={cart} quote={quote} repairs={cartRepairs} member={snapshot?.member} suggestions={cartSuggestions} products={menu?.products??[]} onProduct={openProduct} onAcceptRepair={acceptCartRepair} onQuantity={(lineId,quantity)=>updateCart(cart.map(line=>line.lineId===lineId?{...line,quantity:Math.max(1,quantity)}:line))} onRemove={lineId=>updateCart(cart.filter(line=>line.lineId!==lineId))} onMenu={()=>changeView('menu')} onCheckout={()=>void openCheckoutStep('contact')}/>:null}
+      {view==='checkout'?<CheckoutUi4View step={checkoutStep} cart={cart} quote={quote} repairs={cartRepairs} checkout={checkout} setCheckout={changeCheckout} paymentChannels={snapshot?.paymentChannels??[]} onStep={step=>void openCheckoutStep(step)} onBackToJar={()=>changeView('cart')} onRepair={()=>changeView('cart')} onPaymentEvidence={file=>void uploadPaymentEvidence(file)}/>:null}
       {view==='orders'?<OrdersView segment={orderSegment} setSegment={setOrderSegment} active={activeOrders} history={history} expandedOrderId={expandedOrderId} setExpandedOrderId={setExpandedOrderId} onReorder={order=>void reorder(order)} onBrowse={()=>changeView('menu')} connection={connection}/>:null}
       {view==='more'?<MemberView connection={connection} snapshot={snapshot} history={history} pendingIntents={pendingIntents} readingIntentId={readingIntentId} onRefresh={()=>void refresh()} onReadback={intent=>void readbackIntent(intent)} onDiscard={removeIntent} onFallback={()=>void requestFallback()} onReorder={order=>void reorder(order)} onBrowse={()=>changeView('menu')}/>:null}
     </section>
