@@ -1428,8 +1428,8 @@ function CartSheet({cart,quote,menu,checkoutStage,serviceMode,tender,diningTarge
                 </div>
                 {attention?<div className="stage3-line-attention">
                   <div>
-                    <b>{attention.kind}</b>
-                    <span>{attention.kind==='PRICE_CHANGED'?'餐單價格已更新，請確認新價格。':'商品／套餐發布資料已更新，請確認或重新編輯。'}</span>
+                    <b>{attention.kind==='PRICE_CHANGED'?'價格有更新':'商品內容有更新'}</b>
+                    <span>{attention.kind==='PRICE_CHANGED'?'餐單價格已更新，請確認新價格。':'商品／套餐資料已更新，請確認或重新編輯。'}</span>
                     {priceChanged?<small>舊價 {money('HKD',unitMinor!)} → 新價 {money('HKD',proposedUnit!)}</small>:null}
                   </div>
                   <div className="stage3-attention-actions">
