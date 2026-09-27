@@ -16,14 +16,18 @@ export function Stage5SubmitView({
   reading,
   onReadback,
   onRepair,
-  onDone,
+  onBack,
+  onViewOrder,
+  onContinue,
 }:{
   session:SmmStage5Session;
   submitting:boolean;
   reading:boolean;
   onReadback:()=>void;
   onRepair:()=>void;
-  onDone:()=>void;
+  onBack:()=>void;
+  onViewOrder:()=>void;
+  onContinue:()=>void;
 }){
   const shortRef=smmStage5SubmissionShortRef(session.intent.submissionId);
   const repair=smmStage5RepairPath(session.message);
@@ -62,7 +66,10 @@ export function Stage5SubmitView({
         <small>流水號</small>
         <strong className="stage5-display-code">{session.displayCode}</strong>
         <p>前線只顯示正式流水號；技術識別碼不會出現。</p>
-        <button className="primary stage5-primary" type="button" onClick={onDone}>完成</button>
+        <div className="stage5-actions">
+          <button className="primary stage5-primary" type="button" onClick={onViewOrder}>查看訂單</button>
+          <button className="stage5-secondary" type="button" onClick={onContinue}>繼續點單</button>
+        </div>
       </section>:null}
 
       {session.state==='REJECTED'?<section className="stage5-rejected" role="alert">
@@ -80,6 +87,7 @@ export function Stage5SubmitView({
         <button className="primary stage5-primary" type="button" disabled={reading} onClick={onReadback}>
           {reading?'正在確認原結果':'重新確認結果'}
         </button>
+        <button className="stage5-secondary" type="button" disabled={reading} onClick={onBack}>返回</button>
       </section>:null}
     </section>
   </div>;
