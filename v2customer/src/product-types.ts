@@ -117,6 +117,24 @@ export interface CustomerCartSelection {
   readonly publishedAdjustmentMinor?:number;
 }
 
+export interface CustomerCartComboSelection {
+  readonly poolId:string;
+  readonly groupId:string;
+  readonly subPoolId:string;
+  readonly choiceId:string;
+  readonly choiceType:CustomerComboChoiceType;
+  readonly choiceLabel:string;
+  readonly productId?:string;
+  readonly publishedAdjustmentMinor:number;
+}
+
+export interface CustomerCartComboIntent {
+  readonly comboId:string;
+  readonly comboName:string;
+  readonly publishedBasePriceMinor:number;
+  readonly selections:readonly CustomerCartComboSelection[];
+}
+
 export interface CustomerCartLine {
   readonly lineId:string;
   readonly productId:string;
@@ -125,6 +143,7 @@ export interface CustomerCartLine {
   readonly selectedVariationId?:string;
   readonly selectedVariationName?:string;
   readonly selections:readonly CustomerCartSelection[];
+  readonly combo?:CustomerCartComboIntent;
   readonly createdAt:string;
   readonly note?:string;
   readonly attention?:string;

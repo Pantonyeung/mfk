@@ -19,12 +19,13 @@ function collectSource(directory){
 const source=collectSource(srcRoot);
 const app=fs.readFileSync(path.join(srcRoot,'App.tsx'),'utf8');
 const views=fs.readFileSync(path.join(srcRoot,'components/customer-views.tsx'),'utf8');
+const ui3=fs.readFileSync(path.join(srcRoot,'components/product-sheet-ui3.tsx'),'utf8');
 const types=fs.readFileSync(path.join(srcRoot,'product-types.ts'),'utf8');
 const primitives=fs.readFileSync(path.join(srcRoot,'ui/primitives.tsx'),'utf8');
 const styles=fs.readFileSync(path.join(srcRoot,'styles.css'),'utf8');
 
 test('R2 keeps the five-part customer mental model and complete memory jar',()=>{
-  for(const label of['首頁','點單','記憶罐','我的訂單','我的記憶'])assert.match(primitives,new RegExp(label));
+  for(const label of['首頁','點單','記憶罐','訂單','會員'])assert.match(primitives,new RegExp(label));
   for(const marker of['記憶罐係今次落單草稿','今次已選','取餐聯絡','目前餐牌價格','前往最後確認'])assert.match(views,new RegExp(marker));
   assert.match(views,/JarVisual/);
   assert.match(views,/removeConfirm/);
@@ -33,13 +34,18 @@ test('R2 keeps the five-part customer mental model and complete memory jar',()=>
   assert.match(views,/hideFromView/);
 });
 
-test('product configuration is progressive and preserves required min max unavailable validation',()=>{
-  assert.match(views,/設定進度/);
-  assert.match(views,/目前步驟/);
-  assert.match(views,/已完成/);
-  assert.match(views,/最少/);
-  assert.match(views,/最多/);
-  assert.match(views,/disabled=\{!option\.available\}/);
+test('product configuration follows canonical UI3 flow and preserves required min max unavailable validation',()=>{
+  const order=['data-ui3-section="hero"','data-ui3-section="combo"','data-ui3-section="required"','data-ui3-section="optional"','data-ui3-section="quantity"','data-ui3-section="recommendation"','data-ui3-section="summary"','data-ui3-section="add"'];
+  let previous=-1;
+  for(const marker of order){
+    const index=ui3.indexOf(marker);
+    assert.ok(index>previous,marker);
+    previous=index;
+  }
+  assert.match(ui3,/最少/);
+  assert.match(ui3,/最多/);
+  assert.match(ui3,/disabled=\{disabled\}/);
+  assert.match(ui3,/disabled=\{!addReady\}/);
   assert.match(app,/validateCustomerSelections/);
 });
 

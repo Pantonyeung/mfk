@@ -4,9 +4,10 @@ import {resolveCustomerRuntimePort} from './runtime';
 import {buildCustomerRecommendations} from './recommendation';
 import {publishedCartRepairs,quotePublishedCart,repairPublishedCartLine} from './local-quote';
 import {buildWhatsAppFallbackUrl} from './whatsapp-fallback';
-import {selectedCustomerOptions,toggleCustomerSelection,validateCustomerSelections,type CustomerSelectionState} from './selection';
+import {customerComboPublishedUnitMinor,customerStandalonePublishedUnitMinor,restoreCustomerComboSelectionState,selectedCustomerComboIntent,selectedCustomerOptions,toggleCustomerComboSelection,toggleCustomerSelection,validateCustomerComboSelection,validateCustomerSelections,type CustomerComboSelectionState,type CustomerSelectionState} from './selection';
 import {BottomNavigation,CustomerHeader,StatusBanner,type ActionState,type ProductOriginRect} from './ui/primitives';
-import {CartView,CheckoutView,HomeView,MemberView,OrdersView,ProductSheet,type MenuLayout,type OrderSegment} from './components/customer-views';
+import {CartView,CheckoutView,HomeView,MemberView,OrdersView,type MenuLayout,type OrderSegment} from './components/customer-views';
+import {ProductSheet} from './components/product-sheet-ui3';
 import {Stage2Menu} from './stage2/Stage2Menu';
 import {Stage2BottomNavigation} from './stage2/Stage2BottomNavigation';
 import type {
@@ -58,11 +59,12 @@ export function App(){
   const [selectedProduct,setSelectedProduct]=useState<CustomerProduct|null>(null);
   const [selectedProductOrigin,setSelectedProductOrigin]=useState<ProductOriginRect|null>(null);
   const [selections,setSelections]=useState<CustomerSelectionState>({});
+  const [selectedComboEnabled,setSelectedComboEnabled]=useState(false);
+  const [selectedComboSelections,setSelectedComboSelections]=useState<CustomerComboSelectionState>(Object.freeze([]));
   const [selectedVariationId,setSelectedVariationId]=useState<string|null>(null);
   const [selectedQuantity,setSelectedQuantity]=useState(1);
   const [selectedNote,setSelectedNote]=useState('');
   const [editingLineId,setEditingLineId]=useState<string|null>(null);
-  const [productStep,setProductStep]=useState(0);
   const [orderSegment,setOrderSegment]=useState<OrderSegment>('current');
   const [expandedOrderId,setExpandedOrderId]=useState<string|null>(null);
   const [submitting,setSubmitting]=useState(false);
@@ -192,11 +194,12 @@ export function App(){
     setSelectedProduct(null);
     setSelectedProductOrigin(null);
     setSelections({});
+    setSelectedComboEnabled(false);
+    setSelectedComboSelections(Object.freeze([]));
     setSelectedVariationId(null);
     setSelectedQuantity(1);
     setSelectedNote('');
     setEditingLineId(null);
-    setProductStep(0);
   };
 
   const openProduct=(product:CustomerProduct,origin:ProductOriginRect|null,line?:CustomerCartLine)=>{
@@ -209,11 +212,12 @@ export function App(){
     setSelectedProduct(product);
     setSelectedProductOrigin(origin);
     setSelections(restored);
+    setSelectedComboEnabled(Boolean(line?.combo));
+    setSelectedComboSelections(restoreCustomerComboSelectionState(line?.combo));
     setSelectedVariationId(line?.selectedVariationId??null);
     setSelectedQuantity(line?.quantity??1);
     setSelectedNote(line?.note??'');
     setEditingLineId(line?.lineId??null);
-    setProductStep(0);
   };
 
   const addSelectedProduct=()=>{
@@ -221,6 +225,27 @@ export function App(){
     const validation=validateCustomerSelections(selectedProduct,selections);
     if(!validation.ok){setNotice(validation.issues[0]??'請完成商品設定');return}
     if(selectedProduct.variationRequired&&!selectedVariationId){setNotice('請先揀必選規格');return}
+
+    if(selectedComboEnabled){
+      const comboValidation=validateCustomerComboSelection(selectedProduct,menu,selectedComboSelections);
+      if(!comboValidation.ok){setNotice(comboValidation.issues[0]??'請完成套餐設定');return}
+    }
+
+    const ordinarySelections=selectedCustomerOptions(selectedProduct,selections);
+    const comboIntent=selectedComboEnabled
+      ?selectedCustomerComboIntent(selectedProduct,menu,selectedComboSelections)
+      :null;
+    if(selectedComboEnabled&&!comboIntent){setNotice('套餐資料待同步，暫時未能加入套餐。');return}
+
+    const comboUnitMinor=comboIntent?customerComboPublishedUnitMinor(comboIntent,ordinarySelections):null;
+    if(comboIntent&&comboUnitMinor===null){setNotice('套餐價格資料待同步，請稍後再試。');return}
+
+    const standaloneUnitMinor=!comboIntent
+      ?customerStandalonePublishedUnitMinor(selectedProduct,ordinarySelections)
+      :null;
+    if(!comboIntent&&standaloneUnitMinor===null){setNotice('商品價格資料待同步，請稍後再試。');return}
+    const publishedUnitPriceMinor=comboIntent?comboUnitMinor:standaloneUnitMinor;
+
     const variation=selectedProduct.variations?.find(item=>item.variationId===selectedVariationId);
     const existing=editingLineId?cart.find(line=>line.lineId===editingLineId):null;
     const line:CustomerCartLine=Object.freeze({
@@ -229,12 +254,11 @@ export function App(){
       productName:selectedProduct.name,
       quantity:selectedQuantity,
       ...(variation?{selectedVariationId:variation.variationId,selectedVariationName:variation.name}:{}),
-      selections:selectedCustomerOptions(selectedProduct,selections),
+      selections:ordinarySelections,
+      ...(comboIntent?{combo:comboIntent}:{}),
       createdAt:existing?.createdAt??nowIso(),
       ...(selectedNote.trim()?{note:selectedNote.trim()}:{}),
-      ...(Number.isSafeInteger(selectedProduct.publishedUnitPriceMinor)?{
-        publishedUnitPriceMinor:Number(selectedProduct.publishedUnitPriceMinor)+selectedCustomerOptions(selectedProduct,selections).reduce((sum,option)=>sum+Number(option.publishedAdjustmentMinor||0),0),
-      }:{}),
+      ...(publishedUnitPriceMinor!==null&&Number.isSafeInteger(publishedUnitPriceMinor)?{publishedUnitPriceMinor}:{}),
     });
     updateCart(existing?cart.map(item=>item.lineId===existing.lineId?line:item):[...cart,line]);
     setJarPulseKey(value=>value+1);
@@ -483,6 +507,7 @@ export function App(){
   const homeRecommendations=buildCustomerRecommendations({products:allProducts,history,cart,limit:4});
   const menuRecommendations=buildCustomerRecommendations({products:allProducts,history,cart,limit:8});
   const cartSuggestions=buildCustomerRecommendations({products:allProducts,history,cart,activeCategoryId:effectiveCategoryId,limit:2});
+  const productRecommendations=selectedProduct?buildCustomerRecommendations({products:allProducts,history,cart,activeCategoryId:selectedProduct.categoryId,limit:8}).filter(item=>item.product.productId!==selectedProduct.productId).slice(0,3):[];
   const actionState:ActionState=quote?.freshness==='MATERIAL_CHANGE'||!cart.length||!quote||Boolean(submitBlockReason)?'disabled':readingIntentId||submitting?'loading':currentPending?.state==='UNKNOWN'?'unknown':currentPending?.state==='PENDING'?'pending':'default';
 
   return <main className="customer-shell" data-network={!browserOnline?'offline':connection.toLowerCase()}>
@@ -508,9 +533,13 @@ export function App(){
 
     {view==='menu'?<Stage2BottomNavigation active="menu" cartCount={cartCount} orderCount={activeOrders.length} onChange={changeView}/>:view!=='checkout'?<BottomNavigation active={view} cartCount={cartCount} orderCount={activeOrders.length} pulseKey={jarPulseKey} onChange={changeView}/>:null}
 
-    {selectedProduct?<ProductSheet product={selectedProduct} selections={selections} selectedVariationId={selectedVariationId} quantity={selectedQuantity} note={selectedNote} currentStep={productStep} editing={Boolean(editingLineId)} setStep={setProductStep} setVariation={setSelectedVariationId} setQuantity={setSelectedQuantity} setNote={setSelectedNote} toggle={(groupId,optionId)=>{
+    {selectedProduct?<ProductSheet product={selectedProduct} menu={menu} selections={selections} comboEnabled={selectedComboEnabled} comboSelections={selectedComboSelections} selectedVariationId={selectedVariationId} quantity={selectedQuantity} note={selectedNote} editing={Boolean(editingLineId)} recommendations={productRecommendations} setVariation={setSelectedVariationId} setComboEnabled={setSelectedComboEnabled} clearCombo={()=>setSelectedComboSelections(Object.freeze([]))} setQuantity={setSelectedQuantity} setNote={setSelectedNote} toggle={(groupId,optionId)=>{
       const group=selectedProduct.optionGroups.find(item=>item.optionGroupId===groupId);
       if(group)setSelections(current=>toggleCustomerSelection(current,group,optionId));
+    }} toggleCombo={(poolId,groupId,subPoolId,choiceId)=>{
+      const pool=menu?.comboPools?.find(item=>item.poolId===poolId);
+      const group=pool?.groups.find(item=>item.groupId===groupId);
+      if(pool&&group)setSelectedComboSelections(current=>toggleCustomerComboSelection(current,pool,group,subPoolId,choiceId));
     }} origin={selectedProductOrigin} onClose={closeProduct} onAdd={addSelectedProduct}/>:null}
   </main>;
 }
