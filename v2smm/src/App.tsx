@@ -576,7 +576,6 @@ export function App(){
     });
     saveIntent(base);
     setStage5Session(Object.freeze({intent:base,state:'DRAFT',message:'提交身份已鎖定。'}));
-    await new Promise<void>(resolve=>window.requestAnimationFrame(()=>resolve()));
 
     if(!port?.submitOrder){
       setNotice('門店提交服務尚未連接；草稿已保存，未建立正式訂單。');
