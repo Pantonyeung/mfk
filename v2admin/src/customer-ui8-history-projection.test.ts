@@ -31,8 +31,8 @@ describe('Customer UI8 historical projection',()=>{
     expect(projected.historicalLines).toEqual([{
       name:'肉燥便當',
       quantity:1,
-      historicalUnitLabel:'HK$48.00',
-      historicalLineTotalLabel:'HK$48.00',
+      historicalUnitLabel:'HK$48',
+      historicalLineTotalLabel:'HK$48',
       detail:'加飯',
     }]);
     expect(projected.reorderIntent).toEqual(baseOrder.customerReorderIntent);
