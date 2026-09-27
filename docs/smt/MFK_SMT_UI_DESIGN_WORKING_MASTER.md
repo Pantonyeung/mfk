@@ -4655,3 +4655,30 @@ App Start
 
 MILESTONE：
 MFK_SMT_NO_HOME_DIRECT_OPERATION_FLOW_LOCKED
+
+
+==================================================
+RECORD 010｜UI-STAGE-00 VISUAL PACK R1 GENERATED
+日期：2026-09-27
+狀態：OWNER REVIEW PENDING
+==================================================
+
+已產生並放入 Stage 00 Folder：
+- Boot / Loading
+- Login
+- Opening Cash Review
+- Opening Confirm
+- Visual Overview
+
+Visual Links：
+Boot https://drive.google.com/file/d/1Lk1H9LVgJF26AKK8C0N_XzFp3pzt4Dyt/view?usp=drivesdk
+Login https://drive.google.com/file/d/1eDQelCxwnyWB_8TXD7h3DR-tp6R63_zr/view?usp=drivesdk
+Opening Cash Review https://drive.google.com/file/d/1Gyi3bsLSYUSF3hxfqBB4SEkYMSrhwXcP/view?usp=drivesdk
+Opening Confirm https://drive.google.com/file/d/12l_C7Vlw1d81sMJ1PVtt3byKKLYmQje1/view?usp=drivesdk
+Overview https://drive.google.com/file/d/1SYZpn-V92zBunM2men2yh9Gey9SFlHcz/view?usp=drivesdk
+
+舊 Home/Shell Visual：
+已標 SUPERSEDED / REJECTED，不再作 Stage 00 current visual authority。
+
+NEXT：
+Owner review Stage 00 visuals。
