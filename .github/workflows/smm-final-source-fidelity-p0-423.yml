@@ -36,6 +36,18 @@ jobs:
           name: smm-p0-dist
           path: v2smm/dist
           if-no-files-found: error
+      - name: Install Playwright for visual evidence
+        run: |
+          npm install --no-audit --no-fund --legacy-peer-deps --package-lock=false --no-save playwright@1.55.0
+          npx playwright install --with-deps chromium
+      - name: Stage 0-4 visual evidence
+        run: node test/visual-evidence.mjs
+      - name: Upload Stage 0-4 screenshots
+        uses: actions/upload-artifact@v4
+        with:
+          name: smm-p0-stage0-4-visual-evidence
+          path: v2smm/evidence/smm-p0
+          if-no-files-found: error
       - name: Wrangler dry-run only
         run: npx --yes wrangler@4 deploy --dry-run --config wrangler.jsonc
 
