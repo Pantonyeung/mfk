@@ -171,6 +171,45 @@ export function App(){
     });
   };
 
+  const openSubmitRoute=(submissionId:string)=>{
+    presentWithContinuity(()=>{
+      setSubmitRouteId(submissionId);
+      setWaitingOrderId(null);
+      setView('submit');
+      replacePath('/submit/'+encodeURIComponent(submissionId));
+      persist({preferences:{activeView:'orders',activeCategoryId}});
+      window.scrollTo({top:0,behavior:'auto'});
+    });
+  };
+
+  const openWaitingRoute=(orderId:string)=>{
+    presentWithContinuity(()=>{
+      setWaitingOrderId(orderId);
+      setSubmitRouteId(null);
+      setView('waiting');
+      replacePath('/orders/'+encodeURIComponent(orderId)+'/waiting');
+      persist({preferences:{activeView:'orders',activeCategoryId}});
+      window.scrollTo({top:0,behavior:'auto'});
+    });
+  };
+
+  const startUi5Submission=()=>{
+    if(submitBlockReason){setNotice(submitBlockReason);return}
+    if(!quote||quote.freshness!=='CURRENT'){setNotice('提交前價格未係 CURRENT；請先重新確認。');return}
+    if(cartRepairs.length){setNotice('仍有餐點需要修正；只修受影響項目後再提交。');return}
+    const cartFingerprint=JSON.stringify(cart);
+    const checkoutFingerprint=JSON.stringify(checkout);
+    const same=pendingIntents.find(item=>
+      JSON.stringify(item.cart)===cartFingerprint&&
+      JSON.stringify(item.checkout)===checkoutFingerprint&&
+      item.menuRevision===String(menu?.revision||'')
+    );
+    if(same?.state==='DELIVERED'&&same.canonicalOrderId){openWaitingRoute(same.canonicalOrderId);return}
+    const intent=same??createCustomerPendingIntent(cart,checkout,String(menu?.revision||''));
+    if(!same)saveIntent(intent);
+    openSubmitRoute(intent.submissionId);
+  };
+
   useEffect(()=>{void refresh();},[]);
 
   useEffect(()=>{
