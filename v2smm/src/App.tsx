@@ -23,9 +23,16 @@ import {
   sameSmmCartRefreshAttention,
   smmLineTotalMinor,
 } from './stage3-cart.mjs';
+import {
+  SMM_STAGE4_TENDERS,
+  smmStage4CheckoutReady,
+  smmStage4DiningTargetStatus,
+  smmStage4TenderLabel,
+} from './stage4-checkout.mjs';
 import './stage1.css';
 import './stage2.css';
 import './stage3.css';
+import './stage4.css';
 import type {
   SmmCartLine,
   SmmConnectionState,
@@ -67,6 +74,7 @@ export function App(){
   const [comboEnabled,setComboEnabled]=useState(false);
   const [comboSelections,setComboSelections]=useState<SmmComboSelectionState>({});
   const [cartOpen,setCartOpen]=useState(false);
+  const [checkoutStage,setCheckoutStage]=useState(false);
   const [editingLineId,setEditingLineId]=useState<string|null>(null);
   const [cartNote,setCartNote]=useState(initial.cartNote);
   const [submitting,setSubmitting]=useState(false);
@@ -77,7 +85,7 @@ export function App(){
   const [moreTool,setMoreTool]=useState<'staff'|'connection'|'channels'|'business'|'printing'|'diagnostics'|'sellability'|'pending'|'capacity'|'reporting'|'refunds'|null>(null);
   const [dineTable,setDineTable]=useState('');
   const [dineCovers,setDineCovers]=useState(2);
-  const [diningTarget,setDiningTarget]=useState<SmmDiningTarget|null>(null);
+  const [diningTarget,setDiningTarget]=useState<SmmDiningTarget|null>(initial.preferences.diningTarget);
   const [diningTargetOpen,setDiningTargetOpen]=useState(false);
 
   const persist=(next:{
@@ -90,23 +98,23 @@ export function App(){
       cart:next.cart??cart,
       cartNote:next.cartNote??cartNote,
       pendingIntents:next.pendingIntents??pendingIntents,
-      preferences:next.preferences??{activeView:view,activeCategoryId,sourceFilter,serviceMode,tender},
+      preferences:next.preferences??{activeView:view,activeCategoryId,sourceFilter,serviceMode,tender,diningTarget},
     });
   };
 
   const changeView=(next:View)=>{
     setView(next);
-    persist({preferences:{activeView:next,activeCategoryId,sourceFilter,serviceMode,tender}});
+    persist({preferences:{activeView:next,activeCategoryId,sourceFilter,serviceMode,tender,diningTarget}});
   };
 
   const changeCategory=(next:string|null)=>{
     setActiveCategoryId(next);
-    persist({preferences:{activeView:view,activeCategoryId:next,sourceFilter,serviceMode,tender}});
+    persist({preferences:{activeView:view,activeCategoryId:next,sourceFilter,serviceMode,tender,diningTarget}});
   };
 
   const changeSource=(next:string)=>{
     setSourceFilter(next);
-    persist({preferences:{activeView:view,activeCategoryId,sourceFilter:next,serviceMode,tender}});
+    persist({preferences:{activeView:view,activeCategoryId,sourceFilter:next,serviceMode,tender,diningTarget}});
   };
 
   const refresh=async()=>{
@@ -319,7 +327,7 @@ export function App(){
       cart:frozen,
       cartNote,
       pendingIntents,
-      preferences:{activeView:view,activeCategoryId,sourceFilter,serviceMode,tender},
+      preferences:{activeView:view,activeCategoryId,sourceFilter,serviceMode,tender,diningTarget},
     });
     if(affected>0)setNotice('餐單有更新；請喺購物草稿逐項確認已標示商品。未確認前唔會靜默接受新價格或套餐資料。');
   },[menu?.revision,menu?.observedAt]);
@@ -426,6 +434,7 @@ export function App(){
 
   const changeServiceMode=(next:SmmServiceMode)=>{
     const repriced=cart.map(line=>repriceLine(line,next));
+    const nextDiningTarget=next==='TAKEAWAY'?null:diningTarget;
     setServiceMode(next);
     if(next==='TAKEAWAY')setDiningTarget(null);
     setCart(repriced);
@@ -433,13 +442,18 @@ export function App(){
       cart:repriced,
       cartNote,
       pendingIntents,
-      preferences:{activeView:view,activeCategoryId,sourceFilter,serviceMode:next,tender},
+      preferences:{activeView:view,activeCategoryId,sourceFilter,serviceMode:next,tender,diningTarget:nextDiningTarget},
     });
   };
 
   const changeTender=(next:SmmTender)=>{
     setTender(next);
-    persist({preferences:{activeView:view,activeCategoryId,sourceFilter,serviceMode,tender:next}});
+    persist({preferences:{activeView:view,activeCategoryId,sourceFilter,serviceMode,tender:next,diningTarget}});
+  };
+
+  const changeDiningTarget=(next:SmmDiningTarget|null)=>{
+    setDiningTarget(next);
+    persist({preferences:{activeView:view,activeCategoryId,sourceFilter,serviceMode,tender,diningTarget:next}});
   };
 
   const saveIntent=(intent:SmmPendingIntent)=>{
@@ -630,7 +644,7 @@ export function App(){
         quote={quote}
         serviceMode={serviceMode}
         onProduct={product=>{setEditingLineId(null);setSelectedProduct(product);setSelections({});setSelectedVariationId(null);setComboEnabled(false);setComboSelections({})}}
-        onCart={()=>setCartOpen(true)}
+        onCart={()=>{setCheckoutStage(false);setCartOpen(true)}}
       />:null}
       {view==='work'?<WorkView connection={connection} items={snapshot?.work??[]} onRefresh={()=>void refresh()}/>:null}
       {view==='orders'?<OrdersView
@@ -655,15 +669,15 @@ export function App(){
           const selected=(snapshot?.diningTables??[]).find(row=>row.tableId===dineTable);
           if(!selected){setNotice('請先選擇 Admin 已發布嘅枱號。');return}
           const target:SmmDiningTarget={kind:'TABLE',tableId:selected.tableId,covers:dineCovers};
-          setDiningTarget(target);
           changeServiceMode('DINE_IN');
+          changeDiningTarget(target);
           setDiningTargetOpen(false);
           setNotice('已選 '+selected.label+'；加入商品後提交，SMT 會自動開枱／加單。');
           changeView('order');
         }}
         onWait={()=>{
-          setDiningTarget({kind:'WAITING',covers:dineCovers});
           changeServiceMode('DINE_IN');
+          changeDiningTarget({kind:'WAITING',covers:dineCovers});
           setDiningTargetOpen(false);
           setNotice('已選輪候；加入商品後提交會先進堂食輪候。');
           changeView('order');
@@ -716,7 +730,7 @@ export function App(){
         const group=resolved?.groups.find(item=>item.pool.poolId===poolId&&item.group.groupId===groupId);
         if(group)setComboSelections(current=>toggleSmmComboSelection(current,group,choiceId));
       }}
-      onClose={()=>{const returnToCart=Boolean(editingLineId);resetProductEditor();if(returnToCart)setCartOpen(true)}}
+      onClose={()=>{const returnToCart=Boolean(editingLineId);resetProductEditor();if(returnToCart){setCheckoutStage(false);setCartOpen(true)}}}
       onAdd={addSelectedProduct}
     />:null}
 
@@ -724,17 +738,25 @@ export function App(){
       cart={cart}
       quote={quote}
       menu={menu}
+      checkoutStage={checkoutStage}
       serviceMode={serviceMode}
+      tender={tender}
+      diningTarget={diningTarget}
+      diningTables={snapshot?.diningTables??[]}
       note={cartNote}
       onNote={changeCartNote}
       onServiceMode={changeServiceMode}
-      onClose={()=>setCartOpen(false)}
+      onTender={changeTender}
+      onChooseDiningTarget={()=>{setDineCovers(diningTarget?.covers??dineCovers);setDiningTargetOpen(true)}}
+      onClose={()=>{setCartOpen(false);setCheckoutStage(false)}}
+      onBackToCart={()=>setCheckoutStage(false)}
       onEdit={openCartLineEditor}
       onAcceptRefresh={acceptCartRefresh}
       onQuantity={(lineId,quantity)=>updateCart(cart.map(line=>line.lineId===lineId?{...line,quantity:Math.min(99,Math.max(1,quantity))}:line))}
       onRemove={lineId=>updateCart(cart.filter(line=>line.lineId!==lineId))}
-      onClear={()=>{setCart([]);setCartNote('');persist({cart:[],cartNote:''})}}
-      onCheckout={()=>{setCartOpen(false);setNotice('購物草稿已準備完成；今輪停喺 Stage 3，結帳會喺下一個 Stage 接上。')}}
+      onClear={()=>{setCart([]);setCartNote('');setCheckoutStage(false);persist({cart:[],cartNote:''})}}
+      onCheckout={()=>setCheckoutStage(true)}
+      onSubmitBoundary={()=>setNotice('結帳資料已確認；第 4 階段未送出正式訂單。正式提交同 PENDING／CONFIRMED／REJECTED／UNKNOWN 留待第 5 階段。')}
     />:null}
 
     {diningTargetOpen?<DiningTargetSheet
@@ -742,7 +764,7 @@ export function App(){
       covers={dineCovers}
       setCovers={setDineCovers}
       onClose={()=>setDiningTargetOpen(false)}
-      onSelect={target=>{setDiningTarget(target);setDiningTargetOpen(false);const label=(snapshot?.diningTables??[]).find(row=>row.tableId===target.tableId)?.label;setNotice(target.kind==='TABLE'?'堂食會掛入 '+(label??target.tableId)+'。':'堂食會先加入輪候。');}}
+      onSelect={target=>{changeDiningTarget(target);setDiningTargetOpen(false);const label=(snapshot?.diningTables??[]).find(row=>row.tableId===target.tableId)?.label;setNotice(target.kind==='TABLE'?'堂食會掛入 '+(label??target.tableId)+'。':'堂食會先加入輪候。');}}
     />:null}
   </main>;
 }
