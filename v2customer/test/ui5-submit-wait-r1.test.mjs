@@ -16,8 +16,8 @@ const types=fs.readFileSync(path.join(src,'product-types.ts'),'utf8');
 const styles=fs.readFileSync(path.join(src,'styles.css'),'utf8');
 
 test('UI5 exposes only canonical submit and waiting routes after UI4 review',()=>{
-  assert.match(app,/\/submit\/\(\[\^\/\]\+\)/);
-  assert.match(app,/\/orders\/\(\[\^\/\]\+\)\\\/waiting/);
+  assert.ok(app.includes("pathname.match(/^\\/submit\\/([^/]+)$/)"));
+  assert.ok(app.includes("pathname.match(/^\\/orders\\/([^/]+)\\/waiting$/)"));
   assert.match(app,/replacePath\('\/submit\/'/);
   assert.match(app,/replacePath\('\/orders\/'/);
   assert.match(ui4,/onReviewConfirmed/);
