@@ -305,6 +305,22 @@ export function restoreCustomerComboSelectionState(
   })));
 }
 
+export function customerStandalonePublishedUnitMinor(
+  product:CustomerProduct,
+  ordinarySelections:readonly CustomerCartSelection[],
+):number|null{
+  const base=Number(product.publishedUnitPriceMinor);
+  if(!Number.isSafeInteger(base)||base<0)return null;
+  let unitMinor=base;
+  for(const selection of ordinarySelections){
+    if(selection.publishedAdjustmentMinor===undefined)return null;
+    const adjustment=Number(selection.publishedAdjustmentMinor);
+    if(!Number.isSafeInteger(adjustment))return null;
+    unitMinor+=adjustment;
+  }
+  return Number.isSafeInteger(unitMinor)&&unitMinor>=0?unitMinor:null;
+}
+
 export function customerComboPublishedUnitMinor(
   intent:CustomerCartComboIntent,
   ordinarySelections:readonly CustomerCartSelection[],
