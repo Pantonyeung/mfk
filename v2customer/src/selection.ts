@@ -133,7 +133,7 @@ export function toggleCustomerComboSelection(
   const choice=subPool?.choices.find(row=>row.choiceId===choiceId);
   if(!subPool||!choice||!choice.available)return state;
 
-  const draft:Object.freeze extends never?never:CustomerComboDraftSelection=Object.freeze({
+  const draft:CustomerComboDraftSelection=Object.freeze({
     poolId:pool.poolId,
     groupId:group.groupId,
     subPoolId,
@@ -173,6 +173,8 @@ export function validateCustomerComboSelection(
   if(!combo){
     return Object.freeze({ok:false,issues:Object.freeze(['套餐資料需要重新同步'])});
   }
+  const exactBound=combo.comboId===product.comboId;
+  if(!exactBound)issues.push('套餐綁定已更新，請重新同步');
   if(!Number.isSafeInteger(Number(combo.publishedBasePriceMinor))||Number(combo.publishedBasePriceMinor)<0){
     issues.push('套餐價格資料待同步');
   }
