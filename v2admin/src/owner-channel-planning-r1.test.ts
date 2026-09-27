@@ -74,6 +74,7 @@ describe('Owner Stage04 channel + planning',()=>{
     expect(worker).toContain("owner:planning:");
     expect(worker).toContain("recognizedSalesMinor");
     expect(worker).toContain("'/owner/planning'");
+    expect(worker).toContain("'/owner/channels'");
     expect(worker).toContain("'/owner/channels/command'");
     const readIndex=worker.indexOf("https://internal/admin/store/readback");
     const commandIndex=worker.indexOf("https://internal/admin/store/status/'+(action==='PAUSE'?'rest':'open')");
