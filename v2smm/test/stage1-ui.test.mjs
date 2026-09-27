@@ -64,8 +64,9 @@ test('Stage 1 normal UI removes engineering placeholder copy',()=>{
   assert.doesNotMatch(orderView,/Store Kernel|Pricing Engine|Order Engine/i);
 });
 
-test('Stage 1 can render unavailable data without fabricating products or prices',()=>{
-  assert.match(orderView,/目前未有正式餐單資料/);
-  assert.match(orderView,/未連線時唔會建立假商品或者假價格/);
+test('Stage 1 can render unavailable data with human recovery copy',()=>{
+  assert.match(orderView,/餐單暫時未能載入/);
+  assert.match(orderView,/請稍後重新整理/);
+  assert.doesNotMatch(orderView,/Stage 1|假商品|假價格/);
   assert.match(app,/SMM_APP_REFRESH_DIAGNOSTIC/);
 });
