@@ -598,6 +598,7 @@ export interface WorkspaceHoldDraft{
     name:string;
     qty:number;
     unitMinor:number;
+    serviceMode?:'takeaway'|'dine-in';
     detail?:string;
     composition?:unknown;
   }[];
