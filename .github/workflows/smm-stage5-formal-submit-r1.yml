@@ -1,0 +1,50 @@
+name: smm-stage5-formal-submit-r1
+
+on:
+  push:
+    branches:
+      - work/MFK/SMM-UI-STAGE5-FORMAL-SUBMIT-R1
+  workflow_dispatch:
+
+jobs:
+  smm:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: v2smm
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-audit --no-fund --legacy-peer-deps --package-lock=false
+      - name: Stage 5 formal submit contract
+        run: node --test test/stage5-submit.test.mjs
+      - name: Stage 4 regression
+        run: node --test test/stage4-checkout.test.mjs
+      - name: Stage 3 regression
+        run: node --test test/stage3-ui.test.mjs test/stage3-rework.test.mjs
+      - name: Stage 0-2 / loginId / Combo regression
+        run: node --test test/stage0-ui.test.mjs test/stage1-ui.test.mjs test/stage2-ui.test.mjs test/stage2-combo-r1.test.mjs test/login-id-r1.test.mjs
+      - name: Full SMM tests
+        run: npm test
+      - name: SMM build
+        run: npm run build
+      - name: Worker dry-run only
+        run: npx --yes wrangler@4 deploy --dry-run --config wrangler.jsonc
+
+  v2local:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: v2local
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-audit --no-fund --legacy-peer-deps --package-lock=false
+      - name: Protected v2local tests
+        run: npm test
+      - name: v2local build
+        run: npm run build
