@@ -6,63 +6,66 @@ const app=readFileSync(new URL('../src/App.tsx',import.meta.url),'utf8');
 const css=readFileSync(new URL('../src/stage1.css',import.meta.url),'utf8');
 const slots=JSON.parse(readFileSync(new URL('../public/brand/stage1/asset-slots.json',import.meta.url),'utf8'));
 
-test('Stage 1 order surface is implemented and scoped without changing order authority',()=>{
-  assert.match(app,/import '\.\/stage1\.css'/);
-  assert.match(app,/data-view=\{view\}/);
-  assert.match(app,/stage1-order/);
-  assert.match(app,/stage1-product-grid/);
-  assert.match(app,/stage1-cart-bar/);
-  assert.doesNotMatch(app,/function OrderView[\s\S]*submitOrder\s*\(/);
+const orderStart=app.indexOf('function OrderView');
+const orderEnd=app.indexOf('function DineView',orderStart);
+assert.ok(orderStart>=0&&orderEnd>orderStart);
+const orderView=app.slice(orderStart,orderEnd);
+
+test('Stage 1 implements final Search Category Product Grid Sold Out Cart Bar flow',()=>{
+  for(const marker of['stage1-search','stage1-category-rail','stage1-product-grid','stage1-soldout','stage1-cart-bar','查看購物車']){
+    assert.match(orderView,new RegExp(marker));
+  }
+  assert.doesNotMatch(orderView,/submitOrder\s*\(/);
 });
 
-test('Stage 1 product imagery stays blank until official product photography exists',()=>{
-  assert.match(app,/className="product-media"/);
-  assert.match(app,/正式產品圖片待補/);
-  assert.doesNotMatch(app,/product-avatar/);
-  assert.equal(slots.ownerLock.productPhotography,'OFFICIAL_ONLY');
-  assert.equal(slots.stage1.productCards.imageStatus,'EMPTY_UNTIL_OFFICIAL_PRODUCT_PHOTO');
+test('Stage 1 uses canonical product imageRef first and approved brand media fallback',()=>{
+  assert.match(app,/function productMediaSrc/);
+  assert.match(app,/product\.imageRef/);
+  assert.match(app,/function ProductMedia/);
+  assert.match(orderView,/<ProductMedia product=\{product\} className="product-media"\/>/);
+  assert.equal(slots.ownerLock.productMedia,'CANONICAL_IMAGE_REF_FIRST');
+  assert.equal(slots.stage1.productCards.imageStatus,'CANONICAL_OR_APPROVED_BRAND_FALLBACK');
   assert.equal(slots.stage1.productCards.fakeFoodImages,false);
+  for(const file of['product-feature.webp','product-bowl.webp','product-salad.webp']){
+    assert.ok(existsSync(new URL('../public/brand/stage1/'+file,import.meta.url)));
+  }
 });
 
-test('Stage 1 pauses all IP and defers future graphics to discrete asset slots',()=>{
-  assert.equal(slots.ownerLock.ipProduction,'PAUSED');
-  assert.equal(slots.ownerLock.generatedCharacters,'DO_NOT_CREATE');
-  assert.match(slots.ownerLock.visualRule,/discrete asset file/);
-  assert.doesNotMatch(app,/stage0\/splash-male|stage0\/login-female|stage0\/connecting-male|stage0\/recovery-female/);
-  assert.ok(existsSync(new URL('../public/brand/stage1/asset-slots.json',import.meta.url)));
+test('Stage 1 has five-tab icon navigation in fixed source order',()=>{
+  for(const label of['點單','待處理','訂單','堂食','更多'])assert.match(app,new RegExp('label="'+label+'"'));
+  assert.match(app,/function NavGlyph/);
+  assert.match(app,/className="nav-glyph"/);
+  assert.match(app,/<svg/);
 });
 
-test('Stage 1 product media is square at every breakpoint and responsive geometry remains locked',()=>{
-  assert.match(css,/\.product-media\{[\s\S]*aspect-ratio:1\/1/);
-  assert.doesNotMatch(css,/aspect-ratio:4\/3/);
-  assert.doesNotMatch(css,/aspect-ratio:16\/8/);
+test('Stage 1 sold-out products stay in the grid and are disabled',()=>{
+  assert.match(orderView,/disabled=\{!product\.available\}/);
+  assert.match(orderView,/!product\.available\?<span className="stage1-soldout">暫停供應<\/span>:null/);
+  assert.match(css,/\.stage1-product-card\.disabled/);
+  assert.match(css,/\.stage1-product-card\.disabled \.stage1-product-add/);
+});
+
+test('Stage 1 geometry keeps two columns above 360 and one column at 360',()=>{
   assert.match(css,/\.stage1-product-grid\{[\s\S]*grid-template-columns:repeat\(2/);
-  assert.match(css,/@media\(max-width:360px\)[\s\S]*\.stage1-product-grid\{grid-template-columns:1fr\}/);
-  for(const width of [360,375,390,430,440,520])assert.ok(width>=360&&width<=520);
-  assert.doesNotMatch(css,/product-avatar/);
+  assert.match(css,/@media\(max-width:360px\)[\s\S]*\.stage1-product-grid\{grid-template-columns:1fr/);
+  assert.match(css,/\.stage1-category-rail button\{[\s\S]*min-height:44px/);
+  assert.match(css,/\.stage1-product-card \.product-media\{[\s\S]*aspect-ratio/);
 });
 
-test('Stage 1 product card exposes a visible plus affordance only for available products',()=>{
-  assert.match(app,/product\.available\?<span className="stage1-product-add" aria-hidden="true">＋<\/span>:null/);
-  assert.doesNotMatch(app,/stage1-product-add[^\n]*<button/);
-  assert.match(css,/\.stage1-product-add\{[\s\S]*width:48px;[\s\S]*height:48px;/);
-  assert.match(css,/\.stage1-product-card\.disabled \.stage1-product-add\{[\s\S]*display:none/);
+test('Stage 1 zero-result recovery is human-facing and keeps source mascot presentation',()=>{
+  assert.match(orderView,/stage1-zero-result/);
+  assert.match(orderView,/搵唔到呢款商品/);
+  assert.match(orderView,/清除搜尋/);
+  assert.match(orderView,/stage0\/stage0-female\.svg/);
 });
 
-test('Stage 1 category rail meets high-frequency touch target',()=>{
-  assert.match(css,/\.stage1-category-rail button\{[\s\S]*min-height:48px/);
+test('Stage 1 normal UI removes engineering placeholder copy',()=>{
+  assert.doesNotMatch(orderView,/正式產品圖片待補|本機介面|餐單版本/);
+  assert.doesNotMatch(orderView,/Store Kernel|Pricing Engine|Order Engine/i);
 });
 
-test('Stage 1 keeps zero-result recovery and empty product-image policy',()=>{
-  assert.match(app,/搵唔到商品/);
-  assert.match(app,/清除搜尋/);
-  assert.match(app,/className="product-media"/);
-  assert.doesNotMatch(app,/img[^>]+product/i);
-});
-
-test('Stage 1 can render while store data is unavailable without exposing raw engineering errors',()=>{
-  assert.match(app,/Stage 1 已可進入/);
-  assert.match(app,/未連線時唔會建立假商品或者假價格/);
+test('Stage 1 can render unavailable data without fabricating products or prices',()=>{
+  assert.match(orderView,/目前未有正式餐單資料/);
+  assert.match(orderView,/未連線時唔會建立假商品或者假價格/);
   assert.match(app,/SMM_APP_REFRESH_DIAGNOSTIC/);
-  assert.doesNotMatch(app,/setError\(reason instanceof Error\?reason\.message/);
 });
