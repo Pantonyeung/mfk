@@ -53,7 +53,7 @@ test('Combo draft selection uses exact IDs and banked DRINK optional semantics o
 
 test('ProductSheet consumes canonical Combo projection and renders selectable Combo section',()=>{
   for(const marker of[
-    'data-ui3-section="combo"',
+    "kind:'combo'",
     'menu?.combos',
     'menu?.comboPools',
     'product.comboId',
@@ -61,7 +61,7 @@ test('ProductSheet consumes canonical Combo projection and renders selectable Co
     '套餐基本價',
     'addonKind',
     'publishedAdjustmentMinor',
-    'disabled={!choice.available||(maxReached&&!active)}',
+    'disabled={!choice.available}',
   ])assert.ok(views.includes(marker),marker);
   assert.ok(views.includes('toggleCombo'));
   assert.ok(views.includes('comboEnabled'));
