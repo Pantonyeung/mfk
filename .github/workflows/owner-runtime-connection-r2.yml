@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - work/MFK/OWNER-RUNTIME-CONNECTION-R2
+      - main
   pull_request:
     paths:
       - 'v2owner/**'
