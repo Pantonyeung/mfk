@@ -153,10 +153,27 @@ export function buildOwnerReadModelSnapshot({active,orders,reports,acks,channels
   const devices=Object.values(row(acks)).map(rawAck=>{const ack=row(rawAck);const deviceId=String(ack.deviceId||'');return{deviceId,name:deviceId||'未命名裝置',kind:'SMT',health:'UNKNOWN',...(ack.appliedAt?{lastSeen:String(ack.appliedAt)}:{}),binding:ack.revision!==undefined?'Admin revision '+String(ack.revision):'未有 revision 讀回',jobs:'未有打印工作讀回',affected:'未有影響範圍讀回'};}).filter(device=>device.deviceId);
   const reportCards=reportRows.slice(0,31).map(rawReport=>{const report=row(rawReport);const date=String(report.date||'');const currentEffectiveSalesMinor=Math.round(Number(report.netMinor)||0);return{reportId:'daily:'+date,name:date+' 有效營業額',value:moneyLabel(currentEffectiveSalesMinor),compare:String(Math.max(0,Number(report.orders)||0))+' 單',freshness:'CANONICAL_PROJECTION',businessDate:date,metricKind:'CURRENT_EFFECTIVE_SALES',currentEffectiveSalesMinor,metricVersion:'MFK_CURRENT_EFFECTIVE_SALES_V1'};});
   const today=latestReport?{salesLabel:moneyLabel(Number(latestReport.netMinor)||0),orderCount:Math.max(0,Number(latestReport.orders)||0),averageOrderLabel:moneyLabel((Number(latestReport.orders)||0)>0?Math.round((Number(latestReport.netMinor)||0)/Number(latestReport.orders)):0),comparisonLabel:'未有比較資料讀回'}:undefined;
-  const store=Object.keys(snapshot).length||latestReport?{storeId:String(activeEnvelope.storeId||'MF01'),storeName:String(settings.storeName||'磨飯'),businessDate:String(latestReport?.date||''),operatingStatus:'未有營業狀態讀回',observedAt:now,freshness:'PARTIAL'}:undefined;
+  const businessDay=row(snapshot.businessDay);
+  const currentBusinessDate=hktBusinessDate(now,String(businessDay.cutoff||'05:00'));
+  const currentMonth=currentBusinessDate.slice(0,7);
+  const monthReports=reportRows.filter(rawReport=>{const report=row(rawReport),date=String(report.date||'');return date.startsWith(currentMonth)&&date<=currentBusinessDate;});
+  const currentEffectiveSalesMtdMinor=monthReports.length
+    ?monthReports.reduce((sum,rawReport)=>sum+Math.round(Number(row(rawReport).netMinor)||0),0)
+    :null;
+  const planningBasis={
+    month:currentMonth,
+    businessDate:currentBusinessDate,
+    sourceMetric:'CURRENT_EFFECTIVE_SALES',
+    sourceAuthority:'CANONICAL_REPORTING_PROJECTION',
+    currentEffectiveSalesMtdMinor,
+    metricVersion:'MFK_CURRENT_EFFECTIVE_SALES_V1',
+    completeness:monthReports.length?'PARTIAL':'UNAVAILABLE',
+    observedAt:now,
+  };
+  const store=Object.keys(snapshot).length||latestReport?{storeId:String(activeEnvelope.storeId||'MF01'),storeName:String(settings.storeName||'磨飯'),businessDate:String(latestReport?.date||currentBusinessDate),operatingStatus:'未有營業狀態讀回',observedAt:now,freshness:'PARTIAL'}:undefined;
   return{
     globalState:Object.keys(snapshot).length||mappedOrders.length||reportRows.length?'PARTIAL':'EMPTY',
-    ...(store?{store}:{}),...(today?{today}:{}),
+    ...(store?{store}:{}),...(today?{today}:{}),planningBasis,
     liveOrders:{activeCount:activeOrders.length,readyCount:activeOrders.filter(order=>order.fulfillmentLabel==='可取餐').length,recentOrders:activeOrders.slice(0,10).map(order=>({orderId:order.orderId,displayCode:order.displayCode,source:order.source,amountLabel:order.currentEffectiveAmountLabel,fulfillmentLabel:order.fulfillmentLabel||'未有交收狀態讀回'})),observedAt:now},
     readiness:[],actions:[],orders:mappedOrders,channels:rows(channels),sellability,staff,devices,reports:reportCards,campaigns:[],settlements:[],inventory:[],notifications:[],activity:[],adminLinkLabel:'Admin',observedAt:now,
   };
