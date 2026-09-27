@@ -137,3 +137,43 @@ Exact FINAL_HEAD / FINAL_CI / behind-main 以 #404 最終 `READY_FOR_COMMANDER_A
 
 NO MAIN MERGE  
 NO DEPLOY
+
+
+## Final CHANGES_REQUIRED correction
+
+Controlling review：#404 comment `5854856433`
+
+已修：
+
+1. UI7 EMPTY state
+   - healthy connection + no canonical UI7 pickup stage => `EMPTY`
+   - canonical `READY` 只由正式 Order/Fulfillment projection 讀回
+   - unsupported stage => `UNKNOWN`
+   - LOADING / READY / EMPTY / ERROR / OFFLINE / STALE / UNKNOWN 分開
+   - deterministic EMPTY contract test 已加入
+
+2. Stage 7 fixed bottom navigation
+   - pickup/UI7 保留 Customer 固定五項 bottom nav
+   - active = `orders`
+   - 無第六項
+   - existing `position:fixed`
+   - existing `env(safe-area-inset-bottom)`
+   - existing nav button `min-height:60px`（>=44px）
+   - nav 只做 App view navigation；無 pickup/Fulfillment mutation
+
+保持：
+
+- `READY != ARRIVED != VERIFIED != HANDED_OVER != COMPLETED`
+- unresolved exception != Completed
+- `SAFE_UNAVAILABLE_FIRST_BREAK:CUSTOMER_ARRIVAL_NOTIFICATION_SEAM_MISSING_IN_CURRENT_MAIN`
+- NO arrival authority
+- NO Stage8
+- NO Seed / Reward
+- NO MAIN MERGE
+- NO DEPLOY
+
+Final exact HEAD / CI / behind-main 以 #404 最後 `READY_FOR_COMMANDER_REACCEPTANCE` receipt 為準。
+
+Milestone candidate：
+
+`MFK_CUSTOMER_UI7_PICKUP_COMPLETE_R1_READY_FOR_COMMANDER_REACCEPTANCE`
