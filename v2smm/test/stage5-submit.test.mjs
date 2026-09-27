@@ -22,7 +22,9 @@ const css=readFileSync(new URL('../src/stage5.css',import.meta.url),'utf8');
 test('Stage 5 state machine stays DRAFT -> PENDING -> CONFIRMED / REJECTED / UNKNOWN only',()=>{
   assert.match(view,/SmmStage5State='DRAFT'\|'PENDING'\|'CONFIRMED'\|'REJECTED'\|'UNKNOWN'/);
   for(const state of['DRAFT','PENDING','CONFIRMED','REJECTED','UNKNOWN'])assert.match(view,new RegExp(state));
-  assert.doesNotMatch(view,/PREPARING|READY|COMPLETED|Stage 6|第 6 階段/);
+  const stateType=view.match(/export type SmmStage5State=([^;]+);/)?.[1]??'';
+  assert.doesNotMatch(stateType,/PREPARING|READY|COMPLETED/);
+  assert.doesNotMatch(view,/Stage 6|第 6 階段/);
 });
 
 test('Stage 5 implements the V2 full-screen 5.2-5.6 family instead of a generic bottom sheet',()=>{
@@ -44,7 +46,7 @@ test('Stage 5 uses supplied branded artwork slots for every V2 result state',()=
 
 test('one intent owns one stable submissionId and one derived idempotencyKey',()=>{
   assert.match(persistence,/const submissionId=createSmmStableSubmissionId\(\)/);
-  assert.ok(persistence.includes('idempotencyKey:`smm-direct:\\${submissionId}`'));
+  assert.match(persistence,/idempotencyKey:`smm-direct:\$\{submissionId\}`/);
   assert.match(adapter,/submissionId:intent\.submissionId/);
   assert.match(adapter,/idempotencyKey:intent\.idempotencyKey/);
   assert.match(app,/const base=existing\?\?createSmmPendingIntent/);
