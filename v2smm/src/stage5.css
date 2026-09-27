@@ -137,6 +137,7 @@
   font-weight:900;
 }
 .stage5-progress-list .done i{background:#24c989;color:#fff}
+.stage5-progress-list .active i{border:2px solid #377cf6;background:#eaf2ff}
 .stage5-progress-list .waiting i{border:2px solid #7b92ff;background:#fff}
 .stage5-progress-list span{font-size:13px;font-weight:750;color:#304b79}
 .stage5-progress-list small{font-size:10px;color:#4f73c9}
