@@ -51,12 +51,12 @@ function Stage5Submitting({session,submitting}:{session:SmmStage5Session;submitt
     <p className="stage5-kicker">正在處理您的訂單...</p>
     <Stage5Artwork name="submitting" alt="磨飯角色正在處理訂單"/>
     <div className="stage5-progress-list" aria-live="polite">
-      <div className="done"><i>✓</i><span>驗證訂單內容</span><small>已完成</small></div>
-      <div className="done"><i>✓</i><span>鎖定提交身份</span><small>已完成</small></div>
-      <div className="done"><i>✓</i><span>提交至系統</span><small>{submitting?'處理中':'已建立提交'}</small></div>
+      <div className="done"><i>✓</i><span>驗證訂單內容</span><small>300ms</small></div>
+      <div className="done"><i>✓</i><span>鎖定提交身份</span><small>420ms</small></div>
+      <div className="done"><i>✓</i><span>提交至系統</span><small>{submitting?'680ms':'已建立提交'}</small></div>
       <div className="waiting"><i/><span>等待確認結果</span><small>...</small></div>
     </div>
-    <div className="stage5-info-note"><b>i</b><span>請勿重複提交訂單</span></div>
+    <div className="stage5-info-note"><b>i</b><span>請勿關閉應用程式</span></div>
     <small className="stage5-foot-ref">提交參考 {shortRef}</small>
   </section>;
 }
