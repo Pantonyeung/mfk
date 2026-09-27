@@ -44,7 +44,7 @@ export function ChannelHealthPage({
   const selected=channels.find(channel=>channel.channelId===selectedId)??null;
   const observedAt=useMemo(()=>{
     const values=channels.map(channel=>channel.observedAt).filter(Boolean).sort();
-    return values.at(-1)??null;
+    return values.length?values[values.length-1]:null;
   },[channels]);
 
   return <section className="page channel-page">
