@@ -10,6 +10,7 @@ const productSheet=fs.readFileSync(path.join(src,'components/product-sheet-ui3.t
 const app=fs.readFileSync(path.join(src,'App.tsx'),'utf8');
 const css=fs.readFileSync(path.join(src,'styles.css'),'utf8');
 const nav=fs.readFileSync(path.join(src,'stage2/Stage2BottomNavigation.tsx'),'utf8');
+const primitives=fs.readFileSync(path.join(src,'ui/primitives.tsx'),'utf8');
 const selection=fs.readFileSync(path.join(src,'selection.ts'),'utf8');
 const quote=fs.readFileSync(path.join(src,'local-quote.ts'),'utf8');
 const cloud=fs.readFileSync(path.join(src,'../../contracts/customer-cloud-v1.ts'),'utf8');
@@ -46,6 +47,7 @@ test('UI3 keeps exact five-nav with 記憶罐 in the center',()=>{
     previous=index;
   }
   assert.match(nav,/data-center=\{item\.id==='cart'\|\|undefined\}/);
+  for(const label of labels)assert.ok(primitives.includes(label),label+' global nav');
 });
 
 test('UI3 Combo renders only from exact product.comboId and never heuristics',()=>{
