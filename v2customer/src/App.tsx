@@ -240,9 +240,16 @@ export function App(){
     const comboUnitMinor=comboIntent?customerComboPublishedUnitMinor(comboIntent,ordinarySelections):null;
     if(comboIntent&&comboUnitMinor===null){setNotice('套餐價格資料待同步，請稍後再試。');return}
 
-    const standaloneUnitMinor=!comboIntent&&Number.isSafeInteger(selectedProduct.publishedUnitPriceMinor)
-      ?Number(selectedProduct.publishedUnitPriceMinor)+ordinarySelections.reduce((sum,option)=>sum+Number(option.publishedAdjustmentMinor||0),0)
+    const ordinaryPriceFactsReady=ordinarySelections.every(option=>
+      option.publishedAdjustmentMinor!==undefined&&
+      Number.isSafeInteger(Number(option.publishedAdjustmentMinor))
+    );
+    const standaloneUnitMinor=!comboIntent&&
+      Number.isSafeInteger(selectedProduct.publishedUnitPriceMinor)&&
+      ordinaryPriceFactsReady
+      ?Number(selectedProduct.publishedUnitPriceMinor)+ordinarySelections.reduce((sum,option)=>sum+Number(option.publishedAdjustmentMinor),0)
       :null;
+    if(!comboIntent&&standaloneUnitMinor===null){setNotice('商品價格資料待同步，請稍後再試。');return}
     const publishedUnitPriceMinor=comboIntent?comboUnitMinor:standaloneUnitMinor;
 
     const variation=selectedProduct.variations?.find(item=>item.variationId===selectedVariationId);
