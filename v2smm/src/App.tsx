@@ -64,7 +64,7 @@ export function App(){
   const initial=useMemo(()=>readSmmLocalWorkspace(),[]);
   const [view,setView]=useState<View>(initial.preferences.activeView);
   const [activeCategoryId,setActiveCategoryId]=useState<string|null>(initial.preferences.activeCategoryId);
-  const [sourceFilter,setSourceFilter]=useState(initial.preferences.sourceFilter);
+  const [sourceFilter]=useState(initial.preferences.sourceFilter);
   const [serviceMode,setServiceMode]=useState<SmmServiceMode>(initial.preferences.serviceMode);
   const [tender,setTender]=useState<SmmTender>(initial.preferences.tender);
   const [cart,setCart]=useState<readonly SmmCartLine[]>(initial.cart);
@@ -125,11 +125,6 @@ export function App(){
   const changeCategory=(next:string|null)=>{
     setActiveCategoryId(next);
     persist({preferences:{activeView:view,activeCategoryId:next,sourceFilter,serviceMode,tender,diningTarget}});
-  };
-
-  const changeSource=(next:string)=>{
-    setSourceFilter(next);
-    persist({preferences:{activeView:view,activeCategoryId,sourceFilter:next,serviceMode,tender,diningTarget}});
   };
 
   const refresh=async()=>{
