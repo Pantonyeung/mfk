@@ -30,8 +30,8 @@ test('Stage 0 uses MoreFun brand and approved IP assets from the final visual so
   assert.match(stage0,/\/brand\/stage0\/stage0-male\.svg/);
   assert.match(stage0,/\/brand\/stage0\/stage0-female\.svg/);
   assert.ok(existsSync(new URL('../public/brand/morefun-logo.webp',import.meta.url)));
-  assert.ok(existsSync(new URL('../public/brand/stage0/stage0-male.svg',import.meta.url)));
-  assert.ok(existsSync(new URL('../public/brand/stage0/stage0-female.svg',import.meta.url)));
+  assert.ok(existsSync(new URL('../public/brand/stage0/stage0-male.webp',import.meta.url)));
+  assert.ok(existsSync(new URL('../public/brand/stage0/stage0-female.webp',import.meta.url)));
   assert.match(css,/stage0-mascot-pair/);
   assert.match(css,/stage0-feather/);
 });
