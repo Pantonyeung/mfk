@@ -292,6 +292,21 @@
   padding:24px 16px;
   text-align:center;
 }
+.stage7-filter-empty{
+  min-height:150px;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:5px;
+  padding:20px 16px;
+  border:1px dashed #d7e1ee;
+  border-radius:13px;
+  background:#fbfcfe;
+  text-align:center;
+}
+.stage7-filter-empty strong{color:#284875;font-size:14px}
+.stage7-filter-empty span{max-width:32ch;color:#7c899d;font-size:10px;line-height:1.5}
 .stage7-empty-icon{
   width:72px;height:72px;
   display:grid;place-items:center;
