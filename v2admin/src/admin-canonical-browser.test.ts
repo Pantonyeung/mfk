@@ -48,6 +48,7 @@ describe('Admin canonical browser hydration',()=>{
       },
     });
 
+    localStorage.setItem('mfk.admin.sync-outbox.v1',JSON.stringify([{revision:1},{revision:8}]));
     expect(hydrateAdminFromCanonical(envelope)).toBe(7);
 
     const staff=JSON.parse(localStorage.getItem('mfk.admin.staff.v1')||'[]');
@@ -64,5 +65,6 @@ describe('Admin canonical browser hydration',()=>{
     const releases=JSON.parse(localStorage.getItem('mfk.admin.releases.v1')||'[]');
     expect(releases[0].version).toBe(7);
     expect(JSON.parse(localStorage.getItem('mfk.admin.catalog-draft.v2')||'null')).toEqual(envelope.snapshot.catalog);
+    expect(JSON.parse(localStorage.getItem('mfk.admin.sync-outbox.v1')||'[]')).toEqual([{revision:8}]);
   });
 });
