@@ -121,10 +121,10 @@ test('shared Loading Empty Offline Stale Partial Unknown Error remain distinct',
   assert.equal(smmStage5SharedState('LOADING',true)?.kind,'LOADING');
   assert.equal(smmStage5SharedState('READY',false)?.kind,'EMPTY');
   assert.equal(smmStage5SharedState('NOT_CONNECTED',true)?.kind,'OFFLINE');
-  assert.equal(smmStage5SharedState('STALE',true)?.kind,'STALE');
-  assert.equal(smmStage5SharedState('PARTIAL',true)?.kind,'PARTIAL');
+  assert.equal(smmStage5SharedState('READY',true,{stale:true})?.kind,'STALE');
+  assert.equal(smmStage5SharedState('READY',true,{partial:true})?.kind,'PARTIAL');
   assert.equal(smmStage5SharedState('UNKNOWN',true)?.kind,'UNKNOWN');
-  assert.equal(smmStage5SharedState('ERROR',true)?.kind,'ERROR');
+  assert.equal(smmStage5SharedState('READY',true,{error:true})?.kind,'ERROR');
   for(const marker of['LOADING','EMPTY','OFFLINE','STALE','PARTIAL','UNKNOWN','ERROR'])assert.ok(shared.includes(marker),marker);
   assert.match(view,/data-stage5-transport-state/);
   assert.match(view,/data-stage5-state/);
