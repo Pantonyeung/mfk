@@ -45,16 +45,16 @@ function Stage5Artwork({name,alt}:{name:keyof typeof STAGE5_ART;alt:string}){
   return <img className={`stage5-art stage5-art-${name}`} src={STAGE5_ART[name]} alt={alt}/>;
 }
 
-function Stage5Submitting({session,submitting}:{session:SmmStage5Session;submitting:boolean}){
+function Stage5Submitting({session}:{session:SmmStage5Session}){
   const shortRef=smmStage5SubmissionShortRef(session.intent.submissionId);
   return <section className="stage5-state stage5-submitting" data-stage5-visual="5.2_SUBMITTING">
     <p className="stage5-kicker">正在處理您的訂單...</p>
     <Stage5Artwork name="submitting" alt="磨飯角色正在處理訂單"/>
     <div className="stage5-progress-list" aria-live="polite">
-      <div className="done"><i>✓</i><span>驗證訂單內容</span><small>300ms</small></div>
-      <div className="done"><i>✓</i><span>鎖定提交身份</span><small>420ms</small></div>
-      <div className="done"><i>✓</i><span>提交至系統</span><small>{submitting?'680ms':'已建立提交'}</small></div>
-      <div className="waiting"><i/><span>等待確認結果</span><small>...</small></div>
+      <div className="done"><i>✓</i><span>驗證訂單內容</span><small>已完成</small></div>
+      <div className="done"><i>✓</i><span>鎖定提交身份</span><small>已完成</small></div>
+      <div className="active"><i/><span>提交至系統</span><small>進行中</small></div>
+      <div className="waiting"><i/><span>等待確認結果</span><small>下一步</small></div>
     </div>
     <div className="stage5-info-note"><b>i</b><span>請勿關閉應用程式</span></div>
     <small className="stage5-foot-ref">提交參考 {shortRef}</small>
@@ -168,7 +168,8 @@ export function Stage5SubmitView({
   onHome:()=>void;
 }){
   const title=
-    session.state==='DRAFT'?'提交中':
+    session.state==='DRAFT'&&submitting?'提交中':
+    session.state==='DRAFT'?'尚未送出':
     session.state==='PENDING'?'已提交':
     session.state==='CONFIRMED'?'訂單確認':
     session.state==='REJECTED'?'提交失敗':
@@ -184,7 +185,7 @@ export function Stage5SubmitView({
     <Stage5TopBar title={title} onBack={onBack}/>
     <Stage5SharedState connection={connection}/>
     <main className="stage5-body">
-      {session.state==='DRAFT'?<Stage5Submitting session={session} submitting={submitting}/>:null}
+      {session.state==='DRAFT'&&submitting?<Stage5Submitting session={session}/>:null}
       {session.state==='PENDING'?<Stage5Pending session={session} onPendingDetails={onPendingDetails} onHome={onHome}/>:null}
       {session.state==='CONFIRMED'?<Stage5Confirmed session={session} onViewOrder={onViewOrder} onContinue={onContinue}/>:null}
       {session.state==='REJECTED'?<Stage5Rejected session={session} onRepair={onRepair} onBack={onBack}/>:null}
