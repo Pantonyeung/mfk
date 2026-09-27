@@ -310,6 +310,7 @@ export interface CustomerHistoryProjection {
   readonly customerDisplayName?:string;
   readonly historicalLines:readonly CustomerHistoricalLine[];
   readonly reorderIntent?:readonly import('../../contracts/customer-cloud-v1').CustomerReorderIntentLine[];
+  readonly reorderPriceFacts?:readonly import('../../contracts/customer-cloud-v1').CustomerReorderHistoryPriceFact[];
   readonly reorderEligible:boolean;
 }
 
