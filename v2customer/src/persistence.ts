@@ -93,6 +93,20 @@ export function createCustomerSubmissionId():string{
   return `CUSTOMER-${uuid}`;
 }
 
+function createCustomerFallbackReference():string{
+  if(typeof crypto!=='undefined'&&typeof crypto.getRandomValues==='function'){
+    const value=crypto.getRandomValues(new Uint32Array(1))[0]%1_000_000;
+    return String(value).padStart(6,'0');
+  }
+  return String(Date.now()%1_000_000).padStart(6,'0');
+}
+
+function customerPublishedTotalMinor(cart:readonly CustomerCartLine[]){
+  if(!cart.length||cart.some(line=>!Number.isSafeInteger(Number(line.publishedUnitPriceMinor))||Number(line.publishedUnitPriceMinor)<0))return undefined;
+  const total=cart.reduce((sum,line)=>sum+Number(line.publishedUnitPriceMinor)*line.quantity,0);
+  return Number.isSafeInteger(total)&&total>=0?total:undefined;
+}
+
 export function createCustomerPendingIntent(
   cart:readonly CustomerCartLine[],
   checkout:CustomerCheckoutDraft,
@@ -100,6 +114,7 @@ export function createCustomerPendingIntent(
 ):CustomerPendingIntent{
   const submissionId=createCustomerSubmissionId();
   const now=new Date().toISOString();
+  const publishedTotalMinor=customerPublishedTotalMinor(cart);
   return Object.freeze({
     submissionId,
     menuRevision:String(menuRevision||'').trim(),
@@ -109,5 +124,7 @@ export function createCustomerPendingIntent(
     state:'DRAFT',
     cart:Object.freeze([...cart]),
     checkout:Object.freeze({...checkout}),
+    fallbackReference:createCustomerFallbackReference(),
+    ...(publishedTotalMinor!==undefined?{publishedTotalMinor}:{}),
   });
 }
