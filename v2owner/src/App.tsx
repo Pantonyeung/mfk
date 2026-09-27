@@ -310,7 +310,7 @@ function TodayPage({
 
 function MorePage({snapshot,connection,onTool}:{snapshot:OwnerReadModelSnapshot|null;connection:OwnerConnectionState;onTool:(tool:Tool)=>void}){
   const tools:{id:Tool;title:string;detail:string;state:string}[]=[
-    {id:'planning',title:'月目標／成本',detail:'Target、成本、估算營運淨利',state:snapshot?.reports.some(row=>row.metricKind==='CURRENT_EFFECTIVE_SALES')?'可計算':'待數據'},
+    {id:'planning',title:'月目標／成本',detail:'Target、成本、估算營運淨利',state:snapshot?.planningBasis?.currentEffectiveSalesMtdMinor!==null&&snapshot?.planningBasis?.currentEffectiveSalesMtdMinor!==undefined?'可計算':'待數據'},
     {id:'reports',title:'報表',detail:'固定可信摘要',state:String(snapshot?.reports.length??0)},
     {id:'sellability',title:'商品供應',detail:'售罄／恢復有限操作',state:connection==='FRESH'?'可查詢':'未連接'},
     {id:'channels',title:'渠道',detail:'Desired / Observed / Freshness',state:String(snapshot?.channels.length??0)},
