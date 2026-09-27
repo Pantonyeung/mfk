@@ -1574,7 +1574,7 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
       ...(order.cancellationNoticeState?{cancellationNoticeState:order.cancellationNoticeState}:{}),
       attention:[
         ...(order.providerLifecycleNote?[order.providerLifecycleNote]:[]),
-        ...((order.keetaDeferCount??0)>0?['Keeta 已稍後處理 '+String(order.keetaDeferCount)+' / 2']:[]),
+        ...(order.fulfillmentLabel==='待處理'&&(order.keetaDeferCount??0)>0?['Keeta 已稍後處理 '+String(order.keetaDeferCount)+' / 2']:[]),
       ],metrics:[
         {id:'time',label:'時間',value:new Date(order.createdAt).toLocaleTimeString('zh-HK')},
         {id:'items',label:'件數',value:String(order.items.reduce((s,x)=>s+x.qty,0))},
