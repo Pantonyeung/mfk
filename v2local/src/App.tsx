@@ -22,7 +22,7 @@ import {resolveBusinessWindow} from './runtime/local-operations.ts';
 import {RuntimeReadyActivation} from './runtime/RuntimeReadyActivation.tsx';
 import {StaffAuthGate,StaffSessionBadge} from './presentation/StaffAuthGate.tsx';
 import {CashOpeningGate} from './presentation/CashOpeningGate.tsx';
-import {ComboWorkspace,HoldCartWorkspace,HoldListWorkspace,OrganizeWorkspace,ProductConfigWorkspace,RequiredFastLaneWorkspace,applyRequiredSelectionToCart,initialHoldModeForLines,isDrinkSupplementProductId,projectDrinkSupplementChoices,quickConfigurationForProduct,requiredTasksForCart,type OrderingPanelState,type WorkspaceHoldDraft,type WorkspaceProduct} from './features/ordering/OrderingCenterWorkspaces.tsx';
+import {ComboWorkspace,HoldCartWorkspace,HoldListWorkspace,OrganizeWorkspace,ProductConfigWorkspace,RequiredFastLaneWorkspace,applyRequiredSelectionToCart,initialHoldModeForLines,isDrinkSupplementProductId,projectDrinkSupplementChoices,productEditorInitialFromDetail,quickConfigurationForProduct,requiredTasksForCart,type OrderingPanelState,type WorkspaceHoldDraft,type WorkspaceProduct} from './features/ordering/OrderingCenterWorkspaces.tsx';
 import {RiceballPairingWorkspace} from './features/ordering/RiceballPairingWorkspace.tsx';
 import {applyRiceballPairings,buildRiceballPairingDraft,existingPairingGroups,isPairedComboLine,nextPairingStartIndex,restorePairingGroup} from './features/ordering/riceball-pairing-model.ts';
 import {applyRiceballDrinkPromotion,riceballDrinkPromotionStateEqual,stripRiceballDrinkPromotionDetail} from './features/ordering/riceball-drink-promotion-model.ts';
@@ -412,6 +412,10 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode,diningAddition,on
     const product=products.find(item=>item.id===id);if(!product||!product.priceReady||!product.sellable)return;
     const quickConfig=quickConfigurationById.get(id);
     if(!quickConfig?.eligible){setPanel({type:'product',productId:id});return;}
+    const workspaceProduct=workspaceProducts.find(item=>item.id===id);
+    const quickStructured=workspaceProduct
+      ?productEditorInitialFromDetail(workspaceProduct,quickConfig.detail)
+      :{selected:{} as Record<string,string[]>,note:''};
     const line:CartLine={
       id:nextLocalCartLineId(),
       productId:product.id,
@@ -420,7 +424,8 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode,diningAddition,on
       unitMinor:product.priceMinor+quickConfig.deltaMinor,
       serviceMode,
       detail:quickConfig.detail||undefined,
-      optionSelections:quickConfig.optionSelections,
+      optionSelections:quickStructured.selected,
+      freeNote:quickStructured.note,
     };
     setCart([...cart,line]);
     setRecent(id);
