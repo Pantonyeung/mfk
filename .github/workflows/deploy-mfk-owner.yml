@@ -1,4 +1,4 @@
-name: deploy-mfk-owner
+name: verify-mfk-owner-cloudflare-build
 
 on:
   workflow_dispatch:
@@ -9,7 +9,7 @@ on:
       - 'v2owner/DEPLOY_REQUEST'
 
 jobs:
-  deploy:
+  verify:
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -24,11 +24,7 @@ jobs:
       - run: npm run build
       - name: Wrangler dry-run
         run: npx --yes wrangler@latest deploy --dry-run --config wrangler.jsonc
-        env:
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      - name: Deploy mfk-owner
-        run: npx --yes wrangler@latest deploy --config wrangler.jsonc
-        env:
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      - name: Deployment ownership
+        run: |
+          echo "mfk-owner production deployment is owned by the connected Cloudflare Workers Builds project."
+          echo "GitHub validates source/build only and does not use the mfk-admin deploy token for mfk-owner."
