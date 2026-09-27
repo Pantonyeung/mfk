@@ -1,5 +1,5 @@
 import {useMemo,useState} from 'react';
-import type {OwnerConnectionState,OwnerSellabilityCommandInput,OwnerSellabilityItem} from './product-types';
+import type {OwnerConnectionState,OwnerSellabilityCommandInput,OwnerSellabilityCommandResult,OwnerSellabilityItem} from './product-types';
 
 function grainLabel(value:OwnerSellabilityItem['grain']){
   return value==='PRODUCT'?'商品':value==='OPTION'?'選項':value==='MODIFIER'?'配料／修改項':'套餐子項';
@@ -7,11 +7,13 @@ function grainLabel(value:OwnerSellabilityItem['grain']){
 function scopeLabel(value:OwnerSellabilityItem['scope']){return value==='ONLINE_ONLY'?'只停網上':'全渠道';}
 
 export function SellabilityPage({
-  items,connection,busy,onCommand,onReload,onBack,
+  items,connection,busy,result,onDismissResult,onCommand,onReload,onBack,
 }:{
   items:readonly OwnerSellabilityItem[];
   connection:OwnerConnectionState;
   busy:boolean;
+  result:OwnerSellabilityCommandResult|null;
+  onDismissResult:()=>void;
   onCommand:(input:OwnerSellabilityCommandInput)=>void;
   onReload:()=>void;
   onBack:()=>void;
@@ -45,6 +47,12 @@ export function SellabilityPage({
       <button className="back-link" onClick={onBack}>‹ 更多</button>
       <div><span>商品供應</span><h1>售罄／恢復</h1><small>即時停售或恢復商品；商品結構同價格設定仍留喺 Admin。</small></div>
     </header>
+
+    {result?<section className={'sellability-result-panel '+result.state.toLowerCase()} role="status">
+      <div className="sellability-result-icon" aria-hidden="true">{result.state==='CONFIRMED'?'✓':result.state==='PARTIAL'?'!':'?'}</div>
+      <div><span>更新結果</span><h2>{result.state==='CONFIRMED'?'產品狀態已更新':result.state==='PARTIAL'?'部分產品已更新':'結果待確認'}</h2><p>{result.state==='CONFIRMED'?'最新供應狀態已完成確認。':result.state==='PARTIAL'?'部分項目仍需重新確認。':'暫時唔好重複操作，請先重新讀取狀態。'}</p></div>
+      <button onClick={onDismissResult}>收起</button>
+    </section>:null}
 
     <section className="card sellability-controls">
       <input value={query} onChange={e=>setQuery(e.target.value)} placeholder="搜尋商品／選項／套餐子項"/>
