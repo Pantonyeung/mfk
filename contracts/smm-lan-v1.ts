@@ -2,6 +2,26 @@ export const SMM_LAN_PROTOCOL_VERSION=1 as const;
 export const SMM_LAN_SUBMIT_TYPE='smm.lan.order.submit.v1' as const;
 export const SMM_LAN_RESULT_TYPE='smm.lan.order.result.v1' as const;
 
+export type SmmLanComboChoiceType='PRODUCT'|'LABEL'|'NONE';
+
+export interface SmmLanComboSelectionIntent{
+  readonly poolId:string;
+  readonly groupId:string;
+  readonly subPoolId:string;
+  readonly choiceId:string;
+  readonly choiceType:SmmLanComboChoiceType;
+  readonly choiceLabel:string;
+  readonly productId?:string;
+  readonly publishedAdjustmentMinor:number;
+}
+
+export interface SmmLanComboIntent{
+  readonly comboId:string;
+  readonly comboName:string;
+  readonly publishedBasePriceMinor:number;
+  readonly selections:readonly SmmLanComboSelectionIntent[];
+}
+
 export interface SmmLanLineIntent{
   readonly lineId:string;
   readonly productId:string;
@@ -15,6 +35,7 @@ export interface SmmLanLineIntent{
     readonly optionName:string;
     readonly publishedAdjustmentMinor?:number;
   }[];
+  readonly combo?:SmmLanComboIntent;
   readonly publishedUnitPriceMinor?:number;
 }
 
@@ -93,6 +114,11 @@ function smmMoney(value:unknown,code:string){
   if(!Number.isSafeInteger(out)||out<0)throw new Error(code);
   return out;
 }
+function smmSignedMoney(value:unknown,code:string){
+  const out=Number(value);
+  if(!Number.isSafeInteger(out))throw new Error(code);
+  return out;
+}
 function smmQty(value:unknown,code:string){
   const out=Number(value);
   if(!Number.isSafeInteger(out)||out<1||out>999)throw new Error(code);
@@ -129,10 +155,38 @@ export function validateSmmLanOrderRequest(input:unknown):SmmLanOrderRequest{
           optionId:smmText(selection.optionId,'SMM_ORDER_SELECTION_ID_INVALID_'+index+'_'+selectionIndex,120),
           optionName:smmText(selection.optionName,'SMM_ORDER_SELECTION_NAME_INVALID_'+index+'_'+selectionIndex,160),
           ...(selection.publishedAdjustmentMinor!==undefined?{
-            publishedAdjustmentMinor:Number(selection.publishedAdjustmentMinor),
+            publishedAdjustmentMinor:smmSignedMoney(selection.publishedAdjustmentMinor,'SMM_ORDER_SELECTION_PRICE_INVALID_'+index+'_'+selectionIndex),
           }:{}),
         });
       })),
+      ...(line.combo!==undefined?{combo:(()=>{
+        const combo=smmRecord(line.combo,'SMM_ORDER_COMBO_INVALID_'+index);
+        if(!Array.isArray(combo.selections))throw new Error('SMM_ORDER_COMBO_SELECTIONS_INVALID_'+index);
+        return Object.freeze({
+          comboId:smmText(combo.comboId,'SMM_ORDER_COMBO_ID_INVALID_'+index,160),
+          comboName:smmText(combo.comboName,'SMM_ORDER_COMBO_NAME_INVALID_'+index,200),
+          publishedBasePriceMinor:smmMoney(combo.publishedBasePriceMinor,'SMM_ORDER_COMBO_BASE_PRICE_INVALID_'+index),
+          selections:Object.freeze(combo.selections.map((rawComboSelection,comboSelectionIndex)=>{
+            const selection=smmRecord(rawComboSelection,'SMM_ORDER_COMBO_SELECTION_INVALID_'+index+'_'+comboSelectionIndex);
+            const choiceType=selection.choiceType==='PRODUCT'?'PRODUCT':selection.choiceType==='LABEL'?'LABEL':selection.choiceType==='NONE'?'NONE':null;
+            if(!choiceType)throw new Error('SMM_ORDER_COMBO_CHOICE_TYPE_INVALID_'+index+'_'+comboSelectionIndex);
+            const productId=typeof selection.productId==='string'&&selection.productId.trim()
+              ?smmText(selection.productId,'SMM_ORDER_COMBO_PRODUCT_ID_INVALID_'+index+'_'+comboSelectionIndex,160)
+              :undefined;
+            if(choiceType==='PRODUCT'&&!productId)throw new Error('SMM_ORDER_COMBO_PRODUCT_ID_REQUIRED_'+index+'_'+comboSelectionIndex);
+            return Object.freeze({
+              poolId:smmText(selection.poolId,'SMM_ORDER_COMBO_POOL_ID_INVALID_'+index+'_'+comboSelectionIndex,160),
+              groupId:smmText(selection.groupId,'SMM_ORDER_COMBO_GROUP_ID_INVALID_'+index+'_'+comboSelectionIndex,160),
+              subPoolId:smmText(selection.subPoolId,'SMM_ORDER_COMBO_SUBPOOL_ID_INVALID_'+index+'_'+comboSelectionIndex,160),
+              choiceId:smmText(selection.choiceId,'SMM_ORDER_COMBO_CHOICE_ID_INVALID_'+index+'_'+comboSelectionIndex,160),
+              choiceType,
+              choiceLabel:smmText(selection.choiceLabel,'SMM_ORDER_COMBO_CHOICE_LABEL_INVALID_'+index+'_'+comboSelectionIndex,200),
+              ...(productId?{productId}:{}),
+              publishedAdjustmentMinor:smmSignedMoney(selection.publishedAdjustmentMinor,'SMM_ORDER_COMBO_ADJUSTMENT_INVALID_'+index+'_'+comboSelectionIndex),
+            });
+          })),
+        });
+      })()}:{}),
     });
   });
   return Object.freeze({

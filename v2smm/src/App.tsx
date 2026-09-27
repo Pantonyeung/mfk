@@ -3,7 +3,19 @@ import {readSmmLocalWorkspace,writeSmmLocalWorkspace,createSmmPendingIntent,type
 import {resolveSmmRuntimePort} from './runtime';
 import {pairSmmLan,probeSmmLan,readSmmLanPwaConfig,saveSmmLanPwaConfig} from './pwa-lan';
 import {clearSmmStaffSession,listSmmStaff,readSmmStaffSession,refreshSmmStaffSession,verifySmmStaff,type SmmStaffDirectoryItem,type SmmStaffSession} from './pwa-staff';
-import {selectedSmmCartOptions,toggleSmmSelection,validateSmmSelections,type SmmSelectionState} from './selection';
+import {
+  publishedSmmComboUnitMinor,
+  revalidateSmmCartComboIntent,
+  resolveSmmProductCombo,
+  selectedSmmCartOptions,
+  selectedSmmComboIntent,
+  toggleSmmComboSelection,
+  toggleSmmSelection,
+  validateSmmComboSelections,
+  validateSmmSelections,
+  type SmmComboSelectionState,
+  type SmmSelectionState,
+} from './selection';
 import type {
   SmmCartLine,
   SmmConnectionState,
@@ -42,6 +54,8 @@ export function App(){
   const [selectedProduct,setSelectedProduct]=useState<SmmProduct|null>(null);
   const [selections,setSelections]=useState<SmmSelectionState>({});
   const [selectedVariationId,setSelectedVariationId]=useState<string|null>(null);
+  const [comboEnabled,setComboEnabled]=useState(false);
+  const [comboSelections,setComboSelections]=useState<SmmComboSelectionState>({});
   const [cartOpen,setCartOpen]=useState(false);
   const [submitting,setSubmitting]=useState(false);
   const submitLockRef=useRef(false);
@@ -130,9 +144,18 @@ export function App(){
   const repriceLine=(line:SmmCartLine,mode:SmmServiceMode):SmmCartLine=>{
     const product=menu?.products.find(item=>item.productId===line.productId);
     if(!product)return line;
+    const optionMinor=line.selections.reduce((sum,item)=>sum+(Number.isSafeInteger(Number(item.publishedAdjustmentMinor))?Number(item.publishedAdjustmentMinor):0),0);
+    if(line.combo){
+      const combo=menu?revalidateSmmCartComboIntent(product,menu,line.combo):null;
+      const unitMinor=combo?publishedSmmComboUnitMinor(combo,optionMinor):null;
+      return Object.freeze({
+        ...line,
+        ...(combo?{combo}:{}),
+        publishedUnitPriceMinor:unitMinor??undefined,
+      });
+    }
     const base=productPrice(product,mode);
     if(base===null)return {...line,publishedUnitPriceMinor:undefined};
-    const optionMinor=line.selections.reduce((sum,item)=>sum+(Number.isSafeInteger(Number(item.publishedAdjustmentMinor))?Number(item.publishedAdjustmentMinor):0),0);
     return Object.freeze({...line,publishedUnitPriceMinor:base+optionMinor});
   };
   const publishedTotalMinor=cart.every(line=>Number.isSafeInteger(Number(line.publishedUnitPriceMinor))&&Number(line.publishedUnitPriceMinor)>=0)
@@ -198,15 +221,28 @@ export function App(){
         });
       });
 
-      const base=productPrice(product,serviceMode);
       const optionMinor=refreshedSelections.reduce(
         (sum,item)=>sum+(Number.isSafeInteger(Number(item.publishedAdjustmentMinor))?Number(item.publishedAdjustmentMinor):0),
         0,
       );
-      const unitMinor=base!==null&&selectionsValid?base+optionMinor:undefined;
+      const refreshedCombo=line.combo?revalidateSmmCartComboIntent(product,menu,line.combo):null;
+      if(line.combo&&!refreshedCombo)selectionsValid=false;
+      if(refreshedCombo&&JSON.stringify(refreshedCombo)!==JSON.stringify(line.combo))changed=true;
+      const base=line.combo?null:productPrice(product,serviceMode);
+      const comboUnit=refreshedCombo?publishedSmmComboUnitMinor(refreshedCombo,optionMinor):null;
+      const unitMinor=selectionsValid
+        ?line.combo
+          ?comboUnit??undefined
+          :base!==null?base+optionMinor:undefined
+        :undefined;
       if(line.publishedUnitPriceMinor!==unitMinor)changed=true;
       if(unitMinor===undefined)invalid=true;
-      return Object.freeze({...line,selections:Object.freeze(refreshedSelections),publishedUnitPriceMinor:unitMinor});
+      return Object.freeze({
+        ...line,
+        selections:Object.freeze(refreshedSelections),
+        ...(refreshedCombo?{combo:refreshedCombo}:{}),
+        publishedUnitPriceMinor:unitMinor,
+      });
     });
 
     if(!changed)return;
@@ -232,14 +268,23 @@ export function App(){
       setNotice('請先選擇必選規格');
       return;
     }
-    const variation=selectedProduct.variations?.find(item=>item.variationId===selectedVariationId);
-    const selectedOptions=selectedSmmCartOptions(selectedProduct,selections);
-    const baseMinor=productPrice(selectedProduct,serviceMode);
-    if(baseMinor===null){
-      setNotice('餐單價格資料未完整，請重新同步。');
+    const comboValidation=validateSmmComboSelections(selectedProduct,menu,comboEnabled,comboSelections);
+    if(!comboValidation.ok){
+      setNotice(comboValidation.issues[0]??'請完成套餐設定');
       return;
     }
+    const variation=selectedProduct.variations?.find(item=>item.variationId===selectedVariationId);
+    const selectedOptions=selectedSmmCartOptions(selectedProduct,selections);
     const optionMinor=selectedOptions.reduce((sum,item)=>sum+(Number.isSafeInteger(Number(item.publishedAdjustmentMinor))?Number(item.publishedAdjustmentMinor):0),0);
+    const combo=selectedSmmComboIntent(selectedProduct,menu,comboEnabled,comboSelections);
+    const baseMinor=productPrice(selectedProduct,serviceMode);
+    const publishedUnitPriceMinor=combo
+      ?publishedSmmComboUnitMinor(combo,optionMinor)
+      :baseMinor===null?null:baseMinor+optionMinor;
+    if(publishedUnitPriceMinor===null){
+      setNotice('餐單／套餐價格資料未完整，請重新同步。');
+      return;
+    }
     const line:SmmCartLine=Object.freeze({
       lineId:crypto.randomUUID(),
       productId:selectedProduct.productId,
@@ -247,7 +292,8 @@ export function App(){
       quantity:1,
       ...(variation?{selectedVariationId:variation.variationId,selectedVariationName:variation.name}:{}),
       selections:selectedOptions,
-      publishedUnitPriceMinor:baseMinor+optionMinor,
+      ...(combo?{combo}:{}),
+      publishedUnitPriceMinor,
       createdAt:nowIso(),
     });
     const next=[...cart,line];
@@ -256,7 +302,9 @@ export function App(){
     setSelectedProduct(null);
     setSelections({});
     setSelectedVariationId(null);
-    setNotice('已加入本機購物草稿；未提交正式訂單。');
+    setComboEnabled(false);
+    setComboSelections({});
+    setNotice(combo?'已加入套餐購物草稿；正式套餐內容同價格會由 SMT 再驗證。':'已加入本機購物草稿；未提交正式訂單。');
   };
 
   const updateCart=(next:readonly SmmCartLine[])=>{
@@ -462,7 +510,7 @@ export function App(){
         cart={cart}
         quote={quote}
         serviceMode={serviceMode}
-        onProduct={product=>{setSelectedProduct(product);setSelections({});setSelectedVariationId(null)}}
+        onProduct={product=>{setSelectedProduct(product);setSelections({});setSelectedVariationId(null);setComboEnabled(false);setComboSelections({})}}
         onCart={()=>setCartOpen(true)}
       />:null}
       {view==='work'?<WorkView connection={connection} items={snapshot?.work??[]} onRefresh={()=>void refresh()}/>:null}
@@ -531,14 +579,23 @@ export function App(){
 
     {selectedProduct?<ProductSheet
       product={selectedProduct}
+      menu={menu}
       selections={selections}
       selectedVariationId={selectedVariationId}
+      comboEnabled={comboEnabled}
+      comboSelections={comboSelections}
       setVariation={setSelectedVariationId}
+      setComboEnabled={value=>{setComboEnabled(value);if(!value)setComboSelections({})}}
       toggle={(groupId,optionId)=>{
         const group=selectedProduct.optionGroups.find(item=>item.optionGroupId===groupId);
         if(group)setSelections(current=>toggleSmmSelection(current,group,optionId));
       }}
-      onClose={()=>setSelectedProduct(null)}
+      toggleCombo={(poolId,groupId,choiceId)=>{
+        const resolved=resolveSmmProductCombo(selectedProduct,menu);
+        const group=resolved?.groups.find(item=>item.pool.poolId===poolId&&item.group.groupId===groupId);
+        if(group)setComboSelections(current=>toggleSmmComboSelection(current,group,choiceId));
+      }}
+      onClose={()=>{setSelectedProduct(null);setSelections({});setSelectedVariationId(null);setComboEnabled(false);setComboSelections({})}}
       onAdd={addSelectedProduct}
     />:null}
 
@@ -592,7 +649,7 @@ function OrderView({connection,categories,activeCategoryId,setCategory,search,se
     {categories.length?<div className="category-rail">{categories.map(item=><button key={item.categoryId} className={activeCategoryId===item.categoryId?'active':''} onClick={()=>setCategory(item.categoryId)}>{item.name}</button>)}</div>:null}
     {connection==='LOADING'?<EmptyState title="正在同步餐單" detail="請稍候。"/>:
       !categories.length?<EmptyState title={connection==='NOT_CONNECTED'?'餐單服務尚未連接':'暫時未有餐單'} detail={connection==='NOT_CONNECTED'?'連接後會顯示正式分類、商品、規格同供應狀態。':'目前門店資料未提供任何可售商品。'}/>:
-      products.length?<div className="product-grid">{products.map(product=>{const price=serviceMode==='DINE_IN'?product.publishedDineInUnitPriceMinor:product.publishedTakeawayUnitPriceMinor;return <button key={product.productId} className={`product-card ${product.available?'':'disabled'}`} disabled={!product.available} onClick={()=>onProduct(product)}><span className="product-avatar">{product.name.slice(0,1)}</span><strong>{product.name}</strong><small>{Number.isSafeInteger(Number(price))?money('HKD',Number(price)):(product.available?'可供應':'暫停供應')}</small><i>{product.optionGroups.length||product.variations?.length?'可設定':''}</i></button>})}</div>:
+      products.length?<div className="product-grid">{products.map(product=>{const price=serviceMode==='DINE_IN'?product.publishedDineInUnitPriceMinor:product.publishedTakeawayUnitPriceMinor;return <button key={product.productId} className={`product-card ${product.available?'':'disabled'}`} disabled={!product.available} onClick={()=>onProduct(product)}><span className="product-avatar">{product.name.slice(0,1)}</span><strong>{product.name}</strong><small>{Number.isSafeInteger(Number(price))?money('HKD',Number(price)):(product.available?'可供應':'暫停供應')}</small><i>{product.optionGroups.length||product.variations?.length||product.comboId?'可設定':''}</i></button>})}</div>:
       <EmptyState title="搵唔到商品" detail="清除搜尋或者切換其他分類。"><button className="primary" onClick={()=>setSearch('')}>清除搜尋</button></EmptyState>}
     {count>0?<button className="cart-bar" onClick={onCart}><div><b>{count}</b><span>購物草稿</span></div><div><strong>{quote?money(quote.currency,quote.totalMinor):'價格資料未完整'}</strong><small>{quote?`已發布餐單版本 ${quote.revision}`:'請重新同步餐單'}</small></div><em>查看</em></button>:null}
   </section>;
@@ -772,22 +829,66 @@ function Diagnostics({connection,snapshot,pendingCount}:{connection:SmmConnectio
   return <><div className="diag-line"><span>門店連線</span><b className={connection==='READY'?'':'warn'}>{connectionLabelShort(connection)}</b><small>{snapshot?.connectionPath??'—'} · {snapshot?.observedAt?new Date(snapshot.observedAt).toLocaleString('zh-HK'):'未有讀回'}</small></div><div className="diag-line"><span>餐單版本</span><b>{snapshot?.menu?.revision??'—'}</b><small>{snapshot?.menu?.observedAt?new Date(snapshot.menu.observedAt).toLocaleString('zh-HK'):'未有餐單'}</small></div><div className="diag-line"><span>本機待提交</span><b>{pendingCount}</b><small>只係本機草稿，不係正式訂單</small></div></>;
 }
 
-function ProductSheet({product,selections,selectedVariationId,setVariation,toggle,onClose,onAdd}:{
+function ProductSheet({
+  product,
+  menu,
+  selections,
+  selectedVariationId,
+  comboEnabled,
+  comboSelections,
+  setVariation,
+  setComboEnabled,
+  toggle,
+  toggleCombo,
+  onClose,
+  onAdd,
+}:{
   product:SmmProduct;
+  menu:SmmReadModelSnapshot['menu'];
   selections:SmmSelectionState;
   selectedVariationId:string|null;
+  comboEnabled:boolean;
+  comboSelections:SmmComboSelectionState;
   setVariation:(id:string)=>void;
+  setComboEnabled:(value:boolean)=>void;
   toggle:(groupId:string,optionId:string)=>void;
+  toggleCombo:(poolId:string,groupId:string,choiceId:string)=>void;
   onClose:()=>void;
   onAdd:()=>void;
 }){
   const validation=validateSmmSelections(product,selections);
   const variationOk=!product.variationRequired||Boolean(selectedVariationId);
+  const combo=resolveSmmProductCombo(product,menu);
+  const comboValidation=validateSmmComboSelections(product,menu,comboEnabled,comboSelections);
+  const firstIssue=validation.issues[0]??comboValidation.issues[0];
+  const deltaLabel=(minor:number)=>minor===0?'不加價':(minor>0?'+':'')+money('HKD',minor);
   return <div className="overlay"><section className="sheet" role="dialog" aria-modal="true"><div className="sheet-grabber"/><header><div><span>商品設定</span><h2>{product.name}</h2><small>{product.description??'請完成所需選項'}</small></div><button onClick={onClose}>✕</button></header>
     {product.variations?.length?<section className="option-group"><div><strong>規格</strong><span>{product.variationRequired?'必選':'可選'}</span></div><div className="option-list">{product.variations.map(item=><button key={item.variationId} disabled={!item.available} className={selectedVariationId===item.variationId?'active':''} onClick={()=>setVariation(item.variationId)}>{item.name}</button>)}</div></section>:null}
     {product.optionGroups.map(group=><section className="option-group" key={group.optionGroupId}><div><strong>{group.name}</strong><span>最少 {Math.max(group.required?1:0,group.minSelections)} · 最多 {group.maxSelections}</span></div><div className="option-list">{group.options.map(option=><button key={option.optionId} disabled={!option.available} className={(selections[group.optionGroupId]??[]).includes(option.optionId)?'active':''} onClick={()=>toggle(group.optionGroupId,option.optionId)}>{option.name}</button>)}</div></section>)}
-    {!validation.ok?<p className="callout">{validation.issues[0]}</p>:null}
-    <footer><button onClick={onClose}>取消</button><button className="primary" disabled={!validation.ok||!variationOk} onClick={onAdd}>加入草稿</button></footer>
+    {combo?<section className={`option-group stage2-combo-section ${comboEnabled&&!comboValidation.ok?'has-error':''}`}>
+      <div><strong>套餐</strong><span>{combo.combo.name} · 只讀 Admin 已發布 Combo / Pool；正式提交由 SMT 再驗證</span></div>
+      <div className="segmented"><button type="button" className={comboEnabled?'active':''} aria-pressed={comboEnabled} onClick={()=>setComboEnabled(!comboEnabled)}>{comboEnabled?'已選套餐':'升級套餐'}</button></div>
+      {comboEnabled?<><p className="callout">套餐基礎價 {money('HKD',combo.combo.publishedBasePriceMinor)}</p>
+        {combo.groups.map(group=>{
+          const selected=comboSelections[group.key]??[];
+          const groupError=selected.length<group.effectiveMinSelections||
+            selected.length>group.effectiveMaxSelections||
+            selected.some(id=>!group.choices.find(choice=>choice.choiceId===id&&choice.available));
+          const maxReached=group.effectiveMaxSelections>1&&selected.length>=group.effectiveMaxSelections;
+          return <section className={`option-group stage2-combo-group ${groupError?'has-error':''}`} key={group.key}>
+            <div><strong>{group.group.name}</strong><span>{group.pool.addonKind==='DRINK'?'飲品可跳過':group.effectiveMinSelections>0?'必選':'可選'} · 最少 {group.effectiveMinSelections} · 最多 {group.effectiveMaxSelections}</span></div>
+            <div className="option-list">{group.choices.map(choice=>{
+              const active=selected.includes(choice.choiceId);
+              const disabled=!choice.available||(maxReached&&!active);
+              return <button key={choice.choiceId} type="button" disabled={disabled} className={active?'active':''} onClick={()=>toggleCombo(group.pool.poolId,group.group.groupId,choice.choiceId)}>{choice.choiceLabel} · {!choice.available?'暫停供應':deltaLabel(choice.publishedAdjustmentMinor)}</button>;
+            })}</div>
+            {groupError?<p className="callout">{selected.length<group.effectiveMinSelections?`最少需要選擇 ${group.effectiveMinSelections} 項。`:selected.length>group.effectiveMaxSelections?`最多只可以選擇 ${group.effectiveMaxSelections} 項。`:'已選套餐內容包含暫停供應項目，請重新選擇。'}</p>:null}
+          </section>;
+        })}
+      </>:null}
+    </section>:null}
+    {(!validation.ok||!comboValidation.ok)&&firstIssue?<p className="callout">{firstIssue}</p>:null}
+    <footer><button onClick={onClose}>取消</button><button className="primary" disabled={!validation.ok||!variationOk||!comboValidation.ok} onClick={onAdd}>{comboEnabled?'加入套餐草稿':'加入草稿'}</button></footer>
   </section></div>;
 }
 
@@ -814,7 +915,7 @@ function CartSheet({cart,quote,pending,submitting,serviceMode,tender,diningTarge
     <section className="option-group"><div><strong>服務方式</strong><span>員工設定</span></div><div className="segmented"><button className={serviceMode==='TAKEAWAY'?'active':''} onClick={()=>onServiceMode('TAKEAWAY')}>外賣</button><button className={serviceMode==='DINE_IN'?'active':''} onClick={()=>onServiceMode('DINE_IN')}>堂食</button></div></section>
     {serviceMode==='DINE_IN'?<section className="option-group"><div><strong>堂食掛單</strong><span>先揀枱／輪候，再由堂食 Checkout 埋單</span></div><button className="primary" type="button" onClick={onChooseDiningTarget}>{diningTarget?.kind==='TABLE'?((diningTables.find(row=>row.tableId===diningTarget.tableId)?.label??diningTarget.tableId)+' · '+diningTarget.covers+' 位'):diningTarget?.kind==='WAITING'?('輪候 · '+diningTarget.covers+' 位'):'選擇枱／輪候'}</button></section>:null}
     {serviceMode==='TAKEAWAY'?<section className="option-group"><div><strong>收款方式</strong><span>只記錄，不自動開錢箱</span></div><div className="option-list">{tenders.map(([value,label])=><button key={value} className={tender===value?'active':''} onClick={()=>onTender(value)}>{label}</button>)}</div>{tender==='CASH'?<p className="callout">現金只會記錄為收款方式；需要開錢箱時由 SMT 人手操作。</p>:null}</section>:null}
-    {!cart.length?<EmptyState title="草稿係空嘅" detail="返回點單加入商品。"/>:cart.map(line=><div className="cart-line" key={line.lineId}><div><strong>{line.productName}</strong><small>{[line.selectedVariationName,...line.selections.map(item=>item.optionName)].filter(Boolean).join(' · ')||'無額外設定'} · {Number.isSafeInteger(Number(line.publishedUnitPriceMinor))?money('HKD',Number(line.publishedUnitPriceMinor)):'價格待同步'}</small></div><div className="qty"><button onClick={()=>onQuantity(line.lineId,line.quantity-1)}>−</button><b>{line.quantity}</b><button onClick={()=>onQuantity(line.lineId,line.quantity+1)}>＋</button></div><button className="danger" onClick={()=>onRemove(line.lineId)}>移除</button></div>)}
+    {!cart.length?<EmptyState title="草稿係空嘅" detail="返回點單加入商品。"/>:cart.map(line=><div className="cart-line" key={line.lineId}><div><strong>{line.productName}</strong><small>{[line.combo?.comboName,line.selectedVariationName,...line.selections.map(item=>item.optionName),...(line.combo?.selections.map(item=>item.choiceLabel)??[])].filter(Boolean).join(' · ')||'無額外設定'} · {Number.isSafeInteger(Number(line.publishedUnitPriceMinor))?money('HKD',Number(line.publishedUnitPriceMinor)):'價格待同步'}</small></div><div className="qty"><button onClick={()=>onQuantity(line.lineId,line.quantity-1)}>−</button><b>{line.quantity}</b><button onClick={()=>onQuantity(line.lineId,line.quantity+1)}>＋</button></div><button className="danger" onClick={()=>onRemove(line.lineId)}>移除</button></div>)}
     <div className="cart-total"><span>已發布總額</span><strong>{quote?money(quote.currency,quote.totalMinor):'價格資料未完整'}</strong><small>{quote?`餐單版本 ${quote.revision} · SMT 提交時再核對`:'請重新同步餐單'}</small></div>
     {pending?<p className="callout">{pending.state==='UNKNOWN'?'上次提交結果未明，請先重新確認，唔好重新送出。':pending.lastMessage??'已有待提交草稿'}</p>:null}
     <footer><button onClick={onClose}>返回</button>{pending?.state==='UNKNOWN'?<button className="primary" onClick={()=>onReadback(pending)}>重新確認結果</button>:<button className="primary" disabled={submitting||!cart.length||!quote} onClick={onSubmit}>{submitting?'提交中…':'提交訂單'}</button>}</footer>

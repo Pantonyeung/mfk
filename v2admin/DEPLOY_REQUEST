@@ -1,7 +1,7 @@
 MFK_ADMIN_DEPLOY_REQUEST
 target=mfk-admin
 canonical_url=https://admin.morefunos.com
-product_source=da66fb7c1642165d26456198ba21824346cf4035
+product_source=INTEGRATION_COMBO_DEPLOY_R1
 requested_by=owner
-reason=publish_d11_dining_overdue_threshold
-work_id=MFK-ADMIN-D11-DINING-OVERDUE-R1
+reason=deploy_admin_combo_drink_crossport_projection
+work_id=MFK-ADMIN-COMBO-DRINK-CROSSPORT-DEPLOY-R1
