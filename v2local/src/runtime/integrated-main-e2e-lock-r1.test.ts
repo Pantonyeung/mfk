@@ -27,7 +27,8 @@ describe('2026-09-26 integrated main E2E preservation lock',()=>{
     expect(customer).toContain("CUSTOMER_MENU_PRICE_CHANGED");
     expect(customer).toContain("sourceLabel:'自家 App'");
     expect(customer).toContain("paymentEvidenceRef:intent.checkout.paymentEvidenceRef");
-    expect(customer).toContain("initialFulfillmentLabel:'進行中'");
+    expect(customer).toContain("initialFulfillmentLabel:'待處理'");
+    expect(customer).toContain('CUSTOMER_PAYMENT_EVIDENCE_REQUIRED');
     expect(customer).toContain("state:'CONFIRMED'");
     expect(customer).toContain('canonicalOrderId:order.id');
     expect(customer).toContain('canonicalDisplay:order.display');

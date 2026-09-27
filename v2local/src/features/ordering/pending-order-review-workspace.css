@@ -1,0 +1,42 @@
+.pending-order-flow{display:flex;flex-direction:column;gap:18px;min-height:0;height:100%}
+.pending-order-title{display:flex;justify-content:space-between;align-items:flex-start;gap:20px}
+.pending-order-title small{font-size:12px;letter-spacing:.08em;color:#64748b}
+.pending-order-title h2{margin:4px 0 3px;font-size:28px}
+.pending-order-title p{margin:0;color:#64748b}
+.pending-order-title>span{padding:8px 12px;border-radius:999px;font-weight:700;background:#e2e8f0}
+.pending-order-title>span.pending{background:#dbeafe;color:#1d4ed8}
+.pending-order-title>span.active{background:#dcfce7;color:#166534}
+.pending-order-summary-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.pending-order-summary-grid article,.pending-review-facts>div{border:1px solid #dbe3ef;border-radius:14px;padding:14px;background:#fff}
+.pending-order-summary-grid span,.pending-review-facts span{display:block;font-size:12px;color:#64748b;margin-bottom:5px}
+.pending-order-summary-grid b,.pending-review-facts b{font-size:17px}
+.pending-order-preview,.pending-review-lines,.pending-review-facts{border:1px solid #dbe3ef;border-radius:16px;background:#fff}
+.pending-order-preview{padding:14px}
+.pending-order-preview header,.pending-review-lines>header,.pending-payment-evidence header,.pending-whatsapp-qr header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.pending-order-preview>div{display:grid;grid-template-columns:48px 1fr auto;gap:10px;align-items:center;padding:10px 0;border-top:1px solid #edf2f7}
+.pending-order-preview p{margin:0}.pending-order-preview small{display:block;color:#64748b}
+.pending-order-actions{margin-top:auto;display:flex;justify-content:flex-end;gap:10px}
+.pending-order-actions button,.pending-evidence-actions button,.pending-whatsapp-template button{min-height:48px;border:1px solid #cbd5e1;border-radius:12px;background:#fff;padding:0 18px;font-weight:700}
+.pending-order-actions .primary,.pending-evidence-actions .primary{background:#1f5fbf;color:#fff;border-color:#1f5fbf}
+.pending-order-actions button:disabled,.pending-evidence-actions button:disabled{opacity:.45}
+.pending-order-result{padding:12px 14px;border-radius:12px}.pending-order-result.success{background:#ecfdf5;color:#166534}.pending-order-result.error{background:#fef2f2;color:#b91c1c}
+.pending-review-columns{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(320px,.8fr);gap:16px;min-height:0;flex:1}
+.pending-review-lines{padding:14px;overflow:auto}
+.pending-review-lines article{display:grid;grid-template-columns:42px 1fr auto;gap:10px;align-items:center;padding:12px 0;border-top:1px solid #edf2f7}
+.pending-review-lines article>span{display:grid;place-items:center;width:32px;height:32px;border-radius:50%;background:#eff6ff;color:#1d4ed8;font-weight:800}
+.pending-review-lines article div{display:flex;flex-direction:column;gap:3px}.pending-review-lines small,.pending-review-lines em{font-style:normal;color:#64748b}
+.pending-review-facts{padding:14px;overflow:auto;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;align-content:start}
+.pending-review-facts>p,.pending-payment-evidence,.pending-whatsapp-qr{grid-column:1/-1}
+.pending-review-facts>p{margin:0;color:#475569}
+.pending-payment-evidence,.pending-whatsapp-qr{border:1px solid #dbe3ef;border-radius:14px;padding:12px}
+.pending-evidence-image-button{width:100%;height:180px;border:0;border-radius:12px;overflow:hidden;padding:0;background:#f8fafc}
+.pending-evidence-image-button img{width:100%;height:100%;object-fit:contain}
+.pending-evidence-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:10px}
+.pending-whatsapp-template{display:flex;flex-wrap:wrap;gap:8px}
+.pending-whatsapp-template button{min-height:38px;padding:0 10px;font-size:12px}
+.pending-whatsapp-template button.active{background:#eff6ff;border-color:#1f5fbf;color:#1d4ed8}
+.pending-whatsapp-qr>img{display:block;width:180px;height:180px;margin:12px auto}
+.pending-evidence-zoom{position:fixed;inset:0;background:rgba(15,23,42,.82);z-index:200;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px}
+.pending-evidence-zoom img{max-width:88vw;max-height:78vh;object-fit:contain;background:#fff;border-radius:14px}
+.pending-evidence-zoom button{min-height:48px;border:0;border-radius:12px;padding:0 20px}
+@media(max-width:900px){.pending-order-summary-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.pending-review-columns{grid-template-columns:1fr}.pending-review-facts{grid-template-columns:1fr}}

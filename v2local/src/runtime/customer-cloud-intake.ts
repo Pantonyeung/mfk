@@ -1,4 +1,4 @@
-// Build refresh: Customer revision/price validation + own-channel auto-admit.
+// A3B: Customer revision/price validation + own-channel pending operator review.
 // Customer electronic tender labels come from the Admin-published payment channel.
 import type {
   CustomerCloudCartLine,
@@ -385,6 +385,9 @@ async function reconcileOrders(){
           orderEvents:capacityEventsFromRuntime(),
         });
       }
+      if(intent.checkout.paymentMethod==='ELECTRONIC'&&!intent.checkout.paymentEvidenceRef){
+        throw new Error('CUSTOMER_PAYMENT_EVIDENCE_REQUIRED');
+      }
       const order=localRuntime.createOrder({
         items:priced.items,
         totalMinor:priced.totalMinor,
@@ -394,8 +397,9 @@ async function reconcileOrders(){
         sourceLabel:'自家 App',
         providerRef,
         ...(intent.checkout.paymentMethod==='ELECTRONIC'&&intent.checkout.paymentEvidenceRef?{paymentEvidenceRef:intent.checkout.paymentEvidenceRef,paymentVerificationState:'PENDING' as const}:{}),
+        ...(intent.checkout.name?{customerName:intent.checkout.name}:{}),
         customerPhone:intent.checkout.phone,
-        initialFulfillmentLabel:'進行中',
+        initialFulfillmentLabel:'待處理',
       });
       window.dispatchEvent(new CustomEvent('mfk-customer-order-intake',{detail:{
         canonicalOrderId:order.id,

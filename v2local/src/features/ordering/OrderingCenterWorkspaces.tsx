@@ -28,6 +28,7 @@ export type OrderingPanelState=
   |{readonly type:'required'}
   |{readonly type:'drink-config';readonly choiceId:string;readonly qty:number;readonly targetLineId?:string;readonly returnTo?:'required'|'riceball-pair'}
   |{readonly type:'riceball-pair'}
+  |{readonly type:'pending-order';readonly orderId:string}
   |{readonly type:'organize'}
   |{readonly type:'combo'}
   |{readonly type:'hold'}
