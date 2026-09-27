@@ -1,4 +1,4 @@
-import {useState} from 'react';
+import {useEffect,useState} from 'react';
 import {ActionButton,AnimatedValue} from '../ui/primitives';
 import type {
   CustomerCartLine,
@@ -82,6 +82,15 @@ export function CheckoutUi4View({
   onPaymentEvidence:(file:File)=>void;
 }){
   const [reviewConfirmed,setReviewConfirmed]=useState(false);
+  const reviewFingerprint=JSON.stringify({
+    cart,
+    checkout,
+    quoteId:quote?.quoteId??null,
+    quoteRevision:quote?.revision??null,
+    quoteFreshness:quote?.freshness??null,
+    repairs:repairs.map(item=>({lineId:item.lineId,kind:item.kind,previousUnitPriceMinor:item.previousUnitPriceMinor,currentUnitPriceMinor:item.currentUnitPriceMinor})),
+  });
+  useEffect(()=>{setReviewConfirmed(false);},[reviewFingerprint]);
   const phoneDigits=digits(checkout.phone);
   const pickupCode=pickupCodeFromPhone(checkout.phone);
   const phoneReady=phoneDigits.length>=8;
