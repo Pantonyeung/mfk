@@ -43,3 +43,21 @@ jobs:
         run: npx vitest run src/runtime/customer-combo-ordering-r1.test.ts src/runtime/smm-combo-revalidation.test.ts src/runtime/customer-cloud-intake.test.ts
       - name: v2local build
         run: npm run build
+
+  v2admin:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: v2admin
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-audit --no-fund --legacy-peer-deps --package-lock=false
+      - name: Admin tests
+        run: npm test
+      - name: Admin build
+        run: npm run build
+      - name: Worker dry run
+        run: npx --yes wrangler@4 deploy --dry-run --config wrangler.jsonc
