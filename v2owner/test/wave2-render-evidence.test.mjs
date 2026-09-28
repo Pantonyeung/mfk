@@ -110,7 +110,8 @@ async function waitText(client,textValue){
     if(result?.result?.value===true)return;
     await sleep(100);
   }
-  throw new Error('Rendered text not found: '+textValue);
+  const body=await client.send('Runtime.evaluate',{expression:'document.body?document.body.innerText.slice(0,1200):"NO_BODY"',returnByValue:true});
+  throw new Error('Rendered text not found: '+textValue+' | BODY: '+String(body?.result?.value??''));
 }
 
 test('Wave2 FINAL screens render at 390 and 440 with 360 minimum width', {timeout:90000}, async()=>{
