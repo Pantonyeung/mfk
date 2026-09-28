@@ -37,15 +37,23 @@ const moneyLabel=(quote:CustomerQuoteSnapshot|null)=>quote
 
 function StateBanner({state}:{state:Ui8PageState}){
   if(state==='READY')return null;
+  const label:Record<Exclude<Ui8PageState,'READY'>,string>={
+    LOADING:'更新中',
+    EMPTY:'暫時未有訂單',
+    ERROR:'更新失敗',
+    OFFLINE:'目前離線',
+    STALE:'資料需要更新',
+    UNKNOWN:'確認中',
+  };
   const detail:Record<Exclude<Ui8PageState,'READY'>,string>={
     LOADING:'正在更新訂單紀錄。',
-    EMPTY:'呢個分類暫時冇訂單；EMPTY 唔等於連線錯誤。',
+    EMPTY:'呢個分類暫時未有訂單。',
     ERROR:'訂單資料暫時未能更新；歷史訂單會保持原樣。',
     OFFLINE:'目前離線；可以先查看已載入嘅訂單紀錄。',
     STALE:'顯示最近一次已知訂單資料；再次下單前會重新確認。',
     UNKNOWN:'訂單狀態仍在確認；請稍後再試。',
   };
-  return <section className={"ui8-state state-"+state.toLowerCase()} role="status"><strong>{state}</strong><p>{detail[state]}</p></section>;
+  return <section className={"ui8-state state-"+state.toLowerCase()} role="status"><strong>{label[state]}</strong><p>{detail[state]}</p></section>;
 }
 
 function IdentityPair({displayCode,pickupCode}:{displayCode:string;pickupCode?:string}){
