@@ -331,7 +331,7 @@ function currentAvailabilityBusinessDate(now=Date.now()){
   const cutoff=readBusinessCutoff();
   return resolveBusinessWindow(now,cutoff.hour,cutoff.minute).businessDate;
 }
-function rollRuntimeAvailabilityForBusinessDay(now=Date.now()){
+export function rollRuntimeAvailabilityForBusinessDay(now=Date.now()){
   const businessDate=currentAvailabilityBusinessDate(now);
   if(data.availabilityBusinessDate===businessDate)return false;
   const nextAvailability=Object.fromEntries(Object.entries(data.availability).map(([nodeId,status])=>[
