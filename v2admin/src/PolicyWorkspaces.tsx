@@ -262,27 +262,28 @@ export function StoreSettingsWorkspace({domain='home'}:{domain?:StoreSettingsDom
   const requestRename=(id:string,newLabel:string)=>{
     const label=newLabel.trim();
     const visibleRow=diningTables.find(item=>item.id===id);
-    if(!visibleRow){setRenameMessages(current=>({...current,[id]:'未能建立改名計劃。'}));return;}
+    if(!visibleRow){setRenameMessages(current=>({...current,[id]:'未能改名。'}));return;}
     if(!label){setRenameMessages(current=>({...current,[id]:'請先輸入新名稱。'}));return;}
     if(label===visibleRow.name){setRenameMessages(current=>({...current,[id]:'新名稱與目前名稱相同。'}));return;}
-    if(visibleRow.versions?.some(item=>item.status==='PLANNED')){setRenameMessages(current=>({...current,[id]:'已有待生效改名計劃；不會重複建立版本。'}));return;}
     setConfig(current=>{
       const rows=[...(current.diningTables??[])];
       const index=rows.findIndex(item=>item.id===id);
       if(index<0)return current;
       const row=rows[index],versions=[...(row.versions??[])];
-      if(versions.some(item=>item.status==='PLANNED'))return current;
+      const at=new Date().toISOString();
       const versionId='V'+String(versions.length+1);
-      const planned:DiningTableVersion={versionId,label,requestedAt:new Date().toISOString(),requestedBy:'ADMIN',sourceRevision:activeRelease?.version??0,status:'PLANNED'};
-      rows[index]={...row,versions:[...versions,planned]};
-      appendAdminAudit({action:'建立堂食枱改名計劃',target:id,before:row,after:{versionId,label,status:'PLANNED'}});
+      const activeVersion:DiningTableVersion={versionId,label,requestedAt:at,requestedBy:'ADMIN',sourceRevision:activeRelease?.version??0,status:'ACTIVE',effectiveAt:at};
+      rows[index]={...row,name:label,versions:[...versions.map(item=>item.status==='ACTIVE'?{...item,status:'SUPERSEDED' as const}:item.status==='PLANNED'?{...item,status:'SUPERSEDED' as const}:item),activeVersion]};
+      appendAdminAudit({action:'修改堂食枱名稱',target:id,before:row,after:{versionId,label,status:'ACTIVE'}});
       return {...current,diningTables:rows};
     });
     setRenameDrafts(current=>({...current,[id]:''}));
-    setRenameMessages(current=>({...current,[id]:'已建立改名計劃；尚未發佈。'}));
+    setRenameMessages(current=>({...current,[id]:'名稱已更新至本頁草稿；正式發佈後 SMT／SMM 會使用新名稱。'}));
   };
   const requestRetirement=(id:string)=>patchTable(id,{retirementStatus:'PLANNED_RETIREMENT'});
-  const activatePending=async(id:string)=>{const evidence=await readFreshDiningOccupancy(id);if(!evidence||evidence.activeSessionCount!==0){setSaveMessage('未能生效：枱仍有人使用，或者佔用讀回未能證明為最新。');return;}const row=diningTables.find(item=>item.id===id);if(!row)return;const versions=[...(row.versions??[])];const planned=versions.find(item=>item.status==='PLANNED');if(row.retirementStatus==='PLANNED_RETIREMENT'){writeAdminStored('dining-table-id-ledger.v1',[...new Set([...readAdminStored<string[]>('dining-table-id-ledger.v1',[]),id])]);patchTable(id,{active:false,retirementStatus:'RETIRED',retirementEvidence:{observedAt:evidence.observedAt,runtimeRevision:evidence.runtimeRevision}});appendAdminAudit({action:'堂食枱退休生效',target:id,after:{observedAt:evidence.observedAt,runtimeRevision:evidence.runtimeRevision}});return;}if(!planned)return;const at=new Date().toISOString();patchTable(id,{name:planned.label,versions:versions.map(item=>item.versionId===planned.versionId?{...item,status:'ACTIVE' as const,effectiveAt:at,activationEvidence:{observedAt:evidence.observedAt,runtimeRevision:evidence.runtimeRevision}}:item.status==='ACTIVE'?{...item,status:'SUPERSEDED' as const}:item)});appendAdminAudit({action:'堂食枱名稱版本生效',target:id,after:{versionId:planned.versionId,observedAt:evidence.observedAt,runtimeRevision:evidence.runtimeRevision}});};
+  const cancelRetirement=(id:string)=>patchTable(id,{retirementStatus:undefined});
+  const setTemporaryAvailability=(id:string,active:boolean)=>{const row=diningTables.find(item=>item.id===id);if(!row||row.retirementStatus==='RETIRED')return;patchTable(id,{active,retirementStatus:row.retirementStatus});};
+  const activatePending=async(id:string)=>{const row=diningTables.find(item=>item.id===id);if(!row||row.retirementStatus!=='PLANNED_RETIREMENT')return;const evidence=await readFreshDiningOccupancy(id);if(!evidence||evidence.activeSessionCount!==0){setSaveMessage('未能退休：枱仍有人使用，或者佔用讀回未能證明為最新。');return;}writeAdminStored('dining-table-id-ledger.v1',[...new Set([...readAdminStored<string[]>('dining-table-id-ledger.v1',[]),id])]);patchTable(id,{active:false,retirementStatus:'RETIRED',retirementEvidence:{observedAt:evidence.observedAt,runtimeRevision:evidence.runtimeRevision}});appendAdminAudit({action:'堂食枱退休生效',target:id,after:{observedAt:evidence.observedAt,runtimeRevision:evidence.runtimeRevision}});};
   const validationInput=()=>({
     diningOverdueMinutes:config.diningOverdueMinutes,
     customerWhatsAppEnabled:config.customerWhatsAppEnabled!==false,
@@ -364,13 +365,12 @@ export function StoreSettingsWorkspace({domain='home'}:{domain?:StoreSettingsDom
           <b>{row.id}</b>
           <label><span>目前名稱</span><input value={row.name} readOnly/></label>
           <label><span>新名稱</span><input value={renameDrafts[row.id]??''} onChange={event=>setRenameDrafts(current=>({...current,[row.id]:event.target.value}))} placeholder="輸入新名稱"/></label>
-          <button type="button" onClick={()=>requestRename(row.id,renameDrafts[row.id]??'')}>建立改名計劃</button>
-          {row.versions?.find(item=>item.status==='PLANNED')?(()=>{const planned=row.versions?.find(item=>item.status==='PLANNED');return <div className="admin-validation"><b>待生效名稱：{planned?.label}</b><span>狀態：PLANNED</span></div>})():null}
+          <button type="button" onClick={()=>requestRename(row.id,renameDrafts[row.id]??'')}>更新名稱</button>
           {renameMessages[row.id]?<small role="status">{renameMessages[row.id]}</small>:null}
           <label><span>排序</span><input type="number" min={1} value={row.sortOrder} onChange={event=>patchTable(row.id,{sortOrder:Number(event.target.value)||index+1})}/></label>
-          <span>{row.retirementStatus??(row.active?'ACTIVE':'RETIRED')}</span>
-          <button type="button" onClick={()=>void activatePending(row.id)}>檢查並生效</button>
-          <button type="button" onClick={()=>requestRetirement(row.id)}>安排停用</button>
+          <span>{row.retirementStatus==='RETIRED'?'RETIRED':row.retirementStatus==='PLANNED_RETIREMENT'?'PLANNED_RETIREMENT':row.active?'ACTIVE':'INACTIVE'}</span>
+          {row.retirementStatus!=='RETIRED'?<Toggle checked={row.active} onChange={active=>setTemporaryAvailability(row.id,active)} label={row.active?'可使用':'暫停使用'}/>:null}
+          {row.retirementStatus==='PLANNED_RETIREMENT'?<><button type="button" onClick={()=>cancelRetirement(row.id)}>取消退休</button><button type="button" onClick={()=>void activatePending(row.id)}>檢查並永久退休</button></>:row.retirementStatus!=='RETIRED'?<button type="button" onClick={()=>requestRetirement(row.id)}>安排永久退休</button>:null}
         </div>)}</div>
       </article></div>:null}
     {domain==='whatsapp'?<div className="admin-policy-grid two"><article className="admin-policy-card"><h2>Customer WhatsApp 備援</h2>
