@@ -60,6 +60,9 @@ describe('Admin UI recomposition',()=>{
     expect(timing).toContain('‹ 門店設定');
     expect(timing).toContain('堂食超時變紅（分鐘）');
     expect(timing).not.toContain('Customer WhatsApp 備援');
+    const payments=render('/admin/store/settings/payments');
+    expect(payments).toContain('AlipayHK');
+    expect(payments).not.toContain('付款 QR 圖');
   });
 
   it('only reports SMT success for a matching revision and fingerprint readback',()=>{
