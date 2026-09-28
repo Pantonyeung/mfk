@@ -71,6 +71,28 @@ test('Wave2 keeps UI10 missing and does not smuggle account-recovery authority i
   assert.doesNotMatch(combined,/createTemporaryPassword|resetCustomerPassword|changeCustomerPhone|sendOtp|verifyOtp/i);
 });
 
+test('Wave2 matches the source cart and customer-facing state composition',()=>{
+  assert.doesNotMatch(views,/<JarVisual count=\{itemCount\}\/>/);
+  assert.doesNotMatch(views,/aria-label="Checkout 進度"/);
+  assert.doesNotMatch(ui8,/<strong>\{state\}<\/strong>/);
+  assert.match(ui8,/暫時未有訂單/);
+  assert.match(ui4,/已提交付款憑證/);
+  assert.match(ui5,/訂單已成功送達/);
+  assert.match(ui5,/等待店舖確認/);
+  assert.match(ui8,/再來一單/);
+  assert.match(views,/加入磨飯到主畫面/);
+  assert.match(views,/開啟訂單通知/);
+});
+
+test('UI9 keeps the formal-member IA Phone + Password only and fail-closed',()=>{
+  assert.match(views,/ui9-membership-module/);
+  assert.match(views,/用電話同密碼建立會員/);
+  assert.match(views,/type="tel" disabled/);
+  assert.match(views,/type="password" disabled/);
+  assert.match(views,/SMS／Email 驗證碼/);
+  assert.doesNotMatch(views,/sendOtp|verifyOtp|createTemporaryPassword|resetCustomerPassword/i);
+});
+
 test('Wave2 does not move transaction authority into presentation components',()=>{
   const combined=[ui3,ui4,ui5,ui6,ui7,ui8,views].join('\n');
   assert.doesNotMatch(combined,/createFormalOrder\(|allocateDisplayNumber\(|markOrderReady\(|completeOrder\(|updateFulfillment\(/);
