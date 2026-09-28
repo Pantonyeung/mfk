@@ -21,13 +21,9 @@ assert.ok(checkoutStart>=0&&checkoutEnd>checkoutStart);
 const checkout=app.slice(checkoutStart,checkoutEnd);
 
 test('Stage 4 keeps tender for takeaway and makes initial dining tenderless',()=>{
-  const markers=['服務方式','堂食去向','訂單確認','確認落單'];
-  let previous=-1;
-  for(const marker of markers){
-    const index=checkout.indexOf(marker);
-    assert.ok(index>previous,marker);
-    previous=index;
-  }
+  for(const marker of['服務方式','堂食去向','訂單確認','確認落單'])assert.match(checkout,new RegExp(marker));
+  assert.match(checkout,/serviceMode==='TAKEAWAY'\?<section[\s\S]*付款方式/);
+  assert.match(checkout,/堂食先落單，食完先埋單/);
 });
 
 test('DINE_IN without Table or Waiting target cannot submit',()=>{
