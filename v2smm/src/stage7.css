@@ -650,3 +650,23 @@
     scroll-behavior:auto!important;
   }
 }
+
+/* Wave 2: source/provider final-art slots. Final artwork is intentionally pending. */
+.stage7-source-icon{
+  position:relative;
+  overflow:hidden;
+  border:1px solid #d9e3ef;
+  background:#f3f6fb;
+}
+.stage7-source-art{
+  display:block;
+  width:26px;
+  height:26px;
+  border-radius:9px;
+  border:1px dashed rgba(22,53,104,.28);
+  background:rgba(255,255,255,.66);
+}
+.stage7-source-third_party{background:#fff5d9;border-color:#eed89c}
+.stage7-source-smm{background:#f2edff;border-color:#d8caf2}
+.stage7-source-own_platform{background:#eef4ff;border-color:#ceddf5}
+.stage7-source-onsite{background:#fff2e9;border-color:#f1d4bf}
