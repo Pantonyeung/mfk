@@ -2612,6 +2612,7 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
     return data.availability[nodeId]||'available';
   },
   async readAvailability(){
+    applyBusinessDayAvailabilityRollover();
     return {revision:1,nodes:Object.entries(productNames).map(([nodeId,label])=>({nodeId,label,status:data.availability[nodeId]||'available',sourceLabel:'LOCAL'})),canChange:true};
   },
   async readCapacityPoolState(){
@@ -2632,7 +2633,7 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
     return view;
   },
   async setAvailability(nodeId,status){
-    rollRuntimeAvailabilityForBusinessDay();
+    applyBusinessDayAvailabilityRollover();
     data={...data,availability:{...data.availability,[nodeId]:status},availabilityBusinessDate:currentAvailabilityBusinessDate()};save();
     queueRuntimeSellabilityProjection(nodeId,status);
     return {revision:1,nodes:Object.entries(productNames).map(([id,label])=>({nodeId:id,label,status:data.availability[id]||'available',sourceLabel:'LOCAL'})),canChange:true};
