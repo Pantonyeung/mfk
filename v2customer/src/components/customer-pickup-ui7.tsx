@@ -16,10 +16,6 @@ type Ui7CanonicalStage='READY'|'ARRIVED'|'VERIFIED'|'HANDED_OVER'|'COMPLETED'|'P
 type Ui7Freshness='CURRENT'|'LOADING'|'ERROR'|'OFFLINE'|'STALE'|'UNKNOWN';
 type Ui7EmptyState='LOADING'|'EMPTY'|'ERROR'|'OFFLINE'|'STALE'|'UNKNOWN';
 
-const characterPath=(variant:CharacterVariant)=>variant==='female'
-  ?'/brand/stage7-pickup-female.svg'
-  :'/brand/stage7-pickup-male.svg';
-
 const isUi7Stage=(stage:CustomerOrderStage):stage is Ui7CanonicalStage=>
   ['READY','ARRIVED','VERIFIED','HANDED_OVER','COMPLETED','PICKUP_EXCEPTION'].includes(stage);
 
@@ -48,7 +44,7 @@ const formatTime=(value:string|undefined)=>{
 };
 
 function Mascot({variant}:{variant:CharacterVariant}){
-  return <img className="ui7-mascot" src={characterPath(variant)} alt="磨飯品牌角色"/>;
+  return <div className="ui7-mascot ui7-brand-art-slot" data-final-art-pending="true" data-character-slot={variant} role="img" aria-label="磨飯品牌角色插圖位置"/>;
 }
 
 function IdentityPanel({
@@ -64,23 +60,24 @@ function IdentityPanel({
   const displayCode=order?.displayCode??historyOrder?.displayCode??intent?.canonicalDisplay??'同步中';
   return <section className="ui7-identity-panel" aria-label="取餐資料">
     <article><span>取餐碼</span><strong>{pickupCode}</strong><small>電話最後四位</small></article>
-    <article><span>流水號</span><strong>{displayCode}</strong><small>店舖 Display Number</small></article>
-    <p>Pickup Code ≠ Display Number；畫面唔會顯示 UUID 或 internal Order ID。</p>
+    <article><span>流水號</span><strong>{displayCode}</strong><small>店舖取餐流水號</small></article>
+    <p>取餐碼同流水號用途不同；取餐時跟畫面提示出示即可。</p>
   </section>;
 }
 
 function FreshnessBanner({freshness}:{freshness:Ui7Freshness}){
   if(freshness==='CURRENT')return null;
+  const label=freshness==='OFFLINE'?'目前離線':freshness==='STALE'?'資料需要更新':freshness==='ERROR'?'更新失敗':freshness==='LOADING'?'更新中':'確認中';
   const detail=freshness==='OFFLINE'
-    ?'目前離線；以下只保留最近一次 canonical readback，恢復連線後只會重新讀狀態。'
+    ?'目前離線；以下保留最近一次已知狀態，恢復連線後會再更新。'
     :freshness==='STALE'
-      ?'以下係最近一次 canonical readback；最新取餐狀態仍待同步。'
+      ?'以下係最近一次已知狀態；最新取餐進度仍在更新。'
       :freshness==='ERROR'
-        ?'同步暫時出錯；唔會因錯誤推斷已核對、已交付或已完成。'
+        ?'更新暫時出錯；唔會因此將訂單顯示成已交付或已完成。'
         :freshness==='LOADING'
-          ?'正在更新；以下只係最近一次 canonical readback。'
-          :'狀態未明；唔會推斷 VERIFIED、HANDED_OVER 或 COMPLETED。';
-  return <section className={"ui7-freshness state-"+freshness.toLowerCase()} role="status"><strong>{freshness}</strong><p>{detail}</p></section>;
+          ?'正在更新；以下先顯示最近一次已知狀態。'
+          :'最新狀態未明；未確認前唔會顯示已核對、已交付或已完成。';
+  return <section className={"ui7-freshness state-"+freshness.toLowerCase()} role="status"><strong>{label}</strong><p>{detail}</p></section>;
 }
 
 function ReadyView({
@@ -97,17 +94,17 @@ function ReadyView({
   const summary=order.itemSummary||intent?.cart.map(line=>line.productName+' ×'+line.quantity).join('、')||'訂單內容等待讀回';
   return <>
     <header className="ui7-hero ui7-ready-hero">
-      <div className="ui7-title-row"><h1>可取餐</h1><span className="ui7-state-pill ready">READY</span></div>
+      <div className="ui7-title-row"><h1>可取餐</h1><span className="ui7-state-pill ready">餐點準備好</span></div>
       <Mascot variant={variant}/>
       <h2>餐點已準備好</h2>
-      <p>請到店出示取餐碼。READY 仍然唔係 Completed。</p>
+      <p>請到店出示取餐碼；真正交畀你之後先會顯示完成。</p>
     </header>
     <IdentityPanel order={order} historyOrder={historyOrder} intent={intent}/>
     <section className="ui7-order-summary"><span>餐點</span><strong>{summary}</strong>{order.amountLabel?<em>{order.amountLabel}</em>:null}</section>
     <section className="ui7-arrival-unavailable">
       <button type="button" disabled aria-disabled="true">我到了</button>
       <strong>到店通知暫未連接</strong>
-      <p>「我到了」只可以通知店員；current main 未有安全 arrival-notification seam，所以唔會假裝已通知，更唔會改 Fulfillment 或 Complete。</p>
+      <p>「我到了」功能稍後開放；暫時直接到店出示取餐碼即可。</p>
     </section>
   </>;
 }
@@ -125,7 +122,7 @@ function ArrivedView({
   const name=order.customerDisplayName??historyOrder?.customerDisplayName??intent?.checkout.name??'姓名待讀回';
   return <>
     <header className="ui7-hero ui7-arrived-hero">
-      <div className="ui7-title-row"><h1>到店取餐</h1><span className="ui7-state-pill arrived">ARRIVED</span></div>
+      <div className="ui7-title-row"><h1>到店取餐</h1><span className="ui7-state-pill arrived">已到店</span></div>
       <p>請向店員出示</p>
       <div className="ui7-code-lockup"><span>取餐碼</span><strong>{code}</strong><small>電話最後四位</small></div>
     </header>
@@ -135,7 +132,7 @@ function ArrivedView({
     </section>
     <section className="ui7-checklist">
       <span>店員核對：</span>
-      <ul><li>取餐碼／姓名</li><li>袋數／餐點（只在 canonical facts 存在時顯示）</li><li>必要時其他資料</li></ul>
+      <ul><li>取餐碼／姓名</li><li>袋數／餐點</li><li>必要時其他資料</li></ul>
     </section>
     <div className="ui7-status-cta">等待店員核對</div>
   </>;
@@ -154,10 +151,10 @@ function VerificationView({
   const handed=order.stage==='HANDED_OVER';
   return <>
     <header className="ui7-hero ui7-verification-hero">
-      <div className="ui7-title-row"><h1>{handed?'交付中':'核對中'}</h1><span className="ui7-state-pill verified">{handed?'HANDED OVER':'VERIFIED'}</span></div>
+      <div className="ui7-title-row"><h1>{handed?'交付中':'核對中'}</h1><span className="ui7-state-pill verified">{handed?'已交付':'已核對'}</span></div>
       <Mascot variant={variant}/>
       <h2>{handed?'交付已確認':'核對完成'}</h2>
-      <p>{handed?'等候 canonical COMPLETED readback；未完成前唔會顯示完成。':'店員正將餐點交畀你。'}</p>
+      <p>{handed?'餐點已交到你手上，正在更新完成狀態。':'店員正將餐點交畀你。'}</p>
     </header>
     <section className="ui7-verification-card">
       <div><span>袋數確認</span><strong>{order.pickupBagCount!==undefined?order.pickupBagCount+' 袋':'待店員讀回'}</strong></div>
@@ -165,7 +162,7 @@ function VerificationView({
       <p>取餐碼 {code} {order.stage==='VERIFIED'?'已核對':'已完成店員核對流程'}</p>
     </section>
     <div className="ui7-status-cta success">正在交付，請稍候</div>
-    <p className="ui7-not-completed">未真正交付並讀回 COMPLETED 前，訂單仍未 Completed。</p>
+    <p className="ui7-not-completed">真正交付完成後，訂單先會顯示「已完成」。</p>
   </>;
 }
 
@@ -194,7 +191,7 @@ function ExceptionView({
       <div className="ui7-title-row"><h1>取餐核對</h1><span className="ui7-state-pill exception">需協助</span></div>
       <Mascot variant={variant}/>
       <h2>暫時未能完成取餐</h2>
-      <p>先解決問題，再由店員完成交付。例外未 resolve 絕不會 Completed。</p>
+      <p>先解決問題，再由店員完成交付。問題解決前，訂單唔會顯示「已完成」。</p>
     </header>
     <section className="ui7-exception-list">
       {cards.map(kind=><article key={kind} className={current===kind?'active':''}>
@@ -227,7 +224,7 @@ function CompletedView({
   const completedAt=order?.completedAt??historyOrder?.completedAt;
   return <>
     <header className="ui7-hero ui7-completed-hero">
-      <div className="ui7-title-row"><h1>已取餐</h1><span className="ui7-state-pill completed">COMPLETED</span></div>
+      <div className="ui7-title-row"><h1>已取餐</h1><span className="ui7-state-pill completed">已完成</span></div>
       <Mascot variant={variant}/>
       <h2>取餐完成</h2>
       <p>多謝你今日幫襯磨飯。</p>
@@ -235,7 +232,7 @@ function CompletedView({
     <section className="ui7-completion-card">
       <div><span>完成時間</span><strong>{formatTime(completedAt)}</strong></div>
       <div><span>流水號</span><strong>{display}</strong></div>
-      {!completedAt?<p>完成狀態已讀回，但 canonical completion time 未提供；畫面唔會自行估算。</p>:null}
+      {!completedAt?<p>完成時間暫未提供；畫面唔會自行估算。</p>:null}
     </section>
     <div className="ui7-completed-actions">
       <ActionButton wide onClick={onOrders}>查看完成訂單</ActionButton>
@@ -278,14 +275,14 @@ export function PickupCompleteUi7View({
     return <section className="page ui7-shell ui7-pending" data-ui7-state={emptyState}>
       <FreshnessBanner freshness={freshness}/>
       <header className="ui7-hero">
-        <span>{emptyState}</span>
+        <span>{emptyState==='OFFLINE'?'目前離線':emptyState==='ERROR'?'更新失敗':emptyState==='STALE'?'需要更新':emptyState==='LOADING'?'更新中':'確認中'}</span>
         <h1>{emptyState==='EMPTY'?'暫時未有取餐狀態':'取餐狀態等待讀回'}</h1>
         <p>{emptyState==='EMPTY'
-          ?'連線正常，但未有 canonical UI7 pickup stage；READY 只會喺店舖正式讀回 READY 時出現。'
-          :'未有 READY / ARRIVED / VERIFIED / HANDED_OVER / COMPLETED canonical fact 前，UI7 唔會推斷取餐進度。'}</p>
+          ?'暫時未進入取餐階段；店舖真正準備好後先會顯示「可取餐」。'
+           :'取餐進度仍在確認；未確認前唔會顯示已核對、已交付或已完成。'}</p>
       </header>
       <IdentityPanel order={order} historyOrder={historyOrder} intent={intent}/>
-      <div className="ui7-pending-actions"><ActionButton onClick={onRefresh}>只讀 Refresh</ActionButton><ActionButton variant="secondary" onClick={onOrders}>返回訂單</ActionButton></div>
+      <div className="ui7-pending-actions"><ActionButton onClick={onRefresh}>重新整理</ActionButton><ActionButton variant="secondary" onClick={onOrders}>返回訂單</ActionButton></div>
     </section>;
   }
 
@@ -296,6 +293,6 @@ export function PickupCompleteUi7View({
     {(stage==='VERIFIED'||stage==='HANDED_OVER')&&order?<VerificationView order={order} intent={intent} variant={characterVariant}/>:null}
     {stage==='PICKUP_EXCEPTION'&&order?<ExceptionView order={order} variant={characterVariant} onHelp={onHelp} onOrders={onOrders}/>:null}
     {stage==='COMPLETED'?<CompletedView order={order} historyOrder={historyOrder} variant={characterVariant} onOrders={onOrders} onHome={onHome}/>:null}
-    {stage!=='COMPLETED'?<section className="ui7-readonly-refresh"><button type="button" onClick={onRefresh}>只讀 Refresh</button><small>Realtime 只係提示；canonical readback 先係真相。Customer 唔可以自行 VERIFIED / HANDED_OVER / COMPLETED。</small></section>:null}
+    {stage!=='COMPLETED'?<section className="ui7-readonly-refresh"><button type="button" onClick={onRefresh}>重新整理</button><small>只會更新取餐進度，唔會自行改成已核對、已交付或已完成。</small></section>:null}
   </section>;
 }

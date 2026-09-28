@@ -146,7 +146,7 @@ test('phone search is canonical + permitted only',()=>{
   assert.equal(smmStage7MatchesSearch(rows[0],'9123','PHONE'),true);
   assert.equal(smmStage7MatchesSearch(rows[1],'9000','PHONE'),false);
   assert.match(view,/disabled=\{value==='PHONE'&&!phoneAvailable\}/);
-  assert.match(view,/只會比對 Display Number、canonical 商品名稱，以及已獲允許嘅 canonical 電話/);
+  assert.match(view,/只會比對訂單編號、商品名稱，以及系統可用嘅電話資料/);
 });
 
 test('Stage 7 list shows human identity, source, time, items, amount and status with honest missing data',()=>{
@@ -161,7 +161,7 @@ test('Stage 7 list shows human identity, source, time, items, amount and status 
 
 test('Stage 7 7.1-7.5 visual family is explicit',()=>{
   for(const marker of['7.1_ACTIVE','7.2_HISTORY','7.3_SEARCH','7.4_DETAIL','7.5_STATUS'])assert.ok(view.includes(marker),marker);
-  for(const marker of['進行中','歷史','搜尋訂單','訂單詳情','更新訂單狀態'])assert.ok(view.includes(marker),marker);
+  for(const marker of['進行中','歷史','搜尋訂單','訂單詳情','訂單狀態'])assert.ok(view.includes(marker),marker);
 });
 
 test('Stage 7 source filters are exactly 全部 / 現場 / SMM / 自家平台 / 第三方',()=>{
@@ -186,7 +186,7 @@ test('Stage 7 status mutation controls are disabled and delegated to SMT',()=>{
   assert.match(view,/input type="radio" disabled/);
   assert.match(view,/textarea disabled/);
   assert.match(view,/className="primary" disabled>確認更新/);
-  assert.ok((view.match(/此操作需由 SMT 處理/g)||[]).length>=3);
+  assert.ok((view.match(/請在收銀機處理/g)||[]).length>=3);
   assert.doesNotMatch(view,/cancelOrder|updateFulfillment|setFulfillment|fulfillmentCommand|onCancel|onFulfillment/);
   assert.doesNotMatch(types,/cancelOrder\?|updateFulfillment\?|fulfillmentCommand\?/);
 });
@@ -199,7 +199,7 @@ test('capability registry keeps fulfillment and cancel NOT_WIRED',()=>{
 test('Stage 7 refresh is the only operational action and has no transport mutation seam',()=>{
   assert.match(view,/await Promise\.resolve\(onRefresh\(\)\)/);
   assert.match(view,/重新整理/);
-  assert.match(view,/重新讀取 SMT 狀態/);
+  assert.match(view,/重新整理狀態/);
   assert.doesNotMatch(view,/fetch\(|POST|PATCH|PUT|DELETE|submitOrder\(/);
 });
 

@@ -21,24 +21,24 @@ test('UI7 route owns READY onward while UI6 remains the pre-pickup read-only sur
   assert.match(app,/openPickupRoute/);
   assert.match(app,/\['READY','ARRIVED','VERIFIED','HANDED_OVER','PICKUP_EXCEPTION','COMPLETED'\]/);
   assert.match(app,/PickupCompleteUi7View/);
-  assert.match(ui6,/READY ≠ COMPLETED/);
+  assert.match(ui6,/可取餐唔代表已交收/);
 });
 
 test('core Stage 7 state lock stays explicit',()=>{
   for(const state of['READY','ARRIVED','VERIFIED','HANDED_OVER','COMPLETED']){
     assert.match(types,new RegExp("\\|'"+state+"'|='"+state+"'"));
   }
-  assert.match(ui7,/READY 仍然唔係 Completed/);
+  assert.match(ui7,/真正交畀你之後先會顯示完成/);
   assert.match(ui7,/到店通知唔等於核對、交收或完成|我到了/);
-  assert.match(ui7,/未真正交付並讀回 COMPLETED 前/);
-  assert.match(ui7,/例外未 resolve 絕不會 Completed/);
+  assert.match(ui7,/真正交付完成後/);
+  assert.match(ui7,/問題解決前，訂單唔會顯示「已完成」/);
 });
 
 test('arrival seam is classified unavailable and never mutates fulfillment',()=>{
   assert.match(ui7,/SAFE_UNAVAILABLE_FIRST_BREAK:CUSTOMER_ARRIVAL_NOTIFICATION_SEAM_MISSING_IN_CURRENT_MAIN/);
   assert.match(ui7,/>我到了</);
   assert.match(ui7,/disabled aria-disabled="true"/);
-  assert.match(ui7,/唔會改 Fulfillment 或 Complete/);
+  assert.match(ui7,/功能稍後開放/);
   assert.doesNotMatch(ui7,/requestArrival|arrivalFetch|markArrived|setArrived/);
 });
 
@@ -63,8 +63,8 @@ test('unresolved pickup exception always blocks Completed projection',()=>{
 test('Pickup Code and Display Number remain separate and no internal identity is rendered',()=>{
   assert.match(ui7,/>取餐碼</);
   assert.match(ui7,/>流水號</);
-  assert.match(ui7,/Pickup Code ≠ Display Number/);
-  assert.match(ui7,/唔會顯示 UUID 或 internal Order ID/);
+  assert.match(ui7,/取餐碼同流水號用途不同/);
+  assert.match(ui7,/取餐時跟畫面提示出示即可/);
   assert.doesNotMatch(ui7,/\{order\??\.orderId\}/);
   assert.doesNotMatch(ui7,/\{intent\??\.canonicalOrderId\}/);
 });
@@ -72,7 +72,7 @@ test('Pickup Code and Display Number remain separate and no internal identity is
 test('completion time is shown only from canonical projected fact',()=>{
   assert.match(ui7,/const completedAt=order\?\.completedAt\?\?historyOrder\?\.completedAt/);
   assert.match(ui7,/formatTime\(completedAt\)/);
-  assert.match(ui7,/canonical completion time 未提供；畫面唔會自行估算/);
+  assert.match(ui7,/完成時間暫未提供；畫面唔會自行估算/);
   assert.doesNotMatch(ui7,/Date\.now\(\).*completed|new Date\(\)\.toISOString\(\).*completed/i);
 });
 
@@ -80,8 +80,8 @@ test('UI7 preserves weak-network fail-closed freshness',()=>{
   for(const state of['LOADING','ERROR','OFFLINE','STALE','UNKNOWN']){
     assert.match(ui7,new RegExp(state));
   }
-  assert.match(ui7,/Realtime 只係提示；canonical readback 先係真相/);
-  assert.match(ui7,/唔會推斷 VERIFIED、HANDED_OVER 或 COMPLETED/);
+  assert.match(ui7,/只會更新取餐進度/);
+  assert.match(ui7,/未確認前唔會顯示已核對、已交付或已完成/);
 });
 
 
@@ -92,7 +92,7 @@ test('UI7 healthy no-stage state is deterministic EMPTY while unsupported is UNK
   assert.match(ui7,/const emptyState:Ui7EmptyState=unsupported\?'UNKNOWN':emptyStateFrom\(freshness\)/);
   assert.match(ui7,/data-ui7-state=\{emptyState\}/);
   assert.match(ui7,/emptyState==='EMPTY'\?'暫時未有取餐狀態':'取餐狀態等待讀回'/);
-  assert.match(ui7,/READY 只會喺店舖正式讀回 READY 時出現/);
+  assert.match(ui7,/店舖真正準備好後先會顯示「可取餐」/);
   assert.doesNotMatch(ui7,/freshness==='CURRENT'\?'READY'/);
 });
 
@@ -100,8 +100,8 @@ test('UI7 keeps exactly five fixed bottom-nav items with Orders active',()=>{
   const navBlock=primitives.slice(primitives.indexOf('export function BottomNavigation'),primitives.indexOf('export interface ProductOriginRect'));
   const navIds=[...navBlock.matchAll(/\{id:'(home|menu|cart|orders|more)' as const/g)].map(match=>match[1]);
   assert.deepEqual(navIds,['home','menu','cart','orders','more']);
-  assert.match(app,/!\['checkout','submit','waiting'\]\.includes\(view\)/);
-  assert.match(app,/active=\{view==='pickup'\|\|view==='orders'\?'orders'/);
+  assert.match(app,/view==='cart'\|\|view==='checkout'\?'cart'/);
+  assert.match(app,/view==='more'\?'more':'orders'/);
   assert.doesNotMatch(app,/\['checkout','submit','waiting','pickup'\]/);
   assert.match(app,/pulseKey=\{jarPulseKey\} onChange=\{changeView\}/);
   assert.match(styles,/\.bottom-navigation\{position:fixed[\s\S]*grid-template-columns:repeat\(5,1fr\)[\s\S]*env\(safe-area-inset-bottom\)/);
@@ -116,8 +116,8 @@ test('UI7 contains no Stage8 reward or instant seed issuance',()=>{
 });
 
 test('formal Stage 7 composition uses supplied IP assets, touch target and reduced motion',()=>{
-  assert.match(ui7,/\/brand\/stage7-pickup-male\.svg/);
-  assert.match(ui7,/\/brand\/stage7-pickup-female\.svg/);
+  assert.match(ui7,/data-final-art-pending="true"/);
+  assert.match(ui7,/data-character-slot=\{variant\}/);
   assert.match(styles,/\.ui7-arrival-unavailable button[\s\S]*min-height:48px/);
   assert.match(styles,/@media\(prefers-reduced-motion:reduce\)[\s\S]*\.ui7-shell/);
 });

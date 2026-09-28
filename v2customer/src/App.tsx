@@ -5,7 +5,7 @@ import {buildCustomerRecommendations} from './recommendation';
 import {publishedCartRepairs,quotePublishedCart,repairPublishedCartLine} from './local-quote';
 import {buildWhatsAppFallbackUrl} from './whatsapp-fallback';
 import {customerComboPublishedUnitMinor,customerStandalonePublishedUnitMinor,restoreCustomerComboSelectionState,selectedCustomerComboIntent,selectedCustomerOptions,toggleCustomerComboSelection,toggleCustomerSelection,validateCustomerComboSelection,validateCustomerSelections,type CustomerComboSelectionState,type CustomerSelectionState} from './selection';
-import {BottomNavigation,CustomerHeader,StatusBanner,type ActionState,type ProductOriginRect} from './ui/primitives';
+import {BottomNavigation,StatusBanner,type ActionState,type ProductOriginRect} from './ui/primitives';
 import {CartView,MemberView,type MenuLayout} from './components/customer-views';
 import {CheckoutUi4View,type CustomerUi4CheckoutStep} from './components/customer-checkout-ui4';
 import {SubmitUi5View} from './components/customer-submit-ui5';
@@ -223,7 +223,7 @@ export function App(){
 
   const startUi5Submission=()=>{
     if(submitBlockReason){setNotice(submitBlockReason);return}
-    if(!quote||quote.freshness!=='CURRENT'){setNotice('提交前價格未係 CURRENT；請先重新確認。');return}
+    if(!quote||quote.freshness!=='CURRENT'){setNotice('提交前價格需要重新確認；請先更新再繼續。');return}
     if(cartRepairs.length){setNotice('仍有餐點需要修正；只修受影響項目後再提交。');return}
     const cartFingerprint=JSON.stringify(cart);
     const checkoutFingerprint=JSON.stringify(checkout);
@@ -414,7 +414,7 @@ export function App(){
 
   const resolveDeliveredIntent=(intent:CustomerPendingIntent,result:CustomerCommandResult,message:string)=>{
     if(!result.orderId){
-      const unknown=Object.freeze({...intent,state:'UNKNOWN' as const,updatedAt:nowIso(),lastMessage:'正式 Order 已回覆成功，但缺少 canonical Order readback identity；保持 UNKNOWN。'});
+      const unknown=Object.freeze({...intent,state:'UNKNOWN' as const,updatedAt:nowIso(),lastMessage:'正式結果未完整確認；請勿重複提交，只可重新確認原本提交。'});
       saveIntent(unknown);
       setSubmitRouteId(intent.submissionId);
       setNotice('正式結果未完整讀回；請勿重複提交，只可重新確認原本提交。');
@@ -515,7 +515,7 @@ export function App(){
           return;
         }
         saveIntent(Object.freeze({...sameCartUnknown,state:'UNKNOWN',updatedAt:nowIso(),lastMessage:prior.message}));
-        setNotice('上一個同一餐點提交結果仍未確認；已查詢原本 Submission ID，唔會建立第二張單。');
+        setNotice('上一個同一餐點提交結果仍未確認；系統只會繼續確認原本嗰次提交，唔會建立第二張單。');
         return;
       }
 
@@ -626,7 +626,7 @@ export function App(){
         const fallbackIntent=Object.freeze({...intent,state:'NOT_CONNECTED' as const,updatedAt:nowIso(),lastMessage:result.message});
         saveIntent(fallbackIntent);
         setFallbackIntentId(intent.submissionId);
-        setNotice('原本提交經 Readback 仍未找到；Online Submit 已鎖定，可以轉用 WhatsApp 人工救援。');
+        setNotice('仍未找到原本提交；自動提交已鎖定，可以轉用 WhatsApp 人工協助。');
         return;
       }
       saveIntent(Object.freeze({...intent,state:'UNKNOWN',updatedAt:nowIso(),lastMessage:result.message}));
@@ -655,7 +655,7 @@ export function App(){
       setOrderSegment('completed');
       setView('orders');
       replacePath('/orders');
-      setNotice('呢張歷史訂單未有可安全複製嘅 Intent；舊 Order 保持唯讀。');
+      setNotice('呢張歷史訂單暫時未能直接再來一單；原有訂單內容保持不變。');
       return;
     }
     const result=buildCurrentReorderCart(order,menu);
@@ -683,25 +683,25 @@ export function App(){
     setView('orders');
     replacePath('/orders');
     setNotice(result.issues.length
-      ?'已建立新購物車；只需修正 '+String(result.issues.length)+' 個受影響 Line。舊訂單冇改動。'
-      :'已用目前餐牌建立新購物車；舊價、付款憑證、Fulfillment、Coupon 狀態全部冇複製。');
+      ?'已建立新購物車；只需修正 '+String(result.issues.length)+' 個受影響餐點。舊訂單冇改動。'
+      :'已用目前餐牌建立新購物車；舊價、付款資料、取餐進度同優惠狀態都唔會沿用。');
     window.scrollTo({top:0,behavior:'auto'});
   };
 
   const acceptUi8Repair=(lineId:string)=>{
-    if(!browserOnline||connection!=='READY'||!menu){setNotice('目前資料未 fresh；draft cart 已保留，請先重新同步 current truth。');return}
+    if(!browserOnline||connection!=='READY'||!menu){setNotice('目前資料需要更新；你已揀嘅餐點已保留，請先重新整理再繼續。');return}
     const line=cart.find(item=>item.lineId===lineId);
     if(!line)return;
     const repaired=repairPublishedCartLine(line,menu);
-    if(!repaired){setNotice('呢一項仍然需要手動修正或移除；其他 Line 保持不變。');return}
+    if(!repaired){setNotice('呢一項仍然需要手動修正或移除；其他餐點保持不變。');return}
     updateCart(cart.map(item=>item.lineId===lineId?clearReorderAttention(repaired):item));
-    setNotice('只更新受影響 Line「'+repaired.productName+'」；其他 Line 冇改動。');
+    setNotice('只更新受影響餐點「'+repaired.productName+'」；其他餐點冇改動。');
   };
 
   const editUi8Repair=(line:CustomerCartLine)=>{
-    if(!browserOnline||connection!=='READY'||!menu){setNotice('目前資料未 fresh；draft cart 已保留，請先重新同步 current truth。');return}
+    if(!browserOnline||connection!=='READY'||!menu){setNotice('目前資料需要更新；你已揀嘅餐點已保留，請先重新整理再繼續。');return}
     const product=menu.products.find(item=>item.productId===line.productId);
-    if(!product?.available){setNotice('呢個舊商品目前不可用；只可以移除受影響 Line，其他 Line 保持不變。');return}
+    if(!product?.available){setNotice('呢個舊商品目前不可用；只可以移除受影響餐點，其他餐點保持不變。');return}
     openProduct(product,null,line);
   };
 
@@ -748,7 +748,7 @@ export function App(){
     });
     if(!url){setNotice('WhatsApp 備用聯絡資料未完整。');return}
     window.open(url,'_blank','noopener,noreferrer');
-    setNotice('已開啟 WhatsApp；舊 Online Submit 保持鎖定，訊息只會喺你主動送出後傳送畀店舖。');
+    setNotice('已開啟 WhatsApp；原本自動送單保持鎖定，訊息只會喺你主動送出後傳送畀店舖。');
   };
 
   const activeOrders=snapshot?.activeOrders??[];
@@ -786,7 +786,6 @@ export function App(){
   const actionState:ActionState=quote?.freshness==='MATERIAL_CHANGE'||!cart.length||!quote||Boolean(submitBlockReason)?'disabled':readingIntentId||submitting?'loading':currentPending?.state==='UNKNOWN'?'unknown':currentPending?.state==='PENDING'?'pending':'default';
 
   return <main className="customer-shell" data-network={!browserOnline?'offline':connection.toLowerCase()}>
-    {view==='home'?null:view==='menu'?null:<CustomerHeader storeName={snapshot?.store?.storeName} connection={connection} browserOnline={browserOnline} onHome={()=>changeView('home')} onService={()=>changeView('more')}/>}
     {view==='home'?null:view==='menu'?null:<div className="global-status" aria-live="polite">
       {notice?<section className="notice" role="status"><p>{notice}</p><button onClick={()=>setNotice(null)}>收起</button></section>:null}
       {!browserOnline?<StatusBanner tone="offline" title="目前離線" detail="已載入內容仍然可以查看。本機記憶罐、聯絡資料同待提交草稿已保留，恢復連線前唔會自動提交。"/>:null}
@@ -801,15 +800,18 @@ export function App(){
       {view==='home'?<Stage1Home snapshot={snapshot} connection={connection} browserOnline={browserOnline} activeOrders={activeOrders} history={history} recommendations={homeRecommendations} cartCount={cartCount} onRetry={()=>void refresh()} onProduct={openProduct} onBrowse={()=>changeView('menu')} onJar={()=>changeView('cart')} onOrders={()=>{setOrderSegment('current');changeView('orders')}} onHistory={()=>{setOrderSegment('completed');changeView('orders')}} onMember={()=>changeView('more')} onBuyAgain={order=>void reorder(order)}/>:null}
       {view==='menu'?<Stage2Menu connection={connection} browserOnline={browserOnline} categories={categories} activeCategoryId={activeCategoryId} setCategory={category=>presentWithContinuity(()=>changeCategory(category))} query={search} setQuery={setSearch} products={menu?.products??[]} recommendations={menuRecommendations} onProduct={(product,origin)=>openProduct(product,origin)} cartCount={cartCount} onCart={()=>changeView('cart')}/>:null}
       {view==='cart'?<CartView cart={cart} quote={quote} repairs={cartRepairs} member={snapshot?.member} suggestions={cartSuggestions} products={menu?.products??[]} onProduct={openProduct} onAcceptRepair={acceptCartRepair} onQuantity={(lineId,quantity)=>updateCart(cart.map(line=>line.lineId===lineId?{...line,quantity:Math.max(1,quantity)}:line))} onRemove={lineId=>updateCart(cart.filter(line=>line.lineId!==lineId))} onMenu={()=>changeView('menu')} onCheckout={()=>void openCheckoutStep('contact')}/>:null}
-      {view==='checkout'?<CheckoutUi4View step={checkoutStep} cart={cart} quote={quote} repairs={cartRepairs} checkout={checkout} setCheckout={changeCheckout} paymentChannels={snapshot?.paymentChannels??[]} onStep={step=>void openCheckoutStep(step)} onBackToJar={()=>changeView('cart')} onRepair={()=>changeView('cart')} onPaymentEvidence={file=>void uploadPaymentEvidence(file)} onReviewConfirmed={startUi5Submission}/>:null}
-      {view==='submit'?(activeSubmitIntent?<SubmitUi5View intent={activeSubmitIntent} submitting={submitting} submitProbe={submitProbe} reading={readingIntentId===activeSubmitIntent.submissionId} fallbackAvailable={Boolean(snapshot?.fallback?.enabled)&&activeSubmitIntent.state==='NOT_CONNECTED'} onSubmit={()=>void submit(activeSubmitIntent)} onReadback={()=>void readbackIntent(activeSubmitIntent)} onFallback={()=>void requestFallback(activeSubmitIntent)} onBackReview={()=>void openCheckoutStep('review')} onBackToJar={()=>changeView('cart')}/>:<section className="page ui5-missing"><h1>提交資料未找到</h1><p>唔會建立新 Submission；請返回記憶罐重新確認。</p><button onClick={()=>changeView('cart')}>返回記憶罐</button></section>):null}
+      {view==='checkout'?<CheckoutUi4View step={checkoutStep} cart={cart} quote={quote} repairs={cartRepairs} checkout={checkout} setCheckout={changeCheckout} paymentChannels={snapshot?.paymentChannels??[]} pickupEtaLabel={snapshot?.store?.etaLabel} onStep={step=>void openCheckoutStep(step)} onBackToJar={()=>changeView('cart')} onRepair={()=>changeView('cart')} onPaymentEvidence={file=>void uploadPaymentEvidence(file)} onReviewConfirmed={startUi5Submission}/>:null}
+      {view==='submit'?(activeSubmitIntent?<SubmitUi5View intent={activeSubmitIntent} submitting={submitting} submitProbe={submitProbe} reading={readingIntentId===activeSubmitIntent.submissionId} fallbackAvailable={Boolean(snapshot?.fallback?.enabled)&&activeSubmitIntent.state==='NOT_CONNECTED'} onSubmit={()=>void submit(activeSubmitIntent)} onReadback={()=>void readbackIntent(activeSubmitIntent)} onFallback={()=>void requestFallback(activeSubmitIntent)} onBackReview={()=>void openCheckoutStep('review')} onBackToJar={()=>changeView('cart')}/>:<section className="page ui5-missing"><h1>未找到今次落單資料</h1><p>請返回記憶罐重新確認餐點，再送出訂單。</p><button onClick={()=>changeView('cart')}>返回記憶罐</button></section>):null}
       {view==='waiting'?<StoreFulfillmentUi6View order={waitingOrder} intent={waitingIntent} connection={connection} browserOnline={browserOnline} onRefresh={()=>void refresh()} onOrders={()=>{setOrderSegment('current');changeView('orders')}} onHome={()=>changeView('home')}/>:null}
-      {view==='pickup'?<PickupCompleteUi7View order={pickupOrder} historyOrder={pickupHistoryOrder} intent={pickupIntent} connection={connection} browserOnline={browserOnline} onRefresh={()=>void refresh()} onOrders={()=>{setOrderSegment(pickupHistoryOrder?'completed':'current');changeView('orders')}} onHome={()=>changeView('home')} onHelp={()=>setNotice('請直接向現場店員求助；呢個操作唔會改 Fulfillment、唔會標記完成，亦冇發出假通知。')}/>:null}
+      {view==='pickup'?<PickupCompleteUi7View order={pickupOrder} historyOrder={pickupHistoryOrder} intent={pickupIntent} connection={connection} browserOnline={browserOnline} onRefresh={()=>void refresh()} onOrders={()=>{setOrderSegment(pickupHistoryOrder?'completed':'current');changeView('orders')}} onHome={()=>changeView('home')} onHelp={()=>setNotice('請直接向現場店員求助；問題處理好之前，訂單唔會顯示已完成。')}/>:null}
       {view==='orders'?<HistoryReorderUi8View segment={orderSegment} setSegment={setOrderSegment} phase={ui8Phase} setPhase={setUi8Phase} active={activeOrders} history={history} selectedHistory={ui8SelectedHistory} cart={cart} repairs={cartRepairs} quote={quote} menu={menu} connection={connection} browserOnline={browserOnline} onOpenCurrent={openUi8Current} onOpenHistory={openUi8History} onStartReorder={order=>void reorder(order)} onAcceptRepair={acceptUi8Repair} onEditRepair={editUi8Repair} onRemoveLine={lineId=>updateCart(cart.filter(line=>line.lineId!==lineId))} onGoCart={()=>changeView('cart')} onBrowse={()=>changeView('menu')} onRefresh={()=>void refresh()}/>:null}
       {view==='more'?<MemberView connection={connection} snapshot={snapshot} history={history} pendingIntents={recoveryIntents} readingIntentId={readingIntentId} onRefresh={()=>void refresh()} onReadback={intent=>void readbackIntent(intent)} onDiscard={removeIntent} onFallback={()=>void requestFallback()} onReorder={order=>void reorder(order)} onBrowse={()=>changeView('menu')}/>:null}
     </section>
 
-    {view==='home'||view==='menu'?<Stage2BottomNavigation active={view} cartCount={cartCount} orderCount={activeOrders.length} onChange={changeView}/>:!['checkout','submit','waiting'].includes(view)?<BottomNavigation active={view==='pickup'||view==='orders'?'orders':view as 'home'|'cart'|'more'} cartCount={cartCount} orderCount={activeOrders.length} pulseKey={jarPulseKey} onChange={changeView}/>:null}
+    {view==='home'||view==='menu'
+      ?<Stage2BottomNavigation active={view} cartCount={cartCount} orderCount={activeOrders.length} onChange={changeView}/>
+      :<BottomNavigation active={view==='cart'||view==='checkout'?'cart':view==='more'?'more':'orders'} cartCount={cartCount} orderCount={activeOrders.length} pulseKey={jarPulseKey} onChange={changeView}/>}
+
 
     {selectedProduct?<ProductSheet product={selectedProduct} menu={menu} selections={selections} comboEnabled={selectedComboEnabled} comboSelections={selectedComboSelections} selectedVariationId={selectedVariationId} quantity={selectedQuantity} note={selectedNote} editing={Boolean(editingLineId)} recommendations={productRecommendations} setVariation={setSelectedVariationId} setComboEnabled={setSelectedComboEnabled} clearCombo={()=>setSelectedComboSelections(Object.freeze([]))} setQuantity={setSelectedQuantity} setNote={setSelectedNote} toggle={(groupId,optionId)=>{
       const group=selectedProduct.optionGroups.find(item=>item.optionGroupId===groupId);

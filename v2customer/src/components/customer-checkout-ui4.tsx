@@ -23,8 +23,8 @@ function stepClass(index:number,active:number){
 
 function CheckoutStepper({step}:{step:CustomerUi4CheckoutStep}){
   const active=step==='contact'?2:step==='payment'?3:4;
-  const labels=['確認商品','聯絡與取餐','付款','提交前確認'];
-  return <ol className="ui4-checkout-stepper" aria-label="Checkout 進度">
+  const labels=['商品','聯絡與取餐','付款','提交'];
+  return <ol className="ui4-checkout-stepper" aria-label="結帳進度">
     {labels.map((label,index)=><li key={label} className={stepClass(index+1,active)}><i>{index+1<active?'✓':index+1}</i><span>{label}</span></li>)}
   </ol>;
 }
@@ -64,6 +64,7 @@ export function CheckoutUi4View({
   checkout,
   setCheckout,
   paymentChannels,
+  pickupEtaLabel,
   onStep,
   onBackToJar,
   onRepair,
@@ -77,6 +78,7 @@ export function CheckoutUi4View({
   checkout:CustomerCheckoutDraft;
   setCheckout:(value:CustomerCheckoutDraft)=>void;
   paymentChannels:readonly CustomerPaymentChannel[];
+  pickupEtaLabel?:string;
   onStep:(step:CustomerUi4CheckoutStep)=>void;
   onBackToJar:()=>void;
   onRepair:()=>void;
@@ -115,16 +117,16 @@ export function CheckoutUi4View({
     </button>
     <header className="page-intro">
       <div>
-        <span className="kicker">記憶罐 Checkout</span>
+        <span className="kicker">記憶罐</span>
         <h1>{step==='contact'?'聯絡與取餐':step==='payment'?'付款':'提交前確認'}</h1>
-        <p>{step==='review'?'今頁只確認資料；真正安全提交屬下一階段。':'每一步都只使用目前已發布資料，正式交易仍由 SMT 核對。'}</p>
+        <p>{step==='review'?'最後睇多次餐點、取餐同付款資料。':'一步一步完成，資料有變會即時提醒你。'}</p>
       </div>
     </header>
     <CheckoutStepper step={step}/>
 
     {step==='contact'?<>
       <section className="ui4-checkout-card">
-        <header><span>STEP 2</span><h2>今次點稱呼你？</h2></header>
+        <header><span>聯絡資料</span><h2>今次點稱呼你？</h2></header>
         <div className="checkout-form">
           <label htmlFor="ui4-customer-name"><span>稱呼 <small>選填</small></span><input id="ui4-customer-name" value={checkout.name} onChange={event=>setCheckout({...checkout,name:event.target.value})} autoComplete="name" placeholder="例如：陳小姐"/></label>
           <label htmlFor="ui4-customer-phone"><span>電話</span><input id="ui4-customer-phone" type="tel" inputMode="tel" value={checkout.phone} onChange={event=>setCheckout({...checkout,phone:event.target.value})} autoComplete="tel" placeholder="用作取餐人工核對"/></label>
@@ -133,7 +135,12 @@ export function CheckoutUi4View({
       <section className="ui4-pickup-code" aria-live="polite">
         <span>取餐碼</span>
         <AnimatedValue as="strong">{pickupCode??'----'}</AnimatedValue>
-        <p>取餐碼只係電話最後 4 位；唔係流水號、備用參考碼或者訂單識別。</p>
+        <p>取餐時可以用呢個短碼畀店員核對。</p>
+      </section>
+      <section className="ui4-pickup-window" aria-label="取餐時間">
+        <header><span>取餐時間</span><strong>即時取餐</strong></header>
+        <p>{pickupEtaLabel??'目前可用到店自取窗口'}</p>
+        <small>V1 只提供目前可用自取窗口，不設明天／後天或其他預約時段。</small>
       </section>
       <div className="ui4-checkout-actions">
         <ActionButton variant="secondary" onClick={onBackToJar}>返回確認商品</ActionButton>
@@ -143,28 +150,28 @@ export function CheckoutUi4View({
 
     {step==='payment'?<>
       <section className="ui4-checkout-card">
-        <header><span>STEP 3</span><h2>選擇付款方式</h2></header>
+        <header><span>付款方式</span><h2>選擇付款方式</h2></header>
         <div className="payment-method-grid">
           <button type="button" className={checkout.paymentMethod==='PAY_AT_STORE'?'active':''} onClick={()=>setCheckout({...checkout,paymentMethod:'PAY_AT_STORE',paymentChannelId:undefined,paymentChannelLabel:undefined,paymentEvidence:undefined})}><b>到店付款</b><span>取餐時再付款</span></button>
           <button type="button" className={checkout.paymentMethod==='ELECTRONIC'?'active':''} onClick={()=>setCheckout({...checkout,paymentMethod:'ELECTRONIC'})}><b>電子支付</b><span>使用店舖已發布付款方式</span></button>
         </div>
       </section>
       {checkout.paymentMethod==='ELECTRONIC'?<section className="ui4-checkout-card ui4-payment-evidence">
-        <header><span>ADMIN PUBLISHED</span><h2>電子支付</h2></header>
+        <header><span>電子支付</span><h2>電子支付</h2></header>
         <div className="payment-channel-grid" role="list" aria-label="電子支付渠道">{paymentChannels.map(channel=>{
           const active=checkout.paymentChannelId===channel.channelId;
           return <button type="button" key={channel.channelId} className={active?'active':''} onClick={()=>{
             const changed=checkout.paymentChannelId!==channel.channelId;
             setCheckout({...checkout,paymentMethod:'ELECTRONIC',paymentChannelId:channel.channelId,paymentChannelLabel:channel.label,...(changed?{paymentEvidence:undefined}:{})});
-          }}><b>{channel.label}</b><span>{channel.qrImageUrl?'已發布付款 QR':'付款 QR 待店舖發布'}</span></button>;
+          }}><b>{channel.label}</b><span>{channel.qrImageUrl?'查看付款碼':'付款碼暫未提供'}</span></button>;
         })}</div>
         {!paymentChannels.length?<p className="payment-channel-empty">店舖暫時未發布可用電子支付方式。</p>:null}
-        {selectedChannel?.qrImageUrl?<div className="ui4-payment-qr"><img src={selectedChannel.qrImageUrl} alt={selectedChannel.label+' 付款 QR'}/><small>{selectedChannel.label} · 店舖已發布付款 QR</small></div>:selectedChannel?<div className="ui4-payment-missing">付款 QR 待店舖發布；唔會顯示假付款碼。</div>:null}
+        {selectedChannel?.qrImageUrl?<div className="ui4-payment-qr"><img src={selectedChannel.qrImageUrl} alt={selectedChannel.label+' 付款 QR'}/><small>{selectedChannel.label} · 店舖查看付款碼</small></div>:selectedChannel?<div className="ui4-payment-missing">付款碼暫未提供，可以改用到店付款。</div>:null}
         <div className="payment-evidence">
-          <p>完成付款後，上傳今次付款截圖作核對證據。截圖本身唔會改寫付款真相。</p>
+          <p>完成付款後，上傳今次付款截圖畀店員核對。</p>
           <label className="evidence-picker"><span>{checkout.paymentEvidence?.fileName??'選擇付款截圖'}</span><input key={checkout.paymentEvidence?checkout.paymentEvidence.fileName+'-'+checkout.paymentEvidence.state:'empty'} type="file" accept="image/jpeg,image/png,image/webp" onChange={event=>{const file=event.target.files?.[0];if(file)onPaymentEvidence(file)}}/></label>
           {checkout.paymentEvidence?.state==='LOCAL_PENDING_UPLOAD'?<small>付款憑證正在上載…</small>:null}
-          {checkout.paymentEvidence?.state==='UPLOADED'?<div className="ui4-evidence-submitted" role="status"><strong>已提交付款憑證</strong><span>仍待 SMT / 店員正式核對。</span></div>:null}
+          {checkout.paymentEvidence?.state==='UPLOADED'?<div className="ui4-evidence-submitted" role="status"><strong>已提交付款憑證</strong><span>店員會再核對付款資料。</span></div>:null}
         </div>
       </section>:null}
       <div className="ui4-checkout-actions">
@@ -175,22 +182,22 @@ export function CheckoutUi4View({
 
     {step==='review'?<>
       <section className="ui4-checkout-card">
-        <header><span>STEP 4</span><h2>確認商品</h2></header>
+        <header><span>最後確認</span><h2>確認商品</h2></header>
         <CheckoutReviewLines cart={cart}/>
       </section>
       <section className="ui4-checkout-card ui4-review-identity">
         <header><span>聯絡與取餐</span><h2>{checkout.name.trim()||'未填稱呼'}</h2></header>
         <p>{checkout.phone||'未填電話'}</p>
         <div><span>取餐碼</span><strong>{pickupCode??'----'}</strong></div>
-        <small>取餐碼只係電話最後 4 位；唔會顯示任何內部識別碼。</small>
+        <small>取餐時出示呢個短碼即可。</small>
       </section>
       <section className="ui4-checkout-card">
         <header><span>付款</span><h2>{checkout.paymentMethod==='PAY_AT_STORE'?'到店付款':selectedChannel?.label??'電子支付資料待重新確認'}</h2></header>
-        {checkout.paymentMethod==='ELECTRONIC'?evidenceReady?<div className="ui4-evidence-submitted"><strong>已提交付款憑證</strong><span>仍待 SMT / 店員正式核對。</span></div>:<p>付款憑證未完成。</p>:<p>取餐時再付款。</p>}
+        {checkout.paymentMethod==='ELECTRONIC'?evidenceReady?<div className="ui4-evidence-submitted"><strong>已提交付款憑證</strong><span>店員會再核對付款資料。</span></div>:<p>付款憑證未完成。</p>:<p>取餐時再付款。</p>}
       </section>
       <section className={'ui4-review-quote '+(materialChange?'needs-attention':'')}>
-        <div><span>目前已發布總額</span><AnimatedValue as="strong">{quote?money(quote.currency,quote.totalMinor):'價格待同步'}</AnimatedValue></div>
-        <p>{quote?.freshness==='CURRENT'?'已按目前菜單資料重新核對；正式提交時 SMT 仍會再驗證。':'目前資料有變更，禁止靜默沿用舊價。'}</p>
+        <div><span>訂單總額</span><AnimatedValue as="strong">{quote?money(quote.currency,quote.totalMinor):'價格待同步'}</AnimatedValue></div>
+        <p>{quote?.freshness==='CURRENT'?'已按目前餐單重新確認。':'餐點或價格有更新，請先修正受影響項目。'}</p>
       </section>
       {materialChange?<section className="ui4-review-attention" role="alert">
         <span>需要修正</span><h2>{repairs.length?repairs.length+' 項餐點已更新':'餐點或價格有變更'}</h2>
@@ -200,7 +207,7 @@ export function CheckoutUi4View({
       <section className="ui4-review-confirm">
         <span>提交前確認</span>
         <h2>{reviewConfirmed?'資料已確認':'確認今次資料'}</h2>
-        <p>{reviewConfirmed?'正式安全提交同等待店舖回覆會由下一階段處理。':'呢個動作只確認 Review UI，唔會建立正式訂單、付款結果或者新提交身份。'}</p>
+        <p>{reviewConfirmed?'正式安全提交同等待店舖回覆會由下一階段處理。':'呢一步只係確認畫面資料，唔會立即建立正式訂單或付款結果。'}</p>
         <ActionButton wide disabled={!reviewReady||reviewConfirmed} onClick={()=>{setReviewConfirmed(true);onReviewConfirmed();}}>{reviewConfirmed?'已確認資料':'確認以上資料'}</ActionButton>
       </section>
       <div className="ui4-checkout-actions">

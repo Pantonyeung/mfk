@@ -64,7 +64,7 @@ test('UI3 required validation, unavailable choices and price readiness block Add
   assert.match(productSheet,/disabled=\{!choice\.available\|\|\(maxReached&&!active\)\}/);
   assert.match(productSheet,/disabled=\{disabled\}/);
   assert.match(productSheet,/disabled=\{!addReady\}/);
-  assert.match(productSheet,/價格待同步/);
+  assert.match(productSheet,/價格更新中/);
 });
 
 test('UI3 published preview exposes Combo base and canonical adjustments only',()=>{
@@ -73,8 +73,8 @@ test('UI3 published preview exposes Combo base and canonical adjustments only',(
   assert.match(productSheet,/choice\.publishedAdjustmentMinor/);
   assert.match(productSheet,/customerComboPublishedUnitMinor/);
   assert.match(productSheet,/customerStandalonePublishedUnitMinor/);
-  assert.match(productSheet,/已發布套餐基本價/);
-  assert.match(productSheet,/正式提交由 SMT 再核對/);
+  assert.match(productSheet,/套餐價會按你揀嘅內容更新/);
+  assert.match(productSheet,/結帳前會再確認餐單、價格同供應狀況/);
   assert.match(quote,/comboPublishedFactsChanged/);
 });
 

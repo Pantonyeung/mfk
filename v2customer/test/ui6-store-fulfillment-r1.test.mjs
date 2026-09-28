@@ -38,14 +38,14 @@ test('order null never falls back to RECEIVED and uses explicit readback states'
   assert.doesNotMatch(ui6,/isUi6Stage\(rawStage\)\?rawStage:'RECEIVED'/);
   assert.match(ui6,/const stage=order&&isUi6Stage\(order\.stage\)\?order\.stage:null/);
   assert.match(ui6,/state=\{unsupported\?'UNKNOWN':emptyStateFrom\(freshness\)\}/);
-  assert.match(ui6,/READBACK PENDING/);
-  assert.match(ui6,/未有 canonical state 就唔顯示任何 Fulfillment 進度/);
+  assert.match(ui6,/店舖狀態等待更新/);
+  assert.match(ui6,/未確認到新狀態之前/);
 });
 
 test('unsupported stage fails closed to UNKNOWN instead of RECEIVED',()=>{
   assert.match(ui6,/const unsupported=Boolean\(order&&!stage\)/);
   assert.match(ui6,/unsupported\?'UNKNOWN'/);
-  assert.match(ui6,/收到未支援或未確認狀態時會 fail-closed/);
+  assert.match(ui6,/暫時未能確認最新進度/);
 });
 
 test('LOADING EMPTY ERROR OFFLINE STALE UNKNOWN are deterministic and separate',()=>{
@@ -62,10 +62,10 @@ test('LOADING EMPTY ERROR OFFLINE STALE UNKNOWN are deterministic and separate',
 
 test('last-known canonical state can remain visible while freshness is not CURRENT',()=>{
   assert.match(ui6,/data-ui6-freshness=\{freshness\}/);
-  assert.match(ui6,/目前離線；以下係最近一次 canonical state/);
-  assert.match(ui6,/以下係最近一次 canonical state；最新狀態仍待讀回/);
-  assert.match(ui6,/同步暫時出錯；以下只保留最近一次 canonical state/);
-  assert.match(ui6,/只保留 last-known canonical state；唔會用連線狀態改寫 Fulfillment/);
+  assert.match(ui6,/目前離線；以下係最近一次已知進度/);
+  assert.match(ui6,/以下係最近一次已知進度；最新狀態仍在更新/);
+  assert.match(ui6,/更新暫時出錯；以下保留最近一次已知進度/);
+  assert.match(ui6,/目前先顯示最近一次已知進度/);
 });
 
 test('COMPLETED deep-link leaves UI6 waiting route and never renders waiting confirmation',()=>{
@@ -80,16 +80,16 @@ test('COMPLETED deep-link leaves UI6 waiting route and never renders waiting con
 test('UI6 keeps Display Number, Pickup Code and Order ID semantics separate without showing the internal value',()=>{
   assert.match(ui6,/>流水號</);
   assert.match(ui6,/>取餐碼</);
-  assert.match(ui6,/Order ID 只留系統內部關聯/);
-  assert.match(ui6,/唔會顯示實際值或 UUID/);
+  assert.match(ui6,/流水號同取餐碼用途不同/);
+  assert.match(ui6,/到店取餐跟畫面提示出示即可/);
   assert.doesNotMatch(ui6,/\{order\??\.orderId\}/);
   assert.doesNotMatch(ui6,/\{intent\??\.canonicalOrderId\}/);
 });
 
 test('UI6 never implements UI7 pickup completion',()=>{
   assert.doesNotMatch(ui6,/PICKUP_VERIFICATION|HANDED_OVER|data-ui7|onHandover|onComplete/);
-  assert.match(ui6,/Ready ≠ Completed/);
-  assert.match(ui6,/UI6 冇「完成交收」操作/);
+  assert.match(ui6,/可取餐唔代表已交收/);
+  assert.match(ui6,/真正交畀你之後先會完成/);
 });
 
 test('Delay and ETA are canonical pass-through only, not a client timer invention',()=>{
@@ -107,9 +107,9 @@ test('reject and cancel remain separate canonical projections',()=>{
 });
 
 test('manual refresh and weak-network recovery are read only and cannot resubmit',()=>{
-  assert.match(ui6,/只讀 Refresh/);
-  assert.match(ui6,/只查 canonical Status/);
-  assert.match(ui6,/恢復連線後只會重新讀回/);
+  assert.match(ui6,/重新整理/);
+  assert.match(ui6,/只會更新訂單進度/);
+  assert.match(ui6,/恢復連線後會重新更新訂單進度/);
   assert.equal((cloud.match(/async readSnapshot\(\)/g)||[]).length,1);
   assert.doesNotMatch(ui6,/onSubmit|readSubmission|createCustomerPendingIntent/);
 });

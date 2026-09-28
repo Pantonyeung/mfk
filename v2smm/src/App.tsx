@@ -32,6 +32,9 @@ import {
 import {Stage5SubmitView,type SmmStage5Session} from './Stage5Submit';
 import {Stage6QueueView} from './Stage6Queue';
 import {Stage7OrdersView} from './Stage7Orders';
+import {Stage8DineView} from './Stage8Dine';
+import {Stage9MoreView,type Stage9Tool} from './Stage9More';
+import {StageXState} from './StageXState';
 import {smmStage5ConfirmedDisplayCode,smmStage5RepairPath,smmStage5SubmissionShortRef} from './stage5-submit.mjs';
 import './stage1.css';
 import './stage2.css';
@@ -40,6 +43,9 @@ import './stage4.css';
 import './stage5.css';
 import './stage6.css';
 import './stage7.css';
+import './stage8.css';
+import './stage9.css';
+import './stagex.css';
 import type {
   SmmCartLine,
   SmmConnectionState,
@@ -121,7 +127,7 @@ export function App(){
     });
   });
   const [search,setSearch]=useState('');
-  const [moreTool,setMoreTool]=useState<'staff'|'connection'|'channels'|'business'|'printing'|'diagnostics'|'sellability'|'pending'|'capacity'|'reporting'|'refunds'|null>(null);
+  const [moreTool,setMoreTool]=useState<Stage9Tool|null>(null);
   const [dineTable,setDineTable]=useState('');
   const [dineCovers,setDineCovers]=useState(2);
   const [diningTarget,setDiningTarget]=useState<SmmDiningTarget|null>(initial.preferences.diningTarget);
@@ -726,8 +732,11 @@ export function App(){
 
     {notice?<div className="notice" role="status"><span>{notice}</span><button onClick={()=>setNotice(null)}>收起</button></div>:null}
     {webSmtAcceptance?<section className="recovery-banner"><strong>Web SMT 驗收模式</strong><span>呢個頁面只會將測試訂單送到臨時公網 SMT；唔會送去舖頭實機、唔會觸發實體打印。</span></section>:null}
-    {error?<section className="recovery-banner degraded"><strong>門店資料同步失敗</strong><span>{error}</span><button onClick={()=>void refresh()}>再試一次</button></section>:null}
-    {connection==='NOT_CONNECTED'?<section className="recovery-banner offline"><strong>尚未連接門店服務</strong><span>本機草稿同操作偏好可以使用；正式餐單、報價、訂單同營運狀態會保持空白，唔會顯示假資料。</span></section>:null}
+    {error?<StageXState compact kind="ERROR" title="門店資料暫時未能更新" detail={error} primaryLabel="再試一次" onPrimary={()=>void refresh()}/>:null}
+    {connection==='NOT_CONNECTED'?<StageXState compact kind="OFFLINE" title="尚未連接門店服務" detail="本機草稿會保留；連線後再載入餐單、訂單同營運資料。"/>:null}
+    {connection==='STALE'?<StageXState compact kind="STALE" onPrimary={()=>void refresh()}/>:null}
+    {connection==='PARTIAL'?<StageXState compact kind="PARTIAL" onPrimary={()=>void refresh()}/>:null}
+    {connection==='UNKNOWN'?<StageXState compact kind="UNKNOWN" primaryLabel="重新確認" onPrimary={()=>void refresh()}/>:null}
 
     <section className="stage">
       {view==='order'?<OrderView
@@ -746,49 +755,56 @@ export function App(){
       />:null}
       {view==='work'?<Stage6QueueView connection={connection} items={snapshot?.work??[]} orders={snapshot?.orders??[]} onRefresh={refresh}/>:null}
       {view==='orders'?<Stage7OrdersView connection={connection} rows={snapshot?.orders??[]} onRefresh={refresh}/>:null}
-      {view==='dine'?<DineView
+      {view==='dine'?<Stage8DineView
         connection={connection}
         sessions={snapshot?.dineSessions??[]}
         tables={snapshot?.diningTables??[]}
-        table={dineTable}
-        covers={dineCovers}
-        setTable={setDineTable}
-        setCovers={setDineCovers}
-        onCreate={()=>{
-          const selected=(snapshot?.diningTables??[]).find(row=>row.tableId===dineTable);
-          if(!selected){setNotice('請先選擇 Admin 已發布嘅枱號。');return}
-          const target:SmmDiningTarget={kind:'TABLE',tableId:selected.tableId,covers:dineCovers};
+        onRefresh={refresh}
+        onStartOrder={(selected,covers)=>{
+          setDineTable(selected.tableId);
+          setDineCovers(covers);
+          const target:SmmDiningTarget={kind:'TABLE',tableId:selected.tableId,covers};
           changeServiceMode('DINE_IN');
           changeDiningTarget(target);
           setDiningTargetOpen(false);
-          setNotice('已選 '+selected.label+'；加入商品後提交，SMT 會自動開枱／加單。');
+          setNotice('已選 '+selected.label+'；加入商品後可以送去收銀機處理。');
           changeView('order');
         }}
-        onWait={()=>{
+        onStartWaiting={covers=>{
+          setDineCovers(covers);
           changeServiceMode('DINE_IN');
-          changeDiningTarget({kind:'WAITING',covers:dineCovers});
+          changeDiningTarget({kind:'WAITING',covers});
           setDiningTargetOpen(false);
-          setNotice('已選輪候；加入商品後提交會先進堂食輪候。');
+          setNotice('已記低輪候人數；完成點單後會交畀收銀機處理。');
           changeView('order');
         }}
       />:null}
-      {view==='more'?<MoreView
-        connection={connection}
+      {view==='more'?<Stage9MoreView
         tool={moreTool}
         setTool={setMoreTool}
-        snapshot={snapshot}
-        staffSession={staffSession}
-        onStaffSession={setStaffSession}
-        pendingIntents={pendingIntents}
-        onReadback={intent=>void readbackIntent(intent)}
-        onDiscard={removeIntent}
-        onSellability={async(productId,available)=>{
-          if(!port?.setSellability){setNotice('商品供應控制尚未連接；冇更改任何正式狀態。');return}
-          const result=await port.setSellability({productId,available,operationId:crypto.randomUUID()});
-          setNotice(result.message);
-          if(result.state==='CONFIRMED')void refresh();
+        statuses={{
+          staff:staffSession?.displayName??'未登入',
+          connection:snapshot?.connectionPath==='LAN'?'LAN':snapshot?.connectionPath==='INTERNET'?'Internet':connectionLabelShort(connection),
+          channels:snapshot?.channels?.length?snapshot.channels.length+' 條渠道':'未有資料',
+          business:snapshot?.businessDay?.businessDate??'未有資料',
+          printing:snapshot?.printHealth?.length?snapshot.printHealth.length+' 部設備':'未有資料',
+          capacity:capacityLabel(snapshot?.capacity?.state),
+          reporting:reportingFreshnessLabel(snapshot?.reporting?.freshness),
+          refunds:snapshot?.refundRequests?.length?snapshot.refundRequests.length+' 項待跟進':'目前冇待跟進',
+          diagnostics:connectionLabelShort(connection),
         }}
-      />:null}
+      >
+        {moreTool==='staff'?<StaffLogin session={staffSession} onSession={setStaffSession}/>:
+         moreTool==='connection'?<ConnectionSettings snapshot={snapshot}/>:
+         moreTool==='pending'?<PendingIntents intents={pendingIntents} onReadback={intent=>void readbackIntent(intent)} onDiscard={removeIntent}/>:
+         moreTool==='channels'?<ChannelList connection={connection} channels={snapshot?.channels??[]}/>:
+         moreTool==='business'?<BusinessDay projection={snapshot?.businessDay}/>:
+         moreTool==='capacity'?<Capacity projection={snapshot?.capacity}/>:
+         moreTool==='reporting'?<Reporting projection={snapshot?.reporting}/>:
+         moreTool==='refunds'?<RefundRequests connection={connection} rows={snapshot?.refundRequests??[]}/>:
+         moreTool==='printing'?<PrintHealth connection={connection} rows={snapshot?.printHealth??[]}/>:
+         moreTool==='diagnostics'?<Diagnostics connection={connection} snapshot={snapshot} pendingCount={pendingIntents.length}/>:null}
+      </Stage9MoreView>:null}
     </section>
 
     <nav className="bottom-nav" aria-label="主要功能">
@@ -942,73 +958,11 @@ function OrderView({connection,categories,activeCategoryId,setCategory,search,se
   </section>;
 }
 
-function DineView({connection,sessions,tables,table,covers,setTable,setCovers,onCreate,onWait}:{
-  connection:SmmConnectionState;
-  sessions:NonNullable<SmmReadModelSnapshot['dineSessions']>;
-  tables:NonNullable<SmmReadModelSnapshot['diningTables']>;
-  table:string;
-  covers:number;
-  setTable:(v:string)=>void;
-  setCovers:(v:number)=>void;
-  onCreate:()=>void;
-  onWait:()=>void;
-}){
-  return <section className="page">
-    <header className="hero"><div><span>堂食</span><h1>桌面管理</h1><small>揀枱／輪候後去點單；第一張堂食單由 SMT 開枱，已有枱就直接加單。</small></div></header>
-    <article className="panel"><h2>開新桌</h2><div className="option-group"><div><strong>揀枱</strong><span>由 Admin 發佈</span></div>{tables.length?<div className="option-list">{tables.map(row=><button key={row.tableId} className={table===row.tableId?'active':''} onClick={()=>setTable(row.tableId)}>{row.label}</button>)}</div>:<p className="callout">Admin 尚未發布任何可用枱號。</p>}</div><div className="field-grid"><label>人數<input type="number" min={1} max={30} value={covers} onChange={e=>setCovers(Math.max(1,Number(e.target.value)||1))}/></label></div><div className="row-actions"><button className="primary" disabled={connection!=='READY'||!table} onClick={onCreate}>{connection==='READY'?'揀枱開始點單':'門店服務未連接'}</button><button disabled={connection!=='READY'} onClick={onWait}>加入輪候後點單</button></div></article>
-    {!sessions.length?<EmptyState title={connection==='NOT_CONNECTED'?'堂食服務尚未連接':'目前冇開啟中桌面'} detail={connection==='NOT_CONNECTED'?'連接後會顯示正式桌面、客數同狀態。':'可以喺上面建立新桌面。'}/>:
-    <div className="cards">{sessions.map(session=><article className="dine-card" key={session.sessionId}><div><small>{new Date(session.openedAt).toLocaleTimeString('zh-HK')}</small><h2>{session.tableLabel}</h2><span>{session.covers} 位 · {session.state}</span>{session.itemSummary?<p>{session.itemSummary}</p>:null}</div>{session.lines?.length?<div className="timeline">{session.lines.map(line=><div key={line.lineIndex}><b>{line.name}</b><span>{line.qty} 件 · 已結 {line.paidQty} · 未結 {line.remainingQty}</span><small>{money('HKD',line.unitMinor)}</small></div>)}</div>:null}{Number.isFinite(Number(session.totalMinor))?<div className="order-meta"><span>總額 {money('HKD',Number(session.totalMinor))}</span><span>已結 {money('HKD',Number(session.paidMinor??0))}</span><b>未結 {money('HKD',Number(session.remainingMinor??0))}</b></div>:null}</article>)}</div>}
-  </section>;
-}
-
-function MoreView({connection,tool,setTool,snapshot,staffSession,onStaffSession,pendingIntents,onReadback,onDiscard,onSellability}:{
-  connection:SmmConnectionState;
-  tool:'staff'|'connection'|'channels'|'business'|'printing'|'diagnostics'|'sellability'|'pending'|'capacity'|'reporting'|'refunds'|null;
-  setTool:(v:'staff'|'connection'|'channels'|'business'|'printing'|'diagnostics'|'sellability'|'pending'|'capacity'|'reporting'|'refunds'|null)=>void;
-  snapshot:SmmReadModelSnapshot|null;
-  staffSession:SmmStaffSession|null;
-  onStaffSession:(session:SmmStaffSession|null)=>void;
-  pendingIntents:readonly SmmPendingIntent[];
-  onReadback:(intent:SmmPendingIntent)=>void;
-  onDiscard:(submissionId:string)=>void;
-  onSellability:(productId:string,available:boolean)=>void;
-}){
-  return <section className="page">
-    <header className="hero"><div><span>更多</span><h1>店務工具</h1><small>只顯示已知資料；未連接嘅功能會保持未連接。</small></div></header>
-    <div className="tool-grid">
-      <Tool title="員工帳戶" detail="同 SMT 共用同一員工身份" state={staffSession?.displayName??'未登入'} onClick={()=>setTool('staff')}/>
-      <Tool title="連線設定" detail="Internet / LAN 配對" state={snapshot?.connectionPath==='LAN'?'LAN':snapshot?.connectionPath==='INTERNET'?'Internet':'未連接'} onClick={()=>setTool('connection')}/>
-      <Tool title="待提交草稿" detail={`${pendingIntents.length} 個本機草稿`} state={pendingIntents.length?'需處理':'正常'} onClick={()=>setTool('pending')}/>
-      <Tool title="平台狀態" detail="平台連線同資料新鮮度" state={snapshot?.channels?.length?String(snapshot.channels.length):'未連接'} onClick={()=>setTool('channels')}/>
-      <Tool title="商品供應" detail="售罄／恢復操作入口" state={connection==='READY'?'可用':'未連接'} onClick={()=>setTool('sellability')}/>
-      <Tool title="營業日" detail="只作記錄同報表分類" state={snapshot?.businessDay?.businessDate??'未連接'} onClick={()=>setTool('business')}/>
-      <Tool title="產能" detail="只讀門店產能狀態" state={snapshot?.capacity?.state??'未連接'} onClick={()=>setTool('capacity')}/>
-      <Tool title="營運報表" detail="當日訂單／營業額／平均單" state={snapshot?.reporting?.freshness??'未連接'} onClick={()=>setTool('reporting')}/>
-      <Tool title="退款要求" detail="只讀退款／售後跟進" state={snapshot?.refundRequests?.length?String(snapshot.refundRequests.length):'未連接'} onClick={()=>setTool('refunds')}/>
-      <Tool title="列印狀態" detail="只讀設備健康" state={snapshot?.printHealth?.length?String(snapshot.printHealth.length):'未連接'} onClick={()=>setTool('printing')}/>
-      <Tool title="診斷" detail="連線、資料版本、本機草稿" state={connectionLabelShort(connection)} onClick={()=>setTool('diagnostics')}/>
-    </div>
-    {tool?<div className="drawer"><div className="drawer-head"><strong>{moreTitle(tool)}</strong><button onClick={()=>setTool(null)}>關閉</button></div>
-      {tool==='staff'?<StaffLogin session={staffSession} onSession={onStaffSession}/>:
-       tool==='connection'?<ConnectionSettings snapshot={snapshot}/>:
-       tool==='pending'?<PendingIntents intents={pendingIntents} onReadback={onReadback} onDiscard={onDiscard}/>:
-       tool==='channels'?<ChannelList connection={connection} channels={snapshot?.channels??[]}/>:
-       tool==='business'?<BusinessDay projection={snapshot?.businessDay}/>:
-       tool==='capacity'?<Capacity projection={snapshot?.capacity}/>:
-       tool==='reporting'?<Reporting projection={snapshot?.reporting}/>:
-       tool==='refunds'?<RefundRequests connection={connection} rows={snapshot?.refundRequests??[]}/>:
-       tool==='printing'?<PrintHealth connection={connection} rows={snapshot?.printHealth??[]}/>:
-       tool==='sellability'?<Sellability connection={connection} products={snapshot?.menu?.products??[]} onChange={onSellability}/>:
-       <Diagnostics connection={connection} snapshot={snapshot} pendingCount={pendingIntents.length}/>}
-    </div>:null}
-  </section>;
-}
-
 function StaffLogin({session,onSession}:{session:SmmStaffSession|null;onSession:(session:SmmStaffSession|null)=>void}){
   const [staff,setStaff]=useState<readonly SmmStaffDirectoryItem[]>([]);
   const [staffId,setStaffId]=useState(session?.staffId??'');
   const [pin,setPin]=useState('');
-  const [state,setState]=useState(session?'已登入：'+session.displayName:'使用同 SMT 一樣嘅員工帳戶同 PIN；首次喺呢部手機登入後會保持登入。');
+  const [state,setState]=useState(session?'已登入：'+session.displayName:'使用店舖員工帳戶同 PIN；首次喺呢部手機登入後會保持登入。');
   const [busy,setBusy]=useState(false);
 
   useEffect(()=>{
@@ -1021,7 +975,7 @@ function StaffLogin({session,onSession}:{session:SmmStaffSession|null;onSession:
     return()=>{cancelled=true};
   },[]);
 
-  if(session)return <section className="panel staff-login"><h2>{session.displayName}</h2><p>{session.role} · 呢部手機已使用同 SMT 共用嘅員工帳戶。離開收銀機去其他位置工作都會保持呢個帳戶；停用員工時會失效。</p><button className="danger" onClick={()=>{clearSmmStaffSession();onSession(null);setState('已登出。');}}>登出／切換帳戶</button></section>;
+  if(session)return <section className="panel staff-login"><h2>{session.displayName}</h2><p>{session.role} · 呢部手機已登入店舖員工帳戶；切換員工時請先登出。</p><button className="danger" onClick={()=>{clearSmmStaffSession();onSession(null);setState('已登出。');}}>登出／切換帳戶</button></section>;
 
   return <section className="panel staff-login"><p>{state}</p>
     <label>員工帳戶<select value={staffId} onChange={e=>setStaffId(e.target.value)}><option value="" disabled>{staff.length?'請選擇帳戶':'未有可用帳戶'}</option>{staff.map(item=><option key={item.staffId} value={item.staffId}>{item.loginId?item.loginId+' · ':''}{item.displayName} · {item.role}</option>)}</select></label>
@@ -1046,38 +1000,33 @@ function PendingIntents({intents,onReadback,onDiscard}:{intents:readonly SmmPend
 }
 
 function ChannelList({connection,channels}:{connection:SmmConnectionState;channels:NonNullable<SmmReadModelSnapshot['channels']>}){
-  if(!channels.length)return <EmptyState title={connection==='NOT_CONNECTED'?'平台狀態尚未連接':'暫時冇平台狀態'} detail="系統唔會用假嘅已連線標記代替正式讀回。"/>;
-  return <>{channels.map(item=><div className="list-row" key={item.channel}><div><strong>{item.channel}</strong><small>{item.detail}</small></div><span className={`status ${item.state==='CONNECTED'?'positive':item.state==='UNKNOWN'?'unknown':'warning'}`}>{item.state}</span></div>)}</>;
+  if(!channels.length)return <EmptyState title={connection==='NOT_CONNECTED'?'平台狀態尚未連接':'暫時冇平台狀態'} detail="未有最新資料時會清楚標示，唔會假裝渠道正常。"/>;
+  return <>{channels.map(item=><div className="list-row" key={item.channel}><div><strong>{item.channel}</strong><small>{item.detail}</small></div><span className={`status ${item.state==='CONNECTED'?'positive':item.state==='UNKNOWN'?'unknown':'warning'}`}>{channelStateLabel(item.state)}</span></div>)}</>;
 }
 
 function BusinessDay({projection}:{projection:SmmReadModelSnapshot['businessDay']}){
-  if(!projection)return <EmptyState title="營業日資料尚未連接" detail="營業日只作記錄同報表分類，永遠唔會阻止落單、付款或者本機提交。"/>;
-  return <><div className="metric-grid"><Metric label="營業日" value={projection.businessDate}/><Metric label="狀態" value={projection.state}/><Metric label="讀取時間" value={new Date(projection.observedAt).toLocaleString('zh-HK')}/></div><p className="callout">營業日只作記錄及分類，唔係交易開關。</p></>;
+  if(!projection)return <EmptyState title="營業日資料尚未連接" detail="連接後會顯示今日營業日記錄。"/>;
+  return <><div className="metric-grid"><Metric label="營業日" value={projection.businessDate}/><Metric label="狀態" value={businessDayStateLabel(projection.state)}/><Metric label="讀取時間" value={new Date(projection.observedAt).toLocaleString('zh-HK')}/></div><p className="callout">營業日用作當日記錄同報表分類。</p></>;
 }
 
 function Capacity({projection}:{projection:SmmReadModelSnapshot['capacity']}){
   if(!projection)return <EmptyState title="產能資料尚未連接" detail="連接後會顯示正式產能狀態；SMM 唔會自行判斷門店忙閒。"/>;
-  return <><div className="metric-grid"><Metric label="狀態" value={projection.state}/><Metric label="門店提示" value={projection.label}/></div><p className="callout">{projection.detail}</p><small>讀取：{new Date(projection.observedAt).toLocaleString('zh-HK')}</small></>;
+  return <><div className="metric-grid"><Metric label="狀態" value={capacityLabel(projection.state)}/><Metric label="門店提示" value={projection.label}/></div><p className="callout">{projection.detail}</p><small>讀取：{new Date(projection.observedAt).toLocaleString('zh-HK')}</small></>;
 }
 
 function Reporting({projection}:{projection:SmmReadModelSnapshot['reporting']}){
   if(!projection)return <EmptyState title="營運報表尚未連接" detail="未連接時唔會顯示假營業額、假訂單數或者假平均單。"/>;
-  return <><div className="metric-grid"><Metric label="營業日" value={projection.businessDate}/><Metric label="訂單" value={String(projection.orderCount)}/><Metric label="營業額" value={projection.salesLabel}/><Metric label="平均單" value={projection.averageOrderLabel}/></div><p className="callout">資料狀態：{projection.freshness} · {new Date(projection.observedAt).toLocaleString('zh-HK')}</p></>;
+  return <><div className="metric-grid"><Metric label="營業日" value={projection.businessDate}/><Metric label="訂單" value={String(projection.orderCount)}/><Metric label="營業額" value={projection.salesLabel}/><Metric label="平均單" value={projection.averageOrderLabel}/></div><p className="callout">資料狀態：{reportingFreshnessLabel(projection.freshness)} · {new Date(projection.observedAt).toLocaleString('zh-HK')}</p></>;
 }
 
 function RefundRequests({connection,rows}:{connection:SmmConnectionState;rows:NonNullable<SmmReadModelSnapshot['refundRequests']>}){
-  if(!rows.length)return <EmptyState title={connection==='NOT_CONNECTED'?'退款要求尚未連接':'暫時冇退款要求'} detail="SMM 只顯示退款／售後跟進資料，唔持有退款或付款主權。"/>;
-  return <>{rows.map(row=><div className="list-row" key={row.refundId}><div><strong>{row.displayCode} · {row.source}</strong><small>{row.reason}{row.amountLabel?` · ${row.amountLabel}`:''}</small></div><span className={`status ${row.state==='UNKNOWN'?'unknown':row.state==='RESOLVED'?'positive':'warning'}`}>{row.state}</span></div>)}</>;
+  if(!rows.length)return <EmptyState title={connection==='NOT_CONNECTED'?'退款要求尚未連接':'暫時冇退款要求'} detail="有退款或售後事項時會喺呢度顯示，實際處理請按店舖流程完成。"/>;
+  return <>{rows.map(row=><div className="list-row" key={row.refundId}><div><strong>{row.displayCode} · {row.source}</strong><small>{row.reason}{row.amountLabel?` · ${row.amountLabel}`:''}</small></div><span className={`status ${row.state==='UNKNOWN'?'unknown':row.state==='RESOLVED'?'positive':'warning'}`}>{refundStateLabel(row.state)}</span></div>)}</>;
 }
 
 function PrintHealth({connection,rows}:{connection:SmmConnectionState;rows:NonNullable<SmmReadModelSnapshot['printHealth']>}){
-  if(!rows.length)return <EmptyState title={connection==='NOT_CONNECTED'?'列印狀態尚未連接':'暫時冇列印設備資料'} detail="SMM 只顯示狀態；實體列印同重印權限唔屬於呢個端口。"/>;
-  return <>{rows.map(row=><div className="list-row" key={row.logicalPrinterId}><div><strong>{row.label}</strong><small>{row.detail}</small></div><span className={`status ${row.state==='READY'?'positive':row.state==='UNKNOWN'?'unknown':'warning'}`}>{row.state}</span></div>)}</>;
-}
-
-function Sellability({connection,products,onChange}:{connection:SmmConnectionState;products:readonly SmmProduct[];onChange:(id:string,available:boolean)=>void}){
-  if(!products.length)return <EmptyState title={connection==='NOT_CONNECTED'?'商品供應服務尚未連接':'暫時冇商品'} detail="正式供應狀態必須由門店權威資料提供。"/>;
-  return <>{products.map(product=><div className="list-row" key={product.productId}><div><strong>{product.name}</strong><small>{product.available?'供應中':'暫停供應'}</small></div><button onClick={()=>onChange(product.productId,!product.available)}>{product.available?'標記售罄':'恢復供應'}</button></div>)}</>;
+  if(!rows.length)return <EmptyState title={connection==='NOT_CONNECTED'?'列印狀態尚未連接':'暫時冇列印設備資料'} detail="呢度只顯示設備健康；需要重印或維修時請到指定工作位置處理。"/>;
+  return <>{rows.map(row=><div className="list-row" key={row.logicalPrinterId}><div><strong>{row.label}</strong><small>{row.detail}</small></div><span className={`status ${row.state==='READY'?'positive':row.state==='UNKNOWN'?'unknown':'warning'}`}>{printStateLabel(row.state)}</span></div>)}</>;
 }
 
 function Diagnostics({connection,snapshot,pendingCount}:{connection:SmmConnectionState;snapshot:SmmReadModelSnapshot|null;pendingCount:number}){
@@ -1644,7 +1593,6 @@ function LanSetup({onReady}:{onReady:()=>void}){
 function EmptyState({title,detail,children}:{title:string;detail:string;children?:React.ReactNode}){
   return <section className="panel empty-state"><h2>{title}</h2><p>{detail}</p>{children}</section>;
 }
-function Tool({title,detail,state,onClick}:{title:string;detail:string;state:string;onClick:()=>void}){return <button className="tool-card" onClick={onClick}><span>◆</span><strong>{title}</strong><small>{detail}</small><em>{state}</em></button>}
 function Metric({label,value}:{label:string;value:string}){return <div><small>{label}</small><strong>{value}</strong></div>}
 function NavGlyph({label}:{label:string}){
   const common={viewBox:'0 0 24 24',width:22,height:22,fill:'none',stroke:'currentColor',strokeWidth:1.8,strokeLinecap:'round' as const,strokeLinejoin:'round' as const,'aria-hidden':true};
@@ -1656,5 +1604,11 @@ function NavGlyph({label}:{label:string}){
 }
 function NavButton({active,label,badge,onClick}:{active:boolean;label:string;badge?:string;onClick:()=>void}){return <button className={active?'active':''} onClick={onClick}><span className="nav-glyph"><NavGlyph label={label}/></span><small>{label}</small>{badge?<b>{badge}</b>:null}</button>}
 
+function channelStateLabel(state:string){return state==='CONNECTED'?'正常':state==='STALE'?'資料稍舊':state==='DEGRADED'?'部分異常':state==='OFFLINE'?'離線':'狀態未明'}
+function businessDayStateLabel(state:string|undefined){return state==='OPEN'?'營業中':state==='CLOSED'?'已收舖':state==='STALE'?'資料稍舊':state==='UNKNOWN'?'狀態未明':state||'未有資料'}
+function capacityLabel(state:string|undefined){return state==='NORMAL'?'正常':state==='BUSY'?'繁忙':state==='PAUSED'?'已暫停':state==='UNKNOWN'?'狀態未明':'未有資料'}
+function reportingFreshnessLabel(state:string|undefined){return state==='CURRENT'?'已更新':state==='STALE'?'資料稍舊':state==='UNKNOWN'?'狀態未明':'未有資料'}
+function refundStateLabel(state:string){return state==='PENDING'?'待處理':state==='REVIEWING'?'跟進中':state==='RESOLVED'?'已完成':'狀態未明'}
+function printStateLabel(state:string){return state==='READY'?'正常':state==='UNKNOWN'?'狀態未明':'需要留意'}
+
 function connectionLabelShort(state:SmmConnectionState){return state==='READY'?'已連接':state==='LOADING'?'同步中':state==='ERROR'?'錯誤':state==='STALE'?'資料稍舊':state==='PARTIAL'?'部分資料':state==='UNKNOWN'?'未知':'未連接'}
-function moreTitle(tool:string){return tool==='staff'?'員工帳戶':tool==='connection'?'連線設定':tool==='pending'?'待提交草稿':tool==='channels'?'平台狀態':tool==='business'?'營業日':tool==='capacity'?'產能':tool==='reporting'?'營運報表':tool==='refunds'?'退款要求':tool==='printing'?'列印狀態':tool==='sellability'?'商品供應':'診斷'}

@@ -1,5 +1,6 @@
 import {useMemo,useState} from 'react';
 import type {SmmConnectionState,SmmOrderProjection} from './product-types';
+import {StageXState,type SmmStageXKind} from './StageXState';
 import {
   smmStage7AmountLabel,
   smmStage7ConnectionState,
@@ -88,19 +89,15 @@ function sourceFilterCount(rows:readonly SmmOrderProjection[],filter:SmmStage7So
 function Stage7StateBanner({connection,hasRows}:{connection:SmmConnectionState;hasRows:boolean}){
   const state=smmStage7ConnectionState(connection,hasRows);
   if(!state)return null;
-  const icon=state.kind==='LOADING'?'◌':state.kind==='OFFLINE'?'⌁':state.kind==='STALE'?'◷':state.kind==='PARTIAL'?'◫':state.kind==='UNKNOWN'?'?':'!';
-  return <section className={`stage7-state stage7-state-${state.kind.toLowerCase()}`} data-stage7-shared-state={state.kind} role="status">
-    <span aria-hidden="true">{icon}</span>
-    <div><strong>{state.title}</strong><small>{state.detail}</small></div>
-  </section>;
+  return <StageXState compact kind={state.kind as SmmStageXKind} title={state.title} detail={state.detail}/>;
 }
 
 function Stage7Empty({segment}:{segment:SmmStage7Segment}){
-  return <section className="stage7-empty" data-stage7-empty="true">
-    <span className="stage7-empty-icon" aria-hidden="true">▣</span>
-    <h2>{segment==='ACTIVE'?'暫時沒有進行中訂單':'暫時沒有歷史訂單'}</h2>
-    <p>{segment==='ACTIVE'?'正式訂單出現後會按目前 canonical 狀態顯示。':'完成或取消訂單會保留做只讀歷史記錄。'}</p>
-  </section>;
+  return <StageXState
+    kind="EMPTY"
+    title={segment==='ACTIVE'?'暫時沒有進行中訂單':'暫時沒有歷史訂單'}
+    detail={segment==='ACTIVE'?'有新正式訂單時會按目前狀態顯示。':'完成或取消訂單會保留喺歷史記錄。'}
+  />;
 }
 
 function Stage7Card({row,onOpen}:{row:SmmOrderProjection;onOpen:()=>void}){
@@ -109,7 +106,7 @@ function Stage7Card({row,onOpen}:{row:SmmOrderProjection;onOpen:()=>void}){
   const source=sourceLabel(row);
   const time=smmStage7OrderTime(row);
   return <button type="button" className="stage7-card" onClick={onOpen}>
-    <span className={`stage7-source-icon stage7-source-${smmStage7SourceGroup(row).toLowerCase()}`}>{source.slice(0,4)}</span>
+    <span className={`stage7-source-icon stage7-source-${smmStage7SourceGroup(row).toLowerCase()}`} data-final-art-pending={`STAGE7_SOURCE_${smmStage7SourceGroup(row)}`} aria-hidden="true"><span className="stage7-source-art"/></span>
     <span className="stage7-card-main">
       <span><strong>{row.displayCode||'未有資料'}</strong><small>{source}</small></span>
       <small>{timeLabel(time)} · {count===null?'項目數未有資料':`${count} 項`} · {smmStage7AmountLabel(row)}</small>
@@ -160,9 +157,9 @@ function Stage7Search({
         onClick={()=>setScope(value)}
       >{label}{value==='PHONE'&&!phoneAvailable?<small>未有資料</small>:null}</button>)}
     </div>
-    {!query.trim()?<section className="stage7-search-hint"><strong>輸入搜尋內容</strong><span>只會比對 Display Number、canonical 商品名稱，以及已獲允許嘅 canonical 電話。</span></section>:
+    {!query.trim()?<section className="stage7-search-hint"><strong>輸入搜尋內容</strong><span>只會比對訂單編號、商品名稱，以及系統可用嘅電話資料。</span></section>:
       results.length?<div className="stage7-list">{results.map(row=><Stage7Card key={row.orderId} row={row} onOpen={()=>onOpen(row)}/>)}</div>:
-      <section className="stage7-search-hint"><strong>找不到訂單</strong><span>系統唔會用內部 Order ID 或不存在嘅電話做搜尋結果。</span></section>}
+      <section className="stage7-search-hint"><strong>找不到訂單</strong><span>只會用目前可搜尋嘅訂單資料提供結果。</span></section>}
   </section>;
 }
 
@@ -195,7 +192,7 @@ function Stage7Detail({
     return <section className="stage7-status-screen" data-stage7-visual="7.5_STATUS">
       <header className="stage7-subheader">
         <button type="button" onClick={onBack} aria-label="返回訂單詳情">‹</button>
-        <strong>更新訂單狀態</strong>
+        <strong>訂單狀態</strong>
         <span/>
       </header>
       <section className="stage7-status-order">
@@ -205,19 +202,19 @@ function Stage7Detail({
       <section className="stage7-status-options">
         {STATUS_OPTIONS.map(option=><label key={option} className={status===option?'current':''}>
           <input type="radio" disabled checked={status===option} readOnly/>
-          <span><strong>{option}</strong><small>{status===option?'目前 canonical 狀態':'此操作需由 SMT 處理'}</small></span>
+          <span><strong>{option}</strong><small>{status===option?'目前狀態':'請在收銀機處理'}</small></span>
         </label>)}
       </section>
       <label className="stage7-disabled-note">
         <span>備註（選填）</span>
         <textarea disabled placeholder="此操作需由 SMT 處理"/>
       </label>
-      <p className="stage7-authority-note">FULFILLMENT_COMMAND / CANCEL_COMMAND 目前未連接。此畫面只可重新讀取 SMT 已處理後嘅 canonical 狀態。</p>
+      <p className="stage7-authority-note">呢部手機目前只可查看同重新整理狀態。需要更改或取消訂單，請在收銀機處理。</p>
       <footer className="stage7-status-footer">
         <button type="button" onClick={onBack}>取消</button>
         <button type="button" className="primary" disabled>確認更新</button>
         <small>此操作需由 SMT 處理</small>
-        <button type="button" className="stage7-readback" disabled={refreshing} onClick={onRefresh}>{refreshing?'重新讀取中…':'重新讀取 SMT 狀態'}</button>
+        <button type="button" className="stage7-readback" disabled={refreshing} onClick={onRefresh}>{refreshing?'重新讀取中…':'重新整理狀態'}</button>
       </footer>
     </section>;
   }
@@ -259,14 +256,14 @@ function Stage7Detail({
     </section>
 
     <section className="stage7-detail-section">
-      <h3>來源 / Fulfillment</h3>
+      <h3>來源 / 出餐進度</h3>
       <DetailField label="來源" value={sourceLabel(row)}/>
       <DetailField label="外部參考" value={row.externalRef}/>
       <DetailField label="目前狀態" value={status}/>
     </section>
 
     <section className="stage7-detail-section">
-      <h3>Timeline</h3>
+      <h3>訂單紀錄</h3>
       {row.timeline.length?<div className="stage7-timeline">{row.timeline.map((item,index)=><article key={index}>
         <span/>
         <div><strong>{item.label||'未有資料'}</strong><small>{item.detail||'未有資料'}</small></div>
@@ -277,9 +274,9 @@ function Stage7Detail({
     {row.note?<section className="stage7-note"><strong>訂單備註</strong><span>{row.note}</span></section>:null}
 
     <footer className="stage7-detail-footer">
-      <button type="button" onClick={onStatus}>更新狀態</button>
+      <button type="button" onClick={onStatus}>查看狀態</button>
       <button type="button" className="primary" disabled={refreshing} onClick={onRefresh}>{refreshing?'重新讀取中…':'重新整理'}</button>
-      <small>更新狀態只提供 read-only 畫面；真正 mutation 需由 SMT 處理。</small>
+      <small>手機只提供查看；需要更改訂單請在收銀機處理。</small>
     </footer>
   </section>;
 }
@@ -371,7 +368,7 @@ export function Stage7OrdersView({
     </div>
 
     <button type="button" className="stage7-search-entry" onClick={()=>setSurface('SEARCH')}>
-      <span aria-hidden="true">⌕</span><span>{query||'搜尋 Display Number / 商品 / 電話'}</span>
+      <span aria-hidden="true">⌕</span><span>{query||'搜尋訂單編號 / 商品 / 電話'}</span>
     </button>
 
     {connection==='READY'&&segmentRows.length===0?<Stage7Empty segment={segment}/>:null}

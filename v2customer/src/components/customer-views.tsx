@@ -38,14 +38,14 @@ const stageMeta:Record<CustomerOrderStage,{label:string;title:string;detail:stri
   ARRIVED:{label:'已到店',title:'等待店員核對',detail:'到店通知唔等於核對、交收或完成。'},
   VERIFIED:{label:'已核對',title:'店員核對完成',detail:'已核對仍然未代表已交收或完成。'},
   PICKUP_VERIFICATION:{label:'取餐核對',title:'請出示取餐資料',detail:'到店、核對、交收、完成係分開階段。'},
-  PICKUP_EXCEPTION:{label:'取餐需協助',title:'暫時未能完成取餐',detail:'例外未 resolve 不可 Completed。'},
-  HANDED_OVER:{label:'已交收',title:'餐點已交畀你',detail:'交收完成後仍要等 canonical Completed readback。'},
+  PICKUP_EXCEPTION:{label:'取餐需協助',title:'暫時未能完成取餐',detail:'問題未處理完成前，訂單唔會顯示已完成。'},
+  HANDED_OVER:{label:'已交收',title:'餐點已交畀你',detail:'交收完成後，等店舖確認完成狀態先會顯示訂單完成。'},
   COMPLETED:{label:'已完成',title:'訂單已完成',detail:'呢張訂單已完成。'},
   UNKNOWN:{label:'狀態未明',title:'正在確認店舖狀態',detail:'未確認狀態唔會當成成功。'},
 };
 
 const quoteMeta:Record<CustomerQuoteSnapshot['freshness'],{label:string;detail:string;tone:'current'|'attention'|'danger'}>={
-  CURRENT:{label:'目前餐牌價格',detail:'按 Admin 已發佈餐牌即時計算；送出時 SMT 會核對餐牌版本同價格。',tone:'current'},
+  CURRENT:{label:'目前餐牌價格',detail:'已按店舖最新餐單計算；正式送出前會再確認價格同供應。',tone:'current'},
   STALE:{label:'餐牌需要更新',detail:'目前顯示最近一次已發佈餐牌；送出前必須重新同步。',tone:'attention'},
   MATERIAL_CHANGE:{label:'餐點或價格有變更',detail:'請先修正受影響項目，再確認今次落單。',tone:'danger'},
   UNKNOWN:{label:'餐牌價格未完整',detail:'未有完整已發佈價格前，唔會建立正式訂單。',tone:'attention'},
@@ -147,7 +147,7 @@ export function HomeView({snapshot,connection,activeOrders,history,recommendatio
 
     <RecommendationRail eyebrow="為你揀快一步" title="有理由嘅推薦，唔靠估" recommendations={recommendations} onProduct={(product,origin)=>onProduct(product,origin)}/>
 
-    {lastOrder?<section className="buy-again-section"><SectionHeading eyebrow="因你上次食過" title="一撳再來一單" action={<button className="text-action" onClick={onHistory}>全部回憶</button>}/><article className="buy-again-row"><div><small>{new Date(lastOrder.completedAt).toLocaleDateString('zh-HK')} · 來自你嘅正式歷史訂單</small><strong>{lastOrder.itemSummary}</strong><span>{lastOrder.amountLabel??'歷史價格未提供'}</span></div><ActionButton variant="secondary" disabled={!lastOrder.reorderEligible} onClick={()=>onBuyAgain(lastOrder)}>按目前菜單重建</ActionButton></article></section>:null}
+    {lastOrder?<section className="buy-again-section"><SectionHeading eyebrow="因你上次食過" title="一撳再來一單" action={<button className="text-action" onClick={onHistory}>全部回憶</button>}/><article className="buy-again-row"><div><small>{new Date(lastOrder.completedAt).toLocaleDateString('zh-HK')} · 來自你嘅正式歷史訂單</small><strong>{lastOrder.itemSummary}</strong><span>{lastOrder.amountLabel??'歷史價格未提供'}</span></div><ActionButton variant="secondary" disabled={!lastOrder.reorderEligible} onClick={()=>onBuyAgain(lastOrder)}>再來一單</ActionButton></article></section>:null}
 
     <section className="memory-ecosystem"><SectionHeading eyebrow="MORE FUN MEMORY" title="將每一餐，儲成你嘅記憶" action={<button className="text-action" onClick={onMember}>我的記憶</button>}/><div className="memory-ecosystem-grid">
       <button className="ecosystem-jar" onClick={onJar}><i className={`mini-jar level-${Math.min(3,cartCount)}`} aria-hidden="true"/><span><small>記憶罐</small><strong>{cartCount?`${cartCount} 件餐點`:'等待第一樣餐點'}</strong></span></button>
@@ -197,9 +197,7 @@ export function CartView({cart,quote,repairs,member,suggestions,products,onProdu
   const [removeConfirm,setRemoveConfirm]=useState<string|null>(null);
   const itemCount=cart.reduce((sum,line)=>sum+line.quantity,0);
   return <section className="page cart-page ui4-memory-jar" data-ui4-route="/memory-jar">
-    <PageIntro kicker="記憶罐" title={cart.length?'確認今次餐點':'由第一樣想食嘅開始'} detail="記憶罐係今次落單草稿。每一項都可以獨立修改、修正或移除，未到安全提交前都未建立正式訂單。" aside={cart.length?<button className="text-action" onClick={onMenu}>繼續加餐</button>:null}/>
-    <ol className="ui4-checkout-stepper" aria-label="Checkout 進度"><li className="active"><i>1</i><span>確認商品</span></li><li className="upcoming"><i>2</i><span>聯絡與取餐</span></li><li className="upcoming"><i>3</i><span>付款</span></li><li className="upcoming"><i>4</i><span>提交前確認</span></li></ol>
-    <JarVisual count={itemCount}/>
+    <PageIntro kicker="今次餐點" title={cart.length?`記憶罐 (${itemCount})`:'記憶罐'} detail="每一項都可以修改、修正或移除，確認好先去結帳。" aside={cart.length?<button className="text-action" onClick={onMenu}>繼續加餐</button>:null}/>
     {!cart.length?<EmptyState title="記憶罐仲係空嘅" detail="去菜單揀一樣真正想食嘅，設定會逐步帶你完成。"><ActionButton onClick={onMenu}>開始點餐</ActionButton></EmptyState>:
     <>
       <section className="jar-live-summary" aria-live="polite"><span>今次已選</span><AnimatedValue as="strong">{itemCount} 件餐點</AnimatedValue><small>{quote?quoteMeta[quote.freshness].label:'等待餐牌價格'}</small></section>
@@ -214,7 +212,7 @@ export function CartView({cart,quote,repairs,member,suggestions,products,onProdu
         const optionSummary=line.selections.map(item=>item.optionName);
         return <article className={'cart-line ui4-cart-line'+(repair?' needs-repair':'')} id={'cart-line-'+line.lineId} key={line.lineId}>
           <div className="cart-line-main">
-            <span className="cart-line-index" aria-hidden="true">{String(index+1).padStart(2,'0')}</span>
+            <span className="ui4-product-media-slot" data-product-media={product?.imageUrl?'canonical':'pending'} aria-label={product?.imageUrl?product.name+' 商品圖片':'商品圖片位置待更新'}>{product?.imageUrl?<img src={product.imageUrl} alt={product.imageAlt??product.name}/>:<i aria-hidden="true"/>}</span>
             <div className="ui4-cart-line-copy">
               <strong>{line.productName}</strong>
               <dl className="ui4-line-summary">
@@ -235,11 +233,11 @@ export function CartView({cart,quote,repairs,member,suggestions,products,onProdu
           {removeConfirm===line.lineId?<div className="remove-confirm" role="alert"><p>只移除「{line.productName}」？其他餐點會保留。</p><button onClick={()=>setRemoveConfirm(null)}>保留</button><ActionButton variant="danger" onClick={()=>{onRemove(line.lineId);setRemoveConfirm(null)}}>確認移除</ActionButton></div>:null}
         </article>;
       })}</div>
-      {member?.state==='READY'&&member.preferences?.length?<section className="remembered-tastes"><span>我哋記得你</span><div>{member.preferences.map(item=><b key={item}>{item}</b>)}</div><small>口味習慣唔會自動改今次餐點；請逐項確認。</small></section>:<section className="remembered-tastes disconnected"><span>已儲存口味</span><p>會員偏好尚未連接，今次設定唔會寫入客戶身份。</p></section>}
+      {member?.state==='READY'&&member.preferences?.length?<section className="remembered-tastes"><span>我哋記得你</span><div>{member.preferences.map(item=><b key={item}>{item}</b>)}</div><small>口味習慣唔會自動改今次餐點；請逐項確認。</small></section>:<section className="remembered-tastes disconnected"><span>已儲存口味</span><p>暫時未有已儲存口味，今次照樣可以落單。</p></section>}
       {suggestions.length?<RecommendationRail eyebrow="今餐可以再睇" title="加一樣，都要有理由" recommendations={suggestions} onProduct={(product,origin)=>onProduct(product,origin)}/>:null}
       <QuoteSummary quote={quote} cart={cart}/>
       {quote?.freshness==='MATERIAL_CHANGE'||repairs.length?<section className="repair-card" role="alert"><span>需要你確認</span><h2>{repairs.length?repairs.length+' 項餐點需要更新':'餐點或價格有重要變更'}</h2><p>只標記受影響餐點。價格變更可喺原項目直接接受；設定變更只修正該項，其他餐點全部保留。</p></section>:null}
-      <div className="screen-primary-action"><div><span>下一步</span><strong>{quote?money(quote.currency,quote.totalMinor):'等待餐牌價格'}</strong></div><ActionButton wide disabled={quote?.freshness==='MATERIAL_CHANGE'||repairs.length>0||!quote} onClick={onCheckout}>聯絡與取餐</ActionButton></div>
+      <div className="screen-primary-action"><div><span>下一步</span><strong>{quote?money(quote.currency,quote.totalMinor):'等待餐牌價格'}</strong></div><ActionButton wide disabled={quote?.freshness==='MATERIAL_CHANGE'||repairs.length>0||!quote} onClick={onCheckout}>前往結帳</ActionButton></div>
     </>}
   </section>;
 }
@@ -267,7 +265,7 @@ export function CheckoutView({cart,quote,checkout,setCheckout,paymentChannels,pe
   const openPaymentChannel=paymentChannels.find(channel=>channel.channelId===openPaymentChannelId)??null;
   return <section className="page checkout-page">
     <button className="back-link" onClick={onBack}>返回記憶罐</button>
-    <PageIntro kicker="最後確認 · 3 / 3" title={unknown?'正在確認訂單':'資料清楚，先安心送出'} detail={unknown?'請勿重複提交。系統只會查詢原本嗰次落單。':'價格已按發佈餐牌計算；送出後由 SMT 核對版本同價格，一致就直接接單。'}/>
+    <PageIntro kicker="最後確認 · 3 / 3" title={unknown?'正在確認訂單':'資料清楚，先安心送出'} detail={unknown?'請勿重複提交。系統只會查詢原本嗰次落單。':'價格已按店舖目前餐牌計算；送出後店舖會再確認價格同供應情況。'}/>
     <JourneyCoach active={4}/>
     <ol className="checkout-steps" aria-label="落單步驟"><li className="done">揀好餐點</li><li className="done">確認聯絡</li><li className="active">安全提交</li></ol>
     <section className="checkout-review" aria-label="訂單摘要"><div><span>餐點</span><strong>{cart.reduce((sum,line)=>sum+line.quantity,0)} 件</strong></div><div><span>目前餐牌價格</span><AnimatedValue>{quote?money(quote.currency,quote.totalMinor):'尚未取得'}</AnimatedValue></div><div><span>價格狀態</span><strong>{quote?quoteMeta[quote.freshness].label:'確認中'}</strong></div></section>
@@ -286,7 +284,7 @@ export function CheckoutView({cart,quote,checkout,setCheckout,paymentChannels,pe
     {materialChange?<section className="safe-submit danger" role="alert"><span>目前被阻擋</span><h2>請先重新確認變更</h2><p>總額或餐點狀態有重要變更。返回記憶罐後會直接標出邊一項要更新，其他餐點唔會清空。</p><ActionButton variant="secondary" wide onClick={onRepair}>查看要更新嘅餐點</ActionButton></section>:
     fallback?<section className="safe-submit state-fallback" role="alert"><span>自動接單暫時不可用</span><h2>暫時未能自動接單</h2><p>已完成 3 次有限連線檢查；呢張訂單未送入正式接單流程。你可以直接轉用 WhatsApp。電子支付付款截圖已清除，下一次自動提交必須重新提供。</p><ActionButton wide onClick={onFallback}>轉用 WhatsApp</ActionButton></section>:
     submitBlockReason?<section className="safe-submit danger" role="alert"><span>暫時未可以送出</span><h2>完成付款資料先可以提交</h2><p>{submitBlockReason}</p><StatefulAction state="disabled" labels={{default:'確認並送出',disabled:'未完成提交條件'}}/></section>:
-    <section className={`safe-submit state-${actionState}`} role={unknown||waiting||processing?'status':undefined}><i className="submit-orbit" aria-hidden="true"><b/><b/><b/></i><span>{processing?'連線檢查':unknown?'結果未知':waiting?'等待中':'安全提交'}</span><h2>{processing?'正在檢查店舖接單狀態':unknown?'正在確認訂單結果':waiting?'正在確認接單結果':quote?'準備送出落單要求':'等待餐牌價格'}</h2><p>{processing?'系統最多檢查 3 次店舖接單連線；檢查期間按鈕會鎖定，完成後先決定正式提交定轉用 WhatsApp。':unknown?'店舖可能已收到落單要求。請勿重複提交，先查詢原本嗰次結果。':waiting?'落單要求已送出，SMT 正核對餐牌版本同價格；未有終局前唔會自動重送。':'如果結果未明，系統會保留原本嗰次落單並先讀回結果，唔會盲目重送。'}</p>{processing||unknown||waiting?<><div className="order-confirm-progress" role="progressbar" aria-label={processing?'正在檢查店舖連線':unknown?'正在確認訂單結果':'SMT 核對中'} aria-valuetext="處理中"><i/><span>{processing?`第 ${submitProbe?.attempt??1} / ${submitProbe?.total??3} 次連線檢查…`:unknown?'正在查詢原本訂單結果…':'訂單已送出，SMT 正核對版本同價格…'}</span></div>{processing?<StatefulAction state="loading" labels={{default:'確認並送出',loading:'正在檢查店舖連線'}}/>:null}</>:<StatefulAction state={actionState} labels={{default:pending?.state==='NOT_CONNECTED'?'重新提交':'確認並送出',loading:'正在安全處理',pending:'等待店舖確認',unknown:'重新確認提交結果',disabled:quote?'需要先修正變更':'等待餐牌價格'}} onClick={onSubmit}/>}
+    <section className={`safe-submit state-${actionState}`} role={unknown||waiting||processing?'status':undefined}><i className="submit-orbit" aria-hidden="true"><b/><b/><b/></i><span>{processing?'連線檢查':unknown?'結果未知':waiting?'等待中':'安全提交'}</span><h2>{processing?'正在檢查店舖接單狀態':unknown?'正在確認訂單結果':waiting?'正在確認接單結果':quote?'準備送出落單要求':'等待餐牌價格'}</h2><p>{processing?'系統最多檢查 3 次店舖接單連線；檢查期間按鈕會鎖定，完成後先決定正式提交定轉用 WhatsApp。':unknown?'店舖可能已收到落單要求。請勿重複提交，先查詢原本嗰次結果。':waiting?'落單要求已送出，店舖正確認餐牌同價格；未確認結果前唔會重複送出。':'如果結果未明，系統會保留原本嗰次落單並先確認結果，唔會重複送出。'}</p>{processing||unknown||waiting?<><div className="order-confirm-progress" role="progressbar" aria-label={processing?'正在檢查店舖連線':unknown?'正在確認訂單結果':'店舖確認中'} aria-valuetext="處理中"><i/><span>{processing?`第 ${submitProbe?.attempt??1} / ${submitProbe?.total??3} 次連線檢查…`:unknown?'正在查詢原本訂單結果…':'訂單已送出，店舖正確認餐牌同價格…'}</span></div>{processing?<StatefulAction state="loading" labels={{default:'確認並送出',loading:'正在檢查店舖連線'}}/>:null}</>:<StatefulAction state={actionState} labels={{default:pending?.state==='NOT_CONNECTED'?'重新提交':'確認並送出',loading:'正在安全處理',pending:'等待店舖確認',unknown:'重新確認提交結果',disabled:quote?'需要先修正變更':'等待餐牌價格'}} onClick={onSubmit}/>}
     {unknown&&pending?<button type="button" className="order-confirm-readback" onClick={()=>onReadback(pending)}>立即重新確認結果</button>:null}
     {unknown?<small>系統只會讀取原本結果，未有重新提交。</small>:pending?.state==='NOT_CONNECTED'?<small>本機草稿已保存，未建立正式訂單。</small>:null}</section>}
     {openPaymentChannel?<div className="payment-qr-backdrop" role="presentation" onClick={()=>setOpenPaymentChannelId(null)}><section className="payment-qr-sheet" role="dialog" aria-modal="true" aria-label={openPaymentChannel.label+' 付款 QR'} onClick={event=>event.stopPropagation()}><header><div><small>電子支付</small><h2>{openPaymentChannel.label}</h2></div><button type="button" onClick={()=>setOpenPaymentChannelId(null)}>關閉</button></header>{openPaymentChannel.qrImageUrl?<><div className="payment-qr-image"><img src={openPaymentChannel.qrImageUrl} alt={openPaymentChannel.label+' 付款 QR Code'}/></div><p>可以直接截圖，或者儲存付款碼後用手機付款。完成後返嚟上傳付款截圖。</p><a className="payment-qr-download" href={openPaymentChannel.qrImageUrl+(openPaymentChannel.qrImageUrl.includes('?')?'&':'?')+'download=1'} download>儲存付款碼</a></>:<><div className="payment-qr-placeholder"><b>QR 圖片待提供</b><span>位置已保留；店舖未發布圖片前唔會顯示假付款碼。</span></div><p>呢個渠道暫時未可以完成電子付款。</p></>}</section></div>:null}
@@ -363,21 +361,37 @@ export function MemberView({connection,snapshot,history,pendingIntents,readingIn
   const state=memberState(connection,member);
   const seedsState=state==='READY'?(member?.seeds?.state??'EMPTY'):state;
   const lastOrder=history[0];
-  return <section className="page member-page">
-    <section className="member-hero"><div><span>我的記憶</span><h1>{member?.state==='READY'&&member.displayName?`${member.displayName}，歡迎返嚟。`:'你嘅記憶，只來自真實相遇。'}</h1><p>{member?.state==='READY'?(member.memberLabel??member.lastVisitLabel??'會員資料已連接'):'店舖未提供正式會員資料前，我哋唔會顯示假積分、假等級或假獎賞。'}</p></div><i className="member-orbit" aria-hidden="true"><b/><b/><b/></i><span className={`member-connection state-${state.toLowerCase()}`}>{state==='READY'?'資料已連接':state==='LOADING'?'同步中':'會員資料未連接'}</span></section>
+  return <section className="page member-page ui9-member-page">
+    <section className="member-hero ui9-member-hero"><div className="ui9-brand-art-slot" data-final-art-pending="true" role="img" aria-label="磨飯品牌角色插圖位置"/><div><span>會員</span><h1>{member?.state==='READY'&&member.displayName?`${member.displayName}，歡迎返嚟。`:'磨飯記得每次相遇。'}</h1><p>{member?.state==='READY'?(member.memberLabel??member.lastVisitLabel??'會員資料已更新'):'會員資料暫時未連接，你仍然可以照常點餐同查看訂單。'}</p>{lastOrder?.pickupCode?<small className="ui9-member-pickup-code">取餐碼 {lastOrder.pickupCode}</small>:null}</div><span className={`member-connection state-${state.toLowerCase()}`}>{state==='READY'?'已更新':state==='LOADING'?'更新中':'稍後再試'}</span></section>
+    <section className="member-module ui9-membership-module" aria-label="正式會員">
+      <SectionHeading eyebrow="正式會員" title={state==='READY'?'會員資料已啟用':'用電話同密碼建立會員'}/>
+      {state==='READY'?<p>正式會員資料已更新；會員身份同優惠狀態以店舖會員資料為準。</p>:<>
+        <div className="ui9-activation-preview" aria-disabled="true">
+          <label><span>電話</span><input type="tel" disabled aria-disabled="true" placeholder="電話"/></label>
+          <label><span>設定密碼</span><input type="password" disabled aria-disabled="true" placeholder="••••••••"/></label>
+        </div>
+        <p>帳戶啟用服務尚未連接；目前唔會建立會員身份，亦唔會用 SMS／Email 驗證碼代替。</p>
+      </>}
+    </section>
+    <section className="ui9-memory-summary" aria-label="會員記憶摘要">
+      <article><span>記憶種子</span><strong>{seedsState==='READY'?(member?.seeds?.valueLabel??'—'):'—'}</strong><small>{member?.seeds?.progressLabel??'每次回來都會留下記憶'}</small></article>
+      <article><span>回憶券</span><strong>{state==='READY'?(member?.coupons?.filter(item=>item.state==='AVAILABLE').length??0):'—'}</strong><small>可使用</small></article>
+      <article><span>記憶勳章</span><strong>{state==='READY'?(member?.badges?.filter(item=>item.state==='EARNED').length??0):'—'}</strong><small>已獲得</small></article>
+    </section>
 
-    <section className="member-module seeds-module"><SectionHeading eyebrow="記憶種子" title="每次返嚟，都有段關係"/><ProjectionState state={seedsState} title="記憶種子" detail="種子數量、進度、下一個小心意同歷史必須由店舖正式會員資料提供。" onRefresh={onRefresh}/>{seedsState==='READY'?<div className="seed-dashboard"><div className="seed-value"><i className="seed-constellation" aria-hidden="true"><b/><b/><b/></i><span>目前記憶種子</span><AnimatedValue as="strong">{member?.seeds?.valueLabel??'—'}</AnimatedValue><small>{member?.seeds?.progressLabel??'進度資料未提供'}</small></div><div className="next-care"><span>下一個小心意</span><strong>{member?.seeds?.nextBenefitLabel??'由店舖會員資料提供'}</strong><p>畫面唔會用固定種子數推算獎賞。</p></div>{member?.seeds?.history?.length?<ol className="seed-history">{member.seeds.history.map(item=><li key={`${item.occurredAt}-${item.label}`}><i/><span>{item.label}</span><time dateTime={item.occurredAt}>{new Date(item.occurredAt).toLocaleDateString('zh-HK')}</time></li>)}</ol>:null}</div>:null}</section>
+    <section className="member-module seeds-module"><SectionHeading eyebrow="記憶種子" title="每次返嚟，都有段關係"/><ProjectionState state={seedsState} title="記憶種子" detail="記憶種子同進度會按你實際完成嘅訂單更新。" onRefresh={onRefresh}/>{seedsState==='READY'?<div className="seed-dashboard"><div className="seed-value"><i className="seed-constellation" aria-hidden="true"><b/><b/><b/></i><span>目前記憶種子</span><AnimatedValue as="strong">{member?.seeds?.valueLabel??'—'}</AnimatedValue><small>{member?.seeds?.progressLabel??'進度資料未提供'}</small></div><div className="next-care"><span>下一個小心意</span><strong>{member?.seeds?.nextBenefitLabel??'由店舖會員資料提供'}</strong><p>下一個小心意會按實際會員進度更新。</p></div>{member?.seeds?.history?.length?<ol className="seed-history">{member.seeds.history.map(item=><li key={`${item.occurredAt}-${item.label}`}><i/><span>{item.label}</span><time dateTime={item.occurredAt}>{new Date(item.occurredAt).toLocaleDateString('zh-HK')}</time></li>)}</ol>:null}</div>:null}</section>
 
     <CouponCollection state={state} coupons={member?.coupons} onRefresh={onRefresh}/>
     <BadgeCollection state={state} badges={member?.badges} onRefresh={onRefresh}/>
 
-    <section className="member-module tastes-module"><SectionHeading eyebrow="我哋記得你" title="常食味道同口味習慣"/><ProjectionState state={state} title="口味習慣" detail="會員偏好、今次取餐聯絡同推廣同意係分開資料；訂單表格唔會覆寫會員身份。" onRefresh={onRefresh}/>{state==='READY'?<><div className="taste-cloud">{member?.preferences?.length?member.preferences.map(item=><span key={item}>{item}</span>):<p>暫時未有已確認口味偏好。</p>}</div>{member?.frequentTasteLabels?.length?<div className="frequent-tastes"><span>常食味道</span>{member.frequentTasteLabels.map(item=><b key={item}>{item}</b>)}</div>:null}</>:null}</section>
+    <section className="member-module tastes-module"><SectionHeading eyebrow="常購 / 最愛 / 偏好" title="我哋記得你嘅習慣"/><ProjectionState state={state} title="口味習慣" detail="已確認嘅口味習慣會放喺呢度，落單時你仍然可以逐次調整。" onRefresh={onRefresh}/>{state==='READY'?<><div className="taste-cloud">{member?.preferences?.length?member.preferences.map(item=><span key={item}>{item}</span>):<p>暫時未有已確認口味偏好。</p>}</div>{member?.frequentTasteLabels?.length?<div className="frequent-tastes"><span>常食味道</span>{member.frequentTasteLabels.map(item=><b key={item}>{item}</b>)}</div>:null}</>:null}</section>
 
-    {lastOrder?<section className="member-module recent-memory"><SectionHeading eyebrow="最近一次返嚟" title="想唔想再食一次？"/><article><div><small>{new Date(lastOrder.completedAt).toLocaleDateString('zh-HK')}</small><strong>{lastOrder.itemSummary}</strong><span>{lastOrder.amountLabel??'歷史價格未提供'}</span></div><ActionButton variant="secondary" disabled={!lastOrder.reorderEligible} onClick={()=>onReorder(lastOrder)}>按目前菜單重建</ActionButton></article></section>:<section className="member-module recent-memory"><EmptyState compact title="最近回憶仲係空嘅" detail="完成第一張訂單後，就可以喺呢度再次點餐。"><ActionButton onClick={onBrowse}>開始第一餐</ActionButton></EmptyState></section>}
+    {lastOrder?<section className="member-module recent-memory"><SectionHeading eyebrow="最近回憶" title="想唔想再食一次？"/><article><div><small>{new Date(lastOrder.completedAt).toLocaleDateString('zh-HK')}</small><strong>{lastOrder.itemSummary}</strong><span>{lastOrder.amountLabel??'歷史價格未提供'}</span></div><ActionButton variant="secondary" disabled={!lastOrder.reorderEligible} onClick={()=>onReorder(lastOrder)}>再來一單</ActionButton></article></section>:<section className="member-module recent-memory"><EmptyState compact title="最近回憶仲係空嘅" detail="完成第一張訂單後，就可以喺呢度再次點餐。"><ActionButton onClick={onBrowse}>開始第一餐</ActionButton></EmptyState></section>}
 
-    <section className="member-module recovery-module"><SectionHeading eyebrow="安全恢復" title="等待確認嘅落單" action={<b>{pendingIntents.length}</b>}/>{pendingIntents.length?<div className="pending-list">{pendingIntents.map(intent=>{const copy=intent.state==='UNKNOWN'?'結果仍在確認':intent.state==='PENDING'?'SMT 核對中':intent.state==='NOT_CONNECTED'?'尚未連接店舖':intent.state==='REJECTED'?'店舖未能接受':'已保存落單草稿';return <article className={`pending-card state-${intent.state.toLowerCase()}`} key={intent.submissionId}><div><span>{copy}</span><p>{intent.lastMessage??'落單資料已安全保留喺本機。'}</p><small>建立於 {new Date(intent.createdAt).toLocaleString('zh-HK')}</small></div><div className="pending-actions"><button onClick={()=>onDiscard(intent.submissionId)}>刪除草稿</button><ActionButton variant="secondary" loading={readingIntentId===intent.submissionId} onClick={()=>onReadback(intent)}>重新確認</ActionButton></div></article>})}</div>:<p className="quiet-state">冇等待確認嘅落單。需要時，本機草稿會喺呢度等你處理。</p>}</section>
+    <section className="member-module recovery-module"><SectionHeading eyebrow="訂單支援" title="等待確認嘅落單" action={<b>{pendingIntents.length}</b>}/>{pendingIntents.length?<div className="pending-list">{pendingIntents.map(intent=>{const copy=intent.state==='UNKNOWN'?'結果仍在確認':intent.state==='PENDING'?'店舖確認中':intent.state==='NOT_CONNECTED'?'尚未連接店舖':intent.state==='REJECTED'?'店舖未能接受':'已保存落單資料';return <article className={`pending-card state-${intent.state.toLowerCase()}`} key={intent.submissionId}><div><span>{copy}</span><p>{intent.lastMessage??'落單資料已安全保留喺本機。'}</p><small>建立於 {new Date(intent.createdAt).toLocaleString('zh-HK')}</small></div><div className="pending-actions"><button onClick={()=>onDiscard(intent.submissionId)}>刪除草稿</button><ActionButton variant="secondary" loading={readingIntentId===intent.submissionId} onClick={()=>onReadback(intent)}>重新確認</ActionButton></div></article>})}</div>:<p className="quiet-state">冇等待確認嘅落單。需要時，本機草稿會喺呢度等你處理。</p>}</section>
 
-    <section className="care-card"><span>MORE FUN CARE</span><h2>{member?.careMessage??'需要我哋補返一點心意？'}</h2><p>由你主動開啟支援；系統唔會自動轉送記憶罐、會員或個人資料。</p><ActionButton variant="secondary" wide onClick={onFallback}>聯絡 More Fun Care</ActionButton></section>
+    <section className="member-module ui9-device-actions"><SectionHeading eyebrow="裝置體驗" title="下次打開更方便"/><div className="ui9-device-action-grid"><article><span>主畫面</span><strong>加入磨飯到主畫面</strong><p>加入後，下次可以更快打開點餐。</p><button type="button" disabled aria-disabled="true">稍後開放</button></article><article><span>訂單通知</span><strong>開啟訂單通知</strong><p>店舖確認、延誤同可取餐等重要狀態會分開處理。</p><button type="button" disabled aria-disabled="true">稍後開放</button></article></div></section>
+    <section className="care-card ui9-care-card"><span>需要幫手？</span><h2>{member?.careMessage??'我哋可以幫你處理。'}</h2><p>支援會由你主動開啟，不會自行分享記憶罐、會員或個人資料。</p><ActionButton variant="secondary" wide onClick={onFallback}>聯絡磨飯</ActionButton></section>
   </section>;
 }
 

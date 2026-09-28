@@ -87,10 +87,10 @@ test('Stage 2 navigation is exact and memory jar is fixed center',()=>{
   assert.ok(nav.includes("id:'cart'"));
 });
 
-test('Stage 2 owns its menu chrome and does not render legacy shell chrome there',()=>{
-  assert.ok(app.includes("view==='menu'?null:<CustomerHeader"));
-  assert.ok(app.includes(`view==='menu'?null:<div className="global-status"`));
-  assert.ok(app.includes("view==='home'||view==='menu'?<Stage2BottomNavigation"));
+test('Stage 2 owns its menu chrome and Wave2 does not reintroduce legacy CustomerHeader',()=>{
+  assert.equal(app.includes('<CustomerHeader'),false);
+  assert.ok(app.includes(`view==='home'?null:view==='menu'?null:<div className="global-status"`));
+  assert.match(app,/view==='home'\|\|view==='menu'\s*\?\s*<Stage2BottomNavigation/);
 });
 
 test('Stage 2 keeps Loading Error Offline Stale Empty states human-safe',()=>{
