@@ -53,8 +53,8 @@ test('UI5 revalidates current published facts immediately before the existing su
 });
 
 test('SubmitProgress represents bounded checks but cloud submit POST exists once and no reconnect auto-submit is introduced',()=>{
-  assert.match(ui5,/第 \'\+probeAttempt\+\' \/ \'\+probeTotal\+\' 次接單檢查/);
-  assert.match(ui5,/每次檢查都屬同一個 Checkout Intent/);
+  assert.match(ui5,/正在確認店舖連線 \'\+probeAttempt\+\' \/ \'\+probeTotal/);
+  assert.match(ui5,/幾次連線檢查都只係確認同一張訂單/);
   assert.equal((cloud.match(/\/api\/customer\/orders\/submit/g)||[]).length,1);
   assert.doesNotMatch(app,/addEventListener\(['"]online['"][\s\S]{0,300}submit\(/);
   assert.doesNotMatch(app,/setInterval\([\s\S]{0,300}submit\(/);
@@ -62,7 +62,7 @@ test('SubmitProgress represents bounded checks but cloud submit POST exists once
 });
 
 test('UNKNOWN can only read back the original submission and never creates another identity',()=>{
-  assert.match(ui5,/SUBMISSION UNKNOWN/);
+  assert.match(ui5,/未收到即時回覆/);
   assert.match(ui5,/請勿重複提交/);
   assert.match(ui5,/onReadback/);
   assert.doesNotMatch(ui5,/createCustomerPendingIntent/);
@@ -87,7 +87,7 @@ test('canonical CONFIRMED delivery is cached then routes to Waiting Store Confir
   assert.match(app,/\/waiting/);
   assert.match(ui5,/訂單已成功送達/);
   assert.match(ui5,/等待店舖確認/);
-  assert.match(ui5,/UI5 唔會自行推斷後續流程/);
+  assert.match(ui5,/店舖狀態已更新，請到訂單頁查看最新進度/);
 });
 
 test('waiting screen contains elapsed time, separate Display Number and Pickup Code, summary, safe leave and read-only refresh',()=>{
@@ -115,14 +115,14 @@ test('WhatsApp fallback uses a manual 4-6 digit reference and complete locked or
   assert.match(fallback,/\{fallbackReference\}/);
   assert.match(fallback,/\{submissionId\}':input\.fallbackReference/);
   assert.match(ui5,/人工參考碼/);
-  assert.match(ui5,/零背景重送、零延遲重送、零 reconnect auto-submit/);
+  assert.match(ui5,/轉用 WhatsApp 後，系統唔會喺背景再重複送單/);
   assert.doesNotMatch(ui5,/intent\.submissionId/);
 });
 
 test('electronic screenshot stays Payment Evidence only in submit and fallback copy',()=>{
   assert.match(ui5,/已提交付款憑證/);
-  assert.match(ui5,/付款截圖只係 Evidence/);
-  assert.match(ui5,/SMT \/ 店員正式核對/);
+  assert.match(ui5,/付款截圖已交畀店員核對/);
+  assert.match(ui5,/最終以店舖確認為準/);
   assert.doesNotMatch(ui5,/已確認付款/);
   assert.match(fallback,/付款憑證未完成/);
   assert.doesNotMatch(fallback,/已確認付款/);

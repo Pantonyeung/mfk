@@ -12,7 +12,6 @@ import type {
 export type Ui8OrderSegment='current'|'completed'|'all';
 export type Ui8Phase='LIST'|'DETAIL'|'COPY'|'REPAIR'|'REVIEW';
 type Ui8CharacterVariant='male'|'female';
-const ui8CharacterPath=(variant:Ui8CharacterVariant)=>variant==='female'?'/brand/stage8-history-female.svg':'/brand/stage8-history-male.svg';
 
 export const CUSTOMER_UI8_SAVED_TEMPLATE_SEAM_CLASSIFICATION=
   'SAFE_UNAVAILABLE_FIRST_BREAK:CUSTOMER_SAVED_ORDER_TEMPLATE_MUTATION_SEAM_MISSING_IN_CURRENT_MAIN' as const;
@@ -34,26 +33,26 @@ const timeLabel=(value:string)=>{
 };
 const moneyLabel=(quote:CustomerQuoteSnapshot|null)=>quote
   ?new Intl.NumberFormat('zh-HK',{style:'currency',currency:quote.currency}).format(quote.totalMinor/100)
-  :'Current Quote 待讀回';
+  :'總額確認中';
 
 function StateBanner({state}:{state:Ui8PageState}){
   if(state==='READY')return null;
   const detail:Record<Exclude<Ui8PageState,'READY'>,string>={
-    LOADING:'正在讀取 canonical Order projection。',
+    LOADING:'正在更新訂單紀錄。',
     EMPTY:'呢個分類暫時冇訂單；EMPTY 唔等於連線錯誤。',
-    ERROR:'訂單資料同步失敗；歷史 Order 唔會因此被改寫。',
-    OFFLINE:'目前離線；只可查看已讀回資料，唔會開始未確認 Reorder。',
-    STALE:'顯示最近一次 canonical projection；新交易前仍會重新驗證 current truth。',
-    UNKNOWN:'訂單狀態未明；禁止由 Stage 8 直接建立或提交新 Order。',
+    ERROR:'訂單資料暫時未能更新；歷史訂單會保持原樣。',
+    OFFLINE:'目前離線；可以先查看已載入嘅訂單紀錄。',
+    STALE:'顯示最近一次已知訂單資料；再次下單前會重新確認。',
+    UNKNOWN:'訂單狀態仍在確認；請稍後再試。',
   };
   return <section className={"ui8-state state-"+state.toLowerCase()} role="status"><strong>{state}</strong><p>{detail[state]}</p></section>;
 }
 
 function IdentityPair({displayCode,pickupCode}:{displayCode:string;pickupCode?:string}){
   return <div className="ui8-identity-pair">
-    <div><span>流水號</span><strong>{displayCode}</strong><small>Display Number</small></div>
-    <div><span>取餐碼</span><strong>{pickupCode??'----'}</strong><small>Pickup Code</small></div>
-    <p>Pickup Code ≠ Display Number；唔會顯示 UUID 或 internal Order ID。</p>
+    <div><span>流水號</span><strong>{displayCode}</strong><small>店舖取餐流水號</small></div>
+    <div><span>取餐碼</span><strong>{pickupCode??'----'}</strong><small>取餐核對短碼</small></div>
+    <p>流水號同取餐碼用途不同；取餐時跟畫面提示出示即可。</p>
   </div>;
 }
 
@@ -99,10 +98,10 @@ function HistoryDetail({
         <div><span>{line.historicalUnitLabel}</span><b>{line.historicalLineTotalLabel}</b></div>
       </article>):<p>{order.itemSummary}</p>}
     </section>
-    <section className="ui8-history-warning"><strong>歷史快照｜只讀</strong><p>舊 Price / Sellability / Coupon eligibility 或 redemption 不可直接帶去新交易。舊 Order 唔會被重新開啟或修改。</p></section>
+    <section className="ui8-history-warning"><strong>歷史訂單</strong><p>再次下單會按目前餐單、價格、供應同優惠重新確認；舊訂單唔會被改動。</p></section>
     <div className="ui8-detail-actions">
-      <ActionButton wide disabled={!order.reorderEligible||!reorderFresh} onClick={()=>onReorder(order)}>{!order.reorderEligible?'舊訂單未有可安全複製嘅 Intent':reorderFresh?'再來一單':'需要重新同步目前餐牌'}</ActionButton>
-      {!reorderFresh&&order.reorderEligible?<section className="ui8-reorder-unavailable" role="status"><strong>暫時未能開始再來一單</strong><p>歷史訂單仍可查看；重新同步 current menu 後先可以建立 New Cart。</p><button type="button" onClick={onRefresh}>只讀 Refresh</button></section>:null}
+      <ActionButton wide disabled={!order.reorderEligible||!reorderFresh} onClick={()=>onReorder(order)}>{!order.reorderEligible?'呢張舊訂單暫時未支援再來一單':reorderFresh?'再來一單':'需要更新目前餐單'}</ActionButton>
+      {!reorderFresh&&order.reorderEligible?<section className="ui8-reorder-unavailable" role="status"><strong>暫時未能開始再來一單</strong><p>歷史訂單仍可查看；更新目前餐單後就可以再來一單。</p><button type="button" onClick={onRefresh}>重新整理</button></section>:null}
       <button className="ui8-template-unavailable" disabled aria-disabled="true">設為常用訂單</button>
       <small>常用訂單功能尚未開放</small>
     </div>
@@ -127,17 +126,17 @@ function CopyIntent({
   return <section className="ui8-copy-intent">
     <button className="ui8-back" onClick={onBack}>返回歷史訂單</button>
     <header className="ui8-copy-hero">
-      <img src={ui8CharacterPath(variant)} alt="磨飯品牌角色"/>
+      <div className="ui8-brand-art-slot" data-final-art-pending="true" data-character-slot={variant} role="img" aria-label="磨飯品牌角色插圖位置"/>
       <span>再來一單</span><h1>正在建立新購物車</h1>
-      <p>Past Order → Copy Intent → New Cart。唔會重開舊 Order。</p>
+      <p>會按你上次嘅選擇建立一個新記憶罐，舊訂單保持不變。</p>
     </header>
     <ol className="ui8-copy-checks">
-      <li className="done"><b>Copy Intent</b><span>只複製 Product / Option / Modifier / Combo 意圖</span></li>
-      <li className="done"><b>Current Price</b><span>舊價唔會成為 current transaction truth</span></li>
-      <li className="done"><b>Sellability</b><span>按目前餐牌重新驗證</span></li>
-      <li className={issueCount?'attention':'done'}><b>Required / Combo</b><span>{issueCount?issueCount+' 個受影響 Line 需要局部修正':'目前設定已通過 current validation'}</span></li>
+      <li className="done"><b>上次選擇</b><span>保留上次揀過嘅餐點同選項</span></li>
+      <li className="done"><b>目前價格</b><span>會用今日餐單價格重新確認</span></li>
+      <li className="done"><b>目前供應</b><span>會檢查餐點同選項而家仲有冇供應</span></li>
+      <li className={issueCount?'attention':'done'}><b>需要你確認</b><span>{issueCount?issueCount+' 項餐點需要局部修正':'目前選擇可以繼續'}</span></li>
     </ol>
-    <section className="ui8-copy-summary"><span>新購物車</span><strong>{cart.length} 個 Line</strong><small>舊 Formal Order identity / payment evidence / fulfillment / coupon redemption 全部冇複製。</small></section>
+    <section className="ui8-copy-summary"><span>新記憶罐</span><strong>{cart.length} 項餐點</strong><small>只帶返餐點選擇；付款、取餐進度同舊優惠狀態都唔會複製。</small></section>
     <ActionButton wide onClick={onContinue}>繼續驗證</ActionButton>
   </section>;
 }
@@ -162,7 +161,7 @@ function Repair({
   const affected=new Set([...repairs.map(item=>item.lineId),...cart.filter(line=>line.attention).map(line=>line.lineId)]);
   const retained=cart.filter(line=>!affected.has(line.lineId));
   return <section className="ui8-repair">
-    <header className="ui8-section-hero"><span>局部 Repair</span><h1>需要修正 {affected.size} 項</h1><p>只改受影響 Line；其他 {retained.length} 項保持新購物車目前狀態。</p></header>
+    <header className="ui8-section-hero"><span>需要你確認</span><h1>需要修正 {affected.size} 項</h1><p>只會改受影響餐點；其他 {retained.length} 項會原樣保留。</p></header>
     {retained.length?<section className="ui8-retained-lines"><span>保留</span>{retained.map(line=><b key={line.lineId}>{line.productName} ×{line.quantity}</b>)}</section>:null}
     <div className="ui8-repair-list">{cart.filter(line=>affected.has(line.lineId)).map(line=>{
       const repairItem=repairs.find(item=>item.lineId===line.lineId);
@@ -170,7 +169,7 @@ function Repair({
       const canAcceptCurrent=Boolean(repairItem?.canAcceptCurrentPrice||(!repairItem&&line.attention&&line.publishedUnitPriceMinor!==undefined));
       return <article key={line.lineId}>
         {product?.imageUrl?<img src={product.imageUrl} alt={product.imageAlt??product.name}/>:<i aria-hidden="true"/>}
-        <div><strong>{line.productName}</strong><p>{line.attention??repairItem?.detail??'目前資料需要重新確認'}</p>{repairItem?.previousUnitPriceMinor!==undefined&&repairItem.currentUnitPriceMinor!==undefined?<small>{'舊 Cart fact HK$'+(repairItem.previousUnitPriceMinor/100).toFixed(0)+' → Current HK$'+(repairItem.currentUnitPriceMinor/100).toFixed(0)}</small>:null}</div>
+        <div><strong>{line.productName}</strong><p>{line.attention??repairItem?.detail??'目前資料需要重新確認'}</p>{repairItem?.previousUnitPriceMinor!==undefined&&repairItem.currentUnitPriceMinor!==undefined?<small>{'上次 HK$'+(repairItem.previousUnitPriceMinor/100).toFixed(0)+' → 而家 HK$'+(repairItem.currentUnitPriceMinor/100).toFixed(0)}</small>:null}</div>
         <div className="ui8-line-actions">
           {canAcceptCurrent?<button onClick={()=>onAccept(line.lineId)}>接受目前資料</button>:null}
           {product?.available?<button onClick={()=>onEdit(line)}>修正呢一項</button>:null}
@@ -178,7 +177,7 @@ function Repair({
         </div>
       </article>;
     })}</div>
-    <section className="ui8-repair-note"><strong>價錢有變會重新 Quote</strong><span>舊 Price / Sellability / Coupon 唔會沿用。</span></section>
+    <section className="ui8-repair-note"><strong>價錢有變會重新確認</strong><span>會用目前價格、供應同優惠狀態。</span></section>
     <ActionButton wide disabled={affected.size>0} onClick={onContinue}>完成局部修正</ActionButton>
   </section>;
 }
@@ -198,12 +197,12 @@ function FinalReview({
 }){
   const ready=Boolean(fresh&&cart.length&&quote?.freshness==='CURRENT'&&!cart.some(line=>line.attention));
   return <section className="ui8-final-review">
-    <header className="ui8-section-hero"><span>Final Review</span><h1>新購物車已準備好</h1><p>以下全部係 current catalog / current quote；歷史 Order 保持不變。</p></header>
+    <header className="ui8-section-hero"><span>最後確認</span><h1>新記憶罐已準備好</h1><p>以下係今日餐單同最新價格；舊訂單保持不變。</p></header>
     <section className="ui8-review-lines">{cart.map(line=><article key={line.lineId}><div><strong>{line.productName} ×{line.quantity}</strong><small>{line.selections.map(item=>item.optionName).join('、')||'標準設定'}</small></div><b>{line.publishedUnitPriceMinor!==undefined?'HK$'+(line.publishedUnitPriceMinor/100).toFixed(0):'待修正'}</b></article>)}</section>
-    <section className={"ui8-current-quote "+(quote?.freshness.toLowerCase()??'unknown')}><span>Current Quote</span><AnimatedValue as="strong">{moneyLabel(quote)}</AnimatedValue><small>{quote?.freshness??'UNKNOWN'} · revision {quote?.revision??'待讀回'}</small></section>
-    {!ready?<section className="ui8-review-block"><strong>未可以完成 Final Review</strong><p>{fresh?'Current Quote 未係 CURRENT，或者仍有受影響 Line。':'需要重新同步 current truth；已建立嘅 draft cart 會保留。'}</p><ActionButton variant="secondary" wide onClick={onRepair}>返回局部 Repair</ActionButton></section>:null}
+    <section className={"ui8-current-quote "+(quote?.freshness.toLowerCase()??'unknown')}><span>目前總額</span><AnimatedValue as="strong">{moneyLabel(quote)}</AnimatedValue><small>{quote?.freshness==='CURRENT'?'已更新':quote?.freshness==='MATERIAL_CHANGE'?'需要重新確認':quote?.freshness==='STALE'?'資料需要更新':'確認中'}</small></section>
+    {!ready?<section className="ui8-review-block"><strong>仲有資料需要確認</strong><p>{fresh?'總額未更新完成，或者仲有受影響餐點。':'需要重新更新目前餐單；已揀好嘅餐點會保留。'}</p><ActionButton variant="secondary" wide onClick={onRepair}>返回修正餐點</ActionButton></section>:null}
     <ActionButton wide disabled={!ready} onClick={onCart}>前往記憶罐</ActionButton>
-    <small className="ui8-checkout-lock">之後只可經正常 UI4 Checkout → UI5 Submit；Stage 8 本身唔會 commit Order。</small>
+    <small className="ui8-checkout-lock">下一步會返到正常結帳流程，確認好先正式送出訂單。</small>
   </section>;
 }
 
@@ -229,9 +228,9 @@ export function HistoryReorderUi8View({
     if(phase==='DETAIL')return <section className="page ui8-page"><HistoryDetail order={selectedHistory} reorderFresh={reorderFresh} onBack={()=>setPhase('LIST')} onReorder={onStartReorder} onRefresh={onRefresh}/></section>;
     if(!reorderFresh)return <section className="page ui8-page ui8-freshness-block" data-ui8-reorder-freshness="BLOCKED">
       <StateBanner state={pageState(connection,browserOnline,false)}/>
-      <header className="ui8-section-hero"><span>Reorder 已暫停</span><h1>需要重新同步 current truth</h1><p>已建立嘅 draft cart 會保留；唔會刪資料、唔會重開舊 Order，亦唔會繼續聲稱 current validation 已完成。</p></header>
-      <section className="ui8-copy-summary"><span>已保留 Draft</span><strong>{cart.length} 個 Line</strong><small>恢復 READY 後會用 current menu / current quote 重新驗證。</small></section>
-      <ActionButton wide onClick={onRefresh}>只讀 Refresh</ActionButton>
+      <header className="ui8-section-hero"><span>再來一單暫停</span><h1>需要更新目前餐單</h1><p>已揀好嘅餐點會保留；更新完成後再繼續確認。</p></header>
+      <section className="ui8-copy-summary"><span>已保留記憶罐</span><strong>{cart.length} 項餐點</strong><small>更新完成後會再確認目前餐單同價格。</small></section>
+      <ActionButton wide onClick={onRefresh}>重新整理</ActionButton>
       <ActionButton variant="secondary" wide onClick={()=>setPhase('DETAIL')}>返回歷史訂單</ActionButton>
     </section>;
     if(phase==='COPY')return <section className="page ui8-page"><CopyIntent order={selectedHistory} cart={cart} issueCount={new Set([...repairs.map(item=>item.lineId),...cart.filter(line=>line.attention).map(line=>line.lineId)]).size} onContinue={()=>setPhase(repairs.length||cart.some(line=>line.attention)?'REPAIR':'REVIEW')} onBack={()=>setPhase('DETAIL')} variant={characterVariant}/></section>;
@@ -242,7 +241,7 @@ export function HistoryReorderUi8View({
   const rows=segment==='current'?active:segment==='completed'?history:[...active,...history];
   const state=pageState(connection,browserOnline,rows.length>0);
   return <section className="page ui8-page" data-ui8-state={state}>
-    <header className="ui8-list-hero"><span>我的訂單</span><h1>訂單紀錄</h1><p>Historical Order 只讀；「再來一單」只會建立 New Cart。</p></header>
+    <header className="ui8-list-hero"><span>我的訂單</span><h1>訂單紀錄</h1><p>可以查看進行中同已完成訂單；「再來一單」會重新確認今日餐單。</p></header>
     <StateBanner state={state}/>
     <div className="ui8-filters" role="tablist" aria-label="訂單篩選">
       <button role="tab" aria-selected={segment==='current'} className={segment==='current'?'active':''} onClick={()=>setSegment('current')}>進行中</button>
@@ -252,6 +251,6 @@ export function HistoryReorderUi8View({
     {rows.length?<div className="ui8-order-list">
       {(segment==='current'||segment==='all')?active.map(order=><CurrentCard key={'current-'+order.orderId} order={order} onOpen={onOpenCurrent}/>):null}
       {(segment==='completed'||segment==='all')?history.map(order=><HistoryCard key={'history-'+order.orderId} order={order} onOpen={onOpenHistory}/>):null}
-    </div>:state==='EMPTY'?<EmptyState title="呢個分類暫時冇訂單" detail="完成或建立訂單後會按 canonical projection 出現。"><ActionButton onClick={onBrowse}>開始點餐</ActionButton></EmptyState>:null}
+    </div>:state==='EMPTY'?<EmptyState title="呢個分類暫時冇訂單" detail="有新訂單或完成訂單後，就會喺呢度見到。"><ActionButton onClick={onBrowse}>開始點餐</ActionButton></EmptyState>:null}
   </section>;
 }

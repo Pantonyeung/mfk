@@ -2574,3 +2574,320 @@ button:hover .product-media img{transform:scale(1.025)}
   .ui8-identity-pair{grid-template-columns:1fr 1fr}.ui8-copy-checks li{grid-template-columns:1fr}.ui8-line-actions{grid-template-columns:1fr}
 }
 @media(prefers-reduced-motion:reduce){.ui8-page *{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+
+
+/* MFK CUSTOMER FINAL SOURCE FIDELITY WAVE2 */
+:root{
+  --customer-source-warm:#f7f1e9;
+  --customer-source-paper:#fffdf9;
+  --customer-source-navy:#173b70;
+  --customer-source-blue:#2f6cb5;
+  --customer-source-orange:#ef7d24;
+  --customer-source-orange-soft:#fff0e4;
+  --customer-source-green:#2f8b67;
+  --customer-source-line:#eadfd2;
+  --customer-source-muted:#756f68;
+}
+
+/* Global customer shell from UI3 onward. UI0-UI2 use their own Stage surfaces. */
+.ui4-memory-jar,.ui4-checkout,.ui5-submit,.ui5-waiting,.ui6-tracking,.ui7-shell,.ui8-page,.ui9-member-page{
+  background:var(--customer-source-warm);
+  color:#2a2927;
+}
+.ui4-memory-jar .page-intro h1,.ui4-checkout .page-intro h1,
+.ui5-submit h1,.ui5-waiting h1,.ui6-tracking h1,.ui7-shell h1,.ui8-page h1,.ui9-member-page h1{
+  color:var(--customer-source-navy);
+}
+
+/* UI3 商品詳情：大商品媒體、暖底、橙色主 CTA；產品媒體只使用正式 imageUrl。 */
+.ui3-product-hero{
+  background:var(--customer-source-paper);
+  border:1px solid var(--customer-source-line);
+  border-radius:24px;
+  overflow:hidden;
+  box-shadow:0 12px 30px rgba(63,52,39,.07);
+}
+.ui3-product-hero .product-media{height:292px;background:#eee5da}
+.ui3-product-hero .product-media img{width:100%;height:100%;object-fit:cover}
+.ui3-product-hero .product-media-fallback.true-empty{
+  display:block;width:100%;height:100%;
+  background:linear-gradient(145deg,#eee5da,#f9f4ed);
+}
+.ui3-product-hero .product-sheet-copy{padding:20px}
+.ui3-product-hero .product-sheet-copy>span,
+.ui3-section-heading span{color:var(--customer-source-orange);font-weight:800}
+.ui3-product-hero .product-sheet-copy>strong{color:var(--customer-source-orange)}
+.ui3-published-note{color:var(--customer-source-muted)}
+.ui3-config-section{
+  background:var(--customer-source-paper);
+  border:1px solid var(--customer-source-line);
+  border-radius:22px;
+  box-shadow:none;
+}
+.ui3-config-section .choice-grid button.active{
+  border-color:var(--customer-source-orange);
+  background:var(--customer-source-orange-soft);
+  color:#2a2927;
+}
+.ui3-current-summary{background:#fff8f1}
+.ui3-sticky-actions{
+  border-top:1px solid var(--customer-source-line);
+  background:rgba(255,253,249,.97);
+}
+.ui3-sticky-actions .action-button.primary{
+  background:var(--customer-source-orange);
+  border-color:var(--customer-source-orange);
+  box-shadow:0 10px 22px rgba(239,125,36,.22);
+}
+
+/* UI4 記憶罐 + Checkout：以商品行為主，保留正式 product image slot。 */
+.ui4-memory-jar .memory-jar-visual{display:none}
+.ui4-memory-jar .ui4-checkout-stepper,.ui4-checkout .ui4-checkout-stepper{
+  background:var(--customer-source-paper);
+  border:1px solid var(--customer-source-line);
+  border-radius:18px;
+}
+.ui4-memory-jar .cart-lines{gap:12px}
+.ui4-memory-jar .ui4-cart-line{
+  background:var(--customer-source-paper);
+  border:1px solid var(--customer-source-line);
+  border-radius:20px;
+  padding:14px;
+}
+.ui4-memory-jar .cart-line-main{
+  display:grid;
+  grid-template-columns:76px minmax(0,1fr) auto;
+  gap:12px;
+  align-items:start;
+}
+.ui4-product-media-slot{
+  display:block;width:76px;height:76px;border-radius:14px;overflow:hidden;
+  background:linear-gradient(145deg,#eee5da,#f8f3ec);
+  border:1px solid var(--customer-source-line);
+}
+.ui4-product-media-slot img{width:100%;height:100%;object-fit:cover;display:block}
+.ui4-product-media-slot i{display:block;width:100%;height:100%;background:linear-gradient(145deg,#eee5da,#f8f3ec)}
+.ui4-memory-jar .ui4-line-total strong,
+.ui4-checkout .ui4-review-lines b{color:var(--customer-source-orange)}
+.ui4-memory-jar .screen-primary-action{
+  background:var(--customer-source-paper);
+  border:1px solid var(--customer-source-line);
+  box-shadow:0 14px 28px rgba(61,48,33,.09);
+}
+.ui4-memory-jar .screen-primary-action .action-button.primary,
+.ui4-checkout .ui4-checkout-actions .action-button.primary{
+  background:var(--customer-source-orange);
+  border-color:var(--customer-source-orange);
+}
+.ui4-checkout-card,.ui4-pickup-code,.ui4-review-quote{
+  background:var(--customer-source-paper);
+  border-color:var(--customer-source-line);
+}
+.ui4-checkout-card>header span{color:var(--customer-source-orange)}
+.ui4-payment-evidence{background:#fffaf4}
+.ui4-evidence-submitted{background:#eef7f1;border-color:#cfe5d8;color:#266b51}
+
+/* UI5 安全提交／等待：正式品牌插圖只保留槽位。 */
+.ui5-hero,.ui5-waiting-hero{
+  background:var(--customer-source-paper);
+  border:1px solid var(--customer-source-line);
+  border-radius:26px;
+  text-align:center;
+  padding:24px 20px;
+}
+.ui5-brand-art-slot{
+  width:132px;height:132px;margin:0 auto 14px;border-radius:34px;
+  background:linear-gradient(145deg,#f3e7d8,#fffaf2);
+  border:1px dashed #d9c8b6;
+  position:relative;
+}
+.ui5-brand-art-slot:after{
+  content:"品牌插圖";position:absolute;inset:auto 0 14px;text-align:center;
+  font-size:11px;color:#9b8c7a;letter-spacing:.08em;
+}
+.ui5-hero>span,.ui5-waiting-hero>span{color:var(--customer-source-blue);font-weight:800}
+.ui5-submit-progress,.ui5-summary,.ui5-identity-boundary,.ui5-waiting-status,.ui5-order-identities,.ui5-waiting-summary,.ui5-safe-leave{
+  background:var(--customer-source-paper);
+  border-color:var(--customer-source-line);
+}
+.ui5-submit-orbit,.ui5-waiting-orbit{display:none}
+.ui5-unknown{background:#fff7e8;border-color:#ecd4a5}
+.ui5-fallback{background:#eff8f1;border-color:#cfe4d4}
+.ui5-fallback .action-button.primary{background:#2c9b61;border-color:#2c9b61}
+.ui5-primary-submit .action-button.primary,.ui5-safe-leave .action-button.primary{
+  background:var(--customer-source-blue);border-color:var(--customer-source-blue);
+}
+
+/* UI6 店舖確認／製作／可取餐。 */
+.ui6-hero{
+  background:var(--customer-source-paper);
+  border:1px solid var(--customer-source-line);
+  border-radius:26px;
+  text-align:center;
+  padding:22px 18px;
+}
+.ui6-brand-art-slot{
+  width:126px;height:126px;margin:0 auto 14px;border-radius:32px;
+  background:linear-gradient(145deg,#f2e8dc,#fffaf4);
+  border:1px dashed #dac9b8;
+  position:relative;
+}
+.ui6-brand-art-slot:after{
+  content:"品牌插圖";position:absolute;inset:auto 0 13px;text-align:center;
+  font-size:11px;color:#998a78;letter-spacing:.08em;
+}
+.ui6-progress,.ui6-identities,.ui6-order-summary,.ui6-readback,.ui6-timeline,.ui6-readback-empty{
+  background:var(--customer-source-paper);border-color:var(--customer-source-line);
+}
+.ui6-tracking.tone-ready .ui6-hero{background:#edf8f1;border-color:#cce5d5}
+.ui6-tracking.tone-delay .ui6-hero{background:#fff6e8;border-color:#efd8aa}
+.ui6-tracking.tone-terminal .ui6-hero{background:#fff1ed;border-color:#edc8bc}
+.ui6-actions .action-button.primary{background:var(--customer-source-blue);border-color:var(--customer-source-blue)}
+
+/* UI7 取餐／交收／完成：IP 只保留正式槽位。 */
+.ui7-brand-art-slot{
+  display:block;width:132px;height:132px;margin:10px auto 14px;border-radius:34px;
+  background:linear-gradient(145deg,#f2e8dc,#fffaf4);
+  border:1px dashed #dac9b8;position:relative;object-fit:unset;
+}
+.ui7-brand-art-slot:after{
+  content:"品牌插圖";position:absolute;inset:auto 0 13px;text-align:center;
+  font-size:11px;color:#998a78;letter-spacing:.08em;
+}
+.ui7-hero,.ui7-identity-panel,.ui7-order-summary,.ui7-verification-card,.ui7-completion-card,.ui7-arrived-meta,.ui7-checklist{
+  background:var(--customer-source-paper);border-color:var(--customer-source-line);
+}
+.ui7-state-pill{background:#edf3fb;color:var(--customer-source-navy)}
+.ui7-state-pill.ready,.ui7-state-pill.completed{background:#e9f5ee;color:#267152}
+.ui7-code-lockup strong,.ui7-identity-panel article:first-child strong{color:var(--customer-source-blue)}
+.ui7-completed-hero{background:#edf8f1;border-color:#cce5d5}
+.ui7-completed-actions .action-button.primary{background:var(--customer-source-blue);border-color:var(--customer-source-blue)}
+
+/* UI8 訂單紀錄／再來一單。 */
+.ui8-list-hero,.ui8-detail-hero,.ui8-section-hero,.ui8-copy-hero{
+  background:var(--customer-source-paper);
+  border:1px solid var(--customer-source-line);
+  border-radius:26px;
+}
+.ui8-order-card,.ui8-history-lines,.ui8-copy-summary,.ui8-current-quote,.ui8-repair-list article{
+  background:var(--customer-source-paper);border-color:var(--customer-source-line);
+}
+.ui8-brand-art-slot{
+  width:132px;height:132px;margin:0 auto 12px;border-radius:34px;
+  background:linear-gradient(145deg,#f2e8dc,#fffaf4);
+  border:1px dashed #dac9b8;position:relative;
+}
+.ui8-brand-art-slot:after{
+  content:"品牌插圖";position:absolute;inset:auto 0 13px;text-align:center;
+  font-size:11px;color:#998a78;letter-spacing:.08em;
+}
+.ui8-filters button.active{background:var(--customer-source-orange);border-color:var(--customer-source-orange);color:#fff}
+.ui8-order-card .action-button.secondary,.ui8-detail-actions .action-button.primary,.ui8-copy-intent .action-button.primary,.ui8-final-review .action-button.primary{
+  border-color:var(--customer-source-blue);
+}
+.ui8-copy-checks li.done i,.ui8-copy-checks li.done:before{color:var(--customer-source-green)}
+.ui8-current-quote strong{color:var(--customer-source-orange)}
+
+/* UI9 會員／記憶：來源式結構，未有正式 IP 只保留槽位。 */
+.ui9-member-page{background:var(--customer-source-warm)}
+.ui9-member-hero{
+  margin:0 0 18px;
+  border-radius:28px;
+  background:linear-gradient(145deg,#fffdf9,#f4e9dc);
+  color:#2a2927;
+  display:grid;
+  grid-template-columns:112px minmax(0,1fr);
+  gap:16px;
+  align-items:center;
+}
+.ui9-member-hero>div:not(.ui9-brand-art-slot){min-width:0}
+.ui9-member-hero h1{color:var(--customer-source-navy)}
+.ui9-brand-art-slot{
+  width:112px;height:132px;border-radius:32px;
+  background:linear-gradient(145deg,#efe3d4,#fff8ef);
+  border:1px dashed #d7c4b1;position:relative;
+}
+.ui9-brand-art-slot:after{
+  content:"品牌插圖";position:absolute;inset:auto 0 13px;text-align:center;
+  color:#998a78;font-size:11px;letter-spacing:.08em;
+}
+.ui9-member-hero .member-connection{
+  grid-column:1/-1;justify-self:start;
+  background:#fff;border:1px solid var(--customer-source-line);color:#6f665d;
+}
+.ui9-memory-summary{
+  display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:0 0 18px;
+}
+.ui9-memory-summary article{
+  min-width:0;padding:14px 12px;border-radius:18px;
+  background:var(--customer-source-paper);border:1px solid var(--customer-source-line);
+}
+.ui9-memory-summary span,.ui9-memory-summary small{display:block;color:var(--customer-source-muted);font-size:11px}
+.ui9-memory-summary strong{display:block;margin:6px 0;color:var(--customer-source-navy);font-size:21px}
+.ui9-member-page .member-module,.ui9-care-card{
+  background:var(--customer-source-paper);
+  border:1px solid var(--customer-source-line);
+  box-shadow:none;
+}
+.ui9-device-action-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.ui9-device-action-grid article{
+  padding:16px;border-radius:18px;background:#fff8f1;border:1px solid var(--customer-source-line);
+}
+.ui9-device-action-grid span,.ui9-device-action-grid strong,.ui9-device-action-grid p{display:block}
+.ui9-device-action-grid strong{margin:5px 0;color:var(--customer-source-navy)}
+.ui9-device-action-grid p{margin:0 0 12px;color:var(--customer-source-muted)}
+.ui9-device-action-grid button{
+  min-height:40px;border-radius:12px;border:1px solid var(--customer-source-line);
+  background:#f3eee8;color:#8b8176;
+}
+
+/* Global navigation for UI4-UI9. Center Memory Jar is the visual anchor. */
+.bottom-navigation{
+  background:rgba(255,253,249,.97);
+  border-top:1px solid var(--customer-source-line);
+  box-shadow:0 -8px 26px rgba(50,40,30,.07);
+}
+.bottom-navigation button.active{color:var(--customer-source-orange);background:transparent}
+.bottom-navigation button:nth-child(3){
+  transform:translateY(-9px);
+}
+.bottom-navigation button:nth-child(3) .nav-glyph{
+  width:42px;height:42px;border-radius:50%;
+  display:grid;place-items:center;
+  background:var(--customer-source-paper);
+  border:2px solid var(--customer-source-orange);
+  color:var(--customer-source-orange);
+  box-shadow:0 8px 18px rgba(239,125,36,.18);
+}
+.bottom-navigation button:nth-child(3) .glyph-jar:before{
+  left:11px;right:11px;top:6px;height:4px;
+}
+.bottom-navigation button:nth-child(3) .glyph-jar:after{
+  content:"";position:absolute;left:10px;right:10px;top:13px;bottom:8px;
+  border:2px solid currentColor;border-radius:4px 4px 8px 8px;
+}
+.bottom-navigation button:nth-child(3)>span{color:var(--customer-source-orange);font-weight:900}
+.bottom-navigation .nav-glyph{background:transparent}
+
+/* Mobile source baseline: 390 first, plus compact 360 without horizontal clipping. */
+@media(max-width:430px){
+  .ui3-product-hero .product-media{height:42vh;min-height:264px;max-height:338px}
+  .ui3-config-section{margin-left:0;margin-right:0}
+  .ui4-memory-jar .cart-line-main{grid-template-columns:72px minmax(0,1fr)}
+  .ui4-memory-jar .ui4-line-total{grid-column:2;justify-self:start}
+  .ui4-product-media-slot{width:72px;height:72px}
+  .ui5-brand-art-slot,.ui6-brand-art-slot,.ui7-brand-art-slot,.ui8-brand-art-slot{width:118px;height:118px}
+  .ui9-member-hero{grid-template-columns:94px minmax(0,1fr)}
+  .ui9-brand-art-slot{width:94px;height:114px}
+}
+@media(max-width:370px){
+  .ui3-product-hero .product-media{height:266px;min-height:0}
+  .ui4-memory-jar .cart-line-main{grid-template-columns:64px minmax(0,1fr);gap:10px}
+  .ui4-product-media-slot{width:64px;height:64px}
+  .ui9-memory-summary{gap:7px}
+  .ui9-memory-summary article{padding:12px 8px}
+  .ui9-memory-summary strong{font-size:18px}
+  .ui9-device-action-grid{grid-template-columns:1fr}
+  .bottom-navigation button{min-width:0}
+  .bottom-navigation button span{font-size:9px}
+}

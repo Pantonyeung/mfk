@@ -26,7 +26,7 @@ const styles=fs.readFileSync(path.join(srcRoot,'styles.css'),'utf8');
 
 test('R2 keeps the five-part customer mental model and complete memory jar',()=>{
   for(const label of['首頁','點單','記憶罐','訂單','會員'])assert.match(primitives,new RegExp(label));
-  for(const marker of['記憶罐係今次落單草稿','今次已選','聯絡與取餐','目前餐牌價格'])assert.match(views,new RegExp(marker));
+  for(const marker of['記憶罐','今次已選','前往結帳','訂單總額'])assert.match(views,new RegExp(marker));
   assert.match(views,/JarVisual/);
   assert.match(views,/removeConfirm/);
   assert.match(views,/onProduct\(product,[\s\S]*line/);
@@ -51,7 +51,7 @@ test('product configuration follows canonical UI3 flow and preserves required mi
 
 test('member ecosystem is read-only projection with honest disconnected states',()=>{
   for(const marker of['CustomerMemberProjection','CustomerMemorySeedProjection','CustomerMemoryBadgeProjection','CustomerMemoryCouponProjection'])assert.match(types,new RegExp(marker));
-  for(const marker of['記憶種子','下一個小心意','回憶券','記憶勳章','常食味道','More Fun Care'])assert.match(source,new RegExp(marker,'i'));
+  for(const marker of['記憶種子','下一個小心意','回憶券','記憶勳章','常購 / 最愛 / 偏好','聯絡磨飯'])assert.match(source,new RegExp(marker,'i'));
   assert.match(views,/等待正式資料/);
   assert.doesNotMatch(views,/>NOT WIRED</);
   assert.doesNotMatch(source,/10\s*seeds|30\s*seeds|seeds\s*[%+*/-]\s*10/i);
