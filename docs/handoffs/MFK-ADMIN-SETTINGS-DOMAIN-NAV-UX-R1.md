@@ -48,3 +48,9 @@ Branch opened and domain validation seam added. UI route split is in progress.
 - Print Templates no longer expands Receipt/Production/Packing/Label/Semantics together: template chooser -> one editor.
 - Existing staff.v1, PIN verifier, RBAC, print-templates.v1 and audit authority unchanged.
 - Current head 2314aa98723695d7679a7082a5d148f2e65d5861; CI pending.
+
+## Milestone 6
+- Milestone 5 first break: print-template test matched chooser helper text 編輯收據模板內容, not an expanded textarea. Assertion corrected to test the actual control (<textarea>) rather than copy.
+- Inventory now uses operation chooser -> Record Movement or Create Item; both mutation forms are no longer simultaneously expanded above the inventory read model.
+- inventory-lite.v1, inventory-movements.v1 and non-blocking inventory semantics unchanged.
+- Current head 0594a59ea3a16a30f52c6acbe63c5d06ad98ec4e; CI pending.
