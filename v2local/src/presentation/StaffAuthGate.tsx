@@ -60,9 +60,9 @@ export function StaffAuthGate({children}:{children:ReactNode}){
     <div className="smt-gated-underlay" aria-hidden="true">{children}</div>
     <div className="s0">
       <section className="s0-brand" aria-label="磨飯 More Fun">
-        <div className="s0-logo"><small>More Fun</small><strong>磨 飯</strong><span>手 作　◆　輕 食</span></div>
+        <img className="s0-formal-logo" src="/assets/smt/stage0/stage0-logo.jpg" alt="磨飯 More Fun" onError={event=>event.currentTarget.classList.add('asset-failed')}/>
         <p>好味 · 好心情</p>
-        <div className="s0-mascot" aria-hidden="true">MF</div>
+        <img className="s0-formal-ip" src="/assets/smt/stage0/stage0-ip-boy.png" alt="" aria-hidden="true" onError={event=>event.currentTarget.classList.add('asset-failed')}/>
       </section>
       <main className="s0-login" aria-labelledby="staff-login-title">
         <header><div><h1 id="staff-login-title">歡迎回來 👋</h1><p>登入以開始今日營運</p></div><div className="s0-clock"><small>{date}</small><b>{time}</b></div></header>
