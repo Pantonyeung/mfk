@@ -157,7 +157,7 @@ describe('SMT full Admin config LKG',()=>{
     expect(print.templateSpec.receipt).toBe('店名\n訂單編號');
   });
 
-  it('projects Admin price, availability, Option Sets, media, and Combo pools into SMT',()=>{
+  it('projects Admin price/config while SMT runtime availability remains locally authoritative',()=>{
     const row=envelope(4);
     applyAdminConfigEnvelope(row);
 
@@ -166,7 +166,10 @@ describe('SMT full Admin config LKG',()=>{
     expect(dineIn.categories).toEqual([{id:'cat-a',label:'主食',position:10}]);
     expect(dineIn.products[0]?.priceMinor).toBe(1000);
     expect(takeaway.products[0]?.priceMinor).toBe(1050);
-    expect(takeaway.products[0]?.sellable).toBe(false);
+    // Admin snapshot.availability is no longer the store-runtime sold-out authority.
+    expect(takeaway.products[0]?.sellable).toBe(true);
+    localStorage.setItem('mfk.v2local.runtime.v1',JSON.stringify({orders:[],holds:[],availability:{p1:'soldout'}}));
+    expect(projectSyncedOrderingCatalog('takeaway',row).products[0]?.sellable).toBe(false);
     expect(takeaway.products[0]?.imageUrl).toBe('https://example.test/p1.webp');
     expect(takeaway.products[0]?.optionSets[0]?.name).toBe('份量');
     expect(takeaway.products[0]?.optionSets[0]?.options[1]?.priceAdjustmentMinor).toBe(-100);
