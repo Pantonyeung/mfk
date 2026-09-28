@@ -24,7 +24,7 @@ test('Device screen follows source hierarchy and stays safe when remote device a
   }
   assert.match(wave2,/data-safe-unavailable="true"/);
   assert.match(wave2,/遠端診斷暫未開放/);
-  assert.match(wave2,/唔會自動重印舊工作/);
+  assert.match(wave2,/舊打印工作.*唔會.*自動重印/);
   assert.doesNotMatch(wave2,/reprintOrderJobs|commandDevice|testPrint|rebindDevice/);
 });
 
