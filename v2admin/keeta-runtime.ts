@@ -1136,6 +1136,7 @@ export class KeetaRuntimeStore{
           total:result.projection.total,available:result.projection.available.length,
           unavailable:result.projection.unavailable.length,
           batches:result.results,completedAt:new Date().toISOString(),
+          ...(body.propagation&&typeof body.propagation==='object'?{propagation:{...body.propagation,providerCompletedAt:new Date().toISOString()}}:{}),
         });
         await this.state.storage.put('sellability:sync:latest',row);
         return json(row);
