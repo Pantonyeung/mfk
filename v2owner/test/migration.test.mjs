@@ -105,12 +105,14 @@ test('bounded actions require runtime and target readback semantics',()=>{
   assert.match(app,/完成後會再次確認最新狀態/);
 });
 
-test('manager log and checklist are local-only product workflows',()=>{
+test('manager log and checklist do not promote local drafts into formal Owner workflow',()=>{
   const app=fs.readFileSync(path.join(srcRoot,'App.tsx'),'utf8');
-  assert.match(app,/本機私人草稿/);
-  assert.match(app,/唔係共享營運真相/);
-  assert.match(app,/經理筆記/);
-  assert.match(app,/交接草稿/);
+  const wave2=fs.readFileSync(path.join(srcRoot,'source-fidelity-wave2.tsx'),'utf8');
+  assert.doesNotMatch(app,/function ManagerWorkspace/);
+  assert.match(wave2,/正式共享日誌未連接/);
+  assert.match(wave2,/新增、回覆、修改同刪除保持停用/);
+  assert.match(wave2,/清單操作暫未開放/);
+  assert.match(wave2,/交接確認暫未開放/);
 });
 
 test('production fixture file has been removed',()=>{
@@ -764,7 +766,8 @@ test('OA-PLN-001 uses canonical runtime rather than localStorage and keeps cost 
   assert.match(page,/Draft \/ Pending \/ External Pre-admission \/ 未結帳 Open Check \/ estimatedOpenAmount 不會加入/);
   assert.doesNotMatch(page,/localStorage|sessionStorage/);
   assert.match(cloud,/\/api\/owner\/planning/);
-  assert.match(app,/營業目標與成本/);
+  assert.match(app,/planning:'\/planning'/);
+  assert.match(app,/PlanningPage/);
 });
 
 test('Stage04 keeps four-item bottom navigation and secondary routes',()=>{

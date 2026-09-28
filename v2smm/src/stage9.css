@@ -9,8 +9,6 @@
 .stage9-header>div{display:grid;gap:3px}
 .stage9-header span,.stage9-header small{font-size:12px;color:#67738a}
 .stage9-header h1{margin:0;font-size:28px;line-height:34px;color:#163568}
-.stage9-group{display:grid;gap:8px}
-.stage9-group h2{margin:0 2px;font-size:13px;line-height:18px;color:#60708a;letter-spacing:.04em}
 .stage9-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
 .stage9-card{
   min-height:118px;
@@ -73,8 +71,13 @@
   padding:11px;border-radius:13px;background:#f3f6fb
 }
 @media(max-width:360px){
-  .stage9-grid{grid-template-columns:1fr}
-  .stage9-card{min-height:92px;grid-template-columns:38px minmax(0,1fr) auto}
+  .stage9-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
+  .stage9-card{min-height:104px;padding:9px;grid-template-columns:32px minmax(0,1fr) 12px;gap:5px 7px}
+  .stage9-icon-slot{width:32px;height:32px;border-radius:10px}
+  .stage9-card-copy strong{font-size:12px;line-height:17px}
+  .stage9-card-copy small{font-size:9px;line-height:13px}
+  .stage9-card-state{font-size:8px;padding:4px 6px}
+  .stage9-chevron{font-size:18px}
 }
 @media(max-height:780px){
   .stage9-page{gap:10px}

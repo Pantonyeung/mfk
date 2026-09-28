@@ -4,24 +4,16 @@ export type Stage9Tool='staff'|'connection'|'channels'|'business'|'printing'|'di
 
 type Statuses=Partial<Record<Stage9Tool,string>>;
 
-const GROUPS=[
-  {label:'店務',items:[
-    ['staff','員工帳戶','查看目前登入員工與切換帳戶','STAGE9_STAFF_ICON'],
-    ['connection','連線','查看門店連線方式與狀態','STAGE9_CONNECTION_ICON'],
-    ['channels','渠道健康','查看外賣平台與自家渠道','STAGE9_CHANNEL_ICON'],
-  ]},
-  {label:'營運',items:[
-    ['business','營業日','查看今日營業日記錄','STAGE9_BUSINESS_DAY_ICON'],
-    ['capacity','產能','查看門店忙閒與接單狀態','STAGE9_CAPACITY_ICON'],
-    ['reporting','營運報表','查看當日訂單、營業額與平均單','STAGE9_REPORTING_ICON'],
-    ['refunds','退款要求','查看需要跟進嘅售後事項','STAGE9_REFUND_ICON'],
-  ]},
-  {label:'設備',items:[
-    ['printing','打印與設備','查看打印機及設備健康','STAGE9_DEVICE_ICON'],
-  ]},
-  {label:'支援',items:[
-    ['diagnostics','診斷','查看連線、資料更新與本機狀態','STAGE9_DIAGNOSTICS_ICON'],
-  ]},
+const TOOLS=[
+  ['staff','員工帳戶','查看目前登入員工與切換帳戶','STAGE9_STAFF_ICON'],
+  ['connection','連線','查看門店連線方式與狀態','STAGE9_CONNECTION_ICON'],
+  ['channels','渠道健康','查看外賣平台與自家渠道','STAGE9_CHANNEL_ICON'],
+  ['business','營業日','查看今日營業日記錄','STAGE9_BUSINESS_DAY_ICON'],
+  ['capacity','產能','查看門店忙閒與接單狀態','STAGE9_CAPACITY_ICON'],
+  ['reporting','營運報表','查看當日訂單、營業額與平均單','STAGE9_REPORTING_ICON'],
+  ['refunds','退款要求','查看需要跟進嘅售後事項','STAGE9_REFUND_ICON'],
+  ['printing','打印與設備','查看打印機及設備健康','STAGE9_DEVICE_ICON'],
+  ['diagnostics','診斷','查看連線、資料更新與本機狀態','STAGE9_DIAGNOSTICS_ICON'],
 ] as const;
 
 function title(tool:Stage9Tool){
@@ -47,9 +39,8 @@ export function Stage9MoreView({tool,setTool,statuses,children}:{
     <header className="stage9-header">
       <div><span>更多</span><h1>店務工具</h1><small>常用店務資料集中一頁；需要更深入設定時再去管理後台。</small></div>
     </header>
-    {GROUPS.map(group=><section className="stage9-group" key={group.label}>
-      <h2>{group.label}</h2>
-      <div className="stage9-grid">{group.items.map(item=>{
+    <div className="stage9-grid" aria-label="店務工具">
+      {TOOLS.map(item=>{
         const key=item[0] as Stage9Tool;
         return <button type="button" className="stage9-card" key={key} onClick={()=>setTool(key)}>
           <span className="stage9-icon-slot" data-final-art-pending={item[3]} aria-hidden="true"/>
@@ -57,8 +48,8 @@ export function Stage9MoreView({tool,setTool,statuses,children}:{
           <span className="stage9-card-state">{statuses[key]||'查看'}</span>
           <span className="stage9-chevron" aria-hidden="true">›</span>
         </button>;
-      })}</div>
-    </section>)}
+      })}
+    </div>
     <section className="stage9-boundary"><strong>手機只做前線店務</strong><span>商品供應更改、重印、深層設定等操作會留喺有正式權限嘅工作位置。</span></section>
   </section>;
 }

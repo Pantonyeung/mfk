@@ -1,66 +1,68 @@
 {
   "work_id": "MFK-SMM-SOURCE-FIDELITY-W2-R1",
   "source_main": "2404a068f0306c6d1aa4f641f98504614fac2236",
-  "generated_by_run": 36365765381,
-  "generated_by_job": 108751737553,
+  "current_main_parent": "29901b86d18b06d4a19371fe3f3a6b91d8682a57",
+  "generated_by_run": 36367741605,
+  "generated_by_job": 108757426995,
   "captured_at": "2026-09-28",
+  "cjk_font_proof": "fonts-noto-cjk + Noto Sans CJK TC fallback",
   "captures": [
     {
       "name": "stage7-440x956",
       "width": 440,
       "height": 956,
-      "sha": "144a6d208162189ce6ec3d2c01fd757ff2c695b376af86e4f9aa22acaea5487a",
-      "bytes": 26820
+      "sha": "a9e2a0376c3123cd607b58c17c1a4f62be4e47b3c4d0a08631f002babf330c5a",
+      "bytes": 45439
     },
     {
       "name": "stage8-440x956",
       "width": 440,
       "height": 956,
-      "sha": "9e9ebc174607178dff7a270d787b6a69a38cf81edfacb50a563dc29b72e486e8",
-      "bytes": 31966
+      "sha": "76aefa667ff779f5ddde351d0940ba2bd7987f078b59863f3eeff8d767e4e66d",
+      "bytes": 67166
     },
     {
       "name": "stage9-440x956",
       "width": 440,
-      "height": 1067,
-      "sha": "2a3ceec3a30be1a3f33201f9d9dda19db1d8b5d35398b1c9bbae692058a7201f",
-      "bytes": 32335
+      "height": 956,
+      "sha": "53b66f2316f87c1c83fddae8d7fcbd02628959b332316ff6ce1fb25239a109d9",
+      "bytes": 77380
     },
     {
       "name": "stagex-440x956",
       "width": 440,
       "height": 956,
-      "sha": "a9eab235e1839fb97f451fb1aa58d39b535abfdde08e574fe8509ab12d12ed7e",
-      "bytes": 35973
+      "sha": "7d690256b740f370c66ecbb6f301bbbd0693a682ad88c2495d4acc8ba85f9de4",
+      "bytes": 96543
     },
     {
       "name": "stage7-360x780",
       "width": 360,
       "height": 780,
-      "sha": "aca298dd82279659e8351a85849879a483c4080f04ddc4a0778c6f6774f7fec5",
-      "bytes": 25303
+      "sha": "34d89bf3bcec7172948fcc07f6b887afbc5bae0d0929cfeedd02f922612b8432",
+      "bytes": 42994
     },
     {
       "name": "stage8-360x780",
       "width": 360,
       "height": 780,
-      "sha": "9d07f50a8b2e1cdeb37d5dec9f9a43170a6be168f3e21f497578eac0d8d3480f",
-      "bytes": 30636
+      "sha": "3f5be8466d0429ee6ca08849b2191c8b09259b6b84ef4146fcaf46bb0e992b6b",
+      "bytes": 64853
     },
     {
       "name": "stage9-360x780",
       "width": 360,
-      "height": 1284,
-      "sha": "5b21fd27be65613df0c797e56e2dc31343f9bf8c2322a28410319f52c499fb50",
-      "bytes": 36502
+      "height": 780,
+      "sha": "ad852807528c6fabe4a3d8fbdb7deff45dc5e65e134a1edfec85e23aa35ac853",
+      "bytes": 54006
     },
     {
       "name": "stagex-360x780",
       "width": 360,
-      "height": 809,
-      "sha": "3541ca47dfc801a42a2d70f9030c9b4576111a0d9f58387ee855848a71db957a",
-      "bytes": 32179
+      "height": 780,
+      "sha": "262efec0d3adda8f91ae59e55dd76ef5bba9f18dac1b270158688726ce2a5fa5",
+      "bytes": 89474
     }
   ],
-  "note": "Rendered from the Wave 2 implementation visual harness at the required viewports. Final mascot/banner/decorative/icon artwork remains pending by asset policy."
+  "note": "Rendered from the Wave 2 implementation visual harness at exact required viewports. Final mascot/banner/decorative/icon artwork remains pending by asset policy."
 }
