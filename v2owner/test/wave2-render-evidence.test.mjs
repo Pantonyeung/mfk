@@ -131,7 +131,7 @@ test('Wave2 FINAL screens render at 390 and 440 with 360 minimum width', {timeou
   browser.stderr.on('data',chunk=>{browserError+=String(chunk)});
   try{
     let debugPort=0;
-    for(let i=0;i<80;i++){
+    for(let i=0;i<300;i++){
       const match=browserError.match(/DevTools listening on ws:\/\/127\.0\.0\.1:(\d+)\//);
       if(match){debugPort=Number(match[1]);break}
       if(browser.exitCode!==null)throw new Error('Chrome exited before debug endpoint: '+browserError.slice(-1200));
