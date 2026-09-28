@@ -50,7 +50,7 @@ export function CashOpeningGate({children}:{children:ReactNode}){
   return <>
     <div className="smt-gated-underlay" aria-hidden="true">{children}</div>
     <div className="s0 s0-opening">
-      <section className="s0-brand"><div className="s0-logo"><small>More Fun</small><strong>磨 飯</strong><span>手 作　◆　輕 食</span></div><p>好味 · 好心情</p><div className="s0-mascot" aria-hidden="true">MF</div></section>
+      <section className="s0-brand" aria-label="磨飯 More Fun"><img className="s0-formal-logo" src="/assets/smt/stage0/stage0-logo.jpg" alt="磨飯 More Fun" onError={event=>event.currentTarget.classList.add('asset-failed')}/><p>好味 · 好心情</p><img className="s0-formal-ip" src="/assets/smt/stage0/stage0-ip-boy.png" alt="" aria-hidden="true" onError={event=>event.currentTarget.classList.add('asset-failed')}/></section>
       <main className="s0-open-card" aria-labelledby="cash-opening-title">
         <header><div><span>今日開更</span><h1 id="cash-opening-title">確認開櫃現金</h1><p>{session?.displayName??'員工'}，核對上一營業日留櫃，再確認今日實際開櫃金額。</p></div><strong>{state.businessDate}</strong></header>
         {suggestion?<section className="s0-retained"><article><small>上一日實點</small><b>{money(suggestion.previousCountedCashMinor)}</b></article><article><small>上一日取走</small><b>− {money(suggestion.previousCashRemovedMinor)}</b></article><article className="primary"><small>上一日留櫃</small><b>{money(suggestion.amountMinor)}</b></article></section>:<section className="s0-no-retained"><b>未有可沿用留櫃記錄</b><p>系統唔會估數，請輸入今日實際開櫃現金。</p></section>}
