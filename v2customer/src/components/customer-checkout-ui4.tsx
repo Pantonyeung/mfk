@@ -23,7 +23,7 @@ function stepClass(index:number,active:number){
 
 function CheckoutStepper({step}:{step:CustomerUi4CheckoutStep}){
   const active=step==='contact'?2:step==='payment'?3:4;
-  const labels=['確認商品','聯絡與取餐','付款','提交前確認'];
+  const labels=['商品','聯絡與取餐','付款','提交'];
   return <ol className="ui4-checkout-stepper" aria-label="結帳進度">
     {labels.map((label,index)=><li key={label} className={stepClass(index+1,active)}><i>{index+1<active?'✓':index+1}</i><span>{label}</span></li>)}
   </ol>;
@@ -64,6 +64,7 @@ export function CheckoutUi4View({
   checkout,
   setCheckout,
   paymentChannels,
+  pickupEtaLabel,
   onStep,
   onBackToJar,
   onRepair,
@@ -77,6 +78,7 @@ export function CheckoutUi4View({
   checkout:CustomerCheckoutDraft;
   setCheckout:(value:CustomerCheckoutDraft)=>void;
   paymentChannels:readonly CustomerPaymentChannel[];
+  pickupEtaLabel?:string;
   onStep:(step:CustomerUi4CheckoutStep)=>void;
   onBackToJar:()=>void;
   onRepair:()=>void;
@@ -134,6 +136,11 @@ export function CheckoutUi4View({
         <span>取餐碼</span>
         <AnimatedValue as="strong">{pickupCode??'----'}</AnimatedValue>
         <p>取餐時可以用呢個短碼畀店員核對。</p>
+      </section>
+      <section className="ui4-pickup-window" aria-label="取餐時間">
+        <header><span>取餐時間</span><strong>即時取餐</strong></header>
+        <p>{pickupEtaLabel??'目前可用到店自取窗口'}</p>
+        <small>V1 只提供目前可用自取窗口，不設明天／後天或其他預約時段。</small>
       </section>
       <div className="ui4-checkout-actions">
         <ActionButton variant="secondary" onClick={onBackToJar}>返回確認商品</ActionButton>
