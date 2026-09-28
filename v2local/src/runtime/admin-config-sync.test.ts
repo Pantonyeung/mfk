@@ -170,6 +170,11 @@ describe('SMT full Admin config LKG',()=>{
     expect(takeaway.products[0]?.sellable).toBe(true);
     localStorage.setItem('mfk.v2local.runtime.v1',JSON.stringify({orders:[],holds:[],availability:{p1:'soldout'}}));
     expect(projectSyncedOrderingCatalog('takeaway',row).products[0]?.sellable).toBe(false);
+    const disabledRow=createMfkAdminConfigEnvelope({
+      storeId:'MF01',revision:5,publishedAt:'2026-09-22T09:00:05.000Z',adminFingerprint:'fnv1a32:admin5',
+      snapshot:{...snapshot,catalog:{...snapshot.catalog,products:snapshot.catalog.products.map(product=>({...product,active:false}))}},
+    });
+    expect(projectSyncedOrderingCatalog('takeaway',disabledRow).products).toHaveLength(0);
     expect(takeaway.products[0]?.imageUrl).toBe('https://example.test/p1.webp');
     expect(takeaway.products[0]?.optionSets[0]?.name).toBe('份量');
     expect(takeaway.products[0]?.optionSets[0]?.options[1]?.priceAdjustmentMinor).toBe(-100);
