@@ -1004,72 +1004,45 @@ export class AdminSyncStore{
     const operationKey='owner:sellability:operation:'+operationId;
     const prior=await this.state.storage.get(operationKey);
     if(prior)return prior.result;
-    const action=String(input?.action||'').toUpperCase(),scope=String(input?.scope||'ALL').toUpperCase();
-    if(!['SOLD_OUT','RESTORE'].includes(action)||!['ALL','ONLINE_ONLY'].includes(scope)){
-      return{state:'UNKNOWN',message:'售罄操作格式無效',targets:[]};
-    }
+    const action=String(input?.action||'').toUpperCase();
+    if(!['SOLD_OUT','RESTORE'].includes(action))return{state:'UNKNOWN',message:'售罄操作格式無效',targets:[]};
     const requested=rows(input?.targets).slice(0,50);
     if(!requested.length)return{state:'UNKNOWN',message:'未有操作目標',targets:[]};
-    const current=await this.state.storage.get('active');
-    if(!current)return{state:'UNKNOWN',message:'Canonical Sellability Authority 未有 active revision',targets:[]};
-    const snapshot=row(current.snapshot),availability={...row(snapshot.availability)};
-    const now=new Date().toISOString(),restoreAt=action==='SOLD_OUT'?ownerTemporaryRestoreAt(input?.restoreAt,now):undefined;
-    const targetResults=[],resolved=[];
+    const active=await this.state.storage.get('active');
+    if(!active)return{state:'UNKNOWN',message:'Admin base catalog 未有 active revision',targets:[]};
+    const snapshot=row(active.snapshot),resolved=[],rejected=[];
     for(const rawTarget of requested){
       const target=row(rawTarget),grain=String(target.grain||'').toUpperCase(),targetId=String(target.targetId||'').trim();
       const found=ownerResolveSellabilityTarget(snapshot,grain,targetId);
-      if(!found){
-        targetResults.push({targetId,grain,state:'REJECTED',message:'目標不存在或唔屬 Sellability Authority'});
-        continue;
-      }
+      if(!found){rejected.push({targetId,grain,state:'REJECTED',message:'目標不存在'});continue;}
       resolved.push(found);
-      const key=ownerSellabilityKey(grain,targetId);
-      if(action==='RESTORE')availability[key]={sellable:true,scope,updatedAt:now,updatedBy:String(session.staffId||session.loginId||'OWNER')};
-      else availability[key]={
-        sellable:false,scope,
-        ...(restoreAt?{restoreAt}:{}),
-        reason:String(input?.reason||'').trim().slice(0,160),
-        updatedAt:now,updatedBy:String(session.staffId||session.loginId||'OWNER'),
-      };
     }
     if(!resolved.length){
-      const result={state:'UNKNOWN',message:'冇有效目標可以套用',targets:Object.freeze(targetResults)};
-      await this.state.storage.put(operationKey,{result,createdAt:now});
+      const result={state:'UNKNOWN',message:'冇有效目標可以套用',targets:Object.freeze(rejected)};
+      await this.state.storage.put(operationKey,{result,createdAt:new Date().toISOString()});
       return result;
     }
-    const nextSnapshot=Object.freeze({...snapshot,availability:Object.freeze(availability)});
-    const envelope=createMfkAdminConfigEnvelope({
-      storeId:String(current.storeId||'MF01'),
-      revision:Number(current.revision||0)+1,
-      publishedAt:now,
-      adminFingerprint:String(current.adminFingerprint||current.fingerprint||'OWNER_SELLABILITY_BOUNDED'),
-      snapshot:nextSnapshot,
+    const createdAt=new Date().toISOString();
+    const command=Object.freeze({
+      operationId,action,
+      targets:Object.freeze(resolved.map(target=>Object.freeze({targetId:target.targetId,grain:target.grain,name:target.name}))),
+      reason:String(input?.reason||'').trim().slice(0,160),
+      requestedBy:String(session.staffId||session.loginId||'OWNER'),
+      createdAt,
+      state:'PENDING_SMT',
     });
-    const applied=await this.publishEnvelope(envelope);
-    if(applied.status!==200){
-      const result={state:'UNKNOWN',message:'Canonical apply 結果未明；請重新讀取',targets:Object.freeze(resolved.map(target=>({...target,state:'UNKNOWN',message:'未取得 canonical apply'})))};
-      await this.state.storage.put(operationKey,{result,createdAt:now});
-      return result;
-    }
-    const readback=await this.state.storage.get('active');
-    const projected=readback?ownerSellabilityTargets(row(readback.snapshot),new Date().toISOString()):[];
-    for(const target of resolved){
-      let item=projected.find(row=>row.targetId===target.targetId&&row.grain===target.grain);
-      if(target.grain==='MODIFIER'){
-        const stateRow=row(row(readback?.snapshot).availability['OPTION:'+target.targetId]);
-        item={targetId:target.targetId,name:target.name,grain:'MODIFIER',state:ownerSellabilityEffective(stateRow)?'SELLABLE':'SOLD_OUT',scope:stateRow.scope==='ONLINE_ONLY'?'ONLINE_ONLY':'ALL',...(stateRow.restoreAt?{restoreAt:String(stateRow.restoreAt)}:{}),observedAt:new Date().toISOString(),readback:'CONFIRMED'};
-      }
-      const expected=action==='RESTORE'?'SELLABLE':'SOLD_OUT';
-      const confirmed=Boolean(item&&item.state===expected&&item.scope===scope);
-      targetResults.push({...target,state:confirmed?'CONFIRMED':'UNKNOWN',...(item?{readback:item}:{}),message:confirmed?'Canonical projection 已確認':'Per-target readback 未確認'});
-    }
-    const confirmedCount=targetResults.filter(item=>item.state==='CONFIRMED').length;
-    const unknownCount=targetResults.filter(item=>item.state==='UNKNOWN').length;
-    const state=confirmedCount===targetResults.length?'CONFIRMED':confirmedCount>0?'PARTIAL':'UNKNOWN';
-    const result={state,message:state==='CONFIRMED'?'售罄狀態已完成 canonical readback':state==='PARTIAL'?'部分目標已確認；其餘保持未明':'結果未明；禁止假裝成功',revision:Number(readback?.revision||envelope.revision),targets:Object.freeze(targetResults)};
-    await this.state.storage.put(operationKey,{result,createdAt:now});
-    await this.appendOwnerActivity(session,{operationId,title:'售罄／恢復',target:resolved.map(item=>item.name).join('、'),result:state,readback:'revision '+String(result.revision)});
+    await this.state.storage.put('owner:sellability:command:'+operationId,command);
+    const result={state:'UNKNOWN',message:'已送往店舖執行；等待 SMT Runtime readback',targets:Object.freeze([...rejected,...resolved.map(target=>({...target,state:'UNKNOWN'}))])};
+    await this.state.storage.put(operationKey,{result,createdAt});
+    const doorbell=JSON.stringify({type:'OWNER_SELLABILITY_COMMAND_AVAILABLE',storeId:String(active.storeId||'MF01'),operationId,receivedAt:createdAt});
+    for(const socket of this.state.getWebSockets()){try{socket.send(doorbell);}catch{}}
+    await this.appendOwnerActivity(session,{operationId,title:'售罄／恢復',target:resolved.map(item=>item.name).join('、'),result:'PENDING_SMT',readback:'等待 SMT Runtime'});
     return result;
+  }
+
+  async pendingOwnerSellabilityCommands(){
+    const rows=await this.state.storage.list({prefix:'owner:sellability:command:'});
+    return [...rows.values()].filter(value=>value?.state==='PENDING_SMT').slice(0,100);
   }
 
   async projectionOrders(){
