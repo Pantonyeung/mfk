@@ -373,3 +373,46 @@ test('SMM web acceptance target is isolated from production order delivery',()=>
   assert.match(acceptance,/\/__mfk\/smm-acceptance\/pending/);
   assert.match(main,/if\(webAcceptance\)installSmmWebAcceptanceIntake/);
 });
+
+
+test('P0 #434 normal Internet snapshot overlays existing SMT projection without inventing work',()=>{
+  const worker=fs.readFileSync(path.join(repoRoot,'v2smm','worker.ts'),'utf8');
+  const normalStart=worker.indexOf("if(url.pathname==='/api/smm/snapshot')");
+  const normalEnd=worker.indexOf("if(url.pathname==='/api/smm/staff')",normalStart);
+  const normal=worker.slice(normalStart,normalEnd);
+  assert.ok(normalStart>=0&&normalEnd>normalStart);
+  assert.match(normal,/acceptance\/smt\/projection/);
+  assert.match(normal,/orders:Array\.isArray\(projection\.orders\)\?projection\.orders:\[\]/);
+  assert.match(normal,/work:Array\.isArray\(projection\.work\)\?projection\.work:\[\]/);
+  assert.match(normal,/dineSessions:Array\.isArray\(projection\.dineSessions\)\?projection\.dineSessions:\[\]/);
+  assert.match(normal,/channel:'SMT_MIRROR',state:'CONNECTED'/);
+  assert.doesNotMatch(normal,/work:\s*\[[^\]]+\]/);
+});
+
+test('P0 #434 missing SMT projection is explicit STALE and acceptance snapshot stays independently wired',()=>{
+  const worker=fs.readFileSync(path.join(repoRoot,'v2smm','worker.ts'),'utf8');
+  const normalStart=worker.indexOf("if(url.pathname==='/api/smm/snapshot')");
+  const normalEnd=worker.indexOf("if(url.pathname==='/api/smm/staff')",normalStart);
+  const normal=worker.slice(normalStart,normalEnd);
+  assert.match(normal,/!projectionResponse\.ok/);
+  assert.match(normal,/channel:'SMT_MIRROR',state:'STALE'/);
+  assert.doesNotMatch(normal,/!projectionResponse\.ok[^\n]+state:'CONNECTED'/);
+
+  const acceptanceStart=worker.indexOf("if(url.pathname==='/api/smm/acceptance/snapshot')");
+  const acceptanceEnd=worker.indexOf("if(url.pathname==='/api/smm/snapshot')",acceptanceStart);
+  const acceptance=worker.slice(acceptanceStart,acceptanceEnd);
+  assert.match(acceptance,/readStaffSession/);
+  assert.match(acceptance,/acceptance\/smt\/projection/);
+  assert.match(acceptance,/channel:'WEB_SMT',state:'STALE'/);
+  assert.match(acceptance,/channel:'WEB_SMT',state:'CONNECTED'/);
+});
+
+test('P0 #434 auth config and menu projection seams remain unchanged around the mirror repair',()=>{
+  const worker=fs.readFileSync(path.join(repoRoot,'v2smm','worker.ts'),'utf8');
+  assert.match(worker,/fetchActive\(storeId\)/);
+  assert.match(worker,/validateMfkAdminConfigEnvelope/);
+  assert.match(worker,/projectSyncedOrderingCatalog\('takeaway',envelope\)/);
+  assert.match(worker,/projectSyncedOrderingCatalog\('dine-in',envelope\)/);
+  assert.match(worker,/readStaffSession/);
+  assert.match(worker,/SMM_STAFF_UNAUTHORIZED/);
+});
