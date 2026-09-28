@@ -1727,6 +1727,12 @@ export default {
     }
 
 
+    if(url.pathname==='/api/admin-sync/dining-occupancy'){
+      const storeId=storeIdFrom(url),id=env.ADMIN_SYNC.idFromName(storeId),stub=env.ADMIN_SYNC.get(id),target=new URL(request.url);
+      target.pathname='/dining-occupancy';
+      return stub.fetch(new Request(target.toString(),request));
+    }
+
     if(url.pathname.startsWith('/api/owner/')){
       if(request.method==='OPTIONS')return new Response(null,{status:204,headers:cors(request)});
       const origin=request.headers.get('origin')||'';if(origin!==OWNER_ORIGIN&&origin!==ADMIN_ORIGIN)return json({code:'OWNER_ORIGIN_FORBIDDEN'},403,cors(request));
