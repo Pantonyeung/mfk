@@ -28,6 +28,7 @@ test('P0 normal Owner surfaces do not expose engineering copy',()=>{
     read('src/channel-health.tsx'),
     read('src/sellability.tsx'),
     read('src/staff-overview.tsx'),
+    read('src/source-fidelity-wave2.tsx'),
   ];
 
   const visible=[];
