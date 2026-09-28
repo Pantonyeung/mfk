@@ -1664,7 +1664,8 @@ export class AdminSyncStore{
           const incomingAt=Date.parse(event.occurredAt);
           const currentAt=current?Date.parse(String(current.occurredAt||'')):Number.NEGATIVE_INFINITY;
           if(!current||!Number.isFinite(currentAt)||incomingAt>=currentAt){
-            await this.state.storage.put(key,{eventId:event.eventId,occurredAt:event.occurredAt,payload:event.payload});
+            const projectionAcceptedAt=new Date().toISOString();
+            await this.state.storage.put(key,{eventId:event.eventId,occurredAt:event.occurredAt,projectionAcceptedAt,payload:event.payload});
             try{
               const active=await this.state.storage.get('active');
               if(active){
@@ -1674,7 +1675,7 @@ export class AdminSyncStore{
                 const stub=this.env.KEETA_RUNTIME.get(id);
                 void stub.fetch(new Request('https://internal/admin/sellability/sync',{
                   method:'POST',headers:{'content-type':'application/json'},
-                  body:JSON.stringify({revision:active.revision,adminFingerprint:active.fingerprint,snapshot:active.snapshot,runtimeSellability}),
+                  body:JSON.stringify({revision:active.revision,adminFingerprint:active.fingerprint,snapshot:active.snapshot,runtimeSellability,propagation:{eventId:event.eventId,occurredAt:event.occurredAt,projectionAcceptedAt,providerTriggeredAt:new Date().toISOString()}}),
                 })).catch(()=>{});
               }
             }catch{}
