@@ -79,7 +79,12 @@ describe('Staff login presentation',()=>{
     for(const digit of ['1','2','3','4','5','6','7','8','9','0']){
       expect(html).toContain('>'+digit+'</button>');
     }
-    expect(html).toContain('登入後開更');
+    expect(html).toContain('aria-label="員工 PIN"');
+    expect(html).toContain('type="password"');
+    expect(html).toContain('inputMode="numeric"');
+    expect(html).not.toContain('掃碼登入');
+    expect(html).not.toContain('需要協助？');
+    expect(html).not.toContain('關閉系統');
     expect(html).toContain('Admin Config R3');
   });
 });
