@@ -168,7 +168,7 @@ test('LAN failure falls back to Internet and connection setup stays out of the o
   assert.match(runtime,/readCloudSnapshot/);
   assert.match(main,/SmmErrorBoundary/);
   assert.match(main,/SMM 顯示已自動保護/);
-  assert.match(app,/tool==='connection'/);
+  assert.match(app,/moreTool==='connection'/);
   assert.match(app,/ConnectionSettings/);
   assert.match(app,/moreTool==='connection'\?<ConnectionSettings/);
   assert.doesNotMatch(app,/Internet 資料通道運作中/);
