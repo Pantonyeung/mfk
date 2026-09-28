@@ -114,7 +114,10 @@ async function ack(envelope:MfkAdminConfigEnvelope,disposition:'APPLIED'|'IDEMPO
   if(!response.ok)throw new Error('ADMIN_CONFIG_ACK_HTTP_'+response.status);
 }
 
+let adminConfigFetchInFlight:Promise<SmtAdminConfigApplyResult|null>|null=null;
 export async function fetchAndApplyAdminConfig(){
+  if(adminConfigFetchInFlight)return adminConfigFetchInFlight;
+  adminConfigFetchInFlight=(async()=>{
   const current=readSmtAdminConfigLkg();
   setStatus({
     state:'CONNECTING',
@@ -149,7 +152,11 @@ export async function fetchAndApplyAdminConfig(){
       error:error instanceof Error?error.message:'ADMIN_CONFIG_SYNC_FAILED',
     });
     return null;
+  }finally{
+    adminConfigFetchInFlight=null;
   }
+  })();
+  return adminConfigFetchInFlight;
 }
 
 let installed=false;
