@@ -139,7 +139,32 @@ export function createSmmLanIngress(runtime:MfkLocalRuntime){
             ...(order.updatedAt&&order.updatedAt!==order.createdAt?[Object.freeze({at:order.updatedAt,label:order.fulfillmentLabel})]:[]),
           ]),
         }))),
-        work:Object.freeze([]),
+        work:Object.freeze(runtime.orders()
+          .filter(order=>order.fulfillmentLabel==='待處理'||order.fulfillmentLabel==='進行中'||order.fulfillmentLabel==='可取餐')
+          .filter(order=>!order.items.length||!order.items.every(item=>item.serviceMode==='dine-in'))
+          .map(order=>Object.freeze({
+            workId:'ORDER:'+order.id,
+            orderId:order.id,
+            displayCode:order.display,
+            kind:'FULFILLMENT',
+            summary:order.items.map(item=>item.name+' ×'+item.qty).join('、'),
+            state:'NORMAL' as const,
+            observedAt:order.updatedAt||order.createdAt,
+            source:order.sourceLabel,
+            orderTime:order.createdAt,
+            itemCount:order.items.reduce((sum,item)=>sum+item.qty,0),
+            serviceMode:'TAKEAWAY' as const,
+            statusLabel:order.fulfillmentLabel,
+            ...(order.customerName?{customerName:order.customerName}:{}),
+            ...(order.customerPhone?{customerContact:order.customerPhone}:{}),
+            ...(order.orderRemark?{note:order.orderRemark}:{}),
+            items:Object.freeze(order.items.map(item=>Object.freeze({
+              quantity:item.qty,
+              name:item.name,
+              ...(item.detail?{detail:item.detail}:{}),
+              amountLabel:'HKD '+((item.unitMinor*item.qty)/100).toFixed(2),
+            }))),
+          }))),
         channels:Object.freeze([]),
         dineSessions:Object.freeze(runtime.holds().filter(hold=>hold.kind==='dining').map(hold=>{
           const payments=hold.payments??[];
