@@ -153,7 +153,7 @@ let reconnectAttempt=0;
 function scheduleReconnect(){
   if(typeof window==='undefined'||!navigator.onLine)return;
   if(reconnectTimer!==undefined)window.clearTimeout(reconnectTimer);
-  const delays=[2000,5000,15000,30000,60000];
+  const delays=[500,1000,2000,5000,15000];
   const delay=delays[Math.min(reconnectAttempt,delays.length-1)]!;
   reconnectAttempt+=1;
   reconnectTimer=window.setTimeout(()=>connectDoorbell(),delay);
