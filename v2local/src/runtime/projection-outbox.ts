@@ -179,6 +179,24 @@ export function queueOrderProjection(order:ProjectionOrderInput){
   }));
 }
 
+export function queueRuntimeSellabilityProjection(nodeId:string,status:'available'|'soldout'|'paused'){
+  const occurredAt=new Date().toISOString();
+  return enqueue(createSmtProjectionEvent({
+    storeId:'MF01',
+    deviceId:readSmtDeviceId(),
+    type:'RUNTIME_SELLABILITY_UPSERT',
+    entityId:nodeId,
+    occurredAt,
+    payload:Object.freeze({
+      nodeId,
+      status,
+      sellable:status==='available',
+      source:'SMT_RUNTIME',
+      observedAt:occurredAt,
+    }),
+  }));
+}
+
 export function queueCashOpeningProjection(row:LocalCashOpening){
   return enqueue(createSmtProjectionEvent({
     storeId:'MF01',
