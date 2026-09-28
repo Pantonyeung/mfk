@@ -13,6 +13,8 @@ import {
   readSmtDeviceId,
   subscribeSmtAdminConfig,
   subscribeSmtCloudDoorbell,
+  readOwnerSellabilityCommands,
+  ackOwnerSellabilityCommand,
 } from './admin-config-sync.ts';
 import {localRuntime} from './local-runtime.ts';
 import {createSmmLanIngress} from './smm-lan-ingress.ts';
@@ -470,11 +472,33 @@ async function reconcileOrders(){
   }
 }
 
+async function reconcileOwnerSellabilityCommands(){
+  const commands=await readOwnerSellabilityCommands();
+  for(const raw of commands){
+    const command=raw as {operationId?:string;action?:string;targets?:readonly {targetId?:string;grain?:string}[]};
+    const operationId=String(command.operationId||'').trim();
+    if(!operationId)continue;
+    const status=command.action==='SOLD_OUT'?'soldout':command.action==='RESTORE'?'available':null;
+    if(!status){await ackOwnerSellabilityCommand(operationId,'REJECTED',[]);continue;}
+    const results=[];
+    for(const target of command.targets??[]){
+      const grain=String(target.grain||'').toUpperCase();
+      const targetId=String(target.targetId||'').trim();
+      const nodeId=grain==='MODIFIER'?'OPTION:'+targetId:grain==='COMBO_CHILD'?'COMBO_CHILD:'+targetId:targetId;
+      if(!targetId){continue;}
+      await localRuntime.setAvailability(nodeId,status);
+      results.push({targetId,grain,nodeId,state:status==='available'?'SELLABLE':'SOLD_OUT'});
+    }
+    await ackOwnerSellabilityCommand(operationId,'CONFIRMED',results);
+  }
+}
+
 let reconciling=false;
 export async function reconcileCustomerCloudBridge(){
   if(reconciling||typeof navigator!=='undefined'&&typeof navigator.onLine==='boolean'&&!navigator.onLine)return;
   reconciling=true;
   try{
+    await reconcileOwnerSellabilityCommands();
     await reconcileQuotes();
     await reconcileOrders();
   }catch(error){
@@ -491,7 +515,7 @@ export function installCustomerCloudBridge(){
   installed=true;
   const reconcile=()=>void reconcileCustomerCloudBridge();
   subscribeSmtCloudDoorbell(event=>{
-    if(event.type==='CUSTOMER_QUOTE_AVAILABLE'||event.type==='CUSTOMER_ORDER_AVAILABLE')reconcile();
+    if(event.type==='CUSTOMER_QUOTE_AVAILABLE'||event.type==='CUSTOMER_ORDER_AVAILABLE'||event.type==='OWNER_SELLABILITY_COMMAND_AVAILABLE')reconcile();
   });
   subscribeSmtAdminConfig(reconcile);
   window.addEventListener('online',reconcile);
