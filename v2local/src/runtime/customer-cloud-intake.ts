@@ -1,11 +1,13 @@
-// Build refresh: Customer revision/price validation + own-channel auto-admit.
+// A3B: Customer revision/price validation + own-channel pending operator review.
 // Customer electronic tender labels come from the Admin-published payment channel.
-import type {
-  CustomerCloudCartLine,
-  MfkCustomerOrderIntent,
-  MfkCustomerQuoteRequest,
+import {
+  customerReorderHistoryPriceFactsFromCart,
+  customerReorderIntentFromCart,
+  type CustomerCloudCartLine,
+  type MfkCustomerOrderIntent,
+  type MfkCustomerQuoteRequest,
 } from '../../../contracts/customer-cloud-v1.ts';
-import {projectSyncedOrderingCatalog,type SyncedOrderingProduct} from './admin-config-projection.ts';
+import {projectSyncedCombos,projectSyncedOrderingCatalog,type SyncedCombo,type SyncedComboPool,type SyncedOrderingProduct} from './admin-config-projection.ts';
 import {
   readSmtAdminConfigLkg,
   readSmtDeviceId,
@@ -15,7 +17,8 @@ import {
 import {localRuntime} from './local-runtime.ts';
 import {createSmmLanIngress} from './smm-lan-ingress.ts';
 import {assertCapacityChannelAdmission} from './capacity-pool-state.ts';
-import {validateSmmLanOrderRequest,type SmmLanOrderRequest} from '../../../contracts/smm-lan-v1.ts';
+import {validateSmmLanOrderRequest,type SmmLanLineIntent,type SmmLanOrderRequest} from '../../../contracts/smm-lan-v1.ts';
+import {revalidateSmmComboLine} from './smm-combo-revalidation.ts';
 
 const ENDPOINT='https://admin.morefunos.com';
 const ATTENTION_KEY='mfk.customer.cloud-intake.attention.v1';
@@ -43,9 +46,31 @@ function selectedByGroup(line:CustomerCloudCartLine){
   return map;
 }
 
+export function customerLineToSmmLanLine(line:CustomerCloudCartLine):SmmLanLineIntent{
+  return Object.freeze({
+    lineId:line.lineId,
+    productId:line.productId,
+    productName:line.productName,
+    quantity:line.quantity,
+    ...(line.selectedVariationId?{selectedVariationId:line.selectedVariationId}:{}),
+    ...(line.selectedVariationName?{selectedVariationName:line.selectedVariationName}:{}),
+    selections:Object.freeze(line.selections.map(selection=>Object.freeze({
+      optionGroupId:selection.optionGroupId,
+      optionId:selection.optionId,
+      optionName:selection.optionName,
+    }))),
+    ...(line.combo?{combo:line.combo}:{}),
+    ...(Number.isSafeInteger(Number(line.publishedUnitPriceMinor))
+      ?{publishedUnitPriceMinor:Number(line.publishedUnitPriceMinor)}
+      :{}),
+  });
+}
+
 export function priceCustomerCart(
   cart:readonly CustomerCloudCartLine[],
   products:readonly SyncedOrderingProduct[],
+  combos:readonly SyncedCombo[]=Object.freeze([]),
+  pools:readonly SyncedComboPool[]=Object.freeze([]),
 ):CustomerPricedCart{
   const byId=new Map(products.map(product=>[product.id,product] as const));
   const items:CustomerPricedLine[]=[];
@@ -77,9 +102,35 @@ export function priceCustomerCart(
       if(!product.optionSets.some(set=>set.id===groupId))throw new Error('CUSTOMER_OPTION_GROUP_UNKNOWN:'+product.id+':'+groupId);
     }
 
-    const unitMinor=product.priceMinor+optionMinor;
-    if(!Number.isSafeInteger(unitMinor)||unitMinor<0)throw new Error('CUSTOMER_UNIT_PRICE_INVALID:'+product.id);
+    const standaloneUnitMinor=product.priceMinor+optionMinor;
+    if(!Number.isSafeInteger(standaloneUnitMinor)||standaloneUnitMinor<0)throw new Error('CUSTOMER_UNIT_PRICE_INVALID:'+product.id);
     const qty=Math.max(1,Math.floor(Number(line.quantity)||1));
+
+    if(line.combo){
+      const smmLine=customerLineToSmmLanLine(line);
+      const comboResult=revalidateSmmComboLine(
+        smmLine,
+        'takeaway',
+        products,
+        combos,
+        pools,
+        standaloneUnitMinor,
+      );
+      const published=Number(line.publishedUnitPriceMinor);
+      if(!Number.isSafeInteger(published)||published<0||published!==comboResult.unitMinor){
+        throw new Error('SMM_PUBLISHED_PRICE_CHANGED');
+      }
+      totalMinor+=comboResult.unitMinor*qty;
+      const note=String(line.note||'').trim();
+      items.push(...comboResult.items.map((item,index)=>Object.freeze({
+        ...item,
+        serviceMode:'takeaway' as const,
+        ...(index===0&&note?{detail:[item.detail,note].filter(Boolean).join(' · ')}:{}),
+      })));
+      continue;
+    }
+
+    const unitMinor=standaloneUnitMinor;
     totalMinor+=unitMinor*qty;
     const detail=[optionNames.join('、'),String(line.note||'').trim()].filter(Boolean).join(' · ');
     items.push(Object.freeze({
@@ -202,7 +253,8 @@ async function reconcileQuotes(){
   for(const raw of quotes){
     const quote=raw as MfkCustomerQuoteRequest&{state?:string};
     try{
-      const priced=priceCustomerCart(quote.cart,catalog.products);
+      const comboData=projectSyncedCombos(envelope);
+      const priced=priceCustomerCart(quote.cart,catalog.products,comboData.combos,comboData.pools);
       assertCapacityChannelAdmission({
         channel:'FIRST_PARTY',
         items:priced.items,
@@ -278,20 +330,7 @@ function smmRequestFromCustomerIntent(intent:MfkCustomerOrderIntent,meta:Record<
     publishedTotalMinor,
     serviceMode:serviceMode as SmmLanOrderRequest['serviceMode'],
     tender:tender as SmmLanOrderRequest['tender'],
-    lines:Object.freeze(intent.cart.map(line=>Object.freeze({
-      lineId:line.lineId,
-      productId:line.productId,
-      productName:line.productName,
-      quantity:line.quantity,
-      ...(line.selectedVariationId?{selectedVariationId:line.selectedVariationId}:{}),
-      ...(line.selectedVariationName?{selectedVariationName:line.selectedVariationName}:{}),
-      selections:Object.freeze(line.selections.map(selection=>Object.freeze({
-        optionGroupId:selection.optionGroupId,
-        optionId:selection.optionId,
-        optionName:selection.optionName,
-      }))),
-      ...(Number.isSafeInteger(Number(line.publishedUnitPriceMinor))?{publishedUnitPriceMinor:Number(line.publishedUnitPriceMinor)}:{}),
-    }))),
+    lines:Object.freeze(intent.cart.map(customerLineToSmmLanLine)),
   });
 }
 
@@ -372,7 +411,8 @@ async function reconcileOrders(){
     }
     try{
       if(String(intent.menuRevision)!==String(envelope.revision))throw new Error('CUSTOMER_MENU_REVISION_CHANGED');
-      const priced=priceCustomerCart(intent.cart,catalog.products);
+      const comboData=projectSyncedCombos(envelope);
+      const priced=priceCustomerCart(intent.cart,catalog.products,comboData.combos,comboData.pools);
       const publishedTotal=intent.cart.reduce((sum,line)=>sum+(Number.isSafeInteger(Number(line.publishedUnitPriceMinor))?Number(line.publishedUnitPriceMinor)*line.quantity:0),0);
       const hasPublishedTotal=intent.cart.every(line=>Number.isSafeInteger(Number(line.publishedUnitPriceMinor))&&Number(line.publishedUnitPriceMinor)>=0);
       if(hasPublishedTotal&&publishedTotal!==priced.totalMinor)throw new Error('CUSTOMER_MENU_PRICE_CHANGED');
@@ -385,6 +425,9 @@ async function reconcileOrders(){
           orderEvents:capacityEventsFromRuntime(),
         });
       }
+      if(intent.checkout.paymentMethod==='ELECTRONIC'&&!intent.checkout.paymentEvidenceRef){
+        throw new Error('CUSTOMER_PAYMENT_EVIDENCE_REQUIRED');
+      }
       const order=localRuntime.createOrder({
         items:priced.items,
         totalMinor:priced.totalMinor,
@@ -394,8 +437,11 @@ async function reconcileOrders(){
         sourceLabel:'自家 App',
         providerRef,
         ...(intent.checkout.paymentMethod==='ELECTRONIC'&&intent.checkout.paymentEvidenceRef?{paymentEvidenceRef:intent.checkout.paymentEvidenceRef,paymentVerificationState:'PENDING' as const}:{}),
+        ...(intent.checkout.name?{customerName:intent.checkout.name}:{}),
         customerPhone:intent.checkout.phone,
-        initialFulfillmentLabel:'進行中',
+        customerReorderIntent:customerReorderIntentFromCart(intent.cart),
+        customerReorderHistoryPriceFacts:customerReorderHistoryPriceFactsFromCart(intent.cart),
+        initialFulfillmentLabel:'待處理',
       });
       window.dispatchEvent(new CustomEvent('mfk-customer-order-intake',{detail:{
         canonicalOrderId:order.id,

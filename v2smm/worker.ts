@@ -84,13 +84,13 @@ async function hmacHex(keyHex:string,message:string){
   const signature=await crypto.subtle.sign('HMAC',key,new TextEncoder().encode(message));
   return bytesToHex(new Uint8Array(signature));
 }
-async function currentStaffVerifier(staffId:string,storeId:string):Promise<{staff:RuntimeStaffIdentity;verifier:StaffPinVerifier}|null>{
-  if(!staffId)return null;
+async function currentStaffVerifier(identifier:string,storeId:string):Promise<{staff:RuntimeStaffIdentity;verifier:StaffPinVerifier}|null>{
+  if(!identifier)return null;
   let active:Record<string,unknown>;
   try{active=await fetchActive(storeId);}catch{return null;}
-  const staff=staffRows(active).find(row=>row.staffId===staffId);
-  if(!staff?.pinVerifier)return null;
-  return Object.freeze({staff,verifier:staff.pinVerifier});
+  const matches=staffRows(active).filter(row=>row.staffId===identifier||row.loginId===identifier);
+  if(matches.length!==1||!matches[0]?.pinVerifier)return null;
+  return Object.freeze({staff:matches[0],verifier:matches[0].pinVerifier});
 }
 
 async function currentStaffIdentity(staffId:string,storeId:string){
@@ -362,6 +362,7 @@ export class SmmIntentStore{
           state:'CONFIRMED',
           submissionId,
           canonicalOrderId:String(row.result?.orderId||''),
+          canonicalDisplay:String(row.result?.displayCode||''),
           canonicalRevision:Number(row.result?.canonicalRevision)||1,
         });
       }
@@ -611,6 +612,7 @@ export default{
       try{active=await fetchActive(storeId);}catch{return json({code:'SMM_CONFIG_NOT_PUBLISHED'},503);}
       return json({staff:staffRows(active).map(item=>({
         staffId:item.staffId,
+        loginId:item.loginId,
         displayName:item.name,
         role:item.role,
       }))});
@@ -619,9 +621,10 @@ export default{
     if(url.pathname==='/api/smm/staff/challenge'){
       if(request.method!=='POST')return json({code:'METHOD_NOT_ALLOWED'},405);
       const body=record(await request.json().catch(()=>({})));
-      const staffId=text(body.staffId,120);
-      const current=await currentStaffVerifier(staffId,storeId);
+      const identifier=text(body.loginId??body.staffId,120);
+      const current=await currentStaffVerifier(identifier,storeId);
       if(!current)return json({code:'SMM_STAFF_NOT_AVAILABLE',message:'呢個員工帳戶暫時未能登入'},404);
+      const staffId=current.staff.staffId;
       const id=env.SMM_INTENT_STORE.idFromName(storeId);
       const stub=env.SMM_INTENT_STORE.get(id);
       const response=await stub.fetch(new Request('https://internal/auth/challenge/create',{
@@ -633,6 +636,8 @@ export default{
       const challenge=record(await response.json());
       return json({
         challengeId:challenge.challengeId,
+        staffId,
+        loginId:current.staff.loginId,
         nonce:challenge.nonce,
         expiresAt:challenge.expiresAt,
         algorithm:current.verifier.algorithm,
@@ -679,6 +684,7 @@ export default{
 
       const staff=Object.freeze({
         staffId:current.staff.staffId,
+        loginId:current.staff.loginId,
         displayName:current.staff.name,
         role:current.staff.role,
         scope:current.staff.scope,

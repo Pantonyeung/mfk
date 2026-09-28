@@ -1,0 +1,385 @@
+import {useMemo,useState} from 'react';
+import type {SmmConnectionState,SmmOrderProjection} from './product-types';
+import {StageXState,type SmmStageXKind} from './StageXState';
+import {
+  smmStage7AmountLabel,
+  smmStage7ConnectionState,
+  smmStage7InSegment,
+  smmStage7ItemCount,
+  smmStage7MatchesDate,
+  smmStage7MatchesSearch,
+  smmStage7MatchesSource,
+  smmStage7MatchesStatus,
+  smmStage7OrderTime,
+  smmStage7Phone,
+  smmStage7SourceGroup,
+  smmStage7StatusLabel,
+  smmStage7Sort,
+  type SmmStage7DateFilter,
+  type SmmStage7SearchScope,
+  type SmmStage7Segment,
+  type SmmStage7SourceFilter,
+  type SmmStage7StatusFilter,
+} from './stage7-orders.mjs';
+
+type Stage7Surface='LIST'|'SEARCH'|'DETAIL'|'STATUS';
+
+const SOURCE_FILTERS:readonly [SmmStage7SourceFilter,string][]=[
+  ['ALL','全部'],
+  ['ONSITE','現場'],
+  ['SMM','SMM'],
+  ['OWN_PLATFORM','自家平台'],
+  ['THIRD_PARTY','第三方'],
+];
+
+const SEARCH_SCOPES:readonly [SmmStage7SearchScope,string][]=[
+  ['ALL','全部'],
+  ['DISPLAY','訂單編號'],
+  ['PRODUCT','商品名稱'],
+  ['PHONE','電話'],
+];
+
+const STATUS_OPTIONS=['待確認','製作中','準備完成 / 可取餐','已取餐','已取消'] as const;
+
+const ACTIVE_STATUS_FILTERS:readonly [SmmStage7StatusFilter,string][]=[
+  ['ALL','全部狀態'],
+  ['PENDING','待確認'],
+  ['WORKING','製作中'],
+  ['READY','可取餐'],
+  ['UNKNOWN','狀態未明'],
+];
+const HISTORY_STATUS_FILTERS:readonly [SmmStage7StatusFilter,string][]=[
+  ['ALL','全部狀態'],
+  ['PICKED_UP','已取餐'],
+  ['CANCELLED','已取消'],
+  ['UNKNOWN','狀態未明'],
+];
+
+function dateTimeLabel(value:string){
+  const date=new Date(value);
+  if(!Number.isFinite(date.getTime()))return '未有資料';
+  return date.toLocaleString('zh-HK',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false});
+}
+
+function timeLabel(value:string){
+  const date=new Date(value);
+  if(!Number.isFinite(date.getTime()))return '未有資料';
+  return date.toLocaleTimeString('zh-HK',{hour:'2-digit',minute:'2-digit',hour12:false});
+}
+
+function statusTone(label:string){
+  if(label==='已取餐')return 'success';
+  if(label==='已取消')return 'cancelled';
+  if(label.includes('可取餐')||label.includes('完成'))return 'ready';
+  if(label==='製作中')return 'working';
+  if(label==='待確認')return 'pending';
+  if(label==='狀態未明'||label==='部分資料')return 'unknown';
+  return 'neutral';
+}
+
+function sourceLabel(row:SmmOrderProjection){
+  const raw=String(row.source||'').trim();
+  return raw||'未有資料';
+}
+
+function sourceFilterCount(rows:readonly SmmOrderProjection[],filter:SmmStage7SourceFilter){
+  return rows.filter(row=>smmStage7MatchesSource(row,filter)).length;
+}
+
+function Stage7StateBanner({connection,hasRows}:{connection:SmmConnectionState;hasRows:boolean}){
+  const state=smmStage7ConnectionState(connection,hasRows);
+  if(!state)return null;
+  return <StageXState compact kind={state.kind as SmmStageXKind} title={state.title} detail={state.detail}/>;
+}
+
+function Stage7Empty({segment}:{segment:SmmStage7Segment}){
+  return <StageXState
+    kind="EMPTY"
+    title={segment==='ACTIVE'?'暫時沒有進行中訂單':'暫時沒有歷史訂單'}
+    detail={segment==='ACTIVE'?'有新正式訂單時會按目前狀態顯示。':'完成或取消訂單會保留喺歷史記錄。'}
+  />;
+}
+
+function Stage7Card({row,onOpen}:{row:SmmOrderProjection;onOpen:()=>void}){
+  const count=smmStage7ItemCount(row);
+  const status=smmStage7StatusLabel(row);
+  const source=sourceLabel(row);
+  const time=smmStage7OrderTime(row);
+  return <button type="button" className="stage7-card" onClick={onOpen}>
+    <span className={`stage7-source-icon stage7-source-${smmStage7SourceGroup(row).toLowerCase()}`} data-final-art-pending={`STAGE7_SOURCE_${smmStage7SourceGroup(row)}`} aria-hidden="true"><span className="stage7-source-art"/></span>
+    <span className="stage7-card-main">
+      <span><strong>{row.displayCode||'未有資料'}</strong><small>{source}</small></span>
+      <small>{timeLabel(time)} · {count===null?'項目數未有資料':`${count} 項`} · {smmStage7AmountLabel(row)}</small>
+      <small>{row.itemSummary||'商品資料未有資料'}</small>
+    </span>
+    <span className={`stage7-status stage7-status-${statusTone(status)}`}>{status}</span>
+    <span className="stage7-chevron" aria-hidden="true">›</span>
+  </button>;
+}
+
+function Stage7Search({
+  rows,
+  query,
+  setQuery,
+  scope,
+  setScope,
+  onBack,
+  onOpen,
+}:{
+  rows:readonly SmmOrderProjection[];
+  query:string;
+  setQuery:(value:string)=>void;
+  scope:SmmStage7SearchScope;
+  setScope:(value:SmmStage7SearchScope)=>void;
+  onBack:()=>void;
+  onOpen:(row:SmmOrderProjection)=>void;
+}){
+  const phoneAvailable=rows.some(row=>Boolean(smmStage7Phone(row)));
+  const results=useMemo(()=>rows.filter(row=>smmStage7MatchesSearch(row,query,scope)),[rows,query,scope]);
+  return <section className="stage7-search-screen" data-stage7-visual="7.3_SEARCH">
+    <header className="stage7-subheader">
+      <button type="button" onClick={onBack} aria-label="返回訂單列表">‹</button>
+      <strong>搜尋訂單</strong>
+      <span/>
+    </header>
+    <label className="stage7-search-box">
+      <span aria-hidden="true">⌕</span>
+      <input autoFocus value={query} onChange={event=>setQuery(event.target.value)} placeholder="訂單編號 / 商品 / 電話"/>
+      {query?<button type="button" onClick={()=>setQuery('')} aria-label="清除搜尋">×</button>:null}
+    </label>
+    <div className="stage7-search-scopes">
+      {SEARCH_SCOPES.map(([value,label])=><button
+        type="button"
+        key={value}
+        className={scope===value?'active':''}
+        disabled={value==='PHONE'&&!phoneAvailable}
+        aria-pressed={scope===value}
+        onClick={()=>setScope(value)}
+      >{label}{value==='PHONE'&&!phoneAvailable?<small>未有資料</small>:null}</button>)}
+    </div>
+    {!query.trim()?<section className="stage7-search-hint"><strong>輸入搜尋內容</strong><span>只會比對訂單編號、商品名稱，以及系統可用嘅電話資料。</span></section>:
+      results.length?<div className="stage7-list">{results.map(row=><Stage7Card key={row.orderId} row={row} onOpen={()=>onOpen(row)}/>)}</div>:
+      <section className="stage7-search-hint"><strong>找不到訂單</strong><span>只會用目前可搜尋嘅訂單資料提供結果。</span></section>}
+  </section>;
+}
+
+function DetailField({label,value}:{label:string;value:string|undefined|null}){
+  const text=String(value??'').trim();
+  return <div className="stage7-field"><span>{label}</span><strong>{text||'未有資料'}</strong></div>;
+}
+
+function Stage7Detail({
+  row,
+  surface,
+  refreshing,
+  onBack,
+  onStatus,
+  onRefresh,
+}:{
+  row:SmmOrderProjection;
+  surface:'DETAIL'|'STATUS';
+  refreshing:boolean;
+  onBack:()=>void;
+  onStatus:()=>void;
+  onRefresh:()=>void;
+}){
+  const count=smmStage7ItemCount(row);
+  const status=smmStage7StatusLabel(row);
+  const phone=smmStage7Phone(row);
+  const structured=row.items??[];
+
+  if(surface==='STATUS'){
+    return <section className="stage7-status-screen" data-stage7-visual="7.5_STATUS">
+      <header className="stage7-subheader">
+        <button type="button" onClick={onBack} aria-label="返回訂單詳情">‹</button>
+        <strong>訂單狀態</strong>
+        <span/>
+      </header>
+      <section className="stage7-status-order">
+        <div><strong>{row.displayCode||'未有資料'}</strong><span>{sourceLabel(row)}</span></div>
+        <small>{count===null?'項目數未有資料':`${count} 項`} · {smmStage7AmountLabel(row)}</small>
+      </section>
+      <section className="stage7-status-options">
+        {STATUS_OPTIONS.map(option=><label key={option} className={status===option?'current':''}>
+          <input type="radio" disabled checked={status===option} readOnly/>
+          <span><strong>{option}</strong><small>{status===option?'目前狀態':'請在收銀機處理'}</small></span>
+        </label>)}
+      </section>
+      <label className="stage7-disabled-note">
+        <span>備註（選填）</span>
+        <textarea disabled placeholder="此操作需由 SMT 處理"/>
+      </label>
+      <p className="stage7-authority-note">呢部手機目前只可查看同重新整理狀態。需要更改或取消訂單，請在收銀機處理。</p>
+      <footer className="stage7-status-footer">
+        <button type="button" onClick={onBack}>取消</button>
+        <button type="button" className="primary" disabled>確認更新</button>
+        <small>此操作需由 SMT 處理</small>
+        <button type="button" className="stage7-readback" disabled={refreshing} onClick={onRefresh}>{refreshing?'重新讀取中…':'重新整理狀態'}</button>
+      </footer>
+    </section>;
+  }
+
+  return <section className="stage7-detail" data-stage7-visual="7.4_DETAIL">
+    <header className="stage7-subheader">
+      <button type="button" onClick={onBack} aria-label="返回訂單列表">‹</button>
+      <strong>訂單詳情</strong>
+      <span>•••</span>
+    </header>
+
+    <section className="stage7-detail-hero">
+      <div><strong>{row.displayCode||'未有資料'}</strong><span>{sourceLabel(row)}</span></div>
+      <span className={`stage7-status stage7-status-${statusTone(status)}`}>{status}</span>
+      <small>下單時間　{dateTimeLabel(smmStage7OrderTime(row))}</small>
+      {row.eta?<small>預計取餐　{row.eta}</small>:<small>預計取餐　未有資料</small>}
+    </section>
+
+    <section className="stage7-detail-section">
+      <h3>顧客資料</h3>
+      <DetailField label="姓名" value={row.customerName}/>
+      <DetailField label="電話" value={phone}/>
+    </section>
+
+    <section className="stage7-detail-section">
+      <h3>訂單內容{count===null?'':`（${count} 項）`}</h3>
+      {structured.length?<div className="stage7-items">{structured.map((item,index)=><article key={index}>
+        <b>{item.quantity}</b>
+        <div><strong>{item.name||'未有資料'}</strong><small>{item.detail||item.remark||'未有資料'}</small></div>
+        <span>{item.amountLabel||'未有資料'}</span>
+      </article>)}</div>:
+      <p className="stage7-summary">{row.itemSummary||'未有資料'}</p>}
+    </section>
+
+    <section className="stage7-detail-section stage7-money">
+      <h3>金額 / 付款</h3>
+      <DetailField label="有效總額" value={smmStage7AmountLabel(row)}/>
+      <DetailField label="付款方式" value={row.tenderLabel}/>
+    </section>
+
+    <section className="stage7-detail-section">
+      <h3>來源 / 出餐進度</h3>
+      <DetailField label="來源" value={sourceLabel(row)}/>
+      <DetailField label="外部參考" value={row.externalRef}/>
+      <DetailField label="目前狀態" value={status}/>
+    </section>
+
+    <section className="stage7-detail-section">
+      <h3>訂單紀錄</h3>
+      {row.timeline.length?<div className="stage7-timeline">{row.timeline.map((item,index)=><article key={index}>
+        <span/>
+        <div><strong>{item.label||'未有資料'}</strong><small>{item.detail||'未有資料'}</small></div>
+        <time>{dateTimeLabel(item.at)}</time>
+      </article>)}</div>:<p className="stage7-summary">未有資料</p>}
+    </section>
+
+    {row.note?<section className="stage7-note"><strong>訂單備註</strong><span>{row.note}</span></section>:null}
+
+    <footer className="stage7-detail-footer">
+      <button type="button" onClick={onStatus}>查看狀態</button>
+      <button type="button" className="primary" disabled={refreshing} onClick={onRefresh}>{refreshing?'重新讀取中…':'重新整理'}</button>
+      <small>手機只提供查看；需要更改訂單請在收銀機處理。</small>
+    </footer>
+  </section>;
+}
+
+export function Stage7OrdersView({
+  connection,
+  rows,
+  onRefresh,
+}:{
+  connection:SmmConnectionState;
+  rows:readonly SmmOrderProjection[];
+  onRefresh:()=>Promise<void>|void;
+}){
+  const [segment,setSegment]=useState<SmmStage7Segment>('ACTIVE');
+  const [sourceFilter,setSourceFilter]=useState<SmmStage7SourceFilter>('ALL');
+  const [dateFilter,setDateFilter]=useState<SmmStage7DateFilter>('ALL');
+  const [statusFilter,setStatusFilter]=useState<SmmStage7StatusFilter>('ALL');
+  const [customDate,setCustomDate]=useState('');
+  const [query,setQuery]=useState('');
+  const [searchScope,setSearchScope]=useState<SmmStage7SearchScope>('ALL');
+  const [surface,setSurface]=useState<Stage7Surface>('LIST');
+  const [selectedId,setSelectedId]=useState<string|null>(null);
+  const [refreshing,setRefreshing]=useState(false);
+
+  const segmentRows=useMemo(()=>smmStage7Sort(rows.filter(row=>smmStage7InSegment(row,segment))),[rows,segment]);
+  const filteredRows=useMemo(()=>segmentRows.filter(row=>
+    smmStage7MatchesSource(row,sourceFilter)&&
+    smmStage7MatchesStatus(row,statusFilter)&&
+    (segment!=='HISTORY'||smmStage7MatchesDate(row,dateFilter,customDate))
+  ),[segmentRows,sourceFilter,statusFilter,segment,dateFilter,customDate]);
+  const selected=selectedId?rows.find(row=>row.orderId===selectedId):undefined;
+
+  const refresh=async()=>{
+    if(refreshing)return;
+    setRefreshing(true);
+    try{await Promise.resolve(onRefresh())}
+    finally{setRefreshing(false)}
+  };
+
+  const openDetail=(row:SmmOrderProjection)=>{setSelectedId(row.orderId);setSurface('DETAIL')};
+  const backToList=()=>{setSelectedId(null);setSurface('LIST')};
+
+  if(selected&&surface==='DETAIL'){
+    return <Stage7Detail row={selected} surface="DETAIL" refreshing={refreshing} onBack={backToList} onStatus={()=>setSurface('STATUS')} onRefresh={()=>void refresh()}/>;
+  }
+  if(selected&&surface==='STATUS'){
+    return <Stage7Detail row={selected} surface="STATUS" refreshing={refreshing} onBack={()=>setSurface('DETAIL')} onStatus={()=>{}} onRefresh={()=>void refresh()}/>;
+  }
+  if(surface==='SEARCH'){
+    return <Stage7Search
+      rows={segmentRows}
+      query={query}
+      setQuery={setQuery}
+      scope={searchScope}
+      setScope={setSearchScope}
+      onBack={()=>setSurface('LIST')}
+      onOpen={openDetail}
+    />;
+  }
+
+  return <section className="stage7-page" aria-label="訂單記錄" data-stage7-visual={segment==='ACTIVE'?'7.1_ACTIVE':'7.2_HISTORY'}>
+    <header className="stage7-header">
+      <h1>訂單</h1>
+      <button type="button" onClick={()=>setSurface('SEARCH')} aria-label="搜尋訂單">⌕</button>
+    </header>
+
+    <Stage7StateBanner connection={connection} hasRows={rows.length>0}/>
+
+    <div className="stage7-segments" aria-label="訂單範圍">
+      <button type="button" className={segment==='ACTIVE'?'active':''} aria-pressed={segment==='ACTIVE'} onClick={()=>{setSegment('ACTIVE');setDateFilter('ALL');setStatusFilter('ALL')}}>進行中</button>
+      <button type="button" className={segment==='HISTORY'?'active':''} aria-pressed={segment==='HISTORY'} onClick={()=>{setSegment('HISTORY');setStatusFilter('ALL')}}>歷史</button>
+    </div>
+
+    {segment==='HISTORY'?<div className="stage7-date-filter" aria-label="歷史日期">
+      {([
+        ['ALL','全部'],['TODAY','今天'],['YESTERDAY','昨天'],['CUSTOM','自訂日期'],
+      ] as const).map(([value,label])=><button type="button" key={value} className={dateFilter===value?'active':''} onClick={()=>setDateFilter(value)}>{label}</button>)}
+      {dateFilter==='CUSTOM'?<input type="date" value={customDate} onChange={event=>setCustomDate(event.target.value)} aria-label="選擇歷史日期"/>:null}
+    </div>:null}
+
+    <div className="stage7-source-filters" aria-label="訂單來源">
+      {SOURCE_FILTERS.map(([value,label])=><button type="button" key={value} className={sourceFilter===value?'active':''} aria-pressed={sourceFilter===value} onClick={()=>setSourceFilter(value)}>
+        <span>{label}</span><b>{sourceFilterCount(segmentRows,value)}</b>
+      </button>)}
+    </div>
+
+    <div className="stage7-status-filters" aria-label="訂單狀態">
+      {(segment==='ACTIVE'?ACTIVE_STATUS_FILTERS:HISTORY_STATUS_FILTERS).map(([value,label])=><button type="button" key={value} className={statusFilter===value?'active':''} aria-pressed={statusFilter===value} onClick={()=>setStatusFilter(value)}>{label}</button>)}
+    </div>
+
+    <button type="button" className="stage7-search-entry" onClick={()=>setSurface('SEARCH')}>
+      <span aria-hidden="true">⌕</span><span>{query||'搜尋訂單編號 / 商品 / 電話'}</span>
+    </button>
+
+    {connection==='READY'&&segmentRows.length===0?<Stage7Empty segment={segment}/>:null}
+
+    {segmentRows.length>0&&filteredRows.length===0?<section className="stage7-filter-empty" data-stage7-filter-empty="true" role="status">
+      <strong>目前篩選條件沒有符合訂單</strong>
+      <span>目前分頁有 {segmentRows.length} 張正式訂單；請調整來源、狀態或日期篩選。</span>
+    </section>:null}
+
+    {filteredRows.length?<div className="stage7-list">{filteredRows.map(row=><Stage7Card key={row.orderId} row={row} onOpen={()=>openDetail(row)}/>)}</div>:null}
+
+    <button type="button" className="stage7-refresh-button" disabled={refreshing} onClick={()=>void refresh()}>{refreshing?'重新整理中…':'重新整理訂單'}</button>
+  </section>;
+}

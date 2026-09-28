@@ -59,17 +59,17 @@ test('production App no longer imports fixtures or exposes migration/demo operat
   assert.doesNotMatch(app,/\.\/fixtures/);
   assert.doesNotMatch(app,/Migration Mode|DEMO|Capability Registry|所有 Command：NOT_WIRED/);
   assert.match(app,/尚未連接門店服務/);
-  assert.match(app,/唔會顯示假資料/);
+  assert.match(app,/連線後再載入餐單、訂單同營運資料/);
   assert.match(app,/本機草稿/);
   assert.match(app,/結果未明/);
 });
 
 test('complete operator routes and failure states are present',()=>{
   for(const marker of[
-    '快速點餐','前線工作','訂單記錄','桌面管理','店務工具',
-    '搜尋商品','商品設定','購物草稿','待提交草稿','平台狀態',
-    '連線設定','商品供應','營業日','產能','營運報表','退款要求','列印狀態','診斷','正在同步餐單',
-    '同步失敗','重新確認結果'
+    '今日想食咩','待處理','訂單記錄','餐枱總覽','店務工具',
+    '搜尋商品','商品客製','購物草稿','待提交草稿','渠道健康',
+    '連線','營業日','產能','營運報表','退款要求','打印與設備','診斷','正在更新餐單',
+    '去結帳'
   ])assert.match(source,new RegExp(marker));
 });
 
@@ -86,8 +86,8 @@ test('typed runtime port is an injected boundary only',()=>{
 test('UNKNOWN flow preserves identity and reads back before any resend',()=>{
   const app=fs.readFileSync(path.join(root,'App.tsx'),'utf8');
   assert.match(app,/readSubmission/);
-  assert.match(app,/唔會自動重送/);
-  assert.match(app,/未有重新提交/);
+  assert.match(app,/只會確認原本結果|只會讀回原本提交/);
+  assert.match(app,/未有再次送出|唔會建立第二張單/);
   assert.match(app,/submissionId/);
   const persistence=fs.readFileSync(path.join(root,'persistence.ts'),'utf8');
   assert.match(persistence,/idempotencyKey/);
@@ -97,7 +97,8 @@ test('Business Day remains record-only and non-blocking',()=>{
   const types=fs.readFileSync(path.join(root,'product-types.ts'),'utf8');
   const app=fs.readFileSync(path.join(root,'App.tsx'),'utf8');
   assert.match(types,/recordOnly:true/);
-  assert.match(app,/永遠唔會阻止落單、付款或者本機提交/);
+  assert.match(app,/營業日用作當日記錄同報表分類/);
+  assert.doesNotMatch(app,/if\s*\([^\n]*businessDay[^\n]*\)\s*(?:return|throw)/);
 });
 
 
@@ -113,8 +114,8 @@ test('SMM uses the shared published menu price and SMT validates only on submit'
   const contract=fs.readFileSync(path.join(repoRoot,'contracts','smm-lan-v1.ts'),'utf8');
   assert.match(types,/publishedTakeawayUnitPriceMinor/);
   assert.match(types,/publishedDineInUnitPriceMinor/);
-  assert.match(app,/已發布總額/);
-  assert.match(app,/SMT 提交時再核對/);
+  assert.match(app,/revalidateSmmCartComboIntent/);
+  assert.match(app,/projectLineAgainstCurrentMenu/);
   assert.doesNotMatch(app,/等待門店報價/);
   assert.doesNotMatch(app,/port\?\.quoteCart/);
   assert.match(app,/port\?\.submitOrder/);
@@ -167,8 +168,9 @@ test('LAN failure falls back to Internet and connection setup stays out of the o
   assert.match(runtime,/readCloudSnapshot/);
   assert.match(main,/SmmErrorBoundary/);
   assert.match(main,/SMM 顯示已自動保護/);
-  assert.match(app,/title="連線設定"/);
-  assert.match(app,/tool==='connection'\?<ConnectionSettings/);
+  assert.match(app,/moreTool==='connection'/);
+  assert.match(app,/ConnectionSettings/);
+  assert.match(app,/moreTool==='connection'\?<ConnectionSettings/);
   assert.doesNotMatch(app,/Internet 資料通道運作中/);
 });
 
@@ -216,13 +218,18 @@ test('dedicated SMM worker keeps auth session only and proxies orders to the sha
 });
 
 
-test('SMM staff checkout has service mode and tender but no automatic drawer or QR handoff',()=>{
+test('SMM Stage 4 adds checkout confirmation UI while formal Stage 5 submission remains unexposed',()=>{
   const app=fs.readFileSync(path.join(root,'App.tsx'),'utf8');
-  const ingress=fs.readFileSync(path.join(repoRoot,'v2local','src','runtime','smm-lan-ingress.ts'),'utf8');
-  assert.match(app,/服務方式/);
-  assert.match(app,/堂食/);
-  assert.match(app,/收款方式/);
-  assert.match(app,/現金只會記錄為收款方式；需要開錢箱時由 SMT 人手操作/);
+  const types=fs.readFileSync(path.join(root,'product-types.ts'),'utf8');
+  const ingress=fs.readFileSync(path.join(repoRoot,'v2local','src/runtime/smm-lan-ingress.ts'),'utf8');
+  const start=app.indexOf('function Stage4CheckoutView');
+  const end=app.indexOf('function DiningTargetSheet',start);
+  const checkout=app.slice(start,end);
+  for(const marker of['服務方式','堂食去向','付款方式','訂單確認','確認落單'])assert.match(checkout,new RegExp(marker));
+  assert.doesNotMatch(checkout,/submitCart|submitOrder|readSubmission|createSmmPendingIntent/);
+  assert.match(app,/const submitCart=async\(\)=>/);
+  assert.match(app,/readSubmission/);
+  assert.match(types,/export type SmmTender=/);
   assert.doesNotMatch(app,/產生 QR|QR 交接|createSmmQrHandoff|renderSmmQrHandoff/);
   assert.match(ingress,/paymentLabel/);
   assert.match(ingress,/SMM_MENU_REVISION_CHANGED/);
@@ -258,7 +265,7 @@ test('Internet staff orders use same-account auth and the existing customer brid
   assert.match(runtime,/hybridTransport/);
   assert.match(runtime,/local\.kind!=='UNAVAILABLE'/);
   assert.match(app,/員工帳戶/);
-  assert.match(app,/同 SMT 共用同一員工身份/);
+  assert.match(app,/店舖員工帳戶|員工帳戶/);
   assert.match(sharedBridge,/bridgeKind==='SMM_STAFF'/);
   assert.match(sharedBridge,/smmIngress\.submit/);
   assert.match(sharedBridge,/\/api\/customer\/smt\/orders\/pending/);
@@ -278,15 +285,16 @@ test('SMM Internet menu and SMT commit share one published catalog projection',(
 });
 
 
-test('persisted cart reprices from the current published menu before resubmit',()=>{
+test('passive menu refresh preserves accepted cart facts and requires line-scoped confirmation before resubmit',()=>{
   const app=fs.readFileSync(path.join(root,'App.tsx'),'utf8');
-  assert.match(app,/cart\.map\(line=>/);
-  assert.match(app,/publishedUnitPriceMinor:unitMinor/);
-  assert.match(app,/menu\?\.revision,menu\?\.observedAt/);
-  assert.match(app,/購物草稿已按目前發布價格重新計算/);
+  assert.match(app,/buildSmmCartRefreshAttention/);
+  assert.match(app,/refreshAttention:proposal/);
+  assert.match(app,/未確認前唔會靜默接受新價格或套餐資料/);
+  assert.match(app,/const repriced=cart\.map\(line=>repriceLine\(line,next\)\)/);
   assert.match(app,/SMM_PUBLISHED_PRICE_CHANGED/);
-  assert.match(app,/SMT 發現餐單版本／價格已更新/);
-  assert.match(app,/removeIntent\(pending\.submissionId\)/);
+  assert.match(app,/SMM_PUBLISHED_PRICE_CHANGED.*SMM_MENU_REVISION_CHANGED/);
+  assert.match(app,/setStage5Session\(Object\.freeze\(\{intent:rejected,state:'REJECTED'/);
+  assert.match(app,/repairStage5/);
 });
 
 
@@ -342,12 +350,12 @@ test('SMM order intent carries published unit price so SMT line-level revalidati
 
 test('SMM never reuses an unresolved submission and only creates a fresh id after definitive reject',()=>{
   const app=fs.readFileSync(path.join(root,'App.tsx'),'utf8');
-  assert.match(app,/await port\.readSubmission\(existing\.submissionId\)/);
+  assert.match(app,/pendingIntents\.find\(item=>item\.state==='PENDING'\|\|item\.state==='UNKNOWN'\|\|item\.state==='NOT_CONNECTED'\)/);
+  assert.match(app,/await port\.readSubmission\(unresolved\.submissionId\)/);
   assert.match(app,/prior\.state==='CONFIRMED'/);
-  assert.match(app,/prior\.state!=='REJECTED'/);
-  assert.match(app,/未重新送出，避免重複訂單/);
-  assert.match(app,/removeIntent\(existing\.submissionId\)/);
-  assert.match(app,/base=createSmmPendingIntent/);
+  assert.match(app,/prior\.state==='REJECTED'/);
+  assert.match(app,/未有再次送出|只會確認原本結果/);
+  assert.match(app,/const base=existing\?\?createSmmPendingIntent/);
 });
 
 

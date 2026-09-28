@@ -26,7 +26,8 @@ describe('MFK Admin migration firewall',()=>{
       const isSyncClient=path.endsWith('admin-sync-client.ts');
       const isProjectionClient=path.endsWith('admin-projection-client.ts');
       const isKeetaClient=path.endsWith('keeta-live-client.ts');
-      const isNetworkClient=isSyncClient||isProjectionClient||isKeetaClient;
+      const isAdminBrowserClient=path.endsWith('admin-browser-session.ts');
+      const isNetworkClient=isSyncClient||isProjectionClient||isKeetaClient||isAdminBrowserClient;
       if(!isNetworkClient)expect(/\bfetch\s*\(/.test(source),path+' used fetch outside approved network seam').toBe(false);
       if(!isProjectionClient)expect(/\bnew\s+WebSocket\s*\(/.test(source),path+' used WebSocket outside projection doorbell seam').toBe(false);
       for(const pattern of forbidden){
@@ -40,6 +41,12 @@ describe('MFK Admin migration firewall',()=>{
         expect(source).toContain('/api/projection/orders');
         expect(source).toContain('/api/projection/reports');
         expect(source).toContain('/api/admin-sync/events');
+      }
+      if(isAdminBrowserClient){
+        expect(source).toContain('/api/admin-browser/auth/challenge');
+        expect(source).toContain('/api/admin-browser/active');
+        expect(source).toContain('x-mfk-admin-session');
+        expect(source).not.toContain('x-mfk-admin-publish-key');
       }
       if(isKeetaClient){
         expect(source).toContain('/api/keeta/admin/status');

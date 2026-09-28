@@ -34,7 +34,7 @@ export function createPwaLanTransport(c:SmmLanPwaConfig):SmmLanTransport{
         return{kind:'RESPONSE',response:r as unknown as SmmLanOrderResponse};
       }catch(error){
         if(error instanceof DOMException&&error.name==='AbortError')return{kind:'UNKNOWN'};
-        return{kind:'UNAVAILABLE'};
+        return{kind:'UNKNOWN'};
       }
     },
     async readSubmission(submissionId,signal){

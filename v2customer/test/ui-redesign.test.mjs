@@ -43,6 +43,6 @@ test('memory jar and recommendations use projected product and history data',()=
   assert.match(app,/buildCustomerRecommendations/);
   assert.match(recommendation,/product\.badge/);
   assert.match(recommendation,/appearedInHistory/);
-  assert.match(app,/buildReorderCart/);
+  assert.match(app,/buildCurrentReorderCart/);
   assert.doesNotMatch(app,/fake|fixture|mock/i);
 });

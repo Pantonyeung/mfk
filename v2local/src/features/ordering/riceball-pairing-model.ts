@@ -1,5 +1,6 @@
 import type {SyncedCombo,SyncedComboPool,SyncedOptionSet} from '../../runtime/admin-config-projection.ts';
 import type {ServiceMode} from './ordering-workspace-model.ts';
+import type {MfkOrderLinePairingV1} from '../../../../contracts/order-line-composition-v1.ts';
 
 export interface PairingProduct{
   readonly id:string;
@@ -16,6 +17,7 @@ export interface PairingCartLine{
   readonly unitMinor:number;
   readonly serviceMode:ServiceMode;
   readonly detail?:string;
+  readonly pairing?:MfkOrderLinePairingV1;
 }
 
 export interface PairingUnit{
@@ -366,6 +368,13 @@ export function applyRiceballPairings<T extends PairingCartLine>(
       qty:1,
       unitMinor:mainPriceMinor,
       detail:withPairingDetail(mainLine.detail,slot.label,combo.name,'飯團'),
+      pairing:Object.freeze({
+        groupLabel:slot.label,
+        comboId:combo.id,
+        comboName:combo.name,
+        role:'MAIN',
+        sourceLineId:mainLine.id,
+      }),
     } as T);
     created.push({
       ...snackLine,
@@ -373,6 +382,13 @@ export function applyRiceballPairings<T extends PairingCartLine>(
       qty:1,
       unitMinor:snackPriceMinor,
       detail:withPairingDetail(snackLine.detail,slot.label,combo.name,'小食'),
+      pairing:Object.freeze({
+        groupLabel:slot.label,
+        comboId:combo.id,
+        comboName:combo.name,
+        role:'SNACK',
+        sourceLineId:snackLine.id,
+      }),
     } as T);
     groups.push(Object.freeze({
       label:slot.label,
@@ -413,7 +429,8 @@ export function restorePairingGroup<T extends PairingCartLine>(
     const product=products.find(row=>row.id===line.productId);
     if(!product)throw new Error('PAIRING_PRODUCT_MISSING');
     const detail=stripPairingDetail(line.detail);
-    const restored={...line,unitMinor:product.priceMinor+selectedOptionAdjustment({...line,detail},product),detail:detail||undefined};
+    const {pairing:_pairing,...base}=line;
+    const restored={...base,unitMinor:product.priceMinor+selectedOptionAdjustment({...line,detail},product),detail:detail||undefined};
     return restored as T;
   });
 }
