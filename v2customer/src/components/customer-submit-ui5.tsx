@@ -86,7 +86,7 @@ export function SubmitUi5View({
   return <section className="page ui5-submit" data-ui5-route="submit" data-submit-state={state}>
     <header className="ui5-hero">
       <div className="ui5-brand-art-slot" data-final-art-pending="true" role="img" aria-label="磨飯品牌角色插圖位置"/>
-      <span>送出訂單</span>
+      <span>安全提交</span>
       <h1>{state==='UNKNOWN'?'未收到即時回覆':state==='NOT_CONNECTED'?'可以轉用 WhatsApp':state==='REJECTED'?'需要重新確認餐點':submitting||state==='PENDING'?'正在送出訂單…':'準備送出今次訂單'}</h1>
       <p>{state==='UNKNOWN'
         ?'可能已經送達店舖；我哋只會確認原本嗰次落單，請勿重複提交。'
@@ -184,7 +184,8 @@ export function WaitingStoreConfirmationUi5View({
   return <section className="page ui5-waiting" data-ui5-route="waiting" data-order-stage={stage}>
     <header className="ui5-waiting-hero">
       <div className="ui5-brand-art-slot" data-final-art-pending="true" role="img" aria-label="磨飯品牌角色插圖位置"/>
-      <span>{canonicalDelivered?'訂單已成功送達':'正在確認原本訂單'}</span>
+      <span>安全提交</span>
+      <small>{canonicalDelivered?'訂單已成功送達':'正在確認原本訂單'}</small>
       <h1>{waiting?'等待店舖確認':'店舖狀態已更新'}</h1>
       <p>{waiting
         ?'訂單已經送到店舖；等候期間唔會重複落單。'
