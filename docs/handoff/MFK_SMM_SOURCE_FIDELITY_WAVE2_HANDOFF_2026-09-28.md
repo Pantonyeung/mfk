@@ -32,20 +32,30 @@ MODE：SOURCE FIDELITY / NO MAIN MERGE / NO DEPLOY
 
 ## Final Candidate Validation
 
-Existing workflow reused；無新增 one-off workflow。
+Existing workflows reused；無新增 one-off workflow。
 
-GitHub Actions：
-- Run `36368063636` = SUCCESS
-- SMM job `108758350787` = SUCCESS
-- v2local job `108758350683` = SUCCESS
-- Full SMM：148 tests PASS / 0 fail
-- SMM build：PASS
-- Wrangler dry-run：PASS
-- v2local tests/build：PASS
+Exact candidate source tree validation：
+- Run `36368211666` = SUCCESS
+  - SMM = SUCCESS
+  - v2local = SUCCESS
+  - Full SMM：148 tests PASS / 0 fail
+  - SMM build = PASS
+  - Wrangler dry-run = PASS
+  - v2local tests/build = PASS
+- Run `36368239086` = SUCCESS
+  - SMM = SUCCESS
+  - SMT / v2local = SUCCESS
+  - Customer = SUCCESS
+  - Admin = SUCCESS
+  - Admin Wrangler dry-run = PASS
+- Run `36368242368` = SUCCESS
+  - Owner = SUCCESS
+  - Admin = SUCCESS
+  - Admin Wrangler dry-run = PASS
 
-Candidate 無 Customer / Admin / Owner source delta；相關 code 直接繼承 current main。Current-main relevant regression evidence：
-- Customer/Admin/SMM/SMT baseline run `36361569473` = SUCCESS
-- Owner current-main run `36366733244` / `36366733245` = SUCCESS
+Current main parent：`29901b86d18b06d4a19371fe3f3a6b91d8682a57`
+Candidate branch：`work/MFK/SMM-SOURCE-FIDELITY-W2-R1`
+BEHIND_MAIN：0
 
 ## Visual Evidence
 
