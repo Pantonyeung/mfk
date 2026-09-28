@@ -299,21 +299,59 @@ export interface OwnerChannelCommandResult {
   readonly readback?:string;
 }
 
+export type OwnerSellabilityGrain='PRODUCT'|'OPTION'|'MODIFIER'|'COMBO_CHILD';
+export type OwnerSellabilityScope='ALL'|'ONLINE_ONLY';
+export type OwnerSellabilityReadback='CONFIRMED'|'PARTIAL'|'UNKNOWN';
+
 export interface OwnerSellabilityItem {
   readonly targetId:string;
   readonly name:string;
-  readonly grain:string;
-  readonly state:string;
-  readonly scope:string;
+  readonly grain:OwnerSellabilityGrain;
+  readonly state:'SELLABLE'|'SOLD_OUT'|'UNKNOWN';
+  readonly scope:OwnerSellabilityScope;
+  readonly restoreAt?:string;
+  readonly quantity?:number;
+  readonly observedAt:string;
+  readonly readback:OwnerSellabilityReadback;
+}
+
+export interface OwnerSellabilityCommandTarget {
+  readonly targetId:string;
+  readonly grain:OwnerSellabilityGrain;
+}
+
+export interface OwnerSellabilityCommandInput {
+  readonly operationId:string;
+  readonly action:'SOLD_OUT'|'RESTORE';
+  readonly scope:OwnerSellabilityScope;
+  readonly targets:readonly OwnerSellabilityCommandTarget[];
+  readonly restoreAt?:string;
+  readonly reason?:string;
+}
+
+export interface OwnerSellabilityTargetResult {
+  readonly targetId:string;
+  readonly grain:OwnerSellabilityGrain;
+  readonly state:'CONFIRMED'|'REJECTED'|'UNKNOWN';
+  readonly readback?:OwnerSellabilityItem;
+  readonly message:string;
+}
+
+export interface OwnerSellabilityCommandResult {
+  readonly state:'CONFIRMED'|'PARTIAL'|'UNKNOWN';
+  readonly message:string;
+  readonly revision?:number;
+  readonly targets:readonly OwnerSellabilityTargetResult[];
 }
 
 export interface OwnerStaffPresence {
   readonly staffId:string;
+  readonly loginId?:string;
   readonly name:string;
   readonly role:string;
   readonly presence:string;
   readonly schedule?:string;
-  readonly permissions:string;
+  readonly capabilitySummary?:string;
 }
 
 export interface OwnerDeviceHealth {
@@ -396,13 +434,16 @@ export interface OwnerActivityRecord {
   readonly activityId:string;
   readonly title:string;
   readonly actor:string;
+  readonly actorStaffId?:string;
   readonly target?:string;
   readonly correlationId?:string;
   readonly incidentId?:string;
   readonly linkedActionId?:string;
   readonly detail?:string;
   readonly requester?:string;
+  readonly requesterStaffId?:string;
   readonly approver?:string;
+  readonly approverStaffId?:string;
   readonly result:string;
   readonly readback?:string;
   readonly observedAt:string;
@@ -469,5 +510,7 @@ export interface OwnerRuntimePort {
   readChannels?():Promise<readonly OwnerChannelHealth[]>;
   readPlanning?(monthKey:string):Promise<OwnerPlanningSnapshot>;
   savePlanning?(input:OwnerPlanningSaveInput):Promise<OwnerPlanningCommandResult>;
+  readSellability?():Promise<readonly OwnerSellabilityItem[]>;
+  commandSellability?(input:OwnerSellabilityCommandInput):Promise<OwnerSellabilityCommandResult>;
   requestAdminDeepLink?():Promise<OwnerCommandResult>;
 }

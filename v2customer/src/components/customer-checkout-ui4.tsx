@@ -68,6 +68,7 @@ export function CheckoutUi4View({
   onBackToJar,
   onRepair,
   onPaymentEvidence,
+  onReviewConfirmed,
 }:{
   step:CustomerUi4CheckoutStep;
   cart:readonly CustomerCartLine[];
@@ -80,6 +81,7 @@ export function CheckoutUi4View({
   onBackToJar:()=>void;
   onRepair:()=>void;
   onPaymentEvidence:(file:File)=>void;
+  onReviewConfirmed:()=>void;
 }){
   const [reviewConfirmed,setReviewConfirmed]=useState(false);
   const reviewFingerprint=JSON.stringify({
@@ -199,7 +201,7 @@ export function CheckoutUi4View({
         <span>提交前確認</span>
         <h2>{reviewConfirmed?'資料已確認':'確認今次資料'}</h2>
         <p>{reviewConfirmed?'正式安全提交同等待店舖回覆會由下一階段處理。':'呢個動作只確認 Review UI，唔會建立正式訂單、付款結果或者新提交身份。'}</p>
-        <ActionButton wide disabled={!reviewReady||reviewConfirmed} onClick={()=>setReviewConfirmed(true)}>{reviewConfirmed?'已確認資料':'確認以上資料'}</ActionButton>
+        <ActionButton wide disabled={!reviewReady||reviewConfirmed} onClick={()=>{setReviewConfirmed(true);onReviewConfirmed();}}>{reviewConfirmed?'已確認資料':'確認以上資料'}</ActionButton>
       </section>
       <div className="ui4-checkout-actions">
         <ActionButton variant="secondary" onClick={()=>onStep('payment')}>返回付款</ActionButton>

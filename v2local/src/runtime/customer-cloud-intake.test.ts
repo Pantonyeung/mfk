@@ -1,6 +1,7 @@
 import {readFileSync,existsSync} from 'node:fs';
 import {describe,expect,it} from 'vitest';
 import {priceCustomerCart} from './customer-cloud-intake.ts';
+import {customerReorderHistoryPriceFactsFromCart,customerReorderIntentFromCart} from '../../../contracts/customer-cloud-v1.ts';
 import type {SyncedOrderingProduct} from './admin-config-projection.ts';
 
 const products:readonly SyncedOrderingProduct[]=[
@@ -115,6 +116,43 @@ describe('customer cloud local quote adapter',()=>{
     expect(source).toContain("CUSTOMER_PAYMENT_EVIDENCE_REQUIRED");
     expect(source).toContain("customerName:intent.checkout.name");
     expect(source).toContain("sourceLabel:'自家 App'");
+  });
+
+
+  it('banks reorder copy intent without old price formal identity payment fulfillment or coupon facts',()=>{
+    const copied=customerReorderIntentFromCart([{
+      lineId:'FORMAL-LINE-OLD',
+      productId:'bento',
+      productName:'肉燥便當',
+      quantity:1,
+      selections:[{optionGroupId:'rice',optionId:'extra',optionName:'加飯'}],
+      publishedUnitPriceMinor:4800,
+      note:'少辣',
+    }]);
+    expect(copied).toEqual([{
+      productId:'bento',
+      productName:'肉燥便當',
+      quantity:1,
+      selections:[{optionGroupId:'rice',optionId:'extra',optionName:'加飯'}],
+      note:'少辣',
+    }]);
+    expect(JSON.stringify(copied)).not.toContain('FORMAL-LINE-OLD');
+    expect(JSON.stringify(copied)).not.toContain('publishedUnitPriceMinor');
+    expect(JSON.stringify(copied)).not.toMatch(/payment|fulfillment|coupon/i);
+
+    const historicalPriceFacts=customerReorderHistoryPriceFactsFromCart([{
+      lineId:'FORMAL-LINE-OLD',
+      productId:'bento',
+      productName:'肉燥便當',
+      quantity:1,
+      selections:[],
+      publishedUnitPriceMinor:4800,
+    }]);
+    expect(historicalPriceFacts).toEqual([{intentIndex:0,historicalPublishedUnitMinor:4800}]);
+
+    const source=readFileSync(new URL('./customer-cloud-intake.ts',import.meta.url),'utf8');
+    expect(source).toContain('customerReorderIntent:customerReorderIntentFromCart(intent.cart)');
+    expect(source).toContain('customerReorderHistoryPriceFacts:customerReorderHistoryPriceFactsFromCart(intent.cart)');
   });
 
 });

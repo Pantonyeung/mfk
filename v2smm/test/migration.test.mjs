@@ -66,10 +66,10 @@ test('production App no longer imports fixtures or exposes migration/demo operat
 
 test('complete operator routes and failure states are present',()=>{
   for(const marker of[
-    '快速點餐','前線工作','訂單記錄','桌面管理','店務工具',
-    '搜尋商品','商品設定','購物草稿','待提交草稿','平台狀態',
-    '連線設定','商品供應','營業日','產能','營運報表','退款要求','列印狀態','診斷','正在同步餐單',
-    '同步失敗','前往結帳'
+    '今日想食咩','待處理','訂單記錄','桌面管理','店務工具',
+    '搜尋商品','商品客製','購物草稿','待提交草稿','平台狀態',
+    '連線設定','商品供應','營業日','產能','營運報表','退款要求','列印狀態','診斷','正在更新餐單',
+    '同步失敗','去結帳'
   ])assert.match(source,new RegExp(marker));
 });
 
@@ -86,8 +86,8 @@ test('typed runtime port is an injected boundary only',()=>{
 test('UNKNOWN flow preserves identity and reads back before any resend',()=>{
   const app=fs.readFileSync(path.join(root,'App.tsx'),'utf8');
   assert.match(app,/readSubmission/);
-  assert.match(app,/唔會自動重送/);
-  assert.match(app,/未有重新提交/);
+  assert.match(app,/只會確認原本結果|只會讀回原本提交/);
+  assert.match(app,/未有再次送出|唔會建立第二張單/);
   assert.match(app,/submissionId/);
   const persistence=fs.readFileSync(path.join(root,'persistence.ts'),'utf8');
   assert.match(persistence,/idempotencyKey/);
@@ -113,8 +113,8 @@ test('SMM uses the shared published menu price and SMT validates only on submit'
   const contract=fs.readFileSync(path.join(repoRoot,'contracts','smm-lan-v1.ts'),'utf8');
   assert.match(types,/publishedTakeawayUnitPriceMinor/);
   assert.match(types,/publishedDineInUnitPriceMinor/);
-  assert.match(app,/SMT 仍會再驗證/);
-  assert.match(app,/SMT 提交時重新驗證/);
+  assert.match(app,/revalidateSmmCartComboIntent/);
+  assert.match(app,/projectLineAgainstCurrentMenu/);
   assert.doesNotMatch(app,/等待門店報價/);
   assert.doesNotMatch(app,/port\?\.quoteCart/);
   assert.match(app,/port\?\.submitOrder/);
@@ -223,7 +223,7 @@ test('SMM Stage 4 adds checkout confirmation UI while formal Stage 5 submission 
   const start=app.indexOf('function Stage4CheckoutView');
   const end=app.indexOf('function DiningTargetSheet',start);
   const checkout=app.slice(start,end);
-  for(const marker of['服務方式','堂食去向','付款方式','最後摘要','提交訂單'])assert.match(checkout,new RegExp(marker));
+  for(const marker of['服務方式','堂食去向','付款方式','訂單確認','確認落單'])assert.match(checkout,new RegExp(marker));
   assert.doesNotMatch(checkout,/submitCart|submitOrder|readSubmission|createSmmPendingIntent/);
   assert.match(app,/const submitCart=async\(\)=>/);
   assert.match(app,/readSubmission/);
@@ -290,8 +290,9 @@ test('passive menu refresh preserves accepted cart facts and requires line-scope
   assert.match(app,/未確認前唔會靜默接受新價格或套餐資料/);
   assert.match(app,/const repriced=cart\.map\(line=>repriceLine\(line,next\)\)/);
   assert.match(app,/SMM_PUBLISHED_PRICE_CHANGED/);
-  assert.match(app,/SMT 發現餐單版本／價格已更新/);
-  assert.match(app,/removeIntent\(pending\.submissionId\)/);
+  assert.match(app,/SMM_PUBLISHED_PRICE_CHANGED.*SMM_MENU_REVISION_CHANGED/);
+  assert.match(app,/setStage5Session\(Object\.freeze\(\{intent:rejected,state:'REJECTED'/);
+  assert.match(app,/repairStage5/);
 });
 
 
@@ -347,12 +348,12 @@ test('SMM order intent carries published unit price so SMT line-level revalidati
 
 test('SMM never reuses an unresolved submission and only creates a fresh id after definitive reject',()=>{
   const app=fs.readFileSync(path.join(root,'App.tsx'),'utf8');
-  assert.match(app,/await port\.readSubmission\(existing\.submissionId\)/);
+  assert.match(app,/pendingIntents\.find\(item=>item\.state==='PENDING'\|\|item\.state==='UNKNOWN'\|\|item\.state==='NOT_CONNECTED'\)/);
+  assert.match(app,/await port\.readSubmission\(unresolved\.submissionId\)/);
   assert.match(app,/prior\.state==='CONFIRMED'/);
-  assert.match(app,/prior\.state!=='REJECTED'/);
-  assert.match(app,/未重新送出，避免重複訂單/);
-  assert.match(app,/removeIntent\(existing\.submissionId\)/);
-  assert.match(app,/base=createSmmPendingIntent/);
+  assert.match(app,/prior\.state==='REJECTED'/);
+  assert.match(app,/未有再次送出|只會確認原本結果/);
+  assert.match(app,/const base=existing\?\?createSmmPendingIntent/);
 });
 
 

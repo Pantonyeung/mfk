@@ -65,4 +65,15 @@ describe('Customer Cloud Edge authority gate',()=>{
     expect(runtime).toContain("ageMs<=15000");
   });
 
+
+  it('keeps Customer Pickup Code separate from Display Number in public projection',()=>{
+    expect(worker).toContain("const display=String(order.display||'')");
+    expect(worker).toContain("const projectedPickup=String(order.pickupCode||'').replace(/\\D/g,'').slice(-4)");
+    expect(worker).toContain("const phoneDigits=String(order.customerPhone||'').replace(/\\D/g,'')");
+    expect(worker).toContain("const pickupCode=projectedPickup||(phoneDigits.length>=4?phoneDigits.slice(-4):'')");
+    expect(worker).toContain("displayCode:display");
+    expect(worker).toContain("...(pickupCode?{pickupCode,phoneMasked:'•••• '+pickupCode}:{})");
+    expect(worker).not.toContain("pickupCode:display||undefined");
+  });
+
 });
