@@ -93,6 +93,19 @@ describe('Admin UI recomposition',()=>{
     expect(inventory).not.toContain('低庫存提示值（可選）');
   });
 
+  it('keeps presentation forms behind a purpose-first chooser',()=>{
+    const customer=render('/admin/presentation/customer-home');
+    expect(customer).toContain('自家落單渠道');
+    expect(customer).toContain('內容');
+    expect(customer).toContain('版面');
+    expect(customer).not.toContain('快捷商品 ID（逗號分隔）');
+    expect(customer).not.toContain('主標題</span><input');
+    const frontline=render('/admin/presentation/frontline-ordering');
+    expect(frontline).toContain('內容');
+    expect(frontline).toContain('版面');
+    expect(frontline).not.toContain('快捷商品 ID（逗號分隔）');
+  });
+
   it('only reports SMT success for a matching revision and fingerprint readback',()=>{
     const activeRelease={version:12,createdAt:'2026-09-22T00:00:00.000Z',fingerprint:'fp-12'};
     const published={state:'PUBLISHED' as const,revision:12,fingerprint:'fp-12',updatedAt:'2026-09-22T00:00:01.000Z'};
