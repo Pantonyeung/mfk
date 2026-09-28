@@ -56,8 +56,17 @@ test('Wave2 keeps formal product media and company-art placeholders honest',()=>
   assert.doesNotMatch(ui8,/stage8-history-(male|female)\.svg/);
 });
 
+test('Wave2 keeps source-owned headers, human degraded states and the current V1 pickup window',()=>{
+  assert.equal(app.includes('<CustomerHeader'),false);
+  assert.match(ui4,/ui4-pickup-window/);
+  assert.match(ui4,/即時取餐/);
+  assert.doesNotMatch(ui6,/<span>\{freshness\}<\/span>/);
+  assert.doesNotMatch(ui7,/<strong>\{freshness\}<\/strong>/);
+});
+
 test('Wave2 keeps the fixed five-item navigation visible across UI4-UI9',()=>{
   for(const label of['首頁','點單','記憶罐','訂單','會員'])assert.match(nav,new RegExp(label));
+  assert.match(nav,/data-final-art-pending="icon"/);
   assert.match(app,/view==='cart'\|\|view==='checkout'\?'cart':view==='more'\?'more':'orders'/);
   assert.match(css,/\.bottom-navigation button:nth-child\(3\)/);
   assert.match(css,/--customer-source-orange:#ef7d24/);
