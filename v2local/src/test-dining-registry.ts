@@ -1,2 +1,2 @@
-const tables=Array.from({length:9},(_,index)=>Object.freeze({id:'T'+String(index+1).padStart(2,'0'),name:String(index+1)+' 號枱',active:true,sortOrder:index+1,version:'TEST-V1',provenance:'VERSIONED' as const}));
+const tables=[...Array.from({length:9},(_,index)=>Object.freeze({id:'T'+String(index+1).padStart(2,'0'),name:String(index+1)+' 號枱',active:true,sortOrder:index+1,version:'TEST-V1',provenance:'VERSIONED' as const})),Object.freeze({id:'T0007',name:'堂7',active:true,sortOrder:10,version:'V1',provenance:'VERSIONED' as const})];
 Object.defineProperty(globalThis,'__MFK_TEST_DINING_TABLES__',{configurable:true,writable:true,value:Object.freeze(tables)});
