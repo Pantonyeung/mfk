@@ -207,7 +207,7 @@ export function CheckoutUi4View({
       <section className="ui4-review-confirm">
         <span>提交前確認</span>
         <h2>{reviewConfirmed?'資料已確認':'確認今次資料'}</h2>
-        <p>{reviewConfirmed?'正式安全提交同等待店舖回覆會由下一階段處理。':'呢個動作只確認 Review UI，唔會建立正式訂單、付款結果或者新提交身份。'}</p>
+        <p>{reviewConfirmed?'正式安全提交同等待店舖回覆會由下一階段處理。':'呢一步只係確認畫面資料，唔會立即建立正式訂單或付款結果。'}</p>
         <ActionButton wide disabled={!reviewReady||reviewConfirmed} onClick={()=>{setReviewConfirmed(true);onReviewConfirmed();}}>{reviewConfirmed?'已確認資料':'確認以上資料'}</ActionButton>
       </section>
       <div className="ui4-checkout-actions">

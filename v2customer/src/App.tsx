@@ -223,7 +223,7 @@ export function App(){
 
   const startUi5Submission=()=>{
     if(submitBlockReason){setNotice(submitBlockReason);return}
-    if(!quote||quote.freshness!=='CURRENT'){setNotice('提交前價格未係 CURRENT；請先重新確認。');return}
+    if(!quote||quote.freshness!=='CURRENT'){setNotice('提交前價格需要重新確認；請先更新再繼續。');return}
     if(cartRepairs.length){setNotice('仍有餐點需要修正；只修受影響項目後再提交。');return}
     const cartFingerprint=JSON.stringify(cart);
     const checkoutFingerprint=JSON.stringify(checkout);
@@ -515,7 +515,7 @@ export function App(){
           return;
         }
         saveIntent(Object.freeze({...sameCartUnknown,state:'UNKNOWN',updatedAt:nowIso(),lastMessage:prior.message}));
-        setNotice('上一個同一餐點提交結果仍未確認；已查詢原本 Submission ID，唔會建立第二張單。');
+        setNotice('上一個同一餐點提交結果仍未確認；系統只會繼續確認原本嗰次提交，唔會建立第二張單。');
         return;
       }
 
@@ -655,7 +655,7 @@ export function App(){
       setOrderSegment('completed');
       setView('orders');
       replacePath('/orders');
-      setNotice('呢張歷史訂單未有可安全複製嘅 Intent；舊 Order 保持唯讀。');
+      setNotice('呢張歷史訂單暫時未能直接再來一單；原有訂單內容保持不變。');
       return;
     }
     const result=buildCurrentReorderCart(order,menu);
@@ -683,25 +683,25 @@ export function App(){
     setView('orders');
     replacePath('/orders');
     setNotice(result.issues.length
-      ?'已建立新購物車；只需修正 '+String(result.issues.length)+' 個受影響 Line。舊訂單冇改動。'
-      :'已用目前餐牌建立新購物車；舊價、付款憑證、Fulfillment、Coupon 狀態全部冇複製。');
+      ?'已建立新購物車；只需修正 '+String(result.issues.length)+' 個受影響餐點。舊訂單冇改動。'
+      :'已用目前餐牌建立新購物車；舊價、付款資料、取餐進度同優惠狀態都唔會沿用。');
     window.scrollTo({top:0,behavior:'auto'});
   };
 
   const acceptUi8Repair=(lineId:string)=>{
-    if(!browserOnline||connection!=='READY'||!menu){setNotice('目前資料未 fresh；draft cart 已保留，請先重新同步 current truth。');return}
+    if(!browserOnline||connection!=='READY'||!menu){setNotice('目前資料需要更新；你已揀嘅餐點已保留，請先重新整理再繼續。');return}
     const line=cart.find(item=>item.lineId===lineId);
     if(!line)return;
     const repaired=repairPublishedCartLine(line,menu);
-    if(!repaired){setNotice('呢一項仍然需要手動修正或移除；其他 Line 保持不變。');return}
+    if(!repaired){setNotice('呢一項仍然需要手動修正或移除；其他餐點保持不變。');return}
     updateCart(cart.map(item=>item.lineId===lineId?clearReorderAttention(repaired):item));
-    setNotice('只更新受影響 Line「'+repaired.productName+'」；其他 Line 冇改動。');
+    setNotice('只更新受影響餐點「'+repaired.productName+'」；其他餐點冇改動。');
   };
 
   const editUi8Repair=(line:CustomerCartLine)=>{
-    if(!browserOnline||connection!=='READY'||!menu){setNotice('目前資料未 fresh；draft cart 已保留，請先重新同步 current truth。');return}
+    if(!browserOnline||connection!=='READY'||!menu){setNotice('目前資料需要更新；你已揀嘅餐點已保留，請先重新整理再繼續。');return}
     const product=menu.products.find(item=>item.productId===line.productId);
-    if(!product?.available){setNotice('呢個舊商品目前不可用；只可以移除受影響 Line，其他 Line 保持不變。');return}
+    if(!product?.available){setNotice('呢個舊商品目前不可用；只可以移除受影響餐點，其他餐點保持不變。');return}
     openProduct(product,null,line);
   };
 
@@ -748,7 +748,7 @@ export function App(){
     });
     if(!url){setNotice('WhatsApp 備用聯絡資料未完整。');return}
     window.open(url,'_blank','noopener,noreferrer');
-    setNotice('已開啟 WhatsApp；舊 Online Submit 保持鎖定，訊息只會喺你主動送出後傳送畀店舖。');
+    setNotice('已開啟 WhatsApp；原本自動送單保持鎖定，訊息只會喺你主動送出後傳送畀店舖。');
   };
 
   const activeOrders=snapshot?.activeOrders??[];
