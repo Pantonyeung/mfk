@@ -144,7 +144,7 @@ function mapPublishedSnapshot(raw:unknown){
   };
   const storeSettings=record(envelope.snapshot.storeSettings);
   const rawTables=Array.isArray(storeSettings.diningTables)?storeSettings.diningTables:[];
-  const diningTables=(rawTables.length?rawTables:Array.from({length:9},(_,index)=>({id:'T'+String(index+1).padStart(2,'0'),name:String(index+1)+' 號枱',active:true,sortOrder:index+1})))
+  const diningTables=rawTables
     .flatMap((raw,index)=>{
       const row=record(raw);
       const tableId=text(row.id,32);
