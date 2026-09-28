@@ -117,23 +117,25 @@ export function PrintCenterWorkspace(){
     {id:'logical-riceball-label',name:'飯糰 Label',type:'LABEL',model:'50×40 Label',widthMm:50,active:true,capabilities:['LABEL']},
     {id:'logical-takeaway-label',name:'外賣 Label',type:'LABEL',model:'50×40 Label',widthMm:50,active:true,capabilities:['LABEL']},
   ]);
+  const [selectedPrinterId,setSelectedPrinterId]=useState<string|null>(null);
   const add=()=>setPrinters(rows=>{
     const row:LogicalPrinterDraft={id:'logical-'+Date.now().toString(36),name:'新打印用途',type:'RECEIPT',model:'80mm 熱敏',widthMm:80,active:true,capabilities:['RECEIPT']};
-    appendAdminAudit({action:'新增 打印用途',target:row.id,after:row});return [...rows,row];
+    appendAdminAudit({action:'新增 打印用途',target:row.id,after:row});setSelectedPrinterId(row.id);return [...rows,row];
   });
   const patch=(id:string,change:Partial<LogicalPrinterDraft>)=>setPrinters(rows=>rows.map(row=>{if(row.id!==id)return row;const after={...row,...change};appendAdminAudit({action:'修改 打印用途',target:id,before:row,after});return after;}));
   const remove=(id:string)=>setPrinters(rows=>{appendAdminAudit({action:'刪除 打印用途',target:id});return rows.filter(row=>row.id!==id);});
   return <section className="admin-editor-page">
     <header className="admin-editor-head"><div><small>唯一打印用途清單</small><h1>打印中心</h1><p>Admin 定義唯一打印用途、規格同能力。實際 IP／USB／實體設備日後只由 SMT 配對，唔會喺兩邊建立第二套名稱。</p></div><div className="admin-editor-actions"><button className="secondary" onClick={add}>新增打印用途</button></div></header>
-    <div className="admin-editor-list">{printers.map(row=><article className="admin-policy-card" key={row.id}>
+    {selectedPrinterId===null?<div className="admin-settings-home" aria-label="打印用途">{printers.map(row=><button type="button" className="admin-settings-link" key={row.id} onClick={()=>setSelectedPrinterId(row.id)}><span><b>{row.name}</b><small>{row.type} · {row.model} · {row.active?'啟用':'停用'}</small></span><strong aria-hidden="true">›</strong></button>)}</div>:<div className="admin-editor-list">{printers.filter(row=>row.id===selectedPrinterId).map(row=><article className="admin-policy-card" key={row.id}>
+      <button type="button" className="admin-back-button" onClick={()=>setSelectedPrinterId(null)}>‹ 打印用途</button>
       <header><h2>{row.name}</h2><small>{row.id}</small></header>
       <label><span>名稱</span><input value={row.name} onChange={event=>patch(row.id,{name:event.target.value})}/></label>
       <label><span>票種</span><select value={row.type} onChange={event=>{const type=event.target.value as LogicalPrinterDraft['type'];patch(row.id,{type,capabilities:[type]})}}><option value="RECEIPT">收據</option><option value="PRODUCTION">製作單</option><option value="PACKING">包裝單</option><option value="LABEL">標籤</option></select></label>
       <label><span>打印規格</span><input value={row.model} onChange={event=>patch(row.id,{model:event.target.value})}/></label>
       <label><span>紙寬／標籤寬 mm</span><input type="number" min={20} max={120} value={row.widthMm} onChange={event=>patch(row.id,{widthMm:Number(event.target.value)||80})}/></label>
       <Toggle checked={row.active} onChange={active=>patch(row.id,{active})} label={row.active?'啟用':'停用'}/>
-      <button type="button" onClick={()=>remove(row.id)}>刪除</button>
-    </article>)}</div>
+      <button type="button" onClick={()=>{remove(row.id);setSelectedPrinterId(null)}}>刪除</button>
+    </article>)}</div>}
   </section>;
 }
 
