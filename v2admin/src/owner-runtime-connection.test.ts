@@ -1,5 +1,5 @@
 import {describe,expect,it} from 'vitest';
-import {buildOwnerReadModelSnapshot,mapOwnerOrderProjection} from '../worker.ts';
+import {AdminSyncStore,buildOwnerReadModelSnapshot,mapOwnerOrderProjection} from '../worker.ts';
 
 describe('Owner canonical read projection',()=>{
   it('preserves canonical fulfillmentLabel and never invents fulfillmentMode or payment state',()=>{
@@ -64,6 +64,33 @@ describe('Owner canonical read projection',()=>{
     expect(snapshot.staff[2]).not.toHaveProperty('loginId');
     expect(JSON.stringify(snapshot.staff)).not.toContain('REPORT_VIEW');
     expect(JSON.stringify(snapshot.staff)).not.toContain('UNKNOWN_TOKEN');
+  });
+
+  it('queues Owner sellability for SMT without publishing a new Admin revision',async()=>{
+    const values=new Map<string,any>();
+    const state:any={
+      storage:{
+        get:async(key:string)=>values.get(key),
+        put:async(key:string,value:any)=>{values.set(key,value);},
+        list:async({prefix}:{prefix:string})=>new Map([...values].filter(([key])=>key.startsWith(prefix))),
+      },
+      getWebSockets:()=>[],
+    };
+    values.set('active',{
+      storeId:'MF01',revision:11,fingerprint:'r11',adminFingerprint:'admin-r11',
+      snapshot:{catalog:{products:[{id:'p1',name:'飯團',active:true}]},availability:{}},
+    });
+    const store=new AdminSyncStore(state,{});
+    const result=await store.ownerSellabilityCommand(
+      {staffId:'owner-1',loginId:'1111'},
+      {operationId:'op-1',action:'PAUSE',targets:[{grain:'PRODUCT',targetId:'p1'}]},
+    );
+    expect(result.state).toBe('UNKNOWN');
+    expect(values.get('active').revision).toBe(11);
+    expect(values.get('owner:sellability:command:op-1')).toMatchObject({
+      operationId:'op-1',action:'PAUSE',state:'PENDING_SMT',
+    });
+    expect(values.get('active').snapshot.availability).toEqual({});
   });
 
 });
