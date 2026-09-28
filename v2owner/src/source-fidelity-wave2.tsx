@@ -136,7 +136,6 @@ function matchReport(report:{reportId:string;name:string},definition:(typeof FIX
 
 export function ReportsPage({snapshot,onBack}:{snapshot:OwnerReadModelSnapshot|null}&BackProps){
   const reports=snapshot?.reports??[];
-  const range:'TODAY'='TODAY';
   const [selected,setSelected]=useState<number|null>(null);
   const mapped=FIXED_REPORTS.map((definition,index)=>({
     definition,
@@ -155,12 +154,22 @@ export function ReportsPage({snapshot,onBack}:{snapshot:OwnerReadModelSnapshot|n
   }
 
   return <section className="page wave2-page reports-page">
-    <SourceHead eyebrow="數據" title="固定報表" detail="八張固定報表，先睇真正有用嘅營運數字。" onBack={onBack}/>
+    <SourceHead eyebrow="數據" title="報表" detail="先睇今日營運，再落入固定報表了解原因。" onBack={onBack}/>
     <div className="wave2-filter-tabs report-range" aria-label="報表時段">
       <button className="active">今日</button>
-      <button disabled title="暫未有正式時段資料">7 日</button>
-      <button disabled title="暫未有正式時段資料">30 日</button>
+      <button disabled title="暫未有正式時段資料">過去 7 日</button>
+      <button disabled title="暫未有正式時段資料">過去 30 日</button>
     </div>
+    <section className="card report-overview">
+      <div className="section-head"><div><span className="eyebrow">營業概覽</span><h2>今日重點</h2></div><small>{snapshot?.observedAt?'更新 '+formatObserved(snapshot.observedAt):'更新時間未提供'}</small></div>
+      <div className="report-kpi-grid">
+        <article><span>訂單數量</span><strong>{snapshot?.today?.orderCount??'—'}</strong><small>正式訂單</small></article>
+        <article><span>有效營業額</span><strong>{snapshot?.today?.salesLabel??'—'}</strong><small>{snapshot?.today?.comparisonLabel??'暫無比較資料'}</small></article>
+        <article><span>平均訂單金額</span><strong>{snapshot?.today?.averageOrderLabel??'—'}</strong><small>按目前資料</small></article>
+        <article><span>需要留意</span><strong>{(snapshot?.actions??[]).filter(item=>item.state!=='RESOLVED').length}</strong><small>待處理事項</small></article>
+      </div>
+    </section>
+    <div className="report-fixed-heading"><div><span>固定報表</span><strong>8 張</strong></div><small>只讀 · 按正式資料顯示</small></div>
     <div className="report-fixed-grid">
       {mapped.map((item,index)=><button type="button" className="card report-card" key={item.definition.id} onClick={()=>setSelected(index)}>
         <AssetSlot name={'owner-report-'+item.definition.id.toLowerCase()+'-icon'} label="報表圖示位置"/>
@@ -168,6 +177,7 @@ export function ReportsPage({snapshot,onBack}:{snapshot:OwnerReadModelSnapshot|n
         <aside><b>{item.report?.value??'—'}</b><em>{item.report?.compare??(item.report?.freshness||'未有資料')}</em></aside>
       </button>)}
     </div>
+    <SafeUnavailable title="歷史時段暫未開放" detail="目前只收到今日固定報表，過去 7 日、30 日同自訂日期未有正式查詢資料，所以保持停用。"/>
     <p className="wave2-footnote">報表只顯示既有固定資料；唔提供自由報表編輯器。</p>
   </section>;
 }
@@ -188,12 +198,26 @@ export function ManagerLogPage({mode,snapshot,onNavigate,onBack}:{mode:ManagerMo
     </div>
 
     {mode==='manager-log'?<>
-      <section className="card manager-summary">
-        <AssetSlot name="owner-manager-log-empty-illustration" label="經理日誌插圖位置" className="large"/>
-        <div><span>今日記錄</span><strong>正式共享日誌未連接</strong><p>現階段唔會用本機私人筆記冒充店舖正式紀錄。</p></div>
+      <section className="card manager-daily-overview">
+        <div className="manager-progress-block">
+          <span>今日檢查</span><strong>—</strong><small>正式完成進度未提供</small>
+        </div>
+        <div className="manager-overview-stats">
+          <article><span>待處理</span><strong>{activeActions}</strong><small>需要跟進</small></article>
+          <article><span>渠道</span><strong>{channelIssues}</strong><small>需要留意</small></article>
+          <article><span>設備</span><strong>{deviceIssues}</strong><small>需要留意</small></article>
+        </div>
+      </section>
+      <section className="manager-focus">
+        <div className="section-head"><div><span className="eyebrow">今日重點</span><h2>需要留意</h2></div></div>
+        <div className="manager-focus-list">
+          <article className="card"><strong>待處理事項</strong><span>{activeActions?activeActions+' 項未完成':'暫時冇未完成事項'}</span></article>
+          <article className="card"><strong>渠道與設備</strong><span>{channelIssues+deviceIssues?channelIssues+deviceIssues+' 項需要留意':'暫時正常'}</span></article>
+          <article className="card"><strong>正式日誌</strong><span>未連接</span></article>
+        </div>
       </section>
       <div className="manager-category-chips"><span>營運</span><span>商品</span><span>客人</span><span>維修</span><span>員工</span><span>其他</span></div>
-      <SafeUnavailable title="新增與回覆暫未開放" detail="目前未有安全嘅共享日誌資料入口，所以新增、回覆、修改同刪除保持停用。"/>
+      <SafeUnavailable title="正式共享日誌未連接" detail="現階段可以安全查看營運重點，但未有共享日誌資料入口；新增、回覆、修改同刪除保持停用，亦唔會用本機私人筆記冒充店舖正式紀錄。"/>
       <button className="primary wide manager-disabled-action" disabled>新增記錄</button>
     </>:null}
 
