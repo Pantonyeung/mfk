@@ -1,4 +1,4 @@
-import type {OwnerAuthSession,OwnerReadModelSnapshot,OwnerRuntimePort} from './product-types';
+import type {OwnerAuthSession,OwnerChannelHealth,OwnerPlanningCommandResult,OwnerPlanningSaveInput,OwnerPlanningSnapshot,OwnerReadModelSnapshot,OwnerRuntimePort,OwnerSellabilityCommandInput,OwnerSellabilityCommandResult,OwnerSellabilityItem} from './product-types';
 
 const OWNER_API_ORIGIN='https://admin.morefunos.com';
 const STORE_ID='MF01';
@@ -13,11 +13,12 @@ function cleanSession(value:unknown):OwnerAuthSession|null{
   if(!value||typeof value!=='object'||Array.isArray(value))return null;
   const row=value as Record<string,unknown>;
   const staffId=String(row.staffId??'').trim();
+  const loginId=String(row.loginId??row.staffId??'').trim();
   const displayName=String(row.displayName??'').trim();
   const sessionToken=String(row.sessionToken??'').trim();
-  if(!staffId||!displayName||String(row.role)!=='OWNER'||sessionToken.length<32)return null;
+  if(!staffId||!loginId||!displayName||String(row.role)!=='OWNER'||sessionToken.length<32)return null;
   return Object.freeze({
-    staffId,displayName,role:'OWNER',
+    staffId,loginId,displayName,role:'OWNER',
     scope:String(row.scope??'STORE'),
     permissions:Object.freeze(Array.isArray(row.permissions)?row.permissions.map(String):[]),
     sessionToken,
@@ -64,26 +65,75 @@ export async function refreshOwnerSession():Promise<OwnerAuthSession|null>{
     saveOwnerSession(null);return null;
   }
 }
-export async function loginOwner(staffId:string,pin:string):Promise<OwnerAuthSession>{
-  const id=String(staffId||'').trim(),cleanPin=String(pin||'').replace(/\D/g,'');
-  if(!id)throw new OwnerRuntimeError('OWNER_STAFF_ID_REQUIRED','請輸入 Owner Staff ID');
+export async function loginOwner(loginId:string,pin:string):Promise<OwnerAuthSession>{
+  const id=String(loginId||'').trim(),cleanPin=String(pin||'').replace(/\D/g,'');
+  if(!id)throw new OwnerRuntimeError('OWNER_LOGIN_ID_REQUIRED','請輸入登入編號');
   if(cleanPin.length<4||cleanPin.length>8)throw new OwnerRuntimeError('OWNER_PIN_INVALID','PIN 必須為 4–8 位數字');
-  const challenge=await ownerFetch('/api/owner/auth/challenge?storeId='+encodeURIComponent(STORE_ID),{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({staffId:id})});
+  const challenge=await ownerFetch('/api/owner/auth/challenge?storeId='+encodeURIComponent(STORE_ID),{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({loginId:id})});
   const challengeId=String(challenge.challengeId??'').trim(),nonce=String(challenge.nonce??'').trim(),saltHex=String(challenge.saltHex??'').trim(),iterations=Number(challenge.iterations);
   if(!challengeId||!nonce||!saltHex||!Number.isSafeInteger(iterations))throw new OwnerRuntimeError('OWNER_AUTH_CHALLENGE_INVALID');
   const derived=await derivePinKeyHex(cleanPin,saltHex,iterations);
   const proofHex=await hmacHex(derived,'MFK_OWNER_LOGIN_V1\n'+challengeId+'\n'+id+'\n'+nonce);
-  const body=await ownerFetch('/api/owner/auth/verify?storeId='+encodeURIComponent(STORE_ID),{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({staffId:id,challengeId,proofHex})});
+  const body=await ownerFetch('/api/owner/auth/verify?storeId='+encodeURIComponent(STORE_ID),{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({loginId:id,challengeId,proofHex})});
   const session=cleanSession(body);if(!session)throw new OwnerRuntimeError('OWNER_SESSION_INVALID');saveOwnerSession(session);return session;
 }
 export async function logoutOwner(){
   const current=readStoredOwnerSession();saveOwnerSession(null);if(!current)return;
   try{await ownerFetch('/api/owner/auth/session?storeId='+encodeURIComponent(STORE_ID),{method:'POST',headers:{'x-mfk-owner-session':current.sessionToken}});}catch{}
 }
+
+function requireOwnerSession():OwnerAuthSession{
+  const session=readStoredOwnerSession();
+  if(!session)throw new OwnerRuntimeError('OWNER_SESSION_REQUIRED','請先登入 Owner App');
+  return session;
+}
+function ownerSessionHeaders(extra:Record<string,string>={}){
+  const session=requireOwnerSession();
+  return {'x-mfk-owner-session':session.sessionToken,...extra};
+}
+export async function readOwnerChannels():Promise<readonly OwnerChannelHealth[]>{
+  const body=await ownerFetch('/api/owner/channels?storeId='+encodeURIComponent(STORE_ID),{
+    method:'GET',cache:'no-store',headers:ownerSessionHeaders(),
+  });
+  return Object.freeze(Array.isArray(body.channels)?body.channels as unknown as OwnerChannelHealth[]:[]);
+}
+export async function readOwnerPlanning(monthKey:string):Promise<OwnerPlanningSnapshot>{
+  const body=await ownerFetch('/api/owner/planning?storeId='+encodeURIComponent(STORE_ID)+'&monthKey='+encodeURIComponent(monthKey),{
+    method:'GET',cache:'no-store',headers:ownerSessionHeaders(),
+  });
+  return body as unknown as OwnerPlanningSnapshot;
+}
+export async function saveOwnerPlanning(input:OwnerPlanningSaveInput):Promise<OwnerPlanningCommandResult>{
+  const body=await ownerFetch('/api/owner/planning?storeId='+encodeURIComponent(STORE_ID),{
+    method:'POST',
+    headers:ownerSessionHeaders({'content-type':'application/json'}),
+    body:JSON.stringify(input),
+  });
+  return body as unknown as OwnerPlanningCommandResult;
+}
+export async function readOwnerSellability():Promise<readonly OwnerSellabilityItem[]>{
+  const body=await ownerFetch('/api/owner/sellability?storeId='+encodeURIComponent(STORE_ID),{
+    method:'GET',cache:'no-store',headers:ownerSessionHeaders(),
+  });
+  return Object.freeze(Array.isArray(body.items)?body.items as unknown as OwnerSellabilityItem[]:[]);
+}
+export async function commandOwnerSellability(input:OwnerSellabilityCommandInput):Promise<OwnerSellabilityCommandResult>{
+  const body=await ownerFetch('/api/owner/sellability?storeId='+encodeURIComponent(STORE_ID),{
+    method:'POST',
+    headers:ownerSessionHeaders({'content-type':'application/json'}),
+    body:JSON.stringify(input),
+  });
+  return body as unknown as OwnerSellabilityCommandResult;
+}
 export function createCloudOwnerRuntimePort():OwnerRuntimePort{
   return Object.freeze({
     portId:'MFK_OWNER_PORT_V1' as const,
     readOwnerSession:refreshOwnerSession,loginOwner,logoutOwner,
+    readChannels:readOwnerChannels,
+    readPlanning:readOwnerPlanning,
+    savePlanning:saveOwnerPlanning,
+    readSellability:readOwnerSellability,
+    commandSellability:commandOwnerSellability,
     async readSnapshot():Promise<OwnerReadModelSnapshot>{
       const session=readStoredOwnerSession();if(!session)throw new OwnerRuntimeError('OWNER_SESSION_REQUIRED','請先登入 Owner App');
       const body=await ownerFetch('/api/owner/snapshot?storeId='+encodeURIComponent(STORE_ID),{method:'GET',cache:'no-store',headers:{'x-mfk-owner-session':session.sessionToken}});

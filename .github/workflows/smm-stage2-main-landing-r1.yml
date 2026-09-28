@@ -1,0 +1,48 @@
+name: smm-stage2-main-landing-r1
+
+on:
+  push:
+    branches:
+      - integration/MFK/SMM-STAGE2-MAIN-LANDING-R1
+  pull_request:
+    paths:
+      - 'v2smm/**'
+      - 'v2local/**'
+      - 'contracts/staff-auth-v1.ts'
+      - '.github/workflows/smm-stage2-main-landing-r1.yml'
+  workflow_dispatch:
+
+jobs:
+  smm:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: v2smm
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-audit --no-fund --legacy-peer-deps --package-lock=false
+      - name: Full SMM tests
+        run: npm test
+      - name: SMM build
+        run: npm run build
+      - name: Worker dry-run
+        run: npx --yes wrangler@4 deploy --dry-run --config wrangler.jsonc
+
+  v2local:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: v2local
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-audit --no-fund --legacy-peer-deps --package-lock=false
+      - name: Full v2local tests
+        run: npm test
+      - name: v2local build
+        run: npm run build

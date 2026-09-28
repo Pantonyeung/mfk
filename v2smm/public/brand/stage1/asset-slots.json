@@ -1,0 +1,37 @@
+{
+  "version": "MFK_SMM_FINAL_SOURCE_FIDELITY_P0_R1",
+  "date": "2026-09-28",
+  "source": {
+    "package": "MFK_SMM_UI_完整設計包_2026-09-26",
+    "allowed": [
+      "03_Stage_UI_效果圖_CURRENT",
+      "04_Final_Implementation_UI_Spec"
+    ],
+    "supersededAssetsIgnored": true
+  },
+  "ownerLock": {
+    "generatedCharacters": "DO_NOT_CREATE",
+    "productMedia": "CANONICAL_IMAGE_REF_FIRST",
+    "visualRule": "Use final CURRENT stage references and implementation spec. Branded fallback media must come from existing approved MoreFun assets; no fake CSS food imagery."
+  },
+  "stage0": {
+    "brandLogo": "/brand/morefun-logo.webp",
+    "mascotAssets": [
+      "/brand/stage0/stage0-male.webp",
+      "/brand/stage0/stage0-female.webp"
+    ]
+  },
+  "stage1": {
+    "productCards": {
+      "imageStatus": "CANONICAL_OR_APPROVED_BRAND_FALLBACK",
+      "canonicalField": "imageRef",
+      "fallbacks": [
+        "/brand/stage1/product-feature.webp",
+        "/brand/stage1/product-bowl.webp",
+        "/brand/stage1/product-salad.webp"
+      ],
+      "fakeFoodImages": false
+    },
+    "navigation": "FIVE_TAB_VECTOR_ICON_PRESENTATION"
+  }
+}

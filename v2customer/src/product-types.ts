@@ -1,7 +1,7 @@
 // Payment methods are Admin-published; channel IDs are stable opaque keys.
 export type CustomerConnectionState='NOT_CONNECTED'|'LOADING'|'READY'|'STALE'|'PARTIAL'|'UNKNOWN'|'ERROR';
 export type CustomerCommandState='CONFIRMED'|'REJECTED'|'FAILED'|'UNKNOWN'|'NOT_CONNECTED';
-export type CustomerOrderStage='RECEIVED'|'REJECTED'|'ACCEPTED'|'PREPARING'|'DELAYED'|'READY'|'PICKUP_VERIFICATION'|'HANDED_OVER'|'COMPLETED';
+export type CustomerOrderStage='RECEIVED'|'REJECTED'|'CANCELED'|'ACCEPTED'|'PREPARING'|'DELAYED'|'READY'|'ARRIVED'|'VERIFIED'|'PICKUP_VERIFICATION'|'PICKUP_EXCEPTION'|'HANDED_OVER'|'COMPLETED'|'UNKNOWN';
 
 export interface CustomerStoreContext {
   readonly storeId:string;
@@ -117,6 +117,24 @@ export interface CustomerCartSelection {
   readonly publishedAdjustmentMinor?:number;
 }
 
+export interface CustomerCartComboSelection {
+  readonly poolId:string;
+  readonly groupId:string;
+  readonly subPoolId:string;
+  readonly choiceId:string;
+  readonly choiceType:CustomerComboChoiceType;
+  readonly choiceLabel:string;
+  readonly productId?:string;
+  readonly publishedAdjustmentMinor:number;
+}
+
+export interface CustomerCartComboIntent {
+  readonly comboId:string;
+  readonly comboName:string;
+  readonly publishedBasePriceMinor:number;
+  readonly selections:readonly CustomerCartComboSelection[];
+}
+
 export interface CustomerCartLine {
   readonly lineId:string;
   readonly productId:string;
@@ -125,6 +143,7 @@ export interface CustomerCartLine {
   readonly selectedVariationId?:string;
   readonly selectedVariationName?:string;
   readonly selections:readonly CustomerCartSelection[];
+  readonly combo?:CustomerCartComboIntent;
   readonly createdAt:string;
   readonly note?:string;
   readonly attention?:string;
@@ -224,9 +243,14 @@ export interface CustomerPendingIntent {
   readonly idempotencyKey:string;
   readonly createdAt:string;
   readonly updatedAt:string;
-  readonly state:'DRAFT'|'NOT_CONNECTED'|'PENDING'|'UNKNOWN';
+  readonly state:'DRAFT'|'NOT_CONNECTED'|'PENDING'|'UNKNOWN'|'REJECTED'|'DELIVERED';
   readonly cart:readonly CustomerCartLine[];
   readonly checkout:CustomerCheckoutDraft;
+  readonly fallbackReference:string;
+  readonly publishedTotalMinor?:number;
+  readonly canonicalOrderId?:string;
+  readonly canonicalDisplay?:string;
+  readonly committedAt?:string;
   readonly lastMessage?:string;
 }
 
@@ -237,20 +261,43 @@ export interface CustomerOrderTimelineItem {
   readonly detail?:string;
 }
 
+export type CustomerPickupExceptionKind='CODE_MISMATCH'|'MISSING_BAG'|'SAME_NAME'|'NO_SHOW'|'OTHER';
+
+export interface CustomerPickupExceptionProjection {
+  readonly kind:CustomerPickupExceptionKind;
+  readonly resolved:boolean;
+  readonly detail?:string;
+  readonly observedAt?:string;
+}
+
 export interface CustomerOrderProjection {
   readonly orderId:string;
   readonly displayCode:string;
   readonly stage:CustomerOrderStage;
   readonly itemSummary:string;
   readonly amountLabel?:string;
+  readonly paymentStatusLabel?:string;
   readonly pickupCode?:string;
   readonly phoneMasked?:string;
   readonly etaLabel?:string;
   readonly rejectionReason?:string;
-  readonly handoverState?:'NOT_ARRIVED'|'ARRIVED'|'VERIFIED'|'HANDED_OVER'|'UNKNOWN';
+  readonly customerDisplayName?:string;
+  readonly handoverState?:'NOT_ARRIVED'|'ARRIVED'|'VERIFIED'|'HANDED_OVER'|'COMPLETED'|'UNKNOWN';
+  readonly pickupBagCount?:number;
+  readonly pickupMealCount?:number;
+  readonly completedAt?:string;
+  readonly pickupException?:CustomerPickupExceptionProjection;
   readonly observedAt:string;
   readonly readback:'CONFIRMED'|'PARTIAL'|'UNKNOWN';
   readonly timeline:readonly CustomerOrderTimelineItem[];
+}
+
+export interface CustomerHistoricalLine {
+  readonly name:string;
+  readonly quantity:number;
+  readonly historicalUnitLabel:string;
+  readonly historicalLineTotalLabel:string;
+  readonly detail?:string;
 }
 
 export interface CustomerHistoryProjection {
@@ -259,6 +306,11 @@ export interface CustomerHistoryProjection {
   readonly completedAt:string;
   readonly itemSummary:string;
   readonly amountLabel?:string;
+  readonly pickupCode?:string;
+  readonly customerDisplayName?:string;
+  readonly historicalLines:readonly CustomerHistoricalLine[];
+  readonly reorderIntent?:readonly import('../../contracts/customer-cloud-v1').CustomerReorderIntentLine[];
+  readonly reorderPriceFacts?:readonly import('../../contracts/customer-cloud-v1').CustomerReorderHistoryPriceFact[];
   readonly reorderEligible:boolean;
 }
 
@@ -284,6 +336,10 @@ export interface CustomerCommandResult {
   readonly state:CustomerCommandState;
   readonly message:string;
   readonly orderId?:string;
+  readonly displayCode?:string;
+  readonly committedAt?:string;
+  readonly totalMinor?:number;
+  readonly readbackCode?:'NOT_FOUND'|'PENDING'|'UNKNOWN';
   readonly canonicalRevision?:number;
 }
 

@@ -8,12 +8,14 @@ export interface SmmLocalPreferences {
   readonly sourceFilter:string;
   readonly serviceMode:SmmServiceMode;
   readonly tender:SmmTender;
+  readonly diningTarget:SmmDiningTarget|null;
 }
 
 export interface SmmLocalWorkspace {
   readonly schemaVersion:1;
   readonly storageKind:'LOCAL_NON_AUTHORITATIVE';
   readonly cart:readonly SmmCartLine[];
+  readonly cartNote:string;
   readonly pendingIntents:readonly SmmPendingIntent[];
   readonly preferences:SmmLocalPreferences;
   readonly updatedAt:string;
@@ -23,6 +25,7 @@ const DEFAULT_WORKSPACE:SmmLocalWorkspace=Object.freeze({
   schemaVersion:1,
   storageKind:'LOCAL_NON_AUTHORITATIVE',
   cart:Object.freeze([]),
+  cartNote:'',
   pendingIntents:Object.freeze([]),
   preferences:Object.freeze({
     activeView:'order',
@@ -30,6 +33,7 @@ const DEFAULT_WORKSPACE:SmmLocalWorkspace=Object.freeze({
     sourceFilter:'全部',
     serviceMode:'TAKEAWAY',
     tender:'CASH',
+    diningTarget:null,
   }),
   updatedAt:new Date(0).toISOString(),
 });
@@ -40,6 +44,17 @@ function isRecord(value:unknown):value is Record<string,unknown>{
 
 function safeArray<T>(value:unknown):readonly T[]{
   return Array.isArray(value)?value as readonly T[]:[];
+}
+
+function readDiningTarget(value:unknown):SmmDiningTarget|null{
+  if(!isRecord(value))return null;
+  const covers=Number(value.covers);
+  if(!Number.isSafeInteger(covers)||covers<1||covers>30)return null;
+  if(value.kind==='WAITING')return Object.freeze({kind:'WAITING',covers});
+  if(value.kind==='TABLE'&&typeof value.tableId==='string'&&value.tableId.trim()){
+    return Object.freeze({kind:'TABLE',tableId:value.tableId.trim(),covers});
+  }
+  return null;
 }
 
 export function readSmmLocalWorkspace():SmmLocalWorkspace{
@@ -57,6 +72,7 @@ export function readSmmLocalWorkspace():SmmLocalWorkspace{
       schemaVersion:1,
       storageKind:'LOCAL_NON_AUTHORITATIVE',
       cart:Object.freeze([...safeArray<SmmCartLine>(parsed.cart)]),
+      cartNote:typeof parsed.cartNote==='string'?parsed.cartNote.slice(0,160):'',
       pendingIntents:Object.freeze([...safeArray<SmmPendingIntent>(parsed.pendingIntents)]),
       preferences:Object.freeze({
         activeView,
@@ -64,6 +80,7 @@ export function readSmmLocalWorkspace():SmmLocalWorkspace{
         sourceFilter:typeof preferences.sourceFilter==='string'?preferences.sourceFilter:'全部',
         serviceMode:preferences.serviceMode==='DINE_IN'?'DINE_IN':'TAKEAWAY',
         tender:['CASH','ALIPAY','WECHAT','FPS','PAYME'].includes(String(preferences.tender))?preferences.tender as SmmTender:'CASH',
+        diningTarget:readDiningTarget(preferences.diningTarget),
       }),
       updatedAt:typeof parsed.updatedAt==='string'?parsed.updatedAt:new Date(0).toISOString(),
     });
@@ -72,11 +89,13 @@ export function readSmmLocalWorkspace():SmmLocalWorkspace{
   }
 }
 
-export function writeSmmLocalWorkspace(workspace:Omit<SmmLocalWorkspace,'schemaVersion'|'storageKind'|'updatedAt'>):SmmLocalWorkspace{
+export function writeSmmLocalWorkspace(workspace:Omit<SmmLocalWorkspace,'schemaVersion'|'storageKind'|'updatedAt'|'cartNote'>&{readonly cartNote?:string}):SmmLocalWorkspace{
+  const previous=readSmmLocalWorkspace();
   const next:SmmLocalWorkspace=Object.freeze({
     schemaVersion:1,
     storageKind:'LOCAL_NON_AUTHORITATIVE',
     cart:Object.freeze([...workspace.cart]),
+    cartNote:typeof workspace.cartNote==='string'?workspace.cartNote.slice(0,160):previous.cartNote,
     pendingIntents:Object.freeze([...workspace.pendingIntents]),
     preferences:Object.freeze({...workspace.preferences}),
     updatedAt:new Date().toISOString(),

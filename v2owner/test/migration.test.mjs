@@ -70,14 +70,14 @@ test('production Owner app has no fixture or migration operator truth',()=>{
   assert.doesNotMatch(app,/\.\/fixtures/);
   assert.doesNotMatch(app,/CAPABILITY_UPGRADE_ONLY|Migration|fixture 截至|MFK Owner|Capability Registry/);
   assert.match(app,/OFFLINE_READONLY|離線唯讀/);
-  assert.match(app,/唔會顯示假 KPI|唔會用假資料代替/);
+  assert.match(app,/唔會顯示假 KPI|唔會用假資料代替|唔會顯示推算數字/);
 });
 
 test('complete Owner product surfaces remain present',()=>{
   for(const marker of[
-    '而家間舖點','Action Queue','訂單監察','渠道健康','商品供應','員工','設備／打印',
+    '而家間舖點','待處理事項','訂單監察','渠道健康','商品供應','員工','設備／打印',
     '報表','客戶','推廣','平台結算','現金','庫存','通知','經理日誌','活動紀錄','Admin',
-    'Requester','Approver','Readback','OFFLINE','STALE','UNKNOWN','PARTIAL'
+    '操作人','批核人','狀態未明','離線唯讀','資料稍舊','部分資料'
   ])assert.match(source,new RegExp(marker));
 });
 
@@ -100,17 +100,19 @@ test('typed Owner runtime keeps injection override and adds first-party authenti
 test('bounded actions require runtime and target readback semantics',()=>{
   const app=fs.readFileSync(path.join(srcRoot,'App.tsx'),'utf8');
   assert.match(app,/requestBoundedAction/);
-  assert.match(app,/冇改變任何正式狀態/);
-  assert.match(app,/結果未明/);
-  assert.match(app,/正式狀態必須等目標系統讀回/);
+  assert.match(app,/正式狀態沒有改變/);
+  assert.match(app,/操作結果未能確認|結果未能確認/);
+  assert.match(app,/完成後會再次確認最新狀態/);
 });
 
-test('manager log and checklist are local-only product workflows',()=>{
+test('manager log and checklist do not promote local drafts into formal Owner workflow',()=>{
   const app=fs.readFileSync(path.join(srcRoot,'App.tsx'),'utf8');
-  assert.match(app,/本機私人草稿/);
-  assert.match(app,/唔係共享營運真相/);
-  assert.match(app,/經理筆記/);
-  assert.match(app,/交接草稿/);
+  const wave2=fs.readFileSync(path.join(srcRoot,'source-fidelity-wave2.tsx'),'utf8');
+  assert.doesNotMatch(app,/function ManagerWorkspace/);
+  assert.match(wave2,/正式共享日誌未連接/);
+  assert.match(wave2,/新增、回覆、修改同刪除保持停用/);
+  assert.match(wave2,/清單操作暫未開放/);
+  assert.match(wave2,/交接確認暫未開放/);
 });
 
 test('production fixture file has been removed',()=>{
@@ -158,9 +160,9 @@ test('Stage01 commander corrections satisfy OA-TOD-001 acceptance contract',()=>
   // 1 Header: store / business day / operating status / freshness.
   assert.match(types,/operatingStatus:string/);
   assert.match(components,/門店/);
-  assert.match(components,/Business Day/);
+  assert.match(components,/營業日/);
   assert.match(components,/營業狀態/);
-  assert.match(components,/Freshness/);
+  assert.match(components,/資料更新/);
   assert.doesNotMatch(vm,/operatingStatus:.*connection/i);
 
   // 2 Live orders always open active scope, with all summary fields.
@@ -188,13 +190,13 @@ test('Stage01 commander corrections satisfy OA-TOD-001 acceptance contract',()=>
   assert.match(vm,/oldestUnresolved/);
   assert.match(components,/最高優先/);
   assert.match(components,/最舊未處理/);
-  assert.match(components,/唔係 SMT Pending Order Queue/);
+  assert.match(components,/只顯示真係需要你介入嘅營運事項/);
 
   // 6 Explicit Health Summary, no provider truth guessing.
   for(const health of['INTERNET','KEETA','OWN_PLATFORM','SMT','PRINTER'])assert.match(mapping,new RegExp(health));
   assert.match(vm,/row\.kind===kind/);
   assert.doesNotMatch(vm,/label\.includes|name\.includes/);
-  assert.match(components,/Health 同 Availability 分開/);
+  assert.match(components,/各渠道同設備分開顯示/);
 
   // 7 Staff summary is projection-driven, including scheduled count.
   for(const field of['staffNow','scheduledStaffCount','onBreakStaffCount','abnormalStaffCount'])assert.match(types,new RegExp(field));
@@ -202,9 +204,9 @@ test('Stage01 commander corrections satisfy OA-TOD-001 acceptance contract',()=>
 
   // 8 Explicit Top Product + Current Hour Trend contract.
   assert.match(types,/OwnerTodayInsight/);
-  assert.match(components,/Top Product/);
-  assert.match(components,/Current Hour Trend/);
-  assert.match(components,/UNAVAILABLE/);
+  assert.match(components,/熱賣商品/);
+  assert.match(components,/目前時段/);
+  assert.match(components,/未有資料/);
   assert.doesNotMatch(app,/reports\.slice\(0,3\)/);
 
   // 9 Nine global states can be represented.
@@ -253,8 +255,8 @@ test('Stage02 Action Queue is a unified actionable projection, not SMT pending o
   assert.doesNotMatch(app,/function ActionCard\(/);
 
   for(const marker of[
-    '影響目標','責任域','確定性','安全下一步','已持續',
-    'Dismissed ≠ Resolved','Readback / Proof','相關處理紀錄'
+    '影響目標','目前狀態','安全下一步','已持續',
+    '處理紀錄會保留','處理結果','相關處理紀錄'
   ])assert.match(components,new RegExp(marker));
 
   assert.match(mapping,/OPEN_ACTIONABLE_ONLY/);
@@ -279,21 +281,20 @@ test('Stage02 bounded action continues through existing Owner runtime only',()=>
   assert.match(mapping,/No Order \/ Pricing \/ Payment \/ Print \/ Auth \/ Sync authority changes/);
 });
 
-test('Stage02 visual convergence matches approved warm ivory navy Owner direction',()=>{
+test('Stage02 visual convergence matches FINAL blue white Owner direction',()=>{
   const css=fs.readFileSync(path.join(srcRoot,'styles.css'),'utf8');
   const app=fs.readFileSync(path.join(srcRoot,'App.tsx'),'utf8');
 
-  assert.match(css,/--mf-navy:#173b72/);
-  assert.match(css,/--mf-ivory:#f6f3ed/);
-  assert.match(css,/--mf-purple:#735ab1/);
-  assert.match(css,/body\{[\s\S]*background:var\(--mf-ivory\)/);
-  assert.match(css,/\.bottom-nav button\.active\{[\s\S]*var\(--mf-blue-soft\)/);
+  assert.match(css,/OWNER FINAL VISUAL SYSTEM P0/);
+  assert.match(css,/--owner-final-navy:#103f78/);
+  assert.match(css,/--owner-final-bg:#f5f8fc/);
+  assert.match(css,/--owner-final-surface:#ffffff/);
+  assert.match(css,/\.bottom-nav button::before/);
   assert.match(css,/\.action-queue-card/);
   assert.match(css,/\.action-detail-drawer/);
 
   assert.match(app,/morefun-logo-canonical\.png/);
   assert.doesNotMatch(app,/>◆</);
-  assert.match(app,/AI_ASSET_PENDING/);
 });
 
 test('Stage02 does not add product imagery or large mascot to normal operational UI',()=>{
@@ -394,14 +395,14 @@ test('Stage02 command flow exposes Pending, locks duplicates, and UNKNOWN only p
   assert.match(components,/disabled=\{commandLocked\}/);
   assert.match(components,/canonicalUnknown=row\.state===\'UNKNOWN\'/);
   assert.match(components,/commandLocked=canonicalUnknown\|\|flight\?\.state===\'PENDING\'\|\|flight\?\.state===\'UNKNOWN\'/);
-  assert.match(components,/正在提交／等待讀回/);
-  assert.match(components,/狀態未明 — 禁止重送/);
-  assert.match(components,/重新確認讀回/);
-  assert.match(app,/禁止重複提交/);
-  assert.match(app,/禁止 blind resend/);
+  assert.match(components,/正在處理/);
+  assert.match(components,/結果待確認/);
+  assert.match(components,/重新確認狀態/);
+  assert.match(app,/暫時唔好重複提交/);
+  assert.match(app,/暫時唔好再次提交/);
   assert.doesNotMatch(app,/setCommandFlight\([^\n]*RESOLVED/);
   assert.doesNotMatch(app,/result\.message/);
-  assert.match(components,/只有 canonical readback \/ proof 先可以真正移出 Queue/);
+  assert.match(components,/未確認完成嘅事項會繼續留喺待處理清單/);
 });
 
 test('Stage02 primary touch targets are at least 44px and responsive gates cover target widths',()=>{
@@ -432,9 +433,9 @@ test('Stage02 canonical UNKNOWN locks action even with no commandFlight and expo
   assert.match(components,/const canonicalUnknown=row\.state===\'UNKNOWN\'/);
   assert.match(components,/const commandLocked=canonicalUnknown\|\|flight\?\.state===\'PENDING\'\|\|flight\?\.state===\'UNKNOWN\'/);
   assert.match(components,/disabled=\{commandLocked\}/);
-  assert.match(components,/canonicalUnknown\?\'狀態未明 — 禁止重送\'/);
-  assert.match(components,/重新確認讀回/);
-  assert.match(components,/Canonical projection 仍 UNKNOWN；只准 refresh \/ readback，禁止再次提交/);
+  assert.match(components,/canonicalUnknown\?\'結果待確認\'/);
+  assert.match(components,/重新確認狀態/);
+  assert.match(components,/最新狀態仍未能確認；請先重新檢查/);
 });
 
 test('Stage02 canonical UNKNOWN cannot reach requestBoundedAction',()=>{
@@ -446,7 +447,7 @@ test('Stage02 canonical UNKNOWN cannot reach requestBoundedAction',()=>{
   const executeGuard=app.indexOf("if(value.actionId&&isCanonicalActionUnknown(snapshot?.actions??[],value.actionId))");
   const requestCall=app.indexOf("await port.requestBoundedAction");
   assert.ok(executeGuard>=0&&requestCall>executeGuard);
-  assert.match(app,/正式狀態仍未明；禁止再次提交，只可重新確認讀回/);
+  assert.match(app,/處理結果仍未確認；請先重新檢查最新狀態/);
 });
 
 test('Stage02 recheck success keeps UNKNOWN locked until canonical projection leaves UNKNOWN',()=>{
@@ -477,7 +478,7 @@ test('Stage02 recheck success keeps UNKNOWN locked until canonical projection le
   const canonicalCheck=recheck.indexOf('isCanonicalActionUnknown(readback.actions,actionId)');
   const unlock=recheck.indexOf('setCommandFlight(null)');
   assert.ok(canonicalCheck>=0&&unlock>canonicalCheck);
-  assert.match(recheck,/Canonical projection 仍 UNKNOWN；保持鎖定/);
+  assert.match(recheck,/最新狀態仍未能確認；暫時保持鎖定/);
 });
 
 test('Stage02 selected drawer follows fresh canonical row state after readback',()=>{
@@ -516,8 +517,8 @@ test('Stage03 list search and filters use explicit order projection fields',()=>
     assert.match(vm,new RegExp(field));
   }
   assert.doesNotMatch(vm,/filters\.fulfillmentMode|fulfillmentModes/);
-  assert.match(components,/Display Number／客戶／電話／外部編號/);
-  assert.match(components,/Business Day/);
+  assert.match(components,/訂單編號／客戶／電話／外部訂單編號/);
+  assert.match(components,/營業日/);
   assert.match(components,/來源/);
   assert.match(components,/付款/);
   assert.match(components,/交收/);
@@ -535,8 +536,8 @@ test('Stage03 preserves Today active and dine-in open scopes',()=>{
   assert.match(vm,/scope==='DINE_IN_OPEN'/);
   assert.match(vm,/order\.fulfillmentMode==='DINE_IN'/);
   assert.match(vm,/order\.paymentState==='OPEN'.*order\.paymentState==='PARTIAL'/);
-  assert.match(components,/由今日頁進入 active order scope/);
-  assert.match(components,/由今日頁進入 dine-in \+ open-payment scope/);
+  assert.match(components,/由今日頁查看正在處理嘅訂單/);
+  assert.match(components,/由今日頁查看堂食未結帳訂單/);
 });
 
 test('Stage03 order card renders required oversight summary without raw order identity',()=>{
@@ -562,21 +563,21 @@ test('Stage03 order detail has seven safe sections and no raw engineering payloa
   const components=fs.readFileSync(path.join(srcRoot,'stage03-order-oversight.tsx'),'utf8');
 
   for(const section of[
-    '1｜Identity',
-    '2｜Items / Option / Modifier / Remark',
-    '3｜Money',
-    '4｜Fulfillment',
-    '5｜External',
-    '6｜Side-effects',
-    '7｜Timeline / Audit',
+    '1｜訂單資料',
+    '2｜訂單內容',
+    '3｜金額與付款',
+    '4｜交收進度',
+    '5｜來源資料',
+    '6｜打印狀況',
+    '7｜處理記錄',
   ])assert.match(components,new RegExp(section.replace(/[|/]/g,'\\$&')));
 
-  for(const label of['Original','Adjustments','Current Effective','Current Tender','Receipt','Production','Packing','Label']){
+  for(const label of['原始金額','調整','目前有效金額','付款方式','小票','製作單','打包單','標籤']){
     assert.match(components,new RegExp(label));
   }
 
   assert.match(components,/auditTrail/);
-  assert.match(components,/唔會直接顯示 raw engineering timeline/);
+  assert.match(components,/暫時未有可顯示嘅處理記錄/);
   assert.doesNotMatch(components,/order\.timeline\.map|order\.prints\.map|order\.exceptions\.map/);
 });
 
@@ -588,8 +589,8 @@ test('Stage03 visual and touch contract remains in approved Owner language',()=>
   assert.match(css,/\.order-segmented button\{min-height:44px\}/);
   assert.match(css,/\.order-search input\{min-height:44px\}/);
   assert.match(css,/\.order-filter select\{[\s\S]*min-height:44px/);
-  assert.match(css,/var\(--mf-navy\)/);
-  assert.match(css,/var\(--mf-surface\)/);
+  assert.match(css,/var\(--owner-final-navy\)/);
+  assert.match(css,/--owner-final-surface:#ffffff/);
 
   for(const width of[360,375,390,430,520]){
     assert.match(css,new RegExp('@media\\(max-width:'+width+'px\\)'));
@@ -629,12 +630,12 @@ test('Stage03 fulfillment filter/card/detail use canonical fulfillment state, ne
   assert.equal(mapCanonicalFulfillmentState(undefined),null);
 
   assert.equal(getOwnerOrderFulfillmentStateLabel({fulfillmentLabel:'可取餐'}),'可取餐');
-  assert.equal(getOwnerOrderFulfillmentStateLabel({fulfillmentMode:'TAKEAWAY'}),'未有交收狀態讀回');
+  assert.equal(getOwnerOrderFulfillmentStateLabel({fulfillmentMode:'TAKEAWAY'}),'未有交收狀態資料');
 
   assert.match(components,/label="交收狀態"/);
   assert.match(components,/getOwnerOrderFulfillmentStateLabel\(order\)/);
-  assert.match(components,/Detail label="State" value=\{detail\.fulfillment\.state\}/);
-  assert.match(components,/Detail label="Mode" value=\{detail\.fulfillment\.mode\}/);
+  assert.match(components,/Detail label="狀態" value=\{detail\.fulfillment\.state\}/);
+  assert.match(components,/Detail label="方式" value=\{detail\.fulfillment\.mode\}/);
   assert.doesNotMatch(components,/fulfillmentLabel\?\?order\.fulfillmentMode|fulfillmentLabel\?\?order\.fulfillmentMode\?\?/);
 
   assert.match(mapping,/StoredOrder\.fulfillmentLabel -> v2local projection-outbox fulfillmentLabel -> Owner order projection/);
@@ -686,7 +687,7 @@ test('Stage03 scoped entry resets every conflicting filter before applying scope
 test('Stage03 scoped ACTIVE cannot coexist with completed history in UI',()=>{
   const components=fs.readFileSync(path.join(srcRoot,'stage03-order-oversight.tsx'),'utf8');
   assert.match(components,/scope==='DEFAULT'\?<div className="segmented order-segmented"/);
-  assert.match(components,/Scoped orders/);
+  assert.match(components,/目前訂單範圍/);
   assert.match(components,/<button className="active" disabled>進行中<\/button>/);
 });
 
@@ -705,10 +706,10 @@ test('Stage03 keeps seven detail sections, four-field search, and no mutations a
   const components=fs.readFileSync(path.join(srcRoot,'stage03-order-oversight.tsx'),'utf8');
   const mapping=fs.readFileSync(path.join(srcRoot,'stage03-api-mapping.ts'),'utf8');
 
-  assert.match(components,/Display Number／客戶／電話／外部編號/);
+  assert.match(components,/訂單編號／客戶／電話／外部訂單編號/);
   for(const section of[
-    '1｜Identity','2｜Items / Option / Modifier / Remark','3｜Money',
-    '4｜Fulfillment','5｜External','6｜Side-effects','7｜Timeline / Audit'
+    '1｜訂單資料','2｜訂單內容','3｜金額與付款',
+    '4｜交收進度','5｜來源資料','6｜打印狀況','7｜處理記錄'
   ])assert.match(components,new RegExp(section.replace(/[|/]/g,'\\$&')));
 
   assert.doesNotMatch(components,/>取消訂單<|>退款<|>修改付款<|>Tender Correction/);
@@ -716,11 +717,10 @@ test('Stage03 keeps seven detail sections, four-field search, and no mutations a
   assert.match(mapping,/No second Order \/ Pricing \/ Payment \/ Print \/ Auth \/ Sync authority/);
 });
 
-
 test('Owner auth UI is fail-closed before canonical read',()=>{
   const app=fs.readFileSync(path.join(srcRoot,'App.tsx'),'utf8');
-  assert.match(app,/OWNER ACCESS/);
-  assert.match(app,/Admin 已發布嘅 OWNER Staff ID 同 PIN/);
+  assert.match(app,/老闆專用/);
+  assert.match(app,/Admin 已發布嘅 OWNER 登入編號同 PIN/);
   assert.match(app,/PERMISSION_DENIED/);
   assert.match(app,/正式資料未完成身份確認前唔會載入/);
 });
@@ -731,4 +731,136 @@ test('Owner read runtime refreshes without enabling bounded mutation transport',
   assert.match(app,/visibilitychange/);
   assert.match(app,/15000/);
   assert.doesNotMatch(cloud,/requestBoundedAction\s*:/);
+});
+
+
+test('OA-CHN-001 exposes canonical channel semantics and disables unsupported commands',()=>{
+  const types=fs.readFileSync(path.join(srcRoot,'product-types.ts'),'utf8');
+  const page=fs.readFileSync(path.join(srcRoot,'channel-health.tsx'),'utf8');
+  const cloud=fs.readFileSync(path.join(srcRoot,'cloud-runtime.ts'),'utf8');
+  for(const field of['acceptingOrders','desiredState','observedState','health','mode','cause','observedAt','freshness','lastCommand','readback'])assert.match(types,new RegExp(field));
+  for(const mode of['NORMAL','BUSY','SNOOZED','PAUSED','CLOSED'])assert.match(types,new RegExp(mode));
+  for(const health of['HEALTHY','DEGRADED','OFFLINE','UNKNOWN'])assert.match(types,new RegExp(health));
+  assert.match(page,/暫停接單/);
+  assert.match(page,/恢復接單/);
+  assert.match(page,/<button disabled>暫停接單<\/button>/);
+  assert.match(page,/目前只供查看；可操作功能會喺完成連接後開放/);
+  assert.doesNotMatch(cloud,/\/api\/owner\/channels\/command/);
+});
+
+test('OA-PLN-001 uses canonical runtime rather than localStorage and keeps cost semantics separate',()=>{
+  const app=fs.readFileSync(path.join(srcRoot,'App.tsx'),'utf8');
+  const types=fs.readFileSync(path.join(srcRoot,'product-types.ts'),'utf8');
+  const page=fs.readFileSync(path.join(srcRoot,'planning.tsx'),'utf8');
+  const cloud=fs.readFileSync(path.join(srcRoot,'cloud-runtime.ts'),'utf8');
+  assert.match(types,/MFK_OWNER_MONTHLY_PLAN_V1/);
+  assert.match(types,/monthlyRevenueTargetMinor/);
+  assert.match(types,/plannedMonthlyMinor/);
+  assert.match(types,/actualToDateMinor/);
+  assert.match(types,/expectedRevision/);
+  assert.match(types,/COMPLETE.*PARTIAL.*MANUAL_ESTIMATE/s);
+  assert.match(page,/Current Effective Sales/);
+  assert.match(page,/估算營運淨利（按已輸入成本）/);
+  assert.match(page,/本月目標已達成/);
+  assert.match(page,/預計 \/ Forecast/);
+  assert.match(page,/Draft \/ Pending \/ External Pre-admission \/ 未結帳 Open Check \/ estimatedOpenAmount 不會加入/);
+  assert.doesNotMatch(page,/localStorage|sessionStorage/);
+  assert.match(cloud,/\/api\/owner\/planning/);
+  assert.match(app,/planning:'\/planning'/);
+  assert.match(app,/PlanningPage/);
+});
+
+test('Stage04 keeps four-item bottom navigation and secondary routes',()=>{
+  const app=fs.readFileSync(path.join(srcRoot,'App.tsx'),'utf8');
+  const navBlock=app.match(/<nav className="bottom-nav"[\s\S]*?<\/nav>/)?.[0]??'';
+  assert.equal((navBlock.match(/<Nav /g)||[]).length,4);
+  for(const label of['今日','待處理','訂單','更多'])assert.match(navBlock,new RegExp(label));
+  assert.match(app,/\/channels/);
+  assert.match(app,/\/planning/);
+  assert.match(app,/PlanningPage/);
+  assert.doesNotMatch(app,/MonthlyTargetSummaryCard/);
+});
+
+
+test('OA-SEL-001 uses canonical Sellability Authority with per-target readback',()=>{
+  const types=fs.readFileSync(path.join(srcRoot,'product-types.ts'),'utf8');
+  const page=fs.readFileSync(path.join(srcRoot,'sellability.tsx'),'utf8');
+  const cloud=fs.readFileSync(path.join(srcRoot,'cloud-runtime.ts'),'utf8');
+  const app=fs.readFileSync(path.join(srcRoot,'App.tsx'),'utf8');
+  for(const grain of['PRODUCT','OPTION','MODIFIER','COMBO_CHILD'])assert.match(types,new RegExp(grain));
+  for(const state of['CONFIRMED','PARTIAL','UNKNOWN'])assert.match(types,new RegExp(state));
+  assert.match(types,/ONLINE_ONLY/);
+  assert.match(types,/restoreAt/);
+  assert.match(cloud,/\/api\/owner\/sellability/);
+  assert.match(page,/即時停售或恢復商品/);
+  assert.match(page,/商品結構同價格設定仍留喺 Admin/);
+  assert.match(page,/只停網上/);
+  assert.match(page,/只停至今日/);
+  assert.match(page,/停至指定時間/);
+  assert.match(page,/數量資料.*只展示/);
+  assert.match(page,/改價、商品／套餐結構、平台對應同刪除商品仍然喺 Admin 處理/);
+  assert.match(page,/唔會自動改成售罄/);
+  assert.match(app,/sellability/);
+  assert.doesNotMatch(page,/localStorage|sessionStorage/);
+});
+
+test('OA-STF-001 is read-only and never fabricates attendance data',()=>{
+  const app=fs.readFileSync(path.join(srcRoot,'App.tsx'),'utf8');
+  const page=fs.readFileSync(path.join(srcRoot,'staff-overview.tsx'),'utf8');
+  const types=fs.readFileSync(path.join(srcRoot,'product-types.ts'),'utf8');
+  const identitySource=fs.readFileSync(path.join(srcRoot,'staff-identity.ts'),'utf8');
+
+  assert.match(app,/StaffOverviewPage/);
+  assert.match(app,/\/staff/);
+  assert.match(app,/onStaff/);
+
+  for(const marker of[
+    '員工摘要',
+    '上班中',
+    '排班與實際',
+    '休息中',
+    '今日工時',
+    '員工提醒',
+    '角色摘要',
+    '基本資料',
+    '角色與能力',
+    '相關紀錄',
+    '員工資料',
+    '未有資料',
+    '未有員工編號資料',
+    '未有能力摘要資料',
+    '暫時未有相關紀錄',
+    '打卡、登入同角色權限係不同資料',
+    '薪酬資料不會喺呢個頁面顯示',
+  ])assert.match(page,new RegExp(marker));
+
+  assert.match(page,/目前未有完整出勤、休息同工時資料/);
+  assert.match(page,/出勤資料未連接/);
+  assert.match(page,/新增／停用員工、角色權限同 PIN 設定請到 Admin 處理/);
+  assert.match(types,/loginId\?:string/);
+  assert.match(types,/capabilitySummary\?:string/);
+  assert.match(identitySource,/staff\.staffId/);
+  assert.doesNotMatch(identitySource,/staff\.name/);
+
+  assert.doesNotMatch(page,/person\.permissions|selected\.permissions/);
+  assert.doesNotMatch(page,/員工編號 \{person\.staffId\}|員工編號<\/span><strong>\{selected\.staffId\}/);
+  assert.doesNotMatch(page,/presence\.includes|schedule\.includes/);
+  assert.doesNotMatch(page,/onCommand|requestBoundedAction|command[A-Z]|fetch\(/);
+  assert.doesNotMatch(page,/localStorage|sessionStorage/);
+  assert.doesNotMatch(page,/<input|<select|<textarea/);
+  assert.doesNotMatch(page,/pinVerifier|password|hashHex|saltHex/);
+});
+
+test('OA-STF-001 audit custody never assigns same-name staff without stable identity',()=>{
+  const {selectStaffAuditHistory,humanEmployeeCode}=loadPureTsModule('staff-identity.ts');
+  const sameNameA={staffId:'staff-a',loginId:'1001',name:'同名員工',role:'STAFF',presence:'UNKNOWN'};
+  const sameNameB={staffId:'staff-b',loginId:'1002',name:'同名員工',role:'STAFF',presence:'UNKNOWN'};
+  const activity=[
+    {activityId:'name-only',title:'舊紀錄',actor:'同名員工',result:'OK',observedAt:'2026-09-27T00:00:00Z'},
+    {activityId:'stable-b',title:'可靠紀錄',actor:'同名員工',actorStaffId:'staff-b',result:'OK',observedAt:'2026-09-27T00:01:00Z'},
+  ];
+  assert.deepEqual(selectStaffAuditHistory(activity,sameNameA).map(row=>row.activityId),[]);
+  assert.deepEqual(selectStaffAuditHistory(activity,sameNameB).map(row=>row.activityId),['stable-b']);
+  assert.equal(humanEmployeeCode(sameNameA),'1001');
+  assert.equal(humanEmployeeCode({...sameNameA,loginId:undefined}),null);
 });

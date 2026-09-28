@@ -17,20 +17,47 @@ import {ActionQueuePage,type OwnerActionCommandFlight} from './stage02-action-qu
 import {isCanonicalActionUnknown,selectOpenActions} from './stage02-open-actions';
 import {OrderOversightPage} from './stage03-order-oversight';
 import type {OwnerOrderScope} from './stage03-view-model';
+import {ChannelHealthPage} from './channel-health';
+import {PlanningPage} from './planning';
+import {SellabilityPage} from './sellability';
+import {StaffOverviewPage} from './staff-overview';
+import {ActivityAuditPage,DeviceHealthPage,ManagerLogPage,MoreHubPage,ReportsPage,SettingsSummaryPage,type ManagerMode} from './source-fidelity-wave2';
 import type {
   OwnerAuthSession,
   OwnerConnectionState,
+  OwnerPlanningSaveInput,
+  OwnerPlanningSnapshot,
   OwnerReadModelSnapshot,
   OwnerRuntimePort,
+  OwnerSellabilityCommandInput,
+  OwnerSellabilityCommandResult,
 } from './product-types';
 
 type View='today'|'queue'|'orders'|'more';
-type Tool='reports'|'sellability'|'channels'|'staff'|'devices'|'customers'|'marketing'|'settlement'|'cash'|'inventory'|'notifications'|'manager'|'activity'|'admin'|'recovery';
+type SecondaryView='channels'|'planning'|'sellability'|'staff'|'devices'|'reports'|'manager-log'|'checklist'|'handoff'|'activity'|'settings-summary';
+type Tool='customers'|'marketing'|'settlement'|'cash'|'inventory'|'notifications'|'admin'|'recovery';
 type Confirmation={label:string;target:string;impact:string;actionId?:string};
+
+const SECONDARY_PATHS:Record<SecondaryView,string>={
+  channels:'/channels',planning:'/planning',sellability:'/sellability',staff:'/staff',
+  devices:'/devices',reports:'/reports','manager-log':'/manager-log',checklist:'/checklist',
+  handoff:'/handoff',activity:'/activity','settings-summary':'/settings-summary',
+};
+function secondaryFromPath(path:string):SecondaryView|null{
+  for(const [view,route] of Object.entries(SECONDARY_PATHS))if(route===path)return view as SecondaryView;
+  return null;
+}
+function primaryFromPath(path:string,fallback:View):View{
+  if(path==='/actions')return 'queue';
+  if(path==='/orders')return 'orders';
+  if(path==='/more')return 'more';
+  if(path==='/today'||path==='/')return 'today';
+  return fallback;
+}
 
 export function App(){
   const local=useMemo(()=>readOwnerLocalWorkspace(),[]);
-  const [view,setView]=useState<View>(local.activeView);
+  const [view,setView]=useState<View>(()=>typeof window==='undefined'?local.activeView:primaryFromPath(window.location.pathname,local.activeView));
   const [managerNote,setManagerNote]=useState(local.managerNote);
   const [handoffNote,setHandoffNote]=useState(local.handoffNote);
   const [checklist,setChecklist]=useState<readonly OwnerChecklistItem[]>(local.checklist);
@@ -48,6 +75,12 @@ export function App(){
   const [confirmation,setConfirmation]=useState<Confirmation|null>(null);
   const [commandFlight,setCommandFlight]=useState<OwnerActionCommandFlight|null>(null);
   const [ordersScope,setOrdersScope]=useState<OwnerOrderScope>('DEFAULT');
+  const [secondary,setSecondary]=useState<SecondaryView|null>(()=>typeof window==='undefined'?null:secondaryFromPath(window.location.pathname));
+  const [planning,setPlanning]=useState<OwnerPlanningSnapshot|null>(null);
+  const [planningLoading,setPlanningLoading]=useState(false);
+  const [planningSaving,setPlanningSaving]=useState(false);
+  const [sellabilityBusy,setSellabilityBusy]=useState(false);
+  const [sellabilityResult,setSellabilityResult]=useState<OwnerSellabilityCommandResult|null>(null);
 
   const persistLocal=(next?:Partial<{view:View;managerNote:string;handoffNote:string;checklist:readonly OwnerChecklistItem[]}>)=>{
     writeOwnerLocalWorkspace({
@@ -58,7 +91,20 @@ export function App(){
     });
   };
 
-  const changeView=(next:View)=>{setView(next);persistLocal({view:next})};
+  const changeView=(next:View)=>{
+    setSecondary(null);setView(next);persistLocal({view:next});
+    if(typeof window!=='undefined'){
+      const path=next==='today'?'/today':next==='queue'?'/actions':next==='orders'?'/orders':'/more';
+      if(window.location.pathname!==path)window.history.pushState({},'',path);
+    }
+  };
+  const openSecondary=(next:SecondaryView)=>{
+    setSecondary(next);setView('more');persistLocal({view:'more'});
+    if(typeof window!=='undefined'){
+      const path=SECONDARY_PATHS[next];
+      if(window.location.pathname!==path)window.history.pushState({},'',path);
+    }
+  };
 
   const refresh=async():Promise<OwnerReadModelSnapshot|null>=>{
     if(!port){setConnection('OFFLINE_READONLY');setSnapshot(null);return null}
@@ -104,6 +150,72 @@ export function App(){
     return()=>{window.clearInterval(timer);document.removeEventListener('visibilitychange',visible);window.removeEventListener('focus',focus);};
   },[port,ownerSession?.sessionToken]);
 
+  useEffect(()=>{
+    const pop=()=>{
+      const path=window.location.pathname;
+      const nextSecondary=secondaryFromPath(path);
+      if(nextSecondary){setSecondary(nextSecondary);setView('more');return}
+      setSecondary(null);
+      if(path==='/actions')setView('queue');
+      else if(path==='/orders')setView('orders');
+      else if(path==='/more')setView('more');
+      else setView('today');
+    };
+    window.addEventListener('popstate',pop);
+    return()=>window.removeEventListener('popstate',pop);
+  },[]);
+
+  const loadPlanning=async(monthKey?:string)=>{
+    if(!port?.readPlanning)return;
+    const key=monthKey??new Date(Date.now()+8*60*60*1000).toISOString().slice(0,7);
+    setPlanningLoading(true);
+    try{setPlanning(await port.readPlanning(key));}
+    catch{setNotice('未能讀取最新規劃；暫時唔會用舊資料代替。');}
+    finally{setPlanningLoading(false);}
+  };
+  const loadSellability=async()=>{
+    if(!port?.readSellability){const next=await refresh();return next?.sellability??null}
+    try{
+      const items=await port.readSellability();
+      setSnapshot(current=>current?{...current,sellability:items}:current);
+      return items;
+    }catch{
+      setNotice('未能確認最新商品供應狀態；暫時保持未有資料。');
+      return null;
+    }
+  };
+  const commandSellability=async(input:OwnerSellabilityCommandInput)=>{
+    if(!port?.commandSellability){setNotice('商品供應操作暫未連接；正式狀態沒有改變。');return}
+    if(connection==='OFFLINE_READONLY'||connection==='PERMISSION_DENIED'){setNotice('目前只可讀取；售罄操作已停用。');return}
+    setSellabilityBusy(true);
+    try{
+      const result=await port.commandSellability(input);
+      if(result.state==='CONFIRMED')setNotice('售罄操作已完成，並已確認各項商品狀態。');
+      else if(result.state==='PARTIAL')setNotice('部分商品已完成更新；其餘商品狀態仍待確認。');
+      else setNotice('操作結果未能確認；請先重新整理，暫時唔好重複操作。');
+      await loadSellability();
+    }catch{setNotice('操作結果未能確認；請先重新整理最新狀態，暫時唔好重複操作。');}
+    finally{setSellabilityBusy(false);}
+  };
+
+  const loadChannels=async()=>{
+    if(!port?.readChannels){
+      const next=await refresh();
+      return next?.channels??null;
+    }
+    try{
+      const channels=await port.readChannels();
+      setSnapshot(current=>current?{...current,channels}:current);
+      return channels;
+    }catch{
+      setNotice('未能確認最新渠道狀態；暫時保持未有資料。');
+      return null;
+    }
+  };
+  useEffect(()=>{if(secondary==='planning'&&ownerSession)void loadPlanning(planning?.plan.monthKey);},[secondary,ownerSession?.sessionToken]);
+  useEffect(()=>{if(secondary==='channels'&&ownerSession)void loadChannels();},[secondary,ownerSession?.sessionToken]);
+  useEffect(()=>{if(secondary==='sellability'&&ownerSession)void loadSellability();},[secondary,ownerSession?.sessionToken]);
+
   const login=async()=>{
     if(!port?.loginOwner||loginBusy)return;
     setLoginBusy(true);setLoginError(null);
@@ -137,27 +249,27 @@ export function App(){
     if(connection==='OFFLINE_READONLY'){setNotice('離線唯讀：遠端操作已停用。');return}
     if(connection==='PERMISSION_DENIED'){setNotice('目前身份冇權執行呢個操作。');return}
     if(actionId&&isCanonicalActionUnknown(snapshot?.actions??[],actionId)){
-      setNotice('正式狀態仍未明；只可重新確認讀回，禁止再次提交。');
+      setNotice('處理結果仍未確認；請先重新檢查最新狀態，暫時唔好再次提交。');
       return;
     }
     if(actionId&&commandFlight?.actionId===actionId&&(commandFlight.state==='PENDING'||commandFlight.state==='UNKNOWN')){
-      setNotice('呢項操作仍在等待正式讀回；禁止重複提交。');
+      setNotice('呢項操作仍在確認中；暫時唔好重複提交。');
       return;
     }
-    setConfirmation({label,target,impact:impact+' 正式狀態必須等目標系統讀回。',actionId});
+    setConfirmation({label,target,impact:impact+' 完成後會再次確認最新狀態。',actionId});
   };
 
   const executeBounded=async(value:Confirmation)=>{
     setConfirmation(null);
     if(connection==='OFFLINE_READONLY'){setNotice('離線唯讀：遠端操作已停用。');return}
     if(value.actionId&&isCanonicalActionUnknown(snapshot?.actions??[],value.actionId)){
-      setNotice('正式狀態仍未明；禁止再次提交，只可重新確認讀回。');
-      setCommandFlight({actionId:value.actionId,state:'UNKNOWN',message:'Canonical projection 仍 UNKNOWN；只可重新確認讀回，禁止 blind resend。'});
+      setNotice('處理結果仍未確認；請先重新檢查最新狀態，暫時唔好再次提交。');
+      setCommandFlight({actionId:value.actionId,state:'UNKNOWN',message:'最新狀態仍未能確認；請先重新檢查，暫時唔好再次提交。'});
       return;
     }
-    if(!port?.requestBoundedAction){setNotice('遠端操作服務尚未連接；冇改變任何正式狀態。');return}
+    if(!port?.requestBoundedAction){setNotice('遠端操作暫未開放；正式狀態沒有改變。');return}
 
-    if(value.actionId)setCommandFlight({actionId:value.actionId,state:'PENDING',message:'正在提交／等待 canonical readback。'});
+    if(value.actionId)setCommandFlight({actionId:value.actionId,state:'PENDING',message:'正在提交並確認最新狀態。'});
 
     try{
       const result=await port.requestBoundedAction({actionType:value.label,target:value.target,reason:value.impact,operationId:crypto.randomUUID()});
@@ -168,9 +280,9 @@ export function App(){
           const canonicalUnknown=readback?isCanonicalActionUnknown(readback.actions,value.actionId):false;
           setCommandFlight(
             !readback
-              ?{actionId:value.actionId,state:'UNKNOWN',message:'操作已確認，但最新正式狀態未能讀回。只可重新確認，禁止重送。'}
+              ?{actionId:value.actionId,state:'UNKNOWN',message:'操作已送出，但最新狀態暫時未能確認。請先重新檢查，暫時唔好再提交。'}
               :canonicalUnknown
-                ?{actionId:value.actionId,state:'UNKNOWN',message:'最新 canonical projection 仍 UNKNOWN；禁止重送，只可重新確認讀回。'}
+                ?{actionId:value.actionId,state:'UNKNOWN',message:'最新狀態仍未能確認；請先重新檢查，暫時唔好再提交。'}
                 :null
           );
         }
@@ -186,38 +298,59 @@ export function App(){
         if(value.actionId)setCommandFlight({actionId:value.actionId,state:'FAILED',message:'操作未完成；請檢查目前狀態。'});
         return;
       }
-      setNotice('操作結果未明；請重新確認正式狀態，唔好重複提交。');
-      if(value.actionId)setCommandFlight({actionId:value.actionId,state:'UNKNOWN',message:'結果未明；只可重新確認 canonical readback，禁止 blind resend。'});
+      setNotice('操作結果未能確認；請先重新檢查最新狀態，暫時唔好重複提交。');
+      if(value.actionId)setCommandFlight({actionId:value.actionId,state:'UNKNOWN',message:'結果未能確認；請先重新檢查最新狀態，暫時唔好再次提交。'});
     }catch{
       setNotice('操作結果未明；請重新確認正式狀態，唔好重複提交。');
-      if(value.actionId)setCommandFlight({actionId:value.actionId,state:'UNKNOWN',message:'結果未明；只可重新確認 canonical readback，禁止 blind resend。'});
+      if(value.actionId)setCommandFlight({actionId:value.actionId,state:'UNKNOWN',message:'結果未能確認；請先重新檢查最新狀態，暫時唔好再次提交。'});
     }
   };
 
   const recheckAction=async(actionId:string)=>{
-    setCommandFlight({actionId,state:'PENDING',message:'正在重新確認正式狀態。'});
+    setCommandFlight({actionId,state:'PENDING',message:'正在重新檢查最新狀態。'});
     const readback=await refresh();
     if(!readback){
-      setCommandFlight({actionId,state:'UNKNOWN',message:'仍未能取得正式讀回；禁止 blind resend。'});
+      setCommandFlight({actionId,state:'UNKNOWN',message:'仍未能確認最新狀態；暫時唔好再次提交。'});
       return;
     }
     if(isCanonicalActionUnknown(readback.actions,actionId)){
-      setCommandFlight({actionId,state:'UNKNOWN',message:'Canonical projection 仍 UNKNOWN；保持鎖定，只可再次重新確認讀回。'});
+      setCommandFlight({actionId,state:'UNKNOWN',message:'最新狀態仍未能確認；暫時保持鎖定，請稍後再重新檢查。'});
       return;
     }
     setCommandFlight(null);
   };
 
-  const connectionLabel=connection==='FRESH'?'資料新鮮':connection==='LOADING'?'同步中':connection==='EMPTY'?'暫無資料':connection==='STALE'?'資料稍舊':connection==='PARTIAL'?'部分資料':connection==='OFFLINE_READONLY'?'離線唯讀':connection==='PERMISSION_DENIED'?'權限不足':connection==='UNKNOWN'?'狀態未明':'同步失敗';
+  const recheckChannel=async(channelId:string)=>{
+    const channels=await loadChannels();
+    const channel=channels?.find(item=>item.channelId===channelId);
+    if(!channel||channel.readback==='UNKNOWN')setNotice('渠道狀態仍未能確認；暫時只供查看。');
+  };
+  const savePlanning=async(input:OwnerPlanningSaveInput)=>{
+    if(!port?.savePlanning){setNotice('規劃儲存功能暫未連接；資料沒有被更改。');return}
+    setPlanningSaving(true);
+    try{
+      const result=await port.savePlanning(input);
+      if(result.state==='CONFIRMED'&&result.snapshot){setPlanning(result.snapshot);setNotice('規劃已保存並完成狀態確認。');}
+      else if(result.state==='REJECTED'){setNotice('規劃版本已更新；請重新讀取再修改。');await loadPlanning(input.monthKey);}
+      else setNotice('保存結果未能確認；請先重新整理，暫時唔好重複提交。');
+    }catch{setNotice('保存結果未能確認；請先重新整理，暫時唔好重複提交。');}
+    finally{setPlanningSaving(false);}
+  };
+
+  const connectionLabel=humanConnectionLabel(connection);
+  const openAdmin=async()=>{
+    if(!port?.requestAdminDeepLink){setNotice('Admin 導航服務尚未連接。');return}
+    try{setNotice((await port.requestAdminDeepLink()).message)}catch{setNotice('暫時未能開啟 Admin。')}
+  };
 
   if(!authChecked){
     return <main className="app-shell owner-auth-shell"><section className="owner-auth-gate"><strong>正在驗證 Owner 工作階段</strong><p>正式資料未完成身份確認前唔會載入。</p></section></main>;
   }
   if(port?.loginOwner&&!ownerSession){
     return <main className="app-shell owner-auth-shell"><form className="owner-auth-gate" onSubmit={event=>{event.preventDefault();void login();}}>
-      <span>OWNER ACCESS</span><h1>老闆登入</h1>
-      <p>使用 Admin 已發布嘅 OWNER Staff ID 同 PIN。身份未確認前不會讀取訂單、電話或營業資料。</p>
-      <label><span>Staff ID</span><input value={loginStaffId} onChange={event=>setLoginStaffId(event.target.value)} autoComplete="username" /></label>
+      <span>老闆專用</span><h1>老闆登入</h1>
+      <p>使用 Admin 已發布嘅 OWNER 登入編號同 PIN。身份未確認前不會讀取訂單、電話或營業資料。</p>
+      <label><span>登入編號</span><input value={loginStaffId} onChange={event=>setLoginStaffId(event.target.value.replace(/[^A-Za-z0-9._-]/g,'').slice(0,64))} autoComplete="username" placeholder="例如 1111" /></label>
       <label><span>PIN</span><input value={loginPin} onChange={event=>setLoginPin(event.target.value.replace(/\D/g,'').slice(0,8))} inputMode="numeric" type="password" autoComplete="current-password" /></label>
       {loginError?<div className="owner-auth-error" role="alert">{loginError}</div>:null}
       <button type="submit" disabled={loginBusy||!loginStaffId.trim()||loginPin.length<4}>{loginBusy?'驗證中…':'登入'}</button>
@@ -227,7 +360,7 @@ export function App(){
   return <main className="app-shell">
     <header className="topbar">
       <img className="brand-logo" src="/brand/morefun-logo-canonical.png" alt="磨飯 More Fun" />
-      <div className="brand-copy"><strong>老闆中心</strong><span>{snapshot?.store?.storeName??'未連接門店'} · {snapshot?.store?.businessDate??'營業日未有資料'}</span></div>
+      <div className="brand-copy"><strong>{snapshot?.store?.storeName??'磨飯'}</strong><span>Owner App · {snapshot?.store?.businessDate??'營業日未有資料'}</span></div>
       {ownerSession?<button className="owner-session-pill" onClick={()=>void logout()} title="登出 Owner 工作階段">{ownerSession.displayName} · 登出</button>:null}
       <button className="state-pill" onClick={()=>void refresh()} aria-label="重新同步"><i/>{connectionLabel}</button>
     </header>
@@ -236,34 +369,34 @@ export function App(){
     <GlobalStateBanner state={connection} onRetry={()=>void refresh()}/>
 
     <section className="stage">
-      {view==='today'?<TodayPage connection={connection} snapshot={snapshot} onQueue={()=>changeView('queue')} onActiveOrders={()=>openOrdersScope('ACTIVE')} onDineInOrders={()=>openOrdersScope('DINE_IN_OPEN')} onTool={setTool}/>:null}
-      {view==='queue'?<ActionQueuePage connection={connection} items={openActions} activity={snapshot?.activity??[]} commandFlight={commandFlight} onCommand={requestBounded} onRecheck={actionId=>void recheckAction(actionId)}/>:null}
-      {view==='orders'?<OrderOversightPage connection={connection} orders={snapshot?.orders??[]} scope={ordersScope} onScopeReset={()=>setOrdersScope('DEFAULT')}/>:null}
-      {view==='more'?<MorePage snapshot={snapshot} connection={connection} onTool={setTool}/>:null}
+      {secondary==='channels'?<ChannelHealthPage channels={snapshot?.channels??[]} connection={connection} onRecheck={channelId=>void recheckChannel(channelId)} onBack={()=>changeView('more')}/>:null}
+      {secondary==='planning'?<PlanningPage value={planning} loading={planningLoading} saving={planningSaving} onMonthChange={monthKey=>void loadPlanning(monthKey)} onSave={input=>void savePlanning(input)} onBack={()=>changeView('more')}/>:null}
+      {secondary==='sellability'?<SellabilityPage items={snapshot?.sellability??[]} connection={connection} busy={sellabilityBusy} result={sellabilityResult} onDismissResult={()=>setSellabilityResult(null)} onCommand={input=>void commandSellability(input)} onReload={()=>void loadSellability()} onBack={()=>changeView('more')}/>:null}
+      {secondary==='staff'?<StaffOverviewPage staff={snapshot?.staff??[]} activity={snapshot?.activity??[]} connection={connection} observedAt={snapshot?.observedAt} onBack={()=>changeView('more')}/>:null}
+      {secondary==='devices'?<DeviceHealthPage snapshot={snapshot} onBack={()=>changeView('more')}/>:null}
+      {secondary==='reports'?<ReportsPage snapshot={snapshot} onBack={()=>changeView('more')}/>:null}
+      {secondary==='manager-log'||secondary==='checklist'||secondary==='handoff'?<ManagerLogPage mode={secondary as ManagerMode} snapshot={snapshot} onNavigate={mode=>openSecondary(mode)} onBack={()=>changeView('more')}/>:null}
+      {secondary==='activity'?<ActivityAuditPage snapshot={snapshot} onBack={()=>changeView('more')}/>:null}
+      {secondary==='settings-summary'?<SettingsSummaryPage snapshot={snapshot} connection={connection} onAdmin={()=>void openAdmin()} onBack={()=>changeView('more')}/>:null}
+      {!secondary&&view==='today'?<TodayPage connection={connection} snapshot={snapshot} onQueue={()=>changeView('queue')} onActiveOrders={()=>openOrdersScope('ACTIVE')} onDineInOrders={()=>openOrdersScope('DINE_IN_OPEN')} onChannels={()=>openSecondary('channels')} onStaff={()=>openSecondary('staff')} onDevices={()=>openSecondary('devices')} onTool={setTool}/>:null}
+      {!secondary&&view==='queue'?<ActionQueuePage connection={connection} items={openActions} activity={snapshot?.activity??[]} commandFlight={commandFlight} onCommand={requestBounded} onRecheck={actionId=>void recheckAction(actionId)}/>:null}
+      {!secondary&&view==='orders'?<OrderOversightPage connection={connection} orders={snapshot?.orders??[]} scope={ordersScope} onScopeReset={()=>setOrdersScope('DEFAULT')}/>:null}
+      {!secondary&&view==='more'?<MoreHubPage snapshot={snapshot} connection={connection} onOpen={openSecondary} onTool={setTool}/>:null}
     </section>
 
     <nav className="bottom-nav" aria-label="主要功能">
       <Nav active={view==='today'} label="今日" onClick={()=>changeView('today')}/>
       <Nav active={view==='queue'} label="待處理" badge={openActions.length?String(openActions.length):undefined} onClick={()=>changeView('queue')}/>
       <Nav active={view==='orders'} label="訂單" onClick={()=>openOrdersScope('DEFAULT')}/>
-      <Nav active={view==='more'} label="更多" onClick={()=>changeView('more')}/>
+      <Nav active={view==='more'||secondary!==null} label="更多" onClick={()=>changeView('more')}/>
     </nav>
 
     {tool?<ToolDrawer
       tool={tool}
       snapshot={snapshot}
       connection={connection}
-      managerNote={managerNote}
-      handoffNote={handoffNote}
-      checklist={checklist}
-      setManagerNote={value=>{setManagerNote(value);persistLocal({managerNote:value})}}
-      setHandoffNote={value=>{setHandoffNote(value);persistLocal({handoffNote:value})}}
-      setChecklist={value=>{setChecklist(value);persistLocal({checklist:value})}}
       onCommand={requestBounded}
-      onAdmin={async()=>{
-        if(!port?.requestAdminDeepLink){setNotice('Admin 導航服務尚未連接。');return}
-        try{setNotice((await port.requestAdminDeepLink()).message)}catch{setNotice('暫時未能開啟 Admin。')}
-      }}
+      onAdmin={()=>void openAdmin()}
       onClose={()=>setTool(null)}
     />:null}
     {confirmation?<ConfirmationSheet value={confirmation} onClose={()=>setConfirmation(null)} onConfirm={()=>void executeBounded(confirmation)}/>:null}
@@ -276,6 +409,9 @@ function TodayPage({
   onQueue,
   onActiveOrders,
   onDineInOrders,
+  onChannels,
+  onStaff,
+  onDevices,
   onTool,
 }:{
   connection:OwnerConnectionState;
@@ -283,6 +419,9 @@ function TodayPage({
   onQueue:()=>void;
   onActiveOrders:()=>void;
   onDineInOrders:()=>void;
+  onChannels:()=>void;
+  onStaff:()=>void;
+  onDevices:()=>void;
   onTool:(tool:Tool)=>void;
 }){
   const vm=buildOwnerTodayViewModel(snapshot);
@@ -295,67 +434,47 @@ function TodayPage({
       freshness={vm.storeFreshness}
       observedAt={vm.observedAt}
     />
-    {!today?<Empty title={connection==='OFFLINE_READONLY'?'今日數據尚未連接':'暫時未有今日數據'} detail="正式營業額、訂單同平均單未有讀回之前唔會顯示假 KPI。"/>:
-      <section className="kpi-grid"><Kpi label="有效營業額" value={today.salesLabel} compare={today.comparisonLabel}/><Kpi label="訂單" value={String(today.orderCount)} compare="正式有效單摘要"/><Kpi label="平均訂單" value={today.averageOrderLabel} compare="有效營業額 / 有效單量"/></section>}
+    {!today?<Empty title={connection==='OFFLINE_READONLY'?'今日數據尚未連接':'暫時未有今日數據'} detail="營業資料暫未更新完成，呢度唔會顯示推算數字。"/>:
+      <section className="kpi-grid"><Kpi label="有效營業額" value={today.salesLabel} compare={today.comparisonLabel}/><Kpi label="有效訂單" value={String(today.orderCount)} compare="已完成並仍然有效"/><Kpi label="平均訂單金額" value={today.averageOrderLabel} compare="目前每張有效訂單平均"/></section>}
     <TodayLiveOrdersCard value={vm.liveOrders} onOpenActive={onActiveOrders}/>
     <DineInOpenChecksCard value={vm.dineIn} onOpenDineIn={onDineInOrders}/>
     <TodayActionSummaryCard value={vm.actionSummary} onOpen={onQueue}/>
-    <TodayHealthSummaryCard value={vm.healthSummary} onChannels={()=>onTool('channels')} onDevices={()=>onTool('devices')}/>
-    <TodayStaffSummaryCard value={vm.staffSummary} onOpen={()=>onTool('staff')}/>
+    <TodayHealthSummaryCard value={vm.healthSummary} onChannels={onChannels} onDevices={onDevices}/>
+    <TodayStaffSummaryCard value={vm.staffSummary} onOpen={onStaff}/>
     <TodayInsightCard value={vm.insight}/>
   </section>;
 }
 
-function MorePage({snapshot,connection,onTool}:{snapshot:OwnerReadModelSnapshot|null;connection:OwnerConnectionState;onTool:(tool:Tool)=>void}){
-  const tools:{id:Tool;title:string;detail:string;state:string}[]=[
-    {id:'reports',title:'報表',detail:'固定可信摘要',state:String(snapshot?.reports.length??0)},
-    {id:'sellability',title:'商品供應',detail:'售罄／恢復有限操作',state:connection==='FRESH'?'可查詢':'未連接'},
-    {id:'channels',title:'渠道',detail:'Desired / Observed / Freshness',state:String(snapshot?.channels.length??0)},
-    {id:'staff',title:'員工',detail:'在場／角色／權限摘要',state:String(snapshot?.staff.length??0)},
-    {id:'devices',title:'設備／打印',detail:'健康／影響範圍／Job certainty',state:String(snapshot?.devices.length??0)},
-    {id:'customers',title:'客戶',detail:'CRM Lite／新客／回頭客／同意',state:snapshot?.customers?'已讀取':'未連接'},
-    {id:'marketing',title:'推廣',detail:'Campaign／Attribution／Funding',state:String(snapshot?.campaigns.length??0)},
-    {id:'settlement',title:'平台結算',detail:'銷售／費用／撥款／差異',state:String(snapshot?.settlements.length??0)},
-    {id:'cash',title:'現金',detail:'Expected / Actual / Over-short',state:snapshot?.cash?'已讀取':'未連接'},
-    {id:'inventory',title:'庫存',detail:'低庫存／盤點／耗損提示',state:String(snapshot?.inventory.length??0)},
-    {id:'notifications',title:'通知',detail:'即時／摘要／收件箱',state:String(snapshot?.notifications.length??0)},
-    {id:'manager',title:'經理日誌',detail:'本機筆記／Checklist／交接草稿',state:'本機'},
-    {id:'activity',title:'活動紀錄',detail:'Requester / Approver / Result / Readback',state:String(snapshot?.activity.length??0)},
-    {id:'admin',title:'前往 Admin',detail:'設定留喺 Admin',state:'導航'},
-    {id:'recovery',title:'資料狀態',detail:'Offline / Stale / Unknown / Partial',state:connection},
-  ];
-  return <section className="page"><header className="page-head"><div><span>更多</span><h1>營運工具</h1><small>設定留 Admin；交易、付款、打印同實體設備執行留喺責任端。</small></div></header><div className="tool-grid">{tools.map(item=><button key={item.id} className="tool-card" onClick={()=>onTool(item.id)} data-icon-state="AI_ASSET_PENDING"><strong>{item.title}</strong><small>{item.detail}</small><em>{item.state}</em></button>)}</div></section>;
-}
-
-function ToolDrawer({tool,snapshot,connection,managerNote,handoffNote,checklist,setManagerNote,setHandoffNote,setChecklist,onCommand,onAdmin,onClose}:{tool:Tool;snapshot:OwnerReadModelSnapshot|null;connection:OwnerConnectionState;managerNote:string;handoffNote:string;checklist:readonly OwnerChecklistItem[];setManagerNote:(v:string)=>void;setHandoffNote:(v:string)=>void;setChecklist:(v:readonly OwnerChecklistItem[])=>void;onCommand:(label:string,target:string,impact:string)=>void;onAdmin:()=>void;onClose:()=>void}){
-  const title=tool==='reports'?'報表':tool==='sellability'?'商品供應':tool==='channels'?'渠道健康':tool==='staff'?'員工':tool==='devices'?'設備／打印':tool==='customers'?'客戶':tool==='marketing'?'推廣':tool==='settlement'?'平台結算':tool==='cash'?'現金':tool==='inventory'?'庫存':tool==='notifications'?'通知':tool==='manager'?'經理日誌':tool==='activity'?'活動紀錄':tool==='admin'?'Admin':tool==='recovery'?'資料狀態':'工具';
+function ToolDrawer({tool,snapshot,connection,onCommand,onAdmin,onClose}:{tool:Tool;snapshot:OwnerReadModelSnapshot|null;connection:OwnerConnectionState;onCommand:(label:string,target:string,impact:string)=>void;onAdmin:()=>void;onClose:()=>void}){
+  const title=tool==='customers'?'客戶':tool==='marketing'?'推廣':tool==='settlement'?'平台結算':tool==='cash'?'現金':tool==='inventory'?'庫存':tool==='notifications'?'通知':tool==='admin'?'Admin':tool==='recovery'?'資料狀態':'工具';
   return <div className="overlay"><section className="drawer" role="dialog" aria-modal="true"><DrawerHead title={title} subtitle="老闆中心" close={onClose}/>
-    {tool==='reports'?<ListOrEmpty rows={snapshot?.reports??[]} render={item=><div className="list-row" key={item.reportId}><div><strong>{item.name}</strong><small>{item.compare??item.freshness}</small></div><b>{item.value}</b></div>} empty="報表尚未連接"/>:null}
-    {tool==='channels'?<ListOrEmpty rows={snapshot?.channels??[]} render={item=><div className="list-row" key={item.channelId}><div><strong>{item.name}</strong><small>Desired：{item.desired} · Observed：{item.observed} · {item.freshness}</small></div><span className="status">{item.health}</span></div>} empty="渠道資料尚未連接"/>:null}
-    {tool==='sellability'?<ListOrEmpty rows={snapshot?.sellability??[]} render={item=><div className="list-row" key={item.targetId}><div><strong>{item.name}</strong><small>{item.grain} · {item.scope} · {item.state}</small></div><button onClick={()=>onCommand(item.state==='AVAILABLE'?'標記售罄':'恢復供應',item.targetId,'有限度供應狀態操作；必須等正式讀回。')}>{item.state==='AVAILABLE'?'售罄':'恢復'}</button></div>} empty="商品供應資料尚未連接"/>:null}
-    {tool==='staff'?<ListOrEmpty rows={snapshot?.staff??[]} render={item=><div className="list-row" key={item.staffId}><div><strong>{item.name}</strong><small>{item.role} · {item.permissions}</small></div><span>{item.presence}</span></div>} empty="員工資料尚未連接"/>:null}
-    {tool==='devices'?<ListOrEmpty rows={snapshot?.devices??[]} render={item=><div className="list-row" key={item.deviceId}><div><strong>{item.name}</strong><small>{item.kind} · {item.affected??'未有影響摘要'} · {item.jobs??'未有 Job 摘要'}</small></div><span>{item.health}</span></div>} empty="設備資料尚未連接"/>:null}
     {tool==='customers'?snapshot?.customers?<div className="metric-grid"><Metric label="客戶" value={snapshot.customers.totalLabel}/><Metric label="新客" value={snapshot.customers.newLabel}/><Metric label="回頭客" value={snapshot.customers.returningLabel}/><Metric label="同意狀態" value={snapshot.customers.consentLabel}/></div>:<Empty title="客戶摘要尚未連接" detail="唔會用假 CRM 數字代替。"/>:null}
-    {tool==='marketing'?<ListOrEmpty rows={snapshot?.campaigns??[]} render={item=><div className="list-row" key={item.campaignId}><div><strong>{item.name}</strong><small>Attributed Orders：{item.attributedOrdersLabel} · {item.fundingLabel??'Funding 未提供'}</small></div><b>{item.attributedSalesLabel}</b></div>} empty="推廣資料尚未連接"/>:null}
+    {tool==='marketing'?<ListOrEmpty rows={snapshot?.campaigns??[]} render={item=><div className="list-row" key={item.campaignId}><div><strong>{item.name}</strong><small>相關訂單：{item.attributedOrdersLabel} · {item.fundingLabel??'資助資料未提供'}</small></div><b>{item.attributedSalesLabel}</b></div>} empty="推廣資料尚未連接"/>:null}
     {tool==='settlement'?<ListOrEmpty rows={snapshot?.settlements??[]} render={(item,index)=><div className="list-row" key={item.channel+'-'+index}><div><strong>{item.channel}</strong><small>銷售 {item.salesLabel} · 費用 {item.feesLabel} · {item.finality}</small></div><b>{item.payoutLabel}</b></div>} empty="結算資料尚未連接"/>:null}
     {tool==='cash'?snapshot?.cash?<div className="metric-grid"><Metric label="應有" value={snapshot.cash.expectedLabel}/><Metric label="實有" value={snapshot.cash.actualLabel}/><Metric label="差異" value={snapshot.cash.varianceLabel}/><Metric label="交更" value={snapshot.cash.closeoutState}/></div>:<Empty title="現金摘要尚未連接" detail="Owner App 唔會開錢箱或者改付款結果。"/>:null}
     {tool==='inventory'?<ListOrEmpty rows={snapshot?.inventory??[]} render={item=><div className="list-row" key={item.itemId}><div><strong>{item.name}</strong><small>{item.detail}</small></div><span>{item.state}</span></div>} empty="庫存提示尚未連接"/>:null}
     {tool==='notifications'?<ListOrEmpty rows={snapshot?.notifications??[]} render={item=><div className="list-row" key={item.notificationId}><div><strong>{item.title}</strong><small>{item.detail}</small></div><span>{item.cadence}</span></div>} empty="暫時冇通知"/>:null}
-    {tool==='activity'?<ListOrEmpty rows={snapshot?.activity??[]} render={item=><div className="activity-card" key={item.activityId}><strong>{item.title}</strong><p>{item.actor} · {new Date(item.observedAt).toLocaleString('zh-HK')}</p><small>Requester：{item.requester??'—'} · Approver：{item.approver??'—'} · Result：{item.result} · Readback：{item.readback??'—'}</small></div>} empty="活動紀錄尚未連接"/>:null}
-    {tool==='manager'?<ManagerWorkspace managerNote={managerNote} handoffNote={handoffNote} checklist={checklist} setManagerNote={setManagerNote} setHandoffNote={setHandoffNote} setChecklist={setChecklist}/>:null}
     {tool==='admin'?<><p className="callout">正式設定、權限、產品、價格、渠道同規則由 Admin 負責；Owner 只提供導航入口。</p><button className="primary wide" onClick={onAdmin}>前往 Admin</button></>:null}
-    {tool==='recovery'?<><div className="diag-line"><span>連線</span><b>{connection}</b><small>{snapshot?.observedAt?new Date(snapshot.observedAt).toLocaleString('zh-HK'):'未有讀回'}</small></div><p className="callout">OFFLINE / STALE / UNKNOWN / PARTIAL 都係資料狀態；未知唔等於失敗，冇目標讀回唔算成功。</p></>:null}
+    {tool==='recovery'?<><div className="diag-line"><span>連線</span><b>{humanConnectionLabel(connection)}</b><small>{snapshot?.observedAt?new Date(snapshot.observedAt).toLocaleString('zh-HK'):'未有更新時間'}</small></div><p className="callout">資料未確認完整前會保持相應提示，唔會將未明結果當成成功。</p></>:null}
   </section></div>;
-}
-
-function ManagerWorkspace({managerNote,handoffNote,checklist,setManagerNote,setHandoffNote,setChecklist}:{managerNote:string;handoffNote:string;checklist:readonly OwnerChecklistItem[];setManagerNote:(v:string)=>void;setHandoffNote:(v:string)=>void;setChecklist:(v:readonly OwnerChecklistItem[])=>void}){
-  return <section className="manager-workspace"><p className="callout">以下只係本機私人草稿，唔係共享營運真相、唔會改 Admin/SMT 狀態。</p><label>經理筆記<textarea value={managerNote} onChange={e=>setManagerNote(e.target.value)} placeholder="記低要跟進嘅事項"/></label><div>{checklist.map(item=><label className="check-row" key={item.id}><input type="checkbox" checked={item.done} onChange={e=>setChecklist(checklist.map(row=>row.id===item.id?{...row,done:e.target.checked}:row))}/><span>{item.label}</span></label>)}</div><label>交接草稿<textarea value={handoffNote} onChange={e=>setHandoffNote(e.target.value)} placeholder="交畀下一更嘅本機備忘"/></label></section>;
 }
 
 function ConfirmationSheet({value,onClose,onConfirm}:{value:Confirmation;onClose:()=>void;onConfirm:()=>void}){
   return <div className="overlay"><section className="sheet" role="dialog" aria-modal="true"><DrawerHead title={value.label} subtitle={value.target} close={onClose}/><p className="callout">{value.impact}</p><div className="sheet-actions"><button onClick={onClose}>取消</button><button className="primary" onClick={onConfirm}>提交操作意圖</button></div></section></div>;
 }
 
+
+function humanConnectionLabel(value:OwnerConnectionState){
+  if(value==='FRESH')return '資料新鮮';
+  if(value==='LOADING')return '同步中';
+  if(value==='EMPTY')return '暫無資料';
+  if(value==='STALE')return '資料稍舊';
+  if(value==='PARTIAL')return '部分資料';
+  if(value==='OFFLINE_READONLY')return '離線唯讀';
+  if(value==='PERMISSION_DENIED')return '權限不足';
+  if(value==='UNKNOWN')return '狀態未明';
+  return '同步失敗';
+}
 
 function resolveSnapshotState(snapshot:OwnerReadModelSnapshot):OwnerConnectionState{
   if(snapshot.globalState)return snapshot.globalState;

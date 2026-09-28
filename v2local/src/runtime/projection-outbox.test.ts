@@ -101,4 +101,114 @@ describe('SMT projection outbox',()=>{
     });
     expect(JSON.parse(values.get(SMT_PROJECTION_OUTBOX_KEY)||'[]')).toHaveLength(0);
   });
+
+  it('projects canonical recognized sales separately so open dine-in does not enter effective sales',()=>{
+    queueOrderProjection({
+      id:'MFK-DINE-1',
+      display:'P010',
+      createdAt:'2026-09-27T04:00:00.000Z',
+      updatedAt:'2026-09-27T04:00:00.000Z',
+      totalMinor:8200,
+      recognizedSalesMinor:0,
+      paymentLabel:'未收款',
+      fulfillmentLabel:'進行中',
+      sourceLabel:'堂食',
+      items:[{id:'p1',name:'堂食套餐',qty:1,unitMinor:8200}],
+    });
+    const payload=readProjectionOutbox()[0]!.event.payload as Record<string,unknown>;
+    expect(payload.totalMinor).toBe(8200);
+    expect(payload.recognizedSalesMinor).toBe(0);
+  });
+
+
+  it('projects Customer UI6 pickup/payment/ETA facts without exposing the full phone number',()=>{
+    queueOrderProjection({
+      id:'MFK-CUSTOMER-1',
+      display:'038',
+      createdAt:'2026-09-27T07:00:00.000Z',
+      updatedAt:'2026-09-27T07:05:00.000Z',
+      totalMinor:5800,
+      paymentLabel:'FPS',
+      paymentVerificationState:'VERIFIED',
+      fulfillmentLabel:'稍有延誤',
+      sourceLabel:'自家 App',
+      customerPhone:'91234567',
+      etaLabel:'12:25',
+      fulfillmentHistory:[
+        {label:'待處理',at:'2026-09-27T07:00:00.000Z'},
+        {label:'進行中',at:'2026-09-27T07:02:00.000Z'},
+        {label:'稍有延誤',at:'2026-09-27T07:05:00.000Z'},
+      ],
+      items:[{id:'p1',name:'紫米飯團',qty:1,unitMinor:5800}],
+    });
+    const payload=readProjectionOutbox()[0]!.event.payload as Record<string,unknown>;
+    expect(payload.pickupCode).toBe('4567');
+    expect(payload).not.toHaveProperty('customerPhone');
+    expect(payload.paymentVerificationState).toBe('VERIFIED');
+    expect(payload.etaLabel).toBe('12:25');
+    expect(payload.fulfillmentLabel).toBe('稍有延誤');
+    expect(payload.fulfillmentHistory).toHaveLength(3);
+  });
+
+
+  it('carries optional canonical UI7 pickup facts without creating a fulfillment command',()=>{
+    queueOrderProjection({
+      id:'MFK-PICKUP-7',
+      display:'P038',
+      createdAt:'2026-09-27T08:00:00.000Z',
+      updatedAt:'2026-09-27T08:20:00.000Z',
+      totalMinor:5800,
+      paymentLabel:'CASH',
+      fulfillmentLabel:'可取餐',
+      sourceLabel:'自家 App',
+      customerName:'陳小米',
+      customerPhone:'91234567',
+      handoverState:'VERIFIED',
+      pickupBagCount:2,
+      pickupMealCount:2,
+      completedAt:'2026-09-27T08:20:00.000Z',
+      pickupException:{kind:'CODE_MISMATCH',resolved:true,observedAt:'2026-09-27T08:15:00.000Z'},
+      items:[{id:'p1',name:'紫米飯團',qty:2,unitMinor:2900}],
+    });
+    const payload=readProjectionOutbox()[0]!.event.payload as Record<string,unknown>;
+    expect(payload.pickupCode).toBe('4567');
+    expect(payload.customerName).toBe('陳小米');
+    expect(payload.handoverState).toBe('VERIFIED');
+    expect(payload.pickupBagCount).toBe(2);
+    expect(payload.pickupMealCount).toBe(2);
+    expect(payload.completedAt).toBe('2026-09-27T08:20:00.000Z');
+    expect(payload.pickupException).toEqual({kind:'CODE_MISMATCH',resolved:true,observedAt:'2026-09-27T08:15:00.000Z'});
+    expect(payload).not.toHaveProperty('customerPhone');
+  });
+
+
+  it('projects immutable Stage8 reorder intent without old transaction truth',()=>{
+    queueOrderProjection({
+      id:'MFK-HISTORY-8',
+      display:'038',
+      createdAt:'2026-09-27T10:00:00.000Z',
+      updatedAt:'2026-09-27T10:20:00.000Z',
+      totalMinor:4800,
+      paymentLabel:'CASH',
+      fulfillmentLabel:'已完成',
+      sourceLabel:'自家 App',
+      customerReorderIntent:[{
+        productId:'bento',
+        productName:'肉燥便當',
+        quantity:1,
+        selections:[{optionGroupId:'rice',optionId:'extra',optionName:'加飯'}],
+      }],
+      items:[{id:'bento',name:'肉燥便當',qty:1,unitMinor:4800}],
+    });
+    const payload=readProjectionOutbox()[0]!.event.payload as Record<string,unknown>;
+    expect(payload.customerReorderIntent).toEqual([{
+      productId:'bento',
+      productName:'肉燥便當',
+      quantity:1,
+      selections:[{optionGroupId:'rice',optionId:'extra',optionName:'加飯'}],
+    }]);
+    const serialized=JSON.stringify(payload.customerReorderIntent);
+    expect(serialized).not.toMatch(/payment|fulfillment|coupon|publishedUnitPriceMinor|lineId/i);
+  });
+
 });

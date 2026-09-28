@@ -1,0 +1,50 @@
+name: smm-stage4-checkout-r1
+
+on:
+  push:
+    branches:
+      - work/MFK/SMM-UI-STAGE4-CHECKOUT-R1
+  workflow_dispatch:
+
+jobs:
+  smm:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: v2smm
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-audit --no-fund --legacy-peer-deps --package-lock=false
+      - name: Stage 4 checkout contract
+        run: node --test test/stage4-checkout.test.mjs
+      - name: Stage 3 regression
+        run: node --test test/stage3-ui.test.mjs test/stage3-rework.test.mjs
+      - name: loginId regression
+        run: node --test test/login-id-r1.test.mjs
+      - name: Combo regression
+        run: node --test test/stage2-combo-r1.test.mjs
+      - name: Full SMM tests
+        run: npm test
+      - name: SMM build
+        run: npm run build
+      - name: Worker dry-run only
+        run: npx --yes wrangler@4 deploy --dry-run --config wrangler.jsonc
+
+  v2local:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: v2local
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-audit --no-fund --legacy-peer-deps --package-lock=false
+      - name: Protected v2local tests
+        run: npm test
+      - name: v2local build
+        run: npm run build

@@ -43,7 +43,7 @@ export function buildOwnerActionQueueViewModel(snapshot:OwnerReadModelSnapshot|n
     .map(action=>({
       action,
       ownerDomain:action.ownerDomain??action.domain,
-      elapsedLabel:action.elapsedLabel??'未有讀回',
+      elapsedLabel:action.elapsedLabel??'未有資料',
       safeNextStepLabel:action.safeNextStepLabel??action.actionLabel??null,
       state:normalizeState(action),
     }))

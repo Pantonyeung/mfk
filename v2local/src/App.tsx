@@ -24,8 +24,10 @@ import {StaffAuthGate,StaffSessionBadge} from './presentation/StaffAuthGate.tsx'
 import {CashOpeningGate} from './presentation/CashOpeningGate.tsx';
 import {ComboWorkspace,HoldCartWorkspace,HoldListWorkspace,OrganizeWorkspace,ProductConfigWorkspace,RequiredFastLaneWorkspace,applyRequiredSelectionToCart,initialHoldModeForLines,isDrinkSupplementProductId,projectDrinkSupplementChoices,quickConfigurationForProduct,requiredTasksForCart,type OrderingPanelState,type WorkspaceHoldDraft,type WorkspaceProduct} from './features/ordering/OrderingCenterWorkspaces.tsx';
 import {RiceballPairingWorkspace} from './features/ordering/RiceballPairingWorkspace.tsx';
+import {PendingOrderReviewWorkspace} from './features/ordering/PendingOrderReviewWorkspace.tsx';
 import {applyRiceballPairings,buildRiceballPairingDraft,existingPairingGroups,isPairedComboLine,nextPairingStartIndex,restorePairingGroup} from './features/ordering/riceball-pairing-model.ts';
 import {applyRiceballDrinkPromotion,riceballDrinkPromotionStateEqual,stripRiceballDrinkPromotionDetail} from './features/ordering/riceball-drink-promotion-model.ts';
+import {MFK_ORDER_LINE_COMPOSITION_SCHEMA,type MfkOrderLineCompositionV1,type MfkOrderLineOptionSelectionsV1,type MfkOrderLinePairingV1} from '../../contracts/order-line-composition-v1.ts';
 
 type Product={
   id:string;
@@ -39,7 +41,7 @@ type Product={
   imageUrl?:string;
   optionSets:readonly SyncedOptionSet[];
 };
-type CartLine={id:string;productId:string;name:string;qty:number;unitMinor:number;serviceMode:ServiceMode;detail?:string};
+type CartLine={id:string;productId:string;name:string;qty:number;unitMinor:number;serviceMode:ServiceMode;detail?:string;optionSelections?:MfkOrderLineOptionSelectionsV1;freeNote?:string;pairing?:MfkOrderLinePairingV1};
 
 const BASE_PRODUCTS:readonly Product[]=[
   {id:'riceball',category:'飯團',name:'原味飯團',priceMinor:4100,priceReady:true},
@@ -58,6 +60,13 @@ const nextLocalCartLineId=()=>{
   localCartLineSequence+=1;
   return 'line-'+Date.now().toString(36)+'-'+localCartLineSequence.toString(36);
 };
+const serializeCartLineComposition=(line:CartLine):MfkOrderLineCompositionV1=>Object.freeze({
+  schema:MFK_ORDER_LINE_COMPOSITION_SCHEMA,
+  cartLineId:line.id,
+  ...(line.optionSelections&&Object.keys(line.optionSelections).length?{optionSelections:line.optionSelections}:{}),
+  ...(line.freeNote!==undefined?{freeNote:line.freeNote}:{}),
+  ...(line.pairing?{pairing:line.pairing}:{}),
+});
 
 const PRODUCT_ART_COLORS:Record<string,[string,string]>={
   '飯團':['#f1c98f','#8a4f2b'],
@@ -397,6 +406,14 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode,diningAddition,on
     recentlyAddedProductId:recent,highlightedCartLineId:highlight,cartPulseNonce:pulse,
   };
 
+  const quickOptionSelectionsForProduct=(product:Product):MfkOrderLineOptionSelectionsV1=>Object.freeze(Object.fromEntries(
+    (product.optionSets??[]).flatMap(set=>{
+      if(set.required||set.min>0)return [];
+      const ids=set.options.filter(option=>option.defaultSelected).map(option=>option.id);
+      return ids.length?[[set.id,Object.freeze(ids)] as const]:[];
+    })
+  ));
+
   const add=(id:string)=>{
     const product=products.find(item=>item.id===id);if(!product||!product.priceReady||!product.sellable)return;
     const quickConfig=quickConfigurationById.get(id);
@@ -409,6 +426,8 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode,diningAddition,on
       unitMinor:product.priceMinor+quickConfig.deltaMinor,
       serviceMode,
       detail:quickConfig.detail||undefined,
+      optionSelections:quickOptionSelectionsForProduct(product),
+      freeNote:'',
     };
     setCart([...cart,line]);
     setRecent(id);
@@ -434,6 +453,25 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode,diningAddition,on
     const line:CartLine={id:nextLocalCartLineId(),productId:product.id,name:product.name,qty,unitMinor:product.priceMinor+deltaMinor,serviceMode,detail:detail||undefined};
     setCart([...cart,line]);setRecent(product.id);setHighlight(line.id);setPulse(value=>value+1);setPanel(null);
   };
+  const addConfiguredStructured=(productId:string,detail:string,deltaMinor:number,qty:number,lineId:string|undefined,structured:{readonly optionSelections:MfkOrderLineOptionSelectionsV1;readonly freeNote:string})=>{
+    const product=products.find(item=>item.id===productId);if(!product||!product.priceReady||!product.sellable)return;
+    if(lineId){
+      const existing=cart.find(item=>item.id===lineId);if(!existing)return;
+      const next=cart.map(item=>item.id===lineId?{
+        ...item,
+        name:product.name,
+        qty,
+        unitMinor:product.priceMinor+deltaMinor,
+        detail:detail||undefined,
+        serviceMode:existing.serviceMode,
+        optionSelections:structured.optionSelections,
+        freeNote:structured.freeNote,
+      }:item);
+      setCart(next);setRecent(product.id);setHighlight(lineId);setPulse(value=>value+1);setPanel(null);return;
+    }
+    const line:CartLine={id:nextLocalCartLineId(),productId:product.id,name:product.name,qty,unitMinor:product.priceMinor+deltaMinor,serviceMode,detail:detail||undefined,optionSelections:structured.optionSelections,freeNote:structured.freeNote};
+    setCart([...cart,line]);setRecent(product.id);setHighlight(line.id);setPulse(value=>value+1);setPanel(null);
+  };
 
   const applyRequired=(lineId:string,groupId:string,optionIds:readonly string[])=>{
     const next=applyRequiredSelectionToCart(cart,workspaceProducts,lineId,groupId,optionIds);
@@ -449,6 +487,7 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode,diningAddition,on
     configurationDetail='',
     configurationAdjustmentMinor=0,
     returnPanel:'required'|'riceball-pair'='required',
+    structured?:{readonly optionSelections:MfkOrderLineOptionSelectionsV1;readonly freeNote:string},
   )=>{
     const choice=drinkSupplementChoices.find(row=>row.id===choiceId);
     if(!choice||!choice.enabled)return;
@@ -467,6 +506,7 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode,diningAddition,on
       unitMinor:choice.adjustmentMinor+configurationAdjustmentMinor,
       serviceMode:target?.serviceMode??serviceMode,
       detail,
+      ...(structured?{optionSelections:structured.optionSelections,freeNote:structured.freeNote}:{}),
     };
     setCart([...cart,line]);
     setHighlight(line.id);
@@ -514,9 +554,12 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode,diningAddition,on
 
   const holdItems=()=>cart.map(line=>({
     id:line.productId,
-    name:line.detail?line.name+'｜'+line.detail:line.name,
+    name:line.name,
     qty:line.qty,
     unitMinor:line.unitMinor,
+    serviceMode:line.serviceMode,
+    ...(line.detail?{detail:line.detail}:{}),
+    composition:serializeCartLineComposition(line),
   }));
   const finishHold=()=>{setCart([]);setServiceMode('takeaway');setPanel(null);};
 
@@ -524,13 +567,28 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode,diningAddition,on
     :panel?.type==='required'?'必選／補選'
     :panel?.type==='drink-config'?'飲品設定'
     :panel?.type==='riceball-pair'?'飯團待組區'
+    :panel?.type==='pending-order'?'待處理訂單'
     :panel?.type==='organize'?'整理工作台'
     :panel?.type==='combo'?'紫米套餐區'
     :panel?.type==='hold'?'暫存工作台'
     :panel?.type==='holds'?'暫存單':'';
 
-  const panelBody=panel?.type==='product'
-    ?(()=>{const product=workspaceProducts.find(item=>item.id===panel.productId);const line=panel.lineId?cart.find(item=>item.id===panel.lineId):undefined;return product?<ProductConfigWorkspace key={product.id+':'+(panel.lineId??'add')} product={product} mode={panel.lineId?'edit':'add'} initial={line?{qty:line.qty,detail:stripRiceballDrinkPromotionDetail(line.detail)||undefined}:undefined} onAdd={(detail,delta,qty)=>addConfigured(product.id,detail,delta,qty,panel.lineId)}/>:null})()
+  const panelBody=panel?.type==='pending-order'
+    ?(()=>{const order=runtimeOrders.find(item=>item.id===panel.orderId);return order?<PendingOrderReviewWorkspace
+      order={order}
+      onAccept={async()=>{
+        const result=await localRuntime.acceptOrder(order.id);
+        if(result.provider.state==='ATTENTION')return '本地已接單；Keeta 同步需要留意。';
+        if(result.provider.state==='SYNCED'||result.provider.state==='IDEMPOTENT')return '已確認接單；Keeta 已同步。';
+        return '已確認接單。';
+      }}
+      onOpenOrders={()=>navigate('/orders?orderId='+encodeURIComponent(order.id))}
+      onReadEvidence={order.paymentEvidenceRef?()=>localRuntime.readPaymentEvidence(order.id):undefined}
+      onReviewEvidence={order.paymentEvidenceRef?async decision=>{await localRuntime.reviewPaymentEvidence(order.id,decision);}:undefined}
+      onDeferKeeta={isKeetaOrder(order)?async()=>{await localRuntime.deferKeetaOrder(order.id);}:undefined}
+    />:null})()
+    :panel?.type==='product'
+    ?(()=>{const product=workspaceProducts.find(item=>item.id===panel.productId);const line=panel.lineId?cart.find(item=>item.id===panel.lineId):undefined;return product?<ProductConfigWorkspace key={product.id+':'+(panel.lineId??'add')} product={product} mode={panel.lineId?'edit':'add'} initial={line?{qty:line.qty,detail:stripRiceballDrinkPromotionDetail(line.detail)||undefined,optionSelections:line.optionSelections,freeNote:line.freeNote}:undefined} onAdd={(detail,delta,qty,structured)=>addConfiguredStructured(product.id,detail,delta,qty,panel.lineId,structured)}/>:null})()
     :panel?.type==='required'
       ?<RequiredFastLaneWorkspace
         cart={cart}
@@ -546,7 +604,7 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode,diningAddition,on
         product={product}
         initial={{qty:panel.qty}}
         pricingBaseMinor={choice.adjustmentMinor}
-        onAdd={(detail,delta,qty)=>addDrinkSupplement(choice.id,qty,panel.targetLineId,detail,delta,panel.returnTo??'required')}
+        onAdd={(detail,delta,qty,structured)=>addDrinkSupplement(choice.id,qty,panel.targetLineId,detail,delta,panel.returnTo??'required',structured)}
       />:null})()
     :panel?.type==='riceball-pair'
       ?<RiceballPairingWorkspace
@@ -594,16 +652,20 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode,diningAddition,on
             ?<HoldListWorkspace holds={heldCarts as readonly WorkspaceHoldDraft[]} onRestore={hold=>{
               const restored:CartLine[]=hold.items.map((item,index)=>{
                 const parts=item.name.split('｜');
-                const name=parts.shift()||item.name;
-                const detail=parts.length?parts.join('｜'):undefined;
+                const legacyName=parts.shift()||item.name;
+                const legacyDetail=parts.length?parts.join('｜'):undefined;
+                const composition=item.composition;
                 return {
-                  id:'line-'+hold.id+'-'+index+'-'+Date.now().toString(36),
+                  id:composition?.cartLineId??('line-'+hold.id+'-'+index+'-'+Date.now().toString(36)),
                   productId:item.id,
-                  name,
+                  name:item.detail?item.name:legacyName,
                   qty:item.qty,
                   unitMinor:item.unitMinor,
-                  serviceMode:hold.kind==='dining'?'dine-in':'takeaway',
-                  detail,
+                  serviceMode:item.serviceMode??(hold.kind==='dining'?'dine-in':'takeaway'),
+                  detail:item.detail??legacyDetail,
+                  ...(composition?.optionSelections?{optionSelections:composition.optionSelections}:{}),
+                  ...(composition?.freeNote!==undefined?{freeNote:composition.freeNote}:{}),
+                  ...(composition?.pairing?{pairing:composition.pairing}:{}),
                 };
               });
               setCart(restored);
@@ -715,7 +777,11 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode,diningAddition,on
       else if(id==='combo')setPanel({type:'combo'});
       else setPanel({type:'organize'});
     },
-    onOpenQueueOrder:(_kind,id)=>navigate('/orders?orderId='+encodeURIComponent(id)),
+    onOpenQueueOrder:(_kind,id)=>{
+      const order=runtimeOrders.find(item=>item.id===id);
+      if(order?.fulfillmentLabel==='待處理'){setPanel({type:'pending-order',orderId:id});return;}
+      navigate('/orders?orderId='+encodeURIComponent(id));
+    },
     onCheckout:()=>{if(diningAddition){void submitDiningAddition();return;}navigate('/checkout');},
   };
 
@@ -912,6 +978,7 @@ function CheckoutPage({cart,setCart,diningCheckout,onDiningCheckoutDone}:{cart:C
           unitMinor:line.unitMinor,
           serviceMode:line.serviceMode,
           ...(line.detail?{detail:line.detail}:{}),
+          composition:serializeCartLineComposition(line),
         })),
         totalMinor:due,
         paymentLabel,

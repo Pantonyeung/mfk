@@ -44,7 +44,8 @@ async function readResult(submissionId:string,signal?:AbortSignal):Promise<Recor
 function finalResponse(request:SmmLanOrderRequest,body:Record<string,unknown>):SmmLanOrderResponse|null{
   if(body.state==='CONFIRMED'){
     const orderId=String(body.canonicalOrderId??'').trim();
-    if(!orderId)return null;
+    const displayCode=String(body.canonicalDisplay??'').trim();
+    if(!orderId||!displayCode)return null;
     return Object.freeze({
       protocolVersion:1,
       type:'smm.lan.order.result.v1',
@@ -53,7 +54,8 @@ function finalResponse(request:SmmLanOrderRequest,body:Record<string,unknown>):S
       idempotencyKey:request.idempotencyKey,
       disposition:'ACCEPTED',
       orderId,
-      canonicalRevision:1,
+      displayCode,
+      canonicalRevision:Number(body.canonicalRevision)||1,
     });
   }
   if(body.state==='REJECTED'){
@@ -73,6 +75,7 @@ function finalResponse(request:SmmLanOrderRequest,body:Record<string,unknown>):S
 export function createPwaCloudTransport():SmmLanTransport{
   return Object.freeze({
     async send(request:SmmLanOrderRequest,signal:AbortSignal):Promise<SmmLanTransportOutcome>{
+      if(typeof navigator!=='undefined'&&navigator.onLine===false)return{kind:'UNAVAILABLE'};
       const headers=authHeaders();
       if(!headers)return{kind:'UNAVAILABLE'};
       let response:Response;
@@ -86,7 +89,7 @@ export function createPwaCloudTransport():SmmLanTransport{
         });
       }catch(error){
         if(error instanceof DOMException&&error.name==='AbortError')return{kind:'UNKNOWN'};
-        return{kind:'UNAVAILABLE'};
+        return{kind:'UNKNOWN'};
       }
       if(!response.ok&&response.status!==202){
         const body=await response.json().catch(()=>({})) as Record<string,unknown>;
@@ -115,7 +118,7 @@ export function createPwaCloudTransport():SmmLanTransport{
       if(body.state==='CONFIRMED'){
         return Object.freeze({
           protocolVersion:1,type:'smm.lan.order.readback.result.v1',submissionId,state:'CONFIRMED',
-          orderId:String(body.canonicalOrderId||''),canonicalRevision:1,
+          orderId:String(body.canonicalOrderId||''),displayCode:String(body.canonicalDisplay||''),canonicalRevision:Number(body.canonicalRevision)||1,
         });
       }
       if(body.state==='REJECTED'){

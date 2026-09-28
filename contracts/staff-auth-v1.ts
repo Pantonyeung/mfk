@@ -11,6 +11,7 @@ export interface StaffPinVerifier{
 
 export interface RuntimeStaffIdentity{
   readonly staffId:string;
+  readonly loginId:string;
   readonly name:string;
   readonly role:'STAFF'|'MANAGER'|'OWNER'|'VIEWER';
   readonly scope:'STORE'|'MULTI_STORE'|'REPORT_ONLY';
@@ -101,16 +102,30 @@ export async function projectStaffForRuntime(input:unknown):Promise<RuntimeStaff
     const row=raw as Record<string,unknown>;
     const staffId=String(row.id??'').trim();
     const name=String(row.name??'').trim();
-    if(!staffId||!name)continue;
+    const explicitLoginId=String(row.loginId??'').trim();
+    const legacyLoginId=!explicitLoginId&&/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(name)?name:'';
+    const loginId=explicitLoginId||legacyLoginId||staffId;
+    if(!staffId||!loginId||!name)continue;
     const role=['STAFF','MANAGER','OWNER','VIEWER'].includes(String(row.role))?String(row.role) as RuntimeStaffIdentity['role']:'STAFF';
     const scope=['STORE','MULTI_STORE','REPORT_ONLY'].includes(String(row.scope))?String(row.scope) as RuntimeStaffIdentity['scope']:'STORE';
     const permissions=Array.isArray(row.permissions)?row.permissions.map(value=>String(value)).filter(Boolean):[];
     const active=row.active!==false;
     const pin=String(row.pin??'').replace(/\D/g,'');
+    const existingVerifier=row.pinVerifier as StaffPinVerifier|undefined;
     let pinVerifier:StaffPinVerifier|undefined;
     if(pin.length>=4&&pin.length<=8)pinVerifier=await createStaffPinVerifier(pin);
+    else if(existingVerifier){
+      try{
+        if(existingVerifier.algorithm!==MFK_STAFF_PIN_ALGORITHM)throw new Error('STAFF_PIN_ALGORITHM_INVALID');
+        if(!Number.isSafeInteger(existingVerifier.iterations)||existingVerifier.iterations<100000)throw new Error('STAFF_PIN_ITERATIONS_INVALID');
+        hexToBytes(existingVerifier.saltHex);
+        hexToBytes(existingVerifier.hashHex);
+        pinVerifier=Object.freeze({...existingVerifier});
+      }catch{/* invalid legacy verifier is not published */}
+    }
     staff.push(Object.freeze({
       staffId,
+      loginId,
       name,
       role,
       scope,
@@ -119,6 +134,11 @@ export async function projectStaffForRuntime(input:unknown):Promise<RuntimeStaff
       permissions:Object.freeze([...new Set(permissions)]),
       ...(pinVerifier?{pinVerifier}:{}),
     }));
+  }
+  const loginIds=new Set<string>();
+  for(const item of staff){
+    if(loginIds.has(item.loginId))throw new Error('STAFF_AUTH_LOGIN_ID_DUPLICATE');
+    loginIds.add(item.loginId);
   }
   return Object.freeze({schema:MFK_STAFF_AUTH_SCHEMA,staff:Object.freeze(staff)});
 }
@@ -142,9 +162,13 @@ export function validateRuntimeStaffAuthSnapshot(input:unknown):RuntimeStaffAuth
       hexToBytes(pinVerifier.saltHex);
       hexToBytes(pinVerifier.hashHex);
     }
+    const staffId=String(item.staffId??'').trim();
+    const name=String(item.name??'').trim();
+    const loginId=String(item.loginId??'').trim()||(/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(name)?name:staffId);
     return Object.freeze({
-      staffId:String(item.staffId??'').trim(),
-      name:String(item.name??'').trim(),
+      staffId,
+      loginId,
+      name,
       role,
       scope,
       adminLogin:Boolean(item.adminLogin),
@@ -153,6 +177,11 @@ export function validateRuntimeStaffAuthSnapshot(input:unknown):RuntimeStaffAuth
       ...(pinVerifier?{pinVerifier:Object.freeze({...pinVerifier})}:{}),
     });
   });
-  if(staff.some(item=>!item.staffId||!item.name))throw new Error('STAFF_AUTH_IDENTITY_INVALID');
+  if(staff.some(item=>!item.staffId||!item.loginId||!item.name))throw new Error('STAFF_AUTH_IDENTITY_INVALID');
+  const loginIds=new Set<string>();
+  for(const item of staff){
+    if(loginIds.has(item.loginId))throw new Error('STAFF_AUTH_LOGIN_ID_DUPLICATE');
+    loginIds.add(item.loginId);
+  }
   return Object.freeze({schema:MFK_STAFF_AUTH_SCHEMA,staff:Object.freeze(staff)});
 }

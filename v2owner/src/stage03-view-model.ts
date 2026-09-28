@@ -80,7 +80,7 @@ export function mapCanonicalFulfillmentState(
 }
 
 export function getOwnerOrderFulfillmentStateLabel(order:OwnerOrderProjection):string{
-  return mapCanonicalFulfillmentState(order.fulfillmentLabel)??'未有交收狀態讀回';
+  return mapCanonicalFulfillmentState(order.fulfillmentLabel)??'未有交收狀態資料';
 }
 
 export function buildOwnerOrderListViewModel(
@@ -126,19 +126,19 @@ export function buildOwnerOrderDetailViewModel(order:OwnerOrderProjection):Owner
     identity:{
       displayCode:order.displayCode,
       source:order.source,
-      businessDate:order.businessDate??'未有讀回',
+      businessDate:order.businessDate??'未有資料',
       customerName:order.customerName??'未有客戶名稱',
       customerPhone:order.customerPhone??'未有電話',
     },
     money:{
-      original:order.originalAmountLabel??'未有讀回',
+      original:order.originalAmountLabel??'未有資料',
       adjustments:order.adjustmentAmountLabel??'未有調整摘要',
-      effective:order.currentEffectiveAmountLabel??order.amountLabel??'未有讀回',
-      tender:order.currentTenderLabel??order.tenderLabel??'未有讀回',
+      effective:order.currentEffectiveAmountLabel??order.amountLabel??'未有資料',
+      tender:order.currentTenderLabel??order.tenderLabel??'未有資料',
     },
     timing:{
-      elapsed:order.elapsedLabel??'未有讀回',
-      promised:order.promisedTimeLabel??'未有讀回',
+      elapsed:order.elapsedLabel??'未有資料',
+      promised:order.promisedTimeLabel??'未有資料',
     },
     fulfillment:{
       state:getOwnerOrderFulfillmentStateLabel(order),
@@ -152,5 +152,5 @@ function formatFulfillmentMode(value:OwnerOrderProjection['fulfillmentMode']):st
   if(value==='TAKEAWAY')return '外賣';
   if(value==='PICKUP')return '自取';
   if(value==='DELIVERY')return '配送';
-  return value??'未有交收方式讀回';
+  return value??'未有交收方式資料';
 }
