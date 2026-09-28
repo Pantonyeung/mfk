@@ -102,7 +102,7 @@ async function proxyAdmin(request:Request,url:URL){
   const suffix=url.pathname.slice('/__mfk/admin'.length)||'/';
   const allowed=
     request.method==='GET'&&(suffix==='/api/admin-sync/active'||suffix==='/api/admin-sync/events')||
-    request.method==='POST'&&suffix==='/api/admin-sync/ack';
+    request.method==='POST'&&(suffix==='/api/admin-sync/ack'||suffix==='/api/admin-sync/dining-occupancy');
 
   if(!allowed)return new Response(JSON.stringify({code:'WEB_ACCEPTANCE_PROXY_BLOCKED'}),{
     status:403,
