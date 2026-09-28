@@ -1,3 +1,4 @@
+import {readFileSync} from 'node:fs';
 import {describe,expect,it} from 'vitest';
 import {canonicalPublishTargetForError,migrateLegacyWhatsAppTemplate,resolveStoreSettingsDomain,validateAllStoreSettingsDomains,validateStoreSettingsDomain} from './admin-store-settings-domain.ts';
 
@@ -33,5 +34,19 @@ describe('Admin Store Settings domain UX',()=>{
   it('maps non-store canonical errors to navigable settings',()=>{
     expect(canonicalPublishTargetForError('員工 A 未填名稱')).toEqual({label:'員工／權限',path:'/admin/staff'});
     expect(canonicalPublishTargetForError('商品 P1 未填價格')).toEqual({label:'商品資料',path:'/admin/catalog/products'});
+  });
+  it('reuses the existing payment channel and upload authority for QR',()=>{
+    const source=readFileSync(new URL('./PolicyWorkspaces.tsx',import.meta.url),'utf8');
+    expect(source).toContain("domain==='qr'");
+    expect(source).toContain('customerPaymentChannels');
+    expect(source).toContain('uploadAdminPaymentQr');
+    expect(source).not.toContain("qr-code.v1");
+  });
+  it('keeps current-domain inline focus and cross-domain navigation contracts',()=>{
+    const source=readFileSync(new URL('./PolicyWorkspaces.tsx',import.meta.url),'utf8');
+    expect(source).toContain("node?.scrollIntoView({behavior:'smooth',block:'center'})");
+    expect(source).toContain("node?.focus({preventScroll:true})");
+    expect(source).toContain('publishBlockers.map');
+    expect(source).toContain('前往設定');
   });
 });
