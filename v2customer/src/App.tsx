@@ -414,7 +414,7 @@ export function App(){
 
   const resolveDeliveredIntent=(intent:CustomerPendingIntent,result:CustomerCommandResult,message:string)=>{
     if(!result.orderId){
-      const unknown=Object.freeze({...intent,state:'UNKNOWN' as const,updatedAt:nowIso(),lastMessage:'正式 Order 已回覆成功，但缺少 canonical Order readback identity；保持 UNKNOWN。'});
+      const unknown=Object.freeze({...intent,state:'UNKNOWN' as const,updatedAt:nowIso(),lastMessage:'正式結果未完整確認；請勿重複提交，只可重新確認原本提交。'});
       saveIntent(unknown);
       setSubmitRouteId(intent.submissionId);
       setNotice('正式結果未完整讀回；請勿重複提交，只可重新確認原本提交。');
@@ -626,7 +626,7 @@ export function App(){
         const fallbackIntent=Object.freeze({...intent,state:'NOT_CONNECTED' as const,updatedAt:nowIso(),lastMessage:result.message});
         saveIntent(fallbackIntent);
         setFallbackIntentId(intent.submissionId);
-        setNotice('原本提交經 Readback 仍未找到；Online Submit 已鎖定，可以轉用 WhatsApp 人工救援。');
+        setNotice('仍未找到原本提交；自動提交已鎖定，可以轉用 WhatsApp 人工協助。');
         return;
       }
       saveIntent(Object.freeze({...intent,state:'UNKNOWN',updatedAt:nowIso(),lastMessage:result.message}));
