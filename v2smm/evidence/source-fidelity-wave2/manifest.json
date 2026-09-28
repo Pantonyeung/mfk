@@ -2,8 +2,8 @@
   "work_id": "MFK-SMM-SOURCE-FIDELITY-W2-R1",
   "source_main": "2404a068f0306c6d1aa4f641f98504614fac2236",
   "current_main_parent": "29901b86d18b06d4a19371fe3f3a6b91d8682a57",
-  "generated_by_run": 36367741605,
-  "generated_by_job": 108757426995,
+  "generated_by_run": 36368063636,
+  "generated_by_job": 108758350787,
   "captured_at": "2026-09-28",
   "cjk_font_proof": "fonts-noto-cjk + Noto Sans CJK TC fallback",
   "captures": [
@@ -25,8 +25,8 @@
       "name": "stage9-440x956",
       "width": 440,
       "height": 956,
-      "sha": "53b66f2316f87c1c83fddae8d7fcbd02628959b332316ff6ce1fb25239a109d9",
-      "bytes": 77380
+      "sha": "abe257a50b860865d13bd66db376a72700028930c3b359e02a13132195840e66",
+      "bytes": 84149
     },
     {
       "name": "stagex-440x956",
@@ -53,16 +53,16 @@
       "name": "stage9-360x780",
       "width": 360,
       "height": 780,
-      "sha": "ad852807528c6fabe4a3d8fbdb7deff45dc5e65e134a1edfec85e23aa35ac853",
-      "bytes": 54006
+      "sha": "2fd377e2b5e007f98db0a2fdb70b644db0236a4b6064237192dc9247f72b91a4",
+      "bytes": 74587
     },
     {
       "name": "stagex-360x780",
       "width": 360,
       "height": 780,
-      "sha": "262efec0d3adda8f91ae59e55dd76ef5bba9f18dac1b270158688726ce2a5fa5",
-      "bytes": 89474
+      "sha": "7b26ff4b3baddca8451b502cb8654486ef68adc4296871ece8302e34a53823d5",
+      "bytes": 89471
     }
   ],
-  "note": "Rendered from the Wave 2 implementation visual harness at exact required viewports. Final mascot/banner/decorative/icon artwork remains pending by asset policy."
+  "note": "Rendered from the Wave 2 implementation visual harness at exact required viewports after final Stage 9 two-column recomposition. Final mascot/banner/decorative/icon artwork remains pending by asset policy."
 }
