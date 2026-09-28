@@ -67,17 +67,20 @@ test('Wave2 keeps source-owned headers, human degraded states and the current V1
 test('Wave2 keeps the fixed five-item navigation visible across UI4-UI9',()=>{
   for(const label of['首頁','點單','記憶罐','訂單','會員'])assert.match(nav,new RegExp(label));
   assert.match(nav,/data-final-art-pending="icon"/);
-  assert.match(app,/view==='cart'\|\|view==='checkout'\?'cart':view==='more'\?'more':'orders'/);
+  assert.match(app,/view==='cart'\\|\\|view==='checkout'\\?'cart':view==='more'\\|\\|view==='account'\\|\\|view==='recovery'\\?'more':'orders'/);
   assert.match(css,/\.bottom-navigation button:nth-child\(3\)/);
   assert.match(css,/--customer-source-orange:#ef7d24/);
   assert.match(css,/@media\(max-width:430px\)/);
   assert.match(css,/@media\(max-width:370px\)/);
 });
 
-test('Wave2 keeps UI10 missing and does not smuggle account-recovery authority into Customer',()=>{
-  const combined=[app,views,ui3,ui4,ui5,ui6,ui7,ui8].join('\n');
-  assert.equal(combined.includes('/support/account-recovery'),false);
+test('UI10 is now a bounded presentation route and still does not smuggle account-recovery authority into Customer',()=>{
+  const ui10=read('customer-ui10.tsx');
+  const combined=[app,views,ui3,ui4,ui5,ui6,ui7,ui8,ui10].join('\n');
+  assert.match(app,/\/support\/account-recovery/);
+  assert.match(app,/\/member\/account/);
   assert.doesNotMatch(combined,/createTemporaryPassword|resetCustomerPassword|changeCustomerPhone|sendOtp|verifyOtp/i);
+  assert.doesNotMatch(ui10,/fetch\(|XMLHttpRequest|sendBeacon/);
 });
 
 test('Wave2 matches the source cart and customer-facing state composition',()=>{
