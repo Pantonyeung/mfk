@@ -1785,7 +1785,9 @@ export default {
         for(const id of ids)ordersUrl.searchParams.append('submissionId',id);
         const orderResponse=await admin.fetch(new Request(ordersUrl.toString(),{method:'GET'}));
         const orderBody=orderResponse.ok?await orderResponse.json():{orders:[]};
-        return json(customerPublicSnapshot(active,Array.isArray(orderBody.orders)?orderBody.orders:[]),200,cors(request));
+        const sellabilityResponse=await admin.fetch(new Request('https://internal/runtime-sellability-readback',{method:'GET'}));
+        const sellabilityBody=sellabilityResponse.ok?await sellabilityResponse.json():{sellability:[]};
+        return json(customerPublicSnapshot(active,Array.isArray(orderBody.orders)?orderBody.orders:[],Array.isArray(sellabilityBody.sellability)?sellabilityBody.sellability:[]),200,cors(request));
       }
 
       if(url.pathname==='/api/customer/payment-qr'){
