@@ -60,3 +60,8 @@ Branch opened and domain validation seam added. UI route split is in progress.
 - Existing presentation.*.v1 storage, customer channel policy, Admin Draft and publish authority unchanged.
 - Milestone 6 CI was still running when this cut started; no merge/deploy action taken.
 - Current head c2e673c12c9f55ad3165d9cc6c16c820f441d334; CI pending.
+
+## Milestone 8
+- Print Center now renders logical-printer list first and only one logical printer editor after selection. Existing logical-printers.v1, capability/type semantics and SMT physical IP/USB boundary unchanged.
+- Pricing remains tabbed Product vs Option with pagination; Access Session is one policy + readback pair, so neither is split merely by source length.
+- Current head 2f127330fdcef02d5169a882a995df88e937c992; CI pending.
