@@ -80,8 +80,9 @@ describe('Staff login presentation',()=>{
       expect(html).toContain('>'+digit+'</button>');
     }
     expect(html).toContain('aria-label="員工 PIN"');
-    expect(html).toContain('type="password"');
-    expect(html).toContain('inputMode="numeric"');
+    expect(html).toContain('使用下方數字鍵輸入');
+    expect(html).not.toContain('type="password"');
+    expect(html).not.toContain('inputmode="numeric"');
     expect(html).not.toContain('掃碼登入');
     expect(html).not.toContain('需要協助？');
     expect(html).not.toContain('關閉系統');
