@@ -47,10 +47,17 @@ function secondaryFromPath(path:string):SecondaryView|null{
   for(const [view,route] of Object.entries(SECONDARY_PATHS))if(route===path)return view as SecondaryView;
   return null;
 }
+function primaryFromPath(path:string,fallback:View):View{
+  if(path==='/actions')return 'queue';
+  if(path==='/orders')return 'orders';
+  if(path==='/more')return 'more';
+  if(path==='/today'||path==='/')return 'today';
+  return fallback;
+}
 
 export function App(){
   const local=useMemo(()=>readOwnerLocalWorkspace(),[]);
-  const [view,setView]=useState<View>(local.activeView);
+  const [view,setView]=useState<View>(()=>typeof window==='undefined'?local.activeView:primaryFromPath(window.location.pathname,local.activeView));
   const [managerNote,setManagerNote]=useState(local.managerNote);
   const [handoffNote,setHandoffNote]=useState(local.handoffNote);
   const [checklist,setChecklist]=useState<readonly OwnerChecklistItem[]>(local.checklist);
