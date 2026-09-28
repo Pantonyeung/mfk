@@ -3,7 +3,7 @@ import type {StaffPinVerifier} from '../../contracts/staff-auth-v1.ts';
 import {useAdminDraft} from './admin-draft.tsx';
 import {appendAdminAudit,readActiveAdminRelease,usePersistentAdminState,writeAdminStored} from './admin-local-store.ts';
 import {saveAdminConfig} from './admin-config-save.ts';
-import {uploadAdminPaymentQr} from './admin-sync-client.ts';
+import {readFreshDiningOccupancy,uploadAdminPaymentQr} from './admin-sync-client.ts';
 import {
   beginKeetaOAuth,
   checkKeetaTokenReadiness,
@@ -155,7 +155,9 @@ export function PrintTemplatesWorkspace(){
 }
 
 type StoreDay='MON'|'TUE'|'WED'|'THU'|'FRI'|'SAT'|'SUN';
-interface DiningTableConfig{readonly id:string;readonly name:string;readonly active:boolean;readonly sortOrder:number}
+type DiningTableVersionStatus='PLANNED'|'ACTIVE'|'SUPERSEDED';
+interface DiningTableVersion{readonly versionId:string;readonly label:string;readonly requestedAt:string;readonly requestedBy:string;readonly sourceRevision:number;readonly status:DiningTableVersionStatus;readonly effectiveAt?:string;readonly activationEvidence?:{readonly observedAt:string;readonly runtimeRevision:number}}
+interface DiningTableConfig{readonly id:string;readonly name:string;readonly active:boolean;readonly sortOrder:number;readonly versions?:readonly DiningTableVersion[];readonly retirementStatus?:'PLANNED_RETIREMENT'|'RETIRED';readonly retirementEvidence?:{readonly observedAt:string;readonly runtimeRevision:number}}
 interface CustomerPaymentChannelConfig{readonly id:string;readonly name:string;readonly enabled:boolean;readonly qrImageUrl:string;readonly sortOrder:number}
 interface StoreSettings{
   storeName:string;storeCode:string;currency:string;timezone:string;
@@ -181,12 +183,6 @@ const DEFAULT_CUSTOMER_PAYMENT_CHANNELS:CustomerPaymentChannelConfig[]=[
   {id:'FPS',name:'轉數快',enabled:true,qrImageUrl:'',sortOrder:3},
   {id:'PAYME',name:'PayMe',enabled:true,qrImageUrl:'',sortOrder:4},
 ];
-const DEFAULT_DINING_TABLES:DiningTableConfig[]=Array.from({length:9},(_,index)=>({
-  id:'T'+String(index+1).padStart(2,'0'),
-  name:String(index+1)+' 號枱',
-  active:true,
-  sortOrder:index+1,
-}));
 const DEFAULT_WEEKLY_HOURS=Object.freeze({
   MON:{closed:false,opensAt:'11:00',closesAt:'20:00'},
   TUE:{closed:false,opensAt:'11:00',closesAt:'20:00'},
@@ -203,7 +199,7 @@ export function StoreSettingsWorkspace(){
     storeName:'磨飯',storeCode:'MF01',currency:'HKD',timezone:'Asia/Hong_Kong',
     lateArrivalMinutes:15,fulfillmentMinutes:20,archiveHours:24,diningOverdueMinutes:35,
     reminderAfterMinutes:5,reminderIntervalMinutes:5,repeatReminder:true,timeoutPriority:'HIGH',
-    dineInEnabled:true,takeawayEnabled:true,diningTables:DEFAULT_DINING_TABLES,customerPaymentChannels:DEFAULT_CUSTOMER_PAYMENT_CHANNELS,
+    dineInEnabled:true,takeawayEnabled:true,diningTables:[],customerPaymentChannels:DEFAULT_CUSTOMER_PAYMENT_CHANNELS,
     customerWhatsAppEnabled:true,
     customerWhatsAppNumber:'',
     customerWhatsAppTemplate:DEFAULT_CUSTOMER_WHATSAPP_TEMPLATE,
@@ -215,7 +211,7 @@ export function StoreSettingsWorkspace(){
   const patch=(change:Partial<StoreSettings>)=>setConfig(current=>{const after={...current,...change};appendAdminAudit({action:'修改門店設定',target:current.storeCode,before:current,after});return after;});
   const patchDay=(day:StoreDay,change:Partial<StoreSettings['weeklyHours'][StoreDay]>)=>patch({weeklyHours:{...config.weeklyHours,[day]:{...config.weeklyHours[day],...change}}});
   const refs=(value:string)=>value.split(',').map(item=>item.trim()).filter(Boolean);
-  const diningTables=(config.diningTables??DEFAULT_DINING_TABLES).slice().sort((a,b)=>a.sortOrder-b.sortOrder);
+  const diningTables=(config.diningTables??[]).slice().sort((a,b)=>a.sortOrder-b.sortOrder);
   const paymentChannels=(config.customerPaymentChannels??DEFAULT_CUSTOMER_PAYMENT_CHANNELS).slice().sort((a,b)=>a.sortOrder-b.sortOrder);
   const [paymentUploadState,setPaymentUploadState]=useState<Record<string,string>>({});
   const patchPaymentChannel=(id:string,change:Partial<CustomerPaymentChannelConfig>)=>patch({customerPaymentChannels:paymentChannels.map(row=>row.id===id?{...row,...change}:row)});
@@ -238,13 +234,11 @@ export function StoreSettingsWorkspace(){
     }
   };
   const patchTable=(id:string,change:Partial<DiningTableConfig>)=>patch({diningTables:diningTables.map(row=>row.id===id?{...row,...change}:row)});
-  const addTable=()=>patch({diningTables:[...diningTables,{
-    id:'T'+String(Math.min(99,Math.max(0,...diningTables.map(row=>Number(row.id.replace(/\D/g,''))||0))+1)).padStart(2,'0'),
-    name:'新枱',
-    active:true,
-    sortOrder:diningTables.length+1,
-  }]});
-  const removeTable=(id:string)=>patch({diningTables:diningTables.filter(row=>row.id!==id)});
+  const nextTableId=()=>{const used=new Set(diningTables.map(row=>row.id));let n=Math.max(0,...diningTables.map(row=>Number(row.id.replace(/\D/g,''))||0))+1;while(used.has('T'+String(n).padStart(4,'0')))n++;return 'T'+String(n).padStart(4,'0');};
+  const addTable=()=>{const id=nextTableId(),at=new Date().toISOString();patch({diningTables:[...diningTables,{id,name:'新枱',active:true,sortOrder:diningTables.length+1,versions:[{versionId:'V1',label:'新枱',requestedAt:at,requestedBy:'ADMIN',sourceRevision:activeRelease?.version??0,status:'ACTIVE',effectiveAt:at}]}]});};
+  const requestRename=(id:string,newLabel:string)=>{const row=diningTables.find(item=>item.id===id);if(!row||!newLabel.trim()||newLabel.trim()===row.name)return;const versions=[...(row.versions??[])];const versionId='V'+String(versions.length+1);patchTable(id,{versions:[...versions,{versionId,label:newLabel.trim(),requestedAt:new Date().toISOString(),requestedBy:'ADMIN',sourceRevision:activeRelease?.version??0,status:'PLANNED'}]});};
+  const requestRetirement=(id:string)=>patchTable(id,{retirementStatus:'PLANNED_RETIREMENT'});
+  const activatePending=async(id:string)=>{const evidence=await readFreshDiningOccupancy(id);if(!evidence||evidence.activeSessionCount!==0){setSaveMessage('未能生效：枱仍有人使用，或者佔用讀回未能證明為最新。');return;}const row=diningTables.find(item=>item.id===id);if(!row)return;const versions=[...(row.versions??[])];const planned=versions.find(item=>item.status==='PLANNED');if(row.retirementStatus==='PLANNED_RETIREMENT'){patchTable(id,{active:false,retirementStatus:'RETIRED',retirementEvidence:{observedAt:evidence.observedAt,runtimeRevision:evidence.runtimeRevision}});appendAdminAudit({action:'堂食枱退休生效',target:id,after:{observedAt:evidence.observedAt,runtimeRevision:evidence.runtimeRevision}});return;}if(!planned)return;const at=new Date().toISOString();patchTable(id,{name:planned.label,versions:versions.map(item=>item.versionId===planned.versionId?{...item,status:'ACTIVE' as const,effectiveAt:at,activationEvidence:{observedAt:evidence.observedAt,runtimeRevision:evidence.runtimeRevision}}:item.status==='ACTIVE'?{...item,status:'SUPERSEDED' as const}:item)});appendAdminAudit({action:'堂食枱名稱版本生效',target:id,after:{versionId:planned.versionId,observedAt:evidence.observedAt,runtimeRevision:evidence.runtimeRevision}});};
   const saveStoreSettings=()=>{
     const errors:string[]=[];
     const tableIds=new Set<string>();
@@ -288,10 +282,11 @@ export function StoreSettingsWorkspace(){
       <article className="admin-policy-card"><header><div><h2>堂食枱號</h2><small>由 Admin 發佈，SMT／SMM 共用同一份枱號同名稱。</small></div><button type="button" onClick={addTable}>新增枱</button></header>
         <div className="admin-editor-list">{diningTables.map((row,index)=><div className="admin-policy-row" key={row.id}>
           <b>{row.id}</b>
-          <label><span>顯示名稱</span><input value={row.name} onChange={event=>patchTable(row.id,{name:event.target.value})}/></label>
+          <label><span>目前名稱</span><input value={row.name} readOnly/></label><label><span>新名稱（建立 PLANNED）</span><input defaultValue="" onBlur={event=>{requestRename(row.id,event.target.value);event.target.value='';}}/></label>
           <label><span>排序</span><input type="number" min={1} value={row.sortOrder} onChange={event=>patchTable(row.id,{sortOrder:Number(event.target.value)||index+1})}/></label>
-          <Toggle checked={row.active} onChange={active=>patchTable(row.id,{active})} label={row.active?'啟用':'停用'}/>
-          <button type="button" onClick={()=>removeTable(row.id)}>刪除</button>
+          <span>{row.retirementStatus??(row.active?'ACTIVE':'RETIRED')}</span>
+          <button type="button" onClick={()=>void activatePending(row.id)}>檢查並生效</button>
+          <button type="button" onClick={()=>requestRetirement(row.id)}>安排停用</button>
         </div>)}</div>
       </article>
       <article className="admin-policy-card"><h2>Customer WhatsApp 備援</h2>
