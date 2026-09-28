@@ -18,6 +18,8 @@ import {Stage2Menu} from './stage2/Stage2Menu';
 import {Stage2BottomNavigation} from './stage2/Stage2BottomNavigation';
 import {LaunchOverlay} from './launch/LaunchOverlay';
 import {Stage1Home} from './stage1/Stage1Home';
+import {CustomerUi10} from './customer-ui10';
+import './customer-ui10.css';
 import type {
   CustomerCartLine,
   CustomerCheckoutDraft,
@@ -31,8 +33,8 @@ import type {
   CustomerRuntimePort,
 } from './product-types';
 
-export type View='home'|'menu'|'cart'|'checkout'|'submit'|'waiting'|'pickup'|'orders'|'more';
-const persistedView=(value:View):CustomerLocalPreferences['activeView']=>value==='submit'||value==='waiting'||value==='pickup'?'orders':value;
+export type View='home'|'menu'|'cart'|'checkout'|'submit'|'waiting'|'pickup'|'orders'|'more'|'account'|'recovery';
+const persistedView=(value:View):CustomerLocalPreferences['activeView']=>value==='submit'||value==='waiting'||value==='pickup'?'orders':value==='account'||value==='recovery'?'more':value;
 
 type CustomerRoute={
   view:View;
@@ -54,6 +56,8 @@ const customerRouteFromPath=(pathname:string):CustomerRoute|null=>{
   if(pickupMatch)return {view:'pickup',pickupOrderId:decodeURIComponent(pickupMatch[1])};
   if(pathname==='/menu')return {view:'menu'};
   if(pathname==='/orders')return {view:'orders'};
+  if(pathname==='/member/account')return {view:'account'};
+  if(pathname==='/support/account-recovery')return {view:'recovery'};
   if(pathname==='/member')return {view:'more'};
   if(pathname==='/'||pathname==='')return {view:'home'};
   return null;
@@ -143,7 +147,9 @@ export function App(){
       setView(next);
       if(next==='orders'){setUi8Phase('LIST');setUi8SelectedOrderId(null);}
       if(next==='home'||next==='menu'||next==='cart'||next==='orders'||next==='more')replacePath(pathForView(next));
-      persist({preferences:{activeView:next==='submit'||next==='waiting'||next==='pickup'?'orders':next,activeCategoryId}});
+      if(next==='account')replacePath('/member/account');
+      if(next==='recovery')replacePath('/support/account-recovery');
+      persist({preferences:{activeView:persistedView(next),activeCategoryId}});
       window.scrollTo({top:0,behavior:'auto'});
     });
   };
@@ -805,12 +811,14 @@ export function App(){
       {view==='waiting'?<StoreFulfillmentUi6View order={waitingOrder} intent={waitingIntent} connection={connection} browserOnline={browserOnline} onRefresh={()=>void refresh()} onOrders={()=>{setOrderSegment('current');changeView('orders')}} onHome={()=>changeView('home')}/>:null}
       {view==='pickup'?<PickupCompleteUi7View order={pickupOrder} historyOrder={pickupHistoryOrder} intent={pickupIntent} connection={connection} browserOnline={browserOnline} onRefresh={()=>void refresh()} onOrders={()=>{setOrderSegment(pickupHistoryOrder?'completed':'current');changeView('orders')}} onHome={()=>changeView('home')} onHelp={()=>setNotice('請直接向現場店員求助；問題處理好之前，訂單唔會顯示已完成。')}/>:null}
       {view==='orders'?<HistoryReorderUi8View segment={orderSegment} setSegment={setOrderSegment} phase={ui8Phase} setPhase={setUi8Phase} active={activeOrders} history={history} selectedHistory={ui8SelectedHistory} cart={cart} repairs={cartRepairs} quote={quote} menu={menu} connection={connection} browserOnline={browserOnline} onOpenCurrent={openUi8Current} onOpenHistory={openUi8History} onStartReorder={order=>void reorder(order)} onAcceptRepair={acceptUi8Repair} onEditRepair={editUi8Repair} onRemoveLine={lineId=>updateCart(cart.filter(line=>line.lineId!==lineId))} onGoCart={()=>changeView('cart')} onBrowse={()=>changeView('menu')} onRefresh={()=>void refresh()}/>:null}
-      {view==='more'?<MemberView connection={connection} snapshot={snapshot} history={history} pendingIntents={recoveryIntents} readingIntentId={readingIntentId} onRefresh={()=>void refresh()} onReadback={intent=>void readbackIntent(intent)} onDiscard={removeIntent} onFallback={()=>void requestFallback()} onReorder={order=>void reorder(order)} onBrowse={()=>changeView('menu')}/>:null}
+      {view==='more'?<><MemberView connection={connection} snapshot={snapshot} history={history} pendingIntents={recoveryIntents} readingIntentId={readingIntentId} onRefresh={()=>void refresh()} onReadback={intent=>void readbackIntent(intent)} onDiscard={removeIntent} onFallback={()=>void requestFallback()} onReorder={order=>void reorder(order)} onBrowse={()=>changeView('menu')}/><div className="ui10-member-entry"><button type="button" onClick={()=>changeView('account')}>帳戶與裝置</button></div></>:null}
+      {view==='account'?<CustomerUi10 mode="ACCOUNT" member={snapshot?.member} fallback={snapshot?.fallback} defaultPhone={checkout.phone} onMember={()=>changeView('more')} onRecovery={()=>changeView('recovery')} onBack={()=>changeView('more')}/>:null}
+      {view==='recovery'?<CustomerUi10 mode="RECOVERY" member={snapshot?.member} fallback={snapshot?.fallback} defaultPhone={checkout.phone} onMember={()=>changeView('more')} onRecovery={()=>changeView('recovery')} onBack={()=>changeView('account')}/>:null}
     </section>
 
     {view==='home'||view==='menu'
       ?<Stage2BottomNavigation active={view} cartCount={cartCount} orderCount={activeOrders.length} onChange={changeView}/>
-      :<BottomNavigation active={view==='cart'||view==='checkout'?'cart':view==='more'?'more':'orders'} cartCount={cartCount} orderCount={activeOrders.length} pulseKey={jarPulseKey} onChange={changeView}/>}
+      :<BottomNavigation active={view==='cart'||view==='checkout'?'cart':view==='more'||view==='account'||view==='recovery'?'more':'orders'} cartCount={cartCount} orderCount={activeOrders.length} pulseKey={jarPulseKey} onChange={changeView}/>}
 
 
     {selectedProduct?<ProductSheet product={selectedProduct} menu={menu} selections={selections} comboEnabled={selectedComboEnabled} comboSelections={selectedComboSelections} selectedVariationId={selectedVariationId} quantity={selectedQuantity} note={selectedNote} editing={Boolean(editingLineId)} recommendations={productRecommendations} setVariation={setSelectedVariationId} setComboEnabled={setSelectedComboEnabled} clearCombo={()=>setSelectedComboSelections(Object.freeze([]))} setQuantity={setSelectedQuantity} setNote={setSelectedNote} toggle={(groupId,optionId)=>{
@@ -827,3 +835,4 @@ export function App(){
     />:null}
   </main>;
 }
+
