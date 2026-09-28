@@ -133,3 +133,33 @@ NO MANUAL DEPLOY
 - Publish: current-domain errors remain inline + scroll/focus. Cross-domain Store Settings blockers show actual domain + reason + navigable target. Existing catalog/staff canonical errors are mapped to their existing Admin pages.
 - Domain-local draft save remains domain-local. Canonical saveAdminConfig remains the only publish engine.
 - Scope remains within the existing candidate file set; no new product source file added.
+
+## #467 FINAL REACCEPTANCE EVIDENCE
+READY_FOR_COMMANDER_ADMIN_SETTINGS_UX_REACCEPTANCE
+FINAL_HEAD: 2c70e902a9ad2cdaf484342e2c61c2f257ff58f1
+CURRENT_MAIN_SHA: 71e301273c81542cb534851de32852e9d4c04e76
+BEHIND_MAIN: 0
+FILES_CHANGED: 11 (same candidate scope)
+FINAL_CI: ALL GREEN
+- admin-crossport-integration-gate 36415712463 GREEN: Admin Full Tests/Build/Wrangler; v2local Full Tests/Build; SMM Full Tests/Build/Wrangler
+- admin-identity-canonical-r1 36415712586 GREEN
+- admin-canonical-readback-r1 36415712617 GREEN
+- owner-runtime-connection-r2 36415712555 GREEN
+- customer-ui5-submit-wait-r1 36415712666 GREEN
+
+WHATSAPP_LEGACY_EMPTY_RESULT: GREEN
+WHATSAPP_INTENTIONAL_CLEAR_RESULT: GREEN
+QR_DOMAIN_RESULT: GREEN
+QR_AUTHORITY_RESULT: GREEN
+DOMAIN_LOCAL_SAVE_RESULT: GREEN
+CROSS_DOMAIN_PUBLISH_RESULT: GREEN
+ERROR_NAVIGATION_RESULT: GREEN
+INLINE_ERROR_RESULT: GREEN
+SCROLL_FOCUS_RESULT: GREEN
+TABLE_REGISTRY_REGRESSION: GREEN
+V2LOCAL_RESULT: GREEN
+SMM_RESULT: GREEN
+AUTHORITY_RESULT: GREEN
+FIRST_BREAK: NONE
+NO MAIN MERGE
+NO MANUAL DEPLOY
