@@ -134,7 +134,7 @@ test('freshness loss during COPY REPAIR REVIEW preserves draft and blocks progre
   assert.match(ui8,/更新完成後會再確認目前餐單同價格/);
   const blocked=ui8.slice(ui8.indexOf("if(!reorderFresh)return"),ui8.indexOf("if(phase==='COPY')"));
   assert.doesNotMatch(blocked,/setCart|updateCart|onGoCart|onContinue/);
-  assert.match(app,/if\(!browserOnline\|\|connection!=='READY'\|\|!menu\)\{setNotice\('目前資料未 fresh；draft cart 已保留/);
+  assert.match(app,/if\(!browserOnline\|\|connection!=='READY'\|\|!menu\)\{setNotice\('目前資料需要更新；你已揀嘅餐點已保留/);
 });
 
 test('Final Review cannot become ready on stale local quote and reconnect READY re-enables current validation',()=>{
