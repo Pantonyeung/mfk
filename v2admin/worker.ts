@@ -1575,6 +1575,27 @@ export class AdminSyncStore{
       const acks=await this.state.storage.get('acks')||{};
       return json({acks:Object.values(acks).sort((a,b)=>String(b.appliedAt).localeCompare(String(a.appliedAt)))});
     }
+    if(url.pathname==='/dining-occupancy'){
+      if(request.method==='POST'){
+        const body=row(await request.json().catch(()=>({})));
+        const tableId=String(body.tableId||'').trim();
+        const observedAt=String(body.observedAt||'').trim();
+        const activeSessionCount=Number(body.activeSessionCount);
+        const runtimeRevision=Number(body.runtimeRevision);
+        if(String(body.storeId||'')!=='MF01'||!tableId||!Number.isSafeInteger(activeSessionCount)||activeSessionCount<0||!Number.isFinite(Date.parse(observedAt))||!Number.isSafeInteger(runtimeRevision)||runtimeRevision<0)return json({code:'DINING_OCCUPANCY_INVALID'},400);
+        const value=Object.freeze({storeId:'MF01',tableId,hasActiveSession:activeSessionCount>0,activeSessionCount,observedAt,runtimeRevision,receivedAt:new Date().toISOString()});
+        await this.state.storage.put('dining:occupancy:'+tableId,value);
+        return json({state:'OBSERVED',readback:value});
+      }
+      if(request.method==='GET'){
+        if(!await this.authorizeAdminRead(request))return json({code:'DINING_OCCUPANCY_READ_UNAUTHORIZED'},401);
+        const tableId=String(url.searchParams.get('tableId')||'').trim();
+        if(!tableId)return json({code:'DINING_OCCUPANCY_TABLE_REQUIRED'},400);
+        const value=await this.state.storage.get('dining:occupancy:'+tableId);
+        return value?json({readback:value}):json({code:'DINING_OCCUPANCY_UNKNOWN'},404);
+      }
+      return json({code:'METHOD_NOT_ALLOWED'},405);
+    }
     if(url.pathname==='/events'){
       if(request.headers.get('upgrade')!=='websocket')return json({code:'WEBSOCKET_REQUIRED'},426);
       const pair=new WebSocketPair();
