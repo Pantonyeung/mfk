@@ -1,0 +1,70 @@
+name: admin-crossport-integration-gate
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'v2admin/**'
+      - 'contracts/**'
+      - '.github/workflows/admin-crossport-integration-gate.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  admin:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: v2admin
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --ignore-scripts --no-audit --no-fund --legacy-peer-deps --package-lock=false
+      - name: Full Admin tests
+        run: npm test
+      - name: Admin build
+        run: npm run build
+      - name: Admin Wrangler dry-run
+        run: npx --yes wrangler@4 deploy --dry-run --config wrangler.jsonc
+
+  v2local:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: v2local
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --ignore-scripts --no-audit --no-fund --legacy-peer-deps --package-lock=false
+      - name: Full v2local tests
+        run: npm test
+      - name: v2local build
+        run: npm run build
+
+  smm:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: v2smm
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --ignore-scripts --no-audit --no-fund --legacy-peer-deps --package-lock=false
+      - name: Full SMM tests
+        run: npm test
+      - name: SMM build
+        run: npm run build
+      - name: SMM Wrangler dry-run
+        run: npx --yes wrangler@4 deploy --dry-run --config wrangler.jsonc
