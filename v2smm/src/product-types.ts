@@ -177,7 +177,7 @@ export interface SmmDiningTarget{
 
 export interface SmmStaffCheckout {
   readonly serviceMode:SmmServiceMode;
-  readonly tender:SmmTender;
+  readonly tender?:SmmTender;
   readonly diningTarget?:SmmDiningTarget;
 }
 

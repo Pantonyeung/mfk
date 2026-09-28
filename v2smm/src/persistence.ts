@@ -118,7 +118,7 @@ export function createSmmPendingIntent(input:{
   readonly menuRevision:string;
   readonly publishedTotalMinor:number;
   readonly serviceMode:SmmServiceMode;
-  readonly tender:SmmTender;
+  readonly tender?:SmmTender;
   readonly diningTarget?:SmmDiningTarget;
 }):SmmPendingIntent{
   const submissionId=createSmmStableSubmissionId();
@@ -131,7 +131,7 @@ export function createSmmPendingIntent(input:{
     state:'DRAFT',
     menuRevision:input.menuRevision,
     publishedTotalMinor:input.publishedTotalMinor,
-    checkout:Object.freeze({serviceMode:input.serviceMode,tender:input.tender,...(input.diningTarget?{diningTarget:Object.freeze({...input.diningTarget})}:{})}),
+    checkout:Object.freeze({serviceMode:input.serviceMode,...(input.serviceMode==='TAKEAWAY'&&input.tender?{tender:input.tender}:{}),...(input.diningTarget?{diningTarget:Object.freeze({...input.diningTarget})}:{})}),
     cart:Object.freeze([...input.cart]),
   });
 }

@@ -20,21 +20,17 @@ const checkoutEnd=app.indexOf('function DiningTargetSheet',checkoutStart);
 assert.ok(checkoutStart>=0&&checkoutEnd>checkoutStart);
 const checkout=app.slice(checkoutStart,checkoutEnd);
 
-test('Stage 4 follows source 4.1-4.5 flow: Service Mode -> Dining Target -> Tender -> Summary -> Submit',()=>{
-  const markers=['服務方式','堂食去向','付款方式','訂單確認','確認落單'];
-  let previous=-1;
-  for(const marker of markers){
-    const index=checkout.indexOf(marker);
-    assert.ok(index>previous,marker);
-    previous=index;
-  }
+test('Stage 4 keeps tender for takeaway and makes initial dining tenderless',()=>{
+  for(const marker of['服務方式','堂食去向','訂單確認','確認落單'])assert.match(checkout,new RegExp(marker));
+  assert.match(checkout,/serviceMode==='TAKEAWAY'\?<section className="stage4-section">[\s\S]*付款方式/);
+  assert.match(checkout,/堂食先落單，食完先埋單/);
 });
 
 test('DINE_IN without Table or Waiting target cannot submit',()=>{
   const status=smmStage4DiningTargetStatus('DINE_IN',null,[]);
   assert.equal(status.required,true);
   assert.equal(status.valid,false);
-  assert.equal(smmStage4CheckoutReady({cartLength:1,totalMinor:4300,hasAttention:false,tender:'CASH',diningTargetValid:status.valid}),false);
+  assert.equal(smmStage4CheckoutReady({cartLength:1,totalMinor:4300,hasAttention:false,serviceMode:'DINE_IN',diningTargetValid:status.valid}),false);
 });
 
 test('DINE_IN Waiting target is valid and published Table target must exist',()=>{
@@ -50,7 +46,7 @@ test('TAKEAWAY does not require Dining Target',()=>{
   assert.equal(status.valid,true);
 });
 
-test('all current tender semantics remain unchanged without payment execution',()=>{
+test('takeaway tender semantics remain unchanged without payment execution',()=>{
   assert.deepEqual(SMM_STAGE4_TENDERS.map(row=>row.value),['CASH','ALIPAY','WECHAT','FPS','PAYME']);
   assert.equal(smmStage4TenderLabel('CASH'),'現金');
   assert.equal(smmStage4TenderLabel('FPS'),'FPS');
@@ -66,7 +62,7 @@ test('Stage 4 final summary includes product media line totals note and final to
 });
 
 test('unresolved Stage 3 line attention blocks Stage 4 submit',()=>{
-  assert.equal(smmStage4CheckoutReady({cartLength:1,totalMinor:4300,hasAttention:true,tender:'CASH',diningTargetValid:true}),false);
+  assert.equal(smmStage4CheckoutReady({cartLength:1,totalMinor:4300,hasAttention:true,tender:'CASH',serviceMode:'TAKEAWAY',diningTargetValid:true}),false);
   assert.match(checkout,/const hasAttention=cart\.some\(line=>Boolean\(line\.refreshAttention\)\)/);
   assert.match(checkout,/disabled=\{!submitReady\}/);
 });
@@ -90,7 +86,7 @@ test('Dining Target remains local non-authoritative workspace and Admin-publishe
 });
 
 test('Stage 4 normal UI removes engineering copy while keeping source hierarchy',()=>{
-  for(const marker of['落單前確認','今張單係外賣定堂食','揀枱號；未有座位就先加入輪候','揀客人今次使用嘅付款方式','最後一步']){
+  for(const marker of['落單前確認','今張單係外賣定堂食','揀枱號；未有座位就先加入輪候','堂食先落單，食完先埋單','最後一步']){
     assert.match(checkout,new RegExp(marker));
   }
   assert.doesNotMatch(checkout,/第 4 階段|第 5 階段|SMT \/ Store Kernel|餐單版本|PRICE_CHANGED|CONFIG_CHANGED|正式價格、Combo、餐單 revision/);

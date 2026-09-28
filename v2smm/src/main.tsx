@@ -23,3 +23,8 @@ installSmmRuntimePort(createPwaRuntimePort());
 const root=document.getElementById('root');
 if(!root)throw new Error('MFK_SMM_ROOT_REQUIRED');
 createRoot(root).render(<StrictMode><SmmErrorBoundary><StageZeroGate><App/></StageZeroGate></SmmErrorBoundary></StrictMode>);
+
+
+if('serviceWorker'in navigator){
+  window.addEventListener('load',()=>{void navigator.serviceWorker.register('/sw.js',{scope:'/'}).then(registration=>registration.update()).catch(()=>{});});
+}

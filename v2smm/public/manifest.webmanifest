@@ -1,0 +1,17 @@
+{
+  "name": "磨飯流動店務",
+  "short_name": "磨飯 SMM",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "theme_color": "#f5efe5",
+  "background_color": "#f5efe5",
+  "icons": [
+    {
+      "src": "/brand/morefun-logo.webp",
+      "sizes": "512x512",
+      "type": "image/webp",
+      "purpose": "any maskable"
+    }
+  ]
+}
