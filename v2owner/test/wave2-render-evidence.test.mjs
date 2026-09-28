@@ -144,7 +144,7 @@ test('Wave2 FINAL screens render at 390 and 440 with 360 minimum width', {timeou
     const client=cdp(pageInfo.webSocketDebuggerUrl);
     await client.send('Page.enable');
     await client.send('Runtime.enable');
-    const initSource='window.__MFK_OWNER_PRODUCT_PORT__={portId:"MFK_OWNER_PORT_V1",readOwnerSession:async()=>'+JSON.stringify(session)+',readSnapshot:async()=>'+JSON.stringify(snapshot)+',readChannels:async()=>'+JSON.stringify(snapshot.channels)+',readSellability:async()=>'+JSON.stringify(snapshot.sellability)+',requestAdminDeepLink:async()=>({state:"NOT_CONNECTED",message:"Admin 導航暫未連接"})};';
+    const initSource='window.__MFK_OWNER_PRODUCT_PORT__={portId:"MFK_OWNER_PORT_V1",readOwnerSession:async()=>('+JSON.stringify(session)+'),readSnapshot:async()=>('+JSON.stringify(snapshot)+'),readChannels:async()=>('+JSON.stringify(snapshot.channels)+'),readSellability:async()=>('+JSON.stringify(snapshot.sellability)+'),requestAdminDeepLink:async()=>({state:"NOT_CONNECTED",message:"Admin 導航暫未連接"})};';
     await client.send('Page.addScriptToEvaluateOnNewDocument',{source:initSource});
 
     const screens=[
