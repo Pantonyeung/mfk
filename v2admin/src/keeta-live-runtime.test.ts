@@ -1110,12 +1110,12 @@ describe('Keeta live edge runtime',()=>{
           revision:9,adminFingerprint:'fp-9',
           snapshot:{
             channelPolicy:{syncSellability:true},
-            availability:{p1:{sellable:true},p2:{sellable:false}},
             catalog:{products:[
               {id:'p1',productCode:'RB-A',active:true},
               {id:'p2',productCode:'BX 2',active:true},
             ]},
           },
+          runtimeSellability:[{nodeId:'p1',status:'available'},{nodeId:'p2',status:'soldout'}],
         }),
       }));
       expect(response.status).toBe(200);
