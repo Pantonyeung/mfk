@@ -82,7 +82,7 @@ describe('Admin UI recomposition',()=>{
     const templates=render('/admin/print/templates');
     expect(templates).toContain('收據');
     expect(templates).toContain('製作單');
-    expect(templates).not.toContain('收據模板內容');
+    expect(templates).not.toContain('<textarea');
   });
 
   it('only reports SMT success for a matching revision and fingerprint readback',()=>{
