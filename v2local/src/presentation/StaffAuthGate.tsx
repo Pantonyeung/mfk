@@ -71,7 +71,7 @@ export function StaffAuthGate({children}:{children:ReactNode}){
           
         </div>
         <label className="s0-staff"><span>員工</span><select value={staffId} onChange={event=>{setStaffId(event.target.value);setPin('');setError('')}}>{loginReady.map(row=><option key={row.staffId} value={row.staffId}>{row.name} · {roleLabel(row.role)}</option>)}</select></label>
-        <label className="s0-pin"><span>PIN</span><input type="password" inputMode="numeric" autoComplete="off" value={pin} onChange={event=>{setPin(event.target.value.replace(/\\D/g,'').slice(0,8));setError('')}} onKeyDown={event=>{if(event.key==='Enter'&&staffId&&pin.length>=4)void submit()}} placeholder="輸入員工 PIN" aria-label="員工 PIN"/>{pin?<button type="button" onClick={()=>setPin('')} aria-label="清除 PIN">×</button>:null}</label>
+        <div className="s0-pin" role="status" aria-label="員工 PIN"><span>PIN</span><strong>{pin?Array.from({length:pin.length},()=> '●').join(' '):'使用下方數字鍵輸入'}</strong>{pin?<button type="button" onClick={()=>setPin('')} aria-label="清除 PIN">×</button>:null}</div>
         <div className="s0-keypad">{['1','2','3','4','5','6','7','8','9','⌫','0'].map(key=><button type="button" key={key} onClick={()=>press(key)}>{key}</button>)}<button className="go" type="button" disabled={!staffId||pin.length<4} onClick={()=>void submit()}>→</button></div>
         {error?<div className="s0-error" role="alert">{error}</div>:null}
         <p className="s0-hint">Admin Config R{sync.revision||'—'} · {sync.state} · 離線可用最後有效設定驗證</p>
