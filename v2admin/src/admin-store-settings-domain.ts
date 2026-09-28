@@ -1,5 +1,5 @@
 export type StoreSettingsDomain =
-  |'home'|'basic'|'service'|'tables'|'hours'|'timing'|'reminders'|'whatsapp'|'payments'|'references';
+  |'home'|'basic'|'service'|'tables'|'hours'|'timing'|'reminders'|'whatsapp'|'payments'|'qr'|'references';
 
 export const STORE_SETTINGS_ROUTES = Object.freeze({
   home:'/admin/store/settings',
@@ -11,12 +11,13 @@ export const STORE_SETTINGS_ROUTES = Object.freeze({
   reminders:'/admin/store/settings/reminders',
   whatsapp:'/admin/store/settings/whatsapp',
   payments:'/admin/store/settings/payments',
+  qr:'/admin/store/settings/qr',
   references:'/admin/store/settings/references',
 } satisfies Record<StoreSettingsDomain,string>);
 
 export function resolveStoreSettingsDomain(pathname:string):StoreSettingsDomain{
   const suffix=pathname.replace(/^\/admin\/store\/settings\/?/,'').split('/')[0]??'';
-  return (['basic','service','tables','hours','timing','reminders','whatsapp','payments','references'] as const).includes(suffix as any)
+  return (['basic','service','tables','hours','timing','reminders','whatsapp','payments','qr','references'] as const).includes(suffix as any)
     ? suffix as Exclude<StoreSettingsDomain,'home'>
     :'home';
 }
@@ -31,6 +32,7 @@ export interface StoreSettingsValidationInput{
 }
 
 export interface StoreSettingsFieldError{fieldId:string;message:string}
+export interface StoreSettingsDomainError extends StoreSettingsFieldError{domain:Exclude<StoreSettingsDomain,'home'>}
 
 export function validateStoreSettingsDomain(domain:StoreSettingsDomain,input:StoreSettingsValidationInput):readonly StoreSettingsFieldError[]{
   const errors:StoreSettingsFieldError[]=[];
@@ -44,12 +46,12 @@ export function validateStoreSettingsDomain(domain:StoreSettingsDomain,input:Sto
     });
   }
   if(domain==='timing'&&(!Number.isFinite(Number(input.diningOverdueMinutes))||Number(input.diningOverdueMinutes)<1)){
-    errors.push({fieldId:'dining-overdue-minutes',message:'必須至少 1 分鐘'});
+    errors.push({fieldId:'dining-overdue-minutes',message:'堂食超時必須至少 1 分鐘'});
   }
   if(domain==='whatsapp'&&input.customerWhatsAppEnabled){
     const digits=input.customerWhatsAppNumber.replace(/\D/g,'');
     if(digits&&(digits.length<8||digits.length>15))errors.push({fieldId:'customer-whatsapp-number',message:'電話格式錯誤'});
-    if(digits&&!input.customerWhatsAppTemplate.trim())errors.push({fieldId:'customer-whatsapp-template',message:'已啟用 WhatsApp 備援時必須填寫訊息模板'});
+    if(digits&&!input.customerWhatsAppTemplate.trim())errors.push({fieldId:'customer-whatsapp-template',message:'訊息模板未填'});
   }
   if(domain==='payments'){
     const ids=new Set<string>();
@@ -62,3 +64,13 @@ export function validateStoreSettingsDomain(domain:StoreSettingsDomain,input:Sto
   }
   return errors;
 }
+
+export function validateAllStoreSettingsDomains(input:StoreSettingsValidationInput):readonly StoreSettingsDomainError[]{
+  const domains:readonly Exclude<StoreSettingsDomain,'home'>[]=['basic','service','tables','hours','timing','reminders','whatsapp','payments','qr','references'];
+  return domains.flatMap(domain=>validateStoreSettingsDomain(domain,input).map(error=>({...error,domain})));
+}
+
+export const STORE_SETTINGS_DOMAIN_LABELS:Readonly<Record<Exclude<StoreSettingsDomain,'home'>,string>>=Object.freeze({
+  basic:'基本資料',service:'服務模式',tables:'堂食枱號',hours:'營業時間',timing:'營運計時',
+  reminders:'訂單提醒',whatsapp:'WhatsApp 備援',payments:'電子支付',qr:'QR Code',references:'其他門店設定',
+});
