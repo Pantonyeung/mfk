@@ -766,7 +766,8 @@ test('OA-PLN-001 uses canonical runtime rather than localStorage and keeps cost 
   assert.match(page,/Draft \/ Pending \/ External Pre-admission \/ 未結帳 Open Check \/ estimatedOpenAmount 不會加入/);
   assert.doesNotMatch(page,/localStorage|sessionStorage/);
   assert.match(cloud,/\/api\/owner\/planning/);
-  assert.match(app,/營業目標與成本/);
+  assert.match(app,/planning:'\/planning'/);
+  assert.match(app,/PlanningPage/);
 });
 
 test('Stage04 keeps four-item bottom navigation and secondary routes',()=>{
