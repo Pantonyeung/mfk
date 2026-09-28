@@ -81,6 +81,7 @@ describe('Staff login presentation',()=>{
     }
     expect(html).toContain('aria-label="員工 PIN"');
     expect(html).toContain('使用下方數字鍵輸入');
+    expect(StaffAuthGate.toString()).toContain('/^\\d$/');
     expect(html).not.toContain('type="password"');
     expect(html).not.toContain('inputmode="numeric"');
     expect(html).not.toContain('掃碼登入');
