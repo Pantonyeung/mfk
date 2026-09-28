@@ -14,6 +14,7 @@ export function smmStage4CheckoutReady(input:{
   readonly cartLength:number;
   readonly totalMinor:number|undefined|null;
   readonly hasAttention:boolean;
-  readonly tender:SmmTender;
+  readonly tender?:SmmTender;
+  readonly serviceMode:SmmServiceMode;
   readonly diningTargetValid:boolean;
 }):boolean;
