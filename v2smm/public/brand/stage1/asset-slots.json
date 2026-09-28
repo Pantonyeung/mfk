@@ -1,54 +1,37 @@
 {
-  "version": "MFK_SMM_STAGE1_ASSET_SLOTS_V1",
-  "date": "2026-09-26",
+  "version": "MFK_SMM_FINAL_SOURCE_FIDELITY_P0_R1",
+  "date": "2026-09-28",
+  "source": {
+    "package": "MFK_SMM_UI_完整設計包_2026-09-26",
+    "allowed": [
+      "03_Stage_UI_效果圖_CURRENT",
+      "04_Final_Implementation_UI_Spec"
+    ],
+    "supersededAssetsIgnored": true
+  },
   "ownerLock": {
-    "ipProduction": "PAUSED",
-    "productPhotography": "OFFICIAL_ONLY",
     "generatedCharacters": "DO_NOT_CREATE",
-    "visualRule": "Each future graphic/icon/banner is a discrete asset file placed into its assigned slot. Do not fake branded imagery by assembling CSS circles/shapes or cropping reference IP art."
+    "productMedia": "CANONICAL_IMAGE_REF_FIRST",
+    "visualRule": "Use final CURRENT stage references and implementation spec. Branded fallback media must come from existing approved MoreFun assets; no fake CSS food imagery."
+  },
+  "stage0": {
+    "brandLogo": "/brand/morefun-logo.webp",
+    "mascotAssets": [
+      "/brand/stage0/stage0-male.webp",
+      "/brand/stage0/stage0-female.webp"
+    ]
   },
   "stage1": {
     "productCards": {
-      "imageStatus": "EMPTY_UNTIL_OFFICIAL_PRODUCT_PHOTO",
-      "currentImplementation": "neutral blank media slot",
+      "imageStatus": "CANONICAL_OR_APPROVED_BRAND_FALLBACK",
+      "canonicalField": "imageRef",
+      "fallbacks": [
+        "/brand/stage1/product-feature.webp",
+        "/brand/stage1/product-bowl.webp",
+        "/brand/stage1/product-salad.webp"
+      ],
       "fakeFoodImages": false
     },
-    "futureAssets": [
-      {
-        "slot": "order-announcement-banner",
-        "status": "PENDING_FUTURE_AI_ASSET",
-        "character": false
-      },
-      {
-        "slot": "order-empty-search-illustration",
-        "status": "PENDING_FUTURE_AI_ASSET",
-        "character": false
-      },
-      {
-        "slot": "nav-order-icon",
-        "status": "PENDING_FUTURE_AI_ASSET",
-        "character": false
-      },
-      {
-        "slot": "nav-work-icon",
-        "status": "PENDING_FUTURE_AI_ASSET",
-        "character": false
-      },
-      {
-        "slot": "nav-orders-icon",
-        "status": "PENDING_FUTURE_AI_ASSET",
-        "character": false
-      },
-      {
-        "slot": "nav-dine-icon",
-        "status": "PENDING_FUTURE_AI_ASSET",
-        "character": false
-      },
-      {
-        "slot": "nav-more-icon",
-        "status": "PENDING_FUTURE_AI_ASSET",
-        "character": false
-      }
-    ]
+    "navigation": "FIVE_TAB_VECTOR_ICON_PRESENTATION"
   }
 }

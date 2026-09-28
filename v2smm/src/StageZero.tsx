@@ -148,31 +148,45 @@ function BrandLockup({compact=false}:{compact?:boolean}){
   </div>;
 }
 
+function Stage0MascotPair({mode='duo'}:{mode?:'duo'|'male'|'female'}){
+  if(mode==='male')return <img className="stage0-mascot stage0-mascot-male" src="/brand/stage0/stage0-male.webp" alt="" aria-hidden="true"/>;
+  if(mode==='female')return <img className="stage0-mascot stage0-mascot-female" src="/brand/stage0/stage0-female.webp" alt="" aria-hidden="true"/>;
+  return <div className="stage0-mascot-pair" aria-hidden="true">
+    <img src="/brand/stage0/stage0-male.webp" alt=""/>
+    <img src="/brand/stage0/stage0-female.webp" alt=""/>
+  </div>;
+}
+
 function StageZeroSplash(){
   return <main className="stage0-shell stage0-splash" aria-busy="true">
+    <span className="stage0-feather stage0-feather-a" aria-hidden="true"/>
+    <span className="stage0-feather stage0-feather-b" aria-hidden="true"/>
     <section className="stage0-center">
       <BrandLockup/>
       <div className="stage0-slogan">
         <strong>前線好幫手</strong>
-        <span>令每一張訂單都更順暢</span>
+        <span>快速點單 · 清楚跟單 · 隨時掌握</span>
       </div>
+      <Stage0MascotPair mode="male"/>
       <div className="stage0-progress" aria-label="啟動中"><i/></div>
-      <small className="stage0-footnote">正在準備工作環境…</small>
+      <small className="stage0-footnote">正在準備 SMM…</small>
     </section>
   </main>;
 }
 
 function StageZeroConnectionChecking(){
-  return <main className="stage0-shell">
+  return <main className="stage0-shell stage0-connection-page">
     <section className="stage0-card stage0-check-card">
       <BrandLockup compact/>
+      <div className="stage0-status-orb loading" aria-hidden="true"><span/></div>
       <h1>正在連線</h1>
-      <p>檢查門店服務同最新資料，完成後會自動進入工作區。</p>
+      <p>正在確認 Internet、店內 LAN 同最新門店資料。</p>
       <div className="stage0-check-list" aria-live="polite">
-        <div><i className="ok"/>Internet 狀態</div>
-        <div><i className="loading"/>門店服務</div>
-        <div><i/>同步最新資料</div>
+        <div><i className="ok"/><span>Internet</span><b>已連接</b></div>
+        <div><i className="loading"/><span>店內 LAN</span><b>檢查中</b></div>
+        <div><i/><span>門店資料</span><b>等待同步</b></div>
       </div>
+      <Stage0MascotPair mode="female"/>
     </section>
   </main>;
 }
@@ -260,9 +274,14 @@ function StageZeroConnectionRecovery({
   return <main className="stage0-shell">
     <section className="stage0-card stage0-recovery-card">
       <BrandLockup compact/>
-      <div className="stage0-status-icon error" aria-hidden="true">!</div>
-      <h1>暫時未能連接門店</h1>
-      <p>{message}</p>
+      <div className="stage0-page-intro">
+        <div>
+          <span>連線與恢復</span>
+          <h1>重新連接門店</h1>
+          <p>{message}</p>
+        </div>
+        <div className="stage0-status-icon error" aria-hidden="true">!</div>
+      </div>
 
       <div className="stage0-connection-grid" aria-label="連線狀態">
         <div>
@@ -279,9 +298,9 @@ function StageZeroConnectionRecovery({
         </div>
       </div>
 
-      <button className="stage0-primary" onClick={onRetry}>重新連線</button>
+      <button className="stage0-primary" onClick={onRetry}>重新檢查</button>
       <button className="stage0-secondary" onClick={()=>setPairOpen(open=>!open)}>
-        {readSmmLanPwaConfig()?'重新配對 LAN':'設定 LAN 配對'}
+        {readSmmLanPwaConfig()?'重新配對 LAN':'設定店內 LAN'}
       </button>
 
       {pairOpen?<section className="stage0-pair-panel">
@@ -293,7 +312,8 @@ function StageZeroConnectionRecovery({
         <button className="stage0-primary" disabled={pairing} onClick={()=>void pairLan()}>{pairing?'配對中…':'儲存並配對'}</button>
       </section>:null}
 
-      <button className="stage0-secondary" disabled={!canEnterOffline} onClick={onOffline}>進入離線工作區</button>
+      <button className="stage0-secondary stage0-offline-button" disabled={!canEnterOffline} onClick={onOffline}>繼續離線工作</button>
+      <Stage0MascotPair mode="female"/>
       <small className="stage0-security">
         {canEnterOffline
           ?'離線工作區只使用此裝置已驗證員工 Session；正式門店資料會保持降級狀態。'
@@ -352,8 +372,9 @@ function StageZeroStaffLogin({onSuccess}:{onSuccess:(session:SmmStaffSession)=>v
       <header>
         <span>歡迎返嚟</span>
         <h1>員工登入</h1>
-        <p>使用你嘅員工身份進入 SMM。</p>
+        <p>揀返你嘅員工身份，再輸入 PIN。</p>
       </header>
+      <Stage0MascotPair/>
 
       {staff.length?<label className="stage0-field">
         <span>員工</span>
@@ -387,10 +408,10 @@ function StageZeroStaffLogin({onSuccess}:{onSuccess:(session:SmmStaffSession)=>v
       {error?<div className="stage0-inline-message danger" role="alert">{error}</div>:null}
 
       <button className="stage0-primary" disabled={loading||pin.length<4} onClick={()=>void submit()}>
-        {loading?'驗證中…':'登入 SMM'}
+        {loading?'驗證中…':'登入'}
       </button>
       {!staff.length&&!directoryLoading?<button className="stage0-text-button" onClick={()=>void loadDirectory()}>重新讀取員工名單</button>:null}
-      <small className="stage0-security">員工身份沿用現有 MFK 驗證流程；工程錯誤只會留喺診斷記錄，唔會直接顯示畀前線員工。</small>
+      <small className="stage0-security">登入後會保持你嘅員工身份；如資料未能同步，畫面會清楚提示下一步。</small>
     </section>
   </main>;
 }

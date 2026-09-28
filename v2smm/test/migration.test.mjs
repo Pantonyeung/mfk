@@ -66,10 +66,10 @@ test('production App no longer imports fixtures or exposes migration/demo operat
 
 test('complete operator routes and failure states are present',()=>{
   for(const marker of[
-    '快速點餐','待處理','訂單記錄','桌面管理','店務工具',
-    '搜尋商品','商品設定','購物草稿','待提交草稿','平台狀態',
-    '連線設定','商品供應','營業日','產能','營運報表','退款要求','列印狀態','診斷','正在同步餐單',
-    '同步失敗','前往結帳'
+    '今日想食咩','待處理','訂單記錄','桌面管理','店務工具',
+    '搜尋商品','商品客製','購物草稿','待提交草稿','平台狀態',
+    '連線設定','商品供應','營業日','產能','營運報表','退款要求','列印狀態','診斷','正在更新餐單',
+    '同步失敗','去結帳'
   ])assert.match(source,new RegExp(marker));
 });
 
@@ -113,8 +113,8 @@ test('SMM uses the shared published menu price and SMT validates only on submit'
   const contract=fs.readFileSync(path.join(repoRoot,'contracts','smm-lan-v1.ts'),'utf8');
   assert.match(types,/publishedTakeawayUnitPriceMinor/);
   assert.match(types,/publishedDineInUnitPriceMinor/);
-  assert.match(app,/SMT 仍會再驗證/);
-  assert.match(app,/SMT 提交時重新驗證/);
+  assert.match(app,/revalidateSmmCartComboIntent/);
+  assert.match(app,/projectLineAgainstCurrentMenu/);
   assert.doesNotMatch(app,/等待門店報價/);
   assert.doesNotMatch(app,/port\?\.quoteCart/);
   assert.match(app,/port\?\.submitOrder/);
@@ -223,7 +223,7 @@ test('SMM Stage 4 adds checkout confirmation UI while formal Stage 5 submission 
   const start=app.indexOf('function Stage4CheckoutView');
   const end=app.indexOf('function DiningTargetSheet',start);
   const checkout=app.slice(start,end);
-  for(const marker of['服務方式','堂食去向','付款方式','最後摘要','提交訂單'])assert.match(checkout,new RegExp(marker));
+  for(const marker of['服務方式','堂食去向','付款方式','訂單確認','確認落單'])assert.match(checkout,new RegExp(marker));
   assert.doesNotMatch(checkout,/submitCart|submitOrder|readSubmission|createSmmPendingIntent/);
   assert.match(app,/const submitCart=async\(\)=>/);
   assert.match(app,/readSubmission/);
