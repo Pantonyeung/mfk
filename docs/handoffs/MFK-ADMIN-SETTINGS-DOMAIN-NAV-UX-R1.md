@@ -23,3 +23,10 @@ Reuse store-settings.v1 draft, saveAdminConfig, immutable Admin release, revisio
 
 ## Milestone
 Branch opened and domain validation seam added. UI route split is in progress.
+
+## Milestone 2
+- Previous HEAD b6a415d122c56bb3ed7bcd31111c17b9ca9eab13: all five required CI gates GREEN.
+- Payment settings now uses list -> one payment method detail; QR forms are no longer all expanded at once.
+- WhatsApp field errors are wired to real input/textarea targets.
+- Full Admin large-page audit started. Largest remaining surfaces are ChannelsWorkspace, CombosWorkspace, ModifiersWorkspace and product detail; Combos/Modifiers already use guided one-object/one-step progressive disclosure, so they are not blindly split again.
+- Current HEAD: 0ab560785a548c53215ae78d667781d817ed7bcd; required CI queued.
