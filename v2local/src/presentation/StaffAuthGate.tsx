@@ -119,7 +119,7 @@ export function StaffAuthGate({children}:{children:ReactNode}){
         <footer className="smt-stage0-footer">
           <div><b>磨飯</b><span>GOOD FOOD GOOD DAY</span></div>
           <div>v2.1.0　|　MFK SMT</div>
-          <div><span className={sync.state==='READY'?'ok':'warn'}>●</span> {sync.state==='READY'?'線上':'本地可用'}　⌁</div>
+          <div><span className={sync.state==='SYNCED'?'ok':'warn'}>●</span> {sync.state==='SYNCED'?'線上':'本地可用'}　⌁</div>
         </footer>
       </div>
     </div>
