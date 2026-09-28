@@ -76,7 +76,7 @@ test('one original readback that is NOT_FOUND locks Online Submit and enables ma
   assert.match(cloud,/response\.status===404.*readbackCode:'NOT_FOUND'/);
   assert.match(app,/result\.readbackCode==='NOT_FOUND'/);
   assert.match(app,/state:'NOT_CONNECTED'/);
-  assert.match(app,/Online Submit 已鎖定，可以轉用 WhatsApp 人工救援/);
+  assert.match(app,/自動提交已鎖定，可以轉用 WhatsApp 人工協助/);
 });
 
 test('canonical CONFIRMED delivery is cached then routes to Waiting Store Confirmation without entering UI6',()=>{
