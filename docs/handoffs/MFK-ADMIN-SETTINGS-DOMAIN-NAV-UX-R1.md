@@ -54,3 +54,9 @@ Branch opened and domain validation seam added. UI route split is in progress.
 - Inventory now uses operation chooser -> Record Movement or Create Item; both mutation forms are no longer simultaneously expanded above the inventory read model.
 - inventory-lite.v1, inventory-movements.v1 and non-blocking inventory semantics unchanged.
 - Current head 0594a59ea3a16a30f52c6acbe63c5d06ad98ec4e; CI pending.
+
+## Milestone 7
+- Presentation surfaces now use purpose-first chooser: Customer = Channel / Content / Layout; Owner & Frontline = Content / Layout. Forms no longer all expand on entry.
+- Existing presentation.*.v1 storage, customer channel policy, Admin Draft and publish authority unchanged.
+- Milestone 6 CI was still running when this cut started; no merge/deploy action taken.
+- Current head c2e673c12c9f55ad3165d9cc6c16c820f441d334; CI pending.
