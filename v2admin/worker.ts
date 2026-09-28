@@ -1599,6 +1599,26 @@ export class AdminSyncStore{
       return json({code:'METHOD_NOT_ALLOWED'},405);
     }
 
+    if(url.pathname==='/smt-owner-sellability'){
+      if(!await this.authorizeSmtDevice(request))return json({code:'SMT_OWNER_SELLABILITY_UNAUTHORIZED'},401);
+      if(request.method==='GET')return json({commands:await this.pendingOwnerSellabilityCommands()});
+      if(request.method==='POST'){
+        const body=row(await request.json().catch(()=>({})));
+        const operationId=String(body.operationId||'').trim();
+        if(!operationId)return json({code:'OWNER_SELLABILITY_OPERATION_REQUIRED'},400);
+        const key='owner:sellability:command:'+operationId;
+        const command=await this.state.storage.get(key);
+        if(!command)return json({code:'OWNER_SELLABILITY_COMMAND_NOT_FOUND'},404);
+        const state=String(body.state||'').toUpperCase();
+        if(state!=='CONFIRMED'&&state!=='REJECTED')return json({code:'OWNER_SELLABILITY_READBACK_STATE_INVALID'},400);
+        const readback=Object.freeze({...command,state,readbackAt:new Date().toISOString(),results:rows(body.results)});
+        await this.state.storage.put(key,readback);
+        await this.state.storage.put('owner:sellability:operation:'+operationId,{result:{state,message:state==='CONFIRMED'?'SMT Runtime 已確認':'SMT Runtime 拒絕操作',targets:readback.results},createdAt:command.createdAt});
+        return json({state:'ACKED',readback});
+      }
+      return json({code:'METHOD_NOT_ALLOWED'},405);
+    }
+
     if(url.pathname==='/smt-refunds'){
       if(request.method!=='GET')return json({code:'METHOD_NOT_ALLOWED'},405);
       if(!await this.authorizeSmtDevice(request))return json({code:'SMT_REFUND_READ_UNAUTHORIZED'},401);
