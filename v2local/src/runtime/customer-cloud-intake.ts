@@ -478,7 +478,7 @@ async function reconcileOwnerSellabilityCommands(){
     const command=raw as {operationId?:string;action?:string;targets?:readonly {targetId?:string;grain?:string}[]};
     const operationId=String(command.operationId||'').trim();
     if(!operationId)continue;
-    const status=command.action==='SOLD_OUT'?'soldout':command.action==='RESTORE'?'available':null;
+    const status=command.action==='SOLD_OUT'?'soldout':command.action==='PAUSE'?'paused':command.action==='RESTORE'?'available':null;
     if(!status){await ackOwnerSellabilityCommand(operationId,'REJECTED',[]);continue;}
     const results=[];
     for(const target of command.targets??[]){
