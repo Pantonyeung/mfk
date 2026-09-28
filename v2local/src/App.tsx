@@ -110,7 +110,7 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode,diningAddition,on
   const [diningAddStatus,setDiningAddStatus]=useState<string|undefined>();
   const [runtimeRevision,setRuntimeRevision]=useState(0);
   useEffect(()=>localRuntime.subscribe(()=>setRuntimeRevision(value=>value+1)),[]);
-  const [category,setCategory]=useState('all');
+  const [category,setCategory]=useState('');
   const [viewMode,setViewMode]=useState<'original'|'organized'>('original');
   const [combineSimilar,setCombineSimilar]=useState(false);
   const [orderingMode,setOrderingMode]=useState<'quick'|'normal'>('quick');
@@ -244,24 +244,15 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode,diningAddition,on
       });
   },[syncedCatalog,adminMenu,fallbackCategoryById]);
 
-  const categories=[
-    {id:'all',label:'熱門'},
-    ...(syncedCatalog
-      ?syncedCatalog.categories.map(row=>({id:row.id,label:row.label}))
-      :adminMenu.categories.slice().sort((a,b)=>a.position-b.position||a.id.localeCompare(b.id)).map(row=>({id:row.id,label:row.name}))),
-  ];
-  const visible=products
-    .filter(product=>category==='all'||product.categoryId===category)
-    .slice()
-    .sort((a,b)=>{
-      if(category!=='all')return 0;
-      const quick=new Map(frontlinePresentation.quickProductIds.map((id,index)=>[id,index] as const));
-      const ai=quick.get(a.id),bi=quick.get(b.id);
-      if(ai===undefined&&bi===undefined)return 0;
-      if(ai===undefined)return 1;
-      if(bi===undefined)return -1;
-      return ai-bi;
-    });
+  const categories=(syncedCatalog
+    ?syncedCatalog.categories.map(row=>({id:row.id,label:row.label}))
+    :adminMenu.categories.slice().sort((a,b)=>a.position-b.position||a.id.localeCompare(b.id)).map(row=>({id:row.id,label:row.name})))
+    .filter(row=>row.label!=='熱門'&&row.label!=='全部'&&row.label!=='更多');
+  const selectedCategory=categories.some(row=>row.id===category)?category:(categories[0]?.id??'');
+  useEffect(()=>{
+    if(selectedCategory&&category!==selectedCategory)setCategory(selectedCategory);
+  },[category,selectedCategory]);
+  const visible=products.filter(product=>!selectedCategory||product.categoryId===selectedCategory);
   const runtimeOrders=useMemo(()=>{void runtimeRevision;return localRuntime.orders();},[runtimeRevision]);
   const heldCarts=useMemo(()=>{void runtimeRevision;return localRuntime.holds();},[runtimeRevision]);
   const businessCutoff=readBusinessCutoff();
@@ -349,7 +340,7 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode,diningAddition,on
   })();
 
   const view:OrderingWorkspaceViewModel={
-    pendingOrders,activeOrders,categories,selectedCategoryId:category,
+    pendingOrders,activeOrders,categories,selectedCategoryId:selectedCategory,
     products:visible.map(product=>({
       id:product.id,
       name:product.name,
@@ -1144,6 +1135,7 @@ function OperationalApp(){
           {item.to==='/orders'&&activeOrderCount>0?<span className="clean-rail-badge" aria-label={'進行中訂單 '+activeOrderCount}>{activeOrderCount>99?'99+':activeOrderCount}</span>:null}
         </NavLink>)}
       </nav>
+      <button type="button" className="clean-display-settings" onClick={()=>window.dispatchEvent(new Event('mfk:stage1-display-settings'))}><span className="clean-rail-icon">Aa</span><span className="clean-rail-label">顯示設定</span></button>
       <StaffSessionBadge/>
       <div className="clean-runtime-state">LOCAL<br/>OFFLINE</div>
     </aside>
