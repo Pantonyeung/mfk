@@ -85,6 +85,14 @@ describe('Admin UI recomposition',()=>{
     expect(templates).not.toContain('<textarea');
   });
 
+  it('keeps inventory mutation forms behind an operation chooser',()=>{
+    const inventory=render('/admin/operations/inventory');
+    expect(inventory).toContain('記錄數量變動');
+    expect(inventory).toContain('新增統計項目');
+    expect(inventory).not.toContain('原因／備註（可選）');
+    expect(inventory).not.toContain('低庫存提示值（可選）');
+  });
+
   it('only reports SMT success for a matching revision and fingerprint readback',()=>{
     const activeRelease={version:12,createdAt:'2026-09-22T00:00:00.000Z',fingerprint:'fp-12'};
     const published={state:'PUBLISHED' as const,revision:12,fingerprint:'fp-12',updatedAt:'2026-09-22T00:00:01.000Z'};
