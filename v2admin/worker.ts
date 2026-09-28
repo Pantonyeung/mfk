@@ -1689,7 +1689,7 @@ export class AdminSyncStore{
       return json({state:'ACKED',accepted});
     }
 
-    if(url.pathname==='/projection/runtime-sellability'){
+    if(url.pathname==='/runtime-sellability-readback'){
       if(request.method!=='GET')return json({code:'METHOD_NOT_ALLOWED'},405);
       const rows=await this.state.storage.list({prefix:'projection:runtime-sellability:'});
       return json({sellability:[...rows.values()].map(value=>value?.payload??value)});
