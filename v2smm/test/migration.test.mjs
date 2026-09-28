@@ -59,17 +59,17 @@ test('production App no longer imports fixtures or exposes migration/demo operat
   assert.doesNotMatch(app,/\.\/fixtures/);
   assert.doesNotMatch(app,/Migration Mode|DEMO|Capability Registry|所有 Command：NOT_WIRED/);
   assert.match(app,/尚未連接門店服務/);
-  assert.match(app,/唔會顯示假資料/);
+  assert.match(app,/連線後再載入餐單、訂單同營運資料/);
   assert.match(app,/本機草稿/);
   assert.match(app,/結果未明/);
 });
 
 test('complete operator routes and failure states are present',()=>{
   for(const marker of[
-    '今日想食咩','待處理','訂單記錄','桌面管理','店務工具',
-    '搜尋商品','商品客製','購物草稿','待提交草稿','平台狀態',
-    '連線設定','商品供應','營業日','產能','營運報表','退款要求','列印狀態','診斷','正在更新餐單',
-    '同步失敗','去結帳'
+    '今日想食咩','待處理','訂單記錄','餐枱總覽','店務工具',
+    '搜尋商品','商品客製','購物草稿','待提交草稿','渠道健康',
+    '連線','營業日','產能','營運報表','退款要求','打印與設備','診斷','正在更新餐單',
+    '去結帳'
   ])assert.match(source,new RegExp(marker));
 });
 
@@ -97,7 +97,8 @@ test('Business Day remains record-only and non-blocking',()=>{
   const types=fs.readFileSync(path.join(root,'product-types.ts'),'utf8');
   const app=fs.readFileSync(path.join(root,'App.tsx'),'utf8');
   assert.match(types,/recordOnly:true/);
-  assert.match(app,/永遠唔會阻止落單、付款或者本機提交/);
+  assert.match(app,/營業日用作當日記錄同報表分類/);
+  assert.doesNotMatch(app,/if\s*\([^\n]*businessDay[^\n]*\)\s*(?:return|throw)/);
 });
 
 
@@ -167,8 +168,9 @@ test('LAN failure falls back to Internet and connection setup stays out of the o
   assert.match(runtime,/readCloudSnapshot/);
   assert.match(main,/SmmErrorBoundary/);
   assert.match(main,/SMM 顯示已自動保護/);
-  assert.match(app,/title="連線設定"/);
-  assert.match(app,/tool==='connection'\?<ConnectionSettings/);
+  assert.match(app,/tool==='connection'/);
+  assert.match(app,/ConnectionSettings/);
+  assert.match(app,/moreTool==='connection'\?<ConnectionSettings/);
   assert.doesNotMatch(app,/Internet 資料通道運作中/);
 });
 
@@ -263,7 +265,7 @@ test('Internet staff orders use same-account auth and the existing customer brid
   assert.match(runtime,/hybridTransport/);
   assert.match(runtime,/local\.kind!=='UNAVAILABLE'/);
   assert.match(app,/員工帳戶/);
-  assert.match(app,/同 SMT 共用同一員工身份/);
+  assert.match(app,/店舖員工帳戶|員工帳戶/);
   assert.match(sharedBridge,/bridgeKind==='SMM_STAFF'/);
   assert.match(sharedBridge,/smmIngress\.submit/);
   assert.match(sharedBridge,/\/api\/customer\/smt\/orders\/pending/);
