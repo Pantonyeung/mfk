@@ -52,6 +52,16 @@ describe('Admin UI recomposition',()=>{
     expect(html).toContain('data-label="狀態"');
   });
 
+  it('turns store settings into a first-level domain chooser instead of one long form',()=>{
+    const home=render('/admin/store/settings');
+    for(const label of ['基本資料','服務模式','堂食枱號','營業時間','營運計時','訂單提醒','WhatsApp 備援','電子支付'])expect(home).toContain(label);
+    expect(home).not.toContain('堂食超時變紅（分鐘）');
+    const timing=render('/admin/store/settings/timing');
+    expect(timing).toContain('‹ 門店設定');
+    expect(timing).toContain('堂食超時變紅（分鐘）');
+    expect(timing).not.toContain('Customer WhatsApp 備援');
+  });
+
   it('only reports SMT success for a matching revision and fingerprint readback',()=>{
     const activeRelease={version:12,createdAt:'2026-09-22T00:00:00.000Z',fingerprint:'fp-12'};
     const published={state:'PUBLISHED' as const,revision:12,fingerprint:'fp-12',updatedAt:'2026-09-22T00:00:01.000Z'};
