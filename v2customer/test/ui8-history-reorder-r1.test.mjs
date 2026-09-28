@@ -90,7 +90,7 @@ test('Local Repair changes only affected NEW CART lines',()=>{
 
 test('Final Review uses current quote and can only return to normal Cart then UI4 UI5',()=>{
   assert.match(ui8,/quote\?\.freshness==='CURRENT'/);
-  assert.match(ui8,/Current Quote/);
+  assert.match(ui8,/目前總額/);
   assert.match(ui8,/正常結帳流程/);
   assert.match(app,/onGoCart=\{\(\)=>changeView\('cart'\)\}/);
   assert.match(app,/view==='checkout'\?<CheckoutUi4View/);
@@ -109,7 +109,7 @@ test('Stage8 page states distinguish LOADING READY EMPTY ERROR OFFLINE STALE UNK
     assert.match(ui8,new RegExp("'"+state+"'"));
   }
   assert.match(ui8,/return hasRows\?'READY':'EMPTY'/);
-  assert.match(ui8,/EMPTY 唔等於連線錯誤/);
+  assert.match(ui8,/呢個分類暫時未有訂單/);
   assert.match(ui8,/訂單狀態仍在確認/);
 });
 
