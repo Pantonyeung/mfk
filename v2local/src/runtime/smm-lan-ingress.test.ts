@@ -186,6 +186,38 @@ describe('SMM LAN ingress',()=>{
       sessionId:'HOLD-3',tableLabel:'堂三',covers:2,totalMinor:8200,paidMinor:4100,remainingMinor:4100,
     });
     expect(snapshot.dineSessions[0].lines[0]).toMatchObject({qty:2,paidQty:1,remainingQty:1});
+    expect(snapshot.work).toHaveLength(1);
+    expect(snapshot.work[0]).toMatchObject({
+      workId:'ORDER:ORDER-9',orderId:'ORDER-9',displayCode:'P009',kind:'FULFILLMENT',
+      summary:'原味飯團 ×1',state:'NORMAL',observedAt:createdAt,source:'SMM',
+      orderTime:createdAt,itemCount:1,serviceMode:'TAKEAWAY',statusLabel:'進行中',
+    });
+  });
+
+  it('projects only canonical active non-dining orders into stable work without duplicates',()=>{
+    const createdAt='2026-09-25T13:30:00.000Z';
+    const order=(id:string,display:string,fulfillmentLabel:string)=>({
+      id,display,createdAt,totalMinor:4100,paymentLabel:'現金',fulfillmentLabel,sourceLabel:'現場',
+      items:[{id:'riceball',name:'原味飯團',qty:1,unitMinor:4100,serviceMode:'takeaway'}],
+    });
+    const ingress=createSmmLanIngress({
+      orders:()=>[
+        order('ACTIVE-1','P001','待處理'),
+        order('ACTIVE-2','P002','進行中'),
+        order('ACTIVE-3','P003','可取餐'),
+        order('DONE-1','P004','已完成'),
+        order('CANCEL-1','P005','已取消'),
+        {...order('DINE-1','D001','進行中'),items:[{id:'riceball',name:'原味飯團',qty:1,unitMinor:4100,serviceMode:'dine-in'}]},
+      ],
+      holds:()=>[],
+    } as any);
+    const first=ingress.readSnapshot() as any;
+    const second=ingress.readSnapshot() as any;
+    expect(first.work.map((row:any)=>row.workId)).toEqual(['ORDER:ACTIVE-1','ORDER:ACTIVE-2','ORDER:ACTIVE-3']);
+    expect(new Set(first.work.map((row:any)=>row.workId)).size).toBe(first.work.length);
+    expect(second.work).toEqual(first.work);
+    expect(first.orders.map((row:any)=>row.orderId)).toEqual(['ACTIVE-1','ACTIVE-2','ACTIVE-3','DONE-1','CANCEL-1']);
+    expect(first.dineSessions).toEqual([]);
   });
 
 

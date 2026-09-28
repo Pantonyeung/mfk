@@ -101,7 +101,7 @@ test('UI7 keeps exactly five fixed bottom-nav items with Orders active',()=>{
   const navIds=[...navBlock.matchAll(/\{id:'(home|menu|cart|orders|more)' as const/g)].map(match=>match[1]);
   assert.deepEqual(navIds,['home','menu','cart','orders','more']);
   assert.match(app,/view==='cart'\|\|view==='checkout'\?'cart'/);
-  assert.match(app,/view==='more'\?'more':'orders'/);
+  assert.match(app,/view==='more'\\|\\|view==='account'\\|\\|view==='recovery'\\?'more':'orders'/);
   assert.doesNotMatch(app,/\['checkout','submit','waiting','pickup'\]/);
   assert.match(app,/pulseKey=\{jarPulseKey\} onChange=\{changeView\}/);
   assert.match(styles,/\.bottom-navigation\{position:fixed[\s\S]*grid-template-columns:repeat\(5,1fr\)[\s\S]*env\(safe-area-inset-bottom\)/);
