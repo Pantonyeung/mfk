@@ -67,6 +67,7 @@ function IdentityPanel({
 
 function FreshnessBanner({freshness}:{freshness:Ui7Freshness}){
   if(freshness==='CURRENT')return null;
+  const label=freshness==='OFFLINE'?'目前離線':freshness==='STALE'?'資料需要更新':freshness==='ERROR'?'更新失敗':freshness==='LOADING'?'更新中':'確認中';
   const detail=freshness==='OFFLINE'
     ?'目前離線；以下保留最近一次已知狀態，恢復連線後會再更新。'
     :freshness==='STALE'
@@ -76,7 +77,7 @@ function FreshnessBanner({freshness}:{freshness:Ui7Freshness}){
         :freshness==='LOADING'
           ?'正在更新；以下先顯示最近一次已知狀態。'
           :'最新狀態未明；未確認前唔會顯示已核對、已交付或已完成。';
-  return <section className={"ui7-freshness state-"+freshness.toLowerCase()} role="status"><strong>{freshness}</strong><p>{detail}</p></section>;
+  return <section className={"ui7-freshness state-"+freshness.toLowerCase()} role="status"><strong>{label}</strong><p>{detail}</p></section>;
 }
 
 function ReadyView({
