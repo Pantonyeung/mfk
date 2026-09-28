@@ -861,6 +861,21 @@ function diningAssignedTables(hold:LocalHoldDraft):string[]{
   const values=[hold.assignedTable,...(hold.joinedTables??[])].filter((value):value is string=>Boolean(value));
   return [...new Set(values)];
 }
+export interface DiningOccupancyReadback{
+  readonly storeId:'MF01';
+  readonly tableId:string;
+  readonly hasActiveSession:boolean;
+  readonly activeSessionCount:number;
+  readonly observedAt:string;
+  readonly runtimeRevision:number;
+}
+export function readDiningOccupancy(tableId:string):DiningOccupancyReadback{
+  const snapshot=readDiningState();
+  const id=String(tableId||'').trim();
+  if(!id)throw new Error('DINING_OCCUPANCY_TABLE_ID_REQUIRED');
+  const activeSessionCount=snapshot.holds.filter(hold=>hold.kind==='dining'&&!hold.archivedAt&&diningAssignedTables(hold).includes(id)).length;
+  return Object.freeze({storeId:'MF01',tableId:id,hasActiveSession:activeSessionCount>0,activeSessionCount,observedAt:new Date().toISOString(),runtimeRevision:snapshot.diningRevision??0});
+}
 function diningCorrectionQuantity(hold:LocalHoldDraft,lineIndex:number){
   return (hold.lineCorrections??[]).filter(row=>row.lineIndex===lineIndex).reduce((sum,row)=>sum+Math.max(0,Number(row.quantity)||0),0);
 }
