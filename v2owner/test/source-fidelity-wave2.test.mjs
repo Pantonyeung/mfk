@@ -43,7 +43,7 @@ test('Manager Log, Checklist and Handoff never promote local drafts into shared 
   const app=read('src/App.tsx');
   for(const route of ["'manager-log'","'checklist'","'handoff'"])assert.match(app,new RegExp(route));
   assert.match(wave2,/正式共享日誌未連接/);
-  assert.match(wave2,/新增與回覆暫未開放/);
+  assert.match(wave2,/新增、回覆、修改同刪除保持停用/);
   assert.match(wave2,/清單操作暫未開放/);
   assert.match(wave2,/交接確認暫未開放/);
   assert.doesNotMatch(wave2,/managerNote|handoffNote|setChecklist|writeOwnerLocalWorkspace/);
