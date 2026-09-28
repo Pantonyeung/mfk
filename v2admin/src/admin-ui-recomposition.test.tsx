@@ -121,6 +121,13 @@ describe('Admin UI recomposition',()=>{
     expect(coupons).not.toContain('datetime-local');
   });
 
+  it('keeps capacity pool forms collapsed until one pool is chosen',()=>{
+    const capacity=render('/admin/operations/capacity');
+    expect(capacity).toContain('產能 Pool');
+    expect(capacity).not.toContain('自家平台停售門檻');
+    expect(capacity).not.toContain('第三方平台停售門檻');
+  });
+
   it('only reports SMT success for a matching revision and fingerprint readback',()=>{
     const activeRelease={version:12,createdAt:'2026-09-22T00:00:00.000Z',fingerprint:'fp-12'};
     const published={state:'PUBLISHED' as const,revision:12,fingerprint:'fp-12',updatedAt:'2026-09-22T00:00:01.000Z'};
