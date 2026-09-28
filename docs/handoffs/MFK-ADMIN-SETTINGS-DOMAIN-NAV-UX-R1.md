@@ -65,3 +65,10 @@ Branch opened and domain validation seam added. UI route split is in progress.
 - Print Center now renders logical-printer list first and only one logical printer editor after selection. Existing logical-printers.v1, capability/type semantics and SMT physical IP/USB boundary unchanged.
 - Pricing remains tabbed Product vs Option with pagination; Access Session is one policy + readback pair, so neither is split merely by source length.
 - Current head 2f127330fdcef02d5169a882a995df88e937c992; CI pending.
+
+## Milestone 9
+- Loyalty tiers now list -> one tier editor; formal ledger readback remains visible and read-only.
+- Coupons now list -> one coupon editor; no longer expands every coupon form at once.
+- loyalty.v1, loyalty-ledger-read.v1 and coupons.v1 storage semantics unchanged; no pricing/points authority introduced.
+- Store Binding remains a coherent create + current bindings pair; Business Day remains three small policy cards; Quick Reasons remains compact row editor. No artificial split.
+- Current head a2a4d45484ff282426336f64486cabf378e8c57f; CI pending.
