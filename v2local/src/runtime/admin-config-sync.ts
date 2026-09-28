@@ -187,8 +187,12 @@ function connectDoorbell(){
       try{
         const row=JSON.parse(String(event.data)) as SmtCloudDoorbell&{revision?:number;fingerprint?:string};
         if(row.type==='ADMIN_CONFIG_AVAILABLE'){
-          try{localStorage.setItem(ADMIN_PROPAGATION_DIAG_KEY,JSON.stringify({revision:row.revision,fingerprint:row.fingerprint,publishedAt:row.publishedAt,acceptedAt:row.acceptedAt,doorbellReceivedAt:now()}));}catch{}
           const current=readSmtAdminConfigLkg();
+          try{
+            const prior=JSON.parse(localStorage.getItem(ADMIN_PROPAGATION_DIAG_KEY)||'{}');
+            const incomingRevision=Number(row.revision)||0,priorRevision=Number(prior.revision)||0;
+            if(incomingRevision>=priorRevision)localStorage.setItem(ADMIN_PROPAGATION_DIAG_KEY,JSON.stringify({revision:row.revision,fingerprint:row.fingerprint,publishedAt:row.publishedAt,acceptedAt:row.acceptedAt,doorbellReceivedAt:now()}));
+          }catch{}
           if(!current||Number(row.revision)>current.revision||String(row.fingerprint)!==current.fingerprint){
             void fetchAndApplyAdminConfig();
           }
