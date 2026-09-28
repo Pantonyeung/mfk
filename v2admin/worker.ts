@@ -1674,10 +1674,24 @@ export class AdminSyncStore{
                 const runtimeSellability=[...sellabilityRows.values()].map(value=>value?.payload??value);
                 const id=this.env.KEETA_RUNTIME.idFromName(event.storeId||'MF01');
                 const stub=this.env.KEETA_RUNTIME.get(id);
+                const providerTriggeredAt=new Date().toISOString();
+                await this.state.storage.put('projection:runtime-sellability-provider:'+event.entityId,{
+                  eventId:event.eventId,state:'PENDING',occurredAt:event.occurredAt,projectionAcceptedAt,providerTriggeredAt,
+                });
                 void stub.fetch(new Request('https://internal/admin/sellability/sync',{
                   method:'POST',headers:{'content-type':'application/json'},
-                  body:JSON.stringify({revision:active.revision,adminFingerprint:active.fingerprint,snapshot:active.snapshot,runtimeSellability,propagation:{eventId:event.eventId,occurredAt:event.occurredAt,projectionAcceptedAt,providerTriggeredAt:new Date().toISOString()}}),
-                })).catch(()=>{});
+                  body:JSON.stringify({revision:active.revision,adminFingerprint:active.fingerprint,snapshot:active.snapshot,runtimeSellability,propagation:{eventId:event.eventId,occurredAt:event.occurredAt,projectionAcceptedAt,providerTriggeredAt}}),
+                })).then(async response=>{
+                  await this.state.storage.put('projection:runtime-sellability-provider:'+event.entityId,{
+                    eventId:event.eventId,state:response.ok?'COMPLETED':'FAILED',status:response.status,
+                    occurredAt:event.occurredAt,projectionAcceptedAt,providerTriggeredAt,providerReadbackAt:new Date().toISOString(),
+                  });
+                }).catch(async error=>{
+                  await this.state.storage.put('projection:runtime-sellability-provider:'+event.entityId,{
+                    eventId:event.eventId,state:'FAILED',status:0,error:error instanceof Error?error.message:'KEETA_SELLABILITY_SYNC_FAILED',
+                    occurredAt:event.occurredAt,projectionAcceptedAt,providerTriggeredAt,providerReadbackAt:new Date().toISOString(),
+                  });
+                });
               }
             }catch{}
           }
