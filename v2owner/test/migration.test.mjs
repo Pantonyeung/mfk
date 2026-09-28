@@ -110,7 +110,7 @@ test('manager log and checklist do not promote local drafts into formal Owner wo
   const wave2=fs.readFileSync(path.join(srcRoot,'source-fidelity-wave2.tsx'),'utf8');
   assert.doesNotMatch(app,/function ManagerWorkspace/);
   assert.match(wave2,/正式共享日誌未連接/);
-  assert.match(wave2,/新增與回覆暫未開放/);
+  assert.match(wave2,/新增、回覆、修改同刪除保持停用/);
   assert.match(wave2,/清單操作暫未開放/);
   assert.match(wave2,/交接確認暫未開放/);
 });
