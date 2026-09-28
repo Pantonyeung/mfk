@@ -124,3 +124,12 @@ RESULTS
 FIRST_BREAK: NONE in final CI. Canonical publish remains intentionally whole-snapshot validation; no second domain publish engine was created.
 NO MAIN MERGE
 NO MANUAL DEPLOY
+
+## #467 Commander Acceptance Correction
+- Base candidate: 6a7da83cf2c37ac65c8d26f3adfc1ff6c45ad432
+- WhatsApp legacy empty string: added same-record initialization marker. Records without marker + blank template hydrate the existing default into the real draft once; after marker=true, a deliberate user clear remains blank and is never silently restored.
+- QR Code: added /admin/store/settings/qr as an independent UI domain. It edits the existing customerPaymentChannels[].qrImageUrl through the existing uploadAdminPaymentQr -> Admin Worker -> Private R2 seam. No QR store/upload/publish authority added.
+- Payments page no longer exposes QR upload controls.
+- Publish: current-domain errors remain inline + scroll/focus. Cross-domain Store Settings blockers show actual domain + reason + navigable target. Existing catalog/staff canonical errors are mapped to their existing Admin pages.
+- Domain-local draft save remains domain-local. Canonical saveAdminConfig remains the only publish engine.
+- Scope remains within the existing candidate file set; no new product source file added.
