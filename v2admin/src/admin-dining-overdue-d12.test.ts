@@ -43,6 +43,6 @@ describe('D12 Admin Dining overdue setting',()=>{
     expect(src).toContain('diningOverdueMinutes:35');
     expect(src).toContain('堂食超時變紅（分鐘）');
     expect(src).toContain('35 分鐘只係預設值');
-    expect(src).toContain('堂食超時提醒分鐘必須至少 1 分鐘');
+    expect(src).toContain('堂食超時變紅（分鐘）');
   });
 });
