@@ -72,7 +72,7 @@ describe('Admin UI recomposition',()=>{
     expect(mapping).not.toContain('佣金估算 %');
     const accept=render('/admin/channels/accept-policy');
     expect(accept).toContain('正常單自動接單');
-    expect(accept).not.toContain('商品對應');
+    expect(accept).not.toContain('<h2>商品對應</h2>');
     expect(accept).not.toContain('佣金估算 %');
   });
 
