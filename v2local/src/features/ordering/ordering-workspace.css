@@ -14,15 +14,20 @@
 .ordering-pending-primary,.ordering-pending-meta,.ordering-active-card>div{display:flex;align-items:center;justify-content:space-between;gap:7px}.ordering-pending-card b,.ordering-active-card b{font-size:17px}.ordering-pending-card strong,.ordering-active-card span{font-size:13px}.ordering-pending-meta,.ordering-active-card small{margin-top:4px;color:#6d6e75;font-size:12px}.ordering-empty{margin:8px 2px;color:#8a8a90;font-size:14px}
 
 .ordering-catalog{grid-area:catalog;min-width:0;min-height:0;display:grid;grid-template-rows:auto auto minmax(0,1fr);gap:10px}
+.ordering-mode-bar{min-height:46px;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:5px 9px;border:1px solid #dfe2e8;border-radius:10px;background:#fff}
+.ordering-mode-bar>span{display:grid;gap:2px}.ordering-mode-bar b{font-size:14px;font-weight:950}.ordering-mode-bar small{font-size:11px;color:#737985}
+.ordering-mode-bar>div{display:flex;align-items:center;padding:3px;border-radius:999px;background:#f0f1f4}
+.ordering-mode-bar button{min-height:34px;padding:0 14px;border:0;border-radius:999px;background:transparent;color:#666;font-size:14px;font-weight:900}
+.ordering-mode-bar button.active{background:#2877d5;color:#fff;box-shadow:0 1px 4px rgba(40,119,213,.18)}
 .ordering-categories{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px}
 .ordering-categories button{min-height:54px;border:1px solid #dddfe5;border-radius:10px;background:#fff;color:#443d39;font-size:18px;font-weight:900;cursor:pointer}
 .ordering-categories button.active{border-color:#6a4f42;background:linear-gradient(180deg,#5c4036,#4a342e);color:#fff}
-.ordering-product-grid{min-height:0;display:grid;grid-template-columns:repeat(6,minmax(0,1fr));grid-auto-rows:220px;align-content:start;gap:10px;overflow-y:auto;overscroll-behavior:contain;padding-right:2px}
+.ordering-product-grid{min-height:0;display:grid;grid-template-columns:repeat(var(--ordering-product-columns,4),minmax(0,1fr));grid-auto-rows:220px;align-content:start;gap:10px;overflow-y:auto;overscroll-behavior:contain;padding-right:2px}
 .ordering-product-card{min-width:0;position:relative;border:1px solid #dbdde3;border-radius:13px;background:#fff;box-shadow:0 4px 12px rgba(0,0,0,.045);overflow:hidden}
 .ordering-product-body{width:100%;height:100%;padding:0;border:0;background:#fff;display:grid;grid-template-rows:132px minmax(0,1fr);text-align:left}
 .ordering-product-media{position:relative;display:block;overflow:hidden;background:#ddd}.ordering-product-media>span{display:none}.ordering-product-media img{width:100%;height:100%;object-fit:cover;display:block}
 .ordering-product-copy{min-width:0;padding:10px 12px;display:grid;align-content:start;gap:4px}.ordering-product-copy small{position:absolute;left:8px;top:8px;padding:4px 7px;border-radius:6px;background:#ff5a72;color:#fff;font-size:12px;font-weight:900}
-.ordering-product-copy b{font-size:18px;line-height:1.25;font-weight:950;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.ordering-product-copy strong{font-size:20px;line-height:1.2;color:#55443c}
+.ordering-product-copy b{font-size:18px;line-height:1.25;font-weight:950;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.ordering-product-description{font-size:12px;line-height:1.25;color:#747a84;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.ordering-product-copy strong{font-size:20px;line-height:1.2;color:#55443c}
 .ordering-product-more{position:absolute;right:5px;bottom:6px;width:34px;height:34px;border:0;background:transparent;font-size:25px;color:#3d3e43}
 .ordering-product-card.recently-added{box-shadow:0 0 0 3px rgba(241,90,36,.24)}
 
@@ -170,3 +175,23 @@
 
 .ordering-menu-local-status{min-height:32px;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:4px 10px;border:1px solid #cfe2d8;border-radius:8px;background:#f3faf6;color:#286145}
 .ordering-menu-local-status b{font-size:12px;font-weight:950;letter-spacing:.03em}.ordering-menu-local-status span{font-size:11px;color:#6b7770}
+
+
+/* 2026-09-26 R4 Owner mindset: one primary 暫存／堂食 entry + low-emphasis clear. */
+.ordering-cart-secondary-actions.active-cart{grid-template-columns:minmax(0,1fr) 48px}
+.ordering-cart-secondary-actions.active-cart .hold-dining-entry{
+  min-width:0;
+  background:#eef5ff;
+  color:#225f9f;
+  border:1px solid #c8d9ef;
+}
+.ordering-cart-secondary-actions.active-cart .cart-clear-icon{
+  width:48px;
+  min-width:48px;
+  padding:0;
+  display:grid;
+  place-items:center;
+  background:#fff0f2;
+  color:#d43a52;
+}
+.ordering-cart-secondary-actions.active-cart .cart-clear-icon svg{width:20px;height:20px}

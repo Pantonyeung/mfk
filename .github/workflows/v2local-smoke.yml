@@ -35,7 +35,8 @@ jobs:
           set -euo pipefail
           grep -F 'SMT_GOLDEN_WIDTH=1920' v2local/src/app/production-viewport-layout.ts
           grep -F 'SMT_GOLDEN_HEIGHT=1080' v2local/src/app/production-viewport-layout.ts
-          grep -F "id:'MFK-'" v2local/src/runtime/local-runtime.ts
+          grep -F "function nextRuntimeIdentity" v2local/src/runtime/local-runtime.ts
+          grep -F "nextRuntimeIdentity('MFK-')" v2local/src/runtime/local-runtime.ts
           grep -F "providerRef===providerRef" v2local/src/runtime/local-runtime.ts
           grep -F "localRuntime.createOrder(orderInput)" v2local/src/runtime/keeta-order-intake.ts
           grep -F "KEETA_ORDER_AVAILABLE" v2local/src/runtime/keeta-order-intake.ts

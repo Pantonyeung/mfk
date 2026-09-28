@@ -1,7 +1,7 @@
 MFK_CUSTOMER_DEPLOY_REQUEST
 target=mfk-customer
 canonical_url=https://order.morefunos.com
-product_source=38f039ec448435b1a5fce226d6dad0c7034b481b
+product_source=0107afd5c7a2dfbb52cdcb11b5ec33b58b25387f
 requested_by=owner
-reason=publish_line_scoped_cart_repair_fresh_payment_evidence_and_bounded_whatsapp_fallback
-work_id=MFK-CUSTOMER-REPAIR-EVIDENCE-PROBE-R1
+reason=publish_fail_closed_submit_gate_and_synchronous_tap_mutex
+work_id=MFK-CUSTOMER-SUBMIT-GATE-MUTEX-R1

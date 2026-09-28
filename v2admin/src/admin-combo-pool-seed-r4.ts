@@ -116,8 +116,8 @@ const drinkPool:ComboPoolDraft=Object.freeze({
       Object.freeze({id:'drink-6-sparkling',choiceType:'PRODUCT' as const,productId:'bf2334d9-5ffb-5d7d-b454-279cc640a23d',label:'',bandId:'drink-special-plus-6',priceAdjustment:'0.00',priceStatus:'READY' as const,active:true,position:90}),
       Object.freeze({id:'drink-8-milk-tea',choiceType:'PRODUCT' as const,productId:'dcf1a976-ec1d-5d24-bc64-ab9d0a15fa02',label:'',bandId:'drink-special-plus-8',priceAdjustment:'0.00',priceStatus:'READY' as const,active:true,position:100}),
 
-      // Owner calls this 手打檸檬茶, but current catalog has no exact canonical Product row. Keep it explicit as a Combo-only LABEL choice.
-      Object.freeze({id:'drink-10-handmade-lemon-tea',choiceType:'LABEL' as const,label:'手打檸檬茶',bandId:'drink-special-plus-10',priceAdjustment:'0.00',priceStatus:'READY' as const,active:true,position:110}),
+      // Owner correction 2026-09-26: 手打檸檬茶 is the same canonical product as the existing lemon-tea product below.
+      Object.freeze({id:'drink-10-handmade-lemon-tea',choiceType:'PRODUCT' as const,productId:'b3529ce7-9b4e-5d20-9e1e-e4ef68319561',label:'手打檸檬茶',bandId:'drink-special-plus-10',priceAdjustment:'0.00',priceStatus:'READY' as const,active:true,position:110}),
     ]),
   })]),
 });

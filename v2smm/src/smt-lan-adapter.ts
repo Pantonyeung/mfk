@@ -21,6 +21,12 @@ function lines(cart:readonly SmmCartLine[]){
     ...(line.selectedVariationId?{selectedVariationId:line.selectedVariationId}:{}),
     ...(line.selectedVariationName?{selectedVariationName:line.selectedVariationName}:{}),
     selections:Object.freeze(line.selections.map(option=>Object.freeze({...option}))),
+    ...(line.combo?{combo:Object.freeze({
+      comboId:line.combo.comboId,
+      comboName:line.combo.comboName,
+      publishedBasePriceMinor:line.combo.publishedBasePriceMinor,
+      selections:Object.freeze(line.combo.selections.map(selection=>Object.freeze({...selection}))),
+    })}:{}),
     ...(Number.isSafeInteger(Number(line.publishedUnitPriceMinor))&&Number(line.publishedUnitPriceMinor)>=0
       ?{publishedUnitPriceMinor:Number(line.publishedUnitPriceMinor)}
       :{}),
@@ -65,7 +71,7 @@ export function createSmmLanOrderAdapter(transport:SmmLanTransport,timeoutMs=300
         const same=response.requestId===req.requestId&&response.submissionId===req.submissionId&&response.idempotencyKey===req.idempotencyKey;
         if(!same)return Object.freeze({state:'UNKNOWN',message:'回覆身份不一致，唔會重新落單'});
         if(response.disposition==='REJECTED')return Object.freeze({state:'REJECTED',message:response.reasonCode});
-        return Object.freeze({state:'CONFIRMED',message:'訂單已建立',orderId:response.orderId,canonicalRevision:response.canonicalRevision});
+        return Object.freeze({state:'CONFIRMED',message:'訂單已建立',orderId:response.orderId,displayCode:response.displayCode,canonicalRevision:response.canonicalRevision});
       }catch{
         return Object.freeze({state:'UNKNOWN',message:'連線中斷，結果未確認；請查詢原本提交'});
       }
@@ -77,7 +83,7 @@ export function createSmmLanOrderAdapter(transport:SmmLanTransport,timeoutMs=300
         if('state'in result&&result.state==='UNAVAILABLE')return Object.freeze({state:'NOT_CONNECTED',message:'暫時未能連接主機'});
         if(result.state==='UNKNOWN')return Object.freeze({state:'UNKNOWN',message:'原提交結果仍未確認'});
         if(result.state==='REJECTED')return Object.freeze({state:'REJECTED',message:result.reasonCode});
-        return Object.freeze({state:'CONFIRMED',message:'訂單已建立',orderId:result.orderId,canonicalRevision:result.canonicalRevision});
+        return Object.freeze({state:'CONFIRMED',message:'訂單已建立',orderId:result.orderId,displayCode:result.displayCode,canonicalRevision:result.canonicalRevision});
       }catch{
         return Object.freeze({state:'UNKNOWN',message:'原提交結果暫時未能確認'});
       }

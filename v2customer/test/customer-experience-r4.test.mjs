@@ -11,13 +11,15 @@ const app=fs.readFileSync(path.join(root,'src/App.tsx'),'utf8');
 const recommendation=fs.readFileSync(path.join(root,'src/recommendation.ts'),'utf8');
 const styles=fs.readFileSync(path.join(root,'src/styles.css'),'utf8');
 const primitives=fs.readFileSync(path.join(root,'src/ui/primitives.tsx'),'utf8');
+const checkoutUi4=fs.readFileSync(path.join(root,'src/components/customer-checkout-ui4.tsx'),'utf8');
 
 test('R4 keeps guided ordering visible across menu product jar and checkout',()=>{
   assert.match(views,/JourneyCoach/);
   assert.match(views,/active=\{1\}/);
   assert.match(views,/active=\{2\}/);
-  assert.match(views,/active=\{3\}/);
-  assert.match(views,/active=\{4\}/);
+  assert.match(views,/ui4-checkout-stepper/);
+  assert.match(checkoutUi4,/ui4-checkout-stepper/);
+  assert.match(checkoutUi4,/提交前確認/);
   assert.match(views,/step-coach/);
 });
 
@@ -58,5 +60,5 @@ test('R4 does not introduce a new network or business authority path',()=>{
   assert.doesNotMatch(source,/createFormalOrder|allocateDisplayNumber|applyDiscount|awardBadge|redeemCoupon/);
   assert.match(app,/port\?\.submitOrder/);
   assert.match(app,/port\?\.readSubmission/);
-  assert.match(app,/port\?\.buildReorderCart/);
+  assert.match(app,/buildCurrentReorderCart/);
 });

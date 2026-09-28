@@ -11,6 +11,12 @@ import {
 } from './admin-projection-client.ts';
 import {AdminResponsiveDataView} from './AdminResponsiveDataView.tsx';
 import {AdminSearchField} from './AdminUiPrimitives.tsx';
+import {
+  capacityPoolCanActivate,
+  nextCapacityPoolId,
+  normalizeCapacityPool,
+  type CapacityPoolDefinitionV1,
+} from '../../contracts/capacity-pool-v1.ts';
 
 function ReadHeader({title,description,badge='只讀資料'}:{title:string;description:string;badge?:string}){
   return <header className="admin-editor-head"><div><small>{badge}</small><h1>{title}</h1><p>{description}</p></div></header>;
@@ -59,15 +65,71 @@ export function OverviewWorkspace(){
   </section>;
 }
 
-interface CapacityConfig{dailyLimit:string;warningAt:number;hardStop:boolean;note:string}
+interface CapacityConfig{
+  dailyLimit:string;
+  warningAt:number;
+  hardStop:boolean;
+  note:string;
+  pools?:readonly CapacityPoolDefinitionV1[];
+}
 export function CapacityWorkspace(){
-  const [config,setConfig]=usePersistentAdminState<CapacityConfig>('capacity.v1',{dailyLimit:'',warningAt:80,hardStop:false,note:''});
+  const {draft}=useAdminDraft();
+  const [config,setConfig]=usePersistentAdminState<CapacityConfig>('capacity.v1',{dailyLimit:'',warningAt:80,hardStop:false,note:'',pools:[]});
+  const pools=(Array.isArray(config.pools)?config.pools:[]).map(normalizeCapacityPool);
+  const products=draft.products.filter(product=>product.active);
+  const savePools=(next:readonly CapacityPoolDefinitionV1[])=>setConfig({...config,pools:next});
+  const updatePool=(id:string,patch:Partial<CapacityPoolDefinitionV1>)=>{
+    savePools(pools.map(pool=>{
+      if(pool.id!==id)return pool;
+      const next=normalizeCapacityPool({...pool,...patch});
+      return next.active&&!capacityPoolCanActivate(next)?normalizeCapacityPool({...next,active:false}):next;
+    }));
+  };
+  const addPool=()=>{
+    const id=nextCapacityPoolId(pools);
+    savePools([...pools,normalizeCapacityPool({
+      id,name:'',active:false,initialQty:0,productIds:[],firstPartyStopAt:0,thirdPartyStopAt:0,note:'',
+    })]);
+  };
+  const removePool=(id:string)=>savePools(pools.filter(pool=>pool.id!==id));
+  const toggleProduct=(pool:CapacityPoolDefinitionV1,productId:string)=>{
+    const selected=pool.productIds.includes(productId);
+    updatePool(pool.id,{productIds:selected?pool.productIds.filter(id=>id!==productId):[...pool.productIds,productId]});
+  };
+
   return <section className="admin-editor-page">
-    <ReadHeader title="每日產能／原料額度" description="設定提示、每日容量同注意事項。預設只提醒；強制停止屬高風險設定，啟用前仍需額外權限審核。" badge="本機設定自動保存"/>
+    <ReadHeader title="每日產能／原料額度" description="設定每日提示，同時建立商品可共用嘅產能 Pool。CAP0 只建立規則；正式扣減、回補、渠道停止同 Override 由後續 SMT runtime cut 執行。" badge="本機設定自動保存"/>
     <div className="admin-policy-grid two">
-      <article className="admin-policy-card"><h2>每日容量</h2><label><span>每日上限（空白 = 無設定）</span><input inputMode="numeric" value={config.dailyLimit} onChange={event=>setConfig({...config,dailyLimit:event.target.value})}/></label><label><span>提醒門檻 %</span><input type="number" min={1} max={100} value={config.warningAt} onChange={event=>setConfig({...config,warningAt:Number(event.target.value)||80})}/></label><label><span>備註</span><textarea rows={4} value={config.note} onChange={event=>setConfig({...config,note:event.target.value})}/></label></article>
-      <article className="admin-policy-card"><h2>行為</h2><label className="admin-toggle"><input type="checkbox" checked={config.hardStop} onChange={event=>setConfig({...config,hardStop:event.target.checked})}/><span>強制停止（預設關閉）</span></label><div className="admin-callout compact">產能／庫存設定唔可以無聲改變正式交易結果。</div></article>
+      <article className="admin-policy-card"><h2>舊版每日容量提示</h2><label><span>每日上限（空白 = 無設定）</span><input inputMode="numeric" value={config.dailyLimit} onChange={event=>setConfig({...config,dailyLimit:event.target.value})}/></label><label><span>提醒門檻 %</span><input type="number" min={1} max={100} value={config.warningAt} onChange={event=>setConfig({...config,warningAt:Number(event.target.value)||80})}/></label><label><span>備註</span><textarea rows={4} value={config.note} onChange={event=>setConfig({...config,note:event.target.value})}/></label></article>
+      <article className="admin-policy-card"><h2>舊版行為</h2><label className="admin-toggle"><input type="checkbox" checked={config.hardStop} onChange={event=>setConfig({...config,hardStop:event.target.checked})}/><span>強制停止（預設關閉）</span></label><div className="admin-callout compact">現有 hardStop 仍只係設定資料；CAP0 唔會新增交易阻斷。產能／庫存設定唔可以無聲改變正式交易結果。</div></article>
     </div>
+
+    <section className="admin-read-card capacity-pool-workspace">
+      <header><div><h2>產能 Pool</h2><small>正式交易規則來源</small></div><button type="button" onClick={addPool}>＋ 新增產能 Pool</button></header>
+      <div className="admin-callout compact">每個 Pool 會保存初始數量、綁定商品，同自家／第三方平台各自嘅剩餘量停售門檻。Pool=0 嘅遠端停止與 Override 仲未喺 CAP0 執行。</div>
+      {pools.length?<div className="capacity-pool-list">{pools.map(pool=>{
+        const canActivate=capacityPoolCanActivate(pool);
+        return <article className="admin-policy-card capacity-pool-card" key={pool.id}>
+          <header><div><small>{pool.id}</small><h3>{pool.name||'未命名 Pool'}</h3></div><button type="button" onClick={()=>removePool(pool.id)}>移除</button></header>
+          <div className="admin-policy-grid two">
+            <label><span>Pool 名稱</span><input value={pool.name} onChange={event=>updatePool(pool.id,{name:event.target.value})} placeholder="例如：紫米"/></label>
+            <label><span>初始數量</span><input type="number" min={0} step={1} value={pool.initialQty} onChange={event=>updatePool(pool.id,{initialQty:Number(event.target.value)})}/></label>
+            <label><span>自家平台停售門檻</span><input type="number" min={0} max={pool.initialQty} step={1} value={pool.firstPartyStopAt} onChange={event=>updatePool(pool.id,{firstPartyStopAt:Number(event.target.value)})}/></label>
+            <label><span>第三方平台停售門檻</span><input type="number" min={0} max={pool.initialQty} step={1} value={pool.thirdPartyStopAt} onChange={event=>updatePool(pool.id,{thirdPartyStopAt:Number(event.target.value)})}/></label>
+          </div>
+          <label><span>Pool 備註</span><textarea rows={2} value={pool.note} onChange={event=>updatePool(pool.id,{note:event.target.value})}/></label>
+          <fieldset className="capacity-pool-products">
+            <legend>綁定商品</legend>
+            {products.length?products.map(product=><label key={product.id}>
+              <input type="checkbox" checked={pool.productIds.includes(product.id)} onChange={()=>toggleProduct(pool,product.id)}/>
+              <span>{product.name}</span>
+            </label>):<p>目前冇可綁定嘅啟用商品。</p>}
+          </fieldset>
+          <label className="admin-toggle"><input type="checkbox" checked={pool.active} disabled={!capacityPoolCanActivate(pool)} onChange={event=>updatePool(pool.id,{active:event.target.checked})}/><span>啟用此 Pool</span></label>
+          {!canActivate?<div className="admin-callout compact">啟用前要填 Pool 名稱、最少綁定一件商品，所有門檻亦唔可以高過初始數量。</div>:null}
+        </article>;
+      })}</div>:<div className="admin-read-empty">未建立產能 Pool。現有每日容量提示會繼續保留，不會自動轉成 Pool。</div>}
+    </section>
   </section>;
 }
 
@@ -173,7 +235,7 @@ export function ExceptionsWorkspace(){
 }
 
 interface SalesMetricRow{
-  date:string;grossMinor:number;adjustmentMinor:number;netMinor:number;orders:number;cashSalesMinor:number;
+  date:string;grossMinor:number;adjustmentMinor:number;netMinor:number;orders:number;cashSalesMinor:number;refundMinor?:number;cashRefundMinor?:number;
   openingCash:Record<string,unknown>|null;dayClose:Record<string,unknown>|null;
 }
 export function SalesReportWorkspace(){
@@ -183,7 +245,7 @@ export function SalesReportWorkspace(){
   const [from,setFrom]=useState('');
   const [to,setTo]=useState('');
   const filtered=rows.filter(row=>(!from||row.date>=from)&&(!to||row.date<=to));
-  const total=(key:'grossMinor'|'adjustmentMinor'|'netMinor'|'orders'|'cashSalesMinor')=>filtered.reduce((sum,row)=>sum+Number(row[key]||0),0);
+  const total=(key:'grossMinor'|'adjustmentMinor'|'netMinor'|'orders'|'cashSalesMinor'|'refundMinor'|'cashRefundMinor')=>filtered.reduce((sum,row)=>sum+Number(row[key]||0),0);
   const latest=filtered[0];
   const close=latest?.dayClose??null;
   const opening=latest?.openingCash??null;
@@ -193,9 +255,11 @@ export function SalesReportWorkspace(){
     <div className="admin-callout compact">Projection：{projectionStatus.updatedAt?new Date(projectionStatus.updatedAt).toLocaleString('zh-HK'):'未同步'}{projectionStatus.error?' · '+projectionStatus.error:''} <button type="button" onClick={()=>void refreshAdminProjection()}>更新</button></div>
     <div className="admin-filterbar"><label><span>由</span><input type="date" value={from} onChange={event=>setFrom(event.target.value)}/></label><label><span>至</span><input type="date" value={to} onChange={event=>setTo(event.target.value)}/></label><span>{filtered.length} 日</span></div>
     <div className="admin-kpi-grid">
-      <article><span>總額</span><strong>{money(total('grossMinor'))}</strong><small>非取消 Order projection</small></article>
-      <article><span>淨額</span><strong>{money(total('netMinor'))}</strong><small>目前 projection</small></article>
+      <article><span>銷售總額</span><strong>{money(total('grossMinor'))}</strong><small>原 sale inflow</small></article>
+      <article><span>退款總額</span><strong>{money(total('refundMinor'))}</strong><small>按實際退款日入賬</small></article>
+      <article><span>淨額</span><strong>{money(total('netMinor'))}</strong><small>期間 gross - refund</small></article>
       <article><span>現金銷售</span><strong>{money(total('cashSalesMinor'))}</strong><small>Combo 只計 CASH 部分</small></article>
+      <article><span>現金退款</span><strong>{money(total('cashRefundMinor'))}</strong><small>實際退款方式 = CASH</small></article>
       <article><span>訂單</span><strong>{total('orders')}</strong><small>projected orders</small></article>
     </div>
     {latest?<section className="admin-read-card">
@@ -216,7 +280,9 @@ export function SalesReportWorkspace(){
       columns={[
         {key:'date',label:'日期',render:(row:SalesMetricRow)=>row.date},
         {key:'gross',label:'總額',numeric:true,render:(row:SalesMetricRow)=>money(row.grossMinor)},
-        {key:'cash',label:'現金',numeric:true,render:(row:SalesMetricRow)=>money(row.cashSalesMinor)},
+        {key:'refund',label:'退款',numeric:true,render:(row:SalesMetricRow)=>money(Number(row.refundMinor||0))},
+        {key:'cash',label:'現金銷售',numeric:true,render:(row:SalesMetricRow)=>money(row.cashSalesMinor)},
+        {key:'cash-refund',label:'現金退款',numeric:true,render:(row:SalesMetricRow)=>money(Number(row.cashRefundMinor||0))},
         {key:'net',label:'淨額',numeric:true,render:(row:SalesMetricRow)=>money(row.netMinor)},
         {key:'orders',label:'訂單',numeric:true,render:(row:SalesMetricRow)=>row.orders},
       ]}

@@ -1,0 +1,23 @@
+MFK 客戶端｜Final Product Gap Audit R2
+日期：2026-09-26
+狀態：FINAL BRIEF 前最後審核
+
+Owner 已回答上一輪 5 個問題；4 個已收口，仍有 2 個邊界需要最後確認。
+
+已收口：
+1. 首次交易填稱呼 + 電話，自動建立幽靈會員／未啟用會員；不做 SMS / Email / OTP。
+2. 記種子在 Business Day / 日結後批次計算；Lifetime Seeds 永不扣；門檻、Audience、Reward、Validity 由 Admin 設。
+3. 電子支付 Screenshot / Payment Proof 由 SMT 代處理訂單人手核對。
+4. WhatsApp fallback 只作人工落單／紀錄；一般不使用 Coupon，Coupon 保留下次。
+5. 換手機需要重新登記；不做 SMS / Email account recovery。
+
+仍待決：
+GAP-01｜無驗證會員跨裝置恢復
+建議 V1：同一裝置用本地 membership token；換手機／清 browser data 不自動按電話載入舊會員私有資料；需要取回舊 Seeds / Coupon / Favorite / Preference 時由店員人工恢復／合併。
+
+GAP-02｜已套 Coupon 並完成電子支付後，先發現 SMT 三次失敗轉 WhatsApp
+例：原價 $50，Coupon -$3，客戶已付 $47。
+如果 WhatsApp 永遠唔用 Coupon，就會差 $3。
+建議：若已按 Coupon Quote 完成電子支付，WhatsApp fallback 人工單沿用該次 Quote；店員在 SMT 正式建立人工單時 Redeem 該 Coupon。否則要追客補差額，體驗差。
+
+FINAL_BRIEF_BLOCKED_BY_2_LAST_DECISIONS

@@ -1,13 +1,14 @@
 import type {MfkLocalRuntime} from './local-runtime.ts';
 import {priceCustomerCart} from './customer-cloud-intake.ts';
-import {projectSyncedOrderingCatalog} from './admin-config-projection.ts';
+import {projectSyncedCombos,projectSyncedOrderingCatalog} from './admin-config-projection.ts';
+import {revalidateSmmComboLine} from './smm-combo-revalidation.ts';
 import {readSmtAdminConfigLkg} from './admin-config-sync.ts';
 import {readSmtDiningTableRegistry,readSmtStoreSettings} from './admin-operational-config.ts';
 import type {SmmLanOrderRequest,SmmLanOrderResponse,SmmLanSubmissionReadbackResponse} from '../../../contracts/smm-lan-v1.ts';
 
 const RESULT_KEY='mfk.v2local.smm-lan-results.v1';
 
-interface StoredResult{readonly submissionId:string;readonly orderId:string;readonly canonicalRevision:number;readonly idempotencyKey:string;readonly requestId:string}
+interface StoredResult{readonly submissionId:string;readonly orderId:string;readonly displayCode:string;readonly canonicalRevision:number;readonly idempotencyKey:string;readonly requestId:string}
 
 function results():StoredResult[]{
   try{const value=JSON.parse(localStorage.getItem(RESULT_KEY)||'[]');return Array.isArray(value)?value:[];}catch{return[]}
@@ -35,7 +36,22 @@ export function createSmmLanIngress(runtime:MfkLocalRuntime){
       if(!envelope)throw new Error('SMM_ADMIN_CONFIG_REQUIRED');
       const takeaway=projectSyncedOrderingCatalog('takeaway',envelope);
       const dineIn=projectSyncedOrderingCatalog('dine-in',envelope);
+      const comboData=projectSyncedCombos(envelope);
       const dineById=new Map(dineIn.products.map(row=>[row.id,row] as const));
+      const productById=new Map(takeaway.products.map(row=>[row.id,row] as const));
+      const comboPoolById=new Map(comboData.pools.map(pool=>[pool.id,pool] as const));
+      const uniqueComboIdForProduct=(productId:string)=>{
+        const matches=comboData.combos.filter(combo=>{
+          if(!combo.mainPoolId)return false;
+          const pool=comboPoolById.get(combo.mainPoolId);
+          return Boolean(pool&&pool.kind==='MAIN_COURSE'&&pool.groups.some(group=>
+            group.subPools.some(subPool=>subPool.choices.some(choice=>
+              choice.type==='PRODUCT'&&choice.productId===productId
+            ))
+          ));
+        });
+        return matches.length===1?matches[0]!.id:undefined;
+      };
       return Object.freeze({
         connectionPath:'LAN' as const,
         menu:Object.freeze({
@@ -44,6 +60,7 @@ export function createSmmLanIngress(runtime:MfkLocalRuntime){
           categories:Object.freeze(takeaway.categories.map(row=>Object.freeze({categoryId:row.id,name:row.label,sortOrder:row.position}))),
           products:Object.freeze(takeaway.products.map(row=>{
             const dine=dineById.get(row.id);
+            const comboId=uniqueComboIdForProduct(row.id);
             return Object.freeze({
               productId:row.id,
               categoryId:row.categoryId,
@@ -63,8 +80,49 @@ export function createSmmLanIngress(runtime:MfkLocalRuntime){
                   publishedAdjustmentMinor:option.priceAdjustmentMinor,
                 }))),
               }))),
+              ...(comboId?{comboId}:{}),
             });
           })),
+          combos:Object.freeze(comboData.combos.map(combo=>Object.freeze({
+            comboId:combo.id,
+            name:combo.name,
+            publishedBasePriceMinor:combo.basePriceMinor,
+            ...(combo.mainPoolId?{mainPoolId:combo.mainPoolId}:{}),
+            addonPoolIds:Object.freeze([...combo.addonPoolIds]),
+          }))),
+          comboPools:Object.freeze(comboData.pools.map(pool=>Object.freeze({
+            poolId:pool.id,
+            name:pool.name,
+            kind:pool.kind,
+            ...(pool.addonKind?{addonKind:pool.addonKind}:{}),
+            groups:Object.freeze(pool.groups.map(group=>Object.freeze({
+              groupId:group.id,
+              name:group.name,
+              required:group.required,
+              minSelections:group.min,
+              maxSelections:group.max,
+              subPools:Object.freeze(group.subPools.map(subPool=>Object.freeze({
+                subPoolId:subPool.id,
+                name:subPool.name,
+                publishedAdjustmentMinor:subPool.priceAdjustmentMinor,
+                choices:Object.freeze(subPool.choices.map(choice=>{
+                  const product=choice.productId?productById.get(choice.productId):undefined;
+                  return Object.freeze({
+                    choiceId:choice.id,
+                    choiceType:choice.type,
+                    ...(choice.productId?{productId:choice.productId}:{}),
+                    label:choice.type==='PRODUCT'
+                      ?(product?.name??choice.label??choice.productId??'未命名商品')
+                      :choice.label,
+                    available:choice.type!=='PRODUCT'||Boolean(
+                      product?.sellable&&product.priceReady&&(pool.kind!=='ADDON'||product.optionSets.length===0)
+                    ),
+                    publishedAdjustmentMinor:choice.priceAdjustmentMinor,
+                  });
+                })),
+              }))),
+            }))),
+          }))),
         }),
         orders:Object.freeze(runtime.orders().filter(order=>!order.items.length||!order.items.every(item=>item.serviceMode==='dine-in')).map(order=>Object.freeze({
           orderId:order.id,
@@ -137,7 +195,7 @@ export function createSmmLanIngress(runtime:MfkLocalRuntime){
       const prior=results().find(row=>row.submissionId===input.submissionId);
       if(prior){
         if(prior.idempotencyKey!==input.idempotencyKey)return rejected(input,'SMM_LAN_IDEMPOTENCY_CONFLICT');
-        return Object.freeze({protocolVersion:1,type:'smm.lan.order.result.v1',requestId:input.requestId,submissionId:input.submissionId,idempotencyKey:input.idempotencyKey,disposition:'ACCEPTED',orderId:prior.orderId,canonicalRevision:prior.canonicalRevision});
+        return Object.freeze({protocolVersion:1,type:'smm.lan.order.result.v1',requestId:input.requestId,submissionId:input.submissionId,idempotencyKey:input.idempotencyKey,disposition:'ACCEPTED',orderId:prior.orderId,displayCode:prior.displayCode,canonicalRevision:prior.canonicalRevision});
       }
 
       const providerRef='SMM:'+input.submissionId;
@@ -145,8 +203,14 @@ export function createSmmLanIngress(runtime:MfkLocalRuntime){
         ??runtime.holds().find(hold=>hold.providerRef===providerRef||(hold.smmSubmissionRefs??[]).includes(providerRef));
       if(recovered){
         const canonicalRevision=1;
-        writeResults([...results(),{submissionId:input.submissionId,orderId:recovered.id,canonicalRevision,idempotencyKey:input.idempotencyKey,requestId:input.requestId}]);
-        return Object.freeze({protocolVersion:1,type:'smm.lan.order.result.v1',requestId:input.requestId,submissionId:input.submissionId,idempotencyKey:input.idempotencyKey,disposition:'ACCEPTED',orderId:recovered.id,canonicalRevision});
+        const recoveredHold='formalOrderId' in recovered?recovered:undefined;
+        const orderId=recoveredHold?.formalOrderId??recovered.id;
+        const displayCode='display' in recovered
+          ?String(recovered.display||'')
+          :String(recoveredHold?.formalOrderDisplay||'');
+        if(!displayCode)return rejected(input,'SMM_CANONICAL_DISPLAY_REQUIRED');
+        writeResults([...results(),{submissionId:input.submissionId,orderId,displayCode,canonicalRevision,idempotencyKey:input.idempotencyKey,requestId:input.requestId}]);
+        return Object.freeze({protocolVersion:1,type:'smm.lan.order.result.v1',requestId:input.requestId,submissionId:input.submissionId,idempotencyKey:input.idempotencyKey,disposition:'ACCEPTED',orderId,displayCode,canonicalRevision});
       }
 
       const envelope=readSmtAdminConfigLkg();
@@ -155,31 +219,62 @@ export function createSmmLanIngress(runtime:MfkLocalRuntime){
 
       const serviceMode=serviceModeValue(input.serviceMode);
       const catalog=projectSyncedOrderingCatalog(serviceMode,envelope);
-      let priced;
+      const comboData=projectSyncedCombos(envelope);
+      const items:{
+        id:string;
+        name:string;
+        qty:number;
+        unitMinor:number;
+        serviceMode:'takeaway'|'dine-in';
+        detail?:string;
+      }[]=[];
+      let authoritativeTotalMinor=0;
       try{
-        priced=priceCustomerCart(input.lines.map(line=>Object.freeze({
-          lineId:line.lineId,
-          productId:line.productId,
-          productName:line.productName,
-          quantity:line.quantity,
-          ...(line.selectedVariationId?{selectedVariationId:line.selectedVariationId}:{}),
-          ...(line.selectedVariationName?{selectedVariationName:line.selectedVariationName}:{}),
-          selections:line.selections,
-          createdAt:new Date().toISOString(),
-        })),catalog.products);
+        for(const line of input.lines){
+          const standalone=priceCustomerCart([Object.freeze({
+            lineId:line.lineId,
+            productId:line.productId,
+            productName:line.productName,
+            quantity:line.quantity,
+            ...(line.selectedVariationId?{selectedVariationId:line.selectedVariationId}:{}),
+            ...(line.selectedVariationName?{selectedVariationName:line.selectedVariationName}:{}),
+            selections:line.selections,
+            createdAt:new Date().toISOString(),
+          })],catalog.products);
+          const standaloneItem=standalone.items[0];
+          if(!standaloneItem)throw new Error('SMM_CART_REVALIDATION_FAILED');
+
+          if(line.combo){
+            const comboResult=revalidateSmmComboLine(
+              line,
+              serviceMode,
+              catalog.products,
+              comboData.combos,
+              comboData.pools,
+              standaloneItem.unitMinor,
+            );
+            const published=Number(line.publishedUnitPriceMinor);
+            if(!Number.isSafeInteger(published)||published<0||published!==comboResult.unitMinor){
+              throw new Error('SMM_PUBLISHED_PRICE_CHANGED');
+            }
+            authoritativeTotalMinor+=comboResult.unitMinor*line.quantity;
+            items.push(...comboResult.items);
+            continue;
+          }
+
+          const published=Number(line.publishedUnitPriceMinor);
+          if(!Number.isSafeInteger(published)||published<0||published!==standaloneItem.unitMinor){
+            throw new Error('SMM_PUBLISHED_PRICE_CHANGED');
+          }
+          authoritativeTotalMinor+=standaloneItem.unitMinor*line.quantity;
+          items.push(Object.freeze({...standaloneItem,serviceMode}));
+        }
       }catch(error){
         return rejected(input,error instanceof Error?error.message:'SMM_CART_REVALIDATION_FAILED');
       }
 
-      if(priced.totalMinor!==input.publishedTotalMinor)return rejected(input,'SMM_PUBLISHED_PRICE_CHANGED');
-      for(let index=0;index<priced.items.length;index++){
-        const published=Number(input.lines[index]?.publishedUnitPriceMinor);
-        if(!Number.isSafeInteger(published)||published<0||published!==priced.items[index]!.unitMinor){
-          return rejected(input,'SMM_PUBLISHED_PRICE_CHANGED');
-        }
-      }
+      if(authoritativeTotalMinor!==input.publishedTotalMinor)return rejected(input,'SMM_PUBLISHED_PRICE_CHANGED');
 
-      const items=priced.items.map(item=>Object.freeze({...item,serviceMode}));
       const canonicalRevision=1;
       if(input.serviceMode==='DINE_IN'){
         if(!input.diningTarget)return rejected(input,'SMM_DINING_TARGET_REQUIRED');
@@ -187,27 +282,36 @@ export function createSmmLanIngress(runtime:MfkLocalRuntime){
           providerRef,
           target:input.diningTarget,
           items:items.map(item=>({id:item.id,name:item.name,qty:item.qty,unitMinor:item.unitMinor})),
-          totalMinor:priced.totalMinor,
+          totalMinor:authoritativeTotalMinor,
           sourceLabel:'SMM',
         });
-        writeResults([...results(),{submissionId:input.submissionId,orderId:hold.id,canonicalRevision,idempotencyKey:input.idempotencyKey,requestId:input.requestId}]);
-        return Object.freeze({protocolVersion:1,type:'smm.lan.order.result.v1',requestId:input.requestId,submissionId:input.submissionId,idempotencyKey:input.idempotencyKey,disposition:'ACCEPTED',orderId:hold.id,canonicalRevision});
+        const canonicalOrderId=hold.formalOrderId??hold.id;
+        const displayCode=String(hold.formalOrderDisplay||'').trim();
+        if(!displayCode)return rejected(input,'SMM_CANONICAL_DISPLAY_REQUIRED');
+        const addition=hold.additions?.find(row=>row.submissionId===providerRef);
+        if(addition){
+          void runtime.ensureDiningAdditionPrint?.(hold.id,addition.id).catch(()=>{});
+        }else if(hold.formalOrderId){
+          void runtime.ensureDiningInitialPrint?.(hold.id).catch(()=>{});
+        }
+        writeResults([...results(),{submissionId:input.submissionId,orderId:canonicalOrderId,displayCode,canonicalRevision,idempotencyKey:input.idempotencyKey,requestId:input.requestId}]);
+        return Object.freeze({protocolVersion:1,type:'smm.lan.order.result.v1',requestId:input.requestId,submissionId:input.submissionId,idempotencyKey:input.idempotencyKey,disposition:'ACCEPTED',orderId:canonicalOrderId,displayCode,canonicalRevision});
       }
       const order=runtime.createOrder({
         items,
-        totalMinor:priced.totalMinor,
+        totalMinor:authoritativeTotalMinor,
         paymentLabel:paymentLabel(input.tender),
         sourceLabel:'SMM',
         providerRef,
         initialFulfillmentLabel:'進行中',
       });
-      writeResults([...results(),{submissionId:input.submissionId,orderId:order.id,canonicalRevision,idempotencyKey:input.idempotencyKey,requestId:input.requestId}]);
-      return Object.freeze({protocolVersion:1,type:'smm.lan.order.result.v1',requestId:input.requestId,submissionId:input.submissionId,idempotencyKey:input.idempotencyKey,disposition:'ACCEPTED',orderId:order.id,canonicalRevision});
+      writeResults([...results(),{submissionId:input.submissionId,orderId:order.id,displayCode:order.display,canonicalRevision,idempotencyKey:input.idempotencyKey,requestId:input.requestId}]);
+      return Object.freeze({protocolVersion:1,type:'smm.lan.order.result.v1',requestId:input.requestId,submissionId:input.submissionId,idempotencyKey:input.idempotencyKey,disposition:'ACCEPTED',orderId:order.id,displayCode:order.display,canonicalRevision});
     },
     readSubmission(submissionId:string):SmmLanSubmissionReadbackResponse{
       const prior=results().find(row=>row.submissionId===submissionId);
       return prior
-        ?Object.freeze({protocolVersion:1,type:'smm.lan.order.readback.result.v1',submissionId,state:'CONFIRMED',orderId:prior.orderId,canonicalRevision:prior.canonicalRevision})
+        ?Object.freeze({protocolVersion:1,type:'smm.lan.order.readback.result.v1',submissionId,state:'CONFIRMED',orderId:prior.orderId,displayCode:prior.displayCode,canonicalRevision:prior.canonicalRevision})
         :Object.freeze({protocolVersion:1,type:'smm.lan.order.readback.result.v1',submissionId,state:'UNKNOWN'});
     },
   });

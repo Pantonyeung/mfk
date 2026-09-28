@@ -15,6 +15,7 @@ vi.mock('./admin-config-sync.ts',()=>({
   subscribeSmtCloudDoorbell:()=>()=>{},
 }));
 vi.mock('./admin-config-projection.ts',()=>({
+  projectSyncedCombos:()=>({combos:[],pools:[]}),
   projectSyncedOrderingCatalog:()=>({
     categories:[],
     products:[{
@@ -57,13 +58,14 @@ describe('SMM LAN ingress',()=>{
       lines:[{lineId:'L1',productId:'riceball',productName:'原味飯團',quantity:2,publishedUnitPriceMinor:4300,selections:[{optionGroupId:'sauce',optionId:'double',optionName:'雙倍醬',publishedAdjustmentMinor:200}]}],
     },{deviceId:'SMM-1',trusted:true});
     expect(result.disposition).toBe('ACCEPTED');
+    expect(result.disposition==='ACCEPTED'&&result.displayCode).toBe('001');
     expect(createOrder).toHaveBeenCalledWith(expect.objectContaining({totalMinor:8600,initialFulfillmentLabel:'進行中'}));
     expect(createOrder.mock.calls[0][0].items[0].unitMinor).toBe(4300);
   });
 
   it('recovers an already committed providerRef instead of duplicating Order',()=>{
     const createOrder=vi.fn();
-    const ingress=createSmmLanIngress({createOrder,orders:()=>[{id:'ORDER-X',providerRef:'SMM:S3'}],holds:()=>[]} as any);
+    const ingress=createSmmLanIngress({createOrder,orders:()=>[{id:'ORDER-X',display:'003',providerRef:'SMM:S3'}],holds:()=>[]} as any);
     const result=ingress.submit({
       protocolVersion:1,type:'smm.lan.order.submit.v1',requestId:'R3',submissionId:'S3',idempotencyKey:'I3',storeId:'MF01',
       menuRevision:'7',publishedTotalMinor:4100,serviceMode:'TAKEAWAY',tender:'CASH',
@@ -71,6 +73,7 @@ describe('SMM LAN ingress',()=>{
     },{deviceId:'SMM-1',trusted:true});
     expect(result.disposition).toBe('ACCEPTED');
     expect(result.disposition==='ACCEPTED'&&result.orderId).toBe('ORDER-X');
+    expect(result.disposition==='ACCEPTED'&&result.displayCode).toBe('003');
     expect(createOrder).not.toHaveBeenCalled();
   });
 
@@ -87,9 +90,9 @@ describe('SMM LAN ingress',()=>{
     expect(createOrder).not.toHaveBeenCalled();
   });
 
-  it('routes trusted SMM dine-in into existing dining hold authority instead of formal Order',()=>{
+  it('routes trusted SMM dine-in through Dining authority and returns the linked Formal Order identity',()=>{
     const createOrder=vi.fn();
-    const upsertSmmDiningHold=vi.fn(()=>({id:'HOLD-DINE',providerRef:'SMM:S5'}));
+    const upsertSmmDiningHold=vi.fn(()=>({id:'HOLD-DINE',formalOrderId:'ORDER-DINE',formalOrderDisplay:'D005',providerRef:'SMM:S5'}));
     const ingress=createSmmLanIngress({createOrder,orders:()=>[],holds:()=>[],upsertSmmDiningHold} as any);
     const result=ingress.submit({
       protocolVersion:1,type:'smm.lan.order.submit.v1',requestId:'R5',submissionId:'S5',idempotencyKey:'I5',storeId:'MF01',
@@ -98,6 +101,8 @@ describe('SMM LAN ingress',()=>{
       lines:[{lineId:'L1',productId:'riceball',productName:'原味飯團',quantity:1,publishedUnitPriceMinor:4100,selections:[]}],
     },{deviceId:'SMM-1',trusted:true});
     expect(result.disposition).toBe('ACCEPTED');
+    expect(result.disposition==='ACCEPTED'&&result.orderId).toBe('ORDER-DINE');
+    expect(result.disposition==='ACCEPTED'&&result.displayCode).toBe('D005');
     expect(createOrder).not.toHaveBeenCalled();
     expect(upsertSmmDiningHold).toHaveBeenCalledWith(expect.objectContaining({
       providerRef:'SMM:S5',
@@ -105,6 +110,59 @@ describe('SMM LAN ingress',()=>{
       totalMinor:4100,
       sourceLabel:'SMM',
     }));
+  });
+
+  it('returns linked Formal Order and triggers initial print for SMM ordered WAITING Dining',()=>{
+    const createOrder=vi.fn();
+    const ensureDiningInitialPrint=vi.fn(()=>Promise.resolve({orderId:'ORDER-WAIT',state:'DONE',planned:3,sent:3,failed:0}));
+    const upsertSmmDiningHold=vi.fn(()=>({id:'HOLD-WAIT',formalOrderId:'ORDER-WAIT',formalOrderDisplay:'W005',providerRef:'SMM:S5W'}));
+    const ingress=createSmmLanIngress({createOrder,orders:()=>[],holds:()=>[],upsertSmmDiningHold,ensureDiningInitialPrint} as any);
+    const result=ingress.submit({
+      protocolVersion:1,type:'smm.lan.order.submit.v1',requestId:'R5W',submissionId:'S5W',idempotencyKey:'I5W',storeId:'MF01',
+      menuRevision:'7',publishedTotalMinor:4100,serviceMode:'DINE_IN',tender:'FPS',
+      diningTarget:{kind:'WAITING',covers:2},
+      lines:[{lineId:'L1',productId:'riceball',productName:'原味飯團',quantity:1,publishedUnitPriceMinor:4100,selections:[]}],
+    },{deviceId:'SMM-1',trusted:true});
+    expect(result.disposition).toBe('ACCEPTED');
+    expect(result.disposition==='ACCEPTED'&&result.orderId).toBe('ORDER-WAIT');
+    expect(result.disposition==='ACCEPTED'&&result.displayCode).toBe('W005');
+    expect(upsertSmmDiningHold).toHaveBeenCalledWith(expect.objectContaining({
+      providerRef:'SMM:S5W',
+      target:{kind:'WAITING',covers:2},
+      totalMinor:4100,
+      sourceLabel:'SMM',
+    }));
+    expect(ensureDiningInitialPrint).toHaveBeenCalledWith('HOLD-WAIT');
+    expect(createOrder).not.toHaveBeenCalled();
+  });
+
+  it('triggers only the delta-print path when SMM adds items to an existing Dining Formal Order',()=>{
+    const createOrder=vi.fn();
+    const ensureDiningInitialPrint=vi.fn();
+    const ensureDiningAdditionPrint=vi.fn(()=>Promise.resolve({
+      orderId:'ORDER-DINE',additionId:'ADD-1',submissionId:'SMM:S5A',state:'DONE',planned:2,sent:2,failed:0,
+    }));
+    const upsertSmmDiningHold=vi.fn(()=>({
+      id:'HOLD-DINE',
+      formalOrderId:'ORDER-DINE',
+      formalOrderDisplay:'D005',
+      providerRef:'SMM:ORIGINAL',
+      additions:[{id:'ADD-1',submissionId:'SMM:S5A'}],
+    }));
+    const ingress=createSmmLanIngress({
+      createOrder,orders:()=>[],holds:()=>[],upsertSmmDiningHold,ensureDiningInitialPrint,ensureDiningAdditionPrint,
+    } as any);
+    const result=ingress.submit({
+      protocolVersion:1,type:'smm.lan.order.submit.v1',requestId:'R5A',submissionId:'S5A',idempotencyKey:'I5A',storeId:'MF01',
+      menuRevision:'7',publishedTotalMinor:4100,serviceMode:'DINE_IN',tender:'FPS',
+      diningTarget:{kind:'TABLE',tableId:'T03',covers:2},
+      lines:[{lineId:'L1',productId:'riceball',productName:'原味飯團',quantity:1,publishedUnitPriceMinor:4100,selections:[]}],
+    },{deviceId:'SMM-1',trusted:true});
+    expect(result.disposition).toBe('ACCEPTED');
+    expect(result.disposition==='ACCEPTED'&&result.orderId).toBe('ORDER-DINE');
+    expect(ensureDiningAdditionPrint).toHaveBeenCalledWith('HOLD-DINE','ADD-1');
+    expect(ensureDiningInitialPrint).not.toHaveBeenCalled();
+    expect(createOrder).not.toHaveBeenCalled();
   });
 
   it('projects canonical SMT orders and dining holds into the SMM shared read model',()=>{

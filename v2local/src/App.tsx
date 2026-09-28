@@ -4,7 +4,9 @@ import {useLocation} from 'react-router';
 import {ProductionViewport} from './app/ProductionViewport.tsx';
 import {OrderingWorkspace} from './features/ordering/OrderingWorkspace.tsx';
 import type {OrderingWorkspaceActions,OrderingWorkspaceViewModel,ServiceMode} from './features/ordering/ordering-workspace-model.ts';
+import {clearDiningAddOrderUiSession,readDiningAddOrderUiSession,saveDiningAddOrderUiSession,type DiningAddOrderRequest} from './features/ordering/dining-add-order-ui-session.ts';
 import {CheckoutWorkspace} from './features/checkout/CheckoutWorkspace.tsx';
+import {clearDiningCheckoutUiSession,diningCheckoutCart,readDiningCheckoutUiSession,saveDiningCheckoutUiSession} from './features/checkout/dining-checkout-ui-session.ts';
 import type {CheckoutChannelId,CheckoutTenderId,CheckoutWorkspaceActions,CheckoutWorkspaceViewModel} from './features/checkout/checkout-workspace-model.ts';
 import {RuntimeOrdersWorkspace} from './presentation/RuntimeOrdersWorkspace.tsx';
 import {RuntimeDiningWorkspace,type DiningCheckoutRequest} from './presentation/RuntimeDiningWorkspace.tsx';
@@ -13,27 +15,33 @@ import {LocalMoreWorkspace} from './presentation/LocalMoreWorkspace.tsx';
 import {localRuntime,type DiningTender} from './runtime/local-runtime.ts';
 import {readLocalAdminMenu,subscribeLocalAdminMenu} from './runtime/local-admin-menu.ts';
 import {readSmtAdminConfigLkg,readSmtAdminSyncStatus,subscribeSmtAdminConfig} from './runtime/admin-config-sync.ts';
-import {projectSyncedCombos,projectSyncedOrderingCatalog,type SyncedOptionSet} from './runtime/admin-config-projection.ts';
+import {projectSyncedCombos,projectSyncedOrderingCatalog,projectSyncedRiceballDrinkPromotion,type SyncedOptionSet} from './runtime/admin-config-projection.ts';
 import {capacityNoticeForCount,readSmtFrontlinePresentation,readSmtStoreSettings} from './runtime/admin-operational-config.ts';
 import {readBusinessCutoff} from './runtime/cash-opening.ts';
 import {resolveBusinessWindow} from './runtime/local-operations.ts';
 import {RuntimeReadyActivation} from './runtime/RuntimeReadyActivation.tsx';
 import {StaffAuthGate,StaffSessionBadge} from './presentation/StaffAuthGate.tsx';
 import {CashOpeningGate} from './presentation/CashOpeningGate.tsx';
-import {ComboWorkspace,HoldCartWorkspace,HoldListWorkspace,OrganizeWorkspace,ProductConfigWorkspace,type OrderingPanelState,type WorkspaceHoldDraft,type WorkspaceProduct} from './features/ordering/OrderingCenterWorkspaces.tsx';
+import {ComboWorkspace,HoldCartWorkspace,HoldListWorkspace,OrganizeWorkspace,ProductConfigWorkspace,RequiredFastLaneWorkspace,applyRequiredSelectionToCart,initialHoldModeForLines,isDrinkSupplementProductId,projectDrinkSupplementChoices,quickConfigurationForProduct,requiredTasksForCart,type OrderingPanelState,type WorkspaceHoldDraft,type WorkspaceProduct} from './features/ordering/OrderingCenterWorkspaces.tsx';
+import {RiceballPairingWorkspace} from './features/ordering/RiceballPairingWorkspace.tsx';
+import {PendingOrderReviewWorkspace} from './features/ordering/PendingOrderReviewWorkspace.tsx';
+import {applyRiceballPairings,buildRiceballPairingDraft,existingPairingGroups,isPairedComboLine,nextPairingStartIndex,restorePairingGroup} from './features/ordering/riceball-pairing-model.ts';
+import {applyRiceballDrinkPromotion,riceballDrinkPromotionStateEqual,stripRiceballDrinkPromotionDetail} from './features/ordering/riceball-drink-promotion-model.ts';
+import {MFK_ORDER_LINE_COMPOSITION_SCHEMA,type MfkOrderLineCompositionV1,type MfkOrderLineOptionSelectionsV1,type MfkOrderLinePairingV1} from '../../contracts/order-line-composition-v1.ts';
 
 type Product={
   id:string;
   categoryId:string;
   category:string;
   name:string;
+  description?:string;
   priceMinor:number;
   priceReady:boolean;
   sellable:boolean;
   imageUrl?:string;
   optionSets:readonly SyncedOptionSet[];
 };
-type CartLine={id:string;productId:string;name:string;qty:number;unitMinor:number;serviceMode:ServiceMode;detail?:string};
+type CartLine={id:string;productId:string;name:string;qty:number;unitMinor:number;serviceMode:ServiceMode;detail?:string;optionSelections?:MfkOrderLineOptionSelectionsV1;freeNote?:string;pairing?:MfkOrderLinePairingV1};
 
 const BASE_PRODUCTS:readonly Product[]=[
   {id:'riceball',category:'飯團',name:'原味飯團',priceMinor:4100,priceReady:true},
@@ -47,6 +55,18 @@ const BASE_PRODUCTS:readonly Product[]=[
 ];
 
 const money=(minor:number)=>'$'+(minor/100).toFixed(2);
+let localCartLineSequence=0;
+const nextLocalCartLineId=()=>{
+  localCartLineSequence+=1;
+  return 'line-'+Date.now().toString(36)+'-'+localCartLineSequence.toString(36);
+};
+const serializeCartLineComposition=(line:CartLine):MfkOrderLineCompositionV1=>Object.freeze({
+  schema:MFK_ORDER_LINE_COMPOSITION_SCHEMA,
+  cartLineId:line.id,
+  ...(line.optionSelections&&Object.keys(line.optionSelections).length?{optionSelections:line.optionSelections}:{}),
+  ...(line.freeNote!==undefined?{freeNote:line.freeNote}:{}),
+  ...(line.pairing?{pairing:line.pairing}:{}),
+});
 
 const PRODUCT_ART_COLORS:Record<string,[string,string]>={
   '飯團':['#f1c98f','#8a4f2b'],
@@ -77,12 +97,23 @@ const nav=[
   {to:'/more',label:'更多',icon:'•••'},
 ] as const;
 
-function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[];setCart:(v:CartLine[])=>void;serviceMode:ServiceMode;setServiceMode:(m:ServiceMode)=>void}){
+function OrderingPage({cart,setCart,serviceMode,setServiceMode,diningAddition,onDiningAdditionDone}:{
+  cart:CartLine[];
+  setCart:(v:CartLine[])=>void;
+  serviceMode:ServiceMode;
+  setServiceMode:(m:ServiceMode)=>void;
+  diningAddition:DiningAddOrderRequest|null;
+  onDiningAdditionDone:()=>void;
+}){
   const navigate=useNavigate();
+  const [diningAddState,setDiningAddState]=useState<'idle'|'processing'|'done'|'failed'|'unknown'>('idle');
+  const [diningAddStatus,setDiningAddStatus]=useState<string|undefined>();
   const [runtimeRevision,setRuntimeRevision]=useState(0);
   useEffect(()=>localRuntime.subscribe(()=>setRuntimeRevision(value=>value+1)),[]);
   const [category,setCategory]=useState('all');
   const [viewMode,setViewMode]=useState<'original'|'organized'>('original');
+  const [combineSimilar,setCombineSimilar]=useState(false);
+  const [orderingMode,setOrderingMode]=useState<'quick'|'normal'>('quick');
   const [pulse,setPulse]=useState(0);
   const [recent,setRecent]=useState<string|undefined>();
   const [highlight,setHighlight]=useState<string|undefined>();
@@ -91,6 +122,49 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
   const [adminConfigRevision,setAdminConfigRevision]=useState(0);
   useEffect(()=>subscribeLocalAdminMenu(()=>setAdminMenuRevision(value=>value+1)),[]);
   useEffect(()=>subscribeSmtAdminConfig(()=>setAdminConfigRevision(value=>value+1)),[]);
+  useEffect(()=>{
+    if(diningAddition&&serviceMode!=='dine-in')setServiceMode('dine-in');
+  },[diningAddition?.holdId,serviceMode,setServiceMode]);
+  useEffect(()=>{
+    if(!diningAddition){
+      setDiningAddState('idle');
+      setDiningAddStatus(undefined);
+      return;
+    }
+    let disposed=false;
+    setDiningAddState('idle');
+    setDiningAddStatus('堂食 '+diningAddition.tableLabel+' · 加單模式 · 會加入同一張訂單');
+    void localRuntime.readDiningHold(diningAddition.holdId).then(async detail=>{
+      if(disposed)return;
+      if(detail.formalOrderId!==diningAddition.formalOrderId){
+        setDiningAddState('failed');
+        setDiningAddStatus('堂食訂單已更新；請返回堂食重新進入加單。');
+        return;
+      }
+      const existing=detail.additions.find(row=>row.submissionId===diningAddition.submissionId);
+      if(!existing)return;
+      setDiningAddState('processing');
+      setDiningAddStatus('加單已存在 · 正在核對新增項目打印狀態…');
+      const result=await localRuntime.ensureDiningAdditionPrint(diningAddition.holdId,existing.id);
+      if(disposed)return;
+      if(result.state==='DONE'){
+        setDiningAddState('done');
+        setDiningAddStatus('加單已保存 · 新增項目已送打印');
+      }else if(result.state==='UNKNOWN'){
+        setDiningAddState('unknown');
+        setDiningAddStatus('加單已保存 · 打印結果未知，系統唔會自動重印');
+      }else{
+        setDiningAddState('failed');
+        setDiningAddStatus('加單已保存 · 新增項目打印未完成，請人手檢查');
+      }
+    }).catch(cause=>{
+      if(disposed)return;
+      console.warn('DINING_ADD_ORDER_RECOVERY_FAILED',cause);
+      setDiningAddState('idle');
+      setDiningAddStatus('未能核對加單狀態；請返回堂食重新讀取。');
+    });
+    return()=>{disposed=true;};
+  },[diningAddition?.holdId,diningAddition?.submissionId,diningAddition?.formalOrderId]);
   const adminMenu=useMemo(()=>{void adminMenuRevision;return readLocalAdminMenu();},[adminMenuRevision]);
   const adminConfig=useMemo(()=>{void adminConfigRevision;return readSmtAdminConfigLkg();},[adminConfigRevision]);
   const syncStatus=useMemo(()=>{void adminConfigRevision;return readSmtAdminSyncStatus();},[adminConfigRevision]);
@@ -98,10 +172,31 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
     ()=>adminConfig?projectSyncedOrderingCatalog(serviceMode,adminConfig):null,
     [adminConfig,serviceMode],
   );
+  const promotionCatalogs=useMemo(
+    ()=>adminConfig?{
+      takeaway:projectSyncedOrderingCatalog('takeaway',adminConfig).products,
+      'dine-in':projectSyncedOrderingCatalog('dine-in',adminConfig).products,
+    }:null,
+    [adminConfig],
+  );
+  const riceballDrinkPromotion=useMemo(
+    ()=>adminConfig?projectSyncedRiceballDrinkPromotion(adminConfig):null,
+    [adminConfig],
+  );
   const comboData=useMemo(
     ()=>adminConfig?projectSyncedCombos(adminConfig):{combos:[] as const,pools:[] as const},
     [adminConfig],
   );
+  useEffect(()=>{
+    if(!promotionCatalogs)return;
+    const normalized=applyRiceballDrinkPromotion(
+      cart,
+      promotionCatalogs,
+      comboData.pools,
+      riceballDrinkPromotion,
+    );
+    if(!riceballDrinkPromotionStateEqual(cart,normalized))setCart(normalized);
+  },[cart,promotionCatalogs,comboData.pools,riceballDrinkPromotion,setCart]);
 
   const storeSettings=useMemo(()=>{void adminConfigRevision;return readSmtStoreSettings();},[adminConfigRevision]);
   const frontlinePresentation=useMemo(()=>{void adminConfigRevision;return readSmtFrontlinePresentation();},[adminConfigRevision]);
@@ -118,6 +213,7 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
         categoryId:row.categoryId,
         category:row.category,
         name:row.name,
+        description:row.description,
         priceMinor:row.priceMinor,
         priceReady:row.priceReady,
         sellable:row.sellable,
@@ -190,7 +286,7 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
     .filter(order=>isKeetaOrder(order)&&!['已完成','已取消'].includes(order.fulfillmentLabel))
     .slice(0,8).map(queueItem);
   const total=cart.reduce((sum,line)=>sum+line.unitMinor*line.qty,0);
-  const nextDisplay='P'+String(localRuntime.orders().length+1).padStart(3,'0');
+  const nextDisplay=diningAddition?.codeLabel??('P'+String(localRuntime.orders().length+1).padStart(3,'0'));
 
   const workspaceProducts:WorkspaceProduct[]=products.filter(product=>product.priceReady&&product.sellable).map(product=>({
     id:product.id,
@@ -201,94 +297,328 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
     imageUrl:product.imageUrl??productArtwork(product),
     optionSets:product.optionSets,
   }));
-  const holdTables=Array.from({length:9},(_,index)=>{
-    const id='T'+String(index+1).padStart(2,'0');
-    const occupied=heldCarts.find(hold=>hold.kind==='dining'&&hold.assignedTable===id);
-    return {id,label:String(index+1),occupied:Boolean(occupied),codeLabel:occupied?.codeLabel};
+  const quickConfigurationById=new Map(workspaceProducts.map(product=>[product.id,quickConfigurationForProduct(product)] as const));
+  const requiredWork=requiredTasksForCart(cart,workspaceProducts);
+  const drinkSupplementChoices=projectDrinkSupplementChoices(workspaceProducts,comboData.pools);
+  const pairingBlockedLineIds=new Set(requiredWork.map(task=>task.lineId));
+  const riceballPairingExisting=existingPairingGroups(cart);
+  const riceballPairingDraft=buildRiceballPairingDraft(
+    cart,
+    workspaceProducts,
+    comboData.combos,
+    comboData.pools,
+    pairingBlockedLineIds,
+    nextPairingStartIndex(cart),
+  );
+  const diningTableDefinitions=storeSettings.diningTables.length
+    ?storeSettings.diningTables
+    :Array.from({length:9},(_,index)=>({
+      id:'T'+String(index+1).padStart(2,'0'),
+      name:String(index+1)+' 號枱',
+      active:true,
+      sortOrder:index+1,
+    }));
+  const holdTables=diningTableDefinitions.map(table=>{
+    const occupied=heldCarts.find(hold=>hold.kind==='dining'&&hold.assignedTable===table.id);
+    return {id:table.id,label:table.name,occupied:Boolean(occupied),codeLabel:occupied?.codeLabel};
   });
+
+  const presentCartLine=(line:CartLine,index:number,quantity=line.qty,sourceLineIds:readonly string[]=[line.id])=>({
+    id:sourceLineIds.length>1?'group:'+sourceLineIds.join('+'):line.id,
+    name:line.name,
+    quantity,
+    lineTotalLabel:money(line.unitMinor*quantity),
+    serviceMode:line.serviceMode,
+    groupId:'local',
+    groupLabel:'本機',
+    detail:line.detail,
+    sourceLineIds,
+  });
+  const presentationCart=(()=>{
+    if(!combineSimilar)return cart.map((line,index)=>presentCartLine(line,index,line.qty,[line.id]));
+    const groups=new Map<string,{line:CartLine;quantity:number;ids:string[];index:number}>();
+    cart.forEach((line,index)=>{
+      const key=[line.productId,line.serviceMode,line.unitMinor,line.detail??''].join('::');
+      const current=groups.get(key);
+      if(current){
+        current.quantity+=line.qty;
+        if(!current.ids.includes(line.id))current.ids.push(line.id);
+      }else groups.set(key,{line,quantity:line.qty,ids:[line.id],index});
+    });
+    return [...groups.values()].sort((a,b)=>a.index-b.index).map(group=>presentCartLine(group.line,group.index,group.quantity,group.ids));
+  })();
 
   const view:OrderingWorkspaceViewModel={
     pendingOrders,activeOrders,categories,selectedCategoryId:category,
     products:visible.map(product=>({
       id:product.id,
       name:product.name,
+      description:product.description,
       priceLabel:product.priceReady?money(product.priceMinor):'未接價格',
       enabled:product.priceReady&&product.sellable&&((serviceMode==='takeaway'&&storeSettings.takeawayEnabled)||(serviceMode==='dine-in'&&storeSettings.dineInEnabled)),
       requiresOptions:product.priceReady&&product.sellable&&product.optionSets.length>0,
+      quickAddAllowed:Boolean(quickConfigurationById.get(product.id)?.eligible),
       imageUrl:frontlinePresentation.showImages?(product.imageUrl??productArtwork(product)):undefined,
       ...(!product.priceReady?{badge:'未接價格'}:!product.sellable?{badge:'停售'}:{}),
     })),
     menuRevisionLabel:adminConfig
       ?storeSettings.storeName+' · ADMIN R'+adminConfig.revision+' · '+(syncStatus.state==='SYNCED'?'已同步':syncStatus.state==='LOCAL_LKG'?'LKG':'同步中')
       :'LOCAL FALLBACK · R'+adminMenu.revision,
-    operationalNotice:capacityNotice
-      ?'今日 '+capacityNotice.currentCount+'/'+capacityNotice.dailyLimit+' 單 · 已到 '+capacityNotice.warningAt+'% 提醒門檻'+(capacityNotice.hardStopConfigured?' · Admin 有 hard-stop 設定但目前只提示':'')
-      :undefined,
+    operationalNotice:diningAddition
+      ?(diningAddStatus??('堂食 '+diningAddition.tableLabel+' · 加單模式'))
+      :capacityNotice
+        ?'今日 '+capacityNotice.currentCount+'/'+capacityNotice.dailyLimit+' 單 · 已到 '+capacityNotice.warningAt+'% 提醒門檻'+(capacityNotice.hardStopConfigured?' · Admin 有 hard-stop 設定但目前只提示':'')
+        :undefined,
     showCategories:frontlinePresentation.showCategories,
-    serviceModes:{takeaway:storeSettings.takeawayEnabled,dineIn:storeSettings.dineInEnabled},
+    showDescriptions:frontlinePresentation.showDescriptions,
+    productColumns:frontlinePresentation.tabletColumns,
+    frontlineGuidance:(frontlinePresentation.headline||frontlinePresentation.body)
+      ?{headline:frontlinePresentation.headline||undefined,body:frontlinePresentation.body||undefined}
+      :undefined,
+    serviceModes:diningAddition
+      ?{takeaway:false,dineIn:storeSettings.dineInEnabled}
+      :{takeaway:storeSettings.takeawayEnabled,dineIn:storeSettings.dineInEnabled},
+    orderingMode,
     cart:{
-      orderId:nextDisplay,serviceMode,viewMode,
-      lines:cart.map(line=>({
-        id:line.id,name:line.name,quantity:line.qty,lineTotalLabel:money(line.unitMinor*line.qty),
-        serviceMode:line.serviceMode,groupId:'local',groupLabel:'本機',detail:line.detail,
-      })),
-      subtotalLabel:money(total),packagingLabel:'$0.00',discountLabel:'$0.00',totalLabel:money(total),checkoutEnabled:cart.length>0&&((serviceMode==='takeaway'&&storeSettings.takeawayEnabled)||(serviceMode==='dine-in'&&storeSettings.dineInEnabled)),
+      orderId:nextDisplay,serviceMode,viewMode,combineSimilar,
+      lines:presentationCart,
+      subtotalLabel:money(total),packagingLabel:'$0.00',discountLabel:'$0.00',totalLabel:money(total),
+      checkoutEnabled:diningAddition
+        ?((diningAddState==='done'||diningAddState==='failed'||diningAddState==='unknown')||(cart.length>0&&requiredWork.length===0&&storeSettings.dineInEnabled&&diningAddState!=='processing'))
+        :(cart.length>0&&requiredWork.length===0&&((serviceMode==='takeaway'&&storeSettings.takeawayEnabled)||(serviceMode==='dine-in'&&storeSettings.dineInEnabled))),
+      ...(diningAddition?{
+        primaryActionLabel:diningAddState==='processing'?'加單處理中':(diningAddState==='done'||diningAddState==='failed'||diningAddState==='unknown')?'返回堂食':'確認加單',
+        contextLabel:'加單 · '+diningAddition.tableLabel,
+      }:{}),
     },
     workItems:[
-      {id:'riceball-pool',label:'飯團待組區',count:0},
-      {id:'required',label:'必選區',count:0},
+      {id:'riceball-pool',label:'飯團待組區',count:riceballPairingDraft.slots.length+riceballPairingExisting.length},
+      {id:'required',label:'必選／補選',count:requiredWork.length},
       {id:'combo',label:'紫米套餐區',count:comboData.combos.length},
     ],
     actionAvailability:{
-      lineServiceMode:true,
+      lineServiceMode:!diningAddition,
       lineEdit:true,
       lineQuantity:true,
-      holdCart:cart.length>0||heldCarts.length>0,
+      holdCart:!diningAddition&&(cart.length>0||heldCarts.length>0),
       cancelCart:cart.length>0,
     },
     recentlyAddedProductId:recent,highlightedCartLineId:highlight,cartPulseNonce:pulse,
   };
 
+  const quickOptionSelectionsForProduct=(product:Product):MfkOrderLineOptionSelectionsV1=>Object.freeze(Object.fromEntries(
+    (product.optionSets??[]).flatMap(set=>{
+      if(set.required||set.min>0)return [];
+      const ids=set.options.filter(option=>option.defaultSelected).map(option=>option.id);
+      return ids.length?[[set.id,Object.freeze(ids)] as const]:[];
+    })
+  ));
+
   const add=(id:string)=>{
     const product=products.find(item=>item.id===id);if(!product||!product.priceReady||!product.sellable)return;
-    const existing=cart.find(item=>item.productId===id&&item.serviceMode===serviceMode);
-    const next=existing
-      ?cart.map(item=>item.id===existing.id?{...item,qty:item.qty+1}:item)
-      :[...cart,{id:'line-'+Date.now().toString(36),productId:product.id,name:product.name,qty:1,unitMinor:product.priceMinor,serviceMode}];
-    setCart(next);
+    const quickConfig=quickConfigurationById.get(id);
+    if(!quickConfig?.eligible){setPanel({type:'product',productId:id});return;}
+    const line:CartLine={
+      id:nextLocalCartLineId(),
+      productId:product.id,
+      name:product.name,
+      qty:1,
+      unitMinor:product.priceMinor+quickConfig.deltaMinor,
+      serviceMode,
+      detail:quickConfig.detail||undefined,
+      optionSelections:quickOptionSelectionsForProduct(product),
+      freeNote:'',
+    };
+    setCart([...cart,line]);
     setRecent(id);
-    setHighlight(existing?.id??next[next.length-1]?.id);
+    setHighlight(line.id);
     setPulse(value=>value+1);
     window.setTimeout(()=>{setRecent(undefined);setHighlight(undefined)},700);
   };
 
-  const addConfigured=(productId:string,detail:string,deltaMinor:number,qty:number)=>{
+  const addConfigured=(productId:string,detail:string,deltaMinor:number,qty:number,lineId?:string)=>{
     const product=products.find(item=>item.id===productId);if(!product||!product.priceReady||!product.sellable)return;
-    const line:CartLine={id:'line-'+Date.now().toString(36),productId:product.id,name:product.name,qty,unitMinor:product.priceMinor+deltaMinor,serviceMode,detail};
+    if(lineId){
+      const existing=cart.find(item=>item.id===lineId);if(!existing)return;
+      const next=cart.map(item=>item.id===lineId?{
+        ...item,
+        name:product.name,
+        qty,
+        unitMinor:product.priceMinor+deltaMinor,
+        detail:detail||undefined,
+        serviceMode:existing.serviceMode,
+      }:item);
+      setCart(next);setRecent(product.id);setHighlight(lineId);setPulse(value=>value+1);setPanel(null);return;
+    }
+    const line:CartLine={id:nextLocalCartLineId(),productId:product.id,name:product.name,qty,unitMinor:product.priceMinor+deltaMinor,serviceMode,detail:detail||undefined};
+    setCart([...cart,line]);setRecent(product.id);setHighlight(line.id);setPulse(value=>value+1);setPanel(null);
+  };
+  const addConfiguredStructured=(productId:string,detail:string,deltaMinor:number,qty:number,lineId:string|undefined,structured:{readonly optionSelections:MfkOrderLineOptionSelectionsV1;readonly freeNote:string})=>{
+    const product=products.find(item=>item.id===productId);if(!product||!product.priceReady||!product.sellable)return;
+    if(lineId){
+      const existing=cart.find(item=>item.id===lineId);if(!existing)return;
+      const next=cart.map(item=>item.id===lineId?{
+        ...item,
+        name:product.name,
+        qty,
+        unitMinor:product.priceMinor+deltaMinor,
+        detail:detail||undefined,
+        serviceMode:existing.serviceMode,
+        optionSelections:structured.optionSelections,
+        freeNote:structured.freeNote,
+      }:item);
+      setCart(next);setRecent(product.id);setHighlight(lineId);setPulse(value=>value+1);setPanel(null);return;
+    }
+    const line:CartLine={id:nextLocalCartLineId(),productId:product.id,name:product.name,qty,unitMinor:product.priceMinor+deltaMinor,serviceMode,detail:detail||undefined,optionSelections:structured.optionSelections,freeNote:structured.freeNote};
     setCart([...cart,line]);setRecent(product.id);setHighlight(line.id);setPulse(value=>value+1);setPanel(null);
   };
 
+  const applyRequired=(lineId:string,groupId:string,optionIds:readonly string[])=>{
+    const next=applyRequiredSelectionToCart(cart,workspaceProducts,lineId,groupId,optionIds);
+    setCart(next);
+    setHighlight(lineId);
+    setPulse(value=>value+1);
+  };
+
+  const addDrinkSupplement=(
+    choiceId:string,
+    qty:number,
+    targetLineId?:string,
+    configurationDetail='',
+    configurationAdjustmentMinor=0,
+    returnPanel:'required'|'riceball-pair'='required',
+    structured?:{readonly optionSelections:MfkOrderLineOptionSelectionsV1;readonly freeNote:string},
+  )=>{
+    const choice=drinkSupplementChoices.find(row=>row.id===choiceId);
+    if(!choice||!choice.enabled)return;
+    const targets=cart.filter(line=>!isDrinkSupplementProductId(line.productId));
+    const target=targetLineId?targets.find(line=>line.id===targetLineId):undefined;
+    const targetIndex=target?targets.findIndex(line=>line.id===target.id):-1;
+    const targetDetail=target
+      ?'指定餐點：'+String(targetIndex+1)+' '+target.name
+      :'未指定配餐（按落單次序）';
+    const detail=[targetDetail,configurationDetail.trim()].filter(Boolean).join(' · ');
+    const line:CartLine={
+      id:nextLocalCartLineId(),
+      productId:'drink-supplement:'+choice.id,
+      name:'飲品｜'+choice.label,
+      qty:Math.max(1,Math.floor(qty||1)),
+      unitMinor:choice.adjustmentMinor+configurationAdjustmentMinor,
+      serviceMode:target?.serviceMode??serviceMode,
+      detail,
+      ...(structured?{optionSelections:structured.optionSelections,freeNote:structured.freeNote}:{}),
+    };
+    setCart([...cart,line]);
+    setHighlight(line.id);
+    setPulse(value=>value+1);
+    setPanel(returnPanel==='riceball-pair'?{type:'riceball-pair'}:{type:'required'});
+  };
+
+  const configureDrinkSupplement=(choiceId:string,qty:number,targetLineId?:string,returnPanel:'required'|'riceball-pair'='required')=>{
+    const choice=drinkSupplementChoices.find(row=>row.id===choiceId);
+    if(!choice?.enabled)return;
+    if(!choice.requiresConfiguration||!choice.productId){
+      addDrinkSupplement(choiceId,qty,targetLineId,'',0,returnPanel);
+      return;
+    }
+    setPanel({type:'drink-config',choiceId,qty:Math.max(1,Math.floor(qty||1)),...(targetLineId?{targetLineId}:{}),returnTo:returnPanel});
+  };
+
+  const applyPairingAssignments=(assignments:Readonly<Record<string,string|undefined>>)=>{
+    const applied=applyRiceballPairings(
+      cart,
+      workspaceProducts,
+      comboData.combos,
+      comboData.pools,
+      riceballPairingDraft,
+      assignments,
+      nextLocalCartLineId,
+    );
+    if(!applied.groups.length)return;
+    setCart(applied.lines);
+    setHighlight(applied.lines[applied.lines.length-1]?.id);
+    setPulse(value=>value+1);
+    setPanel({type:'riceball-pair'});
+  };
+
+  const restorePairing=(label:string)=>{
+    setCart(restorePairingGroup(cart,workspaceProducts,label));
+    setPulse(value=>value+1);
+    setPanel({type:'riceball-pair'});
+  };
+
   const addCombo=(comboId:string,comboName:string,detail:string,unitMinor:number)=>{
-    const line:CartLine={id:'line-'+Date.now().toString(36),productId:comboId,name:comboName,qty:1,unitMinor,serviceMode,detail};
+    const line:CartLine={id:nextLocalCartLineId(),productId:comboId,name:comboName,qty:1,unitMinor,serviceMode,detail};
     setCart([...cart,line]);setHighlight(line.id);setPulse(value=>value+1);setPanel(null);
   };
 
   const holdItems=()=>cart.map(line=>({
     id:line.productId,
-    name:line.detail?line.name+'｜'+line.detail:line.name,
+    name:line.name,
     qty:line.qty,
     unitMinor:line.unitMinor,
+    serviceMode:line.serviceMode,
+    ...(line.detail?{detail:line.detail}:{}),
+    composition:serializeCartLineComposition(line),
   }));
   const finishHold=()=>{setCart([]);setServiceMode('takeaway');setPanel(null);};
 
   const panelTitle=panel?.type==='product'?'商品選項'
+    :panel?.type==='required'?'必選／補選'
+    :panel?.type==='drink-config'?'飲品設定'
+    :panel?.type==='riceball-pair'?'飯團待組區'
+    :panel?.type==='pending-order'?'待處理訂單'
     :panel?.type==='organize'?'整理工作台'
     :panel?.type==='combo'?'紫米套餐區'
     :panel?.type==='hold'?'暫存工作台'
     :panel?.type==='holds'?'暫存單':'';
 
-  const panelBody=panel?.type==='product'
-    ?(()=>{const product=workspaceProducts.find(item=>item.id===panel.productId);return product?<ProductConfigWorkspace product={product} onAdd={(detail,delta,qty)=>addConfigured(product.id,detail,delta,qty)}/>:null})()
+  const panelBody=panel?.type==='pending-order'
+    ?(()=>{const order=runtimeOrders.find(item=>item.id===panel.orderId);return order?<PendingOrderReviewWorkspace
+      order={order}
+      onAccept={async()=>{
+        const result=await localRuntime.acceptOrder(order.id);
+        if(result.provider.state==='ATTENTION')return '本地已接單；Keeta 同步需要留意。';
+        if(result.provider.state==='SYNCED'||result.provider.state==='IDEMPOTENT')return '已確認接單；Keeta 已同步。';
+        return '已確認接單。';
+      }}
+      onOpenOrders={()=>navigate('/orders?orderId='+encodeURIComponent(order.id))}
+      onReadEvidence={order.paymentEvidenceRef?()=>localRuntime.readPaymentEvidence(order.id):undefined}
+      onReviewEvidence={order.paymentEvidenceRef?async decision=>{await localRuntime.reviewPaymentEvidence(order.id,decision);}:undefined}
+      onDeferKeeta={isKeetaOrder(order)?async()=>{await localRuntime.deferKeetaOrder(order.id);}:undefined}
+    />:null})()
+    :panel?.type==='product'
+    ?(()=>{const product=workspaceProducts.find(item=>item.id===panel.productId);const line=panel.lineId?cart.find(item=>item.id===panel.lineId):undefined;return product?<ProductConfigWorkspace key={product.id+':'+(panel.lineId??'add')} product={product} mode={panel.lineId?'edit':'add'} initial={line?{qty:line.qty,detail:stripRiceballDrinkPromotionDetail(line.detail)||undefined,optionSelections:line.optionSelections,freeNote:line.freeNote}:undefined} onAdd={(detail,delta,qty,structured)=>addConfiguredStructured(product.id,detail,delta,qty,panel.lineId,structured)}/>:null})()
+    :panel?.type==='required'
+      ?<RequiredFastLaneWorkspace
+        cart={cart}
+        products={workspaceProducts}
+        onApply={applyRequired}
+        drinkChoices={drinkSupplementChoices}
+        onAddDrink={(choiceId,qty,targetLineId)=>addDrinkSupplement(choiceId,qty,targetLineId)}
+        onConfigureDrink={configureDrinkSupplement}
+      />
+    :panel?.type==='drink-config'
+      ?(()=>{const choice=drinkSupplementChoices.find(row=>row.id===panel.choiceId);const product=choice?.productId?workspaceProducts.find(row=>row.id===choice.productId):undefined;return choice&&product?<ProductConfigWorkspace
+        key={'drink:'+choice.id}
+        product={product}
+        initial={{qty:panel.qty}}
+        pricingBaseMinor={choice.adjustmentMinor}
+        onAdd={(detail,delta,qty,structured)=>addDrinkSupplement(choice.id,qty,panel.targetLineId,detail,delta,panel.returnTo??'required',structured)}
+      />:null})()
+    :panel?.type==='riceball-pair'
+      ?<RiceballPairingWorkspace
+        cart={cart}
+        products={workspaceProducts}
+        combos={comboData.combos}
+        pools={comboData.pools}
+        blockedLineIds={pairingBlockedLineIds}
+        onApply={applyPairingAssignments}
+        onRestore={restorePairing}
+        drinkChoices={drinkSupplementChoices}
+        onAddDrink={(choiceId,qty,targetLineId)=>addDrinkSupplement(choiceId,qty,targetLineId,'',0,'riceball-pair')}
+        onConfigureDrink={(choiceId,qty,targetLineId)=>configureDrinkSupplement(choiceId,qty,targetLineId,'riceball-pair')}
+      />
     :panel?.type==='organize'
       ?<OrganizeWorkspace lines={cart} onDone={()=>setPanel(null)}/>
       :panel?.type==='combo'
@@ -298,17 +628,22 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
             lines={cart}
             totalMinor={total}
             tables={holdTables}
+            initialMode={initialHoldModeForLines(cart)}
             onHoldWaiting={(partySize,note)=>{
               localRuntime.createHold({kind:'waiting',items:holdItems(),totalMinor:total,partySize,note:note||'暫存待客'});
               finishHold();
             }}
             onHoldQueue={(partySize,note)=>{
-              localRuntime.createHold({kind:'dining',items:holdItems(),totalMinor:total,partySize,note:note||'堂食輪候'});
-              finishHold();
+              const draft=localRuntime.createHold({kind:'dining',items:holdItems(),totalMinor:total,partySize,note:note||'堂食輪候'});
+              void localRuntime.admitDiningHold?.(draft.id).then(()=>{
+                void localRuntime.ensureDiningInitialPrint?.(draft.id).catch(()=>{});
+                finishHold();
+              }).catch(()=>{});
             }}
             onHoldTable={(tableId,partySize,note)=>{
               const draft=localRuntime.createHold({kind:'dining',items:holdItems(),totalMinor:total,partySize,note:note||'直接掛枱'});
               void localRuntime.assignDiningTable?.(draft.id,tableId).then(()=>{
+                void localRuntime.ensureDiningInitialPrint?.(draft.id).catch(()=>{});
                 setCart([]);setServiceMode('dine-in');setPanel(null);
               });
             }}
@@ -317,16 +652,20 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
             ?<HoldListWorkspace holds={heldCarts as readonly WorkspaceHoldDraft[]} onRestore={hold=>{
               const restored:CartLine[]=hold.items.map((item,index)=>{
                 const parts=item.name.split('｜');
-                const name=parts.shift()||item.name;
-                const detail=parts.length?parts.join('｜'):undefined;
+                const legacyName=parts.shift()||item.name;
+                const legacyDetail=parts.length?parts.join('｜'):undefined;
+                const composition=item.composition;
                 return {
-                  id:'line-'+hold.id+'-'+index+'-'+Date.now().toString(36),
+                  id:composition?.cartLineId??('line-'+hold.id+'-'+index+'-'+Date.now().toString(36)),
                   productId:item.id,
-                  name,
+                  name:item.detail?item.name:legacyName,
                   qty:item.qty,
                   unitMinor:item.unitMinor,
-                  serviceMode:hold.kind==='dining'?'dine-in':'takeaway',
-                  detail,
+                  serviceMode:item.serviceMode??(hold.kind==='dining'?'dine-in':'takeaway'),
+                  detail:item.detail??legacyDetail,
+                  ...(composition?.optionSelections?{optionSelections:composition.optionSelections}:{}),
+                  ...(composition?.freeNote!==undefined?{freeNote:composition.freeNote}:{}),
+                  ...(composition?.pairing?{pairing:composition.pairing}:{}),
                 };
               });
               setCart(restored);
@@ -336,33 +675,114 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode}:{cart:CartLine[]
             }} onRemove={id=>localRuntime.removeHold(id)}/>
             :null;
 
+  const finishDiningAddition=()=>{
+    setCart([]);
+    onDiningAdditionDone();
+    navigate('/dining');
+  };
+
+  const submitDiningAddition=async()=>{
+    if(!diningAddition)return;
+    if(diningAddState==='done'||diningAddState==='failed'||diningAddState==='unknown'){
+      finishDiningAddition();
+      return;
+    }
+    if(diningAddState==='processing'||!cart.length||requiredWork.length>0)return;
+    setDiningAddState('processing');
+    setDiningAddStatus('堂食 '+diningAddition.tableLabel+' · 正在保存加單…');
+    try{
+      const committed=await localRuntime.appendDiningItems(diningAddition.holdId,{
+        submissionId:diningAddition.submissionId,
+        items:holdItems(),
+        totalMinor:total,
+        sourceLabel:'現場',
+      });
+      const result=await localRuntime.ensureDiningAdditionPrint(diningAddition.holdId,committed.additionId);
+      if(result.state==='DONE'){
+        setDiningAddState('done');
+        setDiningAddStatus('加單已保存 · 新增項目已送打印');
+      }else if(result.state==='UNKNOWN'){
+        setDiningAddState('unknown');
+        setDiningAddStatus('加單已保存 · 打印結果未知，系統唔會自動重印');
+      }else{
+        setDiningAddState('failed');
+        setDiningAddStatus('加單已保存 · 新增項目打印未完成，請人手檢查');
+      }
+    }catch(cause){
+      console.warn('DINING_ADD_ORDER_SUBMIT_FAILED',cause);
+      try{
+        const detail=await localRuntime.readDiningHold(diningAddition.holdId);
+        const existing=detail.additions.find(row=>row.submissionId===diningAddition.submissionId);
+        if(existing){
+          const result=await localRuntime.ensureDiningAdditionPrint(diningAddition.holdId,existing.id);
+          if(result.state==='DONE'){
+            setDiningAddState('done');
+            setDiningAddStatus('加單已保存 · 新增項目已送打印');
+          }else if(result.state==='UNKNOWN'){
+            setDiningAddState('unknown');
+            setDiningAddStatus('加單已保存 · 打印結果未知，系統唔會自動重印');
+          }else{
+            setDiningAddState('failed');
+            setDiningAddStatus('加單已保存 · 新增項目打印未完成，請人手檢查');
+          }
+          return;
+        }
+      }catch(readbackCause){
+        console.warn('DINING_ADD_ORDER_READBACK_FAILED',readbackCause);
+      }
+      setDiningAddState('idle');
+      setDiningAddStatus('加單未完成；請核對堂食內容後再試。');
+    }
+  };
+
   const actions:OrderingWorkspaceActions={
     onSelectCategory:setCategory,
+    onChangeOrderingMode:setOrderingMode,
     onAddProduct:add,
     onConfigureProduct:id=>setPanel({type:'product',productId:id}),
     onChangeServiceMode:mode=>{
+      if(diningAddition)return;
       if(mode==='takeaway'&&!storeSettings.takeawayEnabled)return;
       if(mode==='dine-in'&&!storeSettings.dineInEnabled)return;
       setServiceMode(mode);setCart(cart.map(item=>({...item,serviceMode:mode})));
     },
     onChangeCartView:mode=>{setViewMode(mode);if(mode==='organized')setPanel({type:'organize'});},
+    onToggleCombine:()=>setCombineSimilar(value=>!value),
     onChangeLineServiceMode:(lineId,mode)=>{
+      if(diningAddition)return;
+      const line=cart.find(item=>item.id===lineId);
+      if(line&&isPairedComboLine(line)){setPanel({type:'riceball-pair'});return;}
       if(mode==='takeaway'&&!storeSettings.takeawayEnabled)return;
       if(mode==='dine-in'&&!storeSettings.dineInEnabled)return;
       setCart(cart.map(item=>item.id===lineId?{...item,serviceMode:mode}:item));
     },
-    onAdjustLineQuantity:(lineId,delta)=>setCart(cart.map(item=>item.id===lineId?{...item,qty:item.qty+delta}:item).filter(item=>item.qty>0)),
+    onAdjustLineQuantity:(lineId,delta)=>{
+      const line=cart.find(item=>item.id===lineId);
+      if(line&&isPairedComboLine(line)){setPanel({type:'riceball-pair'});return;}
+      setCart(cart.map(item=>item.id===lineId?{...item,qty:item.qty+delta}:item).filter(item=>item.qty>0));
+    },
     onEditCartLine:lineId=>{
       const line=cart.find(item=>item.id===lineId);
       if(!line)return;
+      if(isPairedComboLine(line)){setPanel({type:'riceball-pair'});return;}
+      if(isDrinkSupplementProductId(line.productId)){setPanel({type:'required'});return;}
       if(comboData.combos.some(combo=>combo.id===line.productId))setPanel({type:'combo'});
-      else setPanel({type:'product',productId:line.productId});
+      else setPanel({type:'product',productId:line.productId,lineId:line.id});
     },
-    onHoldCart:()=>cart.length?setPanel({type:'hold'}):setPanel({type:'holds'}),
+    onHoldCart:()=>{if(diningAddition)return;cart.length?setPanel({type:'hold'}):setPanel({type:'holds'});},
     onCancelCart:()=>setCart([]),
-    onOpenWorkItem:id=>{if(id==='combo')setPanel({type:'combo'});else setPanel({type:'organize'});},
-    onOpenQueueOrder:(_kind,id)=>navigate('/orders?orderId='+encodeURIComponent(id)),
-    onCheckout:()=>navigate('/checkout'),
+    onOpenWorkItem:id=>{
+      if(id==='riceball-pool')setPanel({type:'riceball-pair'});
+      else if(id==='required')setPanel({type:'required'});
+      else if(id==='combo')setPanel({type:'combo'});
+      else setPanel({type:'organize'});
+    },
+    onOpenQueueOrder:(_kind,id)=>{
+      const order=runtimeOrders.find(item=>item.id===id);
+      if(order?.fulfillmentLabel==='待處理'){setPanel({type:'pending-order',orderId:id});return;}
+      navigate('/orders?orderId='+encodeURIComponent(id));
+    },
+    onCheckout:()=>{if(diningAddition){void submitDiningAddition();return;}navigate('/checkout');},
   };
 
   return <OrderingWorkspace view={view} actions={actions} centerPanel={panel&&panelBody?{title:panelTitle,body:panelBody,onClose:()=>setPanel(null)}:null}/>;
@@ -381,6 +801,9 @@ function CheckoutPage({cart,setCart,diningCheckout,onDiningCheckoutDone}:{cart:C
   const [state,setState]=useState<'selected'|'processing'|'success'|'failure'>('selected');
   const [completion,setCompletion]=useState<CheckoutWorkspaceViewModel['completionReview']>();
   const [printStatus,setPrintStatus]=useState<string|undefined>();
+  const [diningRecovering,setDiningRecovering]=useState(Boolean(diningCheckout));
+  const [diningRequiresRefresh,setDiningRequiresRefresh]=useState(false);
+  const [checkoutFailure,setCheckoutFailure]=useState<string|undefined>();
 
   const methodLabels:Record<CheckoutTenderId,string>={
     CASH:'現金付款',ALIPAY:'AlipayHK',WECHAT:'WeChat Pay HK',FPS:'FPS／轉數快',PAYME:'PayMe',COMBO:'組合付款'
@@ -389,6 +812,64 @@ function CheckoutPage({cart,setCart,diningCheckout,onDiningCheckoutDone}:{cart:C
     'walk-in':'現場','whatsapp':'電話／WhatsApp','morefun-app':'磨飯 App','keeta':'Keeta','foodpanda':'Foodpanda'
   };
 
+  useEffect(()=>{
+    if(!diningCheckout){
+      setDiningRecovering(false);
+      setDiningRequiresRefresh(false);
+      setCheckoutFailure(undefined);
+      return;
+    }
+    let disposed=false;
+    setDiningRecovering(true);
+    setDiningRequiresRefresh(false);
+    setCheckoutFailure(undefined);
+    void localRuntime.readDiningHold(diningCheckout.holdId).then(detail=>{
+      if(disposed)return;
+      const prior=detail.payments.find(payment=>payment.submissionId===diningCheckout.submissionId);
+      if(prior){
+        const tender=prior.tender as CheckoutTenderId;
+        setMethod(tender);
+        if(prior.tender==='CASH')setCash(((prior.receivedMinor??prior.amountMinor)/100).toFixed(2));
+        setCompletion({
+          displayOrderCode:detail.codeLabel,
+          tenderLabel:methodLabels[tender],
+          dueLabel:money(prior.amountMinor),
+          ...(prior.tender==='CASH'?{
+            receivedLabel:money(prior.receivedMinor??prior.amountMinor),
+            changeLabel:money(prior.changeMinor??0),
+          }:{}),
+          statusLabel:detail.remainingMinor===0?'堂食已全數結帳':'堂食分項結帳完成',
+        });
+        setState('success');
+        setPrintStatus('堂食付款已存在 · 正在核對付款收據狀態…');
+        void localRuntime.ensureDiningPaymentReceipt(detail.holdId,diningCheckout.submissionId).then(result=>{
+          if(result.state==='DONE'){setPrintStatus('堂食付款已存在 · 付款收據已處理');return;}
+          if(result.state==='UNKNOWN'){setPrintStatus('堂食付款已存在 · 收據／錢箱結果未知，系統唔會自動重試');return;}
+          setPrintStatus('堂食付款已存在 · 付款收據未完成，請人手檢查');
+        }).catch(error=>setPrintStatus('堂食付款已存在 · 收據狀態讀取失敗 '+(error instanceof Error?error.message:String(error))));
+        setDiningRecovering(false);
+        return;
+      }
+      if(detail.checkoutRevision!==diningCheckout.expectedRevision){
+        setDiningRequiresRefresh(true);
+        setCheckoutFailure('堂食內容已經更新；請返回堂食重新選擇未結項目，系統冇收款。');
+        setState('failure');
+        setDiningRecovering(false);
+        return;
+      }
+      setState('selected');
+      setPrintStatus('堂食結帳已恢復 · 尚未付款');
+      setDiningRecovering(false);
+    }).catch(cause=>{
+      if(disposed)return;
+      setDiningRequiresRefresh(true);
+      setCheckoutFailure('未能核對堂食付款狀態：'+(cause instanceof Error?cause.message:String(cause))+'。請返回堂食重新讀取，系統冇自動收款。');
+      setState('failure');
+      setDiningRecovering(false);
+    });
+    return()=>{disposed=true;};
+  },[diningCheckout?.holdId,diningCheckout?.submissionId,diningCheckout?.expectedRevision]);
+
   const parseMoney=(value:string)=>Math.max(0,Math.round((Number(value)||0)*100));
   const cashMinor=parseMoney(cash);
   const comboMinor=(Object.values(split) as string[]).reduce((sum,value)=>sum+parseMoney(value),0);
@@ -396,7 +877,7 @@ function CheckoutPage({cart,setCart,diningCheckout,onDiningCheckoutDone}:{cart:C
   const change=method==='CASH'?Math.max(0,received-due):0;
   const comboExact=method!=='COMBO'||comboMinor===due;
   const cashReady=method!=='CASH'||received>=due;
-  const confirmEnabled=cart.length>0&&comboExact&&cashReady;
+  const confirmEnabled=cart.length>0&&!diningRecovering&&!diningRequiresRefresh&&comboExact&&cashReady;
   const validationMessage=method==='CASH'&&cash&&received<due?'收款金額不足':
     method==='COMBO'&&comboMinor!==due?'組合付款合計 '+money(comboMinor)+'，必須等於 '+money(due):undefined;
 
@@ -442,7 +923,7 @@ function CheckoutPage({cart,setCart,diningCheckout,onDiningCheckoutDone}:{cart:C
     },
     comboMode:method==='COMBO',
     splitTenders:(['CASH','FPS','PAYME','ALIPAY','WECHAT'] as const).map(id=>({id,label:methodLabels[id],amount:split[id]})),
-    validationMessage,statusMessage:printStatus,completionReview:completion,
+    validationMessage,statusMessage:printStatus,failureMessage:checkoutFailure,completionReview:completion,
   };
 
   const confirm=async()=>{
@@ -454,18 +935,38 @@ function CheckoutPage({cart,setCart,diningCheckout,onDiningCheckoutDone}:{cart:C
         const updated=await localRuntime.settleDiningHold(
           diningCheckout.holdId,
           diningCheckout.selections,
-          tenderCode
+          tenderCode,
+          {
+            submissionId:diningCheckout.submissionId,
+            expectedRevision:diningCheckout.expectedRevision,
+            ...(tenderCode==='CASH'?{receivedMinor:received}:{}),
+            ...(tenderCode==='COMBO'?{
+              splitTenders:comboEntries.map(([id,value])=>({tender:id,amountMinor:parseMoney(value)})),
+            }:{}),
+          }
         );
+        const payment=updated.payments.find(row=>row.submissionId===diningCheckout.submissionId);
         setCompletion({
           displayOrderCode:diningCheckout.codeLabel,
-          tenderLabel:tenderDisplay,
-          dueLabel:money(due),
-          receivedLabel:money(received),
-          changeLabel:money(change),
+          tenderLabel:payment?methodLabels[payment.tender as CheckoutTenderId]:tenderDisplay,
+          dueLabel:money(payment?.amountMinor??due),
+          ...(payment?.tender==='CASH'?{
+            receivedLabel:money(payment.receivedMinor??payment.amountMinor),
+            changeLabel:money(payment.changeMinor??0),
+          }:{
+            receivedLabel:money(received),
+            changeLabel:money(change),
+          }),
           statusLabel:updated.remainingMinor===0?'堂食已全數結帳':'堂食分項結帳完成',
         });
+        setCheckoutFailure(undefined);
         setState('success');
-        setPrintStatus('堂食 '+diningCheckout.tableLabel+' 號枱 · 已記錄 '+tenderDisplay+' · 未結 '+money(updated.remainingMinor));
+        setPrintStatus('堂食 '+diningCheckout.tableLabel+' · 已保存付款 · 正在打印付款收據…');
+        void localRuntime.ensureDiningPaymentReceipt(diningCheckout.holdId,diningCheckout.submissionId).then(result=>{
+          if(result.state==='DONE'){setPrintStatus('堂食 '+diningCheckout.tableLabel+' · 付款收據已送出 · 未收 '+money(updated.remainingMinor));return;}
+          if(result.state==='UNKNOWN'){setPrintStatus('堂食 '+diningCheckout.tableLabel+' · 收據／錢箱結果未知 · 唔會自動重試');return;}
+          setPrintStatus('堂食 '+diningCheckout.tableLabel+' · 付款已保存，但付款收據未完成 · 請人手檢查');
+        }).catch(error=>setPrintStatus('堂食付款已保存 · 收據處理失敗 '+(error instanceof Error?error.message:String(error))));
         return;
       }
 
@@ -477,6 +978,7 @@ function CheckoutPage({cart,setCart,diningCheckout,onDiningCheckoutDone}:{cart:C
           unitMinor:line.unitMinor,
           serviceMode:line.serviceMode,
           ...(line.detail?{detail:line.detail}:{}),
+          composition:serializeCartLineComposition(line),
         })),
         totalMinor:due,
         paymentLabel,
@@ -495,7 +997,19 @@ function CheckoutPage({cart,setCart,diningCheckout,onDiningCheckoutDone}:{cart:C
         const failures=summary.results.filter(row=>!row.ok).map(row=>row.role+':'+row.code).join('；');
         setPrintStatus('訂單已完成 · 打印部分失敗 '+summary.sent+'/'+summary.planned+' · '+failures);
       }).catch(error=>setPrintStatus('訂單已完成 · 打印失敗 '+(error instanceof Error?error.message:String(error))));
-    }catch{
+    }catch(cause){
+      const code=cause instanceof Error?cause.message:String(cause);
+      if(diningCheckout){
+        if(code==='DINING_CHECKOUT_STALE'||code==='DINING_CHECKOUT_REFRESH_REQUIRED'){
+          setDiningRequiresRefresh(true);
+          setCheckoutFailure('堂食內容已更新；請返回堂食重新選擇未結項目，系統冇收款。');
+        }else if(code==='DINING_SUBMISSION_CONFLICT'){
+          setDiningRequiresRefresh(true);
+          setCheckoutFailure('同一堂食付款識別出現內容衝突；請返回堂食重新讀取，系統冇建立第二筆付款。');
+        }else{
+          setCheckoutFailure('堂食付款未完成：'+code+'。請核對後重試；系統會沿用同一付款識別。');
+        }
+      }
       setState('failure');
     }
   };
@@ -515,7 +1029,7 @@ function CheckoutPage({cart,setCart,diningCheckout,onDiningCheckoutDone}:{cart:C
     },
     onQuickCash:amount=>setCash(value=>((Number(value)||0)+amount).toFixed(2)),
     onExactCash:()=>setCash((due/100).toFixed(2)),
-    onConfirm:confirm,onRetry:confirm,
+    onConfirm:confirm,onRetry:()=>{if(diningCheckout&&diningRequiresRefresh){setCart([]);onDiningCheckoutDone();navigate('/dining');return;}void confirm();},
     onDone:()=>{setCart([]);if(diningCheckout){onDiningCheckoutDone();navigate('/dining');}else navigate('/')},
   };
 
@@ -528,10 +1042,19 @@ function OperationalApp(){
   const [globalArrival,setGlobalArrival]=useState<{orderId:string;display:string;sourceLabel:string}|null>(null);
   const [snoozedArrival,setSnoozedArrival]=useState<{orderId:string;display:string;sourceLabel:string}|null>(null);
   const snoozeTimerRef=useRef<number|undefined>(undefined);
-  const [cart,setCartState]=useState<CartLine[]>([]);
-  const [serviceMode,setServiceMode]=useState<ServiceMode>('takeaway');
-  const [diningCheckout,setDiningCheckout]=useState<DiningCheckoutRequest|null>(null);
+  const [diningCheckout,setDiningCheckout]=useState<DiningCheckoutRequest|null>(()=>readDiningCheckoutUiSession());
+  const [diningAddition,setDiningAddition]=useState<DiningAddOrderRequest|null>(()=>readDiningAddOrderUiSession());
+  const [cart,setCartState]=useState<CartLine[]>(()=>diningCheckout?diningCheckoutCart(diningCheckout):[]);
+  const [serviceMode,setServiceMode]=useState<ServiceMode>(diningCheckout||diningAddition?'dine-in':'takeaway');
   const [navRevision,setNavRevision]=useState(0);
+  useEffect(()=>{
+    if(location.pathname==='/dining'&&diningAddition){
+      clearDiningAddOrderUiSession();
+      setDiningAddition(null);
+      setCartState([]);
+      setServiceMode('dine-in');
+    }
+  },[location.pathname]);
   const snoozeGlobalArrival=(delayMs:number)=>{
     if(!globalArrival)return;
     const pending=globalArrival;
@@ -580,23 +1103,22 @@ function OperationalApp(){
 
 
   const prepareDiningCheckout=(request:DiningCheckoutRequest)=>{
-    const next:CartLine[]=request.lines.map((line,index)=>{
-      const parts=line.name.split('｜');
-      const name=parts.shift()||line.name;
-      const detail=parts.length?parts.join('｜'):undefined;
-      return {
-        id:'dining-checkout-'+request.holdId+'-'+line.lineIndex+'-'+index,
-        productId:line.id,
-        name,
-        qty:line.qty,
-        unitMinor:line.unitMinor,
-        serviceMode:'dine-in',
-        detail,
-      };
-    });
+    // C2: persist UI intent only. Runtime remains the only payment authority.
+    clearDiningAddOrderUiSession();
+    setDiningAddition(null);
+    saveDiningCheckoutUiSession(request);
     setDiningCheckout(request);
     setServiceMode('dine-in');
-    setCartState(next);
+    setCartState(diningCheckoutCart(request));
+  };
+
+  const prepareDiningAddition=(request:DiningAddOrderRequest)=>{
+    clearDiningCheckoutUiSession();
+    setDiningCheckout(null);
+    saveDiningAddOrderUiSession(request);
+    setDiningAddition(request);
+    setServiceMode('dine-in');
+    setCartState([]);
   };
 
   return <><RuntimeReadyActivation/><ProductionViewport><div className="clean-app">
@@ -627,10 +1149,10 @@ function OperationalApp(){
     </aside>
     <section className="clean-route-stage">
       <Routes>
-        <Route index element={<OrderingPage cart={cart} setCart={setCart} serviceMode={serviceMode} setServiceMode={setServiceMode}/>}/>
-        <Route path="checkout" element={<CheckoutPage cart={cart} setCart={setCart} diningCheckout={diningCheckout} onDiningCheckoutDone={()=>setDiningCheckout(null)}/>}/>
+        <Route index element={<OrderingPage cart={cart} setCart={setCart} serviceMode={serviceMode} setServiceMode={setServiceMode} diningAddition={diningAddition} onDiningAdditionDone={()=>{clearDiningAddOrderUiSession();setDiningAddition(null);}}/>}/>
+        <Route path="checkout" element={<CheckoutPage cart={cart} setCart={setCart} diningCheckout={diningCheckout} onDiningCheckoutDone={()=>{clearDiningCheckoutUiSession();setDiningCheckout(null);}}/>}/>
         <Route path="orders" element={<RuntimeOrdersWorkspace runtime={runtime}/>}/>
-        <Route path="dining" element={<RuntimeDiningWorkspace runtime={runtime} onCheckout={prepareDiningCheckout}/>}/>
+        <Route path="dining" element={<RuntimeDiningWorkspace runtime={runtime} onCheckout={prepareDiningCheckout} onAddOrder={prepareDiningAddition}/>}/>
         <Route path="soldout" element={<RuntimeSoldoutWorkspace runtime={runtime}/>}/>
         <Route path="more" element={<LocalMoreWorkspace/>}/>
         <Route path="*" element={<Navigate to="/" replace/>}/>

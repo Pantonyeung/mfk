@@ -1,3 +1,16 @@
+export interface LocalReportRefundLine{
+  readonly lineId:string;
+  readonly itemName:string;
+  readonly quantity:number;
+  readonly amountMinor:number;
+}
+export interface LocalReportRefund{
+  readonly id:string;
+  readonly createdAt:string;
+  readonly method:string;
+  readonly amountMinor:number;
+  readonly lines:readonly LocalReportRefundLine[];
+}
 export interface LocalReportOrder{
   readonly id:string;
   readonly display:string;
@@ -6,16 +19,44 @@ export interface LocalReportOrder{
   readonly paymentLabel:string;
   readonly fulfillmentLabel:string;
   readonly sourceLabel:string;
+  readonly refunds?:readonly LocalReportRefund[];
+  readonly recognizedSalesMinor?:number;
+  readonly outstandingMinor?:number;
+  readonly paymentEntries?:readonly {
+    readonly createdAt:string;
+    readonly tender:string;
+    readonly amountMinor:number;
+    readonly splitTenders?:readonly {readonly tender:string;readonly amountMinor:number}[];
+    readonly selections?:readonly {readonly lineIndex:number;readonly qty:number}[];
+  }[];
   readonly items:readonly {readonly id:string;readonly name:string;readonly qty:number;readonly unitMinor:number}[];
 }
 
 export interface LocalReport{
   readonly businessDate:string;
   readonly completedOrders:number;
+  readonly orderValueMinor:number;
+  readonly confirmedPaidMinor:number;
+  readonly outstandingMinor:number;
+  readonly grossSalesMinor:number;
+  readonly refundMinor:number;
   readonly netSalesMinor:number;
   readonly cashSalesMinor:number;
+  readonly cashRefundMinor:number;
+  readonly cashNetMinor:number;
   readonly itemUnits:number;
   readonly averageOrderMinor:number;
+  readonly refundRows:readonly {
+    readonly refundId:string;
+    readonly orderId:string;
+    readonly display:string;
+    readonly originalBusinessDate:string;
+    readonly originalCreatedAt:string;
+    readonly executionAt:string;
+    readonly method:string;
+    readonly amountMinor:number;
+    readonly items:string;
+  }[];
   readonly topProducts:readonly {readonly name:string;readonly quantity:number;readonly salesMinor:number}[];
 }
 
@@ -26,6 +67,7 @@ export interface LocalDayClose{
   readonly createdAt:number;
   readonly openingCashMinor:number;
   readonly cashSalesMinor:number;
+  readonly cashRefundMinor?:number;
   readonly expectedCashMinor:number;
   readonly countedCashMinor:number;
   readonly cashDifferenceMinor:number;
@@ -87,8 +129,36 @@ export function buildLocalReport(
     const at=Date.parse(order.createdAt);
     return Number.isFinite(at)&&at>=window.start&&at<window.end;
   });
-  const netSalesMinor=selected.reduce((sum,order)=>sum+Math.max(0,Number(order.totalMinor)||0),0);
+  const refunds=orders.flatMap(order=>(order.refunds??[]).map(refund=>({order,refund}))).filter(({refund})=>{
+    const at=Date.parse(refund.createdAt);
+    return Number.isFinite(at)&&at>=window.start&&at<window.end;
+  });
+  const recognizedSales=(order:LocalReportOrder)=>{
+    if(order.recognizedSalesMinor===undefined)return Math.max(0,Number(order.totalMinor)||0);
+    const total=Math.max(0,Number(order.totalMinor)||0);
+    return Math.min(total,Math.max(0,Number(order.recognizedSalesMinor)||0));
+  };
+  const orderValueMinor=selected.reduce((sum,order)=>sum+Math.max(0,Number(order.totalMinor)||0),0);
+  const confirmedPaidMinor=selected.reduce((sum,order)=>sum+recognizedSales(order),0);
+  const outstandingMinor=selected.reduce((sum,order)=>sum+Math.max(0,Number(order.outstandingMinor)||0),0);
+  const grossSalesMinor=confirmedPaidMinor;
+  const refundMinor=refunds.reduce((sum,row)=>sum+Math.max(0,Number(row.refund.amountMinor)||0),0);
+  const netSalesMinor=grossSalesMinor-refundMinor;
   const cashSalesMinor=selected.reduce((sum,order)=>{
+    if(order.paymentEntries){
+      return sum+order.paymentEntries.reduce((paymentSum,payment)=>{
+        const tender=String(payment.tender||'').toUpperCase();
+        if(tender==='CASH')return paymentSum+Math.max(0,Number(payment.amountMinor)||0);
+        if(tender==='COMBO'){
+          return paymentSum+(payment.splitTenders??[]).reduce((splitSum,row)=>
+            String(row.tender||'').toUpperCase()==='CASH'
+              ?splitSum+Math.max(0,Number(row.amountMinor)||0)
+              :splitSum
+          ,0);
+        }
+        return paymentSum;
+      },0);
+    }
     const label=String(order.paymentLabel||'');
     const upper=label.toUpperCase();
     if(upper.startsWith('COMBO')){
@@ -98,12 +168,30 @@ export function buildLocalReport(
     if(upper.includes('CASH')||label.includes('現金'))return sum+Math.max(0,Number(order.totalMinor)||0);
     return sum;
   },0);
-  const itemUnits=selected.reduce((sum,order)=>sum+order.items.reduce((s,item)=>s+Math.max(0,Number(item.qty)||0),0),0);
+  const cashRefundMinor=refunds.reduce((sum,row)=>{
+    const method=String(row.refund.method||'').toUpperCase();
+    return method.includes('CASH')||String(row.refund.method||'').includes('現金')
+      ?sum+Math.max(0,Number(row.refund.amountMinor)||0)
+      :sum;
+  },0);
+  const cashNetMinor=cashSalesMinor-cashRefundMinor;
+  const recognizedItemQty=(order:LocalReportOrder,lineIndex:number,itemQty:number)=>{
+    const qty=Math.max(0,Number(itemQty)||0);
+    if(order.recognizedSalesMinor===undefined)return qty;
+    if(!order.paymentEntries?.length)return recognizedSales(order)>=Math.max(0,Number(order.totalMinor)||0)?qty:0;
+    const paid=order.paymentEntries.reduce((sum,payment)=>
+      sum+(payment.selections??[]).filter(selection=>selection.lineIndex===lineIndex)
+        .reduce((selectionSum,selection)=>selectionSum+Math.max(0,Number(selection.qty)||0),0)
+    ,0);
+    return Math.min(qty,paid);
+  };
+  const itemUnits=selected.reduce((sum,order)=>sum+order.items.reduce((s,item,index)=>s+recognizedItemQty(order,index,item.qty),0),0);
   const products=new Map<string,{name:string;quantity:number;salesMinor:number}>();
   for(const order of selected){
-    for(const item of order.items){
+    for(const [index,item] of order.items.entries()){
+      const qty=recognizedItemQty(order,index,item.qty);
+      if(qty<=0)continue;
       const row=products.get(item.name)??{name:item.name,quantity:0,salesMinor:0};
-      const qty=Math.max(0,Number(item.qty)||0);
       row.quantity+=qty;
       row.salesMinor+=qty*Math.max(0,Number(item.unitMinor)||0);
       products.set(item.name,row);
@@ -113,10 +201,28 @@ export function buildLocalReport(
   return Object.freeze({
     businessDate:window.businessDate,
     completedOrders:selected.length,
+    orderValueMinor,
+    confirmedPaidMinor,
+    outstandingMinor,
+    grossSalesMinor,
+    refundMinor,
     netSalesMinor,
     cashSalesMinor,
+    cashRefundMinor,
+    cashNetMinor,
     itemUnits,
     averageOrderMinor:selected.length?Math.round(netSalesMinor/selected.length):0,
+    refundRows:Object.freeze(refunds.map(({order,refund})=>Object.freeze({
+      refundId:String((refund as {id?:string}).id||''),
+      orderId:order.id,
+      display:order.display,
+      originalBusinessDate:resolveBusinessWindow(Date.parse(order.createdAt),businessStartHour,businessStartMinute).businessDate,
+      originalCreatedAt:order.createdAt,
+      executionAt:refund.createdAt,
+      method:refund.method,
+      amountMinor:refund.amountMinor,
+      items:refund.lines.map(line=>line.itemName+' ×'+line.quantity).join('、'),
+    })).sort((a,b)=>b.executionAt.localeCompare(a.executionAt))),
     topProducts:Object.freeze(topProducts.map(row=>Object.freeze({...row}))),
   });
 }
@@ -143,7 +249,7 @@ export function createLocalDayClose(input:{
     .reduce((max,row)=>Math.max(max,row.version),0)+1;
   const openingCashMinor=Math.max(0,Math.round(input.openingCashMinor));
   const countedCashMinor=Math.max(0,Math.round(input.countedCashMinor));
-  const expectedCashMinor=openingCashMinor+report.cashSalesMinor;
+  const expectedCashMinor=openingCashMinor+report.cashSalesMinor-report.cashRefundMinor;
   const cashRemovedMinor=input.cashRemovedMinor===undefined?undefined:Math.max(0,Math.round(input.cashRemovedMinor));
   if(cashRemovedMinor!==undefined&&cashRemovedMinor>countedCashMinor)throw new Error('CASH_REMOVED_EXCEEDS_COUNTED');
   const retainedCashMinor=cashRemovedMinor===undefined?undefined:countedCashMinor-cashRemovedMinor;
@@ -154,6 +260,7 @@ export function createLocalDayClose(input:{
     createdAt:now,
     openingCashMinor,
     cashSalesMinor:report.cashSalesMinor,
+    cashRefundMinor:report.cashRefundMinor,
     expectedCashMinor,
     countedCashMinor,
     cashDifferenceMinor:countedCashMinor-expectedCashMinor,

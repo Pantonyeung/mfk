@@ -1,4 +1,5 @@
 import {readAdminSnapshotSection} from './admin-config-sync.ts';
+import {normalizeCapacityPoolConfig,type CapacityPoolDefinitionV1} from '../../../contracts/capacity-pool-v1.ts';
 
 export interface SmtDiningTableConfig{
   readonly id:string;
@@ -15,6 +16,7 @@ export interface SmtStoreSettings{
   readonly lateArrivalMinutes:number;
   readonly fulfillmentMinutes:number;
   readonly archiveHours:number;
+  readonly diningOverdueMinutes:number;
   readonly reminderAfterMinutes:number;
   readonly reminderIntervalMinutes:number;
   readonly repeatReminder:boolean;
@@ -32,6 +34,7 @@ export interface SmtCapacityConfig{
   readonly warningAt:number;
   readonly hardStopConfigured:boolean;
   readonly note:string;
+  readonly pools:readonly CapacityPoolDefinitionV1[];
 }
 
 export interface SmtFrontlinePresentation{
@@ -95,6 +98,7 @@ export function readSmtStoreSettings():SmtStoreSettings{
     lateArrivalMinutes:Math.max(0,number(row.lateArrivalMinutes,15)),
     fulfillmentMinutes:Math.max(0,number(row.fulfillmentMinutes,20)),
     archiveHours:Math.max(1,number(row.archiveHours,24)),
+    diningOverdueMinutes:Math.max(1,Math.floor(number(row.diningOverdueMinutes,35))),
     reminderAfterMinutes:Math.max(0,number(row.reminderAfterMinutes,5)),
     reminderIntervalMinutes:Math.max(1,number(row.reminderIntervalMinutes,5)),
     repeatReminder:bool(row.repeatReminder,true),
@@ -110,14 +114,15 @@ export function readSmtStoreSettings():SmtStoreSettings{
 
 export function readSmtCapacityConfig():SmtCapacityConfig{
   const row=record(readAdminSnapshotSection('capacity'));
-  const limitText=text(row.dailyLimit);
-  const parsed=Number(limitText);
+  const normalized=normalizeCapacityPoolConfig(row);
+  const parsed=Number(normalized.dailyLimit);
   const dailyLimit=Number.isFinite(parsed)&&parsed>0?Math.floor(parsed):undefined;
   return Object.freeze({
     ...(dailyLimit?{dailyLimit}:{}),
-    warningAt:Math.min(100,Math.max(1,Math.floor(number(row.warningAt,80)))),
-    hardStopConfigured:bool(row.hardStop,false),
-    note:text(row.note),
+    warningAt:normalized.warningAt,
+    hardStopConfigured:normalized.hardStop,
+    note:normalized.note,
+    pools:Object.freeze(normalized.pools.map(pool=>Object.freeze({...pool,productIds:Object.freeze([...pool.productIds])}))),
   });
 }
 

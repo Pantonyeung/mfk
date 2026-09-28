@@ -1,0 +1,34 @@
+export const CUSTOMER_FINAL_SOURCE=Object.freeze({
+  logo:Object.freeze({
+    sourceFile:'04_品牌與IP原始素材/IMG_8155(1).png',
+    url:'https://cdn.creativeclaw.co/u/6ad84d58/images/6c117fc9-a78a-44ab-a781-aa94fad1f34c.png',
+  }),
+  maleIpSheet:Object.freeze({
+    sourceFile:'04_品牌與IP原始素材/B3D808D8-931D-4FC7-8259-B5C1BF3934E2.jpeg',
+    url:'https://cdn.creativeclaw.co/u/6ad84d58/images/d280a26f-54da-463f-b273-ea1fa6a1ed9b.jpg',
+  }),
+  femaleIpSheet:Object.freeze({
+    sourceFile:'04_品牌與IP原始素材/AA9C700D-7045-4071-8BAE-22CABFD10FC1(1).jpeg',
+    url:'https://cdn.creativeclaw.co/u/6ad84d58/images/2d135250-c626-4ec9-8f80-182d40ab82c2.jpg',
+  }),
+  riceball:Object.freeze({
+    sourceFile:'04_品牌與IP原始素材/IMG_5084.jpeg',
+    url:'https://cdn.creativeclaw.co/u/6ad84d58/images/de9049b2-630f-4bc8-8829-9ef43cc229fc.jpg',
+  }),
+  bento:Object.freeze({
+    sourceFile:'04_品牌與IP原始素材/IMG_4585.jpeg',
+    url:'https://cdn.creativeclaw.co/u/6ad84d58/images/cf8ddb02-580b-4085-9a55-3f410fb0b93c.jpg',
+  }),
+  stage0Storyboard:Object.freeze({
+    sourceFile:'03_效果圖/正式命名版本/stage0_launch_animation_storyboard_v1.png',
+    url:'https://cdn.creativeclaw.co/u/6ad84d58/images/a0def87e-7c3d-4ba5-8df6-5a838e435c0d.png',
+  }),
+  stage1Final:Object.freeze({
+    sourceFile:'03_效果圖/正式命名版本/磨飯_stage_1_首頁品牌展示.png',
+    url:'https://cdn.creativeclaw.co/u/6ad84d58/images/3cd309ae-89d5-4d3b-a320-66ecf1e0cadf.png',
+  }),
+  stage2Final:Object.freeze({
+    sourceFile:'03_效果圖/正式命名版本/stage2_order_discovery_female_v1.png',
+    url:'https://cdn.creativeclaw.co/u/6ad84d58/images/666570d5-71a7-4c15-b41d-80c6eb53aeb3.png',
+  }),
+});

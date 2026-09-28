@@ -8,6 +8,7 @@ import {installKeetaOrderIntake} from './runtime/keeta-order-intake.ts';
 import {installKeetaOrderLifecycle} from './runtime/keeta-order-lifecycle.ts';
 import {installKeetaAfterSales} from './runtime/keeta-after-sale.ts';
 import {installCustomerCloudBridge} from './runtime/customer-cloud-intake.ts';
+import {installAdminRefundIntake} from './runtime/admin-refund-intake.ts';
 import {localRuntime} from './runtime/local-runtime.ts';
 import {createSmmLanIngress} from './runtime/smm-lan-ingress.ts';
 import {installSmmWebAcceptanceIntake} from './runtime/smm-web-acceptance-intake.ts';
@@ -33,6 +34,7 @@ if(!webAcceptance){
   installKeetaOrderLifecycle();
   installKeetaAfterSales();
   installCustomerCloudBridge();
+  installAdminRefundIntake();
 }
 
 const smmLanIngress=createSmmLanIngress(localRuntime);

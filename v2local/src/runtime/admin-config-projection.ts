@@ -25,6 +25,7 @@ export interface SyncedOrderingProduct{
   readonly categoryId:string;
   readonly category:string;
   readonly name:string;
+  readonly description?:string;
   readonly priceMinor:number;
   readonly priceReady:boolean;
   readonly sellable:boolean;
@@ -75,6 +76,12 @@ export interface SyncedCombo{
   readonly addonPoolIds:readonly string[];
 }
 
+export interface SyncedRiceballDrinkPromotion{
+  readonly active:boolean;
+  readonly eligibleMainPoolIds:readonly string[];
+  readonly drinks:readonly {readonly productId:string;readonly label:string;readonly promoPriceMinor:number}[];
+}
+
 function record(value:unknown):Record<string,unknown>{
   return value&&typeof value==='object'&&!Array.isArray(value)?value as Record<string,unknown>:{};
 }
@@ -91,6 +98,13 @@ function moneyMinor(value:unknown){
 }
 function snapshotOf(envelope?:MfkAdminConfigEnvelope|null){
   return record((envelope??readSmtAdminConfigLkg())?.snapshot);
+}
+function localSellable(raw:unknown,now=Date.now()){
+  const state=record(raw);
+  if(state.scope==='ONLINE_ONLY')return true;
+  const restoreAt=Date.parse(string(state.restoreAt));
+  if(Number.isFinite(restoreAt)&&restoreAt<=now)return true;
+  return state.sellable!==false;
 }
 
 export function projectSyncedOrderingCatalog(
@@ -161,7 +175,7 @@ export function projectSyncedOrderingCatalog(
               name:string(option.name,optionId),
               priceAdjustmentMinor:moneyMinor(option.priceAdjustment),
               defaultSelected:defaults.has(optionId),
-              active:bool(option.active,true),
+              active:bool(option.active,true)&&localSellable(availability['OPTION:'+optionId]),
               position:integer(option.position,0),
             };
           })
@@ -185,11 +199,12 @@ export function projectSyncedOrderingCatalog(
         categoryId,
         category:category?.label??'其他',
         name:string(row.name,id),
+        description:string(row.description)||undefined,
         active:bool(row.active,true),
         position:integer(row.legacySourcePosition,index),
         priceMinor:moneyMinor(priceText)+surcharge+adjustment,
         priceReady:baseReady,
-        sellable:availabilityRow.sellable===undefined?true:bool(availabilityRow.sellable,true),
+        sellable:localSellable(availabilityRow),
         imageUrl:imageUrl||undefined,
         optionSets:Object.freeze(optionSets),
       };
@@ -205,6 +220,33 @@ export function projectSyncedOrderingCatalog(
   return Object.freeze({
     categories:Object.freeze(categories.map(({active:_,...row})=>Object.freeze(row))),
     products:Object.freeze(products),
+  });
+}
+
+export function projectSyncedRiceballDrinkPromotion(
+  envelope?:MfkAdminConfigEnvelope|null,
+):SyncedRiceballDrinkPromotion|null{
+  const snapshot=snapshotOf(envelope);
+  const pricingPromotions=record(snapshot.pricingPromotions);
+  const row=record(pricingPromotions.riceballDrink);
+  if(row.schema!=='MFK_RICEBALL_DRINK_PROMOTION_V1'||!bool(row.active,false))return null;
+  const eligibleMainPoolIds=array(row.eligibleMainPoolIds).map(value=>string(value)).filter(Boolean);
+  const drinks=array(row.drinks).map(raw=>{
+    const drink=record(raw);
+    const productId=string(drink.productId);
+    const priceText=string(drink.promoPrice);
+    const ready=priceText.trim()!==''&&Number.isFinite(Number(priceText));
+    return {
+      productId,
+      label:string(drink.label,productId),
+      promoPriceMinor:ready?moneyMinor(priceText):-1,
+    };
+  }).filter(drink=>drink.productId&&drink.promoPriceMinor>=0);
+  if(!eligibleMainPoolIds.length||!drinks.length)return null;
+  return Object.freeze({
+    active:true,
+    eligibleMainPoolIds:Object.freeze(eligibleMainPoolIds),
+    drinks:Object.freeze(drinks.map(drink=>Object.freeze(drink))),
   });
 }
 
@@ -239,7 +281,7 @@ export function projectSyncedCombos(envelope?:MfkAdminConfigEnvelope|null):{
           label:string(choice.label),
           bandId:string(choice.bandId),
           priceAdjustmentMinor:moneyMinor(choice.priceAdjustment),
-          active:bool(choice.active,true),
+          active:bool(choice.active,true)&&localSellable(record(snapshot.availability)['COMBO_CHILD:'+string(choice.id)]),
           position:integer(choice.position,0),
         };
       }).filter(choice=>choice.id&&choice.active);

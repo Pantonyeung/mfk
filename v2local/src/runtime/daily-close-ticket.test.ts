@@ -37,33 +37,34 @@ const orders:(PrintableOrder&{fulfillmentLabel:string})[]=[
 ];
 
 describe('daily close ticket',()=>{
-  it('summarizes non-cancelled sales by channel and payment without inventing refunds',()=>{
+  it('keeps cancelled paid orders as financial gross until an explicit refund exists',()=>{
     const data=buildDailyClosePrintData({orders,close});
-    expect(data.orderCount).toBe(2);
-    expect(data.itemUnits).toBe(3);
-    expect(data.grossMinor).toBe(12000);
+    expect(data.orderCount).toBe(3);
+    expect(data.itemUnits).toBe(4);
+    expect(data.grossMinor).toBe(15000);
     expect(data.refundMinor).toBeUndefined();
     expect(data.channelRows).toEqual([
-      {label:'店內',orders:1,grossMinor:5000,netMinor:5000},
+      {label:'店內',orders:2,grossMinor:8000,netMinor:8000},
       {label:'Keeta',orders:1,grossMinor:7000,netMinor:7000},
     ]);
     expect(data.paymentRows).toEqual([
-      {label:'CASH',orders:1,amountMinor:5000},
+      {label:'CASH',orders:2,amountMinor:8000},
       {label:'FPS',orders:1,amountMinor:7000},
     ]);
+    expect(data.refundRows).toEqual([]);
     const ticket=renderDailyCloseTicket(data);
     expect(ticket).toContain('日結單 / DAILY CLOSE');
-    expect(ticket).toContain('總訂單數：2 單');
-    expect(ticket).toContain('總件數：3 件');
+    expect(ticket).toContain('總訂單數：3 單');
+    expect(ticket).toContain('總件數：4 件');
     expect(ticket).toContain('Keeta  1單  $70.00');
-    expect(ticket).toContain('CASH  1單  $50.00');
+    expect(ticket).toContain('CASH  2單  $80.00');
     expect(ticket).toContain('退款總額：—（未接正式退款帳）');
     expect(ticket).toContain('差額：-$5.00');
   });
 
   it('prints canonical refund amount only when explicitly supplied',()=>{
     const data=buildDailyClosePrintData({orders,close,refundMinor:1000});
-    expect(data.netMinor).toBe(11000);
+    expect(data.netMinor).toBe(14000);
     expect(renderDailyCloseTicket(data)).toContain('退款總額：-$10.00');
   });
 });

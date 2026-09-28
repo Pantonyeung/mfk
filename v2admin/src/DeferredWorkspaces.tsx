@@ -1,5 +1,7 @@
 import {useMemo,useState} from 'react';
 import {appendAdminAudit,usePersistentAdminState} from './admin-local-store.ts';
+import {useAdminDraft} from './admin-draft.tsx';
+import {saveAdminConfig} from './admin-config-save.ts';
 import {AdminResponsiveDataView} from './AdminResponsiveDataView.tsx';
 import {AdminSearchField} from './AdminUiPrimitives.tsx';
 
@@ -73,6 +75,7 @@ interface PresentationConfig{
   headline:string;eyebrow:string;body:string;ctaLabel:string;showPromos:boolean;showCategories:boolean;showImages:boolean;showDescriptions:boolean;tabletColumns:number;mobileColumns:number;quickProductIds:string[];
 }
 export function PresentationWorkspace({surface}:{surface:'CUSTOMER'|'OWNER'|'FRONTLINE'}){
+  const {draft}=useAdminDraft();
   const key='presentation.'+surface.toLowerCase()+'.v1';
   const [customerChannel,setCustomerChannel]=usePersistentAdminState<{enabled:boolean}>('channel-policy.customer.v1',{enabled:false});
   const setCustomerChannelEnabled=(enabled:boolean)=>{
@@ -84,9 +87,18 @@ export function PresentationWorkspace({surface}:{surface:'CUSTOMER'|'OWNER'|'FRO
     headline:'',eyebrow:'',body:'',ctaLabel:'',showPromos:true,showCategories:true,showImages:true,showDescriptions:true,tabletColumns:4,mobileColumns:2,quickProductIds:[],
   });
   const patch=(change:Partial<PresentationConfig>)=>setConfig(current=>{const after={...current,...change};appendAdminAudit({action:'修改顯示設定',target:surface,before:current,after});return after;});
+  const [saveMessage,setSaveMessage]=useState('');
+  const [saveErrors,setSaveErrors]=useState<readonly string[]>([]);
+  const publish=()=>{
+    const result=saveAdminConfig(draft,undefined,'顯示設定 '+surface);
+    if(!result.ok){setSaveErrors(result.errors);setSaveMessage('未能保存；請先修正設定驗證問題。');return;}
+    setSaveErrors([]);
+    setSaveMessage('已保存並啟用 R'+result.release.version+'；已排入 Admin → SMT／SMM 自動同步。');
+  };
   const title=surface==='CUSTOMER'?'客戶端首頁':surface==='OWNER'?'老闆今日首頁':'前線點單版面';
   return <section className="admin-editor-page">
-    <Header title={title} description="只管理受控顯示設定：顯示內容、區塊、欄數同快捷商品。商品名、價格、供應同訂單仍由正式資料決定。" badge="顯示設定"/>
+    {surface==='FRONTLINE'?<header className="admin-editor-head"><div><small>顯示設定</small><h1>{title}</h1><p>只管理前線顯示：圖片、說明、欄數、快捷商品同操作提示。商品名、價格、供應、訂單同付款權限完全不變。</p>{saveMessage?<span>{saveMessage}</span>:null}</div><div className="admin-editor-actions"><button className="primary" type="button" onClick={publish}>保存並發佈</button></div></header>:<Header title={title} description="只管理受控顯示設定：顯示內容、區塊、欄數同快捷商品。商品名、價格、供應同訂單仍由正式資料決定。" badge="顯示設定"/>}
+    {surface==='FRONTLINE'&&saveErrors.length?<div className="admin-validation is-error" role="alert"><b>有 {saveErrors.length} 項需要處理</b><ul>{saveErrors.map((error,index)=><li key={index}>{error}</li>)}</ul></div>:null}
     <div className="admin-policy-grid two">
       {surface==='CUSTOMER'?<article className="admin-policy-card"><h2>自家落單渠道</h2><label className="admin-toggle"><input type="checkbox" checked={customerChannel.enabled} onChange={event=>setCustomerChannelEnabled(event.target.checked)}/><span>{customerChannel.enabled?'接受自家落單':'暫停自家落單'}</span></label><p>關閉時客戶端只可讀狀態／歷史；新報價同新落單會由 Cloud Edge fail-closed 拒絕。</p></article>:null}
       <article className="admin-policy-card"><h2>內容</h2><label><span>小標題</span><input value={config.eyebrow} onChange={event=>patch({eyebrow:event.target.value})}/></label><label><span>主標題</span><input value={config.headline} onChange={event=>patch({headline:event.target.value})}/></label><label><span>說明</span><textarea rows={4} value={config.body} onChange={event=>patch({body:event.target.value})}/></label><label><span>按鈕文字</span><input value={config.ctaLabel} onChange={event=>patch({ctaLabel:event.target.value})}/></label><label className="admin-toggle"><input type="checkbox" checked={config.showPromos} onChange={event=>patch({showPromos:event.target.checked})}/><span>顯示推廣區</span></label><label className="admin-toggle"><input type="checkbox" checked={config.showCategories} onChange={event=>patch({showCategories:event.target.checked})}/><span>顯示分類導覽</span></label></article>

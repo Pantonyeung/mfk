@@ -30,6 +30,68 @@ export interface SmmVariation {
   readonly available:boolean;
 }
 
+
+export type SmmComboChoiceType='PRODUCT'|'LABEL'|'NONE';
+
+export interface SmmComboChoice {
+  readonly choiceId:string;
+  readonly choiceType:SmmComboChoiceType;
+  readonly productId?:string;
+  readonly label:string;
+  readonly available:boolean;
+  readonly publishedAdjustmentMinor:number;
+}
+
+export interface SmmComboSubPool {
+  readonly subPoolId:string;
+  readonly name:string;
+  readonly publishedAdjustmentMinor:number;
+  readonly choices:readonly SmmComboChoice[];
+}
+
+export interface SmmComboGroup {
+  readonly groupId:string;
+  readonly name:string;
+  readonly required:boolean;
+  readonly minSelections:number;
+  readonly maxSelections:number;
+  readonly subPools:readonly SmmComboSubPool[];
+}
+
+export interface SmmComboPool {
+  readonly poolId:string;
+  readonly name:string;
+  readonly kind:'MAIN_COURSE'|'ADDON';
+  readonly addonKind?:'SNACK'|'DRINK';
+  readonly groups:readonly SmmComboGroup[];
+}
+
+export interface SmmCombo {
+  readonly comboId:string;
+  readonly name:string;
+  readonly publishedBasePriceMinor:number;
+  readonly mainPoolId?:string;
+  readonly addonPoolIds:readonly string[];
+}
+
+export interface SmmCartComboSelection {
+  readonly poolId:string;
+  readonly groupId:string;
+  readonly subPoolId:string;
+  readonly choiceId:string;
+  readonly choiceType:SmmComboChoiceType;
+  readonly choiceLabel:string;
+  readonly productId?:string;
+  readonly publishedAdjustmentMinor:number;
+}
+
+export interface SmmCartComboIntent {
+  readonly comboId:string;
+  readonly comboName:string;
+  readonly publishedBasePriceMinor:number;
+  readonly selections:readonly SmmCartComboSelection[];
+}
+
 export interface SmmProduct {
   readonly productId:string;
   readonly categoryId:string;
@@ -42,6 +104,7 @@ export interface SmmProduct {
   readonly variationRequired?:boolean;
   readonly variations?:readonly SmmVariation[];
   readonly optionGroups:readonly SmmOptionGroup[];
+  readonly comboId?:string;
 }
 
 export interface SmmMenuSnapshot {
@@ -49,6 +112,8 @@ export interface SmmMenuSnapshot {
   readonly observedAt:string;
   readonly categories:readonly SmmCategory[];
   readonly products:readonly SmmProduct[];
+  readonly combos?:readonly SmmCombo[];
+  readonly comboPools?:readonly SmmComboPool[];
 }
 
 export interface SmmQuoteLine {
@@ -74,6 +139,19 @@ export interface SmmCartSelection {
   readonly publishedAdjustmentMinor?:number;
 }
 
+export type SmmCartRefreshKind='PRICE_CHANGED'|'CONFIG_CHANGED';
+
+export interface SmmCartRefreshAttention {
+  readonly kind:SmmCartRefreshKind;
+  readonly menuRevision:string;
+  readonly oldPublishedUnitPriceMinor?:number;
+  readonly proposedPublishedUnitPriceMinor?:number;
+  readonly proposedSelections?:readonly SmmCartSelection[];
+  readonly proposedCombo?:SmmCartComboIntent;
+  readonly canAccept:boolean;
+  readonly detectedAt:string;
+}
+
 export interface SmmCartLine {
   readonly lineId:string;
   readonly productId:string;
@@ -82,7 +160,9 @@ export interface SmmCartLine {
   readonly selectedVariationId?:string;
   readonly selectedVariationName?:string;
   readonly selections:readonly SmmCartSelection[];
+  readonly combo?:SmmCartComboIntent;
   readonly publishedUnitPriceMinor?:number;
+  readonly refreshAttention?:SmmCartRefreshAttention;
   readonly createdAt:string;
 }
 
@@ -106,7 +186,7 @@ export interface SmmPendingIntent {
   readonly idempotencyKey:string;
   readonly createdAt:string;
   readonly updatedAt:string;
-  readonly state:'DRAFT'|'NOT_CONNECTED'|'PENDING'|'UNKNOWN';
+  readonly state:'DRAFT'|'NOT_CONNECTED'|'PENDING'|'REJECTED'|'UNKNOWN';
   readonly menuRevision:string;
   readonly publishedTotalMinor:number;
   readonly checkout:SmmStaffCheckout;
@@ -131,6 +211,26 @@ export interface SmmOrderProjection {
   readonly readback:'CONFIRMED'|'PARTIAL'|'UNKNOWN';
   readonly note?:string;
   readonly timeline:readonly SmmOrderTimelineItem[];
+
+  /** Optional canonical Stage 7 presentation fields. */
+  readonly orderTime?:string;
+  readonly itemCount?:number;
+  readonly sourceGroup?:'ONSITE'|'SMM'|'OWN_PLATFORM'|'THIRD_PARTY';
+  readonly effectiveAmountLabel?:string;
+  readonly tenderLabel?:string;
+  readonly fulfillmentLabel?:string;
+  readonly eta?:string;
+  readonly externalRef?:string;
+  readonly customerName?:string;
+  readonly customerPhone?:string;
+  readonly customerPhonePermitted?:boolean;
+  readonly items?:readonly {
+    readonly quantity:number;
+    readonly name:string;
+    readonly detail?:string;
+    readonly amountLabel?:string;
+    readonly remark?:string;
+  }[];
 }
 
 export interface SmmWorkItem {
@@ -142,6 +242,22 @@ export interface SmmWorkItem {
   readonly eta?:string;
   readonly state:'NORMAL'|'DELAYED'|'ACTION_REQUIRED'|'UNKNOWN';
   readonly observedAt:string;
+
+  /** Optional canonical projection fields for Stage 6 presentation only. */
+  readonly source?:string;
+  readonly orderTime?:string;
+  readonly itemCount?:number;
+  readonly serviceMode?:SmmServiceMode;
+  readonly statusLabel?:string;
+  readonly customerName?:string;
+  readonly customerContact?:string;
+  readonly note?:string;
+  readonly items?:readonly {
+    readonly quantity:number;
+    readonly name:string;
+    readonly detail?:string;
+    readonly amountLabel?:string;
+  }[];
 }
 
 export interface SmmChannelHealth {
@@ -248,6 +364,7 @@ export interface SmmCommandResult {
   readonly state:SmmCommandState;
   readonly message:string;
   readonly orderId?:string;
+  readonly displayCode?:string;
   readonly canonicalRevision?:number;
 }
 

@@ -19,8 +19,10 @@ export interface OrderingProductViewModel {
   readonly priceLabel:string;
   readonly enabled:boolean;
   readonly requiresOptions:boolean;
+  readonly quickAddAllowed:boolean;
   readonly badge?:string;
   readonly imageUrl?:string;
+  readonly description?:string;
 }
 
 export interface CartLineViewModel {
@@ -32,18 +34,22 @@ export interface CartLineViewModel {
   readonly groupId:string;
   readonly groupLabel:string;
   readonly detail?:string;
+  readonly sourceLineIds?:readonly string[];
 }
 
 export interface OrderingCartViewModel {
   readonly orderId:string;
   readonly serviceMode:ServiceMode;
   readonly viewMode:'original'|'organized';
+  readonly combineSimilar:boolean;
   readonly lines:readonly CartLineViewModel[];
   readonly subtotalLabel:string;
   readonly packagingLabel:string;
   readonly discountLabel:string;
   readonly totalLabel:string;
   readonly checkoutEnabled:boolean;
+  readonly primaryActionLabel?:string;
+  readonly contextLabel?:string;
 }
 
 export interface OrderingWorkItemViewModel {
@@ -69,7 +75,11 @@ export interface OrderingWorkspaceViewModel {
   readonly menuRevisionLabel?:string;
   readonly operationalNotice?:string;
   readonly showCategories?:boolean;
+  readonly showDescriptions?:boolean;
+  readonly productColumns?:number;
+  readonly frontlineGuidance?:Readonly<{readonly headline?:string;readonly body?:string}>;
   readonly serviceModes?:Readonly<{takeaway:boolean;dineIn:boolean}>;
+  readonly orderingMode:'quick'|'normal';
   readonly cart:OrderingCartViewModel;
   readonly workItems:readonly OrderingWorkItemViewModel[];
   readonly recentlyAddedProductId?:string;
@@ -80,10 +90,12 @@ export interface OrderingWorkspaceViewModel {
 
 export interface OrderingWorkspaceActions {
   readonly onSelectCategory:(categoryId:string)=>void;
+  readonly onChangeOrderingMode:(mode:'quick'|'normal')=>void;
   readonly onAddProduct:(productId:string)=>void;
   readonly onConfigureProduct:(productId:string)=>void;
   readonly onChangeServiceMode:(mode:ServiceMode)=>void;
   readonly onChangeCartView:(mode:'original'|'organized')=>void;
+  readonly onToggleCombine:()=>void;
   readonly onChangeLineServiceMode:(lineId:string,mode:ServiceMode)=>void;
   readonly onAdjustLineQuantity:(lineId:string,delta:-1|1)=>void;
   readonly onEditCartLine:(lineId:string)=>void;
