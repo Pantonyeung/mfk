@@ -36,6 +36,8 @@ function emitBase64(name,buffer){
 }
 
 test('Wave2 renders Stage7 Stage8 Stage9 StageX at 440x956 and 360x780', {skip:!RUN,timeout:240000}, async()=>{
+  const fontInstall=spawnSync('bash',['-lc','sudo apt-get update -qq && sudo apt-get install -y -qq fonts-noto-cjk'],{encoding:'utf8',timeout:120000});
+  assert.equal(fontInstall.status,0,'CJK font install failed: '+String(fontInstall.stderr||fontInstall.stdout));
   await rm(OUT,{recursive:true,force:true});
   await mkdir(OUT,{recursive:true});
   const npx=process.platform==='win32'?'npx.cmd':'npx';
@@ -51,8 +53,7 @@ test('Wave2 renders Stage7 Stage8 Stage9 StageX at 440x956 and 360x780', {skip:!
           '--yes','playwright@1.55.0','screenshot',
           '--channel','chrome',
           '--viewport-size',width+','+height,
-          '--full-page',
-          '--wait-for-timeout','350',
+          '--wait-for-timeout','650',
           BASE+'?stage='+stage,
           file,
         ],{encoding:'utf8',timeout:90000});
@@ -60,7 +61,7 @@ test('Wave2 renders Stage7 Stage8 Stage9 StageX at 440x956 and 360x780', {skip:!
         const buffer=await readFile(file);
         const size=pngSize(buffer);
         assert.equal(size.width,width,name+' width');
-        assert.ok(size.height>=height,name+' height');
+        assert.equal(size.height,height,name+' height');
         const sha=createHash('sha256').update(buffer).digest('hex');
         captures.push({name,width:size.width,height:size.height,sha,bytes:buffer.length});
         emitBase64(name,buffer);
