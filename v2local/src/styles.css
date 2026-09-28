@@ -796,3 +796,9 @@
   .s0-keypad button{min-height:38px}
   .s0-side{grid-template-rows:86px 82px 82px minmax(76px,1fr) 54px;gap:7px}
 }
+
+/* Stage 0 real-device interaction correction */
+.s0-login-methods{grid-template-columns:1fr}
+.s0-pin input{width:100%;min-width:0;height:100%;border:0;outline:0;background:transparent;color:#183a70;font-size:clamp(16px,1.9dvh,19px);font-weight:750}
+.s0-pin input::placeholder{color:#8a98ad;font-weight:600}
+.s0-side:has(.s0-tools:empty){grid-template-rows:clamp(92px,14dvh,132px) clamp(88px,13dvh,124px) clamp(88px,13dvh,124px) minmax(90px,1fr)}
