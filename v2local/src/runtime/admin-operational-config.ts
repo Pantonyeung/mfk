@@ -79,13 +79,14 @@ export function readSmtDiningTableRegistry():readonly SmtDiningTableConfig[]{
     const item=record(raw);
     const id=text(item.id);
     const name=text(item.name);
-    if(!id||!name)return [];
     const versions=Array.isArray(item.versions)?item.versions.map(record):[];
     const activeVersion=versions.find(version=>version.status==='ACTIVE');
+    const resolvedName=text(activeVersion?.label,name);
+    if(!id||!resolvedName)return [];
     const version=text(activeVersion?.versionId)||text(item.version);
     return [Object.freeze({
       id,
-      name:text(activeVersion?.label,name),
+      name:resolvedName,
       active:item.active!==false,
       sortOrder:Math.max(1,Math.floor(number(item.sortOrder,index+1))),
       version:version||'LEGACY',
