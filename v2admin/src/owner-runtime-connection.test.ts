@@ -93,4 +93,33 @@ describe('Owner canonical read projection',()=>{
     expect(values.get('active').snapshot.availability).toEqual({});
   });
 
+  it('auto-triggers existing Keeta sellability sync when latest SMT runtime projection is accepted',async()=>{
+    const values=new Map<string,any>();
+    const providerCalls:any[]=[];
+    const state:any={
+      storage:{
+        get:async(key:string)=>values.get(key),
+        put:async(key:string,value:any)=>{values.set(key,value);},
+        list:async({prefix}:{prefix:string})=>new Map([...values].filter(([key])=>key.startsWith(prefix))),
+      },
+      getWebSockets:()=>[],
+    };
+    values.set('active',{storeId:'MF01',revision:12,fingerprint:'r12',snapshot:{channelPolicy:{syncSellability:true},catalog:{products:[{id:'p1',productCode:'P1',active:true}]}}});
+    const env:any={KEETA_RUNTIME:{
+      idFromName:(id:string)=>id,
+      get:()=>({fetch:async(request:Request)=>{providerCalls.push(await request.clone().json());return new Response('{}',{status:200});}}),
+    }};
+    const store=new AdminSyncStore(state,env);
+    const event={
+      schema:'MFK_SMT_PROJECTION_EVENT_V1',eventId:'evt-runtime-1',storeId:'MF01',deviceId:'SMT-1',
+      type:'RUNTIME_SELLABILITY_UPSERT',entityId:'p1',occurredAt:'2026-09-29T00:00:00.000Z',
+      payload:{nodeId:'p1',status:'soldout',sellable:false,source:'SMT_RUNTIME',observedAt:'2026-09-29T00:00:00.000Z'},
+    };
+    const response=await store.fetch(new Request('https://internal/projection/events',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({events:[event]})}));
+    expect(response.status).toBe(200);
+    await Promise.resolve();
+    expect(providerCalls).toHaveLength(1);
+    expect(providerCalls[0]).toMatchObject({revision:12,runtimeSellability:[{nodeId:'p1',status:'soldout'}]});
+  });
+
 });
