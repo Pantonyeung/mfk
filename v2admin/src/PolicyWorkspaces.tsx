@@ -240,29 +240,25 @@ export function StoreSettingsWorkspace(){
   const addTable=()=>{const id=nextTableId(),at=new Date().toISOString();patch({diningTables:[...diningTables,{id,name:'新枱',active:true,sortOrder:diningTables.length+1,versions:[{versionId:'V1',label:'新枱',requestedAt:at,requestedBy:'ADMIN',sourceRevision:activeRelease?.version??0,status:'ACTIVE',effectiveAt:at}]}]});};
   const requestRename=(id:string,newLabel:string)=>{
     const label=newLabel.trim();
+    const visibleRow=diningTables.find(item=>item.id===id);
+    if(!visibleRow){setRenameMessages(current=>({...current,[id]:'未能建立改名計劃。'}));return;}
     if(!label){setRenameMessages(current=>({...current,[id]:'請先輸入新名稱。'}));return;}
-    let outcome:'CREATED'|'UNCHANGED'|'ALREADY_PLANNED'|'NOT_FOUND'='NOT_FOUND';
+    if(label===visibleRow.name){setRenameMessages(current=>({...current,[id]:'新名稱與目前名稱相同。'}));return;}
+    if(visibleRow.versions?.some(item=>item.status==='PLANNED')){setRenameMessages(current=>({...current,[id]:'已有待生效改名計劃；不會重複建立版本。'}));return;}
     setConfig(current=>{
       const rows=[...(current.diningTables??[])];
       const index=rows.findIndex(item=>item.id===id);
       if(index<0)return current;
-      const row=rows[index];
-      if(label===row.name){outcome='UNCHANGED';return current;}
-      const versions=[...(row.versions??[])];
-      if(versions.some(item=>item.status==='PLANNED')){outcome='ALREADY_PLANNED';return current;}
+      const row=rows[index],versions=[...(row.versions??[])];
+      if(versions.some(item=>item.status==='PLANNED'))return current;
       const versionId='V'+String(versions.length+1);
       const planned:DiningTableVersion={versionId,label,requestedAt:new Date().toISOString(),requestedBy:'ADMIN',sourceRevision:activeRelease?.version??0,status:'PLANNED'};
       rows[index]={...row,versions:[...versions,planned]};
-      outcome='CREATED';
       appendAdminAudit({action:'建立堂食枱改名計劃',target:id,before:row,after:{versionId,label,status:'PLANNED'}});
       return {...current,diningTables:rows};
     });
-    if(outcome==='CREATED'){
-      setRenameDrafts(current=>({...current,[id]:''}));
-      setRenameMessages(current=>({...current,[id]:'已建立改名計劃；尚未發佈。'}));
-    }else if(outcome==='ALREADY_PLANNED')setRenameMessages(current=>({...current,[id]:'已有待生效改名計劃；不會重複建立版本。'}));
-    else if(outcome==='UNCHANGED')setRenameMessages(current=>({...current,[id]:'新名稱與目前名稱相同。'}));
-    else setRenameMessages(current=>({...current,[id]:'未能建立改名計劃。'}));
+    setRenameDrafts(current=>({...current,[id]:''}));
+    setRenameMessages(current=>({...current,[id]:'已建立改名計劃；尚未發佈。'}));
   };
   const requestRetirement=(id:string)=>patchTable(id,{retirementStatus:'PLANNED_RETIREMENT'});
   const activatePending=async(id:string)=>{const evidence=await readFreshDiningOccupancy(id);if(!evidence||evidence.activeSessionCount!==0){setSaveMessage('未能生效：枱仍有人使用，或者佔用讀回未能證明為最新。');return;}const row=diningTables.find(item=>item.id===id);if(!row)return;const versions=[...(row.versions??[])];const planned=versions.find(item=>item.status==='PLANNED');if(row.retirementStatus==='PLANNED_RETIREMENT'){writeAdminStored('dining-table-id-ledger.v1',[...new Set([...readAdminStored<string[]>('dining-table-id-ledger.v1',[]),id])]);patchTable(id,{active:false,retirementStatus:'RETIRED',retirementEvidence:{observedAt:evidence.observedAt,runtimeRevision:evidence.runtimeRevision}});appendAdminAudit({action:'堂食枱退休生效',target:id,after:{observedAt:evidence.observedAt,runtimeRevision:evidence.runtimeRevision}});return;}if(!planned)return;const at=new Date().toISOString();patchTable(id,{name:planned.label,versions:versions.map(item=>item.versionId===planned.versionId?{...item,status:'ACTIVE' as const,effectiveAt:at,activationEvidence:{observedAt:evidence.observedAt,runtimeRevision:evidence.runtimeRevision}}:item.status==='ACTIVE'?{...item,status:'SUPERSEDED' as const}:item)});appendAdminAudit({action:'堂食枱名稱版本生效',target:id,after:{versionId:planned.versionId,observedAt:evidence.observedAt,runtimeRevision:evidence.runtimeRevision}});};
