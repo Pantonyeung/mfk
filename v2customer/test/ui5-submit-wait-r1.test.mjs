@@ -95,10 +95,10 @@ test('waiting screen contains elapsed time, separate Display Number and Pickup C
     '已等待',
     '流水號',
     '取餐碼',
-    'Order Summary',
+    '今次餐點',
     '可以離開呢一頁',
-    '只讀 Refresh',
-    'Refresh 只查 Status，永遠唔會重新 Submit',
+    '重新整理',
+    '只會更新訂單狀態，唔會重新送單。',
   ])assert.match(ui5,new RegExp(marker));
   assert.match(ui5,/phone\.replace|pickupCodeFromPhone/);
   assert.doesNotMatch(ui5,/intent\.canonicalOrderId\}/);
