@@ -2,7 +2,7 @@ import {printBytesLan,printTextLan} from './native-print.ts';
 import {renderTscRasterLabel} from './label-bitmap.ts';
 import {renderEscPosRasterTicket} from './ticket-bitmap.ts';
 import {buildOrderPrintPlan,groupTscBitmapJobsByPhysicalPrinter,type PrintBinding,type PlannedPrintJob} from './print-routing.ts';
-import {queueOrderProjection} from './projection-outbox.ts';
+import {queueOrderProjection,queueRuntimeSellabilityProjection} from './projection-outbox.ts';
 import {hasStaffPermission,readActiveStaffSession,staffAuthRequired} from './staff-auth.ts';
 import {readSmtDiningTableRegistry,readSmtPrintConfig,readSmtStoreSettings} from './admin-operational-config.ts';
 import {mirrorKeetaOrderCommand,type KeetaProviderMirrorResult} from './keeta-provider-commands.ts';
@@ -2597,6 +2597,7 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
   },
   async setAvailability(nodeId,status){
     data={...data,availability:{...data.availability,[nodeId]:status}};save();
+    queueRuntimeSellabilityProjection(nodeId,status);
     return {revision:1,nodes:Object.entries(productNames).map(([id,label])=>({nodeId:id,label,status:data.availability[id]||'available',sourceLabel:'LOCAL'})),canChange:true};
   }
 });
