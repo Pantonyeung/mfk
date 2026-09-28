@@ -718,3 +718,81 @@
 .s0-formal-ip{display:block;width:360px;max-height:430px;margin-top:auto;object-fit:contain;object-position:center bottom;filter:drop-shadow(0 24px 32px rgba(24,73,139,.16))}
 .s0-formal-logo.asset-failed,.s0-formal-ip.asset-failed{visibility:hidden}
 .s0-formal-logo.asset-failed::after,.s0-formal-ip.asset-failed::after{content:"";display:none}
+
+
+/* Stage 0 runtime viewport convergence — physical 1920x1080 is not the CSS viewport */
+.s0{
+  width:100vw;
+  height:100dvh;
+  min-height:0;
+  overflow:hidden;
+  grid-template-columns:minmax(300px,29vw) minmax(500px,34vw) minmax(420px,1fr);
+  grid-template-rows:minmax(0,1fr) clamp(42px,5.5dvh,58px);
+  gap:clamp(10px,1vw,18px);
+  padding:max(10px,env(safe-area-inset-top)) max(14px,env(safe-area-inset-right)) max(0px,env(safe-area-inset-bottom)) max(14px,env(safe-area-inset-left));
+}
+.s0-brand{min-height:0;padding:clamp(14px,2.6dvh,30px) clamp(18px,2vw,34px)}
+.s0-formal-logo{width:min(78%,300px);height:auto;max-height:clamp(100px,18dvh,170px);object-fit:contain;flex:0 1 auto}
+.s0-brand>p{margin:clamp(12px,2.6dvh,30px) 0 0;font-size:clamp(18px,2.4dvh,27px);padding-bottom:clamp(5px,1dvh,9px);flex:0 0 auto}
+.s0-formal-ip{width:min(82%,350px);height:auto;max-height:min(43dvh,390px);min-height:0;object-fit:contain;object-position:center bottom;flex:1 1 auto}
+.s0-login,.s0-open-card{
+  align-self:stretch;
+  min-height:0;
+  height:auto;
+  max-height:100%;
+  overflow:hidden;
+  padding:clamp(18px,2.8dvh,36px) clamp(24px,2.3vw,42px);
+  border-radius:clamp(20px,2.5dvh,30px);
+}
+.s0-login{display:flex;flex-direction:column}
+.s0-login h1,.s0-open-card h1{font-size:clamp(26px,3.2dvh,34px)}
+.s0-login header p,.s0-open-card header p{margin-top:clamp(3px,.7dvh,7px);font-size:clamp(14px,1.65dvh,17px)}
+.s0-clock b{font-size:clamp(27px,3.4dvh,36px)}
+.s0-login-methods{gap:clamp(8px,1dvh,13px);margin:clamp(12px,2dvh,26px) 0 clamp(10px,1.6dvh,20px)}
+.s0-login-methods button{height:clamp(82px,12dvh,116px);padding:clamp(10px,1.5dvh,16px) clamp(12px,1.2vw,18px);grid-template-columns:clamp(42px,3vw,54px) 1fr}
+.s0-login-methods button>b{font-size:clamp(30px,4dvh,40px)}
+.s0-login-methods strong{font-size:clamp(17px,2dvh,20px)}
+.s0-login-methods small{font-size:clamp(11px,1.4dvh,14px)}
+.s0-staff{gap:clamp(4px,.7dvh,7px);margin-bottom:clamp(7px,1dvh,12px)}
+.s0-staff select{height:clamp(44px,5.8dvh,56px);font-size:clamp(15px,1.7dvh,17px)}
+.s0-pin{height:clamp(46px,6dvh,60px)}
+.s0-pin strong{font-size:clamp(15px,1.8dvh,18px)}
+.s0-keypad{flex:1 1 auto;min-height:0;grid-template-rows:repeat(4,minmax(42px,1fr));gap:clamp(6px,.8dvh,9px);margin-top:clamp(7px,1dvh,12px)}
+.s0-keypad button{height:auto;min-height:42px;font-size:clamp(18px,2.5dvh,23px);border-radius:clamp(9px,1.3dvh,13px)}
+.s0-keypad button.go{font-size:clamp(23px,3dvh,29px)}
+.s0-error{margin-top:clamp(5px,.8dvh,10px);padding:clamp(7px,1dvh,11px) 12px}
+.s0-hint{flex:0 0 auto;margin:clamp(5px,.8dvh,10px) 0 0;font-size:clamp(10px,1.25dvh,12px)}
+.s0-side{min-height:0;grid-template-rows:clamp(92px,14dvh,132px) clamp(88px,13dvh,124px) clamp(88px,13dvh,124px) minmax(90px,1fr) clamp(58px,8dvh,78px);gap:clamp(8px,1.2dvh,14px);overflow:hidden}
+.s0-side article{min-height:0;padding:clamp(13px,1.9dvh,21px) clamp(16px,1.5vw,25px)}
+.s0-side .morning{gap:clamp(12px,1.2vw,20px)}.s0-side .morning>span{font-size:clamp(36px,5dvh,50px)}
+.s0-side h2{font-size:clamp(23px,2.9dvh,29px)}.s0-side p{margin-top:clamp(3px,.6dvh,6px);font-size:clamp(13px,1.6dvh,16px)}
+.s0-side .shift>div>span,.s0-side .goal>span{width:clamp(40px,5dvh,50px);height:clamp(40px,5dvh,50px);font-size:clamp(20px,2.7dvh,26px)}
+.s0-side .shift b,.s0-side .goal b,.s0-side .brand-card b{font-size:clamp(17px,2.1dvh,21px)}
+.s0-side .shift button{height:clamp(40px,5.4dvh,52px);padding:0 clamp(12px,1vw,18px)}
+.s0-side .brand-card::after{width:clamp(100px,12dvh,165px);height:clamp(100px,12dvh,165px)}
+.s0-tools{min-height:0;padding:clamp(5px,.7dvh,7px)}.s0-tools button{font-size:clamp(17px,2.3dvh,21px)}.s0-tools b{font-size:clamp(10px,1.3dvh,12px)}
+.s0-system{min-height:0;font-size:clamp(10px,1.25dvh,12px)}
+.s0-footer{min-height:0;padding-bottom:env(safe-area-inset-bottom);font-size:clamp(11px,1.4dvh,14px)}
+.s0-footer b{font-size:clamp(18px,2.4dvh,23px)}
+.s0-open-card{gap:clamp(9px,1.5dvh,17px)}
+.s0-open-card header>strong{padding:clamp(6px,.8dvh,9px) 12px}
+.s0-retained{gap:clamp(7px,.8dvh,11px)}
+.s0-retained article{gap:clamp(3px,.6dvh,7px);padding:clamp(10px,1.4dvh,16px)}
+.s0-retained b{font-size:clamp(17px,2.2dvh,21px)}
+.s0-no-retained{padding:clamp(12px,1.7dvh,18px)}
+.s0-money,.s0-note{gap:clamp(5px,.7dvh,8px)}
+.s0-money input,.s0-note input{height:clamp(46px,6dvh,58px);font-size:clamp(16px,2dvh,19px)}
+.s0-confirm{height:clamp(50px,6.6dvh,64px);min-height:50px;font-size:clamp(17px,2.1dvh,20px)}
+
+@media(max-height:820px){
+  .s0{grid-template-columns:minmax(270px,26vw) minmax(480px,36vw) minmax(390px,1fr)}
+  .s0-brand>p{margin-top:8px}
+  .s0-formal-logo{max-height:105px}
+  .s0-formal-ip{max-height:35dvh}
+  .s0-login,.s0-open-card{padding-top:14px;padding-bottom:14px}
+  .s0-login-methods{margin:8px 0}
+  .s0-login-methods button{height:74px}
+  .s0-keypad{gap:5px;margin-top:6px}
+  .s0-keypad button{min-height:38px}
+  .s0-side{grid-template-rows:86px 82px 82px minmax(76px,1fr) 54px;gap:7px}
+}
