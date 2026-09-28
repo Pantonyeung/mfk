@@ -65,6 +65,17 @@ describe('Admin UI recomposition',()=>{
     expect(payments).not.toContain('付款 QR 圖');
   });
 
+  it('keeps channel routes task-scoped instead of repeating mapping and every policy form',()=>{
+    const mapping=render('/admin/channels/product-mapping');
+    expect(mapping).toContain('商品對應');
+    expect(mapping).not.toContain('正常單自動接單');
+    expect(mapping).not.toContain('佣金估算 %');
+    const accept=render('/admin/channels/accept-policy');
+    expect(accept).toContain('正常單自動接單');
+    expect(accept).not.toContain('商品對應');
+    expect(accept).not.toContain('佣金估算 %');
+  });
+
   it('only reports SMT success for a matching revision and fingerprint readback',()=>{
     const activeRelease={version:12,createdAt:'2026-09-22T00:00:00.000Z',fingerprint:'fp-12'};
     const published={state:'PUBLISHED' as const,revision:12,fingerprint:'fp-12',updatedAt:'2026-09-22T00:00:01.000Z'};
