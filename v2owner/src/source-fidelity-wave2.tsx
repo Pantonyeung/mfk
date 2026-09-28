@@ -136,7 +136,7 @@ function matchReport(report:{reportId:string;name:string},definition:(typeof FIX
 
 export function ReportsPage({snapshot,onBack}:{snapshot:OwnerReadModelSnapshot|null}&BackProps){
   const reports=snapshot?.reports??[];
-  const [range,setRange]=useState<'TODAY'|'7D'|'30D'>('TODAY');
+  const range:'TODAY'='TODAY';
   const [selected,setSelected]=useState<number|null>(null);
   const mapped=FIXED_REPORTS.map((definition,index)=>({
     definition,
@@ -148,7 +148,7 @@ export function ReportsPage({snapshot,onBack}:{snapshot:OwnerReadModelSnapshot|n
     return <section className="page wave2-page reports-page">
       <SourceHead eyebrow="固定報表" title={item.definition.title} detail={item.definition.detail} onBack={()=>setSelected(null)}/>
       {item.report?<>
-        <section className="card report-hero"><span>{range==='TODAY'?'今日':range==='7D'?'過去 7 日':'過去 30 日'}</span><strong>{item.report.value}</strong><small>{item.report.compare??'暫無比較資料'}</small></section>
+        <section className="card report-hero"><span>今日</span><strong>{item.report.value}</strong><small>{item.report.compare??'暫無比較資料'}</small></section>
         <section className="card report-detail-card"><div><span>資料狀態</span><strong>{item.report.freshness||'未提供'}</strong></div><p>呢張固定報表只供查看；需要其他分析可返回報表首頁。</p></section>
       </>:<SafeUnavailable title="呢張報表暫未有資料" detail="目前資料來源未提供呢項固定報表。畫面會保持空白狀態，唔會自行計算另一套數字。"/>}
     </section>;
@@ -157,9 +157,9 @@ export function ReportsPage({snapshot,onBack}:{snapshot:OwnerReadModelSnapshot|n
   return <section className="page wave2-page reports-page">
     <SourceHead eyebrow="數據" title="固定報表" detail="八張固定報表，先睇真正有用嘅營運數字。" onBack={onBack}/>
     <div className="wave2-filter-tabs report-range" aria-label="報表時段">
-      <button className={range==='TODAY'?'active':''} onClick={()=>setRange('TODAY')}>今日</button>
-      <button className={range==='7D'?'active':''} onClick={()=>setRange('7D')}>7 日</button>
-      <button className={range==='30D'?'active':''} onClick={()=>setRange('30D')}>30 日</button>
+      <button className="active">今日</button>
+      <button disabled title="暫未有正式時段資料">7 日</button>
+      <button disabled title="暫未有正式時段資料">30 日</button>
     </div>
     <div className="report-fixed-grid">
       {mapped.map((item,index)=><button type="button" className="card report-card" key={item.definition.id} onClick={()=>setSelected(index)}>
