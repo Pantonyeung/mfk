@@ -217,7 +217,7 @@ export function readAdminSnapshotSection<T=unknown>(key:string):T|undefined{
 
 export async function readOwnerSellabilityCommands(){
   const deviceId=readSmtDeviceId();
-  const response=await fetch(ENDPOINT+'/api/admin-sync/smt-owner-sellability?storeId=MF01&deviceId='+encodeURIComponent(deviceId),{cache:'no-store'});
+  const response=await fetch(SMT_ADMIN_CONFIG_ENDPOINT+'/api/admin-sync/smt-owner-sellability?storeId=MF01&deviceId='+encodeURIComponent(deviceId),{cache:'no-store'});
   if(!response.ok)throw new Error('OWNER_SELLABILITY_COMMAND_READ_FAILED');
   const body=await response.json() as {commands?:unknown[]};
   return Array.isArray(body.commands)?body.commands:[];
