@@ -34,7 +34,7 @@ import type {
 } from './product-types';
 
 export type View='home'|'menu'|'cart'|'checkout'|'submit'|'waiting'|'pickup'|'orders'|'more'|'account'|'recovery';
-const persistedView=(value:View):CustomerLocalPreferences['activeView']=>value==='submit'||value==='waiting'||value==='pickup'?'orders':value;
+const persistedView=(value:View):CustomerLocalPreferences['activeView']=>value==='submit'||value==='waiting'||value==='pickup'?'orders':value==='account'||value==='recovery'?'more':value;
 
 type CustomerRoute={
   view:View;
@@ -149,7 +149,7 @@ export function App(){
       if(next==='home'||next==='menu'||next==='cart'||next==='orders'||next==='more')replacePath(pathForView(next));
       if(next==='account')replacePath('/member/account');
       if(next==='recovery')replacePath('/support/account-recovery');
-      persist({preferences:{activeView:next==='submit'||next==='waiting'||next==='pickup'?'orders':next,activeCategoryId}});
+      persist({preferences:{activeView:persistedView(next),activeCategoryId}});
       window.scrollTo({top:0,behavior:'auto'});
     });
   };
