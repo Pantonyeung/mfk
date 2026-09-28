@@ -46,8 +46,6 @@ function NotificationConsent(){
 export function CustomerUi10({mode,member,fallback,defaultPhone,onMember,onRecovery,onBack}:{mode:Ui10Mode;member?:CustomerMemberProjection;fallback?:CustomerWhatsAppFallback;defaultPhone?:string;onMember:()=>void;onRecovery:()=>void;onBack:()=>void}){
   const [phone,setPhone]=useState(defaultPhone??'');
   const [password,setPassword]=useState('');
-  const [temporaryPassword,setTemporaryPassword]=useState('');
-  const [newPassword,setNewPassword]=useState('');
   const [notice,setNotice]=useState<string|null>(null);
   const activated=member?.state==='READY';
 
@@ -55,7 +53,7 @@ export function CustomerUi10({mode,member,fallback,defaultPhone,onMember,onRecov
     <header className="ui10-header"><button type="button" onClick={onBack}>返回</button><div><span>帳戶支援</span><strong>找回會員帳戶</strong></div></header>
     <section className="ui10-hero"><div className="ui10-art-slot" data-final-art-pending="UI10_RECOVERY_SUPPORT_ART" aria-hidden="true"/><span>人工核對</span><h1>忘記密碼或換咗電話？</h1><p>磨飯唔會用短訊或電郵驗證碼自動取回舊會員資料。帳戶資料核對約需 1–2 個工作日。</p></section>
     <section className="ui10-card"><span className="ui10-kicker">聯絡資料</span><h2>先提供你記得嘅電話</h2><label className="ui10-field"><span>舊電話／聯絡電話</span><input type="tel" inputMode="tel" autoComplete="tel" value={phone} onChange={e=>setPhone(e.target.value)} placeholder="例如 9123 4567"/></label><p>店舖會經 WhatsApp 人工核對已登記資料。唔會因為輸入電話就自動取得會員資料。</p><button className="ui10-primary" type="button" onClick={()=>setNotice(openSupport(fallback,phone)?'已開啟 WhatsApp；請由你主動送出訊息。':'WhatsApp 支援暫時未能使用，請稍後再試或直接聯絡店舖。')}>用 WhatsApp 聯絡磨飯</button>{notice?<p className="ui10-result" role="status">{notice}</p>:null}</section>
-    <section className="ui10-card ui10-disabled-card" aria-disabled="true"><span className="ui10-kicker">臨時密碼</span><h2>核對完成後首次登入</h2><p>店舖核對完成後，可以提供一次性臨時密碼。首次登入必須改成你自己嘅新密碼；目前自動重設服務尚未連接。</p><label className="ui10-field"><span>一次性臨時密碼</span><input type="password" value={temporaryPassword} onChange={e=>setTemporaryPassword(e.target.value)} disabled placeholder="由店舖提供"/></label><label className="ui10-field"><span>新密碼</span><input type="password" value={newPassword} onChange={e=>setNewPassword(e.target.value)} disabled placeholder="設定新密碼"/></label><button className="ui10-primary" type="button" disabled>更改密碼</button></section>
+    <section className="ui10-card ui10-disabled-card" aria-disabled="true"><span className="ui10-kicker">臨時密碼</span><h2>核對完成後首次登入</h2><p>店舖核對完成後，可以提供一次性臨時密碼。首次登入必須改成你自己嘅新密碼；目前自動重設服務尚未連接。</p><label className="ui10-field"><span>一次性臨時密碼</span><input type="password" disabled placeholder="由店舖提供"/></label><label className="ui10-field"><span>新密碼</span><input type="password" disabled placeholder="設定新密碼"/></label><button className="ui10-primary" type="button" disabled>更改密碼</button></section>
     <button className="ui10-link" type="button" onClick={onMember}>返回會員頁</button>
   </section>;
 
