@@ -106,6 +106,13 @@ describe('Admin UI recomposition',()=>{
     expect(frontline).not.toContain('快捷商品 ID（逗號分隔）');
   });
 
+  it('keeps logical printer forms collapsed until one printer is chosen',()=>{
+    const printCenter=render('/admin/print');
+    expect(printCenter).toContain('收據機');
+    expect(printCenter).toContain('廚房製作單機');
+    expect(printCenter).not.toContain('紙寬／標籤寬 mm');
+  });
+
   it('only reports SMT success for a matching revision and fingerprint readback',()=>{
     const activeRelease={version:12,createdAt:'2026-09-22T00:00:00.000Z',fingerprint:'fp-12'};
     const published={state:'PUBLISHED' as const,revision:12,fingerprint:'fp-12',updatedAt:'2026-09-22T00:00:01.000Z'};
