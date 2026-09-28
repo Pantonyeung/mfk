@@ -2606,6 +2606,10 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
     commitDiningHolds(snapshot,snapshot.holds.map(row=>row.id===holdId?archived:row));
     });
   },
+  runtimeAvailabilityStatus(nodeId:string):SmtAvailabilityStatus{
+    applyBusinessDayAvailabilityRollover();
+    return data.availability[nodeId]||'available';
+  },
   async readAvailability(){
     return {revision:1,nodes:Object.entries(productNames).map(([nodeId,label])=>({nodeId,label,status:data.availability[nodeId]||'available',sourceLabel:'LOCAL'})),canChange:true};
   },
