@@ -602,8 +602,14 @@ export function ChannelsWorkspace({mode}:{mode:'overview'|'mapping'|'failures'|'
   const addMapping=()=>{if(!providerItemId.trim()||!productId)return;setMappings(rows=>{const row:MappingRow={providerItemId:providerItemId.trim(),productId,status:'MAPPED'};appendAdminAudit({action:'新增平台商品對應',target:row.providerItemId,after:row});return [...rows.filter(item=>item.providerItemId!==row.providerItemId),row];});setProviderItemId('');setProductId('');};
   const failures=mappings.filter(row=>row.status==='PENDING');
   const title=mode==='overview'?'平台管理':mode==='mapping'?'商品映射管理':mode==='failures'?'匹配失敗明細':mode==='accept'?'接單／自動接單':mode==='sync'?'售罄／供應同步':'實收估算設定';
+  const description=mode==='overview'?'查看 Keeta 連線、授權、Webhook 同整體平台狀態。'
+    :mode==='mapping'?'管理 Keeta 商品 ID 同磨飯商品嘅對應。'
+    :mode==='failures'?'只處理尚未完成嘅商品匹配。'
+    :mode==='accept'?'管理 Keeta 新單入口、自動接單同遲到界線。'
+    :mode==='sync'?'管理菜單、售罄供應同門店營業狀態同步。'
+    :'查看 Provider commercial evidence，同設定實收估算參數。';
   return <section className="admin-editor-page">
-    <PolicyHeader title={title} description="管理平台顯示名稱、接單、供應同步、佣金估算同商品對應。Live connection 狀態同 Provider business authority 分開顯示，唔會因為連線成功就自動啟動接單。"/>
+    <PolicyHeader title={title} description={description}/>
     {mode==='overview'?<section className="admin-policy-card">
       <header><div><small>KEETA LIVE CONNECTION</small><h2>Keeta 香港連線</h2></div><span className={liveStatus?.oauth.state==='CONNECTED'?'admin-status-good':'admin-not-wired-chip'}>{liveStatus?.oauth.state??'讀取中'}</span></header>
       {liveStatus?<div className="admin-readback-proof">
