@@ -2150,7 +2150,7 @@ export default {
       for(const [key,value] of Object.entries(cors(request)))headers.set(key,value);
       return new Response(response.body,{status:response.status,statusText:response.statusText,headers});
     }
-    if(url.pathname==='/api/health')return json({ok:true,service:'mfk-admin'});
+    if(url.pathname==='/api/health')return json({ok:true,service:'mfk-admin',sourceSha:String(env.MFK_SOURCE_SHA||'UNKNOWN')});
     return env.ASSETS.fetch(request);
   },
 };
