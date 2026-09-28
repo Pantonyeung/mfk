@@ -122,21 +122,25 @@ test('Wave2 FINAL screens render at 390 and 440 with 360 minimum width', {timeou
   const address=server.httpServer.address();
   assert.ok(address&&typeof address==='object');
   const appPort=address.port;
-  const debugPort=9333+(process.pid%200);
   const browser=spawn(chrome,[
     '--headless=new','--no-sandbox','--disable-gpu','--disable-dev-shm-usage',
-    '--remote-debugging-address=127.0.0.1','--remote-debugging-port='+debugPort,
+    '--remote-debugging-address=127.0.0.1','--remote-debugging-port=0',
     '--user-data-dir=/tmp/mfk-owner-wave2-'+process.pid,'about:blank',
   ],{stdio:['ignore','ignore','pipe']});
   let browserError='';
   browser.stderr.on('data',chunk=>{browserError+=String(chunk)});
   try{
-    await waitJson('http://127.0.0.1:'+debugPort+'/json/version');
-    const pageInfo=await waitJson('http://127.0.0.1:'+debugPort+'/json/new?about:blank',1).catch(async()=>{
-      const res=await fetch('http://127.0.0.1:'+debugPort+'/json/new?about:blank',{method:'PUT'});
-      if(!res.ok)throw new Error('Cannot create Chrome target '+res.status);
-      return res.json();
-    });
+    let debugPort=0;
+    for(let i=0;i<80;i++){
+      const match=browserError.match(/DevTools listening on ws:\/\/127\.0\.0\.1:(\d+)\//);
+      if(match){debugPort=Number(match[1]);break}
+      if(browser.exitCode!==null)throw new Error('Chrome exited before debug endpoint: '+browserError.slice(-1200));
+      await sleep(100);
+    }
+    if(!debugPort)throw new Error('Chrome debug endpoint unavailable: '+browserError.slice(-1200));
+    const res=await fetch('http://127.0.0.1:'+debugPort+'/json/new?about:blank',{method:'PUT'});
+    if(!res.ok)throw new Error('Cannot create Chrome target '+res.status);
+    const pageInfo=await res.json();
     const client=cdp(pageInfo.webSocketDebuggerUrl);
     await client.send('Page.enable');
     await client.send('Runtime.enable');
