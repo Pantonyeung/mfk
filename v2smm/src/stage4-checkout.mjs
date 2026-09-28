@@ -33,7 +33,7 @@ export function smmStage4DiningTargetStatus(serviceMode,target,tables){
 }
 
 export function smmStage4CheckoutReady(input){
-  const tenderValid=SMM_STAGE4_TENDERS.some(row=>row.value===input.tender);
+  const tenderValid=input.serviceMode==='DINE_IN'||SMM_STAGE4_TENDERS.some(row=>row.value===input.tender);
   const total=Number(input.totalMinor);
   return Boolean(
     input.cartLength>0&&
