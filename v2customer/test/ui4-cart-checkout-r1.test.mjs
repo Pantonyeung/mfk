@@ -60,7 +60,7 @@ test('quantity and cart actions remain touch-safe and mutations are line-scoped'
 });
 
 test('Checkout is fixed to four UI4 review steps and never creates a submit identity',()=>{
-  const labels=['確認商品','聯絡與取餐','付款','提交前確認'];
+  const labels=['商品','聯絡與取餐','付款','提交'];
   let previous=-1;
   for(const label of labels){
     const index=checkout.indexOf(label);
@@ -71,6 +71,15 @@ test('Checkout is fixed to four UI4 review steps and never creates a submit iden
     assert.equal(checkout.includes(forbidden),false,forbidden);
   }
   assert.ok(checkout.includes('最後睇多次餐點、取餐同付款資料'));
+});
+
+test('UI4 V1 pickup time is the current pickup window only, with no future Scheduled Order seam',()=>{
+  assert.match(checkout,/ui4-pickup-window/);
+  assert.match(checkout,/即時取餐/);
+  assert.match(checkout,/pickupEtaLabel/);
+  assert.match(checkout,/不設明天／後天或其他預約時段/);
+  assert.equal(checkout.includes('scheduledPickupAt'),false);
+  assert.equal(checkout.includes('futurePickupAt'),false);
 });
 
 test('Contact derives Pickup Code only from the phone last four digits',()=>{
