@@ -1,6 +1,24 @@
-import {useMemo,useState,type CSSProperties,type ReactNode} from 'react';
+import {useEffect,useMemo,useState,type CSSProperties,type ReactNode} from 'react';
 import type {CartLineViewModel,OrderingProductViewModel,OrderingWorkspaceActions,OrderingWorkspaceViewModel,ServiceMode} from './ordering-workspace-model.ts';
 import './ordering-workspace.css';
+
+
+type Stage1CardMode='large'|'small'|'text';
+type Stage1DisplayPrefs={cardMode:Stage1CardMode;cardSize:number;fontSize:number;categoryRows:1|2;categoriesPerRow:number};
+const STAGE1_DISPLAY_KEY='mfk.smt.stage1.display.v1';
+const DEFAULT_STAGE1_DISPLAY:Stage1DisplayPrefs={cardMode:'small',cardSize:0,fontSize:0,categoryRows:2,categoriesPerRow:6};
+function readStage1Display():Stage1DisplayPrefs{
+  try{
+    const raw=JSON.parse(localStorage.getItem(STAGE1_DISPLAY_KEY)||'{}') as Partial<Stage1DisplayPrefs>;
+    return {
+      cardMode:raw.cardMode==='large'||raw.cardMode==='text'?raw.cardMode:'small',
+      cardSize:Math.max(-33,Math.min(33,Number(raw.cardSize)||0)),
+      fontSize:Math.max(-33,Math.min(33,Number(raw.fontSize)||0)),
+      categoryRows:raw.categoryRows===1?1:2,
+      categoriesPerRow:Math.max(5,Math.min(7,Math.round(Number(raw.categoriesPerRow)||6))),
+    };
+  }catch{return DEFAULT_STAGE1_DISPLAY;}
+}
 
 function QueueStrip({title,kind,orders,onOpen}:{title:string;kind:'pending'|'active';orders:OrderingWorkspaceViewModel['pendingOrders'];onOpen:(kind:'pending'|'active',id:string)=>void}){
   if(kind==='pending'){
@@ -100,9 +118,25 @@ function OrganizedCart({lines,highlightedLineId,actions,availability}:{lines:rea
 }
 
 export function OrderingWorkspace({view,actions,centerPanel}:{view:OrderingWorkspaceViewModel;actions:OrderingWorkspaceActions;centerPanel?:{readonly title:string;readonly body:ReactNode;readonly onClose:()=>void}|null}){
+  const [displayOpen,setDisplayOpen]=useState(false);
+  const [display,setDisplay]=useState<Stage1DisplayPrefs>(()=>readStage1Display());
+  useEffect(()=>{
+    const open=()=>setDisplayOpen(true);
+    window.addEventListener('mfk:stage1-display-settings',open);
+    return()=>window.removeEventListener('mfk:stage1-display-settings',open);
+  },[]);
+  useEffect(()=>{localStorage.setItem(STAGE1_DISPLAY_KEY,JSON.stringify(display));},[display]);
+  const baseColumns=display.cardMode==='large'?3:display.cardMode==='text'?5:4;
+  const productColumns=Math.max(2,Math.min(6,baseColumns+(display.cardSize<=-22?1:display.cardSize>=22?-1:0)));
+  const displayStyle={
+    '--stage1-font-scale':String(1+display.fontSize/100),
+    '--stage1-card-scale':String(1+display.cardSize/100),
+    '--stage1-category-columns':String(display.categoriesPerRow),
+    '--stage1-category-rows':String(display.categoryRows),
+  } as CSSProperties;
   const availability=view.actionAvailability??{lineServiceMode:true,lineEdit:true,lineQuantity:true,holdCart:true,cancelCart:true};
   const serviceModes=view.serviceModes??{takeaway:true,dineIn:true};
-  return <div className={`ordering-workspace${centerPanel?' panel-open':''}`}>
+  return <div className={`ordering-workspace stage1-card-${display.cardMode}${centerPanel?' panel-open':''}`} style={displayStyle}>
     <header className="ordering-flow-strip">
       <QueueStrip title="待處理" kind="pending" orders={view.pendingOrders} onOpen={actions.onOpenQueueOrder}/>
       <QueueStrip title="Keeta" kind="active" orders={view.activeOrders} onOpen={actions.onOpenQueueOrder}/>
@@ -124,10 +158,10 @@ export function OrderingWorkspace({view,actions,centerPanel}:{view:OrderingWorks
             <button type="button" className={view.orderingMode==='normal'?'active':''} aria-pressed={view.orderingMode==='normal'} onClick={()=>actions.onChangeOrderingMode('normal')}>普通</button>
           </div>
         </section>
-        {view.showCategories===false?null:<nav className="ordering-categories" aria-label="商品分類">
+        {view.showCategories===false?null:<nav className="ordering-categories stage1-categories" aria-label="商品分類">
           {view.categories.map(category=><button type="button" key={category.id} aria-pressed={view.selectedCategoryId===category.id} className={view.selectedCategoryId===category.id?'active':''} onClick={()=>actions.onSelectCategory(category.id)}>{category.label}</button>)}
         </nav>}
-        <section className="ordering-product-grid" style={{'--ordering-product-columns':String(view.productColumns??4)} as CSSProperties}>{view.products.map(product=><ProductCard key={product.id} product={product} mode={view.orderingMode} actions={actions} recentlyAdded={view.recentlyAddedProductId===product.id} showDescription={view.showDescriptions!==false}/>)}</section>
+        <section className="ordering-product-grid" style={{'--ordering-product-columns':String(productColumns)} as CSSProperties}>{view.products.map(product=><ProductCard key={product.id} product={product} mode={view.orderingMode} actions={actions} recentlyAdded={view.recentlyAddedProductId===product.id} showDescription={view.showDescriptions!==false}/>)}</section>
       </>}
     </main>
 
@@ -159,5 +193,14 @@ export function OrderingWorkspace({view,actions,centerPanel}:{view:OrderingWorks
     </aside>
 
     <footer className="ordering-workbar">{view.workItems.map(item=><button type="button" key={item.id} onClick={()=>actions.onOpenWorkItem(item.id)}><span>{item.label}</span>{item.count>0?<b>{item.count}</b>:null}</button>)}</footer>
+    {displayOpen?<div className="stage1-display-backdrop" role="presentation" onClick={()=>setDisplayOpen(false)}><section className="stage1-display-panel" role="dialog" aria-modal="true" aria-label="顯示設定" onClick={event=>event.stopPropagation()}>
+      <header><div><small>本機顯示</small><h2>顯示設定</h2></div><button type="button" onClick={()=>setDisplayOpen(false)}>×</button></header>
+      <div className="stage1-display-modes"><button className={display.cardMode==='large'?'active':''} onClick={()=>setDisplay(v=>({...v,cardMode:'large'}))}>大圖<small>基準每行 3 個</small></button><button className={display.cardMode==='small'?'active':''} onClick={()=>setDisplay(v=>({...v,cardMode:'small'}))}>小圖<small>基準每行 4 個</small></button><button className={display.cardMode==='text'?'active':''} onClick={()=>setDisplay(v=>({...v,cardMode:'text'}))}>純文字<small>基準每行 5 個</small></button></div>
+      <label><span>產品卡大小 <b>{display.cardSize>0?'+':''}{display.cardSize}%</b></span><input type="range" min="-33" max="33" value={display.cardSize} onChange={e=>setDisplay(v=>({...v,cardSize:Number(e.target.value)}))}/></label>
+      <label><span>字體大小 <b>{display.fontSize>0?'+':''}{display.fontSize}%</b></span><input type="range" min="-33" max="33" value={display.fontSize} onChange={e=>setDisplay(v=>({...v,fontSize:Number(e.target.value)}))}/></label>
+      <div className="stage1-display-row"><span>分類行數</span><button className={display.categoryRows===1?'active':''} onClick={()=>setDisplay(v=>({...v,categoryRows:1}))}>1 行</button><button className={display.categoryRows===2?'active':''} onClick={()=>setDisplay(v=>({...v,categoryRows:2}))}>2 行</button></div>
+      <div className="stage1-display-row"><span>每行分類</span>{[5,6,7].map(n=><button key={n} className={display.categoriesPerRow===n?'active':''} onClick={()=>setDisplay(v=>({...v,categoriesPerRow:n}))}>{n} 個</button>)}</div>
+      <footer><button type="button" onClick={()=>setDisplay(DEFAULT_STAGE1_DISPLAY)}>恢復預設</button><button className="primary" type="button" onClick={()=>setDisplayOpen(false)}>完成</button></footer>
+    </section></div>:null}
   </div>;
 }
