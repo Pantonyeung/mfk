@@ -243,7 +243,7 @@ export async function readOwnerSellabilityCommands(){
 
 export async function ackOwnerSellabilityCommand(operationId:string,state:'CONFIRMED'|'REJECTED',results:readonly unknown[]){
   const deviceId=readSmtDeviceId();
-  const response=await fetch(ENDPOINT+'/api/admin-sync/smt-owner-sellability?storeId=MF01&deviceId='+encodeURIComponent(deviceId),{
+  const response=await fetch(SMT_ADMIN_CONFIG_ENDPOINT+'/api/admin-sync/smt-owner-sellability?storeId=MF01&deviceId='+encodeURIComponent(deviceId),{
     method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({operationId,state,results}),
   });
   if(!response.ok)throw new Error('OWNER_SELLABILITY_COMMAND_ACK_FAILED');
