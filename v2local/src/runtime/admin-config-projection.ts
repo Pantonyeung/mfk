@@ -1,5 +1,6 @@
 import type {MfkAdminConfigEnvelope} from '../../../contracts/admin-config-sync-v1.ts';
 import {readSmtAdminConfigLkg} from './admin-config-sync.ts';
+import {SMT_LOCAL_RUNTIME_STORAGE_KEY} from './local-runtime.ts';
 
 export type SyncedServiceMode='takeaway'|'dine-in';
 
@@ -99,12 +100,10 @@ function moneyMinor(value:unknown){
 function snapshotOf(envelope?:MfkAdminConfigEnvelope|null){
   return record((envelope??readSmtAdminConfigLkg())?.snapshot);
 }
-const SMT_RUNTIME_KEY='mfk.v2local.runtime.v1';
-
 function runtimeSellable(nodeId:string){
   if(typeof localStorage==='undefined')return true;
   try{
-    const persisted=JSON.parse(localStorage.getItem(SMT_RUNTIME_KEY)||'null') as {availability?:Record<string,unknown>}|null;
+    const persisted=JSON.parse(localStorage.getItem(SMT_LOCAL_RUNTIME_STORAGE_KEY)||'null') as {availability?:Record<string,unknown>}|null;
     const status=String(persisted?.availability?.[nodeId]??'available');
     return status!=='soldout'&&status!=='paused';
   }catch{return true;}
