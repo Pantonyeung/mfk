@@ -544,3 +544,7 @@ button:active:not(:disabled),a:active,summary:active{transform:scale(.985)}
 .admin-field-error{display:block;margin-top:4px;color:var(--admin-danger);font-weight:750}
 .admin-error-link{padding:2px 0;border:0;background:transparent;color:inherit;text-align:start;text-decoration:underline;text-underline-offset:2px;cursor:pointer}
 @media(max-width:639px){.admin-settings-link{min-height:68px;padding:12px}.admin-settings-home{gap:7px}}
+
+.admin-settings-link[type="button"]{width:100%;font:inherit;text-align:start;cursor:pointer}
+.admin-payment-detail{display:grid;gap:12px;padding-top:8px}
+.admin-back-button{justify-self:start;min-height:44px;padding:0 10px;border:0;background:transparent;color:var(--admin-primary);font-weight:800;cursor:pointer}
