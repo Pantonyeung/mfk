@@ -71,14 +71,13 @@ describe('SMT P1-3 Admin dining table registry convergence',()=>{
     await expect(localRuntime.assignDiningTable(second.id,'T01')).rejects.toThrow('DINING_TABLE_OCCUPIED');
   });
 
-  it('uses 1-9 fallback only when no Admin registry exists',async()=>{
+  it('fails closed with canonical empty registry and invents no tables',async()=>{
+    const fixture=(globalThis as any).__MFK_TEST_DINING_TABLES__; (globalThis as any).__MFK_TEST_DINING_TABLES__=[];
     const {localRuntime}=await import('../runtime/local-runtime.ts');
     localRuntime.clear();
     const wait=await localRuntime.createDiningWait({partySize:2});
-    await localRuntime.assignDiningTable(wait.id,'T09');
-    expect((await localRuntime.readDiningHold(wait.id)).assignedTable).toBe('T09');
-    const other=await localRuntime.createDiningWait({partySize:2});
-    await expect(localRuntime.assignDiningTable(other.id,'T10')).rejects.toThrow('DINING_TABLE_NOT_ASSIGNABLE');
+    await expect(localRuntime.assignDiningTable(wait.id,'T09')).rejects.toThrow('DINING_TABLE_NOT_ASSIGNABLE');
+    (globalThis as any).__MFK_TEST_DINING_TABLES__=fixture;
   });
 
   it('keeps published display names in assignment, detail and checkout UI copy',()=>{

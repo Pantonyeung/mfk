@@ -1,4 +1,4 @@
-import type {MfkLocalRuntime} from './local-runtime.ts';
+import {readDiningOccupancy,type MfkLocalRuntime} from './local-runtime.ts';
 import {priceCustomerCart} from './customer-cloud-intake.ts';
 import {projectSyncedCombos,projectSyncedOrderingCatalog} from './admin-config-projection.ts';
 import {revalidateSmmComboLine} from './smm-combo-revalidation.ts';
@@ -31,6 +31,7 @@ function serviceModeValue(mode:SmmLanOrderRequest['serviceMode']):'takeaway'|'di
 // Dining projection labels are resolved from the Admin-published table registry.
 export function createSmmLanIngress(runtime:MfkLocalRuntime){
   return Object.freeze({
+    readDiningOccupancy(tableId:string){return readDiningOccupancy(tableId);},
     readSnapshot(){
       const envelope=readSmtAdminConfigLkg();
       if(!envelope)throw new Error('SMM_ADMIN_CONFIG_REQUIRED');
@@ -177,7 +178,8 @@ export function createSmmLanIngress(runtime:MfkLocalRuntime){
           const paidMinor=payments.reduce((sum,payment)=>sum+payment.amountMinor,0);
           return Object.freeze({
             sessionId:hold.id,
-            tableLabel:hold.assignedTable?(tableNameById.get(hold.assignedTable)||hold.assignedTable):'輪候 '+hold.codeLabel,
+            tableLabel:hold.assignedTable?(hold.tableLabelAtOpen||tableNameById.get(hold.assignedTable)||hold.assignedTable):'輪候 '+hold.codeLabel,
+            ...(hold.assignedTable?{tableVersion:hold.tableVersionAtOpen||'LEGACY',tableLabelProvenance:hold.tableLabelAtOpen?'CAPTURED':'LEGACY_UNKNOWN'}:{}),
             covers:hold.partySize,
             state:hold.assignedTable?'OCCUPIED':'WAITING',
             openedAt:hold.createdAt,
@@ -215,7 +217,7 @@ export function createSmmLanIngress(runtime:MfkLocalRuntime){
       if(input.serviceMode==='TAKEAWAY'&&!['CASH','ALIPAY','WECHAT','FPS','PAYME'].includes(String(input.tender)))return rejected(input,'SMM_TENDER_INVALID');
       if(input.serviceMode==='DINE_IN'&&input.tender!==undefined)return rejected(input,'SMM_DINING_TENDER_FORBIDDEN');
       if(input.serviceMode==='DINE_IN'&&input.diningTarget?.kind==='TABLE'){
-        const tableIds=new Set((readSmtStoreSettings().diningTables.length?readSmtStoreSettings().diningTables:Array.from({length:9},(_,index)=>({id:'T'+String(index+1).padStart(2,'0')}))).map(row=>row.id));
+        const tableIds=new Set(readSmtStoreSettings().diningTables.map(row=>row.id));
         if(!tableIds.has(input.diningTarget.tableId||''))return rejected(input,'SMM_DINING_TABLE_NOT_PUBLISHED');
       }
 

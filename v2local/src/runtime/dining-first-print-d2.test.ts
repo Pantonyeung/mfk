@@ -95,7 +95,7 @@ describe('D2 first Dining print certainty',()=>{
     expect(kinds).not.toContain('receipt');
     const tableCall=(raster.renderEscPosRasterTicket as any).mock.calls.find((call:any[])=>call[0]?.kind==='dining-table');
     expect(tableCall?.[0]).toMatchObject({kickDrawer:false});
-    expect(tableCall?.[0]?.order?.diningTableLabel).toBe('T03');
+    expect(tableCall?.[0]?.order?.diningTableLabel).toBe('3 號枱');
 
     const native=await import('./native-print.ts');
     expect(native.printBytesLan).toHaveBeenCalledTimes(5);

@@ -243,6 +243,8 @@ export interface LocalDiningHoldDetail{
   readonly holdId:string;
   readonly codeLabel:string;
   readonly assignedTable?:string;
+  readonly tableLabelAtOpen?:string;
+  readonly tableVersionAtOpen?:string;
   readonly createdAt:string;
   readonly partySize:number;
   readonly note:string;
@@ -271,6 +273,8 @@ export interface LocalHoldDraft{
   readonly note:string;
   readonly totalMinor:number;
   readonly assignedTable?:string;
+  readonly tableLabelAtOpen?:string;
+  readonly tableVersionAtOpen?:string;
   readonly payments?:readonly LocalDiningPayment[];
   readonly additions?:readonly LocalDiningAddition[];
   readonly providerRef?:string;
@@ -857,6 +861,21 @@ function diningAssignedTables(hold:LocalHoldDraft):string[]{
   const values=[hold.assignedTable,...(hold.joinedTables??[])].filter((value):value is string=>Boolean(value));
   return [...new Set(values)];
 }
+export interface DiningOccupancyReadback{
+  readonly storeId:'MF01';
+  readonly tableId:string;
+  readonly hasActiveSession:boolean;
+  readonly activeSessionCount:number;
+  readonly observedAt:string;
+  readonly runtimeRevision:number;
+}
+export function readDiningOccupancy(tableId:string):DiningOccupancyReadback{
+  const snapshot=readDiningState();
+  const id=String(tableId||'').trim();
+  if(!id)throw new Error('DINING_OCCUPANCY_TABLE_ID_REQUIRED');
+  const activeSessionCount=snapshot.holds.filter(hold=>hold.kind==='dining'&&!hold.archivedAt&&diningAssignedTables(hold).includes(id)).length;
+  return Object.freeze({storeId:'MF01',tableId:id,hasActiveSession:activeSessionCount>0,activeSessionCount,observedAt:new Date().toISOString(),runtimeRevision:snapshot.diningRevision??0});
+}
 function diningCorrectionQuantity(hold:LocalHoldDraft,lineIndex:number){
   return (hold.lineCorrections??[]).filter(row=>row.lineIndex===lineIndex).reduce((sum,row)=>sum+Math.max(0,Number(row.quantity)||0),0);
 }
@@ -1405,6 +1424,8 @@ function diningDetail(hold:LocalHoldDraft,orders:readonly StoredOrder[]=data.ord
     holdId:hold.id,
     codeLabel:hold.formalOrderDisplay??hold.codeLabel,
     assignedTable:hold.assignedTable,
+    ...(hold.tableLabelAtOpen?{tableLabelAtOpen:hold.tableLabelAtOpen}:{}),
+    ...(hold.tableVersionAtOpen?{tableVersionAtOpen:hold.tableVersionAtOpen}:{}),
     createdAt:hold.createdAt,
     partySize:hold.partySize,
     note:hold.note,
@@ -1494,7 +1515,9 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
       return ensured.hold;
     }
     const tableId=String(target.tableId||'').trim();
-    if(!/^T\d{2}$/.test(tableId))throw new Error('SMM_DINING_TABLE_INVALID');
+    if(!/^T\d{2,}$/.test(tableId))throw new Error('SMM_DINING_TABLE_INVALID');
+    const tableConfig=readSmtDiningTableRegistry().find(table=>table.id===tableId&&table.active);
+    if(!tableConfig)throw new Error('SMM_DINING_TABLE_NOT_PUBLISHED');
     const occupied=snapshot.holds.find(hold=>hold.kind==='dining'&&!hold.archivedAt&&diningAssignedTables(hold).includes(tableId));
     if(occupied){
       const priorAddition=(occupied.additions??[]).find(row=>row.submissionId===providerRef);
@@ -1532,7 +1555,7 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
     const draft:LocalHoldDraft={
       id:nextRuntimeIdentity('HOLD-'),codeLabel:'H'+String(snapshot.holds.length+1).padStart(3,'0'),kind:'dining',
       createdAt:at,partySize:covers,note:'SMM 堂食',totalMinor:Math.max(0,Math.floor(Number(input.totalMinor)||0)),
-      assignedTable:tableId,seatedAt:at,payments:[],providerRef,sourceLabel:input.sourceLabel||'SMM',smmSubmissionRefs:[providerRef],items,
+      assignedTable:tableId,tableLabelAtOpen:tableConfig.name,tableVersionAtOpen:tableConfig.version,seatedAt:at,payments:[],providerRef,sourceLabel:input.sourceLabel||'SMM',smmSubmissionRefs:[providerRef],items,
     };
     const ensured=ensureDiningFormalOrder(snapshot,draft,at);
     commitDiningState(snapshot,{holds:[ensured.hold,...snapshot.holds],orders:ensured.orders});
@@ -2195,14 +2218,14 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
     const hold=requireDiningHold(snapshot,holdId);
     if(hold.archivedAt)throw new Error('DINING_HISTORY_PROTECTED');
     const registry=readSmtDiningTableRegistry();
-    const allowed=registry.length?registry.filter(table=>table.active).map(table=>table.id):Array.from({length:9},(_,index)=>'T'+String(index+1).padStart(2,'0'));
-    if(!allowed.includes(tableId))throw new Error('DINING_TABLE_NOT_ASSIGNABLE');
+    const tableConfig=registry.find(table=>table.active&&table.id===tableId);
+    if(!tableConfig)throw new Error('DINING_TABLE_NOT_ASSIGNABLE');
     if(snapshot.holds.some(row=>row.id!==holdId&&!row.archivedAt&&row.kind==='dining'&&diningAssignedTables(row).includes(tableId)))throw new Error('DINING_TABLE_OCCUPIED');
     if(hold.assignedTable&&hold.assignedTable!==tableId&&(hold.joinedTables??[]).length)throw new Error('DINING_TRANSFER_REQUIRES_UNJOIN');
     const at=new Date().toISOString();
     const seatedAt=hold.seatedAt??(hold.assignedTable?hold.createdAt:at);
     const joinedTables=(hold.joinedTables??[]).filter(id=>id!==tableId);
-    const seated=hold.assignedTable===tableId&&hold.seatedAt?hold:{...hold,assignedTable:tableId,seatedAt,...(joinedTables.length?{joinedTables}:{joinedTables:undefined})};
+    const seated=hold.assignedTable===tableId&&hold.seatedAt?hold:{...hold,assignedTable:tableId,seatedAt,...(!hold.tableLabelAtOpen?{tableLabelAtOpen:tableConfig.name,tableVersionAtOpen:tableConfig.version}:{}),...(joinedTables.length?{joinedTables}:{joinedTables:undefined})};
     const ensured=ensureDiningFormalOrder(snapshot,seated,at);
     if(hold.assignedTable===tableId&&!ensured.changed)return;
     commitDiningState(snapshot,{holds:snapshot.holds.map(row=>row.id===holdId?ensured.hold:row),orders:ensured.orders});
@@ -2217,8 +2240,7 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
     if(!hold.assignedTable)throw new Error('DINING_JOIN_REQUIRES_SEATED');
     if(diningDetail(hold).remainingMinor===0)throw new Error('DINING_JOIN_SETTLED');
     const registry=readSmtDiningTableRegistry();
-    const allowed=registry.length?registry.filter(table=>table.active).map(table=>table.id):Array.from({length:9},(_,index)=>'T'+String(index+1).padStart(2,'0'));
-    if(!allowed.includes(tableId))throw new Error('DINING_TABLE_NOT_ASSIGNABLE');
+    if(!registry.some(table=>table.active&&table.id===tableId))throw new Error('DINING_TABLE_NOT_ASSIGNABLE');
     if(diningAssignedTables(hold).includes(tableId))return;
     if(snapshot.holds.some(row=>row.id!==holdId&&!row.archivedAt&&row.kind==='dining'&&diningAssignedTables(row).includes(tableId)))throw new Error('DINING_TABLE_OCCUPIED');
     const at=new Date().toISOString();

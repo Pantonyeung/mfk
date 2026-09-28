@@ -3,6 +3,7 @@ import type {SmmLanOrderRequest,SmmLanOrderResponse} from '../../../contracts/sm
 export interface SmmWebAcceptanceIngress{
   submit(input:SmmLanOrderRequest,context:{deviceId:string;trusted:boolean}):SmmLanOrderResponse;
   readSnapshot():unknown;
+  readDiningOccupancy?(tableId:string):unknown;
 }
 
 async function getPending(){
@@ -45,6 +46,11 @@ async function publishProjection(snapshot:unknown){
   if(!response.ok)throw new Error('SMM_WEB_ACCEPTANCE_PROJECTION_HTTP_'+response.status);
 }
 
+async function publishDiningOccupancy(readback:unknown){
+  const response=await fetch('/__mfk/admin/api/admin-sync/dining-occupancy',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(readback)});
+  if(!response.ok)throw new Error('DINING_OCCUPANCY_PUBLISH_HTTP_'+response.status);
+}
+
 let installed=false;
 let reconciling=false;
 let timer:number|undefined;
@@ -77,6 +83,10 @@ export async function reconcileSmmWebAcceptanceIntake(ingress:SmmWebAcceptanceIn
       await ack(request,result);
     }
     await publishProjection(ingress.readSnapshot());
+    if(ingress.readDiningOccupancy){
+      const tables=(ingress.readSnapshot() as any)?.diningTables??[];
+      await Promise.all(tables.map((table:any)=>publishDiningOccupancy(ingress.readDiningOccupancy!(String(table.tableId||'')))));
+    }
   }catch{
     // Temporary browser acceptance must never affect local SMT truth or crash UI.
   }finally{

@@ -6,6 +6,8 @@ export interface SmtDiningTableConfig{
   readonly name:string;
   readonly active:boolean;
   readonly sortOrder:number;
+  readonly version:string;
+  readonly provenance:'VERSIONED'|'LEGACY_UNKNOWN';
 }
 
 export interface SmtStoreSettings{
@@ -72,17 +74,25 @@ function strings(value:unknown){
 
 export function readSmtDiningTableRegistry():readonly SmtDiningTableConfig[]{
   const row=record(readAdminSnapshotSection('storeSettings'));
-  const rows=Array.isArray(row.diningTables)?row.diningTables:[];
+  const published=Array.isArray(row.diningTables)?row.diningTables:[];
+  const fixture=(globalThis as typeof globalThis&{__MFK_TEST_DINING_TABLES__?:unknown[]}).__MFK_TEST_DINING_TABLES__;
+  const rows=published.length||import.meta.env.MODE!=='test'?published:Array.isArray(fixture)?fixture:[];
   return Object.freeze(rows.flatMap((raw,index)=>{
     const item=record(raw);
     const id=text(item.id);
     const name=text(item.name);
-    if(!id||!name)return [];
+    const versions=Array.isArray(item.versions)?item.versions.map(record):[];
+    const activeVersion=versions.find(version=>version.status==='ACTIVE');
+    const resolvedName=text(activeVersion?.label,name);
+    if(!id||!resolvedName)return [];
+    const version=text(activeVersion?.versionId)||text(item.version);
     return [Object.freeze({
       id,
-      name,
+      name:resolvedName,
       active:item.active!==false,
       sortOrder:Math.max(1,Math.floor(number(item.sortOrder,index+1))),
+      version:version||'LEGACY',
+      provenance:version?'VERSIONED':'LEGACY_UNKNOWN',
     })];
   }).sort((a,b)=>a.sortOrder-b.sortOrder));
 }
