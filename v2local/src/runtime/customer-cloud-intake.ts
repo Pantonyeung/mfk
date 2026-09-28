@@ -489,7 +489,8 @@ async function reconcileOwnerSellabilityCommands(){
       await localRuntime.setAvailability(nodeId,status);
       results.push({targetId,grain,nodeId,state:status==='available'?'SELLABLE':'SOLD_OUT'});
     }
-    await ackOwnerSellabilityCommand(operationId,'CONFIRMED',results);
+    const confirmed=results.length>0&&results.length===(command.targets??[]).filter(target=>String(target.targetId||'').trim()).length;
+    await ackOwnerSellabilityCommand(operationId,confirmed?'CONFIRMED':'REJECTED',results);
   }
 }
 
