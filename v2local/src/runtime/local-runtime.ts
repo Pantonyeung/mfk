@@ -42,6 +42,7 @@ export interface SmtDiningTableViewModel{readonly id:string;readonly areaLabel:s
 export interface SmtDiningSessionViewModel{readonly sessionId:string;readonly tableLabels:readonly string[];readonly statusLabel:string;readonly metrics:readonly SmtOperationalMetric[]}
 export interface SmtDiningProjection{readonly businessDate:string;readonly revision:number;readonly queue:readonly SmtDiningQueueItemViewModel[];readonly tables:readonly SmtDiningTableViewModel[];readonly selectedSession?:SmtDiningSessionViewModel}
 export type SmtAvailabilityStatus='available'|'soldout'|'paused';
+export const SMT_LOCAL_RUNTIME_STORAGE_KEY='mfk.v2local.runtime.v1';
 export interface SmtAvailabilityNodeViewModel{readonly nodeId:string;readonly label:string;readonly detail?:string;readonly status:SmtAvailabilityStatus;readonly sourceLabel?:string}
 export interface SmtAvailabilityProjection{readonly revision:number;readonly nodes:readonly SmtAvailabilityNodeViewModel[];readonly canChange:boolean}
 export interface LocalOrderLineItem{
@@ -283,7 +284,7 @@ export interface LocalHoldDraft{
   readonly items:readonly LocalOrderLineItem[];
 }
 interface Persisted{orders:StoredOrder[];availability:Record<string,SmtAvailabilityStatus>;holds:LocalHoldDraft[];diningRevision?:number}
-const KEY='mfk.v2local.runtime.v1';
+const KEY=SMT_LOCAL_RUNTIME_STORAGE_KEY;
 const PRINTER_BINDING_KEY='mfk.v2local.printers.v5';
 const LEGACY_PRINTER_BINDING_KEYS=['mfk.v2local.printers.v4','mfk.v2local.printers.v3','mfk.v2local.printers.v2'] as const;
 const RICEBALL_PRODUCT_IDS=Object.freeze(['riceball','tuna','pork']);
