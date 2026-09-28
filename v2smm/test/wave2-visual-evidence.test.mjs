@@ -28,7 +28,7 @@ function pngSize(buffer){
 
 function emitBase64(name,buffer){
   const base64=buffer.toString('base64');
-  const size=32000;
+  const size=1000;
   const total=Math.ceil(base64.length/size);
   for(let i=0;i<total;i++){
     console.log('MFK_WAVE2_EVIDENCE_B64|'+name+'|'+(i+1)+'/'+total+'|'+base64.slice(i*size,(i+1)*size));
