@@ -1612,6 +1612,7 @@ export class AdminSyncStore{
         if(!command)return json({code:'OWNER_SELLABILITY_COMMAND_NOT_FOUND'},404);
         const state=String(body.state||'').toUpperCase();
         if(state!=='CONFIRMED'&&state!=='REJECTED')return json({code:'OWNER_SELLABILITY_READBACK_STATE_INVALID'},400);
+        if(command.state!=='PENDING_SMT')return json({state:'ACKED',readback:command});
         const readback=Object.freeze({...command,state,readbackAt:new Date().toISOString(),results:rows(body.results)});
         await this.state.storage.put(key,readback);
         await this.state.storage.put('owner:sellability:operation:'+operationId,{result:{state,message:state==='CONFIRMED'?'SMT Runtime 已確認':'SMT Runtime 拒絕操作',targets:readback.results},createdAt:command.createdAt});
