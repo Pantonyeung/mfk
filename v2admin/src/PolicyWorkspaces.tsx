@@ -213,6 +213,7 @@ export function StoreSettingsWorkspace({domain='home'}:{domain?:StoreSettingsDom
   const errorSummaryRef=useRef<HTMLDivElement>(null);
   const [renameDrafts,setRenameDrafts]=useState<Record<string,string>>({});
   const [renameMessages,setRenameMessages]=useState<Record<string,string>>({});
+  const patch=(change:Partial<StoreSettings>)=>setConfig(current=>{const after={...current,...change};appendAdminAudit({action:'修改門店設定',target:current.storeCode,before:current,after});return after;});
   useEffect(()=>{
     if(config.customerWhatsAppTemplate===undefined||config.customerWhatsAppTemplate===null){
       patch({customerWhatsAppTemplate:DEFAULT_CUSTOMER_WHATSAPP_TEMPLATE});
@@ -220,7 +221,6 @@ export function StoreSettingsWorkspace({domain='home'}:{domain?:StoreSettingsDom
   // hydrate legacy missing value once; never render a fake visual fallback
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[]);
-  const patch=(change:Partial<StoreSettings>)=>setConfig(current=>{const after={...current,...change};appendAdminAudit({action:'修改門店設定',target:current.storeCode,before:current,after});return after;});
   const patchDay=(day:StoreDay,change:Partial<StoreSettings['weeklyHours'][StoreDay]>)=>patch({weeklyHours:{...config.weeklyHours,[day]:{...config.weeklyHours[day],...change}}});
   const refs=(value:string)=>value.split(',').map(item=>item.trim()).filter(Boolean);
   const diningTables=(config.diningTables??[]).slice().sort((a,b)=>a.sortOrder-b.sortOrder);
