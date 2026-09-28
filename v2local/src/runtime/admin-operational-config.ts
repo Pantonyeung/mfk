@@ -6,6 +6,8 @@ export interface SmtDiningTableConfig{
   readonly name:string;
   readonly active:boolean;
   readonly sortOrder:number;
+  readonly version:string;
+  readonly provenance:'VERSIONED'|'LEGACY_UNKNOWN';
 }
 
 export interface SmtStoreSettings{
@@ -78,11 +80,16 @@ export function readSmtDiningTableRegistry():readonly SmtDiningTableConfig[]{
     const id=text(item.id);
     const name=text(item.name);
     if(!id||!name)return [];
+    const versions=Array.isArray(item.versions)?item.versions.map(record):[];
+    const activeVersion=versions.find(version=>version.status==='ACTIVE');
+    const version=text(activeVersion?.versionId)||text(item.version);
     return [Object.freeze({
       id,
-      name,
+      name:text(activeVersion?.label,name),
       active:item.active!==false,
       sortOrder:Math.max(1,Math.floor(number(item.sortOrder,index+1))),
+      version:version||'LEGACY',
+      provenance:version?'VERSIONED':'LEGACY_UNKNOWN',
     })];
   }).sort((a,b)=>a.sortOrder-b.sortOrder));
 }
