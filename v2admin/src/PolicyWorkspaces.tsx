@@ -348,8 +348,8 @@ export function StoreSettingsWorkspace({domain='home'}:{domain?:StoreSettingsDom
       </article></div>:null}
     {domain==='whatsapp'?<div className="admin-policy-grid two"><article className="admin-policy-card"><h2>Customer WhatsApp 備援</h2>
         <Toggle checked={config.customerWhatsAppEnabled!==false} onChange={customerWhatsAppEnabled=>patch({customerWhatsAppEnabled})} label={config.customerWhatsAppEnabled!==false?'啟用':'停用'}/>
-        <label><span>公司 WhatsApp 電話</span><input inputMode="tel" value={config.customerWhatsAppNumber??''} onChange={event=>patch({customerWhatsAppNumber:event.target.value})} placeholder="例如 85291234567"/></label>
-        <label><span>訊息模板</span><textarea rows={8} value={config.customerWhatsAppTemplate??''} onChange={event=>patch({customerWhatsAppTemplate:event.target.value})}/></label>
+        <label><span>公司 WhatsApp 電話</span><input {...fieldProps('customer-whatsapp-number')} className={fieldError('customer-whatsapp-number')?'admin-field-invalid':undefined} inputMode="tel" value={config.customerWhatsAppNumber??''} onChange={event=>patch({customerWhatsAppNumber:event.target.value})} placeholder="例如 85291234567"/><FieldError id="customer-whatsapp-number"/></label>
+        <label><span>訊息模板</span><textarea {...fieldProps('customer-whatsapp-template')} className={fieldError('customer-whatsapp-template')?'admin-field-invalid':undefined} rows={8} value={config.customerWhatsAppTemplate??''} onChange={event=>patch({customerWhatsAppTemplate:event.target.value})}/><FieldError id="customer-whatsapp-template"/></label>
         <small>可用：{'{name}'}、{'{phone}'}、{'{items}'}、{'{total}'}、{'{submissionId}'}。系統只會喺 Customer 無法連接 SMT 接單後，由客人主動撳掣先開 WhatsApp；唔會自動傳送。</small>
       </article></div>:null}
     {domain==='payments'?<div className="admin-policy-grid two"><article className="admin-policy-card"><header><div><h2>客戶電子支付</h2><small>先揀付款方式；再進入單一設定。Customer 只讀已發佈版本。</small></div><button type="button" onClick={addPaymentChannel}>新增付款方式</button></header>
