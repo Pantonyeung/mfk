@@ -74,7 +74,9 @@ function strings(value:unknown){
 
 export function readSmtDiningTableRegistry():readonly SmtDiningTableConfig[]{
   const row=record(readAdminSnapshotSection('storeSettings'));
-  const rows=Array.isArray(row.diningTables)?row.diningTables:[];
+  const published=Array.isArray(row.diningTables)?row.diningTables:[];
+  const fixture=(globalThis as typeof globalThis&{__MFK_TEST_DINING_TABLES__?:unknown[]}).__MFK_TEST_DINING_TABLES__;
+  const rows=published.length||import.meta.env.MODE!=='test'?published:Array.isArray(fixture)?fixture:[];
   return Object.freeze(rows.flatMap((raw,index)=>{
     const item=record(raw);
     const id=text(item.id);
