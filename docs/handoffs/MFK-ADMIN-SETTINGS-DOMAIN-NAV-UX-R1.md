@@ -35,3 +35,9 @@ Branch opened and domain validation seam added. UI route split is in progress.
 - Channels route duplication reduced: mapping/failure routes now render mapping only; accept renders intake + accept policy only; sync renders sync surfaces + sync policy only; estimate renders commercial + estimate field only.
 - No channel authority, OAuth, webhook, menu sync, sellability, store ops or mapping storage was rebuilt.
 - Current head f110f52dd9a8107b1bef37fb33b34bc3ce5413ae; CI pending start.
+
+## Milestone 4
+- CI first break on Milestone 3 was test-scope only: shell navigation legitimately contains the words 商品對應 even when the accept-policy workspace does not render the mapping editor. Assertion narrowed to the workspace heading contract; product behavior unchanged.
+- Channel page header copy is now mode-specific so accept/sync/mapping/estimate pages no longer describe unrelated tasks.
+- Continued large-page audit: Product detail already has task picker; Modifiers and Combos already have guided progressive disclosure. Refund report is a single coherent workflow + audit readback and is not split merely by page length.
+- Current head 0204a6c03dc4bc19b51136c4e50b10272132ca76; CI pending.
