@@ -51,6 +51,7 @@ const freshnessFrom=(connection:CustomerConnectionState,browserOnline:boolean):U
   return 'CURRENT';
 };
 const emptyStateFrom=(freshness:Ui6Freshness):Ui6EmptyState=>freshness==='CURRENT'?'EMPTY':freshness;
+const freshnessLabel=(freshness:Exclude<Ui6Freshness,'CURRENT'>)=>freshness==='OFFLINE'?'目前離線':freshness==='STALE'?'資料需要更新':freshness==='ERROR'?'更新失敗':freshness==='LOADING'?'更新中':'確認中';
 
 function useElapsed(from:string|undefined){
   const [now,setNow]=useState(()=>Date.now());
@@ -181,7 +182,7 @@ export function StoreFulfillmentUi6View({
 
   return <section className={"page ui6-tracking tone-"+meta.tone} data-ui6-stage={stage} data-ui6-freshness={freshness}>
     {freshness!=='CURRENT'?<section className={"ui6-freshness state-"+freshness.toLowerCase()} role="status">
-      <span>{freshness}</span>
+      <span>{freshnessLabel(freshness)}</span>
       <p>{freshness==='OFFLINE'
         ?'目前離線；以下係最近一次已知進度。恢復連線後會重新更新。'
         :freshness==='STALE'
