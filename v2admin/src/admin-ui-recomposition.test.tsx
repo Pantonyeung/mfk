@@ -76,6 +76,15 @@ describe('Admin UI recomposition',()=>{
     expect(accept).not.toContain('佣金估算 %');
   });
 
+  it('keeps staff and print templates collapsed until one object is chosen',()=>{
+    const staff=render('/admin/staff');
+    expect(staff).not.toContain('PIN（4–8 位）');
+    const templates=render('/admin/print/templates');
+    expect(templates).toContain('收據');
+    expect(templates).toContain('製作單');
+    expect(templates).not.toContain('收據模板內容');
+  });
+
   it('only reports SMT success for a matching revision and fingerprint readback',()=>{
     const activeRelease={version:12,createdAt:'2026-09-22T00:00:00.000Z',fingerprint:'fp-12'};
     const published={state:'PUBLISHED' as const,revision:12,fingerprint:'fp-12',updatedAt:'2026-09-22T00:00:01.000Z'};
