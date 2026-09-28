@@ -70,7 +70,7 @@ function capabilityElement(id:string){
 
 export function MfkAdminApp(){
   return <AdminDraftProvider><AdminShell><Routes>
-    {ADMIN_CAPABILITIES.map(item=><Route key={item.id} path={item.path} element={capabilityElement(item.id)}/>)}
+    {ADMIN_CAPABILITIES.map(item=><Route key={item.id} path={item.id==='store-settings'?item.path+'/*':item.path} element={capabilityElement(item.id)}/>)}
     <Route path="/" element={<Navigate to="/admin/overview" replace/>}/>
     <Route path="*" element={<Navigate to="/admin/overview" replace/>}/>
   </Routes></AdminShell></AdminDraftProvider>;
