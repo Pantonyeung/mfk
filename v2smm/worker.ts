@@ -603,7 +603,26 @@ export default{
       if(request.method!=='GET')return json({code:'METHOD_NOT_ALLOWED'},405);
       let active;
       try{active=await fetchActive(storeId);}catch{return json({code:'SMM_CONFIG_NOT_PUBLISHED'},503);}
-      return json(mapPublishedSnapshot(active));
+      const base=mapPublishedSnapshot(active);
+      const id=env.SMM_INTENT_STORE.idFromName(storeId);
+      const stub=env.SMM_INTENT_STORE.get(id);
+      const projectionResponse=await stub.fetch(new Request('https://internal/acceptance/smt/projection',{method:'GET'}));
+      if(!projectionResponse.ok){
+        return json({...base,channels:[...base.channels,{channel:'SMT_MIRROR',state:'STALE',detail:'等待 SMT canonical operational projection',observedAt:new Date().toISOString()}]});
+      }
+      const projectionBody=record(await projectionResponse.json().catch(()=>({})));
+      const projection=record(projectionBody.snapshot);
+      return json({
+        ...base,
+        orders:Array.isArray(projection.orders)?projection.orders:[],
+        work:Array.isArray(projection.work)?projection.work:[],
+        dineSessions:Array.isArray(projection.dineSessions)?projection.dineSessions:[],
+        channels:[
+          ...base.channels,
+          {channel:'SMT_MIRROR',state:'CONNECTED',detail:'SMT canonical operational projection',observedAt:String(projectionBody.observedAt||base.observedAt)},
+        ],
+        observedAt:String(projectionBody.observedAt||base.observedAt),
+      });
     }
 
     if(url.pathname==='/api/smm/staff'){
