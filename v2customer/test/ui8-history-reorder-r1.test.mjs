@@ -28,7 +28,7 @@ test('Stage8 list has current completed all and keeps Orders active in the fixed
   const navBlock=primitives.slice(primitives.indexOf('export function BottomNavigation'),primitives.indexOf('export interface ProductOriginRect'));
   const navIds=[...navBlock.matchAll(/\{id:'(home|menu|cart|orders|more)' as const/g)].map(match=>match[1]);
   assert.deepEqual(navIds,['home','menu','cart','orders','more']);
-  assert.match(app,/BottomNavigation active=\{view==='cart'\|\|view==='checkout'\?'cart':view==='more'\?'more':'orders'\}/);
+  assert.match(app,/BottomNavigation active=\{view==='cart'\\|\\|view==='checkout'\\?'cart':view==='more'\\|\\|view==='account'\\|\\|view==='recovery'\\?'more':'orders'\}/);
   assert.match(styles,/\.bottom-navigation\{position:fixed[\s\S]*grid-template-columns:repeat\(5,1fr\)[\s\S]*env\(safe-area-inset-bottom\)/);
   const buttonMinHeight=styles.match(/\.bottom-navigation button\{[^}]*min-height:(\d+)px/);
   assert.ok(buttonMinHeight);
