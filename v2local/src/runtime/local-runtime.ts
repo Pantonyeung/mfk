@@ -283,7 +283,7 @@ export interface LocalHoldDraft{
   readonly smmSubmissionRefs?:readonly string[];
   readonly items:readonly LocalOrderLineItem[];
 }
-interface Persisted{orders:StoredOrder[];availability:Record<string,SmtAvailabilityStatus>;holds:LocalHoldDraft[];diningRevision?:number}
+interface Persisted{orders:StoredOrder[];availability:Record<string,SmtAvailabilityStatus>;availabilityBusinessDate?:string;holds:LocalHoldDraft[];diningRevision?:number}
 const KEY=SMT_LOCAL_RUNTIME_STORAGE_KEY;
 const PRINTER_BINDING_KEY='mfk.v2local.printers.v5';
 const LEGACY_PRINTER_BINDING_KEYS=['mfk.v2local.printers.v4','mfk.v2local.printers.v3','mfk.v2local.printers.v2'] as const;
@@ -323,7 +323,7 @@ function read():Persisted{
         items:(Array.isArray(addition?.items)?addition.items:[]).map((item:any)=>normalizeLocalOrderLineItem(item)),
       })),
     })) as LocalHoldDraft[];
-    return {orders,availability:value.availability||{},holds,diningRevision:Number.isSafeInteger(value.diningRevision)?value.diningRevision:0};
+    return {orders,availability:value.availability||{},availabilityBusinessDate:typeof value.availabilityBusinessDate==='string'?value.availabilityBusinessDate:undefined,holds,diningRevision:Number.isSafeInteger(value.diningRevision)?value.diningRevision:0};
   }catch{return clone(defaults)}
 }
 let data=read();
