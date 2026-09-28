@@ -55,7 +55,7 @@ export interface SmmLanOrderRequest{
   readonly menuRevision:string;
   readonly publishedTotalMinor:number;
   readonly serviceMode:'TAKEAWAY'|'DINE_IN';
-  readonly tender:'CASH'|'ALIPAY'|'WECHAT'|'FPS'|'PAYME';
+  readonly tender?:'CASH'|'ALIPAY'|'WECHAT'|'FPS'|'PAYME';
   readonly diningTarget?:SmmLanDiningTarget;
   readonly lines:readonly SmmLanLineIntent[];
 }
@@ -135,9 +135,10 @@ export function validateSmmLanOrderRequest(input:unknown):SmmLanOrderRequest{
   const serviceMode=row.serviceMode==='TAKEAWAY'?'TAKEAWAY':row.serviceMode==='DINE_IN'?'DINE_IN':null;
   if(!serviceMode)throw new Error('SMM_ORDER_SERVICE_MODE_INVALID');
   const tender=['CASH','ALIPAY','WECHAT','FPS','PAYME'].includes(String(row.tender))
-    ?String(row.tender) as SmmLanOrderRequest['tender']
-    :null;
-  if(!tender)throw new Error('SMM_ORDER_TENDER_INVALID');
+    ?String(row.tender) as NonNullable<SmmLanOrderRequest['tender']>
+    :undefined;
+  if(serviceMode==='TAKEAWAY'&&!tender)throw new Error('SMM_ORDER_TENDER_INVALID');
+  if(serviceMode==='DINE_IN'&&row.tender!==undefined)throw new Error('SMM_DINING_TENDER_FORBIDDEN');
   const lines=row.lines.map((raw,index)=>{
     const line=smmRecord(raw,'SMM_ORDER_LINE_INVALID_'+index);
     if(!Array.isArray(line.selections))throw new Error('SMM_ORDER_SELECTIONS_INVALID_'+index);
@@ -200,7 +201,7 @@ export function validateSmmLanOrderRequest(input:unknown):SmmLanOrderRequest{
     menuRevision:smmText(row.menuRevision,'SMM_ORDER_MENU_REVISION_INVALID',120),
     publishedTotalMinor:smmMoney(row.publishedTotalMinor,'SMM_ORDER_TOTAL_INVALID'),
     serviceMode,
-    tender,
+    ...(tender?{tender}:{}),
     ...(serviceMode==='DINE_IN'?{
       diningTarget:(()=>{
         const raw=smmRecord(row.diningTarget,'SMM_DINING_TARGET_REQUIRED');
