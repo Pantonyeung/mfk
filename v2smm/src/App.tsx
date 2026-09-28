@@ -1001,13 +1001,13 @@ function ChannelList({connection,channels}:{connection:SmmConnectionState;channe
 }
 
 function BusinessDay({projection}:{projection:SmmReadModelSnapshot['businessDay']}){
-  if(!projection)return <EmptyState title="營業日資料尚未連接" detail="營業日只作記錄同報表分類，永遠唔會阻止落單、付款或者本機提交。"/>;
-  return <><div className="metric-grid"><Metric label="營業日" value={projection.businessDate}/><Metric label="狀態" value={capacityLabel(projection.state)}/><Metric label="讀取時間" value={new Date(projection.observedAt).toLocaleString('zh-HK')}/></div><p className="callout">營業日用作當日記錄同報表分類。</p></>;
+  if(!projection)return <EmptyState title="營業日資料尚未連接" detail="連接後會顯示今日營業日記錄。"/>;
+  return <><div className="metric-grid"><Metric label="營業日" value={projection.businessDate}/><Metric label="狀態" value={businessDayStateLabel(projection.state)}/><Metric label="讀取時間" value={new Date(projection.observedAt).toLocaleString('zh-HK')}/></div><p className="callout">營業日用作當日記錄同報表分類。</p></>;
 }
 
 function Capacity({projection}:{projection:SmmReadModelSnapshot['capacity']}){
   if(!projection)return <EmptyState title="產能資料尚未連接" detail="連接後會顯示正式產能狀態；SMM 唔會自行判斷門店忙閒。"/>;
-  return <><div className="metric-grid"><Metric label="狀態" value={projection.state}/><Metric label="門店提示" value={projection.label}/></div><p className="callout">{projection.detail}</p><small>讀取：{new Date(projection.observedAt).toLocaleString('zh-HK')}</small></>;
+  return <><div className="metric-grid"><Metric label="狀態" value={capacityLabel(projection.state)}/><Metric label="門店提示" value={projection.label}/></div><p className="callout">{projection.detail}</p><small>讀取：{new Date(projection.observedAt).toLocaleString('zh-HK')}</small></>;
 }
 
 function Reporting({projection}:{projection:SmmReadModelSnapshot['reporting']}){
@@ -1022,7 +1022,7 @@ function RefundRequests({connection,rows}:{connection:SmmConnectionState;rows:No
 
 function PrintHealth({connection,rows}:{connection:SmmConnectionState;rows:NonNullable<SmmReadModelSnapshot['printHealth']>}){
   if(!rows.length)return <EmptyState title={connection==='NOT_CONNECTED'?'列印狀態尚未連接':'暫時冇列印設備資料'} detail="呢度只顯示設備健康；需要重印或維修時請到指定工作位置處理。"/>;
-  return <>{rows.map(row=><div className="list-row" key={row.logicalPrinterId}><div><strong>{row.label}</strong><small>{row.detail}</small></div><span className={`status ${row.state==='READY'?'positive':row.state==='UNKNOWN'?'unknown':'warning'}`}{printStateLabel(row.state)}</span></div>)}</>;
+  return <>{rows.map(row=><div className="list-row" key={row.logicalPrinterId}><div><strong>{row.label}</strong><small>{row.detail}</small></div><span className={`status ${row.state==='READY'?'positive':row.state==='UNKNOWN'?'unknown':'warning'}`}>{printStateLabel(row.state)}</span></div>)}</>;
 }
 
 function Diagnostics({connection,snapshot,pendingCount}:{connection:SmmConnectionState;snapshot:SmmReadModelSnapshot|null;pendingCount:number}){
@@ -1601,6 +1601,7 @@ function NavGlyph({label}:{label:string}){
 function NavButton({active,label,badge,onClick}:{active:boolean;label:string;badge?:string;onClick:()=>void}){return <button className={active?'active':''} onClick={onClick}><span className="nav-glyph"><NavGlyph label={label}/></span><small>{label}</small>{badge?<b>{badge}</b>:null}</button>}
 
 function channelStateLabel(state:string){return state==='CONNECTED'?'正常':state==='STALE'?'資料稍舊':state==='DEGRADED'?'部分異常':state==='OFFLINE'?'離線':'狀態未明'}
+function businessDayStateLabel(state:string|undefined){return state==='OPEN'?'營業中':state==='CLOSED'?'已收舖':state==='STALE'?'資料稍舊':state==='UNKNOWN'?'狀態未明':state||'未有資料'}
 function capacityLabel(state:string|undefined){return state==='NORMAL'?'正常':state==='BUSY'?'繁忙':state==='PAUSED'?'已暫停':state==='UNKNOWN'?'狀態未明':'未有資料'}
 function reportingFreshnessLabel(state:string|undefined){return state==='CURRENT'?'已更新':state==='STALE'?'資料稍舊':state==='UNKNOWN'?'狀態未明':'未有資料'}
 function refundStateLabel(state:string){return state==='PENDING'?'待處理':state==='REVIEWING'?'跟進中':state==='RESOLVED'?'已完成':'狀態未明'}
