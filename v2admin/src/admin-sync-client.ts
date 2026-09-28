@@ -180,3 +180,21 @@ export function installAdminSyncAutoFlush(){
   window.addEventListener('mfk-admin-release',queueLatest);
   window.setTimeout(()=>{queueLatest();flush();},0);
 }
+
+export interface AdminDiningOccupancyReadback{
+  readonly storeId:string;readonly tableId:string;readonly hasActiveSession:boolean;readonly activeSessionCount:number;
+  readonly observedAt:string;readonly runtimeRevision:number;readonly receivedAt?:string;
+}
+export async function readFreshDiningOccupancy(tableId:string,maxAgeMs=5000):Promise<AdminDiningOccupancyReadback|null>{
+  const id=String(tableId||'').trim();if(!id||typeof fetch==='undefined')return null;
+  const key=readExistingAdminPublisherKey();if(!key)return null;
+  try{
+    const response=await fetch('/api/admin-sync/dining-occupancy?storeId=MF01&tableId='+encodeURIComponent(id),{method:'GET',cache:'no-store',credentials:'same-origin',headers:{'x-mfk-admin-publish-key':key}});
+    if(!response.ok)return null;
+    const body=await response.json() as {readback?:AdminDiningOccupancyReadback};
+    const row=body.readback;if(!row||row.tableId!==id)return null;
+    const age=Date.now()-Date.parse(row.observedAt);
+    if(!Number.isFinite(age)||age<0||age>maxAgeMs)return null;
+    return Object.freeze({...row});
+  }catch{return null;}
+}
