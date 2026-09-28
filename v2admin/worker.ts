@@ -1005,7 +1005,7 @@ export class AdminSyncStore{
     const prior=await this.state.storage.get(operationKey);
     if(prior)return prior.result;
     const action=String(input?.action||'').toUpperCase();
-    if(!['SOLD_OUT','RESTORE'].includes(action))return{state:'UNKNOWN',message:'售罄操作格式無效',targets:[]};
+    if(!['SOLD_OUT','PAUSE','RESTORE'].includes(action))return{state:'UNKNOWN',message:'售罄操作格式無效',targets:[]};
     const requested=rows(input?.targets).slice(0,50);
     if(!requested.length)return{state:'UNKNOWN',message:'未有操作目標',targets:[]};
     const active=await this.state.storage.get('active');
