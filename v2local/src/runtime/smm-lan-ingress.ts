@@ -1,4 +1,4 @@
-import type {MfkLocalRuntime} from './local-runtime.ts';
+import {readDiningOccupancy,type MfkLocalRuntime} from './local-runtime.ts';
 import {priceCustomerCart} from './customer-cloud-intake.ts';
 import {projectSyncedCombos,projectSyncedOrderingCatalog} from './admin-config-projection.ts';
 import {revalidateSmmComboLine} from './smm-combo-revalidation.ts';
@@ -31,6 +31,7 @@ function serviceModeValue(mode:SmmLanOrderRequest['serviceMode']):'takeaway'|'di
 // Dining projection labels are resolved from the Admin-published table registry.
 export function createSmmLanIngress(runtime:MfkLocalRuntime){
   return Object.freeze({
+    readDiningOccupancy(tableId:string){return readDiningOccupancy(tableId);},
     readSnapshot(){
       const envelope=readSmtAdminConfigLkg();
       if(!envelope)throw new Error('SMM_ADMIN_CONFIG_REQUIRED');
