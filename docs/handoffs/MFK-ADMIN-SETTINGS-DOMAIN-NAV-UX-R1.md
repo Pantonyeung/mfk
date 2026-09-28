@@ -30,3 +30,8 @@ Branch opened and domain validation seam added. UI route split is in progress.
 - WhatsApp field errors are wired to real input/textarea targets.
 - Full Admin large-page audit started. Largest remaining surfaces are ChannelsWorkspace, CombosWorkspace, ModifiersWorkspace and product detail; Combos/Modifiers already use guided one-object/one-step progressive disclosure, so they are not blindly split again.
 - Current HEAD: 0ab560785a548c53215ae78d667781d817ed7bcd; required CI queued.
+
+## Milestone 3
+- Channels route duplication reduced: mapping/failure routes now render mapping only; accept renders intake + accept policy only; sync renders sync surfaces + sync policy only; estimate renders commercial + estimate field only.
+- No channel authority, OAuth, webhook, menu sync, sellability, store ops or mapping storage was rebuilt.
+- Current head f110f52dd9a8107b1bef37fb33b34bc3ce5413ae; CI pending start.
