@@ -130,7 +130,7 @@ export async function fetchAndApplyAdminConfig(){
     if(!response.ok)throw new Error('ADMIN_CONFIG_FETCH_HTTP_'+response.status);
     const envelope=validateMfkAdminConfigEnvelope(await response.json());
     const applied=applyAdminConfigEnvelope(envelope);
-    if(applied.disposition!=='STALE')await ack(envelope,applied.disposition);
+    if(applied.disposition!=='STALE')void ack(envelope,applied.disposition).catch(()=>{});
     return applied;
   }catch(error){
     const lkg=readSmtAdminConfigLkg();
