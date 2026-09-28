@@ -19,43 +19,76 @@ function installStorage(){
   });
 }
 
-describe('Staff login presentation',()=>{
-  it('keeps the SMT shell visible underneath a compact blocking login dialog',()=>{
-    installStorage();
-    applyAdminConfigEnvelope(createMfkAdminConfigEnvelope({
-      storeId:'MF01',
-      revision:3,
-      publishedAt:'2026-09-22T11:00:00.000Z',
-      adminFingerprint:'fnv1a32:staff-ui',
-      snapshot:{
-        catalog:{categories:[],products:[],combos:[],comboPools:[]},
-        staffAuth:{
-          schema:'MFK_STAFF_AUTH_V1',
-          staff:[{
-            staffId:'staff-1',
-            name:'老闆',
-            role:'OWNER',
-            scope:'STORE',
-            adminLogin:true,
-            active:true,
-            permissions:['ORDER_REVIEW','ORDER_CORRECTION'],
-            pinVerifier:{
-              algorithm:'PBKDF2-SHA256',
-              iterations:120000,
-              saltHex:'00112233445566778899aabbccddeeff',
-              hashHex:'00'.repeat(32),
-            },
-          }],
-        },
+function installStaffConfig(){
+  installStorage();
+  applyAdminConfigEnvelope(createMfkAdminConfigEnvelope({
+    storeId:'MF01',
+    revision:3,
+    publishedAt:'2026-09-22T11:00:00.000Z',
+    adminFingerprint:'fnv1a32:staff-ui',
+    snapshot:{
+      catalog:{categories:[],products:[],combos:[],comboPools:[]},
+      staffAuth:{
+        schema:'MFK_STAFF_AUTH_V1',
+        staff:[{
+          staffId:'staff-1',
+          name:'老闆',
+          role:'OWNER',
+          scope:'STORE',
+          adminLogin:true,
+          active:true,
+          permissions:['ORDER_REVIEW','ORDER_CORRECTION'],
+          pinVerifier:{
+            algorithm:'PBKDF2-SHA256',
+            iterations:120000,
+            saltHex:'00112233445566778899aabbccddeeff',
+            hashHex:'00'.repeat(32),
+          },
+        }],
       },
-    }));
+    },
+  }));
+}
 
-    const html=renderToStaticMarkup(<StaffAuthGate><div>SMT_BACKGROUND_VISIBLE</div></StaffAuthGate>);
-    expect(html).toContain('SMT_BACKGROUND_VISIBLE');
+describe('Staff login presentation',()=>{
+  it('keeps ordering inert underneath the Owner-approved full-screen Stage 0 gate',()=>{
+    installStaffConfig();
+    const html=renderToStaticMarkup(<StaffAuthGate><button>ORDERING_INTERACTION</button></StaffAuthGate>);
+
+    expect(html).toContain('ORDERING_INTERACTION');
     expect(html).toContain('smt-gated-underlay');
-    expect(html).toContain('smt-blocking-overlay');
-    expect(html).toContain('smt-access-card--compact');
+    expect(html).toContain('class="s0"');
     expect(html).toContain('員工登入');
-    expect(html).not.toContain('smt-access-brand-panel');
+    expect(html).toContain('s0-keypad');
+    expect(html).toContain('s0-brand-slot');
+    expect(html).toContain('s0-ip-slot');
+    expect(html).not.toContain('stage0-approved-login-reference.jpeg');
+    expect(html).not.toContain('stage0-logo.jpg');
+
+    // Ordering remains rendered for continuity/readback but is inside the inert,
+    // aria-hidden gated underlay until the existing Staff Auth authority opens it.
+    expect(html.indexOf('smt-gated-underlay')).toBeLessThan(html.indexOf('ORDERING_INTERACTION'));
+
+    // The superseded compact blocking-dialog contract must not return.
+    expect(html).not.toContain('smt-blocking-overlay');
+    expect(html).not.toContain('smt-access-card--compact');
+  });
+
+  it('renders a numeric PIN keypad while preserving the existing staff-auth gate',()=>{
+    installStaffConfig();
+    const html=renderToStaticMarkup(<StaffAuthGate><div>ORDERING</div></StaffAuthGate>);
+
+    for(const digit of ['1','2','3','4','5','6','7','8','9','0']){
+      expect(html).toContain('>'+digit+'</button>');
+    }
+    expect(html).toContain('aria-label="員工 PIN"');
+    expect(html).toContain('使用下方數字鍵輸入');
+    expect(StaffAuthGate.toString()).toContain('/^\\d$/');
+    expect(html).not.toContain('type="password"');
+    expect(html).not.toContain('inputmode="numeric"');
+    expect(html).not.toContain('掃碼登入');
+    expect(html).not.toContain('需要協助？');
+    expect(html).not.toContain('關閉系統');
+    expect(html).toContain('Admin Config R3');
   });
 });

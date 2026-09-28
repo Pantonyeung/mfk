@@ -18,12 +18,14 @@ export function StaffAuthGate({children}:{children:ReactNode}){
   const [staffId,setStaffId]=useState('');
   const [pin,setPin]=useState('');
   const [error,setError]=useState('');
+  const [now,setNow]=useState(()=>new Date());
 
   useEffect(()=>{
     const update=()=>setRevision(value=>value+1);
     const a=subscribeStaffSession(update);
     const b=subscribeSmtAdminConfig(update);
-    return()=>{a();b();};
+    const timer=window.setInterval(()=>setNow(new Date()),30_000);
+    return()=>{a();b();window.clearInterval(timer);};
   },[]);
   void revision;
 
@@ -48,39 +50,40 @@ export function StaffAuthGate({children}:{children:ReactNode}){
     }
   };
 
+  const press=(key:string)=>{
+    if(key==='⌫'){setPin(value=>value.slice(0,-1));setError('');return;}
+    if(/^\d$/.test(key)){setPin(value=>(value+key).slice(0,8));setError('');}
+  };
+  const date=new Intl.DateTimeFormat('zh-HK',{year:'numeric',month:'2-digit',day:'2-digit',weekday:'short'}).format(now);
+  const time=new Intl.DateTimeFormat('zh-HK',{hour:'2-digit',minute:'2-digit',hour12:false}).format(now);
   return <>
     <div className="smt-gated-underlay" aria-hidden="true">{children}</div>
-    <div className="smt-blocking-overlay">
-      <section className="smt-access-card smt-access-card--compact" role="dialog" aria-modal="true" aria-labelledby="staff-login-title">
-        <span className="smt-access-section-label">STAFF ACCESS</span>
-        <h2 id="staff-login-title">員工登入</h2>
-        <p className="smt-access-lead">選擇員工，再輸入 PIN。登入後先可以操作 SMT；背景畫面只作參考，未登入前唔可以操作。</p>
-
-        <label className="smt-access-field">
-          <span>員工</span>
-          <select value={staffId} onChange={event=>{setStaffId(event.target.value);setPin('');setError('')}}>
-            {loginReady.map(row=><option key={row.staffId} value={row.staffId}>{row.name} · {roleLabel(row.role)}</option>)}
-          </select>
-        </label>
-
-        <label className="smt-access-field">
-          <span>PIN</span>
-          <input
-            type="password"
-            inputMode="numeric"
-            autoComplete="off"
-            value={pin}
-            onChange={event=>setPin(event.target.value.replace(/\D/g,'').slice(0,8))}
-            onKeyDown={event=>{if(event.key==='Enter'&&pin.length>=4)void submit()}}
-            placeholder="4–8 位數字"
-          />
-        </label>
-
-        {error?<div className="smt-access-error" role="alert">{error}</div>:null}
-
-        <button className="smt-access-primary" disabled={!staffId||pin.length<4} onClick={()=>void submit()}>登入 SMT</button>
-        <p className="smt-access-help">Admin Config R{sync.revision||'—'} · {sync.state} · 離線可用最後有效設定驗證</p>
+    <div className="s0">
+      <section className="s0-brand" aria-label="磨飯 More Fun">
+        <div className="s0-brand-slot" aria-label="磨飯品牌標誌預留位置"></div>
+        <p>好味 · 好心情</p>
+        <div className="s0-ip-slot" aria-hidden="true"></div>
       </section>
+      <main className="s0-login" aria-labelledby="staff-login-title">
+        <header><div><h1 id="staff-login-title">歡迎回來 👋</h1><p>登入以開始今日營運</p></div><div className="s0-clock"><small>{date}</small><b>{time}</b></div></header>
+        <div className="s0-login-methods">
+          <button className="active" type="button"><b>◎</b><strong>員工登入</strong><small>使用員工帳號</small></button>
+          
+        </div>
+        <label className="s0-staff"><span>員工</span><select value={staffId} onChange={event=>{setStaffId(event.target.value);setPin('');setError('')}}>{loginReady.map(row=><option key={row.staffId} value={row.staffId}>{row.name} · {roleLabel(row.role)}</option>)}</select></label>
+        <div className="s0-pin" role="status" aria-label="員工 PIN"><span>PIN</span><strong>{pin?Array.from({length:pin.length},()=> '●').join(' '):'使用下方數字鍵輸入'}</strong>{pin?<button type="button" onClick={()=>setPin('')} aria-label="清除 PIN">×</button>:null}</div>
+        <div className="s0-keypad">{['1','2','3','4','5','6','7','8','9','⌫','0'].map(key=><button type="button" key={key} onClick={()=>press(key)}>{key}</button>)}<button className="go" type="button" disabled={!staffId||pin.length<4} onClick={()=>void submit()}>→</button></div>
+        {error?<div className="s0-error" role="alert">{error}</div>:null}
+        <p className="s0-hint">Admin Config R{sync.revision||'—'} · {sync.state} · 離線可用最後有效設定驗證</p>
+      </main>
+      <aside className="s0-side">
+        <article className="morning"><span>☀</span><div><h2>早晨！</h2><p>新一天 · 好味道 · 從磨飯開始</p></div></article>
+        <article className="shift"><div><span>◷</span><div><b>開更狀態</b><small>登入成功後進入開更確認</small></div></div></article>
+        <article className="goal"><span>◎</span><div><b>今日小目標</b><p>好食物 · 讓更多人開心</p></div><i>More Fun</i></article>
+        <article className="brand-card"><div><b>手作 · 輕食 · 更美好</b><p>用新鮮食材，為每一天加一點快樂。</p></div></article>
+        
+      </aside>
+      <footer className="s0-footer"><div><b>磨飯</b><span>GOOD FOOD GOOD DAY</span></div><span>v2.1.0　|　MFK SMT</span><span>Admin Config R{sync.revision||'—'} · {sync.state}</span></footer>
     </div>
   </>;
 }
