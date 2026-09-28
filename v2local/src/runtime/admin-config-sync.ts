@@ -22,6 +22,7 @@ export interface SmtAdminConfigApplyResult{
 
 const listeners=new Set<()=>void>();
 export interface SmtCloudDoorbell{readonly type:string;readonly [key:string]:unknown}
+const ADMIN_PROPAGATION_DIAG_KEY='mfk.v2local.admin-propagation-diag.v1';
 const cloudDoorbellListeners=new Set<(event:SmtCloudDoorbell)=>void>();
 
 function emit(){for(const listener of listeners)listener();}
@@ -130,7 +131,13 @@ export async function fetchAndApplyAdminConfig(){
     if(!response.ok)throw new Error('ADMIN_CONFIG_FETCH_HTTP_'+response.status);
     const envelope=validateMfkAdminConfigEnvelope(await response.json());
     const applied=applyAdminConfigEnvelope(envelope);
-    if(applied.disposition!=='STALE')void ack(envelope,applied.disposition).catch(()=>{});
+    if(applied.disposition!=='STALE'){
+      try{
+        const diag=JSON.parse(localStorage.getItem(ADMIN_PROPAGATION_DIAG_KEY)||'{}');
+        localStorage.setItem(ADMIN_PROPAGATION_DIAG_KEY,JSON.stringify({...diag,revision:envelope.revision,fingerprint:envelope.fingerprint,appliedAt:now()}));
+      }catch{}
+      void ack(envelope,applied.disposition).catch(()=>{});
+    }
     return applied;
   }catch(error){
     const lkg=readSmtAdminConfigLkg();
@@ -171,6 +178,7 @@ function connectDoorbell(){
       try{
         const row=JSON.parse(String(event.data)) as SmtCloudDoorbell&{revision?:number;fingerprint?:string};
         if(row.type==='ADMIN_CONFIG_AVAILABLE'){
+          try{localStorage.setItem(ADMIN_PROPAGATION_DIAG_KEY,JSON.stringify({revision:row.revision,fingerprint:row.fingerprint,publishedAt:row.publishedAt,acceptedAt:row.acceptedAt,doorbellReceivedAt:now()}));}catch{}
           const current=readSmtAdminConfigLkg();
           if(!current||Number(row.revision)>current.revision||String(row.fingerprint)!==current.fingerprint){
             void fetchAndApplyAdminConfig();
