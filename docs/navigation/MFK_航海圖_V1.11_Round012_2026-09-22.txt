@@ -1,0 +1,372 @@
+MFK 航海圖 V1.11｜Round012｜2026-09-22
+主題：COMMANDER HANDOFF PROTOCOL LOCKED / MFK ADMIN CANONICAL LIVE / A2 OWNER WALKTHROUGH NEXT
+狀態：CURRENT / CONTROLLING
+CONTROL_BASE_MAIN：8fcaaa587f621dad4d72c27ec39742a3d0f76229
+CONTROL：Pantonyeung/mfk #22
+COMMANDER ENTRY：COMMANDER_CURRENT.md
+
+==================================================
+0. CURRENT AUTHORITY
+==================================================
+
+CURRENT SYSTEM：
+MFK ONLY
+
+External product roles exactly six：
+
+1. SMT
+2. Admin
+3. SMM
+4. Customer
+5. Keeta
+6. Owner
+
+NO SEVENTH PRODUCT.
+
+ONE BUSINESS FACT / ACTION
+=
+ONE DECISION AUTHORITY.
+
+Old Morefun-v2：
+REFERENCE / ORACLE / RETIREMENT ONLY.
+NOT current authority.
+
+==================================================
+1. COMMANDER MANDATORY ENTRY / RETURN
+==================================================
+
+Every Commander MUST start at：
+
+COMMANDER_CURRENT.md
+
+Then fresh-read：
+
+1. #22 latest controlling comment
+2. current navigation
+3. HANDOFF_CURRENT.md
+4. active issue(s)
+
+Every Commander MUST return before：
+
+- saying work complete
+- returning an assignment
+- ending a conversation
+- changing Commander/chat
+- context limit risk
+
+Mandatory return：
+
+1. update COMMANDER_CURRENT.md
+2. remove stale NEXT
+3. record exact commit / run / observed evidence
+4. write ONE exact NEXT
+5. write DO_NOT / NOT_AUTHORIZED
+6. post same return summary to #22
+7. advance navigation if controlling state materially changed
+
+No Commander work is fully returned
+until COMMANDER_CURRENT.md is updated.
+
+Protocol：
+
+#39
+MFK-COMMANDER-HANDOFF-PROTOCOL-R1
+
+Template：
+
+docs/commander/COMMANDER_HANDOFF_TEMPLATE.md
+
+Bootstrap prompt：
+
+docs/commander/COMMANDER_BOOTSTRAP_PROMPT.txt
+
+==================================================
+2. PERMANENT CONNECTION RULE
+==================================================
+
+CONNECT ONE PIECE
+→ TEST SAME PIECE IMMEDIATELY
+→ BANK
+→ STOP
+→ OWNER DECIDES NEXT
+
+NO TARGET READBACK
+=
+NOT GREEN
+
+UNKNOWN
+!=
+FAILED
+
+TRANSPORT SUCCESS
+!=
+TARGET APPLIED
+
+UI SUCCESS
+!=
+CANONICAL READBACK
+
+Never infer permission
+for the next seam.
+
+==================================================
+3. ADMIN CONNECTION BANK
+==================================================
+
+A1：
+
+Admin Menu Index semantic contract
+→ SMT Local LKG
+
+STATUS：
+GREEN / BANKED
+
+MILESTONE：
+MFK_ADMIN_MENU_INDEX_A1_SEMANTIC_LINK_GREEN
+
+A2 IMPLEMENTATION：
+
+Admin Publish Bundle
+→ Human-controlled transfer
+→ SMT apply
+→ SMT Readback Receipt
+→ Admin Compare
+
+STATUS：
+IMPLEMENTATION GREEN / BANKED
+
+MILESTONE：
+MFK_ADMIN_A2_CONTROLLED_TRANSFER_IMPLEMENTATION_GREEN
+
+A2 OWNER REAL CROSS-DEVICE：
+
+PENDING
+
+A3 AUTOMATIC ADMIN→SMT NETWORK：
+
+NOT AUTHORIZED
+
+==================================================
+4. MFK ADMIN HOSTING / DOMAIN
+==================================================
+
+Dedicated MFK Cloudflare account：
+GREEN
+
+Worker：
+mfk-admin
+
+Deployment：
+
+GitHub Actions
+→ Wrangler
+→ mfk-admin
+
+Run：
+35677844235
+SUCCESS
+
+Cloudflare Current Version ID：
+d03884d6-9206-4df9-8cc8-3264a626b486
+
+Canonical root：
+morefunos.com
+
+Canonical Admin：
+https://admin.morefunos.com
+
+Owner browser proof：
+
+MFK Admin 控制面
+Pending Changes / 發布
+ADMIN CONNECTION A2 · HUMAN CONTROLLED
+
+VISIBLE ON CANONICAL DOMAIN.
+
+Therefore：
+
+MFK_ADMIN_WORKER_DEPLOY_GREEN
+MFK_ADMIN_CANONICAL_APP_READBACK_GREEN
+MFK_ADMIN_HOSTING_H2_LIVE_GREEN
+MFK_ADMIN_CANONICAL_DOMAIN_H3_GREEN
+
+H2：
+#37 CLOSED / BANKED
+
+H3：
+#38 CLOSED / BANKED
+
+workers.dev：
+BOOTSTRAP / TEMPORARY VALIDATION ONLY
+
+==================================================
+5. CURRENT EXACT NEXT
+==================================================
+
+ONE TRUE NEXT：
+
+OWNER RUNS ONE REAL
+A2 CROSS-DEVICE WALKTHROUGH
+
+ADMIN：
+
+Pending Changes / 發布
+→ tiny Menu Index change
+→ Validate
+→ confirm A2 impact
+→ exact SMT base revision
+→ export A2 Publish Bundle
+
+SMT：
+
+→ import SAME bundle
+→ apply Local LKG
+→ observed revision/fingerprint
+→ MATCH
+→ export SMT Readback Receipt
+
+ADMIN：
+
+→ import SAME receipt
+→ expected revision = observed revision
+→ expected fingerprint = observed fingerprint
+→ Compare = MATCH
+
+Only then BANK：
+
+MFK_ADMIN_A2_OWNER_CROSS_DEVICE_GREEN
+
+STOP.
+
+Owner decides next seam.
+
+==================================================
+6. CURRENT DO NOT
+==================================================
+
+Until Owner explicitly authorizes：
+
+NO A3 automatic Admin→SMT network
+NO Pricing seam
+NO Modifier seam
+NO Combo seam
+NO Availability seam
+NO Print Rules seam
+NO SMM→SMT
+NO Customer→SMT
+NO Owner remote command
+NO Keeta live wiring
+NO OTA migration / cutover
+
+==================================================
+7. CLOUD PERMANENT RULE
+==================================================
+
+MFK CLOUD
+=
+EVENT-DRIVEN FIRST
+
+Business Hours：
+
+10:00–20:30
+Asia/Hong_Kong
+
+Off Hours：
+
+LOW_TRAFFIC_MODE
+
+Forbidden：
+
+- global 1-minute heavy Cron
+- 5-second watchdog
+- multi-domain scheduled drain
+- background polling merely to discover no work
+
+Cloud failure MUST NEVER block SMT local：
+
+Order
+Checkout
+Payment
+Local Commit
+
+==================================================
+8. KEETA / OTA CURRENT
+==================================================
+
+MFK Keeta：
+
+THIN EDGE ADAPTER ONLY
+NOT_WIRED
+
+Old Morefun-v2 Keeta：
+
+RETIRED
+NEVER RECONNECT
+
+OTA：
+
+UNCHANGED
+LEGACY ENDPOINT REMAINS
+
+OTA requires its own future：
+
+CONNECT
+→ TEST
+→ BANK
+→ CUTOVER
+
+==================================================
+9. CANONICAL CONTROL SURFACES
+==================================================
+
+Stable Commander entry：
+
+COMMANDER_CURRENT.md
+
+Detailed current handoff：
+
+HANDOFF_CURRENT.md
+
+Commander protocol：
+
+docs/commander/README.md
+
+Commander template：
+
+docs/commander/COMMANDER_HANDOFF_TEMPLATE.md
+
+Commander bootstrap prompt：
+
+docs/commander/COMMANDER_BOOTSTRAP_PROMPT.txt
+
+Control log：
+
+#22
+
+Commander governance：
+
+#39
+
+==================================================
+10. MILESTONES
+==================================================
+
+MFK_COMMANDER_HANDOFF_PROTOCOL_LOCKED
+
+MFK_ADMIN_HOSTING_H2_LIVE_GREEN
+
+MFK_ADMIN_CANONICAL_DOMAIN_H3_GREEN
+
+MFK_ADMIN_A2_CONTROLLED_TRANSFER_IMPLEMENTATION_GREEN
+
+CURRENT：
+
+A2 OWNER WALKTHROUGH PENDING
+
+NEXT：
+
+ONE REAL A2 CROSS-DEVICE TEST
+
+==================================================
+END ROUND012
+==================================================

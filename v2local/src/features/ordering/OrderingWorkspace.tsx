@@ -1,4 +1,4 @@
-import {useMemo,useState,type ReactNode} from 'react';
+import {useMemo,useState,type CSSProperties,type ReactNode} from 'react';
 import type {CartLineViewModel,OrderingProductViewModel,OrderingWorkspaceActions,OrderingWorkspaceViewModel,ServiceMode} from './ordering-workspace-model.ts';
 import './ordering-workspace.css';
 
@@ -26,40 +26,49 @@ function QueueStrip({title,kind,orders,onOpen}:{title:string;kind:'pending'|'act
   </section>;
 }
 
-function ProductCard({product,actions,recentlyAdded}:{product:OrderingProductViewModel;actions:OrderingWorkspaceActions;recentlyAdded:boolean}){
+function ProductCard({product,mode,actions,recentlyAdded,showDescription}:{product:OrderingProductViewModel;mode:'quick'|'normal';actions:OrderingWorkspaceActions;recentlyAdded:boolean;showDescription:boolean}){
   const onBody=()=>{
     if(!product.enabled)return;
-    if(product.requiresOptions)actions.onConfigureProduct(product.id);
+    if(mode==='normal'||!product.quickAddAllowed)actions.onConfigureProduct(product.id);
     else actions.onAddProduct(product.id);
   };
   return <article className={`ordering-product-card ${product.imageUrl?'has-media':'text-only'}${product.enabled?'':' disabled'}${recentlyAdded?' recently-added':''}`}>
     <button type="button" className="ordering-product-body" aria-label={`商品 ${product.name}`} disabled={!product.enabled} onClick={onBody}>
       {product.imageUrl?<span className="ordering-product-media" aria-hidden="true"><span>磨</span><img src={product.imageUrl} alt="" loading="lazy" decoding="async" onError={event=>event.currentTarget.remove()}/></span>:null}
-      <span className="ordering-product-copy">{product.badge?<small>{product.badge}</small>:null}<b>{product.name}</b><strong>{product.priceLabel}</strong></span>
+      <span className="ordering-product-copy">{product.badge?<small>{product.badge}</small>:null}<b>{product.name}</b>{showDescription&&product.description?<span className="ordering-product-description">{product.description}</span>:null}<strong>{product.priceLabel}</strong></span>
     </button>
     <button type="button" className="ordering-product-more" aria-label={`更多設定 ${product.name}`} disabled={!product.enabled} onClick={()=>actions.onConfigureProduct(product.id)}>⋮</button>
   </article>;
 }
 
-function ServiceToggle({value,onChange}:{value:ServiceMode;onChange:(mode:ServiceMode)=>void}){
+function TrashGlyph(){
+  return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M4 7h16"/><path d="M9 7V4h6v3"/><path d="m7 7 1 13h8l1-13"/><path d="M10 11v5M14 11v5"/>
+  </svg>;
+}
+
+function ServiceToggle({value,onChange,availability}:{value:ServiceMode;onChange:(mode:ServiceMode)=>void;availability:Readonly<{takeaway:boolean;dineIn:boolean}>}){
   return <div className="ordering-service-toggle" role="group" aria-label="全單用餐方式">
-    <button type="button" className={value==='takeaway'?'active':''} aria-pressed={value==='takeaway'} onClick={()=>onChange('takeaway')}>外賣</button>
-    <button type="button" className={value==='dine-in'?'active':''} aria-pressed={value==='dine-in'} onClick={()=>onChange('dine-in')}>堂食</button>
+    <button type="button" disabled={!availability.takeaway} className={value==='takeaway'?'active':''} aria-pressed={value==='takeaway'} onClick={()=>onChange('takeaway')}>外賣</button>
+    <button type="button" disabled={!availability.dineIn} className={value==='dine-in'?'active':''} aria-pressed={value==='dine-in'} onClick={()=>onChange('dine-in')}>堂食</button>
   </div>;
 }
 
 function CartLineRow({line,index,highlighted,actions,availability}:{line:CartLineViewModel;index:number;highlighted:boolean;actions:OrderingWorkspaceActions;availability:NonNullable<OrderingWorkspaceViewModel['actionAvailability']>}){
   const nextMode:ServiceMode=line.serviceMode==='takeaway'?'dine-in':'takeaway';
+  const sourceLineIds=line.sourceLineIds?.length?line.sourceLineIds:[line.id];
+  const grouped=sourceLineIds.length>1;
+  const sourceLineId=sourceLineIds[0]!;
   return <article className={`ordering-cart-line${highlighted?' line-updated':''}`} aria-label={`購物車商品 ${line.name}`}>
     <div className="ordering-line-identity">
       <span className="ordering-line-sequence">{index+1}</span>
-      {availability.lineServiceMode?<button type="button" className={`ordering-line-mode ${line.serviceMode}`} onClick={()=>actions.onChangeLineServiceMode(line.id,nextMode)} aria-label={`第 ${index+1} 項切換外賣堂食`}>{line.serviceMode==='takeaway'?'外':'堂'}</button>:<span className={`ordering-line-mode ${line.serviceMode}`} aria-label={line.serviceMode==='takeaway'?'外賣':'堂食'}>{line.serviceMode==='takeaway'?'外':'堂'}</span>}
+      {availability.lineServiceMode&&!grouped?<button type="button" className={`ordering-line-mode ${line.serviceMode}`} onClick={()=>actions.onChangeLineServiceMode(sourceLineId,nextMode)} aria-label={`第 ${index+1} 項切換外賣堂食`}>{line.serviceMode==='takeaway'?'外':'堂'}</button>:<span className={`ordering-line-mode ${line.serviceMode}`} aria-label={line.serviceMode==='takeaway'?'外賣':'堂食'}>{line.serviceMode==='takeaway'?'外':'堂'}</span>}
     </div>
-    {availability.lineEdit?<button type="button" className="ordering-line-copy ordering-line-copy-button" onClick={()=>actions.onEditCartLine(line.id)} aria-label={`修改 ${line.name}`}><b>{line.name}</b>{line.detail?<small>{line.detail}</small>:null}</button>:<div className="ordering-line-copy"><b>{line.name}</b>{line.detail?<small>{line.detail}</small>:null}</div>}
+    {availability.lineEdit&&!grouped?<button type="button" className="ordering-line-copy ordering-line-copy-button" onClick={()=>actions.onEditCartLine(sourceLineId)} aria-label={`修改 ${line.name}`}><b>{line.name}</b>{line.detail?<small>{line.detail}</small>:null}</button>:<div className="ordering-line-copy"><b>{line.name}</b>{line.detail?<small>{line.detail}</small>:null}{grouped?<small>合併 {sourceLineIds.length} 行 · 關閉合併可逐行修改</small>:null}</div>}
     <div className="ordering-line-qty">
-      {availability.lineQuantity?<button type="button" onClick={()=>actions.onAdjustLineQuantity(line.id,-1)} aria-label={`減少 ${line.name}`}>−</button>:null}
+      {availability.lineQuantity&&!grouped?<button type="button" onClick={()=>actions.onAdjustLineQuantity(sourceLineId,-1)} aria-label={`減少 ${line.name}`}>−</button>:null}
       <strong>{line.quantity}</strong>
-      {availability.lineQuantity?<button type="button" onClick={()=>actions.onAdjustLineQuantity(line.id,1)} aria-label={`增加 ${line.name}`}>＋</button>:null}
+      {availability.lineQuantity&&!grouped?<button type="button" onClick={()=>actions.onAdjustLineQuantity(sourceLineId,1)} aria-label={`增加 ${line.name}`}>＋</button>:null}
     </div>
     <strong className="ordering-line-total">{line.lineTotalLabel}</strong>
   </article>;
@@ -84,7 +93,7 @@ function OrganizedCart({lines,highlightedLineId,actions,availability}:{lines:rea
         <button type="button" className="ordering-cart-group-head" aria-expanded={!hidden} onClick={()=>setCollapsed(current=>({...current,[group.id]:!current[group.id]}))}>
           <span><strong>{group.label}</strong><small>{group.lines.length} 款 · {quantity} 件</small></span><b>{hidden?'＋':'−'}</b>
         </button>
-        {!hidden?<div className="ordering-cart-group-lines">{group.lines.map(({line,index})=><CartLineRow key={line.id} line={line} index={index} highlighted={highlightedLineId===line.id} actions={actions} availability={availability}/>)}</div>:null}
+        {!hidden?<div className="ordering-cart-group-lines">{group.lines.map(({line,index})=><CartLineRow key={line.id} line={line} index={index} highlighted={highlightedLineId===line.id||Boolean(line.sourceLineIds?.includes(highlightedLineId??''))} actions={actions} availability={availability}/>)}</div>:null}
       </section>;
     })}
   </div>;
@@ -92,6 +101,7 @@ function OrganizedCart({lines,highlightedLineId,actions,availability}:{lines:rea
 
 export function OrderingWorkspace({view,actions,centerPanel}:{view:OrderingWorkspaceViewModel;actions:OrderingWorkspaceActions;centerPanel?:{readonly title:string;readonly body:ReactNode;readonly onClose:()=>void}|null}){
   const availability=view.actionAvailability??{lineServiceMode:true,lineEdit:true,lineQuantity:true,holdCart:true,cancelCart:true};
+  const serviceModes=view.serviceModes??{takeaway:true,dineIn:true};
   return <div className={`ordering-workspace${centerPanel?' panel-open':''}`}>
     <header className="ordering-flow-strip">
       <QueueStrip title="待處理" kind="pending" orders={view.pendingOrders} onOpen={actions.onOpenQueueOrder}/>
@@ -104,34 +114,48 @@ export function OrderingWorkspace({view,actions,centerPanel}:{view:OrderingWorks
         <div className="ordering-center-panel-body">{centerPanel.body}</div>
       </section>:<>
         {view.menuRevisionLabel?<div className="ordering-menu-local-status"><b>{view.menuRevisionLabel}</b><span>本機 Admin → POS</span></div>:null}
-        <nav className="ordering-categories" aria-label="商品分類">
+        {view.operationalNotice?<div className="ordering-menu-local-status warning"><b>{view.operationalNotice}</b><span>Admin 營運提示</span></div>:null}
+        <section className="ordering-mode-bar" aria-label="點單模式">
+          <span><b>點選模式</b><small>{view.frontlineGuidance?.headline
+            ?view.frontlineGuidance.headline+(view.frontlineGuidance.body?' · '+view.frontlineGuidance.body:'')
+            :view.orderingMode==='quick'?'快速加入；必選會進必選區補齊，強制顯示仍開設定':'每件商品都先開設定，必選即時完成'}</small></span>
+          <div role="group" aria-label="快速或普通模式">
+            <button type="button" className={view.orderingMode==='quick'?'active':''} aria-pressed={view.orderingMode==='quick'} onClick={()=>actions.onChangeOrderingMode('quick')}>快速</button>
+            <button type="button" className={view.orderingMode==='normal'?'active':''} aria-pressed={view.orderingMode==='normal'} onClick={()=>actions.onChangeOrderingMode('normal')}>普通</button>
+          </div>
+        </section>
+        {view.showCategories===false?null:<nav className="ordering-categories" aria-label="商品分類">
           {view.categories.map(category=><button type="button" key={category.id} aria-pressed={view.selectedCategoryId===category.id} className={view.selectedCategoryId===category.id?'active':''} onClick={()=>actions.onSelectCategory(category.id)}>{category.label}</button>)}
-        </nav>
-        <section className="ordering-product-grid">{view.products.map(product=><ProductCard key={product.id} product={product} actions={actions} recentlyAdded={view.recentlyAddedProductId===product.id}/>)}</section>
+        </nav>}
+        <section className="ordering-product-grid" style={{'--ordering-product-columns':String(view.productColumns??4)} as CSSProperties}>{view.products.map(product=><ProductCard key={product.id} product={product} mode={view.orderingMode} actions={actions} recentlyAdded={view.recentlyAddedProductId===product.id} showDescription={view.showDescriptions!==false}/>)}</section>
       </>}
     </main>
 
     <aside key={view.cartPulseNonce} className={`ordering-cart${view.cartPulseNonce>0?' cart-updated':''}`} aria-label="購物車">
       <header className="ordering-cart-head">
-        <div className="ordering-cart-order-id"><small>ORDER</small><strong>#{view.cart.orderId}</strong></div>
+        <div className="ordering-cart-order-id"><small>{view.cart.contextLabel??'ORDER'}</small><strong>#{view.cart.orderId}</strong></div>
         <div className="ordering-cart-head-actions">
           <div className="ordering-cart-view-toggle" role="group" aria-label="購物車檢視">
             <button type="button" className={view.cart.viewMode==='original'?'active':''} aria-pressed={view.cart.viewMode==='original'} onClick={()=>actions.onChangeCartView('original')}>原單</button>
             <button type="button" className={view.cart.viewMode==='organized'?'active':''} aria-pressed={view.cart.viewMode==='organized'} onClick={()=>actions.onChangeCartView('organized')}>整理</button>
+            <button type="button" className={view.cart.combineSimilar?'active':''} aria-pressed={view.cart.combineSimilar} onClick={actions.onToggleCombine}>合併 {view.cart.combineSimilar?'開':'關'}</button>
           </div>
-          <ServiceToggle value={view.cart.serviceMode} onChange={actions.onChangeServiceMode}/>
+          <ServiceToggle value={view.cart.serviceMode} onChange={actions.onChangeServiceMode} availability={serviceModes}/>
         </div>
       </header>
       <div className={`ordering-cart-lines ${view.cart.viewMode}`}>
         {view.cart.lines.length?(view.cart.viewMode==='original'
-          ?view.cart.lines.map((line,index)=><CartLineRow key={line.id} line={line} index={index} highlighted={view.highlightedCartLineId===line.id} actions={actions} availability={availability}/>)
+          ?view.cart.lines.map((line,index)=><CartLineRow key={line.id} line={line} index={index} highlighted={view.highlightedCartLineId===line.id||Boolean(line.sourceLineIds?.includes(view.highlightedCartLineId??''))} actions={actions} availability={availability}/>)
           :<OrganizedCart lines={view.cart.lines} highlightedLineId={view.highlightedCartLineId} actions={actions} availability={availability}/>
         ):<div className="ordering-cart-empty">購物車未有商品</div>}
       </div>
       <div className="ordering-cart-facts"><span><small>小計</small><b>{view.cart.subtotalLabel}</b></span><span><small>包裝</small><b>{view.cart.packagingLabel}</b></span><span><small>折扣</small><b>{view.cart.discountLabel}</b></span></div>
       <div className="ordering-cart-total"><span>總計</span><strong>{view.cart.totalLabel}</strong></div>
-      {availability.holdCart||availability.cancelCart?<div className={`ordering-cart-secondary-actions${!availability.cancelCart?' single':''}`}>{availability.holdCart?<button type="button" onClick={actions.onHoldCart}>{view.cart.lines.length?'暫存':'取回訂單'}</button>:null}{availability.cancelCart?<button type="button" className="destructive" onClick={actions.onCancelCart}>取消單</button>:null}</div>:null}
-      <button type="button" className="ordering-checkout" aria-label="結帳" disabled={!view.cart.checkoutEnabled} onClick={actions.onCheckout}>結帳　{view.cart.totalLabel}</button>
+      {view.cart.lines.length?<div className="ordering-cart-secondary-actions active-cart">
+        {availability.holdCart?<button type="button" className="hold-dining-entry" onClick={actions.onHoldCart}>暫存／堂食</button>:<span/>}
+        {availability.cancelCart?<button type="button" className="cart-clear-icon destructive" aria-label="清除訂單" title="清除訂單" onClick={actions.onCancelCart}><TrashGlyph/></button>:<span/>}
+      </div>:availability.holdCart?<div className="ordering-cart-secondary-actions single"><button type="button" onClick={actions.onHoldCart}>取回訂單</button></div>:null}
+      <button type="button" className="ordering-checkout" aria-label={view.cart.primaryActionLabel??'結帳'} disabled={!view.cart.checkoutEnabled} onClick={actions.onCheckout}>{view.cart.primaryActionLabel??'結帳'}　{view.cart.totalLabel}</button>
     </aside>
 
     <footer className="ordering-workbar">{view.workItems.map(item=><button type="button" key={item.id} onClick={()=>actions.onOpenWorkItem(item.id)}><span>{item.label}</span>{item.count>0?<b>{item.count}</b>:null}</button>)}</footer>

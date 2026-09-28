@@ -1,30 +1,46 @@
-# MFK v2smm｜Clean Migration R1
+# MFK v2smm｜Product Completeness R1
 
-WORK_ID: `MFK-SMM-CLEAN-MIGRATION-R1`
+WORK_ID: `MFK-SMM-PRODUCT-COMPLETION-R1`
 
-Role: `FRONTLINE ASSISTIVE TERMINAL`
+Role: `TRUSTED STAFF ASSISTIVE TERMINAL`
 
-This port contains migrated SMM UI/workflow/capability shape only.
+Current state:
+`PRODUCT_COMPLETE_NOT_CONNECTED`
 
-Current boundary:
+This app is a complete SMM product surface prepared for later connection to MFK canonical services.
 
-- independent `v2smm/**` app;
-- 42-item capability registry;
-- Menu / Product / Modifier / Combo / Cart / Quote preview;
-- Pending Intent and Order Result / Readback presentation;
-- frontline work queue, order list, dine-in, sellability, business-day, reporting, print and diagnostics presentation;
-- explicit Offline / Failure / Retry / UNKNOWN / PARTIAL / stale states;
-- every command capability is `NOT_WIRED`.
+Implemented product responsibility:
+- Traditional Chinese mobile operator shell and navigation
+- Menu/category/search/zero-result handling
+- Product variation / modifier / combo selection with min/max/required validation
+- Durable local non-authoritative cart and pending-intent workspace
+- Cart quantity/edit/remove
+- Quote presentation through injected runtime port only; no local pricing engine
+- Stable submission identity, UNKNOWN/readback-first flow, no blind resend
+- Active/history order list, source filter, drill-down timeline
+- Work queue / delayed ETA / action-required visibility
+- Channel Health read-only
+- Sellability command surface
+- Dine-in session surface
+- Business Day record-only projection
+- Print/device health read-only
+- Diagnostics and complete empty/loading/error/not-connected states
+- Browser-refresh persistence for local drafts and operator preferences
 
-Hard no-touch / no-authority rules:
+Connection boundary:
+- runtime is injected only through `window.__MFK_SMM_PRODUCT_PORT__`
+- missing runtime never creates fake data or fake success
+- localStorage stores drafts/preferences only and is explicitly `LOCAL_NON_AUTHORITATIVE`
 
-- no Formal Order creation;
-- no Display Number allocation;
-- no pricing engine;
-- no DB or browser persistence;
-- no cloud submit or API call;
-- no Store Kernel write;
-- no live LAN wiring;
-- no SMT mutation.
+Hard authority rules:
+- no Formal Order writer
+- no Display Number allocator
+- no local Pricing/Payment engine
+- no Store Kernel writer
+- no Print engine
+- no direct cloud/API submit
+- no SMM→SMT live LAN in this phase
+- no provider mutation
+- all command capabilities remain `NOT_WIRED` until a later Owner-authorized connection phase
 
-The app deliberately uses static migration fixtures. They demonstrate interaction shape only and are not current business truth.
+Historical `Morefun-v2/apps/smm-web/**` was used only as UI/workflow/persistence donor. Its old runtime/network/canonical ownership was not migrated.

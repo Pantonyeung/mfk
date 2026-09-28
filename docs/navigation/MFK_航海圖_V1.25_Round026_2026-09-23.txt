@@ -1,0 +1,430 @@
+MFK 航海圖 V1.25｜Round026｜2026-09-23
+主題：OWNER SUPREMACY LOCKED / KEETA LIVE CONNECTION GREEN / FULL PROVIDER INTEGRATION OPEN
+狀態：CURRENT / CONTROLLING
+CONTROL_BASE_MAIN：214fefed3355fbdec17f8aac91236af44729de3c
+CONTROL：Pantonyeung/mfk #22
+KEETA CONNECTION GATE：#120
+
+==================================================
+0. OWNER ABSOLUTE AUTHORITY
+==================================================
+
+Owner 明確決定 = 本項目最高決定。
+
+Commander / AI 可以：
+- 提醒風險
+- 解釋影響
+- 提供替代方案
+- 對新出現且重大嘅風險詢問 Owner 是否接受
+
+Commander / AI 不可以自行：
+- 撤銷 / 輪換 credential
+- unbind / rebind provider authorization
+- 建新 provider account
+- 強制 reauthorization
+- 關閉 live integration
+- 因自己判斷風險而停止 Owner 已授權工作
+- 用 AI 偏好取代 Owner 明確決定
+
+風險流程：
+RISK FOUND
+→ REPORT TO OWNER
+→ OWNER ACCEPTS / REJECTS / MODIFIES
+→ EXECUTE OWNER DECISION
+
+AI risk statement 本身唔係 execution authority。
+
+如果 Owner 已明確授權一個 multi-seam program：
+可逐 seam 執行
+→ 每 seam TEST / BANK
+→ 自動繼續下一 seam
+毋須每刀重新問准。
+
+只有出現超出 Owner 已授權範圍嘅新 money / legal / destructive semantic，
+先停低要求 Owner 新決定。
+
+==================================================
+1. MFK ABSOLUTE SYSTEM RULE
+==================================================
+
+MFK 係唯一 current system。
+
+六個對外角色：
+1. SMT
+2. Admin
+3. SMM
+4. Customer
+5. Keeta
+6. Owner
+
+NO SEVENTH PRODUCT.
+
+禁止建立：
+- 第二 Order Engine
+- 第二 Pricing Engine
+- 第二 Payment Engine
+- 第二 Print Engine
+- 第二 Store Kernel
+- 第二 Auth Engine
+- 第二 Sync Engine
+- Provider-owned transaction truth
+
+Provider Adapter 只可以：
+- Auth / Security
+- Translation
+- Alias / Mapping
+- Provider Evidence
+- Provider Request / Response
+- Readback
+
+Provider payload / IDs 永遠唔係 MFK canonical primary truth。
+
+==================================================
+2. CURRENT GLOBAL REALITY
+==================================================
+
+SIX-ROLE MIGRATION：
+COMPLETE
+
+CAPABILITY UPGRADE：
+COMPLETE / CONTINUING IN PLACE
+
+ADMIN ↔ SMT：
+LIVE TRANSPORT EXISTS
+CONFIG / READBACK / PROJECTION SEAMS ACTIVE
+
+KEETA PROVIDER CONTRACT：
+MIGRATED / COMPLETE
+
+KEETA LIVE EDGE：
+GREEN
+
+KEETA APP：
+磨飯V2
+APP ID：
+3419700273
+
+CANONICAL STORE：
+MF01
+
+PROVIDER SHOP：
+721578302
+
+OAUTH / TOKEN：
+CONNECTED
+
+TOKEN SOURCE：
+TEST_PROVIDER_PORTAL_IMPORT
+
+TOKEN EXPIRY：
+2026-12-22 06:12:11 HKT
+
+SIGNED WEBHOOK：
+GREEN
+
+WEBHOOK ACCEPTED：
+7
+
+LATEST ACCEPTED EVENT：
+1301 STORE AUTHORIZATION ADDED
+
+SIGNATURE VERIFICATION：
+FAIL-CLOSED
+REAL ACCEPTED WEBHOOK PROOF EXISTS
+
+LIVE CALLBACK：
+https://admin.morefunos.com/api/keeta/oauth/callback
+
+LIVE WEBHOOK：
+https://admin.morefunos.com/api/keeta/webhook
+
+==================================================
+3. KEETA CONNECTION BANK
+==================================================
+
+Completed / BANKED：
+
+- Runtime bindings
+- App ID / App Secret binding
+- Provider Shop binding
+- Token encryption key
+- Existing provider authorization preserved
+- Token import
+- Expired-token refresh path without forced reauthorization
+- AES-GCM encrypted token persistence
+- Admin connection status / token readback
+- Signed webhook ingress
+- App ID validation
+- Shop ID validation
+- External callback URL signature semantics
+- 1301 / 1302 / 1303 auth event handling
+- Webhook dedup / duplicate ACK
+- Identity conflict fail-closed
+- Provider evidence journal
+
+CURRENT MILESTONE：
+KEETA_LIVE_CONNECTION_GREEN
+
+==================================================
+4. OWNER-OPENED PROGRAM｜KEETA FULL LIVE INTEGRATION
+==================================================
+
+Owner 2026-09-23 明確授權：
+
+「將 Keeta order 接入嚟、menu 更新、所有嘢接入嚟。」
+
+因此舊有：
+PROVIDER COMMANDS OFF / WAIT OWNER NEXT SEAM
+已被本輪 Owner directive supersede。
+
+新 PROGRAM：
+MFK_KEETA_FULL_LIVE_INTEGRATION_R1
+
+允許範圍：
+
+K1 ORDER INGRESS
+1001 signed webhook
+→ provider order evidence
+→ provider order GET/readback when required
+→ product / option mapping
+→ canonical order intake
+→ SMT local Formal Order authority
+→ same provider identity dedup
+→ human-visible readback
+
+K2 MERCHANT DECISION
+SMT / canonical decision
+→ Keeta confirm / reject
+→ provider readback
+→ UNKNOWN / retry safety
+→ no duplicate provider action
+
+K3 MENU
+MFK canonical menu/config
+→ Keeta full snapshot translation
+→ preflight diff / validation
+→ provider menu sync
+→ task ID
+→ 1202 completion
+→ 1201 picture completion
+→ provider readback / partial error visibility
+
+K4 SELLABILITY / STORE OPS
+MFK canonical availability/config
+→ Keeta SPU / option sellability
+→ business hours
+→ REST / OPEN
+→ provider readback
+→ no reverse authority into MFK
+
+K5 FULFILLMENT
+MFK canonical READY
+→ /order/prepare
+→ provider readback
+
+Provider /order/prepare：
+READY ONLY
+唔代表 generic PREPARING。
+
+K6 LIFECYCLE / CANCEL
+1002 / 1003 / 1004 / 1006 / 1008
+→ provider evidence
+→ canonical linked order readback
+→ no second order state authority
+
+K7 AFTER-SALE
+1005 / 1007 evidence
+→ canonical refund decision
+→ approve / reject / partial refund preview / apply
+→ audit / readback
+→ financial truth remains MFK canonical authority
+
+K8 COMMERCIAL / SETTLEMENT EVIDENCE
+provider commercial snapshot
+→ Admin / Owner reconciliation projection
+→ never blocks new local trading
+
+==================================================
+5. EXECUTION ORDER
+==================================================
+
+Maximum active workers：
+2
+
+WAVE A：
+Worker A = ORDER INGRESS / CANONICAL INTAKE
+Worker B = MENU FULL SNAPSHOT / COMPLETION
+
+After BANK：
+Wave B =
+Merchant decision + fulfillment
+Sellability + store operations
+
+After BANK：
+Wave C =
+Lifecycle / cancel
+After-sale / commercial readback
+
+Owner has already authorized the whole program.
+No per-seam approval wait is required inside this scope.
+
+Every seam：
+FRESH READ
+→ EXACT INPUT
+→ EXACT OUTPUT
+→ TEST
+→ GREEN / RED
+→ BANK
+→ CONTINUE
+
+No fake GREEN.
+No silent provider mutation.
+No duplicate authority.
+
+==================================================
+6. CURRENT FIRST TWO TARGETS
+==================================================
+
+A. ORDER
+
+FIRST BREAK：
+Keeta 1001 live webhook currently reaches secure edge,
+but has not yet been admitted into ONE canonical MFK order intake → SMT.
+
+Target:
+KEETA 1001
+→ normalized provider evidence
+→ providerOrderId / messageId dedup
+→ mapping resolution
+→ SMT intake
+→ SMT creates SAME canonical Formal Order once
+→ provider reference linked
+→ readback
+→ merchant decision stage
+
+Order acceptance MUST NOT create:
+- second Order Engine
+- cloud Formal Order authority
+- duplicate display number
+- duplicate print
+- blind retry
+
+B. MENU
+
+FIRST BREAK：
+Keeta menu contract exists,
+but live full snapshot execution is not yet wired to current MFK catalog.
+
+Target:
+Admin/MFK canonical catalog
+→ Keeta full menu snapshot
+→ validation
+→ preview/diff
+→ live sync
+→ task ID
+→ 1202 / 1201 completion evidence
+→ Admin readback
+
+Menu invariant：
+FULL SNAPSHOT
+OMITTED EXISTING OPEN ITEM CODE MAY DELETE PROVIDER ENTITY
+
+Therefore live execution must prove full canonical snapshot completeness before send.
+Owner has authorized the integration program; this invariant is a correctness gate, not an AI veto.
+
+==================================================
+7. FAILURE ISOLATION
+==================================================
+
+Keeta failure：
+must not block SMT local trading.
+
+Provider unavailable：
+SMT local Order / Checkout / Payment / Print continue.
+
+Webhook invalid：
+block that provider message only.
+
+Menu sync failure：
+provider menu attention / retry/readback only.
+Do not corrupt MFK canonical catalog.
+
+Order mapping failure：
+Exception / Pending Action.
+Do not silently invent canonical product identity.
+
+Provider command UNKNOWN：
+readback / reconcile before retry.
+
+==================================================
+8. SOURCE / AUTHORITY ORACLES
+==================================================
+
+CURRENT AUTHORITY：
+Pantonyeung/mfk main
+#22 latest Owner control
+current MFK runtime
+
+KEETA CONTRACT：
+integrations/keeta/**
+
+Historical Morefun-v2：
+REFERENCE / ORACLE ONLY
+not current authority.
+
+Keeta external material：
+Capability / protocol / acceptance evidence only.
+
+==================================================
+9. CONTROLLING RECORDS
+==================================================
+
+CONTROL：
+#22
+
+KEETA CLEAN MIGRATION：
+#27 BANKED
+
+KEETA RUNTIME SIMPLICITY：
+#33 BANKED
+
+KEETA PROVIDER COMPLETENESS：
+#46 BANKED
+
+KEETA LIVE EDGE：
+#116 CLOSED / BANKED
+
+KEETA CREDENTIAL + EXTERNAL ACCEPTANCE：
+#120 CONNECTION GREEN
+
+LATEST CONNECTED RUNTIME：
+OAuth CONNECTED
+Shop 721578302
+Webhook accepted 7
+
+==================================================
+10. CURRENT / NEXT
+==================================================
+
+CURRENT：
+KEETA_LIVE_CONNECTION_GREEN
+OWNER_FULL_PROVIDER_INTEGRATION_AUTHORIZED
+
+NEXT ACTIVE：
+K1 ORDER INGRESS
+K3 MENU LIVE SYNC
+
+THEN：
+K2 MERCHANT DECISION
+K4 SELLABILITY / STORE OPS
+K5 FULFILLMENT
+K6 LIFECYCLE / CANCEL
+K7 AFTER-SALE
+K8 COMMERCIAL / SETTLEMENT EVIDENCE
+
+SUCCESS TARGET：
+KEETA_FULL_PROVIDER_INTEGRATION_GREEN
+
+==================================================
+END ROUND026
+==================================================

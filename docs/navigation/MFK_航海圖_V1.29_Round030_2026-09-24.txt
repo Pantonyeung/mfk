@@ -1,0 +1,171 @@
+MFK 航海圖 V1.29｜Round030｜2026-09-24
+主題：CUSTOMER → ADMIN → SMT LIVE ORDER LOOP｜PHYSICAL ACCEPTANCE MILESTONE
+狀態：CURRENT / CONTROLLING｜CUSTOMER LIVE LOOP BANKED
+CONTROL：Pantonyeung/mfk #22
+
+==================================================
+0. OWNER VERIFIED REALITY
+==================================================
+Owner 實機驗證：
+- order.morefunos.com → mfk-customer GREEN
+- admin.morefunos.com → mfk-admin GREEN
+- Customer 可取得 SMT canonical quote
+- Customer 可正式提交 Order
+- SMT 可收到自家 App Order
+- SMT 接受後 Customer 可見 lifecycle state
+- Customer confirmation 有動態處理狀態
+- 店舖拒絕時 Customer 有明確不接單結果
+- lifecycle stage 已拆開，不再用單一 HOLD 包住
+
+==================================================
+1. CUSTOMER QUOTE / ORDER LIVE
+==================================================
+Physical evidence：
+LAST PUBLIC QUOTE = PENDING_SMT
+LAST SMT ACK = CONFIRMED
+Customer Order P033 reached SMT as 自家 App.
+SMT accepted P033.
+Customer displayed 製作中 / 餐點製作中.
+
+Flow：
+Customer cart → public quote → Admin → SMT authenticated pull
+→ SMT canonical pricing → quote ACK → Customer confirmed quote
+→ Customer submit → stable Submission ID → Admin pending intent
+→ SMT pull → localRuntime.createOrder → ONE canonical Order / Display
+→ ACK/readback → Customer active order projection
+
+MILESTONE：
+CUSTOMER_SMT_QUOTE_LIVE_GREEN
+CUSTOMER_SMT_ORDER_LIVE_GREEN
+
+==================================================
+2. CUSTOMER STATUS UX
+==================================================
+Accepted stage semantics：
+等待店舖接單 → 已接單 → 製作中 → 可取餐 → 已交收 → 已完成
+
+Rejected：
+店舖不接單 / REJECTED 必須明確顯示。
+
+UNKNOWN：
+唔可以當成功；只可 readback 原 Submission ID；禁止 blind resubmit。
+
+Confirmation UX：
+空白大掣已 superseded。
+改為明確處理文字 + animated progress。
+UNKNOWN 可「立即重新確認結果」。
+readback != resubmit。
+
+Customer visible + online：
+3 秒 bounded snapshot refresh；focus / visibility return 即時 refresh。
+SMT lifecycle change 後 Customer 唔需要手動 browser refresh。
+
+Relevant merges：
+690415e9c53edbdfcf23e8682931a7fe57f93e07
+6e2a9367ca0c06505da94c65ecfcd07b7484e9bf
+
+==================================================
+3. SEQUENTIAL ORDERS
+==================================================
+Bug：
+舊 UNKNOWN / DRAFT intent 曾可污染下一個不同 cart，
+令第二張新單錯誤重用上一個 Submission identity。
+
+Fix：
+- same cart only may reuse same Submission ID for safe readback
+- different cart must create new Submission ID
+- stale UNKNOWN independently read back
+- confirmed stale intent removed
+- no blind duplicate submit
+
+Merge：
+3b96a672fc89e13f9c13e78897e87af88ab7b30b
+
+Physical multi-order acceptance：GREEN / BANKED.
+
+==================================================
+4. SMT GLOBAL NEW ORDER ATTENTION
+==================================================
+Owner lock：
+新單提示唔可以只存在 Orders workspace。
+
+ANY SMT workspace
+→ Customer / Keeta new order
+→ top-level alert + sound
+→ exact Order identity
+→ 立即處理
+
+Checkout-safe snooze：
+30 秒後 / 1 分鐘後。
+Snooze only hides alert；Order remains 待處理；
+no auto accept / cancel；delay 後 alert + sound returns。
+
+Merges：
+b33674a577584d44652b866e6a6f52cb7d614c0c
+d0827eb2a29fe030306e874e86a499c0e2c6f7a5
+
+Runtime OTA：
+runtime-candidate-mfk-d0827eb2a29f
+Builder Run 35985375326 SUCCESS
+21 / 21 test files PASS
+84 / 84 tests PASS
+
+==================================================
+5. SMT ACCEPT SEMANTICS
+==================================================
+Bug：
+Accept button previously gated to Keeta only.
+
+Correct：
+ANY canonical Order with fulfillmentLabel=待處理 → 顯示接受訂單。
+自家 App → 接受訂單。
+Keeta → 接受 Keeta 訂單。
+
+Accept：
+same canonical Order → 進行中
+→ existing Store Kernel / Print Admission
+→ no second transaction engine.
+
+==================================================
+6. CURRENT GREEN / PENDING
+==================================================
+GREEN：
+Customer/Admin custom domains
+Customer quote live
+Customer Order reaches SMT
+SMT Customer accept
+Customer lifecycle projection
+explicit reject presentation
+confirmation progress UX
+global SMT arrival alert implementation
+alert snooze semantics
+Customer auto lifecycle refresh implementation
+
+PHYSICAL ACCEPTANCE GREEN / BANKED：
+1. global alert on non-Orders SMT screen = GREEN
+2. sound = GREEN
+3. 30s snooze returns = GREEN
+4. 60s snooze returns = GREEN
+5. two different Customer carts → two distinct Submission IDs = GREEN
+6. two canonical Orders / Display numbers = GREEN
+7. Customer 我的訂單 simultaneously shows both = GREEN
+8. lifecycle updates without manual refresh = GREEN
+
+MILESTONE：
+CUSTOMER_MULTI_ORDER_LIFECYCLE_PHYSICAL_GREEN
+
+==================================================
+7. NEXT
+==================================================
+Customer live order loop 已完成實機閉環並 BANK。
+
+DO NOT REOPEN without new physical regression evidence.
+
+下一工作由 Owner 重新指定；唔自行開新 seam。
+
+BANKED：
+CUSTOMER_MULTI_ORDER_LIFECYCLE_PHYSICAL_GREEN
+
+==================================================
+END ROUND030
+==================================================

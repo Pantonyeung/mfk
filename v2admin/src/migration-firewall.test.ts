@@ -15,18 +15,43 @@ function sourceFiles(dir:string):string[]{
 }
 
 describe('MFK Admin migration firewall',()=>{
-  it('contains no live network transport in migrated Admin source',()=>{
+  it('allows network only through the explicit Admin sync/projection transports',()=>{
     const forbidden=[
-      /\bfetch\s*\(/,
-      /\bnew\s+WebSocket\s*\(/,
       /\bXMLHttpRequest\b/,
       /\baxios\s*\./,
       /https?:\/\//,
     ];
     for(const path of sourceFiles(root)){
       const source=readFileSync(path,'utf8');
+      const isSyncClient=path.endsWith('admin-sync-client.ts');
+      const isProjectionClient=path.endsWith('admin-projection-client.ts');
+      const isKeetaClient=path.endsWith('keeta-live-client.ts');
+      const isAdminBrowserClient=path.endsWith('admin-browser-session.ts');
+      const isNetworkClient=isSyncClient||isProjectionClient||isKeetaClient||isAdminBrowserClient;
+      if(!isNetworkClient)expect(/\bfetch\s*\(/.test(source),path+' used fetch outside approved network seam').toBe(false);
+      if(!isProjectionClient)expect(/\bnew\s+WebSocket\s*\(/.test(source),path+' used WebSocket outside projection doorbell seam').toBe(false);
       for(const pattern of forbidden){
         expect(pattern.test(source),path+' matched '+String(pattern)).toBe(false);
+      }
+      if(isSyncClient){
+        expect(source).toContain('/api/admin-sync/publish');
+        expect(source).toContain('/api/admin-sync/acks');
+      }
+      if(isProjectionClient){
+        expect(source).toContain('/api/projection/orders');
+        expect(source).toContain('/api/projection/reports');
+        expect(source).toContain('/api/admin-sync/events');
+      }
+      if(isAdminBrowserClient){
+        expect(source).toContain('/api/admin-browser/auth/challenge');
+        expect(source).toContain('/api/admin-browser/active');
+        expect(source).toContain('x-mfk-admin-session');
+        expect(source).not.toContain('x-mfk-admin-publish-key');
+      }
+      if(isKeetaClient){
+        expect(source).toContain('/api/keeta/admin/status');
+        expect(source).toContain('/api/keeta/admin/oauth/begin');
+        expect(source).toContain('/api/keeta/admin/token/readiness');
       }
     }
   });

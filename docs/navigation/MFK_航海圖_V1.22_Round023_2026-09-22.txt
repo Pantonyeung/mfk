@@ -1,0 +1,108 @@
+MFK 航海圖 V1.22｜Round023｜2026-09-22
+主題：ADMIN OPTION CENTER NORMALIZATION
+狀態：CURRENT / CONTROLLING
+CONTROL：#22
+PARENT：#45
+ACTIVE：#68
+PRODUCT DETAIL：#62
+MEDIA RED：#66
+
+==================================================
+0. OWNER LOCK
+==================================================
+
+Option Center:
+CANONICAL OPTION MASTER
+
+Option:
+ID
+Name
+Price
+Active
+
+NO per-Product duplicate Option record.
+
+==================================================
+1. OPTION GROUP
+==================================================
+
+Group references existing Option IDs.
+
+Owns:
+Group ID
+Group Name
+Option membership
+Order
+Required / Optional / Force-show
+Single / Multi
+Min / Max
+Allow Quantities
+
+==================================================
+2. PRODUCT LINK
+==================================================
+
+Product detail:
+show linked Groups / Options
+link / unlink
+read ID / Name / Price from Option Center
+
+Product detail:
+NOT an Option Master editor
+
+==================================================
+3. DEFAULT
+==================================================
+
+defaultSelected:
+PRODUCT-SPECIFIC LINK STATE
+
+NOT global Option property.
+
+Same Option can be default for Product A
+and non-default for Product B.
+
+==================================================
+4. EXAMPLE
+==================================================
+
+Option Center:
+多飯 +$2
+小飯 $0
+走飯 -$1
+
+Group:
+飯量
+
+Product A:
+default 小飯
+
+Product B:
+default 多飯
+
+==================================================
+5. EXACT NEXT
+==================================================
+
+Implement #68:
+Option Center
+→ Group membership
+→ Product links
+→ Product-specific default
+
+Then return to remaining #62 review.
+
+#66 media backend:
+known RED, not next.
+
+==================================================
+6. HOLD
+==================================================
+
+#44 Admin→SMT HOLD
+#40 SMT OTA HOLD
+Keeta live NOT AUTHORIZED
+
+==================================================
+END ROUND023
+==================================================

@@ -1,0 +1,126 @@
+MFK 航海圖 V1.17｜Round018｜2026-09-22
+主題：LEGACY MF01 MENU RE-ENTERED INTO MFK ADMIN / LIVE VISUAL READBACK
+狀態：CURRENT / CONTROLLING
+CONTROL：#22
+
+==================================================
+0. PRIORITY
+==================================================
+
+SMT OTA:
+HOLD
+
+Admin:
+ACTIVE
+
+==================================================
+1. OPERATOR CHINESE UI
+==================================================
+
+#41
+DEPLOYED GREEN
+
+Visual owner confirmation:
+PENDING
+
+==================================================
+2. LEGACY MENU DONOR
+==================================================
+
+Owner authorized historical donor:
+
+Pantonyeung/Morefun-v2
+
+Snapshot:
+
+menu-combined-2026-09-05-v1
+
+Source:
+products TSV
+direct-price TSV
+donor build script
+
+==================================================
+3. IMPORTED CONTENT
+==================================================
+
+Categories:
+14
+
+Canonical Products:
+203
+
+Direct-visible / Active:
+188
+
+Hidden retained inactive:
+15
+
+Direct prices:
+188
+
+Product names:
+EXACT DONOR COPY
+
+Product IDs:
+EXACT DONOR COPY
+
+Legacy barcode:
+RETAINED INTERNALLY
+
+Modifier/combo bindings:
+NOT PRESENT IN SELECTED DONOR SNAPSHOT
+NOT INVENTED
+
+==================================================
+4. VERIFY / DEPLOY
+==================================================
+
+Branch test/build:
+35684903667 SUCCESS
+
+Deploy:
+35684991125 SUCCESS
+
+MILESTONE:
+
+MFK_ADMIN_MF01_LEGACY_MENU_REENTERED_DEPLOYED_GREEN
+
+==================================================
+5. EXACT NEXT
+==================================================
+
+Owner refresh:
+admin.morefunos.com
+
+Readback:
+商品分類 = 14
+商品資料 = 203
+
+Expected:
+188 active
+15 inactive
+
+No SMT publish yet.
+
+Then:
+read SMT Active Revision
+→ one A2 change
+→ readback MATCH
+
+==================================================
+6. HOLD
+==================================================
+
+A3:
+NOT AUTHORIZED
+
+SMT OTA #40:
+HOLD
+
+Keeta live:
+NOT AUTHORIZED
+
+==================================================
+END ROUND018
+==================================================

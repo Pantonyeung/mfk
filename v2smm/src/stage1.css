@@ -1,0 +1,179 @@
+.stage1-order{
+  display:grid;
+  gap:12px;
+  padding-bottom:8px;
+  color:#12264a;
+}
+.stage1-order-header{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  padding:5px 2px 0;
+}
+.stage1-brand-line{display:flex;align-items:center;gap:10px;min-width:0}
+.stage1-brand-line>img{width:50px;height:50px;object-fit:contain;flex:0 0 auto}
+.stage1-brand-line>div{display:grid;gap:2px;min-width:0}
+.stage1-kicker{font-size:10px;font-weight:900;color:#2f73ff;letter-spacing:.05em}
+.stage1-order-header h1{font-size:22px;line-height:1.15;margin:0;color:#163568}
+.stage1-service-mode{
+  display:inline-flex;align-items:center;justify-content:center;
+  min-width:58px;min-height:32px;padding:0 10px;border-radius:999px;
+  background:#eaf2ff;color:#2f73ff;font-size:11px;
+}
+.stage1-search{
+  position:relative;
+  display:grid!important;
+  grid-template-columns:22px minmax(0,1fr) auto;
+  align-items:center;
+  gap:7px;
+  min-height:48px;
+  padding:0 13px;
+  background:#fff;
+  border:1px solid #dde4ee;
+  border-radius:16px;
+  box-shadow:0 5px 18px rgba(22,53,104,.04);
+}
+.stage1-search>span{font-size:18px;color:#8793a6}
+.stage1-search input{
+  min-height:46px!important;
+  border:0!important;
+  padding:0!important;
+  background:transparent!important;
+  color:#12264a;
+  outline:none;
+  font-size:14px;
+}
+.stage1-search button{
+  width:32px;height:32px;border:0;border-radius:50%;background:#f1f5fa;color:#67738a;font-size:18px;
+}
+.stage1-category-rail{
+  display:flex;
+  gap:8px;
+  overflow:auto;
+  padding:1px 0 3px;
+  scroll-snap-type:x proximity;
+  scrollbar-width:none;
+}
+.stage1-category-rail::-webkit-scrollbar{display:none}
+.stage1-category-rail button{
+  flex:0 0 auto;
+  min-height:44px!important;
+  padding:0 16px;
+  border:1px solid #dfe6ef;
+  border-radius:14px!important;
+  background:#fff!important;
+  color:#536078!important;
+  font-size:12px;
+  font-weight:800;
+  scroll-snap-align:start;
+}
+.stage1-category-rail button.active{
+  background:#2f73ff!important;
+  border-color:#2f73ff!important;
+  color:#fff!important;
+  box-shadow:0 7px 16px rgba(47,115,255,.18);
+}
+.stage1-section-title{display:flex;align-items:end;justify-content:space-between;gap:10px;padding:4px 1px 0}
+.stage1-section-title>div{display:grid;gap:2px}
+.stage1-section-title span{font-size:16px;font-weight:900;color:#163568}
+.stage1-section-title small{font-size:10px;color:#7b879a}
+.stage1-section-title>b{
+  font-size:9px;color:#23875c;background:#e9f7f0;padding:5px 8px;border-radius:999px;
+}
+.stage1-section-title>b.muted{color:#80786c;background:#f2f4f7}
+.stage1-product-grid{
+  display:grid!important;
+  grid-template-columns:repeat(2,minmax(0,1fr))!important;
+  gap:10px!important;
+}
+.stage1-product-card{
+  position:relative;
+  min-height:0!important;
+  padding:0!important;
+  border:1px solid #e1e7f0!important;
+  border-radius:18px!important;
+  overflow:hidden;
+  background:#fff!important;
+  box-shadow:0 8px 24px rgba(22,53,104,.06)!important;
+  text-align:left;
+  display:grid!important;
+  grid-template-rows:auto 1fr;
+  gap:0!important;
+}
+.stage1-product-card .product-media{
+  display:block;
+  width:100%;
+  aspect-ratio:1.18/1;
+  background:#edf2f7;
+  overflow:hidden;
+}
+.stage1-product-card .product-media img{
+  display:block;width:100%;height:100%;object-fit:cover;transform:scale(1.01);
+}
+.stage1-product-copy{display:grid;gap:5px;padding:10px 42px 11px 11px;align-content:start;min-height:78px}
+.stage1-product-copy strong{font-size:13px;line-height:1.25;color:#12264a}
+.stage1-product-copy small{font-size:12px;color:#2f73ff;font-weight:900}
+.stage1-product-copy i{font-style:normal;font-size:9px;color:#8390a3}
+.stage1-product-add{
+  position:absolute;right:10px;bottom:12px;
+  display:grid;place-items:center;
+  width:36px!important;height:36px!important;
+  border-radius:50%;
+  background:#2f73ff;
+  color:#fff;
+  font-size:20px;
+  font-weight:500;
+  box-shadow:0 6px 14px rgba(47,115,255,.23);
+}
+.stage1-product-card.disabled{opacity:1!important}
+.stage1-product-card.disabled .product-media img{filter:grayscale(.35);opacity:.48}
+.stage1-product-card.disabled .stage1-product-copy{opacity:.62}
+.stage1-product-card.disabled .stage1-product-add{display:none}
+.stage1-soldout{
+  position:absolute;left:10px;top:10px;
+  padding:6px 9px;border-radius:999px;
+  background:rgba(22,53,104,.88);color:#fff;
+  font-size:9px;font-weight:900;
+}
+.stage1-cart-bar{
+  bottom:84px!important;
+  min-height:62px;
+  padding:9px 12px!important;
+  border-radius:18px!important;
+  background:#163568!important;
+  box-shadow:0 12px 28px rgba(22,53,104,.24)!important;
+}
+.stage1-cart-count{display:flex;gap:7px;align-items:center!important}
+.stage1-cart-count b{background:#fff!important;color:#163568!important;border-radius:50%!important}
+.stage1-cart-count span{font-size:10px;color:#d9e5fb}
+.stage1-cart-bar>div:nth-child(2) strong{font-size:14px}
+.stage1-cart-bar>div:nth-child(2) small{color:#c9d8ef!important}
+.stage1-cart-bar em{font-size:11px;color:#fff}
+.stage1-zero-result{
+  min-height:300px;
+  display:grid;
+  justify-items:center;
+  align-content:center;
+  gap:7px;
+  text-align:center;
+  padding:24px 16px;
+  border:1px dashed #d6e0ed;
+  border-radius:22px;
+  background:#fff;
+}
+.stage1-zero-result img{width:142px;height:142px;object-fit:contain}
+.stage1-zero-result h2{margin:0;font-size:18px;color:#163568}
+.stage1-zero-result p{margin:0;max-width:29ch;font-size:12px;line-height:1.5;color:#7a879a}
+.stage1-zero-result button{min-height:44px;border-radius:13px;padding:0 18px}
+@media(max-width:360px){
+  .stage1-product-grid{grid-template-columns:1fr!important}
+  .stage1-product-card{grid-template-columns:108px minmax(0,1fr);grid-template-rows:1fr}
+  .stage1-product-card .product-media{height:100%;aspect-ratio:auto}
+  .stage1-product-copy{min-height:108px}
+  .stage1-order-header h1{font-size:20px}
+  .stage1-brand-line>img{width:44px;height:44px}
+}
+@media(prefers-reduced-motion:reduce){
+  .stage1-product-card,.stage1-cart-bar{transition:none!important}
+}

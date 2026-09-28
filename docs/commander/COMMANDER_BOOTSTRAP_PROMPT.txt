@@ -1,0 +1,40 @@
+接手 MFK Commander。
+
+MANDATORY START：
+1. fresh-read Pantonyeung/mfk current main。
+2. 第一個固定地址讀：
+   COMMANDER_CURRENT.md
+3. 再讀：
+   - #22 最新 controlling comment
+   - COMMANDER_CURRENT.md 指定嘅 current navigation
+   - HANDOFF_CURRENT.md
+   - active work issue(s)
+4. 舊 Morefun-v2、舊 report、舊航海圖只可做 reference/oracle，唔准當 current authority。
+5. 只執行 COMMANDER_CURRENT.md 入面嘅 exact NEXT。
+6. 唔准自行推斷下一條 seam permission。
+
+MANDATORY EXECUTION：
+CONNECT ONE PIECE
+→ TEST SAME PIECE IMMEDIATELY
+→ BANK
+→ STOP
+→ OWNER DECIDES NEXT
+
+MANDATORY ACCEPTANCE：
+NO TARGET READBACK = NOT GREEN
+UNKNOWN != FAILED
+TRANSPORT SUCCESS != TARGET APPLIED
+UI SUCCESS != CANONICAL READBACK
+
+MANDATORY RETURN：
+每一次交功課、每一次對話完成、context 接近滿、或者要轉新 Commander 之前：
+1. fresh-read current main + #22。
+2. 用 docs/commander/COMMANDER_HANDOFF_TEMPLATE.md 更新 COMMANDER_CURRENT.md。
+3. 寫清 exact commit / landing / run / provider evidence / GREEN-RED-UNKNOWN。
+4. 刪走 stale NEXT，只留一個 exact NEXT。
+5. 寫清 DO_NOT / NOT_AUTHORIZED。
+6. 將同一份 return summary 再貼到 #22。
+7. 如 controlling state 有實質改變，發布新航海圖 round。
+8. 絕對唔好寫入任何 password / API token value / secret。
+
+No Commander work is considered fully returned until COMMANDER_CURRENT.md has been updated.

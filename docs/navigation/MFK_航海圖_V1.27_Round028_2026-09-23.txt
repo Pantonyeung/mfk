@@ -1,0 +1,568 @@
+MFK 航海圖 V1.27｜Round028｜2026-09-23
+主題：KEETA K1–K8 SOURCE / TEST / DEPLOY GREEN｜REAL EXTERNAL ACCEPTANCE ACTIVE
+狀態：CURRENT / CONTROLLING
+CONTROL_BASE_MAIN：a6cca587b347cda90cab94e5ff4a647aacacfd24
+CONTROL：Pantonyeung/mfk #22
+EXTERNAL ACCEPTANCE：#162
+
+==================================================
+0. OWNER ABSOLUTE AUTHORITY
+==================================================
+
+Owner 明確決定 = 本項目最高決定。
+
+Commander / AI 可以：
+- 提醒風險
+- 解釋影響
+- 提供替代方案
+- 對超出已授權範圍嘅新 money / legal / destructive semantic 問 Owner 是否接受
+
+Commander / AI 不可以自行：
+- revoke / rotate credential
+- unbind / rebind provider authorization
+- 建新 provider account
+- 強制 reauthorization
+- 關閉 live integration
+- 停止 Owner 已授權 program
+- 以 AI 偏好取代 Owner 決定
+
+風險流程：
+RISK FOUND
+→ REPORT TO OWNER
+→ OWNER ACCEPTS / REJECTS / MODIFIES
+→ EXECUTE OWNER DECISION
+
+==================================================
+1. CURRENT SYSTEM AUTHORITY
+==================================================
+
+MFK = 唯一 current system。
+
+角色：
+1. SMT
+2. Admin
+3. SMM
+4. Customer
+5. Keeta
+6. Owner
+
+NO SEVENTH PRODUCT.
+
+SMT：
+LOCAL FORMAL ORDER / TRANSACTION / FULFILLMENT AUTHORITY
+
+Admin：
+CONFIG / AUTHOR / PUBLISH / READBACK / PROVIDER OPERATIONS SURFACE
+
+Keeta：
+THIRD_PARTY_PROVIDER EDGE
+AUTH / TRANSLATION / PROVIDER EVIDENCE / PROVIDER COMMAND / READBACK
+
+禁止第二：
+- Order Engine
+- Pricing Engine
+- Payment Engine
+- Print Engine
+- Store Kernel
+- Auth Engine
+- Sync Engine
+
+Provider ID = alias / reference only。
+Provider commercial / refund / lifecycle facts = evidence / projection only。
+唔可以反轉成 MFK canonical primary truth。
+
+==================================================
+2. ADMIN GUIDED UI
+==================================================
+
+OWNER ACCEPTED：
+PR #110 preview semantics
+
+CURRENT PRODUCTION INTEGRATION：
+PR #143
+
+Product：
+af0003259f2bec684b2906c1bd584daa2d63b8c9
+
+Deploy：
+35796454476 SUCCESS
+
+Verification：
+13 / 13 test files PASS
+71 / 71 tests PASS
+
+Accepted UX：
+Combo：
+套餐資料 → 飯糰 → 小食 → 飲品 → 檢查
+
+Option Set：
+選項組 → 規則 → 子選項 → 商品映射 → 檢查
+
+Product：
+filter-first → focused data scope
+
+Blue = current
+Green = complete
+Amber = waiting / attention
+Red = error / destructive
+
+Continue = UI progression only
+NOT Save / Publish / Sync / Readback success。
+
+MILESTONE：
+ADMIN_GUIDED_UI_OWNER_ACCEPTED_PRODUCTION_GREEN
+
+==================================================
+3. KEETA LIVE CONNECTION
+==================================================
+
+App：
+磨飯V2
+
+App ID：
+3419700273
+
+Canonical Store：
+MF01
+
+Provider Shop：
+721578302
+
+OAuth / Token：
+CONNECTED
+
+Token source：
+TEST_PROVIDER_PORTAL_IMPORT
+
+Token expiry：
+2026-12-22 06:12:11 HKT
+
+Callback：
+https://admin.morefunos.com/api/keeta/oauth/callback
+
+Webhook：
+https://admin.morefunos.com/api/keeta/webhook
+
+Signed Webhook：
+GREEN / FAIL-CLOSED
+
+Existing authorization：
+PRESERVED
+
+MILESTONE：
+KEETA_LIVE_CONNECTION_GREEN
+
+==================================================
+4. K1｜ORDER INGRESS
+==================================================
+
+Issue：
+#140
+
+Product：
+9f1eca97a1e2671f9ef7bd02a766890b1f002585
+
+Source/Test：
+GREEN
+
+Flow：
+1001 signed webhook
+→ provider evidence
+→ pending SMT intent
+→ cloud doorbell
+→ SMT authenticated pull
+→ deterministic mapping
+→ localRuntime.createOrder
+→ ONE canonical Order
+→ ONE display number
+→ providerRef dedup
+→ canonical ACK
+
+Hard rules：
+- Cloud NOT Formal Order authority
+- no duplicate Order
+- no duplicate Display
+- no duplicate Print Admission
+- mapping failure = attention
+- never invent canonical product identity
+
+REAL EXTERNAL：
+PENDING #162 E2
+
+==================================================
+5. K2｜MERCHANT CONFIRM
+==================================================
+
+Issue：
+#147
+
+Product：
+97a8229c70b83351e7a1674a98d01f2ac13e8e68
+
+Admin deploy：
+35798153187 SUCCESS
+
+SMT smoke：
+35798128788 SUCCESS
+15 files / 57 tests PASS
+
+Flow：
+SMT canonical ACCEPT
+→ /order/confirm
+→ provider receipt
+→ 1002 lifecycle evidence when emitted
+
+Rules：
+- local decision first
+- provider mirror second
+- idempotent by providerOrderId + action
+- UNKNOWN = no blind retry
+- Admin published autoAccept only
+
+REAL EXTERNAL：
+PENDING #162 E3
+
+==================================================
+6. K3｜FULL MENU LIVE SYNC
+==================================================
+
+Issue：
+#141
+
+Product：
+56e508433af20dd5e35b441db62b814ccef67831
+
+Deploy：
+35797247050 SUCCESS
+
+Verification：
+14 files / 75 tests PASS
+
+Flow：
+Published MFK catalog
+→ full snapshot translation
+→ deterministic OpenItemCode
+→ preflight
+→ live menu sync
+→ taskId
+→ 1202 completion
+→ 1201 picture completion
+→ Admin readback
+
+Invariant：
+FULL SNAPSHOT
+
+OMITTED EXISTING OPEN ITEM CODE
+MAY DELETE PROVIDER ENTITY
+
+MFK catalog remains canonical。
+
+REAL EXTERNAL：
+PENDING #162 E1
+
+==================================================
+7. K4｜SELLABILITY + STORE OPS
+==================================================
+
+Issue：
+#149
+
+Product：
+0ec12df5f9710b5621b3f3dc92b7a2bc05cc563b
+
+Deploy：
+35798804270 SUCCESS
+
+Verification：
+15 files / 82 tests PASS
+
+Worker：
+752039b3-1b43-4c81-ba6c-bf568115cb62
+
+Implemented：
+- published MFK product availability
+  → Keeta SPU status batches
+- deterministic OpenItemCode shared with K3
+- batch <= 200
+- weekly hours update
+- store provider readback
+- REST
+- OPEN
+- idempotent no-op if provider already at target state
+
+Option independent sellability：
+NOT MUTATED unless MFK has canonical option-availability truth。
+
+REAL EXTERNAL：
+PENDING #162 E6
+
+==================================================
+8. K5｜CANONICAL READY
+==================================================
+
+Issue：
+#147
+
+Product：
+97a8229c70b83351e7a1674a98d01f2ac13e8e68
+
+Flow：
+SMT canonical READY
+→ /order/prepare
+→ provider receipt/readback
+
+/order/prepare = READY ONLY
+NOT generic PREPARING。
+
+REAL EXTERNAL：
+PENDING #162 E4
+
+==================================================
+9. K6｜LIFECYCLE / CANCEL
+==================================================
+
+Issue：
+#151
+
+Product：
+a0baca10872a73dcd64447ed4cf0e11514d6148d
+
+Repair：
+bb964fdae34961555bdfa52cb0830ad71c37653b
+
+Admin deploy：
+35800410086 SUCCESS
+15 files / 83 tests PASS
+
+SMT smoke：
+35800516980 SUCCESS
+16 files / 60 tests PASS
+
+Worker：
+87debce5-d72a-42b5-a842-b293972093fd
+
+Flow：
+1002 / 1003 / 1004 / 1006 / 1008
+→ verified evidence
+→ lifecycle queue
+→ cloud doorbell
+→ SMT authenticated pull
+→ providerRef linked canonical Order
+→ local apply / evidence / conflict
+→ canonical ACK
+
+Semantics：
+1002 pending → in-progress when admissible
+1003 completion
+1004 / 1008 cancellation
+1006 evidence-only
+completed-vs-cancel conflict stays visible
+duplicate event idempotent
+
+REAL EXTERNAL：
+PENDING #162 E5
+
+==================================================
+10. K7｜AFTER-SALE / REFUND
+==================================================
+
+Issue：
+#154
+
+Product：
+dc0078402293dd3089b7445a404c22f4755cc4be
+
+UI Repairs：
+31649162abd0a4bf0a71b667d63e0bd367dded30
+73b90b5d2be6a5ae0af8d0297894949307dacbda
+
+Admin deploy：
+35801098970 SUCCESS
+15 files / 85 tests PASS
+
+SMT smoke：
+35801776639 SUCCESS
+17 files / 62 tests PASS
+
+Worker：
+f14bc600-7677-4816-972e-d894649cb7ad
+
+Flow：
+1005 / 1007
+→ verified after-sale evidence
+→ ONE afterSale case per provider afterSaleOrderId
+→ linked canonical Order
+→ human approve / reject
+→ /order/agree or /order/reject
+→ partial refund preview
+→ partial refund apply
+
+Hard rules：
+- provider refund evidence does NOT silently mutate MFK Order total / Payment
+- explicit decision
+- final-decision idempotency
+- conflicting final decision blocked
+- UNKNOWN no blind retry
+- partial refund APPLY requires matching PREVIEW
+
+REAL EXTERNAL：
+PENDING #162 E7
+
+==================================================
+11. K8｜COMMERCIAL / SETTLEMENT EVIDENCE
+==================================================
+
+Issue：
+#158
+
+Product：
+45c39b86434f9c70c26b942bad1a349e8ae072e1
+
+Repairs：
+815a95ffe9fb4a5af4823131f6d5b945374617b5
+a39a5c05c5d19a59eac4db638052bb794f87f0a8
+
+Deploy trigger：
+a6cca587b347cda90cab94e5ff4a647aacacfd24
+
+Deploy run：
+35802522878 SUCCESS
+
+Verification：
+15 files / 86 tests PASS
+Build PASS
+
+Worker：
+c34806d8-a6e8-4f71-b054-98886703ed6b
+
+Flow：
+verified 1001 commercial facts
+→ separate commercial evidence
+→ K1 ACK links canonical Order
+→ /order/get provider refresh
+→ identity verification
+→ Admin 實收估算設定 readback
+
+Captured where provider exposes：
+- merchandise subtotal
+- customer paid
+- shipping fee
+- platform fee
+- minimum order top-up
+- merchant commission
+- merchant activity fee
+- merchant earnings
+
+Hard rules：
+- missing provider values remain UNKNOWN
+- never fabricate zero
+- provider commercial facts do NOT mutate MFK Sales / Tender
+- commercial extraction failure MUST NOT reject valid order webhook
+
+REAL EXTERNAL：
+PENDING #162 E8
+
+==================================================
+12. GLOBAL FAILURE ISOLATION
+==================================================
+
+Keeta unavailable：
+SMT local trading continues。
+
+Provider command failure：
+local canonical decision remains。
+Provider becomes attention / UNKNOWN / readback path。
+
+Commercial failure：
+does not reject order ingress。
+
+Menu failure：
+does not mutate MFK canonical catalog。
+
+Sellability failure：
+does not mutate local canonical availability。
+
+Refund evidence：
+does not silently rewrite payment truth。
+
+==================================================
+13. CURRENT EXTERNAL ACCEPTANCE GATE
+==================================================
+
+Issue：
+#162
+
+SOURCE / TEST / DEPLOY：
+K1–K8 GREEN
+
+CURRENT FIRST BREAK：
+REAL PROVIDER EXTERNAL ACCEPTANCE
+
+Maximum active lanes：
+2
+
+Lane A：
+E1 Menu live completion
++
+E6 controlled provider operations
+
+Lane B：
+E2 real test order
+→ E3 confirm
+→ E4 READY
+→ E5 lifecycle
+→ E7 after-sale where test environment exposes
+→ E8 commercial readback
+
+No fake GREEN。
+
+If provider test environment does not expose a seam：
+record
+EXTERNAL_TEST_ENV_NOT_EXPOSED
+with exact evidence。
+
+==================================================
+14. CURRENT / NEXT
+==================================================
+
+CURRENT：
+
+ADMIN_GUIDED_UI_OWNER_ACCEPTED_PRODUCTION_GREEN
+KEETA_LIVE_CONNECTION_GREEN
+KEETA_K1_K8_SOURCE_TEST_DEPLOY_GREEN
+
+ACTIVE：
+#162 REAL_EXTERNAL_ACCEPTANCE
+
+NEXT OWNER / REAL-WORLD ACTIONS：
+
+A. Admin：
+- 預檢完整 Keeta 菜單
+- 執行一個 controlled full-menu sync
+- capture taskId / 1202 / 1201
+
+B. Keeta Test Store：
+- 建立一張真 test order
+- 由 SMT 驗證 1001 → ONE canonical order
+- ACCEPT
+- READY
+- lifecycle readback
+- commercial readback
+
+C. Controlled Provider Ops：
+- one sellability change
+- hours sync
+- REST / OPEN
+- readback
+
+D. After-sale：
+如 test environment exposes refund / partial refund，
+capture 1005 / 1007 and decision path。
+
+FINAL SUCCESS TARGET：
+
+KEETA_FULL_PROVIDER_INTEGRATION_GREEN
+
+==================================================
+END ROUND028
+==================================================
