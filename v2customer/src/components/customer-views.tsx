@@ -198,8 +198,6 @@ export function CartView({cart,quote,repairs,member,suggestions,products,onProdu
   const itemCount=cart.reduce((sum,line)=>sum+line.quantity,0);
   return <section className="page cart-page ui4-memory-jar" data-ui4-route="/memory-jar">
     <PageIntro kicker="今次餐點" title={cart.length?`記憶罐 (${itemCount})`:'記憶罐'} detail="每一項都可以修改、修正或移除，確認好先去結帳。" aside={cart.length?<button className="text-action" onClick={onMenu}>繼續加餐</button>:null}/>
-    <ol className="ui4-checkout-stepper" aria-label="Checkout 進度"><li className="active"><i>1</i><span>確認商品</span></li><li className="upcoming"><i>2</i><span>聯絡與取餐</span></li><li className="upcoming"><i>3</i><span>付款</span></li><li className="upcoming"><i>4</i><span>提交前確認</span></li></ol>
-    <JarVisual count={itemCount}/>
     {!cart.length?<EmptyState title="記憶罐仲係空嘅" detail="去菜單揀一樣真正想食嘅，設定會逐步帶你完成。"><ActionButton onClick={onMenu}>開始點餐</ActionButton></EmptyState>:
     <>
       <section className="jar-live-summary" aria-live="polite"><span>今次已選</span><AnimatedValue as="strong">{itemCount} 件餐點</AnimatedValue><small>{quote?quoteMeta[quote.freshness].label:'等待餐牌價格'}</small></section>
@@ -364,7 +362,17 @@ export function MemberView({connection,snapshot,history,pendingIntents,readingIn
   const seedsState=state==='READY'?(member?.seeds?.state??'EMPTY'):state;
   const lastOrder=history[0];
   return <section className="page member-page ui9-member-page">
-    <section className="member-hero ui9-member-hero"><div className="ui9-brand-art-slot" data-final-art-pending="true" role="img" aria-label="磨飯品牌角色插圖位置"/><div><span>會員</span><h1>{member?.state==='READY'&&member.displayName?`${member.displayName}，歡迎返嚟。`:'磨飯記得每次相遇。'}</h1><p>{member?.state==='READY'?(member.memberLabel??member.lastVisitLabel??'會員資料已更新'):'會員資料暫時未連接，你仍然可以照常點餐同查看訂單。'}</p></div><span className={`member-connection state-${state.toLowerCase()}`}>{state==='READY'?'已更新':state==='LOADING'?'更新中':'稍後再試'}</span></section>
+    <section className="member-hero ui9-member-hero"><div className="ui9-brand-art-slot" data-final-art-pending="true" role="img" aria-label="磨飯品牌角色插圖位置"/><div><span>會員</span><h1>{member?.state==='READY'&&member.displayName?`${member.displayName}，歡迎返嚟。`:'磨飯記得每次相遇。'}</h1><p>{member?.state==='READY'?(member.memberLabel??member.lastVisitLabel??'會員資料已更新'):'會員資料暫時未連接，你仍然可以照常點餐同查看訂單。'}</p>{lastOrder?.pickupCode?<small className="ui9-member-pickup-code">取餐碼 {lastOrder.pickupCode}</small>:null}</div><span className={`member-connection state-${state.toLowerCase()}`}>{state==='READY'?'已更新':state==='LOADING'?'更新中':'稍後再試'}</span></section>
+    <section className="member-module ui9-membership-module" aria-label="正式會員">
+      <SectionHeading eyebrow="正式會員" title={state==='READY'?'會員資料已啟用':'用電話同密碼建立會員'}/>
+      {state==='READY'?<p>正式會員資料已更新；會員身份同優惠狀態以店舖會員資料為準。</p>:<>
+        <div className="ui9-activation-preview" aria-disabled="true">
+          <label><span>電話</span><input type="tel" disabled aria-disabled="true" placeholder="電話"/></label>
+          <label><span>設定密碼</span><input type="password" disabled aria-disabled="true" placeholder="••••••••"/></label>
+        </div>
+        <p>帳戶啟用服務尚未連接；目前唔會建立會員身份，亦唔會用 SMS／Email 驗證碼代替。</p>
+      </>}
+    </section>
     <section className="ui9-memory-summary" aria-label="會員記憶摘要">
       <article><span>記憶種子</span><strong>{seedsState==='READY'?(member?.seeds?.valueLabel??'—'):'—'}</strong><small>{member?.seeds?.progressLabel??'每次回來都會留下記憶'}</small></article>
       <article><span>回憶券</span><strong>{state==='READY'?(member?.coupons?.filter(item=>item.state==='AVAILABLE').length??0):'—'}</strong><small>可使用</small></article>
