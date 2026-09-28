@@ -327,6 +327,21 @@ function read():Persisted{
   }catch{return clone(defaults)}
 }
 let data=read();
+function currentAvailabilityBusinessDate(now=Date.now()){
+  const cutoff=readBusinessCutoff();
+  return resolveBusinessWindow(now,cutoff.hour,cutoff.minute).businessDate;
+}
+function rollRuntimeAvailabilityForBusinessDay(now=Date.now()){
+  const businessDate=currentAvailabilityBusinessDate(now);
+  if(data.availabilityBusinessDate===businessDate)return false;
+  const nextAvailability=Object.fromEntries(Object.entries(data.availability).map(([nodeId,status])=>[
+    nodeId,status==='soldout'?'available':status,
+  ])) as Record<string,SmtAvailabilityStatus>;
+  data={...data,availability:nextAvailability,availabilityBusinessDate:businessDate};
+  localStorage.setItem(KEY,JSON.stringify(data));
+  return true;
+}
+rollRuntimeAvailabilityForBusinessDay();
 let runtimeIdentitySequence=0;
 function nextRuntimeIdentity(prefix:'MFK-'|'HOLD-'|'ACT-'){
   const stamp=Date.now().toString(36);
@@ -2596,7 +2611,8 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
     return view;
   },
   async setAvailability(nodeId,status){
-    data={...data,availability:{...data.availability,[nodeId]:status}};save();
+    rollRuntimeAvailabilityForBusinessDay();
+    data={...data,availability:{...data.availability,[nodeId]:status},availabilityBusinessDate:currentAvailabilityBusinessDate()};save();
     queueRuntimeSellabilityProjection(nodeId,status);
     return {revision:1,nodes:Object.entries(productNames).map(([id,label])=>({nodeId:id,label,status:data.availability[id]||'available',sourceLabel:'LOCAL'})),canChange:true};
   }
