@@ -74,6 +74,7 @@ interface CapacityConfig{
 }
 export function CapacityWorkspace(){
   const {draft}=useAdminDraft();
+  const [selectedPoolId,setSelectedPoolId]=useState<string|null>(null);
   const [config,setConfig]=usePersistentAdminState<CapacityConfig>('capacity.v1',{dailyLimit:'',warningAt:80,hardStop:false,note:'',pools:[]});
   const pools=(Array.isArray(config.pools)?config.pools:[]).map(normalizeCapacityPool);
   const products=draft.products.filter(product=>product.active);
@@ -89,7 +90,7 @@ export function CapacityWorkspace(){
     const id=nextCapacityPoolId(pools);
     savePools([...pools,normalizeCapacityPool({
       id,name:'',active:false,initialQty:0,productIds:[],firstPartyStopAt:0,thirdPartyStopAt:0,note:'',
-    })]);
+    })]);setSelectedPoolId(id);
   };
   const removePool=(id:string)=>savePools(pools.filter(pool=>pool.id!==id));
   const toggleProduct=(pool:CapacityPoolDefinitionV1,productId:string)=>{
@@ -107,10 +108,10 @@ export function CapacityWorkspace(){
     <section className="admin-read-card capacity-pool-workspace">
       <header><div><h2>產能 Pool</h2><small>正式交易規則來源</small></div><button type="button" onClick={addPool}>＋ 新增產能 Pool</button></header>
       <div className="admin-callout compact">每個 Pool 會保存初始數量、綁定商品，同自家／第三方平台各自嘅剩餘量停售門檻。Pool=0 嘅遠端停止與 Override 仲未喺 CAP0 執行。</div>
-      {pools.length?<div className="capacity-pool-list">{pools.map(pool=>{
+      {pools.length?selectedPoolId===null?<div className="admin-settings-home" aria-label="產能 Pool">{pools.map(pool=><button type="button" className="admin-settings-link" key={pool.id} onClick={()=>setSelectedPoolId(pool.id)}><span><b>{pool.name||'未命名 Pool'}</b><small>{pool.initialQty} · {pool.productIds.length} 件商品 · {pool.active?'啟用':'停用'}</small></span><strong aria-hidden="true">›</strong></button>)}</div>:<div className="capacity-pool-list">{pools.filter(pool=>pool.id===selectedPoolId).map(pool=>{
         const canActivate=capacityPoolCanActivate(pool);
         return <article className="admin-policy-card capacity-pool-card" key={pool.id}>
-          <header><div><small>{pool.id}</small><h3>{pool.name||'未命名 Pool'}</h3></div><button type="button" onClick={()=>removePool(pool.id)}>移除</button></header>
+          <button type="button" className="admin-back-button" onClick={()=>setSelectedPoolId(null)}>‹ 產能 Pool</button><header><div><small>{pool.id}</small><h3>{pool.name||'未命名 Pool'}</h3></div><button type="button" onClick={()=>{removePool(pool.id);setSelectedPoolId(null)}}>移除</button></header>
           <div className="admin-policy-grid two">
             <label><span>Pool 名稱</span><input value={pool.name} onChange={event=>updatePool(pool.id,{name:event.target.value})} placeholder="例如：紫米"/></label>
             <label><span>初始數量</span><input type="number" min={0} step={1} value={pool.initialQty} onChange={event=>updatePool(pool.id,{initialQty:Number(event.target.value)})}/></label>
