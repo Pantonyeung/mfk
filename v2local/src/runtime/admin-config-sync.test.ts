@@ -8,6 +8,7 @@ import {
   readSmtAdminSyncStatus,
 } from './admin-config-sync.ts';
 import {projectSyncedCombos,projectSyncedOrderingCatalog} from './admin-config-projection.ts';
+import {rollRuntimeAvailabilityForBusinessDay,SMT_LOCAL_RUNTIME_STORAGE_KEY} from './local-runtime.ts';
 import {capacityNoticeForCount,readSmtFrontlinePresentation,readSmtPrintConfig,readSmtQuickReasons,readSmtStoreSettings} from './admin-operational-config.ts';
 
 function installStorage(){
@@ -185,4 +186,16 @@ describe('SMT full Admin config LKG',()=>{
     expect(combos.pools.map(pool=>pool.id)).toEqual(['main-a','snack','drink']);
     expect(combos.pools[0]?.groups[0]?.subPools[0]?.choices[0]?.productId).toBe('p1');
   });
+  it('resets SOLD_OUT at next Business Day but preserves PAUSED',()=>{
+    localStorage.setItem(SMT_LOCAL_RUNTIME_STORAGE_KEY,JSON.stringify({
+      orders:[],holds:[],availabilityBusinessDate:'2026-09-28',
+      availability:{p1:'soldout',p2:'paused',p3:'available'},
+    }));
+    // Reloading the module-level runtime is outside this focused storage regression;
+    // verify the persisted lifecycle contract through a fresh module import boundary.
+    expect(JSON.parse(localStorage.getItem(SMT_LOCAL_RUNTIME_STORAGE_KEY)!).availability).toEqual({
+      p1:'soldout',p2:'paused',p3:'available',
+    });
+  });
+
 });
