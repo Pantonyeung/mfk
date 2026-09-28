@@ -2056,10 +2056,17 @@ export default {
           if(!activeResponse.ok)return json({code:'KEETA_ADMIN_CONFIG_NOT_PUBLISHED'},409,cors(request));
           const active=await activeResponse.json();
           init.headers.set('content-type','application/json');
+          let runtimeSellability=[];
+          if(adminSubpath==='sellability/preview'||adminSubpath==='sellability/sync'){
+            const runtimeResponse=await admin.fetch(new Request('https://internal/runtime-sellability-readback',{method:'GET'}));
+            const runtimeBody=runtimeResponse.ok?await runtimeResponse.json():{sellability:[]};
+            runtimeSellability=Array.isArray(runtimeBody.sellability)?runtimeBody.sellability:[];
+          }
           init.body=JSON.stringify({
             revision:active.revision,
             adminFingerprint:active.fingerprint,
             snapshot:active.snapshot,
+            ...(runtimeSellability.length?{runtimeSellability}:{}),
           });
         }else if(request.method!=='GET'&&request.method!=='HEAD'){
           const body=await request.arrayBuffer();
