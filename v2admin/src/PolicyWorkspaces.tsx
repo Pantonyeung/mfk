@@ -1,6 +1,6 @@
 import {useEffect,useMemo,useRef,useState} from 'react';
 import {Link} from 'react-router';
-import {STORE_SETTINGS_ROUTES,validateStoreSettingsDomain,type StoreSettingsDomain,type StoreSettingsFieldError} from './admin-store-settings-domain.ts';
+import {STORE_SETTINGS_DOMAIN_LABELS,STORE_SETTINGS_ROUTES,canonicalPublishTargetForError,migrateLegacyWhatsAppTemplate,validateAllStoreSettingsDomains,validateStoreSettingsDomain,type StoreSettingsDomain,type StoreSettingsFieldError} from './admin-store-settings-domain.ts';
 import type {StaffPinVerifier} from '../../contracts/staff-auth-v1.ts';
 import {useAdminDraft} from './admin-draft.tsx';
 import {appendAdminAudit,readActiveAdminRelease,usePersistentAdminState,writeAdminStored} from './admin-local-store.ts';
@@ -173,6 +173,7 @@ interface StoreSettings{
   customerWhatsAppEnabled:boolean;
   customerWhatsAppNumber:string;
   customerWhatsAppTemplate:string;
+  customerWhatsAppTemplateInitialized?:boolean;
   weeklyHours:Record<StoreDay,{closed:boolean;opensAt:string;closesAt:string}>;
   paymentRefs:string[];printRefs:string[];channelRefs:string[];
 }
@@ -207,20 +208,27 @@ export function StoreSettingsWorkspace({domain='home'}:{domain?:StoreSettingsDom
     customerWhatsAppEnabled:true,
     customerWhatsAppNumber:'',
     customerWhatsAppTemplate:DEFAULT_CUSTOMER_WHATSAPP_TEMPLATE,
+    customerWhatsAppTemplateInitialized:true,
     weeklyHours:DEFAULT_WEEKLY_HOURS,
     paymentRefs:['CASH'],printRefs:['RECEIPT','PRODUCTION','PACKING','LABEL'],channelRefs:[],
   });
   const [saveMessage,setSaveMessage]=useState('');
   const [saveErrors,setSaveErrors]=useState<readonly StoreSettingsFieldError[]>([]);
+  const [publishBlockers,setPublishBlockers]=useState<readonly {label:string;path:string;message:string}[]>([]);
   const errorSummaryRef=useRef<HTMLDivElement>(null);
   const [renameDrafts,setRenameDrafts]=useState<Record<string,string>>({});
   const [renameMessages,setRenameMessages]=useState<Record<string,string>>({});
   const patch=(change:Partial<StoreSettings>)=>setConfig(current=>{const after={...current,...change};appendAdminAudit({action:'修改門店設定',target:current.storeCode,before:current,after});return after;});
   useEffect(()=>{
-    if(config.customerWhatsAppTemplate===undefined||config.customerWhatsAppTemplate===null){
-      patch({customerWhatsAppTemplate:DEFAULT_CUSTOMER_WHATSAPP_TEMPLATE});
+    const migration=migrateLegacyWhatsAppTemplate({
+      value:config.customerWhatsAppTemplate,
+      initialized:config.customerWhatsAppTemplateInitialized,
+      defaultValue:DEFAULT_CUSTOMER_WHATSAPP_TEMPLATE,
+    });
+    if(migration.migrated||config.customerWhatsAppTemplateInitialized!==true){
+      patch({customerWhatsAppTemplate:migration.value,customerWhatsAppTemplateInitialized:true});
     }
-  // hydrate legacy missing value once; never render a fake visual fallback
+  // legacy records have no initialized marker; once marked, an intentional clear remains empty
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[]);
   const patchDay=(day:StoreDay,change:Partial<StoreSettings['weeklyHours'][StoreDay]>)=>patch({weeklyHours:{...config.weeklyHours,[day]:{...config.weeklyHours[day],...change}}});
@@ -293,19 +301,34 @@ export function StoreSettingsWorkspace({domain='home'}:{domain?:StoreSettingsDom
   };
   const saveStoreSettings=()=>{
     const errors=validateStoreSettingsDomain(domain,validationInput());
-    if(errors.length){setSaveErrors(errors);setSaveMessage('未能儲存本頁設定；請修正標示欄位。');focusFirstError(errors);return;}
+    if(errors.length){setSaveErrors(errors);setPublishBlockers([]);setSaveMessage('未能儲存本頁設定；請修正標示欄位。');focusFirstError(errors);return;}
     writeAdminStored('store-settings.v1',config);
     setSaveErrors([]);
     setSaveMessage('已儲存本頁設定草稿；未建立正式版本。');
   };
   const publishStoreSettings=()=>{
-    const errors=validateStoreSettingsDomain(domain,validationInput());
-    if(errors.length){setSaveErrors(errors);setSaveMessage('未能發佈；請修正標示欄位。');focusFirstError(errors);return;}
+    const currentErrors=validateStoreSettingsDomain(domain,validationInput());
+    if(currentErrors.length){setSaveErrors(currentErrors);setPublishBlockers([]);setSaveMessage('未能發佈；請修正標示欄位。');focusFirstError(currentErrors);return;}
     writeAdminStored('store-settings.v1',config);
+    const crossDomain=validateAllStoreSettingsDomains(validationInput()).filter(error=>error.domain!==domain);
+    if(crossDomain.length){
+      setSaveErrors([]);
+      setPublishBlockers(crossDomain.map(error=>({label:STORE_SETTINGS_DOMAIN_LABELS[error.domain],path:STORE_SETTINGS_ROUTES[error.domain],message:error.message})));
+      setSaveMessage('無法正式發佈：其他設定項目仍有需要處理。');
+      errorSummaryRef.current?.scrollIntoView({behavior:'smooth',block:'start'});
+      return;
+    }
     const result=saveAdminConfig(draft);
-    if(!result.ok){setSaveErrors(result.errors.map((message,index)=>({fieldId:'publish-global-'+index,message})));setSaveMessage('正式發佈仍有其他 Canonical Config 驗證問題；本頁草稿已保留。');errorSummaryRef.current?.scrollIntoView({behavior:'smooth',block:'start'});return;}
+    if(!result.ok){
+      setSaveErrors([]);
+      setPublishBlockers(result.errors.map(message=>({...canonicalPublishTargetForError(message),message})));
+      setSaveMessage('無法正式發佈：Canonical Config 仍有需要處理。');
+      errorSummaryRef.current?.scrollIntoView({behavior:'smooth',block:'start'});
+      return;
+    }
     markClean();
     setSaveErrors([]);
+    setPublishBlockers([]);
     setSaveMessage('已正式保存並發佈 R'+result.release.version+'；已排入 Admin → SMT／SMM 自動同步。');
   };
   const fieldError=(id:string)=>saveErrors.find(error=>error.fieldId===id)?.message;
@@ -319,6 +342,7 @@ export function StoreSettingsWorkspace({domain='home'}:{domain?:StoreSettingsDom
       <div><small>{activeRelease?'目前 R'+activeRelease.version:'未有正式版本'} · 門店設定</small><h1>門店設定</h1><p>本機修改會自動保存草稿；只有撳「保存並發佈」先建立正式版本，並送去 SMT／SMM。</p>{saveMessage?<span>{saveMessage}</span>:null}</div>
       <div className="admin-editor-actions"><button className="primary" type="button" onClick={saveStoreSettings}>儲存本頁設定</button><button className="primary" type="button" onClick={publishStoreSettings}>正式保存並發佈</button></div>
     </header>
+    {publishBlockers.length?<div ref={errorSummaryRef} className="admin-validation is-error" role="alert" tabIndex={-1}><b>無法正式發佈</b><ul>{publishBlockers.map((error,index)=><li key={index}><b>{error.label}</b> → {error.message} <Link to={error.path}>前往設定</Link></li>)}</ul></div>:null}
     {saveErrors.length?<div ref={errorSummaryRef} className="admin-validation is-error" role="alert" tabIndex={-1}><b>有 {saveErrors.length} 項需要處理</b><ul>{saveErrors.map((error,index)=><li key={index}><button type="button" className="admin-error-link" onClick={()=>{const node=document.getElementById(error.fieldId);node?.scrollIntoView({behavior:'smooth',block:'center'});node?.focus();}}>{error.message}</button></li>)}</ul></div>:null}
     {domain==='home'?<div className="admin-settings-home" aria-label="門店設定項目">
       <Link className="admin-settings-link" to={STORE_SETTINGS_ROUTES.basic}><span><b>基本資料</b><small>門店名稱、代碼、貨幣、時區</small></span><strong aria-hidden="true">›</strong></Link>
@@ -328,7 +352,8 @@ export function StoreSettingsWorkspace({domain='home'}:{domain?:StoreSettingsDom
       <Link className="admin-settings-link" to={STORE_SETTINGS_ROUTES.timing}><span><b>營運計時</b><small>遲到、出餐、堂食超時、封存</small></span><strong aria-hidden="true">›</strong></Link>
       <Link className="admin-settings-link" to={STORE_SETTINGS_ROUTES.reminders}><span><b>訂單提醒</b><small>Pending Order 提醒</small></span><strong aria-hidden="true">›</strong></Link>
       <Link className="admin-settings-link" to={STORE_SETTINGS_ROUTES.whatsapp}><span><b>WhatsApp 備援</b><small>電話及訊息模板</small></span><strong aria-hidden="true">›</strong></Link>
-      <Link className="admin-settings-link" to={STORE_SETTINGS_ROUTES.payments}><span><b>電子支付</b><small>付款方式及 QR Code</small></span><strong aria-hidden="true">›</strong></Link>
+      <Link className="admin-settings-link" to={STORE_SETTINGS_ROUTES.payments}><span><b>電子支付</b><small>付款方式、名稱、啟用及排序</small></span><strong aria-hidden="true">›</strong></Link>
+      <Link className="admin-settings-link" to={STORE_SETTINGS_ROUTES.qr}><span><b>QR Code</b><small>付款 QR 管理及預覽</small></span><strong aria-hidden="true">›</strong></Link>
       <Link className="admin-settings-link" to={STORE_SETTINGS_ROUTES.references}><span><b>其他門店設定</b><small>系統引用</small></span><strong aria-hidden="true">›</strong></Link>
     </div>:null}
     {domain!=='home'?<nav className="admin-settings-breadcrumb" aria-label="門店設定返回"><Link to={STORE_SETTINGS_ROUTES.home}>‹ 門店設定</Link></nav>:null}
@@ -351,9 +376,18 @@ export function StoreSettingsWorkspace({domain='home'}:{domain?:StoreSettingsDom
     {domain==='whatsapp'?<div className="admin-policy-grid two"><article className="admin-policy-card"><h2>Customer WhatsApp 備援</h2>
         <Toggle checked={config.customerWhatsAppEnabled!==false} onChange={customerWhatsAppEnabled=>patch({customerWhatsAppEnabled})} label={config.customerWhatsAppEnabled!==false?'啟用':'停用'}/>
         <label><span>公司 WhatsApp 電話</span><input {...fieldProps('customer-whatsapp-number')} className={fieldError('customer-whatsapp-number')?'admin-field-invalid':undefined} inputMode="tel" value={config.customerWhatsAppNumber??''} onChange={event=>patch({customerWhatsAppNumber:event.target.value})} placeholder="例如 85291234567"/><FieldError id="customer-whatsapp-number"/></label>
-        <label><span>訊息模板</span><textarea {...fieldProps('customer-whatsapp-template')} className={fieldError('customer-whatsapp-template')?'admin-field-invalid':undefined} rows={8} value={config.customerWhatsAppTemplate??''} onChange={event=>patch({customerWhatsAppTemplate:event.target.value})}/><FieldError id="customer-whatsapp-template"/></label>
+        <label><span>訊息模板</span><textarea {...fieldProps('customer-whatsapp-template')} className={fieldError('customer-whatsapp-template')?'admin-field-invalid':undefined} rows={8} value={config.customerWhatsAppTemplate??''} onChange={event=>patch({customerWhatsAppTemplate:event.target.value,customerWhatsAppTemplateInitialized:true})}/><FieldError id="customer-whatsapp-template"/></label>
         <small>可用：{'{name}'}、{'{phone}'}、{'{items}'}、{'{total}'}、{'{submissionId}'}。系統只會喺 Customer 無法連接 SMT 接單後，由客人主動撳掣先開 WhatsApp；唔會自動傳送。</small>
       </article></div>:null}
+    {domain==='qr'?<div className="admin-policy-grid two"><article className="admin-policy-card"><header><div><h2>QR Code</h2><small>重用電子支付嘅 customerPaymentChannels / qrImageUrl；唔建立第二 QR Store。</small></div></header>
+      <div className="admin-editor-list">{paymentChannels.map(row=><div className="admin-policy-row" key={row.id}>
+        <div><b>{row.name}</b><small>{row.id} · {row.enabled?'啟用':'停用'}</small></div>
+        <label><span>付款 QR 圖</span><input type="file" accept="image/jpeg,image/png,image/webp" onChange={event=>{const file=event.target.files?.[0];if(file)void uploadPaymentQr(row.id,file)}}/></label>
+        {row.qrImageUrl?<div><img src={row.qrImageUrl} alt={row.name+' QR'} style={{width:96,height:96,objectFit:'contain',borderRadius:10,border:'1px solid rgba(0,0,0,.12)'}}/><button type="button" onClick={()=>patchPaymentChannel(row.id,{qrImageUrl:''})}>移除圖片</button></div>:<span>未有付款 QR</span>}
+        <small>{paymentUploadState[row.id]??''}</small>
+      </div>)}</div>
+      <p>上載沿用現有 Admin Worker → Private R2；正式資料仍由同一 customerPaymentChannels 隨 Canonical Publish 發佈。</p>
+    </article></div>:null}
     {domain==='payments'?<div className="admin-policy-grid two"><article className="admin-policy-card"><header><div><h2>客戶電子支付</h2><small>先揀付款方式；再進入單一設定。Customer 只讀已發佈版本。</small></div><button type="button" onClick={addPaymentChannel}>新增付款方式</button></header>
         {selectedPaymentId===null?<div className="admin-settings-home">{paymentChannels.map(row=><button type="button" className="admin-settings-link" key={row.id} onClick={()=>setSelectedPaymentId(row.id)}><span><b>{row.name}</b><small>{row.enabled?'啟用':'停用'} · {row.qrImageUrl?'已有 QR':'未有 QR'}</small></span><strong aria-hidden="true">›</strong></button>)}</div>:paymentChannels.filter(row=>row.id===selectedPaymentId).map((row,index)=><div className="admin-payment-detail" key={row.id}>
           <button type="button" className="admin-back-button" onClick={()=>setSelectedPaymentId(null)}>‹ 電子支付</button>
