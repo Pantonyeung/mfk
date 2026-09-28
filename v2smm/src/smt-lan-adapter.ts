@@ -59,7 +59,7 @@ export function createSmmLanOrderAdapter(transport:SmmLanTransport,timeoutMs=300
         menuRevision:intent.menuRevision,
         publishedTotalMinor:intent.publishedTotalMinor,
         serviceMode:intent.checkout.serviceMode,
-        tender:intent.checkout.tender,
+        ...(intent.checkout.serviceMode==='TAKEAWAY'&&intent.checkout.tender?{tender:intent.checkout.tender}:{}),
         ...(intent.checkout.diningTarget?{diningTarget:intent.checkout.diningTarget}:{}),
         lines:lines(intent.cart),
       });
