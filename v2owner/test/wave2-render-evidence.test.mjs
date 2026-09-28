@@ -168,5 +168,5 @@ test('Wave2 FINAL screens render at 390 and 440 with 360 minimum width', {timeou
     browser.kill('SIGTERM');
     await server.close();
   }
-  assert.equal(browserError.includes('DevToolsActivePort file doesn\\'t exist'),false);
+  assert.equal(browserError.includes("DevToolsActivePort file doesn't exist"),false);
 });
