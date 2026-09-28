@@ -363,6 +363,14 @@ function nextRuntimeIdentity(prefix:'MFK-'|'HOLD-'|'ACT-'){
   throw new Error('LOCAL_IDENTITY_EXHAUSTED');
 }
 function save(){localStorage.setItem(KEY,JSON.stringify(data));listeners.forEach(fn=>fn())}
+function applyBusinessDayAvailabilityRollover(now=Date.now()){
+  const previous={...data.availability};
+  if(!rollRuntimeAvailabilityForBusinessDay(now))return;
+  for(const [nodeId,status] of Object.entries(previous)){
+    if(status==='soldout'&&data.availability[nodeId]==='available')queueRuntimeSellabilityProjection(nodeId,'available');
+  }
+  listeners.forEach(fn=>fn());
+}
 function projectOrder(order:StoredOrder){queueOrderProjection(order)}
 const money=(minor:number)=>String.fromCharCode(36)+(minor/100).toFixed(2);
 function capacityEventsFromOrders(orders:readonly StoredOrder[]):CapacityPoolOrderEvent[]{
