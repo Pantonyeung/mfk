@@ -2900,3 +2900,13 @@ button:hover .product-media img{transform:scale(1.025)}
 .ui9-activation-preview label{display:grid;gap:6px;font-size:12px;color:#667085}
 .ui9-activation-preview input{min-height:44px;border:0;border-radius:14px;background:#f3efe9;padding:0 14px;color:#667085}
 .ui9-member-pickup-code{display:inline-flex;margin-top:8px;padding:6px 10px;border-radius:999px;background:#f3efe9;color:var(--customer-source-navy,#173b70);font-weight:800}
+
+
+/* Wave2 final source pass: source stages own their headers; checkout shows only the current V1 pickup window. */
+.ui4-memory-jar,.ui4-checkout,.ui5-submit,.ui5-waiting,.ui6-tracking,.ui7-shell,.ui8-page,.ui9-member-page{width:min(100%,480px);margin-left:auto;margin-right:auto}
+.ui4-pickup-window{background:var(--customer-source-paper);border:1px solid var(--customer-source-line);border-radius:20px;padding:16px;display:grid;gap:7px}
+.ui4-pickup-window header{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.ui4-pickup-window header span{color:var(--customer-source-muted);font-size:12px;font-weight:800}
+.ui4-pickup-window header strong{color:var(--customer-source-navy)}
+.ui4-pickup-window p,.ui4-pickup-window small{margin:0;color:var(--customer-source-muted);line-height:1.55}
+.ui5-waiting-hero>small{display:block;margin:4px 0 8px;color:var(--customer-source-green);font-weight:800}
