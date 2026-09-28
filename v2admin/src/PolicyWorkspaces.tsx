@@ -1,4 +1,6 @@
-import {useEffect,useMemo,useState} from 'react';
+import {useEffect,useMemo,useRef,useState} from 'react';
+import {Link} from 'react-router';
+import {STORE_SETTINGS_DOMAIN_LABELS,STORE_SETTINGS_ROUTES,canonicalPublishTargetForError,migrateLegacyWhatsAppTemplate,validateAllStoreSettingsDomains,validateStoreSettingsDomain,type StoreSettingsDomain,type StoreSettingsFieldError} from './admin-store-settings-domain.ts';
 import type {StaffPinVerifier} from '../../contracts/staff-auth-v1.ts';
 import {useAdminDraft} from './admin-draft.tsx';
 import {appendAdminAudit,readActiveAdminRelease,usePersistentAdminState,writeAdminStored} from './admin-local-store.ts';
@@ -115,23 +117,25 @@ export function PrintCenterWorkspace(){
     {id:'logical-riceball-label',name:'飯糰 Label',type:'LABEL',model:'50×40 Label',widthMm:50,active:true,capabilities:['LABEL']},
     {id:'logical-takeaway-label',name:'外賣 Label',type:'LABEL',model:'50×40 Label',widthMm:50,active:true,capabilities:['LABEL']},
   ]);
+  const [selectedPrinterId,setSelectedPrinterId]=useState<string|null>(null);
   const add=()=>setPrinters(rows=>{
     const row:LogicalPrinterDraft={id:'logical-'+Date.now().toString(36),name:'新打印用途',type:'RECEIPT',model:'80mm 熱敏',widthMm:80,active:true,capabilities:['RECEIPT']};
-    appendAdminAudit({action:'新增 打印用途',target:row.id,after:row});return [...rows,row];
+    appendAdminAudit({action:'新增 打印用途',target:row.id,after:row});setSelectedPrinterId(row.id);return [...rows,row];
   });
   const patch=(id:string,change:Partial<LogicalPrinterDraft>)=>setPrinters(rows=>rows.map(row=>{if(row.id!==id)return row;const after={...row,...change};appendAdminAudit({action:'修改 打印用途',target:id,before:row,after});return after;}));
   const remove=(id:string)=>setPrinters(rows=>{appendAdminAudit({action:'刪除 打印用途',target:id});return rows.filter(row=>row.id!==id);});
   return <section className="admin-editor-page">
     <header className="admin-editor-head"><div><small>唯一打印用途清單</small><h1>打印中心</h1><p>Admin 定義唯一打印用途、規格同能力。實際 IP／USB／實體設備日後只由 SMT 配對，唔會喺兩邊建立第二套名稱。</p></div><div className="admin-editor-actions"><button className="secondary" onClick={add}>新增打印用途</button></div></header>
-    <div className="admin-editor-list">{printers.map(row=><article className="admin-policy-card" key={row.id}>
+    {selectedPrinterId===null?<div className="admin-settings-home" aria-label="打印用途">{printers.map(row=><button type="button" className="admin-settings-link" key={row.id} onClick={()=>setSelectedPrinterId(row.id)}><span><b>{row.name}</b><small>{row.type} · {row.model} · {row.active?'啟用':'停用'}</small></span><strong aria-hidden="true">›</strong></button>)}</div>:<div className="admin-editor-list">{printers.filter(row=>row.id===selectedPrinterId).map(row=><article className="admin-policy-card" key={row.id}>
+      <button type="button" className="admin-back-button" onClick={()=>setSelectedPrinterId(null)}>‹ 打印用途</button>
       <header><h2>{row.name}</h2><small>{row.id}</small></header>
       <label><span>名稱</span><input value={row.name} onChange={event=>patch(row.id,{name:event.target.value})}/></label>
       <label><span>票種</span><select value={row.type} onChange={event=>{const type=event.target.value as LogicalPrinterDraft['type'];patch(row.id,{type,capabilities:[type]})}}><option value="RECEIPT">收據</option><option value="PRODUCTION">製作單</option><option value="PACKING">包裝單</option><option value="LABEL">標籤</option></select></label>
       <label><span>打印規格</span><input value={row.model} onChange={event=>patch(row.id,{model:event.target.value})}/></label>
       <label><span>紙寬／標籤寬 mm</span><input type="number" min={20} max={120} value={row.widthMm} onChange={event=>patch(row.id,{widthMm:Number(event.target.value)||80})}/></label>
       <Toggle checked={row.active} onChange={active=>patch(row.id,{active})} label={row.active?'啟用':'停用'}/>
-      <button type="button" onClick={()=>remove(row.id)}>刪除</button>
-    </article>)}</div>
+      <button type="button" onClick={()=>{remove(row.id);setSelectedPrinterId(null)}}>刪除</button>
+    </article>)}</div>}
   </section>;
 }
 
@@ -144,13 +148,13 @@ export function PrintTemplatesWorkspace(){
     label:'商品名稱\n選項\n訂單／取餐參考\n件數',
     showComboRelationship:true,separateFoodDrinkCount:true,
   });
+  const [selectedTemplate,setSelectedTemplate]=useState<'receipt'|'production'|'packing'|'label'|'semantics'|null>(null);
   const patch=(change:Partial<PrintTemplateSet>)=>setTemplates(current=>{const after={...current,...change};appendAdminAudit({action:'修改打印模板',target:'打印模板中心'});return after;});
   return <section className="admin-editor-page">
     <PolicyHeader title="打印模板中心" description="管理收據、製作單、打包單同 Label 嘅正式輸出內容。製作單回答要整乜／點整；打包單回答全單齊唔齊。"/>
-    <div className="admin-policy-grid two">
-      {([['receipt','收據'],['production','製作單'],['packing','打包單'],['label','標籤']] as const).map(([key,title])=><article className="admin-policy-card" key={key}><h2>{title}</h2><label><span>{title}模板內容</span><textarea value={templates[key]} onChange={event=>patch({[key]:event.target.value})} rows={8}/></label></article>)}
-      <article className="admin-policy-card"><h2>輸出語義</h2><Toggle checked={templates.showComboRelationship} onChange={showComboRelationship=>patch({showComboRelationship})} label="保留套餐與 child 關係"/><Toggle checked={templates.separateFoodDrinkCount} onChange={separateFoodDrinkCount=>patch({separateFoodDrinkCount})} label="食品／飲品總件數分開"/></article>
-    </div>
+    {selectedTemplate===null?<div className="admin-settings-home" aria-label="打印模板">{([['receipt','收據'],['production','製作單'],['packing','打包單'],['label','標籤']] as const).map(([key,title])=><button type="button" className="admin-settings-link" key={key} onClick={()=>setSelectedTemplate(key)}><span><b>{title}</b><small>編輯{title}模板內容</small></span><strong aria-hidden="true">›</strong></button>)}<button type="button" className="admin-settings-link" onClick={()=>setSelectedTemplate('semantics')}><span><b>輸出語義</b><small>套餐關係、食品／飲品件數</small></span><strong aria-hidden="true">›</strong></button></div>:<div className="admin-policy-grid two">
+      <article className="admin-policy-card"><button type="button" className="admin-back-button" onClick={()=>setSelectedTemplate(null)}>‹ 打印模板中心</button>{selectedTemplate==='semantics'?<><h2>輸出語義</h2><Toggle checked={templates.showComboRelationship} onChange={showComboRelationship=>patch({showComboRelationship})} label="保留套餐與 child 關係"/><Toggle checked={templates.separateFoodDrinkCount} onChange={separateFoodDrinkCount=>patch({separateFoodDrinkCount})} label="食品／飲品總件數分開"/></>:([['receipt','收據'],['production','製作單'],['packing','打包單'],['label','標籤']] as const).filter(([key])=>key===selectedTemplate).map(([key,title])=><div key={key}><h2>{title}</h2><label><span>{title}模板內容</span><textarea value={templates[key]} onChange={event=>patch({[key]:event.target.value})} rows={8}/></label></div>)}</article>
+    </div>}
   </section>;
 }
 
@@ -169,6 +173,7 @@ interface StoreSettings{
   customerWhatsAppEnabled:boolean;
   customerWhatsAppNumber:string;
   customerWhatsAppTemplate:string;
+  customerWhatsAppTemplateInitialized?:boolean;
   weeklyHours:Record<StoreDay,{closed:boolean;opensAt:string;closesAt:string}>;
   paymentRefs:string[];printRefs:string[];channelRefs:string[];
 }
@@ -193,7 +198,7 @@ const DEFAULT_WEEKLY_HOURS=Object.freeze({
   SUN:{closed:false,opensAt:'11:00',closesAt:'20:00'},
 }) as StoreSettings['weeklyHours'];
 
-export function StoreSettingsWorkspace(){
+export function StoreSettingsWorkspace({domain='home'}:{domain?:StoreSettingsDomain}){
   const {draft,markClean}=useAdminDraft();
   const [config,setConfig]=usePersistentAdminState<StoreSettings>('store-settings.v1',{
     storeName:'磨飯',storeCode:'MF01',currency:'HKD',timezone:'Asia/Hong_Kong',
@@ -203,26 +208,42 @@ export function StoreSettingsWorkspace(){
     customerWhatsAppEnabled:true,
     customerWhatsAppNumber:'',
     customerWhatsAppTemplate:DEFAULT_CUSTOMER_WHATSAPP_TEMPLATE,
+    customerWhatsAppTemplateInitialized:true,
     weeklyHours:DEFAULT_WEEKLY_HOURS,
     paymentRefs:['CASH'],printRefs:['RECEIPT','PRODUCTION','PACKING','LABEL'],channelRefs:[],
   });
   const [saveMessage,setSaveMessage]=useState('');
-  const [saveErrors,setSaveErrors]=useState<readonly string[]>([]);
+  const [saveErrors,setSaveErrors]=useState<readonly StoreSettingsFieldError[]>([]);
+  const [publishBlockers,setPublishBlockers]=useState<readonly {label:string;path:string;message:string}[]>([]);
+  const errorSummaryRef=useRef<HTMLDivElement>(null);
   const [renameDrafts,setRenameDrafts]=useState<Record<string,string>>({});
   const [renameMessages,setRenameMessages]=useState<Record<string,string>>({});
   const patch=(change:Partial<StoreSettings>)=>setConfig(current=>{const after={...current,...change};appendAdminAudit({action:'修改門店設定',target:current.storeCode,before:current,after});return after;});
+  useEffect(()=>{
+    const migration=migrateLegacyWhatsAppTemplate({
+      value:config.customerWhatsAppTemplate,
+      initialized:config.customerWhatsAppTemplateInitialized,
+      defaultValue:DEFAULT_CUSTOMER_WHATSAPP_TEMPLATE,
+    });
+    if(migration.migrated||config.customerWhatsAppTemplateInitialized!==true){
+      patch({customerWhatsAppTemplate:migration.value,customerWhatsAppTemplateInitialized:true});
+    }
+  // legacy records have no initialized marker; once marked, an intentional clear remains empty
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[]);
   const patchDay=(day:StoreDay,change:Partial<StoreSettings['weeklyHours'][StoreDay]>)=>patch({weeklyHours:{...config.weeklyHours,[day]:{...config.weeklyHours[day],...change}}});
   const refs=(value:string)=>value.split(',').map(item=>item.trim()).filter(Boolean);
   const diningTables=(config.diningTables??[]).slice().sort((a,b)=>a.sortOrder-b.sortOrder);
   const paymentChannels=(config.customerPaymentChannels??DEFAULT_CUSTOMER_PAYMENT_CHANNELS).slice().sort((a,b)=>a.sortOrder-b.sortOrder);
   const [paymentUploadState,setPaymentUploadState]=useState<Record<string,string>>({});
+  const [selectedPaymentId,setSelectedPaymentId]=useState<string|null>(null);
   const patchPaymentChannel=(id:string,change:Partial<CustomerPaymentChannelConfig>)=>patch({customerPaymentChannels:paymentChannels.map(row=>row.id===id?{...row,...change}:row)});
   const addPaymentChannel=()=>{
     const used=new Set(paymentChannels.map(row=>row.id));
     let n=paymentChannels.length+1;
     let id='PAY-'+String(n).padStart(2,'0');
     while(used.has(id)){n++;id='PAY-'+String(n).padStart(2,'0')}
-    patch({customerPaymentChannels:[...paymentChannels,{id,name:'新付款方式',enabled:false,qrImageUrl:'',sortOrder:paymentChannels.length+1}]});
+    patch({customerPaymentChannels:[...paymentChannels,{id,name:'新付款方式',enabled:false,qrImageUrl:'',sortOrder:paymentChannels.length+1}]});setSelectedPaymentId(id);
   };
   const removePaymentChannel=(id:string)=>patch({customerPaymentChannels:paymentChannels.filter(row=>row.id!==id)});
   const uploadPaymentQr=async(id:string,file:File)=>{
@@ -262,47 +283,83 @@ export function StoreSettingsWorkspace(){
   };
   const requestRetirement=(id:string)=>patchTable(id,{retirementStatus:'PLANNED_RETIREMENT'});
   const activatePending=async(id:string)=>{const evidence=await readFreshDiningOccupancy(id);if(!evidence||evidence.activeSessionCount!==0){setSaveMessage('未能生效：枱仍有人使用，或者佔用讀回未能證明為最新。');return;}const row=diningTables.find(item=>item.id===id);if(!row)return;const versions=[...(row.versions??[])];const planned=versions.find(item=>item.status==='PLANNED');if(row.retirementStatus==='PLANNED_RETIREMENT'){writeAdminStored('dining-table-id-ledger.v1',[...new Set([...readAdminStored<string[]>('dining-table-id-ledger.v1',[]),id])]);patchTable(id,{active:false,retirementStatus:'RETIRED',retirementEvidence:{observedAt:evidence.observedAt,runtimeRevision:evidence.runtimeRevision}});appendAdminAudit({action:'堂食枱退休生效',target:id,after:{observedAt:evidence.observedAt,runtimeRevision:evidence.runtimeRevision}});return;}if(!planned)return;const at=new Date().toISOString();patchTable(id,{name:planned.label,versions:versions.map(item=>item.versionId===planned.versionId?{...item,status:'ACTIVE' as const,effectiveAt:at,activationEvidence:{observedAt:evidence.observedAt,runtimeRevision:evidence.runtimeRevision}}:item.status==='ACTIVE'?{...item,status:'SUPERSEDED' as const}:item)});appendAdminAudit({action:'堂食枱名稱版本生效',target:id,after:{versionId:planned.versionId,observedAt:evidence.observedAt,runtimeRevision:evidence.runtimeRevision}});};
+  const validationInput=()=>({
+    diningOverdueMinutes:config.diningOverdueMinutes,
+    customerWhatsAppEnabled:config.customerWhatsAppEnabled!==false,
+    customerWhatsAppNumber:config.customerWhatsAppNumber??'',
+    customerWhatsAppTemplate:config.customerWhatsAppTemplate??'',
+    diningTables,
+    paymentChannels,
+  });
+  const focusFirstError=(errors:readonly StoreSettingsFieldError[])=>{
+    if(!errors.length)return;
+    requestAnimationFrame(()=>{
+      const node=document.getElementById(errors[0]!.fieldId) as HTMLElement|null;
+      node?.scrollIntoView({behavior:'smooth',block:'center'});
+      node?.focus({preventScroll:true});
+    });
+  };
   const saveStoreSettings=()=>{
-    const errors:string[]=[];
-    const tableIds=new Set<string>();
-    for(const row of diningTables){
-      if(!row.id.trim())errors.push('堂食枱缺少內部 ID');
-      else if(tableIds.has(row.id))errors.push('堂食枱 ID 重複：'+row.id);
-      else tableIds.add(row.id);
-      if(!row.name.trim())errors.push('堂食枱 '+(row.id||'未命名')+' 缺少顯示名稱');
-    }
-    const paymentIds=new Set<string>();
-    if(!Number.isFinite(Number(config.diningOverdueMinutes))||Number(config.diningOverdueMinutes)<1)errors.push('堂食超時提醒分鐘必須至少 1 分鐘');
-    const whatsappDigits=String(config.customerWhatsAppNumber??'').replace(/\D/g,'');
-    if(config.customerWhatsAppEnabled!==false&&whatsappDigits&&(whatsappDigits.length<8||whatsappDigits.length>15))errors.push('Customer WhatsApp 電話格式錯誤');
-    if(config.customerWhatsAppEnabled!==false&&whatsappDigits&&!String(config.customerWhatsAppTemplate??'').trim())errors.push('Customer WhatsApp 已啟用但訊息模板未填');
-    for(const row of paymentChannels){
-      if(!row.id.trim())errors.push('付款方式缺少 ID');
-      else if(paymentIds.has(row.id))errors.push('付款方式 ID 重複：'+row.id);
-      else paymentIds.add(row.id);
-      if(!row.name.trim())errors.push('付款方式 '+(row.id||'未命名')+' 缺少顯示名稱');
-    }
-    if(errors.length){setSaveErrors(errors);setSaveMessage('未能保存；請先修正門店設定。');return;}
+    const errors=validateStoreSettingsDomain(domain,validationInput());
+    if(errors.length){setSaveErrors(errors);setPublishBlockers([]);setSaveMessage('未能儲存本頁設定；請修正標示欄位。');focusFirstError(errors);return;}
     writeAdminStored('store-settings.v1',config);
+    setSaveErrors([]);
+    setSaveMessage('已儲存本頁設定草稿；未建立正式版本。');
+  };
+  const publishStoreSettings=()=>{
+    const currentErrors=validateStoreSettingsDomain(domain,validationInput());
+    if(currentErrors.length){setSaveErrors(currentErrors);setPublishBlockers([]);setSaveMessage('未能發佈；請修正標示欄位。');focusFirstError(currentErrors);return;}
+    writeAdminStored('store-settings.v1',config);
+    const crossDomain=validateAllStoreSettingsDomains(validationInput()).filter(error=>error.domain!==domain);
+    if(crossDomain.length){
+      setSaveErrors([]);
+      setPublishBlockers(crossDomain.map(error=>({label:STORE_SETTINGS_DOMAIN_LABELS[error.domain],path:STORE_SETTINGS_ROUTES[error.domain],message:error.message})));
+      setSaveMessage('無法正式發佈：其他設定項目仍有需要處理。');
+      errorSummaryRef.current?.scrollIntoView({behavior:'smooth',block:'start'});
+      return;
+    }
     const result=saveAdminConfig(draft);
-    if(!result.ok){setSaveErrors(result.errors);setSaveMessage('未能保存；請先修正設定驗證問題。');return;}
+    if(!result.ok){
+      setSaveErrors([]);
+      setPublishBlockers(result.errors.map(message=>({...canonicalPublishTargetForError(message),message})));
+      setSaveMessage('無法正式發佈：Canonical Config 仍有需要處理。');
+      errorSummaryRef.current?.scrollIntoView({behavior:'smooth',block:'start'});
+      return;
+    }
     markClean();
     setSaveErrors([]);
-    setSaveMessage('已保存並啟用 R'+result.release.version+'；已排入 Admin → SMT／SMM 自動同步。');
+    setPublishBlockers([]);
+    setSaveMessage('已正式保存並發佈 R'+result.release.version+'；已排入 Admin → SMT／SMM 自動同步。');
   };
+  const fieldError=(id:string)=>saveErrors.find(error=>error.fieldId===id)?.message;
+  const fieldProps=(id:string)=>({id,'aria-invalid':Boolean(fieldError(id))||undefined,'aria-describedby':fieldError(id)?id+'-error':undefined});
+  const FieldError=({id}:{id:string})=>fieldError(id)?<small id={id+'-error'} className="admin-field-error">{fieldError(id)}</small>:null;
   const activeRelease=readActiveAdminRelease();
 
 
   return <section className="admin-editor-page">
     <header className="admin-editor-head">
       <div><small>{activeRelease?'目前 R'+activeRelease.version:'未有正式版本'} · 門店設定</small><h1>門店設定</h1><p>本機修改會自動保存草稿；只有撳「保存並發佈」先建立正式版本，並送去 SMT／SMM。</p>{saveMessage?<span>{saveMessage}</span>:null}</div>
-      <div className="admin-editor-actions"><button className="primary" type="button" onClick={saveStoreSettings}>保存並發佈</button></div>
+      <div className="admin-editor-actions"><button className="primary" type="button" onClick={saveStoreSettings}>儲存本頁設定</button><button className="primary" type="button" onClick={publishStoreSettings}>正式保存並發佈</button></div>
     </header>
-    {saveErrors.length?<div className="admin-validation is-error" role="alert"><b>有 {saveErrors.length} 項需要處理</b><ul>{saveErrors.map((error,index)=><li key={index}>{error}</li>)}</ul></div>:null}
-    <div className="admin-policy-grid two">
-      <article className="admin-policy-card"><h2>基本資料</h2><label><span>門店顯示名稱</span><input value={config.storeName} onChange={event=>patch({storeName:event.target.value})}/></label><label><span>門店代碼</span><input value={config.storeCode} onChange={event=>patch({storeCode:event.target.value})}/></label><label><span>貨幣</span><select value={config.currency} onChange={event=>patch({currency:event.target.value})}><option value="HKD">HKD</option></select></label><label><span>時區</span><input value={config.timezone} onChange={event=>patch({timezone:event.target.value})}/></label></article>
-      <article className="admin-policy-card"><h2>服務模式</h2><Toggle checked={config.dineInEnabled} onChange={dineInEnabled=>patch({dineInEnabled})} label="堂食"/><Toggle checked={config.takeawayEnabled} onChange={takeawayEnabled=>patch({takeawayEnabled})} label="外賣"/></article>
-      <article className="admin-policy-card"><header><div><h2>堂食枱號</h2><small>由 Admin 發佈，SMT／SMM 共用同一份枱號同名稱。</small></div><button type="button" onClick={addTable}>新增枱</button></header>
+    {publishBlockers.length?<div ref={errorSummaryRef} className="admin-validation is-error" role="alert" tabIndex={-1}><b>無法正式發佈</b><ul>{publishBlockers.map((error,index)=><li key={index}><b>{error.label}</b> → {error.message} <Link to={error.path}>前往設定</Link></li>)}</ul></div>:null}
+    {saveErrors.length?<div ref={errorSummaryRef} className="admin-validation is-error" role="alert" tabIndex={-1}><b>有 {saveErrors.length} 項需要處理</b><ul>{saveErrors.map((error,index)=><li key={index}><button type="button" className="admin-error-link" onClick={()=>{const node=document.getElementById(error.fieldId);node?.scrollIntoView({behavior:'smooth',block:'center'});node?.focus();}}>{error.message}</button></li>)}</ul></div>:null}
+    {domain==='home'?<div className="admin-settings-home" aria-label="門店設定項目">
+      <Link className="admin-settings-link" to={STORE_SETTINGS_ROUTES.basic}><span><b>基本資料</b><small>門店名稱、代碼、貨幣、時區</small></span><strong aria-hidden="true">›</strong></Link>
+      <Link className="admin-settings-link" to={STORE_SETTINGS_ROUTES.service}><span><b>服務模式</b><small>堂食／外賣</small></span><strong aria-hidden="true">›</strong></Link>
+      <Link className="admin-settings-link" to={STORE_SETTINGS_ROUTES.tables}><span><b>堂食枱號</b><small>枱號、改名、排序、停用</small></span><strong aria-hidden="true">›</strong></Link>
+      <Link className="admin-settings-link" to={STORE_SETTINGS_ROUTES.hours}><span><b>營業時間</b><small>七日營業時間</small></span><strong aria-hidden="true">›</strong></Link>
+      <Link className="admin-settings-link" to={STORE_SETTINGS_ROUTES.timing}><span><b>營運計時</b><small>遲到、出餐、堂食超時、封存</small></span><strong aria-hidden="true">›</strong></Link>
+      <Link className="admin-settings-link" to={STORE_SETTINGS_ROUTES.reminders}><span><b>訂單提醒</b><small>Pending Order 提醒</small></span><strong aria-hidden="true">›</strong></Link>
+      <Link className="admin-settings-link" to={STORE_SETTINGS_ROUTES.whatsapp}><span><b>WhatsApp 備援</b><small>電話及訊息模板</small></span><strong aria-hidden="true">›</strong></Link>
+      <Link className="admin-settings-link" to={STORE_SETTINGS_ROUTES.payments}><span><b>電子支付</b><small>付款方式、名稱、啟用及排序</small></span><strong aria-hidden="true">›</strong></Link>
+      <Link className="admin-settings-link" to={STORE_SETTINGS_ROUTES.qr}><span><b>QR Code</b><small>付款 QR 管理及預覽</small></span><strong aria-hidden="true">›</strong></Link>
+      <Link className="admin-settings-link" to={STORE_SETTINGS_ROUTES.references}><span><b>其他門店設定</b><small>系統引用</small></span><strong aria-hidden="true">›</strong></Link>
+    </div>:null}
+    {domain!=='home'?<nav className="admin-settings-breadcrumb" aria-label="門店設定返回"><Link to={STORE_SETTINGS_ROUTES.home}>‹ 門店設定</Link></nav>:null}
+    {domain==='basic'?<div className="admin-policy-grid two"><article className="admin-policy-card"><h2>基本資料</h2><label><span>門店顯示名稱</span><input value={config.storeName} onChange={event=>patch({storeName:event.target.value})}/></label><label><span>門店代碼</span><input value={config.storeCode} onChange={event=>patch({storeCode:event.target.value})}/></label><label><span>貨幣</span><select value={config.currency} onChange={event=>patch({currency:event.target.value})}><option value="HKD">HKD</option></select></label><label><span>時區</span><input value={config.timezone} onChange={event=>patch({timezone:event.target.value})}/></label></article></div>:null}
+    {domain==='service'?<div className="admin-policy-grid two"><article className="admin-policy-card"><h2>服務模式</h2><Toggle checked={config.dineInEnabled} onChange={dineInEnabled=>patch({dineInEnabled})} label="堂食"/><Toggle checked={config.takeawayEnabled} onChange={takeawayEnabled=>patch({takeawayEnabled})} label="外賣"/></article></div>:null}
+    {domain==='tables'?<div className="admin-policy-grid two"><article className="admin-policy-card"><header><div><h2>堂食枱號</h2><small>由 Admin 發佈，SMT／SMM 共用同一份枱號同名稱。</small></div><button type="button" onClick={addTable}>新增枱</button></header>
         <div className="admin-editor-list">{diningTables.map((row,index)=><div className="admin-policy-row" key={row.id}>
           <b>{row.id}</b>
           <label><span>目前名稱</span><input value={row.name} readOnly/></label>
@@ -315,31 +372,37 @@ export function StoreSettingsWorkspace(){
           <button type="button" onClick={()=>void activatePending(row.id)}>檢查並生效</button>
           <button type="button" onClick={()=>requestRetirement(row.id)}>安排停用</button>
         </div>)}</div>
-      </article>
-      <article className="admin-policy-card"><h2>Customer WhatsApp 備援</h2>
+      </article></div>:null}
+    {domain==='whatsapp'?<div className="admin-policy-grid two"><article className="admin-policy-card"><h2>Customer WhatsApp 備援</h2>
         <Toggle checked={config.customerWhatsAppEnabled!==false} onChange={customerWhatsAppEnabled=>patch({customerWhatsAppEnabled})} label={config.customerWhatsAppEnabled!==false?'啟用':'停用'}/>
-        <label><span>公司 WhatsApp 電話</span><input inputMode="tel" value={config.customerWhatsAppNumber??''} onChange={event=>patch({customerWhatsAppNumber:event.target.value})} placeholder="例如 85291234567"/></label>
-        <label><span>訊息模板</span><textarea rows={8} value={config.customerWhatsAppTemplate??DEFAULT_CUSTOMER_WHATSAPP_TEMPLATE} onChange={event=>patch({customerWhatsAppTemplate:event.target.value})}/></label>
+        <label><span>公司 WhatsApp 電話</span><input {...fieldProps('customer-whatsapp-number')} className={fieldError('customer-whatsapp-number')?'admin-field-invalid':undefined} inputMode="tel" value={config.customerWhatsAppNumber??''} onChange={event=>patch({customerWhatsAppNumber:event.target.value})} placeholder="例如 85291234567"/><FieldError id="customer-whatsapp-number"/></label>
+        <label><span>訊息模板</span><textarea {...fieldProps('customer-whatsapp-template')} className={fieldError('customer-whatsapp-template')?'admin-field-invalid':undefined} rows={8} value={config.customerWhatsAppTemplate??''} onChange={event=>patch({customerWhatsAppTemplate:event.target.value,customerWhatsAppTemplateInitialized:true})}/><FieldError id="customer-whatsapp-template"/></label>
         <small>可用：{'{name}'}、{'{phone}'}、{'{items}'}、{'{total}'}、{'{submissionId}'}。系統只會喺 Customer 無法連接 SMT 接單後，由客人主動撳掣先開 WhatsApp；唔會自動傳送。</small>
-      </article>
-      <article className="admin-policy-card"><header><div><h2>客戶電子支付</h2><small>新增、改名、上傳付款 QR、啟用／停用；Customer 只讀已發佈版本。</small></div><button type="button" onClick={addPaymentChannel}>新增付款方式</button></header>
-        <div className="admin-editor-list">{paymentChannels.map((row,index)=><div className="admin-policy-row" key={row.id}>
+      </article></div>:null}
+    {domain==='qr'?<div className="admin-policy-grid two"><article className="admin-policy-card"><header><div><h2>QR Code</h2><small>重用電子支付嘅 customerPaymentChannels / qrImageUrl；唔建立第二 QR Store。</small></div></header>
+      <div className="admin-editor-list">{paymentChannels.map(row=><div className="admin-policy-row" key={row.id}>
+        <div><b>{row.name}</b><small>{row.id} · {row.enabled?'啟用':'停用'}</small></div>
+        <label><span>付款 QR 圖</span><input type="file" accept="image/jpeg,image/png,image/webp" onChange={event=>{const file=event.target.files?.[0];if(file)void uploadPaymentQr(row.id,file)}}/></label>
+        {row.qrImageUrl?<div><img src={row.qrImageUrl} alt={row.name+' QR'} style={{width:96,height:96,objectFit:'contain',borderRadius:10,border:'1px solid rgba(0,0,0,.12)'}}/><button type="button" onClick={()=>patchPaymentChannel(row.id,{qrImageUrl:''})}>移除圖片</button></div>:<span>未有付款 QR</span>}
+        <small>{paymentUploadState[row.id]??''}</small>
+      </div>)}</div>
+      <p>上載沿用現有 Admin Worker → Private R2；正式資料仍由同一 customerPaymentChannels 隨 Canonical Publish 發佈。</p>
+    </article></div>:null}
+    {domain==='payments'?<div className="admin-policy-grid two"><article className="admin-policy-card"><header><div><h2>客戶電子支付</h2><small>先揀付款方式；再進入單一設定。Customer 只讀已發佈版本。</small></div><button type="button" onClick={addPaymentChannel}>新增付款方式</button></header>
+        {selectedPaymentId===null?<div className="admin-settings-home">{paymentChannels.map(row=><button type="button" className="admin-settings-link" key={row.id} onClick={()=>setSelectedPaymentId(row.id)}><span><b>{row.name}</b><small>{row.enabled?'啟用':'停用'} · {row.qrImageUrl?'已有 QR':'未有 QR'}</small></span><strong aria-hidden="true">›</strong></button>)}</div>:paymentChannels.filter(row=>row.id===selectedPaymentId).map((row,index)=><div className="admin-payment-detail" key={row.id}>
+          <button type="button" className="admin-back-button" onClick={()=>setSelectedPaymentId(null)}>‹ 電子支付</button>
           <b>{row.id}</b>
-          <label><span>顯示名稱</span><input value={row.name} onChange={event=>patchPaymentChannel(row.id,{name:event.target.value})} placeholder="例如 AlipayHK"/></label>
-          <label><span>付款 QR 圖</span><input type="file" accept="image/jpeg,image/png,image/webp" onChange={event=>{const file=event.target.files?.[0];if(file)void uploadPaymentQr(row.id,file)}}/></label>
-          {row.qrImageUrl?<div><img src={row.qrImageUrl} alt={row.name+' QR'} style={{width:72,height:72,objectFit:'contain',borderRadius:10,border:'1px solid rgba(0,0,0,.12)'}}/><button type="button" onClick={()=>patchPaymentChannel(row.id,{qrImageUrl:''})}>移除圖片</button></div>:<span>未有付款 QR</span>}
-          <small>{paymentUploadState[row.id]??''}</small>
-          <label><span>排序</span><input type="number" min={1} value={row.sortOrder} onChange={event=>patchPaymentChannel(row.id,{sortOrder:Number(event.target.value)||index+1})}/></label>
+          <label><span>顯示名稱 <b className="admin-required">必填</b></span><input {...fieldProps('payment-'+row.id+'-name')} className={fieldError('payment-'+row.id+'-name')?'admin-field-invalid':undefined} value={row.name} onChange={event=>patchPaymentChannel(row.id,{name:event.target.value})} placeholder="例如 AlipayHK"/><FieldError id={'payment-'+row.id+'-name'}/></label>
           <Toggle checked={row.enabled} onChange={enabled=>patchPaymentChannel(row.id,{enabled})} label={row.enabled?'啟用':'停用'}/>
-          <button type="button" onClick={()=>removePaymentChannel(row.id)}>刪除付款方式</button>
-        </div>)}</div>
-        <p>付款 QR 會經 Admin Worker 上載到私有 R2；R2 唔開 Public Access。未有 QR 嘅付款方式可以保留設定，但 Customer 唔可以用佢提交電子付款。</p>
-      </article>
-      <article className="admin-policy-card"><h2>系統引用</h2><label><span>付款方式 refs</span><input value={config.paymentRefs.join(', ')} onChange={event=>patch({paymentRefs:refs(event.target.value)})} placeholder="例如 CASH, OCTOPUS"/></label><label><span>打印路由 refs</span><input value={config.printRefs.join(', ')} onChange={event=>patch({printRefs:refs(event.target.value)})} placeholder="例如 RECEIPT, KITCHEN"/></label><label><span>渠道 refs</span><input value={config.channelRefs.join(', ')} onChange={event=>patch({channelRefs:refs(event.target.value)})} placeholder="例如 KEETA"/></label></article>
-      <article className="admin-policy-card"><h2>營運計時</h2><label><span>遲到界線（分鐘）</span><input type="number" min={0} value={config.lateArrivalMinutes} onChange={event=>patch({lateArrivalMinutes:Number(event.target.value)||0})}/></label><label><span>出餐計時（分鐘）</span><input type="number" min={0} value={config.fulfillmentMinutes} onChange={event=>patch({fulfillmentMinutes:Number(event.target.value)||0})}/></label><label><span>堂食超時變紅（分鐘）</span><input type="number" min={1} value={config.diningOverdueMinutes??35} onChange={event=>patch({diningOverdueMinutes:Math.max(1,Math.floor(Number(event.target.value)||35))})}/></label><small>堂食枱由開始時間計；超過此分鐘數先標紅。35 分鐘只係預設值。</small><label><span>封存時間（小時）</span><input type="number" min={1} value={config.archiveHours} onChange={event=>patch({archiveHours:Number(event.target.value)||1})}/></label></article>
-      <article className="admin-policy-card"><h2>Pending Order 提醒</h2><label><span>幾多分鐘後提醒</span><input type="number" min={0} value={config.reminderAfterMinutes} onChange={event=>patch({reminderAfterMinutes:Number(event.target.value)||0})}/></label><label><span>提醒間隔（分鐘）</span><input type="number" min={1} value={config.reminderIntervalMinutes} onChange={event=>patch({reminderIntervalMinutes:Number(event.target.value)||1})}/></label><Toggle checked={config.repeatReminder} onChange={repeatReminder=>patch({repeatReminder})} label="重複提醒"/><label><span>Timeout 提示優先級</span><select value={config.timeoutPriority} onChange={event=>patch({timeoutPriority:event.target.value as StoreSettings['timeoutPriority']})}><option value="NORMAL">一般</option><option value="HIGH">高</option><option value="URGENT">緊急</option></select></label><small>Timeout 唔會自動接受／拒絕訂單。</small></article>
-    </div>
-    <section className="admin-rule-card"><h2>七日營業時間</h2><div className="admin-editor-list">{STORE_DAYS.map(day=>{const row=config.weeklyHours[day.id]??DEFAULT_WEEKLY_HOURS[day.id];return <article className="admin-policy-row" key={day.id}><b>{day.label}</b><select value={row.closed?'CLOSED':'OPEN'} onChange={event=>patchDay(day.id,{closed:event.target.value==='CLOSED'})}><option value="OPEN">營業</option><option value="CLOSED">休息</option></select>{row.closed?<span>休息</span>:<><label><span>開門</span><input type="time" value={row.opensAt} onChange={event=>patchDay(day.id,{opensAt:event.target.value})}/></label><label><span>關門</span><input type="time" value={row.closesAt} onChange={event=>patchDay(day.id,{closesAt:event.target.value})}/></label></>}</article>})}</div></section>
+          <label><span>排序</span><input type="number" min={1} value={row.sortOrder} onChange={event=>patchPaymentChannel(row.id,{sortOrder:Number(event.target.value)||index+1})}/></label>
+          <button type="button" onClick={()=>{removePaymentChannel(row.id);setSelectedPaymentId(null)}}>刪除付款方式</button>
+        </div>)}
+        <p>付款 QR 已移到獨立「QR Code」設定頁；付款方式身份、啟用狀態同排序仍由同一 customerPaymentChannels 管理。</p>
+      </article></div>:null}
+    {domain==='references'?<div className="admin-policy-grid two"><article className="admin-policy-card"><h2>系統引用</h2><label><span>付款方式 refs</span><input value={config.paymentRefs.join(', ')} onChange={event=>patch({paymentRefs:refs(event.target.value)})} placeholder="例如 CASH, OCTOPUS"/></label><label><span>打印路由 refs</span><input value={config.printRefs.join(', ')} onChange={event=>patch({printRefs:refs(event.target.value)})} placeholder="例如 RECEIPT, KITCHEN"/></label><label><span>渠道 refs</span><input value={config.channelRefs.join(', ')} onChange={event=>patch({channelRefs:refs(event.target.value)})} placeholder="例如 KEETA"/></label></article></div>:null}
+    {domain==='timing'?<div className="admin-policy-grid two"><article className="admin-policy-card"><h2>營運計時</h2><label><span>遲到界線（分鐘）</span><input type="number" min={0} value={config.lateArrivalMinutes} onChange={event=>patch({lateArrivalMinutes:Number(event.target.value)||0})}/></label><label><span>出餐計時（分鐘）</span><input type="number" min={0} value={config.fulfillmentMinutes} onChange={event=>patch({fulfillmentMinutes:Number(event.target.value)||0})}/></label><label><span>堂食超時變紅（分鐘） <b className="admin-required">必填</b></span><input {...fieldProps('dining-overdue-minutes')} className={fieldError('dining-overdue-minutes')?'admin-field-invalid':undefined} type="number" min={1} value={config.diningOverdueMinutes??35} onChange={event=>patch({diningOverdueMinutes:Math.max(1,Math.floor(Number(event.target.value)||35))})}/><FieldError id="dining-overdue-minutes"/></label><small>堂食枱由開始時間計；超過此分鐘數先標紅。35 分鐘只係預設值。</small><label><span>封存時間（小時）</span><input type="number" min={1} value={config.archiveHours} onChange={event=>patch({archiveHours:Number(event.target.value)||1})}/></label></article></div>:null}
+    {domain==='reminders'?<div className="admin-policy-grid two"><article className="admin-policy-card"><h2>Pending Order 提醒</h2><label><span>幾多分鐘後提醒</span><input type="number" min={0} value={config.reminderAfterMinutes} onChange={event=>patch({reminderAfterMinutes:Number(event.target.value)||0})}/></label><label><span>提醒間隔（分鐘）</span><input type="number" min={1} value={config.reminderIntervalMinutes} onChange={event=>patch({reminderIntervalMinutes:Number(event.target.value)||1})}/></label><Toggle checked={config.repeatReminder} onChange={repeatReminder=>patch({repeatReminder})} label="重複提醒"/><label><span>Timeout 提示優先級</span><select value={config.timeoutPriority} onChange={event=>patch({timeoutPriority:event.target.value as StoreSettings['timeoutPriority']})}><option value="NORMAL">一般</option><option value="HIGH">高</option><option value="URGENT">緊急</option></select></label><small>Timeout 唔會自動接受／拒絕訂單。</small></article></div>:null}
+    {domain==='hours'?    <section className="admin-rule-card"><h2>七日營業時間</h2><div className="admin-editor-list">{STORE_DAYS.map(day=>{const row=config.weeklyHours[day.id]??DEFAULT_WEEKLY_HOURS[day.id];return <article className="admin-policy-row" key={day.id}><b>{day.label}</b><select value={row.closed?'CLOSED':'OPEN'} onChange={event=>patchDay(day.id,{closed:event.target.value==='CLOSED'})}><option value="OPEN">營業</option><option value="CLOSED">休息</option></select>{row.closed?<span>休息</span>:<><label><span>開門</span><input type="time" value={row.opensAt} onChange={event=>patchDay(day.id,{opensAt:event.target.value})}/></label><label><span>關門</span><input type="time" value={row.closesAt} onChange={event=>patchDay(day.id,{closesAt:event.target.value})}/></label></>}</article>})}</div></section>:null}
   </section>;
 }
 
@@ -359,10 +422,11 @@ export function StaffWorkspace(){
   const [staff,setStaff]=usePersistentAdminState<StaffDraft[]>('staff.v1',[]);
   const [saveMessage,setSaveMessage]=useState('');
   const [saveErrors,setSaveErrors]=useState<readonly string[]>([]);
+  const [selectedStaffId,setSelectedStaffId]=useState<string|null>(null);
   useEffect(()=>{
     if(staff.some(row=>!String(row.loginId??'').trim()))setStaff(rows=>rows.map(row=>migrateStaffDraft(row)));
   },[]);
-  const add=()=>setStaff(rows=>{const row:StaffDraft={id:'staff-'+Date.now().toString(36),loginId:'',name:'',role:'STAFF',pin:'',scope:'STORE',adminLogin:false,active:true,permissions:['ORDER_REVIEW']};appendAdminAudit({action:'新增員工',target:row.id});return [...rows,row];});
+  const add=()=>setStaff(rows=>{const row:StaffDraft={id:'staff-'+Date.now().toString(36),loginId:'',name:'',role:'STAFF',pin:'',scope:'STORE',adminLogin:false,active:true,permissions:['ORDER_REVIEW']};appendAdminAudit({action:'新增員工',target:row.id});setSelectedStaffId(row.id);return [...rows,row];});
   const patch=(id:string,change:Partial<StaffDraft>)=>setStaff(rows=>rows.map(row=>{if(row.id!==id)return row;const after={...row,...change};appendAdminAudit({action:'修改員工／權限',target:id,before:{...row,pin:row.pin?'***':'',pinVerifier:row.pinVerifier?'PRESENT':undefined},after:{...after,pin:after.pin?'***':'',pinVerifier:after.pinVerifier?'PRESENT':undefined}});return after;}));
   const remove=(row:StaffDraft)=>{
     if(typeof window!=='undefined'&&!window.confirm('確定移除「'+(row.name||row.id)+'」嘅員工草稿？一般停用請使用狀態開關。'))return;
@@ -381,7 +445,8 @@ export function StaffWorkspace(){
   return <section className="admin-editor-page">
     <header className="admin-editor-head"><div><small>{activeRelease?'目前 R'+activeRelease.version:'未有保存版本'} · 人員／角色／權限</small><h1>員工／權限</h1><p>登入編號係人手輸入嘅帳號；Internal Staff ID 只供系統識別。PIN 只會轉成驗證器發布，唔會將明文 PIN 發布出去。</p>{saveMessage?<span>{saveMessage}</span>:null}</div><div className="admin-editor-actions"><button className="secondary" onClick={add}>新增員工</button><button className="primary" onClick={saveStaff}>保存人員設定</button></div></header>
     {saveErrors.length?<div className="admin-validation is-error" role="alert"><b>有 {saveErrors.length} 項需要處理</b><ul>{saveErrors.map((error,index)=><li key={index}>{error}</li>)}</ul></div>:null}
-    {staff.length===0?<div className="admin-empty-state"><b>未有員工資料</b><p>新增員工後設定角色、PIN、權限範圍同權限。</p><button onClick={add}>新增員工</button></div>:<div className="admin-editor-grid">{staff.map(row=><article className="admin-policy-card" key={row.id}>
+    {staff.length===0?<div className="admin-empty-state"><b>未有員工資料</b><p>新增員工後設定角色、PIN、權限範圍同權限。</p><button onClick={add}>新增員工</button></div>:selectedStaffId===null?<div className="admin-settings-home" aria-label="員工列表">{staff.map(row=><button type="button" className="admin-settings-link" key={row.id} onClick={()=>setSelectedStaffId(row.id)}><span><b>{row.name||row.loginId||'未命名員工'}</b><small>{row.loginId?'登入編號 '+row.loginId:'未設定登入編號'} · {row.active?'啟用':'停用'}</small></span><strong aria-hidden="true">›</strong></button>)}</div>:<div className="admin-editor-grid">{staff.filter(row=>row.id===selectedStaffId).map(row=><article className="admin-policy-card" key={row.id}>
+      <button type="button" className="admin-back-button" onClick={()=>setSelectedStaffId(null)}>‹ 員工列表</button>
       <header><h2>{row.name||row.loginId||'未命名員工'}</h2><small>{row.loginId?'登入編號 '+row.loginId:'未設定登入編號'}</small></header>
       <label><span>登入編號</span><input autoComplete="username" value={row.loginId??''} onChange={event=>patch(row.id,{loginId:event.target.value.replace(/[^A-Za-z0-9._-]/g,'').slice(0,64)})} placeholder="例如 1111"/></label>
       <label><span>員工名稱</span><input value={row.name} onChange={event=>patch(row.id,{name:event.target.value})}/></label>
@@ -391,7 +456,7 @@ export function StaffWorkspace(){
       <div className="admin-check-grid">{PERMISSIONS.map(([id,label])=><label key={id}><input type="checkbox" checked={row.permissions.includes(id)} onChange={event=>togglePermission(row,id,event.target.checked)}/><span>{label}</span></label>)}</div>
       <Toggle checked={row.adminLogin} onChange={adminLogin=>patch(row.id,{adminLogin})} label="允許後台登入"/>
       <Toggle checked={row.active} onChange={active=>patch(row.id,{active})} label={row.active?'啟用':'停用'}/>
-      <button type="button" onClick={()=>remove(row)}>移除</button>
+      <button type="button" onClick={()=>{remove(row);setSelectedStaffId(null)}}>移除</button>
     </article>)}</div>}
   </section>;
 }
@@ -572,8 +637,14 @@ export function ChannelsWorkspace({mode}:{mode:'overview'|'mapping'|'failures'|'
   const addMapping=()=>{if(!providerItemId.trim()||!productId)return;setMappings(rows=>{const row:MappingRow={providerItemId:providerItemId.trim(),productId,status:'MAPPED'};appendAdminAudit({action:'新增平台商品對應',target:row.providerItemId,after:row});return [...rows.filter(item=>item.providerItemId!==row.providerItemId),row];});setProviderItemId('');setProductId('');};
   const failures=mappings.filter(row=>row.status==='PENDING');
   const title=mode==='overview'?'平台管理':mode==='mapping'?'商品映射管理':mode==='failures'?'匹配失敗明細':mode==='accept'?'接單／自動接單':mode==='sync'?'售罄／供應同步':'實收估算設定';
+  const description=mode==='overview'?'查看 Keeta 連線、授權、Webhook 同整體平台狀態。'
+    :mode==='mapping'?'管理 Keeta 商品 ID 同磨飯商品嘅對應。'
+    :mode==='failures'?'只處理尚未完成嘅商品匹配。'
+    :mode==='accept'?'管理 Keeta 新單入口、自動接單同遲到界線。'
+    :mode==='sync'?'管理菜單、售罄供應同門店營業狀態同步。'
+    :'查看 Provider commercial evidence，同設定實收估算參數。';
   return <section className="admin-editor-page">
-    <PolicyHeader title={title} description="管理平台顯示名稱、接單、供應同步、佣金估算同商品對應。Live connection 狀態同 Provider business authority 分開顯示，唔會因為連線成功就自動啟動接單。"/>
+    <PolicyHeader title={title} description={description}/>
     {mode==='overview'?<section className="admin-policy-card">
       <header><div><small>KEETA LIVE CONNECTION</small><h2>Keeta 香港連線</h2></div><span className={liveStatus?.oauth.state==='CONNECTED'?'admin-status-good':'admin-not-wired-chip'}>{liveStatus?.oauth.state??'讀取中'}</span></header>
       {liveStatus?<div className="admin-readback-proof">
@@ -746,13 +817,15 @@ export function ChannelsWorkspace({mode}:{mode:'overview'|'mapping'|'failures'|'
       </div>:<div className="admin-read-empty">未有 Keeta commercial evidence。收到並連結第一張 Keeta 訂單後會自動出現。</div>}
       <div className="admin-editor-actions"><button type="button" className="secondary" disabled={Boolean(commercialBusy)} onClick={()=>void refreshCommercialRows()}>重新讀取列表</button></div>
     </section>:null}
-    <div className="admin-policy-grid two">
-      <article className="admin-policy-card"><h2>Keeta 平台設定</h2><label><span>顯示名稱</span><input value={config.displayName} onChange={event=>patch({displayName:event.target.value})}/></label><Toggle checked={config.enabled} onChange={enabled=>patch({enabled})} label="啟用平台設定"/><Toggle checked={config.autoAccept} onChange={autoAccept=>patch({autoAccept})} label="正常單自動接單"/><Toggle checked={config.syncSellability} onChange={syncSellability=>patch({syncSellability})} label="同步售罄／供應"/><label><span>遲到訂單界線（分鐘）</span><input type="number" min={0} value={config.lateCutoffMinutes} onChange={event=>patch({lateCutoffMinutes:Number(event.target.value)||0})}/></label><label><span>佣金估算 %</span><input inputMode="decimal" value={config.commissionPct} onChange={event=>patch({commissionPct:event.target.value})}/></label></article>
+    {(mode==='overview'||mode==='accept'||mode==='sync'||mode==='estimate')?<div className="admin-policy-grid two">
+      <article className="admin-policy-card"><h2>Keeta 平台設定</h2><label><span>顯示名稱</span><input value={config.displayName} onChange={event=>patch({displayName:event.target.value})}/></label>{mode==='overview'?<Toggle checked={config.enabled} onChange={enabled=>patch({enabled})} label="啟用平台設定"/>:null}{mode==='accept'?<><Toggle checked={config.autoAccept} onChange={autoAccept=>patch({autoAccept})} label="正常單自動接單"/><label><span>遲到訂單界線（分鐘）</span><input type="number" min={0} value={config.lateCutoffMinutes} onChange={event=>patch({lateCutoffMinutes:Number(event.target.value)||0})}/></label></>:null}{mode==='sync'?<Toggle checked={config.syncSellability} onChange={syncSellability=>patch({syncSellability})} label="同步售罄／供應"/>:null}{mode==='estimate'?<label><span>佣金估算 %</span><input inputMode="decimal" value={config.commissionPct} onChange={event=>patch({commissionPct:event.target.value})}/></label>:null}</article>
+    </div>:null}
+    {(mode==='mapping'||mode==='failures')?<div className="admin-policy-grid two">
       <article className="admin-policy-card"><h2>{mode==='failures'?'未完成對應':'商品對應'}</h2>
         {mode==='failures'
           ?(failures.length?<div>{failures.map(row=><p key={row.providerItemId}>{row.providerItemId} · 待處理</p>)}</div>:<div className="admin-read-empty">目前冇待處理映射。</div>)
           :<><label><span>平台商品 ID</span><input value={providerItemId} onChange={event=>setProviderItemId(event.target.value)}/></label><label><span>磨飯商品</span><select value={productId} onChange={event=>setProductId(event.target.value)}><option value="">請選擇</option>{draft.products.map(product=><option key={product.id} value={product.id}>{product.name}</option>)}</select></label><button type="button" onClick={addMapping}>保存對應</button><div className="admin-readback-proof">{mappings.slice(0,20).map(row=><p key={row.providerItemId}><span>{row.providerItemId}</span><b>{draft.products.find(product=>product.id===row.productId)?.name??row.productId}</b></p>)}</div></>}
       </article>
-    </div>
+    </div>:null}
   </section>;
 }

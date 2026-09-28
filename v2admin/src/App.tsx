@@ -1,4 +1,4 @@
-import {Navigate,Route,Routes} from 'react-router';
+import {Navigate,Route,Routes,useLocation} from 'react-router';
 import {AdminShell} from './AdminShell.tsx';
 import {ADMIN_CAPABILITIES} from './admin-capabilities.ts';
 import {AdminDraftProvider} from './admin-draft.tsx';
@@ -7,7 +7,10 @@ import {AvailabilityWorkspace,BusinessDayWorkspace,ChannelsWorkspace,PrintCenter
 import {AuditWorkspace,CapacityWorkspace,ExceptionsWorkspace,OpenOrdersWorkspace,OperationsReportWorkspace,OrdersHistoryWorkspace,OverviewWorkspace,SalesReportWorkspace} from './ReadModelWorkspaces.tsx';
 import {PrintRulesWorkspace,PublishCenterWorkspace,QuickReasonsWorkspace,SettlementWorkspace} from './GovernanceWorkspaces.tsx';
 import {AnnouncementsWorkspace,CouponsWorkspace,Customer360Workspace,InventoryWorkspace,LoyaltyWorkspace,PresentationWorkspace,RfmWorkspace,StoreBindingWorkspace} from './DeferredWorkspaces.tsx';
+import {resolveStoreSettingsDomain} from './admin-store-settings-domain.ts';
 import {ActionQueueWorkspace,AccessSessionWorkspace,CashCloseRecordWorkspace,ChannelReportWorkspace,DeviceHealthWorkspace,DiagnosticsWorkspace,EffectiveSettingsWorkspace,ExportGovernanceWorkspace,IntegrationsGovernanceWorkspace,OtaWorkspace,ProductReportWorkspace,RefundReportWorkspace} from './WorkflowUpgradeWorkspaces.tsx';
+
+function StoreSettingsRouteWorkspace(){const location=useLocation();return <StoreSettingsWorkspace domain={resolveStoreSettingsDomain(location.pathname)}/>;}
 
 function capabilityElement(id:string){
   if(id==='products')return <ProductsWorkspace/>;
@@ -35,7 +38,7 @@ function capabilityElement(id:string){
   if(id==='print-rules')return <PrintRulesWorkspace/>;
   if(id==='device-health')return <DeviceHealthWorkspace/>;
   if(id==='ota')return <OtaWorkspace/>;
-  if(id==='store-settings')return <StoreSettingsWorkspace/>;
+  if(id==='store-settings')return <StoreSettingsRouteWorkspace/>;
   if(id==='quick-reasons')return <QuickReasonsWorkspace/>;
   if(id==='announcement')return <AnnouncementsWorkspace/>;
   if(id==='staff')return <StaffWorkspace/>;
@@ -67,7 +70,7 @@ function capabilityElement(id:string){
 
 export function MfkAdminApp(){
   return <AdminDraftProvider><AdminShell><Routes>
-    {ADMIN_CAPABILITIES.map(item=><Route key={item.id} path={item.path} element={capabilityElement(item.id)}/>)}
+    {ADMIN_CAPABILITIES.map(item=><Route key={item.id} path={item.id==='store-settings'?item.path+'/*':item.path} element={capabilityElement(item.id)}/>)}
     <Route path="/" element={<Navigate to="/admin/overview" replace/>}/>
     <Route path="*" element={<Navigate to="/admin/overview" replace/>}/>
   </Routes></AdminShell></AdminDraftProvider>;

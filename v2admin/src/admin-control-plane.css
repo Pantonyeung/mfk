@@ -534,3 +534,17 @@ button:active:not(:disabled),a:active,summary:active{transform:scale(.985)}
 .admin-canonical-card button{min-height:48px;border:0;border-radius:14px;background:#21477f;color:white;font:inherit;font-weight:900}
 .admin-canonical-card button:disabled{opacity:.45}
 .admin-canonical-card>strong{font-size:12px;line-height:1.55;color:#6a7280}
+
+.admin-settings-home{display:grid;gap:8px;max-width:760px}
+.admin-settings-link{min-height:64px;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 14px;border:1px solid var(--admin-border);border-radius:12px;background:#fff;color:var(--admin-ink);text-decoration:none}
+.admin-settings-link>span{display:grid;gap:3px}.admin-settings-link small{color:var(--admin-muted)}.admin-settings-link>strong{font-size:24px;color:var(--admin-muted)}
+.admin-settings-breadcrumb{margin-bottom:4px}.admin-settings-breadcrumb a{display:inline-flex;min-height:44px;align-items:center;color:var(--admin-primary);font-weight:800;text-decoration:none}
+.admin-required{font-size:10px;color:var(--admin-danger)}
+.admin-field-invalid{border-color:var(--admin-danger)!important;box-shadow:0 0 0 1px var(--admin-danger)}
+.admin-field-error{display:block;margin-top:4px;color:var(--admin-danger);font-weight:750}
+.admin-error-link{padding:2px 0;border:0;background:transparent;color:inherit;text-align:start;text-decoration:underline;text-underline-offset:2px;cursor:pointer}
+@media(max-width:639px){.admin-settings-link{min-height:68px;padding:12px}.admin-settings-home{gap:7px}}
+
+.admin-settings-link[type="button"]{width:100%;font:inherit;text-align:start;cursor:pointer}
+.admin-payment-detail{display:grid;gap:12px;padding-top:8px}
+.admin-back-button{justify-self:start;min-height:44px;padding:0 10px;border:0;background:transparent;color:var(--admin-primary);font-weight:800;cursor:pointer}

@@ -1,0 +1,165 @@
+# MFK Admin Settings Domain Navigation UX R1
+
+WORK_ID: MFK-ADMIN-SETTINGS-DOMAIN-NAV-UX-R1
+BASE_MAIN: 71e301273c81542cb534851de32852e9d4c04e76
+MODE: BOUNDED UI / UX RESTRUCTURE
+NO MAIN MERGE / NO MANUAL DEPLOY
+
+## Current IA
+Store Settings is one long page mixing basic, service, dining tables, WhatsApp, payment QR, references, timing, reminders and business hours.
+
+## Target IA
+Settings home -> choose domain -> focused child page. No child domain may be blocked by unrelated validation.
+
+## Authority
+Reuse store-settings.v1 draft, saveAdminConfig, immutable Admin release, revision/publish/readback, dining table stable ID/version ledger/occupancy readback. No second config/publish/table authority.
+
+## First breaks
+1. Store Settings long-page IA.
+2. WhatsApp visual fallback can diverge from stored validator value.
+3. Validation summary has no field target/focus/scroll.
+4. saveAdminConfig remains whole-snapshot validation; domain draft save must not pretend to be canonical publish.
+5. Other Admin large pages require the same bounded IA audit after this settings seam; do not create an infinite nested navigation loop.
+
+## Milestone
+Branch opened and domain validation seam added. UI route split is in progress.
+
+## Milestone 2
+- Previous HEAD b6a415d122c56bb3ed7bcd31111c17b9ca9eab13: all five required CI gates GREEN.
+- Payment settings now uses list -> one payment method detail; QR forms are no longer all expanded at once.
+- WhatsApp field errors are wired to real input/textarea targets.
+- Full Admin large-page audit started. Largest remaining surfaces are ChannelsWorkspace, CombosWorkspace, ModifiersWorkspace and product detail; Combos/Modifiers already use guided one-object/one-step progressive disclosure, so they are not blindly split again.
+- Current HEAD: 0ab560785a548c53215ae78d667781d817ed7bcd; required CI queued.
+
+## Milestone 3
+- Channels route duplication reduced: mapping/failure routes now render mapping only; accept renders intake + accept policy only; sync renders sync surfaces + sync policy only; estimate renders commercial + estimate field only.
+- No channel authority, OAuth, webhook, menu sync, sellability, store ops or mapping storage was rebuilt.
+- Current head f110f52dd9a8107b1bef37fb33b34bc3ce5413ae; CI pending start.
+
+## Milestone 4
+- CI first break on Milestone 3 was test-scope only: shell navigation legitimately contains the words 商品對應 even when the accept-policy workspace does not render the mapping editor. Assertion narrowed to the workspace heading contract; product behavior unchanged.
+- Channel page header copy is now mode-specific so accept/sync/mapping/estimate pages no longer describe unrelated tasks.
+- Continued large-page audit: Product detail already has task picker; Modifiers and Combos already have guided progressive disclosure. Refund report is a single coherent workflow + audit readback and is not split merely by page length.
+- Current head 0204a6c03dc4bc19b51136c4e50b10272132ca76; CI pending.
+
+## Milestone 5
+- Milestone 4 head f9153f68d849b998182ab1eed551b5258593d33d: all five required CI gates GREEN.
+- Staff page no longer expands every employee form at once: roster -> one staff detail.
+- Print Templates no longer expands Receipt/Production/Packing/Label/Semantics together: template chooser -> one editor.
+- Existing staff.v1, PIN verifier, RBAC, print-templates.v1 and audit authority unchanged.
+- Current head 2314aa98723695d7679a7082a5d148f2e65d5861; CI pending.
+
+## Milestone 6
+- Milestone 5 first break: print-template test matched chooser helper text 編輯收據模板內容, not an expanded textarea. Assertion corrected to test the actual control (<textarea>) rather than copy.
+- Inventory now uses operation chooser -> Record Movement or Create Item; both mutation forms are no longer simultaneously expanded above the inventory read model.
+- inventory-lite.v1, inventory-movements.v1 and non-blocking inventory semantics unchanged.
+- Current head 0594a59ea3a16a30f52c6acbe63c5d06ad98ec4e; CI pending.
+
+## Milestone 7
+- Presentation surfaces now use purpose-first chooser: Customer = Channel / Content / Layout; Owner & Frontline = Content / Layout. Forms no longer all expand on entry.
+- Existing presentation.*.v1 storage, customer channel policy, Admin Draft and publish authority unchanged.
+- Milestone 6 CI was still running when this cut started; no merge/deploy action taken.
+- Current head c2e673c12c9f55ad3165d9cc6c16c820f441d334; CI pending.
+
+## Milestone 8
+- Print Center now renders logical-printer list first and only one logical printer editor after selection. Existing logical-printers.v1, capability/type semantics and SMT physical IP/USB boundary unchanged.
+- Pricing remains tabbed Product vs Option with pagination; Access Session is one policy + readback pair, so neither is split merely by source length.
+- Current head 2f127330fdcef02d5169a882a995df88e937c992; CI pending.
+
+## Milestone 9
+- Loyalty tiers now list -> one tier editor; formal ledger readback remains visible and read-only.
+- Coupons now list -> one coupon editor; no longer expands every coupon form at once.
+- loyalty.v1, loyalty-ledger-read.v1 and coupons.v1 storage semantics unchanged; no pricing/points authority introduced.
+- Store Binding remains a coherent create + current bindings pair; Business Day remains three small policy cards; Quick Reasons remains compact row editor. No artificial split.
+- Current head a2a4d45484ff282426336f64486cabf378e8c57f; CI pending.
+
+## Milestone 10
+- Capacity Pool now renders pool list first -> one pool editor. Multiple pool forms and product binding matrices no longer expand together.
+- capacity.v1 and CAP0 semantics unchanged; this remains configuration only and does not introduce transaction blocking or a second sellability authority.
+- Final broad audit now covers all Admin workspace source files. Remaining multi-section pages are either read models/reports, compact policy pairs, or already progressive/tabbed/guided workflows.
+- Current head b26da7ea234c75aece8def351e6ec6102ff4062d; CI pending.
+
+## Acceptance pre-close
+- Branch compare against current main: ahead 42, behind 0.
+- Files changed: 11; all bounded to Admin UX/tests/handoff. No Store Kernel, Order, Pricing authority, Tender, Fulfillment, Print runtime, Outbox, Business Day schema, Dining Session schema or deployment governance files changed.
+- Required gate status at this checkpoint: Admin Full Tests GREEN; Admin Build GREEN; Admin Wrangler dry-run GREEN; v2local Full Tests GREEN; v2local Build GREEN; Admin Canonical Readback GREEN; Owner Runtime GREEN; Customer UI5 GREEN. SMM leg and Admin Identity still running.
+- No main merge and no manual deploy.
+
+## FINAL ACCEPTANCE
+READY_FOR_COMMANDER_ADMIN_SETTINGS_UX_ACCEPTANCE
+CURRENT_MAIN_SHA: 71e301273c81542cb534851de32852e9d4c04e76
+ACCEPTED_HEAD: 73c8bfe65ca39414759cc83a68bb01ddee783b44
+BEHIND_MAIN: 0 at acceptance check
+FINAL_CI: GREEN
+- Admin Full Tests GREEN
+- Admin Build GREEN
+- Admin Wrangler Dry-run GREEN
+- v2local Full Tests GREEN
+- v2local Build GREEN
+- SMM Full Tests GREEN
+- SMM Build GREEN
+- SMM Wrangler Dry-run GREEN
+- Admin Identity GREEN
+- Admin Canonical Readback GREEN
+- Owner Runtime GREEN
+- Customer UI5 GREEN
+
+RESULTS
+- SETTINGS_HOME_RESULT: GREEN
+- DOMAIN_ROUTE_RESULT: GREEN
+- TABLE_SETTINGS_RESULT: GREEN; existing stable IDs/version ledger/occupancy semantics preserved
+- PAYMENT_SETTINGS_RESULT: GREEN; list -> one payment method detail
+- WHATSAPP_RESULT: GREEN; no visual-only fake default; inline targets wired
+- OPERATING_TIME_RESULT: GREEN
+- REQUIRED_FIELD_RESULT: GREEN for bounded P0 fields implemented
+- INLINE_ERROR_RESULT: GREEN
+- SCROLL_FOCUS_RESULT: GREEN
+- DOMAIN_VALIDATION_RESULT: GREEN for Store Settings draft domains
+- SAVE_PUBLISH_RESULT: GREEN with explicit boundary: page draft save vs existing whole-snapshot canonical publish
+- MOBILE_RESULT: bounded responsive structure implemented; automated build/tests GREEN, physical Safari/Android device evidence not created by this work
+- TABLE_REGISTRY_REGRESSION: GREEN by existing tests
+- SMM_REGRESSION: GREEN
+- AUTHORITY_RESULT: GREEN; no second config/publish/table/pricing/order/print authority
+
+FIRST_BREAK: NONE in final CI. Canonical publish remains intentionally whole-snapshot validation; no second domain publish engine was created.
+NO MAIN MERGE
+NO MANUAL DEPLOY
+
+## #467 Commander Acceptance Correction
+- Base candidate: 6a7da83cf2c37ac65c8d26f3adfc1ff6c45ad432
+- WhatsApp legacy empty string: added same-record initialization marker. Records without marker + blank template hydrate the existing default into the real draft once; after marker=true, a deliberate user clear remains blank and is never silently restored.
+- QR Code: added /admin/store/settings/qr as an independent UI domain. It edits the existing customerPaymentChannels[].qrImageUrl through the existing uploadAdminPaymentQr -> Admin Worker -> Private R2 seam. No QR store/upload/publish authority added.
+- Payments page no longer exposes QR upload controls.
+- Publish: current-domain errors remain inline + scroll/focus. Cross-domain Store Settings blockers show actual domain + reason + navigable target. Existing catalog/staff canonical errors are mapped to their existing Admin pages.
+- Domain-local draft save remains domain-local. Canonical saveAdminConfig remains the only publish engine.
+- Scope remains within the existing candidate file set; no new product source file added.
+
+## #467 FINAL REACCEPTANCE EVIDENCE
+READY_FOR_COMMANDER_ADMIN_SETTINGS_UX_REACCEPTANCE
+FINAL_HEAD: 2c70e902a9ad2cdaf484342e2c61c2f257ff58f1
+CURRENT_MAIN_SHA: 71e301273c81542cb534851de32852e9d4c04e76
+BEHIND_MAIN: 0
+FILES_CHANGED: 11 (same candidate scope)
+FINAL_CI: ALL GREEN
+- admin-crossport-integration-gate 36415712463 GREEN: Admin Full Tests/Build/Wrangler; v2local Full Tests/Build; SMM Full Tests/Build/Wrangler
+- admin-identity-canonical-r1 36415712586 GREEN
+- admin-canonical-readback-r1 36415712617 GREEN
+- owner-runtime-connection-r2 36415712555 GREEN
+- customer-ui5-submit-wait-r1 36415712666 GREEN
+
+WHATSAPP_LEGACY_EMPTY_RESULT: GREEN
+WHATSAPP_INTENTIONAL_CLEAR_RESULT: GREEN
+QR_DOMAIN_RESULT: GREEN
+QR_AUTHORITY_RESULT: GREEN
+DOMAIN_LOCAL_SAVE_RESULT: GREEN
+CROSS_DOMAIN_PUBLISH_RESULT: GREEN
+ERROR_NAVIGATION_RESULT: GREEN
+INLINE_ERROR_RESULT: GREEN
+SCROLL_FOCUS_RESULT: GREEN
+TABLE_REGISTRY_REGRESSION: GREEN
+V2LOCAL_RESULT: GREEN
+SMM_RESULT: GREEN
+AUTHORITY_RESULT: GREEN
+FIRST_BREAK: NONE
+NO MAIN MERGE
+NO MANUAL DEPLOY
