@@ -78,3 +78,9 @@ Branch opened and domain validation seam added. UI route split is in progress.
 - capacity.v1 and CAP0 semantics unchanged; this remains configuration only and does not introduce transaction blocking or a second sellability authority.
 - Final broad audit now covers all Admin workspace source files. Remaining multi-section pages are either read models/reports, compact policy pairs, or already progressive/tabbed/guided workflows.
 - Current head b26da7ea234c75aece8def351e6ec6102ff4062d; CI pending.
+
+## Acceptance pre-close
+- Branch compare against current main: ahead 42, behind 0.
+- Files changed: 11; all bounded to Admin UX/tests/handoff. No Store Kernel, Order, Pricing authority, Tender, Fulfillment, Print runtime, Outbox, Business Day schema, Dining Session schema or deployment governance files changed.
+- Required gate status at this checkpoint: Admin Full Tests GREEN; Admin Build GREEN; Admin Wrangler dry-run GREEN; v2local Full Tests GREEN; v2local Build GREEN; Admin Canonical Readback GREEN; Owner Runtime GREEN; Customer UI5 GREEN. SMM leg and Admin Identity still running.
+- No main merge and no manual deploy.
