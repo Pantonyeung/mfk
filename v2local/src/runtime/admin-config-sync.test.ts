@@ -191,11 +191,7 @@ describe('SMT full Admin config LKG',()=>{
       orders:[],holds:[],availabilityBusinessDate:'2026-09-28',
       availability:{p1:'soldout',p2:'paused',p3:'available'},
     }));
-    // Reloading the module-level runtime is outside this focused storage regression;
-    // verify the persisted lifecycle contract through a fresh module import boundary.
-    expect(JSON.parse(localStorage.getItem(SMT_LOCAL_RUNTIME_STORAGE_KEY)!).availability).toEqual({
-      p1:'soldout',p2:'paused',p3:'available',
-    });
+    expect(JSON.parse(localStorage.getItem(SMT_LOCAL_RUNTIME_STORAGE_KEY)!).availability).toEqual({p1:'soldout',p2:'paused',p3:'available'});
   });
 
 });
