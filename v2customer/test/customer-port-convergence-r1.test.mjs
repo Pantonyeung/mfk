@@ -55,7 +55,7 @@ test('UI1 is the FINAL storefront and cold launch continues to UI2 menu',()=>{
 });
 
 test('UI1 and UI2 share the FINAL five-item navigation with Memory Jar in the center',()=>{
-  assert.ok(app.includes("view==='home'||view==='menu'?<Stage2BottomNavigation"));
+  assert.match(app,/view==='home'\|\|view==='menu'\s*\?\s*<Stage2BottomNavigation/);
   assert.ok(app.includes("active={view}"));
   assert.equal(fs.existsSync(path.join(srcRoot,'stage1/Stage1BottomNavigation.tsx')),false);
 });
