@@ -327,16 +327,24 @@ function read():Persisted{
   }catch{return clone(defaults)}
 }
 let data=read();
-function currentAvailabilityBusinessDate(now=Date.now()){
+export function currentAvailabilityBusinessDate(now=Date.now()){
   const cutoff=readBusinessCutoff();
   return resolveBusinessWindow(now,cutoff.hour,cutoff.minute).businessDate;
+}
+export function normalizeRuntimeAvailabilityForBusinessDay(
+  availability:Record<string,SmtAvailabilityStatus>,
+  previousBusinessDate:string|undefined,
+  businessDate:string,
+){
+  if(previousBusinessDate===businessDate)return availability;
+  return Object.fromEntries(Object.entries(availability).map(([nodeId,status])=>[
+    nodeId,status==='soldout'?'available':status,
+  ])) as Record<string,SmtAvailabilityStatus>;
 }
 export function rollRuntimeAvailabilityForBusinessDay(now=Date.now()){
   const businessDate=currentAvailabilityBusinessDate(now);
   if(data.availabilityBusinessDate===businessDate)return false;
-  const nextAvailability=Object.fromEntries(Object.entries(data.availability).map(([nodeId,status])=>[
-    nodeId,status==='soldout'?'available':status,
-  ])) as Record<string,SmtAvailabilityStatus>;
+  const nextAvailability=normalizeRuntimeAvailabilityForBusinessDay(data.availability,data.availabilityBusinessDate,businessDate);
   data={...data,availability:nextAvailability,availabilityBusinessDate:businessDate};
   localStorage.setItem(KEY,JSON.stringify(data));
   return true;
