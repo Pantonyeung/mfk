@@ -1662,6 +1662,14 @@ export class AdminSyncStore{
           if(!current||incomingVersion>currentVersion||incomingVersion===currentVersion&&incomingAt>=currentAt){
             await this.state.storage.put(key,{eventId:event.eventId,occurredAt:event.occurredAt,payload:event.payload});
           }
+        }else if(event.type==='RUNTIME_SELLABILITY_UPSERT'){
+          const key='projection:runtime-sellability:'+event.entityId;
+          const current=await this.state.storage.get(key);
+          const incomingAt=Date.parse(event.occurredAt);
+          const currentAt=current?Date.parse(String(current.occurredAt||'')):Number.NEGATIVE_INFINITY;
+          if(!current||!Number.isFinite(currentAt)||incomingAt>=currentAt){
+            await this.state.storage.put(key,{eventId:event.eventId,occurredAt:event.occurredAt,payload:event.payload});
+          }
         }
         await this.state.storage.put(eventKey,{type:event.type,entityId:event.entityId,occurredAt:event.occurredAt});
         accepted.push(event.eventId);
@@ -1679,6 +1687,12 @@ export class AdminSyncStore{
         }
       }
       return json({state:'ACKED',accepted});
+    }
+
+    if(url.pathname==='/projection/runtime-sellability'){
+      if(request.method!=='GET')return json({code:'METHOD_NOT_ALLOWED'},405);
+      const rows=await this.state.storage.list({prefix:'projection:runtime-sellability:'});
+      return json({sellability:[...rows.values()].map(value=>value?.payload??value)});
     }
 
     if(url.pathname==='/projection/orders'){
