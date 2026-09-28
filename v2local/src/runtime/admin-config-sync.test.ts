@@ -8,6 +8,7 @@ import {
   readSmtAdminSyncStatus,
 } from './admin-config-sync.ts';
 import {projectSyncedCombos,projectSyncedOrderingCatalog} from './admin-config-projection.ts';
+import {normalizeRuntimeAvailabilityForBusinessDay,SMT_LOCAL_RUNTIME_STORAGE_KEY} from './local-runtime.ts';
 import {rollRuntimeAvailabilityForBusinessDay,SMT_LOCAL_RUNTIME_STORAGE_KEY} from './local-runtime.ts';
 import {capacityNoticeForCount,readSmtFrontlinePresentation,readSmtPrintConfig,readSmtQuickReasons,readSmtStoreSettings} from './admin-operational-config.ts';
 
@@ -187,11 +188,12 @@ describe('SMT full Admin config LKG',()=>{
     expect(combos.pools[0]?.groups[0]?.subPools[0]?.choices[0]?.productId).toBe('p1');
   });
   it('resets SOLD_OUT at next Business Day but preserves PAUSED',()=>{
-    localStorage.setItem(SMT_LOCAL_RUNTIME_STORAGE_KEY,JSON.stringify({
-      orders:[],holds:[],availabilityBusinessDate:'2026-09-28',
-      availability:{p1:'soldout',p2:'paused',p3:'available'},
-    }));
-    expect(JSON.parse(localStorage.getItem(SMT_LOCAL_RUNTIME_STORAGE_KEY)!).availability).toEqual({p1:'soldout',p2:'paused',p3:'available'});
+    expect(normalizeRuntimeAvailabilityForBusinessDay(
+      {p1:'soldout',p2:'paused',p3:'available'},'2026-09-28','2026-09-29',
+    )).toEqual({p1:'available',p2:'paused',p3:'available'});
+    expect(normalizeRuntimeAvailabilityForBusinessDay(
+      {p1:'soldout',p2:'paused'},'2026-09-29','2026-09-29',
+    )).toEqual({p1:'soldout',p2:'paused'});
   });
 
 });
