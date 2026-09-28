@@ -1,5 +1,6 @@
 import {describe,expect,it} from 'vitest';
 import {AdminSyncStore,buildOwnerReadModelSnapshot,mapOwnerOrderProjection} from '../worker.ts';
+import {createSmtProjectionEvent} from '../../contracts/smt-projection-v1.ts';
 
 describe('Owner canonical read projection',()=>{
   it('preserves canonical fulfillmentLabel and never invents fulfillmentMode or payment state',()=>{
@@ -110,11 +111,11 @@ describe('Owner canonical read projection',()=>{
       get:()=>({fetch:async(request:Request)=>{providerCalls.push(await request.clone().json());return new Response('{}',{status:200});}}),
     }};
     const store=new AdminSyncStore(state,env);
-    const event={
-      schema:'MFK_SMT_PROJECTION_EVENT_V1',eventId:'evt-runtime-1',storeId:'MF01',deviceId:'SMT-1',
-      type:'RUNTIME_SELLABILITY_UPSERT',entityId:'p1',occurredAt:'2026-09-29T00:00:00.000Z',
+    const event=createSmtProjectionEvent({
+      storeId:'MF01',deviceId:'SMT-1',type:'RUNTIME_SELLABILITY_UPSERT',entityId:'p1',
+      occurredAt:'2026-09-29T00:00:00.000Z',
       payload:{nodeId:'p1',status:'soldout',sellable:false,source:'SMT_RUNTIME',observedAt:'2026-09-29T00:00:00.000Z'},
-    };
+    });
     const response=await store.fetch(new Request('https://internal/projection/events',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({events:[event]})}));
     expect(response.status).toBe(200);
     await Promise.resolve();
