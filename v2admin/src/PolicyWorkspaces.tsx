@@ -146,13 +146,13 @@ export function PrintTemplatesWorkspace(){
     label:'商品名稱\n選項\n訂單／取餐參考\n件數',
     showComboRelationship:true,separateFoodDrinkCount:true,
   });
+  const [selectedTemplate,setSelectedTemplate]=useState<'receipt'|'production'|'packing'|'label'|'semantics'|null>(null);
   const patch=(change:Partial<PrintTemplateSet>)=>setTemplates(current=>{const after={...current,...change};appendAdminAudit({action:'修改打印模板',target:'打印模板中心'});return after;});
   return <section className="admin-editor-page">
     <PolicyHeader title="打印模板中心" description="管理收據、製作單、打包單同 Label 嘅正式輸出內容。製作單回答要整乜／點整；打包單回答全單齊唔齊。"/>
-    <div className="admin-policy-grid two">
-      {([['receipt','收據'],['production','製作單'],['packing','打包單'],['label','標籤']] as const).map(([key,title])=><article className="admin-policy-card" key={key}><h2>{title}</h2><label><span>{title}模板內容</span><textarea value={templates[key]} onChange={event=>patch({[key]:event.target.value})} rows={8}/></label></article>)}
-      <article className="admin-policy-card"><h2>輸出語義</h2><Toggle checked={templates.showComboRelationship} onChange={showComboRelationship=>patch({showComboRelationship})} label="保留套餐與 child 關係"/><Toggle checked={templates.separateFoodDrinkCount} onChange={separateFoodDrinkCount=>patch({separateFoodDrinkCount})} label="食品／飲品總件數分開"/></article>
-    </div>
+    {selectedTemplate===null?<div className="admin-settings-home" aria-label="打印模板">{([['receipt','收據'],['production','製作單'],['packing','打包單'],['label','標籤']] as const).map(([key,title])=><button type="button" className="admin-settings-link" key={key} onClick={()=>setSelectedTemplate(key)}><span><b>{title}</b><small>編輯{title}模板內容</small></span><strong aria-hidden="true">›</strong></button>)}<button type="button" className="admin-settings-link" onClick={()=>setSelectedTemplate('semantics')}><span><b>輸出語義</b><small>套餐關係、食品／飲品件數</small></span><strong aria-hidden="true">›</strong></button></div>:<div className="admin-policy-grid two">
+      <article className="admin-policy-card"><button type="button" className="admin-back-button" onClick={()=>setSelectedTemplate(null)}>‹ 打印模板中心</button>{selectedTemplate==='semantics'?<><h2>輸出語義</h2><Toggle checked={templates.showComboRelationship} onChange={showComboRelationship=>patch({showComboRelationship})} label="保留套餐與 child 關係"/><Toggle checked={templates.separateFoodDrinkCount} onChange={separateFoodDrinkCount=>patch({separateFoodDrinkCount})} label="食品／飲品總件數分開"/></>:([['receipt','收據'],['production','製作單'],['packing','打包單'],['label','標籤']] as const).filter(([key])=>key===selectedTemplate).map(([key,title])=><div key={key}><h2>{title}</h2><label><span>{title}模板內容</span><textarea value={templates[key]} onChange={event=>patch({[key]:event.target.value})} rows={8}/></label></div>)}</article>
+    </div>}
   </section>;
 }
 
