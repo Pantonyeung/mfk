@@ -68,22 +68,22 @@ export function StaffAuthGate({children}:{children:ReactNode}){
         <header><div><h1 id="staff-login-title">歡迎回來 👋</h1><p>登入以開始今日營運</p></div><div className="s0-clock"><small>{date}</small><b>{time}</b></div></header>
         <div className="s0-login-methods">
           <button className="active" type="button"><b>◎</b><strong>員工登入</strong><small>使用員工帳號</small></button>
-          <button type="button" disabled><b>⌗</b><strong>掃碼登入</strong><small>使用員工 QR Code</small></button>
+          
         </div>
         <label className="s0-staff"><span>員工</span><select value={staffId} onChange={event=>{setStaffId(event.target.value);setPin('');setError('')}}>{loginReady.map(row=><option key={row.staffId} value={row.staffId}>{row.name} · {roleLabel(row.role)}</option>)}</select></label>
-        <div className="s0-pin"><span>PIN</span><strong>{pin?Array.from({length:pin.length},()=> '●').join(' '):'輸入員工 PIN'}</strong>{pin?<button type="button" onClick={()=>setPin('')}>×</button>:null}</div>
+        <label className="s0-pin"><span>PIN</span><input type="password" inputMode="numeric" autoComplete="off" value={pin} onChange={event=>{setPin(event.target.value.replace(/\\D/g,'').slice(0,8));setError('')}} onKeyDown={event=>{if(event.key==='Enter'&&staffId&&pin.length>=4)void submit()}} placeholder="輸入員工 PIN" aria-label="員工 PIN"/>{pin?<button type="button" onClick={()=>setPin('')} aria-label="清除 PIN">×</button>:null}</label>
         <div className="s0-keypad">{['1','2','3','4','5','6','7','8','9','⌫','0'].map(key=><button type="button" key={key} onClick={()=>press(key)}>{key}</button>)}<button className="go" type="button" disabled={!staffId||pin.length<4} onClick={()=>void submit()}>→</button></div>
         {error?<div className="s0-error" role="alert">{error}</div>:null}
         <p className="s0-hint">Admin Config R{sync.revision||'—'} · {sync.state} · 離線可用最後有效設定驗證</p>
       </main>
       <aside className="s0-side">
         <article className="morning"><span>☀</span><div><h2>早晨！</h2><p>新一天 · 好味道 · 從磨飯開始</p></div></article>
-        <article className="shift"><div><span>◷</span><div><b>開更狀態</b><small>● 尚未開更</small></div></div><button disabled>登入後開更　›</button></article>
+        <article className="shift"><div><span>◷</span><div><b>開更狀態</b><small>登入成功後進入開更確認</small></div></div></article>
         <article className="goal"><span>◎</span><div><b>今日小目標</b><p>好食物 · 讓更多人開心</p></div><i>More Fun</i></article>
         <article className="brand-card"><div><b>手作 · 輕食 · 更美好</b><p>用新鮮食材，為每一天加一點快樂。</p></div></article>
-        <div className="s0-tools"><button disabled>◉<b>需要協助？</b></button><button disabled>⚙<b>設定</b></button><button disabled className="danger">⏻<b>關閉系統</b></button></div>
+        
       </aside>
-      <footer className="s0-footer"><div><b>磨飯</b><span>GOOD FOOD GOOD DAY</span></div><span>v2.1.0　|　MFK SMT</span><span><i>●</i> {sync.state==='READY'?'線上':'本地可用'}　⌁</span></footer>
+      <footer className="s0-footer"><div><b>磨飯</b><span>GOOD FOOD GOOD DAY</span></div><span>v2.1.0　|　MFK SMT</span><span>Admin Config R{sync.revision||'—'} · {sync.state}</span></footer>
     </div>
   </>;
 }
