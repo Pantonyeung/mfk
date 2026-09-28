@@ -119,7 +119,7 @@ describe('SMM LAN ingress',()=>{
     const ingress=createSmmLanIngress({createOrder,orders:()=>[],holds:()=>[],upsertSmmDiningHold,ensureDiningInitialPrint} as any);
     const result=ingress.submit({
       protocolVersion:1,type:'smm.lan.order.submit.v1',requestId:'R5W',submissionId:'S5W',idempotencyKey:'I5W',storeId:'MF01',
-      menuRevision:'7',publishedTotalMinor:4100,serviceMode:'DINE_IN',tender:'FPS',
+      menuRevision:'7',publishedTotalMinor:4100,serviceMode:'DINE_IN',
       diningTarget:{kind:'WAITING',covers:2},
       lines:[{lineId:'L1',productId:'riceball',productName:'原味飯團',quantity:1,publishedUnitPriceMinor:4100,selections:[]}],
     },{deviceId:'SMM-1',trusted:true});
