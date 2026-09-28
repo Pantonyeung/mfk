@@ -181,6 +181,12 @@ export function queueOrderProjection(order:ProjectionOrderInput){
 
 export function queueRuntimeSellabilityProjection(nodeId:string,status:'available'|'soldout'|'paused'){
   const occurredAt=new Date().toISOString();
+  const current=readRows();
+  const redundant=current.filter(row=>row.event.type==='RUNTIME_SELLABILITY_UPSERT'&&row.event.entityId===nodeId);
+  if(redundant.length){
+    const ids=new Set(redundant.map(row=>row.event.eventId));
+    writeRows(current.filter(row=>!ids.has(row.event.eventId)));
+  }
   return enqueue(createSmtProjectionEvent({
     storeId:'MF01',
     deviceId:readSmtDeviceId(),
