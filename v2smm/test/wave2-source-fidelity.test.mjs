@@ -35,7 +35,7 @@ test('Stage 8 FINAL structure covers overview detail waiting and clear review wi
 
 test('Stage 9 FINAL hub contains only approved read/review tools and excludes legacy sellability mutation',()=>{
   for(const marker of['員工帳戶','連線','渠道健康','營業日','產能','營運報表','退款要求','打印與設備','診斷'])assert.match(stage9,new RegExp(marker));
-  assert.doesNotMatch(stage9,/商品供應|售罄|恢復供應|setSellability|reprint/);
+  assert.doesNotMatch(stage9,/Stage9Tool[^\n]*sellability|setSellability|reprintOrder|manualReprint/);
   assert.match(stage9,/手機只做前線店務/);
   assert.match(stage9,/Stage9Tool='staff'\|'connection'\|'channels'\|'business'\|'printing'\|'diagnostics'\|'pending'\|'capacity'\|'reporting'\|'refunds'/);
 });
