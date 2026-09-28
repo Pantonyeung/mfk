@@ -62,7 +62,7 @@ test('UI1 and UI2 share the FINAL five-item navigation with Memory Jar in the ce
 
 test('UI1 owns FINAL home header/status while remaining inside current customer shell',()=>{
   assert.ok(app.includes('return <main className="customer-shell"'));
-  assert.ok(app.includes("view==='home'?null:view==='menu'?null:<CustomerHeader"));
+  assert.equal(app.includes('<CustomerHeader'),false);
   assert.ok(app.includes("view==='home'?null:view==='menu'?null:<div className=\"global-status\""));
   assert.ok(home.includes('stage1-store-context'));
   assert.ok(homeCss.includes('.stage1-home'));
