@@ -226,13 +226,14 @@ export function StoreSettingsWorkspace({domain='home'}:{domain?:StoreSettingsDom
   const diningTables=(config.diningTables??[]).slice().sort((a,b)=>a.sortOrder-b.sortOrder);
   const paymentChannels=(config.customerPaymentChannels??DEFAULT_CUSTOMER_PAYMENT_CHANNELS).slice().sort((a,b)=>a.sortOrder-b.sortOrder);
   const [paymentUploadState,setPaymentUploadState]=useState<Record<string,string>>({});
+  const [selectedPaymentId,setSelectedPaymentId]=useState<string|null>(null);
   const patchPaymentChannel=(id:string,change:Partial<CustomerPaymentChannelConfig>)=>patch({customerPaymentChannels:paymentChannels.map(row=>row.id===id?{...row,...change}:row)});
   const addPaymentChannel=()=>{
     const used=new Set(paymentChannels.map(row=>row.id));
     let n=paymentChannels.length+1;
     let id='PAY-'+String(n).padStart(2,'0');
     while(used.has(id)){n++;id='PAY-'+String(n).padStart(2,'0')}
-    patch({customerPaymentChannels:[...paymentChannels,{id,name:'新付款方式',enabled:false,qrImageUrl:'',sortOrder:paymentChannels.length+1}]});
+    patch({customerPaymentChannels:[...paymentChannels,{id,name:'新付款方式',enabled:false,qrImageUrl:'',sortOrder:paymentChannels.length+1}]});setSelectedPaymentId(id);
   };
   const removePaymentChannel=(id:string)=>patch({customerPaymentChannels:paymentChannels.filter(row=>row.id!==id)});
   const uploadPaymentQr=async(id:string,file:File)=>{
@@ -351,17 +352,18 @@ export function StoreSettingsWorkspace({domain='home'}:{domain?:StoreSettingsDom
         <label><span>訊息模板</span><textarea rows={8} value={config.customerWhatsAppTemplate??''} onChange={event=>patch({customerWhatsAppTemplate:event.target.value})}/></label>
         <small>可用：{'{name}'}、{'{phone}'}、{'{items}'}、{'{total}'}、{'{submissionId}'}。系統只會喺 Customer 無法連接 SMT 接單後，由客人主動撳掣先開 WhatsApp；唔會自動傳送。</small>
       </article></div>:null}
-    {domain==='payments'?<div className="admin-policy-grid two"><article className="admin-policy-card"><header><div><h2>客戶電子支付</h2><small>新增、改名、上傳付款 QR、啟用／停用；Customer 只讀已發佈版本。</small></div><button type="button" onClick={addPaymentChannel}>新增付款方式</button></header>
-        <div className="admin-editor-list">{paymentChannels.map((row,index)=><div className="admin-policy-row" key={row.id}>
+    {domain==='payments'?<div className="admin-policy-grid two"><article className="admin-policy-card"><header><div><h2>客戶電子支付</h2><small>先揀付款方式；再進入單一設定。Customer 只讀已發佈版本。</small></div><button type="button" onClick={addPaymentChannel}>新增付款方式</button></header>
+        {selectedPaymentId===null?<div className="admin-settings-home">{paymentChannels.map(row=><button type="button" className="admin-settings-link" key={row.id} onClick={()=>setSelectedPaymentId(row.id)}><span><b>{row.name}</b><small>{row.enabled?'啟用':'停用'} · {row.qrImageUrl?'已有 QR':'未有 QR'}</small></span><strong aria-hidden="true">›</strong></button>)}</div>:paymentChannels.filter(row=>row.id===selectedPaymentId).map((row,index)=><div className="admin-payment-detail" key={row.id}>
+          <button type="button" className="admin-back-button" onClick={()=>setSelectedPaymentId(null)}>‹ 電子支付</button>
           <b>{row.id}</b>
-          <label><span>顯示名稱</span><input value={row.name} onChange={event=>patchPaymentChannel(row.id,{name:event.target.value})} placeholder="例如 AlipayHK"/></label>
+          <label><span>顯示名稱 <b className="admin-required">必填</b></span><input {...fieldProps('payment-'+row.id+'-name')} className={fieldError('payment-'+row.id+'-name')?'admin-field-invalid':undefined} value={row.name} onChange={event=>patchPaymentChannel(row.id,{name:event.target.value})} placeholder="例如 AlipayHK"/><FieldError id={'payment-'+row.id+'-name'}/></label>
+          <Toggle checked={row.enabled} onChange={enabled=>patchPaymentChannel(row.id,{enabled})} label={row.enabled?'啟用':'停用'}/>
           <label><span>付款 QR 圖</span><input type="file" accept="image/jpeg,image/png,image/webp" onChange={event=>{const file=event.target.files?.[0];if(file)void uploadPaymentQr(row.id,file)}}/></label>
-          {row.qrImageUrl?<div><img src={row.qrImageUrl} alt={row.name+' QR'} style={{width:72,height:72,objectFit:'contain',borderRadius:10,border:'1px solid rgba(0,0,0,.12)'}}/><button type="button" onClick={()=>patchPaymentChannel(row.id,{qrImageUrl:''})}>移除圖片</button></div>:<span>未有付款 QR</span>}
+          {row.qrImageUrl?<div><img src={row.qrImageUrl} alt={row.name+' QR'} style={{width:96,height:96,objectFit:'contain',borderRadius:10,border:'1px solid rgba(0,0,0,.12)'}}/><button type="button" onClick={()=>patchPaymentChannel(row.id,{qrImageUrl:''})}>移除圖片</button></div>:<span>未有付款 QR</span>}
           <small>{paymentUploadState[row.id]??''}</small>
           <label><span>排序</span><input type="number" min={1} value={row.sortOrder} onChange={event=>patchPaymentChannel(row.id,{sortOrder:Number(event.target.value)||index+1})}/></label>
-          <Toggle checked={row.enabled} onChange={enabled=>patchPaymentChannel(row.id,{enabled})} label={row.enabled?'啟用':'停用'}/>
-          <button type="button" onClick={()=>removePaymentChannel(row.id)}>刪除付款方式</button>
-        </div>)}</div>
+          <button type="button" onClick={()=>{removePaymentChannel(row.id);setSelectedPaymentId(null)}}>刪除付款方式</button>
+        </div>)}
         <p>付款 QR 會經 Admin Worker 上載到私有 R2；R2 唔開 Public Access。未有 QR 嘅付款方式可以保留設定，但 Customer 唔可以用佢提交電子付款。</p>
       </article></div>:null}
     {domain==='references'?<div className="admin-policy-grid two"><article className="admin-policy-card"><h2>系統引用</h2><label><span>付款方式 refs</span><input value={config.paymentRefs.join(', ')} onChange={event=>patch({paymentRefs:refs(event.target.value)})} placeholder="例如 CASH, OCTOPUS"/></label><label><span>打印路由 refs</span><input value={config.printRefs.join(', ')} onChange={event=>patch({printRefs:refs(event.target.value)})} placeholder="例如 RECEIPT, KITCHEN"/></label><label><span>渠道 refs</span><input value={config.channelRefs.join(', ')} onChange={event=>patch({channelRefs:refs(event.target.value)})} placeholder="例如 KEETA"/></label></article></div>:null}
