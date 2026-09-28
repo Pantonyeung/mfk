@@ -195,4 +195,33 @@ describe('SMT full Admin config LKG',()=>{
     )).toEqual({p1:'soldout',p2:'paused'});
   });
 
+  it('rejects a late replay whose canonical publishedAt is older than the active release',()=>{
+    const r11=createMfkAdminConfigEnvelope({
+      storeId:'MF01',revision:11,publishedAt:'2026-09-29T03:00:00.000Z',adminFingerprint:'admin-r11',
+      snapshot:{catalog:{products:[]}},
+    });
+    const r12=createMfkAdminConfigEnvelope({
+      storeId:'MF01',revision:12,publishedAt:'2026-09-29T04:00:00.000Z',adminFingerprint:'admin-r12',
+      snapshot:{catalog:{products:[]}},
+    });
+    expect(applyAdminConfigEnvelope(r11).disposition).toBe('APPLIED');
+    expect(applyAdminConfigEnvelope(r12).disposition).toBe('APPLIED');
+    expect(applyAdminConfigEnvelope(r11)).toMatchObject({disposition:'STALE',revision:12});
+    expect(readSmtAdminConfigLkg()?.revision).toBe(12);
+    expect(readSmtAdminConfigLkg()?.publishedAt).toBe('2026-09-29T04:00:00.000Z');
+  });
+
+  it('rejects a numerically newer revision carrying an older canonical publish time',()=>{
+    const current=createMfkAdminConfigEnvelope({
+      storeId:'MF01',revision:20,publishedAt:'2026-09-29T05:00:00.000Z',adminFingerprint:'admin-r20',
+      snapshot:{catalog:{products:[]}},
+    });
+    const impossible=createMfkAdminConfigEnvelope({
+      storeId:'MF01',revision:21,publishedAt:'2026-09-29T04:59:59.000Z',adminFingerprint:'admin-r21',
+      snapshot:{catalog:{products:[]}},
+    });
+    expect(applyAdminConfigEnvelope(current).disposition).toBe('APPLIED');
+    expect(applyAdminConfigEnvelope(impossible)).toMatchObject({disposition:'STALE',revision:20});
+  });
+
 });
