@@ -115,8 +115,9 @@ async function ack(envelope:MfkAdminConfigEnvelope,disposition:'APPLIED'|'IDEMPO
 }
 
 let adminConfigFetchInFlight:Promise<SmtAdminConfigApplyResult|null>|null=null;
+let adminConfigRefetchRequested=false;
 export async function fetchAndApplyAdminConfig(){
-  if(adminConfigFetchInFlight)return adminConfigFetchInFlight;
+  if(adminConfigFetchInFlight){adminConfigRefetchRequested=true;return adminConfigFetchInFlight;}
   adminConfigFetchInFlight=(async()=>{
   const current=readSmtAdminConfigLkg();
   setStatus({
@@ -154,6 +155,7 @@ export async function fetchAndApplyAdminConfig(){
     return null;
   }finally{
     adminConfigFetchInFlight=null;
+    if(adminConfigRefetchRequested){adminConfigRefetchRequested=false;void fetchAndApplyAdminConfig();}
   }
   })();
   return adminConfigFetchInFlight;
