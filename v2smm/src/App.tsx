@@ -1442,6 +1442,7 @@ function Stage4CheckoutView({cart,quote,menu,serviceMode,tender,diningTarget,din
     totalMinor:quote?.totalMinor,
     hasAttention,
     tender,
+    serviceMode,
     diningTargetValid:diningStatus.valid,
   });
   const serviceLabel=serviceMode==='DINE_IN'?'堂食':'外賣';
