@@ -152,7 +152,7 @@ test('Wave2 FINAL screens render at 390 and 440 with 360 minimum width', {timeou
       ['/reports','固定報表','REPORTS'],
       ['/manager-log','經理日誌','MANAGER_LOG'],
       ['/activity','活動紀錄','ACTIVITY_AUDIT'],
-      ['/more','磨飯－元朗','MORE'],
+      ['/more','營運管理','MORE'],
     ];
     for(const [route,needle,name] of screens){
       for(const width of [360,390,440]){
