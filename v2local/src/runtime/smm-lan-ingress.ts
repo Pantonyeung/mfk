@@ -17,7 +17,7 @@ function writeResults(rows:readonly StoredResult[]){localStorage.setItem(RESULT_
 function rejected(req:SmmLanOrderRequest,reasonCode:string):SmmLanOrderResponse{
   return Object.freeze({protocolVersion:1,type:'smm.lan.order.result.v1',requestId:req.requestId,submissionId:req.submissionId,idempotencyKey:req.idempotencyKey,disposition:'REJECTED',reasonCode});
 }
-function paymentLabel(tender:SmmLanOrderRequest['tender']){
+function paymentLabel(tender:NonNullable<SmmLanOrderRequest['tender']>){
   return tender==='CASH'?'現金'
     :tender==='ALIPAY'?'AlipayHK'
     :tender==='WECHAT'?'WeChat Pay HK'
@@ -165,6 +165,7 @@ export function createSmmLanIngress(runtime:MfkLocalRuntime){
               amountLabel:'HKD '+((item.unitMinor*item.qty)/100).toFixed(2),
             }))),
           }))),
+        diningTables:Object.freeze(readSmtDiningTableRegistry().filter(table=>table.active!==false).map(table=>Object.freeze({tableId:table.id,label:table.name,sortOrder:table.sortOrder}))),
         channels:Object.freeze([]),
         dineSessions:Object.freeze(runtime.holds().filter(hold=>hold.kind==='dining').map(hold=>{
           const payments=hold.payments??[];
@@ -211,7 +212,8 @@ export function createSmmLanIngress(runtime:MfkLocalRuntime){
       if(!String(input.menuRevision||'').trim())return rejected(input,'SMM_MENU_REVISION_REQUIRED');
       if(!Number.isSafeInteger(Number(input.publishedTotalMinor))||Number(input.publishedTotalMinor)<0)return rejected(input,'SMM_PUBLISHED_TOTAL_INVALID');
       if(!['TAKEAWAY','DINE_IN'].includes(String(input.serviceMode)))return rejected(input,'SMM_SERVICE_MODE_INVALID');
-      if(!['CASH','ALIPAY','WECHAT','FPS','PAYME'].includes(String(input.tender)))return rejected(input,'SMM_TENDER_INVALID');
+      if(input.serviceMode==='TAKEAWAY'&&!['CASH','ALIPAY','WECHAT','FPS','PAYME'].includes(String(input.tender)))return rejected(input,'SMM_TENDER_INVALID');
+      if(input.serviceMode==='DINE_IN'&&input.tender!==undefined)return rejected(input,'SMM_DINING_TENDER_FORBIDDEN');
       if(input.serviceMode==='DINE_IN'&&input.diningTarget?.kind==='TABLE'){
         const tableIds=new Set((readSmtStoreSettings().diningTables.length?readSmtStoreSettings().diningTables:Array.from({length:9},(_,index)=>({id:'T'+String(index+1).padStart(2,'0')}))).map(row=>row.id));
         if(!tableIds.has(input.diningTarget.tableId||''))return rejected(input,'SMM_DINING_TABLE_NOT_PUBLISHED');
@@ -325,7 +327,7 @@ export function createSmmLanIngress(runtime:MfkLocalRuntime){
       const order=runtime.createOrder({
         items,
         totalMinor:authoritativeTotalMinor,
-        paymentLabel:paymentLabel(input.tender),
+        paymentLabel:paymentLabel(input.tender!),
         sourceLabel:'SMM',
         providerRef,
         initialFulfillmentLabel:'進行中',
