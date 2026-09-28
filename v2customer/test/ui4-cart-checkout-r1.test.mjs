@@ -85,8 +85,8 @@ test('Electronic payment consumes published channels and treats screenshot as ev
   for(const marker of[
     'paymentChannels.find',
     'selectedChannel.qrImageUrl',
-    '店舖已發布付款 QR',
-    '截圖本身唔會改寫付款真相',
+    '查看付款碼',
+    '完成付款後，上傳今次付款截圖畀店員核對。',
     '已提交付款憑證',
     '店員會再核對付款資料。',
   ])assert.ok(checkout.includes(marker),marker);
