@@ -74,3 +74,25 @@ export const STORE_SETTINGS_DOMAIN_LABELS:Readonly<Record<Exclude<StoreSettingsD
   basic:'基本資料',service:'服務模式',tables:'堂食枱號',hours:'營業時間',timing:'營運計時',
   reminders:'訂單提醒',whatsapp:'WhatsApp 備援',payments:'電子支付',qr:'QR Code',references:'其他門店設定',
 });
+
+export interface WhatsAppTemplateMigrationInput{
+  value:string|undefined|null;
+  initialized:boolean|undefined;
+  defaultValue:string;
+}
+export function migrateLegacyWhatsAppTemplate(input:WhatsAppTemplateMigrationInput){
+  const value=input.value??'';
+  if(input.initialized===true)return {value,initialized:true,migrated:false};
+  if(value.trim())return {value,initialized:true,migrated:false};
+  return {value:input.defaultValue,initialized:true,migrated:true};
+}
+
+export interface CanonicalPublishTarget{label:string;path:string}
+export function canonicalPublishTargetForError(message:string):CanonicalPublishTarget{
+  if(/^員工|^Internal Staff ID|^登入編號/.test(message))return {label:'員工／權限',path:'/admin/staff'};
+  if(/^分類/.test(message))return {label:'分類',path:'/admin/catalog/categories'};
+  if(/^商品|^Product Code|^停用商品/.test(message))return {label:'商品資料',path:'/admin/catalog/products'};
+  if(/^選項|^必選組|^單選組/.test(message))return {label:'選項中心',path:'/admin/catalog/modifiers'};
+  if(/^套餐/.test(message))return {label:'套餐',path:'/admin/catalog/combos'};
+  return {label:'版本與同步',path:'/admin/publish'};
+}
