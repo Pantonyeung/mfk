@@ -72,3 +72,9 @@ Branch opened and domain validation seam added. UI route split is in progress.
 - loyalty.v1, loyalty-ledger-read.v1 and coupons.v1 storage semantics unchanged; no pricing/points authority introduced.
 - Store Binding remains a coherent create + current bindings pair; Business Day remains three small policy cards; Quick Reasons remains compact row editor. No artificial split.
 - Current head a2a4d45484ff282426336f64486cabf378e8c57f; CI pending.
+
+## Milestone 10
+- Capacity Pool now renders pool list first -> one pool editor. Multiple pool forms and product binding matrices no longer expand together.
+- capacity.v1 and CAP0 semantics unchanged; this remains configuration only and does not introduce transaction blocking or a second sellability authority.
+- Final broad audit now covers all Admin workspace source files. Remaining multi-section pages are either read models/reports, compact policy pairs, or already progressive/tabbed/guided workflows.
+- Current head b26da7ea234c75aece8def351e6ec6102ff4062d; CI pending.
