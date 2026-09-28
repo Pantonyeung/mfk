@@ -389,10 +389,11 @@ export function StaffWorkspace(){
   const [staff,setStaff]=usePersistentAdminState<StaffDraft[]>('staff.v1',[]);
   const [saveMessage,setSaveMessage]=useState('');
   const [saveErrors,setSaveErrors]=useState<readonly string[]>([]);
+  const [selectedStaffId,setSelectedStaffId]=useState<string|null>(null);
   useEffect(()=>{
     if(staff.some(row=>!String(row.loginId??'').trim()))setStaff(rows=>rows.map(row=>migrateStaffDraft(row)));
   },[]);
-  const add=()=>setStaff(rows=>{const row:StaffDraft={id:'staff-'+Date.now().toString(36),loginId:'',name:'',role:'STAFF',pin:'',scope:'STORE',adminLogin:false,active:true,permissions:['ORDER_REVIEW']};appendAdminAudit({action:'新增員工',target:row.id});return [...rows,row];});
+  const add=()=>setStaff(rows=>{const row:StaffDraft={id:'staff-'+Date.now().toString(36),loginId:'',name:'',role:'STAFF',pin:'',scope:'STORE',adminLogin:false,active:true,permissions:['ORDER_REVIEW']};appendAdminAudit({action:'新增員工',target:row.id});setSelectedStaffId(row.id);return [...rows,row];});
   const patch=(id:string,change:Partial<StaffDraft>)=>setStaff(rows=>rows.map(row=>{if(row.id!==id)return row;const after={...row,...change};appendAdminAudit({action:'修改員工／權限',target:id,before:{...row,pin:row.pin?'***':'',pinVerifier:row.pinVerifier?'PRESENT':undefined},after:{...after,pin:after.pin?'***':'',pinVerifier:after.pinVerifier?'PRESENT':undefined}});return after;}));
   const remove=(row:StaffDraft)=>{
     if(typeof window!=='undefined'&&!window.confirm('確定移除「'+(row.name||row.id)+'」嘅員工草稿？一般停用請使用狀態開關。'))return;
@@ -411,7 +412,8 @@ export function StaffWorkspace(){
   return <section className="admin-editor-page">
     <header className="admin-editor-head"><div><small>{activeRelease?'目前 R'+activeRelease.version:'未有保存版本'} · 人員／角色／權限</small><h1>員工／權限</h1><p>登入編號係人手輸入嘅帳號；Internal Staff ID 只供系統識別。PIN 只會轉成驗證器發布，唔會將明文 PIN 發布出去。</p>{saveMessage?<span>{saveMessage}</span>:null}</div><div className="admin-editor-actions"><button className="secondary" onClick={add}>新增員工</button><button className="primary" onClick={saveStaff}>保存人員設定</button></div></header>
     {saveErrors.length?<div className="admin-validation is-error" role="alert"><b>有 {saveErrors.length} 項需要處理</b><ul>{saveErrors.map((error,index)=><li key={index}>{error}</li>)}</ul></div>:null}
-    {staff.length===0?<div className="admin-empty-state"><b>未有員工資料</b><p>新增員工後設定角色、PIN、權限範圍同權限。</p><button onClick={add}>新增員工</button></div>:<div className="admin-editor-grid">{staff.map(row=><article className="admin-policy-card" key={row.id}>
+    {staff.length===0?<div className="admin-empty-state"><b>未有員工資料</b><p>新增員工後設定角色、PIN、權限範圍同權限。</p><button onClick={add}>新增員工</button></div>:selectedStaffId===null?<div className="admin-settings-home" aria-label="員工列表">{staff.map(row=><button type="button" className="admin-settings-link" key={row.id} onClick={()=>setSelectedStaffId(row.id)}><span><b>{row.name||row.loginId||'未命名員工'}</b><small>{row.loginId?'登入編號 '+row.loginId:'未設定登入編號'} · {row.active?'啟用':'停用'}</small></span><strong aria-hidden="true">›</strong></button>)}</div>:<div className="admin-editor-grid">{staff.filter(row=>row.id===selectedStaffId).map(row=><article className="admin-policy-card" key={row.id}>
+      <button type="button" className="admin-back-button" onClick={()=>setSelectedStaffId(null)}>‹ 員工列表</button>
       <header><h2>{row.name||row.loginId||'未命名員工'}</h2><small>{row.loginId?'登入編號 '+row.loginId:'未設定登入編號'}</small></header>
       <label><span>登入編號</span><input autoComplete="username" value={row.loginId??''} onChange={event=>patch(row.id,{loginId:event.target.value.replace(/[^A-Za-z0-9._-]/g,'').slice(0,64)})} placeholder="例如 1111"/></label>
       <label><span>員工名稱</span><input value={row.name} onChange={event=>patch(row.id,{name:event.target.value})}/></label>
@@ -421,7 +423,7 @@ export function StaffWorkspace(){
       <div className="admin-check-grid">{PERMISSIONS.map(([id,label])=><label key={id}><input type="checkbox" checked={row.permissions.includes(id)} onChange={event=>togglePermission(row,id,event.target.checked)}/><span>{label}</span></label>)}</div>
       <Toggle checked={row.adminLogin} onChange={adminLogin=>patch(row.id,{adminLogin})} label="允許後台登入"/>
       <Toggle checked={row.active} onChange={active=>patch(row.id,{active})} label={row.active?'啟用':'停用'}/>
-      <button type="button" onClick={()=>remove(row)}>移除</button>
+      <button type="button" onClick={()=>{remove(row);setSelectedStaffId(null)}}>移除</button>
     </article>)}</div>}
   </section>;
 }
