@@ -41,3 +41,10 @@ Branch opened and domain validation seam added. UI route split is in progress.
 - Channel page header copy is now mode-specific so accept/sync/mapping/estimate pages no longer describe unrelated tasks.
 - Continued large-page audit: Product detail already has task picker; Modifiers and Combos already have guided progressive disclosure. Refund report is a single coherent workflow + audit readback and is not split merely by page length.
 - Current head 0204a6c03dc4bc19b51136c4e50b10272132ca76; CI pending.
+
+## Milestone 5
+- Milestone 4 head f9153f68d849b998182ab1eed551b5258593d33d: all five required CI gates GREEN.
+- Staff page no longer expands every employee form at once: roster -> one staff detail.
+- Print Templates no longer expands Receipt/Production/Packing/Label/Semantics together: template chooser -> one editor.
+- Existing staff.v1, PIN verifier, RBAC, print-templates.v1 and audit authority unchanged.
+- Current head 2314aa98723695d7679a7082a5d148f2e65d5861; CI pending.
