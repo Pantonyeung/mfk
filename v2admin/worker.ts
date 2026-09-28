@@ -604,11 +604,13 @@ export function mapCustomerOrderProjection(input){
   };
 }
 
-function customerPublicSnapshot(active,customerOrders=[]){
+function customerPublicSnapshot(active,customerOrders=[],runtimeSellability=[]){
   const snapshot=row(active?.snapshot);
   const catalog=row(snapshot.catalog);
   const optionCenter=row(snapshot.optionCenter);
   const availability=row(snapshot.availability);
+  const runtimeAvailability=new Map(rows(runtimeSellability).map(raw=>{const item=row(raw);return[String(item.nodeId||''),String(item.status||'available')]}).filter(([id])=>id));
+  const runtimeAvailable=nodeId=>!['soldout','paused'].includes(runtimeAvailability.get(nodeId)||'available');
   const productMedia=row(snapshot.productMedia);
   const categories=rows(catalog.categories)
     .map((raw,index)=>{const item=row(raw);return{id:String(item.id||''),name:String(item.name||''),position:Number(item.position??index*10),active:item.active!==false};})
@@ -632,7 +634,7 @@ function customerPublicSnapshot(active,customerOrders=[]){
     const priceText=String(item.basePrice??'').trim();
     const priceReady=priceText!==''&&Number.isFinite(Number(priceText));
     const sellability=row(availability[productId]);
-    return item.active!==false&&ownerSellabilityEffective(sellability)&&priceReady;
+    return item.active!==false&&runtimeAvailable(productId)&&priceReady;
   };
   const comboPools=rows(catalog.comboPools)
     .map(poolRaw=>{
@@ -674,7 +676,7 @@ function customerPublicSnapshot(active,customerOrders=[]){
                     label:choice.choiceType==='PRODUCT'
                       ?String(rawProductById.get(choice.productId)?.name||choice.label||choice.productId||'')
                       :choice.label,
-                    available:ownerSellabilityEffective(availability['COMBO_CHILD:'+choice.choiceId])&&(choice.choiceType!=='PRODUCT'||productAvailableForCombo(choice.productId)),
+                    available:runtimeAvailable('COMBO_CHILD:'+choice.choiceId)&&(choice.choiceType!=='PRODUCT'||productAvailableForCombo(choice.productId)),
                   })),
               };
             })
@@ -744,7 +746,7 @@ function customerPublicSnapshot(active,customerOrders=[]){
           .map(optionRaw=>{const option=row(optionRaw);return{
             optionId:String(option.id||option.code||''),
             name:String(option.name||option.id||option.code||''),
-            available:option.active!==false&&ownerSellabilityEffective(availability['OPTION:'+String(option.id||option.code||'')]),
+            available:option.active!==false&&runtimeAvailable('OPTION:'+String(option.id||option.code||'')),
             publishedAdjustmentMinor:minorFromMoney(option.priceAdjustment),
             position:Number(option.position||0),
           }})
@@ -770,7 +772,7 @@ function customerPublicSnapshot(active,customerOrders=[]){
         categoryId,
         name:String(item.name||productId),
         description:String(item.description||''),
-        available:item.active!==false&&ownerSellabilityEffective(sellability)&&priceReady,
+        available:item.active!==false&&runtimeAvailable(productId)&&priceReady,
         ...(priceReady?{displayPriceLabel:moneyLabel(baseMinor+takeawayMinor),publishedUnitPriceMinor:baseMinor+takeawayMinor}:{}),
         ...(imageUrl?{imageUrl,imageAlt:String(item.name||productId)}:{}),
         optionGroups,
