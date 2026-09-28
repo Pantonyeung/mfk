@@ -1,0 +1,68 @@
+{
+  "work_id": "MFK-SMM-SOURCE-FIDELITY-W2-R1",
+  "source_main": "2404a068f0306c6d1aa4f641f98504614fac2236",
+  "current_main_parent": "29901b86d18b06d4a19371fe3f3a6b91d8682a57",
+  "generated_by_run": 36368063636,
+  "generated_by_job": 108758350787,
+  "captured_at": "2026-09-28",
+  "cjk_font_proof": "fonts-noto-cjk + Noto Sans CJK TC fallback",
+  "captures": [
+    {
+      "name": "stage7-440x956",
+      "width": 440,
+      "height": 956,
+      "sha": "a9e2a0376c3123cd607b58c17c1a4f62be4e47b3c4d0a08631f002babf330c5a",
+      "bytes": 45439
+    },
+    {
+      "name": "stage8-440x956",
+      "width": 440,
+      "height": 956,
+      "sha": "76aefa667ff779f5ddde351d0940ba2bd7987f078b59863f3eeff8d767e4e66d",
+      "bytes": 67166
+    },
+    {
+      "name": "stage9-440x956",
+      "width": 440,
+      "height": 956,
+      "sha": "abe257a50b860865d13bd66db376a72700028930c3b359e02a13132195840e66",
+      "bytes": 84149
+    },
+    {
+      "name": "stagex-440x956",
+      "width": 440,
+      "height": 956,
+      "sha": "7d690256b740f370c66ecbb6f301bbbd0693a682ad88c2495d4acc8ba85f9de4",
+      "bytes": 96543
+    },
+    {
+      "name": "stage7-360x780",
+      "width": 360,
+      "height": 780,
+      "sha": "34d89bf3bcec7172948fcc07f6b887afbc5bae0d0929cfeedd02f922612b8432",
+      "bytes": 42994
+    },
+    {
+      "name": "stage8-360x780",
+      "width": 360,
+      "height": 780,
+      "sha": "3f5be8466d0429ee6ca08849b2191c8b09259b6b84ef4146fcaf46bb0e992b6b",
+      "bytes": 64853
+    },
+    {
+      "name": "stage9-360x780",
+      "width": 360,
+      "height": 780,
+      "sha": "2fd377e2b5e007f98db0a2fdb70b644db0236a4b6064237192dc9247f72b91a4",
+      "bytes": 74587
+    },
+    {
+      "name": "stagex-360x780",
+      "width": 360,
+      "height": 780,
+      "sha": "7b26ff4b3baddca8451b502cb8654486ef68adc4296871ece8302e34a53823d5",
+      "bytes": 89471
+    }
+  ],
+  "note": "Rendered from the Wave 2 implementation visual harness at exact required viewports. Final mascot/banner/decorative/icon artwork remains pending by asset policy."
+}

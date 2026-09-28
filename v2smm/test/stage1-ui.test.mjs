@@ -7,7 +7,7 @@ const css=readFileSync(new URL('../src/stage1.css',import.meta.url),'utf8');
 const slots=JSON.parse(readFileSync(new URL('../public/brand/stage1/asset-slots.json',import.meta.url),'utf8'));
 
 const orderStart=app.indexOf('function OrderView');
-const orderEnd=app.indexOf('function DineView',orderStart);
+const orderEnd=app.indexOf('function StaffLogin',orderStart);
 assert.ok(orderStart>=0&&orderEnd>orderStart);
 const orderView=app.slice(orderStart,orderEnd);
 

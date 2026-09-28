@@ -60,7 +60,7 @@ test('quantity and cart actions remain touch-safe and mutations are line-scoped'
 });
 
 test('Checkout is fixed to four UI4 review steps and never creates a submit identity',()=>{
-  const labels=['確認商品','聯絡與取餐','付款','提交前確認'];
+  const labels=['商品','聯絡與取餐','付款','提交'];
   let previous=-1;
   for(const label of labels){
     const index=checkout.indexOf(label);
@@ -70,14 +70,23 @@ test('Checkout is fixed to four UI4 review steps and never creates a submit iden
   for(const forbidden of['onSubmit','submitOrder(','createCustomerPendingIntent','submissionId','idempotencyKey']){
     assert.equal(checkout.includes(forbidden),false,forbidden);
   }
-  assert.ok(checkout.includes('真正安全提交屬下一階段'));
+  assert.ok(checkout.includes('最後睇多次餐點、取餐同付款資料'));
+});
+
+test('UI4 V1 pickup time is the current pickup window only, with no future Scheduled Order seam',()=>{
+  assert.match(checkout,/ui4-pickup-window/);
+  assert.match(checkout,/即時取餐/);
+  assert.match(checkout,/pickupEtaLabel/);
+  assert.match(checkout,/不設明天／後天或其他預約時段/);
+  assert.equal(checkout.includes('scheduledPickupAt'),false);
+  assert.equal(checkout.includes('futurePickupAt'),false);
 });
 
 test('Contact derives Pickup Code only from the phone last four digits',()=>{
   assert.ok(checkout.includes("value.replace(/\\D/g,'')"));
   assert.ok(checkout.includes("value.length>=4?value.slice(-4):null"));
-  assert.ok(checkout.includes('取餐碼只係電話最後 4 位'));
-  assert.ok(checkout.includes('唔係流水號、備用參考碼或者訂單識別'));
+  assert.ok(checkout.includes('取餐時可以用呢個短碼畀店員核對'));
+  assert.ok(checkout.includes('取餐時出示呢個短碼即可'));
   assert.equal(checkout.includes('crypto.randomUUID'),false);
 });
 
@@ -85,10 +94,10 @@ test('Electronic payment consumes published channels and treats screenshot as ev
   for(const marker of[
     'paymentChannels.find',
     'selectedChannel.qrImageUrl',
-    '店舖已發布付款 QR',
-    '截圖本身唔會改寫付款真相',
+    '查看付款碼',
+    '完成付款後，上傳今次付款截圖畀店員核對。',
     '已提交付款憑證',
-    '仍待 SMT / 店員正式核對',
+    '店員會再核對付款資料。',
   ])assert.ok(checkout.includes(marker),marker);
   assert.equal(checkout.includes('已確認付款'),false);
   assert.ok(app.includes("setNotice('已提交付款憑證，等待店舖核對。')"));
@@ -106,7 +115,7 @@ test('Checkout and review re-read current published facts and repair only affect
   assert.ok(app.includes('quotePublishedCart(cart,snapshot?.menu)'));
   assert.ok(app.includes('publishedCartRepairs(cart,menu)'));
   assert.ok(quote.includes("'MATERIAL_CHANGE'"));
-  assert.ok(checkout.includes('禁止靜默沿用舊價'));
+  assert.ok(checkout.includes('餐點或價格有更新，請先修正受影響項目'));
   assert.ok(checkout.includes('返回記憶罐，只修受影響餐點'));
   assert.ok(checkout.includes(' → '));
 });

@@ -55,14 +55,14 @@ test('UI1 is the FINAL storefront and cold launch continues to UI2 menu',()=>{
 });
 
 test('UI1 and UI2 share the FINAL five-item navigation with Memory Jar in the center',()=>{
-  assert.ok(app.includes("view==='home'||view==='menu'?<Stage2BottomNavigation"));
+  assert.match(app,/view==='home'\|\|view==='menu'\s*\?\s*<Stage2BottomNavigation/);
   assert.ok(app.includes("active={view}"));
   assert.equal(fs.existsSync(path.join(srcRoot,'stage1/Stage1BottomNavigation.tsx')),false);
 });
 
 test('UI1 owns FINAL home header/status while remaining inside current customer shell',()=>{
   assert.ok(app.includes('return <main className="customer-shell"'));
-  assert.ok(app.includes("view==='home'?null:view==='menu'?null:<CustomerHeader"));
+  assert.equal(app.includes('<CustomerHeader'),false);
   assert.ok(app.includes("view==='home'?null:view==='menu'?null:<div className=\"global-status\""));
   assert.ok(home.includes('stage1-store-context'));
   assert.ok(homeCss.includes('.stage1-home'));

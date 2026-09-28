@@ -18,7 +18,7 @@ import {ActionButton,AnimatedValue,ProductDialog,QuantityStepper,type ProductOri
 const money=(currency:string,minor:number)=>new Intl.NumberFormat('zh-HK',{style:'currency',currency}).format(minor/100);
 
 const adjustmentLabel=(value:number|undefined)=>{
-  if(value===undefined||!Number.isSafeInteger(Number(value)))return '價格待同步';
+  if(value===undefined||!Number.isSafeInteger(Number(value)))return '價格更新中';
   const minor=Number(value);
   if(minor===0)return money('HKD',0);
   return (minor>0?'+':'-')+money('HKD',Math.abs(minor));
@@ -159,20 +159,20 @@ export function ProductSheet({
         <h2>{product.name}</h2>
         <p>{product.description}</p>
         <AnimatedValue as="strong">{product.displayPriceLabel??'價格待店舖提供'}</AnimatedValue>
-        <small className="ui3-published-note">起步價只顯示店舖已發布資料。</small>
+        <small className="ui3-published-note">價格以店舖最新餐單為準。</small>
       </div>
     </div>
 
     {product.comboId?<section className="ui3-config-section ui3-combo-section" data-ui3-section="combo">
-      <header className="ui3-section-heading"><div><span>Combo Upgrade</span><h3>套餐升級</h3></div><small>只用 exact comboId</small></header>
+      <header className="ui3-section-heading"><div><span>套餐選擇</span><h3>想加埋小食／飲品？</h3></div><small>可選</small></header>
       {combo?<>
-        <div className="ui3-combo-summary"><div><span>{combo.name}</span><strong>{Number.isSafeInteger(Number(combo.publishedBasePriceMinor))&&Number(combo.publishedBasePriceMinor)>=0?money('HKD',Number(combo.publishedBasePriceMinor)):'價格待同步'}</strong></div><small>已發布套餐基本價 · 正式提交由 SMT 再核對</small></div>
+        <div className="ui3-combo-summary"><div><span>{combo.name}</span><strong>{Number.isSafeInteger(Number(combo.publishedBasePriceMinor))&&Number(combo.publishedBasePriceMinor)>=0?money('HKD',Number(combo.publishedBasePriceMinor)):'價格更新中'}</strong></div><small>套餐價會按你揀嘅內容更新</small></div>
         <div className="choice-grid ui3-combo-mode">
           <button type="button" aria-pressed={!comboEnabled} className={!comboEnabled?'active':''} onClick={()=>{setComboEnabled(false);clearCombo()}}><span>只要主餐</span><small>不升級套餐</small></button>
           <button type="button" aria-pressed={comboEnabled} className={comboEnabled?'active':''} onClick={()=>setComboEnabled(true)}><span>{combo.name}</span><small>升級套餐</small></button>
         </div>
         {comboEnabled?<>
-          {combo.mainPoolId?(()=>{const mainPool=poolById.get(combo.mainPoolId);return <div className="ui3-main-pool"><span>{mainPool?.name??'主餐'}</span><strong>{product.name}</strong><small>保留原商品身份</small></div>})():null}
+          {combo.mainPoolId?(()=>{const mainPool=poolById.get(combo.mainPoolId);return <div className="ui3-main-pool"><span>{mainPool?.name??'主餐'}</span><strong>{product.name}</strong><small>主餐已選</small></div>})():null}
           {combo.addonPoolIds.map(poolId=>{
             const pool=poolById.get(poolId);
             if(!pool||pool.kind!=='ADDON')return <div className="choice-error" key={poolId}>套餐群組資料待同步。</div>;
@@ -196,11 +196,11 @@ export function ProductSheet({
           })}
           {!comboValidation.ok?<p className="choice-error">{comboValidation.issues[0]}</p>:null}
         </>:null}
-      </>:<p className="choice-error">套餐資料待同步；未有 exact canonical Combo 前唔會建立假套餐。</p>}
+      </>:<p className="choice-error">套餐內容暫時未能載入，可以先選主餐。</p>}
     </section>:null}
 
     <section className="ui3-config-section" data-ui3-section="required">
-      <header className="ui3-section-heading"><div><span>Required</span><h3>必選設定</h3></div><small>未完成不可加入</small></header>
+      <header className="ui3-section-heading"><div><span>必選</span><h3>必選項目</h3></div><small>完成後先可加入</small></header>
       {product.variations?.length&&product.variationRequired?<fieldset className="choice-group">
         <legend><span>規格</span><small>必選</small></legend>
         <div className="choice-grid">{product.variations.map(item=><button type="button" key={item.variationId} disabled={!item.available} aria-pressed={selectedVariationId===item.variationId} className={selectedVariationId===item.variationId?'active':''} onClick={()=>setVariation(item.variationId)}><span>{item.name}</span><small>{!item.available?'暫不可選':selectedVariationId===item.variationId?'已選':'必選'}</small></button>)}</div>
@@ -211,7 +211,7 @@ export function ProductSheet({
     </section>
 
     <section className="ui3-config-section" data-ui3-section="optional">
-      <header className="ui3-section-heading"><div><span>Optional</span><h3>可選設定</h3></div><small>按需要調整</small></header>
+      <header className="ui3-section-heading"><div><span>可選</span><h3>加配選項</h3></div><small>按需要調整</small></header>
       {product.variations?.length&&!product.variationRequired?<fieldset className="choice-group">
         <legend><span>規格</span><small>可選</small></legend>
         <div className="choice-grid">{product.variations.map(item=><button type="button" key={item.variationId} disabled={!item.available} aria-pressed={selectedVariationId===item.variationId} className={selectedVariationId===item.variationId?'active':''} onClick={()=>setVariation(item.variationId)}><span>{item.name}</span><small>{!item.available?'暫不可選':selectedVariationId===item.variationId?'已選':'可選'}</small></button>)}</div>
@@ -221,25 +221,25 @@ export function ProductSheet({
     </section>
 
     <section className="ui3-config-section ui3-quantity-section" data-ui3-section="quantity">
-      <header className="ui3-section-heading"><div><span>Qty</span><h3>數量</h3></div><small>最少 1 件</small></header>
+      <header className="ui3-section-heading"><div><span>數量</span><h3>今次要幾多？</h3></div><small>最少 1 件</small></header>
       <div className="ui3-quantity-row"><span>今次數量</span><QuantityStepper label={product.name} quantity={quantity} min={1} onChange={setQuantity}/></div>
       <label htmlFor="product-note" className="ui3-note"><span>今次備註 <small>選填</small></span><textarea id="product-note" value={note} onChange={event=>setNote(event.target.value)} maxLength={120} placeholder="例如：醬汁分開。請勿填寫敏感個人資料。"/><small>{note.length} / 120</small></label>
     </section>
 
     <section className="ui3-config-section ui3-recommendation-section" data-ui3-section="recommendation">
-      <header className="ui3-section-heading"><div><span>Recommendation</span><h3>可以再配一樣</h3></div><small>唔影響加入</small></header>
+      <header className="ui3-section-heading"><div><span>加多一樣</span><h3>配埋會更完整</h3></div><small>可選</small></header>
       {recommendations.length?<div className="ui3-recommendation-list">{recommendations.slice(0,3).map(item=><article key={item.product.productId}><ProductMedia product={item.product} compact/><div><small>{item.reasonLabel}</small><strong>{item.product.name}</strong><span>{item.product.displayPriceLabel??'價格待店舖提供'}</span></div></article>)}</div>:<p className="ui3-quiet-copy">暫時未有合適推薦；可以照常完成今次設定。</p>}
     </section>
 
     <section className="ui3-config-section ui3-current-summary" data-ui3-section="summary">
-      <header className="ui3-section-heading"><div><span>Current Configuration Summary</span><h3>目前設定</h3></div><small>{quantity} 件</small></header>
+      <header className="ui3-section-heading"><div><span>你的選擇</span><h3>目前設定</h3></div><small>{quantity} 件</small></header>
       <p>{summaryParts.join(' · ')||'原味設定'}</p>
-      <div className="ui3-price-breakdown"><span>已發布預覽</span><strong>{priceReady?money('HKD',draftTotalMinor!):'價格待同步'}</strong></div>
-      <small>此價格只根據目前已發布資料預覽；正式提交仍由 SMT 重新核對價格、供應同套餐規則。</small>
+      <div className="ui3-price-breakdown"><span>小計</span><strong>{priceReady?money('HKD',draftTotalMinor!):'價格更新中'}</strong></div>
+      <small>結帳前會再確認餐單、價格同供應狀況。</small>
     </section>
 
     <div className="ui3-sticky-actions" data-ui3-section="add">
-      <div><span>目前預覽</span><strong>{priceReady?money('HKD',draftTotalMinor!):'價格待同步'}</strong><small>{!addReady?(firstMissingRequired?'請先完成：'+firstMissingRequired:'完成必選設定及同步價格後先可以加入'):'設定完整，仍未建立正式訂單'}</small></div>
+      <div><span>今次小計</span><strong>{priceReady?money('HKD',draftTotalMinor!):'價格更新中'}</strong><small>{!addReady?(firstMissingRequired?'請先完成：'+firstMissingRequired:'完成必選設定後先可以加入'):'可以加入記憶罐'}</small></div>
       <ActionButton disabled={!addReady} onClick={onAdd}>{editing?'更新記憶罐':'加入記憶罐'}</ActionButton>
     </div>
   </ProductDialog>;

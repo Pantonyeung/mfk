@@ -2,6 +2,7 @@ const params=new URLSearchParams(location.search);
 const scenario=params.get('scenario')??'populated';
 const stage=params.get('stage')??'READY';
 const quoteFreshness=params.get('quote')??'CURRENT';
+const requestedRoute=params.get('route');
 const now=new Date().toISOString();
 
 if(params.get('motion')==='reduce'){
@@ -51,6 +52,7 @@ if(scenario==='pending'||scenario==='unknown'){
   workspace.pendingIntents=[{submissionId:'internal-acceptance-submission',idempotencyKey:'customer-order:internal-acceptance-submission',createdAt:now,updatedAt:now,state:scenario==='pending'?'PENDING':'UNKNOWN',cart:[cartLine],checkout:workspace.checkout,lastMessage:scenario==='pending'?'等待店舖確認提交結果':'提交結果仍在確認'}];
 }
 localStorage.setItem('mfk:customer:workspace:v1',JSON.stringify(workspace));
+if(requestedRoute)window.history.replaceState({mfkAcceptance:true},'',requestedRoute);
 
 const orderStage=stage;
 const timeline=[
@@ -67,7 +69,7 @@ window.__MFK_CUSTOMER_PRODUCT_PORT__={
       store:{storeId:'store-01',storeName:'磨飯 · 中環',channelAvailable:true,etaLabel:'約 18–25 分鐘',notice:'午市時段餐點即叫即製。',observedAt:now},
       menu:{revision:'menu-r2',observedAt:now,categories:[{categoryId:'rice',name:'暖飯',sortOrder:1},{categoryId:'light',name:'輕盈',sortOrder:2}],products},
       activeOrders:scenario==='noorder'?[]:[{orderId:'order-current-01',displayCode:'MF 038',stage:orderStage,itemSummary:'紫米照燒雞便當 × 2',amountLabel:'HK$136',pickupCode:'5382',phoneMasked:'9*** 4567',etaLabel:orderStage==='DELAYED'?'13:12（已更新）':'12:48',handoverState:orderStage==='HANDED_OVER'||orderStage==='COMPLETED'?'HANDED_OVER':orderStage==='PICKUP_VERIFICATION'?'VERIFIED':'NOT_ARRIVED',observedAt:now,readback:'CONFIRMED',timeline}],
-      history:[{orderId:'order-history-01',displayCode:'MF 021',completedAt:'2026-09-18T05:20:00.000Z',itemSummary:'香草烤雞暖沙律、柑橘時蔬沙律',amountLabel:'HK$130',reorderEligible:true},{orderId:'order-history-02',displayCode:'MF 014',completedAt:'2026-09-07T04:05:00.000Z',itemSummary:'紫米照燒雞便當',amountLabel:'HK$68',reorderEligible:true}],
+      history:[{orderId:'order-history-01',displayCode:'MF 021',completedAt:'2026-09-18T05:20:00.000Z',itemSummary:'香草烤雞暖沙律、柑橘時蔬沙律',amountLabel:'HK$130',pickupCode:'5382',historicalLines:[{name:'香草烤雞暖沙律',quantity:1,historicalUnitLabel:'HK$72',historicalLineTotalLabel:'HK$72'},{name:'柑橘時蔬沙律',quantity:1,historicalUnitLabel:'HK$58',historicalLineTotalLabel:'HK$58'}],reorderEligible:true},{orderId:'order-history-02',displayCode:'MF 014',completedAt:'2026-09-07T04:05:00.000Z',itemSummary:'紫米照燒雞便當',amountLabel:'HK$68',pickupCode:'4567',historicalLines:[{name:'紫米照燒雞便當',quantity:1,historicalUnitLabel:'HK$68',historicalLineTotalLabel:'HK$68'}],reorderEligible:true}],
       member:{state:'READY',displayName:'阿晴',memberLabel:'磨飯記憶會員',lastVisitLabel:'上次返嚟：9 月 18 日',observedAt:now,preferences:['少汁','唔食青瓜','飲品走冰'],frequentTasteLabels:['紫米飯','香草雞','清新酸甜'],careMessage:'上次等耐咗，我哋想補返一點心意。',seeds:{state:'READY',valueLabel:'18 粒',progressLabel:'正式會員進度已更新',nextBenefitLabel:'再累積一段回憶，就會見到新心意',history:[{label:'完成中環自取訂單',occurredAt:'2026-09-18T05:20:00.000Z'},{label:'完成金鐘自取訂單',occurredAt:'2026-09-07T04:05:00.000Z'}]},coupons:[{couponId:'coupon-01',name:'一份小食心意',state:'AVAILABLE',detail:'落單時由正式優惠規則確認適用範圍。',expiryLabel:'10 月 31 日前'},{couponId:'coupon-02',name:'下一段回憶',state:'LOCKED',detail:'解鎖條件由正式會員資料提供。'}],badges:[{badgeId:'badge-01',name:'第一口記憶',state:'EARNED',detail:'完成第一次正式訂單。',earnedAt:'2026-07-21T04:00:00.000Z'},{badgeId:'badge-02',name:'紫米同路人',state:'EARNED',detail:'一段真實嘅紫米回憶。',earnedAt:'2026-09-18T05:20:00.000Z'},{badgeId:'badge-03',name:'四季味道',state:'LOCKED',progressLabel:'進度由正式會員資料提供。'}]},
       observedAt:now,
     };
@@ -83,3 +85,11 @@ window.__MFK_CUSTOMER_PRODUCT_PORT__={
 };
 
 await import('../src/main.tsx');
+
+if(params.get('openProduct')==='1'){
+  for(let attempt=0;attempt<80;attempt+=1){
+    const target=document.querySelector('.stage2-card-hit[data-product-id]');
+    if(target instanceof HTMLButtonElement&&!target.disabled){target.click();break}
+    await new Promise(resolve=>setTimeout(resolve,50));
+  }
+}
