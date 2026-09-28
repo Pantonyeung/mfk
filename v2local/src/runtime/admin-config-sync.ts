@@ -81,14 +81,19 @@ export function applyAdminConfigEnvelope(input:unknown):SmtAdminConfigApplyResul
   const next=validateMfkAdminConfigEnvelope(input);
   const current=readSmtAdminConfigLkg();
   if(current){
-    if(next.revision<current.revision){
+    const nextPublishedAt=Date.parse(next.publishedAt);
+    const currentPublishedAt=Date.parse(current.publishedAt);
+    if(!Number.isFinite(nextPublishedAt)||!Number.isFinite(currentPublishedAt))throw new Error('ADMIN_CONFIG_PUBLISHED_AT_INVALID');
+    if(next.revision<current.revision||nextPublishedAt<currentPublishedAt){
       return Object.freeze({disposition:'STALE',revision:current.revision,fingerprint:current.fingerprint});
     }
     if(next.revision===current.revision){
       if(next.fingerprint!==current.fingerprint)throw new Error('ADMIN_CONFIG_REVISION_CONFLICT');
+      if(nextPublishedAt!==currentPublishedAt)throw new Error('ADMIN_CONFIG_REVISION_TIME_CONFLICT');
       setStatus({state:'SYNCED',revision:current.revision,fingerprint:current.fingerprint,updatedAt:now()});
       return Object.freeze({disposition:'IDEMPOTENT',revision:current.revision,fingerprint:current.fingerprint});
     }
+    if(nextPublishedAt===currentPublishedAt)throw new Error('ADMIN_CONFIG_PUBLISHED_AT_SEQUENCE_CONFLICT');
   }
   // One localStorage replacement is the canonical atomic LKG switch.
   writeJson(SMT_ADMIN_CONFIG_LKG_KEY,next);
