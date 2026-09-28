@@ -84,3 +84,43 @@ Branch opened and domain validation seam added. UI route split is in progress.
 - Files changed: 11; all bounded to Admin UX/tests/handoff. No Store Kernel, Order, Pricing authority, Tender, Fulfillment, Print runtime, Outbox, Business Day schema, Dining Session schema or deployment governance files changed.
 - Required gate status at this checkpoint: Admin Full Tests GREEN; Admin Build GREEN; Admin Wrangler dry-run GREEN; v2local Full Tests GREEN; v2local Build GREEN; Admin Canonical Readback GREEN; Owner Runtime GREEN; Customer UI5 GREEN. SMM leg and Admin Identity still running.
 - No main merge and no manual deploy.
+
+## FINAL ACCEPTANCE
+READY_FOR_COMMANDER_ADMIN_SETTINGS_UX_ACCEPTANCE
+CURRENT_MAIN_SHA: 71e301273c81542cb534851de32852e9d4c04e76
+ACCEPTED_HEAD: 73c8bfe65ca39414759cc83a68bb01ddee783b44
+BEHIND_MAIN: 0 at acceptance check
+FINAL_CI: GREEN
+- Admin Full Tests GREEN
+- Admin Build GREEN
+- Admin Wrangler Dry-run GREEN
+- v2local Full Tests GREEN
+- v2local Build GREEN
+- SMM Full Tests GREEN
+- SMM Build GREEN
+- SMM Wrangler Dry-run GREEN
+- Admin Identity GREEN
+- Admin Canonical Readback GREEN
+- Owner Runtime GREEN
+- Customer UI5 GREEN
+
+RESULTS
+- SETTINGS_HOME_RESULT: GREEN
+- DOMAIN_ROUTE_RESULT: GREEN
+- TABLE_SETTINGS_RESULT: GREEN; existing stable IDs/version ledger/occupancy semantics preserved
+- PAYMENT_SETTINGS_RESULT: GREEN; list -> one payment method detail
+- WHATSAPP_RESULT: GREEN; no visual-only fake default; inline targets wired
+- OPERATING_TIME_RESULT: GREEN
+- REQUIRED_FIELD_RESULT: GREEN for bounded P0 fields implemented
+- INLINE_ERROR_RESULT: GREEN
+- SCROLL_FOCUS_RESULT: GREEN
+- DOMAIN_VALIDATION_RESULT: GREEN for Store Settings draft domains
+- SAVE_PUBLISH_RESULT: GREEN with explicit boundary: page draft save vs existing whole-snapshot canonical publish
+- MOBILE_RESULT: bounded responsive structure implemented; automated build/tests GREEN, physical Safari/Android device evidence not created by this work
+- TABLE_REGISTRY_REGRESSION: GREEN by existing tests
+- SMM_REGRESSION: GREEN
+- AUTHORITY_RESULT: GREEN; no second config/publish/table/pricing/order/print authority
+
+FIRST_BREAK: NONE in final CI. Canonical publish remains intentionally whole-snapshot validation; no second domain publish engine was created.
+NO MAIN MERGE
+NO MANUAL DEPLOY
