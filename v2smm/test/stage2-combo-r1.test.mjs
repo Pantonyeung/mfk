@@ -40,7 +40,7 @@ test('Stage 2 renders Combo section only for canonical Combo products and valida
   assert.match(app,/const combo=resolveSmmProductCombo\(product,menu\)/);
   assert.match(app,/\{combo\?<section className=\{\`stage2-config-section stage2-combo-section/);
   assert.match(app,/套餐基礎價/);
-  assert.match(app,/只讀 Admin 已發布 Combo \/ Pool；正式提交由 SMT 再驗證/);
+  assert.match(app,/揀你想要嘅套餐內容/);
   assert.match(app,/const comboValidation=validateSmmComboSelections\(product,menu,comboEnabled,comboSelections\)/);
   assert.match(app,/disabled=\{!validation\.ok\|\|!variationOk\|\|!comboValidation\.ok\}/);
   assert.match(selection,/if\(!enabled\)return Object\.freeze\(\{ok:true/);
@@ -76,7 +76,8 @@ test('SMT remains authoritative Combo revalidation seam and SMM does not create 
   assert.match(ingress,/revalidateSmmComboLine/);
   assert.match(ingress,/projectSyncedCombos\(envelope\)/);
   assert.match(ingress,/SMM_PUBLISHED_PRICE_CHANGED/);
-  assert.match(app,/正式套餐內容同價格會由 SMT 再驗證/);
+  assert.match(app,/revalidateSmmCartComboIntent/);
+  assert.match(app,/publishedSmmComboUnitMinor/);
   assert.doesNotMatch(app,/function .*ComboEngine|class .*ComboEngine|createComboOrder/);
   assert.doesNotMatch(worker,/function .*ComboEngine|class .*ComboEngine|createComboOrder/);
 });

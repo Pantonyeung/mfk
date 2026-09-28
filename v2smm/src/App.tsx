@@ -60,6 +60,30 @@ type View='order'|'work'|'orders'|'dine'|'more';
 const nowIso=()=>new Date().toISOString();
 const money=(currency:string,minor:number)=>new Intl.NumberFormat('zh-HK',{style:'currency',currency}).format(minor/100);
 
+const SMM_SOURCE_PRODUCT_MEDIA=Object.freeze([
+  '/brand/stage1/product-feature.webp',
+  '/brand/stage1/product-bowl.webp',
+  '/brand/stage1/product-salad.webp',
+]);
+
+function fallbackProductMedia(name:string,productId=''){
+  const normalized=name.trim();
+  if(/沙律|菜|蔬/.test(normalized))return '/brand/stage1/product-salad.webp';
+  if(/飯|便當|咖喱|米/.test(normalized))return '/brand/stage1/product-bowl.webp';
+  let hash=0;
+  for(const ch of productId||normalized)hash=(hash*31+ch.charCodeAt(0))>>>0;
+  return SMM_SOURCE_PRODUCT_MEDIA[hash%SMM_SOURCE_PRODUCT_MEDIA.length];
+}
+
+function productMediaSrc(product:Pick<SmmProduct,'name'|'productId'|'imageRef'>){
+  const exact=String(product.imageRef??'').trim();
+  return exact||fallbackProductMedia(product.name,product.productId);
+}
+
+function ProductMedia({product,className}:{product:Pick<SmmProduct,'name'|'productId'|'imageRef'>;className:string}){
+  return <span className={className}><img src={productMediaSrc(product)} alt={product.name} loading="lazy"/></span>;
+}
+
 export function App(){
   const initial=useMemo(()=>readSmmLocalWorkspace(),[]);
   const [view,setView]=useState<View>(initial.preferences.activeView);
@@ -866,17 +890,17 @@ function OrderView({connection,categories,activeCategoryId,setCategory,search,se
   const unavailable=connection!=='READY';
   return <section className="page order-page stage1-order">
     <header className="stage1-order-header">
-      <div>
-        <span className="stage1-kicker">點單</span>
-        <h1>快速點餐</h1>
-        <p>商品資料只讀取正式餐單；未有正式產品相之前，圖片位置保持留白。</p>
+      <div className="stage1-brand-line">
+        <img src="/brand/morefun-logo.webp" alt="磨飯 More Fun"/>
+        <div><span className="stage1-kicker">SMM 點單</span><h1>今日想食咩？</h1></div>
       </div>
       <b className="stage1-service-mode">{serviceMode==='DINE_IN'?'堂食':'外賣'}</b>
     </header>
 
     <label className="search stage1-search">
-      <span>搜尋商品</span>
-      <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="輸入商品名稱"/>
+      <span aria-hidden="true">⌕</span>
+      <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="搜尋商品"/>
+      {search?<button type="button" onClick={()=>setSearch('')} aria-label="清除搜尋">×</button>:null}
     </label>
 
     {categories.length?<div className="category-rail stage1-category-rail" aria-label="商品分類">
@@ -884,31 +908,36 @@ function OrderView({connection,categories,activeCategoryId,setCategory,search,se
     </div>:null}
 
     <div className="stage1-section-title">
-      <div><span>商品</span><small>{unavailable?'等待正式餐單同步':'選擇商品開始落單'}</small></div>
-      {connection==='READY'?<b>已同步</b>:<b className="muted">本機介面</b>}
+      <div><span>{search?'搜尋結果':'人氣餐點'}</span><small>{unavailable?'餐單同步中':'點商品就可以開始客製'}</small></div>
+      {connection==='READY'?<b>餐單已更新</b>:<b className="muted">稍後更新</b>}
     </div>
 
-    {connection==='LOADING'?<EmptyState title="正在同步餐單" detail="你可以先瀏覽介面；正式商品資料同步完成後會自動顯示。"/>:
-      !categories.length?<EmptyState title={connection==='READY'?'暫時未有餐單':'目前未有正式餐單資料'} detail={connection==='READY'?'目前門店資料未提供任何可售商品。':'Stage 1 已可進入；未連線時唔會建立假商品或者假價格。'}/>:
+    {connection==='LOADING'?<EmptyState title="正在更新餐單" detail="餐單準備好之後，商品會自動顯示。"/>:
+      !categories.length?<EmptyState title={connection==='READY'?'暫時未有餐單':'餐單暫時未能載入'} detail={connection==='READY'?'目前未有可供選擇嘅商品。':'請稍後重新整理，已揀內容唔會因為重新連線而重複落單。'}/>:
       products.length?<div className="product-grid stage1-product-grid">{products.map(product=>{
         const price=serviceMode==='DINE_IN'?product.publishedDineInUnitPriceMinor:product.publishedTakeawayUnitPriceMinor;
         return <button key={product.productId} className={`product-card stage1-product-card ${product.available?'':'disabled'}`} disabled={!product.available} onClick={()=>onProduct(product)}>
-          <span className="product-media" aria-label="正式產品圖片待補"/>
-          {!product.available?<span className="stage1-soldout">已售罄</span>:null}
+          <ProductMedia product={product} className="product-media"/>
+          {!product.available?<span className="stage1-soldout">暫停供應</span>:null}
           <span className="stage1-product-copy">
             <strong>{product.name}</strong>
-            <small>{Number.isSafeInteger(Number(price))?money('HKD',Number(price)):(product.available?'價格待同步':'暫停供應')}</small>
-            <i>{product.optionGroups.length||product.variations?.length||product.comboId?'可設定':''}</i>
+            <small>{Number.isSafeInteger(Number(price))?money('HKD',Number(price)):(product.available?'價格待更新':'暫停供應')}</small>
+            <i>{product.optionGroups.length||product.variations?.length||product.comboId?'可客製':''}</i>
           </span>
           {product.available?<span className="stage1-product-add" aria-hidden="true">＋</span>:null}
         </button>;
       })}</div>:
-      <EmptyState title="搵唔到商品" detail="清除搜尋或者切換其他分類。"><button className="primary" onClick={()=>setSearch('')}>清除搜尋</button></EmptyState>}
+      <section className="stage1-zero-result">
+        <img src="/brand/stage0/stage0-female.webp" alt="" aria-hidden="true"/>
+        <h2>搵唔到呢款商品</h2>
+        <p>試下其他關鍵字，或者轉去其他分類睇下。</p>
+        <button className="primary" onClick={()=>setSearch('')}>清除搜尋</button>
+      </section>}
 
     {count>0?<button className="cart-bar stage1-cart-bar" onClick={onCart}>
       <div className="stage1-cart-count"><b>{count}</b><span>購物草稿</span></div>
-      <div><strong>{quote?money(quote.currency,quote.totalMinor):'價格資料未完整'}</strong><small>{quote?`餐單版本 ${quote.revision}`:'請重新同步餐單'}</small></div>
-      <em>查看</em>
+      <div><strong>{quote?money(quote.currency,quote.totalMinor):'價格更新中'}</strong><small>{quote?'已選商品會保留到結帳':'餐單同步後可結帳'}</small></div>
+      <em>查看購物車</em>
     </button>:null}
   </section>;
 }
@@ -1125,22 +1154,22 @@ function ProductSheet({
       <div className="sheet-grabber"/>
       <header className="stage2-sheet-header">
         <div>
-          <span>{editing?'編輯商品':'商品設定'}</span>
+          <span>{editing?'編輯商品':'商品客製'}</span>
           <h2>{product.name}</h2>
-          <small>{product.description??'按需要完成規格、選項同套餐設定'}</small>
+          <small>{product.description??'揀好必選項，再按需要加配。'}</small>
         </div>
-        <button className="stage2-close" onClick={onClose} aria-label="關閉商品設定">✕</button>
+        <button className="stage2-close" onClick={onClose} aria-label="關閉商品客製">✕</button>
       </header>
 
       <div className="stage2-scroll-body">
         <section className="stage2-product-summary" aria-label="商品摘要">
-          <span className="stage2-product-media" aria-label="正式產品圖片待補"/>
+          <ProductMedia product={product} className="stage2-product-media"/>
           <div>
-            <small>{comboEnabled&&combo?'套餐已發布基礎價':serviceMode==='DINE_IN'?'堂食價格':'外賣價格'}</small>
-            <strong>{draftBaseMinor===null?'價格待同步':money('HKD',draftBaseMinor)}</strong>
-            <span>選項調整 {deltaLabel(selectedAdjustmentMinor)}</span>
-            {comboEnabled?<span>套餐選擇 {deltaLabel(selectedComboAdjustmentMinor)}</span>:null}
-            <b>{draftUnitMinor===null?'草稿價格待同步':money('HKD',draftUnitMinor)}</b>
+            <small>{comboEnabled&&combo?'套餐價':serviceMode==='DINE_IN'?'堂食':'外賣'}</small>
+            <strong>{draftBaseMinor===null?'價格更新中':money('HKD',draftBaseMinor)}</strong>
+            <span>加配 {deltaLabel(selectedAdjustmentMinor)}</span>
+            {comboEnabled?<span>套餐內容 {deltaLabel(selectedComboAdjustmentMinor)}</span>:null}
+            <b>{draftUnitMinor===null?'總價更新中':money('HKD',draftUnitMinor)}</b>
           </div>
         </section>
 
@@ -1201,7 +1230,7 @@ function ProductSheet({
           <div className="stage2-section-head stage2-combo-head">
             <div>
               <strong>套餐</strong>
-              <small>{combo.combo.name} · 只讀 Admin 已發布 Combo / Pool；正式提交由 SMT 再驗證</small>
+              <small>{combo.combo.name} · 揀你想要嘅套餐內容</small>
             </div>
             <button
               type="button"
@@ -1254,7 +1283,7 @@ function ProductSheet({
         </section>:null}
 
         {(!validation.ok||!comboValidation.ok)&&firstIssue?<section className="stage2-validation-summary" role="status">
-          <strong>仲有設定未完成</strong>
+          <strong>仲差一個選擇</strong>
           <span>{firstIssue}</span>
         </section>:null}
       </div>
@@ -1262,8 +1291,8 @@ function ProductSheet({
       <footer className="stage2-sticky-footer">
         <button onClick={onClose}>取消</button>
         <button className="primary" disabled={!validation.ok||!variationOk||!comboValidation.ok} onClick={onAdd}>
-          <span>{editing?'完成':comboEnabled?'加入套餐草稿':'加入草稿'}</span>
-          <small>{draftUnitMinor===null?'價格待同步':money('HKD',draftUnitMinor)}</small>
+          <span>{editing?'儲存修改':'加入購物車'}</span>
+          <small>{draftUnitMinor===null?'價格更新中':money('HKD',draftUnitMinor)}</small>
         </button>
       </footer>
     </section>
@@ -1325,9 +1354,9 @@ function CartSheet({cart,quote,menu,checkoutStage,serviceMode,tender,diningTarge
       <div className="sheet-grabber"/>
       <header className="stage3-cart-header">
         <div>
-          <span>購物草稿</span>
+          <span>購物車</span>
           <h2>{itemCount} 件商品</h2>
-          <small>只係本機草稿；正式價格、套餐同可售狀態仍由 SMT 提交時重新驗證。</small>
+          <small>確認商品、數量同服務方式，之後就可以結帳。</small>
         </div>
         <div className="stage3-header-actions">
           {cart.length?<button className="stage3-clear" type="button" onClick={onClear}>清空</button>:null}
@@ -1337,7 +1366,7 @@ function CartSheet({cart,quote,menu,checkoutStage,serviceMode,tender,diningTarge
 
       <div className="stage3-scroll-body">
         <section className="stage3-mode" aria-label="服務方式">
-          <div><strong>服務方式</strong><small>Stage 3 只設定草稿模式；枱號、付款同提交留待下一 Stage。</small></div>
+          <div><strong>服務方式</strong><small>堂食或外賣都可以喺結帳前再改。</small></div>
           <div className="stage3-segmented">
             <button className={serviceMode==='DINE_IN'?'active':''} type="button" onClick={()=>onServiceMode('DINE_IN')}>堂食</button>
             <button className={serviceMode==='TAKEAWAY'?'active':''} type="button" onClick={()=>onServiceMode('TAKEAWAY')}>外賣</button>
@@ -1345,8 +1374,8 @@ function CartSheet({cart,quote,menu,checkoutStage,serviceMode,tender,diningTarge
         </section>
 
         {!menu&&cart.length?<section className="stage3-sync-warning" role="status">
-          <strong>正式餐單未同步</strong>
-          <span>草稿會保留喺本機；重新同步餐單後先可以進入結帳。</span>
+          <strong>餐單更新中</strong>
+          <span>你揀好嘅商品會保留，資料更新後就可以繼續結帳。</span>
         </section>:null}
 
         {affectedCount>0?<section className="stage3-repair-summary" role="status">
@@ -1355,9 +1384,9 @@ function CartSheet({cart,quote,menu,checkoutStage,serviceMode,tender,diningTarge
         </section>:null}
 
         {!cart.length?<section className="stage3-empty">
-          <span className="stage3-empty-bag" aria-hidden="true">□</span>
-          <h3>購物草稿係空嘅</h3>
-          <p>返回點單加入商品；同一商品唔同設定會保留做獨立項目。</p>
+          <span className="stage3-empty-bag" aria-hidden="true">♡</span>
+          <h3>購物車仲係空嘅</h3>
+          <p>去點單揀返你想食嘅餐點。</p>
           <button className="primary" type="button" onClick={onClose}>去點單</button>
         </section>:<div className="stage3-lines">
           {rows.map(({line,attention})=>{
@@ -1377,8 +1406,10 @@ function CartSheet({cart,quote,menu,checkoutStage,serviceMode,tender,diningTarge
               ?Number(attention.proposedPublishedUnitPriceMinor)
               :null;
             const priceChanged=attention&&unitMinor!==null&&proposedUnit!==null&&unitMinor!==proposedUnit;
+            const product=menu?.products.find(item=>item.productId===line.productId);
+            const mediaProduct=product??{productId:line.productId,name:line.productName,imageRef:undefined};
             return <article className={`stage3-line ${attention?'has-attention':''}`} key={line.lineId}>
-              <span className="stage3-line-media" aria-label="正式產品圖片待補"/>
+              <ProductMedia product={mediaProduct} className="stage3-line-media"/>
               <div className="stage3-line-main">
                 <div className="stage3-line-title">
                   <div><strong>{line.productName}</strong><small>{summary}</small></div>
@@ -1397,8 +1428,8 @@ function CartSheet({cart,quote,menu,checkoutStage,serviceMode,tender,diningTarge
                 </div>
                 {attention?<div className="stage3-line-attention">
                   <div>
-                    <b>{attention.kind}</b>
-                    <span>{attention.kind==='PRICE_CHANGED'?'餐單價格已更新，請確認新價格。':'商品／套餐發布資料已更新，請確認或重新編輯。'}</span>
+                    <b>{attention.kind==='PRICE_CHANGED'?'價格有更新':'商品內容有更新'}</b>
+                    <span>{attention.kind==='PRICE_CHANGED'?'餐單價格已更新，請確認新價格。':'商品／套餐資料已更新，請確認或重新編輯。'}</span>
                     {priceChanged?<small>舊價 {money('HKD',unitMinor!)} → 新價 {money('HKD',proposedUnit!)}</small>:null}
                   </div>
                   <div className="stage3-attention-actions">
@@ -1423,9 +1454,9 @@ function CartSheet({cart,quote,menu,checkoutStage,serviceMode,tender,diningTarge
         <div>
           <span>{affectedCount?'可用小計 · '+validItemCount+' 件':'總額'}</span>
           <strong>{affectedCount?money('HKD',validSubtotalMinor):(quote?money(quote.currency,quote.totalMinor):'價格待同步')}</strong>
-          <small>{menu?'餐單版本 '+menu.revision+' · SMT 仍會再驗證':'等待正式餐單同步'}</small>
+          <small>{menu?'結帳前會再確認最新餐單資料':'等待餐單更新'}</small>
         </div>
-        <button className="primary stage3-checkout" type="button" disabled={!checkoutReady} onClick={onCheckout}>前往結帳 →</button>
+        <button className="primary stage3-checkout" type="button" disabled={!checkoutReady} onClick={onCheckout}>去結帳</button>
       </footer>
     </section>
   </div>;
@@ -1464,9 +1495,9 @@ function Stage4CheckoutView({cart,quote,menu,serviceMode,tender,diningTarget,din
       <div className="sheet-grabber"/>
       <header className="stage4-header">
         <div>
-          <span>第 4 階段 · 結帳</span>
-          <h2>提交前確認</h2>
-          <small>確認以下資料後會進入第 5 階段正式提交；正式結果只以 SMT / Store Kernel 讀回為準。</small>
+          <span>結帳</span>
+          <h2>落單前確認</h2>
+          <small>逐步確認服務方式、堂食去向同付款方式。</small>
         </div>
         <button className="stage4-close" type="button" onClick={onClose} aria-label="關閉結帳">✕</button>
       </header>
@@ -1474,7 +1505,7 @@ function Stage4CheckoutView({cart,quote,menu,serviceMode,tender,diningTarget,din
       <div className="stage4-scroll-body">
         <section className="stage4-section">
           <div className="stage4-section-head">
-            <div><strong>服務方式</strong><small>切換屬店員明確操作；價格會按目前已發布資料即時重算。</small></div>
+            <div><strong>服務方式</strong><small>今張單係外賣定堂食？</small></div>
             <span>1</span>
           </div>
           <div className="stage4-segmented">
@@ -1485,7 +1516,7 @@ function Stage4CheckoutView({cart,quote,menu,serviceMode,tender,diningTarget,din
 
         {serviceMode==='DINE_IN'?<section className={`stage4-section stage4-dining ${diningStatus.valid?'':'required'}`}>
           <div className="stage4-section-head">
-            <div><strong>堂食去向</strong><small>必須使用 Admin 已發布餐枱，或者加入輪候。</small></div>
+            <div><strong>堂食去向</strong><small>揀枱號；未有座位就先加入輪候。</small></div>
             <span>2</span>
           </div>
           <div className="stage4-target-row">
@@ -1495,12 +1526,12 @@ function Stage4CheckoutView({cart,quote,menu,serviceMode,tender,diningTarget,din
             </div>
             <button type="button" className={diningStatus.valid?'':'primary'} onClick={onChooseDiningTarget}>{diningStatus.valid?'更改':'選擇餐枱／輪候'}</button>
           </div>
-          {!diningStatus.valid?<p className="stage4-inline-warning">堂食未選 Table / Waiting target，提交按鈕會保持停用。</p>:null}
+          {!diningStatus.valid?<p className="stage4-inline-warning">堂食需要先揀枱號或者加入輪候。</p>:null}
         </section>:null}
 
         <section className="stage4-section">
           <div className="stage4-section-head">
-            <div><strong>付款方式</strong><small>今階段只記錄 Tender；唔執行付款、唔自動開錢箱。</small></div>
+            <div><strong>付款方式</strong><small>揀客人今次使用嘅付款方式。</small></div>
             <span>{serviceMode==='DINE_IN'?'3':'2'}</span>
           </div>
           <div className="stage4-tender-grid">
@@ -1515,7 +1546,7 @@ function Stage4CheckoutView({cart,quote,menu,serviceMode,tender,diningTarget,din
 
         <section className="stage4-section stage4-summary">
           <div className="stage4-section-head">
-            <div><strong>最後摘要</strong><small>正式價格、Combo、餐單 revision 仍由 SMT 提交時重新驗證。</small></div>
+            <div><strong>訂單確認</strong><small>核對商品、服務方式、付款方式同總額。</small></div>
             <span>{serviceMode==='DINE_IN'?'4':'3'}</span>
           </div>
 
@@ -1524,15 +1555,18 @@ function Stage4CheckoutView({cart,quote,menu,serviceMode,tender,diningTarget,din
             <div><span>服務方式</span><strong>{serviceLabel}</strong></div>
             {serviceMode==='DINE_IN'?<div><span>堂食去向</span><strong className={diningStatus.valid?'':'warn'}>{diningStatus.label}</strong></div>:null}
             <div><span>付款方式</span><strong>{smmStage4TenderLabel(tender)}</strong></div>
-            <div><span>餐單版本</span><strong>{menu?.revision??'等待同步'}</strong></div>
+            <div><span>商品數量</span><strong>{itemCount} 件</strong></div>
           </div>
 
           <div className="stage4-review-lines">
             {cart.map(line=>{
               const total=smmLineTotalMinor(line.publishedUnitPriceMinor,line.quantity);
+              const product=menu?.products.find(item=>item.productId===line.productId);
+              const mediaProduct=product??{productId:line.productId,name:line.productName,imageRef:undefined};
               return <div key={line.lineId}>
+                <ProductMedia product={mediaProduct} className="stage4-line-media"/>
                 <span>{line.productName} × {line.quantity}</span>
-                <strong>{total===null?'價格待同步':money('HKD',total)}</strong>
+                <strong>{total===null?'價格更新中':money('HKD',total)}</strong>
               </div>;
             })}
           </div>
@@ -1540,21 +1574,25 @@ function Stage4CheckoutView({cart,quote,menu,serviceMode,tender,diningTarget,din
           {note.trim()?<div className="stage4-note-summary"><span>備註</span><p>{note}</p></div>:null}
 
           <div className="stage4-total">
-            <div><span>總額</span><small>{quote?'已發布價格預覽 · SMT 最終再驗證':'價格資料未完整'}</small></div>
+            <div><span>總額</span><small>{quote?'已按最新餐單資料計算':'價格更新中'}</small></div>
             <strong>{quote?money(quote.currency,quote.totalMinor):'—'}</strong>
           </div>
 
           {hasAttention?<section className="stage4-blocker" role="alert">
-            <strong>購物草稿有未確認更新</strong>
-            <span>返回購物草稿處理 PRICE_CHANGED / CONFIG_CHANGED 後先可以提交。</span>
+            <strong>有商品資料更新咗</strong>
+            <span>返回購物車確認有變更嘅商品，就可以繼續落單。</span>
           </section>:null}
+          <section className="stage4-final-callout">
+            <img src="/brand/stage0/stage0-female.webp" alt="" aria-hidden="true"/>
+            <div><strong>最後一步</strong><span>資料確認好就可以落單。</span></div>
+          </section>
         </section>
       </div>
 
-      <footer className="stage4-footer">
-        <button type="button" onClick={onBackToCart}>返回購物草稿</button>
-        <button className="primary stage4-submit" type="button" disabled={!submitReady} onClick={onSubmitBoundary}>提交訂單</button>
-        <small>{submitReady?'結帳資料已齊；按一次後會鎖定同一提交身份。':serviceMode==='DINE_IN'&&!diningStatus.valid?'請先選擇餐枱或輪候。':hasAttention?'請先處理購物草稿更新。':'請確認餐單價格資料。'}</small>
+      <footer className="stage4-footer" data-menu-revision={menu?.revision??''}>
+        <button type="button" onClick={onBackToCart}>返回購物車</button>
+        <button className="primary stage4-submit" type="button" disabled={!submitReady} onClick={onSubmitBoundary}>確認落單</button>
+        <small>{submitReady?'資料已齊，按一次確認落單。':serviceMode==='DINE_IN'&&!diningStatus.valid?'請先揀枱號或加入輪候。':hasAttention?'請先處理購物車內有更新嘅商品。':'等價格更新完成就可以落單。'}</small>
       </footer>
     </section>
   </div>;
@@ -1568,9 +1606,9 @@ function DiningTargetSheet({tables,covers,setCovers,onClose,onSelect}:{
   onClose:()=>void;
   onSelect:(target:SmmDiningTarget)=>void;
 }){
-  return <div className="overlay"><section className="sheet" role="dialog" aria-modal="true"><div className="sheet-grabber"/><header><div><span>堂食去向</span><h2>掛枱／輪候</h2><small>揀枱後，SMT 會自動掛入該枱；如果該枱已有堂食單就直接加單。</small></div><button onClick={onClose}>✕</button></header>
+  return <div className="overlay"><section className="sheet" role="dialog" aria-modal="true"><div className="sheet-grabber"/><header><div><span>堂食去向</span><h2>掛枱／輪候</h2><small>揀枱後會掛入該枱；如果已有堂食單就直接加單。</small></div><button onClick={onClose}>✕</button></header>
     <section className="option-group"><div><strong>人數</strong><span>1–30 位</span></div><div className="qty"><button onClick={()=>setCovers(Math.max(1,covers-1))}>−</button><b>{covers}</b><button onClick={()=>setCovers(Math.min(30,covers+1))}>＋</button></div></section>
-    <section className="option-group"><div><strong>掛入邊張枱</strong><span>由 Admin 發佈；已有單＝加單；空枱＝開枱</span></div>{tables.length?<div className="option-list">{tables.map(row=><button key={row.tableId} onClick={()=>onSelect({kind:'TABLE',tableId:row.tableId,covers})}>{row.label}</button>)}</div>:<p className="callout">Admin 尚未發布任何可用枱號。</p>}</section>
+    <section className="option-group"><div><strong>掛入邊張枱</strong><span>已有單＝加單；空枱＝開枱</span></div>{tables.length?<div className="option-list">{tables.map(row=><button key={row.tableId} onClick={()=>onSelect({kind:'TABLE',tableId:row.tableId,covers})}>{row.label}</button>)}</div>:<p className="callout">目前未有可用枱號。</p>}</section>
     <section className="option-group"><div><strong>未決定座位</strong><span>先放入輪候</span></div><button className="primary" onClick={()=>onSelect({kind:'WAITING',covers})}>加入輪候</button></section>
   </section></div>;
 }
@@ -1608,7 +1646,15 @@ function EmptyState({title,detail,children}:{title:string;detail:string;children
 }
 function Tool({title,detail,state,onClick}:{title:string;detail:string;state:string;onClick:()=>void}){return <button className="tool-card" onClick={onClick}><span>◆</span><strong>{title}</strong><small>{detail}</small><em>{state}</em></button>}
 function Metric({label,value}:{label:string;value:string}){return <div><small>{label}</small><strong>{value}</strong></div>}
-function NavButton({active,label,glyph,badge,onClick}:{active:boolean;label:string;glyph?:string;badge?:string;onClick:()=>void}){return <button className={active?'active':''} onClick={onClick}>{glyph?<span>{glyph}</span>:null}<small>{label}</small>{badge?<b>{badge}</b>:null}</button>}
+function NavGlyph({label}:{label:string}){
+  const common={viewBox:'0 0 24 24',width:22,height:22,fill:'none',stroke:'currentColor',strokeWidth:1.8,strokeLinecap:'round' as const,strokeLinejoin:'round' as const,'aria-hidden':true};
+  if(label==='點單')return <svg {...common}><rect x="4" y="4" width="16" height="16" rx="4"/><path d="M8 9h8M8 13h5M8 17h3"/></svg>;
+  if(label==='待處理')return <svg {...common}><path d="M7 5h10l2 3v11H5V8l2-3Z"/><path d="M9 5V3h6v2M8 11h8M8 15h5"/></svg>;
+  if(label==='訂單')return <svg {...common}><path d="M6 3h12v18l-2-1.5L14 21l-2-1.5L10 21l-2-1.5L6 21V3Z"/><path d="M9 8h6M9 12h6M9 16h4"/></svg>;
+  if(label==='堂食')return <svg {...common}><path d="M7 3v7M4.5 3v4.5A2.5 2.5 0 0 0 7 10v11M11 3v18M16 3c2 2 3 5 3 8h-4V3h1Z"/></svg>;
+  return <svg {...common}><circle cx="6" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="18" cy="12" r="1.5" fill="currentColor" stroke="none"/></svg>;
+}
+function NavButton({active,label,badge,onClick}:{active:boolean;label:string;badge?:string;onClick:()=>void}){return <button className={active?'active':''} onClick={onClick}><span className="nav-glyph"><NavGlyph label={label}/></span><small>{label}</small>{badge?<b>{badge}</b>:null}</button>}
 
 function connectionLabelShort(state:SmmConnectionState){return state==='READY'?'已連接':state==='LOADING'?'同步中':state==='ERROR'?'錯誤':state==='STALE'?'資料稍舊':state==='PARTIAL'?'部分資料':state==='UNKNOWN'?'未知':'未連接'}
 function moreTitle(tool:string){return tool==='staff'?'員工帳戶':tool==='connection'?'連線設定':tool==='pending'?'待提交草稿':tool==='channels'?'平台狀態':tool==='business'?'營業日':tool==='capacity'?'產能':tool==='reporting'?'營運報表':tool==='refunds'?'退款要求':tool==='printing'?'列印狀態':tool==='sellability'?'商品供應':'診斷'}
