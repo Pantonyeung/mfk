@@ -17,7 +17,7 @@ test('R4 keeps guided ordering visible across menu product jar and checkout',()=
   assert.match(views,/JourneyCoach/);
   assert.match(views,/active=\{1\}/);
   assert.match(views,/active=\{2\}/);
-  assert.match(views,/ui4-checkout-stepper/);
+  assert.doesNotMatch(views,/ui4-checkout-stepper/);
   assert.match(checkoutUi4,/ui4-checkout-stepper/);
   assert.match(checkoutUi4,/提交前確認/);
   assert.match(views,/step-coach/);
