@@ -34,6 +34,7 @@ import {Stage6QueueView} from './Stage6Queue';
 import {Stage7OrdersView} from './Stage7Orders';
 import {Stage8DineView} from './Stage8Dine';
 import {Stage9MoreView,type Stage9Tool} from './Stage9More';
+import {StageXState} from './StageXState';
 import {smmStage5ConfirmedDisplayCode,smmStage5RepairPath,smmStage5SubmissionShortRef} from './stage5-submit.mjs';
 import './stage1.css';
 import './stage2.css';
@@ -731,8 +732,11 @@ export function App(){
 
     {notice?<div className="notice" role="status"><span>{notice}</span><button onClick={()=>setNotice(null)}>收起</button></div>:null}
     {webSmtAcceptance?<section className="recovery-banner"><strong>Web SMT 驗收模式</strong><span>呢個頁面只會將測試訂單送到臨時公網 SMT；唔會送去舖頭實機、唔會觸發實體打印。</span></section>:null}
-    {error?<section className="recovery-banner degraded"><strong>門店資料同步失敗</strong><span>{error}</span><button onClick={()=>void refresh()}>再試一次</button></section>:null}
-    {connection==='NOT_CONNECTED'?<section className="recovery-banner offline"><strong>尚未連接門店服務</strong><span>本機草稿同操作偏好可以使用；正式餐單、報價、訂單同營運狀態會保持空白，唔會顯示假資料。</span></section>:null}
+    {error?<StageXState compact kind="ERROR" title="門店資料暫時未能更新" detail={error} primaryLabel="再試一次" onPrimary={()=>void refresh()}/>:null}
+    {connection==='NOT_CONNECTED'?<StageXState compact kind="OFFLINE" title="尚未連接門店服務" detail="本機草稿會保留；連線後再載入餐單、訂單同營運資料。"/>:null}
+    {connection==='STALE'?<StageXState compact kind="STALE" onPrimary={()=>void refresh()}/>:null}
+    {connection==='PARTIAL'?<StageXState compact kind="PARTIAL" onPrimary={()=>void refresh()}/>:null}
+    {connection==='UNKNOWN'?<StageXState compact kind="UNKNOWN" primaryLabel="重新確認" onPrimary={()=>void refresh()}/>:null}
 
     <section className="stage">
       {view==='order'?<OrderView
