@@ -435,8 +435,8 @@ async function keetaProviderJson(config,token,url,params){
   return Object.freeze({code,message:String(row.message||'Success'),data:row.data??null,errorList:Array.isArray(row.errorList)?row.errorList:[]});
 }
 
-async function syncKeetaSellability(config,token,snapshot){
-  const projection=buildKeetaSellabilityProjection(snapshot);
+async function syncKeetaSellability(config,token,snapshot,runtimeSellability=[]){
+  const projection=buildKeetaSellabilityProjection(snapshot,runtimeSellability);
   if(!projection.enabled)throw new Error('KEETA_SELLABILITY_SYNC_DISABLED_BY_PUBLISHED_CONFIG');
   const results=[];
   for(const [status,codes] of [[1,projection.available],[0,projection.unavailable]]){
@@ -1109,7 +1109,7 @@ export class KeetaRuntimeStore{
         const body=record(await request.json(),'KEETA_SELLABILITY_PREVIEW_INPUT_INVALID');
         const revision=positiveInt(body.revision,'KEETA_SELLABILITY_ADMIN_REVISION_INVALID');
         const adminFingerprint=nonEmpty(body.adminFingerprint,'KEETA_SELLABILITY_ADMIN_FINGERPRINT_REQUIRED');
-        const projection=buildKeetaSellabilityProjection(body.snapshot);
+        const projection=buildKeetaSellabilityProjection(body.snapshot,body.runtimeSellability);
         return json({
           state:projection.enabled?'READY':'DISABLED',
           revision,adminFingerprint,
@@ -1129,7 +1129,7 @@ export class KeetaRuntimeStore{
         const adminFingerprint=nonEmpty(body.adminFingerprint,'KEETA_SELLABILITY_ADMIN_FINGERPRINT_REQUIRED');
         const config=requireRuntimeConfig(this.env);
         const token=await this.usableToken();
-        const result=await syncKeetaSellability(config,token,body.snapshot);
+        const result=await syncKeetaSellability(config,token,body.snapshot,body.runtimeSellability);
         const row=Object.freeze({
           state:'COMPLETED',provider:'KEETA',canonicalStoreId:'MF01',
           providerShopId:config.providerShopId,adminRevision:revision,adminFingerprint,
