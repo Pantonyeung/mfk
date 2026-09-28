@@ -52,7 +52,7 @@ export function StaffAuthGate({children}:{children:ReactNode}){
 
   const press=(key:string)=>{
     if(key==='⌫'){setPin(value=>value.slice(0,-1));setError('');return;}
-    if(/^\\d$/.test(key)){setPin(value=>(value+key).slice(0,8));setError('');}
+    if(/^\d$/.test(key)){setPin(value=>(value+key).slice(0,8));setError('');}
   };
   const date=new Intl.DateTimeFormat('zh-HK',{year:'numeric',month:'2-digit',day:'2-digit',weekday:'short'}).format(now);
   const time=new Intl.DateTimeFormat('zh-HK',{hour:'2-digit',minute:'2-digit',hour12:false}).format(now);
