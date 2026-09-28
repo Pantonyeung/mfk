@@ -425,6 +425,7 @@ export interface CleanSmtCoreRuntimePort{
     orderId:string;eventId:1002|1003|1004|1006|1008;eventName:string;providerMessageId:string;providerPushedAt:string;rawMessage:string;
   }):{readonly orderId:string;readonly disposition:'APPLIED'|'EVIDENCE_ONLY'|'IDEMPOTENT'|'CONFLICT';readonly fulfillmentLabel:StoredOrder['fulfillmentLabel']};
   readDining?(selectedSessionId?:string):Promise<SmtDiningProjection>;
+  runtimeAvailabilityStatus?(nodeId:string):SmtAvailabilityStatus;
   readAvailability?():Promise<SmtAvailabilityProjection>;
   readCapacityPoolState?():Promise<SmtCapacityPoolStateView>;
   adjustCapacityPool?(poolId:string,remainingQty:number,note?:string):Promise<SmtCapacityPoolStateView>;
