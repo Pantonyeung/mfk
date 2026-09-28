@@ -54,7 +54,7 @@ describe('Admin UI recomposition',()=>{
 
   it('turns store settings into a first-level domain chooser instead of one long form',()=>{
     const home=render('/admin/store/settings');
-    for(const label of ['基本資料','服務模式','堂食枱號','營業時間','營運計時','訂單提醒','WhatsApp 備援','電子支付'])expect(home).toContain(label);
+    for(const label of ['基本資料','服務模式','堂食枱號','營業時間','營運計時','訂單提醒','WhatsApp 備援','電子支付','QR Code'])expect(home).toContain(label);
     expect(home).not.toContain('堂食超時變紅（分鐘）');
     const timing=render('/admin/store/settings/timing');
     expect(timing).toContain('‹ 門店設定');
@@ -63,6 +63,10 @@ describe('Admin UI recomposition',()=>{
     const payments=render('/admin/store/settings/payments');
     expect(payments).toContain('AlipayHK');
     expect(payments).not.toContain('付款 QR 圖');
+    const qr=render('/admin/store/settings/qr');
+    expect(qr).toContain('QR Code');
+    expect(qr).toContain('付款 QR 圖');
+    expect(qr).toContain('AlipayHK');
   });
 
   it('keeps channel routes task-scoped instead of repeating mapping and every policy form',()=>{
