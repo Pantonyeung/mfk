@@ -776,13 +776,15 @@ export function ChannelsWorkspace({mode}:{mode:'overview'|'mapping'|'failures'|'
       </div>:<div className="admin-read-empty">未有 Keeta commercial evidence。收到並連結第一張 Keeta 訂單後會自動出現。</div>}
       <div className="admin-editor-actions"><button type="button" className="secondary" disabled={Boolean(commercialBusy)} onClick={()=>void refreshCommercialRows()}>重新讀取列表</button></div>
     </section>:null}
-    <div className="admin-policy-grid two">
-      <article className="admin-policy-card"><h2>Keeta 平台設定</h2><label><span>顯示名稱</span><input value={config.displayName} onChange={event=>patch({displayName:event.target.value})}/></label><Toggle checked={config.enabled} onChange={enabled=>patch({enabled})} label="啟用平台設定"/><Toggle checked={config.autoAccept} onChange={autoAccept=>patch({autoAccept})} label="正常單自動接單"/><Toggle checked={config.syncSellability} onChange={syncSellability=>patch({syncSellability})} label="同步售罄／供應"/><label><span>遲到訂單界線（分鐘）</span><input type="number" min={0} value={config.lateCutoffMinutes} onChange={event=>patch({lateCutoffMinutes:Number(event.target.value)||0})}/></label><label><span>佣金估算 %</span><input inputMode="decimal" value={config.commissionPct} onChange={event=>patch({commissionPct:event.target.value})}/></label></article>
+    {(mode==='overview'||mode==='accept'||mode==='sync'||mode==='estimate')?<div className="admin-policy-grid two">
+      <article className="admin-policy-card"><h2>Keeta 平台設定</h2><label><span>顯示名稱</span><input value={config.displayName} onChange={event=>patch({displayName:event.target.value})}/></label>{mode==='overview'?<Toggle checked={config.enabled} onChange={enabled=>patch({enabled})} label="啟用平台設定"/>:null}{mode==='accept'?<><Toggle checked={config.autoAccept} onChange={autoAccept=>patch({autoAccept})} label="正常單自動接單"/><label><span>遲到訂單界線（分鐘）</span><input type="number" min={0} value={config.lateCutoffMinutes} onChange={event=>patch({lateCutoffMinutes:Number(event.target.value)||0})}/></label></>:null}{mode==='sync'?<Toggle checked={config.syncSellability} onChange={syncSellability=>patch({syncSellability})} label="同步售罄／供應"/>:null}{mode==='estimate'?<label><span>佣金估算 %</span><input inputMode="decimal" value={config.commissionPct} onChange={event=>patch({commissionPct:event.target.value})}/></label>:null}</article>
+    </div>:null}
+    {(mode==='mapping'||mode==='failures')?<div className="admin-policy-grid two">
       <article className="admin-policy-card"><h2>{mode==='failures'?'未完成對應':'商品對應'}</h2>
         {mode==='failures'
           ?(failures.length?<div>{failures.map(row=><p key={row.providerItemId}>{row.providerItemId} · 待處理</p>)}</div>:<div className="admin-read-empty">目前冇待處理映射。</div>)
           :<><label><span>平台商品 ID</span><input value={providerItemId} onChange={event=>setProviderItemId(event.target.value)}/></label><label><span>磨飯商品</span><select value={productId} onChange={event=>setProductId(event.target.value)}><option value="">請選擇</option>{draft.products.map(product=><option key={product.id} value={product.id}>{product.name}</option>)}</select></label><button type="button" onClick={addMapping}>保存對應</button><div className="admin-readback-proof">{mappings.slice(0,20).map(row=><p key={row.providerItemId}><span>{row.providerItemId}</span><b>{draft.products.find(product=>product.id===row.productId)?.name??row.productId}</b></p>)}</div></>}
       </article>
-    </div>
+    </div>:null}
   </section>;
 }
