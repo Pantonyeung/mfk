@@ -587,7 +587,7 @@ export function App(){
       item.state==='DRAFT'&&
       item.menuRevision===menu.revision&&
       item.checkout?.serviceMode===serviceMode&&
-      item.checkout?.tender===tender&&
+      (serviceMode==='DINE_IN'||item.checkout?.tender===tender)&&
       item.publishedTotalMinor===publishedTotalMinor&&
       JSON.stringify(item.checkout?.diningTarget??null)===JSON.stringify(diningTarget)&&
       JSON.stringify(item.cart)===JSON.stringify(cart)
@@ -597,7 +597,7 @@ export function App(){
       menuRevision:menu.revision,
       publishedTotalMinor,
       serviceMode,
-      tender,
+      ...(serviceMode==='TAKEAWAY'?{tender}:{}),
       ...(diningTarget?{diningTarget}:{}),
     });
     saveIntent(base);
@@ -628,7 +628,14 @@ export function App(){
         const rejected=Object.freeze({...pending,state:'REJECTED' as const,updatedAt:nowIso(),lastMessage:result.message});
         saveIntent(rejected);
         setStage5Session(Object.freeze({intent:rejected,state:'REJECTED',message:result.message}));
-        if(result.message.startsWith('SMM_PUBLISHED_PRICE_CHANGED')||result.message.startsWith('SMM_MENU_REVISION_CHANGED'))await refresh();
+        if(result.message.startsWith('SMM_PUBLISHED_PRICE_CHANGED')||result.message.startsWith('SMM_MENU_REVISION_CHANGED')){
+          removeIntent(pending.submissionId);
+          setStage5Session(null);
+          await refresh();
+          setCartOpen(true);
+          setCheckoutStage(false);
+          setNotice('餐單已更新，需要重新確認有變更嘅商品；購物車已保留，系統唔會自動再次提交。');
+        }
         releaseSubmitLock();
         return;
       }
@@ -1446,7 +1453,7 @@ function Stage4CheckoutView({cart,quote,menu,serviceMode,tender,diningTarget,din
         <div>
           <span>結帳</span>
           <h2>落單前確認</h2>
-          <small>逐步確認服務方式、堂食去向同付款方式。</small>
+          <small>{serviceMode==='DINE_IN'?'確認堂食去向同商品；付款會喺真正埋單時處理。':'逐步確認服務方式同付款方式。'}</small>
         </div>
         <button className="stage4-close" type="button" onClick={onClose} aria-label="關閉結帳">✕</button>
       </header>
@@ -1478,20 +1485,15 @@ function Stage4CheckoutView({cart,quote,menu,serviceMode,tender,diningTarget,din
           {!diningStatus.valid?<p className="stage4-inline-warning">堂食需要先揀枱號或者加入輪候。</p>:null}
         </section>:null}
 
-        <section className="stage4-section">
+        {serviceMode==='TAKEAWAY'?<section className="stage4-section">
           <div className="stage4-section-head">
             <div><strong>付款方式</strong><small>揀客人今次使用嘅付款方式。</small></div>
-            <span>{serviceMode==='DINE_IN'?'3':'2'}</span>
+            <span>2</span>
           </div>
           <div className="stage4-tender-grid">
-            {SMM_STAGE4_TENDERS.map(row=><button
-              key={row.value}
-              type="button"
-              className={tender===row.value?'active':''}
-              onClick={()=>onTender(row.value)}
-            >{row.label}</button>)}
+            {SMM_STAGE4_TENDERS.map(row=><button key={row.value} type="button" className={tender===row.value?'active':''} onClick={()=>onTender(row.value)}>{row.label}</button>)}
           </div>
-        </section>
+        </section>:<section className="stage4-section"><strong>堂食先落單，食完先埋單</strong><small>今次只建立／追加堂食單，唔會記錄付款方式。</small></section>}
 
         <section className="stage4-section stage4-summary">
           <div className="stage4-section-head">
@@ -1503,7 +1505,7 @@ function Stage4CheckoutView({cart,quote,menu,serviceMode,tender,diningTarget,din
             <div><span>商品</span><strong>{itemCount} 件</strong></div>
             <div><span>服務方式</span><strong>{serviceLabel}</strong></div>
             {serviceMode==='DINE_IN'?<div><span>堂食去向</span><strong className={diningStatus.valid?'':'warn'}>{diningStatus.label}</strong></div>:null}
-            <div><span>付款方式</span><strong>{smmStage4TenderLabel(tender)}</strong></div>
+            {serviceMode==='TAKEAWAY'?<div><span>付款方式</span><strong>{smmStage4TenderLabel(tender)}</strong></div>:<div><span>付款</span><strong>食完埋單時處理</strong></div>}
             <div><span>商品數量</span><strong>{itemCount} 件</strong></div>
           </div>
 
