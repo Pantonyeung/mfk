@@ -96,7 +96,7 @@ describe('SMM LAN ingress',()=>{
     const ingress=createSmmLanIngress({createOrder,orders:()=>[],holds:()=>[],upsertSmmDiningHold} as any);
     const result=ingress.submit({
       protocolVersion:1,type:'smm.lan.order.submit.v1',requestId:'R5',submissionId:'S5',idempotencyKey:'I5',storeId:'MF01',
-      menuRevision:'7',publishedTotalMinor:4100,serviceMode:'DINE_IN',tender:'FPS',
+      menuRevision:'7',publishedTotalMinor:4100,serviceMode:'DINE_IN',
       diningTarget:{kind:'TABLE',tableId:'T03',covers:2},
       lines:[{lineId:'L1',productId:'riceball',productName:'原味飯團',quantity:1,publishedUnitPriceMinor:4100,selections:[]}],
     },{deviceId:'SMM-1',trusted:true});
@@ -179,7 +179,9 @@ describe('SMM LAN ingress',()=>{
       }],
     } as any);
     const snapshot=ingress.readSnapshot() as any;
-    expect(snapshot.orders).toHaveLength(1);
+    expect(snapshot.diningTables).toEqual(expect.arrayContaining([expect.objectContaining({tableId:'T03',label:'堂三'})]));
+    expect(snapshot.diningTables.some((row:any)=>row.tableId==='T09')).toBe(false);
+        expect(snapshot.orders).toHaveLength(1);
     expect(snapshot.orders[0]).toMatchObject({displayCode:'P009',lifecycle:'進行中',readback:'CONFIRMED'});
     expect(snapshot.dineSessions).toHaveLength(1);
     expect(snapshot.dineSessions[0]).toMatchObject({
@@ -227,7 +229,7 @@ describe('SMM LAN ingress',()=>{
     const ingress=createSmmLanIngress({createOrder,orders:()=>[],holds:()=>[],upsertSmmDiningHold} as any);
     const result=ingress.submit({
       protocolVersion:1,type:'smm.lan.order.submit.v1',requestId:'R6',submissionId:'S6',idempotencyKey:'I6',storeId:'MF01',
-      menuRevision:'7',publishedTotalMinor:4100,serviceMode:'DINE_IN',tender:'CASH',
+      menuRevision:'7',publishedTotalMinor:4100,serviceMode:'DINE_IN',
       diningTarget:{kind:'TABLE',tableId:'T09',covers:2},
       lines:[{lineId:'L1',productId:'riceball',productName:'原味飯團',quantity:1,publishedUnitPriceMinor:4100,selections:[]}],
     },{deviceId:'SMM-1',trusted:true});
