@@ -1,0 +1,18 @@
+MFK 客戶端功能要求｜Working V10
+日期：2026-09-26
+狀態：需求收集中
+里程碑：WhatsApp 人工參考碼數字格式已鎖
+
+人工參考碼：
+- 純數字
+- 4–6 位
+- 預設建議 6 位
+- 禁止英文字母及符號
+- 同一 submissionId 沿用同一人工參考碼
+- Retry 不重新產生
+- Active fallback scope 內不可重覆
+- 取餐碼 = 電話 last4，與人工參考碼分離
+- 店舖流水號 = SMT Formal Order display sequence，與人工參考碼分離
+
+MILESTONE：
+CUSTOMER_FALLBACK_REFERENCE_NUMERIC_4_TO_6_V1_LOCKED

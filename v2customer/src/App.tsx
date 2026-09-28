@@ -1,15 +1,27 @@
-import {useEffect,useMemo,useState} from 'react';
-import {createCustomerPendingIntent,readCustomerLocalWorkspace,writeCustomerLocalWorkspace,type CustomerLocalPreferences} from './persistence';
+import {useEffect,useMemo,useRef,useState} from 'react';
+import {createCustomerPendingIntent,customerFallbackReference,readCustomerLocalWorkspace,writeCustomerLocalWorkspace,type CustomerLocalPreferences} from './persistence';
 import {resolveCustomerRuntimePort} from './runtime';
 import {buildCustomerRecommendations} from './recommendation';
-import {quotePublishedCart} from './local-quote';
+import {publishedCartRepairs,quotePublishedCart,repairPublishedCartLine} from './local-quote';
 import {buildWhatsAppFallbackUrl} from './whatsapp-fallback';
-import {selectedCustomerOptions,toggleCustomerSelection,validateCustomerSelections,type CustomerSelectionState} from './selection';
+import {customerComboPublishedUnitMinor,customerStandalonePublishedUnitMinor,restoreCustomerComboSelectionState,selectedCustomerComboIntent,selectedCustomerOptions,toggleCustomerComboSelection,toggleCustomerSelection,validateCustomerComboSelection,validateCustomerSelections,type CustomerComboSelectionState,type CustomerSelectionState} from './selection';
 import {BottomNavigation,CustomerHeader,StatusBanner,type ActionState,type ProductOriginRect} from './ui/primitives';
-import {CartView,CheckoutView,HomeView,MemberView,MenuView,OrdersView,ProductSheet,type MenuLayout,type OrderSegment} from './components/customer-views';
+import {CartView,MemberView,type MenuLayout} from './components/customer-views';
+import {CheckoutUi4View,type CustomerUi4CheckoutStep} from './components/customer-checkout-ui4';
+import {SubmitUi5View} from './components/customer-submit-ui5';
+import {StoreFulfillmentUi6View} from './components/customer-fulfillment-ui6';
+import {PickupCompleteUi7View} from './components/customer-pickup-ui7';
+import {HistoryReorderUi8View,type Ui8OrderSegment,type Ui8Phase} from './components/customer-history-ui8';
+import {buildCurrentReorderCart,clearReorderAttention} from './reorder';
+import {ProductSheet} from './components/product-sheet-ui3';
+import {Stage2Menu} from './stage2/Stage2Menu';
+import {Stage2BottomNavigation} from './stage2/Stage2BottomNavigation';
+import {LaunchOverlay} from './launch/LaunchOverlay';
+import {Stage1Home} from './stage1/Stage1Home';
 import type {
   CustomerCartLine,
   CustomerCheckoutDraft,
+  CustomerCommandResult,
   CustomerConnectionState,
   CustomerHistoryProjection,
   CustomerPendingIntent,
@@ -19,9 +31,51 @@ import type {
   CustomerRuntimePort,
 } from './product-types';
 
-export type View='home'|'menu'|'cart'|'checkout'|'orders'|'more';
+export type View='home'|'menu'|'cart'|'checkout'|'submit'|'waiting'|'pickup'|'orders'|'more';
+const persistedView=(value:View):CustomerLocalPreferences['activeView']=>value==='submit'||value==='waiting'||value==='pickup'?'orders':value;
+
+type CustomerRoute={
+  view:View;
+  checkoutStep?:CustomerUi4CheckoutStep;
+  submissionId?:string;
+  waitingOrderId?:string;
+  pickupOrderId?:string;
+};
+const customerRouteFromPath=(pathname:string):CustomerRoute|null=>{
+  if(pathname==='/memory-jar')return {view:'cart'};
+  if(pathname==='/checkout/contact')return {view:'checkout',checkoutStep:'contact'};
+  if(pathname==='/checkout/payment')return {view:'checkout',checkoutStep:'payment'};
+  if(pathname==='/checkout/review')return {view:'checkout',checkoutStep:'review'};
+  const submitMatch=pathname.match(/^\/submit\/([^/]+)$/);
+  if(submitMatch)return {view:'submit',submissionId:decodeURIComponent(submitMatch[1])};
+  const waitingMatch=pathname.match(/^\/orders\/([^/]+)\/waiting$/);
+  if(waitingMatch)return {view:'waiting',waitingOrderId:decodeURIComponent(waitingMatch[1])};
+  const pickupMatch=pathname.match(/^\/orders\/([^/]+)$/);
+  if(pickupMatch)return {view:'pickup',pickupOrderId:decodeURIComponent(pickupMatch[1])};
+  if(pathname==='/menu')return {view:'menu'};
+  if(pathname==='/orders')return {view:'orders'};
+  if(pathname==='/member')return {view:'more'};
+  if(pathname==='/'||pathname==='')return {view:'home'};
+  return null;
+};
+const pathForView=(view:'home'|'menu'|'cart'|'orders'|'more')=>({
+  home:'/',
+  menu:'/menu',
+  cart:'/memory-jar',
+  orders:'/orders',
+  more:'/member',
+})[view];
+const pathForCheckoutStep=(step:CustomerUi4CheckoutStep)=>'/checkout/'+step;
+const replacePath=(path:string)=>{
+  if(typeof window==='undefined'||window.location.pathname===path)return;
+  window.history.pushState({mfkCustomer:true},'',path);
+};
 
 const nowIso=()=>new Date().toISOString();
+const withoutPaymentEvidence=(value:CustomerCheckoutDraft):CustomerCheckoutDraft=>{
+  const {paymentEvidence:_paymentEvidence,...rest}=value;
+  return Object.freeze({...rest});
+};
 const presentWithContinuity=(change:()=>void)=>{
   const candidate=document as Document&{startViewTransition?:(update:()=>void)=>void};
   if(window.matchMedia('(prefers-reduced-motion: reduce)').matches||!candidate.startViewTransition){change();return}
@@ -35,10 +89,17 @@ const presentWithContinuity=(change:()=>void)=>{
 
 export function App(){
   const initial=useMemo(()=>readCustomerLocalWorkspace(),[]);
-  const [view,setView]=useState<View>(initial.preferences.activeView);
+  const initialRoute=useMemo(()=>customerRouteFromPath(typeof window==='undefined'?'':window.location.pathname),[]);
+  const initialSubmission=initialRoute?.submissionId?initial.pendingIntents.find(item=>item.submissionId===initialRoute.submissionId):undefined;
+  const [view,setView]=useState<View>(initialRoute?.view??initial.preferences.activeView);
+  const [launchVisible,setLaunchVisible]=useState(()=>!initialRoute||initialRoute.view==='home'||initialRoute.view==='more');
+  const [checkoutStep,setCheckoutStep]=useState<CustomerUi4CheckoutStep>(initialRoute?.checkoutStep??'contact');
+  const [submitRouteId,setSubmitRouteId]=useState<string|null>(initialRoute?.submissionId??null);
+  const [waitingOrderId,setWaitingOrderId]=useState<string|null>(initialRoute?.waitingOrderId??null);
+  const [pickupOrderId,setPickupOrderId]=useState<string|null>(initialRoute?.pickupOrderId??null);
   const [activeCategoryId,setActiveCategoryId]=useState<string|null>(initial.preferences.activeCategoryId);
-  const [cart,setCart]=useState<readonly CustomerCartLine[]>(initial.cart);
-  const [checkout,setCheckout]=useState<CustomerCheckoutDraft>(initial.checkout);
+  const [cart,setCart]=useState<readonly CustomerCartLine[]>(initialSubmission?.cart??initial.cart);
+  const [checkout,setCheckout]=useState<CustomerCheckoutDraft>(initialSubmission?.checkout??initial.checkout);
   const [pendingIntents,setPendingIntents]=useState<readonly CustomerPendingIntent[]>(initial.pendingIntents);
   const [port]=useState<CustomerRuntimePort|null>(()=>resolveCustomerRuntimePort());
   const [connection,setConnection]=useState<CustomerConnectionState>(port?'LOADING':'NOT_CONNECTED');
@@ -52,38 +113,44 @@ export function App(){
   const [selectedProduct,setSelectedProduct]=useState<CustomerProduct|null>(null);
   const [selectedProductOrigin,setSelectedProductOrigin]=useState<ProductOriginRect|null>(null);
   const [selections,setSelections]=useState<CustomerSelectionState>({});
+  const [selectedComboEnabled,setSelectedComboEnabled]=useState(false);
+  const [selectedComboSelections,setSelectedComboSelections]=useState<CustomerComboSelectionState>(Object.freeze([]));
   const [selectedVariationId,setSelectedVariationId]=useState<string|null>(null);
   const [selectedQuantity,setSelectedQuantity]=useState(1);
   const [selectedNote,setSelectedNote]=useState('');
   const [editingLineId,setEditingLineId]=useState<string|null>(null);
-  const [productStep,setProductStep]=useState(0);
-  const [orderSegment,setOrderSegment]=useState<OrderSegment>('current');
-  const [expandedOrderId,setExpandedOrderId]=useState<string|null>(null);
+  const [orderSegment,setOrderSegment]=useState<Ui8OrderSegment>('current');
+  const [ui8Phase,setUi8Phase]=useState<Ui8Phase>('LIST');
+  const [ui8SelectedOrderId,setUi8SelectedOrderId]=useState<string|null>(null);
   const [submitting,setSubmitting]=useState(false);
   const [readingIntentId,setReadingIntentId]=useState<string|null>(null);
   const [jarPulseKey,setJarPulseKey]=useState(0);
   const [fallbackIntentId,setFallbackIntentId]=useState<string|null>(null);
+  const [submitProbe,setSubmitProbe]=useState<Readonly<{attempt:number;total:number}>|null>(null);
+  const submitLockRef=useRef(false);
 
   const persist=(next:{cart?:readonly CustomerCartLine[];checkout?:CustomerCheckoutDraft;pendingIntents?:readonly CustomerPendingIntent[];preferences?:CustomerLocalPreferences})=>{
     writeCustomerLocalWorkspace({
       cart:next.cart??cart,
       checkout:next.checkout??checkout,
       pendingIntents:next.pendingIntents??pendingIntents,
-      preferences:next.preferences??{activeView:view,activeCategoryId},
+      preferences:next.preferences??{activeView:persistedView(view),activeCategoryId},
     });
   };
 
   const changeView=(next:View)=>{
     presentWithContinuity(()=>{
       setView(next);
-      persist({preferences:{activeView:next,activeCategoryId}});
+      if(next==='orders'){setUi8Phase('LIST');setUi8SelectedOrderId(null);}
+      if(next==='home'||next==='menu'||next==='cart'||next==='orders'||next==='more')replacePath(pathForView(next));
+      persist({preferences:{activeView:next==='submit'||next==='waiting'||next==='pickup'?'orders':next,activeCategoryId}});
       window.scrollTo({top:0,behavior:'auto'});
     });
   };
 
   const changeCategory=(next:string|null)=>{
     setActiveCategoryId(next);
-    persist({preferences:{activeView:view,activeCategoryId:next}});
+    persist({preferences:{activeView:persistedView(view),activeCategoryId:next}});
   };
 
   const changeCheckout=(next:CustomerCheckoutDraft)=>{
@@ -107,6 +174,68 @@ export function App(){
       setConnection('ERROR');
       setError(reason instanceof Error?reason.message:'暫時未能同步門店資料');
     }
+  };
+
+  const openCheckoutStep=async(step:CustomerUi4CheckoutStep)=>{
+    if(step==='contact'||step==='review')await refresh();
+    presentWithContinuity(()=>{
+      setCheckoutStep(step);
+      setView('checkout');
+      replacePath(pathForCheckoutStep(step));
+      persist({preferences:{activeView:'checkout',activeCategoryId}});
+      window.scrollTo({top:0,behavior:'auto'});
+    });
+  };
+
+  const openSubmitRoute=(submissionId:string)=>{
+    presentWithContinuity(()=>{
+      setSubmitRouteId(submissionId);
+      setWaitingOrderId(null);
+      setView('submit');
+      replacePath('/submit/'+encodeURIComponent(submissionId));
+      persist({preferences:{activeView:'orders',activeCategoryId}});
+      window.scrollTo({top:0,behavior:'auto'});
+    });
+  };
+
+  const openWaitingRoute=(orderId:string)=>{
+    presentWithContinuity(()=>{
+      setWaitingOrderId(orderId);
+      setSubmitRouteId(null);
+      setView('waiting');
+      replacePath('/orders/'+encodeURIComponent(orderId)+'/waiting');
+      persist({preferences:{activeView:'orders',activeCategoryId}});
+      window.scrollTo({top:0,behavior:'auto'});
+    });
+  };
+
+  const openPickupRoute=(orderId:string)=>{
+    presentWithContinuity(()=>{
+      setPickupOrderId(orderId);
+      setWaitingOrderId(null);
+      setSubmitRouteId(null);
+      setView('pickup');
+      replacePath('/orders/'+encodeURIComponent(orderId));
+      persist({preferences:{activeView:'orders',activeCategoryId}});
+      window.scrollTo({top:0,behavior:'auto'});
+    });
+  };
+
+  const startUi5Submission=()=>{
+    if(submitBlockReason){setNotice(submitBlockReason);return}
+    if(!quote||quote.freshness!=='CURRENT'){setNotice('提交前價格未係 CURRENT；請先重新確認。');return}
+    if(cartRepairs.length){setNotice('仍有餐點需要修正；只修受影響項目後再提交。');return}
+    const cartFingerprint=JSON.stringify(cart);
+    const checkoutFingerprint=JSON.stringify(checkout);
+    const same=pendingIntents.find(item=>
+      JSON.stringify(item.cart)===cartFingerprint&&
+      JSON.stringify(item.checkout)===checkoutFingerprint&&
+      item.menuRevision===String(menu?.revision||'')
+    );
+    if(same?.state==='DELIVERED'&&same.canonicalOrderId){openWaitingRoute(same.canonicalOrderId);return}
+    const intent=same??createCustomerPendingIntent(cart,checkout,String(menu?.revision||''));
+    if(!same)saveIntent(intent);
+    openSubmitRoute(intent.submissionId);
   };
 
   useEffect(()=>{void refresh();},[]);
@@ -142,10 +271,38 @@ export function App(){
   },[]);
 
   useEffect(()=>{
+    const onPopState=()=>{
+      const route=customerRouteFromPath(window.location.pathname);
+      if(!route)return;
+      setView(route.view);
+      if(route.checkoutStep)setCheckoutStep(route.checkoutStep);
+      setSubmitRouteId(route.submissionId??null);
+      setWaitingOrderId(route.waitingOrderId??null);
+      setPickupOrderId(route.pickupOrderId??null);
+    };
+    window.addEventListener('popstate',onPopState);
+    return()=>window.removeEventListener('popstate',onPopState);
+  },[]);
+
+  useEffect(()=>{
     setQuote(quotePublishedCart(cart,snapshot?.menu));
   },[cart,snapshot?.menu]);
 
   const menu=snapshot?.menu;
+  const selectedPaymentChannel=checkout.paymentMethod==='ELECTRONIC'
+    ?(snapshot?.paymentChannels??[]).find(channel=>channel.channelId===checkout.paymentChannelId)
+    :undefined;
+  const submitBlockReason=(()=>{
+    if(!cart.length)return '記憶罐未有商品。';
+    if(checkout.phone.replace(/\D/g,'').length<8)return '請先輸入至少 8 位電話號碼。';
+    if(checkout.paymentMethod!=='ELECTRONIC')return null;
+    if(!checkout.paymentChannelId)return '請先選擇一個電子支付方式。';
+    if(!selectedPaymentChannel||checkout.paymentChannelLabel!==selectedPaymentChannel.label)return '付款方式資料已更新，請重新選擇付款方式。';
+    if(!selectedPaymentChannel.qrImageUrl)return '呢個電子支付方式未有付款 QR，暫時不可提交。請改用到店付款，或者選擇另一個已設定付款碼嘅渠道。';
+    if(!checkout.paymentEvidence)return '請先上傳今次付款截圖。';
+    if(checkout.paymentEvidence.state==='LOCAL_PENDING_UPLOAD')return '付款截圖仍在上載，請等上載完成。';
+    return null;
+  })();
   const categories=menu?.categories??[];
   const effectiveCategoryId=activeCategoryId&&categories.some(item=>item.categoryId===activeCategoryId)?activeCategoryId:(categories[0]?.categoryId??null);
   const visibleProducts=(menu?.products??[]).filter(product=>{
@@ -156,19 +313,26 @@ export function App(){
   });
 
   const updateCart=(next:readonly CustomerCartLine[])=>{
+    const changed=JSON.stringify(next)!==JSON.stringify(cart);
+    const nextCheckout=changed&&checkout.paymentEvidence?withoutPaymentEvidence(checkout):checkout;
     setCart(next);
-    persist({cart:next});
+    if(nextCheckout!==checkout){
+      setCheckout(nextCheckout);
+      setNotice('餐點已更新；舊付款憑證已失效，請重新提供今次付款憑證。');
+    }
+    persist({cart:next,checkout:nextCheckout});
   };
 
   const closeProduct=()=>{
     setSelectedProduct(null);
     setSelectedProductOrigin(null);
     setSelections({});
+    setSelectedComboEnabled(false);
+    setSelectedComboSelections(Object.freeze([]));
     setSelectedVariationId(null);
     setSelectedQuantity(1);
     setSelectedNote('');
     setEditingLineId(null);
-    setProductStep(0);
   };
 
   const openProduct=(product:CustomerProduct,origin:ProductOriginRect|null,line?:CustomerCartLine)=>{
@@ -181,11 +345,12 @@ export function App(){
     setSelectedProduct(product);
     setSelectedProductOrigin(origin);
     setSelections(restored);
+    setSelectedComboEnabled(Boolean(line?.combo));
+    setSelectedComboSelections(restoreCustomerComboSelectionState(line?.combo));
     setSelectedVariationId(line?.selectedVariationId??null);
     setSelectedQuantity(line?.quantity??1);
     setSelectedNote(line?.note??'');
     setEditingLineId(line?.lineId??null);
-    setProductStep(0);
   };
 
   const addSelectedProduct=()=>{
@@ -193,6 +358,27 @@ export function App(){
     const validation=validateCustomerSelections(selectedProduct,selections);
     if(!validation.ok){setNotice(validation.issues[0]??'請完成商品設定');return}
     if(selectedProduct.variationRequired&&!selectedVariationId){setNotice('請先揀必選規格');return}
+
+    if(selectedComboEnabled){
+      const comboValidation=validateCustomerComboSelection(selectedProduct,menu,selectedComboSelections);
+      if(!comboValidation.ok){setNotice(comboValidation.issues[0]??'請完成套餐設定');return}
+    }
+
+    const ordinarySelections=selectedCustomerOptions(selectedProduct,selections);
+    const comboIntent=selectedComboEnabled
+      ?selectedCustomerComboIntent(selectedProduct,menu,selectedComboSelections)
+      :null;
+    if(selectedComboEnabled&&!comboIntent){setNotice('套餐資料待同步，暫時未能加入套餐。');return}
+
+    const comboUnitMinor=comboIntent?customerComboPublishedUnitMinor(comboIntent,ordinarySelections):null;
+    if(comboIntent&&comboUnitMinor===null){setNotice('套餐價格資料待同步，請稍後再試。');return}
+
+    const standaloneUnitMinor=!comboIntent
+      ?customerStandalonePublishedUnitMinor(selectedProduct,ordinarySelections)
+      :null;
+    if(!comboIntent&&standaloneUnitMinor===null){setNotice('商品價格資料待同步，請稍後再試。');return}
+    const publishedUnitPriceMinor=comboIntent?comboUnitMinor:standaloneUnitMinor;
+
     const variation=selectedProduct.variations?.find(item=>item.variationId===selectedVariationId);
     const existing=editingLineId?cart.find(line=>line.lineId===editingLineId):null;
     const line:CustomerCartLine=Object.freeze({
@@ -201,14 +387,14 @@ export function App(){
       productName:selectedProduct.name,
       quantity:selectedQuantity,
       ...(variation?{selectedVariationId:variation.variationId,selectedVariationName:variation.name}:{}),
-      selections:selectedCustomerOptions(selectedProduct,selections),
+      selections:ordinarySelections,
+      ...(comboIntent?{combo:comboIntent}:{}),
       createdAt:existing?.createdAt??nowIso(),
       ...(selectedNote.trim()?{note:selectedNote.trim()}:{}),
-      ...(Number.isSafeInteger(selectedProduct.publishedUnitPriceMinor)?{
-        publishedUnitPriceMinor:Number(selectedProduct.publishedUnitPriceMinor)+selectedCustomerOptions(selectedProduct,selections).reduce((sum,option)=>sum+Number(option.publishedAdjustmentMinor||0),0),
-      }:{}),
+      ...(publishedUnitPriceMinor!==null&&Number.isSafeInteger(publishedUnitPriceMinor)?{publishedUnitPriceMinor}:{}),
     });
     updateCart(existing?cart.map(item=>item.lineId===existing.lineId?line:item):[...cart,line]);
+    if(existing&&view==='orders'&&ui8Phase==='REPAIR')setUi8Phase('REPAIR');
     setJarPulseKey(value=>value+1);
     setNotice(existing?'記憶罐已更新；未建立正式訂單。':'已加入記憶罐；未建立正式訂單。');
     closeProduct();
@@ -226,16 +412,46 @@ export function App(){
     persist({pendingIntents:next});
   };
 
-  const resolveConfirmedIntent=(intent:CustomerPendingIntent,message:string)=>{
-    const nextPending=pendingIntents.filter(item=>item.submissionId!==intent.submissionId);
+  const resolveDeliveredIntent=(intent:CustomerPendingIntent,result:CustomerCommandResult,message:string)=>{
+    if(!result.orderId){
+      const unknown=Object.freeze({...intent,state:'UNKNOWN' as const,updatedAt:nowIso(),lastMessage:'正式 Order 已回覆成功，但缺少 canonical Order readback identity；保持 UNKNOWN。'});
+      saveIntent(unknown);
+      setSubmitRouteId(intent.submissionId);
+      setNotice('正式結果未完整讀回；請勿重複提交，只可重新確認原本提交。');
+      return;
+    }
+    const delivered=Object.freeze({
+      ...intent,
+      state:'DELIVERED' as const,
+      updatedAt:nowIso(),
+      canonicalOrderId:result.orderId,
+      ...(result.displayCode?{canonicalDisplay:result.displayCode}:{}),
+      ...(result.committedAt?{committedAt:result.committedAt}:{}),
+      lastMessage:message,
+    });
+    const nextPending=[delivered,...pendingIntents.filter(item=>item.submissionId!==intent.submissionId)].slice(0,12);
     const sameCart=JSON.stringify(cart)===JSON.stringify(intent.cart);
     const nextCart=sameCart?[]:cart;
+    const nextCheckout=withoutPaymentEvidence(checkout);
     setPendingIntents(nextPending);
     setCart(nextCart);
-    persist({cart:nextCart,pendingIntents:nextPending});
-    setNotice(message);
+    setCheckout(nextCheckout);
+    setFallbackIntentId(null);
     setOrderSegment('current');
-    changeView('orders');
+    setSubmitRouteId(null);
+    setWaitingOrderId(result.orderId);
+    setNotice('訂單已成功送達；而家等待店舖正式確認。');
+    presentWithContinuity(()=>{
+      setView('waiting');
+      replacePath('/orders/'+encodeURIComponent(result.orderId!)+'/waiting');
+      persist({
+        cart:nextCart,
+        checkout:nextCheckout,
+        pendingIntents:nextPending,
+        preferences:{activeView:'orders',activeCategoryId},
+      });
+      window.scrollTo({top:0,behavior:'auto'});
+    });
     void refresh();
   };
 
@@ -246,34 +462,63 @@ export function App(){
     try{
       const uploaded=await port.uploadPaymentEvidence(file);
       changeCheckout({...checkout,paymentEvidence:{fileName:file.name,mimeType:file.type,size:file.size,state:'UPLOADED',evidenceRef:uploaded.evidenceRef}});
-      setNotice('付款截圖已上載，等待店舖核對。');
+      setNotice('已提交付款憑證，等待店舖核對。');
     }catch(error){
       changeCheckout({...checkout,paymentEvidence:undefined});
       setNotice(error instanceof Error?error.message:'付款截圖上載失敗，請再試。');
     }
   };
 
-  const submit=async()=>{
-    if(submitting)return;
-    if(cart.length===0){setNotice('記憶罐未有商品。');return}
-    if(checkout.phone.replace(/\D/g,'').length<8){setNotice('請輸入至少 8 位電話號碼。');return}
-    const selectedPaymentChannel=checkout.paymentMethod==='ELECTRONIC'
-      ?(snapshot?.paymentChannels??[]).find(channel=>channel.channelId===checkout.paymentChannelId)
-      :undefined;
-    if(checkout.paymentMethod==='ELECTRONIC'&&!checkout.paymentChannelId){setNotice('請先選擇一個店舖提供嘅電子支付方式。');return}
-    if(checkout.paymentMethod==='ELECTRONIC'&&(!selectedPaymentChannel?.qrImageUrl||checkout.paymentChannelLabel!==selectedPaymentChannel.label)){setNotice('付款方式資料已更新或者 QR 尚未設定，請重新選擇付款方式。');return}
-    if(checkout.paymentMethod==='ELECTRONIC'&&!checkout.paymentEvidence){setNotice('電子支付需要提供付款截圖，畀店舖核對。');return}
-    if(checkout.paymentMethod==='ELECTRONIC'&&checkout.paymentEvidence?.state==='LOCAL_PENDING_UPLOAD'){setNotice('付款截圖已選擇，但上載仍未完成；未完成前唔會當成已付款。');return}
-    const cartFingerprint=JSON.stringify(cart);
-    const checkoutFingerprint=JSON.stringify(checkout);
-    let existing=pendingIntents.find(item=>
-      (item.state==='DRAFT'||item.state==='NOT_CONNECTED'||item.state==='UNKNOWN')&&
+  const submit=async(routeIntent?:CustomerPendingIntent)=>{
+    if(submitLockRef.current||submitting)return;
+    if(routeIntent&&routeIntent.state!=='DRAFT')return;
+    const intentCart=routeIntent?.cart??cart;
+    const intentCheckout=routeIntent?.checkout??checkout;
+    const intentMenuRevision=routeIntent?.menuRevision??String(menu?.revision||'');
+    const submitReason=(()=>{
+      if(!intentCart.length)return '記憶罐未有商品。';
+      if(intentCheckout.phone.replace(/\D/g,'').length<8)return '請先輸入至少 8 位電話號碼。';
+      if(intentCheckout.paymentMethod==='ELECTRONIC'){
+        const channel=(snapshot?.paymentChannels??[]).find(item=>item.channelId===intentCheckout.paymentChannelId);
+        if(!intentCheckout.paymentChannelId||!channel||channel.label!==intentCheckout.paymentChannelLabel)return '付款方式資料已更新，請返回付款頁重新確認。';
+        if(!channel.qrImageUrl)return '電子支付 QR 已失效，請返回付款頁重新確認。';
+        if(intentCheckout.paymentEvidence?.state!=='UPLOADED'||!intentCheckout.paymentEvidence.evidenceRef)return '付款憑證未完成，請返回付款頁重新確認。';
+      }
+      const latestQuote=quotePublishedCart(intentCart,menu);
+      const latestRepairs=publishedCartRepairs(intentCart,menu);
+      if(!latestQuote||latestQuote.freshness!=='CURRENT'||latestRepairs.length)return '提交前餐牌、價格或供應資料有變更；請返回記憶罐只修受影響餐點。';
+      return null;
+    })();
+    if(submitReason){setNotice(submitReason);return}
+    submitLockRef.current=true;
+    const cartFingerprint=JSON.stringify(intentCart);
+    const checkoutFingerprint=JSON.stringify(intentCheckout);
+    let existing=routeIntent??pendingIntents.find(item=>
+      item.state==='DRAFT'&&
       JSON.stringify(item.cart)===cartFingerprint&&
       JSON.stringify(item.checkout)===checkoutFingerprint&&
-      item.menuRevision===String(menu?.revision||'')
+      item.menuRevision===intentMenuRevision
     );
     setSubmitting(true);
+    setFallbackIntentId(null);
+    let attemptedIntent:CustomerPendingIntent|null=null;
     try{
+      const sameCartUnknown=pendingIntents.find(item=>item.state==='UNKNOWN'&&JSON.stringify(item.cart)===cartFingerprint);
+      if(sameCartUnknown){
+        if(!port?.readSubmission){
+          setNotice('上一個同一餐點提交結果仍未確認；未有安全讀回前唔會建立另一張單。');
+          return;
+        }
+        const prior=await port.readSubmission(sameCartUnknown.submissionId);
+        if(prior.state==='CONFIRMED'){
+          resolveDeliveredIntent(sameCartUnknown,prior,prior.message||'店舖已確認上一個提交');
+          return;
+        }
+        saveIntent(Object.freeze({...sameCartUnknown,state:'UNKNOWN',updatedAt:nowIso(),lastMessage:prior.message}));
+        setNotice('上一個同一餐點提交結果仍未確認；已查詢原本 Submission ID，唔會建立第二張單。');
+        return;
+      }
+
       const staleUnknowns=pendingIntents.filter(item=>item.state==='UNKNOWN'&&JSON.stringify(item.cart)!==cartFingerprint);
       if(staleUnknowns.length&&port?.readSubmission){
         const resolvedIds:string[]=[];
@@ -287,39 +532,76 @@ export function App(){
           persist({pendingIntents:nextPending});
         }
       }
-      if(existing?.state==='UNKNOWN'&&port?.readSubmission){
-        const prior=await port.readSubmission(existing.submissionId);
-        if(prior.state==='CONFIRMED'){
-          const nextPending=pendingIntents.filter(item=>item.submissionId!==existing!.submissionId);
-          setPendingIntents(nextPending);
-          persist({pendingIntents:nextPending});
-          existing=undefined;
-        }else{
-          saveIntent(Object.freeze({...existing,state:'UNKNOWN',updatedAt:nowIso(),lastMessage:prior.message}));
-          setNotice('呢一張訂單嘅原提交結果仍未確認；已查詢同一 Submission ID，冇重複提交。');
-          return;
-        }
-      }
-      const base=existing??createCustomerPendingIntent(cart,checkout,String(menu?.revision||''));
+
+      const base=existing??createCustomerPendingIntent(intentCart,intentCheckout,intentMenuRevision);
       if(!port?.submitOrder){
+        const cleanCheckout=withoutPaymentEvidence(intentCheckout);
         const offlineIntent=Object.freeze({...base,state:'NOT_CONNECTED' as const,updatedAt:nowIso(),lastMessage:'店舖接單系統暫時未連接；可以改用 WhatsApp。'});
+        setCheckout(cleanCheckout);
         saveIntent(offlineIntent);
         setFallbackIntentId(base.submissionId);
         setNotice('暫時未能自動接單；可以改用 WhatsApp。');
         return;
       }
+
+      if(port.probeOrderBackend){
+        setSubmitProbe({attempt:1,total:3});
+        const health=await port.probeOrderBackend((attempt,total)=>setSubmitProbe({attempt,total}));
+        setSubmitProbe(null);
+        if(!health.reachable){
+          const cleanCheckout=withoutPaymentEvidence(intentCheckout);
+          const offlineIntent=Object.freeze({...base,state:'NOT_CONNECTED' as const,updatedAt:nowIso(),lastMessage:'已完成 3 次有限連線檢查；暫時未能自動接單。'});
+          setCheckout(cleanCheckout);
+          saveIntent(offlineIntent);
+          setFallbackIntentId(base.submissionId);
+          setNotice('已完成 3 次連線檢查；暫時未能自動接單，可以轉用 WhatsApp。');
+          return;
+        }
+      }
+
       const pending=Object.freeze({...base,state:'PENDING' as const,updatedAt:nowIso(),lastMessage:'正在連接店舖接單系統'});
+      attemptedIntent=pending;
       saveIntent(pending);
       const result=await port.submitOrder(pending);
-      if(result.state==='CONFIRMED'){setFallbackIntentId(null);resolveConfirmedIntent(pending,result.message||'店舖已確認訂單');return}
-      const state=result.state==='UNKNOWN'?'UNKNOWN':'NOT_CONNECTED';
-      const unresolved=Object.freeze({...pending,state,updatedAt:nowIso(),lastMessage:result.message});
+      if(result.state==='CONFIRMED'){resolveDeliveredIntent(pending,result,result.message||'店舖已確認訂單');return}
+
+      const cleanCheckout=withoutPaymentEvidence(intentCheckout);
+      setCheckout(cleanCheckout);
+      if(result.state==='UNKNOWN'){
+        saveIntent(Object.freeze({...pending,state:'UNKNOWN' as const,updatedAt:nowIso(),lastMessage:result.message}));
+        setFallbackIntentId(null);
+        setNotice('提交結果未明；系統會先查詢原本嗰次落單，唔會建立第二張。今次付款截圖已從新訂單表格清除。');
+        return;
+      }
+
+      if(result.state==='REJECTED'||result.state==='FAILED'){
+        const rejected=Object.freeze({...pending,state:'REJECTED' as const,updatedAt:nowIso(),lastMessage:result.message});
+        saveIntent(rejected);
+        setFallbackIntentId(null);
+        setNotice(result.message||'店舖未能接受今次訂單；請返回記憶罐重新確認。');
+        return;
+      }
+      const unresolved=Object.freeze({...pending,state:'NOT_CONNECTED' as const,updatedAt:nowIso(),lastMessage:result.message});
       saveIntent(unresolved);
-      if(result.state==='NOT_CONNECTED')setFallbackIntentId(pending.submissionId);
-      setNotice(result.state==='UNKNOWN'?'提交結果未明；會先查詢原本嗰次落單，唔會自動重送。':result.message);
+      setFallbackIntentId(pending.submissionId);
+      setNotice(result.message);
     }catch{
-      setNotice('提交結果未明；原本嗰次落單已保留，請先重新確認。');
+      const cleanCheckout=withoutPaymentEvidence(intentCheckout);
+      setCheckout(cleanCheckout);
+      if(attemptedIntent){
+        saveIntent(Object.freeze({...attemptedIntent,state:'UNKNOWN' as const,updatedAt:nowIso(),lastMessage:'提交結果未明；需要讀回原本結果'}));
+        setFallbackIntentId(null);
+        setNotice('提交結果未明；原本嗰次落單已保留並會先讀回，唔會自動重送。');
+      }else{
+        const base=existing??createCustomerPendingIntent(intentCart,intentCheckout,intentMenuRevision);
+        const offlineIntent=Object.freeze({...base,state:'NOT_CONNECTED' as const,updatedAt:nowIso(),lastMessage:'店舖接單系統暫時未連接；可以改用 WhatsApp。'});
+        saveIntent(offlineIntent);
+        setFallbackIntentId(base.submissionId);
+        setNotice('暫時未能完成店舖連線檢查；可以改用 WhatsApp。');
+      }
     }finally{
+      submitLockRef.current=false;
+      setSubmitProbe(null);
       setSubmitting(false);
     }
   };
@@ -329,14 +611,25 @@ export function App(){
     setReadingIntentId(intent.submissionId);
     try{
       if(!port?.readSubmission){
-        saveIntent(Object.freeze({...intent,state:'NOT_CONNECTED',updatedAt:nowIso(),lastMessage:'訂單查詢服務尚未連接'}));
+        saveIntent(Object.freeze({...intent,state:'UNKNOWN',updatedAt:nowIso(),lastMessage:'訂單查詢服務尚未連接；只可稍後重新讀回原本提交'}));
         setNotice('訂單查詢服務尚未連接；冇重新提交任何交易。');
         return;
       }
       const result=await port.readSubmission(intent.submissionId);
-      if(result.state==='CONFIRMED'){resolveConfirmedIntent(intent,result.message||'店舖已確認訂單');return}
-      const state=result.state==='UNKNOWN'?'UNKNOWN':'NOT_CONNECTED';
-      saveIntent(Object.freeze({...intent,state,updatedAt:nowIso(),lastMessage:result.message}));
+      if(result.state==='CONFIRMED'){resolveDeliveredIntent(intent,result,result.message||'店舖已確認訂單');return}
+      if(result.state==='REJECTED'||result.state==='FAILED'){
+        saveIntent(Object.freeze({...intent,state:'REJECTED',updatedAt:nowIso(),lastMessage:result.message}));
+        setNotice(result.message||'店舖未能接受今次訂單。');
+        return;
+      }
+      if(result.readbackCode==='NOT_FOUND'){
+        const fallbackIntent=Object.freeze({...intent,state:'NOT_CONNECTED' as const,updatedAt:nowIso(),lastMessage:result.message});
+        saveIntent(fallbackIntent);
+        setFallbackIntentId(intent.submissionId);
+        setNotice('原本提交經 Readback 仍未找到；Online Submit 已鎖定，可以轉用 WhatsApp 人工救援。');
+        return;
+      }
+      saveIntent(Object.freeze({...intent,state:'UNKNOWN',updatedAt:nowIso(),lastMessage:result.message}));
       setNotice(result.message);
     }catch{
       saveIntent(Object.freeze({...intent,state:'UNKNOWN',updatedAt:nowIso(),lastMessage:'讀回結果未明'}));
@@ -347,65 +640,188 @@ export function App(){
   };
 
   const reorder=async(order:CustomerHistoryProjection)=>{
-    if(!port?.buildReorderCart){setNotice('再次下單服務尚未連接；冇複製舊價格或者舊供應狀態。');return}
-    try{
-      const result=await port.buildReorderCart(order.orderId);
-      if(result.state!=='CONFIRMED'||!result.cart){setNotice(result.message);return}
-      updateCart(result.cart);
-      setJarPulseKey(value=>value+1);
-      setNotice(result.attention?.length?'已按目前菜單重建記憶罐；需要修正：'+result.attention.join('、'):'已按目前菜單、價格同供應狀態重建記憶罐。');
-      changeView('cart');
-    }catch{
-      setNotice('暫時未能重新驗證舊訂單；冇建立新訂單。');
+    if(!browserOnline||connection!=='READY'||!menu){
+      setUi8SelectedOrderId(order.orderId);
+      setUi8Phase('DETAIL');
+      setOrderSegment('completed');
+      setView('orders');
+      replacePath('/orders');
+      setNotice('歷史訂單仍可查看；需要重新同步目前餐牌後先可以建立新購物車。');
+      return;
     }
+    if(!order.reorderEligible||!order.reorderIntent?.length){
+      setUi8SelectedOrderId(order.orderId);
+      setUi8Phase('DETAIL');
+      setOrderSegment('completed');
+      setView('orders');
+      replacePath('/orders');
+      setNotice('呢張歷史訂單未有可安全複製嘅 Intent；舊 Order 保持唯讀。');
+      return;
+    }
+    const result=buildCurrentReorderCart(order,menu);
+    if(!result.cart.length){
+      setUi8SelectedOrderId(order.orderId);
+      setUi8Phase('DETAIL');
+      setOrderSegment('completed');
+      setView('orders');
+      replacePath('/orders');
+      setNotice(result.issues[0]?.detail??'目前餐牌未能建立新購物車。');
+      return;
+    }
+    const nextCheckout=withoutPaymentEvidence(checkout);
+    setCart(result.cart);
+    setCheckout(nextCheckout);
+    persist({
+      cart:result.cart,
+      checkout:nextCheckout,
+      preferences:{activeView:'orders',activeCategoryId},
+    });
+    setJarPulseKey(value=>value+1);
+    setUi8SelectedOrderId(order.orderId);
+    setUi8Phase('COPY');
+    setOrderSegment('completed');
+    setView('orders');
+    replacePath('/orders');
+    setNotice(result.issues.length
+      ?'已建立新購物車；只需修正 '+String(result.issues.length)+' 個受影響 Line。舊訂單冇改動。'
+      :'已用目前餐牌建立新購物車；舊價、付款憑證、Fulfillment、Coupon 狀態全部冇複製。');
+    window.scrollTo({top:0,behavior:'auto'});
   };
 
-  const requestFallback=async()=>{
+  const acceptUi8Repair=(lineId:string)=>{
+    if(!browserOnline||connection!=='READY'||!menu){setNotice('目前資料未 fresh；draft cart 已保留，請先重新同步 current truth。');return}
+    const line=cart.find(item=>item.lineId===lineId);
+    if(!line)return;
+    const repaired=repairPublishedCartLine(line,menu);
+    if(!repaired){setNotice('呢一項仍然需要手動修正或移除；其他 Line 保持不變。');return}
+    updateCart(cart.map(item=>item.lineId===lineId?clearReorderAttention(repaired):item));
+    setNotice('只更新受影響 Line「'+repaired.productName+'」；其他 Line 冇改動。');
+  };
+
+  const editUi8Repair=(line:CustomerCartLine)=>{
+    if(!browserOnline||connection!=='READY'||!menu){setNotice('目前資料未 fresh；draft cart 已保留，請先重新同步 current truth。');return}
+    const product=menu.products.find(item=>item.productId===line.productId);
+    if(!product?.available){setNotice('呢個舊商品目前不可用；只可以移除受影響 Line，其他 Line 保持不變。');return}
+    openProduct(product,null,line);
+  };
+
+  const openUi8History=(order:CustomerHistoryProjection)=>{
+    setUi8SelectedOrderId(order.orderId);
+    setUi8Phase('DETAIL');
+    setOrderSegment('completed');
+  };
+
+  const openUi8Current=(order:CustomerReadModelSnapshot['activeOrders'][number])=>{
+    if(['READY','ARRIVED','VERIFIED','HANDED_OVER','PICKUP_EXCEPTION','COMPLETED'].includes(order.stage))openPickupRoute(order.orderId);
+    else openWaitingRoute(order.orderId);
+  };
+
+  const acceptCartRepair=(lineId:string)=>{
+    const line=cart.find(item=>item.lineId===lineId);
+    if(!line){setNotice('搵唔到需要更新嘅餐點。');return}
+    const repaired=repairPublishedCartLine(line,menu);
+    if(!repaired){
+      setNotice('呢一項唔可以直接接受新價格；請用「修正」只編輯呢一項，其他餐點會保留。');
+      return;
+    }
+    updateCart(cart.map(item=>item.lineId===lineId?repaired:item));
+    setNotice('已按目前餐牌更新「'+repaired.productName+'」；其他餐點冇改動。');
+  };
+
+  const requestFallback=async(intent?:CustomerPendingIntent)=>{
     const fallback=snapshot?.fallback;
-    const submissionId=fallbackIntentId??pendingIntents[0]?.submissionId;
+    const target=intent
+      ??(fallbackIntentId?pendingIntents.find(item=>item.submissionId===fallbackIntentId):undefined)
+      ??pendingIntents.find(item=>item.state==='NOT_CONNECTED');
     if(!fallback?.enabled){setNotice('店舖暫時未設定 WhatsApp 備用聯絡。');return}
-    const url=buildWhatsAppFallbackUrl({fallback,cart,checkout,quote,submissionId});
+    const targetCart=target?.cart??cart;
+    const targetCheckout=target?.checkout??checkout;
+    const pickupDigits=targetCheckout.phone.replace(/\D/g,'');
+    const url=buildWhatsAppFallbackUrl({
+      fallback,
+      cart:targetCart,
+      checkout:targetCheckout,
+      quote:target?null:quote,
+      ...(target?.publishedTotalMinor!==undefined?{publishedTotalMinor:target.publishedTotalMinor}:{}),
+      ...(target?{fallbackReference:customerFallbackReference(target)}:{}),
+      ...(pickupDigits.length>=4?{pickupCode:pickupDigits.slice(-4)}:{}),
+    });
     if(!url){setNotice('WhatsApp 備用聯絡資料未完整。');return}
     window.open(url,'_blank','noopener,noreferrer');
-    setNotice('已開啟 WhatsApp；訊息只會喺你主動送出後傳送畀店舖。');
+    setNotice('已開啟 WhatsApp；舊 Online Submit 保持鎖定，訊息只會喺你主動送出後傳送畀店舖。');
   };
 
   const activeOrders=snapshot?.activeOrders??[];
   const history=snapshot?.history??[];
-  const currentPending=pendingIntents[0]??null;
+  const recoveryIntents=pendingIntents.filter(item=>item.state!=='DELIVERED');
+  const currentPending=recoveryIntents[0]??null;
+  const currentFallbackIntent=recoveryIntents.find(item=>item.state==='NOT_CONNECTED'&&JSON.stringify(item.cart)===JSON.stringify(cart))??null;
+  const fallbackAvailable=Boolean((fallbackIntentId||currentFallbackIntent)&&snapshot?.fallback?.enabled);
+  const activeSubmitIntent=submitRouteId?pendingIntents.find(item=>item.submissionId===submitRouteId)??null:null;
+  const waitingOrder=waitingOrderId?activeOrders.find(order=>order.orderId===waitingOrderId)??null:null;
+  const waitingIntent=waitingOrderId?pendingIntents.find(item=>item.state==='DELIVERED'&&item.canonicalOrderId===waitingOrderId)??null:null;
+  const pickupOrder=pickupOrderId?activeOrders.find(order=>order.orderId===pickupOrderId)??null:null;
+  const pickupHistoryOrder=pickupOrderId?history.find(order=>order.orderId===pickupOrderId)??null:null;
+  const pickupIntent=pickupOrderId?pendingIntents.find(item=>item.state==='DELIVERED'&&item.canonicalOrderId===pickupOrderId)??null:null;
+  const ui8SelectedHistory=ui8SelectedOrderId?history.find(order=>order.orderId===ui8SelectedOrderId)??null:null;
+  const waitingUi7Ready=Boolean(
+    waitingOrderId&&(
+      (waitingOrder&&['READY','ARRIVED','VERIFIED','HANDED_OVER','PICKUP_EXCEPTION','COMPLETED'].includes(waitingOrder.stage))||
+      history.some(order=>order.orderId===waitingOrderId)
+    )
+  );
+
+  useEffect(()=>{
+    if(view!=='waiting'||!waitingUi7Ready||!waitingOrderId)return;
+    openPickupRoute(waitingOrderId);
+  },[view,waitingUi7Ready,waitingOrderId]);
+
   const cartCount=cart.reduce((sum,line)=>sum+line.quantity,0);
+  const cartRepairs=useMemo(()=>publishedCartRepairs(cart,menu),[cart,menu]);
   const allProducts=menu?.products??[];
-  const homeRecommendations=buildCustomerRecommendations({products:allProducts,history,cart,limit:4});
-  const menuRecommendations=buildCustomerRecommendations({products:allProducts,history,cart,activeCategoryId:effectiveCategoryId,limit:4});
+  const homeRecommendations=buildCustomerRecommendations({products:allProducts,history,cart,limit:6});
+  const menuRecommendations=buildCustomerRecommendations({products:allProducts,history,cart,limit:8});
   const cartSuggestions=buildCustomerRecommendations({products:allProducts,history,cart,activeCategoryId:effectiveCategoryId,limit:2});
-  const actionState:ActionState=quote?.freshness==='MATERIAL_CHANGE'||!cart.length||!quote?'disabled':readingIntentId||submitting?'loading':currentPending?.state==='UNKNOWN'?'unknown':currentPending?.state==='PENDING'?'pending':'default';
+  const productRecommendations=selectedProduct?buildCustomerRecommendations({products:allProducts,history,cart,activeCategoryId:selectedProduct.categoryId,limit:8}).filter(item=>item.product.productId!==selectedProduct.productId).slice(0,3):[];
+  const actionState:ActionState=quote?.freshness==='MATERIAL_CHANGE'||!cart.length||!quote||Boolean(submitBlockReason)?'disabled':readingIntentId||submitting?'loading':currentPending?.state==='UNKNOWN'?'unknown':currentPending?.state==='PENDING'?'pending':'default';
 
   return <main className="customer-shell" data-network={!browserOnline?'offline':connection.toLowerCase()}>
-    <CustomerHeader storeName={snapshot?.store?.storeName} connection={connection} browserOnline={browserOnline} onHome={()=>changeView('home')} onService={()=>changeView('more')}/>
-    <div className="global-status" aria-live="polite">
+    {view==='home'?null:view==='menu'?null:<CustomerHeader storeName={snapshot?.store?.storeName} connection={connection} browserOnline={browserOnline} onHome={()=>changeView('home')} onService={()=>changeView('more')}/>}
+    {view==='home'?null:view==='menu'?null:<div className="global-status" aria-live="polite">
       {notice?<section className="notice" role="status"><p>{notice}</p><button onClick={()=>setNotice(null)}>收起</button></section>:null}
       {!browserOnline?<StatusBanner tone="offline" title="目前離線" detail="已載入內容仍然可以查看。本機記憶罐、聯絡資料同待提交草稿已保留，恢復連線前唔會自動提交。"/>:null}
       {browserOnline&&connection==='ERROR'?<StatusBanner tone="danger" title="暫時未能同步店舖資料" detail={error||'請檢查連線後再試。'} actionLabel="安全重試" onAction={()=>void refresh()}/>:null}
       {browserOnline&&connection==='NOT_CONNECTED'?<StatusBanner tone="warning" title="店舖服務尚未連接" detail="記憶罐、聯絡資料同待提交草稿會保留喺本機；正式菜單、價格、訂單、會員同取餐狀態唔會用假資料代替。"/>:null}
       {browserOnline&&(connection==='STALE'||connection==='PARTIAL')?<StatusBanner tone="warning" title="正顯示最近一次資料" detail="店舖最新狀態仍在更新。涉及價格或落單結果時會要求再次確認。" actionLabel="更新資料" onAction={()=>void refresh()}/>:null}
       {browserOnline&&connection==='UNKNOWN'?<StatusBanner tone="warning" title="正在確認店舖狀態" detail="暫時唔會將未確認結果當成成功。" actionLabel="重新確認" onAction={()=>void refresh()}/>:null}
-      {fallbackIntentId?<StatusBanner tone="warning" title="暫時未能自動接單" detail="系統已完成有限次連線嘗試，但暫時連唔到 SMT 接單後端。你可以用同一份餐點資料改經 WhatsApp 人手落單。" actionLabel="轉用 WhatsApp" onAction={()=>void requestFallback()}/>:null}
-    </div>
+      {fallbackAvailable?<StatusBanner tone="warning" title="暫時未能自動接單" detail="系統已完成 3 次有限連線檢查；呢張訂單未送入正式接單流程。你可以用同一份餐點資料改經 WhatsApp 人手落單。" actionLabel="轉用 WhatsApp" onAction={()=>void requestFallback()}/>:null}
+    </div>}
 
-    <section className="viewport" aria-busy={connection==='LOADING'}>
-      {view==='home'?<HomeView snapshot={snapshot} connection={connection} activeOrders={activeOrders} history={history} recommendations={homeRecommendations} cartCount={cartCount} onRefresh={()=>void refresh()} onProduct={openProduct} onBrowse={()=>changeView('menu')} onJar={()=>changeView('cart')} onOrders={()=>{setOrderSegment('current');changeView('orders')}} onHistory={()=>{setOrderSegment('history');changeView('orders')}} onMember={()=>changeView('more')} onBuyAgain={order=>void reorder(order)} onFallback={()=>void requestFallback()}/>:null}
-      {view==='menu'?<MenuView connection={connection} categories={categories} activeCategoryId={effectiveCategoryId} setCategory={category=>presentWithContinuity(()=>changeCategory(category))} query={search} setQuery={setSearch} layout={menuLayout} setLayout={layout=>presentWithContinuity(()=>setMenuLayout(layout))} products={visibleProducts} recommendations={menuRecommendations} onProduct={(product,origin)=>openProduct(product,origin)} cartCount={cartCount} quote={quote} onCart={()=>changeView('cart')}/>:null}
-      {view==='cart'?<CartView cart={cart} quote={quote} checkout={checkout} member={snapshot?.member} suggestions={cartSuggestions} products={menu?.products??[]} onProduct={openProduct} onCheckoutChange={changeCheckout} onQuantity={(lineId,quantity)=>updateCart(cart.map(line=>line.lineId===lineId?{...line,quantity:Math.max(1,quantity)}:line))} onRemove={lineId=>updateCart(cart.filter(line=>line.lineId!==lineId))} onMenu={()=>changeView('menu')} onCheckout={()=>changeView('checkout')}/>:null}
-      {view==='checkout'?<CheckoutView cart={cart} quote={quote} checkout={checkout} setCheckout={changeCheckout} paymentChannels={snapshot?.paymentChannels??[]} pending={currentPending} actionState={actionState} onSubmit={()=>void submit()} onReadback={intent=>void readbackIntent(intent)} onBack={()=>changeView('cart')} onRepair={()=>changeView('cart')} onPaymentEvidence={file=>void uploadPaymentEvidence(file)}/>:null}
-      {view==='orders'?<OrdersView segment={orderSegment} setSegment={setOrderSegment} active={activeOrders} history={history} expandedOrderId={expandedOrderId} setExpandedOrderId={setExpandedOrderId} onReorder={order=>void reorder(order)} onBrowse={()=>changeView('menu')} connection={connection}/>:null}
-      {view==='more'?<MemberView connection={connection} snapshot={snapshot} history={history} pendingIntents={pendingIntents} readingIntentId={readingIntentId} onRefresh={()=>void refresh()} onReadback={intent=>void readbackIntent(intent)} onDiscard={removeIntent} onFallback={()=>void requestFallback()} onReorder={order=>void reorder(order)} onBrowse={()=>changeView('menu')}/>:null}
+    <section className={view==='menu'?'stage2-viewport':'viewport'} aria-busy={connection==='LOADING'}>
+      {view==='home'?<Stage1Home snapshot={snapshot} connection={connection} browserOnline={browserOnline} activeOrders={activeOrders} history={history} recommendations={homeRecommendations} cartCount={cartCount} onRetry={()=>void refresh()} onProduct={openProduct} onBrowse={()=>changeView('menu')} onJar={()=>changeView('cart')} onOrders={()=>{setOrderSegment('current');changeView('orders')}} onHistory={()=>{setOrderSegment('completed');changeView('orders')}} onMember={()=>changeView('more')} onBuyAgain={order=>void reorder(order)}/>:null}
+      {view==='menu'?<Stage2Menu connection={connection} browserOnline={browserOnline} categories={categories} activeCategoryId={activeCategoryId} setCategory={category=>presentWithContinuity(()=>changeCategory(category))} query={search} setQuery={setSearch} products={menu?.products??[]} recommendations={menuRecommendations} onProduct={(product,origin)=>openProduct(product,origin)} cartCount={cartCount} onCart={()=>changeView('cart')}/>:null}
+      {view==='cart'?<CartView cart={cart} quote={quote} repairs={cartRepairs} member={snapshot?.member} suggestions={cartSuggestions} products={menu?.products??[]} onProduct={openProduct} onAcceptRepair={acceptCartRepair} onQuantity={(lineId,quantity)=>updateCart(cart.map(line=>line.lineId===lineId?{...line,quantity:Math.max(1,quantity)}:line))} onRemove={lineId=>updateCart(cart.filter(line=>line.lineId!==lineId))} onMenu={()=>changeView('menu')} onCheckout={()=>void openCheckoutStep('contact')}/>:null}
+      {view==='checkout'?<CheckoutUi4View step={checkoutStep} cart={cart} quote={quote} repairs={cartRepairs} checkout={checkout} setCheckout={changeCheckout} paymentChannels={snapshot?.paymentChannels??[]} onStep={step=>void openCheckoutStep(step)} onBackToJar={()=>changeView('cart')} onRepair={()=>changeView('cart')} onPaymentEvidence={file=>void uploadPaymentEvidence(file)} onReviewConfirmed={startUi5Submission}/>:null}
+      {view==='submit'?(activeSubmitIntent?<SubmitUi5View intent={activeSubmitIntent} submitting={submitting} submitProbe={submitProbe} reading={readingIntentId===activeSubmitIntent.submissionId} fallbackAvailable={Boolean(snapshot?.fallback?.enabled)&&activeSubmitIntent.state==='NOT_CONNECTED'} onSubmit={()=>void submit(activeSubmitIntent)} onReadback={()=>void readbackIntent(activeSubmitIntent)} onFallback={()=>void requestFallback(activeSubmitIntent)} onBackReview={()=>void openCheckoutStep('review')} onBackToJar={()=>changeView('cart')}/>:<section className="page ui5-missing"><h1>提交資料未找到</h1><p>唔會建立新 Submission；請返回記憶罐重新確認。</p><button onClick={()=>changeView('cart')}>返回記憶罐</button></section>):null}
+      {view==='waiting'?<StoreFulfillmentUi6View order={waitingOrder} intent={waitingIntent} connection={connection} browserOnline={browserOnline} onRefresh={()=>void refresh()} onOrders={()=>{setOrderSegment('current');changeView('orders')}} onHome={()=>changeView('home')}/>:null}
+      {view==='pickup'?<PickupCompleteUi7View order={pickupOrder} historyOrder={pickupHistoryOrder} intent={pickupIntent} connection={connection} browserOnline={browserOnline} onRefresh={()=>void refresh()} onOrders={()=>{setOrderSegment(pickupHistoryOrder?'completed':'current');changeView('orders')}} onHome={()=>changeView('home')} onHelp={()=>setNotice('請直接向現場店員求助；呢個操作唔會改 Fulfillment、唔會標記完成，亦冇發出假通知。')}/>:null}
+      {view==='orders'?<HistoryReorderUi8View segment={orderSegment} setSegment={setOrderSegment} phase={ui8Phase} setPhase={setUi8Phase} active={activeOrders} history={history} selectedHistory={ui8SelectedHistory} cart={cart} repairs={cartRepairs} quote={quote} menu={menu} connection={connection} browserOnline={browserOnline} onOpenCurrent={openUi8Current} onOpenHistory={openUi8History} onStartReorder={order=>void reorder(order)} onAcceptRepair={acceptUi8Repair} onEditRepair={editUi8Repair} onRemoveLine={lineId=>updateCart(cart.filter(line=>line.lineId!==lineId))} onGoCart={()=>changeView('cart')} onBrowse={()=>changeView('menu')} onRefresh={()=>void refresh()}/>:null}
+      {view==='more'?<MemberView connection={connection} snapshot={snapshot} history={history} pendingIntents={recoveryIntents} readingIntentId={readingIntentId} onRefresh={()=>void refresh()} onReadback={intent=>void readbackIntent(intent)} onDiscard={removeIntent} onFallback={()=>void requestFallback()} onReorder={order=>void reorder(order)} onBrowse={()=>changeView('menu')}/>:null}
     </section>
 
-    {view!=='checkout'?<BottomNavigation active={view} cartCount={cartCount} orderCount={activeOrders.length} pulseKey={jarPulseKey} onChange={changeView}/>:null}
+    {view==='home'||view==='menu'?<Stage2BottomNavigation active={view} cartCount={cartCount} orderCount={activeOrders.length} onChange={changeView}/>:!['checkout','submit','waiting'].includes(view)?<BottomNavigation active={view==='pickup'||view==='orders'?'orders':view as 'home'|'cart'|'more'} cartCount={cartCount} orderCount={activeOrders.length} pulseKey={jarPulseKey} onChange={changeView}/>:null}
 
-    {selectedProduct?<ProductSheet product={selectedProduct} selections={selections} selectedVariationId={selectedVariationId} quantity={selectedQuantity} note={selectedNote} currentStep={productStep} editing={Boolean(editingLineId)} setStep={setProductStep} setVariation={setSelectedVariationId} setQuantity={setSelectedQuantity} setNote={setSelectedNote} toggle={(groupId,optionId)=>{
+    {selectedProduct?<ProductSheet product={selectedProduct} menu={menu} selections={selections} comboEnabled={selectedComboEnabled} comboSelections={selectedComboSelections} selectedVariationId={selectedVariationId} quantity={selectedQuantity} note={selectedNote} editing={Boolean(editingLineId)} recommendations={productRecommendations} setVariation={setSelectedVariationId} setComboEnabled={setSelectedComboEnabled} clearCombo={()=>setSelectedComboSelections(Object.freeze([]))} setQuantity={setSelectedQuantity} setNote={setSelectedNote} toggle={(groupId,optionId)=>{
       const group=selectedProduct.optionGroups.find(item=>item.optionGroupId===groupId);
       if(group)setSelections(current=>toggleCustomerSelection(current,group,optionId));
+    }} toggleCombo={(poolId,groupId,subPoolId,choiceId)=>{
+      const pool=menu?.comboPools?.find(item=>item.poolId===poolId);
+      const group=pool?.groups.find(item=>item.groupId===groupId);
+      if(pool&&group)setSelectedComboSelections(current=>toggleCustomerComboSelection(current,pool,group,subPoolId,choiceId));
     }} origin={selectedProductOrigin} onClose={closeProduct} onAdd={addSelectedProduct}/>:null}
+    {launchVisible?<LaunchOverlay
+      onEnterHome={()=>{setLaunchVisible(false);changeView('home')}}
+      onEnterMember={()=>{setLaunchVisible(false);changeView('more')}}
+    />:null}
   </main>;
 }

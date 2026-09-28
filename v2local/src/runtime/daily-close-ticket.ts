@@ -11,7 +11,7 @@ const BOLD_OFF=ESC+'E'+String.fromCharCode(0);
 const NORMAL=GS+'!'+String.fromCharCode(0);
 const DOUBLE=GS+'!'+String.fromCharCode(0x11);
 const RULE='------------------------------------------\n';
-const money=(minor:number)=>'$'+(Math.max(0,Math.round(Number(minor)||0))/100).toFixed(2);
+const money=(minor:number)=>{const n=Math.round(Number(minor)||0);return (n<0?'-':'')+String.fromCharCode(36)+(Math.abs(n)/100).toFixed(2)};
 
 export interface DailyCloseBreakdownRow{
   readonly label:string;
@@ -35,6 +35,17 @@ export interface DailyClosePrintData{
   readonly netMinor:number;
   readonly channelRows:readonly DailyCloseBreakdownRow[];
   readonly paymentRows:readonly DailyClosePaymentRow[];
+  readonly refundRows:readonly DailyClosePaymentRow[];
+  readonly refundDetails:readonly {
+    readonly id:string;
+    readonly orderId:string;
+    readonly display:string;
+    readonly originalCreatedAt:string;
+    readonly executionAt:string;
+    readonly method:string;
+    readonly amountMinor:number;
+    readonly items:string;
+  }[];
   readonly close:LocalDayClose;
 }
 
@@ -72,11 +83,21 @@ export function buildDailyClosePrintData(input:{
   readonly orders:readonly PrintableOrder[];
   readonly close:LocalDayClose;
   readonly refundMinor?:number;
+  readonly refunds?:readonly {
+    readonly id:string;
+    readonly orderId:string;
+    readonly display:string;
+    readonly originalCreatedAt:string;
+    readonly executionAt:string;
+    readonly method:string;
+    readonly amountMinor:number;
+    readonly items:string;
+  }[];
 }):DailyClosePrintData{
-  const sales=input.orders.filter(order=>String((order as PrintableOrder&{fulfillmentLabel?:string}).fulfillmentLabel||'')!=='已取消');
+  const sales=input.orders;
   const grossMinor=sales.reduce((sum,order)=>sum+Math.max(0,Number(order.totalMinor)||0),0);
   const refundMinor=input.refundMinor;
-  const netMinor=refundMinor===undefined?grossMinor:Math.max(0,grossMinor-refundMinor);
+  const netMinor=refundMinor===undefined?grossMinor:grossMinor-refundMinor;
   const itemUnits=sales.reduce((sum,order)=>sum+order.items.reduce((s,item)=>s+Math.max(0,Number(item.qty)||0),0),0);
 
   const channels=new Map<string,{orders:number;grossMinor:number}>();
@@ -98,6 +119,15 @@ export function buildDailyClosePrintData(input:{
     }
   }
 
+  const refundPayments=new Map<string,{orders:Set<string>;amountMinor:number}>();
+  for(const refund of input.refunds??[]){
+    const label=String(refund.method||'未記錄').trim()||'未記錄';
+    const row=refundPayments.get(label)??{orders:new Set<string>(),amountMinor:0};
+    row.orders.add(String(refund.id||'REFUND'));
+    row.amountMinor+=Math.max(0,Number(refund.amountMinor)||0);
+    refundPayments.set(label,row);
+  }
+
   return Object.freeze({
     businessDate:input.close.businessDate,
     closedAt:new Date(input.close.createdAt).toISOString(),
@@ -112,6 +142,10 @@ export function buildDailyClosePrintData(input:{
     paymentRows:Object.freeze([...payments.entries()].sort(([a],[b])=>a.localeCompare(b)).map(([label,row])=>Object.freeze({
       label,orders:row.orders.size,amountMinor:row.amountMinor,
     }))),
+    refundRows:Object.freeze([...refundPayments.entries()].sort(([a],[b])=>a.localeCompare(b)).map(([label,row])=>Object.freeze({
+      label,orders:row.orders.size,amountMinor:row.amountMinor,
+    }))),
+    refundDetails:Object.freeze([...(input.refunds??[])].sort((a,b)=>b.executionAt.localeCompare(a.executionAt)).map(row=>Object.freeze({...row}))),
     close:input.close,
   });
 }
@@ -123,9 +157,21 @@ export function renderDailyCloseTicket(data:DailyClosePrintData){
   const paymentLines=data.paymentRows.length
     ?data.paymentRows.map(row=>row.label+'  '+row.orders+'單  '+money(row.amountMinor)+'\n').join('')
     :'—\n';
+  const refundPaymentLines=data.refundRows.length
+    ?data.refundRows.map(row=>row.label+'  '+row.orders+'筆  -'+money(row.amountMinor)+'\n').join('')
+    :'—\n';
   const refundLine=data.refundMinor===undefined
     ?'退款總額：—（未接正式退款帳）\n'
     :'退款總額：-'+money(data.refundMinor)+'\n';
+  const refundDetailLines=data.refundDetails.length
+    ?data.refundDetails.map(row=>{
+      const original=new Date(row.originalCreatedAt).toLocaleString('zh-HK',{timeZone:'Asia/Hong_Kong',hour12:false});
+      const execution=new Date(row.executionAt).toLocaleString('zh-HK',{timeZone:'Asia/Hong_Kong',hour12:false});
+      return row.display+' · '+row.items+'\n'
+        +'原單：'+original+'\n'
+        +'退款：'+execution+' · '+row.method+' · -'+money(row.amountMinor)+'\n';
+    }).join('')
+    :'—\n';
 
   return INIT
     +CENTER+BOLD_ON+DOUBLE+'More Fun  磨飯\n'+NORMAL+BOLD_OFF
@@ -144,12 +190,19 @@ export function renderDailyCloseTicket(data:DailyClosePrintData){
     +BOLD_ON+'【渠道】\n'+BOLD_OFF
     +channelLines
     +RULE
-    +BOLD_ON+'【付款方式】\n'+BOLD_OFF
+    +BOLD_ON+'【付款方式／銷售入賬】\n'+BOLD_OFF
     +paymentLines
+    +RULE
+    +BOLD_ON+'【退款方式】\n'+BOLD_OFF
+    +refundPaymentLines
+    +RULE
+    +BOLD_ON+'【退款明細】\n'+BOLD_OFF
+    +refundDetailLines
     +RULE
     +BOLD_ON+'【現金核數】\n'+BOLD_OFF
     +'開櫃金：'+money(data.close.openingCashMinor)+'\n'
     +'現金銷售：'+money(data.close.cashSalesMinor)+'\n'
+    +'現金退款：-'+money(data.close.cashRefundMinor)+'\n'
     +'應有現金：'+money(data.close.expectedCashMinor)+'\n'
     +'實點現金：'+money(data.close.countedCashMinor)+'\n'
     +'差額：'+(data.close.cashDifferenceMinor<0?'-':'')+money(Math.abs(data.close.cashDifferenceMinor))+'\n'

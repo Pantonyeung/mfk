@@ -36,3 +36,11 @@
 .payment-followup>button{min-height:42px;border:1px solid #25d366;border-radius:9px;background:#f3fff7;color:#126b35;font-size:13px;font-weight:900}
 .payment-followup-qr{display:grid;grid-template-columns:180px minmax(0,1fr);gap:12px;align-items:start;padding:12px;border:1px solid #dce9df;border-radius:10px;background:#fff}
 .payment-followup-qr img{width:180px;height:180px;object-fit:contain;background:#fff}.payment-followup-qr p{margin:0;font-size:12px;line-height:1.55;white-space:pre-wrap}.payment-followup-qr small{grid-column:2;color:#6b7280;font-size:11px;line-height:1.45}
+
+
+/* B1 SAME-Order payment correction */
+.order-audit-card{display:grid;gap:7px;margin:0 0 10px;padding:10px;border:1px solid #dce2ec;border-radius:10px;background:#f8fafc}
+.order-audit-card>header{display:flex;justify-content:space-between;align-items:center}.order-audit-card>header span{min-width:24px;height:24px;display:grid;place-items:center;border-radius:999px;background:#e8edf5;font-size:12px;font-weight:900}
+.order-audit-card>p{margin:0;padding:7px 0;border-top:1px solid #e7eaf0;display:grid;grid-template-columns:minmax(140px,.8fr) minmax(0,1fr) auto;gap:8px;align-items:center;font-size:12px}.order-audit-card>p:first-of-type{border-top:0}.order-audit-card>p span,.order-audit-card>p small{color:#707784}.order-audit-card>p b{font-size:13px}
+.order-payment-correction-body{display:grid;gap:12px;padding-top:14px}.order-payment-correction-body>p{margin:0;font-size:17px}.order-payment-correction-body>label{display:grid;gap:6px}.order-payment-correction-body select{min-height:48px;padding:0 12px;border:1px solid #d8dce4;border-radius:9px;background:#fff;font-size:16px}.order-payment-correction-body>small{color:#6f7581;line-height:1.45}
+.order-correction-warning{padding:12px;border-radius:10px;background:#f2f6fb;color:#43536c;line-height:1.45}.order-payment-correction-body footer{display:grid;grid-template-columns:1fr 1fr;gap:10px}

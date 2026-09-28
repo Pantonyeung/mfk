@@ -1,4 +1,5 @@
 import {useEffect,useMemo,useState} from 'react';
+import type {StaffPinVerifier} from '../../contracts/staff-auth-v1.ts';
 import {useAdminDraft} from './admin-draft.tsx';
 import {appendAdminAudit,readActiveAdminRelease,usePersistentAdminState,writeAdminStored} from './admin-local-store.ts';
 import {saveAdminConfig} from './admin-config-save.ts';
@@ -158,7 +159,7 @@ interface DiningTableConfig{readonly id:string;readonly name:string;readonly act
 interface CustomerPaymentChannelConfig{readonly id:string;readonly name:string;readonly enabled:boolean;readonly qrImageUrl:string;readonly sortOrder:number}
 interface StoreSettings{
   storeName:string;storeCode:string;currency:string;timezone:string;
-  lateArrivalMinutes:number;fulfillmentMinutes:number;archiveHours:number;
+  lateArrivalMinutes:number;fulfillmentMinutes:number;archiveHours:number;diningOverdueMinutes:number;
   reminderAfterMinutes:number;reminderIntervalMinutes:number;repeatReminder:boolean;timeoutPriority:'NORMAL'|'HIGH'|'URGENT';
   dineInEnabled:boolean;takeawayEnabled:boolean;
   diningTables:DiningTableConfig[];
@@ -200,7 +201,7 @@ export function StoreSettingsWorkspace(){
   const {draft,markClean}=useAdminDraft();
   const [config,setConfig]=usePersistentAdminState<StoreSettings>('store-settings.v1',{
     storeName:'磨飯',storeCode:'MF01',currency:'HKD',timezone:'Asia/Hong_Kong',
-    lateArrivalMinutes:15,fulfillmentMinutes:20,archiveHours:24,
+    lateArrivalMinutes:15,fulfillmentMinutes:20,archiveHours:24,diningOverdueMinutes:35,
     reminderAfterMinutes:5,reminderIntervalMinutes:5,repeatReminder:true,timeoutPriority:'HIGH',
     dineInEnabled:true,takeawayEnabled:true,diningTables:DEFAULT_DINING_TABLES,customerPaymentChannels:DEFAULT_CUSTOMER_PAYMENT_CHANNELS,
     customerWhatsAppEnabled:true,
@@ -254,6 +255,7 @@ export function StoreSettingsWorkspace(){
       if(!row.name.trim())errors.push('堂食枱 '+(row.id||'未命名')+' 缺少顯示名稱');
     }
     const paymentIds=new Set<string>();
+    if(!Number.isFinite(Number(config.diningOverdueMinutes))||Number(config.diningOverdueMinutes)<1)errors.push('堂食超時提醒分鐘必須至少 1 分鐘');
     const whatsappDigits=String(config.customerWhatsAppNumber??'').replace(/\D/g,'');
     if(config.customerWhatsAppEnabled!==false&&whatsappDigits&&(whatsappDigits.length<8||whatsappDigits.length>15))errors.push('Customer WhatsApp 電話格式錯誤');
     if(config.customerWhatsAppEnabled!==false&&whatsappDigits&&!String(config.customerWhatsAppTemplate??'').trim())errors.push('Customer WhatsApp 已啟用但訊息模板未填');
@@ -312,7 +314,7 @@ export function StoreSettingsWorkspace(){
         <p>付款 QR 會經 Admin Worker 上載到私有 R2；R2 唔開 Public Access。未有 QR 嘅付款方式可以保留設定，但 Customer 唔可以用佢提交電子付款。</p>
       </article>
       <article className="admin-policy-card"><h2>系統引用</h2><label><span>付款方式 refs</span><input value={config.paymentRefs.join(', ')} onChange={event=>patch({paymentRefs:refs(event.target.value)})} placeholder="例如 CASH, OCTOPUS"/></label><label><span>打印路由 refs</span><input value={config.printRefs.join(', ')} onChange={event=>patch({printRefs:refs(event.target.value)})} placeholder="例如 RECEIPT, KITCHEN"/></label><label><span>渠道 refs</span><input value={config.channelRefs.join(', ')} onChange={event=>patch({channelRefs:refs(event.target.value)})} placeholder="例如 KEETA"/></label></article>
-      <article className="admin-policy-card"><h2>營運計時</h2><label><span>遲到界線（分鐘）</span><input type="number" min={0} value={config.lateArrivalMinutes} onChange={event=>patch({lateArrivalMinutes:Number(event.target.value)||0})}/></label><label><span>出餐計時（分鐘）</span><input type="number" min={0} value={config.fulfillmentMinutes} onChange={event=>patch({fulfillmentMinutes:Number(event.target.value)||0})}/></label><label><span>封存時間（小時）</span><input type="number" min={1} value={config.archiveHours} onChange={event=>patch({archiveHours:Number(event.target.value)||1})}/></label></article>
+      <article className="admin-policy-card"><h2>營運計時</h2><label><span>遲到界線（分鐘）</span><input type="number" min={0} value={config.lateArrivalMinutes} onChange={event=>patch({lateArrivalMinutes:Number(event.target.value)||0})}/></label><label><span>出餐計時（分鐘）</span><input type="number" min={0} value={config.fulfillmentMinutes} onChange={event=>patch({fulfillmentMinutes:Number(event.target.value)||0})}/></label><label><span>堂食超時變紅（分鐘）</span><input type="number" min={1} value={config.diningOverdueMinutes??35} onChange={event=>patch({diningOverdueMinutes:Math.max(1,Math.floor(Number(event.target.value)||35))})}/></label><small>堂食枱由開始時間計；超過此分鐘數先標紅。35 分鐘只係預設值。</small><label><span>封存時間（小時）</span><input type="number" min={1} value={config.archiveHours} onChange={event=>patch({archiveHours:Number(event.target.value)||1})}/></label></article>
       <article className="admin-policy-card"><h2>Pending Order 提醒</h2><label><span>幾多分鐘後提醒</span><input type="number" min={0} value={config.reminderAfterMinutes} onChange={event=>patch({reminderAfterMinutes:Number(event.target.value)||0})}/></label><label><span>提醒間隔（分鐘）</span><input type="number" min={1} value={config.reminderIntervalMinutes} onChange={event=>patch({reminderIntervalMinutes:Number(event.target.value)||1})}/></label><Toggle checked={config.repeatReminder} onChange={repeatReminder=>patch({repeatReminder})} label="重複提醒"/><label><span>Timeout 提示優先級</span><select value={config.timeoutPriority} onChange={event=>patch({timeoutPriority:event.target.value as StoreSettings['timeoutPriority']})}><option value="NORMAL">一般</option><option value="HIGH">高</option><option value="URGENT">緊急</option></select></label><small>Timeout 唔會自動接受／拒絕訂單。</small></article>
     </div>
     <section className="admin-rule-card"><h2>七日營業時間</h2><div className="admin-editor-list">{STORE_DAYS.map(day=>{const row=config.weeklyHours[day.id]??DEFAULT_WEEKLY_HOURS[day.id];return <article className="admin-policy-row" key={day.id}><b>{day.label}</b><select value={row.closed?'CLOSED':'OPEN'} onChange={event=>patchDay(day.id,{closed:event.target.value==='CLOSED'})}><option value="OPEN">營業</option><option value="CLOSED">休息</option></select>{row.closed?<span>休息</span>:<><label><span>開門</span><input type="time" value={row.opensAt} onChange={event=>patchDay(day.id,{opensAt:event.target.value})}/></label><label><span>關門</span><input type="time" value={row.closesAt} onChange={event=>patchDay(day.id,{closesAt:event.target.value})}/></label></>}</article>})}</div></section>
@@ -320,8 +322,14 @@ export function StoreSettingsWorkspace(){
 }
 
 interface StaffDraft{
-  readonly id:string;readonly name:string;readonly role:'STAFF'|'MANAGER'|'OWNER'|'VIEWER';readonly pin:string;
+  readonly id:string;readonly loginId:string;readonly name:string;readonly role:'STAFF'|'MANAGER'|'OWNER'|'VIEWER';readonly pin:string;
+  readonly pinVerifier?:StaffPinVerifier;
   readonly scope:'STORE'|'MULTI_STORE'|'REPORT_ONLY';readonly adminLogin:boolean;readonly active:boolean;readonly permissions:readonly string[];
+}
+function migrateStaffDraft(row:StaffDraft):StaffDraft{
+  const name=String(row.name??'').trim();
+  const loginId=String(row.loginId??'').trim()||(/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(name)?name:String(row.id??'').trim());
+  return {...row,loginId,pin:String(row.pin??'')};
 }
 const PERMISSIONS=[['ORDER_REVIEW','查看訂單'],['ORDER_CORRECTION','更正訂單／付款'],['ADMIN_CONFIG','修改後台設定'],['PUBLISH_CONFIG','建立設定版本'],['REPORT_VIEW','查看報表'],['REPORT_EXPORT','匯出報表'],['STAFF_MANAGE','管理員工']] as const;
 export function StaffWorkspace(){
@@ -329,8 +337,11 @@ export function StaffWorkspace(){
   const [staff,setStaff]=usePersistentAdminState<StaffDraft[]>('staff.v1',[]);
   const [saveMessage,setSaveMessage]=useState('');
   const [saveErrors,setSaveErrors]=useState<readonly string[]>([]);
-  const add=()=>setStaff(rows=>{const row:StaffDraft={id:'staff-'+Date.now().toString(36),name:'',role:'STAFF',pin:'',scope:'STORE',adminLogin:false,active:true,permissions:['ORDER_REVIEW']};appendAdminAudit({action:'新增員工',target:row.id});return [...rows,row];});
-  const patch=(id:string,change:Partial<StaffDraft>)=>setStaff(rows=>rows.map(row=>{if(row.id!==id)return row;const after={...row,...change};appendAdminAudit({action:'修改員工／權限',target:id,before:{...row,pin:row.pin?'***':''},after:{...after,pin:after.pin?'***':''}});return after;}));
+  useEffect(()=>{
+    if(staff.some(row=>!String(row.loginId??'').trim()))setStaff(rows=>rows.map(row=>migrateStaffDraft(row)));
+  },[]);
+  const add=()=>setStaff(rows=>{const row:StaffDraft={id:'staff-'+Date.now().toString(36),loginId:'',name:'',role:'STAFF',pin:'',scope:'STORE',adminLogin:false,active:true,permissions:['ORDER_REVIEW']};appendAdminAudit({action:'新增員工',target:row.id});return [...rows,row];});
+  const patch=(id:string,change:Partial<StaffDraft>)=>setStaff(rows=>rows.map(row=>{if(row.id!==id)return row;const after={...row,...change};appendAdminAudit({action:'修改員工／權限',target:id,before:{...row,pin:row.pin?'***':'',pinVerifier:row.pinVerifier?'PRESENT':undefined},after:{...after,pin:after.pin?'***':'',pinVerifier:after.pinVerifier?'PRESENT':undefined}});return after;}));
   const remove=(row:StaffDraft)=>{
     if(typeof window!=='undefined'&&!window.confirm('確定移除「'+(row.name||row.id)+'」嘅員工草稿？一般停用請使用狀態開關。'))return;
     setStaff(rows=>{appendAdminAudit({action:'停用並移除員工草稿',target:row.id});return rows.filter(item=>item.id!==row.id);});
@@ -346,13 +357,14 @@ export function StaffWorkspace(){
   };
   const activeRelease=readActiveAdminRelease();
   return <section className="admin-editor-page">
-    <header className="admin-editor-head"><div><small>{activeRelease?'目前 R'+activeRelease.version:'未有保存版本'} · 人員／角色／權限</small><h1>員工／權限</h1><p>管理員工、角色、PIN、權限範圍同後台登入資格。PIN 只會轉成驗證器送到 SMT，唔會將明文 PIN 發布出去。</p>{saveMessage?<span>{saveMessage}</span>:null}</div><div className="admin-editor-actions"><button className="secondary" onClick={add}>新增員工</button><button className="primary" onClick={saveStaff}>保存人員設定</button></div></header>
+    <header className="admin-editor-head"><div><small>{activeRelease?'目前 R'+activeRelease.version:'未有保存版本'} · 人員／角色／權限</small><h1>員工／權限</h1><p>登入編號係人手輸入嘅帳號；Internal Staff ID 只供系統識別。PIN 只會轉成驗證器發布，唔會將明文 PIN 發布出去。</p>{saveMessage?<span>{saveMessage}</span>:null}</div><div className="admin-editor-actions"><button className="secondary" onClick={add}>新增員工</button><button className="primary" onClick={saveStaff}>保存人員設定</button></div></header>
     {saveErrors.length?<div className="admin-validation is-error" role="alert"><b>有 {saveErrors.length} 項需要處理</b><ul>{saveErrors.map((error,index)=><li key={index}>{error}</li>)}</ul></div>:null}
     {staff.length===0?<div className="admin-empty-state"><b>未有員工資料</b><p>新增員工後設定角色、PIN、權限範圍同權限。</p><button onClick={add}>新增員工</button></div>:<div className="admin-editor-grid">{staff.map(row=><article className="admin-policy-card" key={row.id}>
-      <header><h2>{row.name||'未命名員工'}</h2><small>{row.id}</small></header>
+      <header><h2>{row.name||row.loginId||'未命名員工'}</h2><small>{row.loginId?'登入編號 '+row.loginId:'未設定登入編號'}</small></header>
+      <label><span>登入編號</span><input autoComplete="username" value={row.loginId??''} onChange={event=>patch(row.id,{loginId:event.target.value.replace(/[^A-Za-z0-9._-]/g,'').slice(0,64)})} placeholder="例如 1111"/></label>
       <label><span>員工名稱</span><input value={row.name} onChange={event=>patch(row.id,{name:event.target.value})}/></label>
       <label><span>角色</span><select value={row.role} onChange={event=>patch(row.id,{role:event.target.value as StaffDraft['role']})}><option value="STAFF">員工</option><option value="MANAGER">經理</option><option value="OWNER">老闆</option><option value="VIEWER">只讀人員</option></select></label>
-      <label><span>PIN（4–8 位）</span><input type="password" inputMode="numeric" autoComplete="new-password" value={row.pin} onChange={event=>patch(row.id,{pin:event.target.value.replace(/\D/g,'').slice(0,8)})}/></label>
+      <label><span>PIN（4–8 位）</span><input type="password" inputMode="numeric" autoComplete="new-password" value={row.pin} onChange={event=>patch(row.id,{pin:event.target.value.replace(/\D/g,'').slice(0,8)})} placeholder={row.pinVerifier?'留空＝保留現有 PIN':'4–8 位數字'}/></label>
       <label><span>權限範圍</span><select value={row.scope} onChange={event=>patch(row.id,{scope:event.target.value as StaffDraft['scope']})}><option value="STORE">單店</option><option value="MULTI_STORE">多店</option><option value="REPORT_ONLY">只看報表</option></select></label>
       <div className="admin-check-grid">{PERMISSIONS.map(([id,label])=><label key={id}><input type="checkbox" checked={row.permissions.includes(id)} onChange={event=>togglePermission(row,id,event.target.checked)}/><span>{label}</span></label>)}</div>
       <Toggle checked={row.adminLogin} onChange={adminLogin=>patch(row.id,{adminLogin})} label="允許後台登入"/>

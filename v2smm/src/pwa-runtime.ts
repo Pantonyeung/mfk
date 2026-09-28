@@ -26,6 +26,8 @@ function isSnapshot(value:unknown):value is SmmReadModelSnapshot{
   }
   if(value.menu!==undefined){
     if(!isRecord(value.menu)||typeof value.menu.revision!=='string'||!Array.isArray(value.menu.categories)||!Array.isArray(value.menu.products))return false;
+    if(value.menu.combos!==undefined&&!Array.isArray(value.menu.combos))return false;
+    if(value.menu.comboPools!==undefined&&!Array.isArray(value.menu.comboPools))return false;
   }
   return true;
 }

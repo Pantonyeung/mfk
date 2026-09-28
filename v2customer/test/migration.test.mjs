@@ -122,3 +122,40 @@ test('customer checks SMT availability a bounded number of times before WhatsApp
   assert.match(app,/轉用 WhatsApp/);
   assert.match(app,/buildWhatsAppFallbackUrl/);
 });
+
+
+test('payment evidence is transient and cannot reappear in a later checkout draft',()=>{
+  const persistence=fs.readFileSync(path.join(srcRoot,'persistence.ts'),'utf8');
+  const app=fs.readFileSync(path.join(srcRoot,'App.tsx'),'utf8');
+  assert.match(persistence,/persistedCheckout/);
+  assert.doesNotMatch(persistence,/checkout\.paymentEvidence&&typeof checkout\.paymentEvidence/);
+  assert.match(app,/withoutPaymentEvidence/);
+  assert.match(app,/舊付款憑證已失效/);
+});
+
+test('backend preflight is wall-clock bounded and shows visible progress before WhatsApp fallback',()=>{
+  const cloud=fs.readFileSync(path.join(srcRoot,'cloud-runtime.ts'),'utf8');
+  const app=fs.readFileSync(path.join(srcRoot,'App.tsx'),'utf8');
+  const views=fs.readFileSync(path.join(srcRoot,'components/customer-views.tsx'),'utf8');
+  assert.match(cloud,/BACKEND_PROBE_TIMEOUT_MS=1600/);
+  assert.match(cloud,/AbortController/);
+  assert.match(cloud,/onAttempt\?\.\(attempt,BACKEND_PROBE_ATTEMPTS\)/);
+  assert.match(app,/setSubmitProbe/);
+  assert.match(views,/3 次有限連線檢查/);
+  assert.match(views,/轉用 WhatsApp/);
+  assert.match(views,/正在檢查店舖連線/);
+});
+
+
+test('checkout submit is fail-closed before click and guarded by a synchronous mutex',()=>{
+  const app=fs.readFileSync(path.join(srcRoot,'App.tsx'),'utf8');
+  const views=fs.readFileSync(path.join(srcRoot,'components/customer-views.tsx'),'utf8');
+  assert.match(app,/submitLockRef=useRef\(false\)/);
+  assert.match(app,/if\(submitLockRef\.current\|\|submitting\)return/);
+  assert.match(app,/submitLockRef\.current=true/);
+  assert.match(app,/submitLockRef\.current=false/);
+  assert.match(app,/if\(!selectedPaymentChannel\.qrImageUrl\)return '呢個電子支付方式未有付款 QR/);
+  assert.match(app,/Boolean\(submitBlockReason\)\?'disabled'/);
+  assert.match(views,/submitBlockReason\?<section className="safe-submit danger"/);
+  assert.match(views,/未完成提交條件/);
+});

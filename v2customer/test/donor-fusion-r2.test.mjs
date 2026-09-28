@@ -19,13 +19,14 @@ function collectSource(directory){
 const source=collectSource(srcRoot);
 const app=fs.readFileSync(path.join(srcRoot,'App.tsx'),'utf8');
 const views=fs.readFileSync(path.join(srcRoot,'components/customer-views.tsx'),'utf8');
+const ui3=fs.readFileSync(path.join(srcRoot,'components/product-sheet-ui3.tsx'),'utf8');
 const types=fs.readFileSync(path.join(srcRoot,'product-types.ts'),'utf8');
 const primitives=fs.readFileSync(path.join(srcRoot,'ui/primitives.tsx'),'utf8');
 const styles=fs.readFileSync(path.join(srcRoot,'styles.css'),'utf8');
 
 test('R2 keeps the five-part customer mental model and complete memory jar',()=>{
-  for(const label of['首頁','點單','記憶罐','我的訂單','我的記憶'])assert.match(primitives,new RegExp(label));
-  for(const marker of['記憶罐係今次落單草稿','今次已選','取餐聯絡','目前餐牌價格','前往最後確認'])assert.match(views,new RegExp(marker));
+  for(const label of['首頁','點單','記憶罐','訂單','會員'])assert.match(primitives,new RegExp(label));
+  for(const marker of['記憶罐係今次落單草稿','今次已選','聯絡與取餐','目前餐牌價格'])assert.match(views,new RegExp(marker));
   assert.match(views,/JarVisual/);
   assert.match(views,/removeConfirm/);
   assert.match(views,/onProduct\(product,[\s\S]*line/);
@@ -33,13 +34,18 @@ test('R2 keeps the five-part customer mental model and complete memory jar',()=>
   assert.match(views,/hideFromView/);
 });
 
-test('product configuration is progressive and preserves required min max unavailable validation',()=>{
-  assert.match(views,/設定進度/);
-  assert.match(views,/目前步驟/);
-  assert.match(views,/已完成/);
-  assert.match(views,/最少/);
-  assert.match(views,/最多/);
-  assert.match(views,/disabled=\{!option\.available\}/);
+test('product configuration follows canonical UI3 flow and preserves required min max unavailable validation',()=>{
+  const order=['data-ui3-section="hero"','data-ui3-section="combo"','data-ui3-section="required"','data-ui3-section="optional"','data-ui3-section="quantity"','data-ui3-section="recommendation"','data-ui3-section="summary"','data-ui3-section="add"'];
+  let previous=-1;
+  for(const marker of order){
+    const index=ui3.indexOf(marker);
+    assert.ok(index>previous,marker);
+    previous=index;
+  }
+  assert.match(ui3,/最少/);
+  assert.match(ui3,/最多/);
+  assert.match(ui3,/disabled=\{disabled\}/);
+  assert.match(ui3,/disabled=\{!addReady\}/);
   assert.match(app,/validateCustomerSelections/);
 });
 
@@ -63,7 +69,7 @@ test('no obsolete donor runtime or customer-side business authority is transplan
   assert.match(cloud,/https:\/\/admin\.morefunos\.com/);
   assert.doesNotMatch(nonCloud,/\bfetch\s*\(|\bWebSocket\b|\bXMLHttpRequest\b/);
   assert.match(app,/port\?\.submitOrder/);
-  assert.match(app,/port\?\.buildReorderCart/);
+  assert.match(app,/buildCurrentReorderCart/);
 });
 
 test('R2 visual and interaction systems are tokenized and accessible',()=>{
@@ -81,4 +87,15 @@ test('brand photography and reproducible browser acceptance surface exist outsid
   assert.equal(fs.existsSync(path.join(root,'visual-acceptance.html')),true);
   assert.equal(fs.existsSync(path.join(testDir,'visual-acceptance.mjs')),true);
   assert.doesNotMatch(fs.readFileSync(path.join(root,'index.html'),'utf8'),/visual-acceptance/);
+});
+
+
+test('material menu changes identify exact cart lines and allow in-place price acceptance',()=>{
+  const quote=fs.readFileSync(path.join(srcRoot,'local-quote.ts'),'utf8');
+  assert.match(quote,/publishedCartRepairs/);
+  assert.match(quote,/repairPublishedCartLine/);
+  assert.match(quote,/PRICE_CHANGED/);
+  assert.match(views,/接受並更新呢項價格/);
+  assert.match(views,/只標記受影響餐點/);
+  assert.doesNotMatch(views,/返回菜單修正/);
 });
