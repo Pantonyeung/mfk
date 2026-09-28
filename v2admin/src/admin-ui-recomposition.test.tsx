@@ -113,6 +113,14 @@ describe('Admin UI recomposition',()=>{
     expect(printCenter).not.toContain('紙寬／標籤寬 mm');
   });
 
+  it('keeps CRM object forms collapsed until one tier or coupon is chosen',()=>{
+    const loyalty=render('/admin/members/loyalty');
+    expect(loyalty).not.toContain('積分倍率</span><input');
+    const coupons=render('/admin/members/coupons');
+    expect(coupons).not.toContain('優惠碼</span><input');
+    expect(coupons).not.toContain('datetime-local');
+  });
+
   it('only reports SMT success for a matching revision and fingerprint readback',()=>{
     const activeRelease={version:12,createdAt:'2026-09-22T00:00:00.000Z',fingerprint:'fp-12'};
     const published={state:'PUBLISHED' as const,revision:12,fingerprint:'fp-12',updatedAt:'2026-09-22T00:00:01.000Z'};
