@@ -21,6 +21,7 @@ import {ChannelHealthPage} from './channel-health';
 import {PlanningPage} from './planning';
 import {SellabilityPage} from './sellability';
 import {StaffOverviewPage} from './staff-overview';
+import {ActivityAuditPage,DeviceHealthPage,ManagerLogPage,MoreHubPage,ReportsPage,SettingsSummaryPage,type ManagerMode} from './source-fidelity-wave2';
 import type {
   OwnerAuthSession,
   OwnerConnectionState,
@@ -33,9 +34,19 @@ import type {
 } from './product-types';
 
 type View='today'|'queue'|'orders'|'more';
-type SecondaryView='channels'|'planning'|'sellability'|'staff';
-type Tool='reports'|'devices'|'customers'|'marketing'|'settlement'|'cash'|'inventory'|'notifications'|'manager'|'activity'|'admin'|'recovery';
+type SecondaryView='channels'|'planning'|'sellability'|'staff'|'devices'|'reports'|'manager-log'|'checklist'|'handoff'|'activity'|'settings-summary';
+type Tool='customers'|'marketing'|'settlement'|'cash'|'inventory'|'notifications'|'admin'|'recovery';
 type Confirmation={label:string;target:string;impact:string;actionId?:string};
+
+const SECONDARY_PATHS:Record<SecondaryView,string>={
+  channels:'/channels',planning:'/planning',sellability:'/sellability',staff:'/staff',
+  devices:'/devices',reports:'/reports','manager-log':'/manager-log',checklist:'/checklist',
+  handoff:'/handoff',activity:'/activity','settings-summary':'/settings-summary',
+};
+function secondaryFromPath(path:string):SecondaryView|null{
+  for(const [view,route] of Object.entries(SECONDARY_PATHS))if(route===path)return view as SecondaryView;
+  return null;
+}
 
 export function App(){
   const local=useMemo(()=>readOwnerLocalWorkspace(),[]);
@@ -57,7 +68,7 @@ export function App(){
   const [confirmation,setConfirmation]=useState<Confirmation|null>(null);
   const [commandFlight,setCommandFlight]=useState<OwnerActionCommandFlight|null>(null);
   const [ordersScope,setOrdersScope]=useState<OwnerOrderScope>('DEFAULT');
-  const [secondary,setSecondary]=useState<SecondaryView|null>(()=>typeof window!=='undefined'&&window.location.pathname==='/channels'?'channels':typeof window!=='undefined'&&window.location.pathname==='/planning'?'planning':typeof window!=='undefined'&&window.location.pathname==='/sellability'?'sellability':typeof window!=='undefined'&&window.location.pathname==='/staff'?'staff':null);
+  const [secondary,setSecondary]=useState<SecondaryView|null>(()=>typeof window==='undefined'?null:secondaryFromPath(window.location.pathname));
   const [planning,setPlanning]=useState<OwnerPlanningSnapshot|null>(null);
   const [planningLoading,setPlanningLoading]=useState(false);
   const [planningSaving,setPlanningSaving]=useState(false);
@@ -81,9 +92,9 @@ export function App(){
     }
   };
   const openSecondary=(next:SecondaryView)=>{
-    setSecondary(next);
+    setSecondary(next);setView('more');persistLocal({view:'more'});
     if(typeof window!=='undefined'){
-      const path=next==='channels'?'/channels':next==='planning'?'/planning':next==='sellability'?'/sellability':'/staff';
+      const path=SECONDARY_PATHS[next];
       if(window.location.pathname!==path)window.history.pushState({},'',path);
     }
   };
@@ -135,10 +146,8 @@ export function App(){
   useEffect(()=>{
     const pop=()=>{
       const path=window.location.pathname;
-      if(path==='/channels'){setSecondary('channels');return}
-      if(path==='/planning'){setSecondary('planning');return}
-      if(path==='/sellability'){setSecondary('sellability');return}
-      if(path==='/staff'){setSecondary('staff');return}
+      const nextSecondary=secondaryFromPath(path);
+      if(nextSecondary){setSecondary(nextSecondary);setView('more');return}
       setSecondary(null);
       if(path==='/actions')setView('queue');
       else if(path==='/orders')setView('orders');
@@ -322,6 +331,10 @@ export function App(){
   };
 
   const connectionLabel=humanConnectionLabel(connection);
+  const openAdmin=async()=>{
+    if(!port?.requestAdminDeepLink){setNotice('Admin 導航服務尚未連接。');return}
+    try{setNotice((await port.requestAdminDeepLink()).message)}catch{setNotice('暫時未能開啟 Admin。')}
+  };
 
   if(!authChecked){
     return <main className="app-shell owner-auth-shell"><section className="owner-auth-gate"><strong>正在驗證 Owner 工作階段</strong><p>正式資料未完成身份確認前唔會載入。</p></section></main>;
@@ -353,10 +366,15 @@ export function App(){
       {secondary==='planning'?<PlanningPage value={planning} loading={planningLoading} saving={planningSaving} onMonthChange={monthKey=>void loadPlanning(monthKey)} onSave={input=>void savePlanning(input)} onBack={()=>changeView('more')}/>:null}
       {secondary==='sellability'?<SellabilityPage items={snapshot?.sellability??[]} connection={connection} busy={sellabilityBusy} result={sellabilityResult} onDismissResult={()=>setSellabilityResult(null)} onCommand={input=>void commandSellability(input)} onReload={()=>void loadSellability()} onBack={()=>changeView('more')}/>:null}
       {secondary==='staff'?<StaffOverviewPage staff={snapshot?.staff??[]} activity={snapshot?.activity??[]} connection={connection} observedAt={snapshot?.observedAt} onBack={()=>changeView('more')}/>:null}
-      {!secondary&&view==='today'?<TodayPage connection={connection} snapshot={snapshot} onQueue={()=>changeView('queue')} onActiveOrders={()=>openOrdersScope('ACTIVE')} onDineInOrders={()=>openOrdersScope('DINE_IN_OPEN')} onChannels={()=>openSecondary('channels')} onStaff={()=>openSecondary('staff')} onTool={setTool}/>:null}
+      {secondary==='devices'?<DeviceHealthPage snapshot={snapshot} onBack={()=>changeView('more')}/>:null}
+      {secondary==='reports'?<ReportsPage snapshot={snapshot} onBack={()=>changeView('more')}/>:null}
+      {secondary==='manager-log'||secondary==='checklist'||secondary==='handoff'?<ManagerLogPage mode={secondary as ManagerMode} snapshot={snapshot} onNavigate={mode=>openSecondary(mode)} onBack={()=>changeView('more')}/>:null}
+      {secondary==='activity'?<ActivityAuditPage snapshot={snapshot} onBack={()=>changeView('more')}/>:null}
+      {secondary==='settings-summary'?<SettingsSummaryPage snapshot={snapshot} connection={connection} onAdmin={()=>void openAdmin()} onBack={()=>changeView('more')}/>:null}
+      {!secondary&&view==='today'?<TodayPage connection={connection} snapshot={snapshot} onQueue={()=>changeView('queue')} onActiveOrders={()=>openOrdersScope('ACTIVE')} onDineInOrders={()=>openOrdersScope('DINE_IN_OPEN')} onChannels={()=>openSecondary('channels')} onStaff={()=>openSecondary('staff')} onDevices={()=>openSecondary('devices')} onTool={setTool}/>:null}
       {!secondary&&view==='queue'?<ActionQueuePage connection={connection} items={openActions} activity={snapshot?.activity??[]} commandFlight={commandFlight} onCommand={requestBounded} onRecheck={actionId=>void recheckAction(actionId)}/>:null}
       {!secondary&&view==='orders'?<OrderOversightPage connection={connection} orders={snapshot?.orders??[]} scope={ordersScope} onScopeReset={()=>setOrdersScope('DEFAULT')}/>:null}
-      {!secondary&&view==='more'?<MorePage snapshot={snapshot} connection={connection} onTool={setTool} onChannels={()=>openSecondary('channels')} onPlanning={()=>openSecondary('planning')} onSellability={()=>openSecondary('sellability')} onStaff={()=>openSecondary('staff')}/>:null}
+      {!secondary&&view==='more'?<MoreHubPage snapshot={snapshot} connection={connection} onOpen={openSecondary} onTool={setTool}/>:null}
     </section>
 
     <nav className="bottom-nav" aria-label="主要功能">
@@ -370,17 +388,8 @@ export function App(){
       tool={tool}
       snapshot={snapshot}
       connection={connection}
-      managerNote={managerNote}
-      handoffNote={handoffNote}
-      checklist={checklist}
-      setManagerNote={value=>{setManagerNote(value);persistLocal({managerNote:value})}}
-      setHandoffNote={value=>{setHandoffNote(value);persistLocal({handoffNote:value})}}
-      setChecklist={value=>{setChecklist(value);persistLocal({checklist:value})}}
       onCommand={requestBounded}
-      onAdmin={async()=>{
-        if(!port?.requestAdminDeepLink){setNotice('Admin 導航服務尚未連接。');return}
-        try{setNotice((await port.requestAdminDeepLink()).message)}catch{setNotice('暫時未能開啟 Admin。')}
-      }}
+      onAdmin={()=>void openAdmin()}
       onClose={()=>setTool(null)}
     />:null}
     {confirmation?<ConfirmationSheet value={confirmation} onClose={()=>setConfirmation(null)} onConfirm={()=>void executeBounded(confirmation)}/>:null}
@@ -395,6 +404,7 @@ function TodayPage({
   onDineInOrders,
   onChannels,
   onStaff,
+  onDevices,
   onTool,
 }:{
   connection:OwnerConnectionState;
@@ -404,6 +414,7 @@ function TodayPage({
   onDineInOrders:()=>void;
   onChannels:()=>void;
   onStaff:()=>void;
+  onDevices:()=>void;
   onTool:(tool:Tool)=>void;
 }){
   const vm=buildOwnerTodayViewModel(snapshot);
@@ -421,51 +432,24 @@ function TodayPage({
     <TodayLiveOrdersCard value={vm.liveOrders} onOpenActive={onActiveOrders}/>
     <DineInOpenChecksCard value={vm.dineIn} onOpenDineIn={onDineInOrders}/>
     <TodayActionSummaryCard value={vm.actionSummary} onOpen={onQueue}/>
-    <TodayHealthSummaryCard value={vm.healthSummary} onChannels={onChannels} onDevices={()=>onTool('devices')}/>
+    <TodayHealthSummaryCard value={vm.healthSummary} onChannels={onChannels} onDevices={onDevices}/>
     <TodayStaffSummaryCard value={vm.staffSummary} onOpen={onStaff}/>
     <TodayInsightCard value={vm.insight}/>
   </section>;
 }
 
-function MorePage({snapshot,connection,onTool,onChannels,onPlanning,onSellability,onStaff}:{snapshot:OwnerReadModelSnapshot|null;connection:OwnerConnectionState;onTool:(tool:Tool)=>void;onChannels:()=>void;onPlanning:()=>void;onSellability:()=>void;onStaff:()=>void}){
-  const tools:{id:Tool;title:string;detail:string;state:string}[]=[
-    {id:'reports',title:'報表',detail:'固定可信摘要',state:String(snapshot?.reports.length??0)},
-    {id:'devices',title:'設備／打印',detail:'健康／影響範圍／打印狀態',state:String(snapshot?.devices.length??0)},
-    {id:'customers',title:'客戶',detail:'新客／回頭客／同意狀態',state:snapshot?.customers?'已讀取':'未連接'},
-    {id:'marketing',title:'推廣',detail:'活動成效／訂單／資助',state:String(snapshot?.campaigns.length??0)},
-    {id:'settlement',title:'平台結算',detail:'銷售／費用／撥款／差異',state:String(snapshot?.settlements.length??0)},
-    {id:'cash',title:'現金',detail:'應有現金／實際現金／差額',state:snapshot?.cash?'已讀取':'未連接'},
-    {id:'inventory',title:'庫存',detail:'低庫存／盤點／耗損提示',state:String(snapshot?.inventory.length??0)},
-    {id:'notifications',title:'通知',detail:'即時／摘要／收件箱',state:String(snapshot?.notifications.length??0)},
-    {id:'manager',title:'經理日誌',detail:'本機筆記／Checklist／交接草稿',state:'本機'},
-    {id:'activity',title:'活動紀錄',detail:'操作人／批核人／結果／狀態',state:String(snapshot?.activity.length??0)},
-    {id:'admin',title:'前往 Admin',detail:'設定留喺 Admin',state:'導航'},
-    {id:'recovery',title:'資料狀態',detail:'離線／資料稍舊／狀態未明／部分資料',state:humanConnectionLabel(connection)},
-  ];
-  return <section className="page"><header className="page-head"><div><span>更多</span><h1>營運工具</h1><small>設定留 Admin；交易、付款、打印同實體設備執行留喺責任端。</small></div></header><div className="tool-grid"><button className="tool-card" onClick={onChannels}><strong>渠道</strong><small>健康／接單／有限控制</small><em>{String(snapshot?.channels.length??0)}</em></button><button className="tool-card" onClick={onPlanning}><strong>營業目標與成本</strong><small>每月目標／成本規劃</small><em>{snapshot?.planning?.plan.revision?'已設定':'未設定'}</em></button><button className="tool-card" onClick={onSellability}><strong>商品供應</strong><small>售罄／恢復有限操作</small><em>{String(snapshot?.sellability.length??0)}</em></button><button className="tool-card" onClick={onStaff}><strong>員工</strong><small>唯讀出勤／角色摘要</small><em>{String(snapshot?.staff.length??0)}</em></button>{tools.map(item=><button key={item.id} className="tool-card" onClick={()=>onTool(item.id)} data-icon-state="AI_ASSET_PENDING"><strong>{item.title}</strong><small>{item.detail}</small><em>{item.state}</em></button>)}</div></section>;
-}
-
-function ToolDrawer({tool,snapshot,connection,managerNote,handoffNote,checklist,setManagerNote,setHandoffNote,setChecklist,onCommand,onAdmin,onClose}:{tool:Tool;snapshot:OwnerReadModelSnapshot|null;connection:OwnerConnectionState;managerNote:string;handoffNote:string;checklist:readonly OwnerChecklistItem[];setManagerNote:(v:string)=>void;setHandoffNote:(v:string)=>void;setChecklist:(v:readonly OwnerChecklistItem[])=>void;onCommand:(label:string,target:string,impact:string)=>void;onAdmin:()=>void;onClose:()=>void}){
-  const title=tool==='reports'?'報表':tool==='devices'?'設備／打印':tool==='customers'?'客戶':tool==='marketing'?'推廣':tool==='settlement'?'平台結算':tool==='cash'?'現金':tool==='inventory'?'庫存':tool==='notifications'?'通知':tool==='manager'?'經理日誌':tool==='activity'?'活動紀錄':tool==='admin'?'Admin':tool==='recovery'?'資料狀態':'工具';
+function ToolDrawer({tool,snapshot,connection,onCommand,onAdmin,onClose}:{tool:Tool;snapshot:OwnerReadModelSnapshot|null;connection:OwnerConnectionState;onCommand:(label:string,target:string,impact:string)=>void;onAdmin:()=>void;onClose:()=>void}){
+  const title=tool==='customers'?'客戶':tool==='marketing'?'推廣':tool==='settlement'?'平台結算':tool==='cash'?'現金':tool==='inventory'?'庫存':tool==='notifications'?'通知':tool==='admin'?'Admin':tool==='recovery'?'資料狀態':'工具';
   return <div className="overlay"><section className="drawer" role="dialog" aria-modal="true"><DrawerHead title={title} subtitle="老闆中心" close={onClose}/>
-    {tool==='reports'?<ListOrEmpty rows={snapshot?.reports??[]} render={item=><div className="list-row" key={item.reportId}><div><strong>{item.name}</strong><small>{item.compare??item.freshness}</small></div><b>{item.value}</b></div>} empty="報表尚未連接"/>:null}
-
-    {tool==='devices'?<ListOrEmpty rows={snapshot?.devices??[]} render={item=><div className="list-row" key={item.deviceId}><div><strong>{item.name}</strong><small>{item.kind} · {item.affected??'未有影響摘要'} · {item.jobs??'未有打印工作摘要'}</small></div><span>{item.health}</span></div>} empty="設備資料尚未連接"/>:null}
     {tool==='customers'?snapshot?.customers?<div className="metric-grid"><Metric label="客戶" value={snapshot.customers.totalLabel}/><Metric label="新客" value={snapshot.customers.newLabel}/><Metric label="回頭客" value={snapshot.customers.returningLabel}/><Metric label="同意狀態" value={snapshot.customers.consentLabel}/></div>:<Empty title="客戶摘要尚未連接" detail="唔會用假 CRM 數字代替。"/>:null}
     {tool==='marketing'?<ListOrEmpty rows={snapshot?.campaigns??[]} render={item=><div className="list-row" key={item.campaignId}><div><strong>{item.name}</strong><small>相關訂單：{item.attributedOrdersLabel} · {item.fundingLabel??'資助資料未提供'}</small></div><b>{item.attributedSalesLabel}</b></div>} empty="推廣資料尚未連接"/>:null}
     {tool==='settlement'?<ListOrEmpty rows={snapshot?.settlements??[]} render={(item,index)=><div className="list-row" key={item.channel+'-'+index}><div><strong>{item.channel}</strong><small>銷售 {item.salesLabel} · 費用 {item.feesLabel} · {item.finality}</small></div><b>{item.payoutLabel}</b></div>} empty="結算資料尚未連接"/>:null}
     {tool==='cash'?snapshot?.cash?<div className="metric-grid"><Metric label="應有" value={snapshot.cash.expectedLabel}/><Metric label="實有" value={snapshot.cash.actualLabel}/><Metric label="差異" value={snapshot.cash.varianceLabel}/><Metric label="交更" value={snapshot.cash.closeoutState}/></div>:<Empty title="現金摘要尚未連接" detail="Owner App 唔會開錢箱或者改付款結果。"/>:null}
     {tool==='inventory'?<ListOrEmpty rows={snapshot?.inventory??[]} render={item=><div className="list-row" key={item.itemId}><div><strong>{item.name}</strong><small>{item.detail}</small></div><span>{item.state}</span></div>} empty="庫存提示尚未連接"/>:null}
     {tool==='notifications'?<ListOrEmpty rows={snapshot?.notifications??[]} render={item=><div className="list-row" key={item.notificationId}><div><strong>{item.title}</strong><small>{item.detail}</small></div><span>{item.cadence}</span></div>} empty="暫時冇通知"/>:null}
-    {tool==='activity'?<ListOrEmpty rows={snapshot?.activity??[]} render={item=><div className="activity-card" key={item.activityId}><strong>{item.title}</strong><p>{item.actor} · {new Date(item.observedAt).toLocaleString('zh-HK')}</p><small>操作人：{item.requester??'—'} · 批核人：{item.approver??'—'} · 結果：{item.result}</small></div>} empty="活動紀錄尚未連接"/>:null}
-    {tool==='manager'?<ManagerWorkspace managerNote={managerNote} handoffNote={handoffNote} checklist={checklist} setManagerNote={setManagerNote} setHandoffNote={setHandoffNote} setChecklist={setChecklist}/>:null}
     {tool==='admin'?<><p className="callout">正式設定、權限、產品、價格、渠道同規則由 Admin 負責；Owner 只提供導航入口。</p><button className="primary wide" onClick={onAdmin}>前往 Admin</button></>:null}
     {tool==='recovery'?<><div className="diag-line"><span>連線</span><b>{humanConnectionLabel(connection)}</b><small>{snapshot?.observedAt?new Date(snapshot.observedAt).toLocaleString('zh-HK'):'未有更新時間'}</small></div><p className="callout">資料未確認完整前會保持相應提示，唔會將未明結果當成成功。</p></>:null}
   </section></div>;
-}
-
-function ManagerWorkspace({managerNote,handoffNote,checklist,setManagerNote,setHandoffNote,setChecklist}:{managerNote:string;handoffNote:string;checklist:readonly OwnerChecklistItem[];setManagerNote:(v:string)=>void;setHandoffNote:(v:string)=>void;setChecklist:(v:readonly OwnerChecklistItem[])=>void}){
-  return <section className="manager-workspace"><p className="callout">以下只係本機私人草稿，唔係共享營運真相、唔會改 Admin/SMT 狀態。</p><label>經理筆記<textarea value={managerNote} onChange={e=>setManagerNote(e.target.value)} placeholder="記低要跟進嘅事項"/></label><div>{checklist.map(item=><label className="check-row" key={item.id}><input type="checkbox" checked={item.done} onChange={e=>setChecklist(checklist.map(row=>row.id===item.id?{...row,done:e.target.checked}:row))}/><span>{item.label}</span></label>)}</div><label>交接草稿<textarea value={handoffNote} onChange={e=>setHandoffNote(e.target.value)} placeholder="交畀下一更嘅本機備忘"/></label></section>;
 }
 
 function ConfirmationSheet({value,onClose,onConfirm}:{value:Confirmation;onClose:()=>void;onConfirm:()=>void}){
