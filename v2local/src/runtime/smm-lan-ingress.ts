@@ -165,7 +165,7 @@ export function createSmmLanIngress(runtime:MfkLocalRuntime){
               amountLabel:'HKD '+((item.unitMinor*item.qty)/100).toFixed(2),
             }))),
           }))),
-        diningTables:Object.freeze(readSmtDiningTableRegistry().filter(table=>table.active!==false).map(table=>Object.freeze({tableId:table.id,label:table.name,sortOrder:table.sortOrder}))),
+        diningTables:Object.freeze(readSmtDiningTableRegistry().filter(table=>table.active).map(table=>Object.freeze({tableId:table.id,label:table.name,sortOrder:table.sortOrder}))),
         channels:Object.freeze([]),
         dineSessions:Object.freeze(runtime.holds().filter(hold=>hold.kind==='dining').map(hold=>{
           const payments=hold.payments??[];
