@@ -34,6 +34,9 @@ interface OrderInput{
   readonly providerMessageId:string;
   readonly providerPickupCode:string;
   readonly initialFulfillmentLabel:'待處理';
+  readonly referenceValueMinor:number;
+  readonly effectiveTransactionMinor:number;
+  readonly pricingAuthority:'KEETA_PROVIDER_AUTHORIZED_TRANSACTION';
 }
 
 function snapshot(){
@@ -134,12 +137,17 @@ export function translateKeetaIntentToLocalOrder(input:MfkKeetaOrderIntent):Orde
       detail:['Keeta: '+line.providerProductName,options].filter(Boolean).join('｜'),
     }));
   });
-  const totalMinor=items.reduce((sum,item)=>sum+item.unitMinor*item.qty,0);
-  if(totalMinor<=0)throw new Error('KEETA_ORDER_TOTAL_INVALID');
+  const referenceValueMinor=items.reduce((sum,item)=>sum+item.unitMinor*item.qty,0);
+  const effectiveTransactionMinor=facts.providerEffectiveProductTotalMinor;
+  if(referenceValueMinor<=0)throw new Error('KEETA_ORDER_REFERENCE_VALUE_INVALID');
+  if(!Number.isSafeInteger(effectiveTransactionMinor)||effectiveTransactionMinor<0)throw new Error('KEETA_ORDER_EFFECTIVE_TRANSACTION_INVALID');
 
   return Object.freeze({
     items:Object.freeze(items),
-    totalMinor,
+    totalMinor:effectiveTransactionMinor,
+    referenceValueMinor,
+    effectiveTransactionMinor,
+    pricingAuthority:'KEETA_PROVIDER_AUTHORIZED_TRANSACTION' as const,
     paymentLabel:'KEETA',
     sourceLabel:'Keeta · '+facts.providerOrderCode,
     providerRef:'KEETA:'+facts.providerOrderId,
