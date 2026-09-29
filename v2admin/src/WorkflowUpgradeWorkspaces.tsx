@@ -1,9 +1,10 @@
 import {useEffect,useMemo,useState} from 'react';
 import {Link} from 'react-router';
 import {useAdminDraft,validateAdminDraft} from './admin-draft.tsx';
-import {appendAdminAudit,readAdminAudit,readAdminReleases,readAdminStored,usePersistentAdminState} from './admin-local-store.ts';
+import {appendAdminAudit,readActiveAdminRelease,readAdminAudit,readAdminReleases,readAdminStored,usePersistentAdminState} from './admin-local-store.ts';
 import {AdminResponsiveDataView} from './AdminResponsiveDataView.tsx';
 import {createAdminCrossDayRefund,readAdminProjectedDays,readAdminProjectedOrders,readAdminRefundAddenda,readAdminRefunds,refreshAdminProjection} from './admin-projection-client.ts';
+import {readAdminSyncAcks,readAdminSyncStatus,readCanonicalAdminActive} from './admin-sync-client.ts';
 
 function UpgradeHeader({title,description,kicker='功能尚未啟用'}:{title:string;description:string;kicker?:string}){
   return <header className="admin-editor-head">
@@ -285,12 +286,74 @@ export function ExportGovernanceWorkspace(){
 
 interface DiagnosticFinding{id:string;domain:string;state:'HEALTHY'|'DEGRADED'|'UNKNOWN';updatedAt:string;pendingCount:number;lastError?:string;recovery?:string;evidenceRef?:string}
 export function DiagnosticsWorkspace(){
-  const [findings]=usePersistentAdminState<DiagnosticFinding[]>('diagnostics-read.v1',[]);
+  const [version,setVersion]=useState(0);
+  const [cloud,setCloud]=useState<Awaited<ReturnType<typeof readCanonicalAdminActive>>>(null);
+  const [acks,setAcks]=useState<Awaited<ReturnType<typeof readAdminSyncAcks>>>([]);
+  const [readError,setReadError]=useState('');
+  const [loading,setLoading]=useState(false);
+
+  const refresh=async()=>{
+    setLoading(true);
+    try{
+      const [canonical,nextAcks]=await Promise.all([readCanonicalAdminActive(),readAdminSyncAcks()]);
+      setCloud(canonical);
+      setAcks(nextAcks);
+      setReadError('');
+    }catch(error){
+      setReadError(error instanceof Error?error.message:'ADMIN_DIAGNOSTIC_READ_FAILED');
+    }finally{
+      setLoading(false);
+      setVersion(value=>value+1);
+    }
+  };
+  useEffect(()=>{
+    const onRefresh=()=>{void refresh();};
+    window.addEventListener('focus',onRefresh);
+    window.addEventListener('mfk-admin-sync',onRefresh);
+    window.addEventListener('mfk-admin-release',onRefresh);
+    void refresh();
+    return()=>{
+      window.removeEventListener('focus',onRefresh);
+      window.removeEventListener('mfk-admin-sync',onRefresh);
+      window.removeEventListener('mfk-admin-release',onRefresh);
+    };
+  },[]);
+
+  void version;
+  const browser=readActiveAdminRelease();
+  const sync=readAdminSyncStatus();
+  const matchingAck=cloud?acks.find(row=>row.revision===cloud.revision&&row.fingerprint===cloud.fingerprint):undefined;
+  const latestAck=acks[0];
+  const now=new Date().toISOString();
+  const findings:DiagnosticFinding[]=[
+    {
+      id:'browser-proposal',domain:'Browser Local Proposal',state:browser?'HEALTHY':'UNKNOWN',updatedAt:browser?.createdAt??now,pendingCount:sync.state==='QUEUED'||sync.state==='PUBLISHING'?1:0,
+      evidenceRef:browser?'R'+browser.version+' · '+browser.fingerprint:'未有 local release',
+      recovery:'Browser local 只係 proposal/mirror，唔可以當 Cloud canonical。',
+    },
+    {
+      id:'cloud-canonical',domain:'Cloud Canonical Config',state:cloud?'HEALTHY':readError?'DEGRADED':'UNKNOWN',updatedAt:cloud?.publishedAt??now,pendingCount:0,
+      lastError:readError||undefined,
+      evidenceRef:cloud?'R'+cloud.revision+' · '+cloud.fingerprint:'未讀到 canonical active',
+      recovery:'Cloud Active 先係正式 Configuration/Revision truth。',
+    },
+    {
+      id:'admin-publish',domain:'Admin → Cloud Publish',state:sync.state==='ERROR'?'DEGRADED':sync.state==='PUBLISHED'?'HEALTHY':'UNKNOWN',updatedAt:sync.updatedAt,pendingCount:sync.state==='QUEUED'||sync.state==='PUBLISHING'?1:0,
+      lastError:sync.error,
+      evidenceRef:(sync.revision?'status R'+sync.revision:'status 無 revision')+' · '+sync.state,
+      recovery:'ERROR 要先處理 publish error；PUBLISHED revision 必須以 Cloud returned canonical revision 為準。',
+    },
+    {
+      id:'smt-ack',domain:'Cloud → SMT Apply / ACK',state:matchingAck?'HEALTHY':cloud?'DEGRADED':'UNKNOWN',updatedAt:matchingAck?.appliedAt??latestAck?.appliedAt??now,pendingCount:cloud&&!matchingAck?1:0,
+      evidenceRef:matchingAck?'matching R'+matchingAck.revision+' · '+matchingAck.deviceId:latestAck?'最近 R'+latestAck.revision+' · '+latestAck.deviceId:'未有 SMT ACK',
+      recovery:'Cloud revision/fingerprint 必須同 SMT ACK 完全一致。',
+    },
+  ];
   const unknown=findings.filter(row=>row.state==='UNKNOWN').length;
   const degraded=findings.filter(row=>row.state==='DEGRADED').length;
   return <section className="admin-editor-page">
-    <UpgradeHeader title="系統狀態" description="系統狀態顯示功能範圍、目前狀態、資料新鮮度、待處理數量、最後錯誤、安全修復方法同回傳證據。冇證據唔會硬判根因。" kicker="診斷證據"/>
-    <div className="admin-kpi-grid"><article><span>健康</span><strong>{findings.filter(row=>row.state==='HEALTHY').length}</strong><small>已確認</small></article><article><span>需注意</span><strong>{degraded}</strong><small>需要跟進</small></article><article><span>未確認</span><strong>{unknown}</strong><small>等待資料</small></article><article><span>總項目</span><strong>{findings.length}</strong><small>系統狀態</small></article></div>
+    <header className="admin-editor-head"><div><small>LIVE READBACK</small><h1>系統狀態</h1><p>直接分開 Browser proposal、Cloud canonical、Admin publish 同 SMT ACK；唔再用一個 Rxx 假裝代表全部。</p></div><div className="admin-editor-actions"><button type="button" onClick={()=>void refresh()} disabled={loading}>{loading?'讀取中…':'重新讀取'}</button></div></header>
+    <div className="admin-kpi-grid"><article><span>健康</span><strong>{findings.filter(row=>row.state==='HEALTHY').length}</strong><small>有證據</small></article><article><span>需注意</span><strong>{degraded}</strong><small>有斷點</small></article><article><span>未確認</span><strong>{unknown}</strong><small>欠 readback</small></article><article><span>Cloud / SMT</span><strong>{cloud&&matchingAck?'MATCH':'CHECK'}</strong><small>{cloud?'Cloud R'+cloud.revision:'Cloud 未讀到'}{matchingAck?' / SMT R'+matchingAck.revision:''}</small></article></div>
     <AdminResponsiveDataView
       label="系統狀態"
       rows={findings}
