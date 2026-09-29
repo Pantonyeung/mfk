@@ -51,7 +51,7 @@ test('Wave2 keeps formal product media and uses approved company source assets',
     assert.doesNotMatch(source,/data-final-art-pending="true"/);
     assert.match(source,/data-source-asset=/);
   }
-  assert.match(views,/ui9-brand-art-slot/);
+  assert.match(views,/ui9-brand-art-slot/);\n  for(const source of [ui5,ui6,ui7,ui8,views])assert.match(source,/source-ip-crop/);
   assert.doesNotMatch(ui7,/stage7-pickup-(male|female)\.svg/);
   assert.doesNotMatch(ui8,/stage8-history-(male|female)\.svg/);
 });
