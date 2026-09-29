@@ -6,6 +6,12 @@
   "workers_dev": true,
   "preview_urls": true,
   "keep_vars": true,
+  "vars": {
+    "MFK_BUILD_ID": "mfk-smt-fusion-print-r2"
+  },
+  "version_metadata": {
+    "binding": "MFK_VERSION"
+  },
   "secrets": {
     "required": ["WEB_ACCEPTANCE_TOKEN"]
   },

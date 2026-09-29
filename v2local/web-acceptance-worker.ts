@@ -2,6 +2,9 @@
 interface Env{
   ASSETS:{fetch(request:Request):Promise<Response>};
   WEB_ACCEPTANCE_TOKEN:string;
+  MFK_SOURCE_SHA:string;
+  MFK_BUILD_ID:string;
+  MFK_VERSION:{id:string;timestamp:string};
 }
 
 const COOKIE='mfk_smt_web_acceptance';
@@ -155,6 +158,17 @@ export default{
     const url=new URL(request.url);
     const supplied=url.searchParams.get('access')||'';
     const expected=String(env.WEB_ACCEPTANCE_TOKEN||'');
+
+    if(url.pathname==='/__mfk/build'&&request.method==='GET'){
+      return new Response(JSON.stringify({
+        product:'MFK',
+        surface:'SMT',
+        mode:'WEB_ACCEPTANCE',
+        sourceSha:String(env.MFK_SOURCE_SHA||'UNKNOWN'),
+        buildId:String(env.MFK_BUILD_ID||env.MFK_VERSION?.id||'UNKNOWN'),
+        deployedAt:String(env.MFK_VERSION?.timestamp||'UNKNOWN'),
+      }),{headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store'}});
+    }
 
     if(expected&&supplied===expected){
       const proof=await sessionProof(expected);
