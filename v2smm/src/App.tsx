@@ -1,4 +1,4 @@
-import {mfkVersionLabel} from '../../contracts/product-version-v1.ts';
+import {mfkVersionLabel} from '../../contracts/product-version-v1';
 import {useEffect,useMemo,useRef,useState} from 'react';
 import {readSmmLocalWorkspace,writeSmmLocalWorkspace,createSmmPendingIntent,type SmmLocalPreferences} from './persistence';
 import {resolveSmmRuntimePort} from './runtime';
