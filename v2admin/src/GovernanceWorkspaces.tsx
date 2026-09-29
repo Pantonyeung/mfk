@@ -12,7 +12,7 @@ function Header({title,description,badge='已自動保存'}:{title:string;descri
 
 function restoreSnapshot(release:AdminRelease,replaceDraft:(draft:AdminSessionDraft,reason:string)=>void){
   const snapshot=restoreAdminReleaseAsDraft<Record<string,unknown>>(release);
-  if(snapshot.catalog)replaceDraft(snapshot.catalog as AdminSessionDraft,'由設定版本 R'+release.version+' 還原內容');
+  if(snapshot.catalog)replaceDraft(snapshot.catalog as AdminSessionDraft,'由本機保存紀錄還原內容');
   if(snapshot.optionCenter&&typeof snapshot.optionCenter==='object'&&!Array.isArray(snapshot.optionCenter)){
     const optionCenter=snapshot.optionCenter as {sets?:unknown;productLinks?:unknown};
     if(optionCenter.sets!==undefined)writeAdminStored(OPTION_SET_CENTER_STORAGE_KEYS.sets,optionCenter.sets);
@@ -37,22 +37,22 @@ export function PublishCenterWorkspace(){
 
   const restore=(release:AdminRelease)=>{
     restoreSnapshot(release,replaceDraft);
-    const row=createAdminRelease(release.snapshot,'還原自 R'+release.version);
+    const row=createAdminRelease(release.snapshot,'由本機保存紀錄還原');
     markClean();
     writeAdminStored(OPTION_SET_CENTER_STORAGE_KEYS.dirty,false);
     setReleases(readAdminReleases());
     setActive({version:row.version,createdAt:row.createdAt,fingerprint:row.fingerprint});
-    setMessage('已由 R'+release.version+' 還原並保存成 R'+row.version+'；舊版本冇被修改。');
+    setMessage('已由本機保存紀錄還原成新草稿；需要重新正式發佈先會成為正式設定。');
     window.setTimeout(()=>window.location.reload(),50);
   };
 
   return <section className="admin-editor-page">
     <header className="admin-editor-head">
-      <div><small>{active?'目前版本 R'+active.version:'未有保存版本'}</small><h1>設定版本歷史</h1><p>「保存」就係正式版本邊界。呢度冇額外確認步驟；歷史版本只讀，還原會建立另一個新版本。</p></div>
+      <div><small>{active?'已有本機保存紀錄':'未有本機保存紀錄'}</small><h1>本機保存歷史</h1><p>呢度只係 Browser 本機保存紀錄，唔代表正式 Authority。只有正式發佈成功後嘅 Cloud canonical commit 先係正式設定。</p></div>
     </header>
 
     <div className="admin-kpi-grid">
-      <article><span>目前版本</span><strong>{active?'R'+active.version:'—'}</strong><small>{active?new Date(active.createdAt).toLocaleString('zh-HK'):'未建立'}</small></article>
+      <article><span>最近本機保存</span><strong>{active?'有':'—'}</strong><small>{active?new Date(active.createdAt).toLocaleString('zh-HK'):'未建立'}</small></article>
       <article><span>版本總數</span><strong>{releases.length}</strong><small>不可變歷史</small></article>
       <article><span>目前驗證碼</span><strong>{active?active.fingerprint.replace('fnv1a32:',''):'—'}</strong><small>保存後 readback</small></article>
       <article><span>額外確認步驟</span><strong>0</strong><small>保存即目前版本</small></article>
@@ -63,7 +63,7 @@ export function PublishCenterWorkspace(){
     <section className="admin-rule-card">
       <h2>版本歷史</h2>
       {releases.length===0?<div className="admin-read-empty">未有保存版本。去菜單／商品／選項／套餐修改後直接撳「保存」。</div>:<div className="admin-editor-list">{releases.map(release=><article className="admin-policy-row" key={release.version}>
-        <div><b>R{release.version}{active?.version===release.version?' · 目前':''}</b><small>{new Date(release.createdAt).toLocaleString('zh-HK')}</small></div>
+        <div><b>{active?.version===release.version?'最近本機保存':'本機保存紀錄'}</b><small>{new Date(release.createdAt).toLocaleString('zh-HK')}</small></div>
         <code>{release.fingerprint}</code>
         <span>{release.reason||'一般保存'}</span>
         <button type="button" disabled={active?.version===release.version} onClick={()=>restore(release)}>還原為新版本</button>
