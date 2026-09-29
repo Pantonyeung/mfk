@@ -148,14 +148,21 @@ function BrandLockup({compact=false}:{compact?:boolean}){
   </div>;
 }
 
+function Stage0MascotPair({mode='duo'}:{mode?:'duo'|'female'}){
+  if(mode==='female')return <img className="stage0-mascot stage0-mascot-recovery" src="/brand/stage0/stage0-recovery-female.webp" alt="" aria-hidden="true"/>;
+  return <span className="stage0-mascot-pair" aria-hidden="true">
+    <img src="/brand/stage0/stage0-splash-male.webp" alt=""/>
+    <img src="/brand/stage0/stage0-female.webp" alt=""/>
+  </span>;
+}
+
 function Stage0Mascot({scene}:{scene:'splash'|'login'|'checking'|'recovery'}){
+  if(scene==='login')return <Stage0MascotPair/>;
   const src=scene==='splash'
     ?'/brand/stage0/stage0-splash-male.webp'
-    :scene==='login'
-      ?'/brand/stage0/stage0-login-duo.webp'
-      :scene==='recovery'
-        ?'/brand/stage0/stage0-recovery-female.webp'
-        :'/brand/stage0/stage0-female.webp';
+    :scene==='recovery'
+      ?'/brand/stage0/stage0-recovery-female.webp'
+      :'/brand/stage0/stage0-female.webp';
   return <img className={`stage0-mascot stage0-mascot-${scene}`} src={src} alt="" aria-hidden="true"/>;
 }
 
