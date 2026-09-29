@@ -72,7 +72,7 @@ export function RuntimeDiningWorkspace({runtime,onCheckout,onAddOrder}:{runtime:
   const [reprintBusy,setReprintBusy]=useState(false);
   const [now,setNow]=useState(Date.now());
   const [adminConfigRevision,setAdminConfigRevision]=useState(0);
-  useEffect(()=>subscribeSmtAdminConfig(()=>setAdminConfigRevision(value=>value+1)),[]);
+  useEffect(()=>subscribeSmtAdminConfig(()=>{setAdminConfigRevision(value=>value+1);void load();}),[load]);
   void adminConfigRevision;
   const diningOverdueMinutes=readSmtStoreSettings().diningOverdueMinutes;
   const canOverridePrice=Boolean(readActiveStaffSession())&&hasStaffPermission('PRICE_OVERRIDE');
