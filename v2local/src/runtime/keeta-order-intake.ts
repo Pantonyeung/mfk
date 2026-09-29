@@ -21,6 +21,9 @@ interface CatalogProduct{
   readonly name?:string;
   readonly productCode?:string;
   readonly active?:boolean;
+  readonly basePrice?:string;
+  readonly takeawayAdjustment?:string;
+  readonly takeawaySurchargeEnabled?:boolean;
 }
 interface OrderInput{
   readonly items:readonly {id:string;name:string;qty:number;unitMinor:number;serviceMode:'takeaway';productCode?:string;detail?:string}[];
@@ -71,6 +74,13 @@ function resolveProductionComponents(
   if(direct.length!==1)throw new Error(direct.length>1?'KEETA_ORDER_MAPPING_AMBIGUOUS:'+line.skuOpenItemCode:'KEETA_ORDER_MAPPING_REQUIRED:'+line.skuOpenItemCode);
   return [{product:direct[0]!,quantity:1}];
 }
+function canonicalTakeawayUnitMinor(product:CatalogProduct){
+  const base=Number(product.basePrice);
+  if(!Number.isFinite(base)||base<0)throw new Error('KEETA_ORDER_CANONICAL_PRICE_REQUIRED:'+String(product.id||''));
+  const adjustment=product.takeawaySurchargeEnabled?Number(product.takeawayAdjustment||0):0;
+  if(!Number.isFinite(adjustment))throw new Error('KEETA_ORDER_CANONICAL_TAKEAWAY_PRICE_INVALID:'+String(product.id||''));
+  return Math.round((base+adjustment)*100);
+}
 function optionSummary(line:KeetaStandardProviderOrderFacts['lines'][number]){
   return line.selectedOptions
     .map(option=>{
@@ -91,6 +101,9 @@ export function translateKeetaIntentToLocalOrder(input:MfkKeetaOrderIntent):Orde
     name:typeof row.name==='string'?row.name:undefined,
     productCode:typeof row.productCode==='string'?row.productCode:undefined,
     active:row.active!==false,
+    basePrice:typeof row.basePrice==='string'?row.basePrice:undefined,
+    takeawayAdjustment:typeof row.takeawayAdjustment==='string'?row.takeawayAdjustment:undefined,
+    takeawaySurchargeEnabled:row.takeawaySurchargeEnabled===true,
   }));
   const channelMappings=config.channelMappings&&typeof config.channelMappings==='object'&&!Array.isArray(config.channelMappings)?config.channelMappings as {keeta?:unknown}:{};
   const mappings=rows(channelMappings.keeta).map(row=>({
@@ -115,7 +128,7 @@ export function translateKeetaIntentToLocalOrder(input:MfkKeetaOrderIntent):Orde
       id:String(product.id),
       name:String(product.name||line.providerProductName)+(options?'｜'+options:''),
       qty:line.quantity*quantity,
-      unitMinor:componentIndex===0?line.providerFinalUnitPriceMinor:0,
+      unitMinor:canonicalTakeawayUnitMinor(product),
       serviceMode:'takeaway' as const,
       ...(product.productCode?{productCode:String(product.productCode)}:{}),
       detail:['Keeta: '+line.providerProductName,options].filter(Boolean).join('｜'),
