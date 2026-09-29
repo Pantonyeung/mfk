@@ -2144,6 +2144,10 @@ export default {
       const target=new URL(request.url);
       target.pathname=targetPath;
       target.search='';
+      if(url.pathname==='/api/admin-sync/events'){
+        target.search=url.search;
+        return stub.fetch(new Request(target.toString(),request));
+      }
       const forwarded=new Request(target.toString(),request);
       const response=await stub.fetch(forwarded);
       const headers=new Headers(response.headers);
