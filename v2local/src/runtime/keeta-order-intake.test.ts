@@ -32,7 +32,7 @@ function installAdminConfig(){
         products:[{id:'p1',name:'磨飯商品一',productCode:'SKU-P1',categoryId:'cat',active:true,basePrice:'42.00',takeawayAdjustment:'0',modifierGroupIds:[]}],
         modifierGroups:[],combos:[],comboPools:[],
       },
-      channelMapping:[{providerItemId:'SKU-P1',productId:'p1',status:'MAPPED'}],
+      channelMappings:{keeta:[{mappingId:'keeta:SKU-P1',enabled:true,skuOpenItemCode:'SKU-P1',components:[{canonicalProductId:'p1',quantity:1}],optionMappings:[]}]},
     },
   }));
 }
@@ -83,12 +83,47 @@ describe('Keeta → SMT canonical local intake',()=>{
     expect(translated.providerRef).toBe('KEETA:998');
     expect(translated.providerMessageId).toBe('MSG-998');
     expect(translated.totalMinor).toBe(8400);
+    expect(translated.referenceValueMinor).toBe(8400);
+    expect(translated.effectiveTransactionMinor).toBe(8400);
+    expect(translated.pricingAuthority).toBe('KEETA_PROVIDER_AUTHORIZED_TRANSACTION');
     expect(translated.initialFulfillmentLabel).toBe('待處理');
     expect(translated.items).toEqual([{
       id:'p1',name:'磨飯商品一｜加辣',qty:2,unitMinor:4200,serviceMode:'takeaway',
-      productCode:'SKU-P1',detail:'加辣',
+      productCode:'SKU-P1',detail:'Keeta: Provider 商品｜加辣',
     }]);
     expect(translated.providerPickupCode).toBe('K998');
+  });
+
+  it('keeps provider selling price separate from canonical store pricing',()=>{
+    const providerPriced={...intent(),rawMessage:intent().rawMessage.replace('originUnitPrice":4100,\"unitPrice\":4200','originUnitPrice":7400,\"unitPrice\":7500').replace('originAmount":8200,\"amount\":8400','originAmount":14800,\"amount\":15000').replace('price":8400','price":15000')};
+    const translated=translateKeetaIntentToLocalOrder(providerPriced);
+    expect(translated.items[0]?.unitMinor).toBe(4200);
+    expect(translated.referenceValueMinor).toBe(8400);
+    expect(translated.effectiveTransactionMinor).toBe(15000);
+    expect(translated.totalMinor).toBe(15000);
+  });
+
+  it('breaks one Keeta package into multiple canonical production items while keeping one provider transaction amount',()=>{
+    applyAdminConfigEnvelope(createMfkAdminConfigEnvelope({
+      storeId:'MF01',revision:3,publishedAt:'2026-09-23T00:03:00.000Z',adminFingerprint:'fnv1a32:package',
+      snapshot:{
+        catalog:{categories:[{id:'cat',name:'主食',position:10,active:true}],products:[
+          {id:'a',name:'餐 A',productCode:'A',categoryId:'cat',active:true,basePrice:'50.00',takeawayAdjustment:'0',modifierGroupIds:[]},
+          {id:'b',name:'餐 B',productCode:'B',categoryId:'cat',active:true,basePrice:'45.00',takeawayAdjustment:'0',modifierGroupIds:[]},
+        ],modifierGroups:[],combos:[],comboPools:[]},
+        channelMappings:{keeta:[{mappingId:'keeta:2P',enabled:true,skuOpenItemCode:'2P',channelName:'二人餐',components:[{canonicalProductId:'a',quantity:1},{canonicalProductId:'b',quantity:1}],optionMappings:[]}]},
+      },
+    }));
+    const packageIntent={...intent(),rawMessage:JSON.stringify({orderInfo:{
+      baseOrder:{orderViewIdStr:'998',currency:'HKD'},merchantOrder:{orderViewIdStr:'998',seqNoStr:'K998'},
+      products:[{id:9,skuId:99,spuId:88,skuOpenItemCode:'2P',spuOpenItemCode:'SPU-2P',name:'Keeta 二人餐',count:1,currency:'HKD',priceWithGroup:{originUnitPrice:8000,unitPrice:8000,originAmount:8000,amount:8000},groups:[]}],
+      feeDtls:[{code:'productPrice',currency:'HKD',price:8000}],orderPromotionDtlList:[],
+    }})};
+    const translated=translateKeetaIntentToLocalOrder(packageIntent);
+    expect(translated.items.map(item=>({id:item.id,qty:item.qty,unitMinor:item.unitMinor}))).toEqual([{id:'a',qty:1,unitMinor:5000},{id:'b',qty:1,unitMinor:4500}]);
+    expect(translated.referenceValueMinor).toBe(9500);
+    expect(translated.effectiveTransactionMinor).toBe(8000);
+    expect(translated.totalMinor).toBe(8000);
   });
 
   it('commits the same providerRef exactly once through the existing localRuntime order authority',()=>{
@@ -123,7 +158,7 @@ describe('Keeta → SMT canonical local intake',()=>{
       adminFingerprint:'fnv1a32:test2',
       snapshot:{
         catalog:{categories:[],products:[],modifierGroups:[],combos:[],comboPools:[]},
-        channelMapping:[],
+        channelMappings:{keeta:[]},
       },
     }));
     expect(()=>translateKeetaIntentToLocalOrder(intent())).toThrow(/KEETA_ORDER_MAPPING_REQUIRED/);

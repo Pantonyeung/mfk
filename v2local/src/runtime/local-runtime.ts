@@ -121,6 +121,9 @@ export interface LocalPriceOverrideRecord{
 export interface StoredOrder{
   id:string;display:string;createdAt:string;updatedAt?:string;totalMinor:number;paymentLabel:string;fulfillmentLabel:'待處理'|'進行中'|'可取餐'|'已完成'|'已取消';sourceLabel:string;
   originalTotalMinor?:number;
+  referenceValueMinor?:number;
+  effectiveTransactionMinor?:number;
+  pricingAuthority?:'ADMIN_PUBLISHED'|'STAFF_PRICE_OVERRIDE'|'KEETA_PROVIDER_AUTHORIZED_TRANSACTION'|'BULK_NEGOTIATED';
   diningLineCorrections?:readonly LocalDiningLineCorrection[];
   diningPriceOverrides?:readonly LocalPriceOverrideRecord[];
   paymentCorrections?:readonly PaymentCorrectionRecord[];
@@ -515,6 +518,9 @@ export interface MfkLocalRuntime extends CleanSmtCoreRuntimePort{
     customerReorderIntent?:readonly CustomerReorderIntentLine[];
     customerReorderHistoryPriceFacts?:readonly CustomerReorderHistoryPriceFact[];
     initialFulfillmentLabel?:StoredOrder['fulfillmentLabel'];
+    referenceValueMinor?:number;
+    effectiveTransactionMinor?:number;
+    pricingAuthority?:StoredOrder['pricingAuthority'];
   }):StoredOrder;
   orders():readonly StoredOrder[];
   deferKeetaOrder(orderId:string):Promise<{readonly orderId:string;readonly deferCount:number;readonly state:'PENDING'}>;
@@ -1488,6 +1494,9 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
       createdAt,
       updatedAt:createdAt,
       totalMinor:input.totalMinor,
+      ...(Number.isSafeInteger(input.referenceValueMinor)?{referenceValueMinor:input.referenceValueMinor}:{}),
+      ...(Number.isSafeInteger(input.effectiveTransactionMinor)?{effectiveTransactionMinor:input.effectiveTransactionMinor}:{}),
+      ...(input.pricingAuthority?{pricingAuthority:input.pricingAuthority}:{}),
       paymentLabel:input.paymentLabel,
       fulfillmentLabel:input.initialFulfillmentLabel??'進行中',
       sourceLabel:input.sourceLabel||'現場',
