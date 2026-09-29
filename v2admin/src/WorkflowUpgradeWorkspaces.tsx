@@ -1,7 +1,7 @@
 import {useEffect,useMemo,useState} from 'react';
 import {Link} from 'react-router';
 import {useAdminDraft,validateAdminDraft} from './admin-draft.tsx';
-import {appendAdminAudit,readActiveAdminRelease,readAdminAudit,readAdminReleases,readAdminStored,usePersistentAdminState} from './admin-local-store.ts';
+import {appendAdminAudit,readAdminAudit,readAdminReleases,readAdminStored,usePersistentAdminState} from './admin-local-store.ts';
 import {AdminResponsiveDataView} from './AdminResponsiveDataView.tsx';
 import {createAdminCrossDayRefund,readAdminProjectedDays,readAdminProjectedOrders,readAdminRefundAddenda,readAdminRefunds,refreshAdminProjection} from './admin-projection-client.ts';
 import {readAdminSyncAcks,readAdminSyncStatus,readCanonicalAdminActive} from './admin-sync-client.ts';
@@ -320,40 +320,35 @@ export function DiagnosticsWorkspace(){
   },[]);
 
   void version;
-  const browser=readActiveAdminRelease();
   const sync=readAdminSyncStatus();
-  const matchingAck=cloud?acks.find(row=>row.revision===cloud.revision&&row.fingerprint===cloud.fingerprint):undefined;
   const latestAck=acks[0];
   const now=new Date().toISOString();
+  const publishHealthy=sync.state==='PUBLISHED';
+  const publishBusy=sync.state==='QUEUED'||sync.state==='PUBLISHING';
   const findings:DiagnosticFinding[]=[
     {
-      id:'browser-proposal',domain:'Browser Local Proposal',state:browser?'HEALTHY':'UNKNOWN',updatedAt:browser?.createdAt??now,pendingCount:sync.state==='QUEUED'||sync.state==='PUBLISHING'?1:0,
-      evidenceRef:browser?'R'+browser.version+' · '+browser.fingerprint:'未有 local release',
-      recovery:'Browser local 只係 proposal/mirror，唔可以當 Cloud canonical。',
-    },
-    {
-      id:'cloud-canonical',domain:'Cloud Canonical Config',state:cloud?'HEALTHY':readError?'DEGRADED':'UNKNOWN',updatedAt:cloud?.publishedAt??now,pendingCount:0,
-      lastError:readError||undefined,
-      evidenceRef:cloud?'R'+cloud.revision+' · '+cloud.fingerprint:'未讀到 canonical active',
-      recovery:'Cloud Active 先係正式 Configuration/Revision truth。',
-    },
-    {
-      id:'admin-publish',domain:'Admin → Cloud Publish',state:sync.state==='ERROR'?'DEGRADED':sync.state==='PUBLISHED'?'HEALTHY':'UNKNOWN',updatedAt:sync.updatedAt,pendingCount:sync.state==='QUEUED'||sync.state==='PUBLISHING'?1:0,
+      id:'admin-publish',domain:'Admin 正式發佈',state:sync.state==='ERROR'?'DEGRADED':publishHealthy?'HEALTHY':publishBusy?'UNKNOWN':'UNKNOWN',updatedAt:sync.updatedAt,pendingCount:publishBusy?1:0,
       lastError:sync.error,
-      evidenceRef:(sync.revision?'status R'+sync.revision:'status 無 revision')+' · '+sync.state,
-      recovery:'ERROR 要先處理 publish error；PUBLISHED revision 必須以 Cloud returned canonical revision 為準。',
+      evidenceRef:sync.state==='PUBLISHED'?'正式發佈成功':sync.state==='PUBLISHING'?'正在提交':sync.state==='QUEUED'?'等待提交':sync.state==='ERROR'?'發佈失敗':'未有本機發佈動作',
+      recovery:'Admin 發佈成功後，正式設定以 Cloud canonical commit 為準。',
     },
     {
-      id:'smt-ack',domain:'Cloud → SMT Apply / ACK',state:matchingAck?'HEALTHY':cloud?'DEGRADED':'UNKNOWN',updatedAt:matchingAck?.appliedAt??latestAck?.appliedAt??now,pendingCount:cloud&&!matchingAck?1:0,
-      evidenceRef:matchingAck?'matching R'+matchingAck.revision+' · '+matchingAck.deviceId:latestAck?'最近 R'+latestAck.revision+' · '+latestAck.deviceId:'未有 SMT ACK',
-      recovery:'Cloud revision/fingerprint 必須同 SMT ACK 完全一致。',
+      id:'cloud-canonical',domain:'Cloud 正式設定',state:cloud?'HEALTHY':readError?'DEGRADED':'UNKNOWN',updatedAt:cloud?.publishedAt??now,pendingCount:0,
+      lastError:readError||undefined,
+      evidenceRef:cloud?'已讀到正式設定 · '+new Date(cloud.publishedAt).toLocaleString('zh-HK'):'未讀到正式設定',
+      recovery:'如果 Admin 顯示已發佈但 Cloud 讀唔到，呢度就係斷點。',
+    },
+    {
+      id:'smt-ack',domain:'SMT 最近回讀',state:latestAck?'HEALTHY':'UNKNOWN',updatedAt:latestAck?.appliedAt??now,pendingCount:latestAck?0:1,
+      evidenceRef:latestAck?'裝置 '+latestAck.deviceId+' · '+new Date(latestAck.appliedAt).toLocaleString('zh-HK'):'未收到 SMT 回讀',
+      recovery:'SMT 回讀只表示下游最近有成功套用；唔會再用 Rxx 同 Admin 做 UI 比較。',
     },
   ];
   const unknown=findings.filter(row=>row.state==='UNKNOWN').length;
   const degraded=findings.filter(row=>row.state==='DEGRADED').length;
   return <section className="admin-editor-page">
-    <header className="admin-editor-head"><div><small>LIVE READBACK</small><h1>系統狀態</h1><p>直接分開 Browser proposal、Cloud canonical、Admin publish 同 SMT ACK；唔再用一個 Rxx 假裝代表全部。</p></div><div className="admin-editor-actions"><button type="button" onClick={()=>void refresh()} disabled={loading}>{loading?'讀取中…':'重新讀取'}</button></div></header>
-    <div className="admin-kpi-grid"><article><span>健康</span><strong>{findings.filter(row=>row.state==='HEALTHY').length}</strong><small>有證據</small></article><article><span>需注意</span><strong>{degraded}</strong><small>有斷點</small></article><article><span>未確認</span><strong>{unknown}</strong><small>欠 readback</small></article><article><span>Cloud / SMT</span><strong>{cloud&&matchingAck?'MATCH':'CHECK'}</strong><small>{cloud?'Cloud R'+cloud.revision:'Cloud 未讀到'}{matchingAck?' / SMT R'+matchingAck.revision:''}</small></article></div>
+    <header className="admin-editor-head"><div><small>LIVE READBACK</small><h1>系統狀態</h1><p>直接睇 Admin 正式發佈、Cloud 正式設定同 SMT 最近回讀。唔再用 Rxx 對 Rxx 做 matching。</p></div><div className="admin-editor-actions"><button type="button" onClick={()=>void refresh()} disabled={loading}>{loading?'讀取中…':'重新讀取'}</button></div></header>
+    <div className="admin-kpi-grid"><article><span>Admin 發佈</span><strong>{publishHealthy?'成功':sync.state==='ERROR'?'失敗':publishBusy?'處理中':'未確認'}</strong><small>{sync.updatedAt?new Date(sync.updatedAt).toLocaleString('zh-HK'):'—'}</small></article><article><span>Cloud 正式設定</span><strong>{cloud?'已讀到':'未讀到'}</strong><small>{cloud?new Date(cloud.publishedAt).toLocaleString('zh-HK'):'—'}</small></article><article><span>SMT 回讀</span><strong>{latestAck?'有':'未有'}</strong><small>{latestAck?latestAck.deviceId:'—'}</small></article><article><span>需注意</span><strong>{degraded+unknown}</strong><small>失敗／未確認</small></article></div>
     <AdminResponsiveDataView
       label="系統狀態"
       rows={findings}
