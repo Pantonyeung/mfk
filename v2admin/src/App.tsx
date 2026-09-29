@@ -1,3 +1,4 @@
+import {mfkVersionLabel} from '../../contracts/product-version-v1.ts';
 import {Navigate,Route,Routes,useLocation} from 'react-router';
 import {AdminShell} from './AdminShell.tsx';
 import {ADMIN_CAPABILITIES} from './admin-capabilities.ts';
@@ -73,5 +74,7 @@ export function MfkAdminApp(){
     {ADMIN_CAPABILITIES.map(item=><Route key={item.id} path={item.id==='store-settings'?item.path+'/*':item.path} element={capabilityElement(item.id)}/>)}
     <Route path="/" element={<Navigate to="/admin/overview" replace/>}/>
     <Route path="*" element={<Navigate to="/admin/overview" replace/>}/>
-  </Routes></AdminShell></AdminDraftProvider>;
+  </Routes><MfkBuildIdentity/></AdminShell></AdminDraftProvider>;
 }
+
+function MfkBuildIdentity(){const v=mfkVersionLabel('ADMIN');return <small data-mfk-build-identity="ADMIN">Admin · v{v.version} · {v.sourceSha.slice(0,12)}</small>}
