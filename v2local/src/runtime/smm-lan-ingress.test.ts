@@ -233,10 +233,10 @@ describe('SMM LAN ingress',()=>{
       markOrderReady:vi.fn(async()=>{state='可取餐';return{orderId:'ORDER-F1',status:'READY'}}),
     };
     const ingress=createSmmLanIngress(runtime);
-    const accept=await ingress.commandFulfillment({protocolVersion:1,type:'smm.lan.fulfillment.command.v1',requestId:'FR1',commandId:'FC1',storeId:'MF01',orderId:'ORDER-F1',action:'ACCEPT'},{deviceId:'SMM-1',trusted:true});
+    const accept=await ingress.commandFulfillment({protocolVersion:1,type:'smm.operation.command.v1',kind:'FULFILLMENT',requestId:'FR1',commandId:'FC1',storeId:'MF01',targetId:'ORDER-F1',operation:'ACCEPT'},{deviceId:'SMM-1',trusted:true});
     expect(accept).toMatchObject({disposition:'APPLIED',canonicalState:'進行中'});
     expect(runtime.acceptOrder).toHaveBeenCalledWith('ORDER-F1');
-    const ready=await ingress.commandFulfillment({protocolVersion:1,type:'smm.lan.fulfillment.command.v1',requestId:'FR2',commandId:'FC2',storeId:'MF01',orderId:'ORDER-F1',action:'READY'},{deviceId:'SMM-1',trusted:true});
+    const ready=await ingress.commandFulfillment({protocolVersion:1,type:'smm.operation.command.v1',kind:'FULFILLMENT',requestId:'FR2',commandId:'FC2',storeId:'MF01',targetId:'ORDER-F1',operation:'READY'},{deviceId:'SMM-1',trusted:true});
     expect(ready).toMatchObject({disposition:'APPLIED',canonicalState:'可取餐'});
     expect(runtime.markOrderReady).toHaveBeenCalledWith('ORDER-F1');
   });
@@ -246,9 +246,9 @@ describe('SMM LAN ingress',()=>{
     const markOrderReady=vi.fn();
     const base={id:'ORDER-F2',display:'P102',createdAt:'2026-09-29T05:00:00.000Z',totalMinor:4100,paymentLabel:'現金',sourceLabel:'SMM',fulfillmentLabel:'待處理',items:[{id:'riceball',name:'原味飯團',qty:1,unitMinor:4100,serviceMode:'takeaway'}]};
     const ingress=createSmmLanIngress({orders:()=>[base],holds:()=>[],acceptOrder,markOrderReady} as any);
-    const untrusted=await ingress.commandFulfillment({protocolVersion:1,type:'smm.lan.fulfillment.command.v1',requestId:'FR3',commandId:'FC3',storeId:'MF01',orderId:'ORDER-F2',action:'ACCEPT'},{deviceId:'SMM-X',trusted:false});
+    const untrusted=await ingress.commandFulfillment({protocolVersion:1,type:'smm.operation.command.v1',kind:'FULFILLMENT',requestId:'FR3',commandId:'FC3',storeId:'MF01',targetId:'ORDER-F2',operation:'ACCEPT'},{deviceId:'SMM-X',trusted:false});
     expect(untrusted).toMatchObject({disposition:'REJECTED',reasonCode:'SMM_LAN_DEVICE_NOT_TRUSTED'});
-    const invalid=await ingress.commandFulfillment({protocolVersion:1,type:'smm.lan.fulfillment.command.v1',requestId:'FR4',commandId:'FC4',storeId:'MF01',orderId:'ORDER-F2',action:'READY'},{deviceId:'SMM-1',trusted:true});
+    const invalid=await ingress.commandFulfillment({protocolVersion:1,type:'smm.operation.command.v1',kind:'FULFILLMENT',requestId:'FR4',commandId:'FC4',storeId:'MF01',targetId:'ORDER-F2',operation:'READY'},{deviceId:'SMM-1',trusted:true});
     expect(invalid).toMatchObject({disposition:'REJECTED',reasonCode:'ORDER_NOT_READYABLE'});
     expect(acceptOrder).not.toHaveBeenCalled();
     expect(markOrderReady).not.toHaveBeenCalled();
