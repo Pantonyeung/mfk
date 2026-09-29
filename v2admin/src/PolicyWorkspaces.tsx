@@ -51,7 +51,7 @@ export function keetaActionErrorText(error:string){
 
 export interface AvailabilityRule{readonly sellable:boolean;readonly reason:string;readonly updatedAt:string}
 export function AvailabilityWorkspace(){
-  const {draft}=useAdminDraft();
+  const {draft,updateKeetaMappings}=useAdminDraft();
   const [state,setState]=usePersistentAdminState<Record<string,AvailabilityRule>>('availability.v1',{});
   const patch=(id:string,change:Partial<AvailabilityRule>)=>{
     setState(current=>{
@@ -631,14 +631,14 @@ export function ChannelsWorkspace({mode}:{mode:'overview'|'mapping'|'failures'|'
   };
   const commercialMoney=(value:number|undefined)=>value===undefined?'—':'HK'+String.fromCharCode(36)+(value/100).toFixed(2);
   const [config,setConfig]=usePersistentAdminState<ChannelConfig>('channel-policy.keeta.v1',{enabled:false,autoAccept:false,syncSellability:false,commissionPct:'',displayName:'Keeta',lateCutoffMinutes:15});
-  const [mappings,setMappings]=usePersistentAdminState<MappingRow[]>('channel-mapping.keeta.v1',[]);
+  const mappings:MappingRow[]=(draft.channelMappings?.keeta??[]).map(row=>({providerItemId:row.skuOpenItemCode||row.spuOpenItemCode||row.providerSkuId||row.providerSpuId||row.mappingId,channelName:row.channelName,components:row.components,status:'MAPPED'}));
   const [providerItemId,setProviderItemId]=useState('');
   const [productId,setProductId]=useState('');
   const [mappingComponents,setMappingComponents]=useState<MappingComponent[]>([]);
   const [channelName,setChannelName]=useState('');
   const patch=(change:Partial<ChannelConfig>)=>setConfig(current=>{const after={...current,...change};appendAdminAudit({action:'修改平台設定',target:'Keeta',before:current,after});return after;});
   const addMappingComponent=()=>{if(!productId)return;setMappingComponents(rows=>[...rows,{canonicalProductId:productId,quantity:1}]);setProductId('');};
-  const addMapping=()=>{if(!providerItemId.trim()||!mappingComponents.length)return;setMappings(rows=>{const row:MappingRow={providerItemId:providerItemId.trim(),channelName:channelName.trim(),components:Object.freeze([...mappingComponents]),status:'MAPPED'};appendAdminAudit({action:'新增 Keeta 渠道商品對應',target:row.providerItemId,after:row});return [...rows.filter(item=>item.providerItemId!==row.providerItemId),row];});setProviderItemId('');setChannelName('');setMappingComponents([]);};
+  const addMapping=()=>{if(!providerItemId.trim()||!mappingComponents.length)return;(()=>{const row:MappingRow={providerItemId:providerItemId.trim(),channelName:channelName.trim(),components:Object.freeze([...mappingComponents]),status:'MAPPED'};const next=[...(draft.channelMappings?.keeta??[]).filter(item=>(item.skuOpenItemCode||item.spuOpenItemCode||item.providerSkuId||item.providerSpuId)!==row.providerItemId),{mappingId:'keeta:'+row.providerItemId,enabled:true,skuOpenItemCode:row.providerItemId,channelName:row.channelName,components:row.components,optionMappings:[]}];updateKeetaMappings(next);appendAdminAudit({action:'新增 Keeta 渠道商品對應',target:row.providerItemId,after:row});})();setProviderItemId('');setChannelName('');setMappingComponents([]);};
   const failures=mappings.filter(row=>row.status==='PENDING');
   const title=mode==='overview'?'平台管理':mode==='mapping'?'商品映射管理':mode==='failures'?'匹配失敗明細':mode==='accept'?'接單／自動接單':mode==='sync'?'售罄／供應同步':'實收估算設定';
   const description=mode==='overview'?'查看 Keeta 連線、授權、Webhook 同整體平台狀態。'
