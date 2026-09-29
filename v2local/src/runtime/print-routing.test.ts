@@ -96,6 +96,30 @@ describe('MFK checkout print fanout',()=>{
   });
 
 
+  it('prints a mapped Keeta multi-item package as canonical production, packing and per-item labels',()=>{
+    const packageOrder:PrintableOrder={...order,totalMinor:8000,paymentLabel:'KEETA',sourceLabel:'Keeta · K998',providerPickupCode:'K998',items:[
+      {id:'a',name:'餐 A',qty:1,unitMinor:5000,serviceMode:'takeaway',productCode:'A',detail:'Keeta: 二人餐'},
+      {id:'b',name:'餐 B',qty:1,unitMinor:4500,serviceMode:'takeaway',productCode:'B',detail:'Keeta: 二人餐'},
+    ]};
+    const plan=buildOrderPrintPlan(packageOrder,[
+      binding('製作單','production'),binding('打包單','packing'),
+      binding('產品標籤','product-label-takeaway',undefined,'logical-takeaway-label'),binding('袋標籤','bag-label'),
+    ]);
+    const production=plan.find(job=>job.role==='製作單')?.payload??'';
+    const packing=plan.find(job=>job.role==='打包單')?.payload??'';
+    expect(production).toContain('A. 餐 A');
+    expect(production).toContain('B. 餐 B');
+    expect(packing).toContain('總數量 2件');
+    const labels=plan.filter(job=>job.role==='產品標籤');
+    expect(labels).toHaveLength(2);
+    expect(labels.map(job=>job.labelSpec?.primaryText)).toEqual(['餐 A','餐 B']);
+    expect(labels.map(job=>job.labelSpec?.pieceLabel)).toEqual(['1/2','2/2']);
+    expect(plan.find(job=>job.role==='袋標籤')?.labelSpec).toMatchObject({primaryText:'共 2 件',pickupCode:'K998'});
+    const receipt=buildOrderPrintPlan(packageOrder,[binding('顧客小票','receipt')]).find(job=>job.role==='顧客小票')?.payload??'';
+    expect(receipt).toContain('合計 $80.00');
+    expect(receipt).not.toContain('合計 $95.00');
+  });
+
   it('projects a combo label with main food, modifier, snack and drink as locked',()=>{
     const comboOrder:PrintableOrder={...order,items:[{
       id:'combo-d',

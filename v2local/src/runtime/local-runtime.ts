@@ -2,7 +2,7 @@ import {printBytesLan,printTextLan} from './native-print.ts';
 import {renderTscRasterLabel} from './label-bitmap.ts';
 import {renderEscPosRasterTicket} from './ticket-bitmap.ts';
 import {buildOrderPrintPlan,groupTscBitmapJobsByPhysicalPrinter,type PrintBinding,type PlannedPrintJob} from './print-routing.ts';
-import {queueOrderProjection} from './projection-outbox.ts';
+import {queueOrderProjection,queueRuntimeSellabilityProjection} from './projection-outbox.ts';
 import {hasStaffPermission,readActiveStaffSession,staffAuthRequired} from './staff-auth.ts';
 import {readSmtDiningTableRegistry,readSmtPrintConfig,readSmtStoreSettings} from './admin-operational-config.ts';
 import {mirrorKeetaOrderCommand,type KeetaProviderMirrorResult} from './keeta-provider-commands.ts';
@@ -42,6 +42,7 @@ export interface SmtDiningTableViewModel{readonly id:string;readonly areaLabel:s
 export interface SmtDiningSessionViewModel{readonly sessionId:string;readonly tableLabels:readonly string[];readonly statusLabel:string;readonly metrics:readonly SmtOperationalMetric[]}
 export interface SmtDiningProjection{readonly businessDate:string;readonly revision:number;readonly queue:readonly SmtDiningQueueItemViewModel[];readonly tables:readonly SmtDiningTableViewModel[];readonly selectedSession?:SmtDiningSessionViewModel}
 export type SmtAvailabilityStatus='available'|'soldout'|'paused';
+export const SMT_LOCAL_RUNTIME_STORAGE_KEY='mfk.v2local.runtime.v1';
 export interface SmtAvailabilityNodeViewModel{readonly nodeId:string;readonly label:string;readonly detail?:string;readonly status:SmtAvailabilityStatus;readonly sourceLabel?:string}
 export interface SmtAvailabilityProjection{readonly revision:number;readonly nodes:readonly SmtAvailabilityNodeViewModel[];readonly canChange:boolean}
 export interface LocalOrderLineItem{
@@ -120,6 +121,9 @@ export interface LocalPriceOverrideRecord{
 export interface StoredOrder{
   id:string;display:string;createdAt:string;updatedAt?:string;totalMinor:number;paymentLabel:string;fulfillmentLabel:'待處理'|'進行中'|'可取餐'|'已完成'|'已取消';sourceLabel:string;
   originalTotalMinor?:number;
+  referenceValueMinor?:number;
+  effectiveTransactionMinor?:number;
+  pricingAuthority?:'ADMIN_PUBLISHED'|'STAFF_PRICE_OVERRIDE'|'KEETA_PROVIDER_AUTHORIZED_TRANSACTION'|'BULK_NEGOTIATED';
   diningLineCorrections?:readonly LocalDiningLineCorrection[];
   diningPriceOverrides?:readonly LocalPriceOverrideRecord[];
   paymentCorrections?:readonly PaymentCorrectionRecord[];
@@ -282,8 +286,8 @@ export interface LocalHoldDraft{
   readonly smmSubmissionRefs?:readonly string[];
   readonly items:readonly LocalOrderLineItem[];
 }
-interface Persisted{orders:StoredOrder[];availability:Record<string,SmtAvailabilityStatus>;holds:LocalHoldDraft[];diningRevision?:number}
-const KEY='mfk.v2local.runtime.v1';
+interface Persisted{orders:StoredOrder[];availability:Record<string,SmtAvailabilityStatus>;availabilityBusinessDate?:string;holds:LocalHoldDraft[];diningRevision?:number}
+const KEY=SMT_LOCAL_RUNTIME_STORAGE_KEY;
 const PRINTER_BINDING_KEY='mfk.v2local.printers.v5';
 const LEGACY_PRINTER_BINDING_KEYS=['mfk.v2local.printers.v4','mfk.v2local.printers.v3','mfk.v2local.printers.v2'] as const;
 const RICEBALL_PRODUCT_IDS=Object.freeze(['riceball','tuna','pork']);
@@ -322,10 +326,34 @@ function read():Persisted{
         items:(Array.isArray(addition?.items)?addition.items:[]).map((item:any)=>normalizeLocalOrderLineItem(item)),
       })),
     })) as LocalHoldDraft[];
-    return {orders,availability:value.availability||{},holds,diningRevision:Number.isSafeInteger(value.diningRevision)?value.diningRevision:0};
+    return {orders,availability:value.availability||{},availabilityBusinessDate:typeof value.availabilityBusinessDate==='string'?value.availabilityBusinessDate:undefined,holds,diningRevision:Number.isSafeInteger(value.diningRevision)?value.diningRevision:0};
   }catch{return clone(defaults)}
 }
 let data=read();
+export function currentAvailabilityBusinessDate(now=Date.now()){
+  const cutoff=readBusinessCutoff();
+  return resolveBusinessWindow(now,cutoff.hour,cutoff.minute).businessDate;
+}
+export function normalizeRuntimeAvailabilityForBusinessDay(
+  availability:Record<string,SmtAvailabilityStatus>,
+  previousBusinessDate:string|undefined,
+  businessDate:string,
+){
+  if(previousBusinessDate===businessDate)return availability;
+  return Object.fromEntries(Object.entries(availability).map(([nodeId,status])=>[
+    nodeId,status==='soldout'?'available':status,
+  ])) as Record<string,SmtAvailabilityStatus>;
+}
+export function rollRuntimeAvailabilityForBusinessDay(now=Date.now()){
+  if(typeof localStorage==='undefined')return false;
+  const businessDate=currentAvailabilityBusinessDate(now);
+  if(data.availabilityBusinessDate===businessDate)return false;
+  const nextAvailability=normalizeRuntimeAvailabilityForBusinessDay(data.availability,data.availabilityBusinessDate,businessDate);
+  data={...data,availability:nextAvailability,availabilityBusinessDate:businessDate};
+  localStorage.setItem(KEY,JSON.stringify(data));
+  return true;
+}
+if(typeof localStorage!=='undefined')rollRuntimeAvailabilityForBusinessDay();
 let runtimeIdentitySequence=0;
 function nextRuntimeIdentity(prefix:'MFK-'|'HOLD-'|'ACT-'){
   const stamp=Date.now().toString(36);
@@ -339,6 +367,15 @@ function nextRuntimeIdentity(prefix:'MFK-'|'HOLD-'|'ACT-'){
   throw new Error('LOCAL_IDENTITY_EXHAUSTED');
 }
 function save(){localStorage.setItem(KEY,JSON.stringify(data));listeners.forEach(fn=>fn())}
+function applyBusinessDayAvailabilityRollover(now=Date.now()){
+  if(typeof localStorage==='undefined')return;
+  const previous={...data.availability};
+  if(!rollRuntimeAvailabilityForBusinessDay(now))return;
+  for(const [nodeId,status] of Object.entries(previous)){
+    if(status==='soldout'&&data.availability[nodeId]==='available')queueRuntimeSellabilityProjection(nodeId,'available');
+  }
+  listeners.forEach(fn=>fn());
+}
 function projectOrder(order:StoredOrder){queueOrderProjection(order)}
 const money=(minor:number)=>String.fromCharCode(36)+(minor/100).toFixed(2);
 function capacityEventsFromOrders(orders:readonly StoredOrder[]):CapacityPoolOrderEvent[]{
@@ -393,6 +430,7 @@ export interface CleanSmtCoreRuntimePort{
     orderId:string;eventId:1002|1003|1004|1006|1008;eventName:string;providerMessageId:string;providerPushedAt:string;rawMessage:string;
   }):{readonly orderId:string;readonly disposition:'APPLIED'|'EVIDENCE_ONLY'|'IDEMPOTENT'|'CONFLICT';readonly fulfillmentLabel:StoredOrder['fulfillmentLabel']};
   readDining?(selectedSessionId?:string):Promise<SmtDiningProjection>;
+  runtimeAvailabilityStatus?(nodeId:string):SmtAvailabilityStatus;
   readAvailability?():Promise<SmtAvailabilityProjection>;
   readCapacityPoolState?():Promise<SmtCapacityPoolStateView>;
   adjustCapacityPool?(poolId:string,remainingQty:number,note?:string):Promise<SmtCapacityPoolStateView>;
@@ -480,6 +518,9 @@ export interface MfkLocalRuntime extends CleanSmtCoreRuntimePort{
     customerReorderIntent?:readonly CustomerReorderIntentLine[];
     customerReorderHistoryPriceFacts?:readonly CustomerReorderHistoryPriceFact[];
     initialFulfillmentLabel?:StoredOrder['fulfillmentLabel'];
+    referenceValueMinor?:number;
+    effectiveTransactionMinor?:number;
+    pricingAuthority?:StoredOrder['pricingAuthority'];
   }):StoredOrder;
   orders():readonly StoredOrder[];
   deferKeetaOrder(orderId:string):Promise<{readonly orderId:string;readonly deferCount:number;readonly state:'PENDING'}>;
@@ -1453,6 +1494,9 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
       createdAt,
       updatedAt:createdAt,
       totalMinor:input.totalMinor,
+      ...(Number.isSafeInteger(input.referenceValueMinor)?{referenceValueMinor:input.referenceValueMinor}:{}),
+      ...(Number.isSafeInteger(input.effectiveTransactionMinor)?{effectiveTransactionMinor:input.effectiveTransactionMinor}:{}),
+      ...(input.pricingAuthority?{pricingAuthority:input.pricingAuthority}:{}),
       paymentLabel:input.paymentLabel,
       fulfillmentLabel:input.initialFulfillmentLabel??'進行中',
       sourceLabel:input.sourceLabel||'現場',
@@ -2574,7 +2618,12 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
     commitDiningHolds(snapshot,snapshot.holds.map(row=>row.id===holdId?archived:row));
     });
   },
+  runtimeAvailabilityStatus(nodeId:string):SmtAvailabilityStatus{
+    applyBusinessDayAvailabilityRollover();
+    return data.availability[nodeId]||'available';
+  },
   async readAvailability(){
+    applyBusinessDayAvailabilityRollover();
     return {revision:1,nodes:Object.entries(productNames).map(([nodeId,label])=>({nodeId,label,status:data.availability[nodeId]||'available',sourceLabel:'LOCAL'})),canChange:true};
   },
   async readCapacityPoolState(){
@@ -2595,7 +2644,9 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
     return view;
   },
   async setAvailability(nodeId,status){
-    data={...data,availability:{...data.availability,[nodeId]:status}};save();
+    applyBusinessDayAvailabilityRollover();
+    data={...data,availability:{...data.availability,[nodeId]:status},availabilityBusinessDate:currentAvailabilityBusinessDate()};save();
+    queueRuntimeSellabilityProjection(nodeId,status);
     return {revision:1,nodes:Object.entries(productNames).map(([id,label])=>({nodeId:id,label,status:data.availability[id]||'available',sourceLabel:'LOCAL'})),canChange:true};
   }
 });
