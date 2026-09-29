@@ -2890,3 +2890,7 @@ button:hover .product-media img{transform:scale(1.025)}
 .ui4-pickup-window header strong{color:var(--customer-source-navy)}
 .ui4-pickup-window p,.ui4-pickup-window small{margin:0;color:var(--customer-source-muted);line-height:1.55}
 .ui5-waiting-hero>small{display:block;margin:4px 0 8px;color:var(--customer-source-green);font-weight:800}
+
+/* Customer FINAL R2: crop the approved three-view source sheets to the formal front-view IP used by Stage 5-9 effect boards. */
+.source-ip-crop{background-repeat:no-repeat;background-size:300% auto;background-position:left top;overflow:hidden}
+.ui5-brand-art-slot.source-ip-crop,.ui6-brand-art-slot.source-ip-crop,.ui7-brand-art-slot.source-ip-crop,.ui8-brand-art-slot.source-ip-crop,.ui9-brand-art-slot.source-ip-crop{object-fit:unset}
