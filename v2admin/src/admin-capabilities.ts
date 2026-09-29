@@ -92,7 +92,7 @@ export const ADMIN_CAPABILITY_GROUPS:readonly AdminCapabilityGroup[]=[
     c('customer-presentation','客戶端首頁','/admin/presentation/customer-home','P1','PRESENTATION','管理客戶端首頁顯示設定。'),
     c('owner-presentation','Owner 今日首頁','/admin/presentation/owner-home','P1','PRESENTATION','管理老闆首頁顯示設定。'),
     c('frontline-presentation','前線點單版面','/admin/presentation/frontline-ordering','P1','PRESENTATION','管理前線點單版面顯示設定；唔會改動交易規則。'),
-    c('publish-center','版本與同步','/admin/publish','READY','ADMIN_CONFIG','保存 → 驗證 → 建立不可變新版本 → 即時成為目前版本；歷史版本只讀，可還原成另一個新版本。'),
+    c('publish-center','版本與同步','/admin/publish','READY','ADMIN_CONFIG','查看本機保存歷史同正式發佈狀態；正式設定以 Admin 發佈成功後嘅 Cloud commit 為準。'),
     c('diagnostics','系統狀態','/admin/system/diagnostics','GOVERNANCE','GOVERNANCE','顯示異常、記錄同修復證據。'),
     c('integrations-governance','外部連接','/admin/system/integrations','GOVERNANCE','GOVERNANCE','顯示外部連接設定、接收安全同傳送狀態。'),
     c('audit','操作記錄','/admin/system/audit','READY','REPORTING','只讀操作記錄。'),
