@@ -149,6 +149,7 @@ let installed=false;
 let socket:WebSocket|null=null;
 let reconnectTimer:number|undefined;
 let reconnectAttempt=0;
+let doorbellHeartbeat:number|undefined;
 
 function scheduleReconnect(){
   if(typeof window==='undefined'||!navigator.onLine)return;
@@ -165,6 +166,8 @@ function connectDoorbell(){
     socket=new WebSocket(smtAdminWebSocketUrl());
     socket.addEventListener('open',()=>{
       reconnectAttempt=0;
+      if(doorbellHeartbeat!==undefined)window.clearInterval(doorbellHeartbeat);
+      doorbellHeartbeat=window.setInterval(()=>void fetchAndApplyAdminConfig(),15000);
       void fetchAndApplyAdminConfig();
     });
     socket.addEventListener('message',event=>{
@@ -180,8 +183,8 @@ function connectDoorbell(){
         for(const listener of cloudDoorbellListeners)listener(row);
       }catch{}
     });
-    socket.addEventListener('close',()=>{socket=null;scheduleReconnect();});
-    socket.addEventListener('error',()=>{try{socket?.close();}catch{}});
+    socket.addEventListener('close',()=>{socket=null;if(doorbellHeartbeat!==undefined){window.clearInterval(doorbellHeartbeat);doorbellHeartbeat=undefined;}scheduleReconnect();});
+    socket.addEventListener('error',()=>{if(doorbellHeartbeat!==undefined){window.clearInterval(doorbellHeartbeat);doorbellHeartbeat=undefined;}try{socket?.close();}catch{}});
   }catch{scheduleReconnect();}
 }
 
