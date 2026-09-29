@@ -855,6 +855,34 @@ export default{
       }));
     }
 
+    if(url.pathname==='/api/smm/commands/fulfillment'&&request.method==='POST'){
+      const storeId=text(url.searchParams.get('storeId'),40)||'MF01';
+      if(storeId!=='MF01')return json({code:'SMM_STORE_INVALID'},400);
+      const session=await readStaffSession(request,storeId,env);
+      if(!session)return json({code:'SMM_SESSION_REQUIRED'},401);
+      const body=record(await request.json());
+      const id=env.SMM_INTENT_STORE.idFromName(storeId),stub=env.SMM_INTENT_STORE.get(id);
+      return stub.fetch(new Request('https://internal/commands/fulfillment/create',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({...body,staffId:String(session.staffId||'')})}));
+    }
+    if(url.pathname==='/api/smm/commands/fulfillment/readback'&&request.method==='GET'){
+      const storeId=text(url.searchParams.get('storeId'),40)||'MF01';
+      const commandId=text(url.searchParams.get('commandId'),180);
+      if(storeId!=='MF01'||!commandId)return json({code:'SMM_FULFILLMENT_READBACK_INVALID'},400);
+      const session=await readStaffSession(request,storeId,env);
+      if(!session)return json({code:'SMM_SESSION_REQUIRED'},401);
+      const id=env.SMM_INTENT_STORE.idFromName(storeId),stub=env.SMM_INTENT_STORE.get(id);
+      const target=new URL('https://internal/commands/fulfillment/readback');target.searchParams.set('commandId',commandId);
+      return stub.fetch(new Request(target.toString(),{method:'GET'}));
+    }
+    if(url.pathname==='/api/smm/smt/commands/fulfillment/pending'||url.pathname==='/api/smm/smt/commands/fulfillment/ack'){
+      const provided=text(request.headers.get('x-mfk-web-acceptance'),256),expected=String(env.WEB_SMT_ACCEPTANCE_TOKEN||'');
+      if(!expected||provided!==expected)return json({code:'SMM_SMT_COMMAND_UNAUTHORIZED'},401);
+      const storeId=text(url.searchParams.get('storeId'),40)||'MF01';
+      const id=env.SMM_INTENT_STORE.idFromName(storeId),stub=env.SMM_INTENT_STORE.get(id);
+      if(url.pathname.endsWith('/pending'))return stub.fetch(new Request('https://internal/commands/fulfillment/pending',{method:'GET'}));
+      return stub.fetch(new Request('https://internal/commands/fulfillment/ack',{method:'POST',headers:{'content-type':'application/json'},body:await request.text()}));
+    }
+
     if(url.pathname==='/api/smm/orders/submit'){
       if(request.method!=='POST')return json({code:'METHOD_NOT_ALLOWED'},405);
       const staff=await readStaffSession(request,storeId,env);
