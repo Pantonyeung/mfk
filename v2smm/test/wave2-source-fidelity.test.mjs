@@ -44,7 +44,8 @@ test('Stage X exposes seven distinct source states and UNKNOWN remains readback-
   for(const state of['LOADING','EMPTY','OFFLINE','STALE','PARTIAL','UNKNOWN','ERROR'])assert.match(stageX,new RegExp(state));
   assert.match(stageX,/先確認原本結果，請勿重複執行同一操作/);
   assert.match(stageX,/重新確認結果/);
-  assert.match(stageX,/data-final-art-pending/);
+  assert.match(stageX,/STAGE_X_ART/);
+  for(const asset of['loading.webp','empty.webp','offline.webp','stale.webp','partial.webp','unknown.webp','error.webp'])assert.match(stageX,new RegExp(asset.replace('.','\\.')));
   assert.match(cssX,/\.stagex-loading/);
   assert.match(cssX,/\.stagex-unknown/);
   assert.match(cssX,/\.stagex-error/);
@@ -63,8 +64,8 @@ test('Wave2 final art is slot-only for Stage7/8/9/X',()=>{
     'STAGE8_CLEAR_ILLUSTRATION','STAGE8_ADD_ORDER_ICON','STAGE8_CHECKOUT_ICON','STAGE8_CLEAR_ICON',
     'STAGE9_STAFF_ICON','STAGE9_CONNECTION_ICON','STAGE9_CHANNEL_ICON','STAGE9_BUSINESS_DAY_ICON',
     'STAGE9_CAPACITY_ICON','STAGE9_REPORTING_ICON','STAGE9_REFUND_ICON','STAGE9_DEVICE_ICON','STAGE9_DIAGNOSTICS_ICON',
-    'STAGEX_',
-  ])assert.ok((stage7+stage8+stage9+stageX).includes(marker),marker);
+  ])assert.ok((stage7+stage8+stage9).includes(marker),marker);
+  assert.doesNotMatch(stageX,/data-final-art-pending/);
 });
 
 test('Wave2 responsive CSS keeps mobile geometry and reduced-motion support',()=>{
