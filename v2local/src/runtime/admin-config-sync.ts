@@ -170,6 +170,7 @@ let installed=false;
 let socket:WebSocket|null=null;
 let reconnectTimer:number|undefined;
 let reconnectAttempt=0;
+let doorbellReconcileTimer:number|undefined;
 
 function scheduleReconnect(){
   if(typeof window==='undefined'||!navigator.onLine)return;
@@ -186,6 +187,8 @@ function connectDoorbell(){
     socket=new WebSocket(smtAdminWebSocketUrl());
     socket.addEventListener('open',()=>{
       reconnectAttempt=0;
+      if(doorbellReconcileTimer!==undefined)window.clearInterval(doorbellReconcileTimer);
+      doorbellReconcileTimer=window.setInterval(()=>void fetchAndApplyAdminConfig(),15000);
       void fetchAndApplyAdminConfig();
     });
     socket.addEventListener('message',event=>{
@@ -206,8 +209,8 @@ function connectDoorbell(){
         for(const listener of cloudDoorbellListeners)listener(row);
       }catch{}
     });
-    socket.addEventListener('close',()=>{socket=null;scheduleReconnect();});
-    socket.addEventListener('error',()=>{try{socket?.close();}catch{}});
+    socket.addEventListener('close',()=>{socket=null;if(doorbellReconcileTimer!==undefined){window.clearInterval(doorbellReconcileTimer);doorbellReconcileTimer=undefined;}scheduleReconnect();});
+    socket.addEventListener('error',()=>{if(doorbellReconcileTimer!==undefined){window.clearInterval(doorbellReconcileTimer);doorbellReconcileTimer=undefined;}try{socket?.close();}catch{}});
   }catch{scheduleReconnect();}
 }
 
