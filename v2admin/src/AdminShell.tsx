@@ -24,22 +24,27 @@ export function deriveAdminSyncPresentation({
   acks:readonly AdminSyncAckView[];
   online:boolean;
 }):{tone:AdminTone;title:string;detail:string}{
-  if(!activeRelease)return {tone:'neutral',title:'未有啟用版本',detail:'保存後會自動排入 Admin → SMT 同步'};
-
-  const currentAck=status.revision===activeRelease.version&&status.fingerprint
-    ?acks.find(row=>row.revision===activeRelease.version&&row.fingerprint===status.fingerprint)
+  const browserLocal=activeRelease?'Browser local R'+activeRelease.version:'Browser local —';
+  const statusRevision=Number(status.revision);
+  const hasStatusRevision=Number.isSafeInteger(statusRevision)&&statusRevision>0;
+  const cloudTitle=hasStatusRevision?'Cloud R'+statusRevision:(activeRelease?'Proposal R'+activeRelease.version:'未有啟用版本');
+  const matchingAck=hasStatusRevision&&status.fingerprint
+    ?acks.find(row=>row.revision===statusRevision&&row.fingerprint===status.fingerprint)
     :undefined;
   const latestAck=acks[0];
-  const title='R'+activeRelease.version;
 
-  if(!online)return {tone:'warning',title,detail:'離線 · 顯示最後已知同步狀態'};
-  if(status.state==='ERROR'&&status.revision===activeRelease.version)return {tone:'danger',title,detail:'同步失敗'+(status.error?' · '+status.error:'')};
-  if(status.state==='QUEUED'&&status.revision===activeRelease.version)return {tone:'info',title,detail:'已保存 · 等待同步'};
-  if(status.state==='PUBLISHING'&&status.revision===activeRelease.version)return {tone:'info',title,detail:'正在送往雲端'};
-  if(currentAck)return {tone:'success',title,detail:'SMT 已套用 · '+currentAck.deviceId};
-  if(status.state==='PUBLISHED'&&status.revision===activeRelease.version)return {tone:'warning',title,detail:'雲端已接收 · 等待 matching SMT 回讀'};
-  if(latestAck)return {tone:'warning',title,detail:'目前未有 matching 回讀 · 最近只見 R'+latestAck.revision};
-  return {tone:'warning',title,detail:'未觀察到 matching SMT 回讀'};
+  if(!activeRelease&&!hasStatusRevision)return {tone:'neutral',title:'未有啟用版本',detail:'保存後會建立 Browser proposal，再由 Cloud canonical commit'};
+  if(!online)return {tone:'warning',title:cloudTitle,detail:'離線 · '+browserLocal+' · 顯示最後已知同步狀態'};
+  if(status.state==='ERROR')return {tone:'danger',title:cloudTitle,detail:'同步失敗'+(status.error?' · '+status.error:'')+' · '+browserLocal};
+  if(status.state==='QUEUED')return {tone:'info',title:hasStatusRevision?'Proposal R'+statusRevision:cloudTitle,detail:'已保存 Browser proposal · 等待送往 Cloud'};
+  if(status.state==='PUBLISHING')return {tone:'info',title:hasStatusRevision?'Proposal R'+statusRevision:cloudTitle,detail:'正在送往 Cloud canonical commit'};
+  if(status.state==='PUBLISHED'&&matchingAck)return {tone:'success',title:cloudTitle,detail:'Cloud 已提交 · SMT 已套用 · '+matchingAck.deviceId+' · '+browserLocal+'（proposal/mirror）'};
+  if(status.state==='PUBLISHED'){
+    const last=latestAck?' · 最近 SMT 回讀 R'+latestAck.revision:' · 未見 SMT 回讀';
+    return {tone:'warning',title:cloudTitle,detail:'Cloud 已提交 · 等待 SMT matching ACK'+last+' · '+browserLocal+'（proposal/mirror）'};
+  }
+  if(latestAck)return {tone:'warning',title:cloudTitle,detail:'最近 SMT 回讀 R'+latestAck.revision+' · '+browserLocal};
+  return {tone:'warning',title:cloudTitle,detail:'未觀察到 SMT 回讀 · '+browserLocal};
 }
 
 function AdminSyncTopState(){
