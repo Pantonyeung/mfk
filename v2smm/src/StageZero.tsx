@@ -148,13 +148,15 @@ function BrandLockup({compact=false}:{compact?:boolean}){
   </div>;
 }
 
-function Stage0MascotPair({mode='duo'}:{mode?:'duo'|'male'|'female'}){
-  if(mode==='male')return <img className="stage0-mascot stage0-mascot-male" src="/brand/stage0/stage0-male.webp" alt="" aria-hidden="true"/>;
-  if(mode==='female')return <img className="stage0-mascot stage0-mascot-female" src="/brand/stage0/stage0-female.webp" alt="" aria-hidden="true"/>;
-  return <div className="stage0-mascot-pair" aria-hidden="true">
-    <img src="/brand/stage0/stage0-male.webp" alt=""/>
-    <img src="/brand/stage0/stage0-female.webp" alt=""/>
-  </div>;
+function Stage0Mascot({scene}:{scene:'splash'|'login'|'checking'|'recovery'}){
+  const src=scene==='splash'
+    ?'/brand/stage0/stage0-splash-male.webp'
+    :scene==='login'
+      ?'/brand/stage0/stage0-login-duo.webp'
+      :scene==='recovery'
+        ?'/brand/stage0/stage0-recovery-female.webp'
+        :'/brand/stage0/stage0-female.webp';
+  return <img className={`stage0-mascot stage0-mascot-${scene}`} src={src} alt="" aria-hidden="true"/>;
 }
 
 function StageZeroSplash(){
@@ -167,7 +169,7 @@ function StageZeroSplash(){
         <strong>前線好幫手</strong>
         <span>快速點單 · 清楚跟單 · 隨時掌握</span>
       </div>
-      <Stage0MascotPair mode="male"/>
+      <Stage0Mascot scene="splash"/>
       <div className="stage0-progress" aria-label="啟動中"><i/></div>
       <small className="stage0-footnote">正在準備 SMM…</small>
     </section>
@@ -186,7 +188,7 @@ function StageZeroConnectionChecking(){
         <div><i className="loading"/><span>店內 LAN</span><b>檢查中</b></div>
         <div><i/><span>門店資料</span><b>等待同步</b></div>
       </div>
-      <Stage0MascotPair mode="female"/>
+      <Stage0Mascot scene="checking"/>
     </section>
   </main>;
 }
@@ -374,7 +376,7 @@ function StageZeroStaffLogin({onSuccess}:{onSuccess:(session:SmmStaffSession)=>v
         <h1>員工登入</h1>
         <p>揀返你嘅員工身份，再輸入 PIN。</p>
       </header>
-      <Stage0MascotPair/>
+      <Stage0Mascot scene="login"/>
 
       {staff.length?<label className="stage0-field">
         <span>員工</span>
