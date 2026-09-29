@@ -27,12 +27,13 @@ test('Stage 0 source flow contains Splash Login Connection and Recovery',()=>{
 
 test('Stage 0 uses MoreFun brand and approved IP assets from the final visual source',()=>{
   assert.match(stage0,/\/brand\/morefun-logo\.webp/);
-  for(const asset of['stage0-splash-male.webp','stage0-login-duo.webp','stage0-recovery-female.webp','stage0-female.webp']){
+  for(const asset of['stage0-splash-male.webp','stage0-recovery-female.webp','stage0-female.webp']){
     assert.match(stage0,new RegExp(asset.replace('.','\\.')));
     assert.ok(existsSync(new URL('../public/brand/stage0/'+asset,import.meta.url)));
   }
   assert.ok(existsSync(new URL('../public/brand/morefun-logo.webp',import.meta.url)));
-  assert.match(css,/stage0-mascot-login/);
+  assert.match(stage0,/Stage0MascotPair/);
+  assert.match(css,/stage0-mascot-pair/);
   assert.match(css,/stage0-feather/);
 });
 
