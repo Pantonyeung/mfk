@@ -1,3 +1,4 @@
+import {CUSTOMER_FINAL_SOURCE} from '../source-assets';
 import {useRef,useState,type CSSProperties} from 'react';
 import {customerComboChoiceSelected,customerComboEffectiveMin,customerComboGroupSelectionCount,validateCustomerComboSelection,validateCustomerSelections,type CustomerComboSelectionState,type CustomerSelectionState} from '../selection';
 import {ActionButton,AnimatedValue,CollapsingHeader,EmptyState,ExpandingSearch,MenuSkeleton,PageIntro,ProductDialog,PullRefreshSurface,QuantityStepper,StatefulAction,type ActionState,type ProductOriginRect} from '../ui/primitives';
@@ -362,7 +363,7 @@ export function MemberView({connection,snapshot,history,pendingIntents,readingIn
   const seedsState=state==='READY'?(member?.seeds?.state??'EMPTY'):state;
   const lastOrder=history[0];
   return <section className="page member-page ui9-member-page">
-    <section className="member-hero ui9-member-hero"><div className="ui9-brand-art-slot" data-final-art-pending="true" role="img" aria-label="磨飯品牌角色插圖位置"/><div><span>會員</span><h1>{member?.state==='READY'&&member.displayName?`${member.displayName}，歡迎返嚟。`:'磨飯記得每次相遇。'}</h1><p>{member?.state==='READY'?(member.memberLabel??member.lastVisitLabel??'會員資料已更新'):'會員資料暫時未連接，你仍然可以照常點餐同查看訂單。'}</p>{lastOrder?.pickupCode?<small className="ui9-member-pickup-code">取餐碼 {lastOrder.pickupCode}</small>:null}</div><span className={`member-connection state-${state.toLowerCase()}`}>{state==='READY'?'已更新':state==='LOADING'?'更新中':'稍後再試'}</span></section>
+    <section className="member-hero ui9-member-hero"><img className="ui9-brand-art-slot" src={CUSTOMER_FINAL_SOURCE.femaleIpSheet.url} alt="" aria-hidden="true" data-source-asset={CUSTOMER_FINAL_SOURCE.femaleIpSheet.sourceFile}/><div><span>會員</span><h1>{member?.state==='READY'&&member.displayName?`${member.displayName}，歡迎返嚟。`:'磨飯記得每次相遇。'}</h1><p>{member?.state==='READY'?(member.memberLabel??member.lastVisitLabel??'會員資料已更新'):'會員資料暫時未連接，你仍然可以照常點餐同查看訂單。'}</p>{lastOrder?.pickupCode?<small className="ui9-member-pickup-code">取餐碼 {lastOrder.pickupCode}</small>:null}</div><span className={`member-connection state-${state.toLowerCase()}`}>{state==='READY'?'已更新':state==='LOADING'?'更新中':'稍後再試'}</span></section>
     <section className="member-module ui9-membership-module" aria-label="正式會員">
       <SectionHeading eyebrow="正式會員" title={state==='READY'?'會員資料已啟用':'用電話同密碼建立會員'}/>
       {state==='READY'?<p>正式會員資料已更新；會員身份同優惠狀態以店舖會員資料為準。</p>:<>
