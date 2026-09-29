@@ -116,8 +116,8 @@ describe('MFK checkout print fanout',()=>{
     expect(labels.map(job=>job.labelSpec?.pieceLabel)).toEqual(['1/2','2/2']);
     expect(plan.find(job=>job.role==='袋標籤')?.labelSpec).toMatchObject({primaryText:'共 2 件',pickupCode:'K998'});
     const receipt=buildOrderPrintPlan(packageOrder,[binding('顧客小票','receipt')]).find(job=>job.role==='顧客小票')?.payload??'';
-    expect(receipt).toContain('合計 HK$80.00');
-    expect(receipt).not.toContain('HK$95.00');
+    expect(receipt).toContain('合計 $80.00');
+    expect(receipt).not.toContain('合計 $95.00');
   });
 
   it('projects a combo label with main food, modifier, snack and drink as locked',()=>{
