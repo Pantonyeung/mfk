@@ -36,6 +36,7 @@ import {Stage8DineView} from './Stage8Dine';
 import {Stage9MoreView,type Stage9Tool} from './Stage9More';
 import {StageXState} from './StageXState';
 import {smmStage5ConfirmedDisplayCode,smmStage5RepairPath,smmStage5SubmissionShortRef} from './stage5-submit.mjs';
+import {createSingleFlightRefresh} from './refresh-single-flight.mjs';
 import './stage1.css';
 import './stage2.css';
 import './stage3.css';
@@ -157,7 +158,7 @@ export function App(){
     persist({preferences:{activeView:view,activeCategoryId:next,sourceFilter,serviceMode,tender,diningTarget}});
   };
 
-  const refresh=async()=>{
+  const refresh=useMemo(()=>createSingleFlightRefresh(async()=>{
     if(!port){
       setConnection('NOT_CONNECTED');
       setSnapshot(null);
@@ -174,24 +175,26 @@ export function App(){
       setConnection('ERROR');
       setError('暫時未能同步門店資料；可以繼續使用本機介面。');
     }
-  };
+  }),[port]);
+  const initialRefreshRef=useRef(false);
 
   useEffect(()=>{
-    void refresh();
+    if(!initialRefreshRef.current){
+      initialRefreshRef.current=true;
+      void refresh();
+    }
     const onOnline=()=>void refresh();
     const onPageShow=()=>void refresh();
     const onVisibility=()=>{if(document.visibilityState==='visible')void refresh();};
     window.addEventListener('online',onOnline);
     window.addEventListener('pageshow',onPageShow);
     document.addEventListener('visibilitychange',onVisibility);
-    const timer=window.setInterval(()=>{if(document.visibilityState==='visible')void refresh();},2500);
     return()=>{
       window.removeEventListener('online',onOnline);
       window.removeEventListener('pageshow',onPageShow);
       document.removeEventListener('visibilitychange',onVisibility);
-      window.clearInterval(timer);
     };
-  },[]);
+  },[refresh]);
 
   useEffect(()=>{
     let cancelled=false;
