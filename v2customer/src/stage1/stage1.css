@@ -71,3 +71,14 @@
 .stage1-home[data-home-mode="CLOSED"] .stage1-closed-panel{background:#fff2df}
 .stage1-home[data-home-mode="CAMPAIGN"] .stage1-promo-banner{order:0}
 @media(max-width:360px){.stage1-welcome h1{font-size:24px}.stage1-frequent-row{grid-auto-columns:80px}.stage1-frequent-row img{width:66px;height:66px}}
+
+/* UI1 authority-board information skeleton */
+.stage1-fixed-header{min-height:76px;padding-top:calc(9px + env(safe-area-inset-top))}
+.stage1-store-context strong{font-size:13px}
+.stage1-store-chevron{font-size:10px;color:var(--mf-muted)}
+.stage1-store-meta{font-size:9px!important;white-space:nowrap}
+button.stage1-bell{position:relative;padding:0;background:#fffdf8}
+.stage1-bell i{position:absolute;right:3px;top:2px;width:7px;height:7px;border-radius:50%;background:var(--mf-brand-orange);box-shadow:0 0 0 2px #fff}
+.stage1-order-step-labels{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;font-size:8px;color:var(--mf-muted);text-align:center;margin-top:3px}
+.stage1-order-step-labels span:nth-child(1),.stage1-order-step-labels span:nth-child(2){color:var(--mf-brand-orange);font-weight:850}
+.stage1-closed-panel small{font-size:9px;color:var(--mf-muted)}

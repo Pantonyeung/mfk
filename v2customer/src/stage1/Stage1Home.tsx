@@ -19,6 +19,11 @@ const statusLabel=(storeAvailable:boolean|undefined)=>{
   if(storeAvailable===false)return '休息中';
   return '更新中';
 };
+const operatingHoursLabel=(snapshot:CustomerReadModelSnapshot|null)=>{
+  const raw=(snapshot?.store as unknown as {todayHoursLabel?:string;hoursLabel?:string})?.todayHoursLabel
+    ??(snapshot?.store as unknown as {hoursLabel?:string})?.hoursLabel;
+  return String(raw||'').trim();
+};
 
 function mediaFor(product:CustomerProduct){
   if(product.imageUrl)return product.imageUrl;
@@ -57,6 +62,7 @@ export function Stage1Home({
   onBuyAgain:(order:CustomerHistoryProjection)=>void;
 }){
   const store=snapshot?.store;
+  const todayHours=operatingHoursLabel(snapshot);
   const member=snapshot?.member;
   const currentOrder=activeOrders[0];
   const lastOrder=history[0];
@@ -92,10 +98,10 @@ export function Stage1Home({
         <img src={OFFICIAL_LOGO_URL} alt="磨飯 More Fun"/>
       </button>
       <div className="stage1-store-context">
-        <strong>{store?.storeName??'磨飯'}</strong>
-        <span>{statusLabel(store?.channelAvailable)}</span>
+        <strong>{store?.storeName??'磨飯'} <span className="stage1-store-chevron" aria-hidden="true">⌄</span></strong>
+        <span className="stage1-store-meta">{statusLabel(store?.channelAvailable)}{todayHours?' · '+todayHours:''}</span>
       </div>
-      <span className="stage1-bell" aria-hidden="true">♢</span>
+      <button className="stage1-bell" type="button" aria-label="通知"><span aria-hidden="true">♢</span>{activeOrders.length?<i/>:null}</button>
     </header>
 
     <div className="stage1-content">
@@ -119,13 +125,14 @@ export function Stage1Home({
       {currentOrder?<button className="stage1-live-order" onClick={onOrders}>
         <span className="stage1-live-label">訂單進行中</span>
         <strong>{currentOrder.stage==='READY'?'可以取餐啦':currentOrder.stage==='PREPARING'?'製作中':currentOrder.stage==='ACCEPTED'?'店舖已接單':'查看最新進度'}</strong>
+        <div className="stage1-order-step-labels" aria-hidden="true"><span>已接單</span><span>製作中</span><span>快完成</span><span>可取餐</span></div>
         <div className="stage1-order-steps" aria-hidden="true"><i className="done"/><i className="active"/><i/><i/></div>
-        <small>{currentOrder.displayCode}{currentOrder.etaLabel?' · '+currentOrder.etaLabel:''}</small>
+        <small>{currentOrder.displayCode}{currentOrder.etaLabel?' · 預計 '+currentOrder.etaLabel:''}</small>
       </button>:null}
 
       {store?.channelAvailable===false?<section className="stage1-closed-panel">
         <img src={HERO_IP} alt="" aria-hidden="true"/>
-        <div><span>今日已打烊</span><strong>明日再見</strong><button disabled={!canBrowse} onClick={onBrowse}>{canBrowse?'查看餐牌':'餐牌更新中'}</button></div>
+        <div><span>今日已打烊</span><strong>明日再見</strong>{todayHours?<small>下次營業 · {todayHours}</small>:null}<button disabled={!canBrowse} onClick={onBrowse}>{canBrowse?'查看餐牌':'餐牌更新中'}</button></div>
       </section>:null}
 
       <button className="stage1-hero-banner" data-source-file="磨飯_stage_1_首頁品牌展示.png" disabled={!canBrowse} onClick={onBrowse} aria-label={canBrowse?'開始點餐':'餐牌更新中'}>
