@@ -92,6 +92,7 @@ describe('SMT P1-3 Admin dining table registry convergence',()=>{
     expect(runtime).toContain("throw new Error('DINING_TABLE_OCCUPIED')");
     expect(ui).toContain("view?.tables.find(table=>table.id===tableId)?.label??tableId");
     expect(ui).toContain("view?.tables.find(table=>table.id===detail.assignedTable)?.label??detail.assignedTable");
-    expect(app).toContain('const diningTableDefinitions=storeSettings.diningTables.length');
+    expect(app).toContain('const diningTableDefinitions=storeSettings.diningTables;');
+    expect(app).not.toContain('Array.from({length:9}');
   });
 });
