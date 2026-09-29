@@ -149,7 +149,6 @@ let installed=false;
 let socket:WebSocket|null=null;
 let reconnectTimer:number|undefined;
 let reconnectAttempt=0;
-let safetyPollTimer:number|undefined;
 
 function scheduleReconnect(){
   if(typeof window==='undefined'||!navigator.onLine)return;
@@ -197,10 +196,6 @@ export function installSmtAdminAutoSync(){
   };
   window.addEventListener('online',onOnline);
   window.addEventListener('offline',onOffline);
-  const refresh=()=>{if(navigator.onLine)void fetchAndApplyAdminConfig();};
-  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')refresh();});
-  window.addEventListener('focus',refresh);
-  safetyPollTimer=window.setInterval(refresh,2000);
   if(navigator.onLine){
     void fetchAndApplyAdminConfig();
     connectDoorbell();
