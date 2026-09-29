@@ -33,7 +33,7 @@ export function PublishCenterWorkspace(){
   const {markClean,replaceDraft}=useAdminDraft();
   const [releases,setReleases]=useState(()=>readAdminReleases());
   const [active,setActive]=useState(()=>readActiveAdminRelease());
-  const [message,setMessage]=useState('每次喺菜單／商品／選項／套餐撳「保存」，就會建立一個不可變新版本並即時成為目前版本。呢度只保留版本歷史同還原。');
+  const [message,setMessage]=useState('本機保存只係草稿／歷史紀錄；正式設定要以 Admin 正式發佈成功後嘅 Cloud readback 為準。');
 
   const restore=(release:AdminRelease)=>{
     restoreSnapshot(release,replaceDraft);
@@ -53,20 +53,20 @@ export function PublishCenterWorkspace(){
 
     <div className="admin-kpi-grid">
       <article><span>最近本機保存</span><strong>{active?'有':'—'}</strong><small>{active?new Date(active.createdAt).toLocaleString('zh-HK'):'未建立'}</small></article>
-      <article><span>版本總數</span><strong>{releases.length}</strong><small>不可變歷史</small></article>
-      <article><span>目前驗證碼</span><strong>{active?active.fingerprint.replace('fnv1a32:',''):'—'}</strong><small>保存後 readback</small></article>
-      <article><span>額外確認步驟</span><strong>0</strong><small>保存即目前版本</small></article>
+      <article><span>本機紀錄數</span><strong>{releases.length}</strong><small>只供歷史／還原</small></article>
+      <article><span>本機驗證碼</span><strong>{active?active.fingerprint.replace('fnv1a32:',''):'—'}</strong><small>只供本機識別</small></article>
+      <article><span>正式 Authority</span><strong>Cloud</strong><small>正式發佈成功後生效</small></article>
     </div>
 
     <div className="admin-callout compact">{message}</div>
 
     <section className="admin-rule-card">
-      <h2>版本歷史</h2>
-      {releases.length===0?<div className="admin-read-empty">未有保存版本。去菜單／商品／選項／套餐修改後直接撳「保存」。</div>:<div className="admin-editor-list">{releases.map(release=><article className="admin-policy-row" key={release.version}>
+      <h2>本機歷史</h2>
+      {releases.length===0?<div className="admin-read-empty">未有本機保存紀錄。</div>:<div className="admin-editor-list">{releases.map(release=><article className="admin-policy-row" key={release.version}>
         <div><b>{active?.version===release.version?'最近本機保存':'本機保存紀錄'}</b><small>{new Date(release.createdAt).toLocaleString('zh-HK')}</small></div>
         <code>{release.fingerprint}</code>
         <span>{release.reason||'一般保存'}</span>
-        <button type="button" disabled={active?.version===release.version} onClick={()=>restore(release)}>還原為新版本</button>
+        <button type="button" disabled={active?.version===release.version} onClick={()=>restore(release)}>還原為新草稿</button>
       </article>)}</div>}
     </section>
   </section>;
