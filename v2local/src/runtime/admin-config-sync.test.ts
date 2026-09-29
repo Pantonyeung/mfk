@@ -8,7 +8,7 @@ import {
   readSmtAdminSyncStatus,
 } from './admin-config-sync.ts';
 import {projectSyncedCombos,projectSyncedOrderingCatalog} from './admin-config-projection.ts';
-import {localRuntime,normalizeRuntimeAvailabilityForBusinessDay} from './local-runtime.ts';
+import {normalizeRuntimeAvailabilityForBusinessDay} from './local-runtime.ts';
 import {capacityNoticeForCount,readSmtFrontlinePresentation,readSmtPrintConfig,readSmtQuickReasons,readSmtStoreSettings} from './admin-operational-config.ts';
 
 function installStorage(){
@@ -158,7 +158,7 @@ describe('SMT full Admin config LKG',()=>{
     expect(print.templateSpec.receipt).toBe('店名\n訂單編號');
   });
 
-  it('projects Admin price/config while SMT runtime availability remains locally authoritative',async()=>{
+  it('projects Admin price/config while SMT runtime availability remains locally authoritative',()=>{
     const row=envelope(4);
     applyAdminConfigEnvelope(row);
 
@@ -169,7 +169,7 @@ describe('SMT full Admin config LKG',()=>{
     expect(takeaway.products[0]?.priceMinor).toBe(1050);
     // Admin snapshot.availability is no longer the store-runtime sold-out authority.
     expect(takeaway.products[0]?.sellable).toBe(true);
-    await localRuntime.setAvailability?.('p1','soldout',1);
+    localStorage.setItem('mfk.v2local.runtime.v1',JSON.stringify({orders:[],holds:[],availability:{p1:'soldout'}}));
     expect(projectSyncedOrderingCatalog('takeaway',row).products[0]?.sellable).toBe(false);
     const disabledRow=createMfkAdminConfigEnvelope({
       storeId:'MF01',revision:5,publishedAt:'2026-09-22T09:00:05.000Z',adminFingerprint:'fnv1a32:admin5',
