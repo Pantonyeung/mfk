@@ -374,6 +374,7 @@ export interface SmmRuntimePort {
   quoteCart?(cart:readonly SmmCartLine[]):Promise<SmmQuoteSnapshot>;
   submitOrder?(intent:SmmPendingIntent):Promise<SmmCommandResult>;
   readSubmission?(submissionId:string):Promise<SmmCommandResult>;
+  fulfillOrder?(input:{orderId:string;action:'ACCEPT'|'READY'}):Promise<SmmCommandResult>;
   setSellability?(input:{productId:string;available:boolean;operationId:string}):Promise<SmmCommandResult>;
   createDineSession?(input:{tableLabel:string;covers:number;operationId:string}):Promise<SmmCommandResult>;
 }
