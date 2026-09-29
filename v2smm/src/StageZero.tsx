@@ -315,7 +315,7 @@ function StageZeroConnectionRecovery({
       </section>:null}
 
       <button className="stage0-secondary stage0-offline-button" disabled={!canEnterOffline} onClick={onOffline}>繼續離線工作</button>
-      <Stage0MascotPair mode="female"/>
+      <Stage0Mascot scene="recovery"/>
       <small className="stage0-security">
         {canEnterOffline
           ?'離線工作區只使用此裝置已驗證員工 Session；正式門店資料會保持降級狀態。'
