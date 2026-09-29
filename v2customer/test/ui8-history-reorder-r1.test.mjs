@@ -159,7 +159,8 @@ test('saved-template CTA keeps exact diagnostic classification but renders only 
 
 test('Stage8 uses formal male and female IP assets and introduces no Stage9 reward mutation',()=>{
   assert.doesNotMatch(ui8,/data-final-art-pending="true"/);
-  assert.match(ui8,/data-source-asset=/);\n  assert.match(ui8,/source-ip-crop/);
+  assert.match(ui8,/data-source-asset=/);
+  assert.match(ui8,/source-ip-crop/);
   assert.match(ui8,/data-character-slot=\{variant\}/);
   assert.doesNotMatch(ui8,/Stage9|seed|reward|issueCoupon|redeemCoupon/i);
   assert.match(styles,/@media\(prefers-reduced-motion:reduce\)[\s\S]*\.ui8-page/);
