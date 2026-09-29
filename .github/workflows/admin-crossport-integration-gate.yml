@@ -7,6 +7,7 @@ on:
     paths:
       - 'v2admin/**'
       - 'contracts/**'
+      - 'integrations/keeta/**'
       - '.github/workflows/admin-crossport-integration-gate.yml'
   workflow_dispatch:
 
@@ -14,6 +15,22 @@ permissions:
   contents: read
 
 jobs:
+  keeta-contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: integrations/keeta
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Keeta contract tests
+        run: npm test
+      - name: Keeta contract build
+        run: npm run build
+
   admin:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
