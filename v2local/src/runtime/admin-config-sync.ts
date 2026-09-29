@@ -76,6 +76,19 @@ export function subscribeSmtCloudDoorbell(listener:(event:SmtCloudDoorbell)=>voi
   return()=>{cloudDoorbellListeners.delete(listener);};
 }
 
+export function shouldFetchAdminConfigForDoorbell(row:SmtCloudDoorbell,current:MfkAdminConfigEnvelope|null){
+  if(row.type==='CONFIG_INVALIDATED'){
+    const revision=Number(row.revision);
+    return !current||!Number.isSafeInteger(revision)||revision>current.revision;
+  }
+  if(row.type==='ADMIN_CONFIG_AVAILABLE'){
+    const revision=Number(row.revision);
+    const fingerprint=String(row.fingerprint??'');
+    return !current||revision>current.revision||fingerprint!==current.fingerprint;
+  }
+  return false;
+}
+
 export function applyAdminConfigEnvelope(input:unknown):SmtAdminConfigApplyResult{
   const next=validateMfkAdminConfigEnvelope(input);
   const current=readSmtAdminConfigLkg();
@@ -170,13 +183,11 @@ function connectDoorbell(){
     socket.addEventListener('message',event=>{
       try{
         const row=JSON.parse(String(event.data)) as SmtCloudDoorbell&{revision?:number;fingerprint?:string};
-        if(row.type==='ADMIN_CONFIG_AVAILABLE'){
-          const current=readSmtAdminConfigLkg();
-          if(!current||Number(row.revision)>current.revision||String(row.fingerprint)!==current.fingerprint){
-            void fetchAndApplyAdminConfig();
-          }
-          return;
+        const current=readSmtAdminConfigLkg();
+        if(shouldFetchAdminConfigForDoorbell(row,current)){
+          void fetchAndApplyAdminConfig();
         }
+        if(row.type==='ADMIN_CONFIG_AVAILABLE')return;
         for(const listener of cloudDoorbellListeners)listener(row);
       }catch{}
     });
