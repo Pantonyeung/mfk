@@ -82,25 +82,40 @@ export type SmmLanOrderResponse=
     reasonCode:string;
   }>;
 
-export interface SmmLanFulfillmentCommandRequest{
+export type SmmOperationalCommandKind='FULFILLMENT'|'CANCEL'|'DINE_IN'|'SELLABILITY'|'PRINT';
+
+export interface SmmOperationalCommandEnvelopeV1{
   readonly protocolVersion:1;
-  readonly type:'smm.lan.fulfillment.command.v1';
+  readonly type:'smm.operation.command.v1';
   readonly requestId:string;
   readonly commandId:string;
   readonly storeId:'MF01';
-  readonly orderId:string;
-  readonly action:'ACCEPT'|'READY';
+  readonly kind:SmmOperationalCommandKind;
+  readonly targetId:string;
+  readonly operation:string;
+  readonly payload?:Readonly<Record<string,unknown>>;
 }
 
-export type SmmLanFulfillmentCommandResponse=Readonly<{
+export type SmmOperationalCommandResultV1=Readonly<{
   protocolVersion:1;
-  type:'smm.lan.fulfillment.result.v1';
+  type:'smm.operation.result.v1';
   requestId:string;
   commandId:string;
-  orderId:string;
+  kind:SmmOperationalCommandKind;
+  targetId:string;
   disposition:'APPLIED'|'IDEMPOTENT'|'REJECTED';
-  canonicalState?:'進行中'|'可取餐';
+  canonicalState?:string;
   reasonCode?:string;
+}>;
+
+export type SmmLanFulfillmentCommandRequest=SmmOperationalCommandEnvelopeV1&Readonly<{
+  kind:'FULFILLMENT';
+  operation:'ACCEPT'|'READY';
+}>;
+
+export type SmmLanFulfillmentCommandResponse=SmmOperationalCommandResultV1&Readonly<{
+  kind:'FULFILLMENT';
+  canonicalState?:'進行中'|'可取餐';
 }>;
 
 export interface SmmLanSubmissionReadbackRequest{
