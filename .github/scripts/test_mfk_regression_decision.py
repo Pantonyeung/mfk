@@ -87,6 +87,7 @@ class RegressionDecisionTests(unittest.TestCase):
         workflow = (Path(__file__).parents[1] / "workflows" / "mfk-regression-shadow.yml").read_text(encoding="utf-8")
         self.assertIn("continue-on-error: true", workflow)
         self.assertIn("if: always()", workflow)
+        self.assertIn("ref: ${{ github.event.pull_request.head.sha || github.sha }}", workflow)
         self.assertIn("Shadow mode completion", workflow)
 
 

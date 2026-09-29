@@ -24,6 +24,7 @@ jobs:
         with:
           fetch-depth: 0
           path: candidate
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Governance self-test
         id: self_test
