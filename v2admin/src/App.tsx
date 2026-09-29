@@ -1,4 +1,4 @@
-import {mfkVersionLabel} from '../../contracts/product-version-v1.ts';
+import {mfkVersionLabel} from '../../contracts/product-version-v1';
 import {Navigate,Route,Routes,useLocation} from 'react-router';
 import {AdminShell} from './AdminShell.tsx';
 import {ADMIN_CAPABILITIES} from './admin-capabilities.ts';
