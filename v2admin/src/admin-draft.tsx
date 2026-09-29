@@ -179,6 +179,7 @@ interface AdminDraftContextValue{
   readonly validate:()=>readonly string[];
   readonly markClean:()=>void;
   readonly replaceDraft:(next:AdminSessionDraft,reason:string)=>void;
+  readonly updateKeetaMappings:(mappings:readonly KeetaChannelMappingDraft[])=>void;
   readonly reset:()=>void;
 }
 
@@ -868,6 +869,8 @@ export function AdminDraftProvider({children}:{children:ReactNode}){
     appendAdminAudit({action:'取代菜單草稿',target:'菜單',reason});
   };
 
+  const updateKeetaMappings=(mappings:readonly KeetaChannelMappingDraft[])=>mutate('修改 Keeta 渠道商品對應','Keeta',current=>({...current,channelMappings:{...(current.channelMappings??{}),keeta:mappings}}));
+
   const reset=()=>{
     persist(RESET_BASELINE,true);
     writeAdminStored(COMBO_R4_SEED_KEY,true);
@@ -886,7 +889,7 @@ export function AdminDraftProvider({children}:{children:ReactNode}){
     addComboPoolGroup,updateComboPoolGroup,removeComboPoolGroup,moveComboPoolGroup,
     addComboPoolBand,updateComboPoolBand,removeComboPoolBand,moveComboPoolBand,
     addComboPoolChoice,updateComboPoolChoice,removeComboPoolChoice,moveComboPoolChoice,
-    moveCategory,moveProduct,validate,markClean,replaceDraft,reset,
+    moveCategory,moveProduct,validate,markClean,replaceDraft,updateKeetaMappings,reset,
   }),[draft,dirty,validationErrors]);
 
   return <AdminDraftContext.Provider value={value}>{children}</AdminDraftContext.Provider>;
