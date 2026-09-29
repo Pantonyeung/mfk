@@ -131,25 +131,6 @@ export async function flushAdminSyncOutbox(){
 }
 
 
-export async function publishAdminReleaseConfirmed(release:AdminRelease,storeId='MF01'){
-  const envelope=await queueAdminReleaseSync(release,storeId);
-  const status=await flushAdminSyncOutbox();
-  if(status.state!=='PUBLISHED'||status.revision!==envelope.revision||status.fingerprint!==envelope.fingerprint){
-    throw new Error(status.error||'ADMIN_SYNC_PUBLISH_NOT_CONFIRMED');
-  }
-  const key=readExistingAdminPublisherKey();
-  const browserSession=readStoredAdminBrowserSession();
-  const endpoint=browserSession?'/api/admin-browser/publisher-active':'/api/admin-sync/active';
-  const headers:Record<string,string>={};
-  if(browserSession)headers['x-mfk-admin-session']=browserSession.sessionToken;
-  else if(key)headers['x-mfk-admin-publish-key']=key;
-  const response=await fetch(endpoint+'?storeId='+encodeURIComponent(storeId),{cache:'no-store',credentials:'same-origin',headers});
-  if(!response.ok)throw new Error('ADMIN_SYNC_READBACK_HTTP_'+response.status);
-  const active=validateMfkAdminConfigEnvelope(await response.json());
-  if(active.revision!==envelope.revision||active.fingerprint!==envelope.fingerprint)throw new Error('ADMIN_SYNC_READBACK_MISMATCH');
-  return active;
-}
-
 export async function uploadAdminPaymentQr(file:File,channelId:string,storeId='MF01'):Promise<{readonly qrImageUrl:string;readonly objectKey:string}>{
   const id=channelId.trim().toUpperCase();
   if(!/^[A-Z0-9][A-Z0-9_-]{1,39}$/.test(id))throw new Error('PAYMENT_CHANNEL_ID_INVALID');
