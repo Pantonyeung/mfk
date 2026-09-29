@@ -347,7 +347,7 @@ export function DiagnosticsWorkspace(){
   const unknown=findings.filter(row=>row.state==='UNKNOWN').length;
   const degraded=findings.filter(row=>row.state==='DEGRADED').length;
   return <section className="admin-editor-page">
-    <header className="admin-editor-head"><div><small>LIVE READBACK</small><h1>系統狀態</h1><p>直接睇 Admin 正式發佈、Cloud 正式設定同 SMT 最近回讀；冇證據唔會硬判根因，亦唔再用 Rxx 對 Rxx 做 matching。</p></div><div className="admin-editor-actions"><button type="button" onClick={()=>void refresh()} disabled={loading}>{loading?'讀取中…':'重新讀取'}</button></div></header>
+    <header className="admin-editor-head"><div><small>LIVE READBACK</small><h1>系統狀態</h1><p>直接睇 Admin 正式發佈、Cloud 正式設定同 SMT 最近回讀；冇證據唔會硬判根因，唔會用假綠燈代替健康證據，亦唔再用 Rxx 對 Rxx 做 matching。</p></div><div className="admin-editor-actions"><button type="button" onClick={()=>void refresh()} disabled={loading}>{loading?'讀取中…':'重新讀取'}</button></div></header>
     <div className="admin-kpi-grid"><article><span>Admin 發佈</span><strong>{publishHealthy?'成功':sync.state==='ERROR'?'失敗':publishBusy?'處理中':'未確認'}</strong><small>{sync.updatedAt?new Date(sync.updatedAt).toLocaleString('zh-HK'):'—'}</small></article><article><span>Cloud 正式設定</span><strong>{cloud?'已讀到':'未讀到'}</strong><small>{cloud?new Date(cloud.publishedAt).toLocaleString('zh-HK'):'—'}</small></article><article><span>SMT 回讀</span><strong>{latestAck?'有':'未有'}</strong><small>{latestAck?latestAck.deviceId:'—'}</small></article><article><span>需注意</span><strong>{degraded+unknown}</strong><small>失敗／未確認</small></article></div>
     <AdminResponsiveDataView
       label="系統狀態"
