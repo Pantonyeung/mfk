@@ -196,7 +196,7 @@ export function StoreFulfillmentUi6View({
     </section>:null}
 
     <header className="ui6-hero">
-      <div className="ui6-brand-art-slot" data-final-art-pending="true" role="img" aria-label="磨飯品牌角色插圖位置"/>
+      <img className="ui6-brand-art-slot" src={CUSTOMER_FINAL_SOURCE.maleIpSheet.url} alt="" aria-hidden="true" data-source-asset={CUSTOMER_FINAL_SOURCE.maleIpSheet.sourceFile}/>
       <span>{meta.eyebrow}</span>
       <h1>{meta.title}</h1>
       <p>{meta.detail}</p>
