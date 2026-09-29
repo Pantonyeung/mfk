@@ -54,7 +54,8 @@ describe('SMT A3e frontline presentation',()=>{
     expect(adminDeferred).toContain("surface==='FRONTLINE'");
     expect(adminDeferred).toContain("saveAdminConfig(draft,undefined,'顯示設定 '+surface)");
     expect(adminDeferred).toContain('保存並發佈');
-    expect(adminDeferred).toContain('已排入 Admin → SMT／SMM 自動同步');
+    expect(adminDeferred).toContain('等待雲端 Canonical 確認');
+    expect(adminDeferred).not.toContain('已排入 Admin → SMT／SMM 自動同步');
   });
 
   it('keeps business authority outside presentation preferences',()=>{
