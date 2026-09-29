@@ -1,6 +1,5 @@
 import {
   validateMfkCustomerOrderIntent,
-  validateMfkCustomerQuoteRequest,
 } from '../contracts/customer-cloud-v1.ts';
 import {validateSmmLanOrderRequest} from '../contracts/smm-lan-v1.ts';
 
@@ -58,46 +57,6 @@ export class CustomerRuntimeStore{
         lastOrderPull:lastOrderPull??null,
         observedAt,
       },200);
-    }
-
-    if(url.pathname==='/public/quote'&&request.method==='POST'){
-      let quote;
-      try{quote=validateMfkCustomerQuoteRequest(await request.json());}
-      catch(error){return json({code:error instanceof Error?error.message:'CUSTOMER_QUOTE_INVALID'},400);}
-      const key='quote:'+quote.requestId;
-      const existing=await this.state.storage.get(key) as any;
-      if(existing){
-        if(existing.requestFingerprint!==stable(quote))return json({code:'CUSTOMER_QUOTE_ID_CONFLICT'},409);
-        return json({state:existing.state,requestId:quote.requestId,message:'同一報價要求已存在'});
-      }
-      const row=Object.freeze({
-        ...quote,
-        requestFingerprint:stable(quote),
-        state:'PENDING_SMT',
-        receivedAt:new Date().toISOString(),
-      });
-      await this.state.storage.put(key,row);
-      await this.state.storage.put('diag:lastPublicQuote',{requestId:quote.requestId,state:row.state,receivedAt:row.receivedAt});
-      return json({state:'PENDING',requestId:quote.requestId},202);
-    }
-
-    if(url.pathname==='/public/quote/readback'&&request.method==='GET'){
-      const requestId=(url.searchParams.get('requestId')||'').trim();
-      if(!requestId)return json({code:'CUSTOMER_QUOTE_REQUEST_ID_REQUIRED'},400);
-      const row=await this.state.storage.get('quote:'+requestId) as any;
-      if(!row)return json({state:'UNKNOWN',requestId},404);
-      return json({
-        state:row.state,
-        requestId,
-        ...(row.state==='CONFIRMED'?{
-          quoteId:row.quoteId,
-          revision:row.revision,
-          currency:row.currency,
-          totalMinor:row.totalMinor,
-          observedAt:row.observedAt,
-        }:{}),
-        ...(row.state==='REJECTED'?{code:row.code,message:row.message}:{}),
-      });
     }
 
     if(url.pathname==='/public/orders/submit'&&request.method==='POST'){
@@ -201,57 +160,14 @@ export class CustomerRuntimeStore{
       });
     }
 
-    if(url.pathname==='/smt/quotes/pending'&&request.method==='GET'){
-      const quotes=await this.pending('quote:');
-      await this.state.storage.put('diag:lastQuotePull',{count:quotes.length,at:new Date().toISOString(),requestIds:quotes.slice(0,5).map((row:any)=>String(row.requestId||''))});
-      return json({quotes});
-    }
-
     if(url.pathname==='/smt/diagnostics'&&request.method==='GET'){
-      const quotes=await this.pending('quote:');
       const orders=await this.pending('order:');
       return json({
-        pendingQuotes:quotes.length,
         pendingOrders:orders.length,
-        lastPublicQuote:await this.state.storage.get('diag:lastPublicQuote')??null,
-        lastQuotePull:await this.state.storage.get('diag:lastQuotePull')??null,
-        lastQuoteAck:await this.state.storage.get('diag:lastQuoteAck')??null,
         lastOrderPull:await this.state.storage.get('diag:lastOrderPull')??null,
         lastStaffOrderSubmit:await this.state.storage.get('diag:lastStaffOrderSubmit')??null,
         observedAt:new Date().toISOString(),
       });
-    }
-
-    if(url.pathname==='/smt/quotes/ack'&&request.method==='POST'){
-      let body:Record<string,unknown>;
-      try{body=record(await request.json(),'CUSTOMER_QUOTE_ACK_INVALID');}
-      catch(error){return json({code:error instanceof Error?error.message:'CUSTOMER_QUOTE_ACK_INVALID'},400);}
-      const requestId=text(body.requestId,'CUSTOMER_QUOTE_REQUEST_ID_REQUIRED',160);
-      const key='quote:'+requestId;
-      const current=await this.state.storage.get(key) as any;
-      if(!current)return json({code:'CUSTOMER_QUOTE_NOT_FOUND'},404);
-      if(current.state!=='PENDING_SMT')return json({state:'IDEMPOTENT',quote:current});
-      const state=body.state==='CONFIRMED'?'CONFIRMED':body.state==='REJECTED'?'REJECTED':null;
-      if(!state)return json({code:'CUSTOMER_QUOTE_ACK_STATE_INVALID'},400);
-      const next=Object.freeze({
-        ...current,
-        state,
-        resolvedAt:new Date().toISOString(),
-        ...(state==='CONFIRMED'?{
-          quoteId:text(body.quoteId,'CUSTOMER_QUOTE_ID_REQUIRED',180),
-          revision:text(body.revision,'CUSTOMER_QUOTE_REVISION_REQUIRED',180),
-          currency:text(body.currency,'CUSTOMER_QUOTE_CURRENCY_REQUIRED',16),
-          totalMinor:Number(body.totalMinor),
-          observedAt:instant(body.observedAt,'CUSTOMER_QUOTE_OBSERVED_AT_INVALID'),
-        }:{
-          code:typeof body.code==='string'?body.code:'CUSTOMER_QUOTE_REJECTED',
-          message:typeof body.message==='string'?body.message:'暫時未能報價',
-        }),
-      });
-      if(state==='CONFIRMED'&&(!Number.isSafeInteger(next.totalMinor)||next.totalMinor<0))return json({code:'CUSTOMER_QUOTE_TOTAL_INVALID'},400);
-      await this.state.storage.put(key,next);
-      await this.state.storage.put('diag:lastQuoteAck',{requestId,state,code:state==='REJECTED'?next.code:undefined,totalMinor:state==='CONFIRMED'?next.totalMinor:undefined,at:new Date().toISOString()});
-      return json({state:'ACKED',quote:next});
     }
 
     if(url.pathname==='/smt/orders/pending'&&request.method==='GET'){

@@ -5,7 +5,6 @@ import {
   customerReorderIntentFromCart,
   type CustomerCloudCartLine,
   type MfkCustomerOrderIntent,
-  type MfkCustomerQuoteRequest,
 } from '../../../contracts/customer-cloud-v1.ts';
 import {projectSyncedCombos,projectSyncedOrderingCatalog,type SyncedCombo,type SyncedComboPool,type SyncedOrderingProduct} from './admin-config-projection.ts';
 import {
@@ -161,16 +160,11 @@ export interface CustomerCloudBridgeDiagnostic{
   readonly ok:boolean;
   readonly stage:string;
   readonly deviceAuthorized?:boolean;
-  readonly pendingQuotes?:number|null;
   readonly pendingOrders?:number|null;
-  readonly quotePullStatus?:number;
   readonly orderPullStatus?:number;
   readonly status?:number;
   readonly code?:string;
   readonly observedAt?:string;
-  readonly lastPublicQuote?:Record<string,unknown>|null;
-  readonly lastQuotePull?:Record<string,unknown>|null;
-  readonly lastQuoteAck?:Record<string,unknown>|null;
 }
 
 export async function diagnoseCustomerCloudBridge():Promise<CustomerCloudBridgeDiagnostic>{
@@ -182,16 +176,11 @@ export async function diagnoseCustomerCloudBridge():Promise<CustomerCloudBridgeD
       ok:response.ok&&body.ok===true,
       stage:String(body.stage||'CUSTOMER_BRIDGE_DIAGNOSTIC_UNKNOWN'),
       deviceAuthorized:body.deviceAuthorized===true,
-      pendingQuotes:Number.isFinite(Number(body.pendingQuotes))?Number(body.pendingQuotes):null,
       pendingOrders:Number.isFinite(Number(body.pendingOrders))?Number(body.pendingOrders):null,
-      quotePullStatus:Number.isFinite(Number(body.quotePullStatus))?Number(body.quotePullStatus):undefined,
       orderPullStatus:Number.isFinite(Number(body.orderPullStatus))?Number(body.orderPullStatus):undefined,
       status:response.status,
       code:typeof body.code==='string'?body.code:undefined,
       observedAt:typeof body.observedAt==='string'?body.observedAt:new Date().toISOString(),
-      lastPublicQuote:body.lastPublicQuote&&typeof body.lastPublicQuote==='object'?body.lastPublicQuote as Record<string,unknown>:null,
-      lastQuotePull:body.lastQuotePull&&typeof body.lastQuotePull==='object'?body.lastQuotePull as Record<string,unknown>:null,
-      lastQuoteAck:body.lastQuoteAck&&typeof body.lastQuoteAck==='object'?body.lastQuoteAck as Record<string,unknown>:null,
     });
   }catch(error){
     return Object.freeze({
@@ -245,41 +234,6 @@ async function postJson(path:string,body:unknown){
   const result=await response.json().catch(()=>({})) as Record<string,unknown>;
   if(!response.ok)throw new Error(String(result.code||'CUSTOMER_CLOUD_HTTP_'+response.status));
   return result;
-}
-
-async function reconcileQuotes(){
-  const body=await getJson('/api/customer/smt/quotes/pending');
-  const quotes=Array.isArray(body.quotes)?body.quotes:[];
-  if(!quotes.length)return;
-  const {envelope,catalog}=activeCatalog();
-  for(const raw of quotes){
-    const quote=raw as MfkCustomerQuoteRequest&{state?:string};
-    try{
-      const comboData=projectSyncedCombos(envelope);
-      const priced=priceCustomerCart(quote.cart,catalog.products,comboData.combos,comboData.pools);
-      assertCapacityChannelAdmission({
-        channel:'FIRST_PARTY',
-        items:priced.items,
-        orderEvents:capacityEventsFromRuntime(),
-      });
-      await postJson('/api/customer/smt/quotes/ack',{
-        requestId:quote.requestId,
-        state:'CONFIRMED',
-        quoteId:'CUSTOMER-QUOTE:'+quote.requestId,
-        revision:String(envelope.revision)+':'+String(envelope.fingerprint),
-        currency:'HKD',
-        totalMinor:priced.totalMinor,
-        observedAt:new Date().toISOString(),
-      });
-    }catch(error){
-      await postJson('/api/customer/smt/quotes/ack',{
-        requestId:quote.requestId,
-        state:'REJECTED',
-        code:error instanceof Error?error.message:'CUSTOMER_QUOTE_REJECTED',
-        message:'購物籃需要重新確認',
-      }).catch(()=>{});
-    }
-  }
 }
 
 const SMM_CUSTOMER_BRIDGE_PREFIX='__MFK_SMM1__|';
@@ -500,7 +454,6 @@ export async function reconcileCustomerCloudBridge(){
   reconciling=true;
   try{
     await reconcileOwnerSellabilityCommands();
-    await reconcileQuotes();
     await reconcileOrders();
   }catch(error){
     attention(error instanceof Error?error.message:'CUSTOMER_CLOUD_RECONCILE_FAILED');
@@ -516,7 +469,7 @@ export function installCustomerCloudBridge(){
   installed=true;
   const reconcile=()=>void reconcileCustomerCloudBridge();
   subscribeSmtCloudDoorbell(event=>{
-    if(event.type==='CUSTOMER_QUOTE_AVAILABLE'||event.type==='CUSTOMER_ORDER_AVAILABLE'||event.type==='OWNER_SELLABILITY_COMMAND_AVAILABLE')reconcile();
+    if(event.type==='CUSTOMER_ORDER_AVAILABLE'||event.type==='OWNER_SELLABILITY_COMMAND_AVAILABLE')reconcile();
   });
   subscribeSmtAdminConfig(reconcile);
   window.addEventListener('online',reconcile);
