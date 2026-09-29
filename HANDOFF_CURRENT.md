@@ -1,78 +1,46 @@
-# MFK CURRENT HANDOFF｜2026-09-25
+# MFK CURRENT HANDOFF｜P0 Recovery Salvage｜2026-09-29
 
-Current navigation:
-docs/navigation/MFK_航海圖_V1.30_Round031_2026-09-25.txt
+Current Main remains:
+6cb2d05ecfd49ca0a3bc972a03cb283ce1c64d1a
 
-Control:
-#22
+Controlled bank:
+052295861931b72aa401aa6fa06c3cd65866706d
 
-## Current
+Complete audit:
+docs/recovery/MFK_P0_RECOVERY_SALVAGE_AUDIT_2026-09-29.md
 
-Carrier 1.0.7 + SMM PWA LAN/QR software/release gate is GREEN.
+Draft-only sibling Candidates, all based directly on Current Main:
 
-MFK product source:
-`75759607ba05720f723c77d282327b7f1386f616`
+1. #521 / 34ccfbd03d5a198ada34e99d39187ea7b9440918 — Dining live refresh — KEEP.
+2. #522 / 6a036e02d302f66621bd0d7a7ae5d5f0018fcd20 — fake table fail-closed — REBUILD.
+3. #523 / 0552a5982d3c660542ee738377b629fe8d5f2510 — canonical Cloud publish confirmation — REBUILD.
+4. #524 / 0e93e088003b629f28962a0f761f681d24cc5587 — bounded Admin reconciliation — KEEP.
 
-Source/build verification:
-`36084376938` SUCCESS
+Verification:
 
-Canonical Carrier OTA publication:
-`36085973121` SUCCESS
+- All focused tests passed.
+- Full Admin suite passed 212/212.
+- Serialized v2local suites passed 403/403, 402/402 and 403/403 after excluding one exact-base Windows CRLF-only static assertion.
+- All four production builds passed.
+- No deploy, device, provider or physical GREEN is claimed.
 
-Published Carrier:
-- 1.0.7 / 107
-- package `com.morefunos.smt`
-- APK `MoreFunOS-SMT-1.0.7-mfk-75759607ba05.apk`
-- SHA-256 `b521d509f93143e191e9df363b91409e499dc0788776f067e88469611c791046`
-- public manifest + APK hash readback GREEN
-- evidence artifact `10844450207`
+Not salvaged:
 
-Independent release replay:
-`36085863280` SUCCESS
-- same product source
-- same APK SHA-256
+- Sync V2 is QUARANTINED.
+- Customer Cloud quote is DROP.
+- Owner direct canonical availability mutation is DROP.
+- Owner ONLINE_ONLY/expiry and unaudited port identity are QUARANTINED.
+- Exact live Keeta auto-accept revision is UNKNOWN.
 
-Canonical Builder path:
-- `.github/workflows/mfk-carrier-ota.yml`
-- `requests/mfk-carrier-ota-request.txt`
+Tomorrow exact algorithm:
 
-Temporary parallel duplicate publisher path has been retired. One active MFK Carrier OTA path remains.
+accepted Main → merge one Candidate → CI → deploy affected port → physical/public acceptance → checkpoint or immediate revert → next independent Candidate
 
-Milestone:
-`MFK_CARRIER_1_0_7_OTA_PUBLISHED_GREEN`
+Recommended order:
+#521 → #523 → #522 → #524
 
-## Locked architecture
+Exact next:
+Owner reviews and accepts or bypasses #521 first. Do not start #523 until #521 has a new accepted checkpoint or has been reverted.
 
-SMM = PWA/Web only.
-
-Primary:
-PWA → LAN HTTP/JSON :17831 → SMT.
-
-LAN unavailable:
-other allowed path / QR fallback; staff ordering remains unblocked.
-
-QR = Order Intent only.
-SMT revalidates current Menu + Pricing before Store Kernel creates Formal Order.
-
-Runtime OTA URL and Carrier OTA URL remain independently configurable.
-
-## Exact NEXT
-
-Physical Ring 3 only. No product code before physical evidence.
-
-1. Store SMT Recovery → check Carrier OTA.
-2. Fresh offered version must be 1.0.7 / 107.
-3. Install and confirm Carrier 1.0.7 / 107.
-4. Confirm normal SMT boot + independent Runtime/Carrier OTA URL controls.
-5. iPhone Safari on store LAN: PWA LAN probe + one real staff order.
-6. iOS Chrome: repeat LAN capability evidence.
-7. Make LAN unavailable: verify no blocking and fallback available.
-8. QR Order Intent → SMT revalidation → exactly one Formal Order / Display.
-9. Replay same QR/intent: zero duplicate Formal Order.
-10. Restart SMT and repeat one LAN/QR sanity path.
-
-Success target:
-`MFK_CARRIER_1_0_7_SMM_PWA_LAN_QR_PHYSICAL_GREEN`
-
-If RED:
-STOP at exact FIRST BREAK and fix only that seam.
+Tonight remains:
+NO MERGE / NO DEPLOY / NO SMT OTA
