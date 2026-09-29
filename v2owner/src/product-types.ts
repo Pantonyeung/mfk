@@ -149,6 +149,10 @@ export interface OwnerOrderProjection {
   readonly originalAmountLabel?:string;
   readonly adjustmentAmountLabel?:string;
   readonly currentEffectiveAmountLabel?:string;
+  readonly referenceValueLabel?:string;
+  readonly effectiveTransactionLabel?:string;
+  readonly pricingAuthority?:string;
+  readonly printState?:'PENDING'|'DONE'|'UNKNOWN';
   readonly tenderLabel?:string;
   readonly currentTenderLabel?:string;
   readonly paymentState?:'OPEN'|'PARTIAL'|'SETTLED'|string;
