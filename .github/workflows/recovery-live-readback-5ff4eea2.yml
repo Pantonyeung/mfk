@@ -22,6 +22,7 @@ jobs:
           const endpoints={
             adminHealth:'https://admin.morefunos.com/api/health',
             adminActive:'https://admin.morefunos.com/api/admin-sync/active?storeId=MF01',
+            adminAcks:'https://admin.morefunos.com/api/admin-sync/acks?storeId=MF01',
             ownerHealth:'https://owner.morefunos.com/api/health',
           };
           for(const [name,url] of Object.entries(endpoints)){
@@ -43,6 +44,9 @@ jobs:
                   keetaSyncSellability:p?.syncSellability??null,
                   diningTables:tables.map(x=>({id:x?.id,name:x?.name,active:x?.active})).slice(0,30),
                 }));
+              }else if(name==='adminAcks'){
+                const rows=Array.isArray(body?.acks)?body.acks:[];
+                console.log(JSON.stringify({name,status:response.status,acks:rows.slice(0,10).map(x=>({deviceId:x?.deviceId,revision:x?.revision,fingerprint:x?.fingerprint,appliedAt:x?.appliedAt,disposition:x?.disposition}))}));
               }else{
                 console.log(JSON.stringify({name,status:response.status,body}));
               }
