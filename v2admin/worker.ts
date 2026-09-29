@@ -242,6 +242,7 @@ export function normalizeOwnerKeetaChannel(input,now=new Date().toISOString()){
   }:undefined;
   return Object.freeze({
     channelId:'KEETA',name:'Keeta',
+    recentOrderDiagnostics:rows(root.orderDiagnostics).slice(0,10).map(item=>({providerOrderId:String(item.providerOrderId||''),canonicalDisplay:item.canonicalDisplay?String(item.canonicalDisplay):null,state:String(item.state||'UNKNOWN'),mappingState:String(item.mappingState||'PENDING'),ackState:String(item.ackState||'PENDING'),commercialState:item.commercialState?String(item.commercialState):null,providerConfirmState:item.providerConfirmState?String(item.providerConfirmState):null,providerReadyState:item.providerReadyState?String(item.providerReadyState):null,receivedAt:String(item.receivedAt||now)})),
     acceptingOrders:status===3?true:status===4?false:null,
     desiredState,observedState,
     health:freshness==='CURRENT'&&(status===3||status===4)?'HEALTHY':'UNKNOWN',
@@ -971,7 +972,11 @@ export class AdminSyncStore{
       const id=this.env.KEETA_RUNTIME.idFromName('MF01'),stub=this.env.KEETA_RUNTIME.get(id);
       if(freshReadback)await stub.fetch(new Request('https://internal/admin/store/readback',{method:'POST'}));
       const response=await stub.fetch(new Request('https://internal/admin/store/status',{method:'GET'}));
-      if(response.ok)keetaStatus=await response.json();
+      if(response.ok){
+        keetaStatus=await response.json();
+        const intakeResponse=await stub.fetch(new Request('https://internal/admin/orders/intake',{method:'GET'}));
+        if(intakeResponse.ok)keetaStatus={...keetaStatus,orderDiagnostics:(await intakeResponse.json()).items??[]};
+      }
     }catch{}
     try{
       const id=this.env.CUSTOMER_RUNTIME.idFromName('MF01'),stub=this.env.CUSTOMER_RUNTIME.get(id);
