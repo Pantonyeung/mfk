@@ -604,11 +604,13 @@ export function mapCustomerOrderProjection(input){
   };
 }
 
-function customerPublicSnapshot(active,customerOrders=[]){
+function customerPublicSnapshot(active,customerOrders=[],runtimeSellability=[]){
   const snapshot=row(active?.snapshot);
   const catalog=row(snapshot.catalog);
   const optionCenter=row(snapshot.optionCenter);
   const availability=row(snapshot.availability);
+  const runtimeAvailability=new Map(rows(runtimeSellability).map(raw=>{const item=row(raw);return[String(item.nodeId||''),String(item.status||'available')]}).filter(([id])=>id));
+  const runtimeAvailable=nodeId=>!['soldout','paused'].includes(runtimeAvailability.get(nodeId)||'available');
   const productMedia=row(snapshot.productMedia);
   const categories=rows(catalog.categories)
     .map((raw,index)=>{const item=row(raw);return{id:String(item.id||''),name:String(item.name||''),position:Number(item.position??index*10),active:item.active!==false};})
@@ -632,7 +634,7 @@ function customerPublicSnapshot(active,customerOrders=[]){
     const priceText=String(item.basePrice??'').trim();
     const priceReady=priceText!==''&&Number.isFinite(Number(priceText));
     const sellability=row(availability[productId]);
-    return item.active!==false&&ownerSellabilityEffective(sellability)&&priceReady;
+    return item.active!==false&&runtimeAvailable(productId)&&priceReady;
   };
   const comboPools=rows(catalog.comboPools)
     .map(poolRaw=>{
@@ -674,7 +676,7 @@ function customerPublicSnapshot(active,customerOrders=[]){
                     label:choice.choiceType==='PRODUCT'
                       ?String(rawProductById.get(choice.productId)?.name||choice.label||choice.productId||'')
                       :choice.label,
-                    available:ownerSellabilityEffective(availability['COMBO_CHILD:'+choice.choiceId])&&(choice.choiceType!=='PRODUCT'||productAvailableForCombo(choice.productId)),
+                    available:runtimeAvailable('COMBO_CHILD:'+choice.choiceId)&&(choice.choiceType!=='PRODUCT'||productAvailableForCombo(choice.productId)),
                   })),
               };
             })
@@ -744,7 +746,7 @@ function customerPublicSnapshot(active,customerOrders=[]){
           .map(optionRaw=>{const option=row(optionRaw);return{
             optionId:String(option.id||option.code||''),
             name:String(option.name||option.id||option.code||''),
-            available:option.active!==false&&ownerSellabilityEffective(availability['OPTION:'+String(option.id||option.code||'')]),
+            available:option.active!==false&&runtimeAvailable('OPTION:'+String(option.id||option.code||'')),
             publishedAdjustmentMinor:minorFromMoney(option.priceAdjustment),
             position:Number(option.position||0),
           }})
@@ -770,7 +772,7 @@ function customerPublicSnapshot(active,customerOrders=[]){
         categoryId,
         name:String(item.name||productId),
         description:String(item.description||''),
-        available:item.active!==false&&ownerSellabilityEffective(sellability)&&priceReady,
+        available:item.active!==false&&runtimeAvailable(productId)&&priceReady,
         ...(priceReady?{displayPriceLabel:moneyLabel(baseMinor+takeawayMinor),publishedUnitPriceMinor:baseMinor+takeawayMinor}:{}),
         ...(imageUrl?{imageUrl,imageAlt:String(item.name||productId)}:{}),
         optionGroups,
@@ -957,8 +959,9 @@ export class AdminSyncStore{
       }
     }
     await this.state.storage.put('active',envelope);
-    await this.state.storage.put('activeMeta',{revision:envelope.revision,fingerprint:envelope.fingerprint,publishedAt:envelope.publishedAt});
-    const doorbell=JSON.stringify({type:'ADMIN_CONFIG_AVAILABLE',storeId:envelope.storeId,revision:envelope.revision,fingerprint:envelope.fingerprint,publishedAt:envelope.publishedAt});
+    const acceptedAt=new Date().toISOString();
+    await this.state.storage.put('activeMeta',{revision:envelope.revision,fingerprint:envelope.fingerprint,publishedAt:envelope.publishedAt,acceptedAt});
+    const doorbell=JSON.stringify({type:'ADMIN_CONFIG_AVAILABLE',storeId:envelope.storeId,revision:envelope.revision,fingerprint:envelope.fingerprint,publishedAt:envelope.publishedAt,acceptedAt});
     for(const socket of this.state.getWebSockets()){try{socket.send(doorbell);}catch{}}
     return{status:200,body:{state:'PUBLISHED',active:{revision:envelope.revision,fingerprint:envelope.fingerprint,publishedAt:envelope.publishedAt}}};
   }
@@ -1002,72 +1005,45 @@ export class AdminSyncStore{
     const operationKey='owner:sellability:operation:'+operationId;
     const prior=await this.state.storage.get(operationKey);
     if(prior)return prior.result;
-    const action=String(input?.action||'').toUpperCase(),scope=String(input?.scope||'ALL').toUpperCase();
-    if(!['SOLD_OUT','RESTORE'].includes(action)||!['ALL','ONLINE_ONLY'].includes(scope)){
-      return{state:'UNKNOWN',message:'售罄操作格式無效',targets:[]};
-    }
+    const action=String(input?.action||'').toUpperCase();
+    if(!['SOLD_OUT','PAUSE','RESTORE'].includes(action))return{state:'UNKNOWN',message:'售罄操作格式無效',targets:[]};
     const requested=rows(input?.targets).slice(0,50);
     if(!requested.length)return{state:'UNKNOWN',message:'未有操作目標',targets:[]};
-    const current=await this.state.storage.get('active');
-    if(!current)return{state:'UNKNOWN',message:'Canonical Sellability Authority 未有 active revision',targets:[]};
-    const snapshot=row(current.snapshot),availability={...row(snapshot.availability)};
-    const now=new Date().toISOString(),restoreAt=action==='SOLD_OUT'?ownerTemporaryRestoreAt(input?.restoreAt,now):undefined;
-    const targetResults=[],resolved=[];
+    const active=await this.state.storage.get('active');
+    if(!active)return{state:'UNKNOWN',message:'Admin base catalog 未有 active revision',targets:[]};
+    const snapshot=row(active.snapshot),resolved=[],rejected=[];
     for(const rawTarget of requested){
       const target=row(rawTarget),grain=String(target.grain||'').toUpperCase(),targetId=String(target.targetId||'').trim();
       const found=ownerResolveSellabilityTarget(snapshot,grain,targetId);
-      if(!found){
-        targetResults.push({targetId,grain,state:'REJECTED',message:'目標不存在或唔屬 Sellability Authority'});
-        continue;
-      }
+      if(!found){rejected.push({targetId,grain,state:'REJECTED',message:'目標不存在'});continue;}
       resolved.push(found);
-      const key=ownerSellabilityKey(grain,targetId);
-      if(action==='RESTORE')availability[key]={sellable:true,scope,updatedAt:now,updatedBy:String(session.staffId||session.loginId||'OWNER')};
-      else availability[key]={
-        sellable:false,scope,
-        ...(restoreAt?{restoreAt}:{}),
-        reason:String(input?.reason||'').trim().slice(0,160),
-        updatedAt:now,updatedBy:String(session.staffId||session.loginId||'OWNER'),
-      };
     }
     if(!resolved.length){
-      const result={state:'UNKNOWN',message:'冇有效目標可以套用',targets:Object.freeze(targetResults)};
-      await this.state.storage.put(operationKey,{result,createdAt:now});
+      const result={state:'UNKNOWN',message:'冇有效目標可以套用',targets:Object.freeze(rejected)};
+      await this.state.storage.put(operationKey,{result,createdAt:new Date().toISOString()});
       return result;
     }
-    const nextSnapshot=Object.freeze({...snapshot,availability:Object.freeze(availability)});
-    const envelope=createMfkAdminConfigEnvelope({
-      storeId:String(current.storeId||'MF01'),
-      revision:Number(current.revision||0)+1,
-      publishedAt:now,
-      adminFingerprint:String(current.adminFingerprint||current.fingerprint||'OWNER_SELLABILITY_BOUNDED'),
-      snapshot:nextSnapshot,
+    const createdAt=new Date().toISOString();
+    const command=Object.freeze({
+      operationId,action,
+      targets:Object.freeze(resolved.map(target=>Object.freeze({targetId:target.targetId,grain:target.grain,name:target.name}))),
+      reason:String(input?.reason||'').trim().slice(0,160),
+      requestedBy:String(session.staffId||session.loginId||'OWNER'),
+      createdAt,
+      state:'PENDING_SMT',
     });
-    const applied=await this.publishEnvelope(envelope);
-    if(applied.status!==200){
-      const result={state:'UNKNOWN',message:'Canonical apply 結果未明；請重新讀取',targets:Object.freeze(resolved.map(target=>({...target,state:'UNKNOWN',message:'未取得 canonical apply'})))};
-      await this.state.storage.put(operationKey,{result,createdAt:now});
-      return result;
-    }
-    const readback=await this.state.storage.get('active');
-    const projected=readback?ownerSellabilityTargets(row(readback.snapshot),new Date().toISOString()):[];
-    for(const target of resolved){
-      let item=projected.find(row=>row.targetId===target.targetId&&row.grain===target.grain);
-      if(target.grain==='MODIFIER'){
-        const stateRow=row(row(readback?.snapshot).availability['OPTION:'+target.targetId]);
-        item={targetId:target.targetId,name:target.name,grain:'MODIFIER',state:ownerSellabilityEffective(stateRow)?'SELLABLE':'SOLD_OUT',scope:stateRow.scope==='ONLINE_ONLY'?'ONLINE_ONLY':'ALL',...(stateRow.restoreAt?{restoreAt:String(stateRow.restoreAt)}:{}),observedAt:new Date().toISOString(),readback:'CONFIRMED'};
-      }
-      const expected=action==='RESTORE'?'SELLABLE':'SOLD_OUT';
-      const confirmed=Boolean(item&&item.state===expected&&item.scope===scope);
-      targetResults.push({...target,state:confirmed?'CONFIRMED':'UNKNOWN',...(item?{readback:item}:{}),message:confirmed?'Canonical projection 已確認':'Per-target readback 未確認'});
-    }
-    const confirmedCount=targetResults.filter(item=>item.state==='CONFIRMED').length;
-    const unknownCount=targetResults.filter(item=>item.state==='UNKNOWN').length;
-    const state=confirmedCount===targetResults.length?'CONFIRMED':confirmedCount>0?'PARTIAL':'UNKNOWN';
-    const result={state,message:state==='CONFIRMED'?'售罄狀態已完成 canonical readback':state==='PARTIAL'?'部分目標已確認；其餘保持未明':'結果未明；禁止假裝成功',revision:Number(readback?.revision||envelope.revision),targets:Object.freeze(targetResults)};
-    await this.state.storage.put(operationKey,{result,createdAt:now});
-    await this.appendOwnerActivity(session,{operationId,title:'售罄／恢復',target:resolved.map(item=>item.name).join('、'),result:state,readback:'revision '+String(result.revision)});
+    await this.state.storage.put('owner:sellability:command:'+operationId,command);
+    const result={state:'UNKNOWN',message:'已送往店舖執行；等待 SMT Runtime readback',targets:Object.freeze([...rejected,...resolved.map(target=>({...target,state:'UNKNOWN'}))])};
+    await this.state.storage.put(operationKey,{result,createdAt});
+    const doorbell=JSON.stringify({type:'OWNER_SELLABILITY_COMMAND_AVAILABLE',storeId:String(active.storeId||'MF01'),operationId,receivedAt:createdAt});
+    for(const socket of this.state.getWebSockets()){try{socket.send(doorbell);}catch{}}
+    await this.appendOwnerActivity(session,{operationId,title:'售罄／恢復',target:resolved.map(item=>item.name).join('、'),result:'PENDING_SMT',readback:'等待 SMT Runtime'});
     return result;
+  }
+
+  async pendingOwnerSellabilityCommands(){
+    const rows=await this.state.storage.list({prefix:'owner:sellability:command:'});
+    return [...rows.values()].filter(value=>value?.state==='PENDING_SMT').slice(0,100);
   }
 
   async projectionOrders(){
@@ -1624,6 +1600,27 @@ export class AdminSyncStore{
       return json({code:'METHOD_NOT_ALLOWED'},405);
     }
 
+    if(url.pathname==='/smt-owner-sellability'){
+      if(!await this.authorizeSmtDevice(request))return json({code:'SMT_OWNER_SELLABILITY_UNAUTHORIZED'},401);
+      if(request.method==='GET')return json({commands:await this.pendingOwnerSellabilityCommands()});
+      if(request.method==='POST'){
+        const body=row(await request.json().catch(()=>({})));
+        const operationId=String(body.operationId||'').trim();
+        if(!operationId)return json({code:'OWNER_SELLABILITY_OPERATION_REQUIRED'},400);
+        const key='owner:sellability:command:'+operationId;
+        const command=await this.state.storage.get(key);
+        if(!command)return json({code:'OWNER_SELLABILITY_COMMAND_NOT_FOUND'},404);
+        const state=String(body.state||'').toUpperCase();
+        if(state!=='CONFIRMED'&&state!=='REJECTED')return json({code:'OWNER_SELLABILITY_READBACK_STATE_INVALID'},400);
+        if(command.state!=='PENDING_SMT')return json({state:'ACKED',readback:command});
+        const readback=Object.freeze({...command,state,readbackAt:new Date().toISOString(),results:rows(body.results)});
+        await this.state.storage.put(key,readback);
+        await this.state.storage.put('owner:sellability:operation:'+operationId,{result:{state,message:state==='CONFIRMED'?'SMT Runtime 已確認':'SMT Runtime 拒絕操作',targets:readback.results},createdAt:command.createdAt});
+        return json({state:'ACKED',readback});
+      }
+      return json({code:'METHOD_NOT_ALLOWED'},405);
+    }
+
     if(url.pathname==='/smt-refunds'){
       if(request.method!=='GET')return json({code:'METHOD_NOT_ALLOWED'},405);
       if(!await this.authorizeSmtDevice(request))return json({code:'SMT_REFUND_READ_UNAUTHORIZED'},401);
@@ -1662,6 +1659,42 @@ export class AdminSyncStore{
           if(!current||incomingVersion>currentVersion||incomingVersion===currentVersion&&incomingAt>=currentAt){
             await this.state.storage.put(key,{eventId:event.eventId,occurredAt:event.occurredAt,payload:event.payload});
           }
+        }else if(event.type==='RUNTIME_SELLABILITY_UPSERT'){
+          const key='projection:runtime-sellability:'+event.entityId;
+          const current=await this.state.storage.get(key);
+          const incomingAt=Date.parse(event.occurredAt);
+          const currentAt=current?Date.parse(String(current.occurredAt||'')):Number.NEGATIVE_INFINITY;
+          if(!current||!Number.isFinite(currentAt)||incomingAt>=currentAt){
+            const projectionAcceptedAt=new Date().toISOString();
+            await this.state.storage.put(key,{eventId:event.eventId,occurredAt:event.occurredAt,projectionAcceptedAt,payload:event.payload});
+            try{
+              const active=await this.state.storage.get('active');
+              if(active){
+                const sellabilityRows=await this.state.storage.list({prefix:'projection:runtime-sellability:'});
+                const runtimeSellability=[...sellabilityRows.values()].map(value=>value?.payload??value);
+                const id=this.env.KEETA_RUNTIME.idFromName(event.storeId||'MF01');
+                const stub=this.env.KEETA_RUNTIME.get(id);
+                const providerTriggeredAt=new Date().toISOString();
+                await this.state.storage.put('projection:runtime-sellability-provider:'+event.entityId,{
+                  eventId:event.eventId,state:'PENDING',occurredAt:event.occurredAt,projectionAcceptedAt,providerTriggeredAt,
+                });
+                void stub.fetch(new Request('https://internal/admin/sellability/sync',{
+                  method:'POST',headers:{'content-type':'application/json'},
+                  body:JSON.stringify({revision:active.revision,adminFingerprint:active.fingerprint,snapshot:active.snapshot,runtimeSellability,propagation:{eventId:event.eventId,occurredAt:event.occurredAt,projectionAcceptedAt,providerTriggeredAt}}),
+                })).then(async response=>{
+                  await this.state.storage.put('projection:runtime-sellability-provider:'+event.entityId,{
+                    eventId:event.eventId,state:response.ok?'COMPLETED':'FAILED',status:response.status,
+                    occurredAt:event.occurredAt,projectionAcceptedAt,providerTriggeredAt,providerReadbackAt:new Date().toISOString(),
+                  });
+                }).catch(async error=>{
+                  await this.state.storage.put('projection:runtime-sellability-provider:'+event.entityId,{
+                    eventId:event.eventId,state:'FAILED',status:0,error:error instanceof Error?error.message:'KEETA_SELLABILITY_SYNC_FAILED',
+                    occurredAt:event.occurredAt,projectionAcceptedAt,providerTriggeredAt,providerReadbackAt:new Date().toISOString(),
+                  });
+                });
+              }
+            }catch{}
+          }
         }
         await this.state.storage.put(eventKey,{type:event.type,entityId:event.entityId,occurredAt:event.occurredAt});
         accepted.push(event.eventId);
@@ -1679,6 +1712,12 @@ export class AdminSyncStore{
         }
       }
       return json({state:'ACKED',accepted});
+    }
+
+    if(url.pathname==='/runtime-sellability-readback'){
+      if(request.method!=='GET')return json({code:'METHOD_NOT_ALLOWED'},405);
+      const rows=await this.state.storage.list({prefix:'projection:runtime-sellability:'});
+      return json({sellability:[...rows.values()].map(value=>value?.payload??value)});
     }
 
     if(url.pathname==='/projection/orders'){
@@ -1769,7 +1808,9 @@ export default {
         for(const id of ids)ordersUrl.searchParams.append('submissionId',id);
         const orderResponse=await admin.fetch(new Request(ordersUrl.toString(),{method:'GET'}));
         const orderBody=orderResponse.ok?await orderResponse.json():{orders:[]};
-        return json(customerPublicSnapshot(active,Array.isArray(orderBody.orders)?orderBody.orders:[]),200,cors(request));
+        const sellabilityResponse=await admin.fetch(new Request('https://internal/runtime-sellability-readback',{method:'GET'}));
+        const sellabilityBody=sellabilityResponse.ok?await sellabilityResponse.json():{sellability:[]};
+        return json(customerPublicSnapshot(active,Array.isArray(orderBody.orders)?orderBody.orders:[],Array.isArray(sellabilityBody.sellability)?sellabilityBody.sellability:[]),200,cors(request));
       }
 
       if(url.pathname==='/api/customer/payment-qr'){
@@ -2038,10 +2079,17 @@ export default {
           if(!activeResponse.ok)return json({code:'KEETA_ADMIN_CONFIG_NOT_PUBLISHED'},409,cors(request));
           const active=await activeResponse.json();
           init.headers.set('content-type','application/json');
+          let runtimeSellability=[];
+          if(adminSubpath==='sellability/preview'||adminSubpath==='sellability/sync'){
+            const runtimeResponse=await admin.fetch(new Request('https://internal/runtime-sellability-readback',{method:'GET'}));
+            const runtimeBody=runtimeResponse.ok?await runtimeResponse.json():{sellability:[]};
+            runtimeSellability=Array.isArray(runtimeBody.sellability)?runtimeBody.sellability:[];
+          }
           init.body=JSON.stringify({
             revision:active.revision,
             adminFingerprint:active.fingerprint,
             snapshot:active.snapshot,
+            ...(runtimeSellability.length?{runtimeSellability}:{}),
           });
         }else if(request.method!=='GET'&&request.method!=='HEAD'){
           const body=await request.arrayBuffer();

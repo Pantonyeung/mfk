@@ -115,6 +115,28 @@ describe('MFK local operations fusion',()=>{
     expect(opening.sourceCloseId).toBe(close.id);
   });
 
+  it('treats skipped Business Days as record gaps, not a close/open blocker',()=>{
+    const close=createLocalDayClose({
+      orders:[],
+      now:new Date('2026-09-26T12:00:00.000Z').getTime(),
+      openingCashMinor:100000,
+      countedCashMinor:150000,
+      cashRemovedMinor:50000,
+      existing:[],
+    });
+    const suggestion=suggestOpeningCashFromPreviousClose('2026-09-29',[close]);
+    expect(suggestion?.sourceCloseBusinessDate).toBe(close.businessDate);
+    expect(suggestion?.amountMinor).toBe(100000);
+    const opening=createLocalCashOpening({
+      businessDate:'2026-09-29',
+      amountMinor:100000,
+      suggestion,
+      now:new Date('2026-09-29T03:00:00.000Z').getTime(),
+    });
+    expect(opening.businessDate).toBe('2026-09-29');
+    expect(opening.sourceCloseBusinessDate).toBe(close.businessDate);
+  });
+
   it('does not invent next-day float from historical closes without explicit retained cash',()=>{
     const legacy=createLocalDayClose({
       orders:[],

@@ -10,13 +10,12 @@ function harness(){
     list:async({prefix}:{prefix:string})=>new Map([...data].filter(([key])=>key.startsWith(prefix))),
   };
   const state={storage,getWebSockets:()=>[]} as never;
-  const runtime=new AdminSyncStore(state,{} as never);
-  return{data,runtime};
+  return{data,runtime:new AdminSyncStore(state,{} as never)};
 }
 function active(){
   return{
     schema:'MFK_ADMIN_CONFIG_SYNC_V1',storeId:'MF01',revision:10,publishedAt:'2026-09-27T06:00:00Z',
-    adminFingerprint:'admin:10',
+    adminFingerprint:'admin:10',fingerprint:'legacy-active',
     snapshot:{
       catalog:{
         categories:[{id:'cat',name:'飯',active:true}],
@@ -28,87 +27,58 @@ function active(){
       availability:{},
       inventory:[{productId:'p1',quantity:0}],
     },
-    fingerprint:'legacy-active',
   };
 }
 const session={staffId:'owner-1',loginId:'1111',displayName:'Owner'};
 
-describe('OA-SEL-001 canonical sellability',()=>{
-  it('applies product sold-out through existing active availability authority and reads it back',async()=>{
+describe('OA-SEL-001 Owner operational sellability request',()=>{
+  it('queues product SOLD_OUT for SMT runtime without rewriting Admin authority',async()=>{
     const {data,runtime}=harness();data.set('active',active());
-    const result=await runtime.ownerSellabilityCommand(session,{
-      operationId:'sel-1',action:'SOLD_OUT',scope:'ALL',targets:[{targetId:'p1',grain:'PRODUCT'}],
-    });
-    expect(result.state).toBe('CONFIRMED');
-    expect(result.targets[0].readback.state).toBe('SOLD_OUT');
-    expect(result.revision).toBe(11);
-    expect(data.get('active').snapshot.availability.p1.sellable).toBe(false);
+    const result=await runtime.ownerSellabilityCommand(session,{operationId:'sel-1',action:'SOLD_OUT',targets:[{targetId:'p1',grain:'PRODUCT'}]});
+    expect(result.state).toBe('UNKNOWN');
+    expect(data.get('active').revision).toBe(10);
+    expect(data.get('active').snapshot.availability).toEqual({});
+    expect(data.get('owner:sellability:command:sel-1')).toMatchObject({action:'SOLD_OUT',state:'PENDING_SMT'});
   });
 
-  it('supports option and combo-child targets without changing product structure',async()=>{
+  it('queues option and combo-child targets without changing canonical structures',async()=>{
     const {data,runtime}=harness();const before=active();data.set('active',before);
-    const result=await runtime.ownerSellabilityCommand(session,{
-      operationId:'sel-2',action:'SOLD_OUT',scope:'ALL',
-      targets:[{targetId:'opt1',grain:'OPTION'},{targetId:'choice1',grain:'COMBO_CHILD'}],
-    });
-    expect(result.state).toBe('CONFIRMED');
-    const snapshot=data.get('active').snapshot;
-    expect(snapshot.availability['OPTION:opt1'].sellable).toBe(false);
-    expect(snapshot.availability['COMBO_CHILD:choice1'].sellable).toBe(false);
-    expect(snapshot.catalog.products).toEqual(before.snapshot.catalog.products);
-    expect(snapshot.optionCenter.sets).toEqual(before.snapshot.optionCenter.sets);
+    await runtime.ownerSellabilityCommand(session,{operationId:'sel-2',action:'SOLD_OUT',targets:[{targetId:'opt1',grain:'OPTION'},{targetId:'choice1',grain:'COMBO_CHILD'}]});
+    const command=data.get('owner:sellability:command:sel-2');
+    expect(command.targets.map((x:any)=>x.grain)).toEqual(['OPTION','COMBO_CHILD']);
+    expect(data.get('active').snapshot.catalog).toEqual(before.snapshot.catalog);
+    expect(data.get('active').snapshot.optionCenter).toEqual(before.snapshot.optionCenter);
   });
 
-  it('online-only stop does not mean hidden and inventory zero is presentation only',async()=>{
+  it('keeps inventory quantity as presentation/statistics only',async()=>{
     const {data,runtime}=harness();data.set('active',active());
-    await runtime.ownerSellabilityCommand(session,{
-      operationId:'sel-3',action:'SOLD_OUT',scope:'ONLINE_ONLY',targets:[{targetId:'p1',grain:'PRODUCT'}],
-    });
-    const items=await runtime.ownerSellabilityReadModel('2026-09-27T06:05:00Z');
-    const product=items.find((item:any)=>item.targetId==='p1');
-    expect(product.state).toBe('SOLD_OUT');
-    expect(product.scope).toBe('ONLINE_ONLY');
-    expect(product.quantity).toBe(0);
-    expect(data.get('active').snapshot.catalog.products[0].active).toBe(true);
-  });
-
-  it('temporary stop expires by effective availability without rewriting inventory',async()=>{
-    const {data,runtime}=harness();data.set('active',active());
-    await runtime.ownerSellabilityCommand(session,{
-      operationId:'sel-4',action:'SOLD_OUT',scope:'ALL',restoreAt:'2099-09-27T07:00:00Z',targets:[{targetId:'p1',grain:'PRODUCT'}],
-    });
-    expect((await runtime.ownerSellabilityReadModel('2099-09-27T06:30:00Z')).find((x:any)=>x.targetId==='p1').state).toBe('SOLD_OUT');
-    expect((await runtime.ownerSellabilityReadModel('2099-09-27T07:01:00Z')).find((x:any)=>x.targetId==='p1').state).toBe('SELLABLE');
+    await runtime.ownerSellabilityCommand(session,{operationId:'sel-3',action:'PAUSE',targets:[{targetId:'p1',grain:'PRODUCT'}]});
     expect(data.get('active').snapshot.inventory[0].quantity).toBe(0);
+    expect(data.get('active').snapshot.catalog.products[0].active).toBe(true);
+    expect(data.get('owner:sellability:command:sel-3')).toMatchObject({action:'PAUSE',state:'PENDING_SMT'});
   });
 
-  it('invalid target yields PARTIAL when another target confirms',async()=>{
+  it('rejects missing target while queuing valid targets for SMT',async()=>{
     const {data,runtime}=harness();data.set('active',active());
-    const result=await runtime.ownerSellabilityCommand(session,{
-      operationId:'sel-5',action:'SOLD_OUT',scope:'ALL',targets:[{targetId:'p1',grain:'PRODUCT'},{targetId:'missing',grain:'PRODUCT'}],
-    });
-    expect(result.state).toBe('PARTIAL');
-    expect(result.targets.map((x:any)=>x.state)).toContain('CONFIRMED');
+    const result=await runtime.ownerSellabilityCommand(session,{operationId:'sel-5',action:'SOLD_OUT',targets:[{targetId:'p1',grain:'PRODUCT'},{targetId:'missing',grain:'PRODUCT'}]});
+    expect(result.state).toBe('UNKNOWN');
     expect(result.targets.map((x:any)=>x.state)).toContain('REJECTED');
+    expect(data.get('owner:sellability:command:sel-5').targets).toHaveLength(1);
   });
 
-  it('does not mutate existing order projections after sold-out',async()=>{
+  it('does not mutate existing order projections after runtime request',async()=>{
     const {data,runtime}=harness();data.set('active',active());
     data.set('projection:order:o1',{payload:{orderId:'o1',display:'001',sourceLabel:'門店',totalMinor:4000,fulfillmentLabel:'待處理',items:[{id:'l1',name:'產品一',qty:1,unitMinor:4000}]}});
     const before=JSON.stringify(await runtime.projectionOrders());
-    await runtime.ownerSellabilityCommand(session,{operationId:'sel-6',action:'SOLD_OUT',scope:'ALL',targets:[{targetId:'p1',grain:'PRODUCT'}]});
+    await runtime.ownerSellabilityCommand(session,{operationId:'sel-6',action:'SOLD_OUT',targets:[{targetId:'p1',grain:'PRODUCT'}]});
     expect(JSON.stringify(await runtime.projectionOrders())).toBe(before);
   });
 
-  it('maps legacy Modifier grain onto canonical Option sellability identity',async()=>{
+  it('maps legacy MODIFIER grain onto the existing option target for SMT execution',async()=>{
     const {data,runtime}=harness();data.set('active',active());
-    const result=await runtime.ownerSellabilityCommand(session,{
-      operationId:'sel-modifier',action:'SOLD_OUT',scope:'ALL',targets:[{targetId:'opt1',grain:'MODIFIER'}],
-    });
-    expect(result.state).toBe('CONFIRMED');
-    expect(result.targets[0].readback.grain).toBe('MODIFIER');
-    expect(data.get('active').snapshot.availability['OPTION:opt1'].sellable).toBe(false);
-    expect(data.get('active').snapshot.availability['MODIFIER:opt1']).toBeUndefined();
+    await runtime.ownerSellabilityCommand(session,{operationId:'sel-modifier',action:'SOLD_OUT',targets:[{targetId:'opt1',grain:'MODIFIER'}]});
+    const command=data.get('owner:sellability:command:sel-modifier');
+    expect(command.targets[0]).toMatchObject({targetId:'opt1',grain:'MODIFIER'});
+    expect(data.get('active').snapshot.availability).toEqual({});
   });
-
 });
