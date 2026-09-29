@@ -43,14 +43,14 @@ test('Wave2 keeps UI3-UI9 human-facing copy free of the audited engineering labe
   assert.equal(ui7.includes('READY 仍然唔係 Completed'),false);
 });
 
-test('Wave2 keeps formal product media and company-art placeholders honest',()=>{
+test('Wave2 keeps formal product media and uses approved company source assets',()=>{
   assert.match(ui3,/product\.imageUrl\?<img/);
   assert.match(views,/className="ui4-product-media-slot"/);
   assert.match(views,/data-product-media=\{product\?\.imageUrl\?'canonical':'pending'\}/);
-  assert.match(ui5,/data-final-art-pending="true"/);
-  assert.match(ui6,/data-final-art-pending="true"/);
-  assert.match(ui7,/data-final-art-pending="true"/);
-  assert.match(ui8,/data-final-art-pending="true"/);
+  for(const source of [ui5,ui6,ui7,ui8,views]){
+    assert.doesNotMatch(source,/data-final-art-pending="true"/);
+    assert.match(source,/data-source-asset=/);
+  }
   assert.match(views,/ui9-brand-art-slot/);
   assert.doesNotMatch(ui7,/stage7-pickup-(male|female)\.svg/);
   assert.doesNotMatch(ui8,/stage8-history-(male|female)\.svg/);
