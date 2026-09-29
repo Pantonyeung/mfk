@@ -6,6 +6,7 @@ import {
   applyAdminConfigEnvelope,
   readSmtAdminConfigLkg,
   readSmtAdminSyncStatus,
+  shouldFetchAdminConfigForDoorbell,
 } from './admin-config-sync.ts';
 import {projectSyncedCombos,projectSyncedOrderingCatalog} from './admin-config-projection.ts';
 import {capacityNoticeForCount,readSmtFrontlinePresentation,readSmtPrintConfig,readSmtQuickReasons,readSmtStoreSettings} from './admin-operational-config.ts';
@@ -106,6 +107,13 @@ describe('SMT full Admin config LKG',()=>{
     installStorage();
     localStorage.removeItem(SMT_ADMIN_CONFIG_LKG_KEY);
     localStorage.removeItem(SMT_ADMIN_CONFIG_STATUS_KEY);
+  });
+
+  it('treats Sync V2 invalidation as a config fetch trigger without polling',()=>{
+    const current=envelope(4);
+    expect(shouldFetchAdminConfigForDoorbell({type:'CONFIG_INVALIDATED',revision:5},current)).toBe(true);
+    expect(shouldFetchAdminConfigForDoorbell({type:'CONFIG_INVALIDATED',revision:4},current)).toBe(false);
+    expect(shouldFetchAdminConfigForDoorbell({type:'KEETA_ORDER_AVAILABLE'},current)).toBe(false);
   });
 
   it('atomically applies a full Admin snapshot and survives readback',()=>{
