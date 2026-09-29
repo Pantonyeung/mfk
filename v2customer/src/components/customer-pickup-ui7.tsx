@@ -46,7 +46,7 @@ const formatTime=(value:string|undefined)=>{
 
 function Mascot({variant}:{variant:CharacterVariant}){
   const asset=variant==='male'?CUSTOMER_FINAL_SOURCE.maleIpSheet:CUSTOMER_FINAL_SOURCE.femaleIpSheet;
-  return <img className="ui7-mascot ui7-brand-art-slot" src={asset.url} alt="" aria-hidden="true" data-character-slot={variant} data-source-asset={asset.sourceFile}/>;
+  return <div className={`ui7-mascot ui7-brand-art-slot source-ip-crop source-ip-${variant}`} style={{backgroundImage:`url(${asset.url})`}} aria-hidden="true" data-character-slot={variant} data-source-asset={asset.sourceFile}/>;
 }
 
 function IdentityPanel({
