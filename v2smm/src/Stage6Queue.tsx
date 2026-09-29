@@ -1,5 +1,6 @@
 import {useMemo,useState} from 'react';
-import type {SmmConnectionState,SmmOrderProjection,SmmWorkItem} from './product-types';
+import type {
+  SmmCommandResult,SmmConnectionState,SmmOrderProjection,SmmWorkItem} from './product-types';
 import {
   smmStage6ConnectionState,
   smmStage6Counts,
@@ -76,27 +77,19 @@ function Stage6Empty(){
   </section>;
 }
 
-function Stage6Actions({onClose}:{onClose:()=>void}){
-  const actions=[
-    ['▶','開始製作','標記為製作中'],
-    ['✓','已完成 / 可取餐','標記為可取餐'],
-    ['◷','延遲','更新預計時間'],
-    ['!','需要協助','如商品缺貨 / 需聯絡客人'],
-    ['×','取消訂單','標記為已取消'],
-  ] as const;
-  return <div className="stage6-action-layer" role="presentation" onMouseDown={event=>{if(event.target===event.currentTarget)onClose()}}>
+function Stage6Actions({item,busy,onClose,onFulfill}:{item:SmmWorkItem;busy:boolean;onClose:()=>void;onFulfill:(action:'ACCEPT'|'READY')=>void}){
+  const status=String(item.statusLabel||'');
+  const canAccept=status==='待處理';
+  const canReady=status==='進行中';
+  return <div className="stage6-action-layer" role="presentation" onMouseDown={event=>{if(event.target===event.currentTarget&&!busy)onClose()}}>
     <section className="stage6-action-sheet" role="dialog" aria-modal="true" aria-labelledby="stage6-action-title" data-stage6-visual="6.3_ACTIONS">
-      <header><strong id="stage6-action-title">更新訂單狀態</strong><small>目前 Stage 6 只讀；以下操作未連接。</small></header>
+      <header><strong id="stage6-action-title">更新訂單狀態</strong><small>更新會由 SMT 執行，完成後讀返正式狀態。</small></header>
       <div className="stage6-action-list">
-        {actions.map(([icon,label,detail])=><div className="stage6-disabled-action" key={label}>
-          <button type="button" disabled aria-disabled="true">
-            <span aria-hidden="true">{icon}</span>
-            <span><strong>{label}</strong><small>{detail}</small></span>
-          </button>
-          <small>此操作需由 SMT 處理</small>
-        </div>)}
+        <button type="button" disabled={!canAccept||busy} onClick={()=>onFulfill('ACCEPT')}><span aria-hidden="true">▶</span><span><strong>{busy&&canAccept?'處理中…':'開始製作'}</strong><small>標記為製作中</small></span></button>
+        <button type="button" disabled={!canReady||busy} onClick={()=>onFulfill('READY')}><span aria-hidden="true">✓</span><span><strong>{busy&&canReady?'處理中…':'已完成 / 可取餐'}</strong><small>標記為可取餐</small></span></button>
+        {['延遲','需要協助','取消訂單'].map(label=><div className="stage6-disabled-action" key={label}><button type="button" disabled aria-disabled="true"><span><strong>{label}</strong><small>目前未連接</small></span></button><small>請於 SMT 處理</small></div>)}
       </div>
-      <button type="button" className="stage6-cancel-sheet" onClick={onClose}>取消</button>
+      <button type="button" className="stage6-cancel-sheet" disabled={busy} onClick={onClose}>返回</button>
     </section>
   </div>;
 }
@@ -181,16 +174,19 @@ export function Stage6QueueView({
   items,
   orders,
   onRefresh,
+  onFulfill,
 }:{
   connection:SmmConnectionState;
   items:readonly SmmWorkItem[];
   orders:readonly SmmOrderProjection[];
   onRefresh:()=>Promise<void>|void;
+  onFulfill:(input:{orderId:string;action:'ACCEPT'|'READY'})=>Promise<SmmCommandResult>;
 }){
   const [filter,setFilter]=useState<SmmStage6Filter>('ALL');
   const [selectedKey,setSelectedKey]=useState<string|null>(null);
   const [surface,setSurface]=useState<Stage6Surface>('LIST');
   const [refreshing,setRefreshing]=useState(false);
+  const [commandNotice,setCommandNotice]=useState('');
 
   const sorted=useMemo(()=>smmStage6Sort(items),[items]);
   const counts=useMemo(()=>smmStage6Counts(sorted),[sorted]);
@@ -209,6 +205,18 @@ export function Stage6QueueView({
     try{await Promise.resolve(onRefresh());setSurface('STATUS');}
     finally{setRefreshing(false)}
   };
+  const fulfill=async(action:'ACCEPT'|'READY')=>{
+    if(refreshing||!selected)return;
+    const orderId=String(selected.orderId||order?.orderId||'').trim();
+    if(!orderId){setCommandNotice('未能確認正式訂單，請重新整理。');return;}
+    setRefreshing(true);setCommandNotice('正在由 SMT 更新…');
+    try{
+      const result=await onFulfill({orderId,action});
+      setCommandNotice(result.state==='CONFIRMED'?'狀態已更新':result.state==='UNKNOWN'?'已送出，暫未收到確認':result.message);
+      await Promise.resolve(onRefresh());
+      if(result.state==='CONFIRMED')setSurface('DETAIL');
+    }finally{setRefreshing(false)}
+  };
 
   if(selected&&surface!=='LIST'){
     return <>
@@ -221,7 +229,8 @@ export function Stage6QueueView({
         onActions={()=>setSurface('ACTIONS')}
         onRefreshStatus={()=>void refreshStatus()}
       />
-      {surface==='ACTIONS'?<Stage6Actions onClose={()=>setSurface('DETAIL')}/>:null}
+      {commandNotice?<div className="stage6-command-notice" role="status">{commandNotice}</div>:null}
+      {surface==='ACTIONS'?<Stage6Actions item={selected} busy={refreshing} onClose={()=>setSurface('DETAIL')} onFulfill={action=>void fulfill(action)}/>:null}
     </>;
   }
 

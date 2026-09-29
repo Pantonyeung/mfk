@@ -63,20 +63,24 @@ test('Stage 6 6.1-6.5 visual family is explicit',()=>{
   assert.match(view,/stage6-empty\.webp/);
 });
 
-test('Stage 6 mutation-shaped actions are disabled and delegated to SMT',()=>{
+test('Stage 6 enables only ACCEPT and READY through the SMT runtime authority',()=>{
   for(const label of['開始製作','已完成 / 可取餐','延遲','需要協助','取消訂單'])assert.ok(view.includes(label),label);
-  assert.ok((view.match(/此操作需由 SMT 處理/g)||[]).length>=2);
-  assert.match(view,/button type="button" disabled aria-disabled="true"/);
-  assert.doesNotMatch(view,/onFulfillment|onCancelOrder|cancelOrder|fulfillmentCommand|setFulfillment|updateFulfillment/);
-  assert.doesNotMatch(types,/fulfillmentCommand|cancelOrder\?/);
+  assert.match(view,/onFulfill\('ACCEPT'\)/);
+  assert.match(view,/onFulfill\('READY'\)/);
+  assert.match(view,/status==='待處理'/);
+  assert.match(view,/status==='進行中'/);
+  assert.match(view,/\['延遲','需要協助','取消訂單'\]/);
+  assert.match(view,/請於 SMT 處理/);
+  assert.match(types,/fulfillOrder\?/);
+  assert.doesNotMatch(types,/cancelOrder\?/);
 });
 
-test('Stage 6 status update is refresh/readback-only and cannot originate mutation',()=>{
-  assert.match(view,/await Promise\.resolve\(onRefresh\(\)\);setSurface\('STATUS'\)/);
-  assert.match(view,/目前只顯示重新讀取結果/);
-  assert.match(view,/任何狀態變更都必須由 SMT 執行/);
-  assert.match(view,/重新讀取狀態/);
-  assert.doesNotMatch(view,/submitOrder\(|fetch\(|POST|PATCH|PUT|DELETE/);
+test('Stage 6 fulfillment always refreshes canonical readback after SMT command',()=>{
+  assert.match(view,/const result=await onFulfill/);
+  assert.match(view,/await Promise\.resolve\(onRefresh\(\)\)/);
+  assert.match(view,/正在由 SMT 更新/);
+  assert.match(view,/暫未收到確認/);
+  assert.doesNotMatch(view,/fetch\(|POST|PATCH|PUT|DELETE/);
 });
 
 test('Stage X Loading Empty Offline Stale Partial Unknown Error remain separated',()=>{

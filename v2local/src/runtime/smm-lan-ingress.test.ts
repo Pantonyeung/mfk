@@ -223,6 +223,30 @@ describe('SMM LAN ingress',()=>{
   });
 
 
+  it('links SMM ACCEPT and READY to canonical SMT fulfillment with readback',async()=>{
+    let state:'待處理'|'進行中'|'可取餐'='待處理';
+    const order=()=>({id:'F1',display:'P101',createdAt:'2026-09-29T06:00:00.000Z',totalMinor:4100,paymentLabel:'現金',fulfillmentLabel:state,sourceLabel:'SMM',items:[{id:'riceball',name:'原味飯團',qty:1,unitMinor:4100,serviceMode:'takeaway'}]});
+    const runtime:any={orders:()=>[order()],holds:()=>[],acceptOrder:vi.fn(async()=>{state='進行中'}),markOrderReady:vi.fn(async()=>{state='可取餐'})};
+    const ingress=createSmmLanIngress(runtime);
+    const accepted=await ingress.fulfill({protocolVersion:1,type:'smm.lan.fulfillment.v1',requestId:'R-F1',commandId:'C-F1',storeId:'MF01',orderId:'F1',action:'ACCEPT'},{deviceId:'SMM-1',trusted:true});
+    expect(accepted).toMatchObject({disposition:'APPLIED',canonicalState:'進行中'});
+    expect(runtime.acceptOrder).toHaveBeenCalledWith('F1');
+    const ready=await ingress.fulfill({protocolVersion:1,type:'smm.lan.fulfillment.v1',requestId:'R-F2',commandId:'C-F2',storeId:'MF01',orderId:'F1',action:'READY'},{deviceId:'SMM-1',trusted:true});
+    expect(ready).toMatchObject({disposition:'APPLIED',canonicalState:'可取餐'});
+    expect(runtime.markOrderReady).toHaveBeenCalledWith('F1');
+  });
+
+  it('fails closed for untrusted, invalid transition and dining fulfillment',async()=>{
+    const acceptOrder=vi.fn(),markOrderReady=vi.fn();
+    const base:any={id:'F2',display:'P102',createdAt:'2026-09-29T06:00:00.000Z',totalMinor:4100,paymentLabel:'現金',fulfillmentLabel:'待處理',sourceLabel:'SMM',items:[{id:'riceball',name:'原味飯團',qty:1,unitMinor:4100,serviceMode:'takeaway'}]};
+    const ingress=createSmmLanIngress({orders:()=>[base],holds:()=>[],acceptOrder,markOrderReady} as any);
+    expect(await ingress.fulfill({protocolVersion:1,type:'smm.lan.fulfillment.v1',requestId:'R-F3',commandId:'C-F3',storeId:'MF01',orderId:'F2',action:'ACCEPT'},{deviceId:'X',trusted:false})).toMatchObject({disposition:'REJECTED',reasonCode:'SMM_LAN_DEVICE_NOT_TRUSTED'});
+    expect(await ingress.fulfill({protocolVersion:1,type:'smm.lan.fulfillment.v1',requestId:'R-F4',commandId:'C-F4',storeId:'MF01',orderId:'F2',action:'READY'},{deviceId:'SMM-1',trusted:true})).toMatchObject({disposition:'REJECTED',reasonCode:'ORDER_NOT_READYABLE'});
+    const dining=createSmmLanIngress({orders:()=>[{...base,id:'D1',items:[{...base.items[0],serviceMode:'dine-in'}]}],holds:()=>[],acceptOrder,markOrderReady} as any);
+    expect(await dining.fulfill({protocolVersion:1,type:'smm.lan.fulfillment.v1',requestId:'R-F5',commandId:'C-F5',storeId:'MF01',orderId:'D1',action:'ACCEPT'},{deviceId:'SMM-1',trusted:true})).toMatchObject({disposition:'REJECTED',reasonCode:'DINING_FULFILLMENT_MANAGED_BY_DINING'});
+    expect(acceptOrder).not.toHaveBeenCalled();expect(markOrderReady).not.toHaveBeenCalled();
+  });
+
   it('rejects new assignment to an Admin-disabled table',()=>{
     const createOrder=vi.fn();
     const upsertSmmDiningHold=vi.fn();

@@ -82,6 +82,26 @@ export type SmmLanOrderResponse=
     reasonCode:string;
   }>;
 
+export interface SmmLanFulfillmentRequest{
+  readonly protocolVersion:1;
+  readonly type:'smm.lan.fulfillment.v1';
+  readonly requestId:string;
+  readonly commandId:string;
+  readonly storeId:'MF01';
+  readonly orderId:string;
+  readonly action:'ACCEPT'|'READY';
+}
+export type SmmLanFulfillmentResponse=Readonly<{
+  protocolVersion:1;
+  type:'smm.lan.fulfillment.result.v1';
+  requestId:string;
+  commandId:string;
+  orderId:string;
+  disposition:'APPLIED'|'IDEMPOTENT'|'REJECTED';
+  canonicalState?:'進行中'|'可取餐';
+  reasonCode?:string;
+}>;
+
 export interface SmmLanSubmissionReadbackRequest{
   readonly protocolVersion:1;
   readonly type:'smm.lan.order.readback.v1';
