@@ -956,9 +956,19 @@ export class AdminSyncStore{
         return{status:200,body:{state:'IDEMPOTENT',active:current}};
       }
     }
+    const previous=current??null;
     await this.state.storage.put('active',envelope);
     await this.state.storage.put('activeMeta',{revision:envelope.revision,fingerprint:envelope.fingerprint,publishedAt:envelope.publishedAt});
-    const doorbell=JSON.stringify({type:'ADMIN_CONFIG_AVAILABLE',storeId:envelope.storeId,revision:envelope.revision,fingerprint:envelope.fingerprint,publishedAt:envelope.publishedAt});
+    await this.state.storage.put('config:baseline:latest',envelope);
+    const changedDomains=Object.keys(envelope.snapshot||{}).filter(key=>JSON.stringify(previous?.snapshot?.[key])!==JSON.stringify(envelope.snapshot?.[key]));
+    const delta=Object.freeze({
+      schema:'MFK_CONFIG_SYNC_V2',kind:'DELTA',storeId:envelope.storeId,
+      fromRevision:previous?.revision??0,toRevision:envelope.revision,
+      changeId:crypto.randomUUID(),committedAt:new Date().toISOString(),
+      changedDomains,changes:Object.fromEntries(changedDomains.map(key=>[key,envelope.snapshot[key]])),
+    });
+    await this.state.storage.put('config:delta:'+envelope.revision,delta);
+    const doorbell=JSON.stringify({schema:'MFK_CONFIG_SYNC_V2',type:'CONFIG_INVALIDATED',storeId:envelope.storeId,revision:envelope.revision,changeId:delta.changeId,changedDomains});
     for(const socket of this.state.getWebSockets()){try{socket.send(doorbell);}catch{}}
     return{status:200,body:{state:'PUBLISHED',active:{revision:envelope.revision,fingerprint:envelope.fingerprint,publishedAt:envelope.publishedAt}}};
   }
@@ -1542,6 +1552,16 @@ export class AdminSyncStore{
         try{socket.send(message);}catch{}
       }
       return json({state:'DOORBELL_SENT'});
+    }
+    if(url.pathname==='/config-v2/baseline'&&request.method==='GET'){
+      const baseline=await this.state.storage.get('config:baseline:latest')||await this.state.storage.get('active');
+      return baseline?json(baseline):json({code:'ADMIN_CONFIG_NOT_PUBLISHED'},404);
+    }
+    if(url.pathname==='/config-v2/delta'&&request.method==='GET'){
+      const revision=Number(url.searchParams.get('revision'));
+      if(!Number.isSafeInteger(revision)||revision<1)return json({code:'CONFIG_DELTA_REVISION_REQUIRED'},400);
+      const delta=await this.state.storage.get('config:delta:'+revision);
+      return delta?json(delta):json({code:'CONFIG_DELTA_NOT_FOUND',revision},404);
     }
     if(url.pathname==='/active'){
       const active=await this.state.storage.get('active');
