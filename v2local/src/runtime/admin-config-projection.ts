@@ -101,7 +101,8 @@ function snapshotOf(envelope?:MfkAdminConfigEnvelope|null){
   return record((envelope??readSmtAdminConfigLkg())?.snapshot);
 }
 function runtimeSellable(nodeId:string){
-  return localRuntime.runtimeAvailabilityStatus?.(nodeId)!=='soldout'&&localRuntime.runtimeAvailabilityStatus?.(nodeId)!=='paused';
+  const status=localRuntime.runtimeAvailabilityStatus?.(nodeId)??'available';
+  return status!=='soldout'&&status!=='paused';
 }
 
 export function projectSyncedOrderingCatalog(
