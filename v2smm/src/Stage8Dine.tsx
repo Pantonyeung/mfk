@@ -55,7 +55,7 @@ export function Stage8DineView({connection,sessions,tables,onStartOrder,onStartW
     const completed=/CLOSE|COMPLETE/i.test(String(s.state));
     return <section className="stage8-page stage8-subscreen" data-stage8-visual="8.5_CLEAR_REVIEW">
       <header className="stage8-subheader"><button onClick={()=>setSurface('DETAIL')} aria-label="返回餐枱詳情">‹</button><div><strong>清枱前檢查</strong><small>{selected.label}</small></div><span/></header>
-      <div className="stage8-clear-art" data-final-art-pending="STAGE8_CLEAR_ILLUSTRATION" aria-hidden="true"/>
+      <div className="stage8-clear-art" aria-hidden="true"><Stage8ActionIcon slot="STAGE8_CLEAR_ICON"/></div>
       <div className="stage8-clear-copy"><h2>確認餐枱可以交回使用？</h2><p>以下資料只作核對。清枱操作目前仍要喺收銀機完成。</p></div>
       <div className="stage8-checklist"><Check ok={completed} label="訂單已完成"/><Check ok={paid} label="款項已處理"/><Check ok={itemClear} label="沒有未處理項目"/><Check ok={false} label="餐枱可重新使用" pending="完成清枱後確認"/></div>
       <footer className="stage8-footer"><button onClick={()=>setSurface('DETAIL')}>返回</button><button className="stage8-primary" disabled>確認清枱</button><small>手機暫未開放清枱操作</small></footer>
@@ -83,6 +83,13 @@ export function Stage8DineView({connection,sessions,tables,onStartOrder,onStartW
   </section>;
 }
 
+function Stage8ActionIcon({slot}:{slot:string}){
+  const common={viewBox:'0 0 24 24',fill:'none',stroke:'currentColor',strokeWidth:1.8,strokeLinecap:'round' as const,strokeLinejoin:'round' as const};
+  if(slot==='STAGE8_ADD_ORDER_ICON')return <svg {...common}><path d="M5 4h10v16H5zM8 8h4M8 12h4"/><path d="M18 10v8M14 14h8"/></svg>;
+  if(slot==='STAGE8_CHECKOUT_ICON')return <svg {...common}><path d="M6 3h12v18l-2-1.5L14 21l-2-1.5L10 21l-2-1.5L6 21z"/><path d="M9 8h6M9 12h6"/></svg>;
+  return <svg {...common}><path d="M14 3l-2 8M10 11l-5 8M12 11l5 8M7 16h8"/></svg>;
+}
+
 function Stepper({value,setValue}:{value:number;setValue:(value:number)=>void}){return <div className="stage8-stepper"><button onClick={()=>setValue(Math.max(1,value-1))}>−</button><b>{value} 位</b><button onClick={()=>setValue(Math.min(30,value+1))}>＋</button></div>}
 function Check({ok,label,pending}:{ok:boolean;label:string;pending?:string}){return <div className={ok?'ok':'pending'}><span/><strong>{label}</strong><small>{ok?'已符合':pending||'待確認'}</small></div>}
-function ActionSlot({name,note,slot,disabled,onClick}:{name:string;note:string;slot:string;disabled?:boolean;onClick?:()=>void}){return <button type="button" className="stage8-action-card" disabled={disabled} onClick={onClick}><span className="stage8-action-slot" data-final-art-pending={slot} aria-hidden="true"/><strong>{name}</strong><small>{note}</small></button>}
+function ActionSlot({name,note,slot,disabled,onClick}:{name:string;note:string;slot:string;disabled?:boolean;onClick?:()=>void}){return <button type="button" className="stage8-action-card" disabled={disabled} onClick={onClick}><span className="stage8-action-slot" aria-hidden="true"><Stage8ActionIcon slot={slot}/></span><strong>{name}</strong><small>{note}</small></button>}
