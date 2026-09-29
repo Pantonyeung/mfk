@@ -2111,8 +2111,7 @@ export const localRuntime:MfkLocalRuntime=Object.freeze({
       tables:(()=>{
         const registry=readSmtDiningTableRegistry();
         const active=registry.filter(table=>table.active);
-        const fallback=Array.from({length:9},(_,index)=>({id:'T'+String(index+1).padStart(2,'0'),name:String(index+1)+' 號枱',active:true,sortOrder:index+1}));
-        const visibleBase=registry.length?active:fallback;
+        const visibleBase=active;
         const byId=new Map(registry.map(table=>[table.id,table]));
         const orphanOccupied=activeHolds
           .flatMap(hold=>diningAssignedTables(hold))
