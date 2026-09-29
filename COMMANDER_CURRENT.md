@@ -62,6 +62,8 @@ Every Candidate branch merge-base:
 - Candidate 03 focused: Admin 8/8 + v2local cross-port 4/4; full v2admin 212/212; serialized v2local 402/402 excluding exact-base CRLF red; build PASS.
 - Candidate 04 focused: 8/8; serialized v2local excluding exact-base CRLF red: 403/403; build PASS.
 - Exact-base pre-existing red: smt-owner-print-recovery-a2.test.ts uses an LF-only source assertion under Windows CRLF.
+- GitHub Actions repository checks are green on all four code Candidates.
+- Cloudflare Workers Builds currently reports zero-second mfk-customer and mfk-owner failures on all four Draft PRs, without annotations or deployed version IDs. This is an unresolved external PR-build check; resolve it during tomorrow preflight and do not treat it as deploy GREEN.
 - No Builder, deploy, package, device, provider or physical acceptance is claimed.
 
 ## 5. Classification summary

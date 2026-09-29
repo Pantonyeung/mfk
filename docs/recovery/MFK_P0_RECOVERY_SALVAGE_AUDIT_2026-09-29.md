@@ -201,6 +201,13 @@ Known exact-base test issue:
 
 Build warnings about chunks over 500 kB are existing advisory warnings, not build failures.
 
+Current remote check boundary:
+
+- GitHub Actions repository checks are green on all four code Candidates.
+- Cloudflare Workers Builds reports zero-second `mfk-customer` and `mfk-owner` failures on all four Draft PRs, with no annotations or deployed version IDs exposed by the GitHub checks.
+- The failure is therefore recorded as an unresolved external PR-build check, not as Candidate source-test evidence and not as deploy GREEN.
+- Do not rerun or bypass it tonight. Tomorrow's preflight must obtain the Cloudflare failure detail or a clean required check before any merge.
+
 ## 8. Tomorrow release order: lowest to highest blast radius
 
 ### Preflight for every Candidate

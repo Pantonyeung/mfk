@@ -22,6 +22,8 @@ Verification:
 - Full Admin suite passed 212/212; Candidate 03 cross-port focused test passed 4/4.
 - Serialized v2local suites passed 403/403, 402/402 and 403/403 after excluding one exact-base Windows CRLF-only static assertion.
 - All four production builds passed.
+- GitHub Actions repository checks are green on all four code Candidates.
+- Cloudflare Workers Builds currently reports zero-second mfk-customer and mfk-owner failures on all four Draft PRs, with no annotations or deployed version IDs. Treat this as unresolved external preflight, not deploy GREEN.
 - No deploy, device, provider or physical GREEN is claimed.
 
 Not salvaged:
