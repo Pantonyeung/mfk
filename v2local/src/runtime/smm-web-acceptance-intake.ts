@@ -1,9 +1,10 @@
-import type {SmmLanOrderRequest,SmmLanOrderResponse} from '../../../contracts/smm-lan-v1.ts';
+import type {SmmLanOrderRequest,SmmLanOrderResponse,SmmLanFulfillmentCommandRequest,SmmLanFulfillmentCommandResponse} from '../../../contracts/smm-lan-v1.ts';
 
 export interface SmmWebAcceptanceIngress{
   submit(input:SmmLanOrderRequest,context:{deviceId:string;trusted:boolean}):SmmLanOrderResponse;
   readSnapshot():unknown;
   readDiningOccupancy?(tableId:string):unknown;
+  commandFulfillment?(input:SmmLanFulfillmentCommandRequest,context:{deviceId:string;trusted:boolean}):Promise<SmmLanFulfillmentCommandResponse>;
 }
 
 async function getPending(){
@@ -35,6 +36,18 @@ async function ack(request:SmmLanOrderRequest,result:SmmLanOrderResponse){
     if(attempt<2)await wait(250);
   }
   throw new Error('SMM_WEB_ACCEPTANCE_ACK_HTTP_'+lastStatus);
+}
+
+async function getPendingOperations(){
+  const response=await fetch('/__mfk/smm-operations/pending',{cache:'no-store',headers:{accept:'application/json'}});
+  if(!response.ok)throw new Error('SMM_OPERATION_PENDING_HTTP_'+response.status);
+  const body=await response.json().catch(()=>({})) as Record<string,unknown>;
+  return Array.isArray(body.commands)?body.commands:[];
+}
+
+async function ackOperation(commandId:string,result:SmmLanFulfillmentCommandResponse){
+  const response=await fetch('/__mfk/smm-operations/ack',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({commandId,result})});
+  if(!response.ok)throw new Error('SMM_OPERATION_ACK_HTTP_'+response.status);
 }
 
 async function publishProjection(snapshot:unknown){
@@ -81,6 +94,18 @@ export async function reconcileSmmWebAcceptanceIntake(ingress:SmmWebAcceptanceIn
         });
       }
       await ack(request,result);
+    }
+    if(ingress.commandFulfillment){
+      const commands=await getPendingOperations();
+      for(const raw of commands){
+        if(!raw||typeof raw!=='object'||Array.isArray(raw))continue;
+        const command=raw as SmmLanFulfillmentCommandRequest;
+        if(command.protocolVersion!==1||command.type!=='smm.operation.command.v1'||command.kind!=='FULFILLMENT')continue;
+        let result:SmmLanFulfillmentCommandResponse;
+        try{result=await ingress.commandFulfillment(command,{deviceId:'WEB-ACCEPTANCE',trusted:true});}
+        catch(error){result=Object.freeze({protocolVersion:1,type:'smm.operation.result.v1',requestId:String(command.requestId||''),commandId:String(command.commandId||''),kind:'FULFILLMENT',targetId:String(command.targetId||''),disposition:'REJECTED',reasonCode:error instanceof Error?error.message:'SMM_OPERATION_EXECUTION_FAILED'});}
+        await ackOperation(command.commandId,result);
+      }
     }
     await publishProjection(ingress.readSnapshot());
     if(ingress.readDiningOccupancy){
