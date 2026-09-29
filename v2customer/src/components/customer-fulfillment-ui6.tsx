@@ -119,7 +119,7 @@ function ReadbackPending({
   const meta=EMPTY_META[state];
   return <section className={"page ui6-tracking ui6-readback-pending state-"+state.toLowerCase()} data-ui6-state={state}>
     <header className="ui6-hero">
-      <img className="ui6-brand-art-slot" src={CUSTOMER_FINAL_SOURCE.maleIpSheet.url} alt="" aria-hidden="true" data-source-asset={CUSTOMER_FINAL_SOURCE.maleIpSheet.sourceFile}/>
+      <div className="ui6-brand-art-slot source-ip-crop source-ip-female" style={{backgroundImage:`url(${CUSTOMER_FINAL_SOURCE.femaleIpSheet.url})`}} aria-hidden="true" data-source-asset={CUSTOMER_FINAL_SOURCE.femaleIpSheet.sourceFile}/>
       <span>{meta.eyebrow}</span>
       <h1>{meta.title}</h1>
       <p>{meta.detail}</p>
@@ -196,7 +196,7 @@ export function StoreFulfillmentUi6View({
     </section>:null}
 
     <header className="ui6-hero">
-      <img className="ui6-brand-art-slot" src={CUSTOMER_FINAL_SOURCE.maleIpSheet.url} alt="" aria-hidden="true" data-source-asset={CUSTOMER_FINAL_SOURCE.maleIpSheet.sourceFile}/>
+      <div className="ui6-brand-art-slot source-ip-crop source-ip-female" style={{backgroundImage:`url(${CUSTOMER_FINAL_SOURCE.femaleIpSheet.url})`}} aria-hidden="true" data-source-asset={CUSTOMER_FINAL_SOURCE.femaleIpSheet.sourceFile}/>
       <span>{meta.eyebrow}</span>
       <h1>{meta.title}</h1>
       <p>{meta.detail}</p>
