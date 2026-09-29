@@ -132,20 +132,18 @@ describe('Admin UI recomposition',()=>{
     expect(capacity).not.toContain('第三方平台停售門檻');
   });
 
-  it('only reports SMT success for a matching revision and fingerprint readback',()=>{
+  it('treats Admin formal publish as authority and reports SMT readback without revision matching',()=>{
     const activeRelease={version:12,createdAt:'2026-09-22T00:00:00.000Z',fingerprint:'fp-12'};
     const published={state:'PUBLISHED' as const,revision:12,fingerprint:'fp-12',updatedAt:'2026-09-22T00:00:01.000Z'};
-    const mismatched=deriveAdminSyncPresentation({
+    const view=deriveAdminSyncPresentation({
       activeRelease,status:published,online:true,
       acks:[{revision:11,fingerprint:'fp-11',deviceId:'SMT-01',appliedAt:'2026-09-22T00:00:02.000Z'}],
     });
-    expect(mismatched.tone).toBe('warning');
-    expect(mismatched.detail).toContain('等待 matching SMT 回讀');
-
-    const matched=deriveAdminSyncPresentation({
-      activeRelease,status:published,online:true,
-      acks:[{revision:12,fingerprint:'fp-12',deviceId:'SMT-01',appliedAt:'2026-09-22T00:00:02.000Z'}],
-    });
-    expect(matched).toEqual({tone:'success',title:'R12',detail:'SMT 已套用 · SMT-01'});
+    expect(view.tone).toBe('success');
+    expect(view.title).toBe('已正式發佈');
+    expect(view.detail).toContain('SMT 最近回讀');
+    expect(view.detail).not.toContain('matching');
+    expect(view.detail).not.toContain('R11');
+    expect(view.detail).not.toContain('R12');
   });
 });
