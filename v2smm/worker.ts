@@ -425,42 +425,42 @@ export class SmmIntentStore{
       return json({state:'ACKED',submissionId});
     }
 
-    if(url.pathname==='/commands/fulfillment/create'&&request.method==='POST'){
+    if(url.pathname==='/commands/operation/create'&&request.method==='POST'){
       const body=record(await request.json());
-      const requestId=text(body.requestId,180),commandId=text(body.commandId,180),orderId=text(body.orderId,180),staffId=text(body.staffId,120);
-      const action=text(body.action,20);
-      if(!requestId||!commandId||!orderId||!staffId||!['ACCEPT','READY'].includes(action))return json({code:'SMM_FULFILLMENT_COMMAND_INVALID'},400);
-      const key='fulfillment-command:'+commandId;
-      const fingerprint=stable({requestId,commandId,orderId,staffId,action});
+      const requestId=text(body.requestId,180),commandId=text(body.commandId,180),targetId=text(body.targetId,180),staffId=text(body.staffId,120);
+      const kind=text(body.kind,30),operation=text(body.operation,40);
+      if(!requestId||!commandId||!targetId||!staffId||kind!=='FULFILLMENT'||!['ACCEPT','READY'].includes(operation))return json({code:'SMM_OPERATION_COMMAND_INVALID'},400);
+      const key='operation-command:'+commandId;
+      const fingerprint=stable({requestId,commandId,targetId,staffId,kind,operation,payload:record(body.payload)});
       const existing=await this.state.storage.get(key) as any;
       if(existing){
         if(existing.fingerprint!==fingerprint)return json({code:'SMM_FULFILLMENT_COMMAND_CONFLICT'},409);
         return json({state:existing.state,commandId},existing.state==='PENDING_SMT'?202:200);
       }
-      await this.state.storage.put(key,Object.freeze({requestId,commandId,orderId,staffId,action,fingerprint,state:'PENDING_SMT',receivedAt:new Date().toISOString()}));
+      await this.state.storage.put(key,Object.freeze({requestId,commandId,targetId,staffId,kind,operation,payload:record(body.payload),fingerprint,state:'PENDING_SMT',receivedAt:new Date().toISOString()}));
       return json({state:'PENDING_SMT',commandId},202);
     }
 
-    if(url.pathname==='/commands/fulfillment/readback'&&request.method==='GET'){
+    if(url.pathname==='/commands/operation/readback'&&request.method==='GET'){
       const commandId=text(url.searchParams.get('commandId'),180);
       if(!commandId)return json({code:'SMM_FULFILLMENT_COMMAND_ID_REQUIRED'},400);
-      const row=await this.state.storage.get('fulfillment-command:'+commandId) as any;
+      const row=await this.state.storage.get('operation-command:'+commandId) as any;
       if(!row)return json({state:'UNKNOWN',commandId},404);
       return json({state:row.state,commandId,result:row.result??null,resolvedAt:row.resolvedAt??null});
     }
 
-    if(url.pathname==='/commands/fulfillment/pending'&&request.method==='GET'){
-      const rows=await this.state.storage.list({prefix:'fulfillment-command:'});
-      const commands=[...rows.values()].filter((row:any)=>row?.state==='PENDING_SMT').sort((a:any,b:any)=>String(a.receivedAt||'').localeCompare(String(b.receivedAt||''))).slice(0,50).map((row:any)=>({requestId:row.requestId,commandId:row.commandId,orderId:row.orderId,staffId:row.staffId,action:row.action}));
+    if(url.pathname==='/commands/operation/pending'&&request.method==='GET'){
+      const rows=await this.state.storage.list({prefix:'operation-command:'});
+      const commands=[...rows.values()].filter((row:any)=>row?.state==='PENDING_SMT').sort((a:any,b:any)=>String(a.receivedAt||'').localeCompare(String(b.receivedAt||''))).slice(0,50).map((row:any)=>({protocolVersion:1,type:'smm.operation.command.v1',requestId:row.requestId,commandId:row.commandId,storeId:'MF01',kind:row.kind,targetId:row.targetId,operation:row.operation,payload:row.payload,staffId:row.staffId}));
       return json({commands});
     }
 
-    if(url.pathname==='/commands/fulfillment/ack'&&request.method==='POST'){
+    if(url.pathname==='/commands/operation/ack'&&request.method==='POST'){
       const body=record(await request.json());
       const commandId=text(body.commandId,180);
       const result=record(body.result);
       if(!commandId)return json({code:'SMM_FULFILLMENT_COMMAND_ID_REQUIRED'},400);
-      const key='fulfillment-command:'+commandId;
+      const key='operation-command:'+commandId;
       const current=await this.state.storage.get(key) as any;
       if(!current)return json({code:'SMM_FULFILLMENT_COMMAND_NOT_FOUND'},404);
       if(current.state!=='PENDING_SMT')return json({state:'IDEMPOTENT',commandId});
@@ -855,32 +855,32 @@ export default{
       }));
     }
 
-    if(url.pathname==='/api/smm/commands/fulfillment'&&request.method==='POST'){
+    if(url.pathname==='/api/smm/commands/operation'&&request.method==='POST'){
       const storeId=text(url.searchParams.get('storeId'),40)||'MF01';
       if(storeId!=='MF01')return json({code:'SMM_STORE_INVALID'},400);
       const session=await readStaffSession(request,storeId,env);
       if(!session)return json({code:'SMM_SESSION_REQUIRED'},401);
       const body=record(await request.json());
       const id=env.SMM_INTENT_STORE.idFromName(storeId),stub=env.SMM_INTENT_STORE.get(id);
-      return stub.fetch(new Request('https://internal/commands/fulfillment/create',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({...body,staffId:String(session.staffId||'')})}));
+      return stub.fetch(new Request('https://internal/commands/operation/create',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({...body,staffId:String(session.staffId||'')})}));
     }
-    if(url.pathname==='/api/smm/commands/fulfillment/readback'&&request.method==='GET'){
+    if(url.pathname==='/api/smm/commands/operation/readback'&&request.method==='GET'){
       const storeId=text(url.searchParams.get('storeId'),40)||'MF01';
       const commandId=text(url.searchParams.get('commandId'),180);
       if(storeId!=='MF01'||!commandId)return json({code:'SMM_FULFILLMENT_READBACK_INVALID'},400);
       const session=await readStaffSession(request,storeId,env);
       if(!session)return json({code:'SMM_SESSION_REQUIRED'},401);
       const id=env.SMM_INTENT_STORE.idFromName(storeId),stub=env.SMM_INTENT_STORE.get(id);
-      const target=new URL('https://internal/commands/fulfillment/readback');target.searchParams.set('commandId',commandId);
+      const target=new URL('https://internal/commands/operation/readback');target.searchParams.set('commandId',commandId);
       return stub.fetch(new Request(target.toString(),{method:'GET'}));
     }
-    if(url.pathname==='/api/smm/smt/commands/fulfillment/pending'||url.pathname==='/api/smm/smt/commands/fulfillment/ack'){
+    if(url.pathname==='/api/smm/smt/commands/operation/pending'||url.pathname==='/api/smm/smt/commands/operation/ack'){
       const provided=text(request.headers.get('x-mfk-web-acceptance'),256),expected=String(env.WEB_SMT_ACCEPTANCE_TOKEN||'');
       if(!expected||provided!==expected)return json({code:'SMM_SMT_COMMAND_UNAUTHORIZED'},401);
       const storeId=text(url.searchParams.get('storeId'),40)||'MF01';
       const id=env.SMM_INTENT_STORE.idFromName(storeId),stub=env.SMM_INTENT_STORE.get(id);
-      if(url.pathname.endsWith('/pending'))return stub.fetch(new Request('https://internal/commands/fulfillment/pending',{method:'GET'}));
-      return stub.fetch(new Request('https://internal/commands/fulfillment/ack',{method:'POST',headers:{'content-type':'application/json'},body:await request.text()}));
+      if(url.pathname.endsWith('/pending'))return stub.fetch(new Request('https://internal/commands/operation/pending',{method:'GET'}));
+      return stub.fetch(new Request('https://internal/commands/operation/ack',{method:'POST',headers:{'content-type':'application/json'},body:await request.text()}));
     }
 
     if(url.pathname==='/api/smm/orders/submit'){
