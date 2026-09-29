@@ -1,4 +1,5 @@
 import {readAdminStored} from './admin-local-store.ts';
+import {readStoredAdminBrowserSession} from './admin-browser-session.ts';
 
 const PUBLISHER_KEY='sync-publisher-key.v1';
 
@@ -42,6 +43,8 @@ export interface KeetaLiveStatus{
 }
 
 function headers(){
+  const session=readStoredAdminBrowserSession();
+  if(session)return {'x-mfk-admin-session':session.sessionToken};
   const key=readAdminStored<string>(PUBLISHER_KEY,'');
   return key?{'x-mfk-admin-publish-key':key}:{};
 }
