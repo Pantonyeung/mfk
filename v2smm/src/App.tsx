@@ -184,7 +184,7 @@ export function App(){
     window.addEventListener('online',onOnline);
     window.addEventListener('pageshow',onPageShow);
     document.addEventListener('visibilitychange',onVisibility);
-    const timer=window.setInterval(()=>{if(document.visibilityState==='visible')void refresh();},2500);
+    const timer=window.setInterval(()=>{if(document.visibilityState==='visible')void refresh();},15000);
     return()=>{
       window.removeEventListener('online',onOnline);
       window.removeEventListener('pageshow',onPageShow);
