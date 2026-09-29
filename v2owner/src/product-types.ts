@@ -197,6 +197,7 @@ export interface OwnerChannelHealth {
   readonly freshness:'CURRENT'|'STALE'|'PARTIAL'|'UNKNOWN';
   readonly lastCommand?:OwnerChannelLastCommand;
   readonly readback:'CONFIRMED'|'PARTIAL'|'UNKNOWN';
+  readonly recentOrderDiagnostics?:readonly {readonly providerOrderId:string;readonly canonicalDisplay:string|null;readonly state:string;readonly mappingState:string;readonly ackState:string;readonly commercialState:string|null;readonly providerConfirmState:string|null;readonly providerReadyState:string|null;readonly receivedAt:string}[];
   readonly controls:Readonly<{
     pause:boolean;
     resume:boolean;
