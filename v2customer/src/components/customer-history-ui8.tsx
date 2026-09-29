@@ -135,7 +135,7 @@ function CopyIntent({
   return <section className="ui8-copy-intent">
     <button className="ui8-back" onClick={onBack}>返回歷史訂單</button>
     <header className="ui8-copy-hero">
-      <img className="ui8-brand-art-slot" src={(variant==='male'?CUSTOMER_FINAL_SOURCE.maleIpSheet:CUSTOMER_FINAL_SOURCE.femaleIpSheet).url} alt="" aria-hidden="true" data-character-slot={variant} data-source-asset={(variant==='male'?CUSTOMER_FINAL_SOURCE.maleIpSheet:CUSTOMER_FINAL_SOURCE.femaleIpSheet).sourceFile}/>
+      <div className={`ui8-brand-art-slot source-ip-crop source-ip-${variant}`} style={{backgroundImage:`url(${(variant==='male'?CUSTOMER_FINAL_SOURCE.maleIpSheet:CUSTOMER_FINAL_SOURCE.femaleIpSheet).url})`}} aria-hidden="true" data-character-slot={variant} data-source-asset={(variant==='male'?CUSTOMER_FINAL_SOURCE.maleIpSheet:CUSTOMER_FINAL_SOURCE.femaleIpSheet).sourceFile}/>
       <span>再來一單</span><h1>正在建立新購物車</h1>
       <p>會按你上次嘅選擇建立一個新記憶罐，舊訂單保持不變。</p>
     </header>
