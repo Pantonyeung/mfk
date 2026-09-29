@@ -1,7 +1,7 @@
 MFK_CUSTOMER_DEPLOY_REQUEST
 target=mfk-customer
 canonical_url=https://order.morefunos.com
-product_source=d2d59e448058bd8ecbe0fc5a2d7599f7809baa6c
+product_source=cc7a11d0842d8179de4a945095151e2f9d466047
 requested_by=owner
-reason=publish_customer_ui0_r2_opening_video
-work_id=MFK-CUSTOMER-UI0-R2-VIDEO-R1
+reason=publish_customer_ui1_five_state_home_skeleton
+work_id=MFK-CUSTOMER-UI1-FIVE-STATE-SKELETON-R1
