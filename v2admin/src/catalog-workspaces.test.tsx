@@ -98,15 +98,16 @@ describe('MFK Admin complete catalog product',()=>{
     }
   });
 
-  it('uses Save as the one catalog version boundary and retires publish workflow copy',()=>{
+  it('keeps local save history separate from formal Admin publish authority',()=>{
     const products=renderToStaticMarkup(<MemoryRouter initialEntries={['/admin/catalog/products']}><MfkAdminApp/></MemoryRouter>);
     expect(products).toContain('保存');
     expect(products).not.toContain('已自動保存草稿');
     expect(products).not.toContain('有待發布變更');
 
     const history=renderToStaticMarkup(<MemoryRouter initialEntries={['/admin/publish']}><MfkAdminApp/></MemoryRouter>);
-    expect(history).toContain('設定版本歷史');
-    expect(history).toContain('保存');
+    expect(history).toContain('本機保存歷史');
+    expect(history).toContain('唔代表正式 Authority');
+    expect(history).toContain('Cloud canonical commit');
     expect(history).not.toContain('待發布變更');
     expect(history).not.toContain('確認影響範圍');
     expect(history).not.toContain('建立新設定版本');
