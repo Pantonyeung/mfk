@@ -98,6 +98,11 @@ export function ChannelHealthPage({
           {selected.lastCommand?<p className="channel-last-action">最近操作：{commandLabel(selected.lastCommand.action)} · {commandStateLabel(selected.lastCommand.state)}</p>:null}
         </section>
 
+        {selected.channelId==='KEETA'?<section className="channel-detail-section">
+          <h3>最近 Keeta 訂單追蹤</h3>
+          {selected.recentOrderDiagnostics?.length?<div className="channel-detail-grid">{selected.recentOrderDiagnostics.map(item=><div key={item.providerOrderId}><span>{item.canonicalDisplay||'待 SMT'} · {item.providerOrderId}</span><strong>{item.state}</strong><small>Mapping {item.mappingState} · ACK {item.ackState} · 對帳 {item.commercialState??'未有'} · Confirm {item.providerConfirmState??'未執行'} · Ready {item.providerReadyState??'未執行'}</small></div>)}</div>:<p className="unsupported-note">未有 Keeta 訂單追蹤資料。</p>}
+        </section>:null}
+
         <section className="channel-detail-section">
           <h3>渠道控制</h3>
           <div className="channel-actions">
