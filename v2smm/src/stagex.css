@@ -17,21 +17,11 @@
   width:48px;
   height:48px;
   border-radius:15px;
-  border:1px dashed color-mix(in srgb,var(--stagex-accent) 42%,#fff);
-  background:linear-gradient(145deg,rgba(255,255,255,.8),rgba(255,255,255,.28));
-  position:relative;
+  border:0;
+  background:transparent;
+  overflow:hidden;
 }
-.stagex-art-slot::after{
-  content:"";
-  position:absolute;
-  width:12px;
-  height:12px;
-  border-radius:999px;
-  inset:0;
-  margin:auto;
-  background:var(--stagex-accent);
-  opacity:.72;
-}
+.stagex-art-slot img{width:100%;height:100%;object-fit:contain;display:block}
 .stagex-copy{display:grid;gap:4px;min-width:0}
 .stagex-copy>strong{font-size:15px;line-height:20px;color:#163568}
 .stagex-copy>p{margin:0;color:#67738a;font-size:13px;line-height:19px}
@@ -58,12 +48,6 @@
 .stagex-partial{--stagex-accent:#377cf6;--stagex-bg:#eef5ff;--stagex-border:#c8dbfb}
 .stagex-unknown{--stagex-accent:#8552d7;--stagex-bg:#f1ecfb;--stagex-border:#d7c8f0}
 .stagex-error{--stagex-accent:#ea4b5a;--stagex-bg:#fdebed;--stagex-border:#f4c3ca}
-.stagex-loading .stagex-art-slot::after{
-  background:transparent;
-  border:3px solid rgba(55,124,246,.22);
-  border-top-color:#377cf6;
-  animation:stagex-spin .85s linear infinite;
-}
 .stagex-compact{
   grid-template-columns:34px minmax(0,1fr);
   padding:10px 12px;
@@ -76,17 +60,13 @@
   height:34px;
   border-radius:11px;
 }
-.stagex-compact .stagex-art-slot::after{width:9px;height:9px}
 .stagex-compact .stagex-copy>strong{font-size:13px;line-height:18px}
 .stagex-compact .stagex-copy>p{font-size:11px;line-height:16px}
 .stagex-compact .stagex-actions{grid-column:2;justify-content:flex-start}
 .stagex-compact .stagex-actions button{min-height:40px}
-@keyframes stagex-spin{to{transform:rotate(360deg)}}
 @media(max-width:360px){
   .stagex-state:not(.stagex-compact){grid-template-columns:42px minmax(0,1fr);padding:13px}
   .stagex-state:not(.stagex-compact) .stagex-art-slot{width:42px;height:42px;border-radius:13px}
   .stagex-actions{display:grid;grid-template-columns:1fr}
 }
-@media(prefers-reduced-motion:reduce){
-  .stagex-loading .stagex-art-slot::after{animation:none;border-top-color:rgba(55,124,246,.22);background:#377cf6}
-}
+@media(prefers-reduced-motion:reduce){}
