@@ -4,7 +4,7 @@ import {projectSyncedCombos,projectSyncedOrderingCatalog} from './admin-config-p
 import {revalidateSmmComboLine} from './smm-combo-revalidation.ts';
 import {readSmtAdminConfigLkg} from './admin-config-sync.ts';
 import {readSmtDiningTableRegistry,readSmtStoreSettings} from './admin-operational-config.ts';
-import type {SmmLanOrderRequest,SmmLanOrderResponse,SmmLanSubmissionReadbackResponse} from '../../../contracts/smm-lan-v1.ts';
+import type {SmmLanOrderRequest,SmmLanOrderResponse,SmmLanSubmissionReadbackResponse,SmmLanFulfillmentCommandRequest,SmmLanFulfillmentCommandResponse} from '../../../contracts/smm-lan-v1.ts';
 
 const RESULT_KEY='mfk.v2local.smm-lan-results.v1';
 
@@ -336,6 +336,28 @@ export function createSmmLanIngress(runtime:MfkLocalRuntime){
       });
       writeResults([...results(),{submissionId:input.submissionId,orderId:order.id,displayCode:order.display,canonicalRevision,idempotencyKey:input.idempotencyKey,requestId:input.requestId}]);
       return Object.freeze({protocolVersion:1,type:'smm.lan.order.result.v1',requestId:input.requestId,submissionId:input.submissionId,idempotencyKey:input.idempotencyKey,disposition:'ACCEPTED',orderId:order.id,displayCode:order.display,canonicalRevision});
+    },
+    async commandFulfillment(input:SmmLanFulfillmentCommandRequest,context:{deviceId:string;trusted:boolean}):Promise<SmmLanFulfillmentCommandResponse>{
+      const reject=(reasonCode:string):SmmLanFulfillmentCommandResponse=>Object.freeze({protocolVersion:1,type:'smm.lan.fulfillment.result.v1',requestId:input.requestId,commandId:input.commandId,orderId:input.orderId,disposition:'REJECTED',reasonCode});
+      if(input.protocolVersion!==1||input.type!=='smm.lan.fulfillment.command.v1')return reject('SMM_FULFILLMENT_PROTOCOL_INVALID');
+      if(input.storeId!=='MF01')return reject('SMM_LAN_STORE_MISMATCH');
+      if(!context.trusted||!String(context.deviceId||'').trim())return reject('SMM_LAN_DEVICE_NOT_TRUSTED');
+      const before=runtime.orders().find(order=>order.id===input.orderId);
+      if(!before)return reject('ORDER_NOT_FOUND');
+      if(before.diningHoldId||before.items.every(item=>item.serviceMode==='dine-in'))return reject('DINING_FULFILLMENT_MANAGED_BY_DINING');
+      if(input.action==='ACCEPT'){
+        if(before.fulfillmentLabel==='進行中')return Object.freeze({protocolVersion:1,type:'smm.lan.fulfillment.result.v1',requestId:input.requestId,commandId:input.commandId,orderId:input.orderId,disposition:'IDEMPOTENT',canonicalState:'進行中'});
+        if(before.fulfillmentLabel!=='待處理')return reject('ORDER_NOT_ACCEPTABLE');
+        await runtime.acceptOrder(input.orderId);
+      }else if(input.action==='READY'){
+        if(before.fulfillmentLabel==='可取餐')return Object.freeze({protocolVersion:1,type:'smm.lan.fulfillment.result.v1',requestId:input.requestId,commandId:input.commandId,orderId:input.orderId,disposition:'IDEMPOTENT',canonicalState:'可取餐'});
+        if(before.fulfillmentLabel!=='進行中')return reject('ORDER_NOT_READYABLE');
+        await runtime.markOrderReady(input.orderId);
+      }else return reject('SMM_FULFILLMENT_ACTION_INVALID');
+      const after=runtime.orders().find(order=>order.id===input.orderId);
+      const canonicalState=after?.fulfillmentLabel;
+      if(canonicalState!=='進行中'&&canonicalState!=='可取餐')return reject('SMM_FULFILLMENT_READBACK_INVALID');
+      return Object.freeze({protocolVersion:1,type:'smm.lan.fulfillment.result.v1',requestId:input.requestId,commandId:input.commandId,orderId:input.orderId,disposition:'APPLIED',canonicalState});
     },
     readSubmission(submissionId:string):SmmLanSubmissionReadbackResponse{
       const prior=results().find(row=>row.submissionId===submissionId);
