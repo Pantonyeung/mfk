@@ -103,6 +103,29 @@ describe('Keeta → SMT canonical local intake',()=>{
     expect(translated.totalMinor).toBe(15000);
   });
 
+  it('breaks one Keeta package into multiple canonical production items while keeping one provider transaction amount',()=>{
+    applyAdminConfigEnvelope(createMfkAdminConfigEnvelope({
+      storeId:'MF01',revision:3,publishedAt:'2026-09-23T00:03:00.000Z',adminFingerprint:'fnv1a32:package',
+      snapshot:{
+        catalog:{categories:[{id:'cat',name:'主食',position:10,active:true}],products:[
+          {id:'a',name:'餐 A',productCode:'A',categoryId:'cat',active:true,basePrice:'50.00',takeawayAdjustment:'0',modifierGroupIds:[]},
+          {id:'b',name:'餐 B',productCode:'B',categoryId:'cat',active:true,basePrice:'45.00',takeawayAdjustment:'0',modifierGroupIds:[]},
+        ],modifierGroups:[],combos:[],comboPools:[]},
+        channelMappings:{keeta:[{mappingId:'keeta:2P',enabled:true,skuOpenItemCode:'2P',channelName:'二人餐',components:[{canonicalProductId:'a',quantity:1},{canonicalProductId:'b',quantity:1}],optionMappings:[]}]},
+      },
+    }));
+    const packageIntent={...intent(),rawMessage:JSON.stringify({orderInfo:{
+      baseOrder:{orderViewIdStr:'998',currency:'HKD'},merchantOrder:{orderViewIdStr:'998',seqNoStr:'K998'},
+      products:[{id:9,skuId:99,spuId:88,skuOpenItemCode:'2P',spuOpenItemCode:'SPU-2P',name:'Keeta 二人餐',count:1,currency:'HKD',priceWithGroup:{originUnitPrice:8000,unitPrice:8000,originAmount:8000,amount:8000},groups:[]}],
+      feeDtls:[{code:'productPrice',currency:'HKD',price:8000}],orderPromotionDtlList:[],
+    }})};
+    const translated=translateKeetaIntentToLocalOrder(packageIntent);
+    expect(translated.items.map(item=>({id:item.id,qty:item.qty,unitMinor:item.unitMinor}))).toEqual([{id:'a',qty:1,unitMinor:5000},{id:'b',qty:1,unitMinor:4500}]);
+    expect(translated.referenceValueMinor).toBe(9500);
+    expect(translated.effectiveTransactionMinor).toBe(8000);
+    expect(translated.totalMinor).toBe(8000);
+  });
+
   it('commits the same providerRef exactly once through the existing localRuntime order authority',()=>{
     const translated=translateKeetaIntentToLocalOrder(intent());
     const first=localRuntime.createOrder(translated);
