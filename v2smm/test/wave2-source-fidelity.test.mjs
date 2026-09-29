@@ -44,27 +44,26 @@ test('Stage X exposes seven distinct source states and UNKNOWN remains readback-
   for(const state of['LOADING','EMPTY','OFFLINE','STALE','PARTIAL','UNKNOWN','ERROR'])assert.match(stageX,new RegExp(state));
   assert.match(stageX,/先確認原本結果，請勿重複執行同一操作/);
   assert.match(stageX,/重新確認結果/);
-  assert.match(stageX,/data-final-art-pending/);
+  assert.match(stageX,/STAGE_X_ART/);
+  for(const asset of['loading.webp','empty.webp','offline.webp','stale.webp','partial.webp','unknown.webp','error.webp'])assert.match(stageX,new RegExp(asset.replace('.','\\.')));
   assert.match(cssX,/\.stagex-loading/);
   assert.match(cssX,/\.stagex-unknown/);
   assert.match(cssX,/\.stagex-error/);
 });
 
-test('Stage 7 remaining visual gap uses final-art source slots while phone search stays permission-gated',()=>{
-  assert.match(stage7,/data-final-art-pending=\{\`STAGE7_SOURCE_/);
+test('Stage 7 uses explicit source icons while phone search stays permission-gated',()=>{
+  assert.match(stage7,/Stage7SourceIcon/);
+  assert.doesNotMatch(stage7,/data-final-art-pending/);
   assert.match(stage7,/disabled=\{value==='PHONE'&&!phoneAvailable\}/);
   assert.match(stage7,/smmStage7Phone/);
   assert.doesNotMatch(stage7,/cancelOrder|updateFulfillment|setFulfillment|fulfillmentCommand/);
 });
 
-test('Wave2 final art is slot-only for Stage7/8/9/X',()=>{
-  for(const marker of[
-    'STAGE7_SOURCE_',
-    'STAGE8_CLEAR_ILLUSTRATION','STAGE8_ADD_ORDER_ICON','STAGE8_CHECKOUT_ICON','STAGE8_CLEAR_ICON',
-    'STAGE9_STAFF_ICON','STAGE9_CONNECTION_ICON','STAGE9_CHANNEL_ICON','STAGE9_BUSINESS_DAY_ICON',
-    'STAGE9_CAPACITY_ICON','STAGE9_REPORTING_ICON','STAGE9_REFUND_ICON','STAGE9_DEVICE_ICON','STAGE9_DIAGNOSTICS_ICON',
-    'STAGEX_',
-  ])assert.ok((stage7+stage8+stage9+stageX).includes(marker),marker);
+test('Wave2 final art has no generic placeholder slots in Stage7/8/9/X',()=>{
+  assert.match(stage7,/Stage7SourceIcon/);
+  assert.match(stage8,/Stage8ActionIcon/);
+  assert.match(stage9,/Stage9ToolIcon/);
+  for(const source of[stage7,stage8,stage9,stageX])assert.doesNotMatch(source,/data-final-art-pending/);
 });
 
 test('Wave2 responsive CSS keeps mobile geometry and reduced-motion support',()=>{

@@ -658,14 +658,7 @@
   border:1px solid #d9e3ef;
   background:#f3f6fb;
 }
-.stage7-source-art{
-  display:block;
-  width:26px;
-  height:26px;
-  border-radius:9px;
-  border:1px dashed rgba(22,53,104,.28);
-  background:rgba(255,255,255,.66);
-}
+.stage7-source-icon svg{width:26px;height:26px;display:block}
 .stage7-source-third_party{background:#fff5d9;border-color:#eed89c}
 .stage7-source-smm{background:#f2edff;border-color:#d8caf2}
 .stage7-source-own_platform{background:#eef4ff;border-color:#ceddf5}

@@ -2,6 +2,16 @@ import type {ReactNode} from 'react';
 
 export type SmmStageXKind='LOADING'|'EMPTY'|'OFFLINE'|'STALE'|'PARTIAL'|'UNKNOWN'|'ERROR';
 
+const STAGE_X_ART:Record<SmmStageXKind,string>={
+  LOADING:'/brand/stagex/loading.webp',
+  EMPTY:'/brand/stagex/empty.webp',
+  OFFLINE:'/brand/stagex/offline.webp',
+  STALE:'/brand/stagex/stale.webp',
+  PARTIAL:'/brand/stagex/partial.webp',
+  UNKNOWN:'/brand/stagex/unknown.webp',
+  ERROR:'/brand/stagex/error.webp',
+};
+
 const DEFAULT_COPY:Record<SmmStageXKind,{title:string;detail:string;action?:string}>={
   LOADING:{title:'載入中',detail:'正在準備最新資料，請稍候。'},
   EMPTY:{title:'暫時未有資料',detail:'有新內容時會喺呢度顯示。'},
@@ -41,11 +51,9 @@ export function StageXState({
     role={kind==='ERROR'||kind==='UNKNOWN'?'alert':'status'}
     aria-live={kind==='ERROR'||kind==='UNKNOWN'?'assertive':'polite'}
   >
-    <div
-      className="stagex-art-slot"
-      data-final-art-pending={`STAGEX_${kind}`}
-      aria-hidden="true"
-    />
+    <div className="stagex-art-slot" aria-hidden="true">
+      <img src={STAGE_X_ART[kind]} alt=""/>
+    </div>
     <div className="stagex-copy">
       <strong>{title??copy.title}</strong>
       <p>{detail??copy.detail}</p>

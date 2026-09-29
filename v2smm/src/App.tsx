@@ -1,4 +1,3 @@
-import {mfkVersionLabel} from '../../contracts/product-version-v1';
 import {useEffect,useMemo,useRef,useState} from 'react';
 import {readSmmLocalWorkspace,writeSmmLocalWorkspace,createSmmPendingIntent,type SmmLocalPreferences} from './persistence';
 import {resolveSmmRuntimePort} from './runtime';
@@ -185,7 +184,7 @@ export function App(){
     window.addEventListener('online',onOnline);
     window.addEventListener('pageshow',onPageShow);
     document.addEventListener('visibilitychange',onVisibility);
-    const timer=window.setInterval(()=>{if(document.visibilityState==='visible')void refresh();},15000);
+    const timer=window.setInterval(()=>{if(document.visibilityState==='visible')void refresh();},2500);
     return()=>{
       window.removeEventListener('online',onOnline);
       window.removeEventListener('pageshow',onPageShow);
@@ -761,7 +760,7 @@ export function App(){
         onProduct={product=>{setEditingLineId(null);setSelectedProduct(product);setSelections({});setSelectedVariationId(null);setComboEnabled(false);setComboSelections({})}}
         onCart={()=>{setCheckoutStage(false);setCartOpen(true)}}
       />:null}
-      {view==='work'?<Stage6QueueView connection={connection} items={snapshot?.work??[]} orders={snapshot?.orders??[]} onRefresh={refresh}/>:null}
+      {view==='work'?<Stage6QueueView connection={connection} items={snapshot?.work??[]} orders={snapshot?.orders??[]} onRefresh={refresh} onFulfill={async input=>{if(!port?.fulfillOrder)return Object.freeze({state:'NOT_CONNECTED' as const,message:'門店狀態更新未連接'});return port.fulfillOrder(input);}}/>:null}
       {view==='orders'?<Stage7OrdersView connection={connection} rows={snapshot?.orders??[]} onRefresh={refresh}/>:null}
       {view==='dine'?<Stage8DineView
         connection={connection}
@@ -1616,4 +1615,3 @@ function refundStateLabel(state:string){return state==='PENDING'?'待處理':sta
 function printStateLabel(state:string){return state==='READY'?'正常':state==='UNKNOWN'?'狀態未明':'需要留意'}
 
 function connectionLabelShort(state:SmmConnectionState){return state==='READY'?'已連接':state==='LOADING'?'同步中':state==='ERROR'?'錯誤':state==='STALE'?'資料稍舊':state==='PARTIAL'?'部分資料':state==='UNKNOWN'?'未知':'未連接'}
-export function SmmBuildIdentity(){const v=mfkVersionLabel('SMM');return <small data-mfk-build-identity="SMM">SMM · v{v.version} · {v.sourceSha.slice(0,12)}</small>}
