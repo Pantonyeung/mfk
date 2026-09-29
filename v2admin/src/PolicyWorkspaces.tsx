@@ -462,7 +462,8 @@ export function StaffWorkspace(){
 }
 
 interface ChannelConfig{enabled:boolean;autoAccept:boolean;syncSellability:boolean;commissionPct:string;displayName:string;lateCutoffMinutes:number}
-interface MappingRow{providerItemId:string;productId:string;optionGroupId?:string;status:'MAPPED'|'PENDING'|'IGNORED'}
+interface MappingComponent{canonicalProductId:string;quantity:number}
+interface MappingRow{providerItemId:string;channelName?:string;components:readonly MappingComponent[];optionGroupId?:string;status:'MAPPED'|'PENDING'|'IGNORED'}
 export function ChannelsWorkspace({mode}:{mode:'overview'|'mapping'|'failures'|'accept'|'sync'|'estimate'}){
   const {draft}=useAdminDraft();
   const [liveStatus,setLiveStatus]=useState<KeetaLiveStatus|null>(null);
@@ -633,8 +634,11 @@ export function ChannelsWorkspace({mode}:{mode:'overview'|'mapping'|'failures'|'
   const [mappings,setMappings]=usePersistentAdminState<MappingRow[]>('channel-mapping.keeta.v1',[]);
   const [providerItemId,setProviderItemId]=useState('');
   const [productId,setProductId]=useState('');
+  const [mappingComponents,setMappingComponents]=useState<MappingComponent[]>([]);
+  const [channelName,setChannelName]=useState('');
   const patch=(change:Partial<ChannelConfig>)=>setConfig(current=>{const after={...current,...change};appendAdminAudit({action:'修改平台設定',target:'Keeta',before:current,after});return after;});
-  const addMapping=()=>{if(!providerItemId.trim()||!productId)return;setMappings(rows=>{const row:MappingRow={providerItemId:providerItemId.trim(),productId,status:'MAPPED'};appendAdminAudit({action:'新增平台商品對應',target:row.providerItemId,after:row});return [...rows.filter(item=>item.providerItemId!==row.providerItemId),row];});setProviderItemId('');setProductId('');};
+  const addMappingComponent=()=>{if(!productId)return;setMappingComponents(rows=>[...rows,{canonicalProductId:productId,quantity:1}]);setProductId('');};
+  const addMapping=()=>{if(!providerItemId.trim()||!mappingComponents.length)return;setMappings(rows=>{const row:MappingRow={providerItemId:providerItemId.trim(),channelName:channelName.trim(),components:Object.freeze([...mappingComponents]),status:'MAPPED'};appendAdminAudit({action:'新增 Keeta 渠道商品對應',target:row.providerItemId,after:row});return [...rows.filter(item=>item.providerItemId!==row.providerItemId),row];});setProviderItemId('');setChannelName('');setMappingComponents([]);};
   const failures=mappings.filter(row=>row.status==='PENDING');
   const title=mode==='overview'?'平台管理':mode==='mapping'?'商品映射管理':mode==='failures'?'匹配失敗明細':mode==='accept'?'接單／自動接單':mode==='sync'?'售罄／供應同步':'實收估算設定';
   const description=mode==='overview'?'查看 Keeta 連線、授權、Webhook 同整體平台狀態。'
@@ -824,7 +828,7 @@ export function ChannelsWorkspace({mode}:{mode:'overview'|'mapping'|'failures'|'
       <article className="admin-policy-card"><h2>{mode==='failures'?'未完成對應':'商品對應'}</h2>
         {mode==='failures'
           ?(failures.length?<div>{failures.map(row=><p key={row.providerItemId}>{row.providerItemId} · 待處理</p>)}</div>:<div className="admin-read-empty">目前冇待處理映射。</div>)
-          :<><label><span>平台商品 ID</span><input value={providerItemId} onChange={event=>setProviderItemId(event.target.value)}/></label><label><span>磨飯商品</span><select value={productId} onChange={event=>setProductId(event.target.value)}><option value="">請選擇</option>{draft.products.map(product=><option key={product.id} value={product.id}>{product.name}</option>)}</select></label><button type="button" onClick={addMapping}>保存對應</button><div className="admin-readback-proof">{mappings.slice(0,20).map(row=><p key={row.providerItemId}><span>{row.providerItemId}</span><b>{draft.products.find(product=>product.id===row.productId)?.name??row.productId}</b></p>)}</div></>}
+          :<><div className="admin-callout compact">Keeta 商品 ID 只係渠道 Alias；右邊必須對應磨飯實際製作商品。二人餐／多人餐可以加入多個磨飯商品，廚房、Packing 同 Label 會使用呢個 Breakdown，而唔係用 Keeta 商品名代替製作內容。</div><label><span>Keeta 商品／SKU ID</span><input value={providerItemId} onChange={event=>setProviderItemId(event.target.value)} placeholder="例如 1234"/></label><label><span>Keeta 顯示名稱</span><input value={channelName} onChange={event=>setChannelName(event.target.value)} placeholder="例如 二人套餐"/></label><label><span>加入磨飯製作商品</span><select value={productId} onChange={event=>setProductId(event.target.value)}><option value="">請選擇</option>{draft.products.map(product=><option key={product.id} value={product.id}>{product.name}</option>)}</select></label><button type="button" className="secondary" disabled={!productId} onClick={addMappingComponent}>加入製作內容</button>{mappingComponents.length?<div className="admin-readback-proof">{mappingComponents.map((component,index)=><p key={index}><span>#{index+1}</span><b>{draft.products.find(product=>product.id===component.canonicalProductId)?.name??component.canonicalProductId} × {component.quantity}</b></p>)}</div>:<div className="admin-read-empty">未加入磨飯製作商品。</div>}<button type="button" disabled={!providerItemId.trim()||!mappingComponents.length} onClick={addMapping}>保存 Keeta 對應</button><div className="admin-readback-proof">{mappings.slice(0,20).map(row=><p key={row.providerItemId}><span>{row.providerItemId}{row.channelName?' · '+row.channelName:''}</span><b>{row.components.map(component=>(draft.products.find(product=>product.id===component.canonicalProductId)?.name??component.canonicalProductId)+' × '+component.quantity).join(' + ')}</b></p>)}</div></>}
       </article>
     </div>:null}
   </section>;
