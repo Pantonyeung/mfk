@@ -1890,25 +1890,18 @@ export default {
         authorizeUrl.pathname='/authorize-smt-device';
         const authResponse=await admin.fetch(new Request(authorizeUrl.toString(),{method:'GET',headers:new Headers(request.headers)}));
         if(!authResponse.ok)return json({ok:false,stage:'SMT_DEVICE_AUTH',status:authResponse.status,code:'CUSTOMER_SMT_UNAUTHORIZED'},401,cors(request));
-        const quoteResponse=await customer.fetch(new Request('https://internal/smt/quotes/pending',{method:'GET'}));
-        const quoteBody=quoteResponse.ok?await quoteResponse.json():{};
         const orderResponse=await customer.fetch(new Request('https://internal/smt/orders/pending',{method:'GET'}));
         const orderBody=orderResponse.ok?await orderResponse.json():{};
         const traceResponse=await customer.fetch(new Request('https://internal/smt/diagnostics',{method:'GET'}));
         const traceBody=traceResponse.ok?await traceResponse.json():{};
         return json({
-          ok:quoteResponse.ok&&orderResponse.ok&&traceResponse.ok,
-          stage:quoteResponse.ok&&orderResponse.ok&&traceResponse.ok?'CUSTOMER_BRIDGE_PULL_READY':'CUSTOMER_RUNTIME_PULL_FAILED',
+          ok:orderResponse.ok&&traceResponse.ok,
+          stage:orderResponse.ok&&traceResponse.ok?'CUSTOMER_BRIDGE_PULL_READY':'CUSTOMER_RUNTIME_PULL_FAILED',
           deviceAuthorized:true,
-          pendingQuotes:Array.isArray(quoteBody.quotes)?quoteBody.quotes.length:null,
           pendingOrders:Array.isArray(orderBody.orders)?orderBody.orders.length:null,
-          quotePullStatus:quoteResponse.status,
           orderPullStatus:orderResponse.status,
-          lastPublicQuote:traceBody.lastPublicQuote??null,
-          lastQuotePull:traceBody.lastQuotePull??null,
-          lastQuoteAck:traceBody.lastQuoteAck??null,
           observedAt:new Date().toISOString(),
-        },quoteResponse.ok&&orderResponse.ok&&traceResponse.ok?200:502,cors(request));
+        },orderResponse.ok&&traceResponse.ok?200:502,cors(request));
       }
 
       if(url.pathname==='/api/customer/smt/payment-evidence'&&request.method==='GET'){
@@ -1950,14 +1943,12 @@ export default {
       }
 
       const publicMap={
-        '/api/customer/quote':'/public/quote',
-        '/api/customer/quote/readback':'/public/quote/readback',
         '/api/customer/orders/submit':'/public/orders/submit',
         '/api/customer/orders/readback':'/public/orders/readback',
       };
       const targetPath=publicMap[url.pathname];
       let normalizedCustomerOrderBody=null;
-      if(targetPath&&(url.pathname==='/api/customer/quote'||url.pathname==='/api/customer/orders/submit')){
+      if(targetPath&&url.pathname==='/api/customer/orders/submit'){
         const activeResponse=await admin.fetch(new Request('https://internal/active',{method:'GET'}));
         if(!activeResponse.ok)return json({code:'CUSTOMER_CONFIG_NOT_PUBLISHED'},503,cors(request));
         const active=await activeResponse.json();
@@ -1998,14 +1989,14 @@ export default {
           if(body.byteLength)init.body=body;
         }
         const response=await customer.fetch(new Request(target.toString(),init));
-        if(response.status===202&&(url.pathname==='/api/customer/quote'||url.pathname==='/api/customer/orders/submit')){
+        if(response.status===202&&url.pathname==='/api/customer/orders/submit'){
           try{
             const body=await response.clone().json();
             await admin.fetch(new Request('https://internal/customer-doorbell',{
               method:'POST',
               headers:{'content-type':'application/json'},
               body:JSON.stringify({
-                type:url.pathname==='/api/customer/quote'?'CUSTOMER_QUOTE_AVAILABLE':'CUSTOMER_ORDER_AVAILABLE',
+                type:'CUSTOMER_ORDER_AVAILABLE',
                 requestId:body.requestId,
                 submissionId:body.submissionId,
               }),
