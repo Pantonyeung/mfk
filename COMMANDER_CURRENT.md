@@ -1,115 +1,140 @@
 # MFK COMMANDER CURRENT｜MANDATORY ENTRY POINT
 
 Status: CURRENT / CONTROLLING
+
 Control: #22
-Updated: 2026-09-25 Asia/Hong_Kong
+
+Updated: 2026-09-29 23:22 Asia/Hong_Kong
+
 System: MFK ONLY
 
 ## 0. Mandatory read order
+
 1. COMMANDER_CURRENT.md
 2. #22 latest controlling comment
-3. docs/navigation/MFK_航海圖_V1.30_Round031_2026-09-25.txt
+3. docs/recovery/MFK_P0_RECOVERY_SALVAGE_AUDIT_2026-09-29.md
 4. HANDOFF_CURRENT.md
-5. current physical evidence
+5. Current remote Main and Draft PR state
 
-## 1. Current exact state
+## 1. One-line current reality
 
-Product source:
-`75759607ba05720f723c77d282327b7f1386f616`
+P0 incident salvage audit is complete; Current Main remains 6cb2d05ecfd49ca0a3bc972a03cb283ce1c64d1a, four independent exact-base Candidate PRs are Draft only, and no merge/deploy/OTA has occurred.
 
-Source/build verification:
-`36084376938` SUCCESS
+## 2. Current authority / role boundary
 
-Canonical Carrier OTA publish:
-`36085973121` SUCCESS
+- Owner: tomorrow selects one Candidate at a time and accepts or reverts after live evidence.
+- Admin: canonical configuration and Cloud publish authority.
+- SMT: local transaction, frontline runtime sellability and physical apply/readback authority.
+- Provider: Keeta remains provider transaction/commercial evidence authority.
+- Explicit non-authorities: Owner is not a second Admin; browser UI is not Cloud confirmation; source tests are not deploy/device/physical acceptance.
 
-Carrier:
-`1.0.7 / 107`
+## 3. Exact current state
 
-Current public APK:
-`MoreFunOS-SMT-1.0.7-mfk-75759607ba05.apk`
+Current Main:
+6cb2d05ecfd49ca0a3bc972a03cb283ce1c64d1a
 
-APK SHA-256:
-`b521d509f93143e191e9df363b91409e499dc0788776f067e88469611c791046`
+Controlled bank:
+052295861931b72aa401aa6fa06c3cd65866706d
 
-Public Carrier OTA manifest/readback:
-GREEN
+LAST_KNOWN_GOOD:
+5ff4eea2f36d552923bfe1c46393da48d7a63573
 
-Independent replay:
-`36085863280` SUCCESS, same SHA-256.
+Incident final research version:
+7030a9e56b7e547940ee8c3d0cc118a189d99d97
 
-Canonical Builder release path:
-`.github/workflows/mfk-carrier-ota.yml`
-→ `requests/mfk-carrier-ota-request.txt`
+Audit:
+docs/recovery/MFK_P0_RECOVERY_SALVAGE_AUDIT_2026-09-29.md
 
-Temporary parallel duplicate publisher path:
-RETIRED.
+Draft Candidates:
 
-Current milestone:
-`MFK_CARRIER_1_0_7_OTA_PUBLISHED_GREEN`
+- #521 34ccfbd03d5a198ada34e99d39187ea7b9440918 — Dining live refresh
+- #522 6a036e02d302f66621bd0d7a7ae5d5f0018fcd20 — table registry fail-closed
+- #523 d532cf5f35cfe4d8ba2a9914d928ce1da9d7c5a8 — canonical Cloud publish confirmation
+- #524 0e93e088003b629f28962a0f761f681d24cc5587 — bounded SMT Admin reconciliation
 
-Current first break:
-STORE PHYSICAL INSTALL + SMM LAN/QR ACCEPTANCE NOT YET PROVEN.
+Every Candidate branch merge-base:
+6cb2d05ecfd49ca0a3bc972a03cb283ce1c64d1a
 
-## 2. Locked architecture
+## 4. Verification
 
-SMM is PWA/Web only. No SMM APK.
+- Candidate 01 focused: 4/4; serialized v2local excluding exact-base CRLF red: 403/403; build PASS.
+- Candidate 02 focused: 10/10; serialized v2local excluding exact-base CRLF red: 402/402; build PASS.
+- Candidate 03 focused: Admin 8/8 + v2local cross-port 4/4; full v2admin 212/212; serialized v2local 402/402 excluding exact-base CRLF red; build PASS.
+- Candidate 04 focused: 8/8; serialized v2local excluding exact-base CRLF red: 403/403; build PASS.
+- Exact-base pre-existing red: smt-owner-print-recovery-a2.test.ts uses an LF-only source assertion under Windows CRLF.
+- GitHub Actions repository checks are green on all four code Candidates.
+- Cloudflare Workers Builds currently reports zero-second mfk-customer and mfk-owner failures on all four Draft PRs, without annotations or deployed version IDs. This is an unresolved external PR-build check; resolve it during tomorrow preflight and do not treat it as deploy GREEN.
+- No Builder, deploy, package, device, provider or physical acceptance is claimed.
 
-Primary:
-SMM PWA → Carrier LAN HTTP/JSON :17831 → SMT.
+## 5. Classification summary
 
-LAN failure never blocks staff ordering.
+ALREADY_PRESENT:
 
-QR is only an Order Intent transport.
-QR cannot allocate Formal Order / Display.
+- PR #520 WebSocket transport and public SMT identity
+- Admin source identity
+- Keeta one-to-many/quantity/role/option mapping
+- Keeta reference/effective money and pricing authority
+- Keeta lifecycle/diagnostics
+- SMT runtime sellability, projection and Business Day reset
+- SMM ACCEPT/READY/idempotency/Dining exclusion/readback
 
-Formalization remains:
-intent → SMT current Menu/Pricing revalidation → Store Kernel → Formal Order.
+KEEP / REBUILD:
 
-No second Order Engine.
-No second Pricing Engine.
-No second Store Kernel.
+- KEEP: #521, #524
+- REBUILD: #522, #523
 
-## 3. OTA governance
+DROP:
 
-Recovery has two independent controls:
-- Runtime OTA URL
-- Carrier OTA URL
+- Customer Cloud quote revival
+- Owner direct canonical availability mutation
+- browser-vs-Cloud dual revision UX
+- hard-coded global product version
 
-Existing OTA origin/bucket reused.
-No new OTA backend/domain.
+QUARANTINE / UNKNOWN:
 
-One active MFK Carrier release workflow only.
+- Sync V2 in full
+- Owner ONLINE_ONLY and restoreAt/expiry
+- untrusted Customer/Owner/SMM/native source identity paths
+- exact live revision behind Keeta auto-accept
 
-## 4. Exact NEXT
+## 6. Exact NEXT
 
-PHYSICAL ONLY.
+Tomorrow, start with Draft PR #521 only:
 
-Store SMT:
-- Recovery → check Carrier OTA
-- offered = 1.0.7 / 107
-- install
-- installed Carrier = 1.0.7 / 107
-- normal SMT boot
-- Runtime/Carrier OTA URL controls intact
+Current accepted Main → merge #521 → CI → canonical SMT delivery → physical Dining refresh acceptance → accept checkpoint or immediate revert
 
-iPhone:
-- Safari PWA LAN probe / pair / one order
-- iOS Chrome LAN probe
-- LAN unavailable non-blocking proof
-- QR fallback proof
-- same-intent replay zero duplicate Formal Order
-- SMT restart sanity
+Acceptance:
 
-## 5. Commander rule
+- A controlled Admin Dining display change reaches the physical SMT without restart.
+- Matching revision/apply evidence is present.
+- Existing holds/orders remain unchanged.
 
-Do not write new product code before physical evidence.
+STOP condition:
 
-If GREEN:
-BANK `MFK_CARRIER_1_0_7_SMM_PWA_LAN_QR_PHYSICAL_GREEN`.
+- Any stale UI, duplicate mutation, non-matching revision, deploy failure or physical failure. Revert #521 before considering another Candidate.
 
-If RED:
-record LAST_GREEN / FIRST_BREAK / EXPECTED / ACTUAL.
-Open only the smallest seam that explains the physical RED.
+## 7. Suggested remaining order
 
-No architecture rewrite from a browser/device compatibility failure.
+After a new accepted checkpoint for each PASS:
+
+1. #521
+2. #523
+3. #522
+4. #524
+
+All dependencies are NONE; any failed Candidate can be bypassed.
+
+## 8. DO NOT / NOT AUTHORIZED
+
+- Do not merge more than one Candidate before acceptance.
+- Do not merge any Candidate tonight.
+- Do not deploy production tonight.
+- Do not issue SMT OTA tonight.
+- Do not restore the incident tree.
+- Do not implement Sync V2.
+- Do not mutate Keeta/provider state to investigate auto-accept.
+- Do not turn Owner into a second Admin.
+
+## 9. Resume command
+
+> 接手 MFK P0 Recovery Salvage。先 fresh-read COMMANDER_CURRENT、#22 最新 controlling comment、完整 Salvage Audit、HANDOFF_CURRENT 同 remote Main/PR state。只由當前 accepted Main 揀一個 Draft Candidate，CI → Deploy → 實機驗收 → Accept/Revert；未完成回滾或新 checkpoint 前唔准開始下一件。
