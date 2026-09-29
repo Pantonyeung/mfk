@@ -24,7 +24,7 @@ test('UI0 final reconciliation uses male/female 50:50 and dedicated Stage0 sourc
 });
 
 test('UI0 has first visit returning and reduced-motion timing without becoming a data gate',()=>{
-  assert.ok(launch.includes("mode==='reduced'?120:mode==='returning'?1200:3500"));
+  assert.ok(launch.includes("mode==='reduced'?120:mode==='returning'?700:2500"));
   assert.ok(launch.includes('prefers-reduced-motion: reduce'));
   assert.ok(launch.includes('sessionStorage'));
   assert.ok(launch.includes('localStorage'));

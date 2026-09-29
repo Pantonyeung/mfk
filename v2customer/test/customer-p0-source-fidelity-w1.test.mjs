@@ -29,7 +29,7 @@ test('UI0 uses supplied male/female IP sheets, 50:50 selection and exact storybo
   assert.doesNotMatch(config,/stage7-pickup|stage0-character-.*\.svg/);
   for(const mode of ["'reduced'","'returning'","'first'"])assert.ok(overlay.includes(mode),mode);
   for(const copy of['肚餓啦？','用心手作，','每一口都更幸福。','美味，從這裡開始。','進入主頁','進入會員頁'])assert.ok(overlay.includes(copy),copy);
-  assert.ok(overlay.includes("mode==='reduced'?120:mode==='returning'?1200:3500"));
+  assert.ok(overlay.includes("mode==='reduced'?120:mode==='returning'?700:2500"));
 });
 
 test('UI1 uses FINAL source screenshot crop for IP hero and source shortcut icon crops',()=>{
