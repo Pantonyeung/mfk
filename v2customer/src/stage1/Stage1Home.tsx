@@ -66,22 +66,27 @@ export function Stage1Home({
     ?member.coupons.filter(item=>item.state==='AVAILABLE').length
     :0;
 
-  const headline=currentOrder
+  const homeMode=currentOrder?'ORDER_ACTIVE':store?.channelAvailable===false?'CLOSED':availableCouponCount?'CAMPAIGN':history.length?'RETURNING':'NORMAL';
+  const headline=homeMode==='ORDER_ACTIVE'
     ?'辛苦了！美味正在為你準備中'
-    :history.length
-      ?'歡迎回來，今天也要好好吃飯！'
-      :store?.channelAvailable===false
-        ?'今日休息，先來揀定想食嘅'
-        :'今天想食咩？';
-  const subline=currentOrder
-    ?'訂單有新進度會喺呢度睇到。'
-    :history.length
-      ?'有熟悉嘅味道，也可以發現新選擇。'
-      :store?.channelAvailable===false
-        ?'未開始營業都可以慢慢睇餐牌。'
-        :'一餐好飯，讓日常更有味。';
+    :homeMode==='CLOSED'
+      ?'辛苦了，先來揀進吧！'
+      :homeMode==='RETURNING'
+        ?'歡迎回來，今天也要好好吃飯！'
+        :homeMode==='CAMPAIGN'
+          ?'發現更多美味，也收集更多回憶！'
+          :'早安，今天想食咩？';
+  const subline=homeMode==='ORDER_ACTIVE'
+    ?'好好吃飯，補充生活的能量！'
+    :homeMode==='CLOSED'
+      ?'好味道，總是值得期待。'
+      :homeMode==='RETURNING'
+        ?'有美食相伴的日子，總是特別好。'
+        :homeMode==='CAMPAIGN'
+          ?'好吃的飯，總能帶來好心情。'
+          :'一碗好飯，讓日常更有味。';
 
-  return <div className="stage1-home">
+  return <div className="stage1-home" data-home-mode={homeMode}>
     <header className="stage1-fixed-header">
       <button className="stage1-logo-button" onClick={()=>window.scrollTo({top:0,behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'})} aria-label="返回首頁頂部">
         <img src={OFFICIAL_LOGO_URL} alt="磨飯 More Fun"/>
@@ -96,7 +101,7 @@ export function Stage1Home({
     <div className="stage1-content">
       <Stage1StatePanel connection={connection} browserOnline={browserOnline} onRetry={onRetry}/>
 
-      <section className="stage1-welcome">
+      <section className="stage1-welcome" data-home-mode={homeMode}>
         <h1>{headline}</h1>
         <p>{subline}</p>
       </section>
@@ -105,6 +110,11 @@ export function Stage1Home({
         <span aria-hidden="true">⌕</span>
         <strong>{canBrowse?'搜尋想食嘅餐點…':'餐牌更新中…'}</strong>
       </button>
+
+      {homeMode==='RETURNING'&&topRecommendations.length?<section className="stage1-frequent-strip">
+        <div className="stage1-section-title"><div><h2>常點清單</h2><small>最熟悉的味道</small></div><button onClick={onHistory}>查看全部 ›</button></div>
+        <div className="stage1-frequent-row">{topRecommendations.slice(0,4).map(item=><button key={item.product.productId} onClick={event=>{const rect=event.currentTarget.getBoundingClientRect();onProduct(item.product,{top:rect.top,left:rect.left,width:rect.width,height:rect.height});}}><img src={mediaFor(item.product)} alt={item.product.imageAlt??item.product.name}/><strong>{item.product.name}</strong></button>)}</div>
+      </section>:null}
 
       {currentOrder?<button className="stage1-live-order" onClick={onOrders}>
         <span className="stage1-live-label">訂單進行中</span>
