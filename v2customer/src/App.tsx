@@ -1,4 +1,4 @@
-import {mfkVersionLabel} from '../../contracts/product-version-v1.ts';
+import {mfkVersionLabel} from '../../contracts/product-version-v1';
 import {useEffect,useMemo,useRef,useState} from 'react';
 import {createCustomerPendingIntent,customerFallbackReference,readCustomerLocalWorkspace,writeCustomerLocalWorkspace,type CustomerLocalPreferences} from './persistence';
 import {resolveCustomerRuntimePort} from './runtime';
