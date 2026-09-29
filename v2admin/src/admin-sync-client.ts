@@ -51,6 +51,23 @@ export function readExistingAdminPublisherKey(){
   return readAdminStored<string>(PUBLISHER_KEY,'');
 }
 
+export async function readCanonicalAdminActive(storeId='MF01'):Promise<MfkAdminConfigEnvelope|null>{
+  if(typeof fetch==='undefined')return null;
+  const browserSession=readStoredAdminBrowserSession();
+  if(browserSession){
+    try{
+      const response=await fetch('/api/admin-browser/active?storeId='+encodeURIComponent(storeId),{
+        method:'GET',
+        cache:'no-store',
+        credentials:'same-origin',
+        headers:{'x-mfk-admin-session':browserSession.sessionToken},
+      });
+      if(response.ok)return validateMfkAdminConfigEnvelope(await response.json());
+    }catch{}
+  }
+  return readCanonicalAdminActiveWithPublisherKey(storeId);
+}
+
 export async function readCanonicalAdminActiveWithPublisherKey(storeId='MF01'):Promise<MfkAdminConfigEnvelope|null>{
   if(typeof fetch==='undefined')return null;
   const key=readExistingAdminPublisherKey();
