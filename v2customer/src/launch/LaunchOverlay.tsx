@@ -4,7 +4,7 @@ import './launch.css';
 
 const SEEN_KEY='mfk.customer.launch.seen.v2';
 const SESSION_VARIANT_KEY='mfk.customer.launch.variant.v2';
-const UI0_VIDEO_PATH='/media/customer-ui0-opening.mp4';
+const UI0_VIDEO_PATH='https://admin.morefunos.com/api/customer/ui0-opening';
 
 function safeRead(storage:Storage,key:string){try{return storage.getItem(key)}catch{return null}}
 function safeWrite(storage:Storage,key:string,value:string){try{storage.setItem(key,value)}catch{/* optional */}}

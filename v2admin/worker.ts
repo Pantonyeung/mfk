@@ -1822,6 +1822,17 @@ export default {
         return json(customerPublicSnapshot(active,Array.isArray(orderBody.orders)?orderBody.orders:[],Array.isArray(sellabilityBody.sellability)?sellabilityBody.sellability:[]),200,cors(request));
       }
 
+      if(url.pathname==='/api/customer/ui0-opening'){
+        if(request.method!=='GET')return json({code:'METHOD_NOT_ALLOWED'},405,cors(request));
+        const object=await env.CUSTOMER_PAYMENT_EVIDENCE.get('ip/e788f78a-6345-45fa-8d87-467699aa5795.mp4');
+        if(!object)return json({code:'CUSTOMER_UI0_OPENING_NOT_FOUND'},404,cors(request));
+        const headers=new Headers(cors(request));
+        headers.set('content-type','video/mp4');
+        headers.set('cache-control','public, max-age=3600, must-revalidate');
+        headers.set('accept-ranges','bytes');
+        return new Response(object.body,{status:200,headers});
+      }
+
       if(url.pathname==='/api/customer/payment-qr'){
         if(request.method!=='GET')return json({code:'METHOD_NOT_ALLOWED'},405,cors(request));
         const objectKey=String(url.searchParams.get('ref')||'').trim();
