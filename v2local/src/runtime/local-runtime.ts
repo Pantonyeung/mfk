@@ -342,6 +342,7 @@ export function normalizeRuntimeAvailabilityForBusinessDay(
   ])) as Record<string,SmtAvailabilityStatus>;
 }
 export function rollRuntimeAvailabilityForBusinessDay(now=Date.now()){
+  if(typeof localStorage==='undefined')return false;
   const businessDate=currentAvailabilityBusinessDate(now);
   if(data.availabilityBusinessDate===businessDate)return false;
   const nextAvailability=normalizeRuntimeAvailabilityForBusinessDay(data.availability,data.availabilityBusinessDate,businessDate);
@@ -364,6 +365,7 @@ function nextRuntimeIdentity(prefix:'MFK-'|'HOLD-'|'ACT-'){
 }
 function save(){localStorage.setItem(KEY,JSON.stringify(data));listeners.forEach(fn=>fn())}
 function applyBusinessDayAvailabilityRollover(now=Date.now()){
+  if(typeof localStorage==='undefined')return;
   const previous={...data.availability};
   if(!rollRuntimeAvailabilityForBusinessDay(now))return;
   for(const [nodeId,status] of Object.entries(previous)){
