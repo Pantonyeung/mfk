@@ -1,3 +1,4 @@
+import {mfkVersionLabel} from '../../contracts/product-version-v1.ts';
 import {useEffect,useMemo,useState} from 'react';
 import type {ReactNode} from 'react';
 import {readOwnerLocalWorkspace,writeOwnerLocalWorkspace,type OwnerChecklistItem} from './persistence';
@@ -496,3 +497,5 @@ function Detail({label,value}:{label:string;value:string}){return <div><span>{la
 function DetailSection({title,children}:{title:string;children:ReactNode}){return <section className="detail-section"><h3>{title}</h3>{children}</section>}
 function Metric({label,value}:{label:string;value:string}){return <div><small>{label}</small><strong>{value}</strong></div>}
 function ListOrEmpty<T>({rows,render,empty}:{rows:readonly T[];render:(item:T,index:number)=>ReactNode;empty:string}){return rows.length?<>{rows.map(render)}</>:<Empty title={empty} detail="未有正式讀回之前唔會顯示假資料。"/>}
+
+export function OwnerBuildIdentity(){const v=mfkVersionLabel('OWNER');return <small data-mfk-build-identity="OWNER">OWNER · v{v.version} · {v.sourceSha.slice(0,12)}</small>}
