@@ -949,14 +949,16 @@ export class AdminSyncStore{
   }
   async publishEnvelope(envelope){
     const current=await this.state.storage.get('active');
-    if(current){
-      if(envelope.revision<current.revision)return{status:409,body:{code:'ADMIN_CONFIG_REVISION_STALE',currentRevision:current.revision}};
-      if(envelope.revision===current.revision){
-        if(envelope.fingerprint!==current.fingerprint)return{status:409,body:{code:'ADMIN_CONFIG_REVISION_CONFLICT',currentFingerprint:current.fingerprint}};
-        return{status:200,body:{state:'IDEMPOTENT',active:current}};
-      }
-    }
     const previous=current??null;
+    const nextRevision=(Number(current?.revision)||0)+1;
+    // Cloud is the sole revision authority. Browser-supplied revision is only a proposal.
+    envelope=createMfkAdminConfigEnvelope({
+      storeId:envelope.storeId,
+      revision:nextRevision,
+      publishedAt:new Date().toISOString(),
+      adminFingerprint:envelope.adminFingerprint,
+      snapshot:envelope.snapshot,
+    });
     await this.state.storage.put('active',envelope);
     await this.state.storage.put('activeMeta',{revision:envelope.revision,fingerprint:envelope.fingerprint,publishedAt:envelope.publishedAt});
     await this.state.storage.put('config:baseline:latest',envelope);
