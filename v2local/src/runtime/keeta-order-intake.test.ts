@@ -83,6 +83,9 @@ describe('Keeta → SMT canonical local intake',()=>{
     expect(translated.providerRef).toBe('KEETA:998');
     expect(translated.providerMessageId).toBe('MSG-998');
     expect(translated.totalMinor).toBe(8400);
+    expect(translated.referenceValueMinor).toBe(8400);
+    expect(translated.effectiveTransactionMinor).toBe(8400);
+    expect(translated.pricingAuthority).toBe('KEETA_PROVIDER_AUTHORIZED_TRANSACTION');
     expect(translated.initialFulfillmentLabel).toBe('待處理');
     expect(translated.items).toEqual([{
       id:'p1',name:'磨飯商品一｜加辣',qty:2,unitMinor:4200,serviceMode:'takeaway',
@@ -95,7 +98,9 @@ describe('Keeta → SMT canonical local intake',()=>{
     const providerPriced={...intent(),rawMessage:intent().rawMessage.replace('originUnitPrice":4100,\"unitPrice\":4200','originUnitPrice":7400,\"unitPrice\":7500').replace('originAmount":8200,\"amount\":8400','originAmount":14800,\"amount\":15000').replace('price":8400','price":15000')};
     const translated=translateKeetaIntentToLocalOrder(providerPriced);
     expect(translated.items[0]?.unitMinor).toBe(4200);
-    expect(translated.totalMinor).toBe(8400);
+    expect(translated.referenceValueMinor).toBe(8400);
+    expect(translated.effectiveTransactionMinor).toBe(15000);
+    expect(translated.totalMinor).toBe(15000);
   });
 
   it('commits the same providerRef exactly once through the existing localRuntime order authority',()=>{
