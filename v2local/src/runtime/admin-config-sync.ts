@@ -187,6 +187,7 @@ function connectDoorbell(){
         if(shouldFetchAdminConfigForDoorbell(row,current)){
           void fetchAndApplyAdminConfig();
         }
+        if(row.type==='ADMIN_CONFIG_AVAILABLE')return;
         for(const listener of cloudDoorbellListeners)listener(row);
       }catch{}
     });
