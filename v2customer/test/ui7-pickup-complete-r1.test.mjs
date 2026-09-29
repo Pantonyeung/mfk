@@ -116,7 +116,8 @@ test('UI7 contains no Stage8 reward or instant seed issuance',()=>{
 });
 
 test('formal Stage 7 composition uses supplied IP assets, touch target and reduced motion',()=>{
-  assert.match(ui7,/data-final-art-pending="true"/);
+  assert.doesNotMatch(ui7,/data-final-art-pending="true"/);
+  assert.match(ui7,/data-source-asset=/);
   assert.match(ui7,/data-character-slot=\{variant\}/);
   assert.match(styles,/\.ui7-arrival-unavailable button[\s\S]*min-height:48px/);
   assert.match(styles,/@media\(prefers-reduced-motion:reduce\)[\s\S]*\.ui7-shell/);

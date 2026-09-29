@@ -1,3 +1,4 @@
+import {CUSTOMER_FINAL_SOURCE} from '../source-assets';
 import {ActionButton,AnimatedValue,EmptyState} from '../ui/primitives';
 import type {
   CustomerCartLine,
@@ -134,7 +135,7 @@ function CopyIntent({
   return <section className="ui8-copy-intent">
     <button className="ui8-back" onClick={onBack}>返回歷史訂單</button>
     <header className="ui8-copy-hero">
-      <div className="ui8-brand-art-slot" data-final-art-pending="true" data-character-slot={variant} role="img" aria-label="磨飯品牌角色插圖位置"/>
+      <img className="ui8-brand-art-slot" src={(variant==='male'?CUSTOMER_FINAL_SOURCE.maleIpSheet:CUSTOMER_FINAL_SOURCE.femaleIpSheet).url} alt="" aria-hidden="true" data-character-slot={variant} data-source-asset={(variant==='male'?CUSTOMER_FINAL_SOURCE.maleIpSheet:CUSTOMER_FINAL_SOURCE.femaleIpSheet).sourceFile}/>
       <span>再來一單</span><h1>正在建立新購物車</h1>
       <p>會按你上次嘅選擇建立一個新記憶罐，舊訂單保持不變。</p>
     </header>

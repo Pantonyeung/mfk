@@ -4,6 +4,7 @@ import './launch.css';
 
 const SEEN_KEY='mfk.customer.launch.seen.v2';
 const SESSION_VARIANT_KEY='mfk.customer.launch.variant.v2';
+const UI0_VIDEO_PATH='/media/ui0/opening-mobile-v1.mp4';
 
 function safeRead(storage:Storage,key:string){try{return storage.getItem(key)}catch{return null}}
 function safeWrite(storage:Storage,key:string,value:string){try{storage.setItem(key,value)}catch{/* optional */}}
@@ -21,11 +22,12 @@ export function LaunchOverlay({onEnterHome,onEnterMember}:{onEnterHome:()=>void;
   const asset=launchAssetFor(variant);
   const mode=reducedMotion?'reduced':returning?'returning':'first';
   const [ready,setReady]=useState(false);
+  const [videoUnavailable,setVideoUnavailable]=useState(false);
 
   useEffect(()=>{
-    const delay=mode==='reduced'?120:mode==='returning'?1200:3500;
+    const delay=mode==='reduced'?120:mode==='returning'?700:2500;
     const timer=window.setTimeout(()=>setReady(true),delay);
-    const guard=window.setTimeout(()=>setReady(true),3900);
+    const guard=window.setTimeout(()=>setReady(true),2900);
     return()=>{window.clearTimeout(timer);window.clearTimeout(guard)};
   },[mode]);
 
@@ -40,7 +42,14 @@ export function LaunchOverlay({onEnterHome,onEnterMember}:{onEnterHome:()=>void;
     data-launch-variant={variant} data-launch-mode={mode}
     style={{'--launch-accent':asset.accent} as CSSProperties}
   >
-    <div className="launch-brand-scene" aria-hidden="true">
+    {!reducedMotion&&!videoUnavailable?<video
+      className="launch-opening-video"
+      src={UI0_VIDEO_PATH}
+      autoPlay muted playsInline preload="auto"
+      aria-hidden="true"
+      onError={()=>setVideoUnavailable(true)}
+    />:null}
+    <div className={"launch-brand-scene"+(!reducedMotion&&!videoUnavailable?" is-video-backed":"")} aria-hidden="true">
       <img className="launch-logo" src={OFFICIAL_LOGO_URL} alt=""/>
       <div className="launch-character-stage">
         <span className="launch-character-crop">

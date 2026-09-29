@@ -1,4 +1,3 @@
-import {mfkVersionLabel} from '../../contracts/product-version-v1';
 import {useEffect,useMemo,useRef,useState} from 'react';
 import {createCustomerPendingIntent,customerFallbackReference,readCustomerLocalWorkspace,writeCustomerLocalWorkspace,type CustomerLocalPreferences} from './persistence';
 import {resolveCustomerRuntimePort} from './runtime';
@@ -792,6 +791,29 @@ export function App(){
   const productRecommendations=selectedProduct?buildCustomerRecommendations({products:allProducts,history,cart,activeCategoryId:selectedProduct.categoryId,limit:8}).filter(item=>item.product.productId!==selectedProduct.productId).slice(0,3):[];
   const actionState:ActionState=quote?.freshness==='MATERIAL_CHANGE'||!cart.length||!quote||Boolean(submitBlockReason)?'disabled':readingIntentId||submitting?'loading':currentPending?.state==='UNKNOWN'?'unknown':currentPending?.state==='PENDING'?'pending':'default';
 
+  useEffect(()=>{
+    if(!launchVisible)return;
+    const html=document.documentElement;
+    const body=document.body;
+    const previousHtmlOverflow=html.style.overflow;
+    const previousBodyOverflow=body.style.overflow;
+    const previousBodyOverscroll=body.style.overscrollBehavior;
+    html.style.overflow='hidden';
+    body.style.overflow='hidden';
+    body.style.overscrollBehavior='none';
+    window.scrollTo({top:0,behavior:'auto'});
+    return()=>{
+      html.style.overflow=previousHtmlOverflow;
+      body.style.overflow=previousBodyOverflow;
+      body.style.overscrollBehavior=previousBodyOverscroll;
+    };
+  },[launchVisible]);
+
+  if(launchVisible)return <LaunchOverlay
+    onEnterHome={()=>{setLaunchVisible(false);changeView('home')}}
+    onEnterMember={()=>{setLaunchVisible(false);changeView('more')}}
+  />;
+
   return <main className="customer-shell" data-network={!browserOnline?'offline':connection.toLowerCase()}>
     {view==='home'?null:view==='menu'?null:<div className="global-status" aria-live="polite">
       {notice?<section className="notice" role="status"><p>{notice}</p><button onClick={()=>setNotice(null)}>收起</button></section>:null}
@@ -830,12 +852,6 @@ export function App(){
       const group=pool?.groups.find(item=>item.groupId===groupId);
       if(pool&&group)setSelectedComboSelections(current=>toggleCustomerComboSelection(current,pool,group,subPoolId,choiceId));
     }} origin={selectedProductOrigin} onClose={closeProduct} onAdd={addSelectedProduct}/>:null}
-    {launchVisible?<LaunchOverlay
-      onEnterHome={()=>{setLaunchVisible(false);changeView('home')}}
-      onEnterMember={()=>{setLaunchVisible(false);changeView('more')}}
-    />:null}
   </main>;
 }
 
-
-export function CustomerBuildIdentity(){const v=mfkVersionLabel('CUSTOMER');return <small data-mfk-build-identity="CUSTOMER">CUSTOMER · v{v.version} · {v.sourceSha.slice(0,12)}</small>}

@@ -52,3 +52,33 @@
   .stage1-shortcut-source{width:34px;height:34px}
   .stage1-quick-entry-grid strong{font-size:11px}
 }
+
+/* UI1 five-state skeleton from FINAL Stage 1 authority board. */
+.stage1-home[data-home-mode]{background:#fffaf2}
+.stage1-welcome{padding-top:14px}
+.stage1-welcome h1{font-size:27px;max-width:340px}
+.stage1-frequent-strip{margin-top:12px}
+.stage1-frequent-strip .stage1-section-title{margin-bottom:8px}
+.stage1-frequent-strip .stage1-section-title>div{display:flex;align-items:baseline;gap:7px}
+.stage1-frequent-strip .stage1-section-title small{font-size:9px;color:var(--mf-muted)}
+.stage1-frequent-row{display:grid;grid-auto-flow:column;grid-auto-columns:88px;gap:9px;overflow-x:auto;padding:1px 1px 5px;scrollbar-width:none}
+.stage1-frequent-row::-webkit-scrollbar{display:none}
+.stage1-frequent-row button{border:0;background:transparent;padding:0;display:grid;gap:5px;text-align:center;color:var(--mf-brand-navy)}
+.stage1-frequent-row img{width:72px;height:72px;margin:auto;border-radius:50%;object-fit:cover;background:#f0e8dc}
+.stage1-frequent-row strong{font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.stage1-live-order{margin-top:12px}
+.stage1-home[data-home-mode="ORDER_ACTIVE"] .stage1-live-order{background:linear-gradient(135deg,#fff0da,#fff8ed);border:1px solid #ffd3a6}
+.stage1-home[data-home-mode="CLOSED"] .stage1-closed-panel{background:#fff2df}
+.stage1-home[data-home-mode="CAMPAIGN"] .stage1-promo-banner{order:0}
+@media(max-width:360px){.stage1-welcome h1{font-size:24px}.stage1-frequent-row{grid-auto-columns:80px}.stage1-frequent-row img{width:66px;height:66px}}
+
+/* UI1 authority-board information skeleton */
+.stage1-fixed-header{min-height:76px;padding-top:calc(9px + env(safe-area-inset-top))}
+.stage1-store-context strong{font-size:13px}
+.stage1-store-chevron{font-size:10px;color:var(--mf-muted)}
+.stage1-store-meta{font-size:9px!important;white-space:nowrap}
+button.stage1-bell{position:relative;padding:0;background:#fffdf8}
+.stage1-bell i{position:absolute;right:3px;top:2px;width:7px;height:7px;border-radius:50%;background:var(--mf-brand-orange);box-shadow:0 0 0 2px #fff}
+.stage1-order-step-labels{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;font-size:8px;color:var(--mf-muted);text-align:center;margin-top:3px}
+.stage1-order-step-labels span:nth-child(1),.stage1-order-step-labels span:nth-child(2){color:var(--mf-brand-orange);font-weight:850}
+.stage1-closed-panel small{font-size:9px;color:var(--mf-muted)}
