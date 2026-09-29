@@ -49,17 +49,17 @@ Draft Candidates:
 
 - #521 34ccfbd03d5a198ada34e99d39187ea7b9440918 — Dining live refresh
 - #522 6a036e02d302f66621bd0d7a7ae5d5f0018fcd20 — table registry fail-closed
-- #523 0552a5982d3c660542ee738377b629fe8d5f2510 — canonical Cloud publish confirmation
+- #523 d532cf5f35cfe4d8ba2a9914d928ce1da9d7c5a8 — canonical Cloud publish confirmation
 - #524 0e93e088003b629f28962a0f761f681d24cc5587 — bounded SMT Admin reconciliation
 
-Every Candidate's direct parent:
+Every Candidate branch merge-base:
 6cb2d05ecfd49ca0a3bc972a03cb283ce1c64d1a
 
 ## 4. Verification
 
 - Candidate 01 focused: 4/4; serialized v2local excluding exact-base CRLF red: 403/403; build PASS.
 - Candidate 02 focused: 10/10; serialized v2local excluding exact-base CRLF red: 402/402; build PASS.
-- Candidate 03 focused: 8/8; full v2admin: 212/212; build PASS.
+- Candidate 03 focused: Admin 8/8 + v2local cross-port 4/4; full v2admin 212/212; serialized v2local 402/402 excluding exact-base CRLF red; build PASS.
 - Candidate 04 focused: 8/8; serialized v2local excluding exact-base CRLF red: 403/403; build PASS.
 - Exact-base pre-existing red: smt-owner-print-recovery-a2.test.ts uses an LF-only source assertion under Windows CRLF.
 - No Builder, deploy, package, device, provider or physical acceptance is claimed.

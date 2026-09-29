@@ -172,13 +172,13 @@ The important authority regressions inside FIRST_BAD were broader than Sync:
 
 ## 6. Candidate registry
 
-Every Candidate below has direct parent `6cb2d05ecfd49ca0a3bc972a03cb283ce1c64d1a`.
+Every Candidate branch was created from `6cb2d05ecfd49ca0a3bc972a03cb283ce1c64d1a`; its merge-base remains that exact SHA and no Candidate contains another Candidate.
 
 | Candidate | Branch | Commit | Draft PR | Class | Risk |
 |---|---|---|---|---|---|
 | 01 Dining live refresh | `candidate/MFK/01-dining-live-refresh` | `34ccfbd03d5a198ada34e99d39187ea7b9440918` | #521 | `KEEP` | Physical SMT refresh timing |
 | 02 Table fail-closed | `candidate/MFK/02-dining-table-fail-closed` | `6a036e02d302f66621bd0d7a7ae5d5f0018fcd20` | #522 | `REBUILD` | HIGH RISK Admin table authority / physical SMT |
-| 03 Cloud-confirmed publish | `candidate/MFK/03-cloud-confirmed-publish` | `0552a5982d3c660542ee738377b629fe8d5f2510` | #523 | `REBUILD` | HIGH RISK Admin publish authority |
+| 03 Cloud-confirmed publish | `candidate/MFK/03-cloud-confirmed-publish` | `d532cf5f35cfe4d8ba2a9914d928ce1da9d7c5a8` | #523 | `REBUILD` | HIGH RISK Admin publish authority |
 | 04 Reconcile fallback | `candidate/MFK/04-smt-admin-reconcile-fallback` | `0e93e088003b629f28962a0f761f681d24cc5587` | #524 | `KEEP` | HIGH RISK WebSocket-adjacent runtime/network |
 
 All four Draft PR bodies contain the required capability, evidence, state, classification, authority/persistence/provider/physical impact, rollback, tests, live PASS/FAIL, BYPASS and `DEPENDENCY: NONE` sections.
@@ -189,7 +189,7 @@ All four Draft PR bodies contain the required capability, evidence, state, class
 |---|---|---|---|
 | 01 | 2 files / 4 tests passed | 90 files / 403 tests passed, excluding exact-base red below | Passed |
 | 02 | 3 files / 10 tests passed | 89 files / 402 tests passed, excluding exact-base red below | Passed |
-| 03 | 2 files / 8 tests passed | Full v2admin: 33 files / 212 tests passed | Passed |
+| 03 | Admin 2 files / 8 tests and v2local cross-port 1 file / 4 tests passed | Full v2admin 33 files / 212 tests; v2local 89 files / 402 tests excluding exact-base red | Passed |
 | 04 | 2 files / 8 tests passed | 90 files / 403 tests passed, excluding exact-base red below | Passed |
 
 Known exact-base test issue:

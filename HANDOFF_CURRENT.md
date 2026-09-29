@@ -13,13 +13,13 @@ Draft-only sibling Candidates, all based directly on Current Main:
 
 1. #521 / 34ccfbd03d5a198ada34e99d39187ea7b9440918 — Dining live refresh — KEEP.
 2. #522 / 6a036e02d302f66621bd0d7a7ae5d5f0018fcd20 — fake table fail-closed — REBUILD.
-3. #523 / 0552a5982d3c660542ee738377b629fe8d5f2510 — canonical Cloud publish confirmation — REBUILD.
+3. #523 / d532cf5f35cfe4d8ba2a9914d928ce1da9d7c5a8 — canonical Cloud publish confirmation — REBUILD.
 4. #524 / 0e93e088003b629f28962a0f761f681d24cc5587 — bounded Admin reconciliation — KEEP.
 
 Verification:
 
 - All focused tests passed.
-- Full Admin suite passed 212/212.
+- Full Admin suite passed 212/212; Candidate 03 cross-port focused test passed 4/4.
 - Serialized v2local suites passed 403/403, 402/402 and 403/403 after excluding one exact-base Windows CRLF-only static assertion.
 - All four production builds passed.
 - No deploy, device, provider or physical GREEN is claimed.
