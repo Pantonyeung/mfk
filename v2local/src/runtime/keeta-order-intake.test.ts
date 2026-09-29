@@ -32,7 +32,7 @@ function installAdminConfig(){
         products:[{id:'p1',name:'磨飯商品一',productCode:'SKU-P1',categoryId:'cat',active:true,basePrice:'42.00',takeawayAdjustment:'0',modifierGroupIds:[]}],
         modifierGroups:[],combos:[],comboPools:[],
       },
-      channelMapping:[{providerItemId:'SKU-P1',productId:'p1',status:'MAPPED'}],
+      channelMappings:{keeta:[{mappingId:'keeta:SKU-P1',enabled:true,skuOpenItemCode:'SKU-P1',components:[{canonicalProductId:'p1',quantity:1}],optionMappings:[]}]},
     },
   }));
 }
@@ -86,9 +86,16 @@ describe('Keeta → SMT canonical local intake',()=>{
     expect(translated.initialFulfillmentLabel).toBe('待處理');
     expect(translated.items).toEqual([{
       id:'p1',name:'磨飯商品一｜加辣',qty:2,unitMinor:4200,serviceMode:'takeaway',
-      productCode:'SKU-P1',detail:'加辣',
+      productCode:'SKU-P1',detail:'Keeta: Provider 商品｜加辣',
     }]);
     expect(translated.providerPickupCode).toBe('K998');
+  });
+
+  it('keeps provider selling price separate from canonical store pricing',()=>{
+    const providerPriced={...intent(),rawMessage:intent().rawMessage.replace('originUnitPrice":4100,\"unitPrice\":4200','originUnitPrice":7400,\"unitPrice\":7500').replace('originAmount":8200,\"amount\":8400','originAmount":14800,\"amount\":15000').replace('price":8400','price":15000')};
+    const translated=translateKeetaIntentToLocalOrder(providerPriced);
+    expect(translated.items[0]?.unitMinor).toBe(4200);
+    expect(translated.totalMinor).toBe(8400);
   });
 
   it('commits the same providerRef exactly once through the existing localRuntime order authority',()=>{
@@ -123,7 +130,7 @@ describe('Keeta → SMT canonical local intake',()=>{
       adminFingerprint:'fnv1a32:test2',
       snapshot:{
         catalog:{categories:[],products:[],modifierGroups:[],combos:[],comboPools:[]},
-        channelMapping:[],
+        channelMappings:{keeta:[]},
       },
     }));
     expect(()=>translateKeetaIntentToLocalOrder(intent())).toThrow(/KEETA_ORDER_MAPPING_REQUIRED/);
