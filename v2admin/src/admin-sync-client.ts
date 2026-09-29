@@ -119,14 +119,8 @@ export async function flushAdminSyncOutbox(){
     });
     const body=await response.json().catch(()=>({})) as Record<string,unknown>;
     if(!response.ok)throw new Error(typeof body.code==='string'?body.code:'ADMIN_SYNC_PUBLISH_HTTP_'+response.status);
-    const active=body.active&&typeof body.active==='object'&&!Array.isArray(body.active)?body.active as Record<string,unknown>:null;
-    const canonicalRevision=Number(active?.revision);
-    const canonicalFingerprint=String(active?.fingerprint??'');
-    if(!Number.isSafeInteger(canonicalRevision)||canonicalRevision<1||!canonicalFingerprint){
-      throw new Error('ADMIN_SYNC_CANONICAL_READBACK_INVALID');
-    }
     writeOutbox(readOutbox().filter(row=>row.revision>latest.revision));
-    const status={state:'PUBLISHED',revision:canonicalRevision,fingerprint:canonicalFingerprint,updatedAt:new Date().toISOString()} as const;
+    const status={state:'PUBLISHED',revision:latest.revision,fingerprint:latest.fingerprint,updatedAt:new Date().toISOString()} as const;
     writeStatus(status);
     return status;
   }catch(error){

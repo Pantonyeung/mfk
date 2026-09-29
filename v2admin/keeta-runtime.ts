@@ -435,8 +435,8 @@ async function keetaProviderJson(config,token,url,params){
   return Object.freeze({code,message:String(row.message||'Success'),data:row.data??null,errorList:Array.isArray(row.errorList)?row.errorList:[]});
 }
 
-async function syncKeetaSellability(config,token,snapshot){
-  const projection=buildKeetaSellabilityProjection(snapshot);
+async function syncKeetaSellability(config,token,snapshot,runtimeSellability=[]){
+  const projection=buildKeetaSellabilityProjection(snapshot,runtimeSellability);
   if(!projection.enabled)throw new Error('KEETA_SELLABILITY_SYNC_DISABLED_BY_PUBLISHED_CONFIG');
   const results=[];
   for(const [status,codes] of [[1,projection.available],[0,projection.unavailable]]){
@@ -1109,7 +1109,7 @@ export class KeetaRuntimeStore{
         const body=record(await request.json(),'KEETA_SELLABILITY_PREVIEW_INPUT_INVALID');
         const revision=positiveInt(body.revision,'KEETA_SELLABILITY_ADMIN_REVISION_INVALID');
         const adminFingerprint=nonEmpty(body.adminFingerprint,'KEETA_SELLABILITY_ADMIN_FINGERPRINT_REQUIRED');
-        const projection=buildKeetaSellabilityProjection(body.snapshot);
+        const projection=buildKeetaSellabilityProjection(body.snapshot,body.runtimeSellability);
         return json({
           state:projection.enabled?'READY':'DISABLED',
           revision,adminFingerprint,
@@ -1129,13 +1129,14 @@ export class KeetaRuntimeStore{
         const adminFingerprint=nonEmpty(body.adminFingerprint,'KEETA_SELLABILITY_ADMIN_FINGERPRINT_REQUIRED');
         const config=requireRuntimeConfig(this.env);
         const token=await this.usableToken();
-        const result=await syncKeetaSellability(config,token,body.snapshot);
+        const result=await syncKeetaSellability(config,token,body.snapshot,body.runtimeSellability);
         const row=Object.freeze({
           state:'COMPLETED',provider:'KEETA',canonicalStoreId:'MF01',
           providerShopId:config.providerShopId,adminRevision:revision,adminFingerprint,
           total:result.projection.total,available:result.projection.available.length,
           unavailable:result.projection.unavailable.length,
           batches:result.results,completedAt:new Date().toISOString(),
+          ...(body.propagation&&typeof body.propagation==='object'?{propagation:{...body.propagation,providerCompletedAt:new Date().toISOString()}}:{}),
         });
         await this.state.storage.put('sellability:sync:latest',row);
         return json(row);
@@ -1251,17 +1252,26 @@ export class KeetaRuntimeStore{
           canonicalOrderId:row.canonicalOrderId?String(row.canonicalOrderId):null,
           canonicalDisplay:row.canonicalDisplay?String(row.canonicalDisplay):null,
           committedAt:row.committedAt?String(row.committedAt):null,
+          mappingState:row.state==='COMMITTED'?'RESOLVED':'PENDING',
+          ackState:row.state==='COMMITTED'?'ACKED':'PENDING',
+          commercialState:null,
         }))
         .sort((a,b)=>String(b.receivedAt).localeCompare(String(a.receivedAt)))
         .slice(0,200);
+      const enriched=await Promise.all(items.map(async item=>{
+        const commercial=await this.state.storage.get('commercial:order:'+item.providerOrderId);
+        const commandConfirm=await this.state.storage.get('order:command:'+item.providerOrderId+':CONFIRM');
+        const commandReady=await this.state.storage.get('order:command:'+item.providerOrderId+':READY');
+        return Object.freeze({...item,commercialState:commercial?String(commercial.state||'CAPTURED'):null,providerConfirmState:commandConfirm?String(commandConfirm.state||'UNKNOWN'):null,providerReadyState:commandReady?String(commandReady.state||'UNKNOWN'):null});
+      }));
       return json({
         state:'AVAILABLE',
         provider:'KEETA',
         canonicalStoreId:'MF01',
-        pending:items.filter(row=>row.state==='PENDING_SMT').length,
-        committed:items.filter(row=>row.state==='COMMITTED').length,
+        pending:enriched.filter(row=>row.state==='PENDING_SMT').length,
+        committed:enriched.filter(row=>row.state==='COMMITTED').length,
         lastSmtPull,
-        items,
+        items:enriched,
       });
     }
 
