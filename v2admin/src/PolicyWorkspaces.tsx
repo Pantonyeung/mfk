@@ -330,7 +330,7 @@ export function StoreSettingsWorkspace({domain='home'}:{domain?:StoreSettingsDom
     markClean();
     setSaveErrors([]);
     setPublishBlockers([]);
-    setSaveMessage('已正式保存並發佈 R'+result.release.version+'；已排入 Admin → SMT／SMM 自動同步。');
+    setSaveMessage('已建立本機 R'+result.release.version+'；等待雲端 Canonical 確認。');
   };
   const fieldError=(id:string)=>saveErrors.find(error=>error.fieldId===id)?.message;
   const fieldProps=(id:string)=>({id,'aria-invalid':Boolean(fieldError(id))||undefined,'aria-describedby':fieldError(id)?id+'-error':undefined});
@@ -439,7 +439,7 @@ export function StaffWorkspace(){
     if(!result.ok){setSaveErrors(result.errors);setSaveMessage('未能保存；請先修正人員資料。');return;}
     markClean();
     setSaveErrors([]);
-    setSaveMessage('已保存並啟用 R'+result.release.version+'；已排入 Admin → SMT 自動同步。');
+    setSaveMessage('已建立本機 R'+result.release.version+'；等待雲端 Canonical 確認。');
   };
   const activeRelease=readActiveAdminRelease();
   return <section className="admin-editor-page">

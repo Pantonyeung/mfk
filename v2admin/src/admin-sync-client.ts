@@ -17,6 +17,16 @@ export interface AdminSyncStatus{
 }
 const idle=():AdminSyncStatus=>({state:'IDLE',updatedAt:new Date().toISOString()});
 
+export function validateAdminPublishConfirmation(input:unknown,expected:Pick<MfkAdminConfigEnvelope,'revision'|'fingerprint'>){
+  if(!input||typeof input!=='object'||Array.isArray(input))throw new Error('ADMIN_SYNC_PUBLISH_CONFIRMATION_INVALID');
+  const body=input as {state?:unknown;active?:unknown};
+  if(body.state!=='PUBLISHED'&&body.state!=='IDEMPOTENT')throw new Error('ADMIN_SYNC_PUBLISH_CONFIRMATION_INVALID');
+  if(!body.active||typeof body.active!=='object'||Array.isArray(body.active))throw new Error('ADMIN_SYNC_PUBLISH_CONFIRMATION_INVALID');
+  const active=body.active as {revision?:unknown;fingerprint?:unknown};
+  if(active.revision!==expected.revision||active.fingerprint!==expected.fingerprint)throw new Error('ADMIN_SYNC_PUBLISH_CONFIRMATION_MISMATCH');
+  return Object.freeze({state:body.state,revision:expected.revision,fingerprint:expected.fingerprint});
+}
+
 function emit(){if(typeof window!=='undefined')window.dispatchEvent(new CustomEvent('mfk-admin-sync'));}
 
 export function readAdminSyncStatus(){
@@ -119,6 +129,7 @@ export async function flushAdminSyncOutbox(){
     });
     const body=await response.json().catch(()=>({})) as Record<string,unknown>;
     if(!response.ok)throw new Error(typeof body.code==='string'?body.code:'ADMIN_SYNC_PUBLISH_HTTP_'+response.status);
+    validateAdminPublishConfirmation(body,latest);
     writeOutbox(readOutbox().filter(row=>row.revision>latest.revision));
     const status={state:'PUBLISHED',revision:latest.revision,fingerprint:latest.fingerprint,updatedAt:new Date().toISOString()} as const;
     writeStatus(status);

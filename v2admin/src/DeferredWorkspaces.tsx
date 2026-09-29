@@ -95,7 +95,7 @@ export function PresentationWorkspace({surface}:{surface:'CUSTOMER'|'OWNER'|'FRO
     const result=saveAdminConfig(draft,undefined,'顯示設定 '+surface);
     if(!result.ok){setSaveErrors(result.errors);setSaveMessage('未能保存；請先修正設定驗證問題。');return;}
     setSaveErrors([]);
-    setSaveMessage('已保存並啟用 R'+result.release.version+'；已排入 Admin → SMT／SMM 自動同步。');
+    setSaveMessage('已建立本機 R'+result.release.version+'；等待雲端 Canonical 確認。');
   };
   const title=surface==='CUSTOMER'?'客戶端首頁':surface==='OWNER'?'老闆今日首頁':'前線點單版面';
   return <section className="admin-editor-page">
