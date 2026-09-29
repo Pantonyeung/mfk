@@ -126,6 +126,6 @@ export function installSmmWebAcceptanceIntake(ingress:SmmWebAcceptanceIngress){
   document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')reconcile();});
   timer=window.setInterval(()=>{
     if(document.visibilityState==='visible'&&navigator.onLine)reconcile();
-  },1500);
+  },10000);
   window.setTimeout(reconcile,0);
 }
