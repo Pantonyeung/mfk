@@ -58,3 +58,66 @@ export function buildKeetaOptionAliasRequest({
     providerIdsAreAliasesOnly: true,
   });
 }
+
+
+const mappingRecord = (value, code) => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(code);
+  return value;
+};
+
+export function resolveKeetaProductMapping(aliasRequest, registry) {
+  const alias = mappingRecord(aliasRequest, 'KEETA_PRODUCT_ALIAS_REQUIRED');
+  const rows = Array.isArray(registry) ? registry : [];
+  const matches = rows.filter((raw) => {
+    const row = mappingRecord(raw, 'KEETA_PRODUCT_MAPPING_INVALID');
+    if (row.enabled === false) return false;
+    return (
+      (row.skuOpenItemCode && row.skuOpenItemCode === alias.skuOpenItemCode) ||
+      (row.spuOpenItemCode && row.spuOpenItemCode === alias.spuOpenItemCode) ||
+      (row.providerSkuId && String(row.providerSkuId) === String(alias.providerSkuId)) ||
+      (row.providerSpuId && String(row.providerSpuId) === String(alias.providerSpuId))
+    );
+  });
+  if (matches.length === 0) throw new Error('KEETA_PRODUCT_MAPPING_NOT_FOUND');
+  const identities = new Set(matches.map((row) => nonEmpty(row.mappingId, 'KEETA_PRODUCT_MAPPING_ID_REQUIRED')));
+  if (identities.size !== 1) throw new Error('KEETA_PRODUCT_MAPPING_AMBIGUOUS');
+  const mapping = matches[0];
+  const components = Array.isArray(mapping.components) ? mapping.components : [];
+  if (!components.length) throw new Error('KEETA_PRODUCT_MAPPING_COMPONENTS_REQUIRED');
+  return Object.freeze({
+    mappingId: nonEmpty(mapping.mappingId, 'KEETA_PRODUCT_MAPPING_ID_REQUIRED'),
+    channelProductName: typeof mapping.channelProductName === 'string' ? mapping.channelProductName.trim() : '',
+    components: Object.freeze(components.map((raw) => {
+      const component = mappingRecord(raw, 'KEETA_PRODUCT_MAPPING_COMPONENT_INVALID');
+      return Object.freeze({
+        canonicalProductId: nonEmpty(component.canonicalProductId, 'MFK_CANONICAL_PRODUCT_ID_REQUIRED'),
+        quantity: Number.isSafeInteger(component.quantity) && component.quantity > 0 ? component.quantity : 1,
+        role: typeof component.role === 'string' && component.role.trim() ? component.role.trim() : 'PRODUCTION',
+      });
+    })),
+    providerIdsAreAliasesOnly: true,
+    canonicalProductAuthority: 'MFK',
+  });
+}
+
+export function resolveKeetaOptionMapping({ canonicalProductId, providerGroupCode, providerOptionCode }, registry) {
+  const request = buildKeetaOptionAliasRequest({ canonicalProductId, providerGroupCode, providerOptionCode });
+  const rows = Array.isArray(registry) ? registry : [];
+  const matches = rows.filter((raw) => {
+    const row = mappingRecord(raw, 'KEETA_OPTION_MAPPING_INVALID');
+    return row.enabled !== false &&
+      row.canonicalProductId === request.canonicalProductId &&
+      row.providerGroupCode === request.providerGroupCode &&
+      row.providerOptionCode === request.providerOptionCode;
+  });
+  if (matches.length === 0) throw new Error('KEETA_OPTION_MAPPING_NOT_FOUND');
+  if (matches.length > 1) throw new Error('KEETA_OPTION_MAPPING_AMBIGUOUS');
+  const mapping = matches[0];
+  return Object.freeze({
+    canonicalProductId: request.canonicalProductId,
+    canonicalOptionSetId: nonEmpty(mapping.canonicalOptionSetId, 'MFK_CANONICAL_OPTION_SET_ID_REQUIRED'),
+    canonicalOptionId: nonEmpty(mapping.canonicalOptionId, 'MFK_CANONICAL_OPTION_ID_REQUIRED'),
+    providerIdsAreAliasesOnly: true,
+    canonicalOptionAuthority: 'MFK',
+  });
+}
