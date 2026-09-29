@@ -328,7 +328,7 @@ export function StoreSettingsWorkspace({domain='home'}:{domain?:StoreSettingsDom
     markClean();
     setSaveErrors([]);
     setPublishBlockers([]);
-    setSaveMessage('已正式保存並發佈 R'+result.release.version+'；已排入 Admin → SMT／SMM 自動同步。');
+    setSaveMessage('已提交正式發佈；系統會自動送往 Cloud，再通知 SMT／SMM。');
   };
   const fieldError=(id:string)=>saveErrors.find(error=>error.fieldId===id)?.message;
   const fieldProps=(id:string)=>({id,'aria-invalid':Boolean(fieldError(id))||undefined,'aria-describedby':fieldError(id)?id+'-error':undefined});
@@ -338,7 +338,7 @@ export function StoreSettingsWorkspace({domain='home'}:{domain?:StoreSettingsDom
 
   return <section className="admin-editor-page">
     <header className="admin-editor-head">
-      <div><small>{activeRelease?'目前 R'+activeRelease.version:'未有正式版本'} · 門店設定</small><h1>門店設定</h1><p>本機修改會自動保存草稿；只有撳「保存並發佈」先建立正式版本，並送去 SMT／SMM。</p>{saveMessage?<span>{saveMessage}</span>:null}</div>
+      <div><small>{activeRelease?'已有本機保存紀錄':'未有本機保存紀錄'} · 門店設定</small><h1>門店設定</h1><p>本機修改會自動保存草稿；只有撳「保存並發佈」先建立正式版本，並送去 SMT／SMM。</p>{saveMessage?<span>{saveMessage}</span>:null}</div>
       <div className="admin-editor-actions"><button className="primary" type="button" onClick={saveStoreSettings}>儲存本頁設定</button><button className="primary" type="button" onClick={publishStoreSettings}>正式保存並發佈</button></div>
     </header>
     {publishBlockers.length?<div ref={errorSummaryRef} className="admin-validation is-error" role="alert" tabIndex={-1}><b>無法正式發佈</b><ul>{publishBlockers.map((error,index)=><li key={index}><b>{error.label}</b> → {error.message} <Link to={error.path}>前往設定</Link></li>)}</ul></div>:null}
@@ -438,11 +438,11 @@ export function StaffWorkspace(){
     if(!result.ok){setSaveErrors(result.errors);setSaveMessage('未能保存；請先修正人員資料。');return;}
     markClean();
     setSaveErrors([]);
-    setSaveMessage('已保存並啟用 R'+result.release.version+'；已排入 Admin → SMT 自動同步。');
+    setSaveMessage('已提交正式發佈；系統會自動送往 Cloud，再通知 SMT。');
   };
   const activeRelease=readActiveAdminRelease();
   return <section className="admin-editor-page">
-    <header className="admin-editor-head"><div><small>{activeRelease?'目前 R'+activeRelease.version:'未有保存版本'} · 人員／角色／權限</small><h1>員工／權限</h1><p>登入編號係人手輸入嘅帳號；Internal Staff ID 只供系統識別。PIN 只會轉成驗證器發布，唔會將明文 PIN 發布出去。</p>{saveMessage?<span>{saveMessage}</span>:null}</div><div className="admin-editor-actions"><button className="secondary" onClick={add}>新增員工</button><button className="primary" onClick={saveStaff}>保存人員設定</button></div></header>
+    <header className="admin-editor-head"><div><small>{activeRelease?'已有本機保存紀錄':'未有本機保存紀錄'} · 人員／角色／權限</small><h1>員工／權限</h1><p>登入編號係人手輸入嘅帳號；Internal Staff ID 只供系統識別。PIN 只會轉成驗證器發布，唔會將明文 PIN 發布出去。</p>{saveMessage?<span>{saveMessage}</span>:null}</div><div className="admin-editor-actions"><button className="secondary" onClick={add}>新增員工</button><button className="primary" onClick={saveStaff}>保存人員設定</button></div></header>
     {saveErrors.length?<div className="admin-validation is-error" role="alert"><b>有 {saveErrors.length} 項需要處理</b><ul>{saveErrors.map((error,index)=><li key={index}>{error}</li>)}</ul></div>:null}
     {staff.length===0?<div className="admin-empty-state"><b>未有員工資料</b><p>新增員工後設定角色、PIN、權限範圍同權限。</p><button onClick={add}>新增員工</button></div>:selectedStaffId===null?<div className="admin-settings-home" aria-label="員工列表">{staff.map(row=><button type="button" className="admin-settings-link" key={row.id} onClick={()=>setSelectedStaffId(row.id)}><span><b>{row.name||row.loginId||'未命名員工'}</b><small>{row.loginId?'登入編號 '+row.loginId:'未設定登入編號'} · {row.active?'啟用':'停用'}</small></span><strong aria-hidden="true">›</strong></button>)}</div>:<div className="admin-editor-grid">{staff.filter(row=>row.id===selectedStaffId).map(row=><article className="admin-policy-card" key={row.id}>
       <button type="button" className="admin-back-button" onClick={()=>setSelectedStaffId(null)}>‹ 員工列表</button>
@@ -736,7 +736,7 @@ export function ChannelsWorkspace({mode}:{mode:'overview'|'mapping'|'failures'|'
       </header>
       <p>來源固定為已發布 Admin 設定版本；同步係 full snapshot。預檢會先確認分類、商品、Option Set、OpenItemCode 同完整排序，再提交 Keeta 非同步 task。</p>
       {menuPreview?<div className="admin-readback-proof">
-        <p><span>Admin Revision</span><b>R{menuPreview.revision}</b></p>
+        <p><span>正式設定</span><b>已載入</b></p>
         <p><span>分類</span><b>{menuPreview.summary.categories}</b></p>
         <p><span>商品</span><b>{menuPreview.summary.spus}</b></p>
         <p><span>SKU</span><b>{menuPreview.summary.skus}</b></p>
@@ -764,7 +764,7 @@ export function ChannelsWorkspace({mode}:{mode:'overview'|'mapping'|'failures'|'
       <header><div><small>KEETA SELLABILITY</small><h2>Keeta 售罄／供應同步</h2></div><span className={sellabilityStatus?.state==='COMPLETED'?'admin-status-good':'admin-not-wired-chip'}>{sellabilityStatus?.state??'未同步'}</span></header>
       <p>來源固定為已發布 MFK Availability + Catalog。SPU OpenItemCode 同完整菜單使用同一套 deterministic identity。</p>
       {sellabilityPreview?<div className="admin-readback-proof">
-        <p><span>Admin Revision</span><b>R{sellabilityPreview.revision}</b></p>
+        <p><span>正式設定</span><b>已載入</b></p>
         <p><span>同步設定</span><b>{sellabilityPreview.state}</b></p>
         <p><span>商品總數</span><b>{sellabilityPreview.total}</b></p>
         <p><span>可售</span><b>{sellabilityPreview.available}</b></p>
@@ -780,7 +780,7 @@ export function ChannelsWorkspace({mode}:{mode:'overview'|'mapping'|'failures'|'
       <header><div><small>KEETA STORE OPS</small><h2>Keeta 營業時間／開關店</h2></div><span className={storeStatus?.state==='AVAILABLE'?'admin-status-good':'admin-not-wired-chip'}>{storeStatus?.state??'未讀取'}</span></header>
       <p>七日營業時間由已發布 Admin 門店設定投影；REST／OPEN 係 Keeta provider 營運動作，唔會改寫 MFK Store identity。</p>
       {storePreview?<div className="admin-readback-proof">
-        <p><span>Admin Revision</span><b>R{storePreview.revision}</b></p>
+        <p><span>正式設定</span><b>已載入</b></p>
         <p><span>星期資料</span><b>{Object.keys(storePreview.businessHourOfTheWeek).length} / 7</b></p>
       </div>:null}
       <div className="admin-editor-actions">
