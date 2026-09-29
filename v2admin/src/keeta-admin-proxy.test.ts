@@ -1,4 +1,5 @@
 import {describe,expect,it,vi} from 'vitest';
+import {readFileSync} from 'node:fs';
 import worker from '../worker.ts';
 
 describe('Keeta admin proxy',()=>{
@@ -7,7 +8,15 @@ describe('Keeta admin proxy',()=>{
       expect(request.method).toBe('GET');
       expect(new URL(request.url).pathname).toBe('/authorize-admin');
       expect(request.headers.get('origin')).toBe('https://admin.morefunos.com');
-      return new Response(JSON.stringify({ok:true}),{status:200,headers:{'content-type':'application/json'}});
+      return new Response(JSON.stringify({ok:true}),{status:200,headers:{'content-type':'application/json'}  it('keeps Keeta Admin control usable in a clean browser session without the legacy publisher key',()=>{
+    const client=readFileSync(new URL('./keeta-live-client.ts',import.meta.url),'utf8');
+    const source=readFileSync(new URL('../worker.ts',import.meta.url),'utf8');
+    expect(client).toContain("readStoredAdminBrowserSession");
+    expect(client).toContain("'x-mfk-admin-session':session.sessionToken");
+    expect(source).toContain("request.headers.get('x-mfk-admin-session')");
+    expect(source).toContain("await this.readAdminBrowserSession(request)");
+  });
+});
     });
     const keetaFetch=vi.fn(async(request:Request)=>{
       expect(request.method).toBe('POST');
