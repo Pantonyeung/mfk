@@ -14,11 +14,8 @@ import {assertCapacityChannelAdmission} from './capacity-pool-state.ts';
 const ENDPOINT='https://admin.morefunos.com';
 const ATTENTION_KEY='mfk.keeta.order-intake.attention.v1';
 
-interface ChannelMappingRow{
-  readonly providerItemId?:string;
-  readonly productId?:string;
-  readonly status?:string;
-}
+interface ChannelMappingComponent{readonly canonicalProductId?:string;readonly quantity?:number}
+interface ChannelMappingRow{readonly mappingId?:string;readonly enabled?:boolean;readonly skuOpenItemCode?:string;readonly spuOpenItemCode?:string;readonly providerSkuId?:string;readonly providerSpuId?:string;readonly channelName?:string;readonly components?:readonly ChannelMappingComponent[]}
 interface CatalogProduct{
   readonly id?:string;
   readonly name?:string;
@@ -48,31 +45,31 @@ function autoAcceptEnabled(){
 function rows(value:unknown):Record<string,unknown>[]{
   return Array.isArray(value)?value.filter(row=>row&&typeof row==='object'&&!Array.isArray(row)) as Record<string,unknown>[]:[];
 }
-function resolveProduct(
+function resolveProductionComponents(
   line:KeetaStandardProviderOrderFacts['lines'][number],
   catalog:readonly CatalogProduct[],
   mappings:readonly ChannelMappingRow[],
 ){
-  const rawCandidates=[line.skuOpenItemCode,line.spuOpenItemCode,line.providerSkuId,line.providerSpuId].map(String);
-  const candidates=[...new Set(rawCandidates.flatMap(value=>{
-    const trimmed=value.trim();
-    const stripped=trimmed.replace(/^(?:SPU:|SKU:|MF:)/i,'');
-    return stripped&&stripped!==trimmed?[trimmed,stripped]:[trimmed];
-  }))];
-  const explicit=mappings.find(row=>row.status==='MAPPED'&&candidates.includes(String(row.providerItemId||'')));
-  if(explicit?.productId){
-    const product=catalog.find(row=>String(row.id)===String(explicit.productId)&&row.active!==false);
-    if(!product)throw new Error('KEETA_ORDER_MAPPING_CANONICAL_PRODUCT_MISSING:'+line.skuOpenItemCode);
-    return product;
-  }
-  const direct=catalog.filter(row=>row.active!==false&&(
-    candidates.includes(String(row.productCode||''))||
-    candidates.includes(String(row.id||''))
+  const aliases=new Set([line.skuOpenItemCode,line.spuOpenItemCode,line.providerSkuId,line.providerSpuId].map(value=>String(value).trim()).filter(Boolean));
+  const explicit=mappings.filter(row=>row.enabled!==false&&(
+    aliases.has(String(row.skuOpenItemCode||''))||aliases.has(String(row.spuOpenItemCode||''))||
+    aliases.has(String(row.providerSkuId||''))||aliases.has(String(row.providerSpuId||''))
   ));
-  if(direct.length!==1)throw new Error(direct.length>1
-    ?'KEETA_ORDER_MAPPING_AMBIGUOUS:'+line.skuOpenItemCode
-    :'KEETA_ORDER_MAPPING_REQUIRED:'+line.skuOpenItemCode);
-  return direct[0]!;
+  if(explicit.length>1)throw new Error('KEETA_ORDER_MAPPING_AMBIGUOUS:'+line.skuOpenItemCode);
+  if(explicit.length===1){
+    const components=Array.isArray(explicit[0]!.components)?explicit[0]!.components!:[];
+    if(!components.length)throw new Error('KEETA_ORDER_MAPPING_COMPONENTS_REQUIRED:'+line.skuOpenItemCode);
+    return components.map(component=>{
+      const product=catalog.find(row=>String(row.id)===String(component.canonicalProductId||'')&&row.active!==false);
+      if(!product)throw new Error('KEETA_ORDER_MAPPING_CANONICAL_PRODUCT_MISSING:'+String(component.canonicalProductId||''));
+      const quantity=Number.isSafeInteger(component.quantity)&&Number(component.quantity)>0?Number(component.quantity):1;
+      return {product,quantity};
+    });
+  }
+  const candidates=[...aliases].flatMap(value=>[value,value.replace(/^(?:SPU:|SKU:|MF:)/i,'')]);
+  const direct=catalog.filter(row=>row.active!==false&&(candidates.includes(String(row.productCode||''))||candidates.includes(String(row.id||''))));
+  if(direct.length!==1)throw new Error(direct.length>1?'KEETA_ORDER_MAPPING_AMBIGUOUS:'+line.skuOpenItemCode:'KEETA_ORDER_MAPPING_REQUIRED:'+line.skuOpenItemCode);
+  return [{product:direct[0]!,quantity:1}];
 }
 function optionSummary(line:KeetaStandardProviderOrderFacts['lines'][number]){
   return line.selectedOptions
@@ -95,10 +92,12 @@ export function translateKeetaIntentToLocalOrder(input:MfkKeetaOrderIntent):Orde
     productCode:typeof row.productCode==='string'?row.productCode:undefined,
     active:row.active!==false,
   }));
-  const mappings=rows(config.channelMapping).map(row=>({
-    providerItemId:typeof row.providerItemId==='string'?row.providerItemId:undefined,
-    productId:typeof row.productId==='string'?row.productId:undefined,
-    status:typeof row.status==='string'?row.status:undefined,
+  const channelMappings=config.channelMappings&&typeof config.channelMappings==='object'&&!Array.isArray(config.channelMappings)?config.channelMappings as {keeta?:unknown}:{};
+  const mappings=rows(channelMappings.keeta).map(row=>({
+    mappingId:typeof row.mappingId==='string'?row.mappingId:undefined,enabled:row.enabled!==false,
+    skuOpenItemCode:typeof row.skuOpenItemCode==='string'?row.skuOpenItemCode:undefined,spuOpenItemCode:typeof row.spuOpenItemCode==='string'?row.spuOpenItemCode:undefined,
+    providerSkuId:typeof row.providerSkuId==='string'?row.providerSkuId:undefined,providerSpuId:typeof row.providerSpuId==='string'?row.providerSpuId:undefined,
+    channelName:typeof row.channelName==='string'?row.channelName:undefined,components:Array.isArray(row.components)?row.components as ChannelMappingComponent[]:[],
   }));
   const facts=normalizeKeetaStandardProviderOrderFacts({
     orderInfo:JSON.parse(intent.rawMessage),
@@ -108,21 +107,19 @@ export function translateKeetaIntentToLocalOrder(input:MfkKeetaOrderIntent):Orde
   if(facts.providerOrderId!==intent.providerOrderId)throw new Error('KEETA_ORDER_PROVIDER_ID_MISMATCH');
   if(facts.currency!=='HKD')throw new Error('KEETA_ORDER_CURRENCY_UNSUPPORTED:'+facts.currency);
 
-  const items=facts.lines.map(line=>{
-    const product=resolveProduct(line,catalog,mappings);
-    if(line.providerFinalAmountMinor!==line.providerFinalUnitPriceMinor*line.quantity){
-      throw new Error('KEETA_ORDER_LINE_AMOUNT_MISMATCH:'+line.skuOpenItemCode);
-    }
+  const items=facts.lines.flatMap(line=>{
+    if(line.providerFinalAmountMinor!==line.providerFinalUnitPriceMinor*line.quantity)throw new Error('KEETA_ORDER_LINE_AMOUNT_MISMATCH:'+line.skuOpenItemCode);
     const options=optionSummary(line);
-    return Object.freeze({
+    const components=resolveProductionComponents(line,catalog,mappings);
+    return components.map(({product,quantity},componentIndex)=>Object.freeze({
       id:String(product.id),
       name:String(product.name||line.providerProductName)+(options?'｜'+options:''),
-      qty:line.quantity,
-      unitMinor:line.providerFinalUnitPriceMinor,
+      qty:line.quantity*quantity,
+      unitMinor:componentIndex===0?line.providerFinalUnitPriceMinor:0,
       serviceMode:'takeaway' as const,
       ...(product.productCode?{productCode:String(product.productCode)}:{}),
-      ...(options?{detail:options}:{}),
-    });
+      detail:['Keeta: '+line.providerProductName,options].filter(Boolean).join('｜'),
+    }));
   });
   const totalMinor=items.reduce((sum,item)=>sum+item.unitMinor*item.qty,0);
   if(totalMinor<=0)throw new Error('KEETA_ORDER_TOTAL_INVALID');
