@@ -1,33 +1,26 @@
 {
   "version": 1,
-  "capability": "MFK_GOV_01_REGRESSION_CONTROL_FOUNDATION",
-  "base_sha": "c89de036a6e63fe86626e155da777591e9cf80c5",
+  "capability": "MFK_CANDIDATE_01_DINING_LIVE_REFRESH",
+  "base_sha": "b7776a08ef1721e9e7ea0e223b783295d0965a75",
   "allowed_paths": [
-    "AGENTS.md",
-    ".github/mfk-change-manifest.example.json",
     ".github/mfk-change-manifest.json",
-    ".github/pull_request_template.md",
-    ".github/scripts/mfk_regression_decision.py",
-    ".github/scripts/test_mfk_regression_decision.py",
-    ".github/workflows/mfk-regression-shadow.yml",
-    "docs/control/MFK_CHANGE_CONTROL.md",
-    "docs/control/MFK_MAIN_RULESET_PROPOSAL.md",
-    "docs/control/MFK_REGRESSION_MATRIX.md"
+    "v2local/src/presentation/RuntimeDiningWorkspace.tsx",
+    "v2local/src/presentation/smt-dining-admin-live-refresh.test.ts"
   ],
-  "authority_impact": "GOVERNANCE_ONLY",
+  "authority_impact": "NONE",
   "persistence_impact": "NONE",
   "provider_impact": "NONE",
   "transaction_impact": "NONE",
   "expected_behavior_change": [
-    "Classify Candidate scope and declared blast radius.",
-    "Compare scoped base and Candidate test evidence.",
-    "Publish a non-blocking Shadow Mode decision report."
+    "When an Admin config doorbell is applied, the active SMT Dining workspace reloads its read model immediately without a page reload."
   ],
   "non_goals": [
-    "No product runtime change.",
-    "No Builder, deploy, OTA, Ruleset, package manager, Node, dependency, or GitHub Action major-version change.",
-    "No merge, deploy, or OTA."
+    "No Dining transaction-state change.",
+    "No Admin publish protocol change.",
+    "No table registry behavior change.",
+    "No WebSocket transport change.",
+    "No polling or reconciliation change."
   ],
-  "rollback_sha": "c89de036a6e63fe86626e155da777591e9cf80c5",
-  "severity": "WARNING"
+  "rollback_sha": "b7776a08ef1721e9e7ea0e223b783295d0965a75",
+  "severity": "SOFT_BLOCK"
 }
