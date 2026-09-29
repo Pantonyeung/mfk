@@ -117,7 +117,7 @@ describe('Owner canonical read projection',()=>{
       occurredAt:'2026-09-29T00:00:00.000Z',
       payload:{nodeId:'p1',status:'soldout',sellable:false,source:'SMT_RUNTIME',observedAt:'2026-09-29T00:00:00.000Z'},
     });
-    const response=await store.fetch(new Request('https://internal/projection/events',{method:'POST',headers:{'content-type':'application/json',origin:'https://smt.morefunos.com'},body:JSON.stringify({events:[event]})}));
+    const response=await store.fetch(new Request('https://internal/projection/events',{method:'POST',headers:{'content-type':'application/json',origin:'https://appassets.androidplatform.net'},body:JSON.stringify({events:[event]})}));
     expect(response.status).toBe(200);
     await Promise.resolve();
     expect(providerCalls).toHaveLength(1);
