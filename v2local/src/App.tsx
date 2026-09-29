@@ -1,3 +1,4 @@
+import {mfkVersionLabel} from '../../contracts/product-version-v1.ts';
 import {useEffect,useMemo,useRef,useState} from 'react';
 import {NavLink,Navigate,Route,Routes,useNavigate} from 'react-router';
 import {useLocation} from 'react-router';
@@ -1145,7 +1146,7 @@ function OperationalApp(){
         </NavLink>)}
       </nav>
       <StaffSessionBadge/>
-      <div className="clean-runtime-state">LOCAL<br/>OFFLINE</div>
+      <div className="clean-runtime-state">LOCAL<br/>OFFLINE<br/><MfkBuildIdentity/></div>
     </aside>
     <section className="clean-route-stage">
       <Routes>
@@ -1165,3 +1166,5 @@ function OperationalApp(){
 export function MfkV2LocalApp(){
   return <StaffAuthGate><CashOpeningGate><OperationalApp/></CashOpeningGate></StaffAuthGate>;
 }
+
+function MfkBuildIdentity(){const v=mfkVersionLabel('SMT');return <small data-mfk-build-identity="SMT">SMT · v{v.version} · {v.sourceSha.slice(0,12)}</small>}
