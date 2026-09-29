@@ -24,12 +24,12 @@ describe('MFK Admin complete operational workflows',()=>{
     expect(queue).toContain('未有證據唔可以標記已解決');
   });
 
-  it('uses Save as the immutable active-version boundary',()=>{
+  it('keeps Browser save history distinct from formal Admin publish authority',()=>{
     const html=render('/admin/publish');
-    for(const marker of ['設定版本歷史','保存','目前版本','版本總數','版本歷史','還原']){
+    for(const marker of ['本機保存歷史','本機保存紀錄','唔代表正式 Authority','Cloud canonical commit','還原']){
       expect(html).toContain(marker);
     }
-    for(const retired of ['待發布變更','確認影響範圍','建立正式設定版本','建立並下載發布檔案','匯入門店回傳','建立新草稿']){
+    for(const retired of ['設定版本歷史','目前版本 R','待發布變更','確認影響範圍','建立正式設定版本','建立並下載發布檔案','匯入門店回傳','建立新草稿']){
       expect(html).not.toContain(retired);
     }
   });
