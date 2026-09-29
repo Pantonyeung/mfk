@@ -122,7 +122,6 @@ export function installSmmWebAcceptanceIntake(ingress:SmmWebAcceptanceIngress){
   installed=true;
   const reconcile=()=>void reconcileSmmWebAcceptanceIntake(ingress);
   window.addEventListener('online',reconcile);
-  window.addEventListener('focus',reconcile);
   document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')reconcile();});
   timer=window.setInterval(()=>{
     if(document.visibilityState==='visible'&&navigator.onLine)reconcile();
