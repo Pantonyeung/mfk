@@ -1,0 +1,107 @@
+name: MFK / Regression Shadow
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      base_sha:
+        description: Exact 40-character base SHA
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  decision:
+    name: MFK / Regression Shadow
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout candidate
+        continue-on-error: true
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          path: candidate
+
+      - name: Governance self-test
+        id: self_test
+        continue-on-error: true
+        working-directory: candidate
+        run: python3 -m unittest discover -s .github/scripts -p 'test_*.py'
+
+      - name: Classify scope
+        id: scope
+        continue-on-error: true
+        env:
+          BASE_FALLBACK: ${{ github.event.pull_request.base.sha || inputs.base_sha }}
+        run: >-
+          python3 candidate/.github/scripts/mfk_regression_decision.py report
+          --repo candidate
+          --manifest candidate/.github/mfk-change-manifest.json
+          --base-fallback "$BASE_FALLBACK"
+          --json-out candidate/mfk-regression-plan.json
+          --markdown-out candidate/mfk-regression-plan.md
+
+      - name: Checkout declared base
+        if: steps.scope.outcome == 'success' && steps.scope.outputs.has_tests == 'true'
+        continue-on-error: true
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.scope.outputs.base_sha }}
+          path: base
+
+      - name: Use existing Node runtime
+        if: steps.scope.outcome == 'success' && steps.scope.outputs.has_tests == 'true'
+        continue-on-error: true
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Run scoped base and candidate checks
+        id: scoped_tests
+        if: steps.scope.outcome == 'success' && steps.scope.outputs.has_tests == 'true'
+        continue-on-error: true
+        run: >-
+          python3 candidate/.github/scripts/mfk_regression_decision.py run-tests
+          --plan candidate/mfk-regression-plan.json
+          --base-repo base
+          --candidate-repo candidate
+          --results-out candidate/mfk-regression-results.json
+
+      - name: Produce final decision
+        id: final_decision
+        if: steps.scope.outcome == 'success'
+        continue-on-error: true
+        env:
+          BASE_FALLBACK: ${{ github.event.pull_request.base.sha || inputs.base_sha }}
+        run: >-
+          python3 candidate/.github/scripts/mfk_regression_decision.py report
+          --repo candidate
+          --manifest candidate/.github/mfk-change-manifest.json
+          --base-fallback "$BASE_FALLBACK"
+          --results candidate/mfk-regression-results.json
+          --json-out candidate/mfk-regression-decision.json
+          --markdown-out candidate/mfk-regression-decision.md
+
+      - name: Publish shadow evidence
+        if: always()
+        continue-on-error: true
+        shell: bash
+        run: |
+          if [[ -f candidate/mfk-regression-decision.md ]]; then
+            cat candidate/mfk-regression-decision.md >> "$GITHUB_STEP_SUMMARY"
+          elif [[ -f candidate/mfk-regression-plan.md ]]; then
+            cat candidate/mfk-regression-plan.md >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo '## MFK Regression Shadow' >> "$GITHUB_STEP_SUMMARY"
+            echo '- WARNING: GOVERNANCE_TOOLING_FAILURE' >> "$GITHUB_STEP_SUMMARY"
+          fi
+          if [[ '${{ steps.self_test.outcome }}' != 'success' ]]; then
+            echo '- WARNING: GOVERNANCE_SELF_TEST_FAILURE' >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Shadow mode completion
+        if: always()
+        run: echo 'SHADOW_REPORT_ONLY — this governance workflow does not block merge.'
