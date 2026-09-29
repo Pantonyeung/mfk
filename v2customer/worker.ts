@@ -1,4 +1,4 @@
-const UI0_OBJECT_KEY='ui/ui0/opening-mobile-v1.mp4';
+const UI0_OBJECT_KEY='ui/ui0/opening-mobile-v1.MP4';
 
 export default {
   async fetch(request,env){
