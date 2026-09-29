@@ -884,6 +884,11 @@ export class AdminSyncStore{
     const site=request.headers.get('sec-fetch-site');
     if(origin!==ADMIN_ORIGIN)return false;
     if(site&&site!=='same-origin')return false;
+    const sessionToken=(request.headers.get('x-mfk-admin-session')||'').trim();
+    if(sessionToken){
+      const session=await this.readAdminBrowserSession(request);
+      if(session)return true;
+    }
     const key=(request.headers.get('x-mfk-admin-publish-key')||'').trim();
     if(key.length<32||key.length>256)return false;
     const enrolled=await this.state.storage.get('publisherKeyHash');
