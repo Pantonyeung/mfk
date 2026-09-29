@@ -25,6 +25,16 @@ function cors(request){
     'vary':'origin',
   }:{};
 }
+
+// A WebSocket upgrade response carries an out-of-band webSocket handle. Rebuilding
+// that response drops the handle in Workers, so the events route must remain the
+// exact response returned by the Durable Object.
+export function adminSyncOuterResponse(pathname,response,request){
+  if(pathname==='/api/admin-sync/events')return response;
+  const headers=new Headers(response.headers);
+  for(const [key,value] of Object.entries(cors(request)))headers.set(key,value);
+  return new Response(response.body,{status:response.status,statusText:response.statusText,headers});
+}
 async function sha256(value){
   const bytes=new TextEncoder().encode(value);
   const digest=await crypto.subtle.digest('SHA-256',bytes);
@@ -2199,12 +2209,9 @@ export default {
       target.search='';
       const forwarded=new Request(target.toString(),request);
       const response=await stub.fetch(forwarded);
-      const headers=new Headers(response.headers);
-      for(const [key,value] of Object.entries(cors(request)))headers.set(key,value);
-      return new Response(response.body,{status:response.status,statusText:response.statusText,headers});
+      return adminSyncOuterResponse(url.pathname,response,request);
     }
     if(url.pathname==='/api/health')return json({ok:true,service:'mfk-admin',sourceSha:String(env.MFK_SOURCE_SHA||'UNKNOWN')});
     return env.ASSETS.fetch(request);
   },
 };
-

@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "test": "vitest run"
+    "test": "vitest run",
+    "deploy:web-acceptance": "wrangler deploy --config wrangler.web-acceptance.jsonc --var MFK_SOURCE_SHA:$(git rev-parse HEAD) --var MFK_BUILD_ID:$(cat BUILD_ID)"
   },
   "dependencies": {
     "react": "19.2.8",
