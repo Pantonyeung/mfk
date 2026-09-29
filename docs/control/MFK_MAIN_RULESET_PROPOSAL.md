@@ -2,7 +2,9 @@
 
 Status: PROPOSAL ONLY / NOT APPLIED
 
-Live readback on 2026-09-29: repository Rulesets = 0; `main` has no branch protection.
+Live readback on 2026-09-30: repository Rulesets = 0.
+
+Legacy branch protection state has not been verified by the current integration because the protection endpoint is not accessible with the current GitHub integration permissions. Unavailable evidence is not evidence that protection is absent.
 
 ## Proposed branch rules
 

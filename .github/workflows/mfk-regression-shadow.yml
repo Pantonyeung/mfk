@@ -45,7 +45,7 @@ jobs:
           --json-out candidate/mfk-regression-plan.json
           --markdown-out candidate/mfk-regression-plan.md
 
-      - name: Checkout declared base
+      - name: Checkout effective base
         if: steps.scope.outcome == 'success' && steps.scope.outputs.has_tests == 'true'
         continue-on-error: true
         uses: actions/checkout@v4

@@ -35,12 +35,12 @@ This layer wraps and references existing MFK checks. It does not replace Builder
 
 ## Candidate manifest
 
-Every Candidate provides `.github/mfk-change-manifest.json`, based on `.github/mfk-change-manifest.example.json`.
+Every Candidate provides `.github/mfk-change-manifest.json`, based on `.github/mfk-change-manifest.example.json`. It is Candidate-owned only when that path is added or modified relative to the live Pull Request base. A copy inherited unchanged from `main` is historical data, not an active declaration.
 
 Required fields:
 
 - `capability`: one bounded capability identifier.
-- `base_sha`: exact 40-character source base used for `BASE...HEAD`.
+- `base_sha`: exact 40-character source base declared by the Candidate.
 - `allowed_paths`: explicit files or glob patterns; no inferred exceptions.
 - `authority_impact`, `persistence_impact`, `provider_impact`, `transaction_impact`.
 - `expected_behavior_change` and `non_goals`.
@@ -48,6 +48,8 @@ Required fields:
 - `severity`: `HARD_BLOCK`, `SOFT_BLOCK`, or `WARNING`.
 
 The manifest itself must be declared in `allowed_paths`. A path outside the list is `UNDECLARED_BLAST_RADIUS`; reviewers decide whether to narrow the diff or issue a new declaration. The classifier never guesses that an undeclared path is reasonable.
+
+The workflow uses the live Pull Request base as the effective `BASE...HEAD` comparison. If an owned manifest declares another base, it reports `STALE_MANIFEST_BASE_IGNORED` and does not widen the diff from that stale SHA. If the manifest is missing or inherited unchanged, Shadow Mode reports `MANIFEST_NOT_CANDIDATE_OWNED` and `GOVERNANCE_EVIDENCE_MISSING`, ignores its declarations, and classifies the live-base diff without turning the evidence gap into an undeclared-path failure. A future promoted gate may strengthen this policy; Shadow Mode remains non-blocking.
 
 ## Gate contract
 
@@ -93,7 +95,7 @@ Base and Candidate run the same selected command after separate dependency insta
 
 The workflow publishes:
 
-`CAPABILITY`, `CHANGED_FILES`, `AFFECTED_PORTS`, `HARD_RISKS`, `SOFT_RISKS`, `WARNINGS`, `KNOWN_REDS`, `RELEVANT_TESTS`, `UNDECLARED_PATHS`, and `DECISION`.
+`CAPABILITY`, `MANIFEST_OWNERSHIP`, `DECLARED_BASE_SHA`, `EFFECTIVE_BASE_SHA`, `CHANGED_FILES`, `AFFECTED_PORTS`, `HARD_RISKS`, `SOFT_RISKS`, `WARNINGS`, `KNOWN_REDS`, `RELEVANT_TESTS`, `UNDECLARED_PATHS`, and `DECISION`.
 
 JSON is retained in the workflow workspace and the Markdown form is written to the GitHub job summary. The current workflow has no deploy permissions and calls no deploy, Builder, OTA, or repository-settings API.
 

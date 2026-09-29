@@ -243,13 +243,23 @@ def compare_results(suite_ids: list[str], results: dict) -> tuple[list[str], lis
     return hard, soft, warnings, known_reds
 
 
-def build_report(manifest: dict, manifest_errors: list[str], paths: list[str], results: dict | None) -> dict:
+def build_report(
+    manifest: dict,
+    manifest_errors: list[str],
+    paths: list[str],
+    results: dict | None,
+    *,
+    manifest_owned: bool = True,
+    initial_warnings: list[str] | None = None,
+) -> dict:
     ports, suite_ids, path_hard, path_warnings = classify_paths(paths)
-    allowed = manifest.get("allowed_paths", [])
-    undeclared = sorted(path for path in paths if not matches(path, allowed))
+    undeclared = []
+    if manifest_owned:
+        allowed = manifest.get("allowed_paths", [])
+        undeclared = sorted(path for path in paths if not matches(path, allowed))
     hard = list(manifest_errors) + path_hard
     soft: list[str] = []
-    warnings = path_warnings
+    warnings = path_warnings + list(initial_warnings or [])
     known_reds: list[str] = []
     improvements: list[str] = []
     if undeclared:
@@ -293,6 +303,14 @@ def build_report(manifest: dict, manifest_errors: list[str], paths: list[str], r
     }
 
 
+def manifest_candidate_owned(repo: Path, base_sha: str, head: str, manifest_path: Path) -> bool:
+    try:
+        relative_path = manifest_path.resolve().relative_to(repo.resolve()).as_posix()
+    except ValueError:
+        return False
+    return bool(git_output(repo, "diff", "--name-only", f"{base_sha}...{head}", "--", relative_path))
+
+
 def markdown(report: dict) -> str:
     def section(name: str) -> str:
         value = report[name]
@@ -300,7 +318,7 @@ def markdown(report: dict) -> str:
             value = [item["id"] for item in value]
         items = value if isinstance(value, list) else [value]
         return f"## {name}\n" + ("\n".join(f"- `{item}`" for item in items) if items else "- None")
-    names = ("CAPABILITY", "CHANGED_FILES", "AFFECTED_PORTS", "HARD_RISKS", "SOFT_RISKS", "WARNINGS", "KNOWN_REDS", "RELEVANT_TESTS", "UNDECLARED_PATHS", "DECISION")
+    names = ("CAPABILITY", "MANIFEST_OWNERSHIP", "DECLARED_BASE_SHA", "EFFECTIVE_BASE_SHA", "CHANGED_FILES", "AFFECTED_PORTS", "HARD_RISKS", "SOFT_RISKS", "WARNINGS", "KNOWN_REDS", "RELEVANT_TESTS", "UNDECLARED_PATHS", "DECISION")
     return "# MFK Regression Decision (Shadow Mode)\n\n" + "\n\n".join(section(name) for name in names) + "\n"
 
 
@@ -313,8 +331,36 @@ def write_github_output(base_sha: str, has_tests: bool) -> None:
 
 def report_command(args: argparse.Namespace) -> int:
     repo = Path(args.repo).resolve()
-    manifest, errors = load_manifest(Path(args.manifest), args.base_fallback)
-    base_sha = manifest.get("base_sha") or args.base_fallback
+    manifest_path = Path(args.manifest).resolve()
+    base_fallback = str(args.base_fallback or "").strip()
+    manifest_owned = False
+    ownership_warnings: list[str] = []
+    if SHA40.fullmatch(base_fallback):
+        try:
+            manifest_owned = manifest_candidate_owned(repo, base_fallback, args.head, manifest_path)
+        except RuntimeError:
+            ownership_warnings.append("MANIFEST_OWNERSHIP_UNAVAILABLE")
+
+    if manifest_owned:
+        manifest, errors = load_manifest(manifest_path, base_fallback)
+    else:
+        manifest = {
+            "capability": "UNKNOWN",
+            "base_sha": base_fallback,
+            "allowed_paths": [],
+            "authority_impact": "NONE",
+            "persistence_impact": "NONE",
+            "provider_impact": "NONE",
+            "transaction_impact": "NONE",
+            "severity": "WARNING",
+        }
+        errors = []
+        ownership_warnings.extend(("MANIFEST_NOT_CANDIDATE_OWNED", "GOVERNANCE_EVIDENCE_MISSING"))
+
+    declared_base_sha = str(manifest.get("base_sha") or "").strip()
+    base_sha = base_fallback or declared_base_sha
+    if manifest_owned and base_fallback and declared_base_sha != base_fallback:
+        ownership_warnings.append("STALE_MANIFEST_BASE_IGNORED")
     paths: list[str] = []
     if SHA40.fullmatch(str(base_sha)):
         try:
@@ -331,7 +377,17 @@ def report_command(args: argparse.Namespace) -> int:
             results = json.loads(Path(args.results).read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError) as exc:
             errors.append(f"RESULTS_INVALID:{exc}")
-    result = build_report(manifest, errors, paths, results)
+    result = build_report(
+        manifest,
+        errors,
+        paths,
+        results,
+        manifest_owned=manifest_owned,
+        initial_warnings=ownership_warnings,
+    )
+    result["MANIFEST_OWNERSHIP"] = "CANDIDATE_OWNED" if manifest_owned else "INHERITED_OR_MISSING"
+    result["DECLARED_BASE_SHA"] = declared_base_sha if manifest_owned else None
+    result["EFFECTIVE_BASE_SHA"] = base_sha
     Path(args.json_out).write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
     Path(args.markdown_out).write_text(markdown(result), encoding="utf-8")
     write_github_output(str(base_sha), bool(result["RELEVANT_TESTS"]))

@@ -1,7 +1,7 @@
 {
   "version": 1,
   "capability": "MFK_GOV_01_REGRESSION_CONTROL_FOUNDATION",
-  "base_sha": "6cb2d05ecfd49ca0a3bc972a03cb283ce1c64d1a",
+  "base_sha": "c89de036a6e63fe86626e155da777591e9cf80c5",
   "allowed_paths": [
     "AGENTS.md",
     ".github/mfk-change-manifest.example.json",
@@ -28,6 +28,6 @@
     "No Builder, deploy, OTA, Ruleset, package manager, Node, dependency, or GitHub Action major-version change.",
     "No merge, deploy, or OTA."
   ],
-  "rollback_sha": "6cb2d05ecfd49ca0a3bc972a03cb283ce1c64d1a",
+  "rollback_sha": "c89de036a6e63fe86626e155da777591e9cf80c5",
   "severity": "WARNING"
 }
