@@ -5,7 +5,7 @@ import type {StaffPinVerifier} from '../../contracts/staff-auth-v1.ts';
 import {useAdminDraft} from './admin-draft.tsx';
 import {appendAdminAudit,readActiveAdminRelease,usePersistentAdminState,writeAdminStored} from './admin-local-store.ts';
 import {saveAdminConfig} from './admin-config-save.ts';
-import {readFreshDiningOccupancy,uploadAdminPaymentQr} from './admin-sync-client.ts';
+import {publishAdminReleaseConfirmed,readFreshDiningOccupancy,uploadAdminPaymentQr} from './admin-sync-client.ts';
 import {
   beginKeetaOAuth,
   checkKeetaTokenReadiness,
@@ -305,7 +305,7 @@ export function StoreSettingsWorkspace({domain='home'}:{domain?:StoreSettingsDom
     setSaveErrors([]);
     setSaveMessage('已儲存本頁設定草稿；未建立正式版本。');
   };
-  const publishStoreSettings=()=>{
+  const publishStoreSettings=async()=>{
     const currentErrors=validateStoreSettingsDomain(domain,validationInput());
     if(currentErrors.length){setSaveErrors(currentErrors);setPublishBlockers([]);setSaveMessage('未能發佈；請修正標示欄位。');focusFirstError(currentErrors);return;}
     writeAdminStored('store-settings.v1',config);
@@ -325,10 +325,16 @@ export function StoreSettingsWorkspace({domain='home'}:{domain?:StoreSettingsDom
       errorSummaryRef.current?.scrollIntoView({behavior:'smooth',block:'start'});
       return;
     }
-    markClean();
     setSaveErrors([]);
     setPublishBlockers([]);
-    setSaveMessage('已正式保存並發佈 R'+result.release.version+'；已排入 Admin → SMT／SMM 自動同步。');
+    setSaveMessage('R'+result.release.version+' 正在送往雲端並確認 canonical readback…');
+    try{
+      await publishAdminReleaseConfirmed(result.release);
+      markClean();
+      setSaveMessage('已正式保存並發佈 R'+result.release.version+'；雲端 canonical readback 已確認。');
+    }catch(error){
+      setSaveMessage('R'+result.release.version+' 未完成正式發佈：'+(error instanceof Error?error.message:'ADMIN_SYNC_PUBLISH_FAILED'));
+    }
   };
   const fieldError=(id:string)=>saveErrors.find(error=>error.fieldId===id)?.message;
   const fieldProps=(id:string)=>({id,'aria-invalid':Boolean(fieldError(id))||undefined,'aria-describedby':fieldError(id)?id+'-error':undefined});
@@ -339,7 +345,7 @@ export function StoreSettingsWorkspace({domain='home'}:{domain?:StoreSettingsDom
   return <section className="admin-editor-page">
     <header className="admin-editor-head">
       <div><small>{activeRelease?'目前 R'+activeRelease.version:'未有正式版本'} · 門店設定</small><h1>門店設定</h1><p>本機修改會自動保存草稿；只有撳「保存並發佈」先建立正式版本，並送去 SMT／SMM。</p>{saveMessage?<span>{saveMessage}</span>:null}</div>
-      <div className="admin-editor-actions"><button className="primary" type="button" onClick={saveStoreSettings}>儲存本頁設定</button><button className="primary" type="button" onClick={publishStoreSettings}>正式保存並發佈</button></div>
+      <div className="admin-editor-actions"><button className="primary" type="button" onClick={saveStoreSettings}>儲存本頁設定</button><button className="primary" type="button" onClick={()=>void publishStoreSettings()}>正式保存並發佈</button></div>
     </header>
     {publishBlockers.length?<div ref={errorSummaryRef} className="admin-validation is-error" role="alert" tabIndex={-1}><b>無法正式發佈</b><ul>{publishBlockers.map((error,index)=><li key={index}><b>{error.label}</b> → {error.message} <Link to={error.path}>前往設定</Link></li>)}</ul></div>:null}
     {saveErrors.length?<div ref={errorSummaryRef} className="admin-validation is-error" role="alert" tabIndex={-1}><b>有 {saveErrors.length} 項需要處理</b><ul>{saveErrors.map((error,index)=><li key={index}><button type="button" className="admin-error-link" onClick={()=>{const node=document.getElementById(error.fieldId);node?.scrollIntoView({behavior:'smooth',block:'center'});node?.focus();}}>{error.message}</button></li>)}</ul></div>:null}
