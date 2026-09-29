@@ -1,3 +1,4 @@
+import {mfkVersionLabel} from '../../contracts/product-version-v1';
 import {useEffect,useMemo,useRef,useState} from 'react';
 import {createCustomerPendingIntent,customerFallbackReference,readCustomerLocalWorkspace,writeCustomerLocalWorkspace,type CustomerLocalPreferences} from './persistence';
 import {resolveCustomerRuntimePort} from './runtime';
@@ -836,3 +837,5 @@ export function App(){
   </main>;
 }
 
+
+export function CustomerBuildIdentity(){const v=mfkVersionLabel('CUSTOMER');return <small data-mfk-build-identity="CUSTOMER">CUSTOMER · v{v.version} · {v.sourceSha.slice(0,12)}</small>}

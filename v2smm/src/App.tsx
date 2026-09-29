@@ -1,3 +1,4 @@
+import {mfkVersionLabel} from '../../contracts/product-version-v1';
 import {useEffect,useMemo,useRef,useState} from 'react';
 import {readSmmLocalWorkspace,writeSmmLocalWorkspace,createSmmPendingIntent,type SmmLocalPreferences} from './persistence';
 import {resolveSmmRuntimePort} from './runtime';
@@ -1615,3 +1616,4 @@ function refundStateLabel(state:string){return state==='PENDING'?'待處理':sta
 function printStateLabel(state:string){return state==='READY'?'正常':state==='UNKNOWN'?'狀態未明':'需要留意'}
 
 function connectionLabelShort(state:SmmConnectionState){return state==='READY'?'已連接':state==='LOADING'?'同步中':state==='ERROR'?'錯誤':state==='STALE'?'資料稍舊':state==='PARTIAL'?'部分資料':state==='UNKNOWN'?'未知':'未連接'}
+export function SmmBuildIdentity(){const v=mfkVersionLabel('SMM');return <small data-mfk-build-identity="SMM">SMM · v{v.version} · {v.sourceSha.slice(0,12)}</small>}
