@@ -8,7 +8,7 @@ import {
   readSmtAdminSyncStatus,
 } from './admin-config-sync.ts';
 import {projectSyncedCombos,projectSyncedOrderingCatalog} from './admin-config-projection.ts';
-import {localRuntime,normalizeRuntimeAvailabilityForBusinessDay,SMT_LOCAL_RUNTIME_STORAGE_KEY} from './local-runtime.ts';
+import {localRuntime,normalizeRuntimeAvailabilityForBusinessDay} from './local-runtime.ts';
 import {capacityNoticeForCount,readSmtFrontlinePresentation,readSmtPrintConfig,readSmtQuickReasons,readSmtStoreSettings} from './admin-operational-config.ts';
 
 function installStorage(){
