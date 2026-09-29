@@ -13,33 +13,30 @@ permissions:
 jobs:
   probe:
     runs-on: ubuntu-latest
-    env:
-      WEB_ACCEPTANCE_TOKEN: ${{ secrets.WEB_ACCEPTANCE_TOKEN }}
     steps:
-      - name: Probe public SMT HTTP and WebSocket
+      - name: Probe direct Admin WebSocket and public acceptance gate
         shell: bash
         run: |
           set -euo pipefail
           npm install --silent ws@8
           node <<'NODE'
-          const crypto=require('node:crypto');
           const WebSocket=require('ws');
-          const host='mfk-smt-web.yeungyi88.workers.dev';
-          const token=process.env.WEB_ACCEPTANCE_TOKEN||'';
-          console.log(JSON.stringify({secretPresent:Boolean(token)}));
-          const proof=token?crypto.createHash('sha256').update('MFK-SMT-WEB-ACCEPTANCE:'+token).digest('hex'):'';
-          const cookie=proof?'mfk_smt_web_acceptance_session='+proof:'';
-          const http=await fetch('https://'+host+'/__mfk/health',{headers:cookie?{cookie}:{}}).catch(e=>null);
-          if(http){
-            console.log(JSON.stringify({httpStatus:http.status,httpBody:(await http.text()).slice(0,500)}));
-          }else console.log(JSON.stringify({httpStatus:0}));
-          await new Promise(resolve=>{
-            const ws=new WebSocket('wss://'+host+'/__mfk/admin/api/admin-sync/events?storeId=MF01',{headers:cookie?{Cookie:cookie}:{}});
-            const timer=setTimeout(()=>{console.log(JSON.stringify({ws:'TIMEOUT'}));try{ws.terminate()}catch{};resolve()},8000);
-            ws.on('open',()=>console.log(JSON.stringify({ws:'OPEN'})));
-            ws.on('message',data=>{console.log(JSON.stringify({ws:'MESSAGE',data:String(data).slice(0,1000)}));clearTimeout(timer);ws.close();resolve()});
-            ws.on('unexpected-response',(_req,res)=>{console.log(JSON.stringify({ws:'UNEXPECTED_RESPONSE',status:res.statusCode,headers:res.headers}));clearTimeout(timer);resolve()});
-            ws.on('error',error=>{console.log(JSON.stringify({ws:'ERROR',error:String(error)}));});
-            ws.on('close',(code,reason)=>{console.log(JSON.stringify({ws:'CLOSE',code,reason:String(reason)}));});
-          });
+          async function probe(url,headers={}){
+            return await new Promise(resolve=>{
+              const out={url};
+              const ws=new WebSocket(url,{headers});
+              const timer=setTimeout(()=>{out.result='TIMEOUT';try{ws.terminate()}catch{};resolve(out)},8000);
+              ws.on('open',()=>{out.open=true});
+              ws.on('message',data=>{out.result='MESSAGE';out.data=String(data).slice(0,1000);clearTimeout(timer);ws.close();resolve(out)});
+              ws.on('unexpected-response',(_req,res)=>{out.result='HTTP_'+res.statusCode;out.headers=res.headers;clearTimeout(timer);resolve(out)});
+              ws.on('error',error=>{out.error=String(error)});
+              ws.on('close',(code,reason)=>{out.close={code,reason:String(reason)}});
+            });
+          }
+          (async()=>{
+            const direct=await probe('wss://admin.morefunos.com/api/admin-sync/events?storeId=MF01');
+            console.log(JSON.stringify({probe:'direct-admin',...direct}));
+            const publicProbe=await probe('wss://mfk-smt-web.yeungyi88.workers.dev/__mfk/admin/api/admin-sync/events?storeId=MF01');
+            console.log(JSON.stringify({probe:'public-no-cookie',...publicProbe}));
+          })().catch(error=>{console.error(error);process.exit(1)});
           NODE
