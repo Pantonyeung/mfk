@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "capability": "SMM_REQUEST_STORM",
+  "base_sha": "0000000000000000000000000000000000000000",
+  "allowed_paths": [
+    "v2smm/src/App.tsx",
+    "v2smm/test/**"
+  ],
+  "authority_impact": "NONE",
+  "persistence_impact": "NONE",
+  "provider_impact": "NONE",
+  "transaction_impact": "NONE",
+  "expected_behavior_change": [
+    "Bound repeated SMM snapshot requests."
+  ],
+  "non_goals": [
+    "No SMT, Admin, Customer, Keeta, Builder, deploy, or OTA change."
+  ],
+  "rollback_sha": "0000000000000000000000000000000000000000",
+  "severity": "SOFT_BLOCK"
+}

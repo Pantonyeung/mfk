@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "capability": "MFK_GOV_01_REGRESSION_CONTROL_FOUNDATION",
+  "base_sha": "c89de036a6e63fe86626e155da777591e9cf80c5",
+  "allowed_paths": [
+    "AGENTS.md",
+    ".github/mfk-change-manifest.example.json",
+    ".github/mfk-change-manifest.json",
+    ".github/pull_request_template.md",
+    ".github/scripts/mfk_regression_decision.py",
+    ".github/scripts/test_mfk_regression_decision.py",
+    ".github/workflows/mfk-regression-shadow.yml",
+    "docs/control/MFK_CHANGE_CONTROL.md",
+    "docs/control/MFK_MAIN_RULESET_PROPOSAL.md",
+    "docs/control/MFK_REGRESSION_MATRIX.md"
+  ],
+  "authority_impact": "GOVERNANCE_ONLY",
+  "persistence_impact": "NONE",
+  "provider_impact": "NONE",
+  "transaction_impact": "NONE",
+  "expected_behavior_change": [
+    "Classify Candidate scope and declared blast radius.",
+    "Compare scoped base and Candidate test evidence.",
+    "Publish a non-blocking Shadow Mode decision report."
+  ],
+  "non_goals": [
+    "No product runtime change.",
+    "No Builder, deploy, OTA, Ruleset, package manager, Node, dependency, or GitHub Action major-version change.",
+    "No merge, deploy, or OTA."
+  ],
+  "rollback_sha": "c89de036a6e63fe86626e155da777591e9cf80c5",
+  "severity": "WARNING"
+}
