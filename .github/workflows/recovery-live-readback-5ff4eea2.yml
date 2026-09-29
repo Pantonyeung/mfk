@@ -1,0 +1,53 @@
+name: recovery-live-readback-5ff4eea2
+
+on:
+  push:
+    branches:
+      - recovery/live-readback-5ff4eea2-r1
+    paths:
+      - '.github/workflows/recovery-live-readback-5ff4eea2.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  readback:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Read production recovery state
+        shell: bash
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const endpoints={
+            adminHealth:'https://admin.morefunos.com/api/health',
+            adminActive:'https://admin.morefunos.com/api/admin-sync/active?storeId=MF01',
+            ownerHealth:'https://owner.morefunos.com/api/health',
+          };
+          for(const [name,url] of Object.entries(endpoints)){
+            try{
+              const response=await fetch(url,{headers:{accept:'application/json','cache-control':'no-cache'}});
+              const text=await response.text();
+              let body=null; try{body=JSON.parse(text)}catch{}
+              if(name==='adminActive'){
+                const s=body?.snapshot||{};
+                const p=s?.channelPolicy||{};
+                const tables=Array.isArray(s?.storeSettings?.diningTables)?s.storeSettings.diningTables:[];
+                console.log(JSON.stringify({
+                  name,status:response.status,
+                  revision:body?.revision??null,
+                  fingerprint:body?.fingerprint??null,
+                  publishedAt:body?.publishedAt??null,
+                  keetaEnabled:p?.enabled??null,
+                  keetaAutoAccept:p?.autoAccept??null,
+                  keetaSyncSellability:p?.syncSellability??null,
+                  diningTables:tables.map(x=>({id:x?.id,name:x?.name,active:x?.active})).slice(0,30),
+                }));
+              }else{
+                console.log(JSON.stringify({name,status:response.status,body}));
+              }
+            }catch(error){
+              console.log(JSON.stringify({name,error:String(error)}));
+            }
+          }
+          NODE
