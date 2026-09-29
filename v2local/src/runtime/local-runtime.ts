@@ -349,7 +349,7 @@ export function rollRuntimeAvailabilityForBusinessDay(now=Date.now()){
   localStorage.setItem(KEY,JSON.stringify(data));
   return true;
 }
-rollRuntimeAvailabilityForBusinessDay();
+if(typeof localStorage!=='undefined')rollRuntimeAvailabilityForBusinessDay();
 let runtimeIdentitySequence=0;
 function nextRuntimeIdentity(prefix:'MFK-'|'HOLD-'|'ACT-'){
   const stamp=Date.now().toString(36);
