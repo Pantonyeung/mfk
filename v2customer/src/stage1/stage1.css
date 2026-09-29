@@ -52,3 +52,22 @@
   .stage1-shortcut-source{width:34px;height:34px}
   .stage1-quick-entry-grid strong{font-size:11px}
 }
+
+/* UI1 FINAL layout pass: preserve source hierarchy while keeping canonical runtime data. */
+.stage1-content{padding-top:12px}
+.stage1-welcome{padding:10px 4px 12px}
+.stage1-welcome h1{max-width:330px;font-size:27px;line-height:1.08}
+.stage1-welcome p{font-size:12px;line-height:1.5}
+.stage1-search-entry{margin-bottom:2px}
+.stage1-hero-banner{margin-top:12px}
+.stage1-quick-entry-section{margin-top:12px}
+.stage1-top6{margin-top:20px}
+.stage1-section-title h2{font-size:16px}
+.stage1-product-card{box-shadow:0 4px 12px rgba(37,51,70,.045)}
+.stage1-product-media{height:120px}
+.stage1-memory-strip{margin-bottom:8px}
+@media(max-width:360px){
+  .stage1-welcome{padding-top:8px}
+  .stage1-welcome h1{font-size:24px}
+  .stage1-product-media{height:106px}
+}

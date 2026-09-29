@@ -132,19 +132,19 @@ export function Stage1Home({
         <img src={HERO_IP} alt="" aria-hidden="true"/>
       </button>:null}
 
-      <section className="stage1-quick-entry-section">
+      <section className="stage1-quick-entry-section" aria-label="首頁快捷入口">
         <div className="stage1-quick-entry-grid">
-          <button onClick={onMember} aria-label={availableCouponCount?'記憶券，'+availableCouponCount+' 張可用':'記憶券'}>
-            <span className="stage1-shortcut-source stage1-shortcut-ticket" aria-hidden="true"><img src={STAGE1_FINAL_SOURCE} alt=""/></span>
-            <strong>記憶券</strong>{availableCouponCount?<small>{availableCouponCount} 張可用</small>:null}
-          </button>
-          <button onClick={onHistory} aria-label="常購清單">
-            <span className="stage1-shortcut-source stage1-shortcut-heart" aria-hidden="true"><img src={STAGE1_FINAL_SOURCE} alt=""/></span>
-            <strong>常購清單</strong>
-          </button>
-          <button onClick={onBrowse} aria-label="期間限定">
+          <button onClick={onOrders} aria-label="我的訂單">
             <span className="stage1-shortcut-source stage1-shortcut-order" aria-hidden="true"><img src={STAGE1_FINAL_SOURCE} alt=""/></span>
-            <strong>期間限定</strong>
+            <strong>我的訂單</strong>{activeOrders.length?<small>{activeOrders.length} 張進行中</small>:null}
+          </button>
+          <button onClick={onHistory} aria-label="我的收藏">
+            <span className="stage1-shortcut-source stage1-shortcut-heart" aria-hidden="true"><img src={STAGE1_FINAL_SOURCE} alt=""/></span>
+            <strong>我的收藏</strong>{history.length?<small>搵返熟悉味道</small>:null}
+          </button>
+          <button onClick={onMember} aria-label={availableCouponCount?'回憶券，'+availableCouponCount+' 張可用':'回憶券'}>
+            <span className="stage1-shortcut-source stage1-shortcut-ticket" aria-hidden="true"><img src={STAGE1_FINAL_SOURCE} alt=""/></span>
+            <strong>回憶券</strong>{availableCouponCount?<small>{availableCouponCount} 張可用</small>:null}
           </button>
         </div>
       </section>
