@@ -1,4 +1,4 @@
-import {mfkVersionLabel} from '../../contracts/product-version-v1.ts';
+import {mfkVersionLabel} from '../../contracts/product-version-v1';
 import {useEffect,useMemo,useState} from 'react';
 import type {ReactNode} from 'react';
 import {readOwnerLocalWorkspace,writeOwnerLocalWorkspace,type OwnerChecklistItem} from './persistence';
