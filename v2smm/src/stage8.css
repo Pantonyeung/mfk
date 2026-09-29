@@ -86,9 +86,8 @@
   min-height:112px;border:1px solid #dce5f0;border-radius:16px;background:#fff;padding:10px;display:grid;justify-items:center;align-content:center;gap:5px;color:#163568
 }
 .stage8-action-card:disabled{opacity:1;background:#f4f6f9;color:#8390a5}
-.stage8-action-slot{
-  width:34px;height:34px;border-radius:11px;border:1px dashed #bfcde0;background:#f7f9fd
-}
+.stage8-action-slot{width:34px;height:34px;display:grid;place-items:center;border-radius:11px;border:1px solid #d7e1ee;background:#f7f9fd;color:#2f73ff}
+.stage8-action-slot svg{width:22px;height:22px}
 .stage8-action-card strong{font-size:13px}.stage8-action-card small{font-size:9px;color:#748299;text-align:center}
 .stage8-table-status{font-size:10px;font-weight:800;border-radius:999px;padding:6px 8px;background:#eaf2ff;color:#2f73ff}
 .stage8-table-status.empty{background:#e8f8ef;color:#25875a}.stage8-table-status.custody{background:#fff4d9;color:#8b650d}
@@ -101,9 +100,8 @@
 .stage8-money-card>div{display:grid;gap:4px}.stage8-money-card span{font-size:10px;color:#67738a}.stage8-money-card strong{font:800 15px Inter;color:#163568}
 .stage8-money-card .due strong{color:#ea4b5a}
 .stage8-clear-review{min-height:48px;border:1px solid #cddcf1;border-radius:14px;background:#fff;color:#2f73ff;font-weight:800}
-.stage8-clear-art{
-  width:min(100%,210px);height:118px;justify-self:center;border:1px dashed #cad5e4;border-radius:24px;background:linear-gradient(145deg,#f7f9fd,#eef3fb)
-}
+.stage8-clear-art{width:min(100%,210px);height:118px;display:grid;place-items:center;justify-self:center;border:1px solid #cad5e4;border-radius:24px;background:linear-gradient(145deg,#f7f9fd,#eef3fb);color:#238c49}
+.stage8-clear-art svg{width:68px;height:68px}
 .stage8-clear-copy{text-align:center}.stage8-clear-copy h2{margin:0 0 6px;font-size:22px;color:#163568}.stage8-clear-copy p{margin:0;color:#67738a;font-size:13px;line-height:20px}
 .stage8-checklist{display:grid;gap:8px}
 .stage8-checklist>div{display:grid;grid-template-columns:16px 1fr auto;align-items:center;gap:8px;padding:11px 12px;border:1px solid #dde4ee;border-radius:13px;background:#fff}
