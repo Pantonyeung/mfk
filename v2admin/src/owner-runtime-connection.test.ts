@@ -1,4 +1,4 @@
-import {describe,expect,it} from 'vitest';
+import {describe,expect,it,vi} from 'vitest';
 import {AdminSyncStore,buildOwnerReadModelSnapshot,mapOwnerOrderProjection} from '../worker.ts';
 import {createSmtProjectionEvent} from '../../contracts/smt-projection-v1.ts';
 
@@ -119,8 +119,7 @@ describe('Owner canonical read projection',()=>{
     });
     const response=await store.fetch(new Request('https://internal/projection/events',{method:'POST',headers:{'content-type':'application/json',origin:'https://appassets.androidplatform.net'},body:JSON.stringify({events:[event]})}));
     expect(response.status).toBe(200);
-    await Promise.resolve();
-    expect(providerCalls).toHaveLength(1);
+    await vi.waitFor(()=>expect(providerCalls).toHaveLength(1));
     expect(providerCalls[0]).toMatchObject({revision:12,runtimeSellability:[{nodeId:'p1',status:'soldout'}]});
   });
 
