@@ -24,7 +24,7 @@ test('UI0 final reconciliation uses male/female 50:50 and dedicated Stage0 sourc
 });
 
 test('UI0 has first visit returning and reduced-motion timing without becoming a data gate',()=>{
-  assert.ok(launch.includes("mode==='reduced'?120:mode==='returning'?700:2500"));
+  assert.ok(launch.includes("mode==='reduced'?120:mode==='returning'?1200:3500"));
   assert.ok(launch.includes('prefers-reduced-motion: reduce'));
   assert.ok(launch.includes('sessionStorage'));
   assert.ok(launch.includes('localStorage'));
@@ -49,7 +49,7 @@ test('UI1 is the FINAL storefront and cold launch continues to UI2 menu',()=>{
   assert.ok(app.includes("view==='home'?<Stage1Home"));
   assert.ok(app.includes("onBrowse={()=>changeView('menu')}"));
   assert.ok(app.includes("view==='menu'?<Stage2Menu"));
-  for(const marker of['stage1-fixed-header','stage1-welcome','stage1-search-entry','stage1-hero-banner','stage1-announcement-strip','stage1-top6','回憶券','我的收藏','期間限定'])assert.ok(home.includes(marker),marker);
+  for(const marker of['stage1-fixed-header','stage1-welcome','stage1-search-entry','stage1-hero-banner','stage1-announcement-strip','stage1-top6','記憶券','常購清單','期間限定'])assert.ok(home.includes(marker),marker);
   assert.ok(app.includes('limit:6'));
   assert.ok(home.includes('const canBrowse=Boolean(snapshot?.menu)'));
 });

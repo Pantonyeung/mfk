@@ -1,5 +1,4 @@
 import {useEffect,useMemo,useState} from 'react';
-import {CUSTOMER_FINAL_SOURCE} from '../source-assets';
 import {ActionButton,AnimatedValue} from '../ui/primitives';
 import type {
   CustomerConnectionState,
@@ -119,7 +118,7 @@ function ReadbackPending({
   const meta=EMPTY_META[state];
   return <section className={"page ui6-tracking ui6-readback-pending state-"+state.toLowerCase()} data-ui6-state={state}>
     <header className="ui6-hero">
-      <img className="ui6-brand-art-slot" src={CUSTOMER_FINAL_SOURCE.maleIpSheet.url} alt="" aria-hidden="true" data-source-asset={CUSTOMER_FINAL_SOURCE.maleIpSheet.sourceFile}/>
+      <div className="ui6-brand-art-slot" data-final-art-pending="true" role="img" aria-label="磨飯品牌角色插圖位置"/>
       <span>{meta.eyebrow}</span>
       <h1>{meta.title}</h1>
       <p>{meta.detail}</p>
@@ -196,7 +195,7 @@ export function StoreFulfillmentUi6View({
     </section>:null}
 
     <header className="ui6-hero">
-      <img className="ui6-brand-art-slot" src={CUSTOMER_FINAL_SOURCE.maleIpSheet.url} alt="" aria-hidden="true" data-source-asset={CUSTOMER_FINAL_SOURCE.maleIpSheet.sourceFile}/>
+      <div className="ui6-brand-art-slot" data-final-art-pending="true" role="img" aria-label="磨飯品牌角色插圖位置"/>
       <span>{meta.eyebrow}</span>
       <h1>{meta.title}</h1>
       <p>{meta.detail}</p>

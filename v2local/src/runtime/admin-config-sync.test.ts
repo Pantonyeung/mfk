@@ -8,7 +8,6 @@ import {
   readSmtAdminSyncStatus,
 } from './admin-config-sync.ts';
 import {projectSyncedCombos,projectSyncedOrderingCatalog} from './admin-config-projection.ts';
-import {normalizeRuntimeAvailabilityForBusinessDay} from './local-runtime.ts';
 import {capacityNoticeForCount,readSmtFrontlinePresentation,readSmtPrintConfig,readSmtQuickReasons,readSmtStoreSettings} from './admin-operational-config.ts';
 
 function installStorage(){
@@ -158,7 +157,7 @@ describe('SMT full Admin config LKG',()=>{
     expect(print.templateSpec.receipt).toBe('店名\n訂單編號');
   });
 
-  it('projects Admin price/config while SMT runtime availability remains locally authoritative',()=>{
+  it('projects Admin price, availability, Option Sets, media, and Combo pools into SMT',()=>{
     const row=envelope(4);
     applyAdminConfigEnvelope(row);
 
@@ -167,15 +166,7 @@ describe('SMT full Admin config LKG',()=>{
     expect(dineIn.categories).toEqual([{id:'cat-a',label:'主食',position:10}]);
     expect(dineIn.products[0]?.priceMinor).toBe(1000);
     expect(takeaway.products[0]?.priceMinor).toBe(1050);
-    // Admin snapshot.availability is no longer the store-runtime sold-out authority.
-    expect(takeaway.products[0]?.sellable).toBe(true);
-    localStorage.setItem('mfk.v2local.runtime.v1',JSON.stringify({orders:[],holds:[],availability:{p1:'soldout'}}));
-    expect(projectSyncedOrderingCatalog('takeaway',row).products[0]?.sellable).toBe(false);
-    const disabledRow=createMfkAdminConfigEnvelope({
-      storeId:'MF01',revision:5,publishedAt:'2026-09-22T09:00:05.000Z',adminFingerprint:'fnv1a32:admin5',
-      snapshot:{...snapshot,catalog:{...snapshot.catalog,products:snapshot.catalog.products.map(product=>({...product,active:false}))}},
-    });
-    expect(projectSyncedOrderingCatalog('takeaway',disabledRow).products).toHaveLength(0);
+    expect(takeaway.products[0]?.sellable).toBe(false);
     expect(takeaway.products[0]?.imageUrl).toBe('https://example.test/p1.webp');
     expect(takeaway.products[0]?.optionSets[0]?.name).toBe('份量');
     expect(takeaway.products[0]?.optionSets[0]?.options[1]?.priceAdjustmentMinor).toBe(-100);
@@ -186,42 +177,4 @@ describe('SMT full Admin config LKG',()=>{
     expect(combos.pools.map(pool=>pool.id)).toEqual(['main-a','snack','drink']);
     expect(combos.pools[0]?.groups[0]?.subPools[0]?.choices[0]?.productId).toBe('p1');
   });
-  it('resets SOLD_OUT at next Business Day but preserves PAUSED',()=>{
-    expect(normalizeRuntimeAvailabilityForBusinessDay(
-      {p1:'soldout',p2:'paused',p3:'available'},'2026-09-28','2026-09-29',
-    )).toEqual({p1:'available',p2:'paused',p3:'available'});
-    expect(normalizeRuntimeAvailabilityForBusinessDay(
-      {p1:'soldout',p2:'paused'},'2026-09-29','2026-09-29',
-    )).toEqual({p1:'soldout',p2:'paused'});
-  });
-
-  it('rejects a late replay whose canonical publishedAt is older than the active release',()=>{
-    const r11=createMfkAdminConfigEnvelope({
-      storeId:'MF01',revision:11,publishedAt:'2026-09-29T03:00:00.000Z',adminFingerprint:'admin-r11',
-      snapshot:{catalog:{products:[]}},
-    });
-    const r12=createMfkAdminConfigEnvelope({
-      storeId:'MF01',revision:12,publishedAt:'2026-09-29T04:00:00.000Z',adminFingerprint:'admin-r12',
-      snapshot:{catalog:{products:[]}},
-    });
-    expect(applyAdminConfigEnvelope(r11).disposition).toBe('APPLIED');
-    expect(applyAdminConfigEnvelope(r12).disposition).toBe('APPLIED');
-    expect(applyAdminConfigEnvelope(r11)).toMatchObject({disposition:'STALE',revision:12});
-    expect(readSmtAdminConfigLkg()?.revision).toBe(12);
-    expect(readSmtAdminConfigLkg()?.publishedAt).toBe('2026-09-29T04:00:00.000Z');
-  });
-
-  it('rejects a numerically newer revision carrying an older canonical publish time',()=>{
-    const current=createMfkAdminConfigEnvelope({
-      storeId:'MF01',revision:20,publishedAt:'2026-09-29T05:00:00.000Z',adminFingerprint:'admin-r20',
-      snapshot:{catalog:{products:[]}},
-    });
-    const impossible=createMfkAdminConfigEnvelope({
-      storeId:'MF01',revision:21,publishedAt:'2026-09-29T04:59:59.000Z',adminFingerprint:'admin-r21',
-      snapshot:{catalog:{products:[]}},
-    });
-    expect(applyAdminConfigEnvelope(current).disposition).toBe('APPLIED');
-    expect(applyAdminConfigEnvelope(impossible)).toMatchObject({disposition:'STALE',revision:20});
-  });
-
 });

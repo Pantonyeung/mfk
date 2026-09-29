@@ -11,10 +11,9 @@ const smm=fs.readFileSync(path.join(runtimeRoot,'runtime/smm-lan-ingress.ts'),'u
 const ui=fs.readFileSync(path.join(runtimeRoot,'presentation/RuntimeSoldoutWorkspace.tsx'),'utf8');
 
 describe('CAP4 remote-channel integration contract',()=>{
-  it('guards Customer order admission as FIRST_PARTY without a cloud quote admission path',()=>{
+  it('guards both Customer quote and Customer order admission as FIRST_PARTY',()=>{
     expect(customer).toContain('assertCapacityChannelAdmission');
-    expect((customer.match(/channel:'FIRST_PARTY'/g)??[]).length).toBe(1);
-    expect(customer).not.toContain('reconcileQuotes');
+    expect((customer.match(/channel:'FIRST_PARTY'/g)??[]).length).toBeGreaterThanOrEqual(2);
     expect(customer).toContain('capacityEventsFromRuntime');
   });
 

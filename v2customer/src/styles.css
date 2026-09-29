@@ -2698,8 +2698,12 @@ button:hover .product-media img{transform:scale(1.025)}
 .ui5-brand-art-slot{
   width:132px;height:132px;margin:0 auto 14px;border-radius:34px;
   background:linear-gradient(145deg,#f3e7d8,#fffaf2);
-  border:1px solid var(--customer-source-line);
-  position:relative;object-fit:cover;object-position:center top;
+  border:1px dashed #d9c8b6;
+  position:relative;
+}
+.ui5-brand-art-slot:after{
+  content:"品牌插圖";position:absolute;inset:auto 0 14px;text-align:center;
+  font-size:11px;color:#9b8c7a;letter-spacing:.08em;
 }
 .ui5-hero>span,.ui5-waiting-hero>span{color:var(--customer-source-blue);font-weight:800}
 .ui5-submit-progress,.ui5-summary,.ui5-identity-boundary,.ui5-waiting-status,.ui5-order-identities,.ui5-waiting-summary,.ui5-safe-leave{
@@ -2725,8 +2729,12 @@ button:hover .product-media img{transform:scale(1.025)}
 .ui6-brand-art-slot{
   width:126px;height:126px;margin:0 auto 14px;border-radius:32px;
   background:linear-gradient(145deg,#f2e8dc,#fffaf4);
-  border:1px solid var(--customer-source-line);
-  position:relative;object-fit:cover;object-position:center top;
+  border:1px dashed #dac9b8;
+  position:relative;
+}
+.ui6-brand-art-slot:after{
+  content:"品牌插圖";position:absolute;inset:auto 0 13px;text-align:center;
+  font-size:11px;color:#998a78;letter-spacing:.08em;
 }
 .ui6-progress,.ui6-identities,.ui6-order-summary,.ui6-readback,.ui6-timeline,.ui6-readback-empty{
   background:var(--customer-source-paper);border-color:var(--customer-source-line);
@@ -2740,7 +2748,11 @@ button:hover .product-media img{transform:scale(1.025)}
 .ui7-brand-art-slot{
   display:block;width:132px;height:132px;margin:10px auto 14px;border-radius:34px;
   background:linear-gradient(145deg,#f2e8dc,#fffaf4);
-  border:1px solid var(--customer-source-line);position:relative;object-fit:cover;object-position:center top;
+  border:1px dashed #dac9b8;position:relative;object-fit:unset;
+}
+.ui7-brand-art-slot:after{
+  content:"品牌插圖";position:absolute;inset:auto 0 13px;text-align:center;
+  font-size:11px;color:#998a78;letter-spacing:.08em;
 }
 .ui7-hero,.ui7-identity-panel,.ui7-order-summary,.ui7-verification-card,.ui7-completion-card,.ui7-arrived-meta,.ui7-checklist{
   background:var(--customer-source-paper);border-color:var(--customer-source-line);
@@ -2763,7 +2775,11 @@ button:hover .product-media img{transform:scale(1.025)}
 .ui8-brand-art-slot{
   width:132px;height:132px;margin:0 auto 12px;border-radius:34px;
   background:linear-gradient(145deg,#f2e8dc,#fffaf4);
-  border:1px solid var(--customer-source-line);position:relative;object-fit:cover;object-position:center top;
+  border:1px dashed #dac9b8;position:relative;
+}
+.ui8-brand-art-slot:after{
+  content:"品牌插圖";position:absolute;inset:auto 0 13px;text-align:center;
+  font-size:11px;color:#998a78;letter-spacing:.08em;
 }
 .ui8-filters button.active{background:var(--customer-source-orange);border-color:var(--customer-source-orange);color:#fff}
 .ui8-order-card .action-button.secondary,.ui8-detail-actions .action-button.primary,.ui8-copy-intent .action-button.primary,.ui8-final-review .action-button.primary{
@@ -2789,7 +2805,11 @@ button:hover .product-media img{transform:scale(1.025)}
 .ui9-brand-art-slot{
   width:112px;height:132px;border-radius:32px;
   background:linear-gradient(145deg,#efe3d4,#fff8ef);
-  border:1px solid var(--customer-source-line);position:relative;object-fit:cover;object-position:center top;
+  border:1px dashed #d7c4b1;position:relative;
+}
+.ui9-brand-art-slot:after{
+  content:"品牌插圖";position:absolute;inset:auto 0 13px;text-align:center;
+  color:#998a78;font-size:11px;letter-spacing:.08em;
 }
 .ui9-member-hero .member-connection{
   grid-column:1/-1;justify-self:start;

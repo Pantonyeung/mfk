@@ -1,4 +1,4 @@
-.launch-opening-video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background:#fffdf9;z-index:1}\n.launch-brand-scene.is-video-backed{opacity:0;pointer-events:none}\n.launch-overlay{--launch-accent:#2d6eb8;position:fixed;inset:0;width:100vw;height:100dvh;min-height:100svh;z-index:1000;overflow:hidden;overscroll-behavior:none;touch-action:manipulation;display:grid;place-items:center;background:#fffdf9;color:#173e72;isolation:isolate}
+.launch-overlay{--launch-accent:#2d6eb8;position:fixed;inset:0;z-index:1000;overflow:hidden;display:grid;place-items:center;background:#fffdf9;color:#173e72;isolation:isolate}
 .launch-brand-scene{position:absolute;inset:0;display:grid;grid-template-rows:auto 1fr auto auto;place-items:center;padding:8vh 24px 23vh;background:#fffdf9}
 .launch-logo{position:relative;z-index:5;width:min(31vw,138px);max-height:118px;object-fit:contain;opacity:0;transform:translateY(8px)}
 .launch-character-stage{position:relative;width:min(82vw,350px);height:min(48vh,390px);align-self:end}

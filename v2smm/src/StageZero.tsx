@@ -148,22 +148,13 @@ function BrandLockup({compact=false}:{compact?:boolean}){
   </div>;
 }
 
-function Stage0MascotPair({mode='duo'}:{mode?:'duo'|'female'}){
-  if(mode==='female')return <img className="stage0-mascot stage0-mascot-recovery" src="/brand/stage0/stage0-recovery-female.webp" alt="" aria-hidden="true"/>;
-  return <span className="stage0-mascot-pair" aria-hidden="true">
-    <img src="/brand/stage0/stage0-splash-male.webp" alt=""/>
+function Stage0MascotPair({mode='duo'}:{mode?:'duo'|'male'|'female'}){
+  if(mode==='male')return <img className="stage0-mascot stage0-mascot-male" src="/brand/stage0/stage0-male.webp" alt="" aria-hidden="true"/>;
+  if(mode==='female')return <img className="stage0-mascot stage0-mascot-female" src="/brand/stage0/stage0-female.webp" alt="" aria-hidden="true"/>;
+  return <div className="stage0-mascot-pair" aria-hidden="true">
+    <img src="/brand/stage0/stage0-male.webp" alt=""/>
     <img src="/brand/stage0/stage0-female.webp" alt=""/>
-  </span>;
-}
-
-function Stage0Mascot({scene}:{scene:'splash'|'login'|'checking'|'recovery'}){
-  if(scene==='login')return <Stage0MascotPair/>;
-  const src=scene==='splash'
-    ?'/brand/stage0/stage0-splash-male.webp'
-    :scene==='recovery'
-      ?'/brand/stage0/stage0-recovery-female.webp'
-      :'/brand/stage0/stage0-female.webp';
-  return <img className={`stage0-mascot stage0-mascot-${scene}`} src={src} alt="" aria-hidden="true"/>;
+  </div>;
 }
 
 function StageZeroSplash(){
@@ -176,7 +167,7 @@ function StageZeroSplash(){
         <strong>前線好幫手</strong>
         <span>快速點單 · 清楚跟單 · 隨時掌握</span>
       </div>
-      <Stage0Mascot scene="splash"/>
+      <Stage0MascotPair mode="male"/>
       <div className="stage0-progress" aria-label="啟動中"><i/></div>
       <small className="stage0-footnote">正在準備 SMM…</small>
     </section>
@@ -195,7 +186,7 @@ function StageZeroConnectionChecking(){
         <div><i className="loading"/><span>店內 LAN</span><b>檢查中</b></div>
         <div><i/><span>門店資料</span><b>等待同步</b></div>
       </div>
-      <Stage0Mascot scene="checking"/>
+      <Stage0MascotPair mode="female"/>
     </section>
   </main>;
 }
@@ -322,7 +313,7 @@ function StageZeroConnectionRecovery({
       </section>:null}
 
       <button className="stage0-secondary stage0-offline-button" disabled={!canEnterOffline} onClick={onOffline}>繼續離線工作</button>
-      <Stage0Mascot scene="recovery"/>
+      <Stage0MascotPair mode="female"/>
       <small className="stage0-security">
         {canEnterOffline
           ?'離線工作區只使用此裝置已驗證員工 Session；正式門店資料會保持降級狀態。'
@@ -383,7 +374,7 @@ function StageZeroStaffLogin({onSuccess}:{onSuccess:(session:SmmStaffSession)=>v
         <h1>員工登入</h1>
         <p>揀返你嘅員工身份，再輸入 PIN。</p>
       </header>
-      <Stage0Mascot scene="login"/>
+      <Stage0MascotPair/>
 
       {staff.length?<label className="stage0-field">
         <span>員工</span>

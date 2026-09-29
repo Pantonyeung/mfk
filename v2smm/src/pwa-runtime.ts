@@ -1,5 +1,5 @@
 import type {SmmRuntimePort,SmmReadModelSnapshot,SmmPendingIntent,SmmCommandResult} from './product-types';
-import type {SmmLanOrderRequest,SmmLanSubmissionReadbackResponse,SmmLanFulfillmentRequest,SmmLanFulfillmentResponse} from '../../contracts/smm-lan-v1';
+import type {SmmLanOrderRequest,SmmLanSubmissionReadbackResponse} from '../../contracts/smm-lan-v1';
 import {createSmmLanOrderAdapter,type SmmLanTransport} from './smt-lan-adapter';
 import {createPwaLanTransport,readSmmLanPwaConfig} from './pwa-lan';
 import {createPwaCloudTransport} from './pwa-cloud';
@@ -113,31 +113,6 @@ export function createPwaRuntimePort():SmmRuntimePort{
     },
     readSubmission(submissionId:string):Promise<SmmCommandResult>{
       return orders.readSubmission(submissionId);
-    },
-    async fulfillOrder(input:{orderId:string;action:'ACCEPT'|'READY'}):Promise<SmmCommandResult>{
-      const request:SmmLanFulfillmentRequest=Object.freeze({protocolVersion:1,type:'smm.lan.fulfillment.v1',requestId:crypto.randomUUID(),commandId:crypto.randomUUID(),storeId:'MF01',orderId:input.orderId,action:input.action});
-      if(config){
-        try{
-          const local=await withTimeout(lanRequest(request));
-          if(String(local.type)==='smm.lan.fulfillment.result.v1'){
-            const result=local as unknown as SmmLanFulfillmentResponse;
-            return Object.freeze({state:result.disposition==='REJECTED'?'REJECTED':'CONFIRMED',message:result.reasonCode??result.canonicalState??'已更新',orderId:result.orderId});
-          }
-        }catch{/* LAN unavailable: same capability falls through to Internet */}
-      }
-      const session=readSmmStaffSession();
-      if(!session)return Object.freeze({state:'REJECTED',message:'請先登入員工帳戶'});
-      const response=await fetch('/api/smm/fulfillment?storeId=MF01',{method:'POST',headers:{'content-type':'application/json','x-mfk-smm-session':session.sessionToken},body:JSON.stringify(request)});
-      if(!response.ok)return Object.freeze({state:'REJECTED',message:'狀態更新未送出'});
-      for(let attempt=0;attempt<12;attempt++){
-        await new Promise(resolve=>setTimeout(resolve,250));
-        const readback=await fetch('/api/smm/fulfillment/readback?storeId=MF01&commandId='+encodeURIComponent(request.commandId),{cache:'no-store',headers:{'x-mfk-smm-session':session.sessionToken}});
-        if(!readback.ok)continue;
-        const body=await readback.json() as any;
-        if(body.state==='CONFIRMED')return Object.freeze({state:'CONFIRMED',message:String(body.result?.canonicalState||'已更新'),orderId:input.orderId});
-        if(body.state==='REJECTED')return Object.freeze({state:'REJECTED',message:String(body.result?.reasonCode||'狀態更新被拒絕'),orderId:input.orderId});
-      }
-      return Object.freeze({state:'UNKNOWN',message:'已送出，暫未收到門店確認',orderId:input.orderId});
     },
   });
 }

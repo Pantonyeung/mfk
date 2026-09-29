@@ -98,19 +98,6 @@ async function proxySmmAcceptance(request:Request,url:URL,env:Env){
   return new Response(response.body,{status:response.status,statusText:response.statusText,headers:outHeaders});
 }
 
-async function proxySmmFulfillment(request:Request,url:URL,env:Env){
-  const suffix=url.pathname.slice('/__mfk/smm-fulfillment'.length)||'/';
-  const allowed=request.method==='GET'&&suffix==='/pending'||request.method==='POST'&&suffix==='/ack';
-  if(!allowed)return new Response(JSON.stringify({code:'WEB_ACCEPTANCE_SMM_FULFILLMENT_PROXY_BLOCKED'}),{status:403,headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store'}});
-  const targetPath=suffix==='/pending'?'/api/smm/acceptance/smt/fulfillment/pending':'/api/smm/acceptance/smt/fulfillment/ack';
-  const target=new URL('https://smm.morefunos.com'+targetPath);target.searchParams.set('storeId','MF01');
-  const headers=new Headers({accept:'application/json','x-mfk-web-acceptance':String(env.WEB_ACCEPTANCE_TOKEN||'')});
-  if(request.method==='POST')headers.set('content-type','application/json');
-  const response=await fetch(target.toString(),{method:request.method,headers,body:request.method==='POST'?await request.text():undefined});
-  const outHeaders=new Headers(response.headers);outHeaders.set('cache-control','no-store');outHeaders.set('content-type','application/json; charset=utf-8');
-  return new Response(response.body,{status:response.status,statusText:response.statusText,headers:outHeaders});
-}
-
 async function proxyAdmin(request:Request,url:URL){
   const suffix=url.pathname.slice('/__mfk/admin'.length)||'/';
   const allowed=
@@ -190,10 +177,6 @@ export default{
     if(url.pathname==='/__mfk/smm-acceptance/diagnostics'){
       const probe=await smmAcceptanceProbe(env);
       return new Response(JSON.stringify({ok:probe.ok,mode:'WEB_ACCEPTANCE_ONLY',...probe}),{headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store'}});
-    }
-
-    if(url.pathname.startsWith('/__mfk/smm-fulfillment/')){
-      return proxySmmFulfillment(request,url,env);
     }
 
     if(url.pathname.startsWith('/__mfk/smm-acceptance/')){

@@ -116,16 +116,12 @@ export interface ComboDraft{
   readonly sections:readonly ComboSectionDraft[];
 }
 
-export interface KeetaChannelMappingComponentDraft{readonly canonicalProductId:string;readonly quantity:number}
-export interface KeetaChannelOptionMappingDraft{readonly canonicalProductId:string;readonly providerGroupCode:string;readonly providerOptionCode:string;readonly canonicalOptionSetId:string;readonly canonicalOptionId:string}
-export interface KeetaChannelMappingDraft{readonly mappingId:string;readonly enabled:boolean;readonly skuOpenItemCode?:string;readonly spuOpenItemCode?:string;readonly providerSkuId?:string;readonly providerSpuId?:string;readonly channelName?:string;readonly components:readonly KeetaChannelMappingComponentDraft[];readonly optionMappings?:readonly KeetaChannelOptionMappingDraft[]}
 export interface AdminSessionDraft{
   readonly categories:readonly CategoryDraft[];
   readonly products:readonly ProductDraft[];
   readonly modifierGroups:readonly ModifierGroupDraft[];
   readonly combos:readonly ComboDraft[];
   readonly comboPools?:readonly ComboPoolDraft[];
-  readonly channelMappings?:Readonly<{keeta:readonly KeetaChannelMappingDraft[]}>;
 }
 
 interface AdminDraftContextValue{
@@ -179,7 +175,6 @@ interface AdminDraftContextValue{
   readonly validate:()=>readonly string[];
   readonly markClean:()=>void;
   readonly replaceDraft:(next:AdminSessionDraft,reason:string)=>void;
-  readonly updateKeetaMappings:(mappings:readonly KeetaChannelMappingDraft[])=>void;
   readonly reset:()=>void;
 }
 
@@ -309,7 +304,6 @@ function normalizeDraft(input:AdminSessionDraft):AdminSessionDraft{
       sections:(combo.sections??[]).map((section,index)=>normalizeComboSection(section,index)).sort((a,b)=>a.position-b.position),
     })),
     comboPools:(input.comboPools??[]).map((pool,index)=>normalizeComboPool(pool,index)).sort((a,b)=>a.position-b.position),
-    channelMappings:{keeta:(input.channelMappings?.keeta??[]).map(row=>({...row,enabled:row.enabled!==false,components:(row.components??[]).map(component=>({...component,quantity:Number.isSafeInteger(component.quantity)&&component.quantity>0?component.quantity:1})),optionMappings:row.optionMappings??[]}))},
   };
 }
 
@@ -349,13 +343,6 @@ export function validateAdminDraft(draft:AdminSessionDraft){
     for(const groupId of product.modifierGroupIds){
       if(!modifierIds.has(groupId))errors.push('商品 '+label+' 綁定咗不存在嘅選項組 '+groupId);
     }
-  }
-
-  for(const mapping of draft.channelMappings?.keeta??[]){
-    if(!mapping.mappingId.trim())errors.push('Keeta Mapping 未填 Mapping ID');
-    if(!mapping.skuOpenItemCode?.trim()&&!mapping.spuOpenItemCode?.trim()&&!mapping.providerSkuId?.trim()&&!mapping.providerSpuId?.trim())errors.push('Keeta Mapping '+(mapping.mappingId||'未命名')+' 未設定 Provider Alias');
-    if(!mapping.components.length)errors.push('Keeta Mapping '+(mapping.mappingId||'未命名')+' 未設定製作內容');
-    for(const component of mapping.components){if(!productIds.has(component.canonicalProductId))errors.push('Keeta Mapping '+mapping.mappingId+' 指向不存在商品 '+component.canonicalProductId);}
   }
 
   for(const group of draft.modifierGroups){
@@ -869,8 +856,6 @@ export function AdminDraftProvider({children}:{children:ReactNode}){
     appendAdminAudit({action:'取代菜單草稿',target:'菜單',reason});
   };
 
-  const updateKeetaMappings=(mappings:readonly KeetaChannelMappingDraft[])=>mutate('修改 Keeta 渠道商品對應','Keeta',current=>({...current,channelMappings:{...(current.channelMappings??{}),keeta:mappings}}));
-
   const reset=()=>{
     persist(RESET_BASELINE,true);
     writeAdminStored(COMBO_R4_SEED_KEY,true);
@@ -889,7 +874,7 @@ export function AdminDraftProvider({children}:{children:ReactNode}){
     addComboPoolGroup,updateComboPoolGroup,removeComboPoolGroup,moveComboPoolGroup,
     addComboPoolBand,updateComboPoolBand,removeComboPoolBand,moveComboPoolBand,
     addComboPoolChoice,updateComboPoolChoice,removeComboPoolChoice,moveComboPoolChoice,
-    moveCategory,moveProduct,validate,markClean,replaceDraft,updateKeetaMappings,reset,
+    moveCategory,moveProduct,validate,markClean,replaceDraft,reset,
   }),[draft,dirty,validationErrors]);
 
   return <AdminDraftContext.Provider value={value}>{children}</AdminDraftContext.Provider>;

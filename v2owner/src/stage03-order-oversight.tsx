@@ -181,9 +181,6 @@ function OrderOversightDrawer({order,onClose}:{order:OwnerOrderProjection;onClos
           <Detail label="原始金額" value={detail.money.original}/>
           <Detail label="調整" value={detail.money.adjustments}/>
           <Detail label="目前有效金額" value={detail.money.effective}/>
-          {order.referenceValueLabel?<Detail label="Admin 標準價值" value={order.referenceValueLabel}/>:null}
-          {order.effectiveTransactionLabel?<Detail label="實際成交" value={order.effectiveTransactionLabel}/>:null}
-          {order.pricingAuthority?<Detail label="成交定價權" value={order.pricingAuthority}/>:null}
           <Detail label="付款方式" value={detail.money.tender}/>
         </div>
         {order.adjustments?.length?<div className="adjustment-list">{order.adjustments.map((item,index)=><div key={item.label+'-'+index}><span>{item.label}</span><strong>{item.amountLabel}</strong></div>)}</div>:null}
@@ -214,7 +211,6 @@ function OrderOversightDrawer({order,onClose}:{order:OwnerOrderProjection;onClos
           <Detail label="製作單" value={order.sideEffects?.production??'未有資料'}/>
           <Detail label="打包單" value={order.sideEffects?.packing??'未有資料'}/>
           <Detail label="標籤" value={order.sideEffects?.label??'未有資料'}/>
-          {order.printState?<Detail label="首次打印" value={order.printState==='DONE'?'已完成':order.printState==='PENDING'?'待打印':'待確認'}/>:null}
         </div>
       </DetailSection>
 

@@ -3,8 +3,7 @@ export const MFK_SMT_PROJECTION_SCHEMA='MFK_SMT_PROJECTION_EVENT_V1' as const;
 export type SmtProjectionEventType=
   |'ORDER_UPSERT'
   |'CASH_OPENING_CONFIRMED'
-  |'DAY_CLOSE_RECORDED'
-  |'RUNTIME_SELLABILITY_UPSERT';
+  |'DAY_CLOSE_RECORDED';
 
 export interface SmtProjectionEvent<T=Readonly<Record<string,unknown>>>{
   readonly schema:typeof MFK_SMT_PROJECTION_SCHEMA;
@@ -67,7 +66,7 @@ export function createSmtProjectionEvent<T extends Readonly<Record<string,unknow
   readonly payload:T;
 }):SmtProjectionEvent<T>{
   const type=input.type;
-  if(!['ORDER_UPSERT','CASH_OPENING_CONFIRMED','DAY_CLOSE_RECORDED','RUNTIME_SELLABILITY_UPSERT'].includes(type))throw new Error('PROJECTION_EVENT_TYPE_INVALID');
+  if(!['ORDER_UPSERT','CASH_OPENING_CONFIRMED','DAY_CLOSE_RECORDED'].includes(type))throw new Error('PROJECTION_EVENT_TYPE_INVALID');
   const base={
     schema:MFK_SMT_PROJECTION_SCHEMA,
     storeId:text(input.storeId,'PROJECTION_STORE_ID_INVALID',64),
@@ -90,7 +89,7 @@ export function validateSmtProjectionEvent(input:unknown):SmtProjectionEvent{
   const row=record(input,'PROJECTION_EVENT_INVALID');
   if(row.schema!==MFK_SMT_PROJECTION_SCHEMA)throw new Error('PROJECTION_EVENT_SCHEMA_UNSUPPORTED');
   const type=String(row.type) as SmtProjectionEventType;
-  if(!['ORDER_UPSERT','CASH_OPENING_CONFIRMED','DAY_CLOSE_RECORDED','RUNTIME_SELLABILITY_UPSERT'].includes(type))throw new Error('PROJECTION_EVENT_TYPE_INVALID');
+  if(!['ORDER_UPSERT','CASH_OPENING_CONFIRMED','DAY_CLOSE_RECORDED'].includes(type))throw new Error('PROJECTION_EVENT_TYPE_INVALID');
   const base={
     schema:MFK_SMT_PROJECTION_SCHEMA,
     storeId:text(row.storeId,'PROJECTION_STORE_ID_INVALID',64),

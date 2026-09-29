@@ -1,6 +1,5 @@
-import {describe,expect,it,vi} from 'vitest';
-import {AdminSyncStore,buildOwnerReadModelSnapshot,mapOwnerOrderProjection} from '../worker.ts';
-import {createSmtProjectionEvent} from '../../contracts/smt-projection-v1.ts';
+import {describe,expect,it} from 'vitest';
+import {buildOwnerReadModelSnapshot,mapOwnerOrderProjection} from '../worker.ts';
 
 describe('Owner canonical read projection',()=>{
   it('preserves canonical fulfillmentLabel and never invents fulfillmentMode or payment state',()=>{
@@ -65,62 +64,6 @@ describe('Owner canonical read projection',()=>{
     expect(snapshot.staff[2]).not.toHaveProperty('loginId');
     expect(JSON.stringify(snapshot.staff)).not.toContain('REPORT_VIEW');
     expect(JSON.stringify(snapshot.staff)).not.toContain('UNKNOWN_TOKEN');
-  });
-
-  it('queues Owner sellability for SMT without publishing a new Admin revision',async()=>{
-    const values=new Map<string,any>();
-    const state:any={
-      storage:{
-        get:async(key:string)=>values.get(key),
-        put:async(key:string,value:any)=>{values.set(key,value);},
-        list:async({prefix}:{prefix:string})=>new Map([...values].filter(([key])=>key.startsWith(prefix))),
-      },
-      getWebSockets:()=>[],
-    };
-    values.set('active',{
-      storeId:'MF01',revision:11,fingerprint:'r11',adminFingerprint:'admin-r11',
-      snapshot:{catalog:{products:[{id:'p1',name:'飯團',active:true}]},availability:{}},
-    });
-    const store=new AdminSyncStore(state,{});
-    const result=await store.ownerSellabilityCommand(
-      {staffId:'owner-1',loginId:'1111'},
-      {operationId:'op-1',action:'PAUSE',targets:[{grain:'PRODUCT',targetId:'p1'}]},
-    );
-    expect(result.state).toBe('UNKNOWN');
-    expect(values.get('active').revision).toBe(11);
-    expect(values.get('owner:sellability:command:op-1')).toMatchObject({
-      operationId:'op-1',action:'PAUSE',state:'PENDING_SMT',
-    });
-    expect(values.get('active').snapshot.availability).toEqual({});
-  });
-
-  it('auto-triggers existing Keeta sellability sync when latest SMT runtime projection is accepted',async()=>{
-    const values=new Map<string,any>();
-    const providerCalls:any[]=[];
-    const state:any={
-      storage:{
-        get:async(key:string)=>values.get(key),
-        put:async(key:string,value:any)=>{values.set(key,value);},
-        list:async({prefix}:{prefix:string})=>new Map([...values].filter(([key])=>key.startsWith(prefix))),
-      },
-      getWebSockets:()=>[],
-    };
-    values.set('active',{storeId:'MF01',revision:12,fingerprint:'r12',snapshot:{channelPolicy:{syncSellability:true},catalog:{products:[{id:'p1',productCode:'P1',active:true}]}}});
-    values.set('acks',{'SMT-1':{deviceId:'SMT-1',revision:12,fingerprint:'r12'}});
-    const env:any={KEETA_RUNTIME:{
-      idFromName:(id:string)=>id,
-      get:()=>({fetch:async(request:Request)=>{providerCalls.push(await request.clone().json());return new Response('{}',{status:200});}}),
-    }};
-    const store=new AdminSyncStore(state,env);
-    const event=createSmtProjectionEvent({
-      storeId:'MF01',deviceId:'SMT-1',type:'RUNTIME_SELLABILITY_UPSERT',entityId:'p1',
-      occurredAt:'2026-09-29T00:00:00.000Z',
-      payload:{nodeId:'p1',status:'soldout',sellable:false,source:'SMT_RUNTIME',observedAt:'2026-09-29T00:00:00.000Z'},
-    });
-    const response=await store.fetch(new Request('https://internal/projection/events',{method:'POST',headers:{'content-type':'application/json',origin:'https://appassets.androidplatform.net'},body:JSON.stringify({events:[event]})}));
-    expect(response.status).toBe(200);
-    await vi.waitFor(()=>expect(providerCalls).toHaveLength(1));
-    expect(providerCalls[0]).toMatchObject({revision:12,runtimeSellability:[{nodeId:'p1',status:'soldout'}]});
   });
 
 });

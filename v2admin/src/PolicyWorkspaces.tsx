@@ -51,7 +51,7 @@ export function keetaActionErrorText(error:string){
 
 export interface AvailabilityRule{readonly sellable:boolean;readonly reason:string;readonly updatedAt:string}
 export function AvailabilityWorkspace(){
-  const {draft,updateKeetaMappings}=useAdminDraft();
+  const {draft}=useAdminDraft();
   const [state,setState]=usePersistentAdminState<Record<string,AvailabilityRule>>('availability.v1',{});
   const patch=(id:string,change:Partial<AvailabilityRule>)=>{
     setState(current=>{
@@ -262,28 +262,27 @@ export function StoreSettingsWorkspace({domain='home'}:{domain?:StoreSettingsDom
   const requestRename=(id:string,newLabel:string)=>{
     const label=newLabel.trim();
     const visibleRow=diningTables.find(item=>item.id===id);
-    if(!visibleRow){setRenameMessages(current=>({...current,[id]:'未能改名。'}));return;}
+    if(!visibleRow){setRenameMessages(current=>({...current,[id]:'未能建立改名計劃。'}));return;}
     if(!label){setRenameMessages(current=>({...current,[id]:'請先輸入新名稱。'}));return;}
     if(label===visibleRow.name){setRenameMessages(current=>({...current,[id]:'新名稱與目前名稱相同。'}));return;}
+    if(visibleRow.versions?.some(item=>item.status==='PLANNED')){setRenameMessages(current=>({...current,[id]:'已有待生效改名計劃；不會重複建立版本。'}));return;}
     setConfig(current=>{
       const rows=[...(current.diningTables??[])];
       const index=rows.findIndex(item=>item.id===id);
       if(index<0)return current;
       const row=rows[index],versions=[...(row.versions??[])];
-      const at=new Date().toISOString();
+      if(versions.some(item=>item.status==='PLANNED'))return current;
       const versionId='V'+String(versions.length+1);
-      const activeVersion:DiningTableVersion={versionId,label,requestedAt:at,requestedBy:'ADMIN',sourceRevision:activeRelease?.version??0,status:'ACTIVE',effectiveAt:at};
-      rows[index]={...row,name:label,versions:[...versions.map(item=>item.status==='ACTIVE'?{...item,status:'SUPERSEDED' as const}:item.status==='PLANNED'?{...item,status:'SUPERSEDED' as const}:item),activeVersion]};
-      appendAdminAudit({action:'修改堂食枱名稱',target:id,before:row,after:{versionId,label,status:'ACTIVE'}});
+      const planned:DiningTableVersion={versionId,label,requestedAt:new Date().toISOString(),requestedBy:'ADMIN',sourceRevision:activeRelease?.version??0,status:'PLANNED'};
+      rows[index]={...row,versions:[...versions,planned]};
+      appendAdminAudit({action:'建立堂食枱改名計劃',target:id,before:row,after:{versionId,label,status:'PLANNED'}});
       return {...current,diningTables:rows};
     });
     setRenameDrafts(current=>({...current,[id]:''}));
-    setRenameMessages(current=>({...current,[id]:'名稱已更新至本頁草稿；正式發佈後 SMT／SMM 會使用新名稱。'}));
+    setRenameMessages(current=>({...current,[id]:'已建立改名計劃；尚未發佈。'}));
   };
   const requestRetirement=(id:string)=>patchTable(id,{retirementStatus:'PLANNED_RETIREMENT'});
-  const cancelRetirement=(id:string)=>patchTable(id,{retirementStatus:undefined});
-  const setTemporaryAvailability=(id:string,active:boolean)=>{const row=diningTables.find(item=>item.id===id);if(!row||row.retirementStatus==='RETIRED')return;patchTable(id,{active,retirementStatus:row.retirementStatus});};
-  const activatePending=async(id:string)=>{const row=diningTables.find(item=>item.id===id);if(!row||row.retirementStatus!=='PLANNED_RETIREMENT')return;const evidence=await readFreshDiningOccupancy(id);if(!evidence||evidence.activeSessionCount!==0){setSaveMessage('未能退休：枱仍有人使用，或者佔用讀回未能證明為最新。');return;}writeAdminStored('dining-table-id-ledger.v1',[...new Set([...readAdminStored<string[]>('dining-table-id-ledger.v1',[]),id])]);patchTable(id,{active:false,retirementStatus:'RETIRED',retirementEvidence:{observedAt:evidence.observedAt,runtimeRevision:evidence.runtimeRevision}});appendAdminAudit({action:'堂食枱退休生效',target:id,after:{observedAt:evidence.observedAt,runtimeRevision:evidence.runtimeRevision}});};
+  const activatePending=async(id:string)=>{const evidence=await readFreshDiningOccupancy(id);if(!evidence||evidence.activeSessionCount!==0){setSaveMessage('未能生效：枱仍有人使用，或者佔用讀回未能證明為最新。');return;}const row=diningTables.find(item=>item.id===id);if(!row)return;const versions=[...(row.versions??[])];const planned=versions.find(item=>item.status==='PLANNED');if(row.retirementStatus==='PLANNED_RETIREMENT'){writeAdminStored('dining-table-id-ledger.v1',[...new Set([...readAdminStored<string[]>('dining-table-id-ledger.v1',[]),id])]);patchTable(id,{active:false,retirementStatus:'RETIRED',retirementEvidence:{observedAt:evidence.observedAt,runtimeRevision:evidence.runtimeRevision}});appendAdminAudit({action:'堂食枱退休生效',target:id,after:{observedAt:evidence.observedAt,runtimeRevision:evidence.runtimeRevision}});return;}if(!planned)return;const at=new Date().toISOString();patchTable(id,{name:planned.label,versions:versions.map(item=>item.versionId===planned.versionId?{...item,status:'ACTIVE' as const,effectiveAt:at,activationEvidence:{observedAt:evidence.observedAt,runtimeRevision:evidence.runtimeRevision}}:item.status==='ACTIVE'?{...item,status:'SUPERSEDED' as const}:item)});appendAdminAudit({action:'堂食枱名稱版本生效',target:id,after:{versionId:planned.versionId,observedAt:evidence.observedAt,runtimeRevision:evidence.runtimeRevision}});};
   const validationInput=()=>({
     diningOverdueMinutes:config.diningOverdueMinutes,
     customerWhatsAppEnabled:config.customerWhatsAppEnabled!==false,
@@ -365,12 +364,13 @@ export function StoreSettingsWorkspace({domain='home'}:{domain?:StoreSettingsDom
           <b>{row.id}</b>
           <label><span>目前名稱</span><input value={row.name} readOnly/></label>
           <label><span>新名稱</span><input value={renameDrafts[row.id]??''} onChange={event=>setRenameDrafts(current=>({...current,[row.id]:event.target.value}))} placeholder="輸入新名稱"/></label>
-          <button type="button" onClick={()=>requestRename(row.id,renameDrafts[row.id]??'')}>更新名稱</button>
+          <button type="button" onClick={()=>requestRename(row.id,renameDrafts[row.id]??'')}>建立改名計劃</button>
+          {row.versions?.find(item=>item.status==='PLANNED')?(()=>{const planned=row.versions?.find(item=>item.status==='PLANNED');return <div className="admin-validation"><b>待生效名稱：{planned?.label}</b><span>狀態：PLANNED</span></div>})():null}
           {renameMessages[row.id]?<small role="status">{renameMessages[row.id]}</small>:null}
           <label><span>排序</span><input type="number" min={1} value={row.sortOrder} onChange={event=>patchTable(row.id,{sortOrder:Number(event.target.value)||index+1})}/></label>
-          <span>{row.retirementStatus==='RETIRED'?'RETIRED':row.retirementStatus==='PLANNED_RETIREMENT'?'PLANNED_RETIREMENT':row.active?'ACTIVE':'INACTIVE'}</span>
-          {row.retirementStatus!=='RETIRED'?<Toggle checked={row.active} onChange={active=>setTemporaryAvailability(row.id,active)} label={row.active?'可使用':'暫停使用'}/>:null}
-          {row.retirementStatus==='PLANNED_RETIREMENT'?<><button type="button" onClick={()=>cancelRetirement(row.id)}>取消退休</button><button type="button" onClick={()=>void activatePending(row.id)}>檢查並永久退休</button></>:row.retirementStatus!=='RETIRED'?<button type="button" onClick={()=>requestRetirement(row.id)}>安排永久退休</button>:null}
+          <span>{row.retirementStatus??(row.active?'ACTIVE':'RETIRED')}</span>
+          <button type="button" onClick={()=>void activatePending(row.id)}>檢查並生效</button>
+          <button type="button" onClick={()=>requestRetirement(row.id)}>安排停用</button>
         </div>)}</div>
       </article></div>:null}
     {domain==='whatsapp'?<div className="admin-policy-grid two"><article className="admin-policy-card"><h2>Customer WhatsApp 備援</h2>
@@ -462,8 +462,7 @@ export function StaffWorkspace(){
 }
 
 interface ChannelConfig{enabled:boolean;autoAccept:boolean;syncSellability:boolean;commissionPct:string;displayName:string;lateCutoffMinutes:number}
-interface MappingComponent{canonicalProductId:string;quantity:number}
-interface MappingRow{providerItemId:string;channelName?:string;components:readonly MappingComponent[];optionGroupId?:string;status:'MAPPED'|'PENDING'|'IGNORED'}
+interface MappingRow{providerItemId:string;productId:string;optionGroupId?:string;status:'MAPPED'|'PENDING'|'IGNORED'}
 export function ChannelsWorkspace({mode}:{mode:'overview'|'mapping'|'failures'|'accept'|'sync'|'estimate'}){
   const {draft}=useAdminDraft();
   const [liveStatus,setLiveStatus]=useState<KeetaLiveStatus|null>(null);
@@ -631,14 +630,11 @@ export function ChannelsWorkspace({mode}:{mode:'overview'|'mapping'|'failures'|'
   };
   const commercialMoney=(value:number|undefined)=>value===undefined?'—':'HK'+String.fromCharCode(36)+(value/100).toFixed(2);
   const [config,setConfig]=usePersistentAdminState<ChannelConfig>('channel-policy.keeta.v1',{enabled:false,autoAccept:false,syncSellability:false,commissionPct:'',displayName:'Keeta',lateCutoffMinutes:15});
-  const mappings:MappingRow[]=(draft.channelMappings?.keeta??[]).map(row=>({providerItemId:row.skuOpenItemCode||row.spuOpenItemCode||row.providerSkuId||row.providerSpuId||row.mappingId,channelName:row.channelName,components:row.components,status:'MAPPED'}));
+  const [mappings,setMappings]=usePersistentAdminState<MappingRow[]>('channel-mapping.keeta.v1',[]);
   const [providerItemId,setProviderItemId]=useState('');
   const [productId,setProductId]=useState('');
-  const [mappingComponents,setMappingComponents]=useState<MappingComponent[]>([]);
-  const [channelName,setChannelName]=useState('');
   const patch=(change:Partial<ChannelConfig>)=>setConfig(current=>{const after={...current,...change};appendAdminAudit({action:'修改平台設定',target:'Keeta',before:current,after});return after;});
-  const addMappingComponent=()=>{if(!productId)return;setMappingComponents(rows=>[...rows,{canonicalProductId:productId,quantity:1}]);setProductId('');};
-  const addMapping=()=>{if(!providerItemId.trim()||!mappingComponents.length)return;(()=>{const row:MappingRow={providerItemId:providerItemId.trim(),channelName:channelName.trim(),components:Object.freeze([...mappingComponents]),status:'MAPPED'};const next=[...(draft.channelMappings?.keeta??[]).filter(item=>(item.skuOpenItemCode||item.spuOpenItemCode||item.providerSkuId||item.providerSpuId)!==row.providerItemId),{mappingId:'keeta:'+row.providerItemId,enabled:true,skuOpenItemCode:row.providerItemId,channelName:row.channelName,components:row.components,optionMappings:[]}];updateKeetaMappings(next);appendAdminAudit({action:'新增 Keeta 渠道商品對應',target:row.providerItemId,after:row});})();setProviderItemId('');setChannelName('');setMappingComponents([]);};
+  const addMapping=()=>{if(!providerItemId.trim()||!productId)return;setMappings(rows=>{const row:MappingRow={providerItemId:providerItemId.trim(),productId,status:'MAPPED'};appendAdminAudit({action:'新增平台商品對應',target:row.providerItemId,after:row});return [...rows.filter(item=>item.providerItemId!==row.providerItemId),row];});setProviderItemId('');setProductId('');};
   const failures=mappings.filter(row=>row.status==='PENDING');
   const title=mode==='overview'?'平台管理':mode==='mapping'?'商品映射管理':mode==='failures'?'匹配失敗明細':mode==='accept'?'接單／自動接單':mode==='sync'?'售罄／供應同步':'實收估算設定';
   const description=mode==='overview'?'查看 Keeta 連線、授權、Webhook 同整體平台狀態。'
@@ -726,11 +722,6 @@ export function ChannelsWorkspace({mode}:{mode:'overview'|'mapping'|'failures'|'
             <p><span>Canonical Order</span><b>{row.canonicalOrderId??'—'}</b></p>
             <p><span>Display</span><b>{row.canonicalDisplay??'—'}</b></p>
             <p><span>Committed</span><b>{row.committedAt?new Date(row.committedAt).toLocaleString('zh-HK'):'—'}</b></p>
-            <p><span>Mapping</span><b>{row.mappingState}</b></p>
-            <p><span>SMT ACK</span><b>{row.ackState}</b></p>
-            <p><span>Commercial</span><b>{row.commercialState??'未有'}</b></p>
-            <p><span>Provider Confirm</span><b>{row.providerConfirmState??'未執行'}</b></p>
-            <p><span>Provider Ready</span><b>{row.providerReadyState??'未執行'}</b></p>
           </div>
         </article>)}
       </div>:<div className="admin-read-empty">未有 Keeta 1001 訂單入口記錄。</div>}
@@ -833,7 +824,7 @@ export function ChannelsWorkspace({mode}:{mode:'overview'|'mapping'|'failures'|'
       <article className="admin-policy-card"><h2>{mode==='failures'?'未完成對應':'商品對應'}</h2>
         {mode==='failures'
           ?(failures.length?<div>{failures.map(row=><p key={row.providerItemId}>{row.providerItemId} · 待處理</p>)}</div>:<div className="admin-read-empty">目前冇待處理映射。</div>)
-          :<><div className="admin-callout compact">Keeta 商品 ID 只係渠道 Alias；右邊必須對應磨飯實際製作商品。二人餐／多人餐可以加入多個磨飯商品，廚房、Packing 同 Label 會使用呢個 Breakdown，而唔係用 Keeta 商品名代替製作內容。</div><label><span>Keeta 商品／SKU ID</span><input value={providerItemId} onChange={event=>setProviderItemId(event.target.value)} placeholder="例如 1234"/></label><label><span>Keeta 顯示名稱</span><input value={channelName} onChange={event=>setChannelName(event.target.value)} placeholder="例如 二人套餐"/></label><label><span>加入磨飯製作商品</span><select value={productId} onChange={event=>setProductId(event.target.value)}><option value="">請選擇</option>{draft.products.map(product=><option key={product.id} value={product.id}>{product.name}</option>)}</select></label><button type="button" className="secondary" disabled={!productId} onClick={addMappingComponent}>加入製作內容</button>{mappingComponents.length?<div className="admin-readback-proof">{mappingComponents.map((component,index)=><p key={index}><span>#{index+1}</span><b>{draft.products.find(product=>product.id===component.canonicalProductId)?.name??component.canonicalProductId} × {component.quantity}</b></p>)}</div>:<div className="admin-read-empty">未加入磨飯製作商品。</div>}<button type="button" disabled={!providerItemId.trim()||!mappingComponents.length} onClick={addMapping}>保存 Keeta 對應</button><div className="admin-readback-proof">{mappings.slice(0,20).map(row=><p key={row.providerItemId}><span>{row.providerItemId}{row.channelName?' · '+row.channelName:''}</span><b>{row.components.map(component=>(draft.products.find(product=>product.id===component.canonicalProductId)?.name??component.canonicalProductId)+' × '+component.quantity).join(' + ')}</b></p>)}</div></>}
+          :<><label><span>平台商品 ID</span><input value={providerItemId} onChange={event=>setProviderItemId(event.target.value)}/></label><label><span>磨飯商品</span><select value={productId} onChange={event=>setProductId(event.target.value)}><option value="">請選擇</option>{draft.products.map(product=><option key={product.id} value={product.id}>{product.name}</option>)}</select></label><button type="button" onClick={addMapping}>保存對應</button><div className="admin-readback-proof">{mappings.slice(0,20).map(row=><p key={row.providerItemId}><span>{row.providerItemId}</span><b>{draft.products.find(product=>product.id===row.productId)?.name??row.productId}</b></p>)}</div></>}
       </article>
     </div>:null}
   </section>;

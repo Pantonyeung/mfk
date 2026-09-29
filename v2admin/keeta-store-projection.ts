@@ -17,13 +17,12 @@ export interface KeetaSellabilityProjection{
   readonly unavailable:readonly string[];
   readonly total:number;
 }
-export function buildKeetaSellabilityProjection(snapshot:unknown,runtimeSellability:unknown=[]):KeetaSellabilityProjection{
+export function buildKeetaSellabilityProjection(snapshot:unknown):KeetaSellabilityProjection{
   const root=record(snapshot);if(!root)throw new Error('KEETA_SELLABILITY_ADMIN_SNAPSHOT_REQUIRED');
   const policy=record(root.channelPolicy);
   const catalog=record(root.catalog);
   if(!catalog)throw new Error('KEETA_SELLABILITY_CATALOG_REQUIRED');
-  const runtimeRows=array(runtimeSellability).map(record).filter(Boolean) as Record<string,unknown>[];
-  const runtimeById=new Map(runtimeRows.map(item=>[text(item.nodeId),text(item.status)||'available'] as const).filter(([id])=>Boolean(id)));
+  const availability=record(root.availability)??{};
   const products=array(catalog.products).map(record).filter(Boolean) as Record<string,unknown>[];
   const available:string[]=[];
   const unavailable:string[]=[];
@@ -33,8 +32,8 @@ export function buildKeetaSellabilityProjection(snapshot:unknown,runtimeSellabil
     const code=text(product.productCode)||id;
     if(!id||!code)throw new Error('KEETA_SELLABILITY_PRODUCT_ID_REQUIRED');
     const openItemCode=keetaSpuOpenItemCode(code);
-    const status=runtimeById.get(id)??'available';
-    if(status==='soldout'||status==='paused')unavailable.push(openItemCode);
+    const rule=record(availability[id]);
+    if(rule?.sellable===false)unavailable.push(openItemCode);
     else available.push(openItemCode);
   }
   if(available.length+unavailable.length>2000)throw new Error('KEETA_SELLABILITY_SPU_LIMIT_EXCEEDED');

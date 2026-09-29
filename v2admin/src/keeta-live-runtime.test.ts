@@ -1110,12 +1110,12 @@ describe('Keeta live edge runtime',()=>{
           revision:9,adminFingerprint:'fp-9',
           snapshot:{
             channelPolicy:{syncSellability:true},
+            availability:{p1:{sellable:true},p2:{sellable:false}},
             catalog:{products:[
               {id:'p1',productCode:'RB-A',active:true},
               {id:'p2',productCode:'BX 2',active:true},
             ]},
           },
-          runtimeSellability:[{nodeId:'p1',status:'available'},{nodeId:'p2',status:'soldout'}],
         }),
       }));
       expect(response.status).toBe(200);
@@ -1125,47 +1125,6 @@ describe('Keeta live edge runtime',()=>{
       const payloads=providerFetch.mock.calls.map(call=>JSON.parse(String(call[1]?.body??'{}')) as Record<string,unknown>);
       expect(payloads.map(row=>row.status).sort()).toEqual([0,1]);
       expect(payloads.every(row=>row.needLinkage===0)).toBe(true);
-    }finally{vi.unstubAllGlobals();}
-  });
-
-  it('uses SMT runtime sellability overlay and preserves propagation timing evidence',async()=>{
-    const key=Buffer.alloc(32,18).toString('base64');
-    const storage=new Map<string,unknown>();
-    const state={storage:{
-      get:async(key:string)=>storage.get(key),
-      put:async(key:string,value:unknown)=>{storage.set(key,value);},
-      delete:async(key:string)=>{storage.delete(key);},
-      list:async({prefix}:{prefix:string})=>new Map([...storage.entries()].filter(([key])=>key.startsWith(prefix))),
-    }};
-    const env={
-      KEETA_APP_ID:'3419700273',KEETA_APP_SECRET:'test-secret',
-      KEETA_TOKEN_ENCRYPTION_KEY:key,KEETA_PROVIDER_SHOP_ID:'721578302',
-      KEETA_OAUTH_REDIRECT_URI:'https://admin.morefunos.com/api/keeta/oauth/callback',
-    };
-    const {KeetaRuntimeStore}=await import('../keeta-runtime.ts');
-    const runtime=new KeetaRuntimeStore(state as never,env as never);
-    await runtime.fetch(new Request('https://internal/admin/token/import-test',{
-      method:'POST',headers:{'content-type':'application/json'},
-      body:JSON.stringify({accessToken:'access',tokenType:'bearer',expiresIn:7776000,refreshToken:'refresh',scope:'all',issuedAtTime:Date.now()}),
-    }));
-    vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({code:0,message:'Success',data:['ok'],errorList:[]}),{status:200,headers:{'content-type':'application/json'}})));
-    try{
-      const propagation={eventId:'evt-1',occurredAt:'2026-09-29T00:00:00.000Z',projectionAcceptedAt:'2026-09-29T00:00:00.100Z',providerTriggeredAt:'2026-09-29T00:00:00.120Z'};
-      const response=await runtime.fetch(new Request('https://internal/admin/sellability/sync',{
-        method:'POST',headers:{'content-type':'application/json'},
-        body:JSON.stringify({
-          revision:11,adminFingerprint:'fp-11',propagation,
-          snapshot:{channelPolicy:{syncSellability:true},catalog:{products:[
-            {id:'p1',productCode:'P1',active:true},{id:'p2',productCode:'P2',active:true},
-          ]}},
-          runtimeSellability:[{nodeId:'p1',status:'soldout'},{nodeId:'p2',status:'available'}],
-        }),
-      }));
-      expect(response.status).toBe(200);
-      const body=await response.json() as any;
-      expect(body).toMatchObject({state:'COMPLETED',available:1,unavailable:1});
-      expect(body.propagation).toMatchObject(propagation);
-      expect(typeof body.propagation.providerCompletedAt).toBe('string');
     }finally{vi.unstubAllGlobals();}
   });
 

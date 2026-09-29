@@ -86,15 +86,6 @@ function sourceFilterCount(rows:readonly SmmOrderProjection[],filter:SmmStage7So
   return rows.filter(row=>smmStage7MatchesSource(row,filter)).length;
 }
 
-function Stage7SourceIcon({group}:{group:ReturnType<typeof smmStage7SourceGroup>}){
-  const common={viewBox:'0 0 24 24',fill:'none',stroke:'currentColor',strokeWidth:1.8,strokeLinecap:'round' as const,strokeLinejoin:'round' as const};
-  if(group==='ONSITE')return <svg {...common}><path d="M4 10h16v10H4zM6 10l2-6h8l2 6M9 14h6M9 17h4"/></svg>;
-  if(group==='SMM')return <svg {...common}><rect x="7" y="3" width="10" height="18" rx="2"/><path d="M10 6h4M10 17h4"/></svg>;
-  if(group==='OWN_PLATFORM')return <svg {...common}><path d="M5 4h14v16H5zM8 8h8M8 12h8M8 16h5"/></svg>;
-  if(group==='THIRD_PARTY')return <svg {...common}><path d="M6 7h12l1 4v8H5v-8zM9 7V4h6v3M8 13h8"/></svg>;
-  return <svg {...common}><circle cx="12" cy="12" r="8"/><path d="M8 12h8M12 8v8"/></svg>;
-}
-
 function Stage7StateBanner({connection,hasRows}:{connection:SmmConnectionState;hasRows:boolean}){
   const state=smmStage7ConnectionState(connection,hasRows);
   if(!state)return null;
@@ -115,7 +106,7 @@ function Stage7Card({row,onOpen}:{row:SmmOrderProjection;onOpen:()=>void}){
   const source=sourceLabel(row);
   const time=smmStage7OrderTime(row);
   return <button type="button" className="stage7-card" onClick={onOpen}>
-    <span className={`stage7-source-icon stage7-source-${smmStage7SourceGroup(row).toLowerCase()}`} aria-hidden="true"><Stage7SourceIcon group={smmStage7SourceGroup(row)}/></span>
+    <span className={`stage7-source-icon stage7-source-${smmStage7SourceGroup(row).toLowerCase()}`} data-final-art-pending={`STAGE7_SOURCE_${smmStage7SourceGroup(row)}`} aria-hidden="true"><span className="stage7-source-art"/></span>
     <span className="stage7-card-main">
       <span><strong>{row.displayCode||'未有資料'}</strong><small>{source}</small></span>
       <small>{timeLabel(time)} · {count===null?'項目數未有資料':`${count} 項`} · {smmStage7AmountLabel(row)}</small>

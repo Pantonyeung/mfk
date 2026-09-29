@@ -1,6 +1,9 @@
 import {describe,expect,it} from 'vitest';
 import {CustomerRuntimeStore} from '../customer-runtime.ts';
-import {MFK_CUSTOMER_ORDER_INTENT_SCHEMA} from '../../contracts/customer-cloud-v1.ts';
+import {
+  MFK_CUSTOMER_ORDER_INTENT_SCHEMA,
+  MFK_CUSTOMER_QUOTE_REQUEST_SCHEMA,
+} from '../../contracts/customer-cloud-v1.ts';
 
 class MemoryStorage{
   private rows=new Map<string,unknown>();
@@ -15,12 +18,39 @@ function runtime(){
 }
 
 describe('CustomerRuntimeStore public contract',()=>{
-  it('legacy cloud quote endpoints are retired',async()=>{
+  it('keeps quote request durable and returns only public quote facts on readback',async()=>{
     const store=runtime();
-    expect((await store.fetch(new Request('https://internal/public/quote',{method:'POST'}))).status).toBe(404);
-    expect((await store.fetch(new Request('https://internal/public/quote/readback?requestId=legacy'))).status).toBe(404);
-    expect((await store.fetch(new Request('https://internal/smt/quotes/pending'))).status).toBe(404);
-    expect((await store.fetch(new Request('https://internal/smt/quotes/ack',{method:'POST'}))).status).toBe(404);
+    const requestId='CUSTOMER-QUOTE-1';
+    const submit=await store.fetch(new Request('https://internal/public/quote',{
+      method:'POST',
+      headers:{'content-type':'application/json'},
+      body:JSON.stringify({
+        schema:MFK_CUSTOMER_QUOTE_REQUEST_SCHEMA,
+        storeId:'MF01',
+        requestId,
+        createdAt:'2026-09-23T12:00:00.000Z',
+        cart:[{
+          lineId:'L1',productId:'bento',productName:'肉燥便當',quantity:1,selections:[],
+        }],
+      }),
+    }));
+    expect(submit.status).toBe(202);
+
+    const ack=await store.fetch(new Request('https://internal/smt/quotes/ack',{
+      method:'POST',
+      headers:{'content-type':'application/json'},
+      body:JSON.stringify({
+        requestId,state:'CONFIRMED',quoteId:'Q1',revision:'R1',currency:'HKD',totalMinor:4200,
+        observedAt:'2026-09-23T12:00:01.000Z',
+      }),
+    }));
+    expect(ack.status).toBe(200);
+
+    const readback=await store.fetch(new Request('https://internal/public/quote/readback?requestId='+requestId));
+    const body=await readback.json() as Record<string,unknown>;
+    expect(body).toMatchObject({state:'CONFIRMED',requestId,quoteId:'Q1',totalMinor:4200});
+    expect(body).not.toHaveProperty('cart');
+    expect(body).not.toHaveProperty('requestFingerprint');
   });
 
   it('does not expose checkout name or phone through public order readback',async()=>{

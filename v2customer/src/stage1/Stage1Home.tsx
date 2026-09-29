@@ -19,11 +19,6 @@ const statusLabel=(storeAvailable:boolean|undefined)=>{
   if(storeAvailable===false)return '休息中';
   return '更新中';
 };
-const operatingHoursLabel=(snapshot:CustomerReadModelSnapshot|null)=>{
-  const raw=(snapshot?.store as unknown as {todayHoursLabel?:string;hoursLabel?:string})?.todayHoursLabel
-    ??(snapshot?.store as unknown as {hoursLabel?:string})?.hoursLabel;
-  return String(raw||'').trim();
-};
 
 function mediaFor(product:CustomerProduct){
   if(product.imageUrl)return product.imageUrl;
@@ -62,7 +57,6 @@ export function Stage1Home({
   onBuyAgain:(order:CustomerHistoryProjection)=>void;
 }){
   const store=snapshot?.store;
-  const todayHours=operatingHoursLabel(snapshot);
   const member=snapshot?.member;
   const currentOrder=activeOrders[0];
   const lastOrder=history[0];
@@ -72,42 +66,37 @@ export function Stage1Home({
     ?member.coupons.filter(item=>item.state==='AVAILABLE').length
     :0;
 
-  const homeMode=currentOrder?'ORDER_ACTIVE':store?.channelAvailable===false?'CLOSED':availableCouponCount?'CAMPAIGN':history.length?'RETURNING':'NORMAL';
-  const headline=homeMode==='ORDER_ACTIVE'
+  const headline=currentOrder
     ?'辛苦了！美味正在為你準備中'
-    :homeMode==='CLOSED'
-      ?'辛苦了，先來揀進吧！'
-      :homeMode==='RETURNING'
-        ?'歡迎回來，今天也要好好吃飯！'
-        :homeMode==='CAMPAIGN'
-          ?'發現更多美味，也收集更多回憶！'
-          :'早安，今天想食咩？';
-  const subline=homeMode==='ORDER_ACTIVE'
-    ?'好好吃飯，補充生活的能量！'
-    :homeMode==='CLOSED'
-      ?'好味道，總是值得期待。'
-      :homeMode==='RETURNING'
-        ?'有美食相伴的日子，總是特別好。'
-        :homeMode==='CAMPAIGN'
-          ?'好吃的飯，總能帶來好心情。'
-          :'一碗好飯，讓日常更有味。';
+    :history.length
+      ?'歡迎回來，今天也要好好吃飯！'
+      :store?.channelAvailable===false
+        ?'今日休息，先來揀定想食嘅'
+        :'今天想食咩？';
+  const subline=currentOrder
+    ?'訂單有新進度會喺呢度睇到。'
+    :history.length
+      ?'有熟悉嘅味道，也可以發現新選擇。'
+      :store?.channelAvailable===false
+        ?'未開始營業都可以慢慢睇餐牌。'
+        :'一餐好飯，讓日常更有味。';
 
-  return <div className="stage1-home" data-home-mode={homeMode}>
+  return <div className="stage1-home">
     <header className="stage1-fixed-header">
       <button className="stage1-logo-button" onClick={()=>window.scrollTo({top:0,behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'})} aria-label="返回首頁頂部">
         <img src={OFFICIAL_LOGO_URL} alt="磨飯 More Fun"/>
       </button>
       <div className="stage1-store-context">
-        <strong>{store?.storeName??'磨飯'} <span className="stage1-store-chevron" aria-hidden="true">⌄</span></strong>
-        <span className="stage1-store-meta">{statusLabel(store?.channelAvailable)}{todayHours?' · '+todayHours:''}</span>
+        <strong>{store?.storeName??'磨飯'}</strong>
+        <span>{statusLabel(store?.channelAvailable)}</span>
       </div>
-      <button className="stage1-bell" type="button" aria-label="通知"><span aria-hidden="true">♢</span>{activeOrders.length?<i/>:null}</button>
+      <span className="stage1-bell" aria-hidden="true">♢</span>
     </header>
 
     <div className="stage1-content">
       <Stage1StatePanel connection={connection} browserOnline={browserOnline} onRetry={onRetry}/>
 
-      <section className="stage1-welcome" data-home-mode={homeMode}>
+      <section className="stage1-welcome">
         <h1>{headline}</h1>
         <p>{subline}</p>
       </section>
@@ -117,22 +106,16 @@ export function Stage1Home({
         <strong>{canBrowse?'搜尋想食嘅餐點…':'餐牌更新中…'}</strong>
       </button>
 
-      {homeMode==='RETURNING'&&topRecommendations.length?<section className="stage1-frequent-strip">
-        <div className="stage1-section-title"><div><h2>常點清單</h2><small>最熟悉的味道</small></div><button onClick={onHistory}>查看全部 ›</button></div>
-        <div className="stage1-frequent-row">{topRecommendations.slice(0,4).map(item=><button key={item.product.productId} onClick={event=>{const rect=event.currentTarget.getBoundingClientRect();onProduct(item.product,{top:rect.top,left:rect.left,width:rect.width,height:rect.height});}}><img src={mediaFor(item.product)} alt={item.product.imageAlt??item.product.name}/><strong>{item.product.name}</strong></button>)}</div>
-      </section>:null}
-
       {currentOrder?<button className="stage1-live-order" onClick={onOrders}>
         <span className="stage1-live-label">訂單進行中</span>
         <strong>{currentOrder.stage==='READY'?'可以取餐啦':currentOrder.stage==='PREPARING'?'製作中':currentOrder.stage==='ACCEPTED'?'店舖已接單':'查看最新進度'}</strong>
-        <div className="stage1-order-step-labels" aria-hidden="true"><span>已接單</span><span>製作中</span><span>快完成</span><span>可取餐</span></div>
         <div className="stage1-order-steps" aria-hidden="true"><i className="done"/><i className="active"/><i/><i/></div>
-        <small>{currentOrder.displayCode}{currentOrder.etaLabel?' · 預計 '+currentOrder.etaLabel:''}</small>
+        <small>{currentOrder.displayCode}{currentOrder.etaLabel?' · '+currentOrder.etaLabel:''}</small>
       </button>:null}
 
       {store?.channelAvailable===false?<section className="stage1-closed-panel">
         <img src={HERO_IP} alt="" aria-hidden="true"/>
-        <div><span>今日已打烊</span><strong>明日再見</strong>{todayHours?<small>下次營業 · {todayHours}</small>:null}<button disabled={!canBrowse} onClick={onBrowse}>{canBrowse?'查看餐牌':'餐牌更新中'}</button></div>
+        <div><span>今日已打烊</span><strong>明日再見</strong><button disabled={!canBrowse} onClick={onBrowse}>{canBrowse?'查看餐牌':'餐牌更新中'}</button></div>
       </section>:null}
 
       <button className="stage1-hero-banner" data-source-file="磨飯_stage_1_首頁品牌展示.png" disabled={!canBrowse} onClick={onBrowse} aria-label={canBrowse?'開始點餐':'餐牌更新中'}>
@@ -149,19 +132,19 @@ export function Stage1Home({
         <img src={HERO_IP} alt="" aria-hidden="true"/>
       </button>:null}
 
-      <section className="stage1-quick-entry-section" aria-label="首頁快捷入口">
+      <section className="stage1-quick-entry-section">
         <div className="stage1-quick-entry-grid">
-          <button onClick={onHistory} aria-label="我的收藏">
-            <span className="stage1-shortcut-source stage1-shortcut-heart" aria-hidden="true"><img src={STAGE1_FINAL_SOURCE} alt=""/></span>
-            <strong>我的收藏</strong>{history.length?<small>搵返熟悉味道</small>:null}
-          </button>
-          <button onClick={onMember} aria-label={availableCouponCount?'回憶券，'+availableCouponCount+' 張可用':'回憶券'}>
+          <button onClick={onMember} aria-label={availableCouponCount?'記憶券，'+availableCouponCount+' 張可用':'記憶券'}>
             <span className="stage1-shortcut-source stage1-shortcut-ticket" aria-hidden="true"><img src={STAGE1_FINAL_SOURCE} alt=""/></span>
-            <strong>回憶券</strong>{availableCouponCount?<small>{availableCouponCount} 張可用</small>:null}
+            <strong>記憶券</strong>{availableCouponCount?<small>{availableCouponCount} 張可用</small>:null}
+          </button>
+          <button onClick={onHistory} aria-label="常購清單">
+            <span className="stage1-shortcut-source stage1-shortcut-heart" aria-hidden="true"><img src={STAGE1_FINAL_SOURCE} alt=""/></span>
+            <strong>常購清單</strong>
           </button>
           <button onClick={onBrowse} aria-label="期間限定">
             <span className="stage1-shortcut-source stage1-shortcut-order" aria-hidden="true"><img src={STAGE1_FINAL_SOURCE} alt=""/></span>
-            <strong>期間限定</strong><small>今期新品</small>
+            <strong>期間限定</strong>
           </button>
         </div>
       </section>

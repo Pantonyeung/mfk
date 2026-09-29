@@ -1,6 +1,5 @@
 import type {MfkAdminConfigEnvelope} from '../../../contracts/admin-config-sync-v1.ts';
 import {readSmtAdminConfigLkg} from './admin-config-sync.ts';
-const SMT_RUNTIME_KEY='mfk.v2local.runtime.v1';
 
 export type SyncedServiceMode='takeaway'|'dine-in';
 
@@ -100,13 +99,12 @@ function moneyMinor(value:unknown){
 function snapshotOf(envelope?:MfkAdminConfigEnvelope|null){
   return record((envelope??readSmtAdminConfigLkg())?.snapshot);
 }
-function runtimeSellable(nodeId:string){
-  if(typeof localStorage==='undefined')return true;
-  try{
-    const persisted=JSON.parse(localStorage.getItem(SMT_RUNTIME_KEY)||'null') as {availability?:Record<string,unknown>}|null;
-    const status=String(persisted?.availability?.[nodeId]??'available');
-    return status!=='soldout'&&status!=='paused';
-  }catch{return true;}
+function localSellable(raw:unknown,now=Date.now()){
+  const state=record(raw);
+  if(state.scope==='ONLINE_ONLY')return true;
+  const restoreAt=Date.parse(string(state.restoreAt));
+  if(Number.isFinite(restoreAt)&&restoreAt<=now)return true;
+  return state.sellable!==false;
 }
 
 export function projectSyncedOrderingCatalog(
@@ -120,6 +118,7 @@ export function projectSyncedOrderingCatalog(
   const optionCenter=record(snapshot.optionCenter);
   const optionSetsRaw=array(optionCenter.sets);
   const productLinksRaw=array(optionCenter.productLinks);
+  const availability=record(snapshot.availability);
   const productMedia=record(snapshot.productMedia);
 
   const categories=categoriesRaw
@@ -160,6 +159,7 @@ export function projectSyncedOrderingCatalog(
       const baseReady=priceText.trim()!==''&&Number.isFinite(Number(priceText));
       const surcharge=serviceMode==='takeaway'&&bool(row.takeawaySurchargeEnabled,false)?100:0;
       const adjustment=serviceMode==='takeaway'?moneyMinor(row.takeawayAdjustment):0;
+      const availabilityRow=record(availability[id]);
       const mediaRow=record(productMedia[id]);
       const imageUrl=string(mediaRow.publicUrl)||string(mediaRow.canonicalImageRef)||string(row.imageRef);
       const optionSets=(linksByProduct.get(id)??[]).map(link=>{
@@ -175,7 +175,7 @@ export function projectSyncedOrderingCatalog(
               name:string(option.name,optionId),
               priceAdjustmentMinor:moneyMinor(option.priceAdjustment),
               defaultSelected:defaults.has(optionId),
-              active:bool(option.active,true)&&runtimeSellable('OPTION:'+optionId),
+              active:bool(option.active,true)&&localSellable(availability['OPTION:'+optionId]),
               position:integer(option.position,0),
             };
           })
@@ -204,7 +204,7 @@ export function projectSyncedOrderingCatalog(
         position:integer(row.legacySourcePosition,index),
         priceMinor:moneyMinor(priceText)+surcharge+adjustment,
         priceReady:baseReady,
-        sellable:runtimeSellable(id),
+        sellable:localSellable(availabilityRow),
         imageUrl:imageUrl||undefined,
         optionSets:Object.freeze(optionSets),
       };
@@ -281,7 +281,7 @@ export function projectSyncedCombos(envelope?:MfkAdminConfigEnvelope|null):{
           label:string(choice.label),
           bandId:string(choice.bandId),
           priceAdjustmentMinor:moneyMinor(choice.priceAdjustment),
-          active:bool(choice.active,true)&&runtimeSellable('COMBO_CHILD:'+string(choice.id)),
+          active:bool(choice.active,true)&&localSellable(record(snapshot.availability)['COMBO_CHILD:'+string(choice.id)]),
           position:integer(choice.position,0),
         };
       }).filter(choice=>choice.id&&choice.active);

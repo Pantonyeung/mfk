@@ -28,17 +28,12 @@ const snapshot={
 };
 
 describe('Keeta K4 published-config projection',()=>{
-  it('combines Admin base active products with SMT runtime sellability',()=>{
-    const result=buildKeetaSellabilityProjection(snapshot,[
-      {nodeId:'p1',status:'soldout'},
-      {nodeId:'p2',status:'available'},
-      {nodeId:'p3',status:'available'},
-    ]);
+  it('uses K3-compatible SPU OpenItemCodes and canonical sellability only',()=>{
+    const result=buildKeetaSellabilityProjection(snapshot);
     expect(result.enabled).toBe(true);
-    expect(result.available).toEqual(['SPU:BX_2']);
-    expect(result.unavailable).toEqual(['SPU:RB-A']);
+    expect(result.available).toEqual(['SPU:RB-A']);
+    expect(result.unavailable).toEqual(['SPU:BX_2']);
     expect(result.total).toBe(2);
-    expect([...result.available,...result.unavailable]).not.toContain('SPU:OLD');
   });
 
   it('projects weekly business hours and full-day closure deterministically',()=>{

@@ -184,7 +184,7 @@ export function App(){
     window.addEventListener('online',onOnline);
     window.addEventListener('pageshow',onPageShow);
     document.addEventListener('visibilitychange',onVisibility);
-    const timer=window.setInterval(()=>{if(document.visibilityState==='visible')void refresh();},2500);
+    const timer=window.setInterval(()=>{if(document.visibilityState==='visible')void refresh();},15000);
     return()=>{
       window.removeEventListener('online',onOnline);
       window.removeEventListener('pageshow',onPageShow);
@@ -760,7 +760,7 @@ export function App(){
         onProduct={product=>{setEditingLineId(null);setSelectedProduct(product);setSelections({});setSelectedVariationId(null);setComboEnabled(false);setComboSelections({})}}
         onCart={()=>{setCheckoutStage(false);setCartOpen(true)}}
       />:null}
-      {view==='work'?<Stage6QueueView connection={connection} items={snapshot?.work??[]} orders={snapshot?.orders??[]} onRefresh={refresh} onFulfill={async input=>{if(!port?.fulfillOrder)return Object.freeze({state:'NOT_CONNECTED' as const,message:'門店狀態更新未連接'});return port.fulfillOrder(input);}}/>:null}
+      {view==='work'?<Stage6QueueView connection={connection} items={snapshot?.work??[]} orders={snapshot?.orders??[]} onRefresh={refresh}/>:null}
       {view==='orders'?<Stage7OrdersView connection={connection} rows={snapshot?.orders??[]} onRefresh={refresh}/>:null}
       {view==='dine'?<Stage8DineView
         connection={connection}

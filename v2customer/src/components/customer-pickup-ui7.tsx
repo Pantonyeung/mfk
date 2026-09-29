@@ -1,4 +1,3 @@
-import {CUSTOMER_FINAL_SOURCE} from '../source-assets';
 import {ActionButton} from '../ui/primitives';
 import type {
   CustomerConnectionState,
@@ -45,8 +44,7 @@ const formatTime=(value:string|undefined)=>{
 };
 
 function Mascot({variant}:{variant:CharacterVariant}){
-  const asset=variant==='male'?CUSTOMER_FINAL_SOURCE.maleIpSheet:CUSTOMER_FINAL_SOURCE.femaleIpSheet;
-  return <img className="ui7-mascot ui7-brand-art-slot" src={asset.url} alt="" aria-hidden="true" data-character-slot={variant} data-source-asset={asset.sourceFile}/>;
+  return <div className="ui7-mascot ui7-brand-art-slot" data-final-art-pending="true" data-character-slot={variant} role="img" aria-label="磨飯品牌角色插圖位置"/>;
 }
 
 function IdentityPanel({

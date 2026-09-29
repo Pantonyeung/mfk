@@ -48,32 +48,12 @@ function validateStaffConfig(){
   return errors;
 }
 
-function validateKeetaMappings(catalog:AdminSessionDraft){
-  const mappings=readAdminStored<any[]>('channel-mapping.keeta.v1',[]);
-  const productIds=new Set(catalog.products.map(product=>product.id));
-  const errors:string[]=[];
-  for(const mapping of mappings){
-    if(mapping?.status==='IGNORED')continue;
-    const providerId=String(mapping?.providerItemId??'').trim();
-    const components=Array.isArray(mapping?.components)?mapping.components:[];
-    if(!providerId)errors.push('Keeta mapping missing provider item id');
-    if(!components.length)errors.push('Keeta '+providerId+' mapping missing production components');
-    for(const component of components){
-      const productId=String(component?.canonicalProductId??'').trim();
-      if(!productIds.has(productId))errors.push('Keeta '+providerId+' mapping references missing product '+productId);
-      if(!Number.isSafeInteger(component?.quantity)||component.quantity<1)errors.push('Keeta '+providerId+' mapping quantity invalid '+productId);
-    }
-  }
-  return errors;
-}
-
 export function validateAdminConfig(catalog:AdminSessionDraft,optionCenter?:OptionSetCenterState){
   const optionState=optionCenter??readOptionSetCenterState(catalog);
   return Object.freeze([
     ...validateAdminDraft(catalog),
     ...validateOptionSetCenter(optionState),
     ...validateStaffConfig(),
-    ...validateKeetaMappings(catalog),
   ]);
 }
 

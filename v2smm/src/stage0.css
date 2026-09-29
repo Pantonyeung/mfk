@@ -80,9 +80,23 @@
   filter:drop-shadow(0 12px 20px rgba(22,53,104,.12));
 }
 .stage0-splash .stage0-mascot{width:230px;height:230px;margin:4px auto -18px}
-.stage0-mascot-login{width:250px;height:168px;object-fit:contain;margin:-8px auto -16px}
-.stage0-mascot-checking{width:154px;height:154px;object-fit:contain;margin:0 auto -18px}
-.stage0-mascot-recovery{object-fit:contain;object-position:center bottom}
+.stage0-mascot-pair{
+  height:154px;
+  display:flex;
+  align-items:flex-end;
+  justify-content:center;
+  gap:-8px;
+  margin:-2px auto 0;
+  overflow:hidden;
+}
+.stage0-mascot-pair img{
+  width:145px;
+  height:158px;
+  object-fit:contain;
+  object-position:center bottom;
+  filter:drop-shadow(0 9px 18px rgba(22,53,104,.10));
+}
+.stage0-mascot-pair img+img{margin-left:-38px}
 .stage0-feather{
   position:absolute;
   width:102px;
@@ -126,7 +140,7 @@
 .stage0-login-card{padding-bottom:20px}
 .stage0-login-card header{display:grid;gap:4px;text-align:left}
 .stage0-login-card header span,.stage0-page-intro>div>span{color:var(--s0-blue);font-size:11px;font-weight:900}
-.stage0-login-card .stage0-mascot-login{margin-top:-8px;margin-bottom:-16px}
+.stage0-login-card .stage0-mascot-pair{margin-top:-8px;margin-bottom:-16px}
 .stage0-page-intro{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
 .stage0-page-intro>div:first-child{display:grid;gap:5px;min-width:0}
 .stage0-status-icon,.stage0-status-orb{
@@ -233,7 +247,8 @@
   .stage0-shell{padding-left:12px;padding-right:12px}
   .stage0-card{padding:19px 16px;border-radius:24px;gap:12px}
   .stage0-card h1{font-size:24px}
-  .stage0-mascot-login{width:220px;height:148px}
+  .stage0-mascot-pair{height:132px}
+  .stage0-mascot-pair img{width:124px;height:138px}
   .stage0-splash .stage0-mascot{width:198px;height:198px}
   .stage0-connection-grid{grid-template-columns:1fr}
   .stage0-connection-grid .wide{grid-column:auto}
@@ -243,7 +258,8 @@
   .stage0-center{min-height:calc(100dvh - 34px);gap:10px}
   .stage0-splash .stage0-brand-logo{width:132px}
   .stage0-slogan strong{font-size:21px}
-  .stage0-mascot-login{width:200px;height:134px}
+  .stage0-mascot-pair{height:116px}
+  .stage0-mascot-pair img{width:112px;height:124px}
   .stage0-field input,.stage0-field select,.stage0-primary,.stage0-secondary{min-height:48px}
 }
 @media(prefers-reduced-motion:reduce){
@@ -251,8 +267,3 @@
 }
 @keyframes s0progress{from{transform:translateX(-65%)}to{transform:translateX(130%)}}
 @keyframes s0spin{to{transform:rotate(360deg)}}
-
-/* R2 source-IP repair: avoid corrupted composite; compose approved source mascots without redrawing. */
-.stage0-mascot-pair{display:flex;align-items:flex-end;justify-content:center;gap:0;width:min(100%,260px);height:150px;margin:0 auto;overflow:hidden}
-.stage0-mascot-pair img{width:52%;height:100%;object-fit:contain;object-position:center bottom;display:block}
-@media(max-width:360px){.stage0-mascot-pair{width:min(100%,220px);height:126px}}

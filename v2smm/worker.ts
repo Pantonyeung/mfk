@@ -376,48 +376,6 @@ export class SmmIntentStore{
       return json({state:'PENDING_WEB_SMT',submissionId});
     }
 
-    if(url.pathname==='/acceptance/fulfillment/create'&&request.method==='POST'){
-      const body=record(await request.json());
-      const request=record(body.request),staff=record(body.staff);
-      const commandId=text(request.commandId,180),requestId=text(request.requestId,180),orderId=text(request.orderId,180),action=text(request.action,20),staffId=text(staff.staffId,120);
-      if(!commandId||!requestId||!orderId||!staffId||!['ACCEPT','READY'].includes(action))return json({code:'SMM_FULFILLMENT_INTENT_INVALID'},400);
-      const key='acceptance-fulfillment:'+commandId;
-      const fingerprint=stable({requestId,commandId,orderId,action,staffId});
-      const existing=await this.state.storage.get(key) as any;
-      if(existing){
-        if(existing.fingerprint!==fingerprint)return json({code:'SMM_FULFILLMENT_COMMAND_CONFLICT'},409);
-        return json({state:existing.state,commandId},existing.state==='PENDING_WEB_SMT'?202:200);
-      }
-      await this.state.storage.put(key,Object.freeze({request:Object.freeze({...request}),staff:Object.freeze({staffId}),fingerprint,state:'PENDING_WEB_SMT',receivedAt:new Date().toISOString()}));
-      return json({state:'PENDING_WEB_SMT',commandId},202);
-    }
-
-    if(url.pathname==='/acceptance/fulfillment/readback'&&request.method==='GET'){
-      const commandId=text(url.searchParams.get('commandId'),180);
-      if(!commandId)return json({code:'SMM_FULFILLMENT_COMMAND_REQUIRED'},400);
-      const row=await this.state.storage.get('acceptance-fulfillment:'+commandId) as any;
-      if(!row)return json({state:'UNKNOWN',commandId},404);
-      return json({state:row.state,commandId,result:row.result??null});
-    }
-
-    if(url.pathname==='/acceptance/smt/fulfillment/pending'&&request.method==='GET'){
-      const rows=await this.state.storage.list({prefix:'acceptance-fulfillment:'});
-      const commands=[...rows.values()].filter((row:any)=>row?.state==='PENDING_WEB_SMT').sort((a:any,b:any)=>String(a.receivedAt||'').localeCompare(String(b.receivedAt||''))).slice(0,50).map((row:any)=>({request:row.request,staff:row.staff}));
-      return json({commands});
-    }
-
-    if(url.pathname==='/acceptance/smt/fulfillment/ack'&&request.method==='POST'){
-      const body=record(await request.json()),commandId=text(body.commandId,180),result=record(body.result);
-      if(!commandId)return json({code:'SMM_FULFILLMENT_COMMAND_REQUIRED'},400);
-      const key='acceptance-fulfillment:'+commandId,current=await this.state.storage.get(key) as any;
-      if(!current)return json({code:'SMM_FULFILLMENT_COMMAND_NOT_FOUND'},404);
-      if(current.state!=='PENDING_WEB_SMT')return json({state:'IDEMPOTENT',commandId});
-      const disposition=String(result.disposition||'');
-      if(!['APPLIED','IDEMPOTENT','REJECTED'].includes(disposition))return json({code:'SMM_FULFILLMENT_ACK_INVALID'},400);
-      await this.state.storage.put(key,Object.freeze({...current,state:disposition==='REJECTED'?'REJECTED':'CONFIRMED',result:Object.freeze({...result}),resolvedAt:new Date().toISOString()}));
-      return json({state:'ACKED',commandId});
-    }
-
     if(url.pathname==='/acceptance/smt/projection'&&request.method==='POST'){
       const body=record(await request.json().catch(()=>({})));
       const snapshot=record(body.snapshot);
@@ -795,23 +753,6 @@ export default{
       return json({code:'METHOD_NOT_ALLOWED'},405);
     }
 
-    if(url.pathname==='/api/smm/fulfillment'&&request.method==='POST'){
-      const storeId=text(url.searchParams.get('storeId'),40)||'MF01';
-      const staff=await readStaffSession(request,storeId,env);
-      if(!staff)return json({code:'SMM_STAFF_UNAUTHORIZED'},401);
-      const body=record(await request.json());
-      const id=env.SMM_INTENT_STORE.idFromName(storeId),stub=env.SMM_INTENT_STORE.get(id);
-      return stub.fetch(new Request('https://internal/acceptance/fulfillment/create',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({request:body,staff})}));
-    }
-    if(url.pathname==='/api/smm/fulfillment/readback'&&request.method==='GET'){
-      const storeId=text(url.searchParams.get('storeId'),40)||'MF01',commandId=text(url.searchParams.get('commandId'),180);
-      const staff=await readStaffSession(request,storeId,env);
-      if(!staff)return json({code:'SMM_STAFF_UNAUTHORIZED'},401);
-      const id=env.SMM_INTENT_STORE.idFromName(storeId),stub=env.SMM_INTENT_STORE.get(id);
-      const target=new URL('https://internal/acceptance/fulfillment/readback');target.searchParams.set('commandId',commandId);
-      return stub.fetch(new Request(target.toString(),{method:'GET'}));
-    }
-
     if(url.pathname==='/api/smm/acceptance/orders/submit'){
       if(request.method!=='POST')return json({code:'METHOD_NOT_ALLOWED'},405);
       const staff=await readStaffSession(request,storeId,env);
@@ -840,7 +781,7 @@ export default{
       return stub.fetch(new Request(target.toString(),{method:'GET'}));
     }
 
-    if(url.pathname==='/api/smm/acceptance/smt/pending'||url.pathname==='/api/smm/acceptance/smt/ack'||url.pathname==='/api/smm/acceptance/smt/projection'||url.pathname==='/api/smm/acceptance/smt/fulfillment/pending'||url.pathname==='/api/smm/acceptance/smt/fulfillment/ack'){
+    if(url.pathname==='/api/smm/acceptance/smt/pending'||url.pathname==='/api/smm/acceptance/smt/ack'||url.pathname==='/api/smm/acceptance/smt/projection'){
       const provided=text(request.headers.get('x-mfk-web-acceptance'),256);
       const expected=String(env.WEB_SMT_ACCEPTANCE_TOKEN||'');
       if(!expected||!provided||provided.length!==expected.length||!sameHex(provided,expected)){
@@ -848,14 +789,6 @@ export default{
       }
       const id=env.SMM_INTENT_STORE.idFromName(storeId);
       const stub=env.SMM_INTENT_STORE.get(id);
-      if(url.pathname.endsWith('/fulfillment/pending')){
-        if(request.method!=='GET')return json({code:'METHOD_NOT_ALLOWED'},405);
-        return stub.fetch(new Request('https://internal/acceptance/smt/fulfillment/pending',{method:'GET'}));
-      }
-      if(url.pathname.endsWith('/fulfillment/ack')){
-        if(request.method!=='POST')return json({code:'METHOD_NOT_ALLOWED'},405);
-        return stub.fetch(new Request('https://internal/acceptance/smt/fulfillment/ack',{method:'POST',headers:{'content-type':'application/json'},body:await request.text()}));
-      }
       if(url.pathname.endsWith('/pending')){
         if(request.method!=='GET')return json({code:'METHOD_NOT_ALLOWED'},405);
         return stub.fetch(new Request('https://internal/acceptance/smt/pending',{method:'GET'}));
