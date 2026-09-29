@@ -1252,17 +1252,26 @@ export class KeetaRuntimeStore{
           canonicalOrderId:row.canonicalOrderId?String(row.canonicalOrderId):null,
           canonicalDisplay:row.canonicalDisplay?String(row.canonicalDisplay):null,
           committedAt:row.committedAt?String(row.committedAt):null,
+          mappingState:row.state==='COMMITTED'?'RESOLVED':'PENDING',
+          ackState:row.state==='COMMITTED'?'ACKED':'PENDING',
+          commercialState:null,
         }))
         .sort((a,b)=>String(b.receivedAt).localeCompare(String(a.receivedAt)))
         .slice(0,200);
+      const enriched=await Promise.all(items.map(async item=>{
+        const commercial=await this.state.storage.get('commercial:order:'+item.providerOrderId);
+        const commandConfirm=await this.state.storage.get('order:command:'+item.providerOrderId+':CONFIRM');
+        const commandReady=await this.state.storage.get('order:command:'+item.providerOrderId+':READY');
+        return Object.freeze({...item,commercialState:commercial?String(commercial.state||'CAPTURED'):null,providerConfirmState:commandConfirm?String(commandConfirm.state||'UNKNOWN'):null,providerReadyState:commandReady?String(commandReady.state||'UNKNOWN'):null});
+      }));
       return json({
         state:'AVAILABLE',
         provider:'KEETA',
         canonicalStoreId:'MF01',
-        pending:items.filter(row=>row.state==='PENDING_SMT').length,
-        committed:items.filter(row=>row.state==='COMMITTED').length,
+        pending:enriched.filter(row=>row.state==='PENDING_SMT').length,
+        committed:enriched.filter(row=>row.state==='COMMITTED').length,
         lastSmtPull,
-        items,
+        items:enriched,
       });
     }
 

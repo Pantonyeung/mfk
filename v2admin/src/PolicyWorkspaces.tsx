@@ -726,6 +726,11 @@ export function ChannelsWorkspace({mode}:{mode:'overview'|'mapping'|'failures'|'
             <p><span>Canonical Order</span><b>{row.canonicalOrderId??'—'}</b></p>
             <p><span>Display</span><b>{row.canonicalDisplay??'—'}</b></p>
             <p><span>Committed</span><b>{row.committedAt?new Date(row.committedAt).toLocaleString('zh-HK'):'—'}</b></p>
+            <p><span>Mapping</span><b>{row.mappingState}</b></p>
+            <p><span>SMT ACK</span><b>{row.ackState}</b></p>
+            <p><span>Commercial</span><b>{row.commercialState??'未有'}</b></p>
+            <p><span>Provider Confirm</span><b>{row.providerConfirmState??'未執行'}</b></p>
+            <p><span>Provider Ready</span><b>{row.providerReadyState??'未執行'}</b></p>
           </div>
         </article>)}
       </div>:<div className="admin-read-empty">未有 Keeta 1001 訂單入口記錄。</div>}

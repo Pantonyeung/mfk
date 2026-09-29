@@ -224,6 +224,11 @@ export interface KeetaOrderIntakeRow{
   readonly canonicalOrderId:string|null;
   readonly canonicalDisplay:string|null;
   readonly committedAt:string|null;
+  readonly mappingState:'PENDING'|'RESOLVED';
+  readonly ackState:'PENDING'|'ACKED';
+  readonly commercialState:string|null;
+  readonly providerConfirmState:string|null;
+  readonly providerReadyState:string|null;
 }
 export interface KeetaOrderIntakeList{
   readonly state:'AVAILABLE';

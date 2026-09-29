@@ -242,6 +242,7 @@ export function normalizeOwnerKeetaChannel(input,now=new Date().toISOString()){
   }:undefined;
   return Object.freeze({
     channelId:'KEETA',name:'Keeta',
+    recentOrderDiagnostics:rows(root.orderDiagnostics).slice(0,10).map(item=>({providerOrderId:String(item.providerOrderId||''),canonicalDisplay:item.canonicalDisplay?String(item.canonicalDisplay):null,state:String(item.state||'UNKNOWN'),mappingState:String(item.mappingState||'PENDING'),ackState:String(item.ackState||'PENDING'),commercialState:item.commercialState?String(item.commercialState):null,providerConfirmState:item.providerConfirmState?String(item.providerConfirmState):null,providerReadyState:item.providerReadyState?String(item.providerReadyState):null,receivedAt:String(item.receivedAt||now)})),
     acceptingOrders:status===3?true:status===4?false:null,
     desiredState,observedState,
     health:freshness==='CURRENT'&&(status===3||status===4)?'HEALTHY':'UNKNOWN',
@@ -293,6 +294,10 @@ export function mapOwnerOrderProjection(input){
     ...(paymentLabel?{tenderLabel:paymentLabel,currentTenderLabel:paymentLabel}:{}),
     ...(externalRef?{externalRef}:{}),
     itemSummary:items.map(item=>String(row(item).name||'')).filter(Boolean).join('、'),
+    referenceValueLabel:Number.isFinite(Number(order.referenceValueMinor))?moneyLabel(Number(order.referenceValueMinor)):undefined,
+    effectiveTransactionLabel:Number.isFinite(Number(order.effectiveTransactionMinor))?moneyLabel(Number(order.effectiveTransactionMinor)):moneyLabel(totalMinor),
+    pricingAuthority:order.pricingAuthority?String(order.pricingAuthority):undefined,
+    printState:order.acceptancePrintedAt?'DONE':fulfillmentLabel==='待處理'?'PENDING':'UNKNOWN',
     itemLines:items.map(rawItem=>{const item=row(rawItem);const qty=Math.max(0,Math.floor(Number(item.qty)||0));const unitMinor=Math.max(0,Math.round(Number(item.unitMinor)||0));return{lineId:String(item.id||''),name:String(item.name||''),quantity:qty,amountLabel:moneyLabel(qty*unitMinor)};}),
     readback:'CONFIRMED',observedAt,prints:[],exceptions:[],timeline:[],
     ...(fulfillmentLabel?{fulfillmentHistory:[{label:fulfillmentLabel,atLabel:observedAt,state:fulfillmentLabel}]}:{}),
@@ -971,7 +976,11 @@ export class AdminSyncStore{
       const id=this.env.KEETA_RUNTIME.idFromName('MF01'),stub=this.env.KEETA_RUNTIME.get(id);
       if(freshReadback)await stub.fetch(new Request('https://internal/admin/store/readback',{method:'POST'}));
       const response=await stub.fetch(new Request('https://internal/admin/store/status',{method:'GET'}));
-      if(response.ok)keetaStatus=await response.json();
+      if(response.ok){
+        keetaStatus=await response.json();
+        const intakeResponse=await stub.fetch(new Request('https://internal/admin/orders/intake',{method:'GET'}));
+        if(intakeResponse.ok)keetaStatus={...keetaStatus,orderDiagnostics:(await intakeResponse.json()).items??[]};
+      }
     }catch{}
     try{
       const id=this.env.CUSTOMER_RUNTIME.idFromName('MF01'),stub=this.env.CUSTOMER_RUNTIME.get(id);
