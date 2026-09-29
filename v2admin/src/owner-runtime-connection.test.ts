@@ -106,6 +106,7 @@ describe('Owner canonical read projection',()=>{
       getWebSockets:()=>[],
     };
     values.set('active',{storeId:'MF01',revision:12,fingerprint:'r12',snapshot:{channelPolicy:{syncSellability:true},catalog:{products:[{id:'p1',productCode:'P1',active:true}]}}});
+    values.set('acks',{'SMT-1':{deviceId:'SMT-1',revision:12,fingerprint:'r12'}});
     const env:any={KEETA_RUNTIME:{
       idFromName:(id:string)=>id,
       get:()=>({fetch:async(request:Request)=>{providerCalls.push(await request.clone().json());return new Response('{}',{status:200});}}),
@@ -116,7 +117,7 @@ describe('Owner canonical read projection',()=>{
       occurredAt:'2026-09-29T00:00:00.000Z',
       payload:{nodeId:'p1',status:'soldout',sellable:false,source:'SMT_RUNTIME',observedAt:'2026-09-29T00:00:00.000Z'},
     });
-    const response=await store.fetch(new Request('https://internal/projection/events',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({events:[event]})}));
+    const response=await store.fetch(new Request('https://internal/projection/events',{method:'POST',headers:{'content-type':'application/json',origin:'https://smt.morefunos.com'},body:JSON.stringify({events:[event]})}));
     expect(response.status).toBe(200);
     await Promise.resolve();
     expect(providerCalls).toHaveLength(1);
