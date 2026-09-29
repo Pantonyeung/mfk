@@ -2,114 +2,126 @@
 
 Status: CURRENT / CONTROLLING
 Control: #22
-Updated: 2026-09-25 Asia/Hong_Kong
+Updated: 2026-09-30 Asia/Hong_Kong
 System: MFK ONLY
 
 ## 0. Mandatory read order
-1. COMMANDER_CURRENT.md
+
+1. `COMMANDER_CURRENT.md`
 2. #22 latest controlling comment
-3. docs/navigation/MFK_航海圖_V1.30_Round031_2026-09-25.txt
-4. HANDOFF_CURRENT.md
-5. current physical evidence
+3. `docs/control/MFK_CHANGE_CONTROL.md`
+4. `HANDOFF_CURRENT.md`
+5. live repository / deployment / physical evidence relevant to the task
 
-## 1. Current exact state
+If a document conflicts with live repository evidence, report `GOVERNANCE_DRIFT`.
+Do not guess and do not let stale text override verified live evidence.
 
-Product source:
-`75759607ba05720f723c77d282327b7f1386f616`
+## 1. Current repository control state
 
-Source/build verification:
-`36084376938` SUCCESS
+Current product source base for read-only UI forensic audit:
 
-Canonical Carrier OTA publish:
-`36085973121` SUCCESS
+`4c8642d4ec84792de88f00163ce99e3005b8354a`
 
-Carrier:
-`1.0.7 / 107`
+This is the current MFK product tree after:
+- PR #520 WebSocket transport / public SMT identity
+- SMM request-storm containment
+- Governance Shadow foundation
+- PR #521 Dining live-refresh source promotion
 
-Current public APK:
-`MoreFunOS-SMT-1.0.7-mfk-75759607ba05.apk`
+Controlled recovery bank remains:
 
-APK SHA-256:
-`b521d509f93143e191e9df363b91409e499dc0788776f067e88469611c791046`
+`052295861931b72aa401aa6fa06c3cd65866706d`
 
-Public Carrier OTA manifest/readback:
-GREEN
+Do not move or rewrite the recovery bank as part of UI work.
 
-Independent replay:
-`36085863280` SUCCESS, same SHA-256.
+## 2. Acceptance status of current Main
 
-Canonical Builder release path:
-`.github/workflows/mfk-carrier-ota.yml`
-→ `requests/mfk-carrier-ota-request.txt`
+PR #521 source is merged, but physical acceptance is still pending.
 
-Temporary parallel duplicate publisher path:
-RETIRED.
+Published candidate runtime:
 
-Current milestone:
-`MFK_CARRIER_1_0_7_OTA_PUBLISHED_GREEN`
+`runtime-candidate-mfk-4c8642d4ec84`
 
-Current first break:
-STORE PHYSICAL INSTALL + SMM LAN/QR ACCEPTANCE NOT YET PROVEN.
+Source:
 
-## 2. Locked architecture
+`4c8642d4ec84792de88f00163ce99e3005b8354a`
 
-SMM is PWA/Web only. No SMM APK.
+OTA workflow run:
 
-Primary:
-SMM PWA → Carrier LAN HTTP/JSON :17831 → SMT.
+`36643004088` SUCCESS
 
-LAN failure never blocks staff ordering.
+Product completion status for #521:
 
-QR is only an Order Intent transport.
-QR cannot allocate Formal Order / Display.
+`NOT_ACCEPTED`
 
-Formalization remains:
-intent → SMT current Menu/Pricing revalidation → Store Kernel → Formal Order.
+Do not describe #521 as physically accepted until store-device acceptance is recorded.
 
-No second Order Engine.
-No second Pricing Engine.
-No second Store Kernel.
+## 3. Canonical base for OWNER / SMM / CUSTOMER UI forensic audit
 
-## 3. OTA governance
+For the read-only UI forensic comparison, canonical source base is:
 
-Recovery has two independent controls:
-- Runtime OTA URL
-- Carrier OTA URL
+`4c8642d4ec84792de88f00163ce99e3005b8354a`
 
-Existing OTA origin/bucket reused.
-No new OTA backend/domain.
+The audit may inspect:
+- `v2owner/**`
+- `v2smm/**`
+- `v2customer/**`
+- supplied historical briefs / screenshots / UI packages as reference only
 
-One active MFK Carrier release workflow only.
+Historical material is not current implementation authority.
 
-## 4. Exact NEXT
+The audit must compare:
 
-PHYSICAL ONLY.
+`OLD REFERENCE → CURRENT IMPLEMENTATION → TARGET SALVAGE PLAN`
 
-Store SMT:
-- Recovery → check Carrier OTA
-- offered = 1.0.7 / 107
-- install
-- installed Carrier = 1.0.7 / 107
-- normal SMT boot
-- Runtime/Carrier OTA URL controls intact
+No product implementation is authorized by the audit itself.
 
-iPhone:
-- Safari PWA LAN probe / pair / one order
-- iOS Chrome LAN probe
-- LAN unavailable non-blocking proof
-- QR fallback proof
-- same-intent replay zero duplicate Formal Order
-- SMT restart sanity
+## 4. UI audit execution rule
 
-## 5. Commander rule
+AUDIT / PLANNING ONLY.
 
-Do not write new product code before physical evidence.
+Allowed:
+- inventory supplied files
+- compare old vs current
+- produce forensic audit documents
+- produce staged salvage plan
+- create planned GitHub Issues
 
-If GREEN:
-BANK `MFK_CARRIER_1_0_7_SMM_PWA_LAN_QR_PHYSICAL_GREEN`.
+Not allowed without a later explicit Owner promotion:
+- modify product code
+- create implementation PRs
+- merge UI changes
+- deploy
+- OTA
+- alter Order / Pricing / Availability / Payment / Print / Keeta / SMT authority
 
-If RED:
-record LAST_GREEN / FIRST_BREAK / EXPECTED / ACTUAL.
-Open only the smallest seam that explains the physical RED.
+Each future implementation stage must be one bounded Issue → one Candidate → one acceptance → one promotion decision.
 
-No architecture rewrite from a browser/device compatibility failure.
+## 5. Current salvage candidates
+
+Existing recovery Candidates remain independent and must not be mutated by the UI audit:
+- #523 canonical Cloud publish confirmation
+- #522 Dining table registry fail-closed
+- #524 bounded Admin/SMT reconciliation
+
+PR #521 has already been merged into source and is awaiting physical acceptance.
+
+## 6. Governance rule
+
+A governance-only commit after the product audit base does not invalidate the UI audit base if it changes no Owner/SMM/Customer product files.
+
+Before starting the audit, verify:
+- live Main descends from the stated product audit base; and
+- any newer commits do not modify `v2owner/**`, `v2smm/**`, or `v2customer/**`.
+
+If either condition fails, stop and report `GOVERNANCE_DRIFT`.
+
+## 7. Exact NEXT
+
+1. Continue physical acceptance of #521 separately.
+2. Resume read-only forensic audit in order:
+   OWNER → SMM → CUSTOMER.
+3. Produce audit / salvage documents and planned Stage Issues only.
+4. Do not implement any UI Stage until Owner explicitly promotes that Issue.
+
+MILESTONE: `MFK_UI_FORENSIC_AUDIT_BASE_4C8642D4_LOCKED`
