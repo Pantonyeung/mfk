@@ -251,3 +251,8 @@
 }
 @keyframes s0progress{from{transform:translateX(-65%)}to{transform:translateX(130%)}}
 @keyframes s0spin{to{transform:rotate(360deg)}}
+
+/* R2 source-IP repair: avoid corrupted composite; compose approved source mascots without redrawing. */
+.stage0-mascot-pair{display:flex;align-items:flex-end;justify-content:center;gap:0;width:min(100%,260px);height:150px;margin:0 auto;overflow:hidden}
+.stage0-mascot-pair img{width:52%;height:100%;object-fit:contain;object-position:center bottom;display:block}
+@media(max-width:360px){.stage0-mascot-pair{width:min(100%,220px);height:126px}}
