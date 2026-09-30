@@ -1,26 +1,34 @@
 {
   "version": 1,
-  "capability": "MFK_CANDIDATE_01_DINING_LIVE_REFRESH",
-  "base_sha": "b7776a08ef1721e9e7ea0e223b783295d0965a75",
+  "capability": "MFK_ADMIN_SMT_TIME_FIRST_CONVERGENCE_R1",
+  "base_sha": "532e78be814dfb495fe33af964a50d421bc913b5",
   "allowed_paths": [
     ".github/mfk-change-manifest.json",
-    "v2local/src/presentation/RuntimeDiningWorkspace.tsx",
-    "v2local/src/presentation/smt-dining-admin-live-refresh.test.ts"
+    "v2admin/worker.ts",
+    "v2admin/src/admin-sync-client.ts",
+    "v2admin/src/admin-sync-websocket-transport.test.ts",
+    "v2admin/src/admin-cloud-publish-time-first.test.ts",
+    "v2local/src/runtime/admin-config-sync.ts",
+    "v2local/src/runtime/admin-config-sync.test.ts"
   ],
-  "authority_impact": "NONE",
-  "persistence_impact": "NONE",
+  "authority_impact": "ADMIN_CANONICAL_DELIVERY_ORDERING_ONLY",
+  "persistence_impact": "EXISTING_ADMIN_OUTBOX_AND_SMT_LKG_ONLY_NO_SCHEMA_MIGRATION",
   "provider_impact": "NONE",
   "transaction_impact": "NONE",
   "expected_behavior_change": [
-    "When an Admin config doorbell is applied, the active SMT Dining workspace reloads its read model immediately without a page reload."
+    "Admin Cloud publish admission is ordered by publish time instead of diagnostic revision number.",
+    "A newer Admin publish may supersede an older SMT/Admin state even when its Rxx number is lower.",
+    "SMT applies canonical Admin envelopes by publishedAt plus fingerprint and never rejects solely because revision decreased.",
+    "SMT missed-doorbell recovery uses startup/reconnect/focus/pageshow/visibility events through the same canonical pull path, with no interval polling.",
+    "Admin only marks PUBLISHED after exact canonical response plus Cloud publish time evidence."
   ],
   "non_goals": [
-    "No Dining transaction-state change.",
-    "No Admin publish protocol change.",
-    "No table registry behavior change.",
-    "No WebSocket transport change.",
-    "No polling or reconciliation change."
+    "No second config authority.",
+    "No polling loop.",
+    "No Order, Pricing, Payment, Print, Keeta, Customer, SMM or Owner authority change.",
+    "No deploy or OTA.",
+    "No destructive local data reset."
   ],
-  "rollback_sha": "b7776a08ef1721e9e7ea0e223b783295d0965a75",
-  "severity": "SOFT_BLOCK"
+  "rollback_sha": "532e78be814dfb495fe33af964a50d421bc913b5",
+  "severity": "HARD_BLOCK"
 }
