@@ -1,29 +1,37 @@
 {
   "version": 1,
-  "capability": "MFK_ADMIN_RUNTIME_CANONICAL_STATE_R5",
-  "base_sha": "6345f13427101717ea1b67aa6d49fd4de0f891aa",
+  "capability": "MFK_WEB_STATE_SOVEREIGNTY_TQ1",
+  "base_sha": "9910a5e929a4295434eb5a35668d1c5aab0fede4",
+  "root_control": "#596",
   "allowed_paths": [
     ".github/mfk-change-manifest.json",
-    "v2admin/src/AdminShell.tsx",
-    "v2admin/src/admin-canonical-normal-browser.test.ts",
-    "v2admin/src/admin-sync-client.ts"
+    "HANDOFF_CURRENT.md",
+    "docs/governance/MFK_WEB_STATE_SOVEREIGNTY_AUTHORITY_R1_2026-09-30.md",
+    "contracts/web-state-authority-v1.ts",
+    "v2admin/package.json",
+    "v2admin/src/main.tsx",
+    "v2admin/src/AdminCanonicalBootstrap.tsx",
+    "v2admin/src/admin-query-client.ts",
+    "v2admin/src/admin-third-party-state-authority.test.ts",
+    "v2admin/src/admin-canonical-browser.test.ts"
   ],
-  "authority_impact": "NONE_ADMIN_CLOUD_CANONICAL_REMAINS_SOLE_ONLINE_AUTHORITY",
-  "persistence_impact": "READ_NORMALIZATION_ONLY_NO_OUTBOX_MUTATION_CHANGE",
+  "authority_impact": "SYSTEM_WIDE_WEB_STATE_SOVEREIGNTY_ESTABLISHED_ADMIN_TQ1_ONLY_CODE_SLICE",
+  "persistence_impact": "NONE_THIS_SLICE_DOES_NOT_MIGRATE_OR_DELETE_LEGACY_STORAGE",
   "provider_impact": "NONE",
   "transaction_impact": "NONE",
   "expected_behavior_change": [
-    "When canonical hydration is present, active-release matches it, and sync-outbox is empty, a persisted QUEUED or PUBLISHING status cannot remain user-visible.",
-    "A real explicit pending publish remains QUEUED whenever sync-outbox still contains work.",
-    "Normal Safari and fresh browser contexts converge to the same published presentation for the same canonical state."
+    "All web ports gain one controlling authority contract for server state, durable command state, draft state and auth separation.",
+    "Admin canonical active reads are routed through one TanStack Query client and one canonical query key.",
+    "Admin bootstrap no longer directly owns canonical network read orchestration.",
+    "Legacy browser persistence remains compatibility-only until later bounded migration slices."
   ],
   "non_goals": [
-    "No outbox ordering or pruning semantic change.",
-    "No Customer, Owner, SMM or SMT changes.",
-    "No Keeta changes.",
-    "No cache clearing requirement.",
-    "No publish engine rewrite."
+    "No Dexie outbox migration in TQ1.",
+    "No Zustand draft migration in TQ1.",
+    "No SMM, Customer or Owner runtime code change in TQ1.",
+    "No backend API contract change.",
+    "No removal of legacy localStorage keys yet."
   ],
-  "rollback_sha": "6345f13427101717ea1b67aa6d49fd4de0f891aa",
-  "severity": "HARD_BLOCK"
+  "rollback_sha": "9910a5e929a4295434eb5a35668d1c5aab0fede4",
+  "severity": "SYSTEM_AUTHORITY"
 }

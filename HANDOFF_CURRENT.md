@@ -1,3 +1,20 @@
+# SYSTEM-WIDE CURRENT AUTHORITY｜2026-09-30
+
+Web/browser state sovereignty:
+`docs/governance/MFK_WEB_STATE_SOVEREIGNTY_AUTHORITY_R1_2026-09-30.md`
+
+Root control:
+#596
+
+Applies to Admin / SMM / Customer / Owner / future web ports.
+
+Cloud/server state = TanStack Query.  
+Durable explicit browser outbox = Dexie / IndexedDB.  
+Local draft/UI = React/Zustand only.  
+Derived server status must not become durable browser authority.
+
+---
+
 # MFK CURRENT HANDOFF｜2026-09-25
 
 Current navigation:

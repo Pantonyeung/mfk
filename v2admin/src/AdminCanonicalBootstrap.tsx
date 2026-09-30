@@ -1,16 +1,18 @@
 import {useEffect,useState,type ReactNode} from 'react';
+import {useQuery} from '@tanstack/react-query';
 import {readActiveAdminRelease} from './admin-local-store.ts';
-import {readAdminSyncStatus,installAdminSyncAutoFlush,readCanonicalAdminActiveWithPublisherKey,reconcileAdminSyncStatusFromCanonical} from './admin-sync-client.ts';
+import {readAdminSyncStatus,installAdminSyncAutoFlush,reconcileAdminSyncStatusFromCanonical} from './admin-sync-client.ts';
 import {installAdminProjectionLiveRead} from './admin-projection-client.ts';
 import {
   hydrateAdminFromCanonical,
   loginAdminBrowser,
-  readCanonicalAdminActive,
   readStoredAdminBrowserSession,
   refreshAdminBrowserSession,
 } from './admin-browser-session.ts';
+import {adminCanonicalPublisherQueryOptions,adminCanonicalSessionQueryOptions,adminQueryClient} from './admin-query-client.ts';
 
 type BootstrapState='CHECKING'|'LOGIN'|'READY'|'ERROR';
+type CanonicalReadMode='SESSION'|'PUBLISHER'|null;
 
 export function adminCanonicalHydrationRequired(
   local:{version:number;createdAt:string;fingerprint:string}|null,
@@ -32,12 +34,28 @@ export function AdminCanonicalBootstrap({children}:{children:ReactNode}){
   const [pin,setPin]=useState('');
   const [message,setMessage]=useState('');
   const [busy,setBusy]=useState(false);
+  const [canonicalMode,setCanonicalMode]=useState<CanonicalReadMode>(null);
 
-  const activate=()=>{
+  const canonicalQuery=useQuery({
+    ...(canonicalMode==='SESSION'?adminCanonicalSessionQueryOptions():adminCanonicalPublisherQueryOptions()),
+    enabled:state==='READY'&&canonicalMode!==null,
+  });
+
+  const activate=(mode:Exclude<CanonicalReadMode,null>)=>{
+    setCanonicalMode(mode);
     installAdminSyncAutoFlush();
     installAdminProjectionLiveRead();
     setState('READY');
   };
+
+  useEffect(()=>{
+    const active=canonicalQuery.data;
+    if(state!=='READY'||!active)return;
+    const local=readActiveAdminRelease();
+    const sync=readAdminSyncStatus();
+    if(adminCanonicalHydrationRequired(local,active,sync))hydrateAdminFromCanonical(active);
+    reconcileAdminSyncStatusFromCanonical(active);
+  },[canonicalQuery.data,canonicalQuery.dataUpdatedAt,state]);
 
   useEffect(()=>{
     let cancelled=false;
@@ -51,11 +69,11 @@ export function AdminCanonicalBootstrap({children}:{children:ReactNode}){
         if(cancelled)return;
         if(session){
           try{
-            const active=await readCanonicalAdminActive();
+            const active=await adminQueryClient.fetchQuery(adminCanonicalSessionQueryOptions());
             if(cancelled)return;
             if(adminCanonicalHydrationRequired(local,active,sync))hydrateAdminFromCanonical(active);
             reconcileAdminSyncStatusFromCanonical(active);
-            activate();
+            activate('SESSION');
             return;
           }catch{
             if(cancelled)return;
@@ -63,12 +81,12 @@ export function AdminCanonicalBootstrap({children}:{children:ReactNode}){
         }
       }
 
-      const publisherActive=await readCanonicalAdminActiveWithPublisherKey();
+      const publisherActive=await adminQueryClient.fetchQuery(adminCanonicalPublisherQueryOptions()).catch(()=>null);
       if(cancelled)return;
       if(publisherActive){
         if(adminCanonicalHydrationRequired(local,publisherActive,sync))hydrateAdminFromCanonical(publisherActive);
         reconcileAdminSyncStatusFromCanonical(publisherActive);
-        activate();
+        activate('PUBLISHER');
         return;
       }
 
@@ -83,11 +101,11 @@ export function AdminCanonicalBootstrap({children}:{children:ReactNode}){
     setBusy(true);setMessage('正在驗證並讀取 Canonical Admin…');
     try{
       await loginAdminBrowser(loginId,pin);
-      const active=await readCanonicalAdminActive();
+      const active=await adminQueryClient.fetchQuery(adminCanonicalSessionQueryOptions());
       hydrateAdminFromCanonical(active);
       reconcileAdminSyncStatusFromCanonical(active);
       setPin('');
-      activate();
+      activate('SESSION');
     }catch(error){
       setState('LOGIN');
       setMessage(error instanceof Error?error.message:'未能連接 Canonical Admin');
