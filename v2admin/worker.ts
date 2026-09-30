@@ -971,11 +971,21 @@ export class AdminSyncStore{
   }
   async publishEnvelope(envelope){
     const current=await this.state.storage.get('active');
+    const currentMeta=await this.state.storage.get('activeMeta')||{};
     if(current){
-      if(envelope.revision<current.revision)return{status:409,body:{code:'ADMIN_CONFIG_REVISION_STALE',currentRevision:current.revision}};
-      if(envelope.revision===current.revision){
-        if(envelope.fingerprint!==current.fingerprint)return{status:409,body:{code:'ADMIN_CONFIG_REVISION_CONFLICT',currentFingerprint:current.fingerprint}};
-        return{status:200,body:{state:'IDEMPOTENT',active:current}};
+      const incomingPublishedAt=Date.parse(String(envelope.publishedAt||''));
+      const currentPublishedAt=Date.parse(String(current.publishedAt||''));
+      if(!Number.isFinite(incomingPublishedAt)||!Number.isFinite(currentPublishedAt)){
+        return{status:400,body:{code:'ADMIN_CONFIG_PUBLISHED_AT_INVALID'}};
+      }
+      if(incomingPublishedAt<currentPublishedAt){
+        return{status:409,body:{code:'ADMIN_CONFIG_PUBLISH_TIME_STALE',currentPublishedAt:current.publishedAt,currentFingerprint:current.fingerprint}};
+      }
+      if(incomingPublishedAt===currentPublishedAt){
+        if(envelope.fingerprint!==current.fingerprint){
+          return{status:409,body:{code:'ADMIN_CONFIG_PUBLISH_TIME_CONFLICT',currentPublishedAt:current.publishedAt,currentFingerprint:current.fingerprint}};
+        }
+        return{status:200,body:{state:'IDEMPOTENT',active:current,cloudPublishedAt:String(currentMeta.acceptedAt||current.publishedAt)}};
       }
     }
     await this.state.storage.put('active',envelope);
@@ -983,7 +993,7 @@ export class AdminSyncStore{
     await this.state.storage.put('activeMeta',{revision:envelope.revision,fingerprint:envelope.fingerprint,publishedAt:envelope.publishedAt,acceptedAt});
     const doorbell=JSON.stringify({type:'ADMIN_CONFIG_AVAILABLE',storeId:envelope.storeId,revision:envelope.revision,fingerprint:envelope.fingerprint,publishedAt:envelope.publishedAt,acceptedAt});
     for(const socket of this.state.getWebSockets()){try{socket.send(doorbell);}catch{}}
-    return{status:200,body:{state:'PUBLISHED',active:{revision:envelope.revision,fingerprint:envelope.fingerprint,publishedAt:envelope.publishedAt}}};
+    return{status:200,body:{state:'PUBLISHED',active:envelope,cloudPublishedAt:acceptedAt}};
   }
   async ownerChannels(active,observedAt=new Date().toISOString(),freshReadback=false){
     let keetaStatus=null,customerHealth=null;
