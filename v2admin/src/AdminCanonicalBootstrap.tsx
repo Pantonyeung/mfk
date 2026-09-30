@@ -1,14 +1,14 @@
 import {useEffect,useState,type ReactNode} from 'react';
 import {readActiveAdminRelease} from './admin-local-store.ts';
-import {readAdminSyncStatus,installAdminSyncAutoFlush,readCanonicalAdminActiveWithPublisherKey,reconcileAdminSyncStatusFromCanonical} from './admin-sync-client.ts';
+import {readAdminSyncStatus,installAdminSyncAutoFlush,reconcileAdminSyncStatusFromCanonical} from './admin-sync-client.ts';
 import {installAdminProjectionLiveRead} from './admin-projection-client.ts';
 import {
   hydrateAdminFromCanonical,
   loginAdminBrowser,
-  readCanonicalAdminActive,
   readStoredAdminBrowserSession,
   refreshAdminBrowserSession,
 } from './admin-browser-session.ts';
+import {adminCanonicalPublisherQueryOptions,adminCanonicalSessionQueryOptions,adminQueryClient} from './admin-query-client.ts';
 
 type BootstrapState='CHECKING'|'LOGIN'|'READY'|'ERROR';
 
@@ -51,7 +51,7 @@ export function AdminCanonicalBootstrap({children}:{children:ReactNode}){
         if(cancelled)return;
         if(session){
           try{
-            const active=await readCanonicalAdminActive();
+            const active=await adminQueryClient.fetchQuery(adminCanonicalSessionQueryOptions());
             if(cancelled)return;
             if(adminCanonicalHydrationRequired(local,active,sync))hydrateAdminFromCanonical(active);
             reconcileAdminSyncStatusFromCanonical(active);
@@ -63,7 +63,7 @@ export function AdminCanonicalBootstrap({children}:{children:ReactNode}){
         }
       }
 
-      const publisherActive=await readCanonicalAdminActiveWithPublisherKey();
+      const publisherActive=await adminQueryClient.fetchQuery(adminCanonicalPublisherQueryOptions()).catch(()=>null);
       if(cancelled)return;
       if(publisherActive){
         if(adminCanonicalHydrationRequired(local,publisherActive,sync))hydrateAdminFromCanonical(publisherActive);
@@ -83,7 +83,7 @@ export function AdminCanonicalBootstrap({children}:{children:ReactNode}){
     setBusy(true);setMessage('正在驗證並讀取 Canonical Admin…');
     try{
       await loginAdminBrowser(loginId,pin);
-      const active=await readCanonicalAdminActive();
+      const active=await adminQueryClient.fetchQuery(adminCanonicalSessionQueryOptions());
       hydrateAdminFromCanonical(active);
       reconcileAdminSyncStatusFromCanonical(active);
       setPin('');
