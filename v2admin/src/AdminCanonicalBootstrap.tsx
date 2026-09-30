@@ -1,6 +1,6 @@
 import {useEffect,useState,type ReactNode} from 'react';
 import {readActiveAdminRelease} from './admin-local-store.ts';
-import {readAdminSyncStatus,installAdminSyncAutoFlush,readCanonicalAdminActiveWithPublisherKey} from './admin-sync-client.ts';
+import {readAdminSyncStatus,installAdminSyncAutoFlush,readCanonicalAdminActiveWithPublisherKey,reconcileAdminSyncStatusFromCanonical} from './admin-sync-client.ts';
 import {installAdminProjectionLiveRead} from './admin-projection-client.ts';
 import {
   hydrateAdminFromCanonical,
@@ -54,6 +54,7 @@ export function AdminCanonicalBootstrap({children}:{children:ReactNode}){
             const active=await readCanonicalAdminActive();
             if(cancelled)return;
             if(adminCanonicalHydrationRequired(local,active,sync))hydrateAdminFromCanonical(active);
+            reconcileAdminSyncStatusFromCanonical(active);
             activate();
             return;
           }catch{
@@ -66,6 +67,7 @@ export function AdminCanonicalBootstrap({children}:{children:ReactNode}){
       if(cancelled)return;
       if(publisherActive){
         if(adminCanonicalHydrationRequired(local,publisherActive,sync))hydrateAdminFromCanonical(publisherActive);
+        reconcileAdminSyncStatusFromCanonical(publisherActive);
         activate();
         return;
       }
@@ -83,6 +85,7 @@ export function AdminCanonicalBootstrap({children}:{children:ReactNode}){
       await loginAdminBrowser(loginId,pin);
       const active=await readCanonicalAdminActive();
       hydrateAdminFromCanonical(active);
+      reconcileAdminSyncStatusFromCanonical(active);
       setPin('');
       activate();
     }catch(error){
