@@ -453,45 +453,387 @@ Resolve 條件：
 
 ---
 
-# 11. Orders Workspace｜鎖定
+# 11. 訂單管理｜鎖定
 
-## 進行中
-Row/card：
-- Order ID / display
-- Source
-- Created
-- Amount
-- Payment
-- Fulfillment
-- Staff
-- Exception indicator
+訂單管理係獨立功能 domain。
+使用者想「搵張單、睇而家做到邊、查歷史、做售後、處理訂單異常」時，第一時間就應該入 **訂單管理**。
+
+Sidebar 細 Menu 直接顯示：
+- 進行中訂單
+- 訂單歷史
+- 售後／退款／取消／修正
+- 訂單異常
+
+所有頁面符合：
+**訂單管理 → 細 Menu → 已見到目標內容 → 撳 Order / Case 入 Detail / Action**
+
+Admin 唔建立新 Order，唔做第二 POS。
+
+## 11.1 進行中訂單
+
+入口：
+**訂單管理 → 進行中訂單**
+
+第二步完成後直接見 Active Order List。
+
+Header：
+- Title：進行中訂單
+- Search
+- Filter
+- Refresh / freshness
+
+Search：
+- Display Number
+- MFK Order ID（detail/search）
+- External Order Reference
+- Customer name / masked phone（如正式 read model 有）
 
 Filters：
-- search
-- source
-- fulfillment
-- payment
-- business date
+- Source
+- Fulfillment
+- Payment
+- Scheduled / delayed
+- Business Day
+- Attention only
 
-## 歷史
-同一 read model，增加：
-- completed/cancelled time
-- refund/adjustment indicators
+List / Card 最低顯示：
+- Display Number
+- Source
+- Created / elapsed
+- Effective amount
+- Payment summary
+- Fulfillment summary
+- Staff / owner（如有）
+- Scheduled / due / promised time（如有）
+- Exception badges
+- Row action：查看
 
-## Order Detail
-Tabs：
+Primary status 只表達目前主要工作狀態。
+其他 truth 分開顯示。
+
+例：
+- 履約：未完成 / 可取餐
+- 付款：已付款 / 待付款 / 結果未明
+- 來源：門市 / 自家平台 / Keeta
+- Exception：打印異常 / 平台取消要求 / 對帳注意
+
+禁止建立：
+READY_PAID_PRINT_FAILED_CANCEL_PENDING
+呢類 global order status。
+
+## 11.2 訂單歷史
+
+入口：
+**訂單管理 → 訂單歷史**
+
+第二步完成後直接見 Historical Order List。
+
+Search / Filter：
+- Display Number / Order ID
+- Source
+- Date / Business Day
+- Completion state
+- Refund / adjustment
+- Payment method
+- Staff
+
+List：
+- Display Number
+- Source
+- Created
+- Completed / Cancelled time
+- Original amount
+- Adjustment summary
+- Current effective amount
+- Refund indicator
+- Cancel indicator
+- Payment summary
+- View
+
+歷史 Order 永久保留。
+Refund / Cancel / Correction 係 linked record / transition，
+唔直接改寫舊 Order 歷史。
+
+## 11.3 Order Detail
+
+撳一張 Order 後進 Detail。
+呢個係 object interaction，唔係第三層 Menu。
+
+Header：
+- Display Number
+- Source
+- Created / committed time
+- Current primary workflow state
+- Effective amount
+- Attention badges
+- Freshness
+
+內容可用 tabs / section navigation：
 - 摘要
-- Items
+- 商品
+- 付款
+- 履約
+- 售後
+- 時間線
+
+呢啲係同一張 Order Detail 內嘅 content view，
+唔係 Sidebar 第三層。
+
+### 摘要
+- Order identity
+- Source / external reference
+- Created / committed
+- Customer / pickup identity（如有）
+- Effective amount
+- Payment summary
+- Fulfillment summary
+- Staff / owner
+- Scheduled / promised / delayed
+- Current exceptions
+
+### 商品
+- Product
+- Quantity
+- ProductSnapshot
+- Option / Modifier
+- Combo relationship
+- Remark
+- Line price / adjustment summary
+- Print / production exception summary（只在 relevant）
+
+### 付款
+- Current effective tender
+- Payment entries
+- Payment certainty
+- Refund summary
+- Tender correction history
+- Processor / proof reference（detail only）
+
+### 履約
+- Current fulfillment state
+- State history
+- Ready / completed timing
+- Delay
+- Scheduled / promised time
+- Handover facts（如有）
+
+### 售後
+- Refund
+- Cancel
+- Tender Correction
+- Other approved correction
+- Linked records
+- Current effective result
+
+只顯 current state 下真正 allowed action。
+唔顯一排永遠存在嘅危險 buttons。
+
+### 時間線
+聚合：
+- Order created / committed
+- Payment
+- Fulfillment transitions
+- Refund / correction
+- Print exception
+- Platform event
+- Actor / time
+
+每條重要事件可以 deep-link 去原 Audit / Proof。
+
+## 11.4 售後／退款／取消／修正
+
+入口：
+**訂單管理 → 售後／退款／取消／修正**
+
+第二步完成後直接見 After-sales / Correction List。
+
+Filters：
+- Type
+- Current state
+- Date
+- Staff / actor
+- Amount
+- Attention / unresolved
+
+List：
+- Type
+- Display Number
+- Original amount
+- Requested / corrected amount
+- Current effective result
+- Actor
+- Created
+- Current state
+- Readback / proof state
+- View
+
+支援已正式存在／批准嘅 workflow：
+- Refund
+- Cancel
+- Tender Correction
+- Approved amount / content correction（只限 contract 存在）
+- Post-day-close correction（backend seam 未完整時只保留產品位置）
+
+新建售後 action 正常入口：
+1. 先揀／搜尋原 Order
+2. 揀 allowed action
+3. Preview current facts
+4. Permission / Reason / Version Guard（按 policy）
+5. Execute
+6. Readback
+7. Audit
+
+呢個係真正高風險 workflow，可以有 steps。
+但搵到「售後」本身仍然只需要兩步導航。
+
+## 11.5 Refund
+
+Refund UI 必須清楚顯示：
+- Original Order
+- Original payment / tender summary
+- Refundable amount
+- Proposed refund amount
+- Method / destination（按 contract）
+- Reason（optional / required 由 policy）
+- Current payment certainty
+- Expected result
+
+Execute 後：
+- 原 Payment / Order history保留
+- 建 linked refund / reversal record
+- 未 readback 前 PENDING / UNKNOWN
+- 禁止 timeout 後 blind retry
+
+## 11.6 Cancel
+
+Cancel UI 必須清楚：
+- 正在取消邊張 Order
+- Current Order / Fulfillment / Payment facts
+- 已發生 side-effect 有乜
+- Reason
+- Expected impact
+
+Cancel 唔等於：
+- delete Order
+- delete Payment
+- 自動退款
+- 自動重印
+
+真正 dependent actions 按 domain contract 分開處理。
+
+## 11.7 Tender Correction
+
+Primary Home：
+**訂單管理 → 售後／退款／取消／修正**
+
+UI：
+- Original tender
+- Corrected tender
+- Amount
+- Current effective tender
+- Reason / quick reason
+- Actor
+- Expected reporting effect
+
+規則：
+- SAME Order
+- zero new Order
+- preserve history
+- zero auto reprint
+- zero auto drawer action
+
+日結後 Admin Tender Correction：
+產品位置保留，
+但正式 Admin backend mutation seam 未完整證實時標：
+**BACKEND_CONTRACT_GAP**
+
+唔可以做假 button 或只改 browser state。
+
+## 11.8 訂單異常
+
+入口：
+**訂單管理 → 訂單異常**
+
+第二步完成後直接見真正同 Order 有關嘅 exception workspace。
+
+只收會影響特定 Order / transaction 嘅正式異常，例如：
+- Payment UNKNOWN
+- Platform cancel request
+- Late / delayed external order
+- Order / provider reconciliation mismatch
+- Order-level print exception
+- Mapping issue affecting a concrete order
+- Other formal transaction attention
+
+List：
+- Severity
+- Display Number
+- Source
+- Issue type
+- Business impact
+- Current certainty
+- First seen
+- Last observed
+- Current owner domain
+- CTA：處理
+
+唔將所有系統 error 倒入訂單異常。
+Device / platform-wide / config-wide incident 留返各 Primary Home / Action Queue。
+
+## 11.9 訂單異常 Detail / Recovery
+
+Detail：
+- What happened
+- Current confirmed facts
+- Unknown / partial facts
+- Affected domain
+- Safe action
+- Evidence / readback
+- Timeline
+
+如果真正 mutation 屬另一 domain：
+- deep-link 去責任頁
+- 唔喺 Order Exception 自己重造 command
+
+例如：
+- 打印 job 問題 → 打印管理 / 打印狀態
+- 平台 mapping → 平台／渠道管理 / 商品映射或匹配失敗
+- Device offline → 裝置管理 / 裝置狀態
+
+## 11.10 狀態語義
+
+Order UI 永遠分開：
+- Order lifecycle
 - Payment
 - Fulfillment
-- Refund/Correction
-- Timeline / Proof
+- Production / Print side-effect
+- Platform / source
+- Exception / reconciliation
 
-Order Timeline 聚合 domain events，但每條 deep-link 去原 Audit/Proof。
+Ready ≠ Completed。
+Paid ≠ Fulfilled。
+Connected ≠ Order synced。
+Print failed ≠ Order failed。
+Platform accepted ≠ MFK formal Order committed（除非 canonical facts 已證實）。
 
-## 售後／異常
-只顯正式 Refund / Cancel / Tender Correction / Print exception。
-任何 write workflow 都要去正式 domain action surface。
+Query failure唔可以顯示成：
+- 0 orders
+- no history
+- empty success
+
+Stale remote data 必須有 freshness。
+
+## 11.11 人類第一直覺歸類
+
+- 「而家有咩單做緊？」→ 訂單管理 / 進行中訂單
+- 「搵返昨日某張單」→ 訂單管理 / 訂單歷史
+- 「退款／取消／改付款方式」→ 訂單管理 / 售後／退款／取消／修正
+- 「邊張單有問題？」→ 訂單管理 / 訂單異常
+- 「點解嗰張單冇印？」→ Order Detail 見摘要，再 deep-link 打印管理 / 打印狀態
+- 「Keeta mapping 錯」→ 平台／渠道管理 / 商品映射或匹配失敗
+- 「部 SMT offline」→ 裝置管理 / 裝置狀態
+
+任何以上問題如果要第三層 Sidebar 先搵到，視為 IA RED。
 
 ---
 
