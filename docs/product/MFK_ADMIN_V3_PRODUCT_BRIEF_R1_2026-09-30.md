@@ -1005,35 +1005,327 @@ UI 必須標：
 
 ---
 
-# 22. Channel Workspace｜鎖定
+# 22. 平台／渠道管理｜鎖定
 
-Platform Overview：
-每平台一張 status card：
-- configured?
-- auth/readback state
-- order intake state
-- mapping health
-- sellability sync state
-- last successful read
-- last error
-- CTA 去責任頁
+平台／渠道管理係獨立功能 domain。
+使用者唔需要先入「更多」或「連接與設備」再搵平台。
 
-Sub pages：
-- Accept Policy
-- Supply Sync Policy
-- Net Estimate
-- Store Binding
-- Product Mapping
-- Mapping Failure
-- Settlement read-only
+Sidebar 細 Menu 直接顯示：
+- 平台總覽
+- 接單規則
+- 供應同步
+- 門店綁定
+- 商品映射
+- 匹配失敗
+- 實收估算
+- 平台對帳
 
-Keeta / external commercial fields：
-Sales、Commission、Fee、Merchant Earnings 分開。
-Merchant Earnings 不可反寫 Order Sales / Tender。
+所有頁面符合：
+**大 Menu → 細 Menu → 已見到目標內容 → 撳 object 入 Detail / Edit**
 
-Mapping：
-Channel Name / Product / Price / Category / Bundle / Option / Combo。
-外部 mapping 不可污染 MFK Direct Price。
+## 22.1 平台總覽
+
+入口：
+**平台／渠道管理 → 平台總覽**
+
+第二步完成後直接見全部已配置／可配置平台。
+
+每個平台一行／一張卡：
+- Platform Name
+- 配置狀態
+- 接單狀態
+- 連線／Integration health
+- 商品映射狀態
+- 供應同步狀態
+- Last successful read
+- Attention / exception indicator
+- CTA：查看
+
+正常 UI 用 business wording：
+- 接單中
+- 已暫停
+- 繁忙
+- 平台異常
+- 連線異常
+- 未完成設定
+- 結果未明
+
+禁止將以下概念混成一粒「Online / Offline」：
+- Store Open
+- Business Hours
+- Channel Accepting Orders
+- Busy
+- Connectivity
+- Integration Health
+- Platform Suspension
+
+Health ≠ Availability。
+Connected ≠ Synced。
+
+## 22.2 平台詳情
+
+撳一個平台（例如 Keeta）後進 Detail。
+呢個屬 object detail，唔係第三層 navigation。
+
+Header：
+- Platform name
+- Current accepting state
+- Current health
+- Last readback
+- Edit / contextual actions
+
+內容分組：
+- 接單狀態
+- 營業／服務時段摘要
+- 門店綁定摘要
+- 商品映射摘要
+- 供應同步摘要
+- 商業／對帳摘要
+- 最近異常
+- 最近 readback
+
+Contextual shortcuts：
+- 前往接單規則
+- 前往門店綁定
+- 前往商品映射
+- 前往平台對帳
+- 前往待處理事項
+
+如果正式 contract 支援 bounded remote control，可以顯示：
+- 暫停接單
+- 恢復接單
+- Snooze / 暫停至指定時間
+- Busy / 延長準備時間
+
+操作未有 authoritative readback 前：
+- 顯示 PENDING / UNKNOWN
+- 禁止 optimistic 顯示「已成功」
+
+Pause intake 只影響新單。
+禁止自動取消／退款／改動已成立 Order。
+
+## 22.3 接單規則
+
+入口：
+**平台／渠道管理 → 接單規則**
+
+直接顯示各平台目前接單設定。
+
+List：
+- Platform
+- Current mode
+- Accepting orders?
+- Busy / Snooze
+- Schedule summary
+- Last readback
+- Draft / runtime indicator
+- Edit
+
+Edit page：
+- 只顯示該平台 contract 真正支援嘅 setting
+- Temporary action 同 persistent config 分開
+- expiry / until time 清楚
+- Save Draft / Execute action 按 authority contract 分開
+
+禁止用一個 bool 同時代表 Pause / Busy / Closed / Provider suspension。
+
+## 22.4 供應同步
+
+入口：
+**平台／渠道管理 → 供應同步**
+
+用途：
+睇同管理 MFK sellability / availability 點樣投影去各平台。
+
+List：
+- Platform
+- Sync enabled
+- Source scope
+- Last successful sync
+- Current state
+- Pending / mismatch count
+- Last error
+- View detail
+
+Detail：
+- sync policy
+- affected product scope
+- desired vs observed summary
+- last readback
+- exceptions
+- contextual shortcut：前往「售罄／供應」
+
+唔喺呢頁建立第二 Sellability Authority。
+
+## 22.5 門店綁定
+
+入口：
+**平台／渠道管理 → 門店綁定**
+
+List：
+- Platform
+- External store
+- MFK store
+- Authorization / binding state
+- Last verified
+- Attention
+- Edit
+
+Create / Edit：
+- 選平台
+- 選 external store identity
+- 對應 MFK store
+- contract-supported authorization metadata
+- Save / Verify / Readback
+
+完成後直接回到 binding detail/list。
+唔要求再進另一層「平台設定」。
+
+## 22.6 商品映射
+
+入口：
+**平台／渠道管理 → 商品映射**
+
+第二步完成後直接見 mapping workspace。
+
+Search / Filter：
+- Platform
+- Mapping state
+- MFK Category
+- Search external / MFK product name
+
+List：
+- Platform
+- External Product
+- MFK Product
+- External Category
+- Channel Price / commercial summary
+- Option / Combo mapping summary
+- State
+- Last verified
+- Edit
+
+Mapping detail / edit：
+- External product identity
+- MFK Product
+- Channel Name
+- Channel Category
+- Channel Price
+- Bundle / Combo mapping
+- Option mapping
+- Included item mapping
+- Last readback
+- Save Draft / Verify
+
+Contextual shortcuts：
+- 前往產品管理
+- 前往選項／口味
+- 前往套餐管理
+
+外部 channel commercial mapping 唔可以污染 MFK Direct Price。
+
+## 22.7 匹配失敗
+
+入口：
+**平台／渠道管理 → 匹配失敗**
+
+直接見所有需要人工處理嘅 mapping issue。
+
+List：
+- Platform
+- External object
+- Issue type
+- Current state
+- First seen
+- Last observed
+- Suggested MFK target（如正式 resolver 有）
+- CTA：處理
+
+處理 Detail：
+- External facts
+- Candidate / current mapping
+- Affected order/menu scope
+- 修正 mapping
+- Verify
+- Readback
+
+完成 mapping 唔等於舊 external side-effect 自動重播。
+任何需要 transaction reconcile 嘅 case deep-link 去責任 domain。
+
+## 22.8 實收估算
+
+入口：
+**平台／渠道管理 → 實收估算**
+
+用途：
+管理／展示已批准嘅 channel commercial inputs 同估算。
+只顯示 current channel contract 支援嘅正式 fields，禁止 UI 自己發明平台公式。
+
+必須將以下概念分開：
+- Sales
+- Commission
+- Fee
+- Merchant Earnings / estimated payout
+
+Merchant Earnings 不可反寫：
+- Order Sales
+- Tender
+- MFK Direct Price
+
+Create / Edit：
+- 只容許已批准 commercial input
+- Draft → Publish → Readback
+- 未有 provider evidence 嘅 field 唔顯假精準數字
+
+## 22.9 平台對帳
+
+入口：
+**平台／渠道管理 → 平台對帳**
+
+Read-only R1。
+
+List：
+- Platform
+- Period / settlement reference
+- Sales
+- Commission
+- Fee
+- Merchant Earnings
+- Reconciliation state
+- Evidence availability
+- View
+
+Detail：
+- provider reference
+- covered period / orders
+- Sales
+- deductions
+- Commission
+- Fee
+- Merchant Earnings
+- MFK comparison / mismatch where formally available
+- Evidence / readback
+- linked Action Item
+
+平台對帳唔修改 transaction truth。
+如果有 mismatch，需要操作時 deep-link 去正式 reconciliation / action workflow。
+
+## 22.10 Human-first copy
+
+正常操作頁唔顯示：
+- raw provider status code
+- raw API field name
+- engineering error code
+- internal UUID
+- authority theory教學文案
+
+以上只喺 Detail / Diagnostics 必要位置顯示。
+
+使用者第一眼只需要知道：
+- 而家接唔接到單
+- 健唔健康
+- 有冇要處理
+- 我應該去邊一頁處理
 
 ---
 
