@@ -3523,55 +3523,417 @@ Export before execute：
 
 ---
 
-# 30. Audit｜鎖定
+# 30. 系統管理｜鎖定
 
-主畫面叫「操作記錄」，唔叫 raw Log。
+系統管理係獨立功能 domain。
+使用者想知道「邊個做過乜、系統邊度壞、外部整合有冇問題、某設定最後實際用咗邊個值」時，第一時間就應該入 **系統管理**。
 
-每列：
+Sidebar 細 Menu 直接顯示：
+- 操作記錄
+- 系統診斷
+- 系統整合
+- 進階／Effective Settings
+
+所有頁面符合：
+**系統管理 → 細 Menu → 已見到目標內容 → 撳 record / component / integration 入 Detail**
+
+系統管理唔係 catch-all Settings。
+正常業務設定仍留返各自 Primary Home。
+
+## 30.1 操作記錄
+
+入口：
+**系統管理 → 操作記錄**
+
+第二步完成後直接見 Audit List。
+
+主畫面叫「操作記錄」，
+唔叫 Raw Log / Event Stream。
+
+Search / Filter：
+- Time range
+- Actor
+- Action type
+- Domain
+- Target
+- Result
+- High-risk only
+
+List：
 - Time
 - Actor
 - Action
 - Target
 - Result
+- Domain
+- Reason summary（如有）
+- View
 
 Detail：
+- actor
+- action
+- target
 - reason
-- permission/policy
-- device
+- permission / policy
+- device / session
 - before
 - after
 - linked proof
+- readback / result
 - correlation ID
 - engineering audit ID（detail only）
 
+正常畫面先顯人類可理解 action：
+- 修改產品
+- 發佈設定
+- 退款
+- 修正付款方式
+- 撤銷 Session
+- 回復版本
+
+唔要求 Owner 理解 internal event name。
+
+## 30.2 Audit 安全
+
 Sensitive redaction 必須存在。
-PIN/password/token/payment secret 永不落 Audit。
+
+永遠唔落 Audit：
+- PIN
+- Password
+- token secret
+- payment credential secret
+- raw private key
+- full sensitive auth proof
+
+Audit record：
+- append-only / immutable semantics
+- UI 唔提供 edit / delete history
+- display permission 受 RBAC 控制
 
 Resource timeline：
-Order / Product / Staff / Channel 等 detail page 可 contextual 顯 timeline。
+Order / Product / Staff / Channel / Release Detail
+可以 contextual 顯相關操作時間線，
+並 deep-link 回完整操作記錄。
 
----
+## 30.3 系統診斷
 
-# 31. Diagnostics｜鎖定
+入口：
+**系統管理 → 系統診斷**
 
-Diagnostics 至少回答：
-- component / route
-- current state
-- freshness
-- pending count
-- last error
+第二步完成後直接見 Diagnostics Workspace。
+
+第一屏先回答：
+1. 目前可唔可以繼續正常營業？
+2. 邊一個 domain 有問題？
+3. 影響範圍係乜？
+4. 第一個可信 break point 係邊？
+5. 有冇安全下一步？
+
+禁止一粒「System Healthy」總綠燈遮住局部故障。
+
+Overview 可分：
+- Cloud / Canonical
+- SMT / Runtime
+- Orders / Reconcile
+- Platform / Channel
+- Payment
+- Print
+- Device
+- Config / Version
+
+每個 component / route 顯示：
+- Current state
+- Freshness
+- Pending count
+- Last success
+- Last error summary
 - FIRST BREAK
-- safe recovery action
-- readback result
+- Readback result
+- Safe recovery action
+- View detail
 
-Level A：Frontline 能唔能夠繼續營業  
-Level B：Manager/Owner 影響邊啲 device/order/staff  
-Level C：Engineering trace / operation ID / timestamps / proof
+## 30.4 Diagnostics Detail
+
+Detail 可以用 Level tabs：
+
+### Level A｜營運
+俾 Frontline / Manager 睇：
+- 能唔能夠繼續營業
+- 邊個功能受影響
+- 有冇安全 workaround
+- 是否需要 escalation
+
+### Level B｜影響範圍
+俾 Manager / Owner 睇：
+- affected devices
+- affected orders
+- affected platforms
+- affected config versions
+- pending / unknown count
+- first / last observed
+
+### Level C｜工程證據
+俾 Technical / Support：
+- operation ID
+- correlation ID
+- timestamps
+- transport / route
+- raw-ish error detail
+- evidence / proof reference
+
+Level A / B / C 係同一 Diagnostics Detail 內嘅 view，
+唔係第三層 Sidebar。
 
 Diagnostics ≠ Audit。
 Health ≠ Queue。
 Queue ≠ Failure。
 Event history ≠ Proof。
+
+## 30.5 Safe Recovery
+
+只顯正式 contract 存在嘅 recovery：
+
+例如：
+- Refresh / Readback
+- Trigger reconcile
+- Re-pull canonical config
+- Open responsible domain
+- Request approved retry（只限 idempotent contract）
+- Open device detail
+
+如果結果未知：
+- 顯 UNKNOWN
+- 先 readback / reconcile
+- 禁止 blind retry
+
+如果 backend recovery seam 未存在：
+- 唔整假 button
+- 標 BACKEND_CONTRACT_GAP
+
+## 30.6 系統整合
+
+入口：
+**系統管理 → 系統整合**
+
+第二步完成後直接見 Integration Registry / Health。
+
+R1 呢頁用途係：
+- 睇目前系統整合同連線狀態
+- 睇 credential / authorization state
+- 睇最後成功讀取／同步
+- 睇錯誤與 freshness
+- deep-link 去真正業務設定 Primary Home
+
+唔喺呢頁重複：
+- Keeta 接單規則
+- 商品映射
+- 打印 routing
+- Device OTA
+- Staff permission
+
+以上各自留返原 domain。
+
+### Integration List
+
+最低欄位：
+- Integration name
+- Type
+- Purpose
+- Configured?
+- Authorization state
+- Connectivity / provider health
+- Last successful read / sync
+- Freshness
+- Last error summary
+- Current attention
+- Primary owner domain
+- View
+
+例如 Integration type 可以包括正式存在嘅：
+- Platform / Channel
+- SMT / Runtime
+- Payment
+- Print / Device bridge
+- Other approved external service
+
+唔為未存在 provider 製造 placeholder。
+
+### Integration Detail
+
+顯示：
+- Human name
+- Purpose
+- Owner domain
+- Endpoint / environment summary（如可公開）
+- Credential / authorization state
+- Config identity / version
+- Last successful request
+- Last successful readback
+- Freshness
+- Current health
+- Last error
+- Related incidents
+- Linked audit / diagnostics
+
+Credential secret 永遠唔顯示。
+只顯：
+- configured / missing
+- valid / expired / revoked / unknown
+- expiry time（如 contract 有）
+
+### Integration R1 write boundary
+
+R1 預設：
+**System Integration page 係 read / governance surface。**
+
+真正 business config：
+- Platform → 平台／渠道管理
+- Print → 打印管理
+- Device / OTA → 裝置管理
+- Staff access → 人員與權限
+
+只有當正式 backend contract 明確存在時，
+System Integration page 先可以有 bounded action，例如：
+- Re-authorize
+- Verify connection
+- Refresh credential status
+- Revoke integration credential
+
+如果正式 contract 未存在：
+**BACKEND_CONTRACT_GAP**
+唔顯 fake Save / Connect / Test success。
+
+### Integration states
+
+至少分開：
+- NOT_CONFIGURED
+- CONFIGURED
+- AUTH_OK
+- AUTH_EXPIRED / REVOKED
+- HEALTHY
+- DEGRADED
+- UNKNOWN
+- STALE
+- FAILED（只有明確 failure evidence）
+- PARTIAL
+
+Configured ≠ Authorized。
+Authorized ≠ Provider Healthy。
+Provider Healthy ≠ Data Synced。
+Connected ≠ Business Function Ready。
+
+### Integration acceptance
+
+R1 驗收至少要證明：
+- 每個正式 integration 有清楚 owner domain
+- health 有 freshness
+- auth secret 唔洩漏
+- error 唔變成「未配置」
+- timeout 唔直接變 FAILED
+- readback / verify 有 authoritative evidence
+- business config deep-link 去唯一 Primary Home
+- 同一 setting 唔可以喺 System Integration 同 business domain 各有一份 authority
+
+## 30.7 進階／Effective Settings
+
+入口：
+**系統管理 → 進階／Effective Settings**
+
+第二步完成後直接見 Effective Settings Explorer。
+
+用途：
+俾 Owner / Support 查：
+「系統最後實際用緊邊個值？呢個值由邊度嚟？有冇 override？target 真正觀察到咩 version？」
+
+唔係日常設定中心。
+
+Search / Filter：
+- Human setting name
+- Domain
+- Scope
+- Source
+- Override only
+- Mismatch only
+
+List：
+- Setting
+- Domain
+- Scope
+- Effective value
+- Source
+- Override state
+- Security floor / protected constraint（如 relevant）
+- Desired version
+- Observed version
+- Match state
+- Freshness
+- View
+
+正常 UI 優先 human label，
+technical key 只喺 Detail 顯示。
+
+### Effective Setting Detail
+
+顯示：
+- Human name
+- Technical key
+- Domain
+- Scope
+- Effective value
+- Default value（如 relevant）
+- Source
+- Inherited value
+- Override value
+- Security floor / immutable constraint
+- Desired config version
+- Observed target version
+- Last readback
+- MATCH / MISMATCH / UNKNOWN
+- linked release
+- linked audit
+
+Primary CTA 通常係：
+**前往原設定頁**
+
+例如：
+- Business Day boundary → 門店設定
+- Product price → 菜單管理
+- Channel accept policy → 平台／渠道管理
+- Logical printer → 打印管理
+
+禁止由 Advanced page 直接變成萬能 editor。
+
+### Advanced override
+
+只有正式 governance contract 已批准嘅 setting
+先可以有 override action。
+
+Override 必須：
+- explicit permission
+- scope
+- reason
+- expiry（如 policy 要求）
+- security floor guard
+- version guard
+- publish / apply semantics
+- readback
+- audit
+
+如果冇正式 override contract：
+- read-only
+- 唔顯 Edit
+
+## 30.8 人類第一直覺歸類
+
+- 「邊個改過呢個產品？」→ 系統管理 / 操作記錄
+- 「點解今日平台接唔到單？」→ 系統管理 / 系統診斷
+- 「Keeta authorization 過期未？」→ 系統管理 / 系統整合
+- 「Keeta 接單規則點改？」→ 平台／渠道管理 / 接單規則
+- 「呢個設定最後真正生效值係乜？」→ 系統管理 / 進階／Effective Settings
+- 「我要正常改呢個 setting」→ 去返該 setting Primary Home
+- 「某 target 點解仲係舊 version？」→ 發佈與版本 / 版本 Readback；需要 root cause 再去系統診斷
+
+任何以上問題如果要第三層 Sidebar 先搵到，視為 IA RED。
 
 ---
 
