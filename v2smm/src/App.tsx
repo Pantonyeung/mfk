@@ -1,4 +1,5 @@
 import {useEffect,useMemo,useRef,useState} from 'react';
+import {installMfkCanonicalDoorbell,MFK_CANONICAL_DATA_EVENTS} from '../../contracts/mfk-canonical-doorbell-v1';
 import {readSmmLocalWorkspace,writeSmmLocalWorkspace,createSmmPendingIntent,type SmmLocalPreferences} from './persistence';
 import {resolveSmmRuntimePort} from './runtime';
 import {pairSmmLan,probeSmmLan,readSmmLanPwaConfig,saveSmmLanPwaConfig} from './pwa-lan';
@@ -183,17 +184,11 @@ export function App(){
       initialRefreshRef.current=true;
       void refresh();
     }
-    const onOnline=()=>void refresh();
-    const onPageShow=()=>void refresh();
-    const onVisibility=()=>{if(document.visibilityState==='visible')void refresh();};
-    window.addEventListener('online',onOnline);
-    window.addEventListener('pageshow',onPageShow);
-    document.addEventListener('visibilitychange',onVisibility);
-    return()=>{
-      window.removeEventListener('online',onOnline);
-      window.removeEventListener('pageshow',onPageShow);
-      document.removeEventListener('visibilitychange',onVisibility);
-    };
+    const uninstall=installMfkCanonicalDoorbell({
+      onEvent:event=>{if(MFK_CANONICAL_DATA_EVENTS.has(event.type))void refresh();},
+      onReconnect:()=>void refresh(),
+    });
+    return uninstall;
   },[refresh]);
 
   useEffect(()=>{
