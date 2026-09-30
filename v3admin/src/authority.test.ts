@@ -7,7 +7,7 @@ describe('MFK Admin V3 A0 authority',()=>{
     expect(V3_ADMIN_STATE_AUTHORITY.server).toBe('TANSTACK_QUERY');
     expect(V3_ADMIN_STATE_AUTHORITY.outbox).toBe('DEXIE_INDEXEDDB');
     expect(V3_ADMIN_STATE_AUTHORITY.authPersistence).toBe('MEMORY_ONLY');
-    expect(V3_ADMIN_STATE_AUTHORITY.canonicalValidation).toBe('SHARED_ADMIN_CONFIG_CONTRACT');
+    expect(V3_ADMIN_STATE_AUTHORITY.canonicalValidation).toBe('ADMIN_CONFIG_CONTRACT_EQUIVALENT');
     expect(V3_ADMIN_STATE_AUTHORITY.derivedServerStatusPersisted).toBe(false);
     expect(V3_ADMIN_STATE_AUTHORITY.v2StateModulesImported).toBe(false);
   });
