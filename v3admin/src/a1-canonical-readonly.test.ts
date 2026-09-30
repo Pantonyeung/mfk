@@ -3,7 +3,7 @@ import {createMfkAdminConfigEnvelope} from '../../contracts/admin-config-sync-v1
 import {deriveV3AdminProofHex,loginV3Admin} from './auth.ts';
 import {readV3CanonicalAdminActive,summarizeV3Canonical,v3AdminCanonicalQueryKey} from './canonical.ts';
 
-afterEach(()=>{vi.restoreAllMocks();});
+afterEach(()=>{vi.restoreAllMocks();vi.unstubAllGlobals();});
 
 describe('V3 Admin A1 authenticated read-only canonical',()=>{
   it('derives the exact backend proof shape without transmitting raw PIN',async()=>{
