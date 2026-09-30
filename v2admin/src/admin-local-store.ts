@@ -87,7 +87,7 @@ export function readAdminReleases(){
 
 export function createAdminRelease(snapshot:unknown,reason?:string){
   const rows=readAdminReleases();
-  const version=(rows[0]?.version??0)+1;
+  const version=Math.max(0,...rows.map(row=>Number(row.version)||0))+1;
   const createdAt=mfkHongKongIso();
   const canonical=JSON.stringify(snapshot);
   const fingerprint='fnv1a32:'+fnv1a(canonical);
