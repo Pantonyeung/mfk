@@ -981,7 +981,10 @@ export class AdminSyncStore{
       }};
     }
 
-    const cloudPublishedAt=mfkHongKongIso();
+    const current=await this.state.storage.get('active');
+    const currentPublishedMs=current?Date.parse(String(current.publishedAt||'')):Number.NEGATIVE_INFINITY;
+    const publishMs=Number.isFinite(currentPublishedMs)?Math.max(Date.now(),currentPublishedMs+1):Date.now();
+    const cloudPublishedAt=mfkHongKongIso(publishMs);
     const active=createMfkAdminConfigEnvelope({
       storeId:envelope.storeId,
       revision:envelope.revision,
@@ -1587,6 +1590,27 @@ export class AdminSyncStore{
     if(url.pathname==='/active'){
       const active=await this.state.storage.get('active');
       return active?json(active):json({code:'ADMIN_CONFIG_NOT_PUBLISHED'},404);
+    }
+    if(url.pathname==='/published'){
+      if(request.method!=='GET')return json({code:'METHOD_NOT_ALLOWED'},405);
+      const fingerprint=String(url.searchParams.get('fingerprint')||'').trim();
+      if(!fingerprint)return json({code:'ADMIN_CONFIG_PUBLISHED_FINGERPRINT_REQUIRED'},400);
+      const published=await this.state.storage.get('admin:published:'+fingerprint);
+      return published?.active?json(published.active):json({code:'ADMIN_CONFIG_PUBLISHED_NOT_FOUND'},404);
+    }
+    if(url.pathname==='/published-since'){
+      if(request.method!=='GET')return json({code:'METHOD_NOT_ALLOWED'},405);
+      const after=String(url.searchParams.get('after')||'').trim();
+      const afterMs=Date.parse(after);
+      if(!Number.isFinite(afterMs))return json({code:'ADMIN_CONFIG_PUBLISHED_AFTER_INVALID'},400);
+      const stored=await this.state.storage.list({prefix:'admin:published:'});
+      const items=[...stored.values()]
+        .map(value=>value?.active)
+        .filter(Boolean)
+        .filter(value=>Date.parse(String(value.publishedAt||''))>afterMs)
+        .sort((a,b)=>Date.parse(String(a.publishedAt||''))-Date.parse(String(b.publishedAt||'')))
+        .slice(0,200);
+      return json({items,after,count:items.length});
     }
     if(url.pathname==='/publish'){
       if(request.method!=='POST')return json({code:'METHOD_NOT_ALLOWED'},405);
