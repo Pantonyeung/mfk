@@ -7407,3 +7407,461 @@ Status：**LOCKED**
 
 MILESTONE:
 MFK_ADMIN_V3_FIRST_VIEWPORT_ACCEPTANCE_BATCH4_LOCKED
+
+---
+
+# 56. First Viewport Acceptance V1｜Batch 5：門店設定 / 系統管理
+
+本批驗收最後 9 個第二步 destination：
+- 門店設定：5
+- 系統管理：4
+
+共用要求沿用 §52.0：
+第一屏直接開始工作；正常業務設定唔被 Advanced / Diagnostics 搶走；敏感資料唔曝光；Danger action 唔搶主位。
+
+---
+
+## 56.1 門店設定 → 門店資料
+
+### Desktop first viewport
+必須見：
+- Title「門店資料」
+- Store display name
+- Store code / canonical identity
+- Address
+- Contact
+- Timezone
+- Current published / readback summary
+- CTA「編輯」
+
+Primary CTA：
+- 編輯門店資料
+
+Danger：
+- protected / immutable Store identity 只讀
+- Save 只進 Draft，唔顯「已生效」
+
+### Mobile
+第一屏：
+- Store name
+- Store code
+- Address / contact
+- Edit
+- published/readback summary
+
+State guard：
+- missing optional contact ≠ error
+- readback stale 必須顯 freshness
+
+Status：**LOCKED**
+
+---
+
+## 56.2 門店設定 → 營業時間
+
+### Desktop first viewport
+必須見：
+- Title「營業時間」
+- 一星期 Schedule
+- 每日 opening / closing
+- Closed day
+- Special hours / holiday 只喺正式 contract 存在時顯示
+- CTA「編輯」
+
+唔用一日一個 hidden accordion 收埋全週。
+
+Primary CTA：
+- 編輯營業時間
+
+Danger：
+- Store Hours 唔同 Channel Accepting Orders 混埋
+- Save Draft 唔即時改 provider 接單狀態
+
+### Mobile
+- 星期一至日 compact list
+- 每日 opening/closing 直接可掃
+- Edit 可進單一 form
+
+State guard：
+- Store Closed ≠ Platform integration failed
+- Channel runtime state 只 contextual deep-link
+
+Status：**LOCKED**
+
+---
+
+## 56.3 門店設定 → Business Day 分界
+
+### Desktop first viewport
+必須見：
+- Title
+- Current boundary time
+- Effective from
+- Current published value
+- Last readback
+- CTA「編輯」
+
+Primary CTA：
+- 編輯分界時間
+
+Danger：
+- 唔顯任何「因分界失敗禁止落單」操作
+- boundary change 要 Draft / Publish / Readback
+
+### Mobile
+- Boundary time 最大重點
+- Effective from
+- last readback
+- Edit
+
+State guard：
+- rollover stale ≠ transaction blocked
+- mismatch 要 deep-link 發佈／診斷
+
+Status：**LOCKED**
+
+---
+
+## 56.4 門店設定 → 營運時間／提醒設定
+
+### Desktop first viewport
+必須見：
+- Title
+- Current store-level timing summary
+- 預設準備時間
+- Scheduled order lead time
+- Pickup timing
+- Close / last-order reminder
+- Operational threshold（只限正式 contract）
+- CTA「編輯」
+
+Primary CTA：
+- 編輯設定
+
+Danger：
+- 平台專屬 timing 唔喺呢頁重複
+- fulfillment runtime state 唔當 config
+- backend 未有嘅 reminder engine 唔造假 UI
+
+### Mobile
+- Setting name + current value
+- grouped by「時間」「提醒」
+- Edit
+
+State guard：
+- inherited / override 有需要先顯摘要
+- technical provenance deep-link Advanced
+
+Status：**LOCKED**
+
+---
+
+## 56.5 門店設定 → 快捷原因
+
+### Desktop first viewport
+必須見：
+- Title「快捷原因」
+- CTA「新增快捷原因」
+- Applies-to / Active filter
+- Quick Reason List
+
+Row：
+- Reason label
+- Applies to
+- Active
+- Display order
+- Last modified
+- Draft indicator
+
+Primary CTA：
+- 新增快捷原因
+
+Danger：
+- Quick Reason 唔可代表 permission / approval
+- 歷史已使用 reason 唔可 destructive erase
+
+### Mobile
+- Reason label + Active
+- Applies to
+- order
+- Edit
+
+State guard：
+- 無 preset reason ≠ workflow blocked
+- OPTIONAL / NON-BLOCKING 係 default
+
+Status：**LOCKED**
+
+---
+
+# 56.6 系統管理 First Viewport
+
+## A. 操作記錄
+
+Desktop 第一屏：
+- Title「操作記錄」
+- Time / Actor / Action / Domain / Result filters
+- Audit List
+- 第一批 records
+
+Row：
+- Time
+- Actor
+- Human-readable Action
+- Target
+- Result
+- Domain
+- Reason summary（如有）
+
+Primary CTA：
+- 查看 Detail
+
+Danger：
+- 無 Edit / Delete history
+- raw Audit ID / correlation ID 唔放 first viewport
+- PIN / Password / Token / Payment secret 永不顯示
+
+### Mobile
+- Time + Actor
+- Action
+- Target
+- Result
+- tap 入 Detail
+
+State guard：
+- sensitive redaction 必須保持
+- insufficient permission 唔顯 partial secret
+
+Status：**LOCKED**
+
+---
+
+## B. 系統診斷
+
+Desktop 第一屏：
+必須先回答：
+- 可唔可以繼續正常營業
+- 邊個 domain 有問題
+- FIRST BREAK
+- affected scope
+- safe next action
+
+Overview：
+- Cloud / Canonical
+- SMT / Runtime
+- Orders / Reconcile
+- Platform / Channel
+- Payment
+- Print
+- Device
+- Config / Version
+
+每項：
+- Current state
+- Freshness
+- Pending count
+- Last success
+- Last error summary
+- FIRST BREAK
+- Readback
+- Safe recovery
+
+Primary CTA：
+- 查看 Detail / Safe Recovery（有正式 contract 先顯）
+
+Danger：
+- 唔用一粒 System Healthy 總綠燈
+- UNKNOWN 禁 blind retry
+- 無 backend recovery seam 唔顯假 Fix button
+
+### Mobile
+- 最嚴重 / 最先 break domain 先出
+- business impact
+- freshness
+- safe next step
+- 其他 domain 向下
+
+State guard：
+- Health ≠ Queue ≠ Failure
+- Event history ≠ Proof
+
+Status：**LOCKED**
+
+---
+
+## C. 系統整合
+
+Desktop 第一屏：
+- Title「系統整合」
+- Integration List
+- 第一批正式 integrations
+
+Row：
+- Integration name
+- Purpose
+- Configured?
+- Authorization state
+- Provider health
+- Last successful read/sync
+- Freshness
+- Current attention
+- Owner domain
+
+Primary CTA：
+- 查看 Integration
+- Verify / Re-authorize 只喺正式 contract 存在時顯示
+
+Danger：
+- credential secret 永不顯示
+- business config 唔喺呢頁重複 edit
+- fake Connect / Test Success 禁止
+
+### Mobile
+- Name + purpose
+- auth state
+- health
+- last success/freshness
+- owner domain
+- View
+
+State guard：
+- Configured ≠ Authorized
+- Authorized ≠ Healthy
+- Healthy ≠ Synced
+- Connected ≠ Business Ready
+- timeout ≠ FAILED
+
+Status：**LOCKED**
+
+---
+
+## D. 進階／Effective Settings
+
+Desktop 第一屏：
+- Title「進階／Effective Settings」
+- Search
+- Domain / Scope / Source / Override / Mismatch filters
+- Effective Settings List
+
+Row：
+- Human setting name
+- Domain
+- Scope
+- Effective value
+- Source
+- Override state
+- Desired version
+- Observed version
+- Match state
+- Freshness
+
+Primary CTA：
+- 查看 Detail
+- 「前往原設定頁」
+
+Danger：
+- 預設 read-only
+- 唔變萬能 editor
+- technical key 唔做 primary label
+- 無正式 override contract 唔顯 Edit
+
+### Mobile
+- Human setting name
+- Effective value
+- source/override
+- match state
+- freshness
+- 前往原設定頁
+
+State guard：
+- MISMATCH / UNKNOWN 分開
+- missing observed version 唔顯 MATCH
+- security floor 唔可被 UI override 越過
+
+Status：**LOCKED**
+
+---
+
+# 56.7 Batch 5 結果
+
+本批共 9 個第二步 destination：
+
+- 門店設定：5
+- 系統管理：4
+
+結果：
+- **9 LOCKED**
+- **0 YELLOW**
+- **0 RED**
+
+本批確認：
+- Store Settings 唔變巨型 Settings 宇宙
+- Store Hours / Channel Accepting 分開
+- Business Day boundary 唔會變 transaction blocker
+- Quick Reason 唔暗中變 approval / permission
+- Audit / Diagnostics / Integration / Effective Settings 四者角色清楚
+- Sensitive secret 唔出 first viewport
+- Diagnostics 無假總綠燈 / fake recovery
+- Integration governance 唔複製 business config authority
+- Effective Settings 預設 read-only，正常修改返 Primary Home
+
+---
+
+# 56.8 54 / 54 First Viewport 全局收口
+
+五個 Batch 已完成：
+
+- Batch 1：今日 + 訂單 + 菜單 = 12 pages
+- Batch 2：營運 + 平台／渠道 = 12 pages
+- Batch 3：打印 + 裝置 + 人員權限 = 11 pages
+- Batch 4：報表 + 發佈版本 = 10 pages
+- Batch 5：門店設定 + 系統管理 = 9 pages
+
+合計：
+**54 / 54 pages 已完成 First Viewport Acceptance**
+
+最終狀態：
+- **53 LOCKED**
+- **1 YELLOW**
+- **0 RED**
+
+唯一 YELLOW：
+**訂單管理 → 售後／退款／取消／修正**
+只因：
+**Admin post-close Tender Correction = BACKEND_CONTRACT_GAP**
+
+其餘 53 頁：
+Product position / First viewport / CTA hierarchy / Mobile / State / Authority 均已鎖定至可交 implementation。
+
+## 56.9 下一階段
+
+First Viewport 盤點完成後，
+下一階段唔再重複逐頁定義，而係做：
+
+1. **Cross-page interaction audit**
+   - deep-link 帶唔帶 context
+   - back 行為
+   - filter preservation
+   - Draft Bar continuity
+   - Detail → related domain 跳轉
+   - mobile drawer 返回位置
+
+2. **Component contract audit**
+   - PageHeader
+   - DataTable / RecordList
+   - StatusBadge
+   - FilterBar
+   - DraftBar
+   - ConfirmDialog
+   - ReadbackPanel
+   - Timeline
+   - Error/Empty/Stale states
+
+3. **Copy / terminology audit**
+   - 同一概念只用一個正式名稱
+   - 清走工程術語
+   - Danger copy 一致
+   - Save / Publish / Applied 用詞完全分開
+
+MILESTONE:
+MFK_ADMIN_V3_FIRST_VIEWPORT_ACCEPTANCE_54_OF_54_COMPLETE
