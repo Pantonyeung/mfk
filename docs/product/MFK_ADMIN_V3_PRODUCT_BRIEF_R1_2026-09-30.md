@@ -16,16 +16,18 @@ Root Control：#596
 
 # 0. 一句產品定義
 
-MFK Admin V3 係餐飲門店嘅 **Web Control Plane**：
+MFK Admin V3 係餐飲門店嘅 **資料控制與治理中樞（Web Control Plane）**：
 
-- 管理商品、價格、套餐、渠道、打印、人員、門店設定；
-- 監察訂單、Business Day、Cash、SMT/Channel/Device/Print 健康；
-- 用固定可信報表睇正式 read model；
-- 所有正式 mutation 都經唯一 domain authority、權限、版本、防衝突、Audit、Readback；
-- Admin 唔係第二 POS、唔係第二 Order Engine、唔係第二 Pricing Engine、唔係第二 SMT Runtime、唔係 BI Builder。
+- 負責正式配置資料嘅建立、流動、版本、發佈、回讀、權威性同準確性；
+- 管理商品、價格規則、套餐、渠道設定、打印規則、人員權限、門店設定；
+- 監察訂單、營業日、現金、SMT／平台／裝置／打印等正式 read model；
+- 用固定可信報表、操作記錄、診斷同回讀證據確認「資料而家係乜、由邊度嚟、有冇真正套用」；
+- 訂單喺 Admin 只作查看、監察、追蹤同核對；**取消訂單、退款、付款方式修正等交易 mutation 不屬 Admin**；
+- 所有 Admin 自己擁有嘅正式 mutation 都經唯一 domain authority、權限、版本、防衝突、操作記錄、回讀確認；
+- Admin 唔係第二 POS、唔係第二 Order Engine、唔係交易執行端、唔係第二 Pricing Engine、唔係第二 SMT Runtime、唔係 BI Builder。
 
 核心 UX：
-**今日 → 發現問題／Pending Change → 去責任工作區 → 操作 → Readback → 回今日。**
+**今日 → 睇清楚正式資料／發現問題 → 去責任工作區 → 管理配置或核對資料 → 回讀確認 → 回今日。**
 
 ---
 
@@ -48,6 +50,8 @@ MFK Admin V3 係餐飲門店嘅 **Web Control Plane**：
 13. WebSocket / doorbell 只通知重新讀 canonical。
 14. Revision 只係診斷 metadata；人類 freshness 以正式 timestamp/readback 為準。
 15. V3 唔讀 v2 localStorage，不做 v2 compatibility state machine。
+16. **Admin 對訂單／付款交易只讀。** 訂單取消、退款、付款方式修正、交易內容修改等 transaction mutation 必須由正式交易權威／現場操作端執行；Admin 只顯示 canonical result、歷史、異常、證據同報表。
+17. Admin 嘅主要責任係 **資料流動、權威性、版本一致性、準確性、可追溯性**；唔可以因為「管理員權限高」就將交易執行能力搬入 Admin。
 
 ---
 
@@ -76,7 +80,7 @@ R1 一次過重生包含所有目前 P0 / READY / READ_ONLY / GOVERNANCE Admin �
 - 今日 / Readiness
 - Unified Action Queue
 - Pending Changes
-- Orders：進行中、歷史、售後／異常
+- Orders：進行中、歷史、異常、退款／取消／付款方式修正記錄（只讀）
 - Sellability / Availability quick control + readback
 - Menu：Product / Category / Sort / Modifier / Pricing / Combo
 - Product Operational：圖片、打印規則、外賣附加費、Option delta
@@ -117,7 +121,8 @@ R1 一次過重生包含所有目前 P0 / READY / READ_ONLY / GOVERNANCE Admin �
 - AI 自動停售 / 採購 / 自動優惠
 - 第二套 pricing/order/payment/print/sellability engine
 - physical printer IP/USB binding（屬 SMT 現場）
-- POS transaction execution
+- POS / transaction execution
+- Admin 執行訂單取消、退款、付款方式修正或其他交易 mutation
 
 ---
 
@@ -160,7 +165,7 @@ Admin V3 Product Brief 必須係一張 **產品地圖**，唔係功能迷宮。
 ## 4.3 大 Menu｜功能性分類
 
 1. **今日**
-2. **訂單管理**
+2. **訂單監察**
 3. **菜單管理**
 4. **營運管理**
 5. **平台／渠道管理**
@@ -185,10 +190,9 @@ Owner 可按產品需要新增、合併或改名；禁止為追求「少 Menu」
 - /admin/overview — 營運總覽
 - /admin/action-queue — 待處理事項
 
-## 訂單管理
+## 訂單監察
 - /admin/orders/open — 進行中訂單
 - /admin/orders/history — 訂單歷史
-- /admin/orders/aftersales — 售後／退款／取消／修正
 - /admin/orders/exceptions — 訂單異常
 
 ## 菜單管理
@@ -665,7 +669,7 @@ Queue item 必須有：
 但唔可以建立三條互相獨立、各自可 Resolve 嘅 issue。
 
 每條 item 必須有 Primary Owner Domain，例如：
-- Order-specific payment → 訂單管理
+- Order-specific payment → 訂單監察
 - Product mapping → 平台／渠道管理
 - Print route / job → 打印管理
 - Device health → 裝置管理
@@ -718,45 +722,51 @@ UNKNOWN / stale：
 - 「而家有咩要處理？」→ 今日 / 待處理事項
 - 「點解呢件事壞？」→ 系統管理 / 系統診斷
 - 「邊個做過呢個操作？」→ 系統管理 / 操作記錄
-- 「我要真正退款」→ 訂單管理 / 售後
+- 「我要真正退款」→ 訂單監察 / 訂單歷史或訂單詳情（只讀）
 - 「我要真正改 mapping」→ 平台／渠道管理 / 商品映射
 
 任何 action 如果 Queue 自己變第二套 mutation authority，視為 IA / authority RED。
 
 ---
 
-# 11. 訂單管理｜鎖定
+# 11. 訂單監察｜只讀交易事實｜鎖定
 
-訂單管理係獨立功能 domain。
-使用者想「搵張單、睇而家做到邊、查歷史、做售後、處理訂單異常」時，第一時間就應該入 **訂單管理**。
+Admin 嘅訂單 domain 只負責：
+**查看、監察、搜尋、核對、追蹤異常、查看交易變更記錄。**
 
-Sidebar 細 Menu 直接顯示：
+Admin **唔負責**：
+- 取消訂單
+- 退款
+- 付款方式修正
+- 修改已成立訂單內容
+- 重做付款
+- 任何改變 transaction truth 嘅正式 mutation
+
+以上由正式交易權威／現場操作端處理。
+Admin 只讀取 canonical result、linked records、操作記錄同回讀證據。
+
+因此大 Menu 正式命名：
+**訂單監察**
+
+Sidebar 細 Menu：
 - 進行中訂單
 - 訂單歷史
-- 售後／退款／取消／修正
 - 訂單異常
 
-所有頁面符合：
-**訂單管理 → 細 Menu → 已見到目標內容 → 撳 Order / Case 入 Detail / Action**
-
-Admin 唔建立新 Order，唔做第二 POS。
+所有頁面：
+**只讀 + deep-link / evidence**
+唔提供交易 mutation button。
 
 ## 11.1 進行中訂單
 
 入口：
-**訂單管理 → 進行中訂單**
+**訂單監察 → 進行中訂單**
 
 第二步完成後直接見 Active Order List。
 
-Header：
-- Title：進行中訂單
-- Search
-- Filter
-- Refresh / freshness
-
 Search：
 - Display Number
-- MFK Order ID（detail/search）
+- MFK Order ID
 - External Order Reference
 - Customer name / masked phone（如正式 read model 有）
 
@@ -765,10 +775,10 @@ Filters：
 - Fulfillment
 - Payment
 - Scheduled / delayed
-- Business Day
+- 營業日
 - Attention only
 
-List / Card 最低顯示：
+List / Card：
 - Display Number
 - Source
 - Created / elapsed
@@ -776,36 +786,32 @@ List / Card 最低顯示：
 - Payment summary
 - Fulfillment summary
 - Staff / owner（如有）
-- Scheduled / due / promised time（如有）
+- Scheduled / promised time（如有）
 - Exception badges
-- Row action：查看
+- Row action：查看訂單
 
 Primary status 只表達目前主要工作狀態。
-其他 truth 分開顯示。
+Order / Payment / Fulfillment / Print / Platform truth 分開。
 
-例：
-- 履約：未完成 / 可取餐
-- 付款：已付款 / 待付款 / 結果未明
-- 來源：門市 / 自家平台 / Keeta
-- Exception：打印異常 / 平台取消要求 / 對帳注意
+禁止：
+- Cancel
+- Refund
+- Tender Correction
+- inline transaction mutation
 
-禁止建立：
-READY_PAID_PRINT_FAILED_CANCEL_PENDING
-呢類 global order status。
+Status：**READ-ONLY**
 
 ## 11.2 訂單歷史
 
 入口：
-**訂單管理 → 訂單歷史**
-
-第二步完成後直接見 Historical Order List。
+**訂單監察 → 訂單歷史**
 
 Search / Filter：
 - Display Number / Order ID
 - Source
-- Date / Business Day
+- Date / 營業日
 - Completion state
-- Refund / adjustment
+- Refund / adjustment record
 - Payment method
 - Staff
 
@@ -820,16 +826,17 @@ List：
 - Refund indicator
 - Cancel indicator
 - Payment summary
-- View
+- 查看訂單
 
 歷史 Order 永久保留。
-Refund / Cancel / Correction 係 linked record / transition，
-唔直接改寫舊 Order 歷史。
+Refund / Cancel / Payment Correction 只顯 linked record / transition；
+Admin 唔修改舊 Order 歷史。
 
-## 11.3 Order Detail
+Status：**READ-ONLY**
+
+## 11.3 訂單詳情
 
 撳一張 Order 後進 Detail。
-呢個係 object interaction，唔係第三層 Menu。
 
 Header：
 - Display Number
@@ -838,18 +845,15 @@ Header：
 - Current primary workflow state
 - Effective amount
 - Attention badges
-- Freshness
+- 最後更新
 
-內容可用 tabs / section navigation：
+內容：
 - 摘要
 - 商品
 - 付款
 - 履約
-- 售後
+- 交易變更記錄
 - 時間線
-
-呢啲係同一張 Order Detail 內嘅 content view，
-唔係 Sidebar 第三層。
 
 ### 摘要
 - Order identity
@@ -859,29 +863,30 @@ Header：
 - Effective amount
 - Payment summary
 - Fulfillment summary
-- Staff / owner
 - Scheduled / promised / delayed
 - Current exceptions
 
 ### 商品
-- Product
+- 商品
 - Quantity
 - ProductSnapshot
-- Option / Modifier
-- Combo relationship
+- 選項／口味
+- 套餐關係
 - Remark
 - Line price / adjustment summary
-- Print / production exception summary（只在 relevant）
+- Print / production exception summary（如 relevant）
 
 ### 付款
-- Current effective tender
+只讀：
+- Current effective payment method
 - Payment entries
 - Payment certainty
 - Refund summary
-- Tender correction history
-- Processor / proof reference（detail only）
+- Payment correction history
+- Processor / proof reference（Detail only）
 
 ### 履約
+只讀：
 - Current fulfillment state
 - State history
 - Ready / completed timing
@@ -889,153 +894,73 @@ Header：
 - Scheduled / promised time
 - Handover facts（如有）
 
-### 售後
-- Refund
-- Cancel
-- Tender Correction
-- Other approved correction
-- Linked records
+### 交易變更記錄
+只讀顯示：
+- 退款記錄
+- 取消記錄
+- 付款方式修正記錄
+- 其他正式 correction / reversal records
+- Actor
+- Time
 - Current effective result
+- Linked evidence / Audit
 
-只顯 current state 下真正 allowed action。
-唔顯一排永遠存在嘅危險 buttons。
+**呢一區只係睇結果，唔係執行入口。**
+
+如果操作仍未完成：
+Admin 顯示 current canonical state / UNKNOWN / PENDING，
+唔提供「完成交易」掣。
 
 ### 時間線
 聚合：
 - Order created / committed
 - Payment
 - Fulfillment transitions
-- Refund / correction
+- Refund / correction records
 - Print exception
 - Platform event
 - Actor / time
 
-每條重要事件可以 deep-link 去原 Audit / Proof。
+每條重要事件可以 deep-link 去操作記錄 / 證據。
 
-## 11.4 售後／退款／取消／修正
+## 11.4 退款／取消／付款方式修正｜Admin 邊界
 
-入口：
-**訂單管理 → 售後／退款／取消／修正**
+Admin 只可以：
+- 搜尋相關 Order
+- 查看原始交易事實
+- 查看退款／取消／付款方式修正結果
+- 查看執行人、時間、原因、證據
+- 在報表／操作記錄中核對
+- 對資料不一致開診斷／Action Item
 
-第二步完成後直接見 After-sales / Correction List。
+Admin 不可以：
+- 發起退款
+- 發起取消訂單
+- 執行付款方式修正
+- 修改 transaction truth
 
-Filters：
-- Type
-- Current state
-- Date
-- Staff / actor
-- Amount
-- Attention / unresolved
+如果使用者需要真正交易操作：
+由正式交易操作端執行；
+Admin 只喺其後讀取 canonical result。
 
-List：
-- Type
-- Display Number
-- Original amount
-- Requested / corrected amount
-- Current effective result
-- Actor
-- Created
-- Current state
-- Readback / proof state
-- View
+因此：
+**Admin 無售後 mutation workspace。**
+亦唔需要為 Tender Correction 開 Admin backend seam。
 
-支援已正式存在／批准嘅 workflow：
-- Refund
-- Cancel
-- Tender Correction
-- Approved amount / content correction（只限 contract 存在）
-- Post-day-close correction（backend seam 未完整時只保留產品位置）
-
-新建售後 action 正常入口：
-1. 先揀／搜尋原 Order
-2. 揀 allowed action
-3. Preview current facts
-4. Permission / Reason / Version Guard（按 policy）
-5. Execute
-6. Readback
-7. Audit
-
-呢個係真正高風險 workflow，可以有 steps。
-但搵到「售後」本身仍然只需要兩步導航。
-
-## 11.5 Refund
-
-Refund UI 必須清楚顯示：
-- Original Order
-- Original payment / tender summary
-- Refundable amount
-- Proposed refund amount
-- Method / destination（按 contract）
-- Reason（optional / required 由 policy）
-- Current payment certainty
-- Expected result
-
-Execute 後：
-- 原 Payment / Order history保留
-- 建 linked refund / reversal record
-- 未 readback 前 PENDING / UNKNOWN
-- 禁止 timeout 後 blind retry
-
-## 11.6 Cancel
-
-Cancel UI 必須清楚：
-- 正在取消邊張 Order
-- Current Order / Fulfillment / Payment facts
-- 已發生 side-effect 有乜
-- Reason
-- Expected impact
-
-Cancel 唔等於：
-- delete Order
-- delete Payment
-- 自動退款
-- 自動重印
-
-真正 dependent actions 按 domain contract 分開處理。
-
-## 11.7 Tender Correction
-
-Primary Home：
-**訂單管理 → 售後／退款／取消／修正**
-
-UI：
-- Original tender
-- Corrected tender
-- Amount
-- Current effective tender
-- Reason / quick reason
-- Actor
-- Expected reporting effect
-
-規則：
-- SAME Order
-- zero new Order
-- preserve history
-- zero auto reprint
-- zero auto drawer action
-
-日結後 Admin Tender Correction：
-產品位置保留，
-但正式 Admin backend mutation seam 未完整證實時標：
-**BACKEND_CONTRACT_GAP**
-
-唔可以做假 button 或只改 browser state。
-
-## 11.8 訂單異常
+## 11.5 訂單異常
 
 入口：
-**訂單管理 → 訂單異常**
+**訂單監察 → 訂單異常**
 
-第二步完成後直接見真正同 Order 有關嘅 exception workspace。
+第二步直接見同 Order 有關嘅 observation / reconciliation issue。
 
-只收會影響特定 Order / transaction 嘅正式異常，例如：
+例如：
 - Payment UNKNOWN
-- Platform cancel request
+- Platform cancel request / result 未同步
 - Late / delayed external order
 - Order / provider reconciliation mismatch
 - Order-level print exception
 - Mapping issue affecting a concrete order
-- Other formal transaction attention
 
 List：
 - Severity
@@ -1047,32 +972,18 @@ List：
 - First seen
 - Last observed
 - Current owner domain
-- CTA：處理
+- CTA：查看
 
-唔將所有系統 error 倒入訂單異常。
-Device / platform-wide / config-wide incident 留返各 Primary Home / Action Queue。
+如果真正 mutation 屬交易操作端：
+Admin 只顯：
+- 「此問題需要由交易操作端處理」
+- current facts
+- evidence
+- responsible surface（如已有正式 deep-link）
 
-## 11.9 訂單異常 Detail / Recovery
+唔喺 Admin 自己重造 command。
 
-Detail：
-- What happened
-- Current confirmed facts
-- Unknown / partial facts
-- Affected domain
-- Safe action
-- Evidence / readback
-- Timeline
-
-如果真正 mutation 屬另一 domain：
-- deep-link 去責任頁
-- 唔喺 Order Exception 自己重造 command
-
-例如：
-- 打印 job 問題 → 打印管理 / 打印狀態
-- 平台 mapping → 平台／渠道管理 / 商品映射或匹配失敗
-- Device offline → 裝置管理 / 裝置狀態
-
-## 11.10 狀態語義
+## 11.6 狀態語義
 
 Order UI 永遠分開：
 - Order lifecycle
@@ -1093,19 +1004,19 @@ Query failure唔可以顯示成：
 - no history
 - empty success
 
-Stale remote data 必須有 freshness。
+Stale remote data 必須有最後更新時間。
 
-## 11.11 人類第一直覺歸類
+## 11.7 人類第一直覺歸類
 
-- 「而家有咩單做緊？」→ 訂單管理 / 進行中訂單
-- 「搵返昨日某張單」→ 訂單管理 / 訂單歷史
-- 「退款／取消／改付款方式」→ 訂單管理 / 售後／退款／取消／修正
-- 「邊張單有問題？」→ 訂單管理 / 訂單異常
-- 「點解嗰張單冇印？」→ Order Detail 見摘要，再 deep-link 打印管理 / 打印狀態
-- 「Keeta mapping 錯」→ 平台／渠道管理 / 商品映射或匹配失敗
-- 「部 SMT offline」→ 裝置管理 / 裝置狀態
+- 「而家有咩單做緊？」→ 訂單監察 / 進行中訂單
+- 「搵返昨日某張單」→ 訂單監察 / 訂單歷史
+- 「呢張單有冇退款／取消／改付款方式？」→ 訂單詳情 / 交易變更記錄
+- 「邊張單有資料異常？」→ 訂單監察 / 訂單異常
+- 「點解嗰張單冇印？」→ 訂單詳情 → 打印管理 / 打印狀態
+- 「我要真正退款／取消／修正付款方式」→ **唔屬 Admin；去正式交易操作端**
 
-任何以上問題如果要第三層 Sidebar 先搵到，視為 IA RED。
+任何 Admin Order page 出現 transaction mutation button：
+**Authority RED。**
 
 ---
 
@@ -2048,26 +1959,21 @@ UI wording必須分清：
 
 完成後返回現金／收舖 workspace。
 
-## 20.6 日結後修正
+## 20.6 日結後交易修正｜Admin 只讀
 
-Primary Home：
-- 查原 Order → 訂單管理
-- 日結後 Tender Correction → 訂單售後／修正 workflow
-- Audit → 系統管理 / 操作記錄
+日結後退款、取消、付款方式修正等交易 mutation：
+**不屬 Admin。**
 
-產品規格要求：
-- SAME Order
-- full audit history
-- current effective tender
-- zero new Order
-- zero auto reprint
-- zero auto drawer action
+Admin 只提供：
+- 原 Order 查詢
+- current effective result
+- linked correction / refund / cancel record
+- 操作記錄
+- 報表核對
+- 資料不一致診斷
 
-目前正式 Admin backend mutation seam 未完整證實：
-**BACKEND_CONTRACT_GAP**
-
-UI 可以鎖 workflow / page position，
-但 implementation 唔可以假裝已經有正式 mutation API。
+真正交易修正由正式交易操作端執行。
+因此 Admin 唔需要建立 Tender Correction mutation seam。
 
 ## 20.7 人類第一直覺歸類
 
@@ -2076,7 +1982,7 @@ UI 可以鎖 workflow / page position，
 - 「現金差幾多？」→ 營運管理 / 現金／收舖
 - 「點算／交更」→ 營運管理 / 現金／收舖
 - 「營業日幾點切日？」→ 門店設定 / Business Day 分界
-- 「邊張 Order 阻住收舖？」→ 訂單管理 / 該 Order
+- 「邊張 Order 阻住收舖？」→ 訂單監察 / 該 Order
 - 「點解 Close command 未確認？」→ 系統管理 / 系統診斷
 
 任何以上問題如果要第三層 Sidebar 先搵到，視為 IA RED。
@@ -3562,7 +3468,7 @@ Comparison：
 - 某時間區間
 - 某 adjustment
 
-deep-link 去 filtered 訂單歷史／售後紀錄。
+deep-link 去 filtered 訂單歷史／訂單詳情嘅交易變更記錄。
 
 Report 自己唔做 Refund / Cancel。
 
@@ -3722,7 +3628,7 @@ Original day 同 execution day 分開，
 避免跨日退款造成報表誤解。
 
 可 deep-link：
-**訂單管理 → 售後／退款／取消／修正**
+**訂單監察 → 訂單歷史／訂單詳情（交易變更記錄）**
 
 ## 29.3 營運報表
 
@@ -4468,10 +4374,12 @@ UI 要分清：
 
 快捷原因 Primary Home 留喺門店設定。
 
-真正操作仍喺責任 domain：
-- Tender Correction → 訂單管理 / 售後
+快捷原因只係 Admin 配置資料，可以被正式操作端使用。
+
+真正交易操作唔喺 Admin：
+- 付款方式修正 → 正式交易操作端
+- 退款 / 取消訂單 → 正式交易操作端
 - Reprint → 正式打印操作 surface（如 contract 支援）
-- Refund / Cancel → 訂單管理 / 售後
 
 操作頁可以直接顯 Quick Reason picker，
 但唔喺操作頁再建第二套 reason 管理。
@@ -4486,7 +4394,7 @@ UI 要分清：
 ## 33.5 人類第一直覺歸類
 
 - 「新增一個常用退款原因」→ 門店設定 / 快捷原因
-- 「今次真係做退款」→ 訂單管理 / 售後
+- 「今次真係做退款」→ 唔屬 Admin；去正式交易操作端
 - 「某次操作點解做咗」→ 系統管理 / 操作記錄
 
 任何以上問題如果要第三層 Sidebar 先搵到，視為 IA RED。
@@ -4896,6 +4804,7 @@ One-shot Admin V3 rebuild default只准：
 - publish impact/readback panel
 
 ## Authority
+- Admin Order / Payment transaction surfaces 全部只讀；無 Cancel / Refund / Payment Correction mutation
 - 冇第二 Order/Pricing/Sellability/Print/Payment authority
 - 冇 browser server truth
 - WebSocket only invalidates
@@ -5088,13 +4997,13 @@ MFK_ADMIN_V3_PRODUCT_BRIEF_FUNCTION_UI_LOCK_R1_READY
 
 目前：
 - **12 個大 Menu**
-- **54 個第二步正式 destination**
+- **53 個第二步正式 destination**
 - **0 個正常功能需要第三層 Sidebar discovery**
 
 | 大 Menu | 第二步數量 | 主要服務 |
 |---|---:|---|
 | 今日 | 2 | 今日營業額、營運總覽、待處理事項 |
-| 訂單管理 | 4 | 進行中、歷史、售後、訂單異常 |
+| 訂單監察 | 3 | 進行中、歷史、訂單異常 |
 | 菜單管理 | 6 | 分類、產品、選項／口味、套餐、價格、排序 |
 | 營運管理 | 4 | 售罄／供應、營業日、現金／收舖、產能額度 |
 | 平台／渠道管理 | 8 | 平台營運、接單、同步、綁定、映射、失敗、實收、對帳 |
@@ -5131,6 +5040,11 @@ P1：
 ## 50.3 Primary Home collision audit
 
 以下容易撞 authority 嘅位置已鎖：
+
+### Order / Transaction
+- Admin 訂單只讀：進行中、歷史、異常、交易變更記錄
+- Cancel / Refund / Payment Correction：不屬 Admin transaction capability
+- Admin 只核對 canonical result / history / evidence
 
 ### Sales
 - 今日首頁：今日有效營業額 summary
@@ -5195,7 +5109,7 @@ PR #602 既有 7 個 P1 review concerns：
    → §19 + §45 明確鎖 human-facing Cloud publish time。
 
 5. Admin post-close Tender Correction seam
-   → 明確 BACKEND_CONTRACT_GAP；無 authority 不做假 UI mutation。
+   → Owner 已重新定義 authority：交易修正不屬 Admin。Admin 只讀 correction result，因此呢個 Admin backend seam 不再需要。
 
 6. Cutover rollback verification
    → §47 已加入 route rollback + serving identity readback + restored-v2 evidence。
@@ -5207,17 +5121,14 @@ PR #602 既有 7 個 P1 review concerns：
 
 目前 Product / IA 層面無已知缺頁。
 
-仍然存在一個已確認 implementation dependency：
+Owner 已鎖：
+**Admin 不執行訂單取消、退款、付款方式修正等 transaction mutation。**
 
-**Admin post-close Tender Correction → BACKEND_CONTRACT_GAP**
+因此原本「Admin post-close Tender Correction」唔再係 implementation gap，
+而係明確 **OUT OF ADMIN SCOPE**。
 
-在另外批准 bounded backend authority 前：
-- 可以有產品位置
-- 可以有 read surface / workflow contract
-- **唔可以聲稱 Admin 已可正式執行 mutation**
-
-其他任何 implementation 過程發現缺 backend seam：
-同樣先標 BACKEND_CONTRACT_GAP，
+其他 implementation 過程如發現真正缺 backend seam：
+先標 BACKEND_CONTRACT_GAP，
 唔可以自行擴 transaction / provider / SMT authority。
 
 ## 50.6 Global status
@@ -5244,7 +5155,7 @@ Production：
 
 # 51. 54-Page Acceptance Inventory V1｜逐頁驗收盤點
 
-本節將 Product Map 54 個第二步 destination 逐頁做 product acceptance inventory。
+本節將 Product Map 53 個第二步 destination 逐頁做 product acceptance inventory。
 
 每頁固定檢查：
 1. 入口名稱是否直觀
@@ -5273,7 +5184,7 @@ Status：
 - Query error 不可變 $0。
 - 首頁唔可做第二 mutation center。
 
-## 51.2 訂單管理
+## 51.2 訂單監察
 
 | 頁面 | 第一屏 | 主動作 | Mode | Authority | Status |
 |---|---|---|---|---|---|
@@ -5443,7 +5354,7 @@ Status：
 
 ## 51.13 Global result
 
-54 個第二步 destination：
+53 個第二步 destination：
 
 - **53：LOCKED**
 - **1：YELLOW（售後／退款／取消／修正，原因只係 Admin post-close Tender Correction backend seam）**
@@ -5592,7 +5503,7 @@ Status：**LOCKED**
 
 ---
 
-# 52.3 訂單管理 First Viewport
+# 52.3 訂單監察 First Viewport
 
 ## A. 進行中訂單
 
@@ -5666,41 +5577,16 @@ State guard：
 
 Status：**LOCKED**
 
-## C. 售後／退款／取消／修正
+## C. 交易變更記錄｜只讀（Order Detail 內）
 
-Desktop 第一屏：
-- Title
-- Type / State / Date filters
-- Case List
-- 第一批 cases
-- CTA「開始售後」只喺正式 allowed contract 存在時顯示
+唔再有獨立「售後／退款／取消／修正」第二步頁面。
 
-每 row：
-- Type
-- Display Number
-- amount
-- actor
-- current state
-- readback/proof
+退款、取消、付款方式修正：
+- 只喺訂單詳情「交易變更記錄」顯示
+- 顯示 current result / actor / time / reason / evidence
+- 無 mutation CTA
 
-Primary CTA：
-- 查看 case / 開始 approved action
-
-Danger：
-- Refund / Cancel / Tender Correction 必須進 Detail/Workflow 先 execute
-- destructive action 唔放 row immediate button
-
-Mobile：
-- Type + Display Number
-- amount + state
-- proof / unknown badge
-- tap 入 workflow
-
-State guard：
-- Tender Correction Admin post-close seam = BACKEND_CONTRACT_GAP
-- 未有 seam 唔顯假「提交成功」
-
-Status：**YELLOW**
+Status：**LOCKED**
 
 ## D. 訂單異常
 
@@ -5931,20 +5817,18 @@ Status：**LOCKED**
 
 # 52.5 Batch 1 結果
 
-本批共 12 個第二步 destination：
+本批共 11 個第二步 destination：
 
 - 今日：2
-- 訂單管理：4
+- 訂單監察：3
 - 菜單管理：6
 
 結果：
 - **11 LOCKED**
-- **1 YELLOW**
+- **0 YELLOW**
 - **0 RED**
 
-唯一 YELLOW：
-**售後／退款／取消／修正**
-只因 post-close Admin Tender Correction backend seam 未授權。
+訂單監察所有頁面均為只讀；交易 mutation 已移出 Admin。
 
 本批無發現：
 - 第三層 Sidebar discovery
@@ -6452,10 +6336,10 @@ Status：**LOCKED**
 - bounded remote action 未 readback 唔畫成功
 
 累計 First Viewport 驗收：
-- Batch 1：12 pages
+- Batch 1：11 pages
 - Batch 2：12 pages
-- **已驗 24 / 54 pages**
-- 累計：23 LOCKED / 1 YELLOW / 0 RED
+- **已驗 23 / 53 pages**
+- 累計：23 LOCKED / 0 YELLOW / 0 RED
 
 下一 Batch：
 **打印管理 + 裝置管理 + 人員與權限（11 pages）**
@@ -6956,11 +6840,11 @@ Status：**LOCKED**
 - Revoke / Reprint / Retry 等高風險操作唔放列表即時誤觸
 
 累計 First Viewport 驗收：
-- Batch 1：12 pages
+- Batch 1：11 pages
 - Batch 2：12 pages
 - Batch 3：11 pages
-- **已驗 35 / 54 pages**
-- 累計：34 LOCKED / 1 YELLOW / 0 RED
+- **已驗 34 / 53 pages**
+- 累計：34 LOCKED / 0 YELLOW / 0 RED
 
 下一 Batch：
 **報表 + 發佈與版本（10 pages）**
@@ -7395,12 +7279,12 @@ Status：**LOCKED**
 - Rollback 新建 release，完成要 post-readback
 
 累計 First Viewport 驗收：
-- Batch 1：12 pages
+- Batch 1：11 pages
 - Batch 2：12 pages
 - Batch 3：11 pages
 - Batch 4：10 pages
-- **已驗 45 / 54 pages**
-- 累計：44 LOCKED / 1 YELLOW / 0 RED
+- **已驗 44 / 53 pages**
+- 累計：44 LOCKED / 0 YELLOW / 0 RED
 
 下一 Batch：
 **門店設定 + 系統管理（9 pages）**
@@ -7807,28 +7691,26 @@ Status：**LOCKED**
 
 ---
 
-# 56.8 54 / 54 First Viewport 全局收口
+# 56.8 53 / 53 First Viewport 全局收口
 
 五個 Batch 已完成：
 
-- Batch 1：今日 + 訂單 + 菜單 = 12 pages
+- Batch 1：今日 + 訂單 + 菜單 = 11 pages
 - Batch 2：營運 + 平台／渠道 = 12 pages
 - Batch 3：打印 + 裝置 + 人員權限 = 11 pages
 - Batch 4：報表 + 發佈版本 = 10 pages
 - Batch 5：門店設定 + 系統管理 = 9 pages
 
 合計：
-**54 / 54 pages 已完成 First Viewport Acceptance**
+**53 / 53 pages 已完成 First Viewport Acceptance**
 
 最終狀態：
 - **53 LOCKED**
-- **1 YELLOW**
+- **0 YELLOW**
 - **0 RED**
 
-唯一 YELLOW：
-**訂單管理 → 售後／退款／取消／修正**
-只因：
-**Admin post-close Tender Correction = BACKEND_CONTRACT_GAP**
+訂單監察已全面只讀；
+取消訂單、退款、付款方式修正不屬 Admin。
 
 其餘 53 頁：
 Product position / First viewport / CTA hierarchy / Mobile / State / Authority 均已鎖定至可交 implementation。
@@ -7864,7 +7746,7 @@ First Viewport 盤點完成後，
    - Save / Publish / Applied 用詞完全分開
 
 MILESTONE:
-MFK_ADMIN_V3_FIRST_VIEWPORT_ACCEPTANCE_54_OF_54_COMPLETE
+MFK_ADMIN_V3_FIRST_VIEWPORT_ACCEPTANCE_53_OF_53_COMPLETE
 
 ---
 
@@ -7983,7 +7865,7 @@ Mobile：
 | 8 | 匹配失敗 | 商品映射 | External object + platform + issue | 修正後返 failure list / refresh | LOCKED |
 | 9 | 未發佈變更 | 原 Object Detail | Object + draft change identity | 返回未發佈變更原 filter | LOCKED |
 | 10 | 版本／Readback | 系統診斷 | Release + target + mismatch state | 返回同一 Version Detail | LOCKED |
-| 11 | 報表 drill-down | 訂單歷史／售後 | 日期 + scope + metric filter | 返回原 report range | LOCKED |
+| 11 | 報表 drill-down | 訂單歷史／訂單詳情 | 日期 + scope + metric filter | 返回原 report range | LOCKED |
 | 12 | Staff / Role Detail | 操作記錄 | Staff / role target + time context | 返回原 detail | LOCKED |
 
 ---
@@ -8232,7 +8114,7 @@ Status：**LOCKED**
 例：
 退款報表某日 $1,200
 → 撳該 breakdown
-→ 訂單管理 / 售後
+→ 訂單監察 / 售後
 
 帶：
 - date / Business Day
@@ -8426,130 +8308,36 @@ MFK_ADMIN_V3_CROSS_PAGE_INTERACTION_AUDIT_BATCH1_LOCKED
 
 ---
 
-# 58.2 Refund｜退款
+# 58.2 訂單交易 mutation｜明確不屬 Admin
 
-起點：
-**訂單管理 → 售後／退款／取消／修正**
-或
-**Order Detail → 售後**
+以下操作不屬 Admin：
+- 退款
+- 取消訂單
+- 付款方式修正
 
-路線：
+Admin 只可以：
+- 查看原 Order
+- 查看 current transaction result
+- 查看 linked refund / cancel / payment-correction record
+- 查看 Actor / Reason / Time / Evidence
+- 核對報表
+- 追蹤資料不一致
 
-Order
-→ 揀「退款」
-→ Preview
-→ Permission / Reason
-→ Confirm
-→ Execute
-→ Payment readback
-→ linked refund record
-→ Order Detail / After-sales refresh
+Admin 不可以顯示：
+- 確認退款
+- 取消訂單
+- 修正付款方式
+- 任何會改變 transaction truth 嘅執行按鈕
 
-Preview 必須見：
-- Original Order
-- Original tender/payment
-- Refundable amount
-- Proposed refund amount
-- destination / method
-- reason
-- current payment certainty
-- expected result
-
-Confirm copy：
-**確認退款 HK$X？**
-
-Impact copy：
-「原訂單會保留；系統會新增退款／沖正記錄。」
-
-Danger：
-- timeout / processor unknown 禁止 blind retry
-- 唔修改原 payment history
-- 唔自動 delete Order
-- 唔將 Refund request accepted 當 refund completed
-
-返回：
-- 完成後返同一 Order / After-sales case
-- 顯 current effective payment / refund state
-
-Status：**LOCKED**
-
----
-
-# 58.3 Cancel｜取消訂單
-
-起點：
-Order Detail / After-sales
-
-路線：
-
-Order facts
-→ 揀「取消訂單」
-→ Impact Preview
-→ Reason / Permission
-→ Confirm
-→ Execute
-→ Order readback
-→ dependent side-effects separately observed
-
-Preview 必須見：
-- current order state
-- fulfillment state
-- payment state
-- production / print side-effects
-- external platform state
-- cancel impact
-
-Confirm copy：
-**確認取消訂單 #0088？**
-
-Impact copy 必須講清：
-- 取消唔等於退款
-- 取消唔刪除訂單
-- 取消唔自動重印
-- 已發生 side-effect 可能仍存在
-
-Danger：
-- 唔喺 list row 一撳 cancel
-- payment refund 要獨立正式 workflow
-- external provider cancel acceptance 同 canonical Order state 分開
-
-Status：**LOCKED**
-
----
-
-# 58.4 Tender Correction｜付款方式修正
-
-起點：
-Order Detail / After-sales
-
-路線（產品規格）：
-
-Original tender
-→ Corrected tender
-→ Impact Preview
-→ Permission / Reason
-→ Confirm
-→ Execute
-→ authoritative readback
-→ effective tender refresh
-→ Audit
-
-硬規則：
-- SAME Order
-- zero new Order
-- preserve full history
-- zero auto reprint
-- zero auto drawer action
-
-日結後 Admin mutation：
-**BACKEND_CONTRACT_GAP**
+呢三類正式操作由交易操作端執行。
+Admin 等 canonical result，再顯示結果。
 
 因此：
-- Product route / form / preview 可以定義
-- 無正式 backend seam 時唔顯「正式執行成功」
-- Implementation 必須等 bounded authority
+- 原本 Admin Tender Correction BACKEND_CONTRACT_GAP 取消
+- 唔需要為 Admin 新增 transaction mutation API
+- 如果 Admin 出現呢啲 mutation，直接判 **Authority RED**
 
-Status：**YELLOW**
+Status：**LOCKED OUT OF ADMIN SCOPE**
 
 ---
 
@@ -8883,29 +8671,28 @@ UNKNOWN 時：
 
 # 58.15 Batch 2 結果
 
-本批驗 11 類高風險工作路線：
+本批驗 8 類 Admin 高風險工作路線，並鎖 3 類交易 mutation 為 OUT OF ADMIN SCOPE：
 
-1. Refund
-2. Cancel
-3. Tender Correction
-4. Publish
-5. Rollback
-6. Revoke Session / Trusted Device
-7. OTA
-8. Sellability
-9. Cash / Close
-10. Platform Pause / Resume
-11. Print Recovery
+Admin-owned high-risk：
+1. Publish
+2. Rollback
+3. Revoke Session / Trusted Device
+4. OTA
+5. Sellability
+6. Cash / Close
+7. Platform Pause / Resume
+8. Print Recovery
+
+OUT OF ADMIN SCOPE：
+- Refund
+- Cancel Order
+- Payment Method Correction
 
 結果：
-- **10 LOCKED**
-- **1 YELLOW**
+- **8 LOCKED**
+- **3 OUT OF ADMIN SCOPE**
+- **0 YELLOW**
 - **0 RED**
-
-唯一 YELLOW：
-**Tender Correction post-close Admin mutation**
-原因：
-**BACKEND_CONTRACT_GAP**
 
 其餘流程已鎖：
 - Preview
@@ -9731,7 +9518,7 @@ Status：**LOCKED**
 
 ## 每日營運
 - 今日
-- 訂單管理
+- 訂單監察
 - 營運管理
 
 ## 商品與渠道
@@ -9905,7 +9692,7 @@ Search / Saved View / Favorites / Recent 全部係：
 只開已支援 resource；
 需要新 read-only aggregation/search API 時標 BACKEND_CONTRACT_GAP。
 
-本批唔改 12 個大 Menu / 54 個第二步 destination。
+本批唔改 12 個大 Menu / 53 個第二步 destination。
 
 下一階段：
 **共用介面元件規格盤點**
@@ -9930,7 +9717,7 @@ MFK_ADMIN_V3_CROSS_PAGE_INTERACTION_AUDIT_BATCH4_LOCKED
 
 # 61. 共用介面元件規格盤點 V1｜核心元件
 
-本輪開始將 Admin V3 由「54 個定義清楚嘅頁面」收斂成「一套一致產品語言」。
+本輪開始將 Admin V3 由「53 個定義清楚嘅頁面」收斂成「一套一致產品語言」。
 
 核心原則：
 **同一類事情，全系統只准有一種主要表達方法。**
@@ -11820,6 +11607,9 @@ Status：**LOCKED**
 其後正常 UI 只用：
 **付款方式修正**
 
+Admin 只會用以上字眼顯示交易記錄；
+唔會提供「退款／取消訂單／付款方式修正」執行按鈕。
+
 禁止：
 - Correction
 - Tender
@@ -12020,8 +11810,6 @@ Status：**LOCKED**
 - 確認發佈
 - 開始今日營業
 - 準備收舖
-- 確認退款 HK$X
-- 取消訂單 #XXXX
 - 確認暫停 Keeta 接單
 - 恢復供應
 - 撤銷登入工作階段
@@ -12222,3 +12010,36 @@ Status：**LOCKED**
 
 MILESTONE:
 MFK_ADMIN_V3_COPY_TERMINOLOGY_AUDIT_BATCH1_LOCKED
+
+---
+
+# 65. Owner Authority Correction｜Admin 訂單只讀
+
+Owner 於 2026-09-30 明確重新鎖定：
+
+> Admin 負責成個資料流動、權威性、準確性。
+> 訂單喺 Admin 只係查看。
+> 取消訂單、退款等交易操作唔關 Admin。
+
+因此由本節起：
+
+1. 大 Menu 由「訂單管理」改為 **訂單監察**。
+2. 移除獨立「售後／退款／取消／修正」Admin workspace。
+3. Product Map 由 54 個第二步 destination 收斂為 **53 個**。
+4. Admin Order Detail 保留「交易變更記錄」，只讀。
+5. Refund / Cancel / Payment Method Correction 可以喺 Admin：
+   - 睇
+   - 搜
+   - 報表分析
+   - Audit
+   - Evidence / Readback
+   - Reconciliation
+   但 **唔可以執行**。
+6. 原先 Admin post-close Tender Correction BACKEND_CONTRACT_GAP 不再需要，因為個 mutation 本身已明確不屬 Admin。
+7. Admin 核心產品定位提升為：
+   **資料控制、配置治理、版本與發佈、同步與回讀、準確性核對、監察與追溯。**
+8. 任何 implementation 如果喺 Admin 加返 Cancel / Refund / Payment Correction transaction button：
+   **AUTOMATIC AUTHORITY RED。**
+
+MILESTONE:
+MFK_ADMIN_V3_ORDER_READ_ONLY_AUTHORITY_CORRECTION_LOCKED
