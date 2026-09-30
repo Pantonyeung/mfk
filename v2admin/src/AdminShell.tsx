@@ -98,8 +98,8 @@ function AdminSyncTopState(){
 
   return <div className="mfk-admin-topstate" data-tone={tone} aria-live="polite">
     <AdminStatusBadge tone={tone}>{title}</AdminStatusBadge>
-    <span>{detail}</span>
-    <code className="mfk-admin-runtime-diag" data-admin-runtime-diag="R4">{'R4 '+source+' · '+status.state+' · Q'+diagnostic.outboxCount+' · C'+canonical+(diagnostic.outboxCount?' · O'+queued:'')}</code>
+    <span className="mfk-admin-sync-detail">{detail}</span>
+    <code className="mfk-admin-runtime-diag" data-admin-runtime-diag="R4">{'R4 '+source+' Q'+diagnostic.outboxCount+' C'+canonical+(diagnostic.outboxCount?' O'+queued:'')}</code>
   </div>;
 }
 
