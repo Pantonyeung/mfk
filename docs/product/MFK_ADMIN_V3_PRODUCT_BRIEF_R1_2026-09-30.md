@@ -11587,3 +11587,638 @@ Status：**LOCKED**
 
 MILESTONE:
 MFK_ADMIN_V3_COMPONENT_CONTRACT_AUDIT_BATCH3_LOCKED
+
+---
+
+# 64. 文字與術語一致性盤點 V1｜Batch 1：正式中文字典 / 狀態 / 動詞
+
+本輪開始鎖全產品正式中文用詞。
+
+核心原則：
+**正常使用者先睇人話；工程術語只留內部 contract、程式碼、進階詳情同系統診斷。**
+
+如果本節同前文英文描述有衝突：
+**本節對「使用者可見文字」優先。**
+
+英文 internal state / code name 可以保留，
+但正式 UI 不應直接顯示。
+
+---
+
+# 64.1 儲存 / 草稿 / 發佈 / 套用｜四層必須分開
+
+正式 UI 中文：
+
+| 內部語義 | 正式顯示 |
+|---|---|
+| Save Draft | **儲存草稿** |
+| Draft | **草稿** |
+| Pending Changes | **未發佈變更** |
+| Validate | **檢查完整性** |
+| Impact Preview | **影響預覽** |
+| Publish | **發佈** |
+| Publishing | **發佈中** |
+| Cloud Published | **雲端已發佈** |
+| Target Applied | **目標已套用** |
+| Readback | **回讀確認** |
+| Rollback | **回復版本** |
+
+硬規則：
+
+**儲存草稿 ≠ 發佈 ≠ 雲端已發佈 ≠ 目標已套用**
+
+Button：
+- 「儲存草稿」
+- 「檢查並發佈」
+- 「確認發佈」
+- 「查看回讀確認」
+- 「回復至此版本」
+
+禁止正常 UI：
+- Save
+- Apply
+- Publish Now
+- Sync Done
+- Applied
+
+單獨英文顯示。
+
+Status：**LOCKED**
+
+---
+
+# 64.2 資料狀態正式字典
+
+| Internal | 正式中文 | 使用時機 |
+|---|---|---|
+| INITIAL_LOADING | **正在讀取…** | 首次讀取，未有成功資料 |
+| READY | **正常 / 可使用** | 按 domain 用具體 business wording |
+| REFRESHING | **更新中** | 保留舊成功資料 |
+| EMPTY | **目前未有資料** | Query 成功而結果真係為空 |
+| STALE | **資料過期** | 有舊資料但 freshness 超界 |
+| OFFLINE_WITH_DATA | **離線 · 顯示上次成功資料** | 離線但仍有舊資料 |
+| OFFLINE_EMPTY | **離線 · 未有可顯示資料** | 離線而無舊資料 |
+| SUBMITTING | **正在處理…** | command 正在送出 |
+| PENDING | **已送出 · 等待確認** | 已接受，但未有 authoritative result |
+| UNKNOWN | **結果未明 · 正在重新確認** | 無足夠證據判成功 / 失敗 |
+| PARTIAL | **部分完成 · 需要處理** | 一部分已確認，一部分未完成 |
+| CONFIRMED | **已確認** | 有正式回讀 / evidence |
+| FAILED | **操作失敗** | 有明確 failure evidence |
+| CONFLICT | **資料已更新 · 請重新讀取後再套用** | version / state conflict |
+| UNAUTHORIZED | **你目前沒有權限進行此操作** | 正式 authz 拒絕 |
+| FATAL | **暫時無法繼續此工作** | 頁面 / workflow 無法安全繼續 |
+
+硬規則：
+- UNKNOWN ≠ FAILED
+- STALE ≠ OFFLINE
+- EMPTY ≠ ERROR
+- PARTIAL ≠ SUCCESS
+- PENDING ≠ CONFIRMED
+
+Status：**LOCKED**
+
+---
+
+# 64.3 「正常」一定要用業務語言
+
+唔應該全產品都顯一個 generic「正常」。
+
+按 domain 顯：
+
+## 訂單
+- 進行中
+- 可取餐
+- 已完成
+- 已取消
+- 結果未明
+
+## 付款
+- 已付款
+- 待付款
+- 退款中
+- 已退款
+- 結果未明
+
+## 平台／渠道
+- 接單中
+- 已暫停接單
+- 繁忙
+- 未完成設定
+- 連線異常
+- 結果未明
+
+## 商品
+- 可售
+- 暫停售罄
+- 已停用
+- 未到供應時間
+- 結果未明
+
+## 打印
+- 已確認打印
+- 等待確認
+- 部分完成
+- 打印失敗
+- 結果未明
+
+## 裝置
+- 可用
+- 要留意
+- 資料過期
+- 無法連線
+- 結果未明
+
+Status：**LOCKED**
+
+---
+
+# 64.4 營業額 / 銷售正式用詞
+
+正式 UI 主詞：
+**有效營業額**
+
+Internal / English：
+Effective Sales
+
+首頁：
+**今日有效營業額**
+
+報表：
+**有效營業額**
+
+禁止混用：
+- Net Sales
+- Revenue
+- Turnover
+- 收款總額
+- 平台實收
+
+去代表同一 metric。
+
+相關正式詞：
+
+| 概念 | 正式中文 |
+|---|---|
+| Orders | 訂單數 |
+| AOV | 平均客單價 |
+| Adjustments | 調整 |
+| Refund | 退款 |
+| Cash Sales | 現金營業額 |
+| Merchant Earnings | 商戶實收 / 預計實收（視 evidence） |
+| Settlement | 平台結算 / 對帳 |
+
+「商戶實收」唔可以叫「營業額」。
+
+Status：**LOCKED**
+
+---
+
+# 64.5 Business Day 正式用詞
+
+正常 UI：
+**營業日**
+
+Setting：
+**營業日分界**
+
+Workflow：
+- 開始今日營業
+- 營業中
+- 準備收舖
+- 收舖處理中
+- 已完成
+
+Advanced / technical detail 可以：
+**營業日（Business Day）**
+
+正常 page title / button 禁止只寫 Business Day。
+
+Status：**LOCKED**
+
+---
+
+# 64.6 訂單 / 售後正式用詞
+
+正式中文：
+
+| Internal / Existing | 正式 UI |
+|---|---|
+| Order Detail | 訂單詳情 |
+| Active Orders | 進行中訂單 |
+| Order History | 訂單歷史 |
+| After-sales | 售後 |
+| Refund | 退款 |
+| Cancel Order | 取消訂單 |
+| Tender Correction | **付款方式修正** |
+| Exception | 訂單異常 |
+| Fulfillment | 履約狀態 |
+| Timeline | 時間線 |
+
+第一次需要工程對照時可以：
+「付款方式修正（Tender Correction）」
+
+其後正常 UI 只用：
+**付款方式修正**
+
+禁止：
+- Correction
+- Tender
+- Fulfillment
+
+單獨放喺一般使用者頁面。
+
+Status：**LOCKED**
+
+---
+
+# 64.7 平台 / 渠道正式用詞
+
+正式大 Menu：
+**平台／渠道管理**
+
+正式頁名：
+- 平台總覽
+- 接單規則
+- 供應同步
+- 門店綁定
+- 商品映射
+- 匹配失敗
+- 實收估算
+- 平台對帳
+
+Internal：
+Channel / Provider / Integration 可以留 contract。
+
+正常 UI：
+- Platform 可以顯品牌名，例如 Keeta
+- Provider status code 唔直接顯
+
+正式狀態：
+- 接單中
+- 已暫停接單
+- 繁忙
+- 平台異常
+- 連線異常
+- 未完成設定
+- 結果未明
+
+禁止一粒：
+**Online / Offline**
+
+代表以上全部概念。
+
+Status：**LOCKED**
+
+---
+
+# 64.8 商品 / 菜單正式用詞
+
+正式 UI：
+
+| 概念 | 正式中文 |
+|---|---|
+| Product | 商品 |
+| Product Code | 商品編號 |
+| Category | 分類 |
+| Modifier / Option Set | 選項／口味組 |
+| Option | 選項／口味 |
+| Combo | 套餐 |
+| Base Price | 基本價格 |
+| Display Order | 顯示次序 |
+| Active | 啟用 |
+| Sellability | 可售狀態 |
+| Sold Out | 售罄 |
+
+Page title 可以保留：
+**產品管理**
+因為現有 Product Map 已鎖。
+
+但頁內 object 用詞優先：
+**商品**
+
+例如：
+- 新增商品
+- 商品名稱
+- 商品編號
+
+如果要保持既有 Page title：
+「產品管理」可視為 domain 名，
+「商品」係操作 object 名。
+
+Status：**LOCKED**
+
+---
+
+# 64.9 打印正式用詞
+
+正式 UI：
+
+| Internal | 正式中文 |
+|---|---|
+| Logical Printer | 邏輯打印機 |
+| Physical Printer | 實體打印機 |
+| Print Template | 打印模板 |
+| Print Rule | 打印規則 |
+| Print Job | 打印工作 / 打印記錄（按畫面） |
+| Production Ticket | 製作單 |
+| Packing Ticket | 打包單 |
+| Receipt | 收據 |
+| Label | 標籤 |
+| Reprint | 重印 |
+
+規則：
+- 普通 UI 唔用 route / endpoint / job attempt 作主標題
+- 技術 detail 可以保留 PrintJob / attempt ID
+
+「打印結果未明」
+唔寫：
+「Printer Error」
+除非有明確 failure evidence。
+
+Status：**LOCKED**
+
+---
+
+# 64.10 裝置 / 登入 / 權限正式用詞
+
+正式 UI：
+
+| Internal | 正式中文 |
+|---|---|
+| Device | 裝置 |
+| Device Health | 裝置狀態 |
+| Runtime Version | 執行版本 / 目前版本 |
+| OTA | OTA／版本更新 |
+| Session | 登入工作階段 |
+| Trusted Device | 受信任裝置 |
+| Role | 角色 |
+| Permission | 權限 |
+| Scope | 管理範圍 |
+| Revoke Session | 撤銷登入工作階段 |
+
+正常頁面唔用：
+- principal
+- authz
+- scope ID
+- session token
+
+Advanced / Diagnostics 先顯 technical identity。
+
+Status：**LOCKED**
+
+---
+
+# 64.11 系統治理正式用詞
+
+正式 UI：
+
+| Internal | 正式中文 |
+|---|---|
+| Audit | 操作記錄 |
+| Diagnostics | 系統診斷 |
+| Integration | 系統整合 |
+| Effective Settings | 實際生效設定 |
+| Readback | 回讀確認 |
+| Mismatch | 不一致 |
+| Match | 一致 |
+| Reconcile | 重新核對 / 重新收斂（按畫面） |
+| Evidence | 證據 |
+| First Break | 第一個異常點 |
+
+Page title：
+現有「進階／Effective Settings」
+正式 UI 建議改：
+**進階／實際生效設定**
+
+Internal contract 仍可叫 Effective Settings。
+
+Status：**LOCKED**
+
+---
+
+# 64.12 Button 動詞正式字典
+
+## 導航
+- 查看
+- 查看詳情
+- 返回列表
+- 前往產品管理
+- 前往打印管理
+- 前往系統診斷
+
+## 新增 / 編輯
+- 新增商品
+- 新增分類
+- 新增角色
+- 編輯
+- 儲存草稿
+- 取消
+
+## 工作流程
+- 檢查完整性
+- 查看影響
+- 確認發佈
+- 開始今日營業
+- 準備收舖
+- 確認退款 HK$X
+- 取消訂單 #XXXX
+- 確認暫停 Keeta 接單
+- 恢復供應
+- 撤銷登入工作階段
+- 回復至此版本
+
+## 讀取 / 復原
+- 重新讀取
+- 重新確認狀態
+- 查看證據
+- 查看回讀確認
+
+禁止作主要 Button：
+- OK
+- Go
+- Apply
+- Fix
+- Action
+- More
+- Yes
+- Retry（除非正式 safe retry contract，而且中文要具體）
+
+Status：**LOCKED**
+
+---
+
+# 64.13 「取消」文字要分兩種
+
+Dialog secondary action：
+**取消**
+
+Order business action：
+**取消訂單**
+
+唔可以只寫：
+「取消」
+令使用者唔知係關閉視窗定取消交易。
+
+退款：
+**退款**
+
+付款方式修正：
+**付款方式修正**
+
+三者唔互相代替。
+
+Status：**LOCKED**
+
+---
+
+# 64.14 Freshness 正式表達
+
+正常 UI 唔顯字：
+Freshness
+
+正式顯：
+- 最後更新：19:42
+- 最後確認：19:42
+- 資料過期
+- 顯示上次成功資料
+
+視 domain 分：
+- Read model → 最後更新
+- Mutation / Apply → 最後確認
+- Publish → 發佈時間
+- Integration → 最後成功同步 / 讀取
+
+Cloud publish：
+正式時間來源：
+**publishedAt**
+
+正常 UI label：
+**發佈時間**
+
+Status：**LOCKED**
+
+---
+
+# 64.15 技術術語曝光層級
+
+## 第一層：普通使用者
+只顯：
+- 發生咩事
+- 影響乜
+- 下一步
+- 最後更新 / 確認
+
+## 第二層：Manager / Owner Detail
+可以顯：
+- Version
+- Source
+- Scope
+- Desired / Observed 摘要
+
+## 第三層：Diagnostics / Advanced
+先顯：
+- UUID
+- operation ID
+- correlation ID
+- provider code
+- endpoint
+- raw-ish error
+- technical key
+
+禁止第一層直接 dump 工程資料。
+
+Status：**LOCKED**
+
+---
+
+# 64.16 頁面名稱統一規則
+
+Sidebar 細 Menu 名 = Page Title。
+
+例：
+Sidebar：
+「商品映射」
+
+Page Title：
+「商品映射」
+
+唔可以：
+Sidebar 叫「商品映射」
+入頁後突然叫「External Product Mapping Center」。
+
+Detail：
+用 object identity：
+「紫米飯團」
+副標：
+商品詳情
+
+而唔係：
+Product Detail Page。
+
+Status：**LOCKED**
+
+---
+
+# 64.17 語氣規則
+
+MFK Admin 正常 UI：
+- 短
+- 清楚
+- 專業
+- 無工程腔
+- 唔說教
+- 唔用大量感嘆號
+- 唔用「恭喜！」
+- 唔用模糊鼓勵文案代替狀態
+
+好：
+「資料過期 · 最後更新 19:32」
+
+差：
+「哎呀！看來資料可能有點舊，請稍後再試！」
+
+好：
+「結果未明 · 正在重新確認」
+
+差：
+「操作似乎失敗了」
+
+Status：**LOCKED**
+
+---
+
+# 64.18 Batch 1 結果
+
+本輪鎖：
+1. 草稿 / 發佈 / 套用 / 回讀
+2. 全局資料狀態字典
+3. Domain-specific status wording
+4. 營業額 / 銷售
+5. 營業日
+6. 訂單 / 售後
+7. 平台 / 渠道
+8. 商品 / 菜單
+9. 打印
+10. 裝置 / 登入 / 權限
+11. 系統治理
+12. Button 動詞
+13. 「取消」消歧義
+14. Freshness 顯示
+15. 技術術語曝光層級
+16. Page Title 規則
+17. 語氣規則
+
+結果：
+- **17 LOCKED**
+- **0 YELLOW**
+- **0 RED**
+
+下一輪：
+**文字與術語一致性盤點 Batch 2：54 頁 Page Title / CTA / Empty / Error / Confirm Copy 矩陣**
+
+目的：
+將正式字典逐頁套落去，
+捉出任何殘留英文、同義詞、模糊 Button、危險確認文案。
+
+MILESTONE:
+MFK_ADMIN_V3_COPY_TERMINOLOGY_AUDIT_BATCH1_LOCKED
