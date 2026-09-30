@@ -1,3 +1,24 @@
+# ADMIN V3 PRODUCT GATE｜2026-09-30
+
+Controlling candidate product brief:
+`docs/product/MFK_ADMIN_V3_PRODUCT_BRIEF_R1_2026-09-30.md`
+
+Product control:
+#601
+
+Owner direction:
+- lock complete Admin functionality + IA + UI before further implementation;
+- stop A1/A2 incremental implementation roadmap;
+- rebuild Admin V3 once as one isolated product program;
+- v2 Production remains live until full V3 preview/physical acceptance.
+
+Current implementation status:
+- A0 foundation remains merged.
+- PR #599 A1 is frozen / not to merge while #601 is pending approval.
+- #600 A2 incremental spec is superseded as implementation roadmap by #601.
+
+---
+
 # SYSTEM-WIDE CURRENT AUTHORITY｜2026-09-30｜R2
 
 Parallel Web Client Rebirth:
