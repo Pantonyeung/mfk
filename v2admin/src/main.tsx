@@ -7,6 +7,8 @@ import './styles.css';
 import './admin-control-plane.css';
 
 
+window.addEventListener('pageshow',event=>{if(event.persisted)window.location.reload();});
+
 const root=document.getElementById('root');
 if(!root)throw new Error('MFK_ADMIN_ROOT_MISSING');
 

@@ -1,29 +1,30 @@
 {
   "version": 1,
-  "capability": "MFK_ADMIN_BOOTSTRAP_SYNC_STATE_R1",
-  "base_sha": "cae974bfe356783ecaa2df753a5e7e14e4aedb31",
+  "capability": "MFK_ADMIN_BOOTSTRAP_FRESHNESS_R2",
+  "base_sha": "cd483bb38ac612689399463b56549505b2bffa86",
   "allowed_paths": [
     ".github/mfk-change-manifest.json",
-    "v2admin/src/AdminCanonicalBootstrap.tsx",
-    "v2admin/src/admin-canonical-normal-browser.test.ts",
-    "v2admin/src/admin-sync-client.ts"
+    "v2admin/wrangler.jsonc",
+    "v2admin/worker.ts",
+    "v2admin/src/main.tsx",
+    "v2admin/src/admin-shell-freshness-r2.test.ts"
   ],
-  "authority_impact": "NONE_ADMIN_REMAINS_SOLE_CANONICAL_DATA_AUTHORITY",
-  "persistence_impact": "SYNC_STATUS_ONLY_NO_DATA_SCHEMA_MIGRATION",
+  "authority_impact": "NONE_ADMIN_REMAINS_CANONICAL",
+  "persistence_impact": "NONE",
   "provider_impact": "NONE",
   "transaction_impact": "NONE",
   "expected_behavior_change": [
-    "Opening Admin reconciles the visible sync status to the cloud canonical active publish even when local data already matches it.",
-    "Opening Admin never interprets cached release history as a new formal publish command.",
-    "Only an explicit new Admin release event queues a new formal publish; startup only resumes an already queued outbox."
+    "Admin HTML/navigation requests run through the Worker before static asset serving.",
+    "Navigation HTML is served with no-store/no-cache headers and exact source SHA.",
+    "Hashed assets remain on the direct asset path.",
+    "Safari bfcache-restored Admin pages reload once."
   ],
   "non_goals": [
-    "No Customer, Owner, SMM or SMT change.",
-    "No browser cache policy change.",
-    "No Keeta change.",
-    "No polling change.",
-    "No OTA."
+    "No Customer/Owner/SMM/SMT change.",
+    "No Admin data model change.",
+    "No polling.",
+    "No provider change."
   ],
-  "rollback_sha": "cae974bfe356783ecaa2df753a5e7e14e4aedb31",
+  "rollback_sha": "cd483bb38ac612689399463b56549505b2bffa86",
   "severity": "HARD_BLOCK"
 }

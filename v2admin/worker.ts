@@ -35,6 +35,19 @@ export function adminSyncOuterResponse(pathname,response,request){
   for(const [key,value] of Object.entries(cors(request)))headers.set(key,value);
   return new Response(response.body,{status:response.status,statusText:response.statusText,headers});
 }
+
+export function adminShellResponse(response,request,sourceSha='UNKNOWN'){
+  const headers=new Headers(response.headers);
+  const type=String(headers.get('content-type')||'').toLowerCase();
+  const acceptsHtml=String(request.headers.get('accept')||'').toLowerCase().includes('text/html');
+  if(type.includes('text/html')||acceptsHtml){
+    headers.set('cache-control','no-store, no-cache, must-revalidate, max-age=0');
+    headers.set('pragma','no-cache');
+    headers.set('expires','0');
+    headers.set('x-mfk-source-sha',String(sourceSha||'UNKNOWN'));
+  }
+  return new Response(response.body,{status:response.status,statusText:response.statusText,headers});
+}
 async function sha256(value){
   const bytes=new TextEncoder().encode(value);
   const digest=await crypto.subtle.digest('SHA-256',bytes);
@@ -2264,6 +2277,7 @@ export default {
       return adminSyncOuterResponse(url.pathname,response,request);
     }
     if(url.pathname==='/api/health')return json({ok:true,service:'mfk-admin',sourceSha:String(env.MFK_SOURCE_SHA||'UNKNOWN')});
-    return env.ASSETS.fetch(request);
+    const asset=await env.ASSETS.fetch(request);
+    return adminShellResponse(asset,request,String(env.MFK_SOURCE_SHA||'UNKNOWN'));
   },
 };
