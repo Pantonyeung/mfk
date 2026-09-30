@@ -5,6 +5,7 @@
   "compatibility_date": "2026-09-25",
   "workers_dev": true,
   "preview_urls": true,
+  "version_metadata": {"binding": "MFK_VERSION"},
   "keep_vars": true,
   "secrets": {
     "required": ["WEB_SMT_ACCEPTANCE_TOKEN"]
