@@ -1,4 +1,4 @@
-import {createMfkAdminConfigEnvelope,validateMfkAdminConfigAck,validateMfkAdminConfigEnvelope} from '../contracts/admin-config-sync-v1.ts';
+import {createMfkAdminConfigEnvelope,mfkHongKongIso,validateMfkAdminConfigAck,validateMfkAdminConfigEnvelope} from '../contracts/admin-config-sync-v1.ts';
 import {validateSmtProjectionBatch} from '../contracts/smt-projection-v1.ts';
 import {MFK_ADMIN_REFUND_SCHEMA,validateAdminRefundEvent} from '../contracts/admin-refund-v1.ts';
 import {KeetaRuntimeStore} from './keeta-runtime.ts';
@@ -970,28 +970,25 @@ export class AdminSyncStore{
     await this.state.storage.put(key,{...session,staffId:value.staffId,lastSeenAt:value.lastSeenAt});return value;
   }
   async publishEnvelope(envelope){
-    const current=await this.state.storage.get('active');
-    const currentMeta=await this.state.storage.get('activeMeta')||{};
-
-    // Exact retry of the same formal Admin publish is idempotent.
-    if(current&&String(currentMeta.publishRequestFingerprint||'')===String(envelope.fingerprint||'')){
+    const requestKey='admin:publish-request:'+String(envelope.fingerprint||'');
+    const prior=await this.state.storage.get(requestKey);
+    if(prior?.active){
       return{
         status:200,
         body:{
           state:'IDEMPOTENT',
-          active:current,
+          active:prior.active,
           publishRequestFingerprint:envelope.fingerprint,
-          cloudPublishedAt:String(current.publishedAt||currentMeta.cloudPublishedAt||''),
+          cloudPublishedAt:prior.cloudPublishedAt,
         },
       };
     }
 
-    // Cloudflare accepted time is the only delivery ordering clock.
-    // Every distinct formal publish receives a strictly increasing canonical time.
+    const current=await this.state.storage.get('active');
     const nowMs=Date.now();
     const currentMs=current?Date.parse(String(current.publishedAt||'')):Number.NEGATIVE_INFINITY;
     const canonicalMs=Number.isFinite(currentMs)?Math.max(nowMs,currentMs+1):nowMs;
-    const cloudPublishedAt=new Date(canonicalMs).toISOString();
+    const cloudPublishedAt=mfkHongKongIso(canonicalMs);
     const canonical=createMfkAdminConfigEnvelope({
       storeId:envelope.storeId,
       revision:envelope.revision,
@@ -1000,6 +997,11 @@ export class AdminSyncStore{
       snapshot:envelope.snapshot,
     });
 
+    const receipt={
+      active:canonical,
+      cloudPublishedAt,
+      publishRequestFingerprint:envelope.fingerprint,
+    };
     await this.state.storage.put('active',canonical);
     await this.state.storage.put('activeMeta',{
       revision:canonical.revision,
@@ -1009,13 +1011,8 @@ export class AdminSyncStore{
       sourcePublishedAt:envelope.publishedAt,
       cloudPublishedAt,
     });
-    await this.state.storage.put('admin:published:'+canonical.fingerprint,{
-      fingerprint:canonical.fingerprint,
-      publishedAt:canonical.publishedAt,
-      revision:canonical.revision,
-      adminFingerprint:canonical.adminFingerprint,
-      publishRequestFingerprint:envelope.fingerprint,
-    });
+    await this.state.storage.put(requestKey,receipt);
+    await this.state.storage.put('admin:published:'+canonical.fingerprint,receipt);
 
     const doorbell=JSON.stringify({
       type:'ADMIN_CONFIG_AVAILABLE',
@@ -1599,6 +1596,27 @@ export class AdminSyncStore{
       const active=await this.state.storage.get('active');
       return active?json(active):json({code:'ADMIN_CONFIG_NOT_PUBLISHED'},404);
     }
+    if(url.pathname==='/published'){
+      if(request.method!=='GET')return json({code:'METHOD_NOT_ALLOWED'},405);
+      const fingerprint=String(url.searchParams.get('fingerprint')||'').trim();
+      if(!fingerprint)return json({code:'ADMIN_CONFIG_PUBLISHED_FINGERPRINT_REQUIRED'},400);
+      const published=await this.state.storage.get('admin:published:'+fingerprint);
+      return published?.active?json(published.active):json({code:'ADMIN_CONFIG_PUBLISHED_NOT_FOUND'},404);
+    }
+    if(url.pathname==='/published-since'){
+      if(request.method!=='GET')return json({code:'METHOD_NOT_ALLOWED'},405);
+      const after=String(url.searchParams.get('after')||'').trim();
+      const afterMs=Date.parse(after);
+      if(!Number.isFinite(afterMs))return json({code:'ADMIN_CONFIG_PUBLISHED_AFTER_INVALID'},400);
+      const stored=await this.state.storage.list({prefix:'admin:published:'});
+      const items=[...stored.values()]
+        .map(value=>value?.active)
+        .filter(Boolean)
+        .filter(value=>Date.parse(String(value.publishedAt||''))>afterMs)
+        .sort((a,b)=>Date.parse(String(a.publishedAt||''))-Date.parse(String(b.publishedAt||'')))
+        .slice(0,200);
+      return json({items,after,count:items.length});
+    }
     if(url.pathname==='/publish'){
       if(request.method!=='POST')return json({code:'METHOD_NOT_ALLOWED'},405);
       if(!await this.authorizePublish(request))return json({code:'ADMIN_CONFIG_PUBLISH_UNAUTHORIZED'},401);
@@ -1614,13 +1632,14 @@ export class AdminSyncStore{
       try{ack=validateMfkAdminConfigAck(await request.json());}
       catch(error){return json({code:error instanceof Error?error.message:'ADMIN_CONFIG_ACK_INVALID'},400);}
       const published=await this.state.storage.get('admin:published:'+ack.fingerprint);
-      if(!published)return json({code:'ADMIN_CONFIG_ACK_UNKNOWN_PUBLISH',fingerprint:ack.fingerprint},409);
-      if(ack.publishedAt!==published.publishedAt){
-        return json({code:'ADMIN_CONFIG_ACK_PUBLISH_TIME_MISMATCH',expectedPublishedAt:published.publishedAt},409);
+      if(!published?.active)return json({code:'ADMIN_CONFIG_ACK_UNKNOWN_PUBLISH',fingerprint:ack.fingerprint},409);
+      if(ack.publishedAt!==published.active.publishedAt){
+        return json({code:'ADMIN_CONFIG_ACK_PUBLISH_TIME_MISMATCH',expectedPublishedAt:published.active.publishedAt},409);
       }
       const acks=await this.state.storage.get('acks')||{};
       acks[ack.deviceId]=ack;
       await this.state.storage.put('acks',acks);
+      await this.state.storage.put('admin:ack:'+ack.fingerprint+':'+ack.deviceId,ack);
       return json({state:'ACKED',ack});
     }
     if(url.pathname==='/acks'){
