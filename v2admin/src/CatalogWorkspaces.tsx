@@ -41,7 +41,7 @@ function WorkspaceHeader({
     setActive({version:result.release.version,createdAt:result.release.createdAt,fingerprint:result.release.fingerprint});
     setSaveErrors([]);
     setValidated(false);
-    setSaveMessage('已保存 · '+hkTime(result.release.createdAt)+'（香港時間）');
+    setSaveMessage('已保存；等待 Cloud 香港時間正式發佈。');
   };
   const unsaved=dirty||optionDirty;
   const errors=saveErrors.length?saveErrors:validationErrors;
