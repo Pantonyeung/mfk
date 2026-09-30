@@ -1593,9 +1593,10 @@ export class AdminSyncStore{
         return json({code:'ADMIN_CONFIG_ACK_MISMATCH',expectedRevision:active.revision,expectedFingerprint:active.fingerprint},409);
       }
       const acks=await this.state.storage.get('acks')||{};
-      acks[ack.deviceId]=ack;
+      const readback={...ack,readbackAt:new Date().toISOString()};
+      acks[ack.deviceId]=readback;
       await this.state.storage.put('acks',acks);
-      return json({state:'ACKED',ack});
+      return json({state:'ACKED',ack:readback});
     }
     if(url.pathname==='/acks'){
       const acks=await this.state.storage.get('acks')||{};
