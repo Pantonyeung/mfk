@@ -12319,3 +12319,311 @@ MFK_ADMIN_V3_ORDER_READ_ONLY_AUTHORITY_CORRECTION_LOCKED
 
 MILESTONE:
 MFK_ADMIN_V3_COPY_TERMINOLOGY_AUDIT_BATCH2_54_PAGE_MATRIX_LOCKED
+
+---
+
+# 66. 文字與術語一致性盤點 V1｜Batch 3：全文殘留英文 / 同義詞 / 舊名稱清理
+
+本輪做全文清理收口。
+
+原則：
+**英文可以留喺 internal contract / code / engineering evidence；使用者可見 UI 以正式中文為準。**
+
+本輪唔重寫歷史研究段落，
+而係建立一層明確「UI 顯示優先規則」，
+避免 implementation 將舊英文直接搬入畫面。
+
+---
+
+## 66.1 只可內部使用嘅英文詞
+
+以下可以保留喺：
+- 程式碼
+- API / schema
+- internal state
+- engineering note
+- diagnostics advanced evidence
+
+但唔應直接做普通 UI label：
+
+- Save Draft
+- Apply
+- Publish
+- Published
+- Applied
+- Readback
+- UNKNOWN
+- FAILED
+- STALE
+- PENDING
+- CONFIRMED
+- MATCH
+- MISMATCH
+- Product
+- Order Detail
+- Tender Correction
+- Fulfillment
+- Business Day
+- Session
+- Trusted Device
+- Effective Settings
+- Diagnostics
+- Audit
+- Provider
+- Integration
+- Mapping Resolver
+- Settlement Truth
+- First Break
+
+正式 UI 一律跟 §64–§65 中文字典。
+
+Status：**LOCKED**
+
+---
+
+## 66.2 同義詞收斂
+
+### 有效營業額
+只用：
+**有效營業額**
+
+唔用以下字眼代表同一 metric：
+- Revenue
+- Turnover
+- Net Sales
+- 收款總額
+- 平台實收
+
+### 商品
+Object UI 用：
+**商品**
+
+Domain Page 可以保留：
+**產品管理**
+
+### 付款方式修正
+只用：
+**付款方式修正**
+
+唔用：
+- Tender Correction
+- Correction
+- 修改付款
+- 更正支付方式
+
+### 營業日
+只用：
+**營業日**
+
+設定：
+**營業日分界**
+
+### 回讀確認
+只用：
+**回讀確認**
+
+唔用：
+- Verify
+- Readback
+- Check applied
+作正常主標題。
+
+### 實際生效設定
+正常 UI：
+**實際生效設定**
+
+Sidebar / Page：
+**進階／實際生效設定**
+
+Status：**LOCKED**
+
+---
+
+## 66.3 動詞清理
+
+正常 UI 禁止模糊主要 Button：
+
+- OK
+- Go
+- More
+- Action
+- Fix
+- Apply
+- Yes
+- Retry
+
+改用具體動詞：
+
+- 查看詳情
+- 前往原設定頁
+- 儲存草稿
+- 檢查完整性
+- 查看影響
+- 確認發佈
+- 重新讀取
+- 重新確認狀態
+- 確認退款 HK$X
+- 取消訂單 #XXXX
+- 確認暫停平台接單
+- 恢復供應
+- 撤銷登入工作階段
+- 回復至此版本
+
+「Retry」只有喺正式 safe-retry contract 成立時先存在，
+而且顯示具體中文動作。
+
+Status：**LOCKED**
+
+---
+
+## 66.4 狀態文字清理
+
+使用者可見狀態禁止直接顯：
+
+- UNKNOWN
+- FAILED
+- STALE
+- PENDING
+- MATCH
+- MISMATCH
+- PARTIAL
+
+正式顯示：
+
+- 結果未明 · 正在重新確認
+- 操作失敗
+- 資料過期
+- 已送出 · 等待確認
+- 一致
+- 不一致
+- 部分完成 · 需要處理
+
+Internal code 可以維持英文 enum。
+
+Status：**LOCKED**
+
+---
+
+## 66.5 「Online / Connected / Ready」清理
+
+以下英文唔可以作 generic 成功狀態：
+
+- Online
+- Connected
+- Ready
+- Healthy
+- Synced
+
+因為每個 domain 語義唔同。
+
+正式 UI 要講具體 business state，例如：
+
+- 接單中
+- 裝置可用
+- 已連接
+- 已同步
+- 已套用
+- 已確認打印
+
+禁止：
+一個綠色「Online」代表以上全部。
+
+Status：**LOCKED**
+
+---
+
+## 66.6 「Cancel」清理
+
+UI 有兩種完全不同意思：
+
+1. 關閉 / 中止當前 UI：
+   **取消**
+
+2. 取消交易：
+   **取消訂單**
+
+因此 implementation 禁止：
+用一粒「取消」按鈕去代表訂單取消。
+
+Status：**LOCKED**
+
+---
+
+## 66.7 Menu / Page title 最終正式表
+
+12 個大 Menu：
+
+1. 今日
+2. 訂單管理
+3. 菜單管理
+4. 營運管理
+5. 平台／渠道管理
+6. 打印管理
+7. 裝置管理
+8. 人員與權限
+9. 報表
+10. 發佈與版本
+11. 門店設定
+12. 系統管理
+
+54 個第二步 Page Title 以 §65 為唯一 UI 顯示基準。
+
+任何舊英文 heading 只作 internal reference，
+唔可直接進 Sidebar / Page Header。
+
+Status：**LOCKED**
+
+---
+
+## 66.8 Implementation Copy Dictionary
+
+正式獨立文件：
+
+**docs/product/MFK_ADMIN_V3_COPY_DICTIONARY_V1_2026-09-30.md**
+
+用途：
+- 前端直接取正式文字
+- Reviewer 用作文案驗收
+- 減少每頁自行翻譯
+- 減少同義詞漂移
+
+此文件同 Product Brief §64–§66 同步。
+
+---
+
+## 66.9 Batch 3 結果
+
+本輪完成：
+- 全文英文殘留分類
+- UI / internal 邊界
+- 同義詞收斂
+- 動詞收斂
+- 狀態文字收斂
+- Online / Connected / Ready 語義清理
+- Cancel 消歧義
+- Menu / Page title 最終規則
+- implementation-ready Copy Dictionary
+
+結果：
+- **8 LOCKED**
+- **0 YELLOW**
+- **0 RED**
+
+文字與術語一致性盤點至此完成。
+
+下一階段：
+**Owner Review 收口包**
+
+內容：
+1. Product Map
+2. 54/54 First Viewport
+3. 跨頁互動
+4. 共用元件
+5. 響應式
+6. 操作手感
+7. Copy Dictionary
+8. 唯一 YELLOW / BACKEND_CONTRACT_GAP
+9. Implementation entry conditions
+
+MILESTONE:
+MFK_ADMIN_V3_COPY_TERMINOLOGY_AUDIT_COMPLETE
