@@ -1,6 +1,6 @@
 import {createMfkAdminConfigEnvelope,validateMfkAdminConfigEnvelope,type MfkAdminConfigEnvelope,type MfkAdminConfigAck} from '../../contracts/admin-config-sync-v1.ts';
 import {projectStaffForRuntime} from '../../contracts/staff-auth-v1.ts';
-import {readAdminReleases,readAdminStored,writeAdminStored,type AdminRelease} from './admin-local-store.ts';
+import {readActiveAdminRelease,readAdminReleases,readAdminStored,writeAdminStored,type ActiveAdminReleaseRef,type AdminRelease} from './admin-local-store.ts';
 import {readStoredAdminBrowserSession} from './admin-browser-session.ts';
 
 const OUTBOX_KEY='sync-outbox.v1';
@@ -36,8 +36,47 @@ export function validateAdminPublishConfirmation(input:unknown,expected:MfkAdmin
 
 function emit(){if(typeof window!=='undefined')window.dispatchEvent(new CustomEvent('mfk-admin-sync'));}
 
-export function readAdminSyncStatus(){
+interface AdminCanonicalHydratedRef{
+  readonly revision:number;
+  readonly fingerprint:string;
+  readonly publishedAt:string;
+  readonly hydratedAt:string;
+}
+
+function readStoredAdminSyncStatus(){
   return readAdminStored<AdminSyncStatus>(STATUS_KEY,idle());
+}
+function readCanonicalHydratedRef(){
+  const value=readAdminStored<AdminCanonicalHydratedRef|null>('canonical-hydrated.v1',null);
+  if(!value||typeof value!=='object')return null;
+  if(!Number.isSafeInteger(value.revision)||value.revision<1)return null;
+  if(!value.fingerprint||!Number.isFinite(Date.parse(value.publishedAt)))return null;
+  return value;
+}
+export function normalizeAdminSyncStatusAgainstCanonicalCache(
+  current:AdminSyncStatus,
+  outboxCount:number,
+  hydrated:AdminCanonicalHydratedRef|null,
+  activeRelease:ActiveAdminReleaseRef|null,
+):AdminSyncStatus{
+  if((current.state!=='QUEUED'&&current.state!=='PUBLISHING')||outboxCount!==0||!hydrated||!activeRelease)return current;
+  if(activeRelease.version!==hydrated.revision||activeRelease.createdAt!==hydrated.publishedAt)return current;
+  return Object.freeze({
+    state:'PUBLISHED',
+    revision:hydrated.revision,
+    fingerprint:hydrated.fingerprint,
+    adminFingerprint:activeRelease.fingerprint,
+    cloudPublishedAt:hydrated.publishedAt,
+    updatedAt:hydrated.hydratedAt||current.updatedAt,
+  });
+}
+export function readAdminSyncStatus(){
+  return normalizeAdminSyncStatusAgainstCanonicalCache(
+    readStoredAdminSyncStatus(),
+    readOutbox().length,
+    readCanonicalHydratedRef(),
+    readActiveAdminRelease(),
+  );
 }
 export interface AdminSyncDiagnosticSnapshot{
   readonly status:Pick<AdminSyncStatus,'state'|'revision'|'fingerprint'|'adminFingerprint'|'cloudPublishedAt'|'updatedAt'|'error'>;
@@ -92,7 +131,7 @@ export function reconcileAdminSyncStatusFromCanonical(active:MfkAdminConfigEnvel
     const rowPublishedAt=Date.parse(row.publishedAt);
     return Number.isFinite(rowPublishedAt)&&Number.isFinite(activePublishedAt)&&rowPublishedAt>activePublishedAt;
   }));
-  const current=readAdminSyncStatus();
+  const current=readStoredAdminSyncStatus();
   const next:AdminSyncStatus={
     state:'PUBLISHED',
     revision:active.revision,
@@ -137,7 +176,7 @@ export function readExistingAdminPublisherKey(){
 export async function readAdminRuntimeSourceSha(){
   if(typeof fetch==='undefined')return 'unavailable';
   try{
-    const response=await fetch('/api/health?adminRuntimeDiagnostic=R4',{
+    const response=await fetch('/api/health?adminRuntimeDiagnostic=R5',{
       method:'GET',
       cache:'no-store',
       credentials:'same-origin',
