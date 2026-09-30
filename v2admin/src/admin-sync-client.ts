@@ -212,7 +212,7 @@ export function installAdminSyncAutoFlush(){
     if(!latest)return;
     const status=readAdminSyncStatus();
     const pending=readOutbox().some(row=>row.revision===latest.version&&row.adminFingerprint===latest.fingerprint);
-    if(status.state==='PUBLISHED'&&!pending&&status.adminFingerprint===latest.fingerprint)return;
+    if(status.state==='PUBLISHED'&&!pending&&status.revision===latest.version&&status.adminFingerprint===latest.fingerprint)return;
     void queueAdminReleaseSync(latest);
   };
   window.addEventListener('online',flush);
