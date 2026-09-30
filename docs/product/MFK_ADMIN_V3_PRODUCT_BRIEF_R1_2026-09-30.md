@@ -3575,40 +3575,287 @@ Event history ≠ Proof。
 
 ---
 
-# 32. Store / System Settings｜鎖定
+# 32. 門店設定｜鎖定
 
-Store settings唔做「巨型 settings 宇宙」。
+門店設定係獨立功能 domain。
+使用者想改「呢間店係邊間、幾點開、Business Day 幾點切、營運時間點計、常用原因有咩」時，第一時間就應該入 **門店設定**。
 
-按 domain 分組：
-- Store identity / contact
-- Business Day
-- Ordering / operational timing
-- Quick Reasons
-- Channel
-- Print
-- Presentation（P1）
-- Advanced effective values
+Sidebar 細 Menu 直接顯示：
+- 門店資料
+- 營業時間
+- Business Day 分界
+- 營運時間／提醒設定
+- 快捷原因
 
-Advanced page只讀／受控：
-- effective value
-- source
-- override
-- security floor
-- observed version
+所有頁面符合：
+**門店設定 → 細 Menu → 已見到目標內容 → Edit**
+
+禁止將門店設定做成「巨型 Settings 宇宙」。
+平台、打印、裝置、人員、發佈等設定各自留喺自己 Primary Home。
+
+## 32.1 門店資料
+
+入口：
+**門店設定 → 門店資料**
+
+第二步完成後直接見 Store Profile。
+
+顯示：
+- Store display name
+- Store code / identity
+- Address
+- Contact phone
+- Contact email（如正式欄位有）
+- Timezone
+- Locale / currency（如正式 contract 有）
+- Current published version / last readback
+
+Edit：
+- Display name
+- Address
+- Contact
+- 其他正式可修改 store metadata
+
+Store code / canonical identity：
+- 如果屬 immutable / protected identity，只讀
+- 唔畀 UI 自己改到造成跨系統 identity drift
+
+Save：
+- 進 Draft
+- 正式生效走 Publish / Readback
+
+## 32.2 營業時間
+
+入口：
+**門店設定 → 營業時間**
+
+第二步完成後直接見一星期 Schedule。
+
+UI：
+- 星期一至日
+- 每日可設一段或多段 opening window（只限 contract 支援）
+- Closed day
+- Holiday / special hours（只限正式 contract 存在）
+
+Edit：
+- 直接周曆式／表格式編輯
+- 一眼見到每日 opening / closing
+- 唔用 hidden accordion 收埋每一日
+
+規則：
+- Store Business Hours 係一種設定
+- Channel Accepting Orders 係另一種 runtime / channel state
+- Store Closed ≠ Platform integration failed
+
+Cross-domain shortcut：
+**前往平台／渠道管理 → 接單規則**
+
+## 32.3 Business Day 分界
+
+入口：
+**門店設定 → Business Day 分界**
+
+第二步完成後直接見：
+- Current boundary time
+- Effective from
+- Current published value
+- Last readback
+
+Edit：
+- Boundary time
+- Effective date / version（如 contract 支援）
+
+語義：
+Business Day boundary 用嚟：
+- classify transaction reporting day
+- open / close record grouping
+- historical reporting
+
+永遠唔可以直接成為：
+- transaction admission blocker
+- payment blocker
+- order creation blocker
+
+如果 rollover / refresh 出問題：
+- 顯示 attention
+- 交系統診斷／營業日頁處理
+- 唔用「禁止落單」補救。
+
+Contextual shortcut：
+**前往營運管理 → 營業日**
+
+## 32.4 營運時間／提醒設定
+
+入口：
+**門店設定 → 營運時間／提醒設定**
+
+用途：
+集中管理正式存在、屬門店層級嘅時間／提醒 policy。
+
+只顯 contract 已存在嘅欄位，例如：
+- 預設準備時間
+- Scheduled order lead time
+- Pickup timing
+- Close reminder
+- Last-order reminder
+- Operational warning threshold
+- 其他正式店級 timing / reminder
+
+禁止：
+- 將平台專屬 timing 偷放入呢頁
+- 將 fulfillment runtime state 當設定
+- UI 發明 backend 未有嘅 reminder engine
+
+平台專屬規則：
+deep-link 去 **平台／渠道管理**。
+
+## 32.5 Settings human-first layout
+
+每個 Settings page 都係：
+
+Header：
+- Page title
+- Current effective value / summary
+- Last published / readback
+- Edit
+
+View mode：
+- 先顯目前有效設定
+- 顯示來源／版本只在有助理解時
+- Advanced provenance 唔阻住正常操作
+
+Edit mode：
+- 一個清楚表單
+- Save Draft
+- Cancel
+- Validation inline
+- 無第二套右側 navigation
+
+如果值有多層來源：
+normal UI 只顯：
+- Effective value
+- 是否有 override / inherited
+- 需要時「查看來源」
+
+完整 source / override / security floor / observed version：
+放 **系統管理 → 進階／Effective Settings**，
+唔喺普通門店設定頁堆工程資訊。
+
+## 32.6 Primary Home 邊界
+
+以下唔屬門店設定：
+
+- 平台接單／映射／同步 → 平台／渠道管理
+- 邏輯打印機／模板／route → 打印管理
+- Physical device / OTA → 裝置管理
+- Staff / role / permission → 人員與權限
+- Draft / Publish / Rollback → 發佈與版本
+- Audit / Diagnostics / Integration health → 系統管理
+
+門店設定可以顯 contextual summary / shortcut，
+但唔複製第二套管理模型。
+
+## 32.7 人類第一直覺歸類
+
+- 「改店名／地址／電話」→ 門店設定 / 門店資料
+- 「星期日幾點開門」→ 門店設定 / 營業時間
+- 「每日幾點切 Business Day」→ 門店設定 / Business Day 分界
+- 「預設準備時間／收舖提醒」→ 門店設定 / 營運時間／提醒設定
+- 「退款常用原因」→ 門店設定 / 快捷原因
+- 「Keeta 幾時接單」→ 平台／渠道管理 / 接單規則
+- 「打印機設定」→ 打印管理
+
+任何以上問題如果要第三層 Sidebar 先搵到，視為 IA RED。
 
 ---
 
-# 33. Quick Reasons｜鎖定
+# 33. 快捷原因｜鎖定
 
-可設定：
+入口：
+**門店設定 → 快捷原因**
+
+第二步完成後直接見 Quick Reason List。
+
+用途：
+管理某啲正式 workflow 入面常用嘅 reason shortcut，
+減少重複輸入；
+唔係用嚟建立 approval engine。
+
+## 33.1 支援用途
+
+可以包含：
 - Tender Correction
 - Reprint
+- Refund（如果正式 workflow 使用）
+- Cancel（如果正式 workflow 使用）
 - future approved correction workflows
 
-規則：
-Reason OPTIONAL / NON-BLOCKING，除非特定安全 policy 明確要求。
-員工可以自填。
-Quick reason 唔可以變交易 blocker。
+List：
+- Reason label
+- Applies to
+- Active
+- Display order
+- Last modified
+- Draft indicator
+- Row action
+
+Primary CTA：
+**新增快捷原因**
+
+Create / Edit：
+- Reason label *
+- Applies to *
+- Active
+- Display order
+
+## 33.2 行為規則
+
+Quick Reason：
+- 只係 shortcut
+- 員工仍可以自填 reason（除非特定安全 policy 明確限制）
+- 唔可以因為冇預設 reason 就阻交易
+- 唔可以暗中代表 permission
+- 唔可以暗中代表 approval
+
+Reason 預設：
+**OPTIONAL / NON-BLOCKING**
+
+只有特定高風險 workflow 嘅正式 safety policy 明確要求時，
+先可以變 required。
+
+UI 要分清：
+- Required by policy
+- Optional note
+- Quick preset
+
+唔可以全部都畫成「必選原因」。
+
+## 33.3 Cross-domain usage
+
+快捷原因 Primary Home 留喺門店設定。
+
+真正操作仍喺責任 domain：
+- Tender Correction → 訂單管理 / 售後
+- Reprint → 正式打印操作 surface（如 contract 支援）
+- Refund / Cancel → 訂單管理 / 售後
+
+操作頁可以直接顯 Quick Reason picker，
+但唔喺操作頁再建第二套 reason 管理。
+
+## 33.4 Delete guard
+
+如果某 reason 已經存在歷史 Audit / transaction record：
+- historical label snapshot 保留
+- 可以 disable / archive
+- 禁止因刪除 config 而令歷史 reason 消失
+
+## 33.5 人類第一直覺歸類
+
+- 「新增一個常用退款原因」→ 門店設定 / 快捷原因
+- 「今次真係做退款」→ 訂單管理 / 售後
+- 「某次操作點解做咗」→ 系統管理 / 操作記錄
+
+任何以上問題如果要第三層 Sidebar 先搵到，視為 IA RED。
 
 ---
 
