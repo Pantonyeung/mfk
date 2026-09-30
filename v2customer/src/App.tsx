@@ -96,7 +96,7 @@ export function App(){
   const initialRoute=useMemo(()=>customerRouteFromPath(typeof window==='undefined'?'':window.location.pathname),[]);
   const initialSubmission=initialRoute?.submissionId?initial.pendingIntents.find(item=>item.submissionId===initialRoute.submissionId):undefined;
   const [view,setView]=useState<View>(initialRoute?.view??initial.preferences.activeView);
-  const [launchVisible,setLaunchVisible]=useState(()=>!initialRoute||initialRoute.view==='home'||initialRoute.view==='more');
+  const [launchVisible,setLaunchVisible]=useState(()=>!initialRoute||initialRoute.view==='home');
   const [checkoutStep,setCheckoutStep]=useState<CustomerUi4CheckoutStep>(initialRoute?.checkoutStep??'contact');
   const [submitRouteId,setSubmitRouteId]=useState<string|null>(initialRoute?.submissionId??null);
   const [waitingOrderId,setWaitingOrderId]=useState<string|null>(initialRoute?.waitingOrderId??null);
@@ -811,7 +811,6 @@ export function App(){
 
   if(launchVisible)return <LaunchOverlay
     onEnterHome={()=>{setLaunchVisible(false);changeView('home')}}
-    onEnterMember={()=>{setLaunchVisible(false);changeView('more')}}
   />;
 
   return <main className="customer-shell" data-network={!browserOnline?'offline':connection.toLowerCase()}>
