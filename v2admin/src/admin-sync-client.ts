@@ -93,7 +93,7 @@ export async function queueAdminReleaseSync(release:AdminRelease,storeId='MF01')
   return envelope;
 }
 
-export async function flushAdminSyncOutbox(){
+async function flushAdminSyncOutboxOnce(){
   if(typeof window==='undefined'||typeof fetch==='undefined')return readAdminSyncStatus();
   const rows=readOutbox();
   if(rows.length===0)return readAdminSyncStatus();
@@ -119,14 +119,39 @@ export async function flushAdminSyncOutbox(){
     });
     const body=await response.json().catch(()=>({})) as Record<string,unknown>;
     if(!response.ok)throw new Error(typeof body.code==='string'?body.code:'ADMIN_SYNC_PUBLISH_HTTP_'+response.status);
-    writeOutbox(readOutbox().filter(row=>row.revision>latest.revision));
-    const status={state:'PUBLISHED',revision:latest.revision,fingerprint:latest.fingerprint,updatedAt:new Date().toISOString()} as const;
+    const canonical=body.active?validateMfkAdminConfigEnvelope(body.active):null;
+    const sentFingerprints=new Set(rows.map(row=>row.fingerprint));
+    writeOutbox(readOutbox().filter(row=>!sentFingerprints.has(row.fingerprint)));
+    const status={
+      state:'PUBLISHED',
+      revision:canonical?.revision??latest.revision,
+      fingerprint:canonical?.fingerprint??latest.fingerprint,
+      updatedAt:canonical?.publishedAt??new Date().toISOString(),
+    } as const;
     writeStatus(status);
     return status;
   }catch(error){
     const status={state:'ERROR',revision:latest.revision,fingerprint:latest.fingerprint,updatedAt:new Date().toISOString(),error:error instanceof Error?error.message:'ADMIN_SYNC_PUBLISH_FAILED'} as const;
     writeStatus(status);
     return status;
+  }
+}
+
+let adminSyncFlushInFlight:Promise<AdminSyncStatus>|null=null;
+let adminSyncFlushRequested=false;
+export async function flushAdminSyncOutbox(){
+  if(adminSyncFlushInFlight){
+    adminSyncFlushRequested=true;
+    return adminSyncFlushInFlight;
+  }
+  adminSyncFlushInFlight=flushAdminSyncOutboxOnce();
+  try{return await adminSyncFlushInFlight;}
+  finally{
+    adminSyncFlushInFlight=null;
+    if(adminSyncFlushRequested){
+      adminSyncFlushRequested=false;
+      void flushAdminSyncOutbox();
+    }
   }
 }
 
