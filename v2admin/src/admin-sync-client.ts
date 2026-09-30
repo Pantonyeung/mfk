@@ -1,6 +1,6 @@
 import {createMfkAdminConfigEnvelope,mfkHongKongIso,validateMfkAdminConfigEnvelope,type MfkAdminConfigEnvelope,type MfkAdminConfigAck} from '../../contracts/admin-config-sync-v1.ts';
 import {projectStaffForRuntime} from '../../contracts/staff-auth-v1.ts';
-import {readAdminReleases,readAdminStored,writeAdminStored,type AdminRelease} from './admin-local-store.ts';
+import {readActiveAdminRelease,readAdminReleases,readAdminStored,writeAdminStored,type AdminRelease} from './admin-local-store.ts';
 import {readStoredAdminBrowserSession} from './admin-browser-session.ts';
 
 const OUTBOX_KEY='sync-outbox.v1';
@@ -210,12 +210,14 @@ export function installAdminSyncAutoFlush(){
   installed=true;
   const flush=()=>{void flushAdminSyncOutbox();};
   const queueLatest=()=>{
-    const latest=readAdminReleases()[0];
-    if(!latest)return;
+    const active=readActiveAdminRelease();
+    if(!active)return;
+    const release=readAdminReleases().find(row=>row.createdAt===active.createdAt&&row.fingerprint===active.fingerprint);
+    if(!release)return;
     const status=readAdminSyncStatus();
-    const pending=readOutbox().some(row=>row.adminFingerprint===latest.fingerprint&&row.publishedAt===latest.createdAt);
-    if(status.state==='PUBLISHED'&&!pending&&status.adminFingerprint===latest.fingerprint)return;
-    void queueAdminReleaseSync(latest);
+    const pending=readOutbox().some(row=>row.revision===release.version&&row.adminFingerprint===release.fingerprint);
+    if(status.state==='PUBLISHED'&&!pending&&status.adminFingerprint===release.fingerprint)return;
+    void queueAdminReleaseSync(release);
   };
   window.addEventListener('online',flush);
   window.addEventListener('focus',flush);
