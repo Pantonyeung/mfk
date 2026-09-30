@@ -111,7 +111,7 @@ export function validateMfkAdminConfigAck(input:unknown):MfkAdminConfigAck{
     publishedAt:text(row.publishedAt,'ADMIN_CONFIG_ACK_PUBLISHED_AT_INVALID',64),
     appliedAt:text(row.appliedAt,'ADMIN_CONFIG_ACK_APPLIED_AT_INVALID',64),
     disposition,
-  };
+  } as const;
   if(!Number.isFinite(Date.parse(out.publishedAt)))throw new Error('ADMIN_CONFIG_ACK_PUBLISHED_AT_INVALID');
   if(!Number.isFinite(Date.parse(out.appliedAt)))throw new Error('ADMIN_CONFIG_ACK_APPLIED_AT_INVALID');
   return Object.freeze(out);
