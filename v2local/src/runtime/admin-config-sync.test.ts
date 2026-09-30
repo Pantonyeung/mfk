@@ -118,12 +118,12 @@ describe('SMT full Admin config LKG',()=>{
     expect(readSmtAdminSyncStatus().state).toBe('SYNCED');
   });
 
-  it('is idempotent, rejects same-revision conflicts, and ignores stale snapshots',()=>{
+  it('is idempotent, rejects same-time conflicts, and ignores older publish times',()=>{
     const row=envelope(3);
     expect(applyAdminConfigEnvelope(row).disposition).toBe('APPLIED');
     expect(applyAdminConfigEnvelope(row).disposition).toBe('IDEMPOTENT');
     expect(applyAdminConfigEnvelope(envelope(2)).disposition).toBe('STALE');
-    expect(()=>applyAdminConfigEnvelope(envelope(3,'different'))).toThrow('ADMIN_CONFIG_REVISION_CONFLICT');
+    expect(()=>applyAdminConfigEnvelope(envelope(3,'different'))).toThrow('ADMIN_CONFIG_PUBLISHED_AT_CONFLICT');
     expect(readSmtAdminConfigLkg()?.revision).toBe(3);
   });
 
@@ -222,6 +222,21 @@ describe('SMT full Admin config LKG',()=>{
     });
     expect(applyAdminConfigEnvelope(current).disposition).toBe('APPLIED');
     expect(applyAdminConfigEnvelope(impossible)).toMatchObject({disposition:'STALE',revision:20});
+  });
+
+  it('applies a lower diagnostic revision when its canonical publish time is newer',()=>{
+    const older=createMfkAdminConfigEnvelope({
+      storeId:'MF01',revision:23,publishedAt:'2026-09-29T05:00:00.000Z',adminFingerprint:'admin-old',
+      snapshot:{catalog:{products:[{id:'old'}]}},
+    });
+    const newer=createMfkAdminConfigEnvelope({
+      storeId:'MF01',revision:22,publishedAt:'2026-09-29T06:00:00.000Z',adminFingerprint:'admin-new',
+      snapshot:{catalog:{products:[{id:'new'}]}},
+    });
+    expect(applyAdminConfigEnvelope(older).disposition).toBe('APPLIED');
+    expect(applyAdminConfigEnvelope(newer)).toMatchObject({disposition:'APPLIED',revision:22});
+    expect(readSmtAdminConfigLkg()?.publishedAt).toBe('2026-09-29T06:00:00.000Z');
+    expect((readSmtAdminConfigLkg()?.snapshot.catalog as {products?:{id:string}[]}).products?.[0]?.id).toBe('new');
   });
 
 });
