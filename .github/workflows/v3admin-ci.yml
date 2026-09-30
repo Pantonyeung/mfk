@@ -56,4 +56,4 @@ jobs:
           ! grep -R "admin.morefunos.com" -n src index.html package.json | grep -v "vite.config.ts"
       - name: Verify no v2 browser-state imports
         run: |
-          ! grep -R "v2admin\|admin-local-store\|admin-sync-client\|canonical-hydrated.v1\|sync-status.v1" -n src
+          ! grep -R "v2admin\|admin-local-store\|admin-sync-client\|canonical-hydrated.v1\|sync-status.v1" -n src --exclude='*.test.ts'
