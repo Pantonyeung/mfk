@@ -40,6 +40,12 @@ export function readAdminSyncStatus(){
   return readAdminStored<AdminSyncStatus>(STATUS_KEY,idle());
 }
 export function reconcileAdminSyncStatusFromCanonical(active:MfkAdminConfigEnvelope){
+  const activePublishedAt=Date.parse(active.publishedAt);
+  writeOutbox(readOutbox().filter(row=>{
+    if(row.fingerprint===active.fingerprint)return false;
+    const rowPublishedAt=Date.parse(row.publishedAt);
+    return Number.isFinite(rowPublishedAt)&&Number.isFinite(activePublishedAt)&&rowPublishedAt>activePublishedAt;
+  }));
   const current=readAdminSyncStatus();
   const next:AdminSyncStatus={
     state:'PUBLISHED',
