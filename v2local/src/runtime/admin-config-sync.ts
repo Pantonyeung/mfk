@@ -1,12 +1,19 @@
-import {validateMfkAdminConfigEnvelope,type MfkAdminConfigAck,type MfkAdminConfigEnvelope} from '../../../contracts/admin-config-sync-v1.ts';
+import {
+  mfkHongKongIso,
+  mfkPublishTimeMs,
+  validateMfkAdminConfigEnvelope,
+  type MfkAdminConfigAck,
+  type MfkAdminConfigEnvelope,
+} from '../../../contracts/admin-config-sync-v1.ts';
 import {smtAdminHttpOrigin,smtAdminWebSocketUrl} from './web-acceptance.ts';
 
 export const SMT_ADMIN_CONFIG_LKG_KEY='mfk.admin-sync.active.v1';
 export const SMT_ADMIN_CONFIG_STATUS_KEY='mfk.admin-sync.status.v1';
 export const SMT_ADMIN_CONFIG_DEVICE_KEY='mfk.admin-sync.device.v1';
+export const SMT_ADMIN_TIME_FIRST_CUTOVER_KEY='mfk.admin-sync.time-first-cutover.v1';
 export const SMT_ADMIN_CONFIG_ENDPOINT=smtAdminHttpOrigin();
 
-export type SmtAdminSyncState='LOCAL_LKG'|'CONNECTING'|'SYNCED'|'OFFLINE'|'ERROR';
+export type SmtAdminSyncState='LOCAL_LKG'|'CONNECTING'|'SYNCED'|'WAITING_ADMIN_PUBLISH'|'OFFLINE'|'ERROR';
 export interface SmtAdminSyncStatus{
   readonly state:SmtAdminSyncState;
   readonly revision:number;
@@ -23,14 +30,20 @@ export interface SmtAdminConfigApplyResult{
   readonly revision:number;
   readonly fingerprint:string;
 }
+export interface SmtAdminTimeFirstCutover{
+  readonly clearedAt:string;
+  readonly priorFingerprint:string|null;
+  readonly priorPublishedAt:string|null;
+  readonly priorRevision:number|null;
+}
 
 const listeners=new Set<()=>void>();
 export interface SmtCloudDoorbell{readonly type:string;readonly [key:string]:unknown}
 const ADMIN_PROPAGATION_DIAG_KEY='mfk.v2local.admin-propagation-diag.v1';
-const cloudDoorbellListeners=new Set<(event:SmtCloudDoorbell)=>void>();
+const cloudDoorbellListeners=new Set<(event:SmtCloudDoorbell)=>void();
 
 function emit(){for(const listener of listeners)listener();}
-function now(){return new Date().toISOString();}
+function now(){return mfkHongKongIso();}
 function readJson<T>(key:string,fallback:T):T{
   try{
     const raw=localStorage.getItem(key);
@@ -59,6 +72,9 @@ export function readSmtAdminConfigLkg():MfkAdminConfigEnvelope|null{
     return raw?validateMfkAdminConfigEnvelope(JSON.parse(raw)):null;
   }catch{return null;}
 }
+export function readSmtAdminTimeFirstCutover(){
+  return readJson<SmtAdminTimeFirstCutover|null>(SMT_ADMIN_TIME_FIRST_CUTOVER_KEY,null);
+}
 export function readSmtAdminSyncStatus():SmtAdminSyncStatus{
   const active=readSmtAdminConfigLkg();
   return readJson<SmtAdminSyncStatus>(SMT_ADMIN_CONFIG_STATUS_KEY,{
@@ -82,37 +98,67 @@ export function subscribeSmtCloudDoorbell(listener:(event:SmtCloudDoorbell)=>voi
   return()=>{cloudDoorbellListeners.delete(listener);};
 }
 
+export function clearLegacySmtAdminConfigForTimeFirstCutover(){
+  if(typeof localStorage==='undefined')return false;
+  if(localStorage.getItem(SMT_ADMIN_TIME_FIRST_CUTOVER_KEY))return false;
+  const prior=readSmtAdminConfigLkg();
+  localStorage.removeItem(SMT_ADMIN_CONFIG_LKG_KEY);
+  localStorage.removeItem(SMT_ADMIN_CONFIG_STATUS_KEY);
+  localStorage.removeItem(ADMIN_PROPAGATION_DIAG_KEY);
+  writeJson(SMT_ADMIN_TIME_FIRST_CUTOVER_KEY,{
+    clearedAt:now(),
+    priorFingerprint:prior?.fingerprint??null,
+    priorPublishedAt:prior?.publishedAt??null,
+    priorRevision:prior?.revision??null,
+  } satisfies SmtAdminTimeFirstCutover);
+  emit();
+  return true;
+}
+
 export function applyAdminConfigEnvelope(input:unknown):SmtAdminConfigApplyResult{
   const next=validateMfkAdminConfigEnvelope(input);
   const current=readSmtAdminConfigLkg();
+  const nextPublishedAt=mfkPublishTimeMs(next.publishedAt);
+
+  if(!current){
+    const cutover=readSmtAdminTimeFirstCutover();
+    if(cutover&&nextPublishedAt<=mfkPublishTimeMs(cutover.clearedAt)){
+      return Object.freeze({disposition:'STALE',revision:next.revision,fingerprint:next.fingerprint});
+    }
+  }
+
   if(current){
-    const nextPublishedAt=Date.parse(next.publishedAt);
-    const currentPublishedAt=Date.parse(current.publishedAt);
-    if(!Number.isFinite(nextPublishedAt)||!Number.isFinite(currentPublishedAt))throw new Error('ADMIN_CONFIG_PUBLISHED_AT_INVALID');
+    const currentPublishedAt=mfkPublishTimeMs(current.publishedAt);
     if(nextPublishedAt<currentPublishedAt){
       return Object.freeze({disposition:'STALE',revision:current.revision,fingerprint:current.fingerprint});
     }
     if(nextPublishedAt===currentPublishedAt){
       if(next.fingerprint!==current.fingerprint)throw new Error('ADMIN_CONFIG_PUBLISHED_AT_CONFLICT');
+      const prior=readSmtAdminSyncStatus();
       const appliedAt=now();
       setStatus({
         state:'SYNCED',
         revision:current.revision,
         fingerprint:current.fingerprint,
         publishedAt:current.publishedAt,
+        receivedAt:prior.receivedAt,
         appliedAt,
+        ackAt:prior.ackAt,
         updatedAt:appliedAt,
       });
       return Object.freeze({disposition:'IDEMPOTENT',revision:current.revision,fingerprint:current.fingerprint});
     }
   }
+
   writeJson(SMT_ADMIN_CONFIG_LKG_KEY,next);
+  const prior=readSmtAdminSyncStatus();
   const appliedAt=now();
   setStatus({
     state:'SYNCED',
     revision:next.revision,
     fingerprint:next.fingerprint,
     publishedAt:next.publishedAt,
+    receivedAt:prior.receivedAt,
     appliedAt,
     updatedAt:appliedAt,
   });
@@ -138,59 +184,137 @@ async function ack(envelope:MfkAdminConfigEnvelope,disposition:'APPLIED'|'IDEMPO
   if(!response.ok)throw new Error('ADMIN_CONFIG_ACK_HTTP_'+response.status);
   const ackAt=now();
   const status=readSmtAdminSyncStatus();
-  if(status.fingerprint===envelope.fingerprint)setStatus({...status,ackAt,updatedAt:ackAt});
-  try{
-    const diag=readJson<Record<string,unknown>>(ADMIN_PROPAGATION_DIAG_KEY,{});
-    writeJson(ADMIN_PROPAGATION_DIAG_KEY,{...diag,ackAt});
-  }catch{}
+  if(status.fingerprint===envelope.fingerprint){
+    setStatus({...status,ackAt,updatedAt:ackAt});
+  }
+  const diag=readJson<Record<string,unknown>>(ADMIN_PROPAGATION_DIAG_KEY,{});
+  writeJson(ADMIN_PROPAGATION_DIAG_KEY,{...diag,ackAt});
+}
+
+async function applyCanonicalEnvelope(input:unknown){
+  const envelope=validateMfkAdminConfigEnvelope(input);
+  const applied=applyAdminConfigEnvelope(envelope);
+  if(applied.disposition==='STALE')return applied;
+  const appliedAt=readSmtAdminSyncStatus().appliedAt??now();
+  const diag=readJson<Record<string,unknown>>(ADMIN_PROPAGATION_DIAG_KEY,{});
+  writeJson(ADMIN_PROPAGATION_DIAG_KEY,{
+    ...diag,
+    revision:envelope.revision,
+    fingerprint:envelope.fingerprint,
+    publishedAt:envelope.publishedAt,
+    appliedAt,
+  });
+  await ack(envelope,applied.disposition);
+  return applied;
 }
 
 let adminConfigFetchInFlight:Promise<SmtAdminConfigApplyResult|null>|null=null;
 let adminConfigRefetchRequested=false;
+
+async function fetchActiveFallback(){
+  const response=await fetch(SMT_ADMIN_CONFIG_ENDPOINT+'/api/admin-sync/active?storeId=MF01',{cache:'no-store'});
+  if(response.status===404)return null;
+  if(!response.ok)throw new Error('ADMIN_CONFIG_FETCH_HTTP_'+response.status);
+  return applyCanonicalEnvelope(await response.json());
+}
+
+async function fetchPublishedSince(after:string){
+  const url=SMT_ADMIN_CONFIG_ENDPOINT+'/api/admin-sync/published-since?storeId=MF01&after='+encodeURIComponent(after);
+  const response=await fetch(url,{cache:'no-store'});
+  if(!response.ok)throw new Error('ADMIN_CONFIG_HISTORY_HTTP_'+response.status);
+  const body=await response.json() as {items?:unknown[]};
+  return Array.isArray(body.items)?body.items:[];
+}
+
 export async function fetchAndApplyAdminConfig(){
-  if(adminConfigFetchInFlight){adminConfigRefetchRequested=true;return adminConfigFetchInFlight;}
-  adminConfigFetchInFlight=(async()=>{
-  const current=readSmtAdminConfigLkg();
-  setStatus({
-    state:'CONNECTING',
-    revision:current?.revision??0,
-    fingerprint:current?.fingerprint??'',
-    publishedAt:current?.publishedAt,
-    updatedAt:now(),
-  });
-  try{
-    const response=await fetch(SMT_ADMIN_CONFIG_ENDPOINT+'/api/admin-sync/active?storeId=MF01',{cache:'no-store'});
-    if(response.status===404){
-      setStatus({state:current?'LOCAL_LKG':'OFFLINE',revision:current?.revision??0,fingerprint:current?.fingerprint??'',publishedAt:current?.publishedAt,updatedAt:now()});
-      return null;
-    }
-    if(!response.ok)throw new Error('ADMIN_CONFIG_FETCH_HTTP_'+response.status);
-    const envelope=validateMfkAdminConfigEnvelope(await response.json());
-    const applied=applyAdminConfigEnvelope(envelope);
-    if(applied.disposition!=='STALE'){
-      try{
-        const diag=JSON.parse(localStorage.getItem(ADMIN_PROPAGATION_DIAG_KEY)||'{}');
-        localStorage.setItem(ADMIN_PROPAGATION_DIAG_KEY,JSON.stringify({...diag,revision:envelope.revision,fingerprint:envelope.fingerprint,publishedAt:envelope.publishedAt,appliedAt:now()}));
-      }catch{}
-      void ack(envelope,applied.disposition).catch(()=>{});
-    }
-    return applied;
-  }catch(error){
-    const lkg=readSmtAdminConfigLkg();
-    setStatus({
-      state:lkg?'LOCAL_LKG':'ERROR',
-      revision:lkg?.revision??0,
-      fingerprint:lkg?.fingerprint??'',
-      publishedAt:lkg?.publishedAt,
-      updatedAt:now(),
-      error:error instanceof Error?error.message:'ADMIN_CONFIG_SYNC_FAILED',
-    });
-    return null;
-  }finally{
-    adminConfigFetchInFlight=null;
-    if(adminConfigRefetchRequested){adminConfigRefetchRequested=false;void fetchAndApplyAdminConfig();}
+  if(adminConfigFetchInFlight){
+    adminConfigRefetchRequested=true;
+    return adminConfigFetchInFlight;
   }
+
+  adminConfigFetchInFlight=(async()=>{
+    const before=readSmtAdminConfigLkg();
+    const prior=readSmtAdminSyncStatus();
+    setStatus({
+      state:'CONNECTING',
+      revision:before?.revision??0,
+      fingerprint:before?.fingerprint??'',
+      publishedAt:before?.publishedAt,
+      receivedAt:prior.receivedAt,
+      appliedAt:prior.appliedAt,
+      ackAt:prior.ackAt,
+      updatedAt:now(),
+    });
+
+    try{
+      let cursor=before?.publishedAt??readSmtAdminTimeFirstCutover()?.clearedAt;
+      let last:SmtAdminConfigApplyResult|null=null;
+
+      if(!cursor){
+        return await fetchActiveFallback();
+      }
+
+      for(let page=0;page<100;page++){
+        const items=await fetchPublishedSince(cursor);
+        if(!items.length)break;
+        for(const raw of items){
+          const envelope=validateMfkAdminConfigEnvelope(raw);
+          last=await applyCanonicalEnvelope(envelope);
+          cursor=envelope.publishedAt;
+        }
+        if(items.length<200)break;
+      }
+
+      const current=readSmtAdminConfigLkg();
+      if(!current){
+        const at=now();
+        setStatus({
+          state:'WAITING_ADMIN_PUBLISH',
+          revision:0,
+          fingerprint:'',
+          updatedAt:at,
+        });
+      }else if(!last){
+        const status=readSmtAdminSyncStatus();
+        if(status.state==='CONNECTING'){
+          const at=now();
+          setStatus({
+            state:'SYNCED',
+            revision:current.revision,
+            fingerprint:current.fingerprint,
+            publishedAt:current.publishedAt,
+            receivedAt:status.receivedAt,
+            appliedAt:status.appliedAt,
+            ackAt:status.ackAt,
+            updatedAt:at,
+          });
+        }
+      }
+      return last;
+    }catch(error){
+      const lkg=readSmtAdminConfigLkg();
+      const at=now();
+      setStatus({
+        state:lkg?'LOCAL_LKG':'ERROR',
+        revision:lkg?.revision??0,
+        fingerprint:lkg?.fingerprint??'',
+        publishedAt:lkg?.publishedAt,
+        receivedAt:prior.receivedAt,
+        appliedAt:prior.appliedAt,
+        ackAt:prior.ackAt,
+        updatedAt:at,
+        error:error instanceof Error?error.message:'ADMIN_CONFIG_SYNC_FAILED',
+      });
+      return null;
+    }finally{
+      adminConfigFetchInFlight=null;
+      if(adminConfigRefetchRequested){
+        adminConfigRefetchRequested=false;
+        void fetchAndApplyAdminConfig();
+      }
+    }
   })();
+
   return adminConfigFetchInFlight;
 }
 
@@ -218,22 +342,22 @@ function connectDoorbell(){
     });
     socket.addEventListener('message',event=>{
       try{
-        const row=JSON.parse(String(event.data)) as SmtCloudDoorbell&{revision?:number;fingerprint?:string};
+        const row=JSON.parse(String(event.data)) as SmtCloudDoorbell&{
+          revision?:number;fingerprint?:string;publishedAt?:string;acceptedAt?:string
+        };
         if(row.type==='ADMIN_CONFIG_AVAILABLE'){
           const receivedAt=now();
-          try{
-            localStorage.setItem(ADMIN_PROPAGATION_DIAG_KEY,JSON.stringify({
-              revision:row.revision,
-              fingerprint:row.fingerprint,
-              publishedAt:row.publishedAt,
-              acceptedAt:row.acceptedAt,
-              doorbellReceivedAt:receivedAt,
-            }));
-          }catch{}
+          writeJson(ADMIN_PROPAGATION_DIAG_KEY,{
+            revision:row.revision,
+            fingerprint:row.fingerprint,
+            publishedAt:row.publishedAt,
+            acceptedAt:row.acceptedAt,
+            doorbellReceivedAt:receivedAt,
+          });
           const status=readSmtAdminSyncStatus();
           setStatus({...status,receivedAt,updatedAt:receivedAt});
-          // Every Admin publish notification forces a canonical pull.
-          // SMT does not decide whether an Admin publish is worth receiving.
+          // Every formal Admin publish triggers a canonical history catch-up.
+          // No R/revision comparison is allowed to veto a publish.
           void fetchAndApplyAdminConfig();
           return;
         }
@@ -248,16 +372,30 @@ function connectDoorbell(){
 export function installSmtAdminAutoSync(){
   if(installed||typeof window==='undefined')return;
   installed=true;
-  const reconcile=()=>{if(!navigator.onLine)return;void fetchAndApplyAdminConfig();connectDoorbell();};
+
+  const reconcile=()=>{
+    if(!navigator.onLine)return;
+    clearLegacySmtAdminConfigForTimeFirstCutover();
+    void fetchAndApplyAdminConfig();
+    connectDoorbell();
+  };
   const onOnline=()=>reconcile();
   const onFocus=()=>reconcile();
   const onPageShow=()=>reconcile();
   const onVisibility=()=>{if(document.visibilityState==='visible')reconcile();};
   const onOffline=()=>{
     const lkg=readSmtAdminConfigLkg();
-    setStatus({state:lkg?'LOCAL_LKG':'OFFLINE',revision:lkg?.revision??0,fingerprint:lkg?.fingerprint??'',publishedAt:lkg?.publishedAt,updatedAt:now()});
+    const at=now();
+    setStatus({
+      state:lkg?'LOCAL_LKG':'OFFLINE',
+      revision:lkg?.revision??0,
+      fingerprint:lkg?.fingerprint??'',
+      publishedAt:lkg?.publishedAt,
+      updatedAt:at,
+    });
     try{socket?.close();}catch{}
   };
+
   window.addEventListener('online',onOnline);
   window.addEventListener('offline',onOffline);
   window.addEventListener('focus',onFocus);
