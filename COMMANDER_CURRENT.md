@@ -151,13 +151,16 @@ Owner may authorize a later bounded promotion after reviewing candidate evidence
 
 ## 8. Exact NEXT
 
-1. Review and approve Product Brief #601.
-2. Merge the product-spec-only PR; no runtime deploy.
-3. Bank A1/A2 incremental work as reference, not the implementation roadmap.
-4. Prepare one-shot Codex implementation packet from the approved Product Brief.
-5. Codex may modify only explicitly allowed V3 paths.
-6. Build the complete Admin V3 R1 in isolation.
-7. Run full automated + preview physical acceptance.
-8. Only then propose production cutover.
+1. Review Product Brief #601 / Draft PR #602.
+2. Owner must explicitly issue PROMOTE before the product-spec PR may be merged.
+3. After PROMOTE, merge the product-spec-only PR; no runtime deploy.
+4. Bank A1/A2 incremental work as reference, not as partial product promotion.
+5. Prepare the one-shot Codex implementation packet from the approved Product Brief.
+6. Execute R2 A0→A6 as internal engineering / acceptance gates inside the one-shot build; no A-stage production promotion.
+7. Codex may modify only explicitly allowed V3 paths and approved bounded seams.
+8. Build the complete Admin V3 R1 in isolation.
+9. Run full automated + V3 preview physical acceptance, including verified rollback to v2.
+10. Only then propose production cutover.
+11. Merge / deploy / route switch still requires the applicable explicit Owner PROMOTE.
 
 MILESTONE: `MFK_ADMIN_V3_PRODUCT_BRIEF_LOCK_R1_ACTIVE`
