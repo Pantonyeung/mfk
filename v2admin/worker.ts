@@ -1,4 +1,4 @@
-import {createMfkAdminConfigEnvelope,validateMfkAdminConfigAck,validateMfkAdminConfigEnvelope} from '../contracts/admin-config-sync-v1.ts';
+import {createMfkAdminConfigEnvelope,mfkHongKongIso,validateMfkAdminConfigAck,validateMfkAdminConfigEnvelope} from '../contracts/admin-config-sync-v1.ts';
 import {validateSmtProjectionBatch} from '../contracts/smt-projection-v1.ts';
 import {MFK_ADMIN_REFUND_SCHEMA,validateAdminRefundEvent} from '../contracts/admin-refund-v1.ts';
 import {KeetaRuntimeStore} from './keeta-runtime.ts';
@@ -970,30 +970,56 @@ export class AdminSyncStore{
     await this.state.storage.put(key,{...session,staffId:value.staffId,lastSeenAt:value.lastSeenAt});return value;
   }
   async publishEnvelope(envelope){
-    const current=await this.state.storage.get('active');
-    const currentMeta=await this.state.storage.get('activeMeta')||{};
-    if(current){
-      const incomingPublishedAt=Date.parse(String(envelope.publishedAt||''));
-      const currentPublishedAt=Date.parse(String(current.publishedAt||''));
-      if(!Number.isFinite(incomingPublishedAt)||!Number.isFinite(currentPublishedAt)){
-        return{status:400,body:{code:'ADMIN_CONFIG_PUBLISHED_AT_INVALID'}};
-      }
-      if(incomingPublishedAt<currentPublishedAt){
-        return{status:409,body:{code:'ADMIN_CONFIG_PUBLISH_TIME_STALE',currentPublishedAt:current.publishedAt,currentFingerprint:current.fingerprint}};
-      }
-      if(incomingPublishedAt===currentPublishedAt){
-        if(envelope.fingerprint!==current.fingerprint){
-          return{status:409,body:{code:'ADMIN_CONFIG_PUBLISH_TIME_CONFLICT',currentPublishedAt:current.publishedAt,currentFingerprint:current.fingerprint}};
-        }
-        return{status:200,body:{state:'IDEMPOTENT',active:current,cloudPublishedAt:String(currentMeta.acceptedAt||current.publishedAt)}};
-      }
+    const requestKey='admin:publish-request:'+String(envelope.fingerprint||'');
+    const prior=await this.state.storage.get(requestKey);
+    if(prior?.active){
+      return{status:200,body:{
+        state:'IDEMPOTENT',
+        active:prior.active,
+        cloudPublishedAt:prior.cloudPublishedAt,
+        publishRequestFingerprint:envelope.fingerprint,
+      }};
     }
-    await this.state.storage.put('active',envelope);
-    const acceptedAt=new Date().toISOString();
-    await this.state.storage.put('activeMeta',{revision:envelope.revision,fingerprint:envelope.fingerprint,publishedAt:envelope.publishedAt,acceptedAt});
-    const doorbell=JSON.stringify({type:'ADMIN_CONFIG_AVAILABLE',storeId:envelope.storeId,revision:envelope.revision,fingerprint:envelope.fingerprint,publishedAt:envelope.publishedAt,acceptedAt});
+
+    const cloudPublishedAt=mfkHongKongIso();
+    const active=createMfkAdminConfigEnvelope({
+      storeId:envelope.storeId,
+      revision:envelope.revision,
+      publishedAt:cloudPublishedAt,
+      adminFingerprint:envelope.adminFingerprint,
+      snapshot:envelope.snapshot,
+    });
+
+    await this.state.storage.put('active',active);
+    await this.state.storage.put('activeMeta',{
+      revision:active.revision,
+      fingerprint:active.fingerprint,
+      adminFingerprint:active.adminFingerprint,
+      publishedAt:active.publishedAt,
+      acceptedAt:cloudPublishedAt,
+      sourcePublishFingerprint:envelope.fingerprint,
+    });
+    await this.state.storage.put(requestKey,{
+      active,
+      cloudPublishedAt,
+      sourcePublishFingerprint:envelope.fingerprint,
+    });
+
+    const doorbell=JSON.stringify({
+      type:'ADMIN_CONFIG_AVAILABLE',
+      storeId:active.storeId,
+      revision:active.revision,
+      fingerprint:active.fingerprint,
+      publishedAt:active.publishedAt,
+      acceptedAt:cloudPublishedAt,
+    });
     for(const socket of this.state.getWebSockets()){try{socket.send(doorbell);}catch{}}
-    return{status:200,body:{state:'PUBLISHED',active:envelope,cloudPublishedAt:acceptedAt}};
+    return{status:200,body:{
+      state:'PUBLISHED',
+      active,
+      cloudPublishedAt,
+      publishRequestFingerprint:envelope.fingerprint,
+    }};
   }
   async ownerChannels(active,observedAt=new Date().toISOString(),freshReadback=false){
     let keetaStatus=null,customerHealth=null;
