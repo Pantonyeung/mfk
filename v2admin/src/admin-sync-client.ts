@@ -13,6 +13,7 @@ export interface AdminSyncStatus{
   readonly revision?:number;
   readonly fingerprint?:string;
   readonly cloudPublishedAt?:string;
+  readonly adminFingerprint?:string;
   readonly updatedAt:string;
   readonly error?:string;
 }
@@ -136,7 +137,7 @@ export async function flushAdminSyncOutbox(){
     const confirmed=validateAdminPublishConfirmation(body,latest);
     const publishedAt=Date.parse(latest.publishedAt);
     writeOutbox(readOutbox().filter(row=>Date.parse(row.publishedAt)>publishedAt));
-    const status={state:'PUBLISHED',revision:confirmed.active.revision,fingerprint:confirmed.active.fingerprint,cloudPublishedAt:confirmed.cloudPublishedAt,updatedAt:new Date().toISOString()} as const;
+    const status={state:'PUBLISHED',revision:confirmed.active.revision,fingerprint:confirmed.active.fingerprint,adminFingerprint:confirmed.active.adminFingerprint,cloudPublishedAt:confirmed.cloudPublishedAt,updatedAt:new Date().toISOString()} as const;
     writeStatus(status);
     return status;
   }catch(error){
@@ -188,11 +189,7 @@ export function installAdminSyncAutoFlush(){
     if(!latest)return;
     const status=readAdminSyncStatus();
     const pending=readOutbox().some(row=>row.adminFingerprint===latest.fingerprint&&row.publishedAt===latest.createdAt);
-    if(status.state==='PUBLISHED'&&!pending&&status.fingerprint){
-      const localPublished=Date.parse(latest.createdAt);
-      const cloudPublished=Date.parse(status.cloudPublishedAt||'');
-      if(Number.isFinite(localPublished)&&Number.isFinite(cloudPublished)&&cloudPublished>=localPublished)return;
-    }
+    if(status.state==='PUBLISHED'&&!pending&&status.adminFingerprint===latest.fingerprint)return;
     void queueAdminReleaseSync(latest);
   };
   window.addEventListener('online',flush);
