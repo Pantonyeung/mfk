@@ -46,14 +46,14 @@ test('each normal category has one featured large card and the rest small cards'
   assert.equal((menu.match(/<FeaturedProductCard/g)||[]).length,1);
 });
 
-test('product media uses canonical imageUrl with FINAL real-media fallback and never a blank placeholder',()=>{
+test('product media uses canonical imageUrl or neutral placeholder and never invents a food photo',()=>{
   assert.ok(menu.includes('product.imageUrl'));
   assert.ok(menu.includes('product.imageAlt??product.name'));
   assert.ok(menu.includes('mediaFor(product)'));
-  assert.ok(menu.includes('/brand/p0-riceball.webp'));
+  assert.ok(menu.includes('stage2-product-image-empty'));
   assert.ok(css.includes('.stage2-product-media img'));
-  assert.ok(!menu.includes('<span className="stage2-product-media" aria-hidden="true"/>'));
-  assert.ok(!menu.includes('商品圖片暫未提供'));
+  assert.ok(css.includes('.stage2-product-image-empty'));
+  for(const forbidden of['/brand/p0-riceball.webp','/brand/mf-home-hero-salad.webp','/brand/mf-home-hero-bowl.webp'])assert.ok(!menu.includes(forbidden),forbidden);
   assert.ok(menu.includes('displayPriceLabel'));
   assert.ok(menu.includes('已售罄'));
 });
@@ -72,19 +72,22 @@ test('sold-out products remain visible but cannot open product detail',()=>{
   assert.ok(menu.includes('stage2-sold-out'));
 });
 
-test('favorite is UI-local only and supports 已收藏 filter',()=>{
-  assert.ok(menu.includes('useState<ReadonlySet<string>>(new Set())'));
+test('favorite is app-owned device-persisted and supports 已收藏 filter',()=>{
+  assert.ok(app.includes("FAVORITES_KEY='mfk:customer:favorites:v1'"));
+  assert.ok(app.includes('writeFavoriteProductIds'));
+  assert.ok(menu.includes('favorites:ReadonlySet<string>'));
+  assert.ok(menu.includes('onToggleFavorite:(productId:string)=>void'));
   assert.ok(menu.includes("filter==='favorites'"));
   assert.ok(menu.includes('已收藏'));
-  for(const forbidden of['saveFavorite(','updateMember(','writeFavorite(','redeemCoupon(']){
-    assert.ok(!menu.includes(forbidden),forbidden);
-  }
+  for(const forbidden of['updateMember(','redeemCoupon('])assert.ok(!menu.includes(forbidden),forbidden);
 });
 
-test('Stage 2 navigation is exact and memory jar is fixed center',()=>{
+test('Stage 2 navigation is exact and visually flat across all five destinations',()=>{
   for(const label of['首頁','點單','記憶罐','訂單','會員'])assert.ok(nav.includes(label));
-  assert.ok(nav.includes("data-center={item.id==='cart'||undefined}"));
   assert.ok(nav.includes("id:'cart'"));
+  assert.ok(css.includes('.stage2-bottom-nav button[data-center=true]'));
+  assert.ok(css.includes('transform:none'));
+  assert.ok(css.includes('box-shadow:none'));
 });
 
 test('Stage 2 owns its menu chrome and Wave2 does not reintroduce legacy CustomerHeader',()=>{
