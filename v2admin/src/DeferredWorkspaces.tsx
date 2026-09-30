@@ -5,6 +5,8 @@ import {saveAdminConfig} from './admin-config-save.ts';
 import {AdminResponsiveDataView} from './AdminResponsiveDataView.tsx';
 import {AdminSearchField} from './AdminUiPrimitives.tsx';
 
+const hkTime=(value:string)=>new Date(value).toLocaleString('zh-HK',{timeZone:'Asia/Hong_Kong',hour12:false});
+
 function Header({title,description,badge='保留功能'}:{title:string;description:string;badge?:string}){
   return <header className="admin-editor-head"><div><small>{badge}</small><h1>{title}</h1><p>{description}</p></div></header>;
 }
@@ -95,7 +97,7 @@ export function PresentationWorkspace({surface}:{surface:'CUSTOMER'|'OWNER'|'FRO
     const result=saveAdminConfig(draft,undefined,'顯示設定 '+surface);
     if(!result.ok){setSaveErrors(result.errors);setSaveMessage('未能保存；請先修正設定驗證問題。');return;}
     setSaveErrors([]);
-    setSaveMessage('已保存並啟用 R'+result.release.version+'；已排入 Admin → SMT／SMM 自動同步。');
+    setSaveMessage('已建立正式發佈：'+hkTime(result.release.createdAt)+'（香港時間）；已排入 Admin → SMT／SMM 自動同步。');
   };
   const title=surface==='CUSTOMER'?'客戶端首頁':surface==='OWNER'?'老闆今日首頁':'前線點單版面';
   return <section className="admin-editor-page">
