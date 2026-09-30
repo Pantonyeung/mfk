@@ -5153,7 +5153,7 @@ Production：
 
 ---
 
-# 51. 54-Page Acceptance Inventory V1｜逐頁驗收盤點
+# 51. 53-Page Acceptance Inventory V1｜逐頁驗收盤點
 
 本節將 Product Map 53 個第二步 destination 逐頁做 product acceptance inventory。
 
@@ -5377,7 +5377,7 @@ Status：
 - duplicate copy / technical jargon
 
 MILESTONE:
-MFK_ADMIN_V3_54_PAGE_ACCEPTANCE_INVENTORY_V1_READY
+MFK_ADMIN_V3_53_PAGE_ACCEPTANCE_INVENTORY_V1_READY
 
 ---
 
@@ -12040,9 +12040,9 @@ MFK_ADMIN_V3_ORDER_READ_ONLY_AUTHORITY_CORRECTION_LOCKED
 
 ---
 
-# 65. 文字與術語一致性盤點 V1｜Batch 2：54 頁標題 / 主要按鈕 / 空白 / 錯誤 / 確認文案矩陣
+# 65. 文字與術語一致性盤點 V1｜Batch 2：53 頁標題 / 主要按鈕 / 空白 / 錯誤 / 確認文案矩陣
 
-本輪將 §64 正式中文字典逐頁套落 54 個第二步 destination。
+本輪將 §64 正式中文字典逐頁套落 53 個第二步 destination。
 
 目的：
 - Sidebar 細 Menu 名 = Page Title
@@ -12075,7 +12075,6 @@ MFK_ADMIN_V3_ORDER_READ_ONLY_AUTHORITY_CORRECTION_LOCKED
 |---|---|---|---|
 | 進行中訂單 | 查看訂單 | 目前未有進行中訂單 | 無 |
 | 訂單歷史 | 查看訂單 | 目前未有符合條件嘅訂單記錄 | 無 |
-| 售後／退款／取消／修正 | 開始售後 / 查看個案 | 目前未有售後記錄 | **確認退款 HK$X？** / **確認取消訂單 #XXXX？** / **確認修正付款方式？** |
 | 訂單異常 | 處理 | 目前未有訂單異常 | 真正危險操作去責任頁確認 |
 
 正式 object 名：
@@ -12269,7 +12268,7 @@ MFK_ADMIN_V3_ORDER_READ_ONLY_AUTHORITY_CORRECTION_LOCKED
 
 ## 65.13 逐頁文案硬規則
 
-所有 54 頁：
+所有 53 頁：
 
 1. Sidebar 細 Menu 名 = Page Title
 2. Primary CTA 一定係具體中文動詞
@@ -12296,7 +12295,7 @@ MFK_ADMIN_V3_ORDER_READ_ONLY_AUTHORITY_CORRECTION_LOCKED
 - 高風險 Confirm
 
 結果：
-- **54 頁文案規則已覆蓋**
+- **53 頁文案規則已覆蓋**
 - **53 LOCKED**
 - **1 YELLOW**
 - **0 RED**
@@ -12566,7 +12565,7 @@ Status：**LOCKED**
 11. 門店設定
 12. 系統管理
 
-54 個第二步 Page Title 以 §65 為唯一 UI 顯示基準。
+53 個第二步 Page Title 以 §65 為唯一 UI 顯示基準。
 
 任何舊英文 heading 只作 internal reference，
 唔可直接進 Sidebar / Page Header。
@@ -12616,13 +12615,13 @@ Status：**LOCKED**
 
 內容：
 1. Product Map
-2. 54/54 First Viewport
+2. 53/53 First Viewport
 3. 跨頁互動
 4. 共用元件
 5. 響應式
 6. 操作手感
 7. Copy Dictionary
-8. 唯一 YELLOW / BACKEND_CONTRACT_GAP
+8. 交易 mutation 明確 OUT OF ADMIN SCOPE
 9. Implementation entry conditions
 
 MILESTONE:
@@ -12636,13 +12635,13 @@ Admin V3 Product Brief R1 已完成產品層收口。
 
 目前狀態：
 
-- Product Map：12 個大 Menu / 54 個第二步 destination
-- First Viewport：54 / 54 已驗
+- Product Map：12 個大 Menu / 53 個第二步 destination
+- First Viewport：53 / 53 已驗
 - 跨頁互動：核心路線 / 高風險操作 / Bulk / 熟手效率已驗
 - 共用元件：核心元件 / 響應式 / 操作手感已驗
 - 文字：正式中文字典 / 54 頁文案矩陣 / Copy Dictionary 已完成
 - RED：0
-- 唯一 YELLOW：Admin 日結後付款方式修正 = BACKEND_CONTRACT_GAP
+- YELLOW：0；退款／取消訂單／付款方式修正已明確 OUT OF ADMIN SCOPE
 - Implementation：未開始 / 未授權
 - Production：v2 繼續運行
 - Spec PR：Draft，未 PROMOTE
@@ -12654,11 +12653,11 @@ Owner 審批時只需要確認：
 
 1. Product Map / IA
 2. 今日首頁 Sales-first
-3. 54 頁 First Viewport
+3. 53 頁 First Viewport
 4. 跨頁工作語法
 5. 共用元件 / Responsive / Interaction
 6. 正式 Copy Dictionary
-7. 唯一 Backend Contract Gap 處理原則
+7. 交易 mutation OUT OF ADMIN SCOPE 原則
 8. Implementation Entry Conditions
 
 任何 Owner PROMOTE 之前：
