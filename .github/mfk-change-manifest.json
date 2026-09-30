@@ -1,27 +1,30 @@
 {
   "version": 1,
-  "capability": "MFK_ADMIN_BOOTSTRAP_SAVED_STATE_R3",
-  "base_sha": "02b653c6e7406ed9e969145c6c715caeff38fa28",
+  "capability": "MFK_ADMIN_SAFARI_RUNTIME_DIAGNOSTIC_R4",
+  "base_sha": "0776cffed4afa6b8ecb6e5a5e4e822b1a54dd53e",
   "allowed_paths": [
     ".github/mfk-change-manifest.json",
+    "v2admin/src/AdminShell.tsx",
+    "v2admin/src/admin-control-plane.css",
     "v2admin/src/admin-canonical-normal-browser.test.ts",
     "v2admin/src/admin-sync-client.ts"
   ],
-  "authority_impact": "NONE_ADMIN_REMAINS_SOLE_CANONICAL_DATA_AUTHORITY",
-  "persistence_impact": "PRUNE_STALE_LOCAL_SYNC_OUTBOX_AFTER_CANONICAL_READ",
+  "authority_impact": "NONE_DIAGNOSTIC_ONLY_ADMIN_REMAINS_SOLE_CANONICAL_DATA_AUTHORITY",
+  "persistence_impact": "READ_ONLY_DIAGNOSTIC_OF_EXISTING_SYNC_STATUS_OUTBOX_AND_CANONICAL_HYDRATION_MARKER",
   "provider_impact": "NONE",
   "transaction_impact": "NONE",
   "expected_behavior_change": [
-    "Normal Safari with saved browser state removes stale queued publish rows after canonical cloud read.",
-    "Saved local state can no longer overwrite the canonical PUBLISHED status immediately after bootstrap.",
-    "Only a genuinely later explicitly created publish remains queued."
+    "Current Admin runtime shows a compact R4 diagnostic marker with production source SHA, sync state, outbox count and canonical hydration fingerprint.",
+    "If normal Safari still runs an older loaded bundle, the R4 marker is absent, proving the stale runtime path without clearing cache.",
+    "If R4 is present, the marker exposes whether a persisted outbox still exists after canonical hydration."
   ],
   "non_goals": [
+    "No outbox pruning semantic change in R4.",
     "No Customer, Owner, SMM or SMT changes.",
-    "No cache-header or service-worker changes.",
     "No Keeta changes.",
-    "No OTA."
+    "No publish engine rewrite.",
+    "No cache clearing requirement."
   ],
-  "rollback_sha": "02b653c6e7406ed9e969145c6c715caeff38fa28",
+  "rollback_sha": "0776cffed4afa6b8ecb6e5a5e4e822b1a54dd53e",
   "severity": "HARD_BLOCK"
 }
