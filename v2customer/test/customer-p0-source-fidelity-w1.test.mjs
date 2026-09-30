@@ -32,16 +32,15 @@ test('UI0 uses supplied male/female IP sheets, 50:50 selection and exact storybo
   assert.ok(overlay.includes("mode==='reduced'?120:mode==='returning'?700:2500"));
 });
 
-test('UI1 uses FINAL source screenshot crop for IP hero and source shortcut icon crops',()=>{
+test('UI1 uses a purpose-built hero without embedding mockup copy or inventing product media',()=>{
   const home=read('src/stage1/Stage1Home.tsx');
   const css=read('src/stage1/stage1.css');
-  assert.ok(home.includes('CUSTOMER_FINAL_SOURCE.stage1Final.url'));
-  assert.ok(home.includes('stage1-source-hero'));
-  for(const marker of['stage1-shortcut-ticket','stage1-shortcut-heart','stage1-shortcut-order'])assert.ok(home.includes(marker),marker);
-  assert.ok(css.includes('.stage1-source-hero>img'));
-  assert.ok(css.includes('width:608.4%'));
-  assert.ok(css.includes('top:-332.5%'));
-  assert.ok(home.includes('if(product.imageUrl)return product.imageUrl'));
+  assert.ok(home.includes("'/brand/mf-home-storefront-hero-v1.jpg'"));
+  assert.equal(fs.existsSync(path.join(root,'public/brand/mf-home-storefront-hero-v1.jpg')),true);
+  assert.doesNotMatch(home,/CUSTOMER_FINAL_SOURCE\.stage1Final|stage1-source-crop|stage1-shortcut-source/);
+  assert.match(home,/item\.product\.imageUrl[\s\S]*?stage1-product-placeholder/);
+  assert.doesNotMatch(home,/飯團\|紫米|沙律\|蔬菜\|輕食/);
+  assert.ok(css.includes('aspect-ratio:3/2'));
 });
 
 test('UI2 keeps canonical product media and FINAL zero-result female IP repair',()=>{
