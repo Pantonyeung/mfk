@@ -44,7 +44,7 @@ describe('Admin realtime transport recovery',()=>{
     expect(JSON.parse(sent[0]!)).toMatchObject({type:'ADMIN_CONFIG_AVAILABLE',storeId:'MF01',revision:42});
   });
 
-  it('accepts a newer publish time even when the diagnostic revision goes backwards',async()=>{
+  it('assigns a fresh Cloud canonical time to every distinct formal Admin publish',async()=>{
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-09-30T01:00:00.000Z'));
     const values=new Map<string,unknown>();
@@ -57,31 +57,49 @@ describe('Admin realtime transport recovery',()=>{
       getWebSockets:()=>[{send:(message:string)=>sent.push(message)}],
     };
     const store=new AdminSyncStore(state,{});
-    const oldEnvelope=createMfkAdminConfigEnvelope({
-      storeId:'MF01',revision:23,publishedAt:'2026-09-30T00:00:00.000Z',adminFingerprint:'admin-old',
-      snapshot:{catalog:{products:[{id:'old'}]}},
-    });
-    const oldResult=await store.publishEnvelope(oldEnvelope);
-    expect(oldResult.status).toBe(200);
-    expect(oldResult.body).toMatchObject({state:'PUBLISHED',cloudPublishedAt:'2026-09-30T01:00:00.000Z'});
 
-    vi.setSystemTime(new Date('2026-09-30T01:01:00.000Z'));
-    const newerEnvelope=createMfkAdminConfigEnvelope({
-      storeId:'MF01',revision:22,publishedAt:'2026-09-30T00:30:00.000Z',adminFingerprint:'admin-new',
-      snapshot:{catalog:{products:[{id:'new'}]}},
+    const first=createMfkAdminConfigEnvelope({
+      storeId:'MF01',revision:23,publishedAt:'2026-09-30T00:00:00.000Z',adminFingerprint:'admin-first',
+      snapshot:{catalog:{products:[{id:'first'}]}},
     });
-    const newerResult=await store.publishEnvelope(newerEnvelope);
-    expect(newerResult.status).toBe(200);
-    expect(newerResult.body).toMatchObject({
+    const firstResult=await store.publishEnvelope(first);
+    expect(firstResult.body).toMatchObject({
       state:'PUBLISHED',
-      cloudPublishedAt:'2026-09-30T01:01:00.000Z',
-      active:{revision:22,publishedAt:'2026-09-30T00:30:00.000Z',adminFingerprint:'admin-new'},
+      publishRequestFingerprint:first.fingerprint,
+      cloudPublishedAt:'2026-09-30T01:00:00.000Z',
+      active:{revision:23,publishedAt:'2026-09-30T01:00:00.000Z',adminFingerprint:'admin-first'},
     });
-    expect(JSON.parse(sent.at(-1)!)).toMatchObject({type:'ADMIN_CONFIG_AVAILABLE',revision:22,publishedAt:'2026-09-30T00:30:00.000Z'});
 
-    vi.setSystemTime(new Date('2026-09-30T01:02:00.000Z'));
-    const retry=await store.publishEnvelope(newerEnvelope);
-    expect(retry.body).toMatchObject({state:'IDEMPOTENT',cloudPublishedAt:'2026-09-30T01:01:00.000Z'});
+    vi.setSystemTime(new Date('2026-09-30T01:00:10.000Z'));
+    const second=createMfkAdminConfigEnvelope({
+      storeId:'MF01',revision:22,publishedAt:'2026-09-29T23:59:00.000Z',adminFingerprint:'admin-second',
+      snapshot:{catalog:{products:[{id:'second'}]}},
+    });
+    const secondResult=await store.publishEnvelope(second);
+    expect(secondResult.body).toMatchObject({
+      state:'PUBLISHED',
+      publishRequestFingerprint:second.fingerprint,
+      cloudPublishedAt:'2026-09-30T01:00:10.000Z',
+      active:{revision:22,publishedAt:'2026-09-30T01:00:10.000Z',adminFingerprint:'admin-second'},
+    });
+
+    expect(sent).toHaveLength(2);
+    expect(JSON.parse(sent[0]!)).toMatchObject({type:'ADMIN_CONFIG_AVAILABLE',publishedAt:'2026-09-30T01:00:00.000Z'});
+    expect(JSON.parse(sent[1]!)).toMatchObject({type:'ADMIN_CONFIG_AVAILABLE',publishedAt:'2026-09-30T01:00:10.000Z'});
+
+    const active=(secondResult.body as any).active;
+    expect(values.get('admin:published:'+active.fingerprint)).toMatchObject({
+      publishedAt:'2026-09-30T01:00:10.000Z',
+      publishRequestFingerprint:second.fingerprint,
+    });
+
+    vi.setSystemTime(new Date('2026-09-30T01:00:20.000Z'));
+    const retry=await store.publishEnvelope(second);
+    expect(retry.body).toMatchObject({
+      state:'IDEMPOTENT',
+      publishRequestFingerprint:second.fingerprint,
+      cloudPublishedAt:'2026-09-30T01:00:10.000Z',
+    });
     expect(sent).toHaveLength(2);
   });
 
