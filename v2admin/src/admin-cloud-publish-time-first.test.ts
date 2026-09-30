@@ -2,49 +2,77 @@ import {describe,expect,it} from 'vitest';
 import {createMfkAdminConfigEnvelope} from '../../contracts/admin-config-sync-v1.ts';
 import {validateAdminPublishConfirmation} from './admin-sync-client.ts';
 
-function expected(){
+function requestEnvelope(){
   return createMfkAdminConfigEnvelope({
     storeId:'MF01',
-    revision:22,
-    publishedAt:'2026-09-30T00:30:00.000Z',
-    adminFingerprint:'admin-new',
-    snapshot:{catalog:{products:[{id:'new'}]}},
+    revision:6,
+    publishedAt:'2010-01-01T00:00:00.000Z',
+    adminFingerprint:'content-r6',
+    snapshot:{catalog:{products:[{id:'r6'}]}},
+  });
+}
+function cloudEnvelope(source:ReturnType<typeof requestEnvelope>,publishedAt:string){
+  return createMfkAdminConfigEnvelope({
+    storeId:source.storeId,
+    revision:source.revision,
+    publishedAt,
+    adminFingerprint:source.adminFingerprint,
+    snapshot:source.snapshot,
   });
 }
 
-describe('Admin canonical Cloud publish confirmation — time first',()=>{
-  it.each(['PUBLISHED','IDEMPOTENT'] as const)('accepts exact canonical %s evidence with Cloud publish time',state=>{
-    const active=expected();
+describe('Admin canonical Cloud publish confirmation — HK time first',()=>{
+  it.each(['PUBLISHED','IDEMPOTENT'] as const)('accepts matching %s publish request with Cloud HK time',state=>{
+    const request=requestEnvelope();
+    const cloudPublishedAt='2026-09-30T09:01:00.000+08:00';
+    const active=cloudEnvelope(request,cloudPublishedAt);
     expect(validateAdminPublishConfirmation({
       state,
       active,
-      cloudPublishedAt:'2026-09-30T01:01:00.000Z',
-    },active)).toMatchObject({
+      cloudPublishedAt,
+      publishRequestFingerprint:request.fingerprint,
+    },request)).toMatchObject({
       state,
-      active:{fingerprint:active.fingerprint,publishedAt:active.publishedAt},
-      cloudPublishedAt:'2026-09-30T01:01:00.000Z',
+      active:{revision:6,adminFingerprint:'content-r6',publishedAt:cloudPublishedAt},
+      cloudPublishedAt,
     });
   });
 
-  it('rejects a 2xx response without Cloud publish time',()=>{
-    const active=expected();
-    expect(()=>validateAdminPublishConfirmation({state:'PUBLISHED',active},active))
-      .toThrow('ADMIN_SYNC_CLOUD_PUBLISHED_AT_INVALID');
+  it('rejects a 2xx body without Cloud publish time',()=>{
+    const request=requestEnvelope();
+    const active=cloudEnvelope(request,'2026-09-30T09:01:00.000+08:00');
+    expect(()=>validateAdminPublishConfirmation({
+      state:'PUBLISHED',
+      active,
+      publishRequestFingerprint:request.fingerprint,
+    },request)).toThrow('ADMIN_SYNC_CLOUD_PUBLISHED_AT_INVALID');
   });
 
-  it('rejects mismatched canonical fingerprint even when a revision number looks plausible',()=>{
-    const active=expected();
-    const other=createMfkAdminConfigEnvelope({
+  it('rejects another publish request even when its diagnostic R number is the same',()=>{
+    const request=requestEnvelope();
+    const active=cloudEnvelope(request,'2026-09-30T09:01:00.000+08:00');
+    expect(()=>validateAdminPublishConfirmation({
+      state:'PUBLISHED',
+      active,
+      cloudPublishedAt:active.publishedAt,
+      publishRequestFingerprint:'different-request',
+    },request)).toThrow('ADMIN_SYNC_PUBLISH_CONFIRMATION_MISMATCH');
+  });
+
+  it('never uses R size as publish freshness',()=>{
+    const request=requestEnvelope();
+    const active=createMfkAdminConfigEnvelope({
       storeId:'MF01',
-      revision:22,
-      publishedAt:'2026-09-30T00:31:00.000Z',
-      adminFingerprint:'admin-other',
+      revision:999,
+      publishedAt:'2026-09-30T09:01:00.000+08:00',
+      adminFingerprint:'different-content',
       snapshot:{catalog:{products:[{id:'other'}]}},
     });
     expect(()=>validateAdminPublishConfirmation({
       state:'PUBLISHED',
-      active:other,
-      cloudPublishedAt:'2026-09-30T01:02:00.000Z',
-    },active)).toThrow('ADMIN_SYNC_PUBLISH_CONFIRMATION_MISMATCH');
+      active,
+      cloudPublishedAt:active.publishedAt,
+      publishRequestFingerprint:request.fingerprint,
+    },request)).toThrow('ADMIN_SYNC_PUBLISH_CONFIRMATION_MISMATCH');
   });
 });
