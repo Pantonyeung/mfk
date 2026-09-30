@@ -981,7 +981,7 @@ export class AdminSyncStore{
         body:{
           state:'IDEMPOTENT',
           active:current,
-          sourceFingerprint:envelope.fingerprint,
+          publishRequestFingerprint:envelope.fingerprint,
           cloudPublishedAt:String(current.publishedAt||currentMeta.cloudPublishedAt||currentMeta.acceptedAt||''),
         },
       };
@@ -1006,10 +1006,18 @@ export class AdminSyncStore{
       revision:canonical.revision,
       fingerprint:canonical.fingerprint,
       adminFingerprint:canonical.adminFingerprint,
-      sourceFingerprint:envelope.fingerprint,
+      publishRequestFingerprint:envelope.fingerprint,
       sourcePublishedAt:envelope.publishedAt,
       cloudPublishedAt,
       acceptedAt:cloudPublishedAt,
+    });
+
+    await this.state.storage.put('admin:published:'+canonical.fingerprint,{
+      fingerprint:canonical.fingerprint,
+      publishedAt:canonical.publishedAt,
+      revision:canonical.revision,
+      adminFingerprint:canonical.adminFingerprint,
+      publishRequestFingerprint:envelope.fingerprint,
     });
 
     const doorbell=JSON.stringify({
@@ -1026,7 +1034,7 @@ export class AdminSyncStore{
       body:{
         state:'PUBLISHED',
         active:canonical,
-        sourceFingerprint:envelope.fingerprint,
+        publishRequestFingerprint:envelope.fingerprint,
         cloudPublishedAt,
       },
     };
@@ -1608,9 +1616,9 @@ export class AdminSyncStore{
       try{ack=validateMfkAdminConfigAck(await request.json());}
       catch(error){return json({code:error instanceof Error?error.message:'ADMIN_CONFIG_ACK_INVALID'},400);}
       const published=await this.state.storage.get('admin:published:'+ack.fingerprint);
-      if(!published?.active)return json({code:'ADMIN_CONFIG_ACK_UNKNOWN_PUBLISH',fingerprint:ack.fingerprint},409);
-      if(ack.publishedAt!==published.active.publishedAt){
-        return json({code:'ADMIN_CONFIG_ACK_PUBLISH_TIME_MISMATCH',expectedPublishedAt:published.active.publishedAt},409);
+      if(!published)return json({code:'ADMIN_CONFIG_ACK_UNKNOWN_PUBLISH',fingerprint:ack.fingerprint},409);
+      if(ack.publishedAt!==published.publishedAt){
+        return json({code:'ADMIN_CONFIG_ACK_PUBLISH_TIME_MISMATCH',expectedPublishedAt:published.publishedAt},409);
       }
       const acks=await this.state.storage.get('acks')||{};
       acks[ack.deviceId]=ack;
