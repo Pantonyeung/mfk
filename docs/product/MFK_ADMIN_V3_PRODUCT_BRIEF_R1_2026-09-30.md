@@ -10508,3 +10508,533 @@ Domain 可以調整內容，
 
 MILESTONE:
 MFK_ADMIN_V3_COMPONENT_CONTRACT_AUDIT_BATCH1_LOCKED
+
+---
+
+# 62. 共用介面元件規格盤點 V1｜Batch 2：尺寸 / 密度 / 對齊 / 響應式轉換
+
+本輪鎖「成套後台睇落成熟唔成熟、長時間用舒唔舒服」。
+
+核心原則：
+**資訊密度要高，但唔擠；操作要快，但唔誤觸；Desktop / Tablet / Mobile 係同一產品，但唔係同一版面硬縮。**
+
+---
+
+# 62.1 全局尺寸基準
+
+沿用 8px spacing grid。
+
+主要間距：
+- 4px：圖示 / 緊密 inline
+- 8px：小型元素
+- 12px：field / label
+- 16px：一般 row / card 內距
+- 24px：section 內區隔
+- 32px：主要 section 區隔
+- 40–48px：page-level 區隔
+
+Touch target：
+- 最低 44×44px
+
+Control 高度建議：
+- Compact control：36px（只限 Desktop 高密度工具）
+- Standard control：40px
+- Touch / Mobile：44–48px
+
+禁止：
+- Desktop 因為追求高密度而低過可安全點擊尺寸
+- Mobile 用 32px 細掣
+- 同一頁混 3–4 種 control 高度
+
+Status：**LOCKED**
+
+---
+
+# 62.2 Sidebar 尺寸
+
+## Desktop Wide ≥ 1440px
+
+第一欄大 Menu：
+- 建議 176–208px
+
+第二欄細 Menu：
+- 建議 200–232px
+
+總 navigation：
+- 約 376–440px 內
+
+原則：
+- 大 Menu 同細 Menu 同時可見
+- 文字完整顯示
+- Content 至少保留主要工作寬度
+
+## Desktop / Laptop 1180–1439px
+
+第一欄：
+- 64–72px icon + active label / compact text
+或
+- 160px compact rail
+
+第二欄：
+- 200–220px
+
+依實際可讀性揀一種，
+但禁止令 Content 只剩窄欄。
+
+## Tablet 768–1179px
+
+- 大 Menu rail 可固定窄欄
+- 細 Menu 用 overlay / slide panel
+- 揀完細 Menu 後收起
+- Content 佔主要畫面
+
+## Mobile < 768px
+
+- Sidebar 改 Drawer
+- 第一層大 Menu
+- 第二層細 Menu
+- 揀完即關 Drawer
+
+硬規則：
+- 響應式只改呈現方式
+- Product Map 結構唔變
+- 唔用「更多」收納正式功能
+
+Status：**LOCKED**
+
+---
+
+# 62.3 Page Content 寬度
+
+唔用一個固定 max-width 套所有頁。
+
+分三類：
+
+## A. 閱讀 / 設定型
+例如：
+- 門店資料
+- Business Day 分界
+- Role Detail
+
+建議 content width：
+**880–1080px**
+
+## B. 標準管理型
+例如：
+- 產品管理
+- 訂單歷史
+- 員工管理
+
+建議：
+**1100–1360px**
+
+## C. 高密度營運型
+例如：
+- 訂單進行中
+- 商品映射
+- 系統診斷
+- 打印異常
+
+可以用：
+**Full available width**
+
+但：
+- 文字列唔無限拉長
+- 重要數值要對齊
+- 唔做無意義超寬 whitespace
+
+Status：**LOCKED**
+
+---
+
+# 62.4 頁首高度與節奏
+
+PageHeader：
+- Desktop 約 72–96px 視內容
+- Mobile 約 56–72px
+
+Header 內容順序：
+1. Title
+2. Scope / Status / freshness
+3. Primary CTA
+
+禁止：
+- Header 高到食晒第一屏
+- 一頁堆 3 層 breadcrumb + subtitle + description + hero + CTA
+
+需要說明時：
+最多 1–2 行短 description。
+
+Status：**LOCKED**
+
+---
+
+# 62.5 Table Row 密度
+
+Desktop Standard Row：
+**48–56px**
+
+High-density operational row：
+**44–48px**
+只限：
+- orders
+- audit
+- diagnostics
+- mapping
+- print exceptions
+
+Comfortable config row：
+**52–60px**
+
+規則：
+- 同一 table row height 一致
+- primary identity 垂直置中
+- 重要數值用 tabular numeric alignment
+- 狀態 badge 唔推高整行
+
+禁止：
+- 72–88px row 造成管理頁過度鬆散
+- 32–36px row 造成誤觸 / 難掃讀
+
+Status：**LOCKED**
+
+---
+
+# 62.6 Mobile Card 密度
+
+每張 Record Card：
+- 內距 12–16px
+- 卡與卡 8–12px
+- 第一行：primary label + primary status/value
+- 第二行：secondary context
+- 第三行：attention / freshness（有先顯）
+
+禁止：
+- 每張卡塞十幾個 label
+- 將 Desktop 每一欄搬晒落 Mobile
+- 用大卡浪費畫面，只顯一件小資料
+
+Mobile 目標：
+**一屏至少合理見到 3–5 個普通 records**
+（視內容長度而定）
+
+Status：**LOCKED**
+
+---
+
+# 62.7 Search / Filter 對齊
+
+Desktop：
+同一水平工作列：
+
+[Search________________] [Filter] [Filter] [更多篩選] [Saved View]
+
+Primary Create CTA 留 PageHeader，
+唔同 Filter 擠埋一排。
+
+Mobile：
+[Search________] [篩選 3]
+
+Filter 開 bottom sheet / full-screen sheet。
+
+規則：
+- Active filter chip 放 list 上方
+- filter count 清楚
+- Search 寬度優先
+
+Status：**LOCKED**
+
+---
+
+# 62.8 Sticky Zones
+
+允許 sticky：
+
+1. Topbar
+2. Secondary nav（Desktop 視需要）
+3. Table header
+4. Draft Bar
+5. Mobile primary action bar
+6. Bulk Action Bar
+
+禁止同時黐住太多層。
+
+Desktop 同一畫面：
+正常最多 2–3 個 sticky zones。
+
+Mobile：
+通常：
+- Topbar
+- Bottom action / Draft / Bulk（三者同一時間只保留最高優先一個）
+
+Priority：
+Bulk Action
+> High-risk workflow action
+> Draft Bar
+> Normal primary action
+
+避免底部三層 bar 疊埋。
+
+Status：**LOCKED**
+
+---
+
+# 62.9 Modal / Drawer / Sheet 使用規則
+
+## Modal
+只用：
+- confirm
+- short bounded form
+- small comparison / preview
+
+唔用：
+- 20 field full editor
+- long setup flow
+- complex table
+
+## Side Drawer
+適合：
+- lightweight detail preview
+- Audit detail
+- quick evidence
+- contextual inspection
+
+唔應取代正式 Detail page。
+
+## Bottom Sheet
+Mobile 適合：
+- Filter
+- simple selection
+- quick action
+- confirm
+
+## Full Page
+用於：
+- Create / Edit
+- complex Detail
+- workflow
+- Publish / Rollback
+- permission editor
+
+Status：**LOCKED**
+
+---
+
+# 62.10 Form Grid
+
+Desktop：
+- 預設 1–2 columns
+- 相關短 field 可兩欄
+- 長文字 / select / complex input 一欄
+
+例：
+[Product Name________] [Product Code____]
+[Category____________] [Base Price______]
+[Description____________________________]
+
+禁止：
+- 為咗填滿畫面硬塞 3–4 欄
+- label 對唔齊
+- required field 分散到唔知由邊開始
+
+Mobile：
+- 全部單欄
+- field 間距 16–20px
+- section 間距 28–32px
+
+Status：**LOCKED**
+
+---
+
+# 62.11 Detail Page 密度
+
+Object Detail 唔做「一頁幾十張 card」。
+
+建議：
+- Header：identity + state + primary edit
+- Summary：2–4 個最重要 facts
+- Grouped sections
+- 少量 status / relationship cards
+
+如果資訊多：
+- Tabs / section anchors
+- 唔用 nested accordion 層層收埋
+
+Accordion 只適合：
+- optional technical evidence
+- advanced detail
+- rarely needed explanation
+
+Status：**LOCKED**
+
+---
+
+# 62.12 KPI / Metric Card
+
+Metric card 只用喺：
+- 今日首頁
+- 報表 summary
+- 少量 operational summary
+
+標準：
+- 主要數字
+- 清楚 label
+- freshness / comparison（必要）
+- 最多一個次要 context
+
+禁止：
+- 每頁都用 KPI cards
+- 8–12 張同等權重
+- card 裡面再塞細 chart + table + status
+
+今日首頁：
+Effective Sales 最大權重；
+Orders / AOV / Refund 次一級。
+
+Status：**LOCKED**
+
+---
+
+# 62.13 Status Badge 密度
+
+一個 row / card：
+正常最多顯 1 個 primary state + 1–2 個 attention badges。
+
+其他狀態：
+收去 Detail。
+
+例如 Order row：
+- Fulfillment state
+- Payment attention（只有異常先 badge）
+- Print exception（有先顯）
+
+唔可以：
+Paid / Ready / Printed / Synced / Healthy / Source 全部變 badge 一排。
+
+Status：**LOCKED**
+
+---
+
+# 62.14 Danger Action 擺位
+
+列表：
+- Danger action 收 overflow / Detail
+- 唔做 primary row button
+
+Detail：
+- Danger action 放 secondary / danger zone
+- 同 ordinary Edit 保持距離
+
+Confirm：
+- Cancel 左
+- Danger confirm 右
+- 文案明確
+
+Mobile：
+- Danger 唔貼近 Back / Save
+- destructive option 可放頁底 danger zone
+
+Status：**LOCKED**
+
+---
+
+# 62.15 Empty / Error Visual Priority
+
+Empty：
+視覺要輕。
+- icon 可選
+- 一句狀態
+- 一個合理 CTA
+
+Error：
+比 Empty 更高優先，
+但唔使用全頁紅色恐慌。
+
+Blocking error：
+- page-level banner / panel
+- 清楚下一步
+
+Stale：
+低一級 persistent banner，
+唔遮住 content。
+
+UNKNOWN：
+靠文字 + neutral/warning treatment，
+唔畫成 failure red。
+
+Status：**LOCKED**
+
+---
+
+# 62.16 Desktop → Tablet → Mobile 轉換矩陣
+
+| Desktop | Tablet | Mobile |
+|---|---|---|
+| 兩欄 Sidebar 常駐 | 大 Menu rail + 細 Menu overlay | Drawer：大 Menu → 細 Menu |
+| DataTable | Compact table / record list | Stacked cards |
+| Inline Filters | compact / overlay | Filter sheet |
+| Side-by-side form | 1–2 column | Single column |
+| Drawer preview 可用 | Drawer / full page | Full page / bottom sheet |
+| Sticky table header | 視空間 | 不使用橫向大表 |
+| Hover affordance 可輔助 | 不依賴 hover | 無 hover |
+| Keyboard shortcut | 可選 | 不依賴 |
+
+硬規則：
+**功能、名稱、Authority、State semantics 三個尺寸完全一致。**
+
+Status：**LOCKED**
+
+---
+
+# 62.17 可達性 / 輸入密度
+
+所有版本：
+- Touch target ≥44px
+- Keyboard focus visible
+- tab order 跟視覺順序
+- sticky bar 唔遮 focus target
+- Modal / Drawer 關閉後 focus 回來源
+- status 唔靠 color
+- mobile card 保留 field label
+
+高密度唔等於犧牲 accessibility。
+
+Status：**LOCKED**
+
+---
+
+# 62.18 Batch 2 結果
+
+本輪鎖：
+1. Global spacing / control height
+2. Sidebar responsive width
+3. Content width classes
+4. PageHeader density
+5. Table row density
+6. Mobile card density
+7. Search / Filter layout
+8. Sticky zones
+9. Modal / Drawer / Sheet rule
+10. Form grid
+11. Detail density
+12. KPI density
+13. Status badge density
+14. Danger action placement
+15. Empty / Error priority
+16. Desktop / Tablet / Mobile transform
+17. Accessibility density
+
+結果：
+- **17 LOCKED**
+- **0 YELLOW**
+- **0 RED**
+
+下一輪：
+**共用介面元件規格盤點 Batch 3：互動狀態 / 動畫 / 鍵盤 / Focus / Selection / Hover / Drag / Loading 行為**
+
+目的：
+鎖「操作手感」，
+避免視覺一致但用起上嚟每頁反應唔同。
+
+MILESTONE:
+MFK_ADMIN_V3_COMPONENT_CONTRACT_AUDIT_BATCH2_LOCKED
