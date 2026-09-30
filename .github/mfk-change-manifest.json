@@ -1,33 +1,42 @@
 {
   "version": 1,
-  "capability": "MFK_ADMIN_V3_PRODUCT_BRIEF_FUNCTION_UI_LOCK_R1",
-  "base_sha": "f826598f0517229b94c7e817c642e808dc515cc3",
+  "capability": "MFK_ADMIN_V3_ONE_SHOT_IMPLEMENTATION_R1_GATE1",
+  "base_sha": "3c6c00d032eec121f1b6f1a9c059a3215c572ef0",
   "root_control": "#596",
   "product_control": "#601",
+  "implementation_branch": "feat/MFK-V3ADMIN-ONE-SHOT-R1",
   "allowed_paths": [
     ".github/mfk-change-manifest.json",
+    ".github/workflows/v3admin-ci.yml",
     "COMMANDER_CURRENT.md",
     "HANDOFF_CURRENT.md",
-    "docs/product/MFK_ADMIN_V3_PRODUCT_BRIEF_R1_2026-09-30.md"
+    "docs/implementation/**",
+    "v3admin/**"
   ],
-  "authority_impact": "PRODUCT_UI_IA_ACCEPTANCE_LOCK_ONLY; NO_DOMAIN_AUTHORITY_CHANGE",
-  "persistence_impact": "NONE",
+  "read_only_dependencies": [
+    "contracts/admin-config-sync-v1.ts",
+    "contracts/web-state-authority-v1.ts"
+  ],
+  "authority_impact": "NONE; V3 remains a client of existing Admin canonical and SMT/runtime authorities",
+  "persistence_impact": "NO_V2_STORAGE_IMPORT; NO_DURABLE_SERVER_TRUTH; DEXIE_OUTBOX_DISABLED_UNLESS_OFFLINE_COMMAND_EXPLICITLY_APPROVED",
   "provider_impact": "NONE",
   "transaction_impact": "NONE",
   "production_routing_impact": "NONE",
   "expected_behavior_change": [
-    "No runtime behavior change.",
-    "Admin V3 implementation roadmap changes from incremental A1/A2 slices to one product-brief-led isolated rebuild.",
-    "The full R1 function set, navigation, UI patterns, state semantics, forbidden patterns and acceptance gates are locked before implementation.",
-    "Current v2 production remains unchanged."
+    "V3 can identify its loaded client build and compare it with the currently served release manifest.",
+    "V3 uses memory-only Admin authentication and centralized Store/Scope context.",
+    "V3 reads Cloud canonical Admin config through TanStack Query and the shared canonical validator.",
+    "V3 does not read v2 localStorage or import v2 client-state modules.",
+    "A serving/client release mismatch blocks future formal write surfaces."
   ],
   "non_goals": [
-    "No v3admin product code change in this spec slice.",
-    "No backend/API/SMT/domain authority change.",
-    "No production deployment or hostname routing.",
-    "No merge of parked A1 PR #599.",
-    "No Codex implementation until Product Brief #601 is approved and merged."
+    "No production deploy or hostname routing.",
+    "No v2 client/runtime changes.",
+    "No backend/SMT/provider/payment/pricing authority changes.",
+    "No Admin refund/cancel/payment-correction mutation.",
+    "No offline publish outbox in Gate 1.",
+    "No merge of PR #599."
   ],
-  "rollback_sha": "f826598f0517229b94c7e817c642e808dc515cc3",
+  "rollback_sha": "3c6c00d032eec121f1b6f1a9c059a3215c572ef0",
   "severity": "HARD_BLOCK"
 }
