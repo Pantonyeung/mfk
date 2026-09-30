@@ -1,12 +1,11 @@
 const UI0_OBJECT_KEY='ui/ui0/opening-mobile-v1.MP4';
-const CUSTOMER_BUILD_ID='af43260e4b7366c0c7671c1cc2793b8712a4bc3e';
 const CUSTOMER_UI1_CONTRACT='five-state-home-v1';
 
 export default {
   async fetch(request,env){
     const url=new URL(request.url);
     if(url.pathname==='/__mfk/build'){
-      return new Response(JSON.stringify({buildId:CUSTOMER_BUILD_ID,ui1:CUSTOMER_UI1_CONTRACT}),{status:200,headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store'}});
+      return new Response(JSON.stringify({buildId:String(env.MFK_SOURCE_SHA||env.MFK_VERSION?.id||'UNKNOWN'),ui1:CUSTOMER_UI1_CONTRACT}),{status:200,headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store'}});
     }
     if(url.pathname==='/media/ui0/opening-mobile-v1.mp4'){
       if(request.method!=='GET'&&request.method!=='HEAD')return new Response('Method Not Allowed',{status:405});
