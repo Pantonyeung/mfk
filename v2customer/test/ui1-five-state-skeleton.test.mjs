@@ -16,7 +16,14 @@ test('UI1 fixed shortcut rail is 我的收藏 / 回憶券 / 期間限定',()=>{
   const end=home.indexOf('<section className="stage1-top6"');
   const quick=home.slice(start,end);
   for(const label of ['我的收藏','回憶券','期間限定'])assert.ok(quick.includes(label),label);
-  assert.ok(quick.includes('onClick={onHistory}'));
+  assert.ok(quick.includes('onClick={onFavorites}'));
   assert.ok(quick.includes('onClick={onMember}'));
-  assert.ok(quick.includes('onClick={onBrowse}'));
+  assert.ok(quick.includes('onClick={onLimited}'));
+});
+
+
+test('UI1 quick entries map to real destinations',()=>{
+  assert.ok(home.includes('onFavorites:()=>void'));
+  assert.ok(home.includes('onLimited:()=>void'));
+  assert.ok(home.includes('onMember:()=>void'));
 });
