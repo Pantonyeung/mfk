@@ -1,7 +1,7 @@
 # ADMIN V3 CURRENT PRODUCT PHASE｜2026-09-30
 
 Controlling product candidate:
-`docs/product/MFK_ADMIN_V3_PRODUCT_BRIEF_FUNCTION_UI_LOCK_R1_2026-09-30.md`
+`docs/product/MFK_ADMIN_V3_PRODUCT_BRIEF_R1_2026-09-30.md`
 
 Product issue:
 #601
