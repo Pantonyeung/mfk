@@ -43,7 +43,7 @@ export function PublishCenterWorkspace(){
     writeAdminStored(OPTION_SET_CENTER_STORAGE_KEYS.dirty,false);
     setReleases(readAdminReleases());
     setActive({version:row.version,createdAt:row.createdAt,fingerprint:row.fingerprint});
-    setMessage('已由 '+hkTime(release.createdAt)+' 嘅歷史資料重新建立正式發佈；今次以 '+hkTime(row.createdAt)+'（香港時間）作發佈次序。');
+    setMessage('已建立歷史資料重新發佈要求；Cloud 接收後會以今次香港發佈時間成為新狀態。');
     window.setTimeout(()=>window.location.reload(),50);
   };
 
