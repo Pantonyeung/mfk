@@ -27,7 +27,9 @@ export async function readV3CanonicalAdminActive(input:{
     const row=body&&typeof body==='object'&&!Array.isArray(body)?body as Record<string,unknown>:{};
     throw new Error(String(row.message||row.code||'V3_ADMIN_CANONICAL_HTTP_'+response.status));
   }
-  return validateMfkAdminConfigEnvelope(body);
+  const envelope=validateMfkAdminConfigEnvelope(body);
+  if(envelope.storeId!==input.storeId)throw new Error('V3_ADMIN_CANONICAL_STORE_MISMATCH');
+  return envelope;
 }
 
 export function summarizeV3Canonical(envelope:MfkAdminConfigEnvelope){

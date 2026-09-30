@@ -4,6 +4,8 @@ export interface V3ClientReleaseIdentity{
   readonly buildTime:string;
 }
 
+export const V3_RELEASE_REFETCH_INTERVAL_MS=60_000;
+
 declare const __MFK_CLIENT_RELEASE_ID__:string;
 declare const __MFK_CLIENT_SOURCE_SHA__:string;
 declare const __MFK_CLIENT_BUILD_TIME__:string;
@@ -27,5 +29,15 @@ export async function readServingRelease():Promise<V3ClientReleaseIdentity>{
 }
 
 export function releaseIdentityMatches(client:V3ClientReleaseIdentity,serving:V3ClientReleaseIdentity){
-  return client.releaseId===serving.releaseId&&client.sourceSha===serving.sourceSha;
+  return client.releaseId===serving.releaseId
+    &&client.sourceSha===serving.sourceSha
+    &&client.buildTime===serving.buildTime;
+}
+
+export function releaseVerificationMatches(
+  client:V3ClientReleaseIdentity,
+  serving:V3ClientReleaseIdentity|undefined,
+  verificationCurrent:boolean,
+){
+  return verificationCurrent&&serving?releaseIdentityMatches(client,serving):null;
 }

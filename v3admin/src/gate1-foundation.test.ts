@@ -1,7 +1,7 @@
 import {afterEach,describe,expect,it,vi} from 'vitest';
 import {createMfkAdminConfigEnvelope} from '../../contracts/admin-config-sync-v1.ts';
 import {readV3CanonicalAdminActive,v3AdminCanonicalQueryKey} from './canonical.ts';
-import {releaseIdentityMatches} from './release.ts';
+import {releaseIdentityMatches,releaseVerificationMatches,V3_RELEASE_REFETCH_INTERVAL_MS} from './release.ts';
 import {V3_ADMIN_STATE_AUTHORITY} from './state-authority.ts';
 
 afterEach(()=>vi.unstubAllGlobals());
@@ -33,10 +33,31 @@ describe('Admin V3 one-shot Gate 1',()=>{
     await expect(readV3CanonicalAdminActive({storeId:'MF01',sessionToken:'s'.repeat(64)})).rejects.toThrow('ADMIN_CONFIG_STORE_ID_INVALID');
   });
 
+  it('rejects a valid canonical envelope for another store',async()=>{
+    const envelope=createMfkAdminConfigEnvelope({
+      storeId:'MF02',
+      revision:9,
+      publishedAt:'2026-09-30T14:10:00.000Z',
+      adminFingerprint:'fnv1a32:admin',
+      snapshot:{catalog:{categories:[],products:[],modifierGroups:[],combos:[]}},
+    });
+    vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify(envelope),{status:200,headers:{'content-type':'application/json'}})));
+    await expect(readV3CanonicalAdminActive({storeId:'MF01',sessionToken:'s'.repeat(64)})).rejects.toThrow('V3_ADMIN_CANONICAL_STORE_MISMATCH');
+  });
+
   it('separates loaded client release from serving release identity',()=>{
     const same={releaseId:'r1',sourceSha:'a'.repeat(40),buildTime:'2026-09-30T14:00:00.000Z'};
     expect(releaseIdentityMatches(same,same)).toBe(true);
     expect(releaseIdentityMatches(same,{...same,releaseId:'r2'})).toBe(false);
+    expect(releaseIdentityMatches(same,{...same,buildTime:'2026-09-30T14:01:00.000Z'})).toBe(false);
+  });
+
+  it('fails closed while serving release verification is not current',()=>{
+    const same={releaseId:'r1',sourceSha:'a'.repeat(40),buildTime:'2026-09-30T14:00:00.000Z'};
+    expect(releaseVerificationMatches(same,same,true)).toBe(true);
+    expect(releaseVerificationMatches(same,same,false)).toBeNull();
+    expect(releaseVerificationMatches(same,undefined,true)).toBeNull();
+    expect(V3_RELEASE_REFETCH_INTERVAL_MS).toBeGreaterThan(0);
   });
 
   it('does not enable a durable outbox by default',()=>{

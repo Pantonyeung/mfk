@@ -3,7 +3,12 @@ import {useQuery,useQueryClient} from '@tanstack/react-query';
 import {readV3BackendHealth,v3QueryKeys} from './api.ts';
 import {loginV3Admin,logoutV3Admin,type V3AdminSession} from './auth.ts';
 import {readV3CanonicalAdminActive,summarizeV3Canonical,v3AdminCanonicalQueryKey} from './canonical.ts';
-import {readServingRelease,releaseIdentityMatches,V3_CLIENT_RELEASE} from './release.ts';
+import {
+  readServingRelease,
+  releaseVerificationMatches,
+  V3_CLIENT_RELEASE,
+  V3_RELEASE_REFETCH_INTERVAL_MS,
+} from './release.ts';
 import {scopeFromSession} from './scope.ts';
 import {V3_ADMIN_STATE_AUTHORITY,useV3AdminUi} from './state-authority.ts';
 
@@ -32,6 +37,7 @@ export function V3AdminApp(){
     queryKey:['mfk','admin-v3','client-release','serving'],
     queryFn:readServingRelease,
     staleTime:0,
+    refetchInterval:V3_RELEASE_REFETCH_INTERVAL_MS,
     refetchOnMount:'always',
     refetchOnWindowFocus:true,
     refetchOnReconnect:true,
@@ -47,7 +53,11 @@ export function V3AdminApp(){
     gcTime:0,
   });
 
-  const releaseMatch=servingRelease.data?releaseIdentityMatches(V3_CLIENT_RELEASE,servingRelease.data):null;
+  const releaseMatch=releaseVerificationMatches(
+    V3_CLIENT_RELEASE,
+    servingRelease.data,
+    servingRelease.isSuccess&&!servingRelease.isFetching&&!servingRelease.isRefetchError&&!servingRelease.isPaused,
+  );
   const writeBlocked=releaseMatch!==true;
   const summary=canonical.data?summarizeV3Canonical(canonical.data):null;
 
