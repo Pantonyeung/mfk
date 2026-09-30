@@ -1,14 +1,10 @@
-import {execSync} from 'node:child_process';
 import {defineConfig} from 'vite';
 import react from '@vitejs/plugin-react';
 
-function sourceSha(){
-  if(process.env.GITHUB_SHA)return process.env.GITHUB_SHA;
-  try{return execSync('git rev-parse HEAD',{encoding:'utf8'}).trim();}catch{return 'DEV_UNKNOWN_SHA';}
-}
+declare const process:{env:Record<string,string|undefined>};
 
 export default defineConfig(()=>{
-  const sha=sourceSha();
+  const sha=process.env.GITHUB_SHA||process.env.MFK_SOURCE_SHA||'DEV_UNKNOWN_SHA';
   const releaseId=process.env.MFK_V3ADMIN_RELEASE_ID||'v3admin-'+sha.slice(0,12);
   const buildTime=new Date().toISOString();
   const releaseJson=JSON.stringify({releaseId,sourceSha:sha,buildTime});
