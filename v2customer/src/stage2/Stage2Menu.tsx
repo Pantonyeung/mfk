@@ -8,7 +8,7 @@ export const STAGE2_VISUAL_REFERENCE='https://cdn.creativeclaw.co/u/6ad84d58/ima
 const OFFICIAL_LOGO_URL='https://cdn.creativeclaw.co/u/6ad84d58/images/402357b6-d757-4238-99f7-3d20607da6f2.png';
 const ZERO_RESULT_IP='/brand/stage0-female.webp';
 
-type Stage2Filter='all'|'popular'|'favorites';
+type Stage2Filter='all'|'favorites';
 
 function matchesQuery(product:CustomerProduct,query:string){
   const needle=query.trim().toLowerCase();
@@ -99,8 +99,7 @@ export function Stage2Menu({
   const categoryValid=activeCategoryId&&categories.some(item=>item.categoryId===activeCategoryId);
   const selectedCategoryId=categoryValid?activeCategoryId:null;
   const categoryProducts=selectedCategoryId?products.filter(product=>product.categoryId===selectedCategoryId):(recommendationProducts.length?recommendationProducts:products.filter(product=>product.available));
-  const popularIds=new Set(recommendations.map(item=>item.product.productId));
-  const filteredByMode=categoryProducts.filter(product=>filter==='favorites'?favorites.has(product.productId):filter==='popular'?popularIds.has(product.productId):true);
+  const filteredByMode=categoryProducts.filter(product=>filter==='favorites'?favorites.has(product.productId):true);
   const displayProducts=searchMode?products.filter(product=>matchesQuery(product,query)):filteredByMode;
   const featuredProduct=displayProducts.find(product=>product.available)??displayProducts[0]??null;
   const smallProducts=featuredProduct?displayProducts.filter(product=>product.productId!==featuredProduct.productId):[];
@@ -131,12 +130,11 @@ export function Stage2Menu({
 
       {!searchMode?<>
         <div className="stage2-category-rail" role="tablist" aria-label="商品分類">
-          <button role="tab" aria-selected={!selectedCategoryId} className={!selectedCategoryId?'is-active':''} onClick={()=>setCategory(null)}>人氣推薦</button>
+          <button role="tab" aria-selected={!selectedCategoryId} className={!selectedCategoryId?'is-active':''} onClick={()=>setCategory(null)}>推薦</button>
           {categories.map(category=><button key={category.categoryId} role="tab" aria-selected={selectedCategoryId===category.categoryId} className={selectedCategoryId===category.categoryId?'is-active':''} onClick={()=>setCategory(category.categoryId)}>{category.name}</button>)}
         </div>
         {selectedCategoryId?<div className="stage2-filter-strip" role="group" aria-label="商品篩選">
           <button className={filter==='all'?'is-active':''} aria-pressed={filter==='all'} onClick={()=>setFilter('all')}>全部</button>
-          <button className={filter==='popular'?'is-active':''} aria-pressed={filter==='popular'} onClick={()=>setFilter('popular')}>人氣</button>
           <button className={filter==='favorites'?'is-active':''} aria-pressed={filter==='favorites'} onClick={()=>setFilter('favorites')}>已收藏</button>
         </div>:null}
       </>:null}
@@ -150,7 +148,7 @@ export function Stage2Menu({
           <h2>暫時搵唔到呢個結果</h2>
           <p>不如試下其他分類？</p>
           <div className="stage2-repair-categories">
-            <button onClick={()=>{setQuery('');setCategory(null)}}>人氣推薦</button>
+            <button onClick={()=>{setQuery('');setCategory(null)}}>推薦</button>
             {categories.slice(0,3).map(category=><button key={category.categoryId} onClick={()=>{setQuery('');setCategory(category.categoryId)}}>{category.name}</button>)}
           </div>
           <button className="stage2-back-menu" onClick={()=>setQuery('')}>返回點單</button>
@@ -166,7 +164,7 @@ export function Stage2Menu({
       </section>:<section className="stage2-empty" role="status">
         <strong>{filter==='favorites'?'未有收藏商品':'呢個分類暫時未有商品'}</strong>
         <p>{filter==='favorites'?'撳商品右上角嘅心形，就可以喺呢度快速搵返。':'可以切換其他分類繼續睇。'}</p>
-        <button type="button" onClick={()=>{setFilter('all');setCategory(null)}}>返回人氣推薦</button>
+        <button type="button" onClick={()=>{setFilter('all');setCategory(null)}}>返回推薦</button>
       </section>}
     </div>
   </main>;
