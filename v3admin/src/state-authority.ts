@@ -7,7 +7,7 @@ export const V3_ADMIN_STATE_AUTHORITY=Object.freeze({
   outbox:'DEXIE_INDEXEDDB',
   localDraft:'ZUSTAND_OR_REACT',
   authPersistence:'MEMORY_ONLY',
-  canonicalValidation:'SHARED_ADMIN_CONFIG_CONTRACT',
+  canonicalValidation:'ADMIN_CONFIG_CONTRACT_EQUIVALENT',
   derivedServerStatusPersisted:false,
   v2StateModulesImported:false,
 } as const);
