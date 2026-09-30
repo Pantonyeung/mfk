@@ -1329,41 +1329,241 @@ Detail：
 
 ---
 
-# 23. Connected & Device｜鎖定
+# 23. 裝置管理｜鎖定
 
-## Device Health
-每 device：
-- type
-- identity
-- trust
-- current version
-- desired version
-- last seen
+裝置管理係獨立功能 domain。
+使用者想知道「邊部機有問題、版本係乜、最近有冇連線、而家跑緊邊個 Runtime」時，第一時間就應該入 **裝置管理**。
+
+Sidebar 細 Menu 直接顯示：
+- 裝置狀態
+- OTA／版本
+
+所有頁面符合：
+**裝置管理 → 細 Menu → 已見到目標內容 → 撳 device / release 入 Detail**
+
+禁止將裝置功能收埋入：
+「更多 → 連接與設備 → 裝置 → 其他」。
+
+## 23.1 裝置狀態
+
+入口：
+**裝置管理 → 裝置狀態**
+
+第二步完成後直接見 Device List。
+
+Search / Filter：
+- Device type
+- Current health
+- Version
+- Trust / registration state（如正式 read model 有）
+- Last seen
+- Attention only
+
+List 最低欄位：
+- Device name / display identity
+- Type
+- Assigned role / location
+- Current runtime / app version
+- Last seen
+- Freshness
+- Current health
+- Config drift
+- Attention indicator
+- Row action
+
+正常 UI 唔顯 raw UUID 作主要 identity。
+Technical ID 只放 Detail / Diagnostics。
+
+Device type 可以包括目前正式 read model 支援嘅：
+- SMT
+- SMM endpoint / client instance（只作 assistive surface identity，如有）
+- Payment terminal（如有正式 device read model）
+- Printer physical endpoint（只作 observed device health）
+- 其他正式註冊 device
+
+唔可以因為同一個「Device」字就將所有 authority 混埋。
+
+## 23.2 裝置健康顯示
+
+禁止一粒總綠燈將所有 layer 壓成「正常」。
+
+每部裝置 Detail 至少分開顯示正式有證據嘅 domain：
+
+- Runtime / App
+- Cloud / Canonical reachability
+- LAN / local connectivity（如有）
+- Platform integration（如 relevant）
+- Payment（如 relevant）
+- Print endpoint（如 relevant）
+- Queue / Reconcile
+- Config / Version drift
+
+每一項顯示：
+- business meaning state
+- last observed time
 - freshness
-- config drift
-- current health
-- safe recovery action
+- attention / unknown
+- contextual action / deep-link（如適用）
 
-禁止一粒「全部正常」總綠燈。
+規則：
+- Paired ≠ Connected
+- Connected ≠ Ready
+- Ready ≠ Job Success
+- Internet Healthy ≠ Provider Healthy
+- Runtime Healthy ≠ Canonical Applied
+- No recent data ≠ Failed
 
-至少分：
-- Cloud
-- Runtime
-- Platform
-- Payment
-- Print
-- Queue/Reconcile
+## 23.3 裝置詳情
 
-## OTA
-- approved artifact
-- hash
-- target
-- current runtime
-- install state
-- readback
-- rollback record
+撳一部 Device 後進 Detail。
+呢個係 object interaction，唔係第三層 Menu。
 
-Admin 只治理已批准 artifact；唔改 Builder/OTA protocol。
+Header：
+- Display name
+- Device type
+- Current health
+- Current version
+- Last seen
+- Attention / stale state
+
+內容分組：
+
+### Identity
+- Display name
+- Device type
+- Store / location
+- Logical assignment / role
+- Technical identity（detail only）
+
+### Version
+- Current app / runtime
+- Desired / approved version（如 relevant）
+- Version drift
+- Last verified
+
+### Health
+- domain-by-domain health
+- freshness
+- current first break（如已有 diagnostics projection）
+- last error summary
+
+### Binding / Assignment
+只顯正式 observed facts，例如：
+- logical printer → observed physical device
+- terminal assignment
+- store / device role
+
+Physical IP / USB binding：
+- Admin 可顯示 read-only observed result
+- 真正現場 binding 仍由 SMT 做
+- 提供文案「現場設定」已足夠；唔喺 Admin 重造 binding engine
+
+### Recent activity
+- Last config apply
+- Last OTA / activation
+- Last reconnect
+- Relevant incidents
+
+Contextual shortcuts：
+- 前往系統診斷
+- 前往打印管理（printer relevant）
+- 前往平台／渠道管理（integration relevant）
+- 前往 OTA／版本
+
+## 23.4 裝置可操作行為
+
+Admin 只顯正式 contract 已存在嘅 action。
+
+可以包含（只限有 contract）：
+- Refresh / Readback
+- Revoke / Disable（如果屬 device trust authority 並有正式 backend）
+- Request approved OTA
+- Rollback approved runtime
+- Open Diagnostics
+
+如果 backend / runtime contract 未存在：
+- 唔整假 button
+- 唔用 browser local state 假裝完成
+- 標 BACKEND_CONTRACT_GAP
+
+高風險 device action：
+**Permission → Confirm / Reason（如 policy 要求）→ Execute → Readback → Audit**
+
+## 23.5 OTA／版本
+
+入口：
+**裝置管理 → OTA／版本**
+
+第二步完成後直接見：
+- 已批准 Release / Artifact
+- Target
+- Current rollout / install state
+- Current / Previous / Candidate（如 runtime contract 有）
+- Hash / identity
+- Last readback
+- Rollback availability
+
+Admin 只治理已批准 artifact；
+禁止修改 Builder / OTA protocol。
+
+List：
+- Release name
+- Type
+- Version
+- Source identity / hash summary
+- Target
+- State
+- Applied device count / attention count（如正式 read model 有）
+- Last verified
+- View
+
+Release Detail：
+- Exact release identity
+- Hash
+- Approved target
+- Min compatible version（如 relevant）
+- Current deployment state
+- Device readback
+- Failed / Unknown devices
+- Previous version / rollback record
+
+## 23.6 OTA 操作語義
+
+任何 OTA 操作唔可以只用：
+「Published」或「Downloaded」當完成。
+
+必須分：
+- Artifact approved
+- Offered / published
+- Downloaded
+- Verified
+- Candidate staged
+- Activation requested
+- Current runtime readback
+- Functional acceptance（如需要）
+
+只有 Current / installed identity readback matching 先可以講：
+「已套用指定版本」。
+
+如果功能驗收未完成：
+唔可以因為 activation success 就顯示「功能完成」。
+
+Rollback：
+- 只使用正式 previous / approved rollback path
+- 必須有 post-rollback identity readback
+- 唔修改歷史 release
+
+## 23.7 人類第一直覺歸類
+
+- 「邊部 SMT 有問題？」→ 裝置管理 / 裝置狀態
+- 「部機而家跑緊咩版本？」→ 裝置管理 / 裝置狀態
+- 「有冇新版／邊啲機未更新？」→ 裝置管理 / OTA／版本
+- 「打印機點 route？」→ 打印管理 / 打印規則
+- 「打印機 physical IP / USB 綁邊部？」→ SMT 現場
+- 「邊個 Staff / Session 信任呢部裝置？」→ 人員與權限 / 登入／Session／Trusted Device
+- 「點解壞？」→ 系統管理 / 系統診斷
+
+任何以上問題如果要第三層 Sidebar 先搵到，視為 IA RED。
 
 ---
 
