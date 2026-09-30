@@ -1,4 +1,5 @@
 import {useEffect,useMemo,useRef,useState} from 'react';
+import {installMfkCanonicalDoorbell,MFK_CANONICAL_DATA_EVENTS} from '../../contracts/mfk-canonical-doorbell-v1';
 import {createCustomerPendingIntent,customerFallbackReference,readCustomerLocalWorkspace,writeCustomerLocalWorkspace,type CustomerLocalPreferences} from './persistence';
 import {resolveCustomerRuntimePort} from './runtime';
 import {buildCustomerRecommendations} from './recommendation';
@@ -249,23 +250,29 @@ export function App(){
   useEffect(()=>{
     if(!port)return;
     let stopped=false;
-    let busy=false;
-    const poll=async()=>{
-      if(stopped||busy||document.visibilityState!=='visible'||!navigator.onLine)return;
-      busy=true;
-      try{
-        const next=await port.readSnapshot();
-        if(!stopped){setSnapshot(next);setConnection('READY');}
-      }catch{
-        if(!stopped)setConnection('STALE');
-      }finally{busy=false;}
+    let refreshFlight:Promise<void>|null=null;
+    let refreshAgain=false;
+    const pull=()=>{
+      if(stopped||!navigator.onLine)return Promise.resolve();
+      if(refreshFlight){refreshAgain=true;return refreshFlight;}
+      refreshFlight=(async()=>{
+        try{
+          const next=await port.readSnapshot();
+          if(!stopped){setSnapshot(next);setConnection('READY');}
+        }catch{
+          if(!stopped)setConnection('STALE');
+        }finally{
+          refreshFlight=null;
+          if(refreshAgain){refreshAgain=false;void pull();}
+        }
+      })();
+      return refreshFlight;
     };
-    const timer=window.setInterval(()=>void poll(),3000);
-    const visible=()=>{if(document.visibilityState==='visible')void poll();};
-    const focused=()=>void poll();
-    document.addEventListener('visibilitychange',visible);
-    window.addEventListener('focus',focused);
-    return()=>{stopped=true;window.clearInterval(timer);document.removeEventListener('visibilitychange',visible);window.removeEventListener('focus',focused);};
+    const uninstall=installMfkCanonicalDoorbell({
+      onEvent:event=>{if(MFK_CANONICAL_DATA_EVENTS.has(event.type))void pull();},
+      onReconnect:()=>void pull(),
+    });
+    return()=>{stopped=true;uninstall();};
   },[port]);
 
   useEffect(()=>{
