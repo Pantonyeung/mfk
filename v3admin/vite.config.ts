@@ -9,6 +9,10 @@ export default defineConfig({
         target:'https://admin.morefunos.com',
         changeOrigin:true,
         secure:true,
+        headers:{
+          origin:'https://admin.morefunos.com',
+          'sec-fetch-site':'same-origin',
+        },
       },
     },
   },
