@@ -35,13 +35,15 @@ test('UI0 has first visit returning and reduced-motion timing without becoming a
   }
 });
 
-test('UI0 exposes only the two FINAL launch CTAs and routes into current shell',()=>{
-  assert.ok(launch.includes('進入主頁'));
-  assert.ok(launch.includes('進入會員頁'));
+test('UI0 auto-enters Home and preserves direct Member deep-link behaviour',()=>{
+  assert.ok(!launch.includes('進入主頁'));
+  assert.ok(!launch.includes('進入會員頁'));
   assert.ok(!launch.includes('開始點餐'));
   assert.ok(!launch.includes('我的記憶'));
+  assert.ok(launch.includes('enterHomeRef.current()'));
   assert.ok(app.includes("onEnterHome={()=>{setLaunchVisible(false);changeView('home')}}"));
-  assert.ok(app.includes("onEnterMember={()=>{setLaunchVisible(false);changeView('more')}}"));
+  assert.ok(!app.includes('onEnterMember='));
+  assert.ok(app.includes("useState(()=>!initialRoute||initialRoute.view==='home')"));
 });
 
 test('UI1 is the FINAL storefront and cold launch continues to UI2 menu',()=>{
