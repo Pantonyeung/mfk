@@ -12,6 +12,20 @@ import {
 
 type BootstrapState='CHECKING'|'LOGIN'|'READY'|'ERROR';
 
+export function adminCanonicalHydrationRequired(
+  local:{version:number;createdAt:string;fingerprint:string}|null,
+  active:{revision:number;publishedAt:string;adminFingerprint:string;fingerprint:string},
+  sync:{state:string;fingerprint?:string;cloudPublishedAt?:string},
+){
+  if(!local)return true;
+  if(sync.state==='ERROR')return true;
+  if(local.createdAt!==active.publishedAt)return true;
+  if(local.fingerprint!==active.adminFingerprint)return true;
+  if(sync.fingerprint&&sync.fingerprint!==active.fingerprint)return true;
+  if(sync.cloudPublishedAt&&sync.cloudPublishedAt!==active.publishedAt)return true;
+  return false;
+}
+
 export function AdminCanonicalBootstrap({children}:{children:ReactNode}){
   const [state,setState]=useState<BootstrapState>('CHECKING');
   const [loginId,setLoginId]=useState('');
@@ -39,7 +53,7 @@ export function AdminCanonicalBootstrap({children}:{children:ReactNode}){
           try{
             const active=await readCanonicalAdminActive();
             if(cancelled)return;
-            if(!local||local.version!==active.revision||sync.state==='ERROR')hydrateAdminFromCanonical(active);
+            if(adminCanonicalHydrationRequired(local,active,sync))hydrateAdminFromCanonical(active);
             activate();
             return;
           }catch{
@@ -51,9 +65,7 @@ export function AdminCanonicalBootstrap({children}:{children:ReactNode}){
       const publisherActive=await readCanonicalAdminActiveWithPublisherKey();
       if(cancelled)return;
       if(publisherActive){
-        if(!local||local.version!==publisherActive.revision||local.fingerprint!==publisherActive.adminFingerprint||sync.state==='ERROR'){
-          hydrateAdminFromCanonical(publisherActive);
-        }
+        if(adminCanonicalHydrationRequired(local,publisherActive,sync))hydrateAdminFromCanonical(publisherActive);
         activate();
         return;
       }
@@ -90,7 +102,7 @@ export function AdminCanonicalBootstrap({children}:{children:ReactNode}){
         <label><span>登入編號</span><input autoComplete="username" value={loginId} onChange={event=>setLoginId(event.target.value.replace(/[^A-Za-z0-9._-]/g,'').slice(0,64))} placeholder="例如 1111"/></label>
         <label><span>PIN</span><input type="password" inputMode="numeric" autoComplete="current-password" value={pin} onChange={event=>setPin(event.target.value.replace(/\D/g,'').slice(0,8))} placeholder="4–8 位數字"/></label>
         <button type="submit" disabled={busy||!loginId||pin.length<4}>{busy?'連接中…':'驗證並載入正式設定'}</button>
-        <strong>唔會建立第二份 Admin 資料；驗證成功後只會以雲端 Active Revision 作本機編輯基礎。</strong>
+        <strong>唔會建立第二份 Admin 資料；驗證成功後只會以雲端最新 Canonical 發佈作本機編輯基礎。</strong>
       </>:null}
     </form>
   </main>;

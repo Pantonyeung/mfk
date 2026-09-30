@@ -168,11 +168,37 @@ export function hydrateAdminFromCanonical(envelope:MfkAdminConfigEnvelope){
     reason:'CANONICAL_CLOUD_HYDRATION',
   });
   const releases=readAdminStored<AdminRelease[]>('releases.v1',[]);
-  writeAdminStored('releases.v1',[release,...releases.filter(row=>row.version!==release.version)].sort((a,b)=>b.version-a.version).slice(0,200));
+  writeAdminStored(
+    'releases.v1',
+    [release,...releases.filter(row=>!(row.createdAt===release.createdAt&&row.fingerprint===release.fingerprint))]
+      .sort((a,b)=>Date.parse(b.createdAt)-Date.parse(a.createdAt))
+      .slice(0,200),
+  );
   writeAdminStored('active-release.v1',{version:envelope.revision,createdAt:envelope.publishedAt,fingerprint:envelope.adminFingerprint});
-  const pendingOutbox=readAdminStored<Array<{revision?:number}>>('sync-outbox.v1',[]).filter(row=>Number(row.revision)>envelope.revision);
+  const activePublishedAt=Date.parse(envelope.publishedAt);
+  const pendingOutbox=readAdminStored<Array<{revision?:number;publishedAt?:string;fingerprint?:string}>>('sync-outbox.v1',[]).filter(row=>{
+    if(row.fingerprint===envelope.fingerprint)return false;
+    const at=Date.parse(String(row.publishedAt||''));
+    if(Number.isFinite(at))return at>activePublishedAt;
+    // Legacy pre-time-first outbox rows may not carry publishedAt.
+    // Keep only rows that were historically queued after this diagnostic revision.
+    const legacyRevision=Number(row.revision);
+    return Number.isSafeInteger(legacyRevision)&&legacyRevision>envelope.revision;
+  });
   writeAdminStored('sync-outbox.v1',pendingOutbox);
-  writeAdminStored('sync-status.v1',{state:'PUBLISHED',revision:envelope.revision,fingerprint:envelope.fingerprint,updatedAt:new Date().toISOString()});
-  writeAdminStored('canonical-hydrated.v1',{revision:envelope.revision,fingerprint:envelope.fingerprint,hydratedAt:new Date().toISOString()});
+  writeAdminStored('sync-status.v1',{
+    state:'PUBLISHED',
+    revision:envelope.revision,
+    fingerprint:envelope.fingerprint,
+    adminFingerprint:envelope.adminFingerprint,
+    cloudPublishedAt:envelope.publishedAt,
+    updatedAt:new Date().toISOString(),
+  });
+  writeAdminStored('canonical-hydrated.v1',{
+    revision:envelope.revision,
+    fingerprint:envelope.fingerprint,
+    publishedAt:envelope.publishedAt,
+    hydratedAt:new Date().toISOString(),
+  });
   return envelope.revision;
 }

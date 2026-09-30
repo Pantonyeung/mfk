@@ -1,43 +1,34 @@
 {
   "version": 1,
-  "capability": "MFK_ADMIN_SMT_CANONICAL_CLOCK_R2",
-  "base_sha": "17cd0798e468071429c68675783de3faefdaf38c",
+  "capability": "MFK_ADMIN_NORMAL_BROWSER_KEETA_R1",
+  "base_sha": "53747f5b666fd4ecb9dfdb36af1627901b4913a4",
   "allowed_paths": [
     ".github/mfk-change-manifest.json",
-    "contracts/admin-config-sync-v1.ts",
-    "v2admin/worker.ts",
-    "v2admin/src/admin-sync-client.ts",
-    "v2admin/src/admin-sync-websocket-transport.test.ts",
-    "v2admin/src/admin-cloud-publish-time-first.test.ts",
-    "v2admin/src/AdminShell.tsx",
-    "v2admin/src/admin-ui-recomposition.test.tsx",
-    "v2local/src/runtime/admin-config-sync.ts",
-    "v2local/src/runtime/admin-config-sync.test.ts",
-    "v2local/src/presentation/LocalAdminMenuWorkspace.tsx",
-    "v2local/src/presentation/smt-admin-sync-ui.test.tsx",
-    "v2local/src/App.tsx"
+    "v2admin/src/AdminCanonicalBootstrap.tsx",
+    "v2admin/src/admin-browser-session.ts",
+    "v2admin/src/keeta-live-client.ts",
+    "v2admin/src/admin-canonical-normal-browser.test.ts",
+    "v2admin/src/keeta-admin-proxy.test.ts"
   ],
-  "authority_impact": "ADMIN_SOLE_CANONICAL_CONFIG_AUTHORITY_ENFORCED",
-  "persistence_impact": "EXISTING_ADMIN_OUTBOX_SMT_LKG_AND_PUBLISH_RECEIPTS_ONLY_NO_SCHEMA_MIGRATION",
-  "provider_impact": "NONE",
+  "authority_impact": "NONE_ADMIN_REMAINS_SOLE_CANONICAL_DATA_AUTHORITY",
+  "persistence_impact": "NORMAL_BROWSER_LOCAL_ADMIN_STATE_REHYDRATES_FROM_CANONICAL_BY_PUBLISH_IDENTITY_NOT_REVISION",
+  "provider_impact": "KEETA_ADMIN_AUTH_RETRY_ONCE_AFTER_401_USING_EXISTING_SESSION_REFRESH",
   "transaction_impact": "NONE",
   "expected_behavior_change": [
-    "Every distinct formal Admin publish is assigned a strictly increasing Cloud canonical publish time.",
-    "Admin outbox delivers every queued formal publish oldest to newest instead of collapsing to one revision.",
-    "Rxx/revision remains diagnostic metadata only and never decides freshness.",
-    "Every ADMIN_CONFIG_AVAILABLE notification forces SMT to pull the same canonical Admin endpoint.",
-    "SMT atomically applies canonical Admin data by publishedAt plus fingerprint and keeps existing local LKG until a newer canonical publish arrives.",
-    "SMT ACK identifies the exact canonical fingerprint and publishedAt that was applied.",
-    "Admin and SMT human-facing status use publish/apply/readback time vocabulary instead of Rxx truth.",
-    "Reconnect, focus, pageshow and visibility recovery reuse the same canonical pull path without interval polling."
+    "Normal Safari/browser sessions no longer treat equal Rxx as proof that local Admin state matches Cloud canonical state.",
+    "Canonical hydration compares publishedAt, adminFingerprint and canonical fingerprint instead of revision equality.",
+    "Canonical hydration keeps release/outbox ordering time-first rather than revision-first.",
+    "Keeta Admin requests do not remain permanently stuck on an expired/stale browser session; one existing Admin session refresh is attempted after 401 and the request is retried once.",
+    "Private mode and normal mode use the same canonical Admin and Keeta authorization semantics."
   ],
   "non_goals": [
-    "No second config authority.",
-    "No second sync engine.",
-    "No interval polling loop.",
-    "No Order, Pricing, Payment, Print, Keeta, Customer, SMM or Owner authority change.",
-    "No destructive local data reset."
+    "No HTTP cache-header experiment.",
+    "No Service Worker.",
+    "No provider menu contract change.",
+    "No OAuth reauthorization, unbind/rebind, secret rotation or new provider account.",
+    "No Order/Pricing/Payment/Print authority change.",
+    "No polling."
   ],
-  "rollback_sha": "17cd0798e468071429c68675783de3faefdaf38c",
+  "rollback_sha": "53747f5b666fd4ecb9dfdb36af1627901b4913a4",
   "severity": "HARD_BLOCK"
 }
