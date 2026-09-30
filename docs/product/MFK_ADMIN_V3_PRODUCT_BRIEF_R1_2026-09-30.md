@@ -11996,7 +11996,7 @@ Status：**LOCKED**
 - **0 RED**
 
 下一輪：
-**文字與術語一致性盤點 Batch 2：54 頁 Page Title / CTA / Empty / Error / Confirm Copy 矩陣**
+**文字與術語一致性盤點 Batch 2：53 頁 Page Title / CTA / Empty / Error / Confirm Copy 矩陣**
 
 目的：
 將正式字典逐頁套落去，
@@ -12279,7 +12279,7 @@ MFK_ADMIN_V3_ORDER_READ_ONLY_AUTHORITY_CORRECTION_LOCKED
 7. 高風險 confirm 必須包含 object / action / impact
 8. Technical English 唔做主標題
 9. 唔用「OK / Apply / Fix / More / Action / Yes」
-10. 「取消」只作關閉／中止 UI；交易行為必須寫「取消訂單」
+10. 「取消」只作關閉／中止 UI；歷史交易事件顯示可寫「取消訂單」，但 Admin 不提供取消交易 CTA
 
 ---
 
@@ -12297,13 +12297,11 @@ MFK_ADMIN_V3_ORDER_READ_ONLY_AUTHORITY_CORRECTION_LOCKED
 結果：
 - **53 頁文案規則已覆蓋**
 - **53 LOCKED**
-- **1 YELLOW**
+- **0 YELLOW**
 - **0 RED**
 
-唯一 YELLOW：
-**售後／退款／取消／修正**
-原因仍然只係：
-**Admin post-close 付款方式修正 = BACKEND_CONTRACT_GAP**
+訂單監察全部只讀；退款、取消訂單、付款方式修正已明確 OUT OF ADMIN SCOPE。
+如 Admin implementation 出現以上 transaction mutation CTA，直接判 **AUTHORITY RED**。
 
 文案本身已鎖。
 
@@ -12639,7 +12637,7 @@ Admin V3 Product Brief R1 已完成產品層收口。
 - First Viewport：53 / 53 已驗
 - 跨頁互動：核心路線 / 高風險操作 / Bulk / 熟手效率已驗
 - 共用元件：核心元件 / 響應式 / 操作手感已驗
-- 文字：正式中文字典 / 54 頁文案矩陣 / Copy Dictionary 已完成
+- 文字：正式中文字典 / 53 頁文案矩陣 / Copy Dictionary 已完成
 - RED：0
 - YELLOW：0；退款／取消訂單／付款方式修正已明確 OUT OF ADMIN SCOPE
 - Implementation：未開始 / 未授權
