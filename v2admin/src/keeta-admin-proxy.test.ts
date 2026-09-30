@@ -50,4 +50,12 @@ describe('Keeta admin proxy',()=>{
     expect(source).toContain("request.headers.get('x-mfk-admin-session')");
     expect(source).toContain('await this.readAdminBrowserSession(request)');
   });
+
+  it('recovers one stale normal-browser Admin session before Keeta operations fail',()=>{
+    const client=readFileSync(new URL('./keeta-live-client.ts',import.meta.url),'utf8');
+    expect(client).toContain('refreshAdminBrowserSession');
+    expect(client).toContain('response.status===401');
+    expect(client).toContain('await refreshAdminBrowserSession()');
+    expect(client).toContain('response=await run()');
+  });
 });
