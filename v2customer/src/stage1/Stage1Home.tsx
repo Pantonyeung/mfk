@@ -184,16 +184,16 @@ export function Stage1Home({
         </div>
       </section>
 
-      <button className="stage1-search-entry" type="button" onClick={onBrowse} disabled={!canBrowse}>
+      <button className="stage1-search-entry" type="button" onClick={onBrowse}>
         <SearchIcon/>
-        <strong>{canBrowse?'搜尋喜歡的餐點':'餐牌更新中'}</strong>
+        <strong>搜尋喜歡的餐點</strong>
       </button>
 
-      <button className="stage1-brand-banner" type="button" onClick={onBrowse} disabled={!canBrowse}>
+      <button className="stage1-brand-banner" type="button" onClick={onBrowse}>
         <span className="stage1-banner-copy">
           <small>More Fun · 好飯好日常</small>
           <strong>好好吃飯，<br/>就是一件開心的事。</strong>
-          <em>{canBrowse?'開始點單':'餐牌更新中'}</em>
+          <em>開始點單</em>
         </span>
         <span className="stage1-banner-art" aria-hidden="true">
           <img className="male" src={HOME_MALE} alt=""/>
