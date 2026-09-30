@@ -1,37 +1,45 @@
 {
   "version": 1,
-  "capability": "MFK_WEB_STATE_SOVEREIGNTY_TQ1",
-  "base_sha": "9910a5e929a4295434eb5a35668d1c5aab0fede4",
+  "capability": "MFK_V3_WEB_PARALLEL_REBIRTH_A0",
+  "base_sha": "3816a32f846fe36c7a2ca8fe7589e56796178b27",
   "root_control": "#596",
   "allowed_paths": [
     ".github/mfk-change-manifest.json",
+    ".github/workflows/v3admin-a0-foundation.yml",
+    "COMMANDER_CURRENT.md",
     "HANDOFF_CURRENT.md",
-    "docs/governance/MFK_WEB_STATE_SOVEREIGNTY_AUTHORITY_R1_2026-09-30.md",
-    "contracts/web-state-authority-v1.ts",
-    "v2admin/package.json",
-    "v2admin/src/main.tsx",
-    "v2admin/src/AdminCanonicalBootstrap.tsx",
-    "v2admin/src/admin-query-client.ts",
-    "v2admin/src/admin-third-party-state-authority.test.ts",
-    "v2admin/src/admin-canonical-browser.test.ts"
+    "docs/governance/MFK_WEB_CLIENT_PARALLEL_REBIRTH_AUTHORITY_R2_2026-09-30.md",
+    "v3admin/README.md",
+    "v3admin/package.json",
+    "v3admin/tsconfig.json",
+    "v3admin/vite.config.ts",
+    "v3admin/index.html",
+    "v3admin/src/state-authority.ts",
+    "v3admin/src/api.ts",
+    "v3admin/src/App.tsx",
+    "v3admin/src/main.tsx",
+    "v3admin/src/styles.css",
+    "v3admin/src/authority.test.ts"
   ],
-  "authority_impact": "SYSTEM_WIDE_WEB_STATE_SOVEREIGNTY_ESTABLISHED_ADMIN_TQ1_ONLY_CODE_SLICE",
-  "persistence_impact": "NONE_THIS_SLICE_DOES_NOT_MIGRATE_OR_DELETE_LEGACY_STORAGE",
+  "authority_impact": "SYSTEM_WIDE_IMPLEMENTATION_STRATEGY_SWITCH_TO_PARALLEL_V3_WEB_CLIENTS",
+  "persistence_impact": "NEW_ISOLATED_V3_DEXIE_SCHEMA_ONLY_NO_COMMANDS_NO_V2_STORAGE_READS_OR_WRITES",
   "provider_impact": "NONE",
   "transaction_impact": "NONE",
+  "production_routing_impact": "NONE",
   "expected_behavior_change": [
-    "All web ports gain one controlling authority contract for server state, durable command state, draft state and auth separation.",
-    "Admin canonical active reads are routed through one TanStack Query client and one canonical query key.",
-    "Admin bootstrap no longer directly owns canonical network read orchestration.",
-    "Legacy browser persistence remains compatibility-only until later bounded migration slices."
+    "Repository current authority now freezes broad v2 web-state surgery and starts an isolated V3 client line.",
+    "v3admin A0 builds independently with TanStack Query, Dexie and Zustand ownership boundaries.",
+    "v3admin does not import v2 client-state modules and has no production deployment configuration.",
+    "Current v2 production remains unchanged."
   ],
   "non_goals": [
-    "No Dexie outbox migration in TQ1.",
-    "No Zustand draft migration in TQ1.",
-    "No SMM, Customer or Owner runtime code change in TQ1.",
-    "No backend API contract change.",
-    "No removal of legacy localStorage keys yet."
+    "No production route or hostname for V3 in A0.",
+    "No Admin login or canonical authenticated read in A0.",
+    "No publish or mutation behavior in A0.",
+    "No Dexie command rows in A0.",
+    "No v2 runtime change.",
+    "No backend, SMT, SMM, Customer or Owner runtime change."
   ],
-  "rollback_sha": "9910a5e929a4295434eb5a35668d1c5aab0fede4",
-  "severity": "SYSTEM_AUTHORITY"
+  "rollback_sha": "3816a32f846fe36c7a2ca8fe7589e56796178b27",
+  "severity": "HARD_BLOCK"
 }

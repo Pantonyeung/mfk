@@ -1,0 +1,45 @@
+name: v3admin-a0-foundation
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'v3admin/**'
+      - 'docs/governance/MFK_WEB_CLIENT_PARALLEL_REBIRTH_AUTHORITY_R2_2026-09-30.md'
+      - 'contracts/web-state-authority-v1.ts'
+      - 'HANDOFF_CURRENT.md'
+      - '.github/mfk-change-manifest.json'
+      - '.github/workflows/v3admin-a0-foundation.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'v3admin/**'
+      - 'docs/governance/MFK_WEB_CLIENT_PARALLEL_REBIRTH_AUTHORITY_R2_2026-09-30.md'
+      - 'contracts/web-state-authority-v1.ts'
+      - 'HANDOFF_CURRENT.md'
+      - '.github/mfk-change-manifest.json'
+      - '.github/workflows/v3admin-a0-foundation.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  v3admin:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: v3admin
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-audit --no-fund --legacy-peer-deps --package-lock=false
+      - run: npm test
+      - run: npm run typecheck
+      - run: npm run build
+      - name: Verify zero production routing
+        run: |
+          test ! -f wrangler.jsonc
+          test ! -f DEPLOY_REQUEST
+          test ! -f PREVIEW_DEPLOY_TRIGGER
