@@ -1,34 +1,31 @@
 {
   "version": 1,
-  "capability": "MFK_ADMIN_NORMAL_BROWSER_KEETA_R1",
-  "base_sha": "53747f5b666fd4ecb9dfdb36af1627901b4913a4",
+  "capability": "MFK_ADMIN_BOOTSTRAP_ONE_SLICE_R1",
+  "base_sha": "cae974bfe356783ecaa2df753a5e7e14e4aedb31",
   "allowed_paths": [
     ".github/mfk-change-manifest.json",
-    "v2admin/src/AdminCanonicalBootstrap.tsx",
-    "v2admin/src/admin-browser-session.ts",
-    "v2admin/src/keeta-live-client.ts",
-    "v2admin/src/admin-canonical-normal-browser.test.ts",
-    "v2admin/src/keeta-admin-proxy.test.ts"
+    "v2admin/src/admin-sync-client.ts",
+    "v2admin/src/admin-canonical-normal-browser.test.ts"
   ],
-  "authority_impact": "NONE_ADMIN_REMAINS_SOLE_CANONICAL_DATA_AUTHORITY",
-  "persistence_impact": "NORMAL_BROWSER_LOCAL_ADMIN_STATE_REHYDRATES_FROM_CANONICAL_BY_PUBLISH_IDENTITY_NOT_REVISION",
-  "provider_impact": "KEETA_ADMIN_AUTH_RETRY_ONCE_AFTER_401_USING_EXISTING_SESSION_REFRESH",
+  "authority_impact": "NONE_ADMIN_REMAINS_SOLE_CANONICAL_AUTHORITY",
+  "persistence_impact": "BOOTSTRAP_NO_LONGER_CREATES_NEW_PUBLISH_FROM_LOCAL_RELEASE_HISTORY",
+  "provider_impact": "NONE",
   "transaction_impact": "NONE",
   "expected_behavior_change": [
-    "Normal Safari/browser sessions no longer treat equal Rxx as proof that local Admin state matches Cloud canonical state.",
-    "Canonical hydration compares publishedAt, adminFingerprint and canonical fingerprint instead of revision equality.",
-    "Canonical hydration keeps release/outbox ordering time-first rather than revision-first.",
-    "Keeta Admin requests do not remain permanently stuck on an expired/stale browser session; one existing Admin session refresh is attempted after 401 and the request is retried once.",
-    "Private mode and normal mode use the same canonical Admin and Keeta authorization semantics."
+    "Opening Admin after canonical hydration does not invent a new publish queue from whichever local release is first in browser storage.",
+    "Only an explicit mfk-admin-release event creates a new publish request.",
+    "An already-explicitly-queued publish may retry on startup or online recovery.",
+    "Normal Safari should no longer show a false local QUEUED state caused solely by bootstrap."
   ],
   "non_goals": [
-    "No HTTP cache-header experiment.",
-    "No Service Worker.",
-    "No provider menu contract change.",
-    "No OAuth reauthorization, unbind/rebind, secret rotation or new provider account.",
-    "No Order/Pricing/Payment/Print authority change.",
-    "No polling."
+    "No Customer changes.",
+    "No Owner changes.",
+    "No SMM changes.",
+    "No SMT changes.",
+    "No Keeta changes.",
+    "No polling.",
+    "No cache clearing."
   ],
-  "rollback_sha": "53747f5b666fd4ecb9dfdb36af1627901b4913a4",
+  "rollback_sha": "cae974bfe356783ecaa2df753a5e7e14e4aedb31",
   "severity": "HARD_BLOCK"
 }

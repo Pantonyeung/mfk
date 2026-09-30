@@ -207,18 +207,19 @@ export function installAdminSyncAutoFlush(){
   if(installed||typeof window==='undefined')return;
   installed=true;
   const flush=()=>{void flushAdminSyncOutbox();};
-  const queueLatest=()=>{
+  const queueExplicitRelease=()=>{
     const latest=readAdminReleases()[0];
     if(!latest)return;
-    const status=readAdminSyncStatus();
-    const pending=readOutbox().some(row=>row.revision===latest.version&&row.adminFingerprint===latest.fingerprint);
-    if(status.state==='PUBLISHED'&&!pending&&status.revision===latest.version&&status.adminFingerprint===latest.fingerprint)return;
+    const pending=readOutbox().some(row=>row.adminFingerprint===latest.fingerprint);
+    if(pending)return;
     void queueAdminReleaseSync(latest);
   };
   window.addEventListener('online',flush);
-  window.addEventListener('focus',flush);
-  window.addEventListener('mfk-admin-release',queueLatest);
-  window.setTimeout(()=>{queueLatest();flush();},0);
+  window.addEventListener('mfk-admin-release',queueExplicitRelease);
+  // Bootstrap must not create a new publish from whichever local release happens
+  // to be first in browser storage. Canonical hydration already ran before this.
+  // Only an already-explicitly-queued publish may retry on startup.
+  window.setTimeout(flush,0);
 }
 
 export interface AdminDiningOccupancyReadback{
