@@ -134,6 +134,21 @@ export function readExistingAdminPublisherKey(){
   return readAdminStored<string>(PUBLISHER_KEY,'');
 }
 
+export async function readAdminRuntimeSourceSha(){
+  if(typeof fetch==='undefined')return 'unavailable';
+  try{
+    const response=await fetch('/api/health?adminRuntimeDiagnostic=R4',{
+      method:'GET',
+      cache:'no-store',
+      credentials:'same-origin',
+      headers:{accept:'application/json','cache-control':'no-cache'},
+    });
+    const body=await response.json().catch(()=>({})) as {sourceSha?:unknown};
+    return response.ok&&typeof body.sourceSha==='string'?body.sourceSha:'unavailable';
+  }catch{return 'unavailable';}
+}
+
+
 export async function readCanonicalAdminActiveWithPublisherKey(storeId='MF01'):Promise<MfkAdminConfigEnvelope|null>{
   if(typeof fetch==='undefined')return null;
   const key=readExistingAdminPublisherKey();
