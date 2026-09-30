@@ -4,7 +4,6 @@ import {smtAdminHttpOrigin,smtAdminWebSocketUrl} from './web-acceptance.ts';
 export const SMT_ADMIN_CONFIG_LKG_KEY='mfk.admin-sync.active.v1';
 export const SMT_ADMIN_CONFIG_STATUS_KEY='mfk.admin-sync.status.v1';
 export const SMT_ADMIN_CONFIG_DEVICE_KEY='mfk.admin-sync.device.v1';
-export const SMT_ADMIN_TIME_FIRST_CUTOVER_KEY='mfk.admin-sync.time-first-cutover.v1';
 export const SMT_ADMIN_CONFIG_ENDPOINT=smtAdminHttpOrigin();
 
 export type SmtAdminSyncState='LOCAL_LKG'|'CONNECTING'|'SYNCED'|'OFFLINE'|'ERROR';
@@ -233,27 +232,9 @@ function connectDoorbell(){
   }catch{scheduleReconnect();}
 }
 
-export function clearLegacySmtAdminConfigForTimeFirstCutover(){
-  if(typeof localStorage==='undefined')return false;
-  if(localStorage.getItem(SMT_ADMIN_TIME_FIRST_CUTOVER_KEY))return false;
-  const prior=readSmtAdminConfigLkg();
-  localStorage.removeItem(SMT_ADMIN_CONFIG_LKG_KEY);
-  localStorage.removeItem(SMT_ADMIN_CONFIG_STATUS_KEY);
-  localStorage.removeItem(ADMIN_PROPAGATION_DIAG_KEY);
-  writeJson(SMT_ADMIN_TIME_FIRST_CUTOVER_KEY,{
-    clearedAt:now(),
-    priorFingerprint:prior?.fingerprint??null,
-    priorPublishedAt:prior?.publishedAt??null,
-    priorRevision:prior?.revision??null,
-  });
-  emit();
-  return true;
-}
-
 export function installSmtAdminAutoSync(){
   if(installed||typeof window==='undefined')return;
   installed=true;
-  clearLegacySmtAdminConfigForTimeFirstCutover();
   const reconcile=()=>{if(!navigator.onLine)return;void fetchAndApplyAdminConfig();connectDoorbell();};
   const onOnline=()=>reconcile();
   const onFocus=()=>reconcile();
