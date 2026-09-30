@@ -1,33 +1,42 @@
 {
   "version": 1,
-  "capability": "MFK_ADMIN_SMT_EVERY_PUBLISH_OTA_R1",
-  "base_sha": "532e78be814dfb495fe33af964a50d421bc913b5",
+  "capability": "MFK_ADMIN_SMT_CANONICAL_CLOCK_R2",
+  "base_sha": "17cd0798e468071429c68675783de3faefdaf38c",
   "allowed_paths": [
     ".github/mfk-change-manifest.json",
+    "contracts/admin-config-sync-v1.ts",
     "v2admin/worker.ts",
     "v2admin/src/admin-sync-client.ts",
     "v2admin/src/admin-sync-websocket-transport.test.ts",
     "v2admin/src/admin-cloud-publish-time-first.test.ts",
+    "v2admin/src/AdminShell.tsx",
     "v2local/src/runtime/admin-config-sync.ts",
-    "v2local/src/runtime/admin-config-sync.test.ts"
+    "v2local/src/runtime/admin-config-sync.test.ts",
+    "v2local/src/presentation/LocalAdminMenuWorkspace.tsx",
+    "v2local/src/presentation/smt-admin-sync-ui.test.tsx",
+    "v2local/src/App.tsx"
   ],
-  "authority_impact": "ADMIN_CANONICAL_DELIVERY_ORDERING_ONLY",
-  "persistence_impact": "EXISTING_ADMIN_OUTBOX_AND_SMT_LKG_ONLY_NO_SCHEMA_MIGRATION",
+  "authority_impact": "ADMIN_SOLE_CANONICAL_CONFIG_AUTHORITY_ENFORCED",
+  "persistence_impact": "EXISTING_ADMIN_OUTBOX_SMT_LKG_AND_PUBLISH_RECEIPTS_ONLY_NO_SCHEMA_MIGRATION",
   "provider_impact": "NONE",
   "transaction_impact": "NONE",
   "expected_behavior_change": [
-    "Every formal Admin publish is accepted by the canonical Cloud ordering defined by publish time and fingerprint.",
-    "Every ADMIN_CONFIG_AVAILABLE doorbell forces SMT to pull canonical Admin state with no local revision/newness veto.",
-    "SMT applies canonical Admin envelopes by publishedAt plus fingerprint and atomically replaces the local canonical LKG.",
-    "If another Admin publish arrives during an in-flight pull, the existing coalescing path schedules another canonical pull after completion.",
-    "Admin only marks PUBLISHED after exact canonical response plus Cloud publish time evidence."
+    "Every distinct formal Admin publish is assigned a strictly increasing Cloud canonical publish time.",
+    "Admin outbox delivers every queued formal publish oldest to newest instead of collapsing to one revision.",
+    "Rxx/revision remains diagnostic metadata only and never decides freshness.",
+    "Every ADMIN_CONFIG_AVAILABLE notification forces SMT to pull the same canonical Admin endpoint.",
+    "SMT atomically applies canonical Admin data by publishedAt plus fingerprint and keeps existing local LKG until a newer canonical publish arrives.",
+    "SMT ACK identifies the exact canonical fingerprint and publishedAt that was applied.",
+    "Admin and SMT human-facing status use publish/apply/readback time vocabulary instead of Rxx truth.",
+    "Reconnect, focus, pageshow and visibility recovery reuse the same canonical pull path without interval polling."
   ],
   "non_goals": [
     "No second config authority.",
+    "No second sync engine.",
     "No interval polling loop.",
     "No Order, Pricing, Payment, Print, Keeta, Customer, SMM or Owner authority change.",
     "No destructive local data reset."
   ],
-  "rollback_sha": "532e78be814dfb495fe33af964a50d421bc913b5",
+  "rollback_sha": "17cd0798e468071429c68675783de3faefdaf38c",
   "severity": "HARD_BLOCK"
 }
