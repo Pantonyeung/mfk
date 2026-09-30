@@ -105,7 +105,7 @@ export function AdminCanonicalBootstrap({children}:{children:ReactNode}){
       hydrateAdminFromCanonical(active);
       reconcileAdminSyncStatusFromCanonical(active);
       setPin('');
-      activate();
+      activate('SESSION');
     }catch(error){
       setState('LOGIN');
       setMessage(error instanceof Error?error.message:'未能連接 Canonical Admin');
