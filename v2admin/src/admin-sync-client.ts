@@ -12,10 +12,24 @@ export interface AdminSyncStatus{
   readonly state:AdminSyncState;
   readonly revision?:number;
   readonly fingerprint?:string;
+  readonly cloudPublishedAt?:string;
   readonly updatedAt:string;
   readonly error?:string;
 }
 const idle=():AdminSyncStatus=>({state:'IDLE',updatedAt:new Date().toISOString()});
+
+export function validateAdminPublishConfirmation(input:unknown,expected:MfkAdminConfigEnvelope){
+  if(!input||typeof input!=='object'||Array.isArray(input))throw new Error('ADMIN_SYNC_PUBLISH_CONFIRMATION_INVALID');
+  const body=input as {state?:unknown;active?:unknown;cloudPublishedAt?:unknown};
+  if(body.state!=='PUBLISHED'&&body.state!=='IDEMPOTENT')throw new Error('ADMIN_SYNC_PUBLISH_CONFIRMATION_INVALID');
+  const active=validateMfkAdminConfigEnvelope(body.active);
+  if(active.fingerprint!==expected.fingerprint||active.publishedAt!==expected.publishedAt||active.adminFingerprint!==expected.adminFingerprint){
+    throw new Error('ADMIN_SYNC_PUBLISH_CONFIRMATION_MISMATCH');
+  }
+  const cloudPublishedAt=String(body.cloudPublishedAt||'').trim();
+  if(!Number.isFinite(Date.parse(cloudPublishedAt)))throw new Error('ADMIN_SYNC_CLOUD_PUBLISHED_AT_INVALID');
+  return Object.freeze({state:body.state,active,cloudPublishedAt});
+}
 
 function emit(){if(typeof window!=='undefined')window.dispatchEvent(new CustomEvent('mfk-admin-sync'));}
 
@@ -86,8 +100,8 @@ export async function queueAdminReleaseSync(release:AdminRelease,storeId='MF01')
     adminFingerprint:release.fingerprint,
     snapshot:await runtimeSnapshot(release),
   });
-  const rows=readOutbox().filter(row=>row.revision!==envelope.revision);
-  writeOutbox([...rows,envelope].sort((a,b)=>a.revision-b.revision));
+  const rows=readOutbox().filter(row=>row.fingerprint!==envelope.fingerprint);
+  writeOutbox([...rows,envelope].sort((a,b)=>Date.parse(a.publishedAt)-Date.parse(b.publishedAt)));
   writeStatus({state:'QUEUED',revision:envelope.revision,fingerprint:envelope.fingerprint,updatedAt:new Date().toISOString()});
   if(typeof window!=='undefined')void flushAdminSyncOutbox();
   return envelope;
@@ -119,8 +133,10 @@ export async function flushAdminSyncOutbox(){
     });
     const body=await response.json().catch(()=>({})) as Record<string,unknown>;
     if(!response.ok)throw new Error(typeof body.code==='string'?body.code:'ADMIN_SYNC_PUBLISH_HTTP_'+response.status);
-    writeOutbox(readOutbox().filter(row=>row.revision>latest.revision));
-    const status={state:'PUBLISHED',revision:latest.revision,fingerprint:latest.fingerprint,updatedAt:new Date().toISOString()} as const;
+    const confirmed=validateAdminPublishConfirmation(body,latest);
+    const publishedAt=Date.parse(latest.publishedAt);
+    writeOutbox(readOutbox().filter(row=>Date.parse(row.publishedAt)>publishedAt));
+    const status={state:'PUBLISHED',revision:confirmed.active.revision,fingerprint:confirmed.active.fingerprint,cloudPublishedAt:confirmed.cloudPublishedAt,updatedAt:new Date().toISOString()} as const;
     writeStatus(status);
     return status;
   }catch(error){
@@ -171,8 +187,12 @@ export function installAdminSyncAutoFlush(){
     const latest=readAdminReleases()[0];
     if(!latest)return;
     const status=readAdminSyncStatus();
-    const pending=readOutbox().some(row=>row.revision===latest.version);
-    if(status.revision===latest.version&&status.state==='PUBLISHED'&&!pending)return;
+    const pending=readOutbox().some(row=>row.adminFingerprint===latest.fingerprint&&row.publishedAt===latest.createdAt);
+    if(status.state==='PUBLISHED'&&!pending&&status.fingerprint){
+      const localPublished=Date.parse(latest.createdAt);
+      const cloudPublished=Date.parse(status.cloudPublishedAt||'');
+      if(Number.isFinite(localPublished)&&Number.isFinite(cloudPublished)&&cloudPublished>=localPublished)return;
+    }
     void queueAdminReleaseSync(latest);
   };
   window.addEventListener('online',flush);
