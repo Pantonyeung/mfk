@@ -1,4 +1,34 @@
-import {validateMfkAdminConfigEnvelope,type MfkAdminConfigEnvelope} from '../../contracts/admin-config-sync-v1.ts';
+export interface V3CanonicalAdminEnvelope{
+  readonly schema:'MFK_ADMIN_CONFIG_SYNC_V1';
+  readonly storeId:string;
+  readonly revision:number;
+  readonly publishedAt:string;
+  readonly adminFingerprint:string;
+  readonly snapshot:Readonly<Record<string,unknown>>;
+  readonly fingerprint:string;
+}
+
+function validateV3CanonicalShape(input:unknown):V3CanonicalAdminEnvelope{
+  if(!input||typeof input!=='object'||Array.isArray(input))throw new Error('ADMIN_CONFIG_ENVELOPE_INVALID');
+  const row=input as Record<string,unknown>;
+  if(row.schema!=='MFK_ADMIN_CONFIG_SYNC_V1')throw new Error('ADMIN_CONFIG_SCHEMA_UNSUPPORTED');
+  if(typeof row.storeId!=='string'||!row.storeId.trim())throw new Error('ADMIN_CONFIG_STORE_ID_INVALID');
+  if(!Number.isSafeInteger(Number(row.revision))||Number(row.revision)<1)throw new Error('ADMIN_CONFIG_REVISION_INVALID');
+  if(typeof row.publishedAt!=='string'||!Number.isFinite(Date.parse(row.publishedAt)))throw new Error('ADMIN_CONFIG_PUBLISHED_AT_INVALID');
+  if(typeof row.adminFingerprint!=='string'||!row.adminFingerprint.trim())throw new Error('ADMIN_CONFIG_ADMIN_FINGERPRINT_INVALID');
+  if(!row.snapshot||typeof row.snapshot!=='object'||Array.isArray(row.snapshot))throw new Error('ADMIN_CONFIG_SNAPSHOT_INVALID');
+  if(!(row.snapshot as Record<string,unknown>).catalog)throw new Error('ADMIN_CONFIG_CATALOG_REQUIRED');
+  if(typeof row.fingerprint!=='string'||!row.fingerprint.trim())throw new Error('ADMIN_CONFIG_FINGERPRINT_INVALID');
+  return Object.freeze({
+    schema:'MFK_ADMIN_CONFIG_SYNC_V1',
+    storeId:row.storeId.trim(),
+    revision:Number(row.revision),
+    publishedAt:row.publishedAt,
+    adminFingerprint:row.adminFingerprint.trim(),
+    snapshot:row.snapshot as Readonly<Record<string,unknown>>,
+    fingerprint:row.fingerprint.trim(),
+  });
+}
 
 const STORE_ID='MF01';
 
@@ -8,7 +38,7 @@ function apiBase(){
 
 export const v3AdminCanonicalQueryKey=['mfk','admin-v3','canonical','active',STORE_ID] as const;
 
-export async function readV3CanonicalAdminActive(sessionToken:string):Promise<MfkAdminConfigEnvelope>{
+export async function readV3CanonicalAdminActive(sessionToken:string):Promise<V3CanonicalAdminEnvelope>{
   if(!sessionToken)throw new Error('V3_ADMIN_SESSION_REQUIRED');
   const response=await fetch(apiBase()+'/api/admin-browser/active?storeId='+encodeURIComponent(STORE_ID),{
     method:'GET',
@@ -18,10 +48,10 @@ export async function readV3CanonicalAdminActive(sessionToken:string):Promise<Mf
   });
   const body=await response.json().catch(()=>({})) as Record<string,unknown>;
   if(!response.ok)throw new Error(String(body.message||body.code||'V3_ADMIN_CANONICAL_HTTP_'+response.status));
-  return validateMfkAdminConfigEnvelope(body);
+  return validateV3CanonicalAdminEnvelope(body);
 }
 
-export function summarizeV3Canonical(envelope:MfkAdminConfigEnvelope){
+export function summarizeV3Canonical(envelope:V3CanonicalAdminEnvelope){
   const catalog=envelope.snapshot.catalog&&typeof envelope.snapshot.catalog==='object'&&!Array.isArray(envelope.snapshot.catalog)
     ?envelope.snapshot.catalog as Record<string,unknown>
     :{};
