@@ -4738,22 +4738,63 @@ Auth：
 
 # 42. WebSocket / Realtime｜鎖定
 
-WebSocket = doorbell。
+WebSocket = **doorbell only**。
 
-Flow：
+正常低延遲 Flow：
+
 EVENT
 → invalidate exact query keys
 → HTTP canonical/read model refetch
 → render result
 
 不得：
-- event payload直接入正式 UI
+- event payload 直接入正式 UI truth
 - event payload write local persistence
-- setQueryData as formal truth
+- setQueryData as formal canonical truth
+- 用 socket connected 當 config / order / device 已同步
+
+## 42.1 Correctness 唔可以依賴 doorbell
+
+Formal correctness 必須有獨立 canonical reconcile path。
+
+即使：
+- doorbell 完全 miss
+- duplicate doorbell
+- reordered doorbell
+- socket 長時間 nominally connected 但實際漏 event
+
+系統仍然要靠：
+- canonical HTTP pull
+- version / identity compare
+- reconnect / foreground / interval / explicit reconcile trigger（按 implementation contract）
+- authoritative readback
+
+最終收斂。
+
+Doorbell 只係降低 latency，
+唔係 eventual convergence 嘅唯一觸發。
+
+## 42.2 Socket down / silent miss
 
 Socket down：
-只影響 realtime signal；
-唔刪已成功 HTTP data。
+- 只影響 realtime signal
+- 唔刪已成功 HTTP data
+- 顯示 stale / reconnecting 只按正式 freshness contract
+- canonical HTTP read 仍可用時唔可以將整個產品標成 offline
+
+Silent miss：
+- reconcile 發現 desired ≠ observed
+- 直接進 PENDING / PARTIAL / MISMATCH / UNKNOWN 語義
+- 唔因「冇收到 event」直接判 FAILED
+
+## 42.3 Acceptance
+
+必驗：
+- missed doorbell 最終 convergence
+- duplicated doorbell 唔造成第二 business side-effect
+- reordered doorbell 最終以 canonical version / version guard 收斂
+- socket reconnect 觸發 canonical refetch / reconcile
+- stale websocket data 唔覆蓋較新 canonical HTTP truth
 
 ---
 
@@ -4771,27 +4812,38 @@ Admin V3 從本 Product Brief 改為 **一次過重生**：
 舊 A1/A2 incremental implementation roadmap 停止；
 已寫 code 只可作 reference，必須服從本 Brief。
 
-## 43.1 與舊 A0→A7 sequencing 嘅關係
+## 43.1 與 R2 A0→A7 build order 嘅正式 reconciliation
 
-現有 governance / R2 文件如果仍保留 A0→A7：
-- Authority boundary
-- no-touch
-- acceptance discipline
-- CI / review discipline
-
-以上治理原則繼續有效。
-
-但 **A0→A7 作為 Admin V3 implementation order / partial promotion sequence**，
-喺 Owner 明確批准本 Product Brief 並發出 PROMOTE 後，由本 one-shot execution model取代。
+R2 A0→A7 **繼續有效，但重新明確其角色係 one-shot implementation 內部 engineering gates**。
 
 即係：
-- 唔再逐 A-stage 做 production promotion
-- 唔逐頁 merge 當完成
-- 唔用舊 sequence 覆蓋已批准 Product Map
-- 仍然保持 governance、安全、CI、review、no-touch 要求
+
+- A0：shared skeleton / authority / CI
+- A1：canonical read-only shell
+- A2：projection / ACK read models
+- A3：draft / edit / publish / readback
+- A4：只有明確需要 offline publish 先做 Dexie outbox
+- A5：auth / browser parity
+- A6：V3 preview + physical acceptance
+- A7：只係 acceptance 後嘅 cutover gate
+
+硬規則：
+- A0→A6 可以係內部 build / test 順序
+- **唔係逐階段 production promotion**
+- 唔可以 A1 完成就當 Admin V3 部分產品可以上線
+- 唔可以逐頁 merge 當產品完成
+- Product Map / IA / UI 仍以 Owner 批准嘅本 Brief 為準
+- R2 authority boundary / no-touch / CI / review / rollback discipline 全部保留
+
+因此：
+**ONE-SHOT PRODUCT DELIVERY + A0→A6 INTERNAL ENGINEERING GATES**
+兩者唔再衝突。
 
 未有 Owner PROMOTE 前：
-**一律唔開始 one-shot implementation。**
+**一律唔開始 implementation。**
+
+A7 / merge / deploy / production routing：
+仍需要當時相應嘅 Owner PROMOTE。
 
 ---
 
@@ -4824,6 +4876,8 @@ One-shot Admin V3 rebuild default只准：
 
 ## Functional
 - 所有 R1 nav/routes存在
+- R1 scope 每一 capability family 有唯一 Primary Home 或明確 embedded surface
+- 今日首頁第一優先清楚顯示今日有效營業額 / Effective Sales
 - 所有 workspace實作，唔係 placeholder
 - Read-only / mutation邊界符合 Brief
 - Draft/Publish/Readback workflow完整
@@ -4855,6 +4909,7 @@ One-shot Admin V3 rebuild default只准：
 - no secret in audit
 
 ## Reliability
+- human-facing Cloud publish freshness 明確使用 canonical publishedAt
 - background refresh保留舊成功資料
 - reconnect refetch/reconcile
 - timeout = unknown
@@ -5015,3 +5070,172 @@ PR #602 仍保持 Draft，
 
 MILESTONE:
 MFK_ADMIN_V3_PRODUCT_BRIEF_FUNCTION_UI_LOCK_R1_READY
+
+---
+
+# 50. Global Product Inventory / 全局盤點｜2026-09-30
+
+本節係 Product Brief 全局一致性盤點。
+目的唔係新增功能，而係確認：
+- R1 scope 有冇漏
+- 每件事有冇唯一 Primary Home
+- 兩步 discovery 有冇破例
+- 有冇 duplicate authority
+- 有冇 reviewer / governance gap
+- 邊啲係真正 backend contract gap
+
+## 50.1 Navigation inventory
+
+目前：
+- **12 個大 Menu**
+- **54 個第二步正式 destination**
+- **0 個正常功能需要第三層 Sidebar discovery**
+
+| 大 Menu | 第二步數量 | 主要服務 |
+|---|---:|---|
+| 今日 | 2 | 今日營業額、營運總覽、待處理事項 |
+| 訂單管理 | 4 | 進行中、歷史、售後、訂單異常 |
+| 菜單管理 | 6 | 分類、產品、選項／口味、套餐、價格、排序 |
+| 營運管理 | 4 | 售罄／供應、營業日、現金／收舖、產能額度 |
+| 平台／渠道管理 | 8 | 平台營運、接單、同步、綁定、映射、失敗、實收、對帳 |
+| 打印管理 | 5 | 打印總覽、logical printer、模板、規則、異常 |
+| 裝置管理 | 2 | 裝置健康、OTA／版本 |
+| 人員與權限 | 4 | 員工、角色、權限、登入／Session／Trusted Device |
+| 報表 | 6 | 銷售、產品、渠道、退款、營運、匯出 |
+| 發佈與版本 | 4 | 未發佈、Publish、Readback、Rollback |
+| 門店設定 | 5 | 店資料、營業時間、Business Day、營運時間、快捷原因 |
+| 系統管理 | 4 | Audit、Diagnostics、Integrations、Effective Settings |
+
+## 50.2 R1 scope coverage
+
+§3.1 所列 R1 capability families 已全部有明確產品位置。
+
+特殊但合理嘅 embedded surface：
+- Login：pre-auth surface，唔屬 Sidebar route。
+- Product Operational：圖片／產品打印 flag／外賣附加費／Option linkage 直接存在 Product Create/Edit。
+- Pending Changes：Primary Home = 發佈與版本 / 未發佈變更；同時 Draft Bar 可 contextual deep-link。
+- Readback：Primary Home = 發佈與版本 / 版本 Readback；各 domain 可以顯局部 readback 摘要。
+- Quick actions：今日只提供 shortcut，正式 mutation 留責任 domain。
+
+P1：
+- Inventory Lite
+- CRM / Customer 360
+- RFM
+- Loyalty
+- Coupons
+- Announcements
+- Customer / Owner / Frontline Presentation
+
+以上目前 **0 個混入 R1 主導航**。
+
+## 50.3 Primary Home collision audit
+
+以下容易撞 authority 嘅位置已鎖：
+
+### Sales
+- 今日首頁：今日有效營業額 summary
+- 報表 / 銷售：正式分析
+- Payment / Settlement：唔冒充 Sales
+
+### Product vs Sellability
+- 商品名稱／分類／Base Price → 菜單管理 / 產品
+- 而家賣唔賣得 → 營運管理 / 售罄／供應
+- Platform 投影同步 → 平台／渠道管理 / 供應同步
+
+### Product vs Pricing
+- 新增 Product：Base Price 必填
+- 單件 Product Edit：可以改同一 canonical Base Price
+- 價格管理：集中查看／批量管理同一 canonical pricing inputs
+- **唔建立第二 price model / second pricing engine**
+
+### Product vs Print
+- 「呢件產品印乜」→ Product Detail
+- logical printer / template / route → 打印管理
+- physical IP / USB binding → SMT 現場
+
+### Print vs Device
+- Print job / route → 打印管理
+- physical endpoint health → 裝置管理
+- SMT physical binding → SMT 現場
+
+### Platform vs Integration
+- Keeta business operation / mapping / accept policy → 平台／渠道管理
+- credential / authorization / integration health → 系統管理 / 系統整合
+- System Integration 唔複製 business config
+
+### Business Day
+- 今日營業日實際 workflow → 營運管理 / 營業日
+- Business Day boundary time → 門店設定 / Business Day 分界
+
+### Queue / Diagnostics / Audit
+- Queue：有咩要人做
+- Diagnostics：點解壞 / FIRST BREAK
+- Audit：邊個做過乜
+
+三者不可互相取代。
+
+### Version
+- App / Runtime version → 裝置管理 / OTA
+- Config release / desired-vs-observed → 發佈與版本
+
+## 50.4 Reviewer gap audit
+
+PR #602 既有 7 個 P1 review concerns：
+
+1. PROMOTE before merge
+   → 由 COMMANDER_CURRENT + §49 明確鎖。
+
+2. One-shot vs R2 A0→A7
+   → A0→A6 保留做 one-shot 內部 engineering gates；無 partial production promotion；A7 只係 cutover gate。
+
+3. Doorbell-independent reconcile
+   → §19 + §42 明確要求 canonical reconcile；miss / duplicate / reorder 全部驗收。
+
+4. Cloudflare publishedAt
+   → §19 + §45 明確鎖 human-facing Cloud publish time。
+
+5. Admin post-close Tender Correction seam
+   → 明確 BACKEND_CONTRACT_GAP；無 authority 不做假 UI mutation。
+
+6. Cutover rollback verification
+   → §47 已加入 route rollback + serving identity readback + restored-v2 evidence。
+
+7. Integrations workspace
+   → §30.6 已完整定義 fields / state / authority / read-write boundary / acceptance。
+
+## 50.5 Remaining real gap
+
+目前 Product / IA 層面無已知缺頁。
+
+仍然存在一個已確認 implementation dependency：
+
+**Admin post-close Tender Correction → BACKEND_CONTRACT_GAP**
+
+在另外批准 bounded backend authority 前：
+- 可以有產品位置
+- 可以有 read surface / workflow contract
+- **唔可以聲稱 Admin 已可正式執行 mutation**
+
+其他任何 implementation 過程發現缺 backend seam：
+同樣先標 BACKEND_CONTRACT_GAP，
+唔可以自行擴 transaction / provider / SMT authority。
+
+## 50.6 Global status
+
+Product Map：
+**READY FOR OWNER REVIEW**
+
+IA：
+**12 domains / 54 destinations / two-step discovery intact**
+
+Authority：
+**No intentional second Order / Pricing / Sellability / Payment / Print authority**
+
+Governance：
+**PROMOTE gate required**
+
+Implementation：
+**NOT STARTED / NOT AUTHORIZED until Owner PROMOTE**
+
+Production：
+**v2 remains live**
