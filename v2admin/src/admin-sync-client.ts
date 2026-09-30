@@ -232,7 +232,7 @@ export function installAdminSyncAutoFlush(){
   window.addEventListener('online',flush);
   window.addEventListener('focus',flush);
   window.addEventListener('mfk-admin-release',queueLatest);
-  window.setTimeout(()=>{queueLatest();flush();},0);
+  window.setTimeout(flush,0);
 }
 
 export interface AdminDiningOccupancyReadback{
