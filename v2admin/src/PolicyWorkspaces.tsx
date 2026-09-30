@@ -43,6 +43,7 @@ function PolicyHeader({title,description,badge='本機設定自動保存'}:{titl
   </header>;
 }
 const Toggle=({checked,onChange,label}:{checked:boolean;onChange:(next:boolean)=>void;label:string})=><label className="admin-toggle"><input type="checkbox" checked={checked} onChange={event=>onChange(event.target.checked)}/><span>{label}</span></label>;
+const hkTime=(value:string)=>new Date(value).toLocaleString('zh-HK',{timeZone:'Asia/Hong_Kong',hour12:false});
 
 export function keetaActionErrorText(error:string){
   const code=error.trim();
@@ -330,7 +331,7 @@ export function StoreSettingsWorkspace({domain='home'}:{domain?:StoreSettingsDom
     markClean();
     setSaveErrors([]);
     setPublishBlockers([]);
-    setSaveMessage('已正式保存並發佈 R'+result.release.version+'；已排入 Admin → SMT／SMM 自動同步。');
+    setSaveMessage('已建立正式發佈：'+hkTime(result.release.createdAt)+'（香港時間）；已排入 Admin → SMT／SMM 自動同步。');
   };
   const fieldError=(id:string)=>saveErrors.find(error=>error.fieldId===id)?.message;
   const fieldProps=(id:string)=>({id,'aria-invalid':Boolean(fieldError(id))||undefined,'aria-describedby':fieldError(id)?id+'-error':undefined});
@@ -340,7 +341,7 @@ export function StoreSettingsWorkspace({domain='home'}:{domain?:StoreSettingsDom
 
   return <section className="admin-editor-page">
     <header className="admin-editor-head">
-      <div><small>{activeRelease?'目前 R'+activeRelease.version:'未有正式版本'} · 門店設定</small><h1>門店設定</h1><p>本機修改會自動保存草稿；只有撳「保存並發佈」先建立正式版本，並送去 SMT／SMM。</p>{saveMessage?<span>{saveMessage}</span>:null}</div>
+      <div><small>{activeRelease?'本機保存 '+hkTime(activeRelease.createdAt):'未有正式發佈'} · 門店設定</small><h1>門店設定</h1><p>本機修改會自動保存草稿；只有撳「保存並發佈」先建立正式版本，並送去 SMT／SMM。</p>{saveMessage?<span>{saveMessage}</span>:null}</div>
       <div className="admin-editor-actions"><button className="primary" type="button" onClick={saveStoreSettings}>儲存本頁設定</button><button className="primary" type="button" onClick={publishStoreSettings}>正式保存並發佈</button></div>
     </header>
     {publishBlockers.length?<div ref={errorSummaryRef} className="admin-validation is-error" role="alert" tabIndex={-1}><b>無法正式發佈</b><ul>{publishBlockers.map((error,index)=><li key={index}><b>{error.label}</b> → {error.message} <Link to={error.path}>前往設定</Link></li>)}</ul></div>:null}
@@ -439,11 +440,11 @@ export function StaffWorkspace(){
     if(!result.ok){setSaveErrors(result.errors);setSaveMessage('未能保存；請先修正人員資料。');return;}
     markClean();
     setSaveErrors([]);
-    setSaveMessage('已保存並啟用 R'+result.release.version+'；已排入 Admin → SMT 自動同步。');
+    setSaveMessage('已建立正式發佈：'+hkTime(result.release.createdAt)+'（香港時間）；已排入 Admin → SMT 自動同步。');
   };
   const activeRelease=readActiveAdminRelease();
   return <section className="admin-editor-page">
-    <header className="admin-editor-head"><div><small>{activeRelease?'目前 R'+activeRelease.version:'未有保存版本'} · 人員／角色／權限</small><h1>員工／權限</h1><p>登入編號係人手輸入嘅帳號；Internal Staff ID 只供系統識別。PIN 只會轉成驗證器發布，唔會將明文 PIN 發布出去。</p>{saveMessage?<span>{saveMessage}</span>:null}</div><div className="admin-editor-actions"><button className="secondary" onClick={add}>新增員工</button><button className="primary" onClick={saveStaff}>保存人員設定</button></div></header>
+    <header className="admin-editor-head"><div><small>{activeRelease?'本機保存 '+hkTime(activeRelease.createdAt):'未有正式發佈'} · 人員／角色／權限</small><h1>員工／權限</h1><p>登入編號係人手輸入嘅帳號；Internal Staff ID 只供系統識別。PIN 只會轉成驗證器發布，唔會將明文 PIN 發布出去。</p>{saveMessage?<span>{saveMessage}</span>:null}</div><div className="admin-editor-actions"><button className="secondary" onClick={add}>新增員工</button><button className="primary" onClick={saveStaff}>保存人員設定</button></div></header>
     {saveErrors.length?<div className="admin-validation is-error" role="alert"><b>有 {saveErrors.length} 項需要處理</b><ul>{saveErrors.map((error,index)=><li key={index}>{error}</li>)}</ul></div>:null}
     {staff.length===0?<div className="admin-empty-state"><b>未有員工資料</b><p>新增員工後設定角色、PIN、權限範圍同權限。</p><button onClick={add}>新增員工</button></div>:selectedStaffId===null?<div className="admin-settings-home" aria-label="員工列表">{staff.map(row=><button type="button" className="admin-settings-link" key={row.id} onClick={()=>setSelectedStaffId(row.id)}><span><b>{row.name||row.loginId||'未命名員工'}</b><small>{row.loginId?'登入編號 '+row.loginId:'未設定登入編號'} · {row.active?'啟用':'停用'}</small></span><strong aria-hidden="true">›</strong></button>)}</div>:<div className="admin-editor-grid">{staff.filter(row=>row.id===selectedStaffId).map(row=><article className="admin-policy-card" key={row.id}>
       <button type="button" className="admin-back-button" onClick={()=>setSelectedStaffId(null)}>‹ 員工列表</button>
