@@ -15,6 +15,13 @@ test('UI1 human-logic Home exposes factual store and order state without unsuppo
 
 test('UI1 keeps Owner-confirmed warmth copy and fixed shortcut entry trio',()=>{
   assert.ok(home.includes('stage1-welcome'));
-  for(const copy of ['辛苦了！美味正在為你準備中','歡迎回來，今天也要好好吃飯！','早安，今天想食咩？'])assert.ok(home.includes(copy),copy);
+  for(const copy of ['辛苦了，美味準備緊。','歡迎返嚟，今日都要好好食飯。','早安，今天想食咩？','一碗好飯，讓日常更有味。'])assert.ok(home.includes(copy),copy);
   for(const label of ['我的收藏','回憶券','期間限定'])assert.ok(home.includes(label),label);
+});
+
+
+test('UI1 never uses the old whole Stage1 design board as the live Hero',()=>{
+  assert.ok(!home.includes('CUSTOMER_FINAL_SOURCE.stage1Final.url'));
+  assert.ok(!home.includes('stage1-source-hero'));
+  assert.ok(home.includes('stage1-brand-banner'));
 });
