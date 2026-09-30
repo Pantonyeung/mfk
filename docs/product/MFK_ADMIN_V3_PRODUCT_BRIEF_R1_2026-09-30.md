@@ -9925,3 +9925,586 @@ Search / Saved View / Favorites / Recent 全部係：
 
 MILESTONE:
 MFK_ADMIN_V3_CROSS_PAGE_INTERACTION_AUDIT_BATCH4_LOCKED
+
+---
+
+# 61. 共用介面元件規格盤點 V1｜核心元件
+
+本輪開始將 Admin V3 由「54 個定義清楚嘅頁面」收斂成「一套一致產品語言」。
+
+核心原則：
+**同一類事情，全系統只准有一種主要表達方法。**
+
+本節鎖：
+- 頁首
+- 搜尋
+- 篩選
+- 表格 / 手機資料卡
+- 狀態標籤
+- 空白 / 錯誤 / 過期狀態
+- 草稿列
+- 確認視窗
+- 回讀區
+- 時間線
+- 表單
+- 分頁 / 內容切換
+
+---
+
+# 61.1 頁首
+
+正式元件：
+**PageHeader**
+
+所有正式工作頁必須包含：
+- 頁面名稱
+- 必要時顯示 Store / Scope
+- 必要時顯示 freshness / current state
+- Primary CTA
+- 次要操作放次一層
+
+例如：
+產品管理
+[新增產品]
+
+版本／回讀
+[最新版本狀態] [重新確認]
+
+硬規則：
+- 一頁只得一個最主要 Primary CTA
+- 危險操作唔做 PageHeader default primary
+- 唔用大面積宣傳式 Hero 推走工作內容
+- Breadcrumb 只做位置提示，唔取代 Sidebar
+
+Mobile：
+- Title 先
+- Status / Scope 次
+- Primary CTA 放右上或 sticky bottom，視工作性質
+- 次要操作收入 overflow
+
+Status：**LOCKED**
+
+---
+
+# 61.2 搜尋欄
+
+正式元件：
+**SearchField**
+
+List Page 原則：
+- Search 放喺標題下方工作區最前
+- placeholder 用人話講「可以搜乜」
+
+例：
+- 搜尋商品名稱或商品編號
+- 搜尋訂單號
+- 搜尋員工姓名或員工編號
+
+禁止：
+- Search placeholder 寫「Search」
+- 一頁有兩三個功能重疊搜尋欄
+- 搜尋結果 error 顯 empty
+
+Desktop：
+可 inline。
+
+Mobile：
+可置頂或 filter sheet 前。
+
+搜尋中：
+- 唔清空舊結果直到新結果 confirmed
+- 顯「搜尋中」但保留 context
+
+Status：**LOCKED**
+
+---
+
+# 61.3 篩選列
+
+正式元件：
+**FilterBar**
+
+Filter 類型：
+- 單選
+- 多選
+- 日期
+- 狀態
+- Scope
+- Attention only
+
+規則：
+- 常用 2–4 個 filter 可以直接顯
+- 其餘收入「更多篩選」
+- 已生效 filter 要有可見 chip / count
+- 一鍵「清除篩選」
+- Filter 改變後保持 Search（除非語義衝突）
+
+禁止：
+- Filter 全塞 dropdown 內令使用者唔知已套用條件
+- Mobile 第一屏被 6 行 filter 食晒
+
+Mobile：
+- 顯 Search + Filter button
+- Filter button 顯 active count
+- Sheet 內一次過修改
+- Apply 後返回 list
+
+Status：**LOCKED**
+
+---
+
+# 61.4 表格 / 手機資料卡
+
+正式元件：
+**DataTable / ResponsiveRecordList**
+
+Desktop：
+資料多、需要比較時用 Table。
+
+每列：
+- 第一欄係 primary identity
+- 中間係核心 business fields
+- 狀態靠近 object
+- 最右係 row action / overflow
+
+禁止：
+- 一列塞十幾個 badge
+- raw technical ID 做第一欄
+- 每一欄都可 edit，令列表變 spreadsheet editor
+
+Mobile：
+同一資料改成 stacked record card。
+
+每張卡固定：
+1. Primary label
+2. 最重要數值 / 狀態
+3. Secondary context
+4. Attention
+5. Tap 入 Detail
+
+唔將 Desktop 12 欄表格橫向縮細。
+
+Status：**LOCKED**
+
+---
+
+# 61.5 狀態標籤
+
+正式元件：
+**StatusBadge**
+
+只用正式狀態語義。
+
+主要類別：
+
+正常：
+- 正常
+- 可售
+- 接單中
+- 已確認
+- 已套用
+
+過程：
+- 處理中
+- 等待確認
+- 同步中
+- 發佈中
+
+注意：
+- 要留意
+- 部分完成
+- 資料過期
+- 未完成設定
+
+未明：
+- 結果未明
+- 正在重新確認
+
+失敗：
+- 操作失敗
+- 驗證失敗
+- 連線失敗
+
+硬規則：
+- Color 唔係唯一訊號
+- 同一 state 全系統同一中文
+- UNKNOWN 永遠唔用紅色「失敗」字眼
+- StatusBadge 唔塞技術 error code
+
+Status：**LOCKED**
+
+---
+
+# 61.6 空白 / 錯誤 / 過期狀態
+
+正式元件：
+- **EmptyState**
+- **ErrorState**
+- **StaleBanner**
+
+## Empty
+只喺 query 成功而且真係零資料時顯。
+
+例：
+「目前未有產品」
+[新增產品]
+
+## Error
+資料取唔到：
+「暫時無法取得資料」
+
+可以：
+- 重新讀取
+- 前往系統診斷（有需要）
+
+禁止顯：
+0 items / $0。
+
+## Stale
+有舊成功資料：
+「資料過期 · 顯示上次成功資料」
+「最後更新：19:32」
+
+舊資料繼續顯，
+唔整頁清空。
+
+## Offline
+有資料：
+「離線 · 顯示上次成功資料」
+
+無資料：
+「離線 · 未有可顯示資料」
+
+Status：**LOCKED**
+
+---
+
+# 61.7 草稿列
+
+正式元件：
+**DraftBar**
+
+只喺存在正式未發佈 Draft 時顯。
+
+固定資訊：
+- X 項未發佈變更
+- 影響 domain 摘要（有需要）
+- 查看
+- 檢查並發佈
+- 放棄（次要 / danger）
+
+位置：
+Desktop / Tablet：
+底部 sticky。
+
+Mobile：
+底部 sticky compact bar。
+
+規則：
+- 唔遮住重要 form action
+- Publish 完 canonical state 更新先清除
+- 唔用 browser-only flag 控制存在
+- DraftBar 唔自己做正式 publish engine
+
+Status：**LOCKED**
+
+---
+
+# 61.8 確認視窗
+
+正式元件：
+**ConfirmDialog**
+
+只用於：
+- destructive
+- high-risk
+- irreversible / expensive
+- permission-sensitive operation
+
+固定結構：
+1. 明確標題
+2. 正在操作嘅 object
+3. 影響
+4. 唔會影響乜（有助避免誤解時）
+5. Reason / approval（只有 policy 要）
+6. 明確 Confirm button
+7. Cancel
+
+例：
+
+標題：
+「暫停 Keeta 接收新訂單？」
+
+說明：
+「新 Keeta 訂單會暫停接收；已成立訂單不受影響。」
+
+Button：
+[取消]
+[確認暫停 Keeta 接單]
+
+禁止：
+- 「你確定嗎？」
+- [No] [Yes]
+- [Cancel] [OK]
+作為唯一信息。
+
+Status：**LOCKED**
+
+---
+
+# 61.9 回讀區
+
+正式元件：
+**ReadbackPanel**
+
+用途：
+顯示：
+- Desired
+- Observed
+- Last observed time
+- Freshness
+- MATCH / PARTIAL / MISMATCH / UNKNOWN
+- Evidence / safe next action
+
+適用：
+- Publish
+- Rollback
+- OTA
+- Device
+- Integration
+- Platform action
+- Sellability
+- Cash / Close
+- Session revoke
+
+正常使用者第一層：
+只見人類結果。
+
+例：
+「SMT 已套用版本 2026.09.30 · 19:42」
+
+Advanced：
+先顯 desired/observed identity。
+
+禁止：
+- request sent 當 readback
+- socket connected 當 readback
+- Doorbell received 當 applied
+
+Status：**LOCKED**
+
+---
+
+# 61.10 時間線
+
+正式元件：
+**Timeline**
+
+用途：
+回答：
+「呢件 object 發生過乜？」
+
+適用：
+- Order
+- Product
+- Staff
+- Platform
+- Release
+- PrintJob
+- Device incident
+
+每項：
+- Time
+- Human-readable event
+- Actor / source（有需要）
+- Result / state
+- Deep-link to Audit / Proof（有需要）
+
+例：
+19:41 店舖接單
+19:42 付款已確認
+19:43 廚房打印結果未明
+19:45 付款方式由現金修正為 FPS
+
+禁止：
+- Timeline 直接展示 raw event name
+- 將 Event history 當 Proof
+- 將 Timeline 做第二 Audit database
+
+Status：**LOCKED**
+
+---
+
+# 61.11 表單
+
+正式元件：
+**FormSection / Field / InlineValidation**
+
+規則：
+- Label 永遠可見，唔只靠 placeholder
+- 必填用明確標記
+- Validation 貼近 field
+- Related fields 分 section
+- 無需要唔做 wizard
+- Primary action 一致：
+  - 儲存草稿
+  - 儲存
+  - 確認操作
+按正式語義選擇
+
+禁止：
+- 同一頁同時有「Save / Apply / Confirm」但其實係同一意思
+- 表單成功 toast 直接講「已生效」但只係 Draft
+- hidden required field
+
+Mobile：
+- 單欄
+- numeric / time / select 用原生友善 input
+- sticky action 只喺長 form 有需要時
+
+Status：**LOCKED**
+
+---
+
+# 61.12 分頁 / 內容切換
+
+正式元件：
+**Tabs / Segmented View**
+
+Tabs 只用於：
+同一 Object / Workspace 入面平行內容。
+
+例：
+Order Detail：
+- 摘要
+- 商品
+- 付款
+- 履約
+- 售後
+- 時間線
+
+Access Workspace：
+- Admin Accounts
+- Active Sessions
+- Trusted Devices
+
+禁止：
+- Tabs 再變第三層 Product Map
+- Tabs 收埋使用者本來應該由 Sidebar 搵到嘅正式功能
+
+Mobile：
+- tab 可橫向 scroll，但 active tab 必須可見
+- 如 tabs 太多，改 dropdown / compact selector，而唔係縮到睇唔到字
+
+Status：**LOCKED**
+
+---
+
+# 61.13 Toast / Inline Feedback
+
+正式規則：
+
+Toast 只適合：
+- 低風險即時確認
+- 已有正式結果嘅短訊息
+- 非核心證據
+
+例如：
+「草稿已儲存」
+
+唔適合用 Toast 作唯一證據：
+- Refund completed
+- Publish applied
+- OTA installed
+- Session revoked
+- Rollback restored
+
+呢啲必須喺頁面內保留正式 Result / Readback。
+
+Toast 消失唔可以令使用者失去關鍵結果。
+
+Status：**LOCKED**
+
+---
+
+# 61.14 Loading Skeleton
+
+Initial loading：
+- 保留完整 page shell
+- Header 可以先出
+- List / KPI / Detail 用相應 skeleton
+- 唔顯 0 / empty
+
+Background refresh：
+- 保留舊資料
+- 小型「更新中」提示
+- 禁止全頁閃白
+
+Search refresh：
+- 保留舊結果直到新結果 ready
+- 顯搜尋中狀態
+
+Status：**LOCKED**
+
+---
+
+# 61.15 Component ownership
+
+元件係共用產品規格，
+唔屬個別 domain。
+
+因此：
+- 訂單唔可以自己 invent 第二種 StatusBadge
+- 平台唔可以自己 invent 第二種 ConfirmDialog
+- 菜單唔可以自己 invent 第二種 DraftBar
+- 裝置唔可以自己 invent 第二種 UNKNOWN UI
+- 報表唔可以自己 invent Error = 0
+
+Domain 可以調整內容，
+但唔可以改核心互動語法。
+
+---
+
+# 61.16 元件驗收矩陣
+
+本輪鎖定 14 類共用介面能力：
+
+1. PageHeader
+2. SearchField
+3. FilterBar
+4. DataTable / ResponsiveRecordList
+5. StatusBadge
+6. EmptyState
+7. ErrorState
+8. StaleBanner
+9. DraftBar
+10. ConfirmDialog
+11. ReadbackPanel
+12. Timeline
+13. Form
+14. Tabs / Segmented View
+15. Toast / Inline Feedback
+16. Loading Skeleton
+
+結果：
+- **16 LOCKED**
+- **0 YELLOW**
+- **0 RED**
+
+下一輪：
+**共用介面元件規格盤點 Batch 2：元件尺寸 / 密度 / 對齊 / Desktop-Tablet-Mobile 轉換規則**
+
+重點：
+- Sidebar width
+- Page max width
+- Row height / card density
+- Sticky zones
+- modal / drawer / sheet
+- table → mobile card mapping
+- touch target
+- empty/error visual priority
+- form grid
+- danger placement
+
+MILESTONE:
+MFK_ADMIN_V3_COMPONENT_CONTRACT_AUDIT_BATCH1_LOCKED
