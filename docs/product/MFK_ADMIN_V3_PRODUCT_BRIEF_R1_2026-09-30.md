@@ -522,100 +522,304 @@ Surface：
 
 ---
 
-# 13. Menu Workspace｜總規格
+# 13. 菜單管理｜工作區總規格
 
-所有 Menu 編輯共用同一 Draft Context。
+菜單管理係一個清楚嘅功能 domain；Sidebar 細 Menu 直接顯示：
+- 分類管理
+- 產品管理
+- 選項／口味管理
+- 套餐管理
+- 價格管理
+- 顯示與排序
+- 售罄／供應
 
-Global editor header：
-- Draft state
-- Changed count
-- Validation count
--「放棄未保存」
--「檢查完整性」
--「查看變更」
+正常使用唔需要喺以上頁面之間猜路徑。
+每個頁面都遵守成熟後台模式：
 
-唔喺每個 page 即時正式 publish。
+**List → Detail → Create / Edit**
+
+共用規則：
+- List page：Page title + 主要 Create CTA + Search / Filter + Table / List。
+- Detail page：Object header + 核心摘要 + 分組內容 + 清楚 Edit action。
+- Create / Edit page：一個直接表單，必填項先出現；相關設定以 section 分組。
+- 唔使用長篇 onboarding / wizard 文案去解釋顯而易見嘅下一步。
+- Breadcrumb 只顯示位置，例如：菜單管理 / 產品管理 / 紫米飯團。
+- 所有 Menu config 仍共用同一 Draft Context；Page save 只更新 Draft，唔等於 Publish。
+- Product / Category / Option / Combo 關係必須可以由頁面直接睇到。
+- 跨 domain 只提供 contextual shortcut；唔複製第二套 authority。
 
 ---
 
-# 14. Product｜鎖定
+# 14. 產品管理｜鎖定
 
-必填：
+## 14.1 產品列表
+
+入口：
+**菜單管理 → 產品管理**
+
+第二步完成後已經直接見到產品 List。
+
+Header：
+- Title：產品管理
+- Primary CTA：新增產品
+
+Search / Filter：
+- 搜尋：名稱 / Product Code
+- 分類
+- 狀態
+- 套餐關係
+- Draft change
+
+Desktop table 最低欄位：
+- 圖片
+- 商品名稱
+- Product Code
+- 分類
+- Base Price
+- Active
+- 選項／口味摘要
+- 打印摘要
+- Draft indicator
+- Row action
+
+Mobile：
+- stacked record
+- 首行：名稱 + 價格 + 狀態
+- 次行：分類 + Code
+- 再顯示有異常／Draft 時先需要嘅 badge
+
+## 14.2 新增產品
+
+入口：
+- 產品管理 → 新增產品
+- 或 分類詳情 → 新增產品；由分類 context 進入時，自動預選該分類。
+
+建立產品必填：
 - Product Name
 - Product Code
-- Base Price
 - Category
+- Base Price
 - Active
 
-選填：
+Category 必填，唔可以建立無歸屬產品。
+
+Create form 分區：
+
+### 基本資料
+- Product Name *
+- Product Code *
+- Category *
+- Base Price *
+- Active *
 - Description
 - Image
-- Display order
-- Option links
-- Combo relation
-- Print rules
-- takeaway surcharge flag
-- operational metadata
 
-Product detail UI 採 **task picker**：
+### 選項／口味
+- 套用現有 Option Set
+- 顯示 Required / Min / Max 摘要
+- 可新增／移除 linkage
+
+### 套餐
+- 是否屬於 Combo / Child 關係
+- 關係只引用正式 Combo object
+
+### 產品打印設定
+- Receipt ON/OFF
+- Production ON/OFF
+- Packing ON/OFF
+- Label ON/OFF
+- Dine-in print ON/OFF
+- Label destination（Admin logical printer）
+
+產品頁只回答「呢件產品要印乜」。
+完整 Printer / Template / Route / Device 管理由「打印管理」負責。
+產品頁提供 contextual shortcut：**前往打印管理**。
+
+### 價格相關
+- Product takeaway surcharge flag
+- 其他已批准 product pricing input
+
+唔喺 UI 顯示工程 authority 教學文案；唯一 Pricing Authority 係 implementation contract，唔係日常操作說明。
+
+## 14.3 產品詳情
+
+Header：
+- Product name
+- Product Code
+- Active state
+- Category
+- Base Price
+- Edit
+
+內容分組：
 - 基本資料
 - 價格
-- 選項
+- 選項／口味
+- 套餐關係
 - 打印
 - 圖片
-- 進階
+- 最近變更／Draft 狀態
 
-一次只展開一個 edit task；其他摘要仍可見。
+使用者可以直接由產品詳情改 Category。
+改分類 = reassign；唔需要刪除產品再建立。
 
 ---
 
-# 15. Category / Sort｜鎖定
+# 15. 分類管理 / 顯示排序｜鎖定
 
-Category：
-- name
-- order
-- active
-- product count
+## 15.1 分類管理
+
+入口：
+**菜單管理 → 分類管理**
+
+Header：
+- Title：分類管理
+- Primary CTA：新增分類
+
+列表：
+- Category Name
+- Product Count
+- Active
+- Display Order
+- Draft indicator
+- Row action
+
+支援：
+- 新增分類
+- 改名
+- 啟用／停用
+- 排序
+- 查看分類內產品
+
+分類 Detail：
+- Category summary
+- 分類內產品 list
+- CTA：新增產品
+- CTA：管理產品
+
+由分類 Detail 新增產品時：
+- 新產品 Category 自動預選目前分類。
 
 Delete guard：
-有 product reference 不可直接 delete；要先 reassign。
+- 有 product reference 時不可直接 delete。
+- UI 顯示受影響 product count。
+- 提供「重新分類」入口。
+- 完成 reassign 後先可以 delete。
 
-Menu Display：
-- category order
-- product order
-- visibility
-- 禁止另外建立 print-only sort authority。
+## 15.2 顯示與排序
+
+入口：
+**菜單管理 → 顯示與排序**
+
+用途：
+- Category order
+- Product order within category
+- Visibility
+
+Desktop：
+- 左：分類順序
+- 右：選中分類商品順序
+
+支援 drag & drop；亦要有 keyboard / explicit move control。
+
+Mobile：
+- 上移 / 下移
+- 直接顯示目前序號
+
+禁止建立 print-only product sort authority。
+打印沿用 Admin 已發布 Category / Product 排序。
 
 ---
 
-# 16. Modifier / Option Center｜鎖定
+# 16. 選項／口味管理｜鎖定
 
-Option Set：
+UI 對人類使用名稱：
+**選項／口味管理**
+
+底層 contract 可保留 Modifier / Option Set 命名，但正常 UI 唔要求使用者理解工程術語。
+
+## 16.1 Option Set 列表
+
+入口：
+**菜單管理 → 選項／口味管理**
+
+Header：
+- Title：選項／口味管理
+- Primary CTA：新增選項組
+
+List：
+- Name
+- Required
+- Min
+- Max
+- Option count
+- Active
+- Used by product count
+- Draft indicator
+- Row action
+
+## 16.2 Option Set Detail / Edit
+
+基本資料：
 - Name
 - Required?
 - Min
 - Max
 - Active
-- Options
 
-Option：
+Options table：
 - Name
 - Code
-- Price adjustment（可正、0、負）
+- Price Adjustment（正 / 0 / 負）
 - Active
 - Position
+- Row action
+
+支援：
+- 新增 Option
+- 編輯 Option
+- 排序
+- 停用
+- 正價 / 零價 / 負價 adjustment
+
+Usage：
+- 顯示被邊啲 Product / Combo 使用
+- 可以 deep-link 去該 Product / Combo
+- 刪除前要顯示 reference impact
 
 Product linkage：
-- attach reusable Option Set
-- product-specific default / constraints where contract supports
+- Product 只 attach reusable Option Set
+- Product-specific default / constraints 只在 contract 支援時顯示
 
 所有 adjustment 只係 canonical pricing input；唔建立第二 pricing engine。
 
 ---
 
-# 17. Pricing｜鎖定
+# 17. 價格管理｜鎖定
 
-UI 可以管理：
+入口：
+**菜單管理 → 價格管理**
+
+用途：
+提供集中式價格管理／批量檢查，唔取代 Product Detail 入面嘅單件價格編輯。
+
+List：
+- Product
+- Category
+- Base Price
+- Takeaway surcharge
+- Option price effect summary
+- Combo price relation
+- Active
+- Draft indicator
+
+支援：
+- 搜尋
+- 分類 filter
+- 直接進 Product / Option / Combo detail
+- 經正式 Draft 修改已批准 pricing input
+
+UI 可管理：
 - Base price
 - Option +/- adjustment
 - Product takeaway +$1 flag
@@ -627,14 +831,63 @@ Product 外賣附加費：
 - Combo ON → whole Combo +$1
 - child 不可再重複 +$1
 
-Price page 必須明示：
-「正式交易計價由唯一 Pricing Authority 執行；Admin 只發布規則。」
+正式交易仍由唯一 Pricing Authority 計算。
+呢條係 system contract；正常 UI 唔用技術警告文案阻住使用者。
 
 ---
 
-# 18. Combo｜鎖定
+# 18. 套餐管理｜鎖定
 
-保留：
+## 18.1 套餐列表
+
+入口：
+**菜單管理 → 套餐管理**
+
+Header：
+- Title：套餐管理
+- Primary CTA：新增套餐
+
+List：
+- Combo Name
+- Product Code
+- Category
+- Base Price
+- Group count
+- Child count
+- Active
+- Draft indicator
+- Row action
+
+## 18.2 新增／編輯套餐
+
+Create / Edit 一個清楚表單：
+
+### 基本資料
+- Combo Name
+- Product Code
+- Category
+- Base Price
+- Active
+
+### 套餐組別
+每 Group：
+- Name
+- Required / Optional
+- Min
+- Max
+- Position
+
+### Child Products
+- Child product identity
+- Adjustment
+- Availability summary
+- 自身 Option / Modifier relationship 保留
+
+### 打印
+- 顯示 product-level print summary
+- contextual shortcut 去打印管理
+
+Combo 必須保留：
 - Parent identity
 - Main/add-on pools
 - Required/optional groups
@@ -643,7 +896,6 @@ Price page 必須明示：
 - adjustment
 
 打印 / report 不可拆散到失去 Combo relationship。
-
 跨來源 total 只係 read/display，唔改 identity。
 
 ---
@@ -1103,10 +1355,58 @@ Logout 清 authenticated Query cache。
 
 # 35. Config Editing UI Pattern｜全域鎖定
 
-所有 editor page 採：
+全產品採成熟後台模式：
+
+**List → Detail → Create / Edit**
+
+唔再強制使用：
 **Summary → Task Picker → Focused Editor → Back to Summary**
 
-避免同一頁幾十個 field 全開。
+原因：
+- 普通使用者應該直接睇到物件同設定；
+- 唔應該為咗「簡化畫面」而將欄位收埋成另一層迷宮；
+- 真正長／高風險 workflow 先使用 step-based UI。
+
+## List Page
+固定結構：
+- PageHeader
+- Primary Create CTA
+- Search
+- Filter
+- DataTable / ResponsiveRecordList
+- Row actions
+
+## Detail Page
+固定結構：
+- Object header
+- Core summary
+- Grouped sections
+- Edit action
+- Contextual deep-links
+- Timeline / Audit link where relevant
+
+## Create / Edit Page
+固定結構：
+- 清楚單一表單
+- Required fields 優先
+- Related fields 按 section 分組
+- Save Draft / Cancel
+- 必要時右側可以有 Overview / Preview
+- 唔可以右側再變第二套 navigation
+
+## Workflow Page
+只限真正多 gate 操作，例如：
+- Publish
+- Refund / Correction
+- Close Day
+- Rollback
+
+先使用：
+- Step state
+- Validation
+- Impact / Preview
+- Confirmation
+- Readback
 
 共用 components：
 - PageHeader
@@ -1119,8 +1419,6 @@ Logout 清 authenticated Query cache。
 - ErrorState
 - StaleBanner
 - DraftBar
-- GuidedPanel
-- TaskPicker
 - ValidationPanel
 - ImpactPanel
 - ReadbackPanel
@@ -1128,7 +1426,10 @@ Logout 清 authenticated Query cache。
 - AuditDetailDrawer
 - ConfirmDialog
 
-禁止每個 domain 自己 invent 第二套 pattern。
+禁止：
+- 為咗減少頁面資訊而增加 hidden navigation depth
+- 每個 domain invent 第二套基本 List / Detail / Edit pattern
+- 用大量教學文案取代清楚 layout
 
 ---
 
@@ -1349,7 +1650,7 @@ One-shot Admin V3 rebuild default只准：
 - 無 page-level horizontal overflow
 - loading/empty/error/offline/unknown/partial/conflict都有真 UI
 - component pattern一致
-- product detail task picker
+- product detail 直接、分組、可編輯；唔靠 hidden task picker 收埋正式設定
 - pending changes/draft bar
 - publish impact/readback panel
 
