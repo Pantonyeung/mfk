@@ -14,7 +14,13 @@ const statusLabel={
 
 const mobileCoreGroups=new Set(['today','orders','menu','operations']);
 
-interface AdminSyncAckView{revision:number;fingerprint:string;deviceId:string;appliedAt:string}
+interface AdminSyncAckView{revision:number;fingerprint:string;publishedAt:string;deviceId:string;appliedAt:string}
+
+function hkTime(value?:string){
+  if(!value)return '未有時間';
+  const at=Date.parse(value);
+  return Number.isFinite(at)?new Date(at).toLocaleString('zh-HK',{timeZone:'Asia/Hong_Kong',hour12:false}):'時間無效';
+}
 
 export function deriveAdminSyncPresentation({
   activeRelease,status,acks,online,
@@ -24,22 +30,22 @@ export function deriveAdminSyncPresentation({
   acks:readonly AdminSyncAckView[];
   online:boolean;
 }):{tone:AdminTone;title:string;detail:string}{
-  if(!activeRelease)return {tone:'neutral',title:'未有啟用版本',detail:'保存後會自動排入 Admin → SMT 同步'};
+  if(!activeRelease)return {tone:'neutral',title:'未有正式發佈',detail:'保存後會排入 Admin → SMT 發佈'};
 
-  const currentAck=status.revision===activeRelease.version&&status.fingerprint
-    ?acks.find(row=>row.revision===activeRelease.version&&row.fingerprint===status.fingerprint)
+  const currentAck=status.fingerprint&&status.cloudPublishedAt
+    ?acks.find(row=>row.fingerprint===status.fingerprint&&row.publishedAt===status.cloudPublishedAt)
     :undefined;
   const latestAck=acks[0];
-  const title='R'+activeRelease.version;
+  const title=status.cloudPublishedAt?'發佈 '+hkTime(status.cloudPublishedAt):'等待正式發佈';
 
-  if(!online)return {tone:'warning',title,detail:'離線 · 顯示最後已知同步狀態'};
-  if(status.state==='ERROR'&&status.revision===activeRelease.version)return {tone:'danger',title,detail:'同步失敗'+(status.error?' · '+status.error:'')};
-  if(status.state==='QUEUED'&&status.revision===activeRelease.version)return {tone:'info',title,detail:'已保存 · 等待同步'};
-  if(status.state==='PUBLISHING'&&status.revision===activeRelease.version)return {tone:'info',title,detail:'正在送往雲端'};
-  if(currentAck)return {tone:'success',title,detail:'SMT 已套用 · '+currentAck.deviceId};
-  if(status.state==='PUBLISHED'&&status.revision===activeRelease.version)return {tone:'warning',title,detail:'雲端已接收 · 等待 matching SMT 回讀'};
-  if(latestAck)return {tone:'warning',title,detail:'目前未有 matching 回讀 · 最近只見 R'+latestAck.revision};
-  return {tone:'warning',title,detail:'未觀察到 matching SMT 回讀'};
+  if(!online)return {tone:'warning',title,detail:'離線 · 顯示最後已知狀態'};
+  if(status.state==='ERROR')return {tone:'danger',title,detail:'發佈失敗'+(status.error?' · '+status.error:'')};
+  if(status.state==='QUEUED')return {tone:'info',title,detail:'已排隊 · 等待雲端正式發佈'};
+  if(status.state==='PUBLISHING')return {tone:'info',title,detail:'正在正式發佈'};
+  if(currentAck)return {tone:'success',title,detail:'SMT 已套用 · '+hkTime(currentAck.appliedAt)};
+  if(status.state==='PUBLISHED')return {tone:'warning',title,detail:'雲端已發佈 · 等待 SMT 套用回讀'};
+  if(latestAck)return {tone:'warning',title,detail:'未有今次回讀 · 最近 SMT 套用 '+hkTime(latestAck.appliedAt)};
+  return {tone:'warning',title,detail:'未觀察到 SMT 套用回讀'};
 }
 
 function AdminSyncTopState(){
@@ -54,7 +60,7 @@ function AdminSyncTopState(){
       setOnline(navigator.onLine);
       void readAdminSyncAcks().then(rows=>{
         if(!active)return;
-        setAcks(rows.map(row=>({revision:row.revision,fingerprint:row.fingerprint,deviceId:row.deviceId,appliedAt:row.appliedAt})));
+        setAcks(rows.map(row=>({revision:row.revision,fingerprint:row.fingerprint,publishedAt:row.publishedAt,deviceId:row.deviceId,appliedAt:row.appliedAt})));
       });
     };
     window.addEventListener('mfk-admin-sync',refresh);
