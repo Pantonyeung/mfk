@@ -839,3 +839,45 @@ MFK 後台／工作台應遵守：
 
 MILESTONE:
 MFK_BACKOFFICE_WORKSPACE_DISPLAY_INTERACTION_STANDARD_V1_READY
+
+---
+
+# 16. Owner Authority Correction｜Admin 係資料治理中樞，訂單只讀
+
+Owner 於 2026-09-30 明確補充：
+
+- Admin 主要負責資料流動、權威性、準確性、版本、同步、回讀、配置治理。
+- 訂單喺 Admin 只係查看、監察、追蹤同核對。
+- 取消訂單、退款、付款方式修正等交易 mutation 唔屬 Admin。
+
+因此三種工作面重新鎖定：
+
+## Admin
+核心：
+**資料治理 / 配置 / 發佈 / 監察 / 報表 / Audit / Readback**
+
+訂單：
+**Read-only monitoring**
+
+## SMM
+核心：
+**營運工作台 / 異常處理 / 快速分流**
+
+可否執行 transaction mutation：
+只按正式 authority contract，
+唔因為「SMM」名稱自動擁有。
+
+## SMT / 正式交易操作端
+核心：
+**現場 transaction execution / runtime action**
+
+真正 Cancel / Refund / Payment Correction：
+由正式交易權威執行。
+
+硬規則：
+**Admin 權限高 ≠ Admin 可以做所有交易操作。**
+
+管理權、資料權威、交易執行權必須分開。
+
+MILESTONE:
+MFK_ADMIN_ORDER_READ_ONLY_WORKSPACE_STANDARD_CORRECTION_LOCKED
