@@ -1860,36 +1860,312 @@ R1 Admin 此頁預設係 read / diagnostics surface。
 
 ---
 
-# 25. Staff / RBAC｜鎖定
+# 25. 人員與權限｜鎖定
 
-Staff list：
+人員與權限係獨立功能 domain。
+使用者想知道「邊個員工、屬咩角色、有咩權限、可管理邊間店、邊個 session / trusted device 仲有效」時，第一時間就應該入 **人員與權限**。
+
+Sidebar 細 Menu 直接顯示：
+- 員工管理
+- 角色管理
+- 權限管理
+- 登入／Session／Trusted Device
+
+所有頁面符合：
+**人員與權限 → 細 Menu → 已見到目標內容 → 撳 Staff / Role / Session 入 Detail / Edit**
+
+禁止將：
+員工 → 角色 → 權限 → Scope → Session
+做成一層層 hidden menu。
+
+Identity、Role、Permission、Scope、Session 係相關，但唔係同一樣嘢。
+
+## 25.1 員工管理
+
+入口：
+**人員與權限 → 員工管理**
+
+第二步完成後直接見 Staff List。
+
+Header：
+- Title：員工管理
+- Primary CTA：新增員工
+
+Search / Filter：
+- Name / Staff ID
+- Role
+- Active
+- Scope / Store
+- Admin login enabled
+- Attention only
+
+List：
 - Name
 - Staff ID
 - Role
 - Scope
 - Active
+- Admin login
+- Credential / access attention
+- Last relevant access（如正式 read model 有）
+- Row action
+
+正常 UI 唔顯：
+- PIN
+- password
+- token
+- raw credential secret
+- raw internal UUID 作主要 identity
+
+## 25.2 新增／編輯員工
+
+Create / Edit 直接使用一個清楚表單。
+
+### 基本資料
+- Name *
+- Staff ID *
+- Active *
+
+### 角色
+- Role *
+- 顯示該 Role 嘅權限摘要
+
+### Scope
+- Store / Location scope
+- 其他正式 scope dimension（如 contract 支援）
+
+### 登入
+- Frontline credential status
 - Admin login enabled
-- last relevant access status
+- Admin Login ID（如正式 contract 支援）
 
-Staff detail：
-- Identity
+Credential secret：
+- 建立／重設流程只顯輸入欄
+- 儲存後永遠唔再 reveal 原值
+- PIN / password / token 永遠唔落 Audit
+
+### 裝置／Session
+Create/Edit 主表單只顯摘要：
+- Active sessions count
+- Trusted devices count
+
+完整管理 deep-link：
+**前往登入／Session／Trusted Device**
+
+## 25.3 員工詳情
+
+Header：
+- Name
+- Staff ID
+- Active
 - Role
-- Permission
 - Scope
+- Edit
+
+內容分組：
+- 基本資料
+- 角色／權限摘要
+- Scope
+- Credential / Admin login
+- Active sessions / trusted devices 摘要
+- 最近敏感操作／Audit shortcut
+- 最近 access state
+
+Contextual shortcuts：
+- 前往角色管理
+- 前往權限管理
+- 前往登入／Session／Trusted Device
+- 前往操作記錄
+
+## 25.4 角色管理
+
+入口：
+**人員與權限 → 角色管理**
+
+第二步完成後直接見 Role List。
+
+Header：
+- Title：角色管理
+- Primary CTA：新增角色
+
+List：
+- Role Name
+- Staff Count
+- Permission summary
+- Scope policy summary
+- Active
+- Last modified
+- Draft indicator
+- Row action
+
+Role Detail：
+- Role name
+- Description
+- Assigned staff
+- Permission summary
+- Scope rules
+- Inherited / override summary（如正式 contract 有）
+- Edit
+- Duplicate（如產品正式批准）
+
+Create / Edit：
+- Role name *
+- Description
+- Permission set
+- Scope policy
+- Active
+
+Delete guard：
+- Role 仍有 Staff reference 時不可直接 delete
+- 顯示受影響 staff count
+- 先 reassign staff 或停用 role
+
+## 25.5 權限管理
+
+入口：
+**人員與權限 → 權限管理**
+
+第二步完成後直接見 Capability / Permission Matrix。
+
+Permission UI 以「人類工作」分組，唔按 API endpoint 分組。
+
+建議 group：
+- 訂單
+- 售後／退款／取消
+- 菜單
+- 售罄／供應
+- 平台／渠道
+- 打印
+- 裝置／OTA
+- 營業日／現金
+- 員工／權限
+- 報表／匯出
+- 發佈／版本
+- 系統治理
+
+每個 capability 顯示：
+- Capability name
+- View / Manage / Approve（只限正式 permission model 支援）
+- Scope
+- Inherited / direct override（如正式 contract 有）
+- Risk / approval requirement（只在必要時）
+
+操作：
+- 選 Role
+- 直接修改該 Role 權限
+- Save Draft
+- Publish / formalize 仍走正式 config workflow（如 permission config 屬 published Admin config）
+
+硬規則：
+- Actor 不可授予高過自己 authority 嘅 permission
+- Frontend hide 唔係 security
+- protected operation 必須 server-side authz
+- Role permission change 要 Audit
+- Revoke 後下一個 protected request fail-closed
+
+正常 UI 唔展示：
+- internal permission code
+- route name
+- API scope string
+除非進 Advanced / Diagnostics。
+
+## 25.6 Scope
+
+Scope 唔另開第三層 Menu。
+Scope 直接出現喺：
+- Staff Detail / Edit
+- Role Detail / Edit
+- Permission Matrix context
+
+UI 用人類可理解名稱：
+- 全店
+- 指定門店
+- 指定工作範圍
+- 其他正式 scope
+
+禁止只顯 raw scope ID。
+
+如果將來 multi-location：
+「可以睇某店」
+≠
+「可以改某店所有設定」。
+
+## 25.7 登入／Session／Trusted Device
+
+入口：
+**人員與權限 → 登入／Session／Trusted Device**
+
+第二步完成後直接見 access workspace。
+
+Top tabs / filters 可以係：
+- Admin Accounts
+- Active Sessions
+- Trusted Devices
+
+呢啲係同一細 Menu 入面嘅 workspace filter / view，
+唔係第三層 Sidebar。
+
+### Admin Accounts
+List：
+- Staff / Login ID
+- Admin login enabled
 - Credential status
-- Device/session detail（advanced）
-- revoke actions
+- Active session count
+- Trusted device count
+- Last login
+- Attention
+- View
 
-Permission editor：
-- grouped capability matrix
-- scope
-- inherited vs override
-- cannot grant above actor authority
+### Active Sessions
+List：
+- Staff
+- Device
+- Created
+- Last activity
+- Scope
+- Current state
+- Revoke
 
-Protected revoke：
-下一個 protected request fail-closed。
+### Trusted Devices
+List：
+- Device display name
+- Staff / account association
+- Trust state
+- Last seen
+- Created / approved at
+- Revoke / review
 
-PIN/password/token 永遠唔顯示。
+## 25.8 Session / Device revoke
+
+高風險 revoke：
+- 顯示 target
+- 顯示影響
+- Confirm
+- Reason（如 policy 要求）
+- Execute
+- Authoritative readback
+- Audit
+
+Revoke 成功條件：
+- server-side state readback confirmed
+- 下一個 protected request fail-closed
+
+唔可以：
+- 只 frontend hide
+- 只清 browser local state就叫 revoke 成功
+- 顯示 credential secret
+
+## 25.9 人類第一直覺歸類
+
+- 「新增／停用員工」→ 人員與權限 / 員工管理
+- 「呢個職位有咩權限」→ 人員與權限 / 角色管理
+- 「退款權限邊個有」→ 人員與權限 / 權限管理
+- 「邊個 Admin login 仲有效」→ 人員與權限 / 登入／Session／Trusted Device
+- 「要踢走某部已信任裝置」→ 人員與權限 / 登入／Session／Trusted Device
+- 「部 SMT 本身健唔健康」→ 裝置管理 / 裝置狀態
+- 「邊個做過退款／改價」→ 系統管理 / 操作記錄
+
+任何以上問題如果要第三層 Sidebar 先搵到，視為 IA RED。
 
 ---
 
