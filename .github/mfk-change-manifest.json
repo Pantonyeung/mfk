@@ -41,5 +41,5 @@
     "No backend, SMT, SMM, Customer or Owner runtime change."
   ],
   "rollback_sha": "3816a32f846fe36c7a2ca8fe7589e56796178b27",
-  "severity": "SYSTEM_AUTHORITY"
+  "severity": "HARD_BLOCK"
 }
