@@ -66,7 +66,7 @@ function ProductMedia({product}:{product:CustomerProduct}){
 
 export function Stage1Home({
   snapshot,connection,browserOnline,activeOrders,history,recommendations,
-  onRetry,onProduct,onBrowse,onOrders,onMember,onBuyAgain,
+  onRetry,onProduct,onBrowse,onOrders,onHistory,onMember,onBuyAgain,
 }:{
   snapshot:CustomerReadModelSnapshot|null;
   connection:CustomerConnectionState;
@@ -161,7 +161,7 @@ export function Stage1Home({
 
       <section className="stage1-quick-entry-section" aria-label="快捷入口">
         <div className="stage1-quick-entry-grid">
-          <button type="button" onClick={lastOrder?()=>onBuyAgain(lastOrder):onOrders}>
+          <button type="button" onClick={onHistory}>
             <span className="stage1-shortcut-source stage1-shortcut-heart" aria-hidden="true"><img src={STAGE1_FINAL_SOURCE} alt=""/></span>
             <strong>我的收藏</strong>
             {lastOrder?<small>{lastOrder.itemSummary}</small>:<small>常用餐點</small>}
