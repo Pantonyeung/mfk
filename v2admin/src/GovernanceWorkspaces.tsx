@@ -9,10 +9,11 @@ import {AdminResponsiveDataView} from './AdminResponsiveDataView.tsx';
 function Header({title,description,badge='已自動保存'}:{title:string;description:string;badge?:string}){
   return <header className="admin-editor-head"><div><small>{badge}</small><h1>{title}</h1><p>{description}</p></div></header>;
 }
+const hkTime=(value:string)=>new Date(value).toLocaleString('zh-HK',{timeZone:'Asia/Hong_Kong',hour12:false});
 
 function restoreSnapshot(release:AdminRelease,replaceDraft:(draft:AdminSessionDraft,reason:string)=>void){
   const snapshot=restoreAdminReleaseAsDraft<Record<string,unknown>>(release);
-  if(snapshot.catalog)replaceDraft(snapshot.catalog as AdminSessionDraft,'由設定版本 R'+release.version+' 還原內容');
+  if(snapshot.catalog)replaceDraft(snapshot.catalog as AdminSessionDraft,'由歷史保存 '+hkTime(release.createdAt)+' 還原內容');
   if(snapshot.optionCenter&&typeof snapshot.optionCenter==='object'&&!Array.isArray(snapshot.optionCenter)){
     const optionCenter=snapshot.optionCenter as {sets?:unknown;productLinks?:unknown};
     if(optionCenter.sets!==undefined)writeAdminStored(OPTION_SET_CENTER_STORAGE_KEYS.sets,optionCenter.sets);
@@ -33,27 +34,27 @@ export function PublishCenterWorkspace(){
   const {markClean,replaceDraft}=useAdminDraft();
   const [releases,setReleases]=useState(()=>readAdminReleases());
   const [active,setActive]=useState(()=>readActiveAdminRelease());
-  const [message,setMessage]=useState('每次喺菜單／商品／選項／套餐撳「保存」，就會建立一個不可變新版本並即時成為目前版本。呢度只保留版本歷史同還原。');
+  const [message,setMessage]=useState('每次正式發佈都以 Cloud 香港發佈日期時間作先後次序；歷史資料可以重新發佈，R 號唔參與新舊判斷。');
 
   const restore=(release:AdminRelease)=>{
     restoreSnapshot(release,replaceDraft);
-    const row=createAdminRelease(release.snapshot,'還原自 R'+release.version);
+    const row=createAdminRelease(release.snapshot,'重新發佈歷史保存 '+hkTime(release.createdAt));
     markClean();
     writeAdminStored(OPTION_SET_CENTER_STORAGE_KEYS.dirty,false);
     setReleases(readAdminReleases());
     setActive({version:row.version,createdAt:row.createdAt,fingerprint:row.fingerprint});
-    setMessage('已由 R'+release.version+' 還原並保存成 R'+row.version+'；舊版本冇被修改。');
+    setMessage('已由 '+hkTime(release.createdAt)+' 嘅歷史資料重新建立正式發佈；今次以 '+hkTime(row.createdAt)+'（香港時間）作發佈次序。');
     window.setTimeout(()=>window.location.reload(),50);
   };
 
   return <section className="admin-editor-page">
     <header className="admin-editor-head">
-      <div><small>{active?'目前版本 R'+active.version:'未有保存版本'}</small><h1>設定版本歷史</h1><p>「保存」就係正式版本邊界。呢度冇額外確認步驟；歷史版本只讀，還原會建立另一個新版本。</p></div>
+      <div><small>{active?'目前本機保存 '+hkTime(active.createdAt):'未有保存資料'}</small><h1>設定發佈歷史</h1><p>正式發佈以香港日期時間為準。任何歷史資料都可以重新發佈；重新發佈後以今次 Cloud 香港發佈時間成為新狀態。</p></div>
     </header>
 
     <div className="admin-kpi-grid">
-      <article><span>目前版本</span><strong>{active?'R'+active.version:'—'}</strong><small>{active?new Date(active.createdAt).toLocaleString('zh-HK'):'未建立'}</small></article>
-      <article><span>版本總數</span><strong>{releases.length}</strong><small>不可變歷史</small></article>
+      <article><span>目前本機保存</span><strong>{active?hkTime(active.createdAt):'—'}</strong><small>香港時間</small></article>
+      <article><span>歷史保存總數</span><strong>{releases.length}</strong><small>不可變歷史</small></article>
       <article><span>目前驗證碼</span><strong>{active?active.fingerprint.replace('fnv1a32:',''):'—'}</strong><small>保存後 readback</small></article>
       <article><span>額外確認步驟</span><strong>0</strong><small>保存即目前版本</small></article>
     </div>
@@ -61,12 +62,12 @@ export function PublishCenterWorkspace(){
     <div className="admin-callout compact">{message}</div>
 
     <section className="admin-rule-card">
-      <h2>版本歷史</h2>
-      {releases.length===0?<div className="admin-read-empty">未有保存版本。去菜單／商品／選項／套餐修改後直接撳「保存」。</div>:<div className="admin-editor-list">{releases.map(release=><article className="admin-policy-row" key={release.version}>
-        <div><b>R{release.version}{active?.version===release.version?' · 目前':''}</b><small>{new Date(release.createdAt).toLocaleString('zh-HK')}</small></div>
+      <h2>發佈歷史</h2>
+      {releases.length===0?<div className="admin-read-empty">未有保存資料。去菜單／商品／選項／套餐修改後正式發佈。</div>:<div className="admin-editor-list">{releases.map(release=><article className="admin-policy-row" key={release.version}>
+        <div><b>{hkTime(release.createdAt)}{active?.version===release.version?' · 目前本機保存':''}</b><small>香港時間</small></div>
         <code>{release.fingerprint}</code>
         <span>{release.reason||'一般保存'}</span>
-        <button type="button" disabled={active?.version===release.version} onClick={()=>restore(release)}>還原為新版本</button>
+        <button type="button" onClick={()=>restore(release)}>以此資料重新發佈</button>
       </article>)}</div>}
     </section>
   </section>;
