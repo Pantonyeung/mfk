@@ -6,6 +6,8 @@ export const V3_ADMIN_STATE_AUTHORITY=Object.freeze({
   server:'TANSTACK_QUERY',
   outbox:'DEXIE_INDEXEDDB',
   localDraft:'ZUSTAND_OR_REACT',
+  authPersistence:'MEMORY_ONLY',
+  canonicalValidation:'SHARED_ADMIN_CONFIG_CONTRACT',
   derivedServerStatusPersisted:false,
   v2StateModulesImported:false,
 } as const);
