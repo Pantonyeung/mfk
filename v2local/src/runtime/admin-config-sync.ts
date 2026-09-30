@@ -115,6 +115,10 @@ async function ack(envelope:MfkAdminConfigEnvelope,disposition:'APPLIED'|'IDEMPO
     body:JSON.stringify(body),
   });
   if(!response.ok)throw new Error('ADMIN_CONFIG_ACK_HTTP_'+response.status);
+  try{
+    const diag=JSON.parse(localStorage.getItem(ADMIN_PROPAGATION_DIAG_KEY)||'{}');
+    localStorage.setItem(ADMIN_PROPAGATION_DIAG_KEY,JSON.stringify({...diag,ackReadbackAt:now()}));
+  }catch{}
 }
 
 let adminConfigFetchInFlight:Promise<SmtAdminConfigApplyResult|null>|null=null;
