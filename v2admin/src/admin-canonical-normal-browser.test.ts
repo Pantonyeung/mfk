@@ -28,4 +28,13 @@ describe('Admin normal-browser canonical hydration',()=>{
     expect(source).toContain("row.fingerprint===envelope.fingerprint");
     expect(source).not.toContain('Number(row.revision)>envelope.revision');
   });
+
+  it('does not invent a publish queue from local release history during bootstrap',()=>{
+    const source=readFileSync(new URL('./admin-sync-client.ts',import.meta.url),'utf8');
+    const installer=source.slice(source.indexOf('export function installAdminSyncAutoFlush'),source.indexOf('export interface AdminDiningOccupancyReadback'));
+    expect(installer).toContain("window.addEventListener('mfk-admin-release',queueExplicitRelease)");
+    expect(installer).toContain('window.setTimeout(flush,0)');
+    expect(installer).not.toContain('window.setTimeout(()=>{queueLatest();flush();},0)');
+    expect(installer).not.toContain("window.addEventListener('focus',flush)");
+  });
 });
