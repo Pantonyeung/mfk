@@ -39,6 +39,52 @@ function emit(){if(typeof window!=='undefined')window.dispatchEvent(new CustomEv
 export function readAdminSyncStatus(){
   return readAdminStored<AdminSyncStatus>(STATUS_KEY,idle());
 }
+export interface AdminSyncDiagnosticSnapshot{
+  readonly status:Pick<AdminSyncStatus,'state'|'revision'|'fingerprint'|'adminFingerprint'|'cloudPublishedAt'|'updatedAt'|'error'>;
+  readonly outboxCount:number;
+  readonly outbox:readonly {
+    readonly revision:number;
+    readonly fingerprint:string;
+    readonly adminFingerprint:string;
+    readonly publishedAt:string;
+  }[];
+  readonly canonicalHydrated:null|{
+    readonly revision:number;
+    readonly fingerprint:string;
+    readonly publishedAt:string;
+    readonly hydratedAt:string;
+  };
+}
+
+export function readAdminSyncDiagnosticSnapshot():AdminSyncDiagnosticSnapshot{
+  const status=readAdminSyncStatus();
+  const hydrated=readAdminStored<AdminSyncDiagnosticSnapshot['canonicalHydrated']>('canonical-hydrated.v1',null);
+  const outbox=readOutbox().map(row=>Object.freeze({
+    revision:row.revision,
+    fingerprint:row.fingerprint,
+    adminFingerprint:row.adminFingerprint,
+    publishedAt:row.publishedAt,
+  }));
+  return Object.freeze({
+    status:Object.freeze({
+      state:status.state,
+      ...(status.revision!==undefined?{revision:status.revision}:{}),
+      ...(status.fingerprint?{fingerprint:status.fingerprint}:{}),
+      ...(status.adminFingerprint?{adminFingerprint:status.adminFingerprint}:{}),
+      ...(status.cloudPublishedAt?{cloudPublishedAt:status.cloudPublishedAt}:{}),
+      updatedAt:status.updatedAt,
+      ...(status.error?{error:status.error}:{}),
+    }),
+    outboxCount:outbox.length,
+    outbox:Object.freeze(outbox),
+    canonicalHydrated:hydrated&&typeof hydrated==='object'?Object.freeze({
+      revision:Number(hydrated.revision)||0,
+      fingerprint:String(hydrated.fingerprint||''),
+      publishedAt:String(hydrated.publishedAt||''),
+      hydratedAt:String(hydrated.hydratedAt||''),
+    }):null,
+  });
+}
 export function reconcileAdminSyncStatusFromCanonical(active:MfkAdminConfigEnvelope){
   const activePublishedAt=Date.parse(active.publishedAt);
   writeOutbox(readOutbox().filter(row=>{
@@ -87,6 +133,21 @@ function publisherKey(){
 export function readExistingAdminPublisherKey(){
   return readAdminStored<string>(PUBLISHER_KEY,'');
 }
+
+export async function readAdminRuntimeSourceSha(){
+  if(typeof fetch==='undefined')return 'unavailable';
+  try{
+    const response=await fetch('/api/health?adminRuntimeDiagnostic=R4',{
+      method:'GET',
+      cache:'no-store',
+      credentials:'same-origin',
+      headers:{accept:'application/json','cache-control':'no-cache'},
+    });
+    const body=await response.json().catch(()=>({})) as {sourceSha?:unknown};
+    return response.ok&&typeof body.sourceSha==='string'?body.sourceSha:'unavailable';
+  }catch{return 'unavailable';}
+}
+
 
 export async function readCanonicalAdminActiveWithPublisherKey(storeId='MF01'):Promise<MfkAdminConfigEnvelope|null>{
   if(typeof fetch==='undefined')return null;

@@ -130,7 +130,8 @@ button:active:not(:disabled),a:active,summary:active{transform:scale(.985)}
 .mfk-admin-page-identity small{color:var(--admin-subtle);font-size:10px;font-weight:500;letter-spacing:0}
 .mfk-admin-page-identity strong{font-size:15px;font-weight:600;letter-spacing:-.01em}
 .mfk-admin-topstate{max-width:520px;grid-template-columns:auto minmax(0,1fr);gap:3px 8px}
-.mfk-admin-topstate>span:last-child{color:var(--admin-muted);font-size:10px}
+.mfk-admin-sync-detail{color:var(--admin-muted);font-size:10px}
+.mfk-admin-runtime-diag{grid-column:1/-1;color:#6e6e73;font-size:8px;line-height:1.2;letter-spacing:-.03em;white-space:nowrap}
 .admin-status-badge{
   min-height:24px;
   padding:3px 9px;
@@ -445,7 +446,7 @@ button:active:not(:disabled),a:active,summary:active{transform:scale(.985)}
   .mfk-admin-topbar{min-height:52px;padding:7px 12px}
   .mfk-admin-page-identity{display:grid;gap:0}
   .mfk-admin-page-identity small{font-size:9px}.mfk-admin-page-identity strong{font-size:14px}
-  .mfk-admin-topstate{max-width:160px;display:grid}.mfk-admin-topstate>span:last-child{display:block;max-width:118px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .mfk-admin-topstate{max-width:196px;display:grid}.mfk-admin-sync-detail{display:block;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.mfk-admin-runtime-diag{max-width:196px;font-size:7.5px;letter-spacing:-.04em}
   .mfk-admin-context{inset-block-start:52px;min-height:58px;padding:8px 12px}
   .mfk-admin-context-title{gap:8px}.mfk-admin-context-group{font-size:11px}
   .mfk-admin-section-select select{min-height:40px;font-size:13px}

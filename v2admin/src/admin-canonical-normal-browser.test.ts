@@ -29,6 +29,19 @@ describe('Admin normal-browser canonical hydration',()=>{
     expect(sync).toContain('rowPublishedAt>activePublishedAt');
   });
 
+  it('shows a compact R4 runtime diagnostic that distinguishes stale JS from saved outbox state',()=>{
+    const shell=readFileSync(new URL('./AdminShell.tsx',import.meta.url),'utf8');
+    const sync=readFileSync(new URL('./admin-sync-client.ts',import.meta.url),'utf8');
+    expect(shell).toContain('readAdminRuntimeSourceSha');
+    expect(shell).toContain('data-admin-runtime-diag="R4"');
+    expect(sync).toContain("/api/health?adminRuntimeDiagnostic=R4");
+    expect(shell).toContain("' Q'+diagnostic.outboxCount+' C'+canonical");
+    expect(sync).toContain('readAdminSyncDiagnosticSnapshot');
+    expect(sync).toContain("'canonical-hydrated.v1'");
+    expect(sync).toContain('outboxCount:outbox.length');
+    expect(shell).toContain('className="mfk-admin-sync-detail"');
+  });
+
   it('does not turn cached release history into a new publish during startup',()=>{
     const sync=readFileSync(new URL('./admin-sync-client.ts',import.meta.url),'utf8');
     const bootstrap=readFileSync(new URL('./AdminCanonicalBootstrap.tsx',import.meta.url),'utf8');
