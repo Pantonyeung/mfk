@@ -1,642 +1,488 @@
-# MFK Admin V3｜A1 / A2 重新審核｜Against Current Product Brief V1
+# MFK Admin V3｜舊 A1 / A2 重新審核 Against Current Product Brief V1
 
 日期：2026-09-30  
-狀態：RE-AUDIT COMPLETE / IMPLEMENTATION NOT AUTHORIZED  
-控制：#596 / #601 / Draft PR #602  
-被審核：A0 Main Foundation、A1 PR #599、A2 Issue #600、Issue #586 第三方 State Architecture / Storage Migration Map  
-產品基準：目前 Admin V3 Product Brief R1 最新 Owner Authority Correction
+狀態：RE-AUDIT COMPLETE / PRODUCT BRIEF CONTROLLING  
+範圍：A0 foundation、PR #599 A1 candidate、Issue #600 A2 spec、Issue #586 third-party state architecture  
+產品 Authority：#601 / PR #602 current Product Brief
 
 ---
 
-# 0. 最終判斷
+# 0. 結論
 
-## A0
-**可保留做 engineering foundation，但唔當產品 UI。**
+舊方向唔係全部推倒。
 
-可重用：
-- React / Vite skeleton
-- TanStack Query
-- Zustand
-- CI
-- no-v2-import guard
-- zero-production-routing discipline
+但「A1 / A2 已完成」呢個講法唔準確。
 
-需要收緊：
-- Dexie 只可以喺產品明確批准 offline command 時先真正啟用。
-- 目前 R1 未要求 offline publish，所以唔應預先建立「一定會用 outbox」嘅產品假設。
+真實狀態：
 
-## A1 PR #599
-**方向大致正確，但目前唔可信到可以 merge / 當正式 implementation。**
+- **A0：已 merge，可作乾淨 V3 foundation。**
+- **A1：有實作 Candidate，CI GREEN，但 PR #599 仍 Draft、未 merge，而且有 1 個未解 P1。只可 BANK 作 engineering reference，唔可原樣 promote。**
+- **A2：冇實作。只有 Issue #600 UI / Behavior / Acceptance Spec；Issue 已 CLOSED / NOT PLANNED，正式被 #601 supersede。**
+- **舊 localStorage → third-party migration map：概念部分正確，但「將 v2 browser storage 搬入 V3」已被 current Product Brief supersede。V3 唔讀 v2 localStorage，唔做 compatibility state machine。**
 
-原因：
-1. PR 仍係 Draft / unmerged。
-2. CI GREEN 只證明 tests/typecheck/build/zero-routing；唔等於 product acceptance。
-3. Codex review 仲有 1 個 unresolved P1：
-   v3admin/src/canonical.ts 無直接使用 controlling shared validateMfkAdminConfigEnvelope，而係自己複製一套較鬆 validator。
-4. A1 UI 只係 engineering proof，唔符合目前 Product Brief 12 大 Menu / 53 頁 IA。
-5. A1 無 edit / pricing / publish，所以即使 A1 完全正確，都解決唔到 Keeta 驗收時「即時新增分類 → 商品 → 設價 → 發佈」工作。
-6. A1 無 V3 serving-release freshness proof，未解決 Safari 可能仍然載入舊 frontend release 嘅問題。
+因此新 one-shot build 唔應：
+merge A1 再接 A2。
 
-正式狀態：
-**REFERENCE_ONLY / REWORK_REQUIRED**
-
-## A2 Issue #600
-**唔係「A2 已做完」；按 repo 可見證據，A2 只有 Specification，冇 implementation branch / PR。**
-
-#600 已 Closed / Not Planned，
-並明確標：
-SUPERSEDED AS IMPLEMENTATION ROADMAP by #601
-
-因此 A2：
-- 技術 read-model contract 有參考價值；
-- IA / UI / delivery strategy 唔再控制產品；
-- 必須服從目前 Product Brief。
-
-正式狀態：
-**DESIGN REFERENCE ONLY / NOT IMPLEMENTED**
+正確：
+**由 current Product Brief 出 one-shot implementation branch；A0/A1/A2 只作 selective reference。**
 
 ---
 
-# 1. 目前 Product Brief 最新 Authority
+# 1. 第三方架構決策｜保留
 
-最新 Owner correction 已經改成：
+以下方向同 current Product Brief 一致：
 
-- 12 個大 Menu
-- 53 個第二步 destination
-- 「訂單監察」只讀
-- Admin 無 Refund / Cancel / 付款方式修正 transaction mutation
-- 原 Admin post-close Tender Correction BACKEND_CONTRACT_GAP 取消
-- 53 LOCKED
-- 0 YELLOW
-- 0 RED
+## TanStack Query
+用途：
+- canonical server state
+- projection/read models
+- ACK/readback
+- query invalidation/refetch
+- background refresh
 
-因此任何舊 A1 / A2 / Copy Matrix / Closeout 內容如果仍然寫：
-- 54 pages
-- 訂單管理
-- 售後／退款／取消／修正 Admin workspace
-- Admin Tender Correction mutation
-- 唯一 YELLOW = Tender Correction
+保留。
 
-全部視為：
-**STALE PRODUCT TEXT**
-必須清理，唔可交 implementation。
+## React / Zustand
+用途：
+- in-memory form state
+- local UI state
+- filter / view preference
+- non-authoritative UI preference persistence（只限批准範圍）
 
----
-
-# 2. Issue #586 第三方架構｜重新判斷
-
-舊決策：
-
-- TanStack Query → Cloud / server state
-- Dexie → durable pending command
-- Zustand / React → draft / UI preference
-- auth → separate security layer
-
-呢個核心方向仍然正確。
-
-Context7 再核對：
-- TanStack Query v5 有 query staleness、mount/focus/reconnect refetch、invalidateQueries、mutation 後 refetch 模式；
-- Dexie 有 IndexedDB version / transaction / live query / cross-tab reactive support；
-- Zustand persist 有 version / migrate / partialize / rehydrate。
-
-但：
-**Library capability ≠ Product Authority。**
-
-所以最終規則以 Product Brief 為準。
-
----
-
-# 3. 舊 LocalStorage Migration Map｜邊度已經過時
-
-#586 曾經盤到 47 個 browser storage keys，
-並提出：
-- 部分搬 Query
-- 部分搬 Zustand
-- sync-outbox 搬 Dexie
-- compatibility migration 後刪舊 key
-
-呢份清單而家仍然有價值，
-但只可以做：
-
-**FORENSIC INVENTORY / CAPABILITY LOSS CHECKLIST**
-
-唔可以做：
-**V3 migration execution plan**
-
-原因：
-目前 controlling V3 rule 已經鎖：
-- V3 唔讀 v2 localStorage
-- V3 唔做 v2 compatibility state machine
-- V3 唔 import v2 client-state modules
-- v2 production 係 baseline，但唔係 donor architecture
-
-因此：
-
-## 禁止
-v2 47 keys → 一次過 migrate 入 V3
-
-## 正確
-對每一個舊 key 問：
-「佢代表嘅正式 capability / fact，V3 應該由邊個 canonical query / draft contract / approved command 重新取得？」
-
-如果無 server/read/write contract：
-標：
-BACKEND_CONTRACT_GAP
-而唔係偷搬舊 localStorage。
-
----
-
-# 4. A1 可以直接保留嘅設計
-
-## 4.1 Auth challenge / proof
-可以保留概念：
-- Login ID
-- PIN browser-side PBKDF2/HMAC proof
-- raw PIN 不離開 browser
-- existing backend challenge/verify contract
-
-符合 Product Brief §34。
-
-## 4.2 Session
-可以保留：
-- session token 唔放 localStorage / sessionStorage
-- memory/security layer
-- logout 清 authenticated Query cache
-
-需要補：
-- 全局 401 / expiry handling
-- authenticated query registry cleanup
-- focus / route return after re-login
-- session scope / permission projection
-
-## 4.3 Canonical Query
-可以保留：
-- TanStack Query
-- cache: no-store
-- staleTime 0 / refetch mount/focus/reconnect
-- manual refetch
-- canonical publishedAt 作 human freshness
-
-## 4.4 Isolation
-可以保留：
-- v3admin/**
-- no v2 state import
-- no production route
-- CI guard
-
----
-
-# 5. A1 必須廢棄 / 重寫嘅部分
-
-## 5.1 Local duplicated canonical validator｜BLOCKER
-
-A1 canonical.ts 自己重寫：
-- schema shape
-- fingerprint calculation
-- validation
-
-但 controlling repo 已有：
-contracts/admin-config-sync-v1.ts
-→ validateMfkAdminConfigEnvelope
-
-Codex review 已指出：
-A1 local validator 同 shared validator 有實際差異，例如：
-- shared storeId max length
-- exact fingerprint semantics
-- trim / validation behavior
-
-因此：
-**A1 canonical validator 不可直接重用。**
-
-One-shot implementation 必須：
-**import / call shared validator**
-而唔係再 copy。
-
-## 5.2 A1 UI
-A1 UI：
-- Canonical
-- 主權
-- fingerprint
-- revision
-- Snapshot sections
-
-只適合 engineering proof。
-
-目前 Product Brief：
-- 12 大 Menu
-- 53 workspace
-- 今日 Sales-first
-- technical evidence 後置
-- human-first copy
-
-因此：
-**A1 UI 全部視為 throwaway prototype。**
-
-## 5.3 Backend health = 已連接
-A1 用 /api/health 後顯「已連接」。
-
-目前 Product Brief 已鎖：
-Connected ≠ Healthy ≠ Synced ≠ Business Ready。
-
-所以：
-health OK → 已連接
-唔可以做全局產品成功語義。
-
-## 5.4 Fixed MF01
-A1 query / API 寫死 MF01。
-
-R1 現時可以只運行 MF01，
-但新架構 Query Key / API seam 應接受：
-storeId / scope
-參數，
-唔將單店假設焊死喺所有 hooks。
-
-## 5.5 Serving Release Identity
-A1 顯 backend health sourceSha，
-但 Safari 事故要證明嘅係：
-**目前 browser 真係載入邊個 V3 frontend release。**
-
-呢兩件事唔同。
-
-V3 Preview 必須有：
-- frontend build/release identity
-- deployed serving identity
-- no-cache release metadata / equivalent evidence
-- physical browser proof
-
----
-
-# 6. A2 技術內容｜可以重用
-
-以下仍符合目前 Brief：
-
-## Canonical / ACK
-- canonical query 同 ACK 分開
-- exact apply proof 需要正式 identity match
-- revision number 唔係 freshness authority
-- publishedAt 係 Cloud publish time
-
-## Projection
-- Orders / Reports / Refund projection 只讀
-- Query error 唔變成 zero / empty
-- background refresh 保留舊成功資料
-
-## Doorbell
-- WebSocket 只係 notification
-- event → invalidate query → HTTP refetch
-- event payload 唔直接成 canonical truth
+保留。
 
 ## Auth
-- authenticated read 帶 session
-- 401 應 clear session + authenticated Query cache
+- separate security layer
+- session 不放 localStorage/sessionStorage
 
-## State semantics
-- Empty ≠ Error
-- Waiting ≠ Failed
-- Offline ≠ Failed
-- Unknown ≠ Failed
+保留。
 
-以上可以變成 one-shot data layer contract。
+## WebSocket
+- doorbell only
+- event → invalidate query → HTTP authoritative refetch
+
+保留。
 
 ---
 
-# 7. A2 已經過時 / 唔可直接用嘅內容
+# 2. Dexie｜由「預設搬 outbox」改為「條件式啟用」
 
-## 7.1 舊 IA
-A2 定：
+舊設計：
+sync-outbox.v1 → Dexie / IndexedDB。
+
+Current Product Brief 已收窄：
+
+**Dexie / IndexedDB only where product explicitly approves offline command。**
+
+所以 R1 default：
+
+- 唔需要為「架構完整」而先建立 durable outbox workflow
+- 唔由 v2 localStorage 搬舊 outbox 入 V3
+- 唔因為 library 已裝就建立 command truth
+
+只有產品明確批准：
+「Admin offline 都可以建立未送出正式 command」
+先進 A4 / Dexie。
+
+否則：
+Admin mutation online-only + explicit failure / unknown / retry contract。
+
+---
+
+# 3. Zustand Persist｜舊設計太闊，要收窄
+
+舊 Issue #586 migration map 將大量 config localStorage keys歸入 Zustand persist。
+
+Current Brief 唔接受將正式 Draft / canonical baseline 默認變成本機 persisted state。
+
+新規則：
+
+## 可以
+- filter preference
+- view preference
+- sidebar preference
+- non-sensitive local UI preference
+- 明確批准嘅 bounded unsaved editor recovery
+
+## 唔可以
+- canonical config
+- published state
+- applied state
+- formal pending changes
+- authoritative draft state
+- payment/order/print truth
+
+正式 Draft：
+優先 server/canonical draft contract。
+
+未保存 form：
+React/Zustand memory；
+離頁 guard。
+無正式 persistence contract 就唔暗中復活。
+
+---
+
+# 4. v2 LocalStorage Migration｜取消
+
+舊 migration map 提出：
+- sync-outbox.v1 搬 Dexie
+- config drafts 搬 Zustand
+- compatibility migration 後清 key
+
+Current Product Brief 硬規則：
+**V3 唔讀 v2 localStorage，不做 v2 compatibility state machine。**
+
+因此：
+- v3admin 不讀 v2 key
+- 不 migrate v2 key
+- 不 hydrate v2 cache
+- 不用 v2 local pointer 做 bootstrap
+- 舊 v2 storage 同 V3 隔離
+
+V3 係 clean start。
+
+---
+
+# 5. A1 PR #599｜可信部分
+
+A1 candidate 有實際價值：
+
+- existing challenge/verify auth contract
+- raw PIN 不直接傳送
+- session token memory-only
+- TanStack Query canonical read
+- cache:no-store
+- no v2 localStorage
+- no v2 state module import
+- logout 清 canonical Query cache
+- zero production routing
+- CI：test / typecheck / build / zero-routing GREEN
+- Regression Shadow GREEN
+
+以上可以 selective reuse。
+
+---
+
+# 6. A1 PR #599｜不可直接 merge 嘅問題
+
+## P1｜Shared canonical validator GOVERNANCE_DRIFT
+
+PR #599 目前仍有 unresolved Codex P1：
+
+A1 自己喺 v3admin/src/canonical.ts 重寫 validator，
+而唔係使用 controlling shared：
+contracts/admin-config-sync-v1.ts
+→ validateMfkAdminConfigEnvelope。
+
+已修咗 fingerprint recompute，
+但仍然同 shared contract 有差異，例如：
+- storeId max length
+- adminFingerprint constraints
+- exact fingerprint handling / trim semantics
+
+Verdict：
+**A1_NOT_PROMOTABLE_AS_IS**
+
+One-shot build 必須：
+直接 import shared validator / shared type，
+禁止 V3 自己 fork canonical contract。
+
+---
+
+# 7. A1 UI｜全部視為 prototype，不作 Current Product UI
+
+A1 UI 只係：
+- Canonical
+- Authority
+- login
+- metadata/counts
+
+Current Product Brief 已經係：
+
+- 12 大 Menu
+- 53 第二步 destination
+- Today Sales-first
+- mature List → Detail → Edit
+- human-first copy
+- engineering evidence 後置
+
+因此：
+A1 App.tsx / styles.css 唔作 UI donor。
+
+可以保留：
+auth / query / authority technical pattern。
+
+要重做：
+Shell / IA / navigation / Today / workspace UI。
+
+---
+
+# 8. A1 固定 MF01｜要抽成正式 Scope Context
+
+A1：
+STORE_ID = MF01 hard-coded。
+
+Current Product Brief 已有：
+- Store / Scope
+- Role / Permission / Scope
+- multi-store future-safe semantics
+
+R1 可以實際只有 MF01，
+但 implementation 唔應將 store identity散落 hard-code喺每個 query module。
+
+One-shot 應有：
+**Authenticated Scope / Store Context**
+→ query key / API request統一取 scope。
+
+---
+
+# 9. A1 未解決最初 Safari 事故嘅全部問題
+
+TanStack Query解決：
+**Business Data Freshness**
+
+但唔解決：
+**Loaded Client Bundle Freshness**
+
+Keeta驗收事故有兩層：
+
+1. Browser跑緊邊個 V3 client release？
+2. Client入面讀緊邊份 canonical business data？
+
+A1目前 health card讀 backend sourceSha，
+但 backend SHA 唔等於：
+「Safari而家載入緊邊個 JS bundle」。
+
+所以 One-shot Shell 必須另外有：
+- embedded client build/release identity
+- preview serving release identity
+- diagnostics 可比對
+- physical acceptance證明 normal Safari / reopen / second tab 係 current release
+
+TanStack Query唔可以當成解決 stale JS bundle 嘅工具。
+
+---
+
+# 10. A2｜實際狀態係「Spec only」
+
+Issue #600：
+**CLOSED / NOT PLANNED**
+
+Repository：
+冇 A2 implementation branch / PR。
+
+所以：
+A2 沒有完成 code。
+
+之前可保留嘅係：
+- exact ACK match
+- canonical + projection query ownership
+- WebSocket invalidate/refetch
+- Unknown ≠ Failed
+- stale previous data保留
+- no mutation in read model
+- no localStorage
+- query key discipline
+
+---
+
+# 11. A2 UI / IA｜已過時
+
+A2 Spec 原本 read-only destinations：
 - 概覽
 - 訂單
 - 營業報表
 - 退款記錄
-- 主權／診斷
+- 主權 / 診斷
 
-目前 Brief 定：
-**12 大 Menu / 53 第二步頁面**
-
-所以 A2 IA：
-**全部 superseded。**
-
-## 7.2 A2 係 read-only slice
-目前 one-shot R1 要完整：
-- Menu Draft
-- Category / Product
-- Pricing
-- Publish
-- Readback
-- Platform config
-- Printer config
-- Staff / RBAC
-- Store settings
-- Reports
-- Diagnostics
-等等。
-
-所以 A2 只覆蓋少量 read model，
-唔係 Admin V3 product。
-
-## 7.3 A2 Refund UI
-目前 Admin Order domain 已 read-only。
-Refund 可以：
-- report
-- order linked transaction record
-- audit / evidence
-
-但唔係 Admin 售後 mutation workspace。
-
-## 7.4 A2 staged delivery
-A2 原本係 A1 merge 後先做下一 slice。
-
-目前 controlling rule：
-**ONE-SHOT PRODUCT DELIVERY + A0→A6 INTERNAL ENGINEERING GATES**
-
-所以 A1/A2 可以係內部 technical gate，
-唔係逐階段產品交付。
-
----
-
-# 8. 現在真正應該點做｜One-shot Build Contract
-
-## Gate 0｜Foundation Rebase / Cleanup
-
-由 Main A0 foundation 起。
-
-做：
-- 保留 React / Vite / TanStack / CI
-- Query key factory
-- authenticated API client
-- shared contract validators
-- frontend release identity
-- Store / Scope context
-- no v2 state import
-
-唔做：
-- v2 localStorage migration
-- Dexie outbox
-- product UI prototype reuse
-
-Dexie：
-**保持未啟用**
-直到產品明確批准 offline command。
-
----
-
-## Gate 1｜Auth + Global Shell + Canonical
-
-實作：
-- Login ID / PIN proof
-- memory session
-- 401 expiry flow
+Current Product Brief：
 - 12 大 Menu
-- 53 route skeleton
-- responsive navigation
-- global search shell
-- canonical Query
-- publish freshness
-- frontend serving release identity
+- 53 第二步 destination
+- 訂單監察只讀
+- 今日首頁 Sales-first
+- Audit / Diagnostics / Integrations / Effective Settings各有 Primary Home
 
-驗：
-- normal Safari
+因此：
+A2 IA 唔可以直接實作。
+
+A2只可當：
+**read-model / state-semantics reference**。
+
+---
+
+# 12. A2 Diagnostic-first UI｜唔符合 Current Product Brief
+
+A2 Overview將：
+- canonical fingerprint
+- revision
+- ACK fingerprint
+- projection technical facts
+
+放得太前。
+
+Current Brief：
+普通使用者先見 business meaning；
+UUID / fingerprint / operation ID / technical evidence 後置 Diagnostics / Advanced。
+
+因此：
+- fingerprint 不放 Today first viewport
+- revision 不做 freshness
+- publishedAt / business status先做人類 UI
+- exact identity證據放 Readback / Diagnostics Detail
+
+---
+
+# 13. A2 Reports｜改為 Trusted Read Model First
+
+A2可以做 display-only aggregate，
+但 current Product Brief已明確要：
+Trusted Reports / canonical metric semantics。
+
+所以 One-shot build：
+- report headline metrics優先使用正式 server read model
+- client只做 presentation aggregation
+- client aggregation唔可以變 metric authority
+- query error唔變 zero
+
+---
+
+# 14. Current Product Brief｜重新審核後嘅真正基準
+
+Current controlling product基準：
+
+- 12 大 Menu
+- **53** 第二步 destination
+- **53 / 53 First Viewport**
+- **53 LOCKED / 0 YELLOW / 0 RED**
+- 訂單大 Menu = **訂單監察**
+- Admin transaction operations：
+  - Refund
+  - Cancel Order
+  - Payment Method Correction
+  全部 **OUT OF ADMIN SCOPE**
+- Admin只：
+  - Watch
+  - Configure
+  - Govern
+  - Publish
+  - Readback
+  - Reconcile
+  - Audit
+  - Diagnose
+
+任何 Admin transaction mutation button：
+**AUTHORITY RED**
+
+---
+
+# 15. One-shot Implementation 正確做法
+
+## Step 0｜Owner PROMOTE Product Brief
+未 PROMOTE：
+唔開始 implementation。
+
+## Step 1｜Branch from approved Main
+唔由 PR #599 branch繼續堆。
+
+建立一個新 one-shot Admin V3 implementation branch。
+
+## Step 2｜Selective port A0/A1 technical assets
+可帶：
+- v3admin package/toolchain
+- QueryClient policy
+- auth proof flow
+- canonical query pattern
+- no-v2-state tests
+- zero-production-routing guard
+- CI
+
+唔直接帶：
+- A1 App UI
+- A1 IA
+- local canonical validator
+- hard-coded store context
+- Dexie outbox behavior
+
+## Step 3｜先建立 Product Shell
+- 12 big menus
+- 53 routes
+- responsive shell
+- global search scaffold
+- permission-aware nav
+- Today Sales-first
+
+## Step 4｜Canonical Read Layer
+- shared validator
+- Query ownership
+- store/scope context
+- freshness
+- client build identity
+- no v2 local state
+
+## Step 5｜Projection / ACK Read Layer
+重用 A2 state semantics，
+但投影落 current 53-page Product Map。
+
+## Step 6｜Draft / Edit / Publish
+- List → Detail → Edit
+- formal draft
+- validate
+- impact
+- publish mutation
+- invalidate/refetch
+- target readback
+
+## Step 7｜No Admin Transaction Mutation
+Orders / refund / cancel / payment-correction：
+read-only evidence / audit / reports only。
+
+## Step 8｜Dexie Decision Gate
+只有產品明確批准 offline command先加。
+
+## Step 9｜Physical Acceptance
+必測：
+- normal iPhone Safari
 - in-app browser
 - second tab
-- same canonical result
-- no old local truth
-
----
-
-## Gate 2｜Read Model Coverage
-
-唔照舊 A2「5 頁」。
-
-要先建立：
-**53-Page Backend Contract Coverage Matrix**
-
-每頁列：
-
-- Page
-- Query / endpoint
-- canonical authority
-- store/scope
-- freshness field
-- Empty / Error / Stale semantics
-- mutation allowed?
-- mutation endpoint
-- readback endpoint
-- audit evidence
-- backend gap
-
-先知道邊啲 UI 真係有正式資料可接。
-
-A2 舊 endpoints：
-- canonical active
-- ACK
-- orders
-- reports
-- refunds
-
-只係其中一部分。
-
----
-
-## Gate 3｜Config Draft / Edit / Publish
-
-呢個先係今日 Keeta 驗收最重要嘅能力。
-
-最低閉環：
-
-**分類 List**
-→ 新增分類
-→ 儲存草稿
-
-**產品 List**
-→ 新增商品
-→ 設基本價格
-→ 儲存草稿
-
-**未發佈變更**
-→ 檢查完整性
-→ 影響預覽
-
-**發佈中心**
-→ 確認發佈
-→ Cloud published
-→ Target readback
-
-正式實作：
-- useMutation
-- version guard
-- server validation
-- invalidate canonical
-- canonical refetch
-- readback
-
-禁止：
-- browser persist PUBLISHED
-- browser persist QUEUED
-- Save Draft 顯成已生效
-
----
-
-## Gate 4｜Offline Command Decision
-
-目前 Product Brief 無明確要求 offline Admin publish。
-
-因此 default：
-**NO DEXIE OUTBOX IN R1**
-
-只有 Owner / Product 明確批准：
-「Admin 離線都要可以建立 durable unsent publish command」
-先開 Dexie。
-
-否則：
-offline 時 config 可以：
-- 保留已讀資料
-- local unsaved editor state（bounded）
-- 禁止假裝可正式 publish
-
----
-
-## Gate 5｜完整 53 頁 Product Implementation
-
-按 Product Brief：
-- List → Detail → Create/Edit
-- First Viewport
-- Cross-page context
-- Components
-- Responsive
-- Copy Dictionary
-- Orders read-only
-- Primary Home
-
-唔逐頁發明 UX。
-
----
-
-## Gate 6｜Preview Physical Acceptance
-
-必驗：
-
-### Browser / Release
-- iPhone Safari
-- in-app browser
-- desktop Chrome / Safari
-- second tab
+- fresh deploy serving identity
 - reopen
-- frontend release identity
-- canonical identity
-
-### Keeta 驗收核心
-- 新增分類
-- 新增商品
-- 設價
-- 發佈
-- Cloud readback
-- SMT / target readback
-- reopen Safari
-- 同一正式結果
-
-### Freshness
-- Admin canonical 更新
-- client refetch 收斂
-- stale 顯明示
-- local state 不覆蓋較新 HTTP truth
-
-### Rollback
-- V3 → v2 rollback
-- serving identity 證明
-- v2 core navigation / auth 正常
+- focus/reconnect
+- canonical update convergence
+- publish/readback
+- stale data behavior
+- rollback to v2
 
 ---
 
-# 9. 53-Page Backend Contract Coverage Matrix｜Implementation 前必做
+# 16. 最終 Verdict
 
-產品 UI 已收口，
-但 implementation 仍然需要一張「真 API / Contract Map」。
+## Third-party architecture
+**可信，可保留。**
 
-原因：
-舊 #586 已經指出部分能力當時冇正式 read seam，例如：
-- release history
-- audit
-- exceptions
-- operations report
-- settlement facts
-- store binding canonical schema
-等。
+但要跟 current Brief修正：
+- Query = server state
+- Zustand = local UI / bounded form state
+- Dexie = conditional, not default
+- no v2 localStorage migration
 
-呢啲舊 findings 唔可以直接當今日仍然缺，
-亦唔可以直接當已經有。
+## A1
+**有價值但唔可原樣 merge。**
+Verdict：
+**BANK / SELECTIVE REUSE**
 
-Implementation 前要 fresh-read repo/backend，
-逐頁證實。
+Blocker：
+unresolved shared validator P1。
 
-狀態只可以：
-- EXISTING_CONTRACT
-- BOUNDED_NEW_SEAM_REQUIRED
-- OUT_OF_SCOPE
-- BLOCKED
+## A2
+**未實作。**
+Verdict：
+**SPEC / RESEARCH REFERENCE ONLY**
 
-禁止：
-「UI 先畫住個 button，backend 之後再算」。
+## Current next
+唔再做 incremental A1 → A2。
 
----
-
-# 10. A1 / A2 最終資產處理
-
-| 資產 | 處理 |
-|---|---|
-| Main A0 skeleton | REUSE / CLEANUP |
-| TanStack Query dependency | REUSE |
-| Zustand dependency | REUSE |
-| Dexie dependency | KEEP DORMANT / OPTIONAL |
-| A1 auth proof code | REUSE AFTER REVIEW |
-| A1 memory session idea | REUSE |
-| A1 canonical local validator | DELETE / REPLACE WITH SHARED |
-| A1 UI | DO NOT REUSE |
-| A1 tests | PORT / EXPAND |
-| A1 CI | REUSE |
-| A2 query semantics | REUSE |
-| A2 ACK exact-match semantics | REUSE |
-| A2 doorbell invalidation | REUSE |
-| A2 old IA | DELETE / SUPERSEDED |
-| A2 5-page UI spec | SUPERSEDED |
-| #586 47-key list | FORENSIC CHECKLIST ONLY |
-| #586 v2→V3 storage migration plan | DO NOT EXECUTE |
-
----
-
-# 11. 信任結論
-
-唔可以講：
-**「A1 A2 已經做好，可以接住寫。」**
-
-正確講法：
-
-**A0 已落 Main，可作乾淨 foundation。**
-
-**A1 有一個有價值嘅 candidate，但有 unresolved P1 同產品 UI 已過時，所以只可拆件重用，唔可 merge。**
-
-**A2 冇 implementation；只係一份已 superseded 嘅 read-model spec，技術 contract 部分可以抽返入 one-shot。**
-
-真正 implementation source of truth：
-
-1. Current Product Brief
-2. Current Governance R2
-3. Current shared contracts
-4. Fresh backend contract survey
-5. A1/A2 只作 reference
-
----
-
-# 12. Immediate Next
-
-未開始 code 前：
-
-1. 清理 Product Brief / Closeout stale 54-page / Tender-Correction text
-2. 建立 53-Page Backend Contract Coverage Matrix
-3. 將 A1 reusable pieces 寫成 one-shot implementation packet
-4. 將 A2 reusable query/readback rules寫入 data-layer contract
-5. 列 exact no-touch paths
-6. Owner 明確 PROMOTE
-7. 先開始 one-shot implementation
+正確：
+**Approved Product Brief → New one-shot implementation branch → selective reuse technical primitives → build full current Admin V3 product.**
 
 MILESTONE:
-MFK_ADMIN_V3_A1_A2_REAUDIT_COMPLETE
+MFK_ADMIN_V3_A1_A2_REAUDIT_AGAINST_CURRENT_PRODUCT_BRIEF_COMPLETE
