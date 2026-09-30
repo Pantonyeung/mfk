@@ -176,10 +176,14 @@ export function hydrateAdminFromCanonical(envelope:MfkAdminConfigEnvelope){
   );
   writeAdminStored('active-release.v1',{version:envelope.revision,createdAt:envelope.publishedAt,fingerprint:envelope.adminFingerprint});
   const activePublishedAt=Date.parse(envelope.publishedAt);
-  const pendingOutbox=readAdminStored<Array<{publishedAt?:string;fingerprint?:string}>>('sync-outbox.v1',[]).filter(row=>{
-    const at=Date.parse(String(row.publishedAt||''));
+  const pendingOutbox=readAdminStored<Array<{revision?:number;publishedAt?:string;fingerprint?:string}>>('sync-outbox.v1',[]).filter(row=>{
     if(row.fingerprint===envelope.fingerprint)return false;
-    return Number.isFinite(at)&&at>activePublishedAt;
+    const at=Date.parse(String(row.publishedAt||''));
+    if(Number.isFinite(at))return at>activePublishedAt;
+    // Legacy pre-time-first outbox rows may not carry publishedAt.
+    // Keep only rows that were historically queued after this diagnostic revision.
+    const legacyRevision=Number(row.revision);
+    return Number.isSafeInteger(legacyRevision)&&legacyRevision>envelope.revision;
   });
   writeAdminStored('sync-outbox.v1',pendingOutbox);
   writeAdminStored('sync-status.v1',{
