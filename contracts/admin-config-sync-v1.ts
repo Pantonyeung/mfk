@@ -1,6 +1,17 @@
 export const MFK_ADMIN_CONFIG_SYNC_SCHEMA='MFK_ADMIN_CONFIG_SYNC_V1' as const;
 export const MFK_ADMIN_CONFIG_STORE_ID='MF01' as const;
 
+export function mfkHongKongIso(nowMs=Date.now()){
+  const shifted=new Date(nowMs+8*60*60*1000).toISOString();
+  return shifted.slice(0,-1)+'+08:00';
+}
+
+export function mfkPublishTimeMs(value:string){
+  const parsed=Date.parse(String(value||''));
+  if(!Number.isFinite(parsed))throw new Error('ADMIN_CONFIG_PUBLISHED_AT_INVALID');
+  return parsed;
+}
+
 export interface MfkAdminConfigEnvelope{
   readonly schema:typeof MFK_ADMIN_CONFIG_SYNC_SCHEMA;
   readonly storeId:string;
