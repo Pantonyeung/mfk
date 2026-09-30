@@ -19,11 +19,17 @@ type OptionCenterSnapshot={
 };
 
 function stateLabel(state:string){
-  return state==='SYNCED'?'已同步'
-    :state==='CONNECTING'?'連線中'
-    :state==='LOCAL_LKG'?'離線 · 使用本機最後版本'
+  return state==='SYNCED'?'已套用'
+    :state==='CONNECTING'?'同步中'
+    :state==='WAITING_ADMIN_PUBLISH'?'等待 Admin 正式發佈'
+    :state==='LOCAL_LKG'?'離線 · 使用最後已套用資料'
     :state==='OFFLINE'?'離線'
     :'同步異常';
+}
+function hkTime(value?:string){
+  if(!value)return '未有';
+  const at=Date.parse(value);
+  return Number.isFinite(at)?new Date(at).toLocaleString('zh-HK',{timeZone:'Asia/Hong_Kong',hour12:false}):'時間無效';
 }
 
 export function LocalAdminMenuWorkspace(){
@@ -50,11 +56,11 @@ export function LocalAdminMenuWorkspace(){
       <div>
         <small>ADMIN → SMT AUTO SYNC</small>
         <h2>Admin 同步狀態</h2>
-        <p>SMT 只讀 Admin 已保存版本。Admin 一保存，系統會自動接收、驗證、切換本機 LKG，同自動回讀；呢度冇任何編輯、匯入、發布或確認操作。</p>
+        <p>SMT 只接受 Admin 正式發佈資料。每次發佈都按 Cloud 香港日期時間依次接收、套用同回讀；R 號唔參與新舊判斷。</p>
       </div>
       <div className="local-admin-menu-version-pair">
-        <div><span>ACTIVE</span><b>{lkg?'R'+lkg.revision:'—'}</b><small>SMT 正在使用</small></div>
-        <div><span>SYNC</span><b>{stateLabel(status.state)}</b><small>{status.updatedAt?new Date(status.updatedAt).toLocaleString('zh-HK'):'未同步'}</small></div>
+        <div><span>ADMIN 發佈</span><b>{hkTime(lkg?.publishedAt)}</b><small>香港時間</small></div>
+        <div><span>SMT</span><b>{stateLabel(status.state)}</b><small>{status.appliedAt?hkTime(status.appliedAt):hkTime(status.updatedAt)}</small></div>
       </div>
     </header>
 
@@ -62,13 +68,15 @@ export function LocalAdminMenuWorkspace(){
       <header><div><small>自動同步</small><h3>Canonical Admin Config → SMT Local LKG</h3></div><span>ZERO MANUAL ACTION</span></header>
       <div className="local-admin-a2-proof match">
         <p><span>Device</span><code>{readSmtDeviceId()}</code></p>
-        <p><span>Revision</span><b>{lkg?'R'+lkg.revision:'未有 Admin 版本'}</b></p>
+        <p><span>正式發佈時間</span><b>{hkTime(lkg?.publishedAt)}</b></p>
+        <p><span>收到通知時間</span><b>{hkTime(status.receivedAt)}</b></p>
+        <p><span>SMT 套用時間</span><b>{hkTime(status.appliedAt)}</b></p>
+        <p><span>回讀時間</span><b>{hkTime(status.ackAt)}</b></p>
         <p><span>Fingerprint</span><code>{lkg?.fingerprint??'—'}</code></p>
-        <p><span>Admin Fingerprint</span><code>{lkg?.adminFingerprint??'—'}</code></p>
         <p><span>State</span><strong>{stateLabel(status.state)}</strong></p>
         {status.error?<p><span>Last error</span><code>{status.error}</code></p>:null}
       </div>
-      <small>斷網時繼續使用本機最後有效版本；網絡恢復後會自動追到 Admin 最新版本。Realtime 只做通知，正式資料每次都重新讀 canonical endpoint。</small>
+      <small>斷網時只保留最後已套用資料；網絡恢復後按香港發佈時間逐次追返遺漏發佈。Realtime 只做通知，正式資料全部由同一 Canonical Admin 來源重新讀取。</small>
     </section>
 
     <div className="admin-kpi-grid">
