@@ -972,28 +972,70 @@ export class AdminSyncStore{
   async publishEnvelope(envelope){
     const current=await this.state.storage.get('active');
     const currentMeta=await this.state.storage.get('activeMeta')||{};
-    if(current){
-      const incomingPublishedAt=Date.parse(String(envelope.publishedAt||''));
-      const currentPublishedAt=Date.parse(String(current.publishedAt||''));
-      if(!Number.isFinite(incomingPublishedAt)||!Number.isFinite(currentPublishedAt)){
-        return{status:400,body:{code:'ADMIN_CONFIG_PUBLISHED_AT_INVALID'}};
-      }
-      if(incomingPublishedAt<currentPublishedAt){
-        return{status:409,body:{code:'ADMIN_CONFIG_PUBLISH_TIME_STALE',currentPublishedAt:current.publishedAt,currentFingerprint:current.fingerprint}};
-      }
-      if(incomingPublishedAt===currentPublishedAt){
-        if(envelope.fingerprint!==current.fingerprint){
-          return{status:409,body:{code:'ADMIN_CONFIG_PUBLISH_TIME_CONFLICT',currentPublishedAt:current.publishedAt,currentFingerprint:current.fingerprint}};
-        }
-        return{status:200,body:{state:'IDEMPOTENT',active:current,cloudPublishedAt:String(currentMeta.acceptedAt||current.publishedAt)}};
-      }
+
+    // Exact retry of the same formal Admin publish is idempotent.
+    if(current&&String(currentMeta.publishRequestFingerprint||'')===String(envelope.fingerprint||'')){
+      return{
+        status:200,
+        body:{
+          state:'IDEMPOTENT',
+          active:current,
+          publishRequestFingerprint:envelope.fingerprint,
+          cloudPublishedAt:String(current.publishedAt||currentMeta.cloudPublishedAt||''),
+        },
+      };
     }
-    await this.state.storage.put('active',envelope);
-    const acceptedAt=new Date().toISOString();
-    await this.state.storage.put('activeMeta',{revision:envelope.revision,fingerprint:envelope.fingerprint,publishedAt:envelope.publishedAt,acceptedAt});
-    const doorbell=JSON.stringify({type:'ADMIN_CONFIG_AVAILABLE',storeId:envelope.storeId,revision:envelope.revision,fingerprint:envelope.fingerprint,publishedAt:envelope.publishedAt,acceptedAt});
+
+    // Cloudflare accepted time is the only delivery ordering clock.
+    // Every distinct formal publish receives a strictly increasing canonical time.
+    const nowMs=Date.now();
+    const currentMs=current?Date.parse(String(current.publishedAt||'')):Number.NEGATIVE_INFINITY;
+    const canonicalMs=Number.isFinite(currentMs)?Math.max(nowMs,currentMs+1):nowMs;
+    const cloudPublishedAt=new Date(canonicalMs).toISOString();
+    const canonical=createMfkAdminConfigEnvelope({
+      storeId:envelope.storeId,
+      revision:envelope.revision,
+      publishedAt:cloudPublishedAt,
+      adminFingerprint:envelope.adminFingerprint,
+      snapshot:envelope.snapshot,
+    });
+
+    await this.state.storage.put('active',canonical);
+    await this.state.storage.put('activeMeta',{
+      revision:canonical.revision,
+      fingerprint:canonical.fingerprint,
+      adminFingerprint:canonical.adminFingerprint,
+      publishRequestFingerprint:envelope.fingerprint,
+      sourcePublishedAt:envelope.publishedAt,
+      cloudPublishedAt,
+    });
+    await this.state.storage.put('admin:published:'+canonical.fingerprint,{
+      fingerprint:canonical.fingerprint,
+      publishedAt:canonical.publishedAt,
+      revision:canonical.revision,
+      adminFingerprint:canonical.adminFingerprint,
+      publishRequestFingerprint:envelope.fingerprint,
+    });
+
+    const doorbell=JSON.stringify({
+      type:'ADMIN_CONFIG_AVAILABLE',
+      storeId:canonical.storeId,
+      revision:canonical.revision,
+      fingerprint:canonical.fingerprint,
+      publishedAt:canonical.publishedAt,
+      acceptedAt:cloudPublishedAt,
+    });
     for(const socket of this.state.getWebSockets()){try{socket.send(doorbell);}catch{}}
-    return{status:200,body:{state:'PUBLISHED',active:envelope,cloudPublishedAt:acceptedAt}};
+
+    return{
+      status:200,
+      body:{
+        state:'PUBLISHED',
+        active:canonical,
+        publishRequestFingerprint:envelope.fingerprint,
+        cloudPublishedAt,
+      },
+    };
   }
   async ownerChannels(active,observedAt=new Date().toISOString(),freshReadback=false){
     let keetaStatus=null,customerHealth=null;
@@ -1571,10 +1613,10 @@ export class AdminSyncStore{
       let ack;
       try{ack=validateMfkAdminConfigAck(await request.json());}
       catch(error){return json({code:error instanceof Error?error.message:'ADMIN_CONFIG_ACK_INVALID'},400);}
-      const active=await this.state.storage.get('active');
-      if(!active)return json({code:'ADMIN_CONFIG_NOT_PUBLISHED'},409);
-      if(ack.revision!==active.revision||ack.fingerprint!==active.fingerprint){
-        return json({code:'ADMIN_CONFIG_ACK_MISMATCH',expectedRevision:active.revision,expectedFingerprint:active.fingerprint},409);
+      const published=await this.state.storage.get('admin:published:'+ack.fingerprint);
+      if(!published)return json({code:'ADMIN_CONFIG_ACK_UNKNOWN_PUBLISH',fingerprint:ack.fingerprint},409);
+      if(ack.publishedAt!==published.publishedAt){
+        return json({code:'ADMIN_CONFIG_ACK_PUBLISH_TIME_MISMATCH',expectedPublishedAt:published.publishedAt},409);
       }
       const acks=await this.state.storage.get('acks')||{};
       acks[ack.deviceId]=ack;
