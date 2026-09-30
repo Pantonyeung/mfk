@@ -1367,27 +1367,208 @@ Admin 只治理已批准 artifact；唔改 Builder/OTA protocol。
 
 ---
 
-# 24. Printer / Print｜鎖定
+# 24. 打印管理｜鎖定
 
-Admin 唯一 logical printer registry：
-例如：
+打印管理係獨立功能 domain。
+使用者想管理「點樣印、印去邊、用邊個模板、而家邊條打印路線有問題」時，第一時間就應該入 **打印管理**。
+
+Sidebar 細 Menu 直接顯示：
+- 打印總覽
+- 邏輯打印機
+- 打印模板
+- 打印規則
+- 打印狀態／異常
+
+所有頁面符合：
+**打印管理 → 細 Menu → 已見到目標內容 → 撳 object 入 Detail / Edit**
+
+唔需要再經：
+「連接與設備 → 打印 → 設定 → 其他」。
+
+## 24.1 打印總覽
+
+入口：
+**打印管理 → 打印總覽**
+
+用途：
+一眼睇清楚目前打印系統有冇需要處理，但唔用一粒「全部正常」掩蓋個別 route 問題。
+
+畫面分區：
+
+### 邏輯打印機狀態
+每個 logical printer 顯示：
+- 名稱
+- 用途／票種
+- Active
+- 現場綁定狀態（read-only observed）
+- Last seen / freshness
+- Current health
+- Attention indicator
+
+### 最近打印異常
+顯示：
+- Order / Display Number
+- Ticket type
+- Logical printer
+- Current certainty
+- Last attempt
+- Last readback
+- CTA：查看
+
+### 快捷入口
+- 新增邏輯打印機
+- 管理模板
+- 管理打印規則
+- 查看全部異常
+
+禁止：
+- 用 Physical IP / USB 作 Admin logical identity
+- 將「Printer Connected」顯示成「Print Job 已成功」
+- 將 UNKNOWN 顯示成 FAILED
+
+## 24.2 邏輯打印機
+
+入口：
+**打印管理 → 邏輯打印機**
+
+第二步完成後直接見 Logical Printer Registry。
+
+List：
+- Name
+- Type / Capability
+- Supported ticket types
+- Routing use
+- Active
+- 現場綁定狀態（read-only）
+- Last readback
+- Row action
+
+Primary CTA：
+**新增邏輯打印機**
+
+Admin logical printer examples：
 - 收據機
 - 廚房製作單機
 - 打包單機
 - 飯糰 Label
 - 外賣 Label
 
-Logical printer fields：
-- Name
-- Type/capability
-- Supported ticket types
-- routing use
-- active
+Create / Edit：
+- Name *
+- Type / Capability *
+- Supported ticket types *
+- Routing use
+- Active
+- Note（如需要）
 
-Physical IP / USB binding：
-**SMT 現場做，Admin 不做。**
+Physical IP / USB / physical device：
+**唔喺 Admin 呢頁設定。**
 
-Product Print flags：
+Admin 可以顯示：
+- 「已於 SMT 綁定」
+- 「未綁定」
+- observed physical device summary（只讀、如 contract 有）
+
+並提供 contextual shortcut：
+**前往裝置狀態**
+
+真正 physical binding 仍由 SMT 現場做。
+
+同一 physical printer 可以承擔多個 logical destination；
+但 SMT 不得自行建立第二套 logical printer name。
+
+## 24.3 打印模板
+
+入口：
+**打印管理 → 打印模板**
+
+第二步直接見 Template list。
+
+固定模板類型：
+- Receipt
+- Production
+- Packing
+- Label
+
+List：
+- Template Name
+- Type
+- Used by
+- Active
+- Last modified
+- Draft indicator
+- Row action
+
+Create / Edit：
+- Template name
+- Template type
+- 版面／可用欄位設定（只限正式 contract 支援）
+- Active
+- Preview
+
+Preview 只係視覺預覽；
+唔代表 physical print 已成功。
+
+Output semantics：
+- Production：回答「要整乜／點整」
+- Packing：回答「全單齊唔齊」
+- Combo relationship 必須保留
+- Food / Drink total 同附帶用品分開
+
+如果某 template 仍被 rule / product 使用：
+- 刪除前顯示 references
+- 禁止直接 destructive delete
+- 先 reassign / disable
+
+## 24.4 打印規則
+
+入口：
+**打印管理 → 打印規則**
+
+用途：
+管理「邊種票、喺咩條件、送去邊個 logical printer」。
+
+List：
+- Rule name
+- Ticket type
+- Scope / condition summary
+- Logical destination
+- Active
+- Used by / affected scope
+- Draft indicator
+- Row action
+
+Create / Edit：
+- Rule name
+- Ticket type
+- Scope
+- Condition
+- Logical destination
+- Active
+
+規則可以引用：
+- Product / Category
+- Dining / Service Mode
+- Source / Channel
+- Ticket type
+- 其他已批准 routing input
+
+但禁止：
+- 在 Print Rule 入面建立第二套 Product Category
+- 建立 print-only product sort authority
+- 用 physical IP / USB 直接做 canonical routing identity
+
+Product / Category identity 同排序沿用菜單管理正式資料。
+
+## 24.5 產品級打印設定
+
+Primary Home：
+**菜單管理 → 產品管理 → Product Detail / Edit**
+
+因為使用者想答嘅問題係：
+「呢件產品要印乜？」
+
+Product 可以直接設定：
 - Receipt ON/OFF
 - Production ON/OFF
 - Packing ON/OFF
@@ -1395,19 +1576,87 @@ Product Print flags：
 - Dine-in print ON/OFF
 - Label destinations（logical printers）
 
-Templates：
-- Receipt
-- Production
-- Packing
-- Label
+產品頁可以：
+- 直接揀現有 logical printer
+- 顯示目前 template / rule 摘要
+- deep-link：**前往打印管理**
 
-Output semantics：
-- Production：要整乜／點整
-- Packing：全單齊唔齊
-- Combo relationship 保留
-- food/drink total 同 accessory 分開
+但產品頁唔管理：
+- Printer IP
+- USB
+- physical device
+- device driver
+- global template registry
+- global route rules
 
-Print diagnostics read-only 可以顯 job/attempt/readback，但唔改 Store Kernel print queue authority。
+## 24.6 打印狀態／異常
+
+入口：
+**打印管理 → 打印狀態／異常**
+
+第二步直接見 Print Job / Route exception workspace。
+
+Filters：
+- Current state
+- Ticket type
+- Logical printer
+- Order / Display Number
+- Time range
+
+List：
+- Order / Display Number
+- Ticket type
+- Logical destination
+- Job / attempt summary
+- Current state
+- Certainty
+- Last attempt
+- Last readback
+- View detail
+
+State 必須分：
+- PENDING
+- PRINTED / CONFIRMED（只限有足夠 proof）
+- UNKNOWN
+- FAILED
+- PARTIAL
+
+Detail：
+- Order / Display Number
+- Ticket type
+- logical route
+- attempt timeline
+- timing
+- observed device
+- ACK / readback
+- error summary
+- linked Audit / Diagnostics
+
+正常管理 UI 唔顯 raw UUID / stack trace；
+Engineering detail 只喺 Diagnostics / advanced detail。
+
+R1 Admin 此頁預設係 read / diagnostics surface。
+如果未有正式 Admin command contract：
+- 唔顯「重印」／「重試」mutation button
+- 只 deep-link 去已有正式操作 surface
+
+若將來批准 Admin reprint：
+必須建立新 PrintJob + reason + actor + readback；
+禁止修改舊 PrintJob 成功歷史。
+
+## 24.7 Human-first cross-domain rule
+
+打印相關功能嘅 Primary Home：
+
+- 「呢件產品要唔要印」→ 菜單管理 / 產品管理
+- 「打印機叫咩、負責乜票」→ 打印管理 / 邏輯打印機
+- 「張票長咩樣」→ 打印管理 / 打印模板
+- 「邊種情況送去邊部 logical printer」→ 打印管理 / 打印規則
+- 「點解今張單冇印到」→ 打印管理 / 打印狀態／異常
+- 「實體 IP / USB 綁邊部機」→ SMT 現場
+- 「部裝置而家健唔健康」→ 裝置管理 / 裝置狀態
+
+任何一項如果要第三層 Menu 先搵到，視為 IA RED。
 
 ---
 
