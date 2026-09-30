@@ -11,10 +11,9 @@ import {installCustomerCloudBridge} from './runtime/customer-cloud-intake.ts';
 import {installAdminRefundIntake} from './runtime/admin-refund-intake.ts';
 import {localRuntime} from './runtime/local-runtime.ts';
 import {createSmmLanIngress} from './runtime/smm-lan-ingress.ts';
-import {installSmmWebAcceptanceIntake} from './runtime/smm-web-acceptance-intake.ts';
 import type {SmmLanOrderRequest} from '../../contracts/smm-lan-v1.ts';
 import {readLocalCashOpenings,readLocalDayCloses} from './runtime/local-operations.ts';
-import {isSmtWebAcceptance} from './runtime/web-acceptance.ts';
+import {isSmtPublicMirror} from './runtime/web-acceptance.ts';
 import {
   installProjectionOutboxAutoFlush,
   queueCashOpeningProjection,
@@ -23,12 +22,13 @@ import {
 } from './runtime/projection-outbox.ts';
 import './styles.css';
 
-const webAcceptance=isSmtWebAcceptance();
+const publicMirror=isSmtPublicMirror();
+if(publicMirror)document.documentElement.dataset.mfkSmtMode='public-mirror';
 
 installSmtAdminAutoSync();
 installStaffSessionInvalidation();
 
-if(!webAcceptance){
+if(!publicMirror){
   installProjectionOutboxAutoFlush();
   installKeetaOrderIntake();
   installKeetaOrderLifecycle();
@@ -38,7 +38,6 @@ if(!webAcceptance){
 }
 
 const smmLanIngress=createSmmLanIngress(localRuntime);
-if(webAcceptance)installSmmWebAcceptanceIntake(smmLanIngress);
 
 declare global{interface Window{__MFK_SMM_LAN_HANDLE__?:(deviceId:string,payload:string)=>string}}
 window.__MFK_SMM_LAN_HANDLE__=(deviceId,payload)=>{
@@ -55,7 +54,7 @@ window.__MFK_SMM_LAN_HANDLE__=(deviceId,payload)=>{
   }
 };
 
-if(!webAcceptance){
+if(!publicMirror){
   for(const order of localRuntime.orders())queueOrderProjection(order);
   for(const opening of readLocalCashOpenings())queueCashOpeningProjection(opening);
   const latestCloseByDate=new Map<string,ReturnType<typeof readLocalDayCloses>[number]>();
