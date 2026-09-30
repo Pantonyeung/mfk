@@ -1,9 +1,12 @@
-import {beforeEach,describe,expect,it} from 'vitest';
+import {beforeEach,describe,expect,it,vi} from 'vitest';
 import {createMfkAdminConfigEnvelope} from '../../../contracts/admin-config-sync-v1.ts';
 import {
   SMT_ADMIN_CONFIG_LKG_KEY,
   SMT_ADMIN_CONFIG_STATUS_KEY,
+  SMT_ADMIN_TIME_FIRST_CUTOVER_KEY,
   applyAdminConfigEnvelope,
+  clearLegacySmtAdminConfigForTimeFirstCutover,
+  fetchAndApplyAdminConfig,
   readSmtAdminConfigLkg,
   readSmtAdminSyncStatus,
 } from './admin-config-sync.ts';
@@ -118,7 +121,7 @@ describe('SMT full Admin config LKG',()=>{
     expect(readSmtAdminSyncStatus().state).toBe('SYNCED');
   });
 
-  it('is idempotent, rejects same-revision conflicts, and ignores stale snapshots',()=>{
+  it('is idempotent, rejects same-time conflicts, and ignores older publish times',()=>{
     const row=envelope(3);
     expect(applyAdminConfigEnvelope(row).disposition).toBe('APPLIED');
     expect(applyAdminConfigEnvelope(row).disposition).toBe('IDEMPOTENT');
@@ -237,6 +240,73 @@ describe('SMT full Admin config LKG',()=>{
     expect(applyAdminConfigEnvelope(newer)).toMatchObject({disposition:'APPLIED',revision:22});
     expect(readSmtAdminConfigLkg()?.publishedAt).toBe('2026-09-29T06:00:00.000Z');
     expect((readSmtAdminConfigLkg()?.snapshot.catalog as {products?:{id:string}[]}).products?.[0]?.id).toBe('new');
+  });
+
+  it('clears the pre-cutover SMT Admin LKG once and preserves transaction storage',()=>{
+    const old=createMfkAdminConfigEnvelope({
+      storeId:'MF01',
+      revision:23,
+      publishedAt:'2026-09-30T09:30:00.000+08:00',
+      adminFingerprint:'admin-r23',
+      snapshot:{catalog:{products:[{id:'old'}]}},
+    });
+    localStorage.setItem(SMT_ADMIN_CONFIG_LKG_KEY,JSON.stringify(old));
+    localStorage.setItem(SMT_ADMIN_CONFIG_STATUS_KEY,JSON.stringify({state:'SYNCED',revision:23,fingerprint:old.fingerprint,updatedAt:old.publishedAt}));
+    localStorage.setItem('mfk.v2local.runtime.v1',JSON.stringify({orders:[{id:'ORDER-1'}],holds:[],availability:{}}));
+
+    expect(clearLegacySmtAdminConfigForTimeFirstCutover()).toBe(true);
+    expect(localStorage.getItem(SMT_ADMIN_CONFIG_LKG_KEY)).toBeNull();
+    expect(localStorage.getItem(SMT_ADMIN_CONFIG_STATUS_KEY)).toBeNull();
+    expect(localStorage.getItem('mfk.v2local.runtime.v1')).toContain('ORDER-1');
+    expect(localStorage.getItem(SMT_ADMIN_TIME_FIRST_CUTOVER_KEY)).toContain('admin-r23');
+
+    localStorage.setItem(SMT_ADMIN_CONFIG_LKG_KEY,JSON.stringify(old));
+    expect(clearLegacySmtAdminConfigForTimeFirstCutover()).toBe(false);
+    expect(localStorage.getItem(SMT_ADMIN_CONFIG_LKG_KEY)).not.toBeNull();
+  });
+
+  it('applies every canonical publish after cutover in Hong Kong time order even when R numbers go backwards',async()=>{
+    localStorage.setItem(SMT_ADMIN_TIME_FIRST_CUTOVER_KEY,JSON.stringify({
+      clearedAt:'2026-09-30T09:39:00.000+08:00',
+      priorFingerprint:'old',
+      priorPublishedAt:'2026-09-30T09:30:00.000+08:00',
+      priorRevision:23,
+    }));
+    const r23=createMfkAdminConfigEnvelope({
+      storeId:'MF01',revision:23,publishedAt:'2026-09-30T09:40:00.000+08:00',adminFingerprint:'content-a',
+      snapshot:{catalog:{products:[{id:'A'}]}},
+    });
+    const r6=createMfkAdminConfigEnvelope({
+      storeId:'MF01',revision:6,publishedAt:'2026-09-30T09:40:10.000+08:00',adminFingerprint:'content-b',
+      snapshot:{catalog:{products:[{id:'B'}]}},
+    });
+    const r18=createMfkAdminConfigEnvelope({
+      storeId:'MF01',revision:18,publishedAt:'2026-09-30T09:40:20.000+08:00',adminFingerprint:'content-c',
+      snapshot:{catalog:{products:[{id:'C'}]}},
+    });
+    const ackBodies:Record<string,unknown>[]=[];
+    vi.stubGlobal('fetch',vi.fn(async(input:RequestInfo|URL,init?:RequestInit)=>{
+      const url=String(input);
+      if(url.includes('/published-since')){
+        return new Response(JSON.stringify({items:[r23,r6,r18]}),{status:200,headers:{'content-type':'application/json'}});
+      }
+      if(url.includes('/ack')){
+        ackBodies.push(JSON.parse(String(init?.body||'{}')));
+        return new Response(JSON.stringify({state:'ACKED'}),{status:200,headers:{'content-type':'application/json'}});
+      }
+      throw new Error('UNEXPECTED_FETCH '+url);
+    }));
+
+    await fetchAndApplyAdminConfig();
+
+    expect(ackBodies.map(row=>row.revision)).toEqual([23,6,18]);
+    expect(ackBodies.map(row=>row.publishedAt)).toEqual([
+      '2026-09-30T09:40:00.000+08:00',
+      '2026-09-30T09:40:10.000+08:00',
+      '2026-09-30T09:40:20.000+08:00',
+    ]);
+    expect(readSmtAdminConfigLkg()).toMatchObject({revision:18,publishedAt:'2026-09-30T09:40:20.000+08:00'});
+    expect((readSmtAdminConfigLkg()?.snapshot.catalog as {products?:{id:string}[]}).products?.[0]?.id).toBe('C');
   });
 
 });
