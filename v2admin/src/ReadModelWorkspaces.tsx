@@ -22,6 +22,7 @@ function ReadHeader({title,description,badge='只讀資料'}:{title:string;descr
   return <header className="admin-editor-head"><div><small>{badge}</small><h1>{title}</h1><p>{description}</p></div></header>;
 }
 const money=(minor:number)=>'HK$'+(minor/100).toFixed(2);
+const hkTime=(value:string)=>new Date(value).toLocaleString('zh-HK',{timeZone:'Asia/Hong_Kong',hour12:false});
 
 export function OverviewWorkspace(){
   const {draft,dirty}=useAdminDraft();
@@ -41,12 +42,12 @@ export function OverviewWorkspace(){
   const staff=readAdminStored<Array<{active:boolean}>>('staff.v1',[]);
   const readiness=[
     ['菜單資料',errors.length===0?'就緒':errors.length+' 項問題','/admin/catalog/products'],
-    ['設定版本',activeRelease?'R'+activeRelease.version:'未建立','/admin/publish'],
+    ['設定時間',activeRelease?hkTime(activeRelease.createdAt):'未建立','/admin/publish'],
     ['打印用途',printers.length?printers.filter(row=>row.active).length+' 個啟用':'未設定','/admin/print'],
     ['人員權限',staff.length?staff.filter(row=>row.active).length+' 人啟用':'未設定','/admin/staff'],
   ] as const;
   return <section className="admin-editor-page">
-    <ReadHeader title="今日" description="每日營運入口：先睇資料完整度、目前設定版本、未保存變更、最近設定活動同需要處理嘅問題。"/>
+    <ReadHeader title="今日" description="每日營運入口：先睇資料完整度、目前保存時間、未保存變更、最近設定活動同需要處理嘅問題。"/>
     <div className="admin-kpi-grid">
       <article><span>商品</span><strong>{draft.products.length}</strong><small>{draft.products.filter(row=>row.active).length} 啟用</small></article>
       <article><span>選項組／套餐</span><strong>{draft.modifierGroups.length} / {draft.combos.length}</strong><small>菜單結構</small></article>
@@ -59,7 +60,7 @@ export function OverviewWorkspace(){
         <div className="admin-editor-list">{readiness.map(([label,state,path])=><article className="admin-policy-row" key={label}><span>{label}</span><b>{state}</b><Link to={path}>前往</Link></article>)}</div>
         <small>營運準備只係狀態提示，唔會阻止門店交易。</small>
       </section>
-      <section className="admin-read-card"><header><h2>設定變更</h2><span>{dirty?'未保存':'已保存'}</span></header><div className="admin-read-empty">{dirty?'目前有修改未保存；撳「保存」會驗證並建立新版本。':activeRelease?'目前使用 R'+activeRelease.version+'。':'未有保存版本。'}</div><Link to="/admin/publish">查看版本歷史</Link></section>
+      <section className="admin-read-card"><header><h2>設定變更</h2><span>{dirty?'未保存':'已保存'}</span></header><div className="admin-read-empty">{dirty?'目前有修改未保存；撳「保存」會驗證並建立新版本。':activeRelease?'目前保存：'+hkTime(activeRelease.createdAt)+'（香港時間）。':'未有保存資料。'}</div><Link to="/admin/publish">查看版本歷史</Link></section>
       <section className="admin-read-card"><header><h2>最近操作</h2><span>{audit.length}</span></header>{audit.length?<div className="admin-editor-list">{audit.slice(0,5).map(row=><article key={row.id}><b>{row.action}</b><small>{row.target} · {new Date(row.at).toLocaleString('zh-HK')}</small></article>)}</div>:<div className="admin-read-empty">未有操作記錄。</div>}<Link to="/admin/system/audit">查看全部</Link></section>
     </div>
   </section>;
