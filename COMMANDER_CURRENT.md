@@ -85,33 +85,33 @@ Hard prohibitions:
 - no browser-vs-Cloud timestamp ordering as authority
 - no doorbell payload as a second data authority
 
-## 4. Current active implementation slice
+## 4. Current active product phase
 
-Single active implementation slice:
+Single active Admin V3 phase:
 
-`V3ADMIN_A0_FOUNDATION`
+`V3ADMIN_PRODUCT_BRIEF_LOCK_R1`
 
-Branch:
+Controlling product candidate:
 
-`feat/MFK-V3-WEB-PARALLEL-REBIRTH-A0`
+`docs/product/MFK_ADMIN_V3_PRODUCT_BRIEF_R1_2026-09-30.md`
 
-PR:
+Product issue:
 
-`#598`
+`#601`
 
-Scope:
-- isolated `v3admin/**`
-- R2 governance
-- dedicated V3 CI
-- zero production routing
-- no v2 runtime code change
-- no backend / SMT / SMM / Customer / Owner runtime change
+Execution state:
+- A0 foundation remains merged and zero-routed.
+- A1 PR #599 is parked as implementation reference only; do not merge it while Product Brief R1 is being locked.
+- A2 issue #600 is superseded as an implementation roadmap by Product Brief #601; its detailed read-model ideas may be reused only where consistent with the Product Brief.
+- No Codex one-shot implementation starts until Product Brief #601 is approved/published into Main.
+- No V3 production deploy or hostname cutover is authorized.
 
-A0 state:
-- code exists only on candidate branch/PR
-- V3 CI must be GREEN
-- PR remains Draft until Owner explicitly says `PROMOTE`
-- no merge/deploy/cutover is authorized by A0 itself
+One-shot strategy:
+- freeze product/IA/UI first
+- then one isolated Admin V3 implementation program
+- full R1 product acceptance on preview
+- cutover decision only after physical/browser acceptance
+
 
 ## 5. V2 freeze rule
 
@@ -151,12 +151,16 @@ Owner may authorize a later bounded promotion after reviewing candidate evidence
 
 ## 8. Exact NEXT
 
-1. Keep PR #598 as Draft.
-2. Finish current-head CI and review.
-3. Resolve all review findings.
-4. Bank A0 candidate evidence.
-5. Wait for explicit Owner `PROMOTE`.
-6. Only after promotion may A0 merge.
-7. Then start A1: authenticated read-only canonical Admin V3, still with zero production cutover.
+1. Review Product Brief #601 / Draft PR #602.
+2. Owner must explicitly issue PROMOTE before the product-spec PR may be merged.
+3. After PROMOTE, merge the product-spec-only PR; no runtime deploy.
+4. Bank A1/A2 incremental work as reference, not as partial product promotion.
+5. Prepare the one-shot Codex implementation packet from the approved Product Brief.
+6. Execute R2 A0→A6 as internal engineering / acceptance gates inside the one-shot build; no A-stage production promotion.
+7. Codex may modify only explicitly allowed V3 paths and approved bounded seams.
+8. Build the complete Admin V3 R1 in isolation.
+9. Run full automated + V3 preview physical acceptance, including verified rollback to v2.
+10. Only then propose production cutover.
+11. Merge / deploy / route switch still requires the applicable explicit Owner PROMOTE.
 
-MILESTONE: `MFK_V3_PARALLEL_REBIRTH_A0_COMMANDER_LOCKED`
+MILESTONE: `MFK_ADMIN_V3_PRODUCT_BRIEF_LOCK_R1_ACTIVE`

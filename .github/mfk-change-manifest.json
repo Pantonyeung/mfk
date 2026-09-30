@@ -1,45 +1,33 @@
 {
   "version": 1,
-  "capability": "MFK_V3_WEB_PARALLEL_REBIRTH_A0",
-  "base_sha": "3816a32f846fe36c7a2ca8fe7589e56796178b27",
+  "capability": "MFK_ADMIN_V3_PRODUCT_BRIEF_FUNCTION_UI_LOCK_R1",
+  "base_sha": "f826598f0517229b94c7e817c642e808dc515cc3",
   "root_control": "#596",
+  "product_control": "#601",
   "allowed_paths": [
     ".github/mfk-change-manifest.json",
-    ".github/workflows/v3admin-a0-foundation.yml",
     "COMMANDER_CURRENT.md",
     "HANDOFF_CURRENT.md",
-    "docs/governance/MFK_WEB_CLIENT_PARALLEL_REBIRTH_AUTHORITY_R2_2026-09-30.md",
-    "v3admin/README.md",
-    "v3admin/package.json",
-    "v3admin/tsconfig.json",
-    "v3admin/vite.config.ts",
-    "v3admin/index.html",
-    "v3admin/src/state-authority.ts",
-    "v3admin/src/api.ts",
-    "v3admin/src/App.tsx",
-    "v3admin/src/main.tsx",
-    "v3admin/src/styles.css",
-    "v3admin/src/authority.test.ts"
+    "docs/product/MFK_ADMIN_V3_PRODUCT_BRIEF_R1_2026-09-30.md"
   ],
-  "authority_impact": "SYSTEM_WIDE_IMPLEMENTATION_STRATEGY_SWITCH_TO_PARALLEL_V3_WEB_CLIENTS",
-  "persistence_impact": "NEW_ISOLATED_V3_DEXIE_SCHEMA_ONLY_NO_COMMANDS_NO_V2_STORAGE_READS_OR_WRITES",
+  "authority_impact": "PRODUCT_UI_IA_ACCEPTANCE_LOCK_ONLY; NO_DOMAIN_AUTHORITY_CHANGE",
+  "persistence_impact": "NONE",
   "provider_impact": "NONE",
   "transaction_impact": "NONE",
   "production_routing_impact": "NONE",
   "expected_behavior_change": [
-    "Repository current authority now freezes broad v2 web-state surgery and starts an isolated V3 client line.",
-    "v3admin A0 builds independently with TanStack Query, Dexie and Zustand ownership boundaries.",
-    "v3admin does not import v2 client-state modules and has no production deployment configuration.",
+    "No runtime behavior change.",
+    "Admin V3 implementation roadmap changes from incremental A1/A2 slices to one product-brief-led isolated rebuild.",
+    "The full R1 function set, navigation, UI patterns, state semantics, forbidden patterns and acceptance gates are locked before implementation.",
     "Current v2 production remains unchanged."
   ],
   "non_goals": [
-    "No production route or hostname for V3 in A0.",
-    "No Admin login or canonical authenticated read in A0.",
-    "No publish or mutation behavior in A0.",
-    "No Dexie command rows in A0.",
-    "No v2 runtime change.",
-    "No backend, SMT, SMM, Customer or Owner runtime change."
+    "No v3admin product code change in this spec slice.",
+    "No backend/API/SMT/domain authority change.",
+    "No production deployment or hostname routing.",
+    "No merge of parked A1 PR #599.",
+    "No Codex implementation until Product Brief #601 is approved and merged."
   ],
-  "rollback_sha": "3816a32f846fe36c7a2ca8fe7589e56796178b27",
+  "rollback_sha": "f826598f0517229b94c7e817c642e808dc515cc3",
   "severity": "HARD_BLOCK"
 }
