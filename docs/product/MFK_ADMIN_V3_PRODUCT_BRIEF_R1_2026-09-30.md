@@ -3128,7 +3128,7 @@ Permission UI 以「人類工作」分組，唔按 API endpoint 分組。
 
 建議 group：
 - 訂單
-- 售後／退款／取消
+- 訂單交易記錄查看
 - 菜單
 - 售罄／供應
 - 平台／渠道
@@ -5188,15 +5188,14 @@ Status：
 
 | 頁面 | 第一屏 | 主動作 | Mode | Authority | Status |
 |---|---|---|---|---|---|
-| 進行中訂單 | Active Order List | 查看 Order | Read | canonical Order read model | LOCKED |
-| 訂單歷史 | Historical Order List | 查看 Order | Read | immutable Order history + linked adjustments | LOCKED |
-| 售後／退款／取消／修正 | After-sales List | 開始 approved action | Mixed / high-risk workflow | Order/Payment formal mutation contracts | **YELLOW**：Tender Correction Admin seam |
-| 訂單異常 | Order-specific exception list | 處理 → responsible domain | Read + deep-link | domain evidence / reconcile | LOCKED |
+| 進行中訂單 | Active Order List | 查看訂單 | Read-only | canonical Order read model | LOCKED |
+| 訂單歷史 | Historical Order List | 查看訂單 | Read-only | immutable Order history + linked transaction records | LOCKED |
+| 訂單異常 | Order-specific exception list | 查看／前往責任頁 | Read-only + deep-link | domain evidence / reconcile | LOCKED |
 
 驗收：
 - Order / Payment / Fulfillment / Print / Platform state 分開。
-- Refund timeout / UNKNOWN 禁 blind retry。
-- Cancel ≠ delete / refund / reprint。
+- Refund / Cancel / 付款方式修正只顯 linked record / current result。
+- Admin 無交易 mutation button。
 
 ## 51.3 菜單管理
 
@@ -5357,15 +5356,11 @@ Status：
 53 個第二步 destination：
 
 - **53：LOCKED**
-- **1：YELLOW（售後／退款／取消／修正，原因只係 Admin post-close Tender Correction backend seam）**
+- **0：YELLOW**
 - **0：RED**
 
-唯一已確認 implementation dependency：
-**Admin post-close Tender Correction = BACKEND_CONTRACT_GAP**
-
-注意：
-YELLOW 只代表該 page 內一個 mutation seam 未有正式 backend authority；
-唔代表成個訂單售後頁未定義。
+訂單監察全部只讀。
+退款、取消訂單、付款方式修正不屬 Admin transaction capability。
 
 ## 51.14 下一輪
 
@@ -8114,7 +8109,7 @@ Status：**LOCKED**
 例：
 退款報表某日 $1,200
 → 撳該 breakdown
-→ 訂單監察 / 售後
+→ 訂單監察 / 訂單歷史／訂單詳情（交易變更記錄）
 
 帶：
 - date / Business Day
@@ -8628,11 +8623,10 @@ Primary danger button 永遠用：
 **動詞 + 明確物件 / 結果**
 
 例如：
-- 確認退款 HK$120
-- 取消訂單 #0088
 - 確認暫停 Keeta 接單
 - 確認回復至版本 2026.09.29
 - 撤銷阿明此登入工作階段
+- 確認回復供應「紫米飯團」
 
 禁止：
 - OK
@@ -10167,7 +10161,7 @@ Order Detail：
 - 商品
 - 付款
 - 履約
-- 售後
+- 交易變更記錄
 - 時間線
 
 Access Workspace：
@@ -11584,7 +11578,7 @@ Status：**LOCKED**
 
 ---
 
-# 64.6 訂單 / 售後正式用詞
+# 64.6 訂單 / 交易變更記錄正式用詞
 
 正式中文：
 
@@ -11593,7 +11587,6 @@ Status：**LOCKED**
 | Order Detail | 訂單詳情 |
 | Active Orders | 進行中訂單 |
 | Order History | 訂單歷史 |
-| After-sales | 售後 |
 | Refund | 退款 |
 | Cancel Order | 取消訂單 |
 | Tender Correction | **付款方式修正** |
@@ -11608,6 +11601,7 @@ Status：**LOCKED**
 **付款方式修正**
 
 Admin 只會用以上字眼顯示交易記錄；
+「退款 / 取消訂單 / 付款方式修正」喺 Admin 係**記錄類型**，唔係操作 CTA；
 唔會提供「退款／取消訂單／付款方式修正」執行按鈕。
 
 禁止：
@@ -11983,7 +11977,7 @@ Status：**LOCKED**
 3. Domain-specific status wording
 4. 營業額 / 銷售
 5. 營業日
-6. 訂單 / 售後
+6. 訂單 / 交易變更記錄
 7. 平台 / 渠道
 8. 商品 / 菜單
 9. 打印
