@@ -51,7 +51,7 @@ test('UI1 keeps brand warmth and fixed shortcuts while remaining human-logic fir
   assert.ok(app.includes("view==='home'?<Stage1Home"));
   assert.ok(app.includes("onBrowse={()=>changeView('menu')}"));
   assert.ok(app.includes("view==='menu'?<Stage2Menu"));
-  for(const marker of['stage1-fixed-header','stage1-welcome','stage1-live-order','stage1-search-entry','stage1-hero-banner','stage1-announcement-strip','stage1-quick-entry-section','stage1-top6','我的收藏','回憶券','期間限定'])assert.ok(home.includes(marker),marker);
+  for(const marker of['stage1-premium-header','stage1-welcome','stage1-live-order','stage1-search-entry','stage1-brand-banner','stage1-announcement-strip','stage1-quick-entry-section','stage1-top6','我的收藏','回憶券','期間限定'])assert.ok(home.includes(marker),marker);
   assert.ok(app.includes('limit:6'));
   assert.ok(home.includes('const canBrowse=Boolean(snapshot?.menu)'));
 });
@@ -66,7 +66,7 @@ test('UI1 owns FINAL home header/status while remaining inside current customer 
   assert.ok(app.includes('return <main className="customer-shell"'));
   assert.equal(app.includes('<CustomerHeader'),false);
   assert.ok(app.includes("view==='home'?null:view==='menu'?null:<div className=\"global-status\""));
-  assert.ok(home.includes('stage1-store-context'));
+  assert.ok(home.includes('stage1-store-pill'));
   assert.ok(homeCss.includes('.stage1-home'));
 });
 
