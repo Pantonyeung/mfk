@@ -8,7 +8,7 @@
     ".github/mfk-change-manifest.json",
     "COMMANDER_CURRENT.md",
     "HANDOFF_CURRENT.md",
-    "docs/product/MFK_ADMIN_V3_PRODUCT_BRIEF_FUNCTION_UI_LOCK_R1_2026-09-30.md"
+    "docs/product/MFK_ADMIN_V3_PRODUCT_BRIEF_R1_2026-09-30.md"
   ],
   "authority_impact": "PRODUCT_UI_IA_ACCEPTANCE_LOCK_ONLY; NO_DOMAIN_AUTHORITY_CHANGE",
   "persistence_impact": "NONE",
