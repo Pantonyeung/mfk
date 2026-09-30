@@ -8,7 +8,7 @@ declare const __MFK_CLIENT_RELEASE_ID__:string;
 declare const __MFK_CLIENT_SOURCE_SHA__:string;
 declare const __MFK_CLIENT_BUILD_TIME__:string;
 
-export const V3_CLIENT_RELEASE:Object.freeze extends never ? never : V3ClientReleaseIdentity=Object.freeze({
+export const V3_CLIENT_RELEASE:V3ClientReleaseIdentity=Object.freeze({
   releaseId:__MFK_CLIENT_RELEASE_ID__,
   sourceSha:__MFK_CLIENT_SOURCE_SHA__,
   buildTime:__MFK_CLIENT_BUILD_TIME__,
