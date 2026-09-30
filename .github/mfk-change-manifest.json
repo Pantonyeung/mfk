@@ -1,30 +1,27 @@
 {
   "version": 1,
-  "capability": "MFK_ADMIN_BOOTSTRAP_FRESHNESS_R2",
-  "base_sha": "cd483bb38ac612689399463b56549505b2bffa86",
+  "capability": "MFK_ADMIN_BOOTSTRAP_SAVED_STATE_R3",
+  "base_sha": "02b653c6e7406ed9e969145c6c715caeff38fa28",
   "allowed_paths": [
     ".github/mfk-change-manifest.json",
-    "v2admin/wrangler.jsonc",
-    "v2admin/worker.ts",
-    "v2admin/src/main.tsx",
-    "v2admin/src/admin-shell-freshness-r2.test.ts"
+    "v2admin/src/admin-canonical-normal-browser.test.ts",
+    "v2admin/src/admin-sync-client.ts"
   ],
-  "authority_impact": "NONE_ADMIN_REMAINS_CANONICAL",
-  "persistence_impact": "NONE",
+  "authority_impact": "NONE_ADMIN_REMAINS_SOLE_CANONICAL_DATA_AUTHORITY",
+  "persistence_impact": "PRUNE_STALE_LOCAL_SYNC_OUTBOX_AFTER_CANONICAL_READ",
   "provider_impact": "NONE",
   "transaction_impact": "NONE",
   "expected_behavior_change": [
-    "Admin HTML/navigation requests run through the Worker before static asset serving.",
-    "Navigation HTML is served with no-store/no-cache headers and exact source SHA.",
-    "Hashed assets remain on the direct asset path.",
-    "Safari bfcache-restored Admin pages reload once."
+    "Normal Safari with saved browser state removes stale queued publish rows after canonical cloud read.",
+    "Saved local state can no longer overwrite the canonical PUBLISHED status immediately after bootstrap.",
+    "Only a genuinely later explicitly created publish remains queued."
   ],
   "non_goals": [
-    "No Customer/Owner/SMM/SMT change.",
-    "No Admin data model change.",
-    "No polling.",
-    "No provider change."
+    "No Customer, Owner, SMM or SMT changes.",
+    "No cache-header or service-worker changes.",
+    "No Keeta changes.",
+    "No OTA."
   ],
-  "rollback_sha": "cd483bb38ac612689399463b56549505b2bffa86",
+  "rollback_sha": "02b653c6e7406ed9e969145c6c715caeff38fa28",
   "severity": "HARD_BLOCK"
 }

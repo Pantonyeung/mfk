@@ -22,6 +22,13 @@ describe('Admin normal-browser canonical hydration',()=>{
     expect(adminCanonicalHydrationRequired(local,active,sync)).toBe(false);
   });
 
+  it('clears saved outbox rows that are not later than canonical cloud state',()=>{
+    const sync=readFileSync(new URL('./admin-sync-client.ts',import.meta.url),'utf8');
+    expect(sync).toContain('writeOutbox(readOutbox().filter(row=>{');
+    expect(sync).toContain('if(row.fingerprint===active.fingerprint)return false');
+    expect(sync).toContain('rowPublishedAt>activePublishedAt');
+  });
+
   it('does not turn cached release history into a new publish during startup',()=>{
     const sync=readFileSync(new URL('./admin-sync-client.ts',import.meta.url),'utf8');
     const bootstrap=readFileSync(new URL('./AdminCanonicalBootstrap.tsx',import.meta.url),'utf8');
