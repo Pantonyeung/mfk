@@ -725,11 +725,13 @@ test('Owner auth UI is fail-closed before canonical read',()=>{
   assert.match(app,/正式資料未完成身份確認前唔會載入/);
 });
 
-test('Owner read runtime refreshes without enabling bounded mutation transport',()=>{
+test('Owner read runtime revalidates by canonical doorbell without enabling bounded mutation transport',()=>{
   const app=fs.readFileSync(path.join(srcRoot,'App.tsx'),'utf8');
   const cloud=fs.readFileSync(path.join(srcRoot,'cloud-runtime.ts'),'utf8');
-  assert.match(app,/visibilitychange/);
-  assert.match(app,/15000/);
+  assert.match(app,/installMfkCanonicalDoorbell/);
+  assert.match(app,/MFK_CANONICAL_DATA_EVENTS/);
+  assert.doesNotMatch(app,/setInterval\s*\(/);
+  assert.doesNotMatch(app,/visibilitychange/);
   assert.doesNotMatch(cloud,/requestBoundedAction\s*:/);
 });
 
