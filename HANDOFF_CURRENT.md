@@ -1,3 +1,23 @@
+# SYSTEM-WIDE CURRENT AUTHORITY｜2026-09-30｜R2
+
+Parallel Web Client Rebirth:
+`docs/governance/MFK_WEB_CLIENT_PARALLEL_REBIRTH_AUTHORITY_R2_2026-09-30.md`
+
+Root control:
+#596
+
+Implementation strategy:
+- keep current v2 production baseline running
+- stop broad in-place v2 state-architecture migration
+- build isolated V3 web clients in parallel
+- preserve backend / Cloud canonical / SMT / API contracts
+- no production cutover until V3 physical/browser acceptance is GREEN
+
+First slice:
+`v3admin` A0 foundation only, zero production routing.
+
+---
+
 # SYSTEM-WIDE CURRENT AUTHORITY｜2026-09-30
 
 Web/browser state sovereignty:
