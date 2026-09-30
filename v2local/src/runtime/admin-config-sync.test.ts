@@ -118,13 +118,26 @@ describe('SMT full Admin config LKG',()=>{
     expect(readSmtAdminSyncStatus().state).toBe('SYNCED');
   });
 
-  it('is idempotent, rejects same-revision conflicts, and ignores stale snapshots',()=>{
-    const row=envelope(3);
-    expect(applyAdminConfigEnvelope(row).disposition).toBe('APPLIED');
-    expect(applyAdminConfigEnvelope(row).disposition).toBe('IDEMPOTENT');
-    expect(applyAdminConfigEnvelope(envelope(2)).disposition).toBe('STALE');
-    expect(()=>applyAdminConfigEnvelope(envelope(3,'different'))).toThrow('ADMIN_CONFIG_REVISION_CONFLICT');
-    expect(readSmtAdminConfigLkg()?.revision).toBe(3);
+  it('is idempotent and uses canonical publish time rather than diagnostic revision',()=>{
+    const current=createMfkAdminConfigEnvelope({
+      storeId:'MF01',revision:23,publishedAt:'2026-09-29T05:00:00.000Z',adminFingerprint:'admin-r23',
+      snapshot:{catalog:{products:[{id:'OLD'}]}},
+    });
+    const newerWithLowerDiagnosticRevision=createMfkAdminConfigEnvelope({
+      storeId:'MF01',revision:22,publishedAt:'2026-09-29T05:01:00.000Z',adminFingerprint:'admin-r22-newer-time',
+      snapshot:{catalog:{products:[{id:'NEW'}]}},
+    });
+    expect(applyAdminConfigEnvelope(current).disposition).toBe('APPLIED');
+    expect(applyAdminConfigEnvelope(current).disposition).toBe('IDEMPOTENT');
+    expect(applyAdminConfigEnvelope(newerWithLowerDiagnosticRevision).disposition).toBe('APPLIED');
+    expect(readSmtAdminConfigLkg()?.revision).toBe(22);
+    expect(readSmtAdminConfigLkg()?.publishedAt).toBe('2026-09-29T05:01:00.000Z');
+
+    const sameTimeDifferentFingerprint=createMfkAdminConfigEnvelope({
+      storeId:'MF01',revision:99,publishedAt:'2026-09-29T05:01:00.000Z',adminFingerprint:'different',
+      snapshot:{catalog:{products:[{id:'CONFLICT'}]}},
+    });
+    expect(()=>applyAdminConfigEnvelope(sameTimeDifferentFingerprint)).toThrow('ADMIN_CONFIG_PUBLISHED_AT_CONFLICT');
   });
 
   it('projects remaining low-risk Admin operational settings into SMT consumers',()=>{
@@ -195,33 +208,32 @@ describe('SMT full Admin config LKG',()=>{
     )).toEqual({p1:'soldout',p2:'paused'});
   });
 
-  it('rejects a late replay whose canonical publishedAt is older than the active release',()=>{
-    const r11=createMfkAdminConfigEnvelope({
-      storeId:'MF01',revision:11,publishedAt:'2026-09-29T03:00:00.000Z',adminFingerprint:'admin-r11',
+  it('rejects a late replay by canonical publishedAt even when revision numbers disagree',()=>{
+    const earlier=createMfkAdminConfigEnvelope({
+      storeId:'MF01',revision:900,publishedAt:'2026-09-29T03:00:00.000Z',adminFingerprint:'admin-earlier',
       snapshot:{catalog:{products:[]}},
     });
-    const r12=createMfkAdminConfigEnvelope({
-      storeId:'MF01',revision:12,publishedAt:'2026-09-29T04:00:00.000Z',adminFingerprint:'admin-r12',
+    const current=createMfkAdminConfigEnvelope({
+      storeId:'MF01',revision:2,publishedAt:'2026-09-29T04:00:00.000Z',adminFingerprint:'admin-current',
       snapshot:{catalog:{products:[]}},
     });
-    expect(applyAdminConfigEnvelope(r11).disposition).toBe('APPLIED');
-    expect(applyAdminConfigEnvelope(r12).disposition).toBe('APPLIED');
-    expect(applyAdminConfigEnvelope(r11)).toMatchObject({disposition:'STALE',revision:12});
-    expect(readSmtAdminConfigLkg()?.revision).toBe(12);
+    expect(applyAdminConfigEnvelope(earlier).disposition).toBe('APPLIED');
+    expect(applyAdminConfigEnvelope(current).disposition).toBe('APPLIED');
+    expect(applyAdminConfigEnvelope(earlier)).toMatchObject({disposition:'STALE',revision:2});
     expect(readSmtAdminConfigLkg()?.publishedAt).toBe('2026-09-29T04:00:00.000Z');
   });
 
-  it('rejects a numerically newer revision carrying an older canonical publish time',()=>{
+  it('rejects an older canonical publish time even if its diagnostic revision is numerically newer',()=>{
     const current=createMfkAdminConfigEnvelope({
       storeId:'MF01',revision:20,publishedAt:'2026-09-29T05:00:00.000Z',adminFingerprint:'admin-r20',
       snapshot:{catalog:{products:[]}},
     });
-    const impossible=createMfkAdminConfigEnvelope({
-      storeId:'MF01',revision:21,publishedAt:'2026-09-29T04:59:59.000Z',adminFingerprint:'admin-r21',
+    const lateReplay=createMfkAdminConfigEnvelope({
+      storeId:'MF01',revision:999,publishedAt:'2026-09-29T04:59:59.000Z',adminFingerprint:'admin-late-replay',
       snapshot:{catalog:{products:[]}},
     });
     expect(applyAdminConfigEnvelope(current).disposition).toBe('APPLIED');
-    expect(applyAdminConfigEnvelope(impossible)).toMatchObject({disposition:'STALE',revision:20});
+    expect(applyAdminConfigEnvelope(lateReplay)).toMatchObject({disposition:'STALE',revision:20});
   });
 
 });
