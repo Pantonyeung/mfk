@@ -44,7 +44,7 @@ describe('Admin realtime transport recovery',()=>{
     expect(JSON.parse(sent[0]!)).toMatchObject({type:'ADMIN_CONFIG_AVAILABLE',storeId:'MF01',revision:42});
   });
 
-  it('accepts a newer publish time even when the diagnostic revision goes backwards',async()=>{
+  it('accepts every formal publish by Cloud Hong Kong time even when R goes 23 → 6',async()=>{
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-09-30T01:00:00.000Z'));
     const values=new Map<string,unknown>();
@@ -53,36 +53,63 @@ describe('Admin realtime transport recovery',()=>{
       storage:{
         get:vi.fn(async(key:string)=>values.get(key)),
         put:vi.fn(async(key:string,value:unknown)=>{values.set(key,value);}),
+        list:vi.fn(async({prefix}:{prefix:string})=>new Map([...values].filter(([key])=>key.startsWith(prefix)))),
       },
       getWebSockets:()=>[{send:(message:string)=>sent.push(message)}],
     };
     const store=new AdminSyncStore(state,{});
-    const oldEnvelope=createMfkAdminConfigEnvelope({
-      storeId:'MF01',revision:23,publishedAt:'2026-09-30T00:00:00.000Z',adminFingerprint:'admin-old',
-      snapshot:{catalog:{products:[{id:'old'}]}},
+
+    const r23=createMfkAdminConfigEnvelope({
+      storeId:'MF01',revision:23,publishedAt:'2020-01-01T00:00:00.000Z',adminFingerprint:'content-r23',
+      snapshot:{catalog:{products:[{id:'r23'}]}},
     });
-    const oldResult=await store.publishEnvelope(oldEnvelope);
-    expect(oldResult.status).toBe(200);
-    expect(oldResult.body).toMatchObject({state:'PUBLISHED',cloudPublishedAt:'2026-09-30T01:00:00.000Z'});
+    const first=await store.publishEnvelope(r23);
+    expect(first.status).toBe(200);
+    expect(first.body).toMatchObject({
+      state:'PUBLISHED',
+      cloudPublishedAt:'2026-09-30T09:00:00.000+08:00',
+      active:{revision:23,publishedAt:'2026-09-30T09:00:00.000+08:00',adminFingerprint:'content-r23'},
+      publishRequestFingerprint:r23.fingerprint,
+    });
 
     vi.setSystemTime(new Date('2026-09-30T01:01:00.000Z'));
-    const newerEnvelope=createMfkAdminConfigEnvelope({
-      storeId:'MF01',revision:22,publishedAt:'2026-09-30T00:30:00.000Z',adminFingerprint:'admin-new',
-      snapshot:{catalog:{products:[{id:'new'}]}},
+    const r6=createMfkAdminConfigEnvelope({
+      storeId:'MF01',revision:6,publishedAt:'2010-01-01T00:00:00.000Z',adminFingerprint:'content-r6',
+      snapshot:{catalog:{products:[{id:'r6'}]}},
     });
-    const newerResult=await store.publishEnvelope(newerEnvelope);
-    expect(newerResult.status).toBe(200);
-    expect(newerResult.body).toMatchObject({
+    const second=await store.publishEnvelope(r6);
+    expect(second.status).toBe(200);
+    expect(second.body).toMatchObject({
       state:'PUBLISHED',
-      cloudPublishedAt:'2026-09-30T01:01:00.000Z',
-      active:{revision:22,publishedAt:'2026-09-30T00:30:00.000Z',adminFingerprint:'admin-new'},
+      cloudPublishedAt:'2026-09-30T09:01:00.000+08:00',
+      active:{revision:6,publishedAt:'2026-09-30T09:01:00.000+08:00',adminFingerprint:'content-r6'},
+      publishRequestFingerprint:r6.fingerprint,
     });
-    expect(JSON.parse(sent.at(-1)!)).toMatchObject({type:'ADMIN_CONFIG_AVAILABLE',revision:22,publishedAt:'2026-09-30T00:30:00.000Z'});
+    expect(JSON.parse(sent.at(-1)!)).toMatchObject({
+      type:'ADMIN_CONFIG_AVAILABLE',
+      revision:6,
+      publishedAt:'2026-09-30T09:01:00.000+08:00',
+    });
 
     vi.setSystemTime(new Date('2026-09-30T01:02:00.000Z'));
-    const retry=await store.publishEnvelope(newerEnvelope);
-    expect(retry.body).toMatchObject({state:'IDEMPOTENT',cloudPublishedAt:'2026-09-30T01:01:00.000Z'});
+    const retry=await store.publishEnvelope(r6);
+    expect(retry.body).toMatchObject({
+      state:'IDEMPOTENT',
+      cloudPublishedAt:'2026-09-30T09:01:00.000+08:00',
+      publishRequestFingerprint:r6.fingerprint,
+    });
     expect(sent).toHaveLength(2);
+
+    const history=await store.fetch(new Request(
+      'https://internal/published-since?after='+encodeURIComponent('2026-09-30T08:59:00.000+08:00'),
+      {method:'GET'},
+    ));
+    expect(history.status).toBe(200);
+    const body=await history.json() as {items?:Array<{revision:number;publishedAt:string}>};
+    expect(body.items?.map(row=>[row.revision,row.publishedAt])).toEqual([
+      [23,'2026-09-30T09:00:00.000+08:00'],
+      [6,'2026-09-30T09:01:00.000+08:00'],
+    ]);
   });
 
   it('keeps active HTTP response wrapping and CORS behavior',async()=>{
@@ -103,7 +130,7 @@ describe('Admin realtime transport recovery',()=>{
     expect(messageHandler).toContain("row.type==='ADMIN_CONFIG_AVAILABLE'");
     expect(messageHandler).toContain('void fetchAndApplyAdminConfig()');
     expect(messageHandler).not.toContain('Number(row.revision)>current.revision');
-    expect(messageHandler).not.toContain("Date.parse(String(row.publishedAt||''))");
+    expect(messageHandler).not.toContain('revision>');
     expect(messageHandler).not.toMatch(/location\.reload|location\.replace/);
   });
 
