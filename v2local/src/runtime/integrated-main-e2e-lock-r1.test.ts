@@ -9,15 +9,19 @@ const root=path.resolve(here,'..');
 const read=(relative:string)=>fs.readFileSync(path.join(root,relative),'utf8');
 
 describe('2026-09-26 integrated main E2E preservation lock',()=>{
-  it('preserves Web SMT acceptance isolation while production SMT keeps Customer and Keeta consumers',()=>{
+  it('keeps public SMT as a non-transactional mirror while physical SMT keeps Customer and Keeta consumers',()=>{
     const main=read('main.tsx');
-    expect(main).toContain('const webAcceptance=isSmtWebAcceptance()');
-    expect(main).toContain('if(!webAcceptance){');
+    const worker=read('../public-mirror-worker.ts');
+    expect(main).toContain('const publicMirror=isSmtPublicMirror()');
+    expect(main).toContain('if(!publicMirror){');
     expect(main).toContain('installKeetaOrderIntake()');
     expect(main).toContain('installKeetaOrderLifecycle()');
     expect(main).toContain('installKeetaAfterSales()');
     expect(main).toContain('installCustomerCloudBridge()');
-    expect(main).toContain('if(webAcceptance)installSmmWebAcceptanceIntake(smmLanIngress)');
+    expect(main).not.toContain('installSmmWebAcceptanceIntake');
+    expect(worker).toContain("mode:'PUBLIC_MIRROR'");
+    expect(worker).toContain('transactionAuthority:false');
+    expect(worker).toContain('physicalPrint:false');
   });
 
   it('preserves Customer to SMT revision, pricing, evidence, canonical order and readback semantics',()=>{
