@@ -32,15 +32,19 @@ test('UI0 uses supplied male/female IP sheets, 50:50 selection and exact storybo
   assert.ok(overlay.includes("mode==='reduced'?120:mode==='returning'?700:2500"));
 });
 
-test('UI1 uses a purpose-built hero without embedding mockup copy or inventing product media',()=>{
+test('UI1 Phase A is a true skeleton with measurable replaceable asset slots',()=>{
   const home=read('src/stage1/Stage1Home.tsx');
   const css=read('src/stage1/stage1.css');
-  assert.ok(home.includes("'/brand/mf-home-storefront-hero-v1.jpg'"));
-  assert.equal(fs.existsSync(path.join(root,'public/brand/mf-home-storefront-hero-v1.jpg')),true);
-  assert.doesNotMatch(home,/CUSTOMER_FINAL_SOURCE\.stage1Final|stage1-source-crop|stage1-shortcut-source/);
-  assert.match(home,/item\.product\.imageUrl[\s\S]*?stage1-product-placeholder/);
-  assert.doesNotMatch(home,/飯團\|紫米|沙律\|蔬菜\|輕食/);
-  assert.ok(css.includes('aspect-ratio:3/2'));
+  assert.ok(home.includes('data-ui-phase="SKELETON"'));
+  for(const slot of[
+    'HERO_BG_SLOT','HERO_IP_SLOT','HERO_FOOD_SLOT','HERO_COPY_SAFE_AREA',
+    'ANNOUNCEMENT_ICON_SLOT','MEMORY_TICKET_ICON_SLOT','FREQUENT_ICON_SLOT',
+    'LIMITED_ICON_SLOT','TOP6_PRODUCT_IMAGE_SLOT','TOP6_PRODUCT_TEXT_SLOT',
+  ])assert.ok(home.includes(slot),slot);
+  assert.doesNotMatch(home,/mf-home-storefront-hero-v1|<img[^>]+item\.product\.imageUrl|CUSTOMER_FINAL_SOURCE\.stage1Final/);
+  assert.match(css,/\.stage1-hero-frame[\s\S]*?aspect-ratio:16\/9/);
+  assert.match(css,/\.stage1-hero-ip-slot[\s\S]*?width:34%/);
+  assert.match(css,/\.stage1-hero-food-slot[\s\S]*?width:34%/);
 });
 
 test('UI2 keeps canonical product media and FINAL zero-result female IP repair',()=>{
