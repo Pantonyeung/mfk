@@ -97,7 +97,7 @@ Branch:
 
 PR:
 
-`A1 PR pending creation`
+`#599`
 
 A0 is merged to Main at `f826598f0517229b94c7e817c642e808dc515cc3` with zero production routing.
 
