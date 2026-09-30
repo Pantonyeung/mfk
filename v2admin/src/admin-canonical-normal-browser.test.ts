@@ -35,10 +35,11 @@ describe('Admin normal-browser canonical hydration',()=>{
     expect(shell).toContain('readAdminRuntimeSourceSha');
     expect(shell).toContain('data-admin-runtime-diag="R4"');
     expect(sync).toContain("/api/health?adminRuntimeDiagnostic=R4");
-    expect(shell).toContain("' · Q'+diagnostic.outboxCount");
+    expect(shell).toContain("' Q'+diagnostic.outboxCount+' C'+canonical");
     expect(sync).toContain('readAdminSyncDiagnosticSnapshot');
     expect(sync).toContain("'canonical-hydrated.v1'");
     expect(sync).toContain('outboxCount:outbox.length');
+    expect(shell).toContain('className="mfk-admin-sync-detail"');
   });
 
   it('does not turn cached release history into a new publish during startup',()=>{
