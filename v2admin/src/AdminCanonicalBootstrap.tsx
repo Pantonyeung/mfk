@@ -39,7 +39,14 @@ export function AdminCanonicalBootstrap({children}:{children:ReactNode}){
           try{
             const active=await readCanonicalAdminActive();
             if(cancelled)return;
-            if(!local||local.version!==active.revision||sync.state==='ERROR')hydrateAdminFromCanonical(active);
+            const localPublishPending=Boolean(local)&&(
+              sync.state!=='PUBLISHED'||sync.adminFingerprint!==local?.fingerprint
+            );
+            if(!local)hydrateAdminFromCanonical(active);
+            else if(!localPublishPending&&(
+              local.fingerprint!==active.adminFingerprint||
+              Date.parse(local.createdAt)!==Date.parse(active.publishedAt)
+            ))hydrateAdminFromCanonical(active);
             activate();
             return;
           }catch{
@@ -51,9 +58,14 @@ export function AdminCanonicalBootstrap({children}:{children:ReactNode}){
       const publisherActive=await readCanonicalAdminActiveWithPublisherKey();
       if(cancelled)return;
       if(publisherActive){
-        if(!local||local.version!==publisherActive.revision||local.fingerprint!==publisherActive.adminFingerprint||sync.state==='ERROR'){
-          hydrateAdminFromCanonical(publisherActive);
-        }
+        const localPublishPending=Boolean(local)&&(
+          sync.state!=='PUBLISHED'||sync.adminFingerprint!==local?.fingerprint
+        );
+        if(!local)hydrateAdminFromCanonical(publisherActive);
+        else if(!localPublishPending&&(
+          local.fingerprint!==publisherActive.adminFingerprint||
+          Date.parse(local.createdAt)!==Date.parse(publisherActive.publishedAt)
+        ))hydrateAdminFromCanonical(publisherActive);
         activate();
         return;
       }
