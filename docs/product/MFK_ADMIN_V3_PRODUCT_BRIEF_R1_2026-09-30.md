@@ -11038,3 +11038,552 @@ Status：**LOCKED**
 
 MILESTONE:
 MFK_ADMIN_V3_COMPONENT_CONTRACT_AUDIT_BATCH2_LOCKED
+
+---
+
+# 63. 共用介面元件規格盤點 V1｜Batch 3：互動狀態 / 動畫 / 鍵盤 / Focus / Selection / Hover / Drag / Loading
+
+本輪鎖「操作手感」。
+
+核心原則：
+**視覺一致唔夠；同一操作喺全產品要有一致反應時間、Focus、鍵盤、選取、拖放同 loading 行為。**
+
+---
+
+# 63.1 Button 狀態
+
+所有 Button 統一狀態：
+
+- Default
+- Hover（有 hover 裝置先用）
+- Focus-visible
+- Pressed / Active
+- Disabled
+- Submitting
+
+Submitting：
+- 保留原 Button label 語義
+- 可以加 spinner
+- 禁止 layout shift
+- 禁止同一操作再次 click
+
+例：
+「確認暫停 Keeta 接單」
+→ submitting 時：
+「正在暫停…」
+
+唔好：
+Button 文字突然變「Loading」。
+
+Disabled 必須有實際原因；
+如果因 permission / validation：
+附近要有可理解提示。
+
+Status：**LOCKED**
+
+---
+
+# 63.2 Hover 規則
+
+Hover 只係輔助，
+唔可以承載唯一資訊。
+
+可以用：
+- row highlight
+- button emphasis
+- tooltip
+- secondary action reveal（只限 Desktop 輔助）
+
+禁止：
+- 只有 hover 先見 Edit
+- 只有 hover 先見 status meaning
+- 只有 hover 先見 critical action
+
+Touch device 無 hover，
+所有核心操作仍然可見／可到達。
+
+Status：**LOCKED**
+
+---
+
+# 63.3 Focus 規則
+
+鍵盤操作必須清楚。
+
+Focus：
+- 只喺 keyboard navigation 顯明顯 focus ring
+- focus ring 唔靠 subtle shadow
+- sticky bar / modal 唔遮住 focused control
+
+頁面進入：
+- 正常 route：focus 到 Page title / main landmark
+- Modal 打開：focus 入 modal 第一合理 control
+- Modal 關閉：focus 返回觸發按鈕
+- Drawer 關閉：focus 返回 Menu button / 原 trigger
+
+Validation error：
+提交失敗後：
+- focus 去第一個 invalid field
+或
+- error summary，並可跳 field
+
+Status：**LOCKED**
+
+---
+
+# 63.4 Keyboard 導航
+
+所有 Desktop / Laptop core workflow：
+- Tab / Shift+Tab 可完整走完
+- Enter / Space 操作 Button / checkbox
+- Escape 關閉 modal / drawer / sheet（非 destructive confirm 中合理時）
+- Arrow keys 可用於 tabs / menu / radio 等標準元件
+
+Global Search shortcut：
+可以支援 Command/Ctrl + K，
+但唔可以只靠 shortcut。
+
+Bulk selection：
+checkbox 可 keyboard 操作。
+
+Drag-only 功能：
+一定要有非 drag 替代。
+
+Status：**LOCKED**
+
+---
+
+# 63.5 Row / Card 點擊區
+
+如果整行可點：
+- row 本身有明確 hover / focus
+- row 內 Button / checkbox 唔觸發 row navigation
+- keyboard Enter 可入 Detail
+
+禁止：
+- row 每個位置都意外觸發
+- checkbox click 同時開 Detail
+- nested interactive element focus order 混亂
+
+Mobile card：
+- card 可 tap 入 Detail
+- danger action唔放整卡 click
+
+Status：**LOCKED**
+
+---
+
+# 63.6 Selection 視覺
+
+多選模式：
+- selected row / card 要有清楚背景／border + checkbox
+- 唔只靠 color
+- header 顯「已選 X 項」
+
+切 filter / store / scope：
+如 selection 會失效：
+- 明示清除
+或
+- 要求確認
+
+選取狀態唔可以同「current row」或「active row」視覺混淆。
+
+Status：**LOCKED**
+
+---
+
+# 63.7 Drag & Drop
+
+Drag 可以用於：
+- Category order
+- Product order
+- Option order
+- Template / rule ordering（如正式支援）
+
+Drag 需要：
+- 可見 drag handle
+- dragging state
+- drop target
+- invalid target feedback
+
+禁止：
+- 整行任何地方都可拖，影響正常 scroll / click
+- drag 完即 Published
+- 無 keyboard 替代
+
+Keyboard / non-drag 替代：
+- 上移
+- 下移
+- 移至指定位置
+
+Mobile：
+預設用 explicit move control，
+drag 只可輔助。
+
+Status：**LOCKED**
+
+---
+
+# 63.8 Animation / Motion
+
+動畫只服務：
+- 告知位置變化
+- 告知 layer 開關
+- 告知 item reorder
+- 告知 feedback
+
+建議：
+- hover / small state：100–150ms
+- drawer / sheet / modal：150–250ms
+- reorder / list transition：150–250ms
+
+禁止：
+- 500ms+ 花巧 transition 阻工作
+- KPI number 滾數字 animation
+- 每次 page load 大 fade-in
+- 成功後 confetti / celebration
+- loading skeleton shimmer 過度搶眼
+
+Reduced Motion：
+尊重 system preference，
+必要 animation 降低／關閉。
+
+Status：**LOCKED**
+
+---
+
+# 63.9 Route Transition
+
+頁面切換：
+- Shell / Sidebar 保持穩定
+- Main content 可以即時換 skeleton / retained data
+- 唔整全頁白屏
+- 唔每次 route 都重畫 Sidebar
+
+同 domain 切細 Menu：
+- active state 即時更新
+- content loading 唔影響 nav 可用
+
+Detail → Detail：
+例如搜尋結果切另一 Product，
+Header / content 更新清楚，
+唔保留上一件 object 嘅 stale title。
+
+Status：**LOCKED**
+
+---
+
+# 63.10 Loading 行為
+
+分四類：
+
+## Initial Load
+- Shell 先出
+- Header skeleton / content skeleton
+- 禁止顯 0 / empty
+
+## Background Refresh
+- 保留舊成功資料
+- 小型「更新中」
+- 禁止整頁 spinner
+
+## Action Submitting
+- 鎖定該 action
+- 其他安全 navigation 可保留
+- 顯 submitting state
+
+## Long-running / Async
+例如：
+- Publish
+- Export
+- OTA
+- Reconcile
+
+要顯：
+- current stage
+- last update
+- 可以安全離頁與否
+- 返回後點恢復狀態
+
+Status：**LOCKED**
+
+---
+
+# 63.11 Progress Indicator
+
+只喺真正有 stage / progress 語義先用。
+
+可以：
+- Publish workflow stepper
+- Export generating
+- OTA rollout progress（有正式 denominator）
+- Bulk operation result
+
+禁止：
+- 無真 denominator 嘅假 73%
+- polling 次數冒充 progress
+- spinner 轉咗幾耐冒充 completion
+
+如果只知「處理中」：
+顯 indeterminate state。
+
+Status：**LOCKED**
+
+---
+
+# 63.12 Optimistic UI
+
+默認：
+**高風險 mutation 禁止 optimistic success。**
+
+可以 optimistic 嘅只限：
+- 低風險 UI preference
+- local view preference
+- 收藏 / 最近使用
+- 部分可安全 rollback 嘅非業務設定（按正式 contract）
+
+不可 optimistic：
+- Refund
+- Cancel
+- Sellability runtime
+- Publish
+- Rollback
+- OTA
+- Revoke
+- Cash / Close
+- Platform Pause
+- Print recovery
+
+呢啲一定等 readback。
+
+Status：**LOCKED**
+
+---
+
+# 63.13 Tooltip
+
+Tooltip 只用於：
+- icon-only button 解釋
+- 簡短名詞補充
+- truncated value
+
+禁止：
+- 放 critical instruction
+- 放唯一 error meaning
+- 放 required field requirement
+- 放 danger impact
+
+Mobile 無 hover，
+所以 tooltip 唔可以係唯一資訊。
+
+Status：**LOCKED**
+
+---
+
+# 63.14 Copy on interaction
+
+互動時文字規則：
+
+Hover：
+唔改核心 label。
+
+Submitting：
+「正在＋動作」
+
+Pending：
+「已送出 · 等待確認」
+
+Unknown：
+「結果未明 · 正在重新確認」
+
+Confirmed：
+「已確認」
+
+Failed：
+「操作失敗」
+
+Conflict：
+「資料已更新 · 請重新讀取後再套用」
+
+同一 state 全系統一致。
+
+Status：**LOCKED**
+
+---
+
+# 63.15 Inline Edit
+
+R1 預設：
+唔將大型 List 變 spreadsheet。
+
+可以 inline edit：
+- 簡單 order / position
+- small toggle（只係 Draft config 且風險低）
+- 簡單 label（按 domain）
+
+唔適合 inline：
+- 價格高風險 bulk
+- Permission
+- Refund
+- Platform auth
+- Printer routing complex rule
+- Role scope complex edit
+
+Inline edit：
+- Enter / click edit
+- Save / Cancel 明確
+- conflict 明示
+- keyboard 可完成
+
+Status：**LOCKED**
+
+---
+
+# 63.16 Toggle
+
+Toggle 只用於：
+**明確二元、低認知成本設定。**
+
+例如：
+- Active
+- Feature enabled（真二元）
+
+唔用 Toggle：
+- Pause / Busy / Closed / Provider suspended
+- Publish state
+- Payment state
+- Order status
+- Sync health
+
+如果 ON/OFF 有重大即時 side effect：
+要用 Confirm action，
+唔係裸 toggle。
+
+Status：**LOCKED**
+
+---
+
+# 63.17 Context Menu / Overflow
+
+Overflow menu 用於：
+- 次要操作
+- rare action
+- danger action
+
+唔用於：
+- Primary CTA
+- 主要 Edit
+- 主要「處理」
+- 使用者每次都要搵嘅功能
+
+Overflow item：
+- 動詞清楚
+- danger item 分區
+- keyboard 可操作
+
+Status：**LOCKED**
+
+---
+
+# 63.18 Notification / Badge
+
+紅點 / badge 只顯：
+- meaningful unread / attention count
+
+禁止：
+- 所有 warning 都變紅點
+- 每個 Menu 都有 badge
+- count 無法解釋來源
+
+Menu badge 點入：
+應該直達可處理 List / Saved View，
+唔去 generic dashboard。
+
+Status：**LOCKED**
+
+---
+
+# 63.19 Scroll 行為
+
+List：
+- 返回 Detail 後保留 scroll anchor
+
+Modal / Drawer：
+- 背景 scroll lock
+- close 後回原位置
+
+Table：
+- header 可 sticky
+- horizontal scroll 只限真係 unavoidable 嘅 Desktop wide data
+- Mobile 禁依賴 horizontal table
+
+Form validation：
+- scroll/focus 去第一 invalid field
+
+Status：**LOCKED**
+
+---
+
+# 63.20 Auto-refresh
+
+Auto-refresh 只用 read data。
+
+規則：
+- 保留舊成功資料
+- 唔搶 focus
+- 唔關 modal
+- 唔重置 form
+- 唔跳 scroll
+- 唔清 selection
+
+如果 canonical update 令目前 edit conflict：
+顯 Conflict，
+唔 silent overwrite。
+
+Status：**LOCKED**
+
+---
+
+# 63.21 Batch 3 結果
+
+本輪鎖：
+1. Button states
+2. Hover
+3. Focus
+4. Keyboard
+5. Row/Card click behavior
+6. Selection
+7. Drag & Drop
+8. Animation / Motion
+9. Route transition
+10. Loading modes
+11. Progress
+12. Optimistic UI
+13. Tooltip
+14. Interaction copy
+15. Inline edit
+16. Toggle
+17. Overflow menu
+18. Notification / badge
+19. Scroll
+20. Auto-refresh
+
+結果：
+- **20 LOCKED**
+- **0 YELLOW**
+- **0 RED**
+
+下一輪：
+**文字與術語一致性盤點 Batch 1**
+
+會鎖：
+- 中文正式名稱
+- 狀態字典
+- Button 動詞
+- Page title
+- Save / Draft / Publish / Applied
+- Error / Unknown / Stale
+- Platform / Order / Payment / Print 等核心術語
+
+MILESTONE:
+MFK_ADMIN_V3_COMPONENT_CONTRACT_AUDIT_BATCH3_LOCKED
