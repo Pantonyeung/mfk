@@ -3,7 +3,9 @@ import {createMfkAdminConfigEnvelope} from '../../../contracts/admin-config-sync
 import {
   SMT_ADMIN_CONFIG_LKG_KEY,
   SMT_ADMIN_CONFIG_STATUS_KEY,
+  SMT_ADMIN_TIME_FIRST_CUTOVER_KEY,
   applyAdminConfigEnvelope,
+  clearLegacySmtAdminConfigForTimeFirstCutover,
   readSmtAdminConfigLkg,
   readSmtAdminSyncStatus,
 } from './admin-config-sync.ts';
@@ -118,7 +120,7 @@ describe('SMT full Admin config LKG',()=>{
     expect(readSmtAdminSyncStatus().state).toBe('SYNCED');
   });
 
-  it('is idempotent, rejects same-revision conflicts, and ignores stale snapshots',()=>{
+  it('is idempotent, rejects same-time conflicts, and ignores older publish times',()=>{
     const row=envelope(3);
     expect(applyAdminConfigEnvelope(row).disposition).toBe('APPLIED');
     expect(applyAdminConfigEnvelope(row).disposition).toBe('IDEMPOTENT');
@@ -237,6 +239,26 @@ describe('SMT full Admin config LKG',()=>{
     expect(applyAdminConfigEnvelope(newer)).toMatchObject({disposition:'APPLIED',revision:22});
     expect(readSmtAdminConfigLkg()?.publishedAt).toBe('2026-09-29T06:00:00.000Z');
     expect((readSmtAdminConfigLkg()?.snapshot.catalog as {products?:{id:string}[]}).products?.[0]?.id).toBe('new');
+  });
+
+  it('clears the legacy SMT Admin LKG exactly once without touching transaction storage',()=>{
+    const old=createMfkAdminConfigEnvelope({
+      storeId:'MF01',revision:23,publishedAt:'2026-09-29T05:00:00.000Z',adminFingerprint:'admin-r23',
+      snapshot:{catalog:{products:[{id:'old'}]}},
+    });
+    localStorage.setItem(SMT_ADMIN_CONFIG_LKG_KEY,JSON.stringify(old));
+    localStorage.setItem(SMT_ADMIN_CONFIG_STATUS_KEY,JSON.stringify({state:'SYNCED',revision:23,fingerprint:old.fingerprint,updatedAt:old.publishedAt}));
+    localStorage.setItem('mfk.v2local.runtime.v1',JSON.stringify({orders:[{id:'ORDER-1'}],holds:[],availability:{}}));
+
+    expect(clearLegacySmtAdminConfigForTimeFirstCutover()).toBe(true);
+    expect(localStorage.getItem(SMT_ADMIN_CONFIG_LKG_KEY)).toBeNull();
+    expect(localStorage.getItem(SMT_ADMIN_CONFIG_STATUS_KEY)).toBeNull();
+    expect(localStorage.getItem('mfk.v2local.runtime.v1')).toContain('ORDER-1');
+    expect(localStorage.getItem(SMT_ADMIN_TIME_FIRST_CUTOVER_KEY)).toContain('admin-r23');
+
+    localStorage.setItem(SMT_ADMIN_CONFIG_LKG_KEY,JSON.stringify(old));
+    expect(clearLegacySmtAdminConfigForTimeFirstCutover()).toBe(false);
+    expect(localStorage.getItem(SMT_ADMIN_CONFIG_LKG_KEY)).not.toBeNull();
   });
 
 });
