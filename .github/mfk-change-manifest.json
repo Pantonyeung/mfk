@@ -1,43 +1,36 @@
 {
   "version": 1,
-  "capability": "MFK_ADMIN_SMT_CANONICAL_CLOCK_R2",
-  "base_sha": "17cd0798e468071429c68675783de3faefdaf38c",
+  "capability": "MFK_BROWSER_FRESHNESS_AND_DOORBELL_R1",
+  "base_sha": "9d5384ca450f2220ebd027ec31c2e962e640b926",
   "allowed_paths": [
     ".github/mfk-change-manifest.json",
-    "contracts/admin-config-sync-v1.ts",
     "v2admin/worker.ts",
-    "v2admin/src/admin-sync-client.ts",
+    "v2admin/src/main.tsx",
+    "v2admin/src/admin-browser-cache-policy.test.ts",
     "v2admin/src/admin-sync-websocket-transport.test.ts",
-    "v2admin/src/admin-cloud-publish-time-first.test.ts",
-    "v2admin/src/AdminShell.tsx",
-    "v2admin/src/admin-ui-recomposition.test.tsx",
     "v2local/src/runtime/admin-config-sync.ts",
-    "v2local/src/runtime/admin-config-sync.test.ts",
-    "v2local/src/presentation/LocalAdminMenuWorkspace.tsx",
-    "v2local/src/presentation/smt-admin-sync-ui.test.tsx",
-    "v2local/src/App.tsx"
+    "v2local/src/runtime/projection-outbox.ts",
+    "v2local/src/runtime/projection-outbox.test.ts"
   ],
-  "authority_impact": "ADMIN_SOLE_CANONICAL_CONFIG_AUTHORITY_ENFORCED",
-  "persistence_impact": "EXISTING_ADMIN_OUTBOX_SMT_LKG_AND_PUBLISH_RECEIPTS_ONLY_NO_SCHEMA_MIGRATION",
+  "authority_impact": "NONE_ADMIN_REMAINS_SOLE_CANONICAL_CONFIG_AUTHORITY",
+  "persistence_impact": "NONE_NO_SCHEMA_OR_DATA_MIGRATION",
   "provider_impact": "NONE",
   "transaction_impact": "NONE",
   "expected_behavior_change": [
-    "Every distinct formal Admin publish is assigned a strictly increasing Cloud canonical publish time.",
-    "Admin outbox delivers every queued formal publish oldest to newest instead of collapsing to one revision.",
-    "Rxx/revision remains diagnostic metadata only and never decides freshness.",
-    "Every ADMIN_CONFIG_AVAILABLE notification forces SMT to pull the same canonical Admin endpoint.",
-    "SMT atomically applies canonical Admin data by publishedAt plus fingerprint and keeps existing local LKG until a newer canonical publish arrives.",
-    "SMT ACK identifies the exact canonical fingerprint and publishedAt that was applied.",
-    "Admin and SMT human-facing status use publish/apply/readback time vocabulary instead of Rxx truth.",
-    "Reconnect, focus, pageshow and visibility recovery reuse the same canonical pull path without interval polling."
+    "Admin HTML shell is always no-store/no-cache so normal Safari/browser sessions load the current deployed app without private mode or manual cache clearing.",
+    "Safari back-forward-cache restore reloads the Admin shell once instead of reviving stale code.",
+    "Hashed Vite assets remain immutable.",
+    "SMT keeps a passive WebSocket doorbell listener but does not self-pull on focus/pageshow/visibility changes.",
+    "Every Admin doorbell triggers one canonical pull; reconnect triggers one catch-up pull for missed doorbells.",
+    "SMT outbound projection sends immediately when new facts are enqueued, plus one startup/online backlog retry; no focus/config-change polling."
   ],
   "non_goals": [
-    "No second config authority.",
-    "No second sync engine.",
-    "No interval polling loop.",
-    "No Order, Pricing, Payment, Print, Keeta, Customer, SMM or Owner authority change.",
-    "No destructive local data reset."
+    "No second authority.",
+    "No interval polling.",
+    "No Order, Pricing, Payment, Print, Keeta, Customer, SMM or Owner semantic change.",
+    "No destructive cache clearing or localStorage reset.",
+    "No service worker introduced for Admin."
   ],
-  "rollback_sha": "17cd0798e468071429c68675783de3faefdaf38c",
+  "rollback_sha": "9d5384ca450f2220ebd027ec31c2e962e640b926",
   "severity": "HARD_BLOCK"
 }
