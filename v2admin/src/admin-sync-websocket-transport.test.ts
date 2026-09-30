@@ -1,5 +1,6 @@
 import {afterEach,describe,expect,it,vi} from 'vitest';
 import {AdminSyncStore,adminSyncOuterResponse} from '../worker.ts';
+import {createMfkAdminConfigEnvelope} from '../../contracts/admin-config-sync-v1.ts';
 import {readFileSync} from 'node:fs';
 
 const NativeResponse=globalThis.Response;
@@ -42,6 +43,79 @@ describe('Admin realtime transport recovery',()=>{
     expect(JSON.parse(sent[0]!)).toMatchObject({type:'ADMIN_CONFIG_AVAILABLE',storeId:'MF01',revision:42});
   });
 
+  it('makes Cloudflare the canonical publish sequencer instead of trusting browser-local Rxx',async()=>{
+    const values=new Map<string,unknown>();
+    const old=createMfkAdminConfigEnvelope({
+      storeId:'MF01',
+      revision:23,
+      publishedAt:'2026-09-29T10:00:00.000Z',
+      adminFingerprint:'admin-old',
+      snapshot:{catalog:{products:[{id:'OLD'}]}},
+    });
+    values.set('active',old);
+    values.set('activeMeta',{acceptedAt:'2026-09-29T10:00:00.500Z'});
+    const sent:string[]=[];
+    const state={
+      storage:{
+        get:vi.fn(async(key:string)=>values.get(key)),
+        put:vi.fn(async(key:string,value:unknown)=>{values.set(key,value);}),
+      },
+      getWebSockets:()=>[{send:(message:string)=>sent.push(message)}],
+    };
+    const store=new AdminSyncStore(state,{});
+    const fromStaleBrowser=createMfkAdminConfigEnvelope({
+      storeId:'MF01',
+      revision:22,
+      publishedAt:'2026-09-29T09:59:00.000Z',
+      adminFingerprint:'admin-new-data',
+      snapshot:{catalog:{products:[{id:'NEW'}]}},
+    });
+
+    const result:any=await store.publishEnvelope(fromStaleBrowser);
+    const active:any=result.body.active;
+
+    expect(result.status).toBe(200);
+    expect(result.body.state).toBe('PUBLISHED');
+    expect(active.revision).toBe(24);
+    expect(active.adminFingerprint).toBe('admin-new-data');
+    expect(active.snapshot.catalog.products[0].id).toBe('NEW');
+    expect(Date.parse(active.publishedAt)).toBeGreaterThan(Date.parse('2026-09-29T10:00:00.500Z'));
+    expect(active.fingerprint).not.toBe(fromStaleBrowser.fingerprint);
+    expect(JSON.parse(sent[0]!)).toMatchObject({
+      type:'ADMIN_CONFIG_AVAILABLE',
+      revision:24,
+      fingerprint:active.fingerprint,
+      publishedAt:active.publishedAt,
+    });
+  });
+
+  it('treats the same Admin data fingerprint as idempotent without creating a later publish',async()=>{
+    const active=createMfkAdminConfigEnvelope({
+      storeId:'MF01',
+      revision:40,
+      publishedAt:'2026-09-29T11:00:00.000Z',
+      adminFingerprint:'same-admin-data',
+      snapshot:{catalog:{products:[]}},
+    });
+    const state={
+      storage:{get:vi.fn(async(key:string)=>key==='active'?active:undefined),put:vi.fn()},
+      getWebSockets:()=>[],
+    };
+    const store=new AdminSyncStore(state,{});
+    const duplicate=createMfkAdminConfigEnvelope({
+      storeId:'MF01',
+      revision:1,
+      publishedAt:'2026-09-29T01:00:00.000Z',
+      adminFingerprint:'same-admin-data',
+      snapshot:{catalog:{products:[]}},
+    });
+
+    const result:any=await store.publishEnvelope(duplicate);
+
+    expect(result).toMatchObject({status:200,body:{state:'IDEMPOTENT',active}});
+    expect(state.storage.put).not.toHaveBeenCalled();
+  });
+
   it('keeps active HTTP response wrapping and CORS behavior',async()=>{
     vi.stubGlobal('Response',NativeResponse);
     const upstream=new NativeResponse(JSON.stringify({revision:42}),{headers:{'content-type':'application/json'}});
@@ -59,6 +133,7 @@ describe('Admin realtime transport recovery',()=>{
     const messageHandler=client.slice(client.indexOf("socket.addEventListener('message'"),client.indexOf("socket.addEventListener('close'"));
     expect(messageHandler).toContain("row.type==='ADMIN_CONFIG_AVAILABLE'");
     expect(messageHandler).toContain('void fetchAndApplyAdminConfig()');
+    expect(messageHandler).not.toContain('Number(row.revision)>current.revision');
     expect(messageHandler).not.toMatch(/location\.reload|location\.replace/);
   });
 });
