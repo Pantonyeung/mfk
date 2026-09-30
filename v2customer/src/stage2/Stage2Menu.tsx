@@ -160,7 +160,7 @@ export function Stage2Menu({
         </section>}
       </section>:displayProducts.length?<section className="stage2-browse">
         <div className="stage2-section-heading"><h1>{selectedCategoryId?categories.find(item=>item.categoryId===selectedCategoryId)?.name??'點單':'今日主角'}</h1><strong>{displayProducts.length} 款</strong></div>
-        {featuredProduct?<FeaturedProductCard product={featuredProduct} favorite={favorites.has(featuredProduct.productId)} onToggleFavorite={()=>toggleFavorite(featuredProduct.productId)} onOpen={onProduct}/>:null}
+        {featuredProduct?<FeaturedProductCard product={featuredProduct} favorite={favorites.has(featuredProduct.productId)} onToggleFavorite={()=>onToggleFavorite(featuredProduct.productId)} onOpen={onProduct}/>:null}
         {smallProducts.length?<div className="stage2-more-title">更多選擇</div>:null}
         {smallProducts.length?<div className="stage2-small-grid">{smallProducts.map(product=><SmallProductCard key={product.productId} product={product} favorite={favorites.has(product.productId)} onToggleFavorite={()=>onToggleFavorite(product.productId)} onOpen={onProduct}/>)}</div>:null}
       </section>:<section className="stage2-empty" role="status">
