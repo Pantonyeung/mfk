@@ -524,3 +524,43 @@ Product Brief R1 已經由：
 
 MILESTONE:
 MFK_ADMIN_V3_OWNER_REVIEW_CLOSEOUT_PACK_READY
+
+---
+
+# 18. Admin V3 點解存在｜Owner 驗收觸發事件
+
+Admin V3 嘅最直接觸發，
+係 Keeta 驗收期間 Owner 需要即時：
+
+**新增分類 → 新增商品 → 設價 → 發佈**
+
+但手機 Safari 當刻仍然停留喺舊 Admin 畫面／舊版本。
+即使 Cloudflare 已重複部署最新系統，
+refresh 仍未能可靠收斂到最新 serving state。
+
+所以 Admin V3 唔係一次純 UI redesign。
+
+佢要同時修正兩種 freshness 問題：
+
+1. **App / UI Version Freshness**
+   - deployed latest ≠ browser actually serving latest
+
+2. **Business Projection Freshness**
+   - canonical data updated ≠ client local snapshot automatically current
+
+核心風險：
+**舊 browser / client facts 被當成可以長期信任嘅 truth。**
+
+因此 V3 硬要求：
+- no durable browser server truth
+- query / refetch / readback
+- freshness visible
+- published ≠ applied
+- serving release identity 可驗證
+- Safari / in-app / second tab canonical result 要一致
+- V3 不繼承 v2 client-state modules
+
+呢個係 Parallel V3 rebuild 嘅產品與架構起點。
+
+MILESTONE:
+MFK_ADMIN_V3_TRIGGER_INCIDENT_RECORDED
