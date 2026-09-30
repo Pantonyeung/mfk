@@ -10,6 +10,7 @@
     "v2admin/src/admin-sync-websocket-transport.test.ts",
     "v2admin/src/admin-cloud-publish-time-first.test.ts",
     "v2admin/src/AdminShell.tsx",
+    "v2admin/src/admin-ui-recomposition.test.tsx",
     "v2local/src/runtime/admin-config-sync.ts",
     "v2local/src/runtime/admin-config-sync.test.ts",
     "v2local/src/presentation/LocalAdminMenuWorkspace.tsx",
