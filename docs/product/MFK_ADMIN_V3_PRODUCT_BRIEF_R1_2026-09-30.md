@@ -5958,3 +5958,507 @@ Status：**LOCKED**
 
 MILESTONE:
 MFK_ADMIN_V3_FIRST_VIEWPORT_ACCEPTANCE_BATCH1_LOCKED
+
+---
+
+# 53. First Viewport Acceptance V1｜Batch 2：營運管理 / 平台／渠道管理
+
+本批驗收 12 個第二步 destination：
+- 營運管理：4
+- 平台／渠道管理：8
+
+共用要求沿用 §52.0：
+第一屏直接開始工作；Mobile 同 IA；Danger action 唔搶主位；Error / Unknown / Stale 唔偽裝成功。
+
+---
+
+## 53.1 營運管理 → 售罄／供應
+
+### Desktop first viewport
+必須見：
+- Title「售罄／供應」
+- Search
+- Category / State / Channel / Attention filters
+- Product sellability list
+- 第一批 products
+
+Row：
+- Product
+- Category
+- Effective sellability
+- Runtime state
+- Channel summary
+- Temporary / reset
+- Last readback
+- Attention
+
+Primary action：
+- 查看 Product sellability detail
+- 暫停售罄／恢復供應只喺正式 runtime contract 存在時顯示
+
+Danger：
+- 唔可以列表一撳即假成功
+- temporary action 必須有 pending/readback
+- 已成立 Order 唔受後續停售直接取消／退款
+
+### Mobile
+第一張 product card：
+- Product + effective state
+- Category
+- Temporary/reset summary
+- Channel summary
+- freshness / attention
+
+Filter 收入 compact sheet。
+
+State guard：
+- Runtime UNKNOWN ≠ 售罄
+- Channel mismatch ≠ Product disabled
+- stale readback 必須顯 freshness
+
+Status：**LOCKED**
+
+---
+
+## 53.2 營運管理 → 營業日
+
+### Desktop first viewport
+必須見：
+- Current Business Day
+- Current state
+- Opened at / by
+- Last readback
+- Current primary action
+- Open orders / blocker / cash readiness 摘要
+
+Primary CTA：
+- 未開始 →「開始今日營業」
+- 營業中 →「準備收舖」
+- 已完成 → 查看歷史 / 下一 Business Day context
+
+Danger：
+- Close 唔可以一鍵完成
+- 正式 Close 必須先進 Preview / Blockers / Cash / Confirm / Readback
+
+### Mobile
+第一屏：
+- Business Day
+- Current state
+- primary CTA
+- blocker / cash readiness summary
+
+唔需要先 scroll 過歷史記錄先做今日工作。
+
+State guard：
+- rollover stale 唔阻 transaction
+- command 未 readback = PENDING / UNKNOWN
+
+Status：**LOCKED**
+
+---
+
+## 53.3 營運管理 → 現金／收舖
+
+### Desktop first viewport
+必須見：
+- Current Business Day
+- Cash state
+- Expected
+- Actual（如已點算）
+- Difference
+- Current attention
+- Handover / close readiness
+
+Primary CTA：
+- 點算
+- Handover
+- 繼續收舖流程（按 state）
+
+Danger：
+- Cash adjustment / drawer command 唔同普通 Edit 混埋
+- 高風險 action 先 Permission / Reason / Confirm / Readback
+
+### Mobile
+第一屏：
+- Expected / Actual / Difference
+- Current state
+- attention
+- 最主要 action
+
+Cash movement history 放下方。
+
+State guard：
+- Expected unavailable ≠ 0
+- difference 未有 Actual 前唔造假
+- Close ≠ Drawer ≠ Shift
+
+Status：**LOCKED**
+
+---
+
+## 53.4 營運管理 → 產能／原料額度
+
+### Desktop first viewport
+必須見：
+- Title
+- CTA「新增額度」
+- Search / Active / Attention filters
+- Pool List
+- 第一批 pools
+
+Row：
+- Pool name
+- Initial qty
+- Observed remaining
+- Linked product count
+- thresholds
+- Active
+- Last readback
+- Attention
+
+Primary CTA：
+- 新增額度
+
+Danger：
+- Observed remaining 無 runtime evidence 時唔顯 0
+- policy save 唔畫成 runtime remaining 已更新
+
+### Mobile
+- Pool name + Active
+- Initial / observed remaining
+- linked products
+- threshold / attention
+
+State guard：
+- Admin policy ≠ runtime deduction
+- Inventory signal ≠ sellability authority
+
+Status：**LOCKED**
+
+---
+
+# 53.5 平台／渠道管理 First Viewport
+
+## A. 平台總覽
+
+Desktop 第一屏：
+- Title「平台總覽」
+- Platform list/cards
+- 每個平台直接見：接單狀態、Integration health、mapping、supply sync、last successful read、attention
+- 第一批平台唔需要再按「展開」先知基本健康
+
+Primary CTA：
+- 查看平台
+
+Danger：
+- Pause / Resume 如屬 bounded action，唔同「查看」混成一粒 ambiguous toggle
+- 未 readback 唔顯成功
+
+Mobile：
+- Platform name
+- Accepting state
+- Health
+- Mapping / Sync attention
+- Last read
+- 查看
+
+State guard：
+- Store Open ≠ Accepting
+- Connected ≠ Synced
+- Health ≠ Availability
+
+Status：**LOCKED**
+
+## B. 接單規則
+
+Desktop 第一屏：
+- Title
+- Platform filter
+- Accept Policy List
+- 第一批 platforms
+
+Row：
+- Platform
+- Current mode
+- Accepting?
+- Busy / Snooze
+- Schedule summary
+- Last readback
+- Draft/runtime indicator
+
+Primary CTA：
+- Edit
+
+Danger：
+- Temporary action 同 persistent config 必須視覺分開
+- Pause / Busy / Closed / Provider Suspension 唔可壓成一個 bool
+
+Mobile：
+- Platform + current mode
+- Accepting / busy
+- schedule
+- readback
+- Edit
+
+State guard：
+- Execute runtime action 未 readback = PENDING / UNKNOWN
+- Draft save ≠ provider applied
+
+Status：**LOCKED**
+
+## C. 供應同步
+
+Desktop 第一屏：
+- Title
+- Platform filter
+- Sync List
+- 第一批 rows
+
+Row：
+- Platform
+- Sync enabled
+- Source scope
+- Last successful sync
+- Current state
+- Pending / mismatch count
+- Last error
+
+Primary CTA：
+- 查看同步 detail / exceptions
+
+Danger：
+- 唔喺呢頁建立第二 Sellability engine
+- mismatch 唔等於 Product 本身 disabled
+
+Mobile：
+- Platform + sync state
+- mismatch count
+- last sync
+- attention
+
+State guard：
+- stale provider projection 清楚顯示
+- UNKNOWN ≠ FAILED
+
+Status：**LOCKED**
+
+## D. 門店綁定
+
+Desktop 第一屏：
+- Title
+- CTA「新增綁定」（contract 支援先顯）
+- Platform filter
+- Binding List
+
+Row：
+- Platform
+- External store
+- MFK store
+- authorization/binding state
+- Last verified
+- Attention
+
+Primary CTA：
+- 新增／編輯綁定
+
+Danger：
+- Save ≠ Verified
+- credential secret 唔顯示
+- binding identity 唔可 browser-only 假成功
+
+Mobile：
+- Platform
+- External ↔ MFK store
+- State
+- Last verified
+- Edit
+
+State guard：
+- auth expired ≠ binding missing
+- verify timeout = UNKNOWN
+
+Status：**LOCKED**
+
+## E. 商品映射
+
+Desktop 第一屏：
+- Title
+- Platform / Mapping state / Category filters
+- Search external / MFK product
+- Mapping List
+
+Row：
+- Platform
+- External Product
+- MFK Product
+- External Category
+- Channel Price summary
+- Option / Combo summary
+- State
+- Last verified
+
+Primary CTA：
+- Edit mapping
+
+Danger：
+- Channel price 唔反寫 MFK Direct Price
+- bulk mapping 如果將來有，必須 impact preview
+
+Mobile：
+- External product
+- mapped MFK product
+- state
+- platform
+- last verified
+
+State guard：
+- unmapped ≠ product deleted
+- verify unknown 清楚顯示
+
+Status：**LOCKED**
+
+## F. 匹配失敗
+
+Desktop 第一屏：
+- Title
+- Unresolved count
+- Platform / Issue type filters
+- Failure List
+
+Row：
+- Platform
+- External object
+- Issue type
+- Current state
+- First seen
+- Last observed
+- Suggested target（有 evidence 先顯）
+- CTA「處理」
+
+Primary CTA：
+- 處理
+
+Danger：
+- suggestion 唔自動 commit mapping
+- 修正 mapping 後唔自動 replay 舊 transaction side-effect
+
+Mobile：
+- Platform + object
+- issue
+- current state
+- last observed
+- 處理
+
+State guard：
+- resolver 無 confidence/evidence 時唔顯假 suggested target
+- transaction reconcile 返責任 domain
+
+Status：**LOCKED**
+
+## G. 實收估算
+
+Desktop 第一屏：
+- Title
+- Platform / period filter
+- Commercial Input / Estimate workspace
+- 第一批 platform rows
+
+每 row／section：
+- Sales
+- Commission
+- Fee
+- Merchant Earnings / estimated payout
+- evidence/freshness
+- Draft indicator（如有）
+
+Primary CTA：
+- Edit approved commercial inputs
+
+Danger：
+- Merchant Earnings 唔反寫 Sales / Tender / Direct Price
+- provider evidence 未有唔顯假精準數
+
+Mobile：
+- Platform
+- Sales
+- Commission/Fee
+- Estimated payout
+- freshness
+
+State guard：
+- Estimate 必須標 estimate
+- unavailable provider data ≠ $0
+
+Status：**LOCKED**
+
+## H. 平台對帳
+
+Desktop 第一屏：
+- Title
+- Platform / Period / Reconciliation-state filters
+- Settlement List
+
+Row：
+- Platform
+- Period / settlement ref
+- Sales
+- Commission
+- Fee
+- Merchant Earnings
+- Reconciliation state
+- Evidence availability
+
+Primary CTA：
+- 查看
+
+Danger：
+- R1 read-only
+- 唔喺表格直接改 transaction truth
+
+Mobile：
+- Platform + period
+- Merchant Earnings
+- deductions summary
+- reconciliation state
+- evidence badge
+
+State guard：
+- provider settlement ≠ Sales truth
+- mismatch 只 deep-link 正式 reconciliation/action workflow
+
+Status：**LOCKED**
+
+---
+
+# 53.6 Batch 2 結果
+
+本批共 12 個第二步 destination：
+
+- 營運管理：4
+- 平台／渠道管理：8
+
+結果：
+- **12 LOCKED**
+- **0 YELLOW**
+- **0 RED**
+
+本批重點確認：
+- Availability / Business Day / Cash / Capacity authority 無互相污染
+- Channel Accepting / Busy / Connectivity / Health / Suspension 分開
+- Mapping / Direct Price authority 分開
+- Merchant Earnings / Sales / Tender 分開
+- Platform mismatch / transaction reconcile 唔混埋
+- Mobile 第一屏唔依賴 hover / horizontal scroll
+- bounded remote action 未 readback 唔畫成功
+
+累計 First Viewport 驗收：
+- Batch 1：12 pages
+- Batch 2：12 pages
+- **已驗 24 / 54 pages**
+- 累計：23 LOCKED / 1 YELLOW / 0 RED
+
+下一 Batch：
+**打印管理 + 裝置管理 + 人員與權限（11 pages）**
+
+MILESTONE:
+MFK_ADMIN_V3_FIRST_VIEWPORT_ACCEPTANCE_BATCH2_LOCKED
