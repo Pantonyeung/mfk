@@ -12,7 +12,8 @@
     "v2admin/src/main.tsx",
     "v2admin/src/AdminCanonicalBootstrap.tsx",
     "v2admin/src/admin-query-client.ts",
-    "v2admin/src/admin-third-party-state-authority.test.ts"
+    "v2admin/src/admin-third-party-state-authority.test.ts",
+    "v2admin/src/admin-canonical-browser.test.ts"
   ],
   "authority_impact": "SYSTEM_WIDE_WEB_STATE_SOVEREIGNTY_ESTABLISHED_ADMIN_TQ1_ONLY_CODE_SLICE",
   "persistence_impact": "NONE_THIS_SLICE_DOES_NOT_MIGRATE_OR_DELETE_LEGACY_STORAGE",
