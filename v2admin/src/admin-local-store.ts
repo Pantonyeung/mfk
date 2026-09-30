@@ -1,3 +1,4 @@
+import {mfkHongKongIso} from '../../contracts/admin-config-sync-v1.ts';
 import {useEffect,useState,type Dispatch,type SetStateAction} from 'react';
 
 export interface AdminAuditRecord{
@@ -38,7 +39,7 @@ export function appendAdminAudit(input:Omit<AdminAuditRecord,'id'|'at'>){
   const rows=readAdminStored<AdminAuditRecord[]>('audit.v1',[]);
   const record:AdminAuditRecord=Object.freeze({
     id:'audit-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,8),
-    at:new Date().toISOString(),
+    at:mfkHongKongIso(),
     ...input,
   });
   writeAdminStored('audit.v1',[record,...rows].slice(0,2000));
@@ -86,8 +87,8 @@ export function readAdminReleases(){
 
 export function createAdminRelease(snapshot:unknown,reason?:string){
   const rows=readAdminReleases();
-  const version=(rows[0]?.version??0)+1;
-  const createdAt=new Date().toISOString();
+  const version=Math.max(0,...rows.map(row=>Number(row.version)||0))+1;
+  const createdAt=mfkHongKongIso();
   const canonical=JSON.stringify(snapshot);
   const fingerprint='fnv1a32:'+fnv1a(canonical);
   const row:AdminRelease=Object.freeze({
