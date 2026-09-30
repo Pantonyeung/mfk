@@ -46,13 +46,12 @@ test('UI0 auto-enters Home and preserves direct Member deep-link behaviour',()=>
   assert.ok(app.includes("useState(()=>!initialRoute||initialRoute.view==='home')"));
 });
 
-test('UI1 is the human-logic storefront and cold launch continues to UI2 menu',()=>{
+test('UI1 keeps brand warmth and fixed shortcuts while remaining human-logic first',()=>{
   assert.ok(app.includes("import {Stage1Home} from './stage1/Stage1Home'"));
   assert.ok(app.includes("view==='home'?<Stage1Home"));
   assert.ok(app.includes("onBrowse={()=>changeView('menu')}"));
   assert.ok(app.includes("view==='menu'?<Stage2Menu"));
-  for(const marker of['stage1-fixed-header','stage1-live-order','stage1-search-entry','stage1-hero-banner','stage1-announcement-strip','stage1-context-actions','stage1-top6','再來一單','回憶券'])assert.ok(home.includes(marker),marker);
-  for(const removed of['stage1-welcome','我的收藏','期間限定'])assert.ok(!home.includes(removed),removed);
+  for(const marker of['stage1-fixed-header','stage1-welcome','stage1-live-order','stage1-search-entry','stage1-hero-banner','stage1-announcement-strip','stage1-quick-entry-section','stage1-top6','我的收藏','回憶券','期間限定'])assert.ok(home.includes(marker),marker);
   assert.ok(app.includes('limit:6'));
   assert.ok(home.includes('const canBrowse=Boolean(snapshot?.menu)'));
 });
