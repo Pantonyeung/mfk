@@ -143,11 +143,11 @@ export function App(){
 
   useEffect(()=>{
     if(!port||!ownerSession)return;
-    const visible=()=>{if(document.visibilityState==='visible')void refresh();};
-    const focus=()=>void refresh();
-    const timer=window.setInterval(()=>{if(document.visibilityState==='visible')void refresh();},15000);
-    document.addEventListener('visibilitychange',visible);window.addEventListener('focus',focus);
-    return()=>{window.clearInterval(timer);document.removeEventListener('visibilitychange',visible);window.removeEventListener('focus',focus);};
+    const uninstall=installMfkCanonicalDoorbell({
+      onEvent:event=>{if(MFK_CANONICAL_DATA_EVENTS.has(event.type))void refresh();},
+      onReconnect:()=>void refresh(),
+    });
+    return uninstall;
   },[port,ownerSession?.sessionToken]);
 
   useEffect(()=>{
