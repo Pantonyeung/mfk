@@ -1,10 +1,9 @@
 {
   "version": 1,
-  "capability": "MFK_ADMIN_BOOTSTRAP_SYNC_STATE_R1",
-  "base_sha": "cae974bfe356783ecaa2df753a5e7e14e4aedb31",
+  "capability": "MFK_ADMIN_BOOTSTRAP_SYNC_STATE_R2",
+  "base_sha": "cd483bb38ac612689399463b56549505b2bffa86",
   "allowed_paths": [
     ".github/mfk-change-manifest.json",
-    "v2admin/src/AdminCanonicalBootstrap.tsx",
     "v2admin/src/admin-canonical-normal-browser.test.ts",
     "v2admin/src/admin-sync-client.ts"
   ],
@@ -13,9 +12,9 @@
   "provider_impact": "NONE",
   "transaction_impact": "NONE",
   "expected_behavior_change": [
-    "Opening Admin reconciles the visible sync status to the cloud canonical active publish even when local data already matches it.",
-    "Opening Admin never interprets cached release history as a new formal publish command.",
-    "Only an explicit new Admin release event queues a new formal publish; startup only resumes an already queued outbox."
+    "Canonical bootstrap prunes persisted Admin outbox entries that are already represented by, or older than, the Cloud canonical active publish before auto-flush starts.",
+    "A stale persisted outbox can no longer overwrite the reconciled PUBLISHED status with QUEUED/PUBLISHING immediately after READY.",
+    "Only a genuinely later explicit publish remains queued."
   ],
   "non_goals": [
     "No Customer, Owner, SMM or SMT change.",
@@ -24,6 +23,6 @@
     "No polling change.",
     "No OTA."
   ],
-  "rollback_sha": "cae974bfe356783ecaa2df753a5e7e14e4aedb31",
+  "rollback_sha": "cd483bb38ac612689399463b56549505b2bffa86",
   "severity": "HARD_BLOCK"
 }
