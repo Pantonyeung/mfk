@@ -9425,3 +9425,503 @@ Capability-gated 項目：
 
 MILESTONE:
 MFK_ADMIN_V3_CROSS_PAGE_INTERACTION_AUDIT_BATCH3_LOCKED
+
+---
+
+# 60. 跨頁互動盤點 V1｜Batch 4：全局搜尋 / 已儲存檢視 / 收藏 / 最近使用 / 快速前往
+
+本輪補成熟後台「熟手效率層」。
+
+核心原則：
+**兩步 Product Map 仍然係正式、穩定、可學習入口；搜尋／收藏／最近使用只係加速器，唔取代 Primary Home。**
+
+本批能力唔新增第 55 個 Sidebar destination，
+而係 Global Shell / List Workspace 嘅效率功能。
+
+---
+
+# 60.1 全局搜尋／快速前往
+
+入口：
+Topbar 固定提供：
+**搜尋功能、訂單、產品、人員、裝置…**
+
+Desktop 可以另外支援快捷鍵：
+- Command / Ctrl + K
+- 或 /
+實際 shortcut 由 implementation 決定，但 UI 必須有可見搜尋入口。
+
+搜尋結果分組：
+
+## A. 功能
+例：
+- 產品管理
+- 商品映射
+- 打印狀態／異常
+- 權限管理
+- 版本／Readback
+
+撳結果：
+直接去正式第二步 destination。
+
+## B. 訂單
+可以按正式 search contract 搵：
+- Display Number
+- Order ID
+- External reference
+
+撳結果：
+→ Order Detail
+
+## C. 產品
+- Product name
+- Product Code
+
+撳結果：
+→ Product Detail
+
+## D. 人員
+- Staff name
+- Staff ID
+
+撳結果：
+→ Staff Detail
+
+## E. 裝置／打印
+- Device display name
+- Logical printer name
+
+撳結果：
+→ Device / Logical Printer Detail
+
+## F. 平台／映射
+- Platform
+- External Product
+- MFK Product mapping
+
+## G. 版本
+- Release / Version identity
+
+撳結果：
+→ Version Detail / Readback
+
+---
+
+# 60.2 搜尋排序規則
+
+搜尋唔用「AI 猜」做 authority。
+
+基本排序：
+1. Exact ID / Code
+2. Exact name
+3. Prefix
+4. Strong text match
+5. Fuzzy match（只作候選）
+
+例如輸入：
+0088
+
+Order #0088 exact match 應該排先過：
+名稱內含 0088 嘅其他資料。
+
+Fuzzy result：
+必須仍顯示 object type / scope，
+唔可以令人以為係 exact result。
+
+---
+
+# 60.3 搜尋 Permission / Scope
+
+搜尋結果必須先經正式 permission / scope。
+
+禁止：
+- 搜到使用者無權查看嘅 Order
+- 搜到其他 Store sensitive object
+- 用搜尋結果 title 洩漏 PII
+- 搜尋 index 包含 PIN / token / payment secret
+
+搜尋只可以返回：
+**使用者本身有權讀取嘅正式 resource projection。**
+
+如果跨 resource server search seam 未存在：
+- 功能／頁面搜尋可以照做
+- Resource search 只顯 backend 正式支援嘅類型
+- 唔可以用 browser cache 假扮「全局搜尋」
+
+需要新 read seam 時：
+標 **BACKEND_CONTRACT_GAP**
+再做 bounded approval。
+
+---
+
+# 60.4 搜尋結果畫面
+
+Desktop：
+- Search input
+- grouped results
+- 每組最多先顯合理數量
+- 「查看全部」只喺該 resource 有正式 search page 時顯示
+
+每個 result：
+- Object type
+- Primary label
+- Secondary context
+- State（必要先顯）
+- Store / scope（多店時）
+- Match reason（只在有助消歧義時）
+
+Mobile：
+- full-screen search sheet
+- 最近搜尋
+- 即時 results
+- tap 即進 object
+
+禁止：
+- 搜尋結果塞過多 status / technical metadata
+- raw UUID 做主標題
+
+Status：**LOCKED**
+
+---
+
+# 60.5 已儲存檢視
+
+原名：Saved View
+
+中文正式名：
+**已儲存檢視**
+
+用途：
+將一個 List Workspace 嘅：
+- Search
+- Filter
+- Sort
+- Visible columns（如正式支援）
+- View mode
+
+保存成快捷入口。
+
+例：
+- 今日 Keeta 異常
+- 未映射商品
+- 已停售產品
+- 未發佈商品
+- 高風險操作記錄
+- 未套用版本
+
+重要：
+**已儲存檢視唔係新 Menu 層級。**
+
+佢永遠屬於原本 List page。
+
+---
+
+# 60.6 已儲存檢視規則
+
+Saved View 只保存「展示／查詢條件」。
+
+唔可以保存：
+- hidden mutation
+- payment secret
+- auth token
+- raw sensitive payload
+- authority override
+
+如果 view 包含 Store / Scope：
+切換到使用者無權 scope 時：
+- view 唔可以照跑
+- 要提示 scope 不可用 / 重新選擇
+
+如果 underlying field 已改名 / removed：
+- view 顯「需要更新」
+- 唔可以靜靜套錯 filter
+
+Persistence：
+- 如果有正式 user-preference backend，可跨裝置保存
+- 如果只做 device-local preference，UI 要清楚係本機偏好
+- **無論點保存，都唔係 business truth**
+
+Status：**LOCKED**
+
+---
+
+# 60.7 收藏
+
+正式名：
+**收藏**
+
+可以收藏：
+- 第二步功能頁
+- Saved View
+- 特定常用 object（只限合理類型，例如某 Printer / Device / Platform）
+
+唔建議收藏：
+- transient Order（除非正式產品需要）
+- 已完成 exception
+- temporary one-time workflow step
+
+入口：
+Topbar / Home shortcut 可以有「收藏」。
+
+收藏只係 navigation preference。
+
+禁止：
+- 收藏改變 permission
+- 收藏建立第二份資料
+- 收藏 object deleted 後仍假裝存在
+
+Status：**LOCKED**
+
+---
+
+# 60.8 最近使用
+
+正式名：
+**最近使用**
+
+可以記：
+- 最近開過嘅功能頁
+- 最近開過嘅 Product / Staff / Printer / Device / Platform
+- 最近使用 Saved View
+
+唔記：
+- PIN / credential pages 嘅 secret content
+- raw sensitive query
+- payment secret
+- private proof payload
+
+Recent item 顯：
+- 名稱
+- 類型
+- 最後開啟時間
+- scope（有需要）
+
+如果 object 已 deleted / permission revoked：
+- 唔顯內容
+- 顯示「已無法存取」或移除
+
+Status：**LOCKED**
+
+---
+
+# 60.9 最近搜尋
+
+搜尋框可以顯：
+- 最近搜尋詞
+- 最近進入 object
+
+但必須有：
+**清除最近搜尋**
+
+Privacy：
+- 唔保存 secret
+- 敏感 PII query 可以選擇不進 recent
+- logout 後按產品 privacy policy 清理／隔離 user context
+
+Status：**LOCKED**
+
+---
+
+# 60.10 Sidebar 視覺分組
+
+12 個大 Menu 保留，
+但可以加 **非點擊 section label** 降低掃描成本。
+
+建議：
+
+## 每日營運
+- 今日
+- 訂單管理
+- 營運管理
+
+## 商品與渠道
+- 菜單管理
+- 平台／渠道管理
+- 打印管理
+
+## 組織與分析
+- 裝置管理
+- 人員與權限
+- 報表
+
+## 治理與設定
+- 發佈與版本
+- 門店設定
+- 系統管理
+
+硬規則：
+- Section label 唔係 Menu
+- 唔可以點入
+- 唔增加 navigation step
+- Mobile Drawer 同樣可以用 label 分區
+
+Status：**LOCKED**
+
+---
+
+# 60.11 角色感知導航
+
+Navigation 可以按 permission 隱藏完全無權限嘅功能，
+但唔改 Product Map 結構。
+
+例如：
+Staff 無權：
+- 系統管理
+- 權限管理
+- 回復版本
+
+可以唔顯。
+
+但對同一 Role：
+Desktop / Mobile 應該一致。
+
+如果一頁可 View 但不可 Manage：
+- 頁面仍可顯
+- mutation CTA 隱藏 / disabled 按正式 permission semantics
+
+禁止：
+- 前端隱藏當成 security
+- 同一 permission role 喺不同 client 出現完全唔同 IA 名稱
+
+Status：**LOCKED**
+
+---
+
+# 60.12 Quick Go vs Search
+
+「快速前往」主要搵：
+- 功能頁
+- Saved View
+- 最近使用
+- 收藏
+
+「搜尋」主要搵：
+- Order
+- Product
+- Staff
+- Device
+- Printer
+- Platform object
+- Release
+
+可以共用同一 search surface，
+但結果要分組，
+令使用者知道自己係：
+**去一個功能**
+定
+**打開一件物件**。
+
+---
+
+# 60.13 Search → Detail → Back
+
+例：
+Search「紫米飯團」
+→ Product Detail
+→ Edit / 查看打印摘要
+→ Back
+
+Back 應返：
+- Search overlay / results
+- 原搜尋詞仍在
+- 原結果 scroll 保留
+
+如果由 Search result 再 deep-link Print：
+Print Detail
+→ Back Product
+→ Back Search Result
+
+唔可以：
+每次 Back 都返今日首頁。
+
+Status：**LOCKED**
+
+---
+
+# 60.14 Saved View → Detail → Back
+
+例：
+已儲存檢視「未映射商品」
+→ 商品映射 List
+→ External Item Detail
+→ Product Detail
+→ Back
+
+返回順序：
+Product
+→ Mapping Detail
+→ Saved View List（仍係「未映射商品」）
+
+Filter / sort / scroll 保留。
+
+Status：**LOCKED**
+
+---
+
+# 60.15 熟手效率層同 Authority 嘅界線
+
+Search / Saved View / Favorites / Recent 全部係：
+**Navigation / Presentation / Query Convenience**
+
+唔係：
+- Order truth
+- Product truth
+- Pricing truth
+- Sellability truth
+- Payment truth
+- Print truth
+- Permission truth
+
+可以 local / user-preference persistence 嘅，
+只限非權威 UI preference。
+
+任何正式 business state：
+仍然 canonical fetch / readback。
+
+---
+
+# 60.16 Batch 4 結果
+
+本輪驗：
+1. 全局搜尋
+2. 快速前往
+3. Resource search
+4. Permission / Scope filtering
+5. 已儲存檢視
+6. 收藏
+7. 最近使用
+8. 最近搜尋
+9. Sidebar 視覺分組
+10. 角色感知導航
+11. Search / Saved View 返回 context
+
+結果：
+- **11 LOCKED**
+- **0 YELLOW**
+- **0 RED**
+
+注意：
+跨 Resource 搜尋如 backend 未有正式 seam，
+只開已支援 resource；
+需要新 read-only aggregation/search API 時標 BACKEND_CONTRACT_GAP。
+
+本批唔改 12 個大 Menu / 54 個第二步 destination。
+
+下一階段：
+**共用介面元件規格盤點**
+
+由：
+- PageHeader
+- Search / Filter
+- List / Table / Mobile Card
+- Status Badge
+- Draft Bar
+- Confirmation
+- Readback
+- Timeline
+- Loading / Empty / Error / Stale
+
+逐件鎖成全產品統一規格。
+
+MILESTONE:
+MFK_ADMIN_V3_CROSS_PAGE_INTERACTION_AUDIT_BATCH4_LOCKED
