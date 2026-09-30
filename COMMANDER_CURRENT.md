@@ -87,31 +87,30 @@ Hard prohibitions:
 
 ## 4. Current active implementation slice
 
-Single active implementation slice:
+Current product gate:
 
-`V3ADMIN_A0_FOUNDATION`
+`V3ADMIN_PRODUCT_BRIEF_R1_LOCK`
 
-Branch:
+Spec branch:
 
-`feat/MFK-V3-WEB-PARALLEL-REBIRTH-A0`
+`spec/MFK-V3ADMIN-PRODUCT-BRIEF-R1`
 
-PR:
+Product brief:
 
-`#598`
+`docs/product/MFK_ADMIN_V3_PRODUCT_BRIEF_R1_2026-09-30.md`
 
-Scope:
-- isolated `v3admin/**`
-- R2 governance
-- dedicated V3 CI
-- zero production routing
-- no v2 runtime code change
-- no backend / SMT / SMM / Customer / Owner runtime change
+Product control issue:
 
-A0 state:
-- code exists only on candidate branch/PR
-- V3 CI must be GREEN
-- PR remains Draft until Owner explicitly says `PROMOTE`
-- no merge/deploy/cutover is authorized by A0 itself
+`#601`
+
+Current decision:
+- STOP A1/A2 incremental implementation as the active roadmap.
+- Freeze PR #599; do not merge while Product Brief #601 is awaiting Owner approval.
+- #600 A2 incremental spec is superseded as implementation roadmap by #601.
+- First lock the complete Admin V3 product: function scope, IA, UI patterns, state semantics, authority boundaries, acceptance, and RED/rework rules.
+- After Owner approves #601, implementation becomes one Admin V3 rebirth program: one implementation line, one preview acceptance program, no partial production cutover.
+- v2 production remains live throughout.
+- no backend / SMT / SMM / Customer / Owner runtime change is authorized by the product-brief stage.
 
 ## 5. V2 freeze rule
 
@@ -151,12 +150,11 @@ Owner may authorize a later bounded promotion after reviewing candidate evidence
 
 ## 8. Exact NEXT
 
-1. Keep PR #598 as Draft.
-2. Finish current-head CI and review.
-3. Resolve all review findings.
-4. Bank A0 candidate evidence.
-5. Wait for explicit Owner `PROMOTE`.
-6. Only after promotion may A0 merge.
-7. Then start A1: authenticated read-only canonical Admin V3, still with zero production cutover.
+1. Review Product Brief #601.
+2. Amend function/UI only while the product gate is open.
+3. Owner explicitly approves the Product Brief.
+4. Bank the approved brief as controlling Admin V3 Product / IA / UI spec.
+5. Only then create the one-shot Codex implementation program.
+6. No A1/A2 incremental merge, no V3 production routing, no cutover before the product brief is locked.
 
-MILESTONE: `MFK_V3_PARALLEL_REBIRTH_A0_COMMANDER_LOCKED`
+MILESTONE: `MFK_ADMIN_V3_PRODUCT_BRIEF_GATE_ACTIVE`
