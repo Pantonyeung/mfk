@@ -4,6 +4,8 @@
   "base_sha": "0776cffed4afa6b8ecb6e5a5e4e822b1a54dd53e",
   "allowed_paths": [
     ".github/mfk-change-manifest.json",
+    "COMMANDER_CURRENT.md",
+    "HANDOFF_CURRENT.md",
     "v2admin/vite.config.ts",
     "v2admin/src/AdminShell.tsx",
     "v2admin/src/admin-canonical-normal-browser.test.ts"
@@ -13,6 +15,7 @@
   "provider_impact": "NONE",
   "transaction_impact": "NONE",
   "expected_behavior_change": [
+    "Controlling handoff documents are aligned to live Main and the active Admin physical RED.",
     "Admin top-right exposes the exact loaded production bundle SHA prefix.",
     "Admin top-right exposes saved sync-outbox row count and last canonical hydration fingerprint prefix.",
     "A normal Safari screenshot can distinguish stale loaded JavaScript from current JavaScript with stale persisted outbox."
