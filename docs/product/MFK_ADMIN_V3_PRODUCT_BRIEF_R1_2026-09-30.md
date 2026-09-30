@@ -5239,3 +5239,236 @@ Implementation：
 
 Production：
 **v2 remains live**
+
+---
+
+# 51. 54-Page Acceptance Inventory V1｜逐頁驗收盤點
+
+本節將 Product Map 54 個第二步 destination 逐頁做 product acceptance inventory。
+
+每頁固定檢查：
+1. 入口名稱是否直觀
+2. 第二步後第一屏是否已經見到目標內容
+3. Primary CTA 是否清楚
+4. Read / Write / Mixed 邊界
+5. Canonical authority
+6. Loading / Empty / Error / Offline / Unknown / Partial / Conflict 語義
+7. Mobile 是否保持同一 IA
+8. 有冇 duplicate Primary Home / duplicate authority
+
+Status：
+- **LOCKED** = Product / IA / authority 已足夠 deterministic
+- **YELLOW** = 產品位置已鎖，但 implementation 仍有已知 backend seam / contract dependency
+- **RED** = 缺頁、第三層 discovery、重複 authority、假 mutation 或未定義 contract
+
+## 51.1 今日
+
+| 頁面 | 第一屏 | 主動作 | Mode | Authority | Status |
+|---|---|---|---|---|---|
+| 營運總覽 | 今日有效營業額 Hero + Orders/AOV/Refund + readiness + action preview | deep-link 去責任頁 | Read + shortcut | report/read models；首頁無 mutation authority | LOCKED |
+| 待處理事項 | Unified Action Queue | 處理 → deep-link Primary Home | Read / queue governance | canonical action item + domain readback | LOCKED |
+
+驗收：
+- Mobile 第一屏仍先見營業額。
+- Query error 不可變 $0。
+- 首頁唔可做第二 mutation center。
+
+## 51.2 訂單管理
+
+| 頁面 | 第一屏 | 主動作 | Mode | Authority | Status |
+|---|---|---|---|---|---|
+| 進行中訂單 | Active Order List | 查看 Order | Read | canonical Order read model | LOCKED |
+| 訂單歷史 | Historical Order List | 查看 Order | Read | immutable Order history + linked adjustments | LOCKED |
+| 售後／退款／取消／修正 | After-sales List | 開始 approved action | Mixed / high-risk workflow | Order/Payment formal mutation contracts | **YELLOW**：Tender Correction Admin seam |
+| 訂單異常 | Order-specific exception list | 處理 → responsible domain | Read + deep-link | domain evidence / reconcile | LOCKED |
+
+驗收：
+- Order / Payment / Fulfillment / Print / Platform state 分開。
+- Refund timeout / UNKNOWN 禁 blind retry。
+- Cancel ≠ delete / refund / reprint。
+
+## 51.3 菜單管理
+
+| 頁面 | 第一屏 | 主動作 | Mode | Authority | Status |
+|---|---|---|---|---|---|
+| 分類管理 | Category List | 新增分類 | Write Draft | Admin canonical catalog config | LOCKED |
+| 產品管理 | Product List | 新增產品 | Write Draft | Admin canonical product config | LOCKED |
+| 選項／口味管理 | Option Set List | 新增選項組 | Write Draft | Admin canonical modifier config | LOCKED |
+| 套餐管理 | Combo List | 新增套餐 | Write Draft | Admin canonical combo config | LOCKED |
+| 價格管理 | Product Pricing List | 修改 pricing inputs | Write Draft | Admin pricing inputs；正式交易由唯一 Pricing Authority | LOCKED |
+| 顯示與排序 | Category / Product order workspace | 排序 | Write Draft | Admin catalog order / visibility | LOCKED |
+
+驗收：
+- List → Detail → Create/Edit。
+- Product Category 必填。
+- 價格管理同 Product Detail 改同一 canonical price inputs，唔建第二價格模型。
+- Product-level print flag 留 Product；global print registry 留打印管理。
+
+## 51.4 營運管理
+
+| 頁面 | 第一屏 | 主動作 | Mode | Authority | Status |
+|---|---|---|---|---|---|
+| 售罄／供應 | Product sellability list | 暫停售罄 / 恢復（有 contract 先顯） | Mixed | Admin base policy + SMT runtime sellability readback | LOCKED |
+| 營業日 | Current Business Day | 開始營業 / 準備收舖 | Mixed / workflow | formal Business Day authority | LOCKED |
+| 現金／收舖 | Today Cash Workspace | 點算 / Handover / Close | Mixed / high-risk | formal cash/day-close commands | LOCKED |
+| 產能／原料額度 | Capacity / Quota List | 新增額度 | Write Draft + runtime read | Admin policy + runtime observed remaining | LOCKED |
+
+驗收：
+- Business Day 永不做 transaction blocker。
+- Availability 只控制新 admission；舊 Order 唔自動 cancel/refund。
+- Runtime remaining 未有證據時唔顯假 0。
+
+## 51.5 平台／渠道管理
+
+| 頁面 | 第一屏 | 主動作 | Mode | Authority | Status |
+|---|---|---|---|---|---|
+| 平台總覽 | Platform status list/cards | 查看平台 | Read + bounded actions | provider / integration readback | LOCKED |
+| 接單規則 | Platform accept-policy list | 編輯 / bounded runtime action | Mixed | channel policy + provider/runtime state | LOCKED |
+| 供應同步 | Sellability sync list | 查看同步 / exceptions | Mixed | canonical sellability → provider projection | LOCKED |
+| 門店綁定 | Store Binding List | 新增 / 編輯綁定 | Write / verify | formal provider/store binding contract | LOCKED |
+| 商品映射 | External ↔ MFK mapping list | 編輯 mapping | Write Draft / verify | Admin mapping authority | LOCKED |
+| 匹配失敗 | Mapping issue list | 處理 | Mixed | mapping resolver + evidence | LOCKED |
+| 實收估算 | Channel commercial inputs | 編輯 approved inputs | Write Draft / read | provider commercial contract | LOCKED |
+| 平台對帳 | Settlement/Reconcile List | 查看 | Read-only R1 | provider settlement evidence + MFK compare | LOCKED |
+
+驗收：
+- Store Open / Accepting / Busy / Connectivity / Provider Health 分開。
+- Merchant Earnings 不反寫 Sales/Tender。
+- 外部 mapping 唔污染 MFK Direct Price。
+
+## 51.6 打印管理
+
+| 頁面 | 第一屏 | 主動作 | Mode | Authority | Status |
+|---|---|---|---|---|---|
+| 打印總覽 | logical printer + recent exceptions | deep-link | Read | print readback / observed health | LOCKED |
+| 邏輯打印機 | Logical Printer Registry | 新增 printer | Write Draft | Admin 唯一 logical printer registry | LOCKED |
+| 打印模板 | Template List | 新增模板 | Write Draft | Admin template config | LOCKED |
+| 打印規則 | Print Rule List | 新增規則 | Write Draft | Admin logical routing rules | LOCKED |
+| 打印狀態／異常 | Print job/route exception list | 查看 / safe recovery（有 contract 先顯） | Read / bounded | Store Kernel print truth + readback | LOCKED |
+
+驗收：
+- Physical IP/USB binding 留 SMT。
+- Connected ≠ Print Job Success。
+- UNKNOWN ≠ FAILED。
+- 無正式 reprint contract 唔顯假 reprint button。
+
+## 51.7 裝置管理
+
+| 頁面 | 第一屏 | 主動作 | Mode | Authority | Status |
+|---|---|---|---|---|---|
+| 裝置狀態 | Device List | 查看 Device | Read + bounded actions | device/runtime read models | LOCKED |
+| OTA／版本 | Release / Device rollout list | request approved OTA / rollback（有 contract） | Mixed / governance | approved artifact + runtime readback | LOCKED |
+
+驗收：
+- Paired ≠ Connected ≠ Ready ≠ Job Success。
+- Activation success ≠ functional acceptance。
+- Physical printer binding 唔搬入 Admin。
+
+## 51.8 人員與權限
+
+| 頁面 | 第一屏 | 主動作 | Mode | Authority | Status |
+|---|---|---|---|---|---|
+| 員工管理 | Staff List | 新增員工 | Write | staff identity / role assignment | LOCKED |
+| 角色管理 | Role List | 新增角色 | Write | RBAC role config | LOCKED |
+| 權限管理 | Capability Matrix | 修改權限 | Write / high-risk | server-side authz policy | LOCKED |
+| 登入／Session／Trusted Device | Access Workspace | revoke / review | Mixed / high-risk | session/trust backend authority | LOCKED |
+
+驗收：
+- PIN/password/token 永不 reveal / Audit。
+- Actor 不可授予高過自己 authority。
+- Revoke 成功要 server-side readback + next protected request fail-closed。
+
+## 51.9 報表
+
+| 頁面 | 第一屏 | 主動作 | Mode | Authority | Status |
+|---|---|---|---|---|---|
+| 銷售 | Effective Sales + trend/breakdown | drill-down | Read | trusted report read model | LOCKED |
+| 產品 | Product performance | drill-down | Read | trusted report read model | LOCKED |
+| 渠道 | Channel performance | drill-down | Read | trusted report read model | LOCKED |
+| 退款 | Refund performance | drill-down | Read | trusted report read model | LOCKED |
+| 營運 | Operational performance | drill-down | Read | trusted report read model | LOCKED |
+| 匯出 | Export Workspace | 產生匯出 | Read action / high-risk | report export contract + RBAC | LOCKED |
+
+驗收：
+- Report error 唔變 0。
+- Stale / Partial 清楚。
+- Report 可以 deep-link，但唔直接 mutation。
+- 未有 Cost Authority 唔顯假 Margin/Gross Profit。
+
+## 51.10 發佈與版本
+
+| 頁面 | 第一屏 | 主動作 | Mode | Authority | Status |
+|---|---|---|---|---|---|
+| 未發佈變更 | Draft Change List | 檢查並發佈 | Write Draft governance | Admin canonical draft config | LOCKED |
+| 發佈中心 | Draft Summary / Validation | Publish | High-risk workflow | Admin canonical publish | LOCKED |
+| 版本／Readback | Release List + desired/observed | reconcile / view | Read / bounded reconcile | canonical release + target readback | LOCKED |
+| 回復版本 | Rollback source list | 建立 rollback release | High-risk workflow | new canonical release | LOCKED |
+
+驗收：
+- Save ≠ Publish。
+- Cloud Published ≠ Target Applied。
+- publishedAt = human-facing Cloud publish time。
+- doorbell miss / duplicate / reorder 最終都要 canonical reconcile。
+- Rollback 建新 release，唔 edit history。
+
+## 51.11 門店設定
+
+| 頁面 | 第一屏 | 主動作 | Mode | Authority | Status |
+|---|---|---|---|---|---|
+| 門店資料 | Store Profile | Edit | Write Draft | Admin store config | LOCKED |
+| 營業時間 | Weekly schedule | Edit | Write Draft | Admin store-hours config | LOCKED |
+| Business Day 分界 | Current boundary | Edit | Write Draft | Admin classification config | LOCKED |
+| 營運時間／提醒設定 | Store timing/reminder policy | Edit | Write Draft | approved store-level config | LOCKED |
+| 快捷原因 | Quick Reason List | 新增原因 | Write Draft | Admin reason shortcut config | LOCKED |
+
+驗收：
+- Store Hours ≠ Channel Accepting Orders。
+- Quick Reason 預設 OPTIONAL / NON-BLOCKING。
+- Effective provenance advanced detail 留系統管理。
+
+## 51.12 系統管理
+
+| 頁面 | 第一屏 | 主動作 | Mode | Authority | Status |
+|---|---|---|---|---|---|
+| 操作記錄 | Audit List | 查看 | Read | immutable audit truth | LOCKED |
+| 系統診斷 | Diagnostics Workspace | safe recovery / deep-link | Read + bounded recovery | canonical diagnostics/readback | LOCKED |
+| 系統整合 | Integration Registry / Health | verify / re-auth（有 contract 先顯） | Read/governance | integration credential/health contracts | LOCKED |
+| 進階／Effective Settings | Effective Settings Explorer | 前往原設定頁 | Read by default | resolved/effective config read model | LOCKED |
+
+驗收：
+- Diagnostics ≠ Audit ≠ Queue。
+- Configured ≠ Authorized ≠ Healthy ≠ Synced ≠ Business Ready。
+- Advanced 唔變萬能 editor。
+- Secret 永不顯示。
+
+## 51.13 Global result
+
+54 個第二步 destination：
+
+- **53：LOCKED**
+- **1：YELLOW（售後／退款／取消／修正，原因只係 Admin post-close Tender Correction backend seam）**
+- **0：RED**
+
+唯一已確認 implementation dependency：
+**Admin post-close Tender Correction = BACKEND_CONTRACT_GAP**
+
+注意：
+YELLOW 只代表該 page 內一個 mutation seam 未有正式 backend authority；
+唔代表成個訂單售後頁未定義。
+
+## 51.14 下一輪
+
+下一輪由「頁面存在」進入「頁面第一屏」驗收：
+
+逐頁再檢：
+- desktop first viewport
+- mobile first viewport
+- primary CTA hierarchy
+- empty / loading / stale / offline / unknown / partial / conflict UI
+- dangerous action placement
+- deep-link context
+- table/card density
+- duplicate copy / technical jargon
+
+MILESTONE:
+MFK_ADMIN_V3_54_PAGE_ACCEPTANCE_INVENTORY_V1_READY
