@@ -6967,3 +6967,443 @@ Status：**LOCKED**
 
 MILESTONE:
 MFK_ADMIN_V3_FIRST_VIEWPORT_ACCEPTANCE_BATCH3_LOCKED
+
+---
+
+# 55. First Viewport Acceptance V1｜Batch 4：報表 / 發佈與版本
+
+本批驗收 10 個第二步 destination：
+- 報表：6
+- 發佈與版本：4
+
+共用要求沿用 §52.0：
+第一屏直接開始工作；Report 唔做裝飾 dashboard；Publish / Rollback 危險操作必須有 gate；Mobile 同一 IA。
+
+---
+
+## 55.1 報表 → 銷售
+
+### Desktop first viewport
+必須見：
+- Title「銷售」
+- Date / Business Day range
+- Store / scope
+- freshness / completeness
+- Effective Sales
+- Orders
+- AOV
+- Adjustments / Refund
+- 主趨勢圖開始可見
+
+第一屏只突出一個主要問題：
+「呢段時間實際做咗幾多有效生意，同合理基準比點？」
+
+Primary actions：
+- 改日期 / scope
+- drill-down
+- Export（有權限先顯）
+
+Danger：
+- Report 唔直接 Refund / Cancel
+- Payment collected / Settlement 唔可冒充 Sales
+
+### Mobile
+第一屏：
+- Effective Sales
+- Orders
+- AOV
+- Adjustment / Refund
+- freshness
+- 一個 comparison
+- 主趨勢向下接
+
+State guard：
+- query error ≠ $0 / 0 orders
+- stale 顯 last updated
+- partial 顯 completeness
+
+Status：**LOCKED**
+
+---
+
+## 55.2 報表 → 產品
+
+### Desktop first viewport
+必須見：
+- Title「產品」
+- Date / scope / freshness
+- Total product quantity
+- Effective product revenue
+- Top product
+- Category contribution
+- Product performance table header / 第一批 rows
+
+Primary action：
+- drill into Product
+- filter / sort
+
+Danger：
+- 未有 verified Cost Authority 唔顯 Gross Profit / Margin
+- Combo Child 唔同 Standalone 混成同一 sale identity
+
+### Mobile
+- Top product
+- effective revenue / qty
+- category
+- contribution
+- compact ranked product cards
+
+State guard：
+- missing cost ≠ zero margin
+- incomplete channel/product coverage 顯 PARTIAL
+
+Status：**LOCKED**
+
+---
+
+## 55.3 報表 → 渠道
+
+### Desktop first viewport
+必須見：
+- Title「渠道」
+- Date / scope / freshness
+- Total channel orders
+- Effective Sales
+- Channel mix
+- requiring-attention count
+- Channel breakdown table
+
+Row：
+- Channel
+- Orders
+- Effective Sales
+- AOV
+- Mix %
+- freshness / read availability
+- exception count
+
+Primary action：
+- drill-down / deep-link platform domain
+
+Danger：
+- Channel Health 唔直接算入 Sales score
+- 某平台 partial data 唔冒充全店 total
+
+### Mobile
+- Channel
+- Orders / Effective Sales
+- Mix
+- attention / freshness
+
+State guard：
+- unavailable channel ≠ $0
+- provider health ≠ order acceptance state
+
+Status：**LOCKED**
+
+---
+
+## 55.4 報表 → 退款
+
+### Desktop first viewport
+必須見：
+- Title「退款」
+- Date / scope / freshness
+- Refund count
+- Refund amount
+- Refund rate（denominator semantic 已鎖先顯）
+- unresolved / unknown count
+- Breakdown 開始可見
+
+Primary action：
+- drill to filtered After-sales records
+
+Danger：
+- Report 唔直接做 Refund
+- Original Business Day 同 Execution Day 分開
+
+### Mobile
+- Refund amount / count
+- unresolved
+- method / reason summary
+- freshness
+
+State guard：
+- unknown refund outcome 唔計入 confirmed result
+- missing denominator 唔顯假 refund rate
+
+Status：**LOCKED**
+
+---
+
+## 55.5 報表 → 營運
+
+### Desktop first viewport
+必須見：
+- Title「營運」
+- Date / scope
+- Delayed orders
+- Print exceptions
+- Channel exceptions
+- Unresolved actions
+- 一個最重要 trend / table
+
+Primary action：
+- deep-link 去責任頁
+
+Danger：
+- 唔用 equal-weight health card grid 掩蓋優先次序
+- Diagnostics evidence 同 operational KPI 分開
+
+### Mobile
+- 最重要 attention / trend
+- delayed / print / channel / unresolved summary
+- deep-link
+
+State guard：
+- unavailable metric 唔顯 0
+- partial operational coverage 要標示
+
+Status：**LOCKED**
+
+---
+
+## 55.6 報表 → 匯出
+
+### Desktop first viewport
+必須見：
+- Title「匯出」
+- Report type
+- Date / Business Day range
+- Store / scope
+- File format
+- Included field set
+- permission / sensitivity notice（有需要先顯）
+
+Primary CTA：
+- 產生匯出
+
+Execute 前：
+- permission check
+- scope check
+- PII / sensitive field guard
+- large export guard（如 policy 有）
+
+Danger：
+- 無 arbitrary SQL
+- 無 formula editor
+- Export action 唔修改 transaction truth
+
+### Mobile
+- Report type
+- range
+- scope
+- format
+- Generate
+
+State guard：
+- export pending / failed / expired download 分開
+- permission denied 唔顯 fake generated file
+
+Status：**LOCKED**
+
+---
+
+# 55.7 發佈與版本 First Viewport
+
+## A. 未發佈變更
+
+Desktop 第一屏：
+- Title「未發佈變更」
+- Changed count
+- Last modified
+- blocker / warning count
+- Domain / validation filters
+- 第一批 Draft changes
+- CTA「檢查並發佈」
+
+Row：
+- Domain
+- Object
+- Change type
+- Before / After summary
+- Validation state
+- Last changed by / at
+
+Primary CTA：
+- 檢查並發佈
+
+Danger：
+- 放棄整批 Draft 唔做 primary CTA
+- technical JSON diff 唔放 first viewport
+
+### Mobile
+- changed count
+- blocker count
+- Object + change type
+- validation state
+- compact before/after
+
+State guard：
+- unsaved local edit 同 server Draft 要分清
+- empty = 真係無未發佈變更
+
+Status：**LOCKED**
+
+## B. 發佈中心
+
+Desktop 第一屏：
+- Title「發佈中心」
+- Current step
+- Draft Summary
+- Blocker / Warning summary
+- affected domains / targets
+- base version
+- Primary CTA 按 step
+
+真正 flow：
+Draft Summary
+→ Validate
+→ Impact Preview
+→ Confirm Publish
+→ Publishing
+→ Cloud Published
+→ Target Readback/Reconcile
+
+Primary CTA：
+- Validate / Next / Confirm Publish（按 gate）
+
+Danger：
+- Confirm Publish 只喺 Validation + Impact 已經完成後出現
+- Save Draft ≠ Publish
+- Publish request accepted ≠ Runtime applied
+
+### Mobile
+- current step
+- blocker/warning
+- affected scope
+- one primary CTA
+- 詳細 impact 可展開，但唔收埋 blocker
+
+State guard：
+- conflict 阻止 publish
+- request timeout = UNKNOWN / reconcile
+- Cloud published 後仍要 Target Readback
+
+Status：**LOCKED**
+
+## C. 版本／Readback
+
+Desktop 第一屏：
+- Title「版本／Readback」
+- Latest release identity
+- publishedAt
+- Cloud state
+- target apply summary
+- MATCH / PARTIAL / MISMATCH / UNKNOWN
+- Last reconcile
+- Version List / target readback 開始可見
+
+Primary CTA：
+- 查看 Version
+- Reconcile（正式 bounded action 存在時）
+
+Danger：
+- doorbell delivered / socket connected / target online 唔當 Applied
+- revision label 唔當 freshness
+
+### Mobile
+- latest version
+- publishedAt
+- apply summary
+- mismatch / unknown count
+- target cards
+
+State guard：
+- human-facing Cloud publish time = publishedAt
+- missing readback = UNKNOWN
+- missed / duplicate / reordered doorbell 最終要 canonical reconcile
+
+Status：**LOCKED**
+
+## D. 回復版本
+
+Desktop 第一屏：
+- Title「回復版本」
+- Current version
+- 可選 historical versions
+- Published time / changed domains
+- compare / impact entry
+- 唔直接顯一撳即 Rollback 成功
+
+Primary action：
+- 選版本 → Preview difference
+
+正式 flow：
+Select historical state
+→ Compare
+→ Validate
+→ Impact Preview
+→ Confirm
+→ Publish new rollback release
+→ Target Readback
+→ Confirm restored state
+
+Danger：
+- historical release immutable
+- Rollback 永遠建新 release
+- Confirm 回復唔可以放喺未睇 Impact 前
+
+### Mobile
+- Current version
+- target historical version
+- change summary
+- Preview impact
+- confirm 喺後續 workflow
+
+State guard：
+- request accepted ≠ restored
+- 要 post-rollback target identity readback
+- PARTIAL / MISMATCH 唔顯「已回復」
+
+Status：**LOCKED**
+
+---
+
+# 55.8 Batch 4 結果
+
+本批共 10 個第二步 destination：
+
+- 報表：6
+- 發佈與版本：4
+
+結果：
+- **10 LOCKED**
+- **0 YELLOW**
+- **0 RED**
+
+本批確認：
+- Report 第一屏只回答一個主要 business question
+- Error / Stale / Partial 唔偽裝正常數字
+- Sales / Payment / Settlement 分開
+- Cost Authority 未有前唔顯假 Margin
+- Report 唔直接 mutation
+- Export 係高風險 read action，有獨立 permission / PII guard
+- Save Draft / Publish / Cloud Published / Target Applied 四層分開
+- publishedAt 正式做人類 Cloud publish time
+- doorbell 唔係 correctness authority
+- Rollback 新建 release，完成要 post-readback
+
+累計 First Viewport 驗收：
+- Batch 1：12 pages
+- Batch 2：12 pages
+- Batch 3：11 pages
+- Batch 4：10 pages
+- **已驗 45 / 54 pages**
+- 累計：44 LOCKED / 1 YELLOW / 0 RED
+
+下一 Batch：
+**門店設定 + 系統管理（9 pages）**
+
+MILESTONE:
+MFK_ADMIN_V3_FIRST_VIEWPORT_ACCEPTANCE_BATCH4_LOCKED
