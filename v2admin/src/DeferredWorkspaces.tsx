@@ -5,8 +5,6 @@ import {saveAdminConfig} from './admin-config-save.ts';
 import {AdminResponsiveDataView} from './AdminResponsiveDataView.tsx';
 import {AdminSearchField} from './AdminUiPrimitives.tsx';
 
-const hkTime=(value:string)=>new Date(value).toLocaleString('zh-HK',{timeZone:'Asia/Hong_Kong',hour12:false});
-
 function Header({title,description,badge='保留功能'}:{title:string;description:string;badge?:string}){
   return <header className="admin-editor-head"><div><small>{badge}</small><h1>{title}</h1><p>{description}</p></div></header>;
 }
