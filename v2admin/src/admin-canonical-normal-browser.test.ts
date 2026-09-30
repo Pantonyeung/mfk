@@ -30,7 +30,7 @@ describe('Admin normal-browser canonical hydration',()=>{
     expect(sync).toContain('rowPublishedAt>activePublishedAt');
   });
 
-  it('shows a compact R4 runtime diagnostic that distinguishes stale JS from saved outbox state',()=>{
+  it('shows a compact R5 runtime diagnostic that distinguishes stale JS from saved outbox state',()=>{
     const shell=readFileSync(new URL('./AdminShell.tsx',import.meta.url),'utf8');
     const sync=readFileSync(new URL('./admin-sync-client.ts',import.meta.url),'utf8');
     expect(shell).toContain('readAdminRuntimeSourceSha');
