@@ -45,9 +45,11 @@ test('Existing Admin option-center projection continues to carry ordinary drink 
   assert.match(worker,/publishedAdjustmentMinor:minorFromMoney\(option\.priceAdjustment\)/);
 });
 
-test('Visible Customer app re-reads current Admin projection while open',()=>{
-  assert.match(app,/window\.setInterval\(\(\)=>void poll\(\),3000\)/);
-  assert.match(app,/document\.addEventListener\('visibilitychange',visible\)/);
-  assert.match(app,/window\.addEventListener\('focus',focused\)/);
+test('Customer revalidates canonical data on open and doorbell without polling',()=>{
+  assert.match(app,/installMfkCanonicalDoorbell/);
+  assert.match(app,/MFK_CANONICAL_DATA_EVENTS/);
   assert.match(app,/const next=await port\.readSnapshot\(\)/);
+  assert.doesNotMatch(app,/setInterval\s*\(/);
+  assert.doesNotMatch(app,/window\.addEventListener\('focus'/);
+  assert.doesNotMatch(app,/document\.addEventListener\('visibilitychange'/);
 });
