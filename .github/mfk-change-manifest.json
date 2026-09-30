@@ -1,27 +1,29 @@
 {
   "version": 1,
-  "capability": "MFK_ADMIN_BOOTSTRAP_SAVED_STATE_R3",
-  "base_sha": "02b653c6e7406ed9e969145c6c715caeff38fa28",
+  "capability": "MFK_ADMIN_NORMAL_SAFARI_R4_DIAGNOSTIC",
+  "base_sha": "0776cffed4afa6b8ecb6e5a5e4e822b1a54dd53e",
   "allowed_paths": [
     ".github/mfk-change-manifest.json",
-    "v2admin/src/admin-canonical-normal-browser.test.ts",
-    "v2admin/src/admin-sync-client.ts"
+    "v2admin/vite.config.ts",
+    "v2admin/src/AdminShell.tsx",
+    "v2admin/src/admin-canonical-normal-browser.test.ts"
   ],
-  "authority_impact": "NONE_ADMIN_REMAINS_SOLE_CANONICAL_DATA_AUTHORITY",
-  "persistence_impact": "PRUNE_STALE_LOCAL_SYNC_OUTBOX_AFTER_CANONICAL_READ",
+  "authority_impact": "NONE_DIAGNOSTIC_ONLY",
+  "persistence_impact": "NONE_READ_ONLY_LOCAL_DIAGNOSTIC",
   "provider_impact": "NONE",
   "transaction_impact": "NONE",
   "expected_behavior_change": [
-    "Normal Safari with saved browser state removes stale queued publish rows after canonical cloud read.",
-    "Saved local state can no longer overwrite the canonical PUBLISHED status immediately after bootstrap.",
-    "Only a genuinely later explicitly created publish remains queued."
+    "Admin top-right exposes the exact loaded production bundle SHA prefix.",
+    "Admin top-right exposes saved sync-outbox row count and last canonical hydration fingerprint prefix.",
+    "A normal Safari screenshot can distinguish stale loaded JavaScript from current JavaScript with stale persisted outbox."
   ],
   "non_goals": [
+    "No outbox pruning or replay behavior change.",
     "No Customer, Owner, SMM or SMT changes.",
-    "No cache-header or service-worker changes.",
-    "No Keeta changes.",
+    "No Keeta or provider changes.",
+    "No browser cache clearing requirement.",
     "No OTA."
   ],
-  "rollback_sha": "02b653c6e7406ed9e969145c6c715caeff38fa28",
+  "rollback_sha": "0776cffed4afa6b8ecb6e5a5e4e822b1a54dd53e",
   "severity": "HARD_BLOCK"
 }
