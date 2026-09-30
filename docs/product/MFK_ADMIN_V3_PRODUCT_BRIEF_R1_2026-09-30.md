@@ -6462,3 +6462,508 @@ Status：**LOCKED**
 
 MILESTONE:
 MFK_ADMIN_V3_FIRST_VIEWPORT_ACCEPTANCE_BATCH2_LOCKED
+
+---
+
+# 54. First Viewport Acceptance V1｜Batch 3：打印管理 / 裝置管理 / 人員與權限
+
+本批驗收 11 個第二步 destination：
+- 打印管理：5
+- 裝置管理：2
+- 人員與權限：4
+
+共用要求沿用 §52.0：
+第一屏直接開始工作；Mobile 同 IA；Danger action 唔搶主位；技術資料唔阻住普通使用者。
+
+---
+
+## 54.1 打印管理 → 打印總覽
+
+### Desktop first viewport
+必須見：
+- Title「打印總覽」
+- logical printer 狀態摘要
+- 最近打印異常
+- 第一批 printers / exceptions
+- freshness / attention
+
+每個 printer summary：
+- Name
+- 用途 / ticket type
+- Active
+- 現場 observed binding
+- Current health
+- Last seen
+
+Primary CTA：
+- 查看異常
+- 管理邏輯打印機
+- 管理模板 / 規則
+
+Danger：
+- 無 immediate reprint / retry mutation
+- 「Printer Connected」唔畫成「Print Job 已成功」
+
+### Mobile
+第一屏：
+- 有冇打印異常
+- 主要 logical printers 狀態
+- last readback
+- CTA「查看異常」
+
+State guard：
+- UNKNOWN ≠ FAILED
+- observed physical binding missing ≠ logical printer deleted
+
+Status：**LOCKED**
+
+---
+
+## 54.2 打印管理 → 邏輯打印機
+
+### Desktop first viewport
+必須見：
+- Title
+- CTA「新增邏輯打印機」
+- Search / Active / Type filter
+- Logical Printer List
+- 第一批 rows
+
+Row：
+- Name
+- Type / Capability
+- Ticket types
+- Routing use
+- Active
+- Observed physical binding
+- Last readback
+
+Primary CTA：
+- 新增邏輯打印機
+
+Danger：
+- Physical IP / USB 無 edit control
+- logical destination 唔可以由 SMT 自行另建第二套名稱
+
+### Mobile
+- Name + Active
+- capability / ticket types
+- binding summary
+- last readback
+
+State guard：
+- 未綁定 ≠ failed printer
+- stale observed binding 顯 freshness
+
+Status：**LOCKED**
+
+---
+
+## 54.3 打印管理 → 打印模板
+
+### Desktop first viewport
+必須見：
+- Title
+- CTA「新增模板」
+- Type / Active filter
+- Template List
+
+Row：
+- Template Name
+- Type
+- Used by
+- Active
+- Last modified
+- Draft indicator
+
+Primary CTA：
+- 新增模板
+
+Danger：
+- Preview ≠ physical print success
+- 被 rule / product 使用時禁止直接 destructive delete
+
+### Mobile
+- Template name + type
+- usage count
+- Active / Draft
+- View/Edit
+
+State guard：
+- preview error 唔影射正式打印 fail
+- reference count unknown 時唔容許 destructive delete
+
+Status：**LOCKED**
+
+---
+
+## 54.4 打印管理 → 打印規則
+
+### Desktop first viewport
+必須見：
+- Title
+- CTA「新增打印規則」
+- Ticket type / Active / Destination filters
+- Rule List
+
+Row：
+- Rule name
+- Ticket type
+- Scope / condition
+- Logical destination
+- Active
+- Used by / affected scope
+- Draft state
+
+Primary CTA：
+- 新增打印規則
+
+Danger：
+- rule 唔建立第二套 Product Category
+- 唔接受 physical IP / USB 作 canonical destination
+- Bulk rule change 如有，先 Impact Preview
+
+### Mobile
+- Rule name
+- ticket type
+- destination
+- condition summary
+- Active
+
+State guard：
+- referenced product/category unavailable 時顯 conflict / validation issue
+- save = Draft，唔係 Published
+
+Status：**LOCKED**
+
+---
+
+## 54.5 打印管理 → 打印狀態／異常
+
+### Desktop first viewport
+必須見：
+- Title
+- Current-state / Ticket-type / Logical-printer / Time filters
+- Exception List
+- 第一批 jobs / routes
+
+Row：
+- Order / Display Number
+- Ticket type
+- Logical destination
+- Attempt summary
+- Current state
+- Certainty
+- Last attempt
+- Last readback
+
+Primary CTA：
+- 查看 Detail
+
+Danger：
+- R1 無正式 Admin reprint contract 時唔顯 Reprint / Retry
+- UNKNOWN job 禁 blind retry
+- 歷史 successful PrintJob 唔可以被改寫
+
+### Mobile
+- Order number + ticket type
+- destination
+- certainty/state
+- last attempt/readback
+- View
+
+State guard：
+- PENDING / CONFIRMED / UNKNOWN / FAILED / PARTIAL 分開
+- engineering stack trace 唔放 first viewport
+
+Status：**LOCKED**
+
+---
+
+# 54.6 裝置管理 First Viewport
+
+## A. 裝置狀態
+
+Desktop 第一屏：
+- Title
+- Device Type / Health / Version / Attention filters
+- Device List
+- 第一批 devices
+
+Row：
+- Device display name
+- Type
+- Role / location
+- Current runtime/app version
+- Last seen
+- Freshness
+- Current health
+- Config drift
+- Attention
+
+Primary CTA：
+- 查看 Device
+
+Danger：
+- raw UUID 唔做 primary identity
+- 未有正式 command contract 唔顯假 Revoke / Restart / Fix
+
+Mobile：
+- Name + type
+- current version
+- health / last seen
+- drift / attention
+
+State guard：
+- Paired ≠ Connected ≠ Ready
+- Runtime Healthy ≠ Canonical Applied
+- No recent data ≠ Failed
+
+Status：**LOCKED**
+
+## B. OTA／版本
+
+Desktop 第一屏：
+- Title
+- Approved Release / Artifact list
+- Target / State / Version filters
+- 第一批 releases / rollout rows
+
+Row：
+- Release name
+- Version
+- Type
+- Target
+- Rollout/install state
+- applied / attention count（有正式 read model 先顯）
+- Last verified
+
+Primary CTA：
+- 查看 Release
+- Request approved OTA / rollback 只喺正式 contract 存在時顯示
+
+Danger：
+- Downloaded ≠ Installed
+- Activation requested ≠ Current runtime matching
+- Current runtime matching ≠ Functional acceptance
+
+### Mobile
+- Release / version
+- Target
+- current rollout state
+- applied / attention
+- last verified
+
+State guard：
+- rollout state UNKNOWN 唔顯 failed
+- rollback 必須 post-rollback identity readback
+
+Status：**LOCKED**
+
+---
+
+# 54.7 人員與權限 First Viewport
+
+## A. 員工管理
+
+Desktop 第一屏：
+- Title「員工管理」
+- CTA「新增員工」
+- Search
+- Role / Active / Scope / Admin-login filters
+- Staff List
+
+Row：
+- Name
+- Staff ID
+- Role
+- Scope
+- Active
+- Admin login
+- Access attention
+- Last relevant access
+
+Primary CTA：
+- 新增員工
+
+Danger：
+- 停用 / Credential reset 唔放成普通 row primary action
+- PIN / password / token 永不顯示
+
+### Mobile
+- Name + Active
+- Staff ID / Role
+- Scope
+- Admin login / attention
+
+State guard：
+- access data unavailable ≠ no access
+- secret field 唔 render
+
+Status：**LOCKED**
+
+## B. 角色管理
+
+Desktop 第一屏：
+- Title
+- CTA「新增角色」
+- Search / Active filters
+- Role List
+
+Row：
+- Role Name
+- Staff Count
+- Permission summary
+- Scope policy
+- Active
+- Last modified
+- Draft indicator
+
+Primary CTA：
+- 新增角色
+
+Danger：
+- 有 Staff reference 時禁止直接 delete
+- Role Edit 唔可以繞過 server-side authz / publish rules
+
+### Mobile
+- Role name + Active
+- Staff count
+- Permission summary
+- Scope
+
+State guard：
+- inherited / override unknown 時唔顯假完整權限摘要
+
+Status：**LOCKED**
+
+## C. 權限管理
+
+Desktop 第一屏：
+- Title「權限管理」
+- Role selector
+- Capability groups
+- 第一批 permission rows / matrix
+- Current scope / inheritance summary
+
+Row / matrix 第一眼：
+- Human capability name
+- View / Manage / Approve（只限 model 支援）
+- Scope
+- inherited/direct
+- attention / policy requirement
+
+Primary CTA：
+- Save Draft（有改動先 active）
+
+Danger：
+- actor 不可授予高過自己 authority
+- frontend visible checkbox 唔代表 backend permission 已存在
+- high-risk permission change 需 Audit / formalize
+
+### Mobile
+唔使用橫向 giant matrix。
+
+改為：
+- 先揀 Role
+- capability group cards
+- 每 capability 直列 View / Manage / Approve
+- Scope 同一 card 內可見
+
+State guard：
+- permission model fetch fail ≠ all denied / all allowed
+- conflict 要 reload 最新 policy
+
+Status：**LOCKED**
+
+## D. 登入／Session／Trusted Device
+
+Desktop 第一屏：
+- Title
+- top view tabs：Admin Accounts / Active Sessions / Trusted Devices
+- Current selected view list
+- Attention count
+
+Tabs 係 content view，唔係第三層 Sidebar。
+
+Admin Accounts row：
+- Staff / Login ID
+- login enabled
+- credential status
+- session count
+- trusted device count
+- last login
+
+Active Sessions row：
+- Staff
+- Device
+- Created
+- Last activity
+- Scope
+- State
+
+Trusted Devices row：
+- Device
+- Staff/account
+- Trust state
+- Last seen
+- Approved at
+
+Primary CTA：
+- View / Review
+- Revoke 只喺 selected object detail / explicit action 出現
+
+Danger：
+- Revoke 唔放成列表誤觸主按鈕
+- revoke 未 server readback 唔顯成功
+- 只清 browser local state唔算 revoke
+
+### Mobile
+- tabs 改 compact segmented control
+- selected list 用 stacked cards
+- Revoke 要 explicit confirm
+
+State guard：
+- Session stale ≠ revoked
+- Trusted Device offline ≠ untrusted
+- secret 永不顯示
+
+Status：**LOCKED**
+
+---
+
+# 54.8 Batch 3 結果
+
+本批共 11 個第二步 destination：
+
+- 打印管理：5
+- 裝置管理：2
+- 人員與權限：4
+
+結果：
+- **11 LOCKED**
+- **0 YELLOW**
+- **0 RED**
+
+本批確認：
+- Product print flags / logical printer / physical device 三層責任清楚
+- Print job state 同 printer connectivity 分開
+- OTA rollout / activation / installed identity / functional acceptance 分開
+- Device Health / Session Trust 唔互相代替
+- Staff / Role / Permission / Session 各自 Primary Home 清楚
+- Mobile Permission UI 唔使用不可讀嘅橫向 giant matrix
+- Secrets 唔出 first viewport / Audit
+- Revoke / Reprint / Retry 等高風險操作唔放列表即時誤觸
+
+累計 First Viewport 驗收：
+- Batch 1：12 pages
+- Batch 2：12 pages
+- Batch 3：11 pages
+- **已驗 35 / 54 pages**
+- 累計：34 LOCKED / 1 YELLOW / 0 RED
+
+下一 Batch：
+**報表 + 發佈與版本（10 pages）**
+
+MILESTONE:
+MFK_ADMIN_V3_FIRST_VIEWPORT_ACCEPTANCE_BATCH3_LOCKED
