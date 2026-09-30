@@ -55,7 +55,7 @@ export function AdminCanonicalBootstrap({children}:{children:ReactNode}){
     const sync=readAdminSyncStatus();
     if(adminCanonicalHydrationRequired(local,active,sync))hydrateAdminFromCanonical(active);
     reconcileAdminSyncStatusFromCanonical(active);
-  },[canonicalQuery.data,state]);
+  },[canonicalQuery.data,canonicalQuery.dataUpdatedAt,state]);
 
   useEffect(()=>{
     let cancelled=false;
