@@ -12,7 +12,6 @@ import {CUSTOMER_FINAL_SOURCE} from '../source-assets';
 import './stage1.css';
 
 const OFFICIAL_LOGO_URL=CUSTOMER_FINAL_SOURCE.logo.url;
-const HERO_ART_URL='/brand/mf-home-storefront-hero-v1.jpg';
 
 const statusLabel=(storeAvailable:boolean|undefined)=>{
   if(storeAvailable===true)return '營業中';
@@ -44,10 +43,8 @@ function Stage1StatePanel({connection,browserOnline,empty,onRetry}:{connection:C
   return null;
 }
 
-function ShortcutMark({kind}:{kind:'ticket'|'frequent'|'limited'}){
-  return <span className={'stage1-shortcut-mark is-'+kind} aria-hidden="true">
-    {kind==='ticket'?'券':kind==='frequent'?'常':'限'}
-  </span>;
+function AssetSlot({id,label,className}:{id:string;label:string;className:string}){
+  return <span className={className} data-asset-slot={id} aria-hidden="true"><i>{label}</i></span>;
 }
 
 export function Stage1Home({
@@ -79,6 +76,7 @@ export function Stage1Home({
   const todayHours=operatingHoursLabel(snapshot);
   const announcement=store?.notice?.trim();
   const topRecommendations=recommendations.filter(item=>item.product.available).slice(0,6);
+  const frequentRecommendations=history.length?topRecommendations.slice(0,4):[];
   const availableCouponCount=member?.state==='READY'&&member.coupons
     ?member.coupons.filter(item=>item.state==='AVAILABLE').length
     :0;
@@ -103,7 +101,7 @@ export function Stage1Home({
           ?'優惠內容以正式會員資料為準。'
           :'一碗好飯，裝進更多美好日常。';
 
-  return <div className="stage1-home" data-home-mode={homeMode} data-content-state={empty?'EMPTY':connection}>
+  return <div className="stage1-home" data-home-mode={homeMode} data-content-state={empty?'EMPTY':connection} data-ui-phase="SKELETON">
     <header className="stage1-fixed-header">
       <button className="stage1-logo-button" type="button" onClick={()=>window.scrollTo({top:0,behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'})} aria-label="返回首頁頂部">
         <img src={OFFICIAL_LOGO_URL} alt="磨飯 More Fun"/>
@@ -131,16 +129,6 @@ export function Stage1Home({
         <strong>{canBrowse?'搜尋想食嘅餐點…':'餐牌更新中…'}</strong>
       </button>
 
-      <button className="stage1-hero-banner" type="button" disabled={!canBrowse} onClick={onBrowse}>
-        <img src={HERO_ART_URL} alt="" aria-hidden="true"/>
-        <span className="stage1-hero-copy"><small>磨飯日常</small><strong>好好吃飯，<br/>日子慢慢有味。</strong><em>{canBrowse?'睇睇今日餐牌 →':'餐牌資料更新中'}</em></span>
-      </button>
-
-      {announcement?<section className="stage1-announcement-strip" role="status">
-        <span className="stage1-notice-mark" aria-hidden="true">✦</span>
-        <div><strong>店舖公告</strong><p>{announcement}</p></div>
-      </section>:null}
-
       {currentOrder?<button className="stage1-live-order" type="button" onClick={onOrders}>
         <span className="stage1-live-label">訂單進行中</span>
         <strong>{orderStageLabel(currentOrder.stage)}</strong>
@@ -149,14 +137,43 @@ export function Stage1Home({
         <b aria-hidden="true">›</b>
       </button>:null}
 
+      <button className="stage1-hero-frame" type="button" disabled={!canBrowse} onClick={onBrowse} aria-label={canBrowse?'查看今日餐牌':'餐牌更新中'}>
+        <AssetSlot id="HERO_BG_SLOT" label="HERO BACKGROUND" className="stage1-hero-bg-slot"/>
+        <AssetSlot id="HERO_IP_SLOT" label="IP" className="stage1-hero-ip-slot"/>
+        <AssetSlot id="HERO_FOOD_SLOT" label="FOOD" className="stage1-hero-food-slot"/>
+        <span className="stage1-hero-copy" data-asset-slot="HERO_COPY_SAFE_AREA">
+          <small>磨飯日常</small>
+          <strong>好好吃飯，<br/>日子慢慢有味。</strong>
+          <em>{canBrowse?'睇睇今日餐牌 →':'餐牌資料更新中'}</em>
+        </span>
+      </button>
+
+      {announcement?<section className="stage1-announcement-strip" role="status">
+        <AssetSlot id="ANNOUNCEMENT_ICON_SLOT" label="ICON" className="stage1-notice-icon-slot"/>
+        <div><strong>店舖公告</strong><p>{announcement}</p></div>
+      </section>:null}
+
+      {homeMode==='RETURNING'&&frequentRecommendations.length?<section className="stage1-frequent-section" aria-labelledby="stage1-frequent-title">
+        <div className="stage1-section-title">
+          <div><h2 id="stage1-frequent-title">常購清單</h2><small>熟悉味道 · 直接由現有推薦資料顯示</small></div>
+          <button type="button" onClick={onHistory}>查看全部</button>
+        </div>
+        <div className="stage1-frequent-row">
+          {frequentRecommendations.map(item=><button key={item.product.productId} type="button" onClick={event=>{const rect=event.currentTarget.getBoundingClientRect();onProduct(item.product,{top:rect.top,left:rect.left,width:rect.width,height:rect.height});}}>
+            <AssetSlot id="FREQUENT_PRODUCT_IMAGE_SLOT" label="IMAGE" className="stage1-frequent-media-slot"/>
+            <strong>{item.product.name}</strong>
+          </button>)}
+        </div>
+      </section>:null}
+
       {store?.channelAvailable===false?<section className="stage1-closed-panel">
-        <span className="stage1-closed-symbol" aria-hidden="true">☾</span>
+        <AssetSlot id="CLOSED_STATE_ICON_SLOT" label="ICON" className="stage1-closed-icon-slot"/>
         <div><span>休息中</span><strong>餐牌照常開放</strong><p>你仍可揀餐、選配搭同整理記憶罐。</p>{todayHours?<small>今日營業時間 · {todayHours}</small>:null}</div>
         <button type="button" disabled={!canBrowse} onClick={onBrowse}>{canBrowse?'查看餐牌':'餐牌更新中'}</button>
       </section>:null}
 
       {availableCouponCount?<button className="stage1-promo-banner" type="button" onClick={onMember}>
-        <span className="stage1-promo-mark" aria-hidden="true">券</span>
+        <AssetSlot id="CAMPAIGN_ICON_SLOT" label="ICON" className="stage1-promo-icon-slot"/>
         <div><small>記憶券</small><strong>{availableCouponCount} 張回憶券等緊你</strong><span>查看正式內容 →</span></div>
       </button>:null}
 
@@ -164,13 +181,16 @@ export function Stage1Home({
         <div className="stage1-section-title"><h2 id="stage1-quick-entry-title">快速去到</h2></div>
         <div className="stage1-quick-entry-grid">
           <button type="button" onClick={onMember}>
-            <ShortcutMark kind="ticket"/><strong>記憶券</strong>{availableCouponCount?<small>{availableCouponCount} 張可用</small>:<small>會員心意</small>}
+            <AssetSlot id="MEMORY_TICKET_ICON_SLOT" label="ICON" className="stage1-quick-icon-slot"/>
+            <strong>記憶券</strong>{availableCouponCount?<small>{availableCouponCount} 張可用</small>:<small>會員心意</small>}
           </button>
           <button type="button" onClick={onHistory}>
-            <ShortcutMark kind="frequent"/><strong>常購清單</strong><small>{history.length?'搵返熟悉味道':'留低常買味道'}</small>
+            <AssetSlot id="FREQUENT_ICON_SLOT" label="ICON" className="stage1-quick-icon-slot"/>
+            <strong>常購清單</strong><small>{history.length?'搵返熟悉味道':'留低常買味道'}</small>
           </button>
           <button type="button" onClick={onBrowse} disabled={!canBrowse}>
-            <ShortcutMark kind="limited"/><strong>期間限定</strong><small>{canBrowse?'睇今期新意':'餐牌更新中'}</small>
+            <AssetSlot id="LIMITED_ICON_SLOT" label="ICON" className="stage1-quick-icon-slot"/>
+            <strong>期間限定</strong><small>{canBrowse?'睇今期新意':'餐牌更新中'}</small>
           </button>
         </div>
       </section>
@@ -186,11 +206,8 @@ export function Stage1Home({
             type="button" className="stage1-product-card" key={item.product.productId} data-product-id={item.product.productId}
             onClick={event=>{const rect=event.currentTarget.getBoundingClientRect();onProduct(item.product,{top:rect.top,left:rect.left,width:rect.width,height:rect.height});}}
           >
-            <span className="stage1-product-media">{item.product.imageUrl
-              ?<img src={item.product.imageUrl} alt={item.product.imageAlt??item.product.name}/>
-              :<span className="stage1-product-placeholder" aria-hidden="true">磨飯</span>}
-            </span>
-            <span className="stage1-product-info">
+            <AssetSlot id="TOP6_PRODUCT_IMAGE_SLOT" label="PRODUCT IMAGE" className="stage1-product-media-slot"/>
+            <span className="stage1-product-info" data-asset-slot="TOP6_PRODUCT_TEXT_SLOT">
               <small>{item.reasonLabel}</small>
               <strong>{item.product.name}</strong>
               <em>{item.product.displayPriceLabel??'價格稍後顯示'}</em>
