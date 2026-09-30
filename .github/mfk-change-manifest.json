@@ -1,26 +1,32 @@
 {
   "version": 1,
-  "capability": "MFK_CANDIDATE_01_DINING_LIVE_REFRESH",
-  "base_sha": "b7776a08ef1721e9e7ea0e223b783295d0965a75",
+  "capability": "MFK_ADMIN_SMT_TIME_FIRST_CONVERGENCE_R1",
+  "base_sha": "532e78be814dfb495fe33af964a50d421bc913b5",
   "allowed_paths": [
     ".github/mfk-change-manifest.json",
-    "v2local/src/presentation/RuntimeDiningWorkspace.tsx",
-    "v2local/src/presentation/smt-dining-admin-live-refresh.test.ts"
+    "v2admin/worker.ts",
+    "v2admin/src/admin-sync-client.ts",
+    "v2admin/src/admin-sync-websocket-transport.test.ts",
+    "v2local/src/runtime/admin-config-sync.ts",
+    "v2local/src/runtime/admin-config-sync.test.ts",
+    "docs/handoff/MFK_ADMIN_SMT_TIME_FIRST_CONVERGENCE_R1_2026-09-30.md"
   ],
-  "authority_impact": "NONE",
-  "persistence_impact": "NONE",
+  "authority_impact": "ADMIN_CANONICAL_PUBLISH_SEQUENCING",
+  "persistence_impact": "ADMIN_ACTIVE_ENVELOPE_METADATA",
   "provider_impact": "NONE",
   "transaction_impact": "NONE",
   "expected_behavior_change": [
-    "When an Admin config doorbell is applied, the active SMT Dining workspace reloads its read model immediately without a page reload."
+    "Cloudflare accepts a formal Admin snapshot regardless of browser-local Rxx and assigns canonical internal sequence plus Cloudflare publish time.",
+    "SMT orders Admin configuration only by canonical publishedAt and fingerprint, never by browser-local revision.",
+    "Every ADMIN_CONFIG_AVAILABLE doorbell causes a bounded canonical pull.",
+    "Focus, pageshow, visibility restore and network restore trigger event-driven reconcile without adding polling."
   ],
   "non_goals": [
-    "No Dining transaction-state change.",
-    "No Admin publish protocol change.",
-    "No table registry behavior change.",
-    "No WebSocket transport change.",
-    "No polling or reconciliation change."
+    "No second configuration authority.",
+    "No transaction, payment, Keeta, print, fulfillment or sellability authority change.",
+    "No high-frequency polling.",
+    "No deploy, OTA or physical acceptance in this branch."
   ],
-  "rollback_sha": "b7776a08ef1721e9e7ea0e223b783295d0965a75",
+  "rollback_sha": "532e78be814dfb495fe33af964a50d421bc913b5",
   "severity": "SOFT_BLOCK"
 }

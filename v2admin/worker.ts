@@ -971,19 +971,45 @@ export class AdminSyncStore{
   }
   async publishEnvelope(envelope){
     const current=await this.state.storage.get('active');
-    if(current){
-      if(envelope.revision<current.revision)return{status:409,body:{code:'ADMIN_CONFIG_REVISION_STALE',currentRevision:current.revision}};
-      if(envelope.revision===current.revision){
-        if(envelope.fingerprint!==current.fingerprint)return{status:409,body:{code:'ADMIN_CONFIG_REVISION_CONFLICT',currentFingerprint:current.fingerprint}};
-        return{status:200,body:{state:'IDEMPOTENT',active:current}};
-      }
+    if(current&&envelope.adminFingerprint===current.adminFingerprint&&JSON.stringify(envelope.snapshot)===JSON.stringify(current.snapshot)){
+      return{status:200,body:{state:'IDEMPOTENT',active:current,sourceFingerprint:envelope.fingerprint}};
     }
-    await this.state.storage.put('active',envelope);
-    const acceptedAt=new Date().toISOString();
-    await this.state.storage.put('activeMeta',{revision:envelope.revision,fingerprint:envelope.fingerprint,publishedAt:envelope.publishedAt,acceptedAt});
-    const doorbell=JSON.stringify({type:'ADMIN_CONFIG_AVAILABLE',storeId:envelope.storeId,revision:envelope.revision,fingerprint:envelope.fingerprint,publishedAt:envelope.publishedAt,acceptedAt});
+    const currentMeta=await this.state.storage.get('activeMeta')||{};
+    const currentPublishedAt=Date.parse(String(current?.publishedAt||''));
+    const currentAcceptedAt=Date.parse(String(currentMeta.acceptedAt||''));
+    const floor=Math.max(
+      Number.isFinite(currentPublishedAt)?currentPublishedAt+1:0,
+      Number.isFinite(currentAcceptedAt)?currentAcceptedAt+1:0,
+      Date.now(),
+    );
+    const publishedAt=new Date(floor).toISOString();
+    const canonicalRevision=Math.max(0,Math.floor(Number(current?.revision)||0))+1;
+    const canonical=createMfkAdminConfigEnvelope({
+      storeId:envelope.storeId,
+      revision:canonicalRevision,
+      publishedAt,
+      adminFingerprint:envelope.adminFingerprint,
+      snapshot:envelope.snapshot,
+    });
+    await this.state.storage.put('active',canonical);
+    await this.state.storage.put('activeMeta',{
+      revision:canonical.revision,
+      fingerprint:canonical.fingerprint,
+      publishedAt:canonical.publishedAt,
+      acceptedAt:canonical.publishedAt,
+      sourceRevision:envelope.revision,
+      sourceFingerprint:envelope.fingerprint,
+    });
+    const doorbell=JSON.stringify({
+      type:'ADMIN_CONFIG_AVAILABLE',
+      storeId:canonical.storeId,
+      revision:canonical.revision,
+      fingerprint:canonical.fingerprint,
+      publishedAt:canonical.publishedAt,
+      acceptedAt:canonical.publishedAt,
+    });
     for(const socket of this.state.getWebSockets()){try{socket.send(doorbell);}catch{}}
-    return{status:200,body:{state:'PUBLISHED',active:{revision:envelope.revision,fingerprint:envelope.fingerprint,publishedAt:envelope.publishedAt}}};
+    return{status:200,body:{state:'PUBLISHED',active:canonical,sourceFingerprint:envelope.fingerprint}};
   }
   async ownerChannels(active,observedAt=new Date().toISOString(),freshReadback=false){
     let keetaStatus=null,customerHealth=null;
@@ -1567,9 +1593,10 @@ export class AdminSyncStore{
         return json({code:'ADMIN_CONFIG_ACK_MISMATCH',expectedRevision:active.revision,expectedFingerprint:active.fingerprint},409);
       }
       const acks=await this.state.storage.get('acks')||{};
-      acks[ack.deviceId]=ack;
+      const readback={...ack,readbackAt:new Date().toISOString()};
+      acks[ack.deviceId]=readback;
       await this.state.storage.put('acks',acks);
-      return json({state:'ACKED',ack});
+      return json({state:'ACKED',ack:readback});
     }
     if(url.pathname==='/acks'){
       const acks=await this.state.storage.get('acks')||{};
