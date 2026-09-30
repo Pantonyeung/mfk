@@ -17,8 +17,8 @@ Admin V3 Product Brief R1 已完成產品層定義。
 現時已鎖：
 
 - 12 個大 Menu
-- 54 個第二步頁面
-- 54 / 54 第一屏
+- 53 個第二步頁面
+- 53 / 53 第一屏
 - 跨頁返回 / Filter / Draft / Context
 - 高風險操作
 - Bulk / Multi-select
@@ -27,13 +27,14 @@ Admin V3 Product Brief R1 已完成產品層定義。
 - Desktop / Tablet / Mobile
 - Keyboard / Focus / Loading / Selection / Drag
 - 正式中文字典
-- 54 頁 CTA / Empty / Error / Confirm 文案
+- 53 頁 CTA / Empty / Error / Confirm 文案
 - Implementation Copy Dictionary
 
 目前：
 - RED：0
-- 唯一 YELLOW：1
-- 唯一 YELLOW = Admin 日結後「付款方式修正」缺正式 Backend Contract
+- YELLOW：0
+- RED：0
+- 退款／取消訂單／付款方式修正已明確 OUT OF ADMIN SCOPE
 
 因此：
 **產品架構已完成 Owner Review 所需收口，但未獲 PROMOTE，Implementation 不可開始。**
@@ -62,16 +63,15 @@ Admin V3 Product Brief R1 已完成產品層定義。
 
 ---
 
-# 2. Product Map｜12 大 Menu / 54 第二步頁面
+# 2. Product Map｜12 大 Menu / 53 第二步頁面
 
 ## 2.1 今日
 - 營運總覽
 - 待處理事項
 
-## 2.2 訂單管理
+## 2.2 訂單監察
 - 進行中訂單
 - 訂單歷史
-- 售後／退款／取消／修正
 - 訂單異常
 
 ## 2.3 菜單管理
@@ -184,21 +184,17 @@ Error 變 $0。
 
 ---
 
-# 4. 54 / 54 第一屏驗收
+# 4. 53 / 53 第一屏驗收
 
 結果：
 
-- 54 / 54 已完成
+- 53 / 53 已完成
 - 53 LOCKED
-- 1 YELLOW
+- 0 YELLOW
 - 0 RED
 
-唯一 YELLOW：
-**訂單管理 → 售後／退款／取消／修正**
-
-原因唔係 UI 未定，
-而係：
-**Admin 日結後付款方式修正缺正式 Backend Contract。**
+訂單監察全部只讀；退款、取消訂單、付款方式修正不屬 Admin transaction capability。
+任何 Admin transaction mutation button 直接判 Authority RED。
 
 除此之外：
 Page position / First viewport / CTA hierarchy / Mobile / State / Authority 已全部鎖定。
@@ -231,9 +227,6 @@ Page position / First viewport / CTA hierarchy / Mobile / State / Authority 已�
 **目前事實 → 影響預覽 → 權限 / 規則 → 確認 → 執行 → 等待確認 → 回讀 → 正式結果 → 證據**
 
 適用：
-- 退款
-- 取消訂單
-- 付款方式修正
 - 發佈
 - 回復版本
 - 撤銷登入工作階段
@@ -408,39 +401,20 @@ Mobile：
 
 ---
 
-# 13. 唯一 YELLOW
+# 13. 訂單交易 mutation｜明確 OUT OF ADMIN SCOPE
 
-## Admin 日結後付款方式修正
+Admin 只負責查看、監察、報表、Audit、Evidence / Readback、Reconciliation。
 
-產品規格已經定：
+以下正式交易操作唔屬 Admin：
+- 退款
+- 取消訂單
+- 付款方式修正
 
-- 同一張 Order
-- 原付款歷史保留
-- 新增 correction record
-- zero new Order
-- zero auto reprint
-- zero auto drawer action
-- permission
-- reason
-- version guard
-- readback
-- audit
-
-但：
-**目前正式 Backend Admin mutation seam 未證明存在。**
-
-所以 implementation 規則：
-
-- 可以 build read / route / form / preview UI
-- 正式 Execute action 要等 bounded backend contract
-- 無 contract 唔顯假成功
-- 唔用 browser / direct DB / workaround 造第二 Authority
-
-此項係：
-**BACKEND_CONTRACT_GAP**
-
-唔係：
-UI RED。
+Implementation 規則：
+- Admin 可以顯示 linked transaction result / actor / time / reason / evidence
+- Admin 唔可以顯示 transaction execute button
+- 唔需要為 Admin 新增 transaction mutation API
+- 如果 Admin 出現呢類 mutation，直接判 **AUTHORITY RED**
 
 ---
 
@@ -467,17 +441,17 @@ UI RED。
 
 Owner 只需逐項判斷：
 
-- [ ] 12 大 Menu / 54 頁位置接受
+- [ ] 12 大 Menu / 53 頁位置接受
 - [ ] 兩步導航規則接受
 - [ ] 今日首頁 Sales-first 接受
-- [ ] 54 頁 First Viewport 接受
+- [ ] 53 頁 First Viewport 接受
 - [ ] List → Detail → Edit 基本工作法接受
 - [ ] 高風險工作流接受
 - [ ] Search / Saved View / Favorites / Recent 接受
 - [ ] Desktop / Tablet / Mobile 轉換接受
 - [ ] 共用元件 / 操作手感接受
 - [ ] 正式中文字典接受
-- [ ] 日結後付款方式修正維持 BACKEND_CONTRACT_GAP，Implementation 唔造假
+- [ ] 退款／取消訂單／付款方式修正維持 OUT OF ADMIN SCOPE
 - [ ] 接受後先發出明確 PROMOTE
 
 ---
@@ -515,8 +489,7 @@ Product Brief R1 已經由：
 
 目前產品層冇 RED。
 
-唯一未閉環：
-**日結後付款方式修正 Backend Contract。**
+目前產品層無 YELLOW / RED；交易 mutation 邊界已明確鎖出 Admin。
 
 因此本階段完成定義係：
 
