@@ -198,7 +198,6 @@ let installed=false;
 let socket:WebSocket|null=null;
 let reconnectTimer:number|undefined;
 let reconnectAttempt=0;
-let doorbellEverOpened=false;
 
 function scheduleReconnect(){
   if(typeof window==='undefined'||!navigator.onLine)return;
@@ -214,10 +213,8 @@ function connectDoorbell(){
   try{
     socket=new WebSocket(smtAdminWebSocketUrl());
     socket.addEventListener('open',()=>{
-      const recoveringMissedDoorbell=doorbellEverOpened;
-      doorbellEverOpened=true;
       reconnectAttempt=0;
-      if(recoveringMissedDoorbell)void fetchAndApplyAdminConfig();
+      void fetchAndApplyAdminConfig();
     });
     socket.addEventListener('message',event=>{
       try{
@@ -251,10 +248,11 @@ function connectDoorbell(){
 export function installSmtAdminAutoSync(){
   if(installed||typeof window==='undefined')return;
   installed=true;
-  const onOnline=()=>{
-    void fetchAndApplyAdminConfig();
-    connectDoorbell();
-  };
+  const reconcile=()=>{if(!navigator.onLine)return;void fetchAndApplyAdminConfig();connectDoorbell();};
+  const onOnline=()=>reconcile();
+  const onFocus=()=>reconcile();
+  const onPageShow=()=>reconcile();
+  const onVisibility=()=>{if(document.visibilityState==='visible')reconcile();};
   const onOffline=()=>{
     const lkg=readSmtAdminConfigLkg();
     setStatus({state:lkg?'LOCAL_LKG':'OFFLINE',revision:lkg?.revision??0,fingerprint:lkg?.fingerprint??'',publishedAt:lkg?.publishedAt,updatedAt:now()});
@@ -262,10 +260,11 @@ export function installSmtAdminAutoSync(){
   };
   window.addEventListener('online',onOnline);
   window.addEventListener('offline',onOffline);
-  if(navigator.onLine){
-    void fetchAndApplyAdminConfig();
-    connectDoorbell();
-  }else onOffline();
+  window.addEventListener('focus',onFocus);
+  window.addEventListener('pageshow',onPageShow);
+  document.addEventListener('visibilitychange',onVisibility);
+  if(navigator.onLine)reconcile();
+  else onOffline();
 }
 
 export function readAdminSnapshotSection<T=unknown>(key:string):T|undefined{
