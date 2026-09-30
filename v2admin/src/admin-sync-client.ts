@@ -110,22 +110,29 @@ export async function queueAdminReleaseSync(release:AdminRelease,storeId='MF01')
 }
 
 let adminSyncFlushInFlight:Promise<AdminSyncStatus>|null=null;
+let adminSyncFlushInFlight:Promise<AdminSyncStatus>|null=null;
+
 export async function flushAdminSyncOutbox(){
   if(typeof window==='undefined'||typeof fetch==='undefined')return readAdminSyncStatus();
   if(adminSyncFlushInFlight)return adminSyncFlushInFlight;
+
   adminSyncFlushInFlight=(async()=>{
     while(true){
       const rows=readOutbox().slice().sort((a,b)=>Date.parse(a.publishedAt)-Date.parse(b.publishedAt));
       if(rows.length===0)return readAdminSyncStatus();
+
+      // Never collapse formal publishes. Drain oldest → newest so an Owner publish
+      // every 10 seconds remains a sequence of real canonical publishes.
       const next=rows[0]!;
       const browserSession=readStoredAdminBrowserSession();
       const key=browserSession?'':publisherKey();
       if(!browserSession&&!key){
-        const status={state:'ERROR',revision:next.revision,fingerprint:next.fingerprint,adminFingerprint:next.adminFingerprint,updatedAt:new Date().toISOString(),error:'ADMIN_SYNC_PUBLISHER_KEY_UNAVAILABLE'} as const;
+        const status={state:'ERROR',revision:next.revision,fingerprint:next.fingerprint,updatedAt:new Date().toISOString(),error:'ADMIN_SYNC_PUBLISHER_KEY_UNAVAILABLE'} as const;
         writeStatus(status);
         return status;
       }
-      writeStatus({state:'PUBLISHING',revision:next.revision,fingerprint:next.fingerprint,adminFingerprint:next.adminFingerprint,updatedAt:new Date().toISOString()});
+
+      writeStatus({state:'PUBLISHING',revision:next.revision,fingerprint:next.fingerprint,updatedAt:new Date().toISOString()});
       try{
         const endpoint=browserSession?'/api/admin-browser/publish':'/api/admin-sync/publish';
         const headers:Record<string,string>={'content-type':'application/json'};
@@ -140,16 +147,29 @@ export async function flushAdminSyncOutbox(){
         const body=await response.json().catch(()=>({})) as Record<string,unknown>;
         if(!response.ok)throw new Error(typeof body.code==='string'?body.code:'ADMIN_SYNC_PUBLISH_HTTP_'+response.status);
         const confirmed=validateAdminPublishConfirmation(body,next);
+
+        // Remove only the exact publish that Cloud just confirmed.
         writeOutbox(readOutbox().filter(row=>row.fingerprint!==next.fingerprint));
-        const status={state:'PUBLISHED',revision:confirmed.active.revision,fingerprint:confirmed.active.fingerprint,adminFingerprint:confirmed.active.adminFingerprint,cloudPublishedAt:confirmed.cloudPublishedAt,updatedAt:new Date().toISOString()} as const;
+        const status={
+          state:'PUBLISHED',
+          revision:confirmed.active.revision,
+          fingerprint:confirmed.active.fingerprint,
+          adminFingerprint:confirmed.active.adminFingerprint,
+          cloudPublishedAt:confirmed.cloudPublishedAt,
+          updatedAt:new Date().toISOString(),
+        } as const;
         writeStatus(status);
       }catch(error){
-        const status={state:'ERROR',revision:next.revision,fingerprint:next.fingerprint,adminFingerprint:next.adminFingerprint,updatedAt:new Date().toISOString(),error:error instanceof Error?error.message:'ADMIN_SYNC_PUBLISH_FAILED'} as const;
+        const status={state:'ERROR',revision:next.revision,fingerprint:next.fingerprint,updatedAt:new Date().toISOString(),error:error instanceof Error?error.message:'ADMIN_SYNC_PUBLISH_FAILED'} as const;
         writeStatus(status);
         return status;
       }
     }
-  })().finally(()=>{adminSyncFlushInFlight=null;});
+  })().finally(()=>{
+    adminSyncFlushInFlight=null;
+    if(readOutbox().length)void flushAdminSyncOutbox();
+  });
+
   return adminSyncFlushInFlight;
 }
 
