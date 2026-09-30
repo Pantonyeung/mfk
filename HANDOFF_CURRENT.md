@@ -1,78 +1,103 @@
-# MFK CURRENT HANDOFF｜2026-09-25
-
-Current navigation:
-docs/navigation/MFK_航海圖_V1.30_Round031_2026-09-25.txt
+# MFK CURRENT HANDOFF｜2026-09-30 12:30 HKT
 
 Control:
 #22
 
-## Current
+Active execution issue:
+#586 Admin Online Bootstrap Must Converge Before READY
 
-Carrier 1.0.7 + SMM PWA LAN/QR software/release gate is GREEN.
+## Current live source
 
-MFK product source:
-`75759607ba05720f723c77d282327b7f1386f616`
+Main:
+`0776cffed4afa6b8ecb6e5a5e4e822b1a54dd53e`
 
-Source/build verification:
-`36084376938` SUCCESS
+Admin deploy:
+`36668946920` SUCCESS
 
-Canonical Carrier OTA publication:
-`36085973121` SUCCESS
+Production readback:
+`0776cffed4afa6b8ecb6e5a5e4e822b1a54dd53e`
 
-Published Carrier:
-- 1.0.7 / 107
-- package `com.morefunos.smt`
-- APK `MoreFunOS-SMT-1.0.7-mfk-75759607ba05.apk`
-- SHA-256 `b521d509f93143e191e9df363b91409e499dc0788776f067e88469611c791046`
-- public manifest + APK hash readback GREEN
-- evidence artifact `10844450207`
+R3 status:
+`SOURCE_GREEN / DEPLOY_GREEN / PHYSICAL_RED`
 
-Independent release replay:
-`36085863280` SUCCESS
-- same product source
-- same APK SHA-256
+## Latest physical evidence
 
-Canonical Builder path:
-- `.github/workflows/mfk-carrier-ota.yml`
-- `requests/mfk-carrier-ota-request.txt`
+Normal Safari:
+- same admin.morefunos.com URL
+- existing session/localStorage retained
+- still `等待正式發佈 / 已排隊`
 
-Temporary parallel duplicate publisher path has been retired. One active MFK Carrier OTA path remains.
+Fresh ChatGPT in-app browser:
+- same URL
+- current Cloud publish visible
+- `SMT 已套用`
 
-Milestone:
-`MFK_CARRIER_1_0_7_OTA_PUBLISHED_GREEN`
+Conclusion:
+Cloud production is reachable from a fresh browser context. Remaining split is inside normal Safari browser runtime/persisted state.
 
-## Locked architecture
+## Do not guess the root cause
 
-SMM = PWA/Web only.
+Only two candidate branches remain:
 
-Primary:
-PWA → LAN HTTP/JSON :17831 → SMT.
+A. stale already-loaded document / JS bundle
 
-LAN unavailable:
-other allowed path / QR fallback; staff ordering remains unblocked.
+B. current JS + persisted sync-outbox/status returning to QUEUED
 
-QR = Order Intent only.
-SMT revalidates current Menu + Pricing before Store Kernel creates Formal Order.
+## R4 diagnostic Candidate
 
-Runtime OTA URL and Carrier OTA URL remain independently configurable.
+Draft PR:
+`#593`
 
-## Exact NEXT
+Branch:
+`fix/MFK-ADMIN-SAFARI-R4-DIAGNOSTIC`
 
-Physical Ring 3 only. No product code before physical evidence.
+Base:
+`0776cffed4afa6b8ecb6e5a5e4e822b1a54dd53e`
 
-1. Store SMT Recovery → check Carrier OTA.
-2. Fresh offered version must be 1.0.7 / 107.
-3. Install and confirm Carrier 1.0.7 / 107.
-4. Confirm normal SMT boot + independent Runtime/Carrier OTA URL controls.
-5. iPhone Safari on store LAN: PWA LAN probe + one real staff order.
-6. iOS Chrome: repeat LAN capability evidence.
-7. Make LAN unavailable: verify no blocking and fallback available.
-8. QR Order Intent → SMT revalidation → exactly one Formal Order / Display.
-9. Replay same QR/intent: zero duplicate Formal Order.
-10. Restart SMT and repeat one LAN/QR sanity path.
+Diagnostic output:
+- `R4 <source-sha-prefix>`
+- `O<outbox-count>`
+- `C<canonical-hydration-fingerprint-prefix>`
+- local sync state
 
-Success target:
-`MFK_CARRIER_1_0_7_SMM_PWA_LAN_QR_PHYSICAL_GREEN`
+No sync behavior change is included.
 
-If RED:
-STOP at exact FIRST BREAK and fix only that seam.
+## Governance
+
+`docs/control/MFK_CHANGE_CONTROL.md` applies.
+
+Current mode:
+`PREPARE`
+
+Without explicit Owner text containing:
+`PROMOTE #593`
+
+do not:
+- mark Ready
+- merge
+- deploy
+- OTA
+
+#22 latest evidence comment:
+`5904392394`
+
+#586 evidence comment:
+`5904392916`
+
+## Physical acceptance after PROMOTE
+
+Use normal Safari only:
+- do not clear cache
+- do not logout
+- do not use Private mode
+
+Open admin.morefunos.com and capture top-right.
+
+Decision:
+- no `R4` marker → stale loaded shell confirmed
+- `R4` marker + outbox/status evidence → persisted local queue confirmed
+
+Do not begin Customer / Owner / SMM / SMT / Keeta work until this Admin repair is PHYSICAL_ACCEPTED.
+
+MILESTONE:
+`MFK_ADMIN_NORMAL_SAFARI_R4_HANDOFF_READY`

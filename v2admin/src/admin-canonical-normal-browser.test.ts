@@ -22,6 +22,15 @@ describe('Admin normal-browser canonical hydration',()=>{
     expect(adminCanonicalHydrationRequired(local,active,sync)).toBe(false);
   });
 
+  it('exposes loaded bundle identity and local outbox evidence in the normal-browser top state',()=>{
+    const vite=readFileSync(new URL('../vite.config.ts',import.meta.url),'utf8');
+    const shell=readFileSync(new URL('./AdminShell.tsx',import.meta.url),'utf8');
+    expect(vite).toContain('__MFK_SOURCE_SHA__');
+    expect(shell).toContain('R4 {build} · O{outbox.length}');
+    expect(shell).toContain("'canonical-hydrated.v1'");
+    expect(shell).toContain('{status.state}');
+  });
+
   it('clears saved outbox rows that are not later than canonical cloud state',()=>{
     const sync=readFileSync(new URL('./admin-sync-client.ts',import.meta.url),'utf8');
     expect(sync).toContain('writeOutbox(readOutbox().filter(row=>{');

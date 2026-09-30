@@ -2,7 +2,7 @@
 
 Status: CURRENT / CONTROLLING
 Control: #22
-Updated: 2026-09-30 Asia/Hong_Kong
+Updated: 2026-09-30 12:30 Asia/Hong_Kong
 System: MFK ONLY
 
 ## 0. Mandatory read order
@@ -13,136 +13,133 @@ System: MFK ONLY
 4. `HANDOFF_CURRENT.md`
 5. live repository / deployment / physical evidence relevant to the task
 
-If a document conflicts with live repository evidence, report `GOVERNANCE_DRIFT`.
-Do not guess and do not let stale text override verified live evidence.
+If a document conflicts with live repository evidence, report `GOVERNANCE_DRIFT` and repair the controlling record before product promotion.
 
-## 1. Current repository control state
+## 1. Current live source / deployed Admin
 
-Current product source base for read-only UI forensic audit:
+Current live Main:
 
-`4c8642d4ec84792de88f00163ce99e3005b8354a`
+`0776cffed4afa6b8ecb6e5a5e4e822b1a54dd53e`
 
-This is the current MFK product tree after:
-- PR #520 WebSocket transport / public SMT identity
-- SMM request-storm containment
-- Governance Shadow foundation
-- PR #521 Dining live-refresh source promotion
+This is PR #591 / Admin bootstrap saved-state R3.
 
-Controlled recovery bank remains:
+Deployment evidence:
+- deploy-mfk-admin run `36668946920` = SUCCESS
+- production source readback = `0776cffed4afa6b8ecb6e5a5e4e822b1a54dd53e`
+- R3 is SOURCE/DEPLOY GREEN but PHYSICAL RED
 
-`052295861931b72aa401aa6fa06c3cd65866706d`
+The older UI-forensic base and 2026-09-25 carrier handoff are historical context only and are not current execution authority.
 
-Do not move or rewrite the recovery bank as part of UI work.
+## 2. Current Owner execution mode
 
-## 2. Acceptance status of current Main
+Controlling Owner rule from #22:
 
-PR #521 source is merged, but physical acceptance is still pending.
+`ONE REPAIR → ONE PHYSICAL CHECK`
 
-Published candidate runtime:
+Rules:
+1. Only one active repair at a time.
+2. Finish one bounded Candidate.
+3. Do not merge/deploy without explicit Owner `PROMOTE`.
+4. Owner performs real browser/device acceptance.
+5. If RED, return to the same repair. Do not start another surface.
+6. Customer / Owner / SMM / SMT / Keeta implementation remains parked while this Admin repair is RED.
 
-`runtime-candidate-mfk-4c8642d4ec84`
+Active execution issue:
 
-Source:
+`#586 Admin Online Bootstrap Must Converge Before READY`
 
-`4c8642d4ec84792de88f00163ce99e3005b8354a`
+## 3. Latest physical evidence
 
-OTA workflow run:
+Owner physical evidence at 2026-09-30 12:30 HKT:
 
-`36643004088` SUCCESS
+Normal iPhone Safari with existing saved browser state:
+- same URL: `https://admin.morefunos.com`
+- still shows `等待正式發佈`
+- still shows `已排隊`
 
-Product completion status for #521:
+Fresh ChatGPT in-app browser on the same URL:
+- sees current Cloud published state
+- sees `SMT 已套用`
 
-`NOT_ACCEPTED`
+Therefore R3 remains:
 
-Do not describe #521 as physically accepted until store-device acceptance is recorded.
+`PHYSICAL_RED`
 
-## 3. Canonical base for OWNER / SMM / CUSTOMER UI forensic audit
+#22 evidence comment:
+`5904392394`
 
-For the read-only UI forensic comparison, canonical source base is:
+## 4. Current first-break split
 
-`4c8642d4ec84792de88f00163ce99e3005b8354a`
+The remaining first break is not yet proven. Only two branches are allowed:
 
-The audit may inspect:
-- `v2owner/**`
-- `v2smm/**`
-- `v2customer/**`
-- supplied historical briefs / screenshots / UI packages as reference only
+A. Normal Safari is still executing an older already-loaded Admin document / JS bundle, so current R3 bootstrap code never runs.
 
-Historical material is not current implementation authority.
+B. Normal Safari has loaded current Admin JS, but persisted local sync-outbox/status survives or re-enters `QUEUED`.
 
-The audit must compare:
+Do not guess between A and B.
 
-`OLD REFERENCE → CURRENT IMPLEMENTATION → TARGET SALVAGE PLAN`
+## 5. Current PREPARE Candidate
 
-No product implementation is authorized by the audit itself.
+Draft PR:
 
-## 4. UI audit execution rule
+`#593 P0 R4: normal Safari build/outbox diagnostic`
 
-AUDIT / PLANNING ONLY.
+Base:
+`0776cffed4afa6b8ecb6e5a5e4e822b1a54dd53e`
 
-Allowed:
-- inventory supplied files
-- compare old vs current
-- produce forensic audit documents
-- produce staged salvage plan
-- create planned GitHub Issues
+Purpose:
+- diagnostic only
+- expose loaded Admin source SHA prefix
+- expose local saved outbox count
+- expose last canonical-hydration fingerprint prefix
+- expose local sync state
 
-Not allowed without a later explicit Owner promotion:
-- modify product code
-- create implementation PRs
-- merge UI changes
-- deploy
-- OTA
-- alter Order / Pricing / Availability / Payment / Print / Keeta / SMT authority
+No sync semantics are changed by this Candidate.
 
-Each future implementation stage must be one bounded Issue → one Candidate → one acceptance → one promotion decision.
+Expected screenshot:
+- badge begins `R4 <sha7> · O<n>`
+- detail begins `C<fingerprint> · <sync-state>`
 
-## 5. Current salvage candidates
+Interpretation:
+- no R4 marker = stale loaded shell / JS proven
+- R4 marker + O>0 / QUEUED = persisted outbox path proven
 
-Existing recovery Candidates remain independent and must not be mutated by the UI audit:
-- #523 canonical Cloud publish confirmation
-- #522 Dining table registry fail-closed
-- #524 bounded Admin/SMT reconciliation
+## 6. Hard scope
 
-PR #521 has already been merged into source and is awaiting physical acceptance.
+Allowed product scope:
+- Admin browser diagnostic only
+- no outbox pruning/replay behavior change in R4
+- no Customer / Owner / SMM / SMT / Keeta code
+- no OTA
+- no cache clear / logout / Private mode as acceptance workaround
 
-## 6. Governance rule
+No second Order, Pricing, Availability, Config, or Sync authority.
 
-A governance-only commit after the product audit base does not invalidate the UI audit base if it changes no Owner/SMM/Customer product files.
+## 7. Admin authority invariant
 
-Before starting the audit, verify:
-- live Main descends from the stated product audit base; and
-- any newer commits do not modify `v2owner/**`, `v2smm/**`, or `v2customer/**`.
+Admin remains the sole canonical authority for published configuration.
 
-If either condition fails, stop and report `GOVERNANCE_DRIFT`.
-
-## 7. Exact NEXT
-
-1. Continue physical acceptance of #521 separately.
-2. Resume read-only forensic audit in order:
-   OWNER → SMM → CUSTOMER.
-3. Produce audit / salvage documents and planned Stage Issues only.
-4. Do not implement any UI Stage until Owner explicitly promotes that Issue.
-
-MILESTONE: `MFK_UI_FORENSIC_AUDIT_BASE_4C8642D4_LOCKED`
-
-## 8. Admin data authority + delivery invariant
-
-Admin is the sole canonical authority for published configuration and operational policy data consumed by SMT.
-
-Formal Admin publish contract:
+Formal chain:
 
 `ADMIN FORMAL PUBLISH → CLOUDFLARE PUBLISHED TIME → DOORBELL → SMT CANONICAL PULL → ATOMIC APPLY → UI REFRESH → ACK / READBACK`
 
 Hard rules:
+- human-facing freshness uses Cloudflare publish time
+- Rxx/revision is diagnostic only
+- persistent browser storage is cache/LKG only
+- UNKNOWN is not FAILED or SUCCESS
+- no interval polling as an authority substitute
 
-- Human-facing freshness and acceptance use **Cloudflare publish time** as the primary ordering reference.
-- `Rxx` / revision labels are not human-facing truth, not an acceptance gate, and not a cross-device freshness oracle.
-- SMT must converge to every formally published Admin state. A sync path that can permanently miss a formal Admin publish is invalid and must be removed or rebuilt.
-- Doorbell is notification only; SMT must pull canonical Admin data.
-- Reconcile is a required fallback for missed, duplicate, reordered, or reconnect scenarios. It is not a second authority.
-- No second configuration authority may be created in SMT, SMM, Customer, Owner, browser local state, or a parallel sync engine.
-- Acceptance evidence records: Cloudflare published time, SMT received time, SMT applied time, UI refreshed time, ACK/readback time, and observed latency.
-- Fingerprint/source identity may be retained for machine integrity checks; revision numbering may remain internal diagnostic metadata only.
+## 8. Exact NEXT
 
-MILESTONE: `MFK_ADMIN_AUTHORITY_TIME_FIRST_DELIVERY_LOCKED`
+PREPARE only:
+1. finish PR #593 CI/review
+2. keep PR #593 Draft
+3. do not merge/deploy until explicit Owner `PROMOTE #593`
+4. after promotion, deploy Admin only
+5. Owner opens normal Safari without clearing cache/logout/private mode
+6. capture top-right R4 diagnostic line
+7. choose A or B from evidence
+8. next Candidate fixes only that proven seam
+
+MILESTONE: `MFK_ADMIN_NORMAL_SAFARI_R4_DIAGNOSTIC_PREPARE_CURRENT`

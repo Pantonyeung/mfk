@@ -1,7 +1,7 @@
 import {useEffect,useRef,useState,type ReactNode} from 'react';
 import {NavLink,useLocation,useNavigate} from 'react-router';
 import {ADMIN_CAPABILITY_GROUPS,findAdminCapability} from './admin-capabilities.ts';
-import {readActiveAdminRelease,type ActiveAdminReleaseRef} from './admin-local-store.ts';
+import {readActiveAdminRelease,readAdminStored,type ActiveAdminReleaseRef} from './admin-local-store.ts';
 import {readAdminSyncAcks,readAdminSyncStatus,type AdminSyncStatus} from './admin-sync-client.ts';
 import {AdminStatusBadge,type AdminTone} from './AdminUiPrimitives.tsx';
 
@@ -11,6 +11,9 @@ const statusLabel={
   P1:'保留',
   GOVERNANCE:'治理',
 } as const;
+
+declare const __MFK_SOURCE_SHA__:string;
+const ADMIN_BUILD_SHA=typeof __MFK_SOURCE_SHA__==='string'&&__MFK_SOURCE_SHA__.trim()?__MFK_SOURCE_SHA__.trim():'DEV';
 
 const mobileCoreGroups=new Set(['today','orders','menu','operations']);
 
@@ -83,10 +86,14 @@ function AdminSyncTopState(){
   const activeRelease=readActiveAdminRelease();
   const status=readAdminSyncStatus();
   const {tone,title,detail}=deriveAdminSyncPresentation({activeRelease,status,acks,online});
+  const outbox=readAdminStored<Array<{fingerprint?:string;publishedAt?:string}>>('sync-outbox.v1',[]);
+  const hydrated=readAdminStored<{fingerprint?:string;publishedAt?:string}|null>('canonical-hydrated.v1',null);
+  const build=ADMIN_BUILD_SHA==='DEV'?'DEV':ADMIN_BUILD_SHA.slice(0,7);
+  const canonical=hydrated?.fingerprint?hydrated.fingerprint.replace('fnv1a32:','').slice(-8):'—';
 
   return <div className="mfk-admin-topstate" data-tone={tone} aria-live="polite">
-    <AdminStatusBadge tone={tone}>{title}</AdminStatusBadge>
-    <span>{detail}</span>
+    <AdminStatusBadge tone={tone}>R4 {build} · O{outbox.length}</AdminStatusBadge>
+    <span>C{canonical} · {status.state} · {title} · {detail}</span>
   </div>;
 }
 
