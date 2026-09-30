@@ -970,19 +970,30 @@ export class AdminSyncStore{
     await this.state.storage.put(key,{...session,staffId:value.staffId,lastSeenAt:value.lastSeenAt});return value;
   }
   async publishEnvelope(envelope){
-    const requestKey='admin:publish-request:'+String(envelope.fingerprint||'');
-    const prior=await this.state.storage.get(requestKey);
-    if(prior?.active){
-      return{status:200,body:{
-        state:'IDEMPOTENT',
-        active:prior.active,
-        cloudPublishedAt:prior.cloudPublishedAt,
-        publishRequestFingerprint:envelope.fingerprint,
-      }};
+    const current=await this.state.storage.get('active');
+    const currentMeta=await this.state.storage.get('activeMeta')||{};
+
+    // A retry of the same formal Admin publish is idempotent.
+    // The browser-provided revision/publishedAt are diagnostic/source metadata only.
+    if(current&&String(currentMeta.sourceFingerprint||'')===String(envelope.fingerprint||'')){
+      return{
+        status:200,
+        body:{
+          state:'IDEMPOTENT',
+          active:current,
+          sourceFingerprint:envelope.fingerprint,
+          cloudPublishedAt:String(current.publishedAt||currentMeta.cloudPublishedAt||currentMeta.acceptedAt||''),
+        },
+      };
     }
 
-    const cloudPublishedAt=mfkHongKongIso();
-    const active=createMfkAdminConfigEnvelope({
+    // Cloud owns delivery ordering. Make every distinct formal publish strictly newer
+    // than the previous Cloud canonical publish, even if Admin publishes repeatedly.
+    const nowMs=Date.now();
+    const currentPublishedMs=current?Date.parse(String(current.publishedAt||'')):Number.NEGATIVE_INFINITY;
+    const canonicalMs=Number.isFinite(currentPublishedMs)?Math.max(nowMs,currentPublishedMs+1):nowMs;
+    const cloudPublishedAt=new Date(canonicalMs).toISOString();
+    const canonical=createMfkAdminConfigEnvelope({
       storeId:envelope.storeId,
       revision:envelope.revision,
       publishedAt:cloudPublishedAt,
@@ -990,41 +1001,35 @@ export class AdminSyncStore{
       snapshot:envelope.snapshot,
     });
 
-    await this.state.storage.put('active',active);
+    await this.state.storage.put('active',canonical);
     await this.state.storage.put('activeMeta',{
-      revision:active.revision,
-      fingerprint:active.fingerprint,
-      adminFingerprint:active.adminFingerprint,
-      publishedAt:active.publishedAt,
+      revision:canonical.revision,
+      fingerprint:canonical.fingerprint,
+      adminFingerprint:canonical.adminFingerprint,
+      sourceFingerprint:envelope.fingerprint,
+      sourcePublishedAt:envelope.publishedAt,
+      cloudPublishedAt,
       acceptedAt:cloudPublishedAt,
-      sourcePublishFingerprint:envelope.fingerprint,
-    });
-    await this.state.storage.put(requestKey,{
-      active,
-      cloudPublishedAt,
-      sourcePublishFingerprint:envelope.fingerprint,
-    });
-    await this.state.storage.put('admin:published:'+active.fingerprint,{
-      active,
-      cloudPublishedAt,
-      sourcePublishFingerprint:envelope.fingerprint,
     });
 
     const doorbell=JSON.stringify({
       type:'ADMIN_CONFIG_AVAILABLE',
-      storeId:active.storeId,
-      revision:active.revision,
-      fingerprint:active.fingerprint,
-      publishedAt:active.publishedAt,
+      storeId:canonical.storeId,
+      revision:canonical.revision,
+      fingerprint:canonical.fingerprint,
+      publishedAt:canonical.publishedAt,
       acceptedAt:cloudPublishedAt,
     });
     for(const socket of this.state.getWebSockets()){try{socket.send(doorbell);}catch{}}
-    return{status:200,body:{
-      state:'PUBLISHED',
-      active,
-      cloudPublishedAt,
-      publishRequestFingerprint:envelope.fingerprint,
-    }};
+    return{
+      status:200,
+      body:{
+        state:'PUBLISHED',
+        active:canonical,
+        sourceFingerprint:envelope.fingerprint,
+        cloudPublishedAt,
+      },
+    };
   }
   async ownerChannels(active,observedAt=new Date().toISOString(),freshReadback=false){
     let keetaStatus=null,customerHealth=null;
