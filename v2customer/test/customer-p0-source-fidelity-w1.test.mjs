@@ -34,16 +34,17 @@ test('UI0 uses supplied male/female IP sheets, 50:50 selection and owner-locked 
   assert.ok(overlay.includes('enterHomeRef.current()'));
 });
 
-test('UI1 uses FINAL source screenshot crop for IP hero and source shortcut icon crops',()=>{
+test('UI1 keeps the FINAL brand hero while product cards use only canonical media or neutral empty state',()=>{
   const home=read('src/stage1/Stage1Home.tsx');
   const css=read('src/stage1/stage1.css');
   assert.ok(home.includes('CUSTOMER_FINAL_SOURCE.stage1Final.url'));
   assert.ok(home.includes('stage1-source-hero'));
-  for(const marker of['stage1-shortcut-ticket','stage1-shortcut-heart','stage1-shortcut-order'])assert.ok(home.includes(marker),marker);
   assert.ok(css.includes('.stage1-source-hero>img'));
   assert.ok(css.includes('width:608.4%'));
   assert.ok(css.includes('top:-332.5%'));
-  assert.ok(home.includes('if(product.imageUrl)return product.imageUrl'));
+  assert.ok(home.includes('product.imageUrl'));
+  assert.ok(home.includes('stage1-product-image-empty'));
+  for(const forbidden of['/brand/p0-riceball.webp','/brand/mf-home-hero-salad.webp','/brand/mf-home-hero-bowl.webp'])assert.ok(!home.includes(forbidden),forbidden);
 });
 
 test('UI2 keeps canonical product media and FINAL zero-result female IP repair',()=>{
