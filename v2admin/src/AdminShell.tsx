@@ -2,7 +2,7 @@ import {useEffect,useRef,useState,type ReactNode} from 'react';
 import {NavLink,useLocation,useNavigate} from 'react-router';
 import {ADMIN_CAPABILITY_GROUPS,findAdminCapability} from './admin-capabilities.ts';
 import {readActiveAdminRelease,type ActiveAdminReleaseRef} from './admin-local-store.ts';
-import {readAdminSyncAcks,readAdminSyncStatus,type AdminSyncStatus} from './admin-sync-client.ts';
+import {readAdminSyncAcks,readAdminSyncDiagnosticSnapshot,readAdminSyncStatus,type AdminSyncStatus} from './admin-sync-client.ts';
 import {AdminStatusBadge,type AdminTone} from './AdminUiPrimitives.tsx';
 
 const statusLabel={
@@ -52,6 +52,21 @@ function AdminSyncTopState(){
   const [version,setVersion]=useState(0);
   const [acks,setAcks]=useState<readonly AdminSyncAckView[]>([]);
   const [online,setOnline]=useState(()=>typeof navigator==='undefined'||navigator.onLine);
+  const [runtimeSource,setRuntimeSource]=useState('checking');
+
+  useEffect(()=>{
+    let active=true;
+    void fetch('/api/health?adminRuntimeDiagnostic=R4',{
+      method:'GET',
+      cache:'no-store',
+      credentials:'same-origin',
+      headers:{accept:'application/json','cache-control':'no-cache'},
+    }).then(async response=>{
+      const body=await response.json().catch(()=>({})) as {sourceSha?:unknown};
+      if(active&&response.ok&&typeof body.sourceSha==='string')setRuntimeSource(body.sourceSha);
+    }).catch(()=>{if(active)setRuntimeSource('unavailable');});
+    return()=>{active=false;};
+  },[]);
 
   useEffect(()=>{
     let active=true;
@@ -82,11 +97,17 @@ function AdminSyncTopState(){
   void version;
   const activeRelease=readActiveAdminRelease();
   const status=readAdminSyncStatus();
+  const diagnostic=readAdminSyncDiagnosticSnapshot();
   const {tone,title,detail}=deriveAdminSyncPresentation({activeRelease,status,acks,online});
+  const short=(value?:string)=>value?value.replace('fnv1a32:','').slice(-8):'—';
+  const source=runtimeSource.length>=7?runtimeSource.slice(0,7):runtimeSource;
+  const canonical=short(diagnostic.canonicalHydrated?.fingerprint);
+  const queued=short(diagnostic.outbox[0]?.fingerprint);
 
   return <div className="mfk-admin-topstate" data-tone={tone} aria-live="polite">
     <AdminStatusBadge tone={tone}>{title}</AdminStatusBadge>
     <span>{detail}</span>
+    <code className="mfk-admin-runtime-diag" data-admin-runtime-diag="R4">{'R4 '+source+' · '+status.state+' · Q'+diagnostic.outboxCount+' · C'+canonical+(diagnostic.outboxCount?' · O'+queued:'')}</code>
   </div>;
 }
 
