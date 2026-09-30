@@ -121,119 +121,209 @@ R1 一次過重生包含所有目前 P0 / READY / READ_ONLY / GOVERNANCE Admin �
 
 ---
 
-# 4. Final Information Architecture｜鎖定
+# 4. Product Map / Functional IA｜鎖定
 
-R1 Desktop 主導航固定 8 組：
+Admin V3 Product Brief 必須係一張 **產品地圖**，唔係功能迷宮。
+
+## 4.1 Two-step discovery hard rule
+
+任何正式功能／工作區，使用者最多只可以用兩步搵到：
+
+**大 Menu → 細 Menu → 目標內容**
+
+- 第一步：大 Menu = 功能性／業務性分類。
+- 第二步：細 Menu = 具體管理頁。
+- 第二步完成後，內容區必須已經顯示使用者要搵嘅 List / Workspace。
+- 之後撳某個 Order / Product / Staff / Printer 等進 Detail / Settings / Edit，屬物件操作，唔係第三層導航。
+- 正常 discovery 禁止第三層 Sidebar / nested accordion chain。
+- 禁止「更多 → 平台 → 設定 → 其他」呢類 catch-all path。
+- 低頻正式功能仍要有清楚 primary home，唔可以因為低頻而收埋。
+- 功能數量唔係設計目標；**清楚易搵 > 導航數量少**。
+
+## 4.2 Primary home + contextual shortcut
+
+每個正式功能只得一個主要歸屬位置。
+
+其他相關頁可以：
+- 顯示該 task 所需嘅少量相關設定；
+- 提供 direct deep-link 去真正管理頁。
+
+但禁止：
+- 複製第二套設定模型；
+- 建第二 authority；
+- 因方便而令兩個 domain 都可以獨立寫同一份正式 truth。
+
+例：
+- 產品詳情可以設定「呢件產品要印乜」，亦可「前往打印管理」。
+- 完整 Logical Printer / Template / Route / Device 管理由「打印管理」負責。
+
+## 4.3 大 Menu｜功能性分類
 
 1. **今日**
-2. **訂單**
-3. **菜單**
-4. **營運**
-5. **連接與設備**
-6. **人員**
-7. **報表**
-8. **設定**
+2. **訂單管理**
+3. **菜單管理**
+4. **營運管理**
+5. **平台／渠道管理**
+6. **打印管理**
+7. **裝置管理**
+8. **人員與權限**
+9. **報表**
+10. **發佈與版本**
+11. **門店設定**
+12. **系統管理**
 
-禁止再新增第 9 個第一層導航，除非 Owner 修改 Product Brief。
+以上數量唔係硬上限。
+Owner 可按產品需要新增、合併或改名；禁止為追求「少 Menu」而將功能收埋。
 
 ---
 
-# 5. Route Map｜鎖定
+# 5. Product Map / Route Map｜鎖定
+
+所有細 Menu 都係第二步；揀完即到目標 List / Workspace。
 
 ## 今日
 - /admin/overview — 營運總覽
-- /admin/action-queue — 待處理／異常
+- /admin/action-queue — 待處理事項
 
-## 訂單
+## 訂單管理
 - /admin/orders/open — 進行中訂單
 - /admin/orders/history — 訂單歷史
-- /admin/orders/exceptions — 退款／異常
+- /admin/orders/aftersales — 售後／退款／取消／修正
+- /admin/orders/exceptions — 訂單異常
+
+## 菜單管理
+- /admin/catalog/categories — 分類管理
+- /admin/catalog/products — 產品管理
+- /admin/catalog/modifiers — 選項／口味管理
+- /admin/catalog/combos — 套餐管理
+- /admin/catalog/pricing — 價格管理
+- /admin/catalog/menu-display — 顯示與排序
 - /admin/availability — 售罄／供應
 
-## 菜單
-- /admin/catalog/products — 商品資料
-- /admin/catalog/categories — 分類與結構
-- /admin/catalog/menu-display — 顯示排序
-- /admin/catalog/modifiers — 選項中心
-- /admin/catalog/pricing — 價格管理
-- /admin/catalog/combos — 套餐
-
-## 營運
-- /admin/business-day — 營業日／交更
+## 營運管理
+- /admin/business-day — 營業日
 - /admin/cash-close — 現金／收舖
-- /admin/operations/capacity — 每日產能／原料額度
+- /admin/operations/capacity — 產能／原料額度
 
-## 連接與設備
-- /admin/channels — 平台管理
+## 平台／渠道管理
+- /admin/channels — 平台總覽
 - /admin/channels/accept-policy — 接單規則
 - /admin/channels/sync-policy — 供應同步
-- /admin/channels/net-estimate — 實收估算設定
-- /admin/channels/store-binding — 門店授權映射
+- /admin/channels/store-binding — 門店綁定
 - /admin/channels/product-mapping — 商品映射
 - /admin/channels/mapping-failure — 匹配失敗
+- /admin/channels/net-estimate — 實收估算
 - /admin/channels/settlement — 平台對帳
-- /admin/print — 打印中心
+
+## 打印管理
+- /admin/print — 打印總覽
+- /admin/print/printers — 邏輯打印機
 - /admin/print/templates — 打印模板
 - /admin/print/rules — 打印規則
-- /admin/devices — 裝置管理
-- /admin/ota — 裝置版本
+- /admin/print/exceptions — 打印狀態／異常
 
-## 人員
-- /admin/staff — 員工／權限
-- /admin/access — Login / Session / Scope / Trusted Device
+## 裝置管理
+- /admin/devices — 裝置狀態
+- /admin/ota — OTA／版本
+
+## 人員與權限
+- /admin/staff — 員工管理
+- /admin/roles — 角色管理
+- /admin/permissions — 權限管理
+- /admin/access — 登入／Session／Trusted Device
 
 ## 報表
-- /admin/reports/sales
-- /admin/reports/products
-- /admin/reports/channels
-- /admin/reports/refunds
-- /admin/reports/operations
-- /admin/reports/export — 匯出治理
+- /admin/reports/sales — 銷售
+- /admin/reports/products — 產品
+- /admin/reports/channels — 渠道
+- /admin/reports/refunds — 退款
+- /admin/reports/operations — 營運
+- /admin/reports/export — 匯出
 
-## 設定
-- /admin/store/settings
-- /admin/store/quick-reasons
-- /admin/publish
-- /admin/system/diagnostics
-- /admin/system/integrations
-- /admin/system/audit
-- /admin/system/advanced
+## 發佈與版本
+- /admin/publish/pending — 未發佈變更
+- /admin/publish — 發佈中心
+- /admin/publish/versions — 版本／Readback
+- /admin/publish/rollback — 回復版本
 
-P1 routes保留但 R1 nav 不曝光。
+## 門店設定
+- /admin/store/settings — 門店資料
+- /admin/store/hours — 營業時間
+- /admin/store/business-day — Business Day 分界
+- /admin/store/operations — 營運時間／提醒設定
+- /admin/store/quick-reasons — 快捷原因
+
+## 系統管理
+- /admin/system/audit — 操作記錄
+- /admin/system/diagnostics — 系統診斷
+- /admin/system/integrations — 系統整合
+- /admin/system/advanced — 進階／Effective Settings
+
+P1 routes 可以保留，但 R1 navigation 唔曝光 placeholder。
 
 ---
 
 # 6. Global Shell UI｜鎖定
 
-## Desktop ≥1180px
-- 左 rail：232px，固定。
-- Topbar：64px，sticky。
-- 主內容：max-width 1440px。
-- Rail 顯示 8 個 group；active group 明顯。
-- Topbar 左：Group / Page title。
-- Topbar 右：
-  - Store（MF01）
-  - Cloud freshness
-  - Session user
-  - Global status trigger
-  - Account menu
+## Desktop
 
-## Tablet 768–1179px
-- Rail 收成 72px icon/number rail。
-- 點 group 打開 context panel。
-- 內容保持同 Desktop component hierarchy。
+核心 navigation 採 **兩步可見模型**：
 
-## Mobile <768px
-- 頂部：Page title + Store + status。
-- 底部固定 5 格：
-  - 今日
-  - 訂單
-  - 菜單
-  - 營運
-  - 更多
-- 「更多」sheet 收：連接與設備 / 人員 / 報表 / 設定。
-- 禁止整頁水平 scroll。
-- Table 要轉 stacked row 或局部 scroll container。
+左側第一欄：大 Menu / Functional Domain。  
+左側第二欄：目前大 Menu 對應嘅全部細 Menu。
+
+規則：
+- 大 Menu 全部有清楚文字標籤。
+- 細 Menu 一次顯示目前 domain 全部正式頁面；禁止再加第三層 Sidebar。
+- Active 大 Menu / 細 Menu 必須清楚。
+- 兩個 navigation rail 可獨立 scroll，但唔可以靠 hover 先知道名稱。
+- 內容區只處理 List / Detail / Create / Edit / Workflow。
+- Breadcrumb 只顯示 context，唔用嚟補救隱藏 navigation。
+- Topbar sticky 64px。
+- Main content 保持合理閱讀寬度；禁止 page-level horizontal scroll。
+
+Topbar：
+- Page title
+- Store（MF01）
+- Cloud freshness
+- Session user
+- Global status trigger
+- Account menu
+
+## Tablet
+
+保留同一 IA：
+**大 Menu → 細 Menu → Content**
+
+可以：
+- 大 Menu rail 收窄；
+- 細 Menu 用固定／overlay panel。
+
+但禁止：
+- 將正式功能塞入「更多」；
+- 改變 desktop / tablet 功能歸屬。
+
+## Mobile
+
+Mobile 只改呈現，唔改資訊架構。
+
+入口：
+- 頂部 Menu button 打開完整功能導航。
+- 第一頁顯示全部大 Menu。
+- 撳大 Menu 後顯示該 domain 全部細 Menu。
+- 撳細 Menu 即進目標內容。
+- 可以返回「全部功能」。
+
+禁止：
+- 用「更多」做 catch-all；
+- 三層 nested menu；
+- desktop 有直接入口、mobile 卻收埋去另一條 IA。
+
+內容頁：
+- Page title + Store + status
+- List 轉 stacked records
+- Detail/Edit 保持同 desktop 欄位語義
+- 無 page-level horizontal scroll
 
 ---
 
@@ -1299,6 +1389,8 @@ One-shot Admin V3 rebuild default只准：
 - Query failure顯 0 / empty
 - Unknown顯 Failed
 - mobile 爆版
+- 正常功能需要第三層隱藏 Menu／nested accordion 先搵到
+- 正式功能被收埋入「更多」或其他 catch-all bucket
 - placeholder page充數
 - P1 偷入 R1主導航
 - backend/v2 scope 被偷偷改
