@@ -4,6 +4,8 @@ export const SMT_PUBLIC_MIRROR_HOSTS=Object.freeze([
   'smt.morefunos.com',
 ]);
 
+export const SMT_WEB_ACCEPTANCE_HOSTS=SMT_PUBLIC_MIRROR_HOSTS;
+
 export function isSmtPublicMirror(){
   return typeof window!=='undefined'&&SMT_PUBLIC_MIRROR_HOSTS.includes(window.location.hostname);
 }
