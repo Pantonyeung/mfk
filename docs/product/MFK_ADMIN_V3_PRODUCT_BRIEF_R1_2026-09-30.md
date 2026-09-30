@@ -7865,3 +7865,496 @@ First Viewport 盤點完成後，
 
 MILESTONE:
 MFK_ADMIN_V3_FIRST_VIEWPORT_ACCEPTANCE_54_OF_54_COMPLETE
+
+---
+
+# 57. 跨頁互動盤點 V1｜Batch 1：核心工作路線
+
+本輪開始驗「由一頁去另一頁，再返轉頭」嘅完整工作體驗。
+
+目的：
+- Deep-link 唔可以掉 context
+- Back 唔可以返錯地方
+- Filter / Sort / Scroll 唔可以無故消失
+- Draft 唔可以跨頁後令人以為已發佈
+- Mobile navigation 唔可以每次重新由首頁開始
+- 相關頁捷徑唔可以變第二套 Primary Home
+
+---
+
+## 57.1 全局跨頁互動硬規則
+
+### A. Deep-link 必須帶住有用 context
+
+至少可以帶：
+- store / scope
+- source page
+- return target
+- object identity
+- date / business day
+- active filter
+- selected view / tab
+- incident / action item identity
+- release / version identity
+
+但禁止：
+- 將 browser local state 當 canonical business truth
+- URL / client state 帶 secret
+- 用 deep-link 參數改寫 authority
+
+Deep-link 只係「帶你去正確位置」，
+唔係第二資料來源。
+
+### B. Back 行為
+
+由 A → B：
+
+如果 B 係由 A contextual deep-link 入去，
+Back 必須優先返：
+- 原 A 頁
+- 原 filter
+- 原 sort
+- 原 search
+- 原 scroll / selected row context（合理可恢復時）
+
+唔可以一律返 Dashboard / domain root。
+
+如果使用者直接開 B URL：
+Back 行為跟正常 browser history；
+頁內提供「返回列表」時返 B 自己 Primary Home。
+
+### C. Filter / Sort / View preservation
+
+List → Detail → Back：
+必須保留：
+- search
+- filters
+- sort
+- saved view
+- selected tab
+- page / cursor（合理時）
+- scroll anchor
+
+保存方法可以係 URL / router state / query cache / approved client UI state，
+但唔可以變成 server truth。
+
+### D. Draft continuity
+
+正式規則：
+
+1. **已保存 Draft**
+   - 跨頁後 Draft Bar 繼續存在
+   - 顯示 canonical draft count / domain
+   - 可以由任何 config page deep-link 去「未發佈變更」
+
+2. **未保存表單修改**
+   - 離頁前必須明示：
+     - 繼續編輯
+     - 放棄未保存變更
+     - 儲存草稿後離開（只有正式 draft contract 支援時）
+   - 唔可以 silently 丟失
+
+3. Reload / new browser context：
+   - 只恢復正式 server draft
+   - 無 server draft support 嘅 unsaved edit 唔可以靠 localStorage 暗中復活
+
+### E. Mobile navigation continuity
+
+Mobile：
+- Drawer 打開時保留目前 domain
+- 返回上一頁唔重置到「今日」
+- List → Detail → Back 保留原 list context
+- Drawer 揀另一細 Menu 後即關 drawer，進新 workspace
+- Detail 入面跨 domain deep-link，Back 要返來源 Detail / List
+
+---
+
+# 57.2 核心工作路線驗收
+
+| # | 起點 | 目的地 | 必須帶 context | 返回行為 | Status |
+|---|---|---|---|---|---|
+| 1 | 今日／營運總覽 | 報表／銷售 | Store + 今日/Business Day + timeframe | 返回今日原位置 | LOCKED |
+| 2 | 今日／待處理事項 | 責任 Domain | Action Item + object + source queue | 處理後返同一 Queue filter | LOCKED |
+| 3 | 訂單異常 | Order Detail | Order identity + issue context | 返回原 Exception filter/scroll | LOCKED |
+| 4 | Order Detail／打印摘要 | 打印狀態／異常 | Order + ticket / print context | 返回同一 Order Detail tab | LOCKED |
+| 5 | Product Detail／打印 | 打印管理 | Product + current print context | 返回同一 Product Detail | LOCKED |
+| 6 | Product Detail／可售摘要 | 售罄／供應 | Product identity | 返回 Product Detail | LOCKED |
+| 7 | 商品映射 | Product Detail | MFK Product + platform mapping context | 返回原 mapping row/filter | LOCKED |
+| 8 | 匹配失敗 | 商品映射 | External object + platform + issue | 修正後返 failure list / refresh | LOCKED |
+| 9 | 未發佈變更 | 原 Object Detail | Object + draft change identity | 返回未發佈變更原 filter | LOCKED |
+| 10 | 版本／Readback | 系統診斷 | Release + target + mismatch state | 返回同一 Version Detail | LOCKED |
+| 11 | 報表 drill-down | 訂單歷史／售後 | 日期 + scope + metric filter | 返回原 report range | LOCKED |
+| 12 | Staff / Role Detail | 操作記錄 | Staff / role target + time context | 返回原 detail | LOCKED |
+
+---
+
+## 57.3 今日 → 銷售報表
+
+起點：
+**今日 / 營運總覽**
+
+撳：
+**查看銷售報表**
+
+目的地：
+**報表 / 銷售**
+
+必須自動帶：
+- current store
+- current Business Day / today range
+- 同首頁一致嘅 metric scope
+- comparison context（如有）
+
+唔可以：
+- 入到報表變咗「最近 30 日」
+- 換咗另一間店
+- Sales semantic 同首頁唔一致
+
+返回：
+- 返回今日
+- 首頁 scroll 返原本 sales / summary context
+
+Status：**LOCKED**
+
+---
+
+## 57.4 Action Queue → 責任頁 → 返回 Queue
+
+起點：
+**今日 / 待處理事項**
+
+例：
+「Keeta 有 3 件商品映射失敗」
+
+撳：
+**處理**
+
+目的地：
+**平台／渠道管理 / 匹配失敗**
+並帶：
+- action item identity
+- platform
+- affected object(s)
+- source = Action Queue
+
+處理完成：
+- 先由正式 mapping/readback 證明問題已解決
+- Action Queue refresh / reconcile
+- item 可以由 Open → Resolved
+
+返回：
+- 保留原 Queue：
+  - Severity filter
+  - Domain filter
+  - scroll
+  - search
+
+禁止：
+- 喺 Queue 自己另做 mapping mutation
+- 修正 mapping 就即刻 browser-only 隱藏 item
+
+Status：**LOCKED**
+
+---
+
+## 57.5 Order Exception → Order → Print / Payment / Platform
+
+Order exception 係「問題入口」，
+唔係第二 mutation center。
+
+### 例 A：打印問題
+訂單異常
+→ Order Detail
+→ 打印摘要
+→ 打印管理 / 打印狀態／異常
+
+帶：
+- Order identity
+- ticket type
+- logical destination（如有）
+- source issue
+
+返回：
+打印 Detail
+→ Order Detail 原 tab
+→ 訂單異常原 filter
+
+### 例 B：Platform mapping
+Order Detail
+→ Platform issue
+→ 商品映射 / 匹配失敗
+
+修 mapping 後：
+- 唔自動 replay 舊 transaction
+- 返回 Order Detail 後重新 readback / reconcile
+
+Status：**LOCKED**
+
+---
+
+## 57.6 Product Detail → 相關 Domain
+
+Product Detail 可以 contextual 顯：
+- 可售摘要
+- 打印摘要
+- Option / Combo
+- 最近 Draft
+
+但正式管理位置保持唯一。
+
+### 打印
+Product Detail
+→ 前往打印管理
+
+帶：
+- Product identity
+- relevant printer/rule context
+
+返回：
+- Product Detail / 打印 section
+
+### 可售
+Product Detail
+→ 前往售罄／供應
+
+帶：
+- Product identity
+
+返回：
+- Product Detail / 可售摘要
+
+### Option / Combo
+如果 deep-link 去 reusable Option / Combo：
+- 帶 usage source = Product
+- 返回 Product Detail 原 context
+
+Status：**LOCKED**
+
+---
+
+## 57.7 Mapping ↔ Product
+
+商品映射：
+External Product ↔ MFK Product
+
+撳 MFK Product：
+→ 菜單管理 / Product Detail
+
+必須顯：
+- 目前 MFK Product truth
+- 唔將 External price / category 當 MFK truth
+
+返回：
+- 原 Platform
+- 原 mapping filter
+- 原 mapping row / scroll
+
+如果 Product 由 Detail 有正式 draft change：
+返回 mapping 後：
+- Mapping page refresh canonical product summary
+- 未 Publish 嘅 draft 唔可以冒充 external mapping 已同步
+
+Status：**LOCKED**
+
+---
+
+## 57.8 Draft Bar → 未發佈變更 → 發佈中心
+
+任何 config page 保存 Draft 後：
+
+Draft Bar：
+「X 項未發佈變更」
+
+撳「查看」：
+→ 發佈與版本 / 未發佈變更
+
+撳某一 change：
+→ 原 Object Detail
+
+Back：
+→ 未發佈變更原 filter / scroll
+
+撳「檢查並發佈」：
+→ 發佈中心
+→ Validate
+→ Impact
+→ Confirm
+→ Cloud Published
+→ Target Readback
+
+發佈完成後：
+返回原 config domain 時：
+- Draft Bar 清除 / 更新
+- 顯示最新 published/readback state
+- 唔靠 local browser flag 假裝 completed
+
+Status：**LOCKED**
+
+---
+
+## 57.9 Version / Readback → Diagnostics
+
+Version Detail：
+某 target = MISMATCH / UNKNOWN
+
+撳：
+**查看原因**
+
+→ 系統管理 / 系統診斷
+
+帶：
+- Release identity
+- target identity
+- desired
+- observed
+- mismatch / unknown state
+- last readback time
+
+Diagnostics：
+- FIRST BREAK
+- affected scope
+- safe next action
+
+返回：
+→ 同一 Version Detail
+→ 重新 reconcile / refresh
+
+禁止：
+- Diagnostics 自己修改 release history
+- Fix 完只靠 UI toggle 改成 MATCH
+
+Status：**LOCKED**
+
+---
+
+## 57.10 Report drill-down → Source records
+
+例：
+退款報表某日 $1,200
+→ 撳該 breakdown
+→ 訂單管理 / 售後
+
+帶：
+- date / Business Day
+- store
+- refund filter
+- metric definition context
+
+返回：
+- 原 report
+- 原 date range
+- 原 comparison
+- 原 scroll
+
+Report 本身保持 Read-only。
+
+Status：**LOCKED**
+
+---
+
+## 57.11 Staff / Role → Audit
+
+Staff Detail：
+撳「操作記錄」
+
+→ 系統管理 / 操作記錄
+
+帶：
+- actor/target filter
+- time range（如 relevant）
+
+返回：
+→ 原 Staff Detail
+
+Role Detail：
+可以帶 role filter / target reference，
+但 Audit record 仍係 immutable event truth。
+
+Status：**LOCKED**
+
+---
+
+# 57.12 跨頁返回優先次序
+
+系統應依次判斷：
+
+1. 有 contextual return source？
+   → 返回來源 context
+
+2. 無 contextual source，但 browser 有正常 history？
+   → browser back
+
+3. Direct URL / external entry？
+   → 提供「返回列表」去該 Object 嘅 Primary Home
+
+禁止：
+- 一律「返回首頁」
+- 一律「返回大 Menu」
+- Detail 關閉後掉晒 filter
+
+---
+
+# 57.13 URL / Router Context 原則
+
+可以用 URL/query 保存可分享嘅 UI context，例如：
+- store
+- businessDay
+- status
+- source
+- search
+- objectId
+- platform
+- date range
+- view
+
+唔應放入 URL：
+- PIN
+- token
+- secret
+- payment credential
+- private proof payload
+- sensitive PII
+
+Filter 可分享，
+Secret 不可分享。
+
+---
+
+# 57.14 Batch 1 結果
+
+本輪驗 12 條最核心跨頁工作路線：
+
+- **12 LOCKED**
+- **0 YELLOW**
+- **0 RED**
+
+無發現：
+- 第三層 Sidebar dependency
+- 需要第二 mutation authority
+- 必須靠 localStorage 先保持工作 context
+
+已鎖：
+- Deep-link context
+- Back behavior
+- Filter / sort / scroll preservation
+- Draft continuity
+- Mobile navigation continuity
+- Contextual shortcut 唔取代 Primary Home
+
+下一輪跨頁盤點：
+**Batch 2：危險操作 / Confirmation / Readback / Recovery 工作路線**
+
+包括：
+- Refund
+- Cancel
+- Publish
+- Rollback
+- Revoke Session
+- OTA
+- Sellability runtime action
+- Cash / Close
+- Platform pause/resume
+- Print recovery
+
+MILESTONE:
+MFK_ADMIN_V3_CROSS_PAGE_INTERACTION_AUDIT_BATCH1_LOCKED
