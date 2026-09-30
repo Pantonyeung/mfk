@@ -1004,6 +1004,11 @@ export class AdminSyncStore{
       cloudPublishedAt,
       sourcePublishFingerprint:envelope.fingerprint,
     });
+    await this.state.storage.put('admin:published:'+active.fingerprint,{
+      active,
+      cloudPublishedAt,
+      sourcePublishFingerprint:envelope.fingerprint,
+    });
 
     const doorbell=JSON.stringify({
       type:'ADMIN_CONFIG_AVAILABLE',
@@ -1597,14 +1602,15 @@ export class AdminSyncStore{
       let ack;
       try{ack=validateMfkAdminConfigAck(await request.json());}
       catch(error){return json({code:error instanceof Error?error.message:'ADMIN_CONFIG_ACK_INVALID'},400);}
-      const active=await this.state.storage.get('active');
-      if(!active)return json({code:'ADMIN_CONFIG_NOT_PUBLISHED'},409);
-      if(ack.revision!==active.revision||ack.fingerprint!==active.fingerprint){
-        return json({code:'ADMIN_CONFIG_ACK_MISMATCH',expectedRevision:active.revision,expectedFingerprint:active.fingerprint},409);
+      const published=await this.state.storage.get('admin:published:'+ack.fingerprint);
+      if(!published?.active)return json({code:'ADMIN_CONFIG_ACK_UNKNOWN_PUBLISH',fingerprint:ack.fingerprint},409);
+      if(ack.publishedAt!==published.active.publishedAt){
+        return json({code:'ADMIN_CONFIG_ACK_PUBLISH_TIME_MISMATCH',expectedPublishedAt:published.active.publishedAt},409);
       }
       const acks=await this.state.storage.get('acks')||{};
       acks[ack.deviceId]=ack;
       await this.state.storage.put('acks',acks);
+      await this.state.storage.put('admin:ack:'+ack.fingerprint+':'+ack.deviceId,ack);
       return json({state:'ACKED',ack});
     }
     if(url.pathname==='/acks'){
