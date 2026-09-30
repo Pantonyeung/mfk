@@ -97,7 +97,7 @@ export function PresentationWorkspace({surface}:{surface:'CUSTOMER'|'OWNER'|'FRO
     const result=saveAdminConfig(draft,undefined,'顯示設定 '+surface);
     if(!result.ok){setSaveErrors(result.errors);setSaveMessage('未能保存；請先修正設定驗證問題。');return;}
     setSaveErrors([]);
-    setSaveMessage('已建立正式發佈：'+hkTime(result.release.createdAt)+'（香港時間）；已排入 Admin → SMT／SMM 自動同步。');
+    setSaveMessage('已建立發佈要求；等待 Cloud 香港發佈時間，之後自動同步到 SMT／SMM。');
   };
   const title=surface==='CUSTOMER'?'客戶端首頁':surface==='OWNER'?'老闆今日首頁':'前線點單版面';
   return <section className="admin-editor-page">
