@@ -6,6 +6,15 @@ Scope: MFK governance and regression evidence only
 
 This layer wraps and references existing MFK checks. It does not replace Builder, deploy, OTA, package management, or product authority.
 
+## REMOTE_EVIDENCE_REQUIRED
+
+1. Local filesystem is working copy or backup only.
+2. Any report, audit, decision, acceptance record, issue registry, or referenced evidence used for project control must have a canonical remote copy.
+3. An Issue or PR may not claim evidence completeness if its cited evidence only exists locally.
+4. The remote evidence path must be stable and referenced from the controlling Issue or PR.
+5. Local backup is encouraged but never substitutes for remote project evidence.
+6. If evidence is too large or binary, store it in an approved remote artifact, repository, or linked canonical storage; a local path alone is not sufficient.
+
 ## Agent modes
 
 ### AUDIT
