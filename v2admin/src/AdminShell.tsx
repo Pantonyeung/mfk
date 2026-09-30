@@ -2,7 +2,7 @@ import {useEffect,useRef,useState,type ReactNode} from 'react';
 import {NavLink,useLocation,useNavigate} from 'react-router';
 import {ADMIN_CAPABILITY_GROUPS,findAdminCapability} from './admin-capabilities.ts';
 import {readActiveAdminRelease,type ActiveAdminReleaseRef} from './admin-local-store.ts';
-import {readAdminSyncAcks,readAdminSyncDiagnosticSnapshot,readAdminSyncStatus,type AdminSyncStatus} from './admin-sync-client.ts';
+import {readAdminRuntimeSourceSha,readAdminSyncAcks,readAdminSyncDiagnosticSnapshot,readAdminSyncStatus,type AdminSyncStatus} from './admin-sync-client.ts';
 import {AdminStatusBadge,type AdminTone} from './AdminUiPrimitives.tsx';
 
 const statusLabel={
@@ -56,15 +56,7 @@ function AdminSyncTopState(){
 
   useEffect(()=>{
     let active=true;
-    void fetch('/api/health?adminRuntimeDiagnostic=R4',{
-      method:'GET',
-      cache:'no-store',
-      credentials:'same-origin',
-      headers:{accept:'application/json','cache-control':'no-cache'},
-    }).then(async response=>{
-      const body=await response.json().catch(()=>({})) as {sourceSha?:unknown};
-      if(active&&response.ok&&typeof body.sourceSha==='string')setRuntimeSource(body.sourceSha);
-    }).catch(()=>{if(active)setRuntimeSource('unavailable');});
+    void readAdminRuntimeSourceSha().then(source=>{if(active)setRuntimeSource(source);});
     return()=>{active=false;};
   },[]);
 
