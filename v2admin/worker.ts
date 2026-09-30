@@ -971,7 +971,7 @@ export class AdminSyncStore{
   }
   async publishEnvelope(envelope){
     const current=await this.state.storage.get('active');
-    if(current&&envelope.adminFingerprint===current.adminFingerprint){
+    if(current&&envelope.adminFingerprint===current.adminFingerprint&&JSON.stringify(envelope.snapshot)===JSON.stringify(current.snapshot)){
       return{status:200,body:{state:'IDEMPOTENT',active:current,sourceFingerprint:envelope.fingerprint}};
     }
     const currentMeta=await this.state.storage.get('activeMeta')||{};
