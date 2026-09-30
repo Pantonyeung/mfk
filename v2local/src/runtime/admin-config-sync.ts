@@ -11,6 +11,10 @@ export interface SmtAdminSyncStatus{
   readonly state:SmtAdminSyncState;
   readonly revision:number;
   readonly fingerprint:string;
+  readonly publishedAt?:string;
+  readonly receivedAt?:string;
+  readonly appliedAt?:string;
+  readonly ackAt?:string;
   readonly updatedAt:string;
   readonly error?:string;
 }
@@ -61,6 +65,7 @@ export function readSmtAdminSyncStatus():SmtAdminSyncStatus{
     state:active?'LOCAL_LKG':'OFFLINE',
     revision:active?.revision??0,
     fingerprint:active?.fingerprint??'',
+    publishedAt:active?.publishedAt,
     updatedAt:active?.publishedAt??now(),
   });
 }
@@ -89,13 +94,28 @@ export function applyAdminConfigEnvelope(input:unknown):SmtAdminConfigApplyResul
     }
     if(nextPublishedAt===currentPublishedAt){
       if(next.fingerprint!==current.fingerprint)throw new Error('ADMIN_CONFIG_PUBLISHED_AT_CONFLICT');
-      setStatus({state:'SYNCED',revision:current.revision,fingerprint:current.fingerprint,updatedAt:now()});
+      const appliedAt=now();
+      setStatus({
+        state:'SYNCED',
+        revision:current.revision,
+        fingerprint:current.fingerprint,
+        publishedAt:current.publishedAt,
+        appliedAt,
+        updatedAt:appliedAt,
+      });
       return Object.freeze({disposition:'IDEMPOTENT',revision:current.revision,fingerprint:current.fingerprint});
     }
   }
-  // One localStorage replacement is the canonical atomic LKG switch.
   writeJson(SMT_ADMIN_CONFIG_LKG_KEY,next);
-  setStatus({state:'SYNCED',revision:next.revision,fingerprint:next.fingerprint,updatedAt:now()});
+  const appliedAt=now();
+  setStatus({
+    state:'SYNCED',
+    revision:next.revision,
+    fingerprint:next.fingerprint,
+    publishedAt:next.publishedAt,
+    appliedAt,
+    updatedAt:appliedAt,
+  });
   return Object.freeze({disposition:'APPLIED',revision:next.revision,fingerprint:next.fingerprint});
 }
 
@@ -106,6 +126,7 @@ async function ack(envelope:MfkAdminConfigEnvelope,disposition:'APPLIED'|'IDEMPO
     deviceId:readSmtDeviceId(),
     revision:envelope.revision,
     fingerprint:envelope.fingerprint,
+    publishedAt:envelope.publishedAt,
     appliedAt:now(),
     disposition,
   };
@@ -115,6 +136,13 @@ async function ack(envelope:MfkAdminConfigEnvelope,disposition:'APPLIED'|'IDEMPO
     body:JSON.stringify(body),
   });
   if(!response.ok)throw new Error('ADMIN_CONFIG_ACK_HTTP_'+response.status);
+  const ackAt=now();
+  const status=readSmtAdminSyncStatus();
+  if(status.fingerprint===envelope.fingerprint)setStatus({...status,ackAt,updatedAt:ackAt});
+  try{
+    const diag=readJson<Record<string,unknown>>(ADMIN_PROPAGATION_DIAG_KEY,{});
+    writeJson(ADMIN_PROPAGATION_DIAG_KEY,{...diag,ackAt});
+  }catch{}
 }
 
 let adminConfigFetchInFlight:Promise<SmtAdminConfigApplyResult|null>|null=null;
@@ -127,12 +155,13 @@ export async function fetchAndApplyAdminConfig(){
     state:'CONNECTING',
     revision:current?.revision??0,
     fingerprint:current?.fingerprint??'',
+    publishedAt:current?.publishedAt,
     updatedAt:now(),
   });
   try{
     const response=await fetch(SMT_ADMIN_CONFIG_ENDPOINT+'/api/admin-sync/active?storeId=MF01',{cache:'no-store'});
     if(response.status===404){
-      setStatus({state:current?'LOCAL_LKG':'OFFLINE',revision:current?.revision??0,fingerprint:current?.fingerprint??'',updatedAt:now()});
+      setStatus({state:current?'LOCAL_LKG':'OFFLINE',revision:current?.revision??0,fingerprint:current?.fingerprint??'',publishedAt:current?.publishedAt,updatedAt:now()});
       return null;
     }
     if(!response.ok)throw new Error('ADMIN_CONFIG_FETCH_HTTP_'+response.status);
@@ -152,6 +181,7 @@ export async function fetchAndApplyAdminConfig(){
       state:lkg?'LOCAL_LKG':'ERROR',
       revision:lkg?.revision??0,
       fingerprint:lkg?.fingerprint??'',
+      publishedAt:lkg?.publishedAt,
       updatedAt:now(),
       error:error instanceof Error?error.message:'ADMIN_CONFIG_SYNC_FAILED',
     });
@@ -201,7 +231,7 @@ function connectDoorbell(){
             }));
           }catch{}
           const status=readSmtAdminSyncStatus();
-          setStatus({...status,updatedAt:receivedAt});
+          setStatus({...status,receivedAt,updatedAt:receivedAt});
           // Every Admin publish notification forces a canonical pull.
           // SMT does not decide whether an Admin publish is worth receiving.
           void fetchAndApplyAdminConfig();
@@ -225,7 +255,7 @@ export function installSmtAdminAutoSync(){
   const onVisibility=()=>{if(document.visibilityState==='visible')reconcile();};
   const onOffline=()=>{
     const lkg=readSmtAdminConfigLkg();
-    setStatus({state:lkg?'LOCAL_LKG':'OFFLINE',revision:lkg?.revision??0,fingerprint:lkg?.fingerprint??'',updatedAt:now()});
+    setStatus({state:lkg?'LOCAL_LKG':'OFFLINE',revision:lkg?.revision??0,fingerprint:lkg?.fingerprint??'',publishedAt:lkg?.publishedAt,updatedAt:now()});
     try{socket?.close();}catch{}
   };
   window.addEventListener('online',onOnline);
