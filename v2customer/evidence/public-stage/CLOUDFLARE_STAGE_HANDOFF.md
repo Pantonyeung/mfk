@@ -16,3 +16,5 @@ Rule:
 Required GitHub repository secrets:
 - `CLOUDFLARE_API_TOKEN`
 - `CLOUDFLARE_ACCOUNT_ID`
+
+Trigger: 2026-10-01 initial public deployment requested by Owner.
