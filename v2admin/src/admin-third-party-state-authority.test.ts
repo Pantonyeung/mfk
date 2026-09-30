@@ -27,6 +27,7 @@ describe('MFK web state sovereignty TQ1',()=>{
     expect(main).toContain('client={adminQueryClient}');
     expect(bootstrap).toContain('adminQueryClient.fetchQuery(adminCanonicalSessionQueryOptions())');
     expect(bootstrap).toContain('adminQueryClient.fetchQuery(adminCanonicalPublisherQueryOptions())');
+    expect(bootstrap).toContain('canonicalQuery.dataUpdatedAt');
     expect(bootstrap).not.toContain('readCanonicalAdminActive()');
     expect(bootstrap).not.toContain('readCanonicalAdminActiveWithPublisherKey()');
     expect(queryClient).toContain("refetchOnMount:'always'");
