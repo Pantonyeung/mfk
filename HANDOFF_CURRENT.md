@@ -1,3 +1,41 @@
+# ADMIN V3 ONE-SHOT IMPLEMENTATION｜2026-09-30
+
+Owner instruction:
+`開始實作`
+
+Product Brief R1:
+- approved and merged to Main at `3c6c00d032eec121f1b6f1a9c059a3215c572ef0`
+- controlling product spec: `docs/product/MFK_ADMIN_V3_PRODUCT_BRIEF_R1_2026-09-30.md`
+
+Implementation:
+- branch: `feat/MFK-V3ADMIN-ONE-SHOT-R1`
+- status: Gate 1 IN PROGRESS
+- v2 production remains live
+- zero V3 production routing
+
+A1/A2:
+- PR #599 = BANK / SELECTIVE REUSE only
+- #600 = SPEC / RESEARCH REFERENCE only
+
+Gate 1:
+- client build identity
+- serving release identity
+- memory-only auth
+- centralized Store/Scope context
+- shared canonical envelope validator
+- TanStack Query canonical read
+- no v2 localStorage
+- no v2 client-state imports
+- zero-routing CI
+
+Next:
+UI Shell / Design System, then the Keeta acceptance vertical slice.
+
+MILESTONE:
+`MFK_ADMIN_V3_ONE_SHOT_IMPLEMENTATION_STARTED`
+
+---
+
 # ADMIN V3 CURRENT PRODUCT PHASE｜2026-09-30
 
 Controlling product candidate:
