@@ -89,7 +89,7 @@ Hard prohibitions:
 
 Single active Admin V3 phase:
 
-`V3ADMIN_PRODUCT_BRIEF_LOCK_R1`
+`V3ADMIN_ONE_SHOT_IMPLEMENTATION_R1`
 
 Controlling product candidate:
 
@@ -100,10 +100,13 @@ Product issue:
 `#601`
 
 Execution state:
-- A0 foundation remains merged and zero-routed.
-- A1 PR #599 is parked as implementation reference only; do not merge it while Product Brief R1 is being locked.
-- A2 issue #600 is superseded as an implementation roadmap by Product Brief #601; its detailed read-model ideas may be reused only where consistent with the Product Brief.
-- No Codex one-shot implementation starts until Product Brief #601 is approved/published into Main.
+- Product Brief R1 is approved and merged to Main at `3c6c00d032eec121f1b6f1a9c059a3215c572ef0`.
+- Owner instruction on 2026-09-30: `開始實作`.
+- One-shot implementation branch: `feat/MFK-V3ADMIN-ONE-SHOT-R1`.
+- A0 foundation remains the base.
+- A1 PR #599 is BANK / SELECTIVE REUSE only; it must not be merged as the implementation path.
+- A2 issue #600 is SPEC / RESEARCH REFERENCE ONLY.
+- Current implementation starts at Gate 1: client release identity + auth/scope + canonical read + zero-v2-state guard.
 - No V3 production deploy or hostname cutover is authorized.
 
 One-shot strategy:
@@ -151,16 +154,16 @@ Owner may authorize a later bounded promotion after reviewing candidate evidence
 
 ## 8. Exact NEXT
 
-1. Review Product Brief #601 / Draft PR #602.
-2. Owner must explicitly issue PROMOTE before the product-spec PR may be merged.
-3. After PROMOTE, merge the product-spec-only PR; no runtime deploy.
-4. Bank A1/A2 incremental work as reference, not as partial product promotion.
-5. Prepare the one-shot Codex implementation packet from the approved Product Brief.
-6. Execute R2 A0→A6 as internal engineering / acceptance gates inside the one-shot build; no A-stage production promotion.
-7. Codex may modify only explicitly allowed V3 paths and approved bounded seams.
-8. Build the complete Admin V3 R1 in isolation.
-9. Run full automated + V3 preview physical acceptance, including verified rollback to v2.
+1. Complete Gate 1 on `feat/MFK-V3ADMIN-ONE-SHOT-R1`.
+2. Gate 1 must prove client release identity, serving identity, memory-only auth, centralized scope and shared-contract canonical read.
+3. CI + review must be GREEN.
+4. Then build the Product Brief UI Shell / Design System.
+5. Then complete the first vertical slice: Category → Product → Price → Draft → Publish → Cloud readback → SMT readback → Safari reopen convergence.
+6. Continue A2/A3/A5/A6 as internal engineering gates inside the same one-shot program.
+7. Dexie/A4 remains disabled unless offline formal command is explicitly approved.
+8. Build all 53 Product Brief destinations in isolation.
+9. Run automated + V3 preview physical acceptance, including Safari / in-app browser / second-tab convergence and verified rollback to v2.
 10. Only then propose production cutover.
-11. Merge / deploy / route switch still requires the applicable explicit Owner PROMOTE.
+11. Merge / deploy / route switch to production still requires the applicable explicit Owner PROMOTE.
 
-MILESTONE: `MFK_ADMIN_V3_PRODUCT_BRIEF_LOCK_R1_ACTIVE`
+MILESTONE: `MFK_ADMIN_V3_ONE_SHOT_IMPLEMENTATION_R1_ACTIVE`
