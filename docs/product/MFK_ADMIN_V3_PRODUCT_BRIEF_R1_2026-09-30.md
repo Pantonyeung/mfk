@@ -198,9 +198,9 @@ Owner 可按產品需要新增、合併或改名；禁止為追求「少 Menu」
 - /admin/catalog/combos — 套餐管理
 - /admin/catalog/pricing — 價格管理
 - /admin/catalog/menu-display — 顯示與排序
-- /admin/availability — 售罄／供應
 
 ## 營運管理
+- /admin/availability — 售罄／供應
 - /admin/business-day — 營業日
 - /admin/cash-close — 現金／收舖
 - /admin/operations/capacity — 產能／原料額度
@@ -383,73 +383,281 @@ Color 永遠唔可以係唯一狀態訊號；一定有文字。
 
 ---
 
-# 9. 今日 / Command Center｜鎖定
+# 9. 今日｜鎖定
 
-首頁回答四件事：
+「今日」係每日返工入口，但唔係唯一搵功能入口。
 
+Sidebar 細 Menu 只保留：
+- 營運總覽
+- 待處理事項
+
+其他正式功能仍然由自己大 Menu → 細 Menu 兩步直接到達。
+今日頁只做：
+**總覽、提醒、捷徑。**
+唔建立第二套 mutation authority。
+
+## 9.1 營運總覽
+
+入口：
+**今日 → 營運總覽**
+
+第二步完成後直接見今日營運狀況。
+
+第一屏只回答四件事：
 1. 今日可唔可以正常營業？
-2. 有冇異常要處理？
-3. 有冇未發佈改動？
+2. 有冇真正要處理嘅問題？
+3. 有冇未發佈變更？
 4. 今日核心營運數據係乜？
 
-## Above the fold
-A. Readiness strip
-- Business Day
-- Channel
-- SMT / Device
-- Printer
-- Menu / Config
-- Sellability
-每項：Ready / Attention / Unknown + freshness。
+## 9.2 今日營運狀態
 
-B. KPI
+最上方係 compact Readiness Strip，
+唔做一牆 equal-weight status cards。
+
+固定 domain：
+- 營業日
+- 訂單／交易
+- 平台／渠道
+- SMT／裝置
+- 打印
+- 菜單／版本
+- 售罄／供應
+
+每項只顯：
+- 正常
+- 要留意
+- 結果未明
+- 資料過期
+
+加：
+- freshness
+- affected count（有意義先顯）
+- 點擊 deep-link 去 Primary Home
+
+禁止：
+- 單一「全系統正常」綠燈
+- Connected 當 Ready
+- Stale 當 Healthy
+- Error 當 0
+
+## 9.3 今日核心數字
+
+只保留最有用 4 個：
 - Effective Sales
 - Orders
 - AOV
 - Refund / Adjustment
-只用正式 read model。
 
-C. Unified Action Queue
-- blocker
-- refund reconcile
-- channel sync
-- printer fail
-- publish mismatch
-- device/config drift
-同一 incident dedupe；點入責任 Domain。
+全部來自正式 read model。
 
-D. Pending Changes
-- 幾多 draft changes
-- 影響 Domain
-- 最後修改時間
-- CTA：檢查並發佈
+顯示：
+- Current value
+- 合理 comparison（最多一個）
+- Freshness
 
-E. Daily actions
-- Open/Close Business Day
-- Cash handover
-- Quick sellability
-但 mutation 由責任 Domain page 執行，首頁只 deep-link。
+唔將首頁變完整報表。
+需要分析就 deep-link：
+**報表 → 銷售**
+
+## 9.4 要處理
+
+首頁只顯最高優先嘅 Action Queue preview：
+- Severity
+- Title
+- Domain
+- Affected object
+- Last observed
+- CTA：處理
+
+最多顯示一個有限數量，例如 5–8 條；
+其餘：
+**查看全部 → 今日 / 待處理事項**
+
+同一 incident 必須 dedupe。
+唔可以平台頁一條、打印頁一條、首頁又變第三個獨立 issue truth。
+
+## 9.5 未發佈變更
+
+顯示：
+- Draft change count
+- Affected domains
+- Last modified
+- Validation blocker count（如有）
+
+CTA：
+- 查看變更 → 發佈與版本 / 未發佈變更
+- 檢查並發佈 → 發佈與版本 / 發佈中心
+
+Save Draft ≠ Published。
+首頁唔自己建立 publish engine。
+
+## 9.6 今日常用工作
+
+可以顯 contextual shortcut：
+- 開始／查看營業日
+- 準備收舖
+- 現金／交更
+- 售罄／恢復供應
+- 查看進行中訂單
+
+但全部 deep-link 去責任 Domain。
+
+例如：
+- 營業日 → 營運管理 / 營業日
+- 現金 → 營運管理 / 現金／收舖
+- 售罄 → 營運管理 / 售罄／供應
+- 訂單 → 訂單管理 / 進行中訂單
+
+首頁唔放第二套正式 mutation form。
+
+## 9.7 今日頁 human-first rule
+
+正常使用者第一眼只需要知道：
+- 今日營業未
+- 有冇單
+- 有冇錢／退款異常
+- 平台接單正常未
+- 打印／裝置有冇問題
+- 有冇未發佈改動
+- 下一件最重要要處理乜
+
+工程資訊例如：
+- operation ID
+- raw health code
+- revision token
+- internal UUID
+
+全部唔應該出現在今日首頁。
 
 ---
 
-# 10. Unified Action Queue｜鎖定
+# 10. 待處理事項｜鎖定
 
-Queue row：
+入口：
+**今日 → 待處理事項**
+
+第二步完成後直接見 Unified Action Queue。
+
+呢頁回答：
+「而家有咩真正需要人處理？」
+
+Queue 本身唔擁有 business mutation。
+每一條 action item 都 deep-link 去唯一責任 Primary Home。
+
+## 10.1 Queue List
+
+Search / Filter：
+- Severity
+- Domain
+- Current state
+- Assignee / owner（如正式 model 有）
+- Freshness
+- Open / resolved
+- Search target / display number
+
+Row：
 - Severity
 - Domain
 - Title
-- Object
+- Affected object
+- Business impact
+- Current state
 - First seen
 - Last observed
-- Current state
 - Freshness
-- CTA「處理」
+- Owner / assignee（如有）
+- CTA：處理
 
-Queue 不可有直接 mutation button。
+## 10.2 可入 Queue 嘅類型
 
-Resolve 條件：
-- targeted readback 已證明 recovered。
-- 冇 proof 不可標 Resolved。
+例如：
+- Order payment / reconcile attention
+- Refund / correction unresolved
+- Channel sync / mapping mismatch
+- Printer / print-job exception
+- Publish / config mismatch
+- Device / version drift
+- Integration authorization issue
+- Close-day blocker
+- Other formal business attention
+
+禁止將每個 warning / log / telemetry event 都倒入 Queue。
+
+Queue item 必須有：
+- business impact
+- responsible domain
+- current evidence
+- owner / next action
+
+## 10.3 Dedupe / ownership
+
+同一 incident 只得一個 canonical Action Item。
+
+例如一張 Keeta Order 因 mapping 失敗：
+- Queue 可以顯一條 action
+- Order Detail 可以 contextual 顯同一 action
+- Platform Mapping Failure 可以 contextual 顯同一 action
+
+但唔可以建立三條互相獨立、各自可 Resolve 嘅 issue。
+
+每條 item 必須有 Primary Owner Domain，例如：
+- Order-specific payment → 訂單管理
+- Product mapping → 平台／渠道管理
+- Print route / job → 打印管理
+- Device health → 裝置管理
+- Config mismatch → 發佈與版本
+- Integration auth → 系統管理 / 系統整合
+
+## 10.4 處理
+
+CTA「處理」：
+- deep-link 去正式責任頁
+- 帶住 object / filter context
+- 唔喺 Queue 直接 execute refund / retry / publish / reprint / revoke
+
+Queue 可以有：
+- assign / acknowledge（只限正式 queue contract 支援）
+- view evidence
+- open responsible page
+
+如果 queue management backend seam 未存在，
+唔整 browser-only assignment / resolved state。
+
+## 10.5 Resolve
+
+Action Item 只有以下情況先可以 Resolved：
+- targeted authoritative readback 證明問題 recovered；或
+- 正式 domain workflow 產生可信 resolution record；或
+- 經正式 policy 標記 no-longer-actionable / superseded。
+
+冇 proof：
+唔可以只靠人手撳「完成」就消失。
+
+UNKNOWN / stale：
+唔可以自動當 resolved。
+
+## 10.6 Queue ≠ Diagnostics
+
+待處理事項：
+「有咩要人做？」
+
+系統診斷：
+「系統邊度斷咗，證據係乜？」
+
+操作記錄：
+「邊個做過乜？」
+
+三者唔合併成一個萬能 Log 頁。
+
+## 10.7 人類第一直覺歸類
+
+- 「而家有咩要處理？」→ 今日 / 待處理事項
+- 「點解呢件事壞？」→ 系統管理 / 系統診斷
+- 「邊個做過呢個操作？」→ 系統管理 / 操作記錄
+- 「我要真正退款」→ 訂單管理 / 售後
+- 「我要真正改 mapping」→ 平台／渠道管理 / 商品映射
+
+任何 action 如果 Queue 自己變第二套 mutation authority，視為 IA / authority RED。
 
 ---
 
@@ -4487,16 +4695,39 @@ Socket down：
 
 # 43. One-shot Rebirth Engineering Rule
 
-Admin V3 從呢份 Brief 開始改為 **一次過重生**：
+Admin V3 從本 Product Brief 改為 **一次過重生**：
 
 - 一個主 implementation branch / program
 - 可有多個內部 commit，但唔做 A1/A2/A3 partial production promotion
 - 全部 R1 Product Scope + Shell + IA + common UI patterns + state semantics 一次完成
 - 只喺獨立 V3 Preview 驗收
 - v2 Production 全程照常
-- V3 全產品驗收 GREEN 先做 cutover proposal
+- V3 全產品驗收 GREEN 先可以提出 cutover
 
-舊 A1/A2 incremental plan 停止作 implementation roadmap；只可保留已寫 code 作參考，必須服從本 Brief。
+舊 A1/A2 incremental implementation roadmap 停止；
+已寫 code 只可作 reference，必須服從本 Brief。
+
+## 43.1 與舊 A0→A7 sequencing 嘅關係
+
+現有 governance / R2 文件如果仍保留 A0→A7：
+- Authority boundary
+- no-touch
+- acceptance discipline
+- CI / review discipline
+
+以上治理原則繼續有效。
+
+但 **A0→A7 作為 Admin V3 implementation order / partial promotion sequence**，
+喺 Owner 明確批准本 Product Brief 並發出 PROMOTE 後，由本 one-shot execution model取代。
+
+即係：
+- 唔再逐 A-stage 做 production promotion
+- 唔逐頁 merge 當完成
+- 唔用舊 sequence 覆蓋已批准 Product Map
+- 仍然保持 governance、安全、CI、review、no-touch 要求
+
+未有 Owner PROMOTE 前：
+**一律唔開始 one-shot implementation。**
 
 ---
 
@@ -4536,6 +4767,8 @@ One-shot Admin V3 rebuild default只准：
 - Audit/Diagnostics完整
 
 ## UI
+- 所有 R1 正式功能最多「大 Menu → 細 Menu」兩步已見目標 List / Workspace
+- Object Detail / Edit 只可發生喺搵到 object 之後，唔計第三層 discovery
 - Desktop / Tablet / Mobile IA一致
 - 無 page-level horizontal overflow
 - loading/empty/error/offline/unknown/partial/conflict都有真 UI
@@ -4621,12 +4854,49 @@ Browser：
 - exact statuses
 - responsive UI
 - no cache clear requirement
+- two-step discovery parity across desktop / tablet / mobile
 
-最後先提出：
-`V3 → admin.morefunos.com`
+## 47.1 Cutover前 Rollback Verification
 
-未 physical accepted：
+提出 V3 → admin.morefunos.com 前，
+必須有可驗證 rollback path，而且唔只係文件寫「可以 rollback」。
+
+至少證明：
+
+1. **Route rollback**
+   - production route 可以由 V3 指回既有 v2 Admin。
+
+2. **Route / identity readback**
+   - rollback 後可以 authoritative readback 證明實際 serving target / release identity 已回到預期 v2。
+
+3. **Restored-v2 evidence**
+   - v2 landing / auth / core navigation 可正常開啟；
+   - 至少一個 canonical read flow 成功；
+   - 唔需要清 cache；
+   - existing v2 production behavior 未被 V3 rebuild 改壞。
+
+4. **Evidence retention**
+   - rollback time
+   - actor
+   - previous target
+   - restored target
+   - readback evidence
+   - smoke result
+
+Rollback verification 未 GREEN：
+**不可提出 production cutover。**
+
+## 47.2 Cutover Decision
+
+最後先可以提出：
+**V3 → admin.morefunos.com**
+
+未 full physical accepted：
 v2 仍係 Production。
+
+即使所有驗收 GREEN：
+仍然唔等於可以自行 merge / deploy / cutover。
+必須等 Owner 明確 PROMOTE。
 
 ---
 
@@ -4645,16 +4915,39 @@ Domain authority仍服從 COMMANDER_CURRENT / #22 / #596 / live canonical contra
 
 ---
 
-# 49. Owner Approval Gate
+# 49. Owner Approval / PROMOTE Gate
+
+Product Brief acceptance 同 merge / deploy permission 分開。
 
 未經 Owner 批准本 Brief：
 - 不准叫 Codex開始 one-shot Admin V3 implementation
 - 不准 merge A1/A2 incremental implementation
 - 不准新增 V3 production routing
 
-批准後執行模型：
+即使 Owner 表示內容方向接受，
+PR #602 仍保持 Draft，
+直到 Owner 明確發出：
+**PROMOTE**
 
-**PRODUCT BRIEF LOCK → CODEX ONE-SHOT BUILD → CI/REVIEW → V3 PREVIEW → FULL PHYSICAL ACCEPTANCE → CUTOVER DECISION**
+只有明確 PROMOTE 先代表可以進入下一個受治理步驟。
+
+執行模型：
+
+**PRODUCT BRIEF LOCK**
+→ **OWNER PROMOTE**
+→ **CODEX ONE-SHOT BUILD**
+→ **CI / REVIEW**
+→ **V3 PREVIEW**
+→ **FULL PHYSICAL ACCEPTANCE**
+→ **CUTOVER PROPOSAL**
+→ **OWNER PROMOTE FOR MERGE / DEPLOY / CUTOVER（按實際 gate）**
+
+硬規則：
+- review passed ≠ merge permission
+- CI green ≠ deploy permission
+- preview accepted ≠ production cutover permission
+- assistant / Codex / reviewer 不可以代替 Owner PROMOTE
+- 未有相應 PROMOTE，不 merge、不 deploy、不改 production route
 
 MILESTONE:
-`MFK_ADMIN_V3_PRODUCT_BRIEF_FUNCTION_UI_LOCK_R1_READY`
+MFK_ADMIN_V3_PRODUCT_BRIEF_FUNCTION_UI_LOCK_R1_READY
