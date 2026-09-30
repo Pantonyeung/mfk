@@ -225,7 +225,9 @@ export function installAdminSyncAutoFlush(){
   window.addEventListener('online',flush);
   window.addEventListener('focus',flush);
   window.addEventListener('mfk-admin-release',queueLatest);
-  window.setTimeout(()=>{queueLatest();flush();},0);
+  // Startup may resume an already queued formal publish, but must never
+  // reinterpret cached release history as a new publish command.
+  window.setTimeout(flush,0);
 }
 
 export interface AdminDiningOccupancyReadback{
