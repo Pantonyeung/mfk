@@ -125,11 +125,14 @@ describe('Admin realtime transport recovery',()=>{
     expect(messageHandler).not.toMatch(/location\.reload|location\.replace/);
   });
 
-  it('uses event-driven reconcile on resume without interval polling',()=>{
+  it('keeps a passive doorbell and only pulls on boot, doorbell, online recovery or reconnect',()=>{
     const client=readFileSync(new URL('../../v2local/src/runtime/admin-config-sync.ts',import.meta.url),'utf8');
-    expect(client).toContain("window.addEventListener('focus',onFocus)");
-    expect(client).toContain("window.addEventListener('pageshow',onPageShow)");
-    expect(client).toContain("document.addEventListener('visibilitychange',onVisibility)");
+    expect(client).toContain("row.type==='ADMIN_CONFIG_AVAILABLE'");
+    expect(client).toContain('if(recoveringMissedDoorbell)void fetchAndApplyAdminConfig()');
+    expect(client).toContain("window.addEventListener('online',onOnline)");
+    expect(client).not.toContain("window.addEventListener('focus'");
+    expect(client).not.toContain("window.addEventListener('pageshow'");
+    expect(client).not.toContain("document.addEventListener('visibilitychange'");
     expect(client).not.toMatch(/setInterval\s*\(/);
   });
 });
