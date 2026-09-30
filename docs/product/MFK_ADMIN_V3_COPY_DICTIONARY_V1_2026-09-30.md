@@ -127,8 +127,6 @@ Authority：MFK Admin V3 Product Brief §64–§66
 - 確認發佈
 - 開始今日營業
 - 準備收舖
-- 確認退款 HK$X
-- 取消訂單 #XXXX
 - 確認暫停 Keeta 接單
 - 恢復供應
 - 撤銷登入工作階段
@@ -290,7 +288,7 @@ Offline no data：
 - [ ] Freshness 用最後更新 / 最後確認
 - [ ] 高風險 confirm 有 object + impact
 - [ ] Technical ID 唔做第一層主文字
-- [ ] Cancel UI 同取消訂單無混淆
+- [ ] Admin 無退款／取消訂單／付款方式修正 execution CTA
 - [ ] Domain-specific business state 清楚
 - [ ] Mobile / Desktop 用同一正式名稱
 
