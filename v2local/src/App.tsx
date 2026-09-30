@@ -362,8 +362,8 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode,diningAddition,on
       ...(!product.priceReady?{badge:'未接價格'}:!product.sellable?{badge:'停售'}:{}),
     })),
     menuRevisionLabel:adminConfig
-      ?storeSettings.storeName+' · ADMIN R'+adminConfig.revision+' · '+(syncStatus.state==='SYNCED'?'已同步':syncStatus.state==='LOCAL_LKG'?'LKG':'同步中')
-      :'LOCAL FALLBACK · R'+adminMenu.revision,
+      ?storeSettings.storeName+' · Admin 發佈 '+new Date(adminConfig.publishedAt).toLocaleTimeString('zh-HK',{timeZone:'Asia/Hong_Kong',hour12:false})+' · '+(syncStatus.state==='SYNCED'?'已套用':syncStatus.state==='LOCAL_LKG'?'最後已套用設定':'接收中')
+      :'本機備援資料',
     operationalNotice:diningAddition
       ?(diningAddStatus??('堂食 '+diningAddition.tableLabel+' · 加單模式'))
       :capacityNotice
