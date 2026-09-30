@@ -12627,3 +12627,45 @@ Status：**LOCKED**
 
 MILESTONE:
 MFK_ADMIN_V3_COPY_TERMINOLOGY_AUDIT_COMPLETE
+
+---
+
+# 67. Owner Review 收口｜Product Brief R1 審批入口
+
+Admin V3 Product Brief R1 已完成產品層收口。
+
+目前狀態：
+
+- Product Map：12 個大 Menu / 54 個第二步 destination
+- First Viewport：54 / 54 已驗
+- 跨頁互動：核心路線 / 高風險操作 / Bulk / 熟手效率已驗
+- 共用元件：核心元件 / 響應式 / 操作手感已驗
+- 文字：正式中文字典 / 54 頁文案矩陣 / Copy Dictionary 已完成
+- RED：0
+- 唯一 YELLOW：Admin 日結後付款方式修正 = BACKEND_CONTRACT_GAP
+- Implementation：未開始 / 未授權
+- Production：v2 繼續運行
+- Spec PR：Draft，未 PROMOTE
+
+正式 Owner Review 文件：
+**docs/product/MFK_ADMIN_V3_OWNER_REVIEW_CLOSEOUT_PACK_V1_2026-09-30.md**
+
+Owner 審批時只需要確認：
+
+1. Product Map / IA
+2. 今日首頁 Sales-first
+3. 54 頁 First Viewport
+4. 跨頁工作語法
+5. 共用元件 / Responsive / Interaction
+6. 正式 Copy Dictionary
+7. 唯一 Backend Contract Gap 處理原則
+8. Implementation Entry Conditions
+
+任何 Owner PROMOTE 之前：
+- 唔 merge Product Brief PR
+- 唔開始 one-shot implementation
+- 唔 deploy V3
+- 唔 route switch
+
+MILESTONE:
+MFK_ADMIN_V3_OWNER_REVIEW_CLOSEOUT_PACK_READY
