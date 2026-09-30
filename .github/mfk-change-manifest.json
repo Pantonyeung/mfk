@@ -1,30 +1,29 @@
 {
   "version": 1,
-  "capability": "MFK_ADMIN_SAFARI_RUNTIME_DIAGNOSTIC_R4",
-  "base_sha": "0776cffed4afa6b8ecb6e5a5e4e822b1a54dd53e",
+  "capability": "MFK_ADMIN_RUNTIME_CANONICAL_STATE_R5",
+  "base_sha": "6345f13427101717ea1b67aa6d49fd4de0f891aa",
   "allowed_paths": [
     ".github/mfk-change-manifest.json",
     "v2admin/src/AdminShell.tsx",
-    "v2admin/src/admin-control-plane.css",
     "v2admin/src/admin-canonical-normal-browser.test.ts",
     "v2admin/src/admin-sync-client.ts"
   ],
-  "authority_impact": "NONE_DIAGNOSTIC_ONLY_ADMIN_REMAINS_SOLE_CANONICAL_DATA_AUTHORITY",
-  "persistence_impact": "READ_ONLY_DIAGNOSTIC_OF_EXISTING_SYNC_STATUS_OUTBOX_AND_CANONICAL_HYDRATION_MARKER",
+  "authority_impact": "NONE_ADMIN_CLOUD_CANONICAL_REMAINS_SOLE_ONLINE_AUTHORITY",
+  "persistence_impact": "READ_NORMALIZATION_ONLY_NO_OUTBOX_MUTATION_CHANGE",
   "provider_impact": "NONE",
   "transaction_impact": "NONE",
   "expected_behavior_change": [
-    "Current Admin runtime shows a compact R4 diagnostic marker with production source SHA, sync state, outbox count and canonical hydration fingerprint.",
-    "If normal Safari still runs an older loaded bundle, the R4 marker is absent, proving the stale runtime path without clearing cache.",
-    "If R4 is present, the marker exposes whether a persisted outbox still exists after canonical hydration."
+    "When canonical hydration is present, active-release matches it, and sync-outbox is empty, a persisted QUEUED or PUBLISHING status cannot remain user-visible.",
+    "A real explicit pending publish remains QUEUED whenever sync-outbox still contains work.",
+    "Normal Safari and fresh browser contexts converge to the same published presentation for the same canonical state."
   ],
   "non_goals": [
-    "No outbox pruning semantic change in R4.",
+    "No outbox ordering or pruning semantic change.",
     "No Customer, Owner, SMM or SMT changes.",
     "No Keeta changes.",
-    "No publish engine rewrite.",
-    "No cache clearing requirement."
+    "No cache clearing requirement.",
+    "No publish engine rewrite."
   ],
-  "rollback_sha": "0776cffed4afa6b8ecb6e5a5e4e822b1a54dd53e",
+  "rollback_sha": "6345f13427101717ea1b67aa6d49fd4de0f891aa",
   "severity": "HARD_BLOCK"
 }

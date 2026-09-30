@@ -1,5 +1,6 @@
 import {describe,expect,it} from 'vitest';
 import {adminCanonicalHydrationRequired} from './AdminCanonicalBootstrap.tsx';
+import {normalizeAdminSyncStatusAgainstCanonicalCache} from './admin-sync-client.ts';
 import {readFileSync} from 'node:fs';
 
 describe('Admin normal-browser canonical hydration',()=>{
@@ -29,17 +30,35 @@ describe('Admin normal-browser canonical hydration',()=>{
     expect(sync).toContain('rowPublishedAt>activePublishedAt');
   });
 
-  it('shows a compact R4 runtime diagnostic that distinguishes stale JS from saved outbox state',()=>{
+  it('shows a compact R5 runtime diagnostic that distinguishes stale JS from saved outbox state',()=>{
     const shell=readFileSync(new URL('./AdminShell.tsx',import.meta.url),'utf8');
     const sync=readFileSync(new URL('./admin-sync-client.ts',import.meta.url),'utf8');
     expect(shell).toContain('readAdminRuntimeSourceSha');
-    expect(shell).toContain('data-admin-runtime-diag="R4"');
-    expect(sync).toContain("/api/health?adminRuntimeDiagnostic=R4");
+    expect(shell).toContain('data-admin-runtime-diag="R5"');
+    expect(sync).toContain("/api/health?adminRuntimeDiagnostic=R5");
     expect(shell).toContain("' Q'+diagnostic.outboxCount+' C'+canonical");
     expect(sync).toContain('readAdminSyncDiagnosticSnapshot');
     expect(sync).toContain("'canonical-hydrated.v1'");
     expect(sync).toContain('outboxCount:outbox.length');
     expect(shell).toContain('className="mfk-admin-sync-detail"');
+  });
+
+  it('normalizes impossible QUEUED state when canonical is hydrated and outbox is empty',()=>{
+    const current={state:'QUEUED',revision:25,fingerprint:'old',adminFingerprint:'admin-old',updatedAt:'2026-09-30T03:00:00.000Z'} as const;
+    const hydrated={revision:25,fingerprint:'canonical-new',publishedAt:'2026-09-30T03:05:00.000Z',hydratedAt:'2026-09-30T03:05:01.000Z'};
+    const activeRelease={version:25,createdAt:hydrated.publishedAt,fingerprint:'admin-new'};
+    const next=normalizeAdminSyncStatusAgainstCanonicalCache(current,0,hydrated,activeRelease);
+    expect(next.state).toBe('PUBLISHED');
+    expect(next.fingerprint).toBe('canonical-new');
+    expect(next.adminFingerprint).toBe('admin-new');
+    expect(next.cloudPublishedAt).toBe(hydrated.publishedAt);
+  });
+
+  it('does not hide a real queued publish while outbox still has work',()=>{
+    const current={state:'QUEUED',revision:26,fingerprint:'queued',adminFingerprint:'admin-queued',updatedAt:'2026-09-30T03:06:00.000Z'} as const;
+    const hydrated={revision:25,fingerprint:'canonical',publishedAt:'2026-09-30T03:05:00.000Z',hydratedAt:'2026-09-30T03:05:01.000Z'};
+    const activeRelease={version:25,createdAt:hydrated.publishedAt,fingerprint:'admin-current'};
+    expect(normalizeAdminSyncStatusAgainstCanonicalCache(current,1,hydrated,activeRelease)).toBe(current);
   });
 
   it('does not turn cached release history into a new publish during startup',()=>{
