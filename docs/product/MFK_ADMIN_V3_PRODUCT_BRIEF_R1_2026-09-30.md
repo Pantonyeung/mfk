@@ -1,5 +1,11 @@
 # MFK Admin V3｜產品 Brief / 功能 / UI 鎖定 R1
 
+> Status: CURRENT PRODUCT SPEC CANDIDATE  
+> Root Control: #596  
+> Product Control: #601  
+> Runtime impact: NONE  
+> Production routing: FORBIDDEN until full V3 acceptance
+
 狀態：PRODUCT SPEC / IMPLEMENTATION BLOCKED  
 日期：2026-09-30  
 Root Control：#596  
