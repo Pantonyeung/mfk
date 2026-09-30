@@ -93,6 +93,21 @@ describe('V3 Admin A1 authenticated read-only canonical',()=>{
     expect(summary).toMatchObject({storeId:'MF01',revision:9,categories:1,products:2,modifierGroups:1,combos:1});
   });
 
+  it('rejects a canonical payload whose fingerprint does not match its content',async()=>{
+    const envelope=createMfkAdminConfigEnvelope({
+      storeId:'MF01',
+      revision:10,
+      publishedAt:'2026-09-30T07:10:00.000Z',
+      adminFingerprint:'fnv1a32:admin-10',
+      snapshot:{catalog:{categories:[],products:[],modifierGroups:[],combos:[]}},
+    });
+    vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({...envelope,fingerprint:'fnv1a32:00000000'}),{
+      status:200,
+      headers:{'content-type':'application/json'},
+    })));
+    await expect(readV3CanonicalAdminActive('s'.repeat(64))).rejects.toThrow('ADMIN_CONFIG_FINGERPRINT_MISMATCH');
+  });
+
   it('A1 source has no persistent auth, mutation, publish or v2 client-state dependency',async()=>{
     const fs=await import('node:fs');
     const files=['App.tsx','auth.ts','canonical.ts','state-authority.ts'];
