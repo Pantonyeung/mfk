@@ -25,13 +25,24 @@ const operatingHoursLabel=(snapshot:CustomerReadModelSnapshot|null)=>{
   return String(raw||'').trim();
 };
 
-const orderStageLabel=(stage:CustomerOrderStage)=>{
-  if(stage==='READY')return '可以取餐啦';
-  if(stage==='DELAYED')return '準備時間已更新';
-  if(stage==='PREPARING')return '餐點製作中';
-  if(stage==='ACCEPTED')return '店舖已接單';
-  if(stage==='RECEIVED')return '等待店舖確認';
-  return '查看最新進度';
+const orderStagePresentation=(stage:CustomerOrderStage)=>{
+  switch(stage){
+    case 'RECEIVED': return {eyebrow:'訂單已收到',title:'店舖收到喇',detail:'我哋而家確認緊，最新結果會喺呢度更新。',asset:'WAITING',tone:'waiting'} as const;
+    case 'ACCEPTED': return {eyebrow:'店舖已接單',title:'今餐已經排入製作',detail:'我哋會照住最新預計時間準備。',asset:'ACCEPTED',tone:'accepted'} as const;
+    case 'PREPARING': return {eyebrow:'製作中',title:'你嘅一餐，準備緊。',detail:'好好食飯，等多一陣就得。',asset:'PREPARING',tone:'preparing'} as const;
+    case 'DELAYED': return {eyebrow:'稍有延誤',title:'我哋需要多少少時間。',detail:'最新預計時間會跟店舖正式更新。',asset:'DELAYED',tone:'delayed'} as const;
+    case 'READY': return {eyebrow:'可以取餐',title:'好喇，可以過嚟拎喇。',detail:'到店後請按正式取餐資料交收。',asset:'READY',tone:'ready'} as const;
+    case 'ARRIVED': return {eyebrow:'已到店',title:'差最後一步就拎得。',detail:'等店員核對今次取餐資料。',asset:'PICKUP',tone:'pickup'} as const;
+    case 'VERIFIED':
+    case 'PICKUP_VERIFICATION': return {eyebrow:'取餐核對中',title:'資料核對緊。',detail:'核對完成後先正式交餐。',asset:'PICKUP',tone:'pickup'} as const;
+    case 'PICKUP_EXCEPTION': return {eyebrow:'需要幫手',title:'呢張單要店員幫你確認。',detail:'問題處理好之前，唔會當成已完成。',asset:'ATTENTION',tone:'attention'} as const;
+    case 'HANDED_OVER': return {eyebrow:'已交收',title:'餐點已經交畀你。',detail:'多謝等候，記得好好食飯。',asset:'COMPLETE',tone:'complete'} as const;
+    case 'COMPLETED': return {eyebrow:'已完成',title:'今餐完成喇。',detail:'下次返嚟，可以再由熟悉味道開始。',asset:'COMPLETE',tone:'complete'} as const;
+    case 'REJECTED': return {eyebrow:'未能接單',title:'今次店舖未能接受訂單。',detail:'請查看正式原因，再決定下一步。',asset:'ATTENTION',tone:'attention'} as const;
+    case 'CANCELED': return {eyebrow:'訂單已取消',title:'今次訂單已停止。',detail:'如有退款或後續安排，以正式記錄為準。',asset:'ATTENTION',tone:'attention'} as const;
+    case 'UNKNOWN':
+    default: return {eyebrow:'正在確認',title:'最新結果仲確認緊。',detail:'暫時唔會將未確認結果當成成功。',asset:'UNKNOWN',tone:'unknown'} as const;
+  }
 };
 
 function Stage1StatePanel({connection,browserOnline,empty,onRetry}:{connection:CustomerConnectionState;browserOnline:boolean;empty:boolean;onRetry:()=>void}){
@@ -81,6 +92,7 @@ export function Stage1Home({
     ?member.coupons.filter(item=>item.state==='AVAILABLE').length
     :0;
 
+  const activeOrderPresentation=currentOrder?orderStagePresentation(currentOrder.stage):null;
   const homeMode=currentOrder?'ORDER_ACTIVE':store?.channelAvailable===false?'CLOSED':availableCouponCount?'CAMPAIGN':history.length?'RETURNING':'NORMAL';
   const headline=homeMode==='ORDER_ACTIVE'
     ?'你嘅一餐，店舖正細心準備。'
@@ -129,11 +141,15 @@ export function Stage1Home({
         <strong>{canBrowse?'搜尋想食嘅餐點…':'餐牌更新中…'}</strong>
       </button>
 
-      {currentOrder?<button className="stage1-live-order" type="button" onClick={onOrders}>
-        <span className="stage1-live-label">訂單進行中</span>
-        <strong>{orderStageLabel(currentOrder.stage)}</strong>
-        <p>{currentOrder.itemSummary}</p>
-        <small>{currentOrder.displayCode}{currentOrder.etaLabel?' · 預計 '+currentOrder.etaLabel:''}</small>
+      {currentOrder&&activeOrderPresentation?<button className={'stage1-live-order tone-'+activeOrderPresentation.tone} type="button" onClick={onOrders} data-order-stage={currentOrder.stage} data-order-asset={activeOrderPresentation.asset}>
+        <AssetSlot id="ACTIVE_ORDER_IP_SLOT" label={'IP '+activeOrderPresentation.asset} className="stage1-live-order-ip-slot"/>
+        <span className="stage1-live-order-copy">
+          <span className="stage1-live-label">{activeOrderPresentation.eyebrow}</span>
+          <strong>{activeOrderPresentation.title}</strong>
+          <p className="stage1-live-order-detail">{activeOrderPresentation.detail}</p>
+          <p className="stage1-live-order-items">{currentOrder.itemSummary}</p>
+          <small>{currentOrder.displayCode}{currentOrder.etaLabel?' · 預計 '+currentOrder.etaLabel:''}</small>
+        </span>
         <b aria-hidden="true">›</b>
       </button>:null}
 
