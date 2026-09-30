@@ -39,6 +39,20 @@ function emit(){if(typeof window!=='undefined')window.dispatchEvent(new CustomEv
 export function readAdminSyncStatus(){
   return readAdminStored<AdminSyncStatus>(STATUS_KEY,idle());
 }
+export function reconcileAdminSyncStatusFromCanonical(active:MfkAdminConfigEnvelope){
+  const current=readAdminSyncStatus();
+  const next:AdminSyncStatus={
+    state:'PUBLISHED',
+    revision:active.revision,
+    fingerprint:active.fingerprint,
+    adminFingerprint:active.adminFingerprint,
+    cloudPublishedAt:active.publishedAt,
+    updatedAt:new Date().toISOString(),
+  };
+  if(current.state===next.state&&current.revision===next.revision&&current.fingerprint===next.fingerprint&&current.adminFingerprint===next.adminFingerprint&&current.cloudPublishedAt===next.cloudPublishedAt&&!current.error)return current;
+  writeStatus(next);
+  return next;
+}
 function writeStatus(status:AdminSyncStatus){
   writeAdminStored(STATUS_KEY,status);
   emit();
