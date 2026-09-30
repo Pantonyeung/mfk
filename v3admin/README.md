@@ -1,20 +1,33 @@
 # MFK Admin V3
 
-Parallel client rebuild under system authority #596.
+Parallel one-shot rebuild under system authority #596 and approved Product Brief #601.
 
-Status: A0 FOUNDATION / NO PRODUCTION ROUTING.
+Status: IMPLEMENTATION IN PROGRESS / ZERO PRODUCTION ROUTING.
 
-This directory is intentionally isolated from `v2admin`.
+Production v2 remains live.
 
-State ownership:
-- server state: TanStack Query
-- durable explicit commands: Dexie / IndexedDB
-- local UI/draft: React/Zustand
-- auth: separate security layer
+## State ownership
 
-A0 contains no publish flow and no production deployment configuration.
+- Cloud/server state: TanStack Query
+- durable explicit command outbox: disabled by default; Dexie/IndexedDB only if the Product Brief explicitly approves an offline command
+- local form/UI state: React/Zustand, never canonical truth
+- auth/session: separate in-memory security layer
+- realtime: doorbell only; event causes canonical/read-model refetch
 
-Commands:
+## Gate 1 scope
+
+Current implementation proves:
+- memory-only Admin auth
+- shared canonical envelope validation
+- centralized store/scope context
+- client build identity vs serving release manifest
+- canonical read with no-store + TanStack Query
+- no v2 localStorage or v2 client-state import
+- zero production routing
+
+It does not yet implement the full 53-page product or production cutover.
+
+## Commands
 
 ```bash
 npm install --no-audit --no-fund --legacy-peer-deps --package-lock=false
