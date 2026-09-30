@@ -5472,3 +5472,489 @@ YELLOW 只代表該 page 內一個 mutation seam 未有正式 backend authority�
 
 MILESTONE:
 MFK_ADMIN_V3_54_PAGE_ACCEPTANCE_INVENTORY_V1_READY
+
+---
+
+# 52. First Viewport Acceptance V1｜Batch 1：今日 / 訂單 / 菜單
+
+本輪開始由「頁面存在」進一步驗收「一入頁第一屏係咪已經有用」。
+
+## 52.0 全頁 First Viewport 硬規則
+
+Desktop：
+- Page title、主要狀態、主要 CTA、核心內容必須喺第一個可視區開始出現。
+- 唔可以先用大 Hero／教學卡／空白 decoration 推走工作內容。
+- Filter 可以有，但唔可以食晒第一屏。
+- Table/List header 必須喺第一屏見到；正常 768–900px 高度 viewport 至少開始見到第一批 rows。
+- 高風險 action 唔可以同普通 primary CTA 並排造成誤撳。
+
+Mobile：
+- Page title + 核心狀態 + 最主要內容 / CTA 要優先。
+- Search / Filter 收斂成 compact controls / sheet。
+- Table 轉 stacked records；禁止靠橫向 scroll 先知一件事。
+- Danger action 收入 Detail / explicit overflow / confirm，唔放列表最搶眼位置。
+- 第一屏唔展示 raw UUID、API code、operation ID、technical health code。
+
+Global states：
+- INITIAL_LOADING：保留 page shell，顯 skeleton / loading，唔顯 0。
+- EMPTY：講清楚「真係冇資料」同下一步。
+- REFRESHING：保留舊成功資料。
+- STALE / OFFLINE_WITH_DATA：保留資料 + 顯 last success / freshness。
+- UNKNOWN：顯結果未明，唔當 FAILED。
+- PARTIAL：講清邊部分可用、邊部分未齊。
+- CONFLICT：阻止盲目 overwrite，要求重新讀取。
+- UNAUTHORIZED：唔 render 假 action。
+- FATAL：提供 safe exit / retry / diagnostics route。
+
+---
+
+## 52.1 今日 → 營運總覽
+
+### Desktop first viewport
+必須依次見：
+1. 今日有效營業額 Hero
+2. Orders / AOV / Refund-Adjustment
+3. freshness / one comparison
+4. compact readiness strip
+5. Action Queue 至少第一批 items
+
+禁止：
+- 系統 health cards 大過 Sales Hero
+- 未發佈變更置頂搶過營業額
+- 第一屏出 10+ KPI
+
+Primary CTA：
+- 查看銷售報表
+- 處理最高優先問題（只 deep-link）
+
+Danger：
+- 0 個 mutation button
+
+### Mobile first viewport
+必須直接見：
+- 今日有效營業額
+- Orders
+- AOV
+- Refund / Adjustment
+- 高優先 attention indicator
+
+Readiness / Queue 向下接。
+
+State guard：
+- Sales query error ≠ $0
+- stale sales 顯 last updated
+- partial sales 顯 PARTIAL，唔扮完整
+
+Status：**LOCKED**
+
+---
+
+## 52.2 今日 → 待處理事項
+
+### Desktop first viewport
+必須見：
+- Page title
+- Open item count
+- Severity / Domain filters
+- Queue List header
+- 第一批 Action Items
+
+每 row 第一眼：
+- Severity
+- Title
+- Business impact
+- Domain
+- Last observed
+- CTA「處理」
+
+Primary CTA：
+- 處理 → responsible Primary Home
+
+Danger：
+- Queue 唔直接 Refund / Publish / Reprint / Retry transaction
+
+### Mobile
+每 item card：
+- Severity + Title
+- Affected object
+- Business impact
+- Last observed
+- 「處理」
+
+Filter 收入 sheet。
+
+State guard：
+- stale item 唔自動 resolved
+- no proof 唔可以顯完成
+- duplicate incident 必須 dedupe
+
+Status：**LOCKED**
+
+---
+
+# 52.3 訂單管理 First Viewport
+
+## A. 進行中訂單
+
+Desktop 第一屏：
+- Title「進行中訂單」
+- Search
+- Source / Payment / Fulfillment / Attention filters
+- Active Order List header
+- 第一批 orders
+
+每 row 最低：
+- Display Number
+- Source
+- elapsed / created
+- amount
+- payment
+- fulfillment
+- exception indicator
+
+Primary CTA：
+- 查看 Order
+
+Danger：
+- 列表唔直接 Cancel / Refund
+
+Mobile：
+- Display Number + amount + primary workflow state 第一行
+- Source + payment + elapsed 第二行
+- exception badge
+- tap card 入 Detail
+
+State guard：
+- Query error ≠ 0 orders
+- refreshing 保留舊 list
+- Payment UNKNOWN 明確顯示
+
+Status：**LOCKED**
+
+## B. 訂單歷史
+
+Desktop 第一屏：
+- Title
+- Date / Business Day
+- Search
+- Source / Refund / Adjustment filters
+- Historical Order List
+
+每 row：
+- Display Number
+- Date/time
+- Source
+- original amount
+- adjustment indicator
+- effective amount
+- completion state
+
+Primary CTA：
+- 查看 Order
+
+Mobile：
+- number + effective amount
+- date/source
+- refund/cancel/adjustment badges
+
+Danger：
+- 歷史列表無 mutation buttons
+
+State guard：
+- error ≠ empty history
+- partial history 明示範圍
+
+Status：**LOCKED**
+
+## C. 售後／退款／取消／修正
+
+Desktop 第一屏：
+- Title
+- Type / State / Date filters
+- Case List
+- 第一批 cases
+- CTA「開始售後」只喺正式 allowed contract 存在時顯示
+
+每 row：
+- Type
+- Display Number
+- amount
+- actor
+- current state
+- readback/proof
+
+Primary CTA：
+- 查看 case / 開始 approved action
+
+Danger：
+- Refund / Cancel / Tender Correction 必須進 Detail/Workflow 先 execute
+- destructive action 唔放 row immediate button
+
+Mobile：
+- Type + Display Number
+- amount + state
+- proof / unknown badge
+- tap 入 workflow
+
+State guard：
+- Tender Correction Admin post-close seam = BACKEND_CONTRACT_GAP
+- 未有 seam 唔顯假「提交成功」
+
+Status：**YELLOW**
+
+## D. 訂單異常
+
+Desktop 第一屏：
+- Title
+- Attention count
+- Issue type / Severity / Source filters
+- Exception List
+
+每 row：
+- Severity
+- Display Number
+- Issue type
+- Business impact
+- Current certainty
+- Last observed
+- Owner domain
+- CTA
+
+Primary CTA：
+- 處理 / 查看
+
+Danger：
+- 唔喺 exception list 直接 retry non-idempotent action
+
+Mobile：
+- Severity + order number
+- issue + impact
+- certainty + last observed
+- 處理
+
+State guard：
+- UNKNOWN ≠ FAILED
+- platform-wide/device-wide issue 唔重複塞入呢頁
+
+Status：**LOCKED**
+
+---
+
+# 52.4 菜單管理 First Viewport
+
+## A. 分類管理
+
+Desktop 第一屏：
+- Title「分類管理」
+- Primary CTA「新增分類」
+- Search（如分類多）
+- Category List
+- 第一批 categories
+
+Row：
+- Name
+- Product count
+- Active
+- Order
+- Draft indicator
+
+Danger：
+- Delete 收入 Detail / overflow
+- 有 product reference 時禁止直接 delete
+
+Mobile：
+- Name + Active
+- Product count + order
+- Edit / View
+
+Empty：
+- 「目前未有分類」
+- CTA「新增分類」
+
+Status：**LOCKED**
+
+## B. 產品管理
+
+Desktop 第一屏：
+- Title「產品管理」
+- Primary CTA「新增產品」
+- Search
+- Category / Status filters
+- Product List
+- 第一批 products
+
+Row：
+- image
+- name
+- code
+- category
+- base price
+- active
+- draft indicator
+
+Primary CTA：
+- 新增產品
+
+Danger：
+- Disable/Delete 唔放最搶眼 row action
+- Product edit 唔等於 Published
+
+Mobile：
+- image + name + price
+- category + code
+- active / draft badges
+
+Empty：
+- CTA「新增產品」
+- 唔顯教學長文
+
+Status：**LOCKED**
+
+## C. 選項／口味管理
+
+Desktop 第一屏：
+- Title
+- CTA「新增選項組」
+- Search
+- Option Set List
+
+Row：
+- Name
+- Required
+- Min/Max
+- Option count
+- Used by product count
+- Active
+
+Mobile：
+- Name + Active
+- required/min-max
+- option count + usage
+
+Danger：
+- 被產品引用時 Delete 必須 reference guard
+
+Status：**LOCKED**
+
+## D. 套餐管理
+
+Desktop 第一屏：
+- Title
+- CTA「新增套餐」
+- Search / Category / Active filters
+- Combo List
+
+Row：
+- Combo name
+- code
+- category
+- base price
+- group count
+- child count
+- active
+
+Mobile：
+- Name + price
+- category
+- group/child summary
+- active
+
+Danger：
+- Delete / disable 進 Detail/confirm
+- child identity 唔可以 inline 改到失去 product identity
+
+Status：**LOCKED**
+
+## E. 價格管理
+
+Desktop 第一屏：
+- Title「價格管理」
+- Search
+- Category filter
+- Pricing List
+- 第一批 products
+
+Row：
+- Product
+- Category
+- Base Price
+- Takeaway surcharge
+- Option effect summary
+- Combo relation
+- Draft indicator
+
+Primary CTA：
+- 無需強制「新增」；主要係 Edit / bulk approved action
+
+Danger：
+- Bulk change 一定先 preview impact
+- 唔顯「即時生效」；只係 Draft
+
+Mobile：
+- Product + Base Price
+- surcharge / option summary
+- Draft state
+
+State guard：
+- 唔顯第二套 calculated total 冒充 transaction pricing result
+
+Status：**LOCKED**
+
+## F. 顯示與排序
+
+Desktop 第一屏：
+- Title「顯示與排序」
+- Category order panel
+- Selected category product order panel
+- Save Draft state
+
+Primary action：
+- 拖放 / Move
+- Save Draft
+
+Mobile：
+- 先 Category list
+- tap category 後同一頁 content area 顯 Products
+- 上移 / 下移 controls
+- 唔依賴 drag only
+
+Danger：
+- 無 destructive action first viewport
+
+State guard：
+- conflict 時禁止覆蓋別人新排序
+- reload 後以 canonical draft / published source 為準
+
+Status：**LOCKED**
+
+---
+
+# 52.5 Batch 1 結果
+
+本批共 12 個第二步 destination：
+
+- 今日：2
+- 訂單管理：4
+- 菜單管理：6
+
+結果：
+- **11 LOCKED**
+- **1 YELLOW**
+- **0 RED**
+
+唯一 YELLOW：
+**售後／退款／取消／修正**
+只因 post-close Admin Tender Correction backend seam 未授權。
+
+本批無發現：
+- 第三層 Sidebar discovery
+- duplicate Primary Home
+- 第二 Order authority
+- 第二 Pricing authority
+- 首頁 Sales 被其他 widget 搶主次
+
+下一 Batch：
+**營運管理 + 平台／渠道管理（12 pages）**
+
+MILESTONE:
+MFK_ADMIN_V3_FIRST_VIEWPORT_ACCEPTANCE_BATCH1_LOCKED
