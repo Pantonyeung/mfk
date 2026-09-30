@@ -20,7 +20,7 @@ A1 uses the current production API contract:
 4. `POST /api/admin-browser/auth/verify?storeId=MF01`
 5. session token is held in memory only
 6. `GET /api/admin-browser/active?storeId=MF01` with `x-mfk-admin-session`
-7. response is validated with shared `validateMfkAdminConfigEnvelope`
+7. response is validated against the existing `MFK_ADMIN_CONFIG_SYNC_V1` envelope shape and fingerprint semantics
 
 No v2 client module is imported.
 
