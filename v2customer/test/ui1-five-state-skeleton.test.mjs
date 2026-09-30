@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 const home=readFileSync(new URL('../src/stage1/Stage1Home.tsx',import.meta.url),'utf8');
+
 test('UI1 skeleton implements the five FINAL home situations without new authority',()=>{
   for(const mode of ['ORDER_ACTIVE','CLOSED','CAMPAIGN','RETURNING','NORMAL'])assert.ok(home.includes("'"+mode+"'"));
   assert.match(home,/data-home-mode=\{homeMode\}/);
@@ -25,4 +26,24 @@ test('UI1 keeps Top 6 and closed browsing on existing presentation handlers',()=
   assert.match(home,/const canBrowse=Boolean\(snapshot\?\.menu\)/);
   assert.match(home,/stage1-closed-panel[\s\S]*?onClick=\{onBrowse\}/);
   assert.doesNotMatch(home,/submitOrder|quoteCart|channelAvailable\s*=(?!=)/);
+});
+
+test('UI1 skeleton prioritizes active order before the hero frame',()=>{
+  const orderIndex=home.indexOf('className="stage1-live-order"');
+  const heroIndex=home.indexOf('className="stage1-hero-frame"');
+  assert.ok(orderIndex>0);
+  assert.ok(heroIndex>orderIndex);
+});
+
+test('UI1 returning state restores a bounded frequent preview without inventing a new route',()=>{
+  assert.match(home,/const frequentRecommendations=history\.length\?topRecommendations\.slice\(0,4\):\[\]/);
+  assert.match(home,/homeMode==='RETURNING'&&frequentRecommendations\.length/);
+  assert.match(home,/onClick=\{onHistory\}>查看全部<\/button>/);
+  assert.doesNotMatch(home,/frequentRoute|changeView\('frequent'/);
+});
+
+test('UI1 Phase A keeps generated visual assets out of the implemented skeleton',()=>{
+  assert.ok(home.includes('data-ui-phase="SKELETON"'));
+  assert.doesNotMatch(home,/mf-home-storefront-hero-v1|stage1-hero-bg-.*\.(png|jpg|webp)|stage1-hero-ip-.*\.(png|jpg|webp)/);
+  for(const slot of['HERO_BG_SLOT','HERO_IP_SLOT','HERO_FOOD_SLOT','MEMORY_TICKET_ICON_SLOT','TOP6_PRODUCT_IMAGE_SLOT'])assert.ok(home.includes(slot),slot);
 });
