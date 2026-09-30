@@ -1,33 +1,51 @@
 {
   "version": 1,
-  "capability": "MFK_ADMIN_SMT_EVERY_PUBLISH_OTA_R1",
-  "base_sha": "532e78be814dfb495fe33af964a50d421bc913b5",
+  "capability": "MFK_ADMIN_SMT_HK_TIME_CUTOVER_R2",
+  "base_sha": "17cd0798e468071429c68675783de3faefdaf38c",
   "allowed_paths": [
     ".github/mfk-change-manifest.json",
+    "contracts/admin-config-sync-v1.ts",
     "v2admin/worker.ts",
     "v2admin/src/admin-sync-client.ts",
-    "v2admin/src/admin-sync-websocket-transport.test.ts",
+    "v2admin/src/admin-local-store.ts",
+    "v2admin/src/admin-browser-session.ts",
+    "v2admin/src/AdminCanonicalBootstrap.tsx",
+    "v2admin/src/AdminShell.tsx",
+    "v2admin/src/CatalogWorkspaces.tsx",
+    "v2admin/src/DeferredWorkspaces.tsx",
+    "v2admin/src/GovernanceWorkspaces.tsx",
+    "v2admin/src/PolicyWorkspaces.tsx",
+    "v2admin/src/ReadModelWorkspaces.tsx",
     "v2admin/src/admin-cloud-publish-time-first.test.ts",
+    "v2admin/src/admin-sync-websocket-transport.test.ts",
     "v2local/src/runtime/admin-config-sync.ts",
-    "v2local/src/runtime/admin-config-sync.test.ts"
+    "v2local/src/runtime/admin-config-sync.test.ts",
+    "v2local/src/App.tsx",
+    "v2local/src/presentation/LocalAdminMenuWorkspace.tsx",
+    "v2local/src/presentation/smt-admin-sync-ui.test.tsx",
+    "v2local/src/presentation/smt-frontline-presentation-a3e.test.ts"
   ],
-  "authority_impact": "ADMIN_CANONICAL_DELIVERY_ORDERING_ONLY",
-  "persistence_impact": "EXISTING_ADMIN_OUTBOX_AND_SMT_LKG_ONLY_NO_SCHEMA_MIGRATION",
+  "authority_impact": "ADMIN_REMAINS_SOLE_CANONICAL_CONFIG_AUTHORITY",
+  "persistence_impact": "ONE_TIME_CLEAR_OF_SMT_ADMIN_CONFIG_LKG_STATUS_DIAGNOSTIC_ONLY_TRANSACTION_DATA_UNTOUCHED",
   "provider_impact": "NONE",
   "transaction_impact": "NONE",
   "expected_behavior_change": [
-    "Every formal Admin publish is accepted by the canonical Cloud ordering defined by publish time and fingerprint.",
-    "Every ADMIN_CONFIG_AVAILABLE doorbell forces SMT to pull canonical Admin state with no local revision/newness veto.",
-    "SMT applies canonical Admin envelopes by publishedAt plus fingerprint and atomically replaces the local canonical LKG.",
-    "If another Admin publish arrives during an in-flight pull, the existing coalescing path schedules another canonical pull after completion.",
-    "Admin only marks PUBLISHED after exact canonical response plus Cloud publish time evidence."
+    "On first upgraded SMT runtime start while online, clear the legacy SMT Admin config LKG/status once, preserving all order/payment/transaction runtime storage.",
+    "Every formal Admin publish receives a new canonical Cloud Hong Kong publish timestamp, regardless of diagnostic R/revision value or historical client timestamp.",
+    "Admin publish outbox is FIFO and removes only the exact Cloud-confirmed publish request; rapid publishes are not collapsed.",
+    "Cloud retains canonical publish history and SMT catch-up replays every publication after its last applied Hong Kong publish time.",
+    "Every ADMIN_CONFIG_AVAILABLE doorbell triggers the same canonical history catch-up; no R/revision comparison may veto a publish.",
+    "SMT ACK carries canonical publishedAt and is validated by fingerprint + publish time, not by current R/revision.",
+    "Admin and SMT human-facing sync status use Hong Kong publish/apply/readback time instead of Rxx as latest-state language.",
+    "Republishing historical content later is accepted as a new formal publish because Cloud assigns the new Hong Kong publish time."
   ],
   "non_goals": [
     "No second config authority.",
     "No interval polling loop.",
-    "No Order, Pricing, Payment, Print, Keeta, Customer, SMM or Owner authority change.",
-    "No destructive local data reset."
+    "No Order, Pricing, Payment, Print, Keeta, Customer, SMM or Owner transaction authority change.",
+    "No destructive reset of transaction/order/payment data.",
+    "No Builder or OTA protocol redesign."
   ],
-  "rollback_sha": "532e78be814dfb495fe33af964a50d421bc913b5",
+  "rollback_sha": "17cd0798e468071429c68675783de3faefdaf38c",
   "severity": "HARD_BLOCK"
 }
