@@ -8,6 +8,23 @@ export interface V3CanonicalAdminEnvelope{
   readonly fingerprint:string;
 }
 
+function fingerprintV3Canonical(input:Omit<V3CanonicalAdminEnvelope,'fingerprint'>){
+  const canonical=JSON.stringify({
+    schema:input.schema,
+    storeId:input.storeId,
+    revision:input.revision,
+    publishedAt:input.publishedAt,
+    adminFingerprint:input.adminFingerprint,
+    snapshot:input.snapshot,
+  });
+  let hash=0x811c9dc5;
+  for(let index=0;index<canonical.length;index++){
+    hash^=canonical.charCodeAt(index);
+    hash=Math.imul(hash,0x01000193)>>>0;
+  }
+  return 'fnv1a32:'+hash.toString(16).padStart(8,'0');
+}
+
 function validateV3CanonicalShape(input:unknown):V3CanonicalAdminEnvelope{
   if(!input||typeof input!=='object'||Array.isArray(input))throw new Error('ADMIN_CONFIG_ENVELOPE_INVALID');
   const row=input as Record<string,unknown>;
@@ -19,15 +36,17 @@ function validateV3CanonicalShape(input:unknown):V3CanonicalAdminEnvelope{
   if(!row.snapshot||typeof row.snapshot!=='object'||Array.isArray(row.snapshot))throw new Error('ADMIN_CONFIG_SNAPSHOT_INVALID');
   if(!(row.snapshot as Record<string,unknown>).catalog)throw new Error('ADMIN_CONFIG_CATALOG_REQUIRED');
   if(typeof row.fingerprint!=='string'||!row.fingerprint.trim())throw new Error('ADMIN_CONFIG_FINGERPRINT_INVALID');
-  return Object.freeze({
-    schema:'MFK_ADMIN_CONFIG_SYNC_V1',
+  const base={
+    schema:'MFK_ADMIN_CONFIG_SYNC_V1' as const,
     storeId:row.storeId.trim(),
     revision:Number(row.revision),
     publishedAt:row.publishedAt,
     adminFingerprint:row.adminFingerprint.trim(),
     snapshot:row.snapshot as Readonly<Record<string,unknown>>,
-    fingerprint:row.fingerprint.trim(),
-  });
+  };
+  const fingerprint=row.fingerprint.trim();
+  if(fingerprint!==fingerprintV3Canonical(base))throw new Error('ADMIN_CONFIG_FINGERPRINT_MISMATCH');
+  return Object.freeze({...base,fingerprint});
 }
 
 const STORE_ID='MF01';
