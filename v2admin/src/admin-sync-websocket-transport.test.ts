@@ -116,6 +116,38 @@ describe('Admin realtime transport recovery',()=>{
     expect(state.storage.put).not.toHaveBeenCalled();
   });
 
+  it('does not let a reused browser fingerprint hide different Admin data',async()=>{
+    const active=createMfkAdminConfigEnvelope({
+      storeId:'MF01',
+      revision:5,
+      publishedAt:'2026-09-29T12:00:00.000Z',
+      adminFingerprint:'collision-like-fingerprint',
+      snapshot:{catalog:{products:[{id:'A'}]}},
+    });
+    const values=new Map<string,unknown>([['active',active],['activeMeta',{acceptedAt:'2026-09-29T12:00:00.000Z'}]]);
+    const state={
+      storage:{
+        get:vi.fn(async(key:string)=>values.get(key)),
+        put:vi.fn(async(key:string,value:unknown)=>{values.set(key,value);}),
+      },
+      getWebSockets:()=>[],
+    };
+    const store=new AdminSyncStore(state,{});
+    const changed=createMfkAdminConfigEnvelope({
+      storeId:'MF01',
+      revision:1,
+      publishedAt:'2026-09-29T01:00:00.000Z',
+      adminFingerprint:'collision-like-fingerprint',
+      snapshot:{catalog:{products:[{id:'B'}]}},
+    });
+
+    const result:any=await store.publishEnvelope(changed);
+
+    expect(result.body.state).toBe('PUBLISHED');
+    expect(result.body.active.revision).toBe(6);
+    expect(result.body.active.snapshot.catalog.products[0].id).toBe('B');
+  });
+
   it('keeps active HTTP response wrapping and CORS behavior',async()=>{
     vi.stubGlobal('Response',NativeResponse);
     const upstream=new NativeResponse(JSON.stringify({revision:42}),{headers:{'content-type':'application/json'}});
