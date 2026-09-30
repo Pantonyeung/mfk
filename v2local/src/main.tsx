@@ -24,6 +24,7 @@ import './styles.css';
 
 const publicMirror=isSmtPublicMirror();
 if(publicMirror)document.documentElement.dataset.mfkSmtMode='public-mirror';
+if(publicMirror)window.addEventListener('pageshow',event=>{if(event.persisted)window.location.reload();});
 
 installSmtAdminAutoSync();
 installStaffSessionInvalidation();
