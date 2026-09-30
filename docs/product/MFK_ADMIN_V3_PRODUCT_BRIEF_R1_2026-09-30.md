@@ -12669,3 +12669,137 @@ Owner 審批時只需要確認：
 
 MILESTONE:
 MFK_ADMIN_V3_OWNER_REVIEW_CLOSEOUT_PACK_READY
+
+---
+
+# 68. Admin V3 起因｜Keeta 驗收暴露嘅 Browser / Projection Freshness 失控
+
+Admin V3 唔係因為「舊 UI 唔靚」而重做。
+
+主要直接觸發事件：
+Owner 喺 Keeta 驗收期間，需要即時完成：
+**新增分類 → 新增商品 → 設價 → 發佈。**
+
+當時 Owner 由手機 Safari 進入 Admin，
+實際見到嘅仍然係舊畫面／舊版本。
+即使後台 Cloudflare 已重複部署最新候選，
+Safari refresh 仍然未能可靠收斂到最新 serving state。
+
+呢件事將原本屬於「架構風險」嘅問題，
+變成真實驗收阻斷：
+**Owner 無法可靠進入最新 Admin 去完成最基本 canonical config mutation。**
+
+---
+
+## 68.1 問題唔只係舊 bundle
+
+調查後需要分開兩種 freshness failure：
+
+### A. Client / UI Version Freshness
+- Production / preview 已部署新版本
+- Browser 仍可能繼續使用舊 bundle / 舊 bootstrap / 舊 client state
+- Refresh 不足以證明已切到正確 serving release
+
+### B. Business Data / Projection Freshness
+- Client 曾經讀取一份商品 / 價格 / 設定 projection
+- 之後 canonical 已更新
+- Client 如果無正式 invalidation / refetch / freshness / readback，
+  就可能繼續使用舊 facts
+
+因此最危險唔係「畫面舊」本身，
+而係：
+**使用者唔知道自己睇緊舊版本、舊價格、舊設定，仲可能照住舊資料繼續操作。**
+
+---
+
+## 68.2 根本錯誤模式
+
+v2 web clients 累積：
+- localStorage
+- bootstrap state
+- cache
+- sync compatibility
+- hidden browser persistence
+
+如果 client 讀到資料後，
+將本地 copy 當作可以長期代表 server / canonical truth，
+就會形成：
+**Stale Local Projection acting like Authority**
+
+呢個係 V3 要切斷嘅核心反模式。
+
+---
+
+## 68.3 Admin V3 必須解決嘅唔係「Refresh Button」
+
+正確 V3 contract：
+
+1. Browser 唔持有 durable server truth
+2. Server / canonical state 用 query / refetch / readback
+3. 每個重要 projection 有 freshness
+4. Publish 有 canonical published identity / time
+5. Target applied 要獨立 readback
+6. App shell / serving release 要可以辨認
+7. Safari / in-app browser / second tab 要收斂到同一 canonical result
+8. Reload / reopen 唔可以靠舊 local snapshot 冒充最新
+9. local persisted state 只准做 UI preference / bounded draft / explicit pending command
+10. V3 禁止 import v2 client-state modules
+
+---
+
+## 68.4 對 Customer / SMM / Owner 其他端口嘅意義
+
+同一問題唔只影響 Admin。
+
+如果 Customer 曾經讀過舊商品／舊價格，
+而 client 無正式 freshness / version gate / canonical refresh，
+就可能長時間顯示過期價格或設定。
+
+所以日後每個 V3 port 都要證明：
+
+**打開 → 取得最新可用 projection → 知道 projection version/freshness → canonical 改變後可重新收斂 → submit 時仍由正式 authority 做最終合法性檢查。**
+
+唔可以：
+「第一次下載過就永久信本機」。
+
+---
+
+## 68.5 因此點解係 Parallel V3
+
+今次事件證明，
+繼續喺 v2 browser-state 上面不停 patch 會令：
+- 舊 cache semantics
+- compatibility state
+- hidden persistence
+- bootstrap assumptions
+
+繼續帶入下一輪。
+
+所以正式策略係：
+
+**v2 保持 production baseline**
+→ **V3 獨立重建**
+→ **唔繼承 v2 browser authority pattern**
+→ **Preview 做 Safari / in-app / second-tab physical acceptance**
+→ **全部 GREEN 先提出 cutover**
+
+Admin 先做，
+因為 Admin 係 canonical configuration / data management surface。
+
+---
+
+## 68.6 V3 Physical Acceptance 必測
+
+除原本 acceptance 外，新增／重申以下必測：
+
+1. 新部署後 iPhone Safari 可以確認 serving release identity
+2. Hard refresh / reopen / second tab 唔會繼續冒充舊 release
+3. Admin 改商品 / 價格 /設定並發佈後，canonical readback 正確
+4. 其他 client refetch 後收斂到新 projection
+5. Stale client 顯示 freshness / stale state，而唔偽裝最新
+6. Browser cache/local persisted state 不可覆蓋較新 canonical HTTP result
+7. 同一帳號 normal Safari / in-app browser / second tab 最終結果一致
+8. rollback v2 後可證明 serving identity 真正回到 v2
+
+MILESTONE:
+MFK_ADMIN_V3_TRIGGER_INCIDENT_AND_FRESHNESS_ROOT_CAUSE_LOCKED
