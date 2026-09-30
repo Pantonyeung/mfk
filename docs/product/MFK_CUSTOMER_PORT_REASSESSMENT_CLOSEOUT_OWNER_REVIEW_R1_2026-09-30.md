@@ -4,8 +4,8 @@
 控制 Issue：#603  
 Draft PR：#604  
 Branch：`spec/MFK-CUSTOMER-PORT-REASSESSMENT-R1`  
-狀態：READY FOR OWNER REVIEW  
-Implementation：BLOCKED
+狀態：OWNER APPROVED / PRODUCT LOCKED  
+Implementation：ENTRY READY — BLOCKED UNTIL PRODUCT SPEC MERGE
 
 ---
 
@@ -45,7 +45,7 @@ Customer = 消費者交易介面。
 
 | UI | Primary Job | First Viewport | Primary Action |
 |---|---|---|---|
-| UI0 Launch | Brand entry | Logo / IP / animation | Auto Home candidate |
+| UI0 Launch | Brand entry | Logo / IP / animation | Auto Home |
 | UI1 Home | Resume order / start discovery | Store + Active Order if any + Search | Browse / Active Order |
 | UI2 Browse | Find food | Search + Categories + Products | Open Product |
 | UI3 Configure | Configure one product | Product + Price + Choices | Add to Cart |
@@ -423,46 +423,47 @@ System revalidation internal; customer sees Repair only if needed.
 
 ---
 
-# 14. RED Owner Decisions
+# 14. Owner Decisions｜RESOLVED / LOCKED
 
-產品層目前只剩以下需要 Owner 明確決定：
+Owner 於 2026-09-30 明確確認全部剩餘 RED：
 
-## RED-01｜Launch Navigation
+## RED-01｜Launch Navigation → RESOLVED
 
-Current：
-Animation ends → two buttons:
-- 進入主頁
-- 進入會員頁
+LOCKED：
+**Brand animation → automatically enter Home**
 
-Candidate：
-**Animation → automatically enter Home**
-Member remains Bottom Nav destination.
+- 不再顯示「進入主頁 / 進入會員頁」同級選擇。
+- Member 保留 Bottom Navigation 正常入口。
+- reduced-motion / returning flow 同樣以 Home 為預設落點。
 
-Question：
-Lock auto-Home behaviour?
+## RED-02｜Checkout Structure → RESOLVED
 
-## RED-02｜Checkout Structure
+LOCKED：
+**One Checkout surface + one `確認落單` CTA**
 
-Current：
-Contact → Payment → Review → Confirm Data → Submit → Confirm Order
-
-Candidate：
-**One Checkout surface**
-- contact/pickup
+Checkout 同一 surface 包含：
+- contact / pickup
 - payment
 - order summary
 - total
 - one `確認落單`
 
-Question：
-Lock single-surface Checkout and remove separate review-confirm step?
+移除：
+- separate review-confirm page
+- confirm-data-before-submit layer
+- 「下一步：付款 / 下一步：提交前確認」教學式 flow
+
+Safety validation 保留於 system contract：
+quote / availability / payment / material change / duplicate submission protection。
+
+RED COUNT：0
 
 ---
 
 # 15. Owner Review Checklist
 
-- [ ] RED-01 Launch auto-Home
-- [ ] RED-02 Single-surface Checkout
+- [x] RED-01 Launch auto-Home — OWNER CONFIRMED
+- [x] RED-02 Single-surface Checkout — OWNER CONFIRMED
 - [x] Human Logic Gate
 - [x] Direct Order UX
 - [x] Product truth image rule
@@ -483,20 +484,25 @@ Lock single-surface Checkout and remove separate review-confirm step?
 # 16. Gate
 
 Current：
-**READY FOR OWNER REVIEW**
+**OWNER APPROVED / PRODUCT LOCKED**
 
-Not yet：
-- APPROVED
-- IMPLEMENTATION AUTHORIZED
+RED：0
 
-When RED-01 and RED-02 are confirmed：
-- RED = 0
-- Product closeout can be marked LOCKED
-- then merge Product spec
-- then create isolated implementation candidate
-- then physical 360 / 390 / 412 acceptance
-- then Owner UI confirmation
-- only after that can Merge / Deploy / OTA be considered
+YELLOW：
+全部已有 bounded handling，不阻產品定義鎖定。
+
+Implementation Entry：
+**READY AFTER PRODUCT SPEC MERGE**
+
+Sequence：
+1. Product spec merge
+2. Create isolated Customer implementation candidate
+3. Implement locked UI0–UI10 product contract
+4. Physical 360 / 390 / 412 acceptance
+5. Owner visual confirmation per Stage
+6. Only then consider runtime merge / deploy / OTA
+
+No runtime code was changed by this product reassessment approval.
 
 MILESTONE:
-MFK_CUSTOMER_PORT_REASSESSMENT_R1_READY_FOR_OWNER_REVIEW
+MFK_CUSTOMER_PORT_REASSESSMENT_R1_OWNER_APPROVED_PRODUCT_LOCKED
