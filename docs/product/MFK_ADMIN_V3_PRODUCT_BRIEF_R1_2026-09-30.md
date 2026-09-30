@@ -383,38 +383,63 @@ Color 永遠唔可以係唯一狀態訊號；一定有文字。
 
 ---
 
-# 9. 今日｜鎖定
+# 9. 今日｜首頁 / Daily Control Home｜鎖定
 
-「今日」係每日返工入口，但唔係唯一搵功能入口。
+「今日」係 Admin V3 第一頁，亦係每日返工第一眼。
+佢唔係功能總目錄，亦唔係將所有 domain 縮細塞落一頁。
 
-Sidebar 細 Menu 只保留：
+首頁唯一目的：
+**用 5–10 秒回答「今日生意做成點、而家有冇嘢阻住營業、下一件最重要要處理乜」。**
+
+Sidebar 細 Menu：
 - 營運總覽
 - 待處理事項
 
 其他正式功能仍然由自己大 Menu → 細 Menu 兩步直接到達。
-今日頁只做：
-**總覽、提醒、捷徑。**
-唔建立第二套 mutation authority。
 
-## 9.1 營運總覽
+## 9.1 第一優先：今日營業額
 
-入口：
-**今日 → 營運總覽**
+首頁最大、最先睇到嘅數字必須係：
+**今日有效營業額 / Effective Sales**
 
-第二步完成後直接見今日營運狀況。
+呢個數字係首頁 Hero Metric，視覺權重最高。
 
-第一屏只回答四件事：
-1. 今日可唔可以正常營業？
-2. 有冇真正要處理嘅問題？
-3. 有冇未發佈變更？
-4. 今日核心營運數據係乜？
+同區只配必要資料：
+- 今日有效營業額
+- 訂單數
+- 客單價 AOV
+- 退款／調整
+- 上次更新時間 / freshness
+- 一個合理 comparison（例如上週同日同期 或 prior period，只顯一個）
 
-## 9.2 今日營運狀態
+禁止：
+- 將 Payment Collected 當 Sales
+- 將 Platform Settlement / Merchant Earnings 當 Sales
+- query error 顯 $0
+- stale data 當即時
+- 同時擺十幾個 KPI 搶焦點
 
-最上方係 compact Readiness Strip，
-唔做一牆 equal-weight status cards。
+如果資料 PARTIAL / STALE / UNKNOWN：
+營業額卡必須直接顯示資料狀態，唔可以用正常數字樣式掩蓋。
 
-固定 domain：
+CTA：
+**查看銷售報表 → 報表 / 銷售**
+
+## 9.2 首頁真正服務 6 件事
+
+首頁只服務以下六件事，其他全部 deep-link：
+
+### A. 今日生意
+回答：
+- 今日做咗幾多營業額？
+- 幾多張單？
+- 客單價幾多？
+- 有幾多退款／調整？
+
+呢區永遠排第一。
+
+### B. 而家營業狀態
+Compact Readiness Strip：
 - 營業日
 - 訂單／交易
 - 平台／渠道
@@ -434,92 +459,131 @@ Sidebar 細 Menu 只保留：
 - affected count（有意義先顯）
 - 點擊 deep-link 去 Primary Home
 
-禁止：
-- 單一「全系統正常」綠燈
-- Connected 當 Ready
-- Stale 當 Healthy
-- Error 當 0
+禁止用一粒「全系統正常」總綠燈。
 
-## 9.3 今日核心數字
+### C. 而家有咩要處理
+顯示最高優先 Action Queue preview。
 
-只保留最有用 4 個：
-- Effective Sales
-- Orders
-- AOV
-- Refund / Adjustment
-
-全部來自正式 read model。
-
-顯示：
-- Current value
-- 合理 comparison（最多一個）
-- Freshness
-
-唔將首頁變完整報表。
-需要分析就 deep-link：
-**報表 → 銷售**
-
-## 9.4 要處理
-
-首頁只顯最高優先嘅 Action Queue preview：
+每條：
 - Severity
 - Title
 - Domain
 - Affected object
+- Business impact
 - Last observed
 - CTA：處理
 
-最多顯示一個有限數量，例如 5–8 條；
-其餘：
+首頁只顯最重要 5–8 條。
+全部問題：
 **查看全部 → 今日 / 待處理事項**
 
-同一 incident 必須 dedupe。
-唔可以平台頁一條、打印頁一條、首頁又變第三個獨立 issue truth。
+### D. 今日訂單流
+首頁顯簡潔 operational summary：
+- 進行中訂單
+- 待付款／Payment attention
+- 延誤訂單
+- 訂單異常
 
-## 9.5 未發佈變更
+CTA：
+- 查看進行中訂單
+- 查看訂單異常
 
+唔喺首頁直接管理單內所有細節。
+
+### E. 今日現金 / 收舖準備
+只顯：
+- Current Business Day
+- Cash difference / attention（如已有點算）
+- Close readiness
+- 是否有 blocker
+
+CTA：
+- 營業日
+- 現金／收舖
+
+首頁唔自己做 Cash mutation。
+
+### F. 未發佈變更
 顯示：
 - Draft change count
 - Affected domains
 - Last modified
-- Validation blocker count（如有）
+- Validation blocker count
 
 CTA：
-- 查看變更 → 發佈與版本 / 未發佈變更
-- 檢查並發佈 → 發佈與版本 / 發佈中心
+- 查看變更
+- 檢查並發佈
 
 Save Draft ≠ Published。
-首頁唔自己建立 publish engine。
 
-## 9.6 今日常用工作
+## 9.3 首頁資訊層級
 
-可以顯 contextual shortcut：
-- 開始／查看營業日
-- 準備收舖
-- 現金／交更
-- 售罄／恢復供應
+Desktop 第一屏排序：
+
+1. **今日有效營業額 Hero**
+2. Orders / AOV / Refund 小摘要
+3. 營業狀態 Readiness Strip
+4. 要處理 Action Queue preview
+5. 今日訂單流
+6. 現金 / 收舖準備
+7. 未發佈變更
+
+唔應該：
+- 第一屏先見系統狀態、營業額反而縮埋
+- 一開首頁就見技術 health card 多過生意數字
+- 將未發佈變更擺到比營業額更搶眼
+- 用大量圖表令 Owner 搵唔到今日營業額
+
+## 9.4 Mobile 第一屏
+
+Mobile 第一屏最少必須直接見：
+- 今日有效營業額
+- Orders
+- AOV
+- Refund / Adjustment
+- 是否有高優先待處理事項
+
+Readiness / Orders / Cash / Draft 往下排。
+
+唔可以因 responsive 而將營業額收埋落第二、第三屏。
+
+## 9.5 今日常用捷徑
+
+可以提供 contextual shortcut：
 - 查看進行中訂單
+- 售罄／恢復供應
+- 開始／查看營業日
+- 現金／收舖
+- 查看平台狀態
+- 查看打印異常
 
-但全部 deep-link 去責任 Domain。
+全部只 deep-link 去責任 Domain。
+首頁唔建立第二套 mutation form。
 
-例如：
-- 營業日 → 營運管理 / 營業日
-- 現金 → 營運管理 / 現金／收舖
-- 售罄 → 營運管理 / 售罄／供應
-- 訂單 → 訂單管理 / 進行中訂單
+## 9.6 首頁唔服務嘅事
 
-首頁唔放第二套正式 mutation form。
+首頁唔用嚟：
+- 編輯產品
+- 改平台 mapping
+- 改打印模板
+- 管角色權限
+- 做完整報表分析
+- 看完整 Audit
+- 做工程 Diagnostics
 
-## 9.7 今日頁 human-first rule
+以上全部有自己 Primary Home。
 
-正常使用者第一眼只需要知道：
-- 今日營業未
-- 有冇單
-- 有冇錢／退款異常
-- 平台接單正常未
-- 打印／裝置有冇問題
-- 有冇未發佈改動
-- 下一件最重要要處理乜
+## 9.7 首頁 human-first rule
+
+Owner 第一眼應該依次知道：
+
+1. **今日營業額幾多**
+2. **今日有幾多單**
+3. **有冇退款／異常拉低結果**
+4. **而家仲可唔可以正常做生意**
+5. **最重要要處理邊件事**
+6. **收舖／現金有冇問題**
+7. **有冇未發佈改動**
 
 工程資訊例如：
 - operation ID
