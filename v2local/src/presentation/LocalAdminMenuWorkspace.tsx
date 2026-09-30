@@ -19,11 +19,15 @@ type OptionCenterSnapshot={
 };
 
 function stateLabel(state:string){
-  return state==='SYNCED'?'已同步'
-    :state==='CONNECTING'?'連線中'
-    :state==='LOCAL_LKG'?'離線 · 使用本機最後版本'
+  return state==='SYNCED'?'已套用'
+    :state==='CONNECTING'?'正在接收'
+    :state==='LOCAL_LKG'?'離線 · 使用最後已套用設定'
     :state==='OFFLINE'?'離線'
-    :'同步異常';
+    :'接收異常';
+}
+function timeLabel(value?:string){
+  if(!value||!Number.isFinite(Date.parse(value)))return '未有';
+  return new Date(value).toLocaleString('zh-HK',{timeZone:'Asia/Hong_Kong',hour12:false});
 }
 
 export function LocalAdminMenuWorkspace(){
@@ -48,27 +52,30 @@ export function LocalAdminMenuWorkspace(){
   return <section className="local-admin-menu">
     <header className="local-admin-menu-head">
       <div>
-        <small>ADMIN → SMT AUTO SYNC</small>
-        <h2>Admin 同步狀態</h2>
-        <p>SMT 只讀 Admin 已保存版本。Admin 一保存，系統會自動接收、驗證、切換本機 LKG，同自動回讀；呢度冇任何編輯、匯入、發布或確認操作。</p>
+        <small>ADMIN 正式發佈 → SMT 自動套用</small>
+        <h2>Admin 資料接收狀態</h2>
+        <p>Admin 每次正式發佈，SMT 都接收同一份 Canonical 資料、驗證、原子切換本機設定，再回讀確認。Rxx 只保留作內部診斷，唔用嚟判斷邊份資料最新。</p>
       </div>
       <div className="local-admin-menu-version-pair">
-        <div><span>ACTIVE</span><b>{lkg?'R'+lkg.revision:'—'}</b><small>SMT 正在使用</small></div>
-        <div><span>SYNC</span><b>{stateLabel(status.state)}</b><small>{status.updatedAt?new Date(status.updatedAt).toLocaleString('zh-HK'):'未同步'}</small></div>
+        <div><span>ADMIN 發佈</span><b>{timeLabel(lkg?.publishedAt)}</b><small>SMT 已接收嘅 Canonical 發佈時間</small></div>
+        <div><span>SMT</span><b>{stateLabel(status.state)}</b><small>{timeLabel(status.appliedAt??status.updatedAt)}</small></div>
       </div>
     </header>
 
     <section className="local-admin-a2-transfer">
-      <header><div><small>自動同步</small><h3>Canonical Admin Config → SMT Local LKG</h3></div><span>ZERO MANUAL ACTION</span></header>
+      <header><div><small>自動接收</small><h3>Admin Canonical Data → SMT 本機設定</h3></div><span>零人手操作</span></header>
       <div className="local-admin-a2-proof match">
-        <p><span>Device</span><code>{readSmtDeviceId()}</code></p>
-        <p><span>Revision</span><b>{lkg?'R'+lkg.revision:'未有 Admin 版本'}</b></p>
-        <p><span>Fingerprint</span><code>{lkg?.fingerprint??'—'}</code></p>
-        <p><span>Admin Fingerprint</span><code>{lkg?.adminFingerprint??'—'}</code></p>
-        <p><span>State</span><strong>{stateLabel(status.state)}</strong></p>
-        {status.error?<p><span>Last error</span><code>{status.error}</code></p>:null}
+        <p><span>裝置</span><code>{readSmtDeviceId()}</code></p>
+        <p><span>Admin 正式發佈時間</span><b>{timeLabel(lkg?.publishedAt)}</b></p>
+        <p><span>Doorbell 收到時間</span><b>{timeLabel(status.receivedAt)}</b></p>
+        <p><span>SMT 套用時間</span><b>{timeLabel(status.appliedAt)}</b></p>
+        <p><span>ACK 時間</span><b>{timeLabel(status.ackAt)}</b></p>
+        <p><span>Canonical 指紋</span><code>{lkg?.fingerprint??'—'}</code></p>
+        <p><span>Admin 內容指紋</span><code>{lkg?.adminFingerprint??'—'}</code></p>
+        <p><span>狀態</span><strong>{stateLabel(status.state)}</strong></p>
+        {status.error?<p><span>最近錯誤</span><code>{status.error}</code></p>:null}
       </div>
-      <small>斷網時繼續使用本機最後有效版本；網絡恢復後會自動追到 Admin 最新版本。Realtime 只做通知，正式資料每次都重新讀 canonical endpoint。</small>
+      <small>每次 Admin 正式發佈都會通知 SMT，SMT 再重新讀同一個 Canonical endpoint。連續發佈亦唔以 Rxx 判新舊；只以正式發佈時間同 Canonical 指紋收斂。</small>
     </section>
 
     <div className="admin-kpi-grid">
