@@ -17,8 +17,8 @@
   "read_only_dependencies": [
     "contracts/web-state-authority-v1.ts"
   ],
-  "authority_impact": "NONE; V3 remains a client of existing Admin canonical and SMT/runtime authorities",
-  "persistence_impact": "NO_V2_STORAGE_IMPORT; NO_DURABLE_SERVER_TRUTH; DEXIE_OUTBOX_DISABLED_UNLESS_OFFLINE_COMMAND_EXPLICITLY_APPROVED",
+  "authority_impact": "NONE",
+  "persistence_impact": "NONE",
   "provider_impact": "NONE",
   "transaction_impact": "NONE",
   "production_routing_impact": "NONE",
@@ -43,5 +43,14 @@
     "No merge of PR #599."
   ],
   "rollback_sha": "3c6c00d032eec121f1b6f1a9c059a3215c572ef0",
-  "severity": "HARD_BLOCK"
+  "severity": "HARD_BLOCK",
+  "governance_review": {
+    "status": "COMMANDER_REVIEWED",
+    "record": "docs/implementation/MFK_ADMIN_V3_REGRESSION_SHADOW_GOVERNANCE_REVIEW_R1_2026-10-01.md",
+    "notes": [
+      "v3admin/** is the approved isolated ADMIN_V3 client scope.",
+      ".github/workflows/v3admin-ci.yml is reviewed as CI-only with zero deployment/routing behavior.",
+      "contracts/admin-config-sync-v1.ts change is type-only and runtime-semantic-neutral."
+    ]
+  }
 }
