@@ -4,7 +4,6 @@
   "base_sha": "0776cffed4afa6b8ecb6e5a5e4e822b1a54dd53e",
   "allowed_paths": [
     ".github/mfk-change-manifest.json",
-    "v2customer/public/brand/mf-home-storefront-hero-v1.jpg",
     "v2customer/src/stage1/Stage1Home.tsx",
     "v2customer/src/stage1/stage1.css",
     "v2customer/test/customer-p0-source-fidelity-w1.test.mjs",
@@ -19,11 +18,13 @@
   "provider_impact": "NONE",
   "transaction_impact": "NONE",
   "expected_behavior_change": [
-    "Recompose only the Customer UI1 Home storefront hierarchy and state presentation.",
-    "Use the canonical quick-entry labels and a purpose-built brand hero without mockup text or invented product facts.",
+    "Implement only the Customer UI1 Home skeleton and measurable visual asset slots.",
+    "Separate Stage 1 layout geometry from later asset production; Phase A uses neutral placeholders only.",
+    "Prioritize active-order presentation before the hero frame and restore a bounded returning-customer frequent preview using existing data and handlers.",
     "Keep closed-store browsing, recommendation filtering, store truth, active-order readback, and navigation handlers unchanged."
   ],
   "non_goals": [
+    "No generated Hero, character, food, quick-entry icon, or fake product image in Phase A.",
     "No Stage 0 or Stage 2+ change.",
     "No Pricing, Formal Order, Submit, Payment, Coupon, Sellability, Store Status, Recommendation, Runtime Port, identity, or Member authority change.",
     "No merge, deploy, Builder, OTA, or physical acceptance."
