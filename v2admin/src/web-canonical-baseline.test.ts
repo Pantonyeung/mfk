@@ -55,5 +55,7 @@ describe('MFK web canonical baseline',()=>{
     expect(sync).toContain("status.adminFingerprint===latest.fingerprint");
     expect(sync).not.toContain("status.revision===latest.version");
     expect(sync).toContain('refreshAdminBrowserSession');
+    expect(sync).toContain('window.setTimeout(flush,0)');
+    expect(sync).not.toContain('queueLatest();flush();');
   });
 });
