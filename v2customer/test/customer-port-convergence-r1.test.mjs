@@ -49,7 +49,7 @@ test('UI1 is the FINAL storefront and cold launch continues to UI2 menu',()=>{
   assert.ok(app.includes("view==='home'?<Stage1Home"));
   assert.ok(app.includes("onBrowse={()=>changeView('menu')}"));
   assert.ok(app.includes("view==='menu'?<Stage2Menu"));
-  for(const marker of['stage1-fixed-header','stage1-welcome','stage1-search-entry','stage1-hero-banner','stage1-announcement-strip','stage1-top6','回憶券','我的收藏','期間限定'])assert.ok(home.includes(marker),marker);
+  for(const marker of['stage1-fixed-header','stage1-welcome','stage1-search-entry','stage1-hero-banner','stage1-announcement-strip','stage1-top6','記憶券','常購清單','期間限定'])assert.ok(home.includes(marker),marker);
   assert.ok(app.includes('limit:6'));
   assert.ok(home.includes('const canBrowse=Boolean(snapshot?.menu)'));
 });

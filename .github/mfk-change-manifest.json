@@ -1,27 +1,33 @@
 {
   "version": 1,
-  "capability": "MFK_ADMIN_BOOTSTRAP_SAVED_STATE_R3",
-  "base_sha": "02b653c6e7406ed9e969145c6c715caeff38fa28",
+  "capability": "MFK_CUSTOMER_UI1_HOME_R1",
+  "base_sha": "0776cffed4afa6b8ecb6e5a5e4e822b1a54dd53e",
   "allowed_paths": [
     ".github/mfk-change-manifest.json",
-    "v2admin/src/admin-canonical-normal-browser.test.ts",
-    "v2admin/src/admin-sync-client.ts"
+    "v2customer/public/brand/mf-home-storefront-hero-v1.jpg",
+    "v2customer/src/stage1/Stage1Home.tsx",
+    "v2customer/src/stage1/stage1.css",
+    "v2customer/test/customer-p0-source-fidelity-w1.test.mjs",
+    "v2customer/test/customer-port-convergence-r1.test.mjs",
+    "v2customer/test/ui1-authority-board-skeleton.test.mjs",
+    "v2customer/test/ui1-five-state-skeleton.test.mjs",
+    "v2customer/test/visual-acceptance.mjs",
+    "v2customer/evidence/stage1-ui1-home-r1/**"
   ],
-  "authority_impact": "NONE_ADMIN_REMAINS_SOLE_CANONICAL_DATA_AUTHORITY",
-  "persistence_impact": "PRUNE_STALE_LOCAL_SYNC_OUTBOX_AFTER_CANONICAL_READ",
+  "authority_impact": "NONE",
+  "persistence_impact": "NONE",
   "provider_impact": "NONE",
   "transaction_impact": "NONE",
   "expected_behavior_change": [
-    "Normal Safari with saved browser state removes stale queued publish rows after canonical cloud read.",
-    "Saved local state can no longer overwrite the canonical PUBLISHED status immediately after bootstrap.",
-    "Only a genuinely later explicitly created publish remains queued."
+    "Recompose only the Customer UI1 Home storefront hierarchy and state presentation.",
+    "Use the canonical quick-entry labels and a purpose-built brand hero without mockup text or invented product facts.",
+    "Keep closed-store browsing, recommendation filtering, store truth, active-order readback, and navigation handlers unchanged."
   ],
   "non_goals": [
-    "No Customer, Owner, SMM or SMT changes.",
-    "No cache-header or service-worker changes.",
-    "No Keeta changes.",
-    "No OTA."
+    "No Stage 0 or Stage 2+ change.",
+    "No Pricing, Formal Order, Submit, Payment, Coupon, Sellability, Store Status, Recommendation, Runtime Port, identity, or Member authority change.",
+    "No merge, deploy, Builder, OTA, or physical acceptance."
   ],
-  "rollback_sha": "02b653c6e7406ed9e969145c6c715caeff38fa28",
-  "severity": "HARD_BLOCK"
+  "rollback_sha": "0776cffed4afa6b8ecb6e5a5e4e822b1a54dd53e",
+  "severity": "SOFT_BLOCK"
 }
