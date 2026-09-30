@@ -1,3 +1,23 @@
+# ADMIN V3 CURRENT PRODUCT PHASE｜2026-09-30
+
+Controlling product candidate:
+`docs/product/MFK_ADMIN_V3_PRODUCT_BRIEF_FUNCTION_UI_LOCK_R1_2026-09-30.md`
+
+Product issue:
+#601
+
+Current strategy:
+- stop A1/A2 incremental implementation progression
+- lock the whole Admin V3 product, functions, IA, UI and acceptance first
+- then execute one isolated one-shot V3 rebuild
+- v2 production remains untouched until full V3 acceptance
+
+Parked references:
+- PR #599 A1: implementation reference only, not to merge during product lock
+- #600 A2: superseded as implementation roadmap; ideas may be reused only if consistent with #601
+
+---
+
 # ADMIN V3 PRODUCT GATE｜2026-09-30
 
 Controlling candidate product brief:
