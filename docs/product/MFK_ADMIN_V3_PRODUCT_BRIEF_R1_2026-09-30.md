@@ -12287,7 +12287,7 @@ MFK_ADMIN_V3_ORDER_READ_ONLY_AUTHORITY_CORRECTION_LOCKED
 
 已將正式中文字典套落：
 - 12 個大 Menu
-- 54 個第二步頁面
+- 53 個第二步頁面
 - 主要 CTA
 - Empty
 - Error
@@ -12553,7 +12553,7 @@ Status：**LOCKED**
 12 個大 Menu：
 
 1. 今日
-2. 訂單管理
+2. 訂單監察
 3. 菜單管理
 4. 營運管理
 5. 平台／渠道管理
