@@ -94,7 +94,25 @@ export function Stage1Home({
   const availableCouponCount=member?.state==='READY'&&member.coupons
     ?member.coupons.filter(item=>item.state==='AVAILABLE').length
     :0;
-  const homeMode=currentOrder?'ORDER_ACTIVE':store?.channelAvailable===false?'CLOSED':'NORMAL';
+  const homeMode=currentOrder?'ORDER_ACTIVE':store?.channelAvailable===false?'CLOSED':availableCouponCount?'CAMPAIGN':history.length?'RETURNING':'NORMAL';
+  const headline=homeMode==='ORDER_ACTIVE'
+    ?'辛苦了！美味正在為你準備中'
+    :homeMode==='CLOSED'
+      ?'辛苦了，先來揀進吧！'
+      :homeMode==='RETURNING'
+        ?'歡迎回來，今天也要好好吃飯！'
+        :homeMode==='CAMPAIGN'
+          ?'發現更多美味，也收集更多回憶！'
+          :'早安，今天想食咩？';
+  const subline=homeMode==='ORDER_ACTIVE'
+    ?'好好吃飯，補充生活的能量！'
+    :homeMode==='CLOSED'
+      ?'好味道，總是值得期待。'
+      :homeMode==='RETURNING'
+        ?'有美食相伴的日子，總是特別好。'
+        :homeMode==='CAMPAIGN'
+          ?'好吃的飯，總能帶來好心情。'
+          :'一碗好飯，讓日常更有味。';
 
   return <div className="stage1-home" data-home-mode={homeMode}>
     <header className="stage1-fixed-header">
@@ -109,6 +127,11 @@ export function Stage1Home({
 
     <div className="stage1-content">
       <Stage1StatePanel connection={connection} browserOnline={browserOnline} onRetry={onRetry}/>
+
+      <section className="stage1-welcome" data-home-mode={homeMode}>
+        <h1>{headline}</h1>
+        <p>{subline}</p>
+      </section>
 
       {currentOrder?<button className="stage1-live-order" type="button" onClick={onOrders}>
         <span className="stage1-live-main">
@@ -136,16 +159,25 @@ export function Stage1Home({
         <p>{store.notice}</p>
       </section>:null}
 
-      {lastOrder||availableCouponCount?<section className="stage1-context-actions" aria-label="快捷操作">
-        {lastOrder?<button type="button" onClick={()=>onBuyAgain(lastOrder)}>
-          <strong>再來一單</strong>
-          <span>{lastOrder.itemSummary}</span>
-        </button>:null}
-        {availableCouponCount?<button type="button" onClick={onMember}>
-          <strong>回憶券</strong>
-          <span>{availableCouponCount} 張可用</span>
-        </button>:null}
-      </section>:null}
+      <section className="stage1-quick-entry-section" aria-label="快捷入口">
+        <div className="stage1-quick-entry-grid">
+          <button type="button" onClick={lastOrder?()=>onBuyAgain(lastOrder):onOrders}>
+            <span className="stage1-shortcut-source stage1-shortcut-heart" aria-hidden="true"><img src={STAGE1_FINAL_SOURCE} alt=""/></span>
+            <strong>我的收藏</strong>
+            {lastOrder?<small>{lastOrder.itemSummary}</small>:<small>常用餐點</small>}
+          </button>
+          <button type="button" onClick={onMember}>
+            <span className="stage1-shortcut-source stage1-shortcut-ticket" aria-hidden="true"><img src={STAGE1_FINAL_SOURCE} alt=""/></span>
+            <strong>回憶券</strong>
+            {availableCouponCount?<small>{availableCouponCount} 張可用</small>:<small>會員專區</small>}
+          </button>
+          <button type="button" onClick={onBrowse}>
+            <span className="stage1-shortcut-source stage1-shortcut-order" aria-hidden="true"><img src={STAGE1_FINAL_SOURCE} alt=""/></span>
+            <strong>期間限定</strong>
+            <small>今期新品</small>
+          </button>
+        </div>
+      </section>
 
       {topRecommendations.length?<section className="stage1-top6" aria-labelledby="stage1-recommend-title">
         <div className="stage1-section-title">
