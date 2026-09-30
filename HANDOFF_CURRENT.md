@@ -13,8 +13,9 @@ Implementation strategy:
 - preserve backend / Cloud canonical / SMT / API contracts
 - no production cutover until V3 physical/browser acceptance is GREEN
 
-First slice:
-`v3admin` A0 foundation only, zero production routing.
+Completed: `v3admin` A0 foundation merged at `f826598f0517229b94c7e817c642e808dc515cc3`, zero production routing.
+
+Current slice: `v3admin` A1 authenticated canonical read-only. Session is memory-only; canonical state is TanStack Query; no edit/publish/outbox command; zero production routing.
 
 ---
 

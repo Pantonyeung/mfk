@@ -89,29 +89,36 @@ Hard prohibitions:
 
 Single active implementation slice:
 
-`V3ADMIN_A0_FOUNDATION`
+`V3ADMIN_A1_CANONICAL_READONLY`
 
 Branch:
 
-`feat/MFK-V3-WEB-PARALLEL-REBIRTH-A0`
+`feat/MFK-V3ADMIN-A1-CANONICAL-READONLY`
 
 PR:
 
-`#598`
+`#599`
 
-Scope:
+A0 is merged to Main at `f826598f0517229b94c7e817c642e808dc515cc3` with zero production routing.
+
+A1 scope:
 - isolated `v3admin/**`
-- R2 governance
-- dedicated V3 CI
+- authenticated Admin challenge/verify using the existing backend contract
+- session token held in React memory only
+- TanStack Query read of formal `/api/admin-browser/active`
+- shared canonical envelope validation
+- visible read-only canonical summary
+- reusable V3 CI
 - zero production routing
 - no v2 runtime code change
 - no backend / SMT / SMM / Customer / Owner runtime change
 
-A0 state:
-- code exists only on candidate branch/PR
-- V3 CI must be GREEN
-- PR remains Draft until Owner explicitly says `PROMOTE`
-- no merge/deploy/cutover is authorized by A0 itself
+A1 state:
+- candidate branch only until PR promotion
+- no config edit, publish, mutation or outbox command
+- CI/review must be GREEN
+- default delivery is Draft PR
+- no merge/deploy/cutover without explicit Owner `PROMOTE`
 
 ## 5. V2 freeze rule
 
@@ -151,12 +158,12 @@ Owner may authorize a later bounded promotion after reviewing candidate evidence
 
 ## 8. Exact NEXT
 
-1. Keep PR #598 as Draft.
-2. Finish current-head CI and review.
-3. Resolve all review findings.
-4. Bank A0 candidate evidence.
-5. Wait for explicit Owner `PROMOTE`.
-6. Only after promotion may A0 merge.
-7. Then start A1: authenticated read-only canonical Admin V3, still with zero production cutover.
+1. Finish A1 candidate implementation.
+2. Open A1 as Draft PR.
+3. Require V3 CI + Regression Shadow + Codex review GREEN.
+4. Bank A1 candidate evidence.
+5. Wait for explicit Owner `PROMOTE` before merge.
+6. No V3 deployment or hostname cutover.
+7. After A1 is banked, A2 implementation is delegated to Codex from a written UI/behavior/acceptance specification.
 
-MILESTONE: `MFK_V3_PARALLEL_REBIRTH_A0_COMMANDER_LOCKED`
+MILESTONE: `MFK_V3ADMIN_A1_COMMANDER_LOCKED`
