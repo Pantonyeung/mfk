@@ -2831,93 +2831,438 @@ Revoke 成功條件：
 
 ---
 
-# 26. Reports｜鎖定
+# 26. 報表｜鎖定
+
+報表係獨立功能 domain。
+使用者想睇「生意、產品、渠道、退款、營運表現」時，第一時間就應該入 **報表**。
+
+Sidebar 細 Menu 直接顯示：
+- 銷售
+- 產品
+- 渠道
+- 退款
+- 營運
+- 匯出
+
+所有頁面符合：
+**報表 → 細 Menu → 已見到目標報表**
+
+報表只讀。
+任何需要操作嘅 object 只提供 contextual deep-link 去責任頁，
+唔喺 Report 自己直接 mutation。
+
+## 26.1 共用報表框架
+
+所有 Report 共用同一結構：
+
+### Header
+- Report title
+- Date / Business Day range
+- Store / scope
+- Freshness
+- Completeness / partial state
+- Export（有權限先顯示）
+
+### 核心問題
+每張報表第一屏只回答一個主要 business question。
+禁止將 10–20 個同等大小 KPI card 堆成數字牆。
+
+### Summary
+只保留該報表最重要嘅 3–5 個 summary metric。
+
+### Trend / Breakdown
+按問題用最簡單視覺：
+- 時間趨勢 → line
+- 類別比較 → bar / table
+- 精準查數 → table
+- 佔比 → sorted bar / table；唔預設用 pie
+- 細趨勢 → table 內 sparkline（如有需要）
+
+### Drill-down
+每個 breakdown 可以：
+- filter
+- sort
+- drill into fixed detail
+- deep-link 去責任 object
+
+唔做 arbitrary dashboard builder。
+
+## 26.2 報表可信度
+
+每張 Report payload 至少有：
+- metricVersion
+- population / scope
+- businessDayId / date range
+- observedAt / generatedAt
+- freshnessState
+- completeness
+- finality（如 relevant）
+- formulaRef / semantic reference（internal contract）
+
+正常 UI 唔需要顯示全部技術欄位，
+但遇到 STALE / PARTIAL / UNAVAILABLE 必須清楚顯示。
+
+禁止：
+- error 顯 0
+- stale 顯「即時」
+- partial 當 complete
+- platform channel data 冒充全店 truth
+- payment collected 冒充 sales
+- settlement amount 冒充 net sales
+
+## 26.3 視覺原則
+
+報表唔係裝飾 dashboard。
+
+每個 chart 必須有清楚用途：
+- 要比較乜
+- 要搵乜變化
+- 要睇邊個 category / time period
+- 要做咩 decision
+
+視覺排序：
+1. 主要結論 / 核心數字
+2. 最有用比較
+3. 原因拆解
+4. 明細表
+
+Color 只做語義輔助。
+重要數字、分類、狀態要有文字 label，
+唔可以靠 legend / hover 先知道。
+
+Mobile：
+- 主視覺先出
+- Filter 唔可以霸晒第一屏
+- Table 轉 stacked rows / compact scroll container
+- 重要數值唔靠 hover
+
+## 26.4 固定 R1 報表
 
 R1 固定可信 5 張：
-
 1. Sales
 2. Product
 3. Channel
 4. Refund
 5. Operations
 
-每張 report：
-- date range
-- freshness
-- metricVersion
-- completeness
-- fixed drill-down
-- export permission check
-
 禁止：
 - arbitrary metric builder
 - free dashboard canvas
 - formula editor
 - SQL
+- user-defined accounting formula
 
-Reports 只 read model。
-Report 可以 deep-link Orders/Product/Channel/Action Queue，但唔直接 mutation。
+Reports 可以 deep-link：
+- Orders
+- Product
+- Channel
+- Action Queue
+- Audit
+
+但唔直接 mutation。
 
 ---
 
-# 27. Sales Report｜最低內容
+# 27. 銷售報表｜鎖定
 
-- Gross
+入口：
+**報表 → 銷售**
+
+第二步完成後直接見 Sales Report。
+
+## 27.1 第一屏
+
+主要回答：
+「呢段時間實際做咗幾多有效生意，同上一個合理基準比點？」
+
+Summary：
+- Effective Sales / 有效營業額
+- Orders
+- Average Order Value
+- Adjustments / Refund
+
+如果產品最後採用其他正式命名，
+UI 必須跟 metric semantic，而唔係沿用市場容易誤解嘅 Gross / Net 字眼。
+
+## 27.2 趨勢
+
+主視覺：
+- Effective Sales over time
+- Orders over time
+
+可切：
+- hour
+- business day
+- selected range
+
+Comparison：
+預設只顯一個有意義基準，例如：
+- 上週同日同期
+- prior period
+- approved weekday baseline
+
+避免同時塞 3–4 個 comparison 令畫面失焦。
+
+## 27.3 Breakdown
+
+固定 breakdown：
+- Original / Gross-like committed value
 - Adjustments
-- Net
+- Effective / Net result
 - Orders
 - AOV
 - Cash Sales
 - Refund
 - Cash Refund
 - Business Day
-- opening/close readback where applicable
+- Opening / close readback where formally available
 
-Error 不可變成 zero。
+### Adjustment
+必須分開：
+- Cancellation
+- Refund
+- Amount Correction
+- Discount（若 metric semantics 需要）
+
+禁止只顯一個含糊 adjustment total 而無法 drill down。
+
+## 27.4 Drill-down
+
+可以由：
+- 某 Business Day
+- 某時間區間
+- 某 adjustment
+
+deep-link 去 filtered 訂單歷史／售後紀錄。
+
+Report 自己唔做 Refund / Cancel。
+
+## 27.5 Error / freshness
+
+Query error：
+- 唔顯 $0
+- 唔顯 0 Orders
+
+應顯：
+- 暫時無法取得
+- 上次成功資料（如有）
+- last updated
+- stale / partial
 
 ---
 
-# 28. Product Report｜最低內容
+# 28. 產品報表｜鎖定
 
-P0：
+入口：
+**報表 → 產品**
+
+第二步完成後直接見 Product Report。
+
+主要回答：
+「邊啲產品真正賣得多、貢獻幾多，同套餐／選項有咩關係？」
+
+## 28.1 Summary
+
+第一屏只保留：
+- Total product quantity
+- Effective product revenue
+- Top product
+- Category contribution
+
+## 28.2 Product performance table
+
+主表：
+- Product
+- Category
 - Overall Qty
 - Standalone Qty
 - Combo Child Qty
 - Effective Product Revenue
 - Contribution %
-- Category performance
-- Modifier selection count / attach rate
-- Combo parent sales / child mix
-- Channel split
-- time-of-day
+- Channel split summary
+- Trend / comparison（如有）
 
-未有 verified cost authority前：
-禁止顯示假精準 Gross Profit / Margin。
+Table 預設按最有用 metric 排序，例如 Effective Revenue / Qty。
+
+Product row 可以 deep-link：
+**菜單管理 → 產品 Detail**
+
+## 28.3 Category performance
+
+用 sorted bar / table：
+- Category
+- Qty
+- Effective revenue
+- Contribution
+- Product count
+
+唔需要額外 pie chart。
+
+## 28.4 Combo / Option
+
+固定分析：
+- Combo parent sales
+- Child mix
+- Modifier / Option selection count
+- Attach rate
+- Option revenue effect（只限正式 read model 可證實）
+
+避免將 Combo child 數量同 standalone sales 混埋。
+
+## 28.5 時段 / 渠道
+
+可切：
+- time-of-day
+- channel split
+
+但一個畫面只突出一個 comparison，
+唔同維度用 tabs / controlled view 切換，
+唔係全部 chart 同時平鋪。
+
+## 28.6 Cost / Margin hard rule
+
+未有 verified Cost Authority 前：
+禁止顯示：
+- 假 Gross Profit
+- 假 Margin
+- 推算成本當正式成本
+
+如果 cost evidence 不完整：
+直接唔顯，
+唔用 estimate 冒充正式報表。
 
 ---
 
-# 29. Channel / Refund / Operations Reports
+# 29. 渠道 / 退款 / 營運報表｜鎖定
 
-Channel：
-- order count
-- effective sales
-- channel mix
-- channel health/read availability
+## 29.1 渠道報表
 
-Refund：
-- count
-- amount
-- method
-- original day
-- execution day
-- addendum/ref
+入口：
+**報表 → 渠道**
 
-Operations：
-- fulfillment/prep where formally available
-- delayed orders
-- print exceptions
+主要回答：
+「每條渠道帶嚟幾多單／營業額，邊條渠道有營運問題？」
+
+Summary：
+- Total channel orders
+- Effective sales
+- Channel mix
+- Channels requiring attention
+
+Breakdown table：
+- Channel
+- Order count
+- Effective sales
+- AOV（只按正式 metric）
+- Mix %
+- Availability / read freshness
+- Exception count
+
+Channel health 唔直接混入 sales score。
+Health 只作 context。
+
+可 deep-link：
+- 平台／渠道管理
+- filtered orders
 - channel exceptions
-- unresolved actions
+
+## 29.2 退款報表
+
+入口：
+**報表 → 退款**
+
+主要回答：
+「退款發生幾多、涉及幾多錢、邊類原因最多？」
+
+Summary：
+- Refund count
+- Refund amount
+- Refund rate（只限 denominator semantic 已鎖）
+- unresolved / unknown count
+
+Breakdown：
+- Method
+- Reason
+- Original Business Day
+- Execution Day
+- Staff / actor（按 permission）
+- Channel
+- Addendum / linked reference
+
+Original day 同 execution day 分開，
+避免跨日退款造成報表誤解。
+
+可 deep-link：
+**訂單管理 → 售後／退款／取消／修正**
+
+## 29.3 營運報表
+
+入口：
+**報表 → 營運**
+
+主要回答：
+「營運邊度慢、邊度出錯、邊啲問題重複發生？」
+
+固定內容：
+- Fulfillment / prep timing（只限正式 available data）
+- Delayed orders
+- Print exceptions
+- Channel exceptions
+- Unresolved actions
+- Device / config attention（只限正式 read model）
+
+重點以 table / trend 為主，
+唔整一堆 equal-weight health cards。
+
+可以 deep-link：
+- 訂單異常
+- 打印狀態／異常
+- 平台／渠道管理
+- 裝置狀態
+- 待處理事項
+- 系統診斷
+
+## 29.4 匯出
+
+入口：
+**報表 → 匯出**
+
+第二步完成後直接見 Export Workspace。
+
+可揀：
+- Report type
+- Date / Business Day range
+- Store / scope
+- File format（只限正式支援）
+- Included fields（只限固定 approved set）
+
+Export before execute：
+- permission check
+- scope check
+- PII / sensitive field guard
+- large export guard（如 policy 有）
+
+完成後：
+- export status
+- generated time
+- file identity / hash（如 contract 支援）
+- audit reference
+
+禁止：
+- 由 Export 頁改 transaction truth
+- 任意 SQL
+- 任意欄位 expression / formula
+
+## 29.5 人類第一直覺歸類
+
+- 「今日做咗幾多生意？」→ 報表 / 銷售
+- 「邊樣產品賣得最好？」→ 報表 / 產品
+- 「Keeta 佔幾多單？」→ 報表 / 渠道
+- 「退款幾多？」→ 報表 / 退款
+- 「邊度經常延誤／打印出錯？」→ 報表 / 營運
+- 「我要下載正式資料」→ 報表 / 匯出
+
+任何以上問題如果要第三層 Sidebar 先搵到，視為 IA RED。
 
 ---
 
