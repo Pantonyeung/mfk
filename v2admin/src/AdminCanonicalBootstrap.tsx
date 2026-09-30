@@ -39,7 +39,14 @@ export function AdminCanonicalBootstrap({children}:{children:ReactNode}){
           try{
             const active=await readCanonicalAdminActive();
             if(cancelled)return;
-            if(!local||local.version!==active.revision||sync.state==='ERROR')hydrateAdminFromCanonical(active);
+            const localPublishPending=Boolean(local)&&(
+              sync.state!=='PUBLISHED'||sync.adminFingerprint!==local?.fingerprint
+            );
+            if(!local)hydrateAdminFromCanonical(active);
+            else if(!localPublishPending&&(
+              local.fingerprint!==active.adminFingerprint||
+              Date.parse(local.createdAt)!==Date.parse(active.publishedAt)
+            ))hydrateAdminFromCanonical(active);
             activate();
             return;
           }catch{
@@ -51,9 +58,14 @@ export function AdminCanonicalBootstrap({children}:{children:ReactNode}){
       const publisherActive=await readCanonicalAdminActiveWithPublisherKey();
       if(cancelled)return;
       if(publisherActive){
-        if(!local||local.version!==publisherActive.revision||local.fingerprint!==publisherActive.adminFingerprint||sync.state==='ERROR'){
-          hydrateAdminFromCanonical(publisherActive);
-        }
+        const localPublishPending=Boolean(local)&&(
+          sync.state!=='PUBLISHED'||sync.adminFingerprint!==local?.fingerprint
+        );
+        if(!local)hydrateAdminFromCanonical(publisherActive);
+        else if(!localPublishPending&&(
+          local.fingerprint!==publisherActive.adminFingerprint||
+          Date.parse(local.createdAt)!==Date.parse(publisherActive.publishedAt)
+        ))hydrateAdminFromCanonical(publisherActive);
         activate();
         return;
       }
@@ -90,7 +102,7 @@ export function AdminCanonicalBootstrap({children}:{children:ReactNode}){
         <label><span>登入編號</span><input autoComplete="username" value={loginId} onChange={event=>setLoginId(event.target.value.replace(/[^A-Za-z0-9._-]/g,'').slice(0,64))} placeholder="例如 1111"/></label>
         <label><span>PIN</span><input type="password" inputMode="numeric" autoComplete="current-password" value={pin} onChange={event=>setPin(event.target.value.replace(/\D/g,'').slice(0,8))} placeholder="4–8 位數字"/></label>
         <button type="submit" disabled={busy||!loginId||pin.length<4}>{busy?'連接中…':'驗證並載入正式設定'}</button>
-        <strong>唔會建立第二份 Admin 資料；驗證成功後只會以雲端 Active Revision 作本機編輯基礎。</strong>
+        <strong>唔會建立第二份 Admin 資料；驗證成功後只會以雲端最新香港發佈時間對應嘅正式資料作本機編輯基礎。</strong>
       </>:null}
     </form>
   </main>;
