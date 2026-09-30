@@ -208,23 +208,21 @@ function connectDoorbell(){
       try{
         const row=JSON.parse(String(event.data)) as SmtCloudDoorbell&{revision?:number;fingerprint?:string;publishedAt?:string;acceptedAt?:string};
         if(row.type==='ADMIN_CONFIG_AVAILABLE'){
-          const current=readSmtAdminConfigLkg();
+          const receivedAt=now();
           try{
-            const prior=JSON.parse(localStorage.getItem(ADMIN_PROPAGATION_DIAG_KEY)||'{}');
-            const incomingPublishedAt=Date.parse(String(row.publishedAt||''));
-            const priorPublishedAt=Date.parse(String(prior.publishedAt||''));
-            if(!Number.isFinite(priorPublishedAt)||Number.isFinite(incomingPublishedAt)&&incomingPublishedAt>=priorPublishedAt){
-              localStorage.setItem(ADMIN_PROPAGATION_DIAG_KEY,JSON.stringify({revision:row.revision,fingerprint:row.fingerprint,publishedAt:row.publishedAt,acceptedAt:row.acceptedAt,doorbellReceivedAt:now()}));
-            }
+            localStorage.setItem(ADMIN_PROPAGATION_DIAG_KEY,JSON.stringify({
+              revision:row.revision,
+              fingerprint:row.fingerprint,
+              publishedAt:row.publishedAt,
+              acceptedAt:row.acceptedAt,
+              doorbellReceivedAt:receivedAt,
+            }));
           }catch{}
-          const incomingPublishedAt=Date.parse(String(row.publishedAt||''));
-          const currentPublishedAt=current?Date.parse(current.publishedAt):Number.NEGATIVE_INFINITY;
-          if(!current||Number.isFinite(incomingPublishedAt)&&incomingPublishedAt>currentPublishedAt||String(row.fingerprint)!==current.fingerprint){
-            const receivedAt=now();
-            const status=readSmtAdminSyncStatus();
-            setStatus({...status,receivedAt,updatedAt:receivedAt});
-            void fetchAndApplyAdminConfig();
-          }
+          const status=readSmtAdminSyncStatus();
+          setStatus({...status,receivedAt,updatedAt:receivedAt});
+          // Every Admin publish notification forces a canonical pull.
+          // SMT does not decide whether Admin data is "new enough" to receive.
+          void fetchAndApplyAdminConfig();
           return;
         }
         for(const listener of cloudDoorbellListeners)listener(row);
