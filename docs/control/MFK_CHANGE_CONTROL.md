@@ -125,3 +125,20 @@ A bypass only addresses the named check and scope. It does not grant merge, depl
 ## Shadow exit and promotion criteria
 
 Governance self-test, scope analysis, test execution, and final report steps use non-blocking workflow behavior. A tooling failure is reported as `GOVERNANCE_TOOLING_FAILURE`; existing product/deploy paths remain independent. Promotion from Shadow Mode requires Owner approval after reviewing false positives, known reds, unrelated workflow noise, scope accuracy, and human/AI use. Ruleset changes are separately proposed in `MFK_MAIN_RULESET_PROPOSAL.md` and are not automated here.
+
+## Admin canonical data authority and time-first delivery
+
+For Admin-published configuration and operational policy data:
+
+- Admin is the sole canonical authority.
+- Formal publish must flow as: `Admin formal publish → Cloudflare published time → doorbell → SMT canonical pull → atomic apply → UI refresh → ACK/readback`.
+- Human-facing freshness and acceptance use Cloudflare publish time as the primary ordering reference.
+- `Rxx` / revision labels must not be used as human-facing truth, merge/acceptance gates, or cross-device freshness comparison.
+- SMT must eventually converge to every formally published Admin state.
+- Doorbell is notification only; it cannot become configuration truth.
+- Reconcile is mandatory fallback for missed/duplicate/reordered doorbells and reconnects, and must pull the same canonical Admin state.
+- Any path that can permanently strand SMT on an older formally published Admin state is invalid and must be removed or rebuilt rather than patched with another authority.
+- Machine integrity may additionally verify fingerprint/source identity.
+- Acceptance evidence records `publishedAt`, `doorbellReceivedAt`, `appliedAt`, `uiRefreshedAt`, `ack/readbackAt`, and propagation latency.
+
+This rule does not authorize a second sync engine, second config authority, high-frequency polling, or destructive data reset.

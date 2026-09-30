@@ -125,3 +125,24 @@ If either condition fails, stop and report `GOVERNANCE_DRIFT`.
 4. Do not implement any UI Stage until Owner explicitly promotes that Issue.
 
 MILESTONE: `MFK_UI_FORENSIC_AUDIT_BASE_4C8642D4_LOCKED`
+
+## 8. Admin data authority + delivery invariant
+
+Admin is the sole canonical authority for published configuration and operational policy data consumed by SMT.
+
+Formal Admin publish contract:
+
+`ADMIN FORMAL PUBLISH → CLOUDFLARE PUBLISHED TIME → DOORBELL → SMT CANONICAL PULL → ATOMIC APPLY → UI REFRESH → ACK / READBACK`
+
+Hard rules:
+
+- Human-facing freshness and acceptance use **Cloudflare publish time** as the primary ordering reference.
+- `Rxx` / revision labels are not human-facing truth, not an acceptance gate, and not a cross-device freshness oracle.
+- SMT must converge to every formally published Admin state. A sync path that can permanently miss a formal Admin publish is invalid and must be removed or rebuilt.
+- Doorbell is notification only; SMT must pull canonical Admin data.
+- Reconcile is a required fallback for missed, duplicate, reordered, or reconnect scenarios. It is not a second authority.
+- No second configuration authority may be created in SMT, SMM, Customer, Owner, browser local state, or a parallel sync engine.
+- Acceptance evidence records: Cloudflare published time, SMT received time, SMT applied time, UI refreshed time, ACK/readback time, and observed latency.
+- Fingerprint/source identity may be retained for machine integrity checks; revision numbering may remain internal diagnostic metadata only.
+
+MILESTONE: `MFK_ADMIN_AUTHORITY_TIME_FIRST_DELIVERY_LOCKED`
