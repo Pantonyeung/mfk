@@ -85,32 +85,33 @@ Hard prohibitions:
 - no browser-vs-Cloud timestamp ordering as authority
 - no doorbell payload as a second data authority
 
-## 4. Current active implementation slice
+## 4. Current active product phase
 
-Current product gate:
+Single active Admin V3 phase:
 
-`V3ADMIN_PRODUCT_BRIEF_R1_LOCK`
+`V3ADMIN_PRODUCT_BRIEF_LOCK_R1`
 
-Spec branch:
+Controlling product candidate:
 
-`spec/MFK-V3ADMIN-PRODUCT-BRIEF-R1`
+`docs/product/MFK_ADMIN_V3_PRODUCT_BRIEF_FUNCTION_UI_LOCK_R1_2026-09-30.md`
 
-Product brief:
-
-`docs/product/MFK_ADMIN_V3_PRODUCT_BRIEF_R1_2026-09-30.md`
-
-Product control issue:
+Product issue:
 
 `#601`
 
-Current decision:
-- STOP A1/A2 incremental implementation as the active roadmap.
-- Freeze PR #599; do not merge while Product Brief #601 is awaiting Owner approval.
-- #600 A2 incremental spec is superseded as implementation roadmap by #601.
-- First lock the complete Admin V3 product: function scope, IA, UI patterns, state semantics, authority boundaries, acceptance, and RED/rework rules.
-- After Owner approves #601, implementation becomes one Admin V3 rebirth program: one implementation line, one preview acceptance program, no partial production cutover.
-- v2 production remains live throughout.
-- no backend / SMT / SMM / Customer / Owner runtime change is authorized by the product-brief stage.
+Execution state:
+- A0 foundation remains merged and zero-routed.
+- A1 PR #599 is parked as implementation reference only; do not merge it while Product Brief R1 is being locked.
+- A2 issue #600 is superseded as an implementation roadmap by Product Brief #601; its detailed read-model ideas may be reused only where consistent with the Product Brief.
+- No Codex one-shot implementation starts until Product Brief #601 is approved/published into Main.
+- No V3 production deploy or hostname cutover is authorized.
+
+One-shot strategy:
+- freeze product/IA/UI first
+- then one isolated Admin V3 implementation program
+- full R1 product acceptance on preview
+- cutover decision only after physical/browser acceptance
+
 
 ## 5. V2 freeze rule
 
@@ -150,11 +151,13 @@ Owner may authorize a later bounded promotion after reviewing candidate evidence
 
 ## 8. Exact NEXT
 
-1. Review Product Brief #601.
-2. Amend function/UI only while the product gate is open.
-3. Owner explicitly approves the Product Brief.
-4. Bank the approved brief as controlling Admin V3 Product / IA / UI spec.
-5. Only then create the one-shot Codex implementation program.
-6. No A1/A2 incremental merge, no V3 production routing, no cutover before the product brief is locked.
+1. Review and approve Product Brief #601.
+2. Merge the product-spec-only PR; no runtime deploy.
+3. Bank A1/A2 incremental work as reference, not the implementation roadmap.
+4. Prepare one-shot Codex implementation packet from the approved Product Brief.
+5. Codex may modify only explicitly allowed V3 paths.
+6. Build the complete Admin V3 R1 in isolation.
+7. Run full automated + preview physical acceptance.
+8. Only then propose production cutover.
 
-MILESTONE: `MFK_ADMIN_V3_PRODUCT_BRIEF_GATE_ACTIVE`
+MILESTONE: `MFK_ADMIN_V3_PRODUCT_BRIEF_LOCK_R1_ACTIVE`
