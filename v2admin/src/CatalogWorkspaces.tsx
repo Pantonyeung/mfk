@@ -6,6 +6,8 @@ import {normalizeProductMedia,normalizeProductPrintRule,PRODUCT_MEDIA_BACKEND_CO
 import {projectOptionSetsForProduct,useOptionSetCenter,type OptionSetCenterController,type OptionSetCenterState,type ProductOptionSetLink} from './admin-option-set-center.ts';
 import {AdminGuidedPanel,AdminGuidedProgress,AdminPagination,AdminSearchField,AdminStepActions,type AdminGuidedStep} from './AdminUiPrimitives.tsx';
 
+const hkTime=(value:string)=>new Date(value).toLocaleString('zh-HK',{timeZone:'Asia/Hong_Kong',hour12:false});
+
 function WorkspaceHeader({
   title,description,onAdd,addLabel,optionCenterState,optionDirty=false,onOptionSaved,
 }:{
@@ -39,12 +41,12 @@ function WorkspaceHeader({
     setActive({version:result.release.version,createdAt:result.release.createdAt,fingerprint:result.release.fingerprint});
     setSaveErrors([]);
     setValidated(false);
-    setSaveMessage('已保存 · R'+result.release.version);
+    setSaveMessage('已保存；等待 Cloud 香港時間正式發佈。');
   };
   const unsaved=dirty||optionDirty;
   const errors=saveErrors.length?saveErrors:validationErrors;
   return <header className="admin-editor-head">
-    <div><small>{unsaved?'未保存變更':active?'已保存 · R'+active.version:'未有保存版本'}</small><h1>{title}</h1><p>{description}</p>{saveMessage?<span>{saveMessage}</span>:null}</div>
+    <div><small>{unsaved?'未保存變更':active?'已保存 · '+hkTime(active.createdAt):'未有保存資料'}</small><h1>{title}</h1><p>{description}</p>{saveMessage?<span>{saveMessage}</span>:null}</div>
     <div className="admin-editor-actions">
       {onAdd?<button type="button" className="secondary" onClick={onAdd}>{addLabel??'新增'}</button>:null}
       <button type="button" className="secondary" onClick={runReset}>還原原始 MF01 菜單</button>
@@ -54,7 +56,7 @@ function WorkspaceHeader({
     {validated?<div ref={validationRef} tabIndex={-1} className={'admin-validation '+(errors.length?'is-error':'is-ok')} role={errors.length?'alert':'status'}>
       {errors.length
         ?<><b>有 {errors.length} 項需要處理</b><ul>{errors.map((error,index)=><li key={index}>{error}</li>)}</ul></>
-        :<><b>資料完整性檢查通過</b><span>撳「保存」會建立一個新版本並即時成為目前版本。</span></>}
+        :<><b>資料完整性檢查通過</b><span>撳「保存」會建立正式發佈要求；Cloud 接收後以香港發佈時間作先後次序。</span></>}
     </div>:null}
   </header>;
 }
@@ -89,10 +91,10 @@ function readActiveProductOptionLinks():readonly ProductOptionSetLink[]{
 export function CategoriesWorkspace(){
   const {draft,addCategory,updateCategory,removeCategory,moveCategory}=useAdminDraft();
   return <section className="admin-editor-page">
-    <WorkspaceHeader title="商品分類" description="建立分類、顯示次序同啟用狀態。完成修改後撳「保存」，成功即建立新版本並生效。" onAdd={addCategory} addLabel="新增分類"/>
+    <WorkspaceHeader title="商品分類" description="建立分類、顯示次序同啟用狀態。完成修改後撳「保存」，成功即建立正式發佈要求；Cloud 接收後以香港時間生效。" onAdd={addCategory} addLabel="新增分類"/>
     <div className="admin-kpi-grid">
       <article><span>分類總數</span><strong>{draft.categories.length}</strong><small>目前編輯內容</small></article>
-      <article><span>已啟用</span><strong>{draft.categories.filter(row=>row.active).length}</strong><small>保存後進入新版本</small></article>
+      <article><span>已啟用</span><strong>{draft.categories.filter(row=>row.active).length}</strong><small>保存後進入正式發佈</small></article>
       <article><span>停用</span><strong>{draft.categories.filter(row=>!row.active).length}</strong><small>保留資料</small></article>
       <article><span>未分類啟用商品</span><strong>{draft.products.filter(row=>row.active&&!draft.categories.some(category=>category.id===row.categoryId)).length}</strong><small>必須處理</small></article>
     </div>
