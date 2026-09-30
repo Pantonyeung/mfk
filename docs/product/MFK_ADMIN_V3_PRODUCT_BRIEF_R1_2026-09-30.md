@@ -495,30 +495,127 @@ Order Timeline 聚合 domain events，但每條 deep-link 去原 Audit/Proof。
 
 ---
 
-# 12. Sellability / Availability｜鎖定
+# 12. 營運管理｜售罄／供應｜鎖定
 
-UI 必須分兩件事：
+Primary Home：
+**營運管理 → 售罄／供應**
 
-A. **Base Eligibility / Policy**
-- Admin config
-- 隨 publish 發佈
+使用者第二步完成後直接見目前商品可售狀態，唔需要再入「菜單 → 商品 → 進階 → 供應」。
 
-B. **Runtime Sellability**
-- SMT Runtime authority / readback
+產品詳情仍可以顯示目前可售摘要同 contextual shortcut：
+**前往售罄／供應**
+
+## 12.1 售罄／供應列表
+
+Header：
+- Title：售罄／供應
+- Search：商品名稱 / Product Code
+- Filter：分類 / 目前狀態 / Channel / Attention only
+
+List 最低欄位：
+- Product
+- Category
+- 目前有效可售狀態
+- Runtime 狀態
+- Channel summary
+- Temporary / reset summary
+- Last readback
+- Attention
+- Row action
+
+正常 UI 優先顯示 business meaning：
+- 可售
+- 暫停售罄
+- 今日售罄
+- 指定渠道停售
+- 未到供應時間
+- 受必要選項／套餐依賴影響
+- 結果未明
+- 資料過期
+
+唔要求前線使用者理解 Base Eligibility / Runtime Resolver 呢類工程術語。
+
+## 12.2 底層真相仍然分開
+
+UI 雖然簡潔，但資料語義必須分：
+
+A. Admin Base Eligibility / Policy
+- active / disabled
+- schedule / channel policy
+- publish-controlled config
+
+B. SMT Runtime Sellability
 - temporary sold out / restore
+- runtime operational state
+- authoritative readback
 
-禁止將 Inventory quantity 直接等同停售。
+C. Channel Projection
+- 各平台目前 observed sellability
+- propagation / mismatch 狀態
+
+Effective Sellability 只係以上正式 truth 嘅 projection。
 禁止 Admin 再造第二 Availability Engine。
 
-Surface：
-- Product
-- Base policy
-- Runtime observed state
-- Channel projection
-- Last readback
-- bounded request action（只有 authority contract 支援先顯示）
+Inventory quantity 可以係 signal / reference，
+但禁止將 Inventory quantity 直接當 transaction sellability authority。
 
-任何 runtime request 未 readback 前顯示 PENDING/UNKNOWN。
+## 12.3 商品 Detail
+
+撳一件商品後進 Detail。
+
+Header：
+- Product
+- Current effective sellability
+- Last readback
+- Attention
+- Safe action（只限 contract 支援）
+
+內容分組：
+- 目前狀態
+- 基礎規則
+- 即時狀態
+- 依賴
+- Readback
+
+Contextual shortcuts：
+- 前往產品管理
+- 前往選項／口味
+- 前往套餐管理
+- 前往平台／渠道管理
+- 前往待處理事項
+
+## 12.4 即時操作
+
+只喺正式 runtime request contract 存在時顯示：
+- 暫停售罄
+- 恢復供應
+- 指定時間後恢復
+- 指定渠道停售／恢復（如 contract 支援）
+
+操作：
+**Action → PENDING → authoritative readback → CONFIRMED / UNKNOWN / FAILED**
+
+未 readback 前唔可以畫成已成功。
+
+Availability 只控制新 transaction admission。
+已成立 Order 唔可以因為商品之後停售而自動：
+- cancel
+- remove
+- refund
+- rollback production
+
+如果已成立 Order 真係做唔到，
+要進正式 Order exception / modification workflow。
+
+## 12.5 人類第一直覺歸類
+
+- 「呢件貨而家賣唔賣得？」→ 營運管理 / 售罄／供應
+- 「改商品名稱／價錢／分類」→ 菜單管理 / 產品管理
+- 「某個口味停售」→ 營運管理 / 售罄／供應
+- 「Keeta 有冇同步到停售」→ 平台／渠道管理 / 供應同步
+- 「點解停售 request 冇套用」→ 系統管理 / 系統診斷
+
+任何以上問題如果要第三層 Sidebar 先搵到，視為 IA RED。
 
 ---
 
@@ -950,58 +1047,281 @@ UI 禁止將「Save Draft」寫成「已發佈」。
 
 ---
 
-# 20. Business Day / Cash｜鎖定
+# 20. 營運管理｜營業日 / 現金 / 收舖｜鎖定
 
-每日 workflow 由「今日」進入。
+營運管理 Sidebar 細 Menu 直接顯示：
+- 售罄／供應
+- 營業日
+- 現金／收舖
+- 產能／原料額度
 
-Flow：
-- Open Day
-- Operating
-- Close Preview
-- Count / Handover
-- Close Day
+## 20.1 營業日
 
-Business Day 分界可設定任意時間。
-Business Day classification 永遠唔可以做 transaction blocker。
+入口：
+**營運管理 → 營業日**
 
-Close Preview：
+第二步完成後直接見 Current Business Day。
+
+Header：
+- Current Business Day
+- Current state
+- Opened at
+- Opened by
+- Last readback
+- Primary action（按 current state）
+
+內容：
+- 今日營業日摘要
+- Open orders / unresolved attention summary
+- Cash / close readiness summary
+- Current channel / device attention summary（只摘要）
+- Previous business days
+
+State 用人類語言：
+- 未開始
+- 營業中
+- 準備收舖
+- 收舖處理中
+- 已完成
+- 結果未明
+
+Business Day 分界時間可由門店設定配置。
+Business Day 只作 record / reporting classification / day-close history，
+**永遠唔可以成為 transaction blocker。**
+
+Business Day stale / rollover failure：
+- 顯示 attention
+- 提供 safe recovery / diagnostics
+- 唔阻正式新交易
+
+## 20.2 開始營業日
+
+Current Business Day 未開始時：
+Primary CTA：
+**開始今日營業**
+
+Create / Confirm surface 只顯必要資料：
+- Business date / display
+- Open time
+- Staff
+- Opening cash（如 current contract 要求）
+
+成功條件：
+- canonical current businessDay readback confirmed
+
+唔需要長篇 wizard 文案。
+
+## 20.3 收舖入口
+
+營業中時，營業日頁直接有：
+**準備收舖**
+
+撳後進正式 Close Workflow：
+1. Close Preview
+2. 處理 Blockers
+3. 現金點算 / Handover
+4. Confirm Close
+5. Readback
+
+Close Preview 只顯真正需要處理嘅：
 - pending payment
 - open cash issue
 - money attention
-- unresolved blockers
+- unresolved blocker
+- other formally defined close blockers
 
-Cash：
-- expected
-- actual
-- difference
-- removed
-- retained
-- staff
-- approval/reason where required
+## 20.4 現金／收舖
 
-Close ≠ Drawer ≠ Shift；UI wording唔混。
+入口：
+**營運管理 → 現金／收舖**
 
-日結後 Tender Correction：
-由有權限 Admin 正式 workflow 做；
-SAME order、full audit、zero new order、zero auto reprint、zero auto drawer action。
+第二步完成後直接見今日 Cash Workspace。
+
+Header：
+- Current Business Day
+- Cash state
+- Last readback
+- Current difference / attention
+
+核心內容：
+- Expected cash
+- Actual cash（完成點算後）
+- Difference
+- Removed
+- Retained
+- Staff / handover
+- Current cash movements summary
+- Attention / unresolved issue
+
+Close ≠ Drawer ≠ Shift。
+UI wording必須分清：
+- 營業日
+- 現金點算
+- 交更 / Handover
+- Drawer action
+- Shift
+
+## 20.5 現金點算 / Handover
+
+正常表單：
+- Expected（read-only）
+- Actual *
+- Difference（derived display）
+- Removed
+- Retained
+- Staff
+- Reason / approval（只在 policy 真正要求）
+
+高風險操作：
+**Permission → Reason / Approval（如需要）→ Execute → Readback → Audit**
+
+完成後返回現金／收舖 workspace。
+
+## 20.6 日結後修正
+
+Primary Home：
+- 查原 Order → 訂單管理
+- 日結後 Tender Correction → 訂單售後／修正 workflow
+- Audit → 系統管理 / 操作記錄
+
+產品規格要求：
+- SAME Order
+- full audit history
+- current effective tender
+- zero new Order
+- zero auto reprint
+- zero auto drawer action
+
+目前正式 Admin backend mutation seam 未完整證實：
+**BACKEND_CONTRACT_GAP**
+
+UI 可以鎖 workflow / page position，
+但 implementation 唔可以假裝已經有正式 mutation API。
+
+## 20.7 人類第一直覺歸類
+
+- 「今日開咗營業日未？」→ 營運管理 / 營業日
+- 「而家可唔可以收舖？」→ 營運管理 / 營業日
+- 「現金差幾多？」→ 營運管理 / 現金／收舖
+- 「點算／交更」→ 營運管理 / 現金／收舖
+- 「營業日幾點切日？」→ 門店設定 / Business Day 分界
+- 「邊張 Order 阻住收舖？」→ 訂單管理 / 該 Order
+- 「點解 Close command 未確認？」→ 系統管理 / 系統診斷
+
+任何以上問題如果要第三層 Sidebar 先搵到，視為 IA RED。
 
 ---
 
-# 21. Capacity / 原料額度｜鎖定
+# 21. 營運管理｜產能／原料額度｜鎖定
 
-Admin 設 policy：
+入口：
+**營運管理 → 產能／原料額度**
+
+第二步完成後直接見 Capacity / Quota List。
+
+呢頁管理營運 policy；
+唔建立 Inventory ERP，亦唔建立第二 Sellability Engine。
+
+## 21.1 List
+
+Header：
+- Title：產能／原料額度
+- Primary CTA：新增額度
+
+Search / Filter：
+- Pool name
+- Active
+- Attention
+
+List：
 - Pool name
 - Initial qty
-- linked products
-- first-party stop threshold
-- third-party stop threshold
-- active
-- note
+- Observed remaining（只限正式 runtime read model 有）
+- Linked product count
+- First-party stop threshold
+- Third-party stop threshold
+- Active
+- Last readback
+- Attention
+- Row action
 
-UI 必須標：
-「設定資料 / policy；真正 runtime 扣減及停售只由正式 runtime authority 執行。」
+如果正式 runtime remaining 未有：
+- 唔顯假 0
+- 顯示「未有即時數據」
 
-唔用呢頁偷偷建立第二 inventory/sellability engine。
+## 21.2 Create / Edit
+
+直接表單：
+- Pool name *
+- Initial qty *
+- Linked products *
+- First-party stop threshold
+- Third-party stop threshold
+- Active
+- Note
+
+Linked products 用搜尋 / multi-select，
+並清楚顯示：
+- Product name
+- Category
+- Current sellability summary
+
+Save 只進 Draft。
+正式生效仍走 Publish / Readback。
+
+## 21.3 Detail
+
+Header：
+- Pool name
+- Active
+- Policy summary
+- Runtime observed summary（如有）
+- Last readback
+- Edit
+
+內容：
+- Initial qty
+- Linked products
+- Thresholds
+- Published config
+- Runtime observed facts
+- Recent changes / audit shortcut
+
+Contextual shortcuts：
+- 前往產品管理
+- 前往售罄／供應
+- 前往平台供應同步
+- 前往操作記錄
+
+## 21.4 Authority boundary
+
+Admin：
+- 定義 quota / capacity policy
+- 定義 linked products
+- 定義 thresholds
+- Publish config
+
+Runtime：
+- 真正扣減
+- 即時剩餘量
+- 觸發 runtime sellability action（只按正式 contract）
+- readback
+
+Inventory signal：
+可以係參考輸入，但唔直接變 transaction blocker。
+
+UI 唔需要向普通使用者展示上述 authority 理論；
+呢啲係 implementation / acceptance rule。
+
+## 21.5 人類第一直覺歸類
+
+- 「今日某原料得返幾多額度？」→ 營運管理 / 產能／原料額度
+- 「邊啲產品用呢個額度？」→ 營運管理 / 產能／原料額度
+- 「商品本身停售未？」→ 營運管理 / 售罄／供應
+- 「改商品內容／價錢」→ 菜單管理 / 產品管理
+- 「Keeta 有冇同步停售」→ 平台／渠道管理 / 供應同步
+
+任何以上問題如果要第三層 Sidebar 先搵到，視為 IA RED。
 
 ---
 
