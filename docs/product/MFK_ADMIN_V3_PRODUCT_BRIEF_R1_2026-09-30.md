@@ -8358,3 +8358,576 @@ Secret 不可分享。
 
 MILESTONE:
 MFK_ADMIN_V3_CROSS_PAGE_INTERACTION_AUDIT_BATCH1_LOCKED
+
+---
+
+# 58. 跨頁互動盤點 V1｜Batch 2：高風險操作 / 確認 / 回讀 / 復原
+
+本輪驗高風險操作成條工作路線，
+重點唔係「有冇掣」，而係：
+
+**睇清楚 → 知影響 → 確認 → 執行 → 等待 → 回讀 → 成功 / 未明 / 失敗 → 安全下一步**
+
+任何高風險操作都唔可以：
+- 一撳即當成功
+- timeout 就當 failed
+- UNKNOWN 狀態盲目 retry
+- 只靠 browser state 改畫面
+- 做完無 Audit / Readback
+
+---
+
+## 58.1 全局高風險操作模板
+
+所有高風險操作統一：
+
+1. **目前事實**
+   - 正在操作邊個 object
+   - current state
+   - current amount / version / target
+   - freshness
+
+2. **影響預覽**
+   - 會改咩
+   - 唔會改咩
+   - 影響邊啲 object / channel / device / staff
+   - 有冇 irreversible side effect
+
+3. **權限 / Policy**
+   - actor 有冇 permission
+   - reason / approval 是否需要
+   - version / identity guard
+
+4. **確認**
+   - Button 用明確動詞
+   - 唔用「OK / Apply / Fix」
+
+5. **執行**
+   - SUBMITTING
+   - 唔可以重複撳
+
+6. **結果未明**
+   - PENDING / UNKNOWN
+   - 保留 operation identity
+   - 先 readback / reconcile
+   - 禁止 blind retry
+
+7. **正式結果**
+   - CONFIRMED
+   - FAILED（有明確證據）
+   - CONFLICT
+   - PARTIAL
+
+8. **證據**
+   - readback
+   - timestamp
+   - actor
+   - linked Audit / operation evidence
+
+---
+
+# 58.2 Refund｜退款
+
+起點：
+**訂單管理 → 售後／退款／取消／修正**
+或
+**Order Detail → 售後**
+
+路線：
+
+Order
+→ 揀「退款」
+→ Preview
+→ Permission / Reason
+→ Confirm
+→ Execute
+→ Payment readback
+→ linked refund record
+→ Order Detail / After-sales refresh
+
+Preview 必須見：
+- Original Order
+- Original tender/payment
+- Refundable amount
+- Proposed refund amount
+- destination / method
+- reason
+- current payment certainty
+- expected result
+
+Confirm copy：
+**確認退款 HK$X？**
+
+Impact copy：
+「原訂單會保留；系統會新增退款／沖正記錄。」
+
+Danger：
+- timeout / processor unknown 禁止 blind retry
+- 唔修改原 payment history
+- 唔自動 delete Order
+- 唔將 Refund request accepted 當 refund completed
+
+返回：
+- 完成後返同一 Order / After-sales case
+- 顯 current effective payment / refund state
+
+Status：**LOCKED**
+
+---
+
+# 58.3 Cancel｜取消訂單
+
+起點：
+Order Detail / After-sales
+
+路線：
+
+Order facts
+→ 揀「取消訂單」
+→ Impact Preview
+→ Reason / Permission
+→ Confirm
+→ Execute
+→ Order readback
+→ dependent side-effects separately observed
+
+Preview 必須見：
+- current order state
+- fulfillment state
+- payment state
+- production / print side-effects
+- external platform state
+- cancel impact
+
+Confirm copy：
+**確認取消訂單 #0088？**
+
+Impact copy 必須講清：
+- 取消唔等於退款
+- 取消唔刪除訂單
+- 取消唔自動重印
+- 已發生 side-effect 可能仍存在
+
+Danger：
+- 唔喺 list row 一撳 cancel
+- payment refund 要獨立正式 workflow
+- external provider cancel acceptance 同 canonical Order state 分開
+
+Status：**LOCKED**
+
+---
+
+# 58.4 Tender Correction｜付款方式修正
+
+起點：
+Order Detail / After-sales
+
+路線（產品規格）：
+
+Original tender
+→ Corrected tender
+→ Impact Preview
+→ Permission / Reason
+→ Confirm
+→ Execute
+→ authoritative readback
+→ effective tender refresh
+→ Audit
+
+硬規則：
+- SAME Order
+- zero new Order
+- preserve full history
+- zero auto reprint
+- zero auto drawer action
+
+日結後 Admin mutation：
+**BACKEND_CONTRACT_GAP**
+
+因此：
+- Product route / form / preview 可以定義
+- 無正式 backend seam 時唔顯「正式執行成功」
+- Implementation 必須等 bounded authority
+
+Status：**YELLOW**
+
+---
+
+# 58.5 Publish｜正式發佈
+
+起點：
+Draft Bar / 未發佈變更
+
+路線：
+
+Draft Summary
+→ Validate
+→ Blocker / Warning
+→ Impact Preview
+→ Confirm Publish
+→ Publishing
+→ Cloud Published
+→ Target Readback
+→ MATCH / PARTIAL / MISMATCH / UNKNOWN
+
+Confirm 必須見：
+- changed domains
+- object counts
+- affected channels / print / staff / targets
+- base version
+- warning summary
+
+Danger：
+- Blocker 未清禁止 Publish
+- browser save time 唔當 publishedAt
+- Cloud Published 唔當 target applied
+- UNKNOWN target 禁止畫綠
+
+完成：
+- Draft Bar 根據 canonical state 清除／更新
+- 原 config page refresh published/readback state
+
+Status：**LOCKED**
+
+---
+
+# 58.6 Rollback｜回復版本
+
+起點：
+**發佈與版本 → 回復版本**
+或 Version Detail contextual action
+
+路線：
+
+Select historical state
+→ Compare
+→ Validate
+→ Impact Preview
+→ Confirm
+→ Publish NEW rollback release
+→ Target readback
+→ MATCH / PARTIAL / MISMATCH
+→ restored evidence
+
+Confirm copy：
+**建立新回復版本，回到版本 X？**
+
+Danger：
+- 永遠唔 edit historical release
+- request accepted ≠ restored
+- post-rollback target identity 未確認唔算成功
+
+返回：
+- Version Detail
+- 顯 new rollback release identity + observed targets
+
+Status：**LOCKED**
+
+---
+
+# 58.7 Revoke Session / Trusted Device｜撤銷登入
+
+起點：
+**人員與權限 → 登入／Session／Trusted Device**
+或 Staff Detail shortcut
+
+路線：
+
+Select session/device
+→ Impact Preview
+→ Confirm
+→ Execute revoke
+→ server-side readback
+→ next protected request fail-closed
+→ Audit
+
+Preview：
+- Staff
+- Device
+- Scope
+- Last activity
+- 會失去咩 access
+
+Confirm copy：
+**撤銷此登入工作階段？**
+或
+**取消信任此裝置？**
+
+Danger：
+- 只清 localStorage / browser cache 唔算 revoke
+- revoke 未 server readback 唔顯 completed
+
+Status：**LOCKED**
+
+---
+
+# 58.8 OTA｜安裝 / 回復版本
+
+起點：
+**裝置管理 → OTA／版本**
+
+路線：
+
+Approved artifact
+→ Target devices
+→ Compatibility / Impact
+→ Confirm request
+→ Offered / Downloaded / Verified
+→ Candidate staged
+→ Activation requested
+→ Current runtime identity readback
+→ Functional acceptance（如需要）
+
+Danger：
+- Downloaded ≠ Installed
+- Activated ≠ current runtime identity confirmed
+- identity match ≠ functional acceptance
+- Rollback 一樣要 identity readback
+
+如果某 device UNKNOWN：
+- 唔重複下 command
+- 先 refresh / reconcile / readback
+
+Status：**LOCKED**
+
+---
+
+# 58.9 Sellability runtime action｜停售 / 恢復供應
+
+起點：
+**營運管理 → 售罄／供應**
+
+路線：
+
+Product / Option / scope
+→ current effective state
+→ 選暫停售罄 / 恢復
+→ impact
+→ execute
+→ SMT runtime readback
+→ channel projection refresh
+
+Impact 必須見：
+- 影響邊件商品
+- 影響門店 / channel scope
+- temporary until / reset
+- 已成立 Order 不受自動取消影響
+
+Confirm copy：
+**暫停售罄「紫米飯團」？**
+或
+**恢復供應「紫米飯團」？**
+
+Danger：
+- runtime request 未 readback 唔顯已停售 / 已恢復
+- Channel projection 未同步要獨立顯 mismatch / pending
+
+Status：**LOCKED**
+
+---
+
+# 58.10 Cash / Close｜現金 / 收舖
+
+起點：
+**營運管理 → 營業日**
+或
+**現金／收舖**
+
+路線：
+
+Close Preview
+→ Blockers
+→ Cash Count / Handover
+→ Difference
+→ Permission / Reason（如 policy）
+→ Confirm Close
+→ Day-close readback
+→ completed state
+
+Preview 必須見：
+- pending payment
+- open cash issue
+- money attention
+- unresolved blockers
+- Expected / Actual / Difference
+
+Danger：
+- Close ≠ Drawer ≠ Shift
+- Blocker 未處理唔可以 fake continue
+- Close request accepted ≠ Business Day closed
+
+Status：**LOCKED**
+
+---
+
+# 58.11 Platform Pause / Resume｜暫停 / 恢復接單
+
+起點：
+**平台／渠道管理 → 接單規則**
+或 Platform Detail
+
+路線：
+
+Current accepting state
+→ Action
+→ Scope / duration
+→ Impact Preview
+→ Confirm
+→ Provider/runtime request
+→ readback
+→ accepting state refresh
+
+Preview：
+- Platform
+- current mode
+- action duration / expiry
+- 新訂單影響
+- 已成立 Order 不受影響
+
+Confirm copy：
+**暫停 Keeta 接收新訂單？**
+
+Danger：
+- Pause ≠ Store Closed
+- Pause ≠ Busy
+- Pause ≠ provider suspension
+- timeout = UNKNOWN，唔 blind retry
+
+Status：**LOCKED**
+
+---
+
+# 58.12 Print Recovery｜打印復原
+
+起點：
+**打印管理 → 打印狀態／異常**
+或 Order Detail / Print exception deep-link
+
+R1 預設：
+Read / Diagnostics first。
+
+路線：
+
+PrintJob / route facts
+→ current certainty
+→ readback
+→ safe recovery available?
+→ approved action（有 contract 先顯）
+→ new PrintJob / new attempt
+→ readback
+→ evidence
+
+如果無正式 Admin command contract：
+- 只顯查看 / diagnostics / deep-link
+- 唔顯 Reprint / Retry
+
+如果將來有：
+- Reprint 必須建新 PrintJob
+- reason + actor + operation identity
+- 舊成功歷史 immutable
+
+Danger：
+- UNKNOWN 禁 blind resend
+- Printer connected 唔代表 job printed
+
+Status：**LOCKED**
+
+---
+
+# 58.13 高風險操作 Button 規則
+
+Primary danger button 永遠用：
+**動詞 + 明確物件 / 結果**
+
+例如：
+- 確認退款 HK$120
+- 取消訂單 #0088
+- 確認暫停 Keeta 接單
+- 確認回復至版本 2026.09.29
+- 撤銷阿明此登入工作階段
+
+禁止：
+- OK
+- Confirm
+- Apply
+- Fix
+- Retry
+- Yes
+
+單獨作為危險操作 Button。
+
+---
+
+# 58.14 UNKNOWN / Retry 全局規則
+
+UNKNOWN 時：
+
+顯示：
+**結果未明 · 正在重新確認**
+
+可用 action：
+- 重新讀取狀態
+- 查看證據
+- 前往系統診斷
+
+只喺以下全部成立先可以提供 retry：
+- command idempotent / safe retry contract 明確
+- operation identity 可追蹤
+- 已做 authoritative readback
+- 不會造成第二 business effect
+
+否則：
+**禁止重試。**
+
+---
+
+# 58.15 Batch 2 結果
+
+本批驗 10 類高風險工作路線：
+
+1. Refund
+2. Cancel
+3. Tender Correction
+4. Publish
+5. Rollback
+6. Revoke Session / Trusted Device
+7. OTA
+8. Sellability
+9. Cash / Close
+10. Platform Pause / Resume
+11. Print Recovery
+
+結果：
+- **10 LOCKED**
+- **1 YELLOW**
+- **0 RED**
+
+唯一 YELLOW：
+**Tender Correction post-close Admin mutation**
+原因：
+**BACKEND_CONTRACT_GAP**
+
+其餘流程已鎖：
+- Preview
+- Permission
+- Confirm
+- Submit
+- Pending / Unknown
+- Readback
+- Audit
+- Return context
+
+下一輪：
+**Batch 3：大量操作 / 批次修改 / 多選工作流**
+
+包括：
+- 批量產品啟用/停用
+- 批量改分類
+- 批量價格修改
+- 批量售罄
+- 批量 mapping
+- 批量 Role / Scope（如正式支援）
+- 批量 Export / sensitive reads
+
+MILESTONE:
+MFK_ADMIN_V3_CROSS_PAGE_INTERACTION_AUDIT_BATCH2_LOCKED
