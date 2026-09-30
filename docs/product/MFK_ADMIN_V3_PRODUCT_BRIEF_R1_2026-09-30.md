@@ -1339,53 +1339,310 @@ Combo 必須保留：
 
 ---
 
-# 19. Publish Workflow｜最重要鎖定
+# 19. 發佈與版本｜鎖定
 
-Publish Center 不做第一層 nav；主要由 Pending Changes 進入。
+發佈與版本係獨立功能 domain。
+使用者想知道「有咩未發佈、今次會改乜、發佈咗未、SMT 真正套用咗未、要唔要回復」時，第一時間就應該入 **發佈與版本**。
+
+Sidebar 細 Menu 直接顯示：
+- 未發佈變更
+- 發佈中心
+- 版本／Readback
+- 回復版本
+
+所有頁面符合：
+**發佈與版本 → 細 Menu → 已見到目標內容**
+
+同時，所有 config domain 可以用 Draft Bar / contextual shortcut 直接 deep-link 去以上頁面。
+Deep-link 只係捷徑，唔取代 Primary Home。
+
+## 19.1 未發佈變更
+
+入口：
+**發佈與版本 → 未發佈變更**
+
+第二步完成後直接見所有 Draft changes。
+
+Header：
+- Title：未發佈變更
+- Changed count
+- Last modified
+- Current draft owner / actor summary（如有）
+- Primary CTA：檢查並發佈
+
+List / grouped view：
+- Domain
+- Object
+- Change type：新增 / 修改 / 停用 / 刪除候選
+- Before / After summary
+- Validation state
+- Last changed by
+- Last changed at
+- View
+
+支援：
+- Search
+- Domain filter
+- Validation state filter
+- 進入原本 object detail
+- 放棄單項變更（只限 contract 支援）
+- 放棄整批 draft（有 confirm / impact）
+
+正常 UI 唔用 Git diff / JSON patch 做主要顯示。
+Advanced detail 先可以睇 technical diff。
+
+## 19.2 發佈中心
+
+入口：
+**發佈與版本 → 發佈中心**
+
+呢頁係真正 publish workflow，
+可以用 step-based UI，因為本身係有明確 gate 嘅高風險操作。
 
 Flow：
-1. **Draft Summary**
-2. **Validate**
-3. **Impact Preview**
-4. **Confirm Publish**
-5. **Publishing**
-6. **Cloud Published**
-7. **Target Readback**
-8. **MATCH / PARTIAL / MISMATCH**
+1. Draft Summary
+2. Validate
+3. Impact Preview
+4. Confirm Publish
+5. Publishing
+6. Cloud Published
+7. Target Readback / Reconcile
+8. MATCH / PARTIAL / MISMATCH
 
-## Validate
+### Draft Summary
+顯示：
+- Changed domains
+- Object count
+- Added / Updated / Disabled
+- Actor
+- Base version / identity
+- Draft age
+
+### Validate
 分：
 - Blocker
 - Warning
 
-Blocker 禁 publish。
-Warning 要明示，但按 policy 可繼續。
+Blocker：
+- 禁 publish
+- 要顯示受影響 object
+- 提供 direct link 去修正位置
 
-## Impact Preview
+Warning：
+- 清楚顯示
+- policy 容許時可以繼續
+- 唔可以用紅色假裝 blocker
+
+### Impact Preview
 至少列：
 - Changed domains
-- Added/Updated/Disabled objects
+- Added / Updated / Disabled objects
 - Channels affected
-- Print/routing affected
-- Staff/access affected
-- target systems
+- Print / routing affected
+- Staff / access affected
+- Target systems
+- Expected runtime impact
+- Any known temporary inconsistency window
 
-## Publish
-帶 expected base identity/version guard。
+Impact Preview 唔需要展示 raw dependency graph，
+但要令人知道「今次發佈會影響乜」。
 
-## Readback
-逐 target：
+### Confirm Publish
+Confirm surface：
+- version / release identity
+- expected base identity / version guard
+- impacted scope
+- warning summary
+- actor
+- reason（只在 policy 要求）
+
+Save Draft ≠ Publish。
+Publish request accepted ≠ Runtime applied。
+
+## 19.3 Cloud Published
+
+Cloud publish 成功後，UI 要顯示：
+- Release / config version identity
+- Published by
+- **publishedAt**
+- Cloud state
+- Target list
+
+人類畫面嘅「最後發佈時間」以 Cloudflare / canonical publish time **publishedAt** 為準，
+唔用 browser click time、local save time 或 request start time冒充。
+
+Cloud Published 只代表 canonical cloud version 已建立。
+唔代表 SMT / target 已套用。
+
+## 19.4 版本／Readback
+
+入口：
+**發佈與版本 → 版本／Readback**
+
+第二步完成後直接見 Version List。
+
+List：
+- Version / Release
+- publishedAt
+- Published by
+- Changed domains
+- Cloud state
+- Target apply summary
+- MATCH / PARTIAL / MISMATCH / UNKNOWN
+- Last reconcile / readback
+- View
+
+Version Detail：
+- Release identity
+- Base version
+- publishedAt
+- Changed objects summary
+- Target-by-target desired identity
+- Target observed identity
+- observedAt
+- freshness
+- result
+- evidence reference
+- Reconcile state
+
+Target readback 最少顯示：
 - desired
 - observed
 - timestamp
 - result
 - evidence
 
-## Rollback
-永遠建立 **新 release**；
-禁止 edit historical release。
+禁止將：
+- doorbell delivered
+- websocket connected
+- request sent
+- target online
 
-UI 禁止將「Save Draft」寫成「已發佈」。
+當成 config 已套用。
+
+## 19.5 Doorbell + canonical pull + reconcile
+
+Admin → SMT convergence 正式語義：
+
+1. Cloud canonical config / release 先成立
+2. Doorbell / event 只做「有新版本」提示
+3. SMT canonical pull
+4. Apply
+5. Readback
+6. Admin compare desired vs observed
+
+Doorbell 係 latency optimization，
+唔係 correctness authority。
+
+Acceptance 必須證明：
+- doorbell miss → reconcile 後仍 convergence
+- duplicate doorbell → 唔重複造成錯誤 side-effect
+- reordered doorbell → 最終仍以 canonical latest / version guard 收斂
+
+如果 doorbell 唔到：
+- Admin 唔可以直接判 FAILED
+- reconcile / pull path 仍要可以自行收斂
+
+## 19.6 PARTIAL / MISMATCH / UNKNOWN
+
+MATCH：
+- 所有 required targets observed identity 符合 desired
+- freshness 足夠
+
+PARTIAL：
+- 部分 target MATCH
+- 部分仍 pending / unavailable / mismatch
+
+MISMATCH：
+- target 已有可信 observed identity
+- 明確同 desired 唔同
+
+UNKNOWN：
+- 無足夠 readback
+- timeout / offline / stale evidence
+- 唔可以當 FAILED
+
+畫面要直接列：
+- 邊個 target
+- desired
+- observed
+- 最後確認時間
+- 下一個 safe action
+
+## 19.7 回復版本
+
+入口：
+**發佈與版本 → 回復版本**
+
+第二步完成後直接見可回復嘅歷史版本。
+
+Rollback 唔修改舊 Release。
+永遠建立 **新 Release**，內容指向一個已知良好 config state。
+
+Rollback flow：
+1. 揀目標歷史版本
+2. Preview difference
+3. Validate
+4. Impact Preview
+5. Confirm
+6. Publish new rollback release
+7. Target readback / reconcile
+8. Confirm restored state
+
+UI 必須清楚顯示：
+- Current version
+- Target historical version
+- New rollback release identity
+- Changed domains
+- Impact
+- Expected target scope
+
+成功條件唔係「Rollback request accepted」。
+要有：
+- new release cloud identity
+- target observed identity
+- post-rollback readback
+- MATCH / PARTIAL / MISMATCH
+
+## 19.8 歷史版本
+
+Historical Release：
+- immutable
+- 可以 View
+- 可以 Compare
+- 可以作 rollback source
+- 唔可以 Edit
+
+Compare：
+- Version A vs B
+- domain / object level human-readable diff
+- technical diff 只放 advanced detail
+
+## 19.9 Draft Bar
+
+所有 config edit page 有未發佈變更時，
+底部 Draft Bar 固定提供：
+- X 項未發佈變更
+- 查看
+- 檢查並發佈
+- 放棄
+
+「查看」→ 未發佈變更
+「檢查並發佈」→ 發佈中心
+
+呢啲係 shortcut，
+唔代表發佈與版本功能要收埋。
+
+## 19.10 人類第一直覺歸類
+
+- 「我改咗啲乜但未生效？」→ 發佈與版本 / 未發佈變更
+- 「我要正式發佈」→ 發佈與版本 / 發佈中心
+- 「雲端發佈咗未？」→ 發佈與版本 / 版本／Readback
+- 「SMT 真正套用咗未？」→ 發佈與版本 / 版本／Readback
+- 「點解一部 SMT 仲係舊版本？」→ 版本／Readback，再 deep-link 系統診斷
+- 「我要返去上一個好版本」→ 發佈與版本 / 回復版本
+
+任何以上問題如果要第三層 Sidebar 先搵到，視為 IA RED。
 
 ---
 
