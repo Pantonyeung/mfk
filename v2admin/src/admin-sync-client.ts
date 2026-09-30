@@ -110,7 +110,6 @@ export async function queueAdminReleaseSync(release:AdminRelease,storeId='MF01')
 }
 
 let adminSyncFlushInFlight:Promise<AdminSyncStatus>|null=null;
-let adminSyncFlushInFlight:Promise<AdminSyncStatus>|null=null;
 
 export async function flushAdminSyncOutbox(){
   if(typeof window==='undefined'||typeof fetch==='undefined')return readAdminSyncStatus();
