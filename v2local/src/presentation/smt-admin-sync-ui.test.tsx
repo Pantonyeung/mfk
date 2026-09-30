@@ -41,9 +41,10 @@ describe('SMT Admin sync status UI',()=>{
     }));
 
     const html=renderToStaticMarkup(<LocalAdminMenuWorkspace/>);
-    for(const marker of ['Admin 同步狀態','ZERO MANUAL ACTION','SMT 正在使用','已收到完整設定','R7']){
+    for(const marker of ['Admin 資料接收狀態','零人手操作','Admin 正式發佈時間','SMT 套用時間','已收到完整設定']){
       expect(html).toContain(marker);
     }
+    expect(html).not.toContain('R7');
     for(const forbidden of ['匯入 Admin A2 Bundle','下載 SMT Readback Receipt','保存草稿','發布到 POS','初始 Menu → 草稿','＋ 分類','＋ 商品']){
       expect(html).not.toContain(forbidden);
     }
