@@ -1,26 +1,42 @@
 {
   "version": 1,
-  "capability": "MFK_CANDIDATE_01_DINING_LIVE_REFRESH",
-  "base_sha": "b7776a08ef1721e9e7ea0e223b783295d0965a75",
+  "capability": "MFK_ADMIN_SMT_CANONICAL_LIVE_R2",
+  "base_sha": "532e78be814dfb495fe33af964a50d421bc913b5",
   "allowed_paths": [
     ".github/mfk-change-manifest.json",
-    "v2local/src/presentation/RuntimeDiningWorkspace.tsx",
-    "v2local/src/presentation/smt-dining-admin-live-refresh.test.ts"
+    "contracts/admin-config-sync-v1.ts",
+    "v2admin/worker.ts",
+    "v2admin/src/admin-sync-client.ts",
+    "v2admin/src/admin-sync-websocket-transport.test.ts",
+    "v2admin/src/admin-cloud-publish-time-first.test.ts",
+    "v2admin/src/AdminShell.tsx",
+    "v2local/src/runtime/admin-config-sync.ts",
+    "v2local/src/runtime/admin-config-sync.test.ts",
+    "v2local/src/presentation/LocalAdminMenuWorkspace.tsx",
+    "v2local/src/presentation/smt-admin-sync-ui.test.tsx",
+    "v2local/src/App.tsx"
   ],
-  "authority_impact": "NONE",
-  "persistence_impact": "NONE",
+  "authority_impact": "ADMIN_SOLE_CANONICAL_CONFIG_AUTHORITY_ENFORCED",
+  "persistence_impact": "EXISTING_ADMIN_OUTBOX_SMT_LKG_AND_SMALL_PUBLISH_RECEIPTS_ONLY_NO_SCHEMA_MIGRATION",
   "provider_impact": "NONE",
   "transaction_impact": "NONE",
   "expected_behavior_change": [
-    "When an Admin config doorbell is applied, the active SMT Dining workspace reloads its read model immediately without a page reload."
+    "Every distinct formal Admin publish is accepted into Cloud canonical state on a strictly increasing Cloud publish clock.",
+    "Admin outbox drains every formal publish oldest to newest instead of collapsing to the numerically latest revision.",
+    "Rxx/revision is diagnostic metadata only and never decides which Admin data is newer.",
+    "Every Admin publish rings the existing doorbell; SMT pulls the same canonical endpoint and applies by publishedAt plus fingerprint.",
+    "Rapid repeated publishes such as every ten seconds remain separate formal publishes and are delivered sequentially.",
+    "SMT ACK identifies the exact canonical fingerprint and publishedAt that was applied.",
+    "Admin and SMT human-facing status use publish/applied/readback time vocabulary instead of Rxx as truth.",
+    "Reconnect/focus/pageshow/visibility recovery reuses the same canonical pull path without an interval polling engine."
   ],
   "non_goals": [
-    "No Dining transaction-state change.",
-    "No Admin publish protocol change.",
-    "No table registry behavior change.",
-    "No WebSocket transport change.",
-    "No polling or reconciliation change."
+    "No second config authority.",
+    "No second sync engine.",
+    "No interval polling.",
+    "No Order, Pricing, Payment, Print, Keeta, Customer, SMM or Owner authority change.",
+    "No destructive SMT transaction or config reset."
   ],
-  "rollback_sha": "b7776a08ef1721e9e7ea0e223b783295d0965a75",
-  "severity": "SOFT_BLOCK"
+  "rollback_sha": "532e78be814dfb495fe33af964a50d421bc913b5",
+  "severity": "HARD_BLOCK"
 }
