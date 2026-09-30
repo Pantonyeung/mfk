@@ -48,7 +48,7 @@ export async function readV3CanonicalAdminActive(sessionToken:string):Promise<V3
   });
   const body=await response.json().catch(()=>({})) as Record<string,unknown>;
   if(!response.ok)throw new Error(String(body.message||body.code||'V3_ADMIN_CANONICAL_HTTP_'+response.status));
-  return validateV3CanonicalAdminEnvelope(body);
+  return validateV3CanonicalShape(body);
 }
 
 export function summarizeV3Canonical(envelope:V3CanonicalAdminEnvelope){
