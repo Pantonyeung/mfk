@@ -22,6 +22,15 @@ describe('Admin normal-browser canonical hydration',()=>{
     expect(adminCanonicalHydrationRequired(local,active,sync)).toBe(false);
   });
 
+  it('does not turn cached release history into a new publish during startup',()=>{
+    const sync=readFileSync(new URL('./admin-sync-client.ts',import.meta.url),'utf8');
+    const bootstrap=readFileSync(new URL('./AdminCanonicalBootstrap.tsx',import.meta.url),'utf8');
+    expect(sync).toContain('window.setTimeout(flush,0)');
+    expect(sync).not.toContain('queueLatest();flush();');
+    expect(bootstrap).toContain('reconcileAdminSyncStatusFromCanonical(active)');
+    expect(bootstrap).toContain('reconcileAdminSyncStatusFromCanonical(publisherActive)');
+  });
+
   it('keeps canonical hydration/outbox ordering time-first',()=>{
     const source=readFileSync(new URL('./admin-browser-session.ts',import.meta.url),'utf8');
     expect(source).toContain('Date.parse(b.createdAt)-Date.parse(a.createdAt)');
