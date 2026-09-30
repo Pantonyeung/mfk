@@ -1,5 +1,5 @@
 import {readAdminStored} from './admin-local-store.ts';
-import {readStoredAdminBrowserSession} from './admin-browser-session.ts';
+import {readStoredAdminBrowserSession,refreshAdminBrowserSession} from './admin-browser-session.ts';
 
 const PUBLISHER_KEY='sync-publisher-key.v1';
 
@@ -44,28 +44,38 @@ export interface KeetaLiveStatus{
 
 function headers(){
   const session=readStoredAdminBrowserSession();
-  if(session)return {'x-mfk-admin-session':session.sessionToken};
+  const expiresAt=session?.expiresAt?Date.parse(session.expiresAt):Number.POSITIVE_INFINITY;
+  if(session&&(!Number.isFinite(expiresAt)||expiresAt>Date.now()))return {'x-mfk-admin-session':session.sessionToken};
   const key=readAdminStored<string>(PUBLISHER_KEY,'');
   return key?{'x-mfk-admin-publish-key':key}:{};
 }
 
-export async function readKeetaLiveStatus():Promise<KeetaLiveStatus>{
-  const response=await fetch('/api/keeta/admin/status?storeId=MF01',{
-    method:'POST',
+async function keetaAdminFetch(path:string,init:RequestInit={}){
+  const run=()=>fetch(path,{
+    ...init,
     credentials:'same-origin',
     cache:'no-store',
-    headers:headers(),
+    headers:{...(init.headers??{}),...headers()},
   });
+  let response=await run();
+  if(response.status===401&&readStoredAdminBrowserSession()){
+    await refreshAdminBrowserSession();
+    response=await run();
+  }
+  return response;
+}
+
+export async function readKeetaLiveStatus():Promise<KeetaLiveStatus>{
+  const response=await keetaAdminFetch('/api/keeta/admin/status?storeId=MF01',{method:'POST'});
   const body=await response.json().catch(()=>({})) as KeetaLiveStatus&{code?:string};
   if(!response.ok)throw new Error(body.code||'KEETA_STATUS_HTTP_'+response.status);
   return body;
 }
 
 export async function beginKeetaOAuth(){
-  const response=await fetch('/api/keeta/admin/oauth/begin?storeId=MF01',{
+  const response=await keetaAdminFetch('/api/keeta/admin/oauth/begin?storeId=MF01',{
     method:'POST',
-    credentials:'same-origin',
-    headers:{'content-type':'application/json',...headers()},
+    headers:{'content-type':'application/json'},
   });
   const body=await response.json().catch(()=>({})) as {authorizationUrl?:string;code?:string};
   if(!response.ok||!body.authorizationUrl)throw new Error(body.code||'KEETA_OAUTH_BEGIN_HTTP_'+response.status);
@@ -73,10 +83,9 @@ export async function beginKeetaOAuth(){
 }
 
 export async function checkKeetaTokenReadiness(){
-  const response=await fetch('/api/keeta/admin/token/readiness?storeId=MF01',{
+  const response=await keetaAdminFetch('/api/keeta/admin/token/readiness?storeId=MF01',{
     method:'POST',
-    credentials:'same-origin',
-    headers:{'content-type':'application/json',...headers()},
+    headers:{'content-type':'application/json'},
   });
   const body=await response.json().catch(()=>({})) as {state?:string;code?:string};
   return Object.freeze({ok:response.ok,state:body.state??'UNKNOWN',code:body.code});
@@ -87,10 +96,9 @@ export async function importKeetaTestToken(raw:string){
   let token:unknown;
   try{token=JSON.parse(raw);}
   catch{throw new Error('KEETA_TEST_TOKEN_JSON_INVALID');}
-  const response=await fetch('/api/keeta/admin/token/import-test?storeId=MF01',{
+  const response=await keetaAdminFetch('/api/keeta/admin/token/import-test?storeId=MF01',{
     method:'POST',
-    credentials:'same-origin',
-    headers:{'content-type':'application/json',...headers()},
+    headers:{'content-type':'application/json'},
     body:JSON.stringify(token),
   });
   const body=await response.json().catch(()=>({})) as {state?:string;source?:string;expiresAt?:string;code?:string};
@@ -137,11 +145,9 @@ export interface KeetaMenuStatus{
   }|null;
 }
 async function keetaAdminPost<T>(path:string):Promise<T>{
-  const response=await fetch('/api/keeta/admin/'+path+'?storeId=MF01',{
+  const response=await keetaAdminFetch('/api/keeta/admin/'+path+'?storeId=MF01',{
     method:'POST',
-    credentials:'same-origin',
-    cache:'no-store',
-    headers:{'content-type':'application/json',...headers()},
+    headers:{'content-type':'application/json'},
   });
   const body=await response.json().catch(()=>({})) as T&{code?:string};
   if(!response.ok)throw new Error(body.code||'KEETA_ADMIN_HTTP_'+response.status);
@@ -286,11 +292,9 @@ export function readKeetaCommercialRows():Promise<KeetaCommercialList>{
   return keetaAdminPost<KeetaCommercialList>('commercial/list');
 }
 export async function refreshKeetaCommercial(providerOrderId:string):Promise<KeetaCommercialRow>{
-  const response=await fetch('/api/keeta/admin/commercial/refresh?storeId=MF01',{
+  const response=await keetaAdminFetch('/api/keeta/admin/commercial/refresh?storeId=MF01',{
     method:'POST',
-    credentials:'same-origin',
-    cache:'no-store',
-    headers:{'content-type':'application/json',...headers()},
+    headers:{'content-type':'application/json'},
     body:JSON.stringify({providerOrderId}),
   });
   const body=await response.json().catch(()=>({})) as KeetaCommercialRow&{code?:string};
