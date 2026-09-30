@@ -63,7 +63,7 @@ describe('Admin realtime transport recovery',()=>{
     });
     const oldResult=await store.publishEnvelope(oldEnvelope);
     expect(oldResult.status).toBe(200);
-    expect(oldResult.body).toMatchObject({state:'PUBLISHED',cloudPublishedAt:'2026-09-30T01:00:00.000Z'});
+    expect(oldResult.body).toMatchObject({state:'PUBLISHED',cloudPublishedAt:'2026-09-30T09:00:00.000+08:00',active:{publishedAt:'2026-09-30T09:00:00.000+08:00'}});
 
     vi.setSystemTime(new Date('2026-09-30T01:01:00.000Z'));
     const newerEnvelope=createMfkAdminConfigEnvelope({
@@ -74,14 +74,14 @@ describe('Admin realtime transport recovery',()=>{
     expect(newerResult.status).toBe(200);
     expect(newerResult.body).toMatchObject({
       state:'PUBLISHED',
-      cloudPublishedAt:'2026-09-30T01:01:00.000Z',
-      active:{revision:22,publishedAt:'2026-09-30T00:30:00.000Z',adminFingerprint:'admin-new'},
+      cloudPublishedAt:'2026-09-30T09:01:00.000+08:00',
+      active:{revision:22,publishedAt:'2026-09-30T09:01:00.000+08:00',adminFingerprint:'admin-new'},
     });
-    expect(JSON.parse(sent.at(-1)!)).toMatchObject({type:'ADMIN_CONFIG_AVAILABLE',revision:22,publishedAt:'2026-09-30T00:30:00.000Z'});
+    expect(JSON.parse(sent.at(-1)!)).toMatchObject({type:'ADMIN_CONFIG_AVAILABLE',revision:22,publishedAt:'2026-09-30T09:01:00.000+08:00'});
 
     vi.setSystemTime(new Date('2026-09-30T01:02:00.000Z'));
     const retry=await store.publishEnvelope(newerEnvelope);
-    expect(retry.body).toMatchObject({state:'IDEMPOTENT',cloudPublishedAt:'2026-09-30T01:01:00.000Z'});
+    expect(retry.body).toMatchObject({state:'IDEMPOTENT',cloudPublishedAt:'2026-09-30T09:01:00.000+08:00'});
     expect(sent).toHaveLength(2);
   });
 
