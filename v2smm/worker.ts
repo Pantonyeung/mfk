@@ -610,8 +610,21 @@ async function readStaffSession(request:Request,storeId:string,env:{SMM_INTENT_S
   return Object.freeze({...current,sessionToken:token});
 }
 
+function smmAssetResponse(response:Response,request:Request,url:URL,env:any){
+  const headers=new Headers(response.headers);
+  const contentType=String(headers.get('content-type')||'').toLowerCase();
+  const acceptsHtml=String(request.headers.get('accept')||'').toLowerCase().includes('text/html');
+  if(contentType.includes('text/html')||acceptsHtml){
+    headers.set('cache-control','no-cache, must-revalidate, max-age=0');
+    headers.set('x-mfk-build-id',String(env.MFK_SOURCE_SHA||env.MFK_VERSION?.id||'UNKNOWN'));
+  }else if(url.pathname.startsWith('/assets/')){
+    headers.set('cache-control','public, max-age=31536000, immutable');
+  }
+  return new Response(response.body,{status:response.status,statusText:response.statusText,headers});
+}
+
 export default{
-  async fetch(request:Request,env:{ASSETS:{fetch(request:Request):Promise<Response>};SMM_INTENT_STORE:any;WEB_SMT_ACCEPTANCE_TOKEN?:string}){
+  async fetch(request:Request,env:{ASSETS:{fetch(request:Request):Promise<Response>};SMM_INTENT_STORE:any;WEB_SMT_ACCEPTANCE_TOKEN?:string;MFK_SOURCE_SHA?:string;MFK_VERSION?:{id?:string;timestamp?:string}}){
     const url=new URL(request.url);
     const storeId=(url.searchParams.get('storeId')||'MF01').trim().slice(0,64)||'MF01';
 
@@ -1098,7 +1111,9 @@ export default{
       });
     }
 
+    if(url.pathname==='/__mfk/build')return json({buildId:String(env.MFK_SOURCE_SHA||env.MFK_VERSION?.id||'UNKNOWN'),deployedAt:String(env.MFK_VERSION?.timestamp||'UNKNOWN')});
     if(url.pathname==='/api/health')return json({ok:true,service:'mfk-smm-web',internetProjection:'admin-published-config',internetStaffOrders:'customer-bridge-shared'});
-    return env.ASSETS.fetch(request);
+    const response=await env.ASSETS.fetch(request);
+    return smmAssetResponse(response,request,url,env);
   },
 };
