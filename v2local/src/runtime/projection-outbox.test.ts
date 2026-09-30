@@ -1,4 +1,5 @@
 import {beforeEach,describe,expect,it,vi} from 'vitest';
+import {readFileSync} from 'node:fs';
 import {
   SMT_PROJECTION_ACKED_KEY,
   SMT_PROJECTION_OUTBOX_KEY,
@@ -209,6 +210,15 @@ describe('SMT projection outbox',()=>{
     }]);
     const serialized=JSON.stringify(payload.customerReorderIntent);
     expect(serialized).not.toMatch(/payment|fulfillment|coupon|publishedUnitPriceMinor|lineId/i);
+  });
+
+  it('flushes outbound facts only on enqueue, startup backlog or network recovery',()=>{
+    const source=readFileSync(new URL('./projection-outbox.ts',import.meta.url),'utf8');
+    expect(source).toContain("window.addEventListener('online',flush)");
+    expect(source).toContain('window.setTimeout(flush,0)');
+    expect(source).not.toContain("window.addEventListener('focus',flush)");
+    expect(source).not.toContain('subscribeSmtAdminConfig(flush)');
+    expect(source).not.toMatch(/setInterval\s*\(/);
   });
 
 });
