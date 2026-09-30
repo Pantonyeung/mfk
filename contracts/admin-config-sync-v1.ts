@@ -17,6 +17,7 @@ export interface MfkAdminConfigAck{
   readonly deviceId:string;
   readonly revision:number;
   readonly fingerprint:string;
+  readonly publishedAt:string;
   readonly appliedAt:string;
   readonly disposition:'APPLIED'|'IDEMPOTENT';
 }
@@ -107,9 +108,11 @@ export function validateMfkAdminConfigAck(input:unknown):MfkAdminConfigAck{
     deviceId:text(row.deviceId,'ADMIN_CONFIG_ACK_DEVICE_ID_INVALID',128),
     revision:revision(row.revision,'ADMIN_CONFIG_ACK_REVISION_INVALID'),
     fingerprint:text(row.fingerprint,'ADMIN_CONFIG_ACK_FINGERPRINT_INVALID',128),
+    publishedAt:text(row.publishedAt,'ADMIN_CONFIG_ACK_PUBLISHED_AT_INVALID',64),
     appliedAt:text(row.appliedAt,'ADMIN_CONFIG_ACK_APPLIED_AT_INVALID',64),
     disposition,
   };
+  if(!Number.isFinite(Date.parse(out.publishedAt)))throw new Error('ADMIN_CONFIG_ACK_PUBLISHED_AT_INVALID');
   if(!Number.isFinite(Date.parse(out.appliedAt)))throw new Error('ADMIN_CONFIG_ACK_APPLIED_AT_INVALID');
   return Object.freeze(out);
 }

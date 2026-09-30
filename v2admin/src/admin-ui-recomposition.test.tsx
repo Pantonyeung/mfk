@@ -132,20 +132,29 @@ describe('Admin UI recomposition',()=>{
     expect(capacity).not.toContain('第三方平台停售門檻');
   });
 
-  it('only reports SMT success for a matching revision and fingerprint readback',()=>{
-    const activeRelease={version:12,createdAt:'2026-09-22T00:00:00.000Z',fingerprint:'fp-12'};
-    const published={state:'PUBLISHED' as const,revision:12,fingerprint:'fp-12',updatedAt:'2026-09-22T00:00:01.000Z'};
+  it('only reports SMT success for matching canonical fingerprint and publish time readback',()=>{
+    const activeRelease={version:12,createdAt:'2026-09-22T00:00:00.000Z',fingerprint:'admin-fp-12'};
+    const published={
+      state:'PUBLISHED' as const,
+      revision:12,
+      fingerprint:'canonical-fp-12',
+      adminFingerprint:'admin-fp-12',
+      cloudPublishedAt:'2026-09-22T00:00:01.000Z',
+      updatedAt:'2026-09-22T00:00:01.000Z',
+    };
     const mismatched=deriveAdminSyncPresentation({
       activeRelease,status:published,online:true,
-      acks:[{revision:11,fingerprint:'fp-11',deviceId:'SMT-01',appliedAt:'2026-09-22T00:00:02.000Z'}],
+      acks:[{revision:99,fingerprint:'other',publishedAt:'2026-09-22T00:00:01.000Z',deviceId:'SMT-01',appliedAt:'2026-09-22T00:00:02.000Z'}],
     });
     expect(mismatched.tone).toBe('warning');
-    expect(mismatched.detail).toContain('等待 matching SMT 回讀');
+    expect(mismatched.detail).toContain('等待 SMT 套用回讀');
 
     const matched=deriveAdminSyncPresentation({
       activeRelease,status:published,online:true,
-      acks:[{revision:12,fingerprint:'fp-12',deviceId:'SMT-01',appliedAt:'2026-09-22T00:00:02.000Z'}],
+      acks:[{revision:1,fingerprint:'canonical-fp-12',publishedAt:'2026-09-22T00:00:01.000Z',deviceId:'SMT-01',appliedAt:'2026-09-22T00:00:02.000Z'}],
     });
-    expect(matched).toEqual({tone:'success',title:'R12',detail:'SMT 已套用 · SMT-01'});
+    expect(matched.tone).toBe('success');
+    expect(matched.title).toContain('發佈');
+    expect(matched.detail).toContain('SMT 已套用');
   });
 });
