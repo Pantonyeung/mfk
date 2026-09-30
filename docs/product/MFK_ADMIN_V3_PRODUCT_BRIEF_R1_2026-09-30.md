@@ -8931,3 +8931,497 @@ UNKNOWN 時：
 
 MILESTONE:
 MFK_ADMIN_V3_CROSS_PAGE_INTERACTION_AUDIT_BATCH2_LOCKED
+
+---
+
+# 59. 跨頁互動盤點 V1｜Batch 3：大量操作 / 批次修改 / 多選工作流
+
+本輪驗「一次處理多件物件」嘅產品規則。
+
+核心原則：
+**大量操作係同一正式 Authority 嘅效率工具，唔係另一套批量引擎。**
+
+任何 Bulk Action 都唔可以：
+- 因為係批量就繞過 permission
+- 因為係批量就跳過 validation / impact
+- 因為係批量就用 browser state 當成功
+- 因為部分成功就顯示「全部完成」
+- 對 UNKNOWN 項目盲目再次執行
+
+---
+
+## 59.1 多選模式｜全局規格
+
+### Desktop
+
+List page 有正式 Bulk Capability 時：
+- Row checkbox
+- Header checkbox
+- 選中後出現 sticky Bulk Action Bar
+
+Bulk Action Bar 顯示：
+- 已選 X 項
+- 可用操作
+- 清除選取
+
+禁止：
+- 未選任何項目都長期放大量危險 Bulk button
+- 用隱藏右鍵 / hover 做唯一入口
+
+### Mobile
+
+唔依賴 long-press。
+
+使用：
+- 明確「選取」按鈕
+- 進入多選模式後每張 record card 有 checkbox
+- 底部 sticky action bar
+
+退出：
+- 完成
+- 取消選取
+
+---
+
+## 59.2 「全選」語義必須分清
+
+必須分開：
+
+1. **選取目前頁面**
+2. **選取目前篩選結果全部 X 項**
+
+如果支援第 2 種：
+UI 必須明示 exact count。
+
+例如：
+「已選目前 50 項」
+「選取符合篩選條件嘅全部 326 項」
+
+禁止：
+一粒「全選」令人唔知係全頁、全部資料、定全部篩選結果。
+
+如果 dataset / backend 未能安全 materialize 全部 target identity：
+唔提供「全部篩選結果」。
+
+---
+
+## 59.3 Scope / Filter / Selection 邊界
+
+Selection 必須綁定：
+- Store / scope
+- current object type
+- current filter result
+- permission context
+
+以下情況要清除／重新確認 selection：
+- 切換 Store
+- 切換 permission scope
+- 換 object type
+- 重要 filter 令 target set 改變
+- canonical data refresh 發現 selected object 已不存在 / 不再 eligible
+
+禁止：
+跨 Store 帶住舊 selection 做 mutation。
+
+---
+
+## 59.4 Bulk Action 共用流程
+
+正式 Bulk Mutation：
+
+1. Select
+2. Choose Action
+3. **Impact Preview**
+4. Validation
+5. Permission / Policy
+6. Confirm
+7. Draft / Execute
+8. Per-item result / readback
+9. Summary
+10. Return to original List context
+
+Impact Preview 最少顯：
+- Selected count
+- Eligible count
+- Ineligible count
+- Affected domains
+- Before / After summary
+- high-risk side-effect
+- target scope
+
+如果部分 item 唔 eligible：
+唔可以靜靜 skip。
+
+要明示：
+「326 項入面，312 項可以處理，14 項需要先修正。」
+
+---
+
+# 59.5 批量產品啟用／停用
+
+Primary Home：
+**菜單管理 → 產品管理**
+
+Flow：
+
+Select Products
+→ 啟用 / 停用
+→ Impact Preview
+→ Validate references / dependencies
+→ Save to Draft
+→ Draft Bar update
+→ Publish workflow
+→ Readback
+
+Preview：
+- Product count
+- Categories
+- currently active / inactive counts
+- Combo / Option / Channel dependency summary（有影響先顯）
+
+Danger：
+- Bulk disable 唔等於 runtime temporary sold-out
+- 已成立 Order 唔受 config disable 自動取消
+- Save Draft 唔顯「已停售」
+
+Status：**LOCKED**
+
+---
+
+# 59.6 批量重新分類
+
+Primary Home：
+**菜單管理 → 產品管理**
+
+Flow：
+
+Select Products
+→「移至分類」
+→ 選 Target Category
+→ Preview
+→ Validate
+→ Save Draft
+
+Preview：
+- X products
+- From categories
+- Target category
+- affected display order / visibility（如 relevant）
+
+Danger：
+- 唔刪除／重建 Product identity
+- Product Code / history 保留
+- Target Category disabled / invalid 時阻止 confirm
+
+完成：
+- 返回原 Product List
+- 保留 filter / search
+- Draft indicator 更新
+
+Status：**LOCKED**
+
+---
+
+# 59.7 批量價格修改
+
+Primary Home：
+**菜單管理 → 價格管理**
+
+呢類屬高風險 Draft mutation。
+
+R1 可以支援嘅模式只限產品正式批准嘅 pricing input。
+
+例如：
+- 對選中商品設定明確新 Base Price
+- 對選中商品切換已批准 surcharge flag
+- 其他已正式定義 bulk pricing action
+
+禁止預設提供：
+- arbitrary formula
+- SQL
+- 任意百分比 pricing engine
+- browser 自行計算後直接當正式 price truth
+
+Flow：
+
+Select
+→ Choose approved pricing action
+→ Input
+→ **Before / After Preview**
+→ Validate
+→ Confirm
+→ Save Draft
+→ Publish / Readback
+
+Preview 必須逐項或可展開顯：
+- Product
+- Current price
+- New price
+- Delta
+- any warnings
+
+Danger：
+- 唔可以只顯「共 50 件，+10%」而唔畀睇新價
+- Pricing Authority 仍然唯一
+- Draft ≠ transaction price applied
+
+Status：**LOCKED**
+
+---
+
+# 59.8 批量售罄／恢復供應
+
+Primary Home：
+**營運管理 → 售罄／供應**
+
+只喺正式 batch runtime contract 存在時顯示。
+
+Flow：
+
+Select products
+→ action
+→ scope / duration
+→ Impact Preview
+→ Execute
+→ per-product runtime readback
+→ channel projection refresh
+→ result summary
+
+Preview：
+- Product count
+- Store / channel scope
+- Temporary until / reset
+- already sold-out count
+- already available count
+
+Danger：
+- 部分 UNKNOWN 唔可以顯「全部完成」
+- 已成立 Order 唔自動取消
+- Channel projection lag 要獨立顯示
+
+如果無正式 bulk runtime contract：
+**隱藏 Bulk runtime action**
+而唔係由 browser 幫手逐件亂 call。
+
+Status：**LOCKED（capability-gated）**
+
+---
+
+# 59.9 批量商品映射
+
+Primary Home：
+**平台／渠道管理 → 商品映射 / 匹配失敗**
+
+安全原則：
+Suggestion ≠ Confirmed Mapping。
+
+可以：
+- 多選已經逐項確認 candidate 嘅 mapping
+- 統一套用共同 metadata（只限正式 contract）
+
+唔可以：
+- 一鍵接受所有「系統建議」而無 review
+- 將 fuzzy match / name similarity 當 authoritative mapping
+- mapping 完自動 replay 舊 transaction side-effects
+
+Flow：
+
+Select issues
+→ Review mapping pairs
+→ Validate
+→ Impact
+→ Confirm
+→ Save / Execute formal mapping
+→ Verify
+→ per-item result
+
+Result 必須分：
+- Confirmed
+- Failed
+- Unknown
+- Still unmatched
+
+Status：**LOCKED**
+
+---
+
+# 59.10 批量 Role / Scope
+
+R1 **唔預設開啟** 大量權限 mutation。
+
+原因：
+- 權限屬高風險
+- Scope 可能跨 Store
+- 每個 Staff / Role inheritance 未必一致
+
+如果日後正式支援：
+
+Select staff
+→ Choose Role / Scope action
+→ permission impact
+→ affected capability preview
+→ confirm
+→ server-side apply
+→ readback
+→ audit
+
+硬規則：
+- actor 不可 grant above own authority
+- 不能用 frontend selection 繞過 scope
+- 每個 affected principal 都要有 audit evidence
+
+現時產品標準：
+**Bulk Role/Scope capability = capability-gated，無正式 contract 不顯示。**
+
+Status：**LOCKED（預設關閉）**
+
+---
+
+# 59.11 大量匯出 / 敏感讀取
+
+Primary Home：
+**報表 → 匯出**
+
+Bulk Export 係高風險 Read Action，
+唔係普通 Download。
+
+Flow：
+
+Choose report/data set
+→ Date / Scope
+→ Field set
+→ Estimate row count / sensitivity
+→ Permission check
+→ Confirm
+→ Generate
+→ export status
+→ file availability / expiry
+→ Audit
+
+必須檢：
+- EXPORT permission
+- Store / role scope
+- PII fields
+- sensitive financial fields
+- large export policy
+
+Danger：
+- 睇得到一筆記錄 ≠ 可以 bulk export 全部
+- Export permission 同 View permission 分開
+
+Status：**LOCKED**
+
+---
+
+# 59.12 Partial Success｜部分成功
+
+Bulk operation 最容易出錯嘅位係：
+「部分成功但 UI 當全部成功」。
+
+正式結果必須顯：
+
+例如：
+**50 項處理完成**
+- 44 已確認
+- 3 結果未明
+- 2 失敗
+- 1 已跳過（不符合條件）
+
+每個非成功 item：
+- object
+- state
+- reason / evidence
+- safe next action
+
+禁止：
+- 只 toast「完成」
+- 自動 retry UNKNOWN
+- 將 skipped 當 success
+
+---
+
+# 59.13 Bulk Undo 規則
+
+唔設一粒萬能 Undo。
+
+### Draft config
+未 Publish 前：
+可以透過 Draft / discard semantics 撤回。
+
+### 已正式 runtime action
+例如：
+- sold-out
+- pause channel
+- revoke session
+
+要做相反正式 command，
+唔叫 browser Undo。
+
+### Historical / financial
+Refund / Cancel / Audit：
+唔提供 generic Undo。
+
+如果業務需要 reversal：
+要正式 linked correction / reversal workflow。
+
+---
+
+# 59.14 返回原工作位置
+
+Bulk action 完成後：
+
+List 應保留：
+- original search
+- filters
+- sort
+- saved view
+- scroll anchor
+
+Selection：
+- 完成後清除成功 selection
+- failed / unknown item 由 Result Summary 提供直接處理入口
+- 唔暗中保留舊 selection 去下一次 mutation
+
+Draft bulk change：
+- Draft Bar 即時顯最新 count
+- List row 顯 Draft indicator
+
+---
+
+# 59.15 Batch 3 結果
+
+本輪驗：
+1. 批量產品啟用／停用
+2. 批量重新分類
+3. 批量價格修改
+4. 批量售罄／恢復
+5. 批量商品映射
+6. Bulk Role / Scope
+7. Bulk Export / sensitive read
+8. Partial success / retry
+9. Undo / reversal
+10. Return context
+
+結果：
+- **10 LOCKED**
+- **0 YELLOW**
+- **0 RED**
+
+Capability-gated 項目：
+- Bulk runtime sellability
+- Bulk Role / Scope
+- 其他未有正式 batch contract 嘅 mutation
+
+原則：
+**無 contract = 唔顯功能**
+唔會為咗「Bulk UX」而自行開 backend scope。
+
+下一輪：
+**跨頁互動盤點 Batch 4：搜尋 / Saved View / 收藏 / 最近使用 / 全局快速前往**
+
+目的：
+將成熟後台熟手效率補返上去，
+同時保持「兩步 Product Map」做穩定基本入口。
+
+MILESTONE:
+MFK_ADMIN_V3_CROSS_PAGE_INTERACTION_AUDIT_BATCH3_LOCKED
