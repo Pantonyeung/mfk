@@ -11,10 +11,10 @@
     "COMMANDER_CURRENT.md",
     "HANDOFF_CURRENT.md",
     "docs/implementation/**",
-    "v3admin/**"
+    "v3admin/**",
+    "contracts/admin-config-sync-v1.ts"
   ],
   "read_only_dependencies": [
-    "contracts/admin-config-sync-v1.ts",
     "contracts/web-state-authority-v1.ts"
   ],
   "authority_impact": "NONE; V3 remains a client of existing Admin canonical and SMT/runtime authorities",
@@ -27,7 +27,8 @@
     "V3 uses memory-only Admin authentication and centralized Store/Scope context.",
     "V3 reads Cloud canonical Admin config through TanStack Query and the shared canonical validator.",
     "V3 does not read v2 localStorage or import v2 client-state modules.",
-    "A serving/client release mismatch blocks future formal write surfaces."
+    "A serving/client release mismatch blocks future formal write surfaces.",
+    "Shared Admin ACK contract receives a type-only literal preservation fix; runtime semantics are unchanged."
   ],
   "non_goals": [
     "No production deploy or hostname routing.",
