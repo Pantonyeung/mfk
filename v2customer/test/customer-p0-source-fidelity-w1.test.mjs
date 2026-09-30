@@ -20,7 +20,7 @@ test('FINAL source provenance is explicit and points to the supplied package fil
   ])assert.ok(source.includes(marker),marker);
 });
 
-test('UI0 uses supplied male/female IP sheets, 50:50 selection and exact storyboard CTA copy',()=>{
+test('UI0 uses supplied male/female IP sheets, 50:50 selection and owner-locked auto-Home handoff',()=>{
   const config=read('src/launch/launch-config.ts');
   const overlay=read('src/launch/LaunchOverlay.tsx');
   assert.ok(config.includes('CUSTOMER_FINAL_SOURCE.maleIpSheet.url'));
@@ -28,8 +28,10 @@ test('UI0 uses supplied male/female IP sheets, 50:50 selection and exact storybo
   assert.ok(config.includes("<.5?'male':'female'"));
   assert.doesNotMatch(config,/stage7-pickup|stage0-character-.*\.svg/);
   for(const mode of ["'reduced'","'returning'","'first'"])assert.ok(overlay.includes(mode),mode);
-  for(const copy of['肚餓啦？','用心手作，','每一口都更幸福。','美味，從這裡開始。','進入主頁','進入會員頁'])assert.ok(overlay.includes(copy),copy);
+  for(const copy of['肚餓啦？','用心手作，','每一口都更幸福。'])assert.ok(overlay.includes(copy),copy);
+  for(const removed of['進入主頁','進入會員頁'])assert.ok(!overlay.includes(removed),removed);
   assert.ok(overlay.includes("mode==='reduced'?120:mode==='returning'?700:2500"));
+  assert.ok(overlay.includes('enterHomeRef.current()'));
 });
 
 test('UI1 uses FINAL source screenshot crop for IP hero and source shortcut icon crops',()=>{
