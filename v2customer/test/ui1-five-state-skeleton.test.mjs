@@ -4,22 +4,19 @@ import {readFileSync} from 'node:fs';
 
 const home=readFileSync(new URL('../src/stage1/Stage1Home.tsx',import.meta.url),'utf8');
 
-test('UI1 Home has only factual presentation modes and puts active order first',()=>{
-  for(const mode of ['ORDER_ACTIVE','CLOSED','NORMAL'])assert.ok(home.includes("'"+mode+"'"));
-  for(const removed of ['CAMPAIGN','RETURNING'])assert.ok(!home.includes("'"+removed+"'"),removed);
+test('UI1 Home preserves five brand situations without turning them into instruction copy',()=>{
+  for(const mode of ['ORDER_ACTIVE','CLOSED','CAMPAIGN','RETURNING','NORMAL'])assert.ok(home.includes("'"+mode+"'"));
   assert.match(home,/data-home-mode=\{homeMode\}/);
-  const activeIndex=home.indexOf('currentOrder?<button className="stage1-live-order"');
-  const searchIndex=home.indexOf('<button className="stage1-search-entry"');
-  assert.ok(activeIndex>=0&&searchIndex>activeIndex);
-  assert.ok(!home.includes('stage1-welcome'));
-  assert.ok(!home.includes('stage1-memory-strip'));
+  assert.ok(home.includes('stage1-welcome'));
+  assert.match(home,/currentOrder\?<button className="stage1-live-order"/);
 });
 
-test('UI1 contextual actions are conditional, factual and do not duplicate fake product truth',()=>{
-  assert.ok(home.includes('lastOrder?<button'));
-  assert.ok(home.includes('availableCouponCount?<button'));
-  assert.ok(home.includes('stage1-product-image-empty'));
-  assert.ok(!home.includes('我的收藏'));
-  assert.ok(!home.includes('期間限定'));
-  assert.ok(!home.includes('stage1-shortcut-'));
+test('UI1 fixed shortcut rail is 我的收藏 / 回憶券 / 期間限定',()=>{
+  const start=home.indexOf('<section className="stage1-quick-entry-section"');
+  const end=home.indexOf('<section className="stage1-top6"');
+  const quick=home.slice(start,end);
+  for(const label of ['我的收藏','回憶券','期間限定'])assert.ok(quick.includes(label),label);
+  assert.ok(quick.includes('onClick={onHistory}'));
+  assert.ok(quick.includes('onClick={onMember}'));
+  assert.ok(quick.includes('onClick={onBrowse}'));
 });
