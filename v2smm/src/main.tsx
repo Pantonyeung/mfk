@@ -20,6 +20,8 @@ class SmmErrorBoundary extends Component<{children:ReactNode},{failed:boolean}>{
 
 installSmmRuntimePort(createPwaRuntimePort());
 
+window.addEventListener('pageshow',event=>{if(event.persisted)window.location.reload();});
+
 const root=document.getElementById('root');
 if(!root)throw new Error('MFK_SMM_ROOT_REQUIRED');
 createRoot(root).render(<StrictMode><SmmErrorBoundary><StageZeroGate><App/></StageZeroGate></SmmErrorBoundary></StrictMode>);
