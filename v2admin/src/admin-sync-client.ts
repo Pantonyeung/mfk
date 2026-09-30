@@ -1,7 +1,7 @@
 import {createMfkAdminConfigEnvelope,validateMfkAdminConfigEnvelope,type MfkAdminConfigEnvelope,type MfkAdminConfigAck} from '../../contracts/admin-config-sync-v1.ts';
 import {projectStaffForRuntime} from '../../contracts/staff-auth-v1.ts';
 import {readAdminReleases,readAdminStored,writeAdminStored,type AdminRelease} from './admin-local-store.ts';
-import {readStoredAdminBrowserSession} from './admin-browser-session.ts';
+import {readStoredAdminBrowserSession,refreshAdminBrowserSession} from './admin-browser-session.ts';
 
 const OUTBOX_KEY='sync-outbox.v1';
 const STATUS_KEY='sync-status.v1';
@@ -123,7 +123,7 @@ export async function flushAdminSyncOutbox(){
 
       // Deliver every formal publish. Never collapse to only the numerically latest revision.
       const next=rows[0]!;
-      const browserSession=readStoredAdminBrowserSession();
+      let browserSession=readStoredAdminBrowserSession();
       const key=browserSession?'':publisherKey();
       if(!browserSession&&!key){
         const status={state:'ERROR',revision:next.revision,fingerprint:next.fingerprint,adminFingerprint:next.adminFingerprint,updatedAt:new Date().toISOString(),error:'ADMIN_SYNC_PUBLISHER_KEY_UNAVAILABLE'} as const;
@@ -133,16 +133,23 @@ export async function flushAdminSyncOutbox(){
 
       writeStatus({state:'PUBLISHING',revision:next.revision,fingerprint:next.fingerprint,adminFingerprint:next.adminFingerprint,updatedAt:new Date().toISOString()});
       try{
-        const endpoint=browserSession?'/api/admin-browser/publish':'/api/admin-sync/publish';
-        const headers:Record<string,string>={'content-type':'application/json'};
-        if(browserSession)headers['x-mfk-admin-session']=browserSession.sessionToken;
-        else headers['x-mfk-admin-publish-key']=key;
-        const response=await fetch(endpoint+'?storeId='+encodeURIComponent(next.storeId),{
-          method:'POST',
-          credentials:'same-origin',
-          headers,
-          body:JSON.stringify(next),
-        });
+        const send=async()=>{
+          const endpoint=browserSession?'/api/admin-browser/publish':'/api/admin-sync/publish';
+          const headers:Record<string,string>={'content-type':'application/json'};
+          if(browserSession)headers['x-mfk-admin-session']=browserSession.sessionToken;
+          else headers['x-mfk-admin-publish-key']=key;
+          return fetch(endpoint+'?storeId='+encodeURIComponent(next.storeId),{
+            method:'POST',
+            credentials:'same-origin',
+            headers,
+            body:JSON.stringify(next),
+          });
+        };
+        let response=await send();
+        if(response.status===401&&browserSession){
+          const refreshed=await refreshAdminBrowserSession();
+          if(refreshed){browserSession=refreshed;response=await send();}
+        }
         const body=await response.json().catch(()=>({})) as Record<string,unknown>;
         if(!response.ok)throw new Error(typeof body.code==='string'?body.code:'ADMIN_SYNC_PUBLISH_HTTP_'+response.status);
         const confirmed=validateAdminPublishConfirmation(body,next);
@@ -211,8 +218,8 @@ export function installAdminSyncAutoFlush(){
     const latest=readAdminReleases()[0];
     if(!latest)return;
     const status=readAdminSyncStatus();
-    const pending=readOutbox().some(row=>row.revision===latest.version&&row.adminFingerprint===latest.fingerprint);
-    if(status.state==='PUBLISHED'&&!pending&&status.revision===latest.version&&status.adminFingerprint===latest.fingerprint)return;
+    const pending=readOutbox().some(row=>row.adminFingerprint===latest.fingerprint);
+    if(status.state==='PUBLISHED'&&!pending&&status.adminFingerprint===latest.fingerprint)return;
     void queueAdminReleaseSync(latest);
   };
   window.addEventListener('online',flush);
