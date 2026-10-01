@@ -82,6 +82,32 @@ async function changes(after:number){
   return{checkpointRequired:false as const,batch:validateMfkSyncChangeBatch(body)};
 }
 
+async function ackApplied(current:MfkSyncHead,bundle:Bundle){
+  const session=readSmmStaffSession();
+  if(!session)return;
+  const response=await fetch(ADMIN_SYNC_ENDPOINT+'/api/admin-sync/sync/applied?storeId='+STORE_ID+'&port=SMM',{
+    method:'POST',
+    credentials:'omit',
+    cache:'no-store',
+    headers:{'content-type':'application/json','x-mfk-smm-session':session.sessionToken},
+    body:JSON.stringify({
+      schema:'MFK_SYNC_APPLIED_ACK_V1',
+      protocol:'MFK_CHECKPOINTED_DELTA_SYNC_PROTOCOL_V1',
+      storeId:STORE_ID,
+      port:'SMM',
+      clientId:'SMM:'+session.staffId,
+      appliedSeq:bundle.appliedSeq,
+      projectionHash:bundle.projectionHash,
+      appliedAt:new Date().toISOString(),
+      checkpointSeq:bundle.checkpointSeq,
+    }),
+  });
+  if(!response.ok){
+    const body=await response.json().catch(()=>({})) as Record<string,unknown>;
+    throw new Error(String(body.code||'SMM_SYNC_APPLIED_ACK_FAILED'));
+  }
+}
+
 export async function reconcileSmmConfig():Promise<Partial<SmmReadModelSnapshot>>{
   let current=await head();
   let bundle=readBundle();
@@ -105,6 +131,7 @@ export async function reconcileSmmConfig():Promise<Partial<SmmReadModelSnapshot>
     }
     if(appliedSeq===current.headSeq){
       bundle=writeBundle(current,entities,appliedSeq,checkpointSeq);
+      void ackApplied(current,bundle).catch(()=>{});
       const config=materializeSmmConfigSnapshot(bundle.entities) as Partial<SmmReadModelSnapshot>;
       const menu=config.menu?Object.freeze({...config.menu,revision:String(current.canonicalRevision),observedAt:current.observedAt}):undefined;
       return Object.freeze({...config,...(menu?{menu}:{}),observedAt:current.observedAt});
