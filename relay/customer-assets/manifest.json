@@ -1,0 +1,36 @@
+{
+  "bucket": "mfk-customer-assets",
+  "generatedAt": "2026-10-01",
+  "files": [
+    {
+      "path": "relay/customer-assets/hero-background-main.png",
+      "key": "customer/brand/hero/hero-background-main.png",
+      "sha256": "4c7169f5c57f12f445eb9222e71750f3476b4de0433424867d4442e238cd1db1",
+      "contentType": "image/png"
+    },
+    {
+      "path": "relay/customer-assets/hero-male-main.png",
+      "key": "customer/brand/hero/hero-male-main.png",
+      "sha256": "231d7a2848af5f8eb689d4d41a6d8114236d9fdfc76c9179948612fc70ccf8ba",
+      "contentType": "image/png"
+    },
+    {
+      "path": "relay/customer-assets/hero-female-main.png",
+      "key": "customer/brand/hero/hero-female-main.png",
+      "sha256": "22e1b2bee4d5cc11c514e4885f2450d74439f9caa8f78081ed3e711a17546bbe",
+      "contentType": "image/png"
+    },
+    {
+      "path": "relay/customer-assets/hero-doodle-morefun-main.png",
+      "key": "customer/brand/hero/hero-doodle-morefun-main.png",
+      "sha256": "06ac2e24485964613dff929bd2404ac17708f5ab50b8fa3dbcab475ee354ece7",
+      "contentType": "image/png"
+    },
+    {
+      "path": "relay/customer-assets/hero-doodle-goodtaste-main.png",
+      "key": "customer/brand/hero/hero-doodle-goodtaste-main.png",
+      "sha256": "584b1e7bd6fab50c55494bab5cce7c80635736bd647ed5d1ee626aed5f74cfd1",
+      "contentType": "image/png"
+    }
+  ]
+}
