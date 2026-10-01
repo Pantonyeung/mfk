@@ -37,6 +37,12 @@ const PREVIEW_PRODUCTS:readonly ProductListRecord[]=[
 
 const PREVIEW_CATEGORIES=['全部','飯類','飯糰','便當','茶飲','小食','湯品','甜品'] as const;
 const STATUS_OPTIONS=['全部','已發佈','草稿','待回讀','已停用'] as const;
+export const MOBILE_PRODUCT_PAGE_SIZE=10;
+
+export function productFormCanSave(input:{name:string;category:string;price:string}){
+  const priceNumber=Number(input.price);
+  return Boolean(input.name.trim()&&input.category&&input.category!=='全部'&&input.price.trim()&&Number.isFinite(priceNumber)&&priceNumber>=0);
+}
 
 function row(value:unknown):RowObject{
   return value&&typeof value==='object'&&!Array.isArray(value)?value as RowObject:{};
@@ -146,7 +152,7 @@ function ProductFormModal({
   const [price,setPrice]=useState(product?String(product.priceMinor/100):'');
   const [active,setActive]=useState(product?.status!=='已停用');
   const priceNumber=Number(price);
-  const valid=Boolean(name.trim()&&category&&category!=='全部'&&price.trim()&&Number.isFinite(priceNumber)&&priceNumber>=0);
+  const valid=productFormCanSave({name,category,price});
   const submit=(event:FormEvent)=>{
     event.preventDefault();
     if(!valid||!previewMode)return;
@@ -295,7 +301,7 @@ export function ProductListPage({canonicalSnapshot,previewMode=false,onReviewDra
         <div className="v3-product-mobile-groups">
           <MobileGroupedPager
             items={filtered.map(product=>({...product,group:product.category}))}
-            pageSize={10}
+            pageSize={MOBILE_PRODUCT_PAGE_SIZE}
             emptyLabel="目前未有商品"
             renderItem={product=><article key={product.id} className="v3-product-mobile-card" tabIndex={0} onKeyDown={event=>openFromKeyboard(event,product)} onClick={()=>setMobileForm({mode:'edit',product})}>
               <ProductThumb name={product.name}/>
