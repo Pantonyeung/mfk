@@ -21,6 +21,8 @@ import {FormalChannelPage} from './formal-channel-pages.tsx';
 import {FormalAccessGapPage,FormalPermissionsSummaryPage,FormalRolesSummaryPage,FormalStaffPage} from './formal-staff-pages.tsx';
 import {FormalCapacityPage} from './formal-capacity-page.tsx';
 import {FormalOrderExceptionsPage,FormalOrdersPage,FormalRefundReportPage,FormalSalesReportPage,FormalTodayPage} from './formal-read-pages.tsx';
+import {FormalChannelReportPage,FormalExportPage,FormalOperationsReportPage,FormalProductReportPage} from './formal-report-pages.tsx';
+import {FormalBusinessDayRuntimePage,FormalCashCloseRuntimePage} from './formal-operations-read-pages.tsx';
 import {
   EmptyState,
   ErrorState,
@@ -140,10 +142,10 @@ export function AdminShell({storeId,displayName,releaseStatus,canonicalState,can
               ?(previewMode?<MenuDisplayPage/>:formalDraftEnabled?<FormalMenuDisplayPage/>:<RouteSkeleton path={path} canonicalState={canonicalState} onRefresh={onRefresh}/>)
               :path==='/admin/availability'
                 ?(previewMode?<AvailabilityPage canonicalSnapshot={canonicalSnapshot} previewMode/>:formalDraftEnabled?<FormalAvailabilityPage/>:<AvailabilityPage canonicalSnapshot={canonicalSnapshot}/>)
-                :path==='/admin/business-day'&&previewMode
-                  ?<BusinessDayPage/>
-                  :path==='/admin/cash-close'&&previewMode
-                    ?<CashClosePage/>
+                :path==='/admin/business-day'
+                  ?(previewMode?<BusinessDayPage/>:formalDraftEnabled?<FormalBusinessDayRuntimePage/>:<RouteSkeleton path={path} canonicalState={canonicalState} onRefresh={onRefresh}/>)
+                  :path==='/admin/cash-close'
+                    ?(previewMode?<CashClosePage/>:formalDraftEnabled?<FormalCashCloseRuntimePage/>:<RouteSkeleton path={path} canonicalState={canonicalState} onRefresh={onRefresh}/>)
                     :path==='/admin/operations/capacity'
                       ?(previewMode?<CapacityPage/>:formalDraftEnabled?<FormalCapacityPage/>:<RouteSkeleton path={path} canonicalState={canonicalState} onRefresh={onRefresh}/>)
                       :path==='/admin/channels'
@@ -186,16 +188,16 @@ export function AdminShell({storeId,displayName,releaseStatus,canonicalState,can
                                                 ?(previewMode?<AccessPage/>:formalDraftEnabled?<FormalAccessGapPage/>:<RouteSkeleton path={path} canonicalState={canonicalState} onRefresh={onRefresh}/>)
                                                 :path==='/admin/reports/sales'
                                                   ?(previewMode?<ReportPage mode="sales"/>:formalDraftEnabled?<FormalSalesReportPage/>:<RouteSkeleton path={path} canonicalState={canonicalState} onRefresh={onRefresh}/>)
-                                                  :path==='/admin/reports/products'&&previewMode
-                                                    ?<ReportPage mode="products"/>
-                                                    :path==='/admin/reports/channels'&&previewMode
-                                                      ?<ReportPage mode="channels"/>
+                                                  :path==='/admin/reports/products'
+                                                    ?(previewMode?<ReportPage mode="products"/>:formalDraftEnabled?<FormalProductReportPage/>:<RouteSkeleton path={path} canonicalState={canonicalState} onRefresh={onRefresh}/>)
+                                                    :path==='/admin/reports/channels'
+                                                      ?(previewMode?<ReportPage mode="channels"/>:formalDraftEnabled?<FormalChannelReportPage/>:<RouteSkeleton path={path} canonicalState={canonicalState} onRefresh={onRefresh}/>)
                                                       :path==='/admin/reports/refunds'
                                                         ?(previewMode?<ReportPage mode="refunds"/>:formalDraftEnabled?<FormalRefundReportPage/>:<RouteSkeleton path={path} canonicalState={canonicalState} onRefresh={onRefresh}/>)
-                                                        :path==='/admin/reports/operations'&&previewMode
-                                                          ?<ReportPage mode="operations"/>
-                                                          :path==='/admin/reports/export'&&previewMode
-                                                            ?<ReportPage mode="export"/>
+                                                        :path==='/admin/reports/operations'
+                                                          ?(previewMode?<ReportPage mode="operations"/>:formalDraftEnabled?<FormalOperationsReportPage/>:<RouteSkeleton path={path} canonicalState={canonicalState} onRefresh={onRefresh}/>)
+                                                          :path==='/admin/reports/export'
+                                                            ?(previewMode?<ReportPage mode="export"/>:formalDraftEnabled?<FormalExportPage/>:<RouteSkeleton path={path} canonicalState={canonicalState} onRefresh={onRefresh}/>)
                                                             :path==='/admin/publish/pending'
                                                               ?(previewMode?<PublishFlowPage mode="pending"/>:formalDraftEnabled?<FormalPendingChangesPage/>:<RouteSkeleton path={path} canonicalState={canonicalState} onRefresh={onRefresh}/>)
                                                   :path==='/admin/publish'
