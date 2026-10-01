@@ -18,6 +18,7 @@ import {FormalPrintersPage,FormalPrintRulesGapPage,FormalPrintTemplatesPage} fro
 import {FormalCombosPage} from './formal-combos-page.tsx';
 import {FormalDiningTablesPage,FormalStoreSettingsPage} from './formal-store-pages.tsx';
 import {FormalChannelPage} from './formal-channel-pages.tsx';
+import {FormalAccessGapPage,FormalPermissionsSummaryPage,FormalRolesSummaryPage,FormalStaffPage} from './formal-staff-pages.tsx';
 import {
   EmptyState,
   ErrorState,
@@ -173,14 +174,14 @@ export function AdminShell({storeId,displayName,releaseStatus,canonicalState,can
                                       ?<DevicesPage/>
                                       :path==='/admin/ota'&&previewMode
                                         ?<OtaPage/>
-                                        :path==='/admin/staff'&&previewMode
-                                          ?<StaffPage/>
-                                          :path==='/admin/roles'&&previewMode
-                                            ?<RolesPage/>
-                                            :path==='/admin/permissions'&&previewMode
-                                              ?<PermissionsPage/>
-                                              :path==='/admin/access'&&previewMode
-                                                ?<AccessPage/>
+                                        :path==='/admin/staff'
+                                          ?(previewMode?<StaffPage/>:formalDraftEnabled?<FormalStaffPage/>:<RouteSkeleton path={path} canonicalState={canonicalState} onRefresh={onRefresh}/>)
+                                          :path==='/admin/roles'
+                                            ?(previewMode?<RolesPage/>:formalDraftEnabled?<FormalRolesSummaryPage/>:<RouteSkeleton path={path} canonicalState={canonicalState} onRefresh={onRefresh}/>)
+                                            :path==='/admin/permissions'
+                                              ?(previewMode?<PermissionsPage/>:formalDraftEnabled?<FormalPermissionsSummaryPage/>:<RouteSkeleton path={path} canonicalState={canonicalState} onRefresh={onRefresh}/>)
+                                              :path==='/admin/access'
+                                                ?(previewMode?<AccessPage/>:formalDraftEnabled?<FormalAccessGapPage/>:<RouteSkeleton path={path} canonicalState={canonicalState} onRefresh={onRefresh}/>)
                                                 :path==='/admin/reports/sales'&&previewMode
                                                   ?<ReportPage mode="sales"/>
                                                   :path==='/admin/reports/products'&&previewMode
