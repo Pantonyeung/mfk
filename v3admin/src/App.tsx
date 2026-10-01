@@ -88,6 +88,7 @@ function AuthenticatedAdminShell({
     releaseStatus={releaseStatus}
     canonicalState={canonicalState}
     canonicalSnapshot={formalDraft.workingSnapshot}
+    formalDraftEnabled
     onRefresh={onRefresh}
     onDiagnostics={onDiagnostics}
     onSignOut={onSignOut}
