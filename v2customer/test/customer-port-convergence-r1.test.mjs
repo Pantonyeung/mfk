@@ -64,7 +64,7 @@ test('UI1 owns Home header/status and preserves runtime product truth',()=>{
   assert.equal(app.includes('<CustomerHeader'),false);
   assert.ok(home.includes('stage1-store-chip'));
   assert.ok(home.includes('product.imageUrl'));
-  assert.ok(homeCss.includes('.stage1-mobile-home'));
+  assert.ok(homeCss.includes('.stage1-home'));
   for(const forbidden of['/brand/p0-riceball.webp','/brand/mf-home-hero-salad.webp','/brand/mf-home-hero-bowl.webp'])assert.ok(!home.includes(forbidden),forbidden);
 });
 
