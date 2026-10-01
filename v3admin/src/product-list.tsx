@@ -444,7 +444,7 @@ export function ProductListPage({canonicalSnapshot,previewMode=false,formalDraft
   const [selected,setSelected]=useState<Set<string>>(new Set());
   const [openProduct,setOpenProduct]=useState<ProductListRecord|null>(null);
   const [previewEditorId,setPreviewEditorId]=useState<string|null|undefined>(undefined);
-  const [formalEditorId,setFormalEditorId]=useState<string|null>(null);
+  const [formalEditorId,setFormalEditorId]=useState<string|null|undefined>(undefined);
 
   const categoryOptions=useMemo(()=>{
     if(previewMode)return ['全部',...previewCategories.filter(item=>item.active).sort((a,b)=>a.sortOrder-b.sortOrder).map(item=>item.name)];
@@ -486,7 +486,7 @@ export function ProductListPage({canonicalSnapshot,previewMode=false,formalDraft
       eyebrow="菜單管理"
       title="產品管理"
       description="Desktop 保留完整列表；手機版按分類收納，每頁最多 10 件商品。"
-      aside={<><span className="v3-product-count">{filtered.length} / {sourceRows.length} 項商品</span><button className="v3-primary" type="button" disabled={!previewMode} title={previewMode?'':'正式新增產品仲要接 server-side Product Code allocation seam'} onClick={()=>setPreviewEditorId(null)}>＋ 新增產品</button></>}
+      aside={<><span className="v3-product-count">{filtered.length} / {sourceRows.length} 項商品</span><button className="v3-primary" type="button" disabled={!previewMode&&!formalDraftEnabled} title={previewMode?'介面預覽新增':formalDraftEnabled?'填齊資料後由 Server 產生 Product Code 並建立正式草稿':'新增產品尚未接駁'} onClick={()=>{if(previewMode)setPreviewEditorId(null);else if(formalDraftEnabled)setFormalEditorId(null);}}>＋ 新增產品</button></>}
     />
 
     <section className="v3-product-toolbar" aria-label="產品搜尋與篩選">
@@ -539,6 +539,6 @@ export function ProductListPage({canonicalSnapshot,previewMode=false,formalDraft
     {previewMode?<DraftBar count={4} onReview={onReviewDraft??(()=>{})}/>:null}
     {openProduct?<ProductDrawer product={openProduct} onClose={()=>setOpenProduct(null)}/>:null}
     {previewMode&&previewEditorId!==undefined?<PreviewProductEditor productId={previewEditorId} onClose={()=>setPreviewEditorId(undefined)}/>:null}
-    {formalDraftEnabled&&formalEditorId?<FormalProductEditor productId={formalEditorId} onClose={()=>setFormalEditorId(null)}/>:null}
+    {formalDraftEnabled&&formalEditorId!==undefined?<FormalProductEditor productId={formalEditorId} onClose={()=>setFormalEditorId(undefined)}/>:null}
   </div>;
 }
