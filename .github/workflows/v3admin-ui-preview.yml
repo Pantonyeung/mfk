@@ -64,7 +64,7 @@ jobs:
           set -euo pipefail
           node <<'NODE'
           const expected=process.env.GITHUB_SHA;
-          const base='https://preview.mfk-admin-v3-ui-preview.pages.dev';
+          const base='https://mfk-admin-v3-ui-preview.pages.dev';
           const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
           let last='';
           for(let attempt=1;attempt<=18;attempt++){
