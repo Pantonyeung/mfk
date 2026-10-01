@@ -80,6 +80,7 @@ export const ADMIN_MENU_GROUPS:readonly AdminMenuGroup[]=[
   ]},
   {id:'store',index:'11',label:'門店設定',destinations:[
     {path:'/admin/store/settings',title:'門店資料',primaryAction:'編輯門店資料',empty:'暫時無法取得門店資料',authority:'config'},
+    {path:'/admin/store/tables',title:'餐桌管理',primaryAction:'新增餐桌',empty:'目前未有餐桌',authority:'config'},
     {path:'/admin/store/hours',title:'營業時間',primaryAction:'編輯營業時間',empty:'目前未有營業時間設定',authority:'config'},
     {path:'/admin/store/business-day',title:'營業日分界',primaryAction:'編輯分界時間',empty:'目前未有營業日分界設定',authority:'config'},
     {path:'/admin/store/operations',title:'營運時間／提醒設定',primaryAction:'編輯設定',empty:'目前未有營運時間／提醒設定',authority:'config'},
