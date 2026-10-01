@@ -15,6 +15,7 @@ import {FormalCategoriesPage,FormalMenuDisplayPage,FormalPricingPage} from './fo
 import {FormalAvailabilityPage} from './formal-availability-page.tsx';
 import {FormalModifiersPage} from './formal-modifiers-page.tsx';
 import {FormalPrintersPage,FormalPrintRulesGapPage,FormalPrintTemplatesPage} from './formal-print-pages.tsx';
+import {FormalCombosPage} from './formal-combos-page.tsx';
 import {
   EmptyState,
   ErrorState,
@@ -126,8 +127,8 @@ export function AdminShell({storeId,displayName,releaseStatus,canonicalState,can
       ?(previewMode?<CategoriesPage/>:formalDraftEnabled?<FormalCategoriesPage/>:<RouteSkeleton path={path} canonicalState={canonicalState} onRefresh={onRefresh}/>)
       :path==='/admin/catalog/modifiers'
         ?(previewMode?<ModifiersPage/>:formalDraftEnabled?<FormalModifiersPage/>:<RouteSkeleton path={path} canonicalState={canonicalState} onRefresh={onRefresh}/>)
-        :path==='/admin/catalog/combos'&&previewMode
-          ?<CombosPage/>
+        :path==='/admin/catalog/combos'
+          ?(previewMode?<CombosPage/>:formalDraftEnabled?<FormalCombosPage/>:<RouteSkeleton path={path} canonicalState={canonicalState} onRefresh={onRefresh}/>)
           :path==='/admin/catalog/pricing'
             ?(previewMode?<PricingPage/>:formalDraftEnabled?<FormalPricingPage/>:<RouteSkeleton path={path} canonicalState={canonicalState} onRefresh={onRefresh}/>)
             :path==='/admin/catalog/menu-display'
