@@ -2,6 +2,9 @@ import {createContext,useContext,useEffect,type ReactNode} from 'react';
 import {useQuery,useQueryClient} from '@tanstack/react-query';
 import type {AdminDayCloseRefundAddendum,AdminRefundEvent} from '../../contracts/admin-refund-v1.ts';
 import type {MfkAdminConfigAck} from '../../contracts/admin-config-sync-v1.ts';
+import {v3AdminCanonicalQueryKey} from './canonical.ts';
+import {v3FormalDraftQueryKey} from './formal-draft.tsx';
+import {V3_DATA_REFETCH_INTERVAL_MS} from './state-authority.ts';
 
 export interface V3ProjectedOrderItem{
   readonly id:string;
@@ -203,6 +206,7 @@ export function V3ReadModelProvider({storeId,sessionToken,children}:{storeId:str
     refetchOnMount:'always',
     refetchOnWindowFocus:true,
     refetchOnReconnect:true,
+    refetchInterval:V3_DATA_REFETCH_INTERVAL_MS,
     retry:1,
   });
   const reports=useQuery({
@@ -213,6 +217,7 @@ export function V3ReadModelProvider({storeId,sessionToken,children}:{storeId:str
     refetchOnMount:'always',
     refetchOnWindowFocus:true,
     refetchOnReconnect:true,
+    refetchInterval:V3_DATA_REFETCH_INTERVAL_MS,
     retry:1,
   });
 
@@ -224,6 +229,7 @@ export function V3ReadModelProvider({storeId,sessionToken,children}:{storeId:str
     refetchOnMount:'always',
     refetchOnWindowFocus:true,
     refetchOnReconnect:true,
+    refetchInterval:V3_DATA_REFETCH_INTERVAL_MS,
     retry:1,
   });
 
@@ -235,6 +241,7 @@ export function V3ReadModelProvider({storeId,sessionToken,children}:{storeId:str
     refetchOnMount:'always',
     refetchOnWindowFocus:true,
     refetchOnReconnect:true,
+    refetchInterval:V3_DATA_REFETCH_INTERVAL_MS,
     retry:1,
   });
   const keetaCommercial=useQuery({
@@ -245,6 +252,7 @@ export function V3ReadModelProvider({storeId,sessionToken,children}:{storeId:str
     refetchOnMount:'always',
     refetchOnWindowFocus:true,
     refetchOnReconnect:true,
+    refetchInterval:V3_DATA_REFETCH_INTERVAL_MS,
     retry:1,
   });
 
@@ -256,6 +264,7 @@ export function V3ReadModelProvider({storeId,sessionToken,children}:{storeId:str
     refetchOnMount:'always',
     refetchOnWindowFocus:true,
     refetchOnReconnect:true,
+    refetchInterval:V3_DATA_REFETCH_INTERVAL_MS,
     retry:1,
   });
 
@@ -264,23 +273,30 @@ export function V3ReadModelProvider({storeId,sessionToken,children}:{storeId:str
     let socket:WebSocket|null=null;
     let reconnect:number|undefined;
     let closed=false;
-    const invalidate=()=>{
+    const invalidateOperational=()=>{
       void queryClient.invalidateQueries({queryKey:ordersKey});
       void queryClient.invalidateQueries({queryKey:reportsKey});
       void queryClient.invalidateQueries({queryKey:refundsKey});
+      void queryClient.invalidateQueries({queryKey:keetaStatusKey});
       void queryClient.invalidateQueries({queryKey:keetaCommercialKey});
       void queryClient.invalidateQueries({queryKey:acksKey});
     };
+    const invalidateConfig=()=>{
+      void queryClient.invalidateQueries({queryKey:v3AdminCanonicalQueryKey(storeId)});
+      void queryClient.invalidateQueries({queryKey:v3FormalDraftQueryKey(storeId)});
+    };
+    const invalidateAll=()=>{invalidateConfig();invalidateOperational();};
     const connect=()=>{
       if(closed)return;
       const protocol=window.location.protocol==='https:'?'wss:':'ws:';
       try{
         socket=new WebSocket(protocol+'//'+window.location.host+'/api/admin-sync/events?storeId='+encodeURIComponent(storeId));
-        socket.addEventListener('open',invalidate);
+        socket.addEventListener('open',invalidateAll);
         socket.addEventListener('message',event=>{
           try{
             const message=JSON.parse(String(event.data)) as {type?:string};
-            if(message.type==='SMT_PROJECTION_AVAILABLE'||message.type==='ADMIN_REFUND_AVAILABLE')invalidate();
+            if(message.type==='ADMIN_CONFIG_AVAILABLE')invalidateAll();
+            else if(message.type==='SMT_PROJECTION_AVAILABLE'||message.type==='ADMIN_REFUND_AVAILABLE')invalidateOperational();
           }catch{}
         });
         socket.addEventListener('close',()=>{
