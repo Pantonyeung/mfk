@@ -14,7 +14,7 @@ import {FormalDraftStatusBar,FormalPendingChangesPage,FormalPublishPage} from '.
 import {FormalCategoriesPage,FormalMenuDisplayPage,FormalPricingPage} from './formal-catalog-pages.tsx';
 import {FormalAvailabilityPage} from './formal-availability-page.tsx';
 import {FormalModifiersPage} from './formal-modifiers-page.tsx';
-import {FormalPrintersPage,FormalPrintRulesGapPage,FormalPrintTemplatesPage} from './formal-print-pages.tsx';
+import {FormalPrintExceptionsGapPage,FormalPrintOverviewPage,FormalPrintersPage,FormalPrintRulesGapPage,FormalPrintTemplatesPage} from './formal-print-pages.tsx';
 import {FormalCombosPage} from './formal-combos-page.tsx';
 import {FormalDiningTablesPage,FormalStoreSettingsPage} from './formal-store-pages.tsx';
 import {FormalChannelPage} from './formal-channel-pages.tsx';
@@ -26,6 +26,8 @@ import {FormalBusinessDayRuntimePage,FormalCashCloseRuntimePage} from './formal-
 import {FormalActionQueuePage,FormalAuditGapPage,FormalDiagnosticsPage,FormalEffectiveSettingsPage,FormalIntegrationsPage} from './formal-system-pages.tsx';
 import {FormalSettlementPage} from './formal-settlement-page.tsx';
 import {FormalRollbackGapPage,FormalVersionsReadbackPage} from './formal-publish-history-pages.tsx';
+import {FormalDevicesPage,FormalOtaGapPage} from './formal-device-pages.tsx';
+import {FormalQuickReasonsGapPage} from './formal-quick-reasons-page.tsx';
 import {
   EmptyState,
   ErrorState,
@@ -167,20 +169,20 @@ export function AdminShell({storeId,displayName,releaseStatus,canonicalState,can
                               ?(previewMode?<ChannelPage mode="estimate"/>:formalDraftEnabled?<FormalChannelPage mode="estimate"/>:<RouteSkeleton path={path} canonicalState={canonicalState} onRefresh={onRefresh}/>)
                               :path==='/admin/channels/settlement'
                                 ?(previewMode?<SettlementPage/>:formalDraftEnabled?<FormalSettlementPage/>:<RouteSkeleton path={path} canonicalState={canonicalState} onRefresh={onRefresh}/>)
-                                :path==='/admin/print'&&previewMode
-                                  ?<PrintOverviewPage/>
+                                :path==='/admin/print'
+                                  ?(previewMode?<PrintOverviewPage/>:formalDraftEnabled?<FormalPrintOverviewPage/>:<RouteSkeleton path={path} canonicalState={canonicalState} onRefresh={onRefresh}/>)
                                   :path==='/admin/print/printers'
                                 ?(previewMode?<PrintersPage/>:formalDraftEnabled?<FormalPrintersPage/>:<RouteSkeleton path={path} canonicalState={canonicalState} onRefresh={onRefresh}/>)
                                 :path==='/admin/print/templates'
                                   ?(previewMode?<PrintTemplatesPage/>:formalDraftEnabled?<FormalPrintTemplatesPage/>:<RouteSkeleton path={path} canonicalState={canonicalState} onRefresh={onRefresh}/>)
                                   :path==='/admin/print/rules'
                                     ?(previewMode?<PrintRulesPage/>:formalDraftEnabled?<FormalPrintRulesGapPage/>:<RouteSkeleton path={path} canonicalState={canonicalState} onRefresh={onRefresh}/>)
-                                    :path==='/admin/print/exceptions'&&previewMode
-                                      ?<PrintExceptionsPage/>
-                                      :path==='/admin/devices'&&previewMode
-                                      ?<DevicesPage/>
-                                      :path==='/admin/ota'&&previewMode
-                                        ?<OtaPage/>
+                                    :path==='/admin/print/exceptions'
+                                      ?(previewMode?<PrintExceptionsPage/>:formalDraftEnabled?<FormalPrintExceptionsGapPage/>:<RouteSkeleton path={path} canonicalState={canonicalState} onRefresh={onRefresh}/>)
+                                      :path==='/admin/devices'
+                                      ?(previewMode?<DevicesPage/>:formalDraftEnabled?<FormalDevicesPage/>:<RouteSkeleton path={path} canonicalState={canonicalState} onRefresh={onRefresh}/>)
+                                      :path==='/admin/ota'
+                                        ?(previewMode?<OtaPage/>:formalDraftEnabled?<FormalOtaGapPage/>:<RouteSkeleton path={path} canonicalState={canonicalState} onRefresh={onRefresh}/>)
                                         :path==='/admin/staff'
                                           ?(previewMode?<StaffPage/>:formalDraftEnabled?<FormalStaffPage/>:<RouteSkeleton path={path} canonicalState={canonicalState} onRefresh={onRefresh}/>)
                                           :path==='/admin/roles'
@@ -225,8 +227,8 @@ export function AdminShell({storeId,displayName,releaseStatus,canonicalState,can
                                                 ?(previewMode?<StoreSettingsPage mode="business-day"/>:formalDraftEnabled?<FormalStoreSettingsPage mode="business-day"/>:<RouteSkeleton path={path} canonicalState={canonicalState} onRefresh={onRefresh}/>)
                                                 :path==='/admin/store/operations'
                                                   ?(previewMode?<StoreSettingsPage mode="operations"/>:formalDraftEnabled?<FormalStoreSettingsPage mode="operations"/>:<RouteSkeleton path={path} canonicalState={canonicalState} onRefresh={onRefresh}/>)
-                                                  :path==='/admin/store/quick-reasons'&&previewMode
-                                                    ?<QuickReasonsPage/>
+                                                  :path==='/admin/store/quick-reasons'
+                                                    ?(previewMode?<QuickReasonsPage/>:formalDraftEnabled?<FormalQuickReasonsGapPage/>:<RouteSkeleton path={path} canonicalState={canonicalState} onRefresh={onRefresh}/>)
                                                     :path==='/admin/store/tables'
                                                       ?(previewMode?<DiningTablesPage/>:formalDraftEnabled?<FormalDiningTablesPage/>:<RouteSkeleton path={path} canonicalState={canonicalState} onRefresh={onRefresh}/>)
                                                       :previewMode
