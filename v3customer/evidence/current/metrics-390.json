@@ -3,6 +3,17 @@
   "viewportHeight": 890,
   "documentWidth": 390,
   "documentHeight": 1148,
+  "header": {
+    "x": 0,
+    "y": 0,
+    "width": 390,
+    "height": 70,
+    "top": 0,
+    "right": 390,
+    "bottom": 70,
+    "left": 0
+  },
+  "headerPosition": "fixed",
   "hero": {
     "x": 0,
     "y": 0,
@@ -151,44 +162,59 @@
     {
       "x": 18,
       "y": 822,
-      "width": 88.5,
+      "width": 70.796875,
       "height": 63,
       "top": 822,
-      "right": 106.5,
+      "right": 88.796875,
       "bottom": 885,
       "left": 18
     },
     {
-      "x": 106.5,
+      "x": 88.796875,
       "y": 822,
-      "width": 88.5,
+      "width": 70.796875,
       "height": 63,
       "top": 822,
-      "right": 195,
+      "right": 159.59375,
       "bottom": 885,
-      "left": 106.5
+      "left": 88.796875
     },
     {
-      "x": 195,
+      "x": 159.59375,
       "y": 822,
-      "width": 88.5,
+      "width": 70.796875,
       "height": 63,
       "top": 822,
-      "right": 283.5,
+      "right": 230.390625,
       "bottom": 885,
-      "left": 195
+      "left": 159.59375
     },
     {
-      "x": 283.5,
+      "x": 230.390625,
       "y": 822,
-      "width": 88.5,
+      "width": 70.796875,
+      "height": 63,
+      "top": 822,
+      "right": 301.1875,
+      "bottom": 885,
+      "left": 230.390625
+    },
+    {
+      "x": 301.1875,
+      "y": 822,
+      "width": 70.8125,
       "height": 63,
       "top": 822,
       "right": 372,
       "bottom": 885,
-      "left": 283.5
+      "left": 301.1875
     }
   ],
+  "scrolled": {
+    "headerTop": 0,
+    "heroProgress": 0.992,
+    "heroScale": 0.821
+  },
   "pageScreens": 1.29,
   "acceptance": {
     "heroShare": 0.64,
