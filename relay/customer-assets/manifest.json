@@ -1,0 +1,36 @@
+{
+  "bucket": "mfk-customer-assets",
+  "assetGroup": "customer-hero",
+  "files": [
+    {
+      "path": "relay/customer-assets/hero-background-main.png",
+      "key": "customer/brand/hero/hero-background-main.png",
+      "sizeBytes": 1398999,
+      "contentType": "image/png"
+    },
+    {
+      "path": "relay/customer-assets/hero-male-main.png",
+      "key": "customer/brand/hero/hero-male-main.png",
+      "sizeBytes": 1262825,
+      "contentType": "image/png"
+    },
+    {
+      "path": "relay/customer-assets/hero-female-main.png",
+      "key": "customer/brand/hero/hero-female-main.png",
+      "sizeBytes": 1271250,
+      "contentType": "image/png"
+    },
+    {
+      "path": "relay/customer-assets/hero-doodle-morefun-main.png",
+      "key": "customer/brand/hero/hero-doodle-morefun-main.png",
+      "sizeBytes": 518952,
+      "contentType": "image/png"
+    },
+    {
+      "path": "relay/customer-assets/hero-doodle-goodtaste-main.png",
+      "key": "customer/brand/hero/hero-doodle-goodtaste-main.png",
+      "sizeBytes": 540564,
+      "contentType": "image/png"
+    }
+  ]
+}
