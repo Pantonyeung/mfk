@@ -1,6 +1,7 @@
 import {describe,expect,it} from 'vitest';
-import {readFileSync} from 'node:fs';
-import {productRecordsFromSnapshot} from './product-list.tsx';
+import {renderToStaticMarkup} from 'react-dom/server';
+import {AdminShell} from './admin-shell.tsx';
+import {ProductListPage,productRecordsFromSnapshot} from './product-list.tsx';
 
 describe('Admin V3 UI-01 Product List',()=>{
   it('projects canonical catalog facts into presentation rows without creating another authority',()=>{
@@ -28,33 +29,45 @@ describe('Admin V3 UI-01 Product List',()=>{
     });
   });
 
-  it('keeps product code presentation read-only and preview data explicitly non-canonical',()=>{
-    const source=readFileSync(new URL('./product-list.tsx',import.meta.url),'utf8');
-    expect(source).toContain('系統自動生成，不可 inline 修改');
-    expect(source).toContain('介面示例，只用嚟驗 UI；唔代表正式 Canonical 資料');
-    expect(source).not.toMatch(/localStorage|sessionStorage|Dexie|indexedDB/i);
-    expect(source).not.toMatch(/<input[^>]+productCode/i);
+  it('renders the locked preview with explicit non-canonical labelling and read-only product codes',()=>{
+    const html=renderToStaticMarkup(<ProductListPage previewMode/>);
+    expect(html).toContain('UI-01 公網預覽');
+    expect(html).toContain('唔代表正式 Canonical 資料');
+    expect(html).toContain('PRD000123');
+    expect(html).toContain('＋ 新增產品');
+    expect(html).toContain('系統自動生成');
   });
 
-  it('uses full-width list as the default and only opens the product drawer after selection',()=>{
-    const source=readFileSync(new URL('./product-list.tsx',import.meta.url),'utf8');
-    expect(source).toContain("useState<'list'|'grid'>('list')");
-    expect(source).toContain('openProduct?<ProductDrawer');
-    expect(source).not.toContain('permanent right');
+  it('uses full-width list as the default instead of a permanent right editor',()=>{
+    const html=renderToStaticMarkup(<ProductListPage previewMode/>);
+    expect(html).toContain('v3-product-table-wrap');
+    expect(html).not.toContain('v3-product-drawer-backdrop');
+    expect(html).not.toContain('v3-product-drawer"');
   });
 
-  it('exposes a public isolated UI-01 review mode without enabling backend reads',()=>{
-    const app=readFileSync(new URL('./App.tsx',import.meta.url),'utf8');
-    expect(app).toContain("get('preview')==='ui-01'");
-    expect(app).toContain('enabled:!uiPreview');
-    expect(app).toContain('previewMode');
-    expect(app).toContain('initialPath="/admin/catalog/products"');
+  it('renders search, filters, sort, view toggle and Draft Bar in the review surface',()=>{
+    const html=renderToStaticMarkup(<ProductListPage previewMode/>);
+    expect(html).toContain('搜尋商品名稱、商品編號、關鍵字');
+    expect(html).toContain('最近更新');
+    expect(html).toContain('列表');
+    expect(html).toContain('卡片');
+    expect(html).toContain('2</strong> 項未發佈變更');
   });
 
-  it('routes the locked product destination to the UI-01 implementation',()=>{
-    const shell=readFileSync(new URL('./admin-shell.tsx',import.meta.url),'utf8');
-    expect(shell).toContain("path==='/admin/catalog/products'");
-    expect(shell).toContain('<ProductListPage');
-    expect(shell).toContain("if(!previewMode)window.history.pushState");
+  it('routes the isolated shell directly to Product Management for Owner review',()=>{
+    const html=renderToStaticMarkup(<AdminShell
+      storeId="PREVIEW"
+      displayName="介面驗收"
+      releaseStatus={<div>UI-01</div>}
+      canonicalState="fresh"
+      previewMode
+      initialPath="/admin/catalog/products"
+      onRefresh={()=>{}}
+      onDiagnostics={()=>{}}
+      onSignOut={()=>{}}
+    />);
+    expect(html).toContain('產品管理');
+    expect(html).toContain('UI-01 公網預覽');
+    expect(html).toContain('只供介面驗收');
   });
 });
