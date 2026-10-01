@@ -116,7 +116,29 @@ export function buildSmmSyncEntities(snapshot:unknown):MfkSyncEntityMap{
   const root=row(snapshot),menu=row(root.menu);
   const out:Record<string,MfkSyncCheckpointEntity>={};
   arrayEntities(out,'SMM_CATEGORY',menu.categories,['categoryId','id']);
-  arrayEntities(out,'SMM_PRODUCT',menu.products,['productId','id']);
+  rows(menu.products).forEach((value,index)=>{
+    const item=row(value);
+    const productId=safeId(item.productId??item.id,String(index+1));
+    const normalized={
+      productId,
+      categoryId:text(item.categoryId),
+      name:text(item.name)||productId,
+      description:text(item.description)||undefined,
+      imageRef:text(item.imageRef)||text(item.imageUrl)||undefined,
+      available:item.available!==false,
+      ...(Number.isSafeInteger(Number(item.publishedTakeawayUnitPriceMinor))
+        ?{publishedTakeawayUnitPriceMinor:Number(item.publishedTakeawayUnitPriceMinor)}
+        :Number.isSafeInteger(Number(item.publishedUnitPriceMinor))
+          ?{publishedTakeawayUnitPriceMinor:Number(item.publishedUnitPriceMinor)}
+          :{}),
+      ...(Number.isSafeInteger(Number(item.publishedDineInUnitPriceMinor))
+        ?{publishedDineInUnitPriceMinor:Number(item.publishedDineInUnitPriceMinor)}
+        :{}),
+      optionGroups:Array.isArray(item.optionGroups)?item.optionGroups:[],
+      ...(text(item.comboId)?{comboId:text(item.comboId)}:{}),
+    };
+    put(out,'SMM_PRODUCT',productId,normalized);
+  });
   arrayEntities(out,'SMM_COMBO',menu.combos,['comboId','id']);
   arrayEntities(out,'SMM_COMBO_POOL',menu.comboPools,['poolId','id']);
   arrayEntities(out,'SMM_DINING_TABLE',root.diningTables,['tableId','id']);
