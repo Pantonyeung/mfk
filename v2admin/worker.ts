@@ -1419,7 +1419,7 @@ export class AdminSyncStore{
         acceptedAt:result.cloudPublishedAt,
         syncCommitSeq:result.body.syncCommitSeq,
       });
-      for(const socket of this.state.getWebSockets()){try{socket.send(legacyDoorbell);}catch{}}
+      for(const socket of this.portSockets('SMT')){try{socket.send(legacyDoorbell);}catch{}}
       for(const event of result.doorbells){
         if(event.port==='CUSTOMER'){
           try{
@@ -1436,7 +1436,8 @@ export class AdminSyncStore{
           continue;
         }
         const message=JSON.stringify(event);
-        const sockets=event.port==='SMM'?this.state.getWebSockets('SYNC:SMM'):this.state.getWebSockets();
+        if(event.port==='KEETA')continue;
+        const sockets=this.portSockets(event.port);
         for(const socket of sockets){try{socket.send(message);}catch{}}
       }
       for(const plan of result.checkpointPlans){
