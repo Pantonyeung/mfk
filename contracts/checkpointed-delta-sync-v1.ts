@@ -160,7 +160,7 @@ export function validateMfkSyncHead(input:unknown):MfkSyncHead{
     canonicalPublishedAt:instant(row.canonicalPublishedAt,'SYNC_HEAD_CANONICAL_PUBLISHED_AT_INVALID'),
     observedAt:instant(row.observedAt,'SYNC_HEAD_OBSERVED_AT_INVALID'),
   };
-  if(out.journalFloorSeq>out.headSeq)throw new Error('SYNC_HEAD_JOURNAL_FLOOR_AHEAD');
+  if(out.journalFloorSeq>out.headSeq+1)throw new Error('SYNC_HEAD_JOURNAL_FLOOR_AHEAD');
   if(out.checkpointSeq>out.headSeq)throw new Error('SYNC_HEAD_CHECKPOINT_AHEAD');
   return Object.freeze(out);
 }
