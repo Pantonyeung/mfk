@@ -6,7 +6,7 @@ import {AdminWorkspace} from './admin-workspaces.tsx';
 import {ModifiersPage,CombosPage} from './catalog-functional-pages.tsx';
 import {CategoriesPage,PricingPage,MenuDisplayPage} from './catalog-core-pages.tsx';
 import {DiningTablesPage} from './dining-tables-page.tsx';
-import {ChannelPage,PermissionsPage,PrintRulesPage,PrintTemplatesPage,PrintersPage,QuickReasonsPage,RolesPage,StaffPage,StoreSettingsPage} from './admin-functional-pages.tsx';
+import {ChannelPage,PermissionsPage,PrintExceptionsPage,PrintOverviewPage,PrintRulesPage,PrintTemplatesPage,PrintersPage,QuickReasonsPage,RolesPage,SettlementPage,StaffPage,StoreSettingsPage} from './admin-functional-pages.tsx';
 import {AccessPage,BusinessDayPage,CapacityPage,CashClosePage,DevicesPage,OtaPage,PublishFlowPage} from './admin-operations-pages.tsx';
 import {OrdersPage,ReportPage} from './admin-read-pages.tsx';
 import {AuditPage,DiagnosticsPage,EffectiveSettingsPage,IntegrationsPage,TodayPage} from './admin-system-pages.tsx';
@@ -148,13 +148,19 @@ export function AdminShell({storeId,displayName,releaseStatus,canonicalState,can
                             ?<ChannelPage mode="failures"/>
                             :path==='/admin/channels/net-estimate'&&previewMode
                               ?<ChannelPage mode="estimate"/>
-                              :path==='/admin/print/printers'&&previewMode
+                              :path==='/admin/channels/settlement'&&previewMode
+                                ?<SettlementPage/>
+                                :path==='/admin/print'&&previewMode
+                                  ?<PrintOverviewPage/>
+                                  :path==='/admin/print/printers'&&previewMode
                                 ?<PrintersPage/>
                                 :path==='/admin/print/templates'&&previewMode
                                   ?<PrintTemplatesPage/>
                                   :path==='/admin/print/rules'&&previewMode
                                     ?<PrintRulesPage/>
-                                    :path==='/admin/devices'&&previewMode
+                                    :path==='/admin/print/exceptions'&&previewMode
+                                      ?<PrintExceptionsPage/>
+                                      :path==='/admin/devices'&&previewMode
                                       ?<DevicesPage/>
                                       :path==='/admin/ota'&&previewMode
                                         ?<OtaPage/>
