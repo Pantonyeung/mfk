@@ -33,7 +33,7 @@ jobs:
       - run: npm run build
 
   relay-r2-assets:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/temp/MFK-CUSTOMER-R2-ASSET-RELAY-20261001'
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/temp/MFK-CUSTOMER-R2-ASSET-RELAY-20261001') || (github.event_name == 'pull_request' && github.head_ref == 'temp/MFK-CUSTOMER-R2-ASSET-RELAY-20261001')
     runs-on: ubuntu-latest
     steps:
       - name: Checkout relay branch
