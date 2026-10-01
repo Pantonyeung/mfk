@@ -105,6 +105,8 @@ jobs:
               viewportHeight:innerHeight,
               documentWidth:document.documentElement.scrollWidth,
               documentHeight:document.documentElement.scrollHeight,
+              header:r('.header'),
+              headerPosition:getComputedStyle(document.querySelector('.header')).position,
               hero:r('.hero'),
               cta:r('.hero-copy > button'),
               quick:r('.quick'),
@@ -117,17 +119,27 @@ jobs:
             };
           });
 
+          await page.evaluate(()=>scrollTo(0,260));
+          await page.waitForTimeout(100);
+          metrics.scrolled=await page.evaluate(()=>({
+            headerTop:document.querySelector('.header').getBoundingClientRect().top,
+            heroProgress:Number(getComputedStyle(document.querySelector('.hero')).getPropertyValue('--hero-progress')),
+            heroScale:Number(getComputedStyle(document.querySelector('.hero')).getPropertyValue('--hero-visual-scale'))
+          }));
+
           const screens=metrics.documentHeight/metrics.viewportHeight;
           const fail=[];
           if(metrics.documentWidth>metrics.viewportWidth) fail.push('horizontal-overflow');
+          if(metrics.headerPosition!=='fixed'||metrics.scrolled.headerTop!==0) fail.push('header-not-fixed');
           if(!metrics.hero || metrics.hero.height<metrics.viewportHeight*0.60) fail.push('hero-under-60-percent');
           if(!metrics.hero || metrics.hero.height>metrics.viewportHeight*0.72) fail.push('hero-over-72-percent');
+          if(metrics.scrolled.heroProgress<0.9||metrics.scrolled.heroScale>0.85) fail.push('hero-scroll-scale-contract');
           if(screens<1.20 || screens>1.50) fail.push('home-length-outside-reference-class');
           if(!metrics.cta || metrics.cta.height<48) fail.push('cta-touch-too-small');
           if(metrics.quickCards.length!==4 || metrics.quickCards.some(x=>x.height<150||x.width<70)) fail.push('quick-card-touch-contract');
           if(metrics.quickIcons.length!==4 || metrics.quickIcons.some(x=>x.height<52||x.width<52)) fail.push('quick-icon-size-contract');
           if(!metrics.lifestyle || metrics.lifestyle.height<150) fail.push('lifestyle-banner-missing');
-          if(metrics.navButtons.length!==4 || metrics.navButtons.some(x=>x.height<52)) fail.push('bottom-nav-touch-contract');
+          if(metrics.navButtons.length!==5 || metrics.navButtons.some(x=>x.height<52||x.width<60)) fail.push('bottom-nav-touch-contract');
 
           metrics.pageScreens=Number(screens.toFixed(3));
           metrics.acceptance={

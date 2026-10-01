@@ -20,6 +20,8 @@ for(const size of viewports){
         viewportWidth:innerWidth,
         documentHeight:document.documentElement.scrollHeight,
         documentWidth:document.documentElement.scrollWidth,
+        header:rect('.header'),
+        headerPosition:getComputedStyle(document.querySelector('.header')!).position,
         hero:rect('.hero'),
         cta:rect('.hero-copy > button'),
         quickCards:[...document.querySelectorAll('.quick-card')].map(el=>el.getBoundingClientRect()),
@@ -31,6 +33,8 @@ for(const size of viewports){
     });
 
     expect(metrics.documentWidth).toBeLessThanOrEqual(metrics.viewportWidth);
+    expect(metrics.headerPosition).toBe('fixed');
+    expect(metrics.header?.top ?? -1).toBe(0);
     expect(metrics.hero?.height ?? 0).toBeGreaterThanOrEqual(metrics.viewportHeight*.60);
     expect(metrics.hero?.height ?? 0).toBeLessThanOrEqual(metrics.viewportHeight*.72);
 
@@ -52,9 +56,10 @@ for(const size of viewports){
 
     expect(metrics.lifestyle?.height ?? 0).toBeGreaterThanOrEqual(150);
     expect(metrics.recent?.height ?? 0).toBeGreaterThanOrEqual(72);
+    expect(metrics.navButtons).toHaveLength(5);
     for(const button of metrics.navButtons){
       expect(button.height).toBeGreaterThanOrEqual(52);
-      expect(button.width).toBeGreaterThanOrEqual(70);
+      expect(button.width).toBeGreaterThanOrEqual(60);
     }
   });
 }
@@ -68,8 +73,15 @@ test('primary home actions stay honest in preview',async({page})=>{
   await expect(page.locator('.lifestyle')).toBeVisible();
   await expect(page.locator('.featured-card')).toHaveCount(0);
   await expect(page.locator('.recent-card')).toBeVisible();
-  await expect(page.locator('nav button')).toHaveCount(4);
+  await expect(page.locator('nav button')).toHaveCount(5);
 
-  await page.locator('.quick-card').first().click();
+  const heroVisual=page.locator('.hero-visual');
+  const initialWidth=(await heroVisual.boundingBox())?.width ?? 0;
+  await page.evaluate(()=>window.scrollTo(0,260));
+  await expect.poll(()=>page.locator('.hero').evaluate(el=>Number(getComputedStyle(el).getPropertyValue('--hero-progress')))).toBeGreaterThan(.9);
+  expect((await heroVisual.boundingBox())?.width ?? initialWidth).toBeLessThan(initialWidth*.9);
+  expect((await page.locator('.header').boundingBox())?.y ?? -1).toBe(0);
+
+  await page.getByRole('button',{name:'記憶罐'}).click();
   await expect(page.getByRole('status')).toContainText('預覽版未接駁');
 });

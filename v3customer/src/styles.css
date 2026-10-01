@@ -27,17 +27,21 @@ svg{display:block;width:1em;height:1em}
   box-shadow:0 0 72px rgba(20,65,130,.18);
 }
 main{display:grid;gap:12px;min-width:0}
-#menu-discovery,#recent-order{scroll-margin-top:12px}
+#menu-discovery,#recent-order{scroll-margin-top:calc(72px + env(safe-area-inset-top))}
 
 .header{
-  position:absolute;
-  z-index:20;
-  top:0;left:0;right:0;
+  position:fixed;
+  z-index:35;
+  top:0;left:50%;
+  width:min(100%,430px);
+  transform:translateX(-50%);
   display:grid;
   grid-template-columns:70px 126px 44px minmax(0,1fr);
   align-items:center;
   gap:5px;
   padding:calc(10px + env(safe-area-inset-top)) 8px 8px;
+  background:linear-gradient(180deg,rgba(220,236,255,.94),rgba(220,236,255,.76) 78%,transparent);
+  backdrop-filter:blur(10px);
 }
 .logo-button{
   min-width:56px;
@@ -100,6 +104,9 @@ main{display:grid;gap:12px;min-width:0}
 .search b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:10px;color:#8390aa}
 
 .hero{
+  --hero-progress:0;
+  --hero-visual-scale:1;
+  --hero-bg-scale:1.025;
   position:relative;
   height:clamp(520px,64svh,600px);
   min-height:520px;
@@ -119,7 +126,8 @@ main{display:grid;gap:12px;min-width:0}
   height:100%;
   object-fit:cover;
   object-position:52% 54%;
-  transform:scale(1.025);
+  transform:scale(var(--hero-bg-scale));
+  transform-origin:center top;
   filter:saturate(1.03) contrast(.98) brightness(1.03);
 }
 .hero-world-vignette{
@@ -196,6 +204,9 @@ main{display:grid;gap:12px;min-width:0}
   top:92px;
   width:75%;
   height:445px;
+  transform:scale(var(--hero-visual-scale));
+  transform-origin:72% 38%;
+  will-change:transform;
 }
 .male,.female,.doodle{position:absolute;object-fit:contain}
 .male{
@@ -453,7 +464,7 @@ nav{
   height:74px;
   padding:5px 18px calc(5px + env(safe-area-inset-bottom));
   display:grid;
-  grid-template-columns:repeat(4,1fr);
+  grid-template-columns:repeat(5,1fr);
   border-top:1px solid #eef1f7;
   background:rgba(255,255,255,.96);
   box-shadow:0 -10px 28px rgba(42,86,155,.08);
@@ -474,7 +485,7 @@ nav button{
 nav button svg{font-size:27px}
 nav button b{font-size:11px}
 nav .active{color:#1767f7}
-nav button i{width:7px;height:7px;top:4px;right:24px}
+nav button i{width:7px;height:7px;top:4px;left:calc(50% + 8px)}
 
 @media(max-width:380px){
   .header{grid-template-columns:62px 112px 42px minmax(0,1fr);gap:4px;padding-left:6px;padding-right:6px}

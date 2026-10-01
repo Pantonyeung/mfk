@@ -1,9 +1,9 @@
-import {useState} from 'react';
+import {useEffect,useState} from 'react';
 import {CUSTOMER_V3_ASSETS as A} from './assets';
 import {PREVIEW_HOME as vm} from './preview-fixture';
 import type {QuickCardId} from './home-model';
 
-type IconName=QuickCardId|'pin'|'chevron'|'bell'|'search'|'history'|'home'|'menu'|'orders'|'user';
+type IconName=QuickCardId|'pin'|'chevron'|'bell'|'search'|'history'|'home'|'menu'|'jar'|'orders'|'user';
 
 function Icon({name}:Readonly<{name:IconName}>){
   const common={fill:'none',stroke:'currentColor',strokeWidth:1.9,strokeLinecap:'round' as const,strokeLinejoin:'round' as const};
@@ -19,6 +19,7 @@ function Icon({name}:Readonly<{name:IconName}>){
     history:<><path {...common} d="M4 12a8 8 0 1 0 2.3-5.7L4 8.6"/><path {...common} d="M4 4v4.6h4.6M12 8v4l3 2"/></>,
     home:<><path {...common} d="m4 11 8-7 8 7"/><path fill="currentColor" d="M6.5 10.5V20h11v-9.5L12 6l-5.5 4.5Z"/></>,
     menu:<><path {...common} d="M7 3v8m-2-8v5a2 2 0 0 0 4 0V3M7 11v10M16 3v18M16 3c3 2 3 7 0 9"/></>,
+    jar:<><path {...common} d="M8 3h8v3H8zM7 7h10l1 3v9a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2v-9l1-3Z"/><path {...common} d="M9 12h6m-5 4h4"/></>,
     orders:<><path {...common} d="M6 4h12v16H6zM9 8h6m-6 4h6m-6 4h4"/></>,
     user:<><circle fill="currentColor" cx="12" cy="8" r="4"/><path fill="currentColor" d="M4.5 21a7.5 7.5 0 0 1 15 0H4.5Z"/></>
   };
@@ -129,6 +130,9 @@ function BottomNav({showPreviewNotice}:Readonly<{showPreviewNotice:(label:string
     <button type="button" onClick={()=>scrollToId('menu-discovery')}>
       <Icon name="menu"/><b>菜單</b>
     </button>
+    <button type="button" onClick={()=>showPreviewNotice('記憶罐')}>
+      <Icon name="jar"/><b>記憶罐</b>
+    </button>
     <button type="button" onClick={()=>scrollToId('recent-order')}>
       <Icon name="orders"/><b>訂單</b><i/>
     </button>
@@ -141,6 +145,28 @@ function BottomNav({showPreviewNotice}:Readonly<{showPreviewNotice:(label:string
 export function CustomerV3App(){
   const [previewNotice,setPreviewNotice]=useState('');
   const showPreviewNotice=(label:string)=>setPreviewNotice(`${label}：預覽版未接駁`);
+
+  useEffect(()=>{
+    const hero=document.querySelector<HTMLElement>('.hero');
+    if(!hero||window.matchMedia('(prefers-reduced-motion: reduce)').matches)return;
+
+    let frame=0;
+    const update=()=>{
+      frame=0;
+      const progress=Math.min(window.scrollY/260,1);
+      hero.style.setProperty('--hero-progress',progress.toFixed(3));
+      hero.style.setProperty('--hero-visual-scale',(1-progress*.18).toFixed(3));
+      hero.style.setProperty('--hero-bg-scale',(1.025-progress*.025).toFixed(3));
+    };
+    const onScroll=()=>{if(!frame)frame=window.requestAnimationFrame(update);};
+
+    update();
+    window.addEventListener('scroll',onScroll,{passive:true});
+    return ()=>{
+      window.removeEventListener('scroll',onScroll);
+      if(frame)window.cancelAnimationFrame(frame);
+    };
+  },[]);
 
   return <div className="shell">
     <Header showPreviewNotice={showPreviewNotice}/>
