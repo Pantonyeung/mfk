@@ -12,6 +12,7 @@ import {
   type MfkSyncEntityMap,
 } from '../../sync/checkpointed-delta-sync';
 import type {SmmReadModelSnapshot} from './product-types';
+import {readSmmStaffSession} from './pwa-staff';
 
 const ADMIN_SYNC_ENDPOINT='https://admin.morefunos.com';
 const STORE_ID='MF01';
@@ -49,7 +50,13 @@ function writeBundle(head:MfkSyncHead,entities:MfkSyncEntityMap,appliedSeq:numbe
   return bundle;
 }
 async function get(path:string){
-  const response=await fetch(ADMIN_SYNC_ENDPOINT+path,{cache:'no-store',headers:{accept:'application/json'}});
+  const session=readSmmStaffSession();
+  if(!session)throw new Error('SMM_SYNC_SESSION_REQUIRED');
+  const response=await fetch(ADMIN_SYNC_ENDPOINT+path,{
+    cache:'no-store',
+    credentials:'omit',
+    headers:{accept:'application/json','x-mfk-smm-session':session.sessionToken},
+  });
   const body=await response.json().catch(()=>({})) as Record<string,unknown>;
   return{response,body};
 }
@@ -124,7 +131,12 @@ export function subscribeSmmConfigChanges(listener:(headSeq:number)=>void){
   const connect=()=>{
     if(stopped||navigator.onLine===false)return;
     try{
-      socket=new WebSocket('wss://admin.morefunos.com/api/admin-sync/sync/events?storeId='+STORE_ID+'&port=SMM');
+      const session=readSmmStaffSession();
+      if(!session){timer=window.setTimeout(connect,2000);return;}
+      socket=new WebSocket(
+        'wss://admin.morefunos.com/api/admin-sync/sync/events?storeId='+STORE_ID+'&port=SMM',
+        ['mfk-smm-sync-v1','mfk-smm-session.'+session.sessionToken],
+      );
       socket.addEventListener('open',()=>{attempt=0;});
       socket.addEventListener('message',event=>{
         try{
