@@ -13,7 +13,7 @@ on:
       - ".github/workflows/v3customer-ci.yml"
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   verify:
@@ -31,3 +31,100 @@ jobs:
       - run: npm install --ignore-scripts
       - run: npm run typecheck
       - run: npm run build
+
+  visual-capture:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/feat/MFK-CUSTOMER-V3-LONG-HOME-R1'
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      BUCKET: mfk-customer-assets
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/MFK-CUSTOMER-V3-LONG-HOME-R1
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install app dependencies
+        working-directory: v3customer
+        run: npm install --ignore-scripts
+
+      - name: Pull canonical Hero assets from private R2
+        run: |
+          set -euo pipefail
+          mkdir -p v3customer/public/media/customer/hero
+          npx --yes wrangler@latest r2 object get "$BUCKET/customer/brand/hero/hero-background-main.png" --file "v3customer/public/media/customer/hero/hero-background-main.png" --remote
+          npx --yes wrangler@latest r2 object get "$BUCKET/customer/brand/hero/hero-male-main.png" --file "v3customer/public/media/customer/hero/hero-male-main.png" --remote
+          npx --yes wrangler@latest r2 object get "$BUCKET/customer/brand/hero/hero-female-main.png" --file "v3customer/public/media/customer/hero/hero-female-main.png" --remote
+          npx --yes wrangler@latest r2 object get "$BUCKET/customer/brand/hero/hero-doodle-morefun-main.png" --file "v3customer/public/media/customer/hero/hero-doodle-morefun-main.png" --remote
+          npx --yes wrangler@latest r2 object get "$BUCKET/customer/brand/hero/hero-doodle-goodtaste-main.png" --file "v3customer/public/media/customer/hero/hero-doodle-goodtaste-main.png" --remote
+
+      - name: Install Chromium
+        working-directory: v3customer
+        run: npx playwright install chromium --with-deps
+
+      - name: Render 390px evidence
+        run: |
+          set -euo pipefail
+          cd v3customer
+          npm run dev -- --port 4175 > /tmp/mfk-v3-vite.log 2>&1 &
+          SERVER_PID=$!
+          trap 'kill $SERVER_PID || true' EXIT
+
+          for i in {1..60}; do
+            if curl -fsS http://127.0.0.1:4175 >/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+
+          node --input-type=module <<'NODE'
+          import { chromium } from '@playwright/test';
+          import fs from 'node:fs/promises';
+
+          const browser=await chromium.launch({headless:true});
+          const page=await browser.newPage({
+            viewport:{width:390,height:844},
+            deviceScaleFactor:1
+          });
+          await page.goto('http://127.0.0.1:4175',{waitUntil:'networkidle'});
+          await page.evaluate(()=>document.fonts.ready);
+          await fs.mkdir('/tmp/mfk-evidence',{recursive:true});
+          await page.screenshot({path:'/tmp/mfk-evidence/long-home-390.png',fullPage:true});
+          await page.locator('.hero').screenshot({path:'/tmp/mfk-evidence/hero-390.png'});
+          const metrics=await page.evaluate(()=>({
+            viewportWidth:innerWidth,
+            viewportHeight:innerHeight,
+            documentWidth:document.documentElement.scrollWidth,
+            documentHeight:document.documentElement.scrollHeight,
+            hero:document.querySelector('.hero')?.getBoundingClientRect().toJSON(),
+            quick:document.querySelector('.quick')?.getBoundingClientRect().toJSON(),
+            categories:document.querySelector('.categories')?.getBoundingClientRect().toJSON(),
+            products:document.querySelector('.products')?.getBoundingClientRect().toJSON()
+          }));
+          await fs.writeFile('/tmp/mfk-evidence/metrics-390.json',JSON.stringify(metrics,null,2));
+          await browser.close();
+          NODE
+
+      - name: Publish visual evidence branch
+        run: |
+          set -euo pipefail
+          cp /tmp/mfk-evidence/long-home-390.png /tmp/long-home-390.png
+          cp /tmp/mfk-evidence/hero-390.png /tmp/hero-390.png
+          cp /tmp/mfk-evidence/metrics-390.json /tmp/metrics-390.json
+
+          git config user.name "MFK Visual Evidence Bot"
+          git config user.email "actions@users.noreply.github.com"
+          git fetch origin temp/MFK-CUSTOMER-V3-VISUAL-EVIDENCE
+          git switch -C temp/MFK-CUSTOMER-V3-VISUAL-EVIDENCE origin/temp/MFK-CUSTOMER-V3-VISUAL-EVIDENCE
+          mkdir -p v3customer/evidence/current
+          cp /tmp/long-home-390.png v3customer/evidence/current/long-home-390.png
+          cp /tmp/hero-390.png v3customer/evidence/current/hero-390.png
+          cp /tmp/metrics-390.json v3customer/evidence/current/metrics-390.json
+          git add v3customer/evidence/current
+          git commit -m "evidence(customer): refresh 390px visual capture" || exit 0
+          git push origin HEAD:temp/MFK-CUSTOMER-V3-VISUAL-EVIDENCE
