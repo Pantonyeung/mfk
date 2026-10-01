@@ -18,7 +18,7 @@ describe('Admin V3 read-model functional wave',()=>{
 
   it('renders fixed read-only report surfaces',()=>{
     expect(renderToStaticMarkup(<ReportPage mode="sales"/>)).toContain('有效營業額');
-    expect(renderToStaticMarkup(<ReportPage mode="products"/>)).toContain('商品');
+    expect(renderToStaticMarkup(<ReportPage mode="products"/>)).toContain('產品');
     expect(renderToStaticMarkup(<ReportPage mode="channels"/>)).toContain('Keeta');
     expect(renderToStaticMarkup(<ReportPage mode="refunds"/>)).toContain('已退款');
     expect(renderToStaticMarkup(<ReportPage mode="operations"/>)).toContain('打印異常');
