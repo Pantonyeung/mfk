@@ -1,9 +1,15 @@
 import {describe,expect,it} from 'vitest';
 import {renderToStaticMarkup} from 'react-dom/server';
 import {AdminShell} from './admin-shell.tsx';
-import {ProductListPage,productRecordsFromSnapshot} from './product-list.tsx';
+import {MobileGroupedPager} from './mobile-grouped-list.tsx';
+import {
+  MOBILE_PRODUCT_PAGE_SIZE,
+  ProductListPage,
+  productFormCanSave,
+  productRecordsFromSnapshot,
+} from './product-list.tsx';
 
-describe('Admin V3 UI-01 Product List',()=>{
+describe('Admin V3 Product Management mobile contract',()=>{
   it('projects canonical catalog facts into presentation rows without creating another authority',()=>{
     const rows=productRecordsFromSnapshot({
       catalog:{
@@ -29,36 +35,49 @@ describe('Admin V3 UI-01 Product List',()=>{
     });
   });
 
-  it('renders the locked preview with explicit non-canonical labelling and read-only product codes',()=>{
+  it('locks mobile high-volume pages to ten items per category page',()=>{
+    expect(MOBILE_PRODUCT_PAGE_SIZE).toBe(10);
+    const items=Array.from({length:12},(_,index)=>({id:'p-'+index,group:'飯糰',name:'商品 '+index}));
+    const html=renderToStaticMarkup(<MobileGroupedPager
+      items={items}
+      pageSize={MOBILE_PRODUCT_PAGE_SIZE}
+      renderItem={item=><div>{item.name}</div>}
+    />);
+    expect(html).toContain('12 項');
+    expect(html).toContain('第 1 / 2 頁');
+    expect(html).toContain('商品 9');
+    expect(html).not.toContain('商品 10');
+  });
+
+  it('requires complete product data before Save Draft can become available',()=>{
+    expect(productFormCanSave({name:'',category:'飯糰',price:'42'})).toBe(false);
+    expect(productFormCanSave({name:'紫米飯糰',category:'',price:'42'})).toBe(false);
+    expect(productFormCanSave({name:'紫米飯糰',category:'飯糰',price:''})).toBe(false);
+    expect(productFormCanSave({name:'紫米飯糰',category:'飯糰',price:'42'})).toBe(true);
+  });
+
+  it('renders the public preview with explicit non-production labelling',()=>{
     const html=renderToStaticMarkup(<ProductListPage previewMode/>);
-    expect(html).toContain('UI-01 公網預覽');
+    expect(html).toContain('UI 公網預覽');
     expect(html).toContain('唔代表正式 Canonical 資料');
-    expect(html).toContain('PRD000123');
-    expect(html).toContain('＋ 新增產品');
-    expect(html).toContain('<code>PRD000123</code>');
+    expect(html).toContain('唔會寫入 Production');
+    expect(html).toContain('v3-product-add-mobile');
+    expect(html).toContain('v3-product-add-desktop');
   });
 
-  it('uses full-width list as the default instead of a permanent right editor',()=>{
+  it('keeps desktop full-width list while exposing the mobile grouped list separately',()=>{
     const html=renderToStaticMarkup(<ProductListPage previewMode/>);
+    expect(html).toContain('v3-product-desktop-content');
     expect(html).toContain('v3-product-table-wrap');
-    expect(html).not.toContain('v3-product-drawer-backdrop');
-    expect(html).not.toContain('v3-product-drawer"');
-  });
-
-  it('renders search, filters, sort, view toggle and Draft Bar in the review surface',()=>{
-    const html=renderToStaticMarkup(<ProductListPage previewMode/>);
-    expect(html).toContain('搜尋商品名稱、商品編號、關鍵字');
-    expect(html).toContain('最近更新');
-    expect(html).toContain('列表');
-    expect(html).toContain('卡片');
-    expect(html).toContain('2</strong> 項未發佈變更');
+    expect(html).toContain('v3-product-mobile-groups');
+    expect(html).not.toContain('v3-mobile-product-modal');
   });
 
   it('routes the isolated shell directly to Product Management for Owner review',()=>{
     const html=renderToStaticMarkup(<AdminShell
       storeId="PREVIEW"
       displayName="介面驗收"
-      releaseStatus={<div>UI-01</div>}
+      releaseStatus={<div>UI</div>}
       canonicalState="fresh"
       previewMode
       initialPath="/admin/catalog/products"
@@ -67,7 +86,7 @@ describe('Admin V3 UI-01 Product List',()=>{
       onSignOut={()=>{}}
     />);
     expect(html).toContain('產品管理');
-    expect(html).toContain('UI-01 公網預覽');
+    expect(html).toContain('UI 公網預覽');
     expect(html).toContain('只供介面驗收');
   });
 });
