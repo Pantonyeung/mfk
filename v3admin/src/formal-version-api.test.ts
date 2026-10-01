@@ -1,6 +1,6 @@
 import {afterEach,describe,expect,it,vi} from 'vitest';
 import {createMfkAdminConfigEnvelope} from '../../contracts/admin-config-sync-v1.ts';
-import {readV3FormalVersions,rollbackV3FormalVersion,V3FormalDraftHttpError} from './formal-draft.tsx';
+import {readV3FormalVersions,rollbackV3FormalVersion} from './formal-draft.tsx';
 
 afterEach(()=>vi.unstubAllGlobals());
 
@@ -81,7 +81,7 @@ describe('Admin V3 formal version API',()=>{
       targetFingerprint:'fp-8',
       reason:'回復',
       operationId:'op-stale',
-    })).rejects.toMatchObject<V3FormalDraftHttpError>({status:409,code:'ADMIN_ROLLBACK_BASE_CONFLICT'});
+    })).rejects.toMatchObject({status:409,code:'ADMIN_ROLLBACK_BASE_CONFLICT'});
   });
 
   it('rejects malformed version-list payloads instead of inventing history',async()=>{
