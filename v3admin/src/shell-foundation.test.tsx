@@ -73,4 +73,26 @@ describe('Admin V3 shell foundation',()=>{
     expect(markup).toContain('業務資料與操作會按垂直切片正式接駁');
     expect(markup).toContain('MF01');
   });
+
+
+  it.each([
+    ['/admin/publish/versions','返回 發佈與版本','版本／回讀確認'],
+    ['/admin/publish/rollback','返回 發佈與版本','回復版本'],
+    ['/admin/print/exceptions','返回 打印管理','打印狀態／異常'],
+  ])('renders contextual section back navigation for %s',(path,backLabel,currentTitle)=>{
+    const markup=renderToStaticMarkup(<AdminShell
+      storeId="PREVIEW"
+      displayName="介面驗收"
+      releaseStatus={<div>UI</div>}
+      canonicalState="fresh"
+      previewMode
+      initialPath={path}
+      onRefresh={()=>{}}
+      onDiagnostics={()=>{}}
+      onSignOut={()=>{}}
+    />);
+    expect(markup).toContain('aria-label="目前功能層級"');
+    expect(markup).toContain(backLabel);
+    expect(markup).toContain(currentTitle);
+  });
 });
