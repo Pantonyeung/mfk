@@ -10,6 +10,10 @@ export interface ProductMediaUploadResult{
   uploadedAt:string;
 }
 
+export function productMediaPreviewEnabled(){
+  return (import.meta.env.VITE_MFK_V3_R2_MEDIA_ENABLED as string|undefined)==='1';
+}
+
 function previewApiBase(){
   const configured=(import.meta.env.VITE_MFK_V3_PREVIEW_API_BASE as string|undefined)?.replace(/\/$/,'')??'';
   if(configured)return configured;
@@ -23,6 +27,7 @@ export async function uploadPreviewProductMedia(input:{
   file:File;
   storeId?:string;
 }):Promise<ProductMediaUploadResult>{
+  if(!productMediaPreviewEnabled())throw new Error('R2_MEDIA_DEFERRED_UNTIL_OWNER_ACCEPTANCE');
   const base=previewApiBase();
   if(!base)throw new Error('PREVIEW_MEDIA_API_NOT_CONFIGURED');
   const storeId=input.storeId??'MF01';
@@ -50,4 +55,6 @@ export const PRODUCT_MEDIA_STORAGE_POLICY=Object.freeze({
   externalUrlAuthority:false,
   browserDirectR2Credentials:false,
   maxBytes:8*1024*1024,
+  phase:'DEFERRED_UNTIL_OWNER_ADMIN_ACCEPTANCE' as const,
+  previewUploadEnabled:productMediaPreviewEnabled(),
 });
