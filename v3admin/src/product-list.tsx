@@ -1,6 +1,6 @@
 import {useMemo,useState,type KeyboardEvent} from 'react';
 import {MobileGroupedPager} from './mobile-grouped-list.tsx';
-import {uploadPreviewProductMedia,PRODUCT_MEDIA_STORAGE_POLICY,type ProductMediaSurface} from './product-media-api.ts';
+import {productMediaPreviewEnabled,uploadPreviewProductMedia,PRODUCT_MEDIA_STORAGE_POLICY,type ProductMediaSurface} from './product-media-api.ts';
 import {
   usePreviewCatalog,
   type PreviewProduct,
@@ -161,6 +161,7 @@ function ProductMediaField({
 }){
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState('');
+  const enabled=productMediaPreviewEnabled();
   const upload=async(file:File)=>{
     setBusy(true);setError('');
     try{
@@ -171,11 +172,11 @@ function ProductMediaField({
     }finally{setBusy(false);}
   };
   return <section className="v3-r2-media-field">
-    <header><div><strong>{label}</strong><small>{description}</small></div><StatusBadge tone={value?'good':'neutral'}>{value?'R2 已有圖片':'未設定'}</StatusBadge></header>
+    <header><div><strong>{label}</strong><small>{description}</small></div><StatusBadge tone={value?'good':enabled?'neutral':'warning'}>{value?'R2 已有圖片':enabled?'未設定':'入口已開 · R2 待接通'}</StatusBadge></header>
     <div className="v3-r2-media-body">
       <div className="v3-r2-media-preview">{value?<img src={value} alt={label}/>:<span>未有圖片</span>}</div>
       <div className="v3-r2-media-actions">
-        <label className="v3-r2-upload-button"><span>{busy?'上載中…':value?'更換圖片':'上載圖片'}</span><input type="file" accept="image/jpeg,image/png,image/webp,image/avif" disabled={busy} onChange={event=>{const file=event.target.files?.[0];if(file)void upload(file);event.currentTarget.value='';}}/></label>
+        <label className={"v3-r2-upload-button"+(!enabled?" is-disabled":"")}><span>{!enabled?'R2 待認收後接通':busy?'上載中…':value?'更換圖片':'上載圖片'}</span><input type="file" accept="image/jpeg,image/png,image/webp,image/avif" disabled={busy||!enabled} onChange={event=>{const file=event.target.files?.[0];if(file)void upload(file);event.currentTarget.value='';}}/></label>
         {value?<><small>R2 Object</small><code>{r2RefFromUrl(value)||'R2 media ref'}</code></>:null}
         {error?<div className="v3-error" role="alert">{error}</div>:null}
       </div>
@@ -251,7 +252,7 @@ function PreviewProductEditor({productId,onClose}:{productId:string|null;onClose
             <ProductMediaField label="自家／Customer 顯示圖" description="Customer、SMM 等自家介面預設使用。" value={customerImage} productId={draftId} surface="CUSTOMER" onUploaded={setCustomerImage}/>
             <ProductMediaField label="Keeta 平台圖" description="第三方平台獨立圖片，可同自家顯示圖不同。" value={keetaImage} productId={draftId} surface="KEETA" onUploaded={setKeetaImage}/>
           </div>
-          <small>Storage Policy：{PRODUCT_MEDIA_STORAGE_POLICY.binaryStore} · Browser 無 R2 credential · 最高 8MB</small>
+          <small>Storage Policy：{PRODUCT_MEDIA_STORAGE_POLICY.binaryStore} · 入口已建立 · R2 正式接通延後至 Admin 認收後 · Browser 無 R2 credential · 最高 8MB</small>
         </section>
 
         <section className="v3-functional-section">
