@@ -2,6 +2,20 @@ import {
   MFK_CUSTOMER_ORDER_INTENT_SCHEMA,
   MFK_CUSTOMER_QUOTE_REQUEST_SCHEMA,
 } from '../../contracts/customer-cloud-v1';
+import {
+  validateMfkSyncChangeBatch,
+  validateMfkSyncCheckpoint,
+  validateMfkSyncHead,
+  type MfkSyncHead,
+} from '../../contracts/checkpointed-delta-sync-v1';
+import {
+  applyMfkSyncChanges,
+  buildCustomerSyncEntities,
+  entityMapFromCheckpoint,
+  materializeCustomerConfigSnapshot,
+  projectionHashForEntities,
+  type MfkSyncEntityMap,
+} from '../../sync/checkpointed-delta-sync';
 import type {
   CustomerCartLine,
   CustomerCommandResult,
@@ -14,6 +28,7 @@ import type {
 const ENDPOINT='https://admin.morefunos.com';
 const STORE_ID='MF01';
 const REF_KEY='mfk:customer:cloud-submission-refs:v1';
+const SYNC_BUNDLE_KEY='mfk:customer:config-sync-bundle:v1';
 
 function readSubmissionRefs():string[]{
   try{
@@ -27,6 +42,193 @@ function rememberSubmissionRef(submissionId:string){
     const next=[submissionId,...readSubmissionRefs().filter(id=>id!==submissionId)].slice(0,24);
     localStorage.setItem(REF_KEY,JSON.stringify(next));
   }catch{}
+}
+
+interface CustomerConfigSyncBundle{
+  readonly schema:'MFK_CUSTOMER_CONFIG_SYNC_BUNDLE_V1';
+  readonly appliedSeq:number;
+  readonly checkpointSeq:number;
+  readonly projectionHash:string;
+  readonly entities:MfkSyncEntityMap;
+  readonly head:MfkSyncHead;
+  readonly updatedAt:string;
+}
+
+function readCustomerSyncBundle():CustomerConfigSyncBundle|null{
+  try{
+    const raw=localStorage.getItem(SYNC_BUNDLE_KEY);
+    if(!raw)return null;
+    const parsed=JSON.parse(raw) as CustomerConfigSyncBundle;
+    if(parsed?.schema!=='MFK_CUSTOMER_CONFIG_SYNC_BUNDLE_V1')return null;
+    const head=validateMfkSyncHead(parsed.head);
+    if(head.port!=='CUSTOMER')return null;
+    if(!parsed.entities||typeof parsed.entities!=='object')return null;
+    return Object.freeze({...parsed,head,entities:parsed.entities});
+  }catch{return null;}
+}
+
+function writeCustomerSyncBundle(head:MfkSyncHead,entities:MfkSyncEntityMap,appliedSeq:number,checkpointSeq:number){
+  const projectionHash=projectionHashForEntities(entities);
+  if(appliedSeq===head.headSeq&&projectionHash!==head.projectionHash)throw new Error('CUSTOMER_SYNC_PROJECTION_HASH_MISMATCH');
+  const bundle:CustomerConfigSyncBundle=Object.freeze({
+    schema:'MFK_CUSTOMER_CONFIG_SYNC_BUNDLE_V1',
+    appliedSeq,
+    checkpointSeq,
+    projectionHash,
+    entities,
+    head,
+    updatedAt:new Date().toISOString(),
+  });
+  localStorage.setItem(SYNC_BUNDLE_KEY,JSON.stringify(bundle));
+  return bundle;
+}
+
+async function fetchCustomerSyncHead(){
+  const {response,body}=await jsonFetch('/api/customer/sync/head?storeId='+STORE_ID);
+  if(!response.ok)throw new Error(String(body.code||'CUSTOMER_SYNC_HEAD_FAILED'));
+  const head=validateMfkSyncHead(body);
+  if(head.port!=='CUSTOMER'||head.storeId!==STORE_ID)throw new Error('CUSTOMER_SYNC_HEAD_IDENTITY_MISMATCH');
+  return head;
+}
+
+async function fetchCustomerCheckpoint(head:MfkSyncHead){
+  const {response,body}=await jsonFetch('/api/customer/sync/checkpoint?storeId='+STORE_ID+'&seq='+String(head.checkpointSeq));
+  if(!response.ok)throw new Error(String(body.code||'CUSTOMER_SYNC_CHECKPOINT_FAILED'));
+  const checkpoint=validateMfkSyncCheckpoint(body);
+  if(checkpoint.port!=='CUSTOMER'||checkpoint.storeId!==STORE_ID||checkpoint.checkpointSeq!==head.checkpointSeq)throw new Error('CUSTOMER_SYNC_CHECKPOINT_IDENTITY_MISMATCH');
+  if(checkpoint.checkpointHash!==head.checkpointHash)throw new Error('CUSTOMER_SYNC_CHECKPOINT_HASH_MISMATCH');
+  return checkpoint;
+}
+
+async function fetchCustomerChanges(after:number){
+  const {response,body}=await jsonFetch('/api/customer/sync/changes?storeId='+STORE_ID+'&after='+String(after));
+  if(response.status===409&&String(body.code||'').includes('CHECKPOINT'))return{checkpointRequired:true as const};
+  if(!response.ok)throw new Error(String(body.code||'CUSTOMER_SYNC_CHANGES_FAILED'));
+  return{checkpointRequired:false as const,batch:validateMfkSyncChangeBatch(body)};
+}
+
+function customerConfigFromBundle(bundle:CustomerConfigSyncBundle):Partial<CustomerReadModelSnapshot>{
+  const materialized=materializeCustomerConfigSnapshot(bundle.entities) as {
+    store?:CustomerReadModelSnapshot['store'];
+    menu?:CustomerReadModelSnapshot['menu'];
+    paymentChannels?:CustomerReadModelSnapshot['paymentChannels'];
+    fallback?:CustomerReadModelSnapshot['fallback'];
+  };
+  const observedAt=bundle.head.observedAt;
+  return Object.freeze({
+    ...(materialized.store?{store:Object.freeze({...materialized.store,observedAt})}:{}),
+    ...(materialized.menu?{menu:Object.freeze({...materialized.menu,revision:String(bundle.head.canonicalRevision),observedAt})}:{}),
+    ...(materialized.paymentChannels?{paymentChannels:materialized.paymentChannels}:{}),
+    ...(materialized.fallback?{fallback:materialized.fallback}:{}),
+    observedAt,
+  });
+}
+
+function overlayCustomerRuntimeSellability(
+  config:Partial<CustomerReadModelSnapshot>,
+  runtimeSellability:readonly unknown[],
+):Partial<CustomerReadModelSnapshot>{
+  const menu=config.menu;
+  if(!menu||!runtimeSellability.length)return config;
+  const state=new Map<string,boolean>();
+  for(const raw of runtimeSellability){
+    if(!raw||typeof raw!=='object'||Array.isArray(raw))continue;
+    const row=raw as Record<string,unknown>;
+    const nodeId=String(row.nodeId||'').trim();
+    if(nodeId)state.set(nodeId,row.sellable===true||String(row.status||'')==='available');
+  }
+  if(!state.size)return config;
+  const products=menu.products.map(product=>Object.freeze({
+    ...product,
+    ...(state.has(product.productId)?{available:Boolean(state.get(product.productId))}:{}),
+    optionGroups:product.optionGroups.map(group=>Object.freeze({
+      ...group,
+      options:group.options.map(option=>Object.freeze({
+        ...option,
+        ...(state.has('OPTION:'+option.optionId)?{available:Boolean(state.get('OPTION:'+option.optionId))}:{}),
+      })),
+    })),
+  }));
+  const comboPools=menu.comboPools?.map(pool=>Object.freeze({
+    ...pool,
+    groups:pool.groups.map(group=>Object.freeze({
+      ...group,
+      subPools:group.subPools.map(subPool=>Object.freeze({
+        ...subPool,
+        choices:subPool.choices.map(choice=>Object.freeze({
+          ...choice,
+          ...(state.has('COMBO_CHILD:'+choice.choiceId)?{available:Boolean(state.get('COMBO_CHILD:'+choice.choiceId))}:{}),
+        })),
+      })),
+    })),
+  }));
+  return Object.freeze({...config,menu:Object.freeze({...menu,products:Object.freeze(products),...(comboPools?{comboPools:Object.freeze(comboPools)}:{})})});
+}
+
+async function reconcileCustomerConfig():Promise<Partial<CustomerReadModelSnapshot>>{
+  let head=await fetchCustomerSyncHead();
+  let bundle=readCustomerSyncBundle();
+  let entities:MfkSyncEntityMap;
+  let appliedSeq:number;
+  let checkpointSeq:number;
+
+  if(bundle&&bundle.head.storeId===head.storeId){
+    entities=bundle.entities;
+    appliedSeq=bundle.appliedSeq;
+    checkpointSeq=bundle.checkpointSeq;
+  }else if(head.checkpointHash){
+    const checkpoint=await fetchCustomerCheckpoint(head);
+    entities=entityMapFromCheckpoint(checkpoint);
+    appliedSeq=checkpoint.checkpointSeq;
+    checkpointSeq=checkpoint.checkpointSeq;
+  }else{
+    throw new Error('CUSTOMER_SYNC_BOOTSTRAP_CHECKPOINT_UNAVAILABLE');
+  }
+
+  for(let guard=0;guard<12;guard++){
+    head=await fetchCustomerSyncHead();
+    if(appliedSeq>head.headSeq||appliedSeq<head.checkpointSeq){
+      if(!head.checkpointHash)throw new Error('CUSTOMER_SYNC_CHECKPOINT_REQUIRED');
+      const checkpoint=await fetchCustomerCheckpoint(head);
+      entities=entityMapFromCheckpoint(checkpoint);
+      appliedSeq=checkpoint.checkpointSeq;
+      checkpointSeq=checkpoint.checkpointSeq;
+    }
+    if(appliedSeq===head.headSeq){
+      bundle=writeCustomerSyncBundle(head,entities,appliedSeq,checkpointSeq);
+      return customerConfigFromBundle(bundle);
+    }
+    const next=await fetchCustomerChanges(appliedSeq);
+    if(next.checkpointRequired){
+      if(!head.checkpointHash)throw new Error('CUSTOMER_SYNC_CHECKPOINT_REQUIRED');
+      const checkpoint=await fetchCustomerCheckpoint(head);
+      entities=entityMapFromCheckpoint(checkpoint);
+      appliedSeq=checkpoint.checkpointSeq;
+      checkpointSeq=checkpoint.checkpointSeq;
+      continue;
+    }
+    if(next.batch.storeId!==STORE_ID||next.batch.port!=='CUSTOMER')throw new Error('CUSTOMER_SYNC_CHANGE_IDENTITY_MISMATCH');
+    entities=applyMfkSyncChanges(entities,next.batch.changes);
+    appliedSeq=next.batch.toInclusive;
+  }
+  throw new Error('CUSTOMER_SYNC_RECONCILE_GUARD_EXCEEDED');
+}
+
+async function bootstrapCustomerConfigFromLegacy():Promise<Partial<CustomerReadModelSnapshot>>{
+  const params=new URLSearchParams({storeId:STORE_ID});
+  const {response,body}=await jsonFetch('/api/customer/snapshot?'+params.toString());
+  if(!response.ok)throw new Error(String(body.code||'CUSTOMER_SNAPSHOT_FAILED'));
+  const snapshot=body as unknown as CustomerReadModelSnapshot;
+  try{
+    const head=await fetchCustomerSyncHead();
+    const entities=buildCustomerSyncEntities(snapshot);
+    const hash=projectionHashForEntities(entities);
+    if(head.headSeq===0||hash===head.projectionHash){
+      const bundle=writeCustomerSyncBundle(head,entities,head.headSeq,head.checkpointSeq);
+      return customerConfigFromBundle(bundle);
+    }
+  }catch{}
+  return snapshot;
 }
 
 function requestId(prefix:string){
@@ -167,11 +369,22 @@ export function createCloudCustomerRuntimePort():CustomerRuntimePort{
     probeOrderBackend,
 
     async readSnapshot():Promise<CustomerReadModelSnapshot>{
-      const params=new URLSearchParams({storeId:STORE_ID});
+      let config:Partial<CustomerReadModelSnapshot>;
+      try{config=await reconcileCustomerConfig();}
+      catch{config=await bootstrapCustomerConfigFromLegacy();}
+
+      const params=new URLSearchParams({storeId:STORE_ID,config:'0'});
       for(const submissionId of readSubmissionRefs())params.append('submissionId',submissionId);
       const {response,body}=await jsonFetch('/api/customer/snapshot?'+params.toString());
       if(!response.ok)throw new Error(String(body.code||'CUSTOMER_SNAPSHOT_FAILED'));
-      return body as unknown as CustomerReadModelSnapshot;
+      const dynamic=body as Record<string,unknown>;
+      const merged=overlayCustomerRuntimeSellability(config,Array.isArray(dynamic.runtimeSellability)?dynamic.runtimeSellability:[]);
+      return Object.freeze({
+        ...merged,
+        activeOrders:Array.isArray(dynamic.activeOrders)?dynamic.activeOrders:[],
+        history:Array.isArray(dynamic.history)?dynamic.history:[],
+        observedAt:typeof dynamic.observedAt==='string'?dynamic.observedAt:String(merged.observedAt||new Date().toISOString()),
+      }) as CustomerReadModelSnapshot;
     },
 
     async quoteCart(cart:readonly CustomerCartLine[]):Promise<CustomerQuoteSnapshot>{
