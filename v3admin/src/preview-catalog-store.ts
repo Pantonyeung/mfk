@@ -146,7 +146,7 @@ interface PreviewCatalogState{
   optionSets:PreviewOptionSet[];
   combos:PreviewCombo[];
   diningTables:PreviewDiningTable[];
-  createProduct(input:Omit<PreviewProduct,'id'|'code'|'updatedAt'|'status'>):PreviewProduct;
+  createProduct(input:Omit<PreviewProduct,'id'|'code'|'updatedAt'|'status'>&{id?:string}):PreviewProduct;
   updateProduct(id:string,patch:Partial<Omit<PreviewProduct,'id'|'code'>>):void;
   updateProductCustomerImage(id:string,url:string):void;
   updateProductChannelImage(id:string,channel:string,url:string):void;
@@ -175,9 +175,10 @@ export const usePreviewCatalog=create<PreviewCatalogState>((set,get)=>({
   diningTables:[...DINING_TABLES],
   createProduct(input){
     const products=get().products;
+    const {id:requestedId,...rest}=input;
     const product:PreviewProduct={
-      ...input,
-      id:uid('product'),
+      ...rest,
+      id:requestedId||uid('product'),
       code:nextNumericCode(products),
       updatedAt:'剛剛',
       status:'草稿',
