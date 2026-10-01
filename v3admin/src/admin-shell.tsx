@@ -25,7 +25,7 @@ import {FormalChannelReportPage,FormalExportPage,FormalOperationsReportPage,Form
 import {FormalBusinessDayRuntimePage,FormalCashCloseRuntimePage} from './formal-operations-read-pages.tsx';
 import {FormalActionQueuePage,FormalAuditGapPage,FormalDiagnosticsPage,FormalEffectiveSettingsPage,FormalIntegrationsPage} from './formal-system-pages.tsx';
 import {FormalSettlementPage} from './formal-settlement-page.tsx';
-import {FormalRollbackGapPage,FormalVersionsReadbackPage} from './formal-publish-history-pages.tsx';
+import {FormalRollbackPage,FormalVersionsReadbackPage} from './formal-publish-history-pages.tsx';
 import {FormalDevicesPage,FormalOtaGapPage} from './formal-device-pages.tsx';
 import {FormalQuickReasonsGapPage} from './formal-quick-reasons-page.tsx';
 import {
@@ -210,7 +210,7 @@ export function AdminShell({storeId,displayName,releaseStatus,canonicalState,can
                                                     :path==='/admin/publish/versions'
                                                       ?(previewMode?<PublishFlowPage mode="versions"/>:formalDraftEnabled?<FormalVersionsReadbackPage/>:<RouteSkeleton path={path} canonicalState={canonicalState} onRefresh={onRefresh}/>)
                                                       :path==='/admin/publish/rollback'
-                                                        ?(previewMode?<PublishFlowPage mode="rollback"/>:formalDraftEnabled?<FormalRollbackGapPage/>:<RouteSkeleton path={path} canonicalState={canonicalState} onRefresh={onRefresh}/>)
+                                                        ?(previewMode?<PublishFlowPage mode="rollback"/>:formalDraftEnabled?<FormalRollbackPage/>:<RouteSkeleton path={path} canonicalState={canonicalState} onRefresh={onRefresh}/>)
                                                         :path==='/admin/system/audit'
                                                           ?(previewMode?<AuditPage/>:formalDraftEnabled?<FormalAuditGapPage/>:<RouteSkeleton path={path} canonicalState={canonicalState} onRefresh={onRefresh}/>)
                                                           :path==='/admin/system/diagnostics'
