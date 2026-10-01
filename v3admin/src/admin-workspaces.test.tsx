@@ -33,8 +33,11 @@ describe('Admin V3 whole-admin preview coverage',()=>{
   });
 
   it.each([
+    ['/admin/catalog/categories','分類管理'],
     ['/admin/catalog/modifiers','選項／口味管理'],
     ['/admin/catalog/combos','套餐管理'],
+    ['/admin/catalog/pricing','價格管理'],
+    ['/admin/catalog/menu-display','顯示與排序'],
     ['/admin/store/tables','餐桌管理'],
   ])('routes dedicated functional workspace for %s', (path,title)=>{
     const html=renderToStaticMarkup(<AdminShell
