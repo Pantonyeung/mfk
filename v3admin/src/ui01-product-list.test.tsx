@@ -35,7 +35,7 @@ describe('Admin V3 UI-01 Product List',()=>{
     expect(html).toContain('唔代表正式 Canonical 資料');
     expect(html).toContain('PRD000123');
     expect(html).toContain('＋ 新增產品');
-    expect(html).toContain('系統自動生成');
+    expect(html).toContain('<code>PRD000123</code>');
   });
 
   it('uses full-width list as the default instead of a permanent right editor',()=>{
