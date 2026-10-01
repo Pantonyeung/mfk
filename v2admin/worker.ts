@@ -2967,7 +2967,7 @@ export default {
         :url.pathname.replace('/api/admin-sync','')||'/active';
       const target=new URL(request.url);
       target.pathname=targetPath;
-      target.search='';
+      target.search=targetPath.startsWith('/sync/')?url.search:'';
       const forwarded=new Request(target.toString(),request);
       const response=await stub.fetch(forwarded);
       return adminSyncOuterResponse(url.pathname,response,request);
