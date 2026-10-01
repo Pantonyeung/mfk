@@ -3,6 +3,21 @@ import {useMutation,useQuery,useQueryClient} from '@tanstack/react-query';
 import type {MfkAdminConfigEnvelope} from '../../contracts/admin-config-sync-v1.ts';
 import {v3AdminCanonicalQueryKey} from './canonical.ts';
 
+export interface V3FormalAdminVersionSummary{
+  readonly revision:number;
+  readonly publishedAt:string;
+  readonly fingerprint:string;
+  readonly adminFingerprint:string;
+  readonly state:'ACTIVE'|'ARCHIVED';
+}
+export interface V3FormalAdminVersionList{
+  readonly schema:'MFK_ADMIN_VERSION_LIST_V1';
+  readonly storeId:string;
+  readonly activeFingerprint:string;
+  readonly historyCompleteness:'FORWARD_ONLY';
+  readonly versions:readonly V3FormalAdminVersionSummary[];
+}
+
 export interface V3FormalAdminDraft{
   readonly schema:'MFK_ADMIN_DRAFT_V1';
   readonly storeId:string;
@@ -128,6 +143,66 @@ export async function publishV3FormalDraft(input:{storeId:string;sessionToken:st
 }
 
 
+function validateVersionList(value:unknown):V3FormalAdminVersionList{
+  if(!value||typeof value!=='object'||Array.isArray(value))throw new Error('V3_ADMIN_VERSION_LIST_INVALID');
+  const row=value as Record<string,unknown>;
+  if(
+    row.schema!=='MFK_ADMIN_VERSION_LIST_V1'||
+    typeof row.storeId!=='string'||!row.storeId||
+    typeof row.activeFingerprint!=='string'||!row.activeFingerprint||
+    row.historyCompleteness!=='FORWARD_ONLY'||
+    !Array.isArray(row.versions)
+  )throw new Error('V3_ADMIN_VERSION_LIST_INVALID');
+  const versions=row.versions.map(item=>{
+    if(!item||typeof item!=='object'||Array.isArray(item))throw new Error('V3_ADMIN_VERSION_LIST_INVALID');
+    const version=item as Record<string,unknown>;
+    if(
+      !Number.isSafeInteger(version.revision)||
+      typeof version.publishedAt!=='string'||!Number.isFinite(Date.parse(version.publishedAt))||
+      typeof version.fingerprint!=='string'||!version.fingerprint||
+      typeof version.adminFingerprint!=='string'||
+      !['ACTIVE','ARCHIVED'].includes(String(version.state))
+    )throw new Error('V3_ADMIN_VERSION_LIST_INVALID');
+    return version as unknown as V3FormalAdminVersionSummary;
+  });
+  return {...row,versions} as unknown as V3FormalAdminVersionList;
+}
+
+export async function readV3FormalVersions(input:{storeId:string;sessionToken:string}):Promise<V3FormalAdminVersionList>{
+  const response=await fetch(endpoint('/api/admin-browser/versions',input.storeId),{
+    method:'GET',
+    cache:'no-store',
+    credentials:'include',
+    headers:authHeaders(input.sessionToken),
+  });
+  return validateVersionList(await parseResponse(response));
+}
+
+export async function rollbackV3FormalVersion(input:{
+  storeId:string;
+  sessionToken:string;
+  canonical:MfkAdminConfigEnvelope;
+  targetFingerprint:string;
+  reason:string;
+  operationId:string;
+}):Promise<Record<string,unknown>>{
+  const response=await fetch(endpoint('/api/admin-browser/versions/rollback',input.storeId),{
+    method:'POST',
+    credentials:'include',
+    headers:authHeaders(input.sessionToken,true),
+    body:JSON.stringify({
+      operationId:input.operationId,
+      targetFingerprint:input.targetFingerprint,
+      expectedActiveFingerprint:input.canonical.fingerprint,
+      expectedActivePublishedAt:input.canonical.publishedAt,
+      expectedActiveRevision:input.canonical.revision,
+      reason:input.reason,
+    }),
+  });
+  return parseResponse(response);
+}
+
+
 export interface V3FormalCreatedProduct{
   readonly id:string;
   readonly productCode:string;
@@ -200,6 +275,9 @@ interface FormalDraftContextValue{
   readonly createProduct:(product:{name:string;categoryId:string;basePrice:string;description:string;active:boolean})=>Promise<V3FormalProductCreateResult>;
   readonly discard:()=>Promise<void>;
   readonly publish:()=>Promise<Record<string,unknown>>;
+  readonly readVersions:()=>Promise<V3FormalAdminVersionList>;
+  readonly rollbackVersion:(input:{targetFingerprint:string;reason:string;operationId:string})=>Promise<Record<string,unknown>>;
+  readonly isRollingBack:boolean;
   readonly refresh:()=>Promise<void>;
 }
 
@@ -272,12 +350,27 @@ export function V3FormalDraftProvider({
     },
   });
 
+
+  const rollbackMutation=useMutation({
+    mutationFn:(input:{targetFingerprint:string;reason:string;operationId:string})=>rollbackV3FormalVersion({
+      storeId,
+      sessionToken,
+      canonical,
+      targetFingerprint:input.targetFingerprint,
+      reason:input.reason,
+      operationId:input.operationId,
+    }),
+    onSuccess:async()=>{
+      await queryClient.invalidateQueries({queryKey:v3AdminCanonicalQueryKey(storeId)});
+    },
+  });
+
   const draft=query.data??null;
   const canonicalSnapshot=(canonical.snapshot&&typeof canonical.snapshot==='object'&&!Array.isArray(canonical.snapshot)
     ?canonical.snapshot
     :{}) as Record<string,unknown>;
   const workingSnapshot=draft?.snapshot??canonicalSnapshot;
-  const error=(query.error??saveMutation.error??createProductMutation.error??discardMutation.error??publishMutation.error) as Error|null;
+  const error=(query.error??saveMutation.error??createProductMutation.error??discardMutation.error??publishMutation.error??rollbackMutation.error) as Error|null;
 
   const value:FormalDraftContextValue={
     canonical,
@@ -292,6 +385,9 @@ export function V3FormalDraftProvider({
     createProduct:product=>createProductMutation.mutateAsync(product),
     discard:async()=>{await discardMutation.mutateAsync();},
     publish:()=>publishMutation.mutateAsync(),
+    readVersions:()=>readV3FormalVersions({storeId,sessionToken}),
+    rollbackVersion:input=>rollbackMutation.mutateAsync(input),
+    isRollingBack:rollbackMutation.isPending,
     refresh:async()=>{await query.refetch();},
   };
   return <FormalDraftContext.Provider value={value}>{children}</FormalDraftContext.Provider>;
