@@ -25,8 +25,9 @@ const JSON_HEADERS={'content-type':'application/json; charset=utf-8','cache-cont
 const ADMIN_ORIGIN='https://admin.morefunos.com';
 const SMT_ORIGIN='https://appassets.androidplatform.net';
 const CUSTOMER_ORIGIN='https://order.morefunos.com';
+const SMM_ORIGIN='https://smm.morefunos.com';
 const OWNER_ORIGIN='https://owner.morefunos.com';
-const CORS_ORIGINS=new Set([ADMIN_ORIGIN,SMT_ORIGIN,CUSTOMER_ORIGIN,OWNER_ORIGIN]);
+const CORS_ORIGINS=new Set([ADMIN_ORIGIN,SMT_ORIGIN,CUSTOMER_ORIGIN,SMM_ORIGIN,OWNER_ORIGIN]);
 const MFK_SYNC_PORTS=Object.freeze(['SMT','SMM','CUSTOMER','KEETA']);
 const MFK_SYNC_CHECKPOINT_EVENT_THRESHOLD=128;
 const MFK_SYNC_CHECKPOINT_MAX_AGE_MS=24*60*60*1000;
@@ -72,7 +73,7 @@ function cors(request){
 // that response drops the handle in Workers, so the events route must remain the
 // exact response returned by the Durable Object.
 export function adminSyncOuterResponse(pathname,response,request){
-  if(pathname==='/api/admin-sync/events')return response;
+  if(pathname==='/api/admin-sync/events'||pathname==='/api/admin-sync/sync/events')return response;
   const headers=new Headers(response.headers);
   for(const [key,value] of Object.entries(cors(request)))headers.set(key,value);
   return new Response(response.body,{status:response.status,statusText:response.statusText,headers});
@@ -1424,7 +1425,8 @@ export class AdminSyncStore{
           continue;
         }
         const message=JSON.stringify(event);
-        for(const socket of this.state.getWebSockets()){try{socket.send(message);}catch{}}
+        const sockets=event.port==='SMM'?this.state.getWebSockets('SYNC:SMM'):this.state.getWebSockets();
+        for(const socket of sockets){try{socket.send(message);}catch{}}
       }
       for(const plan of result.checkpointPlans){
         const task=this.maybeBuildSyncCheckpoint(plan.port,plan.entities,plan.head);
@@ -2274,13 +2276,26 @@ export class AdminSyncStore{
       }
       return json({state:'DOORBELL_SENT'});
     }
+    if(url.pathname==='/sync/events'){
+      if(request.headers.get('upgrade')!=='websocket')return json({code:'WEBSOCKET_REQUIRED'},426);
+      const port=String(url.searchParams.get('port')||'').toUpperCase();
+      if(port!=='SMM')return json({code:'SYNC_EVENT_PORT_INVALID'},400);
+      if(request.headers.get('origin')!==SMM_ORIGIN)return json({code:'SYNC_PORT_UNAUTHORIZED'},401);
+      const pair=new WebSocketPair();
+      const client=pair[0],server=pair[1];
+      this.state.acceptWebSocket(server,['SYNC:SMM']);
+      const head=await this.readSyncHead('SMM');
+      server.send(JSON.stringify({type:'PORT_HEAD_AVAILABLE',storeId:head.storeId,port:'SMM',headSeq:head.headSeq,sourceCommitSeq:head.sourceCommitSeq,projectionHash:head.projectionHash,publishedAt:head.observedAt}));
+      return new Response(null,{status:101,webSocket:client});
+    }
     if(url.pathname==='/sync/head'){
       if(request.method!=='GET')return json({code:'METHOD_NOT_ALLOWED'},405);
       const port=String(url.searchParams.get('port')||'').toUpperCase();
       if(!MFK_SYNC_PORTS.includes(port))return json({code:'SYNC_PORT_INVALID'},400);
       if(port==='SMT'&&!await this.authorizeSmtDevice(request))return json({code:'SYNC_PORT_UNAUTHORIZED'},401);
       if(port==='CUSTOMER'&&request.headers.get('origin')!==CUSTOMER_ORIGIN)return json({code:'SYNC_PORT_UNAUTHORIZED'},401);
-      if(port==='SMM'||port==='KEETA')return json({code:'SYNC_PORT_DIRECT_READ_FORBIDDEN'},403);
+      if(port==='SMM'&&request.headers.get('origin')!==SMM_ORIGIN)return json({code:'SYNC_PORT_UNAUTHORIZED'},401);
+      if(port==='KEETA')return json({code:'SYNC_PORT_DIRECT_READ_FORBIDDEN'},403);
       return json(await this.readSyncHead(port));
     }
     if(url.pathname==='/sync/changes'){
@@ -2289,7 +2304,8 @@ export class AdminSyncStore{
       if(!MFK_SYNC_PORTS.includes(port))return json({code:'SYNC_PORT_INVALID'},400);
       if(port==='SMT'&&!await this.authorizeSmtDevice(request))return json({code:'SYNC_PORT_UNAUTHORIZED'},401);
       if(port==='CUSTOMER'&&request.headers.get('origin')!==CUSTOMER_ORIGIN)return json({code:'SYNC_PORT_UNAUTHORIZED'},401);
-      if(port==='SMM'||port==='KEETA')return json({code:'SYNC_PORT_DIRECT_READ_FORBIDDEN'},403);
+      if(port==='SMM'&&request.headers.get('origin')!==SMM_ORIGIN)return json({code:'SYNC_PORT_UNAUTHORIZED'},401);
+      if(port==='KEETA')return json({code:'SYNC_PORT_DIRECT_READ_FORBIDDEN'},403);
       const result=await this.readSyncChanges(port,Number(url.searchParams.get('after')||0));
       return json(result.body,result.status);
     }
@@ -2299,7 +2315,8 @@ export class AdminSyncStore{
       if(!MFK_SYNC_PORTS.includes(port))return json({code:'SYNC_PORT_INVALID'},400);
       if(port==='SMT'&&!await this.authorizeSmtDevice(request))return json({code:'SYNC_PORT_UNAUTHORIZED'},401);
       if(port==='CUSTOMER'&&request.headers.get('origin')!==CUSTOMER_ORIGIN)return json({code:'SYNC_PORT_UNAUTHORIZED'},401);
-      if(port==='SMM'||port==='KEETA')return json({code:'SYNC_PORT_DIRECT_READ_FORBIDDEN'},403);
+      if(port==='SMM'&&request.headers.get('origin')!==SMM_ORIGIN)return json({code:'SYNC_PORT_UNAUTHORIZED'},401);
+      if(port==='KEETA')return json({code:'SYNC_PORT_DIRECT_READ_FORBIDDEN'},403);
       const result=await this.readSyncCheckpoint(port,url.searchParams.get('seq'));
       return json(result.body,result.status);
     }
