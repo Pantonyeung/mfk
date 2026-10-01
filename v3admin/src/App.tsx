@@ -18,6 +18,8 @@ function hkTime(value:string){
   return Number.isFinite(at)?new Date(at).toLocaleString('zh-HK',{timeZone:'Asia/Hong_Kong',hour12:false}):value;
 }
 function previewRequested(){
+  const envPreview=(import.meta.env.VITE_MFK_V3_PREVIEW_MODE as string|undefined)==='1';
+  if(envPreview)return true;
   if(typeof window==='undefined')return false;
   return new URLSearchParams(window.location.search).get('preview')==='ui-01';
 }
