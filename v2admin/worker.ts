@@ -118,6 +118,45 @@ function moneyLabel(minor){
   return 'HK'+String.fromCharCode(36)+(Number.isInteger(value)?String(value):value.toFixed(2));
 }
 
+
+export function nextAdminProductCode(snapshot,lastAllocated=0){
+  const catalog=row(row(snapshot).catalog);
+  const products=rows(catalog.products);
+  let max=Number.isSafeInteger(Number(lastAllocated))&&Number(lastAllocated)>0?Number(lastAllocated):0;
+  const used=new Set();
+  for(const raw of products){
+    const product=row(raw);
+    const code=String(product.productCode||product.legacyBarcode||'').trim().toUpperCase();
+    if(code)used.add(code);
+    const match=/^PRD(\d+)$/.exec(code);
+    if(match){
+      const numeric=Number(match[1]);
+      if(Number.isSafeInteger(numeric)&&numeric>max)max=numeric;
+    }
+  }
+  let next=max+1;
+  while(used.has('PRD'+String(next).padStart(6,'0')))next++;
+  if(!Number.isSafeInteger(next)||next<1)throw new Error('ADMIN_PRODUCT_CODE_EXHAUSTED');
+  return Object.freeze({numeric:next,productCode:'PRD'+String(next).padStart(6,'0')});
+}
+
+function normalizeAdminProductCreateInput(input){
+  const value=row(input),product=row(value.product);
+  const name=String(product.name||'').trim().slice(0,160);
+  const categoryId=String(product.categoryId||'').trim().slice(0,128);
+  const description=String(product.description||'').trim().slice(0,2000);
+  const priceText=String(product.basePrice??'').trim();
+  const price=Number(priceText);
+  if(!name||!categoryId||!priceText||!Number.isFinite(price)||price<0||price>999999.99)return null;
+  return Object.freeze({
+    name,
+    categoryId,
+    description,
+    basePrice:price.toFixed(2),
+    active:product.active!==false,
+  });
+}
+
 export const MFK_OWNER_MONTHLY_PLAN_SCHEMA='MFK_OWNER_MONTHLY_PLAN_V1';
 const OWNER_COST_CATEGORIES=new Set(['RENT','UTILITIES_WATER','UTILITIES_ELECTRICITY','UTILITIES_GAS','LABOR','OTHER','CUSTOM']);
 const OWNER_DEFAULT_COST_LINES=[
@@ -1558,7 +1597,7 @@ export class AdminSyncStore{
       const session=await this.readAdminBrowserSession(request);if(!session)return json({code:'ADMIN_BROWSER_SESSION_UNAUTHORIZED'},401);
       const active=await this.state.storage.get('active');return active?json(active):json({code:'ADMIN_CONFIG_NOT_PUBLISHED'},404);
     }
-    if(url.pathname==='/admin-browser/draft'||url.pathname==='/admin-browser/draft/publish'){
+    if(url.pathname==='/admin-browser/draft'||url.pathname==='/admin-browser/draft/publish'||url.pathname==='/admin-browser/draft/products'){
       const session=await this.readAdminBrowserSession(request);if(!session)return json({code:'ADMIN_BROWSER_SESSION_UNAUTHORIZED'},401);
       const storeId=storeIdFrom(url),active=await this.state.storage.get('active');
       if(!active||String(active.storeId||'')!==storeId)return json({code:'ADMIN_BROWSER_STORE_FORBIDDEN'},403);
@@ -1587,6 +1626,62 @@ export class AdminSyncStore{
         const result=await this.publishEnvelope(envelope,{fingerprint:draft.baseFingerprint,publishedAt:draft.basePublishedAt});
         if(result.status===200)await this.state.storage.delete(draftKey);
         return json(result.body,result.status);
+      }
+
+
+      if(url.pathname==='/admin-browser/draft/products'){
+        if(request.method!=='POST')return json({code:'METHOD_NOT_ALLOWED'},405);
+        let input;try{input=await request.json();}catch{return json({code:'ADMIN_PRODUCT_CREATE_INPUT_INVALID'},400);}
+        const normalized=normalizeAdminProductCreateInput(input);
+        if(!normalized)return json({code:'ADMIN_PRODUCT_CREATE_INPUT_INVALID'},400);
+
+        const currentDraft=await this.state.storage.get(draftKey);
+        if(currentDraft){
+          if(!Number.isSafeInteger(input?.expectedDraftRevision)||input.expectedDraftRevision!==currentDraft.draftRevision)return json({code:'ADMIN_DRAFT_REVISION_CONFLICT'},409);
+          if(input?.baseFingerprint!==currentDraft.baseFingerprint||input?.basePublishedAt!==currentDraft.basePublishedAt)return json({code:'ADMIN_DRAFT_BASE_CONFLICT'},409);
+        }else if(input?.expectedDraftRevision!==undefined){
+          return json({code:'ADMIN_DRAFT_REVISION_CONFLICT'},409);
+        }
+
+        if(typeof input?.baseFingerprint!=='string'||typeof input?.basePublishedAt!=='string'||input.baseFingerprint!==String(active.fingerprint||'')||input.basePublishedAt!==String(active.publishedAt||''))return json({code:'ADMIN_DRAFT_BASE_CONFLICT'},409);
+
+        const workingSnapshot=row(currentDraft?.snapshot||active.snapshot);
+        const catalog=row(workingSnapshot.catalog);
+        const categories=rows(catalog.categories);
+        if(!categories.some(raw=>String(row(raw).id||'')===normalized.categoryId))return json({code:'ADMIN_PRODUCT_CATEGORY_NOT_FOUND'},400);
+        const products=rows(catalog.products);
+        const persistedCounter=Number(await this.state.storage.get('admin-browser:product-code-counter'))||0;
+        const allocation=nextAdminProductCode(workingSnapshot,persistedCounter);
+        const productId='product-'+crypto.randomUUID();
+        const product=Object.freeze({
+          id:productId,
+          productCode:allocation.productCode,
+          name:normalized.name,
+          categoryId:normalized.categoryId,
+          basePrice:normalized.basePrice,
+          description:normalized.description,
+          active:normalized.active,
+          modifierGroupIds:Object.freeze([]),
+          legacySourcePosition:products.length,
+        });
+        const snapshot={
+          ...workingSnapshot,
+          catalog:{...catalog,products:[...products,product]},
+        };
+        const draft={
+          schema:'MFK_ADMIN_DRAFT_V1',
+          storeId,
+          draftId:currentDraft?.draftId||crypto.randomUUID(),
+          baseFingerprint:String(active.fingerprint||''),
+          basePublishedAt:String(active.publishedAt||''),
+          draftRevision:currentDraft?currentDraft.draftRevision+1:1,
+          snapshot,
+          updatedAt:new Date().toISOString(),
+          updatedByStaffId:session.staffId,
+        };
+        await this.state.storage.put('admin-browser:product-code-counter',allocation.numeric);
+        await this.state.storage.put(draftKey,draft);
+        return json({state:'CREATED',product,draft},201);
       }
 
       if(request.method==='GET'){
