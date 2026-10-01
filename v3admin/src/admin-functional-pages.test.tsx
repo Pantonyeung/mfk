@@ -30,6 +30,15 @@ describe('Admin V3 functional domain wave',()=>{
     expect(state.printRules.length).toBeGreaterThan(0);
   });
 
+  it('keeps logical printer naming in Admin while physical IP stays out of Admin authority',()=>{
+    const state=usePreviewAdmin.getState();
+    const labels=state.printers.filter(printer=>printer.type==='LABEL');
+    expect(labels.length).toBeGreaterThanOrEqual(2);
+    expect(labels.map(printer=>printer.name)).toEqual(expect.arrayContaining(['標籤機 1','標籤機 2']));
+    expect(labels.some(printer=>'ip' in printer||'host' in printer||'port' in printer)).toBe(false);
+    expect(renderToStaticMarkup(<PrintersPage/>)).toContain('實體 IP／USB 配對唔喺 Admin 做');
+  });
+
   it('enforces printer reference guard in preview state',()=>{
     const state=usePreviewAdmin.getState();
     expect(state.removePrinter('logical-receipt')).toBe(false);
