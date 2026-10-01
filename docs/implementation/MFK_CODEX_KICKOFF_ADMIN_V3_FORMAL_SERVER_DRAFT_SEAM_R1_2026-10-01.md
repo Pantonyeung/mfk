@@ -268,5 +268,25 @@ npm run build
 Owner 今次 approval 只係 implementation authorization。
 唔係 PROMOTE。
 
+## Codex implementation evidence
+
+- BASE_SHA：`f78960ebbd07e1adfff62d19d3ac129be863cb53`
+- FILES_CHANGED：`.github/mfk-change-manifest.json`、`v2admin/worker.ts`、`v2admin/src/admin-formal-server-draft.test.ts`、本 evidence packet
+- TESTS_ADDED：28 個 Formal Server Draft seam cases，覆蓋 auth、store scope、CRUD、server revision、reload、second tab、publish、race、Draft preserve 同 existing publish regression
+- RED_BEFORE：focused suite 26 cases，24 failed / 2 passed；所有 failure 指向 Draft route 尚未存在
+- GREEN_AFTER：focused suite 28 / 28 passed
+- FULL_TEST_RESULT：37 files / 257 tests passed
+- BUILD_RESULT：Vite production build passed
+- FIRST_BREAK_BEFORE：未保存修改後冇 authoritative server Saved Draft
+- FIRST_BREAK_AFTER：Saved Draft 由同一 Store Durable Object authoritative storage 擁有；browser storage 冇新增 authority
+- AUTHORITY_IMPACT：只擴展現有 Admin canonical config authority；冇第二 writer
+- PERSISTENCE_IMPACT：新增每 Store 單一 `MFK_ADMIN_DRAFT_V1` record、server draft identity/revision/time/actor
+- NO_TOUCH_CONFIRMATION：冇改 Pricing、SMT Store Kernel、Order、Payment、Refund、Cancel、provider、v2 browser state、routing、deploy 或 OTA
+- RACE_GUARD_PROOF：publish-from-Draft 將 expected base 帶入現有 `publishEnvelope`；final serialized storage read 發現 A→B 即 409，B 保留，Draft 保留
+- SECOND_TAB_PROOF：Tab A 由 revision 1 寫成 2 後，仍持 revision 1 嘅 Tab B 收到 `ADMIN_DRAFT_REVISION_CONFLICT`
+- DRAFT_PRESERVE_ON_CONFLICT_PROOF：base conflict、revision conflict、validation fail、canonical write fail 均不 delete Draft
+- ROLLBACK_SHA：`f78960ebbd07e1adfff62d19d3ac129be863cb53`
+- REMAINING_RISKS：只交 Draft PR；未獲 PROMOTE，禁止 merge / deploy / cutover / OTA
+
 MILESTONE:
-MFK_ADMIN_V3_FORMAL_SERVER_DRAFT_SEAM_R1_CODEX_READY
+MFK_ADMIN_V3_FORMAL_SERVER_DRAFT_SEAM_R1_CODEX_IMPLEMENTATION_READY

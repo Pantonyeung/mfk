@@ -19,7 +19,7 @@ function cors(request){
   const origin=request.headers.get('origin')||'';
   return CORS_ORIGINS.has(origin)?{
     'access-control-allow-origin':origin,
-    'access-control-allow-methods':'GET,POST,OPTIONS',
+    'access-control-allow-methods':'GET,POST,PUT,DELETE,OPTIONS',
     'access-control-allow-headers':'content-type,x-mfk-admin-publish-key,x-mfk-smm-session,x-mfk-owner-session,x-mfk-admin-session',
     'access-control-allow-credentials':'true',
     'vary':'origin',
@@ -982,9 +982,14 @@ export class AdminSyncStore{
     const value={staffId:String(current.staff.staffId||''),loginId:String(current.loginId||''),displayName:String(current.staff.name||current.staff.staffId||''),role:String(current.staff.role||''),scope:String(current.staff.scope||'STORE'),permissions:rows(current.staff.permissions).map(String),sessionToken:token,createdAt:String(session.createdAt||''),expiresAt:String(session.expiresAt||''),lastSeenAt:new Date().toISOString()};
     await this.state.storage.put(key,{...session,staffId:value.staffId,lastSeenAt:value.lastSeenAt});return value;
   }
-  async publishEnvelope(envelope){
-    const current=await this.state.storage.get('active');
+  async publishEnvelope(envelope,expectedBase:{fingerprint:string;publishedAt:string}|null=null){
+    const initialCurrent=await this.state.storage.get('active');
     const currentMeta=await this.state.storage.get('activeMeta')||{};
+    // Durable Object storage input gates serialize this final compare-before-write boundary.
+    const current=expectedBase?await this.state.storage.get('active'):initialCurrent;
+    if(expectedBase&&(!current||String(current.fingerprint||'')!==String(expectedBase.fingerprint||'')||String(current.publishedAt||'')!==String(expectedBase.publishedAt||''))){
+      return{status:409,body:{code:'ADMIN_DRAFT_BASE_CONFLICT'}};
+    }
 
     // Exact retry of the same formal Admin publish is idempotent.
     if(current&&String(currentMeta.publishRequestFingerprint||'')===String(envelope.fingerprint||'')){
@@ -1552,6 +1557,79 @@ export class AdminSyncStore{
     if(url.pathname==='/admin-browser/active'&&request.method==='GET'){
       const session=await this.readAdminBrowserSession(request);if(!session)return json({code:'ADMIN_BROWSER_SESSION_UNAUTHORIZED'},401);
       const active=await this.state.storage.get('active');return active?json(active):json({code:'ADMIN_CONFIG_NOT_PUBLISHED'},404);
+    }
+    if(url.pathname==='/admin-browser/draft'||url.pathname==='/admin-browser/draft/publish'){
+      const session=await this.readAdminBrowserSession(request);if(!session)return json({code:'ADMIN_BROWSER_SESSION_UNAUTHORIZED'},401);
+      const storeId=storeIdFrom(url),active=await this.state.storage.get('active');
+      if(!active||String(active.storeId||'')!==storeId)return json({code:'ADMIN_BROWSER_STORE_FORBIDDEN'},403);
+      const draftKey='admin-browser:draft';
+
+      if(url.pathname==='/admin-browser/draft/publish'){
+        if(request.method!=='POST')return json({code:'METHOD_NOT_ALLOWED'},405);
+        if(String(session.role)!=='OWNER'&&!rows(session.permissions).map(String).includes('PUBLISH_CONFIG'))return json({code:'ADMIN_BROWSER_PUBLISH_FORBIDDEN'},403);
+        let input;try{input=await request.json();}catch{return json({code:'ADMIN_DRAFT_INPUT_INVALID'},400);}
+        const draft=await this.state.storage.get(draftKey);
+        if(!draft)return json({code:'ADMIN_DRAFT_NOT_FOUND'},404);
+        if(typeof input?.draftId!=='string'||!Number.isSafeInteger(input?.expectedDraftRevision))return json({code:'ADMIN_DRAFT_INPUT_INVALID'},400);
+        if(input.draftId!==draft.draftId)return json({code:'ADMIN_DRAFT_ID_CONFLICT'},409);
+        if(input.expectedDraftRevision!==draft.draftRevision)return json({code:'ADMIN_DRAFT_REVISION_CONFLICT'},409);
+        if(String(active.fingerprint||'')!==draft.baseFingerprint||String(active.publishedAt||'')!==draft.basePublishedAt)return json({code:'ADMIN_DRAFT_BASE_CONFLICT'},409);
+        let envelope;
+        try{
+          envelope=createMfkAdminConfigEnvelope({
+            storeId,
+            revision:Number(active.revision)+1,
+            publishedAt:String(active.publishedAt||''),
+            adminFingerprint:'sha256:'+await sha256(JSON.stringify(draft.snapshot)),
+            snapshot:draft.snapshot,
+          });
+        }catch(error){return json({code:error instanceof Error?error.message:'ADMIN_CONFIG_INVALID'},400);}
+        const result=await this.publishEnvelope(envelope,{fingerprint:draft.baseFingerprint,publishedAt:draft.basePublishedAt});
+        if(result.status===200)await this.state.storage.delete(draftKey);
+        return json(result.body,result.status);
+      }
+
+      if(request.method==='GET'){
+        const draft=await this.state.storage.get(draftKey);
+        return draft?json(draft):json({code:'ADMIN_DRAFT_NOT_FOUND'},404);
+      }
+      if(request.method==='PUT'){
+        let input;try{input=await request.json();}catch{return json({code:'ADMIN_DRAFT_INPUT_INVALID'},400);}
+        const snapshot=input?.snapshot;
+        if(typeof input?.baseFingerprint!=='string'||!input.baseFingerprint.trim()||input.baseFingerprint.length>128||typeof input?.basePublishedAt!=='string'||!Number.isFinite(Date.parse(input.basePublishedAt))||!snapshot||typeof snapshot!=='object'||Array.isArray(snapshot))return json({code:'ADMIN_DRAFT_INPUT_INVALID'},400);
+        const currentDraft=await this.state.storage.get(draftKey);
+        if(currentDraft){
+          if(!Number.isSafeInteger(input.expectedDraftRevision)||input.expectedDraftRevision!==currentDraft.draftRevision)return json({code:'ADMIN_DRAFT_REVISION_CONFLICT'},409);
+          if(input.baseFingerprint!==currentDraft.baseFingerprint||input.basePublishedAt!==currentDraft.basePublishedAt)return json({code:'ADMIN_DRAFT_BASE_CONFLICT'},409);
+        }else if(input.expectedDraftRevision!==undefined){
+          return json({code:'ADMIN_DRAFT_REVISION_CONFLICT'},409);
+        }
+        if(input.baseFingerprint!==String(active.fingerprint||'')||input.basePublishedAt!==String(active.publishedAt||''))return json({code:'ADMIN_DRAFT_BASE_CONFLICT'},409);
+        const draft={
+          schema:'MFK_ADMIN_DRAFT_V1',
+          storeId,
+          draftId:currentDraft?.draftId||crypto.randomUUID(),
+          baseFingerprint:input.baseFingerprint,
+          basePublishedAt:input.basePublishedAt,
+          draftRevision:currentDraft?currentDraft.draftRevision+1:1,
+          snapshot,
+          updatedAt:new Date().toISOString(),
+          updatedByStaffId:session.staffId,
+        };
+        await this.state.storage.put(draftKey,draft);
+        return json(draft);
+      }
+      if(request.method==='DELETE'){
+        let input;try{input=await request.json();}catch{return json({code:'ADMIN_DRAFT_INPUT_INVALID'},400);}
+        const draft=await this.state.storage.get(draftKey);
+        if(!draft)return json({code:'ADMIN_DRAFT_NOT_FOUND'},404);
+        if(typeof input?.draftId!=='string'||!Number.isSafeInteger(input?.expectedDraftRevision))return json({code:'ADMIN_DRAFT_INPUT_INVALID'},400);
+        if(input.draftId!==draft.draftId)return json({code:'ADMIN_DRAFT_ID_CONFLICT'},409);
+        if(input.expectedDraftRevision!==draft.draftRevision)return json({code:'ADMIN_DRAFT_REVISION_CONFLICT'},409);
+        await this.state.storage.delete(draftKey);
+        return json({state:'DISCARDED'});
+      }
+      return json({code:'METHOD_NOT_ALLOWED'},405);
     }
     if(url.pathname==='/admin-browser/publisher-active'&&request.method==='GET'){
       if(!await this.authorizeAdminRead(request))return json({code:'ADMIN_BROWSER_PUBLISHER_UNAUTHORIZED'},401);
@@ -2252,7 +2330,7 @@ export default {
       const stub=env.ADMIN_SYNC.get(id);
       const target=new URL(request.url);
       target.pathname='/admin-browser/'+url.pathname.slice('/api/admin-browser/'.length);
-      target.search='';
+      target.search='?storeId='+encodeURIComponent(storeId);
       const response=await stub.fetch(new Request(target.toString(),request));
       const headers=new Headers(response.headers);
       for(const [key,value] of Object.entries(cors(request)))headers.set(key,value);
