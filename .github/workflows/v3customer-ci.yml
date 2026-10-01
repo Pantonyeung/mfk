@@ -211,6 +211,11 @@ jobs:
           npx --yes wrangler@latest r2 object get "$BUCKET/customer/brand/hero/hero-female-main.png" --file "v3customer/public/media/customer/hero/hero-female-main.png" --remote
           npx --yes wrangler@latest r2 object get "$BUCKET/customer/brand/hero/hero-doodle-morefun-main.png" --file "v3customer/public/media/customer/hero/hero-doodle-morefun-main.png" --remote
           npx --yes wrangler@latest r2 object get "$BUCKET/customer/brand/hero/hero-doodle-goodtaste-main.png" --file "v3customer/public/media/customer/hero/hero-doodle-goodtaste-main.png" --remote
+          mkdir -p v3customer/public/media/customer/home
+          npx --yes wrangler@latest r2 object get "$BUCKET/customer/brand/home/chef-product-01.png" --file "v3customer/public/media/customer/home/chef-product-01.png" --remote
+          npx --yes wrangler@latest r2 object get "$BUCKET/customer/brand/home/chef-product-02.png" --file "v3customer/public/media/customer/home/chef-product-02.png" --remote
+          npx --yes wrangler@latest r2 object get "$BUCKET/customer/brand/home/chef-product-03.png" --file "v3customer/public/media/customer/home/chef-product-03.png" --remote
+          npx --yes wrangler@latest r2 object get "$BUCKET/customer/brand/home/chef-product-04.png" --file "v3customer/public/media/customer/home/chef-product-04.png" --remote
 
       - name: Build preview
         working-directory: v3customer
