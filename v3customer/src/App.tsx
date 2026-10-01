@@ -74,7 +74,7 @@ function BrandBanner(){
 
 function Member(){
   return <section className="member">
-    <button type="button"><b>♛</b><div><strong>磨飯會員</strong><small>美味累積・驚喜更多</small><em>{vm.pointsLabel} →</em></div><span>▣</span></button>
+    <button type="button"><b>♛</b><div><strong>磨飯會員</strong><small>美味累積・驚喜更多</small><em>{vm.pointsLabel} →</em></div><span>🎁</span></button>
     <button type="button"><b>＋</b><div><strong>邀請好友</strong><small>一起享受美味時光</small><em>{vm.inviteRewardLabel} →</em></div><span className="faces"><img src={A.maleHeroR2} alt=""/><img src={A.femaleHeroR2} alt=""/></span></button>
   </section>;
 }
@@ -88,7 +88,7 @@ function Recent(){
 }
 
 function Services(){
-  const items=[['◉','外送到府','美味直達你手中'],['▣','到店取餐','30分鐘快速取餐'],['●','尋找門市','查詢附近磨飯']];
+  const items=[['🛵','外送到府','美味直達你手中'],['🏪','到店取餐','30分鐘快速取餐'],['📍','尋找門市','查詢附近磨飯']];
   return <section className="section">
     <div className="heading"><h2>多元取餐・美味更輕鬆</h2></div>
     <div className="services">{items.map(([icon,title,sub])=><button key={title} type="button"><b>{icon}</b><span><strong>{title}</strong><small>{sub}</small></span><Arrow/></button>)}</div>
