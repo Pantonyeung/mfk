@@ -25,6 +25,7 @@ import {FormalChannelReportPage,FormalExportPage,FormalOperationsReportPage,Form
 import {FormalBusinessDayRuntimePage,FormalCashCloseRuntimePage} from './formal-operations-read-pages.tsx';
 import {FormalActionQueuePage,FormalAuditGapPage,FormalDiagnosticsPage,FormalEffectiveSettingsPage,FormalIntegrationsPage} from './formal-system-pages.tsx';
 import {FormalSettlementPage} from './formal-settlement-page.tsx';
+import {FormalRollbackGapPage,FormalVersionsReadbackPage} from './formal-publish-history-pages.tsx';
 import {
   EmptyState,
   ErrorState,
@@ -204,10 +205,10 @@ export function AdminShell({storeId,displayName,releaseStatus,canonicalState,can
                                                               ?(previewMode?<PublishFlowPage mode="pending"/>:formalDraftEnabled?<FormalPendingChangesPage/>:<RouteSkeleton path={path} canonicalState={canonicalState} onRefresh={onRefresh}/>)
                                                   :path==='/admin/publish'
                                                     ?(previewMode?<PublishFlowPage mode="publish"/>:formalDraftEnabled?<FormalPublishPage/>:<RouteSkeleton path={path} canonicalState={canonicalState} onRefresh={onRefresh}/>)
-                                                    :path==='/admin/publish/versions'&&previewMode
-                                                      ?<PublishFlowPage mode="versions"/>
-                                                      :path==='/admin/publish/rollback'&&previewMode
-                                                        ?<PublishFlowPage mode="rollback"/>
+                                                    :path==='/admin/publish/versions'
+                                                      ?(previewMode?<PublishFlowPage mode="versions"/>:formalDraftEnabled?<FormalVersionsReadbackPage/>:<RouteSkeleton path={path} canonicalState={canonicalState} onRefresh={onRefresh}/>)
+                                                      :path==='/admin/publish/rollback'
+                                                        ?(previewMode?<PublishFlowPage mode="rollback"/>:formalDraftEnabled?<FormalRollbackGapPage/>:<RouteSkeleton path={path} canonicalState={canonicalState} onRefresh={onRefresh}/>)
                                                         :path==='/admin/system/audit'
                                                           ?(previewMode?<AuditPage/>:formalDraftEnabled?<FormalAuditGapPage/>:<RouteSkeleton path={path} canonicalState={canonicalState} onRefresh={onRefresh}/>)
                                                           :path==='/admin/system/diagnostics'
