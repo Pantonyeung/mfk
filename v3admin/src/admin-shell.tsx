@@ -24,6 +24,7 @@ import {FormalOrderExceptionsPage,FormalOrdersPage,FormalRefundReportPage,Formal
 import {FormalChannelReportPage,FormalExportPage,FormalOperationsReportPage,FormalProductReportPage} from './formal-report-pages.tsx';
 import {FormalBusinessDayRuntimePage,FormalCashCloseRuntimePage} from './formal-operations-read-pages.tsx';
 import {FormalActionQueuePage,FormalAuditGapPage,FormalDiagnosticsPage,FormalEffectiveSettingsPage,FormalIntegrationsPage} from './formal-system-pages.tsx';
+import {FormalSettlementPage} from './formal-settlement-page.tsx';
 import {
   EmptyState,
   ErrorState,
@@ -163,8 +164,8 @@ export function AdminShell({storeId,displayName,releaseStatus,canonicalState,can
                             ?(previewMode?<ChannelPage mode="failures"/>:formalDraftEnabled?<FormalChannelPage mode="failures"/>:<RouteSkeleton path={path} canonicalState={canonicalState} onRefresh={onRefresh}/>)
                             :path==='/admin/channels/net-estimate'
                               ?(previewMode?<ChannelPage mode="estimate"/>:formalDraftEnabled?<FormalChannelPage mode="estimate"/>:<RouteSkeleton path={path} canonicalState={canonicalState} onRefresh={onRefresh}/>)
-                              :path==='/admin/channels/settlement'&&previewMode
-                                ?<SettlementPage/>
+                              :path==='/admin/channels/settlement'
+                                ?(previewMode?<SettlementPage/>:formalDraftEnabled?<FormalSettlementPage/>:<RouteSkeleton path={path} canonicalState={canonicalState} onRefresh={onRefresh}/>)
                                 :path==='/admin/print'&&previewMode
                                   ?<PrintOverviewPage/>
                                   :path==='/admin/print/printers'
