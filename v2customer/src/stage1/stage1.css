@@ -134,10 +134,8 @@
   font-weight:950;
 }
 .stage1-welcome p{margin:8px 0 0;color:#5f7390;font-size:12px;line-height:18px;font-weight:650}
-.stage1-welcome-art{position:absolute;right:-8px;bottom:-24px;width:55%;height:210px;pointer-events:none}
-.stage1-welcome-art img{position:absolute;bottom:0;width:116px;height:190px;object-fit:cover;object-position:center top;border-radius:58px 58px 24px 24px;filter:drop-shadow(0 12px 18px rgba(24,52,95,.12))}
-.stage1-welcome-art .male{right:78px;transform:rotate(-3deg)}
-.stage1-welcome-art .female{right:-4px;width:108px;height:178px;transform:rotate(3deg)}
+.stage1-welcome-art{position:absolute;right:-10px;bottom:-16px;width:57%;height:214px;pointer-events:none}
+.stage1-welcome-art .pair{position:absolute;right:-8px;bottom:0;width:238px;height:auto;max-width:none;object-fit:contain;filter:drop-shadow(0 14px 20px rgba(24,52,95,.13))}
 
 .stage1-search-entry{
   width:100%;
@@ -177,10 +175,8 @@
 .stage1-banner-copy small{color:var(--mf-orange);font-size:9px;line-height:14px;font-weight:900;letter-spacing:.05em}
 .stage1-banner-copy strong{color:var(--mf-navy);font-size:21px;line-height:1.28;font-weight:950;letter-spacing:-.025em}
 .stage1-banner-copy em{justify-self:start;margin-top:4px;padding:7px 11px;border-radius:999px;background:#fff;color:var(--mf-navy);font-size:10px;font-style:normal;font-weight:900}
-.stage1-banner-art{position:absolute;right:-2px;bottom:-28px;width:51%;height:190px}
-.stage1-banner-art img{position:absolute;bottom:0;width:110px;height:180px;object-fit:cover;object-position:center top;border-radius:56px 56px 22px 22px;filter:drop-shadow(0 10px 18px rgba(24,52,95,.12))}
-.stage1-banner-art .male{right:64px}
-.stage1-banner-art .female{right:-8px;width:104px;height:170px}
+.stage1-banner-art{position:absolute;right:-10px;bottom:-20px;width:54%;height:194px}
+.stage1-banner-art .pair{position:absolute;right:-12px;bottom:0;width:228px;height:auto;max-width:none;object-fit:contain;filter:drop-shadow(0 12px 18px rgba(24,52,95,.12))}
 .stage1-banner-dots{position:absolute;right:17px;bottom:13px;display:flex;gap:6px;z-index:6}
 .stage1-banner-dots i{width:7px;height:7px;border-radius:50%;background:rgba(18,59,121,.25)}
 .stage1-banner-dots i:first-child{background:#fff}
@@ -313,15 +309,11 @@
   .stage1-premium-header{padding-left:15px;padding-right:15px}
   .stage1-welcome{min-height:202px}
   .stage1-welcome h1{font-size:27px}
-  .stage1-welcome-art{width:56%;height:198px}
-  .stage1-welcome-art img{width:108px;height:178px}
-  .stage1-welcome-art .male{right:70px}
-  .stage1-welcome-art .female{width:100px;height:168px}
+  .stage1-welcome-art{width:58%;height:202px}
+  .stage1-welcome-art .pair{width:222px;right:-10px}
   .stage1-brand-banner{min-height:178px}
   .stage1-banner-copy strong{font-size:19px}
-  .stage1-banner-art img{width:104px;height:171px}
-  .stage1-banner-art .male{right:59px}
-  .stage1-banner-art .female{width:98px;height:162px}
+  .stage1-banner-art .pair{width:212px;right:-12px}
   .stage1-quick-entry-section{gap:8px}
   .stage1-quick-entry-section>button{min-height:88px;padding-left:7px;padding-right:7px;grid-template-columns:34px minmax(0,1fr) 8px;gap:5px}
   .stage1-shortcut-icon{width:34px;height:34px}
@@ -337,17 +329,13 @@
   .stage1-welcome-copy{width:60%}
   .stage1-welcome h1{font-size:25px}
   .stage1-welcome p{font-size:11px}
-  .stage1-welcome-art{right:-16px;width:57%;height:185px}
-  .stage1-welcome-art img{width:98px;height:164px}
-  .stage1-welcome-art .male{right:61px}
-  .stage1-welcome-art .female{width:92px;height:154px}
+  .stage1-welcome-art{right:-16px;width:59%;height:188px}
+  .stage1-welcome-art .pair{width:202px;right:-14px}
   .stage1-brand-banner{min-height:166px;padding-left:15px}
   .stage1-banner-copy{width:58%}
   .stage1-banner-copy strong{font-size:18px}
-  .stage1-banner-art{right:-8px;height:170px}
-  .stage1-banner-art img{width:94px;height:156px}
-  .stage1-banner-art .male{right:54px}
-  .stage1-banner-art .female{width:90px;height:150px}
+  .stage1-banner-art{right:-10px;height:174px}
+  .stage1-banner-art .pair{width:194px;right:-14px}
   .stage1-quick-entry-section{grid-template-columns:1fr}
   .stage1-quick-entry-section>button{min-height:58px;grid-template-columns:38px minmax(0,1fr) 14px;padding:8px 11px}
   .stage1-top6-grid{gap:8px}
