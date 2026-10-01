@@ -5,6 +5,7 @@
   "root_control": "#596",
   "allowed_paths": [
     ".github/mfk-change-manifest.json",
+    ".github/workflows/v3customer-ci.yml",
     "v3customer/**",
     "docs/product/MFK_CUSTOMER_V3_LONG_HOME_VISUAL_PRD_R1_2026-10-01.md",
     "docs/execution/MFK_CUSTOMER_V3_HIGH_FIDELITY_AI_IMPLEMENTATION_R1_2026-10-01.md"
@@ -17,7 +18,8 @@
   "expected_behavior_change": [
     "Add isolated zero-production-routing Customer V3 long-scroll homepage preview.",
     "Lock the Owner-selected long homepage as the visual implementation target.",
-    "Provide a real React implementation surface for screenshot-diff iteration."
+    "Provide a real React implementation surface for screenshot-diff iteration.",
+    "Run isolated Customer V3 typecheck/build CI without deploy permissions."
   ],
   "non_goals": [
     "No v2customer change.",
