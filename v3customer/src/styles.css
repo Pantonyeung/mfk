@@ -11,7 +11,7 @@ button{font:inherit;color:inherit;cursor:pointer}
 button:focus-visible{outline:3px solid rgba(23,103,247,.35);outline-offset:2px}
 .shell{
   position:relative;width:min(100%,430px);min-height:100vh;margin:auto;background:#fbfcff;
-  box-shadow:0 0 75px rgba(20,65,130,.18);padding-bottom:42px;overflow:hidden
+  box-shadow:0 0 75px rgba(20,65,130,.18);padding-bottom:24px;overflow:hidden
 }
 .header{
   position:absolute;z-index:20;top:0;left:0;right:0;
@@ -31,10 +31,10 @@ button:focus-visible{outline:3px solid rgba(23,103,247,.35);outline-offset:2px}
 .bell i{position:absolute;width:7px;height:7px;border-radius:50%;background:#ff4c57;right:-1px;top:1px}
 .search{grid-area:search;border-radius:999px;height:36px;text-align:left;padding:0 9px;font-size:15px;min-width:0;overflow:hidden;white-space:nowrap}
 .search b{font-size:9px;color:#8a98b3;margin-left:5px;display:inline-block;max-width:72px;overflow:hidden;text-overflow:ellipsis;vertical-align:middle}
-main{display:grid;grid-template-columns:minmax(0,1fr);gap:5px;min-width:0}
+main{display:grid;grid-template-columns:minmax(0,1fr);gap:3px;min-width:0}
 #menu-discovery,#chef-picks,#recent-order{scroll-margin-top:12px}
 .hero{
-  position:relative;height:228px;min-height:228px;display:block;
+  position:relative;height:214px;min-height:214px;display:block;
   padding:0;overflow:hidden;background:#dcecff;min-width:0
 }
 .hero:before{
@@ -55,9 +55,9 @@ main{display:grid;grid-template-columns:minmax(0,1fr);gap:5px;min-width:0}
     radial-gradient(circle at 18% 16%,rgba(255,255,255,.58),transparent 26%),
     linear-gradient(180deg,rgba(255,255,255,.02),rgba(255,255,255,.08) 66%,rgba(255,255,255,.26));
 }
-.hero-copy{position:absolute;z-index:8;left:12px;top:58px;width:44%;padding:0}
+.hero-copy{position:absolute;z-index:8;left:12px;top:52px;width:44%;padding:0}
 .hero-copy em{font-family:cursive;color:#3977e7;font-size:12px;font-weight:900}
-.hero h1{margin:2px 0 4px;font-size:22px;line-height:1.01;letter-spacing:-.04em;text-wrap:balance}
+.hero h1{margin:2px 0 4px;font-size:25px;line-height:1.01;letter-spacing:-.04em;text-wrap:balance}
 .hero-copy>strong{display:block;font-size:8px;margin-top:2px}
 .hero-copy p{font-size:8px;line-height:1.35;color:#31588f;margin:5px 0}
 .hero-copy>button{
@@ -68,17 +68,17 @@ main{display:grid;grid-template-columns:minmax(0,1fr);gap:5px;min-width:0}
 .hero-copy>button:hover{transform:translateY(-1px);box-shadow:0 17px 32px rgba(80,86,234,.34)}
 .hero-copy>button:active{transform:translateY(1px)}
 .hero-copy small{display:block;margin-top:5px;font-size:6px;white-space:nowrap}
-.hero-visual{position:absolute;right:-3px;top:38px;width:72%;height:188px;z-index:3}
+.hero-visual{position:absolute;right:-3px;top:34px;width:72%;height:180px;z-index:3}
 .cloud{position:absolute;border-radius:45% 55% 60% 40%;background:rgba(255,255,255,.55);filter:blur(.1px)}
 .c1{width:190px;height:112px;right:-56px;top:6px;transform:rotate(-10deg)}
 .c2{width:180px;height:100px;left:-24px;bottom:22px;transform:rotate(9deg)}
 .c3{width:124px;height:84px;right:44px;bottom:78px;background:rgba(255,249,232,.68)}
 .male{
-  position:absolute;width:190px;height:220px;object-fit:contain;left:-20px;bottom:-4px;z-index:5;
+  position:absolute;width:184px;height:210px;object-fit:contain;left:-18px;bottom:-4px;z-index:5;
   filter:drop-shadow(0 17px 18px rgba(36,67,126,.2));transform:rotate(-2deg)
 }
 .female{
-  position:absolute;width:150px;height:188px;object-fit:contain;right:-6px;bottom:-4px;z-index:4;
+  position:absolute;width:154px;height:184px;object-fit:contain;right:-4px;bottom:-4px;z-index:4;
   filter:drop-shadow(0 15px 16px rgba(68,55,138,.17));transform:rotate(3deg)
 }
 .doodle{position:absolute;z-index:7;object-fit:contain;pointer-events:none}
@@ -139,7 +139,7 @@ main{display:grid;grid-template-columns:minmax(0,1fr);gap:5px;min-width:0}
 .brand-banner>div{position:absolute;left:10px;top:8px;z-index:2}
 .brand-banner h2{font-size:13px;line-height:1.03;margin:0}
 .brand-banner i{display:block;color:#6c5aee;font-family:cursive;font-size:7px;margin-top:2px}
-.brand-banner img{position:absolute;width:68px;height:78px;object-fit:contain;left:48%;bottom:-13px}
+.brand-banner img{position:absolute;width:116px;height:124px;object-fit:contain;left:42%;bottom:-42px}
 .brand-banner>p{position:absolute;right:8px;top:10px;text-align:right;font-family:cursive;color:#a153dd;font-weight:900;font-size:7px}
 .member{margin:0 10px;display:grid;grid-template-columns:1fr 1fr;gap:6px;min-width:0}
 .member>button{
@@ -154,27 +154,27 @@ main{display:grid;grid-template-columns:minmax(0,1fr);gap:5px;min-width:0}
 .faces{position:absolute;right:-3px;bottom:-9px;width:58px;height:48px}
 .faces img{position:absolute;width:38px;height:46px;object-fit:contain}
 .faces img:first-child{left:0}.faces img:last-child{right:0}
-.recent-row{display:grid;grid-template-columns:34px 1fr auto;align-items:center;gap:7px}
-.recent-row>img{width:34px;height:34px;border-radius:50%;object-fit:cover}
-.recent-row div{display:grid}.recent-row strong{font-size:9px}.recent-row small{font-size:6.5px;color:#7786a2}
-.recent-row>button{min-height:32px;border:1px solid #d8e4ff;border-radius:999px;background:#f8fbff;font-weight:900;padding:0 12px;font-size:8px}
+.recent-row{display:grid;grid-template-columns:30px 1fr auto;align-items:center;gap:6px}
+.recent-row>img{width:30px;height:30px;border-radius:50%;object-fit:cover}
+.recent-row div{display:grid}.recent-row strong{font-size:8px}.recent-row small{font-size:6px;color:#7786a2}
+.recent-row>button{min-height:28px;border:1px solid #d8e4ff;border-radius:999px;background:#f8fbff;font-weight:900;padding:0 10px;font-size:7px}
 .services{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px;min-width:0}
 .services button{
-  min-height:46px;border:0;border-radius:13px;background:#eef5ff;display:grid;
+  min-height:38px;border:0;border-radius:12px;background:#eef5ff;display:grid;
   grid-template-columns:25px 1fr auto;align-items:center;padding:8px;text-align:left
 }
 .services button>b{font-size:14px}.services button span{display:grid;gap:1px}
 .services strong{font-size:7.2px}.services small{font-size:5.4px;color:#7584a1}
 .lifestyle{
-  margin:0 10px 4px;min-height:78px;border-radius:17px;background:linear-gradient(110deg,#fff3df,#e5f4ff);
-  position:relative;overflow:hidden;padding:10px;box-shadow:0 8px 22px rgba(42,86,155,.08)
+  margin:0 10px 4px;min-height:72px;border-radius:17px;background:linear-gradient(110deg,#fff3df,#e5f4ff);
+  position:relative;overflow:hidden;padding:8px 10px;box-shadow:0 8px 22px rgba(42,86,155,.08)
 }
 .lifestyle h2{font-size:13px;line-height:1.03;margin:0}
 .lifestyle p{font-size:5.8px;line-height:1.32;color:#65799c;margin:4px 0}
 .lifestyle button{min-height:32px;border:0;border-radius:999px;background:linear-gradient(90deg,#2777ff,#8e54f6);color:#fff;font-weight:900;padding:0 12px;font-size:8px}
 .lifestyle>div{position:relative;z-index:3;width:54%}
-.lifestyle>span{position:absolute;right:0;bottom:-3px;width:49%;height:78px}
-.lifestyle>span img{position:absolute;width:56px;height:78px;object-fit:contain;bottom:0}
+.lifestyle>span{position:absolute;right:0;bottom:-5px;width:52%;height:78px}
+.lifestyle>span img{position:absolute;width:78px;height:88px;object-fit:contain;bottom:0}
 .lifestyle>span img:first-child{left:-2px}.lifestyle>span img:last-child{right:-5px}
 nav{
   position:fixed;z-index:30;left:50%;bottom:0;transform:translateX(-50%);
@@ -210,3 +210,9 @@ nav button b{font-size:7px}nav .active{color:#1767f7}
 
 .hero,.quick,.categories,.section,.brand-banner,.member,.lifestyle,.products,.services{max-width:100%;min-width:0}
 .quick>*,.categories>*,.products>*,.member>*,.services>*{min-width:0}
+
+.recent{padding-top:6px;padding-bottom:6px}
+.recent .heading{margin-bottom:2px}
+.services{align-items:stretch}
+.section:has(.services){padding-top:6px;padding-bottom:6px}
+.section:has(.services) .heading{margin-bottom:2px}
