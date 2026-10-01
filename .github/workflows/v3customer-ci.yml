@@ -1,0 +1,33 @@
+name: v3customer-ci
+
+on:
+  pull_request:
+    paths:
+      - "v3customer/**"
+      - ".github/workflows/v3customer-ci.yml"
+  push:
+    branches-ignore:
+      - main
+    paths:
+      - "v3customer/**"
+      - ".github/workflows/v3customer-ci.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: v3customer
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: v3customer/package.json
+      - run: npm install --ignore-scripts
+      - run: npm run typecheck
+      - run: npm run build
