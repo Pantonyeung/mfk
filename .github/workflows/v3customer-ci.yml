@@ -181,3 +181,24 @@ jobs:
           git add v3customer/evidence/current
           git commit -m "evidence(customer): refresh 390px visual capture" || exit 0
           git push origin HEAD:temp/MFK-CUSTOMER-V3-VISUAL-EVIDENCE
+
+
+  deploy-preview:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/feat/MFK-CUSTOMER-V3-LONG-HOME-R1'
+    needs: verify
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: v3customer
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: npm install --ignore-scripts
+      - run: npm run build
+      - name: Deploy isolated V3 Customer preview
+        run: npx --yes wrangler@latest deploy --config wrangler.jsonc
