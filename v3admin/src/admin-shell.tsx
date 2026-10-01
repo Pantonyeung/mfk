@@ -11,6 +11,7 @@ import {AccessPage,BusinessDayPage,CapacityPage,CashClosePage,DevicesPage,OtaPag
 import {OrdersPage,ReportPage} from './admin-read-pages.tsx';
 import {AuditPage,DiagnosticsPage,EffectiveSettingsPage,IntegrationsPage,TodayPage} from './admin-system-pages.tsx';
 import {FormalDraftStatusBar,FormalPendingChangesPage,FormalPublishPage} from './formal-publish-pages.tsx';
+import {FormalCategoriesPage,FormalMenuDisplayPage,FormalPricingPage} from './formal-catalog-pages.tsx';
 import {
   EmptyState,
   ErrorState,
@@ -118,16 +119,16 @@ export function AdminShell({storeId,displayName,releaseStatus,canonicalState,can
         ?<OrdersPage mode="exceptions"/>
         :path==='/admin/catalog/products'
           ?<ProductListPage canonicalSnapshot={canonicalSnapshot} previewMode={previewMode} formalDraftEnabled={formalDraftEnabled} onReviewDraft={()=>navigate('/admin/publish/pending')}/>
-    :path==='/admin/catalog/categories'&&previewMode
-      ?<CategoriesPage/>
+    :path==='/admin/catalog/categories'
+      ?(previewMode?<CategoriesPage/>:formalDraftEnabled?<FormalCategoriesPage/>:<RouteSkeleton path={path} canonicalState={canonicalState} onRefresh={onRefresh}/>)
       :path==='/admin/catalog/modifiers'&&previewMode
         ?<ModifiersPage/>
         :path==='/admin/catalog/combos'&&previewMode
           ?<CombosPage/>
-          :path==='/admin/catalog/pricing'&&previewMode
-            ?<PricingPage/>
-            :path==='/admin/catalog/menu-display'&&previewMode
-              ?<MenuDisplayPage/>
+          :path==='/admin/catalog/pricing'
+            ?(previewMode?<PricingPage/>:formalDraftEnabled?<FormalPricingPage/>:<RouteSkeleton path={path} canonicalState={canonicalState} onRefresh={onRefresh}/>)
+            :path==='/admin/catalog/menu-display'
+              ?(previewMode?<MenuDisplayPage/>:formalDraftEnabled?<FormalMenuDisplayPage/>:<RouteSkeleton path={path} canonicalState={canonicalState} onRefresh={onRefresh}/>)
               :path==='/admin/availability'
                 ?<AvailabilityPage canonicalSnapshot={canonicalSnapshot} previewMode={previewMode}/>
                 :path==='/admin/business-day'&&previewMode
