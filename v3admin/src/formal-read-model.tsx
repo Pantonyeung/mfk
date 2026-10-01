@@ -186,6 +186,9 @@ interface V3ReadModelContextValue{
   readonly refundsError:Error|null;
   readonly keetaError:Error|null;
   readonly acksError:Error|null;
+  readonly allDataUpdatedAt:number;
+  readonly anyRefreshing:boolean;
+  readonly anyError:boolean;
   readonly refresh:()=>Promise<void>;
 }
 const V3ReadModelContext=createContext<V3ReadModelContextValue|null>(null);
@@ -316,6 +319,18 @@ export function V3ReadModelProvider({storeId,sessionToken,children}:{storeId:str
     };
   },[queryClient,storeId]);
 
+  const updatedTimes=[
+    orders.dataUpdatedAt,
+    reports.dataUpdatedAt,
+    refunds.dataUpdatedAt,
+    keetaStatus.dataUpdatedAt,
+    keetaCommercial.dataUpdatedAt,
+    acks.dataUpdatedAt,
+  ];
+  const allDataUpdatedAt=updatedTimes.every(value=>value>0)?Math.min(...updatedTimes):0;
+  const anyRefreshing=[orders,reports,refunds,keetaStatus,keetaCommercial,acks].some(query=>query.isFetching);
+  const anyError=[orders,reports,refunds,keetaStatus,keetaCommercial,acks].some(query=>Boolean(query.error));
+
   const value:V3ReadModelContextValue={
     orders:orders.data??[],
     days:reports.data??[],
@@ -339,6 +354,9 @@ export function V3ReadModelProvider({storeId,sessionToken,children}:{storeId:str
     refundsError:refunds.error as Error|null,
     keetaError:(keetaStatus.error??keetaCommercial.error) as Error|null,
     acksError:acks.error as Error|null,
+    allDataUpdatedAt,
+    anyRefreshing,
+    anyError,
     refresh:async()=>{await Promise.all([orders.refetch(),reports.refetch(),refunds.refetch(),keetaStatus.refetch(),keetaCommercial.refetch(),acks.refetch()]);},
   };
   return <V3ReadModelContext.Provider value={value}>{children}</V3ReadModelContext.Provider>;
