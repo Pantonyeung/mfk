@@ -9,7 +9,8 @@
     "v3customer/**",
     "docs/product/MFK_CUSTOMER_V3_LONG_HOME_VISUAL_PRD_R1_2026-10-01.md",
     "docs/product/MFK_CUSTOMER_V3_LONG_HOME_COMPONENT_MAP_R1_2026-10-01.md",
-    "docs/execution/MFK_CUSTOMER_V3_HIGH_FIDELITY_AI_IMPLEMENTATION_R1_2026-10-01.md"
+    "docs/execution/MFK_CUSTOMER_V3_HIGH_FIDELITY_AI_IMPLEMENTATION_R1_2026-10-01.md",
+    "docs/product/MFK_CUSTOMER_V3_LONG_HOME_R2_IMPLEMENTATION_LOCK_2026-10-01.md"
   ],
   "authority_impact": "NONE",
   "persistence_impact": "NONE",
