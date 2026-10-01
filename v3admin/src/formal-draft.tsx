@@ -127,6 +127,66 @@ export async function publishV3FormalDraft(input:{storeId:string;sessionToken:st
   return parseResponse(response);
 }
 
+
+export interface V3FormalCreatedProduct{
+  readonly id:string;
+  readonly productCode:string;
+  readonly name:string;
+  readonly categoryId:string;
+  readonly basePrice:string;
+  readonly description:string;
+  readonly active:boolean;
+}
+
+export interface V3FormalProductCreateResult{
+  readonly state:'CREATED';
+  readonly product:V3FormalCreatedProduct;
+  readonly draft:V3FormalAdminDraft;
+}
+
+function validateCreatedProduct(value:unknown):V3FormalCreatedProduct{
+  if(!value||typeof value!=='object'||Array.isArray(value))throw new Error('V3_ADMIN_PRODUCT_CREATE_INVALID');
+  const row=value as Record<string,unknown>;
+  if(
+    typeof row.id!=='string'||!row.id||
+    typeof row.productCode!=='string'||!row.productCode||
+    typeof row.name!=='string'||!row.name||
+    typeof row.categoryId!=='string'||!row.categoryId||
+    typeof row.basePrice!=='string'||
+    typeof row.description!=='string'||
+    typeof row.active!=='boolean'
+  )throw new Error('V3_ADMIN_PRODUCT_CREATE_INVALID');
+  return row as unknown as V3FormalCreatedProduct;
+}
+
+export async function createV3FormalProduct(input:{
+  storeId:string;
+  sessionToken:string;
+  canonical:MfkAdminConfigEnvelope;
+  currentDraft:V3FormalAdminDraft|null;
+  product:{name:string;categoryId:string;basePrice:string;description:string;active:boolean};
+}):Promise<V3FormalProductCreateResult>{
+  const payload:Record<string,unknown>={
+    baseFingerprint:input.currentDraft?.baseFingerprint??input.canonical.fingerprint,
+    basePublishedAt:input.currentDraft?.basePublishedAt??input.canonical.publishedAt,
+    product:input.product,
+  };
+  if(input.currentDraft)payload.expectedDraftRevision=input.currentDraft.draftRevision;
+  const response=await fetch(endpoint('/api/admin-browser/draft/products',input.storeId),{
+    method:'POST',
+    credentials:'include',
+    headers:authHeaders(input.sessionToken,true),
+    body:JSON.stringify(payload),
+  });
+  const body=await parseResponse(response);
+  if(body.state!=='CREATED')throw new Error('V3_ADMIN_PRODUCT_CREATE_INVALID');
+  return{
+    state:'CREATED',
+    product:validateCreatedProduct(body.product),
+    draft:validateDraft(body.draft),
+  };
+}
+
 interface FormalDraftContextValue{
   readonly canonical:MfkAdminConfigEnvelope;
   readonly draft:V3FormalAdminDraft|null;
@@ -137,6 +197,7 @@ interface FormalDraftContextValue{
   readonly error:Error|null;
   readonly saveSnapshot:(snapshot:Record<string,unknown>)=>Promise<V3FormalAdminDraft>;
   readonly mutateSnapshot:(mutator:(current:Record<string,unknown>)=>Record<string,unknown>)=>Promise<V3FormalAdminDraft>;
+  readonly createProduct:(product:{name:string;categoryId:string;basePrice:string;description:string;active:boolean})=>Promise<V3FormalProductCreateResult>;
   readonly discard:()=>Promise<void>;
   readonly publish:()=>Promise<Record<string,unknown>>;
   readonly refresh:()=>Promise<void>;
@@ -178,6 +239,18 @@ export function V3FormalDraftProvider({
     onSuccess:draft=>queryClient.setQueryData(key,draft),
   });
 
+
+  const createProductMutation=useMutation({
+    mutationFn:(product:{name:string;categoryId:string;basePrice:string;description:string;active:boolean})=>createV3FormalProduct({
+      storeId,
+      sessionToken,
+      canonical,
+      currentDraft:queryClient.getQueryData<V3FormalAdminDraft|null>(key)??null,
+      product,
+    }),
+    onSuccess:result=>queryClient.setQueryData(key,result.draft),
+  });
+
   const discardMutation=useMutation({
     mutationFn:async()=>{
       const draft=queryClient.getQueryData<V3FormalAdminDraft|null>(key)??null;
@@ -204,18 +277,19 @@ export function V3FormalDraftProvider({
     ?canonical.snapshot
     :{}) as Record<string,unknown>;
   const workingSnapshot=draft?.snapshot??canonicalSnapshot;
-  const error=(query.error??saveMutation.error??discardMutation.error??publishMutation.error) as Error|null;
+  const error=(query.error??saveMutation.error??createProductMutation.error??discardMutation.error??publishMutation.error) as Error|null;
 
   const value:FormalDraftContextValue={
     canonical,
     draft,
     workingSnapshot,
     isLoading:query.isPending,
-    isSaving:saveMutation.isPending||discardMutation.isPending,
+    isSaving:saveMutation.isPending||createProductMutation.isPending||discardMutation.isPending,
     isPublishing:publishMutation.isPending,
     error,
     saveSnapshot:snapshot=>saveMutation.mutateAsync(snapshot),
     mutateSnapshot:mutator=>saveMutation.mutateAsync(mutator(workingSnapshot)),
+    createProduct:product=>createProductMutation.mutateAsync(product),
     discard:async()=>{await discardMutation.mutateAsync();},
     publish:()=>publishMutation.mutateAsync(),
     refresh:async()=>{await query.refetch();},
