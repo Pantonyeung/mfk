@@ -169,7 +169,7 @@ interface PreviewCatalogState{
 }
 
 export const usePreviewCatalog=create<PreviewCatalogState>((set,get)=>({
-  products:[...PRODUCTS],
+  products:[...PREVIEW_PRODUCTS],
   optionSets:[...OPTION_SETS],
   combos:[...COMBOS],
   diningTables:[...DINING_TABLES],
