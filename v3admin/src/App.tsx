@@ -14,7 +14,7 @@ import {scopeFromSession} from './scope.ts';
 import {V3_ADMIN_STATE_AUTHORITY,V3_DATA_REFETCH_INTERVAL_MS,resetV3AdminServerQueries,useV3AdminUi} from './state-authority.ts';
 import {V3FormalDraftProvider,useV3FormalDraft} from './formal-draft.tsx';
 import type {MfkAdminConfigEnvelope} from '../../contracts/admin-config-sync-v1.ts';
-import {V3ReadModelProvider} from './formal-read-model.tsx';
+import {V3ReadModelProvider,useV3ReadModels} from './formal-read-model.tsx';
 
 function hkTime(value:string){
   const at=Date.parse(value);
@@ -43,23 +43,26 @@ function ReleaseStatus({match,pending,error,servingId}:{match:boolean|null;pendi
 }
 
 function FreshnessStatus({
-  updatedAt,
+  canonicalUpdatedAt,
+  liveUpdatedAt,
   fetching,
   error,
   resetBusy,
   onReset,
 }:{
-  updatedAt:number;
+  canonicalUpdatedAt:number;
+  liveUpdatedAt:number;
   fetching:boolean;
   error:boolean;
   resetBusy:boolean;
   onReset:()=>void;
 }){
-  const last=updatedAt>0?hkTime(new Date(updatedAt).toISOString()):'未有成功同步';
+  const canonicalLast=canonicalUpdatedAt>0?hkTime(new Date(canonicalUpdatedAt).toISOString()):'未有成功同步';
+  const liveLast=liveUpdatedAt>0?hkTime(new Date(liveUpdatedAt).toISOString()):'未完成全量同步';
   return <section className="v3-freshness-strip" data-state={error?'danger':fetching?'pending':'ok'} aria-live="polite">
-    <div><span>正式資料狀態</span><strong>{error?'重新同步失敗 · 顯示上次成功資料':fetching?'正在向伺服器重新同步…':'已向伺服器確認'}</strong></div>
-    <div><span>最後成功同步</span><strong>{last}</strong></div>
-    <div><span>自動重新確認</span><strong>開頁／回到前景／網絡重連／每 {Math.round(V3_DATA_REFETCH_INTERVAL_MS/1000)} 秒</strong></div>
+    <div><span>正式設定最後確認</span><strong>{canonicalLast}</strong></div>
+    <div><span>營運資料全量確認</span><strong>{liveLast}</strong></div>
+    <div><span>同步狀態</span><strong>{error?'部分資料重新同步失敗':fetching?'正在向伺服器重新同步…':'已向伺服器重新確認'} · 每 {Math.round(V3_DATA_REFETCH_INTERVAL_MS/1000)} 秒 fallback</strong></div>
     <button type="button" disabled={resetBusy} onClick={onReset}>{resetBusy?'重新同步中…':'清除暫存並重新同步'}</button>
   </section>;
 }
@@ -96,6 +99,11 @@ function AuthenticatedAdminShell({
   backendSha,
   diagnosticsOpen,
   onRefresh,
+  canonicalUpdatedAt,
+  canonicalFetching,
+  canonicalError,
+  resetBusy,
+  onResetFresh,
   onDiagnostics,
   onSignOut,
 }:{
@@ -106,15 +114,29 @@ function AuthenticatedAdminShell({
   releaseStatus:ReactNode;
   backendSha?:string;
   diagnosticsOpen:boolean;
+  canonicalUpdatedAt:number;
+  canonicalFetching:boolean;
+  canonicalError:boolean;
+  resetBusy:boolean;
+  onResetFresh:()=>void;
   onRefresh:()=>void;
   onDiagnostics:()=>void;
   onSignOut:()=>void;
 }){
   const formalDraft=useV3FormalDraft();
+  const readModels=useV3ReadModels();
+  const freshness=<FreshnessStatus
+    canonicalUpdatedAt={canonicalUpdatedAt}
+    liveUpdatedAt={readModels.allDataUpdatedAt}
+    fetching={canonicalFetching||readModels.anyRefreshing}
+    error={canonicalError||readModels.anyError}
+    resetBusy={resetBusy}
+    onReset={onResetFresh}
+  />;
   return <AdminShell
     storeId={storeId}
     displayName={session.displayName}
-    releaseStatus={releaseStatus}
+    releaseStatus={<>{releaseStatus}{freshness}</>}
     canonicalState={canonicalState}
     canonicalSnapshot={formalDraft.workingSnapshot}
     formalDraftEnabled
@@ -211,13 +233,6 @@ export function V3AdminApp(){
   const canonicalState=canonical.data?(canonical.isRefetchError?'stale':canonical.isFetching?'refreshing':'fresh'):canonical.isError?'error':'pending';
   const shellReleaseStatus=<>
     {releaseStatus}
-    <FreshnessStatus
-      updatedAt={canonical.dataUpdatedAt}
-      fetching={canonical.isFetching}
-      error={canonical.isRefetchError||canonical.isError}
-      resetBusy={freshResetBusy}
-      onReset={()=>void resetFreshData()}
-    />
     {releaseMatch!==true?<div className="v3-warning v3-release-warning" role="alert">目前 Client Release 未確認一致。請先載入最新版本；唔應以舊 Client 判斷正式資料。</div>:null}
   </>;
   if(!scope||!canonical.data){
@@ -248,6 +263,11 @@ export function V3AdminApp(){
         releaseStatus={shellReleaseStatus}
         backendSha={health.data?.sourceSha}
         diagnosticsOpen={diagnosticsOpen}
+        canonicalUpdatedAt={canonical.dataUpdatedAt}
+        canonicalFetching={canonical.isFetching}
+        canonicalError={canonical.isRefetchError||canonical.isError}
+        resetBusy={freshResetBusy}
+        onResetFresh={()=>void resetFreshData()}
         onRefresh={()=>void canonical.refetch()}
         onDiagnostics={()=>setDiagnosticsOpen(!diagnosticsOpen)}
         onSignOut={()=>void signOut()}
