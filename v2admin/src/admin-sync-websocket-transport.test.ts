@@ -119,7 +119,9 @@ describe('Admin realtime transport recovery',()=>{
     const client=readFileSync(new URL('../../v2local/src/runtime/admin-config-sync.ts',import.meta.url),'utf8');
     const messageHandler=client.slice(client.indexOf("socket.addEventListener('message'"),client.indexOf("socket.addEventListener('close'"));
     expect(messageHandler).toContain("row.type==='ADMIN_CONFIG_AVAILABLE'");
-    expect(messageHandler).toContain('void fetchAndApplyAdminConfig()');
+    expect(messageHandler).toContain("row.type==='PORT_HEAD_AVAILABLE'&&row.port==='SMT'");
+    expect(messageHandler).toContain('void reconcileSmtCheckpointedSync()');
+    expect(messageHandler).not.toContain('void fetchAndApplyAdminConfig()');
     expect(messageHandler).not.toContain('Number(row.revision)>current.revision');
     expect(messageHandler).not.toContain("Date.parse(String(row.publishedAt||''))");
     expect(messageHandler).not.toMatch(/location\.reload|location\.replace/);
