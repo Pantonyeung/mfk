@@ -3,7 +3,7 @@ import {useV3FormalDraft,V3FormalDraftHttpError} from './formal-draft.tsx';
 import {
   createFormalCategory,
   moveFormalCategory,
-  moveFormalProduct,
+  moveFormalProductWithinCategory,
   patchFormalCatalogProduct,
   patchFormalCategory,
   patchFormalComboPrice,
@@ -172,7 +172,7 @@ export function FormalMenuDisplayPage(){
   };
   const moveProduct=async(id:string,direction:-1|1)=>{
     setError('');
-    try{await formal.mutateSnapshot(snapshot=>moveFormalProduct(snapshot,id,direction));}
+    try{await formal.mutateSnapshot(snapshot=>moveFormalProductWithinCategory(snapshot,id,direction));}
     catch(err){setError(errorCopy(err));}
   };
   const products=catalog.products.filter(product=>product.categoryId===selectedCategory);
