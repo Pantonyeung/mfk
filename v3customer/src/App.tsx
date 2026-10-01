@@ -20,7 +20,7 @@ function Header(){
 function Hero(){
   return <section className="hero" aria-labelledby="hero-title">
     <div className="hero-world" aria-hidden="true">
-      <img className="hero-world-bg" src="/brand/r3/hero-world-bg-r3.webp" alt=""/>
+      <img className="hero-world-bg" src="/media/customer/hero/hero-background-main.png" alt=""/>
       <span className="hero-world-vignette"/>
     </div>
     <div className="hero-copy">
