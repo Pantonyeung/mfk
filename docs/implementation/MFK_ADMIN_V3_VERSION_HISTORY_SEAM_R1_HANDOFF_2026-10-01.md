@@ -1,7 +1,7 @@
 # MFK Admin V3｜Version History Seam R1｜Handoff
 
 日期：2026-10-01  
-狀態：IMPLEMENTED / DRAFT PR / NO PROMOTE / NO DEPLOY
+狀態：LANDED TO MAIN / NO DEPLOY / NO OTA
 
 ## 目的
 
@@ -88,4 +88,11 @@ GitHub Actions evidence：
 PR #613（Product Create + Product Code seam）亦修改 `v2admin/worker.ts`。
 兩者任何一個先 merge，另一個 merge 前必須 fresh main / conflict check / full v2admin suite rerun。
 
-MILESTONE: MFK_ADMIN_V3_VERSION_HISTORY_SEAM_R1_IMPLEMENTED_GREEN_PENDING_PROMOTE
+MILESTONE: MFK_ADMIN_V3_VERSION_HISTORY_SEAM_R1_LANDED_MAIN
+
+
+## Landing Readback
+
+- Main merge SHA: `b52830172f82cdf5ea76ccc2dd15b5019a14ec6e`
+- Version-history PR #614 landed first; rollback landing PR #616 landed after all checks green.
+- Production route / hostname / deploy / OTA remains untouched.
