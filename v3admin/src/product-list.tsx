@@ -23,6 +23,7 @@ export type ProductListRecord={
   optionSetCount?:number;
   comboCount?:number;
   printDestinationNames?:Partial<Record<ProductPrintTarget,readonly string[]>>;
+  printTemplateNames?:Partial<Record<ProductPrintTarget,string>>;
 };
 
 const STATUS_OPTIONS=['全部','已發佈','草稿','待回讀','已停用'] as const;
@@ -56,8 +57,9 @@ export function productPrintSummary(targets:readonly ProductPrintTarget[]){
 export function productPrintConfigCanSave(
   targets:readonly ProductPrintTarget[],
   destinationIds:Partial<Record<ProductPrintTarget,readonly string[]>>,
+  templateIds:Partial<Record<ProductPrintTarget,string>>={},
 ){
-  return targets.every(target=>(destinationIds[target]?.length??0)>0);
+  return targets.every(target=>(destinationIds[target]?.length??0)>0&&Boolean(templateIds[target]));
 }
 
 
@@ -138,7 +140,7 @@ export function productRecordsFromSnapshot(snapshot:unknown):ProductListRecord[]
   });
 }
 
-function previewRecord(product:PreviewProduct,comboCount:number,printDestinationNames:Partial<Record<ProductPrintTarget,readonly string[]>>):ProductListRecord{
+function previewRecord(product:PreviewProduct,comboCount:number,printDestinationNames:Partial<Record<ProductPrintTarget,readonly string[]>>,printTemplateNames:Partial<Record<ProductPrintTarget,string>>):ProductListRecord{
   return{
     id:product.id,
     name:product.name,
@@ -152,6 +154,7 @@ function previewRecord(product:PreviewProduct,comboCount:number,printDestination
     optionSetCount:product.optionSetIds.length,
     comboCount,
     printDestinationNames,
+    printTemplateNames,
   };
 }
 
@@ -170,7 +173,7 @@ function ProductDrawer({product,onClose}:{product:ProductListRecord;onClose:()=>
         <div><dt>分類</dt><dd>{product.category}</dd></div>
         <div><dt>基本價格</dt><dd>{money(product.priceMinor)}</dd></div>
         <div><dt>狀態</dt><dd><StatusBadge tone={statusTone(product.status)}>{product.status}</StatusBadge></dd></div>
-        <div><dt>圖片</dt><dd>{product.imageUrl?'已設定':'未設定'}</dd></div><div><dt>打印</dt><dd>{product.printRule||'不打印'}{product.printDestinationNames?PRODUCT_PRINT_TARGET_OPTIONS.filter(option=>(product.printDestinationNames?.[option.id]?.length??0)>0).map(option=><small key={option.id}>{option.label} → {product.printDestinationNames?.[option.id]?.join('、')}</small>):null}</dd></div>
+        <div><dt>圖片</dt><dd>{product.imageUrl?'已設定':'未設定'}</dd></div><div><dt>打印</dt><dd>{product.printRule||'不打印'}{product.printDestinationNames?PRODUCT_PRINT_TARGET_OPTIONS.filter(option=>(product.printDestinationNames?.[option.id]?.length??0)>0).map(option=><small key={option.id}>{option.label} → {product.printDestinationNames?.[option.id]?.join('、')}{product.printTemplateNames?.[option.id]?' · '+product.printTemplateNames?.[option.id]:''}</small>):null}</dd></div>
       </dl>
     </aside>
   </>;
@@ -228,7 +231,9 @@ function PreviewProductEditor({productId,onClose}:{productId:string|null;onClose
   const createProduct=usePreviewCatalog(state=>state.createProduct);
   const updateProduct=usePreviewCatalog(state=>state.updateProduct);
   const logicalPrinters=usePreviewAdmin(state=>state.printers);
+  const printTemplates=usePreviewAdmin(state=>state.templates);
   const activePrinters=logicalPrinters.filter(printer=>printer.active);
+  const activeTemplates=printTemplates.filter(template=>template.active);
   const [draftId]=useState(()=>product?.id??'draft-'+crypto.randomUUID());
   const [name,setName]=useState(product?.name??'');
   const [category,setCategory]=useState(product?.category??categories.find(item=>item.active)?.name??'');
@@ -242,6 +247,7 @@ function PreviewProductEditor({productId,onClose}:{productId:string|null;onClose
     LABEL:new Set(product?.printDestinationIds.LABEL??[]),
     RECEIPT:new Set(product?.printDestinationIds.RECEIPT??[]),
   }));
+  const [printTemplateIds,setPrintTemplateIds]=useState<Partial<Record<ProductPrintTarget,string>>>(()=>({...product?.printTemplateIds}));
   const [customerImage,setCustomerImage]=useState(product?.customerImageUrl??'');
   const [keetaImage,setKeetaImage]=useState(product?.channelImages.KEETA??'');
   const [optionIds,setOptionIds]=useState<Set<string>>(new Set(product?.optionSetIds??[]));
@@ -251,7 +257,7 @@ function PreviewProductEditor({productId,onClose}:{productId:string|null;onClose
     LABEL:[...printDestinationIds.LABEL],
     RECEIPT:[...printDestinationIds.RECEIPT],
   };
-  const valid=productFormCanSave({name,category,price})&&productPrintConfigCanSave([...printTargets],destinationSnapshot);
+  const valid=productFormCanSave({name,category,price})&&productPrintConfigCanSave([...printTargets],destinationSnapshot,printTemplateIds);
   const editing=Boolean(product);
 
   const relatedCombos=combos.filter(combo=>combo.groups.some(group=>group.choices.some(choice=>choice.productId===product?.id)));
@@ -272,6 +278,7 @@ function PreviewProductEditor({productId,onClose}:{productId:string|null;onClose
         LABEL:printTargets.has('LABEL')?[...printDestinationIds.LABEL]:[],
         RECEIPT:printTargets.has('RECEIPT')?[...printDestinationIds.RECEIPT]:[],
       },
+      printTemplateIds:Object.fromEntries([...printTargets].map(target=>[target,printTemplateIds[target]]).filter(([,value])=>Boolean(value))) as Partial<Record<ProductPrintTarget,string>>,
     };
     if(product){
       updateProduct(product.id,{...base,status:active?'草稿':'已停用'});
@@ -345,6 +352,10 @@ function PreviewProductEditor({productId,onClose}:{productId:string|null;onClose
                     if(matches.length===1&&printDestinationIds[option.id].size===0){
                       setPrintDestinationIds(current=>({...current,[option.id]:new Set([matches[0].id])}));
                     }
+                    const templates=activeTemplates.filter(template=>template.type===option.id);
+                    if(templates.length===1&&!printTemplateIds[option.id]){
+                      setPrintTemplateIds(current=>({...current,[option.id]:templates[0].id}));
+                    }
                   }
                 }}
               />
@@ -373,6 +384,9 @@ function PreviewProductEditor({productId,onClose}:{productId:string|null;onClose
               </div>
               {!printers.length?<div className="v3-error">未有啟用中嘅 {option?.label} Logical Printer；請先去「打印管理 → 邏輯打印機」建立。</div>:null}
               {printers.length>0&&!selected.size?<div className="v3-error">已選「{option?.label}」，必須最少指定一個 Logical Printer 先可以儲存。</div>:null}
+              <label className="v3-print-template-select"><span>{option?.label} Template *</span><select value={printTemplateIds[target]??''} onChange={event=>setPrintTemplateIds(current=>({...current,[target]:event.target.value}))}><option value="">請選擇 Template</option>{activeTemplates.filter(template=>template.type===target).map(template=><option key={template.id} value={template.id}>{template.name}</option>)}</select></label>
+              {!activeTemplates.some(template=>template.type===target)?<div className="v3-error">未有啟用中嘅 {option?.label} Template；請先去「打印管理 → 打印模板」建立。</div>:null}
+              {activeTemplates.some(template=>template.type===target)&&!printTemplateIds[target]?<div className="v3-error">已選「{option?.label}」，必須指定 Template 先可以儲存。</div>:null}
             </div>;
           })}
           <div className="v3-mobile-form-note">
@@ -380,7 +394,8 @@ function PreviewProductEditor({productId,onClose}:{productId:string|null;onClose
             {[...printTargets].map(target=>{
               const option=PRODUCT_PRINT_TARGET_OPTIONS.find(item=>item.id===target);
               const names=activePrinters.filter(printer=>printDestinationIds[target].has(printer.id)).map(printer=>printer.name);
-              return names.length?<span key={target}> · {option?.label} → {names.join('、')}</span>:null;
+              const templateName=activeTemplates.find(template=>template.id===printTemplateIds[target])?.name;
+              return names.length?<span key={target}> · {option?.label} → {names.join('、')}{templateName?' · '+templateName:''}</span>:null;
             })}
           </div>
         </section>
@@ -400,7 +415,9 @@ export function ProductListPage({canonicalSnapshot,previewMode=false,onReviewDra
   const previewCategories=usePreviewCatalog(state=>state.categories);
   const combos=usePreviewCatalog(state=>state.combos);
   const logicalPrinters=usePreviewAdmin(state=>state.printers);
+  const printTemplates=usePreviewAdmin(state=>state.templates);
   const printerNameById=useMemo(()=>new Map(logicalPrinters.map(printer=>[printer.id,printer.name])),[logicalPrinters]);
+  const templateNameById=useMemo(()=>new Map(printTemplates.map(template=>[template.id,template.name])),[printTemplates]);
   const previewRows=useMemo(()=>previewProducts.map(product=>{
     const names:Partial<Record<ProductPrintTarget,readonly string[]>>={
       PRODUCTION:product.printDestinationIds.PRODUCTION.map(id=>printerNameById.get(id)??id),
@@ -408,8 +425,14 @@ export function ProductListPage({canonicalSnapshot,previewMode=false,onReviewDra
       LABEL:product.printDestinationIds.LABEL.map(id=>printerNameById.get(id)??id),
       RECEIPT:product.printDestinationIds.RECEIPT.map(id=>printerNameById.get(id)??id),
     };
-    return previewRecord(product,combos.filter(combo=>combo.groups.some(group=>group.choices.some(choice=>choice.productId===product.id))).length,names);
-  }),[previewProducts,combos,printerNameById]);
+    const templateNames:Partial<Record<ProductPrintTarget,string>>={
+      PRODUCTION:product.printTemplateIds.PRODUCTION?templateNameById.get(product.printTemplateIds.PRODUCTION)??product.printTemplateIds.PRODUCTION:undefined,
+      PACKING:product.printTemplateIds.PACKING?templateNameById.get(product.printTemplateIds.PACKING)??product.printTemplateIds.PACKING:undefined,
+      LABEL:product.printTemplateIds.LABEL?templateNameById.get(product.printTemplateIds.LABEL)??product.printTemplateIds.LABEL:undefined,
+      RECEIPT:product.printTemplateIds.RECEIPT?templateNameById.get(product.printTemplateIds.RECEIPT)??product.printTemplateIds.RECEIPT:undefined,
+    };
+    return previewRecord(product,combos.filter(combo=>combo.groups.some(group=>group.choices.some(choice=>choice.productId===product.id))).length,names,templateNames);
+  }),[previewProducts,combos,printerNameById,templateNameById]);
   const sourceRows=previewMode?previewRows:canonicalRows;
 
   const [query,setQuery]=useState('');
