@@ -12,6 +12,7 @@ import {
   type FormalKeetaMapping,
 } from './formal-channel.ts';
 import {PageHeader,StatusBadge} from './ui.tsx';
+import {useV3ReadModels} from './formal-read-model.tsx';
 
 function errorCopy(error:unknown){
   if(error instanceof V3FormalDraftHttpError){
@@ -75,6 +76,7 @@ function MappingEditor({mapping,onClose}:{mapping:FormalKeetaMapping;onClose:()=
 
 export function FormalChannelPage({mode}:{mode:'overview'|'accept'|'sync'|'binding'|'mapping'|'failures'|'estimate'}){
   const formal=useV3FormalDraft();
+  const read=useV3ReadModels();
   const policy=useMemo(()=>readFormalKeetaPolicy(formal.workingSnapshot),[formal.workingSnapshot]);
   const mappings=useMemo(()=>readFormalKeetaMappings(formal.workingSnapshot),[formal.workingSnapshot]);
   const mappingErrors=useMemo(()=>validateFormalKeetaMappings(formal.workingSnapshot,mappings),[formal.workingSnapshot,mappings]);
@@ -93,13 +95,26 @@ export function FormalChannelPage({mode}:{mode:'overview'|'accept'|'sync'|'bindi
     <PageHeader eyebrow="平台／渠道管理" title={title} description="Admin-owned Keeta policy / mapping 會寫 Formal Server Draft；Provider live command 同 readback 仍係獨立 integration authority。" aside={mode==='mapping'?<button className="v3-primary" type="button" onClick={()=>setSelected(newMapping())}>＋ 新增映射</button>:undefined}/>
     {error?<div className="v3-error">{error}</div>:null}
 
-    {mode==='overview'?<section className="v3-functional-section">
-      <header><div><h3>Keeta 平台設定</h3><p>呢度係正式 Admin config；OAuth / Provider live health 唔會由 browser state 冒充。</p></div><StatusBadge tone={draftPolicy.enabled?'good':'neutral'}>{draftPolicy.enabled?'設定啟用':'設定停用'}</StatusBadge></header>
-      <label><span>顯示名稱</span><input value={draftPolicy.displayName} onChange={event=>setDraftPolicy(current=>({...current,displayName:event.target.value}))}/></label>
-      <label className="v3-functional-switch"><input type="checkbox" checked={draftPolicy.enabled} onChange={event=>setDraftPolicy(current=>({...current,enabled:event.target.checked}))}/><span>啟用平台設定</span></label>
-      <button className="v3-primary" type="button" disabled={formal.isSaving} onClick={()=>void savePolicy()}>儲存正式草稿</button>
-      <div className="v3-mobile-form-note">Live Status：{FORMAL_KEETA_PROVIDER_GAPS.liveStatus}</div>
-    </section>:null}
+    {mode==='overview'?<>
+      <section className="v3-functional-section">
+        <header><div><h3>Keeta 平台設定</h3><p>Admin config 由 Formal Draft 管理。</p></div><StatusBadge tone={draftPolicy.enabled?'good':'neutral'}>{draftPolicy.enabled?'設定啟用':'設定停用'}</StatusBadge></header>
+        <label><span>顯示名稱</span><input value={draftPolicy.displayName} onChange={event=>setDraftPolicy(current=>({...current,displayName:event.target.value}))}/></label>
+        <label className="v3-functional-switch"><input type="checkbox" checked={draftPolicy.enabled} onChange={event=>setDraftPolicy(current=>({...current,enabled:event.target.checked}))}/><span>啟用平台設定</span></label>
+        <button className="v3-primary" type="button" disabled={formal.isSaving} onClick={()=>void savePolicy()}>儲存正式草稿</button>
+      </section>
+      <section className="v3-functional-section">
+        <header><div><h3>Keeta Live Runtime</h3><p>直接讀 Provider integration runtime；同 Admin config 分開。</p></div><StatusBadge tone={read.keetaStatus?.oauth.state==='CONNECTED'?'good':'warning'}>{read.keetaStatus?.oauth.state??(read.keetaPending?'讀取中':'結果未明')}</StatusBadge></header>
+        {read.keetaError?<div className="v3-error">{read.keetaError.message}</div>:null}
+        {read.keetaStatus?<div className="v3-formal-draft-meta">
+          <div><span>Provider Shop</span><strong>{read.keetaStatus.providerShopId??'未綁定'}</strong></div>
+          <div><span>OAuth</span><strong>{read.keetaStatus.oauth.state}</strong></div>
+          <div><span>Token 到期</span><strong>{read.keetaStatus.oauth.expiresAt??'—'}</strong></div>
+          <div><span>Webhook Accepted</span><strong>{read.keetaStatus.webhook.acceptedCount}</strong></div>
+          <div><span>Webhook Duplicate</span><strong>{read.keetaStatus.webhook.duplicateCount}</strong></div>
+          <div><span>Webhook Conflict</span><strong>{read.keetaStatus.webhook.conflictCount}</strong></div>
+        </div>:<div className="v3-mobile-form-note">未有 Keeta runtime readback。</div>}
+      </section>
+    </>:null}
 
     {mode==='accept'?<section className="v3-functional-section">
       <h3>接單規則</h3>
@@ -123,7 +138,8 @@ export function FormalChannelPage({mode}:{mode:'overview'|'accept'|'sync'|'bindi
     </section>:null}
 
     {mode==='binding'?<section className="v3-functional-section">
-      <header><div><h3>Keeta 門店綁定</h3><p>未驗證到可以安全用 Canonical Draft 改 Provider Shop identity，所以唔會喺 V3 假設一個可寫欄位。</p></div><StatusBadge tone="warning">INTEGRATION SEAM REQUIRED</StatusBadge></header>
+      <header><div><h3>Keeta 門店綁定</h3><p>Provider Shop identity 直接由 runtime readback 顯示；未有 verified mutation seam 前保持只讀。</p></div><StatusBadge tone={read.keetaStatus?.providerShopId?'good':'warning'}>{read.keetaStatus?.providerShopId?'已綁定':'未確認'}</StatusBadge></header>
+      {read.keetaStatus?<div className="v3-formal-draft-meta"><div><span>Canonical Store</span><strong>{read.keetaStatus.canonicalStoreId}</strong></div><div><span>Provider Shop</span><strong>{read.keetaStatus.providerShopId??'—'}</strong></div><div><span>OAuth</span><strong>{read.keetaStatus.oauth.state}</strong></div></div>:null}
       <div className="v3-mobile-form-note">{FORMAL_KEETA_PROVIDER_GAPS.storeBinding}</div>
     </section>:null}
 
