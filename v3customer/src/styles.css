@@ -34,7 +34,7 @@ button:focus-visible{outline:3px solid rgba(23,103,247,.35);outline-offset:2px}
 main{display:grid;grid-template-columns:minmax(0,1fr);gap:3px;min-width:0}
 #menu-discovery,#chef-picks,#recent-order{scroll-margin-top:12px}
 .hero{
-  position:relative;height:214px;min-height:214px;display:block;
+  position:relative;height:208px;min-height:208px;display:block;
   padding:0;overflow:hidden;background:#dcecff;min-width:0
 }
 .hero:before{
@@ -55,7 +55,7 @@ main{display:grid;grid-template-columns:minmax(0,1fr);gap:3px;min-width:0}
     radial-gradient(circle at 18% 16%,rgba(255,255,255,.58),transparent 26%),
     linear-gradient(180deg,rgba(255,255,255,.02),rgba(255,255,255,.08) 66%,rgba(255,255,255,.26));
 }
-.hero-copy{position:absolute;z-index:8;left:12px;top:52px;width:44%;padding:0}
+.hero-copy{position:absolute;z-index:8;left:12px;top:50px;width:44%;padding:0}
 .hero-copy em{font-family:cursive;color:#3977e7;font-size:12px;font-weight:900}
 .hero h1{margin:2px 0 4px;font-size:25px;line-height:1.01;letter-spacing:-.04em;text-wrap:balance}
 .hero-copy>strong{display:block;font-size:8px;margin-top:2px}
@@ -68,7 +68,7 @@ main{display:grid;grid-template-columns:minmax(0,1fr);gap:3px;min-width:0}
 .hero-copy>button:hover{transform:translateY(-1px);box-shadow:0 17px 32px rgba(80,86,234,.34)}
 .hero-copy>button:active{transform:translateY(1px)}
 .hero-copy small{display:block;margin-top:5px;font-size:6px;white-space:nowrap}
-.hero-visual{position:absolute;right:-3px;top:34px;width:72%;height:180px;z-index:3}
+.hero-visual{position:absolute;right:-3px;top:32px;width:72%;height:176px;z-index:3}
 .cloud{position:absolute;border-radius:45% 55% 60% 40%;background:rgba(255,255,255,.55);filter:blur(.1px)}
 .c1{width:190px;height:112px;right:-56px;top:6px;transform:rotate(-10deg)}
 .c2{width:180px;height:100px;left:-24px;bottom:22px;transform:rotate(9deg)}
@@ -90,7 +90,7 @@ main{display:grid;grid-template-columns:minmax(0,1fr);gap:3px;min-width:0}
   background:rgba(255,255,255,.95);border-radius:24px;box-shadow:var(--shadow)
 }
 .card{
-  position:relative;min-height:66px;border:0;border-radius:14px;text-align:left;
+  position:relative;min-height:62px;border:0;border-radius:14px;text-align:left;
   padding:7px 6px;display:grid;grid-template-rows:auto 1fr;overflow:hidden;min-width:0
 }
 .card>div{display:grid;gap:2px}
@@ -107,7 +107,7 @@ main{display:grid;grid-template-columns:minmax(0,1fr);gap:3px;min-width:0}
   background:#fff;border-radius:22px;box-shadow:0 8px 22px rgba(42,86,155,.08)
 }
 .cat{
-  border:0;border-radius:13px;min-height:58px;padding:5px 3px;display:grid;min-width:0;
+  border:0;border-radius:13px;min-height:56px;padding:4px 3px;display:grid;min-width:0;
   justify-items:center;align-content:center;gap:4px;text-align:center
 }
 .cat b{font-size:18px}.cat strong{font-size:8px}.cat small{font-size:5.8px;color:#65799a;line-height:1.12}
@@ -122,7 +122,7 @@ main{display:grid;grid-template-columns:minmax(0,1fr);gap:3px;min-width:0}
 .products{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px;overflow:hidden;min-width:0}
 .products::-webkit-scrollbar{display:none}
 .products article{border:1px solid var(--line);border-radius:12px;overflow:hidden;padding-bottom:4px;min-width:0}
-.media{position:relative;height:48px;background:#f3f5fb}
+.media{position:relative;height:44px;background:#f3f5fb}
 .media img{width:100%;height:100%;object-fit:cover}
 .media button{position:absolute;right:3px;top:3px;width:26px;height:26px;border:0;border-radius:50%;background:#fff}
 .products article>strong,.products article>small{display:block;padding:0 8px}
@@ -132,7 +132,7 @@ main{display:grid;grid-template-columns:minmax(0,1fr);gap:3px;min-width:0}
 .products footer b{font-size:10px}
 .products footer button{width:28px;height:28px;border:0;border-radius:50%;background:#2d73ff;color:white;font-size:15px}
 .brand-banner{
-  margin:0 10px;min-height:62px;border-radius:17px;position:relative;overflow:hidden;
+  margin:0 10px;min-height:58px;border-radius:17px;position:relative;overflow:hidden;
   background:linear-gradient(90deg,#dfeeff,#eadcff 56%,#f4dafa);
   box-shadow:0 8px 22px rgba(42,86,155,.08)
 }
@@ -143,7 +143,7 @@ main{display:grid;grid-template-columns:minmax(0,1fr);gap:3px;min-width:0}
 .brand-banner>p{position:absolute;right:8px;top:10px;text-align:right;font-family:cursive;color:#a153dd;font-weight:900;font-size:7px}
 .member{margin:0 10px;display:grid;grid-template-columns:1fr 1fr;gap:6px;min-width:0}
 .member>button{
-  min-height:62px;border:0;border-radius:15px;padding:8px;text-align:left;
+  min-height:58px;border:0;border-radius:15px;padding:7px;text-align:left;
   display:grid;grid-template-columns:30px 1fr;position:relative;overflow:hidden
 }
 .member>button:first-child{background:#e5efff}.member>button:last-child{background:#fff1db}
@@ -160,21 +160,21 @@ main{display:grid;grid-template-columns:minmax(0,1fr);gap:3px;min-width:0}
 .recent-row>button{min-height:28px;border:1px solid #d8e4ff;border-radius:999px;background:#f8fbff;font-weight:900;padding:0 10px;font-size:7px}
 .services{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px;min-width:0}
 .services button{
-  min-height:38px;border:0;border-radius:12px;background:#eef5ff;display:grid;
+  min-height:34px;border:0;border-radius:12px;background:#eef5ff;display:grid;
   grid-template-columns:25px 1fr auto;align-items:center;padding:8px;text-align:left
 }
 .services button>b{font-size:14px}.services button span{display:grid;gap:1px}
 .services strong{font-size:7.2px}.services small{font-size:5.4px;color:#7584a1}
 .lifestyle{
-  margin:0 10px 4px;min-height:72px;border-radius:17px;background:linear-gradient(110deg,#fff3df,#e5f4ff);
-  position:relative;overflow:hidden;padding:8px 10px;box-shadow:0 8px 22px rgba(42,86,155,.08)
+  margin:0 10px 4px;min-height:68px;border-radius:17px;background:linear-gradient(110deg,#fff3df,#e5f4ff);
+  position:relative;overflow:hidden;padding:7px 10px;box-shadow:0 8px 22px rgba(42,86,155,.08)
 }
 .lifestyle h2{font-size:13px;line-height:1.03;margin:0}
 .lifestyle p{font-size:5.8px;line-height:1.32;color:#65799c;margin:4px 0}
 .lifestyle button{min-height:32px;border:0;border-radius:999px;background:linear-gradient(90deg,#2777ff,#8e54f6);color:#fff;font-weight:900;padding:0 12px;font-size:8px}
 .lifestyle>div{position:relative;z-index:3;width:54%}
-.lifestyle>span{position:absolute;right:0;bottom:-5px;width:52%;height:78px}
-.lifestyle>span img{position:absolute;width:78px;height:88px;object-fit:contain;bottom:0}
+.lifestyle>span{position:absolute;right:0;bottom:-4px;width:52%;height:70px}
+.lifestyle>span img{position:absolute;width:72px;height:80px;object-fit:contain;bottom:0}
 .lifestyle>span img:first-child{left:-2px}.lifestyle>span img:last-child{right:-5px}
 nav{
   position:fixed;z-index:30;left:50%;bottom:0;transform:translateX(-50%);
@@ -211,7 +211,7 @@ nav button b{font-size:7px}nav .active{color:#1767f7}
 .hero,.quick,.categories,.section,.brand-banner,.member,.lifestyle,.products,.services{max-width:100%;min-width:0}
 .quick>*,.categories>*,.products>*,.member>*,.services>*{min-width:0}
 
-.recent{padding-top:6px;padding-bottom:6px}
+.recent{padding-top:4px;padding-bottom:4px}
 .recent .heading{margin-bottom:2px}
 .services{align-items:stretch}
 .section:has(.services){padding-top:6px;padding-bottom:6px}
