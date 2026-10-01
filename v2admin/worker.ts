@@ -2607,6 +2607,12 @@ export default {
         return new Response(response.body,{status:response.status,statusText:response.statusText,headers});
       }
 
+      if(url.pathname==='/api/customer/events'){
+        if(request.headers.get('upgrade')!=='websocket')return json({code:'WEBSOCKET_REQUIRED'},426,cors(request));
+        if(request.headers.get('origin')!==CUSTOMER_ORIGIN)return json({code:'CUSTOMER_EVENT_ORIGIN_FORBIDDEN'},403,cors(request));
+        return customer.fetch(new Request('https://customer-runtime/public/events',{method:'GET',headers:new Headers(request.headers)}));
+      }
+
       if(url.pathname==='/api/customer/channel-health'){
         if(request.method!=='GET')return json({code:'METHOD_NOT_ALLOWED'},405,cors(request));
         const response=await customer.fetch(new Request('https://internal/public/channel-health',{method:'GET'}));
