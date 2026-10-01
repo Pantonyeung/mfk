@@ -13,16 +13,6 @@
     "bottom": 569.59375,
     "left": 0
   },
-  "cta": {
-    "x": 18,
-    "y": 335.640625,
-    "width": 148,
-    "height": 54,
-    "top": 335.640625,
-    "right": 166,
-    "bottom": 389.640625,
-    "left": 18
-  },
   "quick": {
     "x": 14,
     "y": 555.59375,
@@ -31,90 +21,6 @@
     "top": 555.59375,
     "right": 376,
     "bottom": 815.59375,
-    "left": 14
-  },
-  "quickCards": [
-    {
-      "x": 26,
-      "y": 567.59375,
-      "width": 163,
-      "height": 112,
-      "top": 567.59375,
-      "right": 189,
-      "bottom": 679.59375,
-      "left": 26
-    },
-    {
-      "x": 201,
-      "y": 567.59375,
-      "width": 163,
-      "height": 112,
-      "top": 567.59375,
-      "right": 364,
-      "bottom": 679.59375,
-      "left": 201
-    },
-    {
-      "x": 26,
-      "y": 691.59375,
-      "width": 163,
-      "height": 112,
-      "top": 691.59375,
-      "right": 189,
-      "bottom": 803.59375,
-      "left": 26
-    },
-    {
-      "x": 201,
-      "y": 691.59375,
-      "width": 163,
-      "height": 112,
-      "top": 691.59375,
-      "right": 364,
-      "bottom": 803.59375,
-      "left": 201
-    }
-  ],
-  "featured": {
-    "x": 14,
-    "y": 829.59375,
-    "width": 362,
-    "height": 366,
-    "top": 829.59375,
-    "right": 376,
-    "bottom": 1195.59375,
-    "left": 14
-  },
-  "featuredCards": [
-    {
-      "x": 30,
-      "y": 913.59375,
-      "width": 159,
-      "height": 266,
-      "top": 913.59375,
-      "right": 189,
-      "bottom": 1179.59375,
-      "left": 30
-    },
-    {
-      "x": 201,
-      "y": 913.59375,
-      "width": 159,
-      "height": 266,
-      "top": 913.59375,
-      "right": 360,
-      "bottom": 1179.59375,
-      "left": 201
-    }
-  ],
-  "recent": {
-    "x": 14,
-    "y": 1209.59375,
-    "width": 362,
-    "height": 182,
-    "top": 1209.59375,
-    "right": 376,
-    "bottom": 1391.59375,
     "left": 14
   },
   "nav": {
@@ -127,51 +33,66 @@
     "bottom": 890,
     "left": 0
   },
-  "navButtons": [
+  "sections": [
     {
-      "x": 18,
-      "y": 826,
-      "width": 88.5,
-      "height": 59,
-      "top": 826,
-      "right": 106.5,
-      "bottom": 885,
-      "left": 18
+      "index": 0,
+      "className": "hero",
+      "id": "",
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 390,
+        "height": 569.59375,
+        "top": 0,
+        "right": 390,
+        "bottom": 569.59375,
+        "left": 0
+      }
     },
     {
-      "x": 106.5,
-      "y": 826,
-      "width": 88.5,
-      "height": 59,
-      "top": 826,
-      "right": 195,
-      "bottom": 885,
-      "left": 106.5
+      "index": 1,
+      "className": "quick",
+      "id": "",
+      "rect": {
+        "x": 14,
+        "y": 555.59375,
+        "width": 362,
+        "height": 260,
+        "top": 555.59375,
+        "right": 376,
+        "bottom": 815.59375,
+        "left": 14
+      }
     },
     {
-      "x": 195,
-      "y": 826,
-      "width": 88.5,
-      "height": 59,
-      "top": 826,
-      "right": 283.5,
-      "bottom": 885,
-      "left": 195
+      "index": 2,
+      "className": "featured-section",
+      "id": "menu-discovery",
+      "rect": {
+        "x": 14,
+        "y": 829.59375,
+        "width": 362,
+        "height": 366,
+        "top": 829.59375,
+        "right": 376,
+        "bottom": 1195.59375,
+        "left": 14
+      }
     },
     {
-      "x": 283.5,
-      "y": 826,
-      "width": 88.5,
-      "height": 59,
-      "top": 826,
-      "right": 372,
-      "bottom": 885,
-      "left": 283.5
+      "index": 3,
+      "className": "recent-section",
+      "id": "recent-order",
+      "rect": {
+        "x": 14,
+        "y": 1209.59375,
+        "width": 362,
+        "height": 182,
+        "top": 1209.59375,
+        "right": 376,
+        "bottom": 1391.59375,
+        "left": 14
+      }
     }
-  ],
-  "pageScreens": 1.652,
-  "acceptance": {
-    "heroShare": 0.64,
-    "failures": []
-  }
+  ]
 }
