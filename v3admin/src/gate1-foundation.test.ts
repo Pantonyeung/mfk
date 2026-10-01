@@ -1,8 +1,9 @@
 import {afterEach,describe,expect,it,vi} from 'vitest';
+import {QueryClient} from '@tanstack/react-query';
 import {createMfkAdminConfigEnvelope} from '../../contracts/admin-config-sync-v1.ts';
 import {readV3CanonicalAdminActive,v3AdminCanonicalQueryKey} from './canonical.ts';
 import {releaseIdentityMatches,releaseVerificationMatches,V3_RELEASE_REFETCH_INTERVAL_MS} from './release.ts';
-import {V3_ADMIN_STATE_AUTHORITY,V3_DATA_REFETCH_INTERVAL_MS} from './state-authority.ts';
+import {V3_ADMIN_STATE_AUTHORITY,V3_DATA_REFETCH_INTERVAL_MS,resetV3AdminServerQueries} from './state-authority.ts';
 
 afterEach(()=>vi.unstubAllGlobals());
 
@@ -65,6 +66,15 @@ describe('Admin V3 one-shot Gate 1',()=>{
 
   it('sets a bounded automatic server revalidation interval',()=>{
     expect(V3_DATA_REFETCH_INTERVAL_MS).toBe(60_000);
+  });
+
+  it('can clear only the in-memory V3 query cache and force active queries back to server truth',async()=>{
+    const client=new QueryClient();
+    const key=['mfk','admin-v3','canonical','active','MF01'] as const;
+    client.setQueryData(key,{revision:1,source:'stale'});
+    expect(client.getQueryData(key)).toEqual({revision:1,source:'stale'});
+    await resetV3AdminServerQueries(client);
+    expect(client.getQueryData(key)).toBeUndefined();
   });
 
   it('does not enable a durable outbox by default',()=>{
