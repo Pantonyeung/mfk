@@ -1,0 +1,125 @@
+name: v3admin-preview-command
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mfk-v3admin-ui-preview
+  cancel-in-progress: true
+
+jobs:
+  publish-ui-preview:
+    if: >-
+      github.event.issue.pull_request &&
+      github.event.issue.number == 605 &&
+      github.event.comment.body == '/v3admin-preview' &&
+      contains(fromJson('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association)
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      PROJECT_NAME: mfk-admin-v3-ui-preview
+      PREVIEW_BRANCH: preview
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/MFK-V3ADMIN-ONE-SHOT-R1
+          fetch-depth: 1
+
+      - id: source
+        name: Resolve exact preview source SHA
+        shell: bash
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install
+        working-directory: v3admin
+        run: npm install --no-audit --no-fund --legacy-peer-deps --package-lock=false
+
+      - name: Test
+        working-directory: v3admin
+        run: npm test
+
+      - name: Typecheck
+        working-directory: v3admin
+        run: npm run typecheck
+
+      - name: Build isolated V3 UI preview
+        working-directory: v3admin
+        run: npm run build
+        env:
+          MFK_SOURCE_SHA: ${{ steps.source.outputs.sha }}
+          MFK_V3ADMIN_RELEASE_ID: preview-${{ steps.source.outputs.sha }}
+          VITE_MFK_V3_PREVIEW_MODE: '1'
+          VITE_MFK_V3_R2_MEDIA_ENABLED: '0'
+
+      - name: Keep R2 integration code deferred
+        working-directory: v3admin
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -f wrangler.jsonc ]; then
+            mv wrangler.jsonc wrangler.r2.deferred.jsonc
+          fi
+          if [ -d functions ]; then
+            mv functions functions.r2.deferred
+          fi
+
+      - name: Ensure preview project exists
+        working-directory: v3admin
+        shell: bash
+        run: |
+          set +e
+          npx --yes wrangler@latest pages project create "$PROJECT_NAME" --production-branch preview >/tmp/pages-create.log 2>&1
+          code=$?
+          set -e
+          cat /tmp/pages-create.log
+          if [ "$code" -ne 0 ]; then
+            echo "Project create returned non-zero; continuing because it may already exist."
+          fi
+
+      - name: Publish UI-only Admin implementation preview
+        working-directory: v3admin
+        shell: bash
+        env:
+          SOURCE_SHA: ${{ steps.source.outputs.sha }}
+        run: |
+          set -euo pipefail
+          npx --yes wrangler@latest pages deploy dist             --project-name "$PROJECT_NAME"             --branch "$PREVIEW_BRANCH"             --commit-hash "$SOURCE_SHA"             --commit-message "MFK Admin V3 acceptance preview — contextual navigation"
+
+      - name: Public preview readback
+        shell: bash
+        env:
+          SOURCE_SHA: ${{ steps.source.outputs.sha }}
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const expected=process.env.SOURCE_SHA;
+          const base='https://mfk-admin-v3-ui-preview.pages.dev';
+          const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+          let last='';
+          for(let attempt=1;attempt<=18;attempt++){
+            try{
+              const [release,html]=await Promise.all([
+                fetch(base+'/release.json',{headers:{'cache-control':'no-cache'}}).then(r=>r.json()),
+                fetch(base+'/?preview=ui-01',{headers:{'cache-control':'no-cache'}}).then(r=>r.text()),
+              ]);
+              if(release?.sourceSha===expected&&html.includes('MFK Admin V3')){
+                console.log('PREVIEW_GREEN '+base+'/');
+                console.log('SOURCE_SHA '+release.sourceSha);
+                process.exit(0);
+              }
+              last=JSON.stringify({release,htmlTitle:html.slice(0,120)});
+            }catch(error){last=String(error);}
+            await sleep(5000);
+          }
+          console.error('Preview readback failed: '+last);
+          process.exit(1);
+          NODE
