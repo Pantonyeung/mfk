@@ -73,7 +73,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          npx --yes wrangler@latest pages deploy dist             --config wrangler.pages.jsonc             --project-name "$PROJECT_NAME"             --branch "$PREVIEW_BRANCH"             --commit-hash "$GITHUB_SHA"             --commit-message "MFK Admin V3 public implementation preview"
+          npx --yes wrangler@latest pages deploy dist \
+            --project-name "$PROJECT_NAME" \
+            --branch "$PREVIEW_BRANCH" \
+            --commit-hash "$GITHUB_SHA" \
+            --commit-message "MFK Admin V3 public implementation preview"
 
       - name: Public preview and R2 binding readback
         shell: bash
