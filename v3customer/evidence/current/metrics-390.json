@@ -2,7 +2,7 @@
   "viewportWidth": 390,
   "viewportHeight": 890,
   "documentWidth": 390,
-  "documentHeight": 890,
+  "documentHeight": 975,
   "hero": {
     "x": 0,
     "y": 0,
@@ -17,31 +17,11 @@
     "x": 10,
     "y": 208,
     "width": 370,
-    "height": 84.03125,
+    "height": 82,
     "top": 208,
     "right": 380,
-    "bottom": 292.03125,
+    "bottom": 290,
     "left": 10
-  },
-  "categories": {
-    "x": 10,
-    "y": 295.03125,
-    "width": 370,
-    "height": 66,
-    "top": 295.03125,
-    "right": 380,
-    "bottom": 361.03125,
-    "left": 10
-  },
-  "products": {
-    "x": 18,
-    "y": 404.03125,
-    "width": 354,
-    "height": 104,
-    "top": 404.03125,
-    "right": 372,
-    "bottom": 508.03125,
-    "left": 18
   },
   "nav": {
     "x": 0,
@@ -77,116 +57,41 @@
         "x": 10,
         "y": 208,
         "width": 370,
-        "height": 84.03125,
+        "height": 82,
         "top": 208,
         "right": 380,
-        "bottom": 292.03125,
+        "bottom": 290,
         "left": 10
       }
     },
     {
       "index": 2,
-      "className": "categories",
+      "className": "featured-section",
       "id": "menu-discovery",
       "rect": {
-        "x": 10,
-        "y": 295.03125,
-        "width": 370,
-        "height": 66,
-        "top": 295.03125,
-        "right": 380,
-        "bottom": 361.03125,
-        "left": 10
+        "x": 0,
+        "y": 293,
+        "width": 390,
+        "height": 415.8125,
+        "top": 293,
+        "right": 390,
+        "bottom": 708.8125,
+        "left": 0
       }
     },
     {
       "index": 3,
-      "className": "section",
-      "id": "chef-picks",
-      "rect": {
-        "x": 10,
-        "y": 364.03125,
-        "width": 370,
-        "height": 152,
-        "top": 364.03125,
-        "right": 380,
-        "bottom": 516.03125,
-        "left": 10
-      }
-    },
-    {
-      "index": 4,
-      "className": "brand-banner",
-      "id": "",
-      "rect": {
-        "x": 10,
-        "y": 519.03125,
-        "width": 370,
-        "height": 58,
-        "top": 519.03125,
-        "right": 380,
-        "bottom": 577.03125,
-        "left": 10
-      }
-    },
-    {
-      "index": 5,
-      "className": "member",
-      "id": "",
-      "rect": {
-        "x": 10,
-        "y": 580.03125,
-        "width": 370,
-        "height": 58,
-        "top": 580.03125,
-        "right": 380,
-        "bottom": 638.03125,
-        "left": 10
-      }
-    },
-    {
-      "index": 6,
-      "className": "section recent",
+      "className": "recent-section",
       "id": "recent-order",
       "rect": {
-        "x": 10,
-        "y": 641.03125,
-        "width": 370,
-        "height": 68,
-        "top": 641.03125,
-        "right": 380,
-        "bottom": 709.03125,
-        "left": 10
-      }
-    },
-    {
-      "index": 7,
-      "className": "section",
-      "id": "",
-      "rect": {
-        "x": 10,
-        "y": 712.03125,
-        "width": 370,
-        "height": 63,
-        "top": 712.03125,
-        "right": 380,
-        "bottom": 775.03125,
-        "left": 10
-      }
-    },
-    {
-      "index": 8,
-      "className": "lifestyle",
-      "id": "",
-      "rect": {
-        "x": 10,
-        "y": 778.03125,
-        "width": 370,
-        "height": 80.625,
-        "top": 778.03125,
-        "right": 380,
-        "bottom": 858.65625,
-        "left": 10
+        "x": 0,
+        "y": 711.8125,
+        "width": 390,
+        "height": 250.8125,
+        "top": 711.8125,
+        "right": 390,
+        "bottom": 962.625,
+        "left": 0
       }
     }
   ]
