@@ -166,7 +166,6 @@ export function projectionHashForEntities(entities:MfkSyncEntityMap){
   return fingerprintMfkSyncValue(
     Object.keys(entities).sort().map(key=>({
       key,
-      entityRevision:entities[key]!.entityRevision,
       payloadHash:entities[key]!.payloadHash,
     })),
   );
@@ -215,7 +214,7 @@ export function diffMfkSyncEntities(input:MfkSyncDiffInput):MfkSyncDiffResult{
       commitId:input.commitId,
       entityType:target.entityType,
       entityId:target.entityId,
-      entityRevision:(before?.entityRevision??0)+1,
+      entityRevision:input.sourceCommitSeq,
       op,
       ...(after?{payload:after.payload}:{}),
       payloadHash,
