@@ -91,7 +91,11 @@ describe('MFK checkpointed delta sync engine',()=>{
       storeId:'MF01',port:'SMT',sourceCommitSeq:20,commitId:'commit-20',
       startingPortSeq:9,previous,next,createdAt:at,
     });
-    expect(result.changes).toHaveLength(1);
-    expect(result.changes[0]).toMatchObject({entityType:'PRODUCT',entityId:'PRD-1',op:'DELETE',portSeq:10});
+    expect(result.changes).toHaveLength(2);
+    const deletion=result.changes.find(change=>change.entityType==='PRODUCT');
+    const order=result.changes.find(change=>change.entityType==='ENTITY_ORDER');
+    expect(deletion).toMatchObject({entityType:'PRODUCT',entityId:'PRD-1',op:'DELETE'});
+    expect(order).toMatchObject({entityType:'ENTITY_ORDER',entityId:'SMT:PRODUCT',op:'UPSERT'});
+    expect((order?.payload as {ids?:unknown[]})?.ids).toEqual([]);
   });
 });
