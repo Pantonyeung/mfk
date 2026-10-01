@@ -26,6 +26,32 @@ export type ProductListRecord={
 const STATUS_OPTIONS=['全部','已發佈','草稿','待回讀','已停用'] as const;
 export const MOBILE_PRODUCT_PAGE_SIZE=10;
 
+export type ProductPrintTarget='PRODUCTION'|'PACKING'|'LABEL'|'RECEIPT';
+
+export const PRODUCT_PRINT_TARGET_OPTIONS=Object.freeze([
+  {id:'PRODUCTION' as const,label:'製作單',description:'廚房／製作位需要收到嘅商品製作資料。'},
+  {id:'PACKING' as const,label:'打包單',description:'執單／打包位需要收到嘅商品資料。'},
+  {id:'LABEL' as const,label:'標籤',description:'需要逐件貼標籤嘅商品。'},
+  {id:'RECEIPT' as const,label:'小票',description:'需要喺小票輸出呢件商品。'},
+]);
+
+export function productPrintTargetsFromRule(rule:string):ProductPrintTarget[]{
+  const text=String(rule||'').trim().toLocaleLowerCase();
+  const targets:ProductPrintTarget[]=[];
+  if(text.includes('製作單')||text.includes('production'))targets.push('PRODUCTION');
+  if(text.includes('打包單')||text.includes('packing'))targets.push('PACKING');
+  if(text.includes('標籤')||text.includes('label'))targets.push('LABEL');
+  if(text.includes('小票')||text.includes('收據')||text.includes('receipt'))targets.push('RECEIPT');
+  return targets;
+}
+
+export function productPrintSummary(targets:readonly ProductPrintTarget[]){
+  const selected=new Set(targets);
+  const labels=PRODUCT_PRINT_TARGET_OPTIONS.filter(option=>selected.has(option.id)).map(option=>option.label);
+  return labels.length?labels.join('＋'):'不打印';
+}
+
+
 export function productFormCanSave(input:{name:string;category:string;price:string}){
   const priceNumber=Number(input.price);
   return Boolean(input.name.trim()&&input.category&&input.category!=='全部'&&input.price.trim()&&Number.isFinite(priceNumber)&&priceNumber>=0);
@@ -134,7 +160,7 @@ function ProductDrawer({product,onClose}:{product:ProductListRecord;onClose:()=>
         <div><dt>分類</dt><dd>{product.category}</dd></div>
         <div><dt>基本價格</dt><dd>{money(product.priceMinor)}</dd></div>
         <div><dt>狀態</dt><dd><StatusBadge tone={statusTone(product.status)}>{product.status}</StatusBadge></dd></div>
-        <div><dt>圖片</dt><dd>{product.imageUrl?'已設定':'未設定'}</dd></div>
+        <div><dt>圖片</dt><dd>{product.imageUrl?'已設定':'未設定'}</dd></div><div><dt>打印</dt><dd>{product.printRule||'不打印'}</dd></div>
       </dl>
     </aside>
   </>;
@@ -197,7 +223,7 @@ function PreviewProductEditor({productId,onClose}:{productId:string|null;onClose
   const [price,setPrice]=useState(product?String(product.priceMinor/100):'');
   const [active,setActive]=useState(product?.status!=='已停用');
   const [description,setDescription]=useState(product?.description??'');
-  const [printRule,setPrintRule]=useState(product?.printRule??'製作單');
+  const [printTargets,setPrintTargets]=useState<Set<ProductPrintTarget>>(()=>new Set(productPrintTargetsFromRule(product?.printRule??'製作單')));
   const [customerImage,setCustomerImage]=useState(product?.customerImageUrl??'');
   const [keetaImage,setKeetaImage]=useState(product?.channelImages.KEETA??'');
   const [optionIds,setOptionIds]=useState<Set<string>>(new Set(product?.optionSetIds??[]));
@@ -215,7 +241,7 @@ function PreviewProductEditor({productId,onClose}:{productId:string|null;onClose
       customerImageUrl:customerImage,
       channelImages:{KEETA:keetaImage},
       optionSetIds:[...optionIds],
-      printRule,
+      printRule:productPrintSummary([...printTargets]),
     };
     if(product){
       updateProduct(product.id,{...base,status:active?'草稿':'已停用'});
@@ -271,7 +297,22 @@ function PreviewProductEditor({productId,onClose}:{productId:string|null;onClose
 
         <section className="v3-functional-section">
           <h3>打印</h3>
-          <label><span>打印摘要</span><select value={printRule} onChange={event=>setPrintRule(event.target.value)}><option>製作單</option><option>製作單＋標籤</option><option>製作單＋打包單</option><option>標籤</option><option>打包單</option></select></label>
+          <p>可多選。剔中邊啲，呢件商品就會出邊啲；唔再限制只能揀一個組合。</p>
+          <div className="v3-option-link-grid">
+            {PRODUCT_PRINT_TARGET_OPTIONS.map(option=><label key={option.id}>
+              <input
+                type="checkbox"
+                checked={printTargets.has(option.id)}
+                onChange={event=>setPrintTargets(current=>{
+                  const next=new Set(current);
+                  if(event.target.checked)next.add(option.id);else next.delete(option.id);
+                  return next;
+                })}
+              />
+              <span><strong>{option.label}</strong><small>{option.description}</small></span>
+            </label>)}
+          </div>
+          <div className="v3-mobile-form-note">目前會輸出：{productPrintSummary([...printTargets])}</div>
         </section>
       </div>
       <footer className="v3-functional-footer"><button type="button" onClick={onClose}>取消</button><button className="v3-primary" type="button" disabled={!valid} onClick={save}>儲存草稿</button></footer>
