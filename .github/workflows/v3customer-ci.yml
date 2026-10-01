@@ -127,7 +127,7 @@ jobs:
           if(metrics.documentWidth>metrics.viewportWidth) fail.push('horizontal-overflow');
           if(!metrics.hero || metrics.hero.height<metrics.viewportHeight*0.60) fail.push('hero-under-60-percent');
           if(!metrics.hero || metrics.hero.height>metrics.viewportHeight*0.72) fail.push('hero-over-72-percent');
-          if(screens<1.35 || screens>1.70) fail.push('home-not-1.5-screen-class');
+          if(screens<1.40 || screens>1.62) fail.push('home-not-1.5-screen-class');
           if(!metrics.cta || metrics.cta.height<48) fail.push('cta-touch-too-small');
           if(metrics.quickCards.length!==4 || metrics.quickCards.some(x=>x.height<100||x.width<150)) fail.push('quick-card-touch-contract');
           if(metrics.featuredCards.length!==2) fail.push('featured-count-not-two');
