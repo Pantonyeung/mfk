@@ -193,7 +193,7 @@ export function diffMfkSyncEntities(input:MfkSyncDiffInput):MfkSyncDiffResult{
       commitId:input.commitId,
       entityType:target.entityType,
       entityId:target.entityId,
-      entityRevision:input.sourceCommitSeq,
+      entityRevision:(before?.entityRevision??0)+1,
       op,
       ...(after?{payload:after.payload}:{}),
       payloadHash,
