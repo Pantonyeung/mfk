@@ -60,7 +60,7 @@ function comboLine(overrides:Partial<CustomerCloudCartLine>={}):CustomerCloudCar
     productId:'main-a',
     productName:'A 飯團',
     quantity:1,
-    selections:[{optionGroupId:'main-opt',optionId:'plus',optionName:'加配'}],
+    selections:[{optionGroupId:'main-opt',optionId:'plus',optionName:'加配',publishedAdjustmentMinor:200}],
     combo:{
       comboId:'combo-a',
       comboName:'A 餐',
@@ -105,11 +105,20 @@ function customerCartLine():CustomerCartLine{
 }
 
 function customerOrderInput(){
+  const commercialProof={
+    schema:'MFK_CUSTOMER_COMMERCIAL_FRESHNESS_V1',keyId:'test',storeId:'MF01',customerPortSeq:7,
+    projectionHash:'fnv1a32:test',canonicalRevision:1,canonicalFingerprint:'fingerprint-1',
+    issuedAt:'2026-09-27T00:00:00.000Z',expiresAt:'2026-09-27T00:05:00.000Z',freshnessToken:'payload.signature',
+  } as const;
   return {
     schema:MFK_CUSTOMER_ORDER_INTENT_SCHEMA,
     storeId:'MF01',
     submissionId:'CUSTOMER-combo-test',
     menuRevision:'rev-combo-1',
+    customerPortSeq:7,
+    projectionHash:'fnv1a32:test',
+    canonicalRevision:1,
+    commercialProof,
     idempotencyKey:'customer-order:CUSTOMER-combo-test',
     createdAt:'2026-09-27T00:00:00.000Z',
     updatedAt:'2026-09-27T00:00:00.000Z',

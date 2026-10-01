@@ -94,6 +94,24 @@ describe('customer cloud local quote adapter',()=>{
     ],products)).toThrow('CUSTOMER_OPTION_UNAVAILABLE:bento:rice:ghost');
   });
 
+  it('uses a server-verified historical grant price while rechecking current fulfilability',()=>{
+    const current=[{
+      ...products[0]!,
+      priceMinor:5200,
+      optionSets:[],
+    }];
+    const cart=[{
+      lineId:'L-HONOUR',productId:'bento',productName:'肉燥便當',quantity:1,selections:[],publishedUnitPriceMinor:4800,
+    }];
+    const result=priceCustomerCart(cart,current,[],[],[{lineId:'L-HONOUR',productId:'bento',quantity:1,publishedUnitPriceMinor:4800}]);
+    expect(result.totalMinor).toBe(4800);
+    expect(result.items[0]?.unitMinor).toBe(4800);
+    expect(()=>priceCustomerCart([{...cart[0]!,publishedUnitPriceMinor:100}],current,[],[],[{lineId:'L-HONOUR',productId:'bento',quantity:1,publishedUnitPriceMinor:4800}]))
+      .toThrow('CUSTOMER_COMMERCIAL_GRANT_CART_MISMATCH:L-HONOUR');
+    expect(()=>priceCustomerCart(cart,[{...current[0]!,sellable:false}],[],[],[{lineId:'L-HONOUR',productId:'bento',quantity:1,publishedUnitPriceMinor:4800}]))
+      .toThrow('CUSTOMER_PRODUCT_UNAVAILABLE:bento');
+  });
+
   it('uses the same Customer cloud reconcile loop for SMM staff orders',()=>{
     const source=readFileSync(new URL('./customer-cloud-intake.ts',import.meta.url),'utf8');
     const main=readFileSync(new URL('../main.tsx',import.meta.url),'utf8');
@@ -107,11 +125,12 @@ describe('customer cloud local quote adapter',()=>{
   });
 
 
-  it('requires the Customer published menu revision and stages a matching own-channel order for operator review',()=>{
+  it('requires the verified commercial grant instead of equality with the latest menu revision',()=>{
     const source=readFileSync(new URL('./customer-cloud-intake.ts',import.meta.url),'utf8');
     expect(source).toContain("const {envelope,catalog}=activeCatalog()");
-    expect(source).toContain("CUSTOMER_MENU_REVISION_CHANGED");
-    expect(source).toContain("String(intent.menuRevision)!==String(envelope.revision)");
+    expect(source).toContain('validateMfkCustomerCommercialGrant');
+    expect(source).toContain('commercialGrant.lines');
+    expect(source).not.toContain("String(intent.menuRevision)!==String(envelope.revision)");
     expect(source).toContain("initialFulfillmentLabel:'待處理'");
     expect(source).toContain("CUSTOMER_PAYMENT_EVIDENCE_REQUIRED");
     expect(source).toContain("customerName:intent.checkout.name");

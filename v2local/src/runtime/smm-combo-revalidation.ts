@@ -74,6 +74,7 @@ export function revalidateSmmComboLine(
   combos:readonly SyncedCombo[],
   pools:readonly SyncedComboPool[],
   standaloneMainUnitMinor:number,
+  honourPublishedCommercialFacts=false,
 ):SmmCanonicalComboLineResult{
   const intent=line.combo;
   if(!intent)throw new Error('SMM_COMBO_INTENT_REQUIRED');
@@ -84,7 +85,7 @@ export function revalidateSmmComboLine(
   const matches=mainComboMatches(line.productId,combos,pools);
   if(matches.length!==1||matches[0]!.id!==intent.comboId)throw new Error('SMM_COMBO_BINDING_CHANGED');
   const combo=matches[0]!;
-  if(intent.comboName!==combo.name||intent.publishedBasePriceMinor!==combo.basePriceMinor){
+  if(!honourPublishedCommercialFacts&&(intent.comboName!==combo.name||intent.publishedBasePriceMinor!==combo.basePriceMinor)){
     throw new Error('SMM_COMBO_PUBLISHED_FACT_CHANGED');
   }
 
@@ -130,7 +131,7 @@ export function revalidateSmmComboLine(
         if(selection.choiceType!==choice.type)throw new Error('SMM_COMBO_CHOICE_TYPE_CHANGED');
         if((selection.productId??'')!==(choice.productId??''))throw new Error('SMM_COMBO_PRODUCT_CHANGED');
         const adjustment=subPool.priceAdjustmentMinor+choice.priceAdjustmentMinor;
-        if(selection.publishedAdjustmentMinor!==adjustment)throw new Error('SMM_COMBO_PUBLISHED_PRICE_CHANGED');
+        if(!honourPublishedCommercialFacts&&selection.publishedAdjustmentMinor!==adjustment)throw new Error('SMM_COMBO_PUBLISHED_PRICE_CHANGED');
 
         if(choice.type==='PRODUCT'){
           const child=products.find(product=>product.id===choice.productId&&product.sellable&&product.priceReady);

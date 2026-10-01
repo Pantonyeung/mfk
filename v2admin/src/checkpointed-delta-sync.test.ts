@@ -82,6 +82,29 @@ describe('MFK checkpointed delta sync engine',()=>{
     expect(snapshot.catalog.products[0]?.basePrice).toBe('52.00');
   });
 
+  it('sends one Customer product price delta instead of a full menu snapshot',()=>{
+    const customer=(price:number)=>({
+      store:{storeId:'MF01',storeName:'磨飯',channelAvailable:true},
+      menu:{categories:[{categoryId:'CAT-1',name:'飯糰',sortOrder:10}],products:[{productId:'PRD-1',categoryId:'CAT-1',name:'紫米飯糰',description:'',available:true,publishedUnitPriceMinor:price,optionGroups:[]}],combos:[],comboPools:[]},
+      paymentChannels:[],fallback:{enabled:false,phone:'',template:'',retryAttempts:3},
+    });
+    const result=diffMfkSyncEntities({
+      storeId:'MF01',port:'CUSTOMER',sourceCommitSeq:14,commitId:'commit-14',startingPortSeq:7,
+      previous:buildCustomerSyncEntities(customer(4800)),next:buildCustomerSyncEntities(customer(5200)),createdAt:at,
+    });
+    expect(result.changes).toHaveLength(1);
+    expect(result.changes[0]).toMatchObject({entityType:'CUSTOMER_PRODUCT',entityId:'PRD-1',op:'UPSERT',portSeq:8});
+    expect(result.changes[0]?.payload).toMatchObject({publishedUnitPriceMinor:5200});
+  });
+
+  it('does not trust a cached entity payloadHash when browser payload bytes were changed',()=>{
+    const original=buildCustomerSyncEntities({menu:{products:[{productId:'PRD-1',name:'Original',optionGroups:[]}]}});
+    const tampered=structuredClone(original);
+    const key=Object.keys(tampered).find(value=>value.startsWith('CUSTOMER_PRODUCT:'))!;
+    tampered[key]!.payload={...tampered[key]!.payload,name:'Tampered'};
+    expect(projectionHashForEntities(tampered)).not.toBe(projectionHashForEntities(original));
+  });
+
   it('represents deletion by identity and never by array position',()=>{
     const previous=buildSmtSyncEntities(adminSnapshot('48.00'));
     const nextSnapshot=adminSnapshot('48.00');

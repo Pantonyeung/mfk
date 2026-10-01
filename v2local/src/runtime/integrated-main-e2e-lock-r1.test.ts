@@ -20,11 +20,13 @@ describe('2026-09-26 integrated main E2E preservation lock',()=>{
     expect(main).toContain('if(webAcceptance)installSmmWebAcceptanceIntake(smmLanIngress)');
   });
 
-  it('preserves Customer to SMT revision, pricing, evidence, canonical order and readback semantics',()=>{
+  it('preserves Customer commercial grant, evidence, canonical order and readback semantics',()=>{
     const customer=read('runtime/customer-cloud-intake.ts');
     expect(customer).toContain('const {envelope,catalog}=activeCatalog()');
-    expect(customer).toContain("CUSTOMER_MENU_REVISION_CHANGED");
-    expect(customer).toContain("CUSTOMER_MENU_PRICE_CHANGED");
+    expect(customer).toContain('validateMfkCustomerCommercialGrant');
+    expect(customer).toContain('commercialGrant.lines');
+    expect(customer).not.toContain("String(intent.menuRevision)!==String(envelope.revision)");
+    expect(customer).not.toContain("CUSTOMER_MENU_PRICE_CHANGED");
     expect(customer).toContain("sourceLabel:'自家 App'");
     expect(customer).toContain("paymentEvidenceRef:intent.checkout.paymentEvidenceRef");
     expect(customer).toContain("initialFulfillmentLabel:'待處理'");

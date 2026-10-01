@@ -19,6 +19,16 @@ import {
 } from '../sync/checkpointed-delta-sync.ts';
 import {buildKeetaMenuProjection} from './keeta-menu-projection.ts';
 import {projectAdminEnvelopeToSmmConfig} from '../sync/smm-admin-projection';
+import {validateMfkCustomerOrderIntent} from '../contracts/customer-cloud-v1.ts';
+import {
+  MFK_CUSTOMER_COMMERCIAL_GRANT_SCHEMA,
+  verifyCustomerCommercialCart,
+} from '../contracts/customer-commercial-freshness-v1.ts';
+import {
+  issueCustomerCommercialFreshnessProof,
+  parseCustomerCommercialProofKeyring,
+  verifyCustomerCommercialFreshnessProof,
+} from './customer-commercial-proof.ts';
 export {KeetaRuntimeStore,CustomerRuntimeStore};
 
 const JSON_HEADERS={'content-type':'application/json; charset=utf-8','cache-control':'no-store'};
@@ -1103,6 +1113,61 @@ export class AdminSyncStore{
 
   async readSyncHead(port,storage=this.state.storage){
     return await storage.get(syncHeadKey(port))||emptySyncHead('MF01',port);
+  }
+
+  commercialProofKeyring(){
+    return parseCustomerCommercialProofKeyring(this.env.CUSTOMER_COMMERCIAL_PROOF_KEYRING);
+  }
+
+  async customerCommercialHead(head){
+    const active=await this.state.storage.get('active');
+    if(!active||String(active.fingerprint||'')!==String(head.canonicalFingerprint||''))throw new Error('CUSTOMER_COMMERCIAL_STATE_UNAVAILABLE');
+    const commercialFreshness=await issueCustomerCommercialFreshnessProof({
+      storeId:String(head.storeId||'MF01'),
+      customerPortSeq:Number(head.headSeq||0),
+      projectionHash:String(head.projectionHash||''),
+      canonicalRevision:Number(head.canonicalRevision||0),
+      canonicalFingerprint:String(head.canonicalFingerprint||''),
+    },this.commercialProofKeyring());
+    return Object.freeze({...head,commercialFreshness});
+  }
+
+  async verifyCustomerCommercialIntent(input,serverReceivedAtMs=Date.now()){
+    const intent=validateMfkCustomerOrderIntent(input);
+    const proof=await verifyCustomerCommercialFreshnessProof(intent.commercialProof,this.commercialProofKeyring(),{
+      storeId:intent.storeId,
+      customerPortSeq:intent.customerPortSeq,
+      projectionHash:intent.projectionHash,
+      canonicalRevision:intent.canonicalRevision,
+      canonicalFingerprint:intent.commercialProof.canonicalFingerprint,
+    },serverReceivedAtMs);
+    if(String(intent.menuRevision)!==String(proof.canonicalRevision))throw new Error('CUSTOMER_COMMERCIAL_MENU_REVISION_MISMATCH');
+    const current=await this.state.storage.get('active');
+    const active=current&&String(current.fingerprint||'')===proof.canonicalFingerprint
+      ?current
+      :await this.state.storage.get('admin-browser:version:'+proof.canonicalFingerprint);
+    if(!active||String(active.storeId||'')!==intent.storeId||Number(active.revision)!==proof.canonicalRevision)throw new Error('CUSTOMER_COMMERCIAL_HISTORY_UNAVAILABLE');
+    const projection=customerPublicSnapshot(active,[],[]);
+    const entities=buildCustomerSyncEntities(projection);
+    if(projectionHashForEntities(entities)!==proof.projectionHash)throw new Error('CUSTOMER_COMMERCIAL_HISTORY_HASH_MISMATCH');
+    const facts=verifyCustomerCommercialCart(intent.cart,projection);
+    return Object.freeze({
+      intent,
+      grant:Object.freeze({
+        schema:MFK_CUSTOMER_COMMERCIAL_GRANT_SCHEMA,
+        storeId:intent.storeId,
+        submissionId:intent.submissionId,
+        customerPortSeq:intent.customerPortSeq,
+        projectionHash:intent.projectionHash,
+        canonicalRevision:intent.canonicalRevision,
+        canonicalFingerprint:proof.canonicalFingerprint,
+        proofExpiresAt:proof.expiresAt,
+        verifiedAt:new Date(serverReceivedAtMs).toISOString(),
+        factsHash:facts.factsHash,
+        totalMinor:facts.totalMinor,
+        lines:facts.lines,
+      }),
+    });
   }
 
   async readSyncChanges(port,after){
@@ -2301,7 +2366,19 @@ export class AdminSyncStore{
       if(!MFK_SYNC_PORTS.includes(port))return json({code:'SYNC_PORT_INVALID'},400);
       if(port==='KEETA')return json({code:'SYNC_PORT_DIRECT_READ_FORBIDDEN'},403);
       if(!await this.authorizeSyncRead(request,port))return json({code:'SYNC_PORT_UNAUTHORIZED'},401);
-      return json(await this.readSyncHead(port));
+      const head=await this.readSyncHead(port);
+      if(port!=='CUSTOMER')return json(head);
+      try{return json(await this.customerCommercialHead(head));}
+      catch(error){return json({code:error instanceof Error?error.message:'CUSTOMER_COMMERCIAL_PROOF_UNAVAILABLE'},503);}
+    }
+
+    if(url.pathname==='/customer-commercial/verify'){
+      if(request.method!=='POST')return json({code:'METHOD_NOT_ALLOWED'},405);
+      let input;try{input=await request.json();}catch{return json({code:'CUSTOMER_ORDER_INTENT_INVALID'},400);}
+      try{
+        const verified=await this.verifyCustomerCommercialIntent(input,Date.now());
+        return json({grant:verified.grant});
+      }catch(error){return json({code:error instanceof Error?error.message:'CUSTOMER_COMMERCIAL_VERIFICATION_FAILED'},409);}
     }
     if(url.pathname==='/sync/changes'){
       if(request.method!=='GET')return json({code:'METHOD_NOT_ALLOWED'},405);
@@ -2804,11 +2881,12 @@ export default {
       }
 
       const publicMap={
-        '/api/customer/orders/submit':'/public/orders/submit',
+        '/api/customer/orders/submit':'/internal/orders/submit',
         '/api/customer/orders/readback':'/public/orders/readback',
       };
       const targetPath=publicMap[url.pathname];
       let normalizedCustomerOrderBody=null;
+      let verifiedCustomerOrder=null;
       if(targetPath&&url.pathname==='/api/customer/orders/submit'){
         const activeResponse=await admin.fetch(new Request('https://internal/active',{method:'GET'}));
         if(!activeResponse.ok)return json({code:'CUSTOMER_CONFIG_NOT_PUBLISHED'},503,cors(request));
@@ -2818,10 +2896,10 @@ export default {
         if(policy.enabled!==true)return json({code:'CUSTOMER_CHANNEL_DISABLED'},503,cors(request));
         if(url.pathname==='/api/customer/orders/submit'){
           const intent=await request.clone().json().catch(()=>null);
+          if(!intent)return json({code:'CUSTOMER_ORDER_INTENT_INVALID'},400,cors(request));
           const checkout=row(row(intent).checkout);
           if(checkout.paymentMethod==='ELECTRONIC'){
             const channelId=String(checkout.paymentChannelId||'').trim().toUpperCase();
-            const channelLabel=String(checkout.paymentChannelLabel||'').trim();
             const settings=row(activeSnapshot.storeSettings);
             const configured=Array.isArray(settings.customerPaymentChannels)?settings.customerPaymentChannels:[
               {id:'ALIPAY',name:'AlipayHK',enabled:true,qrImageUrl:'',sortOrder:1},
@@ -2833,12 +2911,17 @@ export default {
             const qr=channel?String(channel.qrImageUrl||'').trim():'';
             const currentLabel=channel?String(channel.name||'').trim():'';
             if(!channel||!currentLabel||!qr)return json({code:'CUSTOMER_PAYMENT_CHANNEL_UNAVAILABLE'},409,cors(request));
-            if(channelLabel&&channelLabel!==currentLabel)return json({code:'CUSTOMER_PAYMENT_CHANNEL_CHANGED'},409,cors(request));
             normalizedCustomerOrderBody={
               ...row(intent),
               checkout:{...checkout,paymentChannelId:channelId,paymentChannelLabel:currentLabel},
             };
           }
+          const verification=await admin.fetch(new Request('https://internal/customer-commercial/verify',{
+            method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(normalizedCustomerOrderBody??intent),
+          }));
+          const verificationBody=await verification.json().catch(()=>({}));
+          if(!verification.ok)return json({code:String(verificationBody.code||'CUSTOMER_COMMERCIAL_VERIFICATION_FAILED')},verification.status,cors(request));
+          verifiedCustomerOrder={intent:normalizedCustomerOrderBody??intent,commercialGrant:verificationBody.grant};
         }
       }
       if(targetPath){
@@ -2846,8 +2929,13 @@ export default {
         target.pathname=targetPath;
         const init={method:request.method,headers:new Headers(request.headers)};
         if(request.method!=='GET'&&request.method!=='HEAD'){
-          const body=await request.arrayBuffer();
-          if(body.byteLength)init.body=body;
+          if(url.pathname==='/api/customer/orders/submit'&&verifiedCustomerOrder){
+            init.headers.set('content-type','application/json');
+            init.body=JSON.stringify(verifiedCustomerOrder);
+          }else{
+            const body=await request.arrayBuffer();
+            if(body.byteLength)init.body=body;
+          }
         }
         const response=await customer.fetch(new Request(target.toString(),init));
         if(response.status===202&&url.pathname==='/api/customer/orders/submit'){
@@ -3048,7 +3136,7 @@ export default {
       forwardedHeaders.set('x-mfk-smm-session',token);
       return stub.fetch(new Request(target.toString(),{method:'GET',headers:forwardedHeaders}));
     }
-    if(url.pathname==='/api/admin-sync/provider-doorbell'||url.pathname==='/api/admin-sync/customer-doorbell'||url.pathname==='/api/admin-sync/customer-orders'||url.pathname==='/api/admin-sync/authorize-smt-device'){
+    if(url.pathname==='/api/admin-sync/provider-doorbell'||url.pathname==='/api/admin-sync/customer-doorbell'||url.pathname==='/api/admin-sync/customer-orders'||url.pathname==='/api/admin-sync/authorize-smt-device'||url.pathname==='/api/admin-sync/customer-commercial/verify'){
       return json({code:'NOT_FOUND'},404,cors(request));
     }
     if(url.pathname.startsWith('/api/admin-sync/')||url.pathname.startsWith('/api/projection/')){

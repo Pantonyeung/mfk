@@ -240,6 +240,7 @@ export interface CustomerCheckoutDraft {
 export interface CustomerPendingIntent {
   readonly submissionId:string;
   readonly menuRevision:string;
+  readonly commercialFreshness?:import('../../contracts/customer-commercial-freshness-v1').MfkCustomerCommercialFreshnessProof;
   readonly idempotencyKey:string;
   readonly createdAt:string;
   readonly updatedAt:string;
@@ -329,6 +330,7 @@ export interface CustomerReadModelSnapshot {
   readonly paymentChannels?:readonly CustomerPaymentChannel[];
   readonly fallback?:CustomerWhatsAppFallback;
   readonly member?:CustomerMemberProjection;
+  readonly commercialFreshness?:import('../../contracts/customer-commercial-freshness-v1').MfkCustomerCommercialFreshnessProof;
   readonly observedAt:string;
 }
 

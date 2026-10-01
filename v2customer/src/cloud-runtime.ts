@@ -9,6 +9,11 @@ import {
   type MfkSyncHead,
 } from '../../contracts/checkpointed-delta-sync-v1';
 import {
+  customerCommercialProofMatches,
+  validateMfkCustomerCommercialFreshnessProof,
+  type MfkCustomerCommercialFreshnessProof,
+} from '../../contracts/customer-commercial-freshness-v1';
+import {
   applyMfkSyncChanges,
   buildCustomerSyncEntities,
   entityMapFromCheckpoint,
@@ -88,7 +93,9 @@ async function fetchCustomerSyncHead(){
   if(!response.ok)throw new Error(String(body.code||'CUSTOMER_SYNC_HEAD_FAILED'));
   const head=validateMfkSyncHead(body);
   if(head.port!=='CUSTOMER'||head.storeId!==STORE_ID)throw new Error('CUSTOMER_SYNC_HEAD_IDENTITY_MISMATCH');
-  return head;
+  const commercialFreshness=validateMfkCustomerCommercialFreshnessProof(body.commercialFreshness);
+  if(!customerCommercialProofMatches(commercialFreshness,{storeId:head.storeId,customerPortSeq:head.headSeq,projectionHash:head.projectionHash,canonicalRevision:head.canonicalRevision,canonicalFingerprint:head.canonicalFingerprint}))throw new Error('CUSTOMER_COMMERCIAL_PROOF_IDENTITY_MISMATCH');
+  return Object.freeze({head,commercialFreshness});
 }
 
 async function fetchCustomerCheckpoint(head:MfkSyncHead){
@@ -107,7 +114,7 @@ async function fetchCustomerChanges(after:number){
   return{checkpointRequired:false as const,batch:validateMfkSyncChangeBatch(body)};
 }
 
-function customerConfigFromBundle(bundle:CustomerConfigSyncBundle):Partial<CustomerReadModelSnapshot>{
+function customerConfigFromBundle(bundle:CustomerConfigSyncBundle,commercialFreshness:MfkCustomerCommercialFreshnessProof):Partial<CustomerReadModelSnapshot>{
   const materialized=materializeCustomerConfigSnapshot(bundle.entities) as {
     store?:CustomerReadModelSnapshot['store'];
     menu?:CustomerReadModelSnapshot['menu'];
@@ -120,6 +127,7 @@ function customerConfigFromBundle(bundle:CustomerConfigSyncBundle):Partial<Custo
     ...(materialized.menu?{menu:Object.freeze({...materialized.menu,revision:String(bundle.head.canonicalRevision),observedAt})}:{}),
     ...(materialized.paymentChannels?{paymentChannels:materialized.paymentChannels}:{}),
     ...(materialized.fallback?{fallback:materialized.fallback}:{}),
+    commercialFreshness,
     observedAt,
   });
 }
@@ -166,7 +174,7 @@ function overlayCustomerRuntimeSellability(
 }
 
 async function reconcileCustomerConfig():Promise<Partial<CustomerReadModelSnapshot>>{
-  let head=await fetchCustomerSyncHead();
+  let {head,commercialFreshness}=await fetchCustomerSyncHead();
   let bundle=readCustomerSyncBundle();
   let entities:MfkSyncEntityMap;
   let appliedSeq:number;
@@ -186,7 +194,7 @@ async function reconcileCustomerConfig():Promise<Partial<CustomerReadModelSnapsh
   }
 
   for(let guard=0;guard<12;guard++){
-    head=await fetchCustomerSyncHead();
+    ({head,commercialFreshness}=await fetchCustomerSyncHead());
     if(appliedSeq>head.headSeq||appliedSeq<head.checkpointSeq){
       if(!head.checkpointHash)throw new Error('CUSTOMER_SYNC_CHECKPOINT_REQUIRED');
       const checkpoint=await fetchCustomerCheckpoint(head);
@@ -196,7 +204,7 @@ async function reconcileCustomerConfig():Promise<Partial<CustomerReadModelSnapsh
     }
     if(appliedSeq===head.headSeq){
       bundle=writeCustomerSyncBundle(head,entities,appliedSeq,checkpointSeq);
-      return customerConfigFromBundle(bundle);
+      return customerConfigFromBundle(bundle,commercialFreshness);
     }
     const next=await fetchCustomerChanges(appliedSeq);
     if(next.checkpointRequired){
@@ -220,12 +228,12 @@ async function bootstrapCustomerConfigFromLegacy():Promise<Partial<CustomerReadM
   if(!response.ok)throw new Error(String(body.code||'CUSTOMER_SNAPSHOT_FAILED'));
   const snapshot=body as unknown as CustomerReadModelSnapshot;
   try{
-    const head=await fetchCustomerSyncHead();
+    const {head,commercialFreshness}=await fetchCustomerSyncHead();
     const entities=buildCustomerSyncEntities(snapshot);
     const hash=projectionHashForEntities(entities);
     if(head.headSeq===0||hash===head.projectionHash){
       const bundle=writeCustomerSyncBundle(head,entities,head.headSeq,head.checkpointSeq);
-      return customerConfigFromBundle(bundle);
+      return customerConfigFromBundle(bundle,commercialFreshness);
     }
   }catch{}
   return snapshot;
@@ -461,6 +469,10 @@ export function createCloudCustomerRuntimePort():CustomerRuntimePort{
             storeId:STORE_ID,
             submissionId:intent.submissionId,
             menuRevision:intent.menuRevision,
+            customerPortSeq:intent.commercialFreshness?.customerPortSeq,
+            projectionHash:intent.commercialFreshness?.projectionHash,
+            canonicalRevision:intent.commercialFreshness?.canonicalRevision,
+            commercialProof:intent.commercialFreshness,
             idempotencyKey:intent.idempotencyKey,
             createdAt:intent.createdAt,
             updatedAt:intent.updatedAt,

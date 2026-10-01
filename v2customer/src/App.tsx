@@ -236,10 +236,11 @@ export function App(){
     const same=pendingIntents.find(item=>
       JSON.stringify(item.cart)===cartFingerprint&&
       JSON.stringify(item.checkout)===checkoutFingerprint&&
-      item.menuRevision===String(menu?.revision||'')
+      item.menuRevision===String(menu?.revision||'')&&
+      item.commercialFreshness?.freshnessToken===snapshot?.commercialFreshness?.freshnessToken
     );
     if(same?.state==='DELIVERED'&&same.canonicalOrderId){openWaitingRoute(same.canonicalOrderId);return}
-    const intent=same??createCustomerPendingIntent(cart,checkout,String(menu?.revision||''));
+    const intent=same??createCustomerPendingIntent(cart,checkout,String(menu?.revision||''),snapshot?.commercialFreshness);
     if(!same)saveIntent(intent);
     openSubmitRoute(intent.submissionId);
   };
@@ -253,6 +254,7 @@ export function App(){
     const reconcile=async()=>{
       if(stopped||busy||document.visibilityState!=='visible'||!navigator.onLine)return;
       busy=true;
+      setConnection('STALE');
       try{
         const next=await port.readSnapshot();
         if(!stopped){setSnapshot(next);setConnection('READY');}
@@ -278,6 +280,17 @@ export function App(){
       window.removeEventListener('online',online);
     };
   },[port]);
+
+  useEffect(()=>{
+    const expiresAt=Date.parse(String(snapshot?.commercialFreshness?.expiresAt||''));
+    if(!Number.isFinite(expiresAt))return;
+    const delay=Math.max(0,expiresAt-Date.now());
+    const timer=window.setTimeout(()=>{
+      setConnection('STALE');
+      if(document.visibilityState==='visible'&&navigator.onLine)void refresh();
+    },Math.min(delay,2_147_483_647));
+    return()=>window.clearTimeout(timer);
+  },[snapshot?.commercialFreshness?.freshnessToken]);
 
   useEffect(()=>{
     if(!port||(snapshot?.activeOrders.length??0)===0)return;
@@ -326,11 +339,16 @@ export function App(){
   },[cart,snapshot?.menu]);
 
   const menu=snapshot?.menu;
+  const commercialReady=Boolean(
+    browserOnline&&connection==='READY'&&snapshot?.commercialFreshness&&
+    Date.parse(snapshot.commercialFreshness.expiresAt)>Date.now()
+  );
   const selectedPaymentChannel=checkout.paymentMethod==='ELECTRONIC'
     ?(snapshot?.paymentChannels??[]).find(channel=>channel.channelId===checkout.paymentChannelId)
     :undefined;
   const submitBlockReason=(()=>{
     if(!cart.length)return '記憶罐未有商品。';
+    if(!commercialReady)return '正在確認最新價格同供應狀態；確認完成前暫停落單。';
     if(checkout.phone.replace(/\D/g,'').length<8)return '請先輸入至少 8 位電話號碼。';
     if(checkout.paymentMethod!=='ELECTRONIC')return null;
     if(!checkout.paymentChannelId)return '請先選擇一個電子支付方式。';
@@ -392,6 +410,7 @@ export function App(){
 
   const addSelectedProduct=()=>{
     if(!selectedProduct)return;
+    if(!commercialReady){setNotice('正在確認最新價格同供應狀態；確認完成前暫停加入記憶罐。');return}
     const validation=validateCustomerSelections(selectedProduct,selections);
     if(!validation.ok){setNotice(validation.issues[0]??'請完成商品設定');return}
     if(selectedProduct.variationRequired&&!selectedVariationId){setNotice('請先揀必選規格');return}
@@ -512,18 +531,22 @@ export function App(){
     const intentCart=routeIntent?.cart??cart;
     const intentCheckout=routeIntent?.checkout??checkout;
     const intentMenuRevision=routeIntent?.menuRevision??String(menu?.revision||'');
+    const intentCommercialFreshness=routeIntent?.commercialFreshness??snapshot?.commercialFreshness;
     const submitReason=(()=>{
       if(!intentCart.length)return '記憶罐未有商品。';
+      if(!intentCommercialFreshness||Date.parse(intentCommercialFreshness.expiresAt)<=Date.now())return '今次價格確認已過期；請先更新最新價格，重新確認後再提交。';
       if(intentCheckout.phone.replace(/\D/g,'').length<8)return '請先輸入至少 8 位電話號碼。';
       if(intentCheckout.paymentMethod==='ELECTRONIC'){
         const channel=(snapshot?.paymentChannels??[]).find(item=>item.channelId===intentCheckout.paymentChannelId);
-        if(!intentCheckout.paymentChannelId||!channel||channel.label!==intentCheckout.paymentChannelLabel)return '付款方式資料已更新，請返回付款頁重新確認。';
+        if(!intentCheckout.paymentChannelId||!channel)return '付款方式暫時不可用，請返回付款頁重新確認。';
         if(!channel.qrImageUrl)return '電子支付 QR 已失效，請返回付款頁重新確認。';
         if(intentCheckout.paymentEvidence?.state!=='UPLOADED'||!intentCheckout.paymentEvidence.evidenceRef)return '付款憑證未完成，請返回付款頁重新確認。';
       }
-      const latestQuote=quotePublishedCart(intentCart,menu);
-      const latestRepairs=publishedCartRepairs(intentCart,menu);
-      if(!latestQuote||latestQuote.freshness!=='CURRENT'||latestRepairs.length)return '提交前餐牌、價格或供應資料有變更；請返回記憶罐只修受影響餐點。';
+      if(!routeIntent){
+        const latestQuote=quotePublishedCart(intentCart,menu);
+        const latestRepairs=publishedCartRepairs(intentCart,menu);
+        if(!commercialReady||!latestQuote||latestQuote.freshness!=='CURRENT'||latestRepairs.length)return '提交前餐牌、價格或供應資料有變更；請返回記憶罐只修受影響餐點。';
+      }
       return null;
     })();
     if(submitReason){setNotice(submitReason);return}
@@ -534,7 +557,8 @@ export function App(){
       item.state==='DRAFT'&&
       JSON.stringify(item.cart)===cartFingerprint&&
       JSON.stringify(item.checkout)===checkoutFingerprint&&
-      item.menuRevision===intentMenuRevision
+      item.menuRevision===intentMenuRevision&&
+      item.commercialFreshness?.freshnessToken===intentCommercialFreshness?.freshnessToken
     );
     setSubmitting(true);
     setFallbackIntentId(null);
@@ -570,7 +594,7 @@ export function App(){
         }
       }
 
-      const base=existing??createCustomerPendingIntent(intentCart,intentCheckout,intentMenuRevision);
+      const base=existing??createCustomerPendingIntent(intentCart,intentCheckout,intentMenuRevision,intentCommercialFreshness);
       if(!port?.submitOrder){
         const cleanCheckout=withoutPaymentEvidence(intentCheckout);
         const offlineIntent=Object.freeze({...base,state:'NOT_CONNECTED' as const,updatedAt:nowIso(),lastMessage:'店舖接單系統暫時未連接；可以改用 WhatsApp。'});
@@ -630,7 +654,7 @@ export function App(){
         setFallbackIntentId(null);
         setNotice('提交結果未明；原本嗰次落單已保留並會先讀回，唔會自動重送。');
       }else{
-        const base=existing??createCustomerPendingIntent(intentCart,intentCheckout,intentMenuRevision);
+        const base=existing??createCustomerPendingIntent(intentCart,intentCheckout,intentMenuRevision,intentCommercialFreshness);
         const offlineIntent=Object.freeze({...base,state:'NOT_CONNECTED' as const,updatedAt:nowIso(),lastMessage:'店舖接單系統暫時未連接；可以改用 WhatsApp。'});
         saveIntent(offlineIntent);
         setFallbackIntentId(base.submissionId);
@@ -874,7 +898,7 @@ export function App(){
       :<BottomNavigation active={view==='cart'||view==='checkout'?'cart':view==='more'||view==='account'||view==='recovery'?'more':'orders'} cartCount={cartCount} orderCount={activeOrders.length} pulseKey={jarPulseKey} onChange={changeView}/>}
 
 
-    {selectedProduct?<ProductSheet product={selectedProduct} menu={menu} selections={selections} comboEnabled={selectedComboEnabled} comboSelections={selectedComboSelections} selectedVariationId={selectedVariationId} quantity={selectedQuantity} note={selectedNote} editing={Boolean(editingLineId)} recommendations={productRecommendations} setVariation={setSelectedVariationId} setComboEnabled={setSelectedComboEnabled} clearCombo={()=>setSelectedComboSelections(Object.freeze([]))} setQuantity={setSelectedQuantity} setNote={setSelectedNote} toggle={(groupId,optionId)=>{
+    {selectedProduct?<ProductSheet product={selectedProduct} menu={menu} selections={selections} comboEnabled={selectedComboEnabled} comboSelections={selectedComboSelections} selectedVariationId={selectedVariationId} quantity={selectedQuantity} note={selectedNote} editing={Boolean(editingLineId)} commercialReady={commercialReady} recommendations={productRecommendations} setVariation={setSelectedVariationId} setComboEnabled={setSelectedComboEnabled} clearCombo={()=>setSelectedComboSelections(Object.freeze([]))} setQuantity={setSelectedQuantity} setNote={setSelectedNote} toggle={(groupId,optionId)=>{
       const group=selectedProduct.optionGroups.find(item=>item.optionGroupId===groupId);
       if(group)setSelections(current=>toggleCustomerSelection(current,group,optionId));
     }} toggleCombo={(poolId,groupId,subPoolId,choiceId)=>{

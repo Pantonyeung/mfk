@@ -212,7 +212,7 @@ export function projectionHashForEntities(entities:MfkSyncEntityMap){
   return fingerprintMfkSyncValue(
     Object.keys(entities).sort().map(key=>({
       key,
-      payloadHash:entities[key]!.payloadHash,
+      payloadHash:fingerprintMfkSyncValue(entities[key]!.payload),
     })),
   );
 }

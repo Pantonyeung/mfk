@@ -13,7 +13,8 @@
   "secrets": {
     "required": [
       "KEETA_APP_SECRET",
-      "KEETA_TOKEN_ENCRYPTION_KEY"
+      "KEETA_TOKEN_ENCRYPTION_KEY",
+      "CUSTOMER_COMMERCIAL_PROOF_KEYRING"
     ]
   },
   "assets": {
