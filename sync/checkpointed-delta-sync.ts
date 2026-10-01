@@ -6,7 +6,7 @@ import {
   type MfkSyncCheckpoint,
   type MfkSyncCheckpointEntity,
   type MfkSyncPort,
-} from '../contracts/checkpointed-delta-sync-v1.ts';
+} from '../contracts/checkpointed-delta-sync-v1';
 
 type JsonRow=Record<string,unknown>;
 export type MfkSyncEntityMap=Readonly<Record<string,MfkSyncCheckpointEntity>>;
