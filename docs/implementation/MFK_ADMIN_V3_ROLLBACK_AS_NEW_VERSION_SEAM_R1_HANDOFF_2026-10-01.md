@@ -1,7 +1,7 @@
 # MFK Admin V3｜Rollback As New Version Seam R1｜Handoff
 
 日期：2026-10-01  
-狀態：IMPLEMENTED / STACKED DRAFT PR / NO PROMOTE / NO DEPLOY
+狀態：LANDED TO MAIN / NO DEPLOY / NO OTA
 
 ## Dependency
 
@@ -86,4 +86,11 @@ GitHub Actions evidence：
    - publish result 之後等 Canonical refresh + SMT ACK
 4. UI 只可在 ACK / authoritative readback 成立後顯示 Applied；唔可以 server 200 就當門店已套用。
 
-MILESTONE: MFK_ADMIN_V3_ROLLBACK_AS_NEW_VERSION_SEAM_R1_IMPLEMENTED_GREEN_PENDING_PROMOTE
+MILESTONE: MFK_ADMIN_V3_ROLLBACK_AS_NEW_VERSION_SEAM_R1_LANDED_MAIN
+
+
+## Landing Readback
+
+- Main merge SHA: `b52830172f82cdf5ea76ccc2dd15b5019a14ec6e`
+- Version-history PR #614 landed first; rollback landing PR #616 landed after all checks green.
+- Production route / hostname / deploy / OTA remains untouched.
