@@ -49,7 +49,7 @@ main{
 .logo-button{
   grid-area:logo;
   min-width:56px;
-  min-height:48px;
+  min-height:40px;
   border:0;
   background:transparent;
   padding:0;
@@ -320,18 +320,18 @@ main{
 /* Main content uses fewer, larger image cards. */
 .featured-section{
   margin:0 14px;
-  padding:16px;
+  padding:14px;
   border-radius:26px;
   background:#fff;
   box-shadow:var(--shadow);
 }
 .section-heading{
-  min-height:56px;
+  min-height:46px;
   display:flex;
   align-items:center;
   justify-content:space-between;
   gap:12px;
-  margin-bottom:12px;
+  margin-bottom:8px;
 }
 .section-heading h2{
   margin:0;
@@ -365,7 +365,7 @@ main{
 }
 .featured-main{
   width:100%;
-  min-height:208px;
+  min-height:160px;
   border:0;
   padding:0;
   background:#fff;
@@ -373,7 +373,7 @@ main{
 }
 .featured-media{
   position:relative;
-  height:138px;
+  height:110px;
   overflow:hidden;
   background:#edf2fb;
 }
@@ -384,11 +384,11 @@ main{
 }
 .featured-copy{
   display:grid;
-  gap:4px;
-  padding:11px 12px 8px;
+  gap:3px;
+  padding:9px 10px 7px;
 }
 .featured-copy strong{
-  font-size:14px;
+  font-size:13px;
   line-height:1.2;
 }
 .featured-copy small{
@@ -396,16 +396,16 @@ main{
   color:#7786a0;
 }
 .featured-card footer{
-  min-height:54px;
-  padding:0 12px 10px;
+  min-height:46px;
+  padding:0 10px 8px;
   display:flex;
   align-items:center;
   justify-content:space-between;
 }
-.featured-card footer b{font-size:18px}
+.featured-card footer b{font-size:17px}
 .featured-card footer button{
-  width:46px;
-  height:46px;
+  width:44px;
+  height:44px;
   border:0;
   border-radius:50%;
   background:#2d73ff;
@@ -417,7 +417,7 @@ main{
 /* Recent order is one clear, large touch row. */
 .recent-section{
   margin:0 14px;
-  padding:16px;
+  padding:12px;
   border-radius:24px;
   background:#fff;
   box-shadow:var(--shadow);
@@ -431,7 +431,7 @@ main{
 }
 .recent-title h2{
   margin:0;
-  font-size:20px;
+  font-size:18px;
 }
 .recent-title p{
   margin:4px 0 0;
@@ -447,21 +447,21 @@ main{
 }
 .recent-card{
   width:100%;
-  min-height:92px;
-  margin-top:10px;
+  min-height:72px;
+  margin-top:6px;
   border:0;
   border-radius:20px;
-  padding:12px;
+  padding:9px;
   display:grid;
-  grid-template-columns:68px minmax(0,1fr) auto;
+  grid-template-columns:54px minmax(0,1fr) auto;
   align-items:center;
   gap:12px;
   background:#f4f8ff;
   text-align:left;
 }
 .recent-card img{
-  width:68px;
-  height:68px;
+  width:54px;
+  height:54px;
   border-radius:18px;
   object-fit:cover;
 }
@@ -471,7 +471,7 @@ main{
   gap:5px;
 }
 .recent-card strong{
-  font-size:14px;
+  font-size:13px;
   line-height:1.2;
 }
 .recent-card small{
@@ -480,7 +480,7 @@ main{
 }
 .recent-card>b{
   min-height:44px;
-  padding:0 14px;
+  padding:0 12px;
   display:grid;
   place-items:center;
   border-radius:999px;
@@ -582,15 +582,15 @@ nav .active{color:#1767f7}
     margin-left:10px;
     margin-right:10px;
   }
-  .featured-media{height:124px}
-  .featured-main{min-height:194px}
+  .featured-media{height:104px}
+  .featured-main{min-height:154px}
   .featured-copy strong{font-size:13px}
 
   .recent-card{
-    grid-template-columns:60px minmax(0,1fr) auto;
+    grid-template-columns:52px minmax(0,1fr) auto;
     gap:9px;
   }
-  .recent-card img{width:60px;height:60px}
+  .recent-card img{width:52px;height:52px}
   .recent-card>b{padding:0 10px;font-size:11px}
 }
 
