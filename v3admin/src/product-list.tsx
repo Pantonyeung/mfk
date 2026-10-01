@@ -2,7 +2,6 @@ import {useMemo,useState,type KeyboardEvent} from 'react';
 import {MobileGroupedPager} from './mobile-grouped-list.tsx';
 import {uploadPreviewProductMedia,PRODUCT_MEDIA_STORAGE_POLICY,type ProductMediaSurface} from './product-media-api.ts';
 import {
-  PREVIEW_CATALOG_CATEGORIES,
   usePreviewCatalog,
   type PreviewProduct,
 } from './preview-catalog-store.ts';
@@ -186,13 +185,14 @@ function ProductMediaField({
 
 function PreviewProductEditor({productId,onClose}:{productId:string|null;onClose:()=>void}){
   const product=usePreviewCatalog(state=>productId?state.products.find(item=>item.id===productId):undefined);
+  const categories=usePreviewCatalog(state=>state.categories);
   const optionSets=usePreviewCatalog(state=>state.optionSets);
   const combos=usePreviewCatalog(state=>state.combos);
   const createProduct=usePreviewCatalog(state=>state.createProduct);
   const updateProduct=usePreviewCatalog(state=>state.updateProduct);
   const [draftId]=useState(()=>product?.id??'draft-'+crypto.randomUUID());
   const [name,setName]=useState(product?.name??'');
-  const [category,setCategory]=useState(product?.category??PREVIEW_CATALOG_CATEGORIES[0]);
+  const [category,setCategory]=useState(product?.category??categories.find(item=>item.active)?.name??'');
   const [price,setPrice]=useState(product?String(product.priceMinor/100):'');
   const [active,setActive]=useState(product?.status!=='已停用');
   const [description,setDescription]=useState(product?.description??'');
@@ -238,7 +238,7 @@ function PreviewProductEditor({productId,onClose}:{productId:string|null;onClose
           <div className="v3-functional-grid">
             <label><span>商品名稱 *</span><input autoFocus value={name} onChange={event=>setName(event.target.value)} placeholder="輸入商品名稱"/></label>
             <label><span>商品編號</span><input value={product?.code??'儲存後由系統自動生成'} disabled/></label>
-            <label><span>分類 *</span><select value={category} onChange={event=>setCategory(event.target.value)}>{PREVIEW_CATALOG_CATEGORIES.map(item=><option key={item}>{item}</option>)}</select></label>
+            <label><span>分類 *</span><select value={category} onChange={event=>setCategory(event.target.value)}>{categories.filter(item=>item.active||item.name===category).sort((a,b)=>a.sortOrder-b.sortOrder).map(item=><option key={item.id} value={item.name}>{item.name}</option>)}</select></label>
             <label><span>基本價格 *</span><div className="v3-money-input"><b>HK$</b><input inputMode="decimal" value={price} onChange={event=>setPrice(event.target.value.replace(/[^0-9.]/g,''))}/></div></label>
           </div>
           <label><span>商品描述</span><textarea rows={3} value={description} onChange={event=>setDescription(event.target.value)}/></label>
@@ -285,6 +285,7 @@ function isMobileViewport(){
 export function ProductListPage({canonicalSnapshot,previewMode=false,onReviewDraft}:{canonicalSnapshot?:unknown;previewMode?:boolean;onReviewDraft?:()=>void}){
   const canonicalRows=useMemo(()=>productRecordsFromSnapshot(canonicalSnapshot),[canonicalSnapshot]);
   const previewProducts=usePreviewCatalog(state=>state.products);
+  const previewCategories=usePreviewCatalog(state=>state.categories);
   const combos=usePreviewCatalog(state=>state.combos);
   const previewRows=useMemo(()=>previewProducts.map(product=>previewRecord(product,combos.filter(combo=>combo.groups.some(group=>group.choices.some(choice=>choice.productId===product.id))).length)),[previewProducts,combos]);
   const sourceRows=previewMode?previewRows:canonicalRows;
@@ -299,10 +300,10 @@ export function ProductListPage({canonicalSnapshot,previewMode=false,onReviewDra
   const [previewEditorId,setPreviewEditorId]=useState<string|null|undefined>(undefined);
 
   const categoryOptions=useMemo(()=>{
-    if(previewMode)return ['全部',...PREVIEW_CATALOG_CATEGORIES];
+    if(previewMode)return ['全部',...previewCategories.filter(item=>item.active).sort((a,b)=>a.sortOrder-b.sortOrder).map(item=>item.name)];
     const values=[...new Set(sourceRows.map(item=>item.category).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'zh-HK'));
     return ['全部',...values];
-  },[previewMode,sourceRows]);
+  },[previewMode,previewCategories,sourceRows]);
 
   const filtered=useMemo(()=>{
     const needle=query.trim().toLocaleLowerCase();
