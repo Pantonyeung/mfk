@@ -10,11 +10,9 @@ const app=fs.readFileSync(path.join(root,'App.tsx'),'utf8');
 const admin=fs.readFileSync(path.join(root,'runtime/admin-operational-config.ts'),'utf8');
 
 describe('SMT A4 Admin table registry in hold selector',()=>{
-  it('uses Admin-published dining tables before the legacy 1-9 fallback',()=>{
-    expect(app).toContain('const diningTableDefinitions=storeSettings.diningTables.length');
-    expect(app).toContain('?storeSettings.diningTables');
-    expect(app).toContain("id:'T'+String(index+1).padStart(2,'0')");
-    expect(app).toContain("name:String(index+1)+' 號枱'");
+  it('uses only Admin-published dining tables and fails closed without a registry',()=>{
+    expect(app).toContain('const diningTableDefinitions=storeSettings.diningTables;');
+    expect(app).not.toContain('Array.from({length:9}');
   });
 
   it('uses Admin table id and display name while preserving occupied hold readback',()=>{

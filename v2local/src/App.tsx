@@ -310,14 +310,7 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode,diningAddition,on
     pairingBlockedLineIds,
     nextPairingStartIndex(cart),
   );
-  const diningTableDefinitions=storeSettings.diningTables.length
-    ?storeSettings.diningTables
-    :Array.from({length:9},(_,index)=>({
-      id:'T'+String(index+1).padStart(2,'0'),
-      name:String(index+1)+' 號枱',
-      active:true,
-      sortOrder:index+1,
-    }));
+  const diningTableDefinitions=storeSettings.diningTables;
   const holdTables=diningTableDefinitions.map(table=>{
     const occupied=heldCarts.find(hold=>hold.kind==='dining'&&hold.assignedTable===table.id);
     return {id:table.id,label:table.name,occupied:Boolean(occupied),codeLabel:occupied?.codeLabel};
