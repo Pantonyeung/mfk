@@ -611,3 +611,15 @@ dialog p{color:var(--muted);line-height:1.55}
   .v3-formal-draft-strip{margin:10px 12px 0;align-items:flex-start}
   .v3-formal-draft-meta{grid-template-columns:1fr}
 }
+
+
+/* Formal combo reusable-pool editor */
+.v3-combo-formal-sheet{width:min(980px,98vw)}
+.v3-combo-nested-block{display:grid;gap:8px;padding:10px;border:1px solid #e8e1d6;border-radius:10px;background:#fff}
+.v3-combo-nested-block>header{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.v3-combo-band-row{display:grid;grid-template-columns:minmax(150px,1.2fr) minmax(100px,.7fr) auto auto;gap:8px;align-items:end}
+.v3-combo-choice-list-row{display:grid;grid-template-columns:120px minmax(180px,1.3fr) minmax(130px,.9fr) minmax(100px,.7fr) auto;gap:8px;align-items:end}
+.v3-combo-band-row input,.v3-combo-choice-list-row input,.v3-combo-choice-list-row select{min-height:42px;border:1px solid #c9c3b7;border-radius:9px;background:#fff;padding:8px 9px}
+@media(max-width:767px){
+  .v3-combo-band-row,.v3-combo-choice-list-row{grid-template-columns:1fr}
+}
