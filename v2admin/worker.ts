@@ -1245,17 +1245,83 @@ export class AdminSyncStore{
     return{status:200,body:{state:'ACKED',ack,head}};
   }
 
+  async deliverKeetaProviderDelta(plan){
+    const targetHeadSeq=Number(plan.head?.headSeq||0);
+    try{
+      const id=this.env.KEETA_RUNTIME.idFromName(String(plan.head?.storeId||'MF01'));
+      const keeta=this.env.KEETA_RUNTIME.get(id);
+      const statusResponse=await keeta.fetch(new Request('https://keeta-runtime/internal/provider/status',{method:'GET'}));
+      if(!statusResponse.ok)throw new Error('KEETA_PROVIDER_STATUS_UNAVAILABLE');
+      const status=await statusResponse.json();
+      const providerAppliedSeq=Number(status.providerAppliedSeq)||0;
+      if(providerAppliedSeq>=targetHeadSeq)return status;
+      if(providerAppliedSeq<Number(plan.head?.checkpointSeq||0)){
+        return await this.markKeetaProviderRecovery(keeta,targetHeadSeq,'KEETA_PROVIDER_CHECKPOINT_REQUIRED');
+      }
+      const changes=[];
+      for(let seq=providerAppliedSeq+1;seq<=targetHeadSeq;seq++){
+        const change=await this.state.storage.get(syncEventKey('KEETA',seq));
+        if(!change)return await this.markKeetaProviderRecovery(keeta,targetHeadSeq,'KEETA_PROVIDER_JOURNAL_GAP');
+        changes.push(change);
+      }
+      const batch={
+        schema:'MFK_SYNC_CHANGE_BATCH_V1',
+        protocol:MFK_CHECKPOINTED_DELTA_SYNC_PROTOCOL,
+        schemaVersion:MFK_SYNC_SCHEMA_VERSION,
+        storeId:String(plan.head?.storeId||'MF01'),
+        port:'KEETA',
+        fromExclusive:providerAppliedSeq,
+        toInclusive:targetHeadSeq,
+        headSeq:targetHeadSeq,
+        journalFloorSeq:Number(plan.head?.journalFloorSeq||1),
+        changes,
+        observedAt:new Date().toISOString(),
+      };
+      const response=await keeta.fetch(new Request('https://keeta-runtime/internal/provider/delta',{
+        method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({batch,currentEntities:plan.entities}),
+      }));
+      const body=await response.json().catch(()=>({}));
+      if(!response.ok){
+        const code=String(body.code||'KEETA_PROVIDER_DELTA_FAILED');
+        await this.markKeetaProviderRecovery(keeta,targetHeadSeq,code);
+        throw new Error(code);
+      }
+      await this.state.storage.delete('sync:provider-error:KEETA');
+      return body;
+    }catch(error){
+      await this.state.storage.put('sync:provider-error:KEETA',{
+        code:error instanceof Error?error.message:'KEETA_PROVIDER_DELIVERY_FAILED',
+        headSeq:targetHeadSeq,observedAt:new Date().toISOString(),
+      });
+      return null;
+    }
+  }
+
+  async markKeetaProviderRecovery(keeta,headSeq,reason){
+    const response=await keeta.fetch(new Request('https://keeta-runtime/internal/provider/recovery-required',{
+      method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({headSeq,reason}),
+    }));
+    return response.json().catch(()=>({state:'UNKNOWN',headSeq,reason}));
+  }
+
   async syncDistributionReadback(){
     const heads={};
     for(const port of MFK_SYNC_PORTS)heads[port]=await this.readSyncHead(port);
     const appliedRows=await this.state.storage.list({prefix:'sync:applied:'});
     const applied=[...appliedRows.values()].sort((a,b)=>String(a.port).localeCompare(String(b.port))||String(a.clientId).localeCompare(String(b.clientId)));
     const errors=await this.state.storage.list({prefix:'sync:projection-error:'});
+    let keetaProvider=null;
+    try{
+      const id=this.env.KEETA_RUNTIME.idFromName('MF01');
+      const response=await this.env.KEETA_RUNTIME.get(id).fetch(new Request('https://keeta-runtime/internal/provider/status',{method:'GET'}));
+      if(response.ok)keetaProvider=await response.json();
+    }catch{}
     return Object.freeze({
       schema:'MFK_SYNC_DISTRIBUTION_READBACK_V1',
       protocol:MFK_CHECKPOINTED_DELTA_SYNC_PROTOCOL,
       heads,
       applied,
+      providers:Object.freeze({KEETA:keetaProvider}),
       projectionErrors:[...errors.entries()].map(([key,value])=>({key,value})),
       observedAt:new Date().toISOString(),
     });
@@ -1508,7 +1574,15 @@ export class AdminSyncStore{
           continue;
         }
         const message=JSON.stringify(event);
-        if(event.port==='KEETA')continue;
+        if(event.port==='KEETA'){
+          const plan=result.checkpointPlans.find(item=>item.port==='KEETA');
+          if(plan){
+            const task=this.deliverKeetaProviderDelta(plan);
+            if(typeof this.state.waitUntil==='function')this.state.waitUntil(task);
+            else void task;
+          }
+          continue;
+        }
         const sockets=this.portSockets(event.port);
         for(const socket of sockets){try{socket.send(message);}catch{}}
       }
@@ -1914,6 +1988,11 @@ export class AdminSyncStore{
 
   async fetch(request){
     const url=new URL(request.url);
+    if(url.pathname==='/internal/sync/head'&&request.method==='GET'){
+      const port=String(url.searchParams.get('port')||'').toUpperCase();
+      if(!MFK_SYNC_PORTS.includes(port))return json({code:'SYNC_PORT_INVALID'},400);
+      return json(await this.readSyncHead(port));
+    }
     if(url.pathname==='/authorize-admin'){
       if(!await this.authorizeAdminRead(request))return json({code:'ADMIN_READ_UNAUTHORIZED'},401);
       return json({ok:true});
@@ -3015,6 +3094,9 @@ export default {
           'store/preview','store/hours/sync',
         ]);
         if(activeConfigSubpaths.has(adminSubpath)&&request.method==='POST'){
+          const operatorInput=adminSubpath==='menu/sync'
+            ?await request.clone().json().catch(()=>({}))
+            :{};
           const activeResponse=await admin.fetch(new Request('https://internal/active',{method:'GET'}));
           if(!activeResponse.ok)return json({code:'KEETA_ADMIN_CONFIG_NOT_PUBLISHED'},409,cors(request));
           const active=await activeResponse.json();
@@ -3025,11 +3107,19 @@ export default {
             const runtimeBody=runtimeResponse.ok?await runtimeResponse.json():{sellability:[]};
             runtimeSellability=Array.isArray(runtimeBody.sellability)?runtimeBody.sellability:[];
           }
+          let recovery={};
+          if(adminSubpath==='menu/sync'){
+            const headResponse=await admin.fetch(new Request('https://admin-sync/internal/sync/head?port=KEETA',{method:'GET'}));
+            if(!headResponse.ok)return json({code:'KEETA_SYNC_HEAD_UNAVAILABLE'},409,cors(request));
+            const head=await headResponse.json();
+            recovery={reason:operatorInput.reason,sourceToSeq:Number(head.headSeq)||0};
+          }
           init.body=JSON.stringify({
             revision:active.revision,
             adminFingerprint:active.fingerprint,
             snapshot:active.snapshot,
             ...(runtimeSellability.length?{runtimeSellability}:{}),
+            ...recovery,
           });
         }else if(request.method!=='GET'&&request.method!=='HEAD'){
           const body=await request.arrayBuffer();

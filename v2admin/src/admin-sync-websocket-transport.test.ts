@@ -142,6 +142,60 @@ describe('Admin realtime transport recovery',()=>{
     expect(sent).toHaveLength(4);
   });
 
+  it('delivers a one-Product Admin change as KEETA Delta and never calls full-menu sync',async()=>{
+    const values=new Map<string,unknown>();
+    const tasks:Promise<unknown>[]=[];
+    const providerRequests:Request[]=[];
+    let providerAppliedSeq=0;
+    const state={
+      storage:{
+        get:async(key:string)=>values.get(key),
+        put:async(key:string,value:unknown)=>{values.set(key,value);},
+        delete:async(key:string)=>{values.delete(key);},
+      },
+      getWebSockets:()=>[],
+      waitUntil:(task:Promise<unknown>)=>tasks.push(task),
+    };
+    const env={KEETA_RUNTIME:{
+      idFromName:()=>({}),
+      get:()=>({fetch:async(request:Request)=>{
+        providerRequests.push(request.clone());
+        const path=new URL(request.url).pathname;
+        if(path==='/internal/provider/status')return new Response(JSON.stringify({providerAppliedSeq}),{headers:{'content-type':'application/json'}});
+        if(path==='/internal/provider/delta'){
+          const body=await request.json() as {batch:{toInclusive:number}};
+          providerAppliedSeq=body.batch.toInclusive;
+          return new Response(JSON.stringify({state:'APPLIED',providerAppliedSeq}),{headers:{'content-type':'application/json'}});
+        }
+        throw new Error('UNEXPECTED_KEETA_ROUTE:'+path);
+      }}),
+    }};
+    const store=new AdminSyncStore(state as never,env as never);
+    const snapshot=(price:string)=>({
+      catalog:{
+        categories:[{id:'cat',name:'主食',position:10,active:true}],
+        products:[{id:'p1',productCode:'SKU-P1',name:'商品一',categoryId:'cat',active:true,basePrice:price,takeawayAdjustment:'0.00',takeawaySurchargeEnabled:false,modifierGroupIds:[]}],
+      },
+      optionCenter:{sets:[],productLinks:[]},
+    });
+    await store.publishEnvelope(createMfkAdminConfigEnvelope({
+      storeId:'MF01',revision:1,publishedAt:'2026-10-01T00:00:00.000Z',adminFingerprint:'admin-1',snapshot:snapshot('42.00'),
+    }));
+    await Promise.all(tasks.splice(0));
+    providerRequests.length=0;
+
+    await store.publishEnvelope(createMfkAdminConfigEnvelope({
+      storeId:'MF01',revision:2,publishedAt:'2026-10-01T00:01:00.000Z',adminFingerprint:'admin-2',snapshot:snapshot('43.00'),
+    }));
+    await Promise.all(tasks.splice(0));
+
+    const deltaRequest=providerRequests.find(request=>new URL(request.url).pathname==='/internal/provider/delta');
+    expect(deltaRequest).toBeDefined();
+    const delivered=await deltaRequest!.json() as {batch:{changes:Array<{entityType:string;entityId:string}>}};
+    expect(delivered.batch.changes).toEqual([expect.objectContaining({entityType:'KEETA_SPU',entityId:'SPU:SKU-P1'})]);
+    expect(providerRequests.some(request=>new URL(request.url).pathname==='/admin/menu/sync')).toBe(false);
+  });
+
   it('keeps active HTTP response wrapping and CORS behavior',async()=>{
     vi.stubGlobal('Response',NativeResponse);
     const upstream=new NativeResponse(JSON.stringify({revision:42}),{headers:{'content-type':'application/json'}});
