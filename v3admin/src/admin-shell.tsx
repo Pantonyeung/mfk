@@ -20,6 +20,7 @@ import {FormalDiningTablesPage,FormalStoreSettingsPage} from './formal-store-pag
 import {FormalChannelPage} from './formal-channel-pages.tsx';
 import {FormalAccessGapPage,FormalPermissionsSummaryPage,FormalRolesSummaryPage,FormalStaffPage} from './formal-staff-pages.tsx';
 import {FormalCapacityPage} from './formal-capacity-page.tsx';
+import {FormalOrdersPage,FormalSalesReportPage,FormalTodayPage} from './formal-read-pages.tsx';
 import {
   EmptyState,
   ErrorState,
@@ -115,14 +116,14 @@ export function AdminShell({storeId,displayName,releaseStatus,canonicalState,can
     if(drawerOpen||window.matchMedia('(max-width: 1179px)').matches){setDrawerOpen(true);setMobileStep('destinations');}
   };
 
-  const routeContent=path==='/admin/overview'&&previewMode
-    ?<TodayPage mode="overview" onNavigate={navigate}/>
+  const routeContent=path==='/admin/overview'
+    ?(previewMode?<TodayPage mode="overview" onNavigate={navigate}/>:formalDraftEnabled?<FormalTodayPage onNavigate={navigate}/>:<RouteSkeleton path={path} canonicalState={canonicalState} onRefresh={onRefresh}/>)
     :path==='/admin/action-queue'&&previewMode
       ?<TodayPage mode="queue" onNavigate={navigate}/>
-      :path==='/admin/orders/open'&&previewMode
-        ?<OrdersPage mode="open"/>
-    :path==='/admin/orders/history'&&previewMode
-      ?<OrdersPage mode="history"/>
+      :path==='/admin/orders/open'
+        ?(previewMode?<OrdersPage mode="open"/>:formalDraftEnabled?<FormalOrdersPage mode="open"/>:<RouteSkeleton path={path} canonicalState={canonicalState} onRefresh={onRefresh}/>)
+    :path==='/admin/orders/history'
+      ?(previewMode?<OrdersPage mode="history"/>:formalDraftEnabled?<FormalOrdersPage mode="history"/>:<RouteSkeleton path={path} canonicalState={canonicalState} onRefresh={onRefresh}/>)
       :path==='/admin/orders/exceptions'&&previewMode
         ?<OrdersPage mode="exceptions"/>
         :path==='/admin/catalog/products'
@@ -183,8 +184,8 @@ export function AdminShell({storeId,displayName,releaseStatus,canonicalState,can
                                               ?(previewMode?<PermissionsPage/>:formalDraftEnabled?<FormalPermissionsSummaryPage/>:<RouteSkeleton path={path} canonicalState={canonicalState} onRefresh={onRefresh}/>)
                                               :path==='/admin/access'
                                                 ?(previewMode?<AccessPage/>:formalDraftEnabled?<FormalAccessGapPage/>:<RouteSkeleton path={path} canonicalState={canonicalState} onRefresh={onRefresh}/>)
-                                                :path==='/admin/reports/sales'&&previewMode
-                                                  ?<ReportPage mode="sales"/>
+                                                :path==='/admin/reports/sales'
+                                                  ?(previewMode?<ReportPage mode="sales"/>:formalDraftEnabled?<FormalSalesReportPage/>:<RouteSkeleton path={path} canonicalState={canonicalState} onRefresh={onRefresh}/>)
                                                   :path==='/admin/reports/products'&&previewMode
                                                     ?<ReportPage mode="products"/>
                                                     :path==='/admin/reports/channels'&&previewMode
