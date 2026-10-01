@@ -334,7 +334,7 @@ export function ProductListPage({canonicalSnapshot,previewMode=false,onReviewDra
   };
 
   return <div className="v3-product-page">
-    {previewMode?<div className="v3-preview-banner" role="status"><strong>產品管理已接實際 Preview State</strong><span>圖片上載會寫入專用非 Production R2；產品／選項／套餐修改會喺呢個 Preview session 即時互相反映。</span></div>:null}
+    {previewMode?<div className="v3-preview-banner" role="status"><strong>產品管理已接實際 Preview State</strong><span>圖片入口已建立，產品圖正式只會存 R2；目前 R2 連線按驗收 Gate 暫未啟用。產品／選項／套餐修改會喺 Preview session 即時互相反映。</span></div>:null}
     <PageHeader
       eyebrow="菜單管理"
       title="產品管理"
