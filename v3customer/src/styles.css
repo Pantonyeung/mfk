@@ -15,12 +15,12 @@ button:focus-visible{outline:3px solid rgba(23,103,247,.35);outline-offset:2px}
 }
 .header{
   position:absolute;z-index:20;top:0;left:0;right:0;
-  display:grid;grid-template-columns:72px 108px 36px minmax(0,1fr);
+  display:grid;grid-template-columns:86px 112px 36px minmax(0,1fr);
   grid-template-areas:"logo location bell search";
   align-items:center;gap:6px;padding:calc(6px + env(safe-area-inset-top)) 10px 4px;background:transparent
 }
 .logo-button{grid-area:logo;border:0;background:transparent;padding:0;display:grid;place-items:center}
-.logo{width:64px;height:46px;object-fit:contain}
+.logo{width:72px;height:48px;object-fit:contain}
 .pill,.round{
   min-height:38px;border:1px solid #fff;background:rgba(255,255,255,.9);
   box-shadow:0 5px 14px rgba(47,92,164,.08)
@@ -74,15 +74,15 @@ main{display:grid;grid-template-columns:minmax(0,1fr);gap:8px;min-width:0}
 .c2{width:180px;height:100px;left:-24px;bottom:22px;transform:rotate(9deg)}
 .c3{width:124px;height:84px;right:44px;bottom:78px;background:rgba(255,249,232,.68)}
 .male{
-  position:absolute;width:174px;height:214px;object-fit:contain;left:-12px;bottom:-4px;z-index:5;
+  position:absolute;width:190px;height:220px;object-fit:contain;left:-20px;bottom:-4px;z-index:5;
   filter:drop-shadow(0 17px 18px rgba(36,67,126,.2));transform:rotate(-2deg)
 }
 .female{
-  position:absolute;width:140px;height:184px;object-fit:contain;right:-4px;bottom:-3px;z-index:4;
+  position:absolute;width:150px;height:188px;object-fit:contain;right:-6px;bottom:-4px;z-index:4;
   filter:drop-shadow(0 15px 16px rgba(68,55,138,.17));transform:rotate(3deg)
 }
 .doodle{position:absolute;z-index:7;object-fit:contain;pointer-events:none}
-.doodle-more{width:48px;height:48px;right:38px;top:4px;transform:rotate(7deg)}
+.doodle-more{width:48px;height:48px;right:78px;top:4px;transform:rotate(7deg)}
 .doodle-taste{width:62px;height:62px;right:-2px;bottom:0;transform:rotate(-6deg)}
 .quick{
   position:relative;z-index:8;margin:-4px 10px 0;padding:6px;
