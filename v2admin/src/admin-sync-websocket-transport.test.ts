@@ -40,7 +40,7 @@ describe('Admin realtime transport recovery',()=>{
 
     expect(response.status).toBe(101);
     expect(response.webSocket).toBe(client);
-    expect(state.acceptWebSocket).toHaveBeenCalledWith(server);
+    expect(state.acceptWebSocket).toHaveBeenCalledWith(server,['PORT:SMT']);
     expect(JSON.parse(sent[0]!)).toMatchObject({type:'ADMIN_CONFIG_AVAILABLE',storeId:'MF01',revision:42});
   });
 
@@ -54,7 +54,7 @@ describe('Admin realtime transport recovery',()=>{
         get:vi.fn(async(key:string)=>values.get(key)),
         put:vi.fn(async(key:string,value:unknown)=>{values.set(key,value);}),
       },
-      getWebSockets:()=>[{send:(message:string)=>sent.push(message)}],
+      getWebSockets:(tag?:string)=>tag==='PORT:SMT'?[{send:(message:string)=>sent.push(message)}]:[],
     };
     const store=new AdminSyncStore(state,{});
 
@@ -83,9 +83,10 @@ describe('Admin realtime transport recovery',()=>{
       active:{revision:22,publishedAt:'2026-09-30T01:00:10.000Z',adminFingerprint:'admin-second'},
     });
 
-    expect(sent).toHaveLength(2);
+    expect(sent.filter(message=>JSON.parse(message).type==='ADMIN_CONFIG_AVAILABLE')).toHaveLength(2);
+    expect(sent.filter(message=>JSON.parse(message).type==='PORT_HEAD_AVAILABLE')).toHaveLength(2);
     expect(JSON.parse(sent[0]!)).toMatchObject({type:'ADMIN_CONFIG_AVAILABLE',publishedAt:'2026-09-30T01:00:00.000Z'});
-    expect(JSON.parse(sent[1]!)).toMatchObject({type:'ADMIN_CONFIG_AVAILABLE',publishedAt:'2026-09-30T01:00:10.000Z'});
+    expect(JSON.parse(sent[2]!)).toMatchObject({type:'ADMIN_CONFIG_AVAILABLE',publishedAt:'2026-09-30T01:00:10.000Z'});
 
     const active=(secondResult.body as any).active;
     expect(values.get('admin:published:'+active.fingerprint)).toMatchObject({
@@ -100,7 +101,7 @@ describe('Admin realtime transport recovery',()=>{
       publishRequestFingerprint:second.fingerprint,
       cloudPublishedAt:'2026-09-30T01:00:10.000Z',
     });
-    expect(sent).toHaveLength(2);
+    expect(sent).toHaveLength(4);
   });
 
   it('keeps active HTTP response wrapping and CORS behavior',async()=>{
