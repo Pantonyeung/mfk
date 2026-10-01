@@ -107,3 +107,5 @@ jobs:
             echo
             echo "Result: byte-for-byte SHA256 readback GREEN"
           } >> "$GITHUB_STEP_SUMMARY"
+
+# trigger=2026-10-01T18:30:00+08:00
