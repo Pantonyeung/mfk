@@ -77,7 +77,7 @@ export function readFormalStoreSettings(snapshot:Record<string,unknown>):FormalS
     weeklyHours,
     diningTables:list(settings.diningTables).map((value,index)=>{
       const item=row(value);
-      const retirementStatus=item.retirementStatus==='PLANNED_RETIREMENT'||item.retirementStatus==='RETIRED'?item.retirementStatus:undefined;
+      const retirementStatus:FormalDiningTable['retirementStatus']=item.retirementStatus==='PLANNED_RETIREMENT'||item.retirementStatus==='RETIRED'?item.retirementStatus:undefined;
       return{
         id:text(item.id),
         name:text(item.name),
@@ -130,7 +130,7 @@ export function patchFormalDiningTable(snapshot:Record<string,unknown>,tableId:s
     const item=row(value);
     if(text(item.id)!==tableId)return value;
     found=true;
-    const next={...item,...patch};
+    const next:Record<string,unknown>={...item,...patch};
     if(typeof patch.name==='string'&&patch.name.trim()&&patch.name!==text(item.name)){
       const versions=list(item.versions);
       const at=new Date().toISOString();
