@@ -95,7 +95,8 @@ export function buildSmtSyncEntities(snapshot:unknown):MfkSyncEntityMap{
 export function buildCustomerSyncEntities(snapshot:unknown):MfkSyncEntityMap{
   const root=row(snapshot),menu=row(root.menu);
   const out:Record<string,MfkSyncCheckpointEntity>={};
-  const store=row(root.store);
+  const store={...row(root.store)};
+  delete store.observedAt;
   if(Object.keys(store).length)put(out,'CUSTOMER_STORE',safeId(store.storeId,'STORE'),store);
   arrayEntities(out,'CUSTOMER_CATEGORY',menu.categories,['categoryId','id']);
   arrayEntities(out,'CUSTOMER_PRODUCT',menu.products,['productId','id']);
@@ -106,6 +107,7 @@ export function buildCustomerSyncEntities(snapshot:unknown):MfkSyncEntityMap{
   if(Object.keys(fallback).length)put(out,'CUSTOMER_FALLBACK','DEFAULT',fallback);
   const menuMeta={...menu};
   delete menuMeta.categories;delete menuMeta.products;delete menuMeta.combos;delete menuMeta.comboPools;
+  delete menuMeta.observedAt;delete menuMeta.revision;
   if(Object.keys(menuMeta).length)put(out,'CUSTOMER_MENU_META','ROOT',menuMeta);
   return Object.freeze(out);
 }
@@ -120,6 +122,7 @@ export function buildSmmSyncEntities(snapshot:unknown):MfkSyncEntityMap{
   arrayEntities(out,'SMM_DINING_TABLE',root.diningTables,['tableId','id']);
   const menuMeta={...menu};
   delete menuMeta.categories;delete menuMeta.products;delete menuMeta.combos;delete menuMeta.comboPools;
+  delete menuMeta.observedAt;delete menuMeta.revision;
   if(Object.keys(menuMeta).length)put(out,'SMM_MENU_META','ROOT',menuMeta);
   return Object.freeze(out);
 }
