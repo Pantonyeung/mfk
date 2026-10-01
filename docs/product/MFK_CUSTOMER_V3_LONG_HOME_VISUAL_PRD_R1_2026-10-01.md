@@ -5,21 +5,47 @@ Status: OWNER VISUAL DIRECTION LOCKED / IMPLEMENTATION TARGET
 Capability: CUSTOMER_V3_LONG_HOME_UI_R1  
 Execution mode: isolated V3 preview, zero production routing.
 
-## 1. Owner-locked design direction
+## 0. Source lineage
 
-The selected direction is the long-scroll homepage produced after filtering earlier concepts #2 and #3.
+This V3 Visual PRD is based on:
+- Owner-locked 2026-10-01 long-scroll homepage image;
+- earlier selected concept directions #2 and #3;
+- MFK Customer UI Component Spec V1 (2026-09-26);
+- MFK Customer UI Frontend Handoff V1 (2026-09-26);
+- MFK Customer Design Tokens V1 (2026-09-26);
+- Owner-confirmed Male/Female IP Master Packs (2026-09-30).
+
+Where the new Owner-locked visual direction conflicts with the older UI spec, this document records the visual override explicitly instead of silently mixing the two.
+
+## 1. Owner-locked design direction
 
 Locked:
 - long vertically scrollable homepage; not restricted to one viewport;
 - large visual-first dual-IP Hero;
 - male IP visually dominant in the foreground, female IP supporting;
 - strong primary CTA;
-- blue / navy / purple / cream palette;
+- blue / navy / purple / cream visual family;
 - premium rounded cards, soft shadows, clear vertical rhythm;
 - rich below-the-fold content;
 - simple bottom navigation.
 
-## 2. PRD role
+### Explicit visual overrides versus 2026-09-26 UI spec
+
+1. Older Component Spec fixed 5 bottom-nav items:
+   首頁｜點單｜記憶罐｜訂單｜會員
+
+   New Owner-locked visual target shows 4:
+   首頁｜菜單｜訂單｜我的
+
+   V3 preview follows the new four-item visual target.
+   This does NOT delete Memory Jar / member capabilities; they must remain reachable through the approved route/interaction model before production cutover.
+
+2. Older Design Tokens used Brand Orange as the primary CTA emphasis.
+   New Owner-locked homepage uses a blue-purple Hero CTA.
+   V3 homepage may use the blue-purple Hero CTA as an explicit homepage visual override.
+   Transactional/semantic colors remain separate.
+
+## 2. Why a PRD helps — and why PRD alone is not enough
 
 A normal prose PRD helps product semantics but is not enough for pixel fidelity.
 
@@ -36,8 +62,9 @@ This Visual PRD locks:
 Final fidelity is governed by:
 1. this Visual PRD;
 2. the locked reference image;
-3. the exact asset pack;
-4. deterministic screenshot-diff evidence.
+3. exact approved assets;
+4. component map;
+5. deterministic screenshot-diff evidence.
 
 ## 3. Page structure
 
@@ -75,7 +102,7 @@ Dynamic facts must come from approved Customer read models/runtime adapters:
 - store/location/operating state;
 - category/product identity;
 - product image;
-- price;
+- current price;
 - availability;
 - member/reward state;
 - recent order;
@@ -87,22 +114,27 @@ Preview fixtures are permitted only in isolated visual acceptance and must be ex
 
 ## 5. Visual tokens
 
-Palette:
-- navy #0B2C66
-- blue #1767F7
-- purple #8B4DF6
-- sky #D9ECFF
-- cream #FFF8EB
-- white #FFFFFF
-- muted text #7484A5
+### Canonical base tokens from MFK Customer Design Tokens V1
+- brand navy #15396B
+- brand orange #F07F24
+- warm background #F7F1E9
+- surface #FFFDFC
+- male IP accent #2467B2
+- female IP accent #8659B5
+- text primary #253346
+- text muted #7B8490
+- border #E6DED5
+- touch minimum 44px
+- content max width 480px
+- mobile baseline width 390px
+- radius md 18px / lg 24px / xl 32px
+- card shadow 0 6px 18px rgba(37,51,70,0.08)
 
-Geometry:
-- preview page max width 430px;
-- horizontal gutter 14-20px;
-- card radius 18-26px;
-- primary CTA pill;
-- minimum touch target 44px;
-- section rhythm 12-24px.
+### Owner-locked homepage visual override
+- Hero/marketing blue may extend brighter than canonical maleBlue;
+- Hero CTA may use blue-purple gradient;
+- purple remains decorative/IP accent, not semantic state;
+- body/transaction text must continue using readable system UI typography.
 
 ## 6. Asset strategy
 
@@ -125,11 +157,42 @@ Runtime DOM text:
 - ETA;
 - product name.
 
-Current exact-fidelity blocker:
-- the selected Hero uses dynamic poses that do not exist in the current repository stage0 male/female assets.
-- exact transparent Hero pose assets must be generated and Owner-approved before final pixel acceptance.
+### Fresh asset audit
 
-## 7. Responsive acceptance
+The uploaded 2026-09-30 Master Packs already contain Owner-confirmed transparent Hero assets:
+
+Male:
+- ASSET_ID: HERO-M-DEFAULT
+- FILE: stage1-hero-male-v1.png
+- 1086 × 1448 RGBA
+- STATUS: OWNER_CONFIRMED
+- SHA256: 6b9e3b1da901645e6b34936fef3da2716073f6fd7840042917fd32e2d286a481
+
+Female:
+- ASSET_ID: HERO-F-DEFAULT
+- FILE: stage1-hero-female-v1.png
+- 1086 × 1448 RGBA
+- STATUS: OWNER_CONFIRMED
+- SHA256: 03996829f96438f800a69b35285b90fcc98d614762e22df3167f68b2c2b7e0f9
+
+Therefore identity regeneration is NOT the default next step.
+Implementation should import these Owner-confirmed assets first and only generate a new pose if Owner later requests it.
+
+Current repository gap:
+- the approved Master Pack assets are available in the supplied asset packs but are not yet stored inside the V3 repository acceptance bundle.
+
+## 7. Component/interaction rules inherited from source UI spec
+
+- Product price is projection only.
+- Sold-out truth is read only.
+- Recommendation failure must not block ordering.
+- Touch targets >= 44px.
+- Status must not rely on color alone.
+- Reduced Motion supported.
+- Generic spinner must not replace LOADING / EMPTY / ERROR / OFFLINE / STALE / UNKNOWN distinctions.
+- AI mockup text/prices/addresses must never become canonical data.
+
+## 8. Responsive acceptance
 
 Required widths:
 - 360
@@ -145,7 +208,7 @@ Rules:
 - bottom nav respects safe area;
 - reduced-motion remains usable.
 
-## 8. Visual acceptance
+## 9. Visual acceptance
 
 Use one deterministic browser environment.
 
@@ -158,14 +221,20 @@ Critical regions:
 - member/reorder/services;
 - bottom nav.
 
-Final target after exact asset pack:
+Final target after approved assets are inside the repo:
 - critical-region pixel diff ratio <= 3%;
 - full-page pixel diff ratio <= 5%;
 - major block geometry tolerance <= 4px at baseline viewport;
 - no unintended text wrapping;
 - no placeholder icon or fake product truth in production candidate.
 
-## 9. Definition of done
+Playwright acceptance has been scaffolded at:
+- 360×800
+- 390×844
+- 412×915
+- 430×932
+
+## 10. Definition of done
 
 Not done:
 - screenshot only;
@@ -177,7 +246,8 @@ Not done:
 Done:
 - React implementation renders;
 - actions are real callbacks;
-- responsive baselines pass;
+- typecheck/build GREEN;
+- responsive visual baselines pass;
 - screenshot diff evidence exists;
 - official logo/IP fidelity passes Owner review;
 - canonical data boundaries remain unchanged;
