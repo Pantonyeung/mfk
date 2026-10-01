@@ -16,6 +16,7 @@ import {FormalAvailabilityPage} from './formal-availability-page.tsx';
 import {FormalModifiersPage} from './formal-modifiers-page.tsx';
 import {FormalPrintersPage,FormalPrintRulesGapPage,FormalPrintTemplatesPage} from './formal-print-pages.tsx';
 import {FormalCombosPage} from './formal-combos-page.tsx';
+import {FormalDiningTablesPage,FormalStoreSettingsPage} from './formal-store-pages.tsx';
 import {
   EmptyState,
   ErrorState,
@@ -207,18 +208,18 @@ export function AdminShell({storeId,displayName,releaseStatus,canonicalState,can
                                                               ?<IntegrationsPage/>
                                                               :path==='/admin/system/advanced'&&previewMode
                                                                 ?<EffectiveSettingsPage onNavigate={navigate}/>
-                                                                :path==='/admin/store/settings'&&previewMode
-                                            ?<StoreSettingsPage mode="settings"/>
-                                            :path==='/admin/store/hours'&&previewMode
-                                              ?<StoreSettingsPage mode="hours"/>
-                                              :path==='/admin/store/business-day'&&previewMode
-                                                ?<StoreSettingsPage mode="business-day"/>
-                                                :path==='/admin/store/operations'&&previewMode
-                                                  ?<StoreSettingsPage mode="operations"/>
+                                                                :path==='/admin/store/settings'
+                                            ?(previewMode?<StoreSettingsPage mode="settings"/>:formalDraftEnabled?<FormalStoreSettingsPage mode="settings"/>:<RouteSkeleton path={path} canonicalState={canonicalState} onRefresh={onRefresh}/>)
+                                            :path==='/admin/store/hours'
+                                              ?(previewMode?<StoreSettingsPage mode="hours"/>:formalDraftEnabled?<FormalStoreSettingsPage mode="hours"/>:<RouteSkeleton path={path} canonicalState={canonicalState} onRefresh={onRefresh}/>)
+                                              :path==='/admin/store/business-day'
+                                                ?(previewMode?<StoreSettingsPage mode="business-day"/>:formalDraftEnabled?<FormalStoreSettingsPage mode="business-day"/>:<RouteSkeleton path={path} canonicalState={canonicalState} onRefresh={onRefresh}/>)
+                                                :path==='/admin/store/operations'
+                                                  ?(previewMode?<StoreSettingsPage mode="operations"/>:formalDraftEnabled?<FormalStoreSettingsPage mode="operations"/>:<RouteSkeleton path={path} canonicalState={canonicalState} onRefresh={onRefresh}/>)
                                                   :path==='/admin/store/quick-reasons'&&previewMode
                                                     ?<QuickReasonsPage/>
-                                                    :path==='/admin/store/tables'&&previewMode
-                                                      ?<DiningTablesPage/>
+                                                    :path==='/admin/store/tables'
+                                                      ?(previewMode?<DiningTablesPage/>:formalDraftEnabled?<FormalDiningTablesPage/>:<RouteSkeleton path={path} canonicalState={canonicalState} onRefresh={onRefresh}/>)
                                                       :previewMode
                                                         ?<AdminWorkspace path={path} previewMode/>
                                                         :<RouteSkeleton path={path} canonicalState={canonicalState} onRefresh={onRefresh}/>;
