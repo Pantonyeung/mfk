@@ -26,6 +26,7 @@ jobs:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       PROJECT_NAME: mfk-admin-v3-ui-preview
       PREVIEW_BRANCH: preview
+      PRODUCT_MEDIA_BUCKET: mfk-admin-v3-product-media-preview
     steps:
       - uses: actions/checkout@v4
         with:
@@ -36,12 +37,55 @@ jobs:
       - run: npm install --no-audit --no-fund --legacy-peer-deps --package-lock=false
       - run: npm test
       - run: npm run typecheck
+
+      - name: Ensure preview-only product media R2 bucket exists
+        shell: bash
+        run: |
+          set +e
+          npx --yes wrangler@latest r2 bucket create "$PRODUCT_MEDIA_BUCKET" >/tmp/r2-create.log 2>&1
+          code=$?
+          set -e
+          cat /tmp/r2-create.log
+          if [ "$code" -ne 0 ]; then
+            echo "R2 create returned non-zero; continuing because the preview bucket may already exist."
+          fi
+
+      - name: Deploy preview-only R2 media API
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx --yes wrangler@latest deploy --config wrangler.preview-media.jsonc | tee /tmp/media-deploy.log
+          API_URL="$(grep -Eo 'https://[^ ]+\.workers\.dev' /tmp/media-deploy.log | tail -1)"
+          if [ -z "$API_URL" ]; then
+            echo "Unable to resolve preview media Worker URL."
+            exit 1
+          fi
+          echo "VITE_MFK_V3_PREVIEW_API_BASE=$API_URL" >> "$GITHUB_ENV"
+          echo "PREVIEW_MEDIA_API=$API_URL" >> "$GITHUB_ENV"
+
+      - name: Preview media API readback
+        shell: bash
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const url=process.env.PREVIEW_MEDIA_API+'/api/health';
+          const response=await fetch(url,{headers:{'cache-control':'no-cache'}});
+          const body=await response.json();
+          if(!response.ok||body?.ok!==true||body?.storage!=='R2_ONLY'){
+            console.error(JSON.stringify({status:response.status,body}));
+            process.exit(1);
+          }
+          console.log('PREVIEW_MEDIA_R2_GREEN '+url);
+          NODE
+
       - name: Build isolated V3 UI preview
         run: npm run build
         env:
           MFK_SOURCE_SHA: ${{ github.sha }}
           MFK_V3ADMIN_RELEASE_ID: preview-${{ github.sha }}
           VITE_MFK_V3_PREVIEW_MODE: '1'
+          VITE_MFK_V3_PREVIEW_API_BASE: ${{ env.VITE_MFK_V3_PREVIEW_API_BASE }}
+
       - name: Ensure preview project exists
         shell: bash
         run: |
@@ -53,11 +97,13 @@ jobs:
           if [ "$code" -ne 0 ]; then
             echo "Project create returned non-zero; continuing because it may already exist."
           fi
+
       - name: Publish branch-only Cloudflare Pages preview
         shell: bash
         run: |
           set -euo pipefail
-          npx --yes wrangler@latest pages deploy dist             --project-name "$PROJECT_NAME"             --branch "$PREVIEW_BRANCH"             --commit-hash "$GITHUB_SHA"             --commit-message "MFK Admin V3 UI-01 public preview"
+          npx --yes wrangler@latest pages deploy dist             --project-name "$PROJECT_NAME"             --branch "$PREVIEW_BRANCH"             --commit-hash "$GITHUB_SHA"             --commit-message "MFK Admin V3 public implementation preview"
+
       - name: Public preview readback
         shell: bash
         run: |
