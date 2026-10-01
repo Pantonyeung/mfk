@@ -7,6 +7,9 @@ import {
   MOBILE_PRODUCT_PAGE_SIZE,
   ProductListPage,
   productFormCanSave,
+  productPrintSummary,
+  productPrintTargetsFromRule,
+  PRODUCT_PRINT_TARGET_OPTIONS,
   productRecordsFromSnapshot,
 } from './product-list.tsx';
 import {usePreviewCatalog} from './preview-catalog-store.ts';
@@ -56,6 +59,20 @@ describe('Admin V3 Product Management contract',()=>{
     expect(productFormCanSave({name:'紫米飯糰',category:'',price:'42'})).toBe(false);
     expect(productFormCanSave({name:'紫米飯糰',category:'飯糰',price:''})).toBe(false);
     expect(productFormCanSave({name:'紫米飯糰',category:'飯糰',price:'42'})).toBe(true);
+  });
+
+  it('supports independent multi-select product print outputs',()=>{
+    expect(PRODUCT_PRINT_TARGET_OPTIONS.map(option=>option.label)).toEqual(['製作單','打包單','標籤','小票']);
+    expect(productPrintSummary(['PRODUCTION','PACKING','LABEL','RECEIPT'])).toBe('製作單＋打包單＋標籤＋小票');
+    expect(productPrintSummary(['PACKING','LABEL'])).toBe('打包單＋標籤');
+    expect(productPrintSummary([])).toBe('不打印');
+  });
+
+  it('migrates existing single/composite print summaries into independent targets',()=>{
+    expect(productPrintTargetsFromRule('製作單＋標籤')).toEqual(['PRODUCTION','LABEL']);
+    expect(productPrintTargetsFromRule('製作單＋打包單')).toEqual(['PRODUCTION','PACKING']);
+    expect(productPrintTargetsFromRule('標籤')).toEqual(['LABEL']);
+    expect(productPrintTargetsFromRule('小票')).toEqual(['RECEIPT']);
   });
 
   it('locks all product image binary storage to R2 only',()=>{
