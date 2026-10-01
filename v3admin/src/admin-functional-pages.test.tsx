@@ -86,7 +86,7 @@ describe('Admin V3 functional domain wave',()=>{
       onSignOut={()=>{}}
     />);
     expect(html).toContain(title);
-    expect(html).toContain('功能 Preview');
+    expect(html).toContain('Preview');
     expect(html).not.toContain('尚未接駁');
   });
 });
