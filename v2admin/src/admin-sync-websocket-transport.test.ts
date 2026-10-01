@@ -44,6 +44,43 @@ describe('Admin realtime transport recovery',()=>{
     expect(JSON.parse(sent[0]!)).toMatchObject({type:'ADMIN_CONFIG_AVAILABLE',storeId:'MF01',revision:42});
   });
 
+  it('keeps SMM HEAD and WebSocket transport behind the same live staff session',async()=>{
+    const sent:string[]=[];
+    const client={side:'client'};
+    const server={send:(message:string)=>sent.push(message)};
+    const active={storeId:'MF01',revision:42,fingerprint:'sha256:config-42',publishedAt:'2026-09-29T10:00:00.000Z'};
+    const state={
+      acceptWebSocket:vi.fn(),
+      storage:{get:vi.fn(async(key:string)=>key==='active'?active:undefined)},
+    };
+    const store=new AdminSyncStore(state,{});
+    const baseHeaders={origin:'https://smm.morefunos.com'};
+
+    const denied=await store.fetch(new Request('https://internal/sync/head?storeId=MF01&port=SMM',{headers:baseHeaders}));
+    expect(denied.status).toBe(401);
+
+    vi.stubGlobal('fetch',vi.fn(async()=>({
+      ok:true,
+      json:async()=>({staffId:'STAFF-1',displayName:'店員一',role:'STAFF'}),
+    })));
+    const authorizedHeaders={...baseHeaders,'x-mfk-smm-session':'a'.repeat(64)};
+    const allowed=await store.fetch(new Request('https://internal/sync/head?storeId=MF01&port=SMM',{headers:authorizedHeaders}));
+    expect(allowed.status).toBe(200);
+
+    vi.stubGlobal('WebSocketPair',class{0=client;1=server;});
+    vi.stubGlobal('Response',class{
+      status:number;webSocket:unknown;body:unknown;headers:Headers;
+      constructor(body:unknown,init:any={}){this.body=body;this.status=init.status??200;this.webSocket=init.webSocket;this.headers=new Headers(init.headers);}
+    });
+    const upgrade:any=await store.fetch(new Request('https://internal/events?storeId=MF01&port=SMM',{
+      headers:{...authorizedHeaders,upgrade:'websocket'},
+    }));
+    expect(upgrade.status).toBe(101);
+    expect(upgrade.headers.get('sec-websocket-protocol')).toBe('mfk-smm-sync-v1');
+    expect(state.acceptWebSocket).toHaveBeenCalledWith(server,['PORT:SMM']);
+    expect(JSON.parse(sent[0]!)).toMatchObject({type:'PORT_HEAD_AVAILABLE',port:'SMM',headSeq:0});
+  });
+
   it('assigns a fresh Cloud canonical time to every distinct formal Admin publish',async()=>{
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-09-30T01:00:00.000Z'));

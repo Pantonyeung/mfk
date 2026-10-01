@@ -1026,6 +1026,13 @@ export class AdminSyncStore{
     return Boolean(await resolveSmmStaffSession(request,storeIdFrom(url)));
   }
 
+  async authorizeSyncRead(request,port){
+    if(port==='SMT')return this.authorizeSmtDevice(request);
+    if(port==='CUSTOMER')return request.headers.get('origin')===CUSTOMER_ORIGIN;
+    if(port==='SMM')return this.authorizeSmmSync(request);
+    return false;
+  }
+
 
   async staffIdentity(loginId,purpose='OWNER'){
     const active=await this.state.storage.get('active');if(!active)return null;
@@ -2288,36 +2295,20 @@ export class AdminSyncStore{
       }
       return json({state:'DOORBELL_SENT'});
     }
-    if(url.pathname==='/sync/events'){
-      if(request.headers.get('upgrade')!=='websocket')return json({code:'WEBSOCKET_REQUIRED'},426);
-      const port=String(url.searchParams.get('port')||'').toUpperCase();
-      if(port!=='SMM')return json({code:'SYNC_EVENT_PORT_INVALID'},400);
-      if(request.headers.get('origin')!==SMM_ORIGIN)return json({code:'SYNC_PORT_UNAUTHORIZED'},401);
-      const pair=new WebSocketPair();
-      const client=pair[0],server=pair[1];
-      this.state.acceptWebSocket(server,['SYNC:SMM']);
-      const head=await this.readSyncHead('SMM');
-      server.send(JSON.stringify({type:'PORT_HEAD_AVAILABLE',storeId:head.storeId,port:'SMM',headSeq:head.headSeq,sourceCommitSeq:head.sourceCommitSeq,projectionHash:head.projectionHash,publishedAt:head.observedAt}));
-      return new Response(null,{status:101,webSocket:client});
-    }
     if(url.pathname==='/sync/head'){
       if(request.method!=='GET')return json({code:'METHOD_NOT_ALLOWED'},405);
       const port=String(url.searchParams.get('port')||'').toUpperCase();
       if(!MFK_SYNC_PORTS.includes(port))return json({code:'SYNC_PORT_INVALID'},400);
-      if(port==='SMT'&&!await this.authorizeSmtDevice(request))return json({code:'SYNC_PORT_UNAUTHORIZED'},401);
-      if(port==='CUSTOMER'&&request.headers.get('origin')!==CUSTOMER_ORIGIN)return json({code:'SYNC_PORT_UNAUTHORIZED'},401);
-      if(port==='SMM'&&request.headers.get('origin')!==SMM_ORIGIN)return json({code:'SYNC_PORT_UNAUTHORIZED'},401);
       if(port==='KEETA')return json({code:'SYNC_PORT_DIRECT_READ_FORBIDDEN'},403);
+      if(!await this.authorizeSyncRead(request,port))return json({code:'SYNC_PORT_UNAUTHORIZED'},401);
       return json(await this.readSyncHead(port));
     }
     if(url.pathname==='/sync/changes'){
       if(request.method!=='GET')return json({code:'METHOD_NOT_ALLOWED'},405);
       const port=String(url.searchParams.get('port')||'').toUpperCase();
       if(!MFK_SYNC_PORTS.includes(port))return json({code:'SYNC_PORT_INVALID'},400);
-      if(port==='SMT'&&!await this.authorizeSmtDevice(request))return json({code:'SYNC_PORT_UNAUTHORIZED'},401);
-      if(port==='CUSTOMER'&&request.headers.get('origin')!==CUSTOMER_ORIGIN)return json({code:'SYNC_PORT_UNAUTHORIZED'},401);
-      if(port==='SMM'&&request.headers.get('origin')!==SMM_ORIGIN)return json({code:'SYNC_PORT_UNAUTHORIZED'},401);
       if(port==='KEETA')return json({code:'SYNC_PORT_DIRECT_READ_FORBIDDEN'},403);
+      if(!await this.authorizeSyncRead(request,port))return json({code:'SYNC_PORT_UNAUTHORIZED'},401);
       const result=await this.readSyncChanges(port,Number(url.searchParams.get('after')||0));
       return json(result.body,result.status);
     }
@@ -2325,10 +2316,8 @@ export class AdminSyncStore{
       if(request.method!=='GET')return json({code:'METHOD_NOT_ALLOWED'},405);
       const port=String(url.searchParams.get('port')||'').toUpperCase();
       if(!MFK_SYNC_PORTS.includes(port))return json({code:'SYNC_PORT_INVALID'},400);
-      if(port==='SMT'&&!await this.authorizeSmtDevice(request))return json({code:'SYNC_PORT_UNAUTHORIZED'},401);
-      if(port==='CUSTOMER'&&request.headers.get('origin')!==CUSTOMER_ORIGIN)return json({code:'SYNC_PORT_UNAUTHORIZED'},401);
-      if(port==='SMM'&&request.headers.get('origin')!==SMM_ORIGIN)return json({code:'SYNC_PORT_UNAUTHORIZED'},401);
       if(port==='KEETA')return json({code:'SYNC_PORT_DIRECT_READ_FORBIDDEN'},403);
+      if(!await this.authorizeSyncRead(request,port))return json({code:'SYNC_PORT_UNAUTHORIZED'},401);
       const result=await this.readSyncCheckpoint(port,url.searchParams.get('seq'));
       return json(result.body,result.status);
     }
@@ -2406,8 +2395,9 @@ export class AdminSyncStore{
     if(url.pathname==='/events'){
       if(request.headers.get('upgrade')!=='websocket')return json({code:'WEBSOCKET_REQUIRED'},426);
       const requestedPort=String(url.searchParams.get('port')||'SMT').toUpperCase();
-      const port=requestedPort==='SMM'?'SMM':'SMT';
-      if(port==='SMM'&&request.headers.get('x-mfk-sync-port-authorized')!=='SMM')return json({code:'SYNC_EVENT_UNAUTHORIZED'},401);
+      if(requestedPort!=='SMT'&&requestedPort!=='SMM')return json({code:'SYNC_EVENT_PORT_INVALID'},400);
+      const port=requestedPort;
+      if(port==='SMM'&&!await this.authorizeSmmSync(request))return json({code:'SYNC_EVENT_UNAUTHORIZED'},401);
       const pair=new WebSocketPair();
       const client=pair[0],server=pair[1];
       this.state.acceptWebSocket(server,['PORT:'+port]);
@@ -3055,7 +3045,7 @@ export default {
       target.pathname='/events';
       target.search='?storeId='+encodeURIComponent(storeId)+'&port=SMM';
       const forwardedHeaders=new Headers(request.headers);
-      forwardedHeaders.set('x-mfk-sync-port-authorized','SMM');
+      forwardedHeaders.set('x-mfk-smm-session',token);
       return stub.fetch(new Request(target.toString(),{method:'GET',headers:forwardedHeaders}));
     }
     if(url.pathname==='/api/admin-sync/provider-doorbell'||url.pathname==='/api/admin-sync/customer-doorbell'||url.pathname==='/api/admin-sync/customer-orders'||url.pathname==='/api/admin-sync/authorize-smt-device'){
