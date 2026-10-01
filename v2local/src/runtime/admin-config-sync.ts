@@ -1,9 +1,26 @@
-import {validateMfkAdminConfigEnvelope,type MfkAdminConfigAck,type MfkAdminConfigEnvelope} from '../../../contracts/admin-config-sync-v1.ts';
+import {createMfkAdminConfigEnvelope,validateMfkAdminConfigEnvelope,type MfkAdminConfigAck,type MfkAdminConfigEnvelope} from '../../../contracts/admin-config-sync-v1.ts';
+import {
+  MFK_CHECKPOINTED_DELTA_SYNC_PROTOCOL,
+  validateMfkSyncChangeBatch,
+  validateMfkSyncCheckpoint,
+  validateMfkSyncHead,
+  type MfkSyncHead,
+} from '../../../contracts/checkpointed-delta-sync-v1.ts';
+import {
+  applyMfkSyncChanges,
+  buildSmtSyncEntities,
+  entityMapFromCheckpoint,
+  materializeSmtSnapshot,
+  projectionHashForEntities,
+  type MfkSyncEntityMap,
+} from '../../../sync/checkpointed-delta-sync.ts';
 import {smtAdminHttpOrigin,smtAdminWebSocketUrl} from './web-acceptance.ts';
 
 export const SMT_ADMIN_CONFIG_LKG_KEY='mfk.admin-sync.active.v1';
 export const SMT_ADMIN_CONFIG_STATUS_KEY='mfk.admin-sync.status.v1';
 export const SMT_ADMIN_CONFIG_DEVICE_KEY='mfk.admin-sync.device.v1';
+export const SMT_ADMIN_SYNC_BUNDLE_POINTER_KEY='mfk.admin-sync.bundle-pointer.v1';
+export const SMT_ADMIN_SYNC_BUNDLE_PREFIX='mfk.admin-sync.bundle.v1:';
 export const SMT_ADMIN_CONFIG_ENDPOINT=smtAdminHttpOrigin();
 
 export type SmtAdminSyncState='LOCAL_LKG'|'CONNECTING'|'SYNCED'|'OFFLINE'|'ERROR';
@@ -17,6 +34,9 @@ export interface SmtAdminSyncStatus{
   readonly ackAt?:string;
   readonly updatedAt:string;
   readonly error?:string;
+  readonly appliedSeq?:number;
+  readonly headSeq?:number;
+  readonly syncProtocol?:typeof MFK_CHECKPOINTED_DELTA_SYNC_PROTOCOL;
 }
 export interface SmtAdminConfigApplyResult{
   readonly disposition:'APPLIED'|'IDEMPOTENT'|'STALE';
@@ -40,6 +60,74 @@ function readJson<T>(key:string,fallback:T):T{
 function writeJson(key:string,value:unknown){
   localStorage.setItem(key,JSON.stringify(value));
 }
+
+interface SmtAdminSyncBundle{
+  readonly schema:'MFK_SMT_ADMIN_SYNC_BUNDLE_V1';
+  readonly appliedSeq:number;
+  readonly checkpointSeq:number;
+  readonly projectionHash:string;
+  readonly envelope:MfkAdminConfigEnvelope;
+  readonly entities:MfkSyncEntityMap;
+  readonly updatedAt:string;
+}
+
+function readSmtAdminSyncBundle():SmtAdminSyncBundle|null{
+  try{
+    const pointer=localStorage.getItem(SMT_ADMIN_SYNC_BUNDLE_POINTER_KEY);
+    if(!pointer)return null;
+    const raw=localStorage.getItem(pointer);
+    if(!raw)return null;
+    const parsed=JSON.parse(raw) as SmtAdminSyncBundle;
+    if(parsed?.schema!=='MFK_SMT_ADMIN_SYNC_BUNDLE_V1')return null;
+    if(!Number.isSafeInteger(Number(parsed.appliedSeq))||Number(parsed.appliedSeq)<0)return null;
+    const envelope=validateMfkAdminConfigEnvelope(parsed.envelope);
+    const entities=parsed.entities&&typeof parsed.entities==='object'?parsed.entities:null;
+    if(!entities)return null;
+    return Object.freeze({...parsed,envelope,entities});
+  }catch{return null;}
+}
+
+function commitSmtAdminSyncBundle(head:MfkSyncHead,entities:MfkSyncEntityMap,appliedSeq:number,checkpointSeq:number){
+  const projectionHash=projectionHashForEntities(entities);
+  if(appliedSeq===head.headSeq&&projectionHash!==head.projectionHash)throw new Error('SYNC_FINAL_PROJECTION_HASH_MISMATCH');
+  const snapshot=materializeSmtSnapshot(entities);
+  const envelope=createMfkAdminConfigEnvelope({
+    storeId:head.storeId,
+    revision:head.canonicalRevision,
+    publishedAt:head.canonicalPublishedAt,
+    adminFingerprint:head.adminFingerprint,
+    snapshot,
+  });
+  if(envelope.fingerprint!==head.canonicalFingerprint)throw new Error('SYNC_CANONICAL_FINGERPRINT_MISMATCH');
+
+  const bundle:SmtAdminSyncBundle=Object.freeze({
+    schema:'MFK_SMT_ADMIN_SYNC_BUNDLE_V1',
+    appliedSeq,
+    checkpointSeq,
+    projectionHash,
+    envelope,
+    entities,
+    updatedAt:now(),
+  });
+  const bundleKey=SMT_ADMIN_SYNC_BUNDLE_PREFIX+String(appliedSeq).padStart(16,'0')+':'+head.canonicalFingerprint;
+  // Write full candidate first. The single pointer write is the local atomic switch.
+  localStorage.setItem(bundleKey,JSON.stringify(bundle));
+  localStorage.setItem(SMT_ADMIN_SYNC_BUNDLE_POINTER_KEY,bundleKey);
+  // Legacy mirror is compatibility only; readers in this module prefer the bundle pointer.
+  localStorage.setItem(SMT_ADMIN_CONFIG_LKG_KEY,JSON.stringify(envelope));
+  setStatus({
+    state:'SYNCED',
+    revision:envelope.revision,
+    fingerprint:envelope.fingerprint,
+    publishedAt:envelope.publishedAt,
+    appliedAt:bundle.updatedAt,
+    updatedAt:bundle.updatedAt,
+    appliedSeq,
+    headSeq:head.headSeq,
+    syncProtocol:MFK_CHECKPOINTED_DELTA_SYNC_PROTOCOL,
+  });
+  return bundle;
+}
 function randomId(){
   const bytes=new Uint8Array(12);
   crypto.getRandomValues(bytes);
@@ -54,6 +142,8 @@ export function readSmtDeviceId(){
   return id;
 }
 export function readSmtAdminConfigLkg():MfkAdminConfigEnvelope|null{
+  const bundle=readSmtAdminSyncBundle();
+  if(bundle)return bundle.envelope;
   try{
     const raw=localStorage.getItem(SMT_ADMIN_CONFIG_LKG_KEY);
     return raw?validateMfkAdminConfigEnvelope(JSON.parse(raw)):null;
@@ -145,6 +235,156 @@ async function ack(envelope:MfkAdminConfigEnvelope,disposition:'APPLIED'|'IDEMPO
   }catch{}
 }
 
+async function fetchSmtSyncHead():Promise<MfkSyncHead>{
+  const deviceId=readSmtDeviceId();
+  const response=await fetch(SMT_ADMIN_CONFIG_ENDPOINT+'/api/admin-sync/sync/head?storeId=MF01&port=SMT&deviceId='+encodeURIComponent(deviceId),{cache:'no-store'});
+  if(!response.ok)throw new Error('SYNC_HEAD_HTTP_'+response.status);
+  return validateMfkSyncHead(await response.json());
+}
+
+async function fetchSmtSyncCheckpoint(head:MfkSyncHead){
+  const deviceId=readSmtDeviceId();
+  const response=await fetch(SMT_ADMIN_CONFIG_ENDPOINT+'/api/admin-sync/sync/checkpoint?storeId=MF01&port=SMT&deviceId='+encodeURIComponent(deviceId)+'&seq='+String(head.checkpointSeq),{cache:'no-store'});
+  if(!response.ok)throw new Error('SYNC_CHECKPOINT_HTTP_'+response.status);
+  const checkpoint=validateMfkSyncCheckpoint(await response.json());
+  if(checkpoint.port!=='SMT'||checkpoint.storeId!==head.storeId||checkpoint.checkpointSeq!==head.checkpointSeq)throw new Error('SYNC_CHECKPOINT_IDENTITY_MISMATCH');
+  if(checkpoint.checkpointHash!==head.checkpointHash)throw new Error('SYNC_CHECKPOINT_HASH_MISMATCH');
+  return checkpoint;
+}
+
+async function fetchSmtSyncChanges(after:number){
+  const deviceId=readSmtDeviceId();
+  const response=await fetch(SMT_ADMIN_CONFIG_ENDPOINT+'/api/admin-sync/sync/changes?storeId=MF01&port=SMT&deviceId='+encodeURIComponent(deviceId)+'&after='+String(after),{cache:'no-store'});
+  const body=await response.json().catch(()=>({})) as Record<string,unknown>;
+  if(response.status===409&&String(body.code||'').includes('CHECKPOINT'))return{checkpointRequired:true as const};
+  if(!response.ok)throw new Error('SYNC_CHANGES_HTTP_'+response.status+':'+String(body.code||''));
+  return{checkpointRequired:false as const,batch:validateMfkSyncChangeBatch(body)};
+}
+
+async function ackSmtSyncApplied(head:MfkSyncHead,bundle:SmtAdminSyncBundle){
+  const deviceId=readSmtDeviceId();
+  const response=await fetch(SMT_ADMIN_CONFIG_ENDPOINT+'/api/admin-sync/sync/applied?storeId=MF01&port=SMT&deviceId='+encodeURIComponent(deviceId),{
+    method:'POST',
+    headers:{'content-type':'application/json'},
+    body:JSON.stringify({
+      schema:'MFK_SYNC_APPLIED_ACK_V1',
+      protocol:MFK_CHECKPOINTED_DELTA_SYNC_PROTOCOL,
+      storeId:head.storeId,
+      port:'SMT',
+      clientId:deviceId,
+      appliedSeq:bundle.appliedSeq,
+      projectionHash:bundle.projectionHash,
+      appliedAt:now(),
+      checkpointSeq:bundle.checkpointSeq,
+    }),
+  });
+  if(!response.ok)throw new Error('SYNC_APPLIED_ACK_HTTP_'+response.status);
+  const ackAt=now();
+  const status=readSmtAdminSyncStatus();
+  setStatus({...status,ackAt,updatedAt:ackAt});
+}
+
+async function bootstrapSmtSyncFromLegacy(){
+  await fetchAndApplyAdminConfig();
+  const lkg=readSmtAdminConfigLkg();
+  if(!lkg)throw new Error('SYNC_BOOTSTRAP_LKG_UNAVAILABLE');
+  const head=await fetchSmtSyncHead();
+  const entities=buildSmtSyncEntities(lkg.snapshot);
+  const projectionHash=projectionHashForEntities(entities);
+  if(head.headSeq>0&&head.canonicalFingerprint===lkg.fingerprint&&head.projectionHash===projectionHash){
+    const bundle=commitSmtAdminSyncBundle(head,entities,head.headSeq,head.checkpointSeq);
+    void ackSmtSyncApplied(head,bundle).catch(()=>{});
+    return bundle;
+  }
+  return null;
+}
+
+let deltaSyncInFlight:Promise<SmtAdminSyncBundle|null>|null=null;
+let deltaSyncRequested=false;
+export async function reconcileSmtCheckpointedSync(){
+  if(deltaSyncInFlight){deltaSyncRequested=true;return deltaSyncInFlight;}
+  deltaSyncInFlight=(async()=>{
+    try{
+      let head:MfkSyncHead;
+      try{head=await fetchSmtSyncHead();}
+      catch(error){
+        // Existing installations may not yet have a device ACK or sync head.
+        const bootstrapped=await bootstrapSmtSyncFromLegacy();
+        if(bootstrapped)return bootstrapped;
+        head=await fetchSmtSyncHead();
+      }
+
+      let bundle=readSmtAdminSyncBundle();
+      let entities:MfkSyncEntityMap;
+      let appliedSeq:number;
+      let checkpointSeq:number;
+
+      if(bundle&&bundle.envelope.storeId===head.storeId){
+        entities=bundle.entities;
+        appliedSeq=bundle.appliedSeq;
+        checkpointSeq=bundle.checkpointSeq;
+      }else if(head.checkpointHash){
+        const checkpoint=await fetchSmtSyncCheckpoint(head);
+        entities=entityMapFromCheckpoint(checkpoint);
+        appliedSeq=checkpoint.checkpointSeq;
+        checkpointSeq=checkpoint.checkpointSeq;
+      }else{
+        const bootstrapped=await bootstrapSmtSyncFromLegacy();
+        if(bootstrapped)return bootstrapped;
+        throw new Error('SYNC_BOOTSTRAP_CHECKPOINT_UNAVAILABLE');
+      }
+
+      for(let guard=0;guard<12;guard++){
+        head=await fetchSmtSyncHead();
+        if(appliedSeq>head.headSeq||appliedSeq<head.checkpointSeq){
+          if(!head.checkpointHash)throw new Error('SYNC_CHECKPOINT_REQUIRED_BUT_UNAVAILABLE');
+          const checkpoint=await fetchSmtSyncCheckpoint(head);
+          entities=entityMapFromCheckpoint(checkpoint);
+          appliedSeq=checkpoint.checkpointSeq;
+          checkpointSeq=checkpoint.checkpointSeq;
+        }
+
+        if(appliedSeq===head.headSeq){
+          const committed=commitSmtAdminSyncBundle(head,entities,appliedSeq,checkpointSeq);
+          void ackSmtSyncApplied(head,committed).catch(()=>{});
+          return committed;
+        }
+
+        const next=await fetchSmtSyncChanges(appliedSeq);
+        if(next.checkpointRequired){
+          if(!head.checkpointHash)throw new Error('SYNC_CHECKPOINT_REQUIRED_BUT_UNAVAILABLE');
+          const checkpoint=await fetchSmtSyncCheckpoint(head);
+          entities=entityMapFromCheckpoint(checkpoint);
+          appliedSeq=checkpoint.checkpointSeq;
+          checkpointSeq=checkpoint.checkpointSeq;
+          continue;
+        }
+        if(next.batch.storeId!==head.storeId||next.batch.port!=='SMT')throw new Error('SYNC_CHANGE_BATCH_IDENTITY_MISMATCH');
+        entities=applyMfkSyncChanges(entities,next.batch.changes);
+        appliedSeq=next.batch.toInclusive;
+      }
+      throw new Error('SYNC_RECONCILE_GUARD_EXCEEDED');
+    }catch(error){
+      const lkg=readSmtAdminConfigLkg();
+      const status=readSmtAdminSyncStatus();
+      setStatus({
+        ...status,
+        state:lkg?'LOCAL_LKG':'ERROR',
+        revision:lkg?.revision??status.revision??0,
+        fingerprint:lkg?.fingerprint??status.fingerprint??'',
+        publishedAt:lkg?.publishedAt??status.publishedAt,
+        updatedAt:now(),
+        error:error instanceof Error?error.message:'SYNC_RECONCILE_FAILED',
+      });
+      return null;
+    }finally{
+      deltaSyncInFlight=null;
+      if(deltaSyncRequested){deltaSyncRequested=false;void reconcileSmtCheckpointedSync();}
+    }
+  })();
+  return deltaSyncInFlight;
+}
+
 let adminConfigFetchInFlight:Promise<SmtAdminConfigApplyResult|null>|null=null;
 let adminConfigRefetchRequested=false;
 export async function fetchAndApplyAdminConfig(){
@@ -214,11 +454,18 @@ function connectDoorbell(){
     socket=new WebSocket(smtAdminWebSocketUrl());
     socket.addEventListener('open',()=>{
       reconnectAttempt=0;
-      void fetchAndApplyAdminConfig();
+      void reconcileSmtCheckpointedSync();
     });
     socket.addEventListener('message',event=>{
       try{
         const row=JSON.parse(String(event.data)) as SmtCloudDoorbell&{revision?:number;fingerprint?:string};
+        if(row.type==='PORT_HEAD_AVAILABLE'&&row.port==='SMT'){
+          const receivedAt=now();
+          const status=readSmtAdminSyncStatus();
+          setStatus({...status,receivedAt,headSeq:Number(row.headSeq)||status.headSeq,updatedAt:receivedAt});
+          void reconcileSmtCheckpointedSync();
+          return;
+        }
         if(row.type==='ADMIN_CONFIG_AVAILABLE'){
           const receivedAt=now();
           try{
@@ -232,9 +479,9 @@ function connectDoorbell(){
           }catch{}
           const status=readSmtAdminSyncStatus();
           setStatus({...status,receivedAt,updatedAt:receivedAt});
-          // Every Admin publish notification forces a canonical pull.
-          // SMT does not decide whether an Admin publish is worth receiving.
-          void fetchAndApplyAdminConfig();
+          // Legacy doorbell remains during migration; the new client reconciles the
+          // checkpointed delta head instead of pulling the full canonical snapshot.
+          void reconcileSmtCheckpointedSync();
           return;
         }
         for(const listener of cloudDoorbellListeners)listener(row);
@@ -248,7 +495,7 @@ function connectDoorbell(){
 export function installSmtAdminAutoSync(){
   if(installed||typeof window==='undefined')return;
   installed=true;
-  const reconcile=()=>{if(!navigator.onLine)return;void fetchAndApplyAdminConfig();connectDoorbell();};
+  const reconcile=()=>{if(!navigator.onLine)return;void reconcileSmtCheckpointedSync();connectDoorbell();};
   const onOnline=()=>reconcile();
   const onFocus=()=>reconcile();
   const onPageShow=()=>reconcile();
