@@ -1019,6 +1019,7 @@ export class AdminSyncStore{
           publishedAt:String(current.publishedAt||''),
           fingerprint:currentFingerprint,
           adminFingerprint:String(current.adminFingerprint||''),
+          publishRequestFingerprint:String(currentMeta.publishRequestFingerprint||''),
           snapshot:current.snapshot,
           recordedAt:new Date().toISOString(),
         });
@@ -1612,6 +1613,125 @@ export class AdminSyncStore{
         historyCompleteness:'FORWARD_ONLY',
         versions,
       });
+    }
+    if(url.pathname==='/admin-browser/versions/rollback'){
+      const session=await this.readAdminBrowserSession(request);if(!session)return json({code:'ADMIN_BROWSER_SESSION_UNAUTHORIZED'},401);
+      if(request.method!=='POST')return json({code:'METHOD_NOT_ALLOWED'},405);
+      const storeId=storeIdFrom(url),active=await this.state.storage.get('active');
+      if(!active||String(active.storeId||'')!==storeId)return json({code:'ADMIN_BROWSER_STORE_FORBIDDEN'},403);
+      if(String(session.role)!=='OWNER'&&!rows(session.permissions).map(String).includes('PUBLISH_CONFIG'))return json({code:'ADMIN_BROWSER_ROLLBACK_FORBIDDEN'},403);
+      let input;try{input=await request.json();}catch{return json({code:'ADMIN_ROLLBACK_INPUT_INVALID'},400);}
+      const operationId=String(input?.operationId||'').trim();
+      const targetFingerprint=String(input?.targetFingerprint||'').trim();
+      const expectedActiveFingerprint=String(input?.expectedActiveFingerprint||'').trim();
+      const expectedActivePublishedAt=String(input?.expectedActivePublishedAt||'').trim();
+      const expectedActiveRevision=Number(input?.expectedActiveRevision);
+      const reason=String(input?.reason||'').trim();
+      if(!operationId||operationId.length>160||!targetFingerprint||targetFingerprint.length>256||!expectedActiveFingerprint||expectedActiveFingerprint.length>256||!Number.isFinite(Date.parse(expectedActivePublishedAt))||!Number.isSafeInteger(expectedActiveRevision)||expectedActiveRevision<0||!reason||reason.length>240){
+        return json({code:'ADMIN_ROLLBACK_INPUT_INVALID'},400);
+      }
+      const operationKey='admin-browser:rollback-operation:'+operationId;
+      const target=await this.state.storage.get('admin-browser:version:'+targetFingerprint);
+      if(!target||String(target.storeId||'')!==storeId||!target.snapshot)return json({code:'ADMIN_ROLLBACK_TARGET_NOT_FOUND'},404);
+      if(targetFingerprint===String(active.fingerprint||''))return json({code:'ADMIN_ROLLBACK_TARGET_ALREADY_ACTIVE'},409);
+      let envelope;
+      try{
+        envelope=createMfkAdminConfigEnvelope({
+          storeId,
+          revision:expectedActiveRevision+1,
+          publishedAt:expectedActivePublishedAt,
+          adminFingerprint:'sha256:'+await sha256(JSON.stringify(target.snapshot)),
+          snapshot:target.snapshot,
+        });
+      }catch(error){return json({code:error instanceof Error?error.message:'ADMIN_CONFIG_INVALID'},400);}
+      const intent={
+        operationId,targetFingerprint,expectedActiveFingerprint,expectedActivePublishedAt,expectedActiveRevision,reason,
+        publishRequestFingerprint:String(envelope.fingerprint||''),
+      };
+      const prior=await this.state.storage.get(operationKey);
+      if(prior){
+        const same=String(prior.targetFingerprint||'')===targetFingerprint
+          &&String(prior.expectedActiveFingerprint||'')===expectedActiveFingerprint
+          &&String(prior.expectedActivePublishedAt||'')===expectedActivePublishedAt
+          &&Number(prior.expectedActiveRevision)===expectedActiveRevision
+          &&String(prior.reason||'')===reason;
+        if(!same)return json({code:'ADMIN_ROLLBACK_OPERATION_CONFLICT'},409);
+        if(prior.state==='SUCCEEDED'&&prior.result)return json(prior.result);
+        if(prior.state==='FAILED'&&prior.result)return json(prior.result,Number(prior.httpStatus)||409);
+        if(prior.state==='PENDING'){
+          const activeMeta=await this.state.storage.get('activeMeta')||{};
+          const currentActive=await this.state.storage.get('active');
+          if(String(activeMeta.publishRequestFingerprint||'')===String(envelope.fingerprint||'')&&currentActive){
+            const recovered={
+              state:'ROLLED_BACK_AS_NEW_VERSION',
+              operationId,
+              targetFingerprint,
+              reason,
+              recoveredFromReadback:true,
+              active:currentActive,
+              cloudPublishedAt:String(currentActive.publishedAt||activeMeta.cloudPublishedAt||''),
+            };
+            await this.state.storage.put(operationKey,{...prior,state:'SUCCEEDED',result:recovered,completedAt:new Date().toISOString()});
+            return json(recovered);
+          }
+          const versions=await this.state.storage.list({prefix:'admin-browser:version:'});
+          const published=[...versions.values()].find(version=>String(version?.publishRequestFingerprint||'')===String(envelope.fingerprint||''));
+          if(published){
+            const recovered={
+              state:'ROLLBACK_ALREADY_PUBLISHED',
+              operationId,
+              targetFingerprint,
+              reason,
+              recoveredFromReadback:true,
+              publishedVersion:{
+                revision:Number(published.revision),
+                publishedAt:String(published.publishedAt||''),
+                fingerprint:String(published.fingerprint||''),
+                adminFingerprint:String(published.adminFingerprint||''),
+              },
+              currentActiveFingerprint:String(currentActive?.fingerprint||''),
+            };
+            await this.state.storage.put(operationKey,{...prior,state:'SUCCEEDED',result:recovered,completedAt:new Date().toISOString()});
+            return json(recovered);
+          }
+          if(!currentActive||String(currentActive.fingerprint||'')!==expectedActiveFingerprint||String(currentActive.publishedAt||'')!==expectedActivePublishedAt||Number(currentActive.revision)!==expectedActiveRevision){
+            return json({
+              code:'ADMIN_ROLLBACK_RESULT_UNKNOWN',
+              operationId,
+              expected:{fingerprint:expectedActiveFingerprint,publishedAt:expectedActivePublishedAt,revision:expectedActiveRevision},
+              observed:currentActive?{fingerprint:String(currentActive.fingerprint||''),publishedAt:String(currentActive.publishedAt||''),revision:Number(currentActive.revision)}:null,
+            },409);
+          }
+        }
+      }else{
+        if(String(active.fingerprint||'')!==expectedActiveFingerprint||String(active.publishedAt||'')!==expectedActivePublishedAt||Number(active.revision)!==expectedActiveRevision){
+          return json({code:'ADMIN_ROLLBACK_BASE_CONFLICT'},409);
+        }
+        await this.state.storage.put(operationKey,{
+          schema:'MFK_ADMIN_ROLLBACK_OPERATION_V1',
+          ...intent,
+          state:'PENDING',
+          requestedByStaffId:String(session.staffId||''),
+          requestedAt:new Date().toISOString(),
+        });
+      }
+      const result=await this.publishEnvelope(envelope,{fingerprint:expectedActiveFingerprint,publishedAt:expectedActivePublishedAt});
+      if(result.status!==200){
+        const failed={code:String(result.body?.code||'ADMIN_ROLLBACK_PUBLISH_FAILED'),operationId};
+        await this.state.storage.put(operationKey,{schema:'MFK_ADMIN_ROLLBACK_OPERATION_V1',...intent,state:'FAILED',requestedByStaffId:String(session.staffId||''),result:failed,httpStatus:result.status,completedAt:new Date().toISOString()});
+        return json(failed,result.status);
+      }
+      const response={
+        state:'ROLLED_BACK_AS_NEW_VERSION',
+        operationId,
+        targetFingerprint,
+        reason,
+        recoveredFromReadback:false,
+        active:result.body.active,
+        cloudPublishedAt:String(result.body.cloudPublishedAt||result.body.active?.publishedAt||''),
+      };
+      await this.state.storage.put(operationKey,{schema:'MFK_ADMIN_ROLLBACK_OPERATION_V1',...intent,state:'SUCCEEDED',requestedByStaffId:String(session.staffId||''),result:response,completedAt:new Date().toISOString()});
+      return json(response);
     }
     if(url.pathname==='/admin-browser/draft'||url.pathname==='/admin-browser/draft/publish'){
       const session=await this.readAdminBrowserSession(request);if(!session)return json({code:'ADMIN_BROWSER_SESSION_UNAUTHORIZED'},401);
