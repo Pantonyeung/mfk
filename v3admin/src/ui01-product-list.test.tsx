@@ -9,6 +9,7 @@ import {
   productFormCanSave,
   productPrintSummary,
   productPrintTargetsFromRule,
+  productPrintConfigCanSave,
   PRODUCT_PRINT_TARGET_OPTIONS,
   productRecordsFromSnapshot,
 } from './product-list.tsx';
@@ -66,6 +67,20 @@ describe('Admin V3 Product Management contract',()=>{
     expect(productPrintSummary(['PRODUCTION','PACKING','LABEL','RECEIPT'])).toBe('製作單＋打包單＋標籤＋小票');
     expect(productPrintSummary(['PACKING','LABEL'])).toBe('打包單＋標籤');
     expect(productPrintSummary([])).toBe('不打印');
+  });
+
+  it('requires each selected print output to resolve to at least one logical printer',()=>{
+    expect(productPrintConfigCanSave(['LABEL'],{LABEL:['logical-label-1']})).toBe(true);
+    expect(productPrintConfigCanSave(['LABEL'],{LABEL:[]})).toBe(false);
+    expect(productPrintConfigCanSave(['PRODUCTION','PACKING','LABEL'],{
+      PRODUCTION:['logical-production'],
+      PACKING:['logical-packing'],
+      LABEL:['logical-label-2'],
+    })).toBe(true);
+    expect(productPrintConfigCanSave(['PRODUCTION','LABEL'],{
+      PRODUCTION:['logical-production'],
+      LABEL:[],
+    })).toBe(false);
   });
 
   it('migrates existing single/composite print summaries into independent targets',()=>{
