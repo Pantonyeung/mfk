@@ -48,12 +48,20 @@ jobs:
         run: |
           test -f dist/release.json
           node -e "const x=require('./dist/release.json'); if(!x.releaseId||!x.sourceSha||!x.buildTime) process.exit(1)"
-      - name: Verify zero production routing
+      - name: Verify isolated preview-only routing
         run: |
-          test ! -f wrangler.jsonc
+          node <<'NODE'
+          const fs=require('node:fs');
+          const config=JSON.parse(fs.readFileSync('wrangler.jsonc','utf8'));
+          if(config.name!=='mfk-admin-v3-ui-preview')process.exit(1);
+          if(config.pages_build_output_dir!=='./dist')process.exit(1);
+          if(config.main||config.routes||config.route||config.workers_dev)process.exit(1);
+          const buckets=Array.isArray(config.r2_buckets)?config.r2_buckets:[];
+          if(buckets.length!==1||buckets[0].binding!=='PRODUCT_MEDIA'||buckets[0].bucket_name!=='mfk-admin-v3-product-media-preview')process.exit(1);
+          NODE
           test ! -f DEPLOY_REQUEST
           test ! -f PREVIEW_DEPLOY_TRIGGER
-          ! grep -R "admin.morefunos.com" -n src index.html package.json | grep -v "vite.config.ts"
+          ! grep -R "admin.morefunos.com" -n src index.html package.json functions wrangler.jsonc | grep -v "vite.config.ts"
       - name: Verify no v2 browser-state imports
         run: |
           ! grep -R "v2admin\|admin-local-store\|admin-sync-client\|canonical-hydrated.v1\|sync-status.v1" -n src --exclude='*.test.ts'
