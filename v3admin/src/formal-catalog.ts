@@ -202,3 +202,20 @@ export function patchFormalComboPrice(snapshot:Record<string,unknown>,comboId:st
   if(!found)throw new Error('FORMAL_COMBO_NOT_FOUND');
   return{...snapshot,catalog:{...catalog,combos}};
 }
+
+
+export function moveFormalProductWithinCategory(snapshot:Record<string,unknown>,productId:string,direction:-1|1){
+  const catalog=row(snapshot.catalog);
+  const products=[...list(catalog.products)];
+  const currentIndex=products.findIndex(value=>text(row(value).id)===productId);
+  if(currentIndex<0)return snapshot;
+  const categoryId=text(row(products[currentIndex]).categoryId);
+  const peerIndexes=products.map((value,index)=>({value,index})).filter(item=>text(row(item.value).categoryId)===categoryId).map(item=>item.index);
+  const peerPosition=peerIndexes.indexOf(currentIndex);
+  const targetPeerPosition=peerPosition+direction;
+  if(peerPosition<0||targetPeerPosition<0||targetPeerPosition>=peerIndexes.length)return snapshot;
+  const targetIndex=peerIndexes[targetPeerPosition];
+  [products[currentIndex],products[targetIndex]]=[products[targetIndex],products[currentIndex]];
+  const normalized=products.map((value,idx)=>({...row(value),legacySourcePosition:idx}));
+  return{...snapshot,catalog:{...catalog,products:normalized}};
+}
