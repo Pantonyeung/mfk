@@ -72,12 +72,35 @@ jobs:
       - name: Publish Pages preview with R2 binding and Functions
         shell: bash
         run: |
-          set -euo pipefail
+          set +e
           npx --yes wrangler@latest pages deploy dist \
             --project-name "$PROJECT_NAME" \
             --branch "$PREVIEW_BRANCH" \
             --commit-hash "$GITHUB_SHA" \
-            --commit-message "MFK Admin V3 public implementation preview"
+            --commit-message "MFK Admin V3 public implementation preview" \
+            >/tmp/pages-r2.log 2>&1
+          code=$?
+          set -e
+          cat /tmp/pages-r2.log
+          if [ "$code" -eq 0 ]; then
+            echo "R2_PREVIEW_ACTIVE=1" >> "$GITHUB_ENV"
+            exit 0
+          fi
+
+          if grep -q "R2 bucket .* not found" /tmp/pages-r2.log; then
+            echo "::warning::Preview R2 bucket is not provisioned or current token cannot access it. Deploying UI-only preview so Owner review can continue; product image upload remains fail-closed."
+            mv wrangler.jsonc wrangler.r2.pending.jsonc
+            mv functions functions.r2.pending
+            npx --yes wrangler@latest pages deploy dist \
+              --project-name "$PROJECT_NAME" \
+              --branch "$PREVIEW_BRANCH" \
+              --commit-hash "$GITHUB_SHA" \
+              --commit-message "MFK Admin V3 public implementation preview (R2 pending)"
+            echo "R2_PREVIEW_ACTIVE=0" >> "$GITHUB_ENV"
+            exit 0
+          fi
+
+          exit "$code"
 
       - name: Public preview and R2 binding readback
         shell: bash
@@ -86,22 +109,30 @@ jobs:
           node <<'NODE'
           const expected=process.env.GITHUB_SHA;
           const base='https://mfk-admin-v3-ui-preview.pages.dev';
+          const requireR2=process.env.R2_PREVIEW_ACTIVE==='1';
           const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
           let last='';
           for(let attempt=1;attempt<=18;attempt++){
             try{
-              const [release,health,html]=await Promise.all([
+              const [release,html]=await Promise.all([
                 fetch(base+'/release.json',{headers:{'cache-control':'no-cache'}}).then(r=>r.json()),
-                fetch(base+'/api/preview-health',{headers:{'cache-control':'no-cache'}}).then(async r=>({status:r.status,body:await r.json()})),
                 fetch(base+'/?preview=ui-01',{headers:{'cache-control':'no-cache'}}).then(r=>r.text()),
               ]);
-              if(release?.sourceSha===expected&&health.status===200&&health.body?.storage==='R2_ONLY'&&html.includes('MFK Admin V3')){
+              let health={status:0,body:null};
+              try{
+                const response=await fetch(base+'/api/preview-health',{headers:{'cache-control':'no-cache'}});
+                health={status:response.status,body:await response.json().catch(()=>null)};
+              }catch{}
+              const uiGreen=release?.sourceSha===expected&&html.includes('MFK Admin V3');
+              const r2Green=health.status===200&&health.body?.storage==='R2_ONLY';
+              if(uiGreen&&(!requireR2||r2Green)){
                 console.log('PREVIEW_GREEN '+base+'/');
-                console.log('R2_BINDING_GREEN '+JSON.stringify(health.body));
                 console.log('SOURCE_SHA '+release.sourceSha);
+                if(r2Green)console.log('R2_BINDING_GREEN '+JSON.stringify(health.body));
+                else console.log('R2_BINDING_PENDING_FAIL_CLOSED');
                 process.exit(0);
               }
-              last=JSON.stringify({release,health,htmlTitle:html.slice(0,120)});
+              last=JSON.stringify({release,health,htmlTitle:html.slice(0,120),requireR2});
             }catch(error){last=String(error);}
             await sleep(5000);
           }
