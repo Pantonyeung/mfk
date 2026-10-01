@@ -14,6 +14,7 @@ import {scopeFromSession} from './scope.ts';
 import {V3_ADMIN_STATE_AUTHORITY,useV3AdminUi} from './state-authority.ts';
 import {V3FormalDraftProvider,useV3FormalDraft} from './formal-draft.tsx';
 import type {MfkAdminConfigEnvelope} from '../../contracts/admin-config-sync-v1.ts';
+import {V3ReadModelProvider} from './formal-read-model.tsx';
 
 function hkTime(value:string){
   const at=Date.parse(value);
@@ -186,17 +187,19 @@ export function V3AdminApp(){
     sessionToken={session.sessionToken}
     canonical={canonical.data}
   >
-    <AuthenticatedAdminShell
-      storeId={scope.storeId}
-      session={session}
-      canonical={canonical.data}
-      canonicalState={canonicalState}
-      releaseStatus={shellReleaseStatus}
-      backendSha={health.data?.sourceSha}
-      diagnosticsOpen={diagnosticsOpen}
-      onRefresh={()=>void canonical.refetch()}
-      onDiagnostics={()=>setDiagnosticsOpen(!diagnosticsOpen)}
-      onSignOut={()=>void signOut()}
-    />
+    <V3ReadModelProvider storeId={scope.storeId} sessionToken={session.sessionToken}>
+      <AuthenticatedAdminShell
+        storeId={scope.storeId}
+        session={session}
+        canonical={canonical.data}
+        canonicalState={canonicalState}
+        releaseStatus={shellReleaseStatus}
+        backendSha={health.data?.sourceSha}
+        diagnosticsOpen={diagnosticsOpen}
+        onRefresh={()=>void canonical.refetch()}
+        onDiagnostics={()=>setDiagnosticsOpen(!diagnosticsOpen)}
+        onSignOut={()=>void signOut()}
+      />
+    </V3ReadModelProvider>
   </V3FormalDraftProvider>;
 }
