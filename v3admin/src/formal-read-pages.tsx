@@ -1,6 +1,7 @@
 import {useMemo,useState} from 'react';
 import {useV3ReadModels,type V3ProjectedDay,type V3ProjectedOrder} from './formal-read-model.tsx';
 import {PageHeader,StatusBadge} from './ui.tsx';
+import type {AdminRefundEvent} from '../../contracts/admin-refund-v1.ts';
 
 function money(minor:number){return 'HK$'+(Math.max(0,Number(minor)||0)/100).toFixed(2);}
 function hkt(value:string){
@@ -112,5 +113,62 @@ export function FormalTodayPage({onNavigate}:{onNavigate:(path:string)=>void}){
       <article className="v3-whole-panel"><header><h2>今日訂單流</h2><button type="button" onClick={()=>onNavigate('/admin/orders/open')}>查看進行中訂單</button></header><div className="v3-readiness-stack"><div><span>進行中</span><StatusBadge tone={openOrders.length?'warning':'good'}>{openOrders.length} 張</StatusBadge></div><div><span>Projection</span><StatusBadge tone={read.ordersError?'unknown':'good'}>{read.ordersError?'結果未明':'已讀取'}</StatusBadge></div></div></article>
       <article className="v3-whole-panel"><header><h2>銷售詳情</h2><button type="button" onClick={()=>onNavigate('/admin/reports/sales')}>查看銷售報表</button></header><div className="v3-readiness-stack"><div><span>現金銷售</span><strong>{hasData?money(latest.cashSalesMinor):'—'}</strong></div><div><span>淨額</span><strong>{hasData?money(latest.netMinor):'—'}</strong></div></div></article>
     </section>
+  </div>;
+}
+
+
+function RefundDetail({refund,onClose}:{refund:AdminRefundEvent;onClose:()=>void}){
+  return <div className="v3-functional-editor" role="dialog" aria-modal="true">
+    <button className="v3-functional-backdrop" type="button" aria-label="關閉" onClick={onClose}/>
+    <section className="v3-functional-sheet">
+      <header><div><small>正式退款事件 · 只讀</small><h2>{refund.display||refund.orderId}</h2></div><button type="button" onClick={onClose}>關閉</button></header>
+      <div className="v3-functional-body">
+        <section className="v3-functional-section">
+          <div className="v3-formal-draft-meta">
+            <div><span>Refund ID</span><strong>{refund.refundId}</strong></div>
+            <div><span>Order ID</span><strong>{refund.orderId}</strong></div>
+            <div><span>退款金額</span><strong>{money(refund.amountMinor)}</strong></div>
+            <div><span>退款方式</span><strong>{refund.method}</strong></div>
+            <div><span>原營業日</span><strong>{refund.originalBusinessDate}</strong></div>
+            <div><span>執行營業日</span><strong>{refund.executionBusinessDate}</strong></div>
+            <div><span>執行時間</span><strong>{hkt(refund.executionAt)}</strong></div>
+            <div><span>Addendum</span><strong>{refund.addendumVersionLabel}</strong></div>
+          </div>
+        </section>
+        <section className="v3-functional-section"><h3>退款項目</h3><div className="v3-action-list">{refund.lines.map(line=><article key={line.lineId}><div><strong>{line.itemName}</strong><small>{line.lineId}</small></div><strong>× {line.quantity}</strong><span>{money(line.amountMinor)}</span></article>)}</div></section>
+        {refund.note?<div className="v3-mobile-form-note">{refund.note}</div>:null}
+        <div className="v3-mobile-form-note">Admin 呢頁只讀已完成正式退款事件；退款 mutation 唔喺 V3 Admin 執行。</div>
+      </div>
+    </section>
+  </div>;
+}
+
+export function FormalOrderExceptionsPage(){
+  const read=useV3ReadModels();
+  const [query,setQuery]=useState('');
+  const [selected,setSelected]=useState<AdminRefundEvent|null>(null);
+  const rows=read.refunds.filter(refund=>!query.trim()||(refund.refundId+' '+refund.orderId+' '+refund.display+' '+refund.lines.map(line=>line.itemName).join(' ')).toLocaleLowerCase().includes(query.toLocaleLowerCase()));
+  return <div className="v3-functional-page">
+    <PageHeader eyebrow="訂單監察" title="訂單異常" description="目前正式可讀 evidence 先接退款事件；付款修正、取消、打印異常要等各自 server read model，唔會用假資料補。" aside={<button type="button" disabled={read.refundsRefreshing} onClick={()=>void read.refresh()}>{read.refundsRefreshing?'更新中…':'重新讀取'}</button>}/>
+    {read.refundsError?<div className="v3-error">未能讀取正式退款 evidence：{read.refundsError.message}</div>:null}
+    <div className="v3-mobile-form-note">Coverage：REFUND 已接正式 server evidence；PAYMENT / CANCEL / PRINT exception aggregation 尚未有 V3 verified read seam。</div>
+    <section className="v3-product-toolbar"><div className="v3-product-search"><span>⌕</span><input value={query} onChange={event=>setQuery(event.target.value)} placeholder="搜尋退款／訂單／商品"/></div></section>
+    {read.refundsPending?<div className="v3-refreshing">正在讀取正式退款 evidence…</div>:!rows.length?<section className="v3-product-empty"><h2>目前未有正式退款事件</h2></section>:<div className="v3-action-list">{rows.map(refund=><article key={refund.refundId} className="is-clickable" onClick={()=>setSelected(refund)}><div><strong>{refund.display||refund.orderId}</strong><small>{refund.refundId} · {refund.executionBusinessDate} · {refund.method}</small></div><strong>{money(refund.amountMinor)}</strong><StatusBadge tone="good">已退款</StatusBadge></article>)}</div>}
+    {selected?<RefundDetail refund={selected} onClose={()=>setSelected(null)}/>:null}
+  </div>;
+}
+
+export function FormalRefundReportPage(){
+  const read=useV3ReadModels();
+  const [from,setFrom]=useState('');
+  const [to,setTo]=useState('');
+  const rows=read.refunds.filter(refund=>(!from||refund.executionBusinessDate>=from)&&(!to||refund.executionBusinessDate<=to));
+  const amount=rows.reduce((sum,refund)=>sum+refund.amountMinor,0);
+  return <div className="v3-functional-page">
+    <PageHeader eyebrow="報表" title="退款" description="正式退款報表直接讀 server refund evidence；按實際退款執行日統計。" aside={<button type="button" disabled={read.refundsRefreshing} onClick={()=>void read.refresh()}>{read.refundsRefreshing?'更新中…':'重新讀取'}</button>}/>
+    {read.refundsError?<div className="v3-error">{read.refundsError.message}</div>:null}
+    <section className="v3-product-toolbar"><div className="v3-product-selects"><label><span>由</span><input type="date" value={from} onChange={event=>setFrom(event.target.value)}/></label><label><span>至</span><input type="date" value={to} onChange={event=>setTo(event.target.value)}/></label></div></section>
+    <section className="v3-whole-kpi-grid"><article><span>退款總額</span><strong>{money(amount)}</strong><small>{rows.length} 筆</small></article><article><span>退款事件</span><strong>{rows.length}</strong><small>正式 evidence</small></article><article><span>Addenda</span><strong>{read.refundAddenda.length}</strong><small>Day-close non-posting reference</small></article></section>
+    <div className="v3-price-edit-list">{rows.map(refund=><article key={refund.refundId}><div><strong>{refund.display||refund.orderId}</strong><small>{refund.executionBusinessDate} · {refund.method} · {refund.addendumVersionLabel}</small></div><strong>{money(refund.amountMinor)}</strong><StatusBadge tone="good">已確認</StatusBadge></article>)}</div>
   </div>;
 }
