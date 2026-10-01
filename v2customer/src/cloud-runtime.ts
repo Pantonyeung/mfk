@@ -231,6 +231,47 @@ async function bootstrapCustomerConfigFromLegacy():Promise<Partial<CustomerReadM
   return snapshot;
 }
 
+function subscribeCustomerConfigChanges(listener:(headSeq:number)=>void){
+  let stopped=false;
+  let socket:WebSocket|null=null;
+  let timer:number|undefined;
+  let attempt=0;
+  const connect=()=>{
+    if(stopped||typeof window==='undefined'||typeof WebSocket==='undefined'||navigator.onLine===false)return;
+    try{
+      const url=new URL(ENDPOINT);
+      url.protocol=url.protocol==='https:'?'wss:':'ws:';
+      url.pathname='/api/customer/events';
+      url.search='?storeId='+encodeURIComponent(STORE_ID);
+      socket=new WebSocket(url.toString());
+      socket.addEventListener('open',()=>{attempt=0;});
+      socket.addEventListener('message',event=>{
+        try{
+          const row=JSON.parse(String(event.data)) as Record<string,unknown>;
+          if(row.type==='PORT_HEAD_AVAILABLE'&&row.port==='CUSTOMER')listener(Number(row.headSeq)||0);
+        }catch{}
+      });
+      socket.addEventListener('close',()=>{
+        socket=null;
+        if(stopped)return;
+        const delays=[500,1000,2000,5000,15000,30000];
+        const delay=delays[Math.min(attempt,delays.length-1)]!;
+        attempt+=1;
+        timer=window.setTimeout(connect,delay);
+      });
+      socket.addEventListener('error',()=>{try{socket?.close();}catch{}});
+    }catch{
+      if(!stopped)timer=window.setTimeout(connect,2000);
+    }
+  };
+  connect();
+  return()=>{
+    stopped=true;
+    if(timer!==undefined)window.clearTimeout(timer);
+    try{socket?.close();}catch{}
+  };
+}
+
 function requestId(prefix:string){
   const id=typeof crypto!=='undefined'&&typeof crypto.randomUUID==='function'
     ?crypto.randomUUID()
@@ -367,6 +408,7 @@ export function createCloudCustomerRuntimePort():CustomerRuntimePort{
     portId:'MFK_CUSTOMER_PORT_V1' as const,
     uploadPaymentEvidence:uploadCustomerPaymentEvidence,
     probeOrderBackend,
+    subscribeConfigChanges:subscribeCustomerConfigChanges,
 
     async readSnapshot():Promise<CustomerReadModelSnapshot>{
       let config:Partial<CustomerReadModelSnapshot>;
