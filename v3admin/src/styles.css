@@ -41,6 +41,12 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 .v3-release-strip[data-state="ok"]{border-left:4px solid var(--good)}
 .v3-release-strip[data-state="danger"]{border-left:4px solid var(--danger)}
 .v3-release-strip[data-state="pending"]{border-left:4px solid var(--warning)}
+.v3-freshness-strip{display:grid;grid-template-columns:repeat(3,minmax(0,1fr)) auto;align-items:center;gap:12px;margin:10px 24px 0;padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:var(--paper)}
+.v3-freshness-strip span{display:block;color:var(--muted);font-size:.75rem}
+.v3-freshness-strip strong{display:block;margin-top:3px;font-size:.875rem;overflow-wrap:anywhere}
+.v3-freshness-strip[data-state="ok"]{border-left:4px solid var(--good)}
+.v3-freshness-strip[data-state="pending"]{border-left:4px solid var(--warning)}
+.v3-freshness-strip[data-state="danger"]{border-left:4px solid var(--danger)}
 .v3-login-card,.v3-diagnostics{margin-top:22px;padding:24px;border:1px solid var(--line);border-radius:16px;background:var(--paper);box-shadow:0 14px 44px rgba(54,46,31,.05)}
 .v3-login-card{display:grid;grid-template-columns:minmax(0,1fr) minmax(300px,.8fr);gap:32px}
 .v3-login-card h2,.v3-diagnostics h2{margin:6px 0 8px}
@@ -182,6 +188,9 @@ dialog p{color:var(--muted);line-height:1.55}
   .v3-top-actions button:first-child{display:none}
   .v3-top-actions button{padding:8px 10px}
   .v3-release-strip{grid-template-columns:1fr 1fr;margin:10px 12px 0}
+  .v3-freshness-strip{grid-template-columns:1fr 1fr;margin:10px 12px 0}
+  .v3-freshness-strip>div:last-of-type{grid-column:1/-1}
+  .v3-freshness-strip button{grid-column:1/-1}
   .v3-release-warning{margin-left:12px;margin-right:12px}
   .v3-release-strip>div:last-of-type{grid-column:1/-1}
   .v3-release-strip button{grid-column:1/-1}
@@ -208,6 +217,8 @@ dialog p{color:var(--muted);line-height:1.55}
 }
 @media(max-width:420px){
   .v3-release-strip{grid-template-columns:1fr}
+  .v3-freshness-strip{grid-template-columns:1fr}
+  .v3-freshness-strip>div:last-of-type{grid-column:auto}
   .v3-release-strip>div:last-of-type{grid-column:auto}
   .v3-page-actions{align-items:stretch;flex-direction:column}
   .v3-page-actions button{width:100%}
