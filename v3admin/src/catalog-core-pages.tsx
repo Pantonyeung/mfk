@@ -53,13 +53,15 @@ export function CategoriesPage(){
     <PageHeader eyebrow="菜單管理" title="分類管理" description="實際管理分類名稱、啟用狀態、排序同商品引用。" aside={<button className="v3-primary" type="button" onClick={()=>{const next=create();setSelected(next.id);}}>＋ 新增分類</button>}/>
     <div className="v3-functional-card-grid">{sorted.map((category,index)=>{
       const count=products.filter(product=>product.category===category.name).length;
-      return <button type="button" key={category.id} onClick={()=>setSelected(category.id)}>
-        <div><strong>{category.name}</strong><small>{category.id}</small></div>
-        <b>{count}</b><span>件商品</span>
-        <StatusBadge tone={category.active?'good':'neutral'}>{category.active?'啟用':'停用'}</StatusBadge>
-        <small>次序 {index+1}</small>
-        <div className="v3-inline-order-buttons" onClick={event=>event.stopPropagation()}><button type="button" disabled={index===0} onClick={()=>move(category.id,-1)}>↑</button><button type="button" disabled={index===sorted.length-1} onClick={()=>move(category.id,1)}>↓</button></div>
-      </button>;
+      return <article className="v3-functional-card" key={category.id}>
+        <button type="button" className="v3-functional-card-main" onClick={()=>setSelected(category.id)}>
+          <div><strong>{category.name}</strong><small>{category.id}</small></div>
+          <b>{count}</b><span>件商品</span>
+          <StatusBadge tone={category.active?'good':'neutral'}>{category.active?'啟用':'停用'}</StatusBadge>
+          <small>次序 {index+1}</small>
+        </button>
+        <div className="v3-inline-order-buttons"><button type="button" disabled={index===0} onClick={()=>move(category.id,-1)}>↑</button><button type="button" disabled={index===sorted.length-1} onClick={()=>move(category.id,1)}>↓</button></div>
+      </article>;
     })}</div>
     {selectedCategory?<CategoryEditor category={selectedCategory} onClose={()=>setSelected(null)}/>:null}
   </div>;
@@ -114,10 +116,12 @@ export function MenuDisplayPage(){
     <section className="v3-sort-workspace">
       <div className="v3-sort-category-column">
         <header><strong>分類次序</strong><small>{sortedCategories.length} 個分類</small></header>
-        {sortedCategories.map((category,index)=><button key={category.id} type="button" className={selectedCategory===category.name?'is-active':''} onClick={()=>setSelectedCategory(category.name)}>
-          <span><b>{index+1}. {category.name}</b><small>{products.filter(product=>product.category===category.name).length} 件商品</small></span>
-          <span className="v3-inline-order-buttons" onClick={event=>event.stopPropagation()}><button disabled={index===0} onClick={()=>moveCategory(category.id,-1)}>↑</button><button disabled={index===sortedCategories.length-1} onClick={()=>moveCategory(category.id,1)}>↓</button></span>
-        </button>)}
+        {sortedCategories.map((category,index)=><article key={category.id} className={selectedCategory===category.name?'is-active':''}>
+          <button type="button" className="v3-sort-category-select" onClick={()=>setSelectedCategory(category.name)}>
+            <span><b>{index+1}. {category.name}</b><small>{products.filter(product=>product.category===category.name).length} 件商品</small></span>
+          </button>
+          <span className="v3-inline-order-buttons"><button type="button" disabled={index===0} onClick={()=>moveCategory(category.id,-1)}>↑</button><button type="button" disabled={index===sortedCategories.length-1} onClick={()=>moveCategory(category.id,1)}>↓</button></span>
+        </article>)}
       </div>
       <div className="v3-sort-product-column">
         <header><strong>{selectedCategory||'商品次序'}</strong><small>{categoryProducts.length} 件商品</small></header>
