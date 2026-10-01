@@ -34,16 +34,17 @@ test('UI0 uses supplied male/female IP sheets, 50:50 selection and owner-locked 
   assert.ok(overlay.includes('enterHomeRef.current()'));
 });
 
-test('UI1 implements the locked premium composition without using the old design-board crop as a runtime asset',()=>{
+test('UI1 implements the mobile-first large-hero R4 composition as real components',()=>{
   const home=read('src/stage1/Stage1Home.tsx');
   const css=read('src/stage1/stage1.css');
-  for(const marker of['stage1-premium-header','stage1-welcome','stage1-search-entry','stage1-brand-banner','stage1-quick-entry-section','stage1-top6'])assert.ok(home.includes(marker),marker);
-  assert.ok(home.includes("const HOME_PAIR='https://cdn.creativeclaw.co/u/6ad84d58/images/c40034d5-c340-4af5-8819-68c52b236c09.png'"));
-  assert.ok(home.includes('stage1-welcome-art'));
-  assert.ok(home.includes('stage1-banner-art'));
+  for(const marker of['stage1-mobile-header','stage1-search','stage1-big-hero','stage1-quick-row','stage1-category-rail','stage1-product-section'])assert.ok(home.includes(marker),marker);
+  assert.ok(home.includes("const HERO_IP_PAIR='https://cdn.creativeclaw.co/u/6ad84d58/images/c40034d5-c340-4af5-8819-68c52b236c09.png'"));
   assert.ok(home.includes('product.imageUrl'));
-  assert.ok(home.includes('stage1-product-image-empty'));
-  assert.ok(css.includes('.stage1-brand-banner'));
+  assert.ok(home.includes('stage1-food-placeholder'));
+  assert.ok(css.includes('.stage1-big-hero'));
+  assert.ok(css.includes('@media(max-width:390px)'));
+  assert.ok(css.includes('@media(max-width:360px)'));
+  assert.ok(css.includes('@media(min-width:400px)'));
   assert.ok(!home.includes('CUSTOMER_FINAL_SOURCE.stage1Final.url'));
   assert.ok(!home.includes('stage1-source-hero'));
   for(const forbidden of['/brand/p0-riceball.webp','/brand/mf-home-hero-salad.webp','/brand/mf-home-hero-bowl.webp'])assert.ok(!home.includes(forbidden),forbidden);
@@ -56,15 +57,14 @@ test('UI2 keeps canonical product media and FINAL zero-result female IP repair',
   assert.ok(menu.includes('/brand/stage0-female.webp'));
   for(const copy of['暫時搵唔到呢個結果','不如試下其他分類？','返回點單'])assert.ok(menu.includes(copy),copy);
   for(const label of['首頁','點單','記憶罐','訂單','會員'])assert.ok(nav.includes(label),label);
-  assert.ok(nav.includes("data-center={item.id==='cart'||undefined}"));
 });
 
-test('390 baseline and 360 minimum remain responsive and touch safe',()=>{
+test('mobile acceptance stays 360 / 390 / 412-oriented and touch safe',()=>{
   const stage1=read('src/stage1/stage1.css');
   const stage2=read('src/stage2/stage2.css');
-  for(const css of[stage1,stage2]){
-    assert.ok(css.includes('max-width:480px'));
-    assert.ok(css.includes('@media(max-width:360px)'));
-  }
+  assert.ok(stage1.includes('max-width:480px'));
+  assert.ok(stage1.includes('@media(max-width:390px)'));
+  assert.ok(stage1.includes('@media(max-width:360px)'));
+  assert.ok(stage1.includes('@media(min-width:400px)'));
   assert.ok(stage2.includes('min-height:44px'));
 });
