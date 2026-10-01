@@ -22,6 +22,22 @@ export interface V3ProjectedOrder{
   readonly staffId?:string;
   readonly staffName?:string;
   readonly refunds?:readonly Record<string,unknown>[];
+  readonly printEvidence?:Readonly<{
+    readonly scope:'DINING_INITIAL';
+    readonly certainty:'TRANSPORT_ONLY';
+    readonly attemptedAt:string;
+    readonly completedAt?:string;
+    readonly state:'DONE'|'FAILED'|'UNKNOWN';
+    readonly planned:number;
+    readonly sent:number;
+    readonly failed:number;
+    readonly results:readonly Readonly<{
+      readonly jobId:string;
+      readonly role:string;
+      readonly ok:boolean;
+      readonly code:string;
+    }>[];
+  }>;
   readonly items:readonly V3ProjectedOrderItem[];
 }
 export interface V3ProjectedDay{
