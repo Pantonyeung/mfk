@@ -1,6 +1,7 @@
 import {useMemo,useState} from 'react';
 import {MobileGroupedPager} from './mobile-grouped-list.tsx';
-import {MOBILE_PRODUCT_PAGE_SIZE,PREVIEW_PRODUCTS,productRecordsFromSnapshot,type ProductListRecord} from './product-list.tsx';
+import {MOBILE_PRODUCT_PAGE_SIZE,productRecordsFromSnapshot,type ProductListRecord} from './product-list.tsx';
+import {PREVIEW_PRODUCTS} from './preview-catalog-store.ts';
 import {PageHeader,StatusBadge} from './ui.tsx';
 
 type AvailabilityRule={
