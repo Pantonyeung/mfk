@@ -2,6 +2,7 @@ import {useEffect,useMemo,useState,type ReactNode} from 'react';
 import {ADMIN_MENU_GROUPS,destinationForPath,menuForDestination,type AdminMenuGroup} from './navigation.ts';
 import {ProductListPage} from './product-list.tsx';
 import {AvailabilityPage} from './availability-page.tsx';
+import {AdminWorkspace} from './admin-workspaces.tsx';
 import {
   EmptyState,
   ErrorState,
@@ -100,7 +101,9 @@ export function AdminShell({storeId,displayName,releaseStatus,canonicalState,can
     ?<ProductListPage canonicalSnapshot={canonicalSnapshot} previewMode={previewMode} onReviewDraft={()=>navigate('/admin/publish/pending')}/>
     :path==='/admin/availability'
       ?<AvailabilityPage canonicalSnapshot={canonicalSnapshot} previewMode={previewMode}/>
-      :<RouteSkeleton path={path} canonicalState={canonicalState} onRefresh={onRefresh}/>;
+      :previewMode
+        ?<AdminWorkspace path={path} previewMode/>
+        :<RouteSkeleton path={path} canonicalState={canonicalState} onRefresh={onRefresh}/>;
 
   return <div className="v3-app-shell" data-preview={previewMode?'true':'false'}>
     <aside className="v3-sidebar" aria-label="Admin 功能導覽"><PrimaryNavigation activeMenu={activeMenu} onSelect={selectMenu}/><SecondaryNavigation menu={activeMenu} path={path} onNavigate={navigate}/></aside>
