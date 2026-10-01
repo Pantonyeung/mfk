@@ -11,6 +11,7 @@ import {
   type FormalLogicalPrinter,
   type FormalPrintTemplateSet,
 } from './formal-print.ts';
+import {useV3ReadModels,type V3ProjectedOrder} from './formal-read-model.tsx';
 import {PageHeader,StatusBadge} from './ui.tsx';
 
 function errorCopy(error:unknown){
@@ -195,12 +196,63 @@ export function FormalPrintOverviewPage(){
   </div>;
 }
 
-export function FormalPrintExceptionsGapPage(){
+export function projectVerifiedPrintEvidence(orders:readonly V3ProjectedOrder[]){
+  return orders
+    .filter(order=>Boolean(order.printEvidence))
+    .map(order=>Object.freeze({
+      orderId:order.orderId,
+      display:order.display,
+      sourceLabel:order.sourceLabel,
+      updatedAt:order.updatedAt,
+      evidence:order.printEvidence!,
+      needsAttention:order.printEvidence!.state!=='DONE',
+    }))
+    .sort((a,b)=>String(b.evidence.attemptedAt||b.updatedAt).localeCompare(String(a.evidence.attemptedAt||a.updatedAt)));
+}
+
+function evidenceTime(value:string){
+  const at=Date.parse(value);
+  return Number.isFinite(at)?new Date(at).toLocaleString('zh-HK',{timeZone:'Asia/Hong_Kong',hour12:false}):value;
+}
+
+export function FormalPrintExceptionsPage(){
+  const read=useV3ReadModels();
+  const rows=useMemo(()=>projectVerifiedPrintEvidence(read.orders),[read.orders]);
+  const attention=rows.filter(row=>row.needsAttention);
+  const unknown=rows.filter(row=>row.evidence.state==='UNKNOWN');
   return <div className="v3-functional-page">
-    <PageHeader eyebrow="打印管理" title="打印狀態／異常" description="未有 verified server print-job / safe-retry read seam 前保持 fail-closed。"/>
+    <PageHeader
+      eyebrow="打印管理"
+      title="打印狀態／異常"
+      description="只讀 SMT 已投影嘅正式 transport evidence；SENT／DONE 只代表打印通道結果，唔等於實體已出紙。"
+      aside={<button type="button" disabled={read.ordersRefreshing} onClick={()=>void read.refresh()}>{read.ordersRefreshing?'更新中…':'重新讀取證據'}</button>}
+    />
+    {read.ordersError?<div className="v3-error">{read.ordersError.message}</div>:null}
+    <section className="v3-whole-kpi-grid">
+      <article><span>有打印證據訂單</span><strong>{rows.length}</strong><small>目前 verified scope：堂食首次打印</small></article>
+      <article><span>需要留意</span><strong>{attention.length}</strong><small>FAILED / UNKNOWN</small></article>
+      <article><span>結果未知</span><strong>{unknown.length}</strong><small>禁止 blind retry</small></article>
+      <article><span>Physical proof</span><strong>未提供</strong><small>Transport ≠ 紙張</small></article>
+    </section>
+
     <section className="v3-functional-section">
-      <header><div><h3>Print evidence seam 未接</h3><p>需要正式 Print Job identity、目的地、狀態、失敗原因，同 safe-retry command/readback。</p></div><StatusBadge tone="warning">READ + COMMAND SEAM REQUIRED</StatusBadge></header>
-      <div className="v3-mobile-form-note">呢頁唔會用 Preview 假異常，亦唔會提供未有 idempotency contract 嘅「重印」按鈕。</div>
+      <header><div><h3>Transport Evidence</h3><p>每個 job 保留 identity、票種、通道結果同 code；UNKNOWN 保持 UNKNOWN。</p></div><StatusBadge tone={attention.length?'warning':'good'}>{attention.length?'有需要留意證據':'目前無 transport 異常'}</StatusBadge></header>
+      {read.ordersPending?<div className="v3-refreshing">正在讀取 SMT 投影…</div>:rows.length?<div className="v3-action-list">{rows.map(row=><article key={row.orderId}>
+        <div>
+          <strong>{row.display} · {row.sourceLabel}</strong>
+          <small>{evidenceTime(row.evidence.attemptedAt)} · {row.evidence.scope} · {row.evidence.certainty}</small>
+          <small>計劃 {row.evidence.planned} · 已送 {row.evidence.sent} · 未完成 {row.evidence.failed}</small>
+          {row.evidence.results.length?<small>{row.evidence.results.map(result=>result.role+': '+result.code).join(' ｜ ')}</small>:<small>未有 per-job 結果</small>}
+        </div>
+        <StatusBadge tone={row.evidence.state==='DONE'?'good':row.evidence.state==='FAILED'?'danger':'warning'}>{row.evidence.state}</StatusBadge>
+      </article>)}</div>:<div className="v3-product-empty"><h2>目前未有正式打印 transport evidence</h2><p>唔會用 Preview 假異常補位。</p></div>}
+    </section>
+
+    <section className="v3-functional-section">
+      <header><div><h3>仍然未有嘅 seam</h3><p>目前只證實堂食首次打印 transport evidence；generic 全單 PrintJob ledger、physical paper proof、safe retry command 仍未接。</p></div><StatusBadge tone="warning">PARTIAL VERIFIED</StatusBadge></header>
+      <div className="v3-mobile-form-note">呢頁係 read-only。未有 idempotent retry + destination readback 前，不提供「重印／重試」按鈕。</div>
     </section>
   </div>;
 }
+
+export const FormalPrintExceptionsGapPage=FormalPrintExceptionsPage;
