@@ -409,6 +409,7 @@ export function createCloudCustomerRuntimePort():CustomerRuntimePort{
     uploadPaymentEvidence:uploadCustomerPaymentEvidence,
     probeOrderBackend,
     subscribeConfigChanges:subscribeCustomerConfigChanges,
+    subscribeConfigChanges:subscribeCustomerConfigChanges,
 
     async readSnapshot():Promise<CustomerReadModelSnapshot>{
       let config:Partial<CustomerReadModelSnapshot>;
