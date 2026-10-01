@@ -73,6 +73,10 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 .v3-top-actions{display:flex;gap:7px}
 .v3-menu-trigger{display:none}
 .v3-content{max-width:1360px;margin:0 auto;padding:32px 32px 96px}
+.v3-contextual-back{display:none;align-items:center;justify-content:space-between;gap:12px;margin:0 0 16px;padding:8px 0 12px;border-bottom:1px solid var(--line)}
+.v3-contextual-back button{display:inline-flex;align-items:center;gap:7px;min-height:44px;padding:7px 10px;border-color:#cfc8bb;background:var(--paper);font-weight:800}
+.v3-contextual-back button span{font-size:1.45rem;line-height:1}
+.v3-contextual-current{min-width:0;color:var(--muted);font-size:.84rem;font-weight:700;text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
 /* Shared product surfaces */
 .v3-page-header{display:flex;align-items:flex-start;justify-content:space-between;gap:28px;padding-bottom:22px;border-bottom:1px solid var(--line)}
@@ -160,6 +164,7 @@ dialog p{color:var(--muted);line-height:1.55}
 }
 @media(max-width:1179px){
   .v3-app-shell{grid-template-columns:72px minmax(0,1fr)}
+  .v3-contextual-back{display:flex}
   .v3-sidebar{grid-template-columns:72px;width:72px}
   .v3-sidebar .v3-menu-secondary{display:none}
   .v3-sidebar .v3-menu-primary button{justify-items:center;padding:7px 4px}
@@ -180,7 +185,11 @@ dialog p{color:var(--muted);line-height:1.55}
   .v3-release-warning{margin-left:12px;margin-right:12px}
   .v3-release-strip>div:last-of-type{grid-column:1/-1}
   .v3-release-strip button{grid-column:1/-1}
-  .v3-content{padding:24px 14px 80px}
+  .v3-content{padding:16px 14px 80px}
+  .v3-contextual-back{position:sticky;top:58px;z-index:13;margin:0 -14px 16px;padding:8px 14px 10px;background:rgba(244,241,233,.96);backdrop-filter:blur(12px)}
+  .v3-contextual-back button{flex:0 1 auto;max-width:72vw}
+  .v3-contextual-back button strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .v3-contextual-current{display:none}
   .v3-page-header{flex-direction:column;gap:16px}
   .v3-page-actions{width:100%;justify-content:flex-start}
   .v3-list-tools{align-items:stretch;flex-direction:column}
