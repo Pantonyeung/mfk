@@ -4,10 +4,19 @@ Date: 2026-10-01
 Scope: Customer Home Hero / Banner assets
 Authority: Owner-confirmed assets only
 
+## Global retention rule
+
+- Owner-confirmed Hero/Banner assets are retained in R2 and are not deleted during normal rotation.
+- Runtime changes use status / schedule / priority / manifest pointers.
+- Lifecycle status vocabulary: `ACTIVE / ROTATING / PAUSED / SEASONAL / EXPIRED / ARCHIVED`.
+- Deletion requires explicit Owner instruction or legal/corruption cleanup.
+
 ## HERO-UI1-BRAND-R1
 
 - Asset ID: `HERO-UI1-BRAND-R1`
 - Owner status: `OWNER_CONFIRMED`
+- Rotation status: `ACTIVE`
+- Semantic type: `IP_STORY`
 - Use: Customer UI1 Home Hero carousel / fullscreen Hero detail
 - Master format: PNG
 - Master dimensions: 941 × 1672
