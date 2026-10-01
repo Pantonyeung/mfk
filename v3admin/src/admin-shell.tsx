@@ -13,6 +13,8 @@ import {AuditPage,DiagnosticsPage,EffectiveSettingsPage,IntegrationsPage,TodayPa
 import {FormalDraftStatusBar,FormalPendingChangesPage,FormalPublishPage} from './formal-publish-pages.tsx';
 import {FormalCategoriesPage,FormalMenuDisplayPage,FormalPricingPage} from './formal-catalog-pages.tsx';
 import {FormalAvailabilityPage} from './formal-availability-page.tsx';
+import {FormalModifiersPage} from './formal-modifiers-page.tsx';
+import {FormalPrintersPage,FormalPrintRulesGapPage,FormalPrintTemplatesPage} from './formal-print-pages.tsx';
 import {
   EmptyState,
   ErrorState,
@@ -122,8 +124,8 @@ export function AdminShell({storeId,displayName,releaseStatus,canonicalState,can
           ?<ProductListPage canonicalSnapshot={canonicalSnapshot} previewMode={previewMode} formalDraftEnabled={formalDraftEnabled} onReviewDraft={()=>navigate('/admin/publish/pending')}/>
     :path==='/admin/catalog/categories'
       ?(previewMode?<CategoriesPage/>:formalDraftEnabled?<FormalCategoriesPage/>:<RouteSkeleton path={path} canonicalState={canonicalState} onRefresh={onRefresh}/>)
-      :path==='/admin/catalog/modifiers'&&previewMode
-        ?<ModifiersPage/>
+      :path==='/admin/catalog/modifiers'
+        ?(previewMode?<ModifiersPage/>:formalDraftEnabled?<FormalModifiersPage/>:<RouteSkeleton path={path} canonicalState={canonicalState} onRefresh={onRefresh}/>)
         :path==='/admin/catalog/combos'&&previewMode
           ?<CombosPage/>
           :path==='/admin/catalog/pricing'
@@ -156,12 +158,12 @@ export function AdminShell({storeId,displayName,releaseStatus,canonicalState,can
                                 ?<SettlementPage/>
                                 :path==='/admin/print'&&previewMode
                                   ?<PrintOverviewPage/>
-                                  :path==='/admin/print/printers'&&previewMode
-                                ?<PrintersPage/>
-                                :path==='/admin/print/templates'&&previewMode
-                                  ?<PrintTemplatesPage/>
-                                  :path==='/admin/print/rules'&&previewMode
-                                    ?<PrintRulesPage/>
+                                  :path==='/admin/print/printers'
+                                ?(previewMode?<PrintersPage/>:formalDraftEnabled?<FormalPrintersPage/>:<RouteSkeleton path={path} canonicalState={canonicalState} onRefresh={onRefresh}/>)
+                                :path==='/admin/print/templates'
+                                  ?(previewMode?<PrintTemplatesPage/>:formalDraftEnabled?<FormalPrintTemplatesPage/>:<RouteSkeleton path={path} canonicalState={canonicalState} onRefresh={onRefresh}/>)
+                                  :path==='/admin/print/rules'
+                                    ?(previewMode?<PrintRulesPage/>:formalDraftEnabled?<FormalPrintRulesGapPage/>:<RouteSkeleton path={path} canonicalState={canonicalState} onRefresh={onRefresh}/>)
                                     :path==='/admin/print/exceptions'&&previewMode
                                       ?<PrintExceptionsPage/>
                                       :path==='/admin/devices'&&previewMode
