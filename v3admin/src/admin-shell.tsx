@@ -20,7 +20,7 @@ import {FormalDiningTablesPage,FormalStoreSettingsPage} from './formal-store-pag
 import {FormalChannelPage} from './formal-channel-pages.tsx';
 import {FormalAccessGapPage,FormalPermissionsSummaryPage,FormalRolesSummaryPage,FormalStaffPage} from './formal-staff-pages.tsx';
 import {FormalCapacityPage} from './formal-capacity-page.tsx';
-import {FormalOrdersPage,FormalSalesReportPage,FormalTodayPage} from './formal-read-pages.tsx';
+import {FormalOrderExceptionsPage,FormalOrdersPage,FormalRefundReportPage,FormalSalesReportPage,FormalTodayPage} from './formal-read-pages.tsx';
 import {
   EmptyState,
   ErrorState,
@@ -124,8 +124,8 @@ export function AdminShell({storeId,displayName,releaseStatus,canonicalState,can
         ?(previewMode?<OrdersPage mode="open"/>:formalDraftEnabled?<FormalOrdersPage mode="open"/>:<RouteSkeleton path={path} canonicalState={canonicalState} onRefresh={onRefresh}/>)
     :path==='/admin/orders/history'
       ?(previewMode?<OrdersPage mode="history"/>:formalDraftEnabled?<FormalOrdersPage mode="history"/>:<RouteSkeleton path={path} canonicalState={canonicalState} onRefresh={onRefresh}/>)
-      :path==='/admin/orders/exceptions'&&previewMode
-        ?<OrdersPage mode="exceptions"/>
+      :path==='/admin/orders/exceptions'
+        ?(previewMode?<OrdersPage mode="exceptions"/>:formalDraftEnabled?<FormalOrderExceptionsPage/>:<RouteSkeleton path={path} canonicalState={canonicalState} onRefresh={onRefresh}/>)
         :path==='/admin/catalog/products'
           ?<ProductListPage canonicalSnapshot={canonicalSnapshot} previewMode={previewMode} formalDraftEnabled={formalDraftEnabled} onReviewDraft={()=>navigate('/admin/publish/pending')}/>
     :path==='/admin/catalog/categories'
@@ -190,8 +190,8 @@ export function AdminShell({storeId,displayName,releaseStatus,canonicalState,can
                                                     ?<ReportPage mode="products"/>
                                                     :path==='/admin/reports/channels'&&previewMode
                                                       ?<ReportPage mode="channels"/>
-                                                      :path==='/admin/reports/refunds'&&previewMode
-                                                        ?<ReportPage mode="refunds"/>
+                                                      :path==='/admin/reports/refunds'
+                                                        ?(previewMode?<ReportPage mode="refunds"/>:formalDraftEnabled?<FormalRefundReportPage/>:<RouteSkeleton path={path} canonicalState={canonicalState} onRefresh={onRefresh}/>)
                                                         :path==='/admin/reports/operations'&&previewMode
                                                           ?<ReportPage mode="operations"/>
                                                           :path==='/admin/reports/export'&&previewMode
