@@ -46,10 +46,10 @@ export function FormalDiagnosticsPage(){
   const read=useV3ReadModels();
   const catalog=useMemo(()=>readFormalCatalog(formal.workingSnapshot),[formal.workingSnapshot]);
   const printers=useMemo(()=>readFormalLogicalPrinters(formal.workingSnapshot),[formal.workingSnapshot]);
-  const rows=[
-    ['Canonical Revision',String(formal.canonical.revision),'good' as const],
-    ['Canonical Published',formal.canonical.publishedAt,'good' as const],
-    ['Draft',formal.draft?'R'+formal.draft.draftRevision:'冇正式草稿',formal.draft?'warning' as const:'good' as const],
+  const rows:Array<[string,string,'neutral'|'good'|'warning'|'danger'|'unknown']>=[
+    ['Canonical Revision',String(formal.canonical.revision),'good'],
+    ['Canonical Published',formal.canonical.publishedAt,'good'],
+    ['Draft',formal.draft?'R'+formal.draft.draftRevision:'冇正式草稿',formal.draft?'warning':'good'],
     ['Catalog',catalog.categories.length+' 分類 / '+catalog.products.length+' 商品','good' as const],
     ['Logical Printers',printers.length+' 個','good' as const],
     ['Orders Projection',read.ordersError?read.ordersError.message:read.ordersPending?'讀取中':read.orders.length+' 張','good' as const],
