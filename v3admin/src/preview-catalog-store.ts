@@ -62,6 +62,13 @@ export interface PreviewCombo{
   groups:readonly PreviewComboGroup[];
 }
 
+export interface PreviewCategory{
+  id:string;
+  name:string;
+  active:boolean;
+  sortOrder:number;
+}
+
 export interface PreviewDiningTable{
   id:string;
   name:string;
@@ -70,6 +77,16 @@ export interface PreviewDiningTable{
   seats:number;
   area:string;
 }
+
+const CATEGORIES:PreviewCategory[]=[
+  {id:'cat-rice',name:'飯類',active:true,sortOrder:10},
+  {id:'cat-riceball',name:'飯糰',active:true,sortOrder:20},
+  {id:'cat-bento',name:'便當',active:true,sortOrder:30},
+  {id:'cat-drink',name:'茶飲',active:true,sortOrder:40},
+  {id:'cat-snack',name:'小食',active:true,sortOrder:50},
+  {id:'cat-soup',name:'湯品',active:true,sortOrder:60},
+  {id:'cat-dessert',name:'甜品',active:true,sortOrder:70},
+];
 
 export const PREVIEW_PRODUCTS:PreviewProduct[]=[
   {id:'p-001',name:'紫米飯糰・照燒雞',code:'PRD000123',category:'飯糰',priceMinor:4200,status:'已發佈',printRule:'製作單＋標籤',updatedAt:'今日 08:42',description:'照燒雞配紫米飯糰。',customerImageUrl:'',channelImages:{KEETA:''},optionSetIds:['set-rice']},
@@ -143,9 +160,15 @@ function uid(prefix:string){
 
 interface PreviewCatalogState{
   products:PreviewProduct[];
+  categories:PreviewCategory[];
   optionSets:PreviewOptionSet[];
   combos:PreviewCombo[];
   diningTables:PreviewDiningTable[];
+  createCategory():PreviewCategory;
+  updateCategory(id:string,patch:Partial<Omit<PreviewCategory,'id'>>):void;
+  removeCategory(id:string):boolean;
+  moveCategory(id:string,direction:-1|1):void;
+  moveProduct(productId:string,direction:-1|1):void;
   createProduct(input:Omit<PreviewProduct,'id'|'code'|'updatedAt'|'status'>&{id?:string}):PreviewProduct;
   updateProduct(id:string,patch:Partial<Omit<PreviewProduct,'id'|'code'>>):void;
   updateProductCustomerImage(id:string,url:string):void;
@@ -170,9 +193,58 @@ interface PreviewCatalogState{
 
 export const usePreviewCatalog=create<PreviewCatalogState>((set,get)=>({
   products:[...PREVIEW_PRODUCTS],
+  categories:[...CATEGORIES],
   optionSets:[...OPTION_SETS],
   combos:[...COMBOS],
   diningTables:[...DINING_TABLES],
+  createCategory(){
+    const existing=get().categories;
+    const next:PreviewCategory={id:uid('cat'),name:'新分類',active:true,sortOrder:(existing.length+1)*10};
+    set({categories:[...existing,next]});
+    return next;
+  },
+  updateCategory(id,patch){
+    const current=get().categories.find(item=>item.id===id);
+    if(!current)return;
+    const nextName=(patch.name??current.name).trim()||current.name;
+    set(state=>({
+      categories:state.categories.map(item=>item.id===id?{...item,...patch,name:nextName}:item),
+      products:nextName===current.name?state.products:state.products.map(product=>product.category===current.name?{...product,category:nextName,updatedAt:'剛剛',status:'草稿'}:product),
+    }));
+  },
+  removeCategory(id){
+    const state=get();
+    const current=state.categories.find(item=>item.id===id);
+    if(!current)return false;
+    if(state.products.some(product=>product.category===current.name))return false;
+    set({categories:state.categories.filter(item=>item.id!==id)});
+    return true;
+  },
+  moveCategory(id,direction){
+    set(state=>{
+      const rows=[...state.categories].sort((a,b)=>a.sortOrder-b.sortOrder);
+      const index=rows.findIndex(item=>item.id===id);
+      const target=index+direction;
+      if(index<0||target<0||target>=rows.length)return{};
+      [rows[index],rows[target]]=[rows[target],rows[index]];
+      return{categories:rows.map((item,idx)=>({...item,sortOrder:(idx+1)*10}))};
+    });
+  },
+  moveProduct(productId,direction){
+    set(state=>{
+      const product=state.products.find(item=>item.id===productId);
+      if(!product)return{};
+      const peers=state.products.filter(item=>item.category===product.category);
+      const index=peers.findIndex(item=>item.id===productId);
+      const target=index+direction;
+      if(index<0||target<0||target>=peers.length)return{};
+      const globalA=state.products.findIndex(item=>item.id===peers[index].id);
+      const globalB=state.products.findIndex(item=>item.id===peers[target].id);
+      const products=[...state.products];
+      [products[globalA],products[globalB]]=[products[globalB],products[globalA]];
+      return{products};
+    });
+  },
   createProduct(input){
     const products=get().products;
     const {id:requestedId,...rest}=input;
@@ -258,5 +330,5 @@ export const usePreviewCatalog=create<PreviewCatalogState>((set,get)=>({
   },
 }));
 
-export const PREVIEW_CATALOG_CATEGORIES=Object.freeze(['飯類','飯糰','便當','茶飲','小食','湯品','甜品']);
+export const PREVIEW_CATALOG_CATEGORIES=Object.freeze(CATEGORIES.map(item=>item.name));
 export const PREVIEW_CHANNELS=Object.freeze([{id:'KEETA',label:'Keeta'}]);
