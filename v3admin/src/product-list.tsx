@@ -22,7 +22,7 @@ export type ProductListRecord={
   imageUrl?:string;
   optionSetCount?:number;
   comboCount?:number;
-  labelPrinterNames?:readonly string[];
+  printDestinationNames?:Partial<Record<ProductPrintTarget,readonly string[]>>;
 };
 
 const STATUS_OPTIONS=['全部','已發佈','草稿','待回讀','已停用'] as const;
@@ -53,8 +53,11 @@ export function productPrintSummary(targets:readonly ProductPrintTarget[]){
   return labels.length?labels.join('＋'):'不打印';
 }
 
-export function productPrintConfigCanSave(targets:readonly ProductPrintTarget[],labelPrinterIds:readonly string[]){
-  return !targets.includes('LABEL')||labelPrinterIds.length>0;
+export function productPrintConfigCanSave(
+  targets:readonly ProductPrintTarget[],
+  destinationIds:Partial<Record<ProductPrintTarget,readonly string[]>>,
+){
+  return targets.every(target=>(destinationIds[target]?.length??0)>0);
 }
 
 
@@ -135,7 +138,7 @@ export function productRecordsFromSnapshot(snapshot:unknown):ProductListRecord[]
   });
 }
 
-function previewRecord(product:PreviewProduct,comboCount:number,labelPrinterNames:readonly string[]):ProductListRecord{
+function previewRecord(product:PreviewProduct,comboCount:number,printDestinationNames:Partial<Record<ProductPrintTarget,readonly string[]>>):ProductListRecord{
   return{
     id:product.id,
     name:product.name,
@@ -148,7 +151,7 @@ function previewRecord(product:PreviewProduct,comboCount:number,labelPrinterName
     imageUrl:product.customerImageUrl||undefined,
     optionSetCount:product.optionSetIds.length,
     comboCount,
-    labelPrinterNames,
+    printDestinationNames,
   };
 }
 
@@ -167,7 +170,7 @@ function ProductDrawer({product,onClose}:{product:ProductListRecord;onClose:()=>
         <div><dt>分類</dt><dd>{product.category}</dd></div>
         <div><dt>基本價格</dt><dd>{money(product.priceMinor)}</dd></div>
         <div><dt>狀態</dt><dd><StatusBadge tone={statusTone(product.status)}>{product.status}</StatusBadge></dd></div>
-        <div><dt>圖片</dt><dd>{product.imageUrl?'已設定':'未設定'}</dd></div><div><dt>打印</dt><dd>{product.printRule||'不打印'}{product.labelPrinterNames?.length?<small>Label → {product.labelPrinterNames.join('、')}</small>:null}</dd></div>
+        <div><dt>圖片</dt><dd>{product.imageUrl?'已設定':'未設定'}</dd></div><div><dt>打印</dt><dd>{product.printRule||'不打印'}{product.printDestinationNames?PRODUCT_PRINT_TARGET_OPTIONS.filter(option=>(product.printDestinationNames?.[option.id]?.length??0)>0).map(option=><small key={option.id}>{option.label} → {product.printDestinationNames?.[option.id]?.join('、')}</small>):null}</dd></div>
       </dl>
     </aside>
   </>;
@@ -225,7 +228,7 @@ function PreviewProductEditor({productId,onClose}:{productId:string|null;onClose
   const createProduct=usePreviewCatalog(state=>state.createProduct);
   const updateProduct=usePreviewCatalog(state=>state.updateProduct);
   const logicalPrinters=usePreviewAdmin(state=>state.printers);
-  const labelPrinters=logicalPrinters.filter(printer=>printer.type==='LABEL'&&printer.active);
+  const activePrinters=logicalPrinters.filter(printer=>printer.active);
   const [draftId]=useState(()=>product?.id??'draft-'+crypto.randomUUID());
   const [name,setName]=useState(product?.name??'');
   const [category,setCategory]=useState(product?.category??categories.find(item=>item.active)?.name??'');
@@ -233,11 +236,22 @@ function PreviewProductEditor({productId,onClose}:{productId:string|null;onClose
   const [active,setActive]=useState(product?.status!=='已停用');
   const [description,setDescription]=useState(product?.description??'');
   const [printTargets,setPrintTargets]=useState<Set<ProductPrintTarget>>(()=>new Set(productPrintTargetsFromRule(product?.printRule??'製作單')));
-  const [labelPrinterIds,setLabelPrinterIds]=useState<Set<string>>(()=>new Set(product?.labelPrinterIds??[]));
+  const [printDestinationIds,setPrintDestinationIds]=useState<Record<ProductPrintTarget,Set<string>>>(()=>({
+    PRODUCTION:new Set(product?.printDestinationIds.PRODUCTION??[]),
+    PACKING:new Set(product?.printDestinationIds.PACKING??[]),
+    LABEL:new Set(product?.printDestinationIds.LABEL??[]),
+    RECEIPT:new Set(product?.printDestinationIds.RECEIPT??[]),
+  }));
   const [customerImage,setCustomerImage]=useState(product?.customerImageUrl??'');
   const [keetaImage,setKeetaImage]=useState(product?.channelImages.KEETA??'');
   const [optionIds,setOptionIds]=useState<Set<string>>(new Set(product?.optionSetIds??[]));
-  const valid=productFormCanSave({name,category,price})&&productPrintConfigCanSave([...printTargets],[...labelPrinterIds]);
+  const destinationSnapshot:Partial<Record<ProductPrintTarget,readonly string[]>>={
+    PRODUCTION:[...printDestinationIds.PRODUCTION],
+    PACKING:[...printDestinationIds.PACKING],
+    LABEL:[...printDestinationIds.LABEL],
+    RECEIPT:[...printDestinationIds.RECEIPT],
+  };
+  const valid=productFormCanSave({name,category,price})&&productPrintConfigCanSave([...printTargets],destinationSnapshot);
   const editing=Boolean(product);
 
   const relatedCombos=combos.filter(combo=>combo.groups.some(group=>group.choices.some(choice=>choice.productId===product?.id)));
@@ -252,7 +266,12 @@ function PreviewProductEditor({productId,onClose}:{productId:string|null;onClose
       channelImages:{KEETA:keetaImage},
       optionSetIds:[...optionIds],
       printRule:productPrintSummary([...printTargets]),
-      labelPrinterIds:printTargets.has('LABEL')?[...labelPrinterIds]:[],
+      printDestinationIds:{
+        PRODUCTION:printTargets.has('PRODUCTION')?[...printDestinationIds.PRODUCTION]:[],
+        PACKING:printTargets.has('PACKING')?[...printDestinationIds.PACKING]:[],
+        LABEL:printTargets.has('LABEL')?[...printDestinationIds.LABEL]:[],
+        RECEIPT:printTargets.has('RECEIPT')?[...printDestinationIds.RECEIPT]:[],
+      },
     };
     if(product){
       updateProduct(product.id,{...base,status:active?'草稿':'已停用'});
@@ -314,34 +333,56 @@ function PreviewProductEditor({productId,onClose}:{productId:string|null;onClose
               <input
                 type="checkbox"
                 checked={printTargets.has(option.id)}
-                onChange={event=>setPrintTargets(current=>{
-                  const next=new Set(current);
-                  if(event.target.checked)next.add(option.id);else next.delete(option.id);
-                  return next;
-                })}
+                onChange={event=>{
+                  const enabled=event.target.checked;
+                  setPrintTargets(current=>{
+                    const next=new Set(current);
+                    if(enabled)next.add(option.id);else next.delete(option.id);
+                    return next;
+                  });
+                  if(enabled){
+                    const matches=activePrinters.filter(printer=>printer.type===option.id);
+                    if(matches.length===1&&printDestinationIds[option.id].size===0){
+                      setPrintDestinationIds(current=>({...current,[option.id]:new Set([matches[0].id])}));
+                    }
+                  }
+                }}
               />
               <span><strong>{option.label}</strong><small>{option.description}</small></span>
             </label>)}
           </div>
-          {printTargets.has('LABEL')?<div className="v3-label-printer-routing">
-            <div><strong>Label 目的地 *</strong><small>有兩部 Label 機時，要指定呢件商品去邊一部；可以揀一部或者多部。</small></div>
-            <div className="v3-option-link-grid">
-              {labelPrinters.map(printer=><label key={printer.id}>
-                <input
-                  type="checkbox"
-                  checked={labelPrinterIds.has(printer.id)}
-                  onChange={event=>setLabelPrinterIds(current=>{
-                    const next=new Set(current);
-                    if(event.target.checked)next.add(printer.id);else next.delete(printer.id);
-                    return next;
-                  })}
-                />
-                <span><strong>{printer.name}</strong><small>{printer.id} · {printer.widthMm}mm</small></span>
-              </label>)}
-            </div>
-            {!labelPrinterIds.size?<div className="v3-error">已選「標籤」，必須最少指定一部 Label 機先可以儲存。</div>:null}
-          </div>:null}
-          <div className="v3-mobile-form-note">目前會輸出：{productPrintSummary([...printTargets])}{printTargets.has('LABEL')&&labelPrinterIds.size?' · Label → '+labelPrinters.filter(printer=>labelPrinterIds.has(printer.id)).map(printer=>printer.name).join('、'):''}</div>
+          {[...printTargets].map(target=>{
+            const option=PRODUCT_PRINT_TARGET_OPTIONS.find(item=>item.id===target);
+            const printers=activePrinters.filter(printer=>printer.type===target);
+            const selected=printDestinationIds[target];
+            return <div className="v3-label-printer-routing" key={target}>
+              <div><strong>{option?.label} 目的地 *</strong><small>名稱同邏輯用途由 Admin 設定；實際實體機／IP 由現場 SMT 配對。可以選一部或者多部。</small></div>
+              <div className="v3-option-link-grid">
+                {printers.map(printer=><label key={printer.id}>
+                  <input
+                    type="checkbox"
+                    checked={selected.has(printer.id)}
+                    onChange={event=>setPrintDestinationIds(current=>{
+                      const next=new Set(current[target]);
+                      if(event.target.checked)next.add(printer.id);else next.delete(printer.id);
+                      return {...current,[target]:next};
+                    })}
+                  />
+                  <span><strong>{printer.name}</strong><small>{printer.id} · Logical {printer.type} · {printer.widthMm}mm</small></span>
+                </label>)}
+              </div>
+              {!printers.length?<div className="v3-error">未有啟用中嘅 {option?.label} Logical Printer；請先去「打印管理 → 邏輯打印機」建立。</div>:null}
+              {printers.length>0&&!selected.size?<div className="v3-error">已選「{option?.label}」，必須最少指定一個 Logical Printer 先可以儲存。</div>:null}
+            </div>;
+          })}
+          <div className="v3-mobile-form-note">
+            目前會輸出：{productPrintSummary([...printTargets])}
+            {[...printTargets].map(target=>{
+              const option=PRODUCT_PRINT_TARGET_OPTIONS.find(item=>item.id===target);
+              const names=activePrinters.filter(printer=>printDestinationIds[target].has(printer.id)).map(printer=>printer.name);
+              return names.length?<span key={target}> · {option?.label} → {names.join('、')}</span>:null;
+            })}
+          </div>
         </section>
       </div>
       <footer className="v3-functional-footer"><button type="button" onClick={onClose}>取消</button><button className="v3-primary" type="button" disabled={!valid} onClick={save}>儲存草稿</button></footer>
@@ -360,7 +401,15 @@ export function ProductListPage({canonicalSnapshot,previewMode=false,onReviewDra
   const combos=usePreviewCatalog(state=>state.combos);
   const logicalPrinters=usePreviewAdmin(state=>state.printers);
   const printerNameById=useMemo(()=>new Map(logicalPrinters.map(printer=>[printer.id,printer.name])),[logicalPrinters]);
-  const previewRows=useMemo(()=>previewProducts.map(product=>previewRecord(product,combos.filter(combo=>combo.groups.some(group=>group.choices.some(choice=>choice.productId===product.id))).length,product.labelPrinterIds.map(id=>printerNameById.get(id)??id))),[previewProducts,combos,printerNameById]);
+  const previewRows=useMemo(()=>previewProducts.map(product=>{
+    const names:Partial<Record<ProductPrintTarget,readonly string[]>>={
+      PRODUCTION:product.printDestinationIds.PRODUCTION.map(id=>printerNameById.get(id)??id),
+      PACKING:product.printDestinationIds.PACKING.map(id=>printerNameById.get(id)??id),
+      LABEL:product.printDestinationIds.LABEL.map(id=>printerNameById.get(id)??id),
+      RECEIPT:product.printDestinationIds.RECEIPT.map(id=>printerNameById.get(id)??id),
+    };
+    return previewRecord(product,combos.filter(combo=>combo.groups.some(group=>group.choices.some(choice=>choice.productId===product.id))).length,names);
+  }),[previewProducts,combos,printerNameById]);
   const sourceRows=previewMode?previewRows:canonicalRows;
 
   const [query,setQuery]=useState('');
