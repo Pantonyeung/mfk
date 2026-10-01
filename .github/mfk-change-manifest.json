@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "capability": "MFK_ADMIN_V3_ONE_SHOT_IMPLEMENTATION_R1_UI_SHELL_FOUNDATION",
+  "capability": "MFK_ADMIN_V3_ONE_SHOT_R1_UI_SHELL_PLUS_UI01_PUBLIC_PREVIEW",
   "base_sha": "3c6c00d032eec121f1b6f1a9c059a3215c572ef0",
   "root_control": "#596",
   "product_control": "#601",
@@ -8,6 +8,7 @@
   "allowed_paths": [
     ".github/mfk-change-manifest.json",
     ".github/workflows/v3admin-ci.yml",
+    ".github/workflows/v3admin-ui-preview.yml",
     "COMMANDER_CURRENT.md",
     "HANDOFF_CURRENT.md",
     "docs/implementation/**",
@@ -31,7 +32,10 @@
     "V3 exposes the locked two-step 12-menu and 53-destination route registry across desktop, tablet, and mobile shells.",
     "V3 provides shared PageHeader, search/filter, table/card, status/state, draft, confirmation, readback, form, and timeline foundations without fabricated domain data.",
     "Order monitoring remains read-only and exposes no refund, cancel-order, or payment-method-correction transaction mutation.",
-    "Shared Admin ACK contract receives a type-only literal preservation fix; runtime semantics are unchanged."
+    "Shared Admin ACK contract receives a type-only literal preservation fix; runtime semantics are unchanged.",
+    "UI-01 Product Management defaults to a full-width Product List with search, category/status filters, sort, list/card view, responsive mobile cards and a temporary slide-over opening hook.",
+    "A query-gated isolated UI-01 public review mode renders clearly-labelled non-canonical fixture data and disables backend reads.",
+    "A branch-only Cloudflare Pages workflow publishes the isolated V3 UI preview without changing admin.morefunos.com routing."
   ],
   "non_goals": [
     "No production deploy or hostname routing.",
@@ -39,8 +43,10 @@
     "No backend/SMT/provider/payment/pricing authority changes.",
     "No Admin refund/cancel/payment-correction mutation.",
     "No offline publish outbox in Gate 1.",
-    "No 53-page business implementation or vertical-slice mutation in the UI Shell foundation.",
-    "No merge of PR #599."
+    "No merge of PR #599.",
+    "No UI-02 editable Product Drawer fields in this slice.",
+    "No Product mutation or formal Draft mutation from the public preview.",
+    "No production Admin V3 hostname cutover; preview remains isolated from admin.morefunos.com."
   ],
   "rollback_sha": "3c6c00d032eec121f1b6f1a9c059a3215c572ef0",
   "severity": "HARD_BLOCK",
@@ -50,7 +56,8 @@
     "notes": [
       "v3admin/** is the approved isolated ADMIN_V3 client scope.",
       ".github/workflows/v3admin-ci.yml is reviewed as CI-only with zero deployment/routing behavior.",
-      "contracts/admin-config-sync-v1.ts change is type-only and runtime-semantic-neutral."
+      "contracts/admin-config-sync-v1.ts change is type-only and runtime-semantic-neutral.",
+      "UI-01 public preview uses explicit non-canonical fixtures only for visual acceptance and performs no backend read/write in preview mode."
     ]
   }
 }
