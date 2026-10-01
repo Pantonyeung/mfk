@@ -1408,6 +1408,20 @@ export class AdminSyncStore{
       });
       for(const socket of this.state.getWebSockets()){try{socket.send(legacyDoorbell);}catch{}}
       for(const event of result.doorbells){
+        if(event.port==='CUSTOMER'){
+          try{
+            const id=this.env.CUSTOMER_RUNTIME.idFromName(event.storeId||'MF01');
+            const stub=this.env.CUSTOMER_RUNTIME.get(id);
+            const task=stub.fetch(new Request('https://customer-runtime/internal/config-doorbell',{
+              method:'POST',
+              headers:{'content-type':'application/json'},
+              body:JSON.stringify(event),
+            }));
+            if(typeof this.state.waitUntil==='function')this.state.waitUntil(task);
+            else void task;
+          }catch{}
+          continue;
+        }
         const message=JSON.stringify(event);
         for(const socket of this.state.getWebSockets()){try{socket.send(message);}catch{}}
       }
