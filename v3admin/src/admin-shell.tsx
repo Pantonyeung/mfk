@@ -7,6 +7,7 @@ import {ModifiersPage,CombosPage} from './catalog-functional-pages.tsx';
 import {CategoriesPage,PricingPage,MenuDisplayPage} from './catalog-core-pages.tsx';
 import {DiningTablesPage} from './dining-tables-page.tsx';
 import {ChannelPage,PermissionsPage,PrintRulesPage,PrintTemplatesPage,PrintersPage,QuickReasonsPage,RolesPage,StaffPage,StoreSettingsPage} from './admin-functional-pages.tsx';
+import {AccessPage,BusinessDayPage,CapacityPage,CashClosePage,DevicesPage,OtaPage,PublishFlowPage} from './admin-operations-pages.tsx';
 import {
   EmptyState,
   ErrorState,
@@ -115,7 +116,13 @@ export function AdminShell({storeId,displayName,releaseStatus,canonicalState,can
               ?<MenuDisplayPage/>
               :path==='/admin/availability'
                 ?<AvailabilityPage canonicalSnapshot={canonicalSnapshot} previewMode={previewMode}/>
-                :path==='/admin/channels'&&previewMode
+                :path==='/admin/business-day'&&previewMode
+                  ?<BusinessDayPage/>
+                  :path==='/admin/cash-close'&&previewMode
+                    ?<CashClosePage/>
+                    :path==='/admin/operations/capacity'&&previewMode
+                      ?<CapacityPage/>
+                      :path==='/admin/channels'&&previewMode
                   ?<ChannelPage mode="overview"/>
                   :path==='/admin/channels/accept-policy'&&previewMode
                     ?<ChannelPage mode="accept"/>
@@ -135,13 +142,27 @@ export function AdminShell({storeId,displayName,releaseStatus,canonicalState,can
                                   ?<PrintTemplatesPage/>
                                   :path==='/admin/print/rules'&&previewMode
                                     ?<PrintRulesPage/>
-                                    :path==='/admin/staff'&&previewMode
-                                      ?<StaffPage/>
-                                      :path==='/admin/roles'&&previewMode
-                                        ?<RolesPage/>
-                                        :path==='/admin/permissions'&&previewMode
-                                          ?<PermissionsPage/>
-                                          :path==='/admin/store/settings'&&previewMode
+                                    :path==='/admin/devices'&&previewMode
+                                      ?<DevicesPage/>
+                                      :path==='/admin/ota'&&previewMode
+                                        ?<OtaPage/>
+                                        :path==='/admin/staff'&&previewMode
+                                          ?<StaffPage/>
+                                          :path==='/admin/roles'&&previewMode
+                                            ?<RolesPage/>
+                                            :path==='/admin/permissions'&&previewMode
+                                              ?<PermissionsPage/>
+                                              :path==='/admin/access'&&previewMode
+                                                ?<AccessPage/>
+                                                :path==='/admin/publish/pending'&&previewMode
+                                                  ?<PublishFlowPage mode="pending"/>
+                                                  :path==='/admin/publish'&&previewMode
+                                                    ?<PublishFlowPage mode="publish"/>
+                                                    :path==='/admin/publish/versions'&&previewMode
+                                                      ?<PublishFlowPage mode="versions"/>
+                                                      :path==='/admin/publish/rollback'&&previewMode
+                                                        ?<PublishFlowPage mode="rollback"/>
+                                                        :path==='/admin/store/settings'&&previewMode
                                             ?<StoreSettingsPage mode="settings"/>
                                             :path==='/admin/store/hours'&&previewMode
                                               ?<StoreSettingsPage mode="hours"/>
