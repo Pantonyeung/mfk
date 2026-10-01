@@ -36,7 +36,7 @@ describe('Admin V3 functional domain wave',()=>{
     expect(labels.length).toBeGreaterThanOrEqual(2);
     expect(labels.map(printer=>printer.name)).toEqual(expect.arrayContaining(['標籤機 1','標籤機 2']));
     expect(labels.some(printer=>'ip' in printer||'host' in printer||'port' in printer)).toBe(false);
-    expect(renderToStaticMarkup(<PrintersPage/>)).toContain('實體 IP／USB 配對唔喺 Admin 做');
+    expect(renderToStaticMarkup(<PrintersPage/>)).toContain('實際實體機 IP／USB 由現場 SMT 配對');
   });
 
   it('enforces printer reference guard in preview state',()=>{
