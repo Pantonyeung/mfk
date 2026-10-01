@@ -12,6 +12,7 @@ import {OrdersPage,ReportPage} from './admin-read-pages.tsx';
 import {AuditPage,DiagnosticsPage,EffectiveSettingsPage,IntegrationsPage,TodayPage} from './admin-system-pages.tsx';
 import {FormalDraftStatusBar,FormalPendingChangesPage,FormalPublishPage} from './formal-publish-pages.tsx';
 import {FormalCategoriesPage,FormalMenuDisplayPage,FormalPricingPage} from './formal-catalog-pages.tsx';
+import {FormalAvailabilityPage} from './formal-availability-page.tsx';
 import {
   EmptyState,
   ErrorState,
@@ -130,7 +131,7 @@ export function AdminShell({storeId,displayName,releaseStatus,canonicalState,can
             :path==='/admin/catalog/menu-display'
               ?(previewMode?<MenuDisplayPage/>:formalDraftEnabled?<FormalMenuDisplayPage/>:<RouteSkeleton path={path} canonicalState={canonicalState} onRefresh={onRefresh}/>)
               :path==='/admin/availability'
-                ?<AvailabilityPage canonicalSnapshot={canonicalSnapshot} previewMode={previewMode}/>
+                ?(previewMode?<AvailabilityPage canonicalSnapshot={canonicalSnapshot} previewMode/>:formalDraftEnabled?<FormalAvailabilityPage/>:<AvailabilityPage canonicalSnapshot={canonicalSnapshot}/>)
                 :path==='/admin/business-day'&&previewMode
                   ?<BusinessDayPage/>
                   :path==='/admin/cash-close'&&previewMode
