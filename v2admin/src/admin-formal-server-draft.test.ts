@@ -1,6 +1,6 @@
 import {describe,expect,it,vi} from 'vitest';
 import {createMfkAdminConfigEnvelope} from '../../contracts/admin-config-sync-v1.ts';
-import worker,{AdminSyncStore} from '../worker.ts';
+import worker,{AdminSyncStore,nextAdminProductCode} from '../worker.ts';
 
 const STORE_ID='MF01';
 const BASE_PUBLISHED_AT='2026-10-01T01:00:00.000Z';
@@ -81,6 +81,41 @@ function request(path:string,method='GET',body?:unknown,authenticated=true){
 
 function saveBody(active:any,snapshot:unknown=adminSnapshot('draft')){
   return{baseFingerprint:active.fingerprint,basePublishedAt:active.publishedAt,snapshot};
+}
+
+function productCreateSnapshot(existingCodes:string[]=[]){
+  return{
+    ...adminSnapshot('base'),
+    catalog:{
+      categories:[{id:'cat-riceball',name:'飯糰',position:10,active:true}],
+      products:existingCodes.map((productCode,index)=>({
+        id:'existing-'+String(index+1),
+        productCode,
+        name:'Existing '+String(index+1),
+        categoryId:'cat-riceball',
+        basePrice:'10.00',
+        active:true,
+      })),
+      modifierGroups:[],
+      combos:[],
+      comboPools:[],
+    },
+  };
+}
+
+function productCreateBody(active:any,overrides:Record<string,unknown>={}){
+  return{
+    baseFingerprint:active.fingerprint,
+    basePublishedAt:active.publishedAt,
+    product:{
+      name:'紫米飯糰・照燒雞',
+      categoryId:'cat-riceball',
+      basePrice:'42',
+      description:'照燒雞配紫米飯糰',
+      active:true,
+    },
+    ...overrides,
+  };
 }
 
 async function json(response:Response){return await response.json() as any;}
@@ -326,6 +361,98 @@ describe('Admin V3 formal server Draft seam',()=>{
       draftId:draft.draftId,expectedDraftRevision:draft.draftRevision,
     }))).rejects.toThrow('simulated publish write failure');
     expect(h.values.get('admin-browser:draft')).toEqual(draft);
+  });
+
+  it('allocates the next system Product Code without reusing an existing PRD code',()=>{
+    expect(nextAdminProductCode(productCreateSnapshot(['PRD000123']),0)).toEqual({numeric:124,productCode:'PRD000124'});
+    expect(nextAdminProductCode(productCreateSnapshot(['PRD000123']),130)).toEqual({numeric:131,productCode:'PRD000131'});
+  });
+
+  it('creates a complete Product directly into Formal Server Draft only after required fields arrive',async()=>{
+    const h=await harness();
+    const active={...h.active,snapshot:productCreateSnapshot(['PRD000123'])};
+    h.values.set('active',active);
+    const response=await h.store.fetch(request('/admin-browser/draft/products?storeId=MF01','POST',productCreateBody(active)));
+    expect(response.status).toBe(201);
+    const body=await json(response);
+    expect(body).toMatchObject({
+      state:'CREATED',
+      product:{
+        productCode:'PRD000124',
+        name:'紫米飯糰・照燒雞',
+        categoryId:'cat-riceball',
+        basePrice:'42.00',
+        active:true,
+      },
+      draft:{schema:'MFK_ADMIN_DRAFT_V1',draftRevision:1},
+    });
+    expect(body.product.id).toMatch(/^product-[0-9a-f-]{36}$/i);
+    expect(body.draft.snapshot.catalog.products).toHaveLength(2);
+    expect(h.values.get('admin-browser:product-code-counter')).toBe(124);
+  });
+
+  it('does not create blank or incomplete Products',async()=>{
+    const h=await harness();
+    const active={...h.active,snapshot:productCreateSnapshot()};
+    h.values.set('active',active);
+    const response=await h.store.fetch(request('/admin-browser/draft/products?storeId=MF01','POST',productCreateBody(active,{
+      product:{name:'',categoryId:'cat-riceball',basePrice:'42'},
+    })));
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({code:'ADMIN_PRODUCT_CREATE_INPUT_INVALID'});
+    expect(h.values.has('admin-browser:draft')).toBe(false);
+    expect(h.values.has('admin-browser:product-code-counter')).toBe(false);
+  });
+
+  it('rejects Product creation into a missing category',async()=>{
+    const h=await harness();
+    const active={...h.active,snapshot:productCreateSnapshot()};
+    h.values.set('active',active);
+    const response=await h.store.fetch(request('/admin-browser/draft/products?storeId=MF01','POST',productCreateBody(active,{
+      product:{name:'X',categoryId:'missing',basePrice:'10'},
+    })));
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({code:'ADMIN_PRODUCT_CATEGORY_NOT_FOUND'});
+  });
+
+  it('requires exact Draft revision for second Product creation',async()=>{
+    const h=await harness();
+    const active={...h.active,snapshot:productCreateSnapshot(['PRD000009'])};
+    h.values.set('active',active);
+    const first=await json(await h.store.fetch(request('/admin-browser/draft/products?storeId=MF01','POST',productCreateBody(active))));
+    const stale=await h.store.fetch(request('/admin-browser/draft/products?storeId=MF01','POST',productCreateBody(active,{
+      expectedDraftRevision:0,
+      product:{name:'Second',categoryId:'cat-riceball',basePrice:'20'},
+    })));
+    expect(stale.status).toBe(409);
+    await expect(stale.json()).resolves.toMatchObject({code:'ADMIN_DRAFT_REVISION_CONFLICT'});
+    expect(h.values.get('admin-browser:product-code-counter')).toBe(10);
+
+    const second=await h.store.fetch(request('/admin-browser/draft/products?storeId=MF01','POST',productCreateBody(active,{
+      expectedDraftRevision:first.draft.draftRevision,
+      product:{name:'Second',categoryId:'cat-riceball',basePrice:'20'},
+    })));
+    expect(second.status).toBe(201);
+    const body=await json(second);
+    expect(body.product.productCode).toBe('PRD000011');
+    expect(body.draft.draftRevision).toBe(2);
+  });
+
+  it('never reuses an allocated Product Code even if the Product later disappears from the Draft',async()=>{
+    const h=await harness();
+    const active={...h.active,snapshot:productCreateSnapshot()};
+    h.values.set('active',active);
+    const first=await json(await h.store.fetch(request('/admin-browser/draft/products?storeId=MF01','POST',productCreateBody(active))));
+    const draft=h.values.get('admin-browser:draft');
+    draft.snapshot={...draft.snapshot,catalog:{...draft.snapshot.catalog,products:[]}};
+    h.values.set('admin-browser:draft',draft);
+
+    const response=await h.store.fetch(request('/admin-browser/draft/products?storeId=MF01','POST',productCreateBody(active,{
+      expectedDraftRevision:first.draft.draftRevision,
+      product:{name:'Replacement',categoryId:'cat-riceball',basePrice:'21'},
+    })));
+    expect(response.status).toBe(201);
+    expect((await json(response)).product.productCode).toBe('PRD000002');
   });
 
   it('keeps the existing admin-browser publish contract working',async()=>{
