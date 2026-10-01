@@ -250,7 +250,7 @@ export function App(){
     if(!port)return;
     let stopped=false;
     let busy=false;
-    const poll=async()=>{
+    const reconcile=async()=>{
       if(stopped||busy||document.visibilityState!=='visible'||!navigator.onLine)return;
       busy=true;
       try{
@@ -260,13 +260,44 @@ export function App(){
         if(!stopped)setConnection('STALE');
       }finally{busy=false;}
     };
-    const timer=window.setInterval(()=>void poll(),3000);
-    const visible=()=>{if(document.visibilityState==='visible')void poll();};
-    const focused=()=>void poll();
+    const unsubscribe=port.subscribeConfigChanges?.(()=>void reconcile())??(()=>{});
+    const visible=()=>{if(document.visibilityState==='visible')void reconcile();};
+    const focused=()=>void reconcile();
+    const pageShown=()=>void reconcile();
+    const online=()=>void reconcile();
     document.addEventListener('visibilitychange',visible);
     window.addEventListener('focus',focused);
-    return()=>{stopped=true;window.clearInterval(timer);document.removeEventListener('visibilitychange',visible);window.removeEventListener('focus',focused);};
+    window.addEventListener('pageshow',pageShown);
+    window.addEventListener('online',online);
+    return()=>{
+      stopped=true;
+      unsubscribe();
+      document.removeEventListener('visibilitychange',visible);
+      window.removeEventListener('focus',focused);
+      window.removeEventListener('pageshow',pageShown);
+      window.removeEventListener('online',online);
+    };
   },[port]);
+
+  useEffect(()=>{
+    if(!port||(snapshot?.activeOrders.length??0)===0)return;
+    let stopped=false;
+    let busy=false;
+    const pollActiveOrderReadback=async()=>{
+      if(stopped||busy||document.visibilityState!=='visible'||!navigator.onLine)return;
+      busy=true;
+      try{
+        const next=await port.readSnapshot();
+        if(!stopped){setSnapshot(next);setConnection('READY');}
+      }catch{
+        if(!stopped)setConnection('STALE');
+      }finally{busy=false;}
+    };
+    // Order lifecycle is operational data, not Admin config. Poll only while a
+    // customer actually has a live order; normal browsing is Doorbell + resume driven.
+    const timer=window.setInterval(()=>void pollActiveOrderReadback(),3000);
+    return()=>{stopped=true;window.clearInterval(timer);};
+  },[port,snapshot?.activeOrders.length]);
 
   useEffect(()=>{
     const online=()=>setBrowserOnline(true);
