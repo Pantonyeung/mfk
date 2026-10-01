@@ -171,12 +171,13 @@ describe('Admin realtime transport recovery',()=>{
       }}),
     }};
     const store=new AdminSyncStore(state as never,env as never);
-    const snapshot=(price:string)=>({
+    const snapshot=(price:string,receiptEnabled=true)=>({
       catalog:{
         categories:[{id:'cat',name:'主食',position:10,active:true}],
         products:[{id:'p1',productCode:'SKU-P1',name:'商品一',categoryId:'cat',active:true,basePrice:price,takeawayAdjustment:'0.00',takeawaySurchargeEnabled:false,modifierGroupIds:[]}],
       },
       optionCenter:{sets:[],productLinks:[]},
+      printRules:{receipt:{enabled:receiptEnabled}},
     });
     await store.publishEnvelope(createMfkAdminConfigEnvelope({
       storeId:'MF01',revision:1,publishedAt:'2026-10-01T00:00:00.000Z',adminFingerprint:'admin-1',snapshot:snapshot('42.00'),
@@ -194,6 +195,34 @@ describe('Admin realtime transport recovery',()=>{
     const delivered=await deltaRequest!.json() as {batch:{changes:Array<{entityType:string;entityId:string}>}};
     expect(delivered.batch.changes).toEqual([expect.objectContaining({entityType:'KEETA_SPU',entityId:'SPU:SKU-P1'})]);
     expect(providerRequests.some(request=>new URL(request.url).pathname==='/admin/menu/sync')).toBe(false);
+
+    const secondCommitChanges=[...values.values()].filter((value):value is Record<string,unknown>=>
+      Boolean(value)&&typeof value==='object'&&(value as Record<string,unknown>).schema==='MFK_PORT_CHANGE_V1'&&
+      (value as Record<string,unknown>).sourceCommitSeq===2,
+    );
+    expect(secondCommitChanges.map(change=>`${change.port}:${change.entityType}:${change.entityId}`).sort()).toEqual([
+      'CUSTOMER:CUSTOMER_PRODUCT:p1',
+      'KEETA:KEETA_SPU:SPU:SKU-P1',
+      'SMM:SMM_PRODUCT:p1',
+      'SMT:PRODUCT:p1',
+    ]);
+
+    const beforeIrrelevant=Object.fromEntries(['SMT','SMM','CUSTOMER','KEETA'].map(port=>[
+      port,(values.get('sync:head:'+port) as {headSeq:number}).headSeq,
+    ]));
+    providerRequests.length=0;
+    await store.publishEnvelope(createMfkAdminConfigEnvelope({
+      storeId:'MF01',revision:3,publishedAt:'2026-10-01T00:02:00.000Z',adminFingerprint:'admin-3',snapshot:snapshot('43.00',false),
+    }));
+    await Promise.all(tasks.splice(0));
+    const afterIrrelevant=Object.fromEntries(['SMT','SMM','CUSTOMER','KEETA'].map(port=>[
+      port,(values.get('sync:head:'+port) as {headSeq:number}).headSeq,
+    ]));
+    expect(afterIrrelevant.SMT).toBeGreaterThan(beforeIrrelevant.SMT);
+    expect(afterIrrelevant).toMatchObject({
+      SMM:beforeIrrelevant.SMM,CUSTOMER:beforeIrrelevant.CUSTOMER,KEETA:beforeIrrelevant.KEETA,
+    });
+    expect(providerRequests.some(request=>new URL(request.url).pathname==='/internal/provider/delta')).toBe(false);
   });
 
   it('keeps active HTTP response wrapping and CORS behavior',async()=>{

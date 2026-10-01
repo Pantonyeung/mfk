@@ -14,7 +14,7 @@ import {
   type MfkCustomerCommercialFreshnessProof,
 } from '../../contracts/customer-commercial-freshness-v1';
 import {
-  applyMfkSyncChanges,
+  applyMfkSyncChangeBatch,
   buildCustomerSyncEntities,
   entityMapFromCheckpoint,
   materializeCustomerConfigSnapshot,
@@ -216,8 +216,7 @@ async function reconcileCustomerConfig():Promise<Partial<CustomerReadModelSnapsh
       continue;
     }
     if(next.batch.storeId!==STORE_ID||next.batch.port!=='CUSTOMER')throw new Error('CUSTOMER_SYNC_CHANGE_IDENTITY_MISMATCH');
-    entities=applyMfkSyncChanges(entities,next.batch.changes);
-    appliedSeq=next.batch.toInclusive;
+    ({entities,appliedSeq}=applyMfkSyncChangeBatch(entities,appliedSeq,next.batch));
   }
   throw new Error('CUSTOMER_SYNC_RECONCILE_GUARD_EXCEEDED');
 }

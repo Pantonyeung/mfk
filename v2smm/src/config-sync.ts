@@ -5,7 +5,7 @@ import {
   type MfkSyncHead,
 } from '../../contracts/checkpointed-delta-sync-v1';
 import {
-  applyMfkSyncChanges,
+  applyMfkSyncChangeBatch,
   entityMapFromCheckpoint,
   materializeSmmConfigSnapshot,
   projectionHashForEntities,
@@ -144,8 +144,7 @@ export async function reconcileSmmConfig():Promise<Partial<SmmReadModelSnapshot>
       continue;
     }
     if(next.batch.port!=='SMM'||next.batch.storeId!==STORE_ID)throw new Error('SMM_SYNC_CHANGE_IDENTITY_MISMATCH');
-    entities=applyMfkSyncChanges(entities,next.batch.changes);
-    appliedSeq=next.batch.toInclusive;
+    ({entities,appliedSeq}=applyMfkSyncChangeBatch(entities,appliedSeq,next.batch));
   }
   throw new Error('SMM_SYNC_RECONCILE_GUARD_EXCEEDED');
 }

@@ -3,6 +3,7 @@ import {
   MFK_SYNC_SCHEMA_VERSION,
   fingerprintMfkSyncValue,
   type MfkSyncChange,
+  type MfkSyncChangeBatch,
   type MfkSyncCheckpoint,
   type MfkSyncCheckpointEntity,
   type MfkSyncPort,
@@ -331,6 +332,20 @@ export function applyMfkSyncChanges(
     out[key]=checkpointEntity(change.entityType,change.entityId,change.payload,change.entityRevision);
   }
   return Object.freeze(out);
+}
+
+export function applyMfkSyncChangeBatch(
+  current:MfkSyncEntityMap,
+  appliedSeq:number,
+  batch:MfkSyncChangeBatch,
+):Readonly<{entities:MfkSyncEntityMap;appliedSeq:number}>{
+  const currentSeq=Math.max(0,Math.floor(appliedSeq));
+  if(batch.toInclusive<=currentSeq)return Object.freeze({entities:current,appliedSeq:currentSeq});
+  if(batch.fromExclusive!==currentSeq)throw new Error('SYNC_CHANGE_BATCH_FROM_MISMATCH');
+  return Object.freeze({
+    entities:applyMfkSyncChanges(current,batch.changes),
+    appliedSeq:batch.toInclusive,
+  });
 }
 
 export function materializeSmtSnapshot(entities:MfkSyncEntityMap):Readonly<JsonRow>{

@@ -306,6 +306,7 @@ export function validateMfkSyncChangeBatch(input:unknown):MfkSyncChangeBatch{
   }
   if(changes.length&&changes[changes.length-1]!.portSeq!==out.toInclusive)throw new Error('SYNC_CHANGE_BATCH_TO_MISMATCH');
   if(!changes.length&&out.toInclusive!==out.fromExclusive)throw new Error('SYNC_CHANGE_BATCH_EMPTY_RANGE_INVALID');
+  if(out.toInclusive>out.headSeq)throw new Error('SYNC_CHANGE_BATCH_TO_AHEAD_OF_HEAD');
   return Object.freeze(out);
 }
 

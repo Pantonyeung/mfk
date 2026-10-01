@@ -1,7 +1,10 @@
 import {describe,expect,it} from 'vitest';
+import {validateMfkSyncChangeBatch} from '../../contracts/checkpointed-delta-sync-v1.ts';
 import {
+  applyMfkSyncChangeBatch,
   applyMfkSyncChanges,
   buildCustomerSyncEntities,
+  buildSmmSyncEntities,
   buildSmtSyncEntities,
   createMfkSyncCheckpoint,
   diffMfkSyncEntities,
@@ -82,6 +85,38 @@ describe('MFK checkpointed delta sync engine',()=>{
     expect(snapshot.catalog.products[0]?.basePrice).toBe('52.00');
   });
 
+  it('ignores an exact duplicate batch and rejects a gap before changing the LKG',()=>{
+    const base=buildSmtSyncEntities(adminSnapshot('48.00'));
+    const diff=diffMfkSyncEntities({
+      storeId:'MF01',port:'SMT',sourceCommitSeq:11,commitId:'commit-11',
+      startingPortSeq:100,previous:base,next:buildSmtSyncEntities(adminSnapshot('52.00')),createdAt:at,
+    });
+    const batch=validateMfkSyncChangeBatch({
+      schema:'MFK_SYNC_CHANGE_BATCH_V1',protocol:'MFK_CHECKPOINTED_DELTA_SYNC_PROTOCOL_V1',
+      storeId:'MF01',port:'SMT',fromExclusive:100,toInclusive:101,headSeq:101,
+      journalFloorSeq:1,changes:diff.changes,observedAt:at,
+    });
+    const first=applyMfkSyncChangeBatch(base,100,batch);
+    expect(first.appliedSeq).toBe(101);
+    expect((materializeSmtSnapshot(first.entities) as {catalog:{products:Array<{basePrice:string}>}}).catalog.products[0]?.basePrice).toBe('52.00');
+
+    const duplicate=applyMfkSyncChangeBatch(first.entities,first.appliedSeq,batch);
+    expect(duplicate).toEqual({entities:first.entities,appliedSeq:101});
+
+    const gap=validateMfkSyncChangeBatch({
+      ...batch,fromExclusive:102,toInclusive:103,headSeq:103,
+      changes:[{...batch.changes[0]!,portSeq:103}],
+    });
+    const lkgHash=projectionHashForEntities(first.entities);
+    expect(()=>applyMfkSyncChangeBatch(first.entities,first.appliedSeq,gap)).toThrow('SYNC_CHANGE_BATCH_FROM_MISMATCH');
+    expect(projectionHashForEntities(first.entities)).toBe(lkgHash);
+
+    expect(()=>validateMfkSyncChangeBatch({
+      ...batch,toInclusive:103,headSeq:103,
+      changes:[batch.changes[0],{...batch.changes[0]!,portSeq:103}],
+    })).toThrow('SYNC_CHANGE_BATCH_NON_CONTIGUOUS');
+  });
+
   it('sends one Customer product price delta instead of a full menu snapshot',()=>{
     const customer=(price:number)=>({
       store:{storeId:'MF01',storeName:'磨飯',channelAvailable:true},
@@ -95,6 +130,36 @@ describe('MFK checkpointed delta sync engine',()=>{
     expect(result.changes).toHaveLength(1);
     expect(result.changes[0]).toMatchObject({entityType:'CUSTOMER_PRODUCT',entityId:'PRD-1',op:'UPSERT',portSeq:8});
     expect(result.changes[0]?.payload).toMatchObject({publishedUnitPriceMinor:5200});
+  });
+
+  it('orders a new Category before its Product and emits only dependency entities',()=>{
+    const customerBase={
+      store:{storeId:'MF01',storeName:'磨飯',channelAvailable:true},
+      menu:{categories:[],products:[],combos:[],comboPools:[]},
+      paymentChannels:[],fallback:{enabled:false,phone:'',template:'',retryAttempts:3},
+    };
+    const customerNext=structuredClone(customerBase) as typeof customerBase&{menu:{categories:Record<string,unknown>[];products:Record<string,unknown>[];combos:never[];comboPools:never[]}};
+    customerNext.menu.categories.push({categoryId:'CAT-NEW',name:'飲品',sortOrder:20});
+    customerNext.menu.products.push({productId:'PRD-NEW',categoryId:'CAT-NEW',name:'檸茶',available:true,publishedUnitPriceMinor:1800,optionGroups:[]});
+
+    const smtNext=adminSnapshot('18.00');
+    smtNext.catalog.categories=[{id:'CAT-NEW',name:'飲品',position:20}];
+    smtNext.catalog.products=[{id:'PRD-NEW',productCode:'PRD000009',categoryId:'CAT-NEW',name:'檸茶',basePrice:'18.00',active:true}];
+    const smtBase=structuredClone(smtNext);
+    smtBase.catalog.categories=[];
+    smtBase.catalog.products=[];
+
+    const cases=[
+      {port:'CUSTOMER' as const,previous:buildCustomerSyncEntities(customerBase),next:buildCustomerSyncEntities(customerNext),category:'CUSTOMER_CATEGORY',product:'CUSTOMER_PRODUCT'},
+      {port:'SMM' as const,previous:buildSmmSyncEntities(customerBase),next:buildSmmSyncEntities(customerNext),category:'SMM_CATEGORY',product:'SMM_PRODUCT'},
+      {port:'SMT' as const,previous:buildSmtSyncEntities(smtBase),next:buildSmtSyncEntities(smtNext),category:'CATEGORY',product:'PRODUCT'},
+    ];
+    for(const item of cases){
+      const result=diffMfkSyncEntities({storeId:'MF01',port:item.port,sourceCommitSeq:15,commitId:'commit-15',startingPortSeq:0,previous:item.previous,next:item.next,createdAt:at});
+      const types=result.changes.map(change=>change.entityType);
+      expect(types.indexOf(item.category)).toBeLessThan(types.indexOf(item.product));
+      expect(types.filter(type=>type!==item.category&&type!==item.product&&type!=='ENTITY_ORDER')).toEqual([]);
+    }
   });
 
   it('does not trust a cached entity payloadHash when browser payload bytes were changed',()=>{
