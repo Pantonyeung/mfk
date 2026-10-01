@@ -62,7 +62,7 @@ export interface PreviewCombo{
   groups:readonly PreviewComboGroup[];
 }
 
-const PRODUCTS:PreviewProduct[]=[
+export const PREVIEW_PRODUCTS:PreviewProduct[]=[
   {id:'p-001',name:'紫米飯糰・照燒雞',code:'PRD000123',category:'飯糰',priceMinor:4200,status:'已發佈',printRule:'製作單＋標籤',updatedAt:'今日 08:42',description:'照燒雞配紫米飯糰。',customerImageUrl:'',channelImages:{KEETA:''},optionSetIds:['set-rice']},
   {id:'p-002',name:'紫米飯糰・吞拿魚',code:'PRD000124',category:'飯糰',priceMinor:4000,status:'已發佈',printRule:'製作單＋標籤',updatedAt:'今日 08:41',description:'吞拿魚紫米飯糰。',customerImageUrl:'',channelImages:{KEETA:''},optionSetIds:['set-rice']},
   {id:'p-003',name:'紫米飯糰・雞蛋沙律',code:'PRD000125',category:'飯糰',priceMinor:3800,status:'已發佈',printRule:'製作單＋標籤',updatedAt:'今日 08:40',description:'',customerImageUrl:'',channelImages:{KEETA:''},optionSetIds:['set-rice']},
