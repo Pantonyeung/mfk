@@ -76,9 +76,13 @@ function TemplateEditor({template,onClose}:{template:PreviewPrintTemplate;onClos
   const remove=usePreviewAdmin(state=>state.removeTemplate);
   return <Sheet eyebrow="打印模板" title={template.name} onClose={onClose}>
     <section className="v3-functional-section">
-      <label><span>模板名稱</span><input value={template.name} onChange={event=>update(template.id,{name:event.target.value})}/></label>
-      <label><span>模板內容</span><textarea rows={12} value={template.content} onChange={event=>update(template.id,{content:event.target.value})}/></label>
+      <div className="v3-functional-grid">
+        <label><span>Template 名稱</span><input value={template.name} onChange={event=>update(template.id,{name:event.target.value})}/></label>
+        <label><span>Template 用途</span><select value={template.type} onChange={event=>update(template.id,{type:event.target.value as PreviewPrintTemplate['type']})}><option value="RECEIPT">小票</option><option value="PRODUCTION">製作單</option><option value="PACKING">打包單</option><option value="LABEL">Label</option></select></label>
+      </div>
+      <label><span>Template 內容</span><textarea rows={12} value={template.content} onChange={event=>update(template.id,{content:event.target.value})}/></label>
       <label className="v3-functional-switch"><input type="checkbox" checked={template.active} onChange={event=>update(template.id,{active:event.target.checked})}/><span>{template.active?'啟用':'停用'}</span></label>
+      <div className="v3-mobile-form-note">Template 名稱、用途同版式由 Admin 管理；實體打印機 IP／USB 仍然由現場 SMT 配對。</div>
     </section>
     <section className="v3-functional-danger"><div><strong>刪除模板</strong><small>Preview 未接正式引用檢查。</small></div><button type="button" onClick={()=>{remove(template.id);onClose();}}>刪除</button></section>
   </Sheet>;
