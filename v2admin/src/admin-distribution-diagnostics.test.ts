@@ -212,6 +212,11 @@ describe('Admin distribution diagnostics contract',()=>{
 });
 
 describe('Admin distribution diagnostics security and bounded UI',()=>{
+  it('locks the Owner-approved freshness window to five minutes',()=>{
+    const config=readFileSync(new URL('../wrangler.jsonc',import.meta.url),'utf8');
+    expect(config).toContain('"MFK_SYNC_DIAGNOSTICS_STALE_AFTER_MS": "300000"');
+  });
+
   it.each([
     ['unauthenticated',{}],
     ['Customer origin',{'origin':'https://order.morefunos.com'}],

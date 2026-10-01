@@ -8,7 +8,8 @@
   "vars": {
     "KEETA_APP_ID": "3419700273",
     "KEETA_PROVIDER_SHOP_ID": "721578302",
-    "KEETA_OAUTH_REDIRECT_URI": "https://admin.morefunos.com/api/keeta/oauth/callback"
+    "KEETA_OAUTH_REDIRECT_URI": "https://admin.morefunos.com/api/keeta/oauth/callback",
+    "MFK_SYNC_DIAGNOSTICS_STALE_AFTER_MS": "300000"
   },
   "secrets": {
     "required": [
