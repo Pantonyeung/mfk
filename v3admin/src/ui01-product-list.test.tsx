@@ -2,14 +2,16 @@ import {describe,expect,it} from 'vitest';
 import {renderToStaticMarkup} from 'react-dom/server';
 import {AdminShell} from './admin-shell.tsx';
 import {MobileGroupedPager} from './mobile-grouped-list.tsx';
+import {PRODUCT_MEDIA_STORAGE_POLICY} from './product-media-api.ts';
 import {
   MOBILE_PRODUCT_PAGE_SIZE,
   ProductListPage,
   productFormCanSave,
   productRecordsFromSnapshot,
 } from './product-list.tsx';
+import {usePreviewCatalog} from './preview-catalog-store.ts';
 
-describe('Admin V3 Product Management mobile contract',()=>{
+describe('Admin V3 Product Management contract',()=>{
   it('projects canonical catalog facts into presentation rows without creating another authority',()=>{
     const rows=productRecordsFromSnapshot({
       catalog:{
@@ -56,21 +58,27 @@ describe('Admin V3 Product Management mobile contract',()=>{
     expect(productFormCanSave({name:'紫米飯糰',category:'飯糰',price:'42'})).toBe(true);
   });
 
-  it('renders the public preview with explicit non-production labelling',()=>{
-    const html=renderToStaticMarkup(<ProductListPage previewMode/>);
-    expect(html).toContain('UI 公網預覽');
-    expect(html).toContain('唔代表正式 Canonical 資料');
-    expect(html).toContain('唔會寫入 Production');
-    expect(html).toContain('v3-product-add-mobile');
-    expect(html).toContain('v3-product-add-desktop');
+  it('locks all product image binary storage to R2 only',()=>{
+    expect(PRODUCT_MEDIA_STORAGE_POLICY.binaryStore).toBe('R2_ONLY');
+    expect(PRODUCT_MEDIA_STORAGE_POLICY.externalUrlAuthority).toBe(false);
+    expect(PRODUCT_MEDIA_STORAGE_POLICY.browserDirectR2Credentials).toBe(false);
+    expect(PRODUCT_MEDIA_STORAGE_POLICY.surfaces).toEqual(['CUSTOMER','KEETA']);
   });
 
-  it('keeps desktop full-width list while exposing the mobile grouped list separately',()=>{
+  it('has real option-set and combo relationship preview state',()=>{
+    const state=usePreviewCatalog.getState();
+    expect(state.optionSets.length).toBeGreaterThan(0);
+    expect(state.combos.length).toBeGreaterThan(0);
+    expect(state.products.some(product=>product.optionSetIds.length>0)).toBe(true);
+    expect(state.combos.some(combo=>combo.groups.some(group=>group.choices.some(choice=>Boolean(choice.productId))))).toBe(true);
+  });
+
+  it('renders the public product list as functional preview state, not placeholder copy',()=>{
     const html=renderToStaticMarkup(<ProductListPage previewMode/>);
-    expect(html).toContain('v3-product-desktop-content');
-    expect(html).toContain('v3-product-table-wrap');
-    expect(html).toContain('v3-product-mobile-groups');
-    expect(html).not.toContain('v3-mobile-product-modal');
+    expect(html).toContain('產品管理已接實際 Preview State');
+    expect(html).toContain('選項／套餐');
+    expect(html).toContain('新增產品');
+    expect(html).not.toContain('尚未接駁');
   });
 
   it('routes the isolated shell directly to Product Management for Owner review',()=>{
@@ -86,7 +94,7 @@ describe('Admin V3 Product Management mobile contract',()=>{
       onSignOut={()=>{}}
     />);
     expect(html).toContain('產品管理');
-    expect(html).toContain('UI 公網預覽');
+    expect(html).toContain('產品管理已接實際 Preview State');
     expect(html).toContain('只供介面驗收');
   });
 });
