@@ -1,0 +1,267 @@
+name: v3customer-ci
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "v3customer/**"
+      - ".github/workflows/v3customer-ci.yml"
+  push:
+    branches-ignore:
+      - main
+    paths:
+      - "v3customer/**"
+      - ".github/workflows/v3customer-ci.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: v3customer
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: v3customer/package.json
+      - run: npm install --ignore-scripts
+      - run: npm run typecheck
+      - run: npm run build
+
+  publish-hero-assets:
+    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/feat/MFK-CUSTOMER-V3-LONG-HOME-R1'
+    needs: verify
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      BUCKET: mfk-customer-assets
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Publish stable-name Hero carousel assets to R2
+        run: |
+          set -euo pipefail
+          for index in 01 02 03 04; do
+            npx --yes wrangler@latest r2 object put "$BUCKET/customer/brand/hero-carousel/home-hero-$index.webp" \
+              --file "v3customer/asset-sources/hero-carousel/home-hero-$index.webp" \
+              --content-type "image/webp" \
+              --cache-control "public, max-age=300, stale-while-revalidate=86400" \
+              --remote --force
+          done
+          npx --yes wrangler@latest r2 object put "$BUCKET/customer/brand/hero-carousel/manifest.json" \
+            --file "v3customer/asset-sources/hero-carousel/manifest.json" \
+            --content-type "application/json" \
+            --cache-control "no-cache" \
+            --remote --force
+
+  visual-capture:
+    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/feat/MFK-CUSTOMER-V3-LONG-HOME-R1'
+    needs: [verify, publish-hero-assets]
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      BUCKET: mfk-customer-assets
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/MFK-CUSTOMER-V3-LONG-HOME-R1
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install app dependencies
+        working-directory: v3customer
+        run: npm install --ignore-scripts
+
+      - name: Pull canonical Hero assets from private R2
+        run: |
+          set -euo pipefail
+          mkdir -p v3customer/public/media/customer/hero
+          npx --yes wrangler@latest r2 object get "$BUCKET/customer/brand/hero/hero-background-main.png" --file "v3customer/public/media/customer/hero/hero-background-main.png" --remote
+          npx --yes wrangler@latest r2 object get "$BUCKET/customer/brand/hero/hero-male-main.png" --file "v3customer/public/media/customer/hero/hero-male-main.png" --remote
+          npx --yes wrangler@latest r2 object get "$BUCKET/customer/brand/hero/hero-female-main.png" --file "v3customer/public/media/customer/hero/hero-female-main.png" --remote
+          npx --yes wrangler@latest r2 object get "$BUCKET/customer/brand/hero/hero-doodle-morefun-main.png" --file "v3customer/public/media/customer/hero/hero-doodle-morefun-main.png" --remote
+          npx --yes wrangler@latest r2 object get "$BUCKET/customer/brand/hero/hero-doodle-goodtaste-main.png" --file "v3customer/public/media/customer/hero/hero-doodle-goodtaste-main.png" --remote
+          mkdir -p v3customer/public/media/customer/hero-carousel
+          for index in 01 02 03 04; do
+            npx --yes wrangler@latest r2 object get "$BUCKET/customer/brand/hero-carousel/home-hero-$index.webp" --file "v3customer/public/media/customer/hero-carousel/home-hero-$index.webp" --remote
+          done
+
+      - name: Install Chromium
+        working-directory: v3customer
+        run: npx playwright install chromium --with-deps
+
+      - name: Render and validate 390px mobile evidence
+        run: |
+          set -euo pipefail
+          cd v3customer
+          npm run dev -- --port 4175 > /tmp/mfk-v3-vite.log 2>&1 &
+          SERVER_PID=$!
+          trap 'kill $SERVER_PID || true' EXIT
+
+          for i in {1..60}; do
+            if curl -fsS http://127.0.0.1:4175 >/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+
+          node --input-type=module <<'NODE'
+          import { chromium } from '@playwright/test';
+          import fs from 'node:fs/promises';
+
+          const browser=await chromium.launch({headless:true});
+          const page=await browser.newPage({
+            viewport:{width:390,height:890},
+            deviceScaleFactor:1
+          });
+          await page.goto('http://127.0.0.1:4175',{waitUntil:'networkidle'});
+          await page.evaluate(()=>document.fonts.ready);
+          await page.waitForFunction(()=>[...document.querySelectorAll('.hero-slide')].every(img=>img.complete&&img.naturalWidth>0));
+
+          await fs.mkdir('/tmp/mfk-evidence',{recursive:true});
+          await page.screenshot({path:'/tmp/mfk-evidence/long-home-390.png',fullPage:true});
+          await page.locator('.hero').screenshot({path:'/tmp/mfk-evidence/hero-390.png'});
+
+          const metrics=await page.evaluate(()=>{
+            const r=(selector)=>document.querySelector(selector)?.getBoundingClientRect().toJSON();
+            return {
+              viewportWidth:innerWidth,
+              viewportHeight:innerHeight,
+              documentWidth:document.documentElement.scrollWidth,
+              documentHeight:document.documentElement.scrollHeight,
+              header:r('.header'),
+              headerPosition:getComputedStyle(document.querySelector('.header')).position,
+              hero:r('.hero'),
+              heroTitle:r('#hero-title'),
+              heroVisual:r('.hero-visual'),
+              heroSlides:[...document.querySelectorAll('.hero-slide')].map(el=>el.getBoundingClientRect().toJSON()),
+              heroDots:[...document.querySelectorAll('.hero-dots button')].map(el=>el.getBoundingClientRect().toJSON()),
+              storeStatusText:document.querySelector('.store-status')?.textContent?.trim(),
+              cta:r('.hero-copy > button'),
+              quick:r('.quick'),
+              quickCards:[...document.querySelectorAll('.quick-card')].map(el=>el.getBoundingClientRect().toJSON()),
+              quickIcons:[...document.querySelectorAll('.quick-icon')].map(el=>el.getBoundingClientRect().toJSON()),
+              lifestyle:r('.lifestyle'),
+              recent:r('.recent-section'),
+              nav:r('nav'),
+              navButtons:[...document.querySelectorAll('nav button')].map(el=>el.getBoundingClientRect().toJSON())
+            };
+          });
+
+          await page.evaluate(()=>scrollTo({top:260,behavior:'instant'}));
+          await page.waitForFunction(()=>Number(getComputedStyle(document.querySelector('.hero')).getPropertyValue('--hero-progress'))>0.9);
+          metrics.scrolled=await page.evaluate(()=>({
+            headerTop:document.querySelector('.header').getBoundingClientRect().top,
+            heroProgress:Number(getComputedStyle(document.querySelector('.hero')).getPropertyValue('--hero-progress')),
+            heroScale:Number(getComputedStyle(document.querySelector('.hero')).getPropertyValue('--hero-visual-scale'))
+          }));
+
+          const screens=metrics.documentHeight/metrics.viewportHeight;
+          const fail=[];
+          if(metrics.documentWidth>metrics.viewportWidth) fail.push('horizontal-overflow');
+          if(metrics.headerPosition!=='fixed'||metrics.scrolled.headerTop!==0) fail.push('header-not-fixed');
+          if(!metrics.hero || metrics.hero.height<metrics.viewportHeight*0.60) fail.push('hero-under-60-percent');
+          if(!metrics.hero || metrics.hero.height>metrics.viewportHeight*0.72) fail.push('hero-over-72-percent');
+          if(metrics.scrolled.heroProgress<0.9||metrics.scrolled.heroScale>0.85) fail.push('hero-scroll-scale-contract');
+          if(!metrics.heroTitle||!metrics.heroVisual||metrics.heroVisual.top<metrics.heroTitle.bottom+4) fail.push('hero-title-overlap');
+          if(metrics.heroSlides.length!==4||metrics.heroDots.length!==4) fail.push('hero-carousel-contract');
+          if(metrics.heroDots.some(x=>x.height<34||x.width<34)) fail.push('hero-carousel-touch-contract');
+          if(metrics.storeStatusText!=='營業中') fail.push('store-status-copy');
+          if(screens<1.20 || screens>1.50) fail.push('home-length-outside-reference-class');
+          if(!metrics.cta || metrics.cta.height<48) fail.push('cta-touch-too-small');
+          if(metrics.quickCards.length!==4 || metrics.quickCards.some(x=>x.height<150||x.width<70)) fail.push('quick-card-touch-contract');
+          if(metrics.quickIcons.length!==4 || metrics.quickIcons.some(x=>x.height<52||x.width<52)) fail.push('quick-icon-size-contract');
+          if(!metrics.lifestyle || metrics.lifestyle.height<150) fail.push('lifestyle-banner-missing');
+          if(metrics.navButtons.length!==5 || metrics.navButtons.some(x=>x.height<52||x.width<60)) fail.push('bottom-nav-touch-contract');
+
+          metrics.pageScreens=Number(screens.toFixed(3));
+          metrics.acceptance={
+            heroShare:Number((metrics.hero.height/metrics.viewportHeight).toFixed(3)),
+            failures:fail
+          };
+
+          await fs.writeFile('/tmp/mfk-evidence/metrics-390.json',JSON.stringify(metrics,null,2));
+          if(fail.length){
+            console.error(JSON.stringify(metrics,null,2));
+            process.exit(1);
+          }
+
+          console.log(JSON.stringify(metrics.acceptance));
+          await browser.close();
+          NODE
+
+      - name: Publish visual evidence branch
+        run: |
+          set -euo pipefail
+          cp /tmp/mfk-evidence/long-home-390.png /tmp/long-home-390.png
+          cp /tmp/mfk-evidence/hero-390.png /tmp/hero-390.png
+          cp /tmp/mfk-evidence/metrics-390.json /tmp/metrics-390.json
+
+          git config user.name "MFK Visual Evidence Bot"
+          git config user.email "actions@users.noreply.github.com"
+          git fetch origin temp/MFK-CUSTOMER-V3-VISUAL-EVIDENCE
+          git switch -C temp/MFK-CUSTOMER-V3-VISUAL-EVIDENCE origin/temp/MFK-CUSTOMER-V3-VISUAL-EVIDENCE
+          mkdir -p v3customer/evidence/current
+          cp /tmp/long-home-390.png v3customer/evidence/current/long-home-390.png
+          cp /tmp/hero-390.png v3customer/evidence/current/hero-390.png
+          cp /tmp/metrics-390.json v3customer/evidence/current/metrics-390.json
+          git add v3customer/evidence/current
+          git commit -m "evidence(customer): refresh 390px visual capture" || exit 0
+          git push origin HEAD:temp/MFK-CUSTOMER-V3-VISUAL-EVIDENCE
+
+
+  deploy-preview:
+    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/feat/MFK-CUSTOMER-V3-LONG-HOME-R1'
+    needs: [verify, publish-hero-assets]
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      BUCKET: mfk-customer-assets
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Pull canonical Hero assets from private R2
+        run: |
+          set -euo pipefail
+          mkdir -p v3customer/public/media/customer/hero
+          npx --yes wrangler@latest r2 object get "$BUCKET/customer/brand/hero/hero-background-main.png" --file "v3customer/public/media/customer/hero/hero-background-main.png" --remote
+          npx --yes wrangler@latest r2 object get "$BUCKET/customer/brand/hero/hero-male-main.png" --file "v3customer/public/media/customer/hero/hero-male-main.png" --remote
+          npx --yes wrangler@latest r2 object get "$BUCKET/customer/brand/hero/hero-female-main.png" --file "v3customer/public/media/customer/hero/hero-female-main.png" --remote
+          npx --yes wrangler@latest r2 object get "$BUCKET/customer/brand/hero/hero-doodle-morefun-main.png" --file "v3customer/public/media/customer/hero/hero-doodle-morefun-main.png" --remote
+          npx --yes wrangler@latest r2 object get "$BUCKET/customer/brand/hero/hero-doodle-goodtaste-main.png" --file "v3customer/public/media/customer/hero/hero-doodle-goodtaste-main.png" --remote
+          mkdir -p v3customer/public/media/customer/hero-carousel
+          for index in 01 02 03 04; do
+            npx --yes wrangler@latest r2 object get "$BUCKET/customer/brand/hero-carousel/home-hero-$index.webp" --file "v3customer/public/media/customer/hero-carousel/home-hero-$index.webp" --remote
+          done
+
+      - name: Build preview
+        working-directory: v3customer
+        run: |
+          npm install --ignore-scripts
+          npm run build
+
+      - name: Ensure isolated Pages preview project
+        working-directory: v3customer
+        run: |
+          npx --yes wrangler@latest pages project create mfk-customer-v3-preview --production-branch=preview || true
+
+      - name: Deploy isolated V3 Customer preview
+        working-directory: v3customer
+        run: |
+          npx --yes wrangler@latest pages deploy dist             --project-name=mfk-customer-v3-preview             --branch=preview             --commit-hash="$GITHUB_SHA"             --commit-message="MFK Customer V3 Owner preview"

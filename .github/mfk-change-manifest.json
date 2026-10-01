@@ -1,36 +1,47 @@
 {
   "version": 1,
-  "capability": "MFK_ADMIN_V3_FORMAL_SERVER_DRAFT_SEAM_R1",
-  "base_sha": "f78960ebbd07e1adfff62d19d3ac129be863cb53",
+  "capability": "CUSTOMER_V3_PREVIEW_JOURNEY_R1",
+  "base_sha": "a41378d7106362b6fb13c66549c6c6556c909025",
   "root_control": "#596",
-  "product_control": "#601",
   "allowed_paths": [
     ".github/mfk-change-manifest.json",
-    "docs/implementation/MFK_CODEX_KICKOFF_ADMIN_V3_FORMAL_SERVER_DRAFT_SEAM_R1_2026-10-01.md",
-    "v2admin/worker.ts",
-    "v2admin/src/admin-formal-server-draft.test.ts",
-    "v2admin/src/admin-sync-websocket-transport.test.ts"
+    ".github/workflows/v3customer-ci.yml",
+    "v3customer/**",
+    "docs/product/MFK_CUSTOMER_V3_LONG_HOME_VISUAL_PRD_R1_2026-10-01.md",
+    "docs/product/MFK_CUSTOMER_V3_LONG_HOME_COMPONENT_MAP_R1_2026-10-01.md",
+    "docs/execution/MFK_CUSTOMER_V3_HIGH_FIDELITY_AI_IMPLEMENTATION_R1_2026-10-01.md",
+    "docs/product/MFK_CUSTOMER_V3_LONG_HOME_R2_IMPLEMENTATION_LOCK_2026-10-01.md",
+    "docs/product/MFK_CUSTOMER_V3_LONG_HOME_R3_BACKGROUND_COMPLETION_2026-10-01.md",
+    "docs/product/MFK_CUSTOMER_V3_ASSET_REPLACEMENT_CONTRACT_R1_2026-10-01.md",
+    "docs/product/MFK_CUSTOMER_V3_MOBILE_HOME_LAYOUT_R4_2026-10-01.md"
   ],
-  "authority_impact": "BOUNDED_EXTENSION_OF_EXISTING_ADMIN_CANONICAL_CONFIG_AUTHORITY_FOR_FORMAL_SERVER_DRAFT_ONLY; NO_SECOND_AUTHORITY",
-  "persistence_impact": "ADD_SERVER_SIDE_ADMIN_DRAFT_RECORD_WITH_DRAFT_ID_REVISION_AND_CANONICAL_BASE_GUARD",
+  "authority_impact": "NONE",
+  "persistence_impact": "NONE",
   "provider_impact": "NONE",
   "transaction_impact": "NONE",
   "production_routing_impact": "NONE",
   "expected_behavior_change": [
-    "Admin V3 can persist a formal server Draft separately from unsaved browser edits.",
-    "Saved Draft supports authoritative reload/new-browser restoration and optimistic concurrency.",
-    "Stale Draft or stale second-tab writes fail closed with explicit conflicts.",
-    "Publish-from-Draft reuses existing Admin publish authority and clears Draft only after successful canonical publish.",
-    "Final canonical base guard prevents stale Draft overwrite during a publish race."
+    "Keep the approved Hero assets while recomposing the Customer Home from the Owner-provided visual reference.",
+    "Make Hero occupy at least 60% of the first viewport.",
+    "Keep four premium vertical quick actions in one row, with large icons and whole-card touch targets.",
+    "Keep truthful store operating status, notification and search fixed while the Customer Home scrolls.",
+    "Shrink the Hero character composition progressively during upward scrolling without recompressing the approved source assets.",
+    "Keep the Hero headline in a protected text region and rotate four optimized transparent Q-character scenes with an accessible manual selector.",
+    "Publish Hero scenes to stable R2 object names so future artwork replaces the same slot without an app-code path change.",
+    "Use the canonical customer label 期間限定 and responsive press, crossfade, drift and subtle trail feedback with reduced-motion support.",
+    "Use one character-led lifestyle banner, one recent-order row, and five-item bottom navigation including the canonical Memory Jar; remove competing product-card sections.",
+    "Connect every actionable Customer Home entry to presentation-only discovery, ordering, Memory Jar, checkout, order and profile preview screens.",
+    "Reuse one curated-list template for Today Picks, Popular Combos, Limited and 30-minute pickup entries.",
+    "Keep preview checkout honest: it must state that no formal order or charge is created and that submitted payment proof is not confirmed payment.",
+    "Cover empty search, offline, sold-out, repricing and retry/recovery presentation states without creating a second business authority.",
+    "Run isolated Customer V3 typecheck/build and deterministic visual-layout acceptance without production cutover."
   ],
   "non_goals": [
-    "No Pricing authority or takeaway surcharge schema change.",
-    "No SMT Store Kernel change.",
-    "No Order, Payment, Refund, Cancel or provider transaction change.",
-    "No v2 browser-state migration.",
-    "No localStorage, sessionStorage or Dexie formal Draft authority.",
-    "No production deploy, hostname cutover or OTA."
+    "No v2customer change.",
+    "No production route or hostname cutover.",
+    "No Order, Pricing, Payment, Fulfillment, Sellability, Admin, SMT or provider authority change.",
+    "No merge, deploy or OTA without separate Owner PROMOTE."
   ],
-  "rollback_sha": "f78960ebbd07e1adfff62d19d3ac129be863cb53",
-  "severity": "HARD_BLOCK"
+  "rollback_sha": "a41378d7106362b6fb13c66549c6c6556c909025",
+  "severity": "SOFT_BLOCK"
 }
