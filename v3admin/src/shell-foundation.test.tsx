@@ -23,11 +23,11 @@ const LOCKED_MENU_LABELS=[
 ];
 
 describe('Admin V3 shell foundation',()=>{
-  it('locks the two-step product map at 12 menus and 53 destinations',()=>{
+  it('locks the two-step product map at 12 menus and 54 destinations',()=>{
     expect(ADMIN_MENU_GROUPS.map(menu=>menu.label)).toEqual(LOCKED_MENU_LABELS);
     expect(ADMIN_MENU_GROUPS).toHaveLength(12);
-    expect(ADMIN_DESTINATIONS).toHaveLength(53);
-    expect(new Set(ADMIN_DESTINATIONS.map(destination=>destination.path)).size).toBe(53);
+    expect(ADMIN_DESTINATIONS).toHaveLength(54);
+    expect(new Set(ADMIN_DESTINATIONS.map(destination=>destination.path)).size).toBe(54);
     expect(ADMIN_MENU_GROUPS.every(menu=>menu.destinations.length>0)).toBe(true);
   });
 
@@ -40,6 +40,7 @@ describe('Admin V3 shell foundation',()=>{
 
   it('resolves registered routes and fails closed to the overview skeleton',()=>{
     expect(destinationForPath('/admin/catalog/products').title).toBe('產品管理');
+    expect(destinationForPath('/admin/store/tables').title).toBe('餐桌管理');
     expect(destinationForPath('/not-a-v3-route').path).toBe('/admin/overview');
   });
 
