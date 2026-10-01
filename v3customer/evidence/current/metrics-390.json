@@ -2,45 +2,45 @@
   "viewportWidth": 390,
   "viewportHeight": 844,
   "documentWidth": 390,
-  "documentHeight": 932,
+  "documentHeight": 902,
   "hero": {
     "x": 0,
     "y": 0,
     "width": 390,
-    "height": 214,
+    "height": 208,
     "top": 0,
     "right": 390,
-    "bottom": 214,
+    "bottom": 208,
     "left": 0
   },
   "quick": {
     "x": 10,
-    "y": 214,
+    "y": 208,
     "width": 370,
     "height": 84.03125,
-    "top": 214,
+    "top": 208,
     "right": 380,
-    "bottom": 298.03125,
+    "bottom": 292.03125,
     "left": 10
   },
   "categories": {
     "x": 10,
-    "y": 301.03125,
+    "y": 295.03125,
     "width": 370,
-    "height": 68,
-    "top": 301.03125,
+    "height": 66,
+    "top": 295.03125,
     "right": 380,
-    "bottom": 369.03125,
+    "bottom": 361.03125,
     "left": 10
   },
   "products": {
     "x": 18,
-    "y": 412.03125,
+    "y": 404.03125,
     "width": 354,
-    "height": 108,
-    "top": 412.03125,
+    "height": 104,
+    "top": 404.03125,
     "right": 372,
-    "bottom": 520.03125,
+    "bottom": 508.03125,
     "left": 18
   },
   "nav": {
@@ -62,10 +62,10 @@
         "x": 0,
         "y": 0,
         "width": 390,
-        "height": 214,
+        "height": 208,
         "top": 0,
         "right": 390,
-        "bottom": 214,
+        "bottom": 208,
         "left": 0
       }
     },
@@ -75,12 +75,12 @@
       "id": "",
       "rect": {
         "x": 10,
-        "y": 214,
+        "y": 208,
         "width": 370,
         "height": 84.03125,
-        "top": 214,
+        "top": 208,
         "right": 380,
-        "bottom": 298.03125,
+        "bottom": 292.03125,
         "left": 10
       }
     },
@@ -90,12 +90,12 @@
       "id": "menu-discovery",
       "rect": {
         "x": 10,
-        "y": 301.03125,
+        "y": 295.03125,
         "width": 370,
-        "height": 68,
-        "top": 301.03125,
+        "height": 66,
+        "top": 295.03125,
         "right": 380,
-        "bottom": 369.03125,
+        "bottom": 361.03125,
         "left": 10
       }
     },
@@ -105,12 +105,12 @@
       "id": "chef-picks",
       "rect": {
         "x": 10,
-        "y": 372.03125,
+        "y": 364.03125,
         "width": 370,
-        "height": 156,
-        "top": 372.03125,
+        "height": 152,
+        "top": 364.03125,
         "right": 380,
-        "bottom": 528.03125,
+        "bottom": 516.03125,
         "left": 10
       }
     },
@@ -120,12 +120,12 @@
       "id": "",
       "rect": {
         "x": 10,
-        "y": 531.03125,
+        "y": 519.03125,
         "width": 370,
-        "height": 62,
-        "top": 531.03125,
+        "height": 58,
+        "top": 519.03125,
         "right": 380,
-        "bottom": 593.03125,
+        "bottom": 577.03125,
         "left": 10
       }
     },
@@ -135,12 +135,12 @@
       "id": "",
       "rect": {
         "x": 10,
-        "y": 596.03125,
+        "y": 580.03125,
         "width": 370,
-        "height": 62,
-        "top": 596.03125,
+        "height": 58,
+        "top": 580.03125,
         "right": 380,
-        "bottom": 658.03125,
+        "bottom": 638.03125,
         "left": 10
       }
     },
@@ -150,12 +150,12 @@
       "id": "recent-order",
       "rect": {
         "x": 10,
-        "y": 661.03125,
+        "y": 641.03125,
         "width": 370,
-        "height": 72,
-        "top": 661.03125,
+        "height": 68,
+        "top": 641.03125,
         "right": 380,
-        "bottom": 733.03125,
+        "bottom": 709.03125,
         "left": 10
       }
     },
@@ -165,12 +165,12 @@
       "id": "",
       "rect": {
         "x": 10,
-        "y": 736.03125,
+        "y": 712.03125,
         "width": 370,
-        "height": 67,
-        "top": 736.03125,
+        "height": 63,
+        "top": 712.03125,
         "right": 380,
-        "bottom": 803.03125,
+        "bottom": 775.03125,
         "left": 10
       }
     },
@@ -180,12 +180,12 @@
       "id": "",
       "rect": {
         "x": 10,
-        "y": 806.03125,
+        "y": 778.03125,
         "width": 370,
-        "height": 98.03125,
-        "top": 806.03125,
+        "height": 96.03125,
+        "top": 778.03125,
         "right": 380,
-        "bottom": 904.0625,
+        "bottom": 874.0625,
         "left": 10
       }
     }
