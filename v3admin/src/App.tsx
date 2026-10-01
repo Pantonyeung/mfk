@@ -17,6 +17,10 @@ function hkTime(value:string){
   const at=Date.parse(value);
   return Number.isFinite(at)?new Date(at).toLocaleString('zh-HK',{timeZone:'Asia/Hong_Kong',hour12:false}):value;
 }
+function previewRequested(){
+  if(typeof window==='undefined')return false;
+  return new URLSearchParams(window.location.search).get('preview')==='ui-01';
+}
 
 function ReleaseStatus({match,pending,error,servingId}:{match:boolean|null;pending:boolean;error:boolean;servingId?:string}){
   return <section className="v3-release-strip" data-state={match===true?'ok':match===false?'danger':'pending'} aria-live="polite">
@@ -24,6 +28,14 @@ function ReleaseStatus({match,pending,error,servingId}:{match:boolean|null;pendi
     <div><span>伺服器版本</span><strong>{pending?'正在確認…':error?'暫時無法確認':servingId}</strong></div>
     <div><span>狀態</span><strong>{match===true?'版本一致':match===false?'版本不一致 · 禁止正式寫入':'正在確認版本'}</strong></div>
     {match===false?<button type="button" onClick={()=>window.location.reload()}>載入最新版本</button>:null}
+  </section>;
+}
+
+function PreviewReleaseStatus(){
+  return <section className="v3-preview-release" role="status">
+    <div><span>預覽 Slice</span><strong>UI-01｜產品管理 Default List</strong></div>
+    <div><span>資料模式</span><strong>介面示例 · 非 Canonical</strong></div>
+    <div><span>Production</span><strong>v2 完全不受影響</strong></div>
   </section>;
 }
 
@@ -50,20 +62,22 @@ export function V3AdminApp(){
   const [pin,setPin]=useState('');
   const [authBusy,setAuthBusy]=useState(false);
   const [authError,setAuthError]=useState('');
+  const uiPreview=previewRequested();
 
-  const health=useQuery({queryKey:v3QueryKeys.health,queryFn:readV3BackendHealth});
+  const health=useQuery({queryKey:v3QueryKeys.health,queryFn:readV3BackendHealth,enabled:!uiPreview});
   const servingRelease=useQuery({
     queryKey:['mfk','admin-v3','client-release','serving'],queryFn:readServingRelease,staleTime:0,
     refetchInterval:V3_RELEASE_REFETCH_INTERVAL_MS,refetchOnMount:'always',refetchOnWindowFocus:true,refetchOnReconnect:true,retry:1,
+    enabled:!uiPreview,
   });
   const scope=useMemo(()=>session?scopeFromSession(session):null,[session]);
   const canonical=useQuery({
     queryKey:scope?v3AdminCanonicalQueryKey(scope.storeId):['mfk','admin-v3','canonical','disabled'],
     queryFn:()=>readV3CanonicalAdminActive({storeId:scope?.storeId??'',sessionToken:session?.sessionToken??''}),
-    enabled:Boolean(session&&scope),staleTime:0,gcTime:0,
+    enabled:Boolean(!uiPreview&&session&&scope),staleTime:0,gcTime:0,
   });
 
-  const releaseMatch=releaseVerificationMatches(V3_CLIENT_RELEASE,servingRelease.data,servingRelease.isSuccess&&!servingRelease.isFetching&&!servingRelease.isRefetchError&&!servingRelease.isPaused);
+  const releaseMatch=uiPreview?true:releaseVerificationMatches(V3_CLIENT_RELEASE,servingRelease.data,servingRelease.isSuccess&&!servingRelease.isFetching&&!servingRelease.isRefetchError&&!servingRelease.isPaused);
   const summary=canonical.data?summarizeV3Canonical(canonical.data):null;
   const releaseStatus=<ReleaseStatus match={releaseMatch} pending={servingRelease.isPending} error={servingRelease.isError} servingId={servingRelease.data?.releaseId}/>;
 
@@ -80,6 +94,18 @@ export function V3AdminApp(){
     queryClient.removeQueries({queryKey:['mfk','admin-v3'],exact:false});
     await logoutV3Admin(token);
   };
+
+  if(uiPreview)return <AdminShell
+    storeId="PREVIEW"
+    displayName="介面驗收"
+    releaseStatus={<PreviewReleaseStatus/>}
+    canonicalState="fresh"
+    previewMode
+    initialPath="/admin/catalog/products"
+    onRefresh={()=>{}}
+    onDiagnostics={()=>{}}
+    onSignOut={()=>{}}
+  />;
 
   if(!session)return <main className="v3-auth-shell">
     <header className="v3-auth-head"><div><small>V3 預覽 · 未連接正式站點</small><h1>MFK Admin V3</h1><p>先確認版本，再讀正式雲端資料。瀏覽器唔會保存正式伺服器資料作為真相。</p></div><button type="button" onClick={()=>setDiagnosticsOpen(!diagnosticsOpen)}>{diagnosticsOpen?'收起系統資訊':'系統資訊'}</button></header>
@@ -98,7 +124,16 @@ export function V3AdminApp(){
 
   const canonicalState=canonical.data?(canonical.isRefetchError?'stale':canonical.isFetching?'refreshing':'fresh'):canonical.isError?'error':'pending';
   const shellReleaseStatus=<>{releaseStatus}{releaseMatch!==true?<div className="v3-warning v3-release-warning" role="alert">目前 Client Release 未確認一致。正式寫入功能保持鎖定。</div>:null}</>;
-  return <AdminShell storeId={scope?.storeId??''} displayName={session.displayName} releaseStatus={shellReleaseStatus} canonicalState={canonicalState} onRefresh={()=>void canonical.refetch()} onDiagnostics={()=>setDiagnosticsOpen(!diagnosticsOpen)} onSignOut={()=>void signOut()}>
+  return <AdminShell
+    storeId={scope?.storeId??''}
+    displayName={session.displayName}
+    releaseStatus={shellReleaseStatus}
+    canonicalState={canonicalState}
+    canonicalSnapshot={canonical.data?.snapshot}
+    onRefresh={()=>void canonical.refetch()}
+    onDiagnostics={()=>setDiagnosticsOpen(!diagnosticsOpen)}
+    onSignOut={()=>void signOut()}
+  >
     {diagnosticsOpen?<Diagnostics backendSha={health.data?.sourceSha} summary={summary}/>:null}
   </AdminShell>;
 }
