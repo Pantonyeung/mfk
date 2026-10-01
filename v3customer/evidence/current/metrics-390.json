@@ -42,5 +42,152 @@
     "right": 370,
     "bottom": 609.75,
     "left": 20
-  }
+  },
+  "nav": {
+    "x": 0,
+    "y": 782,
+    "width": 390,
+    "height": 62,
+    "top": 782,
+    "right": 390,
+    "bottom": 844,
+    "left": 0
+  },
+  "sections": [
+    {
+      "index": 0,
+      "className": "hero",
+      "id": "",
+      "rect": {
+        "x": 0,
+        "y": 0,
+        "width": 390,
+        "height": 228,
+        "top": 0,
+        "right": 390,
+        "bottom": 228,
+        "left": 0
+      }
+    },
+    {
+      "index": 1,
+      "className": "quick",
+      "id": "",
+      "rect": {
+        "x": 10,
+        "y": 232,
+        "width": 370,
+        "height": 100.75,
+        "top": 232,
+        "right": 380,
+        "bottom": 332.75,
+        "left": 10
+      }
+    },
+    {
+      "index": 2,
+      "className": "categories",
+      "id": "menu-discovery",
+      "rect": {
+        "x": 10,
+        "y": 340.75,
+        "width": 370,
+        "height": 84,
+        "top": 340.75,
+        "right": 380,
+        "bottom": 424.75,
+        "left": 10
+      }
+    },
+    {
+      "index": 3,
+      "className": "section",
+      "id": "chef-picks",
+      "rect": {
+        "x": 10,
+        "y": 432.75,
+        "width": 370,
+        "height": 187,
+        "top": 432.75,
+        "right": 380,
+        "bottom": 619.75,
+        "left": 10
+      }
+    },
+    {
+      "index": 4,
+      "className": "brand-banner",
+      "id": "",
+      "rect": {
+        "x": 10,
+        "y": 627.75,
+        "width": 370,
+        "height": 76,
+        "top": 627.75,
+        "right": 380,
+        "bottom": 703.75,
+        "left": 10
+      }
+    },
+    {
+      "index": 5,
+      "className": "member",
+      "id": "",
+      "rect": {
+        "x": 10,
+        "y": 711.75,
+        "width": 370,
+        "height": 70,
+        "top": 711.75,
+        "right": 380,
+        "bottom": 781.75,
+        "left": 10
+      }
+    },
+    {
+      "index": 6,
+      "className": "section recent",
+      "id": "recent-order",
+      "rect": {
+        "x": 10,
+        "y": 789.75,
+        "width": 370,
+        "height": 102,
+        "top": 789.75,
+        "right": 380,
+        "bottom": 891.75,
+        "left": 10
+      }
+    },
+    {
+      "index": 7,
+      "className": "section",
+      "id": "",
+      "rect": {
+        "x": 10,
+        "y": 899.75,
+        "width": 370,
+        "height": 102,
+        "top": 899.75,
+        "right": 380,
+        "bottom": 1001.75,
+        "left": 10
+      }
+    },
+    {
+      "index": 8,
+      "className": "lifestyle",
+      "id": "",
+      "rect": {
+        "x": 10,
+        "y": 1009.75,
+        "width": 370,
+        "height": 141.6875,
+        "top": 1009.75,
+        "right": 380,
+        "bottom": 1151.4375,
+        "left": 10
+      }
+    }
+  ]
 }
