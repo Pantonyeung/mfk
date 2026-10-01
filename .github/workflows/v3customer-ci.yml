@@ -88,7 +88,7 @@ jobs:
 
           const browser=await chromium.launch({headless:true});
           const page=await browser.newPage({
-            viewport:{width:390,height:844},
+            viewport:{width:390,height:890},
             deviceScaleFactor:1
           });
           await page.goto('http://127.0.0.1:4175',{waitUntil:'networkidle'});
