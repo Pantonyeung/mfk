@@ -12,8 +12,7 @@ import {CUSTOMER_FINAL_SOURCE} from '../source-assets';
 import './stage1.css';
 
 const OFFICIAL_LOGO_URL=CUSTOMER_FINAL_SOURCE.logo.url;
-const HOME_MALE='/brand/stage0-male.webp';
-const HOME_FEMALE='/brand/stage0-female.webp';
+const HOME_PAIR='https://cdn.creativeclaw.co/u/6ad84d58/images/c40034d5-c340-4af5-8819-68c52b236c09.png';
 
 const statusLabel=(value:boolean|undefined)=>{
   if(value===true)return '營業中';
@@ -179,8 +178,7 @@ export function Stage1Home({
           <p>{subline}</p>
         </div>
         <div className="stage1-welcome-art" aria-hidden="true">
-          <img className="male" src={HOME_MALE} alt=""/>
-          <img className="female" src={HOME_FEMALE} alt=""/>
+          <img className="pair" src={HOME_PAIR} alt=""/>
         </div>
       </section>
 
@@ -196,8 +194,7 @@ export function Stage1Home({
           <em>開始點單</em>
         </span>
         <span className="stage1-banner-art" aria-hidden="true">
-          <img className="male" src={HOME_MALE} alt=""/>
-          <img className="female" src={HOME_FEMALE} alt=""/>
+          <img className="pair" src={HOME_PAIR} alt=""/>
         </span>
         <span className="stage1-banner-dots" aria-hidden="true"><i/><i/><i/></span>
       </button>
