@@ -3,6 +3,8 @@ import {ADMIN_MENU_GROUPS,destinationForPath,menuForDestination,type AdminMenuGr
 import {ProductListPage} from './product-list.tsx';
 import {AvailabilityPage} from './availability-page.tsx';
 import {AdminWorkspace} from './admin-workspaces.tsx';
+import {ModifiersPage,CombosPage} from './catalog-functional-pages.tsx';
+import {DiningTablesPage} from './dining-tables-page.tsx';
 import {
   EmptyState,
   ErrorState,
@@ -99,11 +101,17 @@ export function AdminShell({storeId,displayName,releaseStatus,canonicalState,can
 
   const routeContent=path==='/admin/catalog/products'
     ?<ProductListPage canonicalSnapshot={canonicalSnapshot} previewMode={previewMode} onReviewDraft={()=>navigate('/admin/publish/pending')}/>
-    :path==='/admin/availability'
-      ?<AvailabilityPage canonicalSnapshot={canonicalSnapshot} previewMode={previewMode}/>
-      :previewMode
-        ?<AdminWorkspace path={path} previewMode/>
-        :<RouteSkeleton path={path} canonicalState={canonicalState} onRefresh={onRefresh}/>;
+    :path==='/admin/catalog/modifiers'&&previewMode
+      ?<ModifiersPage/>
+      :path==='/admin/catalog/combos'&&previewMode
+        ?<CombosPage/>
+        :path==='/admin/availability'
+          ?<AvailabilityPage canonicalSnapshot={canonicalSnapshot} previewMode={previewMode}/>
+          :path==='/admin/store/tables'&&previewMode
+            ?<DiningTablesPage/>
+            :previewMode
+              ?<AdminWorkspace path={path} previewMode/>
+              :<RouteSkeleton path={path} canonicalState={canonicalState} onRefresh={onRefresh}/>;
 
   return <div className="v3-app-shell" data-preview={previewMode?'true':'false'}>
     <aside className="v3-sidebar" aria-label="Admin 功能導覽"><PrimaryNavigation activeMenu={activeMenu} onSelect={selectMenu}/><SecondaryNavigation menu={activeMenu} path={path} onNavigate={navigate}/></aside>
