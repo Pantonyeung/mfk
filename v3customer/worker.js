@@ -4,6 +4,10 @@ const HERO_MEDIA=Object.freeze({
   '/media/customer/hero/hero-female-main.png':'customer/brand/hero/hero-female-main.png',
   '/media/customer/hero/hero-doodle-morefun-main.png':'customer/brand/hero/hero-doodle-morefun-main.png',
   '/media/customer/hero/hero-doodle-goodtaste-main.png':'customer/brand/hero/hero-doodle-goodtaste-main.png',
+  '/media/customer/home/chef-product-01.png':'customer/brand/home/chef-product-01.png',
+  '/media/customer/home/chef-product-02.png':'customer/brand/home/chef-product-02.png',
+  '/media/customer/home/chef-product-03.png':'customer/brand/home/chef-product-03.png',
+  '/media/customer/home/chef-product-04.png':'customer/brand/home/chef-product-04.png',
 });
 
 export default {
