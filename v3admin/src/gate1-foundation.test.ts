@@ -2,7 +2,7 @@ import {afterEach,describe,expect,it,vi} from 'vitest';
 import {createMfkAdminConfigEnvelope} from '../../contracts/admin-config-sync-v1.ts';
 import {readV3CanonicalAdminActive,v3AdminCanonicalQueryKey} from './canonical.ts';
 import {releaseIdentityMatches,releaseVerificationMatches,V3_RELEASE_REFETCH_INTERVAL_MS} from './release.ts';
-import {V3_ADMIN_STATE_AUTHORITY} from './state-authority.ts';
+import {V3_ADMIN_STATE_AUTHORITY,V3_DATA_REFETCH_INTERVAL_MS} from './state-authority.ts';
 
 afterEach(()=>vi.unstubAllGlobals());
 
@@ -15,7 +15,10 @@ describe('Admin V3 one-shot Gate 1',()=>{
       adminFingerprint:'fnv1a32:admin',
       snapshot:{catalog:{categories:[{id:'C1'}],products:[{id:'P1'}],modifierGroups:[],combos:[]}},
     });
-    vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify(envelope),{status:200,headers:{'content-type':'application/json'}})));
+    vi.stubGlobal('fetch',vi.fn(async(_input:RequestInfo|URL,init?:RequestInit)=>{
+      expect(init?.cache).toBe('no-store');
+      return new Response(JSON.stringify(envelope),{status:200,headers:{'content-type':'application/json'}});
+    }));
     const result=await readV3CanonicalAdminActive({storeId:'MF01',sessionToken:'s'.repeat(64)});
     expect(result.fingerprint).toBe(envelope.fingerprint);
     expect(v3AdminCanonicalQueryKey('MF01')).toEqual(['mfk','admin-v3','canonical','active','MF01']);
@@ -58,6 +61,10 @@ describe('Admin V3 one-shot Gate 1',()=>{
     expect(releaseVerificationMatches(same,same,false)).toBeNull();
     expect(releaseVerificationMatches(same,undefined,true)).toBeNull();
     expect(V3_RELEASE_REFETCH_INTERVAL_MS).toBeGreaterThan(0);
+  });
+
+  it('sets a bounded automatic server revalidation interval',()=>{
+    expect(V3_DATA_REFETCH_INTERVAL_MS).toBe(60_000);
   });
 
   it('does not enable a durable outbox by default',()=>{
