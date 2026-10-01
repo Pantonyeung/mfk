@@ -9,18 +9,18 @@ const AUDIT_ROWS=[
   {id:'audit-4',time:'09:41',actor:'系統',action:'SMT 回讀',target:'SMT-01',result:'一致'},
 ] as const;
 
-export function TodayPage({mode}:{mode:'overview'|'queue'}){
+export function TodayPage({mode,onNavigate}:{mode:'overview'|'queue';onNavigate?:(path:string)=>void}){
   const drafts=usePreviewAdmin(state=>state.draftChanges);
   const devices=usePreviewAdmin(state=>state.devices);
   const channel=usePreviewAdmin(state=>state.channelConfig);
   if(mode==='queue'){
     const items=[
-      ...drafts.map(item=>({id:item.id,title:item.object,domain:item.domain,impact:'未發佈變更',tone:'warning' as const})),
-      ...devices.filter(item=>item.state!=='可用').map(item=>({id:item.id,title:item.name,domain:'裝置管理',impact:item.state,tone:'unknown' as const})),
-      ...(!channel.enabled?[{id:'channel-off',title:'Keeta',domain:'平台／渠道管理',impact:'平台設定停用',tone:'warning' as const}]:[]),
+      ...drafts.map(item=>({id:item.id,title:item.object,domain:item.domain,impact:'未發佈變更',tone:'warning' as const,path:'/admin/publish/pending'})),
+      ...devices.filter(item=>item.state!=='可用').map(item=>({id:item.id,title:item.name,domain:'裝置管理',impact:item.state,tone:'unknown' as const,path:'/admin/devices'})),
+      ...(!channel.enabled?[{id:'channel-off',title:'Keeta',domain:'平台／渠道管理',impact:'平台設定停用',tone:'warning' as const,path:'/admin/channels'}]:[]),
     ];
     return <div className="v3-functional-page"><div className="v3-preview-banner"><strong>今日／待處理事項</strong><span>Action Queue 只分流去責任頁，唔喺呢度建立第二 mutation center。</span></div><PageHeader eyebrow="今日" title="待處理事項" description="按目前 Preview 狀態聚合需要處理嘅工作。" aside={<span className="v3-product-count">{items.length} 項</span>}/>
-      <div className="v3-action-list">{items.map(item=><article key={item.id}><div><strong>{item.title}</strong><small>{item.domain}</small></div><StatusBadge tone={item.tone}>{item.impact}</StatusBadge><button type="button">前往責任頁</button></article>)}</div>
+      <div className="v3-action-list">{items.map(item=><article key={item.id}><div><strong>{item.title}</strong><small>{item.domain}</small></div><StatusBadge tone={item.tone}>{item.impact}</StatusBadge><button type="button" onClick={()=>onNavigate?.(item.path)}>前往責任頁</button></article>)}</div>
     </div>;
   }
   const stale=devices.filter(item=>item.state==='資料過期').length;
@@ -53,15 +53,15 @@ export function IntegrationsPage(){
   </div>;
 }
 
-export function EffectiveSettingsPage(){
+export function EffectiveSettingsPage({onNavigate}:{onNavigate?:(path:string)=>void}){
   const settings=usePreviewAdmin(state=>state.storeSettings);
   const channel=usePreviewAdmin(state=>state.channelConfig);
   const rows=[
-    ['門店名稱',settings.storeName,'門店設定／門店資料'],
-    ['營業日分界',settings.businessDayCutoff,'門店設定／營業日分界'],
-    ['Keeta 自動接單',channel.autoAccept?'開':'關','平台／渠道管理／接單規則'],
-    ['供應同步',channel.syncSellability?'開':'關','平台／渠道管理／供應同步'],
-    ['Keeta Shop ID',channel.providerShopId,'平台／渠道管理／門店綁定'],
+    ['門店名稱',settings.storeName,'門店設定／門店資料','/admin/store/settings'],
+    ['營業日分界',settings.businessDayCutoff,'門店設定／營業日分界','/admin/store/business-day'],
+    ['Keeta 自動接單',channel.autoAccept?'開':'關','平台／渠道管理／接單規則','/admin/channels/accept-policy'],
+    ['供應同步',channel.syncSellability?'開':'關','平台／渠道管理／供應同步','/admin/channels/sync-policy'],
+    ['Keeta Shop ID',channel.providerShopId,'平台／渠道管理／門店綁定','/admin/channels/store-binding'],
   ];
-  return <div className="v3-functional-page"><PageHeader eyebrow="系統管理" title="進階／實際生效設定" description="Read-mostly effective values；正常修改返回唯一 Primary Home。" /><div className="v3-action-list">{rows.map(([name,value,source])=><article key={name}><div><strong>{name}</strong><small>來源：{source}</small></div><strong>{value}</strong><button type="button">前往原設定頁</button></article>)}</div></div>;
+  return <div className="v3-functional-page"><PageHeader eyebrow="系統管理" title="進階／實際生效設定" description="Read-mostly effective values；正常修改返回唯一 Primary Home。" /><div className="v3-action-list">{rows.map(([name,value,source,path])=><article key={name}><div><strong>{name}</strong><small>來源：{source}</small></div><strong>{value}</strong><button type="button" onClick={()=>onNavigate?.(path)}>前往原設定頁</button></article>)}</div></div>;
 }
