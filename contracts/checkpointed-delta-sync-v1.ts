@@ -16,6 +16,9 @@ export interface MfkSyncHead{
   readonly checkpointHash:string;
   readonly projectionHash:string;
   readonly sourceCommitSeq:number;
+  readonly canonicalRevision:number;
+  readonly canonicalFingerprint:string;
+  readonly canonicalPublishedAt:string;
   readonly observedAt:string;
 }
 
@@ -152,6 +155,9 @@ export function validateMfkSyncHead(input:unknown):MfkSyncHead{
     checkpointHash:String(row.checkpointHash??''),
     projectionHash:String(row.projectionHash??''),
     sourceCommitSeq:nonNegativeInt(row.sourceCommitSeq,'SYNC_HEAD_SOURCE_COMMIT_INVALID'),
+    canonicalRevision:nonNegativeInt(row.canonicalRevision,'SYNC_HEAD_CANONICAL_REVISION_INVALID'),
+    canonicalFingerprint:text(row.canonicalFingerprint,'SYNC_HEAD_CANONICAL_FINGERPRINT_INVALID',180),
+    canonicalPublishedAt:instant(row.canonicalPublishedAt,'SYNC_HEAD_CANONICAL_PUBLISHED_AT_INVALID'),
     observedAt:instant(row.observedAt,'SYNC_HEAD_OBSERVED_AT_INVALID'),
   };
   if(out.journalFloorSeq>out.headSeq)throw new Error('SYNC_HEAD_JOURNAL_FLOOR_AHEAD');
