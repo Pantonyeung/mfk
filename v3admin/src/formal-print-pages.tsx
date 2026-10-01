@@ -167,3 +167,40 @@ export function FormalPrintRulesGapPage(){
     </section>
   </div>;
 }
+
+
+export function FormalPrintOverviewPage(){
+  const formal=useV3FormalDraft();
+  const printers=useMemo(()=>readFormalLogicalPrinters(formal.workingSnapshot),[formal.workingSnapshot]);
+  const templates=useMemo(()=>readFormalPrintTemplates(formal.workingSnapshot),[formal.workingSnapshot]);
+  const active=printers.filter(printer=>printer.active);
+  const counts={
+    RECEIPT:active.filter(printer=>printer.type==='RECEIPT').length,
+    PRODUCTION:active.filter(printer=>printer.type==='PRODUCTION').length,
+    PACKING:active.filter(printer=>printer.type==='PACKING').length,
+    LABEL:active.filter(printer=>printer.type==='LABEL').length,
+  };
+  return <div className="v3-functional-page">
+    <PageHeader eyebrow="打印管理" title="打印總覽" description="直接讀 Formal Server Draft / Canonical 嘅 Logical Printer 同 Template；實體 IP／USB 保持 SMT 現場 authority。"/>
+    <section className="v3-whole-kpi-grid">
+      <article><span>小票 Logical Printer</span><strong>{counts.RECEIPT}</strong><small>{templates.receipt?'Template 已設定':'未有 Template'}</small></article>
+      <article><span>製作單 Logical Printer</span><strong>{counts.PRODUCTION}</strong><small>{templates.production?'Template 已設定':'未有 Template'}</small></article>
+      <article><span>打包單 Logical Printer</span><strong>{counts.PACKING}</strong><small>{templates.packing?'Template 已設定':'未有 Template'}</small></article>
+      <article><span>Label Logical Printer</span><strong>{counts.LABEL}</strong><small>{templates.label?'Template 已設定':'未有 Template'}</small></article>
+    </section>
+    <section className="v3-functional-section">
+      <header><div><h3>正式打印 Authority</h3><p>Admin 已接 Logical Printer + Template；Product per-output routing 仲等正式 schema seam。</p></div><StatusBadge tone="warning">{FORMAL_PRINT_ROUTING_GAP.status}</StatusBadge></header>
+      <div className="v3-action-list">{printers.map(printer=><article key={printer.id}><div><strong>{printer.name}</strong><small>{printer.id} · {printer.type} · {printer.widthMm}mm</small></div><StatusBadge tone={printer.active?'good':'neutral'}>{printer.active?'啟用':'停用'}</StatusBadge></article>)}</div>
+    </section>
+  </div>;
+}
+
+export function FormalPrintExceptionsGapPage(){
+  return <div className="v3-functional-page">
+    <PageHeader eyebrow="打印管理" title="打印狀態／異常" description="未有 verified server print-job / safe-retry read seam 前保持 fail-closed。"/>
+    <section className="v3-functional-section">
+      <header><div><h3>Print evidence seam 未接</h3><p>需要正式 Print Job identity、目的地、狀態、失敗原因，同 safe-retry command/readback。</p></div><StatusBadge tone="warning">READ + COMMAND SEAM REQUIRED</StatusBadge></header>
+      <div className="v3-mobile-form-note">呢頁唔會用 Preview 假異常，亦唔會提供未有 idempotency contract 嘅「重印」按鈕。</div>
+    </section>
+  </div>;
+}
