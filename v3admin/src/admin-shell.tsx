@@ -1,5 +1,6 @@
 import {useEffect,useMemo,useState,type ReactNode} from 'react';
 import {ADMIN_MENU_GROUPS,destinationForPath,menuForDestination,type AdminMenuGroup} from './navigation.ts';
+import {ProductListPage} from './product-list.tsx';
 import {
   EmptyState,
   ErrorState,
@@ -30,7 +31,7 @@ function SecondaryNavigation({menu,path,onBack,onNavigate}:{menu:AdminMenuGroup;
   return <div className="v3-menu-secondary">
     {onBack?<button className="v3-nav-back" type="button" onClick={onBack}>返回主要功能</button>:null}
     <div className="v3-secondary-title"><small>{menu.index}</small><strong>{menu.label}</strong></div>
-    <nav aria-label={`${menu.label}頁面`}>{menu.destinations.map(destination=><button key={destination.path} type="button" className={destination.path===path?'is-active':''} aria-current={destination.path===path?'page':undefined} onClick={()=>onNavigate(destination.path)}>{destination.title}</button>)}</nav>
+    <nav aria-label={menu.label+'頁面'}>{menu.destinations.map(destination=><button key={destination.path} type="button" className={destination.path===path?'is-active':''} aria-current={destination.path===path?'page':undefined} onClick={()=>onNavigate(destination.path)}>{destination.title}</button>)}</nav>
   </div>;
 }
 
@@ -49,17 +50,20 @@ function RouteSkeleton({path,canonicalState,onRefresh}:{path:string;canonicalSta
   </>;
 }
 
-export function AdminShell({storeId,displayName,releaseStatus,canonicalState,onRefresh,onDiagnostics,onSignOut,children}:{
+export function AdminShell({storeId,displayName,releaseStatus,canonicalState,canonicalSnapshot,previewMode=false,initialPath,onRefresh,onDiagnostics,onSignOut,children}:{
   storeId:string;
   displayName:string;
   releaseStatus:ReactNode;
   canonicalState:CanonicalState;
+  canonicalSnapshot?:unknown;
+  previewMode?:boolean;
+  initialPath?:string;
   onRefresh:()=>void;
   onDiagnostics:()=>void;
   onSignOut:()=>void;
   children?:ReactNode;
 }){
-  const [path,setPath]=useState(currentPath);
+  const [path,setPath]=useState(()=>initialPath??currentPath());
   const selectedDestination=useMemo(()=>destinationForPath(path),[path]);
   const selectedMenu=useMemo(()=>menuForDestination(selectedDestination),[selectedDestination]);
   const [activeMenu,setActiveMenu]=useState(selectedMenu);
@@ -67,10 +71,11 @@ export function AdminShell({storeId,displayName,releaseStatus,canonicalState,onR
   const [mobileStep,setMobileStep]=useState<'menus'|'destinations'>('menus');
 
   useEffect(()=>{
+    if(previewMode)return;
     const onPopState=()=>setPath(currentPath());
     window.addEventListener('popstate',onPopState);
     return ()=>window.removeEventListener('popstate',onPopState);
-  },[]);
+  },[previewMode]);
   useEffect(()=>setActiveMenu(selectedMenu),[selectedMenu]);
   useEffect(()=>{
     if(!drawerOpen)return;
@@ -80,7 +85,7 @@ export function AdminShell({storeId,displayName,releaseStatus,canonicalState,onR
   },[drawerOpen]);
 
   const navigate=(nextPath:string)=>{
-    window.history.pushState({},'',nextPath);
+    if(!previewMode)window.history.pushState({},'',nextPath);
     setPath(nextPath);
     setDrawerOpen(false);
     setMobileStep('menus');
@@ -90,7 +95,11 @@ export function AdminShell({storeId,displayName,releaseStatus,canonicalState,onR
     if(drawerOpen||window.matchMedia('(max-width: 1179px)').matches){setDrawerOpen(true);setMobileStep('destinations');}
   };
 
-  return <div className="v3-app-shell">
+  const routeContent=path==='/admin/catalog/products'
+    ?<ProductListPage canonicalSnapshot={canonicalSnapshot} previewMode={previewMode} onReviewDraft={()=>navigate('/admin/publish/pending')}/>
+    :<RouteSkeleton path={path} canonicalState={canonicalState} onRefresh={onRefresh}/>;
+
+  return <div className="v3-app-shell" data-preview={previewMode?'true':'false'}>
     <aside className="v3-sidebar" aria-label="Admin 功能導覽"><PrimaryNavigation activeMenu={activeMenu} onSelect={selectMenu}/><SecondaryNavigation menu={activeMenu} path={path} onNavigate={navigate}/></aside>
     {drawerOpen?<><button className="v3-drawer-backdrop" type="button" aria-label="關閉功能選單" onClick={()=>setDrawerOpen(false)}/><aside className="v3-drawer" aria-label="流動版功能導覽">
       <div className="v3-drawer-head"><strong>功能選單</strong><button type="button" onClick={()=>setDrawerOpen(false)}>關閉</button></div>
@@ -101,10 +110,10 @@ export function AdminShell({storeId,displayName,releaseStatus,canonicalState,onR
         <button className="v3-menu-trigger" type="button" aria-expanded={drawerOpen} onClick={()=>{setMobileStep('menus');setDrawerOpen(true);}}>功能</button>
         <a className="v3-brand" href="/admin/overview" onClick={event=>{event.preventDefault();navigate('/admin/overview');}}><span>MFK</span><strong>Admin V3</strong></a>
         <div className="v3-context"><span>{storeId}</span><strong>{displayName}</strong></div>
-        <div className="v3-top-actions"><button type="button" onClick={onDiagnostics}>系統資訊</button><button type="button" onClick={onSignOut}>登出</button></div>
+        {previewMode?<div className="v3-preview-topbadge">只供介面驗收</div>:<div className="v3-top-actions"><button type="button" onClick={onDiagnostics}>系統資訊</button><button type="button" onClick={onSignOut}>登出</button></div>}
       </header>
       {releaseStatus}
-      <main className="v3-content"><RouteSkeleton path={path} canonicalState={canonicalState} onRefresh={onRefresh}/>{children}</main>
+      <main className="v3-content">{routeContent}{children}</main>
     </div>
   </div>;
 }
