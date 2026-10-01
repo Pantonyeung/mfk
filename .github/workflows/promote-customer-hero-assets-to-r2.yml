@@ -17,7 +17,7 @@ jobs:
       - name: Checkout relay source
         uses: actions/checkout@v4
         with:
-          ref: temp/MFK-CUSTOMER-R2-ASSET-RELAY-20261001
+          ref: temp/MFK-CUSTOMER-HERO-ASSET-RELAY-20261001-1835A
           path: relay-src
 
       - name: Upload lossless masters to R2 and verify readback
@@ -108,4 +108,4 @@ jobs:
             echo "Result: byte-for-byte SHA256 readback GREEN"
           } >> "$GITHUB_STEP_SUMMARY"
 
-# merge-trigger=2026-10-01T18:40:00+08:00
+# merge-trigger=2026-10-01T18:50:00+08:00
