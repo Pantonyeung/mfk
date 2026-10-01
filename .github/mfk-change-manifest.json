@@ -12,7 +12,8 @@
     "docs/execution/MFK_CUSTOMER_V3_HIGH_FIDELITY_AI_IMPLEMENTATION_R1_2026-10-01.md",
     "docs/product/MFK_CUSTOMER_V3_LONG_HOME_R2_IMPLEMENTATION_LOCK_2026-10-01.md",
     "docs/product/MFK_CUSTOMER_V3_LONG_HOME_R3_BACKGROUND_COMPLETION_2026-10-01.md",
-    "docs/product/MFK_CUSTOMER_V3_ASSET_REPLACEMENT_CONTRACT_R1_2026-10-01.md"
+    "docs/product/MFK_CUSTOMER_V3_ASSET_REPLACEMENT_CONTRACT_R1_2026-10-01.md",
+    "docs/product/MFK_CUSTOMER_V3_MOBILE_HOME_LAYOUT_R4_2026-10-01.md"
   ],
   "authority_impact": "NONE",
   "persistence_impact": "NONE",
@@ -20,10 +21,11 @@
   "transaction_impact": "NONE",
   "production_routing_impact": "NONE",
   "expected_behavior_change": [
-    "Add isolated zero-production-routing Customer V3 long-scroll homepage preview.",
-    "Lock the Owner-selected long homepage as the visual implementation target.",
-    "Provide a real React implementation surface for screenshot-diff iteration.",
-    "Run isolated Customer V3 typecheck/build CI without deploy permissions."
+    "Keep the approved Hero art unchanged while rebuilding the Customer Home layout around a large-image mobile-first hierarchy.",
+    "Make Hero occupy at least 60% of the first viewport.",
+    "Keep total Home length approximately 1.5 viewports.",
+    "Use four large 2x2 quick-action cards, two large featured cards, one recent-order row, and four-item bottom navigation.",
+    "Run isolated Customer V3 typecheck/build and deterministic visual-layout acceptance without production cutover."
   ],
   "non_goals": [
     "No v2customer change.",
