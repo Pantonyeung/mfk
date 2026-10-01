@@ -373,3 +373,58 @@ dialog p{color:var(--muted);line-height:1.55}
   .v3-product-mobile-card .v3-product-thumb{width:44px;height:44px}
   .v3-page-header .v3-product-count{order:3}
 }
+
+
+/* Whole Admin V3 preview workspaces */
+.v3-whole-workspace{display:grid;gap:18px}
+.v3-whole-meta-strip{display:flex;gap:18px;flex-wrap:wrap;padding:10px 12px;border:1px solid var(--line);border-radius:11px;background:#fbf8f1;color:var(--muted);font-size:.76rem}
+.v3-whole-meta-strip strong{color:var(--ink)}
+.v3-whole-kpi-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.v3-whole-kpi-grid article{display:grid;gap:6px;min-height:138px;padding:15px;border:1px solid var(--line);border-radius:15px;background:var(--paper);box-shadow:0 9px 26px rgba(55,46,31,.035)}
+.v3-whole-kpi-grid article>span{color:var(--muted);font-size:.78rem;font-weight:700}
+.v3-whole-kpi-grid article>strong{font-size:1.6rem;letter-spacing:-.02em}
+.v3-whole-kpi-grid article>small{color:var(--muted);line-height:1.35}
+.v3-whole-kpi-grid .v3-status{justify-self:start;margin-top:auto}
+.v3-whole-two-col{display:grid;grid-template-columns:1.25fr .75fr;gap:14px}
+.v3-whole-panel{overflow:hidden;border:1px solid var(--line);border-radius:15px;background:var(--paper)}
+.v3-whole-panel>header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 15px;border-bottom:1px solid #ece8df;background:#faf7f0}
+.v3-whole-panel>header h2{margin:0;font-size:1rem}
+.v3-whole-panel>header span{color:var(--muted);font-size:.75rem}
+.v3-whole-list{display:grid;border:1px solid var(--line);border-radius:15px;overflow:hidden;background:var(--paper)}
+.v3-whole-panel>.v3-whole-list{border:0;border-radius:0}
+.v3-whole-list>button{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(100px,.7fr) auto 18px;align-items:center;gap:14px;min-height:66px;border:0;border-radius:0;border-bottom:1px solid #eee9df;padding:11px 14px;background:transparent;text-align:left}
+.v3-whole-list>button:last-child{border-bottom:0}
+.v3-whole-list>button:hover{background:#fcf8ef}
+.v3-whole-list-main{display:grid;gap:3px}
+.v3-whole-list-main small{color:var(--muted);font-size:.72rem}
+.v3-whole-list-value{font-weight:800}
+.v3-readiness-stack{display:grid}
+.v3-readiness-stack>div{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:13px 15px;border-bottom:1px solid #eee9df}
+.v3-readiness-stack>div:last-child{border-bottom:0}
+.v3-whole-mobile-groups{display:none}
+.v3-whole-mobile-record{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;min-height:66px;border:1px solid var(--line);border-radius:11px;background:var(--paper);padding:10px 11px;text-align:left}
+.v3-whole-mobile-record>span{display:grid;gap:3px}
+.v3-whole-mobile-record>span:first-child{min-width:0}
+.v3-whole-mobile-record>span:last-child{justify-items:end}
+.v3-whole-mobile-record small{color:var(--muted);font-size:.7rem}
+.v3-whole-mobile-record b{font-size:.82rem}
+.v3-whole-modal .v3-mobile-modal-sheet textarea{width:100%;border:1px solid #c9c3b7;border-radius:11px;padding:10px 12px;background:#fff;color:var(--ink)}
+.v3-mobile-object-summary{display:grid;grid-template-columns:1fr auto auto;gap:8px;align-items:center;padding:12px;border:1px solid var(--line);border-radius:11px;background:var(--paper)}
+.v3-mobile-object-summary span{color:var(--muted)}
+.v3-mobile-object-summary code{font-size:.76rem}
+.v3-mobile-object-summary strong{font-size:.92rem}
+
+@media(max-width:1180px){
+  .v3-whole-kpi-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .v3-whole-two-col{grid-template-columns:1fr}
+}
+@media(max-width:767px){
+  .v3-whole-kpi-grid{grid-template-columns:1fr 1fr;gap:8px}
+  .v3-whole-kpi-grid article{min-height:120px;padding:12px}
+  .v3-whole-kpi-grid article>strong{font-size:1.3rem}
+  .v3-whole-desktop{display:none}
+  .v3-whole-mobile-groups{display:block}
+  .v3-whole-meta-strip{display:grid;grid-template-columns:1fr 1fr;gap:6px 12px}
+  .v3-whole-meta-strip span:last-child{grid-column:1/-1}
+  .v3-whole-panel>.v3-whole-list{display:grid}
+}
