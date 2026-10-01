@@ -2,6 +2,7 @@ import {describe,expect,it} from 'vitest';
 import {renderToStaticMarkup} from 'react-dom/server';
 import {AdminShell} from './admin-shell.tsx';
 import {AdminWorkspace,adminWorkspaceCoverage} from './admin-workspaces.tsx';
+import {ADMIN_DESTINATIONS} from './navigation.ts';
 
 describe('Admin V3 whole-admin preview coverage',()=>{
   it('covers every current navigation destination including restored table management',()=>{
@@ -53,6 +54,26 @@ describe('Admin V3 whole-admin preview coverage',()=>{
     />);
     expect(html).toContain(title);
     expect(html).not.toContain('尚未接駁');
+  });
+
+  it('routes all 54 destinations to dedicated functional preview workspaces',()=>{
+    expect(ADMIN_DESTINATIONS).toHaveLength(54);
+    for(const destination of ADMIN_DESTINATIONS){
+      const html=renderToStaticMarkup(<AdminShell
+        storeId="PREVIEW"
+        displayName="介面驗收"
+        releaseStatus={<div>UI</div>}
+        canonicalState="fresh"
+        previewMode
+        initialPath={destination.path}
+        onRefresh={()=>{}}
+        onDiagnostics={()=>{}}
+        onSignOut={()=>{}}
+      />);
+      expect(html,destination.path).not.toContain('Admin V3 全域公網實作');
+      expect(html,destination.path).not.toContain('尚未接駁');
+      expect(html,destination.path).toContain(destination.title);
+    }
   });
 
   it('keeps transaction monitoring read-only in Admin preview',()=>{
