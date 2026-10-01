@@ -16,7 +16,7 @@ import {
   createMfkSyncCheckpoint,
   diffMfkSyncEntities,
   projectionHashForEntities,
-} from './checkpointed-delta-sync.ts';
+} from '../sync/checkpointed-delta-sync.ts';
 import {buildKeetaMenuProjection} from './keeta-menu-projection.ts';
 export {KeetaRuntimeStore,CustomerRuntimeStore};
 
