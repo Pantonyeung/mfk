@@ -2578,6 +2578,21 @@ export default {
       const adminId=env.ADMIN_SYNC.idFromName(storeId);
       const admin=env.ADMIN_SYNC.get(adminId);
 
+      if(url.pathname.startsWith('/api/customer/sync/')){
+        if(request.method!=='GET')return json({code:'METHOD_NOT_ALLOWED'},405,cors(request));
+        if(request.headers.get('origin')!==CUSTOMER_ORIGIN)return json({code:'CUSTOMER_SYNC_ORIGIN_FORBIDDEN'},403,cors(request));
+        const action=url.pathname.slice('/api/customer/sync/'.length);
+        if(!['head','changes','checkpoint'].includes(action))return json({code:'NOT_FOUND'},404,cors(request));
+        const target=new URL(request.url);
+        target.pathname='/sync/'+action;
+        target.searchParams.set('storeId',storeId);
+        target.searchParams.set('port','CUSTOMER');
+        const response=await admin.fetch(new Request(target.toString(),{method:'GET',headers:new Headers(request.headers)}));
+        const headers=new Headers(response.headers);
+        for(const [key,value] of Object.entries(cors(request)))headers.set(key,value);
+        return new Response(response.body,{status:response.status,statusText:response.statusText,headers});
+      }
+
       if(url.pathname==='/api/customer/channel-health'){
         if(request.method!=='GET')return json({code:'METHOD_NOT_ALLOWED'},405,cors(request));
         const response=await customer.fetch(new Request('https://internal/public/channel-health',{method:'GET'}));
@@ -2598,7 +2613,17 @@ export default {
         const orderBody=orderResponse.ok?await orderResponse.json():{orders:[]};
         const sellabilityResponse=await admin.fetch(new Request('https://internal/runtime-sellability-readback',{method:'GET'}));
         const sellabilityBody=sellabilityResponse.ok?await sellabilityResponse.json():{sellability:[]};
-        return json(customerPublicSnapshot(active,Array.isArray(orderBody.orders)?orderBody.orders:[],Array.isArray(sellabilityBody.sellability)?sellabilityBody.sellability:[]),200,cors(request));
+        const sellability=Array.isArray(sellabilityBody.sellability)?sellabilityBody.sellability:[];
+        const projected=customerPublicSnapshot(active,Array.isArray(orderBody.orders)?orderBody.orders:[],sellability);
+        if(url.searchParams.get('config')==='0'){
+          return json({
+            activeOrders:projected.activeOrders,
+            history:projected.history,
+            runtimeSellability:sellability,
+            observedAt:projected.observedAt,
+          },200,cors(request));
+        }
+        return json(projected,200,cors(request));
       }
 
       if(url.pathname==='/api/customer/payment-qr'){
