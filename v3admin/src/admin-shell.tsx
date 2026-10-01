@@ -17,6 +17,7 @@ import {FormalModifiersPage} from './formal-modifiers-page.tsx';
 import {FormalPrintersPage,FormalPrintRulesGapPage,FormalPrintTemplatesPage} from './formal-print-pages.tsx';
 import {FormalCombosPage} from './formal-combos-page.tsx';
 import {FormalDiningTablesPage,FormalStoreSettingsPage} from './formal-store-pages.tsx';
+import {FormalChannelPage} from './formal-channel-pages.tsx';
 import {
   EmptyState,
   ErrorState,
@@ -142,20 +143,20 @@ export function AdminShell({storeId,displayName,releaseStatus,canonicalState,can
                     ?<CashClosePage/>
                     :path==='/admin/operations/capacity'&&previewMode
                       ?<CapacityPage/>
-                      :path==='/admin/channels'&&previewMode
-                  ?<ChannelPage mode="overview"/>
-                  :path==='/admin/channels/accept-policy'&&previewMode
-                    ?<ChannelPage mode="accept"/>
-                    :path==='/admin/channels/sync-policy'&&previewMode
-                      ?<ChannelPage mode="sync"/>
-                      :path==='/admin/channels/store-binding'&&previewMode
-                        ?<ChannelPage mode="binding"/>
-                        :path==='/admin/channels/product-mapping'&&previewMode
-                          ?<ChannelPage mode="mapping"/>
-                          :path==='/admin/channels/mapping-failure'&&previewMode
-                            ?<ChannelPage mode="failures"/>
-                            :path==='/admin/channels/net-estimate'&&previewMode
-                              ?<ChannelPage mode="estimate"/>
+                      :path==='/admin/channels'
+                  ?(previewMode?<ChannelPage mode="overview"/>:formalDraftEnabled?<FormalChannelPage mode="overview"/>:<RouteSkeleton path={path} canonicalState={canonicalState} onRefresh={onRefresh}/>)
+                  :path==='/admin/channels/accept-policy'
+                    ?(previewMode?<ChannelPage mode="accept"/>:formalDraftEnabled?<FormalChannelPage mode="accept"/>:<RouteSkeleton path={path} canonicalState={canonicalState} onRefresh={onRefresh}/>)
+                    :path==='/admin/channels/sync-policy'
+                      ?(previewMode?<ChannelPage mode="sync"/>:formalDraftEnabled?<FormalChannelPage mode="sync"/>:<RouteSkeleton path={path} canonicalState={canonicalState} onRefresh={onRefresh}/>)
+                      :path==='/admin/channels/store-binding'
+                        ?(previewMode?<ChannelPage mode="binding"/>:formalDraftEnabled?<FormalChannelPage mode="binding"/>:<RouteSkeleton path={path} canonicalState={canonicalState} onRefresh={onRefresh}/>)
+                        :path==='/admin/channels/product-mapping'
+                          ?(previewMode?<ChannelPage mode="mapping"/>:formalDraftEnabled?<FormalChannelPage mode="mapping"/>:<RouteSkeleton path={path} canonicalState={canonicalState} onRefresh={onRefresh}/>)
+                          :path==='/admin/channels/mapping-failure'
+                            ?(previewMode?<ChannelPage mode="failures"/>:formalDraftEnabled?<FormalChannelPage mode="failures"/>:<RouteSkeleton path={path} canonicalState={canonicalState} onRefresh={onRefresh}/>)
+                            :path==='/admin/channels/net-estimate'
+                              ?(previewMode?<ChannelPage mode="estimate"/>:formalDraftEnabled?<FormalChannelPage mode="estimate"/>:<RouteSkeleton path={path} canonicalState={canonicalState} onRefresh={onRefresh}/>)
                               :path==='/admin/channels/settlement'&&previewMode
                                 ?<SettlementPage/>
                                 :path==='/admin/print'&&previewMode
