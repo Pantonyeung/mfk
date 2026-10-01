@@ -1,36 +1,30 @@
 {
   "version": 1,
-  "capability": "MFK_ADMIN_V3_FORMAL_SERVER_DRAFT_SEAM_R1",
-  "base_sha": "f78960ebbd07e1adfff62d19d3ac129be863cb53",
+  "capability": "CUSTOMER_V3_LONG_HOME_UI_R1",
+  "base_sha": "a41378d7106362b6fb13c66549c6c6556c909025",
   "root_control": "#596",
-  "product_control": "#601",
   "allowed_paths": [
     ".github/mfk-change-manifest.json",
-    "docs/implementation/MFK_CODEX_KICKOFF_ADMIN_V3_FORMAL_SERVER_DRAFT_SEAM_R1_2026-10-01.md",
-    "v2admin/worker.ts",
-    "v2admin/src/admin-formal-server-draft.test.ts",
-    "v2admin/src/admin-sync-websocket-transport.test.ts"
+    "v3customer/**",
+    "docs/product/MFK_CUSTOMER_V3_LONG_HOME_VISUAL_PRD_R1_2026-10-01.md",
+    "docs/execution/MFK_CUSTOMER_V3_HIGH_FIDELITY_AI_IMPLEMENTATION_R1_2026-10-01.md"
   ],
-  "authority_impact": "BOUNDED_EXTENSION_OF_EXISTING_ADMIN_CANONICAL_CONFIG_AUTHORITY_FOR_FORMAL_SERVER_DRAFT_ONLY; NO_SECOND_AUTHORITY",
-  "persistence_impact": "ADD_SERVER_SIDE_ADMIN_DRAFT_RECORD_WITH_DRAFT_ID_REVISION_AND_CANONICAL_BASE_GUARD",
+  "authority_impact": "NONE",
+  "persistence_impact": "NONE",
   "provider_impact": "NONE",
   "transaction_impact": "NONE",
   "production_routing_impact": "NONE",
   "expected_behavior_change": [
-    "Admin V3 can persist a formal server Draft separately from unsaved browser edits.",
-    "Saved Draft supports authoritative reload/new-browser restoration and optimistic concurrency.",
-    "Stale Draft or stale second-tab writes fail closed with explicit conflicts.",
-    "Publish-from-Draft reuses existing Admin publish authority and clears Draft only after successful canonical publish.",
-    "Final canonical base guard prevents stale Draft overwrite during a publish race."
+    "Add isolated zero-production-routing Customer V3 long-scroll homepage preview.",
+    "Lock the Owner-selected long homepage as the visual implementation target.",
+    "Provide a real React implementation surface for screenshot-diff iteration."
   ],
   "non_goals": [
-    "No Pricing authority or takeaway surcharge schema change.",
-    "No SMT Store Kernel change.",
-    "No Order, Payment, Refund, Cancel or provider transaction change.",
-    "No v2 browser-state migration.",
-    "No localStorage, sessionStorage or Dexie formal Draft authority.",
-    "No production deploy, hostname cutover or OTA."
+    "No v2customer change.",
+    "No production route or hostname cutover.",
+    "No Order, Pricing, Payment, Fulfillment, Sellability, Admin, SMT or provider authority change.",
+    "No merge, deploy or OTA without separate Owner PROMOTE."
   ],
-  "rollback_sha": "f78960ebbd07e1adfff62d19d3ac129be863cb53",
-  "severity": "HARD_BLOCK"
+  "rollback_sha": "a41378d7106362b6fb13c66549c6c6556c909025",
+  "severity": "SOFT_BLOCK"
 }
