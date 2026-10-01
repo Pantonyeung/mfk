@@ -8,7 +8,7 @@ import {
   entityMapFromCheckpoint,
   materializeSmtSnapshot,
   projectionHashForEntities,
-} from '../checkpointed-delta-sync.ts';
+} from '../../sync/checkpointed-delta-sync.ts';
 
 const at='2026-10-01T10:00:00.000Z';
 
