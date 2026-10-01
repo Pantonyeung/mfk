@@ -18,6 +18,7 @@ import {
   projectionHashForEntities,
 } from '../sync/checkpointed-delta-sync.ts';
 import {buildKeetaMenuProjection} from './keeta-menu-projection.ts';
+import {projectAdminEnvelopeToSmmConfig} from '../sync/smm-admin-projection';
 export {KeetaRuntimeStore,CustomerRuntimeStore};
 
 const JSON_HEADERS={'content-type':'application/json; charset=utf-8','cache-control':'no-store'};
@@ -1073,7 +1074,7 @@ export class AdminSyncStore{
     if(port==='SMT')return buildSmtSyncEntities(active.snapshot);
     const customerSnapshot=customerPublicSnapshot(active,[],[]);
     if(port==='CUSTOMER')return buildCustomerSyncEntities(customerSnapshot);
-    if(port==='SMM')return buildSmmSyncEntities({menu:customerSnapshot.menu,diningTables:[]});
+    if(port==='SMM')return buildSmmSyncEntities(projectAdminEnvelopeToSmmConfig(active));
     if(port==='KEETA'){
       const projection=buildKeetaMenuProjection(active.snapshot);
       return buildKeetaSyncEntities(projection.payload);
