@@ -2,33 +2,33 @@
   "viewportWidth": 390,
   "viewportHeight": 890,
   "documentWidth": 390,
-  "documentHeight": 975,
+  "documentHeight": 1470,
   "hero": {
     "x": 0,
     "y": 0,
     "width": 390,
-    "height": 208,
+    "height": 569.59375,
     "top": 0,
     "right": 390,
-    "bottom": 208,
+    "bottom": 569.59375,
     "left": 0
   },
   "quick": {
-    "x": 10,
-    "y": 208,
-    "width": 370,
-    "height": 82,
-    "top": 208,
-    "right": 380,
-    "bottom": 290,
-    "left": 10
+    "x": 14,
+    "y": 555.59375,
+    "width": 362,
+    "height": 260,
+    "top": 555.59375,
+    "right": 376,
+    "bottom": 815.59375,
+    "left": 14
   },
   "nav": {
     "x": 0,
-    "y": 846,
+    "y": 820,
     "width": 390,
-    "height": 44,
-    "top": 846,
+    "height": 70,
+    "top": 820,
     "right": 390,
     "bottom": 890,
     "left": 0
@@ -42,10 +42,10 @@
         "x": 0,
         "y": 0,
         "width": 390,
-        "height": 208,
+        "height": 569.59375,
         "top": 0,
         "right": 390,
-        "bottom": 208,
+        "bottom": 569.59375,
         "left": 0
       }
     },
@@ -54,14 +54,14 @@
       "className": "quick",
       "id": "",
       "rect": {
-        "x": 10,
-        "y": 208,
-        "width": 370,
-        "height": 82,
-        "top": 208,
-        "right": 380,
-        "bottom": 290,
-        "left": 10
+        "x": 14,
+        "y": 555.59375,
+        "width": 362,
+        "height": 260,
+        "top": 555.59375,
+        "right": 376,
+        "bottom": 815.59375,
+        "left": 14
       }
     },
     {
@@ -69,14 +69,14 @@
       "className": "featured-section",
       "id": "menu-discovery",
       "rect": {
-        "x": 0,
-        "y": 293,
-        "width": 390,
-        "height": 415.8125,
-        "top": 293,
-        "right": 390,
-        "bottom": 708.8125,
-        "left": 0
+        "x": 14,
+        "y": 829.59375,
+        "width": 362,
+        "height": 366,
+        "top": 829.59375,
+        "right": 376,
+        "bottom": 1195.59375,
+        "left": 14
       }
     },
     {
@@ -84,14 +84,14 @@
       "className": "recent-section",
       "id": "recent-order",
       "rect": {
-        "x": 0,
-        "y": 711.8125,
-        "width": 390,
-        "height": 250.8125,
-        "top": 711.8125,
-        "right": 390,
-        "bottom": 962.625,
-        "left": 0
+        "x": 14,
+        "y": 1209.59375,
+        "width": 362,
+        "height": 182,
+        "top": 1209.59375,
+        "right": 376,
+        "bottom": 1391.59375,
+        "left": 14
       }
     }
   ]
