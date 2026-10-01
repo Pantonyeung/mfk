@@ -13,6 +13,9 @@ https://github.com/Pantonyeung/mfk
 Implementation branch:
 https://github.com/Pantonyeung/mfk/tree/feat/MFK-V3ADMIN-FORMAL-SERVER-DRAFT-SEAM-R1
 
+Draft PR:
+https://github.com/Pantonyeung/mfk/pull/611
+
 Exact base:
 f78960ebbd07e1adfff62d19d3ac129be863cb53
 
