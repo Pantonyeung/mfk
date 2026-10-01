@@ -45,7 +45,7 @@ describe('Admin V3 functional catalog correction',()=>{
     expect(html).toContain('顯示與排序');
     expect(html).toContain('分類次序');
     expect(html).toContain('飯糰');
-    expect(html).toContain('紫米飯糰・照燒雞');
+    expect(html).toContain('香煎雞扒紫米飯');
   });
 
   it('restores dining table management with actual table state',()=>{
