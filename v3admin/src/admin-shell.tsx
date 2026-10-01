@@ -105,9 +105,9 @@ export function AdminShell({storeId,displayName,releaseStatus,canonicalState,can
   };
 
   const routeContent=path==='/admin/overview'&&previewMode
-    ?<TodayPage mode="overview"/>
+    ?<TodayPage mode="overview" onNavigate={navigate}/>
     :path==='/admin/action-queue'&&previewMode
-      ?<TodayPage mode="queue"/>
+      ?<TodayPage mode="queue" onNavigate={navigate}/>
       :path==='/admin/orders/open'&&previewMode
         ?<OrdersPage mode="open"/>
     :path==='/admin/orders/history'&&previewMode
@@ -193,7 +193,7 @@ export function AdminShell({storeId,displayName,releaseStatus,canonicalState,can
                                                             :path==='/admin/system/integrations'&&previewMode
                                                               ?<IntegrationsPage/>
                                                               :path==='/admin/system/advanced'&&previewMode
-                                                                ?<EffectiveSettingsPage/>
+                                                                ?<EffectiveSettingsPage onNavigate={navigate}/>
                                                                 :path==='/admin/store/settings'&&previewMode
                                             ?<StoreSettingsPage mode="settings"/>
                                             :path==='/admin/store/hours'&&previewMode
