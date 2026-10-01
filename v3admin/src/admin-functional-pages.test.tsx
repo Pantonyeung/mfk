@@ -39,6 +39,14 @@ describe('Admin V3 functional domain wave',()=>{
     expect(renderToStaticMarkup(<PrintersPage/>)).toContain('實際實體機 IP／USB 由現場 SMT 配對');
   });
 
+  it('keeps print template name/type/content in Admin authority',()=>{
+    const state=usePreviewAdmin.getState();
+    const labelTemplate=state.templates.find(template=>template.type==='LABEL');
+    expect(labelTemplate?.name).toBeTruthy();
+    expect(labelTemplate?.content).toContain('商品名稱');
+    expect(renderToStaticMarkup(<PrintTemplatesPage/>)).toContain('打印模板');
+  });
+
   it('enforces printer reference guard in preview state',()=>{
     const state=usePreviewAdmin.getState();
     expect(state.removePrinter('logical-receipt')).toBe(false);
