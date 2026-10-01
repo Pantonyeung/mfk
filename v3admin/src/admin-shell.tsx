@@ -9,6 +9,7 @@ import {DiningTablesPage} from './dining-tables-page.tsx';
 import {ChannelPage,PermissionsPage,PrintRulesPage,PrintTemplatesPage,PrintersPage,QuickReasonsPage,RolesPage,StaffPage,StoreSettingsPage} from './admin-functional-pages.tsx';
 import {AccessPage,BusinessDayPage,CapacityPage,CashClosePage,DevicesPage,OtaPage,PublishFlowPage} from './admin-operations-pages.tsx';
 import {OrdersPage,ReportPage} from './admin-read-pages.tsx';
+import {AuditPage,DiagnosticsPage,EffectiveSettingsPage,IntegrationsPage,TodayPage} from './admin-system-pages.tsx';
 import {
   EmptyState,
   ErrorState,
@@ -103,8 +104,12 @@ export function AdminShell({storeId,displayName,releaseStatus,canonicalState,can
     if(drawerOpen||window.matchMedia('(max-width: 1179px)').matches){setDrawerOpen(true);setMobileStep('destinations');}
   };
 
-  const routeContent=path==='/admin/orders/open'&&previewMode
-    ?<OrdersPage mode="open"/>
+  const routeContent=path==='/admin/overview'&&previewMode
+    ?<TodayPage mode="overview"/>
+    :path==='/admin/action-queue'&&previewMode
+      ?<TodayPage mode="queue"/>
+      :path==='/admin/orders/open'&&previewMode
+        ?<OrdersPage mode="open"/>
     :path==='/admin/orders/history'&&previewMode
       ?<OrdersPage mode="history"/>
       :path==='/admin/orders/exceptions'&&previewMode
@@ -181,7 +186,15 @@ export function AdminShell({storeId,displayName,releaseStatus,canonicalState,can
                                                       ?<PublishFlowPage mode="versions"/>
                                                       :path==='/admin/publish/rollback'&&previewMode
                                                         ?<PublishFlowPage mode="rollback"/>
-                                                        :path==='/admin/store/settings'&&previewMode
+                                                        :path==='/admin/system/audit'&&previewMode
+                                                          ?<AuditPage/>
+                                                          :path==='/admin/system/diagnostics'&&previewMode
+                                                            ?<DiagnosticsPage/>
+                                                            :path==='/admin/system/integrations'&&previewMode
+                                                              ?<IntegrationsPage/>
+                                                              :path==='/admin/system/advanced'&&previewMode
+                                                                ?<EffectiveSettingsPage/>
+                                                                :path==='/admin/store/settings'&&previewMode
                                             ?<StoreSettingsPage mode="settings"/>
                                             :path==='/admin/store/hours'&&previewMode
                                               ?<StoreSettingsPage mode="hours"/>
