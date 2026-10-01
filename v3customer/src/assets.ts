@@ -10,9 +10,12 @@ export const CUSTOMER_V3_ASSETS=Object.freeze({
   // Locked reference only; never rendered as the live UI.
   lockedLongHomeReferenceR2:'https://cdn.creativeclaw.co/u/6ad84d58/images/09313f05-42df-4018-ba67-a232bcdb2df9.png',
 
-  bowl:'https://raw.githubusercontent.com/Pantonyeung/mfk/main/v2customer/public/brand/mf-home-hero-bowl.webp',
-  salad:'https://raw.githubusercontent.com/Pantonyeung/mfk/main/v2customer/public/brand/mf-home-hero-salad.webp',
-  riceball:'https://raw.githubusercontent.com/Pantonyeung/mfk/main/v2customer/public/brand/p0-riceball.webp'
+  bowl:'/media/customer/products/chicken-rice.webp',
+  salad:'/media/customer/products/herb-chicken.webp',
+  riceball:'/media/customer/products/riceball.webp',
+  memoryJarEmpty:'/media/customer/memory-jar/memory-jar-empty.webp',
+  memoryJarPartial:'/media/customer/memory-jar/memory-jar-partial.webp',
+  memoryJarFull:'/media/customer/memory-jar/memory-jar-full.webp'
 });
 
 export const CUSTOMER_V3_HERO_SLIDES=Object.freeze([

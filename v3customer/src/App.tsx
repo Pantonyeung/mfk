@@ -1,7 +1,11 @@
 import {useEffect,useState} from 'react';
 import {CUSTOMER_V3_ASSETS as A,CUSTOMER_V3_HERO_SLIDES as HERO_SLIDES} from './assets';
+import {CheckoutScreen,JarScreen,MenuScreen,ProductScreen} from './ordering-screens';
+import {NotificationsScreen,OrderDetailScreen,OrdersScreen,ProfileScreen,ReorderScreen,SearchScreen,StoreStatusSheet} from './customer-screens';
 import {PREVIEW_HOME as vm} from './preview-fixture';
 import type {QuickCardId} from './home-model';
+import {PREVIEW_PRODUCTS} from './preview-data';
+import type {CustomerRoute,JarItem,MenuCollection} from './preview-data';
 
 type IconName=QuickCardId|'pin'|'chevron'|'bell'|'search'|'history'|'home'|'menu'|'jar'|'orders'|'user';
 
@@ -34,30 +38,30 @@ const scrollToId=(id:string)=>{
   });
 };
 
-function Header({showPreviewNotice}:Readonly<{showPreviewNotice:(label:string)=>void}>){
+function Header({onOpenStore,onNavigate}:Readonly<{onOpenStore:()=>void;onNavigate:(route:CustomerRoute)=>void}>){
   return <header className="header">
-    <button className="logo-button" type="button" onClick={()=>window.scrollTo({top:0,behavior:'smooth'})} aria-label="返回首頁頂部">
+    <button className="logo-button" type="button" onClick={()=>onNavigate('home')} aria-label="返回首頁">
       <img className="logo" src={A.logo} alt="磨飯 More Fun"/>
     </button>
     <button
       className="pill store-status"
       type="button"
       data-state={vm.storeStatus}
-      onClick={()=>showPreviewNotice('店舖狀態')}
+      onClick={onOpenStore}
       aria-label={`店舖狀態：${vm.storeStatusLabel}`}
     >
       <span className="status-dot"/><b>{vm.storeStatusLabel}</b><Icon name="chevron"/>
     </button>
-    <button className="round bell" type="button" onClick={()=>showPreviewNotice('通知')} aria-label="通知">
+    <button className="round bell" type="button" onClick={()=>onNavigate('notifications')} aria-label="通知">
       <Icon name="bell"/><i/>
     </button>
-    <button className="pill search" type="button" onClick={()=>showPreviewNotice('搜尋')}>
+    <button className="pill search" type="button" onClick={()=>onNavigate('search')}>
       <Icon name="search"/><b>{vm.searchPlaceholder}</b>
     </button>
   </header>;
 }
 
-function Hero({showPreviewNotice}:Readonly<{showPreviewNotice:(label:string)=>void}>){
+function Hero({onStart}:Readonly<{onStart:()=>void}>){
   const [activeSlide,setActiveSlide]=useState(0);
   const [loadedSlides,setLoadedSlides]=useState<ReadonlySet<number>>(()=>new Set());
 
@@ -83,7 +87,7 @@ function Hero({showPreviewNotice}:Readonly<{showPreviewNotice:(label:string)=>vo
       <em>More Fun!</em>
       <h1 id="hero-title">同磨飯，<br/>食得更開心！</h1>
       <p>用手作的溫度<br/>讓每一餐都更美好</p>
-      <button type="button" onClick={()=>showPreviewNotice('開始點餐')}>開始點餐 <Arrow/></button>
+      <button type="button" onClick={onStart}>開始點餐 <Arrow/></button>
       <small>好食・好人・更開心</small>
     </div>
     <div className="hero-visual" aria-hidden="true">
@@ -119,13 +123,13 @@ function Hero({showPreviewNotice}:Readonly<{showPreviewNotice:(label:string)=>vo
   </section>;
 }
 
-function Quick({showPreviewNotice}:Readonly<{showPreviewNotice:(label:string)=>void}>){
+function Quick({onSelect}:Readonly<{onSelect:(collection:MenuCollection)=>void}>){
   return <section id="menu-discovery" className="quick" aria-label="快捷入口">
     {vm.quickCards.map(card=><button
       type="button"
       key={card.id}
       className={'quick-card '+card.tone}
-      onClick={()=>showPreviewNotice(card.title)}
+      onClick={()=>onSelect(card.id)}
     >
       <span className="quick-copy">
         <strong>{card.title}</strong>
@@ -148,13 +152,13 @@ function Lifestyle(){
   </section>;
 }
 
-function Recent({showPreviewNotice}:Readonly<{showPreviewNotice:(label:string)=>void}>){
+function Recent({onViewAll,onReorder}:Readonly<{onViewAll:()=>void;onReorder:()=>void}>){
   return <section id="recent-order" className="recent-section">
     <div className="recent-title">
       <h2><Icon name="history"/>最近訂單</h2>
-      <button type="button" onClick={()=>showPreviewNotice('全部訂單')}>查看全部 <Arrow/></button>
+      <button type="button" onClick={onViewAll}>查看全部 <Arrow/></button>
     </div>
-    {vm.recentOrder?<button className="recent-card" type="button" onClick={()=>showPreviewNotice('再來一單')}>
+    {vm.recentOrder?<button className="recent-card" type="button" onClick={onReorder}>
       <span className="recent-avatar"><img src={A.maleHeroR2} alt=""/></span>
       <span>
         <strong>{vm.recentOrder.itemSummary}</strong>
@@ -168,29 +172,67 @@ function Recent({showPreviewNotice}:Readonly<{showPreviewNotice:(label:string)=>
   </section>;
 }
 
-function BottomNav({showPreviewNotice}:Readonly<{showPreviewNotice:(label:string)=>void}>){
+function BottomNav({route,jarFilled,onNavigate}:Readonly<{route:CustomerRoute;jarFilled:boolean;onNavigate:(route:CustomerRoute)=>void}>){
+  const active=route==='home'?'home':route==='menu'||route==='product'?'menu':route==='jar'||route==='checkout'?'jar':route==='orders'||route==='order-detail'||route==='reorder'?'orders':route==='profile'?'profile':'';
   return <nav aria-label="主要導覽">
-    <button className="active" type="button" onClick={()=>window.scrollTo({top:0,behavior:'smooth'})}>
+    <button className={active==='home'?'active':''} type="button" onClick={()=>onNavigate('home')}>
       <Icon name="home"/><b>首頁</b>
     </button>
-    <button type="button" onClick={()=>scrollToId('menu-discovery')}>
+    <button className={active==='menu'?'active':''} type="button" onClick={()=>onNavigate('menu')}>
       <Icon name="menu"/><b>菜單</b>
     </button>
-    <button type="button" onClick={()=>showPreviewNotice('記憶罐')}>
-      <Icon name="jar"/><b>記憶罐</b>
+    <button className={active==='jar'?'active':''} type="button" onClick={()=>onNavigate('jar')}>
+      <img className="nav-jar-icon" src={jarFilled?A.memoryJarPartial:A.memoryJarEmpty} alt=""/><b>記憶罐</b>
     </button>
-    <button type="button" onClick={()=>scrollToId('recent-order')}>
+    <button className={active==='orders'?'active':''} type="button" onClick={()=>onNavigate('orders')}>
       <Icon name="orders"/><b>訂單</b><i/>
     </button>
-    <button type="button" onClick={()=>showPreviewNotice('我的')}>
+    <button className={active==='profile'?'active':''} type="button" onClick={()=>onNavigate('profile')}>
       <Icon name="user"/><b>我的</b>
     </button>
   </nav>;
 }
 
 export function CustomerV3App(){
-  const [previewNotice,setPreviewNotice]=useState('');
-  const showPreviewNotice=(label:string)=>setPreviewNotice(`${label}：預覽版未接駁`);
+  const knownRoutes:readonly CustomerRoute[]=['home','search','notifications','menu','product','jar','checkout','orders','order-detail','reorder','profile'];
+  const readRoute=():CustomerRoute=>{
+    const hash=window.location.hash.slice(1) as CustomerRoute;
+    return knownRoutes.includes(hash)?hash:'home';
+  };
+  const [route,setRoute]=useState<CustomerRoute>(readRoute);
+  const [menuCollection,setMenuCollection]=useState<MenuCollection>('all');
+  const [selectedProductId,setSelectedProductId]=useState(PREVIEW_PRODUCTS[0].id);
+  const [jarItem,setJarItem]=useState<JarItem|null>(null);
+  const [showStore,setShowStore]=useState(false);
+  const [online,setOnline]=useState(()=>navigator.onLine);
+
+  const navigate=(next:CustomerRoute)=>{
+    const nextHash=`#${next}`;
+    if(window.location.hash===nextHash)setRoute(next);
+    else window.location.hash=next;
+  };
+  const openMenu=(collection:MenuCollection='all')=>{setMenuCollection(collection);navigate('menu');};
+  const openProduct=(id:string)=>{setSelectedProductId(id);navigate('product');};
+  const addToJar=(item:JarItem)=>{setJarItem(item);navigate('jar');};
+  const selectedProduct=PREVIEW_PRODUCTS.find(product=>product.id===selectedProductId)??PREVIEW_PRODUCTS[0];
+
+  useEffect(()=>{
+    const onHashChange=()=>setRoute(readRoute());
+    const onOnline=()=>setOnline(true);
+    const onOffline=()=>setOnline(false);
+    window.addEventListener('hashchange',onHashChange);
+    window.addEventListener('online',onOnline);
+    window.addEventListener('offline',onOffline);
+    return ()=>{
+      window.removeEventListener('hashchange',onHashChange);
+      window.removeEventListener('online',onOnline);
+      window.removeEventListener('offline',onOffline);
+    };
+  },[]);
+
+  useEffect(()=>{
+    window.scrollTo({top:0,behavior:'auto'});
+  },[route]);
 
   useEffect(()=>{
     const hero=document.querySelector<HTMLElement>('.hero');
@@ -212,19 +254,30 @@ export function CustomerV3App(){
       window.removeEventListener('scroll',onScroll);
       if(frame)window.cancelAnimationFrame(frame);
     };
-  },[]);
+  },[route]);
+
+  const screen=route==='home'?<>
+      <Hero onStart={()=>openMenu('all')}/>
+      <Quick onSelect={openMenu}/>
+      <Lifestyle/>
+      <Recent onViewAll={()=>navigate('orders')} onReorder={()=>navigate('reorder')}/>
+    </>:route==='search'?<SearchScreen onBack={()=>navigate('home')} onOpenProduct={openProduct}/>
+      :route==='notifications'?<NotificationsScreen onBack={()=>navigate('home')}/>
+      :route==='menu'?<MenuScreen collection={menuCollection} onCollection={setMenuCollection} onOpenProduct={openProduct} onBack={()=>navigate('home')}/>
+      :route==='product'?<ProductScreen key={selectedProduct.id} product={selectedProduct} onBack={()=>navigate('menu')} onAdd={addToJar}/>
+      :route==='jar'?<JarScreen item={jarItem} onBack={()=>navigate('menu')} onBrowse={()=>openMenu('all')} onQuantity={quantity=>setJarItem(current=>current?{...current,quantity}:current)} onCheckout={()=>jarItem&&navigate('checkout')}/>
+      :route==='checkout'&&jarItem?<CheckoutScreen item={jarItem} onBack={()=>navigate('jar')} onHome={()=>navigate('home')} onOrder={()=>navigate('order-detail')}/>
+      :route==='orders'?<OrdersScreen onBack={()=>navigate('home')} onDetail={()=>navigate('order-detail')} onReorder={()=>navigate('reorder')}/>
+      :route==='order-detail'?<OrderDetailScreen onBack={()=>navigate('orders')} onReorder={()=>navigate('reorder')}/>
+      :route==='reorder'?<ReorderScreen onBack={()=>navigate('orders')} onAdd={addToJar}/>
+      :route==='profile'?<ProfileScreen onBack={()=>navigate('home')}/>
+      :<JarScreen item={jarItem} onBack={()=>navigate('menu')} onBrowse={()=>openMenu('all')} onQuantity={quantity=>setJarItem(current=>current?{...current,quantity}:current)} onCheckout={()=>jarItem&&navigate('checkout')}/>;
 
   return <div className="shell">
-    <Header showPreviewNotice={showPreviewNotice}/>
-    <main>
-      <Hero showPreviewNotice={showPreviewNotice}/>
-      <Quick showPreviewNotice={showPreviewNotice}/>
-      <Lifestyle/>
-      <Recent showPreviewNotice={showPreviewNotice}/>
-    </main>
-    {previewNotice&&<button className="preview-notice" type="button" role="status" onClick={()=>setPreviewNotice('')}>
-      {previewNotice}<span aria-hidden="true">×</span>
-    </button>}
-    <BottomNav showPreviewNotice={showPreviewNotice}/>
+    <Header onOpenStore={()=>setShowStore(true)} onNavigate={navigate}/>
+    {!online&&<div className="network-banner" role="status">暫時離線・部分資料可能未更新</div>}
+    <main className={route==='home'?'':'destination-main'}>{screen}</main>
+    {showStore&&<StoreStatusSheet onClose={()=>setShowStore(false)}/>}
+    <BottomNav route={route} jarFilled={Boolean(jarItem)} onNavigate={navigate}/>
   </div>;
 }

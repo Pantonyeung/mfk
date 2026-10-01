@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "capability": "CUSTOMER_V3_LONG_HOME_UI_R1",
+  "capability": "CUSTOMER_V3_PREVIEW_JOURNEY_R1",
   "base_sha": "a41378d7106362b6fb13c66549c6c6556c909025",
   "root_control": "#596",
   "allowed_paths": [
@@ -30,7 +30,10 @@
     "Publish Hero scenes to stable R2 object names so future artwork replaces the same slot without an app-code path change.",
     "Use the canonical customer label 期間限定 and responsive press, crossfade, drift and subtle trail feedback with reduced-motion support.",
     "Use one character-led lifestyle banner, one recent-order row, and five-item bottom navigation including the canonical Memory Jar; remove competing product-card sections.",
-    "Keep unavailable preview actions honest with an explicit not-connected status instead of inventing transaction behavior.",
+    "Connect every actionable Customer Home entry to presentation-only discovery, ordering, Memory Jar, checkout, order and profile preview screens.",
+    "Reuse one curated-list template for Today Picks, Popular Combos, Limited and 30-minute pickup entries.",
+    "Keep preview checkout honest: it must state that no formal order or charge is created and that submitted payment proof is not confirmed payment.",
+    "Cover empty search, offline, sold-out, repricing and retry/recovery presentation states without creating a second business authority.",
     "Run isolated Customer V3 typecheck/build and deterministic visual-layout acceptance without production cutover."
   ],
   "non_goals": [

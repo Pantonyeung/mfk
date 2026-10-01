@@ -569,6 +569,7 @@ nav button{
   color:#7b87a0;
 }
 nav button svg{font-size:27px}
+.nav-jar-icon{width:30px;height:30px;object-fit:contain;filter:drop-shadow(0 2px 2px rgba(84,54,138,.14))}
 nav button b{font-size:11px}
 nav .active{color:#1767f7}
 nav button i{width:7px;height:7px;top:4px;left:calc(50% + 8px)}
