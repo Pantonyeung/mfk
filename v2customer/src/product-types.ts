@@ -360,4 +360,5 @@ export interface CustomerRuntimePort {
   probeOrderBackend?(onAttempt?:(attempt:number,total:number)=>void):Promise<Readonly<{reachable:boolean;attempts:number;reason?:string}>>;
   requestFallback?():Promise<CustomerCommandResult>;
   uploadPaymentEvidence?(file:File):Promise<{readonly evidenceRef:string}>;
+  subscribeConfigChanges?(listener:(headSeq:number)=>void):()=>void;
 }
