@@ -1,0 +1,95 @@
+name: customer-r2-asset-relay
+
+on:
+  push:
+    branches:
+      - temp/MFK-CUSTOMER-R2-ASSET-RELAY-20261001
+    paths:
+      - "relay/customer-assets/**"
+      - ".github/workflows/customer-r2-asset-relay.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  relay:
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      BUCKET: mfk-customer-assets
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check credentials
+        run: |
+          set -euo pipefail
+          test -n "$CLOUDFLARE_API_TOKEN"
+          test -n "$CLOUDFLARE_ACCOUNT_ID"
+
+      - name: Upload lossless PNG masters to R2
+        run: |
+          set -euo pipefail
+
+          upload_and_verify() {
+            local file="$1"
+            local key="$2"
+            local before after
+            before="$(sha256sum "$file" | awk '{print $1}')"
+            echo "UPLOAD $file -> $BUCKET/$key"
+            npx --yes wrangler@latest r2 object put "$BUCKET/$key" \
+              --file="$file" \
+              --content-type="image/png" \
+              --remote
+            mkdir -p verify
+            npx --yes wrangler@latest r2 object get "$BUCKET/$key" \
+              --file="verify/$(basename "$file")" \
+              --remote
+            after="$(sha256sum "verify/$(basename "$file")" | awk '{print $1}')"
+            test "$before" = "$after"
+            printf '%s %s %s\n' "$key" "$before" "$(stat -c %s "$file")" >> verify/receipt.txt
+          }
+
+          upload_and_verify "relay/customer-assets/hero-background-main.png" "customer/brand/hero/hero-background-main.png"
+          upload_and_verify "relay/customer-assets/hero-male-main.png" "customer/brand/hero/hero-male-main.png"
+          upload_and_verify "relay/customer-assets/hero-female-main.png" "customer/brand/hero/hero-female-main.png"
+          upload_and_verify "relay/customer-assets/hero-doodle-morefun-main.png" "customer/brand/hero/hero-doodle-morefun-main.png"
+          upload_and_verify "relay/customer-assets/hero-doodle-goodtaste-main.png" "customer/brand/hero/hero-doodle-goodtaste-main.png"
+
+          cat verify/receipt.txt
+
+      - name: Write R2 receipt manifest
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          rows=[]
+          for line in Path("verify/receipt.txt").read_text().splitlines():
+              key, sha256, size = line.split()
+              rows.append({"key":key,"sha256":sha256,"sizeBytes":int(size),"contentType":"image/png"})
+          Path("verify/asset-manifest.json").write_text(
+              json.dumps({"assetGroup":"customer-hero","files":rows},indent=2)+"\n"
+          )
+          PY
+          npx --yes wrangler@latest r2 object put "$BUCKET/customer/brand/hero/asset-manifest.json" \
+            --file="verify/asset-manifest.json" \
+            --content-type="application/json" \
+            --remote
+          npx --yes wrangler@latest r2 object get "$BUCKET/customer/brand/hero/asset-manifest.json" \
+            --file="verify/asset-manifest-readback.json" \
+            --remote
+          cmp verify/asset-manifest.json verify/asset-manifest-readback.json
+
+      - name: Evidence summary
+        run: |
+          {
+            echo "## Customer R2 asset relay"
+            echo
+            echo '~~~text'
+            cat verify/receipt.txt
+            echo '~~~'
+            echo
+            echo "Bucket: $BUCKET"
+            echo "Result: SHA256 readback GREEN"
+          } >> "$GITHUB_STEP_SUMMARY"
