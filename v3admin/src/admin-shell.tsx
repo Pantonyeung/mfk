@@ -19,6 +19,7 @@ import {FormalCombosPage} from './formal-combos-page.tsx';
 import {FormalDiningTablesPage,FormalStoreSettingsPage} from './formal-store-pages.tsx';
 import {FormalChannelPage} from './formal-channel-pages.tsx';
 import {FormalAccessGapPage,FormalPermissionsSummaryPage,FormalRolesSummaryPage,FormalStaffPage} from './formal-staff-pages.tsx';
+import {FormalCapacityPage} from './formal-capacity-page.tsx';
 import {
   EmptyState,
   ErrorState,
@@ -142,8 +143,8 @@ export function AdminShell({storeId,displayName,releaseStatus,canonicalState,can
                   ?<BusinessDayPage/>
                   :path==='/admin/cash-close'&&previewMode
                     ?<CashClosePage/>
-                    :path==='/admin/operations/capacity'&&previewMode
-                      ?<CapacityPage/>
+                    :path==='/admin/operations/capacity'
+                      ?(previewMode?<CapacityPage/>:formalDraftEnabled?<FormalCapacityPage/>:<RouteSkeleton path={path} canonicalState={canonicalState} onRefresh={onRefresh}/>)
                       :path==='/admin/channels'
                   ?(previewMode?<ChannelPage mode="overview"/>:formalDraftEnabled?<FormalChannelPage mode="overview"/>:<RouteSkeleton path={path} canonicalState={canonicalState} onRefresh={onRefresh}/>)
                   :path==='/admin/channels/accept-policy'
