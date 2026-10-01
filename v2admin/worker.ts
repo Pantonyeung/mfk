@@ -1004,6 +1004,27 @@ export class AdminSyncStore{
       };
     }
 
+    // Preserve the current canonical version before any distinct publish replaces it.
+    // The record is immutable and may safely exist while it is still active; the read model
+    // derives ACTIVE vs ARCHIVED by comparing fingerprints.
+    if(current){
+      const currentFingerprint=String(current.fingerprint||'');
+      const versionKey='admin-browser:version:'+currentFingerprint;
+      const recorded=await this.state.storage.get(versionKey);
+      if(!recorded&&currentFingerprint){
+        await this.state.storage.put(versionKey,{
+          schema:'MFK_ADMIN_VERSION_V1',
+          storeId:String(current.storeId||''),
+          revision:Number(current.revision),
+          publishedAt:String(current.publishedAt||''),
+          fingerprint:currentFingerprint,
+          adminFingerprint:String(current.adminFingerprint||''),
+          snapshot:current.snapshot,
+          recordedAt:new Date().toISOString(),
+        });
+      }
+    }
+
     // Cloudflare accepted time is the only delivery ordering clock.
     // Every distinct formal publish receives a strictly increasing canonical time.
     const nowMs=Date.now();
@@ -1557,6 +1578,40 @@ export class AdminSyncStore{
     if(url.pathname==='/admin-browser/active'&&request.method==='GET'){
       const session=await this.readAdminBrowserSession(request);if(!session)return json({code:'ADMIN_BROWSER_SESSION_UNAUTHORIZED'},401);
       const active=await this.state.storage.get('active');return active?json(active):json({code:'ADMIN_CONFIG_NOT_PUBLISHED'},404);
+    }
+    if(url.pathname==='/admin-browser/versions'&&request.method==='GET'){
+      const session=await this.readAdminBrowserSession(request);if(!session)return json({code:'ADMIN_BROWSER_SESSION_UNAUTHORIZED'},401);
+      const storeId=storeIdFrom(url),active=await this.state.storage.get('active');
+      if(!active||String(active.storeId||'')!==storeId)return json({code:'ADMIN_BROWSER_STORE_FORBIDDEN'},403);
+      const stored=await this.state.storage.list({prefix:'admin-browser:version:'});
+      const byFingerprint=new Map();
+      for(const version of stored.values()){
+        if(!version||String(version.storeId||'')!==storeId)continue;
+        const fingerprint=String(version.fingerprint||'');
+        if(!fingerprint)continue;
+        byFingerprint.set(fingerprint,{
+          revision:Number(version.revision),
+          publishedAt:String(version.publishedAt||''),
+          fingerprint,
+          adminFingerprint:String(version.adminFingerprint||''),
+          state:fingerprint===String(active.fingerprint||'')?'ACTIVE':'ARCHIVED',
+        });
+      }
+      byFingerprint.set(String(active.fingerprint||''),{
+        revision:Number(active.revision),
+        publishedAt:String(active.publishedAt||''),
+        fingerprint:String(active.fingerprint||''),
+        adminFingerprint:String(active.adminFingerprint||''),
+        state:'ACTIVE',
+      });
+      const versions=[...byFingerprint.values()].sort((a,b)=>Date.parse(String(b.publishedAt||''))-Date.parse(String(a.publishedAt||'')));
+      return json({
+        schema:'MFK_ADMIN_VERSION_LIST_V1',
+        storeId,
+        activeFingerprint:String(active.fingerprint||''),
+        historyCompleteness:'FORWARD_ONLY',
+        versions,
+      });
     }
     if(url.pathname==='/admin-browser/draft'||url.pathname==='/admin-browser/draft/publish'){
       const session=await this.readAdminBrowserSession(request);if(!session)return json({code:'ADMIN_BROWSER_SESSION_UNAUTHORIZED'},401);
