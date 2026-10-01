@@ -21,6 +21,7 @@ import {
   projectionHashForEntities,
 } from '../sync/checkpointed-delta-sync.ts';
 import {putMfkSyncCheckpointObject,readMfkSyncCheckpointObject} from '../sync/immutable-checkpoint-store.ts';
+import {buildMfkAdminDistributionDiagnostics} from '../contracts/admin-distribution-diagnostics-v1.ts';
 import {buildKeetaMenuProjection} from './keeta-menu-projection.ts';
 import {projectAdminEnvelopeToSmmConfig} from '../sync/smm-admin-projection';
 import {validateMfkCustomerOrderIntent} from '../contracts/customer-cloud-v1.ts';
@@ -1362,6 +1363,7 @@ export class AdminSyncStore{
   }
 
   async syncDistributionReadback(){
+    const observedAt=new Date().toISOString();
     const heads={};
     for(const port of MFK_SYNC_PORTS)heads[port]=await this.readSyncHead(port);
     const appliedRows=await this.state.storage.list({prefix:'sync:applied:'});
@@ -1375,21 +1377,41 @@ export class AdminSyncStore{
     }catch{}
     const checkpoints={};
     for(const port of MFK_SYNC_PORTS){
-      const pointer=await this.state.storage.get(syncCheckpointPointerKey(port));
-      const error=await this.state.storage.get('sync:checkpoint-error:'+port);
-      checkpoints[port]=pointer
-        ?{state:error?'DEGRADED':'READY',pointer,error:error||null}
-        :{state:String(heads[port]?.checkpointHash||'')?'LEGACY_DO':'NONE',pointer:null,error:error||null};
+      const [rawPointer,error,meta]=await Promise.all([
+        this.state.storage.get(syncCheckpointPointerKey(port)),
+        this.state.storage.get('sync:checkpoint-error:'+port),
+        this.state.storage.get('sync:checkpoint-meta:'+port),
+      ]);
+      let pointer=null,r2Readback=null;
+      if(rawPointer){
+        try{
+          pointer=validateMfkSyncCheckpointPointer(rawPointer);
+          if(!this.env.SYNC_CHECKPOINTS)throw new Error('SYNC_CHECKPOINT_R2_BINDING_UNAVAILABLE');
+          await readMfkSyncCheckpointObject(this.env.SYNC_CHECKPOINTS,pointer.current);
+          r2Readback={verified:true,observedAt:new Date().toISOString(),error:null};
+        }catch(readError){
+          r2Readback={verified:false,observedAt:new Date().toISOString(),error:readError instanceof Error?readError.message:'SYNC_CHECKPOINT_READBACK_FAILED'};
+        }
+      }
+      checkpoints[port]={pointer,meta:meta||null,error:error||null,r2Readback};
     }
-    return Object.freeze({
-      schema:'MFK_SYNC_DISTRIBUTION_READBACK_V1',
-      protocol:MFK_CHECKPOINTED_DELTA_SYNC_PROTOCOL,
-      heads,
-      applied,
-      providers:Object.freeze({KEETA:keetaProvider}),
-      checkpoints:Object.freeze(checkpoints),
-      projectionErrors:[...errors.entries()].map(([key,value])=>({key,value})),
-      observedAt:new Date().toISOString(),
+    let commercialProof;
+    try{this.commercialProofKeyring();commercialProof={state:'HEALTHY',observedAt,error:null};}
+    catch(error){commercialProof={state:'ERROR',observedAt,error:error instanceof Error?error.message:'CUSTOMER_COMMERCIAL_PROOF_UNAVAILABLE'};}
+    const [active,activeMeta,providerError]=await Promise.all([
+      this.state.storage.get('active'),this.state.storage.get('activeMeta'),this.state.storage.get('sync:provider-error:KEETA'),
+    ]);
+    const staleAfterMs=Number(this.env.MFK_SYNC_DIAGNOSTICS_STALE_AFTER_MS);
+    return buildMfkAdminDistributionDiagnostics({
+      canonical:active?{
+        storeId:String(active.storeId||'MF01'),canonicalRevision:Number(active.revision)||0,
+        commitId:String(activeMeta?.syncCommitId||''),sourceCommitSeq:Number(activeMeta?.syncCommitSeq)||0,
+        canonicalFingerprint:String(active.fingerprint||''),publishedAt:String(active.publishedAt||''),
+      }:null,
+      heads,applied,provider:{status:keetaProvider,error:providerError||null},checkpoints,
+      projectionErrors:[...errors.values()],commercialProof,observedAt,
+      staleAfterMs:Number.isSafeInteger(staleAfterMs)&&staleAfterMs>0?staleAfterMs:null,
+      checkpointMaxAgeMs:MFK_SYNC_CHECKPOINT_MAX_AGE_MS,
     });
   }
 

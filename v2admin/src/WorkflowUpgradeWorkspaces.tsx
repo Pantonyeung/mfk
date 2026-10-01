@@ -4,6 +4,8 @@ import {useAdminDraft,validateAdminDraft} from './admin-draft.tsx';
 import {appendAdminAudit,readAdminAudit,readAdminReleases,readAdminStored,usePersistentAdminState} from './admin-local-store.ts';
 import {AdminResponsiveDataView} from './AdminResponsiveDataView.tsx';
 import {createAdminCrossDayRefund,readAdminProjectedDays,readAdminProjectedOrders,readAdminRefundAddenda,readAdminRefunds,refreshAdminProjection} from './admin-projection-client.ts';
+import {readAdminDistributionDiagnostics} from './admin-sync-client.ts';
+import type {MfkAdminDistributionDiagnostics} from '../../contracts/admin-distribution-diagnostics-v1.ts';
 
 function UpgradeHeader({title,description,kicker='功能尚未啟用'}:{title:string;description:string;kicker?:string}){
   return <header className="admin-editor-head">
@@ -283,28 +285,69 @@ export function ExportGovernanceWorkspace(){
   </section>;
 }
 
-interface DiagnosticFinding{id:string;domain:string;state:'HEALTHY'|'DEGRADED'|'UNKNOWN';updatedAt:string;pendingCount:number;lastError?:string;recovery?:string;evidenceRef?:string}
 export function DiagnosticsWorkspace(){
-  const [findings]=usePersistentAdminState<DiagnosticFinding[]>('diagnostics-read.v1',[]);
-  const unknown=findings.filter(row=>row.state==='UNKNOWN').length;
-  const degraded=findings.filter(row=>row.state==='DEGRADED').length;
+  const [diagnostics,setDiagnostics]=useState<MfkAdminDistributionDiagnostics|null>(null);
+  const [busy,setBusy]=useState(true);
+  const [error,setError]=useState('');
+  const refresh=async()=>{
+    setBusy(true);setError('');
+    try{setDiagnostics(await readAdminDistributionDiagnostics());}
+    catch(reason){setError(reason instanceof Error?reason.message:'ADMIN_DISTRIBUTION_DIAGNOSTICS_FAILED');}
+    finally{setBusy(false);}
+  };
+  useEffect(()=>{
+    let active=true;
+    void readAdminDistributionDiagnostics().then(value=>{if(active)setDiagnostics(value);}).catch(reason=>{if(active)setError(reason instanceof Error?reason.message:'ADMIN_DISTRIBUTION_DIAGNOSTICS_FAILED');}).finally(()=>{if(active)setBusy(false);});
+    return()=>{active=false;};
+  },[]);
+  const time=(value:string)=>Number.isFinite(Date.parse(value))?new Date(value).toLocaleString('zh-HK',{timeZone:'Asia/Hong_Kong',hour12:false}):'—';
+  if(!diagnostics)return <section className="admin-editor-page">
+    <header className="admin-editor-head"><div><small>ADMIN DISTRIBUTION READBACK</small><h1>系統狀態</h1><p>Canonical、Port Head、Client Applied、Provider Applied、Checkpoint 同錯誤係分開證據；冇證據唔會硬判根因。</p></div><div className="admin-editor-actions"><button type="button" disabled={busy} onClick={()=>void refresh()}>{busy?'讀取中…':'重新讀取'}</button></div></header>
+    <div className="admin-read-empty">{error?'未能讀取：'+error:'正在讀取正式 diagnostics；唔會用假綠燈代替健康證據。'}</div>
+  </section>;
+  const portRows=[
+    {port:'CUSTOMER',head:diagnostics.ports.CUSTOMER.headSeq,source:diagnostics.ports.CUSTOMER.sourceCommitSeq,projection:diagnostics.ports.CUSTOMER.projectionHash,applied:'Browser '+diagnostics.ports.CUSTOMER.browserCoverage+' · Proof '+diagnostics.ports.CUSTOMER.commercialProofIssuer,behind:'—',state:diagnostics.ports.CUSTOMER.state,observedAt:diagnostics.ports.CUSTOMER.observedAt},
+    {port:'SMT',head:diagnostics.ports.SMT.headSeq,source:diagnostics.ports.SMT.sourceCommitSeq,projection:diagnostics.ports.SMT.projectionHash,applied:diagnostics.ports.SMT.clients.map(client=>client.clientId+' A'+client.appliedSeq+' '+client.state).join(' · ')||'未有 tracked client',behind:String(diagnostics.ports.SMT.behind),state:diagnostics.ports.SMT.state,observedAt:diagnostics.ports.SMT.clients[0]?.lastSeenAt??diagnostics.ports.SMT.observedAt},
+    {port:'SMM',head:diagnostics.ports.SMM.headSeq,source:diagnostics.ports.SMM.sourceCommitSeq,projection:diagnostics.ports.SMM.projectionHash,applied:diagnostics.ports.SMM.clients.map(client=>client.clientId+' A'+client.appliedSeq+' '+client.state).join(' · ')||'UNKNOWN CLIENT COVERAGE',behind:String(diagnostics.ports.SMM.behind),state:diagnostics.ports.SMM.state,observedAt:diagnostics.ports.SMM.clients[0]?.lastSeenAt??diagnostics.ports.SMM.observedAt},
+    {port:'KEETA',head:diagnostics.ports.KEETA.headSeq,source:diagnostics.ports.KEETA.sourceCommitSeq,projection:diagnostics.ports.KEETA.projectionHash,applied:'ProviderAppliedSeq '+diagnostics.ports.KEETA.providerAppliedSeq,behind:String(diagnostics.ports.KEETA.behind),state:diagnostics.ports.KEETA.state,observedAt:diagnostics.ports.KEETA.freshness.observedAt??diagnostics.ports.KEETA.observedAt},
+  ];
+  const clientRows=(['SMT','SMM'] as const).flatMap(port=>diagnostics.ports[port].clients.map(client=>({port,...client})));
+  const checkpointRows=Object.values(diagnostics.checkpoints);
   return <section className="admin-editor-page">
-    <UpgradeHeader title="系統狀態" description="系統狀態顯示功能範圍、目前狀態、資料新鮮度、待處理數量、最後錯誤、安全修復方法同回傳證據。冇證據唔會硬判根因。" kicker="診斷證據"/>
-    <div className="admin-kpi-grid"><article><span>健康</span><strong>{findings.filter(row=>row.state==='HEALTHY').length}</strong><small>已確認</small></article><article><span>需注意</span><strong>{degraded}</strong><small>需要跟進</small></article><article><span>未確認</span><strong>{unknown}</strong><small>等待資料</small></article><article><span>總項目</span><strong>{findings.length}</strong><small>系統狀態</small></article></div>
+    <header className="admin-editor-head"><div><small>ADMIN DISTRIBUTION READBACK</small><h1>系統狀態</h1><p>Connected ≠ Latest；Doorbell ≠ Applied；Canonical Published ≠ All Ports Current；Provider Accepted ≠ Provider Applied。</p></div><div className="admin-editor-actions"><button type="button" disabled={busy} onClick={()=>void refresh()}>{busy?'讀取中…':'重新讀取'}</button></div></header>
+    {error?<div className="admin-callout compact">最近一次重新讀取失敗：{error}；以下保留最後成功證據。</div>:null}
+    <div className="admin-kpi-grid"><article><span>整體</span><strong>{diagnostics.globalState}</strong><small>{time(diagnostics.observedAt)}</small></article><article><span>Canonical</span><strong>{diagnostics.canonical.state}</strong><small>R{diagnostics.canonical.canonicalRevision}</small></article><article><span>Commit</span><strong>{diagnostics.canonical.sourceCommitSeq}</strong><small>{diagnostics.canonical.commitId||'—'}</small></article><article><span>錯誤</span><strong>{diagnostics.errors.length}</strong><small>獨立 observation</small></article></div>
+    <section className="admin-read-card"><header><h2>Canonical Published</h2><span>{diagnostics.canonical.state}</span></header><div className="admin-readback-proof"><p><span>Store</span><b>{diagnostics.canonical.storeId||'—'}</b></p><p><span>Canonical Revision</span><b>{diagnostics.canonical.canonicalRevision}</b></p><p><span>Fingerprint</span><b>{diagnostics.canonical.canonicalFingerprint.slice(0,12)||'—'}</b></p><p><span>Published At</span><b>{time(diagnostics.canonical.publishedAt)}</b></p></div></section>
     <AdminResponsiveDataView
-      label="系統狀態"
-      rows={findings}
-      rowKey={row=>row.id}
-      emptyTitle="未有系統狀態回傳"
-      emptyDescription="未有正式回傳，所以唔會用假綠燈代替健康證據。"
+      label="Port distribution state"
+      rows={portRows}
+      rowKey={row=>row.port}
+      emptyDescription="未有 Port readback。"
       columns={[
-        {key:'domain',label:'範圍',render:(row:DiagnosticFinding)=>row.domain},
-        {key:'state',label:'狀態',render:(row:DiagnosticFinding)=>row.state},
-        {key:'pending',label:'待處理',numeric:true,render:(row:DiagnosticFinding)=>row.pendingCount},
-        {key:'error',label:'最後錯誤',render:(row:DiagnosticFinding)=>row.lastError||'—'},
-        {key:'evidence',label:'證據',render:(row:DiagnosticFinding)=>row.evidenceRef||'—'},
+        {key:'port',label:'Port',render:row=>row.port},
+        {key:'head',label:'HeadSeq',numeric:true,render:row=>row.head},
+        {key:'source',label:'Source Commit',numeric:true,render:row=>row.source},
+        {key:'projection',label:'Projection hash',render:row=>row.projection.slice(0,12)||'—'},
+        {key:'applied',label:'Applied / coverage',render:row=>row.applied},
+        {key:'behind',label:'Behind',numeric:true,render:row=>row.behind},
+        {key:'state',label:'狀態',render:row=>row.state},
+        {key:'observed',label:'最後觀察',render:row=>time(row.observedAt)},
       ]}
     />
+    <AdminResponsiveDataView label="Tracked SMT / SMM clients" rows={clientRows} rowKey={row=>row.port+row.clientId} emptyDescription="UNKNOWN CLIENT COVERAGE" columns={[
+      {key:'port',label:'Port',render:row=>row.port},{key:'client',label:'Client',render:row=>row.clientId},{key:'head',label:'HeadSeq',numeric:true,render:row=>row.headSeq},{key:'applied',label:'AppliedSeq',numeric:true,render:row=>row.appliedSeq},{key:'behind',label:'Behind',numeric:true,render:row=>row.behind},{key:'hash',label:'Hash match',render:row=>row.projectionHashMatch?'MATCH':'MISMATCH'},{key:'checkpoint',label:'CheckpointSeq',numeric:true,render:row=>row.checkpointSeq??'—'},{key:'appliedAt',label:'Last applied',render:row=>time(row.lastAppliedAt)},{key:'state',label:'狀態',render:row=>row.state},
+    ]}/>
+    <section className="admin-read-card"><header><h2>Keeta Provider Readback</h2><span>{diagnostics.ports.KEETA.state}</span></header><div className="admin-readback-proof"><p><span>HeadSeq</span><b>{diagnostics.ports.KEETA.headSeq}</b></p><p><span>ProviderAppliedSeq</span><b>{diagnostics.ports.KEETA.providerAppliedSeq}</b></p><p><span>Behind</span><b>{diagnostics.ports.KEETA.behind}</b></p><p><span>Provider state</span><b>{diagnostics.ports.KEETA.lastProviderState}</b></p><p><span>Last mutation</span><b>{diagnostics.ports.KEETA.lastMutationKind??'—'}</b></p><p><span>Operation</span><b>{diagnostics.ports.KEETA.lastOperationId??'—'}</b></p><p><span>Task</span><b>{diagnostics.ports.KEETA.lastTaskId??'—'}</b></p><p><span>Last error</span><b>{diagnostics.ports.KEETA.lastError??'—'}</b></p></div></section>
+    <AdminResponsiveDataView label="Checkpoint health" rows={checkpointRows} rowKey={row=>row.port} emptyDescription="未有 Checkpoint evidence。" columns={[
+      {key:'port',label:'Checkpoint Port',render:row=>row.port},{key:'seq',label:'CheckpointSeq',numeric:true,render:row=>row.checkpointSeq},
+      {key:'previous',label:'Previous',numeric:true,render:row=>row.previousCheckpointSeq??'—'},{key:'floor',label:'Journal Floor',numeric:true,render:row=>row.journalFloorSeq},
+      {key:'hash',label:'Object hash',render:row=>row.currentObjectHash??'—'},{key:'age',label:'Age',render:row=>row.checkpointAgeMs===null?'—':Math.round(row.checkpointAgeMs/60000)+'m'},{key:'build',label:'Last build',render:row=>row.lastBuildState},{key:'r2',label:'R2 Readback',render:row=>row.r2ReadbackVerified?'VERIFIED':'NOT VERIFIED'},
+      {key:'state',label:'狀態',render:row=>row.state},{key:'error',label:'最後錯誤',render:row=>row.lastBuildError??'—'},
+    ]}/>
+    {diagnostics.freshnessPolicy.state==='OWNER_LOCK_REQUIRED'?<div className="admin-callout compact">Applied / Provider freshness threshold 未有 Owner Lock，所以 exact sequence readback 會保守顯示 UNKNOWN，唔會將舊證據當 CURRENT。</div>:null}
+    {diagnostics.errors.length?<AdminResponsiveDataView label="Distribution errors" rows={diagnostics.errors} rowKey={row=>row.domain+row.port+row.code+row.lastObservedAt} emptyDescription="未有錯誤。" columns={[
+      {key:'domain',label:'Domain',render:row=>row.domain},{key:'port',label:'Port',render:row=>row.port},{key:'code',label:'Code',render:row=>row.code},{key:'meaning',label:'Operator meaning',render:row=>row.operatorMeaning},{key:'observed',label:'最後觀察',render:row=>time(row.lastObservedAt)},
+    ]}/>:<div className="admin-read-empty">未觀察到 projection / checkpoint / provider error。</div>}
   </section>;
 }
 
