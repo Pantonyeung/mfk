@@ -1219,8 +1219,11 @@ export class AdminSyncStore{
 
   async publishEnvelope(envelope,expectedBase:{fingerprint:string;publishedAt:string}|null=null){
     const result=await this.withStorageTransaction(async storage=>{
-      const current=await storage.get('active');
+      const initialCurrent=await storage.get('active');
       const currentMeta=await storage.get('activeMeta')||{};
+      // Re-read at the exact canonical write boundary so a racing publish can never
+      // be overwritten by a stale Draft, including inside the sync transaction.
+      const current=expectedBase?await storage.get('active'):initialCurrent;
       if(expectedBase&&(!current||String(current.fingerprint||'')!==String(expectedBase.fingerprint||'')||String(current.publishedAt||'')!==String(expectedBase.publishedAt||''))){
         return{status:409,body:{code:'ADMIN_DRAFT_BASE_CONFLICT'},doorbells:[],checkpointPlans:[]};
       }
