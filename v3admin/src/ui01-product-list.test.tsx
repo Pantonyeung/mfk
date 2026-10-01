@@ -70,17 +70,25 @@ describe('Admin V3 Product Management contract',()=>{
   });
 
   it('requires each selected print output to resolve to at least one logical printer',()=>{
-    expect(productPrintConfigCanSave(['LABEL'],{LABEL:['logical-label-1']})).toBe(true);
-    expect(productPrintConfigCanSave(['LABEL'],{LABEL:[]})).toBe(false);
+    expect(productPrintConfigCanSave(['LABEL'],{LABEL:['logical-label-1']},{LABEL:'tpl-label'})).toBe(true);
+    expect(productPrintConfigCanSave(['LABEL'],{LABEL:[]},{LABEL:'tpl-label'})).toBe(false);
     expect(productPrintConfigCanSave(['PRODUCTION','PACKING','LABEL'],{
       PRODUCTION:['logical-production'],
       PACKING:['logical-packing'],
       LABEL:['logical-label-2'],
+    },{
+      PRODUCTION:'tpl-production',
+      PACKING:'tpl-packing',
+      LABEL:'tpl-label',
     })).toBe(true);
     expect(productPrintConfigCanSave(['PRODUCTION','LABEL'],{
       PRODUCTION:['logical-production'],
       LABEL:[],
+    },{
+      PRODUCTION:'tpl-production',
+      LABEL:'tpl-label',
     })).toBe(false);
+    expect(productPrintConfigCanSave(['LABEL'],{LABEL:['logical-label-1']},{LABEL:''})).toBe(false);
   });
 
   it('migrates existing single/composite print summaries into independent targets',()=>{
