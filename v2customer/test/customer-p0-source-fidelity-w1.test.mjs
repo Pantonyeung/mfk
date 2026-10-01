@@ -38,8 +38,9 @@ test('UI1 implements the locked premium composition without using the old design
   const home=read('src/stage1/Stage1Home.tsx');
   const css=read('src/stage1/stage1.css');
   for(const marker of['stage1-premium-header','stage1-welcome','stage1-search-entry','stage1-brand-banner','stage1-quick-entry-section','stage1-top6'])assert.ok(home.includes(marker),marker);
-  assert.ok(home.includes("const HOME_MALE='/brand/stage0-male.webp'"));
-  assert.ok(home.includes("const HOME_FEMALE='/brand/stage0-female.webp'"));
+  assert.ok(home.includes("const HOME_PAIR='https://cdn.creativeclaw.co/u/6ad84d58/images/c40034d5-c340-4af5-8819-68c52b236c09.png'"));
+  assert.ok(home.includes('stage1-welcome-art'));
+  assert.ok(home.includes('stage1-banner-art'));
   assert.ok(home.includes('product.imageUrl'));
   assert.ok(home.includes('stage1-product-image-empty'));
   assert.ok(css.includes('.stage1-brand-banner'));
