@@ -21,10 +21,11 @@
   "transaction_impact": "NONE",
   "production_routing_impact": "NONE",
   "expected_behavior_change": [
-    "Keep the approved Hero art unchanged while rebuilding the Customer Home layout around a large-image mobile-first hierarchy.",
+    "Keep the approved Hero assets while recomposing the Customer Home from the Owner-provided visual reference.",
     "Make Hero occupy at least 60% of the first viewport.",
-    "Keep total Home length approximately 1.5 viewports.",
-    "Use four large 2x2 quick-action cards, two large featured cards, one recent-order row, and four-item bottom navigation.",
+    "Use four single-row, whole-card quick actions with large icons and at least 44px touch targets.",
+    "Use one character-led lifestyle banner, one recent-order row, and four-item bottom navigation; remove competing product-card sections.",
+    "Keep unavailable preview actions honest with an explicit not-connected status instead of inventing transaction behavior.",
     "Run isolated Customer V3 typecheck/build and deterministic visual-layout acceptance without production cutover."
   ],
   "non_goals": [

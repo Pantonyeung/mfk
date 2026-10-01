@@ -62,11 +62,6 @@ jobs:
           npx --yes wrangler@latest r2 object get "$BUCKET/customer/brand/hero/hero-female-main.png" --file "v3customer/public/media/customer/hero/hero-female-main.png" --remote
           npx --yes wrangler@latest r2 object get "$BUCKET/customer/brand/hero/hero-doodle-morefun-main.png" --file "v3customer/public/media/customer/hero/hero-doodle-morefun-main.png" --remote
           npx --yes wrangler@latest r2 object get "$BUCKET/customer/brand/hero/hero-doodle-goodtaste-main.png" --file "v3customer/public/media/customer/hero/hero-doodle-goodtaste-main.png" --remote
-          mkdir -p v3customer/public/media/customer/home
-          npx --yes wrangler@latest r2 object get "$BUCKET/customer/brand/home/chef-product-01.png" --file "v3customer/public/media/customer/home/chef-product-01.png" --remote
-          npx --yes wrangler@latest r2 object get "$BUCKET/customer/brand/home/chef-product-02.png" --file "v3customer/public/media/customer/home/chef-product-02.png" --remote
-          npx --yes wrangler@latest r2 object get "$BUCKET/customer/brand/home/chef-product-03.png" --file "v3customer/public/media/customer/home/chef-product-03.png" --remote
-          npx --yes wrangler@latest r2 object get "$BUCKET/customer/brand/home/chef-product-04.png" --file "v3customer/public/media/customer/home/chef-product-04.png" --remote
 
       - name: Install Chromium
         working-directory: v3customer
@@ -114,8 +109,8 @@ jobs:
               cta:r('.hero-copy > button'),
               quick:r('.quick'),
               quickCards:[...document.querySelectorAll('.quick-card')].map(el=>el.getBoundingClientRect().toJSON()),
-              featured:r('.featured-section'),
-              featuredCards:[...document.querySelectorAll('.featured-card')].map(el=>el.getBoundingClientRect().toJSON()),
+              quickIcons:[...document.querySelectorAll('.quick-icon')].map(el=>el.getBoundingClientRect().toJSON()),
+              lifestyle:r('.lifestyle'),
               recent:r('.recent-section'),
               nav:r('nav'),
               navButtons:[...document.querySelectorAll('nav button')].map(el=>el.getBoundingClientRect().toJSON())
@@ -127,10 +122,11 @@ jobs:
           if(metrics.documentWidth>metrics.viewportWidth) fail.push('horizontal-overflow');
           if(!metrics.hero || metrics.hero.height<metrics.viewportHeight*0.60) fail.push('hero-under-60-percent');
           if(!metrics.hero || metrics.hero.height>metrics.viewportHeight*0.72) fail.push('hero-over-72-percent');
-          if(screens<1.40 || screens>1.62) fail.push('home-not-1.5-screen-class');
+          if(screens<1.20 || screens>1.50) fail.push('home-length-outside-reference-class');
           if(!metrics.cta || metrics.cta.height<48) fail.push('cta-touch-too-small');
-          if(metrics.quickCards.length!==4 || metrics.quickCards.some(x=>x.height<100||x.width<150)) fail.push('quick-card-touch-contract');
-          if(metrics.featuredCards.length!==2) fail.push('featured-count-not-two');
+          if(metrics.quickCards.length!==4 || metrics.quickCards.some(x=>x.height<150||x.width<70)) fail.push('quick-card-touch-contract');
+          if(metrics.quickIcons.length!==4 || metrics.quickIcons.some(x=>x.height<52||x.width<52)) fail.push('quick-icon-size-contract');
+          if(!metrics.lifestyle || metrics.lifestyle.height<150) fail.push('lifestyle-banner-missing');
           if(metrics.navButtons.length!==4 || metrics.navButtons.some(x=>x.height<52)) fail.push('bottom-nav-touch-contract');
 
           metrics.pageScreens=Number(screens.toFixed(3));
@@ -192,11 +188,6 @@ jobs:
           npx --yes wrangler@latest r2 object get "$BUCKET/customer/brand/hero/hero-female-main.png" --file "v3customer/public/media/customer/hero/hero-female-main.png" --remote
           npx --yes wrangler@latest r2 object get "$BUCKET/customer/brand/hero/hero-doodle-morefun-main.png" --file "v3customer/public/media/customer/hero/hero-doodle-morefun-main.png" --remote
           npx --yes wrangler@latest r2 object get "$BUCKET/customer/brand/hero/hero-doodle-goodtaste-main.png" --file "v3customer/public/media/customer/hero/hero-doodle-goodtaste-main.png" --remote
-          mkdir -p v3customer/public/media/customer/home
-          npx --yes wrangler@latest r2 object get "$BUCKET/customer/brand/home/chef-product-01.png" --file "v3customer/public/media/customer/home/chef-product-01.png" --remote
-          npx --yes wrangler@latest r2 object get "$BUCKET/customer/brand/home/chef-product-02.png" --file "v3customer/public/media/customer/home/chef-product-02.png" --remote
-          npx --yes wrangler@latest r2 object get "$BUCKET/customer/brand/home/chef-product-03.png" --file "v3customer/public/media/customer/home/chef-product-03.png" --remote
-          npx --yes wrangler@latest r2 object get "$BUCKET/customer/brand/home/chef-product-04.png" --file "v3customer/public/media/customer/home/chef-product-04.png" --remote
 
       - name: Build preview
         working-directory: v3customer

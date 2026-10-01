@@ -17,6 +17,6 @@ export default defineConfig({
     timeout:60_000
   },
   projects:[
-    {name:'chromium-390',use:{...devices['Desktop Chrome'],viewport:{width:390,height:844}}},
+    {name:'chromium-390',use:{...devices['Desktop Chrome'],channel:process.env.PLAYWRIGHT_CHANNEL,viewport:{width:390,height:844}}},
   ]
 });

@@ -7,11 +7,6 @@ export const CUSTOMER_V3_ASSETS=Object.freeze({
   moreFunDoodleR2:'/media/customer/hero/hero-doodle-morefun-main.png',
   goodTasteDoodleR2:'/media/customer/hero/hero-doodle-goodtaste-main.png',
 
-  chefProduct01:'/media/customer/home/chef-product-01.png',
-  chefProduct02:'/media/customer/home/chef-product-02.png',
-  chefProduct03:'/media/customer/home/chef-product-03.png',
-  chefProduct04:'/media/customer/home/chef-product-04.png',
-
   // Locked reference only; never rendered as the live UI.
   lockedLongHomeReferenceR2:'https://cdn.creativeclaw.co/u/6ad84d58/images/09313f05-42df-4018-ba67-a232bcdb2df9.png',
 

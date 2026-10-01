@@ -15,50 +15,61 @@ for(const size of viewports){
 
     const metrics=await page.evaluate(()=>{
       const rect=(selector:string)=>document.querySelector(selector)?.getBoundingClientRect();
-      const quickCards=[...document.querySelectorAll('.quick-card')].map(el=>el.getBoundingClientRect());
-      const navButtons=[...document.querySelectorAll('nav button')].map(el=>el.getBoundingClientRect());
-      const cta=document.querySelector('.hero-copy > button')?.getBoundingClientRect();
-
       return {
         viewportHeight:innerHeight,
         viewportWidth:innerWidth,
         documentHeight:document.documentElement.scrollHeight,
         documentWidth:document.documentElement.scrollWidth,
         hero:rect('.hero'),
-        cta,
-        quickCards,
-        navButtons,
+        cta:rect('.hero-copy > button'),
+        quickCards:[...document.querySelectorAll('.quick-card')].map(el=>el.getBoundingClientRect()),
+        quickIcons:[...document.querySelectorAll('.quick-icon')].map(el=>el.getBoundingClientRect()),
+        lifestyle:rect('.lifestyle'),
+        recent:rect('.recent-card'),
+        navButtons:[...document.querySelectorAll('nav button')].map(el=>el.getBoundingClientRect()),
       };
     });
 
     expect(metrics.documentWidth).toBeLessThanOrEqual(metrics.viewportWidth);
-    expect(metrics.hero?.height ?? 0).toBeGreaterThanOrEqual(metrics.viewportHeight*0.60);
-    expect(metrics.hero?.height ?? 0).toBeLessThanOrEqual(metrics.viewportHeight*0.72);
+    expect(metrics.hero?.height ?? 0).toBeGreaterThanOrEqual(metrics.viewportHeight*.60);
+    expect(metrics.hero?.height ?? 0).toBeLessThanOrEqual(metrics.viewportHeight*.72);
 
     const pageScreens=metrics.documentHeight/metrics.viewportHeight;
-    expect(pageScreens).toBeGreaterThanOrEqual(1.40);
-    expect(pageScreens).toBeLessThanOrEqual(1.62);
+    expect(pageScreens).toBeGreaterThanOrEqual(1.20);
+    expect(pageScreens).toBeLessThanOrEqual(1.50);
 
     expect(metrics.cta?.height ?? 0).toBeGreaterThanOrEqual(48);
-
+    expect(metrics.quickCards).toHaveLength(4);
+    expect(metrics.quickIcons).toHaveLength(4);
     for(const card of metrics.quickCards){
-      expect(card.height).toBeGreaterThanOrEqual(100);
-      expect(card.width).toBeGreaterThanOrEqual(150);
+      expect(card.height).toBeGreaterThanOrEqual(150);
+      expect(card.width).toBeGreaterThanOrEqual(70);
+    }
+    for(const icon of metrics.quickIcons){
+      expect(icon.height).toBeGreaterThanOrEqual(52);
+      expect(icon.width).toBeGreaterThanOrEqual(52);
     }
 
+    expect(metrics.lifestyle?.height ?? 0).toBeGreaterThanOrEqual(150);
+    expect(metrics.recent?.height ?? 0).toBeGreaterThanOrEqual(72);
     for(const button of metrics.navButtons){
       expect(button.height).toBeGreaterThanOrEqual(52);
+      expect(button.width).toBeGreaterThanOrEqual(70);
     }
   });
 }
 
-test('primary home actions are direct taps',async({page})=>{
+test('primary home actions stay honest in preview',async({page})=>{
   await page.setViewportSize({width:390,height:844});
   await page.goto('/');
 
   await expect(page.locator('.hero-copy > button')).toBeVisible();
   await expect(page.locator('.quick-card')).toHaveCount(4);
-  await expect(page.locator('.featured-card')).toHaveCount(2);
+  await expect(page.locator('.lifestyle')).toBeVisible();
+  await expect(page.locator('.featured-card')).toHaveCount(0);
   await expect(page.locator('.recent-card')).toBeVisible();
   await expect(page.locator('nav button')).toHaveCount(4);
+
+  await page.locator('.quick-card').first().click();
+  await expect(page.getByRole('status')).toContainText('預覽版未接駁');
 });
