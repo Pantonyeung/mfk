@@ -25,7 +25,7 @@ button:focus-visible{outline:3px solid rgba(23,103,247,.35);outline-offset:2px}
   min-height:38px;border:1px solid #fff;background:rgba(255,255,255,.9);
   box-shadow:0 5px 14px rgba(47,92,164,.08)
 }
-.location{grid-area:location;border-radius:999px;font-weight:900}
+.location{grid-area:location;border-radius:999px;font-weight:900;font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 8px}
 .round{grid-area:bell;border-radius:50%;width:36px;height:36px}
 .bell{position:relative;font-size:24px}
 .bell i{position:absolute;width:7px;height:7px;border-radius:50%;background:#ff4c57;right:-1px;top:1px}
@@ -34,8 +34,8 @@ button:focus-visible{outline:3px solid rgba(23,103,247,.35);outline-offset:2px}
 main{display:grid;grid-template-columns:minmax(0,1fr);gap:8px;min-width:0}
 #menu-discovery,#chef-picks,#recent-order{scroll-margin-top:12px}
 .hero{
-  position:relative;min-height:222px;display:grid;grid-template-columns:45% 55%;
-  padding:52px 12px 8px;overflow:hidden;background:#dcecff;min-width:0
+  position:relative;height:228px;min-height:228px;display:block;
+  padding:0;overflow:hidden;background:#dcecff;min-width:0
 }
 .hero:before{
   content:"";position:absolute;inset:0;z-index:2;pointer-events:none;
@@ -55,34 +55,34 @@ main{display:grid;grid-template-columns:minmax(0,1fr);gap:8px;min-width:0}
     radial-gradient(circle at 18% 16%,rgba(255,255,255,.58),transparent 26%),
     linear-gradient(180deg,rgba(255,255,255,.02),rgba(255,255,255,.08) 66%,rgba(255,255,255,.26));
 }
-.hero-copy{position:relative;z-index:8;align-self:end;padding:0 0 4px}
-.hero-copy em{font-family:cursive;color:#3977e7;font-size:13px;font-weight:900}
-.hero h1{margin:4px 0 5px;font-size:24px;line-height:1.02;letter-spacing:-.045em;text-wrap:balance}
-.hero-copy>strong{font-size:9px}
-.hero-copy p{font-size:9px;line-height:1.45;color:#31588f;margin:7px 0}
+.hero-copy{position:absolute;z-index:8;left:12px;top:58px;width:44%;padding:0}
+.hero-copy em{font-family:cursive;color:#3977e7;font-size:12px;font-weight:900}
+.hero h1{margin:2px 0 4px;font-size:22px;line-height:1.01;letter-spacing:-.04em;text-wrap:balance}
+.hero-copy>strong{display:block;font-size:8px;margin-top:2px}
+.hero-copy p{font-size:8px;line-height:1.35;color:#31588f;margin:5px 0}
 .hero-copy>button{
   min-height:44px;border:0;border-radius:999px;background:linear-gradient(90deg,#1686ff,#8a49f8);
-  color:#fff;font-size:13px;font-weight:950;padding:0 18px;
+  color:#fff;font-size:12px;font-weight:950;padding:0 16px;
   box-shadow:0 14px 28px rgba(80,86,234,.28);transition:transform .18s ease,box-shadow .18s ease
 }
 .hero-copy>button:hover{transform:translateY(-1px);box-shadow:0 17px 32px rgba(80,86,234,.34)}
 .hero-copy>button:active{transform:translateY(1px)}
-.hero-copy small{display:block;margin-top:8px;font-size:6.5px;white-space:nowrap}
-.hero-visual{position:absolute;right:-4px;top:38px;width:70%;height:184px;z-index:3}
+.hero-copy small{display:block;margin-top:5px;font-size:6px;white-space:nowrap}
+.hero-visual{position:absolute;right:-3px;top:38px;width:72%;height:188px;z-index:3}
 .cloud{position:absolute;border-radius:45% 55% 60% 40%;background:rgba(255,255,255,.55);filter:blur(.1px)}
 .c1{width:190px;height:112px;right:-56px;top:6px;transform:rotate(-10deg)}
 .c2{width:180px;height:100px;left:-24px;bottom:22px;transform:rotate(9deg)}
 .c3{width:124px;height:84px;right:44px;bottom:78px;background:rgba(255,249,232,.68)}
 .male{
-  position:absolute;width:164px;height:208px;object-fit:contain;left:-10px;bottom:-3px;z-index:5;
+  position:absolute;width:174px;height:214px;object-fit:contain;left:-12px;bottom:-4px;z-index:5;
   filter:drop-shadow(0 17px 18px rgba(36,67,126,.2));transform:rotate(-2deg)
 }
 .female{
-  position:absolute;width:132px;height:178px;object-fit:contain;right:-4px;bottom:-3px;z-index:4;
+  position:absolute;width:140px;height:184px;object-fit:contain;right:-4px;bottom:-3px;z-index:4;
   filter:drop-shadow(0 15px 16px rgba(68,55,138,.17));transform:rotate(3deg)
 }
 .doodle{position:absolute;z-index:7;object-fit:contain;pointer-events:none}
-.doodle-more{width:50px;height:50px;right:17px;top:1px;transform:rotate(7deg)}
+.doodle-more{width:48px;height:48px;right:38px;top:4px;transform:rotate(7deg)}
 .doodle-taste{width:62px;height:62px;right:-2px;bottom:0;transform:rotate(-6deg)}
 .quick{
   position:relative;z-index:8;margin:-4px 10px 0;padding:6px;
