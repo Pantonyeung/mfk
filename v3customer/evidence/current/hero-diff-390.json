@@ -1,0 +1,9 @@
+{
+  "viewport": {
+    "width": 390,
+    "height": 208
+  },
+  "threshold": 15,
+  "changedPixelRatio": 0.741802,
+  "normalizedMAE": 0.218978
+}
