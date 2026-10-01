@@ -274,3 +274,33 @@ export function ChannelPage({mode}:{mode:'overview'|'accept'|'sync'|'binding'|'m
     {selectedMapping?<MappingEditor mapping={selectedMapping} onClose={()=>setSelected(null)}/>:null}
   </div>;
 }
+
+
+export function PrintOverviewPage(){
+  const printers=usePreviewAdmin(state=>state.printers);
+  const rules=usePreviewAdmin(state=>state.printRules);
+  const templates=usePreviewAdmin(state=>state.templates);
+  const activePrinters=printers.filter(item=>item.active).length;
+  return <div className="v3-functional-page"><PreviewNotice/><PageHeader eyebrow="打印管理" title="打印總覽" description="Logical Printer、模板、規則同異常證據集中概覽；唔直接建立第二重印 authority。" />
+    <section className="v3-whole-kpi-grid"><article><span>啟用邏輯打印機</span><strong>{activePrinters}</strong><small>{printers.length} 個總數</small></article><article><span>打印模板</span><strong>{templates.length}</strong></article><article><span>打印規則</span><strong>{rules.filter(item=>item.active).length}</strong></article><article><span>今日異常</span><strong>1</strong><StatusBadge tone="warning">需要檢查</StatusBadge></article></section>
+    <section className="v3-functional-section"><h3>規則摘要</h3><div className="v3-action-list">{rules.map(rule=><article key={rule.id}><div><strong>{rule.name}</strong><small>{rule.event}</small></div><strong>{rule.printerIds.length} 個目的地</strong><StatusBadge tone={rule.active?'good':'neutral'}>{rule.active?'啟用':'停用'}</StatusBadge></article>)}</div></section>
+  </div>;
+}
+
+export function PrintExceptionsPage(){
+  const printers=usePreviewAdmin(state=>state.printers);
+  const failedPrinter=printers.find(item=>item.type==='LABEL')??printers[0];
+  return <div className="v3-functional-page"><div className="v3-preview-banner"><strong>只讀異常 Preview</strong><span>冇正式 safe-retry contract 前，Admin 唔會顯示假「重印」操作。</span></div><PageHeader eyebrow="打印管理" title="打印狀態／異常" description="查看打印工作證據、目的地同第一個異常點。" />
+    <div className="v3-action-list"><article><div><strong>PRINT-20261001-001</strong><small>標籤 · 訂單 MF-2600999 · {failedPrinter?.name??'未有目的地'}</small></div><StatusBadge tone="warning">等待確認</StatusBadge><button type="button">查看詳情</button></article></div>
+  </div>;
+}
+
+export function SettlementPage(){
+  const rows=[
+    {id:'SET-20260930',period:'2026-09-30',gross:'HK$6,428.20',fees:'HK$1,502.80',earnings:'HK$4,925.40',state:'已取得證據'},
+    {id:'SET-20260929',period:'2026-09-29',gross:'HK$5,918.00',fees:'HK$1,382.10',earnings:'HK$4,535.90',state:'已取得證據'},
+  ];
+  return <div className="v3-functional-page"><div className="v3-preview-banner"><strong>平台對帳 · 只讀</strong><span>Provider commercial evidence 唔會改寫 MFK Sales / Order authority。</span></div><PageHeader eyebrow="平台／渠道管理" title="平台對帳" description="查看 Keeta provider settlement evidence；R1 不提供對帳 mutation。" />
+    <div className="v3-price-edit-list">{rows.map(row=><article key={row.id}><div><strong>{row.period}</strong><small>{row.id} · 平台費 {row.fees}</small></div><strong>{row.earnings}</strong><StatusBadge tone="good">{row.state}</StatusBadge></article>)}</div>
+  </div>;
+}
