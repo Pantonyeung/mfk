@@ -67,6 +67,55 @@ export interface PreviewChannelConfig{
   providerShopId:string;
 }
 
+export interface PreviewCapacityPool{
+  id:string;
+  name:string;
+  initialQty:number;
+  remainingQty:number;
+  productIds:readonly string[];
+  active:boolean;
+}
+
+export interface PreviewDevice{
+  id:string;
+  name:string;
+  kind:string;
+  version:string;
+  state:'可用'|'要留意'|'資料過期'|'無法連線';
+  lastSeen:string;
+}
+
+export interface PreviewOtaRelease{
+  id:string;
+  version:string;
+  label:string;
+  approved:boolean;
+  state:'可安裝'|'已安裝'|'已回復';
+}
+
+export interface PreviewSession{
+  id:string;
+  staffName:string;
+  device:string;
+  lastSeen:string;
+  active:boolean;
+}
+
+export interface PreviewTrustedDevice{
+  id:string;
+  name:string;
+  trusted:boolean;
+  lastSeen:string;
+}
+
+export interface PreviewDraftChange{
+  id:string;
+  domain:string;
+  object:string;
+  changeType:'新增'|'修改'|'停用';
+  valid:boolean;
+}
+
 export interface PreviewStoreSettings{
   storeName:string;
   storeCode:string;
@@ -119,6 +168,17 @@ interface PreviewAdminState{
   channelConfig:PreviewChannelConfig;
   storeSettings:PreviewStoreSettings;
   hours:Record<string,PreviewHours>;
+  businessDayOpen:boolean;
+  cashExpectedMinor:number;
+  cashCountedMinor:number|null;
+  cashNote:string;
+  capacityPools:PreviewCapacityPool[];
+  devices:PreviewDevice[];
+  otaReleases:PreviewOtaRelease[];
+  sessions:PreviewSession[];
+  trustedDevices:PreviewTrustedDevice[];
+  draftChanges:PreviewDraftChange[];
+  previewPublishStage:'DRAFT'|'VALIDATED'|'IMPACT'|'PUBLISHED'|'READBACK';
 
   addPrinter():PreviewPrinter;
   updatePrinter(id:string,patch:Partial<Omit<PreviewPrinter,'id'>>):void;
@@ -149,6 +209,17 @@ interface PreviewAdminState{
 
   updateStoreSettings(patch:Partial<PreviewStoreSettings>):void;
   updateHours(day:string,patch:Partial<PreviewHours>):void;
+  setBusinessDayOpen(value:boolean):void;
+  updateCash(patch:{countedMinor?:number|null;note?:string}):void;
+  addCapacityPool():PreviewCapacityPool;
+  updateCapacityPool(id:string,patch:Partial<Omit<PreviewCapacityPool,'id'>>):void;
+  removeCapacityPool(id:string):void;
+  updateDevice(id:string,patch:Partial<Omit<PreviewDevice,'id'>>):void;
+  updateOtaRelease(id:string,patch:Partial<Omit<PreviewOtaRelease,'id'>>):void;
+  revokeSession(id:string):void;
+  setTrustedDevice(id:string,trusted:boolean):void;
+  discardDraftChange(id:string):void;
+  advancePreviewPublish():void;
 }
 
 export const usePreviewAdmin=create<PreviewAdminState>((set,get)=>({
@@ -210,6 +281,38 @@ export const usePreviewAdmin=create<PreviewAdminState>((set,get)=>({
     reminderIntervalMinutes:5,
   },
   hours:{...DEFAULT_HOURS},
+  businessDayOpen:true,
+  cashExpectedMinor:284000,
+  cashCountedMinor:null,
+  cashNote:'',
+  capacityPools:[
+    {id:'pool-riceball',name:'飯糰每日產能',initialQty:180,remainingQty:74,productIds:['p-001','p-002','p-003','p-004'],active:true},
+    {id:'pool-drink',name:'茶飲每日產能',initialQty:120,remainingQty:93,productIds:['p-014'],active:true},
+  ],
+  devices:[
+    {id:'SMT-01',name:'Store Kernel',kind:'SMT',version:'v2.18.4',state:'可用',lastSeen:'剛剛'},
+    {id:'SMM-01',name:'櫃檯 Android',kind:'SMM',version:'v2.18.4',state:'可用',lastSeen:'1 分鐘前'},
+    {id:'KDS-02',name:'廚房顯示',kind:'KDS',version:'v2.17.9',state:'資料過期',lastSeen:'42 分鐘前'},
+  ],
+  otaReleases:[
+    {id:'ota-2184',version:'v2.18.4',label:'目前批准版本',approved:true,state:'已安裝'},
+    {id:'ota-2190',version:'v2.19.0-rc1',label:'候選版本',approved:true,state:'可安裝'},
+  ],
+  sessions:[
+    {id:'session-owner',staffName:'老闆',device:'Safari · iPhone',lastSeen:'剛剛',active:true},
+    {id:'session-manager',staffName:'店長',device:'Chrome · Mac',lastSeen:'8 分鐘前',active:true},
+  ],
+  trustedDevices:[
+    {id:'trust-iphone',name:'老闆 iPhone',trusted:true,lastSeen:'剛剛'},
+    {id:'trust-mac',name:'店長 Mac',trusted:true,lastSeen:'8 分鐘前'},
+  ],
+  draftChanges:[
+    {id:'draft-product',domain:'菜單',object:'紫米飯糰・鹽麴雞',changeType:'修改',valid:true},
+    {id:'draft-category',domain:'菜單',object:'茶飲',changeType:'修改',valid:true},
+    {id:'draft-hours',domain:'門店設定',object:'營業時間',changeType:'修改',valid:true},
+    {id:'draft-channel',domain:'渠道',object:'Keeta 接單規則',changeType:'修改',valid:true},
+  ],
+  previewPublishStage:'DRAFT',
 
   addPrinter(){
     const row:PreviewPrinter={id:uid('printer'),name:'新邏輯打印機',type:'RECEIPT',widthMm:80,active:true};
@@ -274,4 +377,22 @@ export const usePreviewAdmin=create<PreviewAdminState>((set,get)=>({
 
   updateStoreSettings(patch){set(state=>({storeSettings:{...state.storeSettings,...patch}}));},
   updateHours(day,patch){set(state=>({hours:{...state.hours,[day]:{...state.hours[day],...patch}}}));},
+  setBusinessDayOpen(value){set({businessDayOpen:value});},
+  updateCash(patch){set(state=>({cashCountedMinor:patch.countedMinor===undefined?state.cashCountedMinor:patch.countedMinor,cashNote:patch.note===undefined?state.cashNote:patch.note}));},
+  addCapacityPool(){
+    const row:PreviewCapacityPool={id:uid('pool'),name:'新產能 Pool',initialQty:100,remainingQty:100,productIds:[],active:false};
+    set(state=>({capacityPools:[...state.capacityPools,row]}));return row;
+  },
+  updateCapacityPool(id,patch){set(state=>({capacityPools:state.capacityPools.map(item=>item.id===id?{...item,...patch}:item)}));},
+  removeCapacityPool(id){set(state=>({capacityPools:state.capacityPools.filter(item=>item.id!==id)}));},
+  updateDevice(id,patch){set(state=>({devices:state.devices.map(item=>item.id===id?{...item,...patch}:item)}));},
+  updateOtaRelease(id,patch){set(state=>({otaReleases:state.otaReleases.map(item=>item.id===id?{...item,...patch}:item)}));},
+  revokeSession(id){set(state=>({sessions:state.sessions.map(item=>item.id===id?{...item,active:false}:item)}));},
+  setTrustedDevice(id,trusted){set(state=>({trustedDevices:state.trustedDevices.map(item=>item.id===id?{...item,trusted}:item)}));},
+  discardDraftChange(id){set(state=>({draftChanges:state.draftChanges.filter(item=>item.id!==id),previewPublishStage:'DRAFT'}));},
+  advancePreviewPublish(){set(state=>{
+    const order=['DRAFT','VALIDATED','IMPACT','PUBLISHED','READBACK'] as const;
+    const index=order.indexOf(state.previewPublishStage);
+    return{previewPublishStage:order[Math.min(order.length-1,index+1)]};
+  });},
 }));
