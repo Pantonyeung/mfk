@@ -26,6 +26,20 @@ describe('MFK Admin V3 authority',()=>{
     }
   });
 
+  it('forces Cloudflare Pages client assets to bypass persistent browser cache',()=>{
+    const headers=readFileSync(new URL('../public/_headers',import.meta.url),'utf8');
+    expect(headers).toContain('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+    expect(headers).toContain('Pragma: no-cache');
+  });
+
+  it('revalidates formal read models periodically and on canonical server doorbells',()=>{
+    const source=readFileSync(new URL('./formal-read-model.tsx',import.meta.url),'utf8');
+    expect(source.match(/refetchInterval:V3_DATA_REFETCH_INTERVAL_MS/g)?.length).toBeGreaterThanOrEqual(6);
+    expect(source).toContain("message.type==='ADMIN_CONFIG_AVAILABLE'");
+    expect(source).toContain('v3AdminCanonicalQueryKey(storeId)');
+    expect(source).toContain('v3FormalDraftQueryKey(storeId)');
+  });
+
   it('keeps V3 unrouted from production',()=>{
     const pkg=readFileSync(new URL('../package.json',import.meta.url),'utf8');
     expect(pkg).not.toContain('wrangler');
