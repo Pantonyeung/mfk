@@ -1,0 +1,46 @@
+{
+  "viewportWidth": 390,
+  "viewportHeight": 844,
+  "documentWidth": 390,
+  "documentHeight": 1985,
+  "hero": {
+    "x": 0,
+    "y": 113,
+    "width": 683,
+    "height": 402,
+    "top": 113,
+    "right": 683,
+    "bottom": 515,
+    "left": 0
+  },
+  "quick": {
+    "x": 13,
+    "y": 519,
+    "width": 657,
+    "height": 160,
+    "top": 519,
+    "right": 670,
+    "bottom": 679,
+    "left": 13
+  },
+  "categories": {
+    "x": 14,
+    "y": 691,
+    "width": 655,
+    "height": 125,
+    "top": 691,
+    "right": 669,
+    "bottom": 816,
+    "left": 14
+  },
+  "products": {
+    "x": 28,
+    "y": 896,
+    "width": 627,
+    "height": 208,
+    "top": 896,
+    "right": 655,
+    "bottom": 1104,
+    "left": 28
+  }
+}
