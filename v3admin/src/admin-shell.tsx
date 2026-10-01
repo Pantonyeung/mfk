@@ -117,7 +117,7 @@ export function AdminShell({storeId,displayName,releaseStatus,canonicalState,can
       :path==='/admin/orders/exceptions'&&previewMode
         ?<OrdersPage mode="exceptions"/>
         :path==='/admin/catalog/products'
-          ?<ProductListPage canonicalSnapshot={canonicalSnapshot} previewMode={previewMode} onReviewDraft={()=>navigate('/admin/publish/pending')}/>
+          ?<ProductListPage canonicalSnapshot={canonicalSnapshot} previewMode={previewMode} formalDraftEnabled={formalDraftEnabled} onReviewDraft={()=>navigate('/admin/publish/pending')}/>
     :path==='/admin/catalog/categories'&&previewMode
       ?<CategoriesPage/>
       :path==='/admin/catalog/modifiers'&&previewMode
