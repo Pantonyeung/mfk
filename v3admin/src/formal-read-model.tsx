@@ -1,5 +1,6 @@
 import {createContext,useContext,useEffect,type ReactNode} from 'react';
 import {useQuery,useQueryClient} from '@tanstack/react-query';
+import type {AdminDayCloseRefundAddendum,AdminRefundEvent} from '../../contracts/admin-refund-v1.ts';
 
 export interface V3ProjectedOrderItem{
   readonly id:string;
@@ -61,19 +62,32 @@ export async function readV3ProjectedDays(input:{storeId:string;sessionToken:str
   const body=await getJson('/api/projection/reports',input.storeId,input.sessionToken);
   return Array.isArray(body.days)?body.days as unknown as readonly V3ProjectedDay[]:[];
 }
+export async function readV3RefundProjection(input:{storeId:string;sessionToken:string}):Promise<{refunds:readonly AdminRefundEvent[];addenda:readonly AdminDayCloseRefundAddendum[]}>{
+  const body=await getJson('/api/admin-sync/refunds',input.storeId,input.sessionToken);
+  return{
+    refunds:Array.isArray(body.refunds)?body.refunds as unknown as readonly AdminRefundEvent[]:[],
+    addenda:Array.isArray(body.addenda)?body.addenda as unknown as readonly AdminDayCloseRefundAddendum[]:[],
+  };
+}
 
 export function v3ProjectionOrdersKey(storeId:string){return ['mfk','admin-v3','projection','orders',storeId] as const;}
 export function v3ProjectionReportsKey(storeId:string){return ['mfk','admin-v3','projection','reports',storeId] as const;}
+export function v3ProjectionRefundsKey(storeId:string){return ['mfk','admin-v3','projection','refunds',storeId] as const;}
 
 interface V3ReadModelContextValue{
   readonly orders:readonly V3ProjectedOrder[];
   readonly days:readonly V3ProjectedDay[];
+  readonly refunds:readonly AdminRefundEvent[];
+  readonly refundAddenda:readonly AdminDayCloseRefundAddendum[];
   readonly ordersPending:boolean;
   readonly reportsPending:boolean;
+  readonly refundsPending:boolean;
   readonly ordersRefreshing:boolean;
   readonly reportsRefreshing:boolean;
+  readonly refundsRefreshing:boolean;
   readonly ordersError:Error|null;
   readonly reportsError:Error|null;
+  readonly refundsError:Error|null;
   readonly refresh:()=>Promise<void>;
 }
 const V3ReadModelContext=createContext<V3ReadModelContextValue|null>(null);
@@ -82,6 +96,7 @@ export function V3ReadModelProvider({storeId,sessionToken,children}:{storeId:str
   const queryClient=useQueryClient();
   const ordersKey=v3ProjectionOrdersKey(storeId);
   const reportsKey=v3ProjectionReportsKey(storeId);
+  const refundsKey=v3ProjectionRefundsKey(storeId);
   const orders=useQuery({
     queryKey:ordersKey,
     queryFn:()=>readV3ProjectedOrders({storeId,sessionToken}),
@@ -103,6 +118,17 @@ export function V3ReadModelProvider({storeId,sessionToken,children}:{storeId:str
     retry:1,
   });
 
+  const refunds=useQuery({
+    queryKey:refundsKey,
+    queryFn:()=>readV3RefundProjection({storeId,sessionToken}),
+    staleTime:0,
+    gcTime:5*60*1000,
+    refetchOnMount:'always',
+    refetchOnWindowFocus:true,
+    refetchOnReconnect:true,
+    retry:1,
+  });
+
   useEffect(()=>{
     if(typeof window==='undefined'||typeof WebSocket==='undefined')return;
     let socket:WebSocket|null=null;
@@ -111,6 +137,7 @@ export function V3ReadModelProvider({storeId,sessionToken,children}:{storeId:str
     const invalidate=()=>{
       void queryClient.invalidateQueries({queryKey:ordersKey});
       void queryClient.invalidateQueries({queryKey:reportsKey});
+      void queryClient.invalidateQueries({queryKey:refundsKey});
     };
     const connect=()=>{
       if(closed)return;
@@ -144,13 +171,18 @@ export function V3ReadModelProvider({storeId,sessionToken,children}:{storeId:str
   const value:V3ReadModelContextValue={
     orders:orders.data??[],
     days:reports.data??[],
+    refunds:refunds.data?.refunds??[],
+    refundAddenda:refunds.data?.addenda??[],
     ordersPending:orders.isPending,
     reportsPending:reports.isPending,
+    refundsPending:refunds.isPending,
     ordersRefreshing:orders.isFetching&&!orders.isPending,
     reportsRefreshing:reports.isFetching&&!reports.isPending,
+    refundsRefreshing:refunds.isFetching&&!refunds.isPending,
     ordersError:orders.error as Error|null,
     reportsError:reports.error as Error|null,
-    refresh:async()=>{await Promise.all([orders.refetch(),reports.refetch()]);},
+    refundsError:refunds.error as Error|null,
+    refresh:async()=>{await Promise.all([orders.refetch(),reports.refetch(),refunds.refetch()]);},
   };
   return <V3ReadModelContext.Provider value={value}>{children}</V3ReadModelContext.Provider>;
 }
