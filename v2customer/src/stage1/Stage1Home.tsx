@@ -184,7 +184,9 @@ export function Stage1Home({
 
   const heroStyle={
     '--stage1-hero-height':heroHeight+'px',
-    '--stage1-hero-progress':String(heroProgress),
+    '--stage1-hero-scale':String(1-(heroProgress*.14)),
+    '--stage1-hero-copy-opacity':String(1-(heroProgress*.28)),
+    '--stage1-hero-copy-y':(-8*heroProgress)+'px',
   } as CSSProperties;
 
   return <div className="stage1-home stage1-mobile-home" data-hero-collapsed={heroProgress>.5||undefined}>
