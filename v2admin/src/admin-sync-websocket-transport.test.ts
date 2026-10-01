@@ -53,6 +53,7 @@ describe('Admin realtime transport recovery',()=>{
       storage:{
         get:vi.fn(async(key:string)=>values.get(key)),
         put:vi.fn(async(key:string,value:unknown)=>{values.set(key,value);}),
+        delete:vi.fn(async(key:string)=>{values.delete(key);}),
       },
       getWebSockets:(tag?:string)=>tag==='PORT:SMT'?[{send:(message:string)=>sent.push(message)}]:[],
     };
