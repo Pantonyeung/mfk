@@ -13,6 +13,7 @@ export interface PreviewPrinter{
 export interface PreviewPrintTemplate{
   id:string;
   name:string;
+  type:PreviewPrinterType;
   content:string;
   active:boolean;
 }
@@ -231,10 +232,10 @@ export const usePreviewAdmin=create<PreviewAdminState>((set,get)=>({
     {id:'logical-label-2',name:'標籤機 2',type:'LABEL',widthMm:50,active:true},
   ],
   templates:[
-    {id:'tpl-receipt',name:'收據模板',content:'店名\n訂單編號\n商品明細\n總額\n付款方式',active:true},
-    {id:'tpl-production',name:'製作單模板',content:'訂單編號\n商品\n選項／備註',active:true},
-    {id:'tpl-packing',name:'打包單模板',content:'訂單編號\n全單商品／件數',active:true},
-    {id:'tpl-label',name:'標籤模板',content:'商品名稱\n選項\n訂單／取餐參考',active:true},
+    {id:'tpl-receipt',name:'收據模板',type:'RECEIPT',content:'店名\n訂單編號\n商品明細\n總額\n付款方式',active:true},
+    {id:'tpl-production',name:'製作單模板',type:'PRODUCTION',content:'訂單編號\n商品\n選項／備註',active:true},
+    {id:'tpl-packing',name:'打包單模板',type:'PACKING',content:'訂單編號\n全單商品／件數',active:true},
+    {id:'tpl-label',name:'標籤模板',type:'LABEL',content:'商品名稱\n選項\n訂單／取餐參考',active:true},
   ],
   printRules:[
     {id:'rule-receipt',name:'完成付款列印收據',event:'PAYMENT_CONFIRMED',printerIds:['logical-receipt'],active:true},
@@ -326,7 +327,7 @@ export const usePreviewAdmin=create<PreviewAdminState>((set,get)=>({
     set(state=>({printers:state.printers.filter(item=>item.id!==id)}));return true;
   },
   addTemplate(){
-    const row:PreviewPrintTemplate={id:uid('tpl'),name:'新打印模板',content:'',active:true};
+    const row:PreviewPrintTemplate={id:uid('tpl'),name:'新打印模板',type:'LABEL',content:'',active:true};
     set(state=>({templates:[...state.templates,row]}));return row;
   },
   updateTemplate(id,patch){set(state=>({templates:state.templates.map(item=>item.id===id?{...item,...patch}:item)}));},
