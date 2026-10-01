@@ -339,7 +339,7 @@ export async function reconcileSmtCheckpointedSync(){
 
       for(let guard=0;guard<12;guard++){
         head=await fetchSmtSyncHead();
-        if(appliedSeq>head.headSeq||appliedSeq<head.checkpointSeq){
+        if(appliedSeq>head.headSeq||appliedSeq<Math.max(0,head.journalFloorSeq-1)){
           if(!head.checkpointHash)throw new Error('SYNC_CHECKPOINT_REQUIRED_BUT_UNAVAILABLE');
           const checkpoint=await fetchSmtSyncCheckpoint(head);
           entities=entityMapFromCheckpoint(checkpoint);

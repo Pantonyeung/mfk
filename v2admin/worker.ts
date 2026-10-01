@@ -7,16 +7,20 @@ import {
   MFK_CHECKPOINTED_DELTA_SYNC_PROTOCOL,
   MFK_SYNC_SCHEMA_VERSION,
   validateMfkSyncAppliedAck,
+  validateMfkSyncCheckpointPointer,
 } from '../contracts/checkpointed-delta-sync-v1.ts';
 import {
+  applyMfkSyncChanges,
   buildCustomerSyncEntities,
   buildKeetaSyncEntities,
   buildSmmSyncEntities,
   buildSmtSyncEntities,
   createMfkSyncCheckpoint,
   diffMfkSyncEntities,
+  entityMapFromCheckpoint,
   projectionHashForEntities,
 } from '../sync/checkpointed-delta-sync.ts';
+import {putMfkSyncCheckpointObject,readMfkSyncCheckpointObject} from '../sync/immutable-checkpoint-store.ts';
 import {buildKeetaMenuProjection} from './keeta-menu-projection.ts';
 import {projectAdminEnvelopeToSmmConfig} from '../sync/smm-admin-projection';
 import {validateMfkCustomerOrderIntent} from '../contracts/customer-cloud-v1.ts';
@@ -44,6 +48,7 @@ const MFK_SYNC_CHECKPOINT_MAX_AGE_MS=24*60*60*1000;
 function syncHeadKey(port){return 'sync:head:'+String(port);}
 function syncEventKey(port,seq){return 'sync:event:'+String(port)+':'+String(seq).padStart(16,'0');}
 function syncCheckpointKey(port,seq){return 'sync:checkpoint:'+String(port)+':'+String(seq).padStart(16,'0');}
+function syncCheckpointPointerKey(port){return 'sync:checkpoint-pointer:'+String(port);}
 function emptySyncHead(storeId,port){
   return Object.freeze({
     schema:'MFK_SYNC_HEAD_V1',
@@ -1174,7 +1179,7 @@ export class AdminSyncStore{
     const head=await this.readSyncHead(port);
     if(!Number.isSafeInteger(after)||after<0)return{status:400,body:{code:'SYNC_AFTER_INVALID'}};
     if(after>Number(head.headSeq||0))return{status:409,body:{code:'SYNC_CLIENT_AHEAD',head}};
-    if(after<Number(head.checkpointSeq||0)){
+    if(after<Math.max(0,Number(head.journalFloorSeq||1)-1)){
       return{status:409,body:{code:'SYNC_CHECKPOINT_REQUIRED',head}};
     }
     if(after===Number(head.headSeq||0)){
@@ -1224,8 +1229,60 @@ export class AdminSyncStore{
     const seq=requestedSeq===undefined||requestedSeq===null||requestedSeq===''?Number(head.checkpointSeq||0):Number(requestedSeq);
     if(!Number.isSafeInteger(seq)||seq<0)return{status:400,body:{code:'SYNC_CHECKPOINT_SEQ_INVALID'}};
     if(!head.checkpointHash&&seq===0)return{status:404,body:{code:'SYNC_CHECKPOINT_NOT_AVAILABLE',head}};
+    const rawPointer=await this.state.storage.get(syncCheckpointPointerKey(port));
+    if(rawPointer){
+      try{
+        const pointer=validateMfkSyncCheckpointPointer(rawPointer);
+        const generation=pointer.current.checkpointSeq===seq?pointer.current:pointer.previous?.checkpointSeq===seq?pointer.previous:null;
+        if(generation){
+          try{
+            const value=await readMfkSyncCheckpointObject(this.env.SYNC_CHECKPOINTS,generation);
+            return{status:200,body:value.checkpoint};
+          }catch(error){
+            if(generation===pointer.current&&pointer.previous){
+              const checkpoint=await this.rebuildSyncCheckpointFromPrevious(pointer);
+              await this.recordCheckpointDiagnostic(port,'CHECKPOINT_CURRENT_FALLBACK_TO_PREVIOUS',error);
+              return{status:200,body:checkpoint};
+            }
+            throw error;
+          }
+        }
+      }catch(error){
+        await this.recordCheckpointDiagnostic(port,'CHECKPOINT_READ_FAILED',error);
+        return{status:503,body:{code:'SYNC_CHECKPOINT_READ_FAILED',head}};
+      }
+    }
     const checkpoint=await this.state.storage.get(syncCheckpointKey(port,seq));
     return checkpoint?{status:200,body:checkpoint}:{status:404,body:{code:'SYNC_CHECKPOINT_NOT_FOUND',head}};
+  }
+
+  async recordCheckpointDiagnostic(port,code,error){
+    await this.state.storage.put('sync:checkpoint-error:'+port,{
+      code,
+      reason:error instanceof Error?error.message:String(error||code),
+      observedAt:new Date().toISOString(),
+    }).catch(()=>{});
+  }
+
+  async rebuildSyncCheckpointFromPrevious(pointer){
+    const previous=(await readMfkSyncCheckpointObject(this.env.SYNC_CHECKPOINTS,pointer.previous)).checkpoint;
+    const stored=await this.state.storage.list({prefix:'sync:event:'+pointer.current.port+':'});
+    const changes=[...stored.values()]
+      .filter(change=>Number(change?.portSeq)>previous.checkpointSeq&&Number(change?.portSeq)<=pointer.current.checkpointSeq)
+      .sort((left,right)=>Number(left.portSeq)-Number(right.portSeq));
+    let expected=previous.checkpointSeq+1;
+    for(const change of changes){if(Number(change?.portSeq)!==expected++)throw new Error('SYNC_CHECKPOINT_PREVIOUS_TAIL_GAP');}
+    if(expected-1!==pointer.current.checkpointSeq)throw new Error('SYNC_CHECKPOINT_PREVIOUS_TAIL_INCOMPLETE');
+    const checkpoint=createMfkSyncCheckpoint({
+      storeId:pointer.current.storeId,
+      port:pointer.current.port,
+      checkpointSeq:pointer.current.checkpointSeq,
+      sourceCommitSeq:pointer.current.sourceCommitSeq,
+      entities:applyMfkSyncChanges(entityMapFromCheckpoint(previous),changes),
+      createdAt:pointer.current.createdAt,
+    });
+    if(checkpoint.projectionHash!==pointer.current.projectionHash||checkpoint.checkpointHash!==pointer.current.checkpointHash)throw new Error('SYNC_CHECKPOINT_PREVIOUS_RECOVERY_IDENTITY_MISMATCH');
+    return checkpoint;
   }
 
   async recordSyncApplied(input){
@@ -1316,12 +1373,21 @@ export class AdminSyncStore{
       const response=await this.env.KEETA_RUNTIME.get(id).fetch(new Request('https://keeta-runtime/internal/provider/status',{method:'GET'}));
       if(response.ok)keetaProvider=await response.json();
     }catch{}
+    const checkpoints={};
+    for(const port of MFK_SYNC_PORTS){
+      const pointer=await this.state.storage.get(syncCheckpointPointerKey(port));
+      const error=await this.state.storage.get('sync:checkpoint-error:'+port);
+      checkpoints[port]=pointer
+        ?{state:error?'DEGRADED':'READY',pointer,error:error||null}
+        :{state:String(heads[port]?.checkpointHash||'')?'LEGACY_DO':'NONE',pointer:null,error:error||null};
+    }
     return Object.freeze({
       schema:'MFK_SYNC_DISTRIBUTION_READBACK_V1',
       protocol:MFK_CHECKPOINTED_DELTA_SYNC_PROTOCOL,
       heads,
       applied,
       providers:Object.freeze({KEETA:keetaProvider}),
+      checkpoints:Object.freeze(checkpoints),
       projectionErrors:[...errors.entries()].map(([key,value])=>({key,value})),
       observedAt:new Date().toISOString(),
     });
@@ -1329,43 +1395,99 @@ export class AdminSyncStore{
 
   async maybeBuildSyncCheckpoint(port,entities,targetHead){
     try{
+      if(!this.env.SYNC_CHECKPOINTS)throw new Error('SYNC_CHECKPOINT_R2_BINDING_UNAVAILABLE');
       const latest=await this.readSyncHead(port);
       if(Number(latest.headSeq||0)<Number(targetHead.headSeq||0))return;
-      const meta=await this.state.storage.get('sync:checkpoint-meta:'+port)||{};
-      const checkpointSeq=Number(latest.checkpointSeq||0);
+      const rawPointer=await this.state.storage.get(syncCheckpointPointerKey(port));
+      const pointer=rawPointer?validateMfkSyncCheckpointPointer(rawPointer):null;
+      const targetSeq=Number(targetHead.headSeq||0);
+      if(pointer&&pointer.current.checkpointSeq>=targetSeq)return{state:'STALE',checkpointSeq:pointer.current.checkpointSeq};
+      const meta=pointer?.current||await this.state.storage.get('sync:checkpoint-meta:'+port)||{};
+      const checkpointSeq=Number(pointer?.current.checkpointSeq??latest.checkpointSeq??0);
       const lastAt=Date.parse(String(meta.createdAt||''));
       const ageDue=!Number.isFinite(lastAt)||Date.now()-lastAt>=MFK_SYNC_CHECKPOINT_MAX_AGE_MS;
-      const countDue=Number(targetHead.headSeq||0)-checkpointSeq>=MFK_SYNC_CHECKPOINT_EVENT_THRESHOLD;
-      const missing=!String(latest.checkpointHash||'');
+      const countDue=targetSeq-checkpointSeq>=MFK_SYNC_CHECKPOINT_EVENT_THRESHOLD;
+      const missing=!pointer;
       if(!missing&&!countDue&&!ageDue)return;
+      if(projectionHashForEntities(entities)!==String(targetHead.projectionHash||''))throw new Error('SYNC_CHECKPOINT_TARGET_PROJECTION_MISMATCH');
 
       const checkpoint=createMfkSyncCheckpoint({
         storeId:String(targetHead.storeId||'MF01'),
         port,
-        checkpointSeq:Number(targetHead.headSeq||0),
+        checkpointSeq:targetSeq,
         sourceCommitSeq:Number(targetHead.sourceCommitSeq||0),
         entities,
-        createdAt:new Date().toISOString(),
+        createdAt:String(targetHead.observedAt||targetHead.canonicalPublishedAt||new Date().toISOString()),
       });
-      await this.state.storage.put(syncCheckpointKey(port,checkpoint.checkpointSeq),checkpoint);
-      const current=await this.readSyncHead(port);
-      if(Number(current.headSeq||0)<checkpoint.checkpointSeq)return;
-      const nextHead=Object.freeze({
-        ...current,
-        checkpointSeq:checkpoint.checkpointSeq,
-        checkpointHash:checkpoint.checkpointHash,
-        journalFloorSeq:Math.min(Number(current.headSeq||0)+1,checkpoint.checkpointSeq+1),
-      });
-      await this.state.storage.put(syncHeadKey(port),nextHead);
-      await this.state.storage.put('sync:checkpoint-meta:'+port,{createdAt:checkpoint.createdAt,checkpointSeq:checkpoint.checkpointSeq,checkpointHash:checkpoint.checkpointHash});
-
-      const stored=await this.state.storage.list({prefix:'sync:event:'+port+':'});
-      for(const [key,event] of stored.entries()){
-        if(Number(event?.portSeq)<=checkpoint.checkpointSeq)await this.state.storage.delete(key);
+      const immutable=await putMfkSyncCheckpointObject(this.env.SYNC_CHECKPOINTS,checkpoint);
+      let migratedPrevious=null;
+      if(!pointer&&String(latest.checkpointHash||'')&&Number(latest.checkpointSeq||0)<checkpoint.checkpointSeq){
+        const legacy=await this.state.storage.get(syncCheckpointKey(port,Number(latest.checkpointSeq||0)));
+        if(!legacy)throw new Error('SYNC_CHECKPOINT_LEGACY_PREVIOUS_NOT_FOUND');
+        migratedPrevious=(await putMfkSyncCheckpointObject(this.env.SYNC_CHECKPOINTS,legacy)).metadata;
       }
+      const providerAppliedSeq=port==='KEETA'?await this.keetaProviderAppliedSeqForCompaction():null;
+      const result=await this.withStorageTransaction(async storage=>{
+        const current=await this.readSyncHead(port,storage);
+        if(Number(current.headSeq||0)<checkpoint.checkpointSeq)return{state:'STALE_HEAD'};
+        const currentRawPointer=await storage.get(syncCheckpointPointerKey(port));
+        const currentPointer=currentRawPointer?validateMfkSyncCheckpointPointer(currentRawPointer):null;
+        if(currentPointer&&currentPointer.current.checkpointSeq>=checkpoint.checkpointSeq)return{state:'STALE',checkpointSeq:currentPointer.current.checkpointSeq};
+        const previous=currentPointer?.current??migratedPrevious;
+        const recoveryFloor=previous?previous.checkpointSeq+1:checkpoint.checkpointSeq+1;
+        const floor=port==='KEETA'
+          ?providerAppliedSeq===null?Number(current.journalFloorSeq||1):Math.min(recoveryFloor,providerAppliedSeq+1)
+          :recoveryFloor;
+        const journalFloorSeq=Math.min(Number(current.headSeq||0)+1,floor);
+        if(journalFloorSeq<=checkpoint.checkpointSeq){
+          const retained=await storage.list({prefix:'sync:event:'+port+':'});
+          let expected=journalFloorSeq;
+          for(const event of [...retained.values()].filter(value=>Number(value?.portSeq)>=journalFloorSeq&&Number(value?.portSeq)<=checkpoint.checkpointSeq).sort((left,right)=>Number(left.portSeq)-Number(right.portSeq))){
+            if(Number(event?.portSeq)!==expected++)throw new Error('SYNC_CHECKPOINT_RETAINED_TAIL_GAP');
+          }
+          if(expected-1!==checkpoint.checkpointSeq)throw new Error('SYNC_CHECKPOINT_RETAINED_TAIL_INCOMPLETE');
+        }
+        const nextPointer=Object.freeze({
+          schema:'MFK_SYNC_CHECKPOINT_POINTER_V1',
+          current:immutable.metadata,
+          ...(previous?{previous}:{}),
+          updatedAt:new Date().toISOString(),
+        });
+        const nextHead=Object.freeze({
+          ...current,
+          checkpointSeq:checkpoint.checkpointSeq,
+          checkpointHash:checkpoint.checkpointHash,
+          checkpointObjectKey:immutable.metadata.objectKey,
+          checkpointObjectSha256:immutable.metadata.objectSha256,
+          checkpointCompression:immutable.metadata.compression,
+          checkpointSchemaVersion:immutable.metadata.schemaVersion,
+          checkpointCreatedAt:immutable.metadata.createdAt,
+          journalFloorSeq,
+        });
+        await storage.put(syncCheckpointPointerKey(port),nextPointer);
+        await storage.put(syncHeadKey(port),nextHead);
+        await storage.put('sync:checkpoint-meta:'+port,{...immutable.metadata,state:'READY'});
+        const stored=await storage.list({prefix:'sync:event:'+port+':'});
+        for(const [key,event] of stored.entries())if(Number(event?.portSeq)<journalFloorSeq)await storage.delete(key);
+        return{state:'READY',head:nextHead,pointer:nextPointer,reused:immutable.reused};
+      });
+      await this.state.storage.delete('sync:checkpoint-error:'+port);
+      return result;
     }catch(error){
-      await this.state.storage.put('sync:checkpoint-error:'+port,{code:error instanceof Error?error.message:'SYNC_CHECKPOINT_FAILED',observedAt:new Date().toISOString()}).catch(()=>{});
+      await this.recordCheckpointDiagnostic(port,'CHECKPOINT_BUILD_FAILED',error);
+      return{state:'FAILED',code:error instanceof Error?error.message:'SYNC_CHECKPOINT_FAILED'};
     }
+  }
+
+  async keetaProviderAppliedSeqForCompaction(){
+    try{
+      const id=this.env.KEETA_RUNTIME.idFromName('MF01');
+      const response=await this.env.KEETA_RUNTIME.get(id).fetch(new Request('https://keeta-runtime/internal/provider/status',{method:'GET'}));
+      if(!response.ok)return null;
+      const status=await response.json();
+      const value=Number(status.providerAppliedSeq);
+      return Number.isSafeInteger(value)&&value>=0?value:null;
+    }catch{return null;}
   }
 
   async publishEnvelope(envelope,expectedBase:{fingerprint:string;publishedAt:string}|null=null){
@@ -1437,19 +1559,7 @@ export class AdminSyncStore{
           const previousEntities=current?this.syncEntitiesForActive(current,port):Object.freeze({});
           const nextEntities=this.syncEntitiesForActive(canonical,port);
 
-          let effectiveHead=priorHead;
-          if(current&&!String(priorHead.checkpointHash||'')&&Number(priorHead.headSeq||0)===0){
-            const baseline=createMfkSyncCheckpoint({
-              storeId:canonical.storeId,
-              port,
-              checkpointSeq:0,
-              sourceCommitSeq:previousCommitSeq,
-              entities:previousEntities,
-              createdAt:cloudPublishedAt,
-            });
-            await storage.put(syncCheckpointKey(port,0),baseline);
-            effectiveHead=Object.freeze({...priorHead,checkpointSeq:0,checkpointHash:baseline.checkpointHash,projectionHash:baseline.projectionHash,canonicalRevision:Number(current.revision||0),canonicalFingerprint:String(current.fingerprint||'UNPUBLISHED'),canonicalPublishedAt:String(current.publishedAt||new Date(0).toISOString()),adminFingerprint:String(current.adminFingerprint||'UNPUBLISHED')});
-          }
+          const effectiveHead=priorHead;
 
           const diff=diffMfkSyncEntities({
             storeId:canonical.storeId,

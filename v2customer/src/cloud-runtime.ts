@@ -195,7 +195,7 @@ async function reconcileCustomerConfig():Promise<Partial<CustomerReadModelSnapsh
 
   for(let guard=0;guard<12;guard++){
     ({head,commercialFreshness}=await fetchCustomerSyncHead());
-    if(appliedSeq>head.headSeq||appliedSeq<head.checkpointSeq){
+    if(appliedSeq>head.headSeq||appliedSeq<Math.max(0,head.journalFloorSeq-1)){
       if(!head.checkpointHash)throw new Error('CUSTOMER_SYNC_CHECKPOINT_REQUIRED');
       const checkpoint=await fetchCustomerCheckpoint(head);
       entities=entityMapFromCheckpoint(checkpoint);

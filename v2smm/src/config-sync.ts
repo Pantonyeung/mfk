@@ -124,7 +124,7 @@ export async function reconcileSmmConfig():Promise<Partial<SmmReadModelSnapshot>
 
   for(let guard=0;guard<12;guard++){
     current=await head();
-    if(appliedSeq>current.headSeq||appliedSeq<current.checkpointSeq){
+    if(appliedSeq>current.headSeq||appliedSeq<Math.max(0,current.journalFloorSeq-1)){
       if(!current.checkpointHash)throw new Error('SMM_SYNC_CHECKPOINT_REQUIRED');
       const base=await checkpoint(current);
       entities=entityMapFromCheckpoint(base);appliedSeq=base.checkpointSeq;checkpointSeq=base.checkpointSeq;

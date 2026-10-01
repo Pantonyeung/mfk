@@ -30,6 +30,10 @@
     {
       "binding": "CUSTOMER_PAYMENT_EVIDENCE",
       "bucket_name": "mfk-customer-payment-evidence"
+    },
+    {
+      "binding": "SYNC_CHECKPOINTS",
+      "bucket_name": "mfk-sync-checkpoints"
     }
   ],
   "durable_objects": {

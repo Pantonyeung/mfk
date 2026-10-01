@@ -1,5 +1,6 @@
 export const MFK_CHECKPOINTED_DELTA_SYNC_PROTOCOL='MFK_CHECKPOINTED_DELTA_SYNC_PROTOCOL_V1' as const;
 export const MFK_SYNC_SCHEMA_VERSION=1 as const;
+export const MFK_SYNC_CHECKPOINT_COMPRESSION='gzip' as const;
 export const MFK_SYNC_PORTS=['SMT','SMM','CUSTOMER','KEETA'] as const;
 export type MfkSyncPort=typeof MFK_SYNC_PORTS[number];
 export type MfkSyncChangeOperation='UPSERT'|'DELETE';
@@ -14,6 +15,11 @@ export interface MfkSyncHead{
   readonly journalFloorSeq:number;
   readonly checkpointSeq:number;
   readonly checkpointHash:string;
+  readonly checkpointObjectKey?:string;
+  readonly checkpointObjectSha256?:string;
+  readonly checkpointCompression?:typeof MFK_SYNC_CHECKPOINT_COMPRESSION;
+  readonly checkpointSchemaVersion?:typeof MFK_SYNC_SCHEMA_VERSION;
+  readonly checkpointCreatedAt?:string;
   readonly projectionHash:string;
   readonly sourceCommitSeq:number;
   readonly canonicalRevision:number;
@@ -76,6 +82,30 @@ export interface MfkSyncCheckpoint{
   readonly createdAt:string;
 }
 
+export interface MfkSyncCheckpointObject{
+  readonly schema:'MFK_SYNC_CHECKPOINT_OBJECT_V1';
+  readonly schemaVersion:typeof MFK_SYNC_SCHEMA_VERSION;
+  readonly storeId:string;
+  readonly port:MfkSyncPort;
+  readonly checkpointSeq:number;
+  readonly sourceCommitSeq:number;
+  readonly projectionHash:string;
+  readonly checkpointHash:string;
+  readonly objectKey:string;
+  readonly compression:typeof MFK_SYNC_CHECKPOINT_COMPRESSION;
+  readonly compressedBytes:number;
+  readonly uncompressedBytes:number;
+  readonly objectSha256:string;
+  readonly createdAt:string;
+}
+
+export interface MfkSyncCheckpointPointer{
+  readonly schema:'MFK_SYNC_CHECKPOINT_POINTER_V1';
+  readonly current:MfkSyncCheckpointObject;
+  readonly previous?:MfkSyncCheckpointObject;
+  readonly updatedAt:string;
+}
+
 export interface MfkSyncAppliedAck{
   readonly schema:'MFK_SYNC_APPLIED_ACK_V1';
   readonly protocol:typeof MFK_CHECKPOINTED_DELTA_SYNC_PROTOCOL;
@@ -120,6 +150,15 @@ function instant(value:unknown,code:string){
   if(!Number.isFinite(Date.parse(normalized)))throw new Error(code);
   return normalized;
 }
+function schemaVersion(value:unknown,code:string):typeof MFK_SYNC_SCHEMA_VERSION{
+  if(positiveInt(value,code)!==MFK_SYNC_SCHEMA_VERSION)throw new Error(code);
+  return MFK_SYNC_SCHEMA_VERSION;
+}
+function sha256(value:unknown,code:string){
+  const normalized=String(value??'').toLowerCase();
+  if(!/^[0-9a-f]{64}$/.test(normalized))throw new Error(code);
+  return normalized;
+}
 
 function stable(value:unknown):string{
   if(Array.isArray(value))return '['+value.map(stable).join(',')+']';
@@ -144,16 +183,25 @@ export function fingerprintMfkSyncValue(value:unknown){
 export function validateMfkSyncHead(input:unknown):MfkSyncHead{
   const row=object(input,'SYNC_HEAD_INVALID');
   if(row.schema!=='MFK_SYNC_HEAD_V1'||row.protocol!==MFK_CHECKPOINTED_DELTA_SYNC_PROTOCOL)throw new Error('SYNC_HEAD_SCHEMA_UNSUPPORTED');
+  const hasCheckpointObject=row.checkpointObjectKey!==undefined||row.checkpointObjectSha256!==undefined||row.checkpointCompression!==undefined||row.checkpointSchemaVersion!==undefined||row.checkpointCreatedAt!==undefined;
+  const checkpointObject=hasCheckpointObject?{
+    checkpointObjectKey:text(row.checkpointObjectKey,'SYNC_HEAD_CHECKPOINT_OBJECT_KEY_INVALID',512),
+    checkpointObjectSha256:sha256(row.checkpointObjectSha256,'SYNC_HEAD_CHECKPOINT_OBJECT_SHA256_INVALID'),
+    checkpointCompression:row.checkpointCompression===MFK_SYNC_CHECKPOINT_COMPRESSION?MFK_SYNC_CHECKPOINT_COMPRESSION:(()=>{throw new Error('SYNC_HEAD_CHECKPOINT_COMPRESSION_INVALID');})(),
+    checkpointSchemaVersion:schemaVersion(row.checkpointSchemaVersion,'SYNC_HEAD_CHECKPOINT_SCHEMA_VERSION_INVALID'),
+    checkpointCreatedAt:instant(row.checkpointCreatedAt,'SYNC_HEAD_CHECKPOINT_CREATED_AT_INVALID'),
+  }:{};
   const out={
     schema:'MFK_SYNC_HEAD_V1' as const,
     protocol:MFK_CHECKPOINTED_DELTA_SYNC_PROTOCOL,
-    schemaVersion:positiveInt(row.schemaVersion,'SYNC_HEAD_SCHEMA_VERSION_INVALID') as typeof MFK_SYNC_SCHEMA_VERSION,
+    schemaVersion:schemaVersion(row.schemaVersion,'SYNC_HEAD_SCHEMA_VERSION_INVALID'),
     storeId:text(row.storeId,'SYNC_HEAD_STORE_ID_INVALID',64),
     port:port(row.port,'SYNC_HEAD_PORT_INVALID'),
     headSeq:nonNegativeInt(row.headSeq,'SYNC_HEAD_SEQ_INVALID'),
     journalFloorSeq:nonNegativeInt(row.journalFloorSeq,'SYNC_HEAD_JOURNAL_FLOOR_INVALID'),
     checkpointSeq:nonNegativeInt(row.checkpointSeq,'SYNC_HEAD_CHECKPOINT_SEQ_INVALID'),
     checkpointHash:String(row.checkpointHash??''),
+    ...checkpointObject,
     projectionHash:String(row.projectionHash??''),
     sourceCommitSeq:nonNegativeInt(row.sourceCommitSeq,'SYNC_HEAD_SOURCE_COMMIT_INVALID'),
     canonicalRevision:nonNegativeInt(row.canonicalRevision,'SYNC_HEAD_CANONICAL_REVISION_INVALID'),
@@ -165,6 +213,43 @@ export function validateMfkSyncHead(input:unknown):MfkSyncHead{
   if(out.journalFloorSeq>out.headSeq+1)throw new Error('SYNC_HEAD_JOURNAL_FLOOR_AHEAD');
   if(out.checkpointSeq>out.headSeq)throw new Error('SYNC_HEAD_CHECKPOINT_AHEAD');
   return Object.freeze(out);
+}
+
+export function validateMfkSyncCheckpointObject(input:unknown):MfkSyncCheckpointObject{
+  const row=object(input,'SYNC_CHECKPOINT_OBJECT_INVALID');
+  if(row.schema!=='MFK_SYNC_CHECKPOINT_OBJECT_V1')throw new Error('SYNC_CHECKPOINT_OBJECT_SCHEMA_UNSUPPORTED');
+  if(row.compression!==MFK_SYNC_CHECKPOINT_COMPRESSION)throw new Error('SYNC_CHECKPOINT_OBJECT_COMPRESSION_UNSUPPORTED');
+  return Object.freeze({
+    schema:'MFK_SYNC_CHECKPOINT_OBJECT_V1' as const,
+    schemaVersion:schemaVersion(row.schemaVersion,'SYNC_CHECKPOINT_OBJECT_SCHEMA_VERSION_INVALID'),
+    storeId:text(row.storeId,'SYNC_CHECKPOINT_OBJECT_STORE_ID_INVALID',64),
+    port:port(row.port,'SYNC_CHECKPOINT_OBJECT_PORT_INVALID'),
+    checkpointSeq:nonNegativeInt(row.checkpointSeq,'SYNC_CHECKPOINT_OBJECT_SEQ_INVALID'),
+    sourceCommitSeq:nonNegativeInt(row.sourceCommitSeq,'SYNC_CHECKPOINT_OBJECT_SOURCE_COMMIT_INVALID'),
+    projectionHash:text(row.projectionHash,'SYNC_CHECKPOINT_OBJECT_PROJECTION_HASH_INVALID',180),
+    checkpointHash:text(row.checkpointHash,'SYNC_CHECKPOINT_OBJECT_CHECKPOINT_HASH_INVALID',180),
+    objectKey:text(row.objectKey,'SYNC_CHECKPOINT_OBJECT_KEY_INVALID',512),
+    compression:MFK_SYNC_CHECKPOINT_COMPRESSION,
+    compressedBytes:positiveInt(row.compressedBytes,'SYNC_CHECKPOINT_OBJECT_COMPRESSED_BYTES_INVALID'),
+    uncompressedBytes:positiveInt(row.uncompressedBytes,'SYNC_CHECKPOINT_OBJECT_UNCOMPRESSED_BYTES_INVALID'),
+    objectSha256:sha256(row.objectSha256,'SYNC_CHECKPOINT_OBJECT_SHA256_INVALID'),
+    createdAt:instant(row.createdAt,'SYNC_CHECKPOINT_OBJECT_CREATED_AT_INVALID'),
+  });
+}
+
+export function validateMfkSyncCheckpointPointer(input:unknown):MfkSyncCheckpointPointer{
+  const row=object(input,'SYNC_CHECKPOINT_POINTER_INVALID');
+  if(row.schema!=='MFK_SYNC_CHECKPOINT_POINTER_V1')throw new Error('SYNC_CHECKPOINT_POINTER_SCHEMA_UNSUPPORTED');
+  const current=validateMfkSyncCheckpointObject(row.current);
+  const previous=row.previous===undefined?undefined:validateMfkSyncCheckpointObject(row.previous);
+  if(previous&&previous.checkpointSeq>=current.checkpointSeq)throw new Error('SYNC_CHECKPOINT_POINTER_ORDER_INVALID');
+  if(previous&&(previous.storeId!==current.storeId||previous.port!==current.port))throw new Error('SYNC_CHECKPOINT_POINTER_IDENTITY_MISMATCH');
+  return Object.freeze({
+    schema:'MFK_SYNC_CHECKPOINT_POINTER_V1' as const,
+    current,
+    ...(previous?{previous}:{}),
+    updatedAt:instant(row.updatedAt,'SYNC_CHECKPOINT_POINTER_UPDATED_AT_INVALID'),
+  });
 }
 
 export function validateMfkSyncChange(input:unknown):MfkSyncChange{
@@ -179,7 +264,7 @@ export function validateMfkSyncChange(input:unknown):MfkSyncChange{
   const out={
     schema:'MFK_PORT_CHANGE_V1' as const,
     protocol:MFK_CHECKPOINTED_DELTA_SYNC_PROTOCOL,
-    schemaVersion:positiveInt(row.schemaVersion,'SYNC_CHANGE_SCHEMA_VERSION_INVALID') as typeof MFK_SYNC_SCHEMA_VERSION,
+    schemaVersion:schemaVersion(row.schemaVersion,'SYNC_CHANGE_SCHEMA_VERSION_INVALID'),
     storeId:text(row.storeId,'SYNC_CHANGE_STORE_ID_INVALID',64),
     port:port(row.port,'SYNC_CHANGE_PORT_INVALID'),
     portSeq:positiveInt(row.portSeq,'SYNC_CHANGE_SEQ_INVALID'),
@@ -244,7 +329,7 @@ export function validateMfkSyncCheckpoint(input:unknown):MfkSyncCheckpoint{
   return Object.freeze({
     schema:'MFK_SYNC_CHECKPOINT_V1' as const,
     protocol:MFK_CHECKPOINTED_DELTA_SYNC_PROTOCOL,
-    schemaVersion:positiveInt(row.schemaVersion,'SYNC_CHECKPOINT_SCHEMA_VERSION_INVALID') as typeof MFK_SYNC_SCHEMA_VERSION,
+    schemaVersion:schemaVersion(row.schemaVersion,'SYNC_CHECKPOINT_SCHEMA_VERSION_INVALID'),
     storeId:text(row.storeId,'SYNC_CHECKPOINT_STORE_ID_INVALID',64),
     port:port(row.port,'SYNC_CHECKPOINT_PORT_INVALID'),
     checkpointSeq:nonNegativeInt(row.checkpointSeq,'SYNC_CHECKPOINT_SEQ_INVALID'),
