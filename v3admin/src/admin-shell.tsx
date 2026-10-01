@@ -14,7 +14,7 @@ import {FormalDraftStatusBar,FormalPendingChangesPage,FormalPublishPage} from '.
 import {FormalCategoriesPage,FormalMenuDisplayPage,FormalPricingPage} from './formal-catalog-pages.tsx';
 import {FormalAvailabilityPage} from './formal-availability-page.tsx';
 import {FormalModifiersPage} from './formal-modifiers-page.tsx';
-import {FormalPrintExceptionsGapPage,FormalPrintOverviewPage,FormalPrintersPage,FormalPrintRulesGapPage,FormalPrintTemplatesPage} from './formal-print-pages.tsx';
+import {FormalPrintExceptionsPage,FormalPrintOverviewPage,FormalPrintersPage,FormalPrintRulesGapPage,FormalPrintTemplatesPage} from './formal-print-pages.tsx';
 import {FormalCombosPage} from './formal-combos-page.tsx';
 import {FormalDiningTablesPage,FormalStoreSettingsPage} from './formal-store-pages.tsx';
 import {FormalChannelPage} from './formal-channel-pages.tsx';
@@ -178,7 +178,7 @@ export function AdminShell({storeId,displayName,releaseStatus,canonicalState,can
                                   :path==='/admin/print/rules'
                                     ?(previewMode?<PrintRulesPage/>:formalDraftEnabled?<FormalPrintRulesGapPage/>:<RouteSkeleton path={path} canonicalState={canonicalState} onRefresh={onRefresh}/>)
                                     :path==='/admin/print/exceptions'
-                                      ?(previewMode?<PrintExceptionsPage/>:formalDraftEnabled?<FormalPrintExceptionsGapPage/>:<RouteSkeleton path={path} canonicalState={canonicalState} onRefresh={onRefresh}/>)
+                                      ?(previewMode?<PrintExceptionsPage/>:formalDraftEnabled?<FormalPrintExceptionsPage/>:<RouteSkeleton path={path} canonicalState={canonicalState} onRefresh={onRefresh}/>)
                                       :path==='/admin/devices'
                                       ?(previewMode?<DevicesPage/>:formalDraftEnabled?<FormalDevicesPage/>:<RouteSkeleton path={path} canonicalState={canonicalState} onRefresh={onRefresh}/>)
                                       :path==='/admin/ota'
