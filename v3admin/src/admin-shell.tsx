@@ -6,6 +6,7 @@ import {AdminWorkspace} from './admin-workspaces.tsx';
 import {ModifiersPage,CombosPage} from './catalog-functional-pages.tsx';
 import {CategoriesPage,PricingPage,MenuDisplayPage} from './catalog-core-pages.tsx';
 import {DiningTablesPage} from './dining-tables-page.tsx';
+import {ChannelPage,PermissionsPage,PrintRulesPage,PrintTemplatesPage,PrintersPage,QuickReasonsPage,RolesPage,StaffPage,StoreSettingsPage} from './admin-functional-pages.tsx';
 import {
   EmptyState,
   ErrorState,
@@ -114,11 +115,47 @@ export function AdminShell({storeId,displayName,releaseStatus,canonicalState,can
               ?<MenuDisplayPage/>
               :path==='/admin/availability'
                 ?<AvailabilityPage canonicalSnapshot={canonicalSnapshot} previewMode={previewMode}/>
-                :path==='/admin/store/tables'&&previewMode
-                  ?<DiningTablesPage/>
-                  :previewMode
-                    ?<AdminWorkspace path={path} previewMode/>
-                    :<RouteSkeleton path={path} canonicalState={canonicalState} onRefresh={onRefresh}/>;
+                :path==='/admin/channels'&&previewMode
+                  ?<ChannelPage mode="overview"/>
+                  :path==='/admin/channels/accept-policy'&&previewMode
+                    ?<ChannelPage mode="accept"/>
+                    :path==='/admin/channels/sync-policy'&&previewMode
+                      ?<ChannelPage mode="sync"/>
+                      :path==='/admin/channels/store-binding'&&previewMode
+                        ?<ChannelPage mode="binding"/>
+                        :path==='/admin/channels/product-mapping'&&previewMode
+                          ?<ChannelPage mode="mapping"/>
+                          :path==='/admin/channels/mapping-failure'&&previewMode
+                            ?<ChannelPage mode="failures"/>
+                            :path==='/admin/channels/net-estimate'&&previewMode
+                              ?<ChannelPage mode="estimate"/>
+                              :path==='/admin/print/printers'&&previewMode
+                                ?<PrintersPage/>
+                                :path==='/admin/print/templates'&&previewMode
+                                  ?<PrintTemplatesPage/>
+                                  :path==='/admin/print/rules'&&previewMode
+                                    ?<PrintRulesPage/>
+                                    :path==='/admin/staff'&&previewMode
+                                      ?<StaffPage/>
+                                      :path==='/admin/roles'&&previewMode
+                                        ?<RolesPage/>
+                                        :path==='/admin/permissions'&&previewMode
+                                          ?<PermissionsPage/>
+                                          :path==='/admin/store/settings'&&previewMode
+                                            ?<StoreSettingsPage mode="settings"/>
+                                            :path==='/admin/store/hours'&&previewMode
+                                              ?<StoreSettingsPage mode="hours"/>
+                                              :path==='/admin/store/business-day'&&previewMode
+                                                ?<StoreSettingsPage mode="business-day"/>
+                                                :path==='/admin/store/operations'&&previewMode
+                                                  ?<StoreSettingsPage mode="operations"/>
+                                                  :path==='/admin/store/quick-reasons'&&previewMode
+                                                    ?<QuickReasonsPage/>
+                                                    :path==='/admin/store/tables'&&previewMode
+                                                      ?<DiningTablesPage/>
+                                                      :previewMode
+                                                        ?<AdminWorkspace path={path} previewMode/>
+                                                        :<RouteSkeleton path={path} canonicalState={canonicalState} onRefresh={onRefresh}/>;
 
   return <div className="v3-app-shell" data-preview={previewMode?'true':'false'}>
     <aside className="v3-sidebar" aria-label="Admin 功能導覽"><PrimaryNavigation activeMenu={activeMenu} onSelect={selectMenu}/><SecondaryNavigation menu={activeMenu} path={path} onNavigate={navigate}/></aside>
