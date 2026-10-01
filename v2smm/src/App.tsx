@@ -183,6 +183,7 @@ export function App(){
       initialRefreshRef.current=true;
       void refresh();
     }
+    const unsubscribe=port?.subscribeConfigChanges?.(()=>void refresh())??(()=>{});
     const onOnline=()=>void refresh();
     const onPageShow=()=>void refresh();
     const onVisibility=()=>{if(document.visibilityState==='visible')void refresh();};
@@ -190,6 +191,7 @@ export function App(){
     window.addEventListener('pageshow',onPageShow);
     document.addEventListener('visibilitychange',onVisibility);
     return()=>{
+      unsubscribe();
       window.removeEventListener('online',onOnline);
       window.removeEventListener('pageshow',onPageShow);
       document.removeEventListener('visibilitychange',onVisibility);
