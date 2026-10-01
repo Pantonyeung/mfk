@@ -11,6 +11,7 @@ export interface PreviewProduct{
   priceMinor:number;
   status:PreviewProductStatus;
   printRule:string;
+  labelPrinterIds:readonly string[];
   updatedAt:string;
   description:string;
   customerImageUrl:string;
@@ -89,23 +90,23 @@ const CATEGORIES:PreviewCategory[]=[
 ];
 
 export const PREVIEW_PRODUCTS:PreviewProduct[]=[
-  {id:'p-001',name:'紫米飯糰・照燒雞',code:'PRD000123',category:'飯糰',priceMinor:4200,status:'已發佈',printRule:'製作單＋標籤',updatedAt:'今日 08:42',description:'照燒雞配紫米飯糰。',customerImageUrl:'',channelImages:{KEETA:''},optionSetIds:['set-rice']},
-  {id:'p-002',name:'紫米飯糰・吞拿魚',code:'PRD000124',category:'飯糰',priceMinor:4000,status:'已發佈',printRule:'製作單＋標籤',updatedAt:'今日 08:41',description:'吞拿魚紫米飯糰。',customerImageUrl:'',channelImages:{KEETA:''},optionSetIds:['set-rice']},
-  {id:'p-003',name:'紫米飯糰・雞蛋沙律',code:'PRD000125',category:'飯糰',priceMinor:3800,status:'已發佈',printRule:'製作單＋標籤',updatedAt:'今日 08:40',description:'',customerImageUrl:'',channelImages:{KEETA:''},optionSetIds:['set-rice']},
-  {id:'p-004',name:'紫米飯糰・照燒牛肉',code:'PRD000126',category:'飯糰',priceMinor:4400,status:'已發佈',printRule:'製作單＋標籤',updatedAt:'今日 08:39',description:'',customerImageUrl:'',channelImages:{KEETA:''},optionSetIds:['set-rice']},
-  {id:'p-005',name:'紫米飯糰・鹽麴雞',code:'PRD000127',category:'飯糰',priceMinor:4200,status:'草稿',printRule:'製作單＋標籤',updatedAt:'今日 08:38',description:'',customerImageUrl:'',channelImages:{KEETA:''},optionSetIds:['set-rice']},
-  {id:'p-006',name:'紫米飯糰・粟米蟹柳',code:'PRD000128',category:'飯糰',priceMinor:3900,status:'已發佈',printRule:'製作單＋標籤',updatedAt:'今日 08:37',description:'',customerImageUrl:'',channelImages:{KEETA:''},optionSetIds:['set-rice']},
-  {id:'p-007',name:'紫米飯糰・日式咖喱雞',code:'PRD000129',category:'飯糰',priceMinor:4300,status:'已發佈',printRule:'製作單＋標籤',updatedAt:'今日 08:36',description:'',customerImageUrl:'',channelImages:{KEETA:''},optionSetIds:['set-rice']},
-  {id:'p-008',name:'紫米飯糰・芝士雞肉',code:'PRD000130',category:'飯糰',priceMinor:4400,status:'已發佈',printRule:'製作單＋標籤',updatedAt:'今日 08:35',description:'',customerImageUrl:'',channelImages:{KEETA:''},optionSetIds:['set-rice']},
-  {id:'p-009',name:'紫米飯糰・泡菜豬肉',code:'PRD000131',category:'飯糰',priceMinor:4500,status:'待回讀',printRule:'製作單＋標籤',updatedAt:'今日 08:34',description:'',customerImageUrl:'',channelImages:{KEETA:''},optionSetIds:['set-rice']},
-  {id:'p-010',name:'紫米飯糰・味噌三文魚',code:'PRD000132',category:'飯糰',priceMinor:4800,status:'已發佈',printRule:'製作單＋標籤',updatedAt:'今日 08:33',description:'',customerImageUrl:'',channelImages:{KEETA:''},optionSetIds:['set-rice']},
-  {id:'p-011',name:'紫米飯糰・黑椒牛肉',code:'PRD000133',category:'飯糰',priceMinor:4600,status:'已發佈',printRule:'製作單＋標籤',updatedAt:'今日 08:32',description:'',customerImageUrl:'',channelImages:{KEETA:''},optionSetIds:['set-rice']},
-  {id:'p-012',name:'紫米飯糰・南瓜雜菜',code:'PRD000134',category:'飯糰',priceMinor:3600,status:'已發佈',printRule:'製作單＋標籤',updatedAt:'今日 08:31',description:'',customerImageUrl:'',channelImages:{KEETA:''},optionSetIds:['set-rice']},
-  {id:'p-013',name:'香煎雞扒紫米飯',code:'PRD000135',category:'飯類',priceMinor:5200,status:'已發佈',printRule:'製作單＋打包單',updatedAt:'今日 08:29',description:'',customerImageUrl:'',channelImages:{KEETA:''},optionSetIds:['set-rice','set-spice']},
-  {id:'p-014',name:'無糖凍檸茶',code:'PRD000136',category:'茶飲',priceMinor:1800,status:'待回讀',printRule:'標籤',updatedAt:'昨日 21:06',description:'',customerImageUrl:'',channelImages:{KEETA:''},optionSetIds:['set-ice']},
-  {id:'p-015',name:'鹽酥雞小食',code:'PRD000137',category:'小食',priceMinor:2800,status:'草稿',printRule:'製作單',updatedAt:'今日 08:18',description:'',customerImageUrl:'',channelImages:{KEETA:''},optionSetIds:['set-spice']},
-  {id:'p-016',name:'南瓜粟米湯',code:'PRD000138',category:'湯品',priceMinor:2600,status:'已停用',printRule:'製作單',updatedAt:'昨日 19:24',description:'',customerImageUrl:'',channelImages:{KEETA:''},optionSetIds:[]},
-  {id:'p-017',name:'紫米豆乳布甸',code:'PRD000139',category:'甜品',priceMinor:2400,status:'已發佈',printRule:'打包單',updatedAt:'昨日 17:51',description:'',customerImageUrl:'',channelImages:{KEETA:''},optionSetIds:[]},
+  {id:'p-001',name:'紫米飯糰・照燒雞',code:'PRD000123',category:'飯糰',priceMinor:4200,status:'已發佈',printRule:'製作單＋標籤',labelPrinterIds:['logical-label-1'],updatedAt:'今日 08:42',description:'照燒雞配紫米飯糰。',customerImageUrl:'',channelImages:{KEETA:''},optionSetIds:['set-rice']},
+  {id:'p-002',name:'紫米飯糰・吞拿魚',code:'PRD000124',category:'飯糰',priceMinor:4000,status:'已發佈',printRule:'製作單＋標籤',labelPrinterIds:['logical-label-1'],updatedAt:'今日 08:41',description:'吞拿魚紫米飯糰。',customerImageUrl:'',channelImages:{KEETA:''},optionSetIds:['set-rice']},
+  {id:'p-003',name:'紫米飯糰・雞蛋沙律',code:'PRD000125',category:'飯糰',priceMinor:3800,status:'已發佈',printRule:'製作單＋標籤',labelPrinterIds:['logical-label-1'],updatedAt:'今日 08:40',description:'',customerImageUrl:'',channelImages:{KEETA:''},optionSetIds:['set-rice']},
+  {id:'p-004',name:'紫米飯糰・照燒牛肉',code:'PRD000126',category:'飯糰',priceMinor:4400,status:'已發佈',printRule:'製作單＋標籤',labelPrinterIds:['logical-label-1'],updatedAt:'今日 08:39',description:'',customerImageUrl:'',channelImages:{KEETA:''},optionSetIds:['set-rice']},
+  {id:'p-005',name:'紫米飯糰・鹽麴雞',code:'PRD000127',category:'飯糰',priceMinor:4200,status:'草稿',printRule:'製作單＋標籤',labelPrinterIds:['logical-label-1'],updatedAt:'今日 08:38',description:'',customerImageUrl:'',channelImages:{KEETA:''},optionSetIds:['set-rice']},
+  {id:'p-006',name:'紫米飯糰・粟米蟹柳',code:'PRD000128',category:'飯糰',priceMinor:3900,status:'已發佈',printRule:'製作單＋標籤',labelPrinterIds:['logical-label-1'],updatedAt:'今日 08:37',description:'',customerImageUrl:'',channelImages:{KEETA:''},optionSetIds:['set-rice']},
+  {id:'p-007',name:'紫米飯糰・日式咖喱雞',code:'PRD000129',category:'飯糰',priceMinor:4300,status:'已發佈',printRule:'製作單＋標籤',labelPrinterIds:['logical-label-1'],updatedAt:'今日 08:36',description:'',customerImageUrl:'',channelImages:{KEETA:''},optionSetIds:['set-rice']},
+  {id:'p-008',name:'紫米飯糰・芝士雞肉',code:'PRD000130',category:'飯糰',priceMinor:4400,status:'已發佈',printRule:'製作單＋標籤',labelPrinterIds:['logical-label-1'],updatedAt:'今日 08:35',description:'',customerImageUrl:'',channelImages:{KEETA:''},optionSetIds:['set-rice']},
+  {id:'p-009',name:'紫米飯糰・泡菜豬肉',code:'PRD000131',category:'飯糰',priceMinor:4500,status:'待回讀',printRule:'製作單＋標籤',labelPrinterIds:['logical-label-1'],updatedAt:'今日 08:34',description:'',customerImageUrl:'',channelImages:{KEETA:''},optionSetIds:['set-rice']},
+  {id:'p-010',name:'紫米飯糰・味噌三文魚',code:'PRD000132',category:'飯糰',priceMinor:4800,status:'已發佈',printRule:'製作單＋標籤',labelPrinterIds:['logical-label-1'],updatedAt:'今日 08:33',description:'',customerImageUrl:'',channelImages:{KEETA:''},optionSetIds:['set-rice']},
+  {id:'p-011',name:'紫米飯糰・黑椒牛肉',code:'PRD000133',category:'飯糰',priceMinor:4600,status:'已發佈',printRule:'製作單＋標籤',labelPrinterIds:['logical-label-1'],updatedAt:'今日 08:32',description:'',customerImageUrl:'',channelImages:{KEETA:''},optionSetIds:['set-rice']},
+  {id:'p-012',name:'紫米飯糰・南瓜雜菜',code:'PRD000134',category:'飯糰',priceMinor:3600,status:'已發佈',printRule:'製作單＋標籤',labelPrinterIds:['logical-label-1'],updatedAt:'今日 08:31',description:'',customerImageUrl:'',channelImages:{KEETA:''},optionSetIds:['set-rice']},
+  {id:'p-013',name:'香煎雞扒紫米飯',code:'PRD000135',category:'飯類',priceMinor:5200,status:'已發佈',printRule:'製作單＋打包單',labelPrinterIds:[],updatedAt:'今日 08:29',description:'',customerImageUrl:'',channelImages:{KEETA:''},optionSetIds:['set-rice','set-spice']},
+  {id:'p-014',name:'無糖凍檸茶',code:'PRD000136',category:'茶飲',priceMinor:1800,status:'待回讀',printRule:'標籤',labelPrinterIds:['logical-label-2'],updatedAt:'昨日 21:06',description:'',customerImageUrl:'',channelImages:{KEETA:''},optionSetIds:['set-ice']},
+  {id:'p-015',name:'鹽酥雞小食',code:'PRD000137',category:'小食',priceMinor:2800,status:'草稿',printRule:'製作單',labelPrinterIds:[],updatedAt:'今日 08:18',description:'',customerImageUrl:'',channelImages:{KEETA:''},optionSetIds:['set-spice']},
+  {id:'p-016',name:'南瓜粟米湯',code:'PRD000138',category:'湯品',priceMinor:2600,status:'已停用',printRule:'製作單',labelPrinterIds:[],updatedAt:'昨日 19:24',description:'',customerImageUrl:'',channelImages:{KEETA:''},optionSetIds:[]},
+  {id:'p-017',name:'紫米豆乳布甸',code:'PRD000139',category:'甜品',priceMinor:2400,status:'已發佈',printRule:'打包單',labelPrinterIds:[],updatedAt:'昨日 17:51',description:'',customerImageUrl:'',channelImages:{KEETA:''},optionSetIds:[]},
 ];
 
 const OPTION_SETS:PreviewOptionSet[]=[
