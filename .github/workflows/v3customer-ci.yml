@@ -95,6 +95,7 @@ jobs:
           await page.evaluate(()=>document.fonts.ready);
           await fs.mkdir('/tmp/mfk-evidence',{recursive:true});
           await page.screenshot({path:'/tmp/mfk-evidence/long-home-390.png',fullPage:true});
+          await page.screenshot({path:'/tmp/mfk-evidence/hero-frame-390.png',clip:{x:0,y:0,width:390,height:208}});
           await page.locator('.hero').screenshot({path:'/tmp/mfk-evidence/hero-390.png'});
           const metrics=await page.evaluate(()=>({
             viewportWidth:innerWidth,
@@ -110,11 +111,53 @@ jobs:
           await browser.close();
           NODE
 
+      - name: Compare Hero against locked 390 reference
+        run: |
+          set -euo pipefail
+          git fetch origin temp/MFK-CUSTOMER-V3-VISUAL-EVIDENCE
+          git show origin/temp/MFK-CUSTOMER-V3-VISUAL-EVIDENCE:v3customer/evidence/reference/target-hero-390.png > /tmp/mfk-evidence/target-hero-390.png
+          python -m pip install --quiet pillow
+          python - <<'PY'
+          from PIL import Image, ImageChops, ImageEnhance
+          import json
+
+          target=Image.open('/tmp/mfk-evidence/target-hero-390.png').convert('RGB')
+          current=Image.open('/tmp/mfk-evidence/hero-frame-390.png').convert('RGB')
+          assert target.size == current.size == (390,208)
+
+          diff=ImageChops.difference(target,current)
+          gray=diff.convert('L')
+          hist=gray.histogram()
+          changed=sum(hist[16:])
+          total=target.width*target.height
+          ratio=changed/total
+
+          rgb_hist=diff.histogram()
+          abs_sum=sum((i%256)*count for i,count in enumerate(rgb_hist))
+          mae=abs_sum/(total*3*255)
+
+          heat=ImageEnhance.Contrast(diff).enhance(2.5)
+          heat.save('/tmp/mfk-evidence/hero-diff-390.png')
+
+          report={
+            'viewport':{'width':390,'height':208},
+            'threshold':15,
+            'changedPixelRatio':round(ratio,6),
+            'normalizedMAE':round(mae,6)
+          }
+          with open('/tmp/mfk-evidence/hero-diff-390.json','w') as f:
+            json.dump(report,f,indent=2)
+          print(json.dumps(report))
+          PY
+
       - name: Publish visual evidence branch
         run: |
           set -euo pipefail
           cp /tmp/mfk-evidence/long-home-390.png /tmp/long-home-390.png
           cp /tmp/mfk-evidence/hero-390.png /tmp/hero-390.png
+          cp /tmp/mfk-evidence/hero-frame-390.png /tmp/hero-frame-390.png
+          cp /tmp/mfk-evidence/hero-diff-390.png /tmp/hero-diff-390.png
+          cp /tmp/mfk-evidence/hero-diff-390.json /tmp/hero-diff-390.json
           cp /tmp/mfk-evidence/metrics-390.json /tmp/metrics-390.json
 
           git config user.name "MFK Visual Evidence Bot"
@@ -124,6 +167,9 @@ jobs:
           mkdir -p v3customer/evidence/current
           cp /tmp/long-home-390.png v3customer/evidence/current/long-home-390.png
           cp /tmp/hero-390.png v3customer/evidence/current/hero-390.png
+          cp /tmp/hero-frame-390.png v3customer/evidence/current/hero-frame-390.png
+          cp /tmp/hero-diff-390.png v3customer/evidence/current/hero-diff-390.png
+          cp /tmp/hero-diff-390.json v3customer/evidence/current/hero-diff-390.json
           cp /tmp/metrics-390.json v3customer/evidence/current/metrics-390.json
           git add v3customer/evidence/current
           git commit -m "evidence(customer): refresh 390px visual capture" || exit 0
