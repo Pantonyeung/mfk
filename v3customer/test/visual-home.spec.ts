@@ -36,8 +36,8 @@ for(const size of viewports){
     expect(metrics.hero?.height ?? 0).toBeLessThanOrEqual(metrics.viewportHeight*0.72);
 
     const pageScreens=metrics.documentHeight/metrics.viewportHeight;
-    expect(pageScreens).toBeGreaterThanOrEqual(1.35);
-    expect(pageScreens).toBeLessThanOrEqual(1.70);
+    expect(pageScreens).toBeGreaterThanOrEqual(1.40);
+    expect(pageScreens).toBeLessThanOrEqual(1.62);
 
     expect(metrics.cta?.height ?? 0).toBeGreaterThanOrEqual(48);
 
