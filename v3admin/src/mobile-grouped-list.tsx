@@ -1,4 +1,4 @@
-import {useMemo,useState,type ReactNode} from 'react';
+import {Fragment,useMemo,useState,type ReactNode} from 'react';
 
 export type MobileGroupedItem={
   id:string;
@@ -53,7 +53,7 @@ export function MobileGroupedPager<T extends MobileGroupedItem>({
           <span className="v3-mobile-group-chevron" aria-hidden="true">{isOpen?'−':'＋'}</span>
         </button>
         {isOpen?<div className="v3-mobile-group-panel">
-          <div className="v3-mobile-group-items">{visible.map(renderItem)}</div>
+          <div className="v3-mobile-group-items">{visible.map(item=><Fragment key={item.id}>{renderItem(item)}</Fragment>)}</div>
           {pageCount>1?<nav className="v3-mobile-pagination" aria-label={group+' 分頁'}>
             <button type="button" disabled={page<=1} onClick={()=>setPageByGroup(current=>({...current,[group]:Math.max(1,page-1)}))}>上一頁</button>
             <span>第 {page} / {pageCount} 頁</span>
