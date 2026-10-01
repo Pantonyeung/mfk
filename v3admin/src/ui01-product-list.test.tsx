@@ -113,6 +113,21 @@ describe('Admin V3 Product Management contract',()=>{
     expect(state.combos.some(combo=>combo.groups.some(group=>group.choices.some(choice=>Boolean(choice.productId))))).toBe(true);
   });
 
+  it('enables formal Add Product only when the server-owned create seam is available',()=>{
+    const html=renderToStaticMarkup(<ProductListPage
+      formalDraftEnabled
+      canonicalSnapshot={{
+        catalog:{
+          categories:[{id:'cat-rice',name:'飯類',position:10,active:true}],
+          products:[],
+        },
+      }}
+    />);
+    expect(html).toContain('＋ 新增產品');
+    expect(html).toContain('Server 產生 Product Code');
+    expect(html).not.toContain('正式新增產品仲要接 server-side Product Code allocation seam');
+  });
+
   it('renders the public product list as functional preview state, not placeholder copy',()=>{
     const html=renderToStaticMarkup(<ProductListPage previewMode/>);
     expect(html).toContain('產品管理已接實際 Preview State');
