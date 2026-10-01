@@ -19,6 +19,16 @@ function Header(){
 
 function Hero(){
   return <section className="hero" aria-labelledby="hero-title">
+    <div className="hero-world" aria-hidden="true">
+      <span className="hero-glow glow-a"/><span className="hero-glow glow-b"/><span className="hero-glow glow-c"/>
+      <span className="castle castle-left"><i/><i/><b/></span>
+      <span className="castle castle-mid"><i/><i/><b/></span>
+      <span className="castle castle-right"><i/><i/><b/></span>
+      <span className="arch arch-back"/><span className="arch arch-front"/>
+      <span className="hero-step step-a"/><span className="hero-step step-b"/><span className="hero-step step-c"/>
+      <span className="leaf leaf-1"/><span className="leaf leaf-2"/><span className="leaf leaf-3"/>
+      <span className="leaf leaf-4"/><span className="leaf leaf-5"/><span className="leaf leaf-6"/>
+    </div>
     <div className="hero-copy">
       <em>More Fun!</em>
       <h1 id="hero-title">同磨飯，<br/>一齊開飯！</h1>
@@ -28,7 +38,6 @@ function Hero(){
       <small>新鮮手作　｜　營養輕食　｜　美味日常</small>
     </div>
     <div className="hero-visual" aria-hidden="true">
-      <span className="cloud c1"/><span className="cloud c2"/><span className="cloud c3"/>
       <img className="male" src={A.maleHeroR2} alt=""/>
       <img className="female" src={A.femaleHeroR2} alt=""/>
       <img className="doodle doodle-more" src={A.moreFunDoodleR2} alt=""/>
