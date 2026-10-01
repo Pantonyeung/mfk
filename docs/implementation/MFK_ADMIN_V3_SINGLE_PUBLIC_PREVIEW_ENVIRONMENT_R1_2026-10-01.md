@@ -80,3 +80,27 @@ UI-01｜產品管理 Default List
 
 MILESTONE:
 MFK_ADMIN_V3_SINGLE_PUBLIC_PREVIEW_ENVIRONMENT_R1_LOCKED
+
+
+## First Verified Deployment
+
+Public URL:
+
+https://mfk-admin-v3-ui-preview.pages.dev/
+
+Source SHA:
+
+53fe4959f5251d3b422d7da994034a54498e222b
+
+Workflow:
+
+https://github.com/Pantonyeung/mfk/actions/runs/36802637093
+
+Result:
+- test GREEN
+- typecheck GREEN
+- build GREEN
+- Cloudflare Pages deploy GREEN
+- public readback GREEN
+- production hostname untouched
+- production route untouched
