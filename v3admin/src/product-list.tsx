@@ -6,6 +6,7 @@ import {
   type PreviewProduct,
 } from './preview-catalog-store.ts';
 import {DraftBar,PageHeader,StatusBadge} from './ui.tsx';
+import {usePreviewAdmin} from './preview-admin-store.ts';
 
 type RowObject=Record<string,unknown>;
 
@@ -21,6 +22,7 @@ export type ProductListRecord={
   imageUrl?:string;
   optionSetCount?:number;
   comboCount?:number;
+  labelPrinterNames?:readonly string[];
 };
 
 const STATUS_OPTIONS=['全部','已發佈','草稿','待回讀','已停用'] as const;
@@ -49,6 +51,10 @@ export function productPrintSummary(targets:readonly ProductPrintTarget[]){
   const selected=new Set(targets);
   const labels=PRODUCT_PRINT_TARGET_OPTIONS.filter(option=>selected.has(option.id)).map(option=>option.label);
   return labels.length?labels.join('＋'):'不打印';
+}
+
+export function productPrintConfigCanSave(targets:readonly ProductPrintTarget[],labelPrinterIds:readonly string[]){
+  return !targets.includes('LABEL')||labelPrinterIds.length>0;
 }
 
 
@@ -129,7 +135,7 @@ export function productRecordsFromSnapshot(snapshot:unknown):ProductListRecord[]
   });
 }
 
-function previewRecord(product:PreviewProduct,comboCount:number):ProductListRecord{
+function previewRecord(product:PreviewProduct,comboCount:number,labelPrinterNames:readonly string[]):ProductListRecord{
   return{
     id:product.id,
     name:product.name,
@@ -142,6 +148,7 @@ function previewRecord(product:PreviewProduct,comboCount:number):ProductListReco
     imageUrl:product.customerImageUrl||undefined,
     optionSetCount:product.optionSetIds.length,
     comboCount,
+    labelPrinterNames,
   };
 }
 
@@ -160,7 +167,7 @@ function ProductDrawer({product,onClose}:{product:ProductListRecord;onClose:()=>
         <div><dt>分類</dt><dd>{product.category}</dd></div>
         <div><dt>基本價格</dt><dd>{money(product.priceMinor)}</dd></div>
         <div><dt>狀態</dt><dd><StatusBadge tone={statusTone(product.status)}>{product.status}</StatusBadge></dd></div>
-        <div><dt>圖片</dt><dd>{product.imageUrl?'已設定':'未設定'}</dd></div><div><dt>打印</dt><dd>{product.printRule||'不打印'}</dd></div>
+        <div><dt>圖片</dt><dd>{product.imageUrl?'已設定':'未設定'}</dd></div><div><dt>打印</dt><dd>{product.printRule||'不打印'}{product.labelPrinterNames?.length?<small>Label → {product.labelPrinterNames.join('、')}</small>:null}</dd></div>
       </dl>
     </aside>
   </>;
@@ -217,6 +224,8 @@ function PreviewProductEditor({productId,onClose}:{productId:string|null;onClose
   const combos=usePreviewCatalog(state=>state.combos);
   const createProduct=usePreviewCatalog(state=>state.createProduct);
   const updateProduct=usePreviewCatalog(state=>state.updateProduct);
+  const logicalPrinters=usePreviewAdmin(state=>state.printers);
+  const labelPrinters=logicalPrinters.filter(printer=>printer.type==='LABEL'&&printer.active);
   const [draftId]=useState(()=>product?.id??'draft-'+crypto.randomUUID());
   const [name,setName]=useState(product?.name??'');
   const [category,setCategory]=useState(product?.category??categories.find(item=>item.active)?.name??'');
@@ -224,10 +233,11 @@ function PreviewProductEditor({productId,onClose}:{productId:string|null;onClose
   const [active,setActive]=useState(product?.status!=='已停用');
   const [description,setDescription]=useState(product?.description??'');
   const [printTargets,setPrintTargets]=useState<Set<ProductPrintTarget>>(()=>new Set(productPrintTargetsFromRule(product?.printRule??'製作單')));
+  const [labelPrinterIds,setLabelPrinterIds]=useState<Set<string>>(()=>new Set(product?.labelPrinterIds??[]));
   const [customerImage,setCustomerImage]=useState(product?.customerImageUrl??'');
   const [keetaImage,setKeetaImage]=useState(product?.channelImages.KEETA??'');
   const [optionIds,setOptionIds]=useState<Set<string>>(new Set(product?.optionSetIds??[]));
-  const valid=productFormCanSave({name,category,price});
+  const valid=productFormCanSave({name,category,price})&&productPrintConfigCanSave([...printTargets],[...labelPrinterIds]);
   const editing=Boolean(product);
 
   const relatedCombos=combos.filter(combo=>combo.groups.some(group=>group.choices.some(choice=>choice.productId===product?.id)));
@@ -242,6 +252,7 @@ function PreviewProductEditor({productId,onClose}:{productId:string|null;onClose
       channelImages:{KEETA:keetaImage},
       optionSetIds:[...optionIds],
       printRule:productPrintSummary([...printTargets]),
+      labelPrinterIds:printTargets.has('LABEL')?[...labelPrinterIds]:[],
     };
     if(product){
       updateProduct(product.id,{...base,status:active?'草稿':'已停用'});
@@ -312,7 +323,25 @@ function PreviewProductEditor({productId,onClose}:{productId:string|null;onClose
               <span><strong>{option.label}</strong><small>{option.description}</small></span>
             </label>)}
           </div>
-          <div className="v3-mobile-form-note">目前會輸出：{productPrintSummary([...printTargets])}</div>
+          {printTargets.has('LABEL')?<div className="v3-label-printer-routing">
+            <div><strong>Label 目的地 *</strong><small>有兩部 Label 機時，要指定呢件商品去邊一部；可以揀一部或者多部。</small></div>
+            <div className="v3-option-link-grid">
+              {labelPrinters.map(printer=><label key={printer.id}>
+                <input
+                  type="checkbox"
+                  checked={labelPrinterIds.has(printer.id)}
+                  onChange={event=>setLabelPrinterIds(current=>{
+                    const next=new Set(current);
+                    if(event.target.checked)next.add(printer.id);else next.delete(printer.id);
+                    return next;
+                  })}
+                />
+                <span><strong>{printer.name}</strong><small>{printer.id} · {printer.widthMm}mm</small></span>
+              </label>)}
+            </div>
+            {!labelPrinterIds.size?<div className="v3-error">已選「標籤」，必須最少指定一部 Label 機先可以儲存。</div>:null}
+          </div>:null}
+          <div className="v3-mobile-form-note">目前會輸出：{productPrintSummary([...printTargets])}{printTargets.has('LABEL')&&labelPrinterIds.size?' · Label → '+labelPrinters.filter(printer=>labelPrinterIds.has(printer.id)).map(printer=>printer.name).join('、'):''}</div>
         </section>
       </div>
       <footer className="v3-functional-footer"><button type="button" onClick={onClose}>取消</button><button className="v3-primary" type="button" disabled={!valid} onClick={save}>儲存草稿</button></footer>
@@ -329,7 +358,9 @@ export function ProductListPage({canonicalSnapshot,previewMode=false,onReviewDra
   const previewProducts=usePreviewCatalog(state=>state.products);
   const previewCategories=usePreviewCatalog(state=>state.categories);
   const combos=usePreviewCatalog(state=>state.combos);
-  const previewRows=useMemo(()=>previewProducts.map(product=>previewRecord(product,combos.filter(combo=>combo.groups.some(group=>group.choices.some(choice=>choice.productId===product.id))).length)),[previewProducts,combos]);
+  const logicalPrinters=usePreviewAdmin(state=>state.printers);
+  const printerNameById=useMemo(()=>new Map(logicalPrinters.map(printer=>[printer.id,printer.name])),[logicalPrinters]);
+  const previewRows=useMemo(()=>previewProducts.map(product=>previewRecord(product,combos.filter(combo=>combo.groups.some(group=>group.choices.some(choice=>choice.productId===product.id))).length,product.labelPrinterIds.map(id=>printerNameById.get(id)??id))),[previewProducts,combos,printerNameById]);
   const sourceRows=previewMode?previewRows:canonicalRows;
 
   const [query,setQuery]=useState('');
