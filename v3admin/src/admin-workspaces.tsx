@@ -70,6 +70,8 @@ const KIND_BY_PATH:Record<string,WorkspaceKind>={
 };
 
 export const IMPLEMENTED_ROUTE_PATHS=Object.freeze(Object.keys(KIND_BY_PATH));
+const DEDICATED_PREVIEW_ROUTES=new Set(['/admin/catalog/products','/admin/catalog/modifiers','/admin/catalog/combos','/admin/availability','/admin/store/tables']);
+
 
 const PREVIEW_ROWS:Record<WorkspaceKind,readonly DemoRow[]>={
   overview:[
@@ -286,8 +288,7 @@ export function AdminWorkspace({path,previewMode=false}:{
 }
 
 export function adminWorkspaceCoverage(){
-  const missing=ADMIN_DESTINATIONS
-    .map(item=>item.path)
-    .filter(path=>path!=='/admin/catalog/products'&&path!=='/admin/availability'&&!IMPLEMENTED_ROUTE_PATHS.includes(path));
-  return Object.freeze({implemented:IMPLEMENTED_ROUTE_PATHS.length+2,total:ADMIN_DESTINATIONS.length,missing});
+  const paths=ADMIN_DESTINATIONS.map(item=>item.path);
+  const missing=paths.filter(path=>!DEDICATED_PREVIEW_ROUTES.has(path)&&!IMPLEMENTED_ROUTE_PATHS.includes(path));
+  return Object.freeze({implemented:paths.length-missing.length,total:paths.length,missing});
 }
