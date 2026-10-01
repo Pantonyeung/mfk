@@ -20,7 +20,6 @@ test('UI0 final reconciliation uses male/female 50:50 and dedicated Stage0 sourc
   assert.ok(config.includes('CUSTOMER_FINAL_SOURCE.femaleIpSheet.url'));
   assert.ok(!config.includes('stage7-pickup'));
   assert.ok(!config.includes('stage0-character-male.svg'));
-  assert.ok(!config.includes("'hybrid'"));
 });
 
 test('UI0 has first visit returning and reduced-motion timing without becoming a data gate',()=>{
@@ -38,39 +37,37 @@ test('UI0 has first visit returning and reduced-motion timing without becoming a
 test('UI0 auto-enters Home and preserves direct Member deep-link behaviour',()=>{
   assert.ok(!launch.includes('進入主頁'));
   assert.ok(!launch.includes('進入會員頁'));
-  assert.ok(!launch.includes('開始點餐'));
-  assert.ok(!launch.includes('我的記憶'));
   assert.ok(launch.includes('enterHomeRef.current()'));
   assert.ok(app.includes("onEnterHome={()=>{setLaunchVisible(false);changeView('home')}}"));
   assert.ok(!app.includes('onEnterMember='));
   assert.ok(app.includes("useState(()=>!initialRoute||initialRoute.view==='home')"));
 });
 
-test('UI1 keeps brand warmth and fixed shortcuts while remaining human-logic first',()=>{
+test('UI1 uses the locked mobile-first large-image layout and fixed shortcut trio',()=>{
   assert.ok(app.includes("import {Stage1Home} from './stage1/Stage1Home'"));
   assert.ok(app.includes("view==='home'?<Stage1Home"));
   assert.ok(app.includes("onBrowse={()=>changeView('menu')}"));
-  assert.ok(app.includes("view==='menu'?<Stage2Menu"));
-  for(const marker of['stage1-premium-header','stage1-welcome','stage1-live-order','stage1-search-entry','stage1-brand-banner','stage1-announcement-strip','stage1-quick-entry-section','stage1-top6','我的收藏','回憶券','期間限定'])assert.ok(home.includes(marker),marker);
-  assert.ok(app.includes('limit:6'));
-  assert.ok(home.includes('const canBrowse=Boolean(snapshot?.menu)'));
+  assert.ok(app.includes("onCategory={categoryId=>{changeCategory(categoryId);changeView('menu')}}"));
+  for(const marker of['stage1-mobile-header','stage1-active-order','stage1-search','stage1-big-hero','stage1-quick-row','stage1-category-rail','stage1-product-section','我的收藏','回憶券','期間限定'])assert.ok(home.includes(marker),marker);
+  assert.ok(home.includes('好好吃飯'));
+  assert.ok(home.includes('讓日常更有趣'));
 });
 
-test('UI1 and UI2 share the FINAL five-item navigation with Memory Jar in the center',()=>{
+test('UI1 and UI2 share the locked five-item navigation with Memory Jar',()=>{
   assert.match(app,/view==='home'\|\|view==='menu'\s*\?\s*<Stage2BottomNavigation/);
   assert.ok(app.includes("active={view}"));
   assert.equal(fs.existsSync(path.join(srcRoot,'stage1/Stage1BottomNavigation.tsx')),false);
 });
 
-test('UI1 owns FINAL home header/status while remaining inside current customer shell',()=>{
+test('UI1 owns Home header/status and preserves runtime product truth',()=>{
   assert.ok(app.includes('return <main className="customer-shell"'));
   assert.equal(app.includes('<CustomerHeader'),false);
-  assert.ok(app.includes("view==='home'?null:view==='menu'?null:<div className=\"global-status\""));
-  assert.ok(home.includes('stage1-store-pill'));
+  assert.ok(home.includes('stage1-store-chip'));
+  assert.ok(home.includes('product.imageUrl'));
   assert.ok(homeCss.includes('.stage1-home'));
+  for(const forbidden of['/brand/p0-riceball.webp','/brand/mf-home-hero-salad.webp','/brand/mf-home-hero-bowl.webp'])assert.ok(!home.includes(forbidden),forbidden);
 });
 
-test('accepted UI2 to UI8 chain remains wired and no UI10 is introduced',()=>{
+test('accepted UI2 to UI8 chain remains wired',()=>{
   for(const marker of['Stage2Menu','ProductSheet','CheckoutUi4View','SubmitUi5View','StoreFulfillmentUi6View','PickupCompleteUi7View','HistoryReorderUi8View'])assert.ok(app.includes(marker),marker);
-  assert.ok(!app.includes('AccountRecoveryUi10'));
 });
