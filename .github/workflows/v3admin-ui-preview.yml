@@ -8,6 +8,12 @@ on:
     paths:
       - 'v3admin/**'
       - '.github/workflows/v3admin-ui-preview.yml'
+  pull_request:
+    branches:
+      - feat/MFK-V3ADMIN-ONE-SHOT-R1
+    paths:
+      - 'v3admin/**'
+      - '.github/workflows/v3admin-ui-preview.yml'
 
 permissions:
   contents: read
