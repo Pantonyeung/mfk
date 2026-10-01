@@ -170,8 +170,10 @@ export function validateMfkSyncHead(input:unknown):MfkSyncHead{
 export function validateMfkSyncChange(input:unknown):MfkSyncChange{
   const row=object(input,'SYNC_CHANGE_INVALID');
   if(row.schema!=='MFK_PORT_CHANGE_V1'||row.protocol!==MFK_CHECKPOINTED_DELTA_SYNC_PROTOCOL)throw new Error('SYNC_CHANGE_SCHEMA_UNSUPPORTED');
-  const op=row.op==='UPSERT'?'UPSERT':row.op==='DELETE'?'DELETE':null;
-  if(!op)throw new Error('SYNC_CHANGE_OP_INVALID');
+  let op:MfkSyncChangeOperation;
+  if(row.op==='UPSERT')op='UPSERT';
+  else if(row.op==='DELETE')op='DELETE';
+  else throw new Error('SYNC_CHANGE_OP_INVALID');
   const payload=row.payload===undefined?undefined:object(row.payload,'SYNC_CHANGE_PAYLOAD_INVALID');
   if(op==='UPSERT'&&!payload)throw new Error('SYNC_CHANGE_PAYLOAD_REQUIRED');
   const out={
