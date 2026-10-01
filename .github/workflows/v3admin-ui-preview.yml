@@ -38,7 +38,7 @@ jobs:
       - run: npm test
       - run: npm run typecheck
 
-      - name: Ensure preview-only product media R2 bucket exists
+      - name: Best-effort preview R2 bucket create
         shell: bash
         run: |
           set +e
@@ -47,36 +47,8 @@ jobs:
           set -e
           cat /tmp/r2-create.log
           if [ "$code" -ne 0 ]; then
-            echo "R2 create returned non-zero; continuing because the preview bucket may already exist."
+            echo "::warning::Current deploy token cannot create R2 buckets. Pages deploy will verify whether the preview bucket already exists and is bindable."
           fi
-
-      - name: Deploy preview-only R2 media API
-        shell: bash
-        run: |
-          set -euo pipefail
-          npx --yes wrangler@latest deploy --config wrangler.preview-media.jsonc | tee /tmp/media-deploy.log
-          API_URL="$(grep -Eo 'https://[^ ]+\.workers\.dev' /tmp/media-deploy.log | tail -1)"
-          if [ -z "$API_URL" ]; then
-            echo "Unable to resolve preview media Worker URL."
-            exit 1
-          fi
-          echo "VITE_MFK_V3_PREVIEW_API_BASE=$API_URL" >> "$GITHUB_ENV"
-          echo "PREVIEW_MEDIA_API=$API_URL" >> "$GITHUB_ENV"
-
-      - name: Preview media API readback
-        shell: bash
-        run: |
-          set -euo pipefail
-          node <<'NODE'
-          const url=process.env.PREVIEW_MEDIA_API+'/api/health';
-          const response=await fetch(url,{headers:{'cache-control':'no-cache'}});
-          const body=await response.json();
-          if(!response.ok||body?.ok!==true||body?.storage!=='R2_ONLY'){
-            console.error(JSON.stringify({status:response.status,body}));
-            process.exit(1);
-          }
-          console.log('PREVIEW_MEDIA_R2_GREEN '+url);
-          NODE
 
       - name: Build isolated V3 UI preview
         run: npm run build
@@ -84,7 +56,6 @@ jobs:
           MFK_SOURCE_SHA: ${{ github.sha }}
           MFK_V3ADMIN_RELEASE_ID: preview-${{ github.sha }}
           VITE_MFK_V3_PREVIEW_MODE: '1'
-          VITE_MFK_V3_PREVIEW_API_BASE: ${{ env.VITE_MFK_V3_PREVIEW_API_BASE }}
 
       - name: Ensure preview project exists
         shell: bash
@@ -98,13 +69,13 @@ jobs:
             echo "Project create returned non-zero; continuing because it may already exist."
           fi
 
-      - name: Publish branch-only Cloudflare Pages preview
+      - name: Publish Pages preview with R2 binding and Functions
         shell: bash
         run: |
           set -euo pipefail
-          npx --yes wrangler@latest pages deploy dist             --project-name "$PROJECT_NAME"             --branch "$PREVIEW_BRANCH"             --commit-hash "$GITHUB_SHA"             --commit-message "MFK Admin V3 public implementation preview"
+          npx --yes wrangler@latest pages deploy dist             --config wrangler.pages.jsonc             --project-name "$PROJECT_NAME"             --branch "$PREVIEW_BRANCH"             --commit-hash "$GITHUB_SHA"             --commit-message "MFK Admin V3 public implementation preview"
 
-      - name: Public preview readback
+      - name: Public preview and R2 binding readback
         shell: bash
         run: |
           set -euo pipefail
@@ -115,17 +86,21 @@ jobs:
           let last='';
           for(let attempt=1;attempt<=18;attempt++){
             try{
-              const release=await fetch(base+'/release.json',{headers:{'cache-control':'no-cache'}}).then(r=>r.json());
-              const html=await fetch(base+'/?preview=ui-01',{headers:{'cache-control':'no-cache'}}).then(r=>r.text());
-              if(release?.sourceSha===expected&&html.includes('MFK Admin V3')){
+              const [release,health,html]=await Promise.all([
+                fetch(base+'/release.json',{headers:{'cache-control':'no-cache'}}).then(r=>r.json()),
+                fetch(base+'/api/preview-health',{headers:{'cache-control':'no-cache'}}).then(async r=>({status:r.status,body:await r.json()})),
+                fetch(base+'/?preview=ui-01',{headers:{'cache-control':'no-cache'}}).then(r=>r.text()),
+              ]);
+              if(release?.sourceSha===expected&&health.status===200&&health.body?.storage==='R2_ONLY'&&html.includes('MFK Admin V3')){
                 console.log('PREVIEW_GREEN '+base+'/');
+                console.log('R2_BINDING_GREEN '+JSON.stringify(health.body));
                 console.log('SOURCE_SHA '+release.sourceSha);
                 process.exit(0);
               }
-              last=JSON.stringify({release,htmlTitle:html.slice(0,120)});
+              last=JSON.stringify({release,health,htmlTitle:html.slice(0,120)});
             }catch(error){last=String(error);}
             await sleep(5000);
           }
-          console.error('Preview readback failed: '+last);
+          console.error('Preview/R2 readback failed: '+last);
           process.exit(1);
           NODE
