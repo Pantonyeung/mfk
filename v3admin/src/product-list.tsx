@@ -15,7 +15,7 @@ export type ProductListRecord={
   updatedAt:string;
 };
 
-const PREVIEW_PRODUCTS:readonly ProductListRecord[]=[
+export const PREVIEW_PRODUCTS:readonly ProductListRecord[]=[
   {id:'p-001',name:'紫米飯糰・照燒雞',code:'PRD000123',category:'飯糰',priceMinor:4200,status:'已發佈',printRule:'製作單＋標籤',updatedAt:'今日 08:42'},
   {id:'p-002',name:'紫米飯糰・吞拿魚',code:'PRD000124',category:'飯糰',priceMinor:4000,status:'已發佈',printRule:'製作單＋標籤',updatedAt:'今日 08:41'},
   {id:'p-003',name:'紫米飯糰・雞蛋沙律',code:'PRD000125',category:'飯糰',priceMinor:3800,status:'已發佈',printRule:'製作單＋標籤',updatedAt:'今日 08:40'},
