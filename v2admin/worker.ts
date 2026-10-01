@@ -967,6 +967,11 @@ function customerPublicSnapshot(active,customerOrders=[],runtimeSellability=[]){
 export class AdminSyncStore{
   constructor(state,env){this.state=state;this.env=env;}
 
+  portSockets(port){
+    try{return this.state.getWebSockets('PORT:'+String(port));}
+    catch{return this.state.getWebSockets();}
+  }
+
   async authorizePublish(request){
     const origin=request.headers.get('origin');
     const site=request.headers.get('sec-fetch-site');
@@ -1013,6 +1018,12 @@ export class AdminSyncStore{
     if(!deviceId)return false;
     const acks=await this.state.storage.get('acks')||{};
     return Boolean(acks[deviceId]);
+  }
+
+  async authorizeSmmSync(request){
+    if(request.headers.get('origin')!==SMM_ORIGIN)return false;
+    const url=new URL(request.url);
+    return Boolean(await resolveSmmStaffSession(request,storeIdFrom(url)));
   }
 
 
@@ -1512,7 +1523,7 @@ export class AdminSyncStore{
     const result={state:'UNKNOWN',message:'已送往店舖執行；等待 SMT Runtime readback',targets:Object.freeze([...rejected,...resolved.map(target=>({...target,state:'UNKNOWN'}))])};
     await this.state.storage.put(operationKey,{result,createdAt});
     const doorbell=JSON.stringify({type:'OWNER_SELLABILITY_COMMAND_AVAILABLE',storeId:String(active.storeId||'MF01'),operationId,receivedAt:createdAt});
-    for(const socket of this.state.getWebSockets()){try{socket.send(doorbell);}catch{}}
+    for(const socket of this.portSockets('SMT')){try{socket.send(doorbell);}catch{}}
     await this.appendOwnerActivity(session,{operationId,title:'售罄／恢復',target:resolved.map(item=>item.name).join('、'),result:'PENDING_SMT',readback:'等待 SMT Runtime'});
     return result;
   }
@@ -1746,7 +1757,7 @@ export class AdminSyncStore{
       executionAt,
       executionBusinessDate,
     });
-    for(const socket of this.state.getWebSockets()){
+    for(const socket of this.portSockets('SMT')){
       try{socket.send(doorbell);}catch{}
     }
     return {event,addendum};
@@ -2254,7 +2265,7 @@ export class AdminSyncStore{
         submissionId:body.submissionId?String(body.submissionId):undefined,
         receivedAt:new Date().toISOString(),
       });
-      for(const socket of this.state.getWebSockets()){
+      for(const socket of this.portSockets('SMT')){
         try{socket.send(message);}catch{}
       }
       return json({state:'DOORBELL_SENT'});
@@ -2271,7 +2282,7 @@ export class AdminSyncStore{
         providerMessageId:String(body.providerMessageId||''),
         receivedAt:new Date().toISOString(),
       });
-      for(const socket of this.state.getWebSockets()){
+      for(const socket of this.portSockets('SMT')){
         try{socket.send(message);}catch{}
       }
       return json({state:'DOORBELL_SENT'});
@@ -2326,7 +2337,8 @@ export class AdminSyncStore{
       const port=String(body?.port||'').toUpperCase();
       if(port==='SMT'&&!await this.authorizeSmtDevice(request))return json({code:'SYNC_PORT_UNAUTHORIZED'},401);
       if(port==='CUSTOMER')return json({code:'SYNC_CUSTOMER_ACK_NOT_TRACKED'},403);
-      if(port==='SMM'||port==='KEETA')return json({code:'SYNC_PORT_DIRECT_WRITE_FORBIDDEN'},403);
+      if(port==='SMM'&&!await this.authorizeSmmSync(request))return json({code:'SYNC_PORT_UNAUTHORIZED'},401);
+      if(port==='KEETA')return json({code:'SYNC_PORT_DIRECT_WRITE_FORBIDDEN'},403);
       try{
         const result=await this.recordSyncApplied(body);
         return json(result.body,result.status);
@@ -2392,16 +2404,23 @@ export class AdminSyncStore{
     }
     if(url.pathname==='/events'){
       if(request.headers.get('upgrade')!=='websocket')return json({code:'WEBSOCKET_REQUIRED'},426);
+      const requestedPort=String(url.searchParams.get('port')||'SMT').toUpperCase();
+      const port=requestedPort==='SMM'?'SMM':'SMT';
+      if(port==='SMM'&&request.headers.get('x-mfk-sync-port-authorized')!=='SMM')return json({code:'SYNC_EVENT_UNAUTHORIZED'},401);
       const pair=new WebSocketPair();
       const client=pair[0],server=pair[1];
-      this.state.acceptWebSocket(server);
+      this.state.acceptWebSocket(server,['PORT:'+port]);
       const active=await this.state.storage.get('active');
       if(active){
-        const smtHead=await this.readSyncHead('SMT');
-        server.send(JSON.stringify({type:'ADMIN_CONFIG_AVAILABLE',storeId:active.storeId,revision:active.revision,fingerprint:active.fingerprint,publishedAt:active.publishedAt}));
-        server.send(JSON.stringify({type:'PORT_HEAD_AVAILABLE',storeId:active.storeId,port:'SMT',headSeq:Number(smtHead.headSeq||0),sourceCommitSeq:Number(smtHead.sourceCommitSeq||0),projectionHash:String(smtHead.projectionHash||''),publishedAt:String(smtHead.observedAt||active.publishedAt)}));
+        const head=await this.readSyncHead(port);
+        if(port==='SMT')server.send(JSON.stringify({type:'ADMIN_CONFIG_AVAILABLE',storeId:active.storeId,revision:active.revision,fingerprint:active.fingerprint,publishedAt:active.publishedAt}));
+        server.send(JSON.stringify({type:'PORT_HEAD_AVAILABLE',storeId:active.storeId,port,headSeq:Number(head.headSeq||0),sourceCommitSeq:Number(head.sourceCommitSeq||0),projectionHash:String(head.projectionHash||''),publishedAt:String(head.observedAt||active.publishedAt)}));
       }
-      return new Response(null,{status:101,webSocket:client});
+      return new Response(null,{
+        status:101,
+        webSocket:client,
+        ...(port==='SMM'?{headers:{'sec-websocket-protocol':'mfk-smm-sync-v1'}}:{}),
+      });
     }
 
     if(url.pathname==='/refunds'){
@@ -2527,7 +2546,7 @@ export class AdminSyncStore{
           eventTypes:[...eventTypes],
           receivedAt:new Date().toISOString(),
         });
-        for(const socket of this.state.getWebSockets()){
+        for(const socket of this.portSockets('SMT')){
           try{socket.send(doorbell);}catch{}
         }
       }
@@ -3019,6 +3038,24 @@ export default {
       const headers=new Headers(response.headers);
       for(const [key,value] of Object.entries(cors(request)))headers.set(key,value);
       return new Response(response.body,{status:response.status,statusText:response.statusText,headers});
+    }
+    if(url.pathname==='/api/admin-sync/sync/events'){
+      if(request.headers.get('upgrade')!=='websocket')return json({code:'WEBSOCKET_REQUIRED'},426);
+      if(request.headers.get('origin')!==SMM_ORIGIN)return json({code:'SYNC_EVENT_ORIGIN_FORBIDDEN'},403);
+      const protocols=String(request.headers.get('sec-websocket-protocol')||'').split(',').map(value=>value.trim()).filter(Boolean);
+      const sessionProtocol=protocols.find(value=>value.startsWith('mfk-smm-session.'));
+      const token=sessionProtocol?sessionProtocol.slice('mfk-smm-session.'.length):'';
+      if(!protocols.includes('mfk-smm-sync-v1')||!token)return json({code:'SYNC_EVENT_SESSION_REQUIRED'},401);
+      const authHeaders=new Headers(request.headers);
+      authHeaders.set('x-mfk-smm-session',token);
+      const authRequest=new Request(request.url,{method:'GET',headers:authHeaders});
+      if(!await resolveSmmStaffSession(authRequest,storeIdFrom(url)))return json({code:'SYNC_EVENT_SESSION_UNAUTHORIZED'},401);
+      const storeId=storeIdFrom(url),id=env.ADMIN_SYNC.idFromName(storeId),stub=env.ADMIN_SYNC.get(id),target=new URL(request.url);
+      target.pathname='/events';
+      target.search='?storeId='+encodeURIComponent(storeId)+'&port=SMM';
+      const forwardedHeaders=new Headers(request.headers);
+      forwardedHeaders.set('x-mfk-sync-port-authorized','SMM');
+      return stub.fetch(new Request(target.toString(),{method:'GET',headers:forwardedHeaders}));
     }
     if(url.pathname==='/api/admin-sync/provider-doorbell'||url.pathname==='/api/admin-sync/customer-doorbell'||url.pathname==='/api/admin-sync/customer-orders'||url.pathname==='/api/admin-sync/authorize-smt-device'){
       return json({code:'NOT_FOUND'},404,cors(request));
