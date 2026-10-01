@@ -4,6 +4,10 @@ const HERO_MEDIA=Object.freeze({
   '/media/customer/hero/hero-female-main.png':'customer/brand/hero/hero-female-main.png',
   '/media/customer/hero/hero-doodle-morefun-main.png':'customer/brand/hero/hero-doodle-morefun-main.png',
   '/media/customer/hero/hero-doodle-goodtaste-main.png':'customer/brand/hero/hero-doodle-goodtaste-main.png',
+  '/media/customer/hero-carousel/home-hero-01.webp':'customer/brand/hero-carousel/home-hero-01.webp',
+  '/media/customer/hero-carousel/home-hero-02.webp':'customer/brand/hero-carousel/home-hero-02.webp',
+  '/media/customer/hero-carousel/home-hero-03.webp':'customer/brand/hero-carousel/home-hero-03.webp',
+  '/media/customer/hero-carousel/home-hero-04.webp':'customer/brand/hero-carousel/home-hero-04.webp',
 });
 
 export default {
@@ -20,8 +24,8 @@ export default {
       if(!object)return new Response('Not Found',{status:404});
 
       const headers=new Headers();
-      headers.set('content-type','image/png');
-      headers.set('cache-control','public, max-age=0, must-revalidate');
+      headers.set('content-type',objectKey.endsWith('.webp')?'image/webp':'image/png');
+      headers.set('cache-control',objectKey.endsWith('.webp')?'public, max-age=300, stale-while-revalidate=86400':'public, max-age=0, must-revalidate');
       headers.set('etag',object.httpEtag);
       headers.set('x-mfk-asset-key',objectKey);
 

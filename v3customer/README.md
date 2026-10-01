@@ -43,11 +43,11 @@ Uploaded Master Packs contain Owner-confirmed:
 - HERO-M-DEFAULT / stage1-hero-male-v1.png
 - HERO-F-DEFAULT / stage1-hero-female-v1.png
 
-These approved identities should be imported into the V3 asset pack before final pixel acceptance. Do not regenerate identity unless Owner requests a new pose.
+The original five Hero assets remain in private R2. The approved rotating Q-art scenes use four transparent WebP slots under `asset-sources/hero-carousel/`; their stable R2 names and checksums are recorded in the local manifest.
 
-## Current limitation
+## Updating Hero artwork
 
-The preview currently references existing repository web assets so the React shell can be reviewed immediately. Final >95% perceived fidelity remains blocked until the approved Master Pack Hero assets and locked long-page baseline are available inside the repository acceptance bundle.
+Replace a WebP while keeping its `home-hero-01.webp` to `home-hero-04.webp` slot name, update the two recorded checksums, then run the Customer V3 workflow. No React path change is required.
 
 ## Promotion
 

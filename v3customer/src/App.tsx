@@ -1,5 +1,5 @@
 import {useEffect,useState} from 'react';
-import {CUSTOMER_V3_ASSETS as A} from './assets';
+import {CUSTOMER_V3_ASSETS as A,CUSTOMER_V3_HERO_SLIDES as HERO_SLIDES} from './assets';
 import {PREVIEW_HOME as vm} from './preview-fixture';
 import type {QuickCardId} from './home-model';
 
@@ -14,8 +14,8 @@ function Icon({name}:Readonly<{name:IconName}>){
     search:<><circle {...common} cx="10.5" cy="10.5" r="6"/><path {...common} d="m15 15 4.5 4.5"/></>,
     featured:<><path fill="currentColor" d="m12 4 2.2 4.1 4.6-1.6-.7 7.8H5.9l-.7-7.8 4.6 1.6L12 4Z"/><path {...common} d="M7 18h10"/></>,
     popular:<><path {...common} d="M5 9h14l-1 11H6L5 9Z"/><path {...common} d="M9 9a3 3 0 0 1 6 0"/><path fill="currentColor" d="M12 17.5c-3-1.8-4.2-3-4.2-4.6 0-1.2.9-2 2.1-2 .9 0 1.7.5 2.1 1.2.4-.7 1.2-1.2 2.1-1.2 1.2 0 2.1.8 2.1 2 0 1.6-1.2 2.8-4.2 4.6Z"/></>,
-    offer:<><circle {...common} cx="12" cy="12" r="8"/><path {...common} d="M12 7v5l3 2"/><circle fill="currentColor" cx="18.5" cy="5.5" r="2.5"/><path {...common} d="m7 19 10-14"/></>,
-    pickup:<><path {...common} d="M6 8h12l-1 12H7L6 8Z"/><path {...common} d="M9 8a3 3 0 0 1 6 0M3 12h2m-3 4h3m14-4h2m-2 4h3"/><path fill="currentColor" d="M12 17.5c-2.4-1.4-3.3-2.4-3.3-3.7 0-1 .7-1.6 1.7-1.6.7 0 1.3.4 1.6 1 .3-.6.9-1 1.6-1 1 0 1.7.6 1.7 1.6 0 1.3-.9 2.3-3.3 3.7Z"/></>,
+    offer:<><path {...common} d="M19 5C11 5 6 9.2 6 15c0 2.1 1.6 4 4 4 5.8 0 9-6 9-14Z"/><path {...common} d="M5 20c2.1-3.9 5.6-7.1 10-9"/></>,
+    pickup:<><circle {...common} cx="12" cy="12" r="8"/><path {...common} d="M12 7v5l3 2M4 8H2m3-3L3.5 3.5M20 8h2m-3-3 1.5-1.5"/></>,
     history:<><path {...common} d="M4 12a8 8 0 1 0 2.3-5.7L4 8.6"/><path {...common} d="M4 4v4.6h4.6M12 8v4l3 2"/></>,
     home:<><path {...common} d="m4 11 8-7 8 7"/><path fill="currentColor" d="M6.5 10.5V20h11v-9.5L12 6l-5.5 4.5Z"/></>,
     menu:<><path {...common} d="M7 3v8m-2-8v5a2 2 0 0 0 4 0V3M7 11v10M16 3v18M16 3c3 2 3 7 0 9"/></>,
@@ -39,8 +39,14 @@ function Header({showPreviewNotice}:Readonly<{showPreviewNotice:(label:string)=>
     <button className="logo-button" type="button" onClick={()=>window.scrollTo({top:0,behavior:'smooth'})} aria-label="返回首頁頂部">
       <img className="logo" src={A.logo} alt="磨飯 More Fun"/>
     </button>
-    <button className="pill location" type="button" onClick={()=>showPreviewNotice('門市選擇')}>
-      <Icon name="pin"/><b>{vm.locationLabel}</b><Icon name="chevron"/>
+    <button
+      className="pill store-status"
+      type="button"
+      data-state={vm.storeStatus}
+      onClick={()=>showPreviewNotice('店舖狀態')}
+      aria-label={`店舖狀態：${vm.storeStatusLabel}`}
+    >
+      <span className="status-dot"/><b>{vm.storeStatusLabel}</b><Icon name="chevron"/>
     </button>
     <button className="round bell" type="button" onClick={()=>showPreviewNotice('通知')} aria-label="通知">
       <Icon name="bell"/><i/>
@@ -52,6 +58,22 @@ function Header({showPreviewNotice}:Readonly<{showPreviewNotice:(label:string)=>
 }
 
 function Hero({showPreviewNotice}:Readonly<{showPreviewNotice:(label:string)=>void}>){
+  const [activeSlide,setActiveSlide]=useState(0);
+  const [loadedSlides,setLoadedSlides]=useState<ReadonlySet<number>>(()=>new Set());
+
+  useEffect(()=>{
+    if(window.matchMedia('(prefers-reduced-motion: reduce)').matches)return;
+    const timer=window.setTimeout(()=>setActiveSlide(index=>(index+1)%HERO_SLIDES.length),5200);
+    return ()=>window.clearTimeout(timer);
+  },[activeSlide]);
+
+  const markLoaded=(index:number)=>setLoadedSlides(current=>{
+    if(current.has(index))return current;
+    const next=new Set(current);
+    next.add(index);
+    return next;
+  });
+
   return <section className="hero" aria-labelledby="hero-title">
     <div className="hero-world" aria-hidden="true">
       <img className="hero-world-bg" src={A.heroBackgroundR2} alt=""/>
@@ -65,10 +87,34 @@ function Hero({showPreviewNotice}:Readonly<{showPreviewNotice:(label:string)=>vo
       <small>好食・好人・更開心</small>
     </div>
     <div className="hero-visual" aria-hidden="true">
-      <img className="male" src={A.maleHeroR2} alt=""/>
-      <img className="female" src={A.femaleHeroR2} alt=""/>
+      <span className="hero-art-loader" data-visible={loadedSlides.has(activeSlide)?'false':'true'}/>
+      {HERO_SLIDES.map((slide,index)=><img
+        key={slide.id}
+        className={'hero-slide '+(index===activeSlide?'is-active':'')}
+        src={slide.src}
+        alt=""
+        width="720"
+        height="900"
+        loading="eager"
+        fetchPriority={index===0?'high':'low'}
+        decoding="async"
+        onLoad={()=>markLoaded(index)}
+        onError={()=>markLoaded(index)}
+      />)}
       <img className="doodle doodle-more" src={A.moreFunDoodleR2} alt=""/>
       <img className="doodle doodle-taste" src={A.goodTasteDoodleR2} alt=""/>
+      <span className="hero-trail trail-one"/>
+      <span className="hero-trail trail-two"/>
+      <span className="hero-trail trail-three"/>
+    </div>
+    <div className="hero-dots" role="group" aria-label="主視覺輪播">
+      {HERO_SLIDES.map((slide,index)=><button
+        key={slide.id}
+        type="button"
+        aria-label={`顯示${slide.label}`}
+        aria-pressed={index===activeSlide}
+        onClick={()=>setActiveSlide(index)}
+      />)}
     </div>
   </section>;
 }

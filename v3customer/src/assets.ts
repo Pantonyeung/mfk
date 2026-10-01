@@ -15,6 +15,13 @@ export const CUSTOMER_V3_ASSETS=Object.freeze({
   riceball:'https://raw.githubusercontent.com/Pantonyeung/mfk/main/v2customer/public/brand/p0-riceball.webp'
 });
 
+export const CUSTOMER_V3_HERO_SLIDES=Object.freeze([
+  Object.freeze({id:'home-hero-01',label:'一齊出發',src:'/media/customer/hero-carousel/home-hero-01.webp'}),
+  Object.freeze({id:'home-hero-02',label:'季節手作',src:'/media/customer/hero-carousel/home-hero-02.webp'}),
+  Object.freeze({id:'home-hero-03',label:'輕鬆取餐',src:'/media/customer/hero-carousel/home-hero-03.webp'}),
+  Object.freeze({id:'home-hero-04',label:'收藏回憶',src:'/media/customer/hero-carousel/home-hero-04.webp'})
+] as const);
+
 export const CUSTOMER_V3_R2_ASSET_EVIDENCE=Object.freeze({
   heroBackgroundR2:Object.freeze({
     bucket:'mfk-customer-assets',
@@ -40,5 +47,11 @@ export const CUSTOMER_V3_R2_ASSET_EVIDENCE=Object.freeze({
     bucket:'mfk-customer-assets',
     objectKey:'customer/brand/hero/hero-doodle-goodtaste-main.png',
     sha256:'584b1e7bd6fab50c55494bab5cce7c80635736bd647ed5d1ee626aed5f74cfd1'
-  })
+  }),
+  heroCarousel:Object.freeze([
+    Object.freeze({objectKey:'customer/brand/hero-carousel/home-hero-01.webp',sha256:'a54f4ce0cc8cacf1ede07d1eb802f9e50b1b466ca53527ae611e1d678085df83'}),
+    Object.freeze({objectKey:'customer/brand/hero-carousel/home-hero-02.webp',sha256:'6067f7abd2f46ecb0e84fda3b633965bbf470b87b529608eb8325c428a9fb276'}),
+    Object.freeze({objectKey:'customer/brand/hero-carousel/home-hero-03.webp',sha256:'7052fb7cb10bd5fe0a2a8db6976c8c0bb5695fbbf1f3b7e5671fa6efbab52951'}),
+    Object.freeze({objectKey:'customer/brand/hero-carousel/home-hero-04.webp',sha256:'ea33c164830b0077d074493536ef7ed0963920194ee1e382540a09cc95ddd919'})
+  ].map(asset=>Object.freeze({bucket:'mfk-customer-assets',...asset})))
 });

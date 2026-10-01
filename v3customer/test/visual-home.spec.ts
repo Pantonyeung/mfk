@@ -12,6 +12,7 @@ for(const size of viewports){
     await page.setViewportSize({width:size.width,height:size.height});
     await page.goto('/');
     await page.evaluate(()=>document.fonts.ready);
+    await page.waitForFunction(()=>[...document.querySelectorAll<HTMLImageElement>('.hero-slide')].every(image=>image.complete&&image.naturalWidth>0));
 
     const metrics=await page.evaluate(()=>{
       const rect=(selector:string)=>document.querySelector(selector)?.getBoundingClientRect();
@@ -23,6 +24,10 @@ for(const size of viewports){
         header:rect('.header'),
         headerPosition:getComputedStyle(document.querySelector('.header')!).position,
         hero:rect('.hero'),
+        heroTitle:rect('#hero-title'),
+        heroVisual:rect('.hero-visual'),
+        heroSlides:[...document.querySelectorAll('.hero-slide')].map(el=>el.getBoundingClientRect()),
+        heroDots:[...document.querySelectorAll('.hero-dots button')].map(el=>el.getBoundingClientRect()),
         cta:rect('.hero-copy > button'),
         quickCards:[...document.querySelectorAll('.quick-card')].map(el=>el.getBoundingClientRect()),
         quickIcons:[...document.querySelectorAll('.quick-icon')].map(el=>el.getBoundingClientRect()),
@@ -37,6 +42,13 @@ for(const size of viewports){
     expect(metrics.header?.top ?? -1).toBe(0);
     expect(metrics.hero?.height ?? 0).toBeGreaterThanOrEqual(metrics.viewportHeight*.60);
     expect(metrics.hero?.height ?? 0).toBeLessThanOrEqual(metrics.viewportHeight*.72);
+    expect(metrics.heroVisual?.top ?? 0).toBeGreaterThanOrEqual((metrics.heroTitle?.bottom ?? 0)+4);
+    expect(metrics.heroSlides).toHaveLength(4);
+    expect(metrics.heroDots).toHaveLength(4);
+    for(const dot of metrics.heroDots){
+      expect(dot.height).toBeGreaterThanOrEqual(34);
+      expect(dot.width).toBeGreaterThanOrEqual(34);
+    }
 
     const pageScreens=metrics.documentHeight/metrics.viewportHeight;
     expect(pageScreens).toBeGreaterThanOrEqual(1.20);
@@ -69,7 +81,14 @@ test('primary home actions stay honest in preview',async({page})=>{
   await page.goto('/');
 
   await expect(page.locator('.hero-copy > button')).toBeVisible();
+  await expect(page.getByRole('button',{name:'店舖狀態：營業中'})).toBeVisible();
   await expect(page.locator('.quick-card')).toHaveCount(4);
+  await expect(page.getByRole('button',{name:/期間限定/})).toBeVisible();
+  await expect(page.getByText('限時優惠')).toHaveCount(0);
+  await expect(page.locator('.hero-slide')).toHaveCount(4);
+  await page.getByRole('button',{name:'顯示季節手作'}).click();
+  await expect(page.getByRole('button',{name:'顯示季節手作'})).toHaveAttribute('aria-pressed','true');
+  await expect(page.locator('.hero-slide').nth(1)).toHaveCSS('opacity','1');
   await expect(page.locator('.lifestyle')).toBeVisible();
   await expect(page.locator('.featured-card')).toHaveCount(0);
   await expect(page.locator('.recent-card')).toBeVisible();

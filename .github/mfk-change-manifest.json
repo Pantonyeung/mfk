@@ -23,9 +23,12 @@
   "expected_behavior_change": [
     "Keep the approved Hero assets while recomposing the Customer Home from the Owner-provided visual reference.",
     "Make Hero occupy at least 60% of the first viewport.",
-    "Use four single-row, whole-card quick actions with large icons and at least 44px touch targets.",
-    "Keep the address, notification and search header fixed while the Customer Home scrolls.",
+    "Keep four premium vertical quick actions in one row, with large icons and whole-card touch targets.",
+    "Keep truthful store operating status, notification and search fixed while the Customer Home scrolls.",
     "Shrink the Hero character composition progressively during upward scrolling without recompressing the approved source assets.",
+    "Keep the Hero headline in a protected text region and rotate four optimized transparent Q-character scenes with an accessible manual selector.",
+    "Publish Hero scenes to stable R2 object names so future artwork replaces the same slot without an app-code path change.",
+    "Use the canonical customer label 期間限定 and responsive press, crossfade, drift and subtle trail feedback with reduced-motion support.",
     "Use one character-led lifestyle banner, one recent-order row, and five-item bottom navigation including the canonical Memory Jar; remove competing product-card sections.",
     "Keep unavailable preview actions honest with an explicit not-connected status instead of inventing transaction behavior.",
     "Run isolated Customer V3 typecheck/build and deterministic visual-layout acceptance without production cutover."

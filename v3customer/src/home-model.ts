@@ -1,7 +1,9 @@
 export type QuickCardId='featured'|'popular'|'offer'|'pickup';
+export type StoreStatus='open'|'closed';
 
 export type CustomerLongHomeVM=Readonly<{
-  locationLabel:string;
+  storeStatus:StoreStatus;
+  storeStatusLabel:string;
   searchPlaceholder:string;
   quickCards:readonly Readonly<{id:QuickCardId;title:string;subtitle:string;tone:string}>[];
   recentOrder:Readonly<{itemSummary:string;orderedAtLabel:string}>|null;
