@@ -77,3 +77,26 @@ Final acceptance must use:
 7. No React/CSS path rename required.
 
 MILESTONE: MFK_CUSTOMER_V3_STABLE_ASSET_IDENTITY_LOCKED
+
+
+## 7. Confirmed R2 bucket and runtime route
+
+Owner screenshot and existing repository configuration confirm:
+
+- R2 bucket: `mfk-customer-assets`
+- public access: disabled
+- existing binding vocabulary: `CUSTOMER_ASSETS`
+
+Customer V3 R2 object key:
+
+`customer/brand/hero/hero-background-main.png`
+
+Runtime route:
+
+`/media/customer/hero/hero-background-main.png`
+
+The V3 preview Worker reads the private R2 object through the `CUSTOMER_ASSETS` binding and returns it with ETag plus revalidation caching.
+
+Public R2 access does not need to be enabled.
+
+The previous lossy repository WebP derivative has been removed from the Candidate.
