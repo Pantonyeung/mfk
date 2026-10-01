@@ -62,6 +62,16 @@ function SecondaryNavigation({menu,path,onBack,onNavigate}:{menu:AdminMenuGroup;
   </div>;
 }
 
+function ContextualSectionBack({menu,title,onBack}:{menu:AdminMenuGroup;title:string;onBack:()=>void}){
+  return <nav className="v3-contextual-back" aria-label="目前功能層級">
+    <button type="button" onClick={onBack} aria-label={'返回 '+menu.label}>
+      <span aria-hidden="true">‹</span><strong>返回 {menu.label}</strong>
+    </button>
+    <span className="v3-contextual-current">{title}</span>
+  </nav>;
+}
+
+
 type CanonicalState='pending'|'error'|'fresh'|'refreshing'|'stale';
 
 function RouteSkeleton({path,canonicalState,onRefresh}:{path:string;canonicalState:CanonicalState;onRefresh:()=>void}){
@@ -121,6 +131,11 @@ export function AdminShell({storeId,displayName,releaseStatus,canonicalState,can
   const selectMenu=(menu:AdminMenuGroup)=>{
     setActiveMenu(menu);
     if(drawerOpen||window.matchMedia('(max-width: 1179px)').matches){setDrawerOpen(true);setMobileStep('destinations');}
+  };
+  const openCurrentSection=()=>{
+    setActiveMenu(selectedMenu);
+    setMobileStep('destinations');
+    setDrawerOpen(true);
   };
 
   const routeContent=path==='/admin/overview'
@@ -250,7 +265,10 @@ export function AdminShell({storeId,displayName,releaseStatus,canonicalState,can
       </header>
       {releaseStatus}
       {formalDraftEnabled?<FormalDraftStatusBar/>:null}
-      <main className="v3-content">{routeContent}{children}</main>
+      <main className="v3-content">
+        <ContextualSectionBack menu={selectedMenu} title={selectedDestination.title} onBack={openCurrentSection}/>
+        {routeContent}{children}
+      </main>
     </div>
   </div>;
 }
