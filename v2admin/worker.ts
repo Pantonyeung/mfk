@@ -45,6 +45,9 @@ function emptySyncHead(storeId,port){
     checkpointHash:'',
     projectionHash:projectionHashForEntities(Object.freeze({})),
     sourceCommitSeq:0,
+    canonicalRevision:0,
+    canonicalFingerprint:'UNPUBLISHED',
+    canonicalPublishedAt:new Date(0).toISOString(),
     observedAt:new Date(0).toISOString(),
   });
 }
@@ -1290,7 +1293,7 @@ export class AdminSyncStore{
               createdAt:cloudPublishedAt,
             });
             await storage.put(syncCheckpointKey(port,0),baseline);
-            effectiveHead=Object.freeze({...priorHead,checkpointSeq:0,checkpointHash:baseline.checkpointHash,projectionHash:baseline.projectionHash});
+            effectiveHead=Object.freeze({...priorHead,checkpointSeq:0,checkpointHash:baseline.checkpointHash,projectionHash:baseline.projectionHash,canonicalRevision:Number(current.revision||0),canonicalFingerprint:String(current.fingerprint||'UNPUBLISHED'),canonicalPublishedAt:String(current.publishedAt||new Date(0).toISOString())});
           }
 
           const diff=diffMfkSyncEntities({
@@ -1319,6 +1322,9 @@ export class AdminSyncStore{
             checkpointHash:String(effectiveHead.checkpointHash||''),
             projectionHash:diff.projectionHash,
             sourceCommitSeq:commitSeq,
+            canonicalRevision:Number(canonical.revision),
+            canonicalFingerprint:String(canonical.fingerprint),
+            canonicalPublishedAt:String(canonical.publishedAt),
             observedAt:cloudPublishedAt,
           }):effectiveHead;
 
