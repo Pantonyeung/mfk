@@ -8,6 +8,7 @@ import {CategoriesPage,PricingPage,MenuDisplayPage} from './catalog-core-pages.t
 import {DiningTablesPage} from './dining-tables-page.tsx';
 import {ChannelPage,PermissionsPage,PrintRulesPage,PrintTemplatesPage,PrintersPage,QuickReasonsPage,RolesPage,StaffPage,StoreSettingsPage} from './admin-functional-pages.tsx';
 import {AccessPage,BusinessDayPage,CapacityPage,CashClosePage,DevicesPage,OtaPage,PublishFlowPage} from './admin-operations-pages.tsx';
+import {OrdersPage,ReportPage} from './admin-read-pages.tsx';
 import {
   EmptyState,
   ErrorState,
@@ -102,8 +103,14 @@ export function AdminShell({storeId,displayName,releaseStatus,canonicalState,can
     if(drawerOpen||window.matchMedia('(max-width: 1179px)').matches){setDrawerOpen(true);setMobileStep('destinations');}
   };
 
-  const routeContent=path==='/admin/catalog/products'
-    ?<ProductListPage canonicalSnapshot={canonicalSnapshot} previewMode={previewMode} onReviewDraft={()=>navigate('/admin/publish/pending')}/>
+  const routeContent=path==='/admin/orders/open'&&previewMode
+    ?<OrdersPage mode="open"/>
+    :path==='/admin/orders/history'&&previewMode
+      ?<OrdersPage mode="history"/>
+      :path==='/admin/orders/exceptions'&&previewMode
+        ?<OrdersPage mode="exceptions"/>
+        :path==='/admin/catalog/products'
+          ?<ProductListPage canonicalSnapshot={canonicalSnapshot} previewMode={previewMode} onReviewDraft={()=>navigate('/admin/publish/pending')}/>
     :path==='/admin/catalog/categories'&&previewMode
       ?<CategoriesPage/>
       :path==='/admin/catalog/modifiers'&&previewMode
@@ -154,8 +161,20 @@ export function AdminShell({storeId,displayName,releaseStatus,canonicalState,can
                                               ?<PermissionsPage/>
                                               :path==='/admin/access'&&previewMode
                                                 ?<AccessPage/>
-                                                :path==='/admin/publish/pending'&&previewMode
-                                                  ?<PublishFlowPage mode="pending"/>
+                                                :path==='/admin/reports/sales'&&previewMode
+                                                  ?<ReportPage mode="sales"/>
+                                                  :path==='/admin/reports/products'&&previewMode
+                                                    ?<ReportPage mode="products"/>
+                                                    :path==='/admin/reports/channels'&&previewMode
+                                                      ?<ReportPage mode="channels"/>
+                                                      :path==='/admin/reports/refunds'&&previewMode
+                                                        ?<ReportPage mode="refunds"/>
+                                                        :path==='/admin/reports/operations'&&previewMode
+                                                          ?<ReportPage mode="operations"/>
+                                                          :path==='/admin/reports/export'&&previewMode
+                                                            ?<ReportPage mode="export"/>
+                                                            :path==='/admin/publish/pending'&&previewMode
+                                                              ?<PublishFlowPage mode="pending"/>
                                                   :path==='/admin/publish'&&previewMode
                                                     ?<PublishFlowPage mode="publish"/>
                                                     :path==='/admin/publish/versions'&&previewMode
