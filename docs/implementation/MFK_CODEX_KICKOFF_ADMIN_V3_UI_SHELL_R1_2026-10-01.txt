@@ -1,0 +1,167 @@
+你而家正式接手：MFK Admin V3｜UI Shell + Design System Foundation R1
+
+GitHub：
+Repo：https://github.com/Pantonyeung/mfk
+Branch：https://github.com/Pantonyeung/mfk/tree/feat/MFK-V3ADMIN-ONE-SHOT-R1
+PR：https://github.com/Pantonyeung/mfk/pull/605
+Product Issue：https://github.com/Pantonyeung/mfk/issues/601
+Root Program：https://github.com/Pantonyeung/mfk/issues/596
+
+Current verified head：
+c34c6c019f980731bb39945ad918ec55f41252f9
+
+Current Gate 1 status：
+- Codex review completed。
+- Previous 3 個 P2（build instance identity / stale release verification fail-closed / cross-store canonical mismatch）已修正。
+- current review threads unresolved = 0。
+- v3admin-ci GREEN。
+- Regression Shadow GREEN。
+- admin-crossport-integration-gate GREEN。
+- customer-ui5-submit-wait-r1 GREEN。
+- Production v2 remains live。
+- V3 zero production routing。
+
+開工前 mandatory fresh-read，唔准靠舊對話記憶：
+1. COMMANDER_CURRENT.md
+2. HANDOFF_CURRENT.md
+3. docs/product/MFK_ADMIN_V3_PRODUCT_BRIEF_R1_2026-09-30.md
+4. docs/product/MFK_ADMIN_V3_COPY_DICTIONARY_V1_2026-09-30.md
+5. docs/product/MFK_ADMIN_V3_PRE_IMPLEMENTATION_PLAN_V1_2026-09-30.md
+6. docs/architecture/MFK_V3_DOORBELL_CANONICAL_CONVERGENCE_SAFARI_PLAN_V1_2026-09-30.md
+7. docs/implementation/MFK_ADMIN_V3_ONE_SHOT_IMPLEMENTATION_PACKET_R1_2026-09-30.md
+8. docs/implementation/MFK_ADMIN_V3_UI_SHELL_IMPLEMENTATION_PACKET_R1_2026-10-01.md
+9. docs/implementation/MFK_ADMIN_V3_53_PAGE_IMPLEMENTATION_MATRIX_R1_2026-10-01.md
+10. docs/implementation/MFK_ADMIN_V3_BACKEND_SEAM_REGISTER_R1_2026-10-01.md
+11. docs/implementation/MFK_ADMIN_V3_FIRST_VERTICAL_SLICE_ACCEPTANCE_CASES_R1_2026-10-01.md
+12. contracts/admin-config-sync-v1.ts
+13. PR #605 current diff
+14. PR #605 current CI
+15. PR #605 current review threads
+
+Current exact task：
+只做 UI Shell + Design System foundation。
+唔開始 53 頁完整業務 implementation。
+唔開始 production deploy。
+唔改 backend / SMT authority。
+
+要完成：
+1. 建正式 12 大 Menu navigation。
+2. 建 53 route registry / route metadata。
+3. Desktop primary sidebar + second-level navigation。
+4. Tablet compact rail + contextual second-level panel。
+5. Mobile drawer navigation；同一 IA / 同一 route identity。
+6. 共用 AppShell。
+7. 共用 PageHeader。
+8. StoreScopeIndicator。
+9. ClientReleaseIndicator。
+10. SearchField。
+11. FilterBar。
+12. DataTable。
+13. ResponsiveRecordList。
+14. StatusBadge。
+15. EmptyState。
+16. ErrorState。
+17. StaleBanner。
+18. LoadingSkeleton。
+19. DraftBar。
+20. ConfirmDialog。
+21. ReadbackPanel。
+22. Timeline。
+23. FormField / FormSection。
+24. Tabs。
+25. Toast / InlineFeedback。
+26. Permission-aware navigation hook / contract。
+27. Route-level placeholder只可係 engineering skeleton；不可假裝某 domain功能已完成。
+
+Product baseline：
+- 12 大 Menu。
+- 53 第二步 destination。
+- two-step discovery hard rule。
+- 每個正式功能唯一 Primary Home。
+- Sidebar sub-menu name = Page Title。
+- 訂單係「訂單監察」而且只讀。
+- Refund / Cancel Order / Payment Method Correction execution = OUT OF ADMIN SCOPE。
+- Admin如果出現以上 transaction mutation CTA = AUTHORITY RED。
+
+State hard rules：
+- INITIAL_LOADING / EMPTY / READY / REFRESHING / STALE / OFFLINE_WITH_DATA / OFFLINE_EMPTY / PENDING / UNKNOWN / PARTIAL / CONFLICT / FAILED / UNAUTHORIZED / FATAL 分開。
+- Error ≠ Empty。
+- Error ≠ 0。
+- UNKNOWN ≠ FAILED。
+- Published ≠ Applied。
+- Connected ≠ Business Ready。
+- revision number ≠ freshness authority。
+- canonical publishedAt = human-facing publish freshness。
+
+Architecture hard rules：
+- TanStack Query owns server state。
+- React/Zustand only local UI/form state。
+- Dexie disabled unless a formal offline command is explicitly approved。
+- no v2 localStorage。
+- no v2 client-state import。
+- Doorbell payload never becomes business truth。
+- V3 must retain Gate 1 client/serving release fail-closed protection。
+- Store/Scope context must remain centralized。
+
+Allowed product paths：
+- v3admin/**
+- V3-specific tests
+- bounded implementation docs only if required by current task
+- shared contract only if an exact compile/contract blocker is proven and change is backward-compatible + separately called out
+
+No-touch：
+- v2admin/**
+- v2smm/**
+- v2customer/**
+- v2owner/**
+- v2local/**
+- SMT Store Kernel
+- order authority
+- pricing authority
+- payment authority
+- fulfillment authority
+- provider / Keeta transaction logic
+- production deployment / hostname routing
+- current v2 production behavior
+
+UI acceptance：
+- 53 routes resolve。
+- 12 大 Menu內兩步可到所有 second-level workspace。
+- 無正常第三層 Sidebar。
+- Desktop / Tablet / Mobile route identity一致。
+- Mobile無 essential page-level horizontal scroll。
+- Page title跟正式 Copy Dictionary。
+- shared state components唔自行發明 domain truth。
+- no transaction mutation CTA under 訂單監察。
+- Gate 1 release verification仍 fail closed。
+- no v2 state / storage regression。
+
+Engineering acceptance：
+- npm test
+- npm run typecheck
+- npm run build
+- v3admin-ci GREEN
+- Regression Shadow GREEN
+- admin-crossport-integration-gate GREEN
+- no unresolved Codex review finding
+- zero production routing
+
+完成後回報：
+- exact head SHA
+- files changed
+- route registry count
+- component inventory
+- tests
+- CI
+- authority impact
+- persistence impact
+- remaining RED / YELLOW
+- exact NEXT
+
+下一步唔可以自行擴 scope。
+UI Shell GREEN 後，exact NEXT 應係第一條 Vertical Slice：
+Category → Product → Price → Draft → Validate → Impact → Publish → Cloud Readback → SMT Readback → Safari reopen convergence。
+
+禁止自行 merge、deploy 或 production route switch。
+
+而家先 fresh-read以上 authority同 current repo，回報 FIRST BREAK；確認 current head同 scope之後先開始改 code。
