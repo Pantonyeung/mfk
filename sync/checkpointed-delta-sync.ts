@@ -310,3 +310,27 @@ export function materializeSmtSnapshot(entities:MfkSyncEntityMap):Readonly<JsonR
   if(Object.keys(productMedia).length)snapshot.productMedia=productMedia;
   return Object.freeze(snapshot);
 }
+
+
+export function materializeCustomerConfigSnapshot(entities:MfkSyncEntityMap):Readonly<JsonRow>{
+  const store:JsonRow={};
+  const menu:JsonRow={categories:[],products:[],combos:[],comboPools:[]};
+  const paymentChannels:unknown[]=[];
+  let fallback:JsonRow|undefined;
+  for(const entity of Object.values(entities)){
+    if(entity.entityType==='CUSTOMER_STORE')Object.assign(store,entity.payload);
+    else if(entity.entityType==='CUSTOMER_CATEGORY')(menu.categories as unknown[]).push(entity.payload);
+    else if(entity.entityType==='CUSTOMER_PRODUCT')(menu.products as unknown[]).push(entity.payload);
+    else if(entity.entityType==='CUSTOMER_COMBO')(menu.combos as unknown[]).push(entity.payload);
+    else if(entity.entityType==='CUSTOMER_COMBO_POOL')(menu.comboPools as unknown[]).push(entity.payload);
+    else if(entity.entityType==='CUSTOMER_PAYMENT_CHANNEL')paymentChannels.push(entity.payload);
+    else if(entity.entityType==='CUSTOMER_FALLBACK')fallback={...entity.payload};
+    else if(entity.entityType==='CUSTOMER_MENU_META')Object.assign(menu,entity.payload);
+  }
+  return Object.freeze({
+    ...(Object.keys(store).length?{store:Object.freeze(store)}:{}),
+    menu:Object.freeze(menu),
+    paymentChannels:Object.freeze(paymentChannels),
+    ...(fallback?{fallback:Object.freeze(fallback)}:{}),
+  });
+}
