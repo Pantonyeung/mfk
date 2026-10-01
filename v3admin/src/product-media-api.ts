@@ -11,7 +11,10 @@ export interface ProductMediaUploadResult{
 }
 
 function previewApiBase(){
-  return (import.meta.env.VITE_MFK_V3_PREVIEW_API_BASE as string|undefined)?.replace(/\/$/,'')??'';
+  const configured=(import.meta.env.VITE_MFK_V3_PREVIEW_API_BASE as string|undefined)?.replace(/\/$/,'')??'';
+  if(configured)return configured;
+  if(typeof window!=='undefined')return window.location.origin;
+  return '';
 }
 
 export async function uploadPreviewProductMedia(input:{
