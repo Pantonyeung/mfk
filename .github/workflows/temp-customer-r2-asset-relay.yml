@@ -1,0 +1,72 @@
+name: temp-customer-r2-asset-relay
+
+on:
+  push:
+    branches:
+      - temp/MFK-CUSTOMER-R2-ASSET-RELAY-20261001
+    paths:
+      - "relay/customer-assets/**"
+      - ".github/workflows/temp-customer-r2-asset-relay.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  upload-and-verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout relay branch
+        uses: actions/checkout@v4
+
+      - name: Check Cloudflare credentials
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          test -n "$CLOUDFLARE_API_TOKEN"
+          test -n "$CLOUDFLARE_ACCOUNT_ID"
+
+      - name: Verify relay source hashes
+        run: |
+          echo "4c7169f5c57f12f445eb9222e71750f3476b4de0433424867d4442e238cd1db1  relay/customer-assets/hero-background-main.png" | sha256sum -c -
+          echo "231d7a2848af5f8eb689d4d41a6d8114236d9fdfc76c9179948612fc70ccf8ba  relay/customer-assets/hero-male-main.png" | sha256sum -c -
+          echo "22e1b2bee4d5cc11c514e4885f2450d74439f9caa8f78081ed3e711a17546bbe  relay/customer-assets/hero-female-main.png" | sha256sum -c -
+          echo "06ac2e24485964613dff929bd2404ac17708f5ab50b8fa3dbcab475ee354ece7  relay/customer-assets/hero-doodle-morefun-main.png" | sha256sum -c -
+          echo "584b1e7bd6fab50c55494bab5cce7c80635736bd647ed5d1ee626aed5f74cfd1  relay/customer-assets/hero-doodle-goodtaste-main.png" | sha256sum -c -
+
+      - name: Upload lossless PNG masters to R2
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          npx --yes wrangler@latest r2 object put mfk-customer-assets/customer/brand/hero/hero-background-main.png --file=relay/customer-assets/hero-background-main.png --content-type=image/png --remote --force
+          npx --yes wrangler@latest r2 object put mfk-customer-assets/customer/brand/hero/hero-male-main.png --file=relay/customer-assets/hero-male-main.png --content-type=image/png --remote --force
+          npx --yes wrangler@latest r2 object put mfk-customer-assets/customer/brand/hero/hero-female-main.png --file=relay/customer-assets/hero-female-main.png --content-type=image/png --remote --force
+          npx --yes wrangler@latest r2 object put mfk-customer-assets/customer/brand/hero/hero-doodle-morefun-main.png --file=relay/customer-assets/hero-doodle-morefun-main.png --content-type=image/png --remote --force
+          npx --yes wrangler@latest r2 object put mfk-customer-assets/customer/brand/hero/hero-doodle-goodtaste-main.png --file=relay/customer-assets/hero-doodle-goodtaste-main.png --content-type=image/png --remote --force
+          npx --yes wrangler@latest r2 object put mfk-customer-assets/customer/brand/hero/manifest.json --file=relay/customer-assets/manifest.json --content-type=application/json --remote --force
+
+      - name: Read back and verify R2 hashes
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          mkdir -p /tmp/r2-readback
+          npx --yes wrangler@latest r2 object get mfk-customer-assets/customer/brand/hero/hero-background-main.png --file=/tmp/r2-readback/hero-background-main.png --remote
+          npx --yes wrangler@latest r2 object get mfk-customer-assets/customer/brand/hero/hero-male-main.png --file=/tmp/r2-readback/hero-male-main.png --remote
+          npx --yes wrangler@latest r2 object get mfk-customer-assets/customer/brand/hero/hero-female-main.png --file=/tmp/r2-readback/hero-female-main.png --remote
+          npx --yes wrangler@latest r2 object get mfk-customer-assets/customer/brand/hero/hero-doodle-morefun-main.png --file=/tmp/r2-readback/hero-doodle-morefun-main.png --remote
+          npx --yes wrangler@latest r2 object get mfk-customer-assets/customer/brand/hero/hero-doodle-goodtaste-main.png --file=/tmp/r2-readback/hero-doodle-goodtaste-main.png --remote
+
+          echo "4c7169f5c57f12f445eb9222e71750f3476b4de0433424867d4442e238cd1db1  /tmp/r2-readback/hero-background-main.png" | sha256sum -c -
+          echo "231d7a2848af5f8eb689d4d41a6d8114236d9fdfc76c9179948612fc70ccf8ba  /tmp/r2-readback/hero-male-main.png" | sha256sum -c -
+          echo "22e1b2bee4d5cc11c514e4885f2450d74439f9caa8f78081ed3e711a17546bbe  /tmp/r2-readback/hero-female-main.png" | sha256sum -c -
+          echo "06ac2e24485964613dff929bd2404ac17708f5ab50b8fa3dbcab475ee354ece7  /tmp/r2-readback/hero-doodle-morefun-main.png" | sha256sum -c -
+          echo "584b1e7bd6fab50c55494bab5cce7c80635736bd647ed5d1ee626aed5f74cfd1  /tmp/r2-readback/hero-doodle-goodtaste-main.png" | sha256sum -c -
+
+      - name: Remove stale uppercase zero-byte object
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          npx --yes wrangler@latest r2 object delete mfk-customer-assets/customer/brand/hero/hero-background-main.PNG --remote --force || true
