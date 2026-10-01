@@ -105,7 +105,14 @@ jobs:
             hero:document.querySelector('.hero')?.getBoundingClientRect().toJSON(),
             quick:document.querySelector('.quick')?.getBoundingClientRect().toJSON(),
             categories:document.querySelector('.categories')?.getBoundingClientRect().toJSON(),
-            products:document.querySelector('.products')?.getBoundingClientRect().toJSON()
+            products:document.querySelector('.products')?.getBoundingClientRect().toJSON(),
+            nav:document.querySelector('nav')?.getBoundingClientRect().toJSON(),
+            sections:[...document.querySelectorAll('main > *')].map((el,index)=>({
+              index,
+              className:el.className,
+              id:el.id,
+              rect:el.getBoundingClientRect().toJSON()
+            }))
           }));
           await fs.writeFile('/tmp/mfk-evidence/metrics-390.json',JSON.stringify(metrics,null,2));
           await browser.close();
