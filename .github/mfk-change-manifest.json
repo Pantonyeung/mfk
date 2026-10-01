@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "capability": "MFK_ADMIN_V3_WHOLE_PRODUCT_PREVIEW_R2_MEDIA_TABLES_R1",
+  "capability": "MFK_ADMIN_V3_WHOLE_PRODUCT_PREVIEW_R2_ENTRY_DEFERRED_R1",
   "base_sha": "3c6c00d032eec121f1b6f1a9c059a3215c572ef0",
   "root_control": "#596",
   "product_control": "#601",
@@ -19,7 +19,7 @@
     "contracts/web-state-authority-v1.ts"
   ],
   "authority_impact": "NONE",
-  "persistence_impact": "NON_PRODUCTION_ONLY: preview UI state in memory plus product image binary stored in dedicated Cloudflare R2 preview bucket; no production canonical persistence",
+  "persistence_impact": "NON_PRODUCTION_ONLY: preview UI state in memory; product-media R2 contract and entry exist in source but R2 deployment/binding is intentionally deferred until Owner accepts the whole Admin preview.",
   "provider_impact": "NONE",
   "transaction_impact": "NONE",
   "production_routing_impact": "NONE",
@@ -40,7 +40,7 @@
     "Options / modifiers are functionally editable in preview: groups, child options, min/max/selection rules and product linkage.",
     "Combos are functionally editable in preview: groups, product choices, text choices and price adjustments.",
     "Dining table management is restored as /admin/store/tables with create/edit/disable/delete preview behavior.",
-    "Cloudflare Pages Functions provide same-origin product-media upload/read endpoints backed by a dedicated non-production R2 binding."
+    "Product-media upload/read endpoints and R2 binding contract remain implemented in source, but the public Preview deploy intentionally excludes the R2 Functions/binding until Owner Admin acceptance."
   ],
   "non_goals": [
     "No production deploy or hostname routing.",
@@ -51,8 +51,8 @@
     "No merge of PR #599.",
     "No production Admin V3 hostname cutover; preview remains isolated from admin.morefunos.com.",
     "No formal canonical Draft write from preview UI until the approved server Draft client seam is connected.",
-    "No production R2 binding or production product-media cutover.",
-    "No direct Keeta provider media mutation in this preview slice."
+    "No direct Keeta provider media mutation in this preview slice.",
+    "No R2 bucket provisioning, Preview R2 binding, product-media upload activation, or production product-media cutover before Owner accepts the whole Admin implementation."
   ],
   "rollback_sha": "3c6c00d032eec121f1b6f1a9c059a3215c572ef0",
   "severity": "HARD_BLOCK",
@@ -65,7 +65,8 @@
       "contracts/admin-config-sync-v1.ts change is type-only and runtime-semantic-neutral.",
       "UI-01 public preview uses explicit non-canonical fixtures only for visual acceptance and performs no backend read/write in preview mode.",
       "Owner correction restores Dining Table management, raising the current Admin V3 navigation destination count from 53 to 54.",
-      "All preview product image binary is R2-only; Customer/self and Keeta variants remain distinct references."
+      "All preview product image binary is R2-only; Customer/self and Keeta variants remain distinct references.",
+      "Owner 2026-10-01: keep image/R2 entry visible, finish whole Admin first, then connect R2 step-by-step after acceptance. Preview deploy is UI-only until that gate."
     ]
   }
 }
