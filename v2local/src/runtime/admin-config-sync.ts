@@ -288,6 +288,9 @@ async function bootstrapSmtSyncFromLegacy(){
   await fetchAndApplyAdminConfig();
   const lkg=readSmtAdminConfigLkg();
   if(!lkg)throw new Error('SYNC_BOOTSTRAP_LKG_UNAVAILABLE');
+  // Ensure the legacy device registration/ACK has landed before the protected
+  // delta endpoints are used for the first time.
+  await ack(lkg,'IDEMPOTENT');
   const head=await fetchSmtSyncHead();
   const entities=buildSmtSyncEntities(lkg.snapshot);
   const projectionHash=projectionHashForEntities(entities);
