@@ -63,7 +63,7 @@ export function PrintersPage(){
   const [selected,setSelected]=useState<string|null>(null);
   const row=selected?printers.find(item=>item.id===selected):undefined;
   return <div className="v3-functional-page"><PreviewNotice/>
-    <PageHeader eyebrow="打印管理" title="邏輯打印機" description="建立唯一打印用途；實體打印機配對唔喺 Admin 做。" aside={<button className="v3-primary" type="button" onClick={()=>{const next=add();setSelected(next.id);}}>＋ 新增邏輯打印機</button>}/>
+    <PageHeader eyebrow="打印管理" title="邏輯打印機" description="Logical Printer 名稱同用途由 Admin 設定；實際實體機 IP／USB 由現場 SMT 配對。" aside={<button className="v3-primary" type="button" onClick={()=>{const next=add();setSelected(next.id);}}>＋ 新增邏輯打印機</button>}/>
     <div className="v3-functional-card-grid">{printers.map(printer=><button type="button" key={printer.id} onClick={()=>setSelected(printer.id)}>
       <div><strong>{printer.name}</strong><small>{printer.id}</small></div><b>{printer.widthMm}mm</b><span>{printer.type}</span><StatusBadge tone={printer.active?'good':'neutral'}>{printer.active?'啟用':'停用'}</StatusBadge>
     </button>)}</div>
