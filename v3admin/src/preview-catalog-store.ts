@@ -62,6 +62,15 @@ export interface PreviewCombo{
   groups:readonly PreviewComboGroup[];
 }
 
+export interface PreviewDiningTable{
+  id:string;
+  name:string;
+  active:boolean;
+  sortOrder:number;
+  seats:number;
+  area:string;
+}
+
 export const PREVIEW_PRODUCTS:PreviewProduct[]=[
   {id:'p-001',name:'紫米飯糰・照燒雞',code:'PRD000123',category:'飯糰',priceMinor:4200,status:'已發佈',printRule:'製作單＋標籤',updatedAt:'今日 08:42',description:'照燒雞配紫米飯糰。',customerImageUrl:'',channelImages:{KEETA:''},optionSetIds:['set-rice']},
   {id:'p-002',name:'紫米飯糰・吞拿魚',code:'PRD000124',category:'飯糰',priceMinor:4000,status:'已發佈',printRule:'製作單＋標籤',updatedAt:'今日 08:41',description:'吞拿魚紫米飯糰。',customerImageUrl:'',channelImages:{KEETA:''},optionSetIds:['set-rice']},
@@ -100,6 +109,13 @@ const OPTION_SETS:PreviewOptionSet[]=[
   ]},
 ];
 
+const DINING_TABLES:PreviewDiningTable[]=[
+  {id:'T01',name:'1號枱',active:true,sortOrder:10,seats:2,area:'前場'},
+  {id:'T02',name:'2號枱',active:true,sortOrder:20,seats:2,area:'前場'},
+  {id:'T03',name:'3號枱',active:true,sortOrder:30,seats:4,area:'前場'},
+  {id:'T04',name:'4號枱',active:true,sortOrder:40,seats:4,area:'後場'},
+];
+
 const COMBOS:PreviewCombo[]=[
   {id:'combo-lunch',name:'磨飯午市套餐',active:true,basePriceMinor:6800,groups:[
     {id:'combo-lunch-main',name:'主食',required:true,min:1,max:1,choices:[
@@ -129,6 +145,7 @@ interface PreviewCatalogState{
   products:PreviewProduct[];
   optionSets:PreviewOptionSet[];
   combos:PreviewCombo[];
+  diningTables:PreviewDiningTable[];
   createProduct(input:Omit<PreviewProduct,'id'|'code'|'updatedAt'|'status'>):PreviewProduct;
   updateProduct(id:string,patch:Partial<Omit<PreviewProduct,'id'|'code'>>):void;
   updateProductCustomerImage(id:string,url:string):void;
@@ -146,12 +163,16 @@ interface PreviewCatalogState{
   addComboChoice(comboId:string,groupId:string):void;
   updateComboChoice(comboId:string,groupId:string,choiceId:string,patch:Partial<Omit<PreviewComboChoice,'id'>>):void;
   removeComboChoice(comboId:string,groupId:string,choiceId:string):void;
+  createDiningTable():PreviewDiningTable;
+  updateDiningTable(id:string,patch:Partial<Omit<PreviewDiningTable,'id'>>):void;
+  removeDiningTable(id:string):void;
 }
 
 export const usePreviewCatalog=create<PreviewCatalogState>((set,get)=>({
   products:[...PRODUCTS],
   optionSets:[...OPTION_SETS],
   combos:[...COMBOS],
+  diningTables:[...DINING_TABLES],
   createProduct(input){
     const products=get().products;
     const product:PreviewProduct={
@@ -220,6 +241,19 @@ export const usePreviewCatalog=create<PreviewCatalogState>((set,get)=>({
   },
   removeComboChoice(comboId,groupId,choiceId){
     set(state=>({combos:state.combos.map(combo=>combo.id!==comboId?combo:{...combo,groups:combo.groups.map(group=>group.id!==groupId?group:{...group,choices:group.choices.filter(choice=>choice.id!==choiceId)})})}));
+  },
+  createDiningTable(){
+    const existing=get().diningTables;
+    const nextNo=existing.reduce((max,item)=>{const n=Number(item.id.replace(/\\D/g,''));return Number.isFinite(n)?Math.max(max,n):max;},0)+1;
+    const next:PreviewDiningTable={id:'T'+String(nextNo).padStart(2,'0'),name:String(nextNo)+'號枱',active:true,sortOrder:(existing.length+1)*10,seats:2,area:'前場'};
+    set({diningTables:[...existing,next]});
+    return next;
+  },
+  updateDiningTable(id,patch){
+    set(state=>({diningTables:state.diningTables.map(item=>item.id===id?{...item,...patch}:item)}));
+  },
+  removeDiningTable(id){
+    set(state=>({diningTables:state.diningTables.filter(item=>item.id!==id)}));
   },
 }));
 
