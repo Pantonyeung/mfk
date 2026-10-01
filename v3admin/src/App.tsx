@@ -11,7 +11,7 @@ import {
   V3_RELEASE_REFETCH_INTERVAL_MS,
 } from './release.ts';
 import {scopeFromSession} from './scope.ts';
-import {V3_ADMIN_STATE_AUTHORITY,useV3AdminUi} from './state-authority.ts';
+import {V3_ADMIN_STATE_AUTHORITY,V3_DATA_REFETCH_INTERVAL_MS,resetV3AdminServerQueries,useV3AdminUi} from './state-authority.ts';
 import {V3FormalDraftProvider,useV3FormalDraft} from './formal-draft.tsx';
 import type {MfkAdminConfigEnvelope} from '../../contracts/admin-config-sync-v1.ts';
 import {V3ReadModelProvider} from './formal-read-model.tsx';
@@ -27,12 +27,40 @@ function previewRequested(){
   return new URLSearchParams(window.location.search).get('preview')==='ui-01';
 }
 
+function reloadLatestClient(){
+  const url=new URL(window.location.href);
+  url.searchParams.set('mfkReload',String(Date.now()));
+  window.location.replace(url.toString());
+}
+
 function ReleaseStatus({match,pending,error,servingId}:{match:boolean|null;pending:boolean;error:boolean;servingId?:string}){
   return <section className="v3-release-strip" data-state={match===true?'ok':match===false?'danger':'pending'} aria-live="polite">
     <div><span>目前介面版本</span><strong>{V3_CLIENT_RELEASE.releaseId}</strong></div>
     <div><span>伺服器版本</span><strong>{pending?'正在確認…':error?'暫時無法確認':servingId}</strong></div>
-    <div><span>狀態</span><strong>{match===true?'版本一致':match===false?'版本不一致 · 禁止正式寫入':'正在確認版本'}</strong></div>
-    {match===false?<button type="button" onClick={()=>window.location.reload()}>載入最新版本</button>:null}
+    <div><span>狀態</span><strong>{match===true?'版本一致':match===false?'版本不一致 · 請載入最新版本':'正在確認版本'}</strong></div>
+    {match===false?<button type="button" onClick={reloadLatestClient}>載入最新版本</button>:null}
+  </section>;
+}
+
+function FreshnessStatus({
+  updatedAt,
+  fetching,
+  error,
+  resetBusy,
+  onReset,
+}:{
+  updatedAt:number;
+  fetching:boolean;
+  error:boolean;
+  resetBusy:boolean;
+  onReset:()=>void;
+}){
+  const last=updatedAt>0?hkTime(new Date(updatedAt).toISOString()):'未有成功同步';
+  return <section className="v3-freshness-strip" data-state={error?'danger':fetching?'pending':'ok'} aria-live="polite">
+    <div><span>正式資料狀態</span><strong>{error?'重新同步失敗 · 顯示上次成功資料':fetching?'正在向伺服器重新同步…':'已向伺服器確認'}</strong></div>
+    <div><span>最後成功同步</span><strong>{last}</strong></div>
+    <div><span>自動重新確認</span><strong>開頁／回到前景／網絡重連／每 {Math.round(V3_DATA_REFETCH_INTERVAL_MS/1000)} 秒</strong></div>
+    <button type="button" disabled={resetBusy} onClick={onReset}>{resetBusy?'重新同步中…':'清除暫存並重新同步'}</button>
   </section>;
 }
 
@@ -106,6 +134,7 @@ export function V3AdminApp(){
   const [pin,setPin]=useState('');
   const [authBusy,setAuthBusy]=useState(false);
   const [authError,setAuthError]=useState('');
+  const [freshResetBusy,setFreshResetBusy]=useState(false);
   const uiPreview=previewRequested();
 
   const health=useQuery({queryKey:v3QueryKeys.health,queryFn:readV3BackendHealth,enabled:!uiPreview});
@@ -118,7 +147,14 @@ export function V3AdminApp(){
   const canonical=useQuery({
     queryKey:scope?v3AdminCanonicalQueryKey(scope.storeId):['mfk','admin-v3','canonical','disabled'],
     queryFn:()=>readV3CanonicalAdminActive({storeId:scope?.storeId??'',sessionToken:session?.sessionToken??''}),
-    enabled:Boolean(!uiPreview&&session&&scope),staleTime:0,gcTime:0,
+    enabled:Boolean(!uiPreview&&session&&scope),
+    staleTime:0,
+    gcTime:0,
+    refetchOnMount:'always',
+    refetchOnWindowFocus:true,
+    refetchOnReconnect:true,
+    refetchInterval:V3_DATA_REFETCH_INTERVAL_MS,
+    retry:1,
   });
 
   const releaseMatch=uiPreview?true:releaseVerificationMatches(V3_CLIENT_RELEASE,servingRelease.data,servingRelease.isSuccess&&!servingRelease.isFetching&&!servingRelease.isRefetchError&&!servingRelease.isPaused);
@@ -137,6 +173,12 @@ export function V3AdminApp(){
     setSession(null);setPin('');setAuthError('');
     queryClient.removeQueries({queryKey:['mfk','admin-v3'],exact:false});
     await logoutV3Admin(token);
+  };
+  const resetFreshData=async()=>{
+    if(freshResetBusy)return;
+    setFreshResetBusy(true);
+    try{await resetV3AdminServerQueries(queryClient);}
+    finally{setFreshResetBusy(false);}
   };
 
   if(uiPreview)return <AdminShell
@@ -167,7 +209,17 @@ export function V3AdminApp(){
   </main>;
 
   const canonicalState=canonical.data?(canonical.isRefetchError?'stale':canonical.isFetching?'refreshing':'fresh'):canonical.isError?'error':'pending';
-  const shellReleaseStatus=<>{releaseStatus}{releaseMatch!==true?<div className="v3-warning v3-release-warning" role="alert">目前 Client Release 未確認一致。正式寫入功能保持鎖定。</div>:null}</>;
+  const shellReleaseStatus=<>
+    {releaseStatus}
+    <FreshnessStatus
+      updatedAt={canonical.dataUpdatedAt}
+      fetching={canonical.isFetching}
+      error={canonical.isRefetchError||canonical.isError}
+      resetBusy={freshResetBusy}
+      onReset={()=>void resetFreshData()}
+    />
+    {releaseMatch!==true?<div className="v3-warning v3-release-warning" role="alert">目前 Client Release 未確認一致。請先載入最新版本；唔應以舊 Client 判斷正式資料。</div>:null}
+  </>;
   if(!scope||!canonical.data){
     return <AdminShell
       storeId={scope?.storeId??''}
