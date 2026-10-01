@@ -2,7 +2,7 @@
   "viewportWidth": 390,
   "viewportHeight": 890,
   "documentWidth": 390,
-  "documentHeight": 902,
+  "documentHeight": 890,
   "hero": {
     "x": 0,
     "y": 0,
@@ -45,10 +45,10 @@
   },
   "nav": {
     "x": 0,
-    "y": 838,
+    "y": 846,
     "width": 390,
-    "height": 52,
-    "top": 838,
+    "height": 44,
+    "top": 846,
     "right": 390,
     "bottom": 890,
     "left": 0
@@ -182,10 +182,10 @@
         "x": 10,
         "y": 778.03125,
         "width": 370,
-        "height": 96.03125,
+        "height": 80.625,
         "top": 778.03125,
         "right": 380,
-        "bottom": 874.0625,
+        "bottom": 858.65625,
         "left": 10
       }
     }
