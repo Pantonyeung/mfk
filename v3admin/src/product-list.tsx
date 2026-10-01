@@ -1,5 +1,11 @@
-import {useMemo,useState,type FormEvent,type KeyboardEvent} from 'react';
+import {useMemo,useState,type KeyboardEvent} from 'react';
 import {MobileGroupedPager} from './mobile-grouped-list.tsx';
+import {uploadPreviewProductMedia,PRODUCT_MEDIA_STORAGE_POLICY,type ProductMediaSurface} from './product-media-api.ts';
+import {
+  PREVIEW_CATALOG_CATEGORIES,
+  usePreviewCatalog,
+  type PreviewProduct,
+} from './preview-catalog-store.ts';
 import {DraftBar,PageHeader,StatusBadge} from './ui.tsx';
 
 type RowObject=Record<string,unknown>;
@@ -13,29 +19,11 @@ export type ProductListRecord={
   status:'已發佈'|'草稿'|'待回讀'|'已停用'|'資料過期'|'結果未明';
   printRule:string;
   updatedAt:string;
+  imageUrl?:string;
+  optionSetCount?:number;
+  comboCount?:number;
 };
 
-export const PREVIEW_PRODUCTS:readonly ProductListRecord[]=[
-  {id:'p-001',name:'紫米飯糰・照燒雞',code:'PRD000123',category:'飯糰',priceMinor:4200,status:'已發佈',printRule:'製作單＋標籤',updatedAt:'今日 08:42'},
-  {id:'p-002',name:'紫米飯糰・吞拿魚',code:'PRD000124',category:'飯糰',priceMinor:4000,status:'已發佈',printRule:'製作單＋標籤',updatedAt:'今日 08:41'},
-  {id:'p-003',name:'紫米飯糰・雞蛋沙律',code:'PRD000125',category:'飯糰',priceMinor:3800,status:'已發佈',printRule:'製作單＋標籤',updatedAt:'今日 08:40'},
-  {id:'p-004',name:'紫米飯糰・照燒牛肉',code:'PRD000126',category:'飯糰',priceMinor:4400,status:'已發佈',printRule:'製作單＋標籤',updatedAt:'今日 08:39'},
-  {id:'p-005',name:'紫米飯糰・鹽麴雞',code:'PRD000127',category:'飯糰',priceMinor:4200,status:'草稿',printRule:'製作單＋標籤',updatedAt:'今日 08:38'},
-  {id:'p-006',name:'紫米飯糰・粟米蟹柳',code:'PRD000128',category:'飯糰',priceMinor:3900,status:'已發佈',printRule:'製作單＋標籤',updatedAt:'今日 08:37'},
-  {id:'p-007',name:'紫米飯糰・日式咖喱雞',code:'PRD000129',category:'飯糰',priceMinor:4300,status:'已發佈',printRule:'製作單＋標籤',updatedAt:'今日 08:36'},
-  {id:'p-008',name:'紫米飯糰・芝士雞肉',code:'PRD000130',category:'飯糰',priceMinor:4400,status:'已發佈',printRule:'製作單＋標籤',updatedAt:'今日 08:35'},
-  {id:'p-009',name:'紫米飯糰・泡菜豬肉',code:'PRD000131',category:'飯糰',priceMinor:4500,status:'待回讀',printRule:'製作單＋標籤',updatedAt:'今日 08:34'},
-  {id:'p-010',name:'紫米飯糰・味噌三文魚',code:'PRD000132',category:'飯糰',priceMinor:4800,status:'已發佈',printRule:'製作單＋標籤',updatedAt:'今日 08:33'},
-  {id:'p-011',name:'紫米飯糰・黑椒牛肉',code:'PRD000133',category:'飯糰',priceMinor:4600,status:'已發佈',printRule:'製作單＋標籤',updatedAt:'今日 08:32'},
-  {id:'p-012',name:'紫米飯糰・南瓜雜菜',code:'PRD000134',category:'飯糰',priceMinor:3600,status:'已發佈',printRule:'製作單＋標籤',updatedAt:'今日 08:31'},
-  {id:'p-013',name:'香煎雞扒紫米飯',code:'PRD000135',category:'飯類',priceMinor:5200,status:'已發佈',printRule:'製作單＋打包單',updatedAt:'今日 08:29'},
-  {id:'p-014',name:'無糖凍檸茶',code:'PRD000136',category:'茶飲',priceMinor:1800,status:'待回讀',printRule:'標籤',updatedAt:'昨日 21:06'},
-  {id:'p-015',name:'鹽酥雞小食',code:'PRD000137',category:'小食',priceMinor:2800,status:'草稿',printRule:'製作單',updatedAt:'今日 08:18'},
-  {id:'p-016',name:'南瓜粟米湯',code:'PRD000138',category:'湯品',priceMinor:2600,status:'已停用',printRule:'製作單',updatedAt:'昨日 19:24'},
-  {id:'p-017',name:'紫米豆乳布甸',code:'PRD000139',category:'甜品',priceMinor:2400,status:'已發佈',printRule:'打包單',updatedAt:'昨日 17:51'},
-];
-
-const PREVIEW_CATEGORIES=['全部','飯類','飯糰','便當','茶飲','小食','湯品','甜品'] as const;
 const STATUS_OPTIONS=['全部','已發佈','草稿','待回讀','已停用'] as const;
 export const MOBILE_PRODUCT_PAGE_SIZE=10;
 
@@ -93,13 +81,14 @@ export function productRecordsFromSnapshot(snapshot:unknown):ProductListRecord[]
   const root=row(snapshot);
   const catalog=row(root.catalog);
   const categories=categoryLookup(root);
+  const mediaByProduct=row(root.productMedia);
   return rows(catalog.products).map((raw,index)=>{
     const product=row(raw);
     const id=textValue(product.id,product.productId,product.code,product.productCode)||'product-'+String(index+1);
     const categoryId=textValue(product.categoryId,product.category,product.categoryCode);
     const category=categories.get(categoryId)||textValue(product.categoryName,product.categoryLabel,categoryId)||'未分類';
     const print=row(product.printSettings??product.printRule);
-    const printRule=print.label===true?'標籤':print.production===true?'製作單':textValue(product.printLabel,product.printDestination)||'跟隨打印規則';
+    const media=row(mediaByProduct[id]);
     const updated=textValue(product.updatedAt,product.modifiedAt,product.createdAt);
     return{
       id,
@@ -108,69 +97,183 @@ export function productRecordsFromSnapshot(snapshot:unknown):ProductListRecord[]
       category,
       priceMinor:productPriceMinor(product),
       status:humanStatus(product),
-      printRule,
+      printRule:print.label===true?'標籤':print.production===true?'製作單':textValue(product.printLabel,product.printDestination)||'跟隨打印規則',
       updatedAt:updated?new Date(updated).toLocaleString('zh-HK',{timeZone:'Asia/Hong_Kong',hour12:false}):'—',
+      imageUrl:textValue(media.publicUrl,media.customerImageUrl,product.imageRef)||undefined,
     };
   });
 }
 
-function ProductThumb({name}:{name:string}){
+function previewRecord(product:PreviewProduct,comboCount:number):ProductListRecord{
+  return{
+    id:product.id,
+    name:product.name,
+    code:product.code,
+    category:product.category,
+    priceMinor:product.priceMinor,
+    status:product.status,
+    printRule:product.printRule,
+    updatedAt:product.updatedAt,
+    imageUrl:product.customerImageUrl||undefined,
+    optionSetCount:product.optionSetIds.length,
+    comboCount,
+  };
+}
+
+function ProductThumb({name,imageUrl}:{name:string;imageUrl?:string}){
+  if(imageUrl)return <div className="v3-product-thumb has-image"><img src={imageUrl} alt=""/></div>;
   const mark=name.replace(/[・\s]/g,'').slice(0,2)||'品';
   return <div className="v3-product-thumb" aria-hidden="true">{mark}</div>;
 }
 
 function ProductDrawer({product,onClose}:{product:ProductListRecord;onClose:()=>void}){
   return <><button type="button" className="v3-product-drawer-backdrop" aria-label="關閉產品詳情" onClick={onClose}/>
-    <aside className="v3-product-drawer" aria-label="產品詳情預覽">
+    <aside className="v3-product-drawer" aria-label="產品詳情">
       <div className="v3-product-drawer-head"><div><small>產品詳情</small><h2>{product.name}</h2></div><button type="button" onClick={onClose}>關閉</button></div>
       <dl>
-        <div><dt>商品編號</dt><dd>{product.code}<small>系統自動生成，不可 inline 修改</small></dd></div>
+        <div><dt>商品編號</dt><dd>{product.code}<small>系統自動生成，不可手動修改</small></dd></div>
         <div><dt>分類</dt><dd>{product.category}</dd></div>
         <div><dt>基本價格</dt><dd>{money(product.priceMinor)}</dd></div>
         <div><dt>狀態</dt><dd><StatusBadge tone={statusTone(product.status)}>{product.status}</StatusBadge></dd></div>
+        <div><dt>圖片</dt><dd>{product.imageUrl?'已設定':'未設定'}</dd></div>
       </dl>
     </aside>
   </>;
 }
 
-function ProductFormModal({
-  product,
-  categories,
-  previewMode,
-  onClose,
-  onSave,
+function r2RefFromUrl(value:string){
+  try{return new URL(value).searchParams.get('ref')??'';}catch{return '';}
+}
+
+function ProductMediaField({
+  label,
+  description,
+  value,
+  productId,
+  surface,
+  onUploaded,
 }:{
-  product:ProductListRecord|null;
-  categories:readonly string[];
-  previewMode:boolean;
-  onClose:()=>void;
-  onSave:(value:{name:string;category:string;priceMinor:number;active:boolean})=>void;
+  label:string;
+  description:string;
+  value:string;
+  productId:string;
+  surface:ProductMediaSurface;
+  onUploaded:(url:string)=>void;
 }){
-  const editing=Boolean(product);
+  const [busy,setBusy]=useState(false);
+  const [error,setError]=useState('');
+  const upload=async(file:File)=>{
+    setBusy(true);setError('');
+    try{
+      const result=await uploadPreviewProductMedia({productId,surface,file});
+      onUploaded(result.mediaUrl);
+    }catch(error){
+      setError(error instanceof Error?error.message:'圖片上載失敗');
+    }finally{setBusy(false);}
+  };
+  return <section className="v3-r2-media-field">
+    <header><div><strong>{label}</strong><small>{description}</small></div><StatusBadge tone={value?'good':'neutral'}>{value?'R2 已有圖片':'未設定'}</StatusBadge></header>
+    <div className="v3-r2-media-body">
+      <div className="v3-r2-media-preview">{value?<img src={value} alt={label}/>:<span>未有圖片</span>}</div>
+      <div className="v3-r2-media-actions">
+        <label className="v3-r2-upload-button"><span>{busy?'上載中…':value?'更換圖片':'上載圖片'}</span><input type="file" accept="image/jpeg,image/png,image/webp,image/avif" disabled={busy} onChange={event=>{const file=event.target.files?.[0];if(file)void upload(file);event.currentTarget.value='';}}/></label>
+        {value?<><small>R2 Object</small><code>{r2RefFromUrl(value)||'R2 media ref'}</code></>:null}
+        {error?<div className="v3-error" role="alert">{error}</div>:null}
+      </div>
+    </div>
+  </section>;
+}
+
+function PreviewProductEditor({productId,onClose}:{productId:string|null;onClose:()=>void}){
+  const product=usePreviewCatalog(state=>productId?state.products.find(item=>item.id===productId):undefined);
+  const optionSets=usePreviewCatalog(state=>state.optionSets);
+  const combos=usePreviewCatalog(state=>state.combos);
+  const createProduct=usePreviewCatalog(state=>state.createProduct);
+  const updateProduct=usePreviewCatalog(state=>state.updateProduct);
+  const [draftId]=useState(()=>product?.id??'draft-'+crypto.randomUUID());
   const [name,setName]=useState(product?.name??'');
-  const [category,setCategory]=useState(product?.category??categories.find(item=>item!=='全部')??'');
+  const [category,setCategory]=useState(product?.category??PREVIEW_CATALOG_CATEGORIES[0]);
   const [price,setPrice]=useState(product?String(product.priceMinor/100):'');
   const [active,setActive]=useState(product?.status!=='已停用');
-  const priceNumber=Number(price);
+  const [description,setDescription]=useState(product?.description??'');
+  const [printRule,setPrintRule]=useState(product?.printRule??'製作單');
+  const [customerImage,setCustomerImage]=useState(product?.customerImageUrl??'');
+  const [keetaImage,setKeetaImage]=useState(product?.channelImages.KEETA??'');
+  const [optionIds,setOptionIds]=useState<Set<string>>(new Set(product?.optionSetIds??[]));
   const valid=productFormCanSave({name,category,price});
-  const submit=(event:FormEvent)=>{
-    event.preventDefault();
-    if(!valid||!previewMode)return;
-    onSave({name:name.trim(),category,priceMinor:Math.round(priceNumber*100),active});
+  const editing=Boolean(product);
+
+  const relatedCombos=combos.filter(combo=>combo.groups.some(group=>group.choices.some(choice=>choice.productId===product?.id)));
+  const save=()=>{
+    if(!valid)return;
+    const base={
+      name:name.trim(),
+      category,
+      priceMinor:Math.round(Number(price)*100),
+      description:description.trim(),
+      customerImageUrl:customerImage,
+      channelImages:{KEETA:keetaImage},
+      optionSetIds:[...optionIds],
+      printRule,
+    };
+    if(product){
+      updateProduct(product.id,{...base,status:active?'草稿':'已停用'});
+    }else{
+      const created=createProduct({
+        id:draftId,
+        ...base,
+      });
+      if(!active)updateProduct(created.id,{status:'已停用'});
+    }
+    onClose();
   };
-  return <div className="v3-mobile-product-modal" role="dialog" aria-modal="true" aria-label={editing?'編輯商品':'新增商品'}>
-    <button type="button" className="v3-mobile-modal-backdrop" aria-label="關閉" onClick={onClose}/>
-    <section className="v3-mobile-modal-sheet">
-      <header><div><small>{editing?'商品資料':'新增商品'}</small><h2>{editing?product?.name:'新增商品'}</h2></div><button type="button" onClick={onClose}>關閉</button></header>
-      <form onSubmit={submit}>
-        <label><span>商品名稱 *</span><input autoFocus value={name} onChange={event=>setName(event.target.value)} placeholder="輸入商品名稱"/></label>
-        <label><span>商品編號</span><input value={product?.code??'儲存後由系統自動生成'} disabled/></label>
-        <label><span>分類 *</span><select value={category} onChange={event=>setCategory(event.target.value)}><option value="">請選擇分類</option>{categories.filter(item=>item!=='全部').map(item=><option key={item}>{item}</option>)}</select></label>
-        <label><span>基本價格 *</span><div className="v3-money-input"><b>HK$</b><input inputMode="decimal" value={price} onChange={event=>setPrice(event.target.value.replace(/[^0-9.]/g,''))} placeholder="0.00"/></div></label>
-        <label className="v3-mobile-switch-row"><span><strong>啟用商品 *</strong><small>關閉後商品會顯示為已停用</small></span><input type="checkbox" checked={active} onChange={event=>setActive(event.target.checked)}/></label>
-        {!previewMode?<div className="v3-mobile-form-note">正式儲存只會接駁 Server Draft；目前呢個環境唔會寫入 Production。</div>:null}
-        <footer><button type="button" onClick={onClose}>取消</button><button className="v3-primary" type="submit" disabled={!valid||!previewMode}>儲存草稿</button></footer>
-      </form>
+
+  return <div className="v3-functional-editor v3-product-functional-editor" role="dialog" aria-modal="true">
+    <button type="button" className="v3-functional-backdrop" aria-label="關閉" onClick={onClose}/>
+    <section className="v3-functional-sheet">
+      <header><div><small>{editing?'編輯商品':'新增商品'}</small><h2>{editing?product?.name:'新增商品'}</h2></div><button type="button" onClick={onClose}>關閉</button></header>
+      <div className="v3-functional-body">
+        <section className="v3-functional-section">
+          <h3>基本資料</h3>
+          <div className="v3-functional-grid">
+            <label><span>商品名稱 *</span><input autoFocus value={name} onChange={event=>setName(event.target.value)} placeholder="輸入商品名稱"/></label>
+            <label><span>商品編號</span><input value={product?.code??'儲存後由系統自動生成'} disabled/></label>
+            <label><span>分類 *</span><select value={category} onChange={event=>setCategory(event.target.value)}>{PREVIEW_CATALOG_CATEGORIES.map(item=><option key={item}>{item}</option>)}</select></label>
+            <label><span>基本價格 *</span><div className="v3-money-input"><b>HK$</b><input inputMode="decimal" value={price} onChange={event=>setPrice(event.target.value.replace(/[^0-9.]/g,''))}/></div></label>
+          </div>
+          <label><span>商品描述</span><textarea rows={3} value={description} onChange={event=>setDescription(event.target.value)}/></label>
+          <label className="v3-functional-switch"><input type="checkbox" checked={active} onChange={event=>setActive(event.target.checked)}/><span>{active?'啟用商品':'停用商品'}</span></label>
+        </section>
+
+        <section className="v3-functional-section">
+          <header><div><h3>圖片／媒體</h3><p>所有產品圖片 binary 一律放 Cloudflare R2；唔接受外部 URL 做正式圖片 authority。</p></div><StatusBadge tone="good">R2 ONLY</StatusBadge></header>
+          <div className="v3-r2-media-grid">
+            <ProductMediaField label="自家／Customer 顯示圖" description="Customer、SMM 等自家介面預設使用。" value={customerImage} productId={draftId} surface="CUSTOMER" onUploaded={setCustomerImage}/>
+            <ProductMediaField label="Keeta 平台圖" description="第三方平台獨立圖片，可同自家顯示圖不同。" value={keetaImage} productId={draftId} surface="KEETA" onUploaded={setKeetaImage}/>
+          </div>
+          <small>Storage Policy：{PRODUCT_MEDIA_STORAGE_POLICY.binaryStore} · Browser 無 R2 credential · 最高 8MB</small>
+        </section>
+
+        <section className="v3-functional-section">
+          <h3>選項／口味</h3>
+          <p>直接將已建立嘅選項組套用到呢件商品。</p>
+          <div className="v3-option-link-grid">{optionSets.map(set=><label key={set.id}>
+            <input type="checkbox" checked={optionIds.has(set.id)} onChange={event=>setOptionIds(current=>{const next=new Set(current);if(event.target.checked)next.add(set.id);else next.delete(set.id);return next;})}/>
+            <span><strong>{set.name}</strong><small>{set.selection==='SINGLE'?'單選':'多選'} · {set.options.length} 個子選項 · 最少 {set.min}／最多 {set.max}</small></span>
+          </label>)}</div>
+        </section>
+
+        <section className="v3-functional-section">
+          <h3>套餐關係</h3>
+          {relatedCombos.length?<div className="v3-related-combos">{relatedCombos.map(combo=><div key={combo.id}><strong>{combo.name}</strong><span>{money(combo.basePriceMinor)}</span></div>)}</div>:<p>目前未有套餐引用呢件商品。可去「套餐管理」加入。</p>}
+        </section>
+
+        <section className="v3-functional-section">
+          <h3>打印</h3>
+          <label><span>打印摘要</span><select value={printRule} onChange={event=>setPrintRule(event.target.value)}><option>製作單</option><option>製作單＋標籤</option><option>製作單＋打包單</option><option>標籤</option><option>打包單</option></select></label>
+        </section>
+      </div>
+      <footer className="v3-functional-footer"><button type="button" onClick={onClose}>取消</button><button className="v3-primary" type="button" disabled={!valid} onClick={save}>儲存草稿</button></footer>
     </section>
   </div>;
 }
@@ -181,8 +284,11 @@ function isMobileViewport(){
 
 export function ProductListPage({canonicalSnapshot,previewMode=false,onReviewDraft}:{canonicalSnapshot?:unknown;previewMode?:boolean;onReviewDraft?:()=>void}){
   const canonicalRows=useMemo(()=>productRecordsFromSnapshot(canonicalSnapshot),[canonicalSnapshot]);
-  const [previewRows,setPreviewRows]=useState<ProductListRecord[]>(()=>[...PREVIEW_PRODUCTS]);
+  const previewProducts=usePreviewCatalog(state=>state.products);
+  const combos=usePreviewCatalog(state=>state.combos);
+  const previewRows=useMemo(()=>previewProducts.map(product=>previewRecord(product,combos.filter(combo=>combo.groups.some(group=>group.choices.some(choice=>choice.productId===product.id))).length)),[previewProducts,combos]);
   const sourceRows=previewMode?previewRows:canonicalRows;
+
   const [query,setQuery]=useState('');
   const [category,setCategory]=useState('全部');
   const [status,setStatus]=useState('全部');
@@ -190,11 +296,10 @@ export function ProductListPage({canonicalSnapshot,previewMode=false,onReviewDra
   const [view,setView]=useState<'list'|'grid'>('list');
   const [selected,setSelected]=useState<Set<string>>(new Set());
   const [openProduct,setOpenProduct]=useState<ProductListRecord|null>(null);
-  const [mobileForm,setMobileForm]=useState<{mode:'create'|'edit';product:ProductListRecord|null}|null>(null);
-  const [previewNotice,setPreviewNotice]=useState('');
+  const [previewEditorId,setPreviewEditorId]=useState<string|null|undefined>(undefined);
 
   const categoryOptions=useMemo(()=>{
-    if(previewMode)return [...PREVIEW_CATEGORIES];
+    if(previewMode)return ['全部',...PREVIEW_CATALOG_CATEGORIES];
     const values=[...new Set(sourceRows.map(item=>item.category).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'zh-HK'));
     return ['全部',...values];
   },[previewMode,sourceRows]);
@@ -215,58 +320,24 @@ export function ProductListPage({canonicalSnapshot,previewMode=false,onReviewDra
     });
   },[sourceRows,query,category,status,sort]);
 
-  const toggleSelection=(id:string)=>{
-    setSelected(current=>{
-      const next=new Set(current);
-      if(next.has(id))next.delete(id);else next.add(id);
-      return next;
-    });
-  };
   const openDetail=(product:ProductListRecord)=>{
-    if(isMobileViewport())setMobileForm({mode:'edit',product});
-    else setOpenProduct(product);
+    if(previewMode){setPreviewEditorId(product.id);return;}
+    setOpenProduct(product);
   };
   const openFromKeyboard=(event:KeyboardEvent<HTMLElement>,product:ProductListRecord)=>{
     if(event.key==='Enter'){event.preventDefault();openDetail(product);}
   };
-  const saveMobileForm=(value:{name:string;category:string;priceMinor:number;active:boolean})=>{
-    if(!previewMode||!mobileForm)return;
-    if(mobileForm.mode==='edit'&&mobileForm.product){
-      setPreviewRows(current=>current.map(item=>item.id===mobileForm.product?.id?{
-        ...item,
-        name:value.name,
-        category:value.category,
-        priceMinor:value.priceMinor,
-        status:value.active?(item.status==='已停用'?'草稿':item.status):'已停用',
-        updatedAt:'剛剛',
-      }:item));
-      setPreviewNotice('介面預覽：商品資料已更新；重新載入會清除預覽修改。');
-    }else{
-      const nextIndex=previewRows.length+1;
-      const next:ProductListRecord={
-        id:'preview-new-'+String(nextIndex),
-        name:value.name,
-        code:'AUTO'+String(nextIndex).padStart(4,'0'),
-        category:value.category,
-        priceMinor:value.priceMinor,
-        status:value.active?'草稿':'已停用',
-        printRule:'跟隨打印規則',
-        updatedAt:'剛剛',
-      };
-      setPreviewRows(current=>[next,...current]);
-      setPreviewNotice('介面預覽：填妥資料後先建立商品；重新載入會清除預覽修改。');
-    }
-    setMobileForm(null);
+  const toggleSelection=(id:string)=>{
+    setSelected(current=>{const next=new Set(current);if(next.has(id))next.delete(id);else next.add(id);return next;});
   };
 
   return <div className="v3-product-page">
-    {previewMode?<div className="v3-preview-banner" role="status"><strong>UI 公網預覽</strong><span>示例資料只用嚟驗 UI；唔代表正式 Canonical 資料，亦唔會寫入 Production。</span></div>:null}
-    {previewNotice?<div className="v3-preview-notice" role="status">{previewNotice}</div>:null}
+    {previewMode?<div className="v3-preview-banner" role="status"><strong>產品管理已接實際 Preview State</strong><span>圖片上載會寫入專用非 Production R2；產品／選項／套餐修改會喺呢個 Preview session 即時互相反映。</span></div>:null}
     <PageHeader
       eyebrow="菜單管理"
       title="產品管理"
       description="Desktop 保留完整列表；手機版按分類收納，每頁最多 10 件商品。"
-      aside={<><span className="v3-product-count">{filtered.length} / {sourceRows.length} 項商品</span><button className="v3-primary v3-product-add-desktop" type="button" disabled title="Desktop 新增產品流程會跟 UI-03 正式接駁">＋ 新增產品</button><button className="v3-primary v3-product-add-mobile" type="button" disabled={!previewMode} onClick={()=>setMobileForm({mode:'create',product:null})}>＋ 新增產品</button></>}
+      aside={<><span className="v3-product-count">{filtered.length} / {sourceRows.length} 項商品</span><button className="v3-primary" type="button" disabled={!previewMode} onClick={()=>setPreviewEditorId(null)}>＋ 新增產品</button></>}
     />
 
     <section className="v3-product-toolbar" aria-label="產品搜尋與篩選">
@@ -286,14 +357,14 @@ export function ProductListPage({canonicalSnapshot,previewMode=false,onReviewDra
       <>
         <div className="v3-product-desktop-content">
           {view==='grid'?<div className="v3-product-grid">{filtered.map(product=><article key={product.id} className="v3-product-card" tabIndex={0} onKeyDown={event=>openFromKeyboard(event,product)} onClick={()=>openDetail(product)}>
-            <div className="v3-product-card-top"><ProductThumb name={product.name}/><StatusBadge tone={statusTone(product.status)}>{product.status}</StatusBadge></div>
-            <h3>{product.name}</h3><p>{product.category} · {product.code}</p><strong>{money(product.priceMinor)}</strong><small>{product.printRule} · {product.updatedAt}</small>
+            <div className="v3-product-card-top"><ProductThumb name={product.name} imageUrl={product.imageUrl}/><StatusBadge tone={statusTone(product.status)}>{product.status}</StatusBadge></div>
+            <h3>{product.name}</h3><p>{product.category} · {product.code}</p><strong>{money(product.priceMinor)}</strong><small>{product.optionSetCount??0} 個選項組 · {product.comboCount??0} 個套餐</small>
           </article>)}</div>:
-          <div className="v3-product-table-wrap"><table className="v3-product-table"><thead><tr><th className="v3-select-col"><span className="v3-visually-hidden">選擇</span></th><th>商品</th><th>商品編號</th><th>分類</th><th>基本價格</th><th>狀態</th><th>打印規則</th><th>最近更新</th><th><span className="v3-visually-hidden">操作</span></th></tr></thead>
+          <div className="v3-product-table-wrap"><table className="v3-product-table"><thead><tr><th className="v3-select-col"><span className="v3-visually-hidden">選擇</span></th><th>商品</th><th>商品編號</th><th>分類</th><th>基本價格</th><th>狀態</th><th>選項／套餐</th><th>最近更新</th><th><span className="v3-visually-hidden">操作</span></th></tr></thead>
             <tbody>{filtered.map(product=><tr key={product.id} tabIndex={0} onKeyDown={event=>openFromKeyboard(event,product)} onClick={()=>openDetail(product)}>
               <td className="v3-select-col"><input type="checkbox" aria-label={'選擇 '+product.name} checked={selected.has(product.id)} onClick={event=>event.stopPropagation()} onChange={()=>toggleSelection(product.id)}/></td>
-              <td><div className="v3-product-identity"><ProductThumb name={product.name}/><div><strong>{product.name}</strong><small>點擊開啟產品詳情</small></div></div></td>
-              <td><code>{product.code}</code></td><td>{product.category}</td><td className="v3-money">{money(product.priceMinor)}</td><td><StatusBadge tone={statusTone(product.status)}>{product.status}</StatusBadge></td><td>{product.printRule}</td><td>{product.updatedAt}</td>
+              <td><div className="v3-product-identity"><ProductThumb name={product.name} imageUrl={product.imageUrl}/><div><strong>{product.name}</strong><small>點擊即編輯</small></div></div></td>
+              <td><code>{product.code}</code></td><td>{product.category}</td><td className="v3-money">{money(product.priceMinor)}</td><td><StatusBadge tone={statusTone(product.status)}>{product.status}</StatusBadge></td><td>{product.optionSetCount??0} 選項組 · {product.comboCount??0} 套餐</td><td>{product.updatedAt}</td>
               <td><button type="button" className="v3-row-more" aria-label={product.name+' 其他操作'} onClick={event=>event.stopPropagation()}>•••</button></td>
             </tr>)}</tbody></table></div>}
         </div>
@@ -303,11 +374,11 @@ export function ProductListPage({canonicalSnapshot,previewMode=false,onReviewDra
             items={filtered.map(product=>({...product,group:product.category}))}
             pageSize={MOBILE_PRODUCT_PAGE_SIZE}
             emptyLabel="目前未有商品"
-            renderItem={product=><article key={product.id} className="v3-product-mobile-card" tabIndex={0} onKeyDown={event=>openFromKeyboard(event,product)} onClick={()=>setMobileForm({mode:'edit',product})}>
-              <ProductThumb name={product.name}/>
+            renderItem={product=><article key={product.id} className="v3-product-mobile-card" tabIndex={0} onKeyDown={event=>openFromKeyboard(event,product)} onClick={()=>openDetail(product)}>
+              <ProductThumb name={product.name} imageUrl={product.imageUrl}/>
               <div className="v3-product-mobile-main">
                 <div><strong>{product.name}</strong><StatusBadge tone={statusTone(product.status)}>{product.status}</StatusBadge></div>
-                <span>{product.code}</span>
+                <span>{product.code} · {product.optionSetCount??0} 選項組</span>
                 <footer><b>{money(product.priceMinor)}</b><small>{product.updatedAt}</small></footer>
               </div>
             </article>}
@@ -315,9 +386,9 @@ export function ProductListPage({canonicalSnapshot,previewMode=false,onReviewDra
         </div>
       </>}
 
-    {selected.size?<div className="v3-selection-bar" role="status"><strong>已選 {selected.size} 項</strong><span>批量操作會喺對應 Slice 正式定義後接入。</span><button type="button" onClick={()=>setSelected(new Set())}>取消選取</button></div>:null}
-    {previewMode?<DraftBar count={2} onReview={onReviewDraft??(()=>{})}/>:null}
+    {selected.size?<div className="v3-selection-bar" role="status"><strong>已選 {selected.size} 項</strong><span>批量操作會喺對應功能正式接入後啟用。</span><button type="button" onClick={()=>setSelected(new Set())}>取消選取</button></div>:null}
+    {previewMode?<DraftBar count={4} onReview={onReviewDraft??(()=>{})}/>:null}
     {openProduct?<ProductDrawer product={openProduct} onClose={()=>setOpenProduct(null)}/>:null}
-    {mobileForm?<ProductFormModal product={mobileForm.product} categories={categoryOptions} previewMode={previewMode} onClose={()=>setMobileForm(null)} onSave={saveMobileForm}/>:null}
+    {previewMode&&previewEditorId!==undefined?<PreviewProductEditor productId={previewEditorId} onClose={()=>setPreviewEditorId(undefined)}/>:null}
   </div>;
 }
