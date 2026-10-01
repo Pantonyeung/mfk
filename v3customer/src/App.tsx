@@ -20,7 +20,7 @@ function Header(){
 function Hero(){
   return <section className="hero" aria-labelledby="hero-title">
     <div className="hero-world" aria-hidden="true">
-      <img className="hero-world-bg" src="/media/customer/hero/hero-background-main.png" alt=""/>
+      <img className="hero-world-bg" src={A.heroBackgroundR2} alt=""/>
       <span className="hero-world-vignette"/>
     </div>
     <div className="hero-copy">
