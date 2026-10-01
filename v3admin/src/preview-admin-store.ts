@@ -227,7 +227,8 @@ export const usePreviewAdmin=create<PreviewAdminState>((set,get)=>({
     {id:'logical-receipt',name:'收據機',type:'RECEIPT',widthMm:80,active:true},
     {id:'logical-production',name:'廚房製作單機',type:'PRODUCTION',widthMm:80,active:true},
     {id:'logical-packing',name:'打包單機',type:'PACKING',widthMm:80,active:true},
-    {id:'logical-riceball-label',name:'飯糰標籤',type:'LABEL',widthMm:50,active:true},
+    {id:'logical-label-1',name:'標籤機 1',type:'LABEL',widthMm:50,active:true},
+    {id:'logical-label-2',name:'標籤機 2',type:'LABEL',widthMm:50,active:true},
   ],
   templates:[
     {id:'tpl-receipt',name:'收據模板',content:'店名\n訂單編號\n商品明細\n總額\n付款方式',active:true},
@@ -238,7 +239,8 @@ export const usePreviewAdmin=create<PreviewAdminState>((set,get)=>({
   printRules:[
     {id:'rule-receipt',name:'完成付款列印收據',event:'PAYMENT_CONFIRMED',printerIds:['logical-receipt'],active:true},
     {id:'rule-production',name:'新訂單列印製作單',event:'ORDER_CONFIRMED',printerIds:['logical-production'],active:true},
-    {id:'rule-label',name:'飯糰商品列印標籤',event:'PRODUCT_LABEL',printerIds:['logical-riceball-label'],active:true},
+    {id:'rule-label-1',name:'商品標籤機 1',event:'PRODUCT_LABEL',printerIds:['logical-label-1'],active:true},
+    {id:'rule-label-2',name:'商品標籤機 2',event:'PRODUCT_LABEL',printerIds:['logical-label-2'],active:true},
   ],
   roles:[
     {id:'OWNER',name:'老闆',permissions:PREVIEW_PERMISSION_OPTIONS.map(item=>item.id),active:true},
