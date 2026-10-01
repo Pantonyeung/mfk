@@ -23,6 +23,7 @@ import {FormalCapacityPage} from './formal-capacity-page.tsx';
 import {FormalOrderExceptionsPage,FormalOrdersPage,FormalRefundReportPage,FormalSalesReportPage,FormalTodayPage} from './formal-read-pages.tsx';
 import {FormalChannelReportPage,FormalExportPage,FormalOperationsReportPage,FormalProductReportPage} from './formal-report-pages.tsx';
 import {FormalBusinessDayRuntimePage,FormalCashCloseRuntimePage} from './formal-operations-read-pages.tsx';
+import {FormalActionQueuePage,FormalAuditGapPage,FormalDiagnosticsPage,FormalEffectiveSettingsPage,FormalIntegrationsPage} from './formal-system-pages.tsx';
 import {
   EmptyState,
   ErrorState,
@@ -120,8 +121,8 @@ export function AdminShell({storeId,displayName,releaseStatus,canonicalState,can
 
   const routeContent=path==='/admin/overview'
     ?(previewMode?<TodayPage mode="overview" onNavigate={navigate}/>:formalDraftEnabled?<FormalTodayPage onNavigate={navigate}/>:<RouteSkeleton path={path} canonicalState={canonicalState} onRefresh={onRefresh}/>)
-    :path==='/admin/action-queue'&&previewMode
-      ?<TodayPage mode="queue" onNavigate={navigate}/>
+    :path==='/admin/action-queue'
+      ?(previewMode?<TodayPage mode="queue" onNavigate={navigate}/>:formalDraftEnabled?<FormalActionQueuePage onNavigate={navigate}/>:<RouteSkeleton path={path} canonicalState={canonicalState} onRefresh={onRefresh}/>)
       :path==='/admin/orders/open'
         ?(previewMode?<OrdersPage mode="open"/>:formalDraftEnabled?<FormalOrdersPage mode="open"/>:<RouteSkeleton path={path} canonicalState={canonicalState} onRefresh={onRefresh}/>)
     :path==='/admin/orders/history'
@@ -206,14 +207,14 @@ export function AdminShell({storeId,displayName,releaseStatus,canonicalState,can
                                                       ?<PublishFlowPage mode="versions"/>
                                                       :path==='/admin/publish/rollback'&&previewMode
                                                         ?<PublishFlowPage mode="rollback"/>
-                                                        :path==='/admin/system/audit'&&previewMode
-                                                          ?<AuditPage/>
-                                                          :path==='/admin/system/diagnostics'&&previewMode
-                                                            ?<DiagnosticsPage/>
-                                                            :path==='/admin/system/integrations'&&previewMode
-                                                              ?<IntegrationsPage/>
-                                                              :path==='/admin/system/advanced'&&previewMode
-                                                                ?<EffectiveSettingsPage onNavigate={navigate}/>
+                                                        :path==='/admin/system/audit'
+                                                          ?(previewMode?<AuditPage/>:formalDraftEnabled?<FormalAuditGapPage/>:<RouteSkeleton path={path} canonicalState={canonicalState} onRefresh={onRefresh}/>)
+                                                          :path==='/admin/system/diagnostics'
+                                                            ?(previewMode?<DiagnosticsPage/>:formalDraftEnabled?<FormalDiagnosticsPage/>:<RouteSkeleton path={path} canonicalState={canonicalState} onRefresh={onRefresh}/>)
+                                                            :path==='/admin/system/integrations'
+                                                              ?(previewMode?<IntegrationsPage/>:formalDraftEnabled?<FormalIntegrationsPage/>:<RouteSkeleton path={path} canonicalState={canonicalState} onRefresh={onRefresh}/>)
+                                                              :path==='/admin/system/advanced'
+                                                                ?(previewMode?<EffectiveSettingsPage onNavigate={navigate}/>:formalDraftEnabled?<FormalEffectiveSettingsPage onNavigate={navigate}/>:<RouteSkeleton path={path} canonicalState={canonicalState} onRefresh={onRefresh}/>)
                                                                 :path==='/admin/store/settings'
                                             ?(previewMode?<StoreSettingsPage mode="settings"/>:formalDraftEnabled?<FormalStoreSettingsPage mode="settings"/>:<RouteSkeleton path={path} canonicalState={canonicalState} onRefresh={onRefresh}/>)
                                             :path==='/admin/store/hours'
