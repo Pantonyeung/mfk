@@ -37,6 +37,18 @@ export interface ProjectionOrderInput{
   }>;
   readonly customerReorderIntent?:readonly CustomerReorderIntentLine[];
   readonly customerReorderHistoryPriceFacts?:readonly CustomerReorderHistoryPriceFact[];
+  readonly diningInitialPrintAttemptedAt?:string;
+  readonly diningInitialPrintCompletedAt?:string;
+  readonly diningInitialPrintState?:'DONE'|'FAILED'|'UNKNOWN';
+  readonly diningInitialPrintPlanned?:number;
+  readonly diningInitialPrintSent?:number;
+  readonly diningInitialPrintFailed?:number;
+  readonly diningInitialPrintResults?:readonly {
+    readonly jobId:string;
+    readonly role:string;
+    readonly ok:boolean;
+    readonly code:string;
+  }[];
   readonly etaLabel?:string;
   readonly promisedReadyLabel?:string;
   readonly fulfillmentHistory?:readonly {
@@ -149,6 +161,22 @@ export function queueOrderProjection(order:ProjectionOrderInput){
       ...(order.pickupException?{pickupException:Object.freeze({...order.pickupException})}:{}),
       ...(order.customerReorderIntent?.length?{customerReorderIntent:Object.freeze(order.customerReorderIntent.map(line=>Object.freeze({...line,selections:Object.freeze(line.selections.map(selection=>Object.freeze({...selection}))),...(line.combo?{combo:Object.freeze({...line.combo,selections:Object.freeze(line.combo.selections.map(selection=>Object.freeze({...selection})))})}:{})})))}:{}),
       ...(order.customerReorderHistoryPriceFacts?.length?{customerReorderHistoryPriceFacts:Object.freeze(order.customerReorderHistoryPriceFacts.map(fact=>Object.freeze({...fact})))}:{}),
+      ...(order.diningInitialPrintAttemptedAt?{printEvidence:Object.freeze({
+        scope:'DINING_INITIAL',
+        certainty:'TRANSPORT_ONLY',
+        attemptedAt:String(order.diningInitialPrintAttemptedAt),
+        ...(order.diningInitialPrintCompletedAt?{completedAt:String(order.diningInitialPrintCompletedAt)}:{}),
+        state:['DONE','FAILED','UNKNOWN'].includes(String(order.diningInitialPrintState))?order.diningInitialPrintState:'UNKNOWN',
+        planned:Math.max(0,Math.floor(Number(order.diningInitialPrintPlanned)||0)),
+        sent:Math.max(0,Math.floor(Number(order.diningInitialPrintSent)||0)),
+        failed:Math.max(0,Math.floor(Number(order.diningInitialPrintFailed)||0)),
+        results:Object.freeze((order.diningInitialPrintResults??[]).slice(0,64).map(result=>Object.freeze({
+          jobId:String(result.jobId||'').slice(0,220),
+          role:String(result.role||'').slice(0,120),
+          ok:Boolean(result.ok),
+          code:String(result.code||'').slice(0,160),
+        }))),
+      })}:{}),
       ...(order.etaLabel?{etaLabel:String(order.etaLabel)}:{}),
       ...(order.promisedReadyLabel?{promisedReadyLabel:String(order.promisedReadyLabel)}:{}),
       ...(order.fulfillmentHistory?.length?{fulfillmentHistory:Object.freeze(order.fulfillmentHistory.map(entry=>Object.freeze({...entry})))}:{}),
