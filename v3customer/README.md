@@ -47,7 +47,7 @@ The original five Hero assets remain in private R2. The approved rotating Q-art 
 
 ## Updating Hero artwork
 
-Replace a WebP while keeping its `home-hero-01.webp` to `home-hero-04.webp` slot name, update the two recorded checksums, then run the Customer V3 workflow. No React path change is required.
+Replace a WebP while keeping its `home-hero-01.webp` to `home-hero-04.webp` slot name, update the media manifest checksum, then run the Customer V3 workflow. No React path change is required.
 
 ## Promotion
 
