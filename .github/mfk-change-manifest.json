@@ -1,33 +1,36 @@
 {
   "version": 1,
-  "capability": "MFK_ADMIN_V3_PRODUCT_BRIEF_FUNCTION_UI_LOCK_R1",
-  "base_sha": "f826598f0517229b94c7e817c642e808dc515cc3",
+  "capability": "MFK_ADMIN_V3_FORMAL_SERVER_DRAFT_SEAM_R1",
+  "base_sha": "f78960ebbd07e1adfff62d19d3ac129be863cb53",
   "root_control": "#596",
   "product_control": "#601",
   "allowed_paths": [
     ".github/mfk-change-manifest.json",
-    "COMMANDER_CURRENT.md",
-    "HANDOFF_CURRENT.md",
-    "docs/product/MFK_ADMIN_V3_PRODUCT_BRIEF_R1_2026-09-30.md"
+    "docs/implementation/MFK_CODEX_KICKOFF_ADMIN_V3_FORMAL_SERVER_DRAFT_SEAM_R1_2026-10-01.md",
+    "v2admin/worker.ts",
+    "v2admin/src/admin-formal-server-draft.test.ts",
+    "v2admin/src/admin-sync-websocket-transport.test.ts"
   ],
-  "authority_impact": "PRODUCT_UI_IA_ACCEPTANCE_LOCK_ONLY; NO_DOMAIN_AUTHORITY_CHANGE",
-  "persistence_impact": "NONE",
+  "authority_impact": "BOUNDED_EXTENSION_OF_EXISTING_ADMIN_CANONICAL_CONFIG_AUTHORITY_FOR_FORMAL_SERVER_DRAFT_ONLY; NO_SECOND_AUTHORITY",
+  "persistence_impact": "ADD_SERVER_SIDE_ADMIN_DRAFT_RECORD_WITH_DRAFT_ID_REVISION_AND_CANONICAL_BASE_GUARD",
   "provider_impact": "NONE",
   "transaction_impact": "NONE",
   "production_routing_impact": "NONE",
   "expected_behavior_change": [
-    "No runtime behavior change.",
-    "Admin V3 implementation roadmap changes from incremental A1/A2 slices to one product-brief-led isolated rebuild.",
-    "The full R1 function set, navigation, UI patterns, state semantics, forbidden patterns and acceptance gates are locked before implementation.",
-    "Current v2 production remains unchanged."
+    "Admin V3 can persist a formal server Draft separately from unsaved browser edits.",
+    "Saved Draft supports authoritative reload/new-browser restoration and optimistic concurrency.",
+    "Stale Draft or stale second-tab writes fail closed with explicit conflicts.",
+    "Publish-from-Draft reuses existing Admin publish authority and clears Draft only after successful canonical publish.",
+    "Final canonical base guard prevents stale Draft overwrite during a publish race."
   ],
   "non_goals": [
-    "No v3admin product code change in this spec slice.",
-    "No backend/API/SMT/domain authority change.",
-    "No production deployment or hostname routing.",
-    "No merge of parked A1 PR #599.",
-    "No Codex implementation until Product Brief #601 is approved and merged."
+    "No Pricing authority or takeaway surcharge schema change.",
+    "No SMT Store Kernel change.",
+    "No Order, Payment, Refund, Cancel or provider transaction change.",
+    "No v2 browser-state migration.",
+    "No localStorage, sessionStorage or Dexie formal Draft authority.",
+    "No production deploy, hostname cutover or OTA."
   ],
-  "rollback_sha": "f826598f0517229b94c7e817c642e808dc515cc3",
+  "rollback_sha": "f78960ebbd07e1adfff62d19d3ac129be863cb53",
   "severity": "HARD_BLOCK"
 }
