@@ -102,6 +102,44 @@ describe('SMT projection outbox',()=>{
     expect(JSON.parse(values.get(SMT_PROJECTION_OUTBOX_KEY)||'[]')).toHaveLength(0);
   });
 
+  it('projects verified dining print transport evidence without claiming physical paper success',()=>{
+    queueOrderProjection({
+      id:'MFK-DINE-PRINT-1',
+      display:'P011',
+      createdAt:'2026-10-01T03:00:00.000Z',
+      updatedAt:'2026-10-01T03:02:00.000Z',
+      totalMinor:6800,
+      paymentLabel:'未收款',
+      fulfillmentLabel:'進行中',
+      sourceLabel:'堂食',
+      diningInitialPrintAttemptedAt:'2026-10-01T03:01:00.000Z',
+      diningInitialPrintState:'UNKNOWN',
+      diningInitialPrintPlanned:3,
+      diningInitialPrintSent:2,
+      diningInitialPrintFailed:1,
+      diningInitialPrintResults:[
+        {jobId:'MFK-DINE-PRINT-1:production',role:'製作單',ok:true,code:'SENT'},
+        {jobId:'MFK-DINE-PRINT-1:packing',role:'打包單',ok:false,code:'PRINT_OUTCOME_UNKNOWN'},
+      ],
+      items:[{id:'p1',name:'堂食套餐',qty:1,unitMinor:6800}],
+    });
+    const payload=readProjectionOutbox()[0]!.event.payload as Record<string,unknown>;
+    expect(payload.printEvidence).toEqual({
+      scope:'DINING_INITIAL',
+      certainty:'TRANSPORT_ONLY',
+      attemptedAt:'2026-10-01T03:01:00.000Z',
+      state:'UNKNOWN',
+      planned:3,
+      sent:2,
+      failed:1,
+      results:[
+        {jobId:'MFK-DINE-PRINT-1:production',role:'製作單',ok:true,code:'SENT'},
+        {jobId:'MFK-DINE-PRINT-1:packing',role:'打包單',ok:false,code:'PRINT_OUTCOME_UNKNOWN'},
+      ],
+    });
+    expect(JSON.stringify(payload.printEvidence)).not.toMatch(/physical.*success|printed.*true/i);
+  });
+
   it('projects canonical recognized sales separately so open dine-in does not enter effective sales',()=>{
     queueOrderProjection({
       id:'MFK-DINE-1',
