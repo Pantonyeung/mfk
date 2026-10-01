@@ -20,14 +20,8 @@ function Header(){
 function Hero(){
   return <section className="hero" aria-labelledby="hero-title">
     <div className="hero-world" aria-hidden="true">
-      <span className="hero-glow glow-a"/><span className="hero-glow glow-b"/><span className="hero-glow glow-c"/>
-      <span className="castle castle-left"><i/><i/><b/></span>
-      <span className="castle castle-mid"><i/><i/><b/></span>
-      <span className="castle castle-right"><i/><i/><b/></span>
-      <span className="arch arch-back"/><span className="arch arch-front"/>
-      <span className="hero-step step-a"/><span className="hero-step step-b"/><span className="hero-step step-c"/>
-      <span className="leaf leaf-1"/><span className="leaf leaf-2"/><span className="leaf leaf-3"/>
-      <span className="leaf leaf-4"/><span className="leaf leaf-5"/><span className="leaf leaf-6"/>
+      <img className="hero-world-bg" src="/brand/r3/hero-world-bg-r3.webp" alt=""/>
+      <span className="hero-world-vignette"/>
     </div>
     <div className="hero-copy">
       <em>More Fun!</em>
