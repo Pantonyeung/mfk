@@ -119,8 +119,8 @@ jobs:
             };
           });
 
-          await page.evaluate(()=>scrollTo(0,260));
-          await page.waitForTimeout(100);
+          await page.evaluate(()=>scrollTo({top:260,behavior:'instant'}));
+          await page.waitForFunction(()=>Number(getComputedStyle(document.querySelector('.hero')).getPropertyValue('--hero-progress'))>0.9);
           metrics.scrolled=await page.evaluate(()=>({
             headerTop:document.querySelector('.header').getBoundingClientRect().top,
             heroProgress:Number(getComputedStyle(document.querySelector('.hero')).getPropertyValue('--hero-progress')),
