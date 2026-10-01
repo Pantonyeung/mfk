@@ -51,6 +51,28 @@ function arrayEntities(
     put(out,entityType,chosen,item);
   });
 }
+function orderedIds(values:unknown,idKeys:readonly string[]){
+  return rows(values).map((value,index)=>{
+    const item=row(value);
+    return idKeys.map(key=>safeId(item[key],'')).find(Boolean)||String(index+1);
+  });
+}
+function putOrder(out:Record<string,MfkSyncCheckpointEntity>,orderId:string,ids:readonly string[]){
+  put(out,'ENTITY_ORDER',orderId,{ids:[...ids]});
+}
+function orderedEntities(entities:MfkSyncEntityMap,entityType:string,orderId:string){
+  const byId=new Map(Object.values(entities).filter(entity=>entity.entityType===entityType).map(entity=>[entity.entityId,entity] as const));
+  const order=Object.values(entities).find(entity=>entity.entityType==='ENTITY_ORDER'&&entity.entityId===orderId);
+  const ids=Array.isArray(order?.payload?.ids)?order!.payload.ids.map(String):[];
+  const output:MfkSyncCheckpointEntity[]=[];
+  for(const id of ids){
+    const entity=byId.get(id);
+    if(entity){output.push(entity);byId.delete(id);}
+  }
+  output.push(...[...byId.values()].sort((a,b)=>a.entityId.localeCompare(b.entityId)));
+  return output;
+}
+
 function keyedObjectEntities(out:Record<string,MfkSyncCheckpointEntity>,entityType:string,value:unknown){
   const source=row(value);
   for(const key of Object.keys(source).sort()){
@@ -68,12 +90,21 @@ export function buildSmtSyncEntities(snapshot:unknown):MfkSyncEntityMap{
   arrayEntities(out,'COMBO',catalog.combos,['id','comboId']);
   arrayEntities(out,'COMBO_POOL',catalog.comboPools,['id','poolId']);
   arrayEntities(out,'OPTION_SET',optionCenter.sets,['id','setId']);
+  putOrder(out,'SMT:CATEGORY',orderedIds(catalog.categories,['id','categoryId']));
+  putOrder(out,'SMT:PRODUCT',orderedIds(catalog.products,['id','productId','productCode']));
+  putOrder(out,'SMT:COMBO',orderedIds(catalog.combos,['id','comboId']));
+  putOrder(out,'SMT:COMBO_POOL',orderedIds(catalog.comboPools,['id','poolId']));
+  putOrder(out,'SMT:OPTION_SET',orderedIds(optionCenter.sets,['id','setId']));
+  const optionLinkOrder:string[]=[];
   rows(optionCenter.productLinks).forEach((value,index)=>{
     const item=row(value);
     const productId=safeId(item.productId,'PRODUCT');
     const setId=safeId(item.setId,String(index+1));
-    put(out,'OPTION_PRODUCT_LINK',productId+'::'+setId,item);
+    const id=productId+'::'+setId;
+    optionLinkOrder.push(id);
+    put(out,'OPTION_PRODUCT_LINK',id,item);
   });
+  putOrder(out,'SMT:OPTION_PRODUCT_LINK',optionLinkOrder);
   keyedObjectEntities(out,'PRODUCT_MEDIA',root.productMedia);
 
   const catalogMeta={...catalog};
@@ -103,6 +134,11 @@ export function buildCustomerSyncEntities(snapshot:unknown):MfkSyncEntityMap{
   arrayEntities(out,'CUSTOMER_COMBO',menu.combos,['comboId','id']);
   arrayEntities(out,'CUSTOMER_COMBO_POOL',menu.comboPools,['poolId','id']);
   arrayEntities(out,'CUSTOMER_PAYMENT_CHANNEL',root.paymentChannels,['channelId','id']);
+  putOrder(out,'CUSTOMER:CATEGORY',orderedIds(menu.categories,['categoryId','id']));
+  putOrder(out,'CUSTOMER:PRODUCT',orderedIds(menu.products,['productId','id']));
+  putOrder(out,'CUSTOMER:COMBO',orderedIds(menu.combos,['comboId','id']));
+  putOrder(out,'CUSTOMER:COMBO_POOL',orderedIds(menu.comboPools,['poolId','id']));
+  putOrder(out,'CUSTOMER:PAYMENT_CHANNEL',orderedIds(root.paymentChannels,['channelId','id']));
   const fallback=row(root.fallback);
   if(Object.keys(fallback).length)put(out,'CUSTOMER_FALLBACK','DEFAULT',fallback);
   const menuMeta={...menu};
@@ -116,6 +152,8 @@ export function buildSmmSyncEntities(snapshot:unknown):MfkSyncEntityMap{
   const root=row(snapshot),menu=row(root.menu);
   const out:Record<string,MfkSyncCheckpointEntity>={};
   arrayEntities(out,'SMM_CATEGORY',menu.categories,['categoryId','id']);
+  putOrder(out,'SMM:CATEGORY',orderedIds(menu.categories,['categoryId','id']));
+  const smmProductOrder:string[]=[];
   rows(menu.products).forEach((value,index)=>{
     const item=row(value);
     const productId=safeId(item.productId??item.id,String(index+1));
@@ -137,11 +175,16 @@ export function buildSmmSyncEntities(snapshot:unknown):MfkSyncEntityMap{
       optionGroups:Array.isArray(item.optionGroups)?item.optionGroups:[],
       ...(text(item.comboId)?{comboId:text(item.comboId)}:{}),
     };
+    smmProductOrder.push(productId);
     put(out,'SMM_PRODUCT',productId,normalized);
   });
+  putOrder(out,'SMM:PRODUCT',smmProductOrder);
   arrayEntities(out,'SMM_COMBO',menu.combos,['comboId','id']);
   arrayEntities(out,'SMM_COMBO_POOL',menu.comboPools,['poolId','id']);
   arrayEntities(out,'SMM_DINING_TABLE',root.diningTables,['tableId','id']);
+  putOrder(out,'SMM:COMBO',orderedIds(menu.combos,['comboId','id']));
+  putOrder(out,'SMM:COMBO_POOL',orderedIds(menu.comboPools,['poolId','id']));
+  putOrder(out,'SMM:DINING_TABLE',orderedIds(root.diningTables,['tableId','id']));
   const menuMeta={...menu};
   delete menuMeta.categories;delete menuMeta.products;delete menuMeta.combos;delete menuMeta.comboPools;
   delete menuMeta.observedAt;delete menuMeta.revision;
@@ -155,6 +198,9 @@ export function buildKeetaSyncEntities(projectionPayload:unknown):MfkSyncEntityM
   arrayEntities(out,'KEETA_CATEGORY',root.shopCategoryList,['openItemCode','id']);
   arrayEntities(out,'KEETA_CHOICE_GROUP',root.choiceGroupList,['openItemCode','id']);
   arrayEntities(out,'KEETA_SPU',root.spuList,['openItemCode','id']);
+  putOrder(out,'KEETA:CATEGORY',orderedIds(root.shopCategoryList,['openItemCode','id']));
+  putOrder(out,'KEETA:CHOICE_GROUP',orderedIds(root.choiceGroupList,['openItemCode','id']));
+  putOrder(out,'KEETA:SPU',orderedIds(root.spuList,['openItemCode','id']));
   const sequenceMap=row(root.spuSequenceCodeMap);
   for(const key of Object.keys(sequenceMap).sort()){
     put(out,'KEETA_CATEGORY_SEQUENCE',key,{spuOpenItemCodes:sequenceMap[key]});
@@ -289,17 +335,19 @@ export function applyMfkSyncChanges(
 
 export function materializeSmtSnapshot(entities:MfkSyncEntityMap):Readonly<JsonRow>{
   const snapshot:JsonRow={};
-  const catalog:JsonRow={categories:[],products:[],combos:[],comboPools:[]};
-  const optionCenter:JsonRow={sets:[],productLinks:[]};
+  const catalog:JsonRow={
+    categories:orderedEntities(entities,'CATEGORY','SMT:CATEGORY').map(entity=>entity.payload),
+    products:orderedEntities(entities,'PRODUCT','SMT:PRODUCT').map(entity=>entity.payload),
+    combos:orderedEntities(entities,'COMBO','SMT:COMBO').map(entity=>entity.payload),
+    comboPools:orderedEntities(entities,'COMBO_POOL','SMT:COMBO_POOL').map(entity=>entity.payload),
+  };
+  const optionCenter:JsonRow={
+    sets:orderedEntities(entities,'OPTION_SET','SMT:OPTION_SET').map(entity=>entity.payload),
+    productLinks:orderedEntities(entities,'OPTION_PRODUCT_LINK','SMT:OPTION_PRODUCT_LINK').map(entity=>entity.payload),
+  };
   const productMedia:JsonRow={};
   for(const entity of Object.values(entities)){
-    if(entity.entityType==='CATEGORY')(catalog.categories as unknown[]).push(entity.payload);
-    else if(entity.entityType==='PRODUCT')(catalog.products as unknown[]).push(entity.payload);
-    else if(entity.entityType==='COMBO')(catalog.combos as unknown[]).push(entity.payload);
-    else if(entity.entityType==='COMBO_POOL')(catalog.comboPools as unknown[]).push(entity.payload);
-    else if(entity.entityType==='OPTION_SET')(optionCenter.sets as unknown[]).push(entity.payload);
-    else if(entity.entityType==='OPTION_PRODUCT_LINK')(optionCenter.productLinks as unknown[]).push(entity.payload);
-    else if(entity.entityType==='PRODUCT_MEDIA')productMedia[entity.entityId]=entity.payload;
+    if(entity.entityType==='PRODUCT_MEDIA')productMedia[entity.entityId]=entity.payload;
     else if(entity.entityType==='CATALOG_META')Object.assign(catalog,entity.payload);
     else if(entity.entityType==='OPTION_CENTER_META')Object.assign(optionCenter,entity.payload);
     else if(entity.entityType==='SNAPSHOT_SECTION')snapshot[entity.entityId]=entity.payload;
@@ -311,19 +359,18 @@ export function materializeSmtSnapshot(entities:MfkSyncEntityMap):Readonly<JsonR
   return Object.freeze(snapshot);
 }
 
-
 export function materializeCustomerConfigSnapshot(entities:MfkSyncEntityMap):Readonly<JsonRow>{
   const store:JsonRow={};
-  const menu:JsonRow={categories:[],products:[],combos:[],comboPools:[]};
-  const paymentChannels:unknown[]=[];
+  const menu:JsonRow={
+    categories:orderedEntities(entities,'CUSTOMER_CATEGORY','CUSTOMER:CATEGORY').map(entity=>entity.payload),
+    products:orderedEntities(entities,'CUSTOMER_PRODUCT','CUSTOMER:PRODUCT').map(entity=>entity.payload),
+    combos:orderedEntities(entities,'CUSTOMER_COMBO','CUSTOMER:COMBO').map(entity=>entity.payload),
+    comboPools:orderedEntities(entities,'CUSTOMER_COMBO_POOL','CUSTOMER:COMBO_POOL').map(entity=>entity.payload),
+  };
+  const paymentChannels=orderedEntities(entities,'CUSTOMER_PAYMENT_CHANNEL','CUSTOMER:PAYMENT_CHANNEL').map(entity=>entity.payload);
   let fallback:JsonRow|undefined;
   for(const entity of Object.values(entities)){
     if(entity.entityType==='CUSTOMER_STORE')Object.assign(store,entity.payload);
-    else if(entity.entityType==='CUSTOMER_CATEGORY')(menu.categories as unknown[]).push(entity.payload);
-    else if(entity.entityType==='CUSTOMER_PRODUCT')(menu.products as unknown[]).push(entity.payload);
-    else if(entity.entityType==='CUSTOMER_COMBO')(menu.combos as unknown[]).push(entity.payload);
-    else if(entity.entityType==='CUSTOMER_COMBO_POOL')(menu.comboPools as unknown[]).push(entity.payload);
-    else if(entity.entityType==='CUSTOMER_PAYMENT_CHANNEL')paymentChannels.push(entity.payload);
     else if(entity.entityType==='CUSTOMER_FALLBACK')fallback={...entity.payload};
     else if(entity.entityType==='CUSTOMER_MENU_META')Object.assign(menu,entity.payload);
   }
@@ -332,5 +379,21 @@ export function materializeCustomerConfigSnapshot(entities:MfkSyncEntityMap):Rea
     menu:Object.freeze(menu),
     paymentChannels:Object.freeze(paymentChannels),
     ...(fallback?{fallback:Object.freeze(fallback)}:{}),
+  });
+}
+
+export function materializeSmmConfigSnapshot(entities:MfkSyncEntityMap):Readonly<JsonRow>{
+  const menu:JsonRow={
+    categories:orderedEntities(entities,'SMM_CATEGORY','SMM:CATEGORY').map(entity=>entity.payload),
+    products:orderedEntities(entities,'SMM_PRODUCT','SMM:PRODUCT').map(entity=>entity.payload),
+    combos:orderedEntities(entities,'SMM_COMBO','SMM:COMBO').map(entity=>entity.payload),
+    comboPools:orderedEntities(entities,'SMM_COMBO_POOL','SMM:COMBO_POOL').map(entity=>entity.payload),
+  };
+  for(const entity of Object.values(entities)){
+    if(entity.entityType==='SMM_MENU_META')Object.assign(menu,entity.payload);
+  }
+  return Object.freeze({
+    menu:Object.freeze(menu),
+    diningTables:Object.freeze(orderedEntities(entities,'SMM_DINING_TABLE','SMM:DINING_TABLE').map(entity=>entity.payload)),
   });
 }
