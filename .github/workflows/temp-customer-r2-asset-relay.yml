@@ -2,11 +2,6 @@ name: temp-customer-r2-asset-relay
 
 on:
   push:
-    branches:
-      - temp/MFK-CUSTOMER-R2-ASSET-RELAY-20261001
-    paths:
-      - "relay/customer-assets/**"
-      - ".github/workflows/temp-customer-r2-asset-relay.yml"
 
 permissions:
   contents: read
