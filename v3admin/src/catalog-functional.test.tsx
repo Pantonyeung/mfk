@@ -37,7 +37,7 @@ describe('Admin V3 functional catalog correction',()=>{
     expect(html).toContain('商品價格');
     expect(html).toContain('選項價格');
     expect(html).toContain('套餐價格');
-    expect(html).toContain('紫米飯糰・照燒雞');
+    expect(html).toContain('香煎雞扒紫米飯');
   });
 
   it('renders functional category and product ordering',()=>{
