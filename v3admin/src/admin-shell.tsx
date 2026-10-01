@@ -10,6 +10,7 @@ import {ChannelPage,PermissionsPage,PrintExceptionsPage,PrintOverviewPage,PrintR
 import {AccessPage,BusinessDayPage,CapacityPage,CashClosePage,DevicesPage,OtaPage,PublishFlowPage} from './admin-operations-pages.tsx';
 import {OrdersPage,ReportPage} from './admin-read-pages.tsx';
 import {AuditPage,DiagnosticsPage,EffectiveSettingsPage,IntegrationsPage,TodayPage} from './admin-system-pages.tsx';
+import {FormalDraftStatusBar,FormalPendingChangesPage,FormalPublishPage} from './formal-publish-pages.tsx';
 import {
   EmptyState,
   ErrorState,
@@ -59,13 +60,14 @@ function RouteSkeleton({path,canonicalState,onRefresh}:{path:string;canonicalSta
   </>;
 }
 
-export function AdminShell({storeId,displayName,releaseStatus,canonicalState,canonicalSnapshot,previewMode=false,initialPath,onRefresh,onDiagnostics,onSignOut,children}:{
+export function AdminShell({storeId,displayName,releaseStatus,canonicalState,canonicalSnapshot,previewMode=false,formalDraftEnabled=false,initialPath,onRefresh,onDiagnostics,onSignOut,children}:{
   storeId:string;
   displayName:string;
   releaseStatus:ReactNode;
   canonicalState:CanonicalState;
   canonicalSnapshot?:unknown;
   previewMode?:boolean;
+  formalDraftEnabled?:boolean;
   initialPath?:string;
   onRefresh:()=>void;
   onDiagnostics:()=>void;
@@ -184,10 +186,10 @@ export function AdminShell({storeId,displayName,releaseStatus,canonicalState,can
                                                           ?<ReportPage mode="operations"/>
                                                           :path==='/admin/reports/export'&&previewMode
                                                             ?<ReportPage mode="export"/>
-                                                            :path==='/admin/publish/pending'&&previewMode
-                                                              ?<PublishFlowPage mode="pending"/>
-                                                  :path==='/admin/publish'&&previewMode
-                                                    ?<PublishFlowPage mode="publish"/>
+                                                            :path==='/admin/publish/pending'
+                                                              ?(previewMode?<PublishFlowPage mode="pending"/>:formalDraftEnabled?<FormalPendingChangesPage/>:<RouteSkeleton path={path} canonicalState={canonicalState} onRefresh={onRefresh}/>)
+                                                  :path==='/admin/publish'
+                                                    ?(previewMode?<PublishFlowPage mode="publish"/>:formalDraftEnabled?<FormalPublishPage/>:<RouteSkeleton path={path} canonicalState={canonicalState} onRefresh={onRefresh}/>)
                                                     :path==='/admin/publish/versions'&&previewMode
                                                       ?<PublishFlowPage mode="versions"/>
                                                       :path==='/admin/publish/rollback'&&previewMode
@@ -230,6 +232,7 @@ export function AdminShell({storeId,displayName,releaseStatus,canonicalState,can
         {previewMode?<div className="v3-preview-topbadge">只供介面驗收</div>:<div className="v3-top-actions"><button type="button" onClick={onDiagnostics}>系統資訊</button><button type="button" onClick={onSignOut}>登出</button></div>}
       </header>
       {releaseStatus}
+      {formalDraftEnabled?<FormalDraftStatusBar/>:null}
       <main className="v3-content">{routeContent}{children}</main>
     </div>
   </div>;
