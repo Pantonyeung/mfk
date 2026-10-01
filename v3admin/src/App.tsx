@@ -1,4 +1,4 @@
-import {useMemo,useState} from 'react';
+import {useMemo,useState,type ReactNode} from 'react';
 import {useQuery,useQueryClient} from '@tanstack/react-query';
 import {AdminShell} from './admin-shell.tsx';
 import {readV3BackendHealth,v3QueryKeys} from './api.ts';
@@ -12,6 +12,8 @@ import {
 } from './release.ts';
 import {scopeFromSession} from './scope.ts';
 import {V3_ADMIN_STATE_AUTHORITY,useV3AdminUi} from './state-authority.ts';
+import {V3FormalDraftProvider,useV3FormalDraft} from './formal-draft.tsx';
+import type {MfkAdminConfigEnvelope} from '../../contracts/admin-config-sync-v1.ts';
 
 function hkTime(value:string){
   const at=Date.parse(value);
@@ -54,6 +56,44 @@ function Diagnostics({backendSha,summary}:{backendSha?:string;summary:ReturnType
       {summary?<><div><dt>正式發佈時間</dt><dd>{hkTime(summary.publishedAt)}</dd></div><div><dt>Canonical Fingerprint</dt><dd>{summary.fingerprint}</dd></div><div><dt>診斷 Revision</dt><dd>{summary.revision}</dd></div></>:null}
     </dl>
   </section>;
+}
+
+function AuthenticatedAdminShell({
+  storeId,
+  session,
+  canonical,
+  canonicalState,
+  releaseStatus,
+  backendSha,
+  diagnosticsOpen,
+  onRefresh,
+  onDiagnostics,
+  onSignOut,
+}:{
+  storeId:string;
+  session:V3AdminSession;
+  canonical:MfkAdminConfigEnvelope;
+  canonicalState:'pending'|'error'|'fresh'|'refreshing'|'stale';
+  releaseStatus:ReactNode;
+  backendSha?:string;
+  diagnosticsOpen:boolean;
+  onRefresh:()=>void;
+  onDiagnostics:()=>void;
+  onSignOut:()=>void;
+}){
+  const formalDraft=useV3FormalDraft();
+  return <AdminShell
+    storeId={storeId}
+    displayName={session.displayName}
+    releaseStatus={releaseStatus}
+    canonicalState={canonicalState}
+    canonicalSnapshot={formalDraft.workingSnapshot}
+    onRefresh={onRefresh}
+    onDiagnostics={onDiagnostics}
+    onSignOut={onSignOut}
+  >
+    {diagnosticsOpen?<Diagnostics backendSha={backendSha} summary={summarizeV3Canonical(canonical)}/>:null}
+  </AdminShell>;
 }
 
 export function V3AdminApp(){
@@ -126,16 +166,36 @@ export function V3AdminApp(){
 
   const canonicalState=canonical.data?(canonical.isRefetchError?'stale':canonical.isFetching?'refreshing':'fresh'):canonical.isError?'error':'pending';
   const shellReleaseStatus=<>{releaseStatus}{releaseMatch!==true?<div className="v3-warning v3-release-warning" role="alert">目前 Client Release 未確認一致。正式寫入功能保持鎖定。</div>:null}</>;
-  return <AdminShell
-    storeId={scope?.storeId??''}
-    displayName={session.displayName}
-    releaseStatus={shellReleaseStatus}
-    canonicalState={canonicalState}
-    canonicalSnapshot={canonical.data?.snapshot}
-    onRefresh={()=>void canonical.refetch()}
-    onDiagnostics={()=>setDiagnosticsOpen(!diagnosticsOpen)}
-    onSignOut={()=>void signOut()}
+  if(!scope||!canonical.data){
+    return <AdminShell
+      storeId={scope?.storeId??''}
+      displayName={session.displayName}
+      releaseStatus={shellReleaseStatus}
+      canonicalState={canonicalState}
+      canonicalSnapshot={canonical.data?.snapshot}
+      onRefresh={()=>void canonical.refetch()}
+      onDiagnostics={()=>setDiagnosticsOpen(!diagnosticsOpen)}
+      onSignOut={()=>void signOut()}
+    >
+      {diagnosticsOpen?<Diagnostics backendSha={health.data?.sourceSha} summary={summary}/>:null}
+    </AdminShell>;
+  }
+  return <V3FormalDraftProvider
+    storeId={scope.storeId}
+    sessionToken={session.sessionToken}
+    canonical={canonical.data}
   >
-    {diagnosticsOpen?<Diagnostics backendSha={health.data?.sourceSha} summary={summary}/>:null}
-  </AdminShell>;
+    <AuthenticatedAdminShell
+      storeId={scope.storeId}
+      session={session}
+      canonical={canonical.data}
+      canonicalState={canonicalState}
+      releaseStatus={shellReleaseStatus}
+      backendSha={health.data?.sourceSha}
+      diagnosticsOpen={diagnosticsOpen}
+      onRefresh={()=>void canonical.refetch()}
+      onDiagnostics={()=>setDiagnosticsOpen(!diagnosticsOpen)}
+      onSignOut={()=>void signOut()}
+    />
+  </V3FormalDraftProvider>;
 }
