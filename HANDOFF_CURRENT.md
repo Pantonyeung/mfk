@@ -105,6 +105,31 @@ Both:
 - same normalized intent
 - same canonical material facts
 
+## Owner crosswalk closure
+
+Controlling crosswalk:
+`docs/plan/MFP_V3_OWNER_REQUIREMENTS_CROSSWALK_2026-10-02.md`
+
+Current implementation slice:
+`SOURCE_VERIFIED`
+
+A4 stage closure:
+`BLOCKED`
+
+Required before A5:
+- A4-C1 Display Settings
+- A4-C2 Navigation + More shell
+- A4-C3 major modal geometry
+- A4-C4 exact Cart semantics
+- A4-C5 Hold/Retrieve/Dining draft entry
+- A4-C6 exact Fast Lane
+- A4-C7 Owner UI acceptance baseline
+
+Current verified slice SHA:
+`5e4118c003bef84a5e0262d5ac925537c4686ff3`
+
+Do not advance to A5 until the above closure is SOURCE_VERIFIED.
+
 ## Completion target
 
 SOURCE_VERIFIED
