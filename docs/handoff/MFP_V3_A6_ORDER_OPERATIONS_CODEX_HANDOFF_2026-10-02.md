@@ -826,3 +826,40 @@ Status language only:
 
 MILESTONE:
 `MFP_V3_A6_ORDER_OPERATIONS_2026_10_02`
+
+
+---
+
+# OWNER VISUAL LOCK ADDENDUM｜2026-10-02
+
+Owner has now explicitly locked the MFP Pad Ordering page visual direction.
+
+Controlling visual reference:
+`docs/design/MFP_PAD_ORDERING_VISUAL_LOCK_R1_2026-10-02.md`
+
+A6 must extend that same visual system into:
+- Orders
+- Dining
+- Sold-out / Capacity
+- More / Tools
+
+Do NOT create a separate A6 visual language.
+
+Preserve:
+- left high-frequency rail / top-hamburger logic
+- blue active-state language
+- white rounded operational panels
+- compact high-density POS geometry
+- stable primary-action placement
+- large readable operational numbers
+- same typography/card/button family
+
+Internal page layouts may differ by task:
+- Orders = detail + three source lanes
+- Dining = waiting + 3×3 tables + detail
+- Sold-out/Capacity = filters/list/operation workspace
+
+This visual lock does not alter business authority or A6 semantic requirements.
+
+MILESTONE:
+`MFP_A6_VISUAL_EXTENSION_FROM_ORDERING_LOCK_R1_2026_10_02`
