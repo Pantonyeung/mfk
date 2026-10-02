@@ -9,15 +9,16 @@ const root=path.resolve(here,'..');
 const read=(relative:string)=>fs.readFileSync(path.join(root,relative),'utf8');
 
 describe('2026-09-26 integrated main E2E preservation lock',()=>{
-  it('preserves Web SMT acceptance isolation while production SMT keeps Customer and Keeta consumers',()=>{
+  it('keeps the public SMT shell free of legacy polling while production SMT keeps Customer and Keeta consumers',()=>{
     const main=read('main.tsx');
     expect(main).toContain('const webAcceptance=isSmtWebAcceptance()');
+    expect(main).toContain('if(!webAcceptance)installSmtAdminAutoSync()');
     expect(main).toContain('if(!webAcceptance){');
     expect(main).toContain('installKeetaOrderIntake()');
     expect(main).toContain('installKeetaOrderLifecycle()');
     expect(main).toContain('installKeetaAfterSales()');
     expect(main).toContain('installCustomerCloudBridge()');
-    expect(main).toContain('if(webAcceptance)installSmmWebAcceptanceIntake(smmLanIngress)');
+    expect(main).not.toContain('installSmmWebAcceptanceIntake');
   });
 
   it('preserves Customer commercial grant, evidence, canonical order and readback semantics',()=>{
