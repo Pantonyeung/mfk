@@ -68,6 +68,5 @@ export function installAdminRefundIntake(){
     if(event.type==='ADMIN_REFUND_AVAILABLE')reconcile();
   });
   window.addEventListener('online',reconcile);
-  window.addEventListener('focus',reconcile);
   window.setTimeout(reconcile,0);
 }
