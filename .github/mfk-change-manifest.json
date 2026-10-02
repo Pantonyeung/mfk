@@ -1,34 +1,38 @@
 {
   "version": 1,
-  "capability": "MFK_UNIFIED_SURFACES_R1_AUTHORITY_2026_10_02",
-  "base_sha": "6862038da1ac1ab9d0846d3d05a44c933d41f662",
-  "root_control": "#22",
-  "product_control": "#627",
+  "capability": "MFP_V3_A2_DEVICE_STAFF_SECURITY_2026_10_02",
+  "base_sha": "256e130ae4f7292beadbcbbe847433c769066a7e",
+  "root_control": "#636",
+  "product_control": "#635",
   "allowed_paths": [
     ".github/mfk-change-manifest.json",
+    ".github/workflows/v3smt-a0-foundation.yml",
+    "AGENTS.md",
     "COMMANDER_CURRENT.md",
     "HANDOFF_CURRENT.md",
-    "docs/governance/MFK_UNIFIED_SURFACES_R1_AUTHORITY_2026-10-02.md",
-    "docs/handoff/2026-10-02_smt_unified_surfaces_proposal.md"
+    "docs/governance/MFK_V3_SMT_REBUILD_AUTHORITY_2026-10-02.md",
+    "docs/handoff/MFP_V3_A2_DEVICE_STAFF_SECURITY_CODEX_HANDOFF_2026-10-02.md",
+    "v3smt/**"
   ],
-  "authority_impact": "DOCUMENTS_ONLY_OWNER_AUTHORITY_UPDATE; SUPERSEDES_2026_09_30_V3_ONLY_EXECUTION_RESTRICTION_FOR_UNIFIED_SURFACES_R1; NO_RUNTIME_AUTHORITY_CHANGE_IN_THIS_CANDIDATE",
-  "persistence_impact": "NONE",
+  "authority_impact": "ADDS_ONE_SHARED_MFP_DEVICE_AND_STAFF_CLIENT_SECURITY_PORT; FORMAL_AUTH_AND_STORE_KERNEL_ADMISSION_REMAIN_EXTERNAL_AUTHORITIES",
+  "persistence_impact": "DEXIE_INSTALLATION_AND_DEVICE_METADATA_ONLY; NO_PIN_VERIFIER_PERMISSION_OR_STAFF_SESSION_PERSISTENCE",
   "provider_impact": "NONE",
-  "transaction_impact": "NONE",
-  "production_routing_impact": "NONE_IN_THIS_DOCS_ONLY_CANDIDATE",
+  "transaction_impact": "FAIL_CLOSED_ACTION_TIME_PRECHECK_BEFORE_EXISTING_A1_STORE_KERNEL_PORT; SUBMISSION_AND_IDEMPOTENCY_IDENTITY_UNCHANGED",
+  "production_routing_impact": "NONE; PRODUCTION_SECURITY_AUTHORITY_BINDING_REMAINS_UNAVAILABLE",
   "expected_behavior_change": [
-    "Commander and handoff entry points recognize Unified Surfaces R1 as the current Owner-locked execution program.",
-    "The prior SMT unified-surfaces proposal is explicitly superseded as execution authority.",
-    "PR #627 acceptance deployment PROMOTE authority is recorded while final merge/cutover/OTA/decommission remain separately gated.",
-    "The 2026-09-30 V3-only/no-broad-v2 restriction no longer blocks the bounded v2admin/v2local convergence authorized by Unified Surfaces R1."
+    "MFP device identity remains stable across reload while authorization always restarts UNKNOWN until formal readback.",
+    "Only a formal auth authority response can create an in-memory authenticated staff session.",
+    "Expired, revoked, unknown, mismatched or under-permissioned actions fail before Store Kernel submit.",
+    "MFP Pad and MFP Mobile share the same security port and existing A1 Store Kernel port semantics.",
+    "The minimal A2 harness exposes device, login, staff, expiry, logout and permission-denied states without persisting PIN or session authority."
   ],
   "non_goals": [
-    "No runtime source change.",
-    "No deploy in this governance candidate.",
-    "No Store Kernel, Pricing, Order, Payment, Fulfillment, Print, Customer or Keeta logic change.",
+    "No production auth endpoint or Store Kernel binding.",
+    "No final ordering UI.",
+    "No Store Kernel, Pricing, Order, Payment, Fulfillment, Print, Customer or Keeta authority change.",
     "No Builder or OTA protocol change.",
-    "No final PR #627 merge or legacy decommission."
+    "No merge, deploy, cutover or legacy SMM decommission."
   ],
-  "rollback_sha": "6862038da1ac1ab9d0846d3d05a44c933d41f662",
-  "severity": "SOFT_BLOCK"
+  "rollback_sha": "256e130ae4f7292beadbcbbe847433c769066a7e",
+  "severity": "HARD_BLOCK"
 }
