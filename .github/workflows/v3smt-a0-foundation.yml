@@ -1,4 +1,4 @@
-name: MFP V3 A8 Customer Keeta External
+name: MFP V3 A9 Source Diagnostics
 
 on:
   push:
@@ -12,6 +12,7 @@ on:
       - feat/MFP-V3-A6-ORDER-OPERATIONS-2026-10-02
       - feat/MFP-V3-A7-PRINT-HARDWARE-RECOVERY-2026-10-02
       - feat/MFP-V3-A8-CUSTOMER-KEETA-EXTERNAL-2026-10-02
+      - feat/MFP-V3-A9-PUBLIC-DIAGNOSTICS-PHYSICAL-CUTOVER-2026-10-02
     paths:
       - '.github/mfk-change-manifest.json'
       - 'v3smt/**'
@@ -25,6 +26,9 @@ on:
       - 'docs/handoff/MFP_V3_A6_ORDER_OPERATIONS_CODEX_HANDOFF_2026-10-02.md'
       - 'docs/handoff/MFP_V3_A7_PRINT_HARDWARE_RECOVERY_CODEX_HANDOFF_2026-10-02.md'
       - 'docs/handoff/MFP_V3_A8_CUSTOMER_KEETA_EXTERNAL_CODEX_HANDOFF_2026-10-02.md'
+      - 'docs/handoff/MFP_V3_A9_PUBLIC_DIAGNOSTICS_PHYSICAL_CUTOVER_CODEX_HANDOFF_2026-10-02.md'
+      - 'docs/acceptance/MFP_V3_A9_PHYSICAL_ACCEPTANCE_RUNBOOK_2026-10-02.md'
+      - 'docs/acceptance/MFP_V3_A9_SOURCE_BINDING_AUDIT_2026-10-02.md'
       - '.github/workflows/v3smt-a0-foundation.yml'
   pull_request:
     paths:
@@ -40,6 +44,9 @@ on:
       - 'docs/handoff/MFP_V3_A6_ORDER_OPERATIONS_CODEX_HANDOFF_2026-10-02.md'
       - 'docs/handoff/MFP_V3_A7_PRINT_HARDWARE_RECOVERY_CODEX_HANDOFF_2026-10-02.md'
       - 'docs/handoff/MFP_V3_A8_CUSTOMER_KEETA_EXTERNAL_CODEX_HANDOFF_2026-10-02.md'
+      - 'docs/handoff/MFP_V3_A9_PUBLIC_DIAGNOSTICS_PHYSICAL_CUTOVER_CODEX_HANDOFF_2026-10-02.md'
+      - 'docs/acceptance/MFP_V3_A9_PHYSICAL_ACCEPTANCE_RUNBOOK_2026-10-02.md'
+      - 'docs/acceptance/MFP_V3_A9_SOURCE_BINDING_AUDIT_2026-10-02.md'
       - '.github/workflows/v3smt-a0-foundation.yml'
 
 permissions:
@@ -155,3 +162,17 @@ jobs:
           if grep -RInE --include='external-*.ts' --include='external-*.tsx' --exclude='*.test.ts' --exclude='*.test.tsx' 'class[[:space:]]+[A-Za-z0-9_]*(Order|Payment|Refund|Print|Capacity)(Engine|Authority)' v3smt/src; then exit 1; fi
           if grep -RInE --include='external-*.ts' --include='external-*.tsx' --exclude='*.test.ts' --exclude='*.test.tsx' '(appSecret|signingKey|webhookSecret|longLivedBearer|providerBearer|Authorization:)' v3smt/src; then exit 1; fi
           if grep -RInE --include='external-*.ts' --include='external-*.tsx' --exclude='*.test.ts' --exclude='*.test.tsx' '(URLSearchParams|searchParams|console\.(log|info|warn|error)).*(secret|credential|bearer|token)' v3smt/src; then exit 1; fi
+          grep -RInF "target:'MFP_V3'" v3smt/vite.config.ts
+          grep -RInF 'build-identity.json' v3smt/vite.config.ts
+          grep -RInF "APP_ORIGIN='https://appassets.androidplatform.net'" v3smt/src/a9-runtime.ts
+          grep -RInF "FORMAL_COMMAND_ROUTER_BINDING_MISSING" v3smt/src/a9-runtime.ts
+          grep -RInF "MFP_NATIVE_MUTATION_DISABLED_PUBLIC" v3smt/src/a9-runtime.ts
+          grep -RInF 'signalMfpRuntimeReadyOnce' v3smt/src/App.tsx
+          grep -RInF 'data-check-center="A9"' v3smt/src/check-center.tsx
+          grep -RInF "status:'BLOCKED' as const" v3smt/src/a9-runtime.ts
+          grep -RInF 'MFP_A9_PHYSICAL_GATES' v3smt/src/a9-acceptance.ts
+          ! grep -RInE --include='a9-*.ts' --include='check-center.tsx' 'from .*(v2local|v2smm)|store\.kernel\.commit\.v1|runtime\.update\.activate|runtime\.rollback|print\.(sunmi|lan)\.dispatch' v3smt/src
+          ! grep -RInE --include='a9-*.ts' --include='check-center.tsx' 'console\.(log|info|warn|error)|staffSessionRef|providerSecret|paymentEvidence' v3smt/src
+          ! grep -RInE --include='a9-*.ts' --include='check-center.tsx' 'setInterval\s*\(' v3smt/src
+          test -s v3smt/dist/build-identity.json
+          grep -F 'Cache-Control: no-store' v3smt/dist/_headers

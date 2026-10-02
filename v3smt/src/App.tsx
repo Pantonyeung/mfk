@@ -7,6 +7,7 @@ import {MfpSyncHarness} from './sync-harness.tsx';
 import {mfpSyncCoordinator} from './sync-binding.ts';
 import {mfpCheckoutRuntimeBinding} from './checkout-runtime.ts';
 import {mfpPrintHardwareRuntimeBinding} from './print-hardware-runtime.tsx';
+import {signalMfpRuntimeReadyOnce} from './a9-runtime.ts';
 
 export function V3SmtApp(){
   const {surface,setSurface}=useMfpUi();
@@ -19,6 +20,8 @@ export function V3SmtApp(){
     query.addEventListener('change',update);
     return()=>query.removeEventListener('change',update);
   },[setSurface]);
+
+  useEffect(()=>{signalMfpRuntimeReadyOnce(new URL(window.location.href),window.moreFunNative);},[]);
 
   return <main className="v3smt-shell" data-surface={surface}>
     <header className="mfp-app-head">

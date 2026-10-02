@@ -1,40 +1,39 @@
 {
   "version": 1,
-  "capability": "MFP_V3_A8_CUSTOMER_KEETA_EXTERNAL_2026_10_02",
-  "base_sha": "806ca51cfd812a968f9208a45e14d8a228fa91e1",
-  "root_control": "#648",
-  "product_control": "#647",
+  "capability": "MFP_V3_A9_PUBLIC_DIAGNOSTICS_PHYSICAL_CUTOVER_SOURCE_2026_10_02",
+  "base_sha": "83adb14c21170bc3a34a0022c62b1a2bea2f68c4",
+  "root_control": "#650",
+  "product_control": "#649",
   "allowed_paths": [
     ".github/mfk-change-manifest.json",
     ".github/workflows/v3smt-a0-foundation.yml",
     "COMMANDER_CURRENT.md",
     "HANDOFF_CURRENT.md",
-    "docs/design/MFP_PAD_ORDERING_VISUAL_LOCK_R1_2026-10-02.md",
+    "docs/acceptance/MFP_V3_A9_PHYSICAL_ACCEPTANCE_RUNBOOK_2026-10-02.md",
+    "docs/acceptance/MFP_V3_A9_SOURCE_BINDING_AUDIT_2026-10-02.md",
     "docs/governance/MFK_V3_SMT_REBUILD_AUTHORITY_2026-10-02.md",
-    "docs/handoff/MFP_V3_A8_CUSTOMER_KEETA_EXTERNAL_CODEX_HANDOFF_2026-10-02.md",
-    "docs/plan/MFP_V3_OWNER_FINAL_CROSSWALK_2026-10-02.txt",
-    "docs/plan/MFP_V3_SMM_Migration_Plan_2026-10-02.txt",
+    "docs/handoff/MFP_V3_A9_PUBLIC_DIAGNOSTICS_PHYSICAL_CUTOVER_CODEX_HANDOFF_2026-10-02.md",
     "v3smt/**"
   ],
-  "authority_impact": "ADDS ONE BOUNDED CUSTOMER AND KEETA EXTERNAL READ MODEL AND ADAPTER OVER THE EXISTING A2 SECURITY A1 STORE KERNEL A6 ORDER OPERATIONS A5 MONEY REFUND AND A7 PRINT AUTHORITIES; NO SECOND BUSINESS AUTHORITY",
-  "persistence_impact": "NO BROWSER EXTERNAL ORDER PAYMENT REFUND PRINT CAPACITY OR PROVIDER LEDGER; BROWSER STATE IS PRESENTATION AND SINGLE FLIGHT COORDINATION ONLY",
-  "provider_impact": "ADDS INJECTED SERVER PROVIDER ADAPTER CONTRACTS FOR CUSTOMER KEETA ACK LIFECYCLE AFTER SALE AND CHANNEL PROPAGATION; NO PROVIDER SECRET OR DIRECT SENSITIVE REQUEST IN BROWSER",
-  "transaction_impact": "CUSTOMER AND MANUAL KEETA PENDING CREATE ZERO FORMAL ORDERS UNTIL ACCEPT OR IMMEDIATE; EXACT EXTERNAL IDENTITY ADMITS MAX ONE CANONICAL ORDER AND REUSES EXISTING PAYMENT REFUND PRINT AND CAPACITY TRUTH",
-  "production_routing_impact": "NONE; CUSTOMER KEETA CONFIRMATION LIFECYCLE AFTER SALE CHANNEL PROPAGATION AND PUBLIC PRODUCTION BINDINGS REMAIN BLOCKED AND FAIL CLOSED",
+  "authority_impact": "ADDS EXACT BUILD AND CARRIER IDENTITY DIAGNOSTICS ONLY; FORMAL BUSINESS COMMAND ROUTER REMAINS EXPLICITLY BLOCKED AND NO ORDER PRICING PAYMENT MONEY PRINT CAPACITY SECURITY SYNC CUSTOMER OR KEETA AUTHORITY IS CREATED",
+  "persistence_impact": "NO CANONICAL BUSINESS BACKUP OR RESTORE; PUBLIC BROWSER AND V3 CLIENT CANNOT COPY STORE KERNEL ORDER PRICING PAYMENT PRINTJOB SESSION OR PROVIDER SECRET STATE",
+  "provider_impact": "NONE; CUSTOMER AND KEETA PRODUCTION ADAPTERS REMAIN FAIL CLOSED AND PUBLIC ACCEPTANCE CANNOT MUTATE PROVIDERS",
+  "transaction_impact": "NONE; A9 ADAPTER EXPOSES BOUNDED CARRIER STORE KERNEL HEALTH PRINT GATEWAY AND DIAGNOSTIC READBACK ONLY AND DOES NOT TRANSLATE HIGH LEVEL BUSINESS COMMANDS",
+  "production_routing_impact": "NONE; NO DEPLOY CANDIDATE PUBLISH OTA ACTIVATION DOMAIN CUTOVER OR SMM DECOMMISSION",
   "expected_behavior_change": [
-    "Customer pending Pay At Store and electronic evidence review remain outside payment truth until formal Store Kernel admission and canonical readback.",
-    "Duplicate Customer and Keeta inbound identities and duplicate Accept replay resolve to the same canonical Order with one ACK lineage.",
-    "Keeta AUTO and MANUAL admission validate mapping provider facts and canonical A6 channel acceptance before formal admission; Later is bounded to two deferrals.",
-    "Customer modification confirmation Keeta lifecycle and after-sale retain the same canonical Order and route money changes through existing A6 A5 authority.",
-    "Pad and Mobile expose real external read-model facts through one stable review contract with local WhatsApp QR generation.",
-    "External reconciliation is startup Doorbell reconnect and manual-refresh driven with single-flight coalescing and no periodic focus or visibility polling."
+    "More / Tools opens a shared Pad and Mobile Check Center without requiring Order Operations readback.",
+    "The V3 build exposes an exact MFP_V3 source/build identity in the bundle and no-store build-identity.json artifact.",
+    "Trusted appassets runtime identity sends runtime.ready exactly once; public or mismatched identity sends none.",
+    "Carrier Store Kernel Print Runtime OTA fault and adapter evidence is shown with stable fail-closed codes and no secrets.",
+    "Readiness remains BLOCKED while the formal business command router and production adapters are unbound.",
+    "Physical acceptance rollback cutover and SMM gates require explicit real-device and Owner evidence."
   ],
   "non_goals": [
-    "No A9 public diagnostics physical acceptance or cutover implementation.",
-    "No second Pricing Payment Refund Order Print Sync Security Business Day Capacity or Store Kernel authority.",
-    "No browser provider secret direct sensitive provider call periodic business polling v2 client-state or SMM authority.",
-    "No production binding Builder OTA merge deploy cutover or legacy SMM decommission."
+    "No client-side formal business command router or low-level aggregate mutation translation.",
+    "No canonical browser backup or restore.",
+    "No production fixture fallback or physical PASS inferred from source tests.",
+    "No Builder publish request change publish R2 upload OTA activation domain cutover promotion merge or SMM deletion."
   ],
-  "rollback_sha": "806ca51cfd812a968f9208a45e14d8a228fa91e1",
+  "rollback_sha": "83adb14c21170bc3a34a0022c62b1a2bea2f68c4",
   "severity": "HARD_BLOCK"
 }
