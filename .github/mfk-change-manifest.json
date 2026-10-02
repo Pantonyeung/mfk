@@ -1,34 +1,37 @@
 {
   "version": 1,
-  "capability": "MFK_UNIFIED_SURFACES_R1_AUTHORITY_2026_10_02",
-  "base_sha": "6862038da1ac1ab9d0846d3d05a44c933d41f662",
+  "capability": "MFK_SMT_DESKTOP_UI_REFRESH_R2",
+  "base_sha": "0362d54143c07a6edf2597ac0ca9f8f869c2ff5c",
   "root_control": "#22",
-  "product_control": "#627",
+  "product_control": "OWNER_SMT_FINAL_V1.0_ACCEPTED_2026-10-02",
   "allowed_paths": [
     ".github/mfk-change-manifest.json",
-    "COMMANDER_CURRENT.md",
-    "HANDOFF_CURRENT.md",
-    "docs/governance/MFK_UNIFIED_SURFACES_R1_AUTHORITY_2026-10-02.md",
-    "docs/handoff/2026-10-02_smt_unified_surfaces_proposal.md"
+    "v2local/src/styles.css",
+    "v2local/src/features/ordering/OrderingWorkspace.tsx",
+    "v2local/src/features/ordering/ordering-workspace.css",
+    "v2local/src/features/checkout/CheckoutWorkspace.tsx",
+    "v2local/src/features/checkout/checkout-workspace.css",
+    "v2local/src/presentation/smt-quick-normal-a3a.test.ts"
   ],
-  "authority_impact": "DOCUMENTS_ONLY_OWNER_AUTHORITY_UPDATE; SUPERSEDES_2026_09_30_V3_ONLY_EXECUTION_RESTRICTION_FOR_UNIFIED_SURFACES_R1; NO_RUNTIME_AUTHORITY_CHANGE_IN_THIS_CANDIDATE",
+  "authority_impact": "NONE",
   "persistence_impact": "NONE",
   "provider_impact": "NONE",
   "transaction_impact": "NONE",
-  "production_routing_impact": "NONE_IN_THIS_DOCS_ONLY_CANDIDATE",
+  "production_routing_impact": "NONE",
   "expected_behavior_change": [
-    "Commander and handoff entry points recognize Unified Surfaces R1 as the current Owner-locked execution program.",
-    "The prior SMT unified-surfaces proposal is explicitly superseded as execution authority.",
-    "PR #627 acceptance deployment PROMOTE authority is recorded while final merge/cutover/OTA/decommission remain separately gated.",
-    "The 2026-09-30 V3-only/no-broad-v2 restriction no longer blocks the bounded v2admin/v2local convergence authorized by Unified Surfaces R1."
+    "SMT ordering adopts a denser queue-catalog-receipt hierarchy while reusing existing view models and actions.",
+    "Unavailable checkout benefits explain that they are not connected instead of appearing silently disabled.",
+    "Cash quick keys include HKD 20 and the decimal keypad key now sends the value printed on the key.",
+    "Checkout shows an explicit final payment review before invoking the existing confirm action.",
+    "The low-frequency More entry is visually separated as a top hamburger control without changing routing."
   ],
   "non_goals": [
-    "No runtime source change.",
-    "No deploy in this governance candidate.",
-    "No Store Kernel, Pricing, Order, Payment, Fulfillment, Print, Customer or Keeta logic change.",
-    "No Builder or OTA protocol change.",
-    "No final PR #627 merge or legacy decommission."
+    "No Order, Pricing, Payment, Refund, Fulfillment, Print, Provider or Admin authority change.",
+    "No runtime endpoint, payload, persistence, idempotency or canonical readback change.",
+    "No implementation of missing ETA, customer cutoff, student discount or other unbound product capability.",
+    "No mobile or handheld redesign.",
+    "No merge, deploy, production routing, OTA or hostname cutover."
   ],
-  "rollback_sha": "6862038da1ac1ab9d0846d3d05a44c933d41f662",
+  "rollback_sha": "0362d54143c07a6edf2597ac0ca9f8f869c2ff5c",
   "severity": "SOFT_BLOCK"
 }

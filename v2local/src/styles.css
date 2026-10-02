@@ -802,3 +802,82 @@
 /* Bounded-main neutral brand slots: replace only with later Owner-approved transparent assets. */
 .s0-brand-slot{width:min(78%,300px);height:clamp(100px,18dvh,170px);flex:0 0 auto}
 .s0-ip-slot{width:min(82%,350px);height:min(43dvh,390px);margin-top:auto;flex:1 1 auto}
+
+/* SMT Desktop UI Refresh R2 — shared presentation tokens and high-frequency rail. */
+:root{
+  --mfk-pos-canvas:#f2f4f7;
+  --mfk-pos-surface:#fff;
+  --mfk-pos-ink:#172033;
+  --mfk-pos-muted:#475467;
+  --mfk-pos-primary:#1d6fc2;
+  --mfk-pos-danger:#b42318;
+  --mfk-pos-success:#067647;
+  --mfk-pos-warning:#93370d
+}
+.clean-app{grid-template-columns:112px minmax(0,1fr);background:var(--mfk-pos-canvas)}
+.clean-rail{
+  position:relative;
+  padding:16px 10px 14px;
+  gap:10px;
+  background:#292d36;
+  border-right:1px solid #3c424e;
+  box-shadow:8px 0 26px rgba(23,32,51,.18)
+}
+.clean-brand{
+  width:52px;
+  height:52px;
+  margin:0 auto 8px 0;
+  border-radius:13px;
+  background:#fff;
+  color:#292d36;
+  font-size:26px;
+  box-shadow:none
+}
+.clean-rail nav{gap:8px}
+.clean-rail nav a{
+  min-height:92px;
+  padding:8px 4px;
+  grid-template-rows:38px auto;
+  border:1px solid transparent;
+  border-radius:12px;
+  color:#d0d5dd;
+  font-size:15px;
+  transition:background-color 160ms ease,border-color 160ms ease,color 160ms ease,transform 120ms ease
+}
+.clean-rail nav a:hover{border-color:#475467;background:#343944;color:#fff}
+.clean-rail nav a:active{transform:scale(.97)}
+.clean-rail nav a.active{border-color:#667085;background:#3f4653;color:#fff;box-shadow:none}
+.clean-rail-icon{width:38px;height:38px;border-radius:9px;background:#353a45;color:#d0d5dd;font-size:18px}
+.clean-rail nav a.active .clean-rail-icon{background:#1d6fc2;color:#fff}
+.clean-rail nav a:last-child{
+  position:absolute;
+  top:16px;
+  right:10px;
+  width:38px;
+  min-height:52px;
+  padding:0;
+  display:grid;
+  place-items:center;
+  border-color:#475467;
+  background:#343944
+}
+.clean-rail nav a:last-child .clean-rail-icon{width:36px;height:36px;background:transparent;color:#fff}
+.clean-rail nav a:last-child .clean-rail-label{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+.clean-rail nav a:last-child.active{border-color:#84adff;background:#1d6fc2}
+.clean-runtime-state{
+  padding:10px 5px;
+  border:1px solid #53b1a6;
+  border-radius:10px;
+  background:#173b36;
+  color:#75e0d1;
+  font-size:12px
+}
+.runtime-degraded .clean-runtime-state{border-color:#fdb022;background:#4a3510;color:#fedf89}
+.runtime-offline .clean-runtime-state{border-color:#f97066;background:#4a2020;color:#fecdca}
+.clean-route-stage{background:var(--mfk-pos-canvas)}
+.clean-route-stage button:focus-visible,
+.checkout-review-overlay button:focus-visible{
+  outline:4px solid rgba(29,111,194,.28);
+  outline-offset:2px
+}
+@media(prefers-reduced-motion:reduce){.clean-rail nav a{transition:none}}

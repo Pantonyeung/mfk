@@ -12,9 +12,11 @@ const tenderIcon:Record<string,string>={
 
 export function CheckoutWorkspace({view,actions}:{view:CheckoutWorkspaceViewModel;actions:CheckoutWorkspaceActions}){
   const [note,setNote]=useState('');
+  const [reviewOpen,setReviewOpen]=useState(false);
   const failure=view.paymentState==='failure';
   const processing=view.paymentState==='processing';
   const success=view.paymentState==='success';
+  const selectedChannelLabel=view.channels.find(channel=>channel.selected)?.label??'未選擇';
 
   return <main className="checkout-workspace" aria-label="結帳">
     <aside className="checkout-order-panel">
@@ -42,9 +44,9 @@ export function CheckoutWorkspace({view,actions}:{view:CheckoutWorkspaceViewMode
 
       <footer className="checkout-order-footer">
         <button type="button" onClick={actions.onBack}>← 返回訂單</button>
-        <button type="button" disabled>學生優惠</button>
-        <button type="button" disabled>店飯優惠券</button>
-        <button type="button" disabled>整單折扣</button>
+        <button type="button" disabled><span>學生優惠</span><small>未接駁</small></button>
+        <button type="button" disabled><span>店飯優惠券</span><small>未接駁</small></button>
+        <button type="button" disabled><span>整單折扣</span><small>未接駁</small></button>
       </footer>
     </aside>
 
@@ -52,7 +54,7 @@ export function CheckoutWorkspace({view,actions}:{view:CheckoutWorkspaceViewMode
       <section className="checkout-step">
         <header><span>1</span><b>選擇來源</b></header>
         <div className="checkout-source-grid">
-          {view.channels.map(channel=><button type="button" key={channel.id} className={channel.selected?'active':''} onClick={()=>actions.onSelectChannel(channel.id)}>
+          {view.channels.map(channel=><button type="button" key={channel.id} className={channel.selected?'active':''} aria-pressed={channel.selected} onClick={()=>actions.onSelectChannel(channel.id)}>
             <i>{channelIcon[channel.id]??'•'}</i><b>{channel.label}</b>
           </button>)}
         </div>
@@ -68,7 +70,7 @@ export function CheckoutWorkspace({view,actions}:{view:CheckoutWorkspaceViewMode
       <section className="checkout-step">
         <header><span>2</span><b>付款方式</b></header>
         <div className="checkout-method-grid">
-          {view.methods.map(method=><button type="button" key={method.id} disabled={!method.enabled||processing||success} className={method.selected?'active':''} onClick={()=>actions.onSelectMethod(method.id)}>
+          {view.methods.map(method=><button type="button" key={method.id} disabled={!method.enabled||processing||success} className={method.selected?'active':''} aria-pressed={method.selected} onClick={()=>actions.onSelectMethod(method.id)}>
             <i>{tenderIcon[method.id]??'•'}</i><b>{method.label}</b>
           </button>)}
         </div>
@@ -101,12 +103,12 @@ export function CheckoutWorkspace({view,actions}:{view:CheckoutWorkspaceViewMode
         <header><span>4</span><b>輸入金額</b></header>
         {view.cashEntryVisible?<div className="checkout-entry-grid">
           <div className="checkout-keypad">
-            {keypad.map(key=><button type="button" key={key} disabled={processing||success} onClick={()=>actions.onCashKey(key==='.'?'00':key)}>{key}</button>)}
+            {keypad.map(key=><button type="button" key={key} disabled={processing||success} onClick={()=>actions.onCashKey(key)}>{key}</button>)}
           </div>
           <div className="checkout-entry-side">
             <div className="checkout-quick-cash">
               <button type="button" onClick={actions.onExactCash} disabled={!view.exactCashEnabled||processing||success}>剛好</button>
-              {[50,100,200,500].map(amount=><button type="button" key={amount} disabled={processing||success} onClick={()=>actions.onQuickCash(amount)}>+{amount}</button>)}
+              {[20,50,100,200,500].map(amount=><button type="button" key={amount} disabled={processing||success} onClick={()=>actions.onQuickCash(amount)}>+{amount}</button>)}
             </div>
             <button type="button" className="checkout-delete" onClick={()=>actions.onCashKey('⌫')} disabled={processing||success}>⌫ 刪除</button>
             <div className="checkout-cash-value"><span>實收</span><strong>{view.cashInput||'0'}</strong></div>
@@ -119,8 +121,8 @@ export function CheckoutWorkspace({view,actions}:{view:CheckoutWorkspaceViewMode
         <div className="checkout-final-row">
           <input value={note} maxLength={80} onChange={e=>setNote(e.target.value)} placeholder="不辣、多醬、少蔥、五指拖鞋…"/>
           <span>{note.length}/80</span>
-          <button type="button" disabled>儲存為草稿</button>
-          <button type="button" className="checkout-confirm" disabled={success?false:!view.confirmEnabled||processing} onClick={success?actions.onDone:actions.onConfirm}>
+          <button type="button" disabled>草稿（未接駁）</button>
+          <button type="button" className="checkout-confirm" disabled={success?false:!view.confirmEnabled||processing} onClick={success?actions.onDone:()=>setReviewOpen(true)}>
             {processing?'處理中…':success?'完成':'✓ 確認結帳'}
           </button>
         </div>
@@ -131,5 +133,19 @@ export function CheckoutWorkspace({view,actions}:{view:CheckoutWorkspaceViewMode
       {failure?<div className="checkout-payment-alert"><b>付款未完成</b><span>{view.failureMessage??'請重試或重新選擇付款方式。'}</span><button type="button" onClick={actions.onRetry}>重試</button></div>:null}
       {success&&view.completionReview?<div className="checkout-payment-state success">付款成功 · {view.completionReview.displayOrderCode} · {view.completionReview.tenderLabel}</div>:null}
     </section>
+    {reviewOpen?<section className="checkout-review-overlay" role="dialog" aria-modal="true" aria-labelledby="checkout-review-title">
+      <article className="checkout-review-card">
+        <header><div><small>最後一步</small><h2 id="checkout-review-title">付款確認</h2><p>確認後先會正式收款、建立訂單及送出打印。</p></div><strong>#{view.order.orderId}</strong></header>
+        <div className="checkout-review-grid">
+          <p><span>渠道</span><b>{selectedChannelLabel}</b></p>
+          <p><span>付款方式</span><b>{view.selectedMethodLabel}</b></p>
+          <p><span>總額</span><b>{view.amount.dueLabel}</b></p>
+          {view.cashEntryVisible?<><p><span>實收</span><b>{view.amount.receivedLabel}</b></p><p><span>找續</span><b>{view.amount.changeLabel}</b></p></>:null}
+          {view.channelFields.pickupCode?<p><span>取餐碼</span><b>{view.channelFields.pickupCode}</b></p>:null}
+          {view.channelFields.platformOrderNo?<p><span>平台單號</span><b>{view.channelFields.platformOrderNo}</b></p>:null}
+        </div>
+        <footer><button type="button" onClick={()=>setReviewOpen(false)}>返回修改</button><button type="button" className="checkout-review-confirm" autoFocus onClick={()=>{setReviewOpen(false);actions.onConfirm();}}>付款確認</button></footer>
+      </article>
+    </section>:null}
   </main>;
 }

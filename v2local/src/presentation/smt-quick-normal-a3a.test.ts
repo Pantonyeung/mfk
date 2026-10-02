@@ -9,6 +9,7 @@ const here=path.dirname(fileURLToPath(import.meta.url));
 const root=path.resolve(here,'..');
 const app=fs.readFileSync(path.join(root,'App.tsx'),'utf8');
 const workspace=fs.readFileSync(path.join(root,'features/ordering/OrderingWorkspace.tsx'),'utf8');
+const checkout=fs.readFileSync(path.join(root,'features/checkout/CheckoutWorkspace.tsx'),'utf8');
 
 const base:WorkspaceProduct={id:'p',category:'測試',name:'測試',priceMinor:4100,priceLabel:'$41.00',optionSets:[]};
 
@@ -43,5 +44,13 @@ describe('SMT A3a bounded Quick / Normal ordering',()=>{
     expect(app).not.toContain("fast-lane-model");
     expect(app).not.toContain("QuickDrink");
     expect(app).not.toContain("createSecondPricingEngine");
+  });
+
+  it('keeps the R2 checkout boundary explicit and its disabled controls truthful',()=>{
+    expect(checkout).toContain("[20,50,100,200,500].map");
+    expect(checkout).toContain("actions.onCashKey(key)");
+    expect(checkout).toContain("學生優惠</span><small>未接駁");
+    expect(checkout).toContain("setReviewOpen(true)");
+    expect(checkout).toContain("actions.onConfirm();");
   });
 });
