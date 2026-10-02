@@ -445,6 +445,10 @@ export function isSmtCloudDoorbellConnected(){
   return typeof WebSocket!=='undefined'&&socket?.readyState===WebSocket.OPEN;
 }
 
+export function isSmtCloudDoorbellConnected(){
+  return typeof WebSocket!=='undefined'&&socket?.readyState===WebSocket.OPEN;
+}
+
 function scheduleReconnect(){
   if(typeof window==='undefined'||!navigator.onLine)return;
   if(reconnectTimer!==undefined)window.clearTimeout(reconnectTimer);
