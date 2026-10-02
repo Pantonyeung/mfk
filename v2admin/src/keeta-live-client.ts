@@ -37,6 +37,22 @@ export interface KeetaLiveStatus{
     readonly duplicateCount:number;
     readonly conflictCount:number;
   };
+  readonly providerMutation:{
+    readonly schema:string;
+    readonly headSeq:number;
+    readonly providerAppliedSeq:number;
+    readonly behindCount:number;
+    readonly lastOperation:string|{
+      readonly operationId?:string;
+      readonly kind?:string;
+      readonly entityId?:string;
+      readonly state?:string;
+    }|null;
+    readonly taskId:number|null;
+    readonly state:'PENDING'|'APPLIED'|'REJECTED'|'UNKNOWN';
+    readonly observedAt:string;
+    readonly error:string|null;
+  };
   readonly knownExternalBlocker:string|null;
   readonly automaticOrderMutation:false;
   readonly providerCommandActivation:false;
@@ -123,7 +139,10 @@ export interface KeetaMenuPreview{
   readonly destructiveOmissionSemantics:string;
 }
 export interface KeetaMenuStatus{
-  readonly state:'NEVER_SYNCED'|'SUBMITTED'|'COMPLETED'|'PARTIAL'|'FAILED';
+  readonly state:'NEVER_SYNCED'|'PENDING'|'APPLIED'|'REJECTED'|'UNKNOWN'|'FAILED';
+  readonly operation?:'RECOVERY_FULL_MENU_SYNC';
+  readonly reason?:string;
+  readonly sourceToSeq?:number;
   readonly taskId?:number;
   readonly adminRevision?:number;
   readonly snapshotFingerprint?:string;
@@ -144,10 +163,11 @@ export interface KeetaMenuStatus{
     readonly errors:readonly {readonly openItemCode:string|null;readonly code:number|null;readonly message:string|null}[];
   }|null;
 }
-async function keetaAdminPost<T>(path:string):Promise<T>{
+async function keetaAdminPost<T>(path:string,input?:unknown):Promise<T>{
   const response=await keetaAdminFetch('/api/keeta/admin/'+path+'?storeId=MF01',{
     method:'POST',
     headers:{'content-type':'application/json'},
+    ...(input===undefined?{}:{body:JSON.stringify(input)}),
   });
   const body=await response.json().catch(()=>({})) as T&{code?:string};
   if(!response.ok)throw new Error(body.code||'KEETA_ADMIN_HTTP_'+response.status);
@@ -156,8 +176,8 @@ async function keetaAdminPost<T>(path:string):Promise<T>{
 export function previewKeetaMenu():Promise<KeetaMenuPreview>{
   return keetaAdminPost<KeetaMenuPreview>('menu/preview');
 }
-export function syncKeetaMenu():Promise<KeetaMenuStatus>{
-  return keetaAdminPost<KeetaMenuStatus>('menu/sync');
+export function syncKeetaMenu(reason:string):Promise<KeetaMenuStatus>{
+  return keetaAdminPost<KeetaMenuStatus>('menu/sync',{reason});
 }
 export function readKeetaMenuStatus():Promise<KeetaMenuStatus>{
   return keetaAdminPost<KeetaMenuStatus>('menu/status');

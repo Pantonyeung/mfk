@@ -2,6 +2,7 @@ import {createMfkAdminConfigEnvelope,validateMfkAdminConfigEnvelope,type MfkAdmi
 import {projectStaffForRuntime} from '../../contracts/staff-auth-v1.ts';
 import {readActiveAdminRelease,readAdminReleases,readAdminStored,writeAdminStored,type ActiveAdminReleaseRef,type AdminRelease} from './admin-local-store.ts';
 import {readStoredAdminBrowserSession} from './admin-browser-session.ts';
+import {validateMfkAdminDistributionDiagnostics,type MfkAdminDistributionDiagnostics} from '../../contracts/admin-distribution-diagnostics-v1.ts';
 
 const OUTBOX_KEY='sync-outbox.v1';
 const STATUS_KEY='sync-status.v1';
@@ -320,6 +321,21 @@ export async function readAdminSyncAcks(storeId='MF01'):Promise<readonly MfkAdmi
     const body=await response.json() as {acks?:MfkAdminConfigAck[]};
     return Array.isArray(body.acks)?body.acks:[];
   }catch{return [];}
+}
+
+export async function readAdminDistributionDiagnostics(storeId='MF01'):Promise<MfkAdminDistributionDiagnostics>{
+  if(typeof fetch==='undefined')throw new Error('ADMIN_DISTRIBUTION_DIAGNOSTICS_FETCH_UNAVAILABLE');
+  const session=readStoredAdminBrowserSession();
+  const key=readExistingAdminPublisherKey();
+  const headers:Record<string,string>={accept:'application/json','cache-control':'no-cache'};
+  if(session)headers['x-mfk-admin-session']=session.sessionToken;
+  else if(key)headers['x-mfk-admin-publish-key']=key;
+  const response=await fetch('/api/admin-sync/sync/readback?storeId='+encodeURIComponent(storeId),{
+    method:'GET',cache:'no-store',credentials:'same-origin',headers,
+  });
+  const body=await response.json().catch(()=>({})) as Record<string,unknown>;
+  if(!response.ok)throw new Error(typeof body.code==='string'?body.code:'ADMIN_DISTRIBUTION_DIAGNOSTICS_HTTP_'+response.status);
+  return validateMfkAdminDistributionDiagnostics(body);
 }
 
 let installed=false;

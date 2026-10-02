@@ -26,8 +26,9 @@ test('capability registry stays unique and only staff order intent is wired whil
 });
 
 test('SMM UI remains free of canonical writer and transport stays isolated',()=>{
+  const transport=fs.readFileSync(path.join(root,'config-sync.ts'),'utf8');
+  const nonTransport=sourceFiles.filter(name=>name!=='config-sync.ts').map(name=>fs.readFileSync(path.join(root,name),'utf8')).join('\n');
   const forbidden=[
-    /\bWebSocket\b/,
     /\bXMLHttpRequest\b/,
     /\bindexedDB\b/,
     /createFormalOrder/,
@@ -37,6 +38,9 @@ test('SMM UI remains free of canonical writer and transport stays isolated',()=>
     /new\s+Worker\s*\(/
   ];
   for(const pattern of forbidden)assert.equal(pattern.test(source),false,String(pattern));
+  assert.equal(/\bWebSocket\b/.test(nonTransport),false,'WebSocket outside config-sync transport');
+  assert.match(transport,/\bWebSocket\b/);
+  assert.match(transport,/PORT_HEAD_AVAILABLE/);
   const pwaLan=fs.readFileSync(path.join(root,'pwa-lan.ts'),'utf8');
   const pwaRuntime=fs.readFileSync(path.join(root,'pwa-runtime.ts'),'utf8');
   assert.match(pwaLan,/fetch\s*\(/);

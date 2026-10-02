@@ -1,6 +1,7 @@
 import {
   validateMfkCustomerOrderIntent,
 } from '../contracts/customer-cloud-v1.ts';
+import {validateMfkCustomerCommercialGrant} from '../contracts/customer-commercial-freshness-v1.ts';
 import {validateSmmLanOrderRequest} from '../contracts/smm-lan-v1.ts';
 
 const JSON_HEADERS={'content-type':'application/json; charset=utf-8','cache-control':'no-store'};
@@ -45,6 +46,33 @@ export class CustomerRuntimeStore{
   async fetch(request:Request){
     const url=new URL(request.url);
 
+    if(url.pathname==='/public/events'){
+      if(request.headers.get('upgrade')!=='websocket')return json({code:'WEBSOCKET_REQUIRED'},426);
+      const pair=new WebSocketPair();
+      const client=pair[0],server=pair[1];
+      this.state.acceptWebSocket(server);
+      const head=await this.state.storage.get('config:head');
+      if(head)server.send(JSON.stringify(head));
+      return new Response(null,{status:101,webSocket:client});
+    }
+
+    if(url.pathname==='/internal/config-doorbell'&&request.method==='POST'){
+      const body=record(await request.json().catch(()=>({})),'CUSTOMER_CONFIG_DOORBELL_INVALID');
+      if(body.type!=='PORT_HEAD_AVAILABLE'||body.port!=='CUSTOMER')return json({code:'CUSTOMER_CONFIG_DOORBELL_TYPE_INVALID'},400);
+      const event=Object.freeze({
+        type:'PORT_HEAD_AVAILABLE',
+        port:'CUSTOMER',
+        storeId:String(body.storeId||'MF01'),
+        headSeq:Number(body.headSeq)||0,
+        sourceCommitSeq:Number(body.sourceCommitSeq)||0,
+        projectionHash:String(body.projectionHash||''),
+        publishedAt:String(body.publishedAt||new Date().toISOString()),
+      });
+      await this.state.storage.put('config:head',event);
+      for(const socket of this.state.getWebSockets()){try{socket.send(JSON.stringify(event));}catch{}}
+      return json({state:'DOORBELL_SENT',headSeq:event.headSeq});
+    }
+
     if(url.pathname==='/public/channel-health'&&request.method==='GET'){
       const lastOrderPull=await this.state.storage.get('diag:lastOrderPull') as any;
       const observedAt=new Date().toISOString();
@@ -59,9 +87,19 @@ export class CustomerRuntimeStore{
       },200);
     }
 
-    if(url.pathname==='/public/orders/submit'&&request.method==='POST'){
-      let intent;
-      try{intent=validateMfkCustomerOrderIntent(await request.json());}
+    if(url.pathname==='/internal/orders/submit'&&request.method==='POST'){
+      let intent,commercialGrant;
+      try{
+        const body=record(await request.json(),'CUSTOMER_VERIFIED_ORDER_INVALID');
+        intent=validateMfkCustomerOrderIntent(body.intent);
+        commercialGrant=validateMfkCustomerCommercialGrant(body.commercialGrant);
+        if(commercialGrant.storeId!==intent.storeId||commercialGrant.submissionId!==intent.submissionId||commercialGrant.customerPortSeq!==intent.customerPortSeq||commercialGrant.projectionHash!==intent.projectionHash||commercialGrant.canonicalRevision!==intent.canonicalRevision)throw new Error('CUSTOMER_COMMERCIAL_GRANT_IDENTITY_MISMATCH');
+        if(commercialGrant.lines.length!==intent.cart.length)throw new Error('CUSTOMER_COMMERCIAL_GRANT_CART_MISMATCH');
+        for(const line of intent.cart){
+          const grantLine=commercialGrant.lines.find(value=>value.lineId===line.lineId);
+          if(!grantLine||grantLine.productId!==line.productId||grantLine.quantity!==line.quantity||grantLine.publishedUnitPriceMinor!==line.publishedUnitPriceMinor)throw new Error('CUSTOMER_COMMERCIAL_GRANT_CART_MISMATCH');
+        }
+      }
       catch(error){return json({code:error instanceof Error?error.message:'CUSTOMER_ORDER_INTENT_INVALID'},400);}
       const key='order:'+intent.submissionId;
       const existing=await this.state.storage.get(key) as any;
@@ -74,6 +112,7 @@ export class CustomerRuntimeStore{
       }
       const row=Object.freeze({
         ...intent,
+        commercialGrant,
         bridgeKind:'CUSTOMER' as const,
         intentFingerprint:fingerprint,
         state:'PENDING_SMT',

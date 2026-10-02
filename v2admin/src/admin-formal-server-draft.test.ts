@@ -273,7 +273,8 @@ describe('Admin V3 formal server Draft seam',()=>{
     expect(response.status).toBe(200);
     const body=await json(response);
     expect(body).toMatchObject({state:'PUBLISHED',active:{storeId:STORE_ID,snapshot:adminSnapshot('draft')}});
-    expect(h.sent).toHaveLength(1);
+    expect(h.sent).toHaveLength(2);
+    expect(h.sent.map(message=>JSON.parse(message).type)).toEqual(['ADMIN_CONFIG_AVAILABLE','PORT_HEAD_AVAILABLE']);
   });
 
   it('rejects publish with stale draftRevision',async()=>{

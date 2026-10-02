@@ -8,12 +8,14 @@
   "vars": {
     "KEETA_APP_ID": "3419700273",
     "KEETA_PROVIDER_SHOP_ID": "721578302",
-    "KEETA_OAUTH_REDIRECT_URI": "https://admin.morefunos.com/api/keeta/oauth/callback"
+    "KEETA_OAUTH_REDIRECT_URI": "https://admin.morefunos.com/api/keeta/oauth/callback",
+    "MFK_SYNC_DIAGNOSTICS_STALE_AFTER_MS": "300000"
   },
   "secrets": {
     "required": [
       "KEETA_APP_SECRET",
-      "KEETA_TOKEN_ENCRYPTION_KEY"
+      "KEETA_TOKEN_ENCRYPTION_KEY",
+      "CUSTOMER_COMMERCIAL_PROOF_KEYRING"
     ]
   },
   "assets": {
@@ -29,6 +31,10 @@
     {
       "binding": "CUSTOMER_PAYMENT_EVIDENCE",
       "bucket_name": "mfk-customer-payment-evidence"
+    },
+    {
+      "binding": "SYNC_CHECKPOINTS",
+      "bucket_name": "mfk-sync-checkpoints"
     }
   ],
   "durable_objects": {

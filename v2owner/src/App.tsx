@@ -145,9 +145,15 @@ export function App(){
     if(!port||!ownerSession)return;
     const visible=()=>{if(document.visibilityState==='visible')void refresh();};
     const focus=()=>void refresh();
-    const timer=window.setInterval(()=>{if(document.visibilityState==='visible')void refresh();},15000);
-    document.addEventListener('visibilitychange',visible);window.addEventListener('focus',focus);
-    return()=>{window.clearInterval(timer);document.removeEventListener('visibilitychange',visible);window.removeEventListener('focus',focus);};
+    const online=()=>void refresh();
+    document.addEventListener('visibilitychange',visible);
+    window.addEventListener('focus',focus);
+    window.addEventListener('online',online);
+    return()=>{
+      document.removeEventListener('visibilitychange',visible);
+      window.removeEventListener('focus',focus);
+      window.removeEventListener('online',online);
+    };
   },[port,ownerSession?.sessionToken]);
 
   useEffect(()=>{

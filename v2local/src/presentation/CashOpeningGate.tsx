@@ -5,7 +5,7 @@ import {
   readCurrentCashOpeningState,
   subscribeCashOpening,
 } from '../runtime/cash-opening.ts';
-import {readSmtAdminSyncStatus,subscribeSmtAdminConfig} from '../runtime/admin-config-sync.ts';
+import {readSmtAdminSyncStatus,subscribeSmtAdminConfig,subscribeSmtAdminSyncStatus} from '../runtime/admin-config-sync.ts';
 import {readActiveStaffSession,subscribeStaffSession} from '../runtime/staff-auth.ts';
 
 const money=(minor:number)=>'HK$ '+(Math.max(0,minor)/100).toFixed(2);
@@ -22,7 +22,8 @@ export function CashOpeningGate({children}:{children:ReactNode}){
     const a=subscribeCashOpening(update);
     const b=subscribeStaffSession(update);
     const c=subscribeSmtAdminConfig(update);
-    return()=>{a();b();c();};
+    const d=subscribeSmtAdminSyncStatus(update);
+    return()=>{a();b();c();d();};
   },[]);
 
   useEffect(()=>{

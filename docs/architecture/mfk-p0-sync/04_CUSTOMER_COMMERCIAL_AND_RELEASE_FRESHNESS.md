@@ -12,16 +12,19 @@ What You See Is What You Can Pay。
 
 Customer 可交易前必須持有 Server 發出嘅 current Customer HEAD confirmation：
 
-- customerHeadSeq
+- customerPortSeq
 - projectionHash
-- confirmedAt
+- canonicalRevision
+- canonicalFingerprint
+- issuedAt
 - freshnessToken
 - expiresAt
 
 Freshness token：
 - 跟 tiny HEAD 一齊取得，唔需要每件 Product 再打 Quote request
-- bound to store + portSeq + projectionHash + expiry
-- token TTL / carry-forward window 係 business policy，未喺 R1寫死
+- HMAC-SHA256，由 Server-only keyring current key簽發；previous key只用作 bounded rotation verify
+- bound to schema + keyId + store + customerPortSeq + projectionHash + canonicalRevision + canonicalFingerprint + issuedAt + expiresAt
+- TTL固定 5分鐘；以 Server收到 Submit時間判定 expiry，唔信 Browser clock
 
 ## UI
 
@@ -45,15 +48,17 @@ Safari / BFCache 一個月後恢復：
 
 Customer Submit帶：
 - customerPortSeq
+- projectionHash
+- canonicalRevision
 - freshnessToken
 - Product / Option / Combo IDs
-- material commercial facts used by UI
-- submissionId
+- exact material commercial facts used by UI，包括 published unit prices / adjustments
+- submissionId / idempotencyKey
 
 Store Kernel：
 1. verify freshness token
 2. verify material facts existed in server projection history at that seq
-3. verify transaction-time legality，例如 runtime availability
+3. verify transaction-time hard stops
 4. commit or fail-closed
 
 Browser 自己改 $52 -> $1 必須失敗，因為 Server history無嗰個 fact。
@@ -62,9 +67,11 @@ Browser 自己改 $52 -> $1 必須失敗，因為 Server history無嗰個 fact�
 
 新 Price Delta即時出。
 
-已經有有效 Server freshness fence，而且 UI 真係合法顯示過舊價嘅 transaction，應由 Owner-approved bounded commercial policy處理，避免 Checkout 靜默改價。
+已經有有效 Server freshness fence，而且 UI 真係合法顯示過舊價嘅 transaction，完整 honour到 proof `expiresAt`；新 Price / Promotion / HEAD / background revision不得 retroactively invalidate proof或靜默改價。
 
-token TTL / carry-forward window 需要獨立 Owner Lock。
+Proof過期後 fail closed，先暫停 commercial action，再 tiny HEAD / Delta（必要先 Checkpoint）更新，顯示新商業狀態並要求 Customer重新確認，先可 Submit。
+
+仍有效 proof只可被真正非價格 hard stop推翻：legal/safety、store/channel hard closed、商品/option/combo genuinely unfulfillable、已選 payment channel hard unavailable、capacity已拒絕新單。普通 Busy / throttle / ETA / capacity warning不可推翻。
 
 ## Client Release Freshness
 

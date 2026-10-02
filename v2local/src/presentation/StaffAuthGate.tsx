@@ -7,7 +7,7 @@ import {
   staffAuthRequired,
   subscribeStaffSession,
 } from '../runtime/staff-auth.ts';
-import {readSmtAdminSyncStatus,subscribeSmtAdminConfig} from '../runtime/admin-config-sync.ts';
+import {readSmtAdminSyncStatus,subscribeSmtAdminConfig,subscribeSmtAdminSyncStatus} from '../runtime/admin-config-sync.ts';
 
 function roleLabel(role:string){
   return role==='OWNER'?'老闆':role==='MANAGER'?'經理':role==='VIEWER'?'只讀':'員工';
@@ -24,8 +24,9 @@ export function StaffAuthGate({children}:{children:ReactNode}){
     const update=()=>setRevision(value=>value+1);
     const a=subscribeStaffSession(update);
     const b=subscribeSmtAdminConfig(update);
+    const c=subscribeSmtAdminSyncStatus(update);
     const timer=window.setInterval(()=>setNow(new Date()),30_000);
-    return()=>{a();b();window.clearInterval(timer);};
+    return()=>{a();b();c();window.clearInterval(timer);};
   },[]);
   void revision;
 

@@ -473,6 +473,7 @@ export function ChannelsWorkspace({mode}:{mode:'overview'|'mapping'|'failures'|'
   const [menuPreview,setMenuPreview]=useState<KeetaMenuPreview|null>(null);
   const [menuStatus,setMenuStatus]=useState<KeetaMenuStatus|null>(null);
   const [menuBusy,setMenuBusy]=useState(false);
+  const [recoveryReason,setRecoveryReason]=useState('');
   const [sellabilityPreview,setSellabilityPreview]=useState<KeetaSellabilityPreview|null>(null);
   const [sellabilityStatus,setSellabilityStatus]=useState<KeetaSellabilityStatus|null>(null);
   const [storePreview,setStorePreview]=useState<KeetaStorePreview|null>(null);
@@ -578,7 +579,8 @@ export function ChannelsWorkspace({mode}:{mode:'overview'|'mapping'|'failures'|'
     try{
       const preview=await previewKeetaMenu();
       setMenuPreview(preview);
-      setMenuStatus(await syncKeetaMenu());
+      setMenuStatus(await syncKeetaMenu(recoveryReason.trim()));
+      setRecoveryReason('');
     }catch(error){
       setLiveError(error instanceof Error?error.message:'KEETA_MENU_SYNC_FAILED');
     }finally{setMenuBusy(false);}
@@ -671,9 +673,18 @@ export function ChannelsWorkspace({mode}:{mode:'overview'|'mapping'|'failures'|'
         <p><span>Webhook Accepted</span><b>{liveStatus.webhook.acceptedCount}</b></p>
         <p><span>最近 Event</span><b>{liveStatus.webhook.lastEventId??'—'} / {liveStatus.webhook.lastMessageId??'—'}</b></p>
         <p><span>最近驗簽失敗</span><b>{liveStatus.webhook.lastSignatureFailureAt?new Date(liveStatus.webhook.lastSignatureFailureAt).toLocaleString('zh-HK'):'—'}</b></p>
+        <p><span>KEETA HeadSeq</span><b>{liveStatus.providerMutation.headSeq}</b></p>
+        <p><span>ProviderAppliedSeq</span><b>{liveStatus.providerMutation.providerAppliedSeq}</b></p>
+        <p><span>Behind count</span><b>{liveStatus.providerMutation.behindCount}</b></p>
+        <p><span>Provider mutation state</span><b>{liveStatus.providerMutation.state}</b></p>
+        <p><span>Last operation</span><b>{typeof liveStatus.providerMutation.lastOperation==='string'?liveStatus.providerMutation.lastOperation:liveStatus.providerMutation.lastOperation?.kind??'—'}</b></p>
+        <p><span>Task ID</span><b>{liveStatus.providerMutation.taskId??'—'}</b></p>
+        <p><span>Observed at</span><b>{liveStatus.providerMutation.observedAt?new Date(liveStatus.providerMutation.observedAt).toLocaleString('zh-HK'):'—'}</b></p>
+        <p><span>Error / UNKNOWN reason</span><b>{liveStatus.providerMutation.error??'—'}</b></p>
       </div>:<div className="admin-read-empty">正在讀取 Keeta live runtime 狀態。</div>}
       {liveStatus?.missingConfig.length?<div className="admin-validation is-error"><b>Runtime 尚欠設定</b><ul>{liveStatus.missingConfig.map(item=><li key={item}>{item}</li>)}</ul></div>:null}
       {liveStatus?.knownExternalBlocker?<div className="admin-callout compact">Known external blocker：{liveStatus.knownExternalBlocker}。驗簽會 fail-closed，唔會為咗接通而放鬆。</div>:null}
+      <div className="admin-callout compact">Connected ≠ Applied；Provider HTTP accepted ≠ Applied。只有所需 mutation 全部有 provider readback，ProviderAppliedSeq 先會前進。</div>
       {liveError?<div className="admin-validation is-error" role="alert">{liveError}</div>:null}
       <div className="admin-editor-actions">
         <button type="button" className="secondary" disabled={liveBusy} onClick={()=>void refreshLive()}>更新狀態</button>
@@ -741,10 +752,10 @@ export function ChannelsWorkspace({mode}:{mode:'overview'|'mapping'|'failures'|'
     </section>:null}
     {(mode==='overview'||mode==='sync')?<section className="admin-policy-card">
       <header>
-        <div><small>KEETA FULL MENU SNAPSHOT</small><h2>Keeta 菜單同步</h2></div>
-        <span className={menuStatus?.state==='COMPLETED'?'admin-status-good':'admin-not-wired-chip'}>{menuStatus?.state??'讀取中'}</span>
+        <div><small>RECOVERY_FULL_MENU_SYNC</small><h2>Keeta 完整菜單救援</h2></div>
+        <span className={menuStatus?.state==='APPLIED'?'admin-status-good':'admin-not-wired-chip'}>{menuStatus?.state??'讀取中'}</span>
       </header>
-      <p>來源固定為已發布 Admin 設定版本；同步係 full snapshot。預檢會先確認分類、商品、Option Set、OpenItemCode 同完整排序，再提交 Keeta 非同步 task。</p>
+      <p>正常 Publish 只送 KEETA Port Delta 同最小 provider mutation。呢條 full snapshot route 只供明確 bootstrap／provider state lost／schema migration／人工 resync；唔會由正常 publish 自動呼叫。</p>
       {menuPreview?<div className="admin-readback-proof">
         <p><span>Admin Revision</span><b>R{menuPreview.revision}</b></p>
         <p><span>分類</span><b>{menuPreview.summary.categories}</b></p>
@@ -762,11 +773,12 @@ export function ChannelsWorkspace({mode}:{mode:'overview'|'mapping'|'failures'|'
         <p><span>1201 Picture Completion</span><b>{menuStatus.pictureCompletion?new Date(menuStatus.pictureCompletion.completedAt).toLocaleString('zh-HK'):'—'}</b></p>
         <p><span>Errors</span><b>{menuStatus.completion?.errors.length??0}</b></p>
       </div>:null}
-      <div className="admin-callout compact">Full snapshot 規則：未包含嘅既有 provider OpenItemCode 可能被 Keeta 刪除。呢度用完整已發布 MFK catalog 建 snapshot，唔會由 UI 手工砌半份 payload。</div>
+      <div className="admin-callout compact">Destructive recovery：Keeta 官方 full-menu API 會刪除 request 未包含嘅既有 provider OpenItemCode。必須先預檢，並輸入可追查原因。</div>
+      <label><span>救援原因（必填）</span><input value={recoveryReason} onChange={event=>setRecoveryReason(event.target.value)} placeholder="例如 provider state lost / bootstrap"/></label>
       {liveError?<div className="admin-validation is-error" role="alert">{keetaActionErrorText(liveError)}</div>:null}
       <div className="admin-editor-actions">
         <button type="button" className="secondary" disabled={menuBusy} onClick={()=>void previewMenu()}>{menuBusy?'處理中…':'預檢完整菜單'}</button>
-        <button type="button" className="primary" disabled={menuBusy||liveStatus?.oauth.state!=='CONNECTED'} onClick={()=>void submitMenu()}>{menuBusy?'處理中…':'同步完整菜單到 Keeta'}</button>
+        <button type="button" className="primary" disabled={menuBusy||liveStatus?.oauth.state!=='CONNECTED'||!recoveryReason.trim()} onClick={()=>void submitMenu()}>{menuBusy?'處理中…':'執行 destructive full replace'}</button>
         <button type="button" className="secondary" disabled={menuBusy} onClick={()=>void refreshMenu()}>{menuBusy?'讀取中…':'更新同步狀態'}</button>
       </div>
     </section>:null}

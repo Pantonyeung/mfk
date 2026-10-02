@@ -167,7 +167,6 @@ Phase 6 Compactor
 
 ## Tunables Not Yet Locked
 
-- Customer freshness token TTL
 - previous commercial carry-forward window
 - Checkpoint max age
 - max tail event count
@@ -175,6 +174,8 @@ Phase 6 Compactor
 - Journal retention window
 - Delta batching
 - Provider batching/rate-limit
+
+Customer commercial freshness TTL 已由 Owner 鎖定為 `300000ms`（5分鐘）；有效 proof 完整 honour 到 `expiresAt`，expiry 以 Server receive time 判定。
 
 以上要用 latency / traffic / provider contract / 真機測試後再 Owner Lock。
 

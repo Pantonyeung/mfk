@@ -124,6 +124,5 @@ export function installKeetaOrderLifecycle(){
     if(event.type==='KEETA_ORDER_EVENT_AVAILABLE')void reconcileKeetaOrderLifecycle();
   });
   window.addEventListener('online',()=>void reconcileKeetaOrderLifecycle());
-  window.addEventListener('focus',()=>void reconcileKeetaOrderLifecycle());
   window.setTimeout(()=>void reconcileKeetaOrderLifecycle(),0);
 }

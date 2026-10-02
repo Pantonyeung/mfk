@@ -11,7 +11,6 @@ import {installCustomerCloudBridge} from './runtime/customer-cloud-intake.ts';
 import {installAdminRefundIntake} from './runtime/admin-refund-intake.ts';
 import {localRuntime} from './runtime/local-runtime.ts';
 import {createSmmLanIngress} from './runtime/smm-lan-ingress.ts';
-import {installSmmWebAcceptanceIntake} from './runtime/smm-web-acceptance-intake.ts';
 import type {SmmLanOrderRequest} from '../../contracts/smm-lan-v1.ts';
 import {readLocalCashOpenings,readLocalDayCloses} from './runtime/local-operations.ts';
 import {isSmtWebAcceptance} from './runtime/web-acceptance.ts';
@@ -25,7 +24,7 @@ import './styles.css';
 
 const webAcceptance=isSmtWebAcceptance();
 
-installSmtAdminAutoSync();
+if(!webAcceptance)installSmtAdminAutoSync();
 installStaffSessionInvalidation();
 
 if(!webAcceptance){
@@ -38,7 +37,6 @@ if(!webAcceptance){
 }
 
 const smmLanIngress=createSmmLanIngress(localRuntime);
-if(webAcceptance)installSmmWebAcceptanceIntake(smmLanIngress);
 
 declare global{interface Window{__MFK_SMM_LAN_HANDLE__?:(deviceId:string,payload:string)=>string}}
 window.__MFK_SMM_LAN_HANDLE__=(deviceId,payload)=>{

@@ -14,7 +14,7 @@ import {RuntimeSoldoutWorkspace} from './presentation/RuntimeSoldoutWorkspace.ts
 import {LocalMoreWorkspace} from './presentation/LocalMoreWorkspace.tsx';
 import {localRuntime,type DiningTender} from './runtime/local-runtime.ts';
 import {readLocalAdminMenu,subscribeLocalAdminMenu} from './runtime/local-admin-menu.ts';
-import {readSmtAdminConfigLkg,readSmtAdminSyncStatus,subscribeSmtAdminConfig} from './runtime/admin-config-sync.ts';
+import {readSmtAdminConfigLkg,readSmtAdminSyncStatus,subscribeSmtAdminConfig,subscribeSmtAdminSyncStatus} from './runtime/admin-config-sync.ts';
 import {projectSyncedCombos,projectSyncedOrderingCatalog,projectSyncedRiceballDrinkPromotion,type SyncedOptionSet} from './runtime/admin-config-projection.ts';
 import {capacityNoticeForCount,readSmtFrontlinePresentation,readSmtStoreSettings} from './runtime/admin-operational-config.ts';
 import {readBusinessCutoff} from './runtime/cash-opening.ts';
@@ -120,8 +120,10 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode,diningAddition,on
   const [panel,setPanel]=useState<OrderingPanelState>(null);
   const [adminMenuRevision,setAdminMenuRevision]=useState(0);
   const [adminConfigRevision,setAdminConfigRevision]=useState(0);
+  const [adminSyncRevision,setAdminSyncRevision]=useState(0);
   useEffect(()=>subscribeLocalAdminMenu(()=>setAdminMenuRevision(value=>value+1)),[]);
   useEffect(()=>subscribeSmtAdminConfig(()=>setAdminConfigRevision(value=>value+1)),[]);
+  useEffect(()=>subscribeSmtAdminSyncStatus(()=>setAdminSyncRevision(value=>value+1)),[]);
   useEffect(()=>{
     if(diningAddition&&serviceMode!=='dine-in')setServiceMode('dine-in');
   },[diningAddition?.holdId,serviceMode,setServiceMode]);
@@ -167,7 +169,7 @@ function OrderingPage({cart,setCart,serviceMode,setServiceMode,diningAddition,on
   },[diningAddition?.holdId,diningAddition?.submissionId,diningAddition?.formalOrderId]);
   const adminMenu=useMemo(()=>{void adminMenuRevision;return readLocalAdminMenu();},[adminMenuRevision]);
   const adminConfig=useMemo(()=>{void adminConfigRevision;return readSmtAdminConfigLkg();},[adminConfigRevision]);
-  const syncStatus=useMemo(()=>{void adminConfigRevision;return readSmtAdminSyncStatus();},[adminConfigRevision]);
+  const syncStatus=useMemo(()=>{void adminSyncRevision;return readSmtAdminSyncStatus();},[adminSyncRevision]);
   const syncedCatalog=useMemo(
     ()=>adminConfig?projectSyncedOrderingCatalog(serviceMode,adminConfig):null,
     [adminConfig,serviceMode],

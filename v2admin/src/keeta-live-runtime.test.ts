@@ -795,14 +795,20 @@ describe('Keeta live edge runtime',()=>{
         },
         optionCenter:{sets:[],productLinks:[]},
       };
+      const blocked=await runtime.fetch(new Request('https://internal/admin/menu/sync',{
+        method:'POST',headers:{'content-type':'application/json'},
+        body:JSON.stringify({revision:7,adminFingerprint:'fnv1a32:menu7',snapshot,sourceToSeq:12}),
+      }));
+      expect(blocked.status).toBe(409);
+      expect(await blocked.json()).toMatchObject({code:'KEETA_RECOVERY_FULL_MENU_REASON_REQUIRED'});
       const sync=await runtime.fetch(new Request('https://internal/admin/menu/sync',{
         method:'POST',
         headers:{'content-type':'application/json'},
-        body:JSON.stringify({revision:7,adminFingerprint:'fnv1a32:menu7',snapshot}),
+        body:JSON.stringify({revision:7,adminFingerprint:'fnv1a32:menu7',snapshot,reason:'provider state lost',sourceToSeq:12}),
       }));
       expect(sync.status).toBe(200);
       const submitted=await sync.json() as {state:string;taskId:number;summary:{spus:number}};
-      expect(submitted).toMatchObject({state:'SUBMITTED',taskId:897354});
+      expect(submitted).toMatchObject({state:'PENDING',operation:'RECOVERY_FULL_MENU_SYNC',taskId:897354});
       expect(submitted.summary.spus).toBe(1);
 
       const providerCall=providerFetch.mock.calls[0];
@@ -836,13 +842,47 @@ describe('Keeta live edge runtime',()=>{
 
       const status=await runtime.fetch(new Request('https://internal/admin/menu/status',{method:'POST'}));
       const readback=await status.json() as {state:string;taskId:number;completion:{pictureTaskId:number;errors:unknown[]}};
-      expect(readback.state).toBe('COMPLETED');
+      expect(readback.state).toBe('APPLIED');
       expect(readback.taskId).toBe(897354);
       expect(readback.completion.pictureTaskId).toBe(266675845);
       expect(readback.completion.errors).toEqual([]);
+      const providerStatus=await runtime.fetch(new Request('https://keeta-runtime/internal/provider/status',{method:'GET'}));
+      expect(await providerStatus.json()).toMatchObject({headSeq:12,providerAppliedSeq:12,behindCount:0,state:'APPLIED',taskId:897354});
     }finally{
       vi.unstubAllGlobals();
     }
+  });
+
+
+  it('keeps ProviderAppliedSeq behind when Event 1202 reports partial errors',async()=>{
+    const key=Buffer.alloc(32,14).toString('base64');
+    const task={state:'PENDING',operation:'RECOVERY_FULL_MENU_SYNC',taskId:333,sourceToSeq:5};
+    const storage=new Map<string,unknown>([
+      ['menu:sync:task:333',task],['menu:sync:latest',task],
+      ['provider:mutation:status',{schema:'MFK_KEETA_PROVIDER_STATUS_V1',headSeq:5,providerAppliedSeq:4,behindCount:1,state:'PENDING'}],
+    ]);
+    const state={storage:{
+      get:async(key:string)=>storage.get(key),put:async(key:string,value:unknown)=>{storage.set(key,value);},
+      delete:async(key:string)=>{storage.delete(key);},list:async({prefix}:{prefix:string})=>new Map([...storage.entries()].filter(([key])=>key.startsWith(prefix))),
+    }};
+    const env={
+      KEETA_APP_ID:'3419700273',KEETA_APP_SECRET:'test-secret',KEETA_TOKEN_ENCRYPTION_KEY:key,
+      KEETA_PROVIDER_SHOP_ID:'721578302',KEETA_OAUTH_REDIRECT_URI:'https://admin.morefunos.com/api/keeta/oauth/callback',
+    };
+    const {KeetaRuntimeStore}=await import('../keeta-runtime.ts');
+    const runtime=new KeetaRuntimeStore(state as never,env as never);
+    const externalUrl='https://admin.morefunos.com/api/keeta/webhook';
+    const signed=await signKeetaRuntimeParams(externalUrl,{
+      eventId:1202,appId:3419700273,messageId:'menu-partial-333',shopId:721578302,
+      message:JSON.stringify({shopId:721578302,taskId:333,errorSpuDTOList:[{openItemCode:'SPU:2',code:400,message:'invalid'}]}),
+      timestamp:Math.floor(Date.now()/1000),
+    },'test-secret');
+    const response=await runtime.fetch(new Request('https://internal/webhook',{
+      method:'POST',headers:{'content-type':'application/json','x-mfk-keeta-external-url':externalUrl},body:JSON.stringify(signed),
+    }));
+    expect(response.status).toBe(200);
+    expect(storage.get('menu:sync:latest')).toMatchObject({state:'REJECTED'});
+    expect(storage.get('provider:mutation:status')).toMatchObject({providerAppliedSeq:4,behindCount:1,state:'REJECTED'});
   });
 
 
@@ -886,10 +926,10 @@ describe('Keeta live edge runtime',()=>{
     vi.stubGlobal('fetch',providerFetch);
     try{
       const sync=await runtime.fetch(new Request('https://internal/admin/menu/sync',{
-        method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({revision:8,adminFingerprint:'fnv1a32:menu8',snapshot}),
+        method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({revision:8,adminFingerprint:'fnv1a32:menu8',snapshot,reason:'bootstrap',sourceToSeq:0}),
       }));
       expect(sync.status).toBe(200);
-      expect(await sync.json()).toMatchObject({state:'SUBMITTED',taskId:778899});
+      expect(await sync.json()).toMatchObject({state:'PENDING',taskId:778899});
       expect(providerFetch).toHaveBeenCalledTimes(3);
       const status=await runtime.fetch(new Request('https://internal/admin/status',{method:'POST'}));
       expect((await status.json() as {oauth:{state:string;tokenSource:string}}).oauth).toMatchObject({state:'CONNECTED',tokenSource:'OAUTH_REFRESH'});

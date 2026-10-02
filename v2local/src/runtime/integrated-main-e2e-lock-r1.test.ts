@@ -9,22 +9,25 @@ const root=path.resolve(here,'..');
 const read=(relative:string)=>fs.readFileSync(path.join(root,relative),'utf8');
 
 describe('2026-09-26 integrated main E2E preservation lock',()=>{
-  it('preserves Web SMT acceptance isolation while production SMT keeps Customer and Keeta consumers',()=>{
+  it('keeps the public SMT shell free of legacy polling while production SMT keeps Customer and Keeta consumers',()=>{
     const main=read('main.tsx');
     expect(main).toContain('const webAcceptance=isSmtWebAcceptance()');
+    expect(main).toContain('if(!webAcceptance)installSmtAdminAutoSync()');
     expect(main).toContain('if(!webAcceptance){');
     expect(main).toContain('installKeetaOrderIntake()');
     expect(main).toContain('installKeetaOrderLifecycle()');
     expect(main).toContain('installKeetaAfterSales()');
     expect(main).toContain('installCustomerCloudBridge()');
-    expect(main).toContain('if(webAcceptance)installSmmWebAcceptanceIntake(smmLanIngress)');
+    expect(main).not.toContain('installSmmWebAcceptanceIntake');
   });
 
-  it('preserves Customer to SMT revision, pricing, evidence, canonical order and readback semantics',()=>{
+  it('preserves Customer commercial grant, evidence, canonical order and readback semantics',()=>{
     const customer=read('runtime/customer-cloud-intake.ts');
     expect(customer).toContain('const {envelope,catalog}=activeCatalog()');
-    expect(customer).toContain("CUSTOMER_MENU_REVISION_CHANGED");
-    expect(customer).toContain("CUSTOMER_MENU_PRICE_CHANGED");
+    expect(customer).toContain('validateMfkCustomerCommercialGrant');
+    expect(customer).toContain('commercialGrant.lines');
+    expect(customer).not.toContain("String(intent.menuRevision)!==String(envelope.revision)");
+    expect(customer).not.toContain("CUSTOMER_MENU_PRICE_CHANGED");
     expect(customer).toContain("sourceLabel:'自家 App'");
     expect(customer).toContain("paymentEvidenceRef:intent.checkout.paymentEvidenceRef");
     expect(customer).toContain("initialFulfillmentLabel:'待處理'");

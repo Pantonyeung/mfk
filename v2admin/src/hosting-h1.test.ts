@@ -25,8 +25,9 @@ describe('MFK Admin Cloudflare H2 + config sync runtime',()=>{
     const worker=readFileSync(new URL('../worker.ts',import.meta.url),'utf8');
     expect(worker).toContain("const SMT_ORIGIN='https://appassets.androidplatform.net'");
     expect(worker).toContain("const CUSTOMER_ORIGIN='https://order.morefunos.com'");
+    expect(worker).toContain("const SMM_ORIGIN='https://smm.morefunos.com'");
     expect(worker).toContain("const OWNER_ORIGIN='https://owner.morefunos.com'");
-    expect(worker).toContain('CORS_ORIGINS=new Set([ADMIN_ORIGIN,SMT_ORIGIN,CUSTOMER_ORIGIN,OWNER_ORIGIN])');
+    expect(worker).toContain('CORS_ORIGINS=new Set([ADMIN_ORIGIN,SMT_ORIGIN,CUSTOMER_ORIGIN,SMM_ORIGIN,OWNER_ORIGIN])');
     expect(worker).toContain('x-mfk-owner-session');
     expect(worker).toContain("if(origin!==ADMIN_ORIGIN)return false");
     expect(worker).toContain("if(site&&site!=='same-origin')return false");

@@ -12,8 +12,12 @@ describe('public SMT deployment identity',()=>{
     expect(endpoint).toBeLessThan(gate);
     expect(worker).toContain("product:'MFK'");
     expect(worker).toContain("surface:'SMT'");
-    expect(worker).toContain("mode:'WEB_ACCEPTANCE'");
+    expect(worker).toContain("mode:expected?'WEB_ACCEPTANCE':'PUBLIC_SMT_SHELL'");
+    expect(worker).toContain("if(!token)return true");
+    expect(worker).toContain("code:'PUBLIC_SMT_STAFF_AUTH_REQUIRED'");
+    expect(worker).toContain("businessMutationAuth:expected?'PREVIEW_GATE_ONLY':'FORMAL_STAFF_AUTH_REQUIRED'");
     expect(worker).toContain("'cache-control':'no-store'");
+    expect(config).not.toContain('"WEB_ACCEPTANCE_TOKEN"');
     expect(config).toContain('"binding": "MFK_VERSION"');
     expect(config).toContain('"MFK_BUILD_ID"');
     expect(manifest).toContain('MFK_SOURCE_SHA:$(git rev-parse HEAD)');

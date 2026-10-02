@@ -52,6 +52,7 @@ export function ProductSheet({
   origin,
   onClose,
   onAdd,
+  commercialReady,
 }:{
   product:CustomerProduct;
   menu:CustomerMenuSnapshot|null|undefined;
@@ -73,6 +74,7 @@ export function ProductSheet({
   origin:ProductOriginRect|null;
   onClose:()=>void;
   onAdd:()=>void;
+  commercialReady:boolean;
 }){
   const combo=product.comboId?menu?.combos?.find(item=>item.comboId===product.comboId):undefined;
   const poolById=new Map((menu?.comboPools??[]).map(pool=>[pool.poolId,pool] as const));
@@ -95,7 +97,7 @@ export function ProductSheet({
   const draftUnitMinor=comboEnabled?comboUnitMinor:standaloneUnitMinor;
   const draftTotalMinor=draftUnitMinor!==null&&Number.isSafeInteger(draftUnitMinor*quantity)?draftUnitMinor*quantity:null;
   const priceReady=draftTotalMinor!==null&&draftTotalMinor>=0;
-  const addReady=product.available&&variationOk&&validation.ok&&comboValidation.ok&&priceReady&&quantity>=1;
+  const addReady=commercialReady&&product.available&&variationOk&&validation.ok&&comboValidation.ok&&priceReady&&quantity>=1;
 
   const comboChoiceNames=()=>{
     if(!comboEnabled||!combo)return [];
@@ -239,7 +241,7 @@ export function ProductSheet({
     </section>
 
     <div className="ui3-sticky-actions" data-ui3-section="add">
-      <div><span>今次小計</span><strong>{priceReady?money('HKD',draftTotalMinor!):'價格更新中'}</strong><small>{!addReady?(firstMissingRequired?'請先完成：'+firstMissingRequired:'完成必選設定後先可以加入'):'可以加入記憶罐'}</small></div>
+      <div><span>今次小計</span><strong>{priceReady?money('HKD',draftTotalMinor!):'價格更新中'}</strong><small>{!commercialReady?'正在確認最新價格':!addReady?(firstMissingRequired?'請先完成：'+firstMissingRequired:'完成必選設定後先可以加入'):'可以加入記憶罐'}</small></div>
       <ActionButton disabled={!addReady} onClick={onAdd}>{editing?'更新記憶罐':'加入記憶罐'}</ActionButton>
     </div>
   </ProductDialog>;

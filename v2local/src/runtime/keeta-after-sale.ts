@@ -263,6 +263,5 @@ export function installKeetaAfterSales(){
     if(event.type==='KEETA_AFTER_SALE_AVAILABLE')void reconcileKeetaAfterSales();
   });
   window.addEventListener('online',()=>void reconcileKeetaAfterSales());
-  window.addEventListener('focus',()=>void reconcileKeetaAfterSales());
   window.setTimeout(()=>void reconcileKeetaAfterSales(),0);
 }

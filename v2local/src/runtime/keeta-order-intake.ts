@@ -261,24 +261,23 @@ export async function reconcileKeetaOrderIntake(){
 }
 
 let installed=false;
-let fallbackTimer:number|undefined;
+let lastObservedConfigFingerprint='';
 export function installKeetaOrderIntake(){
   if(installed||typeof window==='undefined')return;
   installed=true;
   const reconcile=()=>void reconcileKeetaOrderIntake();
+  lastObservedConfigFingerprint=readSmtAdminConfigLkg()?.fingerprint??'';
   subscribeSmtCloudDoorbell(event=>{
     if(event.type==='KEETA_ORDER_AVAILABLE')reconcile();
   });
-  // K1 transport authorization and mapping both depend on the latest Admin LKG.
-  // Re-run intake immediately after Admin config/ACK changes so startup races cannot strand PENDING_SMT.
-  subscribeSmtAdminConfig(reconcile);
+  // Re-run only when the canonical Admin config fingerprint actually changes.
+  // Sync status, focus and visibility events must never look like new business data.
+  subscribeSmtAdminConfig(()=>{
+    const fingerprint=readSmtAdminConfigLkg()?.fingerprint??'';
+    if(!fingerprint||fingerprint===lastObservedConfigFingerprint)return;
+    lastObservedConfigFingerprint=fingerprint;
+    reconcile();
+  });
   window.addEventListener('online',reconcile);
-  window.addEventListener('focus',reconcile);
-  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')reconcile();});
-  // Doorbell remains primary. This visible-only bounded fallback closes a missed-doorbell gap
-  // without creating a second order path; providerRef dedup + cloud ACK remain authoritative.
-  fallbackTimer=window.setInterval(()=>{
-    if(document.visibilityState==='visible'&&navigator.onLine)reconcile();
-  },5000);
   window.setTimeout(reconcile,0);
 }
