@@ -1,0 +1,631 @@
+MFP V3｜OWNER FINAL REQUIREMENTS CROSSWALK｜2026-10-02
+
+Status:
+CURRENT / CONTROLLING OWNER PRODUCT CROSSWALK
+
+External product:
+MoreFun POS
+
+Short name:
+MFP
+
+Surfaces:
+- MFP Pad
+- MFP Mobile
+
+==================================================
+0. SOURCE PRECEDENCE
+==================================================
+
+產品行為優先次序：
+
+1. Owner_對_SMT_端口要求_FINAL_V1.0
+   = Canonical Owner Product Requirements
+
+2. Owner_SMT_Requirements_Working_V2.5
+   = Detailed decision/change-history evidence.
+   用於補充 FINAL 已收口但未展開的 exact decision history。
+
+3. smt優化ui
+   = Historical implementation / UI acceptance / UX donor evidence.
+   不可以覆蓋 FINAL，但其中已由 Owner 鎖定而 FINAL 未重複描述的 UI acceptance 可作 carry-forward constraint。
+
+MFP V3 不可以因為「重做」而遺失上述 Owner requirement。
+
+==================================================
+1. CURRENT A4 DECISION
+==================================================
+
+A4 exact implementation head：
+5e4118c003bef84a5e0262d5ac925537c4686ff3
+
+A4 declared handoff：
+SOURCE_VERIFIED
+
+但 Owner FINAL crosswalk：
+BLOCKED — OWNER_REQUIREMENTS_CARRY_FORWARD_INCOMPLETE
+
+即：
+- A4 架構／shared ordering domain／Pad-Mobile parity 已驗證。
+- 但未可以宣告 A4 Owner Product Requirement 完成。
+- A5 不應開始，直到 A4 Owner Final Closure 完成。
+
+==================================================
+2. DIRECT PRODUCT CONFLICT
+==================================================
+
+CONFLICT-01｜登入後操作權
+
+Owner FINAL：
+有權登入 MFP（舊稱 SMT）
+→ 就有權使用 Owner FINAL 文件內的 MFP 本機設定／操作。
+本輪不設 Manager-only Gate。
+
+A2 現況：
+存在 ORDER_CREATE / ORDER_READ / PRICE_OVERRIDE / SOLD_OUT_WRITE granular pre-submit permission gate。
+
+Resolution：
+- 保留 formal server/session/device authorization。
+- 保留 security fail-closed。
+- 但 MFP Product capability 不可因 role/manager-only permission 而違反 Owner FINAL。
+- A2 security contract要新增 Owner-alignment：
+  AUTHENTICATED_MFP_STAFF = 基本 MFP frontline operation eligible。
+- action-specific permission 可以作 canonical audit / future extension，但未經 Owner 新版本授權，不可令已登入 MFP 人員無法執行 FINAL 已列出的本機操作。
+- 嚴禁用 UI role check 代替 formal session authorization。
+
+Required before A5 mutation path：
+A2_OWNER_PERMISSION_ALIGNMENT = GREEN
+
+==================================================
+3. FINAL V1.0 SECTION → MFP STAGE MAP
+==================================================
+
+01｜主導航／整體 UI
+Stage：A4 + A6 + A9
+A4：
+- Ordering shell
+- Display Settings
+- 75% major modal geometry
+A6：
+- Orders / Dining / Sold-out high-frequency nav pages
+A9：
+- final navigation/visual/physical acceptance
+
+02｜自家客戶端待處理
+Stage：A8
+要求：
+- 到店支付
+- 電子支付 evidence
+- Accept / Modify / Cancel
+- 客戶同步
+- no duplicate formal effect
+
+03｜Keeta 訂單
+Stage：A8
+要求：
+- separate source identity
+- auto/manual accept
+- immediate/later
+- max defer 2
+- error pending + top + attention
+
+04｜ETA
+Stage：A6
+要求：
+- active not-ready workload
+- Admin configurable thresholds/minutes
+- formal order start
+- ready transition semantics
+
+05｜Customer 落單開關／截單
+Stage：A8
+要求：
+- special cutoff
+- immediate stop
+- only remote new orders affected
+- WhatsApp fallback
+- local MFP trading remains available
+
+06｜Cart
+Stage：A4
+MUST CLOSE NOW：
+- sequence preview display only
+- ORIGINAL input order
+- SORT = Product Category order
+- whole-cart DINE_IN / TAKEAWAY
+- per-line DINE_IN / TAKEAWAY
+- COMBINE only exact same configuration
+- combined quantity stepper
+- non-combined independent lines
+- clear line identity / detail / delete
+
+07｜Hold / Retrieve / Dining attach
+Stage：A4 draft UX + A6 formal operational persistence
+A4 MUST CLOSE NOW：
+- 暫存／堂食 unified entry mindset
+- all takeaway default Hold
+- any dine-in default Dining
+- user may always switch
+- empty cart shows Retrieve entry
+A6：
+- durable Hold / Waiting / Table formal operational behavior
+
+08｜Fast Lane / Required / Rice Combo
+Stage：A4
+MUST CLOSE NOW：
+- three high-frequency entrances
+- positional auto pair only
+- dynamic A/B/C/D… slots
+- reassignment = SWAP, not duplicate
+- unequal residual items remain singles
+- Required zone reads canonical required facts
+- rice combo reads canonical combo facts
+- no auto-upgrade single item into combo
+
+09｜Product Option Modal
+Stage：A4
+MUST CLOSE NOW：
+- approx 75% on Pad
+- stable geometry
+- scrollable content
+- fixed bottom primary action
+- name + price top
+- option/config content
+- fixed summary
+- quantity + preview
+- Add vs Edit Same Line semantics
+
+10｜Quick Mode Required Gate
+Stage：A4 + A5
+A4 MUST CLOSE NOW：
+- quick mode may admit incomplete required draft
+- checkoutReady=false when unresolved
+A5：
+- formal checkout entry must fail closed before formal submit
+
+11｜Checkout
+Stage：A5
+- order summary
+- source/channel
+- payment method
+- cash keypad
+- exact/change
+- back to order
+
+12｜Student Discount
+Stage：A5
+Exact Owner rule：
+- staff confirms Student Count
+- manual selection OR one-click auto
+- quantity <= confirmed students
+- auto chooses most expensive eligible drinks first
+- local preview != formal pricing authority
+
+13｜Final Payment Confirm
+Stage：A5
+- 75% review
+- payment can change before confirm
+- final confirm = formal transaction boundary
+- double tap idempotent
+- first production/print side effects only once
+
+14｜Orders Page
+Stage：A6
+- 3 lanes
+- detail
+- source/payment filter
+- pickup code visible for own platform
+- reprint entry
+- modification/cancel/fulfillment actions
+
+15｜Fulfillment
+Stage：A6
+- incomplete
+- ready
+- handed/picked-up
+- ready may revert to incomplete
+
+16｜Order Modify / Payment Correction / Refund
+Stage：A6 + A5 money semantics
+- same Order
+- customer confirmation for content modification
+- linked correction/refund
+- current effective tender
+- no duplicate production
+- cash refund -> Cash Movement
+
+17｜Cancel after Kitchen Dispatch
+Stage：A6 + A7
+- cancel after production print → cancel notice
+- modification → no auto correction print
+- human communication
+
+18｜Dining Page
+Stage：A6
+- waiting
+- 3×3 tables
+- outdoor
+- detail
+- no unnecessary served/clear-table state
+- same order waiting → table assignment
+
+19｜Dining Split Checkout
+Stage：A6 + A5
+- split by items
+- max splits follows separable item units
+- different tender per split
+- reuse SAME Checkout
+
+20｜Dining Print
+Stage：A7
+- production
+- packing
+- table/unpaid immediate ticket
+- label
+- same Print authority
+
+21｜Sold-out / Restore
+Stage：A6
+- search/filter
+- current unavailable list
+- batch action
+- rice-group quick action
+- no second Availability authority
+
+22｜Capacity Pool
+Stage：A6
+- initial amount
+- product binding
+- per-product consumption
+- formal accepted item → decrement
+- cancel → replenish once
+- Business Day reset, not 00:00
+- manual quantity correction + audit
+
+23｜Channel Threshold
+Stage：A6 + A8
+- independent third-party threshold
+- independent own-platform threshold
+- zero = all bound remote channels stop
+- only new orders affected
+
+24｜Capacity Override
+Stage：A6
+- authorized MFP login can bounded override
+- actor/time/pool/scope/quantity recorded
+- exhaustion re-stops
+- not permanent disable
+
+25｜More / Tools
+Stage：A6 shell + A9 hardening
+- hamburger
+- Today summary
+- Day Close
+- Reports
+- Devices
+- Print
+- Check Center
+- Backup/Restore
+- Diagnostics
+- Admin Sync
+
+26｜Day Close / Cash Count
+Stage：A5
+- opening cash
+- cash sales
+- expected cash
+- denomination count
+- direct total mode
+- actual/variance
+- withdrawal/retained cash
+
+27｜Cash In / Cash Out
+Stage：A5
+- ledger record
+- amount/reason/time/actor
+- not Sales
+- not Refund
+
+28｜Retained Cash / Next Opening
+Stage：A5
+- retained cash
+- next business day opening basis
+- later cash change through Cash In/Out only
+
+29｜Day Close Channel Summary
+Stage：A5
+- count + amount by channel
+
+30｜Tender Summary
+Stage：A5
+- current effective tender only
+- no double count after correction
+- unknown electronic = unclassified electronic
+- reconciliation inference never rewrites Order truth
+
+31｜Reports / Analysis
+Stage：A5 reporting facts + A6/A9 presentation
+- immutable daily report
+- print/reprint
+- product ranking
+- low/zero sales
+- Owner projection consumes same truth
+
+32｜Cross-day Refund / Adjustment
+Stage：A5/A6
+- original report immutable
+- append-only linked adjustment
+- linked original Order/report
+
+33｜Print Configuration Responsibility
+Stage：A7
+Admin：
+- Product routing
+- Logical destination
+- Template publish
+MFP local：
+- physical printer
+- IP
+- binding
+- published template selection
+- execution
+
+34｜Order Reprint
+Stage：A7 + A6 entry
+- entry from Order Detail
+- 80mm whole-ticket
+- Label per-label selection
+- route-specific label selection
+- no Order/payment replay
+
+35｜Printer Failure
+Stage：A7
+- attention
+- no blind physical-success guess
+- human check
+- safe retry/manual decision
+
+36｜Admin Sync / Diagnostics / Backup
+Stage：A9
+- sync status beyond green dot
+- print/network/sync/device/order-flow diagnostics
+- Backup/Restore low-frequency tool
+- never blocks normal trading
+
+37｜Offline / WhatsApp Fallback
+Stage：
+- A3 local projection/sync recovery
+- A5/A6 local transaction continuity
+- A7 local print/hardware continuity
+- A8 Customer WhatsApp fallback
+- A9 full physical acceptance
+Must prove:
+Cloud/Admin/Owner/Provider failure does not block local trade.
+
+38｜Permissions
+Stage：A2 OWNER ALIGNMENT + all stages
+Owner rule：
+MFP LOGIN AUTHORIZED
+→ MFP OPERATION AUTHORIZED
+No Manager-only gate for FINAL-defined MFP operations unless Owner issues later Addendum.
+
+39｜Engineering Acceptance
+Stage：A1–A9 continuous + A9 final
+- idempotent final confirm
+- restart durability
+- cancel Pool replenish once
+- correction no double-count
+- refund preserves Order
+- no blind print retry
+- local trade independent of cloud
+- one Order/Pricing/Payment/Print truth
+
+==================================================
+4. A4 OWNER FINAL CLOSURE — MUST DO BEFORE A5
+==================================================
+
+A4-OF-01｜Display Settings
+Need：
+- category rows / density
+- product rows/columns/density
+- image show/hide
+- font scale
+- overall density/size continuous adjustment
+- instant preview
+- persistence across restart
+Rule：
+presentation only; no business truth changes
+
+A4-OF-02｜Blue Visual Baseline
+Historical Owner UI acceptance：
+- primary blue around #1f5fbf
+- red only destructive/error/real warning
+Current A4 head uses orange as main accent.
+Must align before Owner UI acceptance.
+
+A4-OF-03｜75% Modal / Stable Action Geometry
+Current A4 modal uses fixed max-width/max-height, not Owner approx 75% Pad operation area.
+Need：
+- Pad major modal ~75% operation area
+- scrollable content body
+- fixed/sticky action footer
+- mobile may use touch sheet while preserving stable action location
+
+A4-OF-04｜Exact Cart Semantics
+Need：
+- sequence preview display-only
+- ORIGINAL
+- SORT by Product Category
+- whole-cart service mode
+- per-line service mode
+- exact-config combine
+- stepper only in combined presentation
+- same-line edit
+
+A4-OF-05｜Hold / Dining Mindset
+Need：
+- one high-frequency `Hold / Dining` entry
+- all takeaway → default Hold
+- any dine-in → default Dining
+- manual override both directions
+- empty draft → Retrieve
+A4 may keep behavior draft-only; formal durable hold belongs A6.
+
+A4-OF-06｜Fast Lane Exact Owner Semantics
+Need：
+- Fast Pair
+- Required
+- Rice Combo
+- positional auto pair
+- swap reassignment
+- residual singles
+- no auto-upgrade
+- dynamic slots
+
+A4-OF-07｜Silent Guided Flow
+Historical Owner UI acceptance：
+Required → Quick Drink → Combo blocker → Fast Pair → Checkout → Product
+No wizard next/back.
+Use visual focus/hierarchy only.
+Must not auto-commit.
+
+A4-OF-08｜Right-hand / Muscle-memory Stability
+- primary high-frequency controls stable
+- modal primary action fixed
+- cart/checkout entry stable
+- destructive clear lower visual weight
+
+A4-OF-09｜A2 Permission Owner Alignment
+Before checkout mutation path:
+authenticated MFP staff must not become read-only solely due Manager-style granular permission absent, where Owner FINAL says all logged-in MFP staff can perform FINAL-defined MFP operations.
+Preserve formal auth/session/device fail-closed.
+
+==================================================
+5. HISTORICAL 25 UNACCEPTED ITEMS → MFP STAGE
+==================================================
+
+01 Formal Dining Order Link → A6
+02 Dining unpaid Production Admission → A6/A7
+03 Dining Print → A7
+04 Dining Receipt → A7
+05 Dining Label → A7
+06 Dining Cash Drawer → A7
+07 Cross-device concurrency → A6/A9
+08 Native power-loss recovery → A7/A9
+09 Complete Combo Tender Detail → A5/A6
+10 Real seatedAt → A6
+11 Admin Dining Warning → A6
+12 Safari / physical dining acceptance → A9
+13 Sold-out/Restore full UI → A6
+14 Capacity Pool → A6
+15 Channel Threshold → A6/A8
+16 Override → A6
+17 More/Tools complete convergence → A6/A9
+18 Day Close → A5
+19 Cash In/Out → A5
+20 Reporting → A5/A6
+21 Immutable Daily Report + Later Adjustment → A5/A6
+22 Printer Failure Attention → A7
+23 Diagnostics → A9
+24 Backup/Restore → A9
+25 Offline/WhatsApp Fallback full acceptance → A8/A9
+
+Rule：
+A historical item cannot disappear merely because MFP V3 is a fresh client.
+
+==================================================
+6. A5–A9 STAGE SCOPE AMENDMENT
+==================================================
+
+A5｜CHECKOUT + MONEY
+Must now explicitly include：
+- Checkout UI
+- Student Discount exact rule
+- Final Payment Confirm
+- Payment/Tender
+- Cash drawer/opening facts needed by money flow
+- Cash In/Out ledger
+- retained cash / next opening
+- Day Close cash count
+- Channel Summary / Tender Summary
+- immutable Daily Report money facts
+- cross-day linked adjustment semantics
+- idempotency/readback
+
+A6｜ORDER + FRONTLINE OPERATIONS
+Must explicitly include：
+- Orders page
+- Fulfillment
+- modification/cancel/refund operational UI
+- Dining
+- waiting/table transfer
+- split checkout orchestration
+- ETA
+- Sold-out/Restore
+- Capacity Pool
+- channel thresholds
+- bounded override
+- More/Tools shell
+
+A7｜PRINT + HARDWARE + RECOVERY
+Must explicitly include：
+- printer config responsibility split
+- physical binding/IP
+- published template selection
+- dining print
+- whole-ticket reprint
+- per-label reprint
+- cancel notice
+- printer failure attention
+- drawer/peripheral
+- power-loss/runtime recovery
+
+A8｜CUSTOMER + KEETA + EXTERNAL
+Must explicitly include：
+- Customer pending
+- payment screenshot evidence
+- WhatsApp QR
+- Customer modify/cancel confirmation
+- Customer cutoff/immediate stop
+- Customer WhatsApp fallback
+- Keeta auto/manual
+- defer max 2
+- error attention
+- channel-threshold integration
+
+A9｜PUBLIC + DIAGNOSTICS + PHYSICAL CUTOVER
+Must explicitly include：
+- Admin Sync status
+- Diagnostics
+- Backup/Restore
+- public MFP
+- exact build/runtime identity
+- Pad/Mobile physical acceptance
+- Safari/browser/device acceptance
+- cross-device concurrency acceptance
+- offline/power-loss acceptance
+- zero request-storm proof
+- SMM decommission gate
+
+==================================================
+7. A4 ACCEPTANCE DECISION
+==================================================
+
+A4 declared architecture implementation：
+SOURCE_VERIFIED
+
+A4 Owner Final product acceptance：
+BLOCKED
+
+Reason：
+A4-OF-01..09 remain incomplete/unproven against Owner FINAL + Owner UI acceptance history.
+
+Do NOT start A5 until：
+- A4 Owner Final Closure source is implemented
+- tests are GREEN
+- exact SHA is locked
+- PR #639 updated
+- completion report explicitly covers A4-OF-01..09
+
+MILESTONE:
+MFP_V3_OWNER_FINAL_CROSSWALK_AND_A4_CLOSURE_2026_10_02
