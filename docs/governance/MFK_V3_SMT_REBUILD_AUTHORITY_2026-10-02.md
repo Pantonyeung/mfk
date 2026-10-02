@@ -20,17 +20,14 @@ Surfaces:
 - MFP Pad
 - MFP Mobile
 
-SMM product identity is cancelled.
-Legacy SMM remains transitional compatibility / UX donor only.
+SMM is cancelled as final product identity.
+Legacy SMM remains compatibility / UX donor only.
 
-SMT is not the user-facing target name.
-Existing SMT identifiers may remain temporarily as internal Store Kernel / sync port identifiers.
+SMT may remain temporarily as an internal Store Kernel / sync port identifier.
 
 ## Supersession
 
-For MFP V3 A0–A9 implementation, this authority supersedes PR #627 / Unified Surfaces R1 as current execution control.
-
-PR #627 remains legacy containment / rollback evidence only.
+For MFP V3 A0–A9, this authority supersedes PR #627 / Unified Surfaces R1 as current execution control.
 
 ## Frozen authorities
 
@@ -45,63 +42,56 @@ Do NOT rebuild or duplicate:
 - P0 checkpointed-delta sync semantics
 - Customer / Keeta external authority contracts
 
-## Core client rules
+## Client rules
 
-1. No import of v2 client-state modules.
-2. No periodic business polling.
-3. No periodic auth polling.
-4. Doorbell is invalidation only, never truth.
-5. Reconnect uses bounded single-flight catch-up.
-6. Cloud/server-derived state is not a second authority.
-7. UI state is local-only.
-8. MFP Pad and Mobile share the same business/security/sync contracts.
-9. SMM authority/state/head/session paths may not be reintroduced.
-10. Browser/public surface never becomes a second transaction engine.
+- no v2 client-state imports
+- no periodic business polling
+- no periodic auth polling
+- Doorbell is invalidation only
+- A3 active projection is the ordering source
+- no surface-specific canonical truth
+- Pad/Mobile share business/security/sync contracts
+- no SMM authority/state/head/session path
 
-## P0 sync lock
+## Ordering authority boundary
 
-Canonical identities:
-- HeadSeq = server Store Port head
-- AppliedSeq = client last fully atomically applied sequence
+A4 may:
+- select/project active canonical ordering facts
+- render categories/products/options/combo
+- maintain local cart draft
+- compute local preview arithmetic from published price material facts
+- display sellability
+- produce normalized ordering intent
 
-Connected != Applied.
-Doorbell received != Applied.
+A4 may NOT:
+- create Formal Order
+- allocate formal order/display identity
+- become Pricing Authority
+- bypass later checkout/revision validation
+- create payment/fulfillment/print truth
+- mutate canonical sellability
+- directly fetch/poll Admin catalog from UI
 
-Warm path:
-AppliedSeq == HeadSeq
-→ READY
-→ no delta/checkpoint pull
-→ no periodic business polling
+Formal checkout/price validation begins A5.
 
-Short catch-up:
-HEAD
-→ missing delta only
-→ verify/stage
-→ atomic apply
-→ AppliedSeq last
-→ ACK
+## UI strategy
 
-Long-offline/new client:
-HEAD
-→ checkpoint
-→ verify/install
-→ short tail
-→ atomic apply
-→ AppliedSeq
-→ ACK
+A1–A3:
+architecture seams + verification harnesses.
 
-Failure:
-keep previous LKG
-AppliedSeq unchanged
-no fake READY
+A4–A6:
+formal MFP Pad + Mobile product UI with business capability.
 
-## Stage model
+A7–A9:
+hardware/external/public/physical hardening and final polish.
 
-A0 — Foundation — SOURCE_VERIFIED
-A1 — Store Kernel Seam — SOURCE_VERIFIED
-A2 — Device + Staff Security — SOURCE_VERIFIED
-A3 — Sync + Offline — CURRENT
-A4 — Ordering Surfaces
+## Stage status
+
+A0 — SOURCE_VERIFIED
+A1 — SOURCE_VERIFIED
+A2 — SOURCE_VERIFIED
+A3 — SOURCE_VERIFIED
+A4 — CURRENT
 A5 — Checkout + Money
 A6 — Order Operations
 A7 — Print + Hardware + Recovery
@@ -111,22 +101,20 @@ A9 — Public + Diagnostics + Physical Acceptance + Cutover
 ## Current execution
 
 Stage:
-A3 — Sync + Offline
+A4 — Ordering Surfaces
 
 Branch:
-`feat/MFP-V3-A3-SYNC-OFFLINE-2026-10-02`
+`feat/MFP-V3-A4-ORDERING-SURFACES-2026-10-02`
 
 Parent exact SHA:
-`7d895e0eae3ba7678e4d23416b453912559887ad`
+`adc2cc64573d9d5f7b357a7955ff2b0edc1fd509`
 
-A2 production binding:
-BLOCKED separately.
-It does not block source-level A3 implementation.
-
-A3 completion target:
+Completion target:
 SOURCE_VERIFIED
+
+Carried production binding blockers from A2/A3 remain BLOCKED separately.
 
 No merge / deploy / OTA / public cutover authority.
 
 MILESTONE:
-`MFP_V3_REBUILD_AUTHORITY_A3_CURRENT_2026_10_02`
+`MFP_V3_REBUILD_AUTHORITY_A4_CURRENT_2026_10_02`
