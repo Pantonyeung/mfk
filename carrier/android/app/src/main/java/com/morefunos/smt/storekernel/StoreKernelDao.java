@@ -34,6 +34,9 @@ interface StoreKernelDao {
     @Query("SELECT * FROM store_kernel_command_receipt WHERE store_id = :storeId AND operation_id = :operationId AND idempotency_key = :idempotencyKey LIMIT 1")
     StoreKernelCommandReceiptEntity readReceipt(String storeId, String operationId, String idempotencyKey);
 
+    @Query("SELECT * FROM store_kernel_command_receipt WHERE store_id = :storeId AND command_id = :commandId LIMIT 1")
+    StoreKernelCommandReceiptEntity readReceiptByCommandId(String storeId, String commandId);
+
     @Insert(onConflict = OnConflictStrategy.ABORT)
     void insertReceipt(StoreKernelCommandReceiptEntity receipt);
 

@@ -80,7 +80,7 @@ export function MfpCheckCenterView({surface,url,diagnostics,onRefresh}:{
         <div><dt>Health</dt><dd>{field(kernel,'status')}</dd></div><div><dt>DB</dt><dd>{field(kernel,'database')}</dd></div>
         <div><dt>Schema</dt><dd>{field(kernel,'schemaVersion')}</dd></div><div><dt>Journal</dt><dd>{field(kernel,'journalMode')}</dd></div>
         <div><dt>Synchronous</dt><dd>{field(kernel,'synchronous')}</dd></div><div><dt>Receipt readback</dt><dd>{kernelOk?'AVAILABLE':'BLOCKED'}</dd></div>
-      </dl><small>Low-level health does not satisfy the missing formal business router.</small></article>
+      </dl><small>The formal router is source-verified; Security, Pricing, Tender and domain handlers remain BLOCKED.</small></article>
       <article><h2>SYNC</h2><Status ok={false} code="MFP_SYNC_PRODUCTION_BINDING_MISSING"/><dl>
         <div><dt>HeadSeq</dt><dd>NOT EXPOSED</dd></div><div><dt>AppliedSeq</dt><dd>NOT EXPOSED</dd></div><div><dt>Checkpoint</dt><dd>NOT EXPOSED</dd></div>
         <div><dt>Doorbell</dt><dd>BLOCKED</dd></div><div><dt>Last apply</dt><dd>NOT EXPOSED</dd></div><div><dt>Polling</dt><dd>DISABLED</dd></div>

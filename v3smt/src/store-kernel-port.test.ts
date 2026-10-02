@@ -110,6 +110,9 @@ describe('MFP V3 A1 Store Kernel port',()=>{
 
     expect(await port.submitFormalCommand(command())).toEqual(committed());
     expect(calls).toEqual(['submit','read','submit']);
+    expect(transport.readSubmission).toHaveBeenCalledWith(expect.objectContaining({
+      submissionId:'SUB-01',idempotencyKey:'IDEMP-01',commandType:'ORDER_CREATE',
+    }));
   });
 
   it('returns the original commit identity when readback is COMMITTED',async()=>{

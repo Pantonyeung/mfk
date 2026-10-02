@@ -1,4 +1,4 @@
-name: MFP V3 A9 Source Diagnostics
+name: MFP V3 A9/A9R Source
 
 on:
   push:
@@ -13,9 +13,14 @@ on:
       - feat/MFP-V3-A7-PRINT-HARDWARE-RECOVERY-2026-10-02
       - feat/MFP-V3-A8-CUSTOMER-KEETA-EXTERNAL-2026-10-02
       - feat/MFP-V3-A9-PUBLIC-DIAGNOSTICS-PHYSICAL-CUTOVER-2026-10-02
+      - feat/MFP-V3-A9R-FORMAL-BUSINESS-ROUTER-2026-10-02
     paths:
       - '.github/mfk-change-manifest.json'
       - 'v3smt/**'
+      - 'carrier/android/**'
+      - 'docs/architecture/MFP_V3_A9R_FORMAL_BUSINESS_COMMAND_MATRIX_2026-10-02.md'
+      - 'docs/governance/MFP_V3_A9R_FORMAL_BUSINESS_ROUTER_AUTHORITY_2026-10-02.md'
+      - 'docs/handoff/MFP_V3_A9R_FORMAL_BUSINESS_ROUTER_CODEX_HANDOFF_2026-10-02.md'
       - 'docs/design/MFP_PAD_ORDERING_VISUAL_LOCK_R1_2026-10-02.md'
       - 'docs/governance/MFK_V3_SMT_REBUILD_AUTHORITY_2026-10-02.md'
       - 'docs/handoff/MFP_V3_A1_CODEX_IMPLEMENTATION_HANDOFF_2026-10-02.md'
@@ -34,6 +39,10 @@ on:
     paths:
       - '.github/mfk-change-manifest.json'
       - 'v3smt/**'
+      - 'carrier/android/**'
+      - 'docs/architecture/MFP_V3_A9R_FORMAL_BUSINESS_COMMAND_MATRIX_2026-10-02.md'
+      - 'docs/governance/MFP_V3_A9R_FORMAL_BUSINESS_ROUTER_AUTHORITY_2026-10-02.md'
+      - 'docs/handoff/MFP_V3_A9R_FORMAL_BUSINESS_ROUTER_CODEX_HANDOFF_2026-10-02.md'
       - 'docs/design/MFP_PAD_ORDERING_VISUAL_LOCK_R1_2026-10-02.md'
       - 'docs/governance/MFK_V3_SMT_REBUILD_AUTHORITY_2026-10-02.md'
       - 'docs/handoff/MFP_V3_A1_CODEX_IMPLEMENTATION_HANDOFF_2026-10-02.md'
@@ -165,7 +174,12 @@ jobs:
           grep -RInF "target:'MFP_V3'" v3smt/vite.config.ts
           grep -RInF 'build-identity.json' v3smt/vite.config.ts
           grep -RInF "APP_ORIGIN='https://appassets.androidplatform.net'" v3smt/src/a9-runtime.ts
-          grep -RInF "FORMAL_COMMAND_ROUTER_BINDING_MISSING" v3smt/src/a9-runtime.ts
+          grep -RInF "FORMAL_COMMAND_ROUTER_SOURCE_VERIFIED" v3smt/src/a9-runtime.ts
+          grep -RInF "FORMAL_PRICING_AUTHORITY_DEPENDENCY_MISSING" v3smt/src/a9-runtime.ts
+          grep -RInF "FORMAL_TENDER_AUTHORITY_DEPENDENCY_MISSING" v3smt/src/a9-runtime.ts
+          grep -RInF "type:'mfp.store-kernel.command.v1'" v3smt/src/formal-business-native-transport.ts
+          grep -RInF "STORE_KERNEL_FORMAL_BUSINESS_AUTHORITY" carrier/android/app/src/main/java/com/morefunos/smt/storekernel/business/FormalBusinessCommandRouter.java
+          grep -RInF "STORE_KERNEL_DIRECT_COMMIT_FORBIDDEN" carrier/android/app/src/main/java/com/morefunos/smt/MainActivity.java
           grep -RInF "MFP_NATIVE_MUTATION_DISABLED_PUBLIC" v3smt/src/a9-runtime.ts
           grep -RInF 'signalMfpRuntimeReadyOnce' v3smt/src/App.tsx
           grep -RInF 'data-check-center="A9"' v3smt/src/check-center.tsx
@@ -176,3 +190,19 @@ jobs:
           ! grep -RInE --include='a9-*.ts' --include='check-center.tsx' 'setInterval\s*\(' v3smt/src
           test -s v3smt/dist/build-identity.json
           grep -F 'Cache-Control: no-store' v3smt/dist/_headers
+
+  native-router:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.3.1'
+      - name: Formal router native tests
+        working-directory: carrier/android
+        run: gradle :app:testDebugUnitTest -x verifySmtWebBundle --tests 'com.morefunos.smt.storekernel.business.*' --tests 'com.morefunos.smt.storekernel.StoreKernelFormalReceiptTest' --no-daemon

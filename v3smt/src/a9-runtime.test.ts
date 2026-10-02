@@ -95,10 +95,13 @@ describe('MFP V3 A9 bounded native adapter',()=>{
 });
 
 describe('MFP V3 A9 fail-closed readiness',()=>{
-  it('reports the missing formal router and every unbound production adapter',()=>{
+  it('reports the source-verified formal router and every unbound production authority',()=>{
     const result=evaluateMfpA9Readiness({expectedSourceSha:MFP_BUILD_IDENTITY.sourceSha,builderV3SourceVerified:true});
+    expect(MFP_A9_FORMAL_ROUTER_STATUS).toMatchObject({status:'SOURCE_VERIFIED',code:'FORMAL_COMMAND_ROUTER_SOURCE_VERIFIED'});
     expect(result.status).toBe('BLOCKED');
-    expect(result.codes).toContain(MFP_A9_FORMAL_ROUTER_STATUS.code);
+    expect(result.codes).not.toContain(MFP_A9_FORMAL_ROUTER_STATUS.code);
+    expect(result.codes).toContain('FORMAL_PRICING_AUTHORITY_DEPENDENCY_MISSING');
+    expect(result.codes).toContain('FORMAL_TENDER_AUTHORITY_DEPENDENCY_MISSING');
     expect(result.codes).toContain('MFP_SYNC_PRODUCTION_BINDING_MISSING');
     expect(result.codes).toContain('MFP_PHYSICAL_ACCEPTANCE_REQUIRED');
   });

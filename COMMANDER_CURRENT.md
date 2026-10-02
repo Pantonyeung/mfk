@@ -13,7 +13,7 @@ Parent A9 exact SHA:
 `69adb11215677d506545c5428f8deea4b89e7db2`
 
 Current substage:
-`A9R — Formal Business Command Router`
+`A9R — R0 SOURCE_VERIFIED / R1 CHECKOUT DEPENDENCY BLOCKED`
 
 Working branch:
 `feat/MFP-V3-A9R-FORMAL-BUSINESS-ROUTER-2026-10-02`
@@ -73,13 +73,14 @@ Do not move pricing/payment authority into React.
 
 A9-S source diagnostics = SOURCE_VERIFIED
 A9-B Builder V3 packaging = SOURCE_VERIFIED
-A9R formal router = CURRENT
+A9R R0 formal router skeleton = SOURCE_VERIFIED
+A9R R1 Checkout mutation = BLOCKED — MFP_SECURITY_PRODUCTION_BINDING_MISSING / FORMAL_PRICING_AUTHORITY_DEPENDENCY_MISSING / FORMAL_TENDER_AUTHORITY_DEPENDENCY_MISSING
 A9-C Candidate Publish = BLOCKED
 A9-P Physical Acceptance = BLOCKED
 A9-X Cutover/SMM Decommission = BLOCKED
 
-Completion target for current pass:
-SOURCE_VERIFIED
+Current pass result:
+SOURCE_VERIFIED for the non-mutating R0 router skeleton only. No business aggregate mutation, Candidate Publish, OTA, deploy, cutover, or SMM decommission is authorized.
 
 MILESTONE:
 `MFP_V3_A9R_CURRENT_EXECUTION_CONTROL_2026_10_02`

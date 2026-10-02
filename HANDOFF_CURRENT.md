@@ -3,7 +3,7 @@
 Status: CURRENT / CONTROLLING HANDOFF
 
 Current:
-A9R — Formal Business Command Router
+A9R — R0 router skeleton SOURCE_VERIFIED; R1 Checkout mutation BLOCKED
 
 Branch:
 `feat/MFP-V3-A9R-FORMAL-BUSINESS-ROUTER-2026-10-02`
@@ -54,18 +54,26 @@ Router internally derives canonical mutations only after formal validation.
 
 Forged low-level mutation input must be rejected before Store Kernel commit.
 
-## Current pass
+## Current pass result
 
-R0:
+R0 `SOURCE_VERIFIED`:
 - parser/registry/result/idempotency/native bridge/security seam
+- exact 19-command matrix
+- raw aggregate/canonical state rejection
+- Store Kernel receipt-only terminal rejection persistence
+- direct Browser `store.kernel.commit.v1` blocked
 
-R1 first vertical:
+R1 first vertical remains `BLOCKED`:
 - CHECKOUT_PAYMENT_CONFIRM
+- `MFP_SECURITY_PRODUCTION_BINDING_MISSING`
+- `FORMAL_PRICING_AUTHORITY_DEPENDENCY_MISSING`
+- `FORMAL_TENDER_AUTHORITY_DEPENDENCY_MISSING`
 
-If formal Pricing/Tender dependency is absent:
-report BLOCKED dependency, do not rebuild it in browser.
+No Pricing, Tender, or PIN engine was created in the Router or React. No business aggregate mutation is authorized by this pass.
 
 No Candidate Publish.
+
+Exact next action: bind the existing canonical Security, Pricing, and Tender read authorities and freeze their input contracts before implementing the single native `CHECKOUT_PAYMENT_CONFIRM` handler.
 
 MILESTONE:
 `MFP_V3_A9R_CURRENT_HANDOFF_2026_10_02`
