@@ -2,16 +2,22 @@ import {useEffect,useMemo,useRef,useState} from 'react';
 import {CUSTOMER_V3_ASSETS as A} from './assets';
 import {AppDialog} from './dialog';
 import {
+  DEFAULT_PAYMENT_METHOD_ID,
   PREVIEW_COUPON,
   PREVIEW_CUSTOMER_PHONE,
   PREVIEW_FALLBACK_REFERENCE,
+  PREVIEW_MENU_CATEGORIES,
+  PREVIEW_PAYMENT_METHODS,
   PREVIEW_PICKUP_CODE,
   PREVIEW_PRODUCTS,
+  jarItemCount,
   jarItemsTotal,
   jarTotal,
+  memoryJarLevel,
+  previewPaymentMethod,
   pickupCodeFromPhone
 } from './preview-data';
-import type {JarItem,PaymentMethod,PreviewProduct} from './preview-data';
+import type {JarItem,PaymentMethodId,PreviewProduct} from './preview-data';
 
 const BackTitle=({title,onBack,eyebrow}:Readonly<{title:string;onBack:()=>void;eyebrow?:string}>)=><div className="screen-title">
   <button type="button" onClick={onBack} aria-label="返回">‹</button>
@@ -22,7 +28,7 @@ const Money=({value}:Readonly<{value:number}>)=><b className="money">${value}</b
 
 export type SubmittedOrder=Readonly<{
   pickupCode:string;
-  payment:PaymentMethod;
+  payment:PaymentMethodId;
   proofSubmitted:boolean;
 }>;
 
@@ -30,17 +36,21 @@ export function MenuScreen({onOpenProduct,onBack}:Readonly<{
   onOpenProduct:(id:string)=>void;
   onBack:()=>void;
 }>){
+  const [category,setCategory]=useState('all');
+  const visibleProducts=category==='all'?PREVIEW_PRODUCTS:PREVIEW_PRODUCTS.filter(product=>product.categoryIds.includes(category));
   return <section className="app-screen menu-screen" aria-labelledby="menu-title">
     <BackTitle title="菜單" onBack={onBack}/>
     <div className="collection-hero">
-      <small>全部餐點</small>
-      <h2 id="menu-title">今日手作菜單</h2>
-      <p>一次睇晒而家供應嘅餐點，再逐款加入記憶罐。</p>
+      <div><small>今日手作</small><h2 id="menu-title">今日想食邊一款？</h2><p>按分類慢慢揀，加入後會留返喺菜單。</p></div>
+      <img src={A.maleHeroR2} alt=""/>
+    </div>
+    <div className="menu-categories chip-row" role="group" aria-label="餐點分類">
+      {PREVIEW_MENU_CATEGORIES.map(item=><button type="button" aria-pressed={category===item.id} className={category===item.id?'selected':''} key={item.id} onClick={()=>setCategory(item.id)}>{item.label}</button>)}
     </div>
     <div className="product-list">
-      {PREVIEW_PRODUCTS.map((product,index)=><button className={index===0?'product-card featured-product':'product-card'} type="button" key={product.id} onClick={()=>onOpenProduct(product.id)}>
+      {visibleProducts.map((product,index)=><button className={product.id===PREVIEW_PRODUCTS[0].id?'product-card featured-product':'product-card'} type="button" key={product.id} onClick={()=>onOpenProduct(product.id)}>
         <img src={product.image} alt="" loading={index===0?'eager':'lazy'} decoding="async"/>
-        <span><small>{index===0?'主廚推薦':'手作輕食'}</small><strong>{product.name}</strong><em>{product.description}</em><span><Money value={product.price}/><i>約 {product.pickupMinutes} 分鐘可取</i></span></span>
+        <span><small>{product.id===PREVIEW_PRODUCTS[0].id?'主廚推薦':product.categoryIds.includes('sets')?'期間限定':'手作輕食'}</small><strong>{product.name}</strong><em>{product.description}</em><span><Money value={product.price}/><i>約 {product.pickupMinutes} 分鐘可取</i></span></span>
         <b aria-hidden="true">›</b>
       </button>)}
     </div>
@@ -50,7 +60,7 @@ export function MenuScreen({onOpenProduct,onBack}:Readonly<{
 export function ProductScreen({product,onBack,onAdd}:Readonly<{
   product:PreviewProduct;
   onBack:()=>void;
-  onAdd:(item:JarItem)=>void;
+  onAdd:(item:JarItem,origin:Readonly<{left:number;top:number;width:number;height:number}>)=>void;
 }>){
   const [combo,setCombo]=useState<JarItem['combo']>('單點');
   const [options,setOptions]=useState<string[]>(['原味']);
@@ -112,7 +122,10 @@ export function ProductScreen({product,onBack,onAdd}:Readonly<{
       <label className="note-field">特別備註（選填）<textarea rows={3} value={note} onChange={event=>setNote(event.target.value)} placeholder="例如：不要蔥、少辣"/></label>
     </div>
 
-    <div className="sticky-action"><span><small>合計</small><Money value={total}/></span><button type="button" onClick={()=>onAdd({product,combo,options:Object.freeze([...options]),quantity,note:note.trim()||undefined})}>加入記憶罐</button></div>
+    <div className="sticky-action"><span><small>合計</small><Money value={total}/></span><button type="button" onClick={event=>{
+      const rect=heroRef.current?.getBoundingClientRect()??event.currentTarget.getBoundingClientRect();
+      onAdd({product,combo,options:Object.freeze([...options]),quantity,note:note.trim()||undefined},{left:rect.left,top:rect.top,width:rect.width,height:rect.height});
+    }}>加入記憶罐</button></div>
   </section>;
 }
 
@@ -125,9 +138,12 @@ export function JarScreen({items,onBack,onBrowse,onQuantity,onRemove,onCheckout}
   onCheckout:()=>void;
 }>){
   const total=jarItemsTotal(items);
+  const itemCount=jarItemCount(items);
+  const jarLevel=memoryJarLevel(itemCount);
+  const jarImage=jarLevel==='full'?A.memoryJarFull:jarLevel==='partial'?A.memoryJarPartial:A.memoryJarEmpty;
   return <section className="app-screen jar-screen" aria-labelledby="jar-title">
     <BackTitle title="記憶罐" onBack={onBack}/>
-    <div className={items.length?'jar-heading has-items':'jar-heading is-empty'}><img src={items.length?A.memoryJarPartial:A.memoryJarEmpty} alt=""/><div><h2 id="jar-title">{items.length?'美味已收藏':'記憶罐空空的'}</h2><p>{items.length?`已加入 ${items.length} 款餐點；可以繼續揀，最後一次過結帳。`:'遇見想食嘅餐點，就放入記憶罐。'}</p></div></div>
+    <div className={items.length?`jar-heading has-items ${jarLevel}`:'jar-heading is-empty'}><img src={jarImage} alt=""/><div><small>{jarLevel==='full'?'滿滿好味':jarLevel==='partial'?'回憶收集中':'等緊第一份好味'}</small><h2 id="jar-title">{items.length?'美味已收藏':'記憶罐空空的'}</h2><p>{items.length?`記憶罐有 ${itemCount} 件產品；可以繼續揀，最後一次過結帳。`:'遇見想食嘅餐點，就放入記憶罐。'}</p></div></div>
     {items.length?<>
       <div className="jar-list">{items.map((item,index)=><article className="jar-item" key={`${item.product.id}-${index}`}>
         <img src={item.product.image} alt=""/>
@@ -159,7 +175,7 @@ function CouponFallbackDialog({mode,subtotal,discounted,onClose}:Readonly<{
   };
   return <AppDialog labelledBy="fallback-title" onClose={onClose} className="fallback-dialog">
     <button className="dialog-close" type="button" onClick={onClose} aria-label="關閉">×</button>
-    <small>{mode==='unpaid'?'未付款／現金後備':'已付款極端後備'}</small>
+    <small>{mode==='unpaid'?'未付款後備':'已付款極端後備'}</small>
     <h2 id="fallback-title">{mode==='unpaid'?'轉到 WhatsApp 前確認':'已付款價錢會保留'}</h2>
     {mode==='unpaid'?<>
       <p>WhatsApp 落單暫時唔支援優惠券。今次會解除優惠，優惠券留返下次使用。</p>
@@ -185,12 +201,14 @@ export function CheckoutScreen({items,onBack,onHome,onOrder}:Readonly<{
   const [name,setName]=useState('陳先生');
   const [phone,setPhone]=useState(PREVIEW_CUSTOMER_PHONE);
   const [contactError,setContactError]=useState('');
-  const [payment,setPayment]=useState<PaymentMethod>('electronic');
+  const [paymentId,setPaymentId]=useState<PaymentMethodId>(DEFAULT_PAYMENT_METHOD_ID);
   const [proofName,setProofName]=useState('');
   const [proofError,setProofError]=useState('');
   const [couponOpen,setCouponOpen]=useState(false);
   const [couponApplied,setCouponApplied]=useState(false);
   const [fallbackMode,setFallbackMode]=useState<FallbackMode|null>(null);
+  const paymentPickerRef=useRef<HTMLDetailsElement>(null);
+  const payment=previewPaymentMethod(paymentId);
   const subtotal=useMemo(()=>jarItemsTotal(items),[items]);
   const total=Math.max(0,subtotal-(couponApplied?PREVIEW_COUPON.discount:0));
   const pickupCode=pickupCodeFromPhone(phone)||PREVIEW_PICKUP_CODE;
@@ -200,7 +218,7 @@ export function CheckoutScreen({items,onBack,onHome,onOrder}:Readonly<{
       if(!name.trim()||phone.replace(/\D/g,'').length<8){setContactError('請填寫稱呼及有效電話號碼。');return;}
       setContactError('');
     }
-    if(step===1&&payment==='electronic'&&!proofName){setProofError('請先上載付款證明，再繼續確認訂單。');return;}
+    if(step===1&&payment.requiresProof&&!proofName){setProofError(`請先上載${payment.label}付款憑證，再繼續確認訂單。`);return;}
     setProofError('');
     setStep(value=>Math.min(3,value+1));
   };
@@ -216,28 +234,37 @@ export function CheckoutScreen({items,onBack,onHome,onOrder}:Readonly<{
       <div className="pickup-card"><small>取餐資料</small><h2>舖頭營業中</h2><p>中環皇后大道中 100 號</p><b>◷ 約 30 分鐘可取</b></div>
     </div>}
     {step===1&&<div className="checkout-stack payment-stack">
-      <button type="button" aria-pressed={payment==='cash'} className={payment==='cash'?'selected':''} onClick={()=>{setPayment('cash');setProofError('');}}><span>▣</span><b>現金付款<small>到店自取時付款，不需要付款證明</small></b><i/></button>
-      <button type="button" aria-pressed={payment==='electronic'} className={payment==='electronic'?'selected':''} onClick={()=>setPayment('electronic')}><span>▤</span><b>電子付款<small>轉帳後上載付款證明</small></b><i/></button>
+      <details className="payment-picker" ref={paymentPickerRef}>
+        <summary><span>{payment.symbol}</span><b>付款方式<small>{payment.label}・{payment.description}</small></b><em>更改⌄</em></summary>
+        <div className="payment-method-options" role="radiogroup" aria-label="可用付款方式">
+          {PREVIEW_PAYMENT_METHODS.map(method=><button type="button" role="radio" aria-checked={paymentId===method.id} className={paymentId===method.id?'payment-method-option selected':'payment-method-option'} key={method.id} onClick={()=>{
+            if(method.id!==paymentId)setProofName('');
+            setPaymentId(method.id);
+            setProofError('');
+            paymentPickerRef.current?.removeAttribute('open');
+          }}><span>{method.symbol}</span><b>{method.label}<small>{method.description}</small></b><i/></button>)}
+        </div>
+      </details>
       <button type="button" className="coupon-row" aria-expanded={couponOpen} onClick={()=>setCouponOpen(value=>!value)}><span>◇</span><b>優惠券<small>{couponApplied?PREVIEW_COUPON.title:'查看可用優惠'}</small></b><em>{couponApplied?'已套用':'未選擇'} ›</em></button>
       {couponOpen&&<div className="coupon-picker"><span>◇</span><div><b>{PREVIEW_COUPON.title}</b><small>{PREVIEW_COUPON.description}</small><code>{PREVIEW_COUPON.code}</code></div><button type="button" onClick={()=>{setCouponApplied(value=>!value);setCouponOpen(false);}}>{couponApplied?'移除':'套用'}</button></div>}
-      {payment==='electronic'&&<div className="qr-preview"><small>預覽 QR</small><span aria-hidden="true"/><p>完成轉帳後，上載付款證明。截圖只係核對證明，唔代表已確認收款。</p><label htmlFor="payment-proof">上載付款證明<input id="payment-proof" type="file" accept="image/*" onChange={event=>{setProofName(event.currentTarget.files?.[0]?.name??'');setProofError('');}}/></label>{proofName&&<b role="status">已選擇：{proofName}</b>}{proofError&&<p className="form-error" role="alert">{proofError}</p>}</div>}
+      {payment.requiresProof&&<div className="qr-preview"><small>{payment.label} QR 預覽</small><span aria-hidden="true"/><p>完成付款後，上載付款憑證。截圖只係核對證明，唔代表已確認收款。</p><label htmlFor="payment-proof">上載付款憑證<input id="payment-proof" type="file" accept="image/*" onChange={event=>{setProofName(event.currentTarget.files?.[0]?.name??'');setProofError('');}}/></label>{proofName&&<b role="status">已選擇：{proofName}</b>}{proofError&&<p className="form-error" role="alert">{proofError}</p>}</div>}
     </div>}
     {step===2&&<div className="checkout-stack review-stack">
       <div><small>餐點</small><b>{items.length} 款餐點</b><span>{items.map(item=>`${item.product.name} × ${item.quantity}`).join('・')}</span></div>
       <div><small>聯絡資料</small><b>{name}・{phone}</b></div>
-      <div><small>付款方式</small><b>{payment==='cash'?'現金付款':'電子付款'}</b><span>{payment==='electronic'?'付款證明只會交由舖頭核對，並非已付款確認':'到店自取時付款，唔會進入付款證明流程'}</span></div>
+      <div><small>付款方式</small><b>{payment.label}</b><span>{payment.requiresProof?'付款憑證只會交由舖頭核對，並非已付款確認':'到店自取時付款，唔會進入付款憑證流程'}</span></div>
       {couponApplied&&<div><small>優惠券</small><b>{PREVIEW_COUPON.title}</b><span>已減 ${PREVIEW_COUPON.discount}</span></div>}
       <div><small>整張訂單合計</small><Money value={total}/></div>
       <p className="preview-boundary">預覽模式：確認後只會展示流程，不會建立正式訂單或扣款。</p>
-      {couponApplied&&<div className="fallback-preview"><small>預覽優惠券後備狀態</small><span>只用嚟檢查例外畫面；正常落單唔會顯示。</span><section><button type="button" onClick={()=>setFallbackMode('unpaid')}>未付款／現金後備</button><button type="button" onClick={()=>setFallbackMode('paid')}>已付款後備</button></section></div>}
+      {couponApplied&&<div className="fallback-preview"><small>預覽優惠券後備狀態</small><span>只用嚟檢查例外畫面；正常落單唔會顯示。</span><section><button type="button" onClick={()=>setFallbackMode('unpaid')}>未付款後備</button><button type="button" onClick={()=>setFallbackMode('paid')}>已付款後備</button></section></div>}
     </div>}
     {step===3&&<div className="waiting-state">
       <div className="waiting-art"><img src={A.memoryJarFull} alt="裝滿美味回憶的記憶罐"/><span aria-hidden="true">♡</span></div>
-      <small>{payment==='electronic'?'付款證明已提交・仍待核對':'現金付款・到店付款'}</small><h2>訂單已送出</h2><p>{payment==='electronic'?'付款證明唔等於已確認收款；舖頭核對後會更新進度。':'舖頭確認訂單後會更新進度，取餐時先付款。'}</p>
+      <small>{payment.requiresProof?`${payment.label}付款憑證已提交・仍待核對`:`${payment.label}・到店付款`}</small><h2>訂單已送出</h2><p>{payment.requiresProof?'付款憑證唔等於已確認收款；舖頭核對後會更新進度。':'舖頭確認訂單後會更新進度，取餐時先付款。'}</p>
       <div className="pickup-code"><small>取餐碼・電話尾四位</small><b>{pickupCode}</b><span>訂單顯示編號 MF-NEW・已等候 2 分鐘</span></div>
       <div className="waiting-order-list">{items.map((item,index)=><article key={`${item.product.id}-${index}`}><img src={item.product.image} alt=""/><span><b>{item.product.name}</b><small>數量 {item.quantity}</small></span><Money value={jarTotal(item)}/></article>)}</div>
       <div className="waiting-total"><span>合計</span><Money value={total}/></div>
-      <button type="button" onClick={()=>onOrder({pickupCode,payment,proofSubmitted:payment==='electronic'})}>查看訂單詳情</button><button className="secondary" type="button" onClick={onHome}>返回首頁</button>
+      <button type="button" onClick={()=>onOrder({pickupCode,payment:payment.id,proofSubmitted:payment.requiresProof})}>查看訂單詳情</button><button className="secondary" type="button" onClick={onHome}>返回首頁</button>
     </div>}
     {step<3&&<div className="sticky-action"><span><small>整張訂單合計</small><Money value={total}/></span><button type="button" onClick={next}>{step===2?'確認送出':'下一步'} <b aria-hidden="true">›</b></button></div>}
     {fallbackMode && (

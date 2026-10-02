@@ -98,7 +98,7 @@ main{display:grid;gap:12px;min-width:0}
   place-items:center;
 }
 .bell svg{font-size:22px}
-.bell i,nav button i{
+.bell i,nav button>i{
   position:absolute;
   border-radius:50%;
   background:#ff4f62;
@@ -569,10 +569,15 @@ nav button{
   color:#7b87a0;
 }
 nav button svg{font-size:27px}
-.nav-jar-icon{width:30px;height:30px;object-fit:contain;filter:drop-shadow(0 2px 2px rgba(84,54,138,.14))}
+.nav-jar-visual{position:relative;width:38px;height:32px;display:grid;place-items:center}
+.nav-jar-icon{width:34px;height:34px;object-fit:contain;filter:drop-shadow(0 3px 3px rgba(84,54,138,.18))}
+.nav-jar-badge{position:absolute;top:-6px;right:-8px;min-width:20px;height:20px;padding:0 5px;border:2px solid #fff;border-radius:999px;display:grid;place-items:center;background:#ff5065;color:#fff;font-size:9px;font-style:normal;font-weight:1000;line-height:1;box-shadow:0 4px 9px rgba(164,38,61,.22)}
 nav button b{font-size:11px}
 nav .active{color:#1767f7}
-nav button i{width:7px;height:7px;top:4px;left:calc(50% + 8px)}
+nav button>i{width:7px;height:7px;top:4px;left:calc(50% + 8px)}
+
+.jar-flight{position:fixed;z-index:60;inset:0;pointer-events:none}
+.jar-flight img{position:absolute;left:0;top:0;width:68px;height:68px;border:4px solid rgba(255,255,255,.92);border-radius:22px;object-fit:cover;box-shadow:0 14px 30px rgba(34,65,126,.26);will-change:transform,opacity}
 
 @media(max-width:380px){
   .header{grid-template-columns:62px 112px 42px minmax(0,1fr);gap:4px;padding-left:6px;padding-right:6px}
@@ -604,7 +609,10 @@ nav button i{width:7px;height:7px;top:4px;left:calc(50% + 8px)}
   .hero-slide.is-active~.hero-trail{animation:trailFloat 2.4s var(--ease-out) infinite}
   .hero-slide.is-active~.trail-two{animation-delay:.45s}
   .hero-slide.is-active~.trail-three{animation-delay:.9s}
+  nav button.jar-receiving .nav-jar-visual{animation:jarReceive 650ms var(--ease-out)}
 }
+
+@keyframes jarReceive{0%,64%{transform:none}78%{transform:scale(1.2) rotate(-5deg)}100%{transform:none}}
 
 @media(prefers-reduced-motion:reduce){
   *{scroll-behavior:auto!important;animation:none!important;transition:none!important}

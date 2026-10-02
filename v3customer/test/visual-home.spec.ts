@@ -12,6 +12,7 @@ async function addFirstItemAndOpenCheckout(page:Page){
   await page.getByRole('button',{name:'菜單',exact:true}).click();
   await page.getByRole('button',{name:/香草烤雞腿飯/}).click();
   await page.getByRole('button',{name:'加入記憶罐'}).click();
+  await page.locator('[data-nav-jar]').click();
   await page.getByRole('button',{name:/一次過結帳/}).click();
   await page.getByRole('button',{name:/下一步/}).click();
 }
@@ -87,8 +88,8 @@ test('primary home actions and hero motion stay honest',async({page})=>{
   await page.goto('/');
   await expect(page.getByRole('button',{name:'店舖狀態：營業中'})).toBeVisible();
   await expect(page.locator('.quick-card')).toHaveCount(4);
-  await expect(page.getByRole('button',{name:/限時優惠/})).toBeVisible();
-  await expect(page.getByText('期間限定')).toHaveCount(0);
+  await expect(page.getByRole('button',{name:/期間限定/})).toBeVisible();
+  await expect(page.getByText('限時優惠')).toHaveCount(0);
   await expect(page.locator('.hero-slide')).toHaveCount(4);
 
   const heroVisual=page.locator('.hero-visual');
@@ -98,7 +99,7 @@ test('primary home actions and hero motion stay honest',async({page})=>{
   expect((await heroVisual.boundingBox())?.width ?? initialWidth).toBeLessThan(initialWidth*.9);
   expect((await page.locator('.header').boundingBox())?.y ?? -1).toBe(0);
 
-  await page.getByRole('button',{name:'記憶罐'}).click();
+  await page.locator('[data-nav-jar]').click();
   await expect(page.getByRole('heading',{name:'記憶罐',exact:true})).toBeVisible();
   await expect(page.getByText('記憶罐仲係空嘅')).toBeVisible();
 });
@@ -115,8 +116,8 @@ test('four home entrances have four independent experiences',async({page})=>{
   await expect(page.getByRole('heading',{name:'熱門配搭，一次揀好'})).toBeVisible();
   await page.getByRole('button',{name:'返回',exact:true}).click();
 
-  await page.getByRole('button',{name:/限時優惠/}).click();
-  await expect(page.getByRole('heading',{name:'趁優惠，食好一餐'})).toBeVisible();
+  await page.getByRole('button',{name:/期間限定/}).click();
+  await expect(page.getByRole('heading',{name:'限定登場，食好一餐'})).toBeVisible();
   await page.getByRole('button',{name:'返回',exact:true}).click();
 
   await page.getByRole('button',{name:/30分鐘內可取/}).click();
@@ -127,6 +128,9 @@ test('four home entrances have four independent experiences',async({page})=>{
 test('product options are one scroll page and Memory Jar accepts multiple items',async({page})=>{
   await page.goto('/');
   await page.getByRole('button',{name:'菜單',exact:true}).click();
+  await expect(page.getByRole('group',{name:'餐點分類'}).getByRole('button')).toHaveCount(4);
+  await page.getByRole('button',{name:'飯類',exact:true}).click();
+  await expect(page.locator('.product-card')).toHaveCount(2);
   await page.getByRole('button',{name:/香草烤雞腿飯/}).click();
   await expect(page.getByRole('heading',{name:'選擇組合'})).toBeVisible();
   await expect(page.getByRole('heading',{name:'口味與加配'})).toBeVisible();
@@ -141,31 +145,41 @@ test('product options are one scroll page and Memory Jar accepts multiple items'
   await page.getByRole('button',{name:'增加數量'}).click();
   await page.getByPlaceholder('例如：不要蔥、少辣').fill('少醬');
   await page.getByRole('button',{name:'加入記憶罐'}).click();
-  await expect(page.locator('.jar-item')).toHaveCount(1);
+  await expect(page.getByRole('heading',{name:'菜單',exact:true})).toBeVisible();
+  await expect(page.locator('.jar-flight')).toBeVisible();
+  await expect(page.locator('[data-nav-jar]')).toHaveAttribute('data-jar-level','partial');
+  await expect(page.locator('.nav-jar-badge')).toHaveText('2');
 
-  await page.getByRole('button',{name:/繼續揀餐/}).click();
   await page.getByRole('button',{name:/香酥雞粒飯/}).click();
   await page.getByRole('button',{name:'加入記憶罐'}).click();
+  await expect(page.getByRole('heading',{name:'菜單',exact:true})).toBeVisible();
+  await expect(page.locator('[data-nav-jar]')).toHaveAttribute('data-jar-level','full');
+  await expect(page.locator('.nav-jar-badge')).toHaveText('3');
+  await page.locator('[data-nav-jar]').click();
   await expect(page.locator('.jar-item')).toHaveCount(2);
-  await expect(page.getByText('已加入 2 款餐點；可以繼續揀，最後一次過結帳。')).toBeVisible();
+  await expect(page.getByText('記憶罐有 3 件產品；可以繼續揀，最後一次過結帳。')).toBeVisible();
   await page.getByRole('button',{name:/一次過結帳/}).click();
   await expect(page.getByRole('heading',{name:'取餐資料'})).toBeVisible();
 });
 
-test('electronic payment requires evidence and exposes both coupon fallback previews',async({page})=>{
+test('Admin-shaped payment methods require evidence where configured',async({page})=>{
   await addFirstItemAndOpenCheckout(page);
   await expect(page.getByRole('heading',{name:'付款方式'})).toBeVisible();
+  await page.locator('.payment-picker summary').click();
+  await expect(page.locator('.payment-method-option')).toHaveCount(4);
+  await page.getByRole('radio',{name:/PayMe/}).click();
+  await expect(page.locator('.qr-preview')).toContainText('PayMe QR 預覽');
   await page.getByRole('button',{name:/下一步/}).click();
-  await expect(page.getByRole('alert')).toContainText('請先上載付款證明');
+  await expect(page.getByRole('alert')).toContainText('請先上載PayMe付款憑證');
   await expect(page.getByRole('heading',{name:'付款方式'})).toBeVisible();
 
   await page.getByRole('button',{name:/優惠券/}).click();
   await page.getByRole('button',{name:'套用'}).click();
   await page.locator('#payment-proof').setInputFiles({name:'proof.png',mimeType:'image/png',buffer:Buffer.from('preview-proof')});
   await page.getByRole('button',{name:/下一步/}).click();
-  await expect(page.getByText('付款證明只會交由舖頭核對，並非已付款確認')).toBeVisible();
+  await expect(page.getByText('付款憑證只會交由舖頭核對，並非已付款確認')).toBeVisible();
 
-  await page.getByRole('button',{name:'未付款／現金後備'}).click();
+  await page.getByRole('button',{name:'未付款後備'}).click();
   await expect(page.getByRole('heading',{name:'轉到 WhatsApp 前確認'})).toBeVisible();
   await expect(page.getByText('只供對話查詢，唔係訂單編號。')).toBeVisible();
   await page.getByRole('button',{name:'關閉'}).click();
@@ -176,14 +190,15 @@ test('electronic payment requires evidence and exposes both coupon fallback prev
 
 test('cash bypasses payment proof and pickup code is phone last four digits',async({page})=>{
   await addFirstItemAndOpenCheckout(page);
-  await page.getByRole('button',{name:/現金付款/}).click();
+  await page.locator('.payment-picker summary').click();
+  await page.getByRole('radio',{name:/現金/}).click();
   await expect(page.locator('#payment-proof')).toHaveCount(0);
   await expect(page.locator('.qr-preview')).toHaveCount(0);
   await page.getByRole('button',{name:/下一步/}).click();
-  await expect(page.getByText('唔會進入付款證明流程')).toBeVisible();
+  await expect(page.getByText('唔會進入付款憑證流程')).toBeVisible();
   await page.getByRole('button',{name:/確認送出/}).click();
-  await expect(page.getByText('現金付款・到店付款')).toBeVisible();
-  await expect(page.getByText('付款證明已提交')).toHaveCount(0);
+  await expect(page.getByText('現金・到店付款')).toBeVisible();
+  await expect(page.getByText('付款憑證已提交')).toHaveCount(0);
   await expect(page.getByText('4567',{exact:true})).toBeVisible();
   await expect(page.getByText(/訂單顯示編號 MF-NEW/)).toBeVisible();
 });

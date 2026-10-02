@@ -1,7 +1,8 @@
 import {useMemo,useState} from 'react';
+import {CUSTOMER_V3_ASSETS as A} from './assets';
 import {AppDialog} from './dialog';
-import {PREVIEW_FEATURED_CAMPAIGN,PREVIEW_NOTIFICATIONS,PREVIEW_ORDERS,PREVIEW_PICKUP_CODE,PREVIEW_PRODUCTS} from './preview-data';
-import type {JarItem,PaymentMethod} from './preview-data';
+import {DEFAULT_PAYMENT_METHOD_ID,PREVIEW_FEATURED_CAMPAIGN,PREVIEW_NOTIFICATIONS,PREVIEW_ORDERS,PREVIEW_PICKUP_CODE,PREVIEW_PRODUCTS,previewPaymentMethod} from './preview-data';
+import type {JarItem,PaymentMethodId} from './preview-data';
 
 const BackTitle=({title,onBack}:Readonly<{title:string;onBack:()=>void}>)=><div className="screen-title">
   <button type="button" onClick={onBack} aria-label="返回">‹</button><span><h1>{title}</h1></span>
@@ -53,10 +54,10 @@ export function PopularCombosScreen({onBack,onOpenProduct}:Readonly<{onBack:()=>
 export function OffersScreen({onBack,onOpenProduct}:Readonly<{onBack:()=>void;onOpenProduct:(id:string)=>void}>){
   const products=PREVIEW_PRODUCTS.filter(product=>product.tags.includes('offer'));
   return <section className="app-screen destination-screen offers-screen" aria-labelledby="offers-title">
-    <BackTitle title="限時優惠" onBack={onBack}/>
-    <div className="destination-hero offer"><small>今期優惠</small><h2 id="offers-title">趁優惠，食好一餐</h2><p>優惠內容、供應期同數量由舖頭設定；結帳前會再次確認價錢。</p></div>
-    <div className="offer-note"><b>今個星期</b><span>指定餐點優惠供應，售完即止。</span></div>
-    <div className="destination-list">{products.map(product=><DestinationProduct key={product.id} product={product} onOpen={onOpenProduct} label="限時優惠"/>)}</div>
+    <BackTitle title="期間限定" onBack={onBack}/>
+    <div className="destination-hero offer"><small>今期限定</small><h2 id="offers-title">限定登場，食好一餐</h2><p>期間、供應數量同餐點內容由舖頭設定；結帳前會再次確認價錢。</p></div>
+    <div className="offer-note"><b>今期登場</b><span>指定餐點期間限定供應，售完即止。</span></div>
+    <div className="destination-list">{products.map(product=><DestinationProduct key={product.id} product={product} onOpen={onOpenProduct} label="期間限定"/>)}</div>
   </section>;
 }
 
@@ -96,7 +97,7 @@ export function SearchScreen({onBack,onOpenProduct}:Readonly<{onBack:()=>void;on
     <label className="large-search"><span aria-hidden="true">⌕</span><input autoFocus value={query} onChange={event=>setQuery(event.target.value)} placeholder="搜尋餐點、食材或口味"/><button type="button" onClick={()=>setQuery('')} aria-label="清除搜尋">×</button></label>
     {!query&&<>
       <div className="search-section"><div><h2 id="search-title">最近搜尋</h2><button type="button">清除</button></div><div className="search-tags"><button type="button" onClick={()=>setQuery('雞')}>雞腿飯</button><button type="button" onClick={()=>setQuery('沙律')}>沙律</button></div></div>
-      <div className="search-section"><div><h2>熱門關鍵字</h2></div><div className="search-tags"><button type="button" onClick={()=>setQuery('飯')}>飯類</button><button type="button" onClick={()=>setQuery('雞')}>雞肉</button><button type="button" onClick={()=>setQuery('紫薯')}>限時優惠</button></div></div>
+      <div className="search-section"><div><h2>熱門關鍵字</h2></div><div className="search-tags"><button type="button" onClick={()=>setQuery('飯')}>飯類</button><button type="button" onClick={()=>setQuery('雞')}>雞肉</button><button type="button" onClick={()=>setQuery('紫薯')}>期間限定</button></div></div>
     </>}
     {query&&<div className="search-results" aria-live="polite"><div className="screen-heading"><h2>搜尋結果</h2><span>{results.length} 款餐點</span></div>{results.map(product=><button type="button" key={product.id} onClick={()=>onOpenProduct(product.id)}><img src={product.image} alt=""/><span><b>{product.name}</b><small>約 {product.pickupMinutes} 分鐘可取</small><strong>${product.price}</strong></span><i>›</i></button>)}</div>}
     {query&&!results.length&&<div className="empty-state" role="status"><span>⌕</span><h2>找不到餐點</h2><p>試下搜尋其他名稱或食材。</p><button type="button" onClick={()=>setQuery('')}>清除搜尋</button></div>}
@@ -108,6 +109,7 @@ export function OrdersScreen({onBack,onDetail,onReorder}:Readonly<{onBack:()=>vo
   const orders=PREVIEW_ORDERS.filter(order=>filter==='all'||(filter==='active'?order.active:!order.active));
   return <section className="app-screen orders-screen" aria-labelledby="orders-title">
     <BackTitle title="訂單" onBack={onBack}/>
+    <div className="orders-brand-card"><div><small>每一餐都記得</small><h2>好味旅程</h2><p>進度、取餐碼同過往訂單，整齊放埋一齊。</p></div><img src={A.femaleHeroR2} alt=""/></div>
     <div className="segmented" role="group" aria-label="訂單篩選"><button className={filter==='active'?'selected':''} type="button" onClick={()=>setFilter('active')}>進行中</button><button className={filter==='completed'?'selected':''} type="button" onClick={()=>setFilter('completed')}>已完成</button><button className={filter==='all'?'selected':''} type="button" onClick={()=>setFilter('all')}>全部</button></div>
     <h2 id="orders-title" className="sr-only">訂單列表</h2>
     <div className="order-list">{orders.map(order=><article key={order.key}>
@@ -120,8 +122,9 @@ export function OrdersScreen({onBack,onDetail,onReorder}:Readonly<{onBack:()=>vo
   </section>;
 }
 
-export function OrderDetailScreen({onBack,onReorder,pickupCode=PREVIEW_PICKUP_CODE,payment='electronic'}:Readonly<{onBack:()=>void;onReorder:()=>void;pickupCode?:string;payment?:PaymentMethod}>){
+export function OrderDetailScreen({onBack,onReorder,pickupCode=PREVIEW_PICKUP_CODE,payment=DEFAULT_PAYMENT_METHOD_ID}:Readonly<{onBack:()=>void;onReorder:()=>void;pickupCode?:string;payment?:PaymentMethodId}>){
   const [refreshed,setRefreshed]=useState(false);
+  const selectedPayment=previewPaymentMethod(payment);
   const steps=['已送出','舖頭已接單','準備中','可以取餐','已完成'];
   return <section className="app-screen order-detail-screen" aria-labelledby="order-detail-title">
     <BackTitle title="訂單詳情" onBack={onBack}/>
@@ -130,7 +133,7 @@ export function OrderDetailScreen({onBack,onReorder,pickupCode=PREVIEW_PICKUP_CO
     <button className="refresh-status" type="button" onClick={()=>setRefreshed(true)}>↻ 更新狀態 <small>只會重新讀取進度，不會再次送出訂單</small></button>
     {refreshed&&<p className="inline-message" role="status">已讀取最新進度，冇重複送出訂單。</p>}
     <article className="detail-food"><img src={PREVIEW_PRODUCTS[0].image} alt=""/><span><b>香草烤雞腿飯</b><small>原味・加蛋 × 1</small></span><strong>$190</strong></article>
-    <div className="status-note"><b>{payment==='electronic'?'付款證明已提交':'現金付款'}</b><span>{payment==='electronic'?'付款證明唔等於已確認收款，仍待舖頭核對。':'取餐時先付款，冇付款證明流程。'}</span></div>
+    <div className="status-note"><b>{selectedPayment.requiresProof?`${selectedPayment.label}付款憑證已提交`:`${selectedPayment.label}付款`}</b><span>{selectedPayment.requiresProof?'付款憑證唔等於已確認收款，仍待舖頭核對。':'取餐時先付款，冇付款憑證流程。'}</span></div>
     <button className="wide-secondary" type="button" onClick={onReorder}>再來一單</button>
   </section>;
 }

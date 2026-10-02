@@ -1,12 +1,12 @@
-import {useEffect,useState} from 'react';
+import {useEffect,useRef,useState} from 'react';
 import {CUSTOMER_V3_ASSETS as A,CUSTOMER_V3_HERO_SLIDES as HERO_SLIDES} from './assets';
 import {CheckoutScreen,JarScreen,MenuScreen,ProductScreen} from './ordering-screens';
 import type {SubmittedOrder} from './ordering-screens';
 import {FeaturedCampaignDialog,NotificationsScreen,OffersScreen,OrderDetailScreen,OrdersScreen,PickupGuideScreen,PopularCombosScreen,ProfileScreen,ReorderScreen,SearchScreen,StoreStatusSheet} from './customer-screens';
 import {PREVIEW_HOME as vm} from './preview-fixture';
 import type {QuickCardId} from './home-model';
-import {PREVIEW_PICKUP_CODE,PREVIEW_PRODUCTS} from './preview-data';
-import type {CustomerRoute,JarItem,PaymentMethod} from './preview-data';
+import {DEFAULT_PAYMENT_METHOD_ID,PREVIEW_PICKUP_CODE,PREVIEW_PRODUCTS,jarItemCount,memoryJarLevel} from './preview-data';
+import type {CustomerRoute,JarItem} from './preview-data';
 
 type IconName=QuickCardId|'pin'|'chevron'|'bell'|'search'|'history'|'home'|'menu'|'jar'|'orders'|'user';
 
@@ -173,8 +173,10 @@ function Recent({onViewAll,onReorder}:Readonly<{onViewAll:()=>void;onReorder:()=
   </section>;
 }
 
-function BottomNav({route,jarFilled,onNavigate}:Readonly<{route:CustomerRoute;jarFilled:boolean;onNavigate:(route:CustomerRoute)=>void}>){
+function BottomNav({route,jarCount,jarAnimating,onNavigate}:Readonly<{route:CustomerRoute;jarCount:number;jarAnimating:boolean;onNavigate:(route:CustomerRoute)=>void}>){
   const active=route==='home'||route==='popular'||route==='offers'||route==='pickup-guide'?'home':route==='menu'||route==='product'?'menu':route==='jar'||route==='checkout'?'jar':route==='orders'||route==='order-detail'||route==='reorder'?'orders':route==='profile'?'profile':'';
+  const jarLevel=memoryJarLevel(jarCount);
+  const jarImage=jarLevel==='full'?A.memoryJarFull:jarLevel==='partial'?A.memoryJarPartial:A.memoryJarEmpty;
   return <nav aria-label="主要導覽">
     <button className={active==='home'?'active':''} type="button" onClick={()=>onNavigate('home')}>
       <Icon name="home"/><b>首頁</b>
@@ -182,8 +184,8 @@ function BottomNav({route,jarFilled,onNavigate}:Readonly<{route:CustomerRoute;ja
     <button className={active==='menu'?'active':''} type="button" onClick={()=>onNavigate('menu')}>
       <Icon name="menu"/><b>菜單</b>
     </button>
-    <button className={active==='jar'?'active':''} type="button" onClick={()=>onNavigate('jar')}>
-      <img className="nav-jar-icon" src={jarFilled?A.memoryJarPartial:A.memoryJarEmpty} alt=""/><b>記憶罐</b>
+    <button data-nav-jar data-jar-level={jarLevel} aria-label={`記憶罐，${jarCount} 件產品`} className={`${active==='jar'?'active ':''}${jarAnimating?'jar-receiving':''}`} type="button" onClick={()=>onNavigate('jar')}>
+      <span className="nav-jar-visual"><img className="nav-jar-icon" src={jarImage} alt=""/>{jarCount>0&&<i className="nav-jar-badge" aria-hidden="true">{jarCount>99?'99+':jarCount}</i>}</span><b>記憶罐</b>
     </button>
     <button className={active==='orders'?'active':''} type="button" onClick={()=>onNavigate('orders')}>
       <Icon name="orders"/><b>訂單</b><i/>
@@ -192,6 +194,35 @@ function BottomNav({route,jarFilled,onNavigate}:Readonly<{route:CustomerRoute;ja
       <Icon name="user"/><b>我的</b>
     </button>
   </nav>;
+}
+
+type JarTransfer=Readonly<{
+  id:number;
+  image:string;
+  origin:Readonly<{left:number;top:number;width:number;height:number}>;
+}>;
+
+function JarTransferAnimation({transfer}:Readonly<{transfer:JarTransfer}>){
+  const imageRef=useRef<HTMLImageElement>(null);
+  useEffect(()=>{
+    const image=imageRef.current;
+    const target=document.querySelector<HTMLElement>('[data-nav-jar]');
+    if(!image||!target)return;
+    const targetRect=target.getBoundingClientRect();
+    const startX=transfer.origin.left+transfer.origin.width/2-34;
+    const startY=transfer.origin.top+transfer.origin.height/2-34;
+    const endX=targetRect.left+targetRect.width/2-34;
+    const endY=targetRect.top+targetRect.height/2-34;
+    const reduced=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    image.animate(reduced
+      ?[{opacity:0},{opacity:1},{opacity:0}]
+      :[
+        {opacity:.96,transform:`translate3d(${startX}px,${startY}px,0) scale(.95) rotate(-4deg)`},
+        {opacity:1,offset:.7,transform:`translate3d(${endX-8}px,${endY-20}px,0) scale(.42) rotate(7deg)`},
+        {opacity:0,transform:`translate3d(${endX}px,${endY}px,0) scale(.3) rotate(0deg)`}
+      ],{duration:reduced?220:650,easing:'cubic-bezier(.23,1,.32,1)',fill:'forwards'});
+  },[transfer]);
+  return <div className="jar-flight" aria-hidden="true"><img ref={imageRef} src={transfer.image} alt=""/></div>;
 }
 
 export function CustomerV3App(){
@@ -207,7 +238,9 @@ export function CustomerV3App(){
   const [showStore,setShowStore]=useState(false);
   const [showFeatured,setShowFeatured]=useState(false);
   const [online,setOnline]=useState(()=>navigator.onLine);
-  const [submittedOrder,setSubmittedOrder]=useState<SubmittedOrder>({pickupCode:PREVIEW_PICKUP_CODE,payment:'electronic' as PaymentMethod,proofSubmitted:true});
+  const [submittedOrder,setSubmittedOrder]=useState<SubmittedOrder>({pickupCode:PREVIEW_PICKUP_CODE,payment:DEFAULT_PAYMENT_METHOD_ID,proofSubmitted:true});
+  const [jarTransfer,setJarTransfer]=useState<JarTransfer|null>(null);
+  const [jarAnnouncement,setJarAnnouncement]=useState('');
 
   const navigate=(next:CustomerRoute)=>{
     const nextHash=`#${next}`;
@@ -216,7 +249,13 @@ export function CustomerV3App(){
   };
   const openMenu=()=>navigate('menu');
   const openProduct=(id:string,returnRoute:CustomerRoute='menu')=>{setSelectedProductId(id);setProductReturnRoute(returnRoute);navigate('product');};
-  const addToJar=(item:JarItem)=>{setJarItems(current=>[...current,item]);navigate('jar');};
+  const addToJar=(item:JarItem,origin:JarTransfer['origin'])=>{
+    setJarItems(current=>[...current,item]);
+    setJarAnnouncement(`${item.product.name}已加入記憶罐，共 ${item.quantity} 件。`);
+    setJarTransfer({id:Date.now(),image:item.product.image,origin});
+    navigate('menu');
+  };
+  const addReorderToJar=(item:JarItem)=>{setJarItems(current=>[...current,item]);navigate('jar');};
   const openQuick=(destination:QuickCardId)=>{
     if(destination==='featured'){setShowFeatured(true);return;}
     navigate(destination==='popular'?'popular':destination==='offer'?'offers':'pickup-guide');
@@ -242,6 +281,12 @@ export function CustomerV3App(){
   useEffect(()=>{
     window.scrollTo({top:0,behavior:'auto'});
   },[route]);
+
+  useEffect(()=>{
+    if(!jarTransfer)return;
+    const timer=window.setTimeout(()=>setJarTransfer(null),720);
+    return ()=>window.clearTimeout(timer);
+  },[jarTransfer]);
 
   useEffect(()=>{
     const hero=document.querySelector<HTMLElement>('.hero');
@@ -281,7 +326,7 @@ export function CustomerV3App(){
       :route==='checkout'&&jarItems.length?<CheckoutScreen items={jarItems} onBack={()=>navigate('jar')} onHome={()=>navigate('home')} onOrder={order=>{setSubmittedOrder(order);navigate('order-detail');}}/>
       :route==='orders'?<OrdersScreen onBack={()=>navigate('home')} onDetail={()=>navigate('order-detail')} onReorder={()=>navigate('reorder')}/>
       :route==='order-detail'?<OrderDetailScreen onBack={()=>navigate('orders')} onReorder={()=>navigate('reorder')} pickupCode={submittedOrder.pickupCode} payment={submittedOrder.payment}/>
-      :route==='reorder'?<ReorderScreen onBack={()=>navigate('orders')} onAdd={addToJar}/>
+      :route==='reorder'?<ReorderScreen onBack={()=>navigate('orders')} onAdd={addReorderToJar}/>
       :route==='profile'?<ProfileScreen onBack={()=>navigate('home')}/>
       :<JarScreen items={jarItems} onBack={()=>navigate('menu')} onBrowse={openMenu} onQuantity={updateJarQuantity} onRemove={removeJarItem} onCheckout={()=>jarItems.length&&navigate('checkout')}/>;
 
@@ -291,6 +336,8 @@ export function CustomerV3App(){
     <main className={route==='home'?'':'destination-main'}>{screen}</main>
     {showStore&&<StoreStatusSheet onClose={()=>setShowStore(false)}/>}
     {showFeatured&&<FeaturedCampaignDialog onClose={()=>setShowFeatured(false)} onOpenProduct={id=>{setShowFeatured(false);openProduct(id,'home');}}/>}
-    <BottomNav route={route} jarFilled={jarItems.length>0} onNavigate={navigate}/>
+    {jarTransfer&&<JarTransferAnimation key={jarTransfer.id} transfer={jarTransfer}/>}
+    <span className="sr-only" aria-live="polite">{jarAnnouncement}</span>
+    <BottomNav route={route} jarCount={jarItemCount(jarItems)} jarAnimating={Boolean(jarTransfer)} onNavigate={navigate}/>
   </div>;
 }
