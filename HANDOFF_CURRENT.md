@@ -2,82 +2,70 @@
 
 Status: CURRENT / CONTROLLING HANDOFF
 
-Product:
-MoreFun POS
+Current:
+A9R — Formal Business Command Router
 
-Current Stage:
-A9 — Public + Diagnostics + Physical Acceptance + Cutover
-
-MFK Branch:
-`feat/MFP-V3-A9-PUBLIC-DIAGNOSTICS-PHYSICAL-CUTOVER-2026-10-02`
+Branch:
+`feat/MFP-V3-A9R-FORMAL-BUSINESS-ROUTER-2026-10-02`
 
 Parent:
-#647 — MFP V3 A8｜Customer + Keeta + External｜2026-10-02
+A9 exact head
+`69adb11215677d506545c5428f8deea4b89e7db2`
 
-Parent exact SHA:
-`83adb14c21170bc3a34a0022c62b1a2bea2f68c4`
+Authority:
+`docs/governance/MFP_V3_A9R_FORMAL_BUSINESS_ROUTER_AUTHORITY_2026-10-02.md`
 
-A8:
-SOURCE_VERIFIED
-OWNER ACCEPTED
+Codex handoff:
+`docs/handoff/MFP_V3_A9R_FORMAL_BUSINESS_ROUTER_CODEX_HANDOFF_2026-10-02.md`
 
-Current handoff:
-`docs/handoff/MFP_V3_A9_PUBLIC_DIAGNOSTICS_PHYSICAL_CUTOVER_CODEX_HANDOFF_2026-10-02.md`
+## Why
 
-Builder lane:
-- Pantonyeung/morefunos-v1-builder
-- Draft PR #174
-- Issue #175
-- current workflow still packages v2local and must be migrated before any V3 candidate publish
+A9 fresh audit proved:
+`BLOCKED — FORMAL_COMMAND_ROUTER_BINDING_MISSING`
+
+Current V3 high-level business commands do not have an approved production router into canonical Store Kernel authority.
 
 ## Current objective
 
-A0–A8 source
-→ exact production binding audit
-→ build/runtime identity
-→ Check Center / diagnostics
-→ Builder v3smt exact-source packaging
-→ separately authorized candidate
-→ real device physical acceptance
-→ separately authorized cutover
+Browser:
+`mfp.store-kernel.command.v1`
+
+→ trusted bounded native bridge
+
+→ Formal Business Command Router
+
+→ formal domain validation
+
+→ StoreKernelTransactionCoordinator
+
+→ canonical receipt/readback
+
+→ `mfp.store-kernel.submission.result.v1`
 
 ## First RED
 
-Expected exact source/runtime identity missing or mismatched
-→ BLOCKED
-→ no promote/cutover.
+A browser CHECKOUT_PAYMENT_CONFIRM cannot contain or inject raw:
+- aggregateType
+- mutations
+- canonical Order state
+- canonical Payment state
 
-## Immediate hard blocker to prove
+Router internally derives canonical mutations only after formal validation.
 
-V3 high-level formal commands must have an existing production-authorized business router.
+Forged low-level mutation input must be rejected before Store Kernel commit.
 
-Do not turn the browser into the formal business engine.
+## Current pass
 
-If missing:
-`FORMAL_COMMAND_ROUTER_BINDING_MISSING`
+R0:
+- parser/registry/result/idempotency/native bridge/security seam
 
-## A9 source scope
+R1 first vertical:
+- CHECKOUT_PAYMENT_CONFIRM
 
-- runtime.ready compatibility
-- native bridge adapter
-- production binding audit
-- Check Center
-- build identity
-- fault journal
-- runtime/OTA diagnostics
-- safe Backup/Restore boundary
-- public acceptance safe mode
-- readiness verdict
-- physical acceptance runbook
-- rollback runbook
-- SMM decommission gate
-- cutover gate
+If formal Pricing/Tender dependency is absent:
+report BLOCKED dependency, do not rebuild it in browser.
 
-## Completion target for current pass
-
-SOURCE_VERIFIED
-
-No deploy / OTA / cutover in current pass.
+No Candidate Publish.
 
 MILESTONE:
-`MFP_V3_A9_CURRENT_HANDOFF_2026_10_02`
+`MFP_V3_A9R_CURRENT_HANDOFF_2026_10_02`
