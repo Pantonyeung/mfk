@@ -9,16 +9,17 @@ Repository: Pantonyeung/mfk
 
 ## 0. Owner stage authorization
 
-Owner explicitly accepted A7 at exact SHA:
-`806ca51cfd812a968f9208a45e14d8a228fa91e1`
+Owner explicitly accepted A8 at exact SHA:
+`83adb14c21170bc3a34a0022c62b1a2bea2f68c4`
 
 Owner explicitly authorizes advancement to:
-A8 — Customer + Keeta + External
+A9 — Public + Diagnostics + Physical Acceptance + Cutover
 
 Current Stage:
-A8 — Customer + Keeta + External
+A9
 
-PR #627 remains legacy v2 rollback / containment evidence only.
+Important:
+A9 is gated. A9 SOURCE implementation does NOT itself authorize deploy, OTA activation, public cutover, promotion or SMM decommission.
 
 ## 1. Mandatory read order
 
@@ -28,10 +29,12 @@ PR #627 remains legacy v2 rollback / containment evidence only.
 4. `docs/governance/MFK_V3_SMT_REBUILD_AUTHORITY_2026-10-02.md`
 5. `docs/design/MFP_PAD_ORDERING_VISUAL_LOCK_R1_2026-10-02.md`
 6. `HANDOFF_CURRENT.md`
-7. `docs/handoff/MFP_V3_A8_CUSTOMER_KEETA_EXTERNAL_CODEX_HANDOFF_2026-10-02.md`
-8. current A8 Draft PR / Issue
-9. parent PR #645 / exact parent SHA
-10. Customer / Keeta contracts + verified donor evidence
+7. `docs/handoff/MFP_V3_A9_PUBLIC_DIAGNOSTICS_PHYSICAL_CUTOVER_CODEX_HANDOFF_2026-10-02.md`
+8. current A9 Draft PR / Issue
+9. parent PR #647 / exact parent SHA
+10. Builder A9 PR #174 / Issue #175
+11. Android Carrier runtime/update/recovery source
+12. current V3 A0–A8 source
 
 Conflict:
 `GOVERNANCE_DRIFT`
@@ -45,6 +48,7 @@ MFP:
 SMM:
 - cancelled as final product identity
 - no new SMM authority/state/head/session
+- remains legacy compatibility/rollback evidence until explicit final decommission gate
 
 ## 3. Stage status
 
@@ -56,118 +60,113 @@ A4 — SOURCE_VERIFIED / OWNER ACCEPTED
 A5 — SOURCE_VERIFIED / OWNER ACCEPTED
 A6 — SOURCE_VERIFIED / OWNER ACCEPTED
 A7 — SOURCE_VERIFIED / OWNER ACCEPTED
-A8 — CURRENT
-A9 — Public + Diagnostics + Physical Acceptance + Cutover
+A8 — SOURCE_VERIFIED / OWNER ACCEPTED
+A9 — CURRENT
 
-## 4. A8 authority lock
+## 4. A9 sub-gates
 
-A8 may connect:
-- Customer pending intents
-- payment evidence
-- WhatsApp contact/fallback
-- Customer external confirmation
-- Customer cutoff/stop
-- Keeta inbound/ACK/lifecycle/after-sale
-- external channel attention
+A9-S — Source / Production Binding
+Target: SOURCE_VERIFIED
 
-Do NOT rebuild:
-- Order Authority
-- Pricing
-- Payment/Refund
-- Availability/Capacity
-- Print
-- Sync
-- Customer/Keeta provider engines
+A9-B — Builder V3 Runtime Packaging
+Target: SOURCE_VERIFIED
 
-## 5. P0 external identity lock
+A9-C — Candidate Publish
+Requires explicit Owner/Commander authorization
 
-`EXTERNAL DUPLICATE != NEW FORMAL ORDER`
+A9-P — Physical Acceptance
+Requires published candidate + real device
 
-Customer:
-same submissionId/idempotencyKey
-→ max one canonical Order.
+A9-X — Cutover / Promote / SMM Decommission
+Requires explicit Owner authorization after physical verification
 
-Keeta:
-same providerOrderId/providerMessageId/fingerprint
-→ max one canonical Order.
+No automatic progression.
 
-Before Customer/Manual-Keeta formal accept:
-- zero Formal Order
-- zero ETA
-- zero first print
-- zero capacity consumption
+## 5. Current Builder blocker
 
-## 6. Zero-polling lock
+Fresh Builder audit:
 
-Do not copy legacy:
-- setInterval business polling
-- focus-triggered external fetch
-- visibility-triggered request fan-out
-- fixed 5-second pull
+Repository:
+`Pantonyeung/morefunos-v1-builder`
 
-Use:
-- startup bounded read
-- external event / Doorbell
-- reconnect
-- manual refresh
-- single-flight coalescing
+Builder main:
+`fe2692ac8e979e7d9e1d211758b9f9dfa9846190`
 
-Event payload is notification only, not canonical truth.
+Current `mfk-runtime-ota.yml` still builds:
+`source/v2local`
 
-## 7. Customer Owner locks
+Current publish request still points to:
+`9e713380f860bc33cf4b859e5b51451d1abf9df3`
 
-Payment screenshot:
-`EVIDENCE != PAYMENT TRUTH`
+Therefore current Builder cannot publish MFP V3 safely as-is.
 
-WhatsApp:
-communication/fallback only.
-Not a second Order writer.
+Builder A9 lane:
+- branch `feat/MFP-V3-A9-BUILDER-RUNTIME-OTA-2026-10-02`
+- Draft PR #174
+- Issue #175
+- opening head `4ab3820382a34f4d46306eb329d31090aa8ffa4c`
 
-Cutoff / immediate stop:
-blocks future Customer new order intents only.
-Must not stop local MFP trade or cancel existing Orders.
+Do NOT edit Builder publish request until V3 migration is SOURCE_VERIFIED and Owner explicitly authorizes candidate publish.
 
-## 8. Keeta Owner locks
+## 6. A9 first RED
 
-- AUTO / MANUAL comes from canonical policy
-- Later != Reject != Cancel != Accept
-- maximum defer = 2
-- mapping failure stays attention
-- provider duplicate does not duplicate Order
-- provider after-sale does not replace A6/A5 refund authority
+Exact production identity is mandatory.
 
-## 9. Visual lock
+If expected MFK source SHA, runtime releaseId, build identity, Carrier current runtime or critical production adapter binding cannot be proved:
+- BLOCKED
+- no promotion
+- no PHYSICAL_VERIFIED
+- no cutover
+- no SMM decommission
 
-A8 Pad UI extends:
+P0:
+`NO EXACT IDENTITY = NO CUTOVER`
+
+## 7. Production binding audit
+
+A9 must audit all A1–A8 fail-closed placeholders.
+
+Critical formal router rule:
+Current V3 high-level `mfp.store-kernel.command.v1` must not be translated into low-level aggregate mutations by React/browser business logic.
+
+If no existing formal production business-command router exists:
+`BLOCKED — FORMAL_COMMAND_ROUTER_BINDING_MISSING`
+
+Do not rebuild Order/Pricing/Payment authority in client.
+
+## 8. Visual lock
+
+A9 diagnostics / Check Center extends:
 `MFP_PAD_ORDERING_VISUAL_LOCK_R1`
 
-The locked top pending / external-order strip now receives real Customer / Keeta read-model facts.
+Technical detail belongs under More / Tools, not high-frequency Ordering UI.
 
-No separate visual system.
-
-## 10. Change control
+## 9. Change control
 
 Mode:
 PREPARE
 
-Authorized:
-- bounded A8 source
-- tests
-- CI
-- Draft PR
-- source evidence
+Authorized now:
+- A9 source/binding scaffolding
+- diagnostics
+- build identity
+- runtime.ready compatibility
+- tests/CI
+- physical acceptance runbook
+- Builder source migration PR #174
 
-Not authorized:
-- merge
+Not authorized now:
+- Builder publish request
+- Runtime candidate publish
 - deploy
-- OTA
-- public cutover
+- OTA activation
+- public domain cutover
 - SMM decommission
 
-Completion:
+First-pass completion:
 `SOURCE_VERIFIED`
 
-## 11. Status language
+## 10. Status language
 
 Only:
 - SOURCE_VERIFIED
@@ -177,4 +176,4 @@ Only:
 - FAILED
 
 MILESTONE:
-`MFP_V3_A8_CURRENT_EXECUTION_CONTROL_2026_10_02`
+`MFP_V3_A9_CURRENT_EXECUTION_CONTROL_2026_10_02`
