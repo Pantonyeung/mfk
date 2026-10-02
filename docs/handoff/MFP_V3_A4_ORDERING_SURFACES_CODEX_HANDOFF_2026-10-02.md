@@ -716,3 +716,190 @@ only when A4-C1..A4-C7 are implemented, exact-head CI is green, and the completi
 
 MILESTONE:
 `MFP_V3_A4_OWNER_CROSSWALK_CLOSURE_2026_10_02`
+
+
+---
+
+# A4 OWNER FINAL CLOSURE ADDENDUM｜2026-10-02
+
+Status:
+`BLOCKED — OWNER_REQUIREMENTS_CARRY_FORWARD_INCOMPLETE`
+
+The A4 implementation at exact SHA `5e4118c003bef84a5e0262d5ac925537c4686ff3` is SOURCE_VERIFIED against the original A4 handoff, but it is NOT yet accepted as complete against the Owner FINAL product requirements.
+
+Controlling crosswalk:
+`docs/plan/MFP_V3_OWNER_FINAL_CROSSWALK_2026-10-02.txt`
+
+Before A5 starts, continue PR #639 and close all items below.
+
+## A4-OF-01 Display Settings
+
+Implement presentation-only settings:
+- category density / rows
+- product columns / density
+- image show/hide
+- font scale
+- overall density/size continuous adjustment
+- instant preview
+- persistence after restart
+
+Must not change business truth.
+
+## A4-OF-02 Blue Visual Baseline
+
+Historical Owner UI acceptance requires:
+- blue primary visual language, baseline around `#1f5fbf`
+- red only for destructive / error / true warning
+
+Current A4 orange primary accent is not Owner-aligned.
+
+## A4-OF-03 Major Modal Geometry
+
+Pad major operation modal:
+- approximately 75% of usable operation area
+- content scrolls internally
+- primary bottom action remains fixed/stable
+- existing line edit loads same line and saves same line
+
+Mobile may use a touch sheet, but primary action geometry must remain stable.
+
+## A4-OF-04 Exact Cart Semantics
+
+Implement:
+- sequence preview display-only; must not allocate formal Order identity
+- ORIGINAL = original input order
+- SORT = Product Category order from canonical category position
+- whole-cart DINE_IN / TAKEAWAY
+- per-line DINE_IN / TAKEAWAY
+- COMBINE only exact same configuration
+- combined display gets quantity stepper
+- non-combined display keeps independent lines
+- same-line edit preserves cartLineId
+- destructive clear action has lower visual weight and confirmation
+
+## A4-OF-05 Hold / Dining Mindset
+
+One high-frequency entry:
+`Hold / Dining`
+
+Default:
+- all takeaway → Hold
+- any dine-in line → Dining
+
+Staff can always switch manually both directions.
+
+Empty draft:
+- show Retrieve entry
+
+A4 may keep this draft/local-only.
+Formal durable Hold / Waiting / Table behavior belongs to A6.
+
+## A4-OF-06 Fast Lane Exact Owner Semantics
+
+Implement three focused entrances:
+1. Fast Pair
+2. Required
+3. Rice Combo
+
+Fast Pair:
+- positional pairing only
+- dynamic slots A/B/C/D…
+- reassignment swaps occupied pairing
+- no duplication
+- unequal residual items remain single items
+- no auto-added item
+
+Required:
+- canonical required facts only
+
+Rice Combo:
+- canonical combo facts only
+- single product remains single unless staff explicitly creates combo
+
+## A4-OF-07 Silent Guided Flow
+
+Do not build a wizard.
+
+Use visual focus/hierarchy only.
+
+Guidance priority from Owner UI lineage:
+Required
+→ Quick Drink / optional high-frequency completion where applicable
+→ Combo blocker
+→ Fast Pair
+→ Checkout
+→ Product
+
+No automatic business commit.
+
+## A4-OF-08 Muscle-memory / Right-hand Stability
+
+High-frequency controls must not jump between states.
+
+Keep stable:
+- modal primary action
+- service-mode control
+- cart primary action
+- product configuration action
+- destructive clear at lower visual priority
+
+## A4-OF-09 A2 Permission Owner Alignment
+
+Owner FINAL product rule:
+authenticated MFP staff are eligible to operate MFP FINAL-defined frontline/local operations.
+No Manager-only Gate in this Owner version.
+
+Preserve:
+- formal device authorization
+- formal session authentication
+- Store Kernel admission
+- fail-closed revoked/expired/unknown session/device
+
+But do not make MFP ordering read-only solely because a manager-style granular permission is absent unless a later Owner Addendum explicitly changes the product rule.
+
+Add regression proof before A5.
+
+## Required closure tests
+
+At minimum:
+
+1. Display settings change presentation only.
+2. Display settings persist across restart/storage restore.
+3. Blue primary baseline applied; destructive/error/warning remain red semantics.
+4. Pad major modal is approximately 75% operation area with fixed action footer.
+5. ORIGINAL restores input order.
+6. SORT follows canonical Product Category order.
+7. Combine rejects lines with different option/combo/note/service-mode material facts.
+8. Whole-cart service-mode switch updates all draft lines.
+9. Per-line service-mode switch preserves other lines.
+10. Sequence preview does not allocate formal Order identity.
+11. All-takeaway Hold/Dining entry defaults Hold.
+12. Any-dine-in Hold/Dining entry defaults Dining.
+13. Manual Hold ↔ Dining override always available.
+14. Empty draft exposes Retrieve.
+15. Fast Pair positional pairing is deterministic.
+16. Fast Pair reassignment swaps; never duplicates.
+17. Unequal Fast Pair leaves residual singles.
+18. Rice Combo never auto-upgrades singles.
+19. Silent guidance changes visual focus only; no auto-submit.
+20. Same-line edit preserves cartLineId.
+21. Authenticated valid MFP staff is not blocked by manager-only capability assumptions for Owner FINAL ordering operations.
+22. A1/A2/A3/A4 existing regressions remain GREEN.
+
+## Completion
+
+A4 can be called complete only after:
+- original A4 tests remain green
+- A4-OF-01..09 are green
+- exact-head CI is green
+- exact SHA is reported
+- PR #639 remains Draft unless separately promoted
+
+Then:
+`A4 = SOURCE_VERIFIED`
+
+Until then:
+`A4 OWNER FINAL ACCEPTANCE = BLOCKED`
+
+MILESTONE:
+`MFP_V3_A4_OWNER_FINAL_CLOSURE_2026_10_02`
