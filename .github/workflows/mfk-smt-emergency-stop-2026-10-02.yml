@@ -50,15 +50,136 @@ jobs:
         working-directory: v2local
         run: npm run build
 
-      - name: Deploy exact candidate to mfk-smt-web
+      - name: Bundle Worker module for direct API deploy
         working-directory: v2local
         shell: bash
         run: |
           set -euo pipefail
-          BUILD_ID="$(cat BUILD_ID)"
-          npx --yes wrangler@4.118.0 deploy --config wrangler.web-acceptance.jsonc \
-            --var MFK_SOURCE_SHA:"$GITHUB_SHA" \
-            --var MFK_BUILD_ID:"$BUILD_ID"
+          npm exec --yes --package=esbuild@0.25.10 -- esbuild web-acceptance-worker.ts --bundle --format=esm --target=es2022 --outfile="$RUNNER_TEMP/mfk-smt-web-worker.mjs"
+          test -s "$RUNNER_TEMP/mfk-smt-web-worker.mjs"
+
+      - name: Deploy exact candidate to mfk-smt-web through Cloudflare API
+        working-directory: v2local
+        shell: bash
+        env:
+          MFK_SOURCE_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const fs=require('node:fs');
+          const path=require('node:path');
+          const crypto=require('node:crypto');
+
+          const apiToken=process.env.CLOUDFLARE_API_TOKEN;
+          const accountId=process.env.CLOUDFLARE_ACCOUNT_ID;
+          const sourceSha=process.env.MFK_SOURCE_SHA;
+          const workerName='mfk-smt-web';
+          const assetsDir=path.resolve('dist');
+          const workerFile=process.env.RUNNER_TEMP+'/mfk-smt-web-worker.mjs';
+          const buildId=fs.readFileSync('BUILD_ID','utf8').trim();
+
+          for(const [name,value] of Object.entries({CLOUDFLARE_API_TOKEN:apiToken,CLOUDFLARE_ACCOUNT_ID:accountId,MFK_SOURCE_SHA:sourceSha})){
+            if(!value)throw new Error('MISSING_'+name);
+          }
+          if(!/^[0-9a-f]{40}$/.test(sourceSha))throw new Error('SOURCE_SHA_INVALID');
+
+          const mimeByExt={
+            html:'text/html; charset=utf-8',
+            js:'application/javascript; charset=utf-8',
+            mjs:'application/javascript; charset=utf-8',
+            css:'text/css; charset=utf-8',
+            json:'application/json; charset=utf-8',
+            svg:'image/svg+xml',
+            png:'image/png',
+            jpg:'image/jpeg',
+            jpeg:'image/jpeg',
+            webp:'image/webp',
+            gif:'image/gif',
+            ico:'image/x-icon',
+            txt:'text/plain; charset=utf-8',
+            woff:'font/woff',
+            woff2:'font/woff2'
+          };
+
+          const files=[];
+          const walk=(dir,base='')=>{
+            for(const ent of fs.readdirSync(dir,{withFileTypes:true})){
+              const full=path.join(dir,ent.name);
+              const rel=path.posix.join(base,ent.name);
+              if(ent.isDirectory())walk(full,rel);
+              else if(ent.isFile()){
+                const buf=fs.readFileSync(full);
+                const ext=path.extname(rel).slice(1).toLowerCase();
+                const hash=crypto.createHash('sha256').update(buf.toString('base64')+ext).digest('hex').slice(0,32);
+                files.push({full,rel:'/'+rel.replaceAll('\\','/'),buf,ext,hash,size:buf.length,mime:mimeByExt[ext]||'application/octet-stream'});
+              }
+            }
+          };
+          walk(assetsDir);
+          if(!files.length)throw new Error('NO_ASSETS');
+
+          const manifest=Object.fromEntries(files.map(f=>[f.rel,{hash:f.hash,size:f.size}]));
+          const apiBase='https://api.cloudflare.com/client/v4/accounts/'+accountId;
+          const auth={'Authorization':'Bearer '+apiToken};
+
+          const sessionResponse=await fetch(apiBase+'/workers/scripts/'+workerName+'/assets-upload-session',{
+            method:'POST',
+            headers:{...auth,'content-type':'application/json'},
+            body:JSON.stringify({manifest})
+          });
+          const sessionBody=await sessionResponse.json();
+          if(!sessionResponse.ok||sessionBody.success!==true)throw new Error('ASSET_SESSION_FAILED '+JSON.stringify(sessionBody));
+          const uploadJwt=sessionBody.result?.jwt;
+          const buckets=sessionBody.result?.buckets||[];
+          if(!uploadJwt)throw new Error('ASSET_SESSION_JWT_MISSING');
+
+          const byHash=new Map(files.map(f=>[f.hash,f]));
+          let completionJwt=buckets.length===0?uploadJwt:null;
+          for(const bucket of buckets){
+            const form=new FormData();
+            for(const hash of bucket){
+              const f=byHash.get(hash);
+              if(!f)throw new Error('ASSET_HASH_UNKNOWN '+hash);
+              form.append(hash,new Blob([f.buf.toString('base64')],{type:f.mime}),hash);
+            }
+            const uploadResponse=await fetch(apiBase+'/workers/assets/upload?base64=true',{
+              method:'POST',
+              headers:{'Authorization':'Bearer '+uploadJwt},
+              body:form
+            });
+            const uploadBody=await uploadResponse.json();
+            if(!uploadResponse.ok||uploadBody.success!==true)throw new Error('ASSET_UPLOAD_FAILED '+JSON.stringify(uploadBody));
+            if(uploadBody.result?.jwt)completionJwt=uploadBody.result.jwt;
+          }
+          if(!completionJwt)throw new Error('ASSET_COMPLETION_JWT_MISSING');
+
+          const metadata={
+            main_module:'worker.mjs',
+            compatibility_date:'2026-09-25',
+            assets:{
+              jwt:completionJwt,
+              config:{not_found_handling:'single-page-application'}
+            },
+            bindings:[
+              {type:'assets',name:'ASSETS'},
+              {type:'plain_text',name:'MFK_SOURCE_SHA',text:sourceSha},
+              {type:'plain_text',name:'MFK_BUILD_ID',text:buildId}
+            ]
+          };
+          const form=new FormData();
+          form.append('metadata',new Blob([JSON.stringify(metadata)],{type:'application/json'}),'metadata.json');
+          form.append('worker.mjs',new Blob([fs.readFileSync(workerFile)],{type:'application/javascript+module'}),'worker.mjs');
+
+          const deployResponse=await fetch(apiBase+'/workers/scripts/'+workerName,{
+            method:'PUT',
+            headers:auth,
+            body:form
+          });
+          const deployBody=await deployResponse.json();
+          if(!deployResponse.ok||deployBody.success!==true)throw new Error('WORKER_DEPLOY_FAILED '+JSON.stringify(deployBody));
+          console.log('DEPLOYED mfk-smt-web sourceSha='+sourceSha+' buildId='+buildId);
+          console.log(JSON.stringify(deployBody.result||{}));
+          NODE
 
       - name: Runtime readback
         shell: bash
