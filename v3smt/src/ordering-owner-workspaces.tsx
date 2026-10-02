@@ -5,6 +5,7 @@ import type {
   MfpOrderingDomain,
   MfpOrderingDraft,
   MfpOrderingDraftLine,
+  MfpNormalizedOrderingIntent,
   MfpServiceMode,
 } from './ordering-domain.ts';
 import {
@@ -25,19 +26,6 @@ import {
 
 const money=new Intl.NumberFormat('zh-HK',{style:'currency',currency:'HKD'});
 const formatMoney=(minor:number|null)=>minor===null?'未有已發布價錢':money.format(minor/100);
-
-export function MfpShellNavigation(){
-  const [moreOpen,setMoreOpen]=useState(false);
-  return <><nav className="mfp-primary-nav" aria-label="MFP high-frequency navigation">
-    <button type="button" className="active" aria-current="page">Ordering</button>
-    <button type="button" disabled title="A6 未接駁">Orders</button>
-    <button type="button" disabled title="A6 未接駁">Dining</button>
-    <button type="button" disabled title="A6 未接駁">Sold-out / Capacity</button>
-    <button type="button" className="mfp-more-trigger" aria-expanded={moreOpen} onClick={()=>setMoreOpen(value=>!value)}>☰ More / Tools</button>
-  </nav>{moreOpen?<aside className="mfp-more-menu" aria-label="More / Tools staged shell">
-    {['Today summary','Day Close','Reports','Devices','Print','Check Center','Backup / Restore','Diagnostics','Admin Sync'].map(label=><button key={label} type="button" disabled title="Later stage 未接駁">{label}<small>未接駁</small></button>)}
-  </aside>:null}</>;
-}
 
 export function MfpDisplaySettingsPanel({settings,onChange,onClose}:{
   settings:MfpDisplaySettings;onChange:(settings:MfpDisplaySettings)=>void;onClose:()=>void;
@@ -123,10 +111,10 @@ function updateCombinedQuantity(domain:MfpOrderingDomain,draft:MfpOrderingDraft,
   return last.quantity>1?domain.setQuantity(draft,last.cartLineId,last.quantity-1):domain.removeLine(draft,last.cartLineId);
 }
 
-export function MfpCartDraft({domain,catalog,draft,heldDraft,canDraft,onChange,onHeldDraft,onEdit,onCheckout}:{
+export function MfpCartDraft({domain,catalog,draft,heldDraft,canDraft,onChange,onHeldDraft,onEdit,onCheckout,onDining}:{
   domain:MfpOrderingDomain;catalog:MfpOrderingCatalog;draft:MfpOrderingDraft;heldDraft:MfpOrderingDraft|null;canDraft:boolean;
   onChange:(draft:MfpOrderingDraft)=>void;onHeldDraft:(draft:MfpOrderingDraft|null)=>void;onEdit:(line:MfpOrderingDraftLine)=>void;
-  onCheckout?:()=>void;
+  onCheckout?:()=>void;onDining?:(intent:MfpNormalizedOrderingIntent)=>void;
 }){
   const [viewMode,setViewMode]=useState<MfpCartViewMode>('ORIGINAL');
   const [clearConfirm,setClearConfirm]=useState(false);
@@ -137,6 +125,7 @@ export function MfpCartDraft({domain,catalog,draft,heldDraft,canDraft,onChange,o
   const destination=resolveMfpDraftDestination(draft,destinationOverride);
   const setMode=(serviceMode:MfpServiceMode)=>onChange(domain.setServiceMode(draft,serviceMode));
   const storeDraft=()=>{
+    if(destination==='DINING'&&onDining){onDining(domain.normalize(draft));setHoldOpen(false);return;}
     onHeldDraft(draft);onChange(domain.createDraft(draft.serviceMode));setDestinationOverride(null);setHoldOpen(false);
   };
   const retrieve=()=>{if(heldDraft){onChange(heldDraft);onHeldDraft(null);}};
@@ -158,7 +147,7 @@ export function MfpCartDraft({domain,catalog,draft,heldDraft,canDraft,onChange,o
     <footer><div><small>{intent.pricing}</small><strong>{formatMoney(intent.previewSubtotalMinor)}</strong><span>Preview 唔係 final formal quote</span></div><div className="mfp-cart-primary-actions"><button type="button" className="mfp-hold-dining" disabled={!canDraft||(!draft.lines.length&&!heldDraft)} onClick={()=>draft.lines.length?setHoldOpen(true):retrieve()}>{mfpHoldEntryLabel(draft)}</button><button type="button" className="mfp-checkout-entry" disabled={!canDraft||!intent.checkoutReady||!onCheckout} onClick={onCheckout}>Checkout</button></div></footer>
   </section>{holdOpen?<div className="mfp-config-layer"><section className="mfp-config" role="dialog" aria-modal="true" aria-labelledby="mfp-hold-dining-title">
     <header><div><small>DRAFT / LOCAL UX ONLY</small><h2 id="mfp-hold-dining-title">Hold / Dining</h2></div><button type="button" autoFocus aria-label="關閉暫存堂食" onClick={()=>setHoldOpen(false)}>×</button></header>
-    <div className="mfp-config-scroll mfp-destination-picker"><p>建議：{defaultMfpDraftDestination(draft)==='HOLD'?'Hold':'Dining'}。你可以隨時改。</p><div role="group" aria-label="暫存或堂食"><button type="button" className={destination==='HOLD'?'active':''} onClick={()=>setDestinationOverride('HOLD')}>Hold</button><button type="button" className={destination==='DINING'?'active':''} onClick={()=>setDestinationOverride('DINING')}>Dining</button></div>{destination==='DINING'?<p>Waiting / Table target 由 A6 正式接駁；A4 只保存完整本機草稿。</p>:null}</div>
-    <footer><div><small>{destination} · NO FORMAL ORDER</small><strong>{draft.lines.length} 行草稿</strong></div><button type="button" onClick={storeDraft}>保存本機草稿</button></footer>
+     <div className="mfp-config-scroll mfp-destination-picker"><p>建議：{defaultMfpDraftDestination(draft)==='HOLD'?'Hold':'Dining'}。你可以隨時改。</p><div role="group" aria-label="暫存或堂食"><button type="button" className={destination==='HOLD'?'active':''} onClick={()=>setDestinationOverride('HOLD')}>Hold</button><button type="button" className={destination==='DINING'?'active':''} onClick={()=>setDestinationOverride('DINING')}>Dining</button></div>{destination==='DINING'?<p>Dining 會選擇 Waiting 或可用枱位；正式提交仍由 Store Kernel 處理。</p>:null}</div>
+     <footer><div><small>{destination==='HOLD'?'本機草稿':'尚未正式提交'}</small><strong>{draft.lines.length} 行草稿</strong></div><button type="button" onClick={storeDraft}>{destination==='DINING'?'前往安排枱位':'保存本機草稿'}</button></footer>
   </section></div>:null}</>;
 }

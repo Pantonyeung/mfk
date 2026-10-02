@@ -10,23 +10,12 @@ Owner Authorization: EXPLICIT
 
 ## Product identity
 
-External product:
 MoreFun POS
-
-Short name:
-MFP
-
-Surfaces:
 - MFP Pad
 - MFP Mobile
 
 SMM is cancelled as final product identity.
 Legacy SMM remains compatibility / UX donor only.
-SMT may remain temporarily as internal Store Kernel / sync port identifier.
-
-## Supersession
-
-For MFP V3 A0–A9, this authority supersedes PR #627 / Unified Surfaces R1 as current execution control.
 
 ## Frozen authorities
 
@@ -38,8 +27,9 @@ Do NOT rebuild or duplicate:
 - Fulfillment Authority
 - Print Router / Durable PrintJob Authority
 - Admin canonical backend authority
-- P0 checkpointed-delta sync semantics
+- P0 sync semantics
 - Customer / Keeta external authority contracts
+- Runtime Availability / Capacity formal authority
 
 ## Stage status
 
@@ -48,77 +38,58 @@ A1 — SOURCE_VERIFIED
 A2 — SOURCE_VERIFIED
 A3 — SOURCE_VERIFIED
 A4 — SOURCE_VERIFIED / OWNER ACCEPTED
-A5 — CURRENT
-A6 — Order Operations
+A5 — SOURCE_VERIFIED / OWNER ACCEPTED
+A6 — CURRENT
 A7 — Print + Hardware + Recovery
 A8 — Customer + Keeta + External
 A9 — Public + Diagnostics + Physical Acceptance + Cutover
 
-## A5 authority boundary
+## A6 boundary
 
-A5 may implement:
-- Checkout UI/domain
-- formal validation request/readback seam
-- channel/tender selection
-- cash collection UX
-- Student Discount intent
-- Final Review
-- formal Payment Confirm command path
-- Business Day/cash opening client contract
-- Cash In/Out ledger client contract
-- Day Close/cash count
-- Channel/Tender reporting read models
-- immutable Daily Report money facts
+A6 may implement:
+- canonical order operation read models
+- formal order operation command adapters
+- Orders / Fulfillment UI
+- ETA
+- Dining operational UI/orchestration
+- sold-out/restore UI
+- Capacity Pool UI
+- channel thresholds
+- bounded override
+- More/Tools shell
 
-A5 may NOT:
-- create a second Pricing Engine
-- create a second Payment/Tender Authority
-- create formal Order truth in client state
-- manufacture COMMITTED/payment success
-- create Print authority
-- create Fulfillment authority
-- require cloud round trips for unrelated local Store Kernel operations
+A6 may NOT:
+- allocate a second formal Order
+- create client-only canonical fulfillment
+- create a Dining-specific Order engine
+- create a Dining-specific Payment engine
+- create a new Availability/Capacity authority
+- create physical Print authority
+- bind external Customer/Keeta provider transport
 
-## Formal transaction rule
+## Same-order lock
 
-Only explicit Payment Confirm may cross the formal transaction boundary.
+All formal operations:
+- fulfillment
+- correction
+- refund
+- cancel
+- dining assignment/transfer/addition
 
-Before Payment Confirm:
-- zero formal order commit
-- zero first-print/production effect
-- zero formal sale cash ledger effect
-
-After submit:
-- result must be COMMITTED / REJECTED / UNKNOWN
-- canonical readback is authoritative
-- retry reuses the same submission identity
-
-## Owner FINAL permission rule
-
-Authenticated/authorized MFP staff are eligible for FINAL-defined frontline/local operations.
-No Manager-only Gate in this Owner version.
-
-This does not remove:
-- device authorization
-- formal session validation
-- expiry/revocation fail-closed
-- Store Kernel admission
+must preserve canonical Order identity unless the formal authority explicitly defines a different record type such as linked refund/adjustment.
 
 ## Current execution
 
-Stage:
-A5 — Checkout + Money
-
 Branch:
-`feat/MFP-V3-A5-CHECKOUT-MONEY-2026-10-02`
+`feat/MFP-V3-A6-ORDER-OPERATIONS-2026-10-02`
 
 Parent exact SHA:
-`b83321000668d39580a29e2e838aa585d5750fd5`
+`830fd2f033f2246c1a4f30da71a0a8f9160da751`
 
-Completion target:
+Completion:
 SOURCE_VERIFIED
 
-No merge / deploy / OTA / public cutover authority.
+No merge / deploy / OTA / public cutover.
 
 MILESTONE:
-`MFP_V3_REBUILD_AUTHORITY_A5_CURRENT_2026_10_02`
+`MFP_V3_REBUILD_AUTHORITY_A6_CURRENT_2026_10_02`

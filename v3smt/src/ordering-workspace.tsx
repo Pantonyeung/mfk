@@ -16,6 +16,7 @@ import {
   type MfpOrderingDomain,
   type MfpOrderingDraft,
   type MfpOrderingDraftLine,
+  type MfpNormalizedOrderingIntent,
   type MfpOrderingProduct,
   type MfpOrderingSurface,
   type MfpProductSelectionInput,
@@ -30,7 +31,6 @@ import {
   MfpCartDraft,
   MfpDisplaySettingsPanel,
   MfpFastLanes,
-  MfpShellNavigation,
   MfpSilentGuidance,
 } from './ordering-owner-workspaces.tsx';
 import {isMfpFrontlineSessionEligible,type MfpSecurityPort} from './security-port.ts';
@@ -164,9 +164,9 @@ function ProductGrid({products,mode,onProduct}:{
   }):<p className="mfp-empty-copy">呢個分類未有可用商品。</p>}</div>;
 }
 
-export function MfpOrderingWorkspace({surface,catalog,security,syncSnapshot,checkout}:{
+export function MfpOrderingWorkspace({surface,catalog,security,syncSnapshot,checkout,onDiningIntent}:{
   surface:MfpOrderingSurface;catalog:MfpOrderingCatalog|null;security:MfpSecurityPort;syncSnapshot:MfpSyncSnapshot;
-  checkout?:MfpCheckoutRuntimeBinding;
+  checkout?:MfpCheckoutRuntimeBinding;onDiningIntent?:(intent:MfpNormalizedOrderingIntent)=>void;
 }){
   const domain=useMemo(()=>catalog?createMfpOrderingDomain(catalog):null,[catalog]);
   const [draft,setDraft]=useState<MfpOrderingDraft>({draftOnly:true,serviceMode:'takeaway',lines:[]});
@@ -286,14 +286,14 @@ export function MfpOrderingWorkspace({surface,catalog,security,syncSnapshot,chec
       onPaymentConfirm:()=>{void checkoutSession.paymentConfirm().then(refresh).catch(fail);},
     }}/>;
   }
-  const cart=<MfpCartDraft domain={domain} catalog={catalog} draft={draft} heldDraft={heldDraft} canDraft={canDraft} onChange={setDraft} onHeldDraft={setHeldDraft} onEdit={editLine} onCheckout={startCheckout}/>;
+  const cart=<MfpCartDraft domain={domain} catalog={catalog} draft={draft} heldDraft={heldDraft} canDraft={canDraft} onChange={setDraft} onHeldDraft={setHeldDraft} onEdit={editLine} onCheckout={startCheckout} onDining={onDiningIntent}/>;
   const status=<div className="mfp-ordering-status"><span className={syncSnapshot.state==='OFFLINE'?'offline':''}>{freshness(syncSnapshot)}</span><span>Projection #{catalog.source.appliedSeq}</span><span>{canDraft?`A2 AUTHENTICATED · ${securitySnapshot.session?.displayName}`:`A2 SECURITY GATE · ${securitySnapshot.sessionState} · 只讀模式`}</span></div>;
   const categories=<nav className="mfp-ordering-categories" aria-label="商品分類">{catalog.categories.map(category=><button type="button" key={category.id} aria-pressed={category.id===selectedCategoryId} className={category.id===selectedCategoryId?'active':''} onClick={()=>setSelectedCategoryId(category.id)}>{category.label}</button>)}</nav>;
   const combos=catalog.combos.length?<section className="mfp-combo-strip"><header><b>Combo</b><span>Pool / Choice 由同一 Active Projection 提供</span></header><div>{catalog.combos.map(combo=><button type="button" key={combo.id} disabled={!combo.sellable||!combo.priceReady} onClick={()=>setEditor({kind:'combo',comboId:combo.id})}><b>{combo.name}</b><span>{combo.publishedBasePrice?formatMoney(combo.publishedBasePrice.amountMinor):'價錢未準備'}</span></button>)}</div></section>:null;
 
   const displayStyle=mfpDisplaySettingsStyle(displaySettings) as CSSProperties;
   if(surface==='MFP_PAD')return <section className="mfp-ordering mfp-pad" data-ordering-surface="MFP_PAD" data-show-images={displaySettings.showImages} style={displayStyle}>
-    <MfpShellNavigation/>{status}<header className="mfp-ordering-head"><div><small>MFP PAD</small><h1>商品目錄</h1></div><div className="mfp-ordering-head-actions"><div className="mfp-ordering-mode" role="group" aria-label="點單模式"><button type="button" aria-pressed={orderingMode==='quick'} className={orderingMode==='quick'?'active':''} onClick={()=>setOrderingMode('quick')}>快速</button><button type="button" aria-pressed={orderingMode==='normal'} className={orderingMode==='normal'?'active':''} onClick={()=>setOrderingMode('normal')}>普通</button></div><button type="button" className="mfp-settings-button" onClick={()=>setSettingsOpen(true)}>Display Settings</button></div></header>
+    {status}<header className="mfp-ordering-head"><div><small>MFP PAD</small><h1>商品目錄</h1></div><div className="mfp-ordering-head-actions"><div className="mfp-ordering-mode" role="group" aria-label="點單模式"><button type="button" aria-pressed={orderingMode==='quick'} className={orderingMode==='quick'?'active':''} onClick={()=>setOrderingMode('quick')}>快速</button><button type="button" aria-pressed={orderingMode==='normal'} className={orderingMode==='normal'?'active':''} onClick={()=>setOrderingMode('normal')}>普通</button></div><button type="button" className="mfp-settings-button" onClick={()=>setSettingsOpen(true)}>Display Settings</button></div></header>
     <div className="mfp-pad-layout"><aside>{categories}</aside><main><MfpSilentGuidance catalog={catalog} draft={draft}/><MfpFastLanes catalog={catalog} draft={draft} onEdit={editLine} onCombo={comboId=>setEditor({kind:'combo',comboId})}/><ProductGrid products={products} mode={orderingMode} onProduct={openProduct}/>{combos}</main>{cart}</div>
     {editorBody?<div className="mfp-config-layer">{editorBody}</div>:null}{settingsBody?<div className="mfp-config-layer">{settingsBody}</div>:null}<output className="mfp-ordering-feedback" aria-live="polite">{feedback}</output>
   </section>;

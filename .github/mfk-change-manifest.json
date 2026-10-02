@@ -1,39 +1,40 @@
 {
   "version": 1,
-  "capability": "MFP_V3_A5_CHECKOUT_MONEY_2026_10_02",
-  "base_sha": "b83321000668d39580a29e2e838aa585d5750fd5",
-  "root_control": "#642",
-  "product_control": "#641",
+  "capability": "MFP_V3_A6_ORDER_OPERATIONS_2026_10_02",
+  "base_sha": "830fd2f033f2246c1a4f30da71a0a8f9160da751",
+  "root_control": "#644",
+  "product_control": "#643",
   "allowed_paths": [
     ".github/mfk-change-manifest.json",
     ".github/workflows/v3smt-a0-foundation.yml",
     "COMMANDER_CURRENT.md",
     "HANDOFF_CURRENT.md",
+    "docs/design/MFP_PAD_ORDERING_VISUAL_LOCK_R1_2026-10-02.md",
     "docs/governance/MFK_V3_SMT_REBUILD_AUTHORITY_2026-10-02.md",
-    "docs/handoff/MFP_V3_A5_CHECKOUT_MONEY_CODEX_HANDOFF_2026-10-02.md",
+    "docs/handoff/MFP_V3_A6_ORDER_OPERATIONS_CODEX_HANDOFF_2026-10-02.md",
     "docs/plan/MFP_V3_OWNER_FINAL_CROSSWALK_2026-10-02.txt",
     "docs/plan/MFP_V3_SMM_Migration_Plan_2026-10-02.txt",
     "v3smt/**"
   ],
-  "authority_impact": "ADDS ONE SHARED MFP PAD MOBILE CHECKOUT CLIENT CONTRACT OVER THE EXISTING STORE KERNEL FORMAL TRANSACTION, PRICING, PAYMENT AND READBACK AUTHORITY",
-  "persistence_impact": "NO NEW FORMAL TRUTH STORE; EXISTING A1 BOUNDED COMMAND OUTBOX REMAINS THE ONLY CHECKOUT TRANSPORT PERSISTENCE AND MONEY REPORT FUNCTIONS RETURN IMMUTABLE CANONICAL READ MODELS",
+  "authority_impact": "ADDS ONE SHARED MFP PAD MOBILE ORDER OPERATIONS CLIENT OVER THE EXISTING STORE KERNEL FORMAL ORDER, FULFILLMENT, PAYMENT, AVAILABILITY, CAPACITY AND READBACK AUTHORITY",
+  "persistence_impact": "NO NEW FORMAL TRUTH STORE; EXISTING A1 BOUNDED COMMAND OUTBOX REMAINS THE ONLY FORMAL OPERATION TRANSPORT PERSISTENCE AND CANONICAL STORE KERNEL READBACK ALWAYS WINS",
   "provider_impact": "NONE",
-  "transaction_impact": "PAYMENT CONFIRM IS THE ONLY NEW CLIENT ENTRY TO THE EXISTING STORE KERNEL FORMAL COMMAND PATH; ALL EARLIER CHECKOUT ACTIONS HAVE ZERO FORMAL EFFECT",
+  "transaction_impact": "ORDER OPERATIONS SUBMIT EXPECTED-REVISION AND STABLE-IDEMPOTENCY COMMANDS THROUGH THE EXISTING STORE KERNEL PATH; DINING SPLIT PAYMENT REUSES THE INJECTED A5 CHECKOUT ENTRY",
   "production_routing_impact": "NONE; A2 SECURITY AND A3 SYNC PRODUCTION BINDINGS REMAIN BLOCKED",
   "expected_behavior_change": [
-    "A4 normalized drafts fail closed through formal validation before Final Review.",
-    "Only explicit Payment Confirm creates one stable Store Kernel submission with existing idempotency and UNKNOWN readback-first semantics.",
-    "Channel and canonical configured tender remain separate dimensions across Pad and Mobile checkout.",
-    "Student Discount emits intent only and formal quote totals remain authoritative.",
-    "Business Day cash opening, Cash In/Out, count, close and report facts use integer minor units and immutable append-only contracts.",
-    "Authenticated MFP staff may use FINAL frontline checkout without a Manager-only granular permission while device/session admission remains fail-closed."
+    "Canonical Orders expose three source lanes with source-to-payment filtering across Pad and Mobile.",
+    "Fulfillment, modification, payment correction, refund and cancellation preserve the same Order identity and require canonical readback.",
+    "Waiting admission, later table assignment, transfer, additions and split checkout preserve one Formal Order and reuse A5 checkout.",
+    "Sold-out, restore, Capacity correction and finite override submit through the existing formal Store Kernel operation path.",
+    "UNKNOWN operations retain one operation identity and retry through the existing readback-first Store Kernel seam.",
+    "Authenticated MFP staff may use frontline operations without a Manager-only gate while device and session admission remain fail-closed."
   ],
   "non_goals": [
-    "No A6 Order Operations, refund/cancel UI, Dining or Fulfillment implementation.",
+    "No A7 Print and hardware implementation, A8 external Customer or Keeta engine, or A9 Admin and device implementation.",
     "No second Pricing, Payment, Order, Print, Sync, Security, Business Day or Store Kernel authority.",
-    "No direct Cloud/Admin/Owner/Provider round trip, periodic money polling, v2 client-state or SMM authority.",
+    "No direct Customer, Keeta, SMM or provider engine, periodic business polling, v2 client-state or SMM authority.",
     "No production binding, Builder, OTA, merge, deploy, cutover or legacy SMM decommission."
   ],
-  "rollback_sha": "b83321000668d39580a29e2e838aa585d5750fd5",
+  "rollback_sha": "830fd2f033f2246c1a4f30da71a0a8f9160da751",
   "severity": "HARD_BLOCK"
 }
