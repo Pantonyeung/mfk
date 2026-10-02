@@ -75,7 +75,7 @@ A0 — Foundation — SOURCE_VERIFIED
 A1 — Store Kernel Seam — SOURCE_VERIFIED
 A2 — Device + Staff Security — SOURCE_VERIFIED
 A3 — Sync + Offline — SOURCE_VERIFIED
-A4 — Ordering Surfaces — CURRENT
+A4 — Ordering Surfaces — CURRENT / BLOCKED FOR OWNER CROSSWALK CLOSURE
 A5 — Checkout + Money
 A6 — Order Operations
 A7 — Print + Hardware + Recovery
@@ -149,7 +149,39 @@ Mobile:
 Different presentation is allowed.
 Different business semantics are not.
 
-## 9. Change-control mode
+## 9. Owner crosswalk closure
+
+Controlling crosswalk:
+`docs/plan/MFP_V3_OWNER_REQUIREMENTS_CROSSWALK_2026-10-02.md`
+
+Current A4 implementation slice at:
+`5e4118c003bef84a5e0262d5ac925537c4686ff3`
+
+is SOURCE_VERIFIED for its declared ordering-domain slice.
+
+A4 stage closure is BLOCKED until:
+- A4-C1 Display Settings
+- A4-C2 Navigation + More shell
+- A4-C3 75% major modal geometry
+- A4-C4 exact Cart semantics
+- A4-C5 Hold/Retrieve/Dining draft entry
+- A4-C6 exact Fast Lane
+- A4-C7 Owner UI acceptance baseline
+
+are SOURCE_VERIFIED.
+
+Do not start A5 before A4 closure.
+
+## 10. Permission clarification
+
+Owner FINAL product rule:
+authorized MFP staff must not be given an invented Manager-only product gate for the Owner-listed MFP operations.
+
+A2 permission plumbing remains mandatory.
+Store Kernel/server admission remains mandatory.
+Canonical permission policy must express the Owner product rule rather than silently narrowing it.
+
+## 11. Change-control mode
 
 Current mode:
 PREPARE
@@ -172,7 +204,7 @@ Not authorized:
 Completion target:
 `SOURCE_VERIFIED`
 
-## 10. Status language
+## 12. Status language
 
 Only:
 - SOURCE_VERIFIED
