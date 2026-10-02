@@ -9,16 +9,16 @@ Repository: Pantonyeung/mfk
 
 ## 0. Owner stage authorization
 
-Owner explicitly accepted A6 at exact SHA:
-`881afbd5fd463b4833e3b5980123fe33679bb260`
+Owner explicitly accepted A7 at exact SHA:
+`806ca51cfd812a968f9208a45e14d8a228fa91e1`
 
 Owner explicitly authorizes advancement to:
-A7 — Print + Hardware + Recovery
+A8 — Customer + Keeta + External
 
 Current Stage:
-A7 — Print + Hardware + Recovery
+A8 — Customer + Keeta + External
 
-PR #627 remains legacy v2 rollback / security-critical containment / production-blocker evidence only.
+PR #627 remains legacy v2 rollback / containment evidence only.
 
 ## 1. Mandatory read order
 
@@ -27,14 +27,13 @@ PR #627 remains legacy v2 rollback / security-critical containment / production-
 3. `docs/plan/MFP_V3_SMM_Migration_Plan_2026-10-02.txt`
 4. `docs/governance/MFK_V3_SMT_REBUILD_AUTHORITY_2026-10-02.md`
 5. `docs/design/MFP_PAD_ORDERING_VISUAL_LOCK_R1_2026-10-02.md`
-6. `docs/control/MFK_CHANGE_CONTROL.md`
-7. `HANDOFF_CURRENT.md`
-8. `docs/handoff/MFP_V3_A7_PRINT_HARDWARE_RECOVERY_CODEX_HANDOFF_2026-10-02.md`
-9. current A7 Draft PR / Issue
-10. parent PR #643 / exact parent SHA
-11. existing Carrier Print Gateway / Print evidence source
+6. `HANDOFF_CURRENT.md`
+7. `docs/handoff/MFP_V3_A8_CUSTOMER_KEETA_EXTERNAL_CODEX_HANDOFF_2026-10-02.md`
+8. current A8 Draft PR / Issue
+9. parent PR #645 / exact parent SHA
+10. Customer / Keeta contracts + verified donor evidence
 
-If source/runtime/authority conflicts:
+Conflict:
 `GOVERNANCE_DRIFT`
 
 ## 2. Product structure
@@ -47,9 +46,6 @@ SMM:
 - cancelled as final product identity
 - no new SMM authority/state/head/session
 
-SMT:
-- may remain as internal legacy Store Kernel / Carrier identifier only
-
 ## 3. Stage status
 
 A0 — SOURCE_VERIFIED
@@ -59,79 +55,107 @@ A3 — SOURCE_VERIFIED
 A4 — SOURCE_VERIFIED / OWNER ACCEPTED
 A5 — SOURCE_VERIFIED / OWNER ACCEPTED
 A6 — SOURCE_VERIFIED / OWNER ACCEPTED
-A7 — CURRENT
-A8 — Customer + Keeta + External
+A7 — SOURCE_VERIFIED / OWNER ACCEPTED
+A8 — CURRENT
 A9 — Public + Diagnostics + Physical Acceptance + Cutover
 
-## 4. A7 authority lock
+## 4. A8 authority lock
+
+A8 may connect:
+- Customer pending intents
+- payment evidence
+- WhatsApp contact/fallback
+- Customer external confirmation
+- Customer cutoff/stop
+- Keeta inbound/ACK/lifecycle/after-sale
+- external channel attention
 
 Do NOT rebuild:
-- Print Router
-- Durable PrintJob authority
-- Store Kernel
-- Order/Pricing/Payment/Fulfillment
-- Carrier native print gateway
+- Order Authority
+- Pricing
+- Payment/Refund
+- Availability/Capacity
+- Print
+- Sync
+- Customer/Keeta provider engines
 
-A7 connects MFP source/UI to:
-- canonical PrintJob/readback
-- existing Carrier durable gateway
-- local physical printer bindings
-- hardware/recovery evidence
+## 5. P0 external identity lock
 
-## 5. P0 print rule
+`EXTERNAL DUPLICATE != NEW FORMAL ORDER`
 
-`UNKNOWN PRINT OUTCOME != SAFE TO RETRY`
+Customer:
+same submissionId/idempotencyKey
+→ max one canonical Order.
 
-If a physical dispatch was already in progress and process/device restarts before definitive evidence:
-- preserve canonical job identity
-- mark/retain UNKNOWN / AMBIGUOUS_AFTER_SEND
-- do not auto-reprint
-- require explicit human reprint decision
+Keeta:
+same providerOrderId/providerMessageId/fingerprint
+→ max one canonical Order.
 
-No blind duplicate physical output.
+Before Customer/Manual-Keeta formal accept:
+- zero Formal Order
+- zero ETA
+- zero first print
+- zero capacity consumption
 
-## 6. Owner print responsibility lock
+## 6. Zero-polling lock
 
-Admin:
-- Product printing rules
-- logical destinations
-- template authoring/publish
+Do not copy legacy:
+- setInterval business polling
+- focus-triggered external fetch
+- visibility-triggered request fan-out
+- fixed 5-second pull
 
-MFP local:
-- physical printer/IP
-- local binding
-- published template selection where allowed
-- actual hardware dispatch
+Use:
+- startup bounded read
+- external event / Doorbell
+- reconnect
+- manual refresh
+- single-flight coalescing
 
-MFP must not create a second Product → Printer routing authority.
+Event payload is notification only, not canonical truth.
 
-## 7. Visual lock
+## 7. Customer Owner locks
 
-A7 Pad UI extends:
+Payment screenshot:
+`EVIDENCE != PAYMENT TRUTH`
+
+WhatsApp:
+communication/fallback only.
+Not a second Order writer.
+
+Cutoff / immediate stop:
+blocks future Customer new order intents only.
+Must not stop local MFP trade or cancel existing Orders.
+
+## 8. Keeta Owner locks
+
+- AUTO / MANUAL comes from canonical policy
+- Later != Reject != Cancel != Accept
+- maximum defer = 2
+- mapping failure stays attention
+- provider duplicate does not duplicate Order
+- provider after-sale does not replace A6/A5 refund authority
+
+## 9. Visual lock
+
+A8 Pad UI extends:
 `MFP_PAD_ORDERING_VISUAL_LOCK_R1`
 
-No new visual system.
+The locked top pending / external-order strip now receives real Customer / Keeta read-model facts.
 
-Print/Hardware surfaces live under More/Tools using:
-- blue visual language
-- high-density cards
-- stable action geometry
-- explicit attention states
+No separate visual system.
 
-## 8. Change control
+## 10. Change control
 
 Mode:
-`PREPARE`
+PREPARE
 
 Authorized:
-- A7 bounded source
+- bounded A8 source
 - tests
 - CI
 - Draft PR
 - source evidence
-
-Carrier source:
-READ ONLY by default.
 
 Not authorized:
 - merge
@@ -143,7 +167,7 @@ Not authorized:
 Completion:
 `SOURCE_VERIFIED`
 
-## 9. Status language
+## 11. Status language
 
 Only:
 - SOURCE_VERIFIED
@@ -153,4 +177,4 @@ Only:
 - FAILED
 
 MILESTONE:
-`MFP_V3_A7_CURRENT_EXECUTION_CONTROL_2026_10_02`
+`MFP_V3_A8_CURRENT_EXECUTION_CONTROL_2026_10_02`
