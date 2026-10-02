@@ -7,7 +7,7 @@ import {
   normalizeKeetaStandardProviderOrderFacts,
   type KeetaStandardProviderOrderFacts,
 } from '../../../integrations/keeta/src/order-facts.js';
-import {readSmtAdminConfigLkg,readSmtDeviceId,subscribeSmtAdminConfig,subscribeSmtCloudDoorbell} from './admin-config-sync.ts';
+import {isSmtCloudDoorbellConnected,readSmtAdminConfigLkg,readSmtDeviceId,subscribeSmtAdminConfig,subscribeSmtCloudDoorbell} from './admin-config-sync.ts';
 import {localRuntime,type StoredOrder} from './local-runtime.ts';
 import {assertCapacityChannelAdmission} from './capacity-pool-state.ts';
 
@@ -278,7 +278,7 @@ export function installKeetaOrderIntake(){
   // Doorbell remains primary. This visible-only bounded fallback closes a missed-doorbell gap
   // without creating a second order path; providerRef dedup + cloud ACK remain authoritative.
   fallbackTimer=window.setInterval(()=>{
-    if(document.visibilityState==='visible'&&navigator.onLine)reconcile();
-  },5000);
+    if(document.visibilityState==='visible'&&navigator.onLine&&!isSmtCloudDoorbellConnected())reconcile();
+  },30000);
   window.setTimeout(reconcile,0);
 }
