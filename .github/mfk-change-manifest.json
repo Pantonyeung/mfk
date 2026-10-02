@@ -11,6 +11,7 @@
     "HANDOFF_CURRENT.md",
     "docs/governance/MFK_V3_SMT_REBUILD_AUTHORITY_2026-10-02.md",
     "docs/handoff/MFP_V3_A4_ORDERING_SURFACES_CODEX_HANDOFF_2026-10-02.md",
+    "docs/plan/MFP_V3_OWNER_REQUIREMENTS_CROSSWALK_2026-10-02.md",
     "v3smt/**"
   ],
   "authority_impact": "ADDS_ONE_SHARED_MFP_PAD_MOBILE_ORDERING_DOMAIN_OVER_THE_A3_ACTIVE_PROJECTION; STORE_KERNEL_REMAINS FORMAL ORDER AND PRICING AUTHORITY",
@@ -23,13 +24,15 @@
     "The catalog selector consumes only the A3 atomic active projection and exposes honest LOCAL_LKG and offline states.",
     "Categories, products, media, options, modifiers, combos, cart draft and service mode produce one normalized intent contract.",
     "Local preview arithmetic uses only published material price facts and is never presented as a final formal quote.",
-    "Projection material changes mark affected draft lines REVALIDATION_REQUIRED without silently rewriting their facts."
+    "Projection material changes mark affected draft lines REVALIDATION_REQUIRED without silently rewriting their facts.",
+    "A4 owner-compliance closure carries forward the FINAL Owner requirements for Display Settings, navigation, 75% modal geometry, exact cart semantics, Hold/Retrieve/Dining draft entry and exact Fast Lane behavior."
   ],
   "non_goals": [
     "No formal checkout, Store Kernel order commit, payment, tender, fulfillment or print.",
     "No second Pricing, Order, Sync, Security, Availability or Store Kernel authority.",
     "No direct Admin/catalog fetch, new WebSocket, periodic polling, v2 client-state or SMM authority.",
-    "No production binding, Builder, OTA, merge, deploy, cutover or legacy SMM decommission."
+    "No production binding, Builder, OTA, merge, deploy, cutover or legacy SMM decommission.",
+    "No A5 checkout/money work starts until A4 Owner crosswalk closure A4-C1..A4-C7 is SOURCE_VERIFIED."
   ],
   "rollback_sha": "adc2cc64573d9d5f7b357a7955ff2b0edc1fd509",
   "severity": "HARD_BLOCK"
