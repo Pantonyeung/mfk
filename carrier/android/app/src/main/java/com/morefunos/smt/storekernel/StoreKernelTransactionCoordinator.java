@@ -197,6 +197,19 @@ public final class StoreKernelTransactionCoordinator implements AutoCloseable {
         }
 
         validateClosedCommit(request);
+        // Replay above is final even when dependencies later change. For a new command,
+        // validate every read-only dependency in the same transaction as the writes below.
+        for (StoreKernelContract.AggregateReadDependency dependency : request.readDependencies) {
+            final StoreKernelAggregateEntity current = dao.readAggregate(
+                request.storeId,
+                dependency.aggregateType,
+                dependency.aggregateId
+            );
+            final long actualRevision = current == null ? 0 : current.revision;
+            if (actualRevision != dependency.expectedRevision) {
+                throw failure("STORE_KERNEL_READ_DEPENDENCY_REVISION_CONFLICT");
+            }
+        }
         final List<StoreKernelAggregateEntity> currentAggregates = new ArrayList<>();
         for (StoreKernelContract.AggregateMutation mutation : request.mutations) {
             final StoreKernelAggregateEntity current = dao.readAggregate(

@@ -22,6 +22,7 @@ public final class StoreKernelContract {
     public static final int MAX_MUTATIONS = 32;
     public static final int MAX_OUTBOX_EFFECTS = 64;
     public static final int MAX_AGGREGATE_SNAPSHOT_KEYS = 32;
+    public static final int MAX_READ_DEPENDENCIES = 32;
     public static final int MAX_CLAIM_BATCH = 100;
     public static final long MAX_LEASE_DURATION_MS = 300_000L;
 
@@ -69,6 +70,10 @@ public final class StoreKernelContract {
 
     public static CommitRequest parseCommit(JSONObject request) throws JSONException {
         requireType(request, COMMIT);
+        // Read dependencies are derived by trusted native handlers, never by a wire caller.
+        if (request.has("readDependencies")) {
+            throw new IllegalArgumentException("STORE_KERNEL_READ_DEPENDENCIES_NATIVE_ONLY");
+        }
         final JSONArray rawMutations = requiredArray(request, "mutations");
         if (rawMutations.length() < 1 || rawMutations.length() > MAX_MUTATIONS) {
             throw new IllegalArgumentException("STORE_KERNEL_MUTATION_COUNT_INVALID");
@@ -352,6 +357,35 @@ public final class StoreKernelContract {
         public long newRevision() { return expectedRevision + 1; }
     }
 
+    /** Revision observed by a native reader in this Store Kernel database; zero means absent. */
+    public static final class AggregateReadDependency {
+        public final String aggregateType;
+        public final String aggregateId;
+        public final long expectedRevision;
+
+        public AggregateReadDependency(String aggregateType, String aggregateId, long expectedRevision) {
+            validateIdentifier(aggregateType);
+            validateIdentifier(aggregateId);
+            if (expectedRevision < 0) {
+                throw new IllegalArgumentException("STORE_KERNEL_READ_DEPENDENCY_REVISION_INVALID");
+            }
+            this.aggregateType = aggregateType;
+            this.aggregateId = aggregateId;
+            this.expectedRevision = expectedRevision;
+        }
+
+        private static void validateIdentifier(String value) {
+            if (value == null || value.isEmpty() || !value.equals(value.trim()) || value.length() > 160) {
+                throw new IllegalArgumentException("STORE_KERNEL_READ_DEPENDENCY_IDENTITY_INVALID");
+            }
+            for (int index = 0; index < value.length(); index++) {
+                if (Character.isISOControl(value.charAt(index))) {
+                    throw new IllegalArgumentException("STORE_KERNEL_READ_DEPENDENCY_IDENTITY_INVALID");
+                }
+            }
+        }
+    }
+
     public static final class AggregateKey {
         public final String aggregateType;
         public final String aggregateId;
@@ -446,6 +480,7 @@ public final class StoreKernelContract {
         public final String resultJson;
         public final String traceId;
         public final String committedAt;
+        public final List<AggregateReadDependency> readDependencies;
         public final List<AggregateMutation> mutations;
         public final List<OutboxEffect> outbox;
         public final InboxConsumption inbox;
@@ -464,6 +499,25 @@ public final class StoreKernelContract {
             List<OutboxEffect> outbox,
             InboxConsumption inbox
         ) {
+            this(requestId, commandId, storeId, operationId, idempotencyKey, requestFingerprint,
+                resultJson, traceId, committedAt, mutations, outbox, inbox, Collections.emptyList());
+        }
+
+        private CommitRequest(
+            String requestId,
+            String commandId,
+            String storeId,
+            String operationId,
+            String idempotencyKey,
+            String requestFingerprint,
+            String resultJson,
+            String traceId,
+            String committedAt,
+            List<AggregateMutation> mutations,
+            List<OutboxEffect> outbox,
+            InboxConsumption inbox,
+            List<AggregateReadDependency> readDependencies
+        ) {
             this.requestId = requestId;
             this.commandId = commandId;
             this.storeId = storeId;
@@ -473,9 +527,33 @@ public final class StoreKernelContract {
             this.resultJson = resultJson;
             this.traceId = traceId;
             this.committedAt = committedAt;
+            this.readDependencies = Collections.unmodifiableList(new ArrayList<>(readDependencies));
             this.mutations = Collections.unmodifiableList(new ArrayList<>(mutations));
             this.outbox = Collections.unmodifiableList(new ArrayList<>(outbox));
             this.inbox = inbox;
+        }
+
+        /**
+         * Returns a copy with the complete trusted native read set. No JSON contract is added.
+         * Callers must include every revisioned fact used to derive the mutations; this is not
+         * authorization or an expiry check and cannot guard facts outside this database.
+         */
+        public CommitRequest withReadDependencies(List<AggregateReadDependency> dependencies) {
+            if (dependencies == null) {
+                throw new IllegalArgumentException("STORE_KERNEL_READ_DEPENDENCIES_INVALID");
+            }
+            final List<AggregateReadDependency> snapshot = new ArrayList<>(dependencies);
+            if (snapshot.size() > MAX_READ_DEPENDENCIES) {
+                throw new IllegalArgumentException("STORE_KERNEL_READ_DEPENDENCIES_INVALID");
+            }
+            final Set<String> keys = new HashSet<>();
+            for (AggregateReadDependency dependency : snapshot) {
+                if (dependency == null || !keys.add(dependency.aggregateType + "\u0000" + dependency.aggregateId)) {
+                    throw new IllegalArgumentException("STORE_KERNEL_READ_DEPENDENCIES_INVALID");
+                }
+            }
+            return new CommitRequest(requestId, commandId, storeId, operationId, idempotencyKey,
+                requestFingerprint, resultJson, traceId, committedAt, mutations, outbox, inbox, snapshot);
         }
     }
 

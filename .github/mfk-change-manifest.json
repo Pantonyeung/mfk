@@ -12,6 +12,7 @@
     "docs/architecture/MFP_V3_A9R_FORMAL_BUSINESS_COMMAND_MATRIX_2026-10-02.md",
     "docs/governance/MFP_V3_A9R_FORMAL_BUSINESS_ROUTER_AUTHORITY_2026-10-02.md",
     "docs/handoff/MFP_V3_A9R_FORMAL_BUSINESS_ROUTER_CODEX_HANDOFF_2026-10-02.md",
+    "docs/superpowers/plans/2026-10-03-store-kernel-checkout-read-dependencies.md",
     "carrier/android/app/src/main/java/com/morefunos/smt/MainActivity.java",
     "carrier/android/app/src/main/java/com/morefunos/smt/storekernel/StoreKernelContract.java",
     "carrier/android/app/src/main/java/com/morefunos/smt/storekernel/StoreKernelDao.java",
@@ -40,6 +41,7 @@
     "Direct browser store.kernel.commit.v1 is rejected before Store Kernel mutation.",
     "Unknown commands and aggregate or canonical-state injection fail closed.",
     "Submission replay is readback-first and fingerprint conflicts cannot create a second effect.",
+    "Trusted native handlers can attach an immutable revision read set that is validated inside the same Room transaction before any commit effect.",
     "CHECKOUT_PAYMENT_CONFIRM is registered but remains blocked by production Security Pricing and Tender dependencies."
   ],
   "non_goals": [
