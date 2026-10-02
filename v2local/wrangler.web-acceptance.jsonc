@@ -12,9 +12,6 @@
   "version_metadata": {
     "binding": "MFK_VERSION"
   },
-  "secrets": {
-    "required": ["WEB_ACCEPTANCE_TOKEN"]
-  },
   "assets": {
     "directory": "./dist",
     "binding": "ASSETS",
