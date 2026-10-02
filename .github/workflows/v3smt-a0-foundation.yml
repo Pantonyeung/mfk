@@ -1,0 +1,48 @@
+name: V3 SMT A0 Foundation
+
+on:
+  push:
+    branches:
+      - feat/MFK-V3-SMT-R1-2026-10-02
+    paths:
+      - 'v3smt/**'
+      - 'docs/governance/MFK_V3_SMT_REBUILD_AUTHORITY_2026-10-02.md'
+      - '.github/workflows/v3smt-a0-foundation.yml'
+  pull_request:
+    paths:
+      - 'v3smt/**'
+      - 'docs/governance/MFK_V3_SMT_REBUILD_AUTHORITY_2026-10-02.md'
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install
+        working-directory: v3smt
+        run: npm install --ignore-scripts --no-audit --no-fund
+      - name: Test
+        working-directory: v3smt
+        run: npm test
+      - name: Typecheck
+        working-directory: v3smt
+        run: npm run typecheck
+      - name: Build
+        working-directory: v3smt
+        run: npm run build
+      - name: Authority guard
+        shell: bash
+        run: |
+          set -euo pipefail
+          ! grep -RInE 'setInterval\s*\(' v3smt/src
+          ! grep -RInE 'from .*(v2local|v2smm)' v3smt/src
+          ! find v3smt -maxdepth 2 -iname 'wrangler*' | grep .
+          ! grep -RInE 'wrangler deploy|cloudflare deploy|workers_dev' v3smt
+          grep -RInF "formalTransaction:'STORE_KERNEL'" v3smt/src/state-authority.ts
