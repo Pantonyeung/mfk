@@ -6,85 +6,83 @@ Product:
 MoreFun POS
 
 Current Stage:
-A6 — Order Operations
+A7 — Print + Hardware + Recovery
 
 Branch:
-`feat/MFP-V3-A6-ORDER-OPERATIONS-2026-10-02`
+`feat/MFP-V3-A7-PRINT-HARDWARE-RECOVERY-2026-10-02`
 
 Parent:
-#641 — MFP V3 A5｜Checkout + Money｜2026-10-02
+#643 — MFP V3 A6｜Order Operations｜2026-10-02
 
 Parent exact SHA:
-`830fd2f033f2246c1a4f30da71a0a8f9160da751`
+`881afbd5fd463b4833e3b5980123fe33679bb260`
 
-A5:
+A6:
 SOURCE_VERIFIED
 OWNER ACCEPTED
 
-A5 UI polish:
-DEFERRED BY OWNER
+Current handoff:
+`docs/handoff/MFP_V3_A7_PRINT_HARDWARE_RECOVERY_CODEX_HANDOFF_2026-10-02.md`
 
-Current Stage handoff:
-`docs/handoff/MFP_V3_A6_ORDER_OPERATIONS_CODEX_HANDOFF_2026-10-02.md`
-
-Controlling crosswalk:
-`docs/plan/MFP_V3_OWNER_FINAL_CROSSWALK_2026-10-02.txt`
+Visual lock:
+`docs/design/MFP_PAD_ORDERING_VISUAL_LOCK_R1_2026-10-02.md`
 
 ## Current objective
 
-Canonical Formal Orders
-→ shared MFP Order Operations layer
-→ Orders / Fulfillment / Dining / Sold-out / Capacity
-→ formal Store Kernel commands
-→ canonical readback
+Canonical PrintJob / Print Router
+→ MFP Print/Hardware read model
+→ existing Carrier durable gateway
+→ physical printer binding
+→ explicit evidence / recovery / reprint
 
 ## First RED
 
-Same canonical Order:
-IN_PROGRESS → READY → IN_PROGRESS
+Canonical PrintJob J1 enters physical dispatch.
 
-must remain the SAME Order.
-No second Order.
-No duplicate formal effect.
+Process/device restarts while outcome is uncertain.
 
-## Owner Final A6 scope
+Expected:
+- J1 remains same job
+- state = UNKNOWN / AMBIGUOUS_AFTER_SEND
+- zero automatic second physical dispatch
+- human explicit reprint required
+- reprint gets a new auditable identity
+- no drawer/payment/order/fulfillment replay
 
-- Orders three source lanes
-- Source → Tender filters
-- Fulfillment
-- ETA
-- modification / correction / refund / cancel
-- Dining 3×3 + Waiting
-- same-order table assignment/transfer
-- split checkout orchestration to A5
-- Sold-out / Restore
-- Capacity Pool
-- independent channel thresholds
-- bounded override
-- More / Tools shell
+## Scope
+
+- PrintJob readback
+- transport evidence
+- gateway adapter
+- physical printer bindings/IP
+- health/test
+- receipt/production/packing/label
+- whole-ticket reprint
+- per-label partial reprint
+- Dining print
+- cancel notice
+- cash drawer boundary
+- printer failure attention
+- restart/power-loss recovery
+- local/offline print continuity
+- Print/Hardware UI
 
 ## Hard locks
 
-- no second Order Authority
-- no second Availability/Capacity authority
-- no Dining Order engine
-- no Dining Payment engine
-- no Print engine
-- no Customer/Keeta provider engine
+- no second Print engine
+- no browser DurablePrintJob authority
+- no blind retry of UNKNOWN
+- no drawer on reprint/correction/failed payment
 - no v2 client-state import
 - no SMM authority
-- no periodic business polling
+- no periodic print polling
+- no Carrier rewrite unless a proven blocker requires it
 
 ## Completion target
 
 SOURCE_VERIFIED
 
-Status language:
-- SOURCE_VERIFIED
-- DEPLOYED
-- PHYSICAL_VERIFIED
-- BLOCKED
-- FAILED
+Production/physical print binding may remain BLOCKED.
 
 MILESTONE:
-`MFP_V3_A6_CURRENT_HANDOFF_2026_10_02`
+`MFP_V3_A7_CURRENT_HANDOFF_2026_10_02`

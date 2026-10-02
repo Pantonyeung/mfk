@@ -18,6 +18,8 @@ import {
   type MfpOrderOperationsReadModel,
 } from './order-operations-domain.ts';
 import type {MfpNormalizedOrderingIntent,MfpOrderingSurface} from './ordering-domain.ts';
+import type {MfpPrintHardwareSession} from './print-hardware-domain.ts';
+import {MfpCancelNoticeAction,MfpOrderPrintPanel} from './print-hardware-workspace.tsx';
 
 const money=new Intl.NumberFormat('zh-HK',{style:'currency',currency:'HKD'});
 const formatMoney=(minor:number|null|undefined)=>minor===null||minor===undefined?'—':money.format(minor/100);
@@ -27,14 +29,14 @@ const sourceLabels:Readonly<Record<string,string>>={WALK_IN:'現場',PHONE:'電�
 const sourceLabel=(source:string)=>sourceLabels[source]??source;
 
 export type MfpOperationalPage='ORDERS'|'DINING'|'AVAILABILITY'|'MORE';
-export type MfpAppPage='ORDERING'|MfpOperationalPage;
+export type MfpAppPage='ORDERING'|'PRINT_HARDWARE'|MfpOperationalPage;
 
 export function MfpOperationsNavigation({surface,active,onNavigate}:{surface:MfpOrderingSurface;active:MfpAppPage;onNavigate:(page:MfpAppPage)=>void}){
   const labels:ReadonlyArray<readonly [MfpAppPage,string]>=[
     ['ORDERING','Ordering'],['ORDERS','Orders'],['DINING','Dining'],['AVAILABILITY','Sold-out / Capacity'],
   ];
   return <div className={`mfp-operations-nav-shell ${surface==='MFP_MOBILE'?'mobile':''}`}>
-    <button type="button" className={`mfp-more-tools-button ${active==='MORE'?'active':''}`} aria-current={active==='MORE'?'page':undefined} onClick={()=>onNavigate('MORE')}><span aria-hidden="true">☰</span> More / Tools</button>
+    <button type="button" className={`mfp-more-tools-button ${active==='MORE'||active==='PRINT_HARDWARE'?'active':''}`} aria-current={active==='MORE'||active==='PRINT_HARDWARE'?'page':undefined} onClick={()=>onNavigate('MORE')}><span aria-hidden="true">☰</span> More / Tools</button>
     <nav className="mfp-operations-nav" aria-label="MFP high-frequency operations navigation">
       {labels.map(([page,label])=><button type="button" key={page} className={active===page?'active':''} aria-current={active===page?'page':undefined} onClick={()=>onNavigate(page)}>{label}</button>)}
     </nav>
@@ -91,17 +93,19 @@ function OrderActionForm({order,form,tenders,onSubmit,onClose}:{
   </section></div>;
 }
 
-function OrderDetail({order,tenders,onOperation,onSplit}:{
+function OrderDetail({order,tenders,onOperation,onSplit,printSession,surface}:{
   order:MfpCanonicalOrder;tenders:readonly MfpTenderConfig[];onOperation:(operation:MfpOrderOperation)=>void;onSplit:(order:MfpCanonicalOrder)=>void;
+  printSession?:MfpPrintHardwareSession;surface:MfpOrderingSurface;
 }){
   const [form,setForm]=useState<OrderForm>(null);
+  const [printOpen,setPrintOpen]=useState(false);
   const fulfillment=(target:'IN_PROGRESS'|'READY'|'PICKED_UP')=>onOperation({kind:'SET_FULFILLMENT',orderId:order.orderId,expectedRevision:order.revision,target});
   return <aside className="mfp-order-detail" data-order-id={order.orderId} aria-label={`訂單 ${order.displayNumber} 詳情`}>
     <header><div><small>{sourceLabel(order.source)} · 正式訂單</small><h2>#{order.displayNumber}</h2></div><span>{fulfillmentLabels[order.fulfillmentState]}</span></header>
     <dl><div><dt>用餐方式</dt><dd>{order.serviceMode==='DINE_IN'?'堂食':'外賣'}</dd></div><div><dt>付款</dt><dd>{order.effectiveTenderId}</dd></div><div><dt>已確認</dt><dd>{formatMoney(order.recognizedAmountMinor)}</dd></div><div><dt>未收</dt><dd>{formatMoney(order.outstandingAmountMinor)}</dd></div>{order.eta?<div><dt>預計完成</dt><dd>{order.eta.minutes} 分鐘 · {new Date(order.eta.readyAt).toLocaleTimeString('zh-HK',{hour:'2-digit',minute:'2-digit'})}</dd></div>:null}</dl>
     <section className="mfp-order-items"><h3>商品</h3>{order.items.map(item=><article key={item.lineId}><div><b>{item.name}</b>{item.options?.map(option=><small key={option}>{option}</small>)}{item.note?<small>{item.note}</small>:null}</div><span>×{item.quantity}</span><strong>{formatMoney(item.unitMinor*item.quantity)}</strong></article>)}</section>
     {order.modificationState==='CUSTOMER_CONFIRMATION_REQUIRED'?<p className="mfp-operation-warning">等候客人確認改單</p>:null}
-    {order.cancelNoticeIntent==='CANCEL_NOTICE_REQUIRED'?<p className="mfp-operation-warning">需要取消通知單 · 實體列印未接駁</p>:null}
+    {order.cancelNoticeIntent==='CANCEL_NOTICE_REQUIRED'?<><p className="mfp-operation-warning">需要一張正式取消通知單</p>{printSession?<MfpCancelNoticeAction orderId={order.orderId} session={printSession}/>:null}</>:null}
     {order.humanCommunicationRequired?<p className="mfp-operation-warning">需要人手通知製作區；不會自動補印更正單</p>:null}
     <div className="mfp-fulfillment-actions">
       {order.fulfillmentState!=='READY'?<button type="button" onClick={()=>fulfillment('READY')}>標記可取餐</button>:<button type="button" onClick={()=>fulfillment('IN_PROGRESS')}>返回未完成</button>}
@@ -111,15 +115,16 @@ function OrderDetail({order,tenders,onOperation,onSplit}:{
       <button type="button" onClick={()=>setForm('MODIFY')}>修改訂單</button><button type="button" onClick={()=>setForm('PAYMENT')}>更正付款</button>
       <button type="button" onClick={()=>setForm('FULL_REFUND')}>全額退款</button><button type="button" onClick={()=>setForm('PARTIAL_REFUND')}>部分退款</button>
       {order.serviceMode==='DINE_IN'?<button type="button" onClick={()=>onSplit(order)}>分單付款</button>:null}
-      <button type="button" disabled title="實體列印未接駁">重印（未接駁）</button><button type="button" className="danger" onClick={()=>setForm('CANCEL')}>取消訂單</button>
+      <button type="button" disabled={!printSession} title={printSession?'Order Detail → Reprint':'Print authority 未接駁'} onClick={()=>setPrintOpen(true)}>重印</button><button type="button" className="danger" onClick={()=>setForm('CANCEL')}>取消訂單</button>
     </div>
     {form?<OrderActionForm order={order} form={form} tenders={tenders} onSubmit={onOperation} onClose={()=>setForm(null)}/>:null}
+    {printOpen&&printSession?<MfpOrderPrintPanel surface={surface} orderId={order.orderId} context="ORDER_REPRINT" session={printSession} onClose={()=>setPrintOpen(false)}/>:null}
   </aside>;
 }
 
-function OrdersWorkspace({surface,model,tenders,onOperation,onSplit}:{
+function OrdersWorkspace({surface,model,tenders,onOperation,onSplit,printSession}:{
   surface:MfpOrderingSurface;model:MfpOrderOperationsReadModel;tenders:readonly MfpTenderConfig[];
-  onOperation:(operation:MfpOrderOperation)=>void;onSplit:(order:MfpCanonicalOrder)=>void;
+  onOperation:(operation:MfpOrderOperation)=>void;onSplit:(order:MfpCanonicalOrder)=>void;printSession?:MfpPrintHardwareSession;
 }){
   const [lane,setLane]=useState<MfpOrderLane>('DIRECT');
   const [source,setSource]=useState('');
@@ -134,7 +139,7 @@ function OrdersWorkspace({surface,model,tenders,onOperation,onSplit}:{
     <header><div><small>訂單工作台</small><h1>Orders</h1></div><p>更新時間 {new Date(model.readAt).toLocaleTimeString('zh-HK')}</p></header>
     <div className="mfp-order-filters"><label>Source / Channel<select value={source} onChange={event=>setSource(event.target.value)}><option value="">全部</option>{sources.map(value=><option key={value}>{value}</option>)}</select></label><span>→</span><label>Payment Method<select value={tender} onChange={event=>setTender(event.target.value)}><option value="">全部</option>{tenderIds.map(value=><option key={value}>{value}</option>)}</select></label></div>
     {surface==='MFP_MOBILE'?<div className="mfp-mobile-lane-tabs" role="tablist">{(['DIRECT','OWN_PLATFORM','THIRD_PARTY'] as const).map(value=><button type="button" role="tab" key={value} aria-selected={lane===value} onClick={()=>setLane(value)}>{laneLabels[value]}</button>)}</div>:null}
-    <div className="mfp-orders-layout">{selected?<OrderDetail order={selected} tenders={tenders.length?tenders:tenderConfigs(tenderIds)} onOperation={onOperation} onSplit={onSplit}/>:<p>未有訂單</p>}<div className="mfp-order-lanes">{lanes.map(value=><section key={value} className="mfp-order-lane"><header><h2>{laneLabels[value]}</h2><span>{filtered.filter(order=>mfpOrderLane(order.source)===value).length}</span></header><div>{filtered.filter(order=>mfpOrderLane(order.source)===value).map(order=><OrderCard key={order.orderId} order={order} selected={selected?.orderId===order.orderId} onSelect={()=>setSelectedId(order.orderId)}/>)}</div></section>)}</div></div>
+    <div className="mfp-orders-layout">{selected?<OrderDetail order={selected} tenders={tenders.length?tenders:tenderConfigs(tenderIds)} onOperation={onOperation} onSplit={onSplit} printSession={printSession} surface={surface}/>:<p>未有訂單</p>}<div className="mfp-order-lanes">{lanes.map(value=><section key={value} className="mfp-order-lane"><header><h2>{laneLabels[value]}</h2><span>{filtered.filter(order=>mfpOrderLane(order.source)===value).length}</span></header><div>{filtered.filter(order=>mfpOrderLane(order.source)===value).map(order=><OrderCard key={order.orderId} order={order} selected={selected?.orderId===order.orderId} onSelect={()=>setSelectedId(order.orderId)}/>)}</div></section>)}</div></div>
   </section>;
 }
 
@@ -151,12 +156,13 @@ function SplitCheckoutPanel({order,onSubmit,onClose}:{order:MfpCanonicalOrder;on
   </section></div>;
 }
 
-function DiningWorkspace({surface,model,pendingIntent,onOperation,onSplit,onReturnToOrdering}:{surface:MfpOrderingSurface;model:MfpOrderOperationsReadModel;pendingIntent:MfpNormalizedOrderingIntent|null;onOperation:(operation:MfpOrderOperation)=>void;onSplit:(order:MfpCanonicalOrder)=>void;onReturnToOrdering:()=>void}){
+function DiningWorkspace({surface,model,pendingIntent,onOperation,onSplit,onReturnToOrdering,printSession}:{surface:MfpOrderingSurface;model:MfpOrderOperationsReadModel;pendingIntent:MfpNormalizedOrderingIntent|null;onOperation:(operation:MfpOrderOperation)=>void;onSplit:(order:MfpCanonicalOrder)=>void;onReturnToOrdering:()=>void;printSession?:MfpPrintHardwareSession}){
   const [selectedTable,setSelectedTable]=useState(pendingIntent?model.dining.tables.find(row=>row.state==='AVAILABLE')?.tableId??'T01':'T01');
   const [partySize,setPartySize]=useState(2);
   const [customer,setCustomer]=useState('');
   const [additionProductId,setAdditionProductId]=useState(model.availability.items[0]?.productId??'');
   const [transferTarget,setTransferTarget]=useState('');
+  const [printOpen,setPrintOpen]=useState(false);
   const table=model.dining.tables.find(row=>row.tableId===selectedTable)??model.dining.tables[0];
   const order=model.orders.find(row=>row.orderId===table?.orderId)??null;
   const available=model.dining.tables.filter(row=>row.state==='AVAILABLE');
@@ -170,8 +176,9 @@ function DiningWorkspace({surface,model,pendingIntent,onOperation,onSplit,onRetu
     <header><div><small>堂食訂單及真實入座時間</small><h1>Dining</h1></div><span>3 × 3 枱位</span></header>
     <div className="mfp-dining-layout"><aside className="mfp-waiting-lane"><h2>Waiting</h2>{model.dining.waiting.map(wait=><article key={wait.waitingId}><div><b>{wait.displayNumber}</b><small>{wait.customerDisplayName??'輪候'} · {wait.partySize} 位</small><span>{wait.orderId?'已落單':'未落單'}</span></div><button type="button" disabled={!selectedAvailable} onClick={()=>assign(wait)}>安排到 {selectedAvailable?.label??'所選枱位'}</button></article>)}<form onSubmit={event=>{event.preventDefault();onOperation({kind:'CREATE_WAITING',expectedRevision:model.dining.revision,partySize,customerDisplayName:customer});}}><h3>新增輪候</h3><label>客人<input value={customer} onChange={event=>setCustomer(event.target.value)}/></label><label>人數<input type="number" min="1" inputMode="numeric" value={partySize} onChange={event=>setPartySize(Math.max(1,Number(event.target.value)))}/></label><button type="submit">加入 Waiting</button><small>未落單唔會製造 Formal Order</small></form></aside>
       <main><div className="mfp-table-grid">{model.dining.tables.map(row=><button type="button" key={row.tableId} className={`${row.state.toLowerCase()} ${isMfpDiningWarning(row,model.etaPolicy)?'warning':''}`} aria-pressed={selectedTable===row.tableId} onClick={()=>setSelectedTable(row.tableId)}><b>{row.label}</b><span>{row.state==='AVAILABLE'?'可用':`#${row.displayNumber}`}</span>{row.seatedAt?<small>{new Date(row.seatedAt).toLocaleTimeString('zh-HK',{hour:'2-digit',minute:'2-digit'})}</small>:null}</button>)}</div></main>
-      <aside className="mfp-table-detail"><h2>{table?.label??'Table'}</h2>{pendingIntent?<section className="mfp-dining-admission"><b>待安排堂食草稿</b><span>{pendingIntent.lines.reduce((sum,line)=>sum+line.quantity,0)} 件商品</span>{table?.state==='AVAILABLE'?<button type="button" onClick={()=>onOperation({kind:'ADMIT_DINING_ORDER',expectedRevision:model.dining.revision,intent:pendingIntent,target:{kind:'TABLE',tableId:table.tableId,partySize}})}>正式開單到 {table.label}</button>:<small>請選擇可用枱位</small>}{openWaiting.map(wait=><button type="button" key={wait.waitingId} onClick={()=>onOperation({kind:'ADMIT_DINING_ORDER',expectedRevision:model.dining.revision,intent:pendingIntent,target:{kind:'WAITING',waitingId:wait.waitingId,partySize:wait.partySize}})}>落單到 Waiting {wait.displayNumber}</button>)}<button type="button" onClick={onReturnToOrdering}>返回修改草稿</button></section>:<button type="button" onClick={onReturnToOrdering}>由 Ordering 開堂食單</button>}{order?<><p>#{order.displayNumber} · {order.dining?.partySize} 位</p><p>入座 {order.dining?.seatedAt?new Date(order.dining.seatedAt).toLocaleString('zh-HK'):'—'}</p><p>{order.items.reduce((sum,item)=>sum+item.quantity,0)} 件 · 未收 {formatMoney(order.outstandingAmountMinor)}</p><label>轉枱<select value={transferTarget} onChange={event=>setTransferTarget(event.target.value)}><option value="">選擇可用枱</option>{available.map(row=><option key={row.tableId} value={row.tableId}>{row.label}</option>)}</select></label><button type="button" disabled={!transferTarget} onClick={()=>{const target=model.dining.tables.find(row=>row.tableId===transferTarget)!;onOperation({kind:'TRANSFER_TABLE',orderId:order.orderId,expectedRevision:order.revision,fromTableId:table!.tableId,toTableId:target.tableId,expectedTableRevision:target.revision});}}>確認轉枱</button><label>加單商品<select value={additionProductId} onChange={event=>setAdditionProductId(event.target.value)}>{model.availability.items.filter(item=>item.status==='AVAILABLE').map(item=><option key={item.productId} value={item.productId}>{item.name}</option>)}</select></label><button type="button" disabled={!additionProductId} onClick={()=>onOperation({kind:'ADD_DINING_ITEMS',orderId:order.orderId,expectedRevision:order.revision,items:[{productId:additionProductId,quantity:1}]})}>正式加單</button><button type="button" onClick={()=>onSplit(order)}>分單付款</button></>:<p>{table?.state==='AVAILABLE'?'可直接安排堂食訂單':'未有正式訂單'}</p>}</aside>
+      <aside className="mfp-table-detail"><h2>{table?.label??'Table'}</h2>{pendingIntent?<section className="mfp-dining-admission"><b>待安排堂食草稿</b><span>{pendingIntent.lines.reduce((sum,line)=>sum+line.quantity,0)} 件商品</span>{table?.state==='AVAILABLE'?<button type="button" onClick={()=>onOperation({kind:'ADMIT_DINING_ORDER',expectedRevision:model.dining.revision,intent:pendingIntent,target:{kind:'TABLE',tableId:table.tableId,partySize}})}>正式開單到 {table.label}</button>:<small>請選擇可用枱位</small>}{openWaiting.map(wait=><button type="button" key={wait.waitingId} onClick={()=>onOperation({kind:'ADMIT_DINING_ORDER',expectedRevision:model.dining.revision,intent:pendingIntent,target:{kind:'WAITING',waitingId:wait.waitingId,partySize:wait.partySize}})}>落單到 Waiting {wait.displayNumber}</button>)}<button type="button" onClick={onReturnToOrdering}>返回修改草稿</button></section>:<button type="button" onClick={onReturnToOrdering}>由 Ordering 開堂食單</button>}{order?<><p>#{order.displayNumber} · {order.dining?.partySize} 位</p><p>入座 {order.dining?.seatedAt?new Date(order.dining.seatedAt).toLocaleString('zh-HK'):'—'}</p><p>{order.items.reduce((sum,item)=>sum+item.quantity,0)} 件 · 未收 {formatMoney(order.outstandingAmountMinor)}</p><label>轉枱<select value={transferTarget} onChange={event=>setTransferTarget(event.target.value)}><option value="">選擇可用枱</option>{available.map(row=><option key={row.tableId} value={row.tableId}>{row.label}</option>)}</select></label><button type="button" disabled={!transferTarget} onClick={()=>{const target=model.dining.tables.find(row=>row.tableId===transferTarget)!;onOperation({kind:'TRANSFER_TABLE',orderId:order.orderId,expectedRevision:order.revision,fromTableId:table!.tableId,toTableId:target.tableId,expectedTableRevision:target.revision});}}>確認轉枱</button><label>加單商品<select value={additionProductId} onChange={event=>setAdditionProductId(event.target.value)}>{model.availability.items.filter(item=>item.status==='AVAILABLE').map(item=><option key={item.productId} value={item.productId}>{item.name}</option>)}</select></label><button type="button" disabled={!additionProductId} onClick={()=>onOperation({kind:'ADD_DINING_ITEMS',orderId:order.orderId,expectedRevision:order.revision,items:[{productId:additionProductId,quantity:1}]})}>正式加單</button><button type="button" onClick={()=>onSplit(order)}>分單付款</button><button type="button" disabled={!printSession} onClick={()=>setPrintOpen(true)}>堂食打印 / 重印</button></>:<p>{table?.state==='AVAILABLE'?'可直接安排堂食訂單':'未有正式訂單'}</p>}</aside>
     </div>
+    {printOpen&&order&&printSession?<MfpOrderPrintPanel surface={surface} orderId={order.orderId} context="DINING" session={printSession} onClose={()=>setPrintOpen(false)}/>:null}
   </section>;
 }
 
@@ -198,17 +205,17 @@ function MoreWorkspace({model,onTool}:{model:MfpOrderOperationsReadModel;onTool:
   const tools=[
     ['Day Close','A5'],['Reports','A5'],['Devices','A7 / A9'],['Print Devices','A7'],['Check Center','A9'],['Backup / Restore','A9'],['Diagnostics','A9'],['Admin Sync','A9'],
   ] as const;
-  return <section className="mfp-more-workspace" data-more-tools-shell="A6"><header><div><small>店務工具</small><h1>More / Tools</h1></div></header><article className="mfp-today-summary"><h2>Today</h2><strong>{model.todaySummary?.orderCount??'—'} Orders</strong><b>{formatMoney(model.todaySummary?.recognizedAmountMinor)}</b><small>{model.todaySummary?'已連接今日正式數據':'今日數據未接駁'}</small></article><div className="mfp-tools-grid">{tools.map(([label,stage])=><button type="button" key={label} onClick={()=>onTool(label)}><b>{label}</b><small>{stage==='A5'?'使用現有 Money / Reporting':'未接駁'}</small></button>)}</div></section>;
+  return <section className="mfp-more-workspace" data-more-tools-shell="A6"><header><div><small>店務工具</small><h1>More / Tools</h1></div></header><article className="mfp-today-summary"><h2>Today</h2><strong>{model.todaySummary?.orderCount??'—'} Orders</strong><b>{formatMoney(model.todaySummary?.recognizedAmountMinor)}</b><small>{model.todaySummary?'已連接今日正式數據':'今日數據未接駁'}</small></article><div className="mfp-tools-grid">{tools.map(([label,stage])=><button type="button" key={label} onClick={()=>onTool(label)}><b>{label}</b><small>{stage==='A5'?'使用現有 Money / Reporting':stage==='A7'?'Print / Hardware':'未接駁'}</small></button>)}</div></section>;
 }
 
-export function MfpOrderOperationsWorkspace({surface,page,model,tenders,operationStatus,pendingDiningIntent=null,onOperation,onSplitCheckout,onTool,onReturnToOrdering=()=>{}}:{
+export function MfpOrderOperationsWorkspace({surface,page,model,tenders,operationStatus,pendingDiningIntent=null,onOperation,onSplitCheckout,onTool,onReturnToOrdering=()=>{},printSession}:{
   surface:MfpOrderingSurface;page:MfpOperationalPage;model:MfpOrderOperationsReadModel;tenders:readonly MfpTenderConfig[];
-  operationStatus?:string;pendingDiningIntent?:MfpNormalizedOrderingIntent|null;onOperation:(operation:MfpOrderOperation)=>void;onSplitCheckout:(part:MfpFormalOrderCheckoutPart)=>void;onTool:(tool:string)=>void;onReturnToOrdering?:()=>void;
+  operationStatus?:string;pendingDiningIntent?:MfpNormalizedOrderingIntent|null;onOperation:(operation:MfpOrderOperation)=>void;onSplitCheckout:(part:MfpFormalOrderCheckoutPart)=>void;onTool:(tool:string)=>void;onReturnToOrdering?:()=>void;printSession?:MfpPrintHardwareSession;
 }){
   const [splitOrder,setSplitOrder]=useState<MfpCanonicalOrder|null>(null);
   return <><section className="mfp-order-operations" data-order-operations-contract="SHARED_PAD_MOBILE">
-    {page==='ORDERS'?<OrdersWorkspace surface={surface} model={model} tenders={tenders} onOperation={onOperation} onSplit={setSplitOrder}/>:null}
-    {page==='DINING'?<DiningWorkspace surface={surface} model={model} pendingIntent={pendingDiningIntent} onOperation={onOperation} onSplit={setSplitOrder} onReturnToOrdering={onReturnToOrdering}/>:null}
+    {page==='ORDERS'?<OrdersWorkspace surface={surface} model={model} tenders={tenders} onOperation={onOperation} onSplit={setSplitOrder} printSession={printSession}/>:null}
+    {page==='DINING'?<DiningWorkspace surface={surface} model={model} pendingIntent={pendingDiningIntent} onOperation={onOperation} onSplit={setSplitOrder} onReturnToOrdering={onReturnToOrdering} printSession={printSession}/>:null}
     {page==='AVAILABILITY'?<AvailabilityWorkspace surface={surface} model={model} onOperation={onOperation}/>:null}
     {page==='MORE'?<MoreWorkspace model={model} onTool={onTool}/>:null}
     {operationStatus?<output className="mfp-operation-status" aria-live="polite">{operationStatus}</output>:null}

@@ -15,7 +15,6 @@ MoreFun POS
 - MFP Mobile
 
 SMM is cancelled as final product identity.
-Legacy SMM remains compatibility / UX donor only.
 
 ## Frozen authorities
 
@@ -28,8 +27,9 @@ Do NOT rebuild or duplicate:
 - Print Router / Durable PrintJob Authority
 - Admin canonical backend authority
 - P0 sync semantics
+- Runtime Availability / Capacity authority
 - Customer / Keeta external authority contracts
-- Runtime Availability / Capacity formal authority
+- Android Carrier native Print Gateway
 
 ## Stage status
 
@@ -39,52 +39,65 @@ A2 — SOURCE_VERIFIED
 A3 — SOURCE_VERIFIED
 A4 — SOURCE_VERIFIED / OWNER ACCEPTED
 A5 — SOURCE_VERIFIED / OWNER ACCEPTED
-A6 — CURRENT
-A7 — Print + Hardware + Recovery
+A6 — SOURCE_VERIFIED / OWNER ACCEPTED
+A7 — CURRENT
 A8 — Customer + Keeta + External
 A9 — Public + Diagnostics + Physical Acceptance + Cutover
 
-## A6 boundary
+## A7 authority boundary
 
-A6 may implement:
-- canonical order operation read models
-- formal order operation command adapters
-- Orders / Fulfillment UI
-- ETA
-- Dining operational UI/orchestration
-- sold-out/restore UI
-- Capacity Pool UI
-- channel thresholds
-- bounded override
-- More/Tools shell
+A7 may implement:
+- canonical PrintJob projection/readback
+- injected gateway binding seam
+- local printer binding UI
+- printer health/test UI
+- formal reprint intent UI
+- Dining print/reprint UI
+- cancel-notice print binding
+- cash drawer execution boundary
+- print failure attention
+- source-level restart/recovery semantics
 
-A6 may NOT:
-- allocate a second formal Order
-- create client-only canonical fulfillment
-- create a Dining-specific Order engine
-- create a Dining-specific Payment engine
-- create a new Availability/Capacity authority
-- create physical Print authority
-- bind external Customer/Keeta provider transport
+A7 may NOT:
+- author Product → Printer business routing
+- author formal Print Templates
+- create a browser PrintJob authority
+- create a second durable print queue
+- auto retry UNKNOWN physical outcomes
+- claim physical paper success from transport evidence
 
-## Same-order lock
+## Print uncertainty rule
 
-All formal operations:
-- fulfillment
-- correction
-- refund
-- cancel
-- dining assignment/transfer/addition
+`TRANSPORT EVIDENCE != PHYSICAL PAPER PROOF`
 
-must preserve canonical Order identity unless the formal authority explicitly defines a different record type such as linked refund/adjustment.
+`UNKNOWN / AMBIGUOUS_AFTER_SEND != FAILED_BEFORE_SEND`
+
+After uncertain physical dispatch:
+- no blind retry
+- preserve job/evidence
+- human explicit reprint if needed
+
+## Admin / local split
+
+Admin:
+- product routing
+- logical destination
+- template publish
+
+MFP local:
+- physical printer
+- IP/port
+- local binding
+- published template selection where allowed
+- hardware execution
 
 ## Current execution
 
 Branch:
-`feat/MFP-V3-A6-ORDER-OPERATIONS-2026-10-02`
+`feat/MFP-V3-A7-PRINT-HARDWARE-RECOVERY-2026-10-02`
 
 Parent exact SHA:
-`830fd2f033f2246c1a4f30da71a0a8f9160da751`
+`881afbd5fd463b4833e3b5980123fe33679bb260`
 
 Completion:
 SOURCE_VERIFIED
@@ -92,4 +105,4 @@ SOURCE_VERIFIED
 No merge / deploy / OTA / public cutover.
 
 MILESTONE:
-`MFP_V3_REBUILD_AUTHORITY_A6_CURRENT_2026_10_02`
+`MFP_V3_REBUILD_AUTHORITY_A7_CURRENT_2026_10_02`
