@@ -12,7 +12,6 @@ import {
   readSmtDeviceId,
   subscribeSmtAdminConfig,
   subscribeSmtCloudDoorbell,
-  isSmtCloudDoorbellConnected,
   readOwnerSellabilityCommands,
   ackOwnerSellabilityCommand,
 } from './admin-config-sync.ts';
@@ -486,7 +485,6 @@ export async function reconcileCustomerCloudBridge(){
 }
 
 let installed=false;
-let fallbackTimer:number|undefined;
 export function installCustomerCloudBridge(){
   if(installed||typeof window==='undefined')return;
   installed=true;
@@ -498,8 +496,5 @@ export function installCustomerCloudBridge(){
   window.addEventListener('online',reconcile);
   window.addEventListener('focus',reconcile);
   document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')reconcile();});
-  fallbackTimer=window.setInterval(()=>{
-    if(document.visibilityState==='visible'&&navigator.onLine&&!isSmtCloudDoorbellConnected())reconcile();
-  },30000);
   window.setTimeout(reconcile,0);
 }
