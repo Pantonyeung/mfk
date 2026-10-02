@@ -49,6 +49,7 @@ describe('MFP V3 authority foundation',()=>{
     expect(state).toContain("durableTransportMetadata:'DEXIE_BOUNDED_OUTBOX_ONLY'");
     expect(state).toContain("durableDeviceMetadata:'DEXIE_INSTALLATION_DEVICE_METADATA_ONLY'");
     expect(state).toContain("durableProjection:'DEXIE_ATOMIC_LKG_BUNDLE_ONLY'");
+    expect(state).toContain("durablePresentation:'LOCAL_STORAGE_DISPLAY_SETTINGS_ONLY'");
     expect(state).toContain("devices:'[storeId+deviceClass],&deviceId,&installationId,lastSeenAt,status'");
     expect(state).toContain("syncBundles:'&key,appliedSeq,appliedAt'");
     expect(state).toContain("mfpDb.syncBundles.put({...candidate,key:'active'})");
@@ -80,7 +81,7 @@ describe('MFP V3 authority foundation',()=>{
   it('mounts one shared Pad/Mobile security harness without client-manufactured sessions',()=>{
     const app=read('./App.tsx');
     const security=read('./security-port.ts');
-    expect(app).toContain('<MfpSecurityHarness security={mfpSecurityPort}/>');
+    expect(app).toContain('<MfpSecurityHarness security={mfpSecurityPort}');
     expect(security).toContain('input.authority.loginStaff');
     expect(security).toContain('createMfpSecuritySurfacePorts');
     expect(security).not.toMatch(/setActiveSession|manufactureSession/);

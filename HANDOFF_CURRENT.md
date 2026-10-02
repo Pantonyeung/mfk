@@ -8,92 +8,133 @@ MoreFun POS
 Short name:
 MFP
 
-Current program:
-MFP V3 A0–A9 REBUILD
-
-## Current lane
-
-Stage:
-A3 — Sync + Offline
+Current Stage:
+A4 — Ordering Surfaces
 
 Branch:
-`feat/MFP-V3-A3-SYNC-OFFLINE-2026-10-02`
+`feat/MFP-V3-A4-ORDERING-SURFACES-2026-10-02`
 
 Parent:
-#635 — MFP V3 A2｜Device + Staff Security｜2026-10-02
+#637 — MFP V3 A3｜Sync + Offline｜2026-10-02
 
 Parent exact SHA:
-`7d895e0eae3ba7678e4d23416b453912559887ad`
+`adc2cc64573d9d5f7b357a7955ff2b0edc1fd509`
 
-A2:
+A3 status:
 SOURCE_VERIFIED
 
-A2 production binding:
-BLOCKED, carried forward as a deployment/production-binding blocker only.
-
-Current Stage handoff:
-`docs/handoff/MFP_V3_A3_SYNC_OFFLINE_CODEX_HANDOFF_2026-10-02.md`
+Current handoff:
+`docs/handoff/MFP_V3_A4_ORDERING_SURFACES_CODEX_HANDOFF_2026-10-02.md`
 
 Controlling plan:
 `docs/plan/MFP_V3_SMM_Migration_Plan_2026-10-02.txt`
 
 ## Current objective
 
-Build one event-driven MFP sync/offline seam:
+Build formal MFP ordering surfaces:
 
-Doorbell / reconnect trigger
-→ single-flight HEAD comparison
-→ Delta or Checkpoint recovery
-→ verify/stage
-→ atomic apply
-→ AppliedSeq last
-→ ACK/readback
+A3 Active Projection
+→ shared MFP ordering selector/domain
+→ MFP Pad UI
+→ MFP Mobile UI
+→ same normalized cart intent
+
+Scope:
+- categories
+- products
+- options/modifiers
+- combo
+- cart draft
+- service mode
+- local published-fact price preview
+- read-only sellability
+- Pad + Mobile actual ordering UI
 
 ## First RED
 
-WebSocket open + initial doorbell + online/resume events arriving together must produce one bounded sync chain only.
+Same projection + same selections
+→ identical normalized cart intent on Pad and Mobile.
 
-## Required properties
+No:
+- second pricing authority
+- second order authority
+- second sync client
+- SMM-specific business state
 
-- zero periodic business polling
-- one canonical Store Port HeadSeq
-- per-installation AppliedSeq/readback allowed
-- Connected != Applied
-- Doorbell is invalidation only
-- checkpoint for recovery only
-- LKG survives offline/restart
-- partial apply never becomes active
-- Pad/Mobile share the same sync contract
-- no SMM HeadSeq/state/session dependency
-- A1 idempotency unchanged
-- A2 security not weakened
-
-## Non-goals
+## A4 non-goals
 
 Do not:
-- build final Ordering UI
-- deploy
+- formal Store Kernel checkout commit
+- payment/tender
+- display number allocation
+- fulfillment truth
+- print
+- refunds/cancel
+- external Customer/Keeta execution
+- production deploy
 - merge
-- request OTA
-- modify Builder
-- widen Customer/Keeta engines
-- rebuild Admin canonical authority
-- decommission SMM
+- OTA
 
-## Minimal UI
+A5 owns formal checkout/money.
 
-A3 may show:
-- connection state
-- HeadSeq / AppliedSeq
-- READY / BEHIND / RECOVERING / OFFLINE
-- LKG available
-- last apply
-- explicit test catch-up if useful
+## Integration
 
-## Completion
+A3:
+- read active projection only
+- no direct catalog fetch
+- no new WebSocket/polling
 
-Target:
+A2:
+- consume existing security gate/state
+
+A1:
+- cart remains draft; no formal order state
+
+## UI quality
+
+A4 is a real product UI stage.
+
+MFP Pad:
+- high-density order workspace
+
+MFP Mobile:
+- focused touch-first mobile workspace
+
+Both:
+- same shared domain contract
+- same normalized intent
+- same canonical material facts
+
+## Owner crosswalk closure
+
+Controlling crosswalk:
+`docs/plan/MFP_V3_OWNER_REQUIREMENTS_CROSSWALK_2026-10-02.md`
+
+Current implementation slice:
+`SOURCE_VERIFIED`
+
+A4 stage closure:
+`BLOCKED`
+
+Required before A5:
+- A4-C1 Display Settings
+- A4-C2 Navigation + More shell
+- A4-C3 major modal geometry
+- A4-C4 exact Cart semantics
+- A4-C5 Hold/Retrieve/Dining draft entry
+- A4-C6 exact Fast Lane
+- A4-C7 Owner UI acceptance baseline
+
+Current verified slice SHA:
+`5e4118c003bef84a5e0262d5ac925537c4686ff3`
+
+Do not advance to A5 until the above closure is SOURCE_VERIFIED.
+
+## Completion target
+
 SOURCE_VERIFIED
+
+Production blockers from A2/A3 remain separately BLOCKED until bound/deployed.
 
 Status language:
 - SOURCE_VERIFIED
@@ -103,4 +144,22 @@ Status language:
 - FAILED
 
 MILESTONE:
-`MFP_V3_A3_CURRENT_HANDOFF_2026_10_02`
+`MFP_V3_A4_CURRENT_HANDOFF_2026_10_02`
+
+
+## Owner FINAL carry-forward gate｜2026-10-02
+
+A4 architecture/domain/UI scope has a GREEN exact-head candidate, but Owner FINAL acceptance remains BLOCKED pending the explicit closure addendum.
+
+Read:
+`docs/plan/MFP_V3_OWNER_FINAL_CROSSWALK_2026-10-02.txt`
+
+Continue PR #639 only.
+Do not open A5 yet.
+
+Required closure:
+A4-OF-01..09 in:
+`docs/handoff/MFP_V3_A4_ORDERING_SURFACES_CODEX_HANDOFF_2026-10-02.md`
+
+Target after closure:
+`SOURCE_VERIFIED`

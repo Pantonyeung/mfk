@@ -4,7 +4,7 @@ import type {MfpSecurityPort} from './security-port.ts';
 
 function errorCode(error:unknown){return error instanceof Error?error.message:'MFP_SECURITY_ACTION_FAILED';}
 
-export function MfpSecurityHarness({security}:{security:MfpSecurityPort}){
+export function MfpSecurityHarness({security,onStateChange}:{security:MfpSecurityPort;onStateChange?:()=>void}){
   const [staffId,setStaffId]=useState('');
   const [proof,setProof]=useState('');
   const [feedback,setFeedback]=useState('');
@@ -12,14 +12,14 @@ export function MfpSecurityHarness({security}:{security:MfpSecurityPort}){
   const snapshot=security.getSnapshot();
   const deviceQuery=useQuery({
     queryKey:['mfp-security','device'],
-    queryFn:async()=>{await security.loadDevice();return security.refreshDeviceAuthorization();},
+    queryFn:async()=>{await security.loadDevice();const result=await security.refreshDeviceAuthorization();onStateChange?.();return result;},
     refetchInterval:false,
     refetchOnWindowFocus:false,
     retry:false,
   });
   const sessionQuery=useQuery({
     queryKey:['mfp-security','session',snapshot.session?.staffSessionRef??'none'],
-    queryFn:()=>security.refreshStaffSession(),
+    queryFn:async()=>{const result=await security.refreshStaffSession();onStateChange?.();return result;},
     enabled:Boolean(snapshot.session),
     refetchInterval:false,
     refetchOnWindowFocus:false,
@@ -37,12 +37,14 @@ export function MfpSecurityHarness({security}:{security:MfpSecurityPort}){
       const result=await security.loginStaff(staffId,submittedProof);
       setFeedback(result.state==='AUTHENTICATED'?'AUTHENTICATED':result.state);
     }catch(error){setFeedback(errorCode(error));}
+    onStateChange?.();
     render(value=>value+1);
   };
 
   const logout=async()=>{
     try{await security.logoutStaff();setFeedback('UNAUTHORIZED');}
     catch(error){setFeedback(errorCode(error));}
+    onStateChange?.();
     render(value=>value+1);
   };
 

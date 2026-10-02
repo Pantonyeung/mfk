@@ -71,6 +71,19 @@ export interface MfpSecurityPort{
   submitFormalCommand(command:UnboundCommand,requiredPermission:string):Promise<MfpStoreKernelResult>;
 }
 
+export function isMfpFrontlineSessionEligible(
+  snapshot:ReturnType<MfpSecurityPort['getSnapshot']>,
+  now=Date.now(),
+){
+  const {device,session,sessionState}=snapshot;
+  return device?.status==='AUTHORIZED'
+    &&sessionState==='AUTHENTICATED'
+    &&session?.state==='AUTHENTICATED'
+    &&session.deviceId===device.deviceId
+    &&session.storeId===device.storeId
+    &&Date.parse(session.expiresAt)>now;
+}
+
 function text(value:unknown,code:string,max=240){
   if(typeof value!=='string'||!value.trim()||value!==value.trim()||value.length>max)throw new Error(code);
   return value;
