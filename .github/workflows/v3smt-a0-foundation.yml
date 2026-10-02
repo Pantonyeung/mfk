@@ -1,4 +1,4 @@
-name: MFP V3 A7 Print Hardware Recovery
+name: MFP V3 A8 Customer Keeta External
 
 on:
   push:
@@ -11,6 +11,7 @@ on:
       - feat/MFP-V3-A5-CHECKOUT-MONEY-2026-10-02
       - feat/MFP-V3-A6-ORDER-OPERATIONS-2026-10-02
       - feat/MFP-V3-A7-PRINT-HARDWARE-RECOVERY-2026-10-02
+      - feat/MFP-V3-A8-CUSTOMER-KEETA-EXTERNAL-2026-10-02
     paths:
       - '.github/mfk-change-manifest.json'
       - 'v3smt/**'
@@ -23,6 +24,7 @@ on:
       - 'docs/handoff/MFP_V3_A5_CHECKOUT_MONEY_CODEX_HANDOFF_2026-10-02.md'
       - 'docs/handoff/MFP_V3_A6_ORDER_OPERATIONS_CODEX_HANDOFF_2026-10-02.md'
       - 'docs/handoff/MFP_V3_A7_PRINT_HARDWARE_RECOVERY_CODEX_HANDOFF_2026-10-02.md'
+      - 'docs/handoff/MFP_V3_A8_CUSTOMER_KEETA_EXTERNAL_CODEX_HANDOFF_2026-10-02.md'
       - '.github/workflows/v3smt-a0-foundation.yml'
   pull_request:
     paths:
@@ -37,6 +39,7 @@ on:
       - 'docs/handoff/MFP_V3_A5_CHECKOUT_MONEY_CODEX_HANDOFF_2026-10-02.md'
       - 'docs/handoff/MFP_V3_A6_ORDER_OPERATIONS_CODEX_HANDOFF_2026-10-02.md'
       - 'docs/handoff/MFP_V3_A7_PRINT_HARDWARE_RECOVERY_CODEX_HANDOFF_2026-10-02.md'
+      - 'docs/handoff/MFP_V3_A8_CUSTOMER_KEETA_EXTERNAL_CODEX_HANDOFF_2026-10-02.md'
       - '.github/workflows/v3smt-a0-foundation.yml'
 
 permissions:
@@ -63,7 +66,7 @@ jobs:
       - name: Build
         working-directory: v3smt
         run: npm run build
-      - name: Authority, security, sync, ordering, checkout, money, order operations and print hardware recovery guard
+      - name: Authority, security, sync, ordering, checkout, money, order operations, print and external guard
         shell: bash
         run: |
           set -euo pipefail
@@ -134,3 +137,21 @@ jobs:
           ! grep -RInE --include='print-hardware-*.ts' --include='print-hardware-*.tsx' --exclude='*.test.ts' --exclude='*.test.tsx' '\bfetch\s*\(|new[[:space:]]+WebSocket\s*\(|setInterval\s*\(|localStorage|sessionStorage' v3smt/src
           ! grep -RInE --include='print-hardware-*.ts' --include='print-hardware-*.tsx' --exclude='*.test.ts' --exclude='*.test.tsx' 'from .*(v2local|v2smm)|SMM_INTENT_STORE|SMM.{0,20}HeadSeq|x-mfk-smm-session|mfk-smm-web' v3smt/src
           ! grep -RInE --include='print-hardware-*.ts' --include='print-hardware-*.tsx' --exclude='*.test.ts' --exclude='*.test.tsx' 'class[[:space:]]+[A-Za-z0-9_]*(Print|Order|Payment|Pricing)(Engine|Authority)' v3smt/src
+          grep -RInF "externalIntent:'SERVER_PROVIDER_ADAPTER_CANONICAL_READBACK'" v3smt/src/state-authority.ts
+          grep -RInF "externalFormalAdmission:'STORE_KERNEL'" v3smt/src/state-authority.ts
+          grep -RInF "externalPaymentEvidence:'EVIDENCE_ONLY_NOT_PAYMENT_TRUTH'" v3smt/src/state-authority.ts
+          grep -RInF "externalProviderCredentials:'SERVER_PROVIDER_ADAPTER_ONLY'" v3smt/src/state-authority.ts
+          grep -RInF "externalCoordinator:'EVENT_DRIVEN_SINGLE_FLIGHT'" v3smt/src/state-authority.ts
+          grep -RInF 'createMfpExternalAdmissionSession' v3smt/src/external-domain.ts
+          grep -RInF 'createMfpExternalCoordinator' v3smt/src/external-domain.ts
+          grep -RInF 'submitFrontlineFormalCommand' v3smt/src/external-domain.ts
+          grep -RInF 'authority.readOrder(result.orderRef)' v3smt/src/external-domain.ts
+          grep -RInF 'for(let pass=0;pass<2;pass++)' v3smt/src/external-domain.ts
+          grep -RInF 'QRCode.toDataURL' v3smt/src/external-runtime.tsx
+          grep -RInF 'data-external-surface={surface}' v3smt/src/external-runtime.tsx
+          grep -RInF '<MfpExternalRuntime' v3smt/src/order-operations-runtime.tsx
+          if grep -RInE --include='external-*.ts' --include='external-*.tsx' --exclude='*.test.ts' --exclude='*.test.tsx' '\bfetch\s*\(|setInterval\s*\(|visibilitychange|addEventListener\([^)]*focus|localStorage|sessionStorage' v3smt/src; then exit 1; fi
+          if grep -RInE --include='external-*.ts' --include='external-*.tsx' --exclude='*.test.ts' --exclude='*.test.tsx' 'from .*(v2local|v2smm)|SMM_INTENT_STORE|SMM.{0,20}HeadSeq|x-mfk-smm-session|mfk-smm-web' v3smt/src; then exit 1; fi
+          if grep -RInE --include='external-*.ts' --include='external-*.tsx' --exclude='*.test.ts' --exclude='*.test.tsx' 'class[[:space:]]+[A-Za-z0-9_]*(Order|Payment|Refund|Print|Capacity)(Engine|Authority)' v3smt/src; then exit 1; fi
+          if grep -RInE --include='external-*.ts' --include='external-*.tsx' --exclude='*.test.ts' --exclude='*.test.tsx' '(appSecret|signingKey|webhookSecret|longLivedBearer|providerBearer|Authorization:)' v3smt/src; then exit 1; fi
+          if grep -RInE --include='external-*.ts' --include='external-*.tsx' --exclude='*.test.ts' --exclude='*.test.tsx' '(URLSearchParams|searchParams|console\.(log|info|warn|error)).*(secret|credential|bearer|token)' v3smt/src; then exit 1; fi

@@ -24,6 +24,7 @@ import type {MfpSyncCoordinator,MfpSyncProjectionStore} from './sync-port.ts';
 import type {MfpTenderConfig} from './checkout-domain.ts';
 import {createMfpPrintHardwareSession,type MfpPrintHardwareBinding,type MfpPrintHardwareSession} from './print-hardware-domain.ts';
 import {MfpPrintHardwareRuntime,mfpPrintHardwareRuntimeBinding} from './print-hardware-runtime.tsx';
+import {MfpExternalRuntime,mfpExternalRuntimeBinding,type MfpExternalProviderBinding} from './external-runtime.tsx';
 
 type OperationsBinding=Readonly<{
   authority:MfpOrderOperationsReadPort&Required<Pick<MfpOrderOperationsReadPort,'readOperations'>>;
@@ -105,7 +106,7 @@ function MfpOrderOperationsRuntime({surface,page,security,binding,pendingDiningI
   return <MfpOrderOperationsWorkspace surface={surface} page={page} model={readback.data} tenders={binding.tenders} operationStatus={operationStatus} pendingDiningIntent={pendingDiningIntent} onOperation={operation=>void submit(operation)} onSplitCheckout={part=>void split(part)} onTool={tool=>{if(tool==='Print Devices')onOpenPrintHardware();else setOperationStatus(tool==='Day Close'||tool==='Reports'?'BLOCKED · 需要現有 A5 Money / Reporting runtime binding':'BLOCKED · 此工具會由後續 Stage 接駁');}} onReturnToOrdering={onReturnToOrdering} printSession={printSession}/>;
 }
 
-export function MfpApplicationRuntime({surface,security,sync,projectionStore,checkout,operations=mfpOrderOperationsRuntimeBinding,print=mfpPrintHardwareRuntimeBinding}:{
+export function MfpApplicationRuntime({surface,security,sync,projectionStore,checkout,operations=mfpOrderOperationsRuntimeBinding,print=mfpPrintHardwareRuntimeBinding,external=mfpExternalRuntimeBinding}:{
   surface:MfpOrderingSurface;
   security:MfpSecurityPort;
   sync:MfpSyncCoordinator;
@@ -113,12 +114,14 @@ export function MfpApplicationRuntime({surface,security,sync,projectionStore,che
   checkout:MfpCheckoutRuntimeBinding;
   operations?:OperationsBinding;
   print?:MfpPrintHardwareBinding;
+  external?:MfpExternalProviderBinding;
 }){
   const [page,setPage]=useState<MfpAppPage>('ORDERING');
   const [pendingDiningIntent,setPendingDiningIntent]=useState<MfpNormalizedOrderingIntent|null>(null);
   const printSession=useRef<MfpPrintHardwareSession|null>(null);
   if(!printSession.current)printSession.current=createMfpPrintHardwareSession(print);
   return <div className="mfp-application-runtime">
+    <MfpExternalRuntime surface={surface} security={security} authority={operations.authority} binding={external}/>
     <MfpOperationsNavigation surface={surface} active={page} onNavigate={setPage}/>
     <div className="mfp-application-workspace">
       <div hidden={page!=='ORDERING'}><MfpOrderingRuntime surface={surface} security={security} sync={sync} projectionStore={projectionStore} checkout={checkout} onDiningIntent={intent=>{setPendingDiningIntent(intent);setPage('DINING');}}/></div>
