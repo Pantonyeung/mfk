@@ -16,7 +16,7 @@ Authority remains `STORE_KERNEL_FORMAL_BUSINESS_AUTHORITY`. Admin remains the so
 
 ## Stage 0 — Atomic native read set — complete
 
-Commit `8c52b155fb75edd39e4018853ca3c4144682e179` adds native-only aggregate revision dependencies checked in the same Room transaction before writes, while preserving receipt-first replay. Real Room regression: 32/32.
+Commit `8c52b155fb75edd39e4018853ca3c4144682e179` adds native-only aggregate revision dependencies checked in the same Room transaction before writes, while preserving receipt-first replay. The subsequent router recovery slice adds receipt readback after commit exceptions and safely classifies only proven pre-write revision conflicts. Current scoped regression: 34/34.
 
 ## Stage 1 — Canonical Admin configuration producer
 
@@ -59,9 +59,9 @@ Required money behavior:
 - parse decimal Admin prices to integer HKD minor units with exact decimal rules; reject rounding ambiguity, overflow, negatives, missing price facts, unsellable or incomplete selections;
 - calculate unit and line totals with checked integer arithmetic;
 - Student Discount is 50% of the highest eligible single unit; stable cart-line order breaks equal-price ties;
-- tender is eligible only when present and enabled in `storeSettings.customerPaymentChannels` at confirmation;
+- tender is eligible only when present and enabled in the explicitly bound canonical POS tender publication at confirmation; `storeSettings.customerPaymentChannels` alone is Customer electronic-channel configuration and cannot be promoted to all-POS eligibility or settlement proof;
 - cash received/change are integer minor units; received must cover formal total; non-cash cannot inject cash change;
-- active Business Day comes from a canonical native record tied to Admin cutoff/config and must be OPEN at confirmation.
+- the active Business Day is a canonical transaction classification derived from the accepted cutoff/timezone publication. No OPEN-only trading gate is added unless the controlling Owner contract explicitly requires one.
 
 Canonical eligibility for Student Discount is still absent from the Admin publication contract. Until the Owner selects the field/publication rule, any Student Discount request fails closed with a stable rejection; non-student checkout work can continue.
 

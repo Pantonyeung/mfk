@@ -50,11 +50,13 @@ gradle.bat -p carrier/android testDebugUnitTest -x verifySmtWebBundle --tests co
 Result:
 
 - `FormalBusinessCommandContractTest`: 5 passed
-- `FormalBusinessCommandRouterTest`: 8 passed
+- `FormalBusinessCommandRouterTest`: 10 passed
 - `StoreKernelFormalReceiptTest`: 19 passed
-- Total: 32 passed, 0 failures, 0 errors
+- Total: 34 passed, 0 failures, 0 errors
 
 The persistence tests use Room, including failure injection after receipt write with full transaction rollback, serialized dependency-advance race, lost-reply receipt readback/replay, and close/reopen of a file-backed Room database. They are not FakeGateway-only tests.
+
+The router also performs receipt-first recovery after a commit exception. A lost reply that already has a durable receipt returns the canonical result. Only whitelisted pre-write revision conflicts with no receipt are converted to a durable rejection; all other failures remain `UNKNOWN` and require readback.
 
 `verifySmtWebBundle` was excluded because this isolated worktree does not contain a built `v2local/dist/index.html`. This exclusion is not evidence that Carrier packaging is valid; it exposes the separate packaged-baseline issue recorded below.
 
@@ -112,6 +114,8 @@ No live endpoint is changed by this branch.
 
 - Device admission needs an MFK-native enrollment/authorization record. Admin ACK membership is only config-delivery evidence and is not authorization.
 - Staff authentication can consume the canonical `MFK_STAFF_AUTH_V1` verifier projection, but the native session issuance/revocation contract and maximum 12-hour expiry must be implemented and tested without exposing PINs to persistence or logs.
+- `storeSettings.customerPaymentChannels` is a Customer electronic-channel configuration. It is not, by itself, proof of all-POS tender eligibility or settlement. The formal POS tender publication field/source must be bound explicitly and otherwise fails closed.
+- Admin `businessDay.cutoff` classifies the business date for reporting/history. Current accepted behavior does not establish an old-V2-style OPEN-only trading gate; no such gate may be invented.
 - The canonical source of `studentDiscountEligible` is not present in the published Admin contract. This is a money-policy/data decision; checkout must fail closed for Student Discount until the Owner selects a canonical eligibility field or publication rule.
 - No physical printer/device or live financial acceptance was run. Physical acceptance remains a separate gate.
 

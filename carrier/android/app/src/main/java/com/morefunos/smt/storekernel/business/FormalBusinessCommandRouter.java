@@ -154,17 +154,60 @@ public final class FormalBusinessCommandRouter {
                     if (!validCommitIdentity(command, outcome.commitRequest)) {
                         return reject(command, "FORMAL_STORE_KERNEL_COMMIT_IDENTITY_INVALID");
                     }
-                    return gateway.commit(command, outcome.commitRequest).thenApply(result -> {
-                        final FormalBusinessCommandContract.Result canonical = canonical(result, command.submissionId);
-                        return "COMMITTED".equals(canonical.state)
-                            ? canonical
-                            : FormalBusinessCommandContract.Result.unknown(command.submissionId);
-                    });
+                    return commitWithRecovery(command, outcome.commitRequest);
                 });
             });
         }).handle((result, error) -> error == null
             ? result
             : FormalBusinessCommandContract.Result.unknown(command.submissionId));
+    }
+
+    private CompletableFuture<FormalBusinessCommandContract.Result> commitWithRecovery(
+        FormalBusinessCommandContract.CommandEnvelope command,
+        StoreKernelContract.CommitRequest request
+    ) {
+        return gateway.commit(command, request).thenApply(result -> {
+            final FormalBusinessCommandContract.Result canonical = canonical(result, command.submissionId);
+            return "COMMITTED".equals(canonical.state)
+                ? canonical
+                : FormalBusinessCommandContract.Result.unknown(command.submissionId);
+        }).handle((result, error) -> error == null
+                ? CompletableFuture.completedFuture(result)
+                : recoverCommit(command, error)
+            )
+            .thenCompose(future -> future);
+    }
+
+    private CompletableFuture<FormalBusinessCommandContract.Result> recoverCommit(
+        FormalBusinessCommandContract.CommandEnvelope command,
+        Throwable commitError
+    ) {
+        return gateway.read(command.storeId, command.submissionId).thenCompose(stored -> {
+            if (stored != null) {
+                if (!command.requestFingerprint.equals(stored.requestFingerprint)) {
+                    return CompletableFuture.completedFuture(FormalBusinessCommandContract.Result.rejected(
+                        command.submissionId,
+                        "FORMAL_SUBMISSION_FINGERPRINT_CONFLICT"
+                    ));
+                }
+                return CompletableFuture.completedFuture(canonical(stored, command.submissionId));
+            }
+            final String rejectionCode = safePrewriteConflict(commitError);
+            return rejectionCode == null
+                ? CompletableFuture.completedFuture(FormalBusinessCommandContract.Result.unknown(command.submissionId))
+                : reject(command, rejectionCode);
+        });
+    }
+
+    private static String safePrewriteConflict(Throwable error) {
+        Throwable current = error;
+        while (current instanceof java.util.concurrent.CompletionException && current.getCause() != null) {
+            current = current.getCause();
+        }
+        final String code = current.getMessage();
+        if ("STORE_KERNEL_READ_DEPENDENCY_REVISION_CONFLICT".equals(code)
+            || "STORE_KERNEL_AGGREGATE_REVISION_CONFLICT".equals(code)) return code;
+        return null;
     }
 
     private CompletableFuture<FormalBusinessCommandContract.Result> reject(

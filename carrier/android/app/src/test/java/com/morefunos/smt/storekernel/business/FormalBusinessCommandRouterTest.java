@@ -123,6 +123,49 @@ public final class FormalBusinessCommandRouterTest {
     }
 
     @Test
+    public void lostCommitReplyReadsBackDurableReceiptBeforeReturningUnknown() throws Exception {
+        final FakeGateway gateway = new FakeGateway();
+        gateway.persistThenFailCommit = true;
+        final FormalBusinessCommandRouter router = new FormalBusinessCommandRouter(
+            gateway,
+            allowedSecurity(),
+            Map.of("CHECKOUT_PAYMENT_CONFIRM", value -> CompletableFuture.completedFuture(
+                FormalBusinessCommandRouter.Outcome.commit(commitRequest(value))
+            ))
+        );
+
+        final FormalBusinessCommandContract.Result result = await(router.submit(command()));
+
+        assertEquals("COMMITTED", result.state);
+        assertEquals("ORDER-1", result.orderRef);
+        assertEquals(1, gateway.commitCount.get());
+        assertEquals(0, gateway.recordRejectedCount.get());
+    }
+
+    @Test
+    public void knownPrewriteConflictWithoutReceiptBecomesDurableRejection() throws Exception {
+        final FakeGateway gateway = new FakeGateway();
+        gateway.failCommit = true;
+        gateway.failCommitCode = "STORE_KERNEL_READ_DEPENDENCY_REVISION_CONFLICT";
+        final FormalBusinessCommandRouter router = new FormalBusinessCommandRouter(
+            gateway,
+            allowedSecurity(),
+            Map.of("CHECKOUT_PAYMENT_CONFIRM", value -> CompletableFuture.completedFuture(
+                FormalBusinessCommandRouter.Outcome.commit(commitRequest(value))
+            ))
+        );
+
+        final FormalBusinessCommandContract.Result first = await(router.submit(command()));
+        final FormalBusinessCommandContract.Result replay = await(router.submit(command()));
+
+        assertEquals("REJECTED", first.state);
+        assertEquals("STORE_KERNEL_READ_DEPENDENCY_REVISION_CONFLICT", first.rejectionCode);
+        assertEquals(first.toStoredJson(), replay.toStoredJson());
+        assertEquals(1, gateway.commitCount.get());
+        assertEquals(1, gateway.recordRejectedCount.get());
+    }
+
+    @Test
     public void committedRequiresReceiptEvidence() throws Exception {
         final FakeGateway gateway = new FakeGateway();
         gateway.receiptPresent = false;
@@ -247,8 +290,11 @@ public final class FormalBusinessCommandRouterTest {
     private static final class FakeGateway implements FormalBusinessCommandRouter.Gateway {
         final Map<String, FormalBusinessCommandRouter.StoredResult> results = new HashMap<>();
         final AtomicInteger commitCount = new AtomicInteger();
+        final AtomicInteger recordRejectedCount = new AtomicInteger();
         final List<String> trace = new ArrayList<>();
         boolean failCommit;
+        boolean persistThenFailCommit;
+        String failCommitCode = "TIMEOUT";
         boolean receiptPresent = true;
 
         @Override
@@ -262,6 +308,7 @@ public final class FormalBusinessCommandRouterTest {
             FormalBusinessCommandContract.CommandEnvelope command,
             FormalBusinessCommandContract.Result result
         ) {
+            recordRejectedCount.incrementAndGet();
             final FormalBusinessCommandRouter.StoredResult stored = new FormalBusinessCommandRouter.StoredResult(
                 command.requestFingerprint,
                 result,
@@ -278,7 +325,7 @@ public final class FormalBusinessCommandRouterTest {
         ) {
             trace.add("commit");
             commitCount.incrementAndGet();
-            if (failCommit) return CompletableFuture.failedFuture(new IllegalStateException("TIMEOUT"));
+            if (failCommit) return CompletableFuture.failedFuture(new IllegalStateException(failCommitCode));
             try {
                 final FormalBusinessCommandContract.Result result = FormalBusinessCommandContract.Result.fromStoredJson(request.resultJson);
                 final FormalBusinessCommandRouter.StoredResult stored = new FormalBusinessCommandRouter.StoredResult(
@@ -287,6 +334,9 @@ public final class FormalBusinessCommandRouterTest {
                     receiptPresent
                 );
                 if (receiptPresent) results.put(command.storeId + "\u0000" + command.submissionId, stored);
+                if (persistThenFailCommit) {
+                    return CompletableFuture.failedFuture(new IllegalStateException("TRANSPORT_REPLY_LOST"));
+                }
                 return CompletableFuture.completedFuture(stored);
             } catch (Exception error) {
                 return CompletableFuture.failedFuture(error);
