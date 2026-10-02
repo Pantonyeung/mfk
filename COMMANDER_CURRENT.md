@@ -7,13 +7,11 @@ External Product: MoreFun POS
 Short Name: MFP
 Repository: Pantonyeung/mfk
 
-## 0. Owner supersession lock
+## 0. Supersession lock
 
 For the MoreFun POS V3 A0–A9 rebuild program, the declared MFP Stage branch/PR supersedes PR #627 / Unified Surfaces R1 as CURRENT EXECUTION CONTROL.
 
 PR #627 remains legacy v2 rollback / security-critical containment / production-blocker emergency evidence only.
-
-For the current Stage, branch-local current Commander/Handoff plus the Owner-directed MFP plan control execution until governance landing completes.
 
 ## 1. Mandatory read order
 
@@ -25,9 +23,9 @@ For the current Stage, branch-local current Commander/Handoff plus the Owner-dir
 6. current Stage handoff
 7. current Stage PR
 8. parent Stage PR / exact parent SHA
-9. live repository evidence
+9. verified repository evidence
 
-Conflict with verified source/runtime evidence:
+If current control conflicts with verified source/runtime evidence:
 `GOVERNANCE_DRIFT`
 
 ## 2. Product structure
@@ -38,107 +36,118 @@ MFP
 
 SMM:
 - cancelled as final product identity
-- compatibility/UX donor only
-- no new authority/state/head/session engine
+- legacy compatibility / UX donor only
+- no new authority/state/head/session/order engine
 
 SMT:
-- internal legacy Store Kernel / sync port identifier may remain temporarily
-- not the user-facing target product name
+- may remain as internal legacy Store Kernel / sync port identifier
+- not the external product name
 
 ## 3. Current Stage
 
 Current Stage:
-A3 — Sync + Offline
+A4 — Ordering Surfaces
 
 Execution branch:
-`feat/MFP-V3-A3-SYNC-OFFLINE-2026-10-02`
+`feat/MFP-V3-A4-ORDERING-SURFACES-2026-10-02`
 
-Current Stage handoff:
-`docs/handoff/MFP_V3_A3_SYNC_OFFLINE_CODEX_HANDOFF_2026-10-02.md`
+Current handoff:
+`docs/handoff/MFP_V3_A4_ORDERING_SURFACES_CODEX_HANDOFF_2026-10-02.md`
 
 Parent:
-#635 — MFP V3 A2｜Device + Staff Security｜2026-10-02
+#637 — MFP V3 A3｜Sync + Offline｜2026-10-02
 
 Parent exact SHA:
-`7d895e0eae3ba7678e4d23416b453912559887ad`
+`adc2cc64573d9d5f7b357a7955ff2b0edc1fd509`
 
-A2 source status:
+A3:
 `SOURCE_VERIFIED`
 
-A2 production binding:
-`BLOCKED`
-Formal production device/staff authority + Store Kernel admission binding remain unavailable.
-This blocks production binding/deploy, not A3 source implementation.
+Carried production blockers:
+- A2 production Device/Staff authority binding = BLOCKED
+- A3 production sync binding/physical offline acceptance = BLOCKED
+
+These block deployment, not A4 source implementation.
 
 ## 4. Stage model
 
 A0 — Foundation — SOURCE_VERIFIED
 A1 — Store Kernel Seam — SOURCE_VERIFIED
 A2 — Device + Staff Security — SOURCE_VERIFIED
-A3 — Sync + Offline — CURRENT
-A4 — Ordering Surfaces
+A3 — Sync + Offline — SOURCE_VERIFIED
+A4 — Ordering Surfaces — CURRENT
 A5 — Checkout + Money
 A6 — Order Operations
 A7 — Print + Hardware + Recovery
 A8 — Customer + Keeta + External
 A9 — Public + Diagnostics + Physical Acceptance + Cutover
 
-## 5. A3 authority lock
+## 5. A4 product lock
 
-A3 implements one shared event-driven sync client for MFP Pad + MFP Mobile.
+A4 is the first formal MFP product-UI stage.
 
-Preserve:
-- Admin canonical configuration authority
-- Store Kernel formal transaction authority
-- P0 HeadSeq / AppliedSeq / Delta / Checkpoint semantics
+Implement:
+- MFP Pad ordering UI
+- MFP Mobile ordering UI
+- one shared ordering domain contract
+- one shared normalized cart intent
+- categories/products/options/combo/cart/service mode
+- local price preview from published material facts
+- read-only sellability display
+- A3 active projection consumption
 
 Hard rules:
-- Connected != Applied
-- Doorbell != Truth
-- AppliedSeq advances only after atomic local apply succeeds
-- idle = 0 periodic business polling
-- missed doorbell recovered by reconnect HEAD catch-up
-- checkpoint is recovery object, not routine delivery
-- MFP Pad/Mobile do not create separate canonical heads
+- no second Pricing Authority
+- no second Order Authority
+- no second Sync Authority
+- no formal order commit
+- no payment/tender
+- no print/fulfillment truth
+- no SMM mobile engine
+- no direct catalog polling/fetch in UI
 
 ## 6. First RED
 
-Reconnect must coalesce concurrent:
-- WebSocket open
-- initial doorbell
-- online transition
-- resume/foreground trigger if retained
+Same active canonical projection + same user selections must produce the same normalized cart intent on MFP Pad and MFP Mobile.
 
-into exactly one bounded single-flight catch-up chain for the current observed head.
+Must prove:
+- same product identity
+- same service mode
+- same options
+- same combo choices
+- same quantity
+- same material facts
+- no surface-specific pricing/order authority
 
-No duplicate parallel HEAD/delta/checkpoint pulls.
-No periodic polling.
-No infinite trailing re-request loop.
+## 7. A4 integration locks
 
-## 7. Frozen authorities
+A3:
+- ordering reads active LKG/projection
+- no new WebSocket
+- no new sync coordinator
+- no periodic business polling
 
-Do not rebuild or duplicate:
-- Store Kernel
-- Order
-- Pricing
-- Payment/Tender
-- Fulfillment
-- Print
-- Admin canonical backend
-- Customer/Keeta engines
-- Staff/Device authority from A2
+A2:
+- use existing security state/gate
+- do not reimplement login
+
+A1:
+- no formal Store Kernel submit from ordering draft
+- A5 owns formal checkout integration
 
 ## 8. UI strategy
 
-A3 may add only minimal sync/offline verification UI:
-- connection state
-- HeadSeq
-- AppliedSeq
-- READY/BEHIND/RECOVERING/OFFLINE
-- LKG status
-- last apply time
+A4 must build real functional product UI, not only a harness.
 
-Final product UI begins at A4.
+Pad:
+- high-density, fast ordering workspace
+
+Mobile:
+- true touch-first mobile interaction
+- not scaled-down Pad
+
+Different presentation is allowed.
+Different business semantics are not.
 
 ## 9. Change-control mode
 
@@ -146,11 +155,11 @@ Current mode:
 PREPARE
 
 Authorized:
-- bounded A3 source
+- bounded A4 source
+- real ordering UI
 - tests
 - CI
 - Draft PR updates
-- source evidence
 
 Not authorized:
 - merge
@@ -158,9 +167,9 @@ Not authorized:
 - OTA
 - public cutover
 - SMM decommission
-- production backend widening without explicit new authority
+- backend authority widening
 
-A3 completion target:
+Completion target:
 `SOURCE_VERIFIED`
 
 ## 10. Status language
@@ -173,4 +182,4 @@ Only:
 - FAILED
 
 MILESTONE:
-`MFP_V3_A3_CURRENT_EXECUTION_CONTROL_2026_10_02`
+`MFP_V3_A4_CURRENT_EXECUTION_CONTROL_2026_10_02`
