@@ -137,6 +137,7 @@ export interface MfpOrderingDraftLine{
   readonly productId:string|null;
   readonly comboId:string|null;
   readonly displayName:string;
+  readonly note:string;
   readonly quantity:number;
   readonly serviceMode:MfpServiceMode;
   readonly optionSelections:readonly MfpOptionSelection[];
@@ -158,6 +159,7 @@ export interface MfpProductSelectionInput{
   readonly cartLineId:string;
   readonly productId:string;
   readonly quantity:number;
+  readonly note?:string;
   readonly optionSelections?:Readonly<Record<string,readonly string[]>>;
 }
 
@@ -165,6 +167,7 @@ export interface MfpComboSelectionInput{
   readonly cartLineId:string;
   readonly comboId:string;
   readonly quantity:number;
+  readonly note?:string;
   readonly comboSelections?:Readonly<Record<string,readonly Readonly<{subPoolId:string;choiceId:string}>[]>>;
 }
 
@@ -189,6 +192,7 @@ export interface MfpOrderingDomain{
   setQuantity(draft:MfpOrderingDraft,cartLineId:string,quantity:number):MfpOrderingDraft;
   removeLine(draft:MfpOrderingDraft,cartLineId:string):MfpOrderingDraft;
   setServiceMode(draft:MfpOrderingDraft,serviceMode:MfpServiceMode):MfpOrderingDraft;
+  setLineServiceMode(draft:MfpOrderingDraft,cartLineId:string,serviceMode:MfpServiceMode):MfpOrderingDraft;
   reconcile(draft:MfpOrderingDraft,nextCatalog:MfpOrderingCatalog):MfpOrderingDraft;
   normalize(draft:MfpOrderingDraft):MfpNormalizedOrderingIntent;
 }
@@ -196,6 +200,12 @@ export interface MfpOrderingDomain{
 function validQuantity(value:number){
   if(!Number.isSafeInteger(value)||value<1||value>999)throw new Error('MFP_ORDERING_QUANTITY_INVALID');
   return value;
+}
+
+function validNote(value:string|undefined){
+  if(value===undefined)return '';
+  if(typeof value!=='string'||value.length>200)throw new Error('MFP_ORDERING_NOTE_INVALID');
+  return value.trim();
 }
 
 function materialFact(role:MfpMaterialPriceFact['role'],sourceId:string,fact:MfpPublishedMoneyFact):MfpMaterialPriceFact{
@@ -247,7 +257,7 @@ function productLine(
 
   return Object.freeze({
     cartLineId:input.cartLineId,kind:'PRODUCT',productId:product.productId,comboId:null,
-    displayName:product.name,quantity:input.quantity,serviceMode,
+    displayName:product.name,note:validNote(input.note),quantity:input.quantity,serviceMode,
     optionSelections:Object.freeze(selections),comboSelections:Object.freeze([]),
     materialPriceFacts:Object.freeze(facts),
     previewUnitMinor:facts.reduce((sum,fact)=>sum+fact.amountMinor,0),
@@ -313,7 +323,7 @@ function comboLine(
 
   return Object.freeze({
     cartLineId:input.cartLineId,kind:'COMBO',productId:null,comboId:combo.id,
-    displayName:combo.name,quantity:input.quantity,serviceMode,
+    displayName:combo.name,note:validNote(input.note),quantity:input.quantity,serviceMode,
     optionSelections:Object.freeze([]),comboSelections:Object.freeze(selections),
     materialPriceFacts:Object.freeze(facts),
     previewUnitMinor:facts.reduce((sum,fact)=>sum+fact.amountMinor,0),
@@ -343,10 +353,12 @@ function rebuildLine(catalog:MfpOrderingCatalog,line:MfpOrderingDraftLine){
   return line.kind==='PRODUCT'
     ?productLine(catalog,line.serviceMode,{
       cartLineId:line.cartLineId,productId:line.productId!,quantity:line.quantity,
+      note:line.note,
       optionSelections:selectedOptions(line),
     },true)
     :comboLine(catalog,line.serviceMode,{
       cartLineId:line.cartLineId,comboId:line.comboId!,quantity:line.quantity,
+      note:line.note,
       comboSelections:selectedComboChoices(line),
     },true);
 }
@@ -354,6 +366,7 @@ function rebuildLine(catalog:MfpOrderingCatalog,line:MfpOrderingDraftLine){
 function materialSignature(line:MfpOrderingDraftLine){
   return JSON.stringify({
     kind:line.kind,productId:line.productId,comboId:line.comboId,
+    note:line.note,serviceMode:line.serviceMode,
     optionSelections:line.optionSelections,comboSelections:line.comboSelections,
     materialPriceFacts:line.materialPriceFacts,
   });
@@ -400,6 +413,18 @@ export function createMfpOrderingDomain(catalog:MfpOrderingCatalog):MfpOrderingD
         });}
       });
       return Object.freeze({draftOnly:true,serviceMode,lines:Object.freeze(lines)});
+    },
+    setLineServiceMode(draft,cartLineId,serviceMode){
+      if(!draft.lines.some(line=>line.cartLineId===cartLineId))throw new Error('MFP_ORDERING_CART_LINE_NOT_FOUND');
+      const lines=draft.lines.map(line=>{
+        if(line.cartLineId!==cartLineId)return line;
+        try{return rebuildLine(catalog,Object.freeze({...line,serviceMode}));}
+        catch{return Object.freeze({
+          ...line,serviceMode,state:'REVALIDATION_REQUIRED' as const,
+          issues:Object.freeze([...new Set([...line.issues,'MFP_ORDERING_PROJECTION_CHANGED'])]),
+        });}
+      });
+      return Object.freeze({...draft,lines:Object.freeze(lines)});
     },
     reconcile(draft,nextCatalog){
       const lines=draft.lines.map(line=>{

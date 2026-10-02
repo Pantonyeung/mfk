@@ -12,6 +12,7 @@ export const MFP_STATE_AUTHORITY=Object.freeze({
   durableTransportMetadata:'DEXIE_BOUNDED_OUTBOX_ONLY',
   durableDeviceMetadata:'DEXIE_INSTALLATION_DEVICE_METADATA_ONLY',
   durableProjection:'DEXIE_ATOMIC_LKG_BUNDLE_ONLY',
+  durablePresentation:'LOCAL_STORAGE_DISPLAY_SETTINGS_ONLY',
   localUi:'ZUSTAND_UI_ONLY',
   periodicBusinessPolling:false,
   periodicAuthPolling:false,

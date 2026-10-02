@@ -49,6 +49,7 @@ describe('MFP V3 authority foundation',()=>{
     expect(state).toContain("durableTransportMetadata:'DEXIE_BOUNDED_OUTBOX_ONLY'");
     expect(state).toContain("durableDeviceMetadata:'DEXIE_INSTALLATION_DEVICE_METADATA_ONLY'");
     expect(state).toContain("durableProjection:'DEXIE_ATOMIC_LKG_BUNDLE_ONLY'");
+    expect(state).toContain("durablePresentation:'LOCAL_STORAGE_DISPLAY_SETTINGS_ONLY'");
     expect(state).toContain("devices:'[storeId+deviceClass],&deviceId,&installationId,lastSeenAt,status'");
     expect(state).toContain("syncBundles:'&key,appliedSeq,appliedAt'");
     expect(state).toContain("mfpDb.syncBundles.put({...candidate,key:'active'})");
