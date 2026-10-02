@@ -1,7 +1,6 @@
 # MFP COMMANDER CURRENT｜MANDATORY ENTRY POINT
 
 Status: CURRENT / CONTROLLING
-Control: MFP V3 A0–A9
 Program: MORE FUN POS V3 REBUILD
 Updated: 2026-10-02 Asia/Hong_Kong
 External Product: MoreFun POS
@@ -10,25 +9,13 @@ Repository: Pantonyeung/mfk
 
 ## 0. Owner supersession lock
 
-Owner explicitly supersedes PR #627 / Unified Surfaces R1 as the CURRENT EXECUTION CONTROL for the MFP V3 rebuild program.
+For the MoreFun POS V3 A0–A9 rebuild program, the declared MFP Stage branch/PR supersedes PR #627 / Unified Surfaces R1 as CURRENT EXECUTION CONTROL.
 
-PR #627 is no longer the active implementation lane for MoreFun POS V3.
+PR #627 remains legacy v2 rollback / security-critical containment / production-blocker emergency evidence only.
 
-PR #627 / legacy v2 surfaces remain only for:
-- rollback
-- security-critical containment
-- production-blocker emergency fixes
-- transitional legacy readback until MFP cutover gates are satisfied
+For the current Stage, branch-local current Commander/Handoff plus the Owner-directed MFP plan control execution until governance landing completes.
 
-This supersession is bounded to the MFP V3 A0–A9 program.
-It does not authorize broad changes to Customer, Keeta, Store Kernel, Pricing, Payment, Fulfillment, Print, Builder or OTA authorities.
-
-If live `main` still contains the older #627 entrypoint while working on an explicitly declared MFP V3 execution branch, that stale main entrypoint is historical governance lag, not a reason to reopen #627.
-The current branch-local Commander/Handoff plus the Owner-directed MFP plan are the controlling execution evidence for the declared MFP V3 branch until governance landing completes.
-
-## 1. Controlling documents
-
-Read in this order:
+## 1. Mandatory read order
 
 1. `COMMANDER_CURRENT.md`
 2. `docs/plan/MFP_V3_SMM_Migration_Plan_2026-10-02.txt`
@@ -38,64 +25,57 @@ Read in this order:
 6. current Stage handoff
 7. current Stage PR
 8. parent Stage PR / exact parent SHA
-9. live repository evidence relevant to the task
+9. live repository evidence
 
-If these CURRENT branch documents conflict with verified live source/runtime evidence:
+Conflict with verified source/runtime evidence:
 `GOVERNANCE_DRIFT`
-
-Do not guess.
 
 ## 2. Product structure
 
-External product:
-
-MORE FUN POS
+MFP
 - MFP Pad
 - MFP Mobile
 
-Admin remains:
-- Admin Desktop
-- Admin Mobile
-
 SMM:
-- cancelled as a final product identity
-- legacy compatibility / UX donor only
-- no new SMM authority/state/head/session engine
+- cancelled as final product identity
+- compatibility/UX donor only
+- no new authority/state/head/session engine
 
 SMT:
-- not a user-facing product name for the new system
-- may remain temporarily as an internal Store Kernel / sync port identifier
-- do not mass-rename protocol identifiers during active rebuild stages
+- internal legacy Store Kernel / sync port identifier may remain temporarily
+- not the user-facing target product name
 
 ## 3. Current Stage
 
 Current Stage:
-A2 — Device + Staff Security
-
-Execution PR:
-#635 — MFP V3 A2｜Device + Staff Security｜2026-10-02
+A3 — Sync + Offline
 
 Execution branch:
-`feat/MFP-V3-A2-DEVICE-STAFF-SECURITY-2026-10-02`
+`feat/MFP-V3-A3-SYNC-OFFLINE-2026-10-02`
 
-A2 handoff:
-`docs/handoff/MFP_V3_A2_DEVICE_STAFF_SECURITY_CODEX_HANDOFF_2026-10-02.md`
+Current Stage handoff:
+`docs/handoff/MFP_V3_A3_SYNC_OFFLINE_CODEX_HANDOFF_2026-10-02.md`
 
 Parent:
-#633 — MFP V3 A1｜Store Kernel Seam｜2026-10-02
+#635 — MFP V3 A2｜Device + Staff Security｜2026-10-02
 
 Parent exact SHA:
-`256e130ae4f7292beadbcbbe847433c769066a7e`
+`7d895e0eae3ba7678e4d23416b453912559887ad`
 
-A1 status:
+A2 source status:
 `SOURCE_VERIFIED`
 
-## 4. MFP V3 Stage Model
+A2 production binding:
+`BLOCKED`
+Formal production device/staff authority + Store Kernel admission binding remain unavailable.
+This blocks production binding/deploy, not A3 source implementation.
+
+## 4. Stage model
 
 A0 — Foundation — SOURCE_VERIFIED
 A1 — Store Kernel Seam — SOURCE_VERIFIED
-A2 — Device + Staff Security — CURRENT
-A3 — Sync + Offline
+A2 — Device + Staff Security — SOURCE_VERIFIED
+A3 — Sync + Offline — CURRENT
 A4 — Ordering Surfaces
 A5 — Checkout + Money
 A6 — Order Operations
@@ -103,93 +83,84 @@ A7 — Print + Hardware + Recovery
 A8 — Customer + Keeta + External
 A9 — Public + Diagnostics + Physical Acceptance + Cutover
 
-No later Stage begins automatically.
+## 5. A3 authority lock
 
-## 5. Frozen authorities
+A3 implements one shared event-driven sync client for MFP Pad + MFP Mobile.
 
-Do NOT rebuild or duplicate:
-- Store Kernel / Formal Transaction Authority
-- Order Authority
-- Pricing Authority
-- Payment / Tender Authority
-- Fulfillment Authority
-- Print Router / Durable PrintJob Authority
+Preserve:
 - Admin canonical configuration authority
-- P0 sync contracts
-- Customer / Keeta external authority contracts
+- Store Kernel formal transaction authority
+- P0 HeadSeq / AppliedSeq / Delta / Checkpoint semantics
 
-MFP Pad and MFP Mobile are surfaces over the same authorities.
+Hard rules:
+- Connected != Applied
+- Doorbell != Truth
+- AppliedSeq advances only after atomic local apply succeeds
+- idle = 0 periodic business polling
+- missed doorbell recovered by reconnect HEAD catch-up
+- checkpoint is recovery object, not routine delivery
+- MFP Pad/Mobile do not create separate canonical heads
 
-## 6. A2 authority lock
+## 6. First RED
 
-A2 builds one shared security seam:
+Reconnect must coalesce concurrent:
+- WebSocket open
+- initial doorbell
+- online transition
+- resume/foreground trigger if retained
 
-Device Identity
-→ Device Authorization
-→ Staff Authentication
-→ Opaque Staff Session
-→ Action-time Permission
-→ Store Kernel Admission
-→ Session Readback / Revocation
+into exactly one bounded single-flight catch-up chain for the current observed head.
 
-A2 must NOT create:
-- independent Pad auth
-- independent Mobile auth
-- SMM session authority
-- browser PIN verifier authority
-- second staff/permission truth
-- second device registry
-- anonymous business mutation capability
+No duplicate parallel HEAD/delta/checkpoint pulls.
+No periodic polling.
+No infinite trailing re-request loop.
 
-First RED:
-expired / revoked `staffSessionRef` must fail closed before Store Kernel submit.
+## 7. Frozen authorities
 
-## 7. UI strategy
+Do not rebuild or duplicate:
+- Store Kernel
+- Order
+- Pricing
+- Payment/Tender
+- Fulfillment
+- Print
+- Admin canonical backend
+- Customer/Keeta engines
+- Staff/Device authority from A2
 
-A1–A3:
-- architecture/core seams
-- minimal visible verification UI only
+## 8. UI strategy
 
-A4–A6:
-- formal product UI in parallel with business capability
+A3 may add only minimal sync/offline verification UI:
+- connection state
+- HeadSeq
+- AppliedSeq
+- READY/BEHIND/RECOVERING/OFFLINE
+- LKG status
+- last apply time
 
-A7–A9:
-- hardware/external/public/physical hardening and final UI polish
-
-A2 may implement only the minimum security verification harness required by its handoff.
-
-## 8. Network / security locks
-
-- 0 periodic business polling
-- 0 periodic auth polling
-- no UI focus fan-out
-- no client-manufactured authenticated session
-- no PIN persistence
-- no PIN/hash/verifier in public/browser state
-- no session token in URL
-- no SMM session dependency
-- Store Kernel performs formal command admission
+Final product UI begins at A4.
 
 ## 9. Change-control mode
 
-Current A2 mode:
+Current mode:
 PREPARE
 
 Authorized:
-- bounded source changes on declared A2 branch
+- bounded A3 source
 - tests
 - CI
 - Draft PR updates
 - source evidence
 
 Not authorized:
-- merge to main
-- production deploy
+- merge
+- deploy
 - OTA
 - public cutover
 - SMM decommission
+- production backend widening without explicit new authority
 
-A2 completion target:
+A3 completion target:
 `SOURCE_VERIFIED`
 
 ## 10. Status language
@@ -201,14 +172,5 @@ Only:
 - BLOCKED
 - FAILED
 
-## 11. First action
-
-Fresh-read the A2 handoff and current A1 source.
-
-Write the first RED:
-expired / revoked `staffSessionRef` must fail closed before Store Kernel submit.
-
-Then implement only A2.
-
 MILESTONE:
-`MFP_V3_A2_CURRENT_EXECUTION_CONTROL_2026_10_02`
+`MFP_V3_A3_CURRENT_EXECUTION_CONTROL_2026_10_02`

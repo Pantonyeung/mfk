@@ -1,4 +1,4 @@
-name: MFP V3 A2 Device + Staff Security
+name: MFP V3 A3 Sync + Offline
 
 on:
   push:
@@ -6,18 +6,23 @@ on:
       - feat/MFK-V3-SMT-R1-2026-10-02
       - feat/MFP-V3-A1-STORE-KERNEL-2026-10-02
       - feat/MFP-V3-A2-DEVICE-STAFF-SECURITY-2026-10-02
+      - feat/MFP-V3-A3-SYNC-OFFLINE-2026-10-02
     paths:
+      - '.github/mfk-change-manifest.json'
       - 'v3smt/**'
       - 'docs/governance/MFK_V3_SMT_REBUILD_AUTHORITY_2026-10-02.md'
       - 'docs/handoff/MFP_V3_A1_CODEX_IMPLEMENTATION_HANDOFF_2026-10-02.md'
       - 'docs/handoff/MFP_V3_A2_DEVICE_STAFF_SECURITY_CODEX_HANDOFF_2026-10-02.md'
+      - 'docs/handoff/MFP_V3_A3_SYNC_OFFLINE_CODEX_HANDOFF_2026-10-02.md'
       - '.github/workflows/v3smt-a0-foundation.yml'
   pull_request:
     paths:
+      - '.github/mfk-change-manifest.json'
       - 'v3smt/**'
       - 'docs/governance/MFK_V3_SMT_REBUILD_AUTHORITY_2026-10-02.md'
       - 'docs/handoff/MFP_V3_A1_CODEX_IMPLEMENTATION_HANDOFF_2026-10-02.md'
       - 'docs/handoff/MFP_V3_A2_DEVICE_STAFF_SECURITY_CODEX_HANDOFF_2026-10-02.md'
+      - 'docs/handoff/MFP_V3_A3_SYNC_OFFLINE_CODEX_HANDOFF_2026-10-02.md'
       - '.github/workflows/v3smt-a0-foundation.yml'
 
 permissions:
@@ -44,13 +49,14 @@ jobs:
       - name: Build
         working-directory: v3smt
         run: npm run build
-      - name: Authority and security guard
+      - name: Authority, security and sync guard
         shell: bash
         run: |
           set -euo pipefail
           ! grep -RInE --include='*.ts' --include='*.tsx' --exclude='*.test.ts' --exclude='*.test.tsx' 'setInterval\s*\(' v3smt/src
           ! grep -RInE --include='*.ts' --include='*.tsx' --exclude='*.test.ts' --exclude='*.test.tsx' 'from .*(v2local|v2smm)' v3smt/src
           ! grep -RInE --include='*.ts' --include='*.tsx' --exclude='*.test.ts' --exclude='*.test.tsx' 'SMM_INTENT_STORE|SMM.{0,20}HeadSeq|x-mfk-smm-session|mfk-smm-web' v3smt/src
+          ! grep -RInE 'SMM_INTENT_STORE|SMM.{0,20}HeadSeq|x-mfk-smm-session|mfk-smm-web' v3smt/dist
           ! grep -RInE --include='*.ts' --include='*.tsx' --exclude='*.test.ts' --exclude='*.test.tsx' 'console\.(log|info|warn|error).*\b(pin|proof|staffSessionRef|session)\b' v3smt/src
           ! grep -RInE --include='*.ts' --include='*.tsx' --exclude='*.test.ts' --exclude='*.test.tsx' '(URLSearchParams|searchParams).*\b(staffSessionRef|session)\b' v3smt/src
           ! grep -RInE --include='*.ts' --include='*.tsx' --exclude='*.test.ts' --exclude='*.test.tsx' 'localStorage.*\b(pin|proof|staffSessionRef|session)\b' v3smt/src
@@ -63,3 +69,11 @@ jobs:
           grep -RInF 'input.authority.loginStaff' v3smt/src/security-port.ts
           grep -RInF 'MFP_STAFF_SESSION_MAX_LIFETIME_MS' v3smt/src/security-port.ts
           grep -RInF 'refetchInterval:false' v3smt/src/security-harness.tsx
+          grep -RInF "MFP_SYNC_PROTOCOL='MFK_CHECKPOINTED_DELTA_SYNC_PROTOCOL_V1'" v3smt/src/sync-port.ts
+          grep -RInF 'createMfpSyncCoordinator' v3smt/src/sync-port.ts
+          grep -RInF 'input.store.commitAtomically(candidate)' v3smt/src/sync-port.ts
+          grep -RInF 'for(let pass=0;pass<2;pass++)' v3smt/src/sync-port.ts
+          grep -RInF 'createMfpSyncSurfacePorts' v3smt/src/sync-port.ts
+          grep -RInF 'sync.resumed()' v3smt/src/sync-runtime.ts
+          grep -RInF "durableProjection:'DEXIE_ATOMIC_LKG_BUNDLE_ONLY'" v3smt/src/state-authority.ts
+          ! grep -RInE --include='*.ts' --include='*.tsx' --exclude='*.test.ts' --exclude='*.test.tsx' 'doorbell\.(payload|entities|projection)' v3smt/src

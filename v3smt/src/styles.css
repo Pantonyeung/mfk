@@ -12,6 +12,15 @@ button,input,select{font:inherit}
 .v3smt-grid span{font-size:13px;color:#777066}
 .v3smt-grid strong{font-size:20px}
 .mfp-security{max-width:960px;margin:24px auto 0;background:white;border:1px solid #ddd6ca;border-radius:18px;padding:20px}
+.mfp-sync{max-width:960px;margin:24px auto 0;background:white;border:1px solid #ddd6ca;border-radius:18px;padding:20px}
+.mfp-sync-heading{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.mfp-sync-heading h2{margin:4px 0 12px}
+.mfp-sync-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.mfp-sync-grid article{border:1px solid #ebe5da;border-radius:14px;padding:14px;display:grid;gap:6px}
+.mfp-sync-grid span{font-size:13px;color:#6d675d}
+.mfp-sync-grid strong{overflow-wrap:anywhere}
+.mfp-sync button{border:1px solid #bcb2a3;border-radius:10px;padding:9px 12px;background:#f7f3ec;color:#1c1c1c;cursor:pointer}
+.mfp-sync-error{color:#8b2f20;overflow-wrap:anywhere}
 .mfp-security-heading,.mfp-security-actions{display:flex;align-items:center;justify-content:space-between;gap:12px}
 .mfp-security-heading h2,.mfp-security-grid h3{margin:4px 0 12px}
 .mfp-security-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
@@ -29,5 +38,7 @@ button,input,select{font:inherit}
   .v3smt-shell h1{font-size:30px}
   .v3smt-grid{grid-template-columns:1fr}
   .mfp-security-grid{grid-template-columns:1fr}
+  .mfp-sync-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .mfp-sync-heading{align-items:flex-start;flex-direction:column}
   .mfp-security-heading{align-items:flex-start;flex-direction:column}
 }

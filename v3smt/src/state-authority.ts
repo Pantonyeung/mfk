@@ -3,6 +3,7 @@ import Dexie,{type Table} from 'dexie';
 import {create} from 'zustand';
 import type {MfpCommandOutbox,MfpOutboxRecord} from './store-kernel-port.ts';
 import type {MfpDeviceClass,MfpDeviceIdentity,MfpDeviceMetadataStore} from './security-port.ts';
+import type {MfpSyncActiveProjection,MfpSyncProjectionStore} from './sync-port.ts';
 
 export const MFP_STATE_AUTHORITY=Object.freeze({
   formalTransaction:'STORE_KERNEL',
@@ -10,6 +11,7 @@ export const MFP_STATE_AUTHORITY=Object.freeze({
   serverReadState:'TANSTACK_QUERY_MEMORY',
   durableTransportMetadata:'DEXIE_BOUNDED_OUTBOX_ONLY',
   durableDeviceMetadata:'DEXIE_INSTALLATION_DEVICE_METADATA_ONLY',
+  durableProjection:'DEXIE_ATOMIC_LKG_BUNDLE_ONLY',
   localUi:'ZUSTAND_UI_ONLY',
   periodicBusinessPolling:false,
   periodicAuthPolling:false,
@@ -29,15 +31,23 @@ export const mfpQueryClient=new QueryClient({
 
 export const MFP_OUTBOX_MAX_ROWS=1000;
 
+interface MfpSyncBundleRow extends MfpSyncActiveProjection{readonly key:'active'}
+
 class MfpDb extends Dexie{
   outbox!:Table<MfpOutboxRecord,string>;
   devices!:Table<MfpDeviceIdentity,[string,MfpDeviceClass]>;
+  syncBundles!:Table<MfpSyncBundleRow,string>;
   constructor(){
     super('mfk-mfp-v3');
     this.version(1).stores({outbox:'&submissionId,status,updatedAt'});
     this.version(2).stores({
       outbox:'&submissionId,status,updatedAt',
       devices:'[storeId+deviceClass],&deviceId,&installationId,lastSeenAt,status',
+    });
+    this.version(3).stores({
+      outbox:'&submissionId,status,updatedAt',
+      devices:'[storeId+deviceClass],&deviceId,&installationId,lastSeenAt,status',
+      syncBundles:'&key,appliedSeq,appliedAt',
     });
   }
 }
@@ -63,6 +73,20 @@ export const mfpCommandOutbox:MfpCommandOutbox=Object.freeze({
 export const mfpDeviceMetadataStore:MfpDeviceMetadataStore=Object.freeze({
   async read(storeId:string,deviceClass:MfpDeviceClass){return mfpDb.devices.get([storeId,deviceClass]);},
   async write(device:MfpDeviceIdentity){await mfpDb.devices.put(device);},
+});
+
+export const mfpSyncProjectionStore:MfpSyncProjectionStore=Object.freeze({
+  async readActive(){
+    const row=await mfpDb.syncBundles.get('active');
+    if(!row)return null;
+    const {key:_,...projection}=row;
+    return Object.freeze(projection);
+  },
+  async commitAtomically(candidate:MfpSyncActiveProjection){
+    await mfpDb.transaction('rw',mfpDb.syncBundles,async()=>{
+      await mfpDb.syncBundles.put({...candidate,key:'active'});
+    });
+  },
 });
 
 type Surface='MFP_PAD'|'MFP_MOBILE';
