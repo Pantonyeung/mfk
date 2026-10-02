@@ -1,11 +1,12 @@
 import {useEffect,useState} from 'react';
 import {CUSTOMER_V3_ASSETS as A,CUSTOMER_V3_HERO_SLIDES as HERO_SLIDES} from './assets';
 import {CheckoutScreen,JarScreen,MenuScreen,ProductScreen} from './ordering-screens';
-import {NotificationsScreen,OrderDetailScreen,OrdersScreen,ProfileScreen,ReorderScreen,SearchScreen,StoreStatusSheet} from './customer-screens';
+import type {SubmittedOrder} from './ordering-screens';
+import {FeaturedCampaignDialog,NotificationsScreen,OffersScreen,OrderDetailScreen,OrdersScreen,PickupGuideScreen,PopularCombosScreen,ProfileScreen,ReorderScreen,SearchScreen,StoreStatusSheet} from './customer-screens';
 import {PREVIEW_HOME as vm} from './preview-fixture';
 import type {QuickCardId} from './home-model';
-import {PREVIEW_PRODUCTS} from './preview-data';
-import type {CustomerRoute,JarItem,MenuCollection} from './preview-data';
+import {PREVIEW_PICKUP_CODE,PREVIEW_PRODUCTS} from './preview-data';
+import type {CustomerRoute,JarItem,PaymentMethod} from './preview-data';
 
 type IconName=QuickCardId|'pin'|'chevron'|'bell'|'search'|'history'|'home'|'menu'|'jar'|'orders'|'user';
 
@@ -123,7 +124,7 @@ function Hero({onStart}:Readonly<{onStart:()=>void}>){
   </section>;
 }
 
-function Quick({onSelect}:Readonly<{onSelect:(collection:MenuCollection)=>void}>){
+function Quick({onSelect}:Readonly<{onSelect:(destination:QuickCardId)=>void}>){
   return <section id="menu-discovery" className="quick" aria-label="快捷入口">
     {vm.quickCards.map(card=><button
       type="button"
@@ -173,7 +174,7 @@ function Recent({onViewAll,onReorder}:Readonly<{onViewAll:()=>void;onReorder:()=
 }
 
 function BottomNav({route,jarFilled,onNavigate}:Readonly<{route:CustomerRoute;jarFilled:boolean;onNavigate:(route:CustomerRoute)=>void}>){
-  const active=route==='home'?'home':route==='menu'||route==='product'?'menu':route==='jar'||route==='checkout'?'jar':route==='orders'||route==='order-detail'||route==='reorder'?'orders':route==='profile'?'profile':'';
+  const active=route==='home'||route==='popular'||route==='offers'||route==='pickup-guide'?'home':route==='menu'||route==='product'?'menu':route==='jar'||route==='checkout'?'jar':route==='orders'||route==='order-detail'||route==='reorder'?'orders':route==='profile'?'profile':'';
   return <nav aria-label="主要導覽">
     <button className={active==='home'?'active':''} type="button" onClick={()=>onNavigate('home')}>
       <Icon name="home"/><b>首頁</b>
@@ -194,26 +195,34 @@ function BottomNav({route,jarFilled,onNavigate}:Readonly<{route:CustomerRoute;ja
 }
 
 export function CustomerV3App(){
-  const knownRoutes:readonly CustomerRoute[]=['home','search','notifications','menu','product','jar','checkout','orders','order-detail','reorder','profile'];
+  const knownRoutes:readonly CustomerRoute[]=['home','search','notifications','menu','popular','offers','pickup-guide','product','jar','checkout','orders','order-detail','reorder','profile'];
   const readRoute=():CustomerRoute=>{
     const hash=window.location.hash.slice(1) as CustomerRoute;
     return knownRoutes.includes(hash)?hash:'home';
   };
   const [route,setRoute]=useState<CustomerRoute>(readRoute);
-  const [menuCollection,setMenuCollection]=useState<MenuCollection>('all');
   const [selectedProductId,setSelectedProductId]=useState(PREVIEW_PRODUCTS[0].id);
-  const [jarItem,setJarItem]=useState<JarItem|null>(null);
+  const [productReturnRoute,setProductReturnRoute]=useState<CustomerRoute>('menu');
+  const [jarItems,setJarItems]=useState<JarItem[]>([]);
   const [showStore,setShowStore]=useState(false);
+  const [showFeatured,setShowFeatured]=useState(false);
   const [online,setOnline]=useState(()=>navigator.onLine);
+  const [submittedOrder,setSubmittedOrder]=useState<SubmittedOrder>({pickupCode:PREVIEW_PICKUP_CODE,payment:'electronic' as PaymentMethod,proofSubmitted:true});
 
   const navigate=(next:CustomerRoute)=>{
     const nextHash=`#${next}`;
     if(window.location.hash===nextHash)setRoute(next);
     else window.location.hash=next;
   };
-  const openMenu=(collection:MenuCollection='all')=>{setMenuCollection(collection);navigate('menu');};
-  const openProduct=(id:string)=>{setSelectedProductId(id);navigate('product');};
-  const addToJar=(item:JarItem)=>{setJarItem(item);navigate('jar');};
+  const openMenu=()=>navigate('menu');
+  const openProduct=(id:string,returnRoute:CustomerRoute='menu')=>{setSelectedProductId(id);setProductReturnRoute(returnRoute);navigate('product');};
+  const addToJar=(item:JarItem)=>{setJarItems(current=>[...current,item]);navigate('jar');};
+  const openQuick=(destination:QuickCardId)=>{
+    if(destination==='featured'){setShowFeatured(true);return;}
+    navigate(destination==='popular'?'popular':destination==='offer'?'offers':'pickup-guide');
+  };
+  const updateJarQuantity=(index:number,quantity:number)=>setJarItems(current=>current.map((item,itemIndex)=>itemIndex===index?{...item,quantity}:item));
+  const removeJarItem=(index:number)=>setJarItems(current=>current.filter((_,itemIndex)=>itemIndex!==index));
   const selectedProduct=PREVIEW_PRODUCTS.find(product=>product.id===selectedProductId)??PREVIEW_PRODUCTS[0];
 
   useEffect(()=>{
@@ -257,27 +266,31 @@ export function CustomerV3App(){
   },[route]);
 
   const screen=route==='home'?<>
-      <Hero onStart={()=>openMenu('all')}/>
-      <Quick onSelect={openMenu}/>
+      <Hero onStart={openMenu}/>
+      <Quick onSelect={openQuick}/>
       <Lifestyle/>
       <Recent onViewAll={()=>navigate('orders')} onReorder={()=>navigate('reorder')}/>
-    </>:route==='search'?<SearchScreen onBack={()=>navigate('home')} onOpenProduct={openProduct}/>
+    </>:route==='search'?<SearchScreen onBack={()=>navigate('home')} onOpenProduct={id=>openProduct(id,'search')}/>
       :route==='notifications'?<NotificationsScreen onBack={()=>navigate('home')}/>
-      :route==='menu'?<MenuScreen collection={menuCollection} onCollection={setMenuCollection} onOpenProduct={openProduct} onBack={()=>navigate('home')}/>
-      :route==='product'?<ProductScreen key={selectedProduct.id} product={selectedProduct} onBack={()=>navigate('menu')} onAdd={addToJar}/>
-      :route==='jar'?<JarScreen item={jarItem} onBack={()=>navigate('menu')} onBrowse={()=>openMenu('all')} onQuantity={quantity=>setJarItem(current=>current?{...current,quantity}:current)} onCheckout={()=>jarItem&&navigate('checkout')}/>
-      :route==='checkout'&&jarItem?<CheckoutScreen item={jarItem} onBack={()=>navigate('jar')} onHome={()=>navigate('home')} onOrder={()=>navigate('order-detail')}/>
+      :route==='menu'?<MenuScreen onOpenProduct={id=>openProduct(id,'menu')} onBack={()=>navigate('home')}/>
+      :route==='popular'?<PopularCombosScreen onBack={()=>navigate('home')} onOpenProduct={id=>openProduct(id,'popular')}/>
+      :route==='offers'?<OffersScreen onBack={()=>navigate('home')} onOpenProduct={id=>openProduct(id,'offers')}/>
+      :route==='pickup-guide'?<PickupGuideScreen onBack={()=>navigate('home')} onStart={openMenu}/>
+      :route==='product'?<ProductScreen key={selectedProduct.id} product={selectedProduct} onBack={()=>navigate(productReturnRoute)} onAdd={addToJar}/>
+      :route==='jar'?<JarScreen items={jarItems} onBack={()=>navigate('menu')} onBrowse={openMenu} onQuantity={updateJarQuantity} onRemove={removeJarItem} onCheckout={()=>jarItems.length&&navigate('checkout')}/>
+      :route==='checkout'&&jarItems.length?<CheckoutScreen items={jarItems} onBack={()=>navigate('jar')} onHome={()=>navigate('home')} onOrder={order=>{setSubmittedOrder(order);navigate('order-detail');}}/>
       :route==='orders'?<OrdersScreen onBack={()=>navigate('home')} onDetail={()=>navigate('order-detail')} onReorder={()=>navigate('reorder')}/>
-      :route==='order-detail'?<OrderDetailScreen onBack={()=>navigate('orders')} onReorder={()=>navigate('reorder')}/>
+      :route==='order-detail'?<OrderDetailScreen onBack={()=>navigate('orders')} onReorder={()=>navigate('reorder')} pickupCode={submittedOrder.pickupCode} payment={submittedOrder.payment}/>
       :route==='reorder'?<ReorderScreen onBack={()=>navigate('orders')} onAdd={addToJar}/>
       :route==='profile'?<ProfileScreen onBack={()=>navigate('home')}/>
-      :<JarScreen item={jarItem} onBack={()=>navigate('menu')} onBrowse={()=>openMenu('all')} onQuantity={quantity=>setJarItem(current=>current?{...current,quantity}:current)} onCheckout={()=>jarItem&&navigate('checkout')}/>;
+      :<JarScreen items={jarItems} onBack={()=>navigate('menu')} onBrowse={openMenu} onQuantity={updateJarQuantity} onRemove={removeJarItem} onCheckout={()=>jarItems.length&&navigate('checkout')}/>;
 
   return <div className="shell">
     <Header onOpenStore={()=>setShowStore(true)} onNavigate={navigate}/>
     {!online&&<div className="network-banner" role="status">暫時離線・部分資料可能未更新</div>}
     <main className={route==='home'?'':'destination-main'}>{screen}</main>
     {showStore&&<StoreStatusSheet onClose={()=>setShowStore(false)}/>}
-    <BottomNav route={route} jarFilled={Boolean(jarItem)} onNavigate={navigate}/>
+    {showFeatured&&<FeaturedCampaignDialog onClose={()=>setShowFeatured(false)} onOpenProduct={id=>{setShowFeatured(false);openProduct(id,'home');}}/>}
+    <BottomNav route={route} jarFilled={jarItems.length>0} onNavigate={navigate}/>
   </div>;
 }

@@ -1,19 +1,21 @@
 import {defineConfig,devices} from '@playwright/test';
 
+const port=Number(process.env.PLAYWRIGHT_PORT??4193);
+
 export default defineConfig({
   testDir:'./test',
   timeout:30_000,
   fullyParallel:false,
   use:{
-    baseURL:'http://127.0.0.1:4175',
+    baseURL:`http://127.0.0.1:${port}`,
     trace:'retain-on-failure',
     screenshot:'only-on-failure',
     video:'off'
   },
   webServer:{
-    command:'npm run dev -- --port 4175',
-    url:'http://127.0.0.1:4175',
-    reuseExistingServer:true,
+    command:`npm run dev -- --port ${port} --strictPort`,
+    url:`http://127.0.0.1:${port}`,
+    reuseExistingServer:false,
     timeout:60_000
   },
   projects:[
