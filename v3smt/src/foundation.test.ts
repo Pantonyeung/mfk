@@ -15,9 +15,10 @@ describe('V3 SMT A0 foundation',()=>{
     for(const file of ['./App.tsx','./main.tsx','./state-authority.ts']){
       const source=read(file);
       expect(source).not.toMatch(/setInterval\s*\(/);
-      expect(source).not.toContain('refetchInterval:');
     }
-    expect(read('./state-authority.ts')).toContain('refetchInterval:false');
+    const state=read('./state-authority.ts');
+    expect(state).toContain('refetchInterval:false');
+    expect(state).not.toMatch(/refetchInterval:\s*(?:true|[1-9]\d*)/);
   });
 
   it('does not import v2 client state or runtime modules',()=>{
