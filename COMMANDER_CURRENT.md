@@ -215,3 +215,23 @@ Only:
 
 MILESTONE:
 `MFP_V3_A4_CURRENT_EXECUTION_CONTROL_2026_10_02`
+
+
+## 11. Owner FINAL Crosswalk Gate｜2026-10-02
+
+Original A4 declared scope at SHA `5e4118c003bef84a5e0262d5ac925537c4686ff3` is SOURCE_VERIFIED.
+
+However, Owner FINAL crosswalk found required carry-forward gaps.
+Current A4 execution is therefore:
+
+`BLOCKED — OWNER_REQUIREMENTS_CARRY_FORWARD_INCOMPLETE`
+
+Controlling crosswalk:
+`docs/plan/MFP_V3_OWNER_FINAL_CROSSWALK_2026-10-02.txt`
+
+A4 must close A4-OF-01..09 in the A4 handoff before A5 begins.
+
+Do not advance to A5 until A4 Owner Final Closure is SOURCE_VERIFIED.
+
+MILESTONE:
+`MFP_V3_A4_OWNER_FINAL_CLOSURE_GATE_2026_10_02`
