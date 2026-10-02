@@ -256,7 +256,7 @@ describe('MFP V3 A4 Owner FINAL closure',()=>{
   });
 
   it('wires stable high-frequency navigation, More, three Fast Lanes and protected clear',()=>{
-    const source=readFileSync(new URL('./ordering-workspace.tsx',import.meta.url),'utf8')+readFileSync(new URL('./ordering-owner-workspaces.tsx',import.meta.url),'utf8');
+    const source=['./ordering-workspace.tsx','./ordering-owner-workspaces.tsx','./order-operations-workspace.tsx'].map(name=>readFileSync(new URL(name,import.meta.url),'utf8')).join('\n');
     for(const label of ['Ordering','Orders','Dining','Sold-out / Capacity','More / Tools','Fast Pair','Required','紫米套餐'])expect(source).toContain(label);
     expect(source).toContain('確認清除');
     expect(source).toContain('mfp-clear-secondary');

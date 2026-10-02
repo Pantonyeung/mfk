@@ -1,4 +1,4 @@
-name: MFP V3 A5 Checkout + Money
+name: MFP V3 A6 Order Operations
 
 on:
   push:
@@ -9,26 +9,31 @@ on:
       - feat/MFP-V3-A3-SYNC-OFFLINE-2026-10-02
       - feat/MFP-V3-A4-ORDERING-SURFACES-2026-10-02
       - feat/MFP-V3-A5-CHECKOUT-MONEY-2026-10-02
+      - feat/MFP-V3-A6-ORDER-OPERATIONS-2026-10-02
     paths:
       - '.github/mfk-change-manifest.json'
       - 'v3smt/**'
+      - 'docs/design/MFP_PAD_ORDERING_VISUAL_LOCK_R1_2026-10-02.md'
       - 'docs/governance/MFK_V3_SMT_REBUILD_AUTHORITY_2026-10-02.md'
       - 'docs/handoff/MFP_V3_A1_CODEX_IMPLEMENTATION_HANDOFF_2026-10-02.md'
       - 'docs/handoff/MFP_V3_A2_DEVICE_STAFF_SECURITY_CODEX_HANDOFF_2026-10-02.md'
       - 'docs/handoff/MFP_V3_A3_SYNC_OFFLINE_CODEX_HANDOFF_2026-10-02.md'
       - 'docs/handoff/MFP_V3_A4_ORDERING_SURFACES_CODEX_HANDOFF_2026-10-02.md'
       - 'docs/handoff/MFP_V3_A5_CHECKOUT_MONEY_CODEX_HANDOFF_2026-10-02.md'
+      - 'docs/handoff/MFP_V3_A6_ORDER_OPERATIONS_CODEX_HANDOFF_2026-10-02.md'
       - '.github/workflows/v3smt-a0-foundation.yml'
   pull_request:
     paths:
       - '.github/mfk-change-manifest.json'
       - 'v3smt/**'
+      - 'docs/design/MFP_PAD_ORDERING_VISUAL_LOCK_R1_2026-10-02.md'
       - 'docs/governance/MFK_V3_SMT_REBUILD_AUTHORITY_2026-10-02.md'
       - 'docs/handoff/MFP_V3_A1_CODEX_IMPLEMENTATION_HANDOFF_2026-10-02.md'
       - 'docs/handoff/MFP_V3_A2_DEVICE_STAFF_SECURITY_CODEX_HANDOFF_2026-10-02.md'
       - 'docs/handoff/MFP_V3_A3_SYNC_OFFLINE_CODEX_HANDOFF_2026-10-02.md'
       - 'docs/handoff/MFP_V3_A4_ORDERING_SURFACES_CODEX_HANDOFF_2026-10-02.md'
       - 'docs/handoff/MFP_V3_A5_CHECKOUT_MONEY_CODEX_HANDOFF_2026-10-02.md'
+      - 'docs/handoff/MFP_V3_A6_ORDER_OPERATIONS_CODEX_HANDOFF_2026-10-02.md'
       - '.github/workflows/v3smt-a0-foundation.yml'
 
 permissions:
@@ -55,7 +60,7 @@ jobs:
       - name: Build
         working-directory: v3smt
         run: npm run build
-      - name: Authority, security, sync, ordering, checkout and money guard
+      - name: Authority, security, sync, ordering, checkout, money and order operations guard
         shell: bash
         run: |
           set -euo pipefail
@@ -101,3 +106,15 @@ jobs:
           ! grep -RInE --include='checkout-*.ts' --include='checkout-*.tsx' --include='money-*.ts' --include='money-*.tsx' --exclude='*.test.ts' --exclude='*.test.tsx' '\bfetch\s*\(|new[[:space:]]+WebSocket\s*\(|setInterval\s*\(' v3smt/src
           ! grep -RInE --include='checkout-*.ts' --include='checkout-*.tsx' --include='money-*.ts' --include='money-*.tsx' --exclude='*.test.ts' --exclude='*.test.tsx' 'from .*(v2local|v2smm)|localStorage|sessionStorage' v3smt/src
           ! grep -RInE --include='checkout-*.ts' --include='checkout-*.tsx' --include='money-*.ts' --include='money-*.tsx' --exclude='*.test.ts' --exclude='*.test.tsx' 'class[[:space:]]+[A-Za-z0-9_]*(Pricing|Payment|Order|Print|BusinessDay)(Engine|Authority)' v3smt/src
+          grep -RInF "orderOperations:'STORE_KERNEL_CANONICAL_READBACK'" v3smt/src/state-authority.ts
+          grep -RInF "availabilityCapacity:'STORE_KERNEL_CANONICAL_READBACK'" v3smt/src/state-authority.ts
+          grep -RInF 'createMfpOrderOperationSession' v3smt/src/order-operations-domain.ts
+          grep -RInF 'submitFrontlineFormalCommand' v3smt/src/order-operations-domain.ts
+          grep -RInF 'readOperations' v3smt/src/order-operations-runtime.tsx
+          grep -RInF 'refetchInterval:false' v3smt/src/order-operations-runtime.tsx
+          grep -RInF 'data-order-operations-contract="SHARED_PAD_MOBILE"' v3smt/src/order-operations-workspace.tsx
+          grep -RInF '<MfpApplicationRuntime' v3smt/src/App.tsx
+          ! grep -RInE --include='order-operations-*.ts' --include='order-operations-*.tsx' --exclude='*.test.ts' --exclude='*.test.tsx' '\bfetch\s*\(|new[[:space:]]+WebSocket\s*\(|setInterval\s*\(|localStorage|sessionStorage' v3smt/src
+          ! grep -RInE --include='order-operations-*.ts' --include='order-operations-*.tsx' --exclude='*.test.ts' --exclude='*.test.tsx' 'from .*(v2local|v2smm)|SMM_INTENT_STORE|SMM.{0,20}HeadSeq|x-mfk-smm-session|mfk-smm-web' v3smt/src
+          ! grep -RInE --include='order-operations-*.ts' --include='order-operations-*.tsx' --exclude='*.test.ts' --exclude='*.test.tsx' 'class[[:space:]]+[A-Za-z0-9_]*(Order|Pricing|Payment|Print|Availability|Capacity)(Engine|Authority)' v3smt/src
+          ! grep -RInF "commandType:'ORDER_CREATE'" v3smt/src/order-operations-domain.ts

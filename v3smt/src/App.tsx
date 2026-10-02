@@ -1,5 +1,5 @@
 import {useEffect,useReducer} from 'react';
-import {MfpOrderingRuntime} from './ordering-runtime.tsx';
+import {MfpApplicationRuntime,mfpOrderOperationsRuntimeBinding} from './order-operations-runtime.tsx';
 import {MFP_STATE_AUTHORITY,mfpSyncProjectionStore,useMfpUi} from './state-authority.ts';
 import {MfpSecurityHarness} from './security-harness.tsx';
 import {mfpSecurityPort} from './security-runtime.ts';
@@ -23,11 +23,11 @@ export function V3SmtApp(){
     <header className="mfp-app-head">
       <small>PARALLEL PREVIEW · NO PRODUCTION ROUTING</small>
       <h1>MoreFun POS</h1>
-      <p>MFP Pad + MFP Mobile · Shared Ordering + Formal Checkout Contract</p>
+      <p>MFP Pad + MFP Mobile · Ordering、Checkout、Money、Order Operations</p>
     </header>
-    <MfpOrderingRuntime surface={surface} security={mfpSecurityPort} sync={mfpSyncCoordinator} projectionStore={mfpSyncProjectionStore} checkout={mfpCheckoutRuntimeBinding}/>
+    <MfpApplicationRuntime surface={surface} security={mfpSecurityPort} sync={mfpSyncCoordinator} projectionStore={mfpSyncProjectionStore} checkout={mfpCheckoutRuntimeBinding} operations={mfpOrderOperationsRuntimeBinding}/>
     <details className="mfp-diagnostics">
-      <summary>A1–A3 Diagnostics</summary>
+      <summary>A1–A6 Diagnostics</summary>
       <section className="v3smt-grid">
         <article><span>Surface</span><strong>{surface}</strong></article>
         <article><span>Formal Transaction</span><strong>{MFP_STATE_AUTHORITY.formalTransaction}</strong></article>
