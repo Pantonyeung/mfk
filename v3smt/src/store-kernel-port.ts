@@ -40,7 +40,7 @@ export type MfpStoreKernelResult=
 
 export interface MfpStoreKernelTransport{
   submitCommand(command:MfpStoreKernelCommandEnvelope):Promise<MfpStoreKernelResult>;
-  readSubmission(submissionId:string):Promise<MfpStoreKernelResult>;
+  readSubmission(command:MfpStoreKernelCommandEnvelope):Promise<MfpStoreKernelResult>;
 }
 
 export type MfpOutboxStatus='PENDING'|'UNKNOWN'|'TERMINAL_OBSERVED';
@@ -162,16 +162,15 @@ export function createMfpStoreKernelPort(input:{
   const now=input.now??(()=>new Date().toISOString());
   const inFlight=new Map<string,{fingerprint:string;promise:Promise<MfpStoreKernelResult>}>();
 
-  const readCanonical=async(submissionId:string)=>{
+  const readCanonical=async(record:MfpOutboxRecord)=>{
+    const submissionId=record.submissionId;
     try{
-      const result=validatedResult(await input.transport.readSubmission(submissionId),submissionId);
-      const record=await input.outbox.read(submissionId);
-      if(record)await input.outbox.write(withStatus(record,result.state==='UNKNOWN'?'UNKNOWN':'TERMINAL_OBSERVED',now()));
+      const result=validatedResult(await input.transport.readSubmission(record.command),submissionId);
+      await input.outbox.write(withStatus(record,result.state==='UNKNOWN'?'UNKNOWN':'TERMINAL_OBSERVED',now()));
       return {reached:true,result};
     }catch{
       const result=unknownResult(submissionId);
-      const record=await input.outbox.read(submissionId);
-      if(record)await input.outbox.write(withStatus(record,'UNKNOWN',now()));
+      await input.outbox.write(withStatus(record,'UNKNOWN',now()));
       return {reached:false,result};
     }
   };
@@ -193,7 +192,7 @@ export function createMfpStoreKernelPort(input:{
       if(existing.idempotencyKey!==command.idempotencyKey||existing.fingerprint!==fingerprint){
         throw new Error('MFP_SUBMISSION_PAYLOAD_CONFLICT');
       }
-      const readback=await readCanonical(command.submissionId);
+      const readback=await readCanonical(existing);
       if(readback.result.state!=='UNKNOWN'||!readback.reached||!readback.result.retryPermitted)return readback.result;
       return submitStored(existing);
     }
@@ -231,7 +230,8 @@ export function createMfpStoreKernelPort(input:{
     },
     async readSubmission(submissionId:string){
       text(submissionId,'MFP_COMMAND_SUBMISSION_ID_INVALID');
-      return (await readCanonical(submissionId)).result;
+      const record=await input.outbox.read(submissionId);
+      return record?(await readCanonical(record)).result:unknownResult(submissionId);
     },
   });
 }

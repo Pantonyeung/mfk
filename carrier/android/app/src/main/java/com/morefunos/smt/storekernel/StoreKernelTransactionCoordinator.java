@@ -63,6 +63,21 @@ public final class StoreKernelTransactionCoordinator implements AutoCloseable {
         return submit(() -> database.runInTransaction(() -> readCommandReceiptInTransaction(request)));
     }
 
+    public CompletableFuture<CommandReceiptReadResult> readCommandReceiptByCommandId(
+        String requestId,
+        String storeId,
+        String commandId
+    ) {
+        return submit(() -> database.runInTransaction(() -> CommandReceiptReadResult.from(
+            requestId,
+            dao.readReceiptByCommandId(storeId, commandId)
+        )));
+    }
+
+    public CompletableFuture<CommandReceiptReadResult> recordCommandResult(StoreKernelContract.CommandResultRequest request) {
+        return submit(() -> database.runInTransaction(() -> recordCommandResultInTransaction(request)));
+    }
+
     public CompletableFuture<InboxAppendResult> appendInbox(StoreKernelContract.InboxAppendRequest request) {
         return submit(() -> database.runInTransaction(() -> appendInboxInTransaction(request)));
     }
@@ -137,17 +152,47 @@ public final class StoreKernelTransactionCoordinator implements AutoCloseable {
         return CommandReceiptReadResult.found(request.requestId, receipt);
     }
 
-    private CommitResult commitInTransaction(StoreKernelContract.CommitRequest request) {
-        final StoreKernelCommandReceiptEntity prior = dao.readReceipt(
+    private CommandReceiptReadResult recordCommandResultInTransaction(StoreKernelContract.CommandResultRequest request) {
+        validateCommandResultRequest(request);
+        final StoreKernelCommandReceiptEntity prior = readPriorReceipt(
             request.storeId,
             request.operationId,
-            request.idempotencyKey
+            request.idempotencyKey,
+            request.commandId,
+            request.requestFingerprint
+        );
+        if (prior != null) return CommandReceiptReadResult.found(request.requestId, prior);
+
+        final long commitSequence = dao.nextCommitSequence();
+        final StoreKernelCommandReceiptEntity receipt = new StoreKernelCommandReceiptEntity(
+            request.storeId,
+            request.operationId,
+            request.idempotencyKey,
+            request.commandId,
+            request.requestFingerprint,
+            request.resultJson,
+            StoreKernelContract.sha256(request.resultJson),
+            request.traceId,
+            commitSequence,
+            request.recordedAt
+        );
+        dao.insertReceipt(receipt);
+        insertJournal(request.traceId, request.commandId, 1, "RECEIVED", request.recordedAt, commitSequence);
+        insertJournal(request.traceId, request.commandId, 2, "VALIDATED", request.recordedAt, commitSequence);
+        insertJournal(request.traceId, request.commandId, 3, "REJECTED", request.recordedAt, commitSequence);
+        return CommandReceiptReadResult.found(request.requestId, receipt);
+    }
+
+    private CommitResult commitInTransaction(StoreKernelContract.CommitRequest request) {
+        final StoreKernelCommandReceiptEntity prior = readPriorReceipt(
+            request.storeId,
+            request.operationId,
+            request.idempotencyKey,
+            request.commandId,
+            request.requestFingerprint
         );
         trip(FailurePoint.AFTER_IDEMPOTENCY_LOOKUP);
         if (prior != null) {
-            if (!prior.requestFingerprint.equals(request.requestFingerprint)) {
-                throw failure("STORE_KERNEL_IDEMPOTENCY_FINGERPRINT_CONFLICT");
-            }
             return CommitResult.replay(request.requestId, prior);
         }
 
@@ -341,6 +386,72 @@ public final class StoreKernelTransactionCoordinator implements AutoCloseable {
         }
     }
 
+    private StoreKernelCommandReceiptEntity readPriorReceipt(
+        String storeId,
+        String operationId,
+        String idempotencyKey,
+        String commandId,
+        String requestFingerprint
+    ) {
+        final StoreKernelCommandReceiptEntity byCommand = dao.readReceiptByCommandId(storeId, commandId);
+        if (byCommand != null) {
+            validateReceiptIdentity(byCommand, operationId, idempotencyKey, commandId, requestFingerprint);
+            return byCommand;
+        }
+        final StoreKernelCommandReceiptEntity byIdempotency = dao.readReceipt(storeId, operationId, idempotencyKey);
+        if (byIdempotency != null) {
+            validateReceiptIdentity(byIdempotency, operationId, idempotencyKey, commandId, requestFingerprint);
+            return byIdempotency;
+        }
+        return null;
+    }
+
+    private void validateReceiptIdentity(
+        StoreKernelCommandReceiptEntity receipt,
+        String operationId,
+        String idempotencyKey,
+        String commandId,
+        String requestFingerprint
+    ) {
+        if (!receipt.requestFingerprint.equals(requestFingerprint)) {
+            throw failure("STORE_KERNEL_IDEMPOTENCY_FINGERPRINT_CONFLICT");
+        }
+        if (!receipt.operationId.equals(operationId)
+            || !receipt.idempotencyKey.equals(idempotencyKey)
+            || !receipt.commandId.equals(commandId)) {
+            throw failure("STORE_KERNEL_IDEMPOTENCY_IDENTITY_CONFLICT");
+        }
+    }
+
+    private void validateCommandResultRequest(StoreKernelContract.CommandResultRequest request) {
+        if (request == null
+            || invalidText(request.requestId)
+            || invalidText(request.commandId)
+            || invalidText(request.storeId)
+            || invalidText(request.operationId)
+            || invalidText(request.idempotencyKey)
+            || invalidText(request.traceId)
+            || invalidText(request.recordedAt)
+            || request.requestFingerprint == null
+            || !request.requestFingerprint.matches("^[0-9a-f]{64}$")
+            || request.resultJson == null
+            || request.resultJson.isEmpty()
+            || request.resultJson.getBytes(java.nio.charset.StandardCharsets.UTF_8).length > 131_072) {
+            throw failure("STORE_KERNEL_COMMAND_RESULT_INVALID");
+        }
+        try {
+            if (!(new JSONTokener(request.resultJson).nextValue() instanceof JSONObject)) {
+                throw failure("STORE_KERNEL_COMMAND_RESULT_INVALID");
+            }
+        } catch (JSONException error) {
+            throw failure("STORE_KERNEL_COMMAND_RESULT_INVALID");
+        }
+    }
+
+    private static boolean invalidText(String value) {
+        return value == null || value.isEmpty() || !value.equals(value.trim()) || value.length() > 160;
+    }
+
     private void insertJournal(
         String traceId,
         String commandId,
@@ -483,6 +594,10 @@ public final class StoreKernelTransactionCoordinator implements AutoCloseable {
 
         static CommandReceiptReadResult missing(String requestId) {
             return new CommandReceiptReadResult(requestId, null);
+        }
+
+        static CommandReceiptReadResult from(String requestId, StoreKernelCommandReceiptEntity receipt) {
+            return new CommandReceiptReadResult(requestId, receipt);
         }
 
         public JSONObject toJson() throws JSONException {

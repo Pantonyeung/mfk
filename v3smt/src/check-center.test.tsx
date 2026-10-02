@@ -20,9 +20,9 @@ describe('MFP V3 A9 Check Center',()=>{
     for(const value of ['data-check-center="A9"','IDENTITY','BINDINGS','STORE KERNEL','SYNC','PRINT','RUNTIME / OTA','EXTERNAL','FAULT JOURNAL','BACKUP / RESTORE',candidate,'stable-1','stable-0'])expect(html).toContain(value);
   });
 
-  it('shows the formal-router blocker and every A1-A8 production binding honestly',()=>{
+  it('shows the source-verified formal router and every remaining production binding honestly',()=>{
     const html=renderToStaticMarkup(<MfpCheckCenterView surface="MFP_MOBILE" url={url} diagnostics={diagnostics}/>);
-    for(const value of ['FORMAL_COMMAND_ROUTER_BINDING_MISSING','MFP_SECURITY_PRODUCTION_BINDING_MISSING','MFP_SYNC_PRODUCTION_BINDING_MISSING','MFP_CHECKOUT_PRODUCTION_BINDING_MISSING','MFP_ORDER_OPERATIONS_PRODUCTION_BINDING_MISSING','MFP_MONEY_PRODUCTION_BINDING_MISSING','MFP_CANONICAL_PRINT_BINDING_MISSING','MFP_CUSTOMER_PRODUCTION_BINDING_MISSING','MFP_KEETA_PRODUCTION_BINDING_MISSING'])expect(html).toContain(value);
+    for(const value of ['FORMAL_COMMAND_ROUTER_SOURCE_VERIFIED','MFP_SECURITY_PRODUCTION_BINDING_MISSING','FORMAL_PRICING_AUTHORITY_DEPENDENCY_MISSING','FORMAL_TENDER_AUTHORITY_DEPENDENCY_MISSING','MFP_SYNC_PRODUCTION_BINDING_MISSING','MFP_CHECKOUT_PRODUCTION_BINDING_MISSING','MFP_ORDER_OPERATIONS_PRODUCTION_BINDING_MISSING','MFP_MONEY_PRODUCTION_BINDING_MISSING','MFP_CANONICAL_PRINT_BINDING_MISSING','MFP_CUSTOMER_PRODUCTION_BINDING_MISSING','MFP_KEETA_PRODUCTION_BINDING_MISSING'])expect(html).toContain(value);
   });
 
   it('does not render native fault messages or secrets',()=>{

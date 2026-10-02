@@ -18,14 +18,15 @@ export interface MfpRuntimeReleaseIdentity{
 
 export const MFP_BUILD_IDENTITY=Object.freeze({...__MFP_BUILD_IDENTITY__});
 export const MFP_A9_FORMAL_ROUTER_STATUS=Object.freeze({
-  status:'BLOCKED' as const,
-  code:'FORMAL_COMMAND_ROUTER_BINDING_MISSING',
-  detail:'mfp.store-kernel.command.v1 has no approved production business-command router to the native store.kernel.* contract.',
+  status:'SOURCE_VERIFIED' as const,
+  code:'FORMAL_COMMAND_ROUTER_SOURCE_VERIFIED',
+  detail:'The bounded native formal router is source-bound; production Security, Pricing and Tender authorities remain fail-closed.',
 });
 
 export const MFP_A9_BINDINGS=Object.freeze([
   ['Security','MFP_SECURITY_PRODUCTION_BINDING_MISSING'],
-  ['Store Kernel','FORMAL_COMMAND_ROUTER_BINDING_MISSING'],
+  ['Pricing','FORMAL_PRICING_AUTHORITY_DEPENDENCY_MISSING'],
+  ['Tender','FORMAL_TENDER_AUTHORITY_DEPENDENCY_MISSING'],
   ['Sync','MFP_SYNC_PRODUCTION_BINDING_MISSING'],
   ['Checkout','MFP_CHECKOUT_PRODUCTION_BINDING_MISSING'],
   ['Orders','MFP_ORDER_OPERATIONS_PRODUCTION_BINDING_MISSING'],
@@ -212,7 +213,7 @@ export function evaluateMfpA9Readiness(input:{expectedSourceSha?:string|null;bui
   try{validateMfpBuildIdentity();}catch(error){codes.push(error instanceof Error?error.message:'MFP_BUILD_IDENTITY_INVALID');}
   if(!input.expectedSourceSha)codes.push('MFP_EXPECTED_SOURCE_SHA_REQUIRED');
   else if(input.expectedSourceSha!==MFP_BUILD_IDENTITY.sourceSha)codes.push('MFP_EXPECTED_SOURCE_SHA_MISMATCH');
-  codes.push(MFP_A9_FORMAL_ROUTER_STATUS.code,...MFP_A9_BINDINGS.filter(([name])=>name!=='Store Kernel').map(([,bindingCode])=>bindingCode));
+  codes.push(...MFP_A9_BINDINGS.map(([,bindingCode])=>bindingCode));
   if(!input.builderV3SourceVerified)codes.push('MFP_BUILDER_V3_SOURCE_NOT_ACCEPTED');
   if(!input.publicDeployed)codes.push('MFP_PUBLIC_ACCEPTANCE_NOT_DEPLOYED');
   if(!input.physicalVerified)codes.push('MFP_PHYSICAL_ACCEPTANCE_REQUIRED');

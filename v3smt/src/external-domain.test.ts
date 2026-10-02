@@ -89,7 +89,7 @@ function harness(){
   });
   const port=createMfpStoreKernelPort({outbox:new MemoryOutbox(),transport:{
     submitCommand,
-    readSubmission:async submissionId=>({schema:MFP_STORE_KERNEL_RESULT_SCHEMA,submissionId,state:'COMMITTED',commitId:`READ-${submissionId}`,canonicalRevision:1,orderRef:submissionId==='C1'?'O-C1':'O-K100'}),
+    readSubmission:async command=>({schema:MFP_STORE_KERNEL_RESULT_SCHEMA,submissionId:command.submissionId,state:'COMMITTED',commitId:`READ-${command.submissionId}`,canonicalRevision:1,orderRef:command.submissionId==='C1'?'O-C1':'O-K100'}),
   }});
   const security={submitFrontlineFormalCommand:command=>port.submitFormalCommand({...command,deviceId:'PAD-1',staffSessionRef:'SESSION-1'})} as Pick<MfpSecurityPort,'submitFrontlineFormalCommand'>;
   const adapter={submitExternalAction:vi.fn(async()=>Object.freeze({state:'ACKNOWLEDGED' as const}))};

@@ -479,6 +479,40 @@ public final class StoreKernelContract {
         }
     }
 
+    public static final class CommandResultRequest {
+        public final String requestId;
+        public final String commandId;
+        public final String storeId;
+        public final String operationId;
+        public final String idempotencyKey;
+        public final String requestFingerprint;
+        public final String resultJson;
+        public final String traceId;
+        public final String recordedAt;
+
+        public CommandResultRequest(
+            String requestId,
+            String commandId,
+            String storeId,
+            String operationId,
+            String idempotencyKey,
+            String requestFingerprint,
+            String resultJson,
+            String traceId,
+            String recordedAt
+        ) {
+            this.requestId = requestId;
+            this.commandId = commandId;
+            this.storeId = storeId;
+            this.operationId = operationId;
+            this.idempotencyKey = idempotencyKey;
+            this.requestFingerprint = requestFingerprint;
+            this.resultJson = resultJson;
+            this.traceId = traceId;
+            this.recordedAt = recordedAt;
+        }
+    }
+
     public static final class InboxAppendRequest {
         public final String requestId;
         public final String storeId;
