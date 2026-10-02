@@ -9,18 +9,16 @@ Repository: Pantonyeung/mfk
 
 ## 0. Owner stage authorization
 
-Owner explicitly accepted A5 at exact SHA:
-`830fd2f033f2246c1a4f30da71a0a8f9160da751`
+Owner explicitly accepted A6 at exact SHA:
+`881afbd5fd463b4833e3b5980123fe33679bb260`
 
-Owner direction:
-- Pass A5 now.
-- UI visual refinement is deferred to a later stage.
-- Advance to A6.
+Owner explicitly authorizes advancement to:
+A7 — Print + Hardware + Recovery
 
 Current Stage:
-A6 — Order Operations
+A7 — Print + Hardware + Recovery
 
-PR #627 remains legacy v2 rollback / security-critical containment / production-blocker emergency evidence only.
+PR #627 remains legacy v2 rollback / security-critical containment / production-blocker evidence only.
 
 ## 1. Mandatory read order
 
@@ -28,47 +26,31 @@ PR #627 remains legacy v2 rollback / security-critical containment / production-
 2. `docs/plan/MFP_V3_OWNER_FINAL_CROSSWALK_2026-10-02.txt`
 3. `docs/plan/MFP_V3_SMM_Migration_Plan_2026-10-02.txt`
 4. `docs/governance/MFK_V3_SMT_REBUILD_AUTHORITY_2026-10-02.md`
-5. `docs/control/MFK_CHANGE_CONTROL.md`
-6. `HANDOFF_CURRENT.md`
-7. `docs/handoff/MFP_V3_A6_ORDER_OPERATIONS_CODEX_HANDOFF_2026-10-02.md`
-8. current A6 Draft PR / Issue
-9. parent PR #641 / exact parent SHA
-10. verified repository evidence
+5. `docs/design/MFP_PAD_ORDERING_VISUAL_LOCK_R1_2026-10-02.md`
+6. `docs/control/MFK_CHANGE_CONTROL.md`
+7. `HANDOFF_CURRENT.md`
+8. `docs/handoff/MFP_V3_A7_PRINT_HARDWARE_RECOVERY_CODEX_HANDOFF_2026-10-02.md`
+9. current A7 Draft PR / Issue
+10. parent PR #643 / exact parent SHA
+11. existing Carrier Print Gateway / Print evidence source
 
-Conflict:
+If source/runtime/authority conflicts:
 `GOVERNANCE_DRIFT`
 
-## 2. Product
+## 2. Product structure
 
-MFP
+MFP:
 - MFP Pad
 - MFP Mobile
 
 SMM:
-cancelled as final product identity.
-No new SMM order/state/head/session authority.
+- cancelled as final product identity
+- no new SMM authority/state/head/session
 
-## 3. Current Stage
+SMT:
+- may remain as internal legacy Store Kernel / Carrier identifier only
 
-A6 — Order Operations
-
-Execution branch:
-`feat/MFP-V3-A6-ORDER-OPERATIONS-2026-10-02`
-
-Parent:
-#641 — MFP V3 A5｜Checkout + Money｜2026-10-02
-
-Parent exact SHA:
-`830fd2f033f2246c1a4f30da71a0a8f9160da751`
-
-A5:
-`SOURCE_VERIFIED / OWNER ACCEPTED`
-
-A5 visual polish:
-DEFERRED BY OWNER
-Not an A6 blocker.
-
-## 4. Stage model
+## 3. Stage status
 
 A0 — SOURCE_VERIFIED
 A1 — SOURCE_VERIFIED
@@ -76,62 +58,82 @@ A2 — SOURCE_VERIFIED
 A3 — SOURCE_VERIFIED
 A4 — SOURCE_VERIFIED / OWNER ACCEPTED
 A5 — SOURCE_VERIFIED / OWNER ACCEPTED
-A6 — CURRENT
-A7 — Print + Hardware + Recovery
+A6 — SOURCE_VERIFIED / OWNER ACCEPTED
+A7 — CURRENT
 A8 — Customer + Keeta + External
 A9 — Public + Diagnostics + Physical Acceptance + Cutover
 
-## 5. A6 lock
+## 4. A7 authority lock
 
-A6 scope:
-- canonical Orders read model
-- Orders page
-- fulfillment
-- ETA
-- formal modification
-- payment correction/refund operational entry
-- cancellation
-- Dining
-- waiting/table transfer
-- split checkout orchestration into A5
-- sold-out/restore
-- capacity pool
-- channel thresholds
-- bounded override
-- More/Tools shell
-
-Do not rebuild:
+Do NOT rebuild:
+- Print Router
+- Durable PrintJob authority
 - Store Kernel
-- Order Authority
-- Pricing
-- Payment
-- Print
-- Availability/Capacity authority
-- Customer/Keeta provider engine
+- Order/Pricing/Payment/Fulfillment
+- Carrier native print gateway
 
-## 6. First RED
+A7 connects MFP source/UI to:
+- canonical PrintJob/readback
+- existing Carrier durable gateway
+- local physical printer bindings
+- hardware/recovery evidence
 
-Given canonical formal Order O1:
+## 5. P0 print rule
 
-IN_PROGRESS
-→ READY
-→ IN_PROGRESS
+`UNKNOWN PRINT OUTCOME != SAFE TO RETRY`
 
-must preserve:
-- same orderId O1
-- same Formal Order authority
-- no second Order
-- expected revision
-- stable operation identity
-- stale fail-closed
-- UNKNOWN readback-first
+If a physical dispatch was already in progress and process/device restarts before definitive evidence:
+- preserve canonical job identity
+- mark/retain UNKNOWN / AMBIGUOUS_AFTER_SEND
+- do not auto-reprint
+- require explicit human reprint decision
 
-## 7. Change control
+No blind duplicate physical output.
+
+## 6. Owner print responsibility lock
+
+Admin:
+- Product printing rules
+- logical destinations
+- template authoring/publish
+
+MFP local:
+- physical printer/IP
+- local binding
+- published template selection where allowed
+- actual hardware dispatch
+
+MFP must not create a second Product → Printer routing authority.
+
+## 7. Visual lock
+
+A7 Pad UI extends:
+`MFP_PAD_ORDERING_VISUAL_LOCK_R1`
+
+No new visual system.
+
+Print/Hardware surfaces live under More/Tools using:
+- blue visual language
+- high-density cards
+- stable action geometry
+- explicit attention states
+
+## 8. Change control
 
 Mode:
-PREPARE
+`PREPARE`
 
-No:
+Authorized:
+- A7 bounded source
+- tests
+- CI
+- Draft PR
+- source evidence
+
+Carrier source:
+READ ONLY by default.
+
+Not authorized:
 - merge
 - deploy
 - OTA
@@ -141,7 +143,7 @@ No:
 Completion:
 `SOURCE_VERIFIED`
 
-## 8. Status language
+## 9. Status language
 
 Only:
 - SOURCE_VERIFIED
@@ -151,4 +153,4 @@ Only:
 - FAILED
 
 MILESTONE:
-`MFP_V3_A6_CURRENT_EXECUTION_CONTROL_2026_10_02`
+`MFP_V3_A7_CURRENT_EXECUTION_CONTROL_2026_10_02`
