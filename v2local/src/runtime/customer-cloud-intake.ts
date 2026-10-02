@@ -485,16 +485,21 @@ export async function reconcileCustomerCloudBridge(){
 }
 
 let installed=false;
+let lastObservedConfigFingerprint='';
 export function installCustomerCloudBridge(){
   if(installed||typeof window==='undefined')return;
   installed=true;
   const reconcile=()=>void reconcileCustomerCloudBridge();
+  lastObservedConfigFingerprint=readSmtAdminConfigLkg()?.fingerprint??'';
   subscribeSmtCloudDoorbell(event=>{
     if(event.type==='CUSTOMER_ORDER_AVAILABLE'||event.type==='OWNER_SELLABILITY_COMMAND_AVAILABLE')reconcile();
   });
-  subscribeSmtAdminConfig(reconcile);
+  subscribeSmtAdminConfig(()=>{
+    const fingerprint=readSmtAdminConfigLkg()?.fingerprint??'';
+    if(!fingerprint||fingerprint===lastObservedConfigFingerprint)return;
+    lastObservedConfigFingerprint=fingerprint;
+    reconcile();
+  });
   window.addEventListener('online',reconcile);
-  window.addEventListener('focus',reconcile);
-  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')reconcile();});
   window.setTimeout(reconcile,0);
 }
