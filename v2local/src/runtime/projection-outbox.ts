@@ -1,5 +1,5 @@
 import {createSmtProjectionEvent,type SmtProjectionEvent} from '../../../contracts/smt-projection-v1.ts';
-import {readSmtDeviceId,readAdminSnapshotSection,subscribeSmtAdminConfig} from './admin-config-sync.ts';
+import {readSmtDeviceId,readAdminSnapshotSection} from './admin-config-sync.ts';
 import {resolveBusinessWindow,type LocalCashOpening,type LocalDayClose} from './local-operations.ts';
 import type {CustomerReorderHistoryPriceFact,CustomerReorderIntentLine} from '../../../contracts/customer-cloud-v1.ts';
 
@@ -291,7 +291,5 @@ export function installProjectionOutboxAutoFlush(){
   installed=true;
   const flush=()=>void flushProjectionOutbox();
   window.addEventListener('online',flush);
-  window.addEventListener('focus',flush);
-  subscribeSmtAdminConfig(flush);
   window.setTimeout(flush,0);
 }
