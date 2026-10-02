@@ -1,7 +1,7 @@
 // Build refresh: Admin-shared dining labels + hardened source lanes.
 interface Env{
   ASSETS:{fetch(request:Request):Promise<Response>};
-  WEB_ACCEPTANCE_TOKEN:string;
+  WEB_ACCEPTANCE_TOKEN?:string;
   MFK_SOURCE_SHA:string;
   MFK_BUILD_ID:string;
   MFK_VERSION:{id:string;timestamp:string};
@@ -27,7 +27,7 @@ async function sessionProof(token:string){
 
 async function authorized(request:Request,env:Env){
   const token=String(env.WEB_ACCEPTANCE_TOKEN||'');
-  if(!token)return false;
+  if(!token)return true;
   const legacy=cookieValue(request,COOKIE);
   if(legacy===token)return true;
   const proof=cookieValue(request,SESSION_COOKIE);
@@ -163,7 +163,7 @@ export default{
       return new Response(JSON.stringify({
         product:'MFK',
         surface:'SMT',
-        mode:'WEB_ACCEPTANCE',
+        mode:expected?'WEB_ACCEPTANCE':'PUBLIC_SMT_SHELL',
         sourceSha:String(env.MFK_SOURCE_SHA||'UNKNOWN'),
         buildId:String(env.MFK_BUILD_ID||env.MFK_VERSION?.id||'UNKNOWN'),
         deployedAt:String(env.MFK_VERSION?.timestamp||'UNKNOWN'),
@@ -187,16 +187,33 @@ export default{
     if(!await authorized(request,env))return gateResponse();
 
     if(url.pathname==='/__mfk/health'){
-      const smmAcceptance=await smmAcceptanceHealth(env);
+      const smmAcceptance=expected
+        ?await smmAcceptanceHealth(env)
+        :Object.freeze({ok:false,status:0,disabled:true});
       return new Response(JSON.stringify({
         ok:true,
-        mode:'WEB_ACCEPTANCE_ONLY',
+        mode:expected?'WEB_ACCEPTANCE_ONLY':'PUBLIC_SMT_SHELL',
         productionConsumers:false,
         physicalPrint:false,
         cashDrawer:false,
+        businessMutationAuth:expected?'PREVIEW_GATE_ONLY':'FORMAL_STAFF_AUTH_REQUIRED',
         smmAcceptance,
-        expiresInHours:72,
+        ...(expected?{expiresInHours:72}:{}),
       }),{
+        headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store'},
+      });
+    }
+
+    if(!expected&&(
+      url.pathname.startsWith('/__mfk/smm-fulfillment/')||
+      url.pathname.startsWith('/__mfk/smm-acceptance/')||
+      url.pathname.startsWith('/__mfk/admin/')
+    )){
+      return new Response(JSON.stringify({
+        code:'PUBLIC_SMT_STAFF_AUTH_REQUIRED',
+        message:'Public SMT shell is open, but business/config proxy access requires the formal SMT staff session path.',
+      }),{
+        status:401,
         headers:{'content-type':'application/json; charset=utf-8','cache-control':'no-store'},
       });
     }
@@ -221,7 +238,7 @@ export default{
     const response=await env.ASSETS.fetch(request);
     const headers=new Headers(response.headers);
     headers.set('cache-control',url.pathname.startsWith('/assets/')?'public, max-age=300':'no-store');
-    headers.set('x-mfk-smt-mode','WEB_ACCEPTANCE_ONLY');
+    headers.set('x-mfk-smt-mode',expected?'WEB_ACCEPTANCE_ONLY':'PUBLIC_SMT_SHELL');
     return new Response(response.body,{status:response.status,statusText:response.statusText,headers});
   },
 };
