@@ -29,14 +29,14 @@ const sourceLabels:Readonly<Record<string,string>>={WALK_IN:'現場',PHONE:'電�
 const sourceLabel=(source:string)=>sourceLabels[source]??source;
 
 export type MfpOperationalPage='ORDERS'|'DINING'|'AVAILABILITY'|'MORE';
-export type MfpAppPage='ORDERING'|'PRINT_HARDWARE'|MfpOperationalPage;
+export type MfpAppPage='ORDERING'|'PRINT_HARDWARE'|'CHECK_CENTER'|MfpOperationalPage;
 
 export function MfpOperationsNavigation({surface,active,onNavigate}:{surface:MfpOrderingSurface;active:MfpAppPage;onNavigate:(page:MfpAppPage)=>void}){
   const labels:ReadonlyArray<readonly [MfpAppPage,string]>=[
     ['ORDERING','Ordering'],['ORDERS','Orders'],['DINING','Dining'],['AVAILABILITY','Sold-out / Capacity'],
   ];
   return <div className={`mfp-operations-nav-shell ${surface==='MFP_MOBILE'?'mobile':''}`}>
-    <button type="button" className={`mfp-more-tools-button ${active==='MORE'||active==='PRINT_HARDWARE'?'active':''}`} aria-current={active==='MORE'||active==='PRINT_HARDWARE'?'page':undefined} onClick={()=>onNavigate('MORE')}><span aria-hidden="true">☰</span> More / Tools</button>
+    <button type="button" className={`mfp-more-tools-button ${active==='MORE'||active==='PRINT_HARDWARE'||active==='CHECK_CENTER'?'active':''}`} aria-current={active==='MORE'||active==='PRINT_HARDWARE'||active==='CHECK_CENTER'?'page':undefined} onClick={()=>onNavigate('MORE')}><span aria-hidden="true">☰</span> More / Tools</button>
     <nav className="mfp-operations-nav" aria-label="MFP high-frequency operations navigation">
       {labels.map(([page,label])=><button type="button" key={page} className={active===page?'active':''} aria-current={active===page?'page':undefined} onClick={()=>onNavigate(page)}>{label}</button>)}
     </nav>
@@ -201,11 +201,11 @@ function AvailabilityWorkspace({surface,model,onOperation}:{surface:MfpOrderingS
   </section>;
 }
 
-function MoreWorkspace({model,onTool}:{model:MfpOrderOperationsReadModel;onTool:(tool:string)=>void}){
+export function MfpMoreWorkspace({model,onTool}:{model?:MfpOrderOperationsReadModel;onTool:(tool:string)=>void}){
   const tools=[
     ['Day Close','A5'],['Reports','A5'],['Devices','A7 / A9'],['Print Devices','A7'],['Check Center','A9'],['Backup / Restore','A9'],['Diagnostics','A9'],['Admin Sync','A9'],
   ] as const;
-  return <section className="mfp-more-workspace" data-more-tools-shell="A6"><header><div><small>店務工具</small><h1>More / Tools</h1></div></header><article className="mfp-today-summary"><h2>Today</h2><strong>{model.todaySummary?.orderCount??'—'} Orders</strong><b>{formatMoney(model.todaySummary?.recognizedAmountMinor)}</b><small>{model.todaySummary?'已連接今日正式數據':'今日數據未接駁'}</small></article><div className="mfp-tools-grid">{tools.map(([label,stage])=><button type="button" key={label} onClick={()=>onTool(label)}><b>{label}</b><small>{stage==='A5'?'使用現有 Money / Reporting':stage==='A7'?'Print / Hardware':'未接駁'}</small></button>)}</div></section>;
+  return <section className="mfp-more-workspace" data-more-tools-shell="A6"><header><div><small>店務工具</small><h1>More / Tools</h1></div></header><article className="mfp-today-summary"><h2>Today</h2><strong>{model?.todaySummary?.orderCount??'—'} Orders</strong><b>{formatMoney(model?.todaySummary?.recognizedAmountMinor)}</b><small>{model?.todaySummary?'已連接今日正式數據':'今日數據未接駁'}</small></article><div className="mfp-tools-grid">{tools.map(([label,stage])=><button type="button" key={label} onClick={()=>onTool(label)}><b>{label}</b><small>{stage==='A5'?'使用現有 Money / Reporting':stage==='A7'?'Print / Hardware':'A9 Check Center'}</small></button>)}</div></section>;
 }
 
 export function MfpOrderOperationsWorkspace({surface,page,model,tenders,operationStatus,pendingDiningIntent=null,onOperation,onSplitCheckout,onTool,onReturnToOrdering=()=>{},printSession}:{
@@ -217,7 +217,7 @@ export function MfpOrderOperationsWorkspace({surface,page,model,tenders,operatio
     {page==='ORDERS'?<OrdersWorkspace surface={surface} model={model} tenders={tenders} onOperation={onOperation} onSplit={setSplitOrder} printSession={printSession}/>:null}
     {page==='DINING'?<DiningWorkspace surface={surface} model={model} pendingIntent={pendingDiningIntent} onOperation={onOperation} onSplit={setSplitOrder} onReturnToOrdering={onReturnToOrdering} printSession={printSession}/>:null}
     {page==='AVAILABILITY'?<AvailabilityWorkspace surface={surface} model={model} onOperation={onOperation}/>:null}
-    {page==='MORE'?<MoreWorkspace model={model} onTool={onTool}/>:null}
+    {page==='MORE'?<MfpMoreWorkspace model={model} onTool={onTool}/>:null}
     {operationStatus?<output className="mfp-operation-status" aria-live="polite">{operationStatus}</output>:null}
   </section>{splitOrder?<SplitCheckoutPanel order={splitOrder} onSubmit={onSplitCheckout} onClose={()=>setSplitOrder(null)}/>:null}</>;
 }

@@ -13,6 +13,7 @@ import {
 } from './order-operations-domain.ts';
 import {
   MfpOperationsNavigation,
+  MfpMoreWorkspace,
   MfpOrderOperationsWorkspace,
   type MfpAppPage,
   type MfpOperationalPage,
@@ -25,6 +26,7 @@ import type {MfpTenderConfig} from './checkout-domain.ts';
 import {createMfpPrintHardwareSession,type MfpPrintHardwareBinding,type MfpPrintHardwareSession} from './print-hardware-domain.ts';
 import {MfpPrintHardwareRuntime,mfpPrintHardwareRuntimeBinding} from './print-hardware-runtime.tsx';
 import {MfpExternalRuntime,mfpExternalRuntimeBinding,type MfpExternalProviderBinding} from './external-runtime.tsx';
+import {MfpCheckCenter} from './check-center.tsx';
 
 type OperationsBinding=Readonly<{
   authority:MfpOrderOperationsReadPort&Required<Pick<MfpOrderOperationsReadPort,'readOperations'>>;
@@ -41,6 +43,15 @@ export const mfpOrderOperationsRuntimeBinding:OperationsBinding=Object.freeze({
 });
 
 const message=(error:unknown)=>error instanceof Error?error.message:'MFP_ORDER_OPERATION_UNAVAILABLE';
+
+function MfpMoreRuntime({binding,onTool}:{binding:OperationsBinding;onTool:(tool:string)=>void}){
+  const readback=useQuery({
+    queryKey:['mfp','more-summary'],
+    queryFn:async()=>validateMfpOrderOperationsReadModel(await binding.authority.readOperations()),
+    refetchInterval:false,retry:false,
+  });
+  return <MfpMoreWorkspace model={readback.data} onTool={onTool}/>;
+}
 
 function MfpOrderOperationsRuntime({surface,page,security,binding,pendingDiningIntent,onDiningAdmitted,onReturnToOrdering,printSession,onOpenPrintHardware}:{
   surface:MfpOrderingSurface;
@@ -126,7 +137,9 @@ export function MfpApplicationRuntime({surface,security,sync,projectionStore,che
     <div className="mfp-application-workspace">
       <div hidden={page!=='ORDERING'}><MfpOrderingRuntime surface={surface} security={security} sync={sync} projectionStore={projectionStore} checkout={checkout} onDiningIntent={intent=>{setPendingDiningIntent(intent);setPage('DINING');}}/></div>
       {page==='PRINT_HARDWARE'?<MfpPrintHardwareRuntime surface={surface} session={printSession.current}/>:null}
-      {page!=='ORDERING'&&page!=='PRINT_HARDWARE'?<MfpOrderOperationsRuntime surface={surface} page={page} security={security} binding={operations} pendingDiningIntent={pendingDiningIntent} onDiningAdmitted={()=>setPendingDiningIntent(null)} onReturnToOrdering={()=>setPage('ORDERING')} printSession={printSession.current} onOpenPrintHardware={()=>setPage('PRINT_HARDWARE')}/>:null}
+      {page==='MORE'?<MfpMoreRuntime binding={operations} onTool={tool=>setPage(tool==='Print Devices'?'PRINT_HARDWARE':['Check Center','Backup / Restore','Diagnostics','Admin Sync','Devices'].includes(tool)?'CHECK_CENTER':'MORE')}/>:null}
+      {page==='CHECK_CENTER'?<MfpCheckCenter surface={surface}/>:null}
+      {page!=='ORDERING'&&page!=='PRINT_HARDWARE'&&page!=='MORE'&&page!=='CHECK_CENTER'?<MfpOrderOperationsRuntime surface={surface} page={page} security={security} binding={operations} pendingDiningIntent={pendingDiningIntent} onDiningAdmitted={()=>setPendingDiningIntent(null)} onReturnToOrdering={()=>setPage('ORDERING')} printSession={printSession.current} onOpenPrintHardware={()=>setPage('PRINT_HARDWARE')}/>:null}
     </div>
   </div>;
 }
