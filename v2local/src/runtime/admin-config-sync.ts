@@ -44,12 +44,14 @@ export interface SmtAdminConfigApplyResult{
   readonly fingerprint:string;
 }
 
-const listeners=new Set<()=>void>();
+const configListeners=new Set<()=>void>();
+const statusListeners=new Set<()=>void>();
 export interface SmtCloudDoorbell{readonly type:string;readonly [key:string]:unknown}
 const ADMIN_PROPAGATION_DIAG_KEY='mfk.v2local.admin-propagation-diag.v1';
 const cloudDoorbellListeners=new Set<(event:SmtCloudDoorbell)=>void>();
 
-function emit(){for(const listener of listeners)listener();}
+function emitConfig(){for(const listener of configListeners)listener();}
+function emitStatus(){for(const listener of statusListeners)listener();}
 function now(){return new Date().toISOString();}
 function readJson<T>(key:string,fallback:T):T{
   try{
@@ -88,6 +90,7 @@ function readSmtAdminSyncBundle():SmtAdminSyncBundle|null{
 }
 
 function commitSmtAdminSyncBundle(head:MfkSyncHead,entities:MfkSyncEntityMap,appliedSeq:number,checkpointSeq:number){
+  const previous=readSmtAdminSyncBundle();
   const projectionHash=projectionHashForEntities(entities);
   if(appliedSeq===head.headSeq&&projectionHash!==head.projectionHash)throw new Error('SYNC_FINAL_PROJECTION_HASH_MISMATCH');
   const snapshot=materializeSmtSnapshot(entities);
@@ -126,6 +129,8 @@ function commitSmtAdminSyncBundle(head:MfkSyncHead,entities:MfkSyncEntityMap,app
     headSeq:head.headSeq,
     syncProtocol:MFK_CHECKPOINTED_DELTA_SYNC_PROTOCOL,
   });
+  const configChanged=!previous||previous.envelope.fingerprint!==envelope.fingerprint||previous.projectionHash!==projectionHash;
+  if(configChanged)emitConfig();
   return bundle;
 }
 function randomId(){
@@ -161,11 +166,15 @@ export function readSmtAdminSyncStatus():SmtAdminSyncStatus{
 }
 function setStatus(status:SmtAdminSyncStatus){
   writeJson(SMT_ADMIN_CONFIG_STATUS_KEY,status);
-  emit();
+  emitStatus();
 }
 export function subscribeSmtAdminConfig(listener:()=>void){
-  listeners.add(listener);
-  return()=>{listeners.delete(listener);};
+  configListeners.add(listener);
+  return()=>{configListeners.delete(listener);};
+}
+export function subscribeSmtAdminSyncStatus(listener:()=>void){
+  statusListeners.add(listener);
+  return()=>{statusListeners.delete(listener);};
 }
 export function subscribeSmtCloudDoorbell(listener:(event:SmtCloudDoorbell)=>void){
   cloudDoorbellListeners.add(listener);
@@ -206,6 +215,7 @@ export function applyAdminConfigEnvelope(input:unknown):SmtAdminConfigApplyResul
     appliedAt,
     updatedAt:appliedAt,
   });
+  emitConfig();
   return Object.freeze({disposition:'APPLIED',revision:next.revision,fingerprint:next.fingerprint});
 }
 
@@ -460,16 +470,17 @@ function connectDoorbell(){
     socket=new WebSocket(smtAdminWebSocketUrl());
     socket.addEventListener('open',()=>{
       reconnectAttempt=0;
-      void reconcileSmtCheckpointedSync();
     });
     socket.addEventListener('message',event=>{
       try{
         const row=JSON.parse(String(event.data)) as SmtCloudDoorbell&{revision?:number;fingerprint?:string};
         if(row.type==='PORT_HEAD_AVAILABLE'&&row.port==='SMT'){
           const receivedAt=now();
+          const incomingHeadSeq=Number(row.headSeq)||0;
           const status=readSmtAdminSyncStatus();
-          setStatus({...status,receivedAt,headSeq:Number(row.headSeq)||status.headSeq,updatedAt:receivedAt});
-          void reconcileSmtCheckpointedSync();
+          setStatus({...status,receivedAt,headSeq:incomingHeadSeq||status.headSeq,updatedAt:receivedAt});
+          const bundle=readSmtAdminSyncBundle();
+          if(!deltaSyncInFlight&&incomingHeadSeq>(bundle?.appliedSeq??-1))void reconcileSmtCheckpointedSync();
           return;
         }
         if(row.type==='ADMIN_CONFIG_AVAILABLE'){
@@ -485,9 +496,8 @@ function connectDoorbell(){
           }catch{}
           const status=readSmtAdminSyncStatus();
           setStatus({...status,receivedAt,updatedAt:receivedAt});
-          // Legacy doorbell remains during migration; the new client reconciles the
-          // checkpointed delta head instead of pulling the full canonical snapshot.
-          void reconcileSmtCheckpointedSync();
+          // Legacy config doorbell is diagnostics-only. PORT_HEAD_AVAILABLE is the
+          // canonical invalidation that drives checkpointed delta catch-up.
           return;
         }
         for(const listener of cloudDoorbellListeners)listener(row);
