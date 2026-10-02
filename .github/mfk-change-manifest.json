@@ -1,36 +1,34 @@
 {
   "version": 1,
-  "capability": "MFK_ADMIN_V3_FORMAL_SERVER_DRAFT_SEAM_R1",
-  "base_sha": "f78960ebbd07e1adfff62d19d3ac129be863cb53",
-  "root_control": "#596",
-  "product_control": "#601",
+  "capability": "MFK_UNIFIED_SURFACES_R1_AUTHORITY_2026_10_02",
+  "base_sha": "6862038da1ac1ab9d0846d3d05a44c933d41f662",
+  "root_control": "#22",
+  "product_control": "#627",
   "allowed_paths": [
     ".github/mfk-change-manifest.json",
-    "docs/implementation/MFK_CODEX_KICKOFF_ADMIN_V3_FORMAL_SERVER_DRAFT_SEAM_R1_2026-10-01.md",
-    "v2admin/worker.ts",
-    "v2admin/src/admin-formal-server-draft.test.ts",
-    "v2admin/src/admin-sync-websocket-transport.test.ts"
+    "COMMANDER_CURRENT.md",
+    "HANDOFF_CURRENT.md",
+    "docs/governance/MFK_UNIFIED_SURFACES_R1_AUTHORITY_2026-10-02.md",
+    "docs/handoff/2026-10-02_smt_unified_surfaces_proposal.md"
   ],
-  "authority_impact": "BOUNDED_EXTENSION_OF_EXISTING_ADMIN_CANONICAL_CONFIG_AUTHORITY_FOR_FORMAL_SERVER_DRAFT_ONLY; NO_SECOND_AUTHORITY",
-  "persistence_impact": "ADD_SERVER_SIDE_ADMIN_DRAFT_RECORD_WITH_DRAFT_ID_REVISION_AND_CANONICAL_BASE_GUARD",
+  "authority_impact": "DOCUMENTS_ONLY_OWNER_AUTHORITY_UPDATE; SUPERSEDES_2026_09_30_V3_ONLY_EXECUTION_RESTRICTION_FOR_UNIFIED_SURFACES_R1; NO_RUNTIME_AUTHORITY_CHANGE_IN_THIS_CANDIDATE",
+  "persistence_impact": "NONE",
   "provider_impact": "NONE",
   "transaction_impact": "NONE",
-  "production_routing_impact": "NONE",
+  "production_routing_impact": "NONE_IN_THIS_DOCS_ONLY_CANDIDATE",
   "expected_behavior_change": [
-    "Admin V3 can persist a formal server Draft separately from unsaved browser edits.",
-    "Saved Draft supports authoritative reload/new-browser restoration and optimistic concurrency.",
-    "Stale Draft or stale second-tab writes fail closed with explicit conflicts.",
-    "Publish-from-Draft reuses existing Admin publish authority and clears Draft only after successful canonical publish.",
-    "Final canonical base guard prevents stale Draft overwrite during a publish race."
+    "Commander and handoff entry points recognize Unified Surfaces R1 as the current Owner-locked execution program.",
+    "The prior SMT unified-surfaces proposal is explicitly superseded as execution authority.",
+    "PR #627 acceptance deployment PROMOTE authority is recorded while final merge/cutover/OTA/decommission remain separately gated.",
+    "The 2026-09-30 V3-only/no-broad-v2 restriction no longer blocks the bounded v2admin/v2local convergence authorized by Unified Surfaces R1."
   ],
   "non_goals": [
-    "No Pricing authority or takeaway surcharge schema change.",
-    "No SMT Store Kernel change.",
-    "No Order, Payment, Refund, Cancel or provider transaction change.",
-    "No v2 browser-state migration.",
-    "No localStorage, sessionStorage or Dexie formal Draft authority.",
-    "No production deploy, hostname cutover or OTA."
+    "No runtime source change.",
+    "No deploy in this governance candidate.",
+    "No Store Kernel, Pricing, Order, Payment, Fulfillment, Print, Customer or Keeta logic change.",
+    "No Builder or OTA protocol change.",
+    "No final PR #627 merge or legacy decommission."
   ],
-  "rollback_sha": "f78960ebbd07e1adfff62d19d3ac129be863cb53",
-  "severity": "HARD_BLOCK"
+  "rollback_sha": "6862038da1ac1ab9d0846d3d05a44c933d41f662",
+  "severity": "SOFT_BLOCK"
 }
