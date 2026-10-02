@@ -37,7 +37,14 @@ function renderHarness(state:MfpStaffSessionState,authenticated=false){
     refreshStaffSession:async()=>state,
     logoutStaff:async()=>undefined,
     precheckAction:()=>undefined,
+    precheckFrontlineAction:()=>undefined,
     submitFormalCommand:async()=>({
+      schema:'mfp.store-kernel.submission.result.v1',
+      submissionId:'SUB-01',
+      state:'REJECTED',
+      rejectionCode:'UNAUTHORIZED',
+    }),
+    submitFrontlineFormalCommand:async()=>({
       schema:'mfp.store-kernel.submission.result.v1',
       submissionId:'SUB-01',
       state:'REJECTED',

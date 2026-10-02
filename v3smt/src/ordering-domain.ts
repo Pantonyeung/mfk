@@ -458,3 +458,9 @@ export function createMfpOrderingDomain(catalog:MfpOrderingCatalog):MfpOrderingD
 export function createMfpOrderingSurfaceDomains(domain:MfpOrderingDomain){
   return Object.freeze({MFP_PAD:domain,MFP_MOBILE:domain});
 }
+
+export function markMfpDraftForFormalRevalidation(draft:MfpOrderingDraft,reason='MFP_FORMAL_VALIDATION_REJECTED'){
+  return Object.freeze({...draft,lines:Object.freeze(draft.lines.map(line=>Object.freeze({
+    ...line,state:'REVALIDATION_REQUIRED' as const,issues:Object.freeze([...new Set([...line.issues,reason])]),
+  })))});
+}

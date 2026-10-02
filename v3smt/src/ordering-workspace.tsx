@@ -1,7 +1,16 @@
 import {useEffect,useMemo,useRef,useState,type CSSProperties} from 'react';
 
 import {
+  createMfpCheckoutSession,
+  createMfpStudentDiscountIntent,
+  type MfpCheckoutSession,
+  type MfpCheckoutSnapshot,
+} from './checkout-domain.ts';
+import type {MfpCheckoutRuntimeBinding} from './checkout-runtime.ts';
+import {MfpCheckoutWorkspace} from './checkout-workspace.tsx';
+import {
   createMfpOrderingDomain,
+  markMfpDraftForFormalRevalidation,
   type MfpComboSelectionInput,
   type MfpOrderingCatalog,
   type MfpOrderingDomain,
@@ -155,8 +164,9 @@ function ProductGrid({products,mode,onProduct}:{
   }):<p className="mfp-empty-copy">呢個分類未有可用商品。</p>}</div>;
 }
 
-export function MfpOrderingWorkspace({surface,catalog,security,syncSnapshot}:{
+export function MfpOrderingWorkspace({surface,catalog,security,syncSnapshot,checkout}:{
   surface:MfpOrderingSurface;catalog:MfpOrderingCatalog|null;security:MfpSecurityPort;syncSnapshot:MfpSyncSnapshot;
+  checkout?:MfpCheckoutRuntimeBinding;
 }){
   const domain=useMemo(()=>catalog?createMfpOrderingDomain(catalog):null,[catalog]);
   const [draft,setDraft]=useState<MfpOrderingDraft>({draftOnly:true,serviceMode:'takeaway',lines:[]});
@@ -168,6 +178,9 @@ export function MfpOrderingWorkspace({surface,catalog,security,syncSnapshot}:{
   const [displaySettings,setDisplaySettings]=useState(()=>typeof window==='undefined'?DEFAULT_MFP_DISPLAY_SETTINGS:loadMfpDisplaySettings(window.localStorage));
   const [mobilePage,setMobilePage]=useState<'browse'|'cart'>('browse');
   const [feedback,setFeedback]=useState('');
+  // One shared Pad/Mobile checkout owner: https://react.dev/learn/sharing-state-between-components
+  const [checkoutSession,setCheckoutSession]=useState<MfpCheckoutSession|null>(null);
+  const [checkoutSnapshot,setCheckoutSnapshot]=useState<MfpCheckoutSnapshot|null>(null);
   const lineSequence=useRef(0);
   const priorProjection=useRef(catalog?.source.projectionHash??null);
   const securitySnapshot=security.getSnapshot();
@@ -227,6 +240,17 @@ export function MfpOrderingWorkspace({surface,catalog,security,syncSnapshot}:{
       setFeedback(error instanceof Error?error.message:'MFP_ORDERING_DRAFT_UPDATE_FAILED');
     }
   };
+  const startCheckout=()=>{
+    if(!checkout){setFeedback('A5 FORMAL CHECKOUT BINDING UNAVAILABLE');return;}
+    try{
+      const intent=domain.normalize(draft);
+      const session=createMfpCheckoutSession({intent,authority:checkout.authority,security,tenders:checkout.tenders});
+      setCheckoutSession(session);setCheckoutSnapshot(session.getSnapshot());
+      void session.open().then(()=>setCheckoutSnapshot(session.getSnapshot())).catch(error=>{
+        setCheckoutSnapshot(session.getSnapshot());setFeedback(error instanceof Error?error.message:'MFP_CHECKOUT_VALIDATION_FAILED');
+      });
+    }catch(error){setFeedback(error instanceof Error?error.message:'MFP_CHECKOUT_ENTRY_FAILED');}
+  };
   const editLine=(line:MfpOrderingDraftLine)=>setEditor(line.kind==='PRODUCT'
     ?{kind:'product',productId:line.productId!,lineId:line.cartLineId}
     :{kind:'combo',comboId:line.comboId!,lineId:line.cartLineId});
@@ -239,7 +263,30 @@ export function MfpOrderingWorkspace({surface,catalog,security,syncSnapshot}:{
       ?<ComboEditor key={editor.lineId??editor.comboId} domain={domain} draft={draft} comboId={editorCombo.id} line={editorLine} canDraft={canDraft} onSave={saveCombo} onClose={()=>setEditor(null)}/>
       :null;
   const settingsBody=settingsOpen?<MfpDisplaySettingsPanel settings={displaySettings} onChange={setDisplaySettings} onClose={()=>setSettingsOpen(false)}/>:null;
-  const cart=<MfpCartDraft domain={domain} catalog={catalog} draft={draft} heldDraft={heldDraft} canDraft={canDraft} onChange={setDraft} onHeldDraft={setHeldDraft} onEdit={editLine}/>;
+  if(checkoutSession&&checkoutSnapshot&&checkout){
+    const refresh=()=>setCheckoutSnapshot(checkoutSession.getSnapshot());
+    const fail=(error:unknown)=>setFeedback(error instanceof Error?error.message:'MFP_CHECKOUT_ACTION_FAILED');
+    return <MfpCheckoutWorkspace surface={surface} intent={domain.normalize(draft)} snapshot={checkoutSnapshot} tenders={checkout.tenders} actions={{
+      onBack:()=>{
+        if(checkoutSession.getSnapshot().draftRevalidationRequired)setDraft(current=>markMfpDraftForFormalRevalidation(current));
+        checkoutSession.returnToOrder();setCheckoutSession(null);setCheckoutSnapshot(null);
+      },
+      onChannel:(channelId,identity)=>{try{checkoutSession.selectChannel(channelId,identity);refresh();}catch(error){fail(error);}},
+      onTender:tenderId=>{try{checkoutSession.selectTender(tenderId);refresh();}catch(error){fail(error);}},
+      onCash:amountMinor=>{try{checkoutSession.setCashReceivedMinor(amountMinor);refresh();}catch(error){fail(error);}},
+      onStudentDiscount:(mode,studentCount,selected)=>{
+        const quote=checkoutSession.getSnapshot().quote;
+        if(!quote){fail(new Error('MFP_CHECKOUT_FORMAL_VALIDATION_REQUIRED'));return;}
+        try{
+          const intent=createMfpStudentDiscountIntent(quote,{mode,studentCount,selected});
+          void checkoutSession.validateStudentDiscount(intent).then(refresh).catch(fail);
+        }catch(error){fail(error);}
+      },
+      onFinalReview:()=>{try{checkoutSession.openFinalReview();refresh();}catch(error){fail(error);}},
+      onPaymentConfirm:()=>{void checkoutSession.paymentConfirm().then(refresh).catch(fail);},
+    }}/>;
+  }
+  const cart=<MfpCartDraft domain={domain} catalog={catalog} draft={draft} heldDraft={heldDraft} canDraft={canDraft} onChange={setDraft} onHeldDraft={setHeldDraft} onEdit={editLine} onCheckout={startCheckout}/>;
   const status=<div className="mfp-ordering-status"><span className={syncSnapshot.state==='OFFLINE'?'offline':''}>{freshness(syncSnapshot)}</span><span>Projection #{catalog.source.appliedSeq}</span><span>{canDraft?`A2 AUTHENTICATED · ${securitySnapshot.session?.displayName}`:`A2 SECURITY GATE · ${securitySnapshot.sessionState} · 只讀模式`}</span></div>;
   const categories=<nav className="mfp-ordering-categories" aria-label="商品分類">{catalog.categories.map(category=><button type="button" key={category.id} aria-pressed={category.id===selectedCategoryId} className={category.id===selectedCategoryId?'active':''} onClick={()=>setSelectedCategoryId(category.id)}>{category.label}</button>)}</nav>;
   const combos=catalog.combos.length?<section className="mfp-combo-strip"><header><b>Combo</b><span>Pool / Choice 由同一 Active Projection 提供</span></header><div>{catalog.combos.map(combo=><button type="button" key={combo.id} disabled={!combo.sellable||!combo.priceReady} onClick={()=>setEditor({kind:'combo',comboId:combo.id})}><b>{combo.name}</b><span>{combo.publishedBasePrice?formatMoney(combo.publishedBasePrice.amountMinor):'價錢未準備'}</span></button>)}</div></section>:null;

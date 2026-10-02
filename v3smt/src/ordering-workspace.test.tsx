@@ -32,7 +32,9 @@ const authenticatedSecurity:MfpSecurityPort={
   }),
   loadDevice:async()=>{throw new Error('UNUSED');},refreshDeviceAuthorization:async()=>{throw new Error('UNUSED');},
   loginStaff:async()=>({state:'UNAUTHORIZED'}),refreshStaffSession:async()=> 'AUTHENTICATED',logoutStaff:async()=>undefined,
-  precheckAction:()=>undefined,submitFormalCommand:async()=>{throw new Error('A4_DRAFT_ONLY');},
+  precheckAction:()=>undefined,precheckFrontlineAction:()=>undefined,
+  submitFormalCommand:async()=>{throw new Error('A4_DRAFT_ONLY');},
+  submitFrontlineFormalCommand:async()=>{throw new Error('A5_BINDING_UNAVAILABLE');},
 };
 
 const sync=(state:MfpSyncSnapshot['state']):MfpSyncSnapshot=>({

@@ -7,7 +7,14 @@ External Product: MoreFun POS
 Short Name: MFP
 Repository: Pantonyeung/mfk
 
-## 0. Supersession lock
+## 0. Owner stage authorization
+
+Owner explicitly accepted A4 Owner Final Closure at exact SHA:
+`b83321000668d39580a29e2e838aa585d5750fd5`
+
+Owner explicitly authorizes advancement to:
+
+A5 — Checkout + Money
 
 For the MoreFun POS V3 A0–A9 rebuild program, the declared MFP Stage branch/PR supersedes PR #627 / Unified Surfaces R1 as CURRENT EXECUTION CONTROL.
 
@@ -16,14 +23,15 @@ PR #627 remains legacy v2 rollback / security-critical containment / production-
 ## 1. Mandatory read order
 
 1. `COMMANDER_CURRENT.md`
-2. `docs/plan/MFP_V3_SMM_Migration_Plan_2026-10-02.txt`
-3. `docs/governance/MFK_V3_SMT_REBUILD_AUTHORITY_2026-10-02.md`
-4. `docs/control/MFK_CHANGE_CONTROL.md`
-5. `HANDOFF_CURRENT.md`
-6. current Stage handoff
-7. current Stage PR
-8. parent Stage PR / exact parent SHA
-9. verified repository evidence
+2. `docs/plan/MFP_V3_OWNER_FINAL_CROSSWALK_2026-10-02.txt`
+3. `docs/plan/MFP_V3_SMM_Migration_Plan_2026-10-02.txt`
+4. `docs/governance/MFK_V3_SMT_REBUILD_AUTHORITY_2026-10-02.md`
+5. `docs/control/MFK_CHANGE_CONTROL.md`
+6. `HANDOFF_CURRENT.md`
+7. `docs/handoff/MFP_V3_A5_CHECKOUT_MONEY_CODEX_HANDOFF_2026-10-02.md`
+8. current A5 Draft PR / Issue
+9. parent PR #639 and exact accepted parent SHA
+10. verified repository evidence
 
 If current control conflicts with verified source/runtime evidence:
 `GOVERNANCE_DRIFT`
@@ -40,34 +48,36 @@ SMM:
 - no new authority/state/head/session/order engine
 
 SMT:
-- may remain as internal legacy Store Kernel / sync port identifier
+- may remain temporarily as internal Store Kernel / sync port identifier
 - not the external product name
 
 ## 3. Current Stage
 
 Current Stage:
-A4 — Ordering Surfaces
+A5 — Checkout + Money
 
 Execution branch:
-`feat/MFP-V3-A4-ORDERING-SURFACES-2026-10-02`
+`feat/MFP-V3-A5-CHECKOUT-MONEY-2026-10-02`
 
 Current handoff:
-`docs/handoff/MFP_V3_A4_ORDERING_SURFACES_CODEX_HANDOFF_2026-10-02.md`
+`docs/handoff/MFP_V3_A5_CHECKOUT_MONEY_CODEX_HANDOFF_2026-10-02.md`
 
 Parent:
-#637 — MFP V3 A3｜Sync + Offline｜2026-10-02
+#639 — MFP V3 A4｜Ordering Surfaces｜2026-10-02
 
 Parent exact SHA:
-`adc2cc64573d9d5f7b357a7955ff2b0edc1fd509`
+`b83321000668d39580a29e2e838aa585d5750fd5`
 
-A3:
+A4:
 `SOURCE_VERIFIED`
+Owner accepted.
 
 Carried production blockers:
 - A2 production Device/Staff authority binding = BLOCKED
-- A3 production sync binding/physical offline acceptance = BLOCKED
+- production Store Kernel binding = BLOCKED
+- A3 production sync binding / physical offline acceptance = BLOCKED
 
-These block deployment, not A4 source implementation.
+These block deploy/physical acceptance, not A5 source implementation.
 
 ## 4. Stage model
 
@@ -75,111 +85,116 @@ A0 — Foundation — SOURCE_VERIFIED
 A1 — Store Kernel Seam — SOURCE_VERIFIED
 A2 — Device + Staff Security — SOURCE_VERIFIED
 A3 — Sync + Offline — SOURCE_VERIFIED
-A4 — Ordering Surfaces — CURRENT / BLOCKED FOR OWNER CROSSWALK CLOSURE
-A5 — Checkout + Money
+A4 — Ordering Surfaces — SOURCE_VERIFIED / OWNER ACCEPTED
+A5 — Checkout + Money — CURRENT
 A6 — Order Operations
 A7 — Print + Hardware + Recovery
 A8 — Customer + Keeta + External
 A9 — Public + Diagnostics + Physical Acceptance + Cutover
 
-## 5. A4 product lock
+## 5. A5 formal boundary lock
 
-A4 is the first formal MFP product-UI stage.
+A5 first crosses from local ordering draft into formal transaction submission.
 
-Implement:
-- MFP Pad ordering UI
-- MFP Mobile ordering UI
-- one shared ordering domain contract
-- one shared normalized cart intent
-- categories/products/options/combo/cart/service mode
-- local price preview from published material facts
-- read-only sellability display
-- A3 active projection consumption
+Required chain:
+
+A4 Normalized Draft
+→ Formal Price / Revision Validation
+→ Final Review
+→ explicit PAYMENT CONFIRM
+→ Store Kernel formal command
+→ COMMITTED / REJECTED / UNKNOWN
+→ canonical readback
 
 Hard rules:
-- no second Pricing Authority
-- no second Order Authority
-- no second Sync Authority
-- no formal order commit
-- no payment/tender
-- no print/fulfillment truth
-- no SMM mobile engine
-- no direct catalog polling/fetch in UI
+
+- opening Checkout != formal transaction
+- changing channel != formal transaction
+- changing tender != formal transaction
+- returning to Order != formal transaction
+- Final Review != formal transaction
+- only explicit Payment Confirm may submit
+- client never manufactures COMMITTED / payment success / Order identity
 
 ## 6. First RED
 
-Same active canonical projection + same user selections must produce the same normalized cart intent on MFP Pad and MFP Mobile.
+Before implementation:
 
-Must prove:
-- same product identity
-- same service mode
-- same options
-- same combo choices
-- same quantity
-- same material facts
-- no surface-specific pricing/order authority
+A4 normalized draft enters Checkout and receives formal validation.
 
-## 7. A4 integration locks
+Before Payment Confirm:
+formal Store Kernel commit count MUST remain 0.
 
-A3:
-- ordering reads active LKG/projection
-- no new WebSocket
-- no new sync coordinator
-- no periodic business polling
+After one Payment Confirm:
+exactly one formal submission may occur.
 
-A2:
-- use existing security state/gate
-- do not reimplement login
+Double tap / retry:
+same submissionId + idempotencyKey
+→ no duplicate formal effect.
 
-A1:
-- no formal Store Kernel submit from ordering draft
-- A5 owns formal checkout integration
+Stale formal price/revision:
+→ REJECT before commit
+→ no client shortcut.
 
-## 8. UI strategy
+## 7. Owner FINAL money locks
 
-A4 must build real functional product UI, not only a harness.
+A5 must include:
+- Pad + Mobile Checkout
+- source/channel separate from tender
+- Cash keypad $20/$50/$100/$200/$500/Exact
+- Student Discount exact Owner rule
+- 75% Final Review
+- Payment Confirm = formal transaction boundary
+- Business Day / opening cash
+- Cash In / Cash Out ledger
+- Day Close cash count
+- retained cash / next opening
+- Channel Summary
+- Tender Summary
+- ELECTRONIC_UNCLASSIFIED reporting
+- immutable Daily Report money facts
+- append-only later adjustment contract
 
-Pad:
-- high-density, fast ordering workspace
+## 8. Student Discount exact rule
 
-Mobile:
-- true touch-first mobile interaction
-- not scaled-down Pad
+Staff-confirmed Student Count = N.
 
-Different presentation is allowed.
-Different business semantics are not.
+Manual:
+staff selects up to N eligible special drinks.
 
-## 9. Owner crosswalk closure
+Auto:
+system chooses up to N eligible special drinks,
+most expensive first.
 
-Controlling crosswalk:
-`docs/plan/MFP_V3_OWNER_REQUIREMENTS_CROSSWALK_2026-10-02.md`
+Equal-price tie:
+deterministic stable line identity.
 
-Current A4 implementation slice at:
-`5e4118c003bef84a5e0262d5ac925537c4686ff3`
+Client emits discount intent only.
+Formal Pricing Authority validates final amount.
 
-is SOURCE_VERIFIED for its declared ordering-domain slice.
+## 9. Permission Owner alignment
 
-A4 stage closure is BLOCKED until:
-- A4-C1 Display Settings
-- A4-C2 Navigation + More shell
-- A4-C3 75% major modal geometry
-- A4-C4 exact Cart semantics
-- A4-C5 Hold/Retrieve/Dining draft entry
-- A4-C6 exact Fast Lane
-- A4-C7 Owner UI acceptance baseline
+Owner FINAL:
+valid authenticated MFP login
+→ eligible for FINAL-defined frontline/local MFP operations.
 
-are SOURCE_VERIFIED.
+No Manager-only gate in this Owner version.
 
-Do not start A5 before A4 closure.
+Preserve:
+- device authorization
+- formal staff session
+- expiry/revocation
+- Store Kernel admission
 
-## 10. Permission clarification
+But A5 formal checkout must not be denied solely by a Manager-style granular permission assumption not present in Owner FINAL.
 
-Owner FINAL product rule:
-authorized MFP staff must not be given an invented Manager-only product gate for the Owner-listed MFP operations.
+## 10. Offline/local lock
 
-A2 permission plumbing remains mandatory.
-Store Kernel/server admission remains mandatory.
-Canonical permission policy must express the Owner product rule rather than silently narrowing it.
+A5 source architecture must not require unrelated Cloud/Admin/Owner/Provider round trips for local Store Kernel checkout/money operations.
+
+No periodic business/money polling.
+
+Production offline readiness remains separately BLOCKED until physical binding/acceptance.
 
 ## 11. Change-control mode
 
@@ -187,11 +202,11 @@ Current mode:
 PREPARE
 
 Authorized:
-- bounded A4 source
-- real ordering UI
+- bounded A5 source
 - tests
 - CI
-- Draft PR updates
+- Draft PR
+- source evidence
 
 Not authorized:
 - merge
@@ -199,7 +214,7 @@ Not authorized:
 - OTA
 - public cutover
 - SMM decommission
-- backend authority widening
+- backend authority widening without explicit new authority
 
 Completion target:
 `SOURCE_VERIFIED`
@@ -214,24 +229,4 @@ Only:
 - FAILED
 
 MILESTONE:
-`MFP_V3_A4_CURRENT_EXECUTION_CONTROL_2026_10_02`
-
-
-## 11. Owner FINAL Crosswalk Gate｜2026-10-02
-
-Original A4 declared scope at SHA `5e4118c003bef84a5e0262d5ac925537c4686ff3` is SOURCE_VERIFIED.
-
-However, Owner FINAL crosswalk found required carry-forward gaps.
-Current A4 execution is therefore:
-
-`BLOCKED — OWNER_REQUIREMENTS_CARRY_FORWARD_INCOMPLETE`
-
-Controlling crosswalk:
-`docs/plan/MFP_V3_OWNER_FINAL_CROSSWALK_2026-10-02.txt`
-
-A4 must close A4-OF-01..09 in the A4 handoff before A5 begins.
-
-Do not advance to A5 until A4 Owner Final Closure is SOURCE_VERIFIED.
-
-MILESTONE:
-`MFP_V3_A4_OWNER_FINAL_CLOSURE_GATE_2026_10_02`
+`MFP_V3_A5_CURRENT_EXECUTION_CONTROL_2026_10_02`

@@ -209,6 +209,27 @@ describe('MFP V3 A2 security port',()=>{
     expect(value.storeKernel.submitFormalCommand).not.toHaveBeenCalled();
   });
 
+  it('admits valid authenticated STAFF checkout without a Manager-only granular permission',async()=>{
+    const value=fixture({formalSession:session('AUTHENTICATED',undefined,{role:'STAFF',permissions:[]})});
+    await authorizeAndLogin(value);
+
+    expect(()=>value.security.precheckFrontlineAction()).not.toThrow();
+    expect(await value.security.submitFrontlineFormalCommand(command())).toEqual(committed);
+    expect(value.storeKernel.submitFormalCommand).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    ['EXPIRED',session('AUTHENTICATED','2026-10-02T05:59:59.000Z'),'MFP_STAFF_SESSION_EXPIRED'],
+    ['REVOKED',session('REVOKED'),'MFP_STAFF_SESSION_REVOKED'],
+    ['UNKNOWN',session('UNKNOWN'),'MFP_STAFF_SESSION_UNKNOWN'],
+  ] as const)('keeps %s frontline sessions fail-closed',async(_label,formalSession,errorCode)=>{
+    const value=fixture({formalSession});
+    await value.security.loadDevice();await value.security.refreshDeviceAuthorization();
+    await value.security.loginStaff('STAFF-01','2468');
+    await expect(value.security.submitFrontlineFormalCommand(command())).rejects.toThrow(errorCode);
+    expect(value.storeKernel.submitFormalCommand).not.toHaveBeenCalled();
+  });
+
   it('keeps a definitive Store Kernel auth rejection as REJECTED/UNAUTHORIZED',async()=>{
     const rejected:MfpStoreKernelResult={
       schema:'mfp.store-kernel.submission.result.v1',

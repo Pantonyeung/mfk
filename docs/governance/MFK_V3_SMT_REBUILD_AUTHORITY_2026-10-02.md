@@ -22,8 +22,7 @@ Surfaces:
 
 SMM is cancelled as final product identity.
 Legacy SMM remains compatibility / UX donor only.
-
-SMT may remain temporarily as an internal Store Kernel / sync port identifier.
+SMT may remain temporarily as internal Store Kernel / sync port identifier.
 
 ## Supersession
 
@@ -42,105 +41,84 @@ Do NOT rebuild or duplicate:
 - P0 checkpointed-delta sync semantics
 - Customer / Keeta external authority contracts
 
-## Client rules
-
-- no v2 client-state imports
-- no periodic business polling
-- no periodic auth polling
-- Doorbell is invalidation only
-- A3 active projection is the ordering source
-- no surface-specific canonical truth
-- Pad/Mobile share business/security/sync contracts
-- no SMM authority/state/head/session path
-
-## Ordering authority boundary
-
-A4 may:
-- select/project active canonical ordering facts
-- render categories/products/options/combo
-- maintain local cart draft
-- compute local preview arithmetic from published price material facts
-- display sellability
-- produce normalized ordering intent
-
-A4 may NOT:
-- create Formal Order
-- allocate formal order/display identity
-- become Pricing Authority
-- bypass later checkout/revision validation
-- create payment/fulfillment/print truth
-- mutate canonical sellability
-- directly fetch/poll Admin catalog from UI
-
-Formal checkout/price validation begins A5.
-
-## UI strategy
-
-A1–A3:
-architecture seams + verification harnesses.
-
-A4–A6:
-formal MFP Pad + Mobile product UI with business capability.
-
-A7–A9:
-hardware/external/public/physical hardening and final polish.
-
 ## Stage status
 
 A0 — SOURCE_VERIFIED
 A1 — SOURCE_VERIFIED
 A2 — SOURCE_VERIFIED
 A3 — SOURCE_VERIFIED
-A4 — CURRENT / BLOCKED FOR OWNER CROSSWALK CLOSURE
-A5 — Checkout + Money
+A4 — SOURCE_VERIFIED / OWNER ACCEPTED
+A5 — CURRENT
 A6 — Order Operations
 A7 — Print + Hardware + Recovery
 A8 — Customer + Keeta + External
 A9 — Public + Diagnostics + Physical Acceptance + Cutover
 
-## Owner product precedence
+## A5 authority boundary
 
-Canonical product behavior:
-1. Owner FINAL V1.0
-2. Owner Working V2.5 as detailed decision evidence
-3. historical UI optimization document as implementation/acceptance donor only
+A5 may implement:
+- Checkout UI/domain
+- formal validation request/readback seam
+- channel/tender selection
+- cash collection UX
+- Student Discount intent
+- Final Review
+- formal Payment Confirm command path
+- Business Day/cash opening client contract
+- Cash In/Out ledger client contract
+- Day Close/cash count
+- Channel/Tender reporting read models
+- immutable Daily Report money facts
 
-Controlling MFP crosswalk:
-`docs/plan/MFP_V3_OWNER_REQUIREMENTS_CROSSWALK_2026-10-02.md`
+A5 may NOT:
+- create a second Pricing Engine
+- create a second Payment/Tender Authority
+- create formal Order truth in client state
+- manufacture COMMITTED/payment success
+- create Print authority
+- create Fulfillment authority
+- require cloud round trips for unrelated local Store Kernel operations
 
-A4 may not close until A4-C1..A4-C7 are SOURCE_VERIFIED.
+## Formal transaction rule
 
-## Permission product rule
+Only explicit Payment Confirm may cross the formal transaction boundary.
 
-A2 action-time permission infrastructure remains part of security architecture.
+Before Payment Confirm:
+- zero formal order commit
+- zero first-print/production effect
+- zero formal sale cash ledger effect
 
-For this Owner product version, any successfully authorized MFP staff session must be granted the Owner-listed MFP/legacy-SMT operational capabilities by canonical policy; the client must not invent a Manager-only product gate.
+After submit:
+- result must be COMMITTED / REJECTED / UNKNOWN
+- canonical readback is authoritative
+- retry reuses the same submission identity
 
-This does not remove formal server/Store Kernel permission admission.
+## Owner FINAL permission rule
+
+Authenticated/authorized MFP staff are eligible for FINAL-defined frontline/local operations.
+No Manager-only Gate in this Owner version.
+
+This does not remove:
+- device authorization
+- formal session validation
+- expiry/revocation fail-closed
+- Store Kernel admission
 
 ## Current execution
 
 Stage:
-A4 — Ordering Surfaces
+A5 — Checkout + Money
 
 Branch:
-`feat/MFP-V3-A4-ORDERING-SURFACES-2026-10-02`
+`feat/MFP-V3-A5-CHECKOUT-MONEY-2026-10-02`
 
 Parent exact SHA:
-`adc2cc64573d9d5f7b357a7955ff2b0edc1fd509`
+`b83321000668d39580a29e2e838aa585d5750fd5`
 
-Current implementation slice:
+Completion target:
 SOURCE_VERIFIED
-
-A4 stage closure:
-BLOCKED
-
-Completion target after Owner crosswalk closure:
-SOURCE_VERIFIED
-
-Carried production binding blockers from A2/A3 remain BLOCKED separately.
 
 No merge / deploy / OTA / public cutover authority.
 
 MILESTONE:
-`MFP_V3_REBUILD_AUTHORITY_A4_CURRENT_2026_10_02`
+`MFP_V3_REBUILD_AUTHORITY_A5_CURRENT_2026_10_02`

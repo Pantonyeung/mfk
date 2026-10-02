@@ -71,6 +71,23 @@ describe('MFP V3 authority foundation',()=>{
     expect(productionSource).not.toContain(worker);
   });
 
+  it('keeps A5 checkout and money on existing Store Kernel authority seams',()=>{
+    const checkout=read('./checkout-domain.ts');
+    const runtime=read('./checkout-runtime.ts');
+    const money=read('./money-domain.ts');
+    const state=read('./state-authority.ts');
+    expect(checkout).toContain("commandType:'CHECKOUT_PAYMENT_CONFIRM'");
+    expect(checkout).toContain('submitFrontlineFormalCommand');
+    expect(runtime).toContain("state:'UNKNOWN' as const");
+    expect(runtime).toContain('tenders:Object.freeze([])');
+    expect(state).toContain("paymentTender:'STORE_KERNEL'");
+    expect(state).toContain("businessDayMoney:'STORE_KERNEL_CANONICAL_READBACK'");
+    expect(money).toContain("reportVersion:'1.0'");
+    expect(money).toContain('appendMfpDailyReportAdjustment');
+    expect(checkout+runtime+money).not.toMatch(/\bfetch\s*\(|setInterval\s*\(|localStorage|sessionStorage/);
+    expect(checkout+runtime+money).not.toMatch(/class\s+\w*(?:Pricing|Payment|Order|Print|BusinessDay)(?:Engine|Authority)/);
+  });
+
   it('keeps public/browser staff secrets and session references out of URLs, logs and durable state',()=>{
     expect(productionSource).not.toMatch(/console\.(?:log|info|warn|error)\([^\n]*(?:pin|proof|session)/i);
     expect(productionSource).not.toMatch(/(?:searchParams|URLSearchParams)[^\n]*(?:session|staffSessionRef)/i);
