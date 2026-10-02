@@ -725,11 +725,14 @@ test('Owner auth UI is fail-closed before canonical read',()=>{
   assert.match(app,/正式資料未完成身份確認前唔會載入/);
 });
 
-test('Owner read runtime refreshes without enabling bounded mutation transport',()=>{
+test('Owner read runtime refreshes on lifecycle events without periodic request polling',()=>{
   const app=fs.readFileSync(path.join(srcRoot,'App.tsx'),'utf8');
   const cloud=fs.readFileSync(path.join(srcRoot,'cloud-runtime.ts'),'utf8');
   assert.match(app,/visibilitychange/);
-  assert.match(app,/15000/);
+  assert.match(app,/addEventListener\('focus',focus\)/);
+  assert.match(app,/addEventListener\('online',online\)/);
+  assert.doesNotMatch(app,/setInterval\s*\(/);
+  assert.doesNotMatch(app,/15000/);
   assert.doesNotMatch(cloud,/requestBoundedAction\s*:/);
 });
 
