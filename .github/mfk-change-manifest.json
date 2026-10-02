@@ -12,6 +12,8 @@
     "docs/architecture/MFP_V3_A9R_FORMAL_BUSINESS_COMMAND_MATRIX_2026-10-02.md",
     "docs/governance/MFP_V3_A9R_FORMAL_BUSINESS_ROUTER_AUTHORITY_2026-10-02.md",
     "docs/handoff/MFP_V3_A9R_FORMAL_BUSINESS_ROUTER_CODEX_HANDOFF_2026-10-02.md",
+    "docs/handoff/MFP_V3_POS_KERNEL_PROGRESS_AND_EVIDENCE_2026-10-03.md",
+    "docs/plan/MFP_V3_POS_SOURCE_BINDINGS_AND_OTA_ROADMAP_2026-10-03.md",
     "docs/superpowers/plans/2026-10-03-store-kernel-checkout-read-dependencies.md",
     "carrier/android/app/src/main/java/com/morefunos/smt/MainActivity.java",
     "carrier/android/app/src/main/java/com/morefunos/smt/storekernel/StoreKernelContract.java",
