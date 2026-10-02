@@ -558,3 +558,161 @@ Status language only:
 
 MILESTONE:
 `MFP_V3_A4_ORDERING_SURFACES_2026_10_02`
+
+
+---
+
+# A4 Owner Crosswalk Closure Addendum｜2026-10-02
+
+Status:
+`BLOCKED` for A4 stage closure, while the current implementation slice remains `SOURCE_VERIFIED`.
+
+Controlling crosswalk:
+`docs/plan/MFP_V3_OWNER_REQUIREMENTS_CROSSWALK_2026-10-02.md`
+
+Do not advance to A5 yet.
+
+The current A4 candidate at:
+`5e4118c003bef84a5e0262d5ac925537c4686ff3`
+
+is accepted as SOURCE_VERIFIED for the ordering-domain slice already implemented, but it does not yet satisfy the complete Owner FINAL ordering/UI requirements.
+
+Codex must now close A4-C1 through A4-C7 in this same A4 lane:
+
+## A4-C1 Display Settings
+Implement continuous/persisted visual controls:
+- category rows/density
+- category count/columns as applicable
+- product rows/columns
+- image show/hide
+- font scale
+- overall density/scale
+- immediate preview
+- restart persistence
+- visual-only effect; no business truth mutation
+
+## A4-C2 Navigation + More shell
+Carry:
+- Ordering
+- Orders
+- Dining
+- Sold-out/Capacity
+as high-frequency navigation structure.
+
+Carry:
+- top hamburger More/Tools entry
+
+Later-stage pages may remain clearly marked staged placeholders.
+Do not fake completed later-stage functionality.
+
+## A4-C3 75% major modal geometry
+Pad major operation modal:
+- approx 75% of usable interface
+- internal scroll area
+- fixed bottom primary action
+- stable geometry
+- edit existing line => modification semantics, not duplicate add
+
+Mobile:
+- mobile-appropriate sheet allowed
+- stable primary action placement
+- same business semantics
+
+## A4-C4 Exact Cart semantics
+Add:
+- sequence-number preview only; no formal allocation
+- ORIGINAL view = original input order
+- ORGANIZED view = Product Category order
+- ORGANIZED != COMBINE
+- COMBINE only exact-equivalent lines
+- line-level dine-in/takeaway state
+- whole-cart dine-in/takeaway switch
+- combined quantity stepper
+- uncombined independent lines
+- delete/clear protection
+- no formal Order identity in draft
+
+## A4-C5 Hold / Retrieve / Dining draft entry
+Implement draft interaction shell:
+- all takeaway => default Hold
+- any dine-in => default Dining
+- Hold <-> Dining manual override
+- Hold retains full draft content
+- empty cart => Retrieve
+- held draft can be restored
+- Dining entry may show waiting/table target selection shell
+- formal Dining Order admission remains A6
+
+## A4-C6 Exact Fast Lane
+Implement Owner-defined behavior:
+- Quick Pair
+- Required area
+- rice/combo shortcut area
+- positional auto-pair only
+- no recommendation
+- swap assignment, not duplicate
+- unequal counts => complete pairs + residual singles
+- explicit combo action required to create combo relation
+- required choices from canonical product configuration
+- quick mode may defer required, but unresolved state must remain explicit
+
+## A4-C7 UI acceptance baseline
+Carry historical Owner UI acceptance constraints:
+- professional restaurant POS
+- blue primary visual baseline
+- red reserved for destructive/error/true warning
+- large touch targets for high-frequency actions
+- stable geometry / muscle memory
+- Silent Guided Flow rather than Next/Previous wizard
+- preserve human override where Owner locked it
+
+## A4 Closure tests
+
+At minimum add tests proving:
+
+1. Display settings affect presentation only, never normalized intent.
+2. Display settings survive local restart/restore.
+3. Pad high-frequency navigation contains Ordering / Orders / Dining / Sold-out-Capacity and top More entry.
+4. Major Pad config modal geometry contract is stable and bottom action fixed.
+5. ORIGINAL preserves input sequence.
+6. ORGANIZED sorts by canonical Product Category order.
+7. ORGANIZED does not combine lines.
+8. COMBINE only merges exact-equivalent configuration/service-mode lines.
+9. Line service mode and whole-cart service mode remain deterministic.
+10. Hold/Retrieve preserves draft identity and material facts.
+11. Any dine-in defaults Hold/Dining shell to Dining; all-takeaway defaults Hold.
+12. User can manually override Hold <-> Dining.
+13. Positional pairing produces 1-to-1 pairs only.
+14. Reassigning an already-used partner swaps rather than duplicates.
+15. Unequal pairing leaves residual singles.
+16. Single product is not auto-upgraded into combo.
+17. Required Fast Lane reads canonical required choices only.
+18. Quick mode unresolved required remains INCOMPLETE.
+19. Visual baseline guard contains approved blue primary token and red destructive token.
+20. No A5 formal checkout/money authority is introduced.
+21. Existing A1/A2/A3/A4 tests remain green.
+
+## Permission clarification carried from Owner FINAL
+
+A2 permission infrastructure remains.
+
+However, for this Owner product version:
+- successfully authorized MFP staff must not be silently blocked from the Owner-listed MFP/legacy-SMT operational capabilities by a newly invented Manager-only product rule;
+- action-time permission checks and Store Kernel admission remain mandatory security controls;
+- canonical policy should grant the Owner-listed operational capabilities to authorized MFP staff unless Owner later changes this product rule.
+
+Do not remove security checks.
+Do not invent Manager-only UX policy.
+
+## Completion gate
+
+A4 stage may move from:
+`BLOCKED`
+
+to:
+`SOURCE_VERIFIED`
+
+only when A4-C1..A4-C7 are implemented, exact-head CI is green, and the completion report includes Owner crosswalk closure evidence.
+
+MILESTONE:
+`MFP_V3_A4_OWNER_CROSSWALK_CLOSURE_2026_10_02`
