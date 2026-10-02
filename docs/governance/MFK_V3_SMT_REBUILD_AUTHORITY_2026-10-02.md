@@ -14,7 +14,7 @@ MoreFun POS
 - MFP Pad
 - MFP Mobile
 
-SMM is cancelled as final product identity.
+SMM is cancelled as final product identity but is not yet authorized for deletion/decommission.
 
 ## Frozen authorities
 
@@ -29,7 +29,8 @@ Do NOT rebuild or duplicate:
 - P0 sync semantics
 - Runtime Availability / Capacity
 - Customer app Order authority
-- Keeta provider authority / adapter identity contracts
+- Keeta provider authority
+- Android Carrier runtime/OTA protocol
 
 ## Stage status
 
@@ -41,55 +42,93 @@ A4 — SOURCE_VERIFIED / OWNER ACCEPTED
 A5 — SOURCE_VERIFIED / OWNER ACCEPTED
 A6 — SOURCE_VERIFIED / OWNER ACCEPTED
 A7 — SOURCE_VERIFIED / OWNER ACCEPTED
-A8 — CURRENT
-A9 — Public + Diagnostics + Physical Acceptance + Cutover
+A8 — SOURCE_VERIFIED / OWNER ACCEPTED
+A9 — CURRENT
 
-## A8 boundary
+## A9 source authority boundary
 
-A8 may implement:
-- external intent read models
-- bounded adapter interfaces
-- pending/review UI
-- Customer evidence/contact workflows
-- Customer cutoff/stop command/readback surfaces
-- Customer modification confirmation readback
-- Keeta inbound identity/mapping/ACK
-- Keeta auto/manual/defer/lifecycle
-- Keeta after-sale orchestration
-- external attention/health
-- event-driven reconcile coordinator
+A9 may implement:
+- exact source/build identity
+- V3 runtime.ready compatibility
+- bounded native bridge adapter
+- production adapter binding where a real authority already exists
+- Check Center / diagnostics
+- fault journal read/write seam
+- runtime/OTA status
+- safe backup/restore boundary
+- public acceptance safe mode
+- readiness verdict
+- physical acceptance/runbook evidence structures
+- cutover/decommission gate enforcement
 
-A8 may NOT:
-- commit Customer/Keeta Orders outside Store Kernel
-- treat payment screenshot as payment truth
-- create a second refund ledger
-- create a second capacity calculation
-- create an external print engine
-- keep provider secrets in browser
-- reintroduce periodic/focus business polling
+A9 may NOT:
+- fabricate missing formal business authority
+- put Store Kernel aggregate mutation logic in browser to replace a missing formal command router
+- publish a candidate without explicit gate authorization
+- infer physical success from source tests
+- decommission SMM before PHYSICAL_VERIFIED + Owner approval
 
-## External identity rule
+## Builder exact-source rule
 
-Customer:
-submissionId + idempotencyKey are stable intent identity.
+Current Builder workflow still builds `v2local`.
 
-Keeta:
-providerOrderId + providerMessageId + fingerprint are provider identity evidence.
+MFP V3 candidate publish is BLOCKED until Builder A9 PR #174 becomes SOURCE_VERIFIED for `v3smt` packaging.
 
-Duplicate external delivery must not create duplicate canonical Orders.
+Preserve:
+- exact MFK SHA
+- signed .mfos
+- SHA-256
+- runtime manifest
+- public readback
+- Candidate/Current/Previous
+- runtime.ready
+- rollback
+
+No second OTA protocol.
+
+## Identity rule
+
+`NO EXACT IDENTITY = NO CUTOVER`
+
+Repository HEAD is not deployment proof.
+
+## Production binding rule
+
+Every A1–A8 fail-closed placeholder must either:
+- bind to a proven production authority, or
+- remain explicitly BLOCKED.
+
+No fixture fallback in production.
+
+## Physical rule
+
+Only real-device evidence can produce:
+`PHYSICAL_VERIFIED`
+
+CI/build/published candidate are insufficient.
+
+## Cutover rule
+
+Final cutover and SMM decommission require:
+- accepted exact MFK SHA
+- accepted exact Builder SHA
+- published runtime identity/hash
+- PHYSICAL_VERIFIED
+- public/domain readiness
+- explicit Owner authorization
 
 ## Current execution
 
 Branch:
-`feat/MFP-V3-A8-CUSTOMER-KEETA-EXTERNAL-2026-10-02`
+`feat/MFP-V3-A9-PUBLIC-DIAGNOSTICS-PHYSICAL-CUTOVER-2026-10-02`
 
 Parent exact SHA:
-`806ca51cfd812a968f9208a45e14d8a228fa91e1`
+`83adb14c21170bc3a34a0022c62b1a2bea2f68c4`
 
-Completion:
+Current pass completion:
 SOURCE_VERIFIED
 
-No merge / deploy / OTA / public cutover.
+No deploy / OTA / public cutover.
 
 MILESTONE:
-`MFP_V3_REBUILD_AUTHORITY_A8_CURRENT_2026_10_02`
+`MFP_V3_REBUILD_AUTHORITY_A9_CURRENT_2026_10_02`
