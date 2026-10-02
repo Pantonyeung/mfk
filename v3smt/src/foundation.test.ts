@@ -3,7 +3,7 @@ import {describe,expect,it} from 'vitest';
 
 const read=(name:string)=>readFileSync(new URL(name,import.meta.url),'utf8');
 const productionSource=readdirSync(new URL('.',import.meta.url))
-  .filter(name=>/\.tsx?$/.test(name)&&!name.endsWith('.test.ts'))
+  .filter(name=>/\.tsx?$/.test(name)&&!/\.test\.tsx?$/.test(name))
   .map(name=>read('./'+name))
   .join('\n');
 
@@ -23,6 +23,13 @@ describe('MFP V3 authority foundation',()=>{
     expect(state).not.toMatch(/refetchInterval:\s*(?:true|[1-9]\d*)/);
   });
 
+  it('keeps auth readback event-driven with no periodic polling',()=>{
+    const harness=read('./security-harness.tsx');
+    expect(harness).toContain('useQuery');
+    expect(harness).toContain('refetchInterval:false');
+    expect(harness).not.toMatch(/setInterval\s*\(/);
+  });
+
   it('does not import v2 client state or runtime modules',()=>{
     expect(productionSource).not.toContain('v2local');
     expect(productionSource).not.toContain('../v2');
@@ -36,11 +43,14 @@ describe('MFP V3 authority foundation',()=>{
     expect(app).toContain("matchMedia('(max-width: 767px)')");
   });
 
-  it('keeps durable storage bounded to transport metadata',()=>{
+  it('keeps durable storage bounded to transport and installation/device metadata',()=>{
     const state=read('./state-authority.ts');
     expect(state).toContain('MFP_OUTBOX_MAX_ROWS=1000');
     expect(state).toContain("durableTransportMetadata:'DEXIE_BOUNDED_OUTBOX_ONLY'");
+    expect(state).toContain("durableDeviceMetadata:'DEXIE_INSTALLATION_DEVICE_METADATA_ONLY'");
+    expect(state).toContain("devices:'[storeId+deviceClass],&deviceId,&installationId,lastSeenAt,status'");
     expect(state).not.toMatch(/commitId|canonicalRevision|rejectionCode/);
+    expect(state.toLowerCase()).not.toMatch(/staffsession|permissions|pin|hash|verifier/);
   });
 
   it('has no direct network or unrelated domain fan-out in the business port',()=>{
@@ -55,5 +65,21 @@ describe('MFP V3 authority foundation',()=>{
     expect(productionSource).not.toContain(intent);
     expect(productionSource).not.toMatch(/SMM.{0,20}HeadSeq/);
     expect(productionSource).not.toContain(worker);
+  });
+
+  it('keeps public/browser staff secrets and session references out of URLs, logs and durable state',()=>{
+    expect(productionSource).not.toMatch(/console\.(?:log|info|warn|error)\([^\n]*(?:pin|proof|session)/i);
+    expect(productionSource).not.toMatch(/(?:searchParams|URLSearchParams)[^\n]*(?:session|staffSessionRef)/i);
+    expect(productionSource).not.toMatch(/localStorage[^\n]*(?:pin|proof|session|staffSessionRef)/i);
+    expect(productionSource).not.toContain('x-mfk-smm-session');
+  });
+
+  it('mounts one shared Pad/Mobile security harness without client-manufactured sessions',()=>{
+    const app=read('./App.tsx');
+    const security=read('./security-port.ts');
+    expect(app).toContain('<MfpSecurityHarness security={mfpSecurityPort}/>');
+    expect(security).toContain('input.authority.loginStaff');
+    expect(security).toContain('createMfpSecuritySurfacePorts');
+    expect(security).not.toMatch(/setActiveSession|manufactureSession/);
   });
 });

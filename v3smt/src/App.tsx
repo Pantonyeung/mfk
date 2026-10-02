@@ -1,5 +1,7 @@
 import {useEffect} from 'react';
 import {MFP_STATE_AUTHORITY,useMfpUi} from './state-authority.ts';
+import {MfpSecurityHarness} from './security-harness.tsx';
+import {mfpSecurityPort} from './security-runtime.ts';
 
 export function V3SmtApp(){
   const {surface,setSurface}=useMfpUi();
@@ -24,5 +26,6 @@ export function V3SmtApp(){
       <article><span>Periodic Business Polling</span><strong>{String(MFP_STATE_AUTHORITY.periodicBusinessPolling)}</strong></article>
       <article><span>V2 Client State Imported</span><strong>{String(MFP_STATE_AUTHORITY.v2ClientStateImported)}</strong></article>
     </section>
+    <MfpSecurityHarness security={mfpSecurityPort}/>
   </main>;
 }

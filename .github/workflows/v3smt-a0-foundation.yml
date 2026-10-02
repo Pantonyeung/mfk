@@ -1,20 +1,24 @@
-name: MFP V3 A1 Store Kernel Seam
+name: MFP V3 A2 Device + Staff Security
 
 on:
   push:
     branches:
       - feat/MFK-V3-SMT-R1-2026-10-02
       - feat/MFP-V3-A1-STORE-KERNEL-2026-10-02
+      - feat/MFP-V3-A2-DEVICE-STAFF-SECURITY-2026-10-02
     paths:
       - 'v3smt/**'
       - 'docs/governance/MFK_V3_SMT_REBUILD_AUTHORITY_2026-10-02.md'
       - 'docs/handoff/MFP_V3_A1_CODEX_IMPLEMENTATION_HANDOFF_2026-10-02.md'
+      - 'docs/handoff/MFP_V3_A2_DEVICE_STAFF_SECURITY_CODEX_HANDOFF_2026-10-02.md'
       - '.github/workflows/v3smt-a0-foundation.yml'
   pull_request:
     paths:
       - 'v3smt/**'
       - 'docs/governance/MFK_V3_SMT_REBUILD_AUTHORITY_2026-10-02.md'
       - 'docs/handoff/MFP_V3_A1_CODEX_IMPLEMENTATION_HANDOFF_2026-10-02.md'
+      - 'docs/handoff/MFP_V3_A2_DEVICE_STAFF_SECURITY_CODEX_HANDOFF_2026-10-02.md'
+      - '.github/workflows/v3smt-a0-foundation.yml'
 
 permissions:
   contents: read
@@ -40,15 +44,22 @@ jobs:
       - name: Build
         working-directory: v3smt
         run: npm run build
-      - name: Authority guard
+      - name: Authority and security guard
         shell: bash
         run: |
           set -euo pipefail
-          ! grep -RInE --include='*.ts' --include='*.tsx' --exclude='*.test.ts' 'setInterval\s*\(' v3smt/src
-          ! grep -RInE --include='*.ts' --include='*.tsx' --exclude='*.test.ts' 'from .*(v2local|v2smm)' v3smt/src
-          ! grep -RInE --exclude='*.test.ts' 'SMM_INTENT_STORE|SMM.{0,20}HeadSeq|mfk-smm-web' v3smt/src
+          ! grep -RInE --include='*.ts' --include='*.tsx' --exclude='*.test.ts' --exclude='*.test.tsx' 'setInterval\s*\(' v3smt/src
+          ! grep -RInE --include='*.ts' --include='*.tsx' --exclude='*.test.ts' --exclude='*.test.tsx' 'from .*(v2local|v2smm)' v3smt/src
+          ! grep -RInE --include='*.ts' --include='*.tsx' --exclude='*.test.ts' --exclude='*.test.tsx' 'SMM_INTENT_STORE|SMM.{0,20}HeadSeq|x-mfk-smm-session|mfk-smm-web' v3smt/src
+          ! grep -RInE --include='*.ts' --include='*.tsx' --exclude='*.test.ts' --exclude='*.test.tsx' 'console\.(log|info|warn|error).*\b(pin|proof|staffSessionRef|session)\b' v3smt/src
+          ! grep -RInE --include='*.ts' --include='*.tsx' --exclude='*.test.ts' --exclude='*.test.tsx' '(URLSearchParams|searchParams).*\b(staffSessionRef|session)\b' v3smt/src
+          ! grep -RInE --include='*.ts' --include='*.tsx' --exclude='*.test.ts' --exclude='*.test.tsx' 'localStorage.*\b(pin|proof|staffSessionRef|session)\b' v3smt/src
           ! find v3smt -maxdepth 2 -iname 'wrangler*' | grep .
           ! grep -RInE 'wrangler deploy|cloudflare deploy|workers_dev' v3smt
           grep -RInF "formalTransaction:'STORE_KERNEL'" v3smt/src/state-authority.ts
           grep -RInF "pricing:'STORE_KERNEL'" v3smt/src/state-authority.ts
           grep -RInF 'createMfpSurfacePorts' v3smt/src/store-kernel-port.ts
+          grep -RInF 'createMfpSecuritySurfacePorts' v3smt/src/security-port.ts
+          grep -RInF 'input.authority.loginStaff' v3smt/src/security-port.ts
+          grep -RInF 'MFP_STAFF_SESSION_MAX_LIFETIME_MS' v3smt/src/security-port.ts
+          grep -RInF 'refetchInterval:false' v3smt/src/security-harness.tsx
