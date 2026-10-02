@@ -6,83 +6,86 @@ Product:
 MoreFun POS
 
 Current Stage:
-A7 — Print + Hardware + Recovery
+A8 — Customer + Keeta + External
 
 Branch:
-`feat/MFP-V3-A7-PRINT-HARDWARE-RECOVERY-2026-10-02`
+`feat/MFP-V3-A8-CUSTOMER-KEETA-EXTERNAL-2026-10-02`
 
 Parent:
-#643 — MFP V3 A6｜Order Operations｜2026-10-02
+#645 — MFP V3 A7｜Print + Hardware + Recovery｜2026-10-02
 
 Parent exact SHA:
-`881afbd5fd463b4833e3b5980123fe33679bb260`
+`806ca51cfd812a968f9208a45e14d8a228fa91e1`
 
-A6:
+A7:
 SOURCE_VERIFIED
 OWNER ACCEPTED
 
 Current handoff:
-`docs/handoff/MFP_V3_A7_PRINT_HARDWARE_RECOVERY_CODEX_HANDOFF_2026-10-02.md`
-
-Visual lock:
-`docs/design/MFP_PAD_ORDERING_VISUAL_LOCK_R1_2026-10-02.md`
+`docs/handoff/MFP_V3_A8_CUSTOMER_KEETA_EXTERNAL_CODEX_HANDOFF_2026-10-02.md`
 
 ## Current objective
 
-Canonical PrintJob / Print Router
-→ MFP Print/Hardware read model
-→ existing Carrier durable gateway
-→ physical printer binding
-→ explicit evidence / recovery / reprint
+External Customer / Keeta facts
+→ bounded external adapter/readback
+→ MFP pending/review UI
+→ formal Store Kernel operations only when authorized
+→ canonical Order readback
 
 ## First RED
 
-Canonical PrintJob J1 enters physical dispatch.
+Customer duplicate intent:
+same submissionId/idempotencyKey
+→ zero Formal Order before Accept
+→ exactly one canonical Order after Accept.
 
-Process/device restarts while outcome is uncertain.
+Keeta duplicate:
+same provider identity/fingerprint
+→ max one canonical Order.
 
-Expected:
-- J1 remains same job
-- state = UNKNOWN / AMBIGUOUS_AFTER_SEND
-- zero automatic second physical dispatch
-- human explicit reprint required
-- reprint gets a new auditable identity
-- no drawer/payment/order/fulfillment replay
+## Owner A8 scope
 
-## Scope
+Customer:
+- Pay at store pending
+- electronic payment evidence
+- WhatsApp QR/contact
+- accept / modify / cancel
+- modification confirmation
+- cutoff / immediate stop
+- WhatsApp fallback
 
-- PrintJob readback
-- transport evidence
-- gateway adapter
-- physical printer bindings/IP
-- health/test
-- receipt/production/packing/label
-- whole-ticket reprint
-- per-label partial reprint
-- Dining print
-- cancel notice
-- cash drawer boundary
-- printer failure attention
-- restart/power-loss recovery
-- local/offline print continuity
-- Print/Hardware UI
+Keeta:
+- inbound identity/dedupe
+- mapping boundary
+- auto/manual accept
+- Immediate / Later
+- Later max 2
+- lifecycle
+- after-sale/refund orchestration
+- error attention
+
+External:
+- channel-threshold integration
+- zero-polling event-driven coordinator
+- provider-secret browser safety
 
 ## Hard locks
 
-- no second Print engine
-- no browser DurablePrintJob authority
-- no blind retry of UNKNOWN
-- no drawer on reprint/correction/failed payment
+- no second Order engine
+- no second Payment/Refund engine
+- no Customer/Keeta Print engine
+- no second Capacity truth
+- no setInterval polling
+- no focus/visibility request fan-out
 - no v2 client-state import
 - no SMM authority
-- no periodic print polling
-- no Carrier rewrite unless a proven blocker requires it
+- no provider secrets in browser
 
 ## Completion target
 
 SOURCE_VERIFIED
 
-Production/physical print binding may remain BLOCKED.
+Production external binding may remain BLOCKED.
 
 MILESTONE:
-`MFP_V3_A7_CURRENT_HANDOFF_2026_10_02`
+`MFP_V3_A8_CURRENT_HANDOFF_2026_10_02`
