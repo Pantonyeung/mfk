@@ -1,9 +1,9 @@
 {
   "version": 1,
-  "capability": "MFP_V3_A6_ORDER_OPERATIONS_2026_10_02",
-  "base_sha": "830fd2f033f2246c1a4f30da71a0a8f9160da751",
-  "root_control": "#644",
-  "product_control": "#643",
+  "capability": "MFP_V3_A7_PRINT_HARDWARE_RECOVERY_2026_10_02",
+  "base_sha": "881afbd5fd463b4833e3b5980123fe33679bb260",
+  "root_control": "#646",
+  "product_control": "#645",
   "allowed_paths": [
     ".github/mfk-change-manifest.json",
     ".github/workflows/v3smt-a0-foundation.yml",
@@ -11,30 +11,30 @@
     "HANDOFF_CURRENT.md",
     "docs/design/MFP_PAD_ORDERING_VISUAL_LOCK_R1_2026-10-02.md",
     "docs/governance/MFK_V3_SMT_REBUILD_AUTHORITY_2026-10-02.md",
-    "docs/handoff/MFP_V3_A6_ORDER_OPERATIONS_CODEX_HANDOFF_2026-10-02.md",
+    "docs/handoff/MFP_V3_A7_PRINT_HARDWARE_RECOVERY_CODEX_HANDOFF_2026-10-02.md",
     "docs/plan/MFP_V3_OWNER_FINAL_CROSSWALK_2026-10-02.txt",
     "docs/plan/MFP_V3_SMM_Migration_Plan_2026-10-02.txt",
     "v3smt/**"
   ],
-  "authority_impact": "ADDS ONE SHARED MFP PAD MOBILE ORDER OPERATIONS CLIENT OVER THE EXISTING STORE KERNEL FORMAL ORDER, FULFILLMENT, PAYMENT, AVAILABILITY, CAPACITY AND READBACK AUTHORITY",
-  "persistence_impact": "NO NEW FORMAL TRUTH STORE; EXISTING A1 BOUNDED COMMAND OUTBOX REMAINS THE ONLY FORMAL OPERATION TRANSPORT PERSISTENCE AND CANONICAL STORE KERNEL READBACK ALWAYS WINS",
+  "authority_impact": "ADDS ONE SHARED MFP PAD MOBILE CLIENT OVER THE EXISTING STORE KERNEL PRINT ROUTER DURABLE PRINTJOB READBACK AND ANDROID CARRIER PRINT GATEWAY; NO SECOND PRINT AUTHORITY",
+  "persistence_impact": "NO BROWSER PRINTJOB LEDGER OR QUEUE; CANONICAL PRINT TRUTH REMAINS STORE KERNEL PRINT ROUTER AND DURABLE LOCAL TRANSPORT REMAINS THE EXISTING ANDROID CARRIER SQLITE GATEWAY",
   "provider_impact": "NONE",
-  "transaction_impact": "ORDER OPERATIONS SUBMIT EXPECTED-REVISION AND STABLE-IDEMPOTENCY COMMANDS THROUGH THE EXISTING STORE KERNEL PATH; DINING SPLIT PAYMENT REUSES THE INJECTED A5 CHECKOUT ENTRY",
-  "production_routing_impact": "NONE; A2 SECURITY AND A3 SYNC PRODUCTION BINDINGS REMAIN BLOCKED",
+  "transaction_impact": "REPRINT CREATES A NEW FORMAL PRINT IDENTITY FOR THE SAME ORDER AND NEVER REPLAYS PAYMENT ORDER FULFILLMENT ADMISSION OR DRAWER SIDE EFFECTS; SAFE RETRY IS LIMITED TO FORMAL FAILED_BEFORE_SEND EVIDENCE",
+  "production_routing_impact": "NONE; V3 BROWSER TO CARRIER AND PRODUCTION PRINTJOB READBACK BINDINGS REMAIN BLOCKED AND FAIL CLOSED",
   "expected_behavior_change": [
-    "Canonical Orders expose three source lanes with source-to-payment filtering across Pad and Mobile.",
-    "Fulfillment, modification, payment correction, refund and cancellation preserve the same Order identity and require canonical readback.",
-    "Waiting admission, later table assignment, transfer, additions and split checkout preserve one Formal Order and reuse A5 checkout.",
-    "Sold-out, restore, Capacity correction and finite override submit through the existing formal Store Kernel operation path.",
-    "UNKNOWN operations retain one operation identity and retry through the existing readback-first Store Kernel seam.",
-    "Authenticated MFP staff may use frontline operations without a Manager-only gate while device and session admission remain fail-closed."
+    "Canonical PrintJob and Carrier gateway readback reconstruct NOT_STARTED PERSISTED DISPATCHING ACKNOWLEDGED FAILED_BEFORE_SEND and AMBIGUOUS_AFTER_SEND without browser-owned print truth.",
+    "DISPATCHING at restart remains the same canonical job and becomes AMBIGUOUS_AFTER_SEND with zero automatic physical redispatch.",
+    "Order Detail exposes whole-ticket and per-label partial reprint using new auditable reprint identities with drawer suppressed.",
+    "Dining consumes the same Print authority for table production packing labels payment receipt and addition delta jobs without creating a Dining Print engine.",
+    "Local physical printer binding health probe test attention and recovery diagnostics live under More Tools and do not alter Admin product routing or template authorship.",
+    "Printer failure remains isolated from Ordering Checkout Orders Dining and other transaction UI."
   ],
   "non_goals": [
-    "No A7 Print and hardware implementation, A8 external Customer or Keeta engine, or A9 Admin and device implementation.",
+    "No A8 external Customer or Keeta engine, or A9 Admin and device implementation.",
     "No second Pricing, Payment, Order, Print, Sync, Security, Business Day or Store Kernel authority.",
     "No direct Customer, Keeta, SMM or provider engine, periodic business polling, v2 client-state or SMM authority.",
     "No production binding, Builder, OTA, merge, deploy, cutover or legacy SMM decommission."
   ],
-  "rollback_sha": "830fd2f033f2246c1a4f30da71a0a8f9160da751",
+  "rollback_sha": "881afbd5fd463b4833e3b5980123fe33679bb260",
   "severity": "HARD_BLOCK"
 }
