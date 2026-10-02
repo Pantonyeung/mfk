@@ -8,6 +8,9 @@ import type {MfpSyncActiveProjection,MfpSyncProjectionStore} from './sync-port.t
 export const MFP_STATE_AUTHORITY=Object.freeze({
   formalTransaction:'STORE_KERNEL',
   pricing:'STORE_KERNEL',
+  paymentTender:'STORE_KERNEL',
+  businessDayMoney:'STORE_KERNEL_CANONICAL_READBACK',
+  dailyReport:'IMMUTABLE_CANONICAL_READBACK_PLUS_APPEND_ONLY_ADJUSTMENTS',
   serverReadState:'TANSTACK_QUERY_MEMORY',
   durableTransportMetadata:'DEXIE_BOUNDED_OUTBOX_ONLY',
   durableDeviceMetadata:'DEXIE_INSTALLATION_DEVICE_METADATA_ONLY',

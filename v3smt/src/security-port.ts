@@ -68,7 +68,9 @@ export interface MfpSecurityPort{
   refreshStaffSession():Promise<MfpStaffSessionState>;
   logoutStaff():Promise<void>;
   precheckAction(requiredPermission:string):void;
+  precheckFrontlineAction():void;
   submitFormalCommand(command:UnboundCommand,requiredPermission:string):Promise<MfpStoreKernelResult>;
+  submitFrontlineFormalCommand(command:UnboundCommand):Promise<MfpStoreKernelResult>;
 }
 
 export function isMfpFrontlineSessionEligible(
@@ -150,7 +152,7 @@ export function createMfpSecurityPort(input:{
     return device;
   };
 
-  const precheck=(requiredPermission:string)=>{
+  const precheck=(requiredPermission?:string)=>{
     const currentDevice=requireDevice();
     if(currentDevice.status==='REVOKED')throw new Error('MFP_DEVICE_REVOKED');
     if(currentDevice.status!=='AUTHORIZED')throw new Error('MFP_DEVICE_UNKNOWN');
@@ -170,9 +172,26 @@ export function createMfpSecurityPort(input:{
     if(session.state!=='AUTHENTICATED')throw new Error('MFP_STAFF_SESSION_UNAUTHORIZED');
     if(session.deviceId!==currentDevice.deviceId)throw new Error('MFP_STAFF_SESSION_DEVICE_MISMATCH');
     if(session.storeId!==currentDevice.storeId)throw new Error('MFP_STAFF_SESSION_STORE_MISMATCH');
-    text(requiredPermission,'MFP_REQUIRED_PERMISSION_INVALID',160);
-    if(!session.permissions.includes(requiredPermission))throw new Error('MFP_PERMISSION_DENIED');
+    if(requiredPermission!==undefined){
+      text(requiredPermission,'MFP_REQUIRED_PERMISSION_INVALID',160);
+      if(!session.permissions.includes(requiredPermission))throw new Error('MFP_PERMISSION_DENIED');
+    }
     return {currentDevice,currentSession:session};
+  };
+
+  const submit=async(command:UnboundCommand,requiredPermission?:string)=>{
+    const {currentDevice,currentSession}=precheck(requiredPermission);
+    if(!input.storeKernel)throw new Error('MFP_STORE_KERNEL_BINDING_UNAVAILABLE');
+    const result=await input.storeKernel.submitFormalCommand(Object.freeze({
+      ...command,
+      deviceId:currentDevice.deviceId,
+      staffSessionRef:currentSession.staffSessionRef,
+    }));
+    if(result.state==='REJECTED'&&(result.rejectionCode==='UNAUTHORIZED'||result.rejectionCode.endsWith('_UNAUTHORIZED'))){
+      session=undefined;
+      sessionState='UNAUTHORIZED';
+    }
+    return result;
   };
 
   return Object.freeze({
@@ -255,20 +274,9 @@ export function createMfpSecurityPort(input:{
       });
     },
     precheckAction(requiredPermission:string){precheck(requiredPermission);},
-    async submitFormalCommand(command:UnboundCommand,requiredPermission:string){
-      const {currentDevice,currentSession}=precheck(requiredPermission);
-      if(!input.storeKernel)throw new Error('MFP_STORE_KERNEL_BINDING_UNAVAILABLE');
-      const result=await input.storeKernel.submitFormalCommand(Object.freeze({
-        ...command,
-        deviceId:currentDevice.deviceId,
-        staffSessionRef:currentSession.staffSessionRef,
-      }));
-      if(result.state==='REJECTED'&&(result.rejectionCode==='UNAUTHORIZED'||result.rejectionCode.endsWith('_UNAUTHORIZED'))){
-        session=undefined;
-        sessionState='UNAUTHORIZED';
-      }
-      return result;
-    },
+    precheckFrontlineAction(){precheck();},
+    submitFormalCommand(command:UnboundCommand,requiredPermission:string){return submit(command,requiredPermission);},
+    submitFrontlineFormalCommand(command:UnboundCommand){return submit(command);},
   });
 }
 

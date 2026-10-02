@@ -123,9 +123,10 @@ function updateCombinedQuantity(domain:MfpOrderingDomain,draft:MfpOrderingDraft,
   return last.quantity>1?domain.setQuantity(draft,last.cartLineId,last.quantity-1):domain.removeLine(draft,last.cartLineId);
 }
 
-export function MfpCartDraft({domain,catalog,draft,heldDraft,canDraft,onChange,onHeldDraft,onEdit}:{
+export function MfpCartDraft({domain,catalog,draft,heldDraft,canDraft,onChange,onHeldDraft,onEdit,onCheckout}:{
   domain:MfpOrderingDomain;catalog:MfpOrderingCatalog;draft:MfpOrderingDraft;heldDraft:MfpOrderingDraft|null;canDraft:boolean;
   onChange:(draft:MfpOrderingDraft)=>void;onHeldDraft:(draft:MfpOrderingDraft|null)=>void;onEdit:(line:MfpOrderingDraftLine)=>void;
+  onCheckout?:()=>void;
 }){
   const [viewMode,setViewMode]=useState<MfpCartViewMode>('ORIGINAL');
   const [clearConfirm,setClearConfirm]=useState(false);
@@ -154,7 +155,7 @@ export function MfpCartDraft({domain,catalog,draft,heldDraft,canDraft,onChange,o
       <div className="mfp-line-service" role="group" aria-label={`${row.line.displayName} 用餐方式`}><button type="button" className={row.line.serviceMode==='takeaway'?'active':''} disabled={!canDraft||row.cartLineIds.length>1} onClick={()=>onChange(domain.setLineServiceMode(draft,row.line.cartLineId,'takeaway'))}>外賣</button><button type="button" className={row.line.serviceMode==='dine-in'?'active':''} disabled={!canDraft||row.cartLineIds.length>1} onClick={()=>onChange(domain.setLineServiceMode(draft,row.line.cartLineId,'dine-in'))}>堂食</button></div>
       <div className="mfp-line-actions"><button type="button" disabled={!canDraft||row.cartLineIds.length>1} onClick={()=>onEdit(row.line)}>修改</button><button type="button" disabled={!canDraft||row.cartLineIds.length>1} onClick={()=>onChange(domain.removeLine(draft,row.line.cartLineId))}>移除</button></div>
     </article>):<p className="mfp-empty-copy">未有商品。可用 Retrieve 取回今次本機 session 嘅暫存草稿。</p>}</div>
-    <footer><div><small>{intent.pricing}</small><strong>{formatMoney(intent.previewSubtotalMinor)}</strong><span>Preview 唔係 final formal quote</span></div><div className="mfp-cart-primary-actions"><button type="button" className="mfp-hold-dining" disabled={!canDraft||(!draft.lines.length&&!heldDraft)} onClick={()=>draft.lines.length?setHoldOpen(true):retrieve()}>{mfpHoldEntryLabel(draft)}</button><button type="button" disabled>A5 結帳未接駁</button></div></footer>
+    <footer><div><small>{intent.pricing}</small><strong>{formatMoney(intent.previewSubtotalMinor)}</strong><span>Preview 唔係 final formal quote</span></div><div className="mfp-cart-primary-actions"><button type="button" className="mfp-hold-dining" disabled={!canDraft||(!draft.lines.length&&!heldDraft)} onClick={()=>draft.lines.length?setHoldOpen(true):retrieve()}>{mfpHoldEntryLabel(draft)}</button><button type="button" className="mfp-checkout-entry" disabled={!canDraft||!intent.checkoutReady||!onCheckout} onClick={onCheckout}>Checkout</button></div></footer>
   </section>{holdOpen?<div className="mfp-config-layer"><section className="mfp-config" role="dialog" aria-modal="true" aria-labelledby="mfp-hold-dining-title">
     <header><div><small>DRAFT / LOCAL UX ONLY</small><h2 id="mfp-hold-dining-title">Hold / Dining</h2></div><button type="button" autoFocus aria-label="關閉暫存堂食" onClick={()=>setHoldOpen(false)}>×</button></header>
     <div className="mfp-config-scroll mfp-destination-picker"><p>建議：{defaultMfpDraftDestination(draft)==='HOLD'?'Hold':'Dining'}。你可以隨時改。</p><div role="group" aria-label="暫存或堂食"><button type="button" className={destination==='HOLD'?'active':''} onClick={()=>setDestinationOverride('HOLD')}>Hold</button><button type="button" className={destination==='DINING'?'active':''} onClick={()=>setDestinationOverride('DINING')}>Dining</button></div>{destination==='DINING'?<p>Waiting / Table target 由 A6 正式接駁；A4 只保存完整本機草稿。</p>:null}</div>

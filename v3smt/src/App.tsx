@@ -5,6 +5,7 @@ import {MfpSecurityHarness} from './security-harness.tsx';
 import {mfpSecurityPort} from './security-runtime.ts';
 import {MfpSyncHarness} from './sync-harness.tsx';
 import {mfpSyncCoordinator} from './sync-binding.ts';
+import {mfpCheckoutRuntimeBinding} from './checkout-runtime.ts';
 
 export function V3SmtApp(){
   const {surface,setSurface}=useMfpUi();
@@ -22,9 +23,9 @@ export function V3SmtApp(){
     <header className="mfp-app-head">
       <small>PARALLEL PREVIEW · NO PRODUCTION ROUTING</small>
       <h1>MoreFun POS</h1>
-      <p>MFP Pad + MFP Mobile · Shared Ordering Domain · Draft Only</p>
+      <p>MFP Pad + MFP Mobile · Shared Ordering + Formal Checkout Contract</p>
     </header>
-    <MfpOrderingRuntime surface={surface} security={mfpSecurityPort} sync={mfpSyncCoordinator} projectionStore={mfpSyncProjectionStore}/>
+    <MfpOrderingRuntime surface={surface} security={mfpSecurityPort} sync={mfpSyncCoordinator} projectionStore={mfpSyncProjectionStore} checkout={mfpCheckoutRuntimeBinding}/>
     <details className="mfp-diagnostics">
       <summary>A1–A3 Diagnostics</summary>
       <section className="v3smt-grid">

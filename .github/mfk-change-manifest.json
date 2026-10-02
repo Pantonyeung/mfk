@@ -1,40 +1,39 @@
 {
   "version": 1,
-  "capability": "MFP_V3_A4_ORDERING_SURFACES_2026_10_02",
-  "base_sha": "adc2cc64573d9d5f7b357a7955ff2b0edc1fd509",
-  "root_control": "#640",
-  "product_control": "#639",
+  "capability": "MFP_V3_A5_CHECKOUT_MONEY_2026_10_02",
+  "base_sha": "b83321000668d39580a29e2e838aa585d5750fd5",
+  "root_control": "#642",
+  "product_control": "#641",
   "allowed_paths": [
     ".github/mfk-change-manifest.json",
     ".github/workflows/v3smt-a0-foundation.yml",
     "COMMANDER_CURRENT.md",
     "HANDOFF_CURRENT.md",
     "docs/governance/MFK_V3_SMT_REBUILD_AUTHORITY_2026-10-02.md",
-    "docs/handoff/MFP_V3_A4_ORDERING_SURFACES_CODEX_HANDOFF_2026-10-02.md",
-    "docs/plan/MFP_V3_OWNER_REQUIREMENTS_CROSSWALK_2026-10-02.md",
+    "docs/handoff/MFP_V3_A5_CHECKOUT_MONEY_CODEX_HANDOFF_2026-10-02.md",
+    "docs/plan/MFP_V3_OWNER_FINAL_CROSSWALK_2026-10-02.txt",
+    "docs/plan/MFP_V3_SMM_Migration_Plan_2026-10-02.txt",
     "v3smt/**"
   ],
-  "authority_impact": "ADDS_ONE_SHARED_MFP_PAD_MOBILE_ORDERING_DOMAIN_OVER_THE_A3_ACTIVE_PROJECTION; STORE_KERNEL_REMAINS FORMAL ORDER AND PRICING AUTHORITY",
-  "persistence_impact": "DISPLAY SETTINGS ONLY IN LOCAL STORAGE; CART/HOLD/DINING REMAIN MEMORY-ONLY DRAFT UX AND THE A3 DEXIE ACTIVE_LKG BUNDLE IS READ-ONLY",
+  "authority_impact": "ADDS ONE SHARED MFP PAD MOBILE CHECKOUT CLIENT CONTRACT OVER THE EXISTING STORE KERNEL FORMAL TRANSACTION, PRICING, PAYMENT AND READBACK AUTHORITY",
+  "persistence_impact": "NO NEW FORMAL TRUTH STORE; EXISTING A1 BOUNDED COMMAND OUTBOX REMAINS THE ONLY CHECKOUT TRANSPORT PERSISTENCE AND MONEY REPORT FUNCTIONS RETURN IMMUTABLE CANONICAL READ MODELS",
   "provider_impact": "NONE",
-  "transaction_impact": "NONE; NO FORMAL ORDER IDENTITY, COMMIT, PAYMENT, FULFILLMENT OR PRINT STATE",
+  "transaction_impact": "PAYMENT CONFIRM IS THE ONLY NEW CLIENT ENTRY TO THE EXISTING STORE KERNEL FORMAL COMMAND PATH; ALL EARLIER CHECKOUT ACTIONS HAVE ZERO FORMAL EFFECT",
   "production_routing_impact": "NONE; A2 SECURITY AND A3 SYNC PRODUCTION BINDINGS REMAIN BLOCKED",
   "expected_behavior_change": [
-    "MFP Pad and MFP Mobile render distinct formal ordering workspaces over one ordering domain.",
-    "The catalog selector consumes only the A3 atomic active projection and exposes honest LOCAL_LKG and offline states.",
-    "Categories, products, media, options, modifiers, combos, cart draft and service mode produce one normalized intent contract.",
-    "Local preview arithmetic uses only published material price facts and is never presented as a final formal quote.",
-    "Projection material changes mark affected draft lines REVALIDATION_REQUIRED without silently rewriting their facts.",
-    "A4 owner-compliance closure carries forward the FINAL Owner requirements for Display Settings, navigation, 75% modal geometry, exact cart semantics, Hold/Retrieve/Dining draft entry and exact Fast Lane behavior.",
-    "Authenticated MFP staff retain A4 frontline draft capability without an invented Manager-only presentation gate while device/session expiry and revocation remain fail-closed."
+    "A4 normalized drafts fail closed through formal validation before Final Review.",
+    "Only explicit Payment Confirm creates one stable Store Kernel submission with existing idempotency and UNKNOWN readback-first semantics.",
+    "Channel and canonical configured tender remain separate dimensions across Pad and Mobile checkout.",
+    "Student Discount emits intent only and formal quote totals remain authoritative.",
+    "Business Day cash opening, Cash In/Out, count, close and report facts use integer minor units and immutable append-only contracts.",
+    "Authenticated MFP staff may use FINAL frontline checkout without a Manager-only granular permission while device/session admission remains fail-closed."
   ],
   "non_goals": [
-    "No formal checkout, Store Kernel order commit, payment, tender, fulfillment or print.",
-    "No second Pricing, Order, Sync, Security, Availability or Store Kernel authority.",
-    "No direct Admin/catalog fetch, new WebSocket, periodic polling, v2 client-state or SMM authority.",
-    "No production binding, Builder, OTA, merge, deploy, cutover or legacy SMM decommission.",
-    "No A5 checkout/money work starts until A4 Owner crosswalk closure A4-C1..A4-C7 is SOURCE_VERIFIED."
+    "No A6 Order Operations, refund/cancel UI, Dining or Fulfillment implementation.",
+    "No second Pricing, Payment, Order, Print, Sync, Security, Business Day or Store Kernel authority.",
+    "No direct Cloud/Admin/Owner/Provider round trip, periodic money polling, v2 client-state or SMM authority.",
+    "No production binding, Builder, OTA, merge, deploy, cutover or legacy SMM decommission."
   ],
-  "rollback_sha": "adc2cc64573d9d5f7b357a7955ff2b0edc1fd509",
+  "rollback_sha": "b83321000668d39580a29e2e838aa585d5750fd5",
   "severity": "HARD_BLOCK"
 }
