@@ -79,9 +79,11 @@ describe('SMT Admin config event boundary',()=>{
     expect(sync).toContain('if(!deltaSyncInFlight&&incomingHeadSeq>(bundle?.appliedSeq??-1))');
     expect(sync).not.toMatch(/socket\.addEventListener\('open',[\s\S]{0,180}reconcileSmtCheckpointedSync/);
 
-    for(const source of [customer,keeta,outbox]){
+    for(const source of [customer,keeta]){
       expect(source).toContain('subscribeSmtAdminConfig');
       expect(source).not.toContain('subscribeSmtAdminSyncStatus');
     }
+    expect(outbox).not.toContain('subscribeSmtAdminConfig');
+    expect(outbox).not.toContain('subscribeSmtAdminSyncStatus');
   });
 });
