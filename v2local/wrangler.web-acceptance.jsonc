@@ -5,7 +5,6 @@
   "compatibility_date": "2026-09-25",
   "workers_dev": true,
   "preview_urls": true,
-  "keep_vars": true,
   "vars": {
     "MFK_BUILD_ID": "mfk-smt-fusion-print-r2"
   },
