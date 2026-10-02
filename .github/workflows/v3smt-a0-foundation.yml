@@ -1,4 +1,4 @@
-name: MFP V3 A3 Sync + Offline
+name: MFP V3 A4 Ordering Surfaces
 
 on:
   push:
@@ -7,6 +7,7 @@ on:
       - feat/MFP-V3-A1-STORE-KERNEL-2026-10-02
       - feat/MFP-V3-A2-DEVICE-STAFF-SECURITY-2026-10-02
       - feat/MFP-V3-A3-SYNC-OFFLINE-2026-10-02
+      - feat/MFP-V3-A4-ORDERING-SURFACES-2026-10-02
     paths:
       - '.github/mfk-change-manifest.json'
       - 'v3smt/**'
@@ -14,6 +15,7 @@ on:
       - 'docs/handoff/MFP_V3_A1_CODEX_IMPLEMENTATION_HANDOFF_2026-10-02.md'
       - 'docs/handoff/MFP_V3_A2_DEVICE_STAFF_SECURITY_CODEX_HANDOFF_2026-10-02.md'
       - 'docs/handoff/MFP_V3_A3_SYNC_OFFLINE_CODEX_HANDOFF_2026-10-02.md'
+      - 'docs/handoff/MFP_V3_A4_ORDERING_SURFACES_CODEX_HANDOFF_2026-10-02.md'
       - '.github/workflows/v3smt-a0-foundation.yml'
   pull_request:
     paths:
@@ -23,6 +25,7 @@ on:
       - 'docs/handoff/MFP_V3_A1_CODEX_IMPLEMENTATION_HANDOFF_2026-10-02.md'
       - 'docs/handoff/MFP_V3_A2_DEVICE_STAFF_SECURITY_CODEX_HANDOFF_2026-10-02.md'
       - 'docs/handoff/MFP_V3_A3_SYNC_OFFLINE_CODEX_HANDOFF_2026-10-02.md'
+      - 'docs/handoff/MFP_V3_A4_ORDERING_SURFACES_CODEX_HANDOFF_2026-10-02.md'
       - '.github/workflows/v3smt-a0-foundation.yml'
 
 permissions:
@@ -49,7 +52,7 @@ jobs:
       - name: Build
         working-directory: v3smt
         run: npm run build
-      - name: Authority, security and sync guard
+      - name: Authority, security, sync and ordering guard
         shell: bash
         run: |
           set -euo pipefail
@@ -77,3 +80,12 @@ jobs:
           grep -RInF 'sync.resumed()' v3smt/src/sync-runtime.ts
           grep -RInF "durableProjection:'DEXIE_ATOMIC_LKG_BUNDLE_ONLY'" v3smt/src/state-authority.ts
           ! grep -RInE --include='*.ts' --include='*.tsx' --exclude='*.test.ts' --exclude='*.test.tsx' 'doorbell\.(payload|entities|projection)' v3smt/src
+          ! grep -RInE --include='ordering-*.ts' --include='ordering-*.tsx' --exclude='*.test.ts' --exclude='*.test.tsx' '\bfetch\s*\(|new[[:space:]]+WebSocket\s*\(|setInterval\s*\(|readHead\s*\(|readChanges\s*\(|readCheckpoint\s*\(' v3smt/src
+          ! grep -RInE --include='ordering-*.ts' --include='ordering-*.tsx' --exclude='*.test.ts' --exclude='*.test.tsx' 'from .*(v2local|v2smm)|SMM_INTENT_STORE|SMM.{0,20}HeadSeq|x-mfk-smm-session|mfk-smm-web' v3smt/src
+          ! grep -RInE --include='ordering-domain.ts' '\b(orderId|displayNumber|paymentState|fulfillmentState|printState|COMMITTED)\b' v3smt/src
+          grep -RInF "pricing:'LOCAL_PREVIEW_FROM_PUBLISHED_FACTS'" v3smt/src/ordering-domain.ts
+          grep -RInF 'createMfpOrderingSurfaceDomains' v3smt/src/ordering-domain.ts
+          grep -RInF 'projectionStore.readActive()' v3smt/src/ordering-runtime.tsx
+          grep -RInF 'sync.subscribe' v3smt/src/ordering-runtime.tsx
+          grep -RInF 'data-ordering-surface="MFP_PAD"' v3smt/src/ordering-workspace.tsx
+          grep -RInF 'data-ordering-surface="MFP_MOBILE"' v3smt/src/ordering-workspace.tsx

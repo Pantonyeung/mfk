@@ -80,7 +80,7 @@ describe('MFP V3 authority foundation',()=>{
   it('mounts one shared Pad/Mobile security harness without client-manufactured sessions',()=>{
     const app=read('./App.tsx');
     const security=read('./security-port.ts');
-    expect(app).toContain('<MfpSecurityHarness security={mfpSecurityPort}/>');
+    expect(app).toContain('<MfpSecurityHarness security={mfpSecurityPort}');
     expect(security).toContain('input.authority.loginStaff');
     expect(security).toContain('createMfpSecuritySurfacePorts');
     expect(security).not.toMatch(/setActiveSession|manufactureSession/);

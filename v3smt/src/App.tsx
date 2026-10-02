@@ -1,5 +1,6 @@
-import {useEffect} from 'react';
-import {MFP_STATE_AUTHORITY,useMfpUi} from './state-authority.ts';
+import {useEffect,useReducer} from 'react';
+import {MfpOrderingRuntime} from './ordering-runtime.tsx';
+import {MFP_STATE_AUTHORITY,mfpSyncProjectionStore,useMfpUi} from './state-authority.ts';
 import {MfpSecurityHarness} from './security-harness.tsx';
 import {mfpSecurityPort} from './security-runtime.ts';
 import {MfpSyncHarness} from './sync-harness.tsx';
@@ -7,6 +8,7 @@ import {mfpSyncCoordinator} from './sync-binding.ts';
 
 export function V3SmtApp(){
   const {surface,setSurface}=useMfpUi();
+  const [,refreshSecurity]=useReducer(value=>value+1,0);
 
   useEffect(()=>{
     const query=window.matchMedia('(max-width: 767px)');
@@ -17,18 +19,22 @@ export function V3SmtApp(){
   },[setSurface]);
 
   return <main className="v3smt-shell" data-surface={surface}>
-    <header>
+    <header className="mfp-app-head">
       <small>PARALLEL PREVIEW · NO PRODUCTION ROUTING</small>
       <h1>MoreFun POS</h1>
-      <p>MFP Pad + MFP Mobile 共用同一 Store Kernel Authority。</p>
+      <p>MFP Pad + MFP Mobile · Shared Ordering Domain · Draft Only</p>
     </header>
-    <section className="v3smt-grid">
-      <article><span>Surface</span><strong>{surface}</strong></article>
-      <article><span>Formal Transaction</span><strong>{MFP_STATE_AUTHORITY.formalTransaction}</strong></article>
-      <article><span>Periodic Business Polling</span><strong>{String(MFP_STATE_AUTHORITY.periodicBusinessPolling)}</strong></article>
-      <article><span>V2 Client State Imported</span><strong>{String(MFP_STATE_AUTHORITY.v2ClientStateImported)}</strong></article>
-    </section>
-    <MfpSyncHarness sync={mfpSyncCoordinator}/>
-    <MfpSecurityHarness security={mfpSecurityPort}/>
+    <MfpOrderingRuntime surface={surface} security={mfpSecurityPort} sync={mfpSyncCoordinator} projectionStore={mfpSyncProjectionStore}/>
+    <details className="mfp-diagnostics">
+      <summary>A1–A3 Diagnostics</summary>
+      <section className="v3smt-grid">
+        <article><span>Surface</span><strong>{surface}</strong></article>
+        <article><span>Formal Transaction</span><strong>{MFP_STATE_AUTHORITY.formalTransaction}</strong></article>
+        <article><span>Periodic Business Polling</span><strong>{String(MFP_STATE_AUTHORITY.periodicBusinessPolling)}</strong></article>
+        <article><span>V2 Client State Imported</span><strong>{String(MFP_STATE_AUTHORITY.v2ClientStateImported)}</strong></article>
+      </section>
+      <MfpSyncHarness sync={mfpSyncCoordinator}/>
+      <MfpSecurityHarness security={mfpSecurityPort} onStateChange={refreshSecurity}/>
+    </details>
   </main>;
 }
