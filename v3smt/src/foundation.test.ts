@@ -43,12 +43,15 @@ describe('MFP V3 authority foundation',()=>{
     expect(app).toContain("matchMedia('(max-width: 767px)')");
   });
 
-  it('keeps durable storage bounded to transport and installation/device metadata',()=>{
+  it('keeps durable storage bounded to transport, device metadata and one atomic sync LKG',()=>{
     const state=read('./state-authority.ts');
     expect(state).toContain('MFP_OUTBOX_MAX_ROWS=1000');
     expect(state).toContain("durableTransportMetadata:'DEXIE_BOUNDED_OUTBOX_ONLY'");
     expect(state).toContain("durableDeviceMetadata:'DEXIE_INSTALLATION_DEVICE_METADATA_ONLY'");
+    expect(state).toContain("durableProjection:'DEXIE_ATOMIC_LKG_BUNDLE_ONLY'");
     expect(state).toContain("devices:'[storeId+deviceClass],&deviceId,&installationId,lastSeenAt,status'");
+    expect(state).toContain("syncBundles:'&key,appliedSeq,appliedAt'");
+    expect(state).toContain("mfpDb.syncBundles.put({...candidate,key:'active'})");
     expect(state).not.toMatch(/commitId|canonicalRevision|rejectionCode/);
     expect(state.toLowerCase()).not.toMatch(/staffsession|permissions|pin|hash|verifier/);
   });
@@ -81,5 +84,23 @@ describe('MFP V3 authority foundation',()=>{
     expect(security).toContain('input.authority.loginStaff');
     expect(security).toContain('createMfpSecuritySurfacePorts');
     expect(security).not.toMatch(/setActiveSession|manufactureSession/);
+  });
+
+  it('routes startup, reconnect, online and resume through one sync coordinator only',()=>{
+    const runtime=read('./sync-runtime.ts');
+    const binding=read('./sync-binding.ts');
+    expect(binding).toContain('createMfpSyncCoordinator');
+    expect(runtime).toContain('sync.startup()');
+    expect(runtime).toContain('sync.networkOnline()');
+    expect(runtime).toContain('sync.resumed()');
+    expect(runtime).not.toMatch(/readHead|readChanges|readCheckpoint|setInterval/);
+  });
+
+  it('shares one sync contract across MFP Pad and MFP Mobile',()=>{
+    const sync=read('./sync-port.ts');
+    const app=read('./App.tsx');
+    expect(sync).toContain('createMfpSyncSurfacePorts');
+    expect(sync).toContain('MFP_PAD:port,MFP_MOBILE:port');
+    expect(app).toContain('<MfpSyncHarness sync={mfpSyncCoordinator}/>');
   });
 });

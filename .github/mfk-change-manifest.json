@@ -1,38 +1,37 @@
 {
   "version": 1,
-  "capability": "MFP_V3_A2_DEVICE_STAFF_SECURITY_2026_10_02",
-  "base_sha": "256e130ae4f7292beadbcbbe847433c769066a7e",
-  "root_control": "#636",
-  "product_control": "#635",
+  "capability": "MFP_V3_A3_SYNC_OFFLINE_2026_10_02",
+  "base_sha": "7d895e0eae3ba7678e4d23416b453912559887ad",
+  "root_control": "#638",
+  "product_control": "#637",
   "allowed_paths": [
     ".github/mfk-change-manifest.json",
     ".github/workflows/v3smt-a0-foundation.yml",
-    "AGENTS.md",
     "COMMANDER_CURRENT.md",
     "HANDOFF_CURRENT.md",
     "docs/governance/MFK_V3_SMT_REBUILD_AUTHORITY_2026-10-02.md",
-    "docs/handoff/MFP_V3_A2_DEVICE_STAFF_SECURITY_CODEX_HANDOFF_2026-10-02.md",
+    "docs/handoff/MFP_V3_A3_SYNC_OFFLINE_CODEX_HANDOFF_2026-10-02.md",
     "v3smt/**"
   ],
-  "authority_impact": "ADDS_ONE_SHARED_MFP_DEVICE_AND_STAFF_CLIENT_SECURITY_PORT; FORMAL_AUTH_AND_STORE_KERNEL_ADMISSION_REMAIN_EXTERNAL_AUTHORITIES",
-  "persistence_impact": "DEXIE_INSTALLATION_AND_DEVICE_METADATA_ONLY; NO_PIN_VERIFIER_PERMISSION_OR_STAFF_SESSION_PERSISTENCE",
+  "authority_impact": "ADDS_ONE_SHARED_MFP_PAD_MOBILE_SYNC_COORDINATOR_OVER_THE_EXISTING_CANONICAL_SMT_STORE_PORT_HEAD; DOORBELL_REMAINS_INVALIDATION_ONLY",
+  "persistence_impact": "ONE_DEXIE_ATOMIC_ACTIVE_LKG_BUNDLE_WITH_APPLIED_SEQ_IN_THE_SAME_COMMIT; NO_PARTIAL_CANDIDATE_ACTIVATION",
   "provider_impact": "NONE",
-  "transaction_impact": "FAIL_CLOSED_ACTION_TIME_PRECHECK_BEFORE_EXISTING_A1_STORE_KERNEL_PORT; SUBMISSION_AND_IDEMPOTENCY_IDENTITY_UNCHANGED",
-  "production_routing_impact": "NONE; PRODUCTION_SECURITY_AUTHORITY_BINDING_REMAINS_UNAVAILABLE",
+  "transaction_impact": "NONE; STORE_KERNEL_COMMAND_IDEMPOTENCY_AND_A2_SECURITY_ADMISSION_ARE_UNCHANGED",
+  "production_routing_impact": "NONE; SYNC_TRANSPORT_AND_A2_PRODUCTION_AUTH_DEVICE_BINDING_REMAIN_UNBOUND",
   "expected_behavior_change": [
-    "MFP device identity remains stable across reload while authorization always restarts UNKNOWN until formal readback.",
-    "Only a formal auth authority response can create an in-memory authenticated staff session.",
-    "Expired, revoked, unknown, mismatched or under-permissioned actions fail before Store Kernel submit.",
-    "MFP Pad and MFP Mobile share the same security port and existing A1 Store Kernel port semantics.",
-    "The minimal A2 harness exposes device, login, staff, expiry, logout and permission-denied states without persisting PIN or session authority."
+    "WebSocket open, Doorbell, online, startup and resume share one bounded single-flight catch-up task.",
+    "Canonical HEAD selects warm, missing-delta or checkpoint-plus-tail recovery without periodic business polling.",
+    "Verified candidates become the active LKG atomically and AppliedSeq becomes visible only after commit.",
+    "Offline and restart retain the previous valid LKG; Doorbell payload never becomes canonical truth.",
+    "MFP Pad and MFP Mobile share the same sync coordinator and Store Port HeadSeq contract."
   ],
   "non_goals": [
-    "No production auth endpoint or Store Kernel binding.",
+    "No production sync endpoint, auth/device binding or public routing.",
     "No final ordering UI.",
     "No Store Kernel, Pricing, Order, Payment, Fulfillment, Print, Customer or Keeta authority change.",
-    "No Builder or OTA protocol change.",
-    "No merge, deploy, cutover or legacy SMM decommission."
+    "No v2 client-state or legacy SMM authority import.",
+    "No Builder, OTA, merge, deploy, cutover or legacy SMM decommission."
   ],
-  "rollback_sha": "256e130ae4f7292beadbcbbe847433c769066a7e",
+  "rollback_sha": "7d895e0eae3ba7678e4d23416b453912559887ad",
   "severity": "HARD_BLOCK"
 }
