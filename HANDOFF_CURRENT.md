@@ -9,132 +9,81 @@ Short name:
 MFP
 
 Current Stage:
-A4 — Ordering Surfaces
+A5 — Checkout + Money
 
 Branch:
-`feat/MFP-V3-A4-ORDERING-SURFACES-2026-10-02`
+`feat/MFP-V3-A5-CHECKOUT-MONEY-2026-10-02`
 
 Parent:
-#637 — MFP V3 A3｜Sync + Offline｜2026-10-02
+#639 — MFP V3 A4｜Ordering Surfaces｜2026-10-02
 
 Parent exact SHA:
-`adc2cc64573d9d5f7b357a7955ff2b0edc1fd509`
+`b83321000668d39580a29e2e838aa585d5750fd5`
 
-A3 status:
+A4:
 SOURCE_VERIFIED
+OWNER ACCEPTED
 
-Current handoff:
-`docs/handoff/MFP_V3_A4_ORDERING_SURFACES_CODEX_HANDOFF_2026-10-02.md`
+Current Stage handoff:
+`docs/handoff/MFP_V3_A5_CHECKOUT_MONEY_CODEX_HANDOFF_2026-10-02.md`
 
-Controlling plan:
-`docs/plan/MFP_V3_SMM_Migration_Plan_2026-10-02.txt`
+Controlling crosswalk:
+`docs/plan/MFP_V3_OWNER_FINAL_CROSSWALK_2026-10-02.txt`
 
 ## Current objective
 
-Build formal MFP ordering surfaces:
+A4 Normalized Draft
+→ formal price/revision validation
+→ Checkout
+→ Final Review
+→ Payment Confirm
+→ Store Kernel formal submit
+→ canonical readback
 
-A3 Active Projection
-→ shared MFP ordering selector/domain
-→ MFP Pad UI
-→ MFP Mobile UI
-→ same normalized cart intent
-
-Scope:
-- categories
-- products
-- options/modifiers
-- combo
-- cart draft
-- service mode
-- local published-fact price preview
-- read-only sellability
-- Pad + Mobile actual ordering UI
+Plus Owner FINAL money operations:
+- Student Discount
+- channel/tender
+- cash keypad
+- Business Day cash opening
+- Cash In/Out
+- Day Close
+- retained cash
+- Channel/Tender summaries
+- immutable Daily Report money facts
 
 ## First RED
 
-Same projection + same selections
-→ identical normalized cart intent on Pad and Mobile.
+Before Payment Confirm:
+formal Store Kernel commit count = 0.
 
-No:
-- second pricing authority
-- second order authority
-- second sync client
-- SMM-specific business state
+After explicit Payment Confirm:
+one submission only.
 
-## A4 non-goals
+Double tap/retry:
+same submissionId/idempotencyKey
+→ no duplicate formal effect.
 
-Do not:
-- formal Store Kernel checkout commit
-- payment/tender
-- display number allocation
-- fulfillment truth
-- print
-- refunds/cancel
-- external Customer/Keeta execution
-- production deploy
-- merge
-- OTA
+Stale formal price/revision:
+→ reject before commit.
 
-A5 owns formal checkout/money.
+## Hard locks
 
-## Integration
-
-A3:
-- read active projection only
-- no direct catalog fetch
-- no new WebSocket/polling
-
-A2:
-- consume existing security gate/state
-
-A1:
-- cart remains draft; no formal order state
-
-## UI quality
-
-A4 is a real product UI stage.
-
-MFP Pad:
-- high-density order workspace
-
-MFP Mobile:
-- focused touch-first mobile workspace
-
-Both:
-- same shared domain contract
-- same normalized intent
-- same canonical material facts
-
-## Owner crosswalk closure
-
-Controlling crosswalk:
-`docs/plan/MFP_V3_OWNER_REQUIREMENTS_CROSSWALK_2026-10-02.md`
-
-Current implementation slice:
-`SOURCE_VERIFIED`
-
-A4 stage closure:
-`BLOCKED`
-
-Required before A5:
-- A4-C1 Display Settings
-- A4-C2 Navigation + More shell
-- A4-C3 major modal geometry
-- A4-C4 exact Cart semantics
-- A4-C5 Hold/Retrieve/Dining draft entry
-- A4-C6 exact Fast Lane
-- A4-C7 Owner UI acceptance baseline
-
-Current verified slice SHA:
-`5e4118c003bef84a5e0262d5ac925537c4686ff3`
-
-Do not advance to A5 until the above closure is SOURCE_VERIFIED.
+- Pricing remains formal Store Kernel/Pricing authority
+- Payment/Tender remains formal authority
+- client preview != final quote
+- no fake payment success
+- no formal order identity before commit/readback
+- no Manager-only assumption for Owner FINAL frontline checkout
+- no v2 client-state import
+- no SMM authority
+- no periodic money polling
+- no deploy/merge/OTA
 
 ## Completion target
 
 SOURCE_VERIFIED
 
-Production blockers from A2/A3 remain separately BLOCKED until bound/deployed.
+Production binding remains separately BLOCKED until formal runtime bindings and physical acceptance exist.
 
 Status language:
 - SOURCE_VERIFIED
@@ -144,22 +93,4 @@ Status language:
 - FAILED
 
 MILESTONE:
-`MFP_V3_A4_CURRENT_HANDOFF_2026_10_02`
-
-
-## Owner FINAL carry-forward gate｜2026-10-02
-
-A4 architecture/domain/UI scope has a GREEN exact-head candidate, but Owner FINAL acceptance remains BLOCKED pending the explicit closure addendum.
-
-Read:
-`docs/plan/MFP_V3_OWNER_FINAL_CROSSWALK_2026-10-02.txt`
-
-Continue PR #639 only.
-Do not open A5 yet.
-
-Required closure:
-A4-OF-01..09 in:
-`docs/handoff/MFP_V3_A4_ORDERING_SURFACES_CODEX_HANDOFF_2026-10-02.md`
-
-Target after closure:
-`SOURCE_VERIFIED`
+`MFP_V3_A5_CURRENT_HANDOFF_2026_10_02`
