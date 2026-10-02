@@ -1,156 +1,124 @@
-# ADMIN V3 CURRENT PRODUCT PHASE｜2026-09-30
+# MFK CURRENT HANDOFF｜2026-10-02
 
-Controlling product candidate:
-`docs/product/MFK_ADMIN_V3_PRODUCT_BRIEF_R1_2026-09-30.md`
+Status: CURRENT / CONTROLLING HANDOFF
 
-Product issue:
-#601
+Controlling authority:
+`docs/governance/MFK_UNIFIED_SURFACES_R1_AUTHORITY_2026-10-02.md`
 
-Current strategy:
-- stop A1/A2 incremental implementation progression
-- lock the whole Admin V3 product, functions, IA, UI and acceptance first
-- then execute one isolated one-shot V3 rebuild
-- v2 production remains untouched until full V3 acceptance
+Commander:
+`COMMANDER_CURRENT.md`
 
-Parked references:
-- PR #599 A1: implementation reference only, not to merge during product lock
-- #600 A2: superseded as implementation roadmap; ideas may be reused only if consistent with #601
+Execution:
+- Branch: `feat/MFK-UNIFIED-SURFACES-R1-2026-10-02`
+- Draft PR: #627
+- Foundation: `0223513a2142b02554fd6ff61808b871af8b5bbd`
+- Latest main must be fresh-read before every execution restart.
+
+## Current owner-locked product target
+
+ADMIN
+- Admin Desktop
+- Admin Mobile / Owner Surface
+
+SMT
+- SMT Desktop
+- SMT Mobile / Handheld
+
+Independent Owner App and independent SMM are cancelled as final product identities.
+
+Legacy workers remain temporarily live:
+- `mfk-owner`
+- `mfk-smm-web`
+
+No decommission until physical verification and separate Owner approval.
+
+## Current execution objective
+
+UNIFIED SURFACES R1 — IMPLEMENTATION + DIRECT DEPLOY ACCEPTANCE
+
+Sequence:
+1. Fresh audit PR #627 + latest main + PR #623 foundation.
+2. Integrate latest main safely.
+3. Lock implementation contracts.
+4. Admin Mobile integration into `v2admin`.
+5. SMT Handheld integration into `v2local`.
+6. SMM transitional compatibility adaptation.
+7. Public SMT auth/worker hardening.
+8. Diagnostics adaptation.
+9. Relevant tests + exact-head CI.
+10. Exact source SHA lock.
+11. Acceptance deploy Admin.
+12. Acceptance deploy public SMT.
+13. Runtime identity readback.
+14. Desktop/mobile physical browser acceptance.
+15. Update evidence.
+
+## Authority boundaries
+
+Admin Mobile:
+- same Admin auth/session
+- same canonical readback
+- same permission/audit/publish/diagnostics
+- no dependency on `mfk-owner` / Owner runtime API
+
+SMT Handheld:
+- same Store Kernel / transaction authority as Desktop
+- same Pricing / Order / Fulfillment / Print authority
+- same SMT projection / HeadSeq semantics
+- no SMM formal authority
+- no new `SMM_INTENT_STORE` dependency
+
+Public SMT:
+- authenticated public surface only
+- no anonymous business mutation
+- acceptance token is not staff identity
+- Browser/Cloud is not Formal Order Authority
+
+## PROMOTE scope already granted
+
+Owner has explicitly granted `PROMOTE` for acceptance deployment inside PR #627 after safe main integration and GREEN source tests.
+
+Authorized:
+- existing Admin Worker acceptance deploy
+- existing SMT public Worker acceptance deploy
+- required candidate resource provisioning under existing contracts
+- exact identity readback
+- browser physical acceptance
+- bounded fix / re-test / redeploy loops within the same scope
+
+Still separately gated:
+- final PR merge
+- final hostname cutover
+- OTA completion
+- legacy decommission
+
+## First restart check
+
+Before any source edit:
+- verify live main
+- verify PR #627 head/base
+- verify PR #623 foundation
+- verify controlling authority remains 2026-10-02
+- confirm no runtime conflict from main integration
+
+If conflict:
+`BLOCKED — RUNTIME_CONFLICT`
+
+If governance documents disagree again:
+`BLOCKED — GOVERNANCE_DRIFT`
+
+## Required status language
+
+Only:
+- SOURCE_VERIFIED
+- DEPLOYED
+- PHYSICAL_VERIFIED
+- BLOCKED
+- FAILED
+
+MILESTONE:
+`MFK_UNIFIED_SURFACES_R1_CONTROL_AUTHORITY_READY_2026_10_02`
 
 ---
 
-# ADMIN V3 PRODUCT GATE｜2026-09-30
-
-Controlling candidate product brief:
-`docs/product/MFK_ADMIN_V3_PRODUCT_BRIEF_R1_2026-09-30.md`
-
-Product control:
-#601
-
-Owner direction:
-- lock complete Admin functionality + IA + UI before further implementation;
-- stop A1/A2 incremental implementation roadmap;
-- rebuild Admin V3 once as one isolated product program;
-- v2 Production remains live until full V3 preview/physical acceptance.
-
-Current implementation status:
-- A0 foundation remains merged.
-- PR #599 A1 is frozen / not to merge while #601 is pending approval.
-- #600 A2 incremental spec is superseded as implementation roadmap by #601.
-
----
-
-# SYSTEM-WIDE CURRENT AUTHORITY｜2026-09-30｜R2
-
-Parallel Web Client Rebirth:
-`docs/governance/MFK_WEB_CLIENT_PARALLEL_REBIRTH_AUTHORITY_R2_2026-09-30.md`
-
-Root control:
-#596
-
-Implementation strategy:
-- keep current v2 production baseline running
-- stop broad in-place v2 state-architecture migration
-- build isolated V3 web clients in parallel
-- preserve backend / Cloud canonical / SMT / API contracts
-- no production cutover until V3 physical/browser acceptance is GREEN
-
-First slice:
-`v3admin` A0 foundation only, zero production routing.
-
----
-
-# SYSTEM-WIDE CURRENT AUTHORITY｜2026-09-30
-
-Web/browser state sovereignty:
-`docs/governance/MFK_WEB_STATE_SOVEREIGNTY_AUTHORITY_R1_2026-09-30.md`
-
-Root control:
-#596
-
-Applies to Admin / SMM / Customer / Owner / future web ports.
-
-Cloud/server state = TanStack Query.  
-Durable explicit browser outbox = Dexie / IndexedDB.  
-Local draft/UI = React/Zustand only.  
-Derived server status must not become durable browser authority.
-
----
-
-# MFK CURRENT HANDOFF｜2026-09-25
-
-Current navigation:
-docs/navigation/MFK_航海圖_V1.30_Round031_2026-09-25.txt
-
-Control:
-#22
-
-## Current
-
-Carrier 1.0.7 + SMM PWA LAN/QR software/release gate is GREEN.
-
-MFK product source:
-`75759607ba05720f723c77d282327b7f1386f616`
-
-Source/build verification:
-`36084376938` SUCCESS
-
-Canonical Carrier OTA publication:
-`36085973121` SUCCESS
-
-Published Carrier:
-- 1.0.7 / 107
-- package `com.morefunos.smt`
-- APK `MoreFunOS-SMT-1.0.7-mfk-75759607ba05.apk`
-- SHA-256 `b521d509f93143e191e9df363b91409e499dc0788776f067e88469611c791046`
-- public manifest + APK hash readback GREEN
-- evidence artifact `10844450207`
-
-Independent release replay:
-`36085863280` SUCCESS
-- same product source
-- same APK SHA-256
-
-Canonical Builder path:
-- `.github/workflows/mfk-carrier-ota.yml`
-- `requests/mfk-carrier-ota-request.txt`
-
-Temporary parallel duplicate publisher path has been retired. One active MFK Carrier OTA path remains.
-
-Milestone:
-`MFK_CARRIER_1_0_7_OTA_PUBLISHED_GREEN`
-
-## Locked architecture
-
-SMM = PWA/Web only.
-
-Primary:
-PWA → LAN HTTP/JSON :17831 → SMT.
-
-LAN unavailable:
-other allowed path / QR fallback; staff ordering remains unblocked.
-
-QR = Order Intent only.
-SMT revalidates current Menu + Pricing before Store Kernel creates Formal Order.
-
-Runtime OTA URL and Carrier OTA URL remain independently configurable.
-
-## Exact NEXT
-
-Physical Ring 3 only. No product code before physical evidence.
-
-1. Store SMT Recovery → check Carrier OTA.
-2. Fresh offered version must be 1.0.7 / 107.
-3. Install and confirm Carrier 1.0.7 / 107.
-4. Confirm normal SMT boot + independent Runtime/Carrier OTA URL controls.
-5. iPhone Safari on store LAN: PWA LAN probe + one real staff order.
-6. iOS Chrome: repeat LAN capability evidence.
-7. Make LAN unavailable: verify no blocking and fallback available.
-8. QR Order Intent → SMT revalidation → exactly one Formal Order / Display.
-9. Replay same QR/intent: zero duplicate Formal Order.
-10. Restart SMT and repeat one LAN/QR sanity path.
-
-Success target:
-`MFK_CARRIER_1_0_7_SMM_PWA_LAN_QR_PHYSICAL_GREEN`
-
-If RED:
-STOP at exact FIRST BREAK and fix only that seam.
+Historical handoff lineage dated 2026-09-30 and earlier is retained in Git history and its dated authority documents. It is not the current execution entry point where it conflicts with the 2026-10-02 Unified Surfaces R1 authority.
