@@ -91,12 +91,32 @@ A0 — SOURCE_VERIFIED
 A1 — SOURCE_VERIFIED
 A2 — SOURCE_VERIFIED
 A3 — SOURCE_VERIFIED
-A4 — CURRENT
+A4 — CURRENT / BLOCKED FOR OWNER CROSSWALK CLOSURE
 A5 — Checkout + Money
 A6 — Order Operations
 A7 — Print + Hardware + Recovery
 A8 — Customer + Keeta + External
 A9 — Public + Diagnostics + Physical Acceptance + Cutover
+
+## Owner product precedence
+
+Canonical product behavior:
+1. Owner FINAL V1.0
+2. Owner Working V2.5 as detailed decision evidence
+3. historical UI optimization document as implementation/acceptance donor only
+
+Controlling MFP crosswalk:
+`docs/plan/MFP_V3_OWNER_REQUIREMENTS_CROSSWALK_2026-10-02.md`
+
+A4 may not close until A4-C1..A4-C7 are SOURCE_VERIFIED.
+
+## Permission product rule
+
+A2 action-time permission infrastructure remains part of security architecture.
+
+For this Owner product version, any successfully authorized MFP staff session must be granted the Owner-listed MFP/legacy-SMT operational capabilities by canonical policy; the client must not invent a Manager-only product gate.
+
+This does not remove formal server/Store Kernel permission admission.
 
 ## Current execution
 
@@ -109,7 +129,13 @@ Branch:
 Parent exact SHA:
 `adc2cc64573d9d5f7b357a7955ff2b0edc1fd509`
 
-Completion target:
+Current implementation slice:
+SOURCE_VERIFIED
+
+A4 stage closure:
+BLOCKED
+
+Completion target after Owner crosswalk closure:
 SOURCE_VERIFIED
 
 Carried production binding blockers from A2/A3 remain BLOCKED separately.
