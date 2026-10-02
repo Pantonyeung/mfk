@@ -145,3 +145,21 @@ Status language:
 
 MILESTONE:
 `MFP_V3_A4_CURRENT_HANDOFF_2026_10_02`
+
+
+## Owner FINAL carry-forward gate｜2026-10-02
+
+A4 architecture/domain/UI scope has a GREEN exact-head candidate, but Owner FINAL acceptance remains BLOCKED pending the explicit closure addendum.
+
+Read:
+`docs/plan/MFP_V3_OWNER_FINAL_CROSSWALK_2026-10-02.txt`
+
+Continue PR #639 only.
+Do not open A5 yet.
+
+Required closure:
+A4-OF-01..09 in:
+`docs/handoff/MFP_V3_A4_ORDERING_SURFACES_CODEX_HANDOFF_2026-10-02.md`
+
+Target after closure:
+`SOURCE_VERIFIED`
