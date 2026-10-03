@@ -1,8 +1,10 @@
+import {useEffect,useMemo,useRef,useState,type CSSProperties} from 'react';
 import type {CustomerRecommendation} from '../recommendation';
 import type {
   CustomerConnectionState,
   CustomerHistoryProjection,
   CustomerOrderProjection,
+  CustomerOrderStage,
   CustomerProduct,
   CustomerReadModelSnapshot,
 } from '../product-types';
@@ -11,39 +13,85 @@ import {CUSTOMER_FINAL_SOURCE} from '../source-assets';
 import './stage1.css';
 
 const OFFICIAL_LOGO_URL=CUSTOMER_FINAL_SOURCE.logo.url;
-const STAGE1_FINAL_SOURCE=CUSTOMER_FINAL_SOURCE.stage1Final.url;
-const HERO_IP='/brand/stage0-male.webp';
+const HERO_IP_PAIR='https://cdn.creativeclaw.co/u/6ad84d58/images/c40034d5-c340-4af5-8819-68c52b236c09.png';
 
-const statusLabel=(storeAvailable:boolean|undefined)=>{
-  if(storeAvailable===true)return '營業中';
-  if(storeAvailable===false)return '休息中';
-  return '更新中';
-};
-const operatingHoursLabel=(snapshot:CustomerReadModelSnapshot|null)=>{
-  const raw=(snapshot?.store as unknown as {todayHoursLabel?:string;hoursLabel?:string})?.todayHoursLabel
-    ??(snapshot?.store as unknown as {hoursLabel?:string})?.hoursLabel;
-  return String(raw||'').trim();
+type HeroSlide=Readonly<{
+  id:string;
+  eyebrow:string;
+  title:string;
+  subtitle:string;
+  cta:string;
+  tone:'brand'|'ip'|'food'|'season';
+}>;
+
+const HERO_SLIDES:readonly HeroSlide[]=Object.freeze([
+  {id:'brand',eyebrow:'MORE FUN · 好飯好日常',title:'好好吃飯，\n讓日常更有趣！',subtitle:'手作 · 輕食 · 每一餐都值得期待。',cta:'開始點單',tone:'brand'},
+  {id:'ip',eyebrow:'MORE FUN · 一起吃飯',title:'一齊食飯，\n開心加倍！',subtitle:'熟悉嘅味道，加一點磨飯嘅人情味。',cta:'探索餐牌',tone:'ip'},
+  {id:'food',eyebrow:'新鮮 · 手作 · 輕食',title:'每一口，\n都係好好食飯。',subtitle:'餐牌、價錢同供應狀態以店舖最新資料為準。',cta:'睇今日餐牌',tone:'food'},
+  {id:'season',eyebrow:'MORE FUN · 季節靈感',title:'今季好味，\n慢慢發現。',subtitle:'有正式期間限定內容時，會喺呢度第一時間出現。',cta:'睇期間限定',tone:'season'},
+]);
+
+const orderStateLabel=(stage:CustomerOrderStage)=>{
+  const labels:Record<CustomerOrderStage,string>={
+    RECEIVED:'等店舖確認',
+    REJECTED:'未能接單',
+    CANCELED:'已取消',
+    ACCEPTED:'已接單',
+    PREPARING:'製作中',
+    DELAYED:'稍有延誤',
+    READY:'可以取餐',
+    ARRIVED:'已到店',
+    VERIFIED:'已核對',
+    PICKUP_VERIFICATION:'核對中',
+    PICKUP_EXCEPTION:'需要協助',
+    HANDED_OVER:'已交收',
+    COMPLETED:'已完成',
+    UNKNOWN:'確認中',
+  };
+  return labels[stage];
 };
 
-function mediaFor(product:CustomerProduct){
-  if(product.imageUrl)return product.imageUrl;
-  if(/飯團|紫米/.test(product.name))return '/brand/p0-riceball.webp';
-  if(/沙律|蔬菜|輕食/.test(product.name))return '/brand/mf-home-hero-salad.webp';
-  return '/brand/mf-home-hero-bowl.webp';
+function SearchIcon(){
+  return <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="5.8"/><path d="m15 15 4.2 4.2"/></svg>;
+}
+function PinIcon(){
+  return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s6-5.1 6-11a6 6 0 1 0-12 0c0 5.9 6 11 6 11Z"/><circle cx="12" cy="10" r="2"/></svg>;
+}
+function JarIcon(){
+  return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4h8M7 7h10l-1 13H8L7 7Z"/><path d="M9.5 11.5c1.6 1.7 3.4 1.7 5 0"/></svg>;
+}
+function HeartIcon(){
+  return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20S4 15.2 4 9.2C4 6.3 5.9 4.5 8.2 4.5c1.6 0 3 .9 3.8 2.2.8-1.3 2.2-2.2 3.8-2.2 2.3 0 4.2 1.8 4.2 4.7C20 15.2 12 20 12 20Z"/></svg>;
+}
+function TicketIcon(){
+  return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7.5h16v3a2 2 0 0 0 0 4v3H4v-3a2 2 0 0 0 0-4v-3Z"/><path d="M9 8.5v7"/></svg>;
+}
+function GiftIcon(){
+  return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10h16v10H4zM3 7h18v3H3zM12 7v13"/><path d="M12 7C9 7 7 6 7 4.5S9 3 10 4c1 .8 2 3 2 3Zm0 0c3 0 5-1 5-2.5S15 3 14 4c-1 .8-2 3-2 3Z"/></svg>;
 }
 
-function Stage1StatePanel({connection,browserOnline,onRetry}:{connection:CustomerConnectionState;browserOnline:boolean;onRetry:()=>void}){
-  if(!browserOnline)return <section className="stage1-state-panel state-offline" role="status"><strong>目前離線</strong><p>你仍然可以查看已載入內容。</p></section>;
-  if(connection==='ERROR')return <section className="stage1-state-panel state-error" role="alert"><strong>暫時未能更新店舖資料</strong><p>請稍後再試。</p><button onClick={onRetry}>重新整理</button></section>;
-  if(connection==='STALE'||connection==='PARTIAL')return <section className="stage1-state-panel state-stale" role="status"><strong>正顯示最近一次資料</strong><p>最新內容仍在更新中。</p><button onClick={onRetry}>更新資料</button></section>;
-  if(connection==='NOT_CONNECTED')return <section className="stage1-state-panel state-empty" role="status"><strong>店舖資料暫未連接</strong><p>稍後再試，或者先看看已有內容。</p></section>;
-  if(connection==='LOADING')return <section className="stage1-state-panel state-loading" role="status" aria-busy="true"><strong>正在準備首頁</strong><p>店舖狀態、公告同推薦會逐項出現。</p></section>;
-  return null;
+function ProductMedia({product}:{product:CustomerProduct}){
+  return <span className="stage1-food-media">
+    {product.imageUrl
+      ?<img src={product.imageUrl} alt={product.imageAlt??product.name} loading="lazy" decoding="async"/>
+      :<span className="stage1-food-placeholder" aria-hidden="true"/>}
+  </span>;
+}
+
+function HeroVisual({slide,className=''}:{slide:HeroSlide;className?:string}){
+  return <div className={"stage1-hero-visual "+className} data-hero-tone={slide.tone}>
+    <span className="stage1-hero-glow glow-a" aria-hidden="true"/>
+    <span className="stage1-hero-glow glow-b" aria-hidden="true"/>
+    <img className="stage1-hero-ip" src={HERO_IP_PAIR} alt="" aria-hidden="true"/>
+    <span className="stage1-hero-mark mark-a" aria-hidden="true">✦</span>
+    <span className="stage1-hero-mark mark-b" aria-hidden="true">✧</span>
+  </div>;
 }
 
 export function Stage1Home({
-  snapshot,connection,browserOnline,activeOrders,history,recommendations,cartCount,
-  onRetry,onProduct,onBrowse,onJar,onOrders,onHistory,onMember,onBuyAgain,
+  snapshot,connection,browserOnline,activeOrders,history,recommendations,
+  favoriteProductIds,onToggleFavorite,
+  cartCount,onRetry,onProduct,onBrowse,onCategory,onFavorites,onLimited,onJar,onOrders,onMember,onBuyAgain,
 }:{
   snapshot:CustomerReadModelSnapshot|null;
   connection:CustomerConnectionState;
@@ -51,10 +99,15 @@ export function Stage1Home({
   activeOrders:readonly CustomerOrderProjection[];
   history:readonly CustomerHistoryProjection[];
   recommendations:readonly CustomerRecommendation[];
+  favoriteProductIds:ReadonlySet<string>;
+  onToggleFavorite:(productId:string)=>void;
   cartCount:number;
   onRetry:()=>void;
   onProduct:(product:CustomerProduct,origin:ProductOriginRect|null)=>void;
   onBrowse:()=>void;
+  onCategory:(categoryId:string)=>void;
+  onFavorites:()=>void;
+  onLimited:()=>void;
   onJar:()=>void;
   onOrders:()=>void;
   onHistory:()=>void;
@@ -62,138 +115,233 @@ export function Stage1Home({
   onBuyAgain:(order:CustomerHistoryProjection)=>void;
 }){
   const store=snapshot?.store;
-  const todayHours=operatingHoursLabel(snapshot);
-  const member=snapshot?.member;
+  const menu=snapshot?.menu;
   const currentOrder=activeOrders[0];
   const lastOrder=history[0];
-  const canBrowse=Boolean(snapshot?.menu);
-  const topRecommendations=recommendations.filter(item=>item.product.available).slice(0,6);
+  const categories=menu?.categories??[];
+  const topProducts=recommendations.map(item=>item.product).filter(product=>product.available).slice(0,8);
+  const member=snapshot?.member;
   const availableCouponCount=member?.state==='READY'&&member.coupons
     ?member.coupons.filter(item=>item.state==='AVAILABLE').length
     :0;
 
-  const homeMode=currentOrder?'ORDER_ACTIVE':store?.channelAvailable===false?'CLOSED':availableCouponCount?'CAMPAIGN':history.length?'RETURNING':'NORMAL';
-  const headline=homeMode==='ORDER_ACTIVE'
-    ?'辛苦了！美味正在為你準備中'
-    :homeMode==='CLOSED'
-      ?'辛苦了，先來揀進吧！'
-      :homeMode==='RETURNING'
-        ?'歡迎回來，今天也要好好吃飯！'
-        :homeMode==='CAMPAIGN'
-          ?'發現更多美味，也收集更多回憶！'
-          :'早安，今天想食咩？';
-  const subline=homeMode==='ORDER_ACTIVE'
-    ?'好好吃飯，補充生活的能量！'
-    :homeMode==='CLOSED'
-      ?'好味道，總是值得期待。'
-      :homeMode==='RETURNING'
-        ?'有美食相伴的日子，總是特別好。'
-        :homeMode==='CAMPAIGN'
-          ?'好吃的飯，總能帶來好心情。'
-          :'一碗好飯，讓日常更有味。';
+  const [heroIndex,setHeroIndex]=useState(0);
+  const [heroOpen,setHeroOpen]=useState(false);
+  const [heroProgress,setHeroProgress]=useState(0);
+  const touchStartX=useRef<number|null>(null);
+  const activeHero=HERO_SLIDES[heroIndex]??HERO_SLIDES[0];
 
-  return <div className="stage1-home" data-home-mode={homeMode}>
-    <header className="stage1-fixed-header">
-      <button className="stage1-logo-button" onClick={()=>window.scrollTo({top:0,behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'})} aria-label="返回首頁頂部">
-        <img src={OFFICIAL_LOGO_URL} alt="磨飯 More Fun"/>
+  const relatedProducts=useMemo(()=>topProducts.slice(0,4),[topProducts]);
+
+  useEffect(()=>{
+    let raf=0;
+    const update=()=>{
+      raf=0;
+      const raw=(window.scrollY-18)/190;
+      setHeroProgress(Math.max(0,Math.min(1,raw)));
+    };
+    const onScroll=()=>{
+      if(raf)return;
+      raf=window.requestAnimationFrame(update);
+    };
+    update();
+    window.addEventListener('scroll',onScroll,{passive:true});
+    return()=>{window.removeEventListener('scroll',onScroll);if(raf)window.cancelAnimationFrame(raf);};
+  },[]);
+
+  useEffect(()=>{
+    if(heroOpen||window.matchMedia('(prefers-reduced-motion: reduce)').matches)return;
+    const id=window.setInterval(()=>setHeroIndex(index=>(index+1)%HERO_SLIDES.length),5200);
+    return()=>window.clearInterval(id);
+  },[heroOpen]);
+
+  useEffect(()=>{
+    document.body.classList.toggle('stage1-hero-modal-open',heroOpen);
+    return()=>document.body.classList.remove('stage1-hero-modal-open');
+  },[heroOpen]);
+
+  const heroHeight=Math.round(318-(132*heroProgress));
+  const showScrollBanner=heroProgress>=.52;
+
+  const activateHero=()=>{
+    if(activeHero.id==='season')onLimited();
+    else onBrowse();
+  };
+
+  const changeHero=(next:number)=>{
+    const count=HERO_SLIDES.length;
+    setHeroIndex(((next%count)+count)%count);
+  };
+
+  const onHeroTouchEnd=(event:React.TouchEvent<HTMLDivElement>)=>{
+    if(touchStartX.current===null)return;
+    const end=event.changedTouches[0]?.clientX??touchStartX.current;
+    const delta=end-touchStartX.current;
+    touchStartX.current=null;
+    if(Math.abs(delta)<36)return;
+    changeHero(heroIndex+(delta<0?1:-1));
+  };
+
+  const heroStyle={
+    '--stage1-hero-height':heroHeight+'px',
+    '--stage1-hero-scale':String(1-(heroProgress*.14)),
+    '--stage1-hero-copy-opacity':String(1-(heroProgress*.28)),
+    '--stage1-hero-copy-y':(-8*heroProgress)+'px',
+  } as CSSProperties;
+
+  return <div className="stage1-home stage1-mobile-home" data-hero-collapsed={heroProgress>.5||undefined}>
+    <header className="stage1-mobile-header">
+      <img className="stage1-mobile-logo" src={OFFICIAL_LOGO_URL} alt="磨飯 More Fun"/>
+      <button className="stage1-store-chip" type="button" onClick={onBrowse}>
+        <PinIcon/>
+        <span>
+          <strong>{store?.storeName??'磨飯'}</strong>
+          <small>{store?.channelAvailable===false?'休息中':store?.channelAvailable===true?'營業中':connection==='ERROR'?'未能更新':'更新中'}</small>
+        </span>
+        <i aria-hidden="true">⌄</i>
       </button>
-      <div className="stage1-store-context">
-        <strong>{store?.storeName??'磨飯'} <span className="stage1-store-chevron" aria-hidden="true">⌄</span></strong>
-        <span className="stage1-store-meta">{statusLabel(store?.channelAvailable)}{todayHours?' · '+todayHours:''}</span>
-      </div>
-      <button className="stage1-bell" type="button" aria-label="通知"><span aria-hidden="true">♢</span>{activeOrders.length?<i/>:null}</button>
+      <button className="stage1-jar-button" type="button" onClick={onJar} aria-label="記憶罐">
+        <JarIcon/>
+        {cartCount?<b>{cartCount}</b>:null}
+      </button>
     </header>
 
-    <div className="stage1-content">
-      <Stage1StatePanel connection={connection} browserOnline={browserOnline} onRetry={onRetry}/>
+    <main className="stage1-mobile-content">
+      {!browserOnline?<button className="stage1-compact-state" type="button" onClick={onRetry}>離線 · 顯示已載入資料</button>:null}
+      {browserOnline&&connection==='ERROR'?<button className="stage1-compact-state is-error" type="button" onClick={onRetry}>暫時未能更新 · 重試</button>:null}
 
-      <section className="stage1-welcome" data-home-mode={homeMode}>
-        <h1>{headline}</h1>
-        <p>{subline}</p>
-      </section>
-
-      <button className="stage1-search-entry" onClick={onBrowse} disabled={!canBrowse}>
-        <span aria-hidden="true">⌕</span>
-        <strong>{canBrowse?'搜尋想食嘅餐點…':'餐牌更新中…'}</strong>
-      </button>
-
-      {homeMode==='RETURNING'&&topRecommendations.length?<section className="stage1-frequent-strip">
-        <div className="stage1-section-title"><div><h2>常點清單</h2><small>最熟悉的味道</small></div><button onClick={onHistory}>查看全部 ›</button></div>
-        <div className="stage1-frequent-row">{topRecommendations.slice(0,4).map(item=><button key={item.product.productId} onClick={event=>{const rect=event.currentTarget.getBoundingClientRect();onProduct(item.product,{top:rect.top,left:rect.left,width:rect.width,height:rect.height});}}><img src={mediaFor(item.product)} alt={item.product.imageAlt??item.product.name}/><strong>{item.product.name}</strong></button>)}</div>
-      </section>:null}
-
-      {currentOrder?<button className="stage1-live-order" onClick={onOrders}>
-        <span className="stage1-live-label">訂單進行中</span>
-        <strong>{currentOrder.stage==='READY'?'可以取餐啦':currentOrder.stage==='PREPARING'?'製作中':currentOrder.stage==='ACCEPTED'?'店舖已接單':'查看最新進度'}</strong>
-        <div className="stage1-order-step-labels" aria-hidden="true"><span>已接單</span><span>製作中</span><span>快完成</span><span>可取餐</span></div>
-        <div className="stage1-order-steps" aria-hidden="true"><i className="done"/><i className="active"/><i/><i/></div>
-        <small>{currentOrder.displayCode}{currentOrder.etaLabel?' · 預計 '+currentOrder.etaLabel:''}</small>
+      {currentOrder?<button className="stage1-active-order" type="button" onClick={onOrders}>
+        <span><small>訂單</small><strong>{orderStateLabel(currentOrder.stage)}</strong><em>{currentOrder.displayCode}</em></span>
+        <span className="stage1-active-order-right">
+          {currentOrder.stage==='READY'&&currentOrder.pickupCode?<b>取餐碼 {currentOrder.pickupCode}</b>:null}
+          {currentOrder.etaLabel?<small>{currentOrder.etaLabel}</small>:null}
+          <i aria-hidden="true">›</i>
+        </span>
       </button>:null}
 
-      {store?.channelAvailable===false?<section className="stage1-closed-panel">
-        <img src={HERO_IP} alt="" aria-hidden="true"/>
-        <div><span>今日已打烊</span><strong>明日再見</strong>{todayHours?<small>下次營業 · {todayHours}</small>:null}<button disabled={!canBrowse} onClick={onBrowse}>{canBrowse?'查看餐牌':'餐牌更新中'}</button></div>
-      </section>:null}
+      <section
+        className="stage1-hero-shell"
+        style={heroStyle}
+        onTouchStart={event=>{touchStartX.current=event.touches[0]?.clientX??null;}}
+        onTouchEnd={onHeroTouchEnd}
+      >
+        <button className="stage1-big-hero" type="button" onClick={()=>setHeroOpen(true)} aria-label={"放大查看："+activeHero.title.replace(/\n/g,' ')}>
+          <HeroVisual slide={activeHero}/>
+          <span className="stage1-big-hero-copy">
+            <small>{activeHero.eyebrow}</small>
+            <strong>{activeHero.title.split('\n').map((line,index)=><span key={line}>{line}{index===0?<br/>:null}</span>)}</strong>
+            <em>{activeHero.subtitle}</em>
+          </span>
+        </button>
 
-      <button className="stage1-hero-banner" data-source-file="磨飯_stage_1_首頁品牌展示.png" disabled={!canBrowse} onClick={onBrowse} aria-label={canBrowse?'開始點餐':'餐牌更新中'}>
-        <span className="stage1-source-crop stage1-source-hero" aria-hidden="true"><img src={STAGE1_FINAL_SOURCE} alt=""/></span>
-      </button>
-
-      {store?.notice?<section className="stage1-announcement-strip" role="status">
-        <span aria-hidden="true">✦</span>
-        <div><strong>店舖公告</strong><p>{store.notice}</p></div>
-      </section>:null}
-
-      {availableCouponCount?<button className="stage1-promo-banner" onClick={onMember}>
-        <div><span>收集回憶</span><strong>{availableCouponCount} 張回憶券等緊你</strong><small>立即查看</small></div>
-        <img src={HERO_IP} alt="" aria-hidden="true"/>
-      </button>:null}
-
-      <section className="stage1-quick-entry-section" aria-label="首頁快捷入口">
-        <div className="stage1-quick-entry-grid">
-          <button onClick={onHistory} aria-label="我的收藏">
-            <span className="stage1-shortcut-source stage1-shortcut-heart" aria-hidden="true"><img src={STAGE1_FINAL_SOURCE} alt=""/></span>
-            <strong>我的收藏</strong>{history.length?<small>搵返熟悉味道</small>:null}
-          </button>
-          <button onClick={onMember} aria-label={availableCouponCount?'回憶券，'+availableCouponCount+' 張可用':'回憶券'}>
-            <span className="stage1-shortcut-source stage1-shortcut-ticket" aria-hidden="true"><img src={STAGE1_FINAL_SOURCE} alt=""/></span>
-            <strong>回憶券</strong>{availableCouponCount?<small>{availableCouponCount} 張可用</small>:null}
-          </button>
-          <button onClick={onBrowse} aria-label="期間限定">
-            <span className="stage1-shortcut-source stage1-shortcut-order" aria-hidden="true"><img src={STAGE1_FINAL_SOURCE} alt=""/></span>
-            <strong>期間限定</strong><small>今期新品</small>
-          </button>
+        <div className="stage1-hero-dots" aria-label="主視覺輪播">
+          {HERO_SLIDES.map((slide,index)=><button key={slide.id} type="button" className={index===heroIndex?'is-active':''} aria-label={"第 "+(index+1)+" 張"} onClick={()=>changeHero(index)}/>)}
         </div>
       </section>
 
-      <section className="stage1-top6">
-        <div className="stage1-section-title">
-          <div><h2>為你推薦 <small>Top 6</small></h2></div>
-          <button onClick={onBrowse}>查看全部 ›</button>
+      <button className="stage1-search" type="button" onClick={onBrowse}>
+        <SearchIcon/>
+        <span>搜尋餐點、關鍵字…</span>
+      </button>
+
+      <section className="stage1-quick-row" aria-label="快捷入口">
+        <button type="button" onClick={onFavorites}>
+          <span className="stage1-quick-icon heart"><HeartIcon/></span>
+          <strong>我的收藏</strong>
+          <small>喜歡的味道</small>
+        </button>
+        <button type="button" onClick={onMember}>
+          <span className="stage1-quick-icon ticket"><TicketIcon/></span>
+          <strong>回憶券</strong>
+          <small>{availableCouponCount?availableCouponCount+' 張可用':'專屬好禮'}</small>
+        </button>
+        <button type="button" onClick={onLimited}>
+          <span className="stage1-quick-icon gift"><GiftIcon/></span>
+          <strong>期間限定</strong>
+          <small>季節驚喜</small>
+        </button>
+      </section>
+
+      <section className="stage1-category-section" aria-label="餐點分類">
+        <div className="stage1-category-rail">
+          <button type="button" className="is-active" onClick={onBrowse}>推薦</button>
+          {categories.slice(0,6).map(category=><button type="button" key={category.categoryId} onClick={()=>onCategory(category.categoryId)}>{category.name}</button>)}
+        </div>
+      </section>
+
+      {showScrollBanner?<section className="stage1-scroll-banner" aria-label="磨飯推廣資訊">
+        <div className="stage1-scroll-banner-art" aria-hidden="true"><HeroVisual slide={HERO_SLIDES[(heroIndex+1)%HERO_SLIDES.length]}/></div>
+        <div className="stage1-scroll-banner-copy">
+          <small>{store?.notice?'店舖最新消息':'MORE FUN · 好飯好日常'}</small>
+          <strong>{store?.notice??'手作輕食，繼續向下發現更多。'}</strong>
+        </div>
+        <button type="button" onClick={onBrowse}>探索 ›</button>
+      </section>:null}
+
+      {lastOrder?<button className="stage1-reorder-strip" type="button" onClick={()=>onBuyAgain(lastOrder)}>
+        <small>上次食過</small><strong>{lastOrder.itemSummary}</strong><span>再來一單 ›</span>
+      </button>:null}
+
+      <section className="stage1-product-section">
+        <div className="stage1-section-heading">
+          <h2>精選推薦</h2>
+          <button type="button" onClick={onBrowse}>查看全部 ›</button>
         </div>
 
-        {topRecommendations.length?<div className="stage1-top6-grid">
-          {topRecommendations.map(item=><button
-            className="stage1-product-card" key={item.product.productId} data-product-id={item.product.productId}
-            onClick={event=>{const rect=event.currentTarget.getBoundingClientRect();onProduct(item.product,{top:rect.top,left:rect.left,width:rect.width,height:rect.height});}}
-          >
-            <span className="stage1-product-media"><img src={mediaFor(item.product)} alt={item.product.imageAlt??item.product.name}/><i aria-hidden="true">♡</i></span>
-            <span className="stage1-product-info">
-              {item.product.badge?<small>{item.product.badge}</small>:null}
-              <strong>{item.product.name}</strong>
-              <em>{item.product.displayPriceLabel??'價格稍後顯示'}</em>
-            </span>
-          </button>)}
-        </div>:<div className="stage1-top6-empty">
-          <strong>今日推薦整理中</strong><span>可以先看看完整餐牌。</span>
-          <button onClick={onBrowse} disabled={!canBrowse}>查看餐牌</button>
+        {topProducts.length?<div className="stage1-product-scroll">
+          {topProducts.map(product=>{
+            const favorite=favoriteProductIds.has(product.productId);
+            return <article className="stage1-product-tile" key={product.productId}>
+              <button className="stage1-product-main" type="button" onClick={event=>{const rect=event.currentTarget.getBoundingClientRect();onProduct(product,{top:rect.top,left:rect.left,width:rect.width,height:rect.height});}}>
+                <ProductMedia product={product}/>
+                <span className="stage1-product-copy">
+                  {product.badge?<small>{product.badge}</small>:null}
+                  <strong>{product.name}</strong>
+                  <em>{product.displayPriceLabel??'價格更新中'}</em>
+                </span>
+              </button>
+              <button className={"stage1-product-favorite"+(favorite?' is-active':'')} type="button" aria-label={favorite?'取消收藏':'收藏'} onClick={()=>onToggleFavorite(product.productId)}>
+                <HeartIcon/>
+              </button>
+            </article>;
+          })}
+        </div>:<div className="stage1-product-loading" aria-busy="true">
+          {[0,1,2].map(index=><i key={index}/>)}
         </div>}
       </section>
 
-      <section className="stage1-memory-strip">
-        <button onClick={onJar}><span>記憶罐</span><strong>{cartCount?cartCount+' 件餐點':'今餐未開始'}</strong></button>
-        {lastOrder?<button onClick={()=>onBuyAgain(lastOrder)}><span>上次食過</span><strong>{lastOrder.itemSummary}</strong></button>:<button onClick={onHistory}><span>我的回憶</span><strong>完成第一張訂單後會出現</strong></button>}
+      <div className="stage1-end-marker" role="status">已經到底啦 · More Fun</div>
+    </main>
+
+    {heroOpen?<div className="stage1-hero-modal" role="dialog" aria-modal="true" aria-label={activeHero.title.replace(/\n/g,' ')}>
+      <button className="stage1-hero-modal-close" type="button" onClick={()=>setHeroOpen(false)} aria-label="關閉">×</button>
+      <span className="stage1-hero-modal-count">{heroIndex+1}/{HERO_SLIDES.length}</span>
+
+      <section className="stage1-hero-modal-visual">
+        <HeroVisual slide={activeHero} className="is-full"/>
+        <div className="stage1-hero-modal-title">
+          <small>{activeHero.eyebrow}</small>
+          <h2>{activeHero.title.split('\n').map((line,index)=><span key={line}>{line}{index===0?<br/>:null}</span>)}</h2>
+          <p>{activeHero.subtitle}</p>
+        </div>
       </section>
-    </div>
+
+      <section className="stage1-hero-modal-info">
+        <div className="stage1-hero-modal-cta">
+          <div><small>今次主題</small><strong>{activeHero.title.replace(/\n/g,' ')}</strong></div>
+          <button type="button" onClick={()=>{setHeroOpen(false);activateHero();}}>{activeHero.cta}</button>
+        </div>
+
+        <div className="stage1-hero-modal-recommend">
+          <div className="stage1-section-heading"><h3>相關推薦</h3><button type="button" onClick={()=>{setHeroOpen(false);onBrowse();}}>查看全部 ›</button></div>
+          {relatedProducts.length?<div className="stage1-modal-products">
+            {relatedProducts.map(product=><button key={product.productId} type="button" onClick={()=>{setHeroOpen(false);onProduct(product,null);}}>
+              <ProductMedia product={product}/>
+              <span><strong>{product.name}</strong><em>{product.displayPriceLabel??'價格更新中'}</em></span>
+            </button>)}
+          </div>:<div className="stage1-modal-empty">餐牌更新後，呢度會即時顯示相關餐點。</div>}
+        </div>
+      </section>
+    </div>:null}
   </div>;
 }

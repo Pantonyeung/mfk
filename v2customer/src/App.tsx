@@ -75,6 +75,18 @@ const replacePath=(path:string)=>{
   window.history.pushState({mfkCustomer:true},'',path);
 };
 
+const FAVORITES_KEY='mfk:customer:favorites:v1';
+const readFavoriteProductIds=()=>{
+  if(typeof window==='undefined')return new Set<string>();
+  try{
+    const raw=window.localStorage.getItem(FAVORITES_KEY);
+    const value=raw?JSON.parse(raw):[];
+    return new Set(Array.isArray(value)?value.map(String).filter(Boolean):[]);
+  }catch{return new Set<string>();}
+};
+const writeFavoriteProductIds=(ids:ReadonlySet<string>)=>{
+  try{window.localStorage.setItem(FAVORITES_KEY,JSON.stringify([...ids]));}catch{}
+};
 const nowIso=()=>new Date().toISOString();
 const withoutPaymentEvidence=(value:CustomerCheckoutDraft):CustomerCheckoutDraft=>{
   const {paymentEvidence:_paymentEvidence,...rest}=value;
@@ -113,6 +125,7 @@ export function App(){
   const [error,setError]=useState<string|null>(null);
   const [browserOnline,setBrowserOnline]=useState(()=>typeof navigator==='undefined'||navigator.onLine);
   const [search,setSearch]=useState('');
+  const [favoriteProductIds,setFavoriteProductIds]=useState<ReadonlySet<string>>(()=>readFavoriteProductIds());
   const [menuLayout,setMenuLayout]=useState<MenuLayout>('grid');
   const [selectedProduct,setSelectedProduct]=useState<CustomerProduct|null>(null);
   const [selectedProductOrigin,setSelectedProductOrigin]=useState<ProductOriginRect|null>(null);
@@ -150,6 +163,37 @@ export function App(){
       if(next==='account')replacePath('/member/account');
       if(next==='recovery')replacePath('/support/account-recovery');
       persist({preferences:{activeView:persistedView(next),activeCategoryId}});
+      window.scrollTo({top:0,behavior:'auto'});
+    });
+  };
+
+  const toggleFavoriteProduct=(productId:string)=>{
+    setFavoriteProductIds(current=>{
+      const next=new Set(current);
+      next.has(productId)?next.delete(productId):next.add(productId);
+      writeFavoriteProductIds(next);
+      return next;
+    });
+  };
+
+  const openFavorites=()=>{
+    presentWithContinuity(()=>{
+      setSearch('');
+      setView('menu');
+      replacePath('/menu?filter=favorites');
+      persist({preferences:{activeView:'menu',activeCategoryId}});
+      window.scrollTo({top:0,behavior:'auto'});
+    });
+  };
+
+  const openLimited=()=>{
+    const limited=categories.find(item=>/期間|限定|新品|新/.test(item.name));
+    if(limited)setActiveCategoryId(limited.categoryId);
+    presentWithContinuity(()=>{
+      setSearch('');
+      setView('menu');
+      replacePath('/menu');
+      persist({preferences:{activeView:'menu',activeCategoryId:limited?.categoryId??activeCategoryId}});
       window.scrollTo({top:0,behavior:'auto'});
     });
   };
@@ -825,8 +869,8 @@ export function App(){
     </div>}
 
     <section className={view==='menu'?'stage2-viewport':'viewport'} aria-busy={connection==='LOADING'}>
-      {view==='home'?<Stage1Home snapshot={snapshot} connection={connection} browserOnline={browserOnline} activeOrders={activeOrders} history={history} recommendations={homeRecommendations} cartCount={cartCount} onRetry={()=>void refresh()} onProduct={openProduct} onBrowse={()=>changeView('menu')} onJar={()=>changeView('cart')} onOrders={()=>{setOrderSegment('current');changeView('orders')}} onHistory={()=>{setOrderSegment('completed');changeView('orders')}} onMember={()=>changeView('more')} onBuyAgain={order=>void reorder(order)}/>:null}
-      {view==='menu'?<Stage2Menu connection={connection} browserOnline={browserOnline} categories={categories} activeCategoryId={activeCategoryId} setCategory={category=>presentWithContinuity(()=>changeCategory(category))} query={search} setQuery={setSearch} products={menu?.products??[]} recommendations={menuRecommendations} onProduct={(product,origin)=>openProduct(product,origin)} cartCount={cartCount} onCart={()=>changeView('cart')}/>:null}
+      {view==='home'?<Stage1Home snapshot={snapshot} connection={connection} browserOnline={browserOnline} activeOrders={activeOrders} history={history} recommendations={homeRecommendations} favoriteProductIds={favoriteProductIds} onToggleFavorite={toggleFavoriteProduct} cartCount={cartCount} onRetry={()=>void refresh()} onProduct={openProduct} onBrowse={()=>changeView('menu')} onCategory={categoryId=>{changeCategory(categoryId);changeView('menu')}} onFavorites={openFavorites} onLimited={openLimited} onJar={()=>changeView('cart')} onOrders={()=>{setOrderSegment('current');changeView('orders')}} onHistory={()=>{setOrderSegment('completed');changeView('orders')}} onMember={()=>changeView('more')} onBuyAgain={order=>void reorder(order)}/>:null}
+      {view==='menu'?<Stage2Menu connection={connection} browserOnline={browserOnline} categories={categories} activeCategoryId={activeCategoryId} setCategory={category=>presentWithContinuity(()=>changeCategory(category))} query={search} setQuery={setSearch} products={menu?.products??[]} recommendations={menuRecommendations} favorites={favoriteProductIds} onToggleFavorite={toggleFavoriteProduct} onProduct={(product,origin)=>openProduct(product,origin)} cartCount={cartCount} onCart={()=>changeView('cart')}/>:null}
       {view==='cart'?<CartView cart={cart} quote={quote} repairs={cartRepairs} member={snapshot?.member} suggestions={cartSuggestions} products={menu?.products??[]} onProduct={openProduct} onAcceptRepair={acceptCartRepair} onQuantity={(lineId,quantity)=>updateCart(cart.map(line=>line.lineId===lineId?{...line,quantity:Math.max(1,quantity)}:line))} onRemove={lineId=>updateCart(cart.filter(line=>line.lineId!==lineId))} onMenu={()=>changeView('menu')} onCheckout={()=>void openCheckoutStep('contact')}/>:null}
       {view==='checkout'?<CheckoutUi4View step={checkoutStep} cart={cart} quote={quote} repairs={cartRepairs} checkout={checkout} setCheckout={changeCheckout} paymentChannels={snapshot?.paymentChannels??[]} pickupEtaLabel={snapshot?.store?.etaLabel} onStep={step=>void openCheckoutStep(step)} onBackToJar={()=>changeView('cart')} onRepair={()=>changeView('cart')} onPaymentEvidence={file=>void uploadPaymentEvidence(file)} onReviewConfirmed={startUi5Submission}/>:null}
       {view==='submit'?(activeSubmitIntent?<SubmitUi5View intent={activeSubmitIntent} submitting={submitting} submitProbe={submitProbe} reading={readingIntentId===activeSubmitIntent.submissionId} fallbackAvailable={Boolean(snapshot?.fallback?.enabled)&&activeSubmitIntent.state==='NOT_CONNECTED'} onSubmit={()=>void submit(activeSubmitIntent)} onReadback={()=>void readbackIntent(activeSubmitIntent)} onFallback={()=>void requestFallback(activeSubmitIntent)} onBackReview={()=>void openCheckoutStep('review')} onBackToJar={()=>changeView('cart')}/>:<section className="page ui5-missing"><h1>未找到今次落單資料</h1><p>請返回記憶罐重新確認餐點，再送出訂單。</p><button onClick={()=>changeView('cart')}>返回記憶罐</button></section>):null}
