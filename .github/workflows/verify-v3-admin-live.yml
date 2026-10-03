@@ -1,0 +1,84 @@
+name: verify-v3-admin-live
+
+on:
+  push:
+    branches:
+      - work/MFP-V3-ADMIN-PUBLIC-VERIFY-2026-10-03
+    paths:
+      - .github/workflows/verify-v3-admin-live.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: verify-v3-admin-live
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Verify public release and server identity
+        env:
+          EXPECTED_SOURCE_SHA: cefc455f3a13d2f11b87d7353bc04d28256236a2
+          EXPECTED_RELEASE_ID: v3admin-cefc455f3a13-preview
+          EXPECTED_HOST: admin.morefunos.com
+        run: |
+          set -euo pipefail
+          nonce="${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-$(date +%s)"
+          curl --fail --location --silent --show-error --retry 5 --retry-all-errors --retry-delay 2 \
+            -H 'Cache-Control: no-cache' "https://${EXPECTED_HOST}/release.json?verify=${nonce}" -o release.json
+          curl --fail --location --silent --show-error --retry 5 --retry-all-errors --retry-delay 2 \
+            -H 'Cache-Control: no-cache' "https://${EXPECTED_HOST}/api/health?verify=${nonce}" -o health.json
+          curl --fail --location --silent --show-error --retry 5 --retry-all-errors --retry-delay 2 \
+            -H 'Cache-Control: no-cache' "https://${EXPECTED_HOST}/?verify=${nonce}" -o root.html
+          node --input-type=module <<'NODE'
+          import {readFile,appendFile} from 'node:fs/promises';
+          const release=JSON.parse(await readFile('release.json','utf8'));
+          const health=JSON.parse(await readFile('health.json','utf8'));
+          if(release.sourceSha!==process.env.EXPECTED_SOURCE_SHA) throw new Error(`RELEASE_SOURCE_MISMATCH_${release.sourceSha}`);
+          if(release.releaseId!==process.env.EXPECTED_RELEASE_ID) throw new Error(`RELEASE_ID_MISMATCH_${release.releaseId}`);
+          if(release.configurationWritesEnabled!==false) throw new Error('CONFIGURATION_WRITES_MUST_BE_DISABLED');
+          if(release.mode!=='PRESERVATION') throw new Error(`RELEASE_MODE_MISMATCH_${release.mode}`);
+          if(health.ok!==true||health.service!=='mfk-admin') throw new Error('ADMIN_HEALTH_INVALID');
+          if(health.sourceSha!==process.env.EXPECTED_SOURCE_SHA) throw new Error(`HEALTH_SOURCE_MISMATCH_${health.sourceSha}`);
+          if(health.configurationWritesEnabled!==false) throw new Error('SERVER_WRITES_MUST_BE_DISABLED');
+          console.log(`LIVE_RELEASE=${JSON.stringify(release)}`);
+          console.log(`LIVE_HEALTH=${JSON.stringify(health)}`);
+          await appendFile(process.env.GITHUB_STEP_SUMMARY,`## Admin V3 identity verified\n\n- Host: https://${process.env.EXPECTED_HOST}\n- Source: \`${release.sourceSha}\`\n- Release: \`${release.releaseId}\`\n- Mode: \`${release.mode}\`\n- Configuration writes: \`${release.configurationWritesEnabled}\`\n`);
+          NODE
+          grep -Fq '<title>MFK Admin V3 Preview</title>' root.html
+
+      - name: Install browser verifier
+        run: |
+          npm init -y >/dev/null
+          npm install --no-save --no-audit --no-fund @playwright/test@1.55.0
+          npx playwright install --with-deps chromium
+
+      - name: Verify anonymous preview UI
+        env:
+          VERIFY_URL: https://admin.morefunos.com
+        run: |
+          cat > admin-live.spec.js <<'TEST'
+          const {test,expect}=require('@playwright/test');
+          test('Admin V3 public preview opens without login',async({page})=>{
+            const response=await page.goto(`${process.env.VERIFY_URL}/?verify=${Date.now()}`,{waitUntil:'domcontentloaded',timeout:45000});
+            expect(response?.status()).toBe(200);
+            await expect(page).toHaveTitle('MFK Admin V3 Preview');
+            await expect(page.getByText('只供介面驗收').first()).toBeVisible({timeout:30000});
+            await expect(page.locator('[data-v3-preview-mode="true"], .v3-preview-topbadge').first()).toBeVisible({timeout:30000});
+            await page.screenshot({path:'admin-v3-live.png',fullPage:true});
+          });
+          TEST
+          npx playwright test admin-live.spec.js --reporter=line --workers=1
+          echo ADMIN_PUBLIC_PREVIEW_VERIFIED
+
+      - name: Upload verification screenshot
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: admin-v3-live-verification
+          path: admin-v3-live.png
+          if-no-files-found: ignore
+          retention-days: 7
