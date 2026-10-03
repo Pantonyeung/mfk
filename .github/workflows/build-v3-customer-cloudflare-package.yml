@@ -1,0 +1,58 @@
+name: build-v3-customer-cloudflare-package
+
+on:
+  push:
+    branches:
+      - work/MFP-V3-CUSTOMER-DEPLOY-2026-10-03
+    paths:
+      - .github/v3-emergency/customer-package.trigger
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      MFK_SOURCE_SHA: ${{ github.sha }}
+      MFP_SOURCE_SHA: ${{ github.sha }}
+      VITE_MFK_V3_CONFIG_WRITES_ENABLED: '0'
+      VITE_MFK_V3_PREVIEW_MODE: '0'
+      VITE_MFK_V3_R2_MEDIA_ENABLED: '0'
+      VITE_MFK_ADMIN_API_BASE: ''
+      VITE_MFK_V3_PREVIEW_API_BASE: ''
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Build and verify Customer V3
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd v3customer
+          npm install --no-audit --no-fund --legacy-peer-deps --package-lock=false
+          npm run typecheck
+          node --test test/acceptance-cutover.checks.mjs
+          npm run build
+          node --input-type=module <<'NODE'
+          import {readFile} from 'node:fs/promises';
+          const identity=JSON.parse(await readFile('dist/customer-build-identity.json','utf8'));
+          if(identity?.surface!=='MFP_CUSTOMER_V3'||identity.sourceCommit!==process.env.GITHUB_SHA||identity.sourceDirty!==false)throw new Error('CUSTOMER_BUILD_IDENTITY_MISMATCH');
+          console.log(`CUSTOMER_PACKAGE_IDENTITY ${identity.sourceCommit}`);
+          NODE
+      - name: Upload exact connector package
+        uses: actions/upload-artifact@v4
+        with:
+          name: v3-customer-cloudflare-package-${{ github.sha }}
+          path: |
+            v3customer/dist/**
+            v3customer/worker.js
+            v3customer/wrangler.release.jsonc
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 6
