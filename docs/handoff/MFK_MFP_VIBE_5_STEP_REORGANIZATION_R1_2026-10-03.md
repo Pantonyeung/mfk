@@ -100,3 +100,34 @@ Shell → Ordering → Product Detail / Required → Cart → Checkout → Final
 
 ## 里程碑
 MFK_MFP_VIBE_5_STEP_REORGANIZATION_R1
+
+
+## NEXT STEP｜Step 3 設計正式開始
+
+目前狀態：
+- Step 1 產品目標：已鎖
+- Step 2 PRD／資訊架構：已鎖
+- 下一步：Step 3 設計
+
+第一個正式交付物：
+1. MFP Design Brief R1
+2. MFP Design System R1（初版）
+3. MFP Ordering Golden Path 可點 HTML Prototype R1
+
+第一條 Prototype Journey：
+Shell / Navigation
+→ Ordering Main
+→ Product Detail / Required
+→ Cart
+→ Checkout
+→ Final Payment Review
+→ Completion Review
+
+規則：
+- 暫時只做 Prototype，不改正式 Runtime。
+- Prototype 可用假資料，但要清楚標示。
+- 先驗版面、操作次序、右手操作、固定肌肉記憶、75% Modal、Cart 與 Checkout。
+- Owner 驗收 Prototype 後先凍結 Design System，再進 Step 4 Runtime 開發。
+
+MILESTONE：
+MFK_MFP_STEP3_DESIGN_READY_R1
