@@ -31,7 +31,7 @@ Required native behavior:
 5. Preserve last-known-good state on network, parse, validation, or apply failure; expose exact source freshness and error without claiming convergence.
 6. Bind the existing v3 sync transport or provide a compatibility adapter from this same canonical envelope. Do not create a parallel polling authority.
 
-Implemented source slices: `521158dda13711c6ac3d7d4fb62e2181bb2d63ce` validates and projects the canonical envelope into the Store Kernel; `d87ad51` performs one explicit HTTPS-only `/api/admin-sync/active` read with redirects disabled, bounded time/body, 404 LKG preservation, and no automatic retry or polling. Runtime startup/doorbell wiring remains intentionally unbound until the device/session authority is integrated. Current scoped native regression: 52/52, including 22 real Room tests.
+Implemented source slices: `521158dda13711c6ac3d7d4fb62e2181bb2d63ce` validates and projects the canonical envelope into the Store Kernel; `d87ad51` performs one explicit HTTPS-only `/api/admin-sync/active` read with redirects disabled, bounded time/body, 404 LKG preservation, and no automatic retry or polling. Runtime startup/doorbell wiring remains intentionally unbound until the device/session authority is integrated. Current scoped native regression: 54/54, including 24 real Room tests and HTTP-response-to-LKG integration.
 
 Acceptance: publish/sync convergence, idempotent same fingerprint, rollback/conflict rejection, offline LKG, restart recovery, and Store Kernel readback.
 
