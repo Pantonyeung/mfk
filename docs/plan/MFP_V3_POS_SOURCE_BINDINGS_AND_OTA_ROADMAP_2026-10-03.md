@@ -16,7 +16,7 @@ Authority remains `STORE_KERNEL_FORMAL_BUSINESS_AUTHORITY`. Admin remains the so
 
 ## Stage 0 — Atomic native read set — complete
 
-Commit `8c52b155fb75edd39e4018853ca3c4144682e179` adds native-only aggregate revision dependencies checked in the same Room transaction before writes, while preserving receipt-first replay. The subsequent router recovery slice adds receipt readback after commit exceptions and safely classifies only proven pre-write revision conflicts. Current scoped regression: 34/34.
+Commit `8c52b155fb75edd39e4018853ca3c4144682e179` adds native-only aggregate revision dependencies checked in the same Room transaction before writes, while preserving receipt-first replay. Commit `46a7b066d92337539ac8e510835328620a951c52` adds receipt readback after commit exceptions and safely classifies only proven pre-write revision conflicts. Commit `9c76650f79fba42d38037c84042e1a8ce7034b18` adds a transaction-time commit deadline without weakening receipt replay.
 
 ## Stage 1 — Canonical Admin configuration producer
 
@@ -30,6 +30,8 @@ Required native behavior:
 4. Project the accepted envelope to one Store Kernel aggregate `ADMIN_ACTIVE_CONFIGURATION / <storeId>` through the existing coordinator. Internal aggregate revision is monotonic per accepted publication; the Admin source revision remains an explicit state field and may not be substituted for the internal CAS revision.
 5. Preserve last-known-good state on network, parse, validation, or apply failure; expose exact source freshness and error without claiming convergence.
 6. Bind the existing v3 sync transport or provide a compatibility adapter from this same canonical envelope. Do not create a parallel polling authority.
+
+Implemented source slices: `521158dda13711c6ac3d7d4fb62e2181bb2d63ce` validates and projects the canonical envelope into the Store Kernel; `d87ad51` performs one explicit HTTPS-only `/api/admin-sync/active` read with redirects disabled, bounded time/body, 404 LKG preservation, and no automatic retry or polling. Runtime startup/doorbell wiring remains intentionally unbound until the device/session authority is integrated. Current scoped native regression: 52/52, including 22 real Room tests.
 
 Acceptance: publish/sync convergence, idempotent same fingerprint, rollback/conflict rejection, offline LKG, restart recovery, and Store Kernel readback.
 
