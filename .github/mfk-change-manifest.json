@@ -350,6 +350,7 @@
     "v3customer/test/linked-customer.spec.ts",
     "v3customer/test/linked-doorbell.checks.mjs",
     "v3customer/test/linked-model.checks.mjs",
+    "v3customer/test/linked-published-time.checks.mjs",
     "v3customer/test/linked-selection-race.checks.mjs",
     "v3customer/test/linked-worker.checks.mjs",
     "v3customer/test/visual-home.spec.ts",
@@ -582,6 +583,14 @@
       "writes": "NO_AUTOMATIC_WRITE; EXPLICIT_EXISTING_REVISION_CHECKED_ISOLATED_DRAFT_ONLY; NO_ACTIVE_PUBLISH",
       "live_evidence": "ACTUAL_LIVE_CLASSIFICATION_PENDING_VISIBLE_UI; SYNTHETIC_EDGE_TESTS_NOT_LIVE_REPAIR",
       "source_impact": "ADMIN_UI_ONLY; NO_WORKER_WRAPPER_SHARED_CONTRACT_CONFIG_WORKFLOW_CHANGE"
+    },
+    "customer_timestamp_correction": {
+      "execution_base_sha": "911ed0f55a2bb6b55e6ad99ce767906ce58d3ac1",
+      "scope": "LINKED_CUSTOMER_PUBLISHED_AT_DISPLAY_USES_EXPLICIT_ASIA_HONG_KONG",
+      "semantics": "ORIGINAL_CANONICAL_DATETIME_VALUE_PRESERVED; DISPLAY_ONLY",
+      "verification": "REAL_HOST_TIMEZONE_AND_DATE_ROLLOVER_REGRESSION",
+      "data_authority": "NONE; ALL_ADMIN_DRAFT_AND_BUSINESS_PUBLICATION_REMAIN_PAUSED_PENDING_OWNER_APPROVAL",
+      "runtime_impact": "NO_SHARED_CONTRACT_ADMIN_CONFIG_PROVIDER_OR_OTHER_UI_CHANGE"
     }
   }
 }
