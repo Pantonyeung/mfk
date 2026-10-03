@@ -10,6 +10,8 @@ import androidx.room.Room;
 
 import com.morefunos.smt.storekernel.business.FormalAdminConfigProducer;
 import com.morefunos.smt.storekernel.business.FormalAdminConfigSourceClient;
+import com.morefunos.smt.storekernel.business.FormalCheckoutOrgJsonDecoder;
+import com.morefunos.smt.storekernel.business.FormalCheckoutSourceContracts;
 
 import org.json.JSONObject;
 import org.junit.After;
@@ -68,6 +70,20 @@ public final class FormalAdminConfigSourceIntegrationTest {
         assertEquals(1, stored.revision);
         assertEquals(7, new JSONObject(stored.stateJson).getLong("revision"));
         assertEquals(1, database.storeKernelDao().receiptCount());
+        final FormalCheckoutSourceContracts.SourceFacts checkoutSource =
+            FormalCheckoutSourceContracts.fromValidatedStateJson(
+                "MF01",
+                stored.revision,
+                stored.stateJson,
+                new FormalCheckoutOrgJsonDecoder()
+            );
+        assertEquals(stored.revision, checkoutSource.provenance().kernelRevision());
+        assertEquals(7, checkoutSource.provenance().adminSourceRevision());
+        assertEquals("HKD", checkoutSource.currency().require());
+        assertEquals("Asia/Hong_Kong", checkoutSource.timezone().require().getId());
+        assertEquals("05:00", checkoutSource.businessDayCutoff().require().toString());
+        assertEquals(false, checkoutSource.posTenderPolicy().bound());
+        assertEquals(false, checkoutSource.studentEligibilityPolicy().bound());
         final String acceptedState = stored.stateJson;
 
         final CompletionException failure = assertThrows(CompletionException.class, () -> source(503, "").fetchActive().join());
