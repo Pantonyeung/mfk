@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "capability": "MFP_V3_A9R_FORMAL_BUSINESS_ROUTER_R0_R1_2026_10_02",
+  "capability": "MFP_V3_A9R_POS_KERNEL_BOUNDED_NATIVE_INTEGRATION_2026_10_03",
   "base_sha": "69adb11215677d506545c5428f8deea4b89e7db2",
   "root_control": "#652",
   "product_control": "#651",
@@ -33,10 +33,10 @@
     "v3smt/src/store-kernel-port.test.ts",
     "v3smt/src/store-kernel-port.ts"
   ],
-  "authority_impact": "BINDS ONE BOUNDED NATIVE FORMAL BUSINESS ROUTER OWNED BY STORE_KERNEL_FORMAL_BUSINESS_AUTHORITY; REACT REMAINS NON-AUTHORITATIVE AND PRODUCTION SECURITY PRICING TENDER AND DOMAIN HANDLERS REMAIN FAIL CLOSED",
+  "authority_impact": "EXTENDS THE ONE EXISTING STORE_KERNEL_FORMAL_BUSINESS_AUTHORITY WITH BOUNDED NATIVE PRODUCERS AND HANDLERS; REACT REMAINS NON-AUTHORITATIVE AND UNBOUND PRODUCTION INPUTS FAIL CLOSED",
   "persistence_impact": "REUSES THE EXISTING STORE KERNEL DATABASE COORDINATOR RECEIPT JOURNAL IDEMPOTENCY INBOX AND OUTBOX; ADDS NO DATABASE OR CLIENT BUSINESS TRUTH",
   "provider_impact": "NONE; CUSTOMER AND KEETA HANDLERS REMAIN UNBOUND AND NO PROVIDER CREDENTIAL OR ENDPOINT IS ADDED",
-  "transaction_impact": "R0 MAY RECORD DURABLE TERMINAL REJECTION RECEIPTS; NO BUSINESS AGGREGATE MUTATION IS AUTHORIZED UNTIL SECURITY PRICING TENDER AND THE EXACT DOMAIN HANDLER ARE BOUND",
+  "transaction_impact": "THE TRUSTED NATIVE NON-STUDENT CASH CHECKOUT HANDLER ATOMICALLY WRITES DISPLAY SEQUENCE ORDER PAYMENT RECEIPT AND DETERMINISTIC OUTBOX EFFECTS; PUBLIC PRODUCTION ROUTING REMAINS UNREGISTERED UNTIL REAL SOURCE PRODUCERS ARE BOUND",
   "production_routing_impact": "SOURCE ROUTE ONLY; NO CANDIDATE PUBLISH BUILDER REQUEST CHANGE OTA ACTIVATION DEPLOY CUTOVER OR SMM DECOMMISSION",
   "expected_behavior_change": [
     "The trusted Android bridge accepts only mfp.store-kernel.command.v1 and mfp.store-kernel.submission.read.v1 for formal business traffic.",
@@ -44,13 +44,14 @@
     "Unknown commands and aggregate or canonical-state injection fail closed.",
     "Submission replay is readback-first and fingerprint conflicts cannot create a second effect.",
     "Trusted native handlers can attach an immutable revision read set that is validated inside the same Room transaction before any commit effect.",
-    "CHECKOUT_PAYMENT_CONFIRM is registered but remains blocked by production Security Pricing and Tender dependencies."
+    "CHECKOUT_PAYMENT_CONFIRM derives one canonical non-Student cash Order and Payment transaction from trusted fresh native facts while the public production bridge remains fail closed.",
+    "Outbox acknowledgement and release require the positive attemptCount returned by the current claim so stale callbacks cannot mutate a newer lease."
   ],
   "non_goals": [
     "No client Order Pricing Payment Refund Dining Capacity or Print authority.",
     "No second Store Kernel database or localStorage business truth.",
     "No v2local runtime or SMM authority import.",
-    "No production mutation handler fake COMMITTED deploy publish OTA cutover merge or SMM deletion."
+    "No second transaction authority fake COMMITTED public bridge activation live charge deploy publish OTA cutover merge or SMM deletion."
   ],
   "rollback_sha": "69adb11215677d506545c5428f8deea4b89e7db2",
   "severity": "HARD_BLOCK"

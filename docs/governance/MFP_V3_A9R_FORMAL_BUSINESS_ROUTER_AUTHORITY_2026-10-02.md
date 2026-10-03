@@ -1,6 +1,6 @@
 # MFP V3 A9R｜Formal Business Command Router Authority｜2026-10-02
 
-Status: OWNER AUTHORIZED / CONTROLLING FOR A9R
+Status: OWNER AUTHORIZED / CONTROLLING FOR A9R / POS KERNEL EXECUTION ACTIVE
 Product: MoreFun POS
 Short name: MFP
 Parent A9 exact head:
@@ -288,12 +288,19 @@ A forged browser attempt to submit low-level aggregate mutation through the form
 ## 18. Status gate
 
 Current:
-A9R = AUTHORIZED / NOT YET SOURCE_VERIFIED
+
+- R0 native router: `SOURCE_VERIFIED`
+- bounded non-Student cash `CHECKOUT_PAYMENT_CONFIRM` mapping and same-Room transaction: `SOURCE_AND_ROOM_VERIFIED`
+- production device/Owner/staff, quote, POS tender, Business Day, display-sequence, dispatcher, and public bridge binding: `IN_PROGRESS / FAIL_CLOSED`
+
+The verified checkout mapping does not create production credentials, prove electronic settlement, authorize a live charge, or activate a browser route. Trusted ports are test-injected until real MFK-native producers are bound. Student Discount remains fail-closed until its canonical eligibility and remaining money-policy rules exist.
+
+Owner has authorized continued bounded POS engineering. Existing engineering gaps are not by themselves a stop condition. Genuine money-policy choices, credentials/access expansion, destructive or sensitive work, and ambiguous authority conflicts still require Owner direction.
 
 Candidate Publish remains:
-BLOCKED
+`BLOCKED`
 
-The Router lane must reach SOURCE_VERIFIED and then production bindings must be reassessed before Candidate Publish can even be considered.
+No source or test result grants merge, deploy, OTA activation, cutover, or physical-acceptance authority.
 
 MILESTONE:
 `MFP_V3_A9R_FORMAL_BUSINESS_COMMAND_ROUTER_AUTHORITY_2026_10_02`

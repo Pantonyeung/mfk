@@ -1,79 +1,76 @@
-# MFP CURRENT HANDOFF｜2026-10-02
+# MFP CURRENT HANDOFF — 2026-10-03
 
 Status: CURRENT / CONTROLLING HANDOFF
 
 Current:
-A9R — R0 router skeleton SOURCE_VERIFIED; R1 Checkout mutation BLOCKED
+`A9R — POS KERNEL R1 SOURCE_AND_ROOM_VERIFIED / PRODUCTION SOURCE BINDING IN PROGRESS`
 
 Branch:
-`feat/MFP-V3-A9R-FORMAL-BUSINESS-ROUTER-2026-10-02`
+`feat/MFP-V3-A9R-POS-KERNEL-R1-2026-10-03`
 
 Parent:
-A9 exact head
 `69adb11215677d506545c5428f8deea4b89e7db2`
 
 Authority:
 `docs/governance/MFP_V3_A9R_FORMAL_BUSINESS_ROUTER_AUTHORITY_2026-10-02.md`
 
-Codex handoff:
-`docs/handoff/MFP_V3_A9R_FORMAL_BUSINESS_ROUTER_CODEX_HANDOFF_2026-10-02.md`
+Progress evidence:
+`docs/handoff/MFP_V3_POS_KERNEL_PROGRESS_AND_EVIDENCE_2026-10-03.md`
 
-## Why
+Engineering plan:
+`docs/plan/MFP_V3_POS_SOURCE_BINDINGS_AND_OTA_ROADMAP_2026-10-03.md`
 
-A9 fresh audit proved:
-`BLOCKED — FORMAL_COMMAND_ROUTER_BINDING_MISSING`
+## Owner direction
 
-Current V3 high-level business commands do not have an approved production router into canonical Store Kernel authority.
+POS functionality is the priority and UI work remains paused. Continue bounded engineering through the existing native Store Kernel and consume the existing Admin canonical publication. Do not create another authority or revive old V2 transaction code. Stop only for genuine money-policy decisions, credentials/access expansion, destructive/sensitive operations, or ambiguous authority conflicts.
 
-## Current objective
+## Implemented and verified
 
-Browser:
-`mfp.store-kernel.command.v1`
+`CHECKOUT_PAYMENT_CONFIRM` now has a trusted-native non-Student cash assembler and an exact same-Room transaction mapping. It fresh-validates seven revisioned dependencies and the earliest freshness deadline, then atomically commits:
 
-→ trusted bounded native bridge
+- Business-Day display sequence CAS;
+- one canonical `ORDER`;
+- one linked canonical `PAYMENT`;
+- one durable command receipt;
+- deterministic Order-committed and Payment-confirmed outbox events.
 
-→ Formal Business Command Router
+The same submission replays one effect. Receipt-first recovery survives a lost reply and database reopen. Rollback, stale facts, expired deadlines, display-sequence contention, malformed/forged inputs, and fingerprint conflicts are covered by real Room tests.
 
-→ formal domain validation
+Outbox ACK and release now require the positive `attemptCount` from the claimed item and include it in the Room CAS. A stale callback from an expired lease cannot mutate a newer claim, even when the worker identity is reused.
 
-→ StoreKernelTransactionCoordinator
+At native code commit `3c0cd77681b15b8d980f4e1dbe7aa2650643dbf3`:
 
-→ canonical receipt/readback
+- 11 Android unit-test suites;
+- 85 tests passed;
+- 0 failures, 0 errors, 0 skipped;
+- `:app:assembleDebug -x verifySmtWebBundle --no-daemon` passed.
 
-→ `mfp.store-kernel.submission.result.v1`
+These tests inject trusted source ports. They do not prove production device enrollment, Owner/staff authentication, electronic settlement, physical printing, OTA behavior, or public routing.
 
-## First RED
+## Still fail-closed in production
 
-A browser CHECKOUT_PAYMENT_CONFIRM cannot contain or inject raw:
-- aggregateType
-- mutations
-- canonical Order state
-- canonical Payment state
+The public formal checkout bridge is intentionally not registered. It remains blocked until real native producers supply device/Owner/staff admission, formal quote/normalized intent, enabled POS tender, active Business Day, and display allocation. Student checkout also remains fail-closed until canonical eligibility and the remaining money-policy rules are published.
 
-Router internally derives canonical mutations only after formal validation.
+Every outbox dispatcher must echo the claim item's positive `attemptCount`. Missing or stale tokens must fail closed.
 
-Forged low-level mutation input must be rejected before Store Kernel commit.
+## Current bounded work
 
-## Current pass result
+1. Reconcile native Print/OTA handoff changes and add crash-recovery regression coverage without changing a live endpoint or activating an update.
+2. Freeze the exact canonical Orders/Dining read producer signature and schema.
+3. Keep the Dining planner unregistered until every `Order.dining` membership/lifecycle writer CASes and bumps the same Dining revision.
+4. Preserve Order identity, display number, payment, items, and first seated time; never fabricate an Order merely because a table is occupied.
+5. Continue real native producer/adapter binding and then register only the bounded capability whose complete input/read set is proven.
 
-R0 `SOURCE_VERIFIED`:
-- parser/registry/result/idempotency/native bridge/security seam
-- exact 19-command matrix
-- raw aggregate/canonical state rejection
-- Store Kernel receipt-only terminal rejection persistence
-- direct Browser `store.kernel.commit.v1` blocked
+## Actual Owner decisions still required
 
-R1 first vertical remains `BLOCKED`:
-- CHECKOUT_PAYMENT_CONFIRM
-- `MFP_SECURITY_PRODUCTION_BINDING_MISSING`
-- `FORMAL_PRICING_AUTHORITY_DEPENDENCY_MISSING`
-- `FORMAL_TENDER_AUTHORITY_DEPENDENCY_MISSING`
+- Electronic settlement authority: staff-confirmed evidence or provider-confirmed success.
+- Owner logout scope: this device only or all devices in the store.
 
-No Pricing, Tender, or PIN engine was created in the Router or React. No business aggregate mutation is authorized by this pass.
+Ordinary non-Student checkout and read/adapter engineering should continue while those decisions remain open.
 
-No Candidate Publish.
+## Release boundary
 
-Exact next action: bind the existing canonical Security, Pricing, and Tender read authorities and freeze their input contracts before implementing the single native `CHECKOUT_PAYMENT_CONFIRM` handler.
+No push, Draft PR publication, merge, deploy, Builder request change, OTA activation, endpoint mutation, cutover, SMM decommission, live financial transaction, or physical acceptance has been performed by this branch. Only explicit Owner `PROMOTE` can open those gates.
 
 MILESTONE:
-`MFP_V3_A9R_CURRENT_HANDOFF_2026_10_02`
+`MFP_V3_A9R_POS_KERNEL_CURRENT_HANDOFF_2026_10_03`
