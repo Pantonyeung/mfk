@@ -9,6 +9,7 @@ import org.json.JSONObject;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -263,13 +264,14 @@ public final class RuntimeReleaseStore {
     }
 
     private RuntimeActivationState readState() throws IOException {
-        if (!activationFile.getBaseFile().isFile()) return RuntimeActivationState.empty();
         try (FileInputStream input = activationFile.openRead(); ByteArrayOutputStream bytes = new ByteArrayOutputStream()) {
             final byte[] buffer = new byte[4096];
             int count;
             while ((count = input.read(buffer)) != -1) bytes.write(buffer, 0, count);
             final String raw = bytes.toString(StandardCharsets.UTF_8.name());
             return RuntimeActivationState.fromJson(new JSONObject(raw));
+        } catch (FileNotFoundException error) {
+            return RuntimeActivationState.empty();
         } catch (JSONException error) {
             return RuntimeActivationState.empty();
         }

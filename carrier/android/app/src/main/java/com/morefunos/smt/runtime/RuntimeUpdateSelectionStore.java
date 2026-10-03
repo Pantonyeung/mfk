@@ -9,6 +9,7 @@ import org.json.JSONObject;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -44,7 +45,6 @@ public final class RuntimeUpdateSelectionStore {
     }
 
     public synchronized String selectedReleaseId() throws IOException {
-        if (!selectionFile.getBaseFile().isFile()) return null;
         try (FileInputStream input = selectionFile.openRead(); ByteArrayOutputStream bytes = new ByteArrayOutputStream()) {
             final byte[] buffer = new byte[1024];
             int count;
@@ -56,6 +56,8 @@ public final class RuntimeUpdateSelectionStore {
                 clear();
                 throw new IOException("RUNTIME_UPDATE_SELECTION_INVALID", error);
             }
+        } catch (FileNotFoundException error) {
+            return null;
         }
     }
 
