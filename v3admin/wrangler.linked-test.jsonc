@@ -1,0 +1,21 @@
+{
+  "$schema": "https://raw.githubusercontent.com/cloudflare/workers-sdk/main/packages/wrangler/config-schema.json",
+  "name": "mfk-admin",
+  "main": "./linked-test-worker.ts",
+  "compatibility_date": "2026-09-22",
+  "workers_dev": true,
+  "preview_urls": true,
+  "vars": {
+    "KEETA_APP_ID": "3419700273",
+    "KEETA_PROVIDER_SHOP_ID": "721578302",
+    "KEETA_OAUTH_REDIRECT_URI": "https://admin.morefunos.com/api/keeta/oauth/callback",
+    "MFP_V3_LINKED_TEST_ENABLED": "1"
+  },
+  "secrets": {"required": ["KEETA_APP_SECRET", "KEETA_TOKEN_ENCRYPTION_KEY"]},
+  "assets": {"directory": "./dist", "binding": "ASSETS", "not_found_handling": "single-page-application", "run_worker_first": true},
+  "r2_buckets": [{"binding": "CUSTOMER_PAYMENT_EVIDENCE", "bucket_name": "mfk-customer-payment-evidence"}],
+  "durable_objects": {"bindings": [{"name": "ADMIN_SYNC", "class_name": "AdminSyncStore"}, {"name": "KEETA_RUNTIME", "class_name": "KeetaRuntimeStore"}, {"name": "CUSTOMER_RUNTIME", "class_name": "CustomerRuntimeStore"}]},
+  "migrations": [{"tag": "admin-sync-v1", "new_sqlite_classes": ["AdminSyncStore"]}, {"tag": "keeta-runtime-v1", "new_sqlite_classes": ["KeetaRuntimeStore"]}, {"tag": "customer-runtime-v1", "new_sqlite_classes": ["CustomerRuntimeStore"]}],
+  "observability": {"enabled": false, "head_sampling_rate": 1, "redact_query_string": false, "logs": {"enabled": true, "head_sampling_rate": 1, "persist": true, "invocation_logs": true}, "traces": {"enabled": false, "persist": true, "head_sampling_rate": 1}},
+  "routes": [{"pattern": "admin.morefunos.com", "custom_domain": true, "zone_name": "morefunos.com"}]
+}

@@ -1,0 +1,39 @@
+name: v3-linked-admin-check
+on:
+  push:
+    branches: [work/MFP-V3-LIVE-WIRING-2026-10-03]
+    paths:
+      - v3admin/**
+      - integrations/v3-linked*
+      - .github/workflows/v3-linked-admin-check.yml
+permissions:
+  contents: read
+concurrency:
+  group: v3-linked-admin-check
+  cancel-in-progress: false
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Verify Admin and connected boundaries
+        working-directory: v3admin
+        env:
+          VITE_MFP_V3_LINKED_TEST: '1'
+          VITE_MFK_V3_PREVIEW_MODE: '0'
+          VITE_MFK_V3_CONFIG_WRITES_ENABLED: '1'
+          VITE_MFK_ADMIN_API_BASE: /api/v3-test
+          MFK_SOURCE_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          npm install --ignore-scripts --no-audit --no-fund --legacy-peer-deps --package-lock=false
+          npm run typecheck
+          npm test
+          npm run build
+          npx --yes wrangler@4.146.0 deploy --config wrangler.linked-test.jsonc --dry-run --no-autoconfig
