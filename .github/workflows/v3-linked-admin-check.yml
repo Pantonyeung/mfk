@@ -25,15 +25,11 @@ jobs:
       - name: Verify Admin and connected boundaries
         working-directory: v3admin
         env:
-          VITE_MFP_V3_LINKED_TEST: '1'
-          VITE_MFK_V3_PREVIEW_MODE: '0'
-          VITE_MFK_V3_CONFIG_WRITES_ENABLED: '1'
-          VITE_MFK_ADMIN_API_BASE: /api/v3-test
           MFK_SOURCE_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
           npm install --ignore-scripts --no-audit --no-fund --legacy-peer-deps --package-lock=false
           npm run typecheck
           npm test
-          npm run build
+          VITE_MFP_V3_LINKED_TEST=1 VITE_MFK_V3_PREVIEW_MODE=0 VITE_MFK_V3_CONFIG_WRITES_ENABLED=1 VITE_MFK_ADMIN_API_BASE=/api/v3-test npm run build
           npx --yes wrangler@4.146.0 deploy --config wrangler.linked-test.jsonc --dry-run --no-autoconfig
