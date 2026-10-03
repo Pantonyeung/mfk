@@ -27,6 +27,12 @@ Latest verified native implementation commits:
 - Admin-to-formal-quote producer: `ce6769bb088c5d3bcf4df5270e204b1868eb54ee`
 - tender and Business Day producers: `bfff335004ea26972a3b721b99c78ce48e30bff1`
 - high-level Android checkout bridge: `0d5c18e33b6d4aee59ddd66f69973c82e9196b28`
+- native print dispatch replay: `29e9716e7ee6c00d6dc0f9bee53177b822c017bd`
+- OTA install/recovery hardening: `359b8c69b7602cec06e718e45f2c9c32d37c88b2`
+- canonical Dining Room read: `fe6316f7deb011e24b1bc67afbb6ca0f3b5e7e2c`
+- canonical Admin POS-tender publication/projector: `df260fd12807e87ff83f20def57ee879f2bb98f2`
+- unregistered Dining transition planner: `ffe04cde23131bc6803400ce403f380015418330`
+- Dining Room/CAS regression evidence: `863974f633199821caedb6ffbe09032cc3bcf383`
 
 This branch-local current control explicitly supersedes the older A9R execution-branch pointer for this Owner-directed POS Kernel lane. It does not supersede the A9R authority, create a second authority, or grant promotion.
 
@@ -34,9 +40,9 @@ This branch-local current control explicitly supersedes the older A9R execution-
 
 `A9R — POS KERNEL R1 SOURCE_AND_ROOM_VERIFIED / PRODUCTION SOURCE BINDING IN PROGRESS`
 
-The bounded non-Student `CHECKOUT_PAYMENT_CONFIRM` transaction and high-level Android runtime bridge are source/Room verified. Security, quote, tender, Business Day, display allocation, atomic Order/Payment commit, receipt/readback, and canonical Order readback now use the existing Room Store Kernel. Production remains fail-closed because no approved enrollment/login/session writer populates device/Owner/staff records and no explicit Admin POS-tender publication writer populates `POS_TENDER_POLICY`.
+The bounded non-Student `CHECKOUT_PAYMENT_CONFIRM` transaction and high-level Android runtime bridge are source/Room verified. Security, quote, tender, Business Day, display allocation, atomic Order/Payment commit, receipt/readback, and canonical Order readback now use the existing Room Store Kernel. The explicit Admin `posTenders` publication and same-Room `POS_TENDER_POLICY` projector are implemented. Production remains fail-closed because no approved enrollment/login/session writer populates device/Owner/staff records and no registered public/native catalog plus checkout capability exposes the host core to the runtime.
 
-The next bounded engineering work is native Print/OTA recovery hardening and canonical Orders/Dining read planning. Dining mutation registration remains blocked until every Order.dining lifecycle writer participates in the same Dining revision CAS/bump contract.
+The next bounded engineering work is the smallest public/native catalog-read and checkout capability binding through the same host core, followed by the approved production security population path. Dining mutation registration remains blocked until every Order.dining lifecycle writer participates in the same Dining revision CAS/bump contract.
 
 ## Mandatory read order
 
@@ -72,11 +78,11 @@ React/browser is not the business authority. Admin remains the sole canonical pu
 - Room-backed security admission, formal quote, tender, Business Day, and canonical Order read producers;
 - native-to-web formal quote and Payment Confirm transport with stale quote/tender response generation fencing.
 
-At `0d5c18e`, the full Android unit suite is 19 suites / 122 tests, with 0 failures, 0 errors, and 0 skipped. `:app:lintDebug` and `:app:assembleDebug -x verifySmtWebBundle --no-daemon` succeed. V3 web verification is 31 files / 600 tests plus TypeScript typecheck and production build. These are source/Room/build results, not production credential, enrolled-device, physical-print, provider-settlement, or live-payment proof.
+At `863974f`, the full Android unit suite is 24 suites / 144 tests, with 0 failures, 0 errors, and 0 skipped. `:app:lintDebug` and `:app:assembleDebug -x verifySmtWebBundle --no-daemon` succeed. Admin verification at `df260fd` is 40 files / 284 tests plus a successful Vite production build; the new tender contract passes an isolated strict TypeScript check. The Admin-wide legacy typecheck is not green because its existing scope imports unresolved Worker/Keeta typing debt. These are source/Room/build results, not production credential, enrolled-device, physical-print, provider-settlement, or live-payment proof. The Dining planner remains unregistered.
 
 ## Production binding boundary
 
-Missing production inputs must fail closed. The Room-backed admission/quote/tender/Business Day/display/Order-read ports and the high-level Android bridge are now bound. Current gaps are population and lifecycle writers for device enrollment, Owner authorization, staff PIN/session issue/revoke, explicit Admin POS-tender publication, Admin startup/doorbell convergence, dispatcher consumers, and the remaining Orders/Dining operations. These gaps are authorized engineering work, but credentials and the canonical POS-tender publication field cannot be invented.
+Missing production inputs must fail closed. The Room-backed admission/quote/tender/Business Day/display/Order-read ports, high-level Android bridge, and Admin POS-tender publisher/projector are now bound. Current gaps are population and lifecycle writers for device enrollment, Owner authorization, staff PIN/session issue/revoke, Admin startup/doorbell convergence, the registered public/native catalog and checkout capability, dispatcher consumers, and the remaining Orders/Dining operations. Credentials and enrollment provenance cannot be invented.
 
 The Owner has resolved the prior settlement/logout decisions:
 
@@ -92,7 +98,7 @@ The real native verifier/session issuer/revoker and canonical tender-policy publ
 - no localStorage transaction authority or periodic business polling engine;
 - no V2 runtime authority import or SMM authority;
 - no fake `COMMITTED`, production proof, physical proof, or live financial transaction;
-- no push-triggered publication, Candidate Publish, deploy, OTA activation, merge, cutover, or decommission without explicit Owner `PROMOTE`.
+- source branch and Draft PR publication are authorized; no Candidate Publish, deploy, OTA activation, merge, cutover, or decommission without explicit Owner `PROMOTE`.
 
 ## A9 gates
 
@@ -100,7 +106,8 @@ The real native verifier/session issuer/revoker and canonical tender-policy publ
 - A9-B Builder V3 packaging: `SOURCE_VERIFIED` only for the previously recorded source; current branch is not published
 - A9R router and bounded checkout mapping: `SOURCE_AND_ROOM_VERIFIED`
 - A9R high-level checkout bridge: `SOURCE_AND_ROOM_VERIFIED`
-- A9R production admission/tender population: `BLOCKED / FAIL_CLOSED`
+- A9R Admin tender publication/population: `SOURCE_AND_ROOM_VERIFIED`
+- A9R production admission/public binding: `BLOCKED / FAIL_CLOSED`
 - A9-C Candidate Publish: `BLOCKED`
 - A9-P physical acceptance: `BLOCKED`
 - A9-X cutover/SMM decommission: `BLOCKED`

@@ -1,6 +1,6 @@
 # MFP V3 POS Kernel Progress and Evidence — 2026-10-03
 
-Status: `SOURCE_AND_ROOM_VERIFIED` for the bounded non-Student `CHECKOUT_PAYMENT_CONFIRM` assembler, Room producers, and high-level Android runtime bridge. Production admission and POS-tender population remain absent and fail closed.
+Status: `SOURCE_AND_ROOM_VERIFIED` for the bounded non-Student `CHECKOUT_PAYMENT_CONFIRM` assembler, Room producers, high-level Android runtime bridge, and canonical Admin-to-Room POS-tender publication. Production admission and public/native runtime binding remain absent and fail closed.
 
 This document records the latest Owner direction, the first verified native slice, the overnight candidate artifacts, and the OTA/source-binding evidence in one project. It does not authorize publish, deployment, OTA activation, live payment, merge, or replacement of the accepted production UI.
 
@@ -9,7 +9,7 @@ This document records the latest Owner direction, the first verified native slic
 - Original reviewed checkout: `48c7eca6c051e72562ea9974bc2c6465b8584a7b`
 - Isolated branch: `feat/MFP-V3-A9R-POS-KERNEL-R1-2026-10-03`
 - Verified prerequisite commit: `8c52b155fb75edd39e4018853ca3c4144682e179`
-- Latest verified native/web code commit: `0d5c18e33b6d4aee59ddd66f69973c82e9196b28` (`CHECKOUT_PAYMENT_CONFIRM` mapping: `3e53a26`; outbox fence: `3c0cd77`; Order read: `2cfe244`; security: `8f9f228`; quote: `ce6769b`; tender/Business Day: `bfff335`)
+- Latest verified code commit: `863974f633199821caedb6ffbe09032cc3bcf383` (`CHECKOUT_PAYMENT_CONFIRM` mapping: `3e53a26`; outbox fence: `3c0cd77`; Order read: `2cfe244`; security: `8f9f228`; quote: `ce6769b`; tender/Business Day: `bfff335`; Print: `29e9716`; OTA: `359b8c6`; Dining read: `fe6316f`; Admin tender publication: `df260fd`; unregistered Dining planner/evidence: `ffe04cd` + `863974f`)
 - Existing Draft PR reference: `#651`; this branch has not been pushed to it.
 - Existing A9 base authority: `69adb11215677d506545c5428f8deea4b89e7db2`
 
@@ -47,7 +47,7 @@ The high-level Android bridge is now source-bound. A quote request first revalid
 
 Channel changes invalidate the current quote immediately. Both quote state and the mutable canonical tender snapshot use generation fencing, so an older native response cannot overwrite a newer channel validation. A VALID native quote without its same-response tender snapshot fails closed.
 
-Production checkout is still not usable because no approved device-enrollment, Owner-password, or staff-PIN/session writer populates the required security aggregates, the browser security authority is deliberately unbound, and Admin has no explicit canonical POS-tender publication field/writer. The bridge integration tests seed test-only records; they are not production authentication or tender evidence.
+Production checkout is still not usable because no approved device-enrollment, Owner-password, or staff-PIN/session writer populates the required security aggregates, the browser security authority is deliberately unbound, and no registered public/native catalog plus checkout capability exposes the host core. Admin now has an explicit canonical POS-tender publication field and same-Room projector. The bridge integration tests still seed test-only security records; they are not production authentication evidence.
 
 ## Test evidence
 
@@ -77,10 +77,10 @@ Latest scoped command:
 gradle.bat -p carrier/android :app:testDebugUnitTest -x verifySmtWebBundle --tests com.morefunos.smt.storekernel.business.* --tests com.morefunos.smt.storekernel.StoreKernelFormalReceiptTest --tests com.morefunos.smt.storekernel.FormalAdminConfigSourceIntegrationTest --no-daemon
 ```
 
-Latest full native result at `0d5c18e`:
+Latest full native result at `863974f`:
 
-- 19 suites
-- 122 tests passed
+- 24 suites
+- 144 tests passed
 - 0 failures, 0 errors, 0 skipped
 - 12 dedicated `FormalCheckoutPaymentConfirmIntegrationTest` cases using real Room
 - 25 `StoreKernelFormalReceiptTest` cases, including same-worker stale ACK/release lease races
@@ -88,13 +88,13 @@ Latest full native result at `0d5c18e`:
 - `:app:lintDebug`: successful
 - `:app:assembleDebug -x verifySmtWebBundle --no-daemon`: successful, including desugaring, DEX, and APK packaging
 
-Latest V3 web result at the same code commit:
+Latest Admin result at the same code commit:
 
-- 31 test files
-- 600 tests passed
-- TypeScript typecheck successful
+- 40 test files
+- 284 tests passed
+- isolated strict TypeScript check for `pos-tender-policy-v1.ts` successful
 - Vite production build successful
-- only the pre-existing chunk-size advisory remained
+- only the pre-existing chunk-size advisory remained; the broad legacy Admin/Worker typecheck is not green because it imports existing Worker/Keeta typing debt
 
 The checkout persistence tests use Room and cover atomic commit/replay, forged review rejection, incomplete and mismatched read sets, malformed/trailing normalized intent, dependency advance, deadline expiry, injected failure after receipt with full rollback, display-sequence contention, Router lost-reply recovery from a durable receipt, and close/reopen of a file-backed database. They are not FakeGateway-only tests. The trusted authorities in this suite are test-injected and are not production-source proof.
 
@@ -157,15 +157,15 @@ No live endpoint is changed by this branch.
 - Device admission needs an MFK-native enrollment/authorization record. Admin ACK membership is only config-delivery evidence and is not authorization.
 - Staff authentication can consume the canonical `MFK_STAFF_AUTH_V1` verifier projection, and the value contract now enforces the 12-hour maximum; the real native verifier, session issuer/revoker, and persisted producer remain unbound and must expose no PINs to persistence or logs.
 - Owner-parent authorization is now device-local. The real account/password verifier, persisted authorization/session issuer, and revocation producer remain unbound and must not create or expose credentials.
-- `storeSettings.customerPaymentChannels` is a Customer electronic-channel configuration. It is not, by itself, proof of all-POS tender eligibility or settlement. The formal POS tender publication field/source must be bound explicitly and otherwise fails closed.
+- `storeSettings.customerPaymentChannels` is a Customer electronic-channel configuration and remains insufficient for all-POS tender eligibility or settlement. The explicit canonical `posTenders` publication and same-Room projector are now bound separately.
 - Admin `businessDay.cutoff` classifies the business date for reporting/history. Current accepted behavior does not establish an old-V2-style OPEN-only trading gate; no such gate may be invented.
 - The canonical source of `studentDiscountEligible` is not present in the published Admin contract. This is a money-policy/data decision; checkout must fail closed for Student Discount until the Owner selects a canonical eligibility field or publication rule.
 - Student discount still needs exact option/surcharge basis, odd-minor rounding, and stacking behavior against `riceballDrink`; the mapper does not invent those answers.
-- Electronic tender evidence is settled as `STAFF_CONFIRMED` after staff visual review. The production tender producer remains unbound; it must not claim provider verification, store screenshots, or duplicate payment on reconnect/session change.
-- The checkout handler ports and bridge now use real Room-backed security, quote, tender, Business Day, display allocation, and canonical Order read producers. What remains absent is production population: device enrollment, Owner/password authorization, staff PIN/session issue/revoke, canonical Admin POS-tender publication/projector, and Admin startup/doorbell convergence. Missing records fail closed.
+- Electronic tender evidence is settled as `STAFF_CONFIRMED` after staff visual review. The Room tender producer now consumes the explicit Admin policy; it must not claim provider verification, store screenshots, or duplicate payment on reconnect/session change.
+- The checkout handler ports and bridge now use real Room-backed security, quote, tender, Business Day, display allocation, and canonical Order read producers. What remains absent is production security population (device enrollment, Owner/password authorization, staff PIN/session issue/revoke), Admin startup/doorbell convergence, and registered public/native catalog plus checkout capability. Missing records fail closed.
 - `MFP_ORDER_COMMITTED_V1` and `MFP_PAYMENT_CONFIRMED_V1` are now inserted atomically with deterministic identities, but dispatcher consumers and print/projection acknowledgement semantics remain separate stages. Commit `3c0cd77` fences outbox ACK/release by the claim's monotonically increasing `attemptCount`; a callback from an expired lease cannot alter a reclaimed lease even when the worker identity is reused. Dispatchers must echo the claim item's positive `attemptCount` or fail closed.
 - No physical printer/device or live financial acceptance was run. Physical acceptance remains a separate gate.
 
 ## Next engineering action
 
-Obtain the approved device-enrollment and Owner/staff credential path, and decide/add the explicit Admin POS-tender publication field, before implementing their production writers. Then wire canonical Admin startup/doorbell convergence and run non-production bridge acceptance without a live charge. Continue one formal command family at a time through Orders/Dining and update each outbox dispatcher to echo the claimed attempt token. Do not claim production checkout, live payment, printer, or OTA acceptance from the test-only seeded bridge suite.
+Register the smallest authenticated native catalog-read plus checkout capability over the existing host core, and obtain the approved device-enrollment and Owner/staff credential path before implementing security population writers. Then wire canonical Admin startup/doorbell convergence and run non-production bridge acceptance without a live charge. Keep the Dining planner unregistered until the complete Order index and every membership writer share the same Dining CAS/bump; `DINING_FORMAL_ADMIT`, `DINING_ITEMS_ADD`, and empty-wait seating remain fail-closed. Update each outbox dispatcher to echo the claimed attempt token. Do not claim production checkout, live payment, printer, or OTA acceptance from test-only security records.

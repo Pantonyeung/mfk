@@ -78,7 +78,7 @@ Commit `a2a3194732ee10b136eb488dad408d0442e6546a` also freezes exact decimal-to-
 
 Commit `ce6769bb088c5d3bcf4df5270e204b1868eb54ee` adds the bounded Room-backed non-Student quote producer. It fresh-reads `ADMIN_ACTIVE_CONFIGURATION` and explicit `POS_TENDER_POLICY`, re-resolves supported PRODUCT/no-option/no-combo `WALK_IN` intent, ignores browser preview money, applies the current takeaway adjustment, and writes `FORMAL_QUOTE` with source revisions and expiry. Commit `bfff335004ea26972a3b721b99c78ce48e30bff1` adds the tender and Business Day readers/classifier. Cash maps to `CASH_COUNTED`; electronic tender maps to `STAFF_CONFIRMED`; neither path claims provider verification. The Business Day uses Admin timezone/cutoff without inventing an OPEN gate.
 
-These readers are complete, but the explicit Admin POS-tender publication field/projector is not. `customerPaymentChannels` and `paymentRefs` remain insufficient and cannot populate `POS_TENDER_POLICY` without an Owner-approved canonical field.
+Commit `df260fd12807e87ff83f20def57ee879f2bb98f2` completes the explicit Admin POS-tender publication field and same-Room projector. The typed initial policy enables stable IDs `CASH`, `ALIPAY`, `WECHAT_PAY`, `FPS`, and `PAYME`; Octopus and credit card are absent. Admin policy revision rollback or same-revision content conflict rejects, a valid publication atomically writes `ADMIN_ACTIVE_CONFIGURATION` plus `POS_TENDER_POLICY`, and removing a tender never deletes historical Payment references. `customerPaymentChannels` and `paymentRefs` remain insufficient and are not promoted.
 
 ## Stage 4 — One `CHECKOUT_PAYMENT_CONFIRM` handler
 
@@ -115,7 +115,7 @@ Commit `1e94181` freezes the resolved evidence and logout semantics. Tender mapp
 
 Commit `0d5c18e33b6d4aee59ddd66f69973c82e9196b28` binds the Room-backed security, quote, tender, Business Day, display allocation, and Payment Confirm handler to one high-level Android runtime bridge. The runtime can request a formal quote and submit/read a formal command, but cannot read named aggregates or operate receipts, inbox, outbox, or raw commits. Canonical tender choices travel with the same native quote response. Channel changes invalidate the quote, and generation fencing prevents stale quote/tender responses from replacing a newer validation.
 
-The bridge remains production-fail-closed because the security and tender aggregates have no approved production population writers. Non-Student behavior is source/Room verified with test-only seeded records; Student requests continue to fail closed because canonical eligibility and remaining money-policy decisions are unresolved.
+The bridge remains production-fail-closed because security aggregates have no approved production population writers and the public/native catalog plus checkout capability is not registered. Non-Student tender configuration is source/Room verified; security behavior still uses test-only seeded records. Student requests continue to fail closed because canonical eligibility and remaining money-policy decisions are unresolved.
 
 Known rejection paths must be durable and distinguishable from uncertainty. After any coordinator/transport exception, read back the receipt before returning `UNKNOWN`; stable Store Kernel conflicts map to durable known rejection only when no receipt exists and the failure is classified safe.
 
@@ -150,4 +150,4 @@ Progress one command family at a time through the existing formal router: order 
 3. Built V3 runtime bundle and Carrier packaging test without V2 fallback regression.
 4. Device/security/config-sync test using non-production credentials and no live charge.
 5. Physical printer/device acceptance as a separate gate.
-6. Explicit Owner release authorization before push-triggered publication, deploy, OTA, cutover, or merge.
+6. Source branch and Draft PR publication are authorized. Explicit Owner release authorization remains required before Candidate Publish, deploy, OTA activation, cutover, or merge.
