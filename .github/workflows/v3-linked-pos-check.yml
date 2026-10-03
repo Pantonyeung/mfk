@@ -1,0 +1,48 @@
+name: v3-linked-pos-check
+on:
+  push:
+    branches: [work/MFP-V3-LIVE-WIRING-2026-10-03]
+    paths:
+      - v3smt/**
+      - integrations/v3-linked*
+      - v3admin/src/formal-option-center.ts
+      - contracts/**
+      - .github/workflows/v3-linked-pos-check.yml
+  pull_request:
+    paths:
+      - v3smt/**
+      - integrations/v3-linked*
+      - v3admin/src/formal-option-center.ts
+      - contracts/**
+      - .github/workflows/v3-linked-pos-check.yml
+permissions:
+  contents: read
+concurrency:
+  group: v3-linked-pos-check-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: v3smt
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Verify POS and isolated connected test boundary
+        env:
+          MFP_SOURCE_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          npm ci --no-audit --no-fund
+          npm run typecheck
+          npm test
+          npm run build
+          VITE_MFP_V3_LINKED_TEST=1 npm run build
+          npm run verify:linked-build
+          npx --yes wrangler@4.146.0 deploy --config wrangler.linked-test.jsonc --dry-run --no-autoconfig

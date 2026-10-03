@@ -1,0 +1,27 @@
+{
+  "$schema": "https://raw.githubusercontent.com/cloudflare/workers-sdk/main/packages/wrangler/config-schema.json",
+  "name": "mfk-smt-web",
+  "main": "./src/linked-test-worker.ts",
+  "compatibility_date": "2026-09-25",
+  "workers_dev": true,
+  "preview_urls": true,
+  "keep_vars": true,
+  "vars": {
+    "MFK_BUILD_ID": "mfp-v3-linked-test",
+    "MFP_V3_LINKED_TEST_ENABLED": "1"
+  },
+  "version_metadata": {"binding": "MFK_VERSION"},
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": true
+  },
+  "durable_objects": {
+    "bindings": [
+      {"name": "ADMIN_SYNC", "class_name": "AdminSyncStore", "script_name": "mfk-admin"},
+      {"name": "CUSTOMER_RUNTIME", "class_name": "CustomerRuntimeStore", "script_name": "mfk-admin"}
+    ]
+  },
+  "routes": [{"pattern": "smt.morefunos.com", "custom_domain": true, "zone_name": "morefunos.com"}]
+}

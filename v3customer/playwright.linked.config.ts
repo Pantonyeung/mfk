@@ -1,0 +1,3 @@
+import {defineConfig} from '@playwright/test';
+const port=Number(process.env.PLAYWRIGHT_PORT??4196);
+export default defineConfig({testDir:'./test',testMatch:'linked-customer.spec.ts',timeout:30_000,fullyParallel:false,use:{baseURL:`http://127.0.0.1:${port}`,viewport:{width:390,height:844},launchOptions:{executablePath:process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE},trace:'retain-on-failure',screenshot:'only-on-failure'},webServer:{command:`VITE_MFP_V3_LINKED_TEST=1 npm run dev -- --host 127.0.0.1 --port ${port} --strictPort`,url:`http://127.0.0.1:${port}`,reuseExistingServer:false,timeout:60_000}});

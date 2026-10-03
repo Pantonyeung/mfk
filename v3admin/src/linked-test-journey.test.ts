@@ -54,6 +54,18 @@ describe('cross-surface real persistence contract',()=>{
   it('rejects different payload using an existing submission identity',async()=>{const {env,active}=await start(),input=intent(active.fingerprint);await gateway(env,'customer','/submit','POST',input);input.cart[0].quantity=2;expect((await gateway(env,'customer','/submit','POST',input)).status).toBe(409);});
   it.each(['price','menu','option','electronic','combo'])('rejects untrusted or unsupported submission: %s',async kind=>{const {env,active}=await start(),input:any=intent(active.fingerprint);if(kind==='price')input.cart[0].publishedUnitPriceMinor=1;if(kind==='menu')input.menuRevision='stale';if(kind==='option')input.cart[0].selections=[{optionGroupId:'missing',optionId:'missing',optionName:'missing'}];if(kind==='electronic'){input.checkout.paymentMethod='ELECTRONIC';input.checkout.paymentChannelId='FPS';}if(kind==='combo')input.cart[0].selectedVariationId='invented';expect((await gateway(env,'customer','/submit','POST',input)).status).toBe(400);expect((await(await gateway(env,'pos','/requests')).json()).requests.length).toBe(0);});
   it('never accepts a synthetic COMMITTED or CONFIRMED acknowledgement',async()=>{const {env,active}=await start(),input=intent(active.fingerprint);await gateway(env,'customer','/submit','POST',input);for(const reviewState of ['COMMITTED','CONFIRMED','PAID'])expect((await gateway(env,'pos','/review','POST',{...input,reviewState})).status).toBe(400);});
+  it('projects rejection consistently after POS has already seen a request, including replay and repeated review',async()=>{
+    const {env,active}=await start(),input=intent(active.fingerprint);
+    expect((await gateway(env,'customer','/submit','POST',input)).status).toBe(202);
+    expect((await gateway(env,'pos','/review','POST',{...input,reviewState:'SEEN'})).status).toBe(200);
+    const rejected=await gateway(env,'pos','/review','POST',{...input,reviewState:'REJECTED'});expect(rejected.status).toBe(200);
+    const expected={state:'REJECTED',reviewState:'REJECTED',message:'店舖未能接受呢個要求',formalOrderCreated:false,paymentConfirmed:false};
+    expect(await rejected.json()).toMatchObject(expected);
+    expect(await(await gateway(env,'customer','/readback','POST',input)).json()).toMatchObject(expected);
+    expect(await(await gateway(env,'customer','/submit','POST',input)).json()).toMatchObject(expected);
+    expect(await(await gateway(env,'pos','/review','POST',{...input,reviewState:'SEEN'})).json()).toMatchObject(expected);
+    expect((await(await gateway(env,'pos','/requests')).json()).requests[0]).toMatchObject(expected);
+  });
   it('persists an explicit rejection and returns it to the customer',async()=>{const {env,active}=await start(),input=intent(active.fingerprint);await gateway(env,'customer','/submit','POST',input);await gateway(env,'pos','/review','POST',{...input,reviewState:'REJECTED'});expect((await(await gateway(env,'customer','/readback','POST',input)).json()).state).toBe('REJECTED');});
   it.each(['/session','/requests','/review','/api/admin-browser/active','/api/keeta/admin/status'])('does not expose privileged paths through the Customer surface: %s',async path=>{const {env}=await start();expect((await gateway(env,'customer',path,'POST',{})).status).toBe(403);});
   it('keeps old generic providers closed and original test tokens invalid for MF01',async()=>{const {req,session}=await start();for(const path of ['/api/admin-sync/active','/api/projection/orders','/api/customer/orders/submit'])expect((await req(path,'GET',undefined,session.sessionToken)).status).toBe(503);expect((await req('/api/admin-browser/active','GET',undefined,session.sessionToken)).status).toBe(401);});

@@ -7,7 +7,9 @@
     "dev": "vite --host 0.0.0.0",
     "build": "vite build",
     "typecheck": "tsc --noEmit",
-    "test:visual": "playwright test"
+    "test:visual": "playwright test",
+    "test": "node --test test/*.checks.mjs",
+    "test:linked:ui": "playwright test --config playwright.linked.config.ts"
   },
   "dependencies": {
     "react": "19.2.8",

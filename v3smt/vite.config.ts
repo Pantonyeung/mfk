@@ -8,6 +8,7 @@ const buildId=(process.env.MFP_BUILD_ID??`mfp-v3-${sourceSha.slice(0,12)}`).trim
 if(!/^[A-Za-z0-9._-]{1,160}$/.test(buildId))throw new Error('MFP_BUILD_ID_INVALID');
 const buildIdentity=Object.freeze({
   target:'MFP_V3',sourceSha,buildId,
+  linkedTestEnabled:process.env.VITE_MFP_V3_LINKED_TEST==='1',
   builtAt:process.env.MFP_BUILD_TIMESTAMP?.trim()||null,
 });
 

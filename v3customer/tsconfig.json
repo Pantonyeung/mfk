@@ -8,7 +8,9 @@
     "noEmit": true,
     "jsx": "react-jsx",
     "skipLibCheck": true,
-    "allowSyntheticDefaultImports": true
+    "allowSyntheticDefaultImports": true,
+    "allowImportingTsExtensions": true,
+    "types": ["vite/client"]
   },
   "include": ["src"]
 }

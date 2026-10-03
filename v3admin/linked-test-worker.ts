@@ -4,7 +4,7 @@ import {LINKED_SCOPE,LINKED_HEADER,businessSnapshot,catalogProjection,linkedGate
 export {KeetaRuntimeStore};
 declare const WebSocketPair:any;
 async function hash(value:string){return [...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(value)))].map(v=>v.toString(16).padStart(2,'0')).join('');}
-function publicState(row:any){return {submissionId:row.submissionId,state:row.state,reviewState:row.linkedReviewState??'UNSEEN',reviewedAt:row.linkedReviewedAt??null,message:row.linkedReviewState==='SEEN'?'POS 已查看點餐要求；尚未成交或收款':row.state==='REJECTED'?'店舖未能接受呢個要求':'已送達共用待處理單；等候 POS 查看',formalOrderCreated:false,paymentConfirmed:false};}
+function publicState(row:any){const rejected=row.state==='REJECTED';return {submissionId:row.submissionId,state:row.state,reviewState:rejected?'REJECTED':row.linkedReviewState??'UNSEEN',reviewedAt:row.linkedReviewedAt??null,message:rejected?'店舖未能接受呢個要求':row.linkedReviewState==='SEEN'?'POS 已查看點餐要求；尚未成交或收款':'已送達共用待處理單；等候 POS 查看',formalOrderCreated:false,paymentConfirmed:false};}
 function socket(state:any){const pair=new WebSocketPair();state.acceptWebSocket(pair[1]);pair[1].send(JSON.stringify({type:'REFRESH_REQUIRED'}));return new Response(null,{status:101,webSocket:pair[0]} as any);}
 function notify(state:any){for(const ws of state.getWebSockets()){try{ws.send(JSON.stringify({type:'REFRESH_REQUIRED'}));}catch{}}}
 /** Same published Admin authority and namespace; only an explicitly isolated test instance gets anonymous sessions. */

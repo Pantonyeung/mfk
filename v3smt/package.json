@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "vite build",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "verify:linked-build": "node scripts/verify-linked-build.mjs"
   },
   "dependencies": {
     "@tanstack/react-query": "5.90.3",

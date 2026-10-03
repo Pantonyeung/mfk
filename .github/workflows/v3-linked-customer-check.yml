@@ -1,0 +1,39 @@
+name: V3 linked Customer checks
+on:
+  push:
+    branches:
+      - 'work/MFP-V3-LIVE-WIRING-2026-10-03'
+  pull_request:
+    paths:
+      - 'v3customer/**'
+      - 'integrations/v3-linked-*.ts'
+      - 'contracts/customer-cloud-v1.ts'
+      - 'v3admin/linked-test-worker.ts'
+      - '.github/workflows/v3-linked-customer-check.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  customer-source:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: v3customer
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: npm install --no-package-lock
+      - run: npm run typecheck
+      - run: npm test
+      - name: Build unchanged flag-off shell
+        run: VITE_MFP_V3_LINKED_TEST=0 npm run build
+      - name: Build explicitly connected test UI
+        run: VITE_MFP_V3_LINKED_TEST=1 npm run build
+      - name: Validate existing worker bindings without deployment
+        run: npx --yes wrangler@4.146.0 deploy --dry-run --config wrangler.linked-test.jsonc --outdir /tmp/customer-linked-dry-run
+        env:
+          WRANGLER_SEND_METRICS: 'false'
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:linked:ui

@@ -4,6 +4,7 @@ const port=Number(process.env.PLAYWRIGHT_PORT??4193);
 
 export default defineConfig({
   testDir:'./test',
+  testIgnore:'linked-customer.spec.ts',
   timeout:30_000,
   fullyParallel:false,
   use:{
